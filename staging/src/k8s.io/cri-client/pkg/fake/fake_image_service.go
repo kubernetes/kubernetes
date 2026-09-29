@@ -58,6 +58,11 @@ func (f *RemoteRuntime) PullImage(ctx context.Context, req *kubeapi.PullImageReq
 	}, nil
 }
 
+// PullSecurityProfile pulls a security profile with authentication config.
+func (f *RemoteRuntime) PullSecurityProfile(ctx context.Context, req *kubeapi.PullSecurityProfileRequest) (*kubeapi.PullSecurityProfileResponse, error) {
+	return f.ImageService.PullSecurityProfile(ctx, req.Image, req.Auth, req.SandboxConfig, req.ProfileKind)
+}
+
 // RemoveImage removes the image.
 // This call is idempotent, and must not return an error if the image has
 // already been removed.

@@ -1845,12 +1845,13 @@ var RuntimeService_ServiceDesc = grpc.ServiceDesc{
 }
 
 const (
-	ImageService_ListImages_FullMethodName   = "/runtime.v1.ImageService/ListImages"
-	ImageService_StreamImages_FullMethodName = "/runtime.v1.ImageService/StreamImages"
-	ImageService_ImageStatus_FullMethodName  = "/runtime.v1.ImageService/ImageStatus"
-	ImageService_PullImage_FullMethodName    = "/runtime.v1.ImageService/PullImage"
-	ImageService_RemoveImage_FullMethodName  = "/runtime.v1.ImageService/RemoveImage"
-	ImageService_ImageFsInfo_FullMethodName  = "/runtime.v1.ImageService/ImageFsInfo"
+	ImageService_ListImages_FullMethodName          = "/runtime.v1.ImageService/ListImages"
+	ImageService_StreamImages_FullMethodName        = "/runtime.v1.ImageService/StreamImages"
+	ImageService_ImageStatus_FullMethodName         = "/runtime.v1.ImageService/ImageStatus"
+	ImageService_PullImage_FullMethodName           = "/runtime.v1.ImageService/PullImage"
+	ImageService_PullSecurityProfile_FullMethodName = "/runtime.v1.ImageService/PullSecurityProfile"
+	ImageService_RemoveImage_FullMethodName         = "/runtime.v1.ImageService/RemoveImage"
+	ImageService_ImageFsInfo_FullMethodName         = "/runtime.v1.ImageService/ImageFsInfo"
 )
 
 // ImageServiceClient is the client API for ImageService service.
@@ -1880,6 +1881,56 @@ type ImageServiceClient interface {
 	ImageStatus(ctx context.Context, in *ImageStatusRequest, opts ...grpc.CallOption) (*ImageStatusResponse, error)
 	// PullImage pulls an image with authentication config.
 	PullImage(ctx context.Context, in *PullImageRequest, opts ...grpc.CallOption) (*PullImageResponse, error)
+	// PullSecurityProfile pulls a security profile with authentication config
+	// and caches it in the runtime's storage, if it is not already present.
+	// The pulled profile is applied by passing its reference in
+	// SecurityProfile.oci_ref to RunPodSandbox or CreateContainer.
+	//
+	// The reference must resolve to an image manifest (an image index is
+	// rejected) describing an OCI artifact with exactly one layer. The layer
+	// blob is the raw profile document, not a tar archive, and runtimes must
+	// not require a particular layer media type. The runtime identifies the
+	// kind from the manifest's config media type (see SecurityProfileKind).
+	// If the config is the empty descriptor (application/vnd.oci.empty.v1+json),
+	// the manifest's artifactType must be the kind's config media type
+	// instead; if both are set, they must match.
+	// Runtimes must enforce a maximum size of the profile layer (1 MiB
+	// recommended as the default), checking the descriptor size before
+	// downloading and the bytes read while downloading. The content is valid
+	// if it passes the strict decoding and artifact validation of
+	// sigs.k8s.io/security-profiles-merger. The manifest, layer count, size,
+	// and content are validated on every call, regardless of how the content
+	// got into the runtime's storage.
+	//
+	// The runtime owns the lifecycle of pulled profiles. Pulled profiles must
+	// not be returned by ListImages or StreamImages; content pulled with
+	// PullImage, for example for an image volume, is not affected, even if
+	// it is the same artifact, so runtimes that keep both in one store must
+	// track which call pulled the content. Runtimes look up pulled profiles
+	// by the digest of the reference, whatever its algorithm. The kubelet
+	// does not pass profile references to ImageStatus or RemoveImage and
+	// does not garbage collect profiles.
+	// The kubelet may call PullSecurityProfile repeatedly for the same
+	// reference, and a call for a present profile must not contact the
+	// registry, unless the runtime has to verify the profile against a
+	// signature policy that applies to this request but not to the earlier
+	// pull. Runtimes should keep profiles referenced by existing
+	// sandboxes; an evicted profile is pulled again on the next call.
+	//
+	// Registry unavailability, signature validation failures, and permanent
+	// rejections are reported with the well-known error messages
+	// RegistryUnavailable, SignatureValidationFailed, and
+	// SecurityProfileInvalid as the prefix of the gRPC status message.
+	// SecurityProfileInvalid must only be used for properties of the request
+	// or the artifact itself: an unsupported kind, a reference that is not
+	// canonical and digest-pinned, the manifest, the media type, the layer
+	// count, the size, or the content. The kubelet treats
+	// SecurityProfileInvalid and the gRPC code Unimplemented as permanent and
+	// retries all other errors with backoff, including authentication and
+	// authorization failures.
+	// Feature gate: SecurityProfileOCI
+	// See https://kep.k8s.io/6061 for more details.
+	PullSecurityProfile(ctx context.Context, in *PullSecurityProfileRequest, opts ...grpc.CallOption) (*PullSecurityProfileResponse, error)
 	// RemoveImage removes the image.
 	// This call is idempotent, and must not return an error if the image has
 	// already been removed.
@@ -1953,6 +2004,16 @@ func (c *imageServiceClient) PullImage(ctx context.Context, in *PullImageRequest
 	return out, nil
 }
 
+func (c *imageServiceClient) PullSecurityProfile(ctx context.Context, in *PullSecurityProfileRequest, opts ...grpc.CallOption) (*PullSecurityProfileResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(PullSecurityProfileResponse)
+	err := c.cc.Invoke(ctx, ImageService_PullSecurityProfile_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *imageServiceClient) RemoveImage(ctx context.Context, in *RemoveImageRequest, opts ...grpc.CallOption) (*RemoveImageResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(RemoveImageResponse)
@@ -2000,6 +2061,56 @@ type ImageServiceServer interface {
 	ImageStatus(context.Context, *ImageStatusRequest) (*ImageStatusResponse, error)
 	// PullImage pulls an image with authentication config.
 	PullImage(context.Context, *PullImageRequest) (*PullImageResponse, error)
+	// PullSecurityProfile pulls a security profile with authentication config
+	// and caches it in the runtime's storage, if it is not already present.
+	// The pulled profile is applied by passing its reference in
+	// SecurityProfile.oci_ref to RunPodSandbox or CreateContainer.
+	//
+	// The reference must resolve to an image manifest (an image index is
+	// rejected) describing an OCI artifact with exactly one layer. The layer
+	// blob is the raw profile document, not a tar archive, and runtimes must
+	// not require a particular layer media type. The runtime identifies the
+	// kind from the manifest's config media type (see SecurityProfileKind).
+	// If the config is the empty descriptor (application/vnd.oci.empty.v1+json),
+	// the manifest's artifactType must be the kind's config media type
+	// instead; if both are set, they must match.
+	// Runtimes must enforce a maximum size of the profile layer (1 MiB
+	// recommended as the default), checking the descriptor size before
+	// downloading and the bytes read while downloading. The content is valid
+	// if it passes the strict decoding and artifact validation of
+	// sigs.k8s.io/security-profiles-merger. The manifest, layer count, size,
+	// and content are validated on every call, regardless of how the content
+	// got into the runtime's storage.
+	//
+	// The runtime owns the lifecycle of pulled profiles. Pulled profiles must
+	// not be returned by ListImages or StreamImages; content pulled with
+	// PullImage, for example for an image volume, is not affected, even if
+	// it is the same artifact, so runtimes that keep both in one store must
+	// track which call pulled the content. Runtimes look up pulled profiles
+	// by the digest of the reference, whatever its algorithm. The kubelet
+	// does not pass profile references to ImageStatus or RemoveImage and
+	// does not garbage collect profiles.
+	// The kubelet may call PullSecurityProfile repeatedly for the same
+	// reference, and a call for a present profile must not contact the
+	// registry, unless the runtime has to verify the profile against a
+	// signature policy that applies to this request but not to the earlier
+	// pull. Runtimes should keep profiles referenced by existing
+	// sandboxes; an evicted profile is pulled again on the next call.
+	//
+	// Registry unavailability, signature validation failures, and permanent
+	// rejections are reported with the well-known error messages
+	// RegistryUnavailable, SignatureValidationFailed, and
+	// SecurityProfileInvalid as the prefix of the gRPC status message.
+	// SecurityProfileInvalid must only be used for properties of the request
+	// or the artifact itself: an unsupported kind, a reference that is not
+	// canonical and digest-pinned, the manifest, the media type, the layer
+	// count, the size, or the content. The kubelet treats
+	// SecurityProfileInvalid and the gRPC code Unimplemented as permanent and
+	// retries all other errors with backoff, including authentication and
+	// authorization failures.
+	// Feature gate: SecurityProfileOCI
+	// See https://kep.k8s.io/6061 for more details.
+	PullSecurityProfile(context.Context, *PullSecurityProfileRequest) (*PullSecurityProfileResponse, error)
 	// RemoveImage removes the image.
 	// This call is idempotent, and must not return an error if the image has
 	// already been removed.
@@ -2035,6 +2146,9 @@ func (UnimplementedImageServiceServer) ImageStatus(context.Context, *ImageStatus
 }
 func (UnimplementedImageServiceServer) PullImage(context.Context, *PullImageRequest) (*PullImageResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method PullImage not implemented")
+}
+func (UnimplementedImageServiceServer) PullSecurityProfile(context.Context, *PullSecurityProfileRequest) (*PullSecurityProfileResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method PullSecurityProfile not implemented")
 }
 func (UnimplementedImageServiceServer) RemoveImage(context.Context, *RemoveImageRequest) (*RemoveImageResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method RemoveImage not implemented")
@@ -2128,6 +2242,24 @@ func _ImageService_PullImage_Handler(srv interface{}, ctx context.Context, dec f
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ImageService_PullSecurityProfile_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PullSecurityProfileRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ImageServiceServer).PullSecurityProfile(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ImageService_PullSecurityProfile_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ImageServiceServer).PullSecurityProfile(ctx, req.(*PullSecurityProfileRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _ImageService_RemoveImage_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(RemoveImageRequest)
 	if err := dec(in); err != nil {
@@ -2182,6 +2314,10 @@ var ImageService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "PullImage",
 			Handler:    _ImageService_PullImage_Handler,
+		},
+		{
+			MethodName: "PullSecurityProfile",
+			Handler:    _ImageService_PullSecurityProfile_Handler,
 		},
 		{
 			MethodName: "RemoveImage",

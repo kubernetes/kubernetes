@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strings"
 	"sync/atomic"
 	"time"
 
@@ -36,6 +37,7 @@ import (
 
 	internalapi "k8s.io/cri-api/pkg/apis"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
+	crierrors "k8s.io/cri-api/pkg/errors"
 	"k8s.io/klog/v2"
 
 	"k8s.io/cri-client/pkg/util"
@@ -354,6 +356,52 @@ func (r *remoteImageService) pullImageV1(ctx context.Context, image *runtimeapi.
 	}
 
 	return resp.ImageRef, nil
+}
+
+// PullSecurityProfile pulls a security profile with authentication config.
+// Unlike PullImage, it is bound by the runtime request timeout, because
+// profile artifacts are small.
+func (r *remoteImageService) PullSecurityProfile(ctx context.Context, image *runtimeapi.ImageSpec, auth *runtimeapi.AuthConfig, podSandboxConfig *runtimeapi.PodSandboxConfig, kind runtimeapi.SecurityProfileKind) (*runtimeapi.PullSecurityProfileResponse, error) {
+	ctx, cancel := context.WithTimeout(ctx, r.timeout)
+	defer cancel()
+
+	resp, err := r.imageClient.PullSecurityProfile(ctx, &runtimeapi.PullSecurityProfileRequest{
+		Image:         image,
+		Auth:          auth,
+		SandboxConfig: podSandboxConfig,
+		ProfileKind:   kind,
+	})
+	if err != nil {
+		logger := klog.FromContext(ctx)
+		logger.Error(err, "PullSecurityProfile from image service failed", "image", image.Image, "kind", kind)
+
+		// Strip the status code from unknown errors, like PullImage does,
+		// and from any error carrying a well-known error message, whatever
+		// its code, so that callers can match the message prefix.
+		statusErr, ok := status.FromError(err)
+		if ok && (statusErr.Code() == codes.Unknown || hasWellKnownPullErrorPrefix(statusErr.Message())) {
+			return nil, errors.New(statusErr.Message())
+		}
+
+		return nil, err
+	}
+
+	return resp, nil
+}
+
+// hasWellKnownPullErrorPrefix returns true if msg starts with one of the
+// well-known error messages of the PullSecurityProfile RPC.
+func hasWellKnownPullErrorPrefix(msg string) bool {
+	for _, wellKnown := range []error{
+		crierrors.ErrRegistryUnavailable,
+		crierrors.ErrSignatureValidationFailed,
+		crierrors.ErrSecurityProfileInvalid,
+	} {
+		if strings.HasPrefix(msg, wellKnown.Error()) {
+			return true
+		}
+	}
+	return false
 }
 
 // RemoveImage removes the image.

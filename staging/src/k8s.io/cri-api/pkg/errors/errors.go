@@ -24,10 +24,10 @@ import (
 )
 
 var (
-	// ErrRegistryUnavailable - Get http error on the PullImage RPC call.
+	// ErrRegistryUnavailable - Get http error on the PullImage or PullSecurityProfile RPC call.
 	ErrRegistryUnavailable = errors.New("RegistryUnavailable")
 
-	// ErrSignatureValidationFailed - Unable to validate the image signature on the PullImage RPC call.
+	// ErrSignatureValidationFailed - Unable to validate the image or profile signature on the PullImage or PullSecurityProfile RPC call.
 	ErrSignatureValidationFailed = errors.New("SignatureValidationFailed")
 
 	// ErrRROUnsupported - Unable to enforce recursive readonly mounts
@@ -35,6 +35,11 @@ var (
 
 	// ErrImageVolumeMountFailed - Unable to mount an image volume.
 	ErrImageVolumeMountFailed = errors.New("ImageVolumeMountFailed")
+
+	// ErrSecurityProfileInvalid - The PullSecurityProfile RPC call rejected
+	// the profile permanently, for example because of a wrong config media
+	// type, an oversized artifact, or invalid content.
+	ErrSecurityProfileInvalid = errors.New("SecurityProfileInvalid")
 )
 
 // IsNotFound returns a boolean indicating whether the error
