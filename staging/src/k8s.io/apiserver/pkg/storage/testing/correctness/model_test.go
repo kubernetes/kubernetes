@@ -27,7 +27,8 @@ import (
 )
 
 func TestCorrectness(t *testing.T) {
-	model := NewEmptyModel("", func() runtime.Object { return &example.Pod{} })
+	versioner := &storage.APIObjectVersioner{}
+	model := NewEmptyModel("", func() runtime.Object { return &example.Pod{} }, func() runtime.Object { return &example.PodList{} }, versioner)
 
 	var expectEvents, gotEvents []watch.Event
 	for _, step := range correctnessTestSteps() {

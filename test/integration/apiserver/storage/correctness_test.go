@@ -47,7 +47,16 @@ var (
 		Weight: 10,
 	}, {
 		Choice: RequestTypeGet,
-		Weight: 25,
+		Weight: 10,
+	}, {
+		Choice: RequestTypeList,
+		Weight: 5,
+	}, {
+		Choice: RequestTypeListNamespace,
+		Weight: 5,
+	}, {
+		Choice: RequestTypeListNonRecursive,
+		Weight: 5,
 	}, {
 		Choice: RequestTypeUpdate,
 		Weight: 20,
@@ -120,11 +129,12 @@ func TestCorrectness(t *testing.T) {
 
 func testCorrectness(t *testing.T, store storage.Interface, storagePrefix string) {
 	ctx := t.Context()
+	versioner := store.Versioner()
 
 	list := &api.PodList{}
 	err := store.GetList(ctx, "/pods", storage.ListOptions{Recursive: true, Predicate: storage.Everything}, list)
 	require.NoError(t, err)
-	initialState, err := correctness.NewModelFromStorage(storagePrefix, list, func() runtime.Object { return &api.Pod{} }, cacheKeyFunc)
+	initialState, err := correctness.NewModelFromStorage(storagePrefix, list, func() runtime.Object { return &api.Pod{} }, func() runtime.Object { return &api.PodList{} }, cacheKeyFunc, versioner)
 	require.NoError(t, err)
 
 	stopWatches := make(chan struct{})
@@ -169,7 +179,7 @@ func testCorrectness(t *testing.T, store storage.Interface, storagePrefix string
 	require.Len(t, linearizations, 1, "expected one partition")
 	require.Len(t, linearizations[0], 1, "expected one linearization")
 	history := changesFromLinearization(initialState, operations, linearizations[0][0])
-	validator := correctness.NewWatchValidator(store.Versioner(), cacheKeyFunc, history)
+	validator := correctness.NewWatchValidator(versioner, cacheKeyFunc, history)
 	for _, w := range watches {
 		require.NoError(t, validator.ValidateWatch(w.Request, w.Response))
 	}

@@ -19,7 +19,9 @@ package correctness
 import (
 	"context"
 	"fmt"
+	"maps"
 	"reflect"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -29,13 +31,12 @@ import (
 )
 
 // NewModelFromStorage initializes a State from storage by listing all objects under prefix.
-func NewModelFromStorage(prefix string, list runtime.Object, newFunc func() runtime.Object, keyFunc func(runtime.Object) (string, error)) (*Model, error) {
-	state := NewEmptyModel(prefix, newFunc)
+func NewModelFromStorage(prefix string, list runtime.Object, newFunc, newListFunc func() runtime.Object, keyFunc func(runtime.Object) (string, error), versioner storage.Versioner) (*Model, error) {
+	state := NewEmptyModel(prefix, newFunc, newListFunc, versioner)
 	accessor, err := meta.ListAccessor(list)
 	if err != nil {
 		return nil, err
 	}
-	var versioner = storage.APIObjectVersioner{}
 	rvStr := accessor.GetResourceVersion()
 	if len(rvStr) > 0 {
 		state.ResourceVersion, err = versioner.ParseResourceVersion(rvStr)
@@ -58,12 +59,14 @@ func NewModelFromStorage(prefix string, list runtime.Object, newFunc func() runt
 }
 
 // NewEmptyModel returns a new Model with no items.
-func NewEmptyModel(prefix string, newFunc func() runtime.Object) *Model {
+func NewEmptyModel(prefix string, newFunc, newListFunc func() runtime.Object, versioner storage.Versioner) *Model {
 	return &Model{
 		Prefix:          prefix,
 		ResourceVersion: 1,
 		Items:           make(map[string]runtime.Object),
 		NewFunc:         newFunc,
+		NewListFunc:     newListFunc,
+		Versioner:       versioner,
 	}
 }
 
@@ -72,7 +75,9 @@ type Model struct {
 	Items           map[string]runtime.Object
 	ResourceVersion uint64
 	Prefix          string
+	Versioner       storage.Versioner
 	NewFunc         func() runtime.Object
+	NewListFunc     func() runtime.Object
 }
 
 func (s *Model) Clone() *Model {
@@ -81,6 +86,8 @@ func (s *Model) Clone() *Model {
 		ResourceVersion: s.ResourceVersion,
 		Prefix:          s.Prefix,
 		NewFunc:         s.NewFunc,
+		NewListFunc:     s.NewListFunc,
+		Versioner:       s.Versioner,
 	}
 	for k, v := range s.Items {
 		if v != nil {
@@ -108,6 +115,8 @@ func (s *Model) Step(input Request, output Response) (ok bool, next *Model, chan
 		expected, change = next.delete(context.Background(), input.Key, input.Delete.Preconditions, nil)
 	case OpGet:
 		expected = s.get(input.Key, input.Get.Options)
+	case OpList:
+		expected = s.list(input.Key, input.List.Options)
 	case OpUpdate:
 		next = s.Clone()
 		expected, change = next.update(context.Background(), input.Key, input.Update.IgnoreNotFound, input.Update.Preconditions, input.Update.UpdateFunc, input.Update.CachedExistingObject)
@@ -201,6 +210,24 @@ func (s *Model) get(key string, opts storage.GetOptions) Response {
 		return Response{Object: nil, Err: storage.NewKeyNotFoundError(s.Prefix+key, 0)}
 	}
 	return Response{Object: stored.DeepCopyObject(), Err: nil}
+}
+
+func (s *Model) list(key string, opts storage.ListOptions) Response {
+	prefix := strings.TrimSuffix(key, "/") + "/"
+	var items []runtime.Object
+	for _, k := range slices.Sorted(maps.Keys(s.Items)) {
+		if (opts.Recursive && strings.HasPrefix(k, prefix)) || (!opts.Recursive && k == key) {
+			items = append(items, s.Items[k].DeepCopyObject())
+		}
+	}
+	list := s.NewListFunc()
+	if err := meta.SetList(list, items); err != nil {
+		return Response{Object: nil, Err: err}
+	}
+	if err := s.Versioner.UpdateList(list, s.ResourceVersion, "", nil); err != nil {
+		return Response{Object: nil, Err: err}
+	}
+	return Response{Object: list, Err: nil}
 }
 
 func (s *Model) delete(ctx context.Context, key string, preconditions *storage.Preconditions, validateDeletion storage.ValidateObjectFunc) (Response, *Change) {

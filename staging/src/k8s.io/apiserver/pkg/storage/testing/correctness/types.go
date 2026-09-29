@@ -42,6 +42,7 @@ type Request struct {
 	Key    string
 	Create CreateRequest
 	Get    GetRequest
+	List   ListRequest
 	Delete DeleteRequest
 	Update UpdateRequest
 }
@@ -54,6 +55,11 @@ type CreateRequest struct {
 // GetRequest contains parameters specific to Get operations.
 type GetRequest struct {
 	Options storage.GetOptions
+}
+
+// ListRequest contains parameters specific to GetList operations.
+type ListRequest struct {
+	Options storage.ListOptions
 }
 
 // DeleteRequest contains parameters specific to Delete operations.
@@ -96,6 +102,13 @@ func (r Request) Describe(output Response) string {
 			return fmt.Sprintf("%s(%s) -> %v", r.Op, r.Key, output.Err)
 		}
 	}
+	if r.Op == OpList {
+		accessor, err := meta.ListAccessor(output.Object)
+		if err != nil {
+			panic(err)
+		}
+		return fmt.Sprintf("%s(%s) -> RV: %s, Items: %d", r.Op, r.Key, accessor.GetResourceVersion(), meta.LenList(output.Object))
+	}
 	accessor, err := meta.Accessor(output.Object)
 	if err != nil {
 		panic(err)
@@ -129,6 +142,7 @@ const (
 	OpCreate OpType = "Create"
 	OpDelete OpType = "Delete"
 	OpGet    OpType = "Get"
+	OpList   OpType = "List"
 	OpUpdate OpType = "Update"
 )
 
