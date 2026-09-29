@@ -142,7 +142,11 @@ func (s *Model) update(ctx context.Context, key string, ignoreNotFound bool, pre
 		currentRV = 0
 	} else {
 		currentObj = stored.DeepCopyObject()
-		currentRV = s.ResourceVersion
+		rv, err := s.Versioner.ObjectResourceVersion(stored)
+		if err != nil {
+			return Response{Object: nil, Err: err}, nil
+		}
+		currentRV = rv
 	}
 
 	if err := preconditions.Check(s.Prefix+key, currentObj); err != nil {
@@ -205,7 +209,7 @@ func (s *Model) get(key string, opts storage.GetOptions) Response {
 	stored, exists := s.Items[key]
 	if !exists {
 		if opts.IgnoreNotFound {
-			return Response{Object: nil, Err: nil}
+			return Response{Object: s.NewFunc(), Err: nil}
 		}
 		return Response{Object: nil, Err: storage.NewKeyNotFoundError(s.Prefix+key, 0)}
 	}
