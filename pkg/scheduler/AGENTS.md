@@ -39,7 +39,7 @@ pkg/scheduler/
 │   ├── api_cache/                 # API cache for async/batched operations
 │   └── api_dispatcher/            # API dispatcher for async API calls
 ├── framework/
-│   ├── plugins/                   # In-tree plugins (filtering, scoring, binding, preemption, etc.)
+│   ├── plugins/                   # In-tree plugins (see framework/plugins/dynamicresources/AGENTS.md)
 │   ├── runtime/                   # Framework implementation and plugin execution runner
 │   ├── preemption/                # Preemption interface & candidate evaluation algorithms
 │   ├── parallelize/               # Chunking & parallel evaluation helpers for node iterations

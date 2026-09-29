@@ -35,7 +35,7 @@ pkg/scheduler/framework/
 ├── sorted_nodes.go              # Min-heap and sorting primitives for scored candidate nodes
 ├── parallelize/                 # Parallel chunk worker pool execution (Parallelizer, Until)
 ├── runtime/                     # Framework initialization, plugin registry, and extension point runner pipeline
-├── plugins/                     # In-tree plugin implementations (NodeResourcesFit, NodeAffinity, etc.)
+├── plugins/                     # In-tree plugin implementations (see plugins/dynamicresources/AGENTS.md)
 ├── preemption/                  # Preemption logic, candidate generation, and victim eviction algorithms
 ├── autoscaler_contract/         # Interfaces and contracts for Cluster Autoscaler integration
 ├── api_calls/                   # Helpers for asynchronous/batched API interactions
