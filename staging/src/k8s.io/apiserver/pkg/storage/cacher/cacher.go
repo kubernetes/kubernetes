@@ -853,20 +853,20 @@ func (c *Cacher) GetList(ctx context.Context, key string, opts storage.ListOptio
 			}
 		}
 	}
-    span.AddEvent("Filtered items", attribute.Int("count", listVal.Len()))
-    if c.versioner != nil {
-        continueValue, remainingItemCount, err := storage.PrepareContinueToken(lastSelectedObjectKey, key, int64(resp.ResourceVersion), totalCount, hasMoreListItems, opts)
-        if err != nil {
-            return err
-        }
+	span.AddEvent("Filtered items", attribute.Int("count", listVal.Len()))
+	if c.versioner != nil {
+		continueValue, remainingItemCount, err := storage.PrepareContinueToken(lastSelectedObjectKey, key, int64(resp.ResourceVersion), totalCount, hasMoreListItems, opts)
+		if err != nil {
+			return err
+		}
 
-        if err = c.versioner.UpdateList(listObj, resp.ResourceVersion, continueValue, remainingItemCount); err != nil {
-            return err
-        }
-    }
-    opts.Predicate.SetShardInfoOnList(listObj)
-    metrics.RecordListCacheMetrics(c.groupResource, indexUsed, numFetched, listVal.Len())
-    return nil
+		if err = c.versioner.UpdateList(listObj, resp.ResourceVersion, continueValue, remainingItemCount); err != nil {
+			return err
+		}
+	}
+	opts.Predicate.SetShardInfoOnList(listObj)
+	metrics.RecordListCacheMetrics(c.groupResource, indexUsed, numFetched, listVal.Len())
+	return nil
 }
 
 // baseObjectThreadUnsafe omits locking for cachingObject.
