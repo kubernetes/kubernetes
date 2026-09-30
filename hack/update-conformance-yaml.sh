@@ -25,3 +25,4 @@ cd "${KUBE_ROOT}"
 test/conformance/gen-conformance-yaml.sh
 # replace checked-in yaml
 cp _output/conformance.yaml test/conformance/testdata/conformance.yaml
+cp _output/future-conformance.yaml test/conformance/testdata/future-conformance.yaml
