@@ -1916,6 +1916,25 @@ func TestSubmitPodGroupAlgorithmResult(t *testing.T) {
 			},
 		},
 		{
+			// FM-405: Multi-pod gang waiting on preemption preserves all nominating infos over suggested hosts
+			name:                "Multi-pod gang waiting on preemption preserves nominating infos over suggested hosts for all members",
+			status:              fwk.NewStatus(fwk.Unschedulable, "waiting on preemption"),
+			waitingOnPreemption: true,
+			podResultsByPodName: map[string]algorithmResult{
+				"p1": {scheduleResult: ScheduleResult{SuggestedHost: "suggested-node1", nominatingInfo: &fwk.NominatingInfo{NominatedNodeName: "preempt-node1", NominatingMode: fwk.ModeOverride}}, status: nil},
+				"p2": {scheduleResult: ScheduleResult{SuggestedHost: "suggested-node2", nominatingInfo: &fwk.NominatingInfo{NominatedNodeName: "preempt-node2", NominatingMode: fwk.ModeOverride}}, status: nil},
+				"p3": {scheduleResult: ScheduleResult{SuggestedHost: "", nominatingInfo: clearNominatedNode}, status: fwk.NewStatus(fwk.Unschedulable)},
+			},
+			expectPreempting: map[string]string{"p1": "preempt-node1", "p2": "preempt-node2"},
+			expectFailed:     sets.New("p3"),
+			expectCondition: &metav1.Condition{
+				Type:    schedulingapi.PodGroupInitiallyScheduled,
+				Status:  metav1.ConditionFalse,
+				Reason:  schedulingapi.PodGroupReasonUnschedulable,
+				Message: "waiting on preemption",
+			},
+		},
+		{
 			name:   "Different number of pods in result and queue, should fail all queue pods",
 			status: fwk.NewStatus(fwk.Error),
 			podResultsByPodName: map[string]algorithmResult{
