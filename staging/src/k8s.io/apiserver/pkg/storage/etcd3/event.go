@@ -25,6 +25,8 @@ import (
 )
 
 type event struct {
+	// Use a distinct type to prevent accidentally treating backend-prefixed
+	// etcd keys as the resource-relative keys accepted by storage.ReverseKeyFunc.
 	key              storageKey
 	value            []byte
 	prevValue        []byte

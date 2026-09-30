@@ -280,6 +280,7 @@ const (
 
 // NamespaceKeyRootFunc is the default function for constructing storage paths
 // to resource directories enforcing namespace rules.
+// prefix must start with "/" and must not end with "/".
 func NamespaceKeyRootFunc(ctx context.Context, prefix string) string {
 	key := prefix
 	ns, ok := genericapirequest.NamespaceFrom(ctx)
@@ -292,6 +293,7 @@ func NamespaceKeyRootFunc(ctx context.Context, prefix string) string {
 // NamespaceKeyFunc is the default function for constructing storage paths to
 // a resource relative to the given prefix enforcing namespace rules. If the
 // context does not contain a namespace, it errors.
+// prefix must start with "/" and must not end with "/".
 func NamespaceKeyFunc(ctx context.Context, prefix string, name string) (string, error) {
 	key := NamespaceKeyRootFunc(ctx, prefix)
 	ns, ok := genericapirequest.NamespaceFrom(ctx)
@@ -310,6 +312,7 @@ func NamespaceKeyFunc(ctx context.Context, prefix string, name string) (string, 
 
 // NoNamespaceKeyFunc is the default function for constructing storage paths
 // to a resource relative to the given prefix without a namespace.
+// prefix must start with "/" and must not end with "/".
 func NoNamespaceKeyFunc(ctx context.Context, prefix string, name string) (string, error) {
 	if len(name) == 0 {
 		return "", apierrors.NewBadRequest("Name parameter required.")
@@ -319,6 +322,44 @@ func NoNamespaceKeyFunc(ctx context.Context, prefix string, name string) (string
 	}
 	key := prefix + "/" + name
 	return key, nil
+}
+
+// NoNamespaceReverseKeyFunc returns a function that recovers a cluster-scoped
+// object's name from a resource-relative key formatted as
+// "<resourcePrefix>/<name>". resourcePrefix must start with "/" and must not
+// end with "/"; name must be non-empty and must not contain "/".
+func NoNamespaceReverseKeyFunc(resourcePrefix string) storage.ReverseKeyFunc {
+	keyPrefix := resourcePrefix + "/"
+	return func(key string) (name string, namespace string, err error) {
+		name, found := strings.CutPrefix(key, keyPrefix)
+		if !found {
+			return "", "", fmt.Errorf("key %q does not have resource prefix %q", key, resourcePrefix)
+		}
+		if name == "" || strings.Contains(name, "/") {
+			return "", "", fmt.Errorf("key %q must contain exactly one non-empty name segment after resource prefix %q", key, resourcePrefix)
+		}
+		return name, "", nil
+	}
+}
+
+// NamespaceReverseKeyFunc returns a function that recovers a namespaced
+// object's namespace and name from a resource-relative key formatted as
+// "<resourcePrefix>/<namespace>/<name>". resourcePrefix must start with "/"
+// and must not end with "/"; namespace and name must be non-empty and must not
+// contain "/".
+func NamespaceReverseKeyFunc(resourcePrefix string) storage.ReverseKeyFunc {
+	keyPrefix := resourcePrefix + "/"
+	return func(key string) (name string, namespace string, err error) {
+		instance, found := strings.CutPrefix(key, keyPrefix)
+		if !found {
+			return "", "", fmt.Errorf("key %q does not have resource prefix %q", key, resourcePrefix)
+		}
+		namespace, name, found = strings.Cut(instance, "/")
+		if !found || namespace == "" || name == "" || strings.Contains(name, "/") {
+			return "", "", fmt.Errorf("key %q must contain exactly two non-empty namespace and name segments after resource prefix %q", key, resourcePrefix)
+		}
+		return name, namespace, nil
+	}
 }
 
 type storeKeyFuncs struct {
@@ -384,44 +425,6 @@ func newStoreKeyFuncs(
 			return requestKeyFunc(ctx, accessor.GetName())
 		},
 		reverseKeyFunc: reverseKeyFunc,
-	}
-}
-
-// NoNamespaceReverseKeyFunc returns a function that recovers a cluster-scoped
-// object's name from a resource-relative key formatted as
-// "<resourcePrefix>/<name>". resourcePrefix must start with "/" and must not
-// end with "/"; name must be non-empty and must not contain "/".
-func NoNamespaceReverseKeyFunc(resourcePrefix string) storage.ReverseKeyFunc {
-	keyPrefix := resourcePrefix + "/"
-	return func(key string) (name string, namespace string, err error) {
-		name, found := strings.CutPrefix(key, keyPrefix)
-		if !found {
-			return "", "", fmt.Errorf("key %q does not have resource prefix %q", key, resourcePrefix)
-		}
-		if name == "" || strings.Contains(name, "/") {
-			return "", "", fmt.Errorf("key %q must contain exactly one non-empty name segment after resource prefix %q", key, resourcePrefix)
-		}
-		return name, "", nil
-	}
-}
-
-// NamespaceReverseKeyFunc returns a function that recovers a namespaced
-// object's namespace and name from a resource-relative key formatted as
-// "<resourcePrefix>/<namespace>/<name>". resourcePrefix must start with "/"
-// and must not end with "/"; namespace and name must be non-empty and must not
-// contain "/".
-func NamespaceReverseKeyFunc(resourcePrefix string) storage.ReverseKeyFunc {
-	keyPrefix := resourcePrefix + "/"
-	return func(key string) (name string, namespace string, err error) {
-		instance, found := strings.CutPrefix(key, keyPrefix)
-		if !found {
-			return "", "", fmt.Errorf("key %q does not have resource prefix %q", key, resourcePrefix)
-		}
-		namespace, name, found = strings.Cut(instance, "/")
-		if !found || namespace == "" || name == "" || strings.Contains(name, "/") {
-			return "", "", fmt.Errorf("key %q must contain exactly two non-empty namespace and name segments after resource prefix %q", key, resourcePrefix)
-		}
-		return name, namespace, nil
 	}
 }
 

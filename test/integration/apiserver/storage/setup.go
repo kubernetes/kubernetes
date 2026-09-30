@@ -88,6 +88,7 @@ func setupStore(t *testing.T, decorator generic.StorageDecorator) (storage.Inter
 		storageConfig,
 		"/pods",
 		cacheKeyFunc,
+		nil,
 		func() runtime.Object { return &api.Pod{} },
 		func() runtime.Object { return &api.PodList{} },
 		registrypod.GetAttrs,

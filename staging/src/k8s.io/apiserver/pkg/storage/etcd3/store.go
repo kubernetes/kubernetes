@@ -217,10 +217,10 @@ func newStorageKeyReverseFunc(pathPrefix string, reverseKeyFunc storage.ReverseK
 	}
 	return func(key storageKey) (name string, namespace string, err error) {
 		resourceKey, found := strings.CutPrefix(string(key), pathPrefix)
-		if !found {
-			return "", "", fmt.Errorf("storage key %q does not have backend prefix %q", key, pathPrefix)
+		if !found || !strings.HasPrefix(resourceKey, "/") {
+			return "", "", fmt.Errorf("storage key %q must start with backend prefix %q followed by '/'", key, pathPrefix)
 		}
-		return reverseKeyFunc("/" + resourceKey)
+		return reverseKeyFunc(resourceKey)
 	}
 }
 
