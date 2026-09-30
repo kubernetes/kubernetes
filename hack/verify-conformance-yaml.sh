@@ -25,9 +25,15 @@ cd "${KUBE_ROOT}"
 test/conformance/gen-conformance-yaml.sh
 
 # diff generated and checked-in
-if diff -u test/conformance/testdata/conformance.yaml _output/conformance.yaml; then
-  echo PASS
-  exit 0
+if ! diff -u test/conformance/testdata/conformance.yaml _output/conformance.yaml; then
+  echo 'See instructions in test/conformance/README.md'
+  exit 1
 fi
-echo 'See instructions in test/conformance/README.md'
-exit 1
+if ! diff -u test/conformance/testdata/future-conformance.yaml _output/future-conformance.yaml; then
+  echo 'See instructions in test/conformance/README.md'
+  exit 1
+fi
+
+echo PASS
+exit 0
+
