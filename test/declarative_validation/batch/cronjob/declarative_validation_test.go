@@ -497,6 +497,10 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 		baseObj.Spec.JobTemplate.Spec.Template.Spec.EvictionResponders = responders
 		baseObj.Spec.JobTemplate.Spec.Template.Spec.SchedulingGroup = schedulingGroup
 	})
+	poddeclarativevalidation.RunDeclarativeValidateDefaultNetworkTestCases(t, ctx, registry.Strategy, field.NewPath("spec", "jobTemplate", "spec", "template", "spec"), new(mkCronJob()), func(baseObj *batch.CronJob, defaultNetwork *api.PodDefaultNetwork, hostNetwork bool) {
+		baseObj.Spec.JobTemplate.Spec.Template.Spec.DefaultNetwork = defaultNetwork
+		baseObj.Spec.JobTemplate.Spec.Template.Spec.HostNetwork = hostNetwork
+	})
 }
 
 func tweakJobSchedulingBasic() func(*batch.CronJob) {

@@ -102,6 +102,10 @@ func TestDeclarativeValidate(t *testing.T) {
 			baseObj.Template.Spec.EvictionResponders = responders
 			baseObj.Template.Spec.SchedulingGroup = schedulingGroup
 		})
+		poddeclarativevalidation.RunDeclarativeValidateDefaultNetworkTestCases(t, ctx, registry.Strategy, field.NewPath("template", "spec"), mkPodTemplate(), func(baseObj *api.PodTemplate, defaultNetwork *api.PodDefaultNetwork, hostNetwork bool) {
+			baseObj.Template.Spec.DefaultNetwork = defaultNetwork
+			baseObj.Template.Spec.HostNetwork = hostNetwork
+		})
 	}
 }
 
