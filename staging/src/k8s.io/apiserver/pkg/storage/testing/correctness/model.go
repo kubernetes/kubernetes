@@ -106,57 +106,71 @@ func (s *Model) Equal(other *Model) bool {
 // Step applies an operation to the sequential state machine. change is the
 // write the operation made, or nil if the operation didn't write.
 func (s *Model) Step(input Request, output Response) (ok bool, next *Model, change *Change) {
-	next = s
-	var expected Response
-	switch input.Op {
-	case OpCreate:
-		next = s.Clone()
-		expected, change = next.create(input.Key, input.Create.Object)
-	case OpDelete:
-		next = s.Clone()
-		expected, change = next.delete(context.Background(), input.Key, input.Delete.Preconditions, nil)
-	case OpGet:
-		expected = s.get(input.Key, input.Get.Options)
-	case OpList:
-		if err := checkKey(input.Key, input.List.Options.Recursive); err != nil {
-			expected = Response{Err: err}
-			break
-		}
-		if _, _, err := storage.ValidateListOptions("", s.Versioner, input.List.Options); err != nil {
-			expected = Response{Err: err}
-			break
-		}
-		if input.List.Options.Predicate.Label == nil || input.List.Options.Predicate.Field == nil {
-			// etcd3 and the cacher call methods on both selectors.
-			panic("nil label or field selector is not supported, use storage.Everything to match everything")
-		}
-		if input.List.Options.Predicate.Limit != 0 || input.List.Options.Predicate.Continue != "" {
-			panic("pagination (limit, continue) is not supported")
-		}
-		if !input.List.Options.Predicate.Empty() && input.List.Options.Predicate.GetAttrs == nil {
-			panic("selectors without GetAttrs are not supported")
-		}
-		if input.List.Options.RecordTimestamps {
-			panic("recordTimestamps is not supported, it wraps objects in storage-internal types")
-		}
-		if !input.List.Options.Predicate.Empty() {
-			panic("label and field selectors are not supported, the model doesn't filter lists")
+	if input.Op == OpList && input.List.Options.ResourceVersion != "" {
+		if err := s.checkList(input.Key, input.List.Options); err != nil {
+			return reflect.DeepEqual(Response{Err: err}, output), s, nil
 		}
 		// Model only validates consistent reads, for stale reads we just validate RV and contents are validated later during replay.
-		if input.List.Options.ResourceVersion != "" {
-			return s.validateListRV(input.List.Options, output), s, nil
-		}
-		expected = s.list(input.Key, input.List.Options)
-	case OpUpdate:
-		next = s.Clone()
-		expected, change = next.update(context.Background(), input.Key, input.Update.IgnoreNotFound, input.Update.Preconditions, input.Update.UpdateFunc, input.Update.CachedExistingObject)
-	default:
-		panic(fmt.Sprintf("unknown operation %q", input.Op))
+		return s.validateListRV(input.List.Options, output), s, nil
 	}
+	expected, next, change := s.execute(input)
 	if !reflect.DeepEqual(expected, output) {
 		return false, s, nil
 	}
 	return true, next, change
+}
+
+// execute returns the response storage gives for input served from this
+// state. The receiver is never modified, writes return a new state.
+func (s *Model) execute(input Request) (Response, *Model, *Change) {
+	switch input.Op {
+	case OpCreate:
+		next := s.Clone()
+		resp, change := next.create(input.Key, input.Create.Object)
+		return resp, next, change
+	case OpDelete:
+		next := s.Clone()
+		resp, change := next.delete(context.Background(), input.Key, input.Delete.Preconditions, nil)
+		return resp, next, change
+	case OpGet:
+		return s.get(input.Key, input.Get.Options), s, nil
+	case OpList:
+		return s.list(input.Key, input.List.Options), s, nil
+	case OpUpdate:
+		next := s.Clone()
+		resp, change := next.update(context.Background(), input.Key, input.Update.IgnoreNotFound, input.Update.Preconditions, input.Update.UpdateFunc, input.Update.CachedExistingObject)
+		return resp, next, change
+	default:
+		panic(fmt.Sprintf("unknown operation %q", input.Op))
+	}
+}
+
+// checkList returns the error storage returns for an invalid list and panics
+// on lists the model doesn't support.
+func (s *Model) checkList(key string, opts storage.ListOptions) error {
+	if err := checkKey(key, opts.Recursive); err != nil {
+		return err
+	}
+	if _, _, err := storage.ValidateListOptions("", s.Versioner, opts); err != nil {
+		return err
+	}
+	if opts.Predicate.Label == nil || opts.Predicate.Field == nil {
+		// etcd3 and the cacher call methods on both selectors.
+		panic("nil label or field selector is not supported, use storage.Everything to match everything")
+	}
+	if opts.Predicate.Limit != 0 || opts.Predicate.Continue != "" {
+		panic("pagination (limit, continue) is not supported")
+	}
+	if !opts.Predicate.Empty() && opts.Predicate.GetAttrs == nil {
+		panic("selectors without GetAttrs are not supported")
+	}
+	if opts.RecordTimestamps {
+		panic("recordTimestamps is not supported, it wraps objects in storage-internal types")
+	}
+	if !opts.Predicate.Empty() {
+		panic("label and field selectors are not supported, the model doesn't filter lists")
+	}
+	return nil
 }
 
 func (s *Model) validateListRV(opts storage.ListOptions, output Response) bool {
@@ -308,6 +322,9 @@ func (s *Model) get(key string, opts storage.GetOptions) Response {
 }
 
 func (s *Model) list(key string, opts storage.ListOptions) Response {
+	if err := s.checkList(key, opts); err != nil {
+		return Response{Err: err}
+	}
 	var items []runtime.Object
 	for _, k := range slices.Sorted(maps.Keys(s.Items)) {
 		if keyInScope(key, opts.Recursive, k) {
