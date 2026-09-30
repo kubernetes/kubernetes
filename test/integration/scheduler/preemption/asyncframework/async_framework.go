@@ -240,12 +240,13 @@ type PreemptPodHookFn func(ctx context.Context, c fwk.PreemptionCandidate, preem
 
 // AsyncPreemptionTestConfig is a config for initialising the environment for async preemption tests.
 type AsyncPreemptionTestConfig struct {
-	EnableGenericWorkload  bool
-	PreemptionDoneChannels *sync.Map
-	BlockBindingChannel    chan struct{}
-	InitialBackoffSeconds  int64
-	MaxBackoffSeconds      int64
-	PreemptPodHook         PreemptPodHookFn
+	EnableGenericWorkload                              bool
+	EnableInPlacePodVerticalScalingSchedulerPreemption bool
+	PreemptionDoneChannels                             *sync.Map
+	BlockBindingChannel                                chan struct{}
+	InitialBackoffSeconds                              int64
+	MaxBackoffSeconds                                  int64
+	PreemptPodHook                                     PreemptPodHookFn
 }
 
 // InitTestForAsyncPreemption initializes the test environment for async preemption tests.
@@ -256,11 +257,15 @@ func InitTestForAsyncPreemption(t *testing.T, config AsyncPreemptionTestConfig) 
 		features.SchedulerAsyncPreemption: true,
 		features.GenericWorkload:          config.EnableGenericWorkload,
 	}
+	if config.EnableInPlacePodVerticalScalingSchedulerPreemption {
+		featuresOverrides[features.InPlacePodVerticalScaling] = true
+		featuresOverrides[features.InPlacePodVerticalScalingSchedulerPreemption] = true
+	}
 	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuresOverrides)
 
 	registry := make(frameworkruntime.Registry)
 	// We need to use a custom preemption plugin to test async preemption behavior
-	delayedPreemptionPluginName, getPreemptionPlugin, err := registerDelayedPreemptionPlugin(&registry, config.PreemptionDoneChannels, config.EnableGenericWorkload, config.PreemptPodHook)
+	delayedPreemptionPluginName, getPreemptionPlugin, err := registerDelayedPreemptionPlugin(&registry, config.PreemptionDoneChannels, config.EnableGenericWorkload, config.EnableInPlacePodVerticalScalingSchedulerPreemption, config.PreemptPodHook)
 	if err != nil {
 		t.Fatalf("Error registering a preemption plugin: %v", err)
 	}
@@ -362,11 +367,15 @@ func registerBlockBindingPlugin(registry frameworkruntime.Registry, blockBinding
 }
 
 // registerDelayedPreemptionPlugin register a custom preemption plugin to test async preemption behavior.
-func registerDelayedPreemptionPlugin(registry *frameworkruntime.Registry, preemptionDoneChannels *sync.Map, enableGenericWorkload bool, preemptPodHook PreemptPodHookFn) (string, func() *defaultpreemption.DefaultPreemption, error) {
+func registerDelayedPreemptionPlugin(registry *frameworkruntime.Registry, preemptionDoneChannels *sync.Map, enableGenericWorkload bool, enableInPlacePodVerticalScalingSchedulerPreemption bool, preemptPodHook PreemptPodHookFn) (string, func() *defaultpreemption.DefaultPreemption, error) {
 	delayedPreemptionPluginName := "delay-preemption"
 	var preemptionPlugin *defaultpreemption.DefaultPreemption
 	err := registry.Register(delayedPreemptionPluginName, func(c context.Context, r runtime.Object, fh fwk.Handle) (fwk.Plugin, error) {
-		p, err := frameworkruntime.FactoryAdapter(plfeature.Features{EnableAsyncPreemption: true, EnableGenericWorkload: enableGenericWorkload}, defaultpreemption.New)(c, &config.DefaultPreemptionArgs{
+		p, err := frameworkruntime.FactoryAdapter(plfeature.Features{
+			EnableAsyncPreemption:                              true,
+			EnableGenericWorkload:                              enableGenericWorkload,
+			EnableInPlacePodVerticalScalingSchedulerPreemption: enableInPlacePodVerticalScalingSchedulerPreemption,
+		}, defaultpreemption.New)(c, &config.DefaultPreemptionArgs{
 			// Set default values to pass the validation at the initialization, not related to the test.
 			MinCandidateNodesPercentage: 10,
 			MinCandidateNodesAbsolute:   100,
