@@ -69,3 +69,43 @@ func BenchmarkLazySnapshotCacheIntervalStreaming(b *testing.B) {
 	runtime.KeepAlive(indexer)
 	runtime.KeepAlive(snapshot)
 }
+
+// BenchmarkLazySnapshotIntervalActiveHeap measures live heap with 20 intervals
+// paused after their first snapshot event.
+func BenchmarkLazySnapshotIntervalActiveHeap(b *testing.B) {
+	indexer, snapshot := benchmarkLazySnapshot(b)
+
+	var totalGrowth int64
+	for range b.N {
+		runtime.GC()
+		var before, after runtime.MemStats
+		runtime.ReadMemStats(&before)
+		var measureWithOpenIntervals func(int)
+		measureWithOpenIntervals = func(openIntervals int) {
+			if openIntervals == benchmarkLazySnapshotWatchlists {
+				runtime.GC()
+				runtime.ReadMemStats(&after)
+				return
+			}
+			interval := newCacheIntervalFromLazySnapshot(1000, snapshot)
+			event, err := interval.Next()
+			if err != nil {
+				b.Fatal(err)
+			}
+			if event == nil {
+				b.Fatal("empty snapshot")
+			}
+			// Nesting keeps earlier intervals live at the checkpoint.
+			measureWithOpenIntervals(openIntervals + 1)
+			runtime.KeepAlive(event)
+			runtime.KeepAlive(interval)
+		}
+		b.StartTimer()
+		measureWithOpenIntervals(0)
+		b.StopTimer()
+		totalGrowth += int64(after.HeapAlloc) - int64(before.HeapAlloc)
+		runtime.KeepAlive(indexer)
+		runtime.KeepAlive(snapshot)
+	}
+	b.ReportMetric(float64(totalGrowth)/float64(b.N)/1e6, "MB-active-heap/op")
+}
