@@ -412,6 +412,9 @@ func draDeviceBindingConditionsInUse(claim *resource.ResourceClaim) bool {
 		return false
 	}
 	if allocation := claim.Status.Allocation; allocation != nil {
+		if allocation.AllocationTimestamp != nil {
+			return true
+		}
 		for _, result := range allocation.Devices.Results {
 			if result.BindingConditions != nil || result.BindingFailureConditions != nil {
 				return true
@@ -454,6 +457,7 @@ func dropDeviceBindingConditionsFields(newClaim, oldClaim *resource.ResourceClai
 	}
 
 	if allocation := newClaim.Status.Allocation; allocation != nil {
+		newClaim.Status.Allocation.AllocationTimestamp = nil
 		for i := range allocation.Devices.Results {
 			newClaim.Status.Allocation.Devices.Results[i].BindingConditions = nil
 			newClaim.Status.Allocation.Devices.Results[i].BindingFailureConditions = nil

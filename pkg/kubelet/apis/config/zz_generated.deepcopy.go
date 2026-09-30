@@ -338,6 +338,16 @@ func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 		*out = make([]int32, len(*in))
 		copy(*out, *in)
 	}
+	if in.ClientCertificateKeyAlgorithm != nil {
+		in, out := &in.ClientCertificateKeyAlgorithm, &out.ClientCertificateKeyAlgorithm
+		*out = new(CertificateKeyAlgorithmType)
+		**out = **in
+	}
+	if in.ServerCertificateKeyAlgorithm != nil {
+		in, out := &in.ServerCertificateKeyAlgorithm, &out.ServerCertificateKeyAlgorithm
+		*out = new(CertificateKeyAlgorithmType)
+		**out = **in
+	}
 	out.Authentication = in.Authentication
 	out.Authorization = in.Authorization
 	if in.PreloadedImagesVerificationAllowlist != nil {

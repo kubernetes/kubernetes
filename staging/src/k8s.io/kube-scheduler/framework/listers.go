@@ -24,7 +24,7 @@ import (
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/dynamic-resource-allocation/structured"
+	"k8s.io/dynamic-resource-allocation/structured/schedulerapi"
 	"k8s.io/klog/v2"
 )
 
@@ -152,10 +152,10 @@ type ResourceClaimTracker interface {
 	Get(namespace, claimName string) (*resourceapi.ResourceClaim, error)
 	// ListAllAllocatedDevices lists all allocated Devices from allocated ResourceClaims. The result is guaranteed to immediately include
 	// any changes made via AssumeClaimAfterAPICall(), and SignalClaimPendingAllocation().
-	ListAllAllocatedDevices() (sets.Set[structured.DeviceID], error)
+	ListAllAllocatedDevices() (sets.Set[schedulerapi.DeviceID], error)
 	// GatherAllocatedState gathers information about allocated devices from allocated ResourceClaims. The result is guaranteed to immediately include
 	// any changes made via AssumeClaimAfterAPICall(), and SignalClaimPendingAllocation().
-	GatherAllocatedState() (*structured.AllocatedState, error)
+	GatherAllocatedState() (*schedulerapi.AllocatedState, error)
 
 	// SignalClaimPendingAllocation signals to the tracker that the given ResourceClaim will be allocated via an API call in the
 	// binding phase, therefore the given ResourceClaim must be non-nil and have a non-nil Status.Allocation.

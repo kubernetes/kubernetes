@@ -71,6 +71,12 @@ type genValidations struct {
 	emitRegisterFunc  bool
 	deepEqualFunc     types.Name
 	tagPrefix         string
+
+	// emittedVars maps the name of each package-level variable already written
+	// to this file to its rendered initializer. It is per-file, not per-type,
+	// because that is the scope in which Go declarations collide. The key is
+	// the bare name, since the "private" namer drops PrivateVar.Package.
+	emittedVars map[string]string
 }
 
 // NewGenValidations creates a new generator for the specified package.
@@ -89,6 +95,7 @@ func NewGenValidations(outputFilename, outputPackage, inputPackage string, rootT
 		emitRegisterFunc:  emitRegisterFunc,
 		deepEqualFunc:     deepEqualFunc,
 		tagPrefix:         tagPrefix,
+		emittedVars:       map[string]string{},
 	}
 }
 
@@ -199,7 +206,9 @@ func (g *genValidations) GenerateType(c *generator.Context, t *types.Type, w io.
 	klog.V(5).Infof("emitting validation code for type %v", t)
 
 	sw := generator.NewSnippetWriter(w, c, "$", "$")
-	g.emitValidationVariables(c, t, sw)
+	if err := g.emitValidationVariables(c, t, sw); err != nil {
+		return err
+	}
 	g.emitValidationFunction(c, t, sw)
 	if err := sw.Error(); err != nil {
 		return err
@@ -1742,31 +1751,54 @@ func emitComments(comments []string, sw *generator.SnippetWriter) {
 // emitValidationVariables emits a list of variable declarations. Each variable declaration has a
 // private (unexported) variable name, and a function invocation declaration that is expected
 // to initialize the value of the variable.
-func (g *genValidations) emitValidationVariables(c *generator.Context, t *types.Type, sw *generator.SnippetWriter) {
+//
+// Asking for a variable is a request that it exist, not a declaration of it:
+// validators may ask for the same one many times, and repeats are emitted once.
+// One name with two different initializers is a generator error, since Go allows
+// only one declaration and picking a winner would silently drop a validation.
+func (g *genValidations) emitValidationVariables(c *generator.Context, t *types.Type, sw *generator.SnippetWriter) error {
 	tn := g.discovered.typeNodes[t]
 
-	emit := func(variables []validators.VariableGen) {
+	emit := func(variables []validators.VariableGen) error {
 		slices.SortFunc(variables, func(a, b validators.VariableGen) int {
 			return cmp.Compare(a.Variable.Name, b.Variable.Name)
 		})
 		for _, variable := range variables {
-			targs := generator.Args{
-				"varName": c.Universe.Type(types.Name(variable.Variable)),
+			// Render first and compare the source: an initializer can hold
+			// pointers, which do not compare usefully as Go values.
+			buf := &bytes.Buffer{}
+			bufSW := generator.NewSnippetWriter(buf, c, "$", "$")
+			g.toGolangSourceDataLiteral(bufSW, c, variable.Initializer, flNewlineOK)
+			if err := bufSW.Error(); err != nil {
+				return err
 			}
+			initializer := buf.String()
 
-			sw.Do("var $.varName|private$ = ", targs)
-			g.toGolangSourceDataLiteral(sw, c, variable.Initializer, flNewlineOK)
-			sw.Do("\n", nil)
+			name := variable.Variable.Name
+			if prev, found := g.emittedVars[name]; found {
+				if prev != initializer {
+					return fmt.Errorf("variable %q is needed with two different initializers:\n\t%s\n\t%s", name, prev, initializer)
+				}
+				continue
+			}
+			g.emittedVars[name] = initializer
+
+			sw.Do("var $.varName|private$ = $.initializer$\n", generator.Args{
+				"varName":     c.Universe.Type(types.Name(variable.Variable)),
+				"initializer": initializer,
+			})
 		}
+		return nil
 	}
-	// TODO: Handle potential variable name collisions when multiple validators
-	// generate variables with the same name.
-	emit(tn.typeValidations.Variables)
+	if err := emit(tn.typeValidations.Variables); err != nil {
+		return err
+	}
 	for _, field := range tn.fields {
-		if len(field.fieldValidations.Variables) != 0 {
-			emit(field.fieldValidations.Variables)
+		if err := emit(field.fieldValidations.Variables); err != nil {
+			return err
 		}
 	}
+	return nil
 }
 
 const (
@@ -1790,12 +1822,10 @@ func (g *genValidations) toGolangSourceDataLiteral(sw *generator.SnippetWriter, 
 	case uint, uint8, uint16, uint32, uint64, int, int8, int16, int32, int64, float32, float64, bool:
 		sw.Do(fmt.Sprintf("%v", value), nil)
 	case string:
-		// If the incoming string was quoted, we still do it ourselves, JIC.
-		str := value.(string)
-		if s, err := strconv.Unquote(str); err == nil {
-			str = s
-		}
-		sw.Do(fmt.Sprintf("%q", str), nil)
+		// Values arrive unquoted, so quote exactly once: unquoting first would
+		// corrupt a value that is itself a quoted string. Pass as an argument,
+		// not as the template, since "$" is the delimiter.
+		sw.Do("$.$", fmt.Sprintf("%q", v))
 	case *types.Type:
 		sw.Do("$.|raw$", v)
 	case types.Member:

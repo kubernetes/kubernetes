@@ -2355,8 +2355,6 @@ rules:
       branch: master
     - repository: dynamic-resource-allocation
       branch: master
-    - repository: kms
-      branch: master
     - repository: kubelet
       branch: master
     source:

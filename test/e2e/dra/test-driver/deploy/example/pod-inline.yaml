@@ -37,7 +37,6 @@ spec:
   - name: without-resource
     image: registry.k8s.io/e2e-test-images/agnhost:2.66.1
     command: ["sh", "-c", "set && mount && ls -la /dev/ && /agnhost pause"]
-  terminationGracePeriodSeconds: 0 # Shut down immediately.
   resourceClaims:
   - name: resource
     resourceClaimTemplateName: test-inline-claim-template

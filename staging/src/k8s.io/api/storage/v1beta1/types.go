@@ -692,6 +692,7 @@ type VolumeNodeResources struct {
 
 // StorageHealthStatusType describes the health status category of a storage backend.
 // +enum
+// +k8s:validation-gen-nolint
 type StorageHealthStatusType string
 
 const (

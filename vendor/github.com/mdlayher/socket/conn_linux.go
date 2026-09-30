@@ -95,6 +95,68 @@ func (c *Conn) SetsockoptSockFprog(level, opt int, fprog *unix.SockFprog) error 
 	})
 }
 
+// GetsockoptBytes wraps getsockopt(2) for raw byte slice values on Linux. The
+// existing contents of b are passed to the kernel as the input buffer with
+// optlen set to len(b), and the kernel overwrites b in place. The returned int
+// is the optlen value reported by the kernel on return, which may be smaller
+// than len(b). These in/out semantics are required for socket options which
+// both read from and write to the same buffer.
+//
+// No allocation or copying is performed and b is passed to the kernel
+// verbatim. If len(b) is zero, a nil buffer with optlen 0 is passed.
+func (c *Conn) GetsockoptBytes(level, opt int, b []byte) (int, error) {
+	return controlT(c, "getsockopt", func(fd int) (int, error) {
+		var p unsafe.Pointer
+		if len(b) > 0 {
+			p = unsafe.Pointer(&b[0])
+		}
+
+		optlen := uint32(len(b))
+		_, _, errno := unix.Syscall6(
+			unix.SYS_GETSOCKOPT,
+			uintptr(fd),
+			uintptr(level),
+			uintptr(opt),
+			uintptr(p),
+			uintptr(unsafe.Pointer(&optlen)),
+			0,
+		)
+		if errno != 0 {
+			return 0, errno
+		}
+
+		return int(optlen), nil
+	})
+}
+
+// SetsockoptBytes wraps setsockopt(2) for raw byte slice values on Linux. The
+// bytes of b are passed to the kernel verbatim with optlen set to len(b) and no
+// NUL handling of any kind is performed. If len(b) is zero, a nil buffer with
+// optlen 0 is passed.
+func (c *Conn) SetsockoptBytes(level, opt int, b []byte) error {
+	return c.control("setsockopt", func(fd int) error {
+		var p unsafe.Pointer
+		if len(b) > 0 {
+			p = unsafe.Pointer(&b[0])
+		}
+
+		_, _, errno := unix.Syscall6(
+			unix.SYS_SETSOCKOPT,
+			uintptr(fd),
+			uintptr(level),
+			uintptr(opt),
+			uintptr(p),
+			uintptr(len(b)),
+			0,
+		)
+		if errno != 0 {
+			return errno
+		}
+
+		return nil
+	})
+}
+
 // GetsockoptTpacketStats wraps getsockopt(2) for unix.TpacketStats values.
 func (c *Conn) GetsockoptTpacketStats(level, name int) (*unix.TpacketStats, error) {
 	return controlT(c, "getsockopt", func(fd int) (*unix.TpacketStats, error) {

@@ -23,6 +23,7 @@ import (
 	"strings"
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
@@ -34,6 +35,11 @@ import (
 	"k8s.io/kubernetes/pkg/apis/core/pods"
 	"k8s.io/kubernetes/pkg/features"
 )
+
+func hasFractionalBytes(value resource.Quantity) bool {
+	_, exact := value.AsScale(0)
+	return !exact
+}
 
 func GetWarningsForPod(ctx context.Context, pod, oldPod *api.Pod) []string {
 	if pod == nil {
@@ -212,10 +218,10 @@ func warningsForPodSpecAndMeta(fieldPath *field.Path, podSpec *api.PodSpec, meta
 	}
 
 	// fractional memory/ephemeral-storage requests/limits (#79950, #49442, #18538)
-	if value, ok := podSpec.Overhead[api.ResourceMemory]; ok && value.MilliValue()%int64(1000) != int64(0) {
+	if value, ok := podSpec.Overhead[api.ResourceMemory]; ok && hasFractionalBytes(value) {
 		warnings = append(warnings, fmt.Sprintf("%s: fractional byte value %q is invalid, must be an integer", fieldPath.Child("spec", "overhead").Key(string(api.ResourceMemory)), value.String()))
 	}
-	if value, ok := podSpec.Overhead[api.ResourceEphemeralStorage]; ok && value.MilliValue()%int64(1000) != int64(0) {
+	if value, ok := podSpec.Overhead[api.ResourceEphemeralStorage]; ok && hasFractionalBytes(value) {
 		warnings = append(warnings, fmt.Sprintf("%s: fractional byte value %q is invalid, must be an integer", fieldPath.Child("spec", "overhead").Key(string(api.ResourceEphemeralStorage)), value.String()))
 	}
 
@@ -253,16 +259,16 @@ func warningsForPodSpecAndMeta(fieldPath *field.Path, podSpec *api.PodSpec, meta
 		}
 
 		// fractional memory/ephemeral-storage requests/limits (#79950, #49442, #18538)
-		if value, ok := c.Resources.Limits[api.ResourceMemory]; ok && value.MilliValue()%int64(1000) != int64(0) {
+		if value, ok := c.Resources.Limits[api.ResourceMemory]; ok && hasFractionalBytes(value) {
 			warnings = append(warnings, fmt.Sprintf("%s: fractional byte value %q is invalid, must be an integer", p.Child("resources", "limits").Key(string(api.ResourceMemory)), value.String()))
 		}
-		if value, ok := c.Resources.Requests[api.ResourceMemory]; ok && value.MilliValue()%int64(1000) != int64(0) {
+		if value, ok := c.Resources.Requests[api.ResourceMemory]; ok && hasFractionalBytes(value) {
 			warnings = append(warnings, fmt.Sprintf("%s: fractional byte value %q is invalid, must be an integer", p.Child("resources", "requests").Key(string(api.ResourceMemory)), value.String()))
 		}
-		if value, ok := c.Resources.Limits[api.ResourceEphemeralStorage]; ok && value.MilliValue()%int64(1000) != int64(0) {
+		if value, ok := c.Resources.Limits[api.ResourceEphemeralStorage]; ok && hasFractionalBytes(value) {
 			warnings = append(warnings, fmt.Sprintf("%s: fractional byte value %q is invalid, must be an integer", p.Child("resources", "limits").Key(string(api.ResourceEphemeralStorage)), value.String()))
 		}
-		if value, ok := c.Resources.Requests[api.ResourceEphemeralStorage]; ok && value.MilliValue()%int64(1000) != int64(0) {
+		if value, ok := c.Resources.Requests[api.ResourceEphemeralStorage]; ok && hasFractionalBytes(value) {
 			warnings = append(warnings, fmt.Sprintf("%s: fractional byte value %q is invalid, must be an integer", p.Child("resources", "requests").Key(string(api.ResourceEphemeralStorage)), value.String()))
 		}
 

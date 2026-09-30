@@ -219,6 +219,17 @@ type outFlowControlSizeRequest struct {
 	resp chan uint32
 }
 
+// outStreamRequestForTesting is used by tests to retrieve a pointer to an outStream
+// safely inside the loopyWriter goroutine without racing on loopyWriter.estdStreams.
+// By holding the *outStream pointer while streams and transports close down, tests
+// can inspect settled accounting values (such as bytesOutStanding) after loopyWriter
+// has run to completion without any data races.
+type outStreamRequestForTesting struct {
+	throttledItem
+	streamID uint32
+	resp     chan *outStream
+}
+
 // closeConnection is an instruction to tell the loopy writer to flush the
 // framer and exit, which will cause the transport's connection to be closed
 // (by the client or server).  The transport itself will close after the reader
@@ -799,6 +810,10 @@ func (l *loopyWriter) outFlowControlSizeRequestHandler(o *outFlowControlSizeRequ
 	o.resp <- l.sendQuota
 }
 
+func (l *loopyWriter) outStreamRequestHandler(o *outStreamRequestForTesting) {
+	o.resp <- l.estdStreams[o.streamID]
+}
+
 func (l *loopyWriter) cleanupStreamHandler(c *cleanupStream) error {
 	c.onWrite()
 	if str, ok := l.estdStreams[c.streamID]; ok {
@@ -896,6 +911,8 @@ func (l *loopyWriter) handle(i any) error {
 		return l.goAwayHandler(i)
 	case *outFlowControlSizeRequest:
 		l.outFlowControlSizeRequestHandler(i)
+	case *outStreamRequestForTesting:
+		l.outStreamRequestHandler(i)
 	case closeConnection:
 		// Just return a non-I/O error and run() will flush and close the
 		// connection.

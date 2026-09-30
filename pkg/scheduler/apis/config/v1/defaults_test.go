@@ -675,42 +675,6 @@ func TestSchedulerDefaults(t *testing.T) {
 				},
 			},
 		},
-		{
-			name:     "default DynamicResources",
-			features: map[featuregate.Feature]bool{features.DynamicResourceAllocation: true},
-			config:   &configv1.KubeSchedulerConfiguration{},
-			expected: &configv1.KubeSchedulerConfiguration{
-				Parallelism: ptr.To[int32](16),
-				DebuggingConfiguration: componentbaseconfig.DebuggingConfiguration{
-					EnableProfiling:           &enable,
-					EnableContentionProfiling: &enable,
-				},
-				LeaderElection: componentbaseconfig.LeaderElectionConfiguration{
-					LeaderElect:       ptr.To(true),
-					LeaseDuration:     metav1.Duration{Duration: 15 * time.Second},
-					RenewDeadline:     metav1.Duration{Duration: 10 * time.Second},
-					RetryPeriod:       metav1.Duration{Duration: 2 * time.Second},
-					ResourceLock:      "leases",
-					ResourceNamespace: "kube-system",
-					ResourceName:      "kube-scheduler",
-				},
-				ClientConnection: componentbaseconfig.ClientConnectionConfiguration{
-					QPS:         50,
-					Burst:       100,
-					ContentType: "application/vnd.kubernetes.protobuf",
-				},
-				PercentageOfNodesToScore: ptr.To[int32](config.DefaultPercentageOfNodesToScore),
-				PodInitialBackoffSeconds: ptr.To[int64](1),
-				PodMaxBackoffSeconds:     ptr.To[int64](10),
-				Profiles: []configv1.KubeSchedulerProfile{
-					{
-						Plugins:       getDefaultPlugins(),
-						PluginConfig:  pluginConfigs,
-						SchedulerName: ptr.To("default-scheduler"),
-					},
-				},
-			},
-		},
 	}
 
 	for _, tc := range tests {

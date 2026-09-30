@@ -30,7 +30,7 @@ type ResourceQuotaSpecApplyConfiguration struct {
 	// hard is the set of desired hard limits for each named resource.
 	// More info: https://kubernetes.io/docs/concepts/policy/resource-quotas/
 	Hard *corev1.ResourceList `json:"hard,omitempty"`
-	// A collection of filters that must match each object tracked by a quota.
+	// scopes is a collection of filters that must match each object tracked by a quota.
 	// If not specified, the quota matches all objects.
 	Scopes []corev1.ResourceQuotaScope `json:"scopes,omitempty"`
 	// scopeSelector is also a collection of filters like scopes that must match each object tracked by a quota

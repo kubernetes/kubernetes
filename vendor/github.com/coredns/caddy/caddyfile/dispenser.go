@@ -107,16 +107,23 @@ func (d *Dispenser) NextLine() bool {
 // to load the next token as long as it opens a block or
 // is already in a block. It returns true if a token was
 // loaded, or false when the block's closing curly brace
-// was loaded and thus the block ended. Nested blocks are
-// not supported.
+// was loaded and thus the block ended.
 func (d *Dispenser) NextBlock() bool {
 	if d.nesting > 0 {
-		d.Next()
-		if d.Val() == "}" {
-			d.nesting--
+		if !d.Next() {
 			return false
 		}
-		return true
+
+		if d.Val() == "{" {
+			// a new block, we move the cursor back and try new block flow
+			d.cursor--
+		} else {
+			if d.Val() == "}" {
+				d.nesting--
+				return false
+			}
+			return true
+		}
 	}
 	if !d.NextArg() { // block must open on same line
 		return false
@@ -125,7 +132,9 @@ func (d *Dispenser) NextBlock() bool {
 		d.cursor-- // roll back if not opening brace
 		return false
 	}
-	d.Next()
+	if !d.Next() {
+		return false
+	}
 	if d.Val() == "}" {
 		// Open and then closed right away
 		return false

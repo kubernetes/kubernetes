@@ -136,7 +136,14 @@ func New(c Config, authorizer authorizer.UnconditionalAuthorizer) (*legacyProvid
 }
 
 func (p *legacyProvider) NewRESTStorage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (genericapiserver.APIGroupInfo, error) {
-	apiGroupInfo, err := p.GenericConfig.NewRESTStorage(apiResourceConfigSource, restOptionsGetter)
+	genericConfigSource := apiResourceConfigSource
+	if p.ServiceAccountIssuer != nil {
+		// the serviceaccounts storage built below replaces the generic one, so
+		// keep the generic provider from building a storage that would only be
+		// discarded: each one stands up its own etcd watch cache.
+		genericConfigSource = serviceAccountsDisabled{apiResourceConfigSource}
+	}
+	apiGroupInfo, err := p.GenericConfig.NewRESTStorage(genericConfigSource, restOptionsGetter)
 	if err != nil {
 		return genericapiserver.APIGroupInfo{}, err
 	}
@@ -263,12 +270,10 @@ func (p *legacyProvider) NewRESTStorage(apiResourceConfigSource serverstorage.AP
 		}
 	}
 
-	// potentially override generic storage for service account (with pod support)
+	// use the storage for service account with pod support, built above
 	if resource := "serviceaccounts"; serviceAccountStorage != nil && apiResourceConfigSource.ResourceEnabled(corev1.SchemeGroupVersion.WithResource(resource)) {
-		// don't leak go routines
-		storage[resource].Destroy()
-		if storage[resource+"/token"] != nil {
-			storage[resource+"/token"].Destroy()
+		if _, ok := storage[resource]; ok {
+			return genericapiserver.APIGroupInfo{}, fmt.Errorf("%s storage was already built by the generic provider", resource)
 		}
 
 		storage[resource] = serviceAccountStorage
@@ -434,6 +439,29 @@ func (p *legacyProvider) PostStartHook() (string, genericapiserver.PostStartHook
 
 func (p *legacyProvider) GroupName() string {
 	return api.GroupName
+}
+
+var serviceAccountsResource = corev1.SchemeGroupVersion.WithResource("serviceaccounts")
+
+// serviceAccountsDisabled reports core/v1 serviceaccounts as not enabled, so a
+// caller that builds that storage itself can keep another provider from
+// building one too.
+type serviceAccountsDisabled struct {
+	serverstorage.APIResourceConfigSource
+}
+
+func (s serviceAccountsDisabled) ResourceEnabled(resource schema.GroupVersionResource) bool {
+	if resource == serviceAccountsResource {
+		return false
+	}
+	return s.APIResourceConfigSource.ResourceEnabled(resource)
+}
+
+func (s serviceAccountsDisabled) ResourceExplicitlyEnabled(resource schema.GroupVersionResource) bool {
+	if resource == serviceAccountsResource {
+		return false
+	}
+	return s.APIResourceConfigSource.ResourceExplicitlyEnabled(resource)
 }
 
 type componentStatusStorage struct {

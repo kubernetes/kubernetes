@@ -60,7 +60,7 @@ const (
 	unixPathMax = 108
 
 	// rollingUpdateUIDHashBytes is how much of the SHA-256 digest of a pod UID
-	// is base64-encoded when the full UID does not fit in the registration socket
+	// is base64-encoded when the full UID does not fit in a rolling-update socket
 	// path. 8 bytes (64 bits) is ample for node-local uniqueness during rolling
 	// updates.
 	rollingUpdateUIDHashBytes = 8
@@ -95,6 +95,21 @@ func RollingUpdateRegistrarSocketFile(registryDir, driverName string, podUID typ
 		}
 	}
 	return candidates[len(candidates)-1]
+}
+
+// rollingUpdatePluginSocketFile returns the automatic DRA service socket
+// basename for rolling updates. Keep the pod UID visible when possible. The
+// fallback omits the ".sock" suffix so that the shortened basename also fits
+// with the longest valid driver name under the default plugin directory.
+func rollingUpdatePluginSocketFile(pluginDir string, podUID types.UID) string {
+	uid := string(podUID)
+	basename := "dra-" + uid + ".sock"
+	if len(path.Join(pluginDir, basename)) < unixPathMax {
+		return basename
+	}
+
+	uidHash := sha256Sum(uid)
+	return "dra-" + base64.RawURLEncoding.EncodeToString(uidHash[:rollingUpdateUIDHashBytes])
 }
 
 func sha256Sum(data string) [32]byte {
@@ -450,9 +465,9 @@ func PluginListener(listen func(ctx context.Context, path string) (net.Listener,
 // in parallel while a newer instance replaces the older. When enabled, both
 // instances must share the same plugin data directory and driver name.
 // They create different registration sockets (and DRA gRPC sockets) so the
-// kubelet can connect to both at the same time. The default registration socket
-// basename is chosen to fit within AF_UNIX path limits (see
-// [RollingUpdateRegistrarSocketFile]).
+// kubelet can connect to both at the same time. Automatic socket basenames are
+// shortened when necessary to keep the default paths within AF_UNIX limits
+// (see [RollingUpdateRegistrarSocketFile] for registration socket naming).
 //
 // There is no guarantee which of the two instances are used by kubelet.
 // For example, it can happen that a claim gets prepared by one instance
@@ -669,6 +684,19 @@ func ReconcilePoolWithName(name string) Option {
 	}
 }
 
+// ValidateQualifiedNames enables or disables rejecting attribute and capacity
+// names that are redundantly qualified with the driver's own domain (e.g.
+// "<driverName>/foo" instead of just "foo"). See
+// [resourceslice.Options.ValidateQualifiedNames] for details.
+//
+// Enabled by default.
+func ValidateQualifiedNames(enabled bool) Option {
+	return func(o *options) error {
+		o.validateQualifiedNames = &enabled
+		return nil
+	}
+}
+
 // EnableDeviceMetadata enables the device metadata feature. When enabled,
 // the framework writes a metadata file per request under the plugin data
 // directory and a CDI spec per request under the CDI directory (see
@@ -847,6 +875,7 @@ type options struct {
 	healthV1alpha1             bool
 	healthV1                   bool
 	reconcilePoolWithName      string
+	validateQualifiedNames     *bool
 	enableDeviceMetadata       bool
 	metadataVersions           []schema.GroupVersion
 	cdiDir                     string
@@ -859,21 +888,22 @@ type Helper struct {
 	// backgroundCtx is for activities that are started later.
 	backgroundCtx context.Context
 	// cancel cancels the backgroundCtx.
-	cancel                func(cause error)
-	wg                    sync.WaitGroup
-	registrar             *nodeRegistrar
-	pluginServer          *grpcServer
-	plugin                DRAPlugin
-	driverName            string
-	nodeName              string
-	nodeUID               types.UID
-	kubeClient            kubernetes.Interface
-	resourceClient        cgoresource.ResourceV1Interface
-	serialize             bool
-	grpcMutex             sync.Mutex
-	grpcLockFilePath      string
-	reconcilePoolWithName string
-	metadataWriter        *metadataWriter
+	cancel                 func(cause error)
+	wg                     sync.WaitGroup
+	registrar              *nodeRegistrar
+	pluginServer           *grpcServer
+	plugin                 DRAPlugin
+	driverName             string
+	nodeName               string
+	nodeUID                types.UID
+	kubeClient             kubernetes.Interface
+	resourceClient         cgoresource.ResourceV1Interface
+	serialize              bool
+	grpcMutex              sync.Mutex
+	grpcLockFilePath       string
+	reconcilePoolWithName  string
+	validateQualifiedNames *bool
+	metadataWriter         *metadataWriter
 
 	// Information about resource publishing changes concurrently and thus
 	// must be protected by the mutex. The controller gets started only
@@ -925,10 +955,6 @@ func Start(ctx context.Context, plugin DRAPlugin, opts ...Option) (result *Helpe
 	if o.rollingUpdateUID != "" && o.pluginRegistrationEndpoint.file != "" {
 		return nil, errors.New("rolling updates and explicit registration socket filename are mutually exclusive")
 	}
-	uidPart := ""
-	if o.rollingUpdateUID != "" {
-		uidPart = "-" + string(o.rollingUpdateUID)
-	}
 	if o.pluginRegistrationEndpoint.file == "" {
 		if o.rollingUpdateUID != "" {
 			o.pluginRegistrationEndpoint.file = RollingUpdateRegistrarSocketFile(o.pluginRegistrationEndpoint.dir, o.driverName, o.rollingUpdateUID)
@@ -940,18 +966,23 @@ func Start(ctx context.Context, plugin DRAPlugin, opts ...Option) (result *Helpe
 		o.pluginDataDirectoryPath = path.Join(KubeletPluginsDir, o.driverName)
 	}
 	if o.pluginSocket == "" {
-		o.pluginSocket = "dra" + uidPart + ".sock" // "dra" is hard-coded. The directory is unique, so we get a unique full path also without the UID.
+		if o.rollingUpdateUID != "" {
+			o.pluginSocket = rollingUpdatePluginSocketFile(o.pluginDataDirectoryPath, o.rollingUpdateUID)
+		} else {
+			o.pluginSocket = "dra.sock" // "dra" is hard-coded. The directory is unique, so we get a unique full path also without the UID.
+		}
 	}
 
 	d := &Helper{
-		driverName:            o.driverName,
-		nodeName:              o.nodeName,
-		nodeUID:               o.nodeUID,
-		kubeClient:            o.kubeClient,
-		resourceClient:        draclient.New(o.kubeClient),
-		serialize:             o.serialize,
-		plugin:                plugin,
-		reconcilePoolWithName: o.reconcilePoolWithName,
+		driverName:             o.driverName,
+		nodeName:               o.nodeName,
+		nodeUID:                o.nodeUID,
+		kubeClient:             o.kubeClient,
+		resourceClient:         draclient.New(o.kubeClient),
+		serialize:              o.serialize,
+		plugin:                 plugin,
+		reconcilePoolWithName:  o.reconcilePoolWithName,
+		validateQualifiedNames: o.validateQualifiedNames,
 	}
 	if o.rollingUpdateUID != "" {
 		dir := o.pluginDataDirectoryPath
@@ -1232,7 +1263,8 @@ func (d *Helper) PublishResources(_ context.Context, resources resourceslice.Dri
 					// -> all errors are recoverable.
 					d.plugin.HandleError(ctx, recoverableError{error: err}, msg)
 				},
-				ReconcilePoolWithName: d.reconcilePoolWithName,
+				ReconcilePoolWithName:  d.reconcilePoolWithName,
+				ValidateQualifiedNames: d.validateQualifiedNames,
 			}); err != nil {
 			return fmt.Errorf("start ResourceSlice controller: %w", err)
 		}

@@ -131,7 +131,6 @@ func TestGetTrustAnchorsByName(t *testing.T) {
 }
 
 func testGetTrustAnchorsByName[T clusterTrustBundle](tCtx ktesting.TContext, b testingFunctionBundle[T]) {
-	defer tCtx.Cancel("test completed")
 	t := tCtx.TB()
 
 	ctb1Bundle := mustMakeRoot(t, "root1")
@@ -188,7 +187,6 @@ func TestGetTrustAnchorsByNameCaching(t *testing.T) {
 }
 
 func testGetTrustAnchorsByNameCaching[T clusterTrustBundle](tCtx ktesting.TContext, b testingFunctionBundle[T]) {
-	defer tCtx.Cancel("test completed")
 	t := tCtx.TB()
 
 	ctb1Bundle := mustMakeRoot(t, "root1")
@@ -273,7 +271,6 @@ func TestGetTrustAnchorsBySignerName(t *testing.T) {
 }
 
 func testGetTrustAnchorsBySignerName[T clusterTrustBundle](tCtx ktesting.TContext, b testingFunctionBundle[T]) {
-	defer tCtx.Cancel("test completed")
 	t := tCtx.TB()
 
 	ctb1 := b.ctbConstructor("signer-a-label-a-1", "foo.bar/a", map[string]string{"label": "a"}, mustMakeRoot(t, "0"))
@@ -404,7 +401,6 @@ func TestGetTrustAnchorsBySignerNameCaching(t *testing.T) {
 }
 
 func testGetTrustAnchorsBySignerNameCaching[T clusterTrustBundle](tCtx ktesting.TContext, b testingFunctionBundle[T]) {
-	defer tCtx.Cancel("test completed")
 	t := tCtx.TB()
 
 	ctb1 := b.ctbConstructor("signer-a-label-a-1", "foo.bar/a", map[string]string{"label": "a"}, mustMakeRoot(t, "0"))

@@ -544,13 +544,11 @@ func InitTestAPIServer(t *testing.T, nsPrefix string, admission admission.Interf
 			if options.APIEnablement.RuntimeConfig == nil {
 				options.APIEnablement.RuntimeConfig = cliflag.ConfigurationMap{}
 			}
-			if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
-				options.APIEnablement.RuntimeConfig[resourceapi.SchemeGroupVersion.String()] = "true"
-				if utilfeature.DefaultMutableFeatureGate.EmulationVersion().LessThan(version.MustParse("v1.34.0")) {
-					// Cannot enable the resourceapi.SchemeGroupVersion when emulating < 1.34 unless
-					// we enable --runtime-config-emulation-forward-compatible.
-					options.GenericServerRunOptions.RuntimeConfigEmulationForwardCompatible = true
-				}
+			options.APIEnablement.RuntimeConfig[resourceapi.SchemeGroupVersion.String()] = "true"
+			if utilfeature.DefaultMutableFeatureGate.EmulationVersion().LessThan(version.MustParse("v1.34.0")) {
+				// Cannot enable the resourceapi.SchemeGroupVersion when emulating < 1.34 unless
+				// we enable --runtime-config-emulation-forward-compatible.
+				options.GenericServerRunOptions.RuntimeConfigEmulationForwardCompatible = true
 			}
 			if utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload) {
 				options.APIEnablement.RuntimeConfig[schedulingapiv1beta1.SchemeGroupVersion.String()] = "true"

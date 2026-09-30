@@ -213,7 +213,6 @@ func (c *mutationCache) ByIndex(name string, indexKey string) ([]interface{}, er
 	var items []interface{}
 	keySet := sets.NewString()
 	for _, key := range keys {
-		keySet.Insert(key)
 		obj, exists, err := c.indexer.GetByKey(key)
 		if err != nil {
 			return nil, err
@@ -221,6 +220,10 @@ func (c *mutationCache) ByIndex(name string, indexKey string) ([]interface{}, er
 		if !exists {
 			continue
 		}
+		// Because the indexer returned an object for this key,
+		// add it to keySet to prevent the mutation cache from
+		// adding the same key again in our if c.includeAdds logic below.
+		keySet.Insert(key)
 		if objRuntime, ok := obj.(runtime.Object); ok {
 			items = append(items, c.newerObject(key, objRuntime))
 		} else {

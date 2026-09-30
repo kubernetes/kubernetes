@@ -265,136 +265,159 @@ func TestParseQuantityString(t *testing.T) {
 	}
 }
 
+type parseQuantityTestcase struct {
+	input        string
+	expect       Quantity
+	expectString string
+}
+
+// quantityTestcases generates a new slice with test cases.
+// Several Quantity methods may unexpectedly mutate an instance, so be careful about
+// the "expect" instance within tests.
+func quantityTestcases() []parseQuantityTestcase {
+	return []parseQuantityTestcase{
+		{"0", decQuantity(0, 0, DecimalSI), "0"},
+		{"0n", decQuantity(0, 0, DecimalSI), "0"},
+		{"0u", decQuantity(0, 0, DecimalSI), "0"},
+		{"0m", decQuantity(0, 0, DecimalSI), "0"},
+		{"0Ki", decQuantity(0, 0, BinarySI), "0"},
+		{"0k", decQuantity(0, 0, DecimalSI), "0"},
+		{"0Mi", decQuantity(0, 0, BinarySI), "0"},
+		{"0M", decQuantity(0, 0, DecimalSI), "0"},
+		{"0Gi", decQuantity(0, 0, BinarySI), "0"},
+		{"0G", decQuantity(0, 0, DecimalSI), "0"},
+		{"0Ti", decQuantity(0, 0, BinarySI), "0"},
+		{"0T", decQuantity(0, 0, DecimalSI), "0"},
+
+		// Quantity less numbers are allowed
+		{"1", decQuantity(1, 0, DecimalSI), "1"},
+
+		// Binary suffixes
+		{"1Ki", decQuantity(1024, 0, BinarySI), "1Ki"},
+		{"8Ki", decQuantity(8*1024, 0, BinarySI), "8Ki"},
+		{"7Mi", decQuantity(7*1024*1024, 0, BinarySI), "7Mi"},
+		{"6Gi", decQuantity(6*1024*1024*1024, 0, BinarySI), "6Gi"},
+		{"5Ti", decQuantity(5*1024*1024*1024*1024, 0, BinarySI), "5Ti"},
+		{"4Pi", decQuantity(4*1024*1024*1024*1024*1024, 0, BinarySI), "4Pi"},
+		{"3Ei", decQuantity(3*1024*1024*1024*1024*1024*1024, 0, BinarySI), "3Ei"},
+
+		{"10Ti", decQuantity(10*1024*1024*1024*1024, 0, BinarySI), "10Ti"},
+		{"100Ti", decQuantity(100*1024*1024*1024*1024, 0, BinarySI), "100Ti"},
+
+		// Decimal suffixes
+		{"5n", decQuantity(5, -9, DecimalSI), "5n"},
+		{"4u", decQuantity(4, -6, DecimalSI), "4u"},
+		{"3m", decQuantity(3, -3, DecimalSI), "3m"},
+		{"9", decQuantity(9, 0, DecimalSI), "9"},
+		{"8k", decQuantity(8, 3, DecimalSI), "8k"},
+		{"50k", decQuantity(5, 4, DecimalSI), "50k"},
+		{"7M", decQuantity(7, 6, DecimalSI), "7M"},
+		{"6G", decQuantity(6, 9, DecimalSI), "6G"},
+		{"5T", decQuantity(5, 12, DecimalSI), "5T"},
+		{"40T", decQuantity(4, 13, DecimalSI), "40T"},
+		{"300T", decQuantity(3, 14, DecimalSI), "300T"},
+		{"2P", decQuantity(2, 15, DecimalSI), "2P"},
+		{"1E", decQuantity(1, 18, DecimalSI), "1E"},
+
+		// Decimal exponents
+		{"1E-3", decQuantity(1, -3, DecimalExponent), "1E-3"},
+		{"1e3", decQuantity(1, 3, DecimalExponent), "1e3"},
+		{"1E6", decQuantity(1, 6, DecimalExponent), "1E6"},
+		{"1e9", decQuantity(1, 9, DecimalExponent), "1e9"},
+		{"1E12", decQuantity(1, 12, DecimalExponent), "1E12"},
+		{"1e15", decQuantity(1, 15, DecimalExponent), "1e15"},
+		{"1E18", decQuantity(1, 18, DecimalExponent), "1E18"},
+
+		// Nonstandard but still parsable
+		{"1e14", decQuantity(1, 14, DecimalExponent), "100e12"},
+		{"1e13", decQuantity(1, 13, DecimalExponent), "10e12"},
+		{"1e3", decQuantity(1, 3, DecimalExponent), "1e3"},
+		{"100.035k", decQuantity(100035, 0, DecimalSI), "100.035k"},
+
+		// Things that look like floating point
+		{"0.001", decQuantity(1, -3, DecimalSI), "1m"},
+		{"0.0005k", decQuantity(5, -1, DecimalSI), "500m"},
+		{"0.005", decQuantity(5, -3, DecimalSI), "5m"},
+		{"0.05", decQuantity(5, -2, DecimalSI), "50m"},
+		{"0.5", decQuantity(5, -1, DecimalSI), "500m"},
+		{"0.00050k", decQuantity(5, -1, DecimalSI), "500m"},
+		{"0.00500", decQuantity(5, -3, DecimalSI), "5m"},
+		{"0.05000", decQuantity(5, -2, DecimalSI), "50m"},
+		{"0.50000", decQuantity(5, -1, DecimalSI), "500m"},
+		{"0.5e0", decQuantity(5, -1, DecimalExponent), "500e-3"},
+		{"0.5e-1", decQuantity(5, -2, DecimalExponent), "50e-3"},
+		{"0.5e-2", decQuantity(5, -3, DecimalExponent), "5e-3"},
+		{"0.5e0", decQuantity(5, -1, DecimalExponent), "500e-3"},
+		{"10.035M", decQuantity(10035, 3, DecimalSI), "10.035M"},
+
+		{"1.2e3", decQuantity(12, 2, DecimalExponent), "1200"},
+		{"1.3E+6", decQuantity(13, 5, DecimalExponent), "1300e3"},
+		{"1.40e9", decQuantity(14, 8, DecimalExponent), "1400e6"},
+		{"1.53E12", decQuantity(153, 10, DecimalExponent), "1530e9"},
+		{"1.6e15", decQuantity(16, 14, DecimalExponent), "1600e12"},
+		{"1.7E18", decQuantity(17, 17, DecimalExponent), "1700e15"},
+
+		{"9.01", decQuantity(901, -2, DecimalSI), "9010m"},
+		{"8.1k", decQuantity(81, 2, DecimalSI), "8100"},
+		{"7.123456M", decQuantity(7123456, 0, DecimalSI), "7.123456M"},
+		{"6.987654321G", decQuantity(6987654321, 0, DecimalSI), "6.987654321G"},
+		{"5.444T", decQuantity(5444, 9, DecimalSI), "5.444T"},
+		{"40.1T", decQuantity(401, 11, DecimalSI), "40100G"},
+		{"300.2T", decQuantity(3002, 11, DecimalSI), "300200G"},
+		{"2.5P", decQuantity(25, 14, DecimalSI), "2500T"},
+		{"1.01E", decQuantity(101, 16, DecimalSI), "1010P"},
+
+		// Things that saturate/round
+		{"3.001n", decQuantity(4, -9, DecimalSI), "4n"},
+		{"1.1E-9", decQuantity(2, -9, DecimalExponent), "2e-9"},
+		{"0.0000000001", decQuantity(1, -9, DecimalSI), "1n"},
+		{"0.0000000005", decQuantity(1, -9, DecimalSI), "1n"},
+		{"0.00000000050", decQuantity(1, -9, DecimalSI), "1n"},
+		{"0.5e-9", decQuantity(1, -9, DecimalExponent), "1e-9"},
+		{"0.9n", decQuantity(1, -9, DecimalSI), "1n"},
+		{"0.00000012345", decQuantity(124, -9, DecimalSI), "124n"},
+		{"0.00000012354", decQuantity(124, -9, DecimalSI), "124n"},
+		{"9Ei", Quantity{d: maxAllowed, Format: BinarySI}, "9223372036854775807"},
+		{"9223372036854775807Ki", Quantity{d: maxAllowed, Format: BinarySI}, "9223372036854775807"},
+		{"12E", decQuantity(12, 18, DecimalSI), "12E"},
+
+		// We'll accept fractional binary stuff, too.
+		{"100.035Ki", decQuantity(10243584, -2, BinarySI), "102435840m"},
+		{"0.5Mi", decQuantity(.5*1024*1024, 0, BinarySI), "512Ki"},
+		{"0.05Gi", decQuantity(536870912, -1, BinarySI), "53687091200m"},
+		{"0.025Ti", decQuantity(274877906944, -1, BinarySI), "27487790694400m"},
+
+		// Things written by trolls
+		{"0.000000000001Ki", decQuantity(2, -9, DecimalSI), "2n"}, // rounds up, changes format
+		{".001", decQuantity(1, -3, DecimalSI), "1m"},
+		{".0001k", decQuantity(100, -3, DecimalSI), "100m"},
+		{"1.", decQuantity(1, 0, DecimalSI), "1."},
+		{"1.G", decQuantity(1, 9, DecimalSI), "1.G"},
+	}
+}
+
 func TestQuantityParse(t *testing.T) {
 	if _, err := ParseQuantity(""); err == nil {
 		t.Errorf("expected empty string to return error")
 	}
 
-	table := []struct {
-		input  string
-		expect Quantity
-	}{
-		{"0", decQuantity(0, 0, DecimalSI)},
-		{"0n", decQuantity(0, 0, DecimalSI)},
-		{"0u", decQuantity(0, 0, DecimalSI)},
-		{"0m", decQuantity(0, 0, DecimalSI)},
-		{"0Ki", decQuantity(0, 0, BinarySI)},
-		{"0k", decQuantity(0, 0, DecimalSI)},
-		{"0Mi", decQuantity(0, 0, BinarySI)},
-		{"0M", decQuantity(0, 0, DecimalSI)},
-		{"0Gi", decQuantity(0, 0, BinarySI)},
-		{"0G", decQuantity(0, 0, DecimalSI)},
-		{"0Ti", decQuantity(0, 0, BinarySI)},
-		{"0T", decQuantity(0, 0, DecimalSI)},
-
-		// Quantity less numbers are allowed
-		{"1", decQuantity(1, 0, DecimalSI)},
-
-		// Binary suffixes
-		{"1Ki", decQuantity(1024, 0, BinarySI)},
-		{"8Ki", decQuantity(8*1024, 0, BinarySI)},
-		{"7Mi", decQuantity(7*1024*1024, 0, BinarySI)},
-		{"6Gi", decQuantity(6*1024*1024*1024, 0, BinarySI)},
-		{"5Ti", decQuantity(5*1024*1024*1024*1024, 0, BinarySI)},
-		{"4Pi", decQuantity(4*1024*1024*1024*1024*1024, 0, BinarySI)},
-		{"3Ei", decQuantity(3*1024*1024*1024*1024*1024*1024, 0, BinarySI)},
-
-		{"10Ti", decQuantity(10*1024*1024*1024*1024, 0, BinarySI)},
-		{"100Ti", decQuantity(100*1024*1024*1024*1024, 0, BinarySI)},
-
-		// Decimal suffixes
-		{"5n", decQuantity(5, -9, DecimalSI)},
-		{"4u", decQuantity(4, -6, DecimalSI)},
-		{"3m", decQuantity(3, -3, DecimalSI)},
-		{"9", decQuantity(9, 0, DecimalSI)},
-		{"8k", decQuantity(8, 3, DecimalSI)},
-		{"50k", decQuantity(5, 4, DecimalSI)},
-		{"7M", decQuantity(7, 6, DecimalSI)},
-		{"6G", decQuantity(6, 9, DecimalSI)},
-		{"5T", decQuantity(5, 12, DecimalSI)},
-		{"40T", decQuantity(4, 13, DecimalSI)},
-		{"300T", decQuantity(3, 14, DecimalSI)},
-		{"2P", decQuantity(2, 15, DecimalSI)},
-		{"1E", decQuantity(1, 18, DecimalSI)},
-
-		// Decimal exponents
-		{"1E-3", decQuantity(1, -3, DecimalExponent)},
-		{"1e3", decQuantity(1, 3, DecimalExponent)},
-		{"1E6", decQuantity(1, 6, DecimalExponent)},
-		{"1e9", decQuantity(1, 9, DecimalExponent)},
-		{"1E12", decQuantity(1, 12, DecimalExponent)},
-		{"1e15", decQuantity(1, 15, DecimalExponent)},
-		{"1E18", decQuantity(1, 18, DecimalExponent)},
-
-		// Nonstandard but still parsable
-		{"1e14", decQuantity(1, 14, DecimalExponent)},
-		{"1e13", decQuantity(1, 13, DecimalExponent)},
-		{"1e3", decQuantity(1, 3, DecimalExponent)},
-		{"100.035k", decQuantity(100035, 0, DecimalSI)},
-
-		// Things that look like floating point
-		{"0.001", decQuantity(1, -3, DecimalSI)},
-		{"0.0005k", decQuantity(5, -1, DecimalSI)},
-		{"0.005", decQuantity(5, -3, DecimalSI)},
-		{"0.05", decQuantity(5, -2, DecimalSI)},
-		{"0.5", decQuantity(5, -1, DecimalSI)},
-		{"0.00050k", decQuantity(5, -1, DecimalSI)},
-		{"0.00500", decQuantity(5, -3, DecimalSI)},
-		{"0.05000", decQuantity(5, -2, DecimalSI)},
-		{"0.50000", decQuantity(5, -1, DecimalSI)},
-		{"0.5e0", decQuantity(5, -1, DecimalExponent)},
-		{"0.5e-1", decQuantity(5, -2, DecimalExponent)},
-		{"0.5e-2", decQuantity(5, -3, DecimalExponent)},
-		{"0.5e0", decQuantity(5, -1, DecimalExponent)},
-		{"10.035M", decQuantity(10035, 3, DecimalSI)},
-
-		{"1.2e3", decQuantity(12, 2, DecimalExponent)},
-		{"1.3E+6", decQuantity(13, 5, DecimalExponent)},
-		{"1.40e9", decQuantity(14, 8, DecimalExponent)},
-		{"1.53E12", decQuantity(153, 10, DecimalExponent)},
-		{"1.6e15", decQuantity(16, 14, DecimalExponent)},
-		{"1.7E18", decQuantity(17, 17, DecimalExponent)},
-
-		{"9.01", decQuantity(901, -2, DecimalSI)},
-		{"8.1k", decQuantity(81, 2, DecimalSI)},
-		{"7.123456M", decQuantity(7123456, 0, DecimalSI)},
-		{"6.987654321G", decQuantity(6987654321, 0, DecimalSI)},
-		{"5.444T", decQuantity(5444, 9, DecimalSI)},
-		{"40.1T", decQuantity(401, 11, DecimalSI)},
-		{"300.2T", decQuantity(3002, 11, DecimalSI)},
-		{"2.5P", decQuantity(25, 14, DecimalSI)},
-		{"1.01E", decQuantity(101, 16, DecimalSI)},
-
-		// Things that saturate/round
-		{"3.001n", decQuantity(4, -9, DecimalSI)},
-		{"1.1E-9", decQuantity(2, -9, DecimalExponent)},
-		{"0.0000000001", decQuantity(1, -9, DecimalSI)},
-		{"0.0000000005", decQuantity(1, -9, DecimalSI)},
-		{"0.00000000050", decQuantity(1, -9, DecimalSI)},
-		{"0.5e-9", decQuantity(1, -9, DecimalExponent)},
-		{"0.9n", decQuantity(1, -9, DecimalSI)},
-		{"0.00000012345", decQuantity(124, -9, DecimalSI)},
-		{"0.00000012354", decQuantity(124, -9, DecimalSI)},
-		{"9Ei", Quantity{d: maxAllowed, Format: BinarySI}},
-		{"9223372036854775807Ki", Quantity{d: maxAllowed, Format: BinarySI}},
-		{"12E", decQuantity(12, 18, DecimalSI)},
-
-		// We'll accept fractional binary stuff, too.
-		{"100.035Ki", decQuantity(10243584, -2, BinarySI)},
-		{"0.5Mi", decQuantity(.5*1024*1024, 0, BinarySI)},
-		{"0.05Gi", decQuantity(536870912, -1, BinarySI)},
-		{"0.025Ti", decQuantity(274877906944, -1, BinarySI)},
-
-		// Things written by trolls
-		{"0.000000000001Ki", decQuantity(2, -9, DecimalSI)}, // rounds up, changes format
-		{".001", decQuantity(1, -3, DecimalSI)},
-		{".0001k", decQuantity(100, -3, DecimalSI)},
-		{"1.", decQuantity(1, 0, DecimalSI)},
-		{"1.G", decQuantity(1, 9, DecimalSI)},
+	for _, item := range quantityTestcases() {
+		got, err := ParseQuantity(item.input)
+		if err != nil {
+			t.Errorf("%v: unexpected error: %v", item.input, err)
+			continue
+		}
+		if got.s == "" {
+			t.Errorf("%v: cached string was not set by ParseQuantity as it should have been", item.input)
+		}
+		gotString := got.String()
+		if gotString != item.expectString {
+			t.Errorf("%v: unexpected String() result after ParseQuantity: want %q, got %q", item.input, item.expectString, gotString)
+		}
 	}
 
 	for _, asDec := range []bool{false, true} {
-		for _, item := range table {
+		for _, item := range quantityTestcases() {
 			got, err := ParseQuantity(item.input)
 			if err != nil {
 				t.Errorf("%v: unexpected error: %v", item.input, err)
@@ -433,7 +456,7 @@ func TestQuantityParse(t *testing.T) {
 			}
 		}
 
-		for _, item := range table {
+		for _, item := range quantityTestcases() {
 			got, err := ParseQuantity(item.input)
 			if err != nil {
 				t.Errorf("%v: unexpected error: %v", item.input, err)
@@ -490,7 +513,7 @@ func TestQuantityParse(t *testing.T) {
 		// Try the negative version of everything
 		desired := &inf.Dec{}
 		expect := Quantity{d: infDecAmount{Dec: desired}}
-		for _, item := range table {
+		for _, item := range quantityTestcases() {
 			got, err := ParseQuantity("-" + strings.TrimLeftFunc(item.input, unicode.IsSpace))
 			if err != nil {
 				t.Errorf("-%v: unexpected error: %v", item.input, err)
@@ -512,7 +535,7 @@ func TestQuantityParse(t *testing.T) {
 		}
 
 		// Try everything with an explicit +
-		for _, item := range table {
+		for _, item := range quantityTestcases() {
 			got, err := ParseQuantity("+" + strings.TrimLeftFunc(item.input, unicode.IsSpace))
 			if err != nil {
 				t.Errorf("-%v: unexpected error: %v", item.input, err)
@@ -542,9 +565,9 @@ func TestQuantityParse(t *testing.T) {
 		"-3.01i",
 		"-3.01e-",
 
-		// an exponent outside the int32 scale is rejected rather than truncated
-		// to an unrelated value; 1e4294967297 would otherwise parse as 1e1
-		"1e4294967297",
+		// an exponent that narrows to a scale of math.MinInt32 is rejected,
+		// because negating that scale overflows int32
+		"1e2147483648",
 
 		// trailing whitespace is forbidden
 		" 1",
@@ -559,26 +582,26 @@ func TestQuantityParse(t *testing.T) {
 }
 
 func TestInterpretExponentInt32Bounds(t *testing.T) {
-	// interpret parses the exponent at 64 bits but stores it in an int32 scale
-	// that is later negated, so it accepts [-MaxInt32, MaxInt32] and rejects
-	// anything past it, instead of narrowing it to an unrelated value. This
-	// checks interpret's suffix-layer bounds only, not what the rest of
-	// ParseQuantity does with an accepted exponent.
+	// interpret parses the exponent at 64 bits and narrows it to the int32
+	// scale, the way a <=1.37 apiserver did, so that objects it wrote keep
+	// decoding. The exception is a scale of math.MinInt32, whose negation
+	// overflows int32. This checks interpret's suffix-layer behaviour only,
+	// not what the rest of ParseQuantity does with an accepted exponent.
 	cases := []struct {
 		suffix  string
 		wantExp int32
 		wantOK  bool
 	}{
 		{"e14", 14, true},
-		{"E2147483647", 2147483647, true},   // MaxInt32
-		{"E-2147483647", -2147483647, true}, // -MaxInt32
-		{"E2147483648", 0, false},           // MaxInt32 + 1
-		{"E-2147483648", 0, false},          // MinInt32; -MinInt32 overflows int32
-		{"E4294967297", 0, false},           // 2^32 + 1, truncated to 1 today
-		{"E8589934592", 0, false},           // 2^33, truncated to 0 today
-		{"E9223372036854775807", 0, false},  // MaxInt64, truncated to -1 today
-		{"E9223372036854775808", 0, false},  // MaxInt64 + 1, past int64: ParseInt range error
-		{"E6024865272343", 0, false},        // far past int32
+		{"E2147483647", 2147483647, true},     // MaxInt32
+		{"E-2147483647", -2147483647, true},   // -MaxInt32
+		{"E2147483648", math.MinInt32, true},  // narrows to MinInt32; ParseQuantity rejects that scale
+		{"E-2147483648", math.MinInt32, true}, // narrows to MinInt32 as well
+		{"E4294967297", 1, true},              // 2^32 + 1 narrows to 1
+		{"E8589934592", 0, true},              // 2^33 narrows to 0
+		{"E9223372036854775807", -1, true},    // MaxInt64 narrows to -1
+		{"E9223372036854775808", 0, false},    // MaxInt64 + 1, past int64: ParseInt range error
+		{"E6024865272343", -973843945, true},  // far past int32, narrows
 	}
 	for _, tc := range cases {
 		base, exp, format, ok := quantitySuffixer.interpret(suffix(tc.suffix))
@@ -655,6 +678,14 @@ func TestQuantityCmpInt64AndDec(t *testing.T) {
 		{intQuantity(mostNegative, -18, DecimalSI), intQuantity(-1, 0, DecimalSI), -1},
 		{intQuantity(mostNegative, -19, DecimalSI), intQuantity(-1, 0, DecimalSI), 1},
 
+		// TODO(#141166): 1e-2147483648 is below 1, so this must be -1.
+		{intQuantity(1, math.MinInt32, DecimalSI), intQuantity(1, 0, DecimalSI), 1},
+		// TODO(#141166): -1e-2147483648 is above -1, so this must be 1.
+		{intQuantity(-1, math.MinInt32, DecimalSI), intQuantity(-1, 0, DecimalSI), -1},
+		// TODO(#141166): 1e-2147483648 is below 1e-2147483630, so this must be -1.
+		{intQuantity(1, math.MinInt32, DecimalSI), intQuantity(1, math.MinInt32+18, DecimalSI), 1},
+		{intQuantity(1, math.MinInt32+1, DecimalSI), intQuantity(1, 0, DecimalSI), -1},
+
 		{intQuantity(1*1000000*1000000*1000000, -17, DecimalSI), intQuantity(1, 1, DecimalSI), 0},
 		{intQuantity(1*1000000*1000000*1000000, -17, DecimalSI), intQuantity(-10, 0, DecimalSI), 1},
 		{intQuantity(-1*1000000*1000000*1000000, -17, DecimalSI), intQuantity(-10, 0, DecimalSI), 0},
@@ -704,6 +735,34 @@ func TestQuantityCmpInt64AndDec(t *testing.T) {
 		}
 		if cmp := b.Cmp(a); cmp != -item.cmp {
 			t.Errorf("%#v: unexpected inverted Cmp: %d", item, cmp)
+		}
+	}
+}
+
+func TestQuantityCmpInt64(t *testing.T) {
+	table := []struct {
+		a   Quantity
+		b   int64
+		cmp int
+	}{
+		{intQuantity(901, -2, DecimalSI), 9, 1},
+		{intQuantity(901, -2, DecimalSI), 10, -1},
+		{intQuantity(1000, -3, DecimalSI), 1, 0},
+		{intQuantity(mostPositive, 0, DecimalSI), mostPositive, 0},
+		{intQuantity(mostNegative, 0, DecimalSI), mostNegative, 0},
+		{decQuantity(901, -2, DecimalSI), 9, 1},
+		{decQuantity(901, -2, DecimalSI), 10, -1},
+
+		// TODO(#141166): 1e-2147483648 is below 1, so this must be -1.
+		{intQuantity(1, math.MinInt32, DecimalSI), 1, 1},
+		// TODO(#141166): -1e-2147483648 is above -1, so this must be 1.
+		{intQuantity(-1, math.MinInt32, DecimalSI), -1, -1},
+		{intQuantity(1, math.MinInt32+1, DecimalSI), 1, -1},
+	}
+
+	for _, item := range table {
+		if cmp := item.a.CmpInt64(item.b); cmp != item.cmp {
+			t.Errorf("%#v: unexpected CmpInt64(%d): %d", item, item.b, cmp)
 		}
 	}
 }
@@ -816,14 +875,13 @@ func TestQuantityString(t *testing.T) {
 			t.Errorf("%#v: unexpected error: %v", item.expect, err)
 			continue
 		}
-		if len(q.s) != 0 {
-			t.Errorf("%#v: unexpected nested string: %v", item.expect, q.s)
+		// ParseQuantity always canonicalizes and caches the string form itself now,
+		// since String() no longer mutates the receiver.
+		if len(q.s) == 0 || q.s != item.expect {
+			t.Errorf("%#v: did not set canonical string on parse: %s", item.expect, q.s)
 		}
 		if q.String() != item.expect {
 			t.Errorf("%#v: unexpected alternate canonical: %v", item.expect, q.String())
-		}
-		if len(q.s) == 0 || q.s != item.expect {
-			t.Errorf("%#v: did not set canonical string on ToString: %s", item.expect, q.s)
 		}
 	}
 	desired := &inf.Dec{} // Avoid modifying the values in the table.
@@ -891,6 +949,28 @@ func TestBinarySIZeroExponentString(t *testing.T) {
 	}
 }
 
+func TestQuantityCacheString(t *testing.T) {
+	q := decQuantity(1000, 6, DecimalSI) // canonicalizes to "1G", built without a cached string
+	if len(q.s) != 0 {
+		t.Fatalf("expected no cached string yet, got %q", q.s)
+	}
+	if s := q.CacheString(); s != "1G" {
+		t.Errorf("CacheString() = %q, expected %q", s, "1G")
+	}
+	if q.s != "1G" {
+		t.Errorf("CacheString() did not populate q.s, got %q", q.s)
+	}
+	// calling again with an already-populated cache must return the cached value unchanged
+	if s := q.CacheString(); s != "1G" {
+		t.Errorf("second CacheString() = %q, expected %q", s, "1G")
+	}
+
+	var nilQ *Quantity
+	if s := nilQ.CacheString(); s != "<nil>" {
+		t.Errorf("CacheString() on nil Quantity = %q, expected %q", s, "<nil>")
+	}
+}
+
 func TestQuantityStringBelowNano(t *testing.T) {
 	// DecimalSI has no suffix below "n" (10^-9), so these values take the same
 	// exponent-notation fallback as the >"E" cases above. They are not reachable
@@ -903,6 +983,17 @@ func TestQuantityStringBelowNano(t *testing.T) {
 	}{
 		{decQuantity(1, -12, DecimalSI), "1e-12"},
 		{decQuantity(1, -10, DecimalSI), "100e-12"},
+		{intQuantity(1, math.MinInt32+2, BinarySI), "1e-2147483646"},
+		{intQuantity(1024, math.MinInt32+2, BinarySI), "1024e-2147483646"},
+		{intQuantity(math.MaxInt64, math.MinInt32+2, BinarySI), "9223372036854775807e-2147483646"},
+		// TODO(#141166): Must print the exact value, 1024e-2147483647.
+		{intQuantity(1024, math.MinInt32+1, BinarySI), "102400e2147483647"},
+		// TODO(#141166): Must print the exact value, 1e-2147483648.
+		{intQuantity(1, math.MinInt32, BinarySI), "1"},
+		// TODO(#141166): Must print the exact value, 1024e-2147483648.
+		{intQuantity(1024, math.MinInt32, BinarySI), "1Ki"},
+		// TODO(#141166): Must print the exact value, 9223372036854775807e-2147483648.
+		{intQuantity(math.MaxInt64, math.MinInt32, BinarySI), "9223372036854775807"},
 	}
 	for _, item := range table {
 		if e, a := item.expect, item.in.String(); e != a {
@@ -1901,198 +1992,176 @@ func TestStringQuantityAsFloat64Slow(t *testing.T) {
 	}
 }
 
+// benchmarkQuantities derives a slice of Quantity values from quantityTestcases,
+// keeping only one entry per distinct expected string to avoid redundant benchmarks.
+//
+// This covers quite a lot of different cases, with (by default) -benchtime=1s
+// per case. Run with a smaller -benchtime if you need to safe time.
 func benchmarkQuantities() []Quantity {
-	return []Quantity{
-		intQuantity(1024*1024*1024, 0, BinarySI),
-		intQuantity(1024*1024*1024*1024, 0, BinarySI),
-		intQuantity(1000000, 3, DecimalSI),
-		intQuantity(1000000000, 0, DecimalSI),
-		intQuantity(1, -3, DecimalSI),
-		intQuantity(80, -3, DecimalSI),
-		intQuantity(1080, -3, DecimalSI),
-		intQuantity(0, 0, BinarySI),
-		intQuantity(1, 9, DecimalExponent),
-		intQuantity(1, -9, DecimalSI),
-		intQuantity(1000000, 10, DecimalSI),
+	seen := make(map[string]bool)
+	var values []Quantity
+	for _, item := range quantityTestcases() {
+		if seen[item.expectString] {
+			continue
+		}
+		seen[item.expectString] = true
+		values = append(values, item.expect)
 	}
+	return values
 }
 
 func BenchmarkQuantityString(b *testing.B) {
-	values := benchmarkQuantities()
-	b.ResetTimer()
-	var s string
-	for i := 0; i < b.N; i++ {
-		q := values[i%len(values)]
-		q.s = ""
-		s = q.String()
-	}
-	b.StopTimer()
-	if len(s) == 0 {
-		b.Fatal(s)
-	}
-}
-
-func BenchmarkQuantityStringPrecalc(b *testing.B) {
-	values := benchmarkQuantities()
-	for i := range values {
-		_ = values[i].String()
-	}
-	b.ResetTimer()
-	var s string
-	for i := 0; i < b.N; i++ {
-		q := values[i%len(values)]
-		s = q.String()
-	}
-	b.StopTimer()
-	if len(s) == 0 {
-		b.Fatal(s)
+	for _, q := range benchmarkQuantities() {
+		b.Run(q.String(), func(b *testing.B) {
+			for b.Loop() {
+				q.s = ""
+				if len(q.String()) == 0 {
+					b.Fatal(q)
+				}
+			}
+		})
 	}
 }
 
 func BenchmarkQuantityStringBinarySI(b *testing.B) {
-	values := benchmarkQuantities()
-	for i := range values {
-		values[i].Format = BinarySI
-	}
-	b.ResetTimer()
-	var s string
-	for i := 0; i < b.N; i++ {
-		q := values[i%len(values)]
-		q.s = ""
-		s = q.String()
-	}
-	b.StopTimer()
-	if len(s) == 0 {
-		b.Fatal(s)
+	for _, q := range benchmarkQuantities() {
+		q.Format = BinarySI
+		b.Run(q.String(), func(b *testing.B) {
+			for b.Loop() {
+				q.s = ""
+				if len(q.String()) == 0 {
+					b.Fatal(q)
+				}
+			}
+		})
 	}
 }
 
 func BenchmarkQuantityMarshalJSON(b *testing.B) {
-	values := benchmarkQuantities()
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		q := values[i%len(values)]
-		q.s = ""
-		if _, err := q.MarshalJSON(); err != nil {
-			b.Fatal(err)
-		}
+	for _, q := range benchmarkQuantities() {
+		b.Run(q.String(), func(b *testing.B) {
+			for b.Loop() {
+				q.s = ""
+				if _, err := q.MarshalJSON(); err != nil {
+					b.Fatal(err)
+				}
+			}
+		})
 	}
-	b.StopTimer()
 }
 
 func BenchmarkQuantityUnmarshalJSON(b *testing.B) {
-	values := benchmarkQuantities()
-	var json [][]byte
-	for _, v := range values {
-		data, _ := v.MarshalJSON()
-		json = append(json, data)
-	}
-
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		var q Quantity
-		if err := q.UnmarshalJSON(json[i%len(values)]); err != nil {
+	for _, q := range benchmarkQuantities() {
+		data, err := q.MarshalJSON()
+		if err != nil {
 			b.Fatal(err)
 		}
+		b.Run(q.String(), func(b *testing.B) {
+			for b.Loop() {
+				var q Quantity
+				if err := q.UnmarshalJSON(data); err != nil {
+					b.Fatal(err)
+				}
+			}
+		})
 	}
-	b.StopTimer()
 }
 
 func BenchmarkParseQuantity(b *testing.B) {
-	values := benchmarkQuantities()
-	var strings []string
-	for _, v := range values {
-		strings = append(strings, v.String())
+	for _, item := range quantityTestcases() {
+		b.Run(item.input, func(b *testing.B) {
+			for b.Loop() {
+				ParseQuantity(item.input)
+			}
+		})
 	}
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		if _, err := ParseQuantity(strings[i%len(values)]); err != nil {
-			b.Fatal(err)
-		}
-	}
-	b.StopTimer()
 }
 
 func BenchmarkCanonicalize(b *testing.B) {
-	values := benchmarkQuantities()
-	b.ResetTimer()
-	buffer := make([]byte, 0, 100)
-	for i := 0; i < b.N; i++ {
-		s, _ := values[i%len(values)].CanonicalizeBytes(buffer)
-		if len(s) == 0 {
-			b.Fatal(s)
-		}
+	for _, q := range benchmarkQuantities() {
+		b.Run(q.String(), func(b *testing.B) {
+			buffer := make([]byte, 0, 100)
+			for b.Loop() {
+				s, _ := q.CanonicalizeBytes(buffer)
+				if len(s) == 0 {
+					b.Fatal(s)
+				}
+			}
+		})
 	}
-	b.StopTimer()
 }
 
 func BenchmarkQuantityRoundUp(b *testing.B) {
-	values := benchmarkQuantities()
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		q := values[i%len(values)]
-		copied := q
-		copied.RoundUp(-3)
+	for _, q := range benchmarkQuantities() {
+		b.Run(q.String(), func(b *testing.B) {
+			for b.Loop() {
+				// Cannot use a shallow copy here, that would
+				// share state across iterations of the loop,
+				// depending on the test case.
+				copied := q.DeepCopy()
+				copied.RoundUp(-3)
+			}
+		})
 	}
-	b.StopTimer()
 }
 
 func BenchmarkQuantityCopy(b *testing.B) {
-	values := benchmarkQuantities()
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		values[i%len(values)].DeepCopy()
+	for _, q := range benchmarkQuantities() {
+		b.Run(q.String(), func(b *testing.B) {
+			for b.Loop() {
+				q.DeepCopy()
+			}
+		})
 	}
-	b.StopTimer()
 }
 
 func BenchmarkQuantityAdd(b *testing.B) {
-	values := benchmarkQuantities()
-	base := &Quantity{}
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		q := values[i%len(values)]
-		base.d.Dec = nil
-		base.i = int64Amount{value: 100}
-		base.Add(q)
+	for _, q := range benchmarkQuantities() {
+		b.Run(q.String(), func(b *testing.B) {
+			base := &Quantity{}
+			for b.Loop() {
+				base.d.Dec = nil
+				base.i = int64Amount{value: 100}
+				base.Add(q)
+			}
+		})
 	}
-	b.StopTimer()
 }
 
 func BenchmarkQuantityCmp(b *testing.B) {
-	values := benchmarkQuantities()
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		q := values[i%len(values)]
-		if q.Cmp(q) != 0 {
-			b.Fatal(q)
-		}
+	for _, q := range benchmarkQuantities() {
+		b.Run(q.String(), func(b *testing.B) {
+			for b.Loop() {
+				if q.Cmp(q) != 0 {
+					b.Fatal(q)
+				}
+			}
+		})
 	}
-	b.StopTimer()
 }
 
 func BenchmarkQuantityAsApproximateFloat64(b *testing.B) {
-	values := benchmarkQuantities()
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		q := values[i%len(values)]
-		if q.AsApproximateFloat64() == -1 {
-			b.Fatal(q)
-		}
+	for _, q := range benchmarkQuantities() {
+		b.Run(q.String(), func(b *testing.B) {
+			for b.Loop() {
+				if q.AsApproximateFloat64() == -1 {
+					b.Fatal(q)
+				}
+			}
+		})
 	}
-	b.StopTimer()
 }
 
 func BenchmarkQuantityAsFloat64Slow(b *testing.B) {
-	values := benchmarkQuantities()
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		q := values[i%len(values)]
-		if q.AsFloat64Slow() == -1 {
-			b.Fatal(q)
-		}
+	for _, q := range benchmarkQuantities() {
+		b.Run(q.String(), func(b *testing.B) {
+			for b.Loop() {
+				if q.AsFloat64Slow() == -1 {
+					b.Fatal(q)
+				}
+			}
+		})
 	}
-	b.StopTimer()
 }
 
 var _ pflag.Value = &QuantityValue{}

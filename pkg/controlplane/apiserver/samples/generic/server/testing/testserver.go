@@ -103,11 +103,15 @@ func StartTestServer(t ktesting.TB, instanceOptions *TestServerInstanceOptions, 
 		return result, fmt.Errorf("failed to create temp dir: %w", err)
 	}
 
+	// cancelRun will be called to stop the server and its storage layer.
+	// At the moment it does nothing, which will change below
+	// when the context is set up.
+	//
+	// Same with errCh: it starts as nil and gets created later.
+	cancelRun := func(error) {}
 	var errCh chan error
 	tearDown := func() {
-		// Cancel is stopping apiserver and cleaning up
-		// after itself, including shutting down its storage layer.
-		tCtx.Cancel("tearing down")
+		cancelRun(fmt.Errorf("tearing down"))
 
 		// If the apiserver was started, let's wait for it to
 		// shutdown clearly.
@@ -194,13 +198,20 @@ func StartTestServer(t ktesting.TB, instanceOptions *TestServerInstanceOptions, 
 		return result, fmt.Errorf("failed to create server chain: %w", err)
 	}
 
+	var runCtx context.Context
+	runCtx, cancelRun = context.WithCancelCause(tCtx)
+	defer func() {
+		if result.TearDownFn == nil {
+			cancelRun(fmt.Errorf("startup failed"))
+		}
+	}()
 	errCh = make(chan error)
 	go func() {
 		defer close(errCh)
 		prepared, err := s.PrepareRun()
 		if err != nil {
 			errCh <- err
-		} else if err := prepared.Run(tCtx); err != nil {
+		} else if err := prepared.Run(runCtx); err != nil {
 			errCh <- err
 		}
 	}()

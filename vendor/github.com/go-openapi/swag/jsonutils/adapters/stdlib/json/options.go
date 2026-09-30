@@ -10,6 +10,11 @@ package json
 // It mirrors the limit enforced by the standard library's [encoding/json] decoder
 // (see encoding/json's internal maxNestingDepth), which this adapter would otherwise
 // not benefit from since it drives [encoding/json.Decoder.Token] directly.
+//
+// With encoding/json v2 (GOEXPERIMENT=jsonv2, the default from go1.27), Token applies
+// that same limit itself and reports "exceeded max depth" before this counter fires.
+// Set a lower limit with [WithMaxNestingDepth] to be rejected earlier than the stdlib;
+// a higher one does not lift the stdlib's own 10,000-level ceiling on the decode path.
 const defaultMaxNestingDepth = 10000
 
 // Option selects options for the stdlib adapter.

@@ -289,7 +289,7 @@ func (aq *activeQueue) unlockedMoveEntityToInFlight(logger klog.Logger, entity f
 				_ = specificEntity.RemovePod(pInfo.Pod)
 				logger.Error(nil, "Discarding the popped pod group member. It's tracked in multiple places in the scheduler", "pod", klog.KObj(pInfo), "podGroup", klog.KObj(specificEntity))
 			}
-			if len(specificEntity.QueuedPodInfos) == 0 {
+			if !specificEntity.HasQueuedPodInfos() {
 				return fmt.Errorf("all pods from the pod group are tracked in multiple places in the scheduler: %s", klog.KObj(specificEntity))
 			}
 		default:

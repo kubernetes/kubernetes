@@ -90,10 +90,48 @@ func TestLimitRangerRatioIsExact(t *testing.T) {
 		{"ratio one unit below the maximum", "9007199254740992", "18014398509481983", "2", false},
 		{"ratio exactly at the maximum", "9007199254740992", "18014398509481984", "2", false},
 		{"ratio one unit above the maximum", "9007199254740992", "18014398509481985", "2", true},
+		{"ratio at a suffixed maximum at the largest exponent", "1e2147483647", "1000e2147483647", "1k", false},
+		// TODO(#141166): A 10000:1 ratio exceeds max 1000, so wantError must be true.
+		{"ratio above a suffixed maximum at the largest exponent", "1e2147483647", "10000e2147483647", "1k", false},
+		// TODO(#141166): Ratio 3 exceeds max 2, so wantError must be true.
+		{"ratio above the maximum with both operands negative", "-1", "-3", "2", false},
 	}
 	for _, testCase := range testCases {
 		if err := ratioOf(testCase.req, testCase.lim, testCase.maxRatio); (err != nil) != testCase.wantError {
 			t.Errorf("%s: got error %v, wantError %v", testCase.desc, err, testCase.wantError)
+		}
+	}
+}
+
+func TestLimitRequestRatioConstraint(t *testing.T) {
+	testCases := []struct {
+		desc     string
+		req      string
+		lim      string
+		maxRatio string
+		wantErr  string
+	}{
+		{"ratio under the maximum", "1", "1", "2", ""},
+		{"ratio at the maximum", "1", "2", "2", ""},
+		{"ratio above the maximum", "1", "3", "2", "memory max limit to request ratio per Container is 2, but provided ratio is 3.000000"},
+		{"ratio at the maximum past float64", "1e400", "2e400", "2", ""},
+		// TODO(#141166): The message must show the exact ratio 3.
+		{"ratio above the maximum with the limit past float64", "1e308", "3e308", "2", "memory max limit to request ratio per Container is 2, but provided ratio is +Inf"},
+		// TODO(#141166): The message must show the exact ratio 3.
+		{"ratio above the maximum with both operands past float64", "1e400", "3e400", "2", "memory max limit to request ratio per Container is 2, but provided ratio is NaN"},
+		// TODO(#141166): A negative pair with ratio 1 must not fail the ratio check. Expect no error, or an error about negative values.
+		{"ratio under the maximum with both operands negative", "-1", "-1", "2", "memory max limit to request ratio per Container is 2, but provided ratio is 1.000000"},
+	}
+	for _, testCase := range testCases {
+		err := limitRequestRatioConstraint("Container", "memory", resource.MustParse(testCase.maxRatio),
+			api.ResourceList{api.ResourceMemory: resource.MustParse(testCase.req)},
+			api.ResourceList{api.ResourceMemory: resource.MustParse(testCase.lim)})
+		gotErr := ""
+		if err != nil {
+			gotErr = err.Error()
+		}
+		if gotErr != testCase.wantErr {
+			t.Errorf("%s: got error %q, wantErr %q", testCase.desc, gotErr, testCase.wantErr)
 		}
 	}
 }

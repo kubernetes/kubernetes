@@ -424,7 +424,7 @@ func (ht *serverHandlerTransport) HandleStreams(ctx context.Context, startStream
 		st:               ht,
 		headerWireLength: 0, // won't have access to header wire length until golang/go#18997.
 	}
-	s.Stream.buf.init()
+	s.Stream.buf.init(ht.bufferPool)
 	s.readRequester = s
 	s.trReader = transportReader{
 		reader:        recvBufferReader{ctx: s.ctx, ctxDone: s.ctx.Done(), recv: &s.buf},

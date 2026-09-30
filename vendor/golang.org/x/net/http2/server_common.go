@@ -25,6 +25,8 @@ import (
 //
 //	https://golang.org/pkg/net/http/#ResponseWriter
 //	https://golang.org/pkg/net/http/#example_ResponseWriter_trailers
+//
+// Deprecated: Use [http.TrailerPrefix] instead.
 const TrailerPrefix = "Trailer:"
 
 // Push errors.
@@ -38,16 +40,22 @@ var (
 // The configuration conf may be nil.
 //
 // ConfigureServer must be called before s begins serving.
+//
+// Deprecated: Set [http.Server.Protocols] instead.
 func ConfigureServer(s *http.Server, conf *Server) error {
 	return configureServer(s, conf)
 }
 
 // Server is an HTTP/2 server.
+//
+// Deprecated: Use [http.Server] instead.
 type Server struct {
 	// MaxHandlers limits the number of http.Handler ServeHTTP goroutines
 	// which may run at a time over all connections.
 	// Negative or zero no limit.
 	// TODO: implement
+	//
+	// Deprecated: This field has never had any effect.
 	MaxHandlers int
 
 	// MaxConcurrentStreams optionally specifies the number of
@@ -56,6 +64,9 @@ type Server struct {
 	// which may be active globally, which is MaxHandlers.
 	// If zero, MaxConcurrentStreams defaults to at least 100, per
 	// the HTTP/2 spec's recommendations.
+	//
+	// Deprecated: Use [http.Server.HTTP2] and
+	// [http.HTTP2Config.MaxConcurrentStreams] instead.
 	MaxConcurrentStreams uint32
 
 	// MaxDecoderHeaderTableSize optionally specifies the http2
@@ -63,44 +74,67 @@ type Server struct {
 	// informs the remote endpoint of the maximum size of the header compression
 	// table used to decode header blocks, in octets. If zero, the default value
 	// of 4096 is used.
+	//
+	// Deprecated: Use [http.Server.HTTP2] and
+	// [http.HTTP2Config.MaxDecoderHeaderTableSize] instead.
 	MaxDecoderHeaderTableSize uint32
 
 	// MaxEncoderHeaderTableSize optionally specifies an upper limit for the
 	// header compression table used for encoding request headers. Received
 	// SETTINGS_HEADER_TABLE_SIZE settings are capped at this limit. If zero,
 	// the default value of 4096 is used.
+	//
+	// Deprecated: Use [http.Server.HTTP2] and
+	// [http.HTTP2Config.MaxEncoderHeaderTableSize] instead.
 	MaxEncoderHeaderTableSize uint32
 
 	// MaxReadFrameSize optionally specifies the largest frame
 	// this server is willing to read. A valid value is between
 	// 16k and 16M, inclusive. If zero or otherwise invalid, a
 	// default value is used.
+	//
+	// Deprecated: Use [http.Server.HTTP2] and
+	// [http.HTTP2Config.MaxReadFrameSize] instead.
 	MaxReadFrameSize uint32
 
 	// PermitProhibitedCipherSuites, if true, permits the use of
 	// cipher suites prohibited by the HTTP/2 spec.
+	//
+	// Deprecated: Use [http.Server.HTTP2] and
+	// [http.HTTP2Config.PermitProhibitedCipherSuites] instead.
 	PermitProhibitedCipherSuites bool
 
 	// IdleTimeout specifies how long until idle clients should be
 	// closed with a GOAWAY frame. PING frames are not considered
 	// activity for the purposes of IdleTimeout.
 	// If zero or negative, there is no timeout.
+	//
+	// Deprecated: Use [http.Server.IdleTimeout] instead.
 	IdleTimeout time.Duration
 
 	// ReadIdleTimeout is the timeout after which a health check using a ping
 	// frame will be carried out if no frame is received on the connection.
 	// If zero, no health check is performed.
+	//
+	// Deprecated: Use [http.Server.HTTP2] and
+	// [http.HTTP2Config.SendPingTimeout] instead.
 	ReadIdleTimeout time.Duration
 
 	// PingTimeout is the timeout after which the connection will be closed
 	// if a response to a ping is not received.
 	// If zero, a default of 15 seconds is used.
+	//
+	// Deprecated: Use [http.Server.HTTP2] and
+	// [http.HTTP2Config.PingTimeout] instead.
 	PingTimeout time.Duration
 
 	// WriteByteTimeout is the timeout after which a connection will be
 	// closed if no data can be written to it. The timeout begins when data is
 	// available to write, and is extended whenever any bytes are written.
 	// If zero or negative, there is no timeout.
+	//
+	// Deprecated: Use [http.Server.HTTP2] and
+	// [http.HTTP2Config.WriteByteTimeout] instead.
 	WriteByteTimeout time.Duration
 
 	// MaxUploadBufferPerConnection is the size of the initial flow
@@ -108,12 +142,18 @@ type Server struct {
 	// allow this to be smaller than 65535 or larger than 2^32-1.
 	// If the value is outside this range, a default value will be
 	// used instead.
+	//
+	// Deprecated: Use [http.Server.HTTP2] and
+	// [http.HTTP2Config.MaxReceiveBufferPerConnection] instead.
 	MaxUploadBufferPerConnection int32
 
 	// MaxUploadBufferPerStream is the size of the initial flow control
 	// window for each stream. The HTTP/2 spec does not allow this to
 	// be larger than 2^32-1. If the value is zero or larger than the
 	// maximum, a default value will be used instead.
+	//
+	// Deprecated: Use [http.Server.HTTP2] and
+	// [http.HTTP2Config.MaxReceiveBufferPerStream] instead.
 	MaxUploadBufferPerStream int32
 
 	// NewWriteScheduler constructs a write scheduler for a connection.
@@ -126,6 +166,9 @@ type Server struct {
 	// It's intended to increment a metric for monitoring, such
 	// as an expvar or Prometheus metric.
 	// The errType consists of only ASCII word characters.
+	//
+	// Deprecated: Use [http.Server.HTTP2] and
+	// [http.HTTP2Config.CountError] instead.
 	CountError func(errType string)
 
 	// Internal state. This is a pointer (rather than embedded directly)
@@ -135,6 +178,8 @@ type Server struct {
 }
 
 // ServeConnOpts are options for the Server.ServeConn method.
+//
+// Deprecated: ServeConnOpts is deprecated.
 type ServeConnOpts struct {
 	// Context is the base context to use.
 	// If nil, context.Background is used.
@@ -178,6 +223,8 @@ type ServeConnOpts struct {
 // implemented in terms of providing a suitably-behaving net.Conn.
 //
 // The opts parameter is optional. If nil, default values are used.
+//
+// Deprecated: Use [http.Server.Serve] or [http.Server.ServeTLS] instead.
 func (s *Server) ServeConn(c net.Conn, opts *ServeConnOpts) {
 	if opts == nil {
 		opts = &ServeConnOpts{}

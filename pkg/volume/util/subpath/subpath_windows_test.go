@@ -475,3 +475,70 @@ func TestIsDriveLetterorEmptyPath(t *testing.T) {
 			test.path, result, test.expectedResult)
 	}
 }
+
+func TestIsDeviceOrUncPath(t *testing.T) {
+	tests := []struct {
+		path           string
+		expectedResult bool
+	}{
+		{
+			// ordinary local path must be resolvable
+			path:           `c:\tmp\foo`,
+			expectedResult: false,
+		},
+		{
+			// empty path is not a device/UNC path
+			path:           ``,
+			expectedResult: false,
+		},
+		{
+			// UNC network path: must be refused so it is never followed,
+			// otherwise resolving it triggers forced NTLM authentication.
+			path:           `\\attacker\share`,
+			expectedResult: true,
+		},
+		{
+			// UNC network path referenced by IP
+			path:           `\\127.0.0.1\share\dir`,
+			expectedResult: true,
+		},
+		{
+			// forward-slash UNC form: evalSymlink normalizes "/" to "\" via
+			// mount.NormalizeWindowsPath before this check, but asserting it
+			// here guards against callers that pass an unnormalized target.
+			path:           `//attacker/share`,
+			expectedResult: true,
+		},
+		{
+			// device-form UNC path (extended-length prefix)
+			path:           `\\?\UNC\server\share`,
+			expectedResult: true,
+		},
+		{
+			// device namespace path
+			path:           `\\.\PhysicalDrive0`,
+			expectedResult: true,
+		},
+		{
+			// extended-length local path
+			path:           `\\?\c:\tmp`,
+			expectedResult: true,
+		},
+		{
+			// stripped device-form UNC path
+			path:           `UNC\server\share`,
+			expectedResult: true,
+		},
+		{
+			// volume GUID path
+			path:           `Volume{00000000-0000-0000-0000-000000000000}\`,
+			expectedResult: true,
+		},
+	}
+
+	for _, test := range tests {
+		result := isDeviceOrUncPath(test.path)
+		assert.Equal(t, test.expectedResult, result, "Expect result not equal with isDeviceOrUncPath(%s) return: %t, expected: %t",
+			test.path, result, test.expectedResult)
+	}
+}

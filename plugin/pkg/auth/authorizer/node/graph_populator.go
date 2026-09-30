@@ -85,16 +85,18 @@ func AddGraphEventHandlers(
 		podQueue:         newRateLimitingQueue("node_authorizer_pods"),
 		pvQueue:          newRateLimitingQueue("node_authorizer_persistentvolumes"),
 		attachmentQueue:  newRateLimitingQueue("node_authorizer_volumeattachments"),
+		sliceQueue:       newRateLimitingQueue("node_authorizer_resourceslices"),
 		podLister:        pods.Lister(),
 		pvLister:         pvs.Lister(),
 		attachmentLister: attachments.Lister(),
+		sliceLister:      slices.Lister(),
 	}
 
 	queues := []workqueue.TypedRateLimitingInterface[types.NamespacedName]{
-		g.podQueue, g.pvQueue, g.attachmentQueue,
+		g.podQueue, g.pvQueue, g.attachmentQueue, g.sliceQueue,
 	}
 	workers := []func(){
-		g.runPodWorker, g.runPVWorker, g.runAttachmentWorker,
+		g.runPodWorker, g.runPVWorker, g.runAttachmentWorker, g.runSliceWorker,
 	}
 
 	podHandler, _ := pods.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
@@ -115,21 +117,14 @@ func AddGraphEventHandlers(
 		DeleteFunc: g.deleteVolumeAttachment,
 	})
 
-	synced := []cache.InformerSynced{
-		podHandler.HasSynced, pvsHandler.HasSynced, attachHandler.HasSynced,
-	}
+	sliceHandler, _ := slices.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc:    g.addResourceSlice,
+		UpdateFunc: nil, // Not needed, NodeName is immutable.
+		DeleteFunc: g.deleteResourceSlice,
+	})
 
-	if slices != nil {
-		g.sliceQueue = newRateLimitingQueue("node_authorizer_resourceslices")
-		g.sliceLister = slices.Lister()
-		queues = append(queues, g.sliceQueue)
-		workers = append(workers, g.runSliceWorker)
-		sliceHandler, _ := slices.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-			AddFunc:    g.addResourceSlice,
-			UpdateFunc: nil, // Not needed, NodeName is immutable.
-			DeleteFunc: g.deleteResourceSlice,
-		})
-		synced = append(synced, sliceHandler.HasSynced)
+	synced := []cache.InformerSynced{
+		podHandler.HasSynced, pvsHandler.HasSynced, attachHandler.HasSynced, sliceHandler.HasSynced,
 	}
 
 	if pcrs != nil {
@@ -385,9 +380,6 @@ func (g *graphPopulator) runSliceWorker() {
 }
 
 func (g *graphPopulator) processSliceKey(key types.NamespacedName) error {
-	if g.sliceLister == nil {
-		return nil
-	}
 	slice, err := g.sliceLister.Get(key.Name)
 	if err != nil {
 		if errors.IsNotFound(err) {

@@ -1311,6 +1311,205 @@ func TestDevicesToAllocateConflictWithUpdateAllocatedDevices(t *testing.T) {
 	assert.Equal(t, sets.New[string](deviceID), set)
 }
 
+func TestDevicesToAllocateRollsBackPartialReservation(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	logger := klog.FromContext(tCtx)
+	const (
+		podUID            = "pod"
+		containerName     = "container"
+		initContainerName = "init-container"
+		resourceName      = "domain1.com/resource"
+		deviceID          = "dev0"
+	)
+
+	testManager := &ManagerImpl{
+		healthyDevices:        map[string]sets.Set[string]{resourceName: sets.New[string](deviceID)},
+		allocatedDevices:      map[string]sets.Set[string]{resourceName: sets.New[string](deviceID)},
+		podDevices:            newPodDevices(),
+		sourcesReady:          &sourcesReadyStub{},
+		topologyAffinityStore: topologymanager.NewFakeManager(logger),
+	}
+	testManager.podDevices.insert(podUID, initContainerName, resourceName, constructDevices([]string{deviceID}), newContainerAllocateResponse())
+
+	_, err := testManager.devicesToAllocate(tCtx, podUID, containerName, resourceName, 2, sets.New[string](deviceID))
+	require.ErrorContains(t, err, "requested number of devices unavailable")
+	assert.Equal(t, sets.New[string](deviceID), testManager.allocatedDevices[resourceName], "the committed reusable device must remain allocated")
+	assert.NotContains(t, testManager.podDevices.devs[podUID], containerName, "the partial reservation must be removed")
+}
+
+func TestDevicesToAllocateRevalidatesPreferredDevices(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	logger := klog.FromContext(tCtx)
+	const (
+		resourceName = "domain1.com/resource"
+		device0      = "dev0"
+		device1      = "dev1"
+	)
+
+	firstPreferredAllocationEntered := make(chan struct{})
+	releaseFirstPreferredAllocation := make(chan struct{})
+	var preferredAllocationCalls atomic.Int32
+	endpoint := &MockEndpoint{
+		getPreferredAllocationFunc: func(_, _ []string, _ int) (*pluginapi.PreferredAllocationResponse, error) {
+			if preferredAllocationCalls.Add(1) == 1 {
+				close(firstPreferredAllocationEntered)
+				<-releaseFirstPreferredAllocation
+			}
+			return &pluginapi.PreferredAllocationResponse{
+				ContainerResponses: []*pluginapi.ContainerPreferredAllocationResponse{{DeviceIDs: []string{device0}}},
+			}, nil
+		},
+	}
+	testManager := &ManagerImpl{
+		endpoints: map[string]endpointInfo{
+			resourceName: {
+				e:    endpoint,
+				opts: &pluginapi.DevicePluginOptions{GetPreferredAllocationAvailable: true},
+			},
+		},
+		healthyDevices:        map[string]sets.Set[string]{resourceName: sets.New[string](device0, device1)},
+		allocatedDevices:      map[string]sets.Set[string]{resourceName: sets.New[string]()},
+		podDevices:            newPodDevices(),
+		sourcesReady:          &sourcesReadyStub{},
+		topologyAffinityStore: topologymanager.NewFakeManager(logger),
+		allDevices:            NewResourceDeviceInstances(),
+	}
+
+	type allocationResult struct {
+		devices sets.Set[string]
+		err     error
+	}
+	firstResult := make(chan allocationResult, 1)
+	go func() {
+		devices, err := testManager.devicesToAllocate(tCtx, "pod1", "container", resourceName, 1, nil)
+		firstResult <- allocationResult{devices: devices, err: err}
+	}()
+
+	select {
+	case <-firstPreferredAllocationEntered:
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for the first GetPreferredAllocation call")
+	}
+
+	secondDevices, err := testManager.devicesToAllocate(tCtx, "pod2", "container", resourceName, 1, nil)
+	require.NoError(t, err)
+	close(releaseFirstPreferredAllocation)
+	result := <-firstResult
+	require.NoError(t, result.err)
+	assert.Equal(t, sets.New[string](device0), secondDevices)
+	assert.Equal(t, sets.New[string](device1), result.devices)
+	assert.Empty(t, secondDevices.Intersection(result.devices), "concurrent allocations must not reserve the same preferred device")
+}
+
+func TestReservationLossWindowDoesNotDuplicateDeviceAcrossPods(t *testing.T) {
+	logger, tCtx := ktesting.NewTestContext(t)
+	// With one allocatable device, once pod1 has reserved it, pod2 must fail
+	// allocation until pod1 either commits or releases it.
+	//
+	// This test orchestrates the reservation-loss window:
+	// 1) pod1 reserves a device in allocatedDevices;
+	// 2) pod1 blocks in plugin Allocate (outside m.mutex);
+	// 3) an external caller invokes UpdateAllocatedDevices while pod1 is in-flight;
+	// 4) pod2 attempts allocation.
+	//
+	// Correct behavior: pod2 allocation fails (no available devices) and pod2
+	// gets no device assignment.
+
+	resourceName := "domain1.com/resource"
+	deviceID := "dev0"
+	tmpDir, err := os.MkdirTemp("", "checkpoint")
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		if err := os.RemoveAll(tmpDir); err != nil {
+			t.Errorf("failed to remove temp dir %q: %v", tmpDir, err)
+		}
+	})
+	ckm, err := checkpointmanager.NewCheckpointManager(tmpDir)
+	require.NoError(t, err)
+
+	var allocateCalls atomic.Int32
+	firstAllocateEntered := make(chan struct{}, 1)
+	releaseFirstAllocate := make(chan struct{})
+
+	endpoint := &MockEndpoint{
+		allocateFunc: func(devs []string) (*pluginapi.AllocateResponse, error) {
+			if allocateCalls.Add(1) == 1 {
+				firstAllocateEntered <- struct{}{}
+				<-releaseFirstAllocate
+			}
+			return &pluginapi.AllocateResponse{
+				ContainerResponses: []*pluginapi.ContainerAllocateResponse{
+					{},
+				},
+			}, nil
+		},
+	}
+
+	testManager := &ManagerImpl{
+		endpoints:             make(map[string]endpointInfo),
+		healthyDevices:        make(map[string]sets.Set[string]),
+		unhealthyDevices:      make(map[string]sets.Set[string]),
+		allocatedDevices:      make(map[string]sets.Set[string]),
+		podDevices:            newPodDevices(),
+		activePods:            func() []*v1.Pod { return []*v1.Pod{} },
+		sourcesReady:          &sourcesReadyStub{},
+		topologyAffinityStore: topologymanager.NewFakeManager(logger),
+		allDevices:            NewResourceDeviceInstances(),
+		devicesToReuse:        make(PodReusableDevices),
+		checkpointManager:     ckm,
+	}
+	testManager.endpoints[resourceName] = endpointInfo{e: endpoint}
+	testManager.healthyDevices[resourceName] = sets.New[string](deviceID)
+	testManager.allocatedDevices[resourceName] = sets.New[string]()
+	testManager.allDevices[resourceName] = map[string]*pluginapi.Device{
+		deviceID: {ID: deviceID},
+	}
+
+	pod1 := makePod(v1.ResourceList{
+		v1.ResourceName(resourceName): *resource.NewQuantity(1, resource.DecimalSI),
+	})
+	pod1.Spec.Containers[0].Name = "pod1-container"
+	pod2 := makePod(v1.ResourceList{
+		v1.ResourceName(resourceName): *resource.NewQuantity(1, resource.DecimalSI),
+	})
+	pod2.Spec.Containers[0].Name = "pod2-container"
+
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- testManager.allocateContainerResources(tCtx, pod1, &pod1.Spec.Containers[0], map[string]sets.Set[string]{})
+	}()
+
+	select {
+	case <-firstAllocateEntered:
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for pod1 Allocate to reach plugin RPC")
+	}
+
+	// Ensure this call takes the path that rewrites allocatedDevices from podDevices.
+	testManager.podDevices.insert("stale-pod", "stale-container", resourceName, nil, nil)
+	testManager.UpdateAllocatedDevices(logger)
+
+	err = testManager.allocateContainerResources(tCtx, pod2, &pod2.Spec.Containers[0], map[string]sets.Set[string]{})
+	if err == nil {
+		close(releaseFirstAllocate)
+		require.NoError(t, <-errCh)
+		pod1Devices := testManager.podDevices.containerDevices(string(pod1.UID), pod1.Spec.Containers[0].Name, resourceName)
+		pod2Devices := testManager.podDevices.containerDevices(string(pod2.UID), pod2.Spec.Containers[0].Name, resourceName)
+		t.Fatalf("pod2 unexpectedly allocated devices; pod1=%v pod2=%v", sets.List(pod1Devices), sets.List(pod2Devices))
+	}
+	assert.Contains(t, err.Error(), "requested number of devices unavailable")
+
+	close(releaseFirstAllocate)
+	require.NoError(t, <-errCh)
+
+	pod1Devices := testManager.podDevices.containerDevices(string(pod1.UID), pod1.Spec.Containers[0].Name, resourceName)
+	pod2Devices := testManager.podDevices.containerDevices(string(pod2.UID), pod2.Spec.Containers[0].Name, resourceName)
+	assert.Equal(t, sets.New[string](deviceID), pod1Devices)
+	if pod2Devices != nil {
+		assert.Equal(t, 0, pod2Devices.Len())
+	}
+}
+
 func TestGetDeviceRunContainerOptions(t *testing.T) {
 	logger, tCtx := ktesting.NewTestContext(t)
 	res1 := TestResource{
@@ -1641,7 +1840,10 @@ func TestUpdatePluginResources(t *testing.T) {
 		ManagerImpl: m,
 		callback:    monitorCallback,
 	}
-	testManager.podDevices.devs[string(pod.UID)] = make(containerDevices)
+	testManager.podDevices.insert(
+		string(pod.UID), "container", resourceName1,
+		constructDevices([]string{devID1}), newContainerAllocateResponse(),
+	)
 
 	// require one of resource1 and one of resource2
 	testManager.allocatedDevices[resourceName1] = sets.New[string]()

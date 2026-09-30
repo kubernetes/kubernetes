@@ -9,12 +9,12 @@ godebug default=go1.27
 require (
 	github.com/moby/sys/mountinfo v0.7.2
 	github.com/stretchr/testify v1.12.1
-	golang.org/x/sys v0.47.0
+	golang.org/x/sys v0.48.0
 	k8s.io/klog/v2 v2.140.0
 	k8s.io/utils v0.0.0-20260626114624-be93311217bd
 )
 
 require (
-	github.com/go-logr/logr v1.4.3 // indirect
+	github.com/go-logr/logr v1.4.4 // indirect
 	go.yaml.in/yaml/v3 v3.0.5 // indirect
 )

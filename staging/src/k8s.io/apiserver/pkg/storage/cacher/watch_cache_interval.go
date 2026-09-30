@@ -68,16 +68,21 @@ func newCacheInterval(startIndex, endIndex int, indexer indexerFunc, indexValida
 	}
 }
 
+type intervalStore interface {
+	GetByKey(key string) (item interface{}, exists bool, err error)
+	OrderedListPrefix(prefix, continueKey string) ([]interface{}, error)
+}
+
 // newCacheIntervalFromStore is meant to handle the case of rv=0, such that the events
 // returned by Next() need to be events from a List() done on the underlying store of
 // the watch cache.
 // The items returned in the interval will be sorted by Key.
-func newCacheIntervalFromStore(resourceVersion uint64, indexer store.Indexer, key string, matchesSingle bool) (*watchCacheInterval, error) {
+func newCacheIntervalFromStore(resourceVersion uint64, s intervalStore, key string, matchesSingle bool) (*watchCacheInterval, error) {
 	buffer := &watchCacheIntervalBuffer{}
 	var allItems []interface{}
 	var err error
 	if matchesSingle {
-		item, exists, err := indexer.GetByKey(key)
+		item, exists, err := s.GetByKey(key)
 		if err != nil {
 			return nil, err
 		}
@@ -85,7 +90,7 @@ func newCacheIntervalFromStore(resourceVersion uint64, indexer store.Indexer, ke
 			allItems = append(allItems, item)
 		}
 	} else {
-		allItems, err = indexer.OrderedListPrefix("", "")
+		allItems, err = s.OrderedListPrefix("", "")
 		if err != nil {
 			return nil, err
 		}

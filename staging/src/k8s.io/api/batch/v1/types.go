@@ -103,6 +103,7 @@ type JobList struct {
 
 // CompletionMode specifies how Pod completions of a Job are tracked.
 // +enum
+// +k8s:validation-gen-nolint
 type CompletionMode string
 
 const (
@@ -120,6 +121,7 @@ const (
 
 // PodFailurePolicyAction specifies how a Pod failure is handled.
 // +enum
+// +k8s:validation-gen-nolint
 type PodFailurePolicyAction string
 
 const (
@@ -144,6 +146,7 @@ const (
 )
 
 // +enum
+// +k8s:validation-gen-nolint
 type PodFailurePolicyOnExitCodesOperator string
 
 const (
@@ -153,6 +156,7 @@ const (
 
 // PodReplacementPolicy specifies the policy for creating pod replacements.
 // +enum
+// +k8s:validation-gen-nolint
 type PodReplacementPolicy string
 
 const (
@@ -866,6 +870,7 @@ type CronJobSpec struct {
 // If none of the following policies is specified, the default one
 // is AllowConcurrent.
 // +enum
+// +k8s:validation-gen-nolint
 type ConcurrencyPolicy string
 
 const (

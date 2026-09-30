@@ -7,7 +7,6 @@
 # intersection on every co-allocation. One pod (or claim) fits onto one node.
 - name: CompatibilityGroups
   featureGates:
-    DynamicResourceAllocation: true
     DRAPartitionableDevices: true
     DRADeviceCompatibilityGroups: true
   workloadTemplate:

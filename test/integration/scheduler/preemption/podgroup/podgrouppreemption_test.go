@@ -1272,7 +1272,7 @@ func TestPodGroupPreemption(t *testing.T) {
 					if !tt.tempRemovePG && tt.preemptorPodsQueuedInCreationOrder {
 						podScheduledFn := testutils.PodScheduled(cs, ns, p.Name)
 						err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 10*time.Second, false, func(ctx context.Context) (bool, error) {
-							_, ok := testCtx.Scheduler.SchedulingQueue.GetPod(p.Name, p.Namespace, p.Spec.SchedulingGroup)
+							_, ok := testCtx.Scheduler.SchedulingQueue.GetPod(ctx, p.Name, p.Namespace, p.Spec.SchedulingGroup)
 							if ok {
 								return true, nil
 							}
@@ -1728,7 +1728,7 @@ func TestCompositePodGroupPreemption(t *testing.T) {
 				st.MakeCompositePodGroup().Name("cpg1").Namespace("default").Priority(100).BasicPolicy().WorkloadRef("wl1", "t1").Obj(),
 			},
 			podGroups: []*schedulingv1beta1.PodGroup{
-				st.MakePodGroup().Name("pg1").Namespace("default").Priority(100).MinCount(3).ParentCompositePodGroup("cpg1").WorkloadRef("t1", "wl1").Obj(),
+				st.MakePodGroup().Name("pg1").Namespace("default").Priority(100).MinCount(3).ParentCompositePodGroup("cpg1").WorkloadRef("wl1", "t1").Obj(),
 			},
 			initialPods: []*v1.Pod{
 				st.MakePod().Name("low-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Container("image").ZeroTerminationGracePeriod().Priority(10).Node("node1").Obj(),
@@ -1756,8 +1756,8 @@ func TestCompositePodGroupPreemption(t *testing.T) {
 				st.MakeCompositePodGroup().Name("cpg1").Namespace("default").Priority(10).BasicPolicy().DisruptionModeAll().WorkloadRef("wl1", "t1").Obj(),
 			},
 			podGroups: []*schedulingv1beta1.PodGroup{
-				st.MakePodGroup().Name("pg1").Namespace("default").Priority(10).MinCount(2).ParentCompositePodGroup("cpg1").WorkloadRef("t1", "wl1").Obj(),
-				st.MakePodGroup().Name("pg2").Namespace("default").Priority(10).MinCount(1).ParentCompositePodGroup("cpg1").WorkloadRef("t1", "wl1").Obj(),
+				st.MakePodGroup().Name("pg1").Namespace("default").Priority(10).MinCount(2).ParentCompositePodGroup("cpg1").WorkloadRef("wl1", "t1").Obj(),
+				st.MakePodGroup().Name("pg2").Namespace("default").Priority(10).MinCount(1).ParentCompositePodGroup("cpg1").WorkloadRef("wl1", "t1").Obj(),
 			},
 			initialPods: []*v1.Pod{
 				st.MakePod().Name("low-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").Node("node1").ZeroTerminationGracePeriod().Priority(10).Obj(),
@@ -1782,8 +1782,8 @@ func TestCompositePodGroupPreemption(t *testing.T) {
 				st.MakeCompositePodGroup().Name("cpg1").Namespace("default").Priority(10).BasicPolicy().DisruptionModeSingle().WorkloadRef("wl1", "t1").Obj(),
 			},
 			podGroups: []*schedulingv1beta1.PodGroup{
-				st.MakePodGroup().Name("pg1").Namespace("default").Priority(10).MinCount(2).DisruptionModeSingle().ParentCompositePodGroup("cpg1").WorkloadRef("t1", "wl1").Obj(),
-				st.MakePodGroup().Name("pg2").Namespace("default").Priority(10).MinCount(1).DisruptionModeSingle().ParentCompositePodGroup("cpg1").WorkloadRef("t1", "wl1").Obj(),
+				st.MakePodGroup().Name("pg1").Namespace("default").Priority(10).MinCount(2).DisruptionModeSingle().ParentCompositePodGroup("cpg1").WorkloadRef("wl1", "t1").Obj(),
+				st.MakePodGroup().Name("pg2").Namespace("default").Priority(10).MinCount(1).DisruptionModeSingle().ParentCompositePodGroup("cpg1").WorkloadRef("wl1", "t1").Obj(),
 			},
 			initialPods: []*v1.Pod{
 				st.MakePod().Name("low-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").Node("node1").ZeroTerminationGracePeriod().Priority(10).Obj(),
@@ -1807,7 +1807,7 @@ func TestCompositePodGroupPreemption(t *testing.T) {
 				st.MakeCompositePodGroup().Name("cpg-victim").Namespace("default").Priority(10).BasicPolicy().WorkloadRef("wl1", "t1").Obj(),
 			},
 			podGroups: []*schedulingv1beta1.PodGroup{
-				st.MakePodGroup().Name("pg-victim").Namespace("default").Priority(10).MinCount(1).ParentCompositePodGroup("cpg-victim").WorkloadRef("t1", "wl1").Obj(),
+				st.MakePodGroup().Name("pg-victim").Namespace("default").Priority(10).MinCount(1).ParentCompositePodGroup("cpg-victim").WorkloadRef("wl1", "t1").Obj(),
 			},
 			initialPods: []*v1.Pod{
 				st.MakePod().Name("low-pod").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg-victim").Node("node1").ZeroTerminationGracePeriod().Priority(10).Obj(),
@@ -1831,11 +1831,11 @@ func TestCompositePodGroupPreemption(t *testing.T) {
 			},
 			podGroups: []*schedulingv1beta1.PodGroup{
 				// Workload 1: A standalone PodGroup (Rank 2)
-				st.MakePodGroup().Name("pg-victim-standalone").Namespace("default").Priority(10).MinCount(1).WorkloadRef("t1", "wl2").Obj(),
+				st.MakePodGroup().Name("pg-victim-standalone").Namespace("default").Priority(10).MinCount(1).WorkloadRef("wl2", "t1").Obj(),
 				// Workload 2: A PodGroup under a CompositePodGroup (Rank 3)
-				st.MakePodGroup().Name("pg-victim-child").Namespace("default").Priority(10).MinCount(1).ParentCompositePodGroup("cpg-victim").WorkloadRef("t1", "wl1").Obj(),
+				st.MakePodGroup().Name("pg-victim-child").Namespace("default").Priority(10).MinCount(1).ParentCompositePodGroup("cpg-victim").WorkloadRef("wl1", "t1").Obj(),
 				// Preemptor Workload
-				st.MakePodGroup().Name("pg-preemptor").Namespace("default").Priority(100).MinCount(1).WorkloadRef("t1", "wl3").Obj(),
+				st.MakePodGroup().Name("pg-preemptor").Namespace("default").Priority(100).MinCount(1).WorkloadRef("wl3", "t1").Obj(),
 			},
 			initialPods: []*v1.Pod{
 				// Standalone PG Pod
@@ -1863,8 +1863,8 @@ func TestCompositePodGroupPreemption(t *testing.T) {
 				st.MakeCompositePodGroup().Name("cpg-higher").Namespace("default").Priority(20).BasicPolicy().WorkloadRef("wl2", "t1").Obj(),
 			},
 			podGroups: []*schedulingv1beta1.PodGroup{
-				st.MakePodGroup().Name("pg-lower").Namespace("default").Priority(10).MinCount(1).ParentCompositePodGroup("cpg-lower").WorkloadRef("t1", "wl1").Obj(),
-				st.MakePodGroup().Name("pg-higher").Namespace("default").Priority(20).MinCount(1).ParentCompositePodGroup("cpg-higher").WorkloadRef("t1", "wl2").Obj(),
+				st.MakePodGroup().Name("pg-lower").Namespace("default").Priority(10).MinCount(1).ParentCompositePodGroup("cpg-lower").WorkloadRef("wl1", "t1").Obj(),
+				st.MakePodGroup().Name("pg-higher").Namespace("default").Priority(20).MinCount(1).ParentCompositePodGroup("cpg-higher").WorkloadRef("wl2", "t1").Obj(),
 			},
 			initialPods: []*v1.Pod{
 				st.MakePod().Name("lower-pod").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg-lower").Node("node1").ZeroTerminationGracePeriod().Priority(10).Obj(),
@@ -1888,8 +1888,8 @@ func TestCompositePodGroupPreemption(t *testing.T) {
 				st.MakeCompositePodGroup().Name("cpg-no-pdb").Namespace("default").Priority(10).BasicPolicy().DisruptionModeAll().WorkloadRef("wl2", "t1").Obj(),
 			},
 			podGroups: []*schedulingv1beta1.PodGroup{
-				st.MakePodGroup().Name("pg-pdb").Namespace("default").Priority(10).MinCount(2).ParentCompositePodGroup("cpg-pdb").WorkloadRef("t1", "wl1").Obj(),
-				st.MakePodGroup().Name("pg-no-pdb").Namespace("default").Priority(10).MinCount(1).ParentCompositePodGroup("cpg-no-pdb").WorkloadRef("t1", "wl2").Obj(),
+				st.MakePodGroup().Name("pg-pdb").Namespace("default").Priority(10).MinCount(2).ParentCompositePodGroup("cpg-pdb").WorkloadRef("wl1", "t1").Obj(),
+				st.MakePodGroup().Name("pg-no-pdb").Namespace("default").Priority(10).MinCount(1).ParentCompositePodGroup("cpg-no-pdb").WorkloadRef("wl2", "t1").Obj(),
 			},
 			initialPods: []*v1.Pod{
 				st.MakePod().Name("pod-pdb-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg-pdb").Node("node1").Label("app", "foo").ZeroTerminationGracePeriod().Priority(10).Obj(),
@@ -1920,8 +1920,8 @@ func TestCompositePodGroupPreemption(t *testing.T) {
 				st.MakeCompositePodGroup().Name("cpg-single").Namespace("default").Priority(10).BasicPolicy().DisruptionModeSingle().WorkloadRef("wl1", "t1").Obj(),
 			},
 			podGroups: []*schedulingv1beta1.PodGroup{
-				st.MakePodGroup().Name("pg-pdb").Namespace("default").Priority(10).MinCount(2).DisruptionModeSingle().ParentCompositePodGroup("cpg-single").WorkloadRef("t1", "wl1").Obj(),
-				st.MakePodGroup().Name("pg-no-pdb").Namespace("default").Priority(10).MinCount(1).DisruptionModeSingle().ParentCompositePodGroup("cpg-single").WorkloadRef("t1", "wl1").Obj(),
+				st.MakePodGroup().Name("pg-pdb").Namespace("default").Priority(10).MinCount(2).DisruptionModeSingle().ParentCompositePodGroup("cpg-single").WorkloadRef("wl1", "t1").Obj(),
+				st.MakePodGroup().Name("pg-no-pdb").Namespace("default").Priority(10).MinCount(1).DisruptionModeSingle().ParentCompositePodGroup("cpg-single").WorkloadRef("wl1", "t1").Obj(),
 			},
 			initialPods: []*v1.Pod{
 				st.MakePod().Name("pod-pdb-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg-pdb").Node("node1").Label("app", "foo").ZeroTerminationGracePeriod().Priority(10).Obj(),
@@ -1954,8 +1954,8 @@ func TestCompositePodGroupPreemption(t *testing.T) {
 				st.MakeCompositePodGroup().Name("cpg-parent").Namespace("default").Priority(10).BasicPolicy().DisruptionModeSingle().ParentCompositePodGroup("cpg-grandparent").WorkloadRef("wl1", "t1").Obj(),
 			},
 			podGroups: []*schedulingv1beta1.PodGroup{
-				st.MakePodGroup().Name("pg1").Namespace("default").Priority(10).MinCount(2).DisruptionModeSingle().ParentCompositePodGroup("cpg-parent").WorkloadRef("t1", "wl1").Obj(),
-				st.MakePodGroup().Name("pg2").Namespace("default").Priority(10).MinCount(1).DisruptionModeSingle().ParentCompositePodGroup("cpg-parent").WorkloadRef("t1", "wl1").Obj(),
+				st.MakePodGroup().Name("pg1").Namespace("default").Priority(10).MinCount(2).DisruptionModeSingle().ParentCompositePodGroup("cpg-parent").WorkloadRef("wl1", "t1").Obj(),
+				st.MakePodGroup().Name("pg2").Namespace("default").Priority(10).MinCount(1).DisruptionModeSingle().ParentCompositePodGroup("cpg-parent").WorkloadRef("wl1", "t1").Obj(),
 			},
 			initialPods: []*v1.Pod{
 				st.MakePod().Name("low-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").Node("node1").ZeroTerminationGracePeriod().Priority(10).Obj(),
@@ -1981,8 +1981,8 @@ func TestCompositePodGroupPreemption(t *testing.T) {
 				st.MakeCompositePodGroup().Name("cpg-parent").Namespace("default").Priority(10).BasicPolicy().DisruptionModeAll().ParentCompositePodGroup("cpg-grandparent").WorkloadRef("wl1", "t1").Obj(),
 			},
 			podGroups: []*schedulingv1beta1.PodGroup{
-				st.MakePodGroup().Name("pg1").Namespace("default").Priority(10).MinCount(2).DisruptionModeSingle().ParentCompositePodGroup("cpg-parent").WorkloadRef("t1", "wl1").Obj(),
-				st.MakePodGroup().Name("pg2").Namespace("default").Priority(10).MinCount(1).DisruptionModeSingle().ParentCompositePodGroup("cpg-grandparent").WorkloadRef("t1", "wl1").Obj(),
+				st.MakePodGroup().Name("pg1").Namespace("default").Priority(10).MinCount(2).DisruptionModeSingle().ParentCompositePodGroup("cpg-parent").WorkloadRef("wl1", "t1").Obj(),
+				st.MakePodGroup().Name("pg2").Namespace("default").Priority(10).MinCount(1).DisruptionModeSingle().ParentCompositePodGroup("cpg-grandparent").WorkloadRef("wl1", "t1").Obj(),
 			},
 			initialPods: []*v1.Pod{
 				st.MakePod().Name("low-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").Node("node1").ZeroTerminationGracePeriod().Priority(10).Obj(),
@@ -2006,7 +2006,7 @@ func TestCompositePodGroupPreemption(t *testing.T) {
 				st.MakeCompositePodGroup().Name("cpg1").Namespace("default").Priority(100).BasicPolicy().WorkloadRef("wl1", "t1").Obj(),
 			},
 			podGroups: []*schedulingv1beta1.PodGroup{
-				st.MakePodGroup().Name("pg1").Namespace("default").Priority(100).MinCount(3).ParentCompositePodGroup("cpg1").WorkloadRef("t1", "wl1").Obj(),
+				st.MakePodGroup().Name("pg1").Namespace("default").Priority(100).MinCount(3).ParentCompositePodGroup("cpg1").WorkloadRef("wl1", "t1").Obj(),
 			},
 			initialPods: []*v1.Pod{
 				st.MakePod().Name("low-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").ZeroTerminationGracePeriod().Priority(10).Obj(),
@@ -2032,8 +2032,8 @@ func TestCompositePodGroupPreemption(t *testing.T) {
 				st.MakeCompositePodGroup().Name("cpg1").Namespace("default").Priority(100).BasicPolicy().WorkloadRef("wl1", "t1").PreemptionPolicy(schedulingv1alpha3.PreemptNever).Obj(),
 			},
 			podGroups: []*schedulingv1beta1.PodGroup{
-				st.MakePodGroup().Name("pg1").Namespace("default").Priority(100).MinCount(2).ParentCompositePodGroup("cpg1").WorkloadRef("t1", "wl1").PreemptionPolicy(schedulingv1beta1.PreemptNever).Obj(),
-				st.MakePodGroup().Name("pg2").Namespace("default").Priority(100).MinCount(1).ParentCompositePodGroup("cpg1").WorkloadRef("t1", "wl1").PreemptionPolicy(schedulingv1beta1.PreemptNever).Obj(),
+				st.MakePodGroup().Name("pg1").Namespace("default").Priority(100).MinCount(2).ParentCompositePodGroup("cpg1").WorkloadRef("wl1", "t1").PreemptionPolicy(schedulingv1beta1.PreemptNever).Obj(),
+				st.MakePodGroup().Name("pg2").Namespace("default").Priority(100).MinCount(1).ParentCompositePodGroup("cpg1").WorkloadRef("wl1", "t1").PreemptionPolicy(schedulingv1beta1.PreemptNever).Obj(),
 			},
 			initialPods: []*v1.Pod{
 				st.MakePod().Name("low-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").ZeroTerminationGracePeriod().Priority(10).Obj(),
@@ -2060,8 +2060,8 @@ func TestCompositePodGroupPreemption(t *testing.T) {
 				st.MakeCompositePodGroup().Name("cpg1").Namespace("default").Priority(100).BasicPolicy().WorkloadRef("wl1", "t1").PreemptionPolicy(schedulingv1alpha3.PreemptLowerPriority).Obj(),
 			},
 			podGroups: []*schedulingv1beta1.PodGroup{
-				st.MakePodGroup().Name("pg1").Namespace("default").Priority(100).MinCount(2).ParentCompositePodGroup("cpg1").WorkloadRef("t1", "wl1").PreemptionPolicy(schedulingv1beta1.PreemptLowerPriority).Obj(),
-				st.MakePodGroup().Name("pg2").Namespace("default").Priority(100).MinCount(1).ParentCompositePodGroup("cpg1").WorkloadRef("t1", "wl1").PreemptionPolicy(schedulingv1beta1.PreemptLowerPriority).Obj(),
+				st.MakePodGroup().Name("pg1").Namespace("default").Priority(100).MinCount(2).ParentCompositePodGroup("cpg1").WorkloadRef("wl1", "t1").PreemptionPolicy(schedulingv1beta1.PreemptLowerPriority).Obj(),
+				st.MakePodGroup().Name("pg2").Namespace("default").Priority(100).MinCount(1).ParentCompositePodGroup("cpg1").WorkloadRef("wl1", "t1").PreemptionPolicy(schedulingv1beta1.PreemptLowerPriority).Obj(),
 			},
 			initialPods: []*v1.Pod{
 				st.MakePod().Name("low-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").ZeroTerminationGracePeriod().Priority(10).Obj(),
@@ -2088,7 +2088,7 @@ func TestCompositePodGroupPreemption(t *testing.T) {
 				st.MakeCompositePodGroup().Name("cpg-preempt-never").Namespace("default").Priority(100).BasicPolicy().WorkloadRef("wl1", "t1").PreemptionPolicy(schedulingv1alpha3.PreemptNever).Obj(),
 			},
 			podGroups: []*schedulingv1beta1.PodGroup{
-				st.MakePodGroup().Name("pg-preempt-never").Namespace("default").Priority(100).MinCount(2).ParentCompositePodGroup("cpg-preempt-never").WorkloadRef("t1", "wl1").PreemptionPolicy(schedulingv1beta1.PreemptNever).Obj(),
+				st.MakePodGroup().Name("pg-preempt-never").Namespace("default").Priority(100).MinCount(2).ParentCompositePodGroup("cpg-preempt-never").WorkloadRef("wl1", "t1").PreemptionPolicy(schedulingv1beta1.PreemptNever).Obj(),
 			},
 			initialPods: []*v1.Pod{
 				st.MakePod().Name("low-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").ZeroTerminationGracePeriod().Priority(10).Node("node1").Obj(),
@@ -2114,7 +2114,7 @@ func TestCompositePodGroupPreemption(t *testing.T) {
 				st.MakeCompositePodGroup().Name("cpg-preempt-lower").Namespace("default").Priority(100).BasicPolicy().WorkloadRef("wl1", "t1").PreemptionPolicy(schedulingv1alpha3.PreemptLowerPriority).Obj(),
 			},
 			podGroups: []*schedulingv1beta1.PodGroup{
-				st.MakePodGroup().Name("pg-preempt-lower").Namespace("default").Priority(100).MinCount(2).ParentCompositePodGroup("cpg-preempt-lower").WorkloadRef("t1", "wl1").PreemptionPolicy(schedulingv1beta1.PreemptLowerPriority).Obj(),
+				st.MakePodGroup().Name("pg-preempt-lower").Namespace("default").Priority(100).MinCount(2).ParentCompositePodGroup("cpg-preempt-lower").WorkloadRef("wl1", "t1").PreemptionPolicy(schedulingv1beta1.PreemptLowerPriority).Obj(),
 			},
 			initialPods: []*v1.Pod{
 				st.MakePod().Name("low-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").ZeroTerminationGracePeriod().Priority(10).Node("node1").Obj(),
@@ -2140,7 +2140,7 @@ func TestCompositePodGroupPreemption(t *testing.T) {
 				st.MakeCompositePodGroup().Name("cpg1").Namespace("default").Priority(100).BasicPolicy().WorkloadRef("wl1", "t1").Obj(),
 			},
 			podGroups: []*schedulingv1beta1.PodGroup{
-				st.MakePodGroup().Name("pg1").Namespace("default").Priority(100).MinCount(3).ParentCompositePodGroup("cpg1").WorkloadRef("t1", "wl1").Obj(),
+				st.MakePodGroup().Name("pg1").Namespace("default").Priority(100).MinCount(3).ParentCompositePodGroup("cpg1").WorkloadRef("wl1", "t1").Obj(),
 			},
 			initialPods: []*v1.Pod{
 				st.MakePod().Name("low-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").ZeroTerminationGracePeriod().Priority(10).Obj(),
@@ -2168,7 +2168,7 @@ func TestCompositePodGroupPreemption(t *testing.T) {
 				st.MakeCompositePodGroup().Name("preemptor-cpg").Namespace("default").Priority(100).BasicPolicy().WorkloadRef("wl1", "t1").Obj(),
 			},
 			podGroups: []*schedulingv1beta1.PodGroup{
-				st.MakePodGroup().Name("preemptor-pg").Namespace("default").Priority(100).MinCount(2).ParentCompositePodGroup("preemptor-cpg").WorkloadRef("t1", "wl1").Obj(),
+				st.MakePodGroup().Name("preemptor-pg").Namespace("default").Priority(100).MinCount(2).ParentCompositePodGroup("preemptor-cpg").WorkloadRef("wl1", "t1").Obj(),
 			},
 			initialPods: []*v1.Pod{
 				st.MakePod().Name("initial-pod").Label("app", "initial").Node("node1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "0.25"}).Container("image").ZeroTerminationGracePeriod().Priority(10).Obj(),
@@ -2194,7 +2194,7 @@ func TestCompositePodGroupPreemption(t *testing.T) {
 				st.MakeCompositePodGroup().Name("preemptor-cpg").Namespace("default").Priority(100).BasicPolicy().WorkloadRef("wl1", "t1").Obj(),
 			},
 			podGroups: []*schedulingv1beta1.PodGroup{
-				st.MakePodGroup().Name("preemptor-pg").Namespace("default").Priority(100).MinCount(2).ParentCompositePodGroup("preemptor-cpg").WorkloadRef("t1", "wl1").Obj(),
+				st.MakePodGroup().Name("preemptor-pg").Namespace("default").Priority(100).MinCount(2).ParentCompositePodGroup("preemptor-cpg").WorkloadRef("wl1", "t1").Obj(),
 			},
 			initialPods: []*v1.Pod{
 				st.MakePod().Name("initial-pod").ContainerPort([]v1.ContainerPort{{ContainerPort: 8080, HostPort: 8080}}).Node("node1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "0.25"}).Container("image").ZeroTerminationGracePeriod().Priority(10).Obj(),
@@ -2218,8 +2218,8 @@ func TestCompositePodGroupPreemption(t *testing.T) {
 				st.MakeCompositePodGroup().Name("cpg-preemptor").Namespace("default").Priority(100).BasicPolicy().WorkloadRef("wl2", "t2").Obj(),
 			},
 			podGroups: []*schedulingv1beta1.PodGroup{
-				st.MakePodGroup().Name("pg-victim").Namespace("default").Priority(10).MinCount(2).ParentCompositePodGroup("cpg-victim").WorkloadRef("t1", "wl1").Obj(),
-				st.MakePodGroup().Name("pg-preemptor").Namespace("default").Priority(100).MinCount(2).ParentCompositePodGroup("cpg-preemptor").WorkloadRef("t2", "wl2").Obj(),
+				st.MakePodGroup().Name("pg-victim").Namespace("default").Priority(10).MinCount(2).ParentCompositePodGroup("cpg-victim").WorkloadRef("wl1", "t1").Obj(),
+				st.MakePodGroup().Name("pg-preemptor").Namespace("default").Priority(100).MinCount(2).ParentCompositePodGroup("cpg-preemptor").WorkloadRef("wl2", "t2").Obj(),
 			},
 			initialPods: []*v1.Pod{
 				st.MakePod().Name("low-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg-victim").Node("node1").ZeroTerminationGracePeriod().Priority(10).Obj(),
@@ -2248,8 +2248,8 @@ func TestCompositePodGroupPreemption(t *testing.T) {
 				st.MakeCompositePodGroup().Name("cpg-preemptor").Namespace("default").Priority(100).MinGroupCount(1).WorkloadRef("wl2", "t2").Obj(),
 			},
 			podGroups: []*schedulingv1beta1.PodGroup{
-				st.MakePodGroup().Name("pg-victim").Namespace("default").Priority(10).MinCount(4).ParentCompositePodGroup("cpg-victim").WorkloadRef("t1", "wl1").Obj(),
-				st.MakePodGroup().Name("pg-preemptor").Namespace("default").Priority(100).MinCount(4).ParentCompositePodGroup("cpg-preemptor").WorkloadRef("t2", "wl2").Obj(),
+				st.MakePodGroup().Name("pg-victim").Namespace("default").Priority(10).MinCount(4).ParentCompositePodGroup("cpg-victim").WorkloadRef("wl1", "t1").Obj(),
+				st.MakePodGroup().Name("pg-preemptor").Namespace("default").Priority(100).MinCount(4).ParentCompositePodGroup("cpg-preemptor").WorkloadRef("wl2", "t2").Obj(),
 			},
 			initialPods: []*v1.Pod{
 				st.MakePod().Name("low-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg-victim").Node("node1").ZeroTerminationGracePeriod().Priority(10).Obj(),
@@ -2278,8 +2278,8 @@ func TestCompositePodGroupPreemption(t *testing.T) {
 				st.MakeCompositePodGroup().Name("cpg-preemptor").Namespace("default").Priority(100).BasicPolicy().WorkloadRef("wl2", "t2").Obj(),
 			},
 			podGroups: []*schedulingv1beta1.PodGroup{
-				st.MakePodGroup().Name("pg-victim").Namespace("default").Priority(10).MinCount(4).ParentCompositePodGroup("cpg-victim").WorkloadRef("t1", "wl1").Obj(),
-				st.MakePodGroup().Name("pg-preemptor").Namespace("default").Priority(100).MinCount(4).ParentCompositePodGroup("cpg-preemptor").WorkloadRef("t2", "wl2").Obj(),
+				st.MakePodGroup().Name("pg-victim").Namespace("default").Priority(10).MinCount(4).ParentCompositePodGroup("cpg-victim").WorkloadRef("wl1", "t1").Obj(),
+				st.MakePodGroup().Name("pg-preemptor").Namespace("default").Priority(100).MinCount(4).ParentCompositePodGroup("cpg-preemptor").WorkloadRef("wl2", "t2").Obj(),
 			},
 			initialPods: []*v1.Pod{
 				st.MakePod().Name("low-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg-victim").Node("node1").ZeroTerminationGracePeriod().Priority(10).Obj(),
@@ -2306,8 +2306,8 @@ func TestCompositePodGroupPreemption(t *testing.T) {
 				st.MakeCompositePodGroup().Name("cpg-preemptor").Namespace("default").Priority(100).BasicPolicy().WorkloadRef("wl2", "t1").Obj(),
 			},
 			podGroups: []*schedulingv1beta1.PodGroup{
-				st.MakePodGroup().Name("pg-victim").Namespace("default").Priority(10).MinCount(2).ParentCompositePodGroup("cpg-victim").WorkloadRef("t1", "wl1").Obj(),
-				st.MakePodGroup().Name("pg-preemptor").Namespace("default").Priority(100).MinCount(2).ParentCompositePodGroup("cpg-preemptor").WorkloadRef("t1", "wl2").Obj(),
+				st.MakePodGroup().Name("pg-victim").Namespace("default").Priority(10).MinCount(2).ParentCompositePodGroup("cpg-victim").WorkloadRef("wl1", "t1").Obj(),
+				st.MakePodGroup().Name("pg-preemptor").Namespace("default").Priority(100).MinCount(2).ParentCompositePodGroup("cpg-preemptor").WorkloadRef("wl2", "t1").Obj(),
 			},
 			initialPods: []*v1.Pod{
 				st.MakePod().Name("low-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg-victim").ZeroTerminationGracePeriod().Priority(10).Node("node1").Obj(),

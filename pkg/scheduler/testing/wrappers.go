@@ -1618,6 +1618,15 @@ func (wrapper *PodGroupWrapper) UID(uid types.UID) *PodGroupWrapper {
 	return wrapper
 }
 
+// Label sets a {k,v} pair to the inner PodGroup label.
+func (wrapper *PodGroupWrapper) Label(k, v string) *PodGroupWrapper {
+	if wrapper.PodGroup.Labels == nil {
+		wrapper.PodGroup.Labels = make(map[string]string)
+	}
+	wrapper.PodGroup.Labels[k] = v
+	return wrapper
+}
+
 // Obj returns the inner PodGroup.
 func (wrapper *PodGroupWrapper) Obj() *schedulingv1beta1.PodGroup {
 	return &wrapper.PodGroup
@@ -1639,10 +1648,10 @@ func (wrapper *PodGroupWrapper) BasicPolicy() *PodGroupWrapper {
 }
 
 // WorkloadRef sets appropriate WorkloadRef field of the inner PodGroup.
-func (wrapper *PodGroupWrapper) WorkloadRef(templateName, workloadName string) *PodGroupWrapper {
+func (wrapper *PodGroupWrapper) WorkloadRef(workloadName, templateName string) *PodGroupWrapper {
 	wrapper.PodGroup.Spec.WorkloadRef = &schedulingv1beta1.WorkloadReference{
-		TemplateName: templateName,
 		WorkloadName: workloadName,
+		TemplateName: templateName,
 	}
 	return wrapper
 }
@@ -1698,6 +1707,18 @@ func (wrapper *PodGroupWrapper) PreemptionPolicy(policy schedulingv1beta1.Preemp
 // ParentCompositePodGroup sets the parent composite pod group name of the inner PodGroup.
 func (wrapper *PodGroupWrapper) ParentCompositePodGroup(parent string) *PodGroupWrapper {
 	wrapper.PodGroup.Spec.ParentCompositePodGroupName = &parent
+	return wrapper
+}
+
+// Generation sets `generation` as the generation of the inner PodGroup.
+func (wrapper *PodGroupWrapper) Generation(generation int64) *PodGroupWrapper {
+	wrapper.PodGroup.Generation = generation
+	return wrapper
+}
+
+// Conditions sets `conditions` as .Status.Conditions of the inner PodGroup.
+func (wrapper *PodGroupWrapper) Conditions(conditions ...metav1.Condition) *PodGroupWrapper {
+	wrapper.PodGroup.Status.Conditions = conditions
 	return wrapper
 }
 
@@ -1908,6 +1929,15 @@ func (wrapper *CompositePodGroupWrapper) UID(uid string) *CompositePodGroupWrapp
 	return wrapper
 }
 
+// Label sets a {k,v} pair to the inner CompositePodGroup label.
+func (wrapper *CompositePodGroupWrapper) Label(k, v string) *CompositePodGroupWrapper {
+	if wrapper.CompositePodGroup.Labels == nil {
+		wrapper.CompositePodGroup.Labels = make(map[string]string)
+	}
+	wrapper.CompositePodGroup.Labels[k] = v
+	return wrapper
+}
+
 // ParentCompositePodGroup sets the parent CompositePodGroup.
 func (wrapper *CompositePodGroupWrapper) ParentCompositePodGroup(parent string) *CompositePodGroupWrapper {
 	wrapper.CompositePodGroup.Spec.ParentCompositePodGroupName = new(parent)
@@ -1956,5 +1986,17 @@ func (wrapper *CompositePodGroupWrapper) TopologyKey(topologyKey string) *Compos
 			},
 		},
 	}
+	return wrapper
+}
+
+// Generation sets `generation` as the generation of the inner CompositePodGroup.
+func (wrapper *CompositePodGroupWrapper) Generation(generation int64) *CompositePodGroupWrapper {
+	wrapper.CompositePodGroup.Generation = generation
+	return wrapper
+}
+
+// Conditions sets `conditions` as .Status.Conditions of the inner CompositePodGroup.
+func (wrapper *CompositePodGroupWrapper) Conditions(conditions ...metav1.Condition) *CompositePodGroupWrapper {
+	wrapper.CompositePodGroup.Status.Conditions = conditions
 	return wrapper
 }

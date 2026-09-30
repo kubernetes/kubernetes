@@ -209,6 +209,7 @@ const (
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:prerelease-lifecycle-gen:introduced=1.33
+// +k8s:prerelease-lifecycle-gen:deprecated=1.36
 
 // DeviceTaintRule adds one taint to all devices which match the selector.
 // This has the same effect as if the taint was specified directly
@@ -347,6 +348,7 @@ const DeviceTaintConditionEvictionInProgress = "EvictionInProgress"
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:prerelease-lifecycle-gen:introduced=1.33
+// +k8s:prerelease-lifecycle-gen:deprecated=1.36
 
 // DeviceTaintRuleList is a collection of DeviceTaintRules.
 type DeviceTaintRuleList struct {

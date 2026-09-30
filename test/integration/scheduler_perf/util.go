@@ -32,10 +32,6 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	resourceapi "k8s.io/api/resource/v1"
-	resourcealpha "k8s.io/api/resource/v1alpha3"
-	resourcev1beta1 "k8s.io/api/resource/v1beta1"
-	resourcev1beta2 "k8s.io/api/resource/v1beta2"
 	schedulingapiv1alpha3 "k8s.io/api/scheduling/v1alpha3"
 	schedulingapiv1beta1 "k8s.io/api/scheduling/v1beta1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -44,6 +40,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/informers"
 	coreinformers "k8s.io/client-go/informers/core/v1"
+	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/component-base/featuregate"
@@ -95,12 +92,6 @@ func newDefaultComponentConfig() (*config.KubeSchedulerConfiguration, error) {
 //   - client rate limit is set to 5000.
 func mustSetupCluster(tCtx ktesting.TContext, config *config.KubeSchedulerConfiguration, enabledFeatures map[featuregate.Feature]bool, opts *schedulerPerfOptions) (*scheduler.Scheduler, informers.SharedInformerFactory, <-chan struct{}, ktesting.TContext) {
 	var runtimeConfig []string
-	if enabledFeatures[features.DynamicResourceAllocation] {
-		runtimeConfig = append(runtimeConfig, fmt.Sprintf("%s=true", resourceapi.SchemeGroupVersion))
-		runtimeConfig = append(runtimeConfig, fmt.Sprintf("%s=true", resourcev1beta2.SchemeGroupVersion))
-		runtimeConfig = append(runtimeConfig, fmt.Sprintf("%s=true", resourcev1beta1.SchemeGroupVersion))
-		runtimeConfig = append(runtimeConfig, fmt.Sprintf("%s=true", resourcealpha.SchemeGroupVersion))
-	}
 	if enabledFeatures[features.GenericWorkload] {
 		runtimeConfig = append(runtimeConfig, fmt.Sprintf("%s=true", schedulingapiv1beta1.SchemeGroupVersion))
 	}
@@ -110,7 +101,9 @@ func mustSetupCluster(tCtx ktesting.TContext, config *config.KubeSchedulerConfig
 	customFlags := []string{
 		// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
 		"--disable-admission-plugins=ServiceAccount,TaintNodesByCondition,Priority",
-		"--runtime-config=" + strings.Join(runtimeConfig, ","),
+	}
+	if len(runtimeConfig) > 0 {
+		customFlags = append(customFlags, "--runtime-config="+strings.Join(runtimeConfig, ","))
 	}
 	serverOpts := apiservertesting.NewDefaultTestServerOptions()
 	// Timeout sufficiently long to handle deleting pods of the largest test cases.
@@ -123,9 +116,6 @@ func mustSetupCluster(tCtx ktesting.TContext, config *config.KubeSchedulerConfig
 	// child context, then the server.
 	tCtx.Cleanup(server.TearDownFn)
 	tCtx = tCtx.WithCancel()
-	tCtx.Cleanup(func() {
-		tCtx.Cancel("test is done")
-	})
 
 	// TODO: client connection configuration, such as QPS or Burst is configurable in theory, this could be derived from the `config`, need to
 	// support this when there is any testcase that depends on such configuration.
@@ -147,18 +137,25 @@ func mustSetupCluster(tCtx ktesting.TContext, config *config.KubeSchedulerConfig
 	// Not all config options will be effective but only those mostly related with scheduler performance will
 	// be applied to start a scheduler, most of them are defined in `scheduler.schedulerOptions`.
 	scheduler, informerFactory, done := util.StartSchedulerWithDone(tCtx, config, opts.outOfTreePluginRegistry)
-	util.StartFakePVController(tCtx, tCtx.Client(), informerFactory)
-	runGC := util.CreateGCController(tCtx, tCtx, *cfg, informerFactory)
-	runNS := util.CreateNamespaceController(tCtx, tCtx, *cfg, informerFactory)
-	runResourceClaimController := func() {}
-	if enabledFeatures[features.DynamicResourceAllocation] {
-		// Testing of DRA with inline resource claims depends on this
-		// controller for creating and removing ResourceClaims.
-		runResourceClaimController = util.CreateResourceClaimController(tCtx, tCtx, tCtx.Client(), informerFactory)
-	}
+
+	// The controllers below stand in for kube-controller-manager, which runs in a
+	// separate process from kube-scheduler in a real cluster. Give them their own
+	// client (so that their rate limiting is independent from the scheduler's) and
+	// their own informer factory (so that watches and caches aren't shared with the
+	// scheduler either).
+	controllerClient := clientset.NewForConfigOrDie(cfg)
+	controllerInformerFactory := informers.NewSharedInformerFactory(controllerClient, 0)
+	util.StartFakePVController(tCtx, controllerClient, controllerInformerFactory)
+	runGC := util.CreateGCController(tCtx, tCtx, *cfg, controllerInformerFactory)
+	runNS := util.CreateNamespaceController(tCtx, tCtx, *cfg, controllerInformerFactory)
+	// Testing of DRA with inline resource claims depends on this
+	// controller for creating and removing ResourceClaims.
+	runResourceClaimController := util.CreateResourceClaimController(tCtx, tCtx, controllerClient, controllerInformerFactory)
 
 	informerFactory.Start(tCtx.Done())
 	informerFactory.WaitForCacheSync(tCtx.Done())
+	controllerInformerFactory.Start(tCtx.Done())
+	controllerInformerFactory.WaitForCacheSync(tCtx.Done())
 	go runGC()
 	go runNS()
 	go runResourceClaimController()

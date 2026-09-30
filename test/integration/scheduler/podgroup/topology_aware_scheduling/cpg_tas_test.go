@@ -64,7 +64,7 @@ func makeAssignedGroupPod(podName, podGroupName, nodeName, consumedCPU string) *
 }
 
 func makeGangPodGroupWithParent(podGroupName, parentCPGName, topologyKey string, minCount int32) *schedulingapi.PodGroup {
-	pg := st.MakePodGroup().Name(podGroupName).WorkloadRef("pg", "workload").MinCount(minCount).Priority(100).ParentCompositePodGroup(parentCPGName)
+	pg := st.MakePodGroup().Name(podGroupName).WorkloadRef("workload", "pg").MinCount(minCount).Priority(100).ParentCompositePodGroup(parentCPGName)
 	if topologyKey != "" {
 		pg.TopologyKey(topologyKey)
 	}
@@ -72,7 +72,7 @@ func makeGangPodGroupWithParent(podGroupName, parentCPGName, topologyKey string,
 }
 
 func makeBasicPodGroupWithParent(podGroupName, parentCPGName, topologyKey string) *schedulingapi.PodGroup {
-	pg := st.MakePodGroup().Name(podGroupName).WorkloadRef("pg", "workload").BasicPolicy().Priority(100).ParentCompositePodGroup(parentCPGName)
+	pg := st.MakePodGroup().Name(podGroupName).WorkloadRef("workload", "pg").BasicPolicy().Priority(100).ParentCompositePodGroup(parentCPGName)
 	if topologyKey != "" {
 		pg.TopologyKey(topologyKey)
 	}
@@ -80,7 +80,7 @@ func makeBasicPodGroupWithParent(podGroupName, parentCPGName, topologyKey string
 }
 
 func makeGangCompositePodGroup(cpgName, parentCPGName, topologyKey string, minGroupCount int32) *schedulingv1alpha3.CompositePodGroup {
-	cpg := st.MakeCompositePodGroup().Name(cpgName).WorkloadRef("cpg", "workload").MinGroupCount(minGroupCount).Priority(100)
+	cpg := st.MakeCompositePodGroup().Name(cpgName).WorkloadRef("workload", "cpg").MinGroupCount(minGroupCount).Priority(100)
 	if parentCPGName != "" {
 		cpg.ParentCompositePodGroup(parentCPGName)
 	}
@@ -91,7 +91,7 @@ func makeGangCompositePodGroup(cpgName, parentCPGName, topologyKey string, minGr
 }
 
 func makeBasicCompositePodGroup(cpgName, parentCPGName, topologyKey string) *schedulingv1alpha3.CompositePodGroup {
-	cpg := st.MakeCompositePodGroup().Name(cpgName).WorkloadRef("cpg", "workload").BasicPolicy().Priority(100)
+	cpg := st.MakeCompositePodGroup().Name(cpgName).WorkloadRef("workload", "cpg").BasicPolicy().Priority(100)
 	if parentCPGName != "" {
 		cpg.ParentCompositePodGroup(parentCPGName)
 	}

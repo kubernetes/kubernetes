@@ -1157,7 +1157,7 @@ func TestImages(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.desc, func(t *testing.T) {
 			ctx := ktesting.Init(t)
-			imageListFunc := func() ([]kubecontainer.Image, error) {
+			imageListFunc := func(_ context.Context) ([]kubecontainer.Image, error) {
 				// today, imageListFunc is expected to return a sorted list,
 				// but we may choose to sort in the setter at some future point
 				// (e.g. if the image cache stopped sorting for us)

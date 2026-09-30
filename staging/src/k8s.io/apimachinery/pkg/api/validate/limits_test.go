@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"testing"
+	"time"
 
 	"k8s.io/apimachinery/pkg/api/operation"
 	"k8s.io/apimachinery/pkg/api/validate/constraints"
@@ -423,6 +424,19 @@ func doTestMinimum[T constraints.Integer](t *testing.T, cases []minimumTestCase[
 	}
 }
 
+func TestMinimumDuration(t *testing.T) {
+	doTestMinimum(t, []minimumTestCase[time.Duration]{{
+		min:   time.Second,
+		value: time.Second,
+	}, {
+		min:   time.Second,
+		value: time.Second - time.Nanosecond,
+		wantErrs: field.ErrorList{
+			field.Invalid(field.NewPath("fldpath"), nil, "must be greater than or equal to 1s").WithOrigin("minimum"),
+		},
+	}})
+}
+
 func TestMaximum(t *testing.T) {
 	testMaximumPositive[int](t)
 	testMaximumNegative[int](t)
@@ -499,6 +513,19 @@ func doTestMaximum[T constraints.Integer](t *testing.T, cases []maximumTestCase[
 			matcher.Test(t, tc.wantErrs, gotErrs)
 		})
 	}
+}
+
+func TestMaximumDuration(t *testing.T) {
+	doTestMaximum(t, []maximumTestCase[time.Duration]{{
+		max:   time.Second,
+		value: time.Second,
+	}, {
+		max:   time.Second,
+		value: time.Second + time.Nanosecond,
+		wantErrs: field.ErrorList{
+			field.Invalid(field.NewPath("fldpath"), nil, "must be less than or equal to 1s").WithOrigin("maximum"),
+		},
+	}})
 }
 
 func TestMaxBytes(t *testing.T) {

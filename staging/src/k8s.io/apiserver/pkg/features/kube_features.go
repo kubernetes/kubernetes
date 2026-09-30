@@ -172,6 +172,14 @@ const (
 	// Enables generating snapshots of watch cache store and using them to serve LIST requests.
 	ListFromCacheSnapshot featuregate.Feature = "ListFromCacheSnapshot"
 
+	// owner: @yongruilin
+	// kep: https://kep.k8s.io/5958
+	//
+	// Enables the "drop=metadata.managedFields" Accept header parameter, which serves
+	// responses with metadata.managedFields omitted. When disabled the parameter is
+	// ignored rather than rejected, and responses are unchanged.
+	ManagedFieldsOptOut featuregate.Feature = "ManagedFieldsOptOut"
+
 	// owner: @aramase @BenTheElder
 	// kep: https://kep.k8s.io/5793
 	//
@@ -397,6 +405,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 	ListFromCacheSnapshot: {
 		{Version: version.MustParse("1.33"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.Beta},
+	},
+
+	ManagedFieldsOptOut: {
+		{Version: version.MustParse("1.38"), Default: false, PreRelease: featuregate.Alpha},
 	},
 
 	ManifestBasedAdmissionControlConfig: {

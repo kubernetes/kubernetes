@@ -303,24 +303,6 @@ func TestAddAllEventHandlers(t *testing.T) {
 			expectDynamicInformers: map[schema.GroupVersionResource]bool{},
 		},
 		{
-			name:            "DRA events disabled",
-			emulatedVersion: "1.34",
-			overrides: featuregatetesting.FeatureOverrides{
-				features.DynamicResourceAllocation: false,
-			},
-			gvkMap: map[fwk.EventResource]fwk.ActionType{
-				fwk.ResourceClaim: fwk.Add,
-				fwk.ResourceSlice: fwk.Add,
-				fwk.DeviceClass:   fwk.Add,
-			},
-			expectStaticInformers: map[reflect.Type]bool{
-				reflect.TypeFor[*v1.Pod]():       true,
-				reflect.TypeFor[*v1.Node]():      true,
-				reflect.TypeFor[*v1.Namespace](): true,
-			},
-			expectDynamicInformers: map[schema.GroupVersionResource]bool{},
-		},
-		{
 			name:            "core DRA events enabled",
 			emulatedVersion: "1.35",
 			overrides: featuregatetesting.FeatureOverrides{
@@ -507,28 +489,23 @@ func TestAddAllEventHandlers(t *testing.T) {
 
 			dynclient := dyfake.NewSimpleDynamicClient(scheme)
 			dynInformerFactory := dynamicinformer.NewDynamicSharedInformerFactory(dynclient, 0)
-			var resourceClaimCache *assumecache.AssumeCache
-			var resourceSliceTracker *resourceslicetracker.Tracker
 			var draManager fwk.SharedDRAManager
-			if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
-				resourceClaimInformer := informerFactory.Resource().V1().ResourceClaims().Informer()
-				resourceClaimCache = assumecache.NewAssumeCache(logger, resourceClaimInformer, "ResourceClaim", "", nil)
-				var err error
-				opts := resourceslicetracker.Options{
-					EnableDeviceTaintRules: utilfeature.DefaultFeatureGate.Enabled(features.DRADeviceTaintRules),
-					SliceInformer:          informerFactory.Resource().V1().ResourceSlices(),
-				}
-				if opts.EnableDeviceTaintRules {
-					opts.TaintInformer = informerFactory.Resource().V1().DeviceTaintRules()
-				}
-				resourceSliceTracker, err = resourceslicetracker.StartTracker(ctx, opts)
-				if err != nil {
-					t.Fatalf("couldn't start resource slice tracker: %v", err)
-				}
+			resourceClaimInformer := informerFactory.Resource().V1().ResourceClaims().Informer()
+			resourceClaimCache := assumecache.NewAssumeCache(logger, resourceClaimInformer, "ResourceClaim", "", nil)
+			opts := resourceslicetracker.Options{
+				EnableDeviceTaintRules: utilfeature.DefaultFeatureGate.Enabled(features.DRADeviceTaintRules),
+				SliceInformer:          informerFactory.Resource().V1().ResourceSlices(),
+			}
+			if opts.EnableDeviceTaintRules {
+				opts.TaintInformer = informerFactory.Resource().V1().DeviceTaintRules()
+			}
+			resourceSliceTracker, err := resourceslicetracker.StartTracker(ctx, opts)
+			if err != nil {
+				t.Fatalf("couldn't start resource slice tracker: %v", err)
+			}
 
-				if utilfeature.DefaultFeatureGate.Enabled(features.DRAExtendedResource) {
-					draManager = dynamicresources.NewDRAManager(ctx, resourceClaimCache, resourceSliceTracker, informerFactory)
-				}
+			if utilfeature.DefaultFeatureGate.Enabled(features.DRAExtendedResource) {
+				draManager = dynamicresources.NewDRAManager(ctx, resourceClaimCache, resourceSliceTracker, informerFactory)
 			}
 
 			if err := addAllEventHandlers(&testSched, informerFactory, dynInformerFactory, resourceClaimCache, resourceSliceTracker, draManager, tt.gvkMap); err != nil {
@@ -869,7 +846,7 @@ func TestAddPod(t *testing.T) {
 
 			sched.addPod(tt.pod)
 
-			_, ok := sched.SchedulingQueue.GetPod(tt.pod.Name, tt.pod.Namespace, tt.pod.Spec.SchedulingGroup)
+			_, ok := sched.SchedulingQueue.GetPod(ctx, tt.pod.Name, tt.pod.Namespace, tt.pod.Spec.SchedulingGroup)
 			if tt.expectInQueue && !ok {
 				t.Errorf("Expected pod to be in scheduling queue")
 			} else if !tt.expectInQueue && ok {
@@ -1260,7 +1237,7 @@ func TestUpdatePod(t *testing.T) {
 				}
 			}
 
-			qPod, ok := sched.SchedulingQueue.GetPod(tt.newPod.Name, tt.newPod.Namespace, tt.newPod.Spec.SchedulingGroup)
+			qPod, ok := sched.SchedulingQueue.GetPod(ctx, tt.newPod.Name, tt.newPod.Namespace, tt.newPod.Spec.SchedulingGroup)
 			if tt.expectInQueue != nil {
 				if !ok {
 					t.Errorf("Expected pod to be in scheduling queue")
@@ -1480,7 +1457,7 @@ func TestDeletePod(t *testing.T) {
 			} else if err == nil {
 				t.Errorf("Unexpected pod in cache after removal")
 			}
-			_, ok := sched.SchedulingQueue.GetPod(tt.initialPod.Name, tt.initialPod.Namespace, tt.initialPod.Spec.SchedulingGroup)
+			_, ok := sched.SchedulingQueue.GetPod(ctx, tt.initialPod.Name, tt.initialPod.Namespace, tt.initialPod.Spec.SchedulingGroup)
 			if ok {
 				t.Errorf("Unexpected pod in scheduling queue after removal")
 			}
@@ -2186,7 +2163,7 @@ func TestEventHandlers_DeferredResize(t *testing.T) {
 				targetPod = tt.updatedPod
 			}
 
-			_, ok := sched.SchedulingQueue.GetPod(targetPod.Name, targetPod.Namespace, targetPod.Spec.SchedulingGroup)
+			_, ok := sched.SchedulingQueue.GetPod(ctx, targetPod.Name, targetPod.Namespace, targetPod.Spec.SchedulingGroup)
 			if ok != tt.expectInQueue {
 				t.Errorf("Unexpected queue state: got inQueue=%v, want inQueue=%v", ok, tt.expectInQueue)
 			}

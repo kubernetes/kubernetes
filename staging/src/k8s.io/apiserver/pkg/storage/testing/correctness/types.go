@@ -23,6 +23,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/storage"
 )
 
@@ -41,6 +42,7 @@ type Request struct {
 	Key    string
 	Create CreateRequest
 	Get    GetRequest
+	List   ListRequest
 	Delete DeleteRequest
 	Update UpdateRequest
 }
@@ -53,6 +55,11 @@ type CreateRequest struct {
 // GetRequest contains parameters specific to Get operations.
 type GetRequest struct {
 	Options storage.GetOptions
+}
+
+// ListRequest contains parameters specific to GetList operations.
+type ListRequest struct {
+	Options storage.ListOptions
 }
 
 // DeleteRequest contains parameters specific to Delete operations.
@@ -95,6 +102,13 @@ func (r Request) Describe(output Response) string {
 			return fmt.Sprintf("%s(%s) -> %v", r.Op, r.Key, output.Err)
 		}
 	}
+	if r.Op == OpList {
+		accessor, err := meta.ListAccessor(output.Object)
+		if err != nil {
+			panic(err)
+		}
+		return fmt.Sprintf("%s(%s) -> RV: %s, Items: %d", r.Op, r.Key, accessor.GetResourceVersion(), meta.LenList(output.Object))
+	}
 	accessor, err := meta.Accessor(output.Object)
 	if err != nil {
 		panic(err)
@@ -128,6 +142,7 @@ const (
 	OpCreate OpType = "Create"
 	OpDelete OpType = "Delete"
 	OpGet    OpType = "Get"
+	OpList   OpType = "List"
 	OpUpdate OpType = "Update"
 )
 
@@ -135,4 +150,32 @@ const (
 type Response struct {
 	Object runtime.Object
 	Err    error
+}
+
+// Change is a write the model applied to a single key. PrevObject is nil for a
+// create and Object is nil for a delete. Like etcd3 and the cacher, deciding
+// what a watcher with a predicate receives requires both objects.
+type Change struct {
+	ResourceVersion uint64
+	Object          runtime.Object
+	PrevObject      runtime.Object
+}
+
+// WatchRequest contains parameters for a watch stream.
+type WatchRequest struct {
+	ResourceVersion string
+	// Predicate filters events. The zero value matches everything.
+	Predicate storage.SelectionPredicate
+}
+
+// WatchResponse contains the events and any terminal error received from a watch stream.
+type WatchResponse struct {
+	Events []watch.Event
+	Err    error
+}
+
+// WatchOperation captures a recorded watch operation with its request and response.
+type WatchOperation struct {
+	Request  WatchRequest
+	Response WatchResponse
 }

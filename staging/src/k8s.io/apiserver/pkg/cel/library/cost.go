@@ -503,7 +503,17 @@ func (l *CostEstimator) EstimateCallCost(function, overloadId string, target *ch
 	case "sign", "asInteger", "isInteger", "asApproximateFloat", "isGreaterThan", "isLessThan", "compareTo", "add", "sub", "major", "minor", "patch":
 		return &checker.CallEstimate{CostEstimate: checker.CostEstimate{Min: 1, Max: 1}}
 	case "getScheme", "getHostname", "getHost", "getPort", "getEscapedPath", "getQuery":
-		// url accessors
+		// URL accessors return values derived from components of the URL.
+		// Propagate the target's size estimate so downstream string operations
+		// (e.g. matches()) see a bounded input instead of an unbounded result.
+		// getEscapedPath may expand bytes via percent-encoding, so account for up to 3x expansion (%XX).
+		if target != nil {
+			sz := l.sizeEstimate(*target)
+			if function == "getEscapedPath" {
+				sz = sz.Multiply(checker.SizeEstimate{Min: 1, Max: 3})
+			}
+			return &checker.CallEstimate{CostEstimate: checker.CostEstimate{Min: 1, Max: 1}, ResultSize: &sz}
+		}
 		return &checker.CallEstimate{CostEstimate: checker.CostEstimate{Min: 1, Max: 1}}
 	case "_==_":
 		if len(args) == 2 {

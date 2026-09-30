@@ -206,6 +206,26 @@ func TestDeclarativeValidate(t *testing.T) {
 				field.Invalid(field.NewPath("spec.template.spec.tolerations").Index(0).Child("key"), nil, "").WithOrigin("format=k8s-label-key").MarkAlpha(),
 			},
 		},
+		"activeDeadlineSeconds minimum boundary violation": {
+			input: mkValidReplicationController(func(rc *api.ReplicationController) {
+				deadline := int64(0)
+				rc.Spec.Template.Spec.ActiveDeadlineSeconds = &deadline
+			}),
+			expectedErrs: field.ErrorList{
+				field.Forbidden(field.NewPath("spec", "template", "spec", "activeDeadlineSeconds"), "activeDeadlineSeconds in ReplicationController is not Supported").MarkFromImperative(),
+				field.Invalid(field.NewPath("spec.template.spec.activeDeadlineSeconds"), int64(0), "").WithOrigin("minimum").MarkAlpha(),
+			},
+		},
+		"activeDeadlineSeconds maximum boundary violation": {
+			input: mkValidReplicationController(func(rc *api.ReplicationController) {
+				deadline := int64(2147483648)
+				rc.Spec.Template.Spec.ActiveDeadlineSeconds = &deadline
+			}),
+			expectedErrs: field.ErrorList{
+				field.Forbidden(field.NewPath("spec", "template", "spec", "activeDeadlineSeconds"), "activeDeadlineSeconds in ReplicationController is not Supported").MarkFromImperative(),
+				field.Invalid(field.NewPath("spec.template.spec.activeDeadlineSeconds"), int64(2147483648), "").WithOrigin("maximum").MarkAlpha(),
+			},
+		},
 	}
 	for k, tc := range testCases {
 		t.Run(k, func(t *testing.T) {
