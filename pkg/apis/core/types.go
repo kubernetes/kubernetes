@@ -3550,6 +3550,31 @@ const (
 	DNSNone DNSPolicy = "None"
 )
 
+// PodDefaultNetwork describes the pod's default network.
+type PodDefaultNetwork string
+
+const (
+	// PodDefaultNetworkPod gives the pod its own network namespace and
+	// attaches it to the default pod network (the network that Kubernetes
+	// connects every pod to unless the pod opts out). The container runtime
+	// performs its configured network plumbing and the pod is assigned pod
+	// IPs. This is the default and matches the historical behavior of
+	// Kubernetes.
+	PodDefaultNetworkPod PodDefaultNetwork = "Pod"
+
+	// PodDefaultNetworkHost runs the pod in the host's network namespace.
+	// It is equivalent to setting hostNetwork: true; the two fields are
+	// kept in sync by API defaulting.
+	PodDefaultNetworkHost PodDefaultNetwork = "Host"
+
+	// PodDefaultNetworkNone gives the pod its own network namespace
+	// containing only the loopback interface and does not attach it to the
+	// default pod network. The pod's podIPs are left unset. The pod is never
+	// selected into Services and, by default, receives no cluster DNS
+	// configuration or service environment variables.
+	PodDefaultNetworkNone PodDefaultNetwork = "None"
+)
+
 // NodeSelector represents the union of the results of one or more label queries
 // over a set of nodes; that is, it represents the OR of the selectors represented
 // by the node selector terms.
@@ -4203,6 +4228,25 @@ type PodSpec struct {
 	// +featureGate=EvictionRequestAPI
 	// +optional
 	EvictionResponders []EvictionResponder
+
+	// DefaultNetwork selects the pod's default network.
+	// "Pod" gives the pod its own network namespace attached to the default
+	// pod network, "Host" runs the pod in the host network namespace
+	// (equivalent to hostNetwork: true and kept in sync with it), and
+	// "None" gives the pod an isolated network namespace with only a
+	// loopback interface, not attached to the default pod network and with
+	// no automatic network plumbing.
+	// Defaults to "Pod", or to "Host" when hostNetwork is true; setting
+	// "Host" sets hostNetwork to true. "None" may not be combined with
+	// hostNetwork: true.
+	// When "None" is selected, dnsPolicy defaults to "None" and
+	// enableServiceLinks defaults to false (both may be overridden), and
+	// features that require networking (such as hostPorts and network-based
+	// probes and lifecycle handlers) are forbidden.
+	// This field is immutable.
+	// +featureGate=PodDefaultNetwork
+	// +optional
+	DefaultNetwork *PodDefaultNetwork
 }
 
 // PodResourceClaim references exactly one ResourceClaim through a ClaimSource.

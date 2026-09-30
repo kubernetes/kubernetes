@@ -4078,6 +4078,33 @@ const (
 	DNSNone DNSPolicy = "None"
 )
 
+// PodDefaultNetwork describes the pod's default network.
+// +enum
+// +k8s:enum
+type PodDefaultNetwork string
+
+const (
+	// PodDefaultNetworkPod gives the pod its own network namespace and
+	// attaches it to the default pod network (the network that Kubernetes
+	// connects every pod to unless the pod opts out). The container runtime
+	// performs its configured network plumbing and the pod is assigned pod
+	// IPs. This is the default and matches the historical behavior of
+	// Kubernetes.
+	PodDefaultNetworkPod PodDefaultNetwork = "Pod"
+
+	// PodDefaultNetworkHost runs the pod in the host's network namespace.
+	// It is equivalent to setting hostNetwork: true; the two fields are
+	// kept in sync by API defaulting.
+	PodDefaultNetworkHost PodDefaultNetwork = "Host"
+
+	// PodDefaultNetworkNone gives the pod its own network namespace
+	// containing only the loopback interface and does not attach it to the
+	// default pod network. The pod's podIPs are left unset. The pod is never
+	// selected into Services and, by default, receives no cluster DNS
+	// configuration or service environment variables.
+	PodDefaultNetworkNone PodDefaultNetwork = "None"
+)
+
 const (
 	// DefaultTerminationGracePeriodSeconds indicates the default duration in
 	// seconds a pod needs to terminate gracefully.
@@ -4844,6 +4871,26 @@ type PodSpec struct {
 	// +k8s:maxItems=10
 	// +k8s:alpha(since: "1.37")=+k8s:dependentForbidden("schedulingGroup")
 	EvictionResponders []EvictionResponder `json:"evictionResponders,omitempty" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,44,rep,name=evictionResponders"`
+
+	// defaultNetwork selects the pod's default network.
+	// "Pod" gives the pod its own network namespace attached to the default
+	// pod network, "Host" runs the pod in the host network namespace
+	// (equivalent to hostNetwork: true and kept in sync with it), and
+	// "None" gives the pod an isolated network namespace with only a
+	// loopback interface, not attached to the default pod network and with
+	// no automatic network plumbing.
+	// Defaults to "Pod", or to "Host" when hostNetwork is true; setting
+	// "Host" sets hostNetwork to true. "None" may not be combined with
+	// hostNetwork: true.
+	// When "None" is selected, dnsPolicy defaults to "None" and
+	// enableServiceLinks defaults to false (both may be overridden), and
+	// features that require networking (such as hostPorts and network-based
+	// probes and lifecycle handlers) are forbidden.
+	// This field is immutable.
+	// +featureGate=PodDefaultNetwork
+	// +optional
+	// +k8s:optional
+	DefaultNetwork *PodDefaultNetwork `json:"defaultNetwork,omitempty" protobuf:"bytes,45,opt,name=defaultNetwork,casttype=PodDefaultNetwork"`
 }
 
 // PodResourceClaim references exactly one ResourceClaim, either directly

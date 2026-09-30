@@ -4646,6 +4646,70 @@ func TestDropHostnameOverride(t *testing.T) {
 	}
 }
 
+func TestDropDefaultNetwork(t *testing.T) {
+	podWithoutDefaultNetwork := func() *api.Pod {
+		return &api.Pod{Spec: api.PodSpec{}}
+	}
+	podWithDefaultNetwork := func() *api.Pod {
+		return &api.Pod{
+			Spec: api.PodSpec{
+				DefaultNetwork: ptr.To(api.PodDefaultNetworkNone),
+			},
+		}
+	}
+
+	podInfo := []struct {
+		description       string
+		hasDefaultNetwork bool
+		pod               func() *api.Pod
+	}{
+		{
+			description:       "with DefaultNetwork",
+			hasDefaultNetwork: true,
+			pod:               podWithDefaultNetwork,
+		},
+		{
+			description:       "without DefaultNetwork",
+			hasDefaultNetwork: false,
+			pod:               podWithoutDefaultNetwork,
+		},
+	}
+
+	for _, enabled := range []bool{true, false} {
+		for _, oldPodInfo := range podInfo {
+			for _, newPodInfo := range podInfo {
+				oldPodHasDefaultNetwork, oldPod := oldPodInfo.hasDefaultNetwork, oldPodInfo.pod()
+				newPodHasDefaultNetwork, newPod := newPodInfo.hasDefaultNetwork, newPodInfo.pod()
+
+				t.Run(fmt.Sprintf("feature enabled=%v, old pod %v, new pod %v", enabled, oldPodInfo.description, newPodInfo.description), func(t *testing.T) {
+					featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodDefaultNetwork, enabled)
+
+					DropDisabledPodFields(newPod, oldPod)
+
+					if !reflect.DeepEqual(oldPod, oldPodInfo.pod()) {
+						t.Errorf("old pod changed: %v", cmp.Diff(oldPod, oldPodInfo.pod()))
+					}
+
+					switch {
+					case enabled || oldPodHasDefaultNetwork:
+						if !reflect.DeepEqual(newPod, newPodInfo.pod()) {
+							t.Errorf("new pod changed: %v", cmp.Diff(newPod, newPodInfo.pod()))
+						}
+					case newPodHasDefaultNetwork:
+						if exp := podWithoutDefaultNetwork(); !reflect.DeepEqual(newPod, exp) {
+							t.Errorf("new pod had DefaultNetwork: %v", cmp.Diff(newPod, exp))
+						}
+					default:
+						if !reflect.DeepEqual(newPod, newPodInfo.pod()) {
+							t.Errorf("new pod changed: %v", cmp.Diff(newPod, newPodInfo.pod()))
+						}
+					}
+				})
+			}
+		}
+	}
+}
+
 func TestDropEmptyDirVolumeMode(t *testing.T) {
 	mode := int32(0o755)
 
