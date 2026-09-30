@@ -617,39 +617,40 @@ func TestInterpretExponentInt32Bounds(t *testing.T) {
 
 func TestQuantityRoundUp(t *testing.T) {
 	table := []struct {
-		in     string
-		scale  Scale
-		expect Quantity
-		ok     bool
+		in       string
+		scale    Scale
+		expect   Quantity
+		ok       bool
+		decScale inf.Scale // expected scale of the inf.Dec value after RoundUp
 	}{
-		{"9.01", -3, decQuantity(901, -2, DecimalSI), true},
-		{"9.01", -2, decQuantity(901, -2, DecimalSI), true},
-		{"9.01", -1, decQuantity(91, -1, DecimalSI), false},
-		{"9.01", 0, decQuantity(10, 0, DecimalSI), false},
-		{"9.01", 1, decQuantity(10, 0, DecimalSI), false},
-		{"9.01", 2, decQuantity(100, 0, DecimalSI), false},
+		{"9.01", -3, decQuantity(901, -2, DecimalSI), true, 3},
+		{"9.01", -2, decQuantity(901, -2, DecimalSI), true, 2},
+		{"9.01", -1, decQuantity(91, -1, DecimalSI), false, 1},
+		{"9.01", 0, decQuantity(10, 0, DecimalSI), false, 0},
+		{"9.01", 1, decQuantity(10, 0, DecimalSI), false, -1},
+		{"9.01", 2, decQuantity(100, 0, DecimalSI), false, -2},
 
-		{"-9.01", -3, decQuantity(-901, -2, DecimalSI), true},
-		{"-9.01", -2, decQuantity(-901, -2, DecimalSI), true},
-		{"-9.01", -1, decQuantity(-91, -1, DecimalSI), false},
-		{"-9.01", 0, decQuantity(-10, 0, DecimalSI), false},
-		{"-9.01", 1, decQuantity(-10, 0, DecimalSI), false},
-		{"-9.01", 2, decQuantity(-100, 0, DecimalSI), false},
+		{"-9.01", -3, decQuantity(-901, -2, DecimalSI), true, 3},
+		{"-9.01", -2, decQuantity(-901, -2, DecimalSI), true, 2},
+		{"-9.01", -1, decQuantity(-91, -1, DecimalSI), false, 1},
+		{"-9.01", 0, decQuantity(-10, 0, DecimalSI), false, 0},
+		{"-9.01", 1, decQuantity(-10, 0, DecimalSI), false, -1},
+		{"-9.01", 2, decQuantity(-100, 0, DecimalSI), false, -2},
 
 		// no-op cases
-		{"0", -3, decQuantity(0, 0, DecimalSI), true},
-		{"5", -9, decQuantity(5, 0, DecimalSI), true},
-		{"5", -6, decQuantity(5, 0, DecimalSI), true},
-		{"5", -3, decQuantity(5, 0, DecimalSI), true},
-		{"-5", -3, decQuantity(-5, 0, DecimalSI), true},
-		{"50k", -3, decQuantity(50, 3, DecimalSI), true},
-		{"50k", 0, decQuantity(50, 3, DecimalSI), true},
-		{"2Gi", -3, decQuantity(2147483648, 0, BinarySI), true},
-		{"9223372036854775807", -3, decQuantity(math.MaxInt64, 0, DecimalSI), true},
-		{"-9223372036854775808", -9, decQuantity(math.MinInt64, 0, DecimalSI), true},
-		{"1000m", -3, decQuantity(1000, -3, DecimalSI), true},
-		{"1000m", -9, decQuantity(1000, -3, DecimalSI), true},
-		{"1.5", -3, decQuantity(15, -1, DecimalSI), true},
+		{"0", -3, decQuantity(0, 0, DecimalSI), true, 0},
+		{"5", -9, decQuantity(5, 0, DecimalSI), true, 0},
+		{"5", -6, decQuantity(5, 0, DecimalSI), true, 0},
+		{"5", -3, decQuantity(5, 0, DecimalSI), true, 0},
+		{"-5", -3, decQuantity(-5, 0, DecimalSI), true, 0},
+		{"50k", -3, decQuantity(50, 3, DecimalSI), true, -3},
+		{"50k", 0, decQuantity(50, 3, DecimalSI), true, 0},
+		{"2Gi", -3, decQuantity(2147483648, 0, BinarySI), true, 0},
+		{"9223372036854775807", -3, decQuantity(math.MaxInt64, 0, DecimalSI), true, 0},
+		{"-9223372036854775808", -9, decQuantity(math.MinInt64, 0, DecimalSI), true, 0},
+		{"1000m", -3, decQuantity(1000, -3, DecimalSI), true, 3},
+		{"1000m", -9, decQuantity(1000, -3, DecimalSI), true, 9},
+		{"1.5", -3, decQuantity(15, -1, DecimalSI), true, 3},
 	}
 
 	for _, asDec := range []bool{false, true} {
@@ -675,6 +676,9 @@ func TestQuantityRoundUp(t *testing.T) {
 				}
 				if e, a := expect.String(), got.String(); e != a {
 					t.Errorf("%s(%d,%t,%t): unexpected string: %s vs %s", item.in, item.scale, asDec, cached, a, e)
+				}
+				if asDec && got.d.Dec.Scale() != item.decScale {
+					t.Errorf("%s(%d,%t,%t): unexpected inf.Dec scale: %d vs %d", item.in, item.scale, asDec, cached, got.d.Dec.Scale(), item.decScale)
 				}
 			}
 		}

@@ -658,8 +658,9 @@ func (q *Quantity) AsScale(scale Scale) (CanonicalValue, bool) {
 func (q *Quantity) RoundUp(scale Scale) bool {
 	if q.d.Dec != nil {
 		q.s = ""
-		// return early if no rounding is necessary
-		if -int64(q.d.Dec.Scale()) >= int64(scale) {
+		// Short circuit to avoid padding a whole number with fractional zeros,
+		// for compatibility with how int64Amount behaves.
+		if q.d.Dec.Scale() <= 0 && scale < 0 {
 			return true
 		}
 		d, exact := q.d.AsScale(scale)
