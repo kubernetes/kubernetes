@@ -1029,6 +1029,46 @@ func TestSetOptions_Run_CredentialPlugin(t *testing.T) {
 			},
 			expectError: false,
 		},
+		{
+			name: "switching from Allowlist to AllowAll clears existing allowlist",
+			existingKuberc: `apiVersion: kubectl.config.k8s.io/v1beta1
+kind: Preference
+credentialPluginPolicy: Allowlist
+credentialPluginAllowlist:
+- command: foo
+`,
+			options: SetOptions{
+				Section:      sectionCredentialPlugin,
+				PluginPolicy: string(v1beta1.PluginPolicyAllowAll),
+			},
+			expectedPref: &v1beta1.Preference{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: "kubectl.config.k8s.io/v1beta1",
+					Kind:       "Preference",
+				},
+				CredentialPluginPolicy: v1beta1.PluginPolicyAllowAll,
+			},
+		},
+		{
+			name: "switching from Allowlist to DenyAll clears existing allowlist",
+			existingKuberc: `apiVersion: kubectl.config.k8s.io/v1beta1
+kind: Preference
+credentialPluginPolicy: Allowlist
+credentialPluginAllowlist:
+- command: foo
+`,
+			options: SetOptions{
+				Section:      sectionCredentialPlugin,
+				PluginPolicy: string(v1beta1.PluginPolicyDenyAll),
+			},
+			expectedPref: &v1beta1.Preference{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: "kubectl.config.k8s.io/v1beta1",
+					Kind:       "Preference",
+				},
+				CredentialPluginPolicy: v1beta1.PluginPolicyDenyAll,
+			},
+		},
 	}
 
 	for _, tt := range tests {
