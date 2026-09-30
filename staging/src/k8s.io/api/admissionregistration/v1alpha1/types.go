@@ -95,6 +95,7 @@ type ValidatingAdmissionPolicy struct {
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 	// spec defines the desired behavior of the ValidatingAdmissionPolicy.
+	// +required
 	Spec ValidatingAdmissionPolicySpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
 	// status represents the current status of the ValidatingAdmissionPolicy, including warnings that are useful to determine if the policy
 	// behaves in the expected way.
@@ -137,10 +138,12 @@ type ExpressionWarning struct {
 	// fieldRef is the path to the field that refers to the expression.
 	// For example, the reference to the expression of the first item of
 	// validations is "spec.validations[0].expression"
+	// +required
 	FieldRef string `json:"fieldRef" protobuf:"bytes,2,opt,name=fieldRef"`
 	// warning contains the content of type checking information in a human-readable form.
 	// Each line of the warning contains the type that the expression is checked
 	// against, followed by the type check error from the compiler.
+	// +required
 	Warning string `json:"warning" protobuf:"bytes,3,opt,name=warning"`
 }
 
@@ -175,6 +178,7 @@ type ValidatingAdmissionPolicySpec struct {
 	// However, in order to prevent clusters from being put into an unstable state that cannot be recovered from via the API
 	// ValidatingAdmissionPolicy cannot match ValidatingAdmissionPolicy and ValidatingAdmissionPolicyBinding.
 	// Required.
+	// +required
 	MatchConstraints *MatchResources `json:"matchConstraints,omitempty" protobuf:"bytes,2,rep,name=matchConstraints"`
 
 	// validations contain CEL expressions which is used to apply the validation.
@@ -253,10 +257,12 @@ type ParamKind struct {
 	// apiVersion is the API group version the resources belong to.
 	// In format of "group/version".
 	// Required.
+	// +required
 	APIVersion string `json:"apiVersion,omitempty" protobuf:"bytes,1,rep,name=apiVersion"`
 
 	// kind is the API kind the resources belong to.
 	// Required.
+	// +required
 	Kind string `json:"kind,omitempty" protobuf:"bytes,2,rep,name=kind"`
 }
 
@@ -303,6 +309,7 @@ type Validation struct {
 	//     are overwritten by values in `Y` when the key sets of `X` and `Y` intersect. Elements in `Y` with
 	//     non-intersecting keys are appended, retaining their partial order.
 	// Required.
+	// +required
 	Expression string `json:"expression" protobuf:"bytes,1,opt,name=Expression"`
 	// message represents the message displayed when validation fails. The message is required if the Expression contains
 	// line breaks. The message must not contain line breaks.
@@ -340,10 +347,12 @@ type Variable struct {
 	// name is the name of the variable. The name must be a valid CEL identifier and unique among all variables.
 	// The variable can be accessed in other expressions through `variables`
 	// For example, if name is "foo", the variable will be available as `variables.foo`
+	// +required
 	Name string `json:"name" protobuf:"bytes,1,opt,name=Name"`
 
 	// expression is the expression that will be evaluated as the value of the variable.
 	// The CEL expression has access to the same identifiers as the CEL expressions in Validation.
+	// +required
 	Expression string `json:"expression" protobuf:"bytes,2,opt,name=Expression"`
 }
 
@@ -364,6 +373,7 @@ type AuditAnnotation struct {
 	// will be discarded.
 	//
 	// Required.
+	// +required
 	Key string `json:"key" protobuf:"bytes,1,opt,name=key"`
 
 	// valueExpression represents the expression which is evaluated by CEL to
@@ -381,6 +391,7 @@ type AuditAnnotation struct {
 	// will be joined together in a comma-separated list.
 	//
 	// Required.
+	// +required
 	ValueExpression string `json:"valueExpression" protobuf:"bytes,2,opt,name=valueExpression"`
 }
 
@@ -708,6 +719,7 @@ type MutatingAdmissionPolicy struct {
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 	// spec defines the desired behavior of the MutatingAdmissionPolicy.
+	// +required
 	Spec MutatingAdmissionPolicySpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
 }
 
@@ -743,6 +755,7 @@ type MutatingAdmissionPolicySpec struct {
 	// The CREATE, UPDATE and CONNECT operations are allowed.  The DELETE operation may not be matched.
 	// '*' matches CREATE, UPDATE and CONNECT.
 	// Required.
+	// +required
 	MatchConstraints *MatchResources `json:"matchConstraints,omitempty" protobuf:"bytes,2,rep,name=matchConstraints"`
 
 	// variables contain definitions of variables that can be used in composition of other expressions.
@@ -764,7 +777,7 @@ type MutatingAdmissionPolicySpec struct {
 	// and reinvocation of mutations occurs on a per binding basis.
 	//
 	// +listType=atomic
-	// +optional
+	// +required
 	Mutations []Mutation `json:"mutations,omitempty" protobuf:"bytes,4,rep,name=mutations"`
 
 	// failurePolicy defines how to handle failures for the admission policy. Failures can
@@ -812,6 +825,7 @@ type MutatingAdmissionPolicySpec struct {
 	// order with respect to other admission plugins, admission webhooks, bindings of this policy and admission policies.  Mutations are only
 	// reinvoked when mutations change the object after this mutation is invoked.
 	// Required.
+	// +required
 	ReinvocationPolicy ReinvocationPolicyType `json:"reinvocationPolicy,omitempty" protobuf:"bytes,7,opt,name=reinvocationPolicy,casttype=ReinvocationPolicyType"`
 }
 
@@ -822,16 +836,19 @@ type Mutation struct {
 	// Required.
 	//
 	// +unionDiscriminator
+	// +required
 	PatchType PatchType `json:"patchType" protobuf:"bytes,2,opt,name=patchType,casttype=PatchType"`
 
 	// applyConfiguration defines the desired configuration values of an object.
 	// The configuration is applied to the admission object using
 	// [structured merge diff](https://github.com/kubernetes-sigs/structured-merge-diff).
 	// A CEL expression is used to create apply configuration.
+	// +optional
 	ApplyConfiguration *ApplyConfiguration `json:"applyConfiguration,omitempty" protobuf:"bytes,3,opt,name=applyConfiguration"`
 
 	// jsonPatch defines a [JSON patch](https://jsonpatch.com/) operation to perform a mutation to the object.
 	// A CEL expression is used to create the JSON patch.
+	// +optional
 	JSONPatch *JSONPatch `json:"jsonPatch,omitempty" protobuf:"bytes,4,opt,name=jsonPatch"`
 }
 
@@ -889,6 +906,7 @@ type ApplyConfiguration struct {
 	//
 	// Only property names of the form `[a-zA-Z_.-/][a-zA-Z0-9_.-/]*` are accessible.
 	// Required.
+	// +required
 	Expression string `json:"expression,omitempty" protobuf:"bytes,1,opt,name=expression"`
 }
 
@@ -959,6 +977,7 @@ type JSONPatch struct {
 	//
 	// Only property names of the form `[a-zA-Z_.-/][a-zA-Z0-9_.-/]*` are accessible.
 	// Required.
+	// +required
 	Expression string `json:"expression,omitempty" protobuf:"bytes,1,opt,name=expression"`
 }
 
@@ -1002,6 +1021,7 @@ type MutatingAdmissionPolicyBinding struct {
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 	// spec defines the desired behavior of the MutatingAdmissionPolicyBinding.
+	// +required
 	Spec MutatingAdmissionPolicyBindingSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
 }
 
@@ -1026,6 +1046,7 @@ type MutatingAdmissionPolicyBindingSpec struct {
 	// policyName references a MutatingAdmissionPolicy name which the MutatingAdmissionPolicyBinding binds to.
 	// If the referenced resource does not exist, this binding is considered invalid and will be ignored
 	// Required.
+	// +required
 	PolicyName string `json:"policyName,omitempty" protobuf:"bytes,1,rep,name=policyName"`
 
 	// paramRef specifies the parameter resource used to configure the admission control policy.
