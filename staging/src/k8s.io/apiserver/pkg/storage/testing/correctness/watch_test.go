@@ -45,14 +45,16 @@ func TestValidateWatch(t *testing.T) {
 		pod1RV7       = watch.Event{Type: watch.Modified, Object: dropLabel(pod1, "7", "color")}
 		deletePod1RV8 = watch.Event{Type: watch.Deleted, Object: withRV(pod1, "8")}
 	)
+	pod1Key := mustGetKey(pod1)
+	pod2Key := mustGetKey(pod2)
 	history := []Change{
-		{ResourceVersion: 2, Object: addPod1RV2.Object},
-		{ResourceVersion: 3, Object: addPod2RV3.Object},
-		{ResourceVersion: 4, Object: bluePod1RV4.Object, PrevObject: addPod1RV2.Object},
-		{ResourceVersion: 5, PrevObject: addPod2RV3.Object},
-		{ResourceVersion: 6, Object: redPod1RV6.Object, PrevObject: bluePod1RV4.Object},
-		{ResourceVersion: 7, Object: pod1RV7.Object, PrevObject: redPod1RV6.Object},
-		{ResourceVersion: 8, PrevObject: pod1RV7.Object},
+		{Key: pod1Key, ResourceVersion: 2, Object: addPod1RV2.Object},
+		{Key: pod2Key, ResourceVersion: 3, Object: addPod2RV3.Object},
+		{Key: pod1Key, ResourceVersion: 4, Object: bluePod1RV4.Object, PrevObject: addPod1RV2.Object},
+		{Key: pod2Key, ResourceVersion: 5, PrevObject: addPod2RV3.Object},
+		{Key: pod1Key, ResourceVersion: 6, Object: redPod1RV6.Object, PrevObject: bluePod1RV4.Object},
+		{Key: pod1Key, ResourceVersion: 7, Object: pod1RV7.Object, PrevObject: redPod1RV6.Object},
+		{Key: pod1Key, ResourceVersion: 8, PrevObject: pod1RV7.Object},
 	}
 	// Events for object transitions between selectors.
 	var (
@@ -81,6 +83,16 @@ func TestValidateWatch(t *testing.T) {
 		Field:    fields.OneTermEqualSelector("metadata.name", "pod2"),
 		GetAttrs: storage.DefaultNamespaceScopedAttr,
 	}
+	// watchRequest mirrors the watches the integration traffic opens.
+	watchRequest := func(rv string, pred storage.SelectionPredicate) WatchRequest {
+		opts := storage.ListOptions{ResourceVersion: rv, Predicate: pred, Recursive: true}
+		if rv == "" || rv == "0" {
+			// Otherwise storage starts with initial events, which aren't supported.
+			opts.SendInitialEvents = new(false)
+			opts.ResourceVersionMatch = metav1.ResourceVersionMatchNotOlderThan
+		}
+		return WatchRequest{Key: "/pods/", Options: opts}
+	}
 
 	tests := []struct {
 		name        string
@@ -91,42 +103,42 @@ func TestValidateWatch(t *testing.T) {
 		{
 			name: "whole history",
 			requests: []WatchRequest{
-				{ResourceVersion: ""},
-				{ResourceVersion: "0"},
-				{ResourceVersion: "1"},
+				watchRequest("", storage.Everything),
+				watchRequest("0", storage.Everything),
+				watchRequest("1", storage.Everything),
 			},
 			events: []watch.Event{addPod1RV2, addPod2RV3, bluePod1RV4, deletePod2RV5, redPod1RV6, pod1RV7, deletePod1RV8},
 		},
 		{
 			name: "partial history from beginning",
 			requests: []WatchRequest{
-				{ResourceVersion: ""},
-				{ResourceVersion: "0"},
+				watchRequest("", storage.Everything),
+				watchRequest("0", storage.Everything),
 			},
 			events: []watch.Event{addPod2RV3, bluePod1RV4, deletePod2RV5, redPod1RV6, pod1RV7, deletePod1RV8},
 		},
 		{
 			name: "partial history from the end",
 			requests: []WatchRequest{
-				{ResourceVersion: ""},
-				{ResourceVersion: "0"},
-				{ResourceVersion: "1"},
+				watchRequest("", storage.Everything),
+				watchRequest("0", storage.Everything),
+				watchRequest("1", storage.Everything),
 			},
 			events: []watch.Event{addPod1RV2, addPod2RV3, bluePod1RV4},
 		},
 		{
 			name: "watch opened on exact resource version",
 			requests: []WatchRequest{
-				{ResourceVersion: "3"},
+				watchRequest("3", storage.Everything),
 			},
 			events: []watch.Event{bluePod1RV4, deletePod2RV5},
 		},
 		{
 			name: "missing event in the middle",
 			requests: []WatchRequest{
-				{ResourceVersion: ""},
-				{ResourceVersion: "0"},
-				{ResourceVersion: "1"},
+				watchRequest("", storage.Everything),
+				watchRequest("0", storage.Everything),
+				watchRequest("1", storage.Everything),
 			},
 			events:      []watch.Event{addPod2RV3 /*bluePod1RV4,*/, deletePod2RV5},
 			expectError: true,
@@ -134,9 +146,9 @@ func TestValidateWatch(t *testing.T) {
 		{
 			name: "duplicate event",
 			requests: []WatchRequest{
-				{ResourceVersion: ""},
-				{ResourceVersion: "0"},
-				{ResourceVersion: "1"},
+				watchRequest("", storage.Everything),
+				watchRequest("0", storage.Everything),
+				watchRequest("1", storage.Everything),
 			},
 			events:      []watch.Event{addPod1RV2, addPod2RV3, addPod2RV3, bluePod1RV4},
 			expectError: true,
@@ -144,9 +156,9 @@ func TestValidateWatch(t *testing.T) {
 		{
 			name: "events out of order of different type",
 			requests: []WatchRequest{
-				{ResourceVersion: ""},
-				{ResourceVersion: "0"},
-				{ResourceVersion: "1"},
+				watchRequest("", storage.Everything),
+				watchRequest("0", storage.Everything),
+				watchRequest("1", storage.Everything),
 			},
 			events:      []watch.Event{addPod1RV2, addPod2RV3, deletePod2RV5, bluePod1RV4},
 			expectError: true,
@@ -154,9 +166,9 @@ func TestValidateWatch(t *testing.T) {
 		{
 			name: "events out of order of the same type",
 			requests: []WatchRequest{
-				{ResourceVersion: ""},
-				{ResourceVersion: "0"},
-				{ResourceVersion: "1"},
+				watchRequest("", storage.Everything),
+				watchRequest("0", storage.Everything),
+				watchRequest("1", storage.Everything),
 			},
 			events:      []watch.Event{addPod2RV3, addPod1RV2, bluePod1RV4, deletePod2RV5},
 			expectError: true,
@@ -164,9 +176,9 @@ func TestValidateWatch(t *testing.T) {
 		{
 			name: "event the history never produced",
 			requests: []WatchRequest{
-				{ResourceVersion: ""},
-				{ResourceVersion: "0"},
-				{ResourceVersion: "1"},
+				watchRequest("", storage.Everything),
+				watchRequest("0", storage.Everything),
+				watchRequest("1", storage.Everything),
 			},
 			events: []watch.Event{
 				addPod1RV2,
@@ -178,9 +190,9 @@ func TestValidateWatch(t *testing.T) {
 		{
 			name: "wrong event type",
 			requests: []WatchRequest{
-				{ResourceVersion: ""},
-				{ResourceVersion: "0"},
-				{ResourceVersion: "1"},
+				watchRequest("", storage.Everything),
+				watchRequest("0", storage.Everything),
+				watchRequest("1", storage.Everything),
 			},
 			events: []watch.Event{
 				addPod1RV2,
@@ -192,7 +204,7 @@ func TestValidateWatch(t *testing.T) {
 		{
 			name: "wrong object in event",
 			requests: []WatchRequest{
-				{ResourceVersion: "1"},
+				watchRequest("1", storage.Everything),
 			},
 			events: []watch.Event{
 				addPod1RV2,
@@ -204,7 +216,7 @@ func TestValidateWatch(t *testing.T) {
 		{
 			name: "event at the requested resource version",
 			requests: []WatchRequest{
-				{ResourceVersion: "3"},
+				watchRequest("3", storage.Everything),
 			},
 			events:      []watch.Event{addPod2RV3, bluePod1RV4, deletePod2RV5},
 			expectError: true,
@@ -212,17 +224,17 @@ func TestValidateWatch(t *testing.T) {
 		{
 			name: "bookmark after every event events",
 			requests: []WatchRequest{
-				{ResourceVersion: ""},
-				{ResourceVersion: "0"},
-				{ResourceVersion: "1"},
+				watchRequest("", storage.Everything),
+				watchRequest("0", storage.Everything),
+				watchRequest("1", storage.Everything),
 			},
 			events: []watch.Event{newBookmark("1"), addPod1RV2, newBookmark("2"), addPod2RV3, newBookmark("3"), bluePod1RV4, newBookmark("4"), deletePod2RV5, newBookmark("5")},
 		},
 		{
 			name: "bookmark after the event",
 			requests: []WatchRequest{
-				{ResourceVersion: ""},
-				{ResourceVersion: "0"},
+				watchRequest("", storage.Everything),
+				watchRequest("0", storage.Everything),
 			},
 			events: []watch.Event{
 				addPod2RV3,
@@ -232,8 +244,8 @@ func TestValidateWatch(t *testing.T) {
 		{
 			name: "bookmark ahead of the event",
 			requests: []WatchRequest{
-				{ResourceVersion: ""},
-				{ResourceVersion: "0"},
+				watchRequest("", storage.Everything),
+				watchRequest("0", storage.Everything),
 			},
 			events: []watch.Event{
 				newBookmark("3"),
@@ -244,9 +256,9 @@ func TestValidateWatch(t *testing.T) {
 		{
 			name: "bookmark on fresh watch",
 			requests: []WatchRequest{
-				{ResourceVersion: ""},
-				{ResourceVersion: "0"},
-				{ResourceVersion: "2"},
+				watchRequest("", storage.Everything),
+				watchRequest("0", storage.Everything),
+				watchRequest("2", storage.Everything),
 			},
 			events: []watch.Event{
 				newBookmark("3"),
@@ -255,9 +267,9 @@ func TestValidateWatch(t *testing.T) {
 		{
 			name: "bookmark on fresh watch",
 			requests: []WatchRequest{
-				{ResourceVersion: ""},
-				{ResourceVersion: "0"},
-				{ResourceVersion: "2"},
+				watchRequest("", storage.Everything),
+				watchRequest("0", storage.Everything),
+				watchRequest("2", storage.Everything),
 			},
 			events: []watch.Event{
 				addPod2RV3,
@@ -268,60 +280,60 @@ func TestValidateWatch(t *testing.T) {
 		{
 			name: "label selector color=blue",
 			requests: []WatchRequest{
-				{ResourceVersion: "", Predicate: isBlue},
-				{ResourceVersion: "0", Predicate: isBlue},
-				{ResourceVersion: "1", Predicate: isBlue},
-				{ResourceVersion: "2", Predicate: isBlue},
-				{ResourceVersion: "3", Predicate: isBlue},
+				watchRequest("", isBlue),
+				watchRequest("0", isBlue),
+				watchRequest("1", isBlue),
+				watchRequest("2", isBlue),
+				watchRequest("3", isBlue),
 			},
 			events: []watch.Event{addBluePod1RV4, deleteBluePod1RV6},
 		},
 		{
 			name: "label selector opened on exact resource version",
 			requests: []WatchRequest{
-				{ResourceVersion: "4", Predicate: isBlue},
-				{ResourceVersion: "5", Predicate: isBlue},
+				watchRequest("4", isBlue),
+				watchRequest("5", isBlue),
 			},
 			events: []watch.Event{deleteBluePod1RV6},
 		},
 		{
 			name: "label selector color=red",
 			requests: []WatchRequest{
-				{ResourceVersion: "", Predicate: isRed},
-				{ResourceVersion: "0", Predicate: isRed},
-				{ResourceVersion: "1", Predicate: isRed},
-				{ResourceVersion: "2", Predicate: isRed},
-				{ResourceVersion: "3", Predicate: isRed},
-				{ResourceVersion: "4", Predicate: isRed},
-				{ResourceVersion: "5", Predicate: isRed},
+				watchRequest("", isRed),
+				watchRequest("0", isRed),
+				watchRequest("1", isRed),
+				watchRequest("2", isRed),
+				watchRequest("3", isRed),
+				watchRequest("4", isRed),
+				watchRequest("5", isRed),
 			},
 			events: []watch.Event{addRedPod1RV6, deleteRedPod1RV7},
 		},
 		{
 			name: "field selector name=pod1",
 			requests: []WatchRequest{
-				{ResourceVersion: "", Predicate: isPod1},
-				{ResourceVersion: "0", Predicate: isPod1},
-				{ResourceVersion: "1", Predicate: isPod1},
+				watchRequest("", isPod1),
+				watchRequest("0", isPod1),
+				watchRequest("1", isPod1),
 			},
 			events: []watch.Event{addPod1RV2, bluePod1RV4, redPod1RV6, pod1RV7, deletePod1RV8},
 		},
 		{
 			name: "field selector name=pod2",
 			requests: []WatchRequest{
-				{ResourceVersion: "", Predicate: isPod2},
-				{ResourceVersion: "0", Predicate: isPod2},
-				{ResourceVersion: "1", Predicate: isPod2},
-				{ResourceVersion: "2", Predicate: isPod2},
+				watchRequest("", isPod2),
+				watchRequest("0", isPod2),
+				watchRequest("1", isPod2),
+				watchRequest("2", isPod2),
 			},
 			events: []watch.Event{addPod2RV3, deletePod2RV5},
 		},
 		{
 			name: "event not matching the selector",
 			requests: []WatchRequest{
-				{ResourceVersion: "", Predicate: isBlue},
-				{ResourceVersion: "0", Predicate: isBlue},
-				{ResourceVersion: "1", Predicate: isBlue},
+				watchRequest("", isBlue),
+				watchRequest("0", isBlue),
+				watchRequest("1", isBlue),
 			},
 			events:      []watch.Event{addPod1RV2, addBluePod1RV4, deleteBluePod1RV6},
 			expectError: true,
@@ -329,9 +341,9 @@ func TestValidateWatch(t *testing.T) {
 		{
 			name: "missing move into the selector",
 			requests: []WatchRequest{
-				{ResourceVersion: "1", Predicate: isBlue},
-				{ResourceVersion: "2", Predicate: isBlue},
-				{ResourceVersion: "3", Predicate: isBlue},
+				watchRequest("1", isBlue),
+				watchRequest("2", isBlue),
+				watchRequest("3", isBlue),
 			},
 			events:      []watch.Event{ /*addBluePod1RV4,*/ deleteBluePod1RV6},
 			expectError: true,
@@ -339,11 +351,11 @@ func TestValidateWatch(t *testing.T) {
 		{
 			name: "move into the selector as modified instead of add",
 			requests: []WatchRequest{
-				{ResourceVersion: "", Predicate: isBlue},
-				{ResourceVersion: "0", Predicate: isBlue},
-				{ResourceVersion: "1", Predicate: isBlue},
-				{ResourceVersion: "2", Predicate: isBlue},
-				{ResourceVersion: "3", Predicate: isBlue},
+				watchRequest("", isBlue),
+				watchRequest("0", isBlue),
+				watchRequest("1", isBlue),
+				watchRequest("2", isBlue),
+				watchRequest("3", isBlue),
 			},
 			events:      []watch.Event{bluePod1RV4, deleteBluePod1RV6},
 			expectError: true,
@@ -351,11 +363,11 @@ func TestValidateWatch(t *testing.T) {
 		{
 			name: "move out of the selector as modified instead of delete",
 			requests: []WatchRequest{
-				{ResourceVersion: "", Predicate: isBlue},
-				{ResourceVersion: "0", Predicate: isBlue},
-				{ResourceVersion: "1", Predicate: isBlue},
-				{ResourceVersion: "2", Predicate: isBlue},
-				{ResourceVersion: "3", Predicate: isBlue},
+				watchRequest("", isBlue),
+				watchRequest("0", isBlue),
+				watchRequest("1", isBlue),
+				watchRequest("2", isBlue),
+				watchRequest("3", isBlue),
 			},
 			events:      []watch.Event{addBluePod1RV4, redPod1RV6},
 			expectError: true,
@@ -363,11 +375,11 @@ func TestValidateWatch(t *testing.T) {
 		{
 			name: "move out of the selector with update object instead of previous object",
 			requests: []WatchRequest{
-				{ResourceVersion: "", Predicate: isBlue},
-				{ResourceVersion: "0", Predicate: isBlue},
-				{ResourceVersion: "1", Predicate: isBlue},
-				{ResourceVersion: "2", Predicate: isBlue},
-				{ResourceVersion: "3", Predicate: isBlue},
+				watchRequest("", isBlue),
+				watchRequest("0", isBlue),
+				watchRequest("1", isBlue),
+				watchRequest("2", isBlue),
+				watchRequest("3", isBlue),
 			},
 			events: []watch.Event{
 				addBluePod1RV4,
@@ -378,11 +390,11 @@ func TestValidateWatch(t *testing.T) {
 		{
 			name: "move out of the selector with update object instead of previous object",
 			requests: []WatchRequest{
-				{ResourceVersion: "", Predicate: isBlue},
-				{ResourceVersion: "0", Predicate: isBlue},
-				{ResourceVersion: "1", Predicate: isBlue},
-				{ResourceVersion: "2", Predicate: isBlue},
-				{ResourceVersion: "3", Predicate: isBlue},
+				watchRequest("", isBlue),
+				watchRequest("0", isBlue),
+				watchRequest("1", isBlue),
+				watchRequest("2", isBlue),
+				watchRequest("3", isBlue),
 			},
 			events: []watch.Event{
 				addBluePod1RV4,
@@ -393,28 +405,28 @@ func TestValidateWatch(t *testing.T) {
 		{
 			name: "watch ending with error event",
 			requests: []WatchRequest{
-				{ResourceVersion: ""},
-				{ResourceVersion: "0"},
-				{ResourceVersion: "1"},
+				watchRequest("", storage.Everything),
+				watchRequest("0", storage.Everything),
+				watchRequest("1", storage.Everything),
 			},
 			events: []watch.Event{addPod1RV2, addPod2RV3, bluePod1RV4, newErrorEvent()},
 		},
 		{
 			name: "watch with only error event",
 			requests: []WatchRequest{
-				{ResourceVersion: ""},
-				{ResourceVersion: "0"},
-				{ResourceVersion: "1"},
-				{ResourceVersion: "3"},
+				watchRequest("", storage.Everything),
+				watchRequest("0", storage.Everything),
+				watchRequest("1", storage.Everything),
+				watchRequest("3", storage.Everything),
 			},
 			events: []watch.Event{newErrorEvent()},
 		},
 		{
 			name: "event after error event",
 			requests: []WatchRequest{
-				{ResourceVersion: ""},
-				{ResourceVersion: "0"},
-				{ResourceVersion: "1"},
+				watchRequest("", storage.Everything),
+				watchRequest("0", storage.Everything),
+				watchRequest("1", storage.Everything),
 			},
 			events:      []watch.Event{addPod1RV2, newErrorEvent(), addPod2RV3},
 			expectError: true,
@@ -422,9 +434,9 @@ func TestValidateWatch(t *testing.T) {
 		{
 			name: "missing event before error event",
 			requests: []WatchRequest{
-				{ResourceVersion: ""},
-				{ResourceVersion: "0"},
-				{ResourceVersion: "1"},
+				watchRequest("", storage.Everything),
+				watchRequest("0", storage.Everything),
+				watchRequest("1", storage.Everything),
 			},
 			events:      []watch.Event{addPod1RV2 /*addPod2RV3,*/, bluePod1RV4, newErrorEvent()},
 			expectError: true,
@@ -432,11 +444,42 @@ func TestValidateWatch(t *testing.T) {
 		{
 			name: "error event with non-status object",
 			requests: []WatchRequest{
-				{ResourceVersion: ""},
-				{ResourceVersion: "0"},
-				{ResourceVersion: "1"},
+				watchRequest("", storage.Everything),
+				watchRequest("0", storage.Everything),
+				watchRequest("1", storage.Everything),
 			},
 			events:      []watch.Event{addPod1RV2, {Type: watch.Error, Object: withRV(pod2, "3")}},
+			expectError: true,
+		},
+		{
+			name: "watch on a single key",
+			requests: []WatchRequest{
+				{Key: pod1Key, Options: storage.ListOptions{ResourceVersion: "1", Predicate: storage.Everything}},
+			},
+			events: []watch.Event{addPod1RV2, bluePod1RV4, redPod1RV6, pod1RV7, deletePod1RV8},
+		},
+		{
+			name: "watch on a single key with event for another key",
+			requests: []WatchRequest{
+				{Key: pod1Key, Options: storage.ListOptions{ResourceVersion: "1", Predicate: storage.Everything}},
+			},
+			events:      []watch.Event{addPod1RV2, addPod2RV3, bluePod1RV4},
+			expectError: true,
+		},
+		{
+			name: "watch on a namespace",
+			requests: []WatchRequest{
+				{Key: "/pods/ns1", Options: storage.ListOptions{ResourceVersion: "1", Predicate: storage.Everything, Recursive: true}},
+				{Key: "/pods/ns1/", Options: storage.ListOptions{ResourceVersion: "1", Predicate: storage.Everything, Recursive: true}},
+			},
+			events: []watch.Event{addPod1RV2, addPod2RV3, bluePod1RV4, deletePod2RV5, redPod1RV6, pod1RV7, deletePod1RV8},
+		},
+		{
+			name: "watch on another namespace with event from outside of it",
+			requests: []WatchRequest{
+				{Key: "/pods/ns", Options: storage.ListOptions{ResourceVersion: "1", Predicate: storage.Everything, Recursive: true}},
+			},
+			events:      []watch.Event{addPod1RV2},
 			expectError: true,
 		},
 	}

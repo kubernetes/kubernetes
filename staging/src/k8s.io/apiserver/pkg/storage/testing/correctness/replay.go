@@ -94,7 +94,10 @@ func (r *Replay) Events(request WatchRequest, rvRange *ResourceVersionRange) ([]
 		if change.ResourceVersion < rvRange.Min || change.ResourceVersion >= rvRange.Max {
 			continue
 		}
-		watchEvent, err := change.toWatchEvent(r.versioner, request.Predicate)
+		if !keyInScope(request.Key, request.Options.Recursive, change.Key) {
+			continue
+		}
+		watchEvent, err := change.toWatchEvent(r.versioner, request.Options.Predicate)
 		if err != nil {
 			return nil, err
 		}
