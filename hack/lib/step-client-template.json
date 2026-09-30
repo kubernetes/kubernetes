@@ -1,0 +1,9 @@
+{
+    "subject": {
+        "commonName": {{ toJson .Subject.CommonName }},
+        "organization": {{ toJson (default (list) .Insecure.User.organizations) }}
+    },
+    "sans": [],
+    "keyUsage": ["digitalSignature", "keyEncipherment"],
+    "extKeyUsage": ["clientAuth"]
+}

@@ -444,7 +444,7 @@ function kube::util::test_client_certificate_authentication_enabled {
 }
 
 # creates a client CA, args are sudo, dest-dir, ca-id, purpose
-# purpose is dropped in after "key encipherment", you usually want
+# purpose selects the extended key usages for certificates signed by this CA:
 # '"client auth"'
 # '"server auth"'
 # '"client auth","server auth"'
@@ -453,11 +453,23 @@ function kube::util::create_signing_certkey {
     local dest_dir=$2
     local id=$3
     local purpose=$4
-    # Create client ca
-    ${sudo} /usr/bin/env bash -e <<EOF
-    rm -f "${dest_dir}/${id}-ca.crt" "${dest_dir}/${id}-ca.key"
-    ${OPENSSL_BIN} req -x509 -sha256 -new -nodes -days 365 -newkey rsa:2048 -keyout "${dest_dir}/${id}-ca.key" -out "${dest_dir}/${id}-ca.crt" -subj "/C=xx/ST=x/L=x/O=x/OU=x/CN=ca/emailAddress=x/"
-    echo '{"signing":{"default":{"expiry":"43800h","usages":["signing","key encipherment",${purpose}]}}}' > "${dest_dir}/${id}-ca-config.json"
+    purpose=${purpose//client auth/clientAuth}
+    purpose=${purpose//server auth/serverAuth}
+    ${sudo} rm -f "${dest_dir}/${id}-ca.crt" "${dest_dir}/${id}-ca.key" || return 1
+    ${sudo} "${OPENSSL_BIN}" req -x509 -sha256 -new -nodes -days 365 -newkey rsa:2048 \
+        -keyout "${dest_dir}/${id}-ca.key" -out "${dest_dir}/${id}-ca.crt" \
+        -subj "/C=xx/ST=x/L=x/O=x/OU=x/CN=ca/emailAddress=x/" || return 1
+    # Templates keep CA-specific usages, including the shared client/server CA mode.
+    ${sudo} tee "${dest_dir}/${id}-ca-config.json" >/dev/null <<EOF
+{
+    "subject": {
+        "commonName": {{ toJson .Subject.CommonName }},
+        "organization": {{ toJson (default (list) .Insecure.User.organizations) }}
+    },
+    "sans": {{ if .Insecure.User.serving }}{{ toJson .SANs }}{{ else }}[]{{ end }},
+    "keyUsage": ["digitalSignature", "keyEncipherment"],
+    "extKeyUsage": [${purpose}]
+}
 EOF
 }
 
@@ -468,21 +480,16 @@ function kube::util::create_client_certkey {
     local ca=$3
     local id=$4
     local cn=${5:-$4}
-    local groups=""
-    local SEP=""
-    shift 5
-    while [ -n "${1:-}" ]; do
-        groups+="${SEP}{\"O\":\"$1\"}"
-        SEP=","
-        shift 1
-    done
-    ${sudo} /usr/bin/env bash -e <<EOF
-    cd ${dest_dir}
-    echo '{"CN":"${cn}","names":[${groups}],"hosts":[],"key":{"algo":"rsa","size":2048}}' | ${CFSSL_BIN} gencert -ca=${ca}.crt -ca-key=${ca}.key -config=${ca}-config.json - | ${CFSSLJSON_BIN} -bare client-${id}
-    mv "client-${id}-key.pem" "client-${id}.key"
-    mv "client-${id}.pem" "client-${id}.crt"
-    rm -f "client-${id}.csr"
-EOF
+    shift "$(( $# < 5 ? $# : 5 ))"
+    kube::util::require-jq || return 1
+    # JSON encoding preserves group names without interpreting them as shell or template code.
+    local data
+    data=$(jq -cn --args '{organizations: $ARGS.positional}' -- "$@") || return 1
+    ${sudo} "${STEP_BIN}" certificate create "${cn}" \
+        "${dest_dir}/client-${id}.crt" "${dest_dir}/client-${id}.key" \
+        --ca "${dest_dir}/${ca}.crt" --ca-key "${dest_dir}/${ca}.key" \
+        --template "${dest_dir}/${ca}-config.json" --set-file /dev/stdin \
+        --kty RSA --size 2048 --not-after 43800h --no-password --insecure --force <<<"${data}"
 }
 
 # signs a serving certificate: args are sudo, dest-dir, ca, filename (roughly), subject, hosts...
@@ -492,21 +499,19 @@ function kube::util::create_serving_certkey {
     local ca=$3
     local id=$4
     local cn=${5:-$4}
-    local hosts=""
-    local SEP=""
-    shift 5
-    while [ -n "${1:-}" ]; do
-        hosts+="${SEP}\"$1\""
-        SEP=","
-        shift 1
+    local -a hosts=()
+    local serving=false
+    shift "$(( $# < 5 ? $# : 5 ))"
+    while (( $# )); do
+        hosts+=(--san "$1")
+        serving=true
+        shift
     done
-    ${sudo} /usr/bin/env bash -e <<EOF
-    cd ${dest_dir}
-    echo '{"CN":"${cn}","hosts":[${hosts}],"key":{"algo":"rsa","size":2048}}' | ${CFSSL_BIN} gencert -ca=${ca}.crt -ca-key=${ca}.key -config=${ca}-config.json - | ${CFSSLJSON_BIN} -bare serving-${id}
-    mv "serving-${id}-key.pem" "serving-${id}.key"
-    mv "serving-${id}.pem" "serving-${id}.crt"
-    rm -f "serving-${id}.csr"
-EOF
+    ${sudo} "${STEP_BIN}" certificate create "${cn}" \
+        "${dest_dir}/serving-${id}.crt" "${dest_dir}/serving-${id}.key" \
+        --ca "${dest_dir}/${ca}.crt" --ca-key "${dest_dir}/${ca}.key" \
+        --template "${dest_dir}/${ca}-config.json" --set "serving=${serving}" ${hosts[@]+"${hosts[@]}"} \
+        --kty RSA --size 2048 --not-after 43800h --no-password --insecure --force
 }
 
 # creates a self-contained kubeconfig: args are sudo, dest-dir, ca file, host, port, client id, token(optional)
@@ -606,70 +611,72 @@ function kube::util::join {
   echo "$*"
 }
 
-# Downloads cfssl/cfssljson into $1 directory if they do not already exist in PATH
+# Downloads the offline step CLI (the step-ca companion) if it is not in PATH.
 #
 # Assumed vars:
-#   $1 (cfssl directory) (optional)
+#   $1 (step directory) (optional)
 #
 # Sets:
-#  CFSSL_BIN: The path of the installed cfssl binary
-#  CFSSLJSON_BIN: The path of the installed cfssljson binary
+#  STEP_BIN: The absolute path of the installed step binary
 #
 # shellcheck disable=SC2120 # optional parameters
-function kube::util::ensure-cfssl {
-  if command -v cfssl &>/dev/null && command -v cfssljson &>/dev/null; then
-    CFSSL_BIN=$(command -v cfssl)
-    CFSSLJSON_BIN=$(command -v cfssljson)
+function kube::util::ensure-step {
+  local step_bin
+  if step_bin=$(command -v step) && "${step_bin}" version >/dev/null 2>&1; then
+    STEP_BIN="$(cd "$(dirname "${step_bin}")" && pwd)/$(basename "${step_bin}")"
     return 0
   fi
 
-  host_arch=$(kube::util::host_arch)
-
-  if [[ "${host_arch}" != "amd64" ]]; then
-    echo "Cannot download cfssl on non-amd64 hosts and cfssl does not appear to be installed."
-    echo "Please install cfssl and cfssljson and verify they are in \$PATH."
-    echo "Hint: export PATH=\$PATH:\$GOPATH/bin; go install github.com/cloudflare/cfssl/cmd/...@latest"
-    exit 1
-  fi
-
-  # Create a temp dir for cfssl if no directory was given
-  local cfssldir=${1:-}
-  if [[ -z "${cfssldir}" ]]; then
+  local stepdir=${1:-}
+  if [[ -z "${stepdir}" ]]; then
     kube::util::ensure-temp-dir
-    cfssldir="${KUBE_TEMP}/cfssl"
+    stepdir="${KUBE_TEMP}/step"
+  fi
+  mkdir -p "${stepdir}" || return 1
+  stepdir=$(cd "${stepdir}" && pwd) || return 1
+  STEP_BIN="${stepdir}/step"
+  if [[ -x "${STEP_BIN}" ]] && "${STEP_BIN}" version >/dev/null 2>&1; then
+    return 0
   fi
 
-  mkdir -p "${cfssldir}"
-  pushd "${cfssldir}" > /dev/null || return 1
+  local version=0.30.6
+  local arch kernel checksum
+  arch=$(kube::util::host_arch)
+  kernel=$(uname -s)
+  case "${kernel}/${arch}" in
+    Linux/amd64) checksum=e44a5dc5f880a694b24a0f2941a69a81b0bc6ee053170fdfde18453d4d5816de; kernel=linux ;;
+    Linux/arm64) checksum=eff511c3e6797039702e74fada62b10b079e413742f925703e5b7d810e611619; kernel=linux ;;
+    Linux/ppc64le) checksum=57f59c09912f344942bbc0156361f609bb5f2cdfa0b012d23a384c895937b5f4; kernel=linux ;;
+    Darwin/amd64) checksum=67b499409f06395ec1c7e0b31c0c5a65a9151104e999e52af8611854966851d4; kernel=darwin ;;
+    Darwin/arm64) checksum=33cf8015b875f5d370b93c03d794eb7ba371e5c64569604c72cce6b5cbefd11f; kernel=darwin ;;
+    *)
+      echo "Cannot download step for ${kernel}/${arch}; install the Smallstep CLI and add step to PATH." >&2
+      return 1
+      ;;
+  esac
 
-    echo "Unable to successfully run 'cfssl' from ${PATH}; downloading instead..."
-    kernel=$(uname -s)
-    case "${kernel}" in
-      Linux)
-        curl --retry 10 -L -o cfssl https://github.com/cloudflare/cfssl/releases/download/v1.5.0/cfssl_1.5.0_linux_amd64
-        curl --retry 10 -L -o cfssljson https://github.com/cloudflare/cfssl/releases/download/v1.5.0/cfssljson_1.5.0_linux_amd64
-        ;;
-      Darwin)
-        curl --retry 10 -L -o cfssl https://github.com/cloudflare/cfssl/releases/download/v1.5.0/cfssl_1.5.0_darwin_amd64
-        curl --retry 10 -L -o cfssljson https://github.com/cloudflare/cfssl/releases/download/v1.5.0/cfssljson_1.5.0_darwin_amd64
-        ;;
-      *)
-        echo "Unknown, unsupported platform: ${kernel}." >&2
-        echo "Supported platforms: Linux, Darwin." >&2
-        exit 2
-    esac
-
-    chmod +x cfssl || true
-    chmod +x cfssljson || true
-
-    CFSSL_BIN="${cfssldir}/cfssl"
-    CFSSLJSON_BIN="${cfssldir}/cfssljson"
-    if [[ ! -x ${CFSSL_BIN} || ! -x ${CFSSLJSON_BIN} ]]; then
-      echo "Failed to download 'cfssl'. Please install cfssl and cfssljson and verify they are in \$PATH."
-      echo "Hint: export PATH=\$PATH:\$GOPATH/bin; go install github.com/cloudflare/cfssl/cmd/...@latest"
-      exit 1
+  # Verify the pinned archive before extracting or executing it.
+  (
+    local download_dir
+    download_dir=$(mktemp -d "${stepdir}/download.XXXXXX") || exit 1
+    trap 'rm -rf "${download_dir}"' EXIT
+    cd "${download_dir}" || exit 1
+    curl --fail --silent --show-error --location --retry 10 \
+      "https://github.com/smallstep/cli/releases/download/v${version}/step_${kernel}_${version}_${arch}.tar.gz" \
+      -o step.tar.gz || exit 1
+    if command -v sha256sum >/dev/null; then
+      echo "${checksum}  step.tar.gz" | sha256sum --check --status || exit 1
+    else
+      echo "${checksum}  step.tar.gz" | shasum -a 256 --check --status || exit 1
     fi
-  popd > /dev/null || return 1
+    tar -xzf step.tar.gz "step_${version}/bin/step" || exit 1
+    chmod +x "step_${version}/bin/step" || exit 1
+    "step_${version}/bin/step" version >/dev/null || exit 1
+    mv "step_${version}/bin/step" "${STEP_BIN}"
+  ) || {
+    echo "Failed to install step ${version}; check download access and archive checksum, or install step in PATH." >&2
+    return 1
+  }
 }
 
 # kube::util::ensure-docker-buildx

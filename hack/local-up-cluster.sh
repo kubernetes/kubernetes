@@ -25,6 +25,8 @@ cd "${KUBE_ROOT}"
 # This script builds and runs a local kubernetes cluster. You may need to run
 # this as root to allow kubelet to open containerd's socket, and to write the test
 # CA in /var/run/kubernetes.
+# Certificate generation requires jq and the Smallstep CLI (downloaded if absent).
+# Certificates are signed offline; no step-ca service is required.
 # Usage: `hack/local-up-cluster.sh`.
 
 # Dump config at KUBE_VERBOSE >= 2.
@@ -1483,13 +1485,14 @@ fi
 echo "Detected host and ready to start services.  Doing some housekeeping first..."
 echo "Using GO_OUT ${GO_OUT}"
 
-# kube::util::ensure-cfssl downloads cfssl when cfssl is not found in PATH.
-# Point it at the persistent cache dir and apppend it to PATH so cfssl is
+# kube::util::ensure-step downloads the offline step CLI when it is not in PATH.
+# Point it at the persistent cache dir and append it to PATH so step is
 # downloaded only on the first run and reused afterwards.
 KUBERNETES_SERVER_CACHE_DIR=${KUBERNETES_SERVER_CACHE_DIR:-"${GO_OUT}"}
-CFSSL_PATH="${KUBERNETES_SERVER_CACHE_DIR}/cfssl"
-PATH="${PATH}:${CFSSL_PATH}"
-kube::util::ensure-cfssl "${CFSSL_PATH}"
+STEP_PATH="${KUBERNETES_SERVER_CACHE_DIR}/step"
+PATH="${PATH}:${STEP_PATH}"
+kube::util::ensure-step "${STEP_PATH}" || exit 1
+kube::util::require-jq || exit 1
 
 export KUBELET_CIDFILE=${TMP_DIR}/kubelet.cid
 if [[ "${ENABLE_DAEMON}" = false ]] && [[ -z "${DRY_RUN:-}" ]]; then

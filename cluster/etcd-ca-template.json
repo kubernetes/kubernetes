@@ -1,0 +1,14 @@
+{
+  "subject": {
+    "commonName": {{ toJson .Subject.CommonName }},
+    "country": ["US"],
+    "locality": ["CA"],
+    "organization": ["kubernetes.io"]
+  },
+  "sans": [],
+  "keyUsage": ["certSign", "crlSign"],
+  "basicConstraints": {
+    "isCA": true,
+    "maxPathLen": -1
+  }
+}

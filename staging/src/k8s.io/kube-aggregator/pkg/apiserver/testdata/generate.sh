@@ -14,10 +14,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-cfssl gencert -initca generate.client-ca.json | cfssljson -bare client-ca
-cfssl gencert -initca generate.server-ca.json | cfssljson -bare server-ca
+set -o errexit
+set -o nounset
+set -o pipefail
 
-cfssl gencert -ca client-ca.pem -ca-key client-ca-key.pem -config generate.profiles.json --profile=client generate.client.json | cfssljson -bare client
-cfssl gencert -ca server-ca.pem -ca-key server-ca-key.pem -config generate.profiles.json --profile=server generate.server.json | cfssljson -bare server
+cd "$(dirname "${BASH_SOURCE[0]}")"
 
-rm ./*.csr
+# Requires smallstep step CLI 0.30.6. These commands sign locally without a step-ca server.
+# Unencrypted keys and long lifetimes are only suitable for test fixtures.
+flags=(--kty EC --curve P-256 --no-password --insecure --force --not-after 876000h)
+
+step certificate create Client-CA client-ca.pem client-ca-key.pem \
+  --template generate.client-ca.json "${flags[@]}"
+step certificate create Server-CA server-ca.pem server-ca-key.pem \
+  --template generate.server-ca.json "${flags[@]}"
+step certificate create "My Client" client.pem client-key.pem \
+  --ca client-ca.pem --ca-key client-ca-key.pem --template generate.client.json "${flags[@]}"
+step certificate create test-service2.test-ns.svc server.pem server-key.pem \
+  --ca server-ca.pem --ca-key server-ca-key.pem --template generate.server.json "${flags[@]}"

@@ -1,6 +1,6 @@
 {
     "subject": {
-        "commonName": "Client-CA"
+        "commonName": "Root-CA"
     },
     "sans": [],
     "keyUsage": ["certSign", "crlSign"],
