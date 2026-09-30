@@ -393,10 +393,16 @@ type fakeExtender struct {
 	returnsNoVictims     bool
 	victimsToAdd         []*v1.Pod
 	trimVictims          *int
+	customProcessPreemption func(pod *v1.Pod, victims map[string]*extenderv1.Victims, nodeLister fwk.NodeInfoLister) (map[string]*extenderv1.Victims, error)
 }
 
 func newFakeExtender() *fakeExtender {
 	return &fakeExtender{}
+}
+
+func (f *fakeExtender) WithProcessPreemptionFunc(fn func(pod *v1.Pod, victims map[string]*extenderv1.Victims, nodeLister fwk.NodeInfoLister) (map[string]*extenderv1.Victims, error)) *fakeExtender {
+	f.customProcessPreemption = fn
+	return f
 }
 
 func (f *fakeExtender) WithIgnorable(ignorable bool) *fakeExtender {
@@ -438,13 +444,16 @@ func (f *fakeExtender) IsIgnorable() bool {
 }
 
 func (f *fakeExtender) ProcessPreemption(
-	_ *v1.Pod,
+	pod *v1.Pod,
 	victims map[string]*extenderv1.Victims,
-	_ fwk.NodeInfoLister,
+	nodeLister fwk.NodeInfoLister,
 ) (map[string]*extenderv1.Victims, error) {
 	if f.supportsPreemption {
 		if f.errProcessPreemption {
 			return nil, errors.New("extender preempt error")
+		}
+		if f.customProcessPreemption != nil {
+			return f.customProcessPreemption(pod, victims, nodeLister)
 		}
 		if f.returnsNoVictims {
 			result := make(map[string]*extenderv1.Victims, len(victims))
@@ -525,6 +534,7 @@ func (f *fakeExtender) IsFilter() bool {
 func TestCallExtenders(t *testing.T) {
 	var (
 		node1Name            = "node1"
+		node2Name            = "node2"
 		defaultSchedulerName = "default-scheduler"
 		preemptor            = st.MakePod().Name("preemptor").UID("preemptor").
 					SchedulerName(defaultSchedulerName).Priority(highPriority).
@@ -538,6 +548,10 @@ func TestCallExtenders(t *testing.T) {
 			Node(node1Name).SchedulerName(defaultSchedulerName).Priority(midPriority).
 			Containers([]v1.Container{st.MakeContainer().Name("container1").Obj()}).
 			Obj()
+		victimOnNode2 = st.MakePod().Name("victim-node2").UID("victim-node2").
+				Node(node2Name).SchedulerName(defaultSchedulerName).Priority(midPriority).
+				Containers([]v1.Container{st.MakeContainer().Name("container1").Obj()}).
+				Obj()
 		makeCandidates = func(nodeName string, pods ...*v1.Pod) []fwk.PreemptionCandidate {
 			return []fwk.PreemptionCandidate{
 				&candidate{
@@ -657,6 +671,144 @@ func TestCallExtenders(t *testing.T) {
 			wantStatus:     nil,
 			wantCandidates: []fwk.PreemptionCandidate{},
 		},
+		{
+			name: "chained extenders: Extender 1 nominates victims on Node A and leaves Node B as placeholder, Extender 2 adds victims to Node B",
+			extenders: []fwk.Extender{
+				newFakeExtender().WithSupportsPreemption(true).WithProcessPreemptionFunc(func(_ *v1.Pod, victims map[string]*extenderv1.Victims, _ fwk.NodeInfoLister) (map[string]*extenderv1.Victims, error) {
+					return map[string]*extenderv1.Victims{
+						node1Name: {Pods: []*v1.Pod{victim}},
+						node2Name: {Pods: nil},
+					}, nil
+				}),
+				newFakeExtender().WithSupportsPreemption(true).WithProcessPreemptionFunc(func(_ *v1.Pod, victims map[string]*extenderv1.Victims, _ fwk.NodeInfoLister) (map[string]*extenderv1.Victims, error) {
+					return map[string]*extenderv1.Victims{
+						node1Name: victims[node1Name],
+						node2Name: {Pods: []*v1.Pod{victimOnNode2}},
+					}, nil
+				}),
+			},
+			candidates: []fwk.PreemptionCandidate{
+				&candidate{name: node1Name, victims: &extenderv1.Victims{}},
+				&candidate{name: node2Name, victims: &extenderv1.Victims{}},
+			},
+			wantStatus: nil,
+			wantCandidates: []fwk.PreemptionCandidate{
+				&candidate{name: node1Name, victims: &extenderv1.Victims{Pods: []*v1.Pod{victim}}},
+				&candidate{name: node2Name, victims: &extenderv1.Victims{Pods: []*v1.Pod{victimOnNode2}}},
+			},
+		},
+		{
+			name: "chained extenders: Extender 1 nominates victims on Node A and leaves Node B as placeholder, Extender 2 leaves Node B empty",
+			extenders: []fwk.Extender{
+				newFakeExtender().WithSupportsPreemption(true).WithProcessPreemptionFunc(func(_ *v1.Pod, victims map[string]*extenderv1.Victims, _ fwk.NodeInfoLister) (map[string]*extenderv1.Victims, error) {
+					return map[string]*extenderv1.Victims{
+						node1Name: {Pods: []*v1.Pod{victim}},
+						node2Name: {Pods: nil},
+					}, nil
+				}),
+				newFakeExtender().WithSupportsPreemption(true).WithProcessPreemptionFunc(func(_ *v1.Pod, victims map[string]*extenderv1.Victims, _ fwk.NodeInfoLister) (map[string]*extenderv1.Victims, error) {
+					return map[string]*extenderv1.Victims{
+						node1Name: victims[node1Name],
+						node2Name: {Pods: nil},
+					}, nil
+				}),
+			},
+			candidates: []fwk.PreemptionCandidate{
+				&candidate{name: node1Name, victims: &extenderv1.Victims{}},
+				&candidate{name: node2Name, victims: &extenderv1.Victims{}},
+			},
+			wantStatus: nil,
+			wantCandidates: []fwk.PreemptionCandidate{
+				&candidate{name: node1Name, victims: &extenderv1.Victims{Pods: []*v1.Pod{victim}}},
+			},
+		},
+		{
+			name: "chained extenders: Extender 1 nominates victims on Node A and leaves Node B as placeholder, Extender 2 omits Node A and adds victims to Node B",
+			extenders: []fwk.Extender{
+				newFakeExtender().WithSupportsPreemption(true).WithProcessPreemptionFunc(func(_ *v1.Pod, victims map[string]*extenderv1.Victims, _ fwk.NodeInfoLister) (map[string]*extenderv1.Victims, error) {
+					return map[string]*extenderv1.Victims{
+						node1Name: {Pods: []*v1.Pod{victim}},
+						node2Name: {Pods: nil},
+					}, nil
+				}),
+				newFakeExtender().WithSupportsPreemption(true).WithProcessPreemptionFunc(func(_ *v1.Pod, victims map[string]*extenderv1.Victims, _ fwk.NodeInfoLister) (map[string]*extenderv1.Victims, error) {
+					return map[string]*extenderv1.Victims{
+						node2Name: {Pods: []*v1.Pod{victimOnNode2}},
+					}, nil
+				}),
+			},
+			candidates: []fwk.PreemptionCandidate{
+				&candidate{name: node1Name, victims: &extenderv1.Victims{}},
+				&candidate{name: node2Name, victims: &extenderv1.Victims{}},
+			},
+			wantStatus: nil,
+			wantCandidates: []fwk.PreemptionCandidate{
+				&candidate{name: node2Name, victims: &extenderv1.Victims{Pods: []*v1.Pod{victimOnNode2}}},
+			},
+		},
+		{
+			name: "chained extenders: both extenders leave all candidate nodes empty",
+			extenders: []fwk.Extender{
+				newFakeExtender().WithSupportsPreemption(true).WithProcessPreemptionFunc(func(_ *v1.Pod, victims map[string]*extenderv1.Victims, _ fwk.NodeInfoLister) (map[string]*extenderv1.Victims, error) {
+					return map[string]*extenderv1.Victims{
+						node1Name: {Pods: nil},
+						node2Name: {Pods: nil},
+					}, nil
+				}),
+				newFakeExtender().WithSupportsPreemption(true).WithProcessPreemptionFunc(func(_ *v1.Pod, victims map[string]*extenderv1.Victims, _ fwk.NodeInfoLister) (map[string]*extenderv1.Victims, error) {
+					return map[string]*extenderv1.Victims{
+						node1Name: {Pods: nil},
+						node2Name: {Pods: nil},
+					}, nil
+				}),
+			},
+			candidates: []fwk.PreemptionCandidate{
+				&candidate{name: node1Name, victims: &extenderv1.Victims{}},
+				&candidate{name: node2Name, victims: &extenderv1.Victims{}},
+			},
+			wantStatus:     nil,
+			wantCandidates: []fwk.PreemptionCandidate{},
+		},
+		{
+			name: "chained extenders: Extender 1 returns error and is ignorable, Extender 2 adds victims to placeholder",
+			extenders: []fwk.Extender{
+				newFakeExtender().WithSupportsPreemption(true).WithErrProcessPreemption(true).WithIgnorable(true),
+				newFakeExtender().WithSupportsPreemption(true).WithVictimsToAdd(victim),
+			},
+			candidates:     makeCandidates(node1Name),
+			wantStatus:     nil,
+			wantCandidates: makeCandidates(node1Name, victim),
+		},
+		{
+			name: "chained extenders: Extender 1 returns error and is not ignorable",
+			extenders: []fwk.Extender{
+				newFakeExtender().WithSupportsPreemption(true).WithErrProcessPreemption(true).WithIgnorable(false),
+				newFakeExtender().WithSupportsPreemption(true).WithVictimsToAdd(victim),
+			},
+			candidates:     makeCandidates(node1Name),
+			wantStatus:     fwk.AsStatus(fmt.Errorf("extender preempt error")),
+			wantCandidates: nil,
+		},
+		{
+			name: "chained extenders: Extender 1 nominates victims on Node A, Extender 2 returns error and is ignorable",
+			extenders: []fwk.Extender{
+				newFakeExtender().WithSupportsPreemption(true).WithVictimsToAdd(victim),
+				newFakeExtender().WithSupportsPreemption(true).WithErrProcessPreemption(true).WithIgnorable(true),
+			},
+			candidates:     makeCandidates(node1Name),
+			wantStatus:     nil,
+			wantCandidates: makeCandidates(node1Name, victim),
+		},
+		{
+			name: "chained extenders: Extender 1 nominates victims on Node A, Extender 2 returns error and is not ignorable",
+			extenders: []fwk.Extender{
+				newFakeExtender().WithSupportsPreemption(true).WithVictimsToAdd(victim),
+				newFakeExtender().WithSupportsPreemption(true).WithErrProcessPreemption(true).WithIgnorable(false),
+			},
+			candidates:     makeCandidates(node1Name),
+			wantStatus:     fwk.AsStatus(fmt.Errorf("extender preempt error")),
+			wantCandidates: nil,
+		},
 	}
 
 	for _, tt := range tests {
@@ -666,9 +818,19 @@ func TestCallExtenders(t *testing.T) {
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 
-			nodes := make([]*v1.Node, len([]string{node1Name}))
-			for i, nodeName := range []string{node1Name} {
-				nodes[i] = st.MakeNode().Name(nodeName).Capacity(veryLargeRes).Obj()
+			nodeNames := sets.New[string]()
+			for _, c := range tt.candidates {
+				nodeNames.Insert(c.Name())
+			}
+			for _, c := range tt.wantCandidates {
+				nodeNames.Insert(c.Name())
+			}
+			if nodeNames.Len() == 0 {
+				nodeNames.Insert(node1Name)
+			}
+			nodes := make([]*v1.Node, 0, nodeNames.Len())
+			for nodeName := range nodeNames {
+				nodes = append(nodes, st.MakeNode().Name(nodeName).Capacity(veryLargeRes).Obj())
 			}
 			registeredPlugins := append([]tf.RegisterPluginFunc{
 				tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New)},
@@ -682,7 +844,7 @@ func TestCallExtenders(t *testing.T) {
 			apiDispatcher.Run(logger)
 			defer apiDispatcher.Close()
 			snapshot := internalcache.NewSnapshot([]*v1.Pod{preemptor}, nodes)
-			fwk, err := tf.NewFramework(
+			testFwk, err := tf.NewFramework(
 				ctx,
 				registeredPlugins, "",
 				frameworkruntime.WithClientSet(cs),
@@ -700,12 +862,12 @@ func TestCallExtenders(t *testing.T) {
 			informerFactory.Start(ctx.Done())
 			informerFactory.WaitForCacheSync(ctx.Done())
 			cache := internalcache.New(ctx, apiDispatcher, false, false)
-			fwk.SetAPICacher(apicache.New(nil, cache))
+			testFwk.SetAPICacher(apicache.New(nil, cache))
 
 			fakePreemptionScorePostFilterPlugin := &FakePreemptionScorePostFilterPlugin{}
 			pe := Evaluator{
 				PluginName: "FakePreemptionScorePostFilter",
-				Handler:    fwk,
+				Handler:    testFwk,
 				Interface:  fakePreemptionScorePostFilterPlugin,
 			}
 			gotCandidates, status := pe.callExtenders(logger, preemptor, tt.candidates)
@@ -716,10 +878,15 @@ func TestCallExtenders(t *testing.T) {
 			if len(gotCandidates) != len(tt.wantCandidates) {
 				t.Errorf("callExtenders() returned unexpected number of results. got: %d, want: %d", len(gotCandidates), len(tt.wantCandidates))
 			} else {
-				for i, gotCandidate := range gotCandidates {
-					wantCandidate := tt.wantCandidates[i]
-					if gotCandidate.Name() != wantCandidate.Name() {
-						t.Errorf("callExtenders() node name mismatch. got: %s, want: %s", gotCandidate.Name(), wantCandidate.Name())
+				wantCandidateMap := make(map[string]fwk.PreemptionCandidate)
+				for _, c := range tt.wantCandidates {
+					wantCandidateMap[c.Name()] = c
+				}
+				for _, gotCandidate := range gotCandidates {
+					wantCandidate, ok := wantCandidateMap[gotCandidate.Name()]
+					if !ok {
+						t.Errorf("callExtenders() unexpected candidate node %s", gotCandidate.Name())
+						continue
 					}
 					if len(gotCandidate.Victims().Pods) != len(wantCandidate.Victims().Pods) {
 						t.Errorf("callExtenders() number of victim pods mismatch for node %s. got: %d, want: %d", gotCandidate.Name(), len(gotCandidate.Victims().Pods), len(wantCandidate.Victims().Pods))
