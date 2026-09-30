@@ -118,6 +118,18 @@ var (
 	}, {
 		Choice: RVFuture,
 		Weight: 20,
+	}, {
+		Choice: WatchListRVEmpty,
+		Weight: 10,
+	}, {
+		Choice: WatchListRVZero,
+		Weight: 10,
+	}, {
+		Choice: WatchListRVCurrent,
+		Weight: 10,
+	}, {
+		Choice: WatchListRVPast,
+		Weight: 10,
 	}}
 
 	watchCfg = WatchConfig{

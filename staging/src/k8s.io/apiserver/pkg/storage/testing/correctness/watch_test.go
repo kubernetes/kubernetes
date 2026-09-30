@@ -23,7 +23,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/apiserver/pkg/apis/example"
 	"k8s.io/apiserver/pkg/storage"
 )
 
@@ -34,6 +36,9 @@ func TestValidateWatch(t *testing.T) {
 	pod1 := newTestPod("pod1", "ns1", "uid-1", "")
 	pod2 := newTestPod("pod2", "ns1", "uid-2", "")
 	pod3 := newTestPod("pod3", "ns1", "uid-3", "")
+	pod1Key := mustGetKey(pod1)
+	pod2Key := mustGetKey(pod2)
+
 	var (
 		addPod1RV2    = watch.Event{Type: watch.Added, Object: withRV(pod1, "2")}
 		addPod2RV3    = watch.Event{Type: watch.Added, Object: withRV(pod2, "3")}
@@ -43,16 +48,35 @@ func TestValidateWatch(t *testing.T) {
 		pod1RV7       = watch.Event{Type: watch.Modified, Object: dropLabel(pod1, "7", "color")}
 		deletePod1RV8 = watch.Event{Type: watch.Deleted, Object: withRV(pod1, "8")}
 	)
-	pod1Key := mustGetKey(pod1)
-	pod2Key := mustGetKey(pod2)
-	history := []Change{
-		{Key: pod1Key, ResourceVersion: 2, Object: addPod1RV2.Object},
-		{Key: pod2Key, ResourceVersion: 3, Object: addPod2RV3.Object},
-		{Key: pod1Key, ResourceVersion: 4, Object: bluePod1RV4.Object, PrevObject: addPod1RV2.Object},
-		{Key: pod2Key, ResourceVersion: 5, PrevObject: addPod2RV3.Object},
-		{Key: pod1Key, ResourceVersion: 6, Object: redPod1RV6.Object, PrevObject: bluePod1RV4.Object},
-		{Key: pod1Key, ResourceVersion: 7, Object: pod1RV7.Object, PrevObject: redPod1RV6.Object},
-		{Key: pod1Key, ResourceVersion: 8, PrevObject: pod1RV7.Object},
+	operations := []Operation{
+		{
+			Request:  Request{Op: OpCreate, Key: pod1Key, Create: CreateRequest{Object: pod1}},
+			Response: Response{Object: addPod1RV2.Object},
+		},
+		{
+			Request:  Request{Op: OpCreate, Key: pod2Key, Create: CreateRequest{Object: pod2}},
+			Response: Response{Object: addPod2RV3.Object},
+		},
+		{
+			Request:  Request{Op: OpUpdate, Key: pod1Key, Update: UpdateRequest{UpdateFunc: storage.SimpleUpdate(func(runtime.Object) (runtime.Object, error) { return bluePod1RV4.Object, nil })}},
+			Response: Response{Object: bluePod1RV4.Object},
+		},
+		{
+			Request:  Request{Op: OpDelete, Key: pod2Key},
+			Response: Response{Object: deletePod2RV5.Object},
+		},
+		{
+			Request:  Request{Op: OpUpdate, Key: pod1Key, Update: UpdateRequest{UpdateFunc: storage.SimpleUpdate(func(runtime.Object) (runtime.Object, error) { return redPod1RV6.Object, nil })}},
+			Response: Response{Object: redPod1RV6.Object},
+		},
+		{
+			Request:  Request{Op: OpUpdate, Key: pod1Key, Update: UpdateRequest{UpdateFunc: storage.SimpleUpdate(func(runtime.Object) (runtime.Object, error) { return pod1RV7.Object, nil })}},
+			Response: Response{Object: pod1RV7.Object},
+		},
+		{
+			Request:  Request{Op: OpDelete, Key: pod1Key},
+			Response: Response{Object: deletePod1RV8.Object},
+		},
 	}
 	// Events for object transitions between selectors.
 	var (
@@ -606,6 +630,151 @@ func TestValidateWatch(t *testing.T) {
 			expectError: true,
 		},
 		{
+			name: "watchlist from empty state with remaining events",
+			requests: []WatchRequest{
+				watchList("", storage.Everything),
+				watchList("0", storage.Everything),
+				watchList("1", storage.Everything),
+			},
+			events: []watch.Event{newInitialEventsEndBookmark("1"), addPod1RV2, addPod2RV3, bluePod1RV4, deletePod2RV5, redPod1RV6, pod1RV7, deletePod1RV8},
+		},
+		{
+			name: "watchlist at RV 3 with remaining events",
+			requests: []WatchRequest{
+				watchList("", storage.Everything),
+				watchList("0", storage.Everything),
+				watchList("1", storage.Everything),
+				watchList("2", storage.Everything),
+				watchList("3", storage.Everything),
+			},
+			events: []watch.Event{addPod1RV2, addPod2RV3, newInitialEventsEndBookmark("3"), bluePod1RV4, deletePod2RV5},
+		},
+		{
+			name: "watchlist at RV 4 with only initial events",
+			requests: []WatchRequest{
+				watchList("", storage.Everything),
+				watchList("0", storage.Everything),
+				watchList("3", storage.Everything),
+				watchList("4", storage.Everything),
+			},
+			events: []watch.Event{addBluePod1RV4, addPod2RV3, newInitialEventsEndBookmark("4")},
+		},
+		{
+			name: "watchlist with label selector color=blue",
+			requests: []WatchRequest{
+				watchList("", isBlue),
+				watchList("0", isBlue),
+				watchList("4", isBlue),
+			},
+			events: []watch.Event{addBluePod1RV4, newInitialEventsEndBookmark("4"), deleteBluePod1RV6},
+		},
+		{
+			name: "watchlist with only error event",
+			requests: []WatchRequest{
+				watchList("99", storage.Everything),
+			},
+			events: []watch.Event{newErrorEvent()},
+		},
+		{
+			name: "watchlist missing initial event",
+			requests: []WatchRequest{
+				watchList("", storage.Everything),
+				watchList("3", storage.Everything),
+			},
+			events:      []watch.Event{addPod1RV2 /*addPod2RV3,*/, newInitialEventsEndBookmark("3"), bluePod1RV4},
+			expectError: true,
+		},
+		{
+			name: "watchlist modified event in initial events",
+			requests: []WatchRequest{
+				watchList("4", storage.Everything),
+			},
+			events:      []watch.Event{bluePod1RV4, addPod2RV3, newInitialEventsEndBookmark("4")},
+			expectError: true,
+		},
+		{
+			name: "watchlist missing bookmark",
+			requests: []WatchRequest{
+				watchList("", storage.Everything),
+				watchList("3", storage.Everything),
+			},
+			events:      []watch.Event{addPod1RV2, addPod2RV3},
+			expectError: true,
+		},
+		{
+			name: "watchlist bookmark older than requested resource version",
+			requests: []WatchRequest{
+				watchList("4", storage.Everything),
+			},
+			events:      []watch.Event{addPod1RV2, addPod2RV3, newInitialEventsEndBookmark("3"), bluePod1RV4},
+			expectError: true,
+		},
+		{
+			name: "watchlist missing event after bookmark",
+			requests: []WatchRequest{
+				watchList("3", storage.Everything),
+			},
+			events:      []watch.Event{addPod1RV2, addPod2RV3, newInitialEventsEndBookmark("3") /*bluePod1RV4,*/, deletePod2RV5},
+			expectError: true,
+		},
+		{
+			name: "watchlist event at bookmark resource version after bookmark",
+			requests: []WatchRequest{
+				watchList("3", storage.Everything),
+			},
+			events:      []watch.Event{addPod1RV2, addPod2RV3, newInitialEventsEndBookmark("3"), addPod2RV3, bluePod1RV4},
+			expectError: true,
+		},
+		{
+			name: "watchlist with no events",
+			requests: []WatchRequest{
+				watchList("", storage.Everything),
+				watchList("0", storage.Everything),
+				watchList("3", isBlue),
+			},
+			events: []watch.Event{},
+		},
+		{
+			name: "watchlist with periodic bookmark after initial events end bookmark",
+			requests: []WatchRequest{
+				watchList("", storage.Everything),
+				watchList("3", storage.Everything),
+			},
+			events: []watch.Event{addPod1RV2, addPod2RV3, newInitialEventsEndBookmark("3"), bluePod1RV4, newBookmark("4")},
+		},
+		{
+			name: "watchlist ending with error event after initial events",
+			requests: []WatchRequest{
+				watchList("3", storage.Everything),
+			},
+			events: []watch.Event{addPod1RV2, addPod2RV3, newInitialEventsEndBookmark("3"), bluePod1RV4, newErrorEvent()},
+		},
+		{
+			name: "watchlist ending with error event before initial events end bookmark",
+			requests: []WatchRequest{
+				watchList("3", storage.Everything),
+			},
+			events:      []watch.Event{addPod1RV2, newErrorEvent()},
+			expectError: true,
+		},
+		{
+			name: "watchlist bookmark without initial events end annotation",
+			requests: []WatchRequest{
+				watchList("3", storage.Everything),
+			},
+			events:      []watch.Event{addPod1RV2, addPod2RV3, newBookmark("3"), bluePod1RV4},
+			expectError: true,
+		},
+		{
+			name: "watchlist with repeated initial events end bookmark",
+			requests: []WatchRequest{
+				watchList("", storage.Everything),
+				watchList("3", storage.Everything),
+			},
+			events:      []watch.Event{addPod1RV2, addPod2RV3, newInitialEventsEndBookmark("3"), bluePod1RV4, newInitialEventsEndBookmark("4")},
+			expectError: true,
+		},
+		{
 			name: "watch on a single key",
 			requests: []WatchRequest{
 				{Key: pod1Key, Options: storage.ListOptions{ResourceVersion: "1", Predicate: storage.Everything}},
@@ -646,9 +815,26 @@ func TestValidateWatch(t *testing.T) {
 			events:      []watch.Event{addPod1RV2},
 			expectError: true,
 		},
+		{
+			name: "watchlist on a single key",
+			requests: []WatchRequest{
+				onKey(pod1Key, watchList("3", storage.Everything)),
+			},
+			events: []watch.Event{addPod1RV2, newInitialEventsEndBookmark("3"), bluePod1RV4},
+		},
+		{
+			name: "watchlist on a single key with initial event for another key",
+			requests: []WatchRequest{
+				onKey(pod1Key, watchList("3", storage.Everything)),
+			},
+			events:      []watch.Event{addPod1RV2, addPod2RV3, newInitialEventsEndBookmark("3"), bluePod1RV4},
+			expectError: true,
+		},
 	}
 	versioner := storage.APIObjectVersioner{}
-	replay := &Replay{versioner: versioner, changes: history}
+	initialState := NewEmptyModel("", func() runtime.Object { return &example.Pod{} }, func() runtime.Object { return &example.PodList{} }, versioner)
+	replay, err := NewReplay(initialState, operations)
+	require.NoError(t, err)
 	validator := NewWatchValidator(versioner, replay, getKey)
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -664,53 +850,79 @@ func TestValidateWatch(t *testing.T) {
 	}
 }
 
-func watchEverything(rv string, match metav1.ResourceVersionMatch) WatchRequest {
-	opts := storage.ListOptions{ResourceVersion: rv, ResourceVersionMatch: match, Predicate: storage.Everything, Recursive: true}
-	return WatchRequest{Key: "/pods/", Options: opts}
-}
-
-func watchBlue(rv string, match metav1.ResourceVersionMatch) WatchRequest {
-	isBlue := storage.SelectionPredicate{
+var (
+	isBlue = storage.SelectionPredicate{
 		Label:    labels.SelectorFromSet(labels.Set{"color": "blue"}),
 		Field:    fields.Everything(),
 		GetAttrs: storage.DefaultNamespaceScopedAttr,
 	}
-	opts := storage.ListOptions{ResourceVersion: rv, ResourceVersionMatch: match, Predicate: isBlue, Recursive: true}
-	return WatchRequest{Key: "/pods/", Options: opts}
-}
-
-func watchRed(rv string, match metav1.ResourceVersionMatch) WatchRequest {
-	isRed := storage.SelectionPredicate{
+	isRed = storage.SelectionPredicate{
 		Label:    labels.SelectorFromSet(labels.Set{"color": "red"}),
 		Field:    fields.Everything(),
 		GetAttrs: storage.DefaultNamespaceScopedAttr,
 	}
-	opts := storage.ListOptions{ResourceVersion: rv, ResourceVersionMatch: match, Predicate: isRed, Recursive: true}
-	return WatchRequest{Key: "/pods/", Options: opts}
-}
-
-func watchPod1(rv string, match metav1.ResourceVersionMatch) WatchRequest {
-	isPod1 := storage.SelectionPredicate{
+	isPod1 = storage.SelectionPredicate{
 		Label:    labels.Everything(),
 		Field:    fields.OneTermEqualSelector("metadata.name", "pod1"),
 		GetAttrs: storage.DefaultNamespaceScopedAttr,
 	}
-	opts := storage.ListOptions{ResourceVersion: rv, ResourceVersionMatch: match, Predicate: isPod1, Recursive: true}
-	return WatchRequest{Key: "/pods/", Options: opts}
-}
-
-func watchPod2(rv string, match metav1.ResourceVersionMatch) WatchRequest {
-	isPod2 := storage.SelectionPredicate{
+	isPod2 = storage.SelectionPredicate{
 		Label:    labels.Everything(),
 		Field:    fields.OneTermEqualSelector("metadata.name", "pod2"),
 		GetAttrs: storage.DefaultNamespaceScopedAttr,
 	}
-	opts := storage.ListOptions{ResourceVersion: rv, ResourceVersionMatch: match, Predicate: isPod2, Recursive: true}
+)
+
+func watchEverything(rv string, match metav1.ResourceVersionMatch) WatchRequest {
+	opts := storage.ListOptions{ResourceVersion: rv, ResourceVersionMatch: match, Predicate: storage.Everything, Recursive: true, SendInitialEvents: new(false)}
 	return WatchRequest{Key: "/pods/", Options: opts}
+}
+
+func watchBlue(rv string, match metav1.ResourceVersionMatch) WatchRequest {
+	opts := storage.ListOptions{ResourceVersion: rv, ResourceVersionMatch: match, Predicate: isBlue, Recursive: true, SendInitialEvents: new(false)}
+	return WatchRequest{Key: "/pods/", Options: opts}
+}
+
+func watchRed(rv string, match metav1.ResourceVersionMatch) WatchRequest {
+	opts := storage.ListOptions{ResourceVersion: rv, ResourceVersionMatch: match, Predicate: isRed, Recursive: true, SendInitialEvents: new(false)}
+	return WatchRequest{Key: "/pods/", Options: opts}
+}
+
+func watchPod1(rv string, match metav1.ResourceVersionMatch) WatchRequest {
+	opts := storage.ListOptions{ResourceVersion: rv, ResourceVersionMatch: match, Predicate: isPod1, Recursive: true, SendInitialEvents: new(false)}
+	return WatchRequest{Key: "/pods/", Options: opts}
+}
+
+func watchPod2(rv string, match metav1.ResourceVersionMatch) WatchRequest {
+	opts := storage.ListOptions{ResourceVersion: rv, ResourceVersionMatch: match, Predicate: isPod2, Recursive: true, SendInitialEvents: new(false)}
+	return WatchRequest{Key: "/pods/", Options: opts}
+}
+
+func watchList(rv string, pred storage.SelectionPredicate) WatchRequest {
+	pred.AllowWatchBookmarks = true
+	return WatchRequest{Key: "/pods/", Options: storage.ListOptions{
+		ResourceVersion:      rv,
+		ResourceVersionMatch: metav1.ResourceVersionMatchNotOlderThan,
+		Predicate:            pred,
+		Recursive:            true,
+		SendInitialEvents:    new(true),
+	}}
+}
+
+func onKey(key string, request WatchRequest) WatchRequest {
+	request.Key = key
+	request.Options.Recursive = false
+	return request
 }
 
 func newBookmark(rv string) watch.Event {
 	return watch.Event{Type: watch.Bookmark, Object: newTestPod("", "", "", rv)}
+}
+
+func newInitialEventsEndBookmark(rv string) watch.Event {
+	pod := newTestPod("", "", "", rv)
+	pod.Annotations = map[string]string{metav1.InitialEventsAnnotationKey: "true"}
+	return watch.Event{Type: watch.Bookmark, Object: pod}
 }
 
 func newErrorEvent() watch.Event {
