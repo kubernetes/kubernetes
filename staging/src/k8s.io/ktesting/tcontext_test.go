@@ -33,12 +33,10 @@ import (
 func TestCancelManual(t *testing.T) {
 	tCtx := ktesting.Init(t)
 	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		// Blocks until tCtx.Cancel is called below.
 		<-tCtx.Done()
-	}()
+	})
 	tCtx.Cancel("manually canceled")
 	wg.Wait()
 }
@@ -49,12 +47,10 @@ func TestCancelAutomatic(t *testing.T) {
 	// gets invoked last.
 	t.Cleanup(wg.Wait)
 	tCtx := ktesting.Init(t)
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		// Blocks until the context gets canceled automatically.
 		<-tCtx.Done()
-	}()
+	})
 }
 
 func TestCancelBeforeCleanup(t *testing.T) {

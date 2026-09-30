@@ -92,8 +92,7 @@ func useYAML(t reflect.Type) bool {
 		return useYAML(t.Key()) || useYAML(t.Elem())
 	case reflect.Struct:
 		// All fields must have a `json` tag.
-		for i := 0; i < t.NumField(); i++ {
-			field := t.Field(i)
+		for field := range t.Fields() {
 			if _, ok := field.Tag.Lookup("json"); !ok {
 				return false
 			}
