@@ -163,7 +163,7 @@ func newStatefulSetPVC(name string) v1.PersistentVolumeClaim {
 }
 
 // scSetup sets up necessities for Statefulset integration test, including control plane, apiserver, informers, and clientset
-func scSetup(t *testing.T) (context.Context, kubeapiservertesting.TearDownFunc, *statefulset.StatefulSetController, informers.SharedInformerFactory, clientset.Interface) {
+func scSetup(t *testing.T) (context.Context, *statefulset.StatefulSetController, informers.SharedInformerFactory, clientset.Interface) {
 	tCtx := ktesting.Init(t)
 	// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
 	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
@@ -185,11 +185,11 @@ func scSetup(t *testing.T) (context.Context, kubeapiservertesting.TearDownFunc, 
 		clientset.NewForConfigOrDie(restclient.AddUserAgent(config, "statefulset-controller")),
 	)
 
-	teardown := func() {
-		tCtx.Cancel("tearing down controller")
-		server.TearDownFn()
-	}
-	return tCtx, teardown, sc, informers, clientSet
+	// The statefulset controller runs with tCtx, so tCtx must get canceled
+	// before the server shuts down, to avoid it logging errors while (or
+	// after) the test binary considers the test done.
+	tCtx.Cleanup(server.TearDownFn)
+	return tCtx, sc, informers, clientSet
 }
 
 // Run STS controller and informers

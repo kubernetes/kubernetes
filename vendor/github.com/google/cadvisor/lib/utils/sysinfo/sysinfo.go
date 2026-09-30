@@ -223,8 +223,11 @@ func GetNodesInfo(sysFs sysfs.SysFs) ([]info.Node, int, error) {
 		node := info.Node{Id: id}
 
 		cpuDirs, err := sysFs.GetCPUsPaths(nodeDir)
+		if err != nil {
+			return nil, 0, fmt.Errorf("failed to get CPUs for NUMA node %q: %w", nodeDir, err)
+		}
 		if len(cpuDirs) == 0 {
-			klog.Warningf("Found node without any CPU, nodeDir: %s, number of cpuDirs %d, err: %v", nodeDir, len(cpuDirs), err)
+			klog.V(4).Infof("Found memory-only NUMA node, nodeDir: %s", nodeDir)
 		} else {
 			cores, err := getCoresInfo(sysFs, cpuDirs)
 			if err != nil {

@@ -32,7 +32,7 @@ type VolumeProjectionApplyConfiguration struct {
 	ConfigMap *ConfigMapProjectionApplyConfiguration `json:"configMap,omitempty"`
 	// serviceAccountToken is information about the serviceAccountToken data to project
 	ServiceAccountToken *ServiceAccountTokenProjectionApplyConfiguration `json:"serviceAccountToken,omitempty"`
-	// ClusterTrustBundle allows a pod to access the `.spec.trustBundle` field
+	// clusterTrustBundle allows a pod to access the `.spec.trustBundle` field
 	// of ClusterTrustBundle objects in an auto-updating file.
 	//
 	// Alpha, gated by the ClusterTrustBundleProjection feature gate.
@@ -46,7 +46,7 @@ type VolumeProjectionApplyConfiguration struct {
 	// The ordering of certificates within the file is arbitrary, and Kubelet
 	// may change the order over time.
 	ClusterTrustBundle *ClusterTrustBundleProjectionApplyConfiguration `json:"clusterTrustBundle,omitempty"`
-	// Projects an auto-rotating credential bundle (private key and certificate
+	// podCertificate projects an auto-rotating credential bundle (private key and certificate
 	// chain) that the pod can use either as a TLS client or server.
 	//
 	// Kubelet generates a private key and uses it to send a

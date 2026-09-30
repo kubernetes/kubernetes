@@ -58,7 +58,6 @@ import (
 	kubeletapis "k8s.io/kubelet/pkg/apis"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/nodelifecycle/scheduler"
-	"k8s.io/kubernetes/pkg/controller/tainteviction"
 	consistencyutil "k8s.io/kubernetes/pkg/controller/util/consistency"
 	controllerutil "k8s.io/kubernetes/pkg/controller/util/node"
 	"k8s.io/kubernetes/pkg/features"
@@ -137,11 +136,6 @@ const (
 	podUpdateWorkerSize = 4
 	// nodeUpdateWorkerSize defines the size of workers for node update or/and pod update.
 	nodeUpdateWorkerSize = 8
-
-	// taintEvictionController is defined here in order to prevent imports of
-	// k8s.io/kubernetes/cmd/kube-controller-manager/names which would result in validation errors.
-	// This constant will be removed upon graduation of the SeparateTaintEvictionController feature.
-	taintEvictionController = "taint-eviction-controller"
 )
 
 // labelReconcileInfo lists Node labels to reconcile, and how to reconcile them.
@@ -215,6 +209,12 @@ func (n *nodeHealthMap) set(name string, data *nodeHealthData) {
 	n.nodeHealths[name] = data
 }
 
+func (n *nodeHealthMap) delete(name string) {
+	n.lock.Lock()
+	defer n.lock.Unlock()
+	delete(n.nodeHealths, name)
+}
+
 type podUpdateItem struct {
 	namespace string
 	name      string
@@ -222,8 +222,6 @@ type podUpdateItem struct {
 
 // Controller is the controller that manages node's life cycle.
 type Controller struct {
-	taintManager *tainteviction.Controller
-
 	podLister         corelisters.PodLister
 	podInformerSynced cache.InformerSynced
 	kubeClient        clientset.Interface
@@ -399,15 +397,6 @@ func NewNodeLifecycleController(
 	nc.podLister = podInformer.Lister()
 	nc.nodeLister = nodeInformer.Lister()
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.SeparateTaintEvictionController) {
-		logger.Info("Running TaintEvictionController as part of NodeLifecyleController")
-		tm, err := tainteviction.New(ctx, kubeClient, podInformer, nodeInformer, taintEvictionController)
-		if err != nil {
-			return nil, err
-		}
-		nc.taintManager = tm
-	}
-
 	logger.Info("Controller will reconcile labels")
 	_, _ = nodeInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		AddFunc: controllerutil.CreateAddNodeHandler(func(node *v1.Node) error {
@@ -470,13 +459,6 @@ func (nc *Controller) Run(ctx context.Context) {
 
 	if !cache.WaitForNamedCacheSyncWithContext(ctx, nc.leaseInformerSynced, nc.nodeInformerSynced, nc.podInformerSynced, nc.daemonSetInformerSynced) {
 		return
-	}
-
-	if !utilfeature.DefaultFeatureGate.Enabled(features.SeparateTaintEvictionController) {
-		logger.Info("Starting", "controller", taintEvictionController)
-		wg.Go(func() {
-			nc.taintManager.Run(ctx)
-		})
 	}
 
 	// Start workers to reconcile labels and/or update NoSchedule taint for nodes.
@@ -705,6 +687,7 @@ func (nc *Controller) monitorNodeHealth(ctx context.Context) error {
 		logger.V(1).Info("Controller observed a Node deletion", "node", klog.KRef("", deleted[i].Name))
 		controllerutil.RecordNodeEvent(ctx, nc.recorder, deleted[i].Name, string(deleted[i].UID), v1.EventTypeNormal, "RemovingNode", fmt.Sprintf("Removing Node %v from Controller", deleted[i].Name))
 		delete(nc.knownNodeSet, deleted[i].Name)
+		nc.nodeHealthMap.delete(deleted[i].Name)
 	}
 
 	var zoneToNodeConditionsLock sync.Mutex

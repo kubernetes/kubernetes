@@ -270,3 +270,13 @@ func ImplicitFieldSelections(seln types.Selection) iter.Seq2[*types.Var, bool] {
 		}
 	}
 }
+
+// TupleOf returns a tuple type with the specified list of (unnamed)
+// var types. Neither the zero nor one cases are special.
+func TupleOf(elems ...types.Type) *types.Tuple {
+	params := make([]*types.Var, len(elems))
+	for i, elem := range elems {
+		params[i] = types.NewParam(token.NoPos, nil, "", elem)
+	}
+	return types.NewTuple(params...)
+}

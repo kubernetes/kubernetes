@@ -35,12 +35,51 @@ func TestEqualities(t *testing.T) {
 	type Foo struct {
 		X int
 	}
+	type namedInt int
 
 	table := []struct {
 		a, b                               interface{}
 		deepEqual                          bool // Expected result for DeepEqual
 		deepEqualWithNilDifferentFromEmpty bool // Expected result for DeepEqualWithNilDifferentFromEmpty
 	}{
+		// Basic scalars
+		{true, true, true, true},
+		{true, false, false, false},
+		{namedInt(1), namedInt(1), true, true},
+		{namedInt(1), namedInt(2), false, false},
+		{int8(1), int8(1), true, true},
+		{int8(1), int8(2), false, false},
+		{int16(1), int16(1), true, true},
+		{int16(1), int16(2), false, false},
+		{int32(1), int32(1), true, true},
+		{int32(1), int32(2), false, false},
+		{int64(1), int64(1), true, true},
+		{int64(1), int64(2), false, false},
+		{uint(1), uint(1), true, true},
+		{uint(1), uint(2), false, false},
+		{uint8(1), uint8(1), true, true},
+		{uint8(1), uint8(2), false, false},
+		{uint16(1), uint16(1), true, true},
+		{uint16(1), uint16(2), false, false},
+		{uint32(1), uint32(1), true, true},
+		{uint32(1), uint32(2), false, false},
+		{uint64(1), uint64(1), true, true},
+		{uint64(1), uint64(2), false, false},
+		{uintptr(1), uintptr(1), true, true},
+		{uintptr(1), uintptr(2), false, false},
+		{float32(1.5), float32(1.5), true, true},
+		{float32(1.5), float32(2.5), false, false},
+		{float64(1.5), float64(1.5), true, true},
+		{float64(1.5), float64(2.5), false, false},
+		{complex64(1 + 2i), complex64(1 + 2i), true, true},
+		{complex64(1 + 2i), complex64(1 + 3i), false, false},
+		{complex128(1 + 2i), complex128(1 + 2i), true, true},
+		{complex128(1 + 2i), complex128(1 + 3i), false, false},
+		{namedInt(1), 1, false, false},
+		{int8(1), int16(1), false, false},
+		{uint8(1), uint16(1), false, false},
+		{float32(1.5), float64(1.5), false, false},
+		{complex64(1 + 2i), complex128(1 + 2i), false, false},
 		// Custom equality functions
 		{1, 2, true, true},
 		{2, 1, false, false},

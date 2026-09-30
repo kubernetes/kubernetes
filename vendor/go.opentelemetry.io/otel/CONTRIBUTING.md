@@ -8,8 +8,10 @@ repo for information on this and other language SIGs.
 See the [public meeting
 notes](https://docs.google.com/document/d/1E5e7Ld0NuU1iVvf-42tOBpu2VBBLYnh73GJuITGJTTU/edit)
 for a summary description of past meetings. To request edit access,
-join the meeting or get in touch on
-[Slack](https://cloud-native.slack.com/archives/C01NPAXACKT).
+join the meeting or get in touch on the
+[#otel-go](https://cloud-native.slack.com/archives/C01NPAXACKT)
+channel on CNCF Slack. If you are new to the CNCF Slack community,
+you can [create an account](https://slack.cncf.io/).
 
 The meeting is open for all to join. We invite everyone to join our
 meeting, regardless of your experience level. Whether you're a
@@ -752,8 +754,8 @@ Encapsulate setup in constructor functions, ensuring clear ownership and scope:
 import (
 	"errors"
 
-	semconv "go.opentelemetry.io/otel/semconv/v1.41.0"
-	"go.opentelemetry.io/otel/semconv/v1.41.0/otelconv"
+	semconv "go.opentelemetry.io/otel/semconv/v1.43.0"
+	"go.opentelemetry.io/otel/semconv/v1.43.0/otelconv"
 )
 
 type SDKComponent struct {
@@ -1054,7 +1056,7 @@ func (e *Exporter) ExportSpans(ctx context.Context, spans []trace.ReadOnlySpan) 
 
 All observability metrics should follow the [OpenTelemetry Semantic Conventions for SDK metrics](https://github.com/open-telemetry/semantic-conventions/blob/1cf2476ae5e518225a766990a28a6d5602bd5a30/docs/otel/sdk-metrics.md).
 
-Use the metric semantic conventions convenience package [otelconv](./semconv/v1.41.0/otelconv/metric.go).
+Use the metric semantic conventions convenience package [otelconv](./semconv/v1.43.0/otelconv/metric.go).
 
 ##### Component Identification
 

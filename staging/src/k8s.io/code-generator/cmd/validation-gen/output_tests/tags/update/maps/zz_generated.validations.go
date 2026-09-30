@@ -249,16 +249,11 @@ func Validate_UpdateMapStruct(
 				}
 			}
 			// call field-attached validations
-			earlyReturn := false
 			if e := validate.EachMapVal(ctx, op, fldPath, obj, oldObj, validate.DirectEqual,
 				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *MapItem) field.ErrorList {
 					return validate.UpdateStruct(ctx, op, fldPath, obj, oldObj, validate.NoModify)
-				}).MarkShortCircuit(); len(e) != 0 {
+				}); len(e) != 0 {
 				errs = append(errs, e...)
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
 			}
 			return
 		}

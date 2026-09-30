@@ -27,7 +27,7 @@ import (
 //
 // DeviceDerivedAttribute defines a derived attribute computed via CEL.
 type DeviceDerivedAttributeApplyConfiguration struct {
-	// Name is the identifier for this derived attribute, used in constraints.
+	// name is the identifier for this derived attribute, used in constraints.
 	//
 	// It must be a DNS subdomain followed by a slash ("/") followed by a C identifier
 	// (e.g. "example.com/numaNode" or "derived/numaNode").
@@ -42,7 +42,7 @@ type DeviceDerivedAttributeApplyConfiguration struct {
 	// It is not valid to define a derived attribute that isn't used in at least
 	// one constraint.
 	Name *resourcev1beta2.FullyQualifiedName `json:"name,omitempty"`
-	// Expression is a CEL expression evaluated against each candidate device.
+	// expression is a CEL expression evaluated against each candidate device.
 	// The expression must evaluate to a primitive scalar (string, integer,
 	// boolean, or semver) or a list of these scalars ([]string, []int64,
 	// []bool, []semver) to act as a virtual grouping key. Any other return type

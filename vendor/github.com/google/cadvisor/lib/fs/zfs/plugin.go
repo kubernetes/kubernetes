@@ -24,6 +24,12 @@ import (
 
 type zfsPlugin struct{}
 
+// Overridable for tests.
+var (
+	zfsDevicePath = "/dev/zfs"
+	getZfsStats   = GetZfsStats
+)
+
 // NewPlugin creates a new ZFS filesystem plugin.
 func NewPlugin() fs.FsPlugin {
 	return &zfsPlugin{}
@@ -44,15 +50,19 @@ func (p *zfsPlugin) Priority() int {
 }
 
 // GetStats returns filesystem statistics for ZFS.
+//
+// When /dev/zfs is missing, or when zfs tooling cannot collect stats (common
+// in unprivileged containers that still see the device node but lack
+// permission to use it), fall back to VFS so mountpoint capacity remains
+// available via statfs.
 func (p *zfsPlugin) GetStats(device string, partition fs.PartitionInfo) (*fs.FsStats, error) {
-	// Check if ZFS is available - if /dev/zfs doesn't exist, fall back to VFS
-	if _, err := os.Stat("/dev/zfs"); os.IsNotExist(err) {
+	if _, err := os.Stat(zfsDevicePath); err != nil {
 		return nil, fs.ErrFallbackToVFS
 	}
 
-	capacity, free, avail, err := GetZfsStats(device)
+	capacity, free, avail, err := getZfsStats(device)
 	if err != nil {
-		return nil, err
+		return nil, fs.ErrFallbackToVFS
 	}
 
 	return &fs.FsStats{

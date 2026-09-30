@@ -86,6 +86,13 @@ func ValidateKubeletServingCSR(req *x509.CertificateRequest, usages sets.String)
 		return fmt.Errorf("usages did not match %v", kubeletServingRequiredUsages.List())
 	}
 
+	if req.PublicKeyAlgorithm == x509.MLDSA {
+		err := ValidateMLDSAKeyUsages(usages)
+		if err != nil {
+			return fmt.Errorf("validating usages for ml-dsa key: %w", err)
+		}
+	}
+
 	if !strings.HasPrefix(req.Subject.CommonName, "system:node:") {
 		return commonNameNotSystemNode
 	}
@@ -134,5 +141,49 @@ func ValidateKubeletClientCSR(req *x509.CertificateRequest, usages sets.String) 
 		return fmt.Errorf("usages did not match %v", kubeletClientRequiredUsages.List())
 	}
 
+	if req.PublicKeyAlgorithm == x509.MLDSA {
+		err := ValidateMLDSAKeyUsages(usages)
+		if err != nil {
+			return fmt.Errorf("validating usages for ml-dsa key: %w", err)
+		}
+	}
+
 	return nil
+}
+
+var (
+	mldsaDisallowedUsages = sets.NewString(
+		string(UsageKeyEncipherment),
+		string(UsageKeyAgreement),
+		string(UsageDataEncipherment),
+		string(UsageEncipherOnly),
+		string(UsageDecipherOnly),
+	)
+
+	mldsaAtLeastOneOfUsages = sets.NewString(
+		string(UsageDigitalSignature),
+		string(UsageContentCommitment),
+		string(UsageCertSign),
+		string(UsageCRLSign),
+	)
+)
+
+func ValidateMLDSAKeyUsages(usages sets.String) error {
+	errs := []error{}
+	hasAtLeastOneOfRequirement := false
+	for _, usage := range usages.List() {
+		if mldsaDisallowedUsages.Has(usage) {
+			errs = append(errs, fmt.Errorf("usage %s cannot be used with an ML-DSA signed certificate request", usage))
+		}
+
+		if !hasAtLeastOneOfRequirement && mldsaAtLeastOneOfUsages.Has(usage) {
+			hasAtLeastOneOfRequirement = true
+		}
+	}
+
+	if !hasAtLeastOneOfRequirement {
+		errs = append(errs, fmt.Errorf("usages must contain at least one of %v", mldsaAtLeastOneOfUsages.List()))
+	}
+
+	return errors.Join(errs...)
 }

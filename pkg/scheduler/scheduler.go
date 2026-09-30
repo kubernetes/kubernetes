@@ -109,6 +109,7 @@ type Scheduler struct {
 	nominatedNodeNameForExpectationEnabled              bool
 	genericWorkloadEnabled                              bool
 	inPlacePodVerticalScalingSchedulerPreemptionEnabled bool
+	podGroupPreemptionPolicyEnabled                     bool
 
 	algorithm *SchedulingAlgorithm
 }
@@ -382,8 +383,11 @@ func New(ctx context.Context,
 		nominatedNodeNameForExpectationEnabled: feature.DefaultFeatureGate.Enabled(features.NominatedNodeNameForExpectation),
 		genericWorkloadEnabled:                 feature.DefaultFeatureGate.Enabled(features.GenericWorkload),
 		inPlacePodVerticalScalingSchedulerPreemptionEnabled: feature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingSchedulerPreemption),
+		podGroupPreemptionPolicyEnabled:                     feature.DefaultFeatureGate.Enabled(features.PodGroupPreemptionPolicy),
 	}
-	sched.initAlgorithm(WithAlgorithmPercentageOfNodesToScore(options.percentageOfNodesToScore))
+	if err = sched.initAlgorithm(WithAlgorithmPercentageOfNodesToScore(options.percentageOfNodesToScore)); err != nil {
+		return nil, fmt.Errorf("initializing scheduling algorithm: %w", err)
+	}
 	sched.NextEntity = podQueue.Pop
 	sched.applyDefaultHandlers()
 
@@ -604,6 +608,12 @@ func (sched *Scheduler) CurrentCycle() int64 {
 //
 // CurrentCycle is passed as a bound method value, so a SchedulingQueue installed
 // after this call is still picked up.
-func (sched *Scheduler) initAlgorithm(opts ...AlgorithmOption) {
-	sched.algorithm = NewSchedulingAlgorithm(sched.nodeInfoSnapshot, sched.Cache, append(opts, WithCurrentCycleProvider(sched.CurrentCycle))...)
+func (sched *Scheduler) initAlgorithm(opts ...AlgorithmOption) error {
+	algorithm, err := NewSchedulingAlgorithm(sched.nodeInfoSnapshot, sched.Cache, append(opts, WithCurrentCycleProvider(sched.CurrentCycle))...)
+	if err != nil {
+		return err
+	}
+
+	sched.algorithm = algorithm
+	return nil
 }

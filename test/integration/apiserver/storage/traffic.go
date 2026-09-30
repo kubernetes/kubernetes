@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"math/rand"
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -30,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/testing/correctness"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -38,13 +40,39 @@ import (
 type RequestType string
 
 const (
-	RequestTypeCreate                RequestType = "Create"
-	RequestTypeDelete                RequestType = "Delete"
-	RequestTypeDeleteUIDPrecondition RequestType = "DeleteUIDPrecondition"
-	RequestTypeGet                   RequestType = "Get"
+	RequestTypeCreate                 RequestType = "Create"
+	RequestTypeDelete                 RequestType = "Delete"
+	RequestTypeDeleteUIDPrecondition  RequestType = "DeleteUIDPrecondition"
+	RequestTypeDeleteRVPrecondition   RequestType = "DeleteRVPrecondition"
+	RequestTypeGet                    RequestType = "Get"
+	RequestTypeGetIgnoreNotFound      RequestType = "GetIgnoreNotFound"
+	RequestTypeList                   RequestType = "List"
+	RequestTypeListNamespace          RequestType = "ListNamespace"
+	RequestTypeListNonRecursive       RequestType = "ListNonRecursive"
+	RequestTypeListRVZero             RequestType = "ListRVZero"
+	RequestTypeListRVNotOlderThan     RequestType = "ListRVNotOlderThan"
+	RequestTypeListRVExact            RequestType = "ListRVExact"
+	RequestTypeUpdate                 RequestType = "Update"
+	RequestTypeUpdateUIDPrecondition  RequestType = "UpdateUIDPrecondition"
+	RequestTypeUpdateRVPrecondition   RequestType = "UpdateRVPrecondition"
+	RequestTypeUpdateNoOp             RequestType = "UpdateNoOp"
+	RequestTypeUpdateWithCachedObject RequestType = "UpdateWithCachedObject"
+	RequestTypeUpdateIgnoreNotFound   RequestType = "UpdateIgnoreNotFound"
 )
 
-type TraffiConfig struct {
+// WatchRequestType selects the resource version a watch starts from.
+type WatchRequestType string
+
+const (
+	RVEmpty   WatchRequestType = "RVEmpty"
+	RVZero    WatchRequestType = "RVZero"
+	RVOne     WatchRequestType = "RVOne"
+	RVCurrent WatchRequestType = "RVCurrent"
+	RVPast    WatchRequestType = "RVPast"
+	RVFuture  WatchRequestType = "RVFuture"
+)
+
+type UnaryConfig struct {
 	Concurrency         int
 	MaxOperations       int
 	Namespaces          int
@@ -52,7 +80,14 @@ type TraffiConfig struct {
 	RequestDistribution []ChoiceWeight[RequestType]
 }
 
-func generateKeys(cfg TraffiConfig) []types.NamespacedName {
+type WatchConfig struct {
+	Concurrency         int
+	Duration            time.Duration
+	MaxEvents           int
+	RequestDistribution []ChoiceWeight[WatchRequestType]
+}
+
+func generateKeys(cfg UnaryConfig) []types.NamespacedName {
 	numNamespaces := cfg.Namespaces
 	if numNamespaces <= 0 {
 		numNamespaces = 1
@@ -69,8 +104,8 @@ func generateKeys(cfg TraffiConfig) []types.NamespacedName {
 	return keys
 }
 
-// RunTraffic drives concurrent storage operations and records all invocations.
-func RunTraffic(ctx context.Context, store storage.Interface, cfg TraffiConfig) ([]correctness.Operation, error) {
+// RunUnaryTraffic drives concurrent storage operations and records all invocations.
+func RunUnaryTraffic(ctx context.Context, store storage.Interface, cfg UnaryConfig) ([]correctness.Operation, error) {
 	if cfg.Concurrency <= 0 {
 		return nil, fmt.Errorf("concurrency must be positive")
 	}
@@ -115,7 +150,7 @@ func RunTraffic(ctx context.Context, store storage.Interface, cfg TraffiConfig) 
 				start := time.Now()
 				response := runTraffic(ctx, store, request)
 				end := time.Now()
-				if response.Object != nil {
+				if response.Object != nil && request.Op != correctness.OpList && response.Object.(*api.Pod).Name != "" {
 					cachedObj = response.Object
 				}
 
@@ -138,6 +173,36 @@ func RunTraffic(ctx context.Context, store storage.Interface, cfg TraffiConfig) 
 	return operations, nil
 }
 
+// RunWatchTraffic keeps cfg.Concurrency watches open until stop is closed and
+// records what each of them received. Watches still open at that point run to
+// their own deadline, so the events they already collected are not discarded.
+func RunWatchTraffic(ctx context.Context, store storage.Interface, cfg WatchConfig, stop <-chan struct{}) []correctness.WatchOperation {
+	var mu sync.Mutex
+	var watches []correctness.WatchOperation
+	var wg sync.WaitGroup
+	for range cfg.Concurrency {
+		wg.Go(func() {
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case <-stop:
+					return
+				default:
+				}
+				request := randomWatchRequest(ctx, store, cfg.RequestDistribution)
+				response := runWatch(ctx, store, request, cfg)
+
+				mu.Lock()
+				watches = append(watches, correctness.WatchOperation{Request: request, Response: response})
+				mu.Unlock()
+			}
+		})
+	}
+	wg.Wait()
+	return watches
+}
+
 func randomRequest(keys []types.NamespacedName, ops []ChoiceWeight[RequestType], cached runtime.Object) *correctness.Request {
 	selectedOp := PickRandom(ops)
 	key := keys[rand.Intn(len(keys))]
@@ -145,10 +210,13 @@ func randomRequest(keys []types.NamespacedName, ops []ChoiceWeight[RequestType],
 	switch selectedOp {
 	case RequestTypeCreate:
 		obj := validPod(key.Namespace, key.Name)
+		obj.UID = uuid.NewUUID()
 		return &correctness.Request{
-			Op:     correctness.OpCreate,
-			Key:    storageKey(key),
-			Object: obj,
+			Op:  correctness.OpCreate,
+			Key: storageKey(key),
+			Create: correctness.CreateRequest{
+				Object: obj,
+			},
 		}
 	case RequestTypeDelete:
 		return &correctness.Request{
@@ -165,16 +233,194 @@ func randomRequest(keys []types.NamespacedName, ops []ChoiceWeight[RequestType],
 		}
 		uid := accessor.GetUID()
 		return &correctness.Request{
-			Op:            correctness.OpDelete,
-			Key:           storageKey(key),
-			Preconditions: &storage.Preconditions{UID: &uid},
+			Op:  correctness.OpDelete,
+			Key: storageKey(key),
+			Delete: correctness.DeleteRequest{
+				Preconditions: &storage.Preconditions{UID: &uid},
+			},
+		}
+	case RequestTypeDeleteRVPrecondition:
+		if cached == nil {
+			return nil
+		}
+		accessor, err := meta.Accessor(cached)
+		if err != nil {
+			panic(err)
+		}
+		rv := accessor.GetResourceVersion()
+		return &correctness.Request{
+			Op:  correctness.OpDelete,
+			Key: storageKey(key),
+			Delete: correctness.DeleteRequest{
+				Preconditions: &storage.Preconditions{ResourceVersion: &rv},
+			},
 		}
 	case RequestTypeGet:
-		getOpts := storage.GetOptions{}
 		return &correctness.Request{
-			Op:         correctness.OpGet,
-			Key:        storageKey(key),
-			GetOptions: getOpts,
+			Op:  correctness.OpGet,
+			Key: storageKey(key),
+		}
+	case RequestTypeGetIgnoreNotFound:
+		return &correctness.Request{
+			Op:  correctness.OpGet,
+			Key: storageKey(key),
+			Get: correctness.GetRequest{
+				Options: storage.GetOptions{IgnoreNotFound: true},
+			},
+		}
+	case RequestTypeList:
+		return &correctness.Request{
+			Op:  correctness.OpList,
+			Key: "/pods/",
+			List: correctness.ListRequest{
+				Options: storage.ListOptions{Predicate: storage.Everything, Recursive: true},
+			},
+		}
+	case RequestTypeListNamespace:
+		return &correctness.Request{
+			Op:  correctness.OpList,
+			Key: "/pods/" + key.Namespace,
+			List: correctness.ListRequest{
+				Options: storage.ListOptions{Predicate: storage.Everything, Recursive: true},
+			},
+		}
+	case RequestTypeListNonRecursive:
+		return &correctness.Request{
+			Op:  correctness.OpList,
+			Key: storageKey(key),
+			List: correctness.ListRequest{
+				Options: storage.ListOptions{Predicate: storage.Everything},
+			},
+		}
+	case RequestTypeListRVZero:
+		return &correctness.Request{
+			Op:  correctness.OpList,
+			Key: "/pods/",
+			List: correctness.ListRequest{
+				Options: storage.ListOptions{
+					Predicate:       storage.Everything,
+					Recursive:       true,
+					ResourceVersion: "0",
+				},
+			},
+		}
+	case RequestTypeListRVNotOlderThan:
+		if cached == nil {
+			return nil
+		}
+		accessor, err := meta.Accessor(cached)
+		if err != nil {
+			panic(err)
+		}
+		return &correctness.Request{
+			Op:  correctness.OpList,
+			Key: "/pods/",
+			List: correctness.ListRequest{
+				Options: storage.ListOptions{
+					Predicate:            storage.Everything,
+					Recursive:            true,
+					ResourceVersion:      accessor.GetResourceVersion(),
+					ResourceVersionMatch: metav1.ResourceVersionMatchNotOlderThan,
+				},
+			},
+		}
+	case RequestTypeListRVExact:
+		if cached == nil {
+			return nil
+		}
+		accessor, err := meta.Accessor(cached)
+		if err != nil {
+			panic(err)
+		}
+		return &correctness.Request{
+			Op:  correctness.OpList,
+			Key: "/pods/",
+			List: correctness.ListRequest{
+				Options: storage.ListOptions{
+					Predicate:            storage.Everything,
+					Recursive:            true,
+					ResourceVersion:      accessor.GetResourceVersion(),
+					ResourceVersionMatch: metav1.ResourceVersionMatchExact,
+				},
+			},
+		}
+	case RequestTypeUpdate:
+		return &correctness.Request{
+			Op:  correctness.OpUpdate,
+			Key: storageKey(key),
+			Update: correctness.UpdateRequest{
+				IgnoreNotFound: false,
+				UpdateFunc:     randomUpdate(key),
+			},
+		}
+	case RequestTypeUpdateUIDPrecondition:
+		if cached == nil {
+			return nil
+		}
+		accessor, err := meta.Accessor(cached)
+		if err != nil {
+			panic(err)
+		}
+		uid := accessor.GetUID()
+		return &correctness.Request{
+			Op:  correctness.OpUpdate,
+			Key: storageKey(key),
+			Update: correctness.UpdateRequest{
+				IgnoreNotFound: false,
+				Preconditions:  &storage.Preconditions{UID: &uid},
+				UpdateFunc:     randomUpdate(key),
+			},
+		}
+	case RequestTypeUpdateRVPrecondition:
+		if cached == nil {
+			return nil
+		}
+		accessor, err := meta.Accessor(cached)
+		if err != nil {
+			panic(err)
+		}
+		rv := accessor.GetResourceVersion()
+		return &correctness.Request{
+			Op:  correctness.OpUpdate,
+			Key: storageKey(key),
+			Update: correctness.UpdateRequest{
+				IgnoreNotFound: false,
+				Preconditions:  &storage.Preconditions{ResourceVersion: &rv},
+				UpdateFunc:     randomUpdate(key),
+			},
+		}
+	case RequestTypeUpdateNoOp:
+		return &correctness.Request{
+			Op:  correctness.OpUpdate,
+			Key: storageKey(key),
+			Update: correctness.UpdateRequest{
+				IgnoreNotFound: false,
+				UpdateFunc: storage.SimpleUpdate(func(obj runtime.Object) (runtime.Object, error) {
+					return obj.(*api.Pod).DeepCopy(), nil
+				}),
+			},
+		}
+	case RequestTypeUpdateWithCachedObject:
+		if cached == nil {
+			return nil
+		}
+		return &correctness.Request{
+			Op:  correctness.OpUpdate,
+			Key: storageKey(key),
+			Update: correctness.UpdateRequest{
+				IgnoreNotFound:       false,
+				CachedExistingObject: cached.DeepCopyObject(),
+				UpdateFunc:           randomUpdate(key),
+			},
+		}
+	case RequestTypeUpdateIgnoreNotFound:
+		return &correctness.Request{
+			Op:  correctness.OpUpdate,
+			Key: storageKey(key),
+			Update: correctness.UpdateRequest{
+				IgnoreNotFound: true,
+				UpdateFunc:     randomUpdate(key),
+			},
 		}
 	default:
 		panic(fmt.Sprintf("%v: unknown operation", selectedOp))
@@ -185,17 +431,37 @@ func storageKey(key types.NamespacedName) string {
 	return "/pods/" + key.String()
 }
 
+func randomUpdate(key types.NamespacedName) storage.UpdateFunc {
+	version := strconv.Itoa(rand.Intn(10000))
+	return func(obj runtime.Object, res storage.ResponseMeta) (runtime.Object, *uint64, error) {
+		pod := obj.(*api.Pod).DeepCopy()
+		if pod.Name == "" {
+			pod = validPod(key.Namespace, key.Name)
+		}
+		if pod.Annotations == nil {
+			pod.Annotations = make(map[string]string)
+		}
+		pod.Annotations["version"] = version
+		return pod, nil, nil
+	}
+}
+
 func runTraffic(ctx context.Context, store storage.Interface, request *correctness.Request) correctness.Response {
-	out := &api.Pod{}
+	var out runtime.Object = &api.Pod{}
 	var err error
 	key := request.Key
 	switch request.Op {
 	case correctness.OpCreate:
-		err = store.Create(ctx, key, request.Object, out, 0)
+		err = store.Create(ctx, key, request.Create.Object, out, 0)
 	case correctness.OpDelete:
-		err = store.Delete(ctx, key, out, request.Preconditions, storage.ValidateAllObjectFunc, nil, storage.DeleteOptions{})
+		err = store.Delete(ctx, key, out, request.Delete.Preconditions, storage.ValidateAllObjectFunc, nil, storage.DeleteOptions{})
 	case correctness.OpGet:
-		err = store.Get(ctx, key, request.GetOptions, out)
+		err = store.Get(ctx, key, request.Get.Options, out)
+	case correctness.OpList:
+		out = &api.PodList{}
+		err = store.GetList(ctx, key, request.List.Options, out)
+	case correctness.OpUpdate:
+		err = store.GuaranteedUpdate(ctx, key, out, request.Update.IgnoreNotFound, request.Update.Preconditions, request.Update.UpdateFunc, request.Update.CachedExistingObject)
 	default:
 		panic(fmt.Sprintf("%v: unknown operation", request.Op))
 	}
@@ -213,6 +479,84 @@ func runTraffic(ctx context.Context, store storage.Interface, request *correctne
 	return response
 }
 
+func randomWatchRequest(ctx context.Context, store storage.Interface, distribution []ChoiceWeight[WatchRequestType]) correctness.WatchRequest {
+	var rv string
+	switch selected := PickRandom(distribution); selected {
+	case RVEmpty:
+		rv = ""
+	case RVZero:
+		rv = "0"
+	case RVOne:
+		rv = "1"
+	case RVCurrent:
+		rv = relativeRV(ctx, store, 0)
+	case RVPast:
+		rv = relativeRV(ctx, store, -int64(1+rand.Intn(10)))
+	case RVFuture:
+		rv = relativeRV(ctx, store, int64(1+rand.Intn(10)))
+	default:
+		panic(fmt.Sprintf("%v: unknown watch request type", selected))
+	}
+	opts := storage.ListOptions{ResourceVersion: rv, Predicate: storage.Everything, Recursive: true}
+	if rv == "" || rv == "0" {
+		// Otherwise storage starts with synthetic ADDED events for existing
+		// objects. API validation requires the match with sendInitialEvents.
+		opts.SendInitialEvents = new(false)
+		opts.ResourceVersionMatch = metav1.ResourceVersionMatchNotOlderThan
+	}
+	return correctness.WatchRequest{Key: "/pods/", Options: opts}
+}
+
+func relativeRV(ctx context.Context, store storage.Interface, offset int64) string {
+	currentRV, err := store.GetCurrentResourceVersion(ctx)
+	if err != nil {
+		panic(err)
+	}
+	return strconv.FormatInt(max(int64(currentRV)+offset, 1), 10)
+}
+
+func runWatch(ctx context.Context, store storage.Interface, req correctness.WatchRequest, cfg WatchConfig) correctness.WatchResponse {
+	w, err := store.Watch(ctx, req.Key, req.Options)
+	if err != nil {
+		if _, ok := errors.AsType[*storage.StorageError](err); ok {
+			return correctness.WatchResponse{Err: err}
+		}
+		panic(err)
+	}
+	defer w.Stop()
+
+	timer := time.NewTimer(cfg.Duration)
+	defer timer.Stop()
+
+	var events []watch.Event
+	for {
+		select {
+		case <-ctx.Done():
+			return correctness.WatchResponse{Events: events, Err: ctx.Err()}
+		case <-timer.C:
+			return correctness.WatchResponse{Events: events}
+		case event, open := <-w.ResultChan():
+			if !open {
+				return correctness.WatchResponse{Events: events}
+			}
+			if cacheable, ok := event.Object.(runtime.CacheableObject); ok {
+				event.Object = cacheable.GetObject()
+			}
+			events = append(events, event)
+			if event.Type == watch.Error {
+				_, open := <-w.ResultChan()
+				if open {
+					return correctness.WatchResponse{Events: events, Err: errors.New("watch channel was not closed after watch.Error")}
+				}
+				return correctness.WatchResponse{Events: events}
+			}
+			if cfg.MaxEvents > 0 && len(events) >= cfg.MaxEvents {
+				return correctness.WatchResponse{Events: events}
+			}
+		}
+	}
+}
+
 func validPod(namespace, name string) *api.Pod {
 	gracePeriod := int64(30)
 	enableServiceLinks := true
@@ -220,7 +564,6 @@ func validPod(namespace, name string) *api.Pod {
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: namespace,
 			Name:      name,
-			UID:       uuid.NewUUID(),
 		},
 		Spec: api.PodSpec{
 			RestartPolicy:                 api.RestartPolicyAlways,

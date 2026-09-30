@@ -11784,11 +11784,11 @@ func TestCostInfo(t *testing.T) {
 			if tt.expectedMaxCardinality == nil && curCostInfo.MaxCardinality == nil {
 				// unbounded cardinality case, test ran correctly
 			} else if tt.expectedMaxCardinality == nil && curCostInfo.MaxCardinality != nil {
-				t.Errorf("expected unbounded cardinality (got %d)", curCostInfo.MaxCardinality)
+				t.Errorf("expected unbounded cardinality (got %d)", *curCostInfo.MaxCardinality)
 			} else if tt.expectedMaxCardinality != nil && curCostInfo.MaxCardinality == nil {
-				t.Errorf("expected bounded cardinality of %d but got unbounded cardinality", tt.expectedMaxCardinality)
+				t.Errorf("expected bounded cardinality of %d but got unbounded cardinality", *tt.expectedMaxCardinality)
 			} else if *tt.expectedMaxCardinality != *curCostInfo.MaxCardinality {
-				t.Errorf("wrong cardinality (expected %d, got %d)", *tt.expectedMaxCardinality, curCostInfo.MaxCardinality)
+				t.Errorf("wrong cardinality (expected %d, got %d)", *tt.expectedMaxCardinality, *curCostInfo.MaxCardinality)
 			}
 		})
 	}

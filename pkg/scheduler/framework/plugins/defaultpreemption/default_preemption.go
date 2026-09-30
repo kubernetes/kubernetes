@@ -72,7 +72,7 @@ type DefaultPreemption struct {
 	fts  feature.Features
 	args config.DefaultPreemptionArgs
 
-	Executor          *preemption.Executor
+	Executor          fwk.PreemptionExecutor
 	Evaluator         *preemption.Evaluator
 	pgLister          fwk.PodGroupLister
 	pgSnapshotLister  fwk.PodGroupLister
@@ -115,17 +115,17 @@ func New(_ context.Context, dpArgs runtime.Object, fh fwk.Handle, fts feature.Fe
 	}
 
 	pl := DefaultPreemption{
-		fh:   fh,
-		fts:  fts,
-		args: *args,
+		fh:       fh,
+		fts:      fts,
+		args:     *args,
+		Executor: fh.PreemptionManager().Executor(),
 	}
-	pl.Executor = preemption.NewExecutor(fh, fts)
-	pl.Evaluator = preemption.NewEvaluator(Name, fh, &pl, pl.Executor)
+	pl.Evaluator = preemption.NewEvaluator(Name, fh, &pl, pl.fts)
 
 	if pl.fts.EnableGenericWorkload {
 		pl.pgLister = fh.PodGroupManager().PodGroups()
 		pl.pgSnapshotLister = fh.SnapshotSharedLister().PodGroups()
-		pl.podGroupEvaluator = preemption.NewPodGroupEvaluator(fh, pl.Executor, pl.fts)
+		pl.podGroupEvaluator = preemption.NewPodGroupEvaluator(fh)
 	}
 
 	if pl.fts.EnableCompositePodGroup {
@@ -268,7 +268,7 @@ func (pl *DefaultPreemption) GetOffsetAndNumCandidates(numNodes int32) (int32, i
 
 // This function is not applicable for out-of-tree preemption plugins that exercise
 // different preemption candidates on the same nominated node.
-func (pl *DefaultPreemption) CandidatesToVictimsMap(candidates []preemption.Candidate) map[string]*extenderv1.Victims {
+func (pl *DefaultPreemption) CandidatesToVictimsMap(candidates []fwk.PreemptionCandidate) map[string]*extenderv1.Victims {
 	m := make(map[string]*extenderv1.Victims, len(candidates))
 	for _, c := range candidates {
 		m[c.Name()] = c.Victims()

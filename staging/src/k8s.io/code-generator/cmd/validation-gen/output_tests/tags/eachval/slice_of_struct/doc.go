@@ -36,6 +36,18 @@ type Struct struct {
 
 	// +k8s:eachVal=+k8s:validateFalse="field Struct.ListNonComparableField[*]"
 	ListNonComparableField []NonComparableStruct `json:"listNonComparableField"`
+
+	// Iteration does not short-circuit: a failure under one of these tags
+	// does not suppress the others, for that element or any other.
+	// +k8s:eachVal=+k8s:subfield(a)=+k8s:required
+	// +k8s:eachVal=+k8s:subfield(a)=+k8s:maxLength=3
+	// +k8s:eachVal=+k8s:subfield(b)=+k8s:validateFalse="field Struct.ShortCircuitField[*].b"
+	ShortCircuitField []ShortCircuitStruct `json:"shortCircuitField"`
+}
+
+type ShortCircuitStruct struct {
+	A string `json:"a"`
+	B string `json:"b"`
 }
 
 type OtherStruct struct{}

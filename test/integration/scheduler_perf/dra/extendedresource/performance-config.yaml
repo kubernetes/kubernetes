@@ -25,7 +25,6 @@
 # device class instead.
 - name: ExtendedResource
   featureGates:
-    DynamicResourceAllocation: true
     DRAExtendedResource: true
   workloadTemplate:
   - opcode: createNodes

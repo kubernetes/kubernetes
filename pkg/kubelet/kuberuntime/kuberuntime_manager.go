@@ -1046,14 +1046,12 @@ func (m *kubeGenericRuntimeManager) doPodResizeAction(ctx context.Context, pod *
 		var err error
 		// At upsizing, limits should expand prior to requests in order to keep "requests <= limits".
 		if newPodCgLimValue > currPodCgLimValue {
-			// TODO: Pass logger from context once contextual logging migration is complete
-			if err = setPodCgroupConfig(klog.TODO(), rName, true); err != nil {
+			if err = setPodCgroupConfig(logger, rName, true); err != nil {
 				return err
 			}
 		}
 		if newPodCgReqValue > currPodCgReqValue {
-			// TODO: Pass logger from context once contextual logging migration is complete
-			if err = setPodCgroupConfig(klog.TODO(), rName, false); err != nil {
+			if err = setPodCgroupConfig(logger, rName, false); err != nil {
 				return err
 			}
 		}
@@ -1066,14 +1064,12 @@ func (m *kubeGenericRuntimeManager) doPodResizeAction(ctx context.Context, pod *
 
 		// At downsizing, requests should shrink prior to limits in order to keep "requests <= limits".
 		if newPodCgReqValue < currPodCgReqValue {
-			// TODO: Pass logger from context once contextual logging migration is complete
-			if err = setPodCgroupConfig(klog.TODO(), rName, false); err != nil {
+			if err = setPodCgroupConfig(logger, rName, false); err != nil {
 				return err
 			}
 		}
 		if newPodCgLimValue < currPodCgLimValue {
-			// TODO(#127825): Pass logger from context once contextual logging migration is complete
-			if err = setPodCgroupConfig(klog.TODO(), rName, true); err != nil {
+			if err = setPodCgroupConfig(logger, rName, true); err != nil {
 				return err
 			}
 		}
@@ -1208,7 +1204,7 @@ func (m *kubeGenericRuntimeManager) validateMemoryResizeAction(
 				errs = append(errs, fmt.Errorf("missing container %q memory usage", cStats.Name))
 			} else if *cStats.Memory.UsageBytes >= uint64(desiredLimit) {
 				errs = append(errs, fmt.Errorf("attempting to set container %q memory limit (%d) below current usage (%d)",
-					cStats.Name, desiredLimit, *podUsageStats.Memory.UsageBytes))
+					cStats.Name, desiredLimit, *cStats.Memory.UsageBytes))
 			}
 		}
 	}
@@ -1712,18 +1708,16 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 		// When runc supports slash as sysctl separator, this function can no longer be used.
 		sysctl.ConvertPodSysctlsVariableToDotsSeparator(pod.Spec.SecurityContext)
 
-		// Prepare resources allocated by the Dynammic Resource Allocation feature for the pod
-		if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
-			if err := m.runtimeHelper.PrepareDynamicResources(ctx, pod); err != nil {
-				ref, referr := ref.GetReference(legacyscheme.Scheme, pod)
-				if referr != nil {
-					logger.Error(referr, "Couldn't make a ref to pod", "pod", klog.KObj(pod))
-					return
-				}
-				m.recorder.WithLogger(logger).Eventf(ref, v1.EventTypeWarning, events.FailedPrepareDynamicResources, "Failed to prepare dynamic resources: %v", err)
-				logger.Error(err, "Failed to prepare dynamic resources", "pod", klog.KObj(pod))
+		// Prepare resources allocated by the Dynamic Resource Allocation feature for the pod
+		if err := m.runtimeHelper.PrepareDynamicResources(ctx, pod); err != nil {
+			ref, referr := ref.GetReference(legacyscheme.Scheme, pod)
+			if referr != nil {
+				logger.Error(referr, "Couldn't make a ref to pod", "pod", klog.KObj(pod))
 				return
 			}
+			m.recorder.WithLogger(logger).Eventf(ref, v1.EventTypeWarning, events.FailedPrepareDynamicResources, "Failed to prepare dynamic resources: %v", err)
+			logger.Error(err, "Failed to prepare dynamic resources", "pod", klog.KObj(pod))
+			return
 		}
 
 		podSandboxID, msg, err = m.createPodSandbox(ctx, pod, podContainerChanges.Attempt)
@@ -2137,8 +2131,7 @@ func (m *kubeGenericRuntimeManager) killPodWithSyncResult(ctx context.Context, p
 	return
 }
 
-func (m *kubeGenericRuntimeManager) GeneratePodStatus(event *runtimeapi.ContainerEventResponse) *kubecontainer.PodStatus {
-	ctx := context.TODO() // This context will be passed as parameter in the future
+func (m *kubeGenericRuntimeManager) GeneratePodStatus(ctx context.Context, event *runtimeapi.ContainerEventResponse) *kubecontainer.PodStatus {
 	podUID := kubetypes.UID(event.PodSandboxStatus.Metadata.Uid)
 	podIPs := m.determinePodSandboxIPs(ctx, event.PodSandboxStatus.Metadata.Namespace, event.PodSandboxStatus.Metadata.Name, event.PodSandboxStatus)
 

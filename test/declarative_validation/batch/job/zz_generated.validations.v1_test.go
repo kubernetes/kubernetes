@@ -61,8 +61,24 @@ func init() {
 			"metadata.uid": {
 				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
 			},
+			"spec.activeDeadlineSeconds": {
+				{ErrorType: "FieldValueInvalid", Origin: "minimum"},
+			},
+			"spec.backoffLimit": {
+				{ErrorType: "FieldValueInvalid", Origin: "minimum"},
+			},
 			"spec.backoffLimitPerIndex": {
+				{ErrorType: "FieldValueInvalid", Origin: "minimum"},
 				{ErrorType: "FieldValueRequired", Origin: "dependentRequired"},
+			},
+			"spec.completions": {
+				{ErrorType: "FieldValueInvalid", Origin: "minimum"},
+			},
+			"spec.maxFailedIndexes": {
+				{ErrorType: "FieldValueInvalid", Origin: "minimum"},
+			},
+			"spec.parallelism": {
+				{ErrorType: "FieldValueInvalid", Origin: "minimum"},
 			},
 			"spec.scheduling": {
 				{ErrorType: "FieldValueForbidden"},
@@ -107,6 +123,10 @@ func init() {
 			"spec.scheduling.schedulingPolicy.gang.minCount": {
 				{ErrorType: "FieldValueInvalid", Origin: "minimum"},
 			},
+			"spec.template.spec.activeDeadlineSeconds": {
+				{ErrorType: "FieldValueInvalid", Origin: "maximum"},
+				{ErrorType: "FieldValueInvalid", Origin: "minimum"},
+			},
 			"spec.template.spec.evictionResponders": {
 				{ErrorType: "FieldValueTooMany", Origin: "maxItems"},
 			},
@@ -127,6 +147,9 @@ func init() {
 			},
 			"spec.template.spec.tolerations[*].key": {
 				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-label-key"},
+			},
+			"spec.ttlSecondsAfterFinished": {
+				{ErrorType: "FieldValueInvalid", Origin: "minimum"},
 			},
 		},
 	)

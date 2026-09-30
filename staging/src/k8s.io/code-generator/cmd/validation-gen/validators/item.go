@@ -133,6 +133,9 @@ func (itv *itemTagValidator) GetValidations(context Context, tag codetags.Tag) (
 			for _, vfn := range validations.Functions {
 				f := Function(itemTagName, vfn.Flags, validateFunc, matchArg, equivArg, WrapperFunction{Function: vfn, ObjType: elemT})
 				f.Cohort = itemKey
+				if vfn.Cohort != "" {
+					f.Cohort = itemKey + "." + vfn.Cohort
+				}
 				vfn = f
 				deferredResult.AddFunction(vfn)
 			}
@@ -177,6 +180,9 @@ func (itv *itemTagValidator) GetValidations(context Context, tag codetags.Tag) (
 				}
 				f := Function(itemTagName, fn.Flags, validateFunc, matchArg, equivArg, WrapperFunction{Function: fn, ObjType: elemT})
 				f.Cohort = itemKey
+				if fn.Cohort != "" {
+					f.Cohort = itemKey + "." + fn.Cohort
+				}
 				return f
 			}, d.Scope), nil
 		}))

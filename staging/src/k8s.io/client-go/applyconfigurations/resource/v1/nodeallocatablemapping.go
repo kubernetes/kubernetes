@@ -30,7 +30,7 @@ import (
 // The mapping can be derived from either the count of allocated devices (via deviceMultiplier) or the specific capacity consumed (via capacityKey and capacityMultiplier). These options are mutually exclusive.
 // Kubelet adds this mapped resource quantity from claim to both requests and limits at the pod-level cgroup, and to limits at the container-level cgroup for each container referencing the claim.
 type NodeAllocatableMappingApplyConfiguration struct {
-	// CapacityKey references a capacity name defined as a key in the
+	// capacityKey references a capacity name defined as a key in the
 	// `spec.devices[*].capacity` map. When this field is set, the value associated with
 	// this key in the `status.allocation.devices.results[*].consumedCapacity` map
 	// (for a specific claim allocation) determines the base quantity for
@@ -42,7 +42,7 @@ type NodeAllocatableMappingApplyConfiguration struct {
 	// node allocatable resource mapping will be "4Gi".
 	// The final node allocatable resource amount is `consumedCapacity[capacityKey]` * `capacityMultiplier`.
 	CapacityKey *resourcev1.QualifiedName `json:"capacityKey,omitempty"`
-	// CapacityMultiplier is used as a multiplier for the allocated capacity consumed.
+	// capacityMultiplier is used as a multiplier for the allocated capacity consumed.
 	// It is only valid if `capacityKey` is set.
 	// The final node allocatable resource amount is `consumedCapacity[capacityKey]` * `capacityMultiplier`.
 	// For example, if a Device's capacity "dra.example.com/cores" is consumed,
@@ -50,7 +50,7 @@ type NodeAllocatableMappingApplyConfiguration struct {
 	// {ResourceName: "cpu", capacityKey: "dra.example.com/cores", capacityMultiplier: "2"}.
 	// If a claim consumes 8 "dra.example.com/cores", the CPU footprint is 8 * 2 = 16.
 	CapacityMultiplier *resource.Quantity `json:"capacityMultiplier,omitempty"`
-	// DeviceMultiplier is used as a multiplier for the allocated device count in the claim.
+	// deviceMultiplier is used as a multiplier for the allocated device count in the claim.
 	// The final node allocatable resource amount is `deviceCount` * `deviceMultiplier`.
 	// For example, a DRA driver representing each cache complex (CCX) as a device would have
 	// {ResourceName: "cpu", deviceMultiplier: "8"} in its `nodeAllocatableResources`.

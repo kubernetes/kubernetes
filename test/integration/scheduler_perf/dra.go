@@ -234,7 +234,7 @@ claims:
 		claims, err := draManager.ResourceClaims().List()
 		tCtx.ExpectNoError(err, "list claims")
 		allocatedDevices := sets.New[structured.DeviceID]()
-		allocatedSharedDeviceIDs := sets.New[structured.SharedDeviceID]()
+		allocatedSharedDeviceIDs := sets.New[structured.DeviceID]()
 		aggregatedCapacity := structured.NewConsumedCapacityCollection()
 		for _, claim := range claims {
 			if claim.Status.Allocation == nil {
@@ -242,13 +242,11 @@ claims:
 			}
 			for _, result := range claim.Status.Allocation.Devices.Results {
 				deviceID := structured.MakeDeviceID(result.Driver, result.Pool, result.Device)
-				allocatedDevices.Insert(deviceID)
 				if result.ShareID == nil {
 					allocatedDevices.Insert(deviceID)
 					continue
 				}
-				sharedDeviceID := structured.MakeSharedDeviceID(deviceID, result.ShareID)
-				allocatedSharedDeviceIDs.Insert(sharedDeviceID)
+				allocatedSharedDeviceIDs.Insert(deviceID)
 				claimedCapacity := result.ConsumedCapacity
 				if claimedCapacity != nil {
 					allocatedCapacity := structured.NewDeviceConsumedCapacity(deviceID, claimedCapacity)

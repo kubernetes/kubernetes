@@ -31,7 +31,6 @@ import (
 // definitions are maintained. This ensures that any changes to these types
 // require autoscaler approval.
 type DeviceID = schedulerapi.DeviceID
-type SharedDeviceID = schedulerapi.SharedDeviceID
 type AllocatedState = schedulerapi.AllocatedState
 type ConsumedCapacity = schedulerapi.ConsumedCapacity
 type ConsumedCapacityCollection = schedulerapi.ConsumedCapacityCollection
@@ -40,10 +39,6 @@ type DeviceConsumedCapacity = schedulerapi.DeviceConsumedCapacity
 // Wrapper functions that delegate to the schedulerapi package
 func MakeDeviceID(driver, pool, device string) DeviceID {
 	return schedulerapi.MakeDeviceID(driver, pool, device)
-}
-
-func MakeSharedDeviceID(deviceID DeviceID, shareID *types.UID) SharedDeviceID {
-	return schedulerapi.MakeSharedDeviceID(deviceID, shareID)
 }
 
 func NewConsumedCapacity() ConsumedCapacity {
@@ -67,11 +62,8 @@ func IsDeviceAllocated(deviceID DeviceID, allocatedState *AllocatedState) bool {
 	}
 
 	// Check if device is partially consumed via shared allocations (consumable capacity case).
-	// We need to check if any shared device ID corresponds to our device.
-	for sharedDeviceID := range allocatedState.AllocatedSharedDeviceIDs {
-		if sharedDeviceID.GetDeviceID() == deviceID {
-			return true
-		}
+	if allocatedState.AllocatedSharedDeviceIDs.Has(deviceID) {
+		return true
 	}
 
 	// For scheduler-generated state, consumed capacity is recorded together with

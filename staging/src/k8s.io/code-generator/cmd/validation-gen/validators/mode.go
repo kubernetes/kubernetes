@@ -367,6 +367,7 @@ func generateMemberFieldValidation(structType *types.Type, group *discriminatorG
 	}
 
 	discriminatorType := group.discriminatorMember.Type
+	var result Validations
 	var discriminatedRules []any
 	for _, val := range values {
 		wrapper := MultiWrapperFunction{
@@ -374,6 +375,11 @@ func generateMemberFieldValidation(structType *types.Type, group *discriminatorG
 			ObjType:   nilableFieldType,
 			// Per-mode rules also run at structPath.Child(jsonName).
 			PathFragment: "." + jsonName,
+		}
+		// A variable is a package-level declaration and does not depend on the
+		// mode, so it is hoisted out rather than dropped.
+		for _, v := range rulesByValue[val].Variables {
+			result.AddVariable(v)
 		}
 
 		// Convert the string tag value to the appropriate typed Go literal
@@ -437,7 +443,8 @@ func generateMemberFieldValidation(structType *types.Type, group *discriminatorG
 	// skip the level wrapping in the upstream. Processing the stability level
 	// in the upstream will override the stability levels of the wrapped validators.
 	fn.StabilityLevelSelfManaged = true
-	return Validations{Functions: []FunctionGen{fn}}, nil
+	result.AddFunction(fn)
+	return result, nil
 }
 
 // uniformStabilityLevel returns the common stability level if all rules share

@@ -81,5 +81,4 @@ kubeadmConfigPatches:
 #
 #    --config <(cat test/e2e/dra/kind.yaml; echo "  <some feature>: true")
 featureGates:
-  DynamicResourceAllocation: true # Still needed for n-3 testing against kubelet 1.33. Can be removed once we only test against 1.34.
   NodeLogQuery: true # Still needed for n-3/2/1 testing. Can be removed once we only test against >= 1.36.

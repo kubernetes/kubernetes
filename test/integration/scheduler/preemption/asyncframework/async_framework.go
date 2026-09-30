@@ -340,8 +340,13 @@ func registerDelayedPreemptionPlugin(registry *frameworkruntime.Registry, preemp
 			return nil, fmt.Errorf("unexpected plugin type %T", p)
 		}
 
-		preemptPodFn := preemptionPlugin.Executor.PreemptPod
-		preemptionPlugin.Executor.PreemptPod = func(ctx context.Context, c preemption.Candidate, preemptor preemption.ExecutorPreemptor, victim *v1.Pod, pluginName string) (bool, error) {
+		exec, ok := preemptionPlugin.Executor.(*preemption.Executor)
+		if !ok {
+			return nil, fmt.Errorf("unexpected executor type %T", preemptionPlugin.Executor)
+		}
+
+		preemptPodFn := exec.PreemptPod
+		exec.PreemptPod = func(ctx context.Context, c fwk.PreemptionCandidate, preemptor preemption.ExecutorPreemptor, victim *v1.Pod, pluginName string) (bool, error) {
 			// block the preemption goroutine to complete until the test case allows it to proceed.
 			ch, ok := preemptionDoneChannels.Load(preemptor.GetName())
 			if ok {
@@ -412,7 +417,7 @@ func podGatedInQueue(testCtx *testutils.TestContext, t *testing.T, podName strin
 			t.Fatalf("Expected the pod %s (pod group %s) to be gated", podName, podGroupName)
 		}
 	} else {
-		if pInfo, _ := testCtx.Scheduler.SchedulingQueue.GetPod(podName, testCtx.NS.Name, pod.Spec.SchedulingGroup); pInfo == nil || !pInfo.Gated() {
+		if pInfo, _ := testCtx.Scheduler.SchedulingQueue.GetPod(testCtx.Ctx, podName, testCtx.NS.Name, pod.Spec.SchedulingGroup); pInfo == nil || !pInfo.Gated() {
 			t.Fatalf("Expected the pod %s to be gated", podName)
 		}
 	}

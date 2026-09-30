@@ -31,9 +31,9 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-type Method func(ctx context.Context, unmarshal func(interface{}) error) (interface{}, error)
+type Method func(ctx context.Context, unmarshal func(any) error) (any, error)
 
-type StreamHandler func(context.Context, StreamServer) (interface{}, error)
+type StreamHandler func(context.Context, StreamServer) (any, error)
 
 type Stream struct {
 	Handler         StreamHandler
@@ -69,7 +69,7 @@ func (s *serviceSet) register(name string, desc *ServiceDesc) {
 }
 
 func (s *serviceSet) unaryCall(ctx context.Context, method Method, info *UnaryServerInfo, data []byte) (p []byte, st *status.Status) {
-	unmarshal := func(obj interface{}) error {
+	unmarshal := func(obj any) error {
 		return protoUnmarshal(data, obj)
 	}
 
@@ -150,7 +150,7 @@ func (s *serviceSet) handle(ctx context.Context, req *Request, respond func(*sta
 		// don't get invoked here, which causes hang on client side.
 		// See https://github.com/containerd/ttrpc/issues/126
 		if req.Payload != nil || !info.StreamingClient {
-			unmarshal := func(obj interface{}) error {
+			unmarshal := func(obj any) error {
 				return protoUnmarshal(req.Payload, obj)
 			}
 			if err := sh.data(unmarshal); err != nil {
@@ -209,7 +209,7 @@ func (s *streamHandler) data(unmarshal Unmarshaler) error {
 	}
 }
 
-func (s *streamHandler) SendMsg(m interface{}) error {
+func (s *streamHandler) SendMsg(m any) error {
 	if s.localClosed {
 		return ErrStreamClosed
 	}
@@ -220,7 +220,7 @@ func (s *streamHandler) SendMsg(m interface{}) error {
 	return s.respond(nil, p, true, false)
 }
 
-func (s *streamHandler) RecvMsg(m interface{}) error {
+func (s *streamHandler) RecvMsg(m any) error {
 	select {
 	case unmarshal, ok := <-s.recv:
 		if !ok {
@@ -233,7 +233,7 @@ func (s *streamHandler) RecvMsg(m interface{}) error {
 	}
 }
 
-func protoUnmarshal(p []byte, obj interface{}) error {
+func protoUnmarshal(p []byte, obj any) error {
 	switch v := obj.(type) {
 	case proto.Message:
 		if err := proto.Unmarshal(p, v); err != nil {
@@ -245,7 +245,7 @@ func protoUnmarshal(p []byte, obj interface{}) error {
 	return nil
 }
 
-func protoMarshal(obj interface{}) ([]byte, error) {
+func protoMarshal(obj any) ([]byte, error) {
 	if obj == nil {
 		return nil, nil
 	}
@@ -296,6 +296,6 @@ func fullPath(service, method string) string {
 	return "/" + path.Join(service, method)
 }
 
-func isNil(resp interface{}) bool {
+func isNil(resp any) bool {
 	return (*[2]uintptr)(unsafe.Pointer(&resp))[1] == 0
 }

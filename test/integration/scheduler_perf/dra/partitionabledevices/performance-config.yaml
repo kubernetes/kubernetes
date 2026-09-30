@@ -26,7 +26,6 @@
 # counter conflicts or backtracking. This means one pod or claim fits onto one node.
 - name: Partitionable
   featureGates:
-    DynamicResourceAllocation: true
     DRAPartitionableDevices: true
   workloadTemplate:
   - opcode: createNodes
@@ -151,7 +150,6 @@
 # backtracking. This means one pod or claim fits onto one node.
 - name: PartitionableBacktracking
   featureGates:
-    DynamicResourceAllocation: true
     DRAPartitionableDevices: true
   workloadTemplate:
   - opcode: createNodes

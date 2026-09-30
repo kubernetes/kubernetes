@@ -2087,6 +2087,18 @@ func TestCelEstimatedCostStability(t *testing.T) {
 				`quantity(self.val1).isInteger()`:                                                                                        314576,
 			},
 		},
+		// Verifies that URL accessor ResultSize propagation keeps downstream
+		// string operations bounded. Without the fix, matches() on an accessor
+		// result treats the input as unbounded (~943721 for an unbound string).
+		// getEscapedPath is higher due to 3x percent-encoding expansion (%XX).
+		{name: "url accessors with bounded string",
+			schema: schemas(withMaxLength(stringType, ptr.To[int64](300))),
+			expectCost: map[string]uint64{
+				`url(self.val1).getScheme().matches('^[a-z]+$')`:       365,
+				`url(self.val1).getHostname().matches('^[a-z]+$')`:     365,
+				`url(self.val1).getEscapedPath().matches('^/[a-z]+$')`: 1206,
+			},
+		},
 	}
 
 	for _, tt := range cases {

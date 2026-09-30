@@ -49,7 +49,7 @@ func mkCountRule(counter *int, realRule lintRule) lintRule {
 
 const testTagPrefix = "k8s:"
 
-var validator = validators.InitGlobalValidator(&generator.Context{}, nil, testTagPrefix)
+var validator = validators.InitGlobalValidator(&generator.Context{}, nil, testTagPrefix, nil)
 
 func TestLintCommentsRuleInvocation(t *testing.T) {
 	tests := []struct {
@@ -125,6 +125,109 @@ func TestLintCommentsRuleInvocation(t *testing.T) {
 	}
 }
 
+// TestRuleEnumConsistency verifies +enum pairing across direct, nested, conditional, and custom-prefix tags.
+func TestRuleEnumConsistency(t *testing.T) {
+	tests := []struct {
+		name      string
+		comments  []string
+		tagPrefix string
+		wantMsg   string
+	}{
+		{
+			name: "no markers",
+		},
+		{
+			name:     "OpenAPI enum without validation",
+			comments: []string{"+enum"},
+			wantMsg:  "+enum requires +k8s:enum to be set",
+		},
+		{
+			name:     "both markers",
+			comments: []string{"+enum", "+k8s:enum"},
+		},
+		{
+			name:     "validation without OpenAPI enum",
+			comments: []string{"+k8s:enum"},
+		},
+		{
+			name:     "alpha enum",
+			comments: []string{"+enum", "+k8s:alpha=+k8s:enum"},
+		},
+		{
+			name:     "beta enum",
+			comments: []string{"+enum", "+k8s:beta=+k8s:enum"},
+		},
+		{
+			name:     "conditionally enabled enum",
+			comments: []string{"+enum", "+k8s:alpha=+k8s:ifEnabled(MyFeature)=+k8s:enum"},
+		},
+		{
+			name:     "conditionally disabled enum",
+			comments: []string{"+enum", "+k8s:ifDisabled(MyFeature)=+k8s:enum"},
+		},
+		{
+			name:     "unrelated validation",
+			comments: []string{"+enum", "+k8s:alpha=+k8s:optional"},
+			wantMsg:  "+enum requires +k8s:enum to be set",
+		},
+		{
+			name:     "enum exclusion is not enum validation",
+			comments: []string{"+enum", "+k8s:enumExclude"},
+			wantMsg:  "+enum requires +k8s:enum to be set",
+		},
+		{
+			name:      "custom prefix",
+			comments:  []string{"+enum", "+custom:beta=+custom:enum"},
+			tagPrefix: "custom:",
+		},
+		{
+			name:      "wrong prefix",
+			comments:  []string{"+enum", "+k8s:enum"},
+			tagPrefix: "custom:",
+			wantMsg:   "+enum requires +custom:enum to be set",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			prefix := tt.tagPrefix
+			if prefix == "" {
+				prefix = testTagPrefix
+			}
+			l := newLinter(prefix, enumConsistency(prefix))
+			msgs, err := l.lintComments(nil, nil, tt.comments)
+			if err != nil {
+				t.Fatalf("lintComments() unexpected error: %v", err)
+			}
+			if tt.wantMsg == "" {
+				if len(msgs) != 0 {
+					t.Errorf("lintComments() = %v, want no errors", msgs)
+				}
+			} else if len(msgs) != 1 || msgs[0] != tt.wantMsg {
+				t.Errorf("lintComments() = %v, want [%s]", msgs, tt.wantMsg)
+			}
+		})
+	}
+}
+
+// TestEnumConsistencyRegistered verifies the default linter runs the enum consistency rule.
+func TestEnumConsistencyRegistered(t *testing.T) {
+	enumType := &types.Type{
+		Name:         types.Name{Package: "testpkg/v1", Name: "Enum"},
+		Kind:         types.Alias,
+		Underlying:   types.String,
+		CommentLines: []string{"+enum"},
+	}
+	l := newLinter(testTagPrefix, lintRules(validator, testTagPrefix)...)
+	if err := l.lintType(enumType); err != nil {
+		t.Fatalf("lintType() unexpected error: %v", err)
+	}
+	errs := l.lintErrors[enumType]
+	want := "+enum requires +k8s:enum to be set"
+	if len(errs) != 1 || errs[0].Error() != want {
+		t.Errorf("lintType() errors = %v, want [%s]", errs, want)
+	}
+}
+
 func TestRuleAlphaBetaPrefix(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -182,94 +285,6 @@ func TestRuleAlphaBetaPrefix(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			tags, _ := validator.ExtractTags(validators.Context{}, tt.comments)
 			msg, err := alphaBetaPrefix(testTagPrefix)(nil, nil, tags)
-			if err != nil {
-				t.Errorf("unexpected error: %v", err)
-			} else if msg != tt.wantMsg {
-				t.Errorf("got %q, want %q", msg, tt.wantMsg)
-			}
-		})
-	}
-}
-
-func TestRuleStability(t *testing.T) {
-	tests := []struct {
-		name     string
-		comments []string
-		pkg      string
-		wantMsg  string
-	}{
-		{
-			name:     "stable context, stable tag",
-			comments: []string{"+k8s:required"}, // Stable
-			wantMsg:  "",
-		},
-		{
-			name:     "beta context, stable tag",
-			comments: []string{"+k8s:beta=+k8s:required"}, // Beta context, Stable tag
-			wantMsg:  "",
-		},
-		{
-			name:     "alpha context, stable tag",
-			comments: []string{"+k8s:alpha=+k8s:required"}, // Alpha context, Stable tag
-			wantMsg:  "",
-		},
-		{
-			name:     "alpha context, alpha tag",
-			comments: []string{"+k8s:alpha=+k8s:validateTrueAlpha"}, // Alpha context, Alpha tag
-			wantMsg:  "",
-		},
-		{
-			name:     "stable context, alpha tag",
-			comments: []string{"+k8s:validateTrueAlpha"}, // Stable context, Alpha tag
-			wantMsg:  `tag "k8s:validateTrueAlpha" with stability level "Alpha" cannot be used in Stable validation`,
-		},
-		{
-			name:     "beta context, alpha tag",
-			comments: []string{"+k8s:beta=+k8s:validateTrueAlpha"}, // Beta context, Alpha tag
-			wantMsg:  `tag "k8s:validateTrueAlpha" with stability level "Alpha" cannot be used in Beta validation`,
-		},
-		{
-			name:     "alpha pkg context, beta tag (allowed)",
-			comments: []string{"+k8s:validateTrueBeta"}, // Beta tag in Alpha package
-			pkg:      "k8s.io/api/apps/v1alpha1",
-			wantMsg:  "",
-		},
-		{
-			name:     "alpha pkg context, alpha tag (allowed)",
-			comments: []string{"+k8s:validateTrueAlpha"}, // Alpha tag in Alpha package
-			pkg:      "k8s.io/api/apps/v1alpha1",
-			wantMsg:  "",
-		},
-		{
-			name:     "beta pkg context, beta tag (allowed)",
-			comments: []string{"+k8s:validateTrueBeta"}, // Beta tag in Beta package
-			pkg:      "k8s.io/api/apps/v1beta1",
-			wantMsg:  "",
-		},
-		{
-			name:     "beta pkg context, alpha tag (fails)",
-			comments: []string{"+k8s:validateTrueAlpha"}, // Alpha tag in Beta package
-			pkg:      "k8s.io/api/apps/v1beta1",
-			wantMsg:  `tag "k8s:validateTrueAlpha" with stability level "Alpha" cannot be used in Beta validation`,
-		},
-		{
-			name:     "ifEnabled context allows beta tag",
-			comments: []string{"+k8s:ifEnabled(SomeFeature)=+k8s:validateTrueBeta"}, // Beta tag in ifEnabled
-			wantMsg:  "",
-		},
-		{
-			name:     "ifEnabled context fails alpha tag",
-			comments: []string{"+k8s:ifEnabled(SomeFeature)=+k8s:validateTrueAlpha"}, // Alpha tag in ifEnabled
-			wantMsg:  `tag "k8s:validateTrueAlpha" with stability level "Alpha" cannot be used in Beta validation`,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			dummyType := &types.Type{Name: types.Name{Package: tt.pkg, Name: "Dummy"}}
-			rule := validationStability(testTagPrefix)
-			tags, _ := validator.ExtractTags(validators.Context{}, tt.comments)
-			msg, err := rule(nil, dummyType, tags)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			} else if msg != tt.wantMsg {

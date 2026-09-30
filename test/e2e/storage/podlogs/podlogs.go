@@ -37,7 +37,9 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/watch"
 	clientset "k8s.io/client-go/kubernetes"
+	watchtools "k8s.io/client-go/tools/watch"
 )
 
 // LogOutput determines where output from CopyAllLogs goes.
@@ -108,13 +110,19 @@ func CopyPodLogs(ctx context.Context, cs clientset.Interface, ns, podName string
 			FieldSelector: fmt.Sprintf("metadata.name=%s", podName),
 		}
 	}
-	watcher, err := cs.CoreV1().Pods(ns).Watch(ctx, options)
-
+	// RetryWatcher reconnects internally after a blip. A plain watcher's
+	// closed result channel would otherwise busy-loop check().
+	initialList, err := cs.CoreV1().Pods(ns).List(ctx, options)
+	if err != nil {
+		return fmt.Errorf("cannot list pods in %s: %w", ns, err)
+	}
+	watcher, err := watchtools.NewRetryWatcherWithContext(ctx, initialList.ResourceVersion, podsWatcher{cs: cs, ns: ns, fieldSelector: options.FieldSelector})
 	if err != nil {
 		return fmt.Errorf("cannot create Pod event watcher: %w", err)
 	}
 
 	go func() {
+		defer watcher.Stop()
 		var m sync.Mutex
 		// Key is pod/container name, true if currently logging it.
 		active := map[string]bool{}
@@ -324,6 +332,7 @@ func CopyPodLogs(ctx context.Context, cs clientset.Interface, ns, podName string
 			case <-watcher.ResultChan():
 				check()
 			case <-ticker.C:
+				check()
 			case <-ctx.Done():
 				return
 			}
@@ -331,6 +340,21 @@ func CopyPodLogs(ctx context.Context, cs clientset.Interface, ns, podName string
 	}()
 
 	return nil
+}
+
+// podsWatcher implements cache.WatcherWithContext, optionally restricted to
+// a single pod name, for use with watchtools.NewRetryWatcherWithContext.
+type podsWatcher struct {
+	cs            clientset.Interface
+	ns            string
+	fieldSelector string
+}
+
+func (w podsWatcher) WatchWithContext(ctx context.Context, options meta.ListOptions) (watch.Interface, error) {
+	if w.fieldSelector != "" {
+		options.FieldSelector = w.fieldSelector
+	}
+	return w.cs.CoreV1().Pods(w.ns).Watch(ctx, options)
 }
 
 func maybeClose(writer io.Writer) {

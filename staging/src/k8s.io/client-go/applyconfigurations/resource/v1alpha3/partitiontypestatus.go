@@ -24,16 +24,16 @@ package v1alpha3
 // PartitionTypeStatus reports allocatability for a single partition type,
 // identified by the value of a grouping attribute.
 type PartitionTypeStatusApplyConfiguration struct {
-	// Attribute is the fully qualified name of the device attribute whose value
+	// attribute is the fully qualified name of the device attribute whose value
 	// groups this entry. It is the PartitionTypeAttribute declared by the
 	// devices' own slice, or the default named in the request when their slice
 	// declares none.
 	Attribute *string `json:"attribute,omitempty"`
-	// Type is the partition type value (e.g. "Full" or "Half").
+	// type is the partition type value (e.g. "Full" or "Half").
 	Type *string `json:"type,omitempty"`
-	// Total is the number of devices of this partition type in the pool.
+	// total is the number of devices of this partition type in the pool.
 	Total *int32 `json:"total,omitempty"`
-	// Allocatable is the number of additional devices of this partition type
+	// allocatable is the number of additional devices of this partition type
 	// that could still be allocated given current shared-counter consumption.
 	Allocatable *int32 `json:"allocatable,omitempty"`
 }

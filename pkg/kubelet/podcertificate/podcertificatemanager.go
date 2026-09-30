@@ -23,6 +23,7 @@ import (
 	"crypto/ecdsa"
 	"crypto/ed25519"
 	"crypto/elliptic"
+	"crypto/mldsa"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
@@ -909,6 +910,24 @@ func generateKeyAndProof(keyType string) (crypto.PrivateKey, []byte, error) {
 		_, priv, err := ed25519.GenerateKey(rand.Reader)
 		if err != nil {
 			return nil, nil, fmt.Errorf("while generating Ed25519 key: %w", err)
+		}
+		privKey = priv
+	case "MLDSA44":
+		priv, err := mldsa.GenerateKey(mldsa.MLDSA44())
+		if err != nil {
+			return nil, nil, fmt.Errorf("while generating MLDSA44 key: %w", err)
+		}
+		privKey = priv
+	case "MLDSA65":
+		priv, err := mldsa.GenerateKey(mldsa.MLDSA65())
+		if err != nil {
+			return nil, nil, fmt.Errorf("while generating MLDSA65 key: %w", err)
+		}
+		privKey = priv
+	case "MLDSA87":
+		priv, err := mldsa.GenerateKey(mldsa.MLDSA87())
+		if err != nil {
+			return nil, nil, fmt.Errorf("while generating MLDSA87 key: %w", err)
 		}
 		privKey = priv
 	default:

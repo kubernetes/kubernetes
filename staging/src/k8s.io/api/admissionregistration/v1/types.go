@@ -68,6 +68,7 @@ type Rule struct {
 
 // ScopeType specifies a scope for a Rule.
 // +enum
+// +k8s:validation-gen-nolint
 type ScopeType string
 
 const (
@@ -82,6 +83,7 @@ const (
 
 // FailurePolicyType specifies a failure policy that defines how unrecognized errors from the admission endpoint are handled.
 // +enum
+// +k8s:validation-gen-nolint
 type FailurePolicyType string
 
 const (
@@ -105,6 +107,7 @@ const (
 
 // MatchPolicyType specifies the type of match policy.
 // +enum
+// +k8s:validation-gen-nolint
 type MatchPolicyType string
 
 const (
@@ -116,6 +119,7 @@ const (
 
 // SideEffectClass specifies the types of side effects a webhook may have.
 // +enum
+// +k8s:validation-gen-nolint
 type SideEffectClass string
 
 const (
@@ -695,6 +699,7 @@ type MatchResources struct {
 
 // ValidationAction specifies a policy enforcement action.
 // +enum
+// +k8s:validation-gen-nolint
 type ValidationAction string
 
 const (
@@ -1247,6 +1252,7 @@ type Mutation struct {
 
 // PatchType specifies the type of patch operation for a mutation.
 // +enum
+// +k8s:validation-gen-nolint
 type PatchType string
 
 const (
@@ -1440,6 +1446,7 @@ type MutatingAdmissionPolicyBindingSpec struct {
 // ReinvocationPolicyType specifies what type of policy is used when other admission plugins also perform
 // modifications.
 // +enum
+// +k8s:validation-gen-nolint
 type ReinvocationPolicyType string
 
 const (
@@ -1468,6 +1475,7 @@ type RuleWithOperations struct {
 
 // OperationType specifies an operation for a request.
 // +enum
+// +k8s:validation-gen-nolint
 type OperationType string
 
 // The constants should be kept in sync with those defined in k8s.io/kubernetes/pkg/admission/interface.go.

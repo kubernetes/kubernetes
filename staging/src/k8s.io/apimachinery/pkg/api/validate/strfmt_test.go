@@ -922,9 +922,35 @@ func TestResourceFullyQualifiedName(t *testing.T) {
 		input:    "prefix.com/Name",
 		wantErrs: nil, // no errors, C-identifiers can have uppercase letters
 	}, {
-		name:     "invalid: more than one slash",
-		input:    "prefix.com/name/extra",
-		wantErrs: nil, // This is not validated, yet.
+		name:  "invalid: more than one slash",
+		input: "prefix.com/name/extra",
+		wantErrs: field.ErrorList{
+			field.Invalid(fldPath, "prefix.com/name/extra", "must not contain more than one slash").WithOrigin("format=k8s-resource-fully-qualified-name"),
+		},
+	}, {
+		name:  "invalid: many slashes",
+		input: "prefix.com/a/b/c/d",
+		wantErrs: field.ErrorList{
+			field.Invalid(fldPath, "prefix.com/a/b/c/d", "must not contain more than one slash").WithOrigin("format=k8s-resource-fully-qualified-name"),
+		},
+	}, {
+		name:  "invalid: trailing slash after a qualified name",
+		input: "prefix.com/name/",
+		wantErrs: field.ErrorList{
+			field.Invalid(fldPath, "prefix.com/name/", "must not contain more than one slash").WithOrigin("format=k8s-resource-fully-qualified-name"),
+		},
+	}, {
+		name:  "invalid: empty segment between slashes",
+		input: "prefix.com//name",
+		wantErrs: field.ErrorList{
+			field.Invalid(fldPath, "prefix.com//name", "must not contain more than one slash").WithOrigin("format=k8s-resource-fully-qualified-name"),
+		},
+	}, {
+		name:  "invalid: leading slash before a qualified name",
+		input: "/prefix.com/name",
+		wantErrs: field.ErrorList{
+			field.Invalid(fldPath, "/prefix.com/name", "must not contain more than one slash").WithOrigin("format=k8s-resource-fully-qualified-name"),
+		},
 	}, {
 		name:  "invalid: empty name",
 		input: "prefix.com/",

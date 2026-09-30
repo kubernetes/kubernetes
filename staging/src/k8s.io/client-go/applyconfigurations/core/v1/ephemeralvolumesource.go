@@ -23,7 +23,7 @@ package v1
 //
 // Represents an ephemeral volume that is handled by a normal storage driver.
 type EphemeralVolumeSourceApplyConfiguration struct {
-	// Will be used to create a stand-alone PVC to provision the volume.
+	// volumeClaimTemplate will be used to create a stand-alone PVC to provision the volume.
 	// The pod in which this EphemeralVolumeSource is embedded will be the
 	// owner of the PVC, i.e. the PVC will be deleted together with the
 	// pod.  The name of the PVC will be `<pod name>-<volume name>` where

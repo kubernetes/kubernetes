@@ -27,7 +27,7 @@ import (
 //
 // ExactDeviceRequest is a request for one or more identical devices.
 type ExactDeviceRequestApplyConfiguration struct {
-	// DeviceClassName references a specific DeviceClass, which can define
+	// deviceClassName references a specific DeviceClass, which can define
 	// additional configuration and selectors to be inherited by this
 	// request.
 	//
@@ -39,12 +39,12 @@ type ExactDeviceRequestApplyConfiguration struct {
 	// then administrators can create an empty DeviceClass for users
 	// to reference.
 	DeviceClassName *string `json:"deviceClassName,omitempty"`
-	// Selectors define criteria which must be satisfied by a specific
+	// selectors define criteria which must be satisfied by a specific
 	// device in order for that device to be considered for this
 	// request. All selectors must be satisfied for a device to be
 	// considered.
 	Selectors []DeviceSelectorApplyConfiguration `json:"selectors,omitempty"`
-	// AllocationMode and its related fields define how devices are allocated
+	// allocationMode and its related fields define how devices are allocated
 	// to satisfy this request. Supported values are:
 	//
 	// - ExactCount: This request is for a specific number of devices.
@@ -63,10 +63,10 @@ type ExactDeviceRequestApplyConfiguration struct {
 	// More modes may get added in the future. Clients must refuse to handle
 	// requests with unknown modes.
 	AllocationMode *resourcev1.DeviceAllocationMode `json:"allocationMode,omitempty"`
-	// Count is used only when the count mode is "ExactCount". Must be greater than zero.
+	// count is used only when the count mode is "ExactCount". Must be greater than zero.
 	// If AllocationMode is ExactCount and this field is not specified, the default is one.
 	Count *int64 `json:"count,omitempty"`
-	// AdminAccess indicates that this is a claim for administrative access
+	// adminAccess indicates that this is a claim for administrative access
 	// to the device(s). Claims with AdminAccess are expected to be used for
 	// monitoring or other management services for a device.  They ignore
 	// all ordinary claims to the device with respect to access modes and
@@ -75,7 +75,7 @@ type ExactDeviceRequestApplyConfiguration struct {
 	// Admin access is disabled if this field is unset or
 	// set to false, otherwise it is enabled.
 	AdminAccess *bool `json:"adminAccess,omitempty"`
-	// If specified, the request's tolerations.
+	// tolerations if specified, the request's tolerations.
 	//
 	// Tolerations for NoSchedule are required to allocate a
 	// device which has a taint with that effect. The same applies
@@ -93,7 +93,7 @@ type ExactDeviceRequestApplyConfiguration struct {
 	// This is a beta field and requires enabling the DRADeviceTaints
 	// feature gate.
 	Tolerations []DeviceTolerationApplyConfiguration `json:"tolerations,omitempty"`
-	// Capacity define resource requirements against each capacity.
+	// capacity define resource requirements against each capacity.
 	//
 	// If this field is unset and the device supports multiple allocations,
 	// the default value will be applied to each capacity according to requestPolicy.
@@ -106,7 +106,7 @@ type ExactDeviceRequestApplyConfiguration struct {
 	// the request fails if there are devices that otherwise match the request,
 	// and have this capacity, with a value >= the requested amount, but which cannot be allocated to this request.
 	Capacity *CapacityRequirementsApplyConfiguration `json:"capacity,omitempty"`
-	// DerivedAttributes defines a set of virtual attributes computed via CEL expressions
+	// derivedAttributes defines a set of virtual attributes computed via CEL expressions
 	// for each candidate device. These virtual attributes can be referenced in
 	// `.devices.constraints` to align and match different devices (e.g., co-allocating
 	// a GPU and a NIC on the same NUMA node) even if their drivers publish different

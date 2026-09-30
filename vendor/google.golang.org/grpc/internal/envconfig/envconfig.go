@@ -150,8 +150,25 @@ var (
 	// throttling limit if unforeseen issues arise, and it will be removed in a
 	// future release.
 	//
-	// TODO: Remove this env var once v1.83.0 is release.
+	// TODO: Remove this env var once v1.83.0 is released.
 	ControlBufferThrottleLimit = uint64FromEnv("GRPC_GO_EXPERIMENTAL_CONTROL_BUFFER_THROTTLE_LIMIT", 100, 1, 10000)
+
+	// ALTSMaxFrameSize is the maximum frame size for ALTS in bytes.
+	// This can be overridden by setting the environment variable
+	// "GRPC_GO_EXPERIMENTAL_ALTS_MAX_FRAME_SIZE" (min: 4096, max: 512*1024, capped at
+	// 512KiB to match altsWriteBufferMaxSize in
+	// credentials/alts/internal/conn/record.go).
+	ALTSMaxFrameSize = uint64FromEnv("GRPC_GO_EXPERIMENTAL_ALTS_MAX_FRAME_SIZE", 4096, 4096, 512*1024)
+
+	// EnableReceiveBufferCompaction enables the compaction of data buffers
+	// to reduce the number of buffers in the receive buffer.
+	//
+	// This environment variable serves as an escape hatch to disable the
+	// feature if unforeseen issues arise, and it will be removed in a future
+	// release.
+	//
+	// TODO: Remove this env var once v1.85.0 is released.
+	EnableReceiveBufferCompaction = boolFromEnv("GRPC_GO_EXPERIMENTAL_ENABLE_RECEIVE_BUFFER_COMPACTION", true)
 )
 
 func boolFromEnv(envVar string, def bool) bool {

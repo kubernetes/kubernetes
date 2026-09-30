@@ -192,7 +192,7 @@ func TestCompatibility(t *testing.T) {
 						OutputRoutingOptions: OutputRoutingOptions{
 							SplitStream: true,
 							InfoBufferSize: resource.QuantityValue{
-								Quantity: *resource.NewQuantity(2048, resource.DecimalSI),
+								Quantity: resource.MustParse("2048"),
 							},
 						},
 					},
@@ -200,7 +200,7 @@ func TestCompatibility(t *testing.T) {
 						OutputRoutingOptions: OutputRoutingOptions{
 							SplitStream: true,
 							InfoBufferSize: resource.QuantityValue{
-								Quantity: *resource.NewQuantity(1024, resource.DecimalSI),
+								Quantity: resource.MustParse("1024"),
 							},
 						},
 					},
@@ -219,10 +219,6 @@ func TestCompatibility(t *testing.T) {
 			} else if strictErr != nil {
 				t.Fatalf("unexpected strict unmarshal error: %v", strictErr)
 			}
-			// This sets the internal "s" field just like unmarshaling does.
-			// Required for assert.Equal to pass.
-			_ = tc.expectConfig.Options.Text.InfoBufferSize.String()
-			_ = tc.expectConfig.Options.JSON.InfoBufferSize.String()
 			assert.Equal(t, tc.expectConfig, config)
 			if tc.expectAllFields {
 				notZeroRecursive(t, config, "LoggingConfiguration")

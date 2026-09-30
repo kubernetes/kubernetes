@@ -20,21 +20,61 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/apiserver/pkg/apis/example"
+	"k8s.io/apiserver/pkg/storage"
 )
 
 func TestCorrectness(t *testing.T) {
-	model := NewEmptyModel("")
+	versioner := &storage.APIObjectVersioner{}
+	model := NewEmptyModel("", func() runtime.Object { return &example.Pod{} }, func() runtime.Object { return &example.PodList{} }, versioner)
+	steps := correctnessTestSteps()
+	history := make([]Operation, len(steps))
+	for i, step := range steps {
+		history[i] = Operation{Request: step.Request, Response: step.CorrectResponse}
+	}
+	replay, err := NewReplay(model, history)
+	require.NoError(t, err)
 
-	for _, step := range correctnessTestSteps() {
+	var expectEvents, gotEvents []watch.Event
+	for _, step := range steps {
 		t.Run(step.Name, func(t *testing.T) {
-			for i, invalidResponse := range step.InvalidResponses {
-				ok, _ := model.Step(step.Request, invalidResponse)
-				require.False(t, ok, "alternative response #%d should return ok=false: req=%+v resp=%+v", i, step.Request, invalidResponse)
+			if step.ExpectedEvent != nil {
+				expectEvents = append(expectEvents, *step.ExpectedEvent)
 			}
 
-			ok, next := model.Step(step.Request, step.CorrectResponse)
+			for i, invalidResponse := range step.InvalidResponses {
+				ok, _, _ := model.Step(step.Request, invalidResponse)
+				if ok {
+					err := replay.Validate(step.Request, invalidResponse)
+					require.Error(t, err, "alternative response #%d should fail validation: req=%+v resp=%+v", i, step.Request, invalidResponse)
+				}
+			}
+
+			ok, next, change := model.Step(step.Request, step.CorrectResponse)
 			require.True(t, ok, "valid response should return ok=true: req=%+v resp=%+v", step.Request, step.CorrectResponse)
+			require.NoError(t, replay.Validate(step.Request, step.CorrectResponse))
 			model = next
+			if change != nil {
+				event, err := change.toWatchEvent(storage.APIObjectVersioner{}, storage.Everything)
+				require.NoError(t, err)
+				gotEvents = append(gotEvents, *event)
+			}
+		})
+	}
+	require.Equal(t, expectEvents, gotEvents)
+}
+
+// TestOptionsInvalid checks the model expects the same error storage returns
+// for watches it rejects. Invalid requests are covered by correctnessTestSteps.
+func TestOptionsInvalid(t *testing.T) {
+	versioner := storage.APIObjectVersioner{}
+	validator := NewWatchValidator(versioner, &Replay{versioner: versioner}, getKey)
+	for _, step := range watchTestCasesInvalid() {
+		t.Run(step.Name, func(t *testing.T) {
+			require.NoError(t, validator.ValidateWatch(step.Request, WatchResponse{Err: step.ExpectError}))
+			require.Error(t, validator.ValidateWatch(step.Request, WatchResponse{}))
 		})
 	}
 }

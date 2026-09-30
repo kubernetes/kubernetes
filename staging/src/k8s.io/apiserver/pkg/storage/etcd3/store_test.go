@@ -37,6 +37,7 @@ import (
 	"go.etcd.io/etcd/server/v3/embed"
 	"google.golang.org/grpc/grpclog"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/apitesting"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -73,6 +74,7 @@ func init() {
 	metav1.AddToGroupVersion(scheme, metav1.SchemeGroupVersion)
 	utilruntime.Must(example.AddToScheme(scheme))
 	utilruntime.Must(examplev1.AddToScheme(scheme))
+	utilruntime.Must(corev1.AddToScheme(scheme))
 
 	grpclog.SetLoggerV2(grpclog.NewLoggerV2(io.Discard, io.Discard, os.Stderr))
 }
@@ -677,15 +679,42 @@ func TestStats(t *testing.T) {
 
 func TestPrefix(t *testing.T) {
 	testcases := map[string]string{
-		"custom/prefix":     "/custom/prefix/",
-		"/custom//prefix//": "/custom/prefix/",
-		"/registry":         "/registry/",
+		"":                  "",
+		"/":                 "",
+		"///":               "",
+		"custom/prefix":     "/custom/prefix",
+		"/custom//prefix//": "/custom/prefix",
+		"/custom/./prefix":  "/custom/prefix",
+		"/custom/../prefix": "/prefix",
+		"/registry":         "/registry",
+		"/registry/":        "/registry",
 	}
 	for configuredPrefix, effectivePrefix := range testcases {
-		_, store, _ := testSetup(t, withPrefix(configuredPrefix))
-		if store.pathPrefix != effectivePrefix {
-			t.Errorf("configured prefix of %s, expected effective prefix of %s, got %s", configuredPrefix, effectivePrefix, store.pathPrefix)
-		}
+		t.Run(configuredPrefix, func(t *testing.T) {
+			_, store, _ := testSetup(t, withPrefix(configuredPrefix), withResourcePrefix("/pods"))
+			if store.pathPrefix != effectivePrefix {
+				t.Errorf("expected effective prefix %q, got %q", effectivePrefix, store.pathPrefix)
+			}
+			for _, key := range []string{"/pods", "/pods/", "/pods/ns/pod", "/pods/ns/pod/", "/pods//pod", "/pods/ns/pod..name"} {
+				for _, recursive := range []bool{false, true} {
+					got, err := store.prepareKey(key, recursive)
+					if err != nil {
+						t.Fatalf("prepareKey(%q, %t): %v", key, recursive, err)
+					}
+					want := effectivePrefix + key
+					if recursive && !strings.HasSuffix(key, "/") {
+						want += "/"
+					}
+					if got != want {
+						t.Errorf("prepareKey(%q, %t) = %q, want %q", key, recursive, got, want)
+					}
+				}
+			}
+			// Root prefixes must also work when the store passes them to the estimator.
+			if err := store.EnableResourceSizeEstimation(store.getKeys); err != nil {
+				t.Fatal(err)
+			}
+		})
 	}
 }
 
@@ -906,6 +935,34 @@ func withDefaults(options *setupOptions) {
 }
 
 var _ setupOption = withDefaults
+
+func benchmarkSetup(b *testing.B) (context.Context, *store) {
+	client := testserver.RunEtcd(b, func(cfg *embed.Config) {
+		cfg.QuotaBackendBytes = 4 << 30 // 4 GiB (default 2 GiB is too small for 150k pods)
+	})
+	config := storagetesting.StoreConfigForBenchmarks()
+	compactor := NewCompactor(client.Client, 0, clock.RealClock{}, nil)
+	b.Cleanup(compactor.Stop)
+	store, err := New(
+		client,
+		compactor,
+		config.Codec,
+		config.NewFunc,
+		config.NewListFunc,
+		"",
+		config.ResourcePrefix,
+		config.GroupResource,
+		newTestTransformer(),
+		newTestLeaseManagerConfig(),
+		NewDefaultDecoder(config.Codec, config.Versioner),
+		config.Versioner,
+	)
+	if err != nil {
+		b.Fatal(err)
+	}
+	b.Cleanup(store.Close)
+	return context.Background(), store
+}
 
 func testSetup(t testing.TB, opts ...setupOption) (context.Context, *store, *kubernetes.Client) {
 	setupOpts := setupOptions{}
@@ -1195,7 +1252,7 @@ func BenchmarkStoreWriteThroughput(b *testing.B) {
 	}
 	for _, dims := range dimensions {
 		b.Run(fmt.Sprintf("Namespaces=%d/Pods=%d/Nodes=%d", dims.namespaceCount, dims.namespaceCount*dims.podPerNamespaceCount, dims.nodeCount), func(b *testing.B) {
-			ctx, store, _ := testSetup(b)
+			ctx, store := benchmarkSetup(b)
 			data := storagetesting.PrepareBenchmarkData(dims.namespaceCount, dims.podPerNamespaceCount, dims.nodeCount)
 			b.ResetTimer()
 			storagetesting.RunBenchmarkWriteThroughput(ctx, b, store, data, false, nil)
@@ -1232,7 +1289,7 @@ func BenchmarkStoreList(b *testing.B) {
 			featuregatetesting.SetFeatureGateDuringTest(b, utilfeature.DefaultFeatureGate, features.SizeBasedListCostEstimate, sizeBasedEnabled)
 			b.Run(fmt.Sprintf("SizeBasedListCostEstimate=%v/Namespaces=%d/Pods=%d/Nodes=%d", sizeBasedEnabled, dims.namespaceCount, dims.namespaceCount*dims.podPerNamespaceCount, dims.nodeCount), func(b *testing.B) {
 				data := storagetesting.PrepareBenchmarkData(dims.namespaceCount, dims.podPerNamespaceCount, dims.nodeCount)
-				ctx, store, _ := testSetup(b)
+				ctx, store := benchmarkSetup(b)
 				require.NoError(b, storagetesting.PrecreateBenchmarkPods(ctx, store, data))
 				storagetesting.RunBenchmarkStoreList(ctx, b, store, data, false)
 			})
@@ -1293,7 +1350,7 @@ func TestGetCurrentResourceVersion(t *testing.T) {
 func BenchmarkStoreStats(b *testing.B) {
 	klog.SetLogger(logr.Discard())
 	data := storagetesting.PrepareBenchmarkData(50, 3_000, 5_000)
-	ctx, store, _ := testSetup(b)
+	ctx, store := benchmarkSetup(b)
 	require.NoError(b, storagetesting.PrecreateBenchmarkPods(ctx, store, data))
 	storagetesting.RunBenchmarkStoreStats(ctx, b, store)
 }
@@ -1304,10 +1361,10 @@ func BenchmarkStatsCacheCleanKeys(b *testing.B) {
 	namespaceCount := 50
 	podPerNamespaceCount := 3_000
 	data := storagetesting.PrepareBenchmarkData(namespaceCount, podPerNamespaceCount, 5_000)
-	ctx, store, _ := testSetup(b)
+	ctx, store := benchmarkSetup(b)
 	require.NoError(b, storagetesting.PrecreateBenchmarkPods(ctx, store, data))
 	// List to fetch object sizes for statsCache.
-	listOut := &example.PodList{}
+	listOut := &corev1.PodList{}
 	err := store.GetList(ctx, "/pods/", storage.ListOptions{Recursive: true, Predicate: storage.Everything}, listOut)
 	if err != nil {
 		b.Fatal(err)
@@ -1427,5 +1484,8 @@ func TestPrefixStats(t *testing.T) {
 
 func TestCorrectness(t *testing.T) {
 	ctx, store, _ := testSetup(t)
-	correctness.RunTestCorrectness(ctx, t, store, "")
+	correctness.RunTestCorrectness(ctx, t, store, "", func(obj runtime.Object) (string, error) {
+		pod := obj.(*example.Pod)
+		return computePodKey(pod), nil
+	})
 }

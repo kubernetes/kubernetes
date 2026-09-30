@@ -18,7 +18,6 @@ package preemption
 
 import (
 	"context"
-	"fmt"
 	"strconv"
 	"testing"
 
@@ -26,7 +25,6 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1"
-	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
 	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -39,13 +37,13 @@ import (
 	componentmetrics "k8s.io/component-base/metrics"
 	"k8s.io/klog/v2/ktesting"
 	fwk "k8s.io/kube-scheduler/framework"
-	"k8s.io/kube-scheduler/util"
 	"k8s.io/kubernetes/pkg/features"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/backend/cache"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/backend/queue"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/parallelize"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultbinder"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/queuesort"
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
@@ -100,48 +98,45 @@ type nodeCapacity struct {
 
 var _ fwk.FilterPlugin = &mockFilterPlugin{}
 
-type mockPodGroupLister struct {
-	podGroups map[string]*schedulingv1beta1.PodGroup
+func makePodGroupPreemptor(pg *schedulingv1beta1.PodGroup, pods []*v1.Pod) fwk.PodGroupInfo {
+	return makePodGroupPreemptorWithPreemptionPolicy(pg, pods, v1.PreemptLowerPriority)
 }
 
-func (m *mockPodGroupLister) Get(namespace, name string) (*schedulingv1beta1.PodGroup, error) {
-	if pg, ok := m.podGroups[name]; ok {
-		return pg, nil
-	}
-	return nil, fmt.Errorf("pod group %s not found", name)
-}
-
-type mockCompositePodGroupLister struct {
-	compositePodGroups map[string]*schedulingv1alpha3.CompositePodGroup
-}
-
-func (m *mockCompositePodGroupLister) Get(namespace, name string) (*schedulingv1alpha3.CompositePodGroup, error) {
-	if cpg, ok := m.compositePodGroups[name]; ok {
-		return cpg, nil
-	}
-	return nil, fmt.Errorf("composite pod group %s not found", name)
-}
-
-func makePodGroupPreemptor(pg *schedulingv1beta1.PodGroup, pods []*v1.Pod) *podGroupPreemptor {
-	return makePodGroupPreemptorWithPreemptionPolicy(pg, pods, schedulingv1beta1.PreemptLowerPriority)
-}
-
-func makePodGroupPreemptorWithPreemptionPolicy(pg *schedulingv1beta1.PodGroup, pods []*v1.Pod, policy schedulingv1beta1.PreemptionPolicy) *podGroupPreemptor {
-	return &podGroupPreemptor{
-		priority:         util.PodGroupPriority(pg),
-		pods:             pods,
-		podGroup:         pg,
-		preemptionPolicy: policy,
+func makePodGroupPreemptorWithPreemptionPolicy(pg *schedulingv1beta1.PodGroup, pods []*v1.Pod, policy v1.PreemptionPolicy) fwk.PodGroupInfo {
+	pgCopy := pg.DeepCopy()
+	pgPolicy := schedulingv1beta1.PreemptionPolicy(policy)
+	pgCopy.Spec.PreemptionPolicy = &pgPolicy
+	return &framework.PodGroupInfo{
+		GenericPodGroup: &fwk.GenericPodGroup{
+			PodGroup: pgCopy,
+		},
+		UnscheduledPods: pods,
 	}
 }
 
-func TestPodGroupEvaluator_SelectVictimsOnDomain(t *testing.T) {
+type mockPreemptionManager struct {
+	fwk.PreemptionManager
+	fwk.PreemptionExecutor
+
+	candidate fwk.PreemptionCandidate
+}
+
+func (m *mockPreemptionManager) Executor() fwk.PreemptionExecutor {
+	return m
+}
+
+func (m *mockPreemptionManager) ActuatePodGroupPreemption(_ context.Context, candidate fwk.PreemptionCandidate, _ fwk.PodGroupInfo, _ string) *fwk.Status {
+	m.candidate = candidate
+	return nil
+}
+
+func TestPodGroupEvaluator_Preempt_Victims(t *testing.T) {
 	tests := []struct {
 		name                           string
 		nodes                          []*v1.Node
 		initPods                       []*v1.Pod
 		initPodGroups                  []*schedulingv1beta1.PodGroup
-		preemptor                      *podGroupPreemptor
+		preemptor                      fwk.PodGroupInfo
 		pdbs                           []*policy.PodDisruptionBudget
 		nodeCapacities                 []nodeCapacity
 		expectedVictims                []string
@@ -330,7 +325,7 @@ func TestPodGroupEvaluator_SelectVictimsOnDomain(t *testing.T) {
 			preemptor: makePodGroupPreemptorWithPreemptionPolicy(
 				st.MakePodGroup().Name("preemptor-pg").Priority(highPriority).Obj(),
 				[]*v1.Pod{st.MakePod().Name("p-1").UID("p-1").Priority(highPriority).Obj()},
-				schedulingv1beta1.PreemptLowerPriority,
+				v1.PreemptLowerPriority,
 			),
 			nodeCapacities: []nodeCapacity{
 				{nodeName: "node1", capacity: 1},
@@ -357,7 +352,7 @@ func TestPodGroupEvaluator_SelectVictimsOnDomain(t *testing.T) {
 				[]*v1.Pod{
 					st.MakePod().Name("p-1").UID("p-1").Priority(highPriority).PreemptionPolicy(v1.PreemptNever).Obj(),
 				},
-				schedulingv1beta1.PreemptLowerPriority,
+				v1.PreemptLowerPriority,
 			),
 			nodeCapacities: []nodeCapacity{
 				{nodeName: "node1", capacity: 1},
@@ -608,7 +603,7 @@ func TestPodGroupEvaluator_SelectVictimsOnDomain(t *testing.T) {
 				[]*v1.Pod{
 					st.MakePod().Name("p-1").UID("p-1").Priority(highPriority).Obj(),
 				},
-				schedulingv1beta1.PreemptLowerPriority,
+				v1.PreemptLowerPriority,
 			),
 			expectedVictims: []string{"p1"},
 			expectedStatus:  fwk.NewStatus(fwk.Success),
@@ -634,7 +629,7 @@ func TestPodGroupEvaluator_SelectVictimsOnDomain(t *testing.T) {
 				[]*v1.Pod{
 					st.MakePod().Name("p-1").UID("p-1").Priority(highPriority).PreemptionPolicy(v1.PreemptNever).Obj(),
 				},
-				schedulingv1beta1.PreemptLowerPriority,
+				v1.PreemptLowerPriority,
 			),
 			nodeCapacities: []nodeCapacity{
 				{nodeName: "node1", capacity: 1},
@@ -812,7 +807,7 @@ func TestPodGroupEvaluator_SelectVictimsOnDomain(t *testing.T) {
 				},
 			},
 			expectedVictims: []string{},
-			expectedStatus:  fwk.NewStatus(fwk.UnschedulableAndUnresolvable),
+			expectedStatus:  fwk.NewStatus(fwk.Unschedulable),
 		},
 		{
 			name: "Failure: Cannot preempt the victim with equal priority",
@@ -833,7 +828,7 @@ func TestPodGroupEvaluator_SelectVictimsOnDomain(t *testing.T) {
 				},
 			},
 			expectedVictims: []string{},
-			expectedStatus:  fwk.NewStatus(fwk.UnschedulableAndUnresolvable),
+			expectedStatus:  fwk.NewStatus(fwk.Unschedulable),
 		},
 		{
 			name: "Failure: Cannot preempt if node is empty",
@@ -854,7 +849,7 @@ func TestPodGroupEvaluator_SelectVictimsOnDomain(t *testing.T) {
 				},
 			},
 			expectedVictims: []string{},
-			expectedStatus:  fwk.NewStatus(fwk.UnschedulableAndUnresolvable),
+			expectedStatus:  fwk.NewStatus(fwk.Unschedulable),
 		},
 		{
 			name: "Priority divergence: candidate victim PodGroup has lower priority than the Pods from that group",
@@ -915,7 +910,7 @@ func TestPodGroupEvaluator_SelectVictimsOnDomain(t *testing.T) {
 				},
 			},
 			expectedVictims: []string{},
-			expectedStatus:  fwk.NewStatus(fwk.UnschedulableAndUnresolvable),
+			expectedStatus:  fwk.NewStatus(fwk.Unschedulable),
 		},
 		{
 			name: "Gang scheduling: schedule as many pods as possible without preempting higher priority pods, but still more than minCount",
@@ -1188,7 +1183,10 @@ func TestPodGroupEvaluator_SelectVictimsOnDomain(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GenericWorkload, true)
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.GenericWorkload:          true,
+				features.PodGroupPreemptionPolicy: true,
+			})
 			logger, ctx := ktesting.NewTestContext(t)
 
 			mockFilterFactory := func(ctx context.Context, _ runtime.Object, fh fwk.Handle) (fwk.Plugin, error) {
@@ -1203,17 +1201,21 @@ func TestPodGroupEvaluator_SelectVictimsOnDomain(t *testing.T) {
 				tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			)
 			var objs []runtime.Object
-			for _, p := range append(tt.initPods, tt.preemptor.pods...) {
+			for _, p := range append(tt.initPods, tt.preemptor.GetAllUnscheduledPods()...) {
 				objs = append(objs, p)
 			}
 			for _, n := range tt.nodes {
 				objs = append(objs, n)
 			}
+			for _, p := range tt.pdbs {
+				objs = append(objs, p)
+			}
 			informerFactory := informers.NewSharedInformerFactory(clientsetfake.NewClientset(objs...), 0)
 			parallelism := parallelize.DefaultParallelism
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
-			snapshot := internalcache.NewTestSnapshotWithPodGroups(tt.initPods, tt.nodes, tt.initPodGroups)
+			snapshot := internalcache.NewTestSnapshotWithPodGroups(tt.initPods, tt.nodes, tt.initPodGroups, nil)
+			mockPreemptionManager := &mockPreemptionManager{}
 			f, err := tf.NewFramework(
 				ctx,
 				registeredPlugins, "",
@@ -1223,6 +1225,12 @@ func TestPodGroupEvaluator_SelectVictimsOnDomain(t *testing.T) {
 				frameworkruntime.WithSnapshotSharedLister(snapshot),
 				frameworkruntime.WithMutableSnapshotLister(snapshot),
 				frameworkruntime.WithLogger(logger),
+				frameworkruntime.WithPreemptionManager(func(fh fwk.Handle) fwk.PreemptionManager {
+					m := NewPreemptionManager(fh, feature.NewSchedulerFeaturesFromGates(utilfeature.DefaultFeatureGate))
+					mockPreemptionManager.PreemptionManager = m
+					mockPreemptionManager.PreemptionExecutor = m.Executor()
+					return mockPreemptionManager
+				}),
 			)
 			if err != nil {
 				t.Fatal(err)
@@ -1239,9 +1247,9 @@ func TestPodGroupEvaluator_SelectVictimsOnDomain(t *testing.T) {
 			// Pod sizes are taken from the "size" label on a pod, defaulting to 1 if the label is not set.
 			var mockSchedulingFunc fwk.PodGroupSchedulingFunc = func(ctx context.Context) (*fwk.PodGroupAssignments, *fwk.Status) {
 				minCount := 1
-				if tt.preemptor.podGroup != nil {
-					if tt.preemptor.podGroup.Spec.SchedulingPolicy.Gang != nil {
-						minCount = int(tt.preemptor.podGroup.Spec.SchedulingPolicy.Gang.MinCount)
+				if pg := tt.preemptor.GetPodGroup(); pg != nil {
+					if pg.Spec.SchedulingPolicy.Gang != nil {
+						minCount = int(pg.Spec.SchedulingPolicy.Gang.MinCount)
 					}
 				}
 
@@ -1260,7 +1268,7 @@ func TestPodGroupEvaluator_SelectVictimsOnDomain(t *testing.T) {
 
 				nodeIdx := 0
 				numNodes := len(tt.nodes)
-				for _, p := range tt.preemptor.Members() {
+				for _, p := range tt.preemptor.GetAllUnscheduledPods() {
 					pSize := getCapacity(p)
 					for step := range numNodes {
 						i := (nodeIdx + step) % numNodes
@@ -1290,20 +1298,14 @@ func TestPodGroupEvaluator_SelectVictimsOnDomain(t *testing.T) {
 				podGroups[pg.Name] = pg
 			}
 
-			pgLister := &mockPodGroupLister{podGroups: podGroups}
 			pl := &PodGroupEvaluator{
-				Handle:           f,
-				podGroupSnapshot: pgLister,
+				Handle: f,
 			}
 
 			if err := pl.Handle.MutableSnapshotSharedLister().StartMutations(); err != nil {
 				t.Fatalf("Unexpected error: %v", err)
 			}
-			domain, err := newDomainForWorkloadPreemption(logger, snapshot, pgLister, &mockCompositePodGroupLister{}, "test-domain")
-			if err != nil {
-				t.Fatalf("Failed to create domain: %v", err)
-			}
-			res, gotStatus := pl.selectVictimsOnDomain(ctx, tt.preemptor, domain, tt.pdbs, mockSchedulingFunc)
+			res, gotStatus := pl.Preempt(ctx, tt.preemptor, mockSchedulingFunc)
 			if !gotStatus.IsSuccess() {
 				t.Logf("SelectVictimsOnDomain failed: %v", gotStatus.Message())
 			}
@@ -1324,45 +1326,34 @@ func TestPodGroupEvaluator_SelectVictimsOnDomain(t *testing.T) {
 			}
 
 			gotNames := sets.Set[string]{}
-			for _, p := range res.victims.Pods {
+			for _, p := range mockPreemptionManager.candidate.Victims().Pods {
 				gotNames.Insert(p.Name)
 			}
 			wantNames := sets.New(tt.expectedVictims...)
 			if diff := cmp.Diff(wantNames, gotNames); diff != "" {
 				t.Errorf("Victims mismatch (-want +got):\n%s", diff)
 			}
-			if res.numPodGroupDisruptions != tt.expectedNumPodGroupDisruptions {
-				t.Errorf("numPodGroupDisruptions mismatch. Want %d, Got %d", tt.expectedNumPodGroupDisruptions, res.numPodGroupDisruptions)
+			if mockPreemptionManager.candidate.NumPodGroupDisruptions() != tt.expectedNumPodGroupDisruptions {
+				t.Errorf("numPodGroupDisruptions mismatch. Want %d, Got %d", tt.expectedNumPodGroupDisruptions, mockPreemptionManager.candidate.NumPodGroupDisruptions())
 			}
-			if res.victims.NumPDBViolations != int64(tt.expectedNumPDBViolations) {
-				t.Errorf("NumPDBViolations mismatch. Want %d, Got %d", tt.expectedNumPDBViolations, res.victims.NumPDBViolations)
+			if mockPreemptionManager.candidate.Victims().NumPDBViolations != int64(tt.expectedNumPDBViolations) {
+				t.Errorf("NumPDBViolations mismatch. Want %d, Got %d", tt.expectedNumPDBViolations, mockPreemptionManager.candidate.Victims().NumPDBViolations)
 			}
 		})
 	}
 }
 
-func TestPodGroupEvaluator_SelectVictimsOnDomain_NominatedNodes(t *testing.T) {
+func TestPodGroupEvaluator_Preempt_NominatedNodes(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GenericWorkload, true)
 	logger, ctx := ktesting.NewTestContext(t)
 
 	p1 := st.MakePod().Name("p1").UID("p1").Obj()
 	p2 := st.MakePod().Name("p2").UID("p2").Obj()
-
-	preemptor := makePodGroupPreemptor(
-		st.MakePodGroup().Name("preemptor-pg").Priority(highPriority).Obj(),
-		[]*v1.Pod{p1, p2},
-	)
+	preemptorPGInfo := newTestPodGroupInfo(st.MakePodGroup().Name("preemptor-pg").Priority(highPriority).Obj(), nil, []*v1.Pod{p1, p2})
 
 	node1 := st.MakeNode().Name("node1").Obj()
-	domainNodes := []fwk.NodeInfo{
-		framework.NewNodeInfo(),
-	}
-	domainNodes[0].SetNode(node1)
-
 	// Add a low priority pod as a potential victim to satisfy the check
 	p3 := st.MakePod().Name("p3").UID("p3").Node("node1").Priority(lowPriority).Obj()
-	podInfo, _ := framework.NewPodInfo(p3)
-	domainNodes[0].AddPodInfo(podInfo)
 	objs := []runtime.Object{p1, p2, p3, node1}
 	informerFactory := informers.NewSharedInformerFactory(clientsetfake.NewClientset(objs...), 0)
 	registeredPlugins := []tf.RegisterPluginFunc{
@@ -1378,6 +1369,9 @@ func TestPodGroupEvaluator_SelectVictimsOnDomain_NominatedNodes(t *testing.T) {
 		frameworkruntime.WithSnapshotSharedLister(snapshot),
 		frameworkruntime.WithMutableSnapshotLister(snapshot),
 		frameworkruntime.WithLogger(logger),
+		frameworkruntime.WithPreemptionManager(func(fh fwk.Handle) fwk.PreemptionManager {
+			return NewPreemptionManager(fh, feature.NewSchedulerFeaturesFromGates(utilfeature.DefaultFeatureGate))
+		}),
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -1385,12 +1379,6 @@ func TestPodGroupEvaluator_SelectVictimsOnDomain_NominatedNodes(t *testing.T) {
 
 	informerFactory.Start(ctx.Done())
 	informerFactory.WaitForCacheSync(ctx.Done())
-
-	pgLister := &mockPodGroupLister{podGroups: make(map[string]*schedulingv1beta1.PodGroup)}
-	domain, err := newDomainForWorkloadPreemption(logger, snapshot, pgLister, &mockCompositePodGroupLister{}, "test-domain")
-	if err != nil {
-		t.Fatalf("Failed to create domain: %v", err)
-	}
 
 	mockSchedulingFunc := func(ctx context.Context) (*fwk.PodGroupAssignments, *fwk.Status) {
 		cs1 := framework.NewCycleState()
@@ -1410,7 +1398,7 @@ func TestPodGroupEvaluator_SelectVictimsOnDomain_NominatedNodes(t *testing.T) {
 	if err := pl.Handle.MutableSnapshotSharedLister().StartMutations(); err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
-	result, gotStatus := pl.selectVictimsOnDomain(ctx, preemptor, domain, nil, mockSchedulingFunc)
+	result, gotStatus := pl.Preempt(ctx, preemptorPGInfo, mockSchedulingFunc)
 	if err := pl.Handle.MutableSnapshotSharedLister().EndMutations(); err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -1422,12 +1410,12 @@ func TestPodGroupEvaluator_SelectVictimsOnDomain_NominatedNodes(t *testing.T) {
 		t.Fatalf("expected non-nil result")
 	}
 
-	if len(result.nominatedNodeNames) != 1 {
-		t.Errorf("Expected 1 nominated node name, got %d", len(result.nominatedNodeNames))
+	if len(result.NominatingInfos) != 1 {
+		t.Errorf("Expected 1 nominated node name, got %d", len(result.NominatingInfos))
 	}
 
 	namespacedName := types.NamespacedName{Namespace: p1.Namespace, Name: p1.Name}
-	if info, ok := result.nominatedNodeNames[namespacedName]; !ok || info.NominatedNodeName != "node1" {
+	if info, ok := result.NominatingInfos[namespacedName]; !ok || info.NominatedNodeName != "node1" {
 		t.Errorf("Expected p1 to be nominated for node1, got %v", info)
 	}
 }
@@ -1568,7 +1556,7 @@ func TestPodGroupEvaluator_Preempt(t *testing.T) {
 				tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
 				tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			}
-			snapshot := internalcache.NewTestSnapshotWithPodGroups(tt.initPods, tt.nodes, tt.initPodGroups)
+			snapshot := internalcache.NewTestSnapshotWithPodGroups(tt.initPods, tt.nodes, tt.initPodGroups, nil)
 			f, err := tf.NewFramework(
 				ctx,
 				registeredPlugins, "",
@@ -1577,6 +1565,9 @@ func TestPodGroupEvaluator_Preempt(t *testing.T) {
 				frameworkruntime.WithSnapshotSharedLister(snapshot),
 				frameworkruntime.WithMutableSnapshotLister(snapshot),
 				frameworkruntime.WithLogger(logger),
+				frameworkruntime.WithPreemptionManager(func(fh fwk.Handle) fwk.PreemptionManager {
+					return NewPreemptionManager(fh, feature.NewSchedulerFeaturesFromGates(utilfeature.DefaultFeatureGate))
+				}),
 			)
 			if err != nil {
 				t.Fatal(err)
@@ -1590,12 +1581,8 @@ func TestPodGroupEvaluator_Preempt(t *testing.T) {
 				podGroups[pg.Name] = pg
 			}
 
-			pgLister := &mockPodGroupLister{podGroups: podGroups}
 			pl := &PodGroupEvaluator{
-				Handle:                         f,
-				podGroupSnapshot:               pgLister,
-				pdbLister:                      informerFactory.Policy().V1().PodDisruptionBudgets().Lister(),
-				enablePodGroupPreemptionPolicy: true,
+				Handle: f,
 			}
 
 			mockSchedulingFunc := func(ctx context.Context) (*fwk.PodGroupAssignments, *fwk.Status) {
@@ -1603,7 +1590,10 @@ func TestPodGroupEvaluator_Preempt(t *testing.T) {
 				return nil, fwk.NewStatus(fwk.Error)
 			}
 
-			pgInfo := newTestPodGroupInfo(tt.preemptorPodGroup, nil, tt.preemptorPods)
+			pgInfo := &framework.PodGroupInfo{
+				GenericPodGroup: fwk.NewGenericPodGroup(tt.preemptorPodGroup),
+				UnscheduledPods: tt.preemptorPods,
+			}
 
 			gotResult, gotStatus := pl.Preempt(ctx, pgInfo, mockSchedulingFunc)
 			if gotStatus.Code() != tt.expectedStatus.Code() || gotStatus.Message() != tt.expectedStatus.Message() {
@@ -1651,10 +1641,7 @@ func (pa *mockProposedAssignment) GetCycleState() fwk.CycleState {
 func TestPodGroupPreemptionEvaluationDurationMetric(t *testing.T) {
 	nodeName := "node1"
 	preemptorPod := st.MakePod().Name("p1").UID("p1").Obj()
-	preemptor := newPodGroupPreemptor(
-		newTestPodGroupInfo(st.MakePodGroup().Name("preemptor-pg").Priority(highPriority).Obj(), nil, []*v1.Pod{preemptorPod}),
-		false,
-	)
+	preemptorPGInfo := newTestPodGroupInfo(st.MakePodGroup().Name("preemptor-pg").Priority(highPriority).Obj(), nil, []*v1.Pod{preemptorPod})
 
 	tests := []struct {
 		name             string
@@ -1697,6 +1684,9 @@ func TestPodGroupPreemptionEvaluationDurationMetric(t *testing.T) {
 				frameworkruntime.WithSnapshotSharedLister(snapshot),
 				frameworkruntime.WithMutableSnapshotLister(snapshot),
 				frameworkruntime.WithLogger(logger),
+				frameworkruntime.WithPreemptionManager(func(fh fwk.Handle) fwk.PreemptionManager {
+					return NewPreemptionManager(fh, feature.NewSchedulerFeaturesFromGates(utilfeature.DefaultFeatureGate))
+				}),
 			)
 			if err != nil {
 				t.Fatal(err)
@@ -1704,12 +1694,8 @@ func TestPodGroupPreemptionEvaluationDurationMetric(t *testing.T) {
 			informerFactory.Start(ctx.Done())
 			informerFactory.WaitForCacheSync(ctx.Done())
 
-			pgLister := &mockPodGroupLister{podGroups: make(map[string]*schedulingv1beta1.PodGroup)}
-
 			pl := &PodGroupEvaluator{
-				Handle:           fh,
-				podGroupSnapshot: pgLister,
-				pdbLister:        nil,
+				Handle: fh,
 			}
 
 			mockSchedulingFunc := func(ctx context.Context) (*fwk.PodGroupAssignments, *fwk.Status) {
@@ -1724,17 +1710,13 @@ func TestPodGroupPreemptionEvaluationDurationMetric(t *testing.T) {
 				}
 				return nil, tt.evaluationStatus
 			}
-			domain, err := newDomainForWorkloadPreemption(logger, snapshot, pgLister, &mockCompositePodGroupLister{}, "test-domain")
-			if err != nil {
-				t.Fatalf("Unexpected error: %v", err)
-			}
 			expectedStatus := tt.evaluationStatus.Code().String()
 			stateBefore := captureEvaluationDurationMetric(testRegistry, "podgroup", expectedStatus)
 
 			if err := pl.Handle.MutableSnapshotSharedLister().StartMutations(); err != nil {
 				t.Fatalf("Unexpected error: %v", err)
 			}
-			pl.evaluate(ctx, preemptor, domain, mockSchedulingFunc)
+			pl.Preempt(ctx, preemptorPGInfo, mockSchedulingFunc)
 			if err := pl.Handle.MutableSnapshotSharedLister().EndMutations(); err != nil {
 				t.Errorf("Unexpected error: %v", err)
 			}

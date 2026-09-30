@@ -41,10 +41,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/flagz"
 	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/apiserver/pkg/server/mux"
+	"k8s.io/apiserver/pkg/server/signals"
 	"k8s.io/apiserver/pkg/server/statusz"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	cacheddiscovery "k8s.io/client-go/discovery/cached/memory"
@@ -141,7 +141,7 @@ controller, and serviceaccounts controller.`,
 			}
 			cliflag.PrintFlags(cmd.Flags())
 
-			// We use context.Background() here still because using server.SetupSignalContext() would cause
+			// We use context.Background() here still because using signals.SetupSignalContext() would cause
 			// components like the event broadcaster to terminate on signal immediately, which is not what we want.
 			// Termination for that case is being handled explicitly in Run() later on.
 			ctx := context.Background()
@@ -157,7 +157,7 @@ controller, and serviceaccounts controller.`,
 			s.ComponentGlobalsRegistry.AddMetrics()
 
 			if utilfeature.DefaultFeatureGate.Enabled(cmfeatures.ControllerManagerReleaseLeaderElectionLockOnExit) {
-				ctx = server.SetupSignalContext()
+				ctx = signals.SetupSignalContext()
 			}
 			return Run(ctx, c.Complete())
 		},
@@ -198,7 +198,6 @@ func ResyncPeriod(c *config.CompletedConfig) func() time.Duration {
 // Run runs the KubeControllerManagerOptions.
 func Run(ctx context.Context, c *config.CompletedConfig) error {
 	logger := klog.FromContext(ctx)
-	stopCh := ctx.Done()
 
 	// To help debugging, immediately log version
 	logger.Info("Starting", "version", utilversion.Get())
@@ -255,8 +254,11 @@ func Run(ctx context.Context, c *config.CompletedConfig) error {
 		}
 
 		handler := genericcontrollermanager.BuildHandlerChain(unsecuredMux, &c.Authorization, &c.Authentication)
+		// ctx.Done() is nil for context.Background(), so derive a channel that is closed when Run returns.
+		servingCtx, cancelServingCtx := context.WithCancel(ctx)
+		defer cancelServingCtx()
 		// TODO: handle stoppedCh and listenerStoppedCh returned by c.SecureServing.Serve
-		if _, _, err := c.SecureServing.Serve(handler, 0, stopCh); err != nil {
+		if _, _, err := c.SecureServing.Serve(handler, 0, servingCtx.Done()); err != nil {
 			return err
 		}
 	}

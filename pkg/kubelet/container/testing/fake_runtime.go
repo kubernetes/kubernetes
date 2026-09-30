@@ -316,7 +316,7 @@ func (f *FakeRuntime) KillContainerInPod(container v1.Container, pod *v1.Pod) er
 	return f.Err
 }
 
-func (f *FakeRuntime) GeneratePodStatus(event *runtimeapi.ContainerEventResponse) *kubecontainer.PodStatus {
+func (f *FakeRuntime) GeneratePodStatus(_ context.Context, event *runtimeapi.ContainerEventResponse) *kubecontainer.PodStatus {
 	f.Lock()
 	defer f.Unlock()
 

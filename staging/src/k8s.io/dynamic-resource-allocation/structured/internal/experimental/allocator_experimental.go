@@ -49,7 +49,6 @@ func MakeDeviceID(driver, pool, device string) DeviceID {
 	return internal.MakeDeviceID(driver, pool, device)
 }
 
-type SharedDeviceID = internal.SharedDeviceID
 type DeviceConsumedCapacity = internal.DeviceConsumedCapacity
 type ConsumedCapacityCollection = internal.ConsumedCapacityCollection
 type ConsumedCapacity = internal.ConsumedCapacity
@@ -1973,10 +1972,8 @@ func (alloc *allocator) deviceCapacityInUse(deviceID DeviceID) bool {
 	}
 	// A persisted allow-multiple allocation with no per-share capacity is recorded
 	// only in AllocatedSharedDeviceIDs (with no AggregatedCapacity entry).
-	for sharedDeviceID := range alloc.allocatedState.AllocatedSharedDeviceIDs {
-		if sharedDeviceID.GetDeviceID() == deviceID {
-			return true
-		}
+	if alloc.allocatedState.AllocatedSharedDeviceIDs.Has(deviceID) {
+		return true
 	}
 	return alloc.allocatingCapacityForAnyClaim(deviceID)
 }

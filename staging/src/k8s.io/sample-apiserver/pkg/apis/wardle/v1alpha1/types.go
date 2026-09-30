@@ -20,6 +20,7 @@ import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:prerelease-lifecycle-gen:introduced=1.0
+// +k8s:prerelease-lifecycle-gen:deprecated=1.3
 // +k8s:prerelease-lifecycle-gen:removed=1.10
 
 // FlunderList is a list of Flunder objects.
@@ -50,6 +51,7 @@ type FlunderStatus struct {
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:prerelease-lifecycle-gen:introduced=1.0
+// +k8s:prerelease-lifecycle-gen:deprecated=1.3
 // +k8s:prerelease-lifecycle-gen:removed=1.10
 
 type Flunder struct {
@@ -64,6 +66,7 @@ type Flunder struct {
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:prerelease-lifecycle-gen:introduced=1.0
+// +k8s:prerelease-lifecycle-gen:deprecated=1.3
 // +k8s:prerelease-lifecycle-gen:removed=1.10
 
 type Fischer struct {
@@ -78,6 +81,7 @@ type Fischer struct {
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:prerelease-lifecycle-gen:introduced=1.0
+// +k8s:prerelease-lifecycle-gen:deprecated=1.3
 // +k8s:prerelease-lifecycle-gen:removed=1.10
 
 // FischerList is a list of Fischer objects.

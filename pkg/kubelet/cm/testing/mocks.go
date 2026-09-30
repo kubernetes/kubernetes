@@ -93,7 +93,7 @@ type MockContainerManager_ContainerHasExclusiveCPUs_Call struct {
 //   - logger klog.Logger
 //   - pod *v1.Pod
 //   - container *v1.Container
-func (_e *MockContainerManager_Expecter) ContainerHasExclusiveCPUs(logger interface{}, pod interface{}, container interface{}) *MockContainerManager_ContainerHasExclusiveCPUs_Call {
+func (_e *MockContainerManager_Expecter) ContainerHasExclusiveCPUs(logger any, pod any, container any) *MockContainerManager_ContainerHasExclusiveCPUs_Call {
 	return &MockContainerManager_ContainerHasExclusiveCPUs_Call{Call: _e.mock.On("ContainerHasExclusiveCPUs", logger, pod, container)}
 }
 
@@ -202,7 +202,7 @@ type MockContainerManager_GetAllocatableDevices_Call struct {
 
 // GetAllocatableDevices is a helper method to define mock.On call
 //   - logger klog.Logger
-func (_e *MockContainerManager_Expecter) GetAllocatableDevices(logger interface{}) *MockContainerManager_GetAllocatableDevices_Call {
+func (_e *MockContainerManager_Expecter) GetAllocatableDevices(logger any) *MockContainerManager_GetAllocatableDevices_Call {
 	return &MockContainerManager_GetAllocatableDevices_Call{Call: _e.mock.On("GetAllocatableDevices", logger)}
 }
 
@@ -255,7 +255,7 @@ type MockContainerManager_GetAllocatableMemory_Call struct {
 
 // GetAllocatableMemory is a helper method to define mock.On call
 //   - logger klog.Logger
-func (_e *MockContainerManager_Expecter) GetAllocatableMemory(logger interface{}) *MockContainerManager_GetAllocatableMemory_Call {
+func (_e *MockContainerManager_Expecter) GetAllocatableMemory(logger any) *MockContainerManager_GetAllocatableMemory_Call {
 	return &MockContainerManager_GetAllocatableMemory_Call{Call: _e.mock.On("GetAllocatableMemory", logger)}
 }
 
@@ -308,7 +308,7 @@ type MockContainerManager_GetAllocateResourcesPodAdmitHandler_Call struct {
 
 // GetAllocateResourcesPodAdmitHandler is a helper method to define mock.On call
 //   - logger klog.Logger
-func (_e *MockContainerManager_Expecter) GetAllocateResourcesPodAdmitHandler(logger interface{}) *MockContainerManager_GetAllocateResourcesPodAdmitHandler_Call {
+func (_e *MockContainerManager_Expecter) GetAllocateResourcesPodAdmitHandler(logger any) *MockContainerManager_GetAllocateResourcesPodAdmitHandler_Call {
 	return &MockContainerManager_GetAllocateResourcesPodAdmitHandler_Call{Call: _e.mock.On("GetAllocateResourcesPodAdmitHandler", logger)}
 }
 
@@ -362,7 +362,7 @@ type MockContainerManager_GetCPUs_Call struct {
 // GetCPUs is a helper method to define mock.On call
 //   - pod *v1.Pod
 //   - container *v1.Container
-func (_e *MockContainerManager_Expecter) GetCPUs(pod interface{}, container interface{}) *MockContainerManager_GetCPUs_Call {
+func (_e *MockContainerManager_Expecter) GetCPUs(pod any, container any) *MockContainerManager_GetCPUs_Call {
 	return &MockContainerManager_GetCPUs_Call{Call: _e.mock.On("GetCPUs", pod, container)}
 }
 
@@ -421,7 +421,7 @@ type MockContainerManager_GetCapacity_Call struct {
 // GetCapacity is a helper method to define mock.On call
 //   - logger klog.Logger
 //   - localStorageCapacityIsolation bool
-func (_e *MockContainerManager_Expecter) GetCapacity(logger interface{}, localStorageCapacityIsolation interface{}) *MockContainerManager_GetCapacity_Call {
+func (_e *MockContainerManager_Expecter) GetCapacity(logger any, localStorageCapacityIsolation any) *MockContainerManager_GetCapacity_Call {
 	return &MockContainerManager_GetCapacity_Call{Call: _e.mock.On("GetCapacity", logger, localStorageCapacityIsolation)}
 }
 
@@ -498,7 +498,7 @@ type MockContainerManager_GetDevicePluginResourceCapacity_Call struct {
 
 // GetDevicePluginResourceCapacity is a helper method to define mock.On call
 //   - logger klog.Logger
-func (_e *MockContainerManager_Expecter) GetDevicePluginResourceCapacity(logger interface{}) *MockContainerManager_GetDevicePluginResourceCapacity_Call {
+func (_e *MockContainerManager_Expecter) GetDevicePluginResourceCapacity(logger any) *MockContainerManager_GetDevicePluginResourceCapacity_Call {
 	return &MockContainerManager_GetDevicePluginResourceCapacity_Call{Call: _e.mock.On("GetDevicePluginResourceCapacity", logger)}
 }
 
@@ -552,7 +552,7 @@ type MockContainerManager_GetDevices_Call struct {
 // GetDevices is a helper method to define mock.On call
 //   - podUID string
 //   - containerName string
-func (_e *MockContainerManager_Expecter) GetDevices(podUID interface{}, containerName interface{}) *MockContainerManager_GetDevices_Call {
+func (_e *MockContainerManager_Expecter) GetDevices(podUID any, containerName any) *MockContainerManager_GetDevices_Call {
 	return &MockContainerManager_GetDevices_Call{Call: _e.mock.On("GetDevices", podUID, containerName)}
 }
 
@@ -612,7 +612,7 @@ type MockContainerManager_GetDynamicResources_Call struct {
 //   - logger klog.Logger
 //   - pod *v1.Pod
 //   - container *v1.Container
-func (_e *MockContainerManager_Expecter) GetDynamicResources(logger interface{}, pod interface{}, container interface{}) *MockContainerManager_GetDynamicResources_Call {
+func (_e *MockContainerManager_Expecter) GetDynamicResources(logger any, pod any, container any) *MockContainerManager_GetDynamicResources_Call {
 	return &MockContainerManager_GetDynamicResources_Call{Call: _e.mock.On("GetDynamicResources", logger, pod, container)}
 }
 
@@ -723,7 +723,7 @@ type MockContainerManager_GetMemory_Call struct {
 //   - logger klog.Logger
 //   - pod *v1.Pod
 //   - container *v1.Container
-func (_e *MockContainerManager_Expecter) GetMemory(logger interface{}, pod interface{}, container interface{}) *MockContainerManager_GetMemory_Call {
+func (_e *MockContainerManager_Expecter) GetMemory(logger any, pod any, container any) *MockContainerManager_GetMemory_Call {
 	return &MockContainerManager_GetMemory_Call{Call: _e.mock.On("GetMemory", logger, pod, container)}
 }
 
@@ -1014,7 +1014,7 @@ type MockContainerManager_GetPodCPUs_Call struct {
 
 // GetPodCPUs is a helper method to define mock.On call
 //   - podUID string
-func (_e *MockContainerManager_Expecter) GetPodCPUs(podUID interface{}) *MockContainerManager_GetPodCPUs_Call {
+func (_e *MockContainerManager_Expecter) GetPodCPUs(podUID any) *MockContainerManager_GetPodCPUs_Call {
 	return &MockContainerManager_GetPodCPUs_Call{Call: _e.mock.On("GetPodCPUs", podUID)}
 }
 
@@ -1112,7 +1112,7 @@ type MockContainerManager_GetPodMemory_Call struct {
 // GetPodMemory is a helper method to define mock.On call
 //   - logger klog.Logger
 //   - podUID string
-func (_e *MockContainerManager_Expecter) GetPodMemory(logger interface{}, podUID interface{}) *MockContainerManager_GetPodMemory_Call {
+func (_e *MockContainerManager_Expecter) GetPodMemory(logger any, podUID any) *MockContainerManager_GetPodMemory_Call {
 	return &MockContainerManager_GetPodMemory_Call{Call: _e.mock.On("GetPodMemory", logger, podUID)}
 }
 
@@ -1225,7 +1225,7 @@ type MockContainerManager_GetResources_Call struct {
 //   - ctx context.Context
 //   - pod *v1.Pod
 //   - container1 *v1.Container
-func (_e *MockContainerManager_Expecter) GetResources(ctx interface{}, pod interface{}, container1 interface{}) *MockContainerManager_GetResources_Call {
+func (_e *MockContainerManager_Expecter) GetResources(ctx any, pod any, container1 any) *MockContainerManager_GetResources_Call {
 	return &MockContainerManager_GetResources_Call{Call: _e.mock.On("GetResources", ctx, pod, container1)}
 }
 
@@ -1288,7 +1288,7 @@ type MockContainerManager_InternalContainerLifecycle_Call struct {
 
 // InternalContainerLifecycle is a helper method to define mock.On call
 //   - logger klog.Logger
-func (_e *MockContainerManager_Expecter) InternalContainerLifecycle(logger interface{}) *MockContainerManager_InternalContainerLifecycle_Call {
+func (_e *MockContainerManager_Expecter) InternalContainerLifecycle(logger any) *MockContainerManager_InternalContainerLifecycle_Call {
 	return &MockContainerManager_InternalContainerLifecycle_Call{Call: _e.mock.On("InternalContainerLifecycle", logger)}
 }
 
@@ -1386,7 +1386,7 @@ type MockContainerManager_PodHasExclusiveCPUs_Call struct {
 // PodHasExclusiveCPUs is a helper method to define mock.On call
 //   - logger klog.Logger
 //   - pod *v1.Pod
-func (_e *MockContainerManager_Expecter) PodHasExclusiveCPUs(logger interface{}, pod interface{}) *MockContainerManager_PodHasExclusiveCPUs_Call {
+func (_e *MockContainerManager_Expecter) PodHasExclusiveCPUs(logger any, pod any) *MockContainerManager_PodHasExclusiveCPUs_Call {
 	return &MockContainerManager_PodHasExclusiveCPUs_Call{Call: _e.mock.On("PodHasExclusiveCPUs", logger, pod)}
 }
 
@@ -1442,7 +1442,7 @@ type MockContainerManager_PodMightNeedToUnprepareResources_Call struct {
 
 // PodMightNeedToUnprepareResources is a helper method to define mock.On call
 //   - UID types.UID
-func (_e *MockContainerManager_Expecter) PodMightNeedToUnprepareResources(UID interface{}) *MockContainerManager_PodMightNeedToUnprepareResources_Call {
+func (_e *MockContainerManager_Expecter) PodMightNeedToUnprepareResources(UID any) *MockContainerManager_PodMightNeedToUnprepareResources_Call {
 	return &MockContainerManager_PodMightNeedToUnprepareResources_Call{Call: _e.mock.On("PodMightNeedToUnprepareResources", UID)}
 }
 
@@ -1494,7 +1494,7 @@ type MockContainerManager_PrepareDynamicResources_Call struct {
 // PrepareDynamicResources is a helper method to define mock.On call
 //   - context1 context.Context
 //   - pod *v1.Pod
-func (_e *MockContainerManager_Expecter) PrepareDynamicResources(context1 interface{}, pod interface{}) *MockContainerManager_PrepareDynamicResources_Call {
+func (_e *MockContainerManager_Expecter) PrepareDynamicResources(context1 any, pod any) *MockContainerManager_PrepareDynamicResources_Call {
 	return &MockContainerManager_PrepareDynamicResources_Call{Call: _e.mock.On("PrepareDynamicResources", context1, pod)}
 }
 
@@ -1601,7 +1601,7 @@ type MockContainerManager_Start_Call struct {
 //   - podStatusProvider status.PodStatusProvider
 //   - runtimeService cri.RuntimeService
 //   - b bool
-func (_e *MockContainerManager_Expecter) Start(context1 interface{}, node interface{}, activePodsFunc interface{}, getNodeFunc interface{}, sourcesReady interface{}, podStatusProvider interface{}, runtimeService interface{}, b interface{}) *MockContainerManager_Start_Call {
+func (_e *MockContainerManager_Expecter) Start(context1 any, node any, activePodsFunc any, getNodeFunc any, sourcesReady any, podStatusProvider any, runtimeService any, b any) *MockContainerManager_Start_Call {
 	return &MockContainerManager_Start_Call{Call: _e.mock.On("Start", context1, node, activePodsFunc, getNodeFunc, sourcesReady, podStatusProvider, runtimeService, b)}
 }
 
@@ -1778,7 +1778,7 @@ type MockContainerManager_UnprepareDynamicResources_Call struct {
 // UnprepareDynamicResources is a helper method to define mock.On call
 //   - context1 context.Context
 //   - pod *v1.Pod
-func (_e *MockContainerManager_Expecter) UnprepareDynamicResources(context1 interface{}, pod interface{}) *MockContainerManager_UnprepareDynamicResources_Call {
+func (_e *MockContainerManager_Expecter) UnprepareDynamicResources(context1 any, pod any) *MockContainerManager_UnprepareDynamicResources_Call {
 	return &MockContainerManager_UnprepareDynamicResources_Call{Call: _e.mock.On("UnprepareDynamicResources", context1, pod)}
 }
 
@@ -1823,7 +1823,7 @@ type MockContainerManager_UpdateAllocatedDevices_Call struct {
 
 // UpdateAllocatedDevices is a helper method to define mock.On call
 //   - logger klog.Logger
-func (_e *MockContainerManager_Expecter) UpdateAllocatedDevices(logger interface{}) *MockContainerManager_UpdateAllocatedDevices_Call {
+func (_e *MockContainerManager_Expecter) UpdateAllocatedDevices(logger any) *MockContainerManager_UpdateAllocatedDevices_Call {
 	return &MockContainerManager_UpdateAllocatedDevices_Call{Call: _e.mock.On("UpdateAllocatedDevices", logger)}
 }
 
@@ -1865,7 +1865,7 @@ type MockContainerManager_UpdateAllocatedResourcesStatus_Call struct {
 //   - logger klog.Logger
 //   - pod *v1.Pod
 //   - status1 *v1.PodStatus
-func (_e *MockContainerManager_Expecter) UpdateAllocatedResourcesStatus(logger interface{}, pod interface{}, status1 interface{}) *MockContainerManager_UpdateAllocatedResourcesStatus_Call {
+func (_e *MockContainerManager_Expecter) UpdateAllocatedResourcesStatus(logger any, pod any, status1 any) *MockContainerManager_UpdateAllocatedResourcesStatus_Call {
 	return &MockContainerManager_UpdateAllocatedResourcesStatus_Call{Call: _e.mock.On("UpdateAllocatedResourcesStatus", logger, pod, status1)}
 }
 
@@ -1927,7 +1927,7 @@ type MockContainerManager_UpdatePluginResources_Call struct {
 // UpdatePluginResources is a helper method to define mock.On call
 //   - nodeInfo *framework.NodeInfo
 //   - podAdmitAttributes *lifecycle.PodAdmitAttributes
-func (_e *MockContainerManager_Expecter) UpdatePluginResources(nodeInfo interface{}, podAdmitAttributes interface{}) *MockContainerManager_UpdatePluginResources_Call {
+func (_e *MockContainerManager_Expecter) UpdatePluginResources(nodeInfo any, podAdmitAttributes any) *MockContainerManager_UpdatePluginResources_Call {
 	return &MockContainerManager_UpdatePluginResources_Call{Call: _e.mock.On("UpdatePluginResources", nodeInfo, podAdmitAttributes)}
 }
 
@@ -1983,7 +1983,7 @@ type MockContainerManager_UpdateQOSCgroups_Call struct {
 
 // UpdateQOSCgroups is a helper method to define mock.On call
 //   - logger klog.Logger
-func (_e *MockContainerManager_Expecter) UpdateQOSCgroups(logger interface{}) *MockContainerManager_UpdateQOSCgroups_Call {
+func (_e *MockContainerManager_Expecter) UpdateQOSCgroups(logger any) *MockContainerManager_UpdateQOSCgroups_Call {
 	return &MockContainerManager_UpdateQOSCgroups_Call{Call: _e.mock.On("UpdateQOSCgroups", logger)}
 }
 
@@ -2108,7 +2108,7 @@ type MockPodContainerManager_Destroy_Call struct {
 // Destroy is a helper method to define mock.On call
 //   - logger klog.Logger
 //   - name cm.CgroupName
-func (_e *MockPodContainerManager_Expecter) Destroy(logger interface{}, name interface{}) *MockPodContainerManager_Destroy_Call {
+func (_e *MockPodContainerManager_Expecter) Destroy(logger any, name any) *MockPodContainerManager_Destroy_Call {
 	return &MockPodContainerManager_Destroy_Call{Call: _e.mock.On("Destroy", logger, name)}
 }
 
@@ -2165,7 +2165,7 @@ type MockPodContainerManager_EnsureExists_Call struct {
 // EnsureExists is a helper method to define mock.On call
 //   - logger klog.Logger
 //   - pod *v1.Pod
-func (_e *MockPodContainerManager_Expecter) EnsureExists(logger interface{}, pod interface{}) *MockPodContainerManager_EnsureExists_Call {
+func (_e *MockPodContainerManager_Expecter) EnsureExists(logger any, pod any) *MockPodContainerManager_EnsureExists_Call {
 	return &MockPodContainerManager_EnsureExists_Call{Call: _e.mock.On("EnsureExists", logger, pod)}
 }
 
@@ -2221,7 +2221,7 @@ type MockPodContainerManager_Exists_Call struct {
 
 // Exists is a helper method to define mock.On call
 //   - pod *v1.Pod
-func (_e *MockPodContainerManager_Expecter) Exists(pod interface{}) *MockPodContainerManager_Exists_Call {
+func (_e *MockPodContainerManager_Expecter) Exists(pod any) *MockPodContainerManager_Exists_Call {
 	return &MockPodContainerManager_Exists_Call{Call: _e.mock.On("Exists", pod)}
 }
 
@@ -2283,7 +2283,7 @@ type MockPodContainerManager_GetAllPodsFromCgroups_Call struct {
 
 // GetAllPodsFromCgroups is a helper method to define mock.On call
 //   - logger klog.Logger
-func (_e *MockPodContainerManager_Expecter) GetAllPodsFromCgroups(logger interface{}) *MockPodContainerManager_GetAllPodsFromCgroups_Call {
+func (_e *MockPodContainerManager_Expecter) GetAllPodsFromCgroups(logger any) *MockPodContainerManager_GetAllPodsFromCgroups_Call {
 	return &MockPodContainerManager_GetAllPodsFromCgroups_Call{Call: _e.mock.On("GetAllPodsFromCgroups", logger)}
 }
 
@@ -2346,7 +2346,7 @@ type MockPodContainerManager_GetPodCgroupConfig_Call struct {
 // GetPodCgroupConfig is a helper method to define mock.On call
 //   - pod *v1.Pod
 //   - resource v1.ResourceName
-func (_e *MockPodContainerManager_Expecter) GetPodCgroupConfig(pod interface{}, resource interface{}) *MockPodContainerManager_GetPodCgroupConfig_Call {
+func (_e *MockPodContainerManager_Expecter) GetPodCgroupConfig(pod any, resource any) *MockPodContainerManager_GetPodCgroupConfig_Call {
 	return &MockPodContainerManager_GetPodCgroupConfig_Call{Call: _e.mock.On("GetPodCgroupConfig", pod, resource)}
 }
 
@@ -2411,7 +2411,7 @@ type MockPodContainerManager_GetPodCgroupMemoryUsage_Call struct {
 
 // GetPodCgroupMemoryUsage is a helper method to define mock.On call
 //   - pod *v1.Pod
-func (_e *MockPodContainerManager_Expecter) GetPodCgroupMemoryUsage(pod interface{}) *MockPodContainerManager_GetPodCgroupMemoryUsage_Call {
+func (_e *MockPodContainerManager_Expecter) GetPodCgroupMemoryUsage(pod any) *MockPodContainerManager_GetPodCgroupMemoryUsage_Call {
 	return &MockPodContainerManager_GetPodCgroupMemoryUsage_Call{Call: _e.mock.On("GetPodCgroupMemoryUsage", pod)}
 }
 
@@ -2473,7 +2473,7 @@ type MockPodContainerManager_GetPodContainerName_Call struct {
 
 // GetPodContainerName is a helper method to define mock.On call
 //   - pod *v1.Pod
-func (_e *MockPodContainerManager_Expecter) GetPodContainerName(pod interface{}) *MockPodContainerManager_GetPodContainerName_Call {
+func (_e *MockPodContainerManager_Expecter) GetPodContainerName(pod any) *MockPodContainerManager_GetPodContainerName_Call {
 	return &MockPodContainerManager_GetPodContainerName_Call{Call: _e.mock.On("GetPodContainerName", pod)}
 }
 
@@ -2533,7 +2533,7 @@ type MockPodContainerManager_IsPodCgroup_Call struct {
 
 // IsPodCgroup is a helper method to define mock.On call
 //   - cgroupfs string
-func (_e *MockPodContainerManager_Expecter) IsPodCgroup(cgroupfs interface{}) *MockPodContainerManager_IsPodCgroup_Call {
+func (_e *MockPodContainerManager_Expecter) IsPodCgroup(cgroupfs any) *MockPodContainerManager_IsPodCgroup_Call {
 	return &MockPodContainerManager_IsPodCgroup_Call{Call: _e.mock.On("IsPodCgroup", cgroupfs)}
 }
 
@@ -2585,7 +2585,7 @@ type MockPodContainerManager_ReduceCPULimits_Call struct {
 // ReduceCPULimits is a helper method to define mock.On call
 //   - logger klog.Logger
 //   - name cm.CgroupName
-func (_e *MockPodContainerManager_Expecter) ReduceCPULimits(logger interface{}, name interface{}) *MockPodContainerManager_ReduceCPULimits_Call {
+func (_e *MockPodContainerManager_Expecter) ReduceCPULimits(logger any, name any) *MockPodContainerManager_ReduceCPULimits_Call {
 	return &MockPodContainerManager_ReduceCPULimits_Call{Call: _e.mock.On("ReduceCPULimits", logger, name)}
 }
 
@@ -2643,7 +2643,7 @@ type MockPodContainerManager_SetPodCgroupConfig_Call struct {
 //   - logger klog.Logger
 //   - pod *v1.Pod
 //   - resourceConfig *cm.ResourceConfig
-func (_e *MockPodContainerManager_Expecter) SetPodCgroupConfig(logger interface{}, pod interface{}, resourceConfig interface{}) *MockPodContainerManager_SetPodCgroupConfig_Call {
+func (_e *MockPodContainerManager_Expecter) SetPodCgroupConfig(logger any, pod any, resourceConfig any) *MockPodContainerManager_SetPodCgroupConfig_Call {
 	return &MockPodContainerManager_SetPodCgroupConfig_Call{Call: _e.mock.On("SetPodCgroupConfig", logger, pod, resourceConfig)}
 }
 

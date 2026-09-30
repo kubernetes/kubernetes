@@ -28,13 +28,13 @@ import (
 // ShareableCapacityStatus reports aggregate amounts for a single shareable
 // capacity key.
 type ShareableCapacityStatusApplyConfiguration struct {
-	// Name is the capacity name.
+	// name is the capacity name.
 	Name *string `json:"name,omitempty"`
-	// Total is the sum of this capacity across shareable devices in the pool.
+	// total is the sum of this capacity across shareable devices in the pool.
 	Total *resource.Quantity `json:"total,omitempty"`
-	// Consumed is the amount drawn by current allocations.
+	// consumed is the amount drawn by current allocations.
 	Consumed *resource.Quantity `json:"consumed,omitempty"`
-	// Available is Total minus Consumed, never negative.
+	// available is Total minus Consumed, never negative.
 	Available *resource.Quantity `json:"available,omitempty"`
 }
 

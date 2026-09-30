@@ -25,7 +25,6 @@ import (
 type gceImage struct {
 	CreationTimestamp string `json:"creationTimestamp"`
 	Family            string `json:"family"`
-	ID                string `json:"id"`
 	Name              string `json:"name"`
 }
 

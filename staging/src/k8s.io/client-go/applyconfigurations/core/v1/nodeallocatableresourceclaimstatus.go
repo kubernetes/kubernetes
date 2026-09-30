@@ -23,14 +23,14 @@ package v1
 //
 // NodeAllocatableResourceClaimStatus describes the status of node allocatable resources allocated via DRA.
 type NodeAllocatableResourceClaimStatusApplyConfiguration struct {
-	// ResourceClaimName is the resource claim referenced by the pod that resulted in this node allocatable resource allocation.
+	// resourceClaimName is the resource claim referenced by the pod that resulted in this node allocatable resource allocation.
 	ResourceClaimName *string `json:"resourceClaimName,omitempty"`
-	// Containers lists the names of all containers in this pod that reference the claim.
+	// containers lists the names of all containers in this pod that reference the claim.
 	Containers []string `json:"containers,omitempty"`
-	// Mapping contains allocations through devices mapped in the device spec's `nodeAllocatableResources[...].mapping` field.
+	// mapping contains allocations through devices mapped in the device spec's `nodeAllocatableResources[...].mapping` field.
 	// This is used by kubelet for pod level and container-level cgroup enforcement.
 	Mapping []NodeAllocatableMappedResourcesApplyConfiguration `json:"mapping,omitempty"`
-	// Overhead contains allocations through devices mapped in the device spec's `nodeAllocatableResources[...].overhead` field.
+	// overhead contains allocations through devices mapped in the device spec's `nodeAllocatableResources[...].overhead` field.
 	// This is used by kubelet for pod level and container-level cgroup enforcement.
 	Overhead []NodeAllocatableOverheadResourcesApplyConfiguration `json:"overhead,omitempty"`
 }

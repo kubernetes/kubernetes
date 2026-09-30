@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // Package x documents experimental features for [go.opentelemetry.io/otel/sdk].
-package x // import "go.opentelemetry.io/otel/sdk/internal/x"
+package x
 
 import "strings"
 

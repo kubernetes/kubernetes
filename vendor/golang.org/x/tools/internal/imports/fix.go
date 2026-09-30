@@ -463,6 +463,15 @@ func sortFixes(fixes []*ImportFix) {
 	})
 }
 
+func hasDeleteFix(fixes []*ImportFix) bool {
+	for _, fix := range fixes {
+		if fix.FixType == DeleteImport {
+			return true
+		}
+	}
+	return false
+}
+
 // importSpecName gets the import name of imp in the import spec.
 //
 // When the import identifier matches the assumed import name, the import name does
@@ -579,17 +588,6 @@ func getFixes(ctx context.Context, fset *token.FileSet, f *ast.File, filename st
 }
 
 func getFixesWithSource(ctx context.Context, fset *token.FileSet, f *ast.File, filename string, goroot string, logf func(string, ...any), source Source) ([]*ImportFix, error) {
-	// If there is an Index for the GOMODCACHE, remember that, and later make it so that the
-	// directory walk doesn't go into the module cache, since we already have all the information
-	var ix *modindex.Index
-	src, ok := source.(*ProcessEnvSource)
-	if ok {
-		var err error
-		if ix, err = modindex.Read(src.env.Env["GOMODCACHE"]); err != nil {
-			ix = nil // don't use it if there was an error
-		}
-	}
-
 	// This logic is defensively duplicated from getFixes.
 	abs, err := filepath.Abs(filename)
 	if err != nil {
@@ -632,7 +630,7 @@ func getFixesWithSource(ctx context.Context, fset *token.FileSet, f *ast.File, f
 	// Now we can try adding imports from the stdlib.
 	p.assumeSiblingImportsValid()
 	addStdlibCandidates(p, p.missingRefs)
-	if fixes, done := p.fix(); done {
+	if fixes, done := p.fix(); done && !hasDeleteFix(fixes) {
 		return fixes, nil
 	}
 
@@ -648,6 +646,17 @@ func getFixesWithSource(ctx context.Context, fset *token.FileSet, f *ast.File, f
 	}
 	p.loadRealPackageNames = true
 	p.otherFiles = otherFiles
+
+	// If there is an Index for the GOMODCACHE, remember that, and later make it so that the
+	// directory walk doesn't go into the module cache, since we already have all the information.
+	var ix *modindex.Index
+	if src, ok := source.(*ProcessEnvSource); ok {
+		var err error
+		if ix, err = modindex.Read(src.env.Env["GOMODCACHE"]); err != nil {
+			ix = nil // don't use it if there was an error
+		}
+	}
+
 	if ix != nil {
 		src, ok := p.source.(*ProcessEnvSource)
 		if ok {

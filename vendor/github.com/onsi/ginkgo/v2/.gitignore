@@ -7,3 +7,4 @@ integration/tmp_*/
 .idea/
 *.log
 *.test
+/.release/

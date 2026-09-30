@@ -28,8 +28,8 @@ import (
 	"fmt"
 	"strings"
 
-	jose "gopkg.in/go-jose/go-jose.v2"
-	"gopkg.in/go-jose/go-jose.v2/jwt"
+	jose "github.com/go-jose/go-jose/v4"
+	"github.com/go-jose/go-jose/v4/jwt"
 
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	v1 "k8s.io/api/core/v1"
@@ -337,12 +337,25 @@ type Validator[PrivateClaims any] interface {
 	Validate(ctx context.Context, tokenData string, public *jwt.Claims, private *PrivateClaims) (*apiserverserviceaccount.ServiceAccountInfo, error)
 }
 
+// IMPORTANT: The algorithms listed below must be kept in sync with:
+// - pkg/serviceaccount/externaljwt/plugin/plugin.go validateJWTHeader
+// - pkg/serviceaccount/jwt.go signerFromRSAPrivateKey
+// - pkg/serviceaccount/jwt.go signerFromECDSAPrivateKey
+// - pkg/serviceaccount/jwt.go AcceptableServiceAccountSignatureAlgorithms
+// - test/images/agnhost/openidmetadata/openidmetadata.go validate SupportedSigningAlgs
+var AcceptableServiceAccountSignatureAlgorithms = []jose.SignatureAlgorithm{
+	jose.ES256,
+	jose.ES384,
+	jose.ES512,
+	jose.RS256,
+}
+
 func (j *jwtTokenAuthenticator[PrivateClaims]) AuthenticateToken(ctx context.Context, tokenData string) (*authenticator.Response, bool, error) {
 	if !j.hasCorrectIssuer(tokenData) {
 		return nil, false, nil
 	}
 
-	tok, err := jwt.ParseSigned(tokenData)
+	tok, err := jwt.ParseSigned(tokenData, AcceptableServiceAccountSignatureAlgorithms)
 	if err != nil {
 		return nil, false, nil
 	}
@@ -445,8 +458,31 @@ func (j *jwtTokenAuthenticator[PrivateClaims]) hasCorrectIssuer(tokenData string
 	return j.issuers[claims.Issuer]
 }
 
+// audienceOverrider is a utility struct used to
+// ensure that the audience claim always serializes
+// as a list of string values.
+// This prevents the go-jose change in https://github.com/go-jose/go-jose/blob/25b55feb059b8b08e16a73c601c8b80571fa5208/jwt/claims.go#L129-L135
+// from causing the 'aud' claim in serviceaccount tokens
+// to suddenly be plain strings.
+// Use of this utility struct is intended to allow
+// updating to the latest version of go-jose while maintaining
+// backwards compatibility for serviceaccount token payloads.
+type audienceOverrider struct {
+	Aud []string `json:"aud,omitempty"`
+}
+
 // GenerateToken is shared between internal and external signer code to ensure that claim merging logic remains consistent between them.
 func GenerateToken(signer jose.Signer, iss string, claims *jwt.Claims, privateClaims interface{}) (string, error) {
+	audOverride := &audienceOverrider{
+		Aud: []string{},
+	}
+
+	if claims != nil {
+		for _, aud := range claims.Audience {
+			audOverride.Aud = append(audOverride.Aud, aud)
+		}
+	}
+
 	// claims are applied in reverse precedence
 	return jwt.Signed(signer).
 		Claims(privateClaims).
@@ -454,5 +490,6 @@ func GenerateToken(signer jose.Signer, iss string, claims *jwt.Claims, privateCl
 		Claims(&jwt.Claims{
 			Issuer: iss,
 		}).
-		CompactSerialize()
+		Claims(audOverride).
+		Serialize()
 }

@@ -1,7 +1,7 @@
 // Copyright The OpenTelemetry Authors
 // SPDX-License-Identifier: Apache-2.0
 
-package otlptracegrpc // import "go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
+package otlptracegrpc
 
 import (
 	"context"
@@ -328,12 +328,10 @@ func throttleDelay(s *status.Status) (bool, time.Duration) {
 }
 
 // MarshalLog is the marshaling function used by the logging system to represent this Client.
-func (c *client) MarshalLog() any {
+func (*client) MarshalLog() any {
 	return struct {
-		Type     string
-		Endpoint string
+		Type string
 	}{
-		Type:     "otlptracegrpc",
-		Endpoint: c.endpoint,
+		Type: "otlptracegrpc",
 	}
 }

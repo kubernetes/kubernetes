@@ -24,14 +24,14 @@ package v1
 // DeviceCounterConsumption defines a set of counters that
 // a device will consume from a CounterSet.
 type DeviceCounterConsumptionApplyConfiguration struct {
-	// CounterSet is the name of the set from which the
+	// counterSet is the name of the set from which the
 	// counters defined will be consumed.
 	CounterSet *string `json:"counterSet,omitempty"`
-	// Counters defines the counters that will be consumed by the device.
+	// counters defines the counters that will be consumed by the device.
 	//
 	// The maximum number of counters is 32.
 	Counters map[string]CounterApplyConfiguration `json:"counters,omitempty"`
-	// CompatibilityGroups is a list of opaque group names for
+	// compatibilityGroups is a list of opaque group names for
 	// this counter set consumption.
 	//
 	// Devices that consume counters from the same counter set may only be

@@ -37,7 +37,7 @@ func TestVolumeOperationError(t *testing.T) {
 
 	RecordVolumeOperationErrorMetric("kubernetes.io/fake-plugin", "deletion")
 
-	want := `# HELP volume_operation_errors_total [ALPHA] Total volume operation errors
+	want := `# HELP volume_operation_errors_total [BETA] Total volume operation errors
 # TYPE volume_operation_errors_total counter
 volume_operation_errors_total{operation_name="deletion",plugin_name="kubernetes.io/fake-plugin"} 1
 `

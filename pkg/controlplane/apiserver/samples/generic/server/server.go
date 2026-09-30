@@ -30,6 +30,7 @@ import (
 	_ "k8s.io/apiserver/pkg/admission"
 	genericapifilters "k8s.io/apiserver/pkg/endpoints/filters"
 	genericapiserver "k8s.io/apiserver/pkg/server"
+	"k8s.io/apiserver/pkg/server/signals"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/util/notfoundhandler"
 	"k8s.io/client-go/kubernetes"
@@ -83,7 +84,7 @@ APIs.`,
 			}
 			cliflag.PrintFlags(fs)
 
-			ctx := genericapiserver.SetupSignalContext()
+			ctx := signals.SetupSignalContext()
 
 			completedOptions, err := s.Complete(ctx, []string{}, []net.IP{})
 			if err != nil {

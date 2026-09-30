@@ -363,7 +363,9 @@ func ParseQuantity(str string) (Quantity, error) {
 								return Quantity{i: int64Amount{value: result, scale: Scale(scale)}, Format: format, s: str}, nil
 							}
 						}
-						return Quantity{i: int64Amount{value: result, scale: Scale(scale)}, Format: format}, nil
+						q := Quantity{i: int64Amount{value: result, scale: Scale(scale)}, Format: format}
+						q.CacheString()
+						return q, nil
 					}
 				}
 			}
@@ -377,6 +379,11 @@ func ParseQuantity(str string) (Quantity, error) {
 
 	// So that no one but us has to think about suffixes, remove it.
 	if base == 10 {
+		if exponent == math.MinInt32 {
+			// inf.Dec negates the scale to apply it, which this value
+			// cannot survive, so the quantity has no representation here.
+			return Quantity{}, ErrSuffix
+		}
 		amount.SetScale(amount.Scale() + Scale(exponent).infScale())
 	} else if base == 2 {
 		// numericSuffix = 2 ** exponent
@@ -413,7 +420,9 @@ func ParseQuantity(str string) (Quantity, error) {
 		amount.Neg(amount)
 	}
 
-	return Quantity{d: infDecAmount{amount}, Format: format}, nil
+	q := Quantity{d: infDecAmount{amount}, Format: format}
+	q.CacheString()
+	return q, nil
 }
 
 // DeepCopy returns a deep-copy of the Quantity value.  Note that the method
@@ -732,9 +741,14 @@ func (q Quantity) Equal(v Quantity) bool {
 // of most Quantity values.
 const int64QuantityExpectedBytes = 18
 
-// String formats the Quantity as a string, caching the result if not calculated.
-// String is an expensive operation and caching this result significantly reduces the cost of
-// normal parse / marshal operations on Quantity.
+// String formats the Quantity as a string, returning the cached value if it was
+// already calculated.
+//
+// String is an expensive operation which may get called multiple times during
+// encoding, therefore [ParseQuantity] takes care to always cache the string.
+// After constructing a quantity differently or when modifying an existing
+// instance through math operations, [CacheString] can be called to
+// cache the final result at a time when the caller owns the instance.
 func (q *Quantity) String() string {
 	if q == nil {
 		return "<nil>"
@@ -742,9 +756,25 @@ func (q *Quantity) String() string {
 	if len(q.s) == 0 {
 		result := make([]byte, 0, int64QuantityExpectedBytes)
 		number, suffix := q.CanonicalizeBytes(result)
-		number = append(number, suffix...)
-		q.s = string(number)
+		return string(append(number, suffix...))
 	}
+	return q.s
+}
+
+// CacheString formats the Quantity as a string, same as String, but also
+// caches the result on the receiver so that later calls to String don't have
+// to recompute it.
+//
+// May only be called at times when the caller can safely mutate the instance.
+func (q *Quantity) CacheString() string {
+	if q == nil {
+		return "<nil>"
+	}
+	// This intentionally *always* writes the value back:
+	// it's unnecessary when it was already set, but writing anyway
+	// ensures that data races related to calling CacheString
+	// are more likely to be reported, regardless of the state of the instance.
+	q.s = q.String()
 	return q.s
 }
 

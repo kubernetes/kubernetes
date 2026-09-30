@@ -49,7 +49,6 @@ func TestResourcePoolStatusRequest(t *testing.T) {
 	}{
 		"feature-enabled": {
 			features: map[featuregate.Feature]bool{
-				features.DynamicResourceAllocation:   true,
 				features.DRAResourcePoolStatus:       true,
 				features.DRAPartitionableDevices:     true,
 				features.DRAPartitionableDevicesType: true,

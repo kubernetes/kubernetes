@@ -382,7 +382,7 @@ func TestCacheIntervalNextFromStore(t *testing.T) {
 		return labels.Set(pod.Labels), fields.Set{"spec.nodeName": pod.Spec.NodeName}, nil
 	}
 	const numEvents = 50
-	store := store.NewIndexer(nil)
+	store := store.NewWatchCacheStorage(nil, nil)
 	events := make(map[string]*watchCacheEvent)
 	var rv uint64 = 1 // arbitrary number; rv till which the watch cache has progressed.
 
@@ -400,7 +400,9 @@ func TestCacheIntervalNextFromStore(t *testing.T) {
 			Key:             elem.Key,
 			ResourceVersion: rv,
 		}
-		store.Add(elem)
+		if _, err := store.UpdateStore(watch.Added, elem, rv); err != nil {
+			t.Fatal(err)
+		}
 	}
 
 	wci, err := newCacheIntervalFromStore(rv, store, "", false)
@@ -441,9 +443,9 @@ func TestCacheIntervalNextFromStore(t *testing.T) {
 func TestCacheIntervalFromStoreSorted(t *testing.T) {
 	cases := []struct {
 		name    string
-		indexer store.Indexer
+		indexer *store.WatchCacheStorage
 	}{
-		{"btree", store.NewIndexer(nil)},
+		{"btree", store.NewWatchCacheStorage(nil, nil)},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -453,7 +455,7 @@ func TestCacheIntervalFromStoreSorted(t *testing.T) {
 			for i := n - 1; i >= 0; i-- {
 				key := fmt.Sprintf("pod-%08d", i)
 				elem := makeTestStoreElement(makeTestPod(key, uint64(i)))
-				err := tc.indexer.Add(elem)
+				_, err := tc.indexer.UpdateStore(watch.Added, elem, uint64(i))
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -480,8 +482,7 @@ func TestCacheIntervalFromStoreSorted(t *testing.T) {
 }
 
 // TestCacheIntervalSourceSelection verifies that getIntervalFromStoreLocked builds the
-// interval from the lazy snapshot source when snapshotting is enabled and falls back to the
-// eager snapshot source when it is disabled.
+// interval from the lazy snapshot source regardless of whether snapshotting is enabled.
 func TestCacheIntervalSourceSelection(t *testing.T) {
 	cases := []struct {
 		name             string
@@ -494,9 +495,9 @@ func TestCacheIntervalSourceSelection(t *testing.T) {
 			wantLazySnapshot: true,
 		},
 		{
-			name:             "snapshotting disabled falls back to eager snapshot",
+			name:             "snapshotting disabled still serves from lazy snapshot",
 			snapshottingOn:   false,
-			wantLazySnapshot: false,
+			wantLazySnapshot: true,
 		},
 	}
 	for _, tc := range cases {
