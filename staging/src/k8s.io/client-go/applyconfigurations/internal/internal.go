@@ -7200,6 +7200,9 @@ var schemaYAML = typed.YAMLObject(`types:
           elementRelationship: associative
           keys:
           - name
+    - name: defaultNetwork
+      type:
+        scalar: string
     - name: dnsConfig
       type:
         namedType: io.k8s.api.core.v1.PodDNSConfig

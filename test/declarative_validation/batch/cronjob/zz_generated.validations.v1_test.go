@@ -127,6 +127,9 @@ func init() {
 				{ErrorType: "FieldValueInvalid", Origin: "maximum"},
 				{ErrorType: "FieldValueInvalid", Origin: "minimum"},
 			},
+			"spec.jobTemplate.spec.template.spec.defaultNetwork": {
+				{ErrorType: "FieldValueNotSupported"},
+			},
 			"spec.jobTemplate.spec.template.spec.evictionResponders": {
 				{ErrorType: "FieldValueTooMany", Origin: "maxItems"},
 			},

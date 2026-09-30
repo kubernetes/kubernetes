@@ -1294,6 +1294,21 @@ func Validate_Pod(
 	return errs
 }
 
+var symbolsForPodDefaultNetwork = sets.New(corev1.PodDefaultNetworkHost, corev1.PodDefaultNetworkNone, corev1.PodDefaultNetworkPod)
+
+// Validate_PodDefaultNetwork validates an instance of PodDefaultNetwork according
+// to declarative validation rules in the API schema.
+func Validate_PodDefaultNetwork(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *corev1.PodDefaultNetwork) (errs field.ErrorList) {
+
+	if e := validate.Enum(ctx, op, fldPath, obj, oldObj, symbolsForPodDefaultNetwork, nil); len(e) != 0 {
+		errs = append(errs, e...)
+	}
+
+	return errs
+}
+
 // Validate_PodSpec validates an instance of PodSpec according
 // to declarative validation rules in the API schema.
 func Validate_PodSpec(
@@ -1465,6 +1480,36 @@ func Validate_PodSpec(
 				return oldObj.EvictionResponders
 			})
 		errs = append(errs, fn(fldPath.Child("evictionResponders"), obj.EvictionResponders, oldVal, oldObj != nil)...)
+	}
+
+	{ // field corev1.PodSpec.DefaultNetwork
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *corev1.PodDefaultNetwork,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_PodDefaultNetwork(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *corev1.PodSpec) *corev1.PodDefaultNetwork {
+				return oldObj.DefaultNetwork
+			})
+		errs = append(errs, fn(fldPath.Child("defaultNetwork"), obj.DefaultNetwork, oldVal, oldObj != nil)...)
 	}
 
 	return errs

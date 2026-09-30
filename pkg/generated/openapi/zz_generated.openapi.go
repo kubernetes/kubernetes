@@ -29085,6 +29085,14 @@ func schema_k8sio_api_core_v1_PodSpec(ref common.ReferenceCallback) common.OpenA
 							},
 						},
 					},
+					"defaultNetwork": {
+						SchemaProps: spec.SchemaProps{
+							Description: "defaultNetwork selects the pod's default network. \"Pod\" gives the pod its own network namespace attached to the default pod network, \"Host\" runs the pod in the host network namespace (equivalent to hostNetwork: true and kept in sync with it), and \"None\" gives the pod an isolated network namespace with only a loopback interface, not attached to the default pod network and with no automatic network plumbing. Defaults to \"Pod\", or to \"Host\" when hostNetwork is true; setting \"Host\" sets hostNetwork to true. \"None\" may not be combined with hostNetwork: true. When \"None\" is selected, dnsPolicy defaults to \"None\" and enableServiceLinks defaults to false (both may be overridden), and features that require networking (such as hostPorts and network-based probes and lifecycle handlers) are forbidden. This field is immutable.\n\nPossible enum values:\n - `\"Host\"` runs the pod in the host's network namespace. It is equivalent to setting hostNetwork: true; the two fields are kept in sync by API defaulting.\n - `\"None\"` gives the pod its own network namespace containing only the loopback interface and does not attach it to the default pod network. The pod's podIPs are left unset. The pod is never selected into Services and, by default, receives no cluster DNS configuration or service environment variables.\n - `\"Pod\"` gives the pod its own network namespace and attaches it to the default pod network (the network that Kubernetes connects every pod to unless the pod opts out). The container runtime performs its configured network plumbing and the pod is assigned pod IPs. This is the default and matches the historical behavior of Kubernetes.",
+							Type:        []string{"string"},
+							Format:      "",
+							Enum:        []interface{}{"Host", "None", "Pod"},
+						},
+					},
 				},
 				Required: []string{"containers"},
 			},
