@@ -315,6 +315,12 @@ var (
 	// Marks a single test that tests cluster DNS performance with many services.
 	PerformanceDNS = framework.WithFeature(framework.ValidFeatures.Add("PerformanceDNS"))
 
+	// Owner: sig-network
+	// Marks tests for pods with spec.defaultNetwork "None" (https://kep.k8s.io/6313).
+	// They require the PodDefaultNetwork feature gate and a container runtime
+	// that reports the default_network_none CRI capability.
+	PodDefaultNetwork = framework.WithFeature(framework.ValidFeatures.Add("PodDefaultNetwork"))
+
 	// Owner: sig-node
 	// TODO: document the feature (when to use this feature for a test)
 	PodGarbageCollector = framework.WithFeature(framework.ValidFeatures.Add("PodGarbageCollector"))
