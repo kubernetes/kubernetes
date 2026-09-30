@@ -67,7 +67,6 @@ func TestBeforeSynced(t *testing.T) {
 
 type testClient[T clusterTrustBundle] interface {
 	Create(context.Context, *T, metav1.CreateOptions) (*T, error)
-	Update(context.Context, *T, metav1.UpdateOptions) (*T, error)
 	Delete(context.Context, string, metav1.DeleteOptions) error
 }
 
@@ -182,19 +181,24 @@ func testGetTrustAnchorsByName[T clusterTrustBundle](tCtx ktesting.TContext, b t
 
 func TestGetTrustAnchorsByNameCaching(t *testing.T) {
 	tCtx := ktesting.Init(t)
-	tCtx.SyncTest("v1alpha1", func(tCtx ktesting.TContext) { testGetTrustAnchorsByNameCaching(tCtx, alphaFunctionsBundle) })
-	tCtx.SyncTest("v1beta1", func(tCtx ktesting.TContext) { testGetTrustAnchorsByNameCaching(tCtx, betaFunctionsBundle) })
-	tCtx.SyncTest("v1", func(tCtx ktesting.TContext) { testGetTrustAnchorsByNameCaching(tCtx, gaFunctionsBundle) })
+	tCtx.SyncTest("v1alpha1/unsigned", func(tCtx ktesting.TContext) { testGetTrustAnchorsByNameCaching(tCtx, alphaFunctionsBundle, "") })
+	tCtx.SyncTest("v1alpha1/signed", func(tCtx ktesting.TContext) {
+		testGetTrustAnchorsByNameCaching(tCtx, alphaFunctionsBundle, "foo.bar/a")
+	})
+	tCtx.SyncTest("v1beta1/unsigned", func(tCtx ktesting.TContext) { testGetTrustAnchorsByNameCaching(tCtx, betaFunctionsBundle, "") })
+	tCtx.SyncTest("v1beta1/signed", func(tCtx ktesting.TContext) { testGetTrustAnchorsByNameCaching(tCtx, betaFunctionsBundle, "foo.bar/a") })
+	tCtx.SyncTest("v1/unsigned", func(tCtx ktesting.TContext) { testGetTrustAnchorsByNameCaching(tCtx, gaFunctionsBundle, "") })
+	tCtx.SyncTest("v1/signed", func(tCtx ktesting.TContext) { testGetTrustAnchorsByNameCaching(tCtx, gaFunctionsBundle, "foo.bar/a") })
 }
 
-func testGetTrustAnchorsByNameCaching[T clusterTrustBundle](tCtx ktesting.TContext, b testingFunctionBundle[T]) {
+func testGetTrustAnchorsByNameCaching[T clusterTrustBundle](tCtx ktesting.TContext, b testingFunctionBundle[T], signerName string) {
 	t := tCtx.TB()
 
 	ctb1Bundle := mustMakeRoot(t, "root1")
-	ctb1 := b.ctbConstructor("foo", "", nil, ctb1Bundle)
+	ctb1 := b.ctbConstructor("foo", signerName, nil, ctb1Bundle)
 
 	ctb2Bundle := mustMakeRoot(t, "root2")
-	ctb2 := b.ctbConstructor("foo", "", nil, ctb2Bundle)
+	ctb2 := b.ctbConstructor("foo", signerName, nil, ctb2Bundle)
 
 	kc := fake.NewSimpleClientset(b.ctbToObj(ctb1))
 
@@ -245,10 +249,7 @@ func testGetTrustAnchorsByNameCaching[T clusterTrustBundle](tCtx ktesting.TConte
 		t.Fatalf("Error while adding new CTB: %v", err)
 	}
 
-	// We need to sleep long enough for the informer to notice the new
-	// ClusterTrustBundle, but much less than the 5 minutes of the cache TTL.
-	// This shows us that the informer is properly clearing the cache.
-	time.Sleep(5 * time.Second)
+	tCtx.Wait()
 
 	func() {
 		t.Log("foo should yield the new certificate")
@@ -262,69 +263,6 @@ func testGetTrustAnchorsByNameCaching[T clusterTrustBundle](tCtx ktesting.TConte
 			t.Fatalf("Bad bundle; diff (-got +want)\n%s", diff)
 		}
 	}()
-}
-
-func TestGetTrustAnchorsByNameCachingSignedBundle(t *testing.T) {
-	tCtx := ktesting.Init(t)
-	tCtx.SyncTest("v1alpha1", func(tCtx ktesting.TContext) {
-		testGetTrustAnchorsByNameCachingSignedBundle(tCtx, alphaFunctionsBundle)
-	})
-	tCtx.SyncTest("v1beta1", func(tCtx ktesting.TContext) {
-		testGetTrustAnchorsByNameCachingSignedBundle(tCtx, betaFunctionsBundle)
-	})
-	tCtx.SyncTest("v1", func(tCtx ktesting.TContext) {
-		testGetTrustAnchorsByNameCachingSignedBundle(tCtx, gaFunctionsBundle)
-	})
-}
-
-func testGetTrustAnchorsByNameCachingSignedBundle[T clusterTrustBundle](tCtx ktesting.TContext, b testingFunctionBundle[T]) {
-	defer tCtx.Cancel("test completed")
-	t := tCtx.TB()
-
-	ctb1 := b.ctbConstructor("foo", "foo.bar/a", nil, mustMakeRoot(t, "root1"))
-	ctb2 := b.ctbConstructor("foo", "foo.bar/a", nil, mustMakeRoot(t, "root2"))
-
-	kc := fake.NewSimpleClientset(b.ctbToObj(ctb1))
-
-	informerFactory := informers.NewSharedInformerFactoryWithOptions(kc, 0)
-
-	ctbManager, _ := b.informerManagerConstructor(tCtx, informerFactory, 256, 5*time.Minute)
-
-	informerFactory.Start(tCtx.Done())
-	ctbInformer := b.informerGetter(informerFactory)
-	if !cache.WaitForCacheSync(tCtx.Done(), ctbInformer.HasSynced) {
-		t.Fatalf("Timed out waiting for informer to sync")
-	}
-
-	t.Log("foo should yield the first certificate")
-	gotBundle, err := ctbManager.GetTrustAnchorsByName(tCtx, "foo", false)
-	if err != nil {
-		t.Fatalf("Got error while calling GetTrustAnchorsByName: %v", err)
-	}
-
-	wantBundle := b.ctbTrustBundle(ctb1)
-
-	if diff := diffBundles(gotBundle, []byte(wantBundle)); diff != "" {
-		t.Fatalf("Bad bundle; diff (-got +want)\n%s", diff)
-	}
-
-	client := b.clientGetter(kc)
-	if _, err := client.Update(tCtx, ctb2, metav1.UpdateOptions{}); err != nil {
-		t.Fatalf("Error while updating the CTB: %v", err)
-	}
-
-	tCtx.Wait()
-
-	t.Log("foo should yield the new certificate")
-	gotBundle, err = ctbManager.GetTrustAnchorsByName(tCtx, "foo", false)
-	if err != nil {
-		t.Fatalf("Got error while calling GetTrustAnchorsByName: %v", err)
-	}
-
-	wantBundle = b.ctbTrustBundle(ctb2)
-	if diff := diffBundles(gotBundle, []byte(wantBundle)); diff != "" {
-		t.Fatalf("Bad bundle; diff (-got +want)\n%s", diff)
-	}
 }
 
 func TestDropCacheForKeepsUnrelatedEntries(t *testing.T) {
@@ -341,7 +279,6 @@ func TestDropCacheForKeepsUnrelatedEntries(t *testing.T) {
 }
 
 func testDropCacheForKeepsUnrelatedEntries[T clusterTrustBundle](tCtx ktesting.TContext, b testingFunctionBundle[T]) {
-	defer tCtx.Cancel("test completed")
 	t := tCtx.TB()
 
 	ctb1 := b.ctbConstructor("ctb1", "", nil, mustMakeRoot(t, "root1"))
