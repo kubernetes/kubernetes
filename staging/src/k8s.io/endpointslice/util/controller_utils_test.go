@@ -189,6 +189,24 @@ func TestShouldPodBeInEndpoints(t *testing.T) {
 			},
 			expected: false,
 		},
+		{
+			// Pods with defaultNetwork "None" never have pod IPs (enforced by
+			// status validation) and are excluded by the existing IP check.
+			name: "Running network isolated pod",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					DefaultNetwork: ptr.To(v1.PodDefaultNetworkNone),
+				},
+				Status: v1.PodStatus{
+					Phase: v1.PodRunning,
+					Conditions: []v1.PodCondition{{
+						Type:   v1.PodReady,
+						Status: v1.ConditionTrue,
+					}},
+				},
+			},
+			expected: false,
+		},
 		// Pod should be in endpoints:
 		{
 			name: "Pending pod with Never RestartPolicy",
