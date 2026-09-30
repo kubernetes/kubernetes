@@ -285,7 +285,7 @@ func (kl *Kubelet) makeBlockVolumes(logger klog.Logger, pod *v1.Pod, container *
 // - the Pod is on the pod network and PodIP has not yet been set (e.g., Pod sandbox is being created).
 // - the Pod is on Windows, and contains a hostProcess container.
 func shouldMountHostsFile(pod *v1.Pod, podIPs []string) bool {
-	shouldMount := len(podIPs) > 0 || pod.Spec.HostNetwork
+	shouldMount := len(podIPs) > 0 || pod.Spec.HostNetwork || kubecontainer.IsNetworkIsolatedPod(pod)
 	if runtime.GOOS == "windows" {
 		return shouldMount && !kubecontainer.HasWindowsHostProcessContainer(pod)
 	}
@@ -544,7 +544,7 @@ func nodeHostsFileContent(hostsFilePath string, hostAliases []v1.HostAlias) ([]b
 }
 
 // managedHostsFileContent generates the content of the managed etc hosts based on Pod IPs and other
-// information.
+// information. Without Pod IPs (network isolated pods) the hostname resolves to loopback.
 func managedHostsFileContent(hostIPs []string, hostName, hostDomainName string, hostAliases []v1.HostAlias) []byte {
 	var buffer bytes.Buffer
 	buffer.WriteString(managedHostsHeader)
@@ -554,6 +554,9 @@ func managedHostsFileContent(hostIPs []string, hostName, hostDomainName string, 
 	buffer.WriteString("fe00::0\tip6-mcastprefix\n")
 	buffer.WriteString("fe00::1\tip6-allnodes\n")
 	buffer.WriteString("fe00::2\tip6-allrouters\n")
+	if len(hostIPs) == 0 && len(hostName) > 0 {
+		hostIPs = []string{"127.0.0.1", "::1"}
+	}
 	if len(hostDomainName) > 0 {
 		// host entry generated for all IPs in podIPs
 		// podIPs field is populated for clusters even
@@ -775,31 +778,41 @@ func (kl *Kubelet) makeEnvironmentVariables(ctx context.Context, pod *v1.Pod, co
 		return nil, fmt.Errorf("nil pod.spec.enableServiceLinks encountered, cannot construct envvars")
 	}
 
-	// If the pod originates from the kube-api, when we know that the kube-apiserver is responding and the kubelet's credentials are valid.
-	// Knowing this, it is reasonable to wait until the service lister has synchronized at least once before attempting to build
-	// a service env var map.  This doesn't present the race below from happening entirely, but it does prevent the "obvious"
-	// failure case of services simply not having completed a list operation that can reasonably be expected to succeed.
-	// One common case this prevents is a kubelet restart reading pods before services and some pod not having the
-	// KUBERNETES_SERVICE_HOST injected because we didn't wait a short time for services to sync before proceeding.
-	// The KUBERNETES_SERVICE_HOST link is special because it is unconditionally injected into pods and is read by the
-	// in-cluster-config for pod clients
-	if !kubetypes.IsStaticPod(pod) && !kl.serviceHasSynced() {
-		return nil, fmt.Errorf("services have not yet been read at least once, cannot construct envvars")
-	}
+	var (
+		result     []kubecontainer.EnvVar
+		serviceEnv = map[string]string{}
+		err        error
+	)
+	// Network isolated pods have no route to any Service by default, so
+	// enableServiceLinks also governs the KUBERNETES_* master service variables
+	// that are injected unconditionally for other pods. With the default
+	// (false) nothing is injected and the service informer sync is not awaited.
+	if !kubecontainer.IsNetworkIsolatedPod(pod) || *pod.Spec.EnableServiceLinks {
+		// If the pod originates from the kube-api, when we know that the kube-apiserver is responding and the kubelet's credentials are valid.
+		// Knowing this, it is reasonable to wait until the service lister has synchronized at least once before attempting to build
+		// a service env var map.  This doesn't present the race below from happening entirely, but it does prevent the "obvious"
+		// failure case of services simply not having completed a list operation that can reasonably be expected to succeed.
+		// One common case this prevents is a kubelet restart reading pods before services and some pod not having the
+		// KUBERNETES_SERVICE_HOST injected because we didn't wait a short time for services to sync before proceeding.
+		// The KUBERNETES_SERVICE_HOST link is special because it is unconditionally injected into pods and is read by the
+		// in-cluster-config for pod clients
+		if !kubetypes.IsStaticPod(pod) && !kl.serviceHasSynced() {
+			return nil, fmt.Errorf("services have not yet been read at least once, cannot construct envvars")
+		}
 
-	var result []kubecontainer.EnvVar
-	// Note:  These are added to the docker Config, but are not included in the checksum computed
-	// by kubecontainer.HashContainer(...).  That way, we can still determine whether an
-	// v1.Container is already running by its hash. (We don't want to restart a container just
-	// because some service changed.)
-	//
-	// Note that there is a race between Kubelet seeing the pod and kubelet seeing the service.
-	// To avoid this users can: (1) wait between starting a service and starting; or (2) detect
-	// missing service env var and exit and be restarted; or (3) use DNS instead of env vars
-	// and keep trying to resolve the DNS name of the service (recommended).
-	serviceEnv, err := kl.getServiceEnvVarMap(pod.Namespace, *pod.Spec.EnableServiceLinks)
-	if err != nil {
-		return result, err
+		// Note:  These are added to the docker Config, but are not included in the checksum computed
+		// by kubecontainer.HashContainer(...).  That way, we can still determine whether an
+		// v1.Container is already running by its hash. (We don't want to restart a container just
+		// because some service changed.)
+		//
+		// Note that there is a race between Kubelet seeing the pod and kubelet seeing the service.
+		// To avoid this users can: (1) wait between starting a service and starting; or (2) detect
+		// missing service env var and exit and be restarted; or (3) use DNS instead of env vars
+		// and keep trying to resolve the DNS name of the service (recommended).
+		serviceEnv, err = kl.getServiceEnvVarMap(pod.Namespace, *pod.Spec.EnableServiceLinks)
+		if err != nil {
+			return result, err
+		}
 	}
 
 	var (

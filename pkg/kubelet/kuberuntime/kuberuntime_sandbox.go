@@ -95,6 +95,10 @@ func (m *kubeGenericRuntimeManager) generatePodSandboxConfig(ctx context.Context
 		Annotations: newPodAnnotations(pod),
 	}
 
+	if kubecontainer.IsNetworkIsolatedPod(pod) {
+		podSandboxConfig.DefaultNetwork = runtimeapi.PodSandboxDefaultNetwork_DEFAULT_NETWORK_NONE
+	}
+
 	dnsConfig, err := m.runtimeHelper.GetPodDNS(ctx, pod)
 	if err != nil {
 		return nil, err
