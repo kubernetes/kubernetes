@@ -19,11 +19,13 @@ package preemption
 import (
 	"context"
 	"fmt"
+	"sync"
 	"testing"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -32,9 +34,11 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	configv1 "k8s.io/kube-scheduler/config/v1"
+	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler"
 	configtesting "k8s.io/kubernetes/pkg/scheduler/apis/config/testing"
+	"k8s.io/kubernetes/pkg/scheduler/framework/preemption"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	"k8s.io/kubernetes/test/integration/scheduler/preemption/asyncframework"
 	testutils "k8s.io/kubernetes/test/integration/util"
@@ -2565,5 +2569,679 @@ func TestDeferredResizePodPreemption_MidFlightUpdateAndCancellation(t *testing.T
 		}
 
 		testutils.CleanupPods(testCtx.Ctx, cs, t, []*v1.Pod{victim})
+	})
+}
+
+// TestAsyncDeferredResizePodPreemption_BasicLifecycle tests that deferred resize pods
+// (PodResizePending=True, Reason=Deferred) trigger asynchronous background eviction of
+// lower-priority victims on their assigned node, are parked in unschedulablePods without
+// NominatedNodeName during in-flight preemption, and are woken up once victim deletions complete.
+func TestAsyncDeferredResizePodPreemption_BasicLifecycle(t *testing.T) {
+	t.Run("single victim async preemption, parking without nominated node, and wakeup", func(t *testing.T) {
+		preemptionDoneChannels := &sync.Map{}
+		preemptionConfig := asyncframework.AsyncPreemptionTestConfig{
+			EnableInPlacePodVerticalScalingSchedulerPreemption: true,
+			PreemptionDoneChannels:                             preemptionDoneChannels,
+		}
+
+		testCtx, preemptionPlugin, cs := asyncframework.InitTestForAsyncPreemption(t, preemptionConfig)
+		testutils.SyncSchedulerInformerFactory(testCtx)
+		defer testCtx.SchedulerCloseFn()
+
+		ns := testCtx.NS.Name
+		nodeName := "async-def-node-1"
+		node := st.MakeNode().Name(nodeName).Capacity(map[v1.ResourceName]string{
+			v1.ResourcePods:   "32",
+			v1.ResourceCPU:    "300m",
+			v1.ResourceMemory: "300Mi",
+		}).Label("node", nodeName).Obj()
+		if _, err := cs.CoreV1().Nodes().Create(testCtx.Ctx, node, metav1.CreateOptions{}); err != nil {
+			t.Fatalf("Failed to create node: %v", err)
+		}
+		defer func() {
+			_ = cs.CoreV1().Nodes().Delete(testCtx.Ctx, nodeName, metav1.DeleteOptions{})
+		}()
+
+		// Victim pod using 200m CPU (low priority: 0)
+		victim := initPausePod(&testutils.PausePodConfig{
+			Name:      "victim-low",
+			Namespace: ns,
+			Priority:  &asyncframework.LowPriority,
+			Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
+				v1.ResourceCPU:    *resource.NewMilliQuantity(200, resource.DecimalSI),
+				v1.ResourceMemory: *resource.NewQuantity(100, resource.BinarySI),
+			}},
+		})
+		victim.Spec.NodeName = nodeName
+		victim, err := runPausePod(cs, victim)
+		if err != nil {
+			t.Fatalf("Failed to run victim-low: %v", err)
+		}
+
+		// Preemptor pod requesting resize from 100m to 300m CPU (needs 200m additional CPU)
+		preemptor := initPausePod(&testutils.PausePodConfig{
+			Name:      "preemptor-pod",
+			Namespace: ns,
+			Priority:  &asyncframework.HighPriority,
+			Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
+				v1.ResourceCPU:    *resource.NewMilliQuantity(300, resource.DecimalSI),
+				v1.ResourceMemory: *resource.NewQuantity(100, resource.BinarySI),
+			}},
+		})
+		preemptor.Spec.NodeName = nodeName
+		preemptor, err = cs.CoreV1().Pods(ns).Create(testCtx.Ctx, preemptor, metav1.CreateOptions{})
+		if err != nil {
+			t.Fatalf("Failed to create preemptor: %v", err)
+		}
+
+		preemptor, err = updatePodToDeferredResize(testCtx.Ctx, cs, preemptor, "100m", "100")
+		if err != nil {
+			t.Fatalf("Failed to update preemptor status: %v", err)
+		}
+
+		// Wait for preemptor to arrive in activeQ
+		queue := testCtx.Scheduler.SchedulingQueue
+		err = wait.PollUntilContextTimeout(testCtx.Ctx, 50*time.Millisecond, 10*time.Second, false, func(ctx context.Context) (bool, error) {
+			activePods := queue.PodsInActiveQ()
+			return len(activePods) > 0 && activePods[0].Name == "preemptor-pod", nil
+		})
+		if err != nil {
+			t.Fatalf("Expected preemptor-pod to arrive in activeQ: %v", err)
+		}
+
+		// Trigger preemption scheduling cycle
+		testCtx.Scheduler.ScheduleOne(testCtx.Ctx)
+
+		// Preemption triggers: victim-low is evicted asynchronously in background
+		err = wait.PollUntilContextTimeout(testCtx.Ctx, 50*time.Millisecond, 10*time.Second, false,
+			podIsGettingEvicted(cs, ns, "victim-low"))
+		if err != nil {
+			t.Fatalf("Expected victim-low to be evicted asynchronously: %v", err)
+		}
+
+		// Verify that the deferred resize pod is parked in unschedulable pool
+		if !asyncframework.PodInUnschedulablePodPool(t, queue, "preemptor-pod") {
+			t.Errorf("Expected preemptor-pod to be in unschedulable pool")
+		}
+
+		// Verify that the deferred resize pod is NOT assigned a NominatedNodeName
+		livePreemptor, err := cs.CoreV1().Pods(ns).Get(testCtx.Ctx, "preemptor-pod", metav1.GetOptions{})
+		if err != nil {
+			t.Fatalf("Failed to get live preemptor: %v", err)
+		}
+		if livePreemptor.Status.NominatedNodeName != "" {
+			t.Errorf("Expected NominatedNodeName to remain empty for deferred resize pod, got %q", livePreemptor.Status.NominatedNodeName)
+		}
+
+		// Verify that IsPodRunningPreemption becomes false once eviction finishes
+		err = wait.PollUntilContextTimeout(testCtx.Ctx, 50*time.Millisecond, 5*time.Second, true, func(ctx context.Context) (bool, error) {
+			return !preemptionPlugin.Executor.IsPodRunningPreemption(preemptor.UID), nil
+		})
+		if err != nil {
+			t.Fatalf("Expected IsPodRunningPreemption to be false after eviction completes: %v", err)
+		}
+
+		testutils.CleanupPods(testCtx.Ctx, cs, t, []*v1.Pod{preemptor})
+	})
+
+	t.Run("multiple victims async eviction across node", func(t *testing.T) {
+		preemptionDoneChannels := &sync.Map{}
+		preemptionConfig := asyncframework.AsyncPreemptionTestConfig{
+			EnableInPlacePodVerticalScalingSchedulerPreemption: true,
+			PreemptionDoneChannels:                             preemptionDoneChannels,
+		}
+
+		testCtx, preemptionPlugin, cs := asyncframework.InitTestForAsyncPreemption(t, preemptionConfig)
+		testutils.SyncSchedulerInformerFactory(testCtx)
+		defer testCtx.SchedulerCloseFn()
+
+		ns := testCtx.NS.Name
+		nodeName := "async-def-node-2"
+		node := st.MakeNode().Name(nodeName).Capacity(map[v1.ResourceName]string{
+			v1.ResourcePods:   "32",
+			v1.ResourceCPU:    "400m",
+			v1.ResourceMemory: "400Mi",
+		}).Label("node", nodeName).Obj()
+		if _, err := cs.CoreV1().Nodes().Create(testCtx.Ctx, node, metav1.CreateOptions{}); err != nil {
+			t.Fatalf("Failed to create node: %v", err)
+		}
+		defer func() {
+			_ = cs.CoreV1().Nodes().Delete(testCtx.Ctx, nodeName, metav1.DeleteOptions{})
+		}()
+
+		// Victim 1: 150m CPU
+		victim1 := initPausePod(&testutils.PausePodConfig{
+			Name:      "victim-multi-1",
+			Namespace: ns,
+			Priority:  &asyncframework.LowPriority,
+			Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
+				v1.ResourceCPU:    *resource.NewMilliQuantity(150, resource.DecimalSI),
+				v1.ResourceMemory: *resource.NewQuantity(100, resource.BinarySI),
+			}},
+		})
+		victim1.Spec.NodeName = nodeName
+		victim1, err := runPausePod(cs, victim1)
+		if err != nil {
+			t.Fatalf("Failed to run victim-multi-1: %v", err)
+		}
+
+		// Victim 2: 150m CPU
+		victim2 := initPausePod(&testutils.PausePodConfig{
+			Name:      "victim-multi-2",
+			Namespace: ns,
+			Priority:  &asyncframework.LowPriority,
+			Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
+				v1.ResourceCPU:    *resource.NewMilliQuantity(150, resource.DecimalSI),
+				v1.ResourceMemory: *resource.NewQuantity(100, resource.BinarySI),
+			}},
+		})
+		victim2.Spec.NodeName = nodeName
+		victim2, err = runPausePod(cs, victim2)
+		if err != nil {
+			t.Fatalf("Failed to run victim-multi-2: %v", err)
+		}
+
+		// Preemptor requesting 400m CPU (needs 300m additional CPU -> evicts both victims)
+		preemptor := initPausePod(&testutils.PausePodConfig{
+			Name:      "preemptor-multi",
+			Namespace: ns,
+			Priority:  &asyncframework.HighPriority,
+			Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
+				v1.ResourceCPU:    *resource.NewMilliQuantity(400, resource.DecimalSI),
+				v1.ResourceMemory: *resource.NewQuantity(100, resource.BinarySI),
+			}},
+		})
+		preemptor.Spec.NodeName = nodeName
+		preemptor, err = cs.CoreV1().Pods(ns).Create(testCtx.Ctx, preemptor, metav1.CreateOptions{})
+		if err != nil {
+			t.Fatalf("Failed to create preemptor: %v", err)
+		}
+
+		preemptor, err = updatePodToDeferredResize(testCtx.Ctx, cs, preemptor, "100m", "100")
+		if err != nil {
+			t.Fatalf("Failed to update preemptor status: %v", err)
+		}
+
+		// Wait for preemptor in activeQ
+		queue := testCtx.Scheduler.SchedulingQueue
+		err = wait.PollUntilContextTimeout(testCtx.Ctx, 50*time.Millisecond, 10*time.Second, false, func(ctx context.Context) (bool, error) {
+			activePods := queue.PodsInActiveQ()
+			return len(activePods) > 0 && activePods[0].Name == "preemptor-multi", nil
+		})
+		if err != nil {
+			t.Fatalf("Expected preemptor-multi to arrive in activeQ: %v", err)
+		}
+
+		// Trigger preemption scheduling cycle
+		testCtx.Scheduler.ScheduleOne(testCtx.Ctx)
+
+		// Both victims must be evicted asynchronously
+		err = wait.PollUntilContextTimeout(testCtx.Ctx, 50*time.Millisecond, 10*time.Second, false,
+			podIsGettingEvicted(cs, ns, "victim-multi-1"))
+		if err != nil {
+			t.Fatalf("Expected victim-multi-1 to be evicted asynchronously: %v", err)
+		}
+		err = wait.PollUntilContextTimeout(testCtx.Ctx, 50*time.Millisecond, 10*time.Second, false,
+			podIsGettingEvicted(cs, ns, "victim-multi-2"))
+		if err != nil {
+			t.Fatalf("Expected victim-multi-2 to be evicted asynchronously: %v", err)
+		}
+
+		// Preemptor must be parked in unschedulable pool without NominatedNodeName
+		if !asyncframework.PodInUnschedulablePodPool(t, queue, "preemptor-multi") {
+			t.Errorf("Expected preemptor-multi to be in unschedulable pod pool")
+		}
+		livePreemptor, err := cs.CoreV1().Pods(ns).Get(testCtx.Ctx, "preemptor-multi", metav1.GetOptions{})
+		if err != nil {
+			t.Fatalf("Failed to get live preemptor: %v", err)
+		}
+		if livePreemptor.Status.NominatedNodeName != "" {
+			t.Errorf("Expected NominatedNodeName to remain empty, got %q", livePreemptor.Status.NominatedNodeName)
+		}
+
+		// Wait for preemption state to clear
+		err = wait.PollUntilContextTimeout(testCtx.Ctx, 50*time.Millisecond, 5*time.Second, true, func(ctx context.Context) (bool, error) {
+			return !preemptionPlugin.Executor.IsPodRunningPreemption(preemptor.UID), nil
+		})
+		if err != nil {
+			t.Fatalf("Expected IsPodRunningPreemption to be false after completion: %v", err)
+		}
+
+		testutils.CleanupPods(testCtx.Ctx, cs, t, []*v1.Pod{preemptor})
+	})
+}
+
+// TestAsyncDeferredResizePodPreemption_EvictionFailureRollback tests that when victim deletion
+// fails asynchronously (e.g., HTTP 500 error or webhook admission rejection), the deferred resize
+// pod remains in deferred state, does not trigger premature Kubelet actuation, and does not corrupt
+// scheduler node allocatable cache.
+func TestAsyncDeferredResizePodPreemption_EvictionFailureRollback(t *testing.T) {
+	tests := []struct {
+		name           string
+		preemptPodHook asyncframework.PreemptPodHookFn
+	}{
+		{
+			name: "HTTP 500 internal server error during victim deletion rolls back cleanly",
+			preemptPodHook: func(ctx context.Context, c fwk.PreemptionCandidate, preemptor preemption.ExecutorPreemptor, victim *v1.Pod, pluginName string) (bool, error, bool) {
+				return false, apierrors.NewInternalError(fmt.Errorf("simulated 500 internal server error on victim deletion")), true
+			},
+		},
+		{
+			name: "Admission webhook 403 forbidden rejection on victim deletion rolls back cleanly",
+			preemptPodHook: func(ctx context.Context, c fwk.PreemptionCandidate, preemptor preemption.ExecutorPreemptor, victim *v1.Pod, pluginName string) (bool, error, bool) {
+				return false, apierrors.NewForbidden(v1.Resource("pods"), victim.Name, fmt.Errorf("admission webhook rejected deletion")), true
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			preemptionDoneChannels := &sync.Map{}
+			preemptionConfig := asyncframework.AsyncPreemptionTestConfig{
+				EnableInPlacePodVerticalScalingSchedulerPreemption: true,
+				PreemptionDoneChannels:                             preemptionDoneChannels,
+				PreemptPodHook:                                     tt.preemptPodHook,
+			}
+
+			testCtx, preemptionPlugin, cs := asyncframework.InitTestForAsyncPreemption(t, preemptionConfig)
+			testutils.SyncSchedulerInformerFactory(testCtx)
+			defer testCtx.SchedulerCloseFn()
+
+			ns := testCtx.NS.Name
+			nodeName := "fail-rollback-node"
+			node := st.MakeNode().Name(nodeName).Capacity(map[v1.ResourceName]string{
+				v1.ResourcePods:   "32",
+				v1.ResourceCPU:    "300m",
+				v1.ResourceMemory: "300Mi",
+			}).Label("node", nodeName).Obj()
+			if _, err := cs.CoreV1().Nodes().Create(testCtx.Ctx, node, metav1.CreateOptions{}); err != nil {
+				t.Fatalf("Failed to create node: %v", err)
+			}
+			defer func() {
+				_ = cs.CoreV1().Nodes().Delete(testCtx.Ctx, nodeName, metav1.DeleteOptions{})
+			}()
+
+			// Victim pod (200m CPU)
+			victim := initPausePod(&testutils.PausePodConfig{
+				Name:      "victim-err",
+				Namespace: ns,
+				Priority:  &asyncframework.LowPriority,
+				Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
+					v1.ResourceCPU:    *resource.NewMilliQuantity(200, resource.DecimalSI),
+					v1.ResourceMemory: *resource.NewQuantity(100, resource.BinarySI),
+				}},
+			})
+			victim.Spec.NodeName = nodeName
+			victim, err := runPausePod(cs, victim)
+			if err != nil {
+				t.Fatalf("Failed to run victim-err: %v", err)
+			}
+
+			// Preemptor requesting 300m CPU (needs 200m extra CPU -> triggers preemption against victim-err)
+			preemptor := initPausePod(&testutils.PausePodConfig{
+				Name:      "preemptor-rollback",
+				Namespace: ns,
+				Priority:  &asyncframework.HighPriority,
+				Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
+					v1.ResourceCPU:    *resource.NewMilliQuantity(300, resource.DecimalSI),
+					v1.ResourceMemory: *resource.NewQuantity(100, resource.BinarySI),
+				}},
+			})
+			preemptor.Spec.NodeName = nodeName
+			preemptor, err = cs.CoreV1().Pods(ns).Create(testCtx.Ctx, preemptor, metav1.CreateOptions{})
+			if err != nil {
+				t.Fatalf("Failed to create preemptor: %v", err)
+			}
+
+			preemptor, err = updatePodToDeferredResize(testCtx.Ctx, cs, preemptor, "100m", "100")
+			if err != nil {
+				t.Fatalf("Failed to update preemptor status: %v", err)
+			}
+
+			// Wait for preemptor in activeQ
+			queue := testCtx.Scheduler.SchedulingQueue
+			err = wait.PollUntilContextTimeout(testCtx.Ctx, 50*time.Millisecond, 10*time.Second, false, func(ctx context.Context) (bool, error) {
+				activePods := queue.PodsInActiveQ()
+				return len(activePods) > 0 && activePods[0].Name == "preemptor-rollback", nil
+			})
+			if err != nil {
+				t.Fatalf("Expected preemptor-rollback to arrive in activeQ: %v", err)
+			}
+
+			// Schedule pod to trigger async preemption
+			testCtx.Scheduler.ScheduleOne(testCtx.Ctx)
+
+			// Wait for preemption failure to occur and IsPodRunningPreemption to clear
+			err = wait.PollUntilContextTimeout(testCtx.Ctx, 50*time.Millisecond, 5*time.Second, true, func(ctx context.Context) (bool, error) {
+				return !preemptionPlugin.Executor.IsPodRunningPreemption(preemptor.UID), nil
+			})
+			if err != nil {
+				t.Fatalf("Expected IsPodRunningPreemption to be false after preemption failure: %v", err)
+			}
+
+			// 1. Assert victim pod was NOT deleted
+			liveVictim, err := cs.CoreV1().Pods(ns).Get(testCtx.Ctx, "victim-err", metav1.GetOptions{})
+			if err != nil {
+				t.Fatalf("Failed to get victim pod: %v", err)
+			}
+			if liveVictim.DeletionTimestamp != nil {
+				t.Errorf("Victim pod should NOT have been deleted upon preemption failure")
+			}
+
+			// 2. Assert preemptor remains deferred
+			livePreemptor, err := cs.CoreV1().Pods(ns).Get(testCtx.Ctx, "preemptor-rollback", metav1.GetOptions{})
+			if err != nil {
+				t.Fatalf("Failed to get live preemptor: %v", err)
+			}
+			var hasDeferredCondition bool
+			for _, cond := range livePreemptor.Status.Conditions {
+				if cond.Type == v1.PodResizePending && cond.Status == v1.ConditionTrue && cond.Reason == v1.PodReasonDeferred {
+					hasDeferredCondition = true
+					break
+				}
+			}
+			if !hasDeferredCondition {
+				t.Errorf("Expected preemptor to retain PodResizePending=Deferred condition")
+			}
+
+			// 3. Assert AllocatedResources were NOT updated (no premature Kubelet actuation)
+			if livePreemptor.Status.ContainerStatuses[0].AllocatedResources.Cpu().MilliValue() != 100 {
+				t.Errorf("AllocatedResources should remain 100m, got %dm", livePreemptor.Status.ContainerStatuses[0].AllocatedResources.Cpu().MilliValue())
+			}
+
+			// 4. Assert NominatedNodeName was NOT populated
+			if livePreemptor.Status.NominatedNodeName != "" {
+				t.Errorf("NominatedNodeName should remain empty, got %q", livePreemptor.Status.NominatedNodeName)
+			}
+
+			// 5. Assert node allocatable cache in scheduler is NOT corrupted
+			nodeInfo, err := testCtx.Scheduler.Cache.GetNode(nodeName)
+			if err != nil {
+				t.Fatalf("Failed to retrieve nodeInfo from scheduler cache: %v", err)
+			}
+			// Total requested CPU in cache should accurately reflect victim requests (200m) + preemptor requests (300m) = 500m
+			if nodeInfo.Requested.MilliCPU != 500 {
+				t.Errorf("Expected scheduler nodeInfo cache Requested CPU to be 500m, got %dm", nodeInfo.Requested.MilliCPU)
+			}
+
+			testutils.CleanupPods(testCtx.Ctx, cs, t, []*v1.Pod{victim, livePreemptor})
+		})
+	}
+}
+
+// TestAsyncDeferredResizePodPreemption_PreemptorMutationAndDeletion tests scenarios where
+// the deferred resize preemptor is deleted or its spec resource requests are reverted
+// while async preemption is in flight.
+func TestAsyncDeferredResizePodPreemption_PreemptorMutationAndDeletion(t *testing.T) {
+	t.Run("preemptor pod deletion while async preemption is in flight", func(t *testing.T) {
+		preemptionDoneChannels := &sync.Map{}
+		holdCh := make(chan struct{})
+		preemptionStartedCh := make(chan struct{}, 1)
+
+		preemptionConfig := asyncframework.AsyncPreemptionTestConfig{
+			EnableInPlacePodVerticalScalingSchedulerPreemption: true,
+			PreemptionDoneChannels:                             preemptionDoneChannels,
+			PreemptPodHook: func(ctx context.Context, c fwk.PreemptionCandidate, preemptor preemption.ExecutorPreemptor, victim *v1.Pod, pluginName string) (bool, error, bool) {
+				select {
+				case preemptionStartedCh <- struct{}{}:
+				default:
+				}
+				// Hold preemption until preemptor pod is deleted
+				select {
+				case <-holdCh:
+				case <-ctx.Done():
+					return false, ctx.Err(), true
+				}
+				return false, nil, false
+			},
+		}
+
+		testCtx, preemptionPlugin, cs := asyncframework.InitTestForAsyncPreemption(t, preemptionConfig)
+		testutils.SyncSchedulerInformerFactory(testCtx)
+		defer testCtx.SchedulerCloseFn()
+
+		ns := testCtx.NS.Name
+		nodeName := "mutate-del-node-1"
+		node := st.MakeNode().Name(nodeName).Capacity(map[v1.ResourceName]string{
+			v1.ResourcePods:   "32",
+			v1.ResourceCPU:    "300m",
+			v1.ResourceMemory: "300Mi",
+		}).Label("node", nodeName).Obj()
+		if _, err := cs.CoreV1().Nodes().Create(testCtx.Ctx, node, metav1.CreateOptions{}); err != nil {
+			t.Fatalf("Failed to create node: %v", err)
+		}
+		defer func() {
+			_ = cs.CoreV1().Nodes().Delete(testCtx.Ctx, nodeName, metav1.DeleteOptions{})
+		}()
+
+		// Victim pod (200m CPU)
+		victim := initPausePod(&testutils.PausePodConfig{
+			Name:      "victim-del",
+			Namespace: ns,
+			Priority:  &asyncframework.LowPriority,
+			Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
+				v1.ResourceCPU:    *resource.NewMilliQuantity(200, resource.DecimalSI),
+				v1.ResourceMemory: *resource.NewQuantity(100, resource.BinarySI),
+			}},
+		})
+		victim.Spec.NodeName = nodeName
+		victim, err := runPausePod(cs, victim)
+		if err != nil {
+			t.Fatalf("Failed to run victim-del: %v", err)
+		}
+
+		// Preemptor requesting 300m CPU (needs 200m extra CPU)
+		preemptor := initPausePod(&testutils.PausePodConfig{
+			Name:      "preemptor-del",
+			Namespace: ns,
+			Priority:  &asyncframework.HighPriority,
+			Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
+				v1.ResourceCPU:    *resource.NewMilliQuantity(300, resource.DecimalSI),
+				v1.ResourceMemory: *resource.NewQuantity(100, resource.BinarySI),
+			}},
+		})
+		preemptor.Spec.NodeName = nodeName
+		preemptor, err = cs.CoreV1().Pods(ns).Create(testCtx.Ctx, preemptor, metav1.CreateOptions{})
+		if err != nil {
+			t.Fatalf("Failed to create preemptor: %v", err)
+		}
+
+		preemptor, err = updatePodToDeferredResize(testCtx.Ctx, cs, preemptor, "100m", "100")
+		if err != nil {
+			t.Fatalf("Failed to update preemptor status: %v", err)
+		}
+
+		// Wait for preemptor in activeQ
+		queue := testCtx.Scheduler.SchedulingQueue
+		err = wait.PollUntilContextTimeout(testCtx.Ctx, 50*time.Millisecond, 10*time.Second, false, func(ctx context.Context) (bool, error) {
+			activePods := queue.PodsInActiveQ()
+			return len(activePods) > 0 && activePods[0].Name == "preemptor-del", nil
+		})
+		if err != nil {
+			t.Fatalf("Expected preemptor-del in activeQ: %v", err)
+		}
+
+		// Trigger preemption scheduling cycle
+		testCtx.Scheduler.ScheduleOne(testCtx.Ctx)
+
+		// Wait until preemption hook is entered
+		select {
+		case <-preemptionStartedCh:
+		case <-time.After(10 * time.Second):
+			t.Fatalf("Timed out waiting for preemption to start")
+		}
+
+		// While async preemption is in-flight, delete the preemptor pod
+		err = cs.CoreV1().Pods(ns).Delete(testCtx.Ctx, "preemptor-del", metav1.DeleteOptions{GracePeriodSeconds: ptr.To(int64(0))})
+		if err != nil {
+			t.Fatalf("Failed to delete preemptor pod: %v", err)
+		}
+
+		// Release preemption hook
+		close(holdCh)
+
+		// Verify preemption cleans up cleanly and IsPodRunningPreemption is cleared
+		err = wait.PollUntilContextTimeout(testCtx.Ctx, 50*time.Millisecond, 5*time.Second, true, func(ctx context.Context) (bool, error) {
+			return !preemptionPlugin.Executor.IsPodRunningPreemption(preemptor.UID), nil
+		})
+		if err != nil {
+			t.Fatalf("Expected IsPodRunningPreemption to be false after preemptor deletion: %v", err)
+		}
+
+		testutils.CleanupPods(testCtx.Ctx, cs, t, []*v1.Pod{victim})
+	})
+
+	t.Run("preemptor resource requests reverted back to original size during in-flight preemption", func(t *testing.T) {
+		preemptionDoneChannels := &sync.Map{}
+		holdCh := make(chan struct{})
+		preemptionStartedCh := make(chan struct{}, 1)
+
+		preemptionConfig := asyncframework.AsyncPreemptionTestConfig{
+			EnableInPlacePodVerticalScalingSchedulerPreemption: true,
+			PreemptionDoneChannels:                             preemptionDoneChannels,
+			PreemptPodHook: func(ctx context.Context, c fwk.PreemptionCandidate, preemptor preemption.ExecutorPreemptor, victim *v1.Pod, pluginName string) (bool, error, bool) {
+				select {
+				case preemptionStartedCh <- struct{}{}:
+					// First victim to be processed: hold preemption until preemptor is updated
+					select {
+					case <-holdCh:
+					case <-ctx.Done():
+						return false, ctx.Err(), true
+					}
+					return false, fmt.Errorf("preemptor request reverted to original size; aborting preemption"), true
+				default:
+					// Subsequent victims wait for preemption context cancellation
+					select {
+					case <-ctx.Done():
+						return false, ctx.Err(), true
+					case <-time.After(10 * time.Second):
+						return false, fmt.Errorf("timed out waiting for context cancellation"), true
+					}
+				}
+			},
+		}
+
+		testCtx, preemptionPlugin, cs := asyncframework.InitTestForAsyncPreemption(t, preemptionConfig)
+		testutils.SyncSchedulerInformerFactory(testCtx)
+		defer testCtx.SchedulerCloseFn()
+
+		ns := testCtx.NS.Name
+		nodeName := "mutate-del-node-2"
+		node := st.MakeNode().Name(nodeName).Capacity(map[v1.ResourceName]string{
+			v1.ResourcePods:   "32",
+			v1.ResourceCPU:    "400m",
+			v1.ResourceMemory: "400Mi",
+		}).Label("node", nodeName).Obj()
+		if _, err := cs.CoreV1().Nodes().Create(testCtx.Ctx, node, metav1.CreateOptions{}); err != nil {
+			t.Fatalf("Failed to create node: %v", err)
+		}
+		defer func() {
+			_ = cs.CoreV1().Nodes().Delete(testCtx.Ctx, nodeName, metav1.DeleteOptions{})
+		}()
+
+		// Two victims: victim 1 (150m) and victim 2 (150m)
+		victim1 := initPausePod(&testutils.PausePodConfig{
+			Name:      "victim-revert-1",
+			Namespace: ns,
+			Priority:  &asyncframework.LowPriority,
+			Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
+				v1.ResourceCPU:    *resource.NewMilliQuantity(150, resource.DecimalSI),
+				v1.ResourceMemory: *resource.NewQuantity(100, resource.BinarySI),
+			}},
+		})
+		victim1.Spec.NodeName = nodeName
+		victim1, err := runPausePod(cs, victim1)
+		if err != nil {
+			t.Fatalf("Failed to run victim-revert-1: %v", err)
+		}
+
+		victim2 := initPausePod(&testutils.PausePodConfig{
+			Name:      "victim-revert-2",
+			Namespace: ns,
+			Priority:  &asyncframework.LowPriority,
+			Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
+				v1.ResourceCPU:    *resource.NewMilliQuantity(150, resource.DecimalSI),
+				v1.ResourceMemory: *resource.NewQuantity(100, resource.BinarySI),
+			}},
+		})
+		victim2.Spec.NodeName = nodeName
+		victim2, err = runPausePod(cs, victim2)
+		if err != nil {
+			t.Fatalf("Failed to run victim-revert-2: %v", err)
+		}
+
+		// Preemptor requesting 400m CPU (needs 300m additional CPU -> triggers preemption against victims)
+		preemptor := initPausePod(&testutils.PausePodConfig{
+			Name:      "preemptor-revert",
+			Namespace: ns,
+			Priority:  &asyncframework.HighPriority,
+			Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
+				v1.ResourceCPU:    *resource.NewMilliQuantity(400, resource.DecimalSI),
+				v1.ResourceMemory: *resource.NewQuantity(100, resource.BinarySI),
+			}},
+		})
+		preemptor.Spec.NodeName = nodeName
+		preemptor, err = cs.CoreV1().Pods(ns).Create(testCtx.Ctx, preemptor, metav1.CreateOptions{})
+		if err != nil {
+			t.Fatalf("Failed to create preemptor: %v", err)
+		}
+
+		preemptor, err = updatePodToDeferredResize(testCtx.Ctx, cs, preemptor, "100m", "100")
+		if err != nil {
+			t.Fatalf("Failed to update preemptor status: %v", err)
+		}
+
+		// Wait for preemptor in activeQ
+		queue := testCtx.Scheduler.SchedulingQueue
+		err = wait.PollUntilContextTimeout(testCtx.Ctx, 50*time.Millisecond, 10*time.Second, false, func(ctx context.Context) (bool, error) {
+			activePods := queue.PodsInActiveQ()
+			return len(activePods) > 0 && activePods[0].Name == "preemptor-revert", nil
+		})
+		if err != nil {
+			t.Fatalf("Expected preemptor-revert in activeQ: %v", err)
+		}
+
+		// Trigger preemption scheduling cycle
+		testCtx.Scheduler.ScheduleOne(testCtx.Ctx)
+
+		// Wait until preemption has started
+		select {
+		case <-preemptionStartedCh:
+		case <-time.After(10 * time.Second):
+			t.Fatalf("Timed out waiting for preemption to start")
+		}
+
+		// Revert preemptor requests back to 100m CPU (matching allocated 100m CPU)
+		livePreemptor, err := cs.CoreV1().Pods(ns).Get(testCtx.Ctx, "preemptor-revert", metav1.GetOptions{})
+		if err != nil {
+			t.Fatalf("Failed to get live preemptor: %v", err)
+		}
+		livePreemptor.Spec.Containers[0].Resources.Requests[v1.ResourceCPU] = resource.MustParse("100m")
+		livePreemptor, err = cs.CoreV1().Pods(ns).UpdateResize(testCtx.Ctx, livePreemptor.Name, livePreemptor, metav1.UpdateOptions{})
+		if err != nil {
+			t.Fatalf("Failed to update preemptor spec requests: %v", err)
+		}
+
+		// Release preemption hook
+		close(holdCh)
+
+		// Wait for preemption state to clear
+		err = wait.PollUntilContextTimeout(testCtx.Ctx, 50*time.Millisecond, 5*time.Second, true, func(ctx context.Context) (bool, error) {
+			return !preemptionPlugin.Executor.IsPodRunningPreemption(preemptor.UID), nil
+		})
+		if err != nil {
+			t.Fatalf("Expected IsPodRunningPreemption to be false after completion: %v", err)
+		}
+
+		// Verify victim2 was not unnecessarily evicted
+		liveVictim2, err := cs.CoreV1().Pods(ns).Get(testCtx.Ctx, "victim-revert-2", metav1.GetOptions{})
+		if err != nil {
+			t.Fatalf("Failed to get victim-revert-2: %v", err)
+		}
+		if liveVictim2.DeletionTimestamp != nil {
+			t.Errorf("victim-revert-2 should NOT have been evicted once preemptor resized back down")
+		}
+
+		testutils.CleanupPods(testCtx.Ctx, cs, t, []*v1.Pod{victim1, victim2, livePreemptor})
 	})
 }
