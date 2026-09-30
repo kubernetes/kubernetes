@@ -96,6 +96,7 @@ import (
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	podtest "k8s.io/kubernetes/pkg/kubelet/pod/testing"
 	"k8s.io/kubernetes/pkg/kubelet/podcertificate"
+	"k8s.io/kubernetes/pkg/kubelet/prober"
 	proberesults "k8s.io/kubernetes/pkg/kubelet/prober/results"
 	probetest "k8s.io/kubernetes/pkg/kubelet/prober/testing"
 	"k8s.io/kubernetes/pkg/kubelet/secret"
@@ -124,6 +125,7 @@ import (
 	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/clock"
 	testingclock "k8s.io/utils/clock/testing"
+	"k8s.io/utils/ptr"
 )
 
 func init() {
@@ -2107,6 +2109,180 @@ func TestGetPodsToSync(t *testing.T) {
 	sort.Sort(podsByUID(expected))
 	sort.Sort(podsByUID(podsToSync))
 	assert.Equal(t, expected, podsToSync)
+}
+
+func TestGenerateAPIPodStatusForStaticPodAfterKubeletRestart(t *testing.T) {
+	for _, featureEnabled := range []bool{false, true} {
+		t.Run(fmt.Sprintf("ChangeContainerStatusOnKubeletRestart=%t", featureEnabled), func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ChangeContainerStatusOnKubeletRestart, featureEnabled)
+			for _, sidecar := range []bool{false, true} {
+				for _, tc := range []struct {
+					name           string
+					ready          bool
+					replaced       bool
+					outdatedMirror bool
+					noMirror       bool
+					mirrorPhase    v1.PodPhase
+					probeResult    *proberesults.Result
+					expectedReady  bool
+				}{
+					{name: "ready container", ready: true, expectedReady: true},
+					{name: "unready container"},
+					{name: "replaced container", ready: true, replaced: true},
+					{name: "outdated mirror pod", ready: true, outdatedMirror: true},
+					{name: "no mirror pod", noMirror: true},
+					{name: "mirror terminal phase does not affect static pod", ready: true, mirrorPhase: v1.PodFailed, expectedReady: true},
+					{name: "successful probe overrides unready mirror", probeResult: ptr.To(proberesults.Success)},
+					{name: "failed probe overrides ready mirror", ready: true, expectedReady: true, probeResult: ptr.To(proberesults.Failure)},
+				} {
+					t.Run(fmt.Sprintf("sidecar=%t/%s", sidecar, tc.name), func(t *testing.T) {
+						tCtx := ktesting.Init(t)
+						testKubelet := newTestKubelet(t, false)
+						defer testKubelet.Cleanup()
+						kl := testKubelet.kubelet
+						kl.probeManager = prober.NewManager(kl.statusManager, kl.livenessManager, kl.readinessManager, kl.startupManager, nil, kl.recorder)
+
+						pod := podWithUIDNameNs("static-uid", "static-pod", "test")
+						pod.Annotations[kubetypes.ConfigSourceAnnotationKey] = kubetypes.FileSource
+						pod.Annotations[kubetypes.ConfigHashAnnotationKey] = "static-hash"
+						pod.Spec.RestartPolicy = v1.RestartPolicyAlways
+						container := v1.Container{
+							Name: "container", Image: "image",
+							// This test controls readiness results; workers must not execute a probe.
+							ReadinessProbe: &v1.Probe{
+								ProbeHandler:        v1.ProbeHandler{Exec: &v1.ExecAction{Command: []string{"/bin/true"}}},
+								InitialDelaySeconds: 3600,
+								PeriodSeconds:       1,
+							},
+						}
+						if sidecar {
+							container.RestartPolicy = ptr.To(v1.ContainerRestartPolicyAlways)
+							pod.Spec.InitContainers = []v1.Container{container}
+							pod.Spec.Containers = []v1.Container{{Name: "main", Image: "image"}}
+						} else {
+							pod.Spec.Containers = []v1.Container{container}
+						}
+						pod.Status.Phase = v1.PodPending
+						mirrorPod := pod.DeepCopy()
+						mirrorPod.UID = "mirror-uid"
+						mirrorPod.Annotations[kubetypes.ConfigSourceAnnotationKey] = kubetypes.ApiserverSource
+						mirrorPod.Annotations[kubetypes.ConfigMirrorAnnotationKey] = pod.Annotations[kubetypes.ConfigHashAnnotationKey]
+						if tc.outdatedMirror {
+							mirrorPod.Annotations[kubetypes.ConfigMirrorAnnotationKey] = "old-hash"
+						}
+						containerID := kubecontainer.BuildContainerID("test", "container-id")
+						startedAt := time.Now().Add(-time.Minute)
+						oldStatus := v1.ContainerStatus{
+							Name: container.Name, ContainerID: containerID.String(),
+							Started: new(true), Ready: tc.ready,
+							State: v1.ContainerState{Running: &v1.ContainerStateRunning{StartedAt: metav1.NewTime(startedAt)}},
+						}
+						if tc.replaced {
+							oldStatus.ContainerID = "test://old-container-id"
+						}
+						mirrorPod.Status = v1.PodStatus{
+							Phase:   v1.PodRunning,
+							Reason:  "MirrorOnlyReason",
+							Message: "mirror pod status must only be used for probes",
+							Conditions: []v1.PodCondition{
+								{Type: v1.PodReady, Status: v1.ConditionFalse},
+								{Type: "example.com/ExternalCondition", Status: v1.ConditionTrue},
+							},
+						}
+						if tc.mirrorPhase != "" {
+							mirrorPod.Status.Phase = tc.mirrorPhase
+						}
+						if tc.ready {
+							mirrorPod.Status.Conditions[0].Status = v1.ConditionTrue
+						}
+						if sidecar {
+							mirrorPod.Status.InitContainerStatuses = []v1.ContainerStatus{oldStatus}
+						} else {
+							mirrorPod.Status.ContainerStatuses = []v1.ContainerStatus{oldStatus}
+						}
+						kl.podManager.AddPod(pod)
+						if !tc.noMirror {
+							kl.podManager.AddPod(mirrorPod)
+						}
+						originalPod, originalMirror := pod.DeepCopy(), mirrorPod.DeepCopy()
+						runtimeStatus := &kubecontainer.PodStatus{
+							ID: pod.UID, Name: pod.Name, Namespace: pod.Namespace,
+							ContainerStatuses: []*kubecontainer.Status{{
+								ID: containerID, Name: container.Name,
+								State: kubecontainer.ContainerStateRunning, StartedAt: startedAt,
+							}},
+						}
+						if sidecar {
+							runtimeStatus.ContainerStatuses = append(runtimeStatus.ContainerStatuses, &kubecontainer.Status{
+								ID: kubecontainer.BuildContainerID("test", "main-id"), Name: "main",
+								State: kubecontainer.ContainerStateRunning, StartedAt: startedAt,
+							})
+						}
+
+						for sync := range 2 {
+							if sync == 1 {
+								// SyncPod caches the initial status before registering workers.
+								kl.probeManager.AddPod(tCtx, pod)
+								t.Cleanup(func() {
+									// Wait for worker cleanup before the subtest's logger and feature gates expire.
+									kl.readinessManager.Set(containerID, proberesults.Unknown, pod)
+									kl.probeManager.RemovePod(pod)
+									require.NoError(t, wait.PollUntilContextTimeout(context.WithoutCancel(tCtx), 10*time.Millisecond, wait.ForeverTestTimeout, true, func(context.Context) (bool, error) {
+										_, found := kl.readinessManager.Get(containerID)
+										return !found, nil
+									}), "readiness worker did not remove its result after stopping")
+								})
+								if featureEnabled {
+									// Let the worker seed Failure before installing the controlled result.
+									require.NoError(t, wait.PollUntilContextTimeout(tCtx, 10*time.Millisecond, wait.ForeverTestTimeout, true, func(context.Context) (bool, error) {
+										_, found := kl.readinessManager.Get(containerID)
+										return found, nil
+									}), "readiness worker did not initialize its result")
+								}
+								if tc.probeResult != nil {
+									kl.readinessManager.Set(containerID, *tc.probeResult, pod)
+								}
+							}
+							expectedReady := tc.expectedReady
+							if featureEnabled {
+								// Without preservation, readiness defaults to true only before a worker exists.
+								expectedReady = sync == 0
+							}
+							if sync == 1 && tc.probeResult != nil {
+								expectedReady = *tc.probeResult == proberesults.Success
+							}
+							// Mirror probe history must not change the phase computed from
+							// the runtime and the status manager's cache.
+							if !tc.noMirror {
+								kl.podManager.RemovePod(mirrorPod)
+							}
+							withoutMirror := kl.generateAPIPodStatus(tCtx, pod, runtimeStatus, false)
+							if !tc.noMirror {
+								kl.podManager.AddPod(mirrorPod)
+							}
+							apiStatus := kl.generateAPIPodStatus(tCtx, pod, runtimeStatus, false)
+							assert.Equal(t, withoutMirror.Phase, apiStatus.Phase)
+							assert.Empty(t, apiStatus.Reason)
+							assert.Empty(t, apiStatus.Message)
+							for _, condition := range apiStatus.Conditions {
+								assert.NotEqual(t, v1.PodConditionType("example.com/ExternalCondition"), condition.Type)
+							}
+							statuses := apiStatus.ContainerStatuses
+							if sidecar {
+								statuses = apiStatus.InitContainerStatuses
+							}
+							require.Len(t, statuses, 1)
+							assert.Equal(t, expectedReady, statuses[0].Ready)
+							assert.Equal(t, containerID.String(), statuses[0].ContainerID)
+							kl.statusManager.SetPodStatus(tCtx.Logger(), pod, apiStatus)
+						}
+						assert.Equal(t, originalPod, pod, "the static pod from the config source must not be mutated")
+						assert.Equal(t, originalMirror, mirrorPod, "the mirror pod from the API source must not be mutated")
+					})
+				}
+			}
+		})
+	}
 }
 
 func TestGenerateAPIPodStatusWithSortedContainers(t *testing.T) {
