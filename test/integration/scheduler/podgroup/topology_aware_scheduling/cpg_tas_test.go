@@ -2465,6 +2465,94 @@ func TestCPGTopologyAwareSchedulingChildNominatedNode(t *testing.T) {
 	}
 }
 
+// TestCPGTopologyAwareSchedulingNestedNominatedNode covers NominatedNodeName handling at the
+// middle level of a CompositePodGroup hierarchy: a nested CompositePodGroup choosing the block
+// its own descendants land in. The cluster has a single zone on purpose, so the root is left with
+// one candidate placement and the only decision under test is the nested group's block.
+//
+// Only one of the two nested groups has a nominated pod, and the other one must keep scoring
+// normally: had the nested group matched against the whole hierarchy's nominations instead of its
+// own subtree, it would have followed its sibling's nomination into block-2 as well.
+func TestCPGTopologyAwareSchedulingNestedNominatedNode(t *testing.T) {
+	tests := []scenario{
+		{
+			name: "nested composite pod group prefers the block matching its own subtree's nominated node",
+			steps: []stepsframework.Step{
+				{
+					Name: "Create one node per block in zone-1. block-1's node is smaller so MostAllocated scores it higher; block-2 (nominated for pg1's pod) fits but scores lower, so without nested-level NNN support pg1 deterministically lands in block-1",
+					CreateNodes: []*v1.Node{
+						makeNodeWithLabels("node-b1", map[string]string{"zone": "zone-1", "block": "block-1", "rack": "rack-1"}),
+						st.MakeNode().Name("node-b2").Label("zone", "zone-1").Label("block", "block-2").Label("rack", "rack-2").
+							Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "8"}).Obj(),
+					},
+				},
+				{
+					Name: "Create one pod per leaf group before any group exists, so both wait gated in the queue",
+					CreatePods: []*v1.Pod{
+						makePod("p1", "pg1"),
+						makePod("p2", "pg2"),
+					},
+				},
+				{
+					Name: "Nominate block-2 for pg1's pod only, leaving pg2's pod to be placed by score",
+					UpdatePodStatus: &stepsframework.UpdatePod{
+						PodName:  "p1",
+						ModifyFn: func(p *v1.Pod) { p.Status.NominatedNodeName = "node-b2" },
+					},
+				},
+				{
+					Name:                 "Wait until the gated pod carries the nominated node before opening the gate",
+					WaitForPodsNominated: map[string]string{"p1": "node-b2"},
+				},
+				{
+					Name:                    "Create the root CompositePodGroup (Gang with minGroupCount=2, TopologyKey=zone)",
+					CreateCompositePodGroup: makeGangCompositePodGroup("cpg-root", "", "zone", 2),
+				},
+				{
+					Name:                    "Create nested CompositePodGroup cpg-sub1 (Gang with minGroupCount=1, TopologyKey=block)",
+					CreateCompositePodGroup: makeGangCompositePodGroup("cpg-sub1", "cpg-root", "block", 1),
+				},
+				{
+					Name:                    "Create nested CompositePodGroup cpg-sub2 (Gang with minGroupCount=1, TopologyKey=block)",
+					CreateCompositePodGroup: makeGangCompositePodGroup("cpg-sub2", "cpg-root", "block", 1),
+				},
+				{
+					Name:           "Create leaf PodGroup pg1 under cpg-sub1 (Gang with minCount=1, TopologyKey=rack)",
+					CreatePodGroup: makeGangPodGroupWithParent("pg1", "cpg-sub1", "rack", 1),
+				},
+				{
+					Name:           "Create leaf PodGroup pg2 under cpg-sub2, opening the gate",
+					CreatePodGroup: makeGangPodGroupWithParent("pg2", "cpg-sub2", "rack", 1),
+				},
+				{
+					Name:                 "Verify both leaves are scheduled",
+					WaitForPodsScheduled: []string{"p1", "p2"},
+				},
+				{
+					Name: "Verify cpg-sub1's pod landed in block-2, the nominated block, rather than the higher scoring block-1",
+					VerifyAssignments: &stepsframework.VerifyAssignments{
+						Pods:  []string{"p1"},
+						Nodes: sets.New("node-b2"),
+					},
+				},
+				{
+					Name: "Verify cpg-sub2 has no nomination in its own subtree and still takes the higher scoring block",
+					VerifyAssignments: &stepsframework.VerifyAssignments{
+						Pods:  []string{"p2"},
+						Nodes: sets.New("node-b1"),
+					},
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			runCPGTestScenario(t, tt)
+		})
+	}
+}
+
 func runCPGTestScenario(t *testing.T, tt scenario, opts ...scheduler.Option) {
 	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 		features.CompositePodGroup:               true,
