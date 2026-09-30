@@ -207,8 +207,23 @@ func SetDefaults_Pod(obj *v1.Pod) {
 	}
 
 	if obj.Spec.EnableServiceLinks == nil {
-		enableServiceLinks := v1.DefaultEnableServiceLinks
-		obj.Spec.EnableServiceLinks = &enableServiceLinks
+		// Isolated pods have no route to any Service by default.
+		if isDefaultNetworkNone(&obj.Spec) {
+			obj.Spec.EnableServiceLinks = ptr.To(false)
+		} else {
+			enableServiceLinks := v1.DefaultEnableServiceLinks
+			obj.Spec.EnableServiceLinks = &enableServiceLinks
+		}
+	}
+
+	// Materialize defaultNetwork on Pods only: doing it for workload templates
+	// would change stored templates on gate enablement and trigger rollouts.
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodDefaultNetwork) && obj.Spec.DefaultNetwork == nil {
+		if obj.Spec.HostNetwork {
+			obj.Spec.DefaultNetwork = ptr.To(v1.PodDefaultNetworkHost)
+		} else {
+			obj.Spec.DefaultNetwork = ptr.To(v1.PodDefaultNetworkPod)
+		}
 	}
 
 	if obj.Spec.HostNetwork {
@@ -254,8 +269,29 @@ func SetDefaults_PodSpec(obj *v1.PodSpec) {
 		obj.ServiceAccountName = obj.DeprecatedServiceAccount
 	}
 	obj.DeprecatedServiceAccount = obj.ServiceAccountName
+
+	// Keep defaultNetwork and the legacy hostNetwork boolean in sync in both
+	// directions so that clients that know only one of the fields keep working.
+	// The nil case is only defaulted on Pods (see SetDefaults_Pod).
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodDefaultNetwork) && obj.DefaultNetwork != nil {
+		switch *obj.DefaultNetwork {
+		case v1.PodDefaultNetworkHost:
+			obj.HostNetwork = true
+		case v1.PodDefaultNetworkPod:
+			// "Pod" plus hostNetwork: true can only come from a client that
+			// does not know defaultNetwork (typically a PATCH); the boolean
+			// keeps its historical meaning.
+			if obj.HostNetwork {
+				obj.DefaultNetwork = ptr.To(v1.PodDefaultNetworkHost)
+			}
+		}
+	}
 	if obj.DNSPolicy == "" {
-		obj.DNSPolicy = v1.DNSClusterFirst
+		if isDefaultNetworkNone(obj) {
+			obj.DNSPolicy = v1.DNSNone
+		} else {
+			obj.DNSPolicy = v1.DNSClusterFirst
+		}
 	}
 	if obj.RestartPolicy == "" {
 		obj.RestartPolicy = v1.RestartPolicyAlways
@@ -445,6 +481,14 @@ func defaultHostNetworkPorts(containers *[]v1.Container) {
 			}
 		}
 	}
+}
+
+// isDefaultNetworkNone reports whether the spec opts out of the default pod
+// network. It is false while the PodDefaultNetwork gate is disabled so that the
+// field, which is dropped on write in that case, does not influence defaulting.
+func isDefaultNetworkNone(spec *v1.PodSpec) bool {
+	return utilfeature.DefaultFeatureGate.Enabled(features.PodDefaultNetwork) &&
+		spec.DefaultNetwork != nil && *spec.DefaultNetwork == v1.PodDefaultNetworkNone
 }
 
 func defaultHTTPGetProtocol(action *v1.HTTPGetAction) {
