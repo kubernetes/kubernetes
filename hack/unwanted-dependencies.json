@@ -128,10 +128,7 @@
         "go.uber.org/goleak",
         "go.uber.org/multierr",
         "go.uber.org/zap",
-        "k8s.io/utils",
-        "sigs.k8s.io/kustomize/api",
-        "sigs.k8s.io/kustomize/kustomize/v5",
-        "sigs.k8s.io/kustomize/kyaml"
+        "k8s.io/utils"
       ],
       "github.com/envoyproxy/protoc-gen-validate": [
         "google.golang.org/grpc"
@@ -167,11 +164,6 @@
       ],
       "github.com/klauspost/compress": [
         "github.com/prometheus/client_golang"
-      ],
-      "github.com/mailru/easyjson": [
-        "sigs.k8s.io/kustomize/api",
-        "sigs.k8s.io/kustomize/kustomize/v5",
-        "sigs.k8s.io/kustomize/kyaml"
       ],
       "github.com/modern-go/concurrent": [
         "github.com/prometheus/client_golang"
@@ -210,10 +202,7 @@
         "go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc",
         "go.uber.org/goleak",
         "go.uber.org/multierr",
-        "go.uber.org/zap",
-        "sigs.k8s.io/kustomize/api",
-        "sigs.k8s.io/kustomize/kustomize/v5",
-        "sigs.k8s.io/kustomize/kyaml"
+        "go.uber.org/zap"
       ]
     },
     "unwantedVendored": [
