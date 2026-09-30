@@ -40,6 +40,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/informers"
 	coreinformers "k8s.io/client-go/informers/core/v1"
+	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/component-base/featuregate"
@@ -136,15 +137,25 @@ func mustSetupCluster(tCtx ktesting.TContext, config *config.KubeSchedulerConfig
 	// Not all config options will be effective but only those mostly related with scheduler performance will
 	// be applied to start a scheduler, most of them are defined in `scheduler.schedulerOptions`.
 	scheduler, informerFactory, done := util.StartSchedulerWithDone(tCtx, config, opts.outOfTreePluginRegistry)
-	util.StartFakePVController(tCtx, tCtx.Client(), informerFactory)
-	runGC := util.CreateGCController(tCtx, tCtx, *cfg, informerFactory)
-	runNS := util.CreateNamespaceController(tCtx, tCtx, *cfg, informerFactory)
+
+	// The controllers below stand in for kube-controller-manager, which runs in a
+	// separate process from kube-scheduler in a real cluster. Give them their own
+	// client (so that their rate limiting is independent from the scheduler's) and
+	// their own informer factory (so that watches and caches aren't shared with the
+	// scheduler either).
+	controllerClient := clientset.NewForConfigOrDie(cfg)
+	controllerInformerFactory := informers.NewSharedInformerFactory(controllerClient, 0)
+	util.StartFakePVController(tCtx, controllerClient, controllerInformerFactory)
+	runGC := util.CreateGCController(tCtx, tCtx, *cfg, controllerInformerFactory)
+	runNS := util.CreateNamespaceController(tCtx, tCtx, *cfg, controllerInformerFactory)
 	// Testing of DRA with inline resource claims depends on this
 	// controller for creating and removing ResourceClaims.
-	runResourceClaimController := util.CreateResourceClaimController(tCtx, tCtx, tCtx.Client(), informerFactory)
+	runResourceClaimController := util.CreateResourceClaimController(tCtx, tCtx, controllerClient, controllerInformerFactory)
 
 	informerFactory.Start(tCtx.Done())
 	informerFactory.WaitForCacheSync(tCtx.Done())
+	controllerInformerFactory.Start(tCtx.Done())
+	controllerInformerFactory.WaitForCacheSync(tCtx.Done())
 	go runGC()
 	go runNS()
 	go runResourceClaimController()
