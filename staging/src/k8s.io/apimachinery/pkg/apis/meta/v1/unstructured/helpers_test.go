@@ -488,6 +488,30 @@ func TestDecodeList(t *testing.T) {
 	}
 }
 
+// TestDecodeListAllocations checks that decoding a list does not allocate more
+// than decoding each of its items on its own, which only holds when every item
+// is decoded once.
+func TestDecodeListAllocations(t *testing.T) {
+	const n = 50
+	const item = `{"kind":"Pod","apiVersion":"v1","metadata":{"name":"a","labels":{"app":"a"}},"spec":{"containers":[{"name":"c","image":"i"}]}}`
+	itemData := []byte(item)
+	list := []byte(`{"kind":"PodList","apiVersion":"v1","items":[` + strings.TrimSuffix(strings.Repeat(item+",", n), ",") + `]}`)
+
+	itemAllocs := testing.AllocsPerRun(20, func() {
+		if err := (&Unstructured{}).UnmarshalJSON(itemData); err != nil {
+			t.Fatal(err)
+		}
+	})
+	listAllocs := testing.AllocsPerRun(20, func() {
+		if err := (&UnstructuredList{}).UnmarshalJSON(list); err != nil {
+			t.Fatal(err)
+		}
+	})
+	if listAllocs > n*itemAllocs {
+		t.Errorf("decoding a list of %d items took %v allocations, more than the %v it takes to decode each item on its own", n, listAllocs, n*itemAllocs)
+	}
+}
+
 func benchmarkListJSON(n int) []byte {
 	const item = `{"metadata":{"name":"web-%[1]d","namespace":"default","uid":"4c1f2a9e-0d3b-4c1a-9f2e-%012[1]d","resourceVersion":"%[1]d","labels":{"app":"web","tier":"frontend"},` +
 		`"ownerReferences":[{"apiVersion":"apps/v1","kind":"ReplicaSet","name":"web","uid":"a1b2c3d4","controller":true}],` +
