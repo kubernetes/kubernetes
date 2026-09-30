@@ -315,7 +315,9 @@ func TestIndex(t *testing.T) {
 		"pvc:pv-pvc-ns/pv-pvc-3":        {},
 		"secret:pv-secret-ns/pv-secret": {"pv:pv1", "pv:pv2", "pv:pv3"},
 	})
-	expectIndex(map[string][]string{})
+	expectIndex(map[string][]string{
+		"secret:pv-secret-ns/pv-secret": {},
+	})
 	g.DeletePV("pv1")
 	g.DeletePV("pv2")
 	g.DeletePV("pv3")
@@ -955,7 +957,9 @@ func TestIndex2(t *testing.T) {
 				"pvc:ns/pvc3":        {},
 				"secret:ns/pvsecret": {"pv:pv1", "pv:pv2", "pv:pv3"},
 			},
-			expectedIndex: map[string][]string{},
+			expectedIndex: map[string][]string{
+				"secret:ns/pvsecret": {},
+			},
 		},
 		{
 			desc: "persistentvolumes deleting",
@@ -997,6 +1001,261 @@ func TestIndex2(t *testing.T) {
 				"secret:ns/s3": {"pv:pv3"},
 			},
 			expectedIndex: map[string][]string{},
+		},
+		{
+			desc: "index built for secret via persistentvolumes when pods added after PVs",
+			startingGraph: func() *Graph {
+				g := NewTestGraph()
+				g.AddPV(pv("pv1", "pvc1", "s1"))
+				g.AddPV(pv("pv2", "pvc2", "s1"))
+				g.AddPV(pv("pv3", "pvc3", "s1"))
+				return g
+			}(),
+			graphTransformer: func(g *Graph) {
+				pvcVol := func(name string) []corev1.Volume {
+					return []corev1.Volume{{Name: name, VolumeSource: corev1.VolumeSource{PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: name}}}}
+				}
+				g.AddPod(pod("pod1", "node1", "", pvcVol("pvc1"), nil, ""))
+				g.AddPod(pod("pod2", "node2", "", pvcVol("pvc2"), nil, ""))
+				g.AddPod(pod("pod3", "node1", "", pvcVol("pvc3"), nil, ""))
+			},
+			expectedGraph: map[string][]string{
+				"node:node1":   {},
+				"node:node2":   {},
+				"pod:ns/pod1":  {"node:node1"},
+				"pod:ns/pod2":  {"node:node2"},
+				"pod:ns/pod3":  {"node:node1"},
+				"pv:pv1":       {"pvc:ns/pvc1"},
+				"pv:pv2":       {"pvc:ns/pvc2"},
+				"pv:pv3":       {"pvc:ns/pvc3"},
+				"pvc:ns/pvc1":  {"pod:ns/pod1"},
+				"pvc:ns/pvc2":  {"pod:ns/pod2"},
+				"pvc:ns/pvc3":  {"pod:ns/pod3"},
+				"secret:ns/s1": {"pv:pv1", "pv:pv2", "pv:pv3"},
+			},
+			expectedIndex: map[string][]string{
+				"secret:ns/s1": {"node:node1=2", "node:node2=1"},
+			},
+		},
+		{
+			desc: "index built for secret via persistentvolumes when PVs added after pods",
+			startingGraph: func() *Graph {
+				g := NewTestGraph()
+				pvcVol := func(name string) []corev1.Volume {
+					return []corev1.Volume{{Name: name, VolumeSource: corev1.VolumeSource{PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: name}}}}
+				}
+				g.AddPod(pod("pod1", "node1", "", pvcVol("pvc1"), nil, ""))
+				g.AddPod(pod("pod2", "node2", "", pvcVol("pvc2"), nil, ""))
+				g.AddPod(pod("pod3", "node3", "", pvcVol("pvc3"), nil, ""))
+				g.AddPV(pv("pv1", "pvc1", "s1"))
+				g.AddPV(pv("pv2", "pvc2", "s1"))
+				return g
+			}(),
+			graphTransformer: func(g *Graph) {
+				g.AddPV(pv("pv3", "pvc3", "s1"))
+			},
+			expectedGraph: map[string][]string{
+				"node:node1":   {},
+				"node:node2":   {},
+				"node:node3":   {},
+				"pod:ns/pod1":  {"node:node1"},
+				"pod:ns/pod2":  {"node:node2"},
+				"pod:ns/pod3":  {"node:node3"},
+				"pv:pv1":       {"pvc:ns/pvc1"},
+				"pv:pv2":       {"pvc:ns/pvc2"},
+				"pv:pv3":       {"pvc:ns/pvc3"},
+				"pvc:ns/pvc1":  {"pod:ns/pod1"},
+				"pvc:ns/pvc2":  {"pod:ns/pod2"},
+				"pvc:ns/pvc3":  {"pod:ns/pod3"},
+				"secret:ns/s1": {"pv:pv1", "pv:pv2", "pv:pv3"},
+			},
+			expectedIndex: map[string][]string{
+				"secret:ns/s1": {"node:node1=1", "node:node2=1", "node:node3=1"},
+			},
+		},
+		{
+			desc: "secret via persistentvolumes index updated on pod deletion",
+			startingGraph: func() *Graph {
+				g := NewTestGraph()
+				pvcVol := func(name string) []corev1.Volume {
+					return []corev1.Volume{{Name: name, VolumeSource: corev1.VolumeSource{PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: name}}}}
+				}
+				g.AddPV(pv("pv1", "pvc1", "s1"))
+				g.AddPV(pv("pv2", "pvc2", "s1"))
+				g.AddPV(pv("pv3", "pvc3", "s1"))
+				g.AddPod(pod("pod1", "node1", "", pvcVol("pvc1"), nil, ""))
+				g.AddPod(pod("pod2", "node2", "", pvcVol("pvc2"), nil, ""))
+				g.AddPod(pod("pod3", "node1", "", pvcVol("pvc3"), nil, ""))
+				return g
+			}(),
+			graphTransformer: func(g *Graph) {
+				g.DeletePod("pod1", "ns")
+			},
+			expectedGraph: map[string][]string{
+				"node:node1":   {},
+				"node:node2":   {},
+				"pod:ns/pod2":  {"node:node2"},
+				"pod:ns/pod3":  {"node:node1"},
+				"pv:pv1":       {"pvc:ns/pvc1"},
+				"pv:pv2":       {"pvc:ns/pvc2"},
+				"pv:pv3":       {"pvc:ns/pvc3"},
+				"pvc:ns/pvc1":  {},
+				"pvc:ns/pvc2":  {"pod:ns/pod2"},
+				"pvc:ns/pvc3":  {"pod:ns/pod3"},
+				"secret:ns/s1": {"pv:pv1", "pv:pv2", "pv:pv3"},
+			},
+			expectedIndex: map[string][]string{
+				"secret:ns/s1": {"node:node1=1", "node:node2=1"},
+			},
+		},
+		{
+			desc: "secret via persistentvolumes index updated on PV deletion staying above threshold",
+			startingGraph: func() *Graph {
+				g := NewTestGraph()
+				pvcVol := func(name string) []corev1.Volume {
+					return []corev1.Volume{{Name: name, VolumeSource: corev1.VolumeSource{PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: name}}}}
+				}
+				g.AddPV(pv("pv1", "pvc1", "s1"))
+				g.AddPV(pv("pv2", "pvc2", "s1"))
+				g.AddPV(pv("pv3", "pvc3", "s1"))
+				g.AddPV(pv("pv4", "pvc4", "s1"))
+				g.AddPod(pod("pod1", "node1", "", pvcVol("pvc1"), nil, ""))
+				g.AddPod(pod("pod2", "node2", "", pvcVol("pvc2"), nil, ""))
+				g.AddPod(pod("pod3", "node1", "", pvcVol("pvc3"), nil, ""))
+				g.AddPod(pod("pod4", "node3", "", pvcVol("pvc4"), nil, ""))
+				return g
+			}(),
+			graphTransformer: func(g *Graph) {
+				g.DeletePV("pv1")
+			},
+			expectedGraph: map[string][]string{
+				"node:node1":   {},
+				"node:node2":   {},
+				"node:node3":   {},
+				"pod:ns/pod1":  {"node:node1"},
+				"pod:ns/pod2":  {"node:node2"},
+				"pod:ns/pod3":  {"node:node1"},
+				"pod:ns/pod4":  {"node:node3"},
+				"pv:pv2":       {"pvc:ns/pvc2"},
+				"pv:pv3":       {"pvc:ns/pvc3"},
+				"pv:pv4":       {"pvc:ns/pvc4"},
+				"pvc:ns/pvc1":  {"pod:ns/pod1"},
+				"pvc:ns/pvc2":  {"pod:ns/pod2"},
+				"pvc:ns/pvc3":  {"pod:ns/pod3"},
+				"pvc:ns/pvc4":  {"pod:ns/pod4"},
+				"secret:ns/s1": {"pv:pv2", "pv:pv3", "pv:pv4"},
+			},
+			expectedIndex: map[string][]string{
+				"secret:ns/s1": {"node:node1=1", "node:node2=1", "node:node3=1"},
+			},
+		},
+		{
+			desc: "no index for secret via persistentvolumes - dropping below threshold on PV deletion",
+			startingGraph: func() *Graph {
+				g := NewTestGraph()
+				pvcVol := func(name string) []corev1.Volume {
+					return []corev1.Volume{{Name: name, VolumeSource: corev1.VolumeSource{PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: name}}}}
+				}
+				g.AddPV(pv("pv1", "pvc1", "s1"))
+				g.AddPV(pv("pv2", "pvc2", "s1"))
+				g.AddPV(pv("pv3", "pvc3", "s1"))
+				g.AddPod(pod("pod1", "node1", "", pvcVol("pvc1"), nil, ""))
+				g.AddPod(pod("pod2", "node2", "", pvcVol("pvc2"), nil, ""))
+				g.AddPod(pod("pod3", "node1", "", pvcVol("pvc3"), nil, ""))
+				return g
+			}(),
+			graphTransformer: func(g *Graph) {
+				g.DeletePV("pv1")
+			},
+			expectedGraph: map[string][]string{
+				"node:node1":   {},
+				"node:node2":   {},
+				"pod:ns/pod1":  {"node:node1"},
+				"pod:ns/pod2":  {"node:node2"},
+				"pod:ns/pod3":  {"node:node1"},
+				"pv:pv2":       {"pvc:ns/pvc2"},
+				"pv:pv3":       {"pvc:ns/pvc3"},
+				"pvc:ns/pvc1":  {"pod:ns/pod1"},
+				"pvc:ns/pvc2":  {"pod:ns/pod2"},
+				"pvc:ns/pvc3":  {"pod:ns/pod3"},
+				"secret:ns/s1": {"pv:pv2", "pv:pv3"},
+			},
+			expectedIndex: map[string][]string{},
+		},
+		{
+			desc: "index built for secret referenced by mix of direct pods and persistentvolumes",
+			startingGraph: func() *Graph {
+				g := NewTestGraph()
+				secretVol := func(name string) corev1.Volume {
+					return corev1.Volume{Name: name, VolumeSource: corev1.VolumeSource{Secret: &corev1.SecretVolumeSource{SecretName: name}}}
+				}
+				pvcVol := func(name string) corev1.Volume {
+					return corev1.Volume{Name: name, VolumeSource: corev1.VolumeSource{PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: name}}}
+				}
+				// pod1 on node1 mounts s1 directly and also mounts pvc1 (backed by pv1 -> s1)
+				g.AddPod(pod("pod1", "node1", "", []corev1.Volume{secretVol("s1"), pvcVol("pvc1")}, nil, ""))
+				// pod2 on node2 mounts s1 directly
+				g.AddPod(pod("pod2", "node2", "", []corev1.Volume{secretVol("s1")}, nil, ""))
+				// pod3 on node3 mounts pvc2 (backed by pv2 -> s1)
+				g.AddPod(pod("pod3", "node3", "", []corev1.Volume{pvcVol("pvc2")}, nil, ""))
+				g.AddPV(pv("pv1", "pvc1", "s1"))
+				return g
+			}(),
+			graphTransformer: func(g *Graph) {
+				g.AddPV(pv("pv2", "pvc2", "s1"))
+			},
+			expectedGraph: map[string][]string{
+				"node:node1":   {},
+				"node:node2":   {},
+				"node:node3":   {},
+				"pod:ns/pod1":  {"node:node1"},
+				"pod:ns/pod2":  {"node:node2"},
+				"pod:ns/pod3":  {"node:node3"},
+				"pv:pv1":       {"pvc:ns/pvc1"},
+				"pv:pv2":       {"pvc:ns/pvc2"},
+				"pvc:ns/pvc1":  {"pod:ns/pod1"},
+				"pvc:ns/pvc2":  {"pod:ns/pod3"},
+				"secret:ns/s1": {"pod:ns/pod1", "pod:ns/pod2", "pv:pv1", "pv:pv2"},
+			},
+			expectedIndex: map[string][]string{
+				"secret:ns/s1": {"node:node1=2", "node:node2=1", "node:node3=1"},
+			},
+		},
+		{
+			desc: "mixed direct pod and PV secret index updated when PV deleted",
+			startingGraph: func() *Graph {
+				g := NewTestGraph()
+				secretVol := func(name string) corev1.Volume {
+					return corev1.Volume{Name: name, VolumeSource: corev1.VolumeSource{Secret: &corev1.SecretVolumeSource{SecretName: name}}}
+				}
+				pvcVol := func(name string) corev1.Volume {
+					return []corev1.Volume{{Name: name, VolumeSource: corev1.VolumeSource{PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: name}}}}[0]
+				}
+				g.AddPod(pod("pod1", "node1", "", []corev1.Volume{secretVol("s1"), pvcVol("pvc1")}, nil, ""))
+				g.AddPod(pod("pod2", "node2", "", []corev1.Volume{secretVol("s1")}, nil, ""))
+				g.AddPod(pod("pod3", "node3", "", []corev1.Volume{pvcVol("pvc2")}, nil, ""))
+				g.AddPV(pv("pv1", "pvc1", "s1"))
+				g.AddPV(pv("pv2", "pvc2", "s1"))
+				return g
+			}(),
+			graphTransformer: func(g *Graph) {
+				g.DeletePV("pv1")
+			},
+			expectedGraph: map[string][]string{
+				"node:node1":   {},
+				"node:node2":   {},
+				"node:node3":   {},
+				"pod:ns/pod1":  {"node:node1"},
+				"pod:ns/pod2":  {"node:node2"},
+				"pod:ns/pod3":  {"node:node3"},
+				"pv:pv2":       {"pvc:ns/pvc2"},
+				"pvc:ns/pvc1":  {"pod:ns/pod1"},
+				"pvc:ns/pvc2":  {"pod:ns/pod3"},
+				"secret:ns/s1": {"pod:ns/pod1", "pod:ns/pod2", "pv:pv2"},
+			},
+			expectedIndex: map[string][]string{
+				"secret:ns/s1": {"node:node1=1", "node:node2=1", "node:node3=1"},
+			},
 		},
 		{
 			desc:          "podcertificaterequest adding",
