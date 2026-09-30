@@ -34,15 +34,16 @@ import (
 )
 
 const (
-	clusterCritical       = "cluster-critical"
-	nodeCritical          = "node-critical"
-	bestEffort            = "bestEffort"
-	burstable             = "burstable"
-	highRequestBurstable  = "high-request-burstable"
-	guaranteed            = "guaranteed"
-	highRequestGuaranteed = "high-request-guaranteed"
-	tinyBurstable         = "tiny"
-	maxPods               = 110
+	clusterCritical        = "cluster-critical"
+	nodeCritical           = "node-critical"
+	multiContainerCritical = "multi-container-critical"
+	bestEffort             = "bestEffort"
+	burstable              = "burstable"
+	highRequestBurstable   = "high-request-burstable"
+	guaranteed             = "guaranteed"
+	highRequestGuaranteed  = "high-request-guaranteed"
+	tinyBurstable          = "tiny"
+	maxPods                = 110
 )
 
 type fakePodKiller struct {
@@ -209,6 +210,57 @@ func TestHandleAdmissionFailure(t *testing.T) {
 			expectReasons:        getPredicateFailureReasons(0, 0, 0, false),
 			featureGateEnabled:   false,
 			operation:            lifecycle.ResizeOperation,
+		},
+		{
+			testName:             "critical multi-container pod resize, feature gate enabled -> bypass preemption (no pods evicted, reasons returned)",
+			isPodKillerWithError: false,
+			inputPods:            []*v1.Pod{allPods[bestEffort], allPods[burstable], allPods[highRequestBurstable]},
+			admitPodType:         multiContainerCritical,
+			failReasons:          getPredicateFailureReasons(200, 200, 0, false),
+			expectErr:            false,
+			expectedOutput:       nil,
+			expectReasons:        getPredicateFailureReasons(200, 200, 0, false),
+			featureGateEnabled:   true,
+			operation:            lifecycle.ResizeOperation,
+		},
+		{
+			testName:             "critical multi-container pod resize, feature gate disabled -> perform preemption (evicts burstable pod)",
+			isPodKillerWithError: false,
+			inputPods:            []*v1.Pod{allPods[bestEffort], allPods[burstable], allPods[highRequestBurstable]},
+			admitPodType:         multiContainerCritical,
+			failReasons:          getPredicateFailureReasons(200, 200, 0, false),
+			expectErr:            false,
+			expectedOutput:       []*v1.Pod{allPods[highRequestBurstable]},
+			expectReasons:        getPredicateFailureReasons(0, 0, 0, false),
+			featureGateEnabled:   false,
+			operation:            lifecycle.ResizeOperation,
+		},
+		{
+			testName:             "critical pod initial admission, feature gate enabled -> perform preemption (evicts burstable pod)",
+			isPodKillerWithError: false,
+			inputPods:            []*v1.Pod{allPods[highRequestBurstable]},
+			admitPodType:         clusterCritical,
+			failReasons:          getPredicateFailureReasons(100, 0, 0, false),
+			expectErr:            false,
+			expectedOutput:       []*v1.Pod{allPods[highRequestBurstable]},
+			expectReasons:        getPredicateFailureReasons(0, 0, 0, false),
+			featureGateEnabled:   true,
+			operation:            lifecycle.AddOperation,
+		},
+		{
+			testName:             "critical pod resize with multiple failure reasons across various QoS victim pods, feature gate enabled -> bypass preemption",
+			isPodKillerWithError: false,
+			inputPods: []*v1.Pod{
+				allPods[bestEffort], allPods[burstable], allPods[highRequestBurstable],
+				allPods[guaranteed], allPods[highRequestGuaranteed],
+			},
+			admitPodType:       clusterCritical,
+			failReasons:        getPredicateFailureReasons(550, 550, 0, false),
+			expectErr:          false,
+			expectedOutput:     nil,
+			expectReasons:      getPredicateFailureReasons(550, 550, 0, false),
+			featureGateEnabled: true,
+			operation:          lifecycle.ResizeOperation,
 		},
 	}
 	for _, r := range runs {
@@ -604,6 +656,34 @@ func getTestPods() map[string]*v1.Pod {
 				v1.ResourceMemory: resource.MustParse("300Mi"),
 			},
 		}),
+		multiContainerCritical: {
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "multi-container-critical",
+				Annotations:  map[string]string{},
+			},
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{
+					{
+						Name: "c1",
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								v1.ResourceCPU:    resource.MustParse("100m"),
+								v1.ResourceMemory: resource.MustParse("100Mi"),
+							},
+						},
+					},
+					{
+						Name: "c2",
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								v1.ResourceCPU:    resource.MustParse("100m"),
+								v1.ResourceMemory: resource.MustParse("100Mi"),
+							},
+						},
+					},
+				},
+			},
+		},
 	}
 	allPods[clusterCritical].Namespace = kubeapi.NamespaceSystem
 	allPods[clusterCritical].Spec.PriorityClassName = scheduling.SystemClusterCritical
@@ -614,6 +694,10 @@ func getTestPods() map[string]*v1.Pod {
 	allPods[nodeCritical].Spec.PriorityClassName = scheduling.SystemNodeCritical
 	nodePriority := scheduling.SystemCriticalPriority + 100
 	allPods[nodeCritical].Spec.Priority = &nodePriority
+
+	allPods[multiContainerCritical].Namespace = kubeapi.NamespaceSystem
+	allPods[multiContainerCritical].Spec.PriorityClassName = scheduling.SystemClusterCritical
+	allPods[multiContainerCritical].Spec.Priority = &clusterPriority
 
 	return allPods
 }

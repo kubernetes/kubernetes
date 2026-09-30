@@ -3239,6 +3239,154 @@ func TestDeferredResizeFit(t *testing.T) {
 			enablePreemptionFeature: false,
 			wantStatus:              nil,
 		},
+		{
+			name: "deferred pod with multi-container opposing resource changes (CPU upscale, Memory downscale) fits within node capacity",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "pod-multi",
+					UID:  "pod-multi-uid",
+				},
+				Spec: v1.PodSpec{
+					NodeName: "test-node",
+					Containers: []v1.Container{
+						{
+							Name: "c1",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU:    *resource.NewMilliQuantity(400, resource.DecimalSI),
+									v1.ResourceMemory: *resource.NewQuantity(100, resource.BinarySI),
+								},
+							},
+						},
+						{
+							Name: "c2",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU:    *resource.NewMilliQuantity(200, resource.DecimalSI),
+									v1.ResourceMemory: *resource.NewQuantity(100, resource.BinarySI),
+								},
+							},
+						},
+					},
+				},
+				Status: v1.PodStatus{
+					Conditions: []v1.PodCondition{
+						{
+							Type:   v1.PodResizePending,
+							Reason: v1.PodReasonDeferred,
+						},
+					},
+				},
+			},
+			existingPods: []*v1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "pod-multi",
+						UID:  "pod-multi-uid",
+					},
+					Spec: v1.PodSpec{
+						NodeName: "test-node",
+						Containers: []v1.Container{
+							{
+								Name: "c1",
+								Resources: v1.ResourceRequirements{
+									Requests: v1.ResourceList{
+										v1.ResourceCPU:    *resource.NewMilliQuantity(200, resource.DecimalSI),
+										v1.ResourceMemory: *resource.NewQuantity(300, resource.BinarySI),
+									},
+								},
+							},
+							{
+								Name: "c2",
+								Resources: v1.ResourceRequirements{
+									Requests: v1.ResourceList{
+										v1.ResourceCPU:    *resource.NewMilliQuantity(200, resource.DecimalSI),
+										v1.ResourceMemory: *resource.NewQuantity(300, resource.BinarySI),
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			nodeAllocatable:         framework.Resource{MilliCPU: 1000, Memory: 2000},
+			enablePreemptionFeature: true,
+			wantStatus:              nil,
+		},
+		{
+			name: "deferred pod with multi-container opposing resource changes exceeds node capacity on CPU delta (unresolvable)",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "pod-multi-unres",
+					UID:  "pod-multi-unres-uid",
+				},
+				Spec: v1.PodSpec{
+					NodeName: "test-node",
+					Containers: []v1.Container{
+						{
+							Name: "c1",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU:    *resource.NewMilliQuantity(700, resource.DecimalSI),
+									v1.ResourceMemory: *resource.NewQuantity(100, resource.BinarySI),
+								},
+							},
+						},
+						{
+							Name: "c2",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU:    *resource.NewMilliQuantity(600, resource.DecimalSI),
+									v1.ResourceMemory: *resource.NewQuantity(100, resource.BinarySI),
+								},
+							},
+						},
+					},
+				},
+				Status: v1.PodStatus{
+					Conditions: []v1.PodCondition{
+						{
+							Type:   v1.PodResizePending,
+							Reason: v1.PodReasonDeferred,
+						},
+					},
+				},
+			},
+			existingPods: []*v1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "pod-multi-unres",
+						UID:  "pod-multi-unres-uid",
+					},
+					Spec: v1.PodSpec{
+						NodeName: "test-node",
+						Containers: []v1.Container{
+							{
+								Name: "c1",
+								Resources: v1.ResourceRequirements{
+									Requests: v1.ResourceList{
+										v1.ResourceCPU:    *resource.NewMilliQuantity(100, resource.DecimalSI),
+										v1.ResourceMemory: *resource.NewQuantity(300, resource.BinarySI),
+									},
+								},
+							},
+							{
+								Name: "c2",
+								Resources: v1.ResourceRequirements{
+									Requests: v1.ResourceList{
+										v1.ResourceCPU:    *resource.NewMilliQuantity(100, resource.DecimalSI),
+										v1.ResourceMemory: *resource.NewQuantity(300, resource.BinarySI),
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			nodeAllocatable:         framework.Resource{MilliCPU: 1000, Memory: 2000},
+			enablePreemptionFeature: true,
+			wantStatus:              fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "Insufficient cpu"),
+		},
 	}
 
 	for _, test := range tests {
@@ -3282,6 +3430,472 @@ func TestDeferredResizeFit(t *testing.T) {
 			gotStatus := p.(fwk.FilterPlugin).Filter(tCtx, cycleState, test.pod, nodeInfo)
 			if diff := cmp.Diff(test.wantStatus, gotStatus); diff != "" {
 				tCtx.Errorf("status does not match (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestAdjustDeltasToAccomodateCacheDiscrepancy(t *testing.T) {
+	tests := []struct {
+		name               string
+		opts               ResourceRequestsOptions
+		pod                *v1.Pod
+		cachedPod          *v1.Pod
+		nodeName           string
+		wantDeltaMilliCPU  int64
+		wantDeltaMemory    int64
+		wantDeltaEphemeral int64
+		wantDeltaScalarRes map[v1.ResourceName]int64
+	}{
+		{
+			name: "multi-container pod: container 1 scales up CPU and down Memory, container 2 scales up CPU and down Memory",
+			opts: ResourceRequestsOptions{
+				EnableInPlacePodVerticalScalingSchedulerPreemption: true,
+			},
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "resizing-pod",
+					UID:  "resizing-pod-uid",
+				},
+				Spec: v1.PodSpec{
+					NodeName: "node-1",
+					Containers: []v1.Container{
+						{
+							Name: "c1",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU:    *resource.NewMilliQuantity(400, resource.DecimalSI),
+									v1.ResourceMemory: *resource.NewQuantity(100, resource.BinarySI),
+								},
+							},
+						},
+						{
+							Name: "c2",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU:    *resource.NewMilliQuantity(200, resource.DecimalSI),
+									v1.ResourceMemory: *resource.NewQuantity(100, resource.BinarySI),
+								},
+							},
+						},
+					},
+				},
+			},
+			cachedPod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "resizing-pod",
+					UID:  "resizing-pod-uid",
+				},
+				Spec: v1.PodSpec{
+					NodeName: "node-1",
+					Containers: []v1.Container{
+						{
+							Name: "c1",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU:    *resource.NewMilliQuantity(200, resource.DecimalSI),
+									v1.ResourceMemory: *resource.NewQuantity(300, resource.BinarySI),
+								},
+							},
+						},
+						{
+							Name: "c2",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU:    *resource.NewMilliQuantity(100, resource.DecimalSI),
+									v1.ResourceMemory: *resource.NewQuantity(300, resource.BinarySI),
+								},
+							},
+						},
+					},
+				},
+			},
+			nodeName: "node-1",
+			// Target: CPU 600m, Mem 200. Cached: CPU 300m, Mem 600.
+			// Delta CPU = 600 - 300 = 300m.
+			// Delta Memory = max(0, 200 - 600) = 0 (negative delta clamped).
+			wantDeltaMilliCPU:  300,
+			wantDeltaMemory:    0,
+			wantDeltaEphemeral: 0,
+			wantDeltaScalarRes: map[v1.ResourceName]int64{},
+		},
+		{
+			name: "multi-container pod: mixed changes (c1 +CPU/-Mem, c2 -CPU/+Mem), net CPU upscale and Memory downscale",
+			opts: ResourceRequestsOptions{
+				EnableInPlacePodVerticalScalingSchedulerPreemption: true,
+			},
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "resizing-pod",
+					UID:  "resizing-pod-uid",
+				},
+				Spec: v1.PodSpec{
+					NodeName: "node-1",
+					Containers: []v1.Container{
+						{
+							Name: "c1",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU:    *resource.NewMilliQuantity(350, resource.DecimalSI),
+									v1.ResourceMemory: *resource.NewQuantity(50, resource.BinarySI),
+								},
+							},
+						},
+						{
+							Name: "c2",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU:    *resource.NewMilliQuantity(50, resource.DecimalSI),
+									v1.ResourceMemory: *resource.NewQuantity(150, resource.BinarySI),
+								},
+							},
+						},
+					},
+				},
+			},
+			cachedPod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "resizing-pod",
+					UID:  "resizing-pod-uid",
+				},
+				Spec: v1.PodSpec{
+					NodeName: "node-1",
+					Containers: []v1.Container{
+						{
+							Name: "c1",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU:    *resource.NewMilliQuantity(100, resource.DecimalSI),
+									v1.ResourceMemory: *resource.NewQuantity(200, resource.BinarySI),
+								},
+							},
+						},
+						{
+							Name: "c2",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU:    *resource.NewMilliQuantity(150, resource.DecimalSI),
+									v1.ResourceMemory: *resource.NewQuantity(100, resource.BinarySI),
+								},
+							},
+						},
+					},
+				},
+			},
+			nodeName: "node-1",
+			// Target: CPU 400m, Mem 200. Cached: CPU 250m, Mem 300.
+			// Delta CPU = 400 - 250 = 150m.
+			// Delta Memory = max(0, 200 - 300) = 0.
+			wantDeltaMilliCPU:  150,
+			wantDeltaMemory:    0,
+			wantDeltaEphemeral: 0,
+			wantDeltaScalarRes: map[v1.ResourceName]int64{},
+		},
+		{
+			name: "multi-container pod: all resources scale down (negative deltas clamped to 0)",
+			opts: ResourceRequestsOptions{
+				EnableInPlacePodVerticalScalingSchedulerPreemption: true,
+			},
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "resizing-pod",
+					UID:  "resizing-pod-uid",
+				},
+				Spec: v1.PodSpec{
+					NodeName: "node-1",
+					Containers: []v1.Container{
+						{
+							Name: "c1",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU:    *resource.NewMilliQuantity(50, resource.DecimalSI),
+									v1.ResourceMemory: *resource.NewQuantity(50, resource.BinarySI),
+								},
+							},
+						},
+					},
+				},
+			},
+			cachedPod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "resizing-pod",
+					UID:  "resizing-pod-uid",
+				},
+				Spec: v1.PodSpec{
+					NodeName: "node-1",
+					Containers: []v1.Container{
+						{
+							Name: "c1",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU:    *resource.NewMilliQuantity(200, resource.DecimalSI),
+									v1.ResourceMemory: *resource.NewQuantity(200, resource.BinarySI),
+								},
+							},
+						},
+					},
+				},
+			},
+			nodeName: "node-1",
+			// All deltas clamped to 0
+			wantDeltaMilliCPU:  0,
+			wantDeltaMemory:    0,
+			wantDeltaEphemeral: 0,
+			wantDeltaScalarRes: map[v1.ResourceName]int64{},
+		},
+		{
+			name: "scalar resources: downscale clamped to 0, upscale produces positive delta",
+			opts: ResourceRequestsOptions{
+				EnableInPlacePodVerticalScalingSchedulerPreemption: true,
+			},
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "resizing-pod",
+					UID:  "resizing-pod-uid",
+				},
+				Spec: v1.PodSpec{
+					NodeName: "node-1",
+					Containers: []v1.Container{
+						{
+							Name: "c1",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU:                     *resource.NewMilliQuantity(200, resource.DecimalSI),
+									v1.ResourceName("example.com/gpu"): *resource.NewQuantity(1, resource.DecimalSI),
+									v1.ResourceName("hugepages-2Mi"):   *resource.NewQuantity(2097152, resource.BinarySI),
+								},
+							},
+						},
+					},
+				},
+			},
+			cachedPod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "resizing-pod",
+					UID:  "resizing-pod-uid",
+				},
+				Spec: v1.PodSpec{
+					NodeName: "node-1",
+					Containers: []v1.Container{
+						{
+							Name: "c1",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU:                     *resource.NewMilliQuantity(200, resource.DecimalSI),
+									v1.ResourceName("example.com/gpu"): *resource.NewQuantity(2, resource.DecimalSI),
+									v1.ResourceName("hugepages-2Mi"):   *resource.NewQuantity(1048576, resource.BinarySI),
+								},
+							},
+						},
+					},
+				},
+			},
+			nodeName:           "node-1",
+			wantDeltaMilliCPU:  0,
+			wantDeltaMemory:    0,
+			wantDeltaEphemeral: 0,
+			wantDeltaScalarRes: map[v1.ResourceName]int64{
+				v1.ResourceName("example.com/gpu"): 0,       // max(0, 1 - 2) = 0
+				v1.ResourceName("hugepages-2Mi"):   1048576, // 2097152 - 1048576
+			},
+		},
+		{
+			name: "feature gate disabled: raw requests returned without delta calculation",
+			opts: ResourceRequestsOptions{
+				EnableInPlacePodVerticalScalingSchedulerPreemption: false,
+			},
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "resizing-pod",
+					UID:  "resizing-pod-uid",
+				},
+				Spec: v1.PodSpec{
+					NodeName: "node-1",
+					Containers: []v1.Container{
+						{
+							Name: "c1",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU:    *resource.NewMilliQuantity(400, resource.DecimalSI),
+									v1.ResourceMemory: *resource.NewQuantity(200, resource.BinarySI),
+								},
+							},
+						},
+					},
+				},
+			},
+			cachedPod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "resizing-pod",
+					UID:  "resizing-pod-uid",
+				},
+				Spec: v1.PodSpec{
+					NodeName: "node-1",
+					Containers: []v1.Container{
+						{
+							Name: "c1",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU:    *resource.NewMilliQuantity(200, resource.DecimalSI),
+									v1.ResourceMemory: *resource.NewQuantity(100, resource.BinarySI),
+								},
+							},
+						},
+					},
+				},
+			},
+			nodeName:           "node-1",
+			wantDeltaMilliCPU:  400,
+			wantDeltaMemory:    200,
+			wantDeltaEphemeral: 0,
+			wantDeltaScalarRes: map[v1.ResourceName]int64{},
+		},
+		{
+			name: "pod spec NodeName is empty: raw requests returned",
+			opts: ResourceRequestsOptions{
+				EnableInPlacePodVerticalScalingSchedulerPreemption: true,
+			},
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "resizing-pod",
+					UID:  "resizing-pod-uid",
+				},
+				Spec: v1.PodSpec{
+					NodeName: "",
+					Containers: []v1.Container{
+						{
+							Name: "c1",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU:    *resource.NewMilliQuantity(400, resource.DecimalSI),
+									v1.ResourceMemory: *resource.NewQuantity(200, resource.BinarySI),
+								},
+							},
+						},
+					},
+				},
+			},
+			cachedPod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "resizing-pod",
+					UID:  "resizing-pod-uid",
+				},
+				Spec: v1.PodSpec{
+					NodeName: "node-1",
+					Containers: []v1.Container{
+						{
+							Name: "c1",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU:    *resource.NewMilliQuantity(200, resource.DecimalSI),
+									v1.ResourceMemory: *resource.NewQuantity(100, resource.BinarySI),
+								},
+							},
+						},
+					},
+				},
+			},
+			nodeName:           "node-1",
+			wantDeltaMilliCPU:  400,
+			wantDeltaMemory:    200,
+			wantDeltaEphemeral: 0,
+			wantDeltaScalarRes: map[v1.ResourceName]int64{},
+		},
+		{
+			name: "pod spec NodeName does not match nodeInfo: raw requests returned",
+			opts: ResourceRequestsOptions{
+				EnableInPlacePodVerticalScalingSchedulerPreemption: true,
+			},
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "resizing-pod",
+					UID:  "resizing-pod-uid",
+				},
+				Spec: v1.PodSpec{
+					NodeName: "other-node",
+					Containers: []v1.Container{
+						{
+							Name: "c1",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU:    *resource.NewMilliQuantity(400, resource.DecimalSI),
+									v1.ResourceMemory: *resource.NewQuantity(200, resource.BinarySI),
+								},
+							},
+						},
+					},
+				},
+			},
+			cachedPod:          nil,
+			nodeName:           "node-1",
+			wantDeltaMilliCPU:  400,
+			wantDeltaMemory:    200,
+			wantDeltaEphemeral: 0,
+			wantDeltaScalarRes: map[v1.ResourceName]int64{},
+		},
+		{
+			name: "pod not found in node cache: raw requests returned",
+			opts: ResourceRequestsOptions{
+				EnableInPlacePodVerticalScalingSchedulerPreemption: true,
+			},
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "resizing-pod",
+					UID:  "resizing-pod-uid",
+				},
+				Spec: v1.PodSpec{
+					NodeName: "node-1",
+					Containers: []v1.Container{
+						{
+							Name: "c1",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU:    *resource.NewMilliQuantity(400, resource.DecimalSI),
+									v1.ResourceMemory: *resource.NewQuantity(200, resource.BinarySI),
+								},
+							},
+						},
+					},
+				},
+			},
+			cachedPod:          nil,
+			nodeName:           "node-1",
+			wantDeltaMilliCPU:  400,
+			wantDeltaMemory:    200,
+			wantDeltaEphemeral: 0,
+			wantDeltaScalarRes: map[v1.ResourceName]int64{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			nodeInfo := framework.NewNodeInfo()
+			node := &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: tt.nodeName,
+				},
+			}
+			nodeInfo.SetNode(node)
+			if tt.cachedPod != nil {
+				nodeInfo.AddPod(tt.cachedPod)
+			}
+
+			podReq := computePodResourceRequest(tt.pod, tt.opts)
+			gotCPU, gotMem, gotEph, gotScalars := adjustDeltasToAccomodateCacheDiscrepancy(tt.opts, podReq, nodeInfo, tt.pod)
+
+			if gotCPU != tt.wantDeltaMilliCPU {
+				t.Errorf("adjustDeltasToAccomodateCacheDiscrepancy() gotCPU = %v, want %v", gotCPU, tt.wantDeltaMilliCPU)
+			}
+			if gotMem != tt.wantDeltaMemory {
+				t.Errorf("adjustDeltasToAccomodateCacheDiscrepancy() gotMem = %v, want %v", gotMem, tt.wantDeltaMemory)
+			}
+			if gotEph != tt.wantDeltaEphemeral {
+				t.Errorf("adjustDeltasToAccomodateCacheDiscrepancy() gotEph = %v, want %v", gotEph, tt.wantDeltaEphemeral)
+			}
+			for rName, wantVal := range tt.wantDeltaScalarRes {
+				if gotVal := gotScalars[rName]; gotVal != wantVal {
+					t.Errorf("adjustDeltasToAccomodateCacheDiscrepancy() gotScalar[%v] = %v, want %v", rName, gotVal, wantVal)
+				}
 			}
 		})
 	}

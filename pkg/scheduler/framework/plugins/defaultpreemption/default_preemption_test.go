@@ -554,6 +554,102 @@ func TestPostFilter(t *testing.T) {
 			wantResult: framework.NewPostFilterResultWithNominatedNode(""),
 			wantStatus: fwk.NewStatus(fwk.Unschedulable, "preemption: 0/2 nodes are available: 1 No preemption victims found for incoming pod, 1 Preemption is not helpful for scheduling."),
 		},
+		{
+			name: "deferred pod resize preemption with multi-container opposing resource changes (CPU upscale + Memory downscale)",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "p",
+					UID:       "p",
+					Namespace: v1.NamespaceDefault,
+				},
+				Spec: v1.PodSpec{
+					NodeName: "node1",
+					Priority: &highPriority,
+					Containers: []v1.Container{
+						{
+							Name: "c1",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU:    resource.MustParse("250m"),
+									v1.ResourceMemory: resource.MustParse("100"),
+								},
+							},
+						},
+						{
+							Name: "c2",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU:    resource.MustParse("150m"),
+									v1.ResourceMemory: resource.MustParse("100"),
+								},
+							},
+						},
+					},
+				},
+				Status: v1.PodStatus{
+					Conditions: []v1.PodCondition{
+						{
+							Type:   v1.PodResizePending,
+							Status: v1.ConditionTrue,
+							Reason: v1.PodReasonDeferred,
+						},
+					},
+				},
+			},
+			pods: []*v1.Pod{
+				// Resizing pod cached with CPU 200m, Memory 400 (opposing: target has +200m CPU, -200 Memory)
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "p",
+						UID:       "p",
+						Namespace: v1.NamespaceDefault,
+					},
+					Spec: v1.PodSpec{
+						NodeName: "node1",
+						Priority: &highPriority,
+						Containers: []v1.Container{
+							{
+								Name: "c1",
+								Resources: v1.ResourceRequirements{
+									Requests: v1.ResourceList{
+										v1.ResourceCPU:    resource.MustParse("100m"),
+										v1.ResourceMemory: resource.MustParse("200"),
+									},
+								},
+							},
+							{
+								Name: "c2",
+								Resources: v1.ResourceRequirements{
+									Requests: v1.ResourceList{
+										v1.ResourceCPU:    resource.MustParse("100m"),
+										v1.ResourceMemory: resource.MustParse("200"),
+									},
+								},
+							},
+						},
+					},
+				},
+				// Low-priority victim pod on node1
+				st.MakePod().Name("p1").UID("p1").Namespace(v1.NamespaceDefault).Priority(lowPriority).Node("node1").Req(map[v1.ResourceName]string{
+					v1.ResourceCPU:    "200m",
+					v1.ResourceMemory: "200",
+				}).Obj(),
+			},
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{
+					v1.ResourceCPU:    "400m",
+					v1.ResourceMemory: "400",
+				}).Obj(),
+			},
+			filteredNodesStatuses: framework.NewNodeToStatus(map[string]*fwk.Status{
+				"node1": fwk.NewStatus(fwk.Unschedulable),
+			}, fwk.NewStatus(fwk.UnschedulableAndUnresolvable)),
+			features: feature.Features{
+				EnableInPlacePodVerticalScalingSchedulerPreemption: true,
+			},
+			wantResult: framework.NewPostFilterResultWithNominatedNode("node1"),
+			wantStatus: fwk.NewStatus(fwk.Success, "preemption: found a potential placement for pod on node node1, preempting 1 victims"),
+		},
 	}
 
 	for _, asyncAPICallsEnabled := range []bool{true, false} {
