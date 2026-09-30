@@ -170,7 +170,7 @@ function verify-prereqs() {
     exit 1
   fi
 
-  # we use gcloud to create the cluster and gcloud storage to stage binaries and data
+  # we use gcloud both to create the cluster and to stage binaries and data
   if ! which gcloud >/dev/null; then
     echo "Can't find gcloud in PATH, please fix and retry. The Google Cloud " >&2
     echo "SDK can be downloaded from https://cloud.google.com/sdk/." >&2
@@ -207,11 +207,12 @@ function detect-project() {
 }
 
 # Use gcloud storage to get the md5 hash for a particular tar
-function gcloud_storage_get_tar_md5() {
+function get_tar_md5() {
   # location_tar could be local or in the cloud
   # local tar_location example ./_output/release-tars/kubernetes-server-linux-amd64.tar.gz
   # cloud tar_location example gs://kubernetes-staging-PROJECT/kubernetes-devel/kubernetes-server-linux-amd64.tar.gz
   local -r tar_location=$1
+  #print an empty string if the tar does not exist, so the caller uploads it
   local -r tar_md5=$(gcloud storage hash --hex --skip-crc32c --format='value(md5_hash)' "${tar_location}" 2>/dev/null)
   echo "${tar_md5}"
 }
@@ -219,6 +220,7 @@ function gcloud_storage_get_tar_md5() {
 # Copy a release tar and its accompanying hash.
 function copy-to-staging() {
   local -r staging_path=$1
+  local -r gs_url=$2
   local -r tar=$3
   local -r hash=$4
   local -r basename_tar=$(basename "${tar}")
@@ -229,11 +231,11 @@ function copy-to-staging() {
   #remote_tar_md5 checks the remote location for the existing tarball and its md5
   #staging_path example gs://kubernetes-staging-PROJECT/kubernetes-devel
   #basename_tar example kubernetes-server-linux-amd64.tar.gz
-  local -r remote_tar_md5=$(gcloud_storage_get_tar_md5 "${staging_path}/${basename_tar}")
+  local -r remote_tar_md5=$(get_tar_md5 "${staging_path}/${basename_tar}")
   if [[ -n ${remote_tar_md5} ]]; then
     #local_tar_md5 checks the remote location for the existing tarball and its md5 hash
     #tar example ./_output/release-tars/kubernetes-server-linux-amd64.tar.gz
-    local -r local_tar_md5=$(gcloud_storage_get_tar_md5 "${tar}")
+    local -r local_tar_md5=$(get_tar_md5 "${tar}")
     if [[ "${remote_tar_md5}" == "${local_tar_md5}" ]]; then
       echo "+++ ${basename_tar} uploaded earlier, cloud and local file md5 match (md5 = ${local_tar_md5})"
       return 0
@@ -242,6 +244,7 @@ function copy-to-staging() {
 
   echo "${hash}" > "${tar}.sha512"
   gcloud storage cp --no-user-output-enabled --cache-control="private, max-age=0" "${tar}" "${tar}.sha512" "${staging_path}"
+  gcloud storage objects update --add-acl-grant=entity=allUsers,role=READER "${gs_url}" "${gs_url}.sha512" >/dev/null 2>&1 || true
   echo "+++ ${basename_tar} uploaded (sha512 = ${hash})"
 }
 
@@ -332,9 +335,9 @@ function upload-tars() {
     local staging_bucket="gs://kubernetes-staging-${project_hash}${suffix}"
 
     # Ensure the buckets are created
-    if ! gcloud storage ls "${staging_bucket}" >/dev/null; then
+    if ! gcloud storage buckets describe "${staging_bucket}" >/dev/null; then
       echo "Creating ${staging_bucket}"
-      gcloud storage buckets create "${staging_bucket}" --location="${region}" --project="${PROJECT}"
+      gcloud storage buckets create --location="${region}" --project="${PROJECT}" "${staging_bucket}"
     fi
 
     local staging_path="${staging_bucket}/${INSTANCE_PREFIX}-devel"
