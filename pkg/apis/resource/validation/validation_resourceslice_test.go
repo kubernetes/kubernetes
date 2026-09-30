@@ -2456,6 +2456,26 @@ func TestValidateResourceSliceUpdate(t *testing.T) {
 				return slice
 			},
 		},
+		"consumable-capacity-disable-multiple-allocations-keeps-request-policy": {
+			consumableCapacityFeatureGate: true,
+			wantFailures:                  field.ErrorList{field.Forbidden(consumeableCapacityPath(0).Child("requestPolicy"), "allowMultipleAllocations must be true")},
+			oldResourceSlice:              testResourceSliceWithConsumableCapacity(name, name, name, 1),
+			update: func(slice *resourceapi.ResourceSlice) *resourceapi.ResourceSlice {
+				slice.Spec.Devices[0].AllowMultipleAllocations = new(false)
+				return slice
+			},
+		},
+		"consumable-capacity-disable-multiple-allocations-drops-request-policy": {
+			consumableCapacityFeatureGate: true,
+			oldResourceSlice:              testResourceSliceWithConsumableCapacity(name, name, name, 1),
+			update: func(slice *resourceapi.ResourceSlice) *resourceapi.ResourceSlice {
+				slice.Spec.Devices[0].AllowMultipleAllocations = new(false)
+				updateConsumableCapacity(slice, 0, func(cap *resourceapi.DeviceCapacity) {
+					cap.RequestPolicy = nil
+				})
+				return slice
+			},
+		},
 	}
 
 	for name, scenario := range scenarios {
