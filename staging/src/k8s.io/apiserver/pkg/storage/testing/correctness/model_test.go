@@ -65,3 +65,16 @@ func TestCorrectness(t *testing.T) {
 	}
 	require.Equal(t, expectEvents, gotEvents)
 }
+
+// TestOptionsInvalid checks the model expects the same error storage returns
+// for watches it rejects. Invalid requests are covered by correctnessTestSteps.
+func TestOptionsInvalid(t *testing.T) {
+	versioner := storage.APIObjectVersioner{}
+	validator := NewWatchValidator(versioner, &Replay{versioner: versioner}, getKey)
+	for _, step := range watchTestCasesInvalid() {
+		t.Run(step.Name, func(t *testing.T) {
+			require.NoError(t, validator.ValidateWatch(step.Request, WatchResponse{Err: step.ExpectError}))
+			require.Error(t, validator.ValidateWatch(step.Request, WatchResponse{}))
+		})
+	}
+}

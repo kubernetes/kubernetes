@@ -23,6 +23,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -59,6 +60,7 @@ func correctnessTestSteps() []testStep {
 	pod4Key := mustGetKey(pod4)
 	pod5Key := mustGetKey(pod5)
 	wrongRV := "99"
+	_, invalidRVErr := storage.APIObjectVersioner{}.ParseResourceVersion("abc")
 	pod2RV := "3"
 	pod3RV8 := "8"
 	pod3RV9 := "9"
@@ -1111,6 +1113,146 @@ func correctnessTestSteps() []testStep {
 				{Object: nil, Err: nil},
 			},
 		},
+		{
+			Name: "49. Create pod1 with ResourceVersion set returns ErrResourceVersionSetOnCreate",
+			Request: Request{
+				Op:     OpCreate,
+				Key:    pod1Key,
+				Create: CreateRequest{Object: withRV(pod1, "5")},
+			},
+			CorrectResponse: Response{Err: storage.ErrResourceVersionSetOnCreate},
+			InvalidResponses: []Response{
+				{Object: withRV(pod1, "19")},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name: "50. Create with empty key returns empty key error",
+			Request: Request{
+				Op:     OpCreate,
+				Key:    "",
+				Create: CreateRequest{Object: pod1},
+			},
+			CorrectResponse: Response{Err: fmt.Errorf("empty key: %q", "")},
+			InvalidResponses: []Response{
+				{Object: withRV(pod1, "19")},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name: "51. Get with key escaping the prefix returns invalid key error",
+			Request: Request{
+				Op:  OpGet,
+				Key: "/pods/../secrets/s1",
+			},
+			CorrectResponse: Response{Err: fmt.Errorf("invalid key: %q", "/pods/../secrets/s1")},
+			InvalidResponses: []Response{
+				{Object: nil, Err: storage.NewKeyNotFoundError("/pods/../secrets/s1", 0)},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name: "52. Update with key containing . returns invalid key error",
+			Request: Request{
+				Op:  OpUpdate,
+				Key: "/pods/./ns1/pod4",
+				Update: UpdateRequest{
+					UpdateFunc: storage.SimpleUpdate(func(obj runtime.Object) (runtime.Object, error) { return obj, nil }),
+				},
+			},
+			CorrectResponse: Response{Err: fmt.Errorf("invalid key: %q", "/pods/./ns1/pod4")},
+			InvalidResponses: []Response{
+				{Object: nil, Err: storage.NewKeyNotFoundError("/pods/./ns1/pod4", 18)},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name: "53. Delete with key / returns empty key error",
+			Request: Request{
+				Op:  OpDelete,
+				Key: "/",
+			},
+			CorrectResponse: Response{Err: fmt.Errorf("empty key: %q", "/")},
+			InvalidResponses: []Response{
+				{Object: nil, Err: storage.NewKeyNotFoundError("/", 18)},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name: "54. List with key ending with .. returns invalid key error",
+			Request: Request{
+				Op:   OpList,
+				Key:  "/pods/..",
+				List: listRecursive,
+			},
+			CorrectResponse: Response{Err: fmt.Errorf("invalid key: %q", "/pods/..")},
+			InvalidResponses: []Response{
+				{Object: newTestPodList("18", withLabel(pod4, "17", "version", "v2"))},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name: "55. List with unparsable ResourceVersion returns bad request",
+			Request: Request{
+				Op:  OpList,
+				Key: "/pods/",
+				List: ListRequest{Options: storage.ListOptions{
+					ResourceVersion: "abc",
+					Recursive:       true,
+					Predicate:       storage.Everything,
+				}},
+			},
+			CorrectResponse: Response{Err: apierrors.NewBadRequest(fmt.Sprintf("invalid resource version: %v", invalidRVErr))},
+			InvalidResponses: []Response{
+				{Object: newTestPodList("18", withLabel(pod4, "17", "version", "v2"))},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name: "56. List with unknown ResourceVersionMatch returns error",
+			Request: Request{
+				Op:  OpList,
+				Key: "/pods/",
+				List: ListRequest{Options: storage.ListOptions{
+					ResourceVersion:      "15",
+					ResourceVersionMatch: "Newest",
+					Recursive:            true,
+					Predicate:            storage.Everything,
+				}},
+			},
+			CorrectResponse: Response{Err: fmt.Errorf("unknown ResourceVersionMatch value: %v", "Newest")},
+			InvalidResponses: []Response{
+				{Object: newTestPodList("18", withLabel(pod4, "17", "version", "v2"))},
+				{Object: nil, Err: nil},
+			},
+		},
+	}
+}
+
+type watchTestCase struct {
+	Name        string
+	Request     WatchRequest
+	ExpectError error
+}
+
+func watchTestCasesInvalid() []watchTestCase {
+	_, invalidRVErr := storage.APIObjectVersioner{}.ParseResourceVersion("abc")
+	return []watchTestCase{
+		{
+			Name:        "Watch with empty key returns empty key error",
+			Request:     WatchRequest{Key: "", Options: storage.ListOptions{ResourceVersion: "1", Predicate: storage.Everything, Recursive: true}},
+			ExpectError: fmt.Errorf("empty key: %q", ""),
+		},
+		{
+			Name:        "Watch with key escaping the prefix returns invalid key error",
+			Request:     WatchRequest{Key: "/pods/../secrets", Options: storage.ListOptions{ResourceVersion: "1", Predicate: storage.Everything, Recursive: true}},
+			ExpectError: fmt.Errorf("invalid key: %q", "/pods/../secrets"),
+		},
+		{
+			Name:        "Watch with unparsable ResourceVersion returns invalid error",
+			Request:     WatchRequest{Key: "/pods/", Options: storage.ListOptions{ResourceVersion: "abc", Predicate: storage.Everything, Recursive: true}},
+			ExpectError: invalidRVErr,
+		},
 	}
 }
 
@@ -1121,8 +1263,8 @@ func RunTestCorrectness(ctx context.Context, t *testing.T, store storage.Interfa
 	initialState := NewEmptyModel(storagePrefix, func() runtime.Object { return &example.Pod{} }, func() runtime.Object { return &example.PodList{} }, versioner)
 	model := initialState.Clone()
 
-	watchRequest := WatchRequest{ResourceVersion: "1"}
-	watcher, err := store.Watch(ctx, "/pods/", storage.ListOptions{ResourceVersion: watchRequest.ResourceVersion, Predicate: storage.Everything, Recursive: true})
+	watchRequest := WatchRequest{Key: "/pods/", Options: storage.ListOptions{ResourceVersion: "1", Predicate: storage.Everything, Recursive: true}}
+	watcher, err := store.Watch(ctx, watchRequest.Key, watchRequest.Options)
 	require.NoError(t, err)
 	defer watcher.Stop()
 
@@ -1171,6 +1313,14 @@ func RunTestCorrectness(ctx context.Context, t *testing.T, store storage.Interfa
 	gotEvents := collectEventsTillRV(t, watcher, versioner, model.ResourceVersion)
 	validator := NewWatchValidator(versioner, replay, keyFunc)
 	require.NoError(t, validator.ValidateWatch(watchRequest, WatchResponse{Events: gotEvents}))
+
+	for _, step := range watchTestCasesInvalid() {
+		w, err := store.Watch(ctx, step.Request.Key, step.Request.Options)
+		if err == nil {
+			w.Stop()
+		}
+		require.NoError(t, validator.ValidateWatch(step.Request, WatchResponse{Err: err}), "step %s", step.Name)
+	}
 }
 
 func collectEventsTillRV(t *testing.T, watcher watch.Interface, versioner storage.Versioner, targetRV uint64) []watch.Event {

@@ -161,16 +161,16 @@ type Response struct {
 // create and Object is nil for a delete. Like etcd3 and the cacher, deciding
 // what a watcher with a predicate receives requires both objects.
 type Change struct {
+	Key             string
 	ResourceVersion uint64
 	Object          runtime.Object
 	PrevObject      runtime.Object
 }
 
-// WatchRequest contains parameters for a watch stream.
+// WatchRequest contains parameters for a watch stream, exactly as passed to storage.Interface.Watch.
 type WatchRequest struct {
-	ResourceVersion string
-	// Predicate filters events. The zero value matches everything.
-	Predicate storage.SelectionPredicate
+	Key     string
+	Options storage.ListOptions
 }
 
 // WatchResponse contains the events and any terminal error received from a watch stream.

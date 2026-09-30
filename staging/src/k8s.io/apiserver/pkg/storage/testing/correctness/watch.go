@@ -44,6 +44,12 @@ func NewWatchValidator(versioner storage.Versioner, replay *Replay, keyFunc func
 }
 
 func (v WatchValidator) ValidateWatch(request WatchRequest, response WatchResponse) error {
+	if err := v.checkWatch(request); err != nil {
+		if !reflect.DeepEqual(err, response.Err) {
+			return fmt.Errorf("watch %+v: expected error %v, got %v", request, err, response.Err)
+		}
+		return nil
+	}
 	if response.Err != nil {
 		return fmt.Errorf("watch %+v: unexpected error: %w", request, response.Err)
 	}
@@ -55,6 +61,35 @@ func (v WatchValidator) ValidateWatch(request WatchRequest, response WatchRespon
 	}
 	if err := v.validateBookmarks(response.Events); err != nil {
 		return fmt.Errorf("watch %+v: Broke bookmarks %w", request, err)
+	}
+	return nil
+}
+
+// checkWatch returns the error storage returns for an invalid watch and panics
+// on watches the model can't reproduce.
+func (v WatchValidator) checkWatch(request WatchRequest) error {
+	opts := request.Options
+	if err := checkKey(request.Key, opts.Recursive); err != nil {
+		return err
+	}
+	if _, err := v.versioner.ParseResourceVersion(opts.ResourceVersion); err != nil {
+		return err
+	}
+	if opts.Predicate.Label == nil || opts.Predicate.Field == nil {
+		// etcd3 and the cacher call methods on both selectors.
+		panic("nil label or field selector is not supported, use storage.Everything to match everything")
+	}
+	if opts.Predicate.Limit != 0 || opts.Predicate.Continue != "" {
+		panic("pagination (limit, continue) is not supported")
+	}
+	if !opts.Predicate.Empty() && opts.Predicate.GetAttrs == nil {
+		panic("selectors without GetAttrs are not supported")
+	}
+	if opts.RecordTimestamps {
+		panic("recordTimestamps is not supported, it wraps objects in storage-internal types")
+	}
+	if opts.SendInitialEvents != nil && *opts.SendInitialEvents {
+		panic("initial events are not supported, set sendInitialEvents=false for resourceVersion \"\" or \"0\"")
 	}
 	return nil
 }
@@ -212,8 +247,8 @@ func watchRevisionRange(versioner storage.Versioner, request WatchRequest, event
 			maxRV = max(maxRV, rv+1)
 		}
 	}
-	if request.ResourceVersion != "0" && request.ResourceVersion != "" {
-		requestedRV, err := versioner.ParseResourceVersion(request.ResourceVersion)
+	if request.Options.ResourceVersion != "0" && request.Options.ResourceVersion != "" {
+		requestedRV, err := versioner.ParseResourceVersion(request.Options.ResourceVersion)
 		if err != nil {
 			return nil, err
 		}
