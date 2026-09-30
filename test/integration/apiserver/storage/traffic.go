@@ -49,6 +49,9 @@ const (
 	RequestTypeList                   RequestType = "List"
 	RequestTypeListNamespace          RequestType = "ListNamespace"
 	RequestTypeListNonRecursive       RequestType = "ListNonRecursive"
+	RequestTypeListRVZero             RequestType = "ListRVZero"
+	RequestTypeListRVNotOlderThan     RequestType = "ListRVNotOlderThan"
+	RequestTypeListRVExact            RequestType = "ListRVExact"
 	RequestTypeUpdate                 RequestType = "Update"
 	RequestTypeUpdateUIDPrecondition  RequestType = "UpdateUIDPrecondition"
 	RequestTypeUpdateRVPrecondition   RequestType = "UpdateRVPrecondition"
@@ -287,6 +290,58 @@ func randomRequest(keys []types.NamespacedName, ops []ChoiceWeight[RequestType],
 			Key: storageKey(key),
 			List: correctness.ListRequest{
 				Options: storage.ListOptions{Predicate: storage.Everything},
+			},
+		}
+	case RequestTypeListRVZero:
+		return &correctness.Request{
+			Op:  correctness.OpList,
+			Key: "/pods/",
+			List: correctness.ListRequest{
+				Options: storage.ListOptions{
+					Predicate:       storage.Everything,
+					Recursive:       true,
+					ResourceVersion: "0",
+				},
+			},
+		}
+	case RequestTypeListRVNotOlderThan:
+		if cached == nil {
+			return nil
+		}
+		accessor, err := meta.Accessor(cached)
+		if err != nil {
+			panic(err)
+		}
+		return &correctness.Request{
+			Op:  correctness.OpList,
+			Key: "/pods/",
+			List: correctness.ListRequest{
+				Options: storage.ListOptions{
+					Predicate:            storage.Everything,
+					Recursive:            true,
+					ResourceVersion:      accessor.GetResourceVersion(),
+					ResourceVersionMatch: metav1.ResourceVersionMatchNotOlderThan,
+				},
+			},
+		}
+	case RequestTypeListRVExact:
+		if cached == nil {
+			return nil
+		}
+		accessor, err := meta.Accessor(cached)
+		if err != nil {
+			panic(err)
+		}
+		return &correctness.Request{
+			Op:  correctness.OpList,
+			Key: "/pods/",
+			List: correctness.ListRequest{
+				Options: storage.ListOptions{
+					Predicate:            storage.Everything,
+					Recursive:            true,
+					ResourceVersion:      accessor.GetResourceVersion(),
+					ResourceVersionMatch: metav1.ResourceVersionMatchExact,
+				},
 			},
 		}
 	case RequestTypeUpdate:
