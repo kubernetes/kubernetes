@@ -24866,6 +24866,7 @@ func TestValidateOSFields(t *testing.T) {
 		"Containers[*].TerminationMessagePath",
 		"Containers[*].TerminationMessagePolicy",
 		"Containers[*].WorkingDir",
+		"DefaultNetwork",
 		"DeprecatedServiceAccount",
 		"DNSPolicy",
 		"EnableServiceLinks",

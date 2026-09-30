@@ -826,6 +826,14 @@ const (
 	// Enable PodCertificateRequest objects and podCertificate projected volume sources.
 	PodCertificateRequest featuregate.Feature = "PodCertificateRequest"
 
+	// owner: @aojea
+	// kep: https://kep.k8s.io/6313
+	//
+	// Enables the defaultNetwork field in the Pod spec, which allows pods to opt
+	// out of the default pod network and run with a loopback-only network
+	// namespace.
+	PodDefaultNetwork featuregate.Feature = "PodDefaultNetwork"
+
 	// owner: @ahg-g
 	//
 	// Enables controlling pod ranking on replicaset scale-down.
@@ -1852,6 +1860,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.37"), Default: true, PreRelease: featuregate.GA}, // LockToDefault in 1.38
 	},
 
+	PodDefaultNetwork: {
+		{Version: version.MustParse("1.38"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
 	PodDeletionCost: {
 		{Version: version.MustParse("1.21"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.22"), Default: true, PreRelease: featuregate.Beta},
@@ -2641,6 +2653,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	PodCertificateMLDSA: {},
 
 	PodCertificateRequest: {},
+
+	PodDefaultNetwork: {NodeDeclaredFeatures},
 
 	PodDeletionCost: {},
 
