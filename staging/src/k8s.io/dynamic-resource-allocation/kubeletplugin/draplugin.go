@@ -31,7 +31,6 @@ import (
 	"google.golang.org/grpc"
 	"k8s.io/klog/v2"
 
-	"go.etcd.io/etcd/client/pkg/v3/fileutil"
 	resourceapi "k8s.io/api/resource/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -1310,7 +1309,7 @@ func (d *Helper) serializeGRPCIfEnabled() (func(), error) {
 	// If rolling updates are enabled, we cannot do only in-memory locking.
 	// We must use file locking.
 	if d.grpcLockFilePath != "" {
-		file, err := fileutil.LockFile(d.grpcLockFilePath, os.O_RDWR|os.O_CREATE, 0666)
+		file, err := lockFile(d.grpcLockFilePath)
 		if err != nil {
 			return nil, fmt.Errorf("lock file: %w", err)
 		}
