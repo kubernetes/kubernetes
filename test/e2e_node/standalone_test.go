@@ -660,7 +660,7 @@ func decodePods(respBody []byte) (*v1.PodList, error) {
 	return &pods, nil
 }
 
-var _ = SIGDescribe(feature.StandaloneMode, framework.WithSerial(), func() {
+var _ = SIGDescribe(feature.StandaloneMode, framework.WithFeatureGate(features.ChangeContainerStatusOnKubeletRestart), framework.WithSerial(), func() {
 	f := framework.NewDefaultFramework("static-pod-serial")
 	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 	ginkgo.Context("when creating a static pod and restarting kubelet", func() {
