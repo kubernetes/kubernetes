@@ -41,7 +41,7 @@ var (
 	decOne  = inf.NewDec(1, 0)
 
 	// Largest (in magnitude) number allowed.
-	maxAllowed = infDecAmount{inf.NewDec((1<<63)-1, 0)} // == max int64
+	maxAllowed = infDecAmount{Dec: inf.NewDec((1<<63)-1, 0)} // == max int64
 
 	// MaxMilliValue is the largest whole number whose value in milli-units fits an
 	// int64. It bounds a value, not a quantity: a quantity may be fractional, so a

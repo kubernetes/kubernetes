@@ -47,12 +47,12 @@ func TestQuantityProtoMarshal(t *testing.T) {
 		dec    *inf.Dec
 		expect Quantity
 	}{
-		{dec(0, 0).Dec, Quantity{i: int64Amount{value: 0, scale: 0}, d: infDecAmount{dec(0, 0).Dec}, s: "0", Format: DecimalSI}},
-		{dec(10, 0).Dec, Quantity{i: int64Amount{value: 0, scale: 0}, d: infDecAmount{dec(10, 0).Dec}, s: "10", Format: DecimalSI}},
-		{dec(-10, 0).Dec, Quantity{i: int64Amount{value: 0, scale: 0}, d: infDecAmount{dec(-10, 0).Dec}, s: "-10", Format: DecimalSI}},
+		{dec(0, 0).Dec, Quantity{i: int64Amount{value: 0, scale: 0}, d: infDecAmount{Dec: dec(0, 0).Dec}, s: "0", Format: DecimalSI}},
+		{dec(10, 0).Dec, Quantity{i: int64Amount{value: 0, scale: 0}, d: infDecAmount{Dec: dec(10, 0).Dec}, s: "10", Format: DecimalSI}},
+		{dec(-10, 0).Dec, Quantity{i: int64Amount{value: 0, scale: 0}, d: infDecAmount{Dec: dec(-10, 0).Dec}, s: "-10", Format: DecimalSI}},
 	}
 	for _, testCase := range table2 {
-		q := Quantity{d: infDecAmount{testCase.dec}, Format: DecimalSI}
+		q := Quantity{d: infDecAmount{Dec: testCase.dec}, Format: DecimalSI}
 		// Won't currently get an error as MarshalTo can't return one
 		result, _ := q.Marshal()
 		q.Unmarshal(result)
@@ -103,13 +103,13 @@ func TestQuantityProtoUnmarshal(t *testing.T) {
 		input  Quantity
 		expect *inf.Dec
 	}{
-		{Quantity{i: int64Amount{value: 0, scale: 0}, d: infDecAmount{dec(0, 0).Dec}, s: "0", Format: DecimalSI}, dec(0, 0).Dec},
-		{Quantity{i: int64Amount{value: 0, scale: 0}, d: infDecAmount{dec(10, 0).Dec}, s: "10", Format: DecimalSI}, dec(10, 0).Dec},
-		{Quantity{i: int64Amount{value: 0, scale: 0}, d: infDecAmount{dec(-10, 0).Dec}, s: "-10", Format: DecimalSI}, dec(-10, 0).Dec},
+		{Quantity{i: int64Amount{value: 0, scale: 0}, d: infDecAmount{Dec: dec(0, 0).Dec}, s: "0", Format: DecimalSI}, dec(0, 0).Dec},
+		{Quantity{i: int64Amount{value: 0, scale: 0}, d: infDecAmount{Dec: dec(10, 0).Dec}, s: "10", Format: DecimalSI}, dec(10, 0).Dec},
+		{Quantity{i: int64Amount{value: 0, scale: 0}, d: infDecAmount{Dec: dec(-10, 0).Dec}, s: "-10", Format: DecimalSI}, dec(-10, 0).Dec},
 	}
 	for _, testCase := range table2 {
 		var inputQ Quantity
-		expectQ := Quantity{d: infDecAmount{testCase.expect}, Format: DecimalSI}
+		expectQ := Quantity{d: infDecAmount{Dec: testCase.expect}, Format: DecimalSI}
 		inputByteArray, _ := testCase.input.Marshal()
 		inputQ.Unmarshal(inputByteArray)
 		if inputQ.Cmp(expectQ) != 0 {
