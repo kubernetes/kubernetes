@@ -157,7 +157,17 @@ function download_tarball() {
   url="${DOWNLOAD_URL_PREFIX}/${file}"
   mkdir -p "${download_path}"
 
-  if [[ $(which gsutil) ]] && [[ "$url" =~ ^https://storage.googleapis.com/.* ]]; then
+  # gsutil is being removed from the Google Cloud CLI; prefer gcloud storage
+  # and keep gsutil only for SDKs that predate it.
+  if [[ "$url" =~ ^https://storage.googleapis.com/.* ]] && [[ $(which gcloud) ]] && gcloud storage --help >/dev/null 2>&1; then
+    # Unlike gsutil, gcloud storage refuses to run without an active account
+    # instead of falling back to anonymous access, which breaks public buckets.
+    if [[ -z "$(gcloud auth list --filter=status:ACTIVE --format='value(account)' 2>/dev/null)" ]]; then
+      CLOUDSDK_AUTH_DISABLE_CREDENTIALS=true gcloud storage cp "${url//'https://storage.googleapis.com/'/gs://}" "${download_path}/${file}"
+    else
+      gcloud storage cp "${url//'https://storage.googleapis.com/'/gs://}" "${download_path}/${file}"
+    fi
+  elif [[ $(which gsutil) ]] && [[ "$url" =~ ^https://storage.googleapis.com/.* ]]; then
     gsutil cp "${url//'https://storage.googleapis.com/'/gs://}" "${download_path}/${file}"
   elif [[ $(which curl) ]]; then
     # if the url belongs to GCS API we should use oauth2_token in the headers
@@ -170,7 +180,7 @@ function download_tarball() {
   elif [[ $(which wget) ]]; then
     wget "${url}" -O "${download_path}/${file}"
   else
-    echo "Couldn't find gsutil, curl, or wget.  Bailing out." >&2
+    echo "Couldn't find gcloud, gsutil, curl, or wget.  Bailing out." >&2
     exit 4
   fi
   echo
