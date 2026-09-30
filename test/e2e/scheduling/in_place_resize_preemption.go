@@ -19,6 +19,7 @@ package scheduling
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
@@ -41,6 +42,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	admissionapi "k8s.io/pod-security-admission/api"
 	"k8s.io/utils/ptr"
 )
@@ -889,5 +891,556 @@ var _ = SIGDescribe("InPlaceResizePreemption", framework.WithSerial(), framework
 		step2Pod := podresize.WaitForPodResizeActuation(ctx, f, podClient, step1Pod, step2Expected)
 		gomega.Expect(step2Pod.Status.ContainerStatuses[0].RestartCount).To(gomega.Equal(int32(0)))
 		gomega.Expect(step2Pod.Status.ContainerStatuses[0].AllocatedResources[v1.ResourceCPU]).To(gomega.Equal(resource.MustParse(step2HighCPUStr)))
+	})
+
+	ginkgo.It("validates in-place resize preemption is blocked when PodDisruptionBudget is exhausted for all candidate victims and resumes when budget becomes available", func(ctx context.Context) {
+		podClient := e2epod.NewPodClient(f)
+
+		ginkgo.By("Selecting a ready schedulable node")
+		targetNodeObj, err := e2enode.GetRandomReadySchedulableNode(ctx, cs)
+		framework.ExpectNoError(err, "failed to get a ready schedulable node")
+		targetNode := targetNodeObj.Name
+
+		freeMilliCPU := getNodeFreeCPU(ctx, cs, targetNodeObj)
+
+		victimCPU := max(freeMilliCPU*50/100, 50)
+		initialHighCPU := max(freeMilliCPU*30/100, 30)
+		resizedHighCPU := max(freeMilliCPU*70/100, 70)
+
+		victimCPUStr := fmt.Sprintf("%dm", victimCPU)
+		initialHighCPUStr := fmt.Sprintf("%dm", initialHighCPU)
+		resizedHighCPUStr := fmt.Sprintf("%dm", resizedHighCPU)
+
+		zeroGracePeriod := int64(0)
+		ginkgo.By(fmt.Sprintf("Creating low-priority victim pod on node %s with CPU %s covered by PDB", targetNode, victimCPUStr))
+		pdbVictimConfig := pausePodConfig{
+			Name:                          "pdb-exhausted-victim-pod",
+			Namespace:                     ns,
+			PriorityClassName:             lowPriorityClassName,
+			Labels:                        map[string]string{"app": "pdb-exhausted-victim"},
+			Affinity:                      makeNodeAffinity(targetNode),
+			TerminationGracePeriodSeconds: &zeroGracePeriod,
+			Resources: &v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse(victimCPUStr),
+					v1.ResourceMemory: resource.MustParse("50Mi"),
+				},
+				Limits: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse(victimCPUStr),
+					v1.ResourceMemory: resource.MustParse("50Mi"),
+				},
+			},
+		}
+		victimPod := createPausePod(ctx, f, pdbVictimConfig)
+		framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, cs, victimPod))
+
+		ginkgo.By("Creating PodDisruptionBudget protecting the victim pod with minAvailable=1 (0 disruptions allowed)")
+		minAvail := intstr.FromInt32(1)
+		pdb := &policyv1.PodDisruptionBudget{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "pdb-exhausted-budget",
+				Namespace: ns,
+			},
+			Spec: policyv1.PodDisruptionBudgetSpec{
+				MinAvailable: &minAvail,
+				Selector: &metav1.LabelSelector{
+					MatchLabels: map[string]string{"app": "pdb-exhausted-victim"},
+				},
+			},
+		}
+		_, err = cs.PolicyV1().PodDisruptionBudgets(ns).Create(ctx, pdb, metav1.CreateOptions{})
+		framework.ExpectNoError(err)
+
+		ginkgo.By("Waiting for PDB status to reflect 1 healthy pod and 0 disruptions allowed")
+		err = wait.PollUntilContextTimeout(ctx, 500*time.Millisecond, 30*time.Second, false, func(ctx context.Context) (bool, error) {
+			curPDB, err := cs.PolicyV1().PodDisruptionBudgets(ns).Get(ctx, pdb.Name, metav1.GetOptions{})
+			if err != nil {
+				return false, err
+			}
+			return curPDB.Status.CurrentHealthy == 1 && curPDB.Status.DisruptionsAllowed == 0, nil
+		})
+		framework.ExpectNoError(err, "PDB failed to stabilize with 0 disruptions allowed")
+
+		ginkgo.By(fmt.Sprintf("Creating high-priority pod on node %s with initial CPU %s", targetNode, initialHighCPUStr))
+		originalContainers := []podresize.ResizableContainerInfo{
+			{
+				Name: "c1",
+				Resources: &cgroups.ContainerResources{
+					CPUReq: initialHighCPUStr,
+					CPULim: initialHighCPUStr,
+					MemReq: "50Mi",
+					MemLim: "50Mi",
+				},
+				CPUPolicy: ptr.To(v1.NotRequired),
+				MemPolicy: ptr.To(v1.NotRequired),
+			},
+		}
+
+		tStamp := fmt.Sprintf("%d", time.Now().UnixNano())
+		highPodSpec := podresize.MakePodWithResizableContainers(ns, "pdb-blocked-preemptor-pod", tStamp, originalContainers, nil)
+		highPodSpec.Spec.PriorityClassName = highPriorityClassName
+		highPodSpec.Spec.Affinity = makeNodeAffinity(targetNode)
+
+		highPod := podClient.Create(ctx, highPodSpec)
+		framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, cs, highPod))
+
+		ginkgo.By(fmt.Sprintf("Patching high-priority pod to expand CPU from %s to %s (exceeds node capacity)", initialHighCPUStr, resizedHighCPUStr))
+		expectedContainers := []podresize.ResizableContainerInfo{
+			{
+				Name: "c1",
+				Resources: &cgroups.ContainerResources{
+					CPUReq: resizedHighCPUStr,
+					CPULim: resizedHighCPUStr,
+					MemReq: "50Mi",
+					MemLim: "50Mi",
+				},
+				CPUPolicy: ptr.To(v1.NotRequired),
+				MemPolicy: ptr.To(v1.NotRequired),
+			},
+		}
+
+		patch := podresize.MakeResizePatch(originalContainers, expectedContainers, nil, nil)
+		_, patchErr := cs.CoreV1().Pods(ns).Patch(ctx, highPod.Name, types.StrategicMergePatchType, patch, metav1.PatchOptions{}, "resize")
+		framework.ExpectNoError(patchErr, "failed to patch pod for resize")
+
+		ginkgo.By("Verifying high-priority pod enters Deferred resize state because PDB blocks preemption")
+		waitForPodDeferred(ctx, f, highPod)
+
+		ginkgo.By("Verifying victim pod is NOT preempted while PDB disruption budget is exhausted")
+		gomega.Consistently(ctx, func(ctx context.Context) bool {
+			p, err := cs.CoreV1().Pods(ns).Get(ctx, victimPod.Name, metav1.GetOptions{})
+			return err == nil && p.DeletionTimestamp == nil && p.Status.Phase == v1.PodRunning
+		}).WithTimeout(10 * time.Second).WithPolling(1 * time.Second).Should(gomega.BeTrue(), "Victim pod must remain running while PDB disruption budget is exhausted")
+
+		ginkgo.By("Updating PDB to minAvailable=0 so disruption budget becomes available")
+		curPDB, err := cs.PolicyV1().PodDisruptionBudgets(ns).Get(ctx, pdb.Name, metav1.GetOptions{})
+		framework.ExpectNoError(err)
+		minAvail0 := intstr.FromInt32(0)
+		curPDB.Spec.MinAvailable = &minAvail0
+		_, err = cs.PolicyV1().PodDisruptionBudgets(ns).Update(ctx, curPDB, metav1.UpdateOptions{})
+		framework.ExpectNoError(err)
+
+		err = wait.PollUntilContextTimeout(ctx, 500*time.Millisecond, 30*time.Second, false, func(ctx context.Context) (bool, error) {
+			p, err := cs.PolicyV1().PodDisruptionBudgets(ns).Get(ctx, pdb.Name, metav1.GetOptions{})
+			if err != nil {
+				return false, err
+			}
+			return p.Status.DisruptionsAllowed >= 1, nil
+		})
+		framework.ExpectNoError(err, "PDB failed to update with >= 1 disruptions allowed")
+
+		ginkgo.By("Verifying scheduler preempts victim pod once PDB allows disruption")
+		gomega.Eventually(ctx, func(ctx context.Context) bool {
+			p, err := cs.CoreV1().Pods(ns).Get(ctx, victimPod.Name, metav1.GetOptions{})
+			if err != nil {
+				return apierrors.IsNotFound(err)
+			}
+			return p.DeletionTimestamp != nil
+		}).WithTimeout(45 * time.Second).WithPolling(500 * time.Millisecond).Should(gomega.BeTrue(), "Victim pod should be preempted once PDB budget becomes available")
+
+		ginkgo.By("Waiting for resize actuation to complete on node without container restart")
+		expected := podresize.UpdateExpectedContainerRestarts(ctx, highPod, expectedContainers)
+		resizedPod := podresize.WaitForPodResizeActuation(ctx, f, podClient, highPod, expected)
+
+		ginkgo.By("Verifying pod container restart count is 0 and allocated CPU matches resized target")
+		gomega.Expect(resizedPod.Status.ContainerStatuses[0].RestartCount).To(gomega.Equal(int32(0)), "container should not restart during in-place resize actuation")
+		gomega.Expect(resizedPod.Status.ContainerStatuses[0].AllocatedResources[v1.ResourceCPU]).To(gomega.Equal(resource.MustParse(resizedHighCPUStr)))
+	})
+
+	ginkgo.It("validates dynamic re-enabling of resize preemption when node preemption policy clears DisableResizePreemption", func(ctx context.Context) {
+		podClient := e2epod.NewPodClient(f)
+
+		ginkgo.By("Selecting a ready schedulable node")
+		targetNodeObj, err := e2enode.GetRandomReadySchedulableNode(ctx, cs)
+		framework.ExpectNoError(err, "failed to get a ready schedulable node")
+		targetNode := targetNodeObj.Name
+
+		ginkgo.By(fmt.Sprintf("Patching node %s to disable resize preemption by scheduler", targetNode))
+		patchDisable := []byte(`{"spec": {"podPreemptionPolicy": {"disableResizePreemption": ["scheduler"]}}}`)
+		_, err = cs.CoreV1().Nodes().Patch(ctx, targetNode, types.StrategicMergePatchType, patchDisable, metav1.PatchOptions{})
+		framework.ExpectNoError(err, "failed to patch node to disable resize preemption")
+
+		defer func() {
+			patchReset := []byte(`{"spec": {"podPreemptionPolicy": null}}`)
+			_, _ = cs.CoreV1().Nodes().Patch(ctx, targetNode, types.StrategicMergePatchType, patchReset, metav1.PatchOptions{})
+		}()
+
+		freeMilliCPU := getNodeFreeCPU(ctx, cs, targetNodeObj)
+
+		victimCPU := max(freeMilliCPU*50/100, 50)
+		initialHighCPU := max(freeMilliCPU*30/100, 30)
+		resizedHighCPU := max(freeMilliCPU*70/100, 70)
+
+		victimCPUStr := fmt.Sprintf("%dm", victimCPU)
+		initialHighCPUStr := fmt.Sprintf("%dm", initialHighCPU)
+		resizedHighCPUStr := fmt.Sprintf("%dm", resizedHighCPU)
+
+		ginkgo.By(fmt.Sprintf("Creating low-priority victim pod on node %s with CPU request %s", targetNode, victimCPUStr))
+		zeroGracePeriod := int64(0)
+		victimPodConfig := pausePodConfig{
+			Name:                          "dynamic-policy-victim-pod",
+			Namespace:                     ns,
+			PriorityClassName:             lowPriorityClassName,
+			Affinity:                      makeNodeAffinity(targetNode),
+			TerminationGracePeriodSeconds: &zeroGracePeriod,
+			Resources: &v1.ResourceRequirements{
+				Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse(victimCPUStr), v1.ResourceMemory: resource.MustParse("100Mi")},
+				Limits:   v1.ResourceList{v1.ResourceCPU: resource.MustParse(victimCPUStr), v1.ResourceMemory: resource.MustParse("100Mi")},
+			},
+		}
+		victimPod := createPausePod(ctx, f, victimPodConfig)
+		framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, cs, victimPod), "victim pod failed to run")
+
+		ginkgo.By(fmt.Sprintf("Creating high-priority pod on node %s with initial CPU request %s", targetNode, initialHighCPUStr))
+		originalContainers := []podresize.ResizableContainerInfo{
+			{
+				Name: "c1",
+				Resources: &cgroups.ContainerResources{
+					CPUReq: initialHighCPUStr,
+					CPULim: initialHighCPUStr,
+					MemReq: "100Mi",
+					MemLim: "100Mi",
+				},
+				CPUPolicy: ptr.To(v1.NotRequired),
+				MemPolicy: ptr.To(v1.NotRequired),
+			},
+		}
+
+		tStamp := fmt.Sprintf("%d", time.Now().UnixNano())
+		highPodSpec := podresize.MakePodWithResizableContainers(ns, "dynamic-policy-preemptor-pod", tStamp, originalContainers, nil)
+		highPodSpec.Spec.PriorityClassName = highPriorityClassName
+		highPodSpec.Spec.Affinity = makeNodeAffinity(targetNode)
+
+		highPod := podClient.Create(ctx, highPodSpec)
+		framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, cs, highPod), "high priority pod failed to run")
+
+		ginkgo.By(fmt.Sprintf("Patching high-priority pod to expand CPU from %s to %s (exceeds node capacity)", initialHighCPUStr, resizedHighCPUStr))
+		expectedContainers := []podresize.ResizableContainerInfo{
+			{
+				Name: "c1",
+				Resources: &cgroups.ContainerResources{
+					CPUReq: resizedHighCPUStr,
+					CPULim: resizedHighCPUStr,
+					MemReq: "100Mi",
+					MemLim: "100Mi",
+				},
+				CPUPolicy: ptr.To(v1.NotRequired),
+				MemPolicy: ptr.To(v1.NotRequired),
+			},
+		}
+
+		patch := podresize.MakeResizePatch(originalContainers, expectedContainers, nil, nil)
+		_, patchErr := cs.CoreV1().Pods(ns).Patch(ctx, highPod.Name, types.StrategicMergePatchType, patch, metav1.PatchOptions{}, "resize")
+		framework.ExpectNoError(patchErr, "failed to patch pod for resize")
+
+		ginkgo.By("Verifying high-priority pod remains in Deferred resize state while preemption is disabled on node")
+		waitForPodDeferred(ctx, f, highPod)
+
+		ginkgo.By("Verifying victim pod is NOT preempted while resize preemption is disabled on node")
+		gomega.Consistently(ctx, func(ctx context.Context) bool {
+			p, err := cs.CoreV1().Pods(ns).Get(ctx, victimPod.Name, metav1.GetOptions{})
+			return err == nil && p.DeletionTimestamp == nil && p.Status.Phase == v1.PodRunning
+		}).WithTimeout(10 * time.Second).WithPolling(1 * time.Second).Should(gomega.BeTrue(), "Victim pod must remain running while resize preemption is disabled")
+
+		ginkgo.By(fmt.Sprintf("Re-enabling resize preemption on node %s by clearing PodPreemptionPolicy", targetNode))
+		patchReset := []byte(`{"spec": {"podPreemptionPolicy": null}}`)
+		_, err = cs.CoreV1().Nodes().Patch(ctx, targetNode, types.StrategicMergePatchType, patchReset, metav1.PatchOptions{})
+		framework.ExpectNoError(err, "failed to reset node preemption policy")
+
+		ginkgo.By("Verifying scheduler dynamically re-evaluates deferred pod and preempts victim pod")
+		gomega.Eventually(ctx, func(ctx context.Context) bool {
+			p, err := cs.CoreV1().Pods(ns).Get(ctx, victimPod.Name, metav1.GetOptions{})
+			if err != nil {
+				return apierrors.IsNotFound(err)
+			}
+			return p.DeletionTimestamp != nil
+		}).WithTimeout(45 * time.Second).WithPolling(500 * time.Millisecond).Should(gomega.BeTrue(), "Victim pod should be preempted once node preemption is re-enabled")
+
+		ginkgo.By("Waiting for resize actuation to complete on node without container restart")
+		expected := podresize.UpdateExpectedContainerRestarts(ctx, highPod, expectedContainers)
+		resizedPod := podresize.WaitForPodResizeActuation(ctx, f, podClient, highPod, expected)
+
+		gomega.Expect(resizedPod.Status.ContainerStatuses[0].RestartCount).To(gomega.Equal(int32(0)), "container should not restart during in-place resize actuation")
+		gomega.Expect(resizedPod.Status.ContainerStatuses[0].AllocatedResources[v1.ResourceCPU]).To(gomega.Equal(resource.MustParse(resizedHighCPUStr)))
+	})
+
+	ginkgo.It("validates pod preemptionPolicy PreemptNever prevents resize-induced preemption of lower-priority victims on node", func(ctx context.Context) {
+		podClient := e2epod.NewPodClient(f)
+
+		ginkgo.By("Selecting a ready schedulable node")
+		targetNodeObj, err := e2enode.GetRandomReadySchedulableNode(ctx, cs)
+		framework.ExpectNoError(err, "failed to get a ready schedulable node")
+		targetNode := targetNodeObj.Name
+
+		freeMilliCPU := getNodeFreeCPU(ctx, cs, targetNodeObj)
+
+		victimCPU := max(freeMilliCPU*50/100, 50)
+		initialHighCPU := max(freeMilliCPU*30/100, 30)
+		resizedHighCPU := max(freeMilliCPU*70/100, 70)
+
+		victimCPUStr := fmt.Sprintf("%dm", victimCPU)
+		initialHighCPUStr := fmt.Sprintf("%dm", initialHighCPU)
+		resizedHighCPUStr := fmt.Sprintf("%dm", resizedHighCPU)
+
+		ginkgo.By(fmt.Sprintf("Creating low-priority victim pod on node %s with CPU request %s", targetNode, victimCPUStr))
+		zeroGracePeriod := int64(0)
+		victimPodConfig := pausePodConfig{
+			Name:                          "preempt-never-victim-pod",
+			Namespace:                     ns,
+			PriorityClassName:             lowPriorityClassName,
+			Affinity:                      makeNodeAffinity(targetNode),
+			TerminationGracePeriodSeconds: &zeroGracePeriod,
+			Resources: &v1.ResourceRequirements{
+				Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse(victimCPUStr), v1.ResourceMemory: resource.MustParse("100Mi")},
+				Limits:   v1.ResourceList{v1.ResourceCPU: resource.MustParse(victimCPUStr), v1.ResourceMemory: resource.MustParse("100Mi")},
+			},
+		}
+		victimPod := createPausePod(ctx, f, victimPodConfig)
+		framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, cs, victimPod), "victim pod failed to run")
+
+		ginkgo.By(fmt.Sprintf("Creating high-priority pod on node %s with PreemptionPolicy PreemptNever", targetNode))
+		originalContainers := []podresize.ResizableContainerInfo{
+			{
+				Name: "c1",
+				Resources: &cgroups.ContainerResources{
+					CPUReq: initialHighCPUStr,
+					CPULim: initialHighCPUStr,
+					MemReq: "100Mi",
+					MemLim: "100Mi",
+				},
+				CPUPolicy: ptr.To(v1.NotRequired),
+				MemPolicy: ptr.To(v1.NotRequired),
+			},
+		}
+
+		tStamp := fmt.Sprintf("%d", time.Now().UnixNano())
+		highPodSpec := podresize.MakePodWithResizableContainers(ns, "preempt-never-preemptor-pod", tStamp, originalContainers, nil)
+		highPodSpec.Spec.PriorityClassName = highPriorityClassName
+		highPodSpec.Spec.PreemptionPolicy = ptr.To(v1.PreemptNever)
+		highPodSpec.Spec.Affinity = makeNodeAffinity(targetNode)
+
+		highPod := podClient.Create(ctx, highPodSpec)
+		framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, cs, highPod), "high priority pod failed to run")
+
+		ginkgo.By(fmt.Sprintf("Patching high-priority pod to expand CPU from %s to %s (exceeds node capacity)", initialHighCPUStr, resizedHighCPUStr))
+		expectedContainers := []podresize.ResizableContainerInfo{
+			{
+				Name: "c1",
+				Resources: &cgroups.ContainerResources{
+					CPUReq: resizedHighCPUStr,
+					CPULim: resizedHighCPUStr,
+					MemReq: "100Mi",
+					MemLim: "100Mi",
+				},
+				CPUPolicy: ptr.To(v1.NotRequired),
+				MemPolicy: ptr.To(v1.NotRequired),
+			},
+		}
+
+		patch := podresize.MakeResizePatch(originalContainers, expectedContainers, nil, nil)
+		_, patchErr := cs.CoreV1().Pods(ns).Patch(ctx, highPod.Name, types.StrategicMergePatchType, patch, metav1.PatchOptions{}, "resize")
+		framework.ExpectNoError(patchErr, "failed to patch pod for resize")
+
+		ginkgo.By("Verifying high-priority pod remains in Deferred resize state because PreemptNever prevents preemption")
+		waitForPodDeferred(ctx, f, highPod)
+
+		ginkgo.By("Verifying victim pod is NOT preempted by pod with PreemptNever")
+		gomega.Consistently(ctx, func(ctx context.Context) bool {
+			p, err := cs.CoreV1().Pods(ns).Get(ctx, victimPod.Name, metav1.GetOptions{})
+			return err == nil && p.DeletionTimestamp == nil && p.Status.Phase == v1.PodRunning
+		}).WithTimeout(10 * time.Second).WithPolling(1 * time.Second).Should(gomega.BeTrue(), "Victim pod must remain running when preemptor has PreemptNever")
+
+		ginkgo.By("Voluntarily deleting victim pod to free node capacity")
+		err = cs.CoreV1().Pods(ns).Delete(ctx, victimPod.Name, metav1.DeleteOptions{GracePeriodSeconds: ptr.To(int64(0))})
+		framework.ExpectNoError(err)
+		framework.ExpectNoError(e2epod.WaitForPodNotFoundInNamespace(ctx, cs, victimPod.Name, ns, 30*time.Second))
+
+		ginkgo.By("Verifying high-priority pod resize is actuated after capacity is freed voluntarily")
+		expected := podresize.UpdateExpectedContainerRestarts(ctx, highPod, expectedContainers)
+		resizedPod := podresize.WaitForPodResizeActuation(ctx, f, podClient, highPod, expected)
+
+		gomega.Expect(resizedPod.Status.ContainerStatuses[0].RestartCount).To(gomega.Equal(int32(0)), "container should not restart during in-place resize actuation")
+		gomega.Expect(resizedPod.Status.ContainerStatuses[0].AllocatedResources[v1.ResourceCPU]).To(gomega.Equal(resource.MustParse(resizedHighCPUStr)))
+	})
+
+	ginkgo.It("validates concurrent multi-node in-place resize preemption with deterministic victim eviction and dynamic actuation", func(ctx context.Context) {
+		e2eskipper.SkipUnlessNodeCountIsAtLeast(2)
+		podClient := e2epod.NewPodClient(f)
+
+		ginkgo.By("Selecting two ready schedulable nodes")
+		nodeList, err := e2enode.GetReadySchedulableNodes(ctx, cs)
+		framework.ExpectNoError(err, "failed to get ready schedulable nodes")
+		gomega.Expect(len(nodeList.Items)).To(gomega.BeNumerically(">=", 2))
+
+		node1 := nodeList.Items[0].Name
+		node2 := nodeList.Items[1].Name
+
+		freeMilliCPU1 := getNodeFreeCPU(ctx, cs, &nodeList.Items[0])
+		freeMilliCPU2 := getNodeFreeCPU(ctx, cs, &nodeList.Items[1])
+
+		victim1CPU := max(freeMilliCPU1*50/100, 50)
+		initialHigh1CPU := max(freeMilliCPU1*30/100, 30)
+		resizedHigh1CPU := max(freeMilliCPU1*70/100, 70)
+
+		victim2CPU := max(freeMilliCPU2*50/100, 50)
+		initialHigh2CPU := max(freeMilliCPU2*30/100, 30)
+		resizedHigh2CPU := max(freeMilliCPU2*70/100, 70)
+
+		victim1CPUStr := fmt.Sprintf("%dm", victim1CPU)
+		initialHigh1CPUStr := fmt.Sprintf("%dm", initialHigh1CPU)
+		resizedHigh1CPUStr := fmt.Sprintf("%dm", resizedHigh1CPU)
+
+		victim2CPUStr := fmt.Sprintf("%dm", victim2CPU)
+		initialHigh2CPUStr := fmt.Sprintf("%dm", initialHigh2CPU)
+		resizedHigh2CPUStr := fmt.Sprintf("%dm", resizedHigh2CPU)
+
+		zeroGracePeriod := int64(0)
+
+		ginkgo.By(fmt.Sprintf("Creating victim pod on node1 %s and victim pod on node2 %s", node1, node2))
+		victimPod1 := createPausePod(ctx, f, pausePodConfig{
+			Name:                          "concurrent-victim-node1",
+			Namespace:                     ns,
+			PriorityClassName:             lowPriorityClassName,
+			Affinity:                      makeNodeAffinity(node1),
+			TerminationGracePeriodSeconds: &zeroGracePeriod,
+			Resources: &v1.ResourceRequirements{
+				Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse(victim1CPUStr), v1.ResourceMemory: resource.MustParse("50Mi")},
+				Limits:   v1.ResourceList{v1.ResourceCPU: resource.MustParse(victim1CPUStr), v1.ResourceMemory: resource.MustParse("50Mi")},
+			},
+		})
+		victimPod2 := createPausePod(ctx, f, pausePodConfig{
+			Name:                          "concurrent-victim-node2",
+			Namespace:                     ns,
+			PriorityClassName:             lowPriorityClassName,
+			Affinity:                      makeNodeAffinity(node2),
+			TerminationGracePeriodSeconds: &zeroGracePeriod,
+			Resources: &v1.ResourceRequirements{
+				Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse(victim2CPUStr), v1.ResourceMemory: resource.MustParse("50Mi")},
+				Limits:   v1.ResourceList{v1.ResourceCPU: resource.MustParse(victim2CPUStr), v1.ResourceMemory: resource.MustParse("50Mi")},
+			},
+		})
+
+		framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, cs, victimPod1))
+		framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, cs, victimPod2))
+
+		ginkgo.By(fmt.Sprintf("Creating high-priority pod on node1 %s and on node2 %s", node1, node2))
+		origContainers1 := []podresize.ResizableContainerInfo{
+			{
+				Name: "c1",
+				Resources: &cgroups.ContainerResources{
+					CPUReq: initialHigh1CPUStr,
+					CPULim: initialHigh1CPUStr,
+					MemReq: "50Mi",
+					MemLim: "50Mi",
+				},
+				CPUPolicy: ptr.To(v1.NotRequired),
+				MemPolicy: ptr.To(v1.NotRequired),
+			},
+		}
+		origContainers2 := []podresize.ResizableContainerInfo{
+			{
+				Name: "c1",
+				Resources: &cgroups.ContainerResources{
+					CPUReq: initialHigh2CPUStr,
+					CPULim: initialHigh2CPUStr,
+					MemReq: "50Mi",
+					MemLim: "50Mi",
+				},
+				CPUPolicy: ptr.To(v1.NotRequired),
+				MemPolicy: ptr.To(v1.NotRequired),
+			},
+		}
+
+		tStamp1 := fmt.Sprintf("%d-1", time.Now().UnixNano())
+		highPodSpec1 := podresize.MakePodWithResizableContainers(ns, "concurrent-preemptor-node1", tStamp1, origContainers1, nil)
+		highPodSpec1.Spec.PriorityClassName = highPriorityClassName
+		highPodSpec1.Spec.Affinity = makeNodeAffinity(node1)
+		highPod1 := podClient.Create(ctx, highPodSpec1)
+
+		tStamp2 := fmt.Sprintf("%d-2", time.Now().UnixNano())
+		highPodSpec2 := podresize.MakePodWithResizableContainers(ns, "concurrent-preemptor-node2", tStamp2, origContainers2, nil)
+		highPodSpec2.Spec.PriorityClassName = highPriorityClassName
+		highPodSpec2.Spec.Affinity = makeNodeAffinity(node2)
+		highPod2 := podClient.Create(ctx, highPodSpec2)
+
+		framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, cs, highPod1))
+		framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, cs, highPod2))
+
+		ginkgo.By("Triggering concurrent in-place resize requests on both high-priority pods across nodes")
+		expectedContainers1 := []podresize.ResizableContainerInfo{
+			{
+				Name: "c1",
+				Resources: &cgroups.ContainerResources{
+					CPUReq: resizedHigh1CPUStr,
+					CPULim: resizedHigh1CPUStr,
+					MemReq: "50Mi",
+					MemLim: "50Mi",
+				},
+				CPUPolicy: ptr.To(v1.NotRequired),
+				MemPolicy: ptr.To(v1.NotRequired),
+			},
+		}
+		expectedContainers2 := []podresize.ResizableContainerInfo{
+			{
+				Name: "c1",
+				Resources: &cgroups.ContainerResources{
+					CPUReq: resizedHigh2CPUStr,
+					CPULim: resizedHigh2CPUStr,
+					MemReq: "50Mi",
+					MemLim: "50Mi",
+				},
+				CPUPolicy: ptr.To(v1.NotRequired),
+				MemPolicy: ptr.To(v1.NotRequired),
+			},
+		}
+
+		patch1 := podresize.MakeResizePatch(origContainers1, expectedContainers1, nil, nil)
+		patch2 := podresize.MakeResizePatch(origContainers2, expectedContainers2, nil, nil)
+
+		var wg sync.WaitGroup
+		var patch1Err, patch2Err error
+		wg.Add(2)
+		go func() {
+			defer wg.Done()
+			_, patch1Err = cs.CoreV1().Pods(ns).Patch(ctx, highPod1.Name, types.StrategicMergePatchType, patch1, metav1.PatchOptions{}, "resize")
+		}()
+		go func() {
+			defer wg.Done()
+			_, patch2Err = cs.CoreV1().Pods(ns).Patch(ctx, highPod2.Name, types.StrategicMergePatchType, patch2, metav1.PatchOptions{}, "resize")
+		}()
+		wg.Wait()
+
+		framework.ExpectNoError(patch1Err, "failed to patch highPod1 for resize")
+		framework.ExpectNoError(patch2Err, "failed to patch highPod2 for resize")
+
+		ginkgo.By("Verifying scheduler deterministically preempts victim pods on their respective nodes")
+		gomega.Eventually(ctx, func(ctx context.Context) bool {
+			p1, err1 := cs.CoreV1().Pods(ns).Get(ctx, victimPod1.Name, metav1.GetOptions{})
+			p2, err2 := cs.CoreV1().Pods(ns).Get(ctx, victimPod2.Name, metav1.GetOptions{})
+			p1Evicted := (err1 != nil && apierrors.IsNotFound(err1)) || (err1 == nil && p1.DeletionTimestamp != nil)
+			p2Evicted := (err2 != nil && apierrors.IsNotFound(err2)) || (err2 == nil && p2.DeletionTimestamp != nil)
+			return p1Evicted && p2Evicted
+		}).WithTimeout(45 * time.Second).WithPolling(500 * time.Millisecond).Should(gomega.BeTrue(), "Victim pods on both node1 and node2 should be preempted")
+
+		ginkgo.By("Waiting for concurrent resize actuations to complete without container restarts")
+		var resizedPod1, resizedPod2 *v1.Pod
+		wg.Add(2)
+		go func() {
+			defer wg.Done()
+			expected1 := podresize.UpdateExpectedContainerRestarts(ctx, highPod1, expectedContainers1)
+			resizedPod1 = podresize.WaitForPodResizeActuation(ctx, f, podClient, highPod1, expected1)
+		}()
+		go func() {
+			defer wg.Done()
+			expected2 := podresize.UpdateExpectedContainerRestarts(ctx, highPod2, expectedContainers2)
+			resizedPod2 = podresize.WaitForPodResizeActuation(ctx, f, podClient, highPod2, expected2)
+		}()
+		wg.Wait()
+
+		ginkgo.By("Verifying all containers completed in-place resize with 0 restarts and correct allocated resources")
+		gomega.Expect(resizedPod1.Status.ContainerStatuses[0].RestartCount).To(gomega.Equal(int32(0)), "pod1 container should not restart during concurrent resize actuation")
+		gomega.Expect(resizedPod1.Status.ContainerStatuses[0].AllocatedResources[v1.ResourceCPU]).To(gomega.Equal(resource.MustParse(resizedHigh1CPUStr)))
+		gomega.Expect(resizedPod2.Status.ContainerStatuses[0].RestartCount).To(gomega.Equal(int32(0)), "pod2 container should not restart during concurrent resize actuation")
+		gomega.Expect(resizedPod2.Status.ContainerStatuses[0].AllocatedResources[v1.ResourceCPU]).To(gomega.Equal(resource.MustParse(resizedHigh2CPUStr)))
 	})
 })
