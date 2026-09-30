@@ -8531,14 +8531,72 @@ func hierarchyWithNominations(t *testing.T, nominations map[string]string) *fram
 	return newQueuedPodGroupInfo(root, pInfos...)
 }
 
-func TestHierarchyNominatedPlacement(t *testing.T) {
+// nestedHierarchyWithNominations builds a three level hierarchy - cpg over sub1 and sub2, with
+// one leaf pod group under each - so a test can scope the nomination lookup to a nested group
+// rather than the root. nominations is keyed by leaf pod group name, one pod per leaf.
+func nestedHierarchyWithNominations(t *testing.T, nominations map[string]string) *framework.QueuedPodGroupInfo {
+	t.Helper()
+	cpg := st.MakeCompositePodGroup().Name("cpg").Namespace("default").Obj()
+	sub1 := st.MakeCompositePodGroup().Name("sub1").Namespace("default").ParentCompositePodGroup("cpg").Obj()
+	sub2 := st.MakeCompositePodGroup().Name("sub2").Namespace("default").ParentCompositePodGroup("cpg").Obj()
+	pg1 := st.MakePodGroup().Name("pg1").Namespace("default").ParentCompositePodGroup("sub1").Obj()
+	pg2 := st.MakePodGroup().Name("pg2").Namespace("default").ParentCompositePodGroup("sub2").Obj()
+
+	root := &framework.PodGroupInfo{
+		GenericPodGroup: fwk.NewGenericCompositePodGroup(cpg),
+		Children: []*framework.PodGroupInfo{
+			{
+				GenericPodGroup: fwk.NewGenericCompositePodGroup(sub1),
+				Children:        []*framework.PodGroupInfo{{GenericPodGroup: fwk.NewGenericPodGroup(pg1)}},
+			},
+			{
+				GenericPodGroup: fwk.NewGenericCompositePodGroup(sub2),
+				Children:        []*framework.PodGroupInfo{{GenericPodGroup: fwk.NewGenericPodGroup(pg2)}},
+			},
+		},
+	}
+
+	var pInfos []*framework.QueuedPodInfo
+	for i, pgName := range []string{"pg1", "pg2"} {
+		pod := st.MakePod().Name(fmt.Sprintf("p%d", i+1)).Namespace("default").UID(fmt.Sprintf("p%d", i+1)).
+			PodGroupName(pgName).NominatedNodeName(nominations[pgName]).Obj()
+		podInfo, err := framework.NewPodInfo(pod)
+		if err != nil {
+			t.Fatalf("Failed to create pod info for %s: %v", pgName, err)
+		}
+		pInfos = append(pInfos, &framework.QueuedPodInfo{PodInfo: podInfo})
+	}
+	return newQueuedPodGroupInfo(root, pInfos...)
+}
+
+// podGroupInfoByName finds a pod group in the hierarchy by name, or returns nil.
+func podGroupInfoByName(podGroupInfo *framework.PodGroupInfo, name string) *framework.PodGroupInfo {
+	if podGroupInfo.GetName() == name {
+		return podGroupInfo
+	}
+	for _, child := range podGroupInfo.GetChildGroups() {
+		if found := podGroupInfoByName(child, name); found != nil {
+			return found
+		}
+	}
+	return nil
+}
+
+// TestSubtreeNominatedPlacement covers the nomination matching a composite pod group does before
+// choosing a placement, at the root of the hierarchy and at a nested level.
+func TestSubtreeNominatedPlacement(t *testing.T) {
 	rack1 := placementWithNodes("rack-1", "node-1", "node-2")
 	rack2 := placementWithNodes("rack-2", "node-3", "node-4")
 	rack12 := placementWithNodes("rack-12", "node-1", "node-2", "node-3")
 
 	tests := []struct {
-		name        string
-		placements  []*fwk.Placement
+		name       string
+		placements []*fwk.Placement
+		// nested selects cpg -> {sub1 -> pg1, sub2 -> pg2} instead of the flat cpg -> {pg1, pg2}.
+		nested bool
+		// scope names the pod group whose subtree the nominations are collected from. Empty means
+		// the root, i.e. the whole hierarchy.
+		scope       string
 		nominations map[string]string
 		want        *fwk.Placement
 	}{
@@ -8584,11 +8642,65 @@ func TestHierarchyNominatedPlacement(t *testing.T) {
 			nominations: map[string]string{"pg1": "node-1", "pg2": "node-3"},
 			want:        rack12,
 		},
+		{
+			name:        "a nested group matches the nomination of its own leaf",
+			placements:  []*fwk.Placement{rack1, rack2},
+			nested:      true,
+			scope:       "sub1",
+			nominations: map[string]string{"pg1": "node-3"},
+			want:        rack2,
+		},
+		{
+			name:        "a nested group ignores a nomination belonging to a sibling subtree",
+			placements:  []*fwk.Placement{rack1, rack2},
+			nested:      true,
+			scope:       "sub2",
+			nominations: map[string]string{"pg1": "node-3"},
+			want:        nil,
+		},
+		{
+			// The point of scoping to the subtree: these two nominations can never be honored
+			// together, so the root has to fall back to scoring, but each nested group still has
+			// exactly one placement able to host the pods it is responsible for.
+			name:        "nominations in sibling subtrees are ambiguous for the root",
+			placements:  []*fwk.Placement{rack1, rack2},
+			nested:      true,
+			scope:       "cpg",
+			nominations: map[string]string{"pg1": "node-1", "pg2": "node-3"},
+			want:        nil,
+		},
+		{
+			name:        "the same nominations are unambiguous for the first nested group",
+			placements:  []*fwk.Placement{rack1, rack2},
+			nested:      true,
+			scope:       "sub1",
+			nominations: map[string]string{"pg1": "node-1", "pg2": "node-3"},
+			want:        rack1,
+		},
+		{
+			name:        "and for the second nested group",
+			placements:  []*fwk.Placement{rack1, rack2},
+			nested:      true,
+			scope:       "sub2",
+			nominations: map[string]string{"pg1": "node-1", "pg2": "node-3"},
+			want:        rack2,
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := hierarchyNominatedPlacement(tt.placements, hierarchyWithNominations(t, tt.nominations)); got != tt.want {
+			queued := hierarchyWithNominations(t, tt.nominations)
+			if tt.nested {
+				queued = nestedHierarchyWithNominations(t, tt.nominations)
+			}
+			scope := queued.PodGroupInfo
+			if tt.scope != "" {
+				scope = podGroupInfoByName(queued.PodGroupInfo, tt.scope)
+				if scope == nil {
+					t.Fatalf("no pod group named %q in the hierarchy", tt.scope)
+				}
+			}
+			if got := subtreeNominatedPlacement(tt.placements, scope, queued); got != tt.want {
 				gotName, wantName := "<nil>", "<nil>"
 				if got != nil {
 					gotName = got.Name
@@ -8596,7 +8708,7 @@ func TestHierarchyNominatedPlacement(t *testing.T) {
 				if tt.want != nil {
 					wantName = tt.want.Name
 				}
-				t.Errorf("hierarchyNominatedPlacement() = %v, want %v", gotName, wantName)
+				t.Errorf("subtreeNominatedPlacement() = %v, want %v", gotName, wantName)
 			}
 		})
 	}
