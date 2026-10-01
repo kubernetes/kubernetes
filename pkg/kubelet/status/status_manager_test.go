@@ -530,10 +530,10 @@ func TestStatusEquality(t *testing.T) {
 	}
 	oldPodStatus.ResourceClaimStatuses = []v1.PodResourceClaimStatus{claimStatusA}
 	oldPodStatus.ExtendedResourceClaimStatus = extendedClaimStatusA
-	oldPodStatus.NodeAllocatableResourceClaimStatuses = []v1.NodeAllocatableResourceClaimStatus{
+	oldPodStatus.ExtraNodeAllocatableResources = []v1.ExtraNodeAllocatableResource{
 		{
-			ResourceClaimName: "my-claim",
-			Containers:        []string{"ctr0"},
+			Source:     v1.ExtraNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "my-claim"},
+			Containers: []string{"ctr0"},
 			Mapping: []v1.NodeAllocatableMappedResources{{
 				Name:     v1.ResourceMemory,
 				Quantity: new(resource.MustParse("100Mi")),
@@ -580,7 +580,7 @@ func TestIsPodStatusByKubeletEqualFutureProof(t *testing.T) {
 	kubeletIgnoredFields := sets.NewString(
 		"ResourceClaimStatuses",
 		"ExtendedResourceClaimStatus",
-		"NodeAllocatableResourceClaimStatuses",
+		"ExtraNodeAllocatableResources",
 	)
 
 	// Get all fields in v1.PodStatus.
@@ -625,14 +625,14 @@ func TestIsPodStatusByKubeletEqualFutureProof(t *testing.T) {
 			t.Error("ExtendedResourceClaimStatus: change should be ignored but was detected")
 		}
 
-		// Test NodeAllocatableResourceClaimStatuses
+		// Test ExtraNodeAllocatableResources
 		modified = base.DeepCopy()
-		modified.NodeAllocatableResourceClaimStatuses = []v1.NodeAllocatableResourceClaimStatus{{
-			ResourceClaimName: "test-node-claim",
-			Containers:        []string{"ctr0"},
+		modified.ExtraNodeAllocatableResources = []v1.ExtraNodeAllocatableResource{{
+			Source:     v1.ExtraNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "test-node-claim"},
+			Containers: []string{"ctr0"},
 		}}
 		if !isPodStatusByKubeletEqual(base, modified) {
-			t.Error("NodeAllocatableResourceClaimStatuses: change should be ignored but was detected")
+			t.Error("ExtraNodeAllocatableResources: change should be ignored but was detected")
 		}
 	})
 

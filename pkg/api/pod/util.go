@@ -1135,7 +1135,7 @@ func dropDisabledPodStatusFields(podStatus, oldPodStatus *api.PodStatus, podSpec
 		dropImageVolumeWithDigest(podStatus)
 	}
 
-	dropPodNodeAllocatableResourceStatus(podStatus, oldPodStatus)
+	dropExtraNodeAllocatableResources(podStatus, oldPodStatus)
 
 	if !utilfeature.DefaultFeatureGate.Enabled(features.CSIVolumeHealth) && !volumeHealthInUse(oldPodStatus) {
 		podStatus.VolumeHealth = nil
@@ -1149,18 +1149,18 @@ func draExendedResourceInUse(podStatus *api.PodStatus) bool {
 	return false
 }
 
-func dropPodNodeAllocatableResourceStatus(podStatus, oldPodStatus *api.PodStatus) {
-	if utilfeature.DefaultFeatureGate.Enabled(features.DRANodeAllocatableResources) || draNodeAllocatableResourceStatusInUse(oldPodStatus) {
+func dropExtraNodeAllocatableResources(podStatus, oldPodStatus *api.PodStatus) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.DRANodeAllocatableResources) || extraNodeAllocatableResourcesInUse(oldPodStatus) {
 		return
 	}
-	podStatus.NodeAllocatableResourceClaimStatuses = nil
+	podStatus.ExtraNodeAllocatableResources = nil
 }
 
-func draNodeAllocatableResourceStatusInUse(podStatus *api.PodStatus) bool {
+func extraNodeAllocatableResourcesInUse(podStatus *api.PodStatus) bool {
 	if podStatus == nil {
 		return false
 	}
-	return len(podStatus.NodeAllocatableResourceClaimStatuses) > 0
+	return len(podStatus.ExtraNodeAllocatableResources) > 0
 }
 
 func volumeHealthInUse(podStatus *api.PodStatus) bool {

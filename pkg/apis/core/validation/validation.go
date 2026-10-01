@@ -6335,8 +6335,8 @@ func validateExtraNodeAllocatableResources(podStatus core.PodStatus, podSpec *co
 	// Declarative validation cannot dedupe on a struct key.
 	seenSources := sets.New[core.ExtraNodeAllocatableReference]()
 	for i, res := range podStatus.ExtraNodeAllocatableResources {
-		statusFldPath := fldPath.Index(i)
-		sourceFldPath := statusFldPath.Child("source")
+		idxPath := fldPath.Index(i)
+		sourceFldPath := idxPath.Child("source")
 		source := res.Source
 
 		if source.Name != "" {
@@ -6350,10 +6350,10 @@ func validateExtraNodeAllocatableResources(podStatus core.PodStatus, podSpec *co
 		allErrs = append(allErrs, validateExtraNodeAllocatableSource(source, podStatus, podSpec, sourceFldPath)...)
 
 		if len(res.Mapping) > 0 {
-			allErrs = append(allErrs, validateNodeAllocatableMappedResources(res.Mapping, statusFldPath.Child("mapping"))...)
+			allErrs = append(allErrs, validateNodeAllocatableMappedResources(res.Mapping, idxPath.Child("mapping"))...)
 		}
 		if len(res.Overhead) > 0 {
-			allErrs = append(allErrs, validateNodeAllocatableOverheadResources(res.Overhead, statusFldPath.Child("overhead"))...)
+			allErrs = append(allErrs, validateNodeAllocatableOverheadResources(res.Overhead, idxPath.Child("overhead"))...)
 		}
 	}
 
@@ -6897,8 +6897,8 @@ func validatePodLevelResourcesCoverDRA(pod *v1.Pod) (bool, string) {
 
 	if pod.Spec.Resources.Requests != nil {
 		opts := resourcehelper.PodResourcesOptions{
-			SkipPodLevelResources:                    true,
-			UseDRANodeAllocatableResourceClaimStatus: true,
+			SkipPodLevelResources:            true,
+			UseExtraNodeAllocatableResources: true,
 		}
 		requestWithoutPodLevel := resourcehelper.AggregateContainerRequests(pod, opts)
 
@@ -6918,8 +6918,8 @@ func validatePodLevelResourcesCoverDRA(pod *v1.Pod) (bool, string) {
 
 	if pod.Spec.Resources.Limits != nil {
 		opts := resourcehelper.PodResourcesOptions{
-			SkipPodLevelResources:                    true,
-			UseDRANodeAllocatableResourceClaimStatus: true,
+			SkipPodLevelResources:            true,
+			UseExtraNodeAllocatableResources: true,
 		}
 		limitsWithoutPodLevel := resourcehelper.AggregateContainerLimits(pod, opts)
 
@@ -6940,10 +6940,10 @@ func validatePodLevelResourcesCoverDRA(pod *v1.Pod) (bool, string) {
 			}
 		}
 
-		// Individual Container limits + DRA overheads must be <= Pod-level limits.
-		containerDRAAllocations := make(map[string]v1.ResourceList, len(pod.Spec.Containers))
+		// Individual container limits + extra node allocatable resources (like DRA allocations) must be <= pod-level limits.
+		containerExtraNodeAllocatableRes := make(map[string]v1.ResourceList, len(pod.Spec.Containers))
 		for _, ctr := range pod.Spec.Containers {
-			containerDRAAllocations[ctr.Name] = resourcehelper.GetContainerDRAAllocations(pod, ctr.Name)
+			containerExtraNodeAllocatableRes[ctr.Name] = resourcehelper.GetContainerExtraNodeAllocatableResources(pod, ctr.Name)
 		}
 
 		for _, ctr := range pod.Spec.Containers {
@@ -6958,9 +6958,9 @@ func validatePodLevelResourcesCoverDRA(pod *v1.Pod) (bool, string) {
 					continue
 				}
 
-				draResAllocation := containerDRAAllocations[ctr.Name][resourceName]
+				extraNodeAllocatableQuantity := containerExtraNodeAllocatableRes[ctr.Name][resourceName]
 				effectiveLimit := ctrLimit.DeepCopy()
-				effectiveLimit.Add(draResAllocation)
+				effectiveLimit.Add(extraNodeAllocatableQuantity)
 
 				if effectiveLimit.Cmp(podLevelResLimit) > 0 {
 					return false, fmt.Sprintf("pod level limit for %s is insufficient to cover the limit and DRA overhead for container %s", resourceName, ctr.Name)

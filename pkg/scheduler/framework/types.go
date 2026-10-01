@@ -1301,8 +1301,8 @@ func (pi *PodInfo) CalculateResource() fwk.PodResource {
 		UseStatusResources: inPlacePodVerticalScalingEnabled,
 		InPlacePodLevelResourcesVerticalScalingEnabled: inPlacePodLevelResourcesVerticalScalingEnabled,
 		// SkipPodLevelResources is set to false when PodLevelResources feature is enabled.
-		SkipPodLevelResources:                    !podLevelResourcesEnabled,
-		UseDRANodeAllocatableResourceClaimStatus: nodeAllocatableResourcesDRAEnabled,
+		SkipPodLevelResources:            !podLevelResourcesEnabled,
+		UseExtraNodeAllocatableResources: nodeAllocatableResourcesDRAEnabled,
 	})
 	isPodLevelResourcesSet := podLevelResourcesEnabled && resourcehelper.IsPodLevelRequestsSet(pi.Pod)
 	nonMissingContainerRequests := getNonMissingContainerRequests(requests, isPodLevelResourcesSet)
@@ -1312,9 +1312,9 @@ func (pi *PodInfo) CalculateResource() fwk.PodResource {
 			UseStatusResources: inPlacePodVerticalScalingEnabled,
 			InPlacePodLevelResourcesVerticalScalingEnabled: inPlacePodLevelResourcesVerticalScalingEnabled,
 			// SkipPodLevelResources is set to false when PodLevelResources feature is enabled.
-			SkipPodLevelResources:                    !podLevelResourcesEnabled,
-			NonMissingContainerRequests:              nonMissingContainerRequests,
-			UseDRANodeAllocatableResourceClaimStatus: nodeAllocatableResourcesDRAEnabled,
+			SkipPodLevelResources:            !podLevelResourcesEnabled,
+			NonMissingContainerRequests:      nonMissingContainerRequests,
+			UseExtraNodeAllocatableResources: nodeAllocatableResourcesDRAEnabled,
 		})
 	}
 	non0CPU := non0Requests[v1.ResourceCPU]
