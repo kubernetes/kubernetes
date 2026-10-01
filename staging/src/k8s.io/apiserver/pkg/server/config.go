@@ -403,33 +403,9 @@ func init() {
 
 // NewConfig returns a Config struct with the default values
 func NewConfig(codecs serializer.CodecFactory) *Config {
+
 	defaultHealthChecks := []healthz.HealthChecker{healthz.PingHealthz, healthz.LogHealthz}
-	var id string
-	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.APIServerIdentity) {
-		hostname, err := hostnameFunc()
-		if err != nil {
-			klog.Fatalf("error getting hostname for apiserver identity: %v", err)
-		}
 
-		// Since the hash needs to be unique across each kube-apiserver and aggregated apiservers,
-		// the hash used for the identity should include both the hostname and the identity value.
-		// TODO: receive the identity value as a parameter once the apiserver identity lease controller
-		// post start hook is moved to generic apiserver.
-		b := cryptobyte.NewBuilder(nil)
-		b.AddUint16LengthPrefixed(func(b *cryptobyte.Builder) {
-			b.AddBytes([]byte(hostname))
-		})
-		b.AddUint16LengthPrefixed(func(b *cryptobyte.Builder) {
-			b.AddBytes([]byte("kube-apiserver"))
-		})
-		hashData, err := b.Bytes()
-		if err != nil {
-			klog.Fatalf("error building hash data for apiserver identity: %v", err)
-		}
-
-		hash := sha256.Sum256(hashData)
-		id = "apiserver-" + strings.ToLower(base32.StdEncoding.WithPadding(base32.NoPadding).EncodeToString(hash[:16]))
-	}
 	lifecycleSignals := newLifecycleSignals()
 
 	return &Config{
@@ -480,7 +456,6 @@ func NewConfig(codecs serializer.CodecFactory) *Config {
 		StorageObjectCountTracker:           flowcontrolrequest.NewStorageObjectCountTracker(),
 		ShutdownWatchTerminationGracePeriod: time.Duration(0),
 
-		APIServerID:           id,
 		StorageVersionManager: storageversion.NewDefaultManager(),
 		TracerProvider:        tracing.NewNoopTracerProvider(),
 	}
@@ -725,6 +700,11 @@ func (c *Config) Complete(informers informers.SharedInformerFactory) CompletedCo
 	}
 	if len(c.ExternalAddress) == 0 && c.PublicAddress != nil {
 		c.ExternalAddress = c.PublicAddress.String()
+	}
+
+	// After setting feature gates
+	if len(c.APIServerID) == 0 {
+		c.APIServerID = DefaultAPIServerID(c.FeatureGate)
 	}
 
 	// if there is no port, and we listen on one securely, use that one
@@ -1031,6 +1011,35 @@ func BuildHandlerChainWithStorageVersionPrecondition(apiHandler http.Handler, c 
 	// WithStorageVersionPrecondition needs the WithRequestInfo to run first
 	handler := genericapifilters.WithStorageVersionPrecondition(apiHandler, c.StorageVersionManager, c.Serializer)
 	return DefaultBuildHandlerChain(handler, c)
+}
+
+func DefaultAPIServerID(features featuregate.FeatureGate) string {
+	if !features.Enabled(genericfeatures.APIServerIdentity) {
+		return ""
+	}
+	hostname, err := hostnameFunc()
+	if err != nil {
+		klog.Fatalf("error getting hostname for apiserver identity: %v", err)
+	}
+
+	// Since the hash needs to be unique across each kube-apiserver and aggregated apiservers,
+	// the hash used for the identity should include both the hostname and the identity value.
+	// TODO: receive the identity value as a parameter once the apiserver identity lease controller
+	// post start hook is moved to generic apiserver.
+	b := cryptobyte.NewBuilder(nil)
+	b.AddUint16LengthPrefixed(func(b *cryptobyte.Builder) {
+		b.AddBytes([]byte(hostname))
+	})
+	b.AddUint16LengthPrefixed(func(b *cryptobyte.Builder) {
+		b.AddBytes([]byte("kube-apiserver"))
+	})
+	hashData, err := b.Bytes()
+	if err != nil {
+		klog.Fatalf("error building hash data for apiserver identity: %v", err)
+	}
+
+	hash := sha256.Sum256(hashData)
+	return "apiserver-" + strings.ToLower(base32.StdEncoding.WithPadding(base32.NoPadding).EncodeToString(hash[:16]))
 }
 
 func DefaultBuildHandlerChain(apiHandler http.Handler, c *Config) http.Handler {
