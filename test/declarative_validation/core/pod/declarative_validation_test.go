@@ -197,17 +197,17 @@ func TestDeclarativeValidateNodeAllocatableStatus(t *testing.T) {
 			expectedErrs field.ErrorList
 		}{
 			"valid no changes": {
-				old: makePodWithNodeAllocatableResourceClaimStatuses("claim-1", []api.NodeAllocatableResourceClaimStatus{
+				old: makePodWithExtraNodeAllocatableResources("claim-1", []api.ExtraNodeAllocatableResource{
 					{
-						ResourceClaimName: "claim-1",
+						Source: api.ExtraNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "claim-1"},
 						Mapping: []api.NodeAllocatableMappedResources{
 							{Name: "cpu", Quantity: new(apiresource.MustParse("1"))},
 						},
 					},
 				}),
-				update: makePodWithNodeAllocatableResourceClaimStatuses("claim-1", []api.NodeAllocatableResourceClaimStatus{
+				update: makePodWithExtraNodeAllocatableResources("claim-1", []api.ExtraNodeAllocatableResource{
 					{
-						ResourceClaimName: "claim-1",
+						Source: api.ExtraNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "claim-1"},
 						Mapping: []api.NodeAllocatableMappedResources{
 							{Name: "cpu", Quantity: new(apiresource.MustParse("1"))},
 						},
@@ -217,10 +217,10 @@ func TestDeclarativeValidateNodeAllocatableStatus(t *testing.T) {
 			},
 
 			"invalid: status overhead both perPod and perContainer nil": {
-				old: makePodWithNodeAllocatableResourceClaimStatuses("", nil),
-				update: makePodWithNodeAllocatableResourceClaimStatuses("claim-1", []api.NodeAllocatableResourceClaimStatus{
+				old: makePodWithExtraNodeAllocatableResources("", nil),
+				update: makePodWithExtraNodeAllocatableResources("claim-1", []api.ExtraNodeAllocatableResource{
 					{
-						ResourceClaimName: "claim-1",
+						Source: api.ExtraNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "claim-1"},
 						Overhead: []api.NodeAllocatableOverheadResources{
 							{Name: "cpu"},
 						},
@@ -228,14 +228,14 @@ func TestDeclarativeValidateNodeAllocatableStatus(t *testing.T) {
 				}),
 				subresource: "/status",
 				expectedErrs: field.ErrorList{
-					field.Invalid(field.NewPath("status", "nodeAllocatableResourceClaimStatuses").Index(0).Child("overhead").Index(0), "", "at least one of perPod or perContainer must be set").MarkFromImperative(),
+					field.Invalid(field.NewPath("status", "extraNodeAllocatableResources").Index(0).Child("overhead").Index(0), "", "at least one of perPod or perContainer must be set").MarkFromImperative(),
 				},
 			},
 			"invalid: status overhead perPod negative": {
-				old: makePodWithNodeAllocatableResourceClaimStatuses("", nil),
-				update: makePodWithNodeAllocatableResourceClaimStatuses("claim-1", []api.NodeAllocatableResourceClaimStatus{
+				old: makePodWithExtraNodeAllocatableResources("", nil),
+				update: makePodWithExtraNodeAllocatableResources("claim-1", []api.ExtraNodeAllocatableResource{
 					{
-						ResourceClaimName: "claim-1",
+						Source: api.ExtraNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "claim-1"},
 						Overhead: []api.NodeAllocatableOverheadResources{
 							{Name: "cpu", PerPod: new(apiresource.MustParse("-100m"))},
 						},
@@ -243,14 +243,14 @@ func TestDeclarativeValidateNodeAllocatableStatus(t *testing.T) {
 				}),
 				subresource: "/status",
 				expectedErrs: field.ErrorList{
-					field.Invalid(field.NewPath("status", "nodeAllocatableResourceClaimStatuses").Index(0).Child("overhead").Index(0).Child("perPod"), "-100m", "must be non-negative").MarkFromImperative(),
+					field.Invalid(field.NewPath("status", "extraNodeAllocatableResources").Index(0).Child("overhead").Index(0).Child("perPod"), "-100m", "must be non-negative").MarkFromImperative(),
 				},
 			},
 			"invalid: status mapping duplicate resource name": {
-				old: makePodWithNodeAllocatableResourceClaimStatuses("", nil),
-				update: makePodWithNodeAllocatableResourceClaimStatuses("claim-1", []api.NodeAllocatableResourceClaimStatus{
+				old: makePodWithExtraNodeAllocatableResources("", nil),
+				update: makePodWithExtraNodeAllocatableResources("claim-1", []api.ExtraNodeAllocatableResource{
 					{
-						ResourceClaimName: "claim-1",
+						Source: api.ExtraNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "claim-1"},
 						Mapping: []api.NodeAllocatableMappedResources{
 							{Name: "cpu", Quantity: new(apiresource.MustParse("1"))},
 							{Name: "cpu", Quantity: new(apiresource.MustParse("2"))},
@@ -259,20 +259,20 @@ func TestDeclarativeValidateNodeAllocatableStatus(t *testing.T) {
 				}),
 				subresource: "/status",
 				expectedErrs: field.ErrorList{
-					field.Duplicate(field.NewPath("status", "nodeAllocatableResourceClaimStatuses").Index(0).Child("mapping").Index(1), "cpu"),
+					field.Duplicate(field.NewPath("status", "extraNodeAllocatableResources").Index(0).Child("mapping").Index(1), "cpu"),
 				},
 			},
-			"invalid status: duplicate claim status name": {
-				old: makePodWithNodeAllocatableResourceClaimStatuses("", nil),
-				update: makePodWithNodeAllocatableResourceClaimStatuses("claim-1", []api.NodeAllocatableResourceClaimStatus{
+			"invalid status: duplicate source": {
+				old: makePodWithExtraNodeAllocatableResources("", nil),
+				update: makePodWithExtraNodeAllocatableResources("claim-1", []api.ExtraNodeAllocatableResource{
 					{
-						ResourceClaimName: "claim-1",
+						Source: api.ExtraNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "claim-1"},
 						Mapping: []api.NodeAllocatableMappedResources{
 							{Name: "cpu", Quantity: new(apiresource.MustParse("1"))},
 						},
 					},
 					{
-						ResourceClaimName: "claim-1",
+						Source: api.ExtraNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "claim-1"},
 						Mapping: []api.NodeAllocatableMappedResources{
 							{Name: "memory", Quantity: new(apiresource.MustParse("1G"))},
 						},
@@ -280,15 +280,15 @@ func TestDeclarativeValidateNodeAllocatableStatus(t *testing.T) {
 				}),
 				subresource: "/status",
 				expectedErrs: field.ErrorList{
-					field.Duplicate(field.NewPath("status", "nodeAllocatableResourceClaimStatuses").Index(1), "claim-1"),
+					field.Duplicate(field.NewPath("status", "extraNodeAllocatableResources").Index(1).Child("source"), api.ExtraNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "claim-1"}).MarkFromImperative(),
 				},
 			},
 			"invalid status: duplicate container name": {
-				old: makePodWithNodeAllocatableResourceClaimStatuses("", nil),
-				update: makePodWithNodeAllocatableResourceClaimStatuses("claim-1", []api.NodeAllocatableResourceClaimStatus{
+				old: makePodWithExtraNodeAllocatableResources("", nil),
+				update: makePodWithExtraNodeAllocatableResources("claim-1", []api.ExtraNodeAllocatableResource{
 					{
-						ResourceClaimName: "claim-1",
-						Containers:        []string{"c1", "c1"},
+						Source:     api.ExtraNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "claim-1"},
+						Containers: []string{"ctr", "ctr"},
 						Mapping: []api.NodeAllocatableMappedResources{
 							{Name: "cpu", Quantity: new(apiresource.MustParse("1"))},
 						},
@@ -296,14 +296,14 @@ func TestDeclarativeValidateNodeAllocatableStatus(t *testing.T) {
 				}),
 				subresource: "/status",
 				expectedErrs: field.ErrorList{
-					field.Duplicate(field.NewPath("status", "nodeAllocatableResourceClaimStatuses").Index(0).Child("containers").Index(1), "c1"),
+					field.Duplicate(field.NewPath("status", "extraNodeAllocatableResources").Index(0).Child("containers").Index(1), "ctr"),
 				},
 			},
 			"invalid status: mapping name required": {
-				old: makePodWithNodeAllocatableResourceClaimStatuses("", nil),
-				update: makePodWithNodeAllocatableResourceClaimStatuses("claim-1", []api.NodeAllocatableResourceClaimStatus{
+				old: makePodWithExtraNodeAllocatableResources("", nil),
+				update: makePodWithExtraNodeAllocatableResources("claim-1", []api.ExtraNodeAllocatableResource{
 					{
-						ResourceClaimName: "claim-1",
+						Source: api.ExtraNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "claim-1"},
 						Mapping: []api.NodeAllocatableMappedResources{
 							{Quantity: new(apiresource.MustParse("1"))},
 						},
@@ -311,15 +311,15 @@ func TestDeclarativeValidateNodeAllocatableStatus(t *testing.T) {
 				}),
 				subresource: "/status",
 				expectedErrs: field.ErrorList{
-					field.Required(field.NewPath("status", "nodeAllocatableResourceClaimStatuses").Index(0).Child("mapping").Index(0).Child("name"), ""),
-					field.Invalid(field.NewPath("status", "nodeAllocatableResourceClaimStatuses").Index(0).Child("mapping").Index(0).Child("name"), api.ResourceName(""), "must be a node allocatable resource name").MarkFromImperative(),
+					field.Required(field.NewPath("status", "extraNodeAllocatableResources").Index(0).Child("mapping").Index(0).Child("name"), ""),
+					field.Invalid(field.NewPath("status", "extraNodeAllocatableResources").Index(0).Child("mapping").Index(0).Child("name"), api.ResourceName(""), "must be a node allocatable resource name").MarkFromImperative(),
 				},
 			},
 			"invalid status: mapping quantity required": {
-				old: makePodWithNodeAllocatableResourceClaimStatuses("", nil),
-				update: makePodWithNodeAllocatableResourceClaimStatuses("claim-1", []api.NodeAllocatableResourceClaimStatus{
+				old: makePodWithExtraNodeAllocatableResources("", nil),
+				update: makePodWithExtraNodeAllocatableResources("claim-1", []api.ExtraNodeAllocatableResource{
 					{
-						ResourceClaimName: "claim-1",
+						Source: api.ExtraNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "claim-1"},
 						Mapping: []api.NodeAllocatableMappedResources{
 							{Name: "cpu"},
 						},
@@ -327,14 +327,14 @@ func TestDeclarativeValidateNodeAllocatableStatus(t *testing.T) {
 				}),
 				subresource: "/status",
 				expectedErrs: field.ErrorList{
-					field.Required(field.NewPath("status", "nodeAllocatableResourceClaimStatuses").Index(0).Child("mapping").Index(0).Child("quantity"), ""),
+					field.Required(field.NewPath("status", "extraNodeAllocatableResources").Index(0).Child("mapping").Index(0).Child("quantity"), ""),
 				},
 			},
 			"invalid status: duplicate overhead resource name": {
-				old: makePodWithNodeAllocatableResourceClaimStatuses("", nil),
-				update: makePodWithNodeAllocatableResourceClaimStatuses("claim-1", []api.NodeAllocatableResourceClaimStatus{
+				old: makePodWithExtraNodeAllocatableResources("", nil),
+				update: makePodWithExtraNodeAllocatableResources("claim-1", []api.ExtraNodeAllocatableResource{
 					{
-						ResourceClaimName: "claim-1",
+						Source: api.ExtraNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "claim-1"},
 						Overhead: []api.NodeAllocatableOverheadResources{
 							{Name: "cpu", PerPod: new(apiresource.MustParse("100m"))},
 							{Name: "cpu", PerPod: new(apiresource.MustParse("200m"))},
@@ -343,14 +343,14 @@ func TestDeclarativeValidateNodeAllocatableStatus(t *testing.T) {
 				}),
 				subresource: "/status",
 				expectedErrs: field.ErrorList{
-					field.Duplicate(field.NewPath("status", "nodeAllocatableResourceClaimStatuses").Index(0).Child("overhead").Index(1), "cpu"),
+					field.Duplicate(field.NewPath("status", "extraNodeAllocatableResources").Index(0).Child("overhead").Index(1), "cpu"),
 				},
 			},
 			"invalid status: overhead name required": {
-				old: makePodWithNodeAllocatableResourceClaimStatuses("", nil),
-				update: makePodWithNodeAllocatableResourceClaimStatuses("claim-1", []api.NodeAllocatableResourceClaimStatus{
+				old: makePodWithExtraNodeAllocatableResources("", nil),
+				update: makePodWithExtraNodeAllocatableResources("claim-1", []api.ExtraNodeAllocatableResource{
 					{
-						ResourceClaimName: "claim-1",
+						Source: api.ExtraNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "claim-1"},
 						Overhead: []api.NodeAllocatableOverheadResources{
 							{PerPod: new(apiresource.MustParse("100m"))},
 						},
@@ -358,13 +358,13 @@ func TestDeclarativeValidateNodeAllocatableStatus(t *testing.T) {
 				}),
 				subresource: "/status",
 				expectedErrs: field.ErrorList{
-					field.Required(field.NewPath("status", "nodeAllocatableResourceClaimStatuses").Index(0).Child("overhead").Index(0).Child("name"), ""),
-					field.Invalid(field.NewPath("status", "nodeAllocatableResourceClaimStatuses").Index(0).Child("overhead").Index(0).Child("name"), api.ResourceName(""), "must be a node allocatable resource name").MarkFromImperative(),
+					field.Required(field.NewPath("status", "extraNodeAllocatableResources").Index(0).Child("overhead").Index(0).Child("name"), ""),
+					field.Invalid(field.NewPath("status", "extraNodeAllocatableResources").Index(0).Child("overhead").Index(0).Child("name"), api.ResourceName(""), "must be a node allocatable resource name").MarkFromImperative(),
 				},
 			},
-			"invalid status: resourceClaimName required": {
-				old: makePodWithNodeAllocatableResourceClaimStatuses("", nil),
-				update: makePodWithNodeAllocatableResourceClaimStatuses("", []api.NodeAllocatableResourceClaimStatus{
+			"invalid status: source apiGroup, kind and name required": {
+				old: makePodWithExtraNodeAllocatableResources("", nil),
+				update: makePodWithExtraNodeAllocatableResources("", []api.ExtraNodeAllocatableResource{
 					{
 						Mapping: []api.NodeAllocatableMappedResources{
 							{Name: "cpu", Quantity: new(apiresource.MustParse("1"))},
@@ -373,14 +373,46 @@ func TestDeclarativeValidateNodeAllocatableStatus(t *testing.T) {
 				}),
 				subresource: "/status",
 				expectedErrs: field.ErrorList{
-					field.Required(field.NewPath("status", "nodeAllocatableResourceClaimStatuses").Index(0).Child("resourceClaimName"), ""),
+					field.Required(field.NewPath("status", "extraNodeAllocatableResources").Index(0).Child("source", "apiGroup"), ""),
+					field.Required(field.NewPath("status", "extraNodeAllocatableResources").Index(0).Child("source", "kind"), ""),
+					field.Required(field.NewPath("status", "extraNodeAllocatableResources").Index(0).Child("source", "name"), ""),
+				},
+			},
+			"invalid status: source apiGroup required": {
+				old: makePodWithExtraNodeAllocatableResources("claim-1", nil),
+				update: makePodWithExtraNodeAllocatableResources("claim-1", []api.ExtraNodeAllocatableResource{
+					{
+						Source: api.ExtraNodeAllocatableReference{Kind: "ResourceClaim", Name: "claim-1"},
+						Mapping: []api.NodeAllocatableMappedResources{
+							{Name: "cpu", Quantity: new(apiresource.MustParse("1"))},
+						},
+					},
+				}),
+				subresource: "/status",
+				expectedErrs: field.ErrorList{
+					field.Required(field.NewPath("status", "extraNodeAllocatableResources").Index(0).Child("source", "apiGroup"), ""),
+				},
+			},
+			"invalid status: source apiGroup format": {
+				old: makePodWithExtraNodeAllocatableResources("", nil),
+				update: makePodWithExtraNodeAllocatableResources("", []api.ExtraNodeAllocatableResource{
+					{
+						Source: api.ExtraNodeAllocatableReference{APIGroup: "INVALID.example.com", Kind: "CustomClaim", Name: "custom-source-1"},
+						Mapping: []api.NodeAllocatableMappedResources{
+							{Name: "cpu", Quantity: new(apiresource.MustParse("1"))},
+						},
+					},
+				}),
+				subresource: "/status",
+				expectedErrs: field.ErrorList{
+					field.Invalid(field.NewPath("status", "extraNodeAllocatableResources").Index(0).Child("source", "apiGroup"), nil, "").WithOrigin("format=k8s-long-name"),
 				},
 			},
 			"invalid status: mapping name not a standard container resource": {
-				old: makePodWithNodeAllocatableResourceClaimStatuses("", nil),
-				update: makePodWithNodeAllocatableResourceClaimStatuses("claim-1", []api.NodeAllocatableResourceClaimStatus{
+				old: makePodWithExtraNodeAllocatableResources("", nil),
+				update: makePodWithExtraNodeAllocatableResources("claim-1", []api.ExtraNodeAllocatableResource{
 					{
-						ResourceClaimName: "claim-1",
+						Source: api.ExtraNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "claim-1"},
 						Mapping: []api.NodeAllocatableMappedResources{
 							{Name: "abc", Quantity: new(apiresource.MustParse("1"))},
 						},
@@ -388,14 +420,14 @@ func TestDeclarativeValidateNodeAllocatableStatus(t *testing.T) {
 				}),
 				subresource: "/status",
 				expectedErrs: field.ErrorList{
-					field.Invalid(field.NewPath("status", "nodeAllocatableResourceClaimStatuses").Index(0).Child("mapping").Index(0).Child("name"), api.ResourceName("abc"), "must be a node allocatable resource name").MarkFromImperative(),
+					field.Invalid(field.NewPath("status", "extraNodeAllocatableResources").Index(0).Child("mapping").Index(0).Child("name"), api.ResourceName("abc"), "must be a node allocatable resource name").MarkFromImperative(),
 				},
 			},
 			"invalid status: mapping name ephemeral-storage": {
-				old: makePodWithNodeAllocatableResourceClaimStatuses("", nil),
-				update: makePodWithNodeAllocatableResourceClaimStatuses("claim-1", []api.NodeAllocatableResourceClaimStatus{
+				old: makePodWithExtraNodeAllocatableResources("", nil),
+				update: makePodWithExtraNodeAllocatableResources("claim-1", []api.ExtraNodeAllocatableResource{
 					{
-						ResourceClaimName: "claim-1",
+						Source: api.ExtraNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "claim-1"},
 						Mapping: []api.NodeAllocatableMappedResources{
 							{Name: "ephemeral-storage", Quantity: new(apiresource.MustParse("1Gi"))},
 						},
@@ -403,14 +435,14 @@ func TestDeclarativeValidateNodeAllocatableStatus(t *testing.T) {
 				}),
 				subresource: "/status",
 				expectedErrs: field.ErrorList{
-					field.Invalid(field.NewPath("status", "nodeAllocatableResourceClaimStatuses").Index(0).Child("mapping").Index(0).Child("name"), api.ResourceName("ephemeral-storage"), "must be a node allocatable resource name").MarkFromImperative(),
+					field.Invalid(field.NewPath("status", "extraNodeAllocatableResources").Index(0).Child("mapping").Index(0).Child("name"), api.ResourceName("ephemeral-storage"), "must be a node allocatable resource name").MarkFromImperative(),
 				},
 			},
 			"invalid status: overhead name in kubernetes.io namespace": {
-				old: makePodWithNodeAllocatableResourceClaimStatuses("", nil),
-				update: makePodWithNodeAllocatableResourceClaimStatuses("claim-1", []api.NodeAllocatableResourceClaimStatus{
+				old: makePodWithExtraNodeAllocatableResources("", nil),
+				update: makePodWithExtraNodeAllocatableResources("claim-1", []api.ExtraNodeAllocatableResource{
 					{
-						ResourceClaimName: "claim-1",
+						Source: api.ExtraNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "claim-1"},
 						Overhead: []api.NodeAllocatableOverheadResources{
 							{Name: "kubernetes.io/foo", PerPod: new(apiresource.MustParse("100m"))},
 						},
@@ -418,14 +450,14 @@ func TestDeclarativeValidateNodeAllocatableStatus(t *testing.T) {
 				}),
 				subresource: "/status",
 				expectedErrs: field.ErrorList{
-					field.Invalid(field.NewPath("status", "nodeAllocatableResourceClaimStatuses").Index(0).Child("overhead").Index(0).Child("name"), api.ResourceName("kubernetes.io/foo"), "must be a node allocatable resource name").MarkFromImperative(),
+					field.Invalid(field.NewPath("status", "extraNodeAllocatableResources").Index(0).Child("overhead").Index(0).Child("name"), api.ResourceName("kubernetes.io/foo"), "must be a node allocatable resource name").MarkFromImperative(),
 				},
 			},
 			"valid status: hugepages mapping name": {
-				old: makePodWithNodeAllocatableResourceClaimStatuses("", nil),
-				update: makePodWithNodeAllocatableResourceClaimStatuses("claim-1", []api.NodeAllocatableResourceClaimStatus{
+				old: makePodWithExtraNodeAllocatableResources("", nil),
+				update: makePodWithExtraNodeAllocatableResources("claim-1", []api.ExtraNodeAllocatableResource{
 					{
-						ResourceClaimName: "claim-1",
+						Source: api.ExtraNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "claim-1"},
 						Mapping: []api.NodeAllocatableMappedResources{
 							{Name: "hugepages-2Mi", Quantity: new(apiresource.MustParse("2Mi"))},
 						},
@@ -580,7 +612,7 @@ func makePodVolumeHealthConditions(count int) []api.VolumeHealthCondition {
 	return conditions
 }
 
-func makePodWithNodeAllocatableResourceClaimStatuses(claimName string, statuses []api.NodeAllocatableResourceClaimStatus) *api.Pod {
+func makePodWithExtraNodeAllocatableResources(claimName string, resources []api.ExtraNodeAllocatableResource) *api.Pod {
 	pod := podtest.MakePod("foo")
 	if claimName != "" {
 		pod.Spec.ResourceClaims = []api.PodResourceClaim{
@@ -590,6 +622,6 @@ func makePodWithNodeAllocatableResourceClaimStatuses(claimName string, statuses 
 			},
 		}
 	}
-	pod.Status.NodeAllocatableResourceClaimStatuses = statuses
+	pod.Status.ExtraNodeAllocatableResources = resources
 	return pod
 }
