@@ -28,7 +28,8 @@ import (
 
 func TestCorrectness(t *testing.T) {
 	versioner := &storage.APIObjectVersioner{}
-	model := NewEmptyModel("", func() runtime.Object { return &example.Pod{} }, func() runtime.Object { return &example.PodList{} }, versioner)
+	newPod := func() runtime.Object { return &example.Pod{} }
+	model := NewEmptyModel("", newPod, func() runtime.Object { return &example.PodList{} }, versioner)
 	steps := correctnessTestSteps()
 	history := make([]Operation, len(steps))
 	for i, step := range steps {
@@ -72,9 +73,7 @@ func TestCorrectness(t *testing.T) {
 				require.NoError(t, validator.ValidateWatch(tc.Request, WatchResponse{Err: tc.ExpectError}))
 				return
 			}
-			requestedRV, err := versioner.ParseResourceVersion(tc.Request.Options.ResourceVersion)
-			require.NoError(t, err)
-			events, err := replay.Events(tc.Request, &ResourceVersionRange{Min: requestedRV + 1, Max: model.ResourceVersion + 1})
+			events, err := replay.Watch(tc.Request)
 			require.NoError(t, err)
 			require.NoError(t, validator.ValidateWatch(tc.Request, WatchResponse{Events: events}))
 		})

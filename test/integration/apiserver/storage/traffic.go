@@ -70,6 +70,11 @@ const (
 	RVCurrent WatchRequestType = "RVCurrent"
 	RVPast    WatchRequestType = "RVPast"
 	RVFuture  WatchRequestType = "RVFuture"
+
+	WatchListRVEmpty   WatchRequestType = "WatchListRVEmpty"
+	WatchListRVZero    WatchRequestType = "WatchListRVZero"
+	WatchListRVCurrent WatchRequestType = "WatchListRVCurrent"
+	WatchListRVPast    WatchRequestType = "WatchListRVPast"
 )
 
 type UnaryConfig struct {
@@ -481,6 +486,7 @@ func runTraffic(ctx context.Context, store storage.Interface, request *correctne
 
 func randomWatchRequest(ctx context.Context, store storage.Interface, distribution []ChoiceWeight[WatchRequestType]) correctness.WatchRequest {
 	var rv string
+	watchList := false
 	switch selected := PickRandom(distribution); selected {
 	case RVEmpty:
 		rv = ""
@@ -494,11 +500,24 @@ func randomWatchRequest(ctx context.Context, store storage.Interface, distributi
 		rv = relativeRV(ctx, store, -int64(1+rand.Intn(10)))
 	case RVFuture:
 		rv = relativeRV(ctx, store, int64(1+rand.Intn(10)))
+	case WatchListRVEmpty:
+		rv, watchList = "", true
+	case WatchListRVZero:
+		rv, watchList = "0", true
+	case WatchListRVCurrent:
+		rv, watchList = relativeRV(ctx, store, 0), true
+	case WatchListRVPast:
+		rv, watchList = relativeRV(ctx, store, -int64(1+rand.Intn(10))), true
 	default:
 		panic(fmt.Sprintf("%v: unknown watch request type", selected))
 	}
 	opts := storage.ListOptions{ResourceVersion: rv, Predicate: storage.Everything, Recursive: true}
-	if rv == "" || rv == "0" {
+	switch {
+	case watchList:
+		opts.Predicate.AllowWatchBookmarks = true
+		opts.SendInitialEvents = new(true)
+		opts.ResourceVersionMatch = metav1.ResourceVersionMatchNotOlderThan
+	case rv == "" || rv == "0":
 		// Otherwise storage starts with synthetic ADDED events for existing
 		// objects. API validation requires the match with sendInitialEvents.
 		opts.SendInitialEvents = new(false)

@@ -19,10 +19,13 @@ package correctness
 import (
 	"fmt"
 	"reflect"
+	"strconv"
 
 	"github.com/google/go-cmp/cmp"
 
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/storage"
 )
@@ -30,9 +33,11 @@ import (
 // Replay stores historical model states keyed by ResourceVersion and the
 // sequence of changes produced by replaying history.
 type Replay struct {
+	newFunc   func() runtime.Object
 	versioner storage.Versioner
-	states    map[uint64]*Model
-	changes   []Change
+
+	states  map[uint64]*Model
+	changes []Change
 }
 
 // NewReplay creates a Replay initialized with initialState and replays history on it.
@@ -54,6 +59,7 @@ func NewReplay(initialState *Model, history []Operation) (*Replay, error) {
 		}
 	}
 	return &Replay{
+		newFunc:   initialState.NewFunc,
 		versioner: initialState.Versioner,
 		states:    states,
 		changes:   changes,
@@ -88,7 +94,46 @@ func (r *Replay) Validate(req Request, resp Response) error {
 	return nil
 }
 
-func (r *Replay) Events(request WatchRequest, rvRange *ResourceVersionRange) ([]watch.Event, error) {
+func (r *Replay) Watch(request WatchRequest) ([]watch.Event, error) {
+	var events []watch.Event
+	rv := r.ResourceVersion()
+	requestedRV, err := r.versioner.ParseResourceVersion(request.Options.ResourceVersion)
+	if err != nil {
+		return nil, err
+	}
+	if request.Options.SendInitialEvents != nil && *request.Options.SendInitialEvents {
+		initialEvents, err := r.InitialEvents(request, rv)
+		if err != nil {
+			return nil, err
+		}
+		events = append(events, initialEvents...)
+		bookmark := r.newFunc()
+		accessor, err := meta.Accessor(bookmark)
+		if err != nil {
+			return nil, err
+		}
+		accessor.SetResourceVersion(strconv.FormatUint(rv, 10))
+		accessor.SetAnnotations(map[string]string{metav1.InitialEventsAnnotationKey: "true"})
+		events = append(events, watch.Event{Type: watch.Bookmark, Object: bookmark})
+		requestedRV = rv
+	}
+	streamEvents, err := r.EventsForRVs(request, &ResourceVersionRange{Min: requestedRV + 1, Max: rv + 1})
+	if err != nil {
+		return nil, err
+	}
+	events = append(events, streamEvents...)
+	return events, nil
+}
+
+func (r *Replay) InitialEvents(request WatchRequest, rv uint64) ([]watch.Event, error) {
+	state, ok := r.states[rv]
+	if !ok {
+		return nil, fmt.Errorf("resource version %d not found in history", rv)
+	}
+	return state.initialEvents(request)
+}
+
+func (r *Replay) EventsForRVs(request WatchRequest, rvRange *ResourceVersionRange) ([]watch.Event, error) {
 	filtered := make([]watch.Event, 0, len(r.changes))
 	for _, change := range r.changes {
 		if change.ResourceVersion < rvRange.Min || change.ResourceVersion >= rvRange.Max {
@@ -106,6 +151,10 @@ func (r *Replay) Events(request WatchRequest, rvRange *ResourceVersionRange) ([]
 		}
 	}
 	return filtered, nil
+}
+
+func (r *Replay) ResourceVersion() uint64 {
+	return r.changes[len(r.changes)-1].ResourceVersion
 }
 
 func (r *Replay) LastWatchRV(request WatchRequest) (uint64, error) {

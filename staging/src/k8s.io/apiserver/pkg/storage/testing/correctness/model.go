@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/storage"
 )
 
@@ -335,6 +336,27 @@ func keyInScope(key string, recursive bool, k string) bool {
 func checkKey(key string, recursive bool) error {
 	_, err := storage.PrepareKey("", key, recursive)
 	return err
+}
+
+func (s *Model) initialEvents(request WatchRequest) ([]watch.Event, error) {
+	var events []watch.Event
+	for _, k := range slices.Sorted(maps.Keys(s.Items)) {
+		if !keyInScope(request.Key, request.Options.Recursive, k) {
+			continue
+		}
+		obj := s.Items[k]
+		matches, err := request.Options.Predicate.Matches(obj)
+		if err != nil {
+			return nil, err
+		}
+		if matches {
+			events = append(events, watch.Event{
+				Type:   watch.Added,
+				Object: obj.DeepCopyObject(),
+			})
+		}
+	}
+	return events, nil
 }
 
 func (s *Model) delete(ctx context.Context, key string, preconditions *storage.Preconditions, validateDeletion storage.ValidateObjectFunc) (Response, *Change) {
