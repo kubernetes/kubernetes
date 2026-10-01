@@ -881,12 +881,15 @@ func TestQuantityReadsDoNotMutate(t *testing.T) {
 		{"CmpInt64", func(q *Quantity, _ Quantity) *inf.Dec { q.CmpInt64(7); return nil }},
 		{"AsDec", func(q *Quantity, _ Quantity) *inf.Dec { return q.AsDec() }},
 		{"DeepCopy", func(q *Quantity, _ Quantity) *inf.Dec { return q.DeepCopy().d.Dec }},
+		{"DeepCopyInto", func(q *Quantity, _ Quantity) *inf.Dec { var acc Quantity; q.DeepCopyInto(&acc); return acc.d.Dec }},
 		{"AsFloat64Slow", func(q *Quantity, _ Quantity) *inf.Dec { q.AsFloat64Slow(); return nil }},
 		{"AsApproximateFloat64", func(q *Quantity, _ Quantity) *inf.Dec { q.AsApproximateFloat64(); return nil }},
 		{"AsInt64", func(q *Quantity, _ Quantity) *inf.Dec { q.AsInt64(); return nil }},
 		{"AsScaledInt64", func(q *Quantity, _ Quantity) *inf.Dec { q.AsScaledInt64(Milli); return nil }},
+		{"AsMilliInt64", func(q *Quantity, _ Quantity) *inf.Dec { q.AsMilliInt64(); return nil }},
 		{"Value", func(q *Quantity, _ Quantity) *inf.Dec { q.Value(); return nil }},
 		{"MilliValue", func(q *Quantity, _ Quantity) *inf.Dec { q.MilliValue(); return nil }},
+		{"ScaledValue", func(q *Quantity, _ Quantity) *inf.Dec { q.ScaledValue(Kilo); return nil }},
 		{"AsScale", func(q *Quantity, _ Quantity) *inf.Dec { q.AsScale(0); return nil }},
 		{"AsCanonicalBytes", func(q *Quantity, _ Quantity) *inf.Dec { q.AsCanonicalBytes(nil); return nil }},
 		{"CanonicalizeBytes", func(q *Quantity, _ Quantity) *inf.Dec { q.CanonicalizeBytes(nil); return nil }},
@@ -894,8 +897,36 @@ func TestQuantityReadsDoNotMutate(t *testing.T) {
 		{"IsZero", func(q *Quantity, _ Quantity) *inf.Dec { q.IsZero(); return nil }},
 		{"String", func(q *Quantity, _ Quantity) *inf.Dec { _ = q.String(); return nil }},
 		{"MarshalJSON", func(q *Quantity, _ Quantity) *inf.Dec { _, _ = q.MarshalJSON(); return nil }},
+		{"MarshalCBOR", func(q *Quantity, _ Quantity) *inf.Dec { _, _ = q.MarshalCBOR(); return nil }},
+		{"Marshal", func(q *Quantity, _ Quantity) *inf.Dec { _, _ = q.Marshal(); return nil }},
+		{"Size", func(q *Quantity, _ Quantity) *inf.Dec { q.Size(); return nil }},
+		{"ToUnstructured", func(q *Quantity, _ Quantity) *inf.Dec { q.ToUnstructured(); return nil }},
 		{"Add argument", func(q *Quantity, y Quantity) *inf.Dec { acc := y.DeepCopy(); acc.Add(*q); return acc.d.Dec }},
 		{"Sub argument", func(q *Quantity, y Quantity) *inf.Dec { acc := y.DeepCopy(); acc.Sub(*q); return acc.d.Dec }},
+		{"RoundUp", func(q *Quantity, _ Quantity) *inf.Dec { acc := *q; acc.RoundUp(0); return acc.d.Dec }},
+		{"ToDec", func(q *Quantity, _ Quantity) *inf.Dec { acc := *q; acc.ToDec(); return nil }},
+		{"Set", func(q *Quantity, y Quantity) *inf.Dec { acc := *q; acc.Set(y.Value()); return acc.d.Dec }},
+		{"SetMilli", func(q *Quantity, y Quantity) *inf.Dec { acc := *q; acc.SetMilli(y.Value()); return acc.d.Dec }},
+		{"SetScaled", func(q *Quantity, y Quantity) *inf.Dec { acc := *q; acc.SetScaled(y.Value(), 3); return acc.d.Dec }},
+		{"CacheString", func(q *Quantity, _ Quantity) *inf.Dec { acc := *q; acc.CacheString(); return nil }},
+		{"UnmarshalJSON", func(q *Quantity, y Quantity) *inf.Dec {
+			acc := *q
+			b, _ := y.MarshalJSON()
+			_ = acc.UnmarshalJSON(b)
+			return acc.d.Dec
+		}},
+		{"UnmarshalCBOR", func(q *Quantity, y Quantity) *inf.Dec {
+			acc := *q
+			b, _ := y.MarshalCBOR()
+			_ = acc.UnmarshalCBOR(b)
+			return acc.d.Dec
+		}},
+		{"Unmarshal", func(q *Quantity, y Quantity) *inf.Dec {
+			acc := *q
+			b, _ := y.Marshal()
+			_ = acc.Unmarshal(b)
+			return acc.d.Dec
+		}},
 	}
 	for _, read := range reads {
 		t.Run(read.name, func(t *testing.T) {
@@ -912,6 +943,7 @@ func TestQuantityReadsDoNotMutate(t *testing.T) {
 				{"-50k uncached", intQuantity(-50, 3, BinarySI)},
 				{"dec 1.5Gi", MustParse("1.5Gi")},
 				{"dec 1.5 uncached", decQuantity(15, -1, DecimalSI)},
+				{"-9223372036854775808", MustParse("-9223372036854775808")},
 				{"dec -9223372036854775809", MustParse("-9223372036854775809")},
 				{"dec 9223372036854775807", toDec(MustParse("9223372036854775807"))},
 			}
