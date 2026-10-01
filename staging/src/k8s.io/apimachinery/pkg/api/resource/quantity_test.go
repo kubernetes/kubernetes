@@ -527,6 +527,10 @@ func TestQuantityParse(t *testing.T) {
 				if c := q.Cmp(got); c != 0 {
 					t.Errorf("%v: round trip from decimal back to quantity is not comparable: %d: %#v vs %#v", item.input, c, got, q)
 				}
+				copied.UnscaledBig().SetInt64(0x5a5a5a5a)
+				if c := q.Cmp(got); c != 0 {
+					t.Errorf("%v: NewDecimalQuantity returned memory shared with its argument", item.input)
+				}
 			}
 
 			// verify that we can decompose the input and get the same result by building up from the base.
