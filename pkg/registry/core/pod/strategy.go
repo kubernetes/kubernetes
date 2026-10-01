@@ -249,8 +249,8 @@ func (podStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.
 	if newPod.Status.ExtendedResourceClaimStatus == nil && oldPod.Status.ExtendedResourceClaimStatus != nil {
 		newPod.Status.ExtendedResourceClaimStatus = oldPod.Status.ExtendedResourceClaimStatus
 	}
-	if newPod.Status.NodeAllocatableResourceClaimStatuses == nil && oldPod.Status.NodeAllocatableResourceClaimStatuses != nil {
-		newPod.Status.NodeAllocatableResourceClaimStatuses = oldPod.Status.NodeAllocatableResourceClaimStatuses
+	if newPod.Status.AdditionalNodeAllocatableResources == nil && oldPod.Status.AdditionalNodeAllocatableResources != nil {
+		newPod.Status.AdditionalNodeAllocatableResources = oldPod.Status.AdditionalNodeAllocatableResources
 	}
 
 	preserveOldObservedGeneration(newPod, oldPod)

@@ -660,9 +660,9 @@ func TestAdmissionCheck(t *testing.T) {
 			node: st.MakeNode().Name("fake-node").Capacity(nodeCPUCapacity).Obj(),
 			pod: func() *v1.Pod {
 				p := st.MakePod().Name("pod1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj()
-				p.Status.NodeAllocatableResourceClaimStatuses = []v1.NodeAllocatableResourceClaimStatus{
+				p.Status.AdditionalNodeAllocatableResources = []v1.AdditionalNodeAllocatableResource{
 					{
-						ResourceClaimName: "node-allocatable-claim",
+						Source: v1.AdditionalNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "node-allocatable-claim"},
 						Mapping: []v1.NodeAllocatableMappedResources{{
 							Name:     v1.ResourceCPU,
 							Quantity: new(resource.MustParse("8")),
@@ -679,9 +679,9 @@ func TestAdmissionCheck(t *testing.T) {
 			node: st.MakeNode().Name("fake-node").Capacity(nodeCPUCapacity).Obj(),
 			pod: func() *v1.Pod {
 				p := st.MakePod().Name("pod1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj()
-				p.Status.NodeAllocatableResourceClaimStatuses = []v1.NodeAllocatableResourceClaimStatus{
+				p.Status.AdditionalNodeAllocatableResources = []v1.AdditionalNodeAllocatableResource{
 					{
-						ResourceClaimName: "node-allocatable-claim",
+						Source: v1.AdditionalNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "node-allocatable-claim"},
 						Mapping: []v1.NodeAllocatableMappedResources{{
 							Name:     v1.ResourceCPU,
 							Quantity: new(resource.MustParse(nodeCPUCapacity[v1.ResourceCPU])), // We should exceed node capacity since we also request 1 CPU in standard request.
@@ -700,9 +700,9 @@ func TestAdmissionCheck(t *testing.T) {
 				p := st.MakePod().Name("pod1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj()
 				cpuQty := resource.MustParse(nodeCPUCapacity[v1.ResourceCPU])
 				cpuQty.Sub(resource.MustParse("1"))
-				p.Status.NodeAllocatableResourceClaimStatuses = []v1.NodeAllocatableResourceClaimStatus{
+				p.Status.AdditionalNodeAllocatableResources = []v1.AdditionalNodeAllocatableResource{
 					{
-						ResourceClaimName: "node-allocatable-claim",
+						Source: v1.AdditionalNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "node-allocatable-claim"},
 						Mapping: []v1.NodeAllocatableMappedResources{{
 							Name:     v1.ResourceCPU,
 							Quantity: new(cpuQty),
@@ -719,10 +719,10 @@ func TestAdmissionCheck(t *testing.T) {
 			node: st.MakeNode().Name("fake-node").Capacity(nodeCPUCapacity).Obj(),
 			pod: func() *v1.Pod {
 				p := st.MakePod().Name("pod1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj()
-				p.Status.NodeAllocatableResourceClaimStatuses = []v1.NodeAllocatableResourceClaimStatus{
+				p.Status.AdditionalNodeAllocatableResources = []v1.AdditionalNodeAllocatableResource{
 					{
-						ResourceClaimName: "node-allocatable-claim",
-						Containers:        []string{"bar"}, // Default container name created by st.MakePod() is usually "bar" (let's use that or empty containers since it's just PerPod)
+						Source:     v1.AdditionalNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "node-allocatable-claim"},
+						Containers: []string{"bar"}, // Default container name created by st.MakePod() is usually "bar" (let's use that or empty containers since it's just PerPod)
 						Overhead: []v1.NodeAllocatableOverheadResources{{
 							Name:   v1.ResourceCPU,
 							PerPod: new(resource.MustParse(nodeCPUCapacity[v1.ResourceCPU])), // 1 CPU + nodeCPUCapacity CPU > nodeCPUCapacity
@@ -741,10 +741,10 @@ func TestAdmissionCheck(t *testing.T) {
 				p := st.MakePod().Name("pod1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj()
 				cpuQty := resource.MustParse(nodeCPUCapacity[v1.ResourceCPU])
 				cpuQty.Sub(resource.MustParse("1")) // Now cpuQty + 1 CPU (request) = nodeCPUCapacity CPU
-				p.Status.NodeAllocatableResourceClaimStatuses = []v1.NodeAllocatableResourceClaimStatus{
+				p.Status.AdditionalNodeAllocatableResources = []v1.AdditionalNodeAllocatableResource{
 					{
-						ResourceClaimName: "node-allocatable-claim",
-						Containers:        []string{"bar"},
+						Source:     v1.AdditionalNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "node-allocatable-claim"},
+						Containers: []string{"bar"},
 						Overhead: []v1.NodeAllocatableOverheadResources{{
 							Name:   v1.ResourceCPU,
 							PerPod: &cpuQty,

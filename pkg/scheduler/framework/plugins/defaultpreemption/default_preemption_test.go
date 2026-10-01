@@ -678,9 +678,9 @@ type candidate struct {
 
 func TestDryRunPreemption(t *testing.T) {
 	victimPodWithDRANodeAllocatable := st.MakePod().Name("victimPod").UID("p1").Node("node1").Priority(midPriority).Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj()
-	victimPodWithDRANodeAllocatable.Status.NodeAllocatableResourceClaimStatuses = []v1.NodeAllocatableResourceClaimStatus{
+	victimPodWithDRANodeAllocatable.Status.AdditionalNodeAllocatableResources = []v1.AdditionalNodeAllocatableResource{
 		{
-			ResourceClaimName: "claim-1",
+			Source: v1.AdditionalNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "claim-1"},
 			Mapping: []v1.NodeAllocatableMappedResources{
 				{Name: v1.ResourceCPU, Quantity: new(resource.MustParse("2"))},
 			},

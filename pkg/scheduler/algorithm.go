@@ -550,15 +550,15 @@ func (a *SchedulingAlgorithm) prepareAssumedPod(logger klog.Logger, state fwk.Cy
 	assumedPodInfo := podInfo.DeepCopy()
 	assumedPodInfo.Pod.Spec.NodeName = host
 	if utilfeature.DefaultFeatureGate.Enabled(features.DRANodeAllocatableResources) {
-		// If DRANodeAllocatableResources is enabled, copy the calculated node allocatable resource claim status
+		// If DRANodeAllocatableResources is enabled, copy the calculated additional node allocatable resources
 		// from the cycle state to the assumed pod's status. This ensures that the scheduler's
 		// cached version of the pod reflects the node allocatable resources allocated by the DRA plugin
 		// for this scheduling cycle, making this information available for NodeInfo cache update.
-		// Any potential NodeAllocatableResourceClaimStatuses from a previously failed scheduling attempt is overwritten.
+		// Any potential AdditionalNodeAllocatableResources from a previously failed scheduling attempt is overwritten.
 		// This field is not explicitly cleared as the Pod object is reconstructed in handleSchedulingFailure()
 		// before re-queueing.
-		assumedPodInfo.Pod.Status.NodeAllocatableResourceClaimStatuses =
-			dynamicresources.ExtractPodNodeAllocatableResourceClaimStatus(logger, state, host)
+		assumedPodInfo.Pod.Status.AdditionalNodeAllocatableResources =
+			dynamicresources.ExtractPodAdditionalNodeAllocatableResources(logger, state, host)
 	}
 	return assumedPodInfo
 }

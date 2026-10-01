@@ -6335,8 +6335,8 @@ func validateAdditionalNodeAllocatableResources(podStatus core.PodStatus, podSpe
 	// Declarative validation cannot dedupe on a struct key.
 	seenSources := sets.New[core.AdditionalNodeAllocatableReference]()
 	for i, res := range podStatus.AdditionalNodeAllocatableResources {
-		statusFldPath := fldPath.Index(i)
-		sourceFldPath := statusFldPath.Child("source")
+		idxPath := fldPath.Index(i)
+		sourceFldPath := idxPath.Child("source")
 		source := res.Source
 
 		if source.Name != "" {
@@ -6350,10 +6350,10 @@ func validateAdditionalNodeAllocatableResources(podStatus core.PodStatus, podSpe
 		allErrs = append(allErrs, validateAdditionalNodeAllocatableSource(source, podStatus, podSpec, sourceFldPath)...)
 
 		if len(res.Mapping) > 0 {
-			allErrs = append(allErrs, validateNodeAllocatableMappedResources(res.Mapping, statusFldPath.Child("mapping"))...)
+			allErrs = append(allErrs, validateNodeAllocatableMappedResources(res.Mapping, idxPath.Child("mapping"))...)
 		}
 		if len(res.Overhead) > 0 {
-			allErrs = append(allErrs, validateNodeAllocatableOverheadResources(res.Overhead, statusFldPath.Child("overhead"))...)
+			allErrs = append(allErrs, validateNodeAllocatableOverheadResources(res.Overhead, idxPath.Child("overhead"))...)
 		}
 	}
 
@@ -6881,8 +6881,8 @@ func validatePodLevelResourcesCoverDRA(pod *v1.Pod) (bool, string) {
 
 	if pod.Spec.Resources.Requests != nil {
 		opts := resourcehelper.PodResourcesOptions{
-			SkipPodLevelResources:                    true,
-			UseDRANodeAllocatableResourceClaimStatus: true,
+			SkipPodLevelResources:                 true,
+			UseAdditionalNodeAllocatableResources: true,
 		}
 		requestWithoutPodLevel := resourcehelper.AggregateContainerRequests(pod, opts)
 
@@ -6902,8 +6902,8 @@ func validatePodLevelResourcesCoverDRA(pod *v1.Pod) (bool, string) {
 
 	if pod.Spec.Resources.Limits != nil {
 		opts := resourcehelper.PodResourcesOptions{
-			SkipPodLevelResources:                    true,
-			UseDRANodeAllocatableResourceClaimStatus: true,
+			SkipPodLevelResources:                 true,
+			UseAdditionalNodeAllocatableResources: true,
 		}
 		limitsWithoutPodLevel := resourcehelper.AggregateContainerLimits(pod, opts)
 

@@ -213,10 +213,10 @@ func TestQoSContainerCgroup(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{UID: "99999999", Name: "besteffort-pod-with-dra", Namespace: "test"},
 					Spec:       v1.PodSpec{Containers: []v1.Container{{Name: "foo", Image: "busybox"}}},
 					Status: v1.PodStatus{
-						NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+						AdditionalNodeAllocatableResources: []v1.AdditionalNodeAllocatableResource{
 							{
-								ResourceClaimName: "direct-claim",
-								Containers:        []string{"foo"},
+								Source:     v1.AdditionalNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "direct-claim"},
+								Containers: []string{"foo"},
 								Mapping: []v1.NodeAllocatableMappedResources{
 									{Name: v1.ResourceMemory, Quantity: new(resource.MustParse("128Mi"))},
 								},
@@ -276,10 +276,10 @@ func TestQoSContainerCgroup(t *testing.T) {
 						},
 					},
 					Status: v1.PodStatus{
-						NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+						AdditionalNodeAllocatableResources: []v1.AdditionalNodeAllocatableResource{
 							{
-								ResourceClaimName: "direct-claim",
-								Containers:        []string{"foo"},
+								Source:     v1.AdditionalNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "direct-claim"},
+								Containers: []string{"foo"},
 								Mapping: []v1.NodeAllocatableMappedResources{
 									{Name: v1.ResourceMemory, Quantity: new(resource.MustParse("128Mi"))},
 								},
@@ -344,10 +344,10 @@ func TestQoSContainerCgroup(t *testing.T) {
 						},
 					},
 					Status: v1.PodStatus{
-						NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+						AdditionalNodeAllocatableResources: []v1.AdditionalNodeAllocatableResource{
 							{
-								ResourceClaimName: "direct-claim",
-								Containers:        []string{"foo"},
+								Source:     v1.AdditionalNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "direct-claim"},
+								Containers: []string{"foo"},
 								Mapping: []v1.NodeAllocatableMappedResources{
 									{Name: v1.ResourceMemory, Quantity: new(resource.MustParse("128Mi"))},
 								},

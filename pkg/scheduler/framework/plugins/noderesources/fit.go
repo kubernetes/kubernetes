@@ -324,8 +324,8 @@ func computePodResourceRequest(pod *v1.Pod, opts ResourceRequestsOptions) *preFi
 	// pod hasn't scheduled yet so we don't need to worry about InPlacePodVerticalScalingEnabled
 	reqs := resource.PodRequests(pod, resource.PodResourcesOptions{
 		// SkipPodLevelResources is set to false when PodLevelResources feature is enabled.
-		SkipPodLevelResources:                    !opts.EnablePodLevelResources,
-		UseDRANodeAllocatableResourceClaimStatus: opts.EnableDRANodeAllocatableResources,
+		SkipPodLevelResources:                 !opts.EnablePodLevelResources,
+		UseAdditionalNodeAllocatableResources: opts.EnableDRANodeAllocatableResources,
 	})
 	result := &preFilterState{}
 	result.SetMaxResource(reqs)

@@ -189,10 +189,10 @@ func TestApplySandboxResources(t *testing.T) {
 					},
 				},
 				Status: v1.PodStatus{
-					NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+					AdditionalNodeAllocatableResources: []v1.AdditionalNodeAllocatableResource{
 						{
-							ResourceClaimName: "direct-claim",
-							Containers:        []string{"c1"},
+							Source:     v1.AdditionalNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "direct-claim"},
+							Containers: []string{"c1"},
 							Mapping: []v1.NodeAllocatableMappedResources{
 								{Name: v1.ResourceCPU, Quantity: new(resource.MustParse("200m"))},
 								{Name: v1.ResourceMemory, Quantity: new(resource.MustParse("128Mi"))},
@@ -229,10 +229,10 @@ func TestApplySandboxResources(t *testing.T) {
 					},
 				},
 				Status: v1.PodStatus{
-					NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+					AdditionalNodeAllocatableResources: []v1.AdditionalNodeAllocatableResource{
 						{
-							ResourceClaimName: "direct-claim",
-							Containers:        []string{"c1"},
+							Source:     v1.AdditionalNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "direct-claim"},
+							Containers: []string{"c1"},
 							Mapping: []v1.NodeAllocatableMappedResources{
 								{Name: v1.ResourceCPU, Quantity: new(resource.MustParse("200m"))},
 								{Name: v1.ResourceMemory, Quantity: new(resource.MustParse("128Mi"))},
@@ -273,10 +273,10 @@ func TestApplySandboxResources(t *testing.T) {
 					},
 				},
 				Status: v1.PodStatus{
-					NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+					AdditionalNodeAllocatableResources: []v1.AdditionalNodeAllocatableResource{
 						{
-							ResourceClaimName: "direct-claim",
-							Containers:        []string{"c1"},
+							Source:     v1.AdditionalNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "direct-claim"},
+							Containers: []string{"c1"},
 							Mapping: []v1.NodeAllocatableMappedResources{
 								{Name: v1.ResourceCPU, Quantity: new(resource.MustParse("200m"))},
 								{Name: v1.ResourceMemory, Quantity: new(resource.MustParse("128Mi"))},
@@ -327,10 +327,10 @@ func TestApplySandboxResources(t *testing.T) {
 					},
 				},
 				Status: v1.PodStatus{
-					NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+					AdditionalNodeAllocatableResources: []v1.AdditionalNodeAllocatableResource{
 						{
-							ResourceClaimName: "direct-claim",
-							Containers:        []string{"c1"},
+							Source:     v1.AdditionalNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "direct-claim"},
+							Containers: []string{"c1"},
 							Mapping: []v1.NodeAllocatableMappedResources{
 								{Name: v1.ResourceCPU, Quantity: new(resource.MustParse("200m"))},
 								{Name: v1.ResourceMemory, Quantity: new(resource.MustParse("128Mi"))},
@@ -372,10 +372,10 @@ func TestApplySandboxResources(t *testing.T) {
 					},
 				},
 				Status: v1.PodStatus{
-					NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+					AdditionalNodeAllocatableResources: []v1.AdditionalNodeAllocatableResource{
 						{
-							ResourceClaimName: "combined-claim",
-							Containers:        []string{"c1"},
+							Source:     v1.AdditionalNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "combined-claim"},
+							Containers: []string{"c1"},
 							Mapping: []v1.NodeAllocatableMappedResources{
 								{Name: v1.ResourceCPU, Quantity: new(resource.MustParse("200m"))},
 								{Name: v1.ResourceMemory, Quantity: new(resource.MustParse("128Mi"))},
