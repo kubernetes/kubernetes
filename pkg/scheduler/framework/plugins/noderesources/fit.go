@@ -546,8 +546,19 @@ func (f *Fit) isSchedulableAfterNodeChange(logger klog.Logger, pod *v1.Pod, oldO
 		EnableDRAExtendedResource: f.enableDRAExtendedResource,
 	}
 
-	// Leaving in the queue, since the pod won't fit into the modified node anyway.
-	if !isFit(pod, modifiedNode, draManager, opts) {
+	// The node's allocatable is insufficient for the pod regardless of what else runs on it.
+	if !fitsEmptyNode(pod, modifiedNode, draManager, opts) {
+		// Check if the pod's nominated node just transitioned from "fitting" to "not fitting" (e.g., node shrunk).
+		// If so, the Fit filter will now return UnschedulableAndUnresolvable here.
+		// We re-queue the pod so it can attempt preemption on a different node.
+		// We strictly check this transition to avoid requeue storms on subsequent node shrinks.
+		//
+		// Note: This optimization covers pod-by-pod preemption only. PodGroups waiting
+		// for victims do not benefit because PodGroupEvaluator lacks an "UnschedulableAndUnresolvable" escape path.
+		if pod.Status.NominatedNodeName == modifiedNode.Name && fitsEmptyNode(pod, originalNode, draManager, opts) {
+			logger.V(5).Info("nominated node can no longer accommodate the pod, re-queuing so it can preempt elsewhere", "pod", klog.KObj(pod), "node", klog.KObj(modifiedNode))
+			return fwk.Queue, nil
+		}
 		logger.V(5).Info("node was created or updated, but it doesn't have enough resource(s) to accommodate this pod", "pod", klog.KObj(pod), "node", klog.KObj(modifiedNode))
 		return fwk.QueueSkip, nil
 	}
@@ -639,9 +650,9 @@ func haveAnyRequestedResourcesIncreased(pod *v1.Pod, originalNode, modifiedNode 
 	return false
 }
 
-// isFit checks if the pod fits the node. If the node is nil, it returns false.
-// It constructs a fake NodeInfo object for the node and checks if the pod fits the node.
-func isFit(pod *v1.Pod, node *v1.Node, draManager fwk.SharedDRAManager, opts ResourceRequestsOptions) bool {
+// fitsEmptyNode checks whether the pod's resource requests fit within the node's allocatable,
+// ignoring any pods already running on the node.
+func fitsEmptyNode(pod *v1.Pod, node *v1.Node, draManager fwk.SharedDRAManager, opts ResourceRequestsOptions) bool {
 	if node == nil {
 		return false
 	}
