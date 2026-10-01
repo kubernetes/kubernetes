@@ -118,7 +118,7 @@ func RunTestCreateWithKeyExist(ctx context.Context, t *testing.T, store storage.
 	}
 }
 
-func RunTestGet(ctx context.Context, t *testing.T, store storage.Interface) {
+func RunTestGet(ctx context.Context, t *testing.T, store storage.Interface, isCacher bool) {
 	// create an object to test
 	key, createdObj := testPropagateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "test-ns"}})
 	// update the object once to allow get by exact resource version to be tested
@@ -142,6 +142,7 @@ func RunTestGet(ctx context.Context, t *testing.T, store storage.Interface) {
 
 	currentRV, _ := strconv.Atoi(storedObj.ResourceVersion)
 	lastUpdatedCurrentRV, _ := strconv.Atoi(lastUpdatedObj.ResourceVersion)
+	_, invalidRVErr := storage.APIObjectVersioner{}.ParseResourceVersion("invalid")
 
 	// TODO(jpbetz): Add exact test cases
 	tests := []struct {
@@ -150,6 +151,7 @@ func RunTestGet(ctx context.Context, t *testing.T, store storage.Interface) {
 		ignoreNotFound       bool
 		expectNotFoundErr    bool
 		expectRVTooLarge     bool
+		expectedErrFunc      func() error
 		expectedOut          *example.Pod
 		expectedAlternatives []*example.Pod
 		rv                   string
@@ -192,10 +194,32 @@ func RunTestGet(ctx context.Context, t *testing.T, store storage.Interface) {
 		expectRVTooLarge: true,
 		rv:               strconv.FormatInt(math.MaxInt64, 10),
 	}, {
+		name: "invalid resource version",
+		key:  key,
+		expectedErrFunc: func() error {
+			// etcd3 wraps ParseResourceVersion errors in BadRequest.
+			if isCacher {
+				return invalidRVErr
+			}
+			return apierrors.NewBadRequest(fmt.Sprintf("invalid resource version: %v", invalidRVErr))
+		},
+		rv: "invalid",
+	}, {
 		name:              "get non-existing",
 		key:               "/pods/non-existing",
 		ignoreNotFound:    false,
 		expectNotFoundErr: true,
+	}, {
+		name: "get non-existing with resource version",
+		key:  "/pods/non-existing",
+		expectedErrFunc: func() error {
+			// etcd3 sets ResourceVersion=0 (and prepends pathPrefix when configured).
+			if isCacher {
+				return storage.NewKeyNotFoundError("/pods/non-existing", int64(lastUpdatedCurrentRV))
+			}
+			return storage.NewKeyNotFoundError("/pods/non-existing", 0)
+		},
+		rv: fmt.Sprintf("%d", lastUpdatedCurrentRV),
 	}, {
 		name:              "get non-existing, ignore not found",
 		key:               "/pods/non-existing",
@@ -217,6 +241,11 @@ func RunTestGet(ctx context.Context, t *testing.T, store storage.Interface) {
 
 			out := &example.Pod{}
 			err := store.Get(ctx, tt.key, storage.GetOptions{IgnoreNotFound: tt.ignoreNotFound, ResourceVersion: tt.rv}, out)
+			if tt.expectedErrFunc != nil {
+				expectedErr := tt.expectedErrFunc()
+				assert.Equal(t, expectedErr, err)
+				return
+			}
 			if tt.expectNotFoundErr {
 				if err == nil || !storage.IsNotFound(err) {
 					t.Errorf("expecting not found error, but get: %v", err)
