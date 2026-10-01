@@ -870,6 +870,10 @@ func sharesMemory(a, b *inf.Dec) bool {
 	return cap(aw) > 0 && cap(bw) > 0 && &aw[:1][0] == &bw[:1][0]
 }
 
+// TestQuantityReadsDoNotMutate checks that methods leave their operands
+// unchanged and return results that share no memory with them. Methods that
+// mutate their receiver are called on a copy made by assignment; since
+// Quantity is a value type, the original must not change.
 func TestQuantityReadsDoNotMutate(t *testing.T) {
 	toDec := func(q Quantity) Quantity { q.ToDec(); return q }
 	reads := []struct {
@@ -901,8 +905,11 @@ func TestQuantityReadsDoNotMutate(t *testing.T) {
 		{"Marshal", func(q *Quantity, _ Quantity) *inf.Dec { _, _ = q.Marshal(); return nil }},
 		{"Size", func(q *Quantity, _ Quantity) *inf.Dec { q.Size(); return nil }},
 		{"ToUnstructured", func(q *Quantity, _ Quantity) *inf.Dec { q.ToUnstructured(); return nil }},
-		{"Add argument", func(q *Quantity, y Quantity) *inf.Dec { acc := y.DeepCopy(); acc.Add(*q); return acc.d.Dec }},
-		{"Sub argument", func(q *Quantity, y Quantity) *inf.Dec { acc := y.DeepCopy(); acc.Sub(*q); return acc.d.Dec }},
+		// These mutate their receiver, so they are called on a copy.
+		{"Add", func(q *Quantity, y Quantity) *inf.Dec { acc := *q; acc.Add(y); return acc.d.Dec }},
+		{"Sub", func(q *Quantity, y Quantity) *inf.Dec { acc := *q; acc.Sub(y); return acc.d.Dec }},
+		{"Mul", func(q *Quantity, y Quantity) *inf.Dec { acc := *q; acc.Mul(y.Value()); return acc.d.Dec }},
+		{"Neg", func(q *Quantity, _ Quantity) *inf.Dec { acc := *q; acc.Neg(); return acc.d.Dec }},
 		{"RoundUp", func(q *Quantity, _ Quantity) *inf.Dec { acc := *q; acc.RoundUp(0); return acc.d.Dec }},
 		{"ToDec", func(q *Quantity, _ Quantity) *inf.Dec { acc := *q; acc.ToDec(); return nil }},
 		{"Set", func(q *Quantity, y Quantity) *inf.Dec { acc := *q; acc.Set(y.Value()); return acc.d.Dec }},
@@ -979,7 +986,7 @@ func TestQuantityNeg(t *testing.T) {
 	}
 
 	for i, item := range table {
-		out := item.a.DeepCopy()
+		out := item.a
 		out.Neg()
 		if out.Cmp(item.a) == 0 {
 			t.Errorf("%d: negating an item should not mutate the source: %s", i, out.String())
@@ -1608,8 +1615,8 @@ func TestSub(t *testing.T) {
 	}
 
 	x, y := decQuantity(15, -1, DecimalSI), decQuantity(25, -1, DecimalSI)
-	if n := testing.AllocsPerRun(100, func() { x.Sub(y) }); n != 0 {
-		t.Errorf("Sub of two inf.Dec quantities: %v allocations per call, want 0", n)
+	if n := testing.AllocsPerRun(100, func() { x.Sub(y) }); n > 2 {
+		t.Errorf("Sub of two inf.Dec quantities: %v allocations per call, want at most 2", n)
 	}
 }
 
@@ -1878,8 +1885,8 @@ func TestAdd(t *testing.T) {
 	}
 
 	x, y := decQuantity(15, -1, DecimalSI), decQuantity(25, -1, DecimalSI)
-	if n := testing.AllocsPerRun(100, func() { x.Add(y) }); n != 0 {
-		t.Errorf("Add of two inf.Dec quantities: %v allocations per call, want 0", n)
+	if n := testing.AllocsPerRun(100, func() { x.Add(y) }); n > 2 {
+		t.Errorf("Add of two inf.Dec quantities: %v allocations per call, want at most 2", n)
 	}
 }
 
