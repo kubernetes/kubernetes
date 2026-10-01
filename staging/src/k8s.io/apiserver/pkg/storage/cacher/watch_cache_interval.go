@@ -201,7 +201,7 @@ type historyCacheIntervalSource struct {
 	lock sync.Locker
 }
 
-// Next returns the next event from the watchCache circular buffer.
+// next returns the next event from the watchCache circular buffer.
 // An error is returned if the interval has been invalidated.
 //
 // An interval can be either valid or invalid at any given point of time.
@@ -218,7 +218,7 @@ type historyCacheIntervalSource struct {
 // When this condition becomes false, the interval is no longer valid and
 // should not be used to retrieve and serve elements from the underlying
 // source.
-func (s *historyCacheIntervalSource) Next() (*watchCacheEvent, error) {
+func (s *historyCacheIntervalSource) next() (*watchCacheEvent, error) {
 	// if there are items in the buffer to return, return from
 	// the buffer.
 	if event, exists := s.buffer.next(); exists {
@@ -244,7 +244,7 @@ func (s *historyCacheIntervalSource) Next() (*watchCacheEvent, error) {
 }
 
 func (s *historyCacheIntervalSource) All() iter.Seq2[*watchCacheEvent, error] {
-	return eventsFromNext(s.Next)
+	return eventsFromNext(s.next)
 }
 
 func (s *historyCacheIntervalSource) fillBuffer() {
@@ -266,7 +266,7 @@ type snapshotCacheIntervalSource struct {
 	buffer *watchCacheIntervalBuffer
 }
 
-func (s *snapshotCacheIntervalSource) Next() (*watchCacheEvent, error) {
+func (s *snapshotCacheIntervalSource) next() (*watchCacheEvent, error) {
 	event, exists := s.buffer.next()
 	if !exists {
 		return nil, nil
@@ -275,7 +275,7 @@ func (s *snapshotCacheIntervalSource) Next() (*watchCacheEvent, error) {
 }
 
 func (s *snapshotCacheIntervalSource) All() iter.Seq2[*watchCacheEvent, error] {
-	return eventsFromNext(s.Next)
+	return eventsFromNext(s.next)
 }
 
 // lazySnapshotCacheIntervalSource serves events from an immutable snapshot.
@@ -305,7 +305,7 @@ func (s *lazySnapshotCacheIntervalSource) All() iter.Seq2[*watchCacheEvent, erro
 const bufferSize = 100
 
 // watchCacheIntervalBuffer is used to reduce acquiring
-// the lock on each invocation of historyCacheIntervalSource.Next().
+// the lock on each invocation of historyCacheIntervalSource.next().
 type watchCacheIntervalBuffer struct {
 	// buffer is used to hold watchCacheEvents that
 	// the interval returns on a call to Next().

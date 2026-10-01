@@ -329,7 +329,7 @@ func TestCacheIntervalNextFromWatchCache(t *testing.T) {
 					if i%bufferSize == 0 && i != c.eventsAddedToWatchcache {
 						originalCacheStartIndex := wc.history.startIndex
 						wc.history.startIndex = src.startIndex + 1
-						event, err := src.Next()
+						event, err := src.next()
 						if err == nil {
 							t.Errorf("expected non-nil error")
 						}
@@ -352,7 +352,7 @@ func TestCacheIntervalNextFromWatchCache(t *testing.T) {
 					return
 				}
 
-				event, err := src.Next()
+				event, err := src.next()
 				if err != nil {
 					t.Errorf("unexpected error: %v", err)
 					return
@@ -364,7 +364,7 @@ func TestCacheIntervalNextFromWatchCache(t *testing.T) {
 					t.Error(err)
 				}
 			}
-			event, err := src.Next()
+			event, err := src.next()
 			ok := err != nil
 			if err := verifyNoEvent(ok, event); err != nil {
 				t.Error(err)
@@ -410,7 +410,7 @@ func TestCacheIntervalNextFromStore(t *testing.T) {
 	src := wci.source.(*snapshotCacheIntervalSource)
 
 	for i := 0; i < numEvents; i++ {
-		event, err := src.Next()
+		event, err := src.next()
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -428,7 +428,7 @@ func TestCacheIntervalNextFromStore(t *testing.T) {
 	}
 
 	// All events should have been consumed.
-	event, err := src.Next()
+	event, err := src.next()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -468,7 +468,7 @@ func TestCacheIntervalFromStoreSorted(t *testing.T) {
 
 			got := make([]string, 0, n)
 			for range n {
-				ev, err := src.Next()
+				ev, err := src.next()
 				if err != nil {
 					t.Fatal(err)
 				}
