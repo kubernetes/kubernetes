@@ -17,8 +17,11 @@ limitations under the License.
 package resource
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"os"
+	"os/exec"
 	"strconv"
 	"testing"
 	"time"
@@ -144,34 +147,36 @@ func TestQuantityOutOfInt32ExponentZero(t *testing.T) {
 	}
 }
 
+// zeroAddHelperEnv marks the child process that TestQuantityOutOfInt32ExponentZeroAdd starts.
+const zeroAddHelperEnv = "KUBE_QUANTITY_ZERO_ADD_HELPER"
+
 // TestQuantityOutOfInt32ExponentZeroAdd pins the exponent reset, which 1.37 did not have:
 // with the exponent left at MinInt32, Add panics in inf.Dec.rescale or does not return.
+// The cases run in a child process, so a regression is killed instead of left running.
 func TestQuantityOutOfInt32ExponentZeroAdd(t *testing.T) {
-	for _, in := range zeroMinInt32Spellings {
-		t.Run(in, func(t *testing.T) {
+	if os.Getenv(zeroAddHelperEnv) == "1" {
+		for _, in := range zeroMinInt32Spellings {
 			q, err := ParseQuantity(in)
 			if err != nil {
 				t.Fatalf("ParseQuantity(%q) failed: %v", in, err)
 			}
-			sum := make(chan string, 1)
-			go func() {
-				defer func() {
-					if r := recover(); r != nil {
-						sum <- fmt.Sprintf("panic: %v", r)
-					}
-				}()
-				q := q.DeepCopy()
-				q.Add(MustParse("1"))
-				sum <- q.String()
-			}()
-			select {
-			case got := <-sum:
-				if got != "1" {
-					t.Errorf("Add(1) = %s, want 1", got)
-				}
-			case <-time.After(5 * time.Second):
-				t.Errorf("Add(1) did not return within 5s")
+			q.Add(MustParse("1"))
+			if got := q.String(); got != "1" {
+				t.Errorf("%q: Add(1) = %s, want 1", in, got)
 			}
-		})
+		}
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, os.Args[0], "-test.run=^TestQuantityOutOfInt32ExponentZeroAdd$", "-test.count=1")
+	cmd.Env = append(os.Environ(), zeroAddHelperEnv+"=1")
+	cmd.WaitDelay = time.Second
+	out, err := cmd.CombinedOutput()
+	if ctx.Err() != nil {
+		t.Fatalf("helper did not finish within 30s:\n%s", out)
+	}
+	if err != nil {
+		t.Fatalf("helper failed: %v\n%s", err, out)
 	}
 }
