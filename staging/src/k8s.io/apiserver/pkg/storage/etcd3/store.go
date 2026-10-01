@@ -36,7 +36,6 @@ import (
 	grpcstatus "google.golang.org/grpc/status"
 
 	etcdrpc "go.etcd.io/etcd/api/v3/v3rpc/rpctypes"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/conversion"
@@ -278,7 +277,7 @@ func (s *store) Get(ctx context.Context, key string, opts storage.GetOptions, ou
 		if opts.IgnoreNotFound {
 			return runtime.SetZeroValue(out)
 		}
-		return storage.NewKeyNotFoundError(preparedKey, 0)
+		return storage.NewKeyNotFoundError(preparedKey, getResp.Revision)
 	}
 
 	data, _, err := s.transformer.TransformFromStorage(ctx, getResp.KV.Value, authenticatedDataString(preparedKey))
@@ -1307,7 +1306,7 @@ func (s *store) validateMinimumResourceVersion(minimumResourceVersion string, ac
 	}
 	minimumRV, err := s.versioner.ParseResourceVersion(minimumResourceVersion)
 	if err != nil {
-		return apierrors.NewBadRequest(fmt.Sprintf("invalid resource version: %v", err))
+		return err
 	}
 	// Enforce the storage.Interface guarantee that the resource version of the returned data
 	// "will be at least 'resourceVersion'".

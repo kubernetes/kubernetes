@@ -878,9 +878,10 @@ func readTestCases() []testStep {
 			Request: Request{Op: OpGet, Key: pod1Key},
 			CorrectResponse: Response{
 				Object: nil,
-				Err:    storage.NewKeyNotFoundError(pod1Key, 0),
+				Err:    storage.NewKeyNotFoundError(pod1Key, 18),
 			},
 			InvalidResponses: []Response{
+				{Object: nil, Err: storage.NewKeyNotFoundError(pod1Key, 0)},
 				{Object: withRV(pod1, "2")},
 				{Object: withRV(pod1, "4")},
 				{Object: nil, Err: nil},
@@ -926,6 +927,21 @@ func readTestCases() []testStep {
 			CorrectResponse: Response{Err: fmt.Errorf("invalid key: %q", "/pods/../secrets/s1")},
 			InvalidResponses: []Response{
 				{Object: nil, Err: storage.NewKeyNotFoundError("/pods/../secrets/s1", 0)},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name: "Get with unparsable ResourceVersion returns invalid error",
+			Request: Request{
+				Op:  OpGet,
+				Key: pod4Key,
+				Get: GetRequest{Options: storage.GetOptions{
+					ResourceVersion: "abc",
+				}},
+			},
+			CorrectResponse: Response{Err: invalidRVErr},
+			InvalidResponses: []Response{
+				{Object: withLabel(pod4, "17", "version", "v2")},
 				{Object: nil, Err: nil},
 			},
 		},
