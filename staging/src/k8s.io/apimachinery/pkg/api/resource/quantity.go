@@ -102,6 +102,9 @@ import (
 // writing some sort of special handling code in the hopes that that will
 // cause implementors to also use a fixed point implementation.
 //
+// ---
+// Quantity is a value type. Each shallow copy is independent from its source.
+//
 // +protobuf=true
 // +protobuf.embed=string
 // +protobuf.options.marshal=false
@@ -427,6 +430,7 @@ func ParseQuantity(str string) (Quantity, error) {
 
 // DeepCopy returns a deep-copy of the Quantity value.  Note that the method
 // receiver is a value, so we can mutate it in-place and return it.
+// Quantity is a value type. Each shallow copy is independent from its source.
 func (q Quantity) DeepCopy() Quantity {
 	if q.d.Dec != nil {
 		tmp := &inf.Dec{}

@@ -96,6 +96,9 @@ option go_package = "k8s.io/apimachinery/pkg/api/resource";
 // writing some sort of special handling code in the hopes that that will
 // cause implementors to also use a fixed point implementation.
 //
+// ---
+// Quantity is a value type. Each shallow copy is independent from its source.
+//
 // +protobuf=true
 // +protobuf.embed=string
 // +protobuf.options.marshal=false
