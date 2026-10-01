@@ -56,6 +56,76 @@
       initNodes: 10000
       cloggerPods: 10000
       starvationProne: 500
+# StarvationIndependent with priority clogger < churn < victim and the scheduler's
+# API client limited to 100 QPS. Victims are picked first, so their latency comes
+# from their binds competing with the cloggers' failure status patches for the
+# API budget.
+- name: StarvationHighPriorityVictims
+  schedulerApiClientQPS: 100
+  schedulerApiClientBurst: 100
+  metricsCollectorConfig:
+    metrics:
+      scheduler_pod_scheduling_sli_duration_seconds:
+      - label: attempts
+        values: ["1"]
+      scheduler_scheduling_attempt_duration_seconds:
+      - label: result
+        values: [scheduled, unschedulable, error]
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $initNodes
+    nodeTemplatePath: templates/node.yaml
+  - opcode: createNamespaces
+    prefix: starvation
+    count: 2
+  - opcode: churn
+    mode: recreate
+    number: 600
+    intervalMilliseconds: 50
+    namespace: starvation-0
+    templatePaths:
+    - templates/churn-pod.yaml
+  - opcode: createPods
+    countParam: $cloggerPods
+    podTemplatePath: templates/clogger-pod.yaml
+    namespace: starvation-0
+    skipWaitToCompletion: true
+  # Without the selector, bound churn pods satisfy the barrier before all cloggers are attempted.
+  - opcode: barrier
+    stageRequirement: Attempted
+    namespaces: [starvation-0]
+    labelSelector:
+      role: clogger
+  # Victims get their own namespace so churn pods don't count toward throughput.
+  - opcode: startCollectingMetrics
+    name: victim
+    namespaces: [starvation-1]
+  - opcode: createPods
+    countParam: $starvationProne
+    podTemplatePath: templates/high-priority-victim-pod.yaml
+    namespace: starvation-1
+  - opcode: stopCollectingMetrics
+  workloads:
+  - name: 10Nodes_100Cloggers
+    labels: [integration-test, short]
+    params:
+      initNodes: 10
+      cloggerPods: 100
+      starvationProne: 50
+  - name: 1000Nodes_1000Cloggers
+    labels: [performance]
+    params:
+      initNodes: 1000
+      cloggerPods: 1000
+      starvationProne: 200
+  - name: 1000Nodes_1000Cloggers_AsyncAPICalls
+    featureGates:
+      SchedulerAsyncAPICalls: true
+    labels: [performance]
+    params:
+      initNodes: 1000
+      cloggerPods: 1000
+      starvationProne: 200
 - name: StarvationPodGroup
   featureGates:
     GenericWorkload: true
