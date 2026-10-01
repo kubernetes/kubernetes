@@ -114,9 +114,17 @@ func rawValue(q *Quantity) string {
 	return fmt.Sprintf("%de%d", q.i.value, q.i.scale)
 }
 
-// 1.37 parsed these as zero and wrote them as "0".
+// zeroMinInt32Spellings are zeros whose exponent is MinInt32, directly or once narrowed.
+// 1.37 parsed every one of them as 0 and wrote it as "0".
+var zeroMinInt32Spellings = []string{
+	"0e2147483648", "+0e2147483648", "-0e2147483648",
+	"0e-2147483648", "+0e-2147483648", "-0e-2147483648",
+	"0.000000000000000000000e2147483648",
+}
+
+// TestQuantityOutOfInt32ExponentZero pins the 1.37 behavior: the zeros parse, read as 0 and print as "0".
 func TestQuantityOutOfInt32ExponentZero(t *testing.T) {
-	for _, in := range []string{"0e2147483648", "-0e2147483648", "0e-2147483648", "0.000000000000000000000e2147483648"} {
+	for _, in := range zeroMinInt32Spellings {
 		t.Run(in, func(t *testing.T) {
 			q, err := ParseQuantity(in)
 			if err != nil {
@@ -132,7 +140,19 @@ func TestQuantityOutOfInt32ExponentZero(t *testing.T) {
 			if !fromJSON.IsZero() || fromJSON.String() != "0" {
 				t.Errorf("after json decode: %s, want 0", fromJSON.String())
 			}
-			// With the exponent left at MinInt32, Add panics or does not return.
+		})
+	}
+}
+
+// TestQuantityOutOfInt32ExponentZeroAdd pins the exponent reset, which 1.37 did not have:
+// with the exponent left at MinInt32, Add panics in inf.Dec.rescale or does not return.
+func TestQuantityOutOfInt32ExponentZeroAdd(t *testing.T) {
+	for _, in := range zeroMinInt32Spellings {
+		t.Run(in, func(t *testing.T) {
+			q, err := ParseQuantity(in)
+			if err != nil {
+				t.Fatalf("ParseQuantity(%q) failed: %v", in, err)
+			}
 			sum := make(chan string, 1)
 			go func() {
 				defer func() {
