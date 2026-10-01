@@ -239,7 +239,11 @@ var _ = SIGDescribe("OpenAPIV3", func() {
 		}
 		got := sets.New[string]()
 		for _, v := range protocol.Enum {
-			got.Insert(fmt.Sprint(v))
+			s, ok := v.(string)
+			if !ok {
+				framework.Failf("enum value %v of %s.protocol is %T, want string", v, schemaName, v)
+			}
+			got.Insert(s)
 		}
 		// Later releases may add values, so this is not an exact match.
 		want := sets.New("SCTP", "TCP", "UDP")
