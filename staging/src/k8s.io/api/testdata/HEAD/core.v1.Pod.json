@@ -2208,9 +2208,13 @@
         }
       ]
     },
-    "nodeAllocatableResourceClaimStatuses": [
+    "extraNodeAllocatableResources": [
       {
-        "resourceClaimName": "resourceClaimNameValue",
+        "source": {
+          "apiGroup": "apiGroupValue",
+          "kind": "kindValue",
+          "name": "nameValue"
+        },
         "containers": [
           "containersValue"
         ],
