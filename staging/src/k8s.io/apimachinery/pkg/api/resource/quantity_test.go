@@ -428,7 +428,7 @@ func TestQuantityParse(t *testing.T) {
 			// TODO(#141166): uncomment with the inf.Dec parity check below.
 			// wantValue, wantOK := got.AsInt64()
 			if asDec {
-				got.AsDec()
+				got.ToDec()
 			}
 
 			if e, a := item.expect, got; e.Cmp(a) != 0 {
@@ -472,7 +472,7 @@ func TestQuantityParse(t *testing.T) {
 			}
 
 			if asDec {
-				got.AsDec()
+				got.ToDec()
 			}
 
 			for _, format := range []Format{DecimalSI, BinarySI, DecimalExponent} {
@@ -528,7 +528,7 @@ func TestQuantityParse(t *testing.T) {
 				continue
 			}
 			if asDec {
-				got.AsDec()
+				got.ToDec()
 			}
 
 			expected := item.expect
@@ -550,7 +550,7 @@ func TestQuantityParse(t *testing.T) {
 				continue
 			}
 			if asDec {
-				got.AsDec()
+				got.ToDec()
 			}
 
 			if e, a := item.expect, got; e.Cmp(a) != 0 {
@@ -666,7 +666,7 @@ func TestQuantityRoundUp(t *testing.T) {
 				}
 				expect := item.expect.DeepCopy()
 				if asDec {
-					got.AsDec()
+					got.ToDec()
 				}
 				if cached {
 					// populate the string cache before rounding
@@ -738,7 +738,7 @@ func TestQuantityCmpInt64AndDec(t *testing.T) {
 
 	for _, item := range table {
 		a, b := item.a.DeepCopy(), item.b.DeepCopy()
-		a.AsDec()
+		a.ToDec()
 		if cmp := a.Cmp(b); cmp != item.cmp {
 			t.Errorf("%#v: unexpected Cmp: %d", item, cmp)
 		}
@@ -749,7 +749,7 @@ func TestQuantityCmpInt64AndDec(t *testing.T) {
 
 	for _, item := range table {
 		a, b := item.a.DeepCopy(), item.b.DeepCopy()
-		b.AsDec()
+		b.ToDec()
 		if cmp := a.Cmp(b); cmp != item.cmp {
 			t.Errorf("%#v: unexpected Cmp: %d", item, cmp)
 		}
@@ -760,8 +760,8 @@ func TestQuantityCmpInt64AndDec(t *testing.T) {
 
 	for _, item := range table {
 		a, b := item.a.DeepCopy(), item.b.DeepCopy()
-		a.AsDec()
-		b.AsDec()
+		a.ToDec()
+		b.ToDec()
 		if cmp := a.Cmp(b); cmp != item.cmp {
 			t.Errorf("%#v: unexpected Cmp: %d", item, cmp)
 		}
@@ -1792,7 +1792,7 @@ func TestNegateRoundTrip(t *testing.T) {
 				j := rand.Int63()
 				q := *NewScaledQuantity(j, Scale(k))
 				if asDec {
-					q.AsDec()
+					q.ToDec()
 				}
 
 				b := q.DeepCopy()
@@ -2070,7 +2070,7 @@ func TestQuantityRoundUpAsInt64(t *testing.T) {
 			got := MustParse(item.in)
 			want, wantOK := item.value, item.ok
 			if asDec {
-				got.AsDec()
+				got.ToDec()
 				want, wantOK = item.decValue, item.decOK
 			}
 			got.RoundUp(item.scale)
