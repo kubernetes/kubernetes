@@ -17,6 +17,7 @@ limitations under the License.
 package csi
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/json"
 	"errors"
@@ -512,7 +513,8 @@ func (c *csiMountMgr) getFSGroupPolicy() (storage.FSGroupPolicy, error) {
 	var csiDriver *storage.CSIDriver
 	driver := string(c.driverName)
 	if c.plugin.csiDriverLister != nil {
-		c, err := c.plugin.getCSIDriver(driver)
+		// TODO: pass proper context once VolumePlugin interface is context-aware.
+		c, err := c.plugin.getCSIDriver(context.TODO(), driver)
 		if err != nil && !apierrors.IsNotFound(err) {
 			// Some internal error.
 			return storage.ReadWriteOnceWithFSTypeFSGroupPolicy, err
@@ -539,7 +541,8 @@ func (c *csiMountMgr) supportsVolumeLifecycleMode() error {
 	var csiDriver *storage.CSIDriver
 	driver := string(c.driverName)
 	if c.plugin.csiDriverLister != nil {
-		c, err := c.plugin.getCSIDriver(driver)
+		// TODO: pass proper context once VolumePlugin interface is context-aware.
+		c, err := c.plugin.getCSIDriver(context.TODO(), driver)
 		if err != nil && !apierrors.IsNotFound(err) {
 			// Some internal error.
 			return err

@@ -393,7 +393,7 @@ func (f *fakeKubeletVolumeHost) CSIDriversSynced() cache.InformerSynced {
 	return nil
 }
 
-func (f *fakeKubeletVolumeHost) WaitForCacheSync() error {
+func (f *fakeKubeletVolumeHost) WaitForCacheSync(ctx context.Context) error {
 	return nil
 }
 

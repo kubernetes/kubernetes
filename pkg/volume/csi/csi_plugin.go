@@ -197,7 +197,8 @@ func (p *csiPlugin) VerifyExhaustedResource(spec *volume.Spec) bool {
 
 	pluginName := spec.PersistentVolume.Spec.CSI.Driver
 
-	driver, err := p.getCSIDriver(pluginName)
+	// TODO: pass proper context once VolumePlugin interface is context-aware.
+	driver, err := p.getCSIDriver(context.TODO(), pluginName)
 	if err != nil {
 		klog.ErrorS(err, "Failed to retrieve CSIDriver", "pluginName", pluginName)
 		return false
@@ -463,7 +464,8 @@ func (p *csiPlugin) RequiresRemount(spec *volume.Spec) bool {
 		klog.V(5).Info(log("Failed to mark %q as republish required, err: %v", spec.Name(), err))
 		return false
 	}
-	csiDriver, err := p.getCSIDriver(driverName)
+	// TODO: pass proper context once VolumePlugin interface is context-aware.
+	csiDriver, err := p.getCSIDriver(context.TODO(), driverName)
 	if err != nil {
 		klog.V(5).Info(log("Failed to mark %q as republish required, err: %v", spec.Name(), err))
 		return false
@@ -640,7 +642,8 @@ func (p *csiPlugin) SupportsSELinuxContextMount(spec *volume.Spec) (bool, error)
 		if err != nil {
 			return false, err
 		}
-		csiDriver, err := p.getCSIDriver(driver)
+		// TODO: pass proper context once VolumePlugin interface is context-aware.
+		csiDriver, err := p.getCSIDriver(context.TODO(), driver)
 		if err != nil {
 			if apierrors.IsNotFound(err) {
 				return false, nil
@@ -856,7 +859,8 @@ func (p *csiPlugin) ConstructBlockVolumeSpec(podUID types.UID, specVolName, mapP
 // skipAttach looks up CSIDriver object associated with driver name
 // to determine if driver requires attachment volume operation
 func (p *csiPlugin) skipAttach(driver string) (bool, error) {
-	csiDriver, err := p.getCSIDriver(driver)
+	// TODO: pass proper context once VolumePlugin interface is context-aware.
+	csiDriver, err := p.getCSIDriver(context.TODO(), driver)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			// Don't skip attach if CSIDriver does not exist
@@ -870,10 +874,10 @@ func (p *csiPlugin) skipAttach(driver string) (bool, error) {
 	return false, nil
 }
 
-func (p *csiPlugin) getCSIDriver(driver string) (*storage.CSIDriver, error) {
+func (p *csiPlugin) getCSIDriver(ctx context.Context, driver string) (*storage.CSIDriver, error) {
 	kletHost, ok := p.host.(volume.KubeletVolumeHost)
 	if ok {
-		if err := kletHost.WaitForCacheSync(); err != nil {
+		if err := kletHost.WaitForCacheSync(ctx); err != nil {
 			return nil, err
 		}
 	}
@@ -942,7 +946,8 @@ func (p *csiPlugin) newAttacherDetacher() (*csiAttacher, error) {
 
 // podInfoEnabled  check CSIDriver enabled pod info flag
 func (p *csiPlugin) podInfoEnabled(driverName string) (bool, error) {
-	csiDriver, err := p.getCSIDriver(driverName)
+	// TODO: pass proper context once VolumePlugin interface is context-aware.
+	csiDriver, err := p.getCSIDriver(context.TODO(), driverName)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			klog.V(4).Info(log("CSIDriver %q not found, not adding pod information", driverName))
