@@ -721,12 +721,12 @@ func TestGetContainerOOMScoreAdjust(t *testing.T) {
 		}
 
 		if len(p.draAlloc.containers) > 0 {
-			status := v1.NodeAllocatableResourceClaimStatus{
-				ResourceClaimName: "dra-claim",
-				Containers:        p.draAlloc.containers,
+			res := v1.ExtraNodeAllocatableResource{
+				Source:     v1.ExtraNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "dra-claim"},
+				Containers: p.draAlloc.containers,
 			}
 			if p.draAlloc.mapping != "" {
-				status.Mapping = []v1.NodeAllocatableMappedResources{
+				res.Mapping = []v1.NodeAllocatableMappedResources{
 					{
 						Name:     v1.ResourceMemory,
 						Quantity: new(resource.MustParse(p.draAlloc.mapping)),
@@ -746,8 +746,8 @@ func TestGetContainerOOMScoreAdjust(t *testing.T) {
 					PerPod: new(resource.MustParse(p.draAlloc.perPodOverhead)),
 				})
 			}
-			status.Overhead = overheads
-			pod.Status.NodeAllocatableResourceClaimStatuses = []v1.NodeAllocatableResourceClaimStatus{status}
+			res.Overhead = overheads
+			pod.Status.ExtraNodeAllocatableResources = []v1.ExtraNodeAllocatableResource{res}
 		}
 
 		return pod

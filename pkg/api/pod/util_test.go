@@ -920,7 +920,7 @@ func TestDropDynamicResourceAllocation(t *testing.T) {
 			},
 		},
 	}
-	podWithDRANodeAllocatableResourceStatus := &api.Pod{
+	podWithExtraNodeAllocatableResources := &api.Pod{
 		Spec: api.PodSpec{
 			Containers: []api.Container{
 				{
@@ -939,9 +939,9 @@ func TestDropDynamicResourceAllocation(t *testing.T) {
 			},
 		},
 		Status: api.PodStatus{
-			NodeAllocatableResourceClaimStatuses: []api.NodeAllocatableResourceClaimStatus{
+			ExtraNodeAllocatableResources: []api.ExtraNodeAllocatableResource{
 				{
-					ResourceClaimName: "node-allocatable-claim",
+					Source: api.ExtraNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "node-allocatable-claim"},
 					Mapping: []api.NodeAllocatableMappedResources{
 						{Name: api.ResourceMemory, Quantity: new(resource.MustParse("100Mi"))},
 					},
@@ -950,7 +950,7 @@ func TestDropDynamicResourceAllocation(t *testing.T) {
 		},
 	}
 
-	podWithDRANodeAllocatableResourceStatusOverhead := &api.Pod{
+	podWithExtraNodeAllocatableResourcesOverhead := &api.Pod{
 		Spec: api.PodSpec{
 			Containers: []api.Container{
 				{
@@ -969,9 +969,9 @@ func TestDropDynamicResourceAllocation(t *testing.T) {
 			},
 		},
 		Status: api.PodStatus{
-			NodeAllocatableResourceClaimStatuses: []api.NodeAllocatableResourceClaimStatus{
+			ExtraNodeAllocatableResources: []api.ExtraNodeAllocatableResource{
 				{
-					ResourceClaimName: "node-allocatable-claim",
+					Source: api.ExtraNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "node-allocatable-claim"},
 					Overhead: []api.NodeAllocatableOverheadResources{
 						{
 							Name:   api.ResourceMemory,
@@ -983,7 +983,7 @@ func TestDropDynamicResourceAllocation(t *testing.T) {
 		},
 	}
 
-	podWithoutDRANodeAllocatableResourceStatus := &api.Pod{
+	podWithoutExtraNodeAllocatableResources := &api.Pod{
 		Spec: api.PodSpec{
 			Containers: []api.Container{
 				{
@@ -1082,57 +1082,57 @@ func TestDropDynamicResourceAllocation(t *testing.T) {
 			description:                      "DRA node allocatable resources / no old pod / new with DRA node allocatable resource / disabled",
 			enableDRANodeAllocatableResouces: false,
 			oldPod:                           noPod,
-			newPod:                           podWithDRANodeAllocatableResourceStatus,
-			wantPod:                          podWithoutDRANodeAllocatableResourceStatus,
+			newPod:                           podWithExtraNodeAllocatableResources,
+			wantPod:                          podWithoutExtraNodeAllocatableResources,
 		},
 		{
 			description:                      "DRA node allocatable resources / no old pod / new with DRA node allocatable resource / enabled",
 			enableDRANodeAllocatableResouces: true,
 			oldPod:                           noPod,
-			newPod:                           podWithDRANodeAllocatableResourceStatus,
-			wantPod:                          podWithDRANodeAllocatableResourceStatus,
+			newPod:                           podWithExtraNodeAllocatableResources,
+			wantPod:                          podWithExtraNodeAllocatableResources,
 		},
 		{
-			description:                      "DRA node allocatable resources / old without node allocatable resource status / new with node allocatable resource status / disabled",
+			description:                      "DRA node allocatable resources / old without extra node allocatable resources / new with extra node allocatable resources / disabled",
 			enableDRANodeAllocatableResouces: false,
-			oldPod:                           podWithoutDRANodeAllocatableResourceStatus,
-			newPod:                           podWithDRANodeAllocatableResourceStatus,
-			wantPod:                          podWithoutDRANodeAllocatableResourceStatus,
+			oldPod:                           podWithoutExtraNodeAllocatableResources,
+			newPod:                           podWithExtraNodeAllocatableResources,
+			wantPod:                          podWithoutExtraNodeAllocatableResources,
 		},
 		{
-			description:                      "DRA node allocatable resources / old without node allocatable resource status / new with node allocatable resource status / enabled",
+			description:                      "DRA node allocatable resources / old without extra node allocatable resources / new with extra node allocatable resources / enabled",
 			enableDRANodeAllocatableResouces: true,
-			oldPod:                           podWithoutDRANodeAllocatableResourceStatus,
-			newPod:                           podWithDRANodeAllocatableResourceStatus,
-			wantPod:                          podWithDRANodeAllocatableResourceStatus,
+			oldPod:                           podWithoutExtraNodeAllocatableResources,
+			newPod:                           podWithExtraNodeAllocatableResources,
+			wantPod:                          podWithExtraNodeAllocatableResources,
 		},
 		{
 			description:                      "DRA node allocatable resources (overhead) / no old pod / new with DRA node allocatable resource (overhead) / disabled",
 			enableDRANodeAllocatableResouces: false,
 			oldPod:                           noPod,
-			newPod:                           podWithDRANodeAllocatableResourceStatusOverhead,
-			wantPod:                          podWithoutDRANodeAllocatableResourceStatus,
+			newPod:                           podWithExtraNodeAllocatableResourcesOverhead,
+			wantPod:                          podWithoutExtraNodeAllocatableResources,
 		},
 		{
 			description:                      "DRA node allocatable resources (overhead) / no old pod / new with DRA node allocatable resource (overhead) / enabled",
 			enableDRANodeAllocatableResouces: true,
 			oldPod:                           noPod,
-			newPod:                           podWithDRANodeAllocatableResourceStatusOverhead,
-			wantPod:                          podWithDRANodeAllocatableResourceStatusOverhead,
+			newPod:                           podWithExtraNodeAllocatableResourcesOverhead,
+			wantPod:                          podWithExtraNodeAllocatableResourcesOverhead,
 		},
 		{
-			description:                      "DRA node allocatable resources (overhead) / old without node allocatable resource status / new with node allocatable resource (overhead) status / disabled",
+			description:                      "DRA node allocatable resources (overhead) / old without extra node allocatable resources / new with extra node allocatable resources (overhead) / disabled",
 			enableDRANodeAllocatableResouces: false,
-			oldPod:                           podWithoutDRANodeAllocatableResourceStatus,
-			newPod:                           podWithDRANodeAllocatableResourceStatusOverhead,
-			wantPod:                          podWithoutDRANodeAllocatableResourceStatus,
+			oldPod:                           podWithoutExtraNodeAllocatableResources,
+			newPod:                           podWithExtraNodeAllocatableResourcesOverhead,
+			wantPod:                          podWithoutExtraNodeAllocatableResources,
 		},
 		{
-			description:                      "DRA node allocatable resources (overhead) / old without node allocatable resource status / new with node allocatable resource (overhead) status / enabled",
+			description:                      "DRA node allocatable resources (overhead) / old without extra node allocatable resources / new with extra node allocatable resources (overhead) / enabled",
 			enableDRANodeAllocatableResouces: true,
-			oldPod:                           podWithoutDRANodeAllocatableResourceStatus,
-			newPod:                           podWithDRANodeAllocatableResourceStatusOverhead,
-			wantPod:                          podWithDRANodeAllocatableResourceStatusOverhead,
+			oldPod:                           podWithoutExtraNodeAllocatableResources,
+			newPod:                           podWithExtraNodeAllocatableResourcesOverhead,
+			wantPod:                          podWithExtraNodeAllocatableResourcesOverhead,
 		},
 	}
 
