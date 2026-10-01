@@ -39,6 +39,9 @@ import (
 
 const (
 	defaultKeepAlivePeriod = 3 * time.Minute
+	// 1 MiB MaxHeaderBytes / 128 bytes per value bounds tiny-header floods
+	// while allowing thousands of identity groups sent one per header line.
+	maxHeaderValueCount = 8192
 )
 
 // tlsConfig produces the tls.Config to serve with.
@@ -166,10 +169,11 @@ func (s *SecureServingInfo) Serve(handler http.Handler, shutdownTimeout time.Dur
 	}
 
 	secureServer := &http.Server{
-		Addr:           s.Listener.Addr().String(),
-		Handler:        handler,
-		MaxHeaderBytes: 1 << 20,
-		TLSConfig:      tlsConfig,
+		Addr:                s.Listener.Addr().String(),
+		Handler:             handler,
+		MaxHeaderBytes:      1 << 20,
+		MaxHeaderValueCount: maxHeaderValueCount,
+		TLSConfig:           tlsConfig,
 
 		IdleTimeout:       90 * time.Second, // matches http.DefaultTransport keep-alive timeout
 		ReadHeaderTimeout: 32 * time.Second, // just shy of requestTimeoutUpperBound
