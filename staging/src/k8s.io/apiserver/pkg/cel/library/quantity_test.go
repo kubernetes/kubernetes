@@ -359,6 +359,36 @@ func TestQuantity(t *testing.T) {
 			expr:        `[quantity("9999999999999999999999999999999999999")].all(x, x.add(quantity("1")).compareTo(x.add(quantity("2"))) == -1)`,
 			expectValue: trueVal,
 		},
+		{
+			name:        "is_integer_after_less_than_dec",
+			expr:        `[quantity("1Gi")].all(x, x.isLessThan(quantity("1.5Gi")) && x.isInteger())`,
+			expectValue: trueVal,
+		},
+		{
+			name:        "as_integer_after_less_than_dec",
+			expr:        `[quantity("1Gi")].all(x, x.isLessThan(quantity("1.5Gi")) && x.asInteger() == 1073741824)`,
+			expectValue: trueVal,
+		},
+		{
+			name:        "is_integer_after_greater_than_dec",
+			expr:        `[quantity("1Gi")].all(x, x.isGreaterThan(quantity("0.5Gi")) && x.isInteger())`,
+			expectValue: trueVal,
+		},
+		{
+			name:        "as_integer_after_greater_than_dec",
+			expr:        `[quantity("1Gi")].all(x, x.isGreaterThan(quantity("0.5Gi")) && x.asInteger() == 1073741824)`,
+			expectValue: trueVal,
+		},
+		{
+			name:        "is_integer_after_compare_to_dec",
+			expr:        `[quantity("1Gi")].all(x, x.compareTo(quantity("1.5Gi")) == -1 && x.isInteger())`,
+			expectValue: trueVal,
+		},
+		{
+			name:        "as_integer_after_compare_to_dec",
+			expr:        `[quantity("1Gi")].all(x, x.compareTo(quantity("1.5Gi")) == -1 && x.asInteger() == 1073741824)`,
+			expectValue: trueVal,
+		},
 	}
 
 	for _, c := range cases {

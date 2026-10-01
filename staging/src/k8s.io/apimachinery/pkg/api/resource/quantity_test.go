@@ -237,6 +237,44 @@ func TestQuantityCmp(t *testing.T) {
 			t.Errorf("X: %v, Y: %v, Expected: %v, Actual: %v", testCase.x, testCase.y, testCase.expect, result)
 		}
 	}
+
+	toDec := func(q Quantity) Quantity { q.ToDec(); return q }
+	table3 := []struct {
+		name string
+		rank int
+		q    Quantity
+	}{
+		{"dec -9223372036854775809", 0, MustParse("-9223372036854775809")},
+		{"-9223372036854775808", 1, MustParse("-9223372036854775808")},
+		{"-1500m", 2, MustParse("-1500m")},
+		{"-1e-2147483647 uncached", 3, intQuantity(-1, math.MinInt32+1, DecimalSI)},
+		{"Quantity{}", 4, Quantity{}},
+		{"dec 0 uncached", 4, toDec(Quantity{})},
+		{"1e-2147483647 uncached", 5, intQuantity(1, math.MinInt32+1, DecimalSI)},
+		{"dec 1e-2147483647 uncached", 5, decQuantity(1, -math.MaxInt32, DecimalSI)},
+		{"1500m", 6, MustParse("1500m")},
+		{"1500m uncached", 6, intQuantity(1500, -3, DecimalSI)},
+		{"dec 1500m", 6, toDec(MustParse("1500m"))},
+		{"7 uncached", 7, intQuantity(7, 0, DecimalSI)},
+		{"50k", 8, MustParse("50k")},
+		{"50k uncached", 8, intQuantity(50, 3, DecimalSI)},
+		{"dec 50k uncached", 8, toDec(intQuantity(50, 3, DecimalSI))},
+		{"1536Mi", 9, MustParse("1536Mi")},
+		{"dec 1.5Gi", 9, MustParse("1.5Gi")},
+		{"9223372036854775807", 10, MustParse("9223372036854775807")},
+		{"dec 9223372036854775807", 10, toDec(MustParse("9223372036854775807"))},
+		{"dec 9223372036854775808", 11, MustParse("9223372036854775808")},
+		{"1e2147483647", 12, MustParse("1e2147483647")},
+		{"dec 1e2147483647", 12, toDec(MustParse("1e2147483647"))},
+	}
+	for i := range table3 {
+		for j := range table3 {
+			x, y := &table3[i], &table3[j]
+			if got, want := x.q.Cmp(y.q), min(max(x.rank-y.rank, -1), 1); got != want {
+				t.Errorf("(%s).Cmp(%s) = %d, want %d", x.name, y.name, got, want)
+			}
+		}
+	}
 }
 
 func TestParseQuantityString(t *testing.T) {
@@ -796,6 +834,101 @@ func TestQuantityCmpInt64(t *testing.T) {
 		if cmp := item.a.CmpInt64(item.b); cmp != item.cmp {
 			t.Errorf("%#v: unexpected CmpInt64(%d): %d", item, item.b, cmp)
 		}
+	}
+}
+
+type quantityState struct {
+	i        int64Amount
+	dec      *inf.Dec
+	unscaled string
+	scale    inf.Scale
+	s        string
+	format   Format
+}
+
+func snapshotQuantity(q *Quantity) quantityState {
+	st := quantityState{i: q.i, dec: q.d.Dec, s: q.s, format: q.Format}
+	if q.d.Dec != nil {
+		st.unscaled, st.scale = q.d.Dec.UnscaledBig().String(), q.d.Dec.Scale()
+	}
+	return st
+}
+
+func sharesMemory(a, b *inf.Dec) bool {
+	if a == nil || b == nil {
+		return false
+	}
+	if a == b {
+		return true
+	}
+	aw, bw := a.UnscaledBig().Bits(), b.UnscaledBig().Bits()
+	return cap(aw) > 0 && cap(bw) > 0 && &aw[:1][0] == &bw[:1][0]
+}
+
+func TestQuantityReadsDoNotMutate(t *testing.T) {
+	toDec := func(q Quantity) Quantity { q.ToDec(); return q }
+	reads := []struct {
+		name string
+		fn   func(q *Quantity, y Quantity) *inf.Dec
+	}{
+		{"Cmp", func(q *Quantity, y Quantity) *inf.Dec { q.Cmp(y); return nil }},
+		{"Equal", func(q *Quantity, y Quantity) *inf.Dec { q.Equal(y); return nil }},
+		{"CmpInt64", func(q *Quantity, _ Quantity) *inf.Dec { q.CmpInt64(7); return nil }},
+		{"AsDec", func(q *Quantity, _ Quantity) *inf.Dec { return q.AsDec() }},
+		{"DeepCopy", func(q *Quantity, _ Quantity) *inf.Dec { return q.DeepCopy().d.Dec }},
+		{"AsFloat64Slow", func(q *Quantity, _ Quantity) *inf.Dec { q.AsFloat64Slow(); return nil }},
+		{"AsApproximateFloat64", func(q *Quantity, _ Quantity) *inf.Dec { q.AsApproximateFloat64(); return nil }},
+		{"AsInt64", func(q *Quantity, _ Quantity) *inf.Dec { q.AsInt64(); return nil }},
+		{"AsScaledInt64", func(q *Quantity, _ Quantity) *inf.Dec { q.AsScaledInt64(Milli); return nil }},
+		{"Value", func(q *Quantity, _ Quantity) *inf.Dec { q.Value(); return nil }},
+		{"MilliValue", func(q *Quantity, _ Quantity) *inf.Dec { q.MilliValue(); return nil }},
+		{"AsScale", func(q *Quantity, _ Quantity) *inf.Dec { q.AsScale(0); return nil }},
+		{"AsCanonicalBytes", func(q *Quantity, _ Quantity) *inf.Dec { q.AsCanonicalBytes(nil); return nil }},
+		{"CanonicalizeBytes", func(q *Quantity, _ Quantity) *inf.Dec { q.CanonicalizeBytes(nil); return nil }},
+		{"Sign", func(q *Quantity, _ Quantity) *inf.Dec { q.Sign(); return nil }},
+		{"IsZero", func(q *Quantity, _ Quantity) *inf.Dec { q.IsZero(); return nil }},
+		{"String", func(q *Quantity, _ Quantity) *inf.Dec { _ = q.String(); return nil }},
+		{"MarshalJSON", func(q *Quantity, _ Quantity) *inf.Dec { _, _ = q.MarshalJSON(); return nil }},
+		{"Add argument", func(q *Quantity, y Quantity) *inf.Dec { acc := y.DeepCopy(); acc.Add(*q); return acc.d.Dec }},
+		{"Sub argument", func(q *Quantity, y Quantity) *inf.Dec { acc := y.DeepCopy(); acc.Sub(*q); return acc.d.Dec }},
+	}
+	for _, read := range reads {
+		t.Run(read.name, func(t *testing.T) {
+			table := []struct {
+				name string
+				q    Quantity
+			}{
+				{"Quantity{}", Quantity{}},
+				{"dec 0 uncached", toDec(Quantity{})},
+				{"1500m", MustParse("1500m")},
+				{"1500m uncached", intQuantity(1500, -3, DecimalSI)},
+				{"dec 1500m uncached", toDec(intQuantity(1500, -3, DecimalSI))},
+				{"50Ki", MustParse("50Ki")},
+				{"-50k uncached", intQuantity(-50, 3, BinarySI)},
+				{"dec 1.5Gi", MustParse("1.5Gi")},
+				{"dec 1.5 uncached", decQuantity(15, -1, DecimalSI)},
+				{"dec -9223372036854775809", MustParse("-9223372036854775809")},
+				{"dec 9223372036854775807", toDec(MustParse("9223372036854775807"))},
+			}
+			before := make([]quantityState, len(table))
+			for i := range table {
+				before[i] = snapshotQuantity(&table[i].q)
+			}
+			for i := range table {
+				for j := range table {
+					x, y := &table[i], &table[j]
+					got := read.fn(&x.q, y.q)
+					if sharesMemory(got, x.q.d.Dec) || sharesMemory(got, y.q.d.Dec) {
+						t.Errorf("%s(%s, %s) returned memory shared with an operand", read.name, x.name, y.name)
+					}
+				}
+			}
+			for i := range table {
+				if after := snapshotQuantity(&table[i].q); after != before[i] {
+					t.Errorf("%s changed %s from %+v to %+v", read.name, table[i].name, before[i], after)
+				}
+			}
+		})
 	}
 }
 
@@ -1911,7 +2044,6 @@ func TestQuantityAsInt64(t *testing.T) {
 				fn   func(*Quantity)
 			}{
 				{"ToDec", func(q *Quantity) { q.ToDec() }},
-				{"AsDec", func(q *Quantity) { q.AsDec() }},
 			} {
 				promoted := item.in.DeepCopy()
 				promote.fn(&promoted)

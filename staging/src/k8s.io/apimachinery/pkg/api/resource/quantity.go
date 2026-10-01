@@ -584,14 +584,13 @@ func (q *Quantity) ToDec() *Quantity {
 	return q
 }
 
-// AsDec returns the quantity as represented by a scaled inf.Dec.
+// AsDec returns the quantity as represented by a scaled inf.Dec. The returned
+// quantity is a copy to avoid accidentally modifying the original.
 func (q *Quantity) AsDec() *inf.Dec {
 	if q.d.Dec != nil {
-		return q.d.Dec
+		return new(inf.Dec).Set(q.d.Dec)
 	}
-	q.d.Dec = q.i.AsDec()
-	q.i = int64Amount{}
-	return q.d.Dec
+	return q.i.AsDec()
 }
 
 // AsCanonicalBytes returns the canonical byte representation of this quantity as a mantissa
@@ -700,6 +699,7 @@ func (q *Quantity) Mul(y int64) bool {
 
 // Cmp returns 0 if the quantity is equal to y, -1 if the quantity is less than y, or 1 if the
 // quantity is greater than y.
+// Cmp does not modify q or y.
 func (q *Quantity) Cmp(y Quantity) int {
 	if q.d.Dec == nil && y.d.Dec == nil {
 		return q.i.Cmp(y.i)
