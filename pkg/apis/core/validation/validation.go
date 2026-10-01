@@ -65,6 +65,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/core/helper/qos"
 	podshelper "k8s.io/kubernetes/pkg/apis/core/pods"
 	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
+	resourceapi "k8s.io/kubernetes/pkg/apis/resource"
 
 	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/features"
@@ -6228,7 +6229,7 @@ func ValidatePodStatusUpdate(newPod, oldPod *core.Pod, opts PodValidationOptions
 	allErrs = append(allErrs, ValidateEphemeralContainerStateTransition(newPod.Status.EphemeralContainerStatuses, oldPod.Status.EphemeralContainerStatuses, fldPath.Child("ephemeralContainerStatuses"))...)
 	allErrs = append(allErrs, validatePodResourceClaimStatuses(newPod.Status.ResourceClaimStatuses, newPod.Spec.ResourceClaims, fldPath.Child("resourceClaimStatuses"))...)
 	allErrs = append(allErrs, validatePodExtendedResourceClaimStatus(newPod.Status.ExtendedResourceClaimStatus, &newPod.Spec, fldPath.Child("extendedResourceClaimStatus"))...)
-	allErrs = append(allErrs, validateNodeAllocatableResourceClaimStatus(newPod.Status, &newPod.Spec, fldPath.Child("nodeAllocatableResourceClaimStatuses"))...)
+	allErrs = append(allErrs, validateExtraNodeAllocatableResources(newPod.Status, &newPod.Spec, fldPath.Child("extraNodeAllocatableResources"))...)
 
 	if len(newPod.Status.VolumeHealth) > 0 {
 		allErrs = append(allErrs, validatePodVolumeHealth(newPod.Status.VolumeHealth, &newPod.Spec, fldPath.Child("volumeHealth"))...)
@@ -6322,59 +6323,126 @@ func validatePodResourceClaimStatuses(statuses []core.PodResourceClaimStatus, po
 	return allErrs
 }
 
-// validateNodeAllocatableResourceClaimStatus validates NodeAllocatableResourceClaimStatuses in a pod status
-func validateNodeAllocatableResourceClaimStatus(podStatus core.PodStatus, podSpec *core.PodSpec, fldPath *field.Path) field.ErrorList {
+// validateExtraNodeAllocatableResources validates ExtraNodeAllocatableResources in a pod status
+func validateExtraNodeAllocatableResources(podStatus core.PodStatus, podSpec *core.PodSpec, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
-	if len(podStatus.NodeAllocatableResourceClaimStatuses) == 0 {
+	if len(podStatus.ExtraNodeAllocatableResources) == 0 {
 		return allErrs
 	}
 
-	for i, nodeAllocatableStatus := range podStatus.NodeAllocatableResourceClaimStatuses {
+	containerNames := sets.New[string]()
+	for _, c := range podSpec.InitContainers {
+		containerNames.Insert(c.Name)
+	}
+	for _, c := range podSpec.Containers {
+		containerNames.Insert(c.Name)
+	}
+
+	// Declarative validation cannot dedupe on a struct key.
+	type sourceKey struct {
+		apiGroup, kind, name string
+	}
+	seenSources := sets.New[sourceKey]()
+	for i, res := range podStatus.ExtraNodeAllocatableResources {
 		statusFldPath := fldPath.Index(i)
-		if nodeAllocatableStatus.ResourceClaimName == "" {
-			continue
-		}
+		sourceFldPath := statusFldPath.Child("source")
+		source := res.Source
 
-		// First check the podSpec to see if the ResourceClaim is directly referenced.
-		// If not, check the podStatus to see if the ResourceClaim was generated from a template.
-		found := false
-		for _, claimRef := range podSpec.ResourceClaims {
-			if (claimRef.ResourceClaimName != nil) && (*claimRef.ResourceClaimName == nodeAllocatableStatus.ResourceClaimName) {
-				found = true
-				break
+		// Missing fields get required errors from declarative validation.
+		if source.APIGroup != "" && source.Kind != "" && source.Name != "" {
+			key := sourceKey{apiGroup: source.APIGroup, kind: source.Kind, name: source.Name}
+			if seenSources.Has(key) {
+				allErrs = append(allErrs, field.Duplicate(sourceFldPath, source))
+			} else {
+				seenSources.Insert(key)
 			}
 		}
-		if !found {
-			for _, claimRef := range podStatus.ResourceClaimStatuses {
-				if (claimRef.ResourceClaimName != nil) && (*claimRef.ResourceClaimName == nodeAllocatableStatus.ResourceClaimName) {
-					found = true
-					break
-				}
+
+		allErrs = append(allErrs, validateExtraNodeAllocatableSource(source, podStatus, podSpec, sourceFldPath)...)
+
+		containersFldPath := statusFldPath.Child("containers")
+		for j, containerName := range res.Containers {
+			if !containerNames.Has(containerName) {
+				allErrs = append(allErrs, field.Invalid(containersFldPath.Index(j), containerName, "must match the name of an entry in `spec.initContainers` or `spec.containers`"))
 			}
 		}
-		// Extended resources backed by DRA are satisfied by a scheduler-created
-		// ResourceClaim that is not referenced in podSpec.ResourceClaims nor in
-		// podStatus.ResourceClaimStatuses. Its name is recorded in
-		// podStatus.ExtendedResourceClaimStatus instead.
-		if !found && podStatus.ExtendedResourceClaimStatus != nil &&
-			podStatus.ExtendedResourceClaimStatus.ResourceClaimName == nodeAllocatableStatus.ResourceClaimName {
-			found = true
-		}
 
-		if !found {
-			allErrs = append(allErrs, field.Invalid(statusFldPath.Child("resourceClaimName"), nodeAllocatableStatus.ResourceClaimName, "no mapping found in pod reference"))
+		if len(res.Mapping) > 0 {
+			allErrs = append(allErrs, validateNodeAllocatableMappedResources(res.Mapping, statusFldPath.Child("mapping"))...)
 		}
-
-		if len(nodeAllocatableStatus.Mapping) > 0 {
-			allErrs = append(allErrs, validateNodeAllocatableMappedResources(nodeAllocatableStatus.Mapping, statusFldPath.Child("mapping"))...)
-		}
-		if len(nodeAllocatableStatus.Overhead) > 0 {
-			allErrs = append(allErrs, validateNodeAllocatableOverheadResources(nodeAllocatableStatus.Overhead, statusFldPath.Child("overhead"))...)
+		if len(res.Overhead) > 0 {
+			allErrs = append(allErrs, validateNodeAllocatableOverheadResources(res.Overhead, statusFldPath.Child("overhead"))...)
 		}
 	}
 
 	return allErrs
+}
+
+// isKubernetesAPIGroup reports whether group is reserved for Kubernetes APIs:
+// the core group, groups without a dot, "k8s.io", and groups ending in ".k8s.io".
+func isKubernetesAPIGroup(group string) bool {
+	return group == "" ||
+		group == "k8s.io" ||
+		strings.HasSuffix(group, ".k8s.io") ||
+		!strings.Contains(group, ".")
+}
+
+// validateExtraNodeAllocatableSource validates the source type and reference.
+func validateExtraNodeAllocatableSource(source core.ExtraNodeAllocatableReference, podStatus core.PodStatus, podSpec *core.PodSpec, fldPath *field.Path) field.ErrorList {
+	// Required by declarative validation.
+	if source.APIGroup == "" || source.Kind == "" || source.Name == "" {
+		return nil
+	}
+
+	allErrs := field.ErrorList{}
+	if !isKubernetesAPIGroup(source.APIGroup) {
+		// Non-Kubernetes API groups may be populated by out-of-tree scheduler
+		// plugins. We validate only that the reference fields are well-formed.
+		// Declarative validation checks the apiGroup format.
+		for _, msg := range validation.IsDNS1035Label(strings.ToLower(source.Kind)) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("kind"), source.Kind, "may have mixed case, but should otherwise match: "+msg))
+		}
+		for _, msg := range content.IsPathSegmentName(source.Name) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("name"), source.Name, msg))
+		}
+		return allErrs
+	}
+
+	// For Kubernetes API groups, we currently only support APIGroup "resource.k8s.io" and kind "ResourceClaim".
+	if source.APIGroup != resourceapi.GroupName {
+		allErrs = append(allErrs, field.NotSupported(fldPath.Child("apiGroup"), source.APIGroup, []string{resourceapi.GroupName}))
+	}
+	if source.Kind != "ResourceClaim" {
+		allErrs = append(allErrs, field.NotSupported(fldPath.Child("kind"), source.Kind, []string{"ResourceClaim"}))
+	}
+	if len(allErrs) > 0 {
+		return allErrs
+	}
+
+	return validateExtraNodeAllocatableResourceClaim(source.Name, podStatus, podSpec, fldPath.Child("name"))
+}
+
+// validateExtraNodeAllocatableResourceClaim validates that the pod references the claim.
+func validateExtraNodeAllocatableResourceClaim(claimName string, podStatus core.PodStatus, podSpec *core.PodSpec, fldPath *field.Path) field.ErrorList {
+	// First check the podSpec to see if the ResourceClaim is directly referenced.
+	// If not, check the podStatus to see if the ResourceClaim was generated from a template.
+	for _, claimRef := range podSpec.ResourceClaims {
+		if claimRef.ResourceClaimName != nil && *claimRef.ResourceClaimName == claimName {
+			return nil
+		}
+	}
+	for _, claimRef := range podStatus.ResourceClaimStatuses {
+		if claimRef.ResourceClaimName != nil && *claimRef.ResourceClaimName == claimName {
+			return nil
+		}
+	}
+	// Extended resources backed by DRA are satisfied by a scheduler-created ResourceClaim that is not referenced in podSpec.ResourceClaims nor in
+	// podStatus.ResourceClaimStatuses. Its name is recorded in podStatus.ExtendedResourceClaimStatus instead.
+	if podStatus.ExtendedResourceClaimStatus != nil && podStatus.ExtendedResourceClaimStatus.ResourceClaimName == claimName {
+		return nil
+	}
+	return field.ErrorList{field.Invalid(fldPath, claimName, "no mapping found in pod reference")}
 }
 
 // validateNodeAllocatableMappedResources validates a list of mapped node allocatable resources
@@ -6763,7 +6831,7 @@ func validatePodLevelResourcesResize(newPod, oldPod *core.Pod, podSpecToMutate *
 		allErrs = append(allErrs, errs)
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.DRANodeAllocatableResources) && len(newPod.Status.NodeAllocatableResourceClaimStatuses) > 0 {
+	if utilfeature.DefaultFeatureGate.Enabled(features.DRANodeAllocatableResources) && len(newPod.Status.ExtraNodeAllocatableResources) > 0 {
 		v1Pod := &v1.Pod{}
 		if err := corev1.Convert_core_Pod_To_v1_Pod(newPod, v1Pod, nil); err != nil {
 			allErrs = append(allErrs, field.InternalError(specPath, fmt.Errorf("failed to convert pod for DRA validation: %w", err)))
