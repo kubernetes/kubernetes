@@ -17257,7 +17257,7 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 	}
 }
 
-func TestValidateNodeAllocatableResourceClaimStatus(t *testing.T) {
+func TestValidateAdditionalNodeAllocatableResources(t *testing.T) {
 	validPodSpec1 := core.PodSpec{
 		Containers: []core.Container{
 			{
@@ -17303,13 +17303,13 @@ func TestValidateNodeAllocatableResourceClaimStatus(t *testing.T) {
 		errorMsg    string
 	}{
 		{
-			name: "Valid NodeAllocatableResourceClaimStatus",
+			name: "Valid AdditionalNodeAllocatableResource",
 			spec: validPodSpec1,
 			podStatus: core.PodStatus{
-				NodeAllocatableResourceClaimStatuses: []core.NodeAllocatableResourceClaimStatus{
+				AdditionalNodeAllocatableResources: []core.AdditionalNodeAllocatableResource{
 					{
-						ResourceClaimName: "my-claim1",
-						Containers:        []string{"c1"},
+						Source:     core.AdditionalNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "my-claim1"},
+						Containers: []string{"c1"},
 						Mapping: []core.NodeAllocatableMappedResources{
 							{Name: core.ResourceCPU, Quantity: new(resource.MustParse("1"))},
 							{Name: core.ResourceMemory, Quantity: new(resource.MustParse("1Gi"))},
@@ -17320,20 +17320,99 @@ func TestValidateNodeAllocatableResourceClaimStatus(t *testing.T) {
 			expectError: false,
 		},
 		{
-			name: "Valid Multiple NodeAllocatableResourceClaimStatus",
-			spec: validPodSpec2,
+			name: "Invalid duplicate source",
+			spec: validPodSpec1,
 			podStatus: core.PodStatus{
-				NodeAllocatableResourceClaimStatuses: []core.NodeAllocatableResourceClaimStatus{
+				AdditionalNodeAllocatableResources: []core.AdditionalNodeAllocatableResource{
 					{
-						ResourceClaimName: "my-claim1",
-						Containers:        []string{"c1"},
+						Source:     core.AdditionalNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "my-claim1"},
+						Containers: []string{"c1"},
 						Mapping: []core.NodeAllocatableMappedResources{
 							{Name: core.ResourceCPU, Quantity: new(resource.MustParse("1"))},
 						},
 					},
 					{
-						ResourceClaimName: "my-claim2",
-						Containers:        []string{"c1"},
+						Source:     core.AdditionalNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "my-claim1"},
+						Containers: []string{"c1"},
+						Mapping: []core.NodeAllocatableMappedResources{
+							{Name: core.ResourceMemory, Quantity: new(resource.MustParse("1Gi"))},
+						},
+					},
+				},
+			},
+			expectError: true,
+			errorType:   field.ErrorTypeDuplicate,
+			errorField:  "status.additionalNodeAllocatableResources[1].source",
+		},
+		{
+			name: "Invalid source apiGroup not supported",
+			spec: validPodSpec1,
+			podStatus: core.PodStatus{
+				AdditionalNodeAllocatableResources: []core.AdditionalNodeAllocatableResource{
+					{
+						Source:     core.AdditionalNodeAllocatableReference{APIGroup: "example.com", Kind: "ResourceClaim", Name: "my-claim1"},
+						Containers: []string{"c1"},
+						Mapping: []core.NodeAllocatableMappedResources{
+							{Name: core.ResourceCPU, Quantity: new(resource.MustParse("1"))},
+						},
+					},
+				},
+			},
+			expectError: true,
+			errorType:   field.ErrorTypeNotSupported,
+			errorField:  "status.additionalNodeAllocatableResources[0].source.apiGroup",
+		},
+		{
+			name: "Invalid source apiGroup empty",
+			spec: validPodSpec1,
+			podStatus: core.PodStatus{
+				AdditionalNodeAllocatableResources: []core.AdditionalNodeAllocatableResource{
+					{
+						Source:     core.AdditionalNodeAllocatableReference{Kind: "ResourceClaim", Name: "my-claim1"},
+						Containers: []string{"c1"},
+						Mapping: []core.NodeAllocatableMappedResources{
+							{Name: core.ResourceCPU, Quantity: new(resource.MustParse("1"))},
+						},
+					},
+				},
+			},
+			expectError: true,
+			errorType:   field.ErrorTypeNotSupported,
+			errorField:  "status.additionalNodeAllocatableResources[0].source.apiGroup",
+		},
+		{
+			name: "Invalid source kind not supported",
+			spec: validPodSpec1,
+			podStatus: core.PodStatus{
+				AdditionalNodeAllocatableResources: []core.AdditionalNodeAllocatableResource{
+					{
+						Source:     core.AdditionalNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaimTemplate", Name: "my-claim1"},
+						Containers: []string{"c1"},
+						Mapping: []core.NodeAllocatableMappedResources{
+							{Name: core.ResourceCPU, Quantity: new(resource.MustParse("1"))},
+						},
+					},
+				},
+			},
+			expectError: true,
+			errorType:   field.ErrorTypeNotSupported,
+			errorField:  "status.additionalNodeAllocatableResources[0].source.kind",
+		},
+		{
+			name: "Valid Multiple AdditionalNodeAllocatableResource",
+			spec: validPodSpec2,
+			podStatus: core.PodStatus{
+				AdditionalNodeAllocatableResources: []core.AdditionalNodeAllocatableResource{
+					{
+						Source:     core.AdditionalNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "my-claim1"},
+						Containers: []string{"c1"},
+						Mapping: []core.NodeAllocatableMappedResources{
+							{Name: core.ResourceCPU, Quantity: new(resource.MustParse("1"))},
+						},
+					},
+					{
+						Source:     core.AdditionalNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "my-claim2"},
+						Containers: []string{"c1"},
 						Mapping: []core.NodeAllocatableMappedResources{
 							{Name: core.ResourceMemory, Quantity: new(resource.MustParse("2Gi"))},
 						},
@@ -17346,10 +17425,10 @@ func TestValidateNodeAllocatableResourceClaimStatus(t *testing.T) {
 			name: "Invalid Resource Name",
 			spec: validPodSpec1,
 			podStatus: core.PodStatus{
-				NodeAllocatableResourceClaimStatuses: []core.NodeAllocatableResourceClaimStatus{
+				AdditionalNodeAllocatableResources: []core.AdditionalNodeAllocatableResource{
 					{
-						ResourceClaimName: "my-claim1",
-						Containers:        []string{"c1"},
+						Source:     core.AdditionalNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "my-claim1"},
+						Containers: []string{"c1"},
 						Mapping: []core.NodeAllocatableMappedResources{
 							{Name: "example.com/foo", Quantity: new(resource.MustParse("1"))},
 						},
@@ -17358,17 +17437,17 @@ func TestValidateNodeAllocatableResourceClaimStatus(t *testing.T) {
 			},
 			expectError: true,
 			errorType:   field.ErrorTypeInvalid,
-			errorField:  "status.nodeAllocatableResourceClaimStatuses[0].mapping[0].name",
+			errorField:  "status.additionalNodeAllocatableResources[0].mapping[0].name",
 			errorMsg:    "must be a node allocatable resource name",
 		},
 		{
 			name: "Non-standard resource name",
 			spec: validPodSpec1,
 			podStatus: core.PodStatus{
-				NodeAllocatableResourceClaimStatuses: []core.NodeAllocatableResourceClaimStatus{
+				AdditionalNodeAllocatableResources: []core.AdditionalNodeAllocatableResource{
 					{
-						ResourceClaimName: "my-claim1",
-						Containers:        []string{"c1"},
+						Source:     core.AdditionalNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "my-claim1"},
+						Containers: []string{"c1"},
 						Mapping: []core.NodeAllocatableMappedResources{
 							{Name: "abc", Quantity: new(resource.MustParse("1"))},
 						},
@@ -17377,17 +17456,17 @@ func TestValidateNodeAllocatableResourceClaimStatus(t *testing.T) {
 			},
 			expectError: true,
 			errorType:   field.ErrorTypeInvalid,
-			errorField:  "status.nodeAllocatableResourceClaimStatuses[0].mapping[0].name",
+			errorField:  "status.additionalNodeAllocatableResources[0].mapping[0].name",
 			errorMsg:    "must be a node allocatable resource name",
 		},
 		{
 			name: "kubernetes.io prefixed resource name",
 			spec: validPodSpec1,
 			podStatus: core.PodStatus{
-				NodeAllocatableResourceClaimStatuses: []core.NodeAllocatableResourceClaimStatus{
+				AdditionalNodeAllocatableResources: []core.AdditionalNodeAllocatableResource{
 					{
-						ResourceClaimName: "my-claim1",
-						Containers:        []string{"c1"},
+						Source:     core.AdditionalNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "my-claim1"},
+						Containers: []string{"c1"},
 						Overhead: []core.NodeAllocatableOverheadResources{
 							{Name: "kubernetes.io/foo", PerPod: new(resource.MustParse("1Gi"))},
 						},
@@ -17396,17 +17475,17 @@ func TestValidateNodeAllocatableResourceClaimStatus(t *testing.T) {
 			},
 			expectError: true,
 			errorType:   field.ErrorTypeInvalid,
-			errorField:  "status.nodeAllocatableResourceClaimStatuses[0].overhead[0].name",
+			errorField:  "status.additionalNodeAllocatableResources[0].overhead[0].name",
 			errorMsg:    "must be a node allocatable resource name",
 		},
 		{
 			name: "Ephemeral Storage resource name is rejected",
 			spec: validPodSpec1,
 			podStatus: core.PodStatus{
-				NodeAllocatableResourceClaimStatuses: []core.NodeAllocatableResourceClaimStatus{
+				AdditionalNodeAllocatableResources: []core.AdditionalNodeAllocatableResource{
 					{
-						ResourceClaimName: "my-claim1",
-						Containers:        []string{"c1"},
+						Source:     core.AdditionalNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "my-claim1"},
+						Containers: []string{"c1"},
 						Mapping: []core.NodeAllocatableMappedResources{
 							{Name: "ephemeral-storage", Quantity: new(resource.MustParse("10Gi"))},
 						},
@@ -17415,17 +17494,17 @@ func TestValidateNodeAllocatableResourceClaimStatus(t *testing.T) {
 			},
 			expectError: true,
 			errorType:   field.ErrorTypeInvalid,
-			errorField:  "status.nodeAllocatableResourceClaimStatuses[0].mapping[0].name",
+			errorField:  "status.additionalNodeAllocatableResources[0].mapping[0].name",
 			errorMsg:    "must be a node allocatable resource name",
 		},
 		{
 			name: "Valid hugepages resource name",
 			spec: validPodSpec1,
 			podStatus: core.PodStatus{
-				NodeAllocatableResourceClaimStatuses: []core.NodeAllocatableResourceClaimStatus{
+				AdditionalNodeAllocatableResources: []core.AdditionalNodeAllocatableResource{
 					{
-						ResourceClaimName: "my-claim1",
-						Containers:        []string{"c1"},
+						Source:     core.AdditionalNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "my-claim1"},
+						Containers: []string{"c1"},
 						Mapping: []core.NodeAllocatableMappedResources{
 							{Name: "hugepages-2Mi", Quantity: new(resource.MustParse("2Mi"))},
 						},
@@ -17438,10 +17517,10 @@ func TestValidateNodeAllocatableResourceClaimStatus(t *testing.T) {
 			name: "Negative Quantity",
 			spec: validPodSpec1,
 			podStatus: core.PodStatus{
-				NodeAllocatableResourceClaimStatuses: []core.NodeAllocatableResourceClaimStatus{
+				AdditionalNodeAllocatableResources: []core.AdditionalNodeAllocatableResource{
 					{
-						ResourceClaimName: "my-claim1",
-						Containers:        []string{"c1"},
+						Source:     core.AdditionalNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "my-claim1"},
+						Containers: []string{"c1"},
 						Mapping: []core.NodeAllocatableMappedResources{
 							{Name: core.ResourceCPU, Quantity: new(resource.MustParse("-1"))},
 						},
@@ -17450,16 +17529,16 @@ func TestValidateNodeAllocatableResourceClaimStatus(t *testing.T) {
 			},
 			expectError: true,
 			errorType:   field.ErrorTypeInvalid,
-			errorField:  "status.nodeAllocatableResourceClaimStatuses[0].mapping[0].quantity",
+			errorField:  "status.additionalNodeAllocatableResources[0].mapping[0].quantity",
 			errorMsg:    "must be non-negative",
 		},
 		{
-			name: "Valid NodeAllocatableResourceClaimStatus with empty containers",
+			name: "Valid AdditionalNodeAllocatableResource with empty containers",
 			spec: validPodSpec1,
 			podStatus: core.PodStatus{
-				NodeAllocatableResourceClaimStatuses: []core.NodeAllocatableResourceClaimStatus{
+				AdditionalNodeAllocatableResources: []core.AdditionalNodeAllocatableResource{
 					{
-						ResourceClaimName: "my-claim1",
+						Source: core.AdditionalNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "my-claim1"},
 						Mapping: []core.NodeAllocatableMappedResources{
 							{Name: core.ResourceCPU, Quantity: new(resource.MustParse("1"))},
 						},
@@ -17470,7 +17549,7 @@ func TestValidateNodeAllocatableResourceClaimStatus(t *testing.T) {
 		},
 
 		{
-			name: "Valid ResourceClaimName from PodSpec",
+			name: "Valid claim source from PodSpec",
 			spec: core.PodSpec{
 				Containers: []core.Container{
 					{
@@ -17483,10 +17562,10 @@ func TestValidateNodeAllocatableResourceClaimStatus(t *testing.T) {
 				},
 			},
 			podStatus: core.PodStatus{
-				NodeAllocatableResourceClaimStatuses: []core.NodeAllocatableResourceClaimStatus{
+				AdditionalNodeAllocatableResources: []core.AdditionalNodeAllocatableResource{
 					{
-						ResourceClaimName: "my-claim1",
-						Containers:        []string{"c1"},
+						Source:     core.AdditionalNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "my-claim1"},
+						Containers: []string{"c1"},
 						Mapping: []core.NodeAllocatableMappedResources{
 							{Name: core.ResourceCPU, Quantity: new(resource.MustParse("1"))},
 						},
@@ -17496,7 +17575,7 @@ func TestValidateNodeAllocatableResourceClaimStatus(t *testing.T) {
 			expectError: false,
 		},
 		{
-			name: "Valid ResourceClaimName from PodStatus",
+			name: "Valid claim source from PodStatus",
 			spec: core.PodSpec{
 				Containers: []core.Container{
 					{
@@ -17509,10 +17588,10 @@ func TestValidateNodeAllocatableResourceClaimStatus(t *testing.T) {
 				ResourceClaimStatuses: []core.PodResourceClaimStatus{
 					{Name: "claim1", ResourceClaimName: ptr.To("generated-claim1")},
 				},
-				NodeAllocatableResourceClaimStatuses: []core.NodeAllocatableResourceClaimStatus{
+				AdditionalNodeAllocatableResources: []core.AdditionalNodeAllocatableResource{
 					{
-						ResourceClaimName: "generated-claim1",
-						Containers:        []string{"c1"},
+						Source:     core.AdditionalNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "generated-claim1"},
+						Containers: []string{"c1"},
 						Mapping: []core.NodeAllocatableMappedResources{
 							{Name: core.ResourceCPU, Quantity: new(resource.MustParse("1"))},
 						},
@@ -17522,7 +17601,7 @@ func TestValidateNodeAllocatableResourceClaimStatus(t *testing.T) {
 			expectError: false,
 		},
 		{
-			name: "Invalid ResourceClaimName not found",
+			name: "Invalid claim source not found",
 			spec: core.PodSpec{
 				Containers: []core.Container{
 					{
@@ -17538,10 +17617,10 @@ func TestValidateNodeAllocatableResourceClaimStatus(t *testing.T) {
 				ResourceClaimStatuses: []core.PodResourceClaimStatus{
 					{Name: "claim2", ResourceClaimName: ptr.To("generated-claim2")},
 				},
-				NodeAllocatableResourceClaimStatuses: []core.NodeAllocatableResourceClaimStatus{
+				AdditionalNodeAllocatableResources: []core.AdditionalNodeAllocatableResource{
 					{
-						ResourceClaimName: "non-existent-claim",
-						Containers:        []string{"c1"},
+						Source:     core.AdditionalNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "non-existent-claim"},
+						Containers: []string{"c1"},
 						Mapping: []core.NodeAllocatableMappedResources{
 							{Name: core.ResourceCPU, Quantity: new(resource.MustParse("1"))},
 						},
@@ -17550,21 +17629,21 @@ func TestValidateNodeAllocatableResourceClaimStatus(t *testing.T) {
 			},
 			expectError: true,
 			errorType:   field.ErrorTypeInvalid,
-			errorField:  "status.nodeAllocatableResourceClaimStatuses[0].resourceClaimName",
-			errorMsg:    "not found in PodSpec.ResourceClaims or PodStatus.ResourceClaimStatuses",
+			errorField:  "status.additionalNodeAllocatableResources[0].source.name",
+			errorMsg:    "no mapping found in pod reference",
 		},
 
 		{
-			name: "Invalid NodeAllocatableResourceClaimStatus overhead neither perPod nor perContainer set",
+			name: "Invalid AdditionalNodeAllocatableResource overhead neither perPod nor perContainer set",
 			spec: core.PodSpec{
 				Containers:     []core.Container{{Name: "c1", Image: "image"}},
 				ResourceClaims: []core.PodResourceClaim{{Name: "claim1", ResourceClaimName: new("my-claim1")}},
 			},
 			podStatus: core.PodStatus{
-				NodeAllocatableResourceClaimStatuses: []core.NodeAllocatableResourceClaimStatus{
+				AdditionalNodeAllocatableResources: []core.AdditionalNodeAllocatableResource{
 					{
-						ResourceClaimName: "my-claim1",
-						Containers:        []string{"c1"},
+						Source:     core.AdditionalNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "my-claim1"},
+						Containers: []string{"c1"},
 						Overhead: []core.NodeAllocatableOverheadResources{
 							{Name: core.ResourceMemory},
 						},
@@ -17573,20 +17652,20 @@ func TestValidateNodeAllocatableResourceClaimStatus(t *testing.T) {
 			},
 			expectError: true,
 			errorType:   field.ErrorTypeInvalid,
-			errorField:  "status.nodeAllocatableResourceClaimStatuses[0].overhead[0]",
+			errorField:  "status.additionalNodeAllocatableResources[0].overhead[0]",
 			errorMsg:    "at least one of perPod or perContainer must be set",
 		},
 		{
-			name: "Invalid NodeAllocatableResourceClaimStatus overhead negative perPod",
+			name: "Invalid AdditionalNodeAllocatableResource overhead negative perPod",
 			spec: core.PodSpec{
 				Containers:     []core.Container{{Name: "c1", Image: "image"}},
 				ResourceClaims: []core.PodResourceClaim{{Name: "claim1", ResourceClaimName: new("my-claim1")}},
 			},
 			podStatus: core.PodStatus{
-				NodeAllocatableResourceClaimStatuses: []core.NodeAllocatableResourceClaimStatus{
+				AdditionalNodeAllocatableResources: []core.AdditionalNodeAllocatableResource{
 					{
-						ResourceClaimName: "my-claim1",
-						Containers:        []string{"c1"},
+						Source:     core.AdditionalNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "my-claim1"},
+						Containers: []string{"c1"},
 						Overhead: []core.NodeAllocatableOverheadResources{
 							{Name: core.ResourceMemory, PerPod: new(resource.MustParse("-1Gi"))},
 						},
@@ -17595,20 +17674,20 @@ func TestValidateNodeAllocatableResourceClaimStatus(t *testing.T) {
 			},
 			expectError: true,
 			errorType:   field.ErrorTypeInvalid,
-			errorField:  "status.nodeAllocatableResourceClaimStatuses[0].overhead[0].perPod",
+			errorField:  "status.additionalNodeAllocatableResources[0].overhead[0].perPod",
 			errorMsg:    "must be non-negative",
 		},
 		{
-			name: "Invalid NodeAllocatableResourceClaimStatus overhead negative perContainer",
+			name: "Invalid AdditionalNodeAllocatableResource overhead negative perContainer",
 			spec: core.PodSpec{
 				Containers:     []core.Container{{Name: "c1", Image: "image"}},
 				ResourceClaims: []core.PodResourceClaim{{Name: "claim1", ResourceClaimName: new("my-claim1")}},
 			},
 			podStatus: core.PodStatus{
-				NodeAllocatableResourceClaimStatuses: []core.NodeAllocatableResourceClaimStatus{
+				AdditionalNodeAllocatableResources: []core.AdditionalNodeAllocatableResource{
 					{
-						ResourceClaimName: "my-claim1",
-						Containers:        []string{"c1"},
+						Source:     core.AdditionalNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "my-claim1"},
+						Containers: []string{"c1"},
 						Overhead: []core.NodeAllocatableOverheadResources{
 							{Name: core.ResourceMemory, PerContainer: new(resource.MustParse("-500Mi"))},
 						},
@@ -17617,20 +17696,20 @@ func TestValidateNodeAllocatableResourceClaimStatus(t *testing.T) {
 			},
 			expectError: true,
 			errorType:   field.ErrorTypeInvalid,
-			errorField:  "status.nodeAllocatableResourceClaimStatuses[0].overhead[0].perContainer",
+			errorField:  "status.additionalNodeAllocatableResources[0].overhead[0].perContainer",
 			errorMsg:    "must be non-negative",
 		},
 		{
-			name: "Valid NodeAllocatableResourceClaimStatus overhead both set",
+			name: "Valid AdditionalNodeAllocatableResource overhead both set",
 			spec: core.PodSpec{
 				Containers:     []core.Container{{Name: "c1", Image: "image"}},
 				ResourceClaims: []core.PodResourceClaim{{Name: "claim1", ResourceClaimName: new("my-claim1")}},
 			},
 			podStatus: core.PodStatus{
-				NodeAllocatableResourceClaimStatuses: []core.NodeAllocatableResourceClaimStatus{
+				AdditionalNodeAllocatableResources: []core.AdditionalNodeAllocatableResource{
 					{
-						ResourceClaimName: "my-claim1",
-						Containers:        []string{"c1"},
+						Source:     core.AdditionalNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "my-claim1"},
+						Containers: []string{"c1"},
 						Overhead: []core.NodeAllocatableOverheadResources{
 							{
 								Name:         core.ResourceMemory,
@@ -17650,10 +17729,10 @@ func TestValidateNodeAllocatableResourceClaimStatus(t *testing.T) {
 				ResourceClaims: []core.PodResourceClaim{{Name: "claim1", ResourceClaimName: new("my-claim1")}},
 			},
 			podStatus: core.PodStatus{
-				NodeAllocatableResourceClaimStatuses: []core.NodeAllocatableResourceClaimStatus{
+				AdditionalNodeAllocatableResources: []core.AdditionalNodeAllocatableResource{
 					{
-						ResourceClaimName: "my-claim1",
-						Containers:        []string{"c1"},
+						Source:     core.AdditionalNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "my-claim1"},
+						Containers: []string{"c1"},
 						Overhead: []core.NodeAllocatableOverheadResources{
 							{Name: "example.com/foo", PerPod: new(resource.MustParse("1Gi"))},
 						},
@@ -17662,11 +17741,11 @@ func TestValidateNodeAllocatableResourceClaimStatus(t *testing.T) {
 			},
 			expectError: true,
 			errorType:   field.ErrorTypeInvalid,
-			errorField:  "status.nodeAllocatableResourceClaimStatuses[0].overhead[0].name",
+			errorField:  "status.additionalNodeAllocatableResources[0].overhead[0].name",
 			errorMsg:    "must be a node allocatable resource name",
 		},
 		{
-			name: "Valid ResourceClaimName from ExtendedResourceClaimStatus",
+			name: "Valid claim source from ExtendedResourceClaimStatus",
 			spec: core.PodSpec{
 				Containers: []core.Container{
 					{Name: "c1", Image: "image"},
@@ -17676,10 +17755,10 @@ func TestValidateNodeAllocatableResourceClaimStatus(t *testing.T) {
 				ExtendedResourceClaimStatus: &core.PodExtendedResourceClaimStatus{
 					ResourceClaimName: "extended-claim1",
 				},
-				NodeAllocatableResourceClaimStatuses: []core.NodeAllocatableResourceClaimStatus{
+				AdditionalNodeAllocatableResources: []core.AdditionalNodeAllocatableResource{
 					{
-						ResourceClaimName: "extended-claim1",
-						Containers:        []string{"c1"},
+						Source:     core.AdditionalNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "extended-claim1"},
+						Containers: []string{"c1"},
 						Mapping: []core.NodeAllocatableMappedResources{
 							{Name: core.ResourceCPU, Quantity: new(resource.MustParse("1"))},
 						},
@@ -17689,7 +17768,7 @@ func TestValidateNodeAllocatableResourceClaimStatus(t *testing.T) {
 			expectError: false,
 		},
 		{
-			name: "Invalid ResourceClaimName not matching ExtendedResourceClaimStatus",
+			name: "Invalid claim source not matching ExtendedResourceClaimStatus",
 			spec: core.PodSpec{
 				Containers: []core.Container{
 					{Name: "c1", Image: "image"},
@@ -17699,10 +17778,10 @@ func TestValidateNodeAllocatableResourceClaimStatus(t *testing.T) {
 				ExtendedResourceClaimStatus: &core.PodExtendedResourceClaimStatus{
 					ResourceClaimName: "extended-claim1",
 				},
-				NodeAllocatableResourceClaimStatuses: []core.NodeAllocatableResourceClaimStatus{
+				AdditionalNodeAllocatableResources: []core.AdditionalNodeAllocatableResource{
 					{
-						ResourceClaimName: "some-other-claim",
-						Containers:        []string{"c1"},
+						Source:     core.AdditionalNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "some-other-claim"},
+						Containers: []string{"c1"},
 						Mapping: []core.NodeAllocatableMappedResources{
 							{Name: core.ResourceCPU, Quantity: new(resource.MustParse("1"))},
 						},
@@ -17711,14 +17790,14 @@ func TestValidateNodeAllocatableResourceClaimStatus(t *testing.T) {
 			},
 			expectError: true,
 			errorType:   field.ErrorTypeInvalid,
-			errorField:  "status.nodeAllocatableResourceClaimStatuses[0].resourceClaimName",
+			errorField:  "status.additionalNodeAllocatableResources[0].source.name",
 			errorMsg:    "no mapping found in pod reference",
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			errs := validateNodeAllocatableResourceClaimStatus(tc.podStatus, &tc.spec, field.NewPath("status", "nodeAllocatableResourceClaimStatuses"))
+			errs := validateAdditionalNodeAllocatableResources(tc.podStatus, &tc.spec, field.NewPath("status", "additionalNodeAllocatableResources"))
 
 			if !tc.expectError {
 				if len(errs) != 0 {
@@ -30748,7 +30827,7 @@ func TestValidatePodResize(t *testing.T) {
 			err: "spec: Forbidden: only cpu and memory resources are mutable",
 		},
 		{
-			test: "Resize allowed for pod with NodeAllocatableResourceClaimStatuses",
+			test: "Resize allowed for pod with AdditionalNodeAllocatableResources",
 			old: func() *core.Pod {
 				p := podtest.MakePod("pod",
 					podtest.SetResourceClaims(core.PodResourceClaim{Name: "claim-1", ResourceClaimName: new("node-allocatable-claim-1")}),
@@ -30759,10 +30838,10 @@ func TestValidatePodResize(t *testing.T) {
 						}))),
 					podtest.SetPodResources(&core.ResourceRequirements{Limits: getResources("100m", "200Mi", "", "")}),
 				)
-				p.Status.NodeAllocatableResourceClaimStatuses = []core.NodeAllocatableResourceClaimStatus{
+				p.Status.AdditionalNodeAllocatableResources = []core.AdditionalNodeAllocatableResource{
 					{
-						ResourceClaimName: "node-allocatable-claim-1",
-						Containers:        []string{"container"},
+						Source:     core.AdditionalNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "node-allocatable-claim-1"},
+						Containers: []string{"container"},
 						Mapping: []core.NodeAllocatableMappedResources{{
 							Name:     core.ResourceCPU,
 							Quantity: new(resource.MustParse("100m")),
@@ -30781,10 +30860,10 @@ func TestValidatePodResize(t *testing.T) {
 						}))),
 					podtest.SetPodResources(&core.ResourceRequirements{Limits: getResources("200m", "200Mi", "", "")}),
 				)
-				p.Status.NodeAllocatableResourceClaimStatuses = []core.NodeAllocatableResourceClaimStatus{
+				p.Status.AdditionalNodeAllocatableResources = []core.AdditionalNodeAllocatableResource{
 					{
-						ResourceClaimName: "node-allocatable-claim-1",
-						Containers:        []string{"container"},
+						Source:     core.AdditionalNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "node-allocatable-claim-1"},
+						Containers: []string{"container"},
 						Mapping: []core.NodeAllocatableMappedResources{{
 							Name:     core.ResourceCPU,
 							Quantity: new(resource.MustParse("100m")),
@@ -31191,10 +31270,10 @@ func TestValidatePodResize(t *testing.T) {
 						}))),
 					podtest.SetPodResources(&core.ResourceRequirements{Requests: getResources("200m", "200Mi", "", "")}),
 				)
-				p.Status.NodeAllocatableResourceClaimStatuses = []core.NodeAllocatableResourceClaimStatus{
+				p.Status.AdditionalNodeAllocatableResources = []core.AdditionalNodeAllocatableResource{
 					{
-						ResourceClaimName: "node-allocatable-claim-1",
-						Containers:        []string{"container"},
+						Source:     core.AdditionalNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "node-allocatable-claim-1"},
+						Containers: []string{"container"},
 						Mapping: []core.NodeAllocatableMappedResources{{
 							Name:     core.ResourceCPU,
 							Quantity: new(resource.MustParse("100m")),
@@ -31213,10 +31292,10 @@ func TestValidatePodResize(t *testing.T) {
 						}))),
 					podtest.SetPodResources(&core.ResourceRequirements{Requests: getResources("150m", "200Mi", "", "")}),
 				)
-				p.Status.NodeAllocatableResourceClaimStatuses = []core.NodeAllocatableResourceClaimStatus{
+				p.Status.AdditionalNodeAllocatableResources = []core.AdditionalNodeAllocatableResource{
 					{
-						ResourceClaimName: "node-allocatable-claim-1",
-						Containers:        []string{"container"},
+						Source:     core.AdditionalNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "node-allocatable-claim-1"},
+						Containers: []string{"container"},
 						Mapping: []core.NodeAllocatableMappedResources{{
 							Name:     core.ResourceCPU,
 							Quantity: new(resource.MustParse("100m")),
@@ -31240,10 +31319,10 @@ func TestValidatePodResize(t *testing.T) {
 						}))),
 					podtest.SetPodResources(&core.ResourceRequirements{Limits: getResources("300m", "200Mi", "", "")}),
 				)
-				p.Status.NodeAllocatableResourceClaimStatuses = []core.NodeAllocatableResourceClaimStatus{
+				p.Status.AdditionalNodeAllocatableResources = []core.AdditionalNodeAllocatableResource{
 					{
-						ResourceClaimName: "node-allocatable-claim-1",
-						Containers:        []string{"container"},
+						Source:     core.AdditionalNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "node-allocatable-claim-1"},
+						Containers: []string{"container"},
 						Overhead: []core.NodeAllocatableOverheadResources{{
 							Name:         core.ResourceCPU,
 							PerPod:       new(resource.MustParse("50m")),
@@ -31263,10 +31342,10 @@ func TestValidatePodResize(t *testing.T) {
 						}))),
 					podtest.SetPodResources(&core.ResourceRequirements{Limits: getResources("250m", "200Mi", "", "")}),
 				)
-				p.Status.NodeAllocatableResourceClaimStatuses = []core.NodeAllocatableResourceClaimStatus{
+				p.Status.AdditionalNodeAllocatableResources = []core.AdditionalNodeAllocatableResource{
 					{
-						ResourceClaimName: "node-allocatable-claim-1",
-						Containers:        []string{"container"},
+						Source:     core.AdditionalNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "node-allocatable-claim-1"},
+						Containers: []string{"container"},
 						Overhead: []core.NodeAllocatableOverheadResources{{
 							Name:         core.ResourceCPU,
 							PerPod:       new(resource.MustParse("50m")),
@@ -31295,10 +31374,10 @@ func TestValidatePodResize(t *testing.T) {
 						Limits:   getResources("300m", "400Mi", "", ""),
 					}),
 				)
-				p.Status.NodeAllocatableResourceClaimStatuses = []core.NodeAllocatableResourceClaimStatus{
+				p.Status.AdditionalNodeAllocatableResources = []core.AdditionalNodeAllocatableResource{
 					{
-						ResourceClaimName: "node-allocatable-claim-1",
-						Containers:        []string{"container"},
+						Source:     core.AdditionalNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "node-allocatable-claim-1"},
+						Containers: []string{"container"},
 						Overhead: []core.NodeAllocatableOverheadResources{{
 							Name:         core.ResourceCPU,
 							PerPod:       new(resource.MustParse("50m")),
@@ -31322,10 +31401,10 @@ func TestValidatePodResize(t *testing.T) {
 						Limits:   getResources("400m", "400Mi", "", ""),
 					}),
 				)
-				p.Status.NodeAllocatableResourceClaimStatuses = []core.NodeAllocatableResourceClaimStatus{
+				p.Status.AdditionalNodeAllocatableResources = []core.AdditionalNodeAllocatableResource{
 					{
-						ResourceClaimName: "node-allocatable-claim-1",
-						Containers:        []string{"container"},
+						Source:     core.AdditionalNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "node-allocatable-claim-1"},
+						Containers: []string{"container"},
 						Overhead: []core.NodeAllocatableOverheadResources{{
 							Name:         core.ResourceCPU,
 							PerPod:       new(resource.MustParse("50m")),
