@@ -60,6 +60,7 @@ import (
 	"k8s.io/component-base/metrics"
 	metricsfeatures "k8s.io/component-base/metrics/features"
 	"k8s.io/component-base/metrics/legacyregistry"
+	featuremetrics "k8s.io/component-base/metrics/prometheus/feature"
 	"k8s.io/component-base/metrics/prometheus/slis"
 	"k8s.io/component-base/version"
 	"k8s.io/component-base/version/verflag"
@@ -131,7 +132,7 @@ with the apiserver API to configure the proxy.`,
 				return fmt.Errorf("failed validate: %w", err)
 			}
 			// add feature enablement metrics
-			utilfeature.DefaultMutableFeatureGate.AddMetrics()
+			utilfeature.DefaultMutableFeatureGate.AddMetrics(featuremetrics.RecordFeatureInfo)
 			if err := opts.Run(context.Background()); err != nil {
 				opts.logger.Error(err, "Error running ProxyServer")
 				return err
