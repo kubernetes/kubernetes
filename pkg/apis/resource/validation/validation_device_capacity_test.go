@@ -424,7 +424,7 @@ func TestIsFractionalQuantity(t *testing.T) {
 			if got := isFractionalQuantity(q); got != scenario.wantFractional {
 				t.Errorf("isFractionalQuantity(%s) = %v, want %v", scenario.quantity, got, scenario.wantFractional)
 			}
-			q.AsDec()
+			q.ToDec()
 			if got := isFractionalQuantity(q); got != scenario.wantFractional {
 				t.Errorf("isFractionalQuantity(%s) with the inf.Dec backend = %v, want %v", scenario.quantity, got, scenario.wantFractional)
 			}
