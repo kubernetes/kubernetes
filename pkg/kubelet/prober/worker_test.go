@@ -1281,6 +1281,17 @@ func (r *blockingRunner) RunInContainer(ctx context.Context, _ kubecontainer.Con
 	return nil, ctx.Err()
 }
 
+// countingResultsManager observes writes even if cleanup removes the cached result.
+type countingResultsManager struct {
+	results.Manager
+	writes atomic.Int32
+}
+
+func (m *countingResultsManager) Set(id kubecontainer.ContainerID, result results.Result, pod *v1.Pod) {
+	m.writes.Add(1)
+	m.Manager.Set(id, result, pod)
+}
+
 // TestWorkerStopCancelsInFlightExecProbe covers
 // https://github.com/kubernetes/kubernetes/issues/140977: stop() must cancel
 // a probe that is currently executing, instead of only signalling stopCh
@@ -1296,9 +1307,10 @@ func TestWorkerStopCancelsInFlightExecProbe(t *testing.T) {
 	pod := getTestPod()
 	podManager.AddPod(pod)
 	podStartupLatencyTracker := kubeletutil.NewPodStartupLatencyTracker()
+	readinessResults := &countingResultsManager{Manager: results.NewManager()}
 	m := NewManager(
 		status.NewManager(&fake.Clientset{}, podManager, &statustest.FakePodDeletionSafetyProvider{}, podStartupLatencyTracker),
-		results.NewManager(),
+		readinessResults,
 		results.NewManager(),
 		results.NewManager(),
 		runner,
@@ -1347,6 +1359,7 @@ func TestWorkerStopCancelsInFlightExecProbe(t *testing.T) {
 		t.Fatalf("got initial result %v before the probe ran, want the initial placeholder %v; the probe must not have completed yet at this point in the test", preStopResult, results.Failure)
 	}
 
+	preStopWrites := readinessResults.writes.Load()
 	stopStart := time.Now()
 	w.stop()
 
@@ -1360,6 +1373,10 @@ func TestWorkerStopCancelsInFlightExecProbe(t *testing.T) {
 	// cancelled the in-flight probe rather than waiting for it to finish.
 	if elapsed := time.Since(stopStart); elapsed > 5*time.Second {
 		t.Errorf("worker took %v to stop after stop() was called; expected near-immediate cancellation of the in-flight probe", elapsed)
+	}
+
+	if got := readinessResults.writes.Load(); got != preStopWrites {
+		t.Errorf("cancelled probe published a result: Set calls increased from %d to %d", preStopWrites, got)
 	}
 
 	// run()'s cleanup defer removes the result once the worker has fully
