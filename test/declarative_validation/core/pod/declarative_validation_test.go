@@ -185,7 +185,7 @@ func TestDeclarativeValidateUpdate(t *testing.T) {
 	}
 }
 
-func TestDeclarativeValidateNodeAllocatableStatus(t *testing.T) {
+func TestDeclarativeValidateExtraNodeAllocatableResources(t *testing.T) {
 	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 		features.DRANodeAllocatableResources: true,
 	})
