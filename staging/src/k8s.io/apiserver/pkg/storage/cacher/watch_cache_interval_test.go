@@ -29,11 +29,8 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage/cacher/store"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/cache"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 )
 
 func intervalFromEvents(events []*watchCacheEvent) *watchCacheInterval {
@@ -405,10 +402,7 @@ func TestCacheIntervalNextFromStore(t *testing.T) {
 		}
 	}
 
-	wci, err := newCacheIntervalFromStore(rv, store, "", false)
-	if err != nil {
-		t.Fatal(err)
-	}
+	wci := newCacheIntervalFromLazySnapshot(rv, store.LatestSnapshot())
 
 	for i := 0; i < numEvents; i++ {
 		event, err := wci.Next()
@@ -461,10 +455,7 @@ func TestCacheIntervalFromStoreSorted(t *testing.T) {
 				}
 			}
 
-			wci, err := newCacheIntervalFromStore(n, tc.indexer, "", false)
-			if err != nil {
-				t.Fatal(err)
-			}
+			wci := newCacheIntervalFromLazySnapshot(n, tc.indexer.LatestSnapshot())
 
 			got := make([]string, 0, n)
 			for range n {
@@ -476,54 +467,6 @@ func TestCacheIntervalFromStoreSorted(t *testing.T) {
 			}
 			if !sort.StringsAreSorted(got) {
 				t.Errorf("events not sorted by key: %v", got)
-			}
-		})
-	}
-}
-
-// TestCacheIntervalSourceSelection verifies that getIntervalFromStoreLocked builds the
-// interval from the lazy snapshot source regardless of whether snapshotting is enabled.
-func TestCacheIntervalSourceSelection(t *testing.T) {
-	cases := []struct {
-		name             string
-		snapshottingOn   bool
-		wantLazySnapshot bool
-	}{
-		{
-			name:             "snapshotting enabled serves from lazy snapshot",
-			snapshottingOn:   true,
-			wantLazySnapshot: true,
-		},
-		{
-			name:             "snapshotting disabled still serves from lazy snapshot",
-			snapshottingOn:   false,
-			wantLazySnapshot: true,
-		},
-	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ListFromCacheSnapshot, tc.snapshottingOn)
-			wc := newTestWatchCache(3, DefaultEventFreshDuration, &cache.Indexers{})
-			defer wc.Stop()
-			if err := wc.Add(makeTestPod("pod1", 100)); err != nil {
-				t.Fatal(err)
-			}
-
-			wc.Lock()
-			wci, err := wc.getIntervalFromStoreLocked("", false)
-			wc.Unlock()
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-
-			if tc.wantLazySnapshot {
-				if _, ok := wci.source.(*lazySnapshotCacheIntervalSource); !ok {
-					t.Errorf("expected *lazySnapshotCacheIntervalSource, got %T", wci.source)
-				}
-			} else {
-				if _, ok := wci.source.(*snapshotCacheIntervalSource); !ok {
-					t.Errorf("expected *snapshotCacheIntervalSource, got %T", wci.source)
-				}
 			}
 		})
 	}

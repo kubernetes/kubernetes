@@ -68,50 +68,6 @@ func newCacheInterval(startIndex, endIndex int, indexer indexerFunc, indexValida
 	}
 }
 
-type intervalStore interface {
-	GetByKey(key string) (item interface{}, exists bool, err error)
-	OrderedListPrefix(prefix, continueKey string) ([]interface{}, error)
-}
-
-// newCacheIntervalFromStore is meant to handle the case of rv=0, such that the events
-// returned by Next() need to be events from a List() done on the underlying store of
-// the watch cache.
-// The items returned in the interval will be sorted by Key.
-func newCacheIntervalFromStore(resourceVersion uint64, s intervalStore, key string, matchesSingle bool) (*watchCacheInterval, error) {
-	buffer := &watchCacheIntervalBuffer{}
-	var allItems []interface{}
-	var err error
-	if matchesSingle {
-		item, exists, err := s.GetByKey(key)
-		if err != nil {
-			return nil, err
-		}
-		if exists {
-			allItems = append(allItems, item)
-		}
-	} else {
-		allItems, err = s.OrderedListPrefix("", "")
-		if err != nil {
-			return nil, err
-		}
-	}
-	buffer.buffer = make([]*watchCacheEvent, len(allItems))
-	for i, item := range allItems {
-		elem, ok := item.(*store.Element)
-		if !ok {
-			return nil, fmt.Errorf("not a storeElement: %v", elem)
-		}
-		buffer.buffer[i] = storeElementToWatchCacheEvent(elem, resourceVersion)
-		buffer.endIndex++
-	}
-	ci := &watchCacheInterval{
-		source:          &snapshotCacheIntervalSource{buffer: buffer},
-		resourceVersion: resourceVersion,
-	}
-
-	return ci, nil
-}
-
 // newCacheIntervalFromLazySnapshot builds an interval backed by an immutable store snapshot
 // Unlike newCacheIntervalFromStore, it captures snapshot reference which takes O(1) under watch-cache RLock
 // and defers O(N) traversal to first Next() call post lock release

@@ -304,10 +304,7 @@ func TestResourceVersionAfterInitEvents(t *testing.T) {
 		}
 	}
 
-	wci, err := newCacheIntervalFromStore(numObjects, store, "", false)
-	if err != nil {
-		t.Fatal(err)
-	}
+	wci := newCacheIntervalFromLazySnapshot(numObjects, store.LatestSnapshot())
 
 	filter := func(_ string, _ labels.Set, _ fields.Set, _ runtime.Object) bool { return true }
 	forget := func(_ bool) {}
