@@ -2495,6 +2495,85 @@
         },
         "type": "object"
       },
+      "io.k8s.api.core.v1.ExtraNodeAllocatableReference": {
+        "description": "ExtraNodeAllocatableReference identifies the source object in the pod's namespace contributing extra node allocatable resources to a pod.",
+        "properties": {
+          "apiGroup": {
+            "default": "",
+            "description": "apiGroup is the group of the referenced object. Kubernetes API groups are the core group, groups without a dot, \"k8s.io\", and groups ending in \".k8s.io\"; of these, only \"resource.k8s.io\" is supported. Any other group can be used by out-of-tree scheduler plugins, and for those, only the format of apiGroup, kind, and name is validated.",
+            "type": "string"
+          },
+          "kind": {
+            "default": "",
+            "description": "kind is the type of the referenced object. For apiGroup \"resource.k8s.io\", only \"ResourceClaim\" is supported.",
+            "type": "string"
+          },
+          "name": {
+            "default": "",
+            "description": "name is the name of the source object in the pod's namespace (e.g., name of the resource claim).",
+            "type": "string"
+          }
+        },
+        "required": [
+          "apiGroup",
+          "kind",
+          "name"
+        ],
+        "type": "object",
+        "x-kubernetes-map-type": "atomic"
+      },
+      "io.k8s.api.core.v1.ExtraNodeAllocatableResource": {
+        "description": "ExtraNodeAllocatableResource describes the status of node allocatable resources allocated outside of direct spec requests.",
+        "properties": {
+          "containers": {
+            "description": "containers lists the names of the containers in this pod, including init containers, that use the source. The kubelet adds the resources of this entry to the limits of these containers, as described in `status.extraNodeAllocatableResources`.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "x-kubernetes-list-type": "set"
+          },
+          "mapping": {
+            "description": "mapping contains fixed node allocatable resource quantities allocated once per source. When source.kind is ResourceClaim, this contains allocations through devices mapped in the device spec's `nodeAllocatableResources[...].mapping` field. This is used by kubelet for pod level and container level cgroup enforcement.",
+            "items": {
+              "$ref": "#/components/schemas/io.k8s.api.core.v1.NodeAllocatableMappedResources"
+            },
+            "type": "array",
+            "x-kubernetes-list-map-keys": [
+              "name"
+            ],
+            "x-kubernetes-list-type": "map",
+            "x-kubernetes-patch-merge-key": "name",
+            "x-kubernetes-patch-strategy": "merge"
+          },
+          "overhead": {
+            "description": "overhead contains variable node allocatable resource overheads incurred per pod (PerPod) and per referencing container (PerContainer) when using the source. When source.kind is ResourceClaim, this contains allocations through devices mapped in the device spec's `nodeAllocatableResources[...].overhead` field. This is used by kubelet for pod level and container level cgroup enforcement.",
+            "items": {
+              "$ref": "#/components/schemas/io.k8s.api.core.v1.NodeAllocatableOverheadResources"
+            },
+            "type": "array",
+            "x-kubernetes-list-map-keys": [
+              "name"
+            ],
+            "x-kubernetes-list-type": "map",
+            "x-kubernetes-patch-merge-key": "name",
+            "x-kubernetes-patch-strategy": "merge"
+          },
+          "source": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.ExtraNodeAllocatableReference"
+              }
+            ],
+            "default": {},
+            "description": "source identifies the object in the pod's namespace that this resource contribution originates from (e.g., a ResourceClaim)."
+          }
+        },
+        "required": [
+          "source"
+        ],
+        "type": "object"
+      },
       "io.k8s.api.core.v1.FCVolumeSource": {
         "description": "Represents a Fibre Channel volume. Fibre Channel volumes can only be mounted as read/write once. Fibre Channel volumes support ownership management and SELinux relabeling.",
         "properties": {
@@ -3695,7 +3774,7 @@
                 "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.api.resource.Quantity"
               }
             ],
-            "description": "quantity is the total node allocatable resource capacity allocated for the claim. This claim's allocated devices is shared by all the containers referencing the claim. Kubelet adds this value to both requests and limits at the pod-level cgroup, and to limits at the container-level cgroup for each container referencing the claim."
+            "description": "quantity is the total node allocatable resource capacity allocated for the source. This source's allocated devices are shared by all the containers referencing the source. Kubelet adds this value to both requests and limits at the pod level cgroup, and to limits at the container level cgroup for each container referencing the source, as described in `status.extraNodeAllocatableResources`."
           }
         },
         "required": [
@@ -3718,7 +3797,7 @@
                 "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.api.resource.Quantity"
               }
             ],
-            "description": "perContainer is the variable overhead quantity applied for each container referencing the claim. The container references are recorded in `nodeAllocatableResourceClaimStatuses.containers`. The total overhead quantity allocated for the claim is computed as: Quantity = PerPod + (PerContainer * NumReferences) Kubelet accounts for this overhead in cgroups: - Pod-level cgroup (requests and limits): Kubelet adds PerPod + (PerContainer * NumReferences). - Container-level cgroup (limits only): Kubelet adds PerPod + PerContainer for each referencing container. This allows any single container to access the pod-level overhead, while the parent cgroup caps the total usage to account for PerPod exactly once. At least one of PerPod or PerContainer must be specified. Specifying neither is an invalid configuration."
+            "description": "perContainer is the variable overhead quantity applied for each container referencing the source. The container references are recorded in `extraNodeAllocatableResources.containers`. The total overhead quantity allocated for the source is computed as: Quantity = PerPod + (PerContainer * NumReferences) Kubelet accounts for this overhead in cgroups, as described in `status.extraNodeAllocatableResources`: - Pod level cgroup (requests and limits): Kubelet adds PerPod + (PerContainer * NumReferences). - Container level cgroup (limits only): Kubelet adds PerPod + PerContainer for each referencing container. This allows any single container to access the pod level overhead, while the parent cgroup caps the total usage to account for PerPod exactly once. At least one of PerPod or PerContainer must be specified. Specifying neither is an invalid configuration."
           },
           "perPod": {
             "allOf": [
@@ -3726,59 +3805,11 @@
                 "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.api.resource.Quantity"
               }
             ],
-            "description": "perPod is the flat overhead quantity allocated per pod. Adding to each container limit allows individual containers to utilize the overhead, while the parent pod-level cgroup limit caps the total usage at the pod boundary where the overhead is accounted for exactly once. At least one of PerPod or PerContainer must be specified. Specifying neither is an invalid configuration."
+            "description": "perPod is the flat overhead quantity allocated per pod. Adding to each container limit allows individual containers to utilize the overhead, while the parent pod level cgroup limit caps the total usage at the pod boundary where the overhead is accounted for exactly once. At least one of PerPod or PerContainer must be specified. Specifying neither is an invalid configuration."
           }
         },
         "required": [
           "name"
-        ],
-        "type": "object"
-      },
-      "io.k8s.api.core.v1.NodeAllocatableResourceClaimStatus": {
-        "description": "NodeAllocatableResourceClaimStatus describes the status of node allocatable resources allocated via DRA.",
-        "properties": {
-          "containers": {
-            "description": "containers lists the names of all containers in this pod that reference the claim.",
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "x-kubernetes-list-type": "set"
-          },
-          "mapping": {
-            "description": "mapping contains allocations through devices mapped in the device spec's `nodeAllocatableResources[...].mapping` field. This is used by kubelet for pod level and container-level cgroup enforcement.",
-            "items": {
-              "$ref": "#/components/schemas/io.k8s.api.core.v1.NodeAllocatableMappedResources"
-            },
-            "type": "array",
-            "x-kubernetes-list-map-keys": [
-              "name"
-            ],
-            "x-kubernetes-list-type": "map",
-            "x-kubernetes-patch-merge-key": "name",
-            "x-kubernetes-patch-strategy": "merge"
-          },
-          "overhead": {
-            "description": "overhead contains allocations through devices mapped in the device spec's `nodeAllocatableResources[...].overhead` field. This is used by kubelet for pod level and container-level cgroup enforcement.",
-            "items": {
-              "$ref": "#/components/schemas/io.k8s.api.core.v1.NodeAllocatableOverheadResources"
-            },
-            "type": "array",
-            "x-kubernetes-list-map-keys": [
-              "name"
-            ],
-            "x-kubernetes-list-type": "map",
-            "x-kubernetes-patch-merge-key": "name",
-            "x-kubernetes-patch-strategy": "merge"
-          },
-          "resourceClaimName": {
-            "default": "",
-            "description": "resourceClaimName is the resource claim referenced by the pod that resulted in this node allocatable resource allocation.",
-            "type": "string"
-          }
-        },
-        "required": [
-          "resourceClaimName"
         ],
         "type": "object"
       },
@@ -5971,6 +6002,14 @@
             ],
             "description": "Status of extended resource claim backed by DRA."
           },
+          "extraNodeAllocatableResources": {
+            "description": "extraNodeAllocatableResources lists node allocatable resources that were allocated to this pod outside of its spec requests, for example through DRA claims. These are resources reported in v1.Node `status.allocatable` that are not extended resources (see https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#extended-resources), such as \"cpu\", \"memory\", \"ephemeral-storage\", and \"hugepages-<size>\".\n\nThe kubelet uses these extra resources for cgroup configuration as follows: - Pod level cgroup:\n  - If pod level resources are explicitly specified (in `spec.resources`) for\n    a resource, that value is used as is and must encompass these extra resources.\n  - If pod level resources are not specified, the extra resources are added\n    to the container level aggregates to update the pod level cgroup (both request, and limit when set).\n- Container level cgroup (for each container in `extraNodeAllocatableResources[*].containers`):\n  - Extra node allocatable resources are added to the container's limit.\n    - For cpu and memory, they are added only when a spec limit is explicitly set; otherwise the container limit is unchanged.\n    - For hugepages, extra resources are added even when no container spec limit is set (unless a pod level hugepages limit is set in `spec.resources`).\n- Ephemeral-storage limits are not enforced via cgroups. Extra resources add to spec based container and pod level eviction bounds.",
+            "items": {
+              "$ref": "#/components/schemas/io.k8s.api.core.v1.ExtraNodeAllocatableResource"
+            },
+            "type": "array",
+            "x-kubernetes-list-type": "atomic"
+          },
           "hostIP": {
             "description": "hostIP holds the IP address of the host to which the pod is assigned. Empty if the pod has not started yet. A pod can be assigned to a node that has a problem in kubelet which in turns mean that HostIP will not be updated even if there is a node is assigned to pod",
             "type": "string"
@@ -5996,19 +6035,6 @@
           "message": {
             "description": "A human readable message indicating details about why the pod is in this condition.",
             "type": "string"
-          },
-          "nodeAllocatableResourceClaimStatuses": {
-            "description": "NodeAllocatableResourceClaimStatuses contains the status of node-allocatable resources that were allocated for this pod through DRA claims. This includes resources currently reported in v1.Node `status.allocatable` that are not extended resources (see https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#extended-resources). Examples include \"cpu\", \"memory\", \"ephemeral-storage\", and hugepages.",
-            "items": {
-              "$ref": "#/components/schemas/io.k8s.api.core.v1.NodeAllocatableResourceClaimStatus"
-            },
-            "type": "array",
-            "x-kubernetes-list-map-keys": [
-              "resourceClaimName"
-            ],
-            "x-kubernetes-list-type": "map",
-            "x-kubernetes-patch-merge-key": "resourceClaimName",
-            "x-kubernetes-patch-strategy": "merge"
           },
           "nominatedNodeName": {
             "description": "nominatedNodeName is set only when this pod preempts other pods on the node, but it cannot be scheduled right away as preemption victims receive their graceful termination periods. This field does not guarantee that the pod will be scheduled on this node. Scheduler may decide to place the pod elsewhere if other nodes become available sooner. Scheduler may also decide to give the resources on this node to a higher priority pod that is created after preemption. As a result, this field may be different than PodSpec.nodeName when the pod is scheduled.",

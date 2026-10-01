@@ -31,17 +31,17 @@ type NodeAllocatableOverheadResourcesApplyConfiguration struct {
 	// name is the name of the resource (e.g., cpu, memory).
 	Name *corev1.ResourceName `json:"name,omitempty"`
 	// perPod is the flat overhead quantity allocated per pod.
-	// Adding to each container limit allows individual containers to utilize the overhead, while the parent pod-level cgroup limit caps the total usage at the pod boundary where the overhead is accounted for exactly once.
+	// Adding to each container limit allows individual containers to utilize the overhead, while the parent pod level cgroup limit caps the total usage at the pod boundary where the overhead is accounted for exactly once.
 	// At least one of PerPod or PerContainer must be specified. Specifying neither is an invalid configuration.
 	PerPod *resource.Quantity `json:"perPod,omitempty"`
-	// perContainer is the variable overhead quantity applied for each container referencing the claim.
-	// The container references are recorded in `nodeAllocatableResourceClaimStatuses.containers`.
-	// The total overhead quantity allocated for the claim is computed as:
+	// perContainer is the variable overhead quantity applied for each container referencing the source.
+	// The container references are recorded in `extraNodeAllocatableResources.containers`.
+	// The total overhead quantity allocated for the source is computed as:
 	// Quantity = PerPod + (PerContainer * NumReferences)
-	// Kubelet accounts for this overhead in cgroups:
-	// - Pod-level cgroup (requests and limits): Kubelet adds PerPod + (PerContainer * NumReferences).
-	// - Container-level cgroup (limits only): Kubelet adds PerPod + PerContainer for each referencing container.
-	// This allows any single container to access the pod-level overhead, while the parent cgroup caps the total usage to account for PerPod exactly once.
+	// Kubelet accounts for this overhead in cgroups, as described in `status.extraNodeAllocatableResources`:
+	// - Pod level cgroup (requests and limits): Kubelet adds PerPod + (PerContainer * NumReferences).
+	// - Container level cgroup (limits only): Kubelet adds PerPod + PerContainer for each referencing container.
+	// This allows any single container to access the pod level overhead, while the parent cgroup caps the total usage to account for PerPod exactly once.
 	// At least one of PerPod or PerContainer must be specified. Specifying neither is an invalid configuration.
 	PerContainer *resource.Quantity `json:"perContainer,omitempty"`
 }
