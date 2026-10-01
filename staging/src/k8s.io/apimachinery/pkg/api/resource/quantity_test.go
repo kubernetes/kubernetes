@@ -275,6 +275,11 @@ func TestQuantityCmp(t *testing.T) {
 			}
 		}
 	}
+
+	x, y := decQuantity(15, -1, DecimalSI), decQuantity(25, -1, DecimalSI)
+	if n := testing.AllocsPerRun(100, func() { x.Cmp(y) }); n != 0 {
+		t.Errorf("Cmp of two inf.Dec quantities: %v allocations per call, want 0", n)
+	}
 }
 
 func TestParseQuantityString(t *testing.T) {
@@ -1548,6 +1553,7 @@ func TestDeepCopy(t *testing.T) {
 }
 
 func TestSub(t *testing.T) {
+	self := decQuantity(15, -1, DecimalSI)
 	tests := []struct {
 		a        Quantity
 		b        Quantity
@@ -1559,6 +1565,7 @@ func TestSub(t *testing.T) {
 		{Quantity{Format: DecimalSI}, decQuantity(50, 0, DecimalSI), decQuantity(-50, 0, DecimalSI)},
 		{decQuantity(50, 0, DecimalSI), Quantity{Format: DecimalSI}, decQuantity(50, 0, DecimalSI)},
 		{Quantity{Format: DecimalSI}, Quantity{Format: DecimalSI}, decQuantity(0, 0, DecimalSI)},
+		{self, self, decQuantity(0, 0, DecimalSI)},
 	}
 
 	for i, test := range tests {
@@ -1566,6 +1573,11 @@ func TestSub(t *testing.T) {
 		if test.a.Cmp(test.expected) != 0 {
 			t.Errorf("[%d] Expected %q, got %q", i, test.expected.String(), test.a.String())
 		}
+	}
+
+	x, y := decQuantity(15, -1, DecimalSI), decQuantity(25, -1, DecimalSI)
+	if n := testing.AllocsPerRun(100, func() { x.Sub(y) }); n != 0 {
+		t.Errorf("Sub of two inf.Dec quantities: %v allocations per call, want 0", n)
 	}
 }
 
@@ -1811,6 +1823,7 @@ func TestZeroSubMostNegativeInheritsFormat(t *testing.T) {
 }
 
 func TestAdd(t *testing.T) {
+	self := decQuantity(15, -1, DecimalSI)
 	tests := []struct {
 		a        Quantity
 		b        Quantity
@@ -1822,6 +1835,7 @@ func TestAdd(t *testing.T) {
 		{Quantity{Format: DecimalSI}, decQuantity(50, 0, DecimalSI), decQuantity(50, 0, DecimalSI)},
 		{decQuantity(50, 0, DecimalSI), Quantity{Format: DecimalSI}, decQuantity(50, 0, DecimalSI)},
 		{Quantity{Format: DecimalSI}, Quantity{Format: DecimalSI}, decQuantity(0, 0, DecimalSI)},
+		{self, self, decQuantity(3, 0, DecimalSI)},
 	}
 
 	for i, test := range tests {
@@ -1829,6 +1843,11 @@ func TestAdd(t *testing.T) {
 		if test.a.Cmp(test.expected) != 0 {
 			t.Errorf("[%d] Expected %q, got %q", i, test.expected.String(), test.a.String())
 		}
+	}
+
+	x, y := decQuantity(15, -1, DecimalSI), decQuantity(25, -1, DecimalSI)
+	if n := testing.AllocsPerRun(100, func() { x.Add(y) }); n != 0 {
+		t.Errorf("Add of two inf.Dec quantities: %v allocations per call, want 0", n)
 	}
 }
 
