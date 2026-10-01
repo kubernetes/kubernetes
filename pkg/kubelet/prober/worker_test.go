@@ -1483,3 +1483,38 @@ func TestWorkerStopDuringInitialJitterIsPrompt(t *testing.T) {
 		t.Errorf("worker took %v to stop during its initial jitter wait; expected prompt cancellation instead of waiting out PeriodSeconds", elapsed)
 	}
 }
+
+// A stop notification must not escape while run() can still observe an active worker.
+func TestWorkerStopSerializesNotificationWithRun(t *testing.T) {
+	w := newTestWorker(newTestManager(), readiness, v1.Probe{})
+	w.cancelMu.Lock()
+	started := make(chan struct{})
+	done := make(chan struct{})
+	go func() {
+		close(started)
+		w.stop()
+		close(done)
+	}()
+	<-started
+	select {
+	case <-w.stopCh:
+		w.cancelMu.Unlock()
+		<-done
+		t.Fatal("stop notification was sent before the worker state was serialized with run")
+	case <-time.After(100 * time.Millisecond):
+	}
+	w.cancelMu.Unlock()
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("stop did not complete after run released the mutex")
+	}
+	if !w.stopped {
+		t.Fatal("stop completed without marking the worker stopped")
+	}
+	select {
+	case <-w.stopCh:
+	default:
+		t.Fatal("stop did not notify the worker")
+	}
+}

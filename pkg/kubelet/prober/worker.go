@@ -248,11 +248,6 @@ probeLoop:
 // stop stops the probe worker. The worker handles cleanup and removes itself from its manager.
 // It is safe to call stop multiple times.
 func (w *worker) stop() {
-	select {
-	case w.stopCh <- struct{}{}:
-	default: // Non-blocking.
-	}
-
 	// Cancel a probe that may currently be in flight, so it doesn't keep
 	// running against a container that is being torn down. cancel is nil
 	// if run() hasn't started yet; in that case set stopped so run() knows,
@@ -263,6 +258,11 @@ func (w *worker) stop() {
 	w.cancelMu.Unlock()
 	if cancel != nil {
 		cancel()
+	}
+
+	select {
+	case w.stopCh <- struct{}{}:
+	default: // Non-blocking.
 	}
 }
 
