@@ -85,6 +85,7 @@ import (
 	"k8s.io/component-base/metrics"
 	metricsfeatures "k8s.io/component-base/metrics/features"
 	"k8s.io/component-base/metrics/legacyregistry"
+	featuremetrics "k8s.io/component-base/metrics/prometheus/feature"
 	"k8s.io/component-base/tracing"
 	"k8s.io/component-base/version"
 	"k8s.io/component-base/version/verflag"
@@ -303,7 +304,7 @@ is checked every 20 seconds (also configurable with a flag).`,
 			// set up signal context for kubelet shutdown
 			ctx := signals.SetupSignalContext()
 
-			utilfeature.DefaultMutableFeatureGate.AddMetrics()
+			utilfeature.DefaultMutableFeatureGate.AddMetrics(featuremetrics.RecordFeatureInfo)
 			// run the kubelet
 			return Run(ctx, kubeletServer, kubeletDeps, utilfeature.DefaultFeatureGate)
 		},

@@ -46,6 +46,7 @@ import (
 	"k8s.io/klog/v2"
 	aggregatorapiserver "k8s.io/kube-aggregator/pkg/apiserver"
 
+	featuremetrics "k8s.io/component-base/metrics/prometheus/feature"
 	controlplaneapiserver "k8s.io/kubernetes/pkg/controlplane/apiserver"
 	"k8s.io/kubernetes/pkg/controlplane/apiserver/options"
 	_ "k8s.io/kubernetes/pkg/features"
@@ -96,7 +97,7 @@ APIs.`,
 			}
 
 			// add feature enablement metrics
-			utilfeature.DefaultMutableFeatureGate.AddMetrics()
+			utilfeature.DefaultMutableFeatureGate.AddMetrics(featuremetrics.RecordFeatureInfo)
 
 			return Run(ctx, completedOptions)
 		},
