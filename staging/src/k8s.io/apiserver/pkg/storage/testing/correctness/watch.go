@@ -110,13 +110,14 @@ func validateMaybeLastEventError(events []watch.Event) error {
 }
 
 func (v WatchValidator) validateReliable(request WatchRequest, response WatchResponse) error {
-	if len(response.Events) == 0 {
-		// Empty watch response is always correct, because watch is eventually consistent.
-		return nil
-	}
 	rangeRV, err := watchRevisionRange(v.versioner, request, response.Events)
 	if err != nil {
 		return err
+	}
+	if rangeRV == nil {
+		// No RV marking events to determine range of revisions.
+		// As watch is eventually consistent, empty watch is correct.
+		return nil
 	}
 	expected, err := v.replay.Events(request, rangeRV)
 	if err != nil {
@@ -229,6 +230,40 @@ func (c Change) toWatchEvent(versioner storage.Versioner, pred storage.Selection
 }
 
 func watchRevisionRange(versioner storage.Versioner, request WatchRequest, events []watch.Event) (*ResourceVersionRange, error) {
+	eventsRVs, err := eventResourceVersionRange(events, versioner)
+	if err != nil {
+		return nil, err
+	}
+	// No events to mark RV.
+	if eventsRVs == nil {
+		return nil, nil
+	}
+	requestedRV, err := versioner.ParseResourceVersion(request.Options.ResourceVersion)
+	if err != nil {
+		return nil, err
+	}
+	switch request.Options.ResourceVersionMatch {
+	case metav1.ResourceVersionMatchNotOlderThan:
+		if requestedRV > 0 {
+			eventsRVs.Min = max(eventsRVs.Min, requestedRV+1)
+		}
+	case metav1.ResourceVersionMatchExact:
+		if requestedRV == 0 {
+			return nil, fmt.Errorf("exact resource version match is not supported for resource version %q", request.Options.ResourceVersion)
+		}
+		eventsRVs.Min = requestedRV + 1
+	case "":
+		if requestedRV > 0 {
+			// exact match
+			eventsRVs.Min = requestedRV + 1
+		}
+	default:
+		return nil, fmt.Errorf("unknown resource version match: %s", request.Options.ResourceVersionMatch)
+	}
+	return eventsRVs, nil
+}
+
+func eventResourceVersionRange(events []watch.Event, versioner storage.Versioner) (*ResourceVersionRange, error) {
 	minRV := uint64(math.MaxUint64)
 	maxRV := uint64(0)
 	for _, ev := range events {
@@ -239,20 +274,19 @@ func watchRevisionRange(versioner storage.Versioner, request WatchRequest, event
 		if err != nil {
 			return nil, err
 		}
-		minRV = min(minRV, rv)
-		if ev.Type == watch.Bookmark {
-			// A bookmark only promises everything up to its revision was sent.
-			maxRV = max(maxRV, rv)
-		} else {
+		switch ev.Type {
+		case watch.Added, watch.Deleted, watch.Modified:
+			minRV = min(minRV, rv)
 			maxRV = max(maxRV, rv+1)
+		case watch.Bookmark:
+			minRV = min(minRV, rv+1)
+			maxRV = max(maxRV, rv)
+		default:
+			return nil, fmt.Errorf("unknown watch event type: %v", ev.Type)
 		}
 	}
-	if request.Options.ResourceVersion != "0" && request.Options.ResourceVersion != "" {
-		requestedRV, err := versioner.ParseResourceVersion(request.Options.ResourceVersion)
-		if err != nil {
-			return nil, err
-		}
-		minRV = requestedRV + 1
+	if minRV == uint64(math.MaxUint64) || maxRV == uint64(0) {
+		return nil, nil // no events with RV
 	}
 	return &ResourceVersionRange{Min: minRV, Max: maxRV}, nil
 }
