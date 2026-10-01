@@ -86,28 +86,28 @@ func init() {
 			"spec.tolerations[*].key": {
 				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-label-key"},
 			},
-			"status.nodeAllocatableResourceClaimStatuses[*]": {
+			"status.additionalNodeAllocatableResources[*].containers[*]": {
 				{ErrorType: "FieldValueDuplicate"},
 			},
-			"status.nodeAllocatableResourceClaimStatuses[*].containers[*]": {
+			"status.additionalNodeAllocatableResources[*].mapping[*]": {
 				{ErrorType: "FieldValueDuplicate"},
 			},
-			"status.nodeAllocatableResourceClaimStatuses[*].mapping[*]": {
-				{ErrorType: "FieldValueDuplicate"},
-			},
-			"status.nodeAllocatableResourceClaimStatuses[*].mapping[*].name": {
+			"status.additionalNodeAllocatableResources[*].mapping[*].name": {
 				{ErrorType: "FieldValueRequired"},
 			},
-			"status.nodeAllocatableResourceClaimStatuses[*].mapping[*].quantity": {
+			"status.additionalNodeAllocatableResources[*].mapping[*].quantity": {
 				{ErrorType: "FieldValueRequired"},
 			},
-			"status.nodeAllocatableResourceClaimStatuses[*].overhead[*]": {
+			"status.additionalNodeAllocatableResources[*].overhead[*]": {
 				{ErrorType: "FieldValueDuplicate"},
 			},
-			"status.nodeAllocatableResourceClaimStatuses[*].overhead[*].name": {
+			"status.additionalNodeAllocatableResources[*].overhead[*].name": {
 				{ErrorType: "FieldValueRequired"},
 			},
-			"status.nodeAllocatableResourceClaimStatuses[*].resourceClaimName": {
+			"status.additionalNodeAllocatableResources[*].source.kind": {
+				{ErrorType: "FieldValueRequired"},
+			},
+			"status.additionalNodeAllocatableResources[*].source.name": {
 				{ErrorType: "FieldValueRequired"},
 			},
 			"status.volumeHealth[*]": {

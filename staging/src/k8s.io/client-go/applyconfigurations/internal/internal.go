@@ -4438,6 +4438,50 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: string
       default: ""
+- name: io.k8s.api.core.v1.AdditionalNodeAllocatableReference
+  map:
+    fields:
+    - name: apiGroup
+      type:
+        scalar: string
+    - name: kind
+      type:
+        scalar: string
+      default: ""
+    - name: name
+      type:
+        scalar: string
+      default: ""
+    elementRelationship: atomic
+- name: io.k8s.api.core.v1.AdditionalNodeAllocatableResource
+  map:
+    fields:
+    - name: containers
+      type:
+        list:
+          elementType:
+            scalar: string
+          elementRelationship: associative
+    - name: mapping
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.core.v1.NodeAllocatableMappedResources
+          elementRelationship: associative
+          keys:
+          - name
+    - name: overhead
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.core.v1.NodeAllocatableOverheadResources
+          elementRelationship: associative
+          keys:
+          - name
+    - name: source
+      type:
+        namedType: io.k8s.api.core.v1.AdditionalNodeAllocatableReference
+      default: {}
 - name: io.k8s.api.core.v1.Affinity
   map:
     fields:
@@ -6239,35 +6283,6 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: perPod
       type:
         namedType: io.k8s.apimachinery.pkg.api.resource.Quantity
-- name: io.k8s.api.core.v1.NodeAllocatableResourceClaimStatus
-  map:
-    fields:
-    - name: containers
-      type:
-        list:
-          elementType:
-            scalar: string
-          elementRelationship: associative
-    - name: mapping
-      type:
-        list:
-          elementType:
-            namedType: io.k8s.api.core.v1.NodeAllocatableMappedResources
-          elementRelationship: associative
-          keys:
-          - name
-    - name: overhead
-      type:
-        list:
-          elementType:
-            namedType: io.k8s.api.core.v1.NodeAllocatableOverheadResources
-          elementRelationship: associative
-          keys:
-          - name
-    - name: resourceClaimName
-      type:
-        scalar: string
-      default: ""
 - name: io.k8s.api.core.v1.NodeCondition
   map:
     fields:
@@ -7377,6 +7392,12 @@ var schemaYAML = typed.YAMLObject(`types:
 - name: io.k8s.api.core.v1.PodStatus
   map:
     fields:
+    - name: additionalNodeAllocatableResources
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.core.v1.AdditionalNodeAllocatableResource
+          elementRelationship: atomic
     - name: allocatedResources
       type:
         map:
@@ -7423,14 +7444,6 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: message
       type:
         scalar: string
-    - name: nodeAllocatableResourceClaimStatuses
-      type:
-        list:
-          elementType:
-            namedType: io.k8s.api.core.v1.NodeAllocatableResourceClaimStatus
-          elementRelationship: associative
-          keys:
-          - resourceClaimName
     - name: nominatedNodeName
       type:
         scalar: string

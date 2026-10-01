@@ -18,41 +18,46 @@ limitations under the License.
 
 package v1
 
-// NodeAllocatableResourceClaimStatusApplyConfiguration represents a declarative configuration of the NodeAllocatableResourceClaimStatus type for use
+// AdditionalNodeAllocatableResourceApplyConfiguration represents a declarative configuration of the AdditionalNodeAllocatableResource type for use
 // with apply.
 //
-// NodeAllocatableResourceClaimStatus describes the status of node allocatable resources allocated via DRA.
-type NodeAllocatableResourceClaimStatusApplyConfiguration struct {
-	// resourceClaimName is the resource claim referenced by the pod that resulted in this node allocatable resource allocation.
-	ResourceClaimName *string `json:"resourceClaimName,omitempty"`
-	// containers lists the names of all containers in this pod that reference the claim.
+// AdditionalNodeAllocatableResource describes the status of
+// node allocatable resources allocated outside of direct spec requests.
+type AdditionalNodeAllocatableResourceApplyConfiguration struct {
+	// source identifies the object in the pod's namespace that this resource
+	// contribution originates from (e.g., a ResourceClaim).
+	Source *AdditionalNodeAllocatableReferenceApplyConfiguration `json:"source,omitempty"`
+	// containers lists the names of all containers in this pod that reference the source.
 	Containers []string `json:"containers,omitempty"`
-	// mapping contains allocations through devices mapped in the device spec's `nodeAllocatableResources[...].mapping` field.
+	// mapping contains fixed node allocatable resource quantities allocated once per source.
+	// When source.kind is ResourceClaim, this contains allocations through devices mapped in the device spec's `nodeAllocatableResources[...].mapping` field.
 	// This is used by kubelet for pod level and container-level cgroup enforcement.
 	Mapping []NodeAllocatableMappedResourcesApplyConfiguration `json:"mapping,omitempty"`
-	// overhead contains allocations through devices mapped in the device spec's `nodeAllocatableResources[...].overhead` field.
+	// overhead contains variable node allocatable resource overheads incurred per pod (PerPod) and
+	// per referencing container (PerContainer) when using the source.
+	// When source.kind is ResourceClaim, this contains allocations through devices mapped in the device spec's `nodeAllocatableResources[...].overhead` field.
 	// This is used by kubelet for pod level and container-level cgroup enforcement.
 	Overhead []NodeAllocatableOverheadResourcesApplyConfiguration `json:"overhead,omitempty"`
 }
 
-// NodeAllocatableResourceClaimStatusApplyConfiguration constructs a declarative configuration of the NodeAllocatableResourceClaimStatus type for use with
+// AdditionalNodeAllocatableResourceApplyConfiguration constructs a declarative configuration of the AdditionalNodeAllocatableResource type for use with
 // apply.
-func NodeAllocatableResourceClaimStatus() *NodeAllocatableResourceClaimStatusApplyConfiguration {
-	return &NodeAllocatableResourceClaimStatusApplyConfiguration{}
+func AdditionalNodeAllocatableResource() *AdditionalNodeAllocatableResourceApplyConfiguration {
+	return &AdditionalNodeAllocatableResourceApplyConfiguration{}
 }
 
-// WithResourceClaimName sets the ResourceClaimName field in the declarative configuration to the given value
+// WithSource sets the Source field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the ResourceClaimName field is set to the value of the last call.
-func (b *NodeAllocatableResourceClaimStatusApplyConfiguration) WithResourceClaimName(value string) *NodeAllocatableResourceClaimStatusApplyConfiguration {
-	b.ResourceClaimName = &value
+// If called multiple times, the Source field is set to the value of the last call.
+func (b *AdditionalNodeAllocatableResourceApplyConfiguration) WithSource(value *AdditionalNodeAllocatableReferenceApplyConfiguration) *AdditionalNodeAllocatableResourceApplyConfiguration {
+	b.Source = value
 	return b
 }
 
 // WithContainers adds the given value to the Containers field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the Containers field.
-func (b *NodeAllocatableResourceClaimStatusApplyConfiguration) WithContainers(values ...string) *NodeAllocatableResourceClaimStatusApplyConfiguration {
+func (b *AdditionalNodeAllocatableResourceApplyConfiguration) WithContainers(values ...string) *AdditionalNodeAllocatableResourceApplyConfiguration {
 	for i := range values {
 		b.Containers = append(b.Containers, values[i])
 	}
@@ -62,7 +67,7 @@ func (b *NodeAllocatableResourceClaimStatusApplyConfiguration) WithContainers(va
 // WithMapping adds the given value to the Mapping field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the Mapping field.
-func (b *NodeAllocatableResourceClaimStatusApplyConfiguration) WithMapping(values ...*NodeAllocatableMappedResourcesApplyConfiguration) *NodeAllocatableResourceClaimStatusApplyConfiguration {
+func (b *AdditionalNodeAllocatableResourceApplyConfiguration) WithMapping(values ...*NodeAllocatableMappedResourcesApplyConfiguration) *AdditionalNodeAllocatableResourceApplyConfiguration {
 	for i := range values {
 		if values[i] == nil {
 			panic("nil value passed to WithMapping")
@@ -75,7 +80,7 @@ func (b *NodeAllocatableResourceClaimStatusApplyConfiguration) WithMapping(value
 // WithOverhead adds the given value to the Overhead field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the Overhead field.
-func (b *NodeAllocatableResourceClaimStatusApplyConfiguration) WithOverhead(values ...*NodeAllocatableOverheadResourcesApplyConfiguration) *NodeAllocatableResourceClaimStatusApplyConfiguration {
+func (b *AdditionalNodeAllocatableResourceApplyConfiguration) WithOverhead(values ...*NodeAllocatableOverheadResourcesApplyConfiguration) *AdditionalNodeAllocatableResourceApplyConfiguration {
 	for i := range values {
 		if values[i] == nil {
 			panic("nil value passed to WithOverhead")

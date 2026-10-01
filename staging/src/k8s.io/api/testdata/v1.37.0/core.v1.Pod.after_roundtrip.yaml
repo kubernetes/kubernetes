@@ -1275,20 +1275,6 @@ spec:
       storagePolicyName: storagePolicyNameValue
       volumePath: volumePathValue
 status:
-  additionalNodeAllocatableResources:
-  - containers:
-    - containersValue
-    mapping:
-    - name: nameValue
-      quantity: "0"
-    overhead:
-    - name: nameValue
-      perContainer: "0"
-      perPod: "0"
-    source:
-      apiGroup: apiGroupValue
-      kind: kindValue
-      name: nameValue
   allocatedResources:
     allocatedResourcesKey: "0"
   conditions:

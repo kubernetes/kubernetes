@@ -27,6 +27,16 @@ func (in AWSElasticBlockStoreVolumeSource) OpenAPIModelName() string {
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
+func (in AdditionalNodeAllocatableReference) OpenAPIModelName() string {
+	return "io.k8s.api.core.v1.AdditionalNodeAllocatableReference"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
+func (in AdditionalNodeAllocatableResource) OpenAPIModelName() string {
+	return "io.k8s.api.core.v1.AdditionalNodeAllocatableResource"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
 func (in Affinity) OpenAPIModelName() string {
 	return "io.k8s.api.core.v1.Affinity"
 }
@@ -554,11 +564,6 @@ func (in NodeAllocatableMappedResources) OpenAPIModelName() string {
 // OpenAPIModelName returns the OpenAPI model name for this type.
 func (in NodeAllocatableOverheadResources) OpenAPIModelName() string {
 	return "io.k8s.api.core.v1.NodeAllocatableOverheadResources"
-}
-
-// OpenAPIModelName returns the OpenAPI model name for this type.
-func (in NodeAllocatableResourceClaimStatus) OpenAPIModelName() string {
-	return "io.k8s.api.core.v1.NodeAllocatableResourceClaimStatus"
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.

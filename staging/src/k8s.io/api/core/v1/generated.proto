@@ -63,6 +63,74 @@ message AWSElasticBlockStoreVolumeSource {
   optional bool readOnly = 4;
 }
 
+// AdditionalNodeAllocatableReference identifies the source object in the pod's namespace
+// contributing additional node allocatable resources to a pod.
+// +structType=atomic
+message AdditionalNodeAllocatableReference {
+  // apiGroup is the group for the resource being referenced. It is
+  // empty for the core API.
+  // Currently, only "resource.k8s.io" is supported.
+  // +optional
+  // +k8s:optional
+  optional string apiGroup = 1;
+
+  // kind is the type of resource being referenced.
+  // Currently, only "ResourceClaim" is supported.
+  // +required
+  // +k8s:required
+  optional string kind = 2;
+
+  // name is the name of the source object in the pod's namespace
+  // (e.g., name of the resource claim).
+  // +required
+  // +k8s:required
+  optional string name = 3;
+}
+
+// AdditionalNodeAllocatableResource describes the status of
+// node allocatable resources allocated outside of direct spec requests.
+message AdditionalNodeAllocatableResource {
+  // source identifies the object in the pod's namespace that this resource
+  // contribution originates from (e.g., a ResourceClaim).
+  // +required
+  // +k8s:required
+  optional AdditionalNodeAllocatableReference source = 6;
+
+  // containers lists the names of all containers in this pod that reference the source.
+  // +optional
+  // +listType=set
+  // +k8s:optional
+  // +k8s:listType=set
+  repeated string containers = 2;
+
+  // mapping contains fixed node allocatable resource quantities allocated once per source.
+  // When source.kind is ResourceClaim, this contains allocations through devices mapped in the device spec's `nodeAllocatableResources[...].mapping` field.
+  // This is used by kubelet for pod level and container-level cgroup enforcement.
+  // +optional
+  // +patchStrategy=merge
+  // +patchMergeKey=name
+  // +listType=map
+  // +listMapKey=name
+  // +k8s:optional
+  // +k8s:listType=map
+  // +k8s:listMapKey=name
+  repeated NodeAllocatableMappedResources mapping = 4;
+
+  // overhead contains variable node allocatable resource overheads incurred per pod (PerPod) and
+  // per referencing container (PerContainer) when using the source.
+  // When source.kind is ResourceClaim, this contains allocations through devices mapped in the device spec's `nodeAllocatableResources[...].overhead` field.
+  // This is used by kubelet for pod level and container-level cgroup enforcement.
+  // +optional
+  // +patchStrategy=merge
+  // +patchMergeKey=name
+  // +listType=map
+  // +listMapKey=name
+  // +k8s:optional
+  // +k8s:listType=map
+  // +k8s:listMapKey=name
+  repeated NodeAllocatableOverheadResources overhead = 5;
+}
+
 // Affinity is a group of affinity scheduling rules.
 message Affinity {
   // nodeAffinity describes node affinity scheduling rules for the pod.
@@ -2846,9 +2914,9 @@ message NodeAllocatableMappedResources {
   // +k8s:required
   optional string name = 1;
 
-  // quantity is the total node allocatable resource capacity allocated for the claim.
-  // This claim's allocated devices is shared by all the containers referencing the claim.
-  // Kubelet adds this value to both requests and limits at the pod-level cgroup, and to limits at the container-level cgroup for each container referencing the claim.
+  // quantity is the total node allocatable resource capacity allocated for the source.
+  // This source's allocated devices are shared by all the containers referencing the source.
+  // Kubelet adds this value to both requests and limits at the pod-level cgroup, and to limits at the container-level cgroup for each container referencing the source.
   // +required
   // +k8s:required
   optional .k8s.io.apimachinery.pkg.api.resource.Quantity quantity = 2;
@@ -2869,7 +2937,7 @@ message NodeAllocatableOverheadResources {
   optional .k8s.io.apimachinery.pkg.api.resource.Quantity perPod = 2;
 
   // perContainer is the variable overhead quantity applied for each container referencing the claim.
-  // The container references are recorded in `nodeAllocatableResourceClaimStatuses.containers`.
+  // The container references are recorded in `additionalNodeAllocatableResources.containers`.
   // The total overhead quantity allocated for the claim is computed as:
   // Quantity = PerPod + (PerContainer * NumReferences)
   // Kubelet accounts for this overhead in cgroups:
@@ -2880,45 +2948,6 @@ message NodeAllocatableOverheadResources {
   // +optional
   // +k8s:optional
   optional .k8s.io.apimachinery.pkg.api.resource.Quantity perContainer = 3;
-}
-
-// NodeAllocatableResourceClaimStatus describes the status of node allocatable resources allocated via DRA.
-message NodeAllocatableResourceClaimStatus {
-  // resourceClaimName is the resource claim referenced by the pod that resulted in this node allocatable resource allocation.
-  // +required
-  // +k8s:required
-  optional string resourceClaimName = 1;
-
-  // containers lists the names of all containers in this pod that reference the claim.
-  // +optional
-  // +listType=set
-  // +k8s:optional
-  // +k8s:listType=set
-  repeated string containers = 2;
-
-  // mapping contains allocations through devices mapped in the device spec's `nodeAllocatableResources[...].mapping` field.
-  // This is used by kubelet for pod level and container-level cgroup enforcement.
-  // +optional
-  // +patchStrategy=merge
-  // +patchMergeKey=name
-  // +listType=map
-  // +listMapKey=name
-  // +k8s:optional
-  // +k8s:listType=map
-  // +k8s:listMapKey=name
-  repeated NodeAllocatableMappedResources mapping = 4;
-
-  // overhead contains allocations through devices mapped in the device spec's `nodeAllocatableResources[...].overhead` field.
-  // This is used by kubelet for pod level and container-level cgroup enforcement.
-  // +optional
-  // +patchStrategy=merge
-  // +patchMergeKey=name
-  // +listType=map
-  // +listMapKey=name
-  // +k8s:optional
-  // +k8s:listType=map
-  // +k8s:listMapKey=name
-  repeated NodeAllocatableOverheadResources overhead = 5;
 }
 
 // NodeCondition contains condition information for a node.
@@ -5287,22 +5316,6 @@ message PodStatus {
   // +optional
   optional ResourceRequirements resources = 20;
 
-  // NodeAllocatableResourceClaimStatuses contains the status of node-allocatable resources
-  // that were allocated for this pod through DRA claims. This includes resources currently
-  // reported in v1.Node `status.allocatable` that are not extended resources
-  // (see https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#extended-resources).
-  // Examples include "cpu", "memory", "ephemeral-storage", and hugepages.
-  // +featureGate=DRANodeAllocatableResources
-  // +optional
-  // +patchStrategy=merge
-  // +patchMergeKey=resourceClaimName
-  // +listType=map
-  // +listMapKey=resourceClaimName
-  // +k8s:optional
-  // +k8s:listType=map
-  // +k8s:listMapKey=resourceClaimName
-  repeated NodeAllocatableResourceClaimStatus nodeAllocatableResourceClaimStatuses = 21;
-
   // volumeHealth contains node-reported health for each volume the pod is using.
   // Populated by the kubelet on the pod's node.
   // +featureGate=CSIVolumeHealth
@@ -5313,6 +5326,19 @@ message PodStatus {
   // +k8s:listType=map
   // +k8s:listMapKey=name
   repeated PodVolumeHealth volumeHealth = 22;
+
+  // additionalNodeAllocatableResources contains the status of node allocatable resources
+  // that were allocated for this pod outside of direct spec requests (e.g., through DRA claims).
+  // This includes resources currently
+  // reported in v1.Node `status.allocatable` that are not extended resources
+  // (see https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#extended-resources).
+  // Examples include "cpu", "memory", "ephemeral-storage", and hugepages.
+  // +featureGate=DRANodeAllocatableResources
+  // +optional
+  // +listType=atomic
+  // +k8s:optional
+  // +k8s:listType=atomic
+  repeated AdditionalNodeAllocatableResource additionalNodeAllocatableResources = 23;
 }
 
 // PodTemplate describes a template for creating copies of a predefined pod.
