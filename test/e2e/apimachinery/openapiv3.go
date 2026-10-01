@@ -31,7 +31,9 @@ import (
 	"k8s.io/apiextensions-apiserver/test/integration/fixtures"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/openapi3"
@@ -214,5 +216,39 @@ var _ = SIGDescribe("OpenAPIV3", func() {
 			return isNotFound, nil
 		})
 		framework.ExpectNoError(err, "should not contain OpenAPI V3 for deleted APIService")
+	})
+
+	/*
+		Release : v1.38
+		Testname: OpenAPI V3 enum values
+		Description: Fetch the OpenAPI v3 of the core v1 group version. The protocol property of io.k8s.api.core.v1.ContainerPort MUST list SCTP, TCP and UDP as enum values.
+	*/
+	f.It("should publish enum values of built-in types", f.WithFeatureGate(features.OpenAPIEnums), func(ctx context.Context) {
+		c := openapi3.NewRoot(f.ClientSet.Discovery().OpenAPIV3())
+		openAPISpec, err := c.GVSpec(schema.GroupVersion{Version: "v1"})
+		framework.ExpectNoError(err)
+
+		const schemaName = "io.k8s.api.core.v1.ContainerPort"
+		containerPort, ok := openAPISpec.Components.Schemas[schemaName]
+		if !ok {
+			framework.Failf("OpenAPI v3 for core/v1 has no schema %s", schemaName)
+		}
+		protocol, ok := containerPort.Properties["protocol"]
+		if !ok {
+			framework.Failf("schema %s has no property protocol", schemaName)
+		}
+		got := sets.New[string]()
+		for _, v := range protocol.Enum {
+			s, ok := v.(string)
+			if !ok {
+				framework.Failf("enum value %v of %s.protocol is %T, want string", v, schemaName, v)
+			}
+			got.Insert(s)
+		}
+		// Later releases may add values, so this is not an exact match.
+		want := sets.New("SCTP", "TCP", "UDP")
+		if !got.IsSuperset(want) {
+			framework.Failf("enum values of %s.protocol: got %v, want a superset of %v", schemaName, sets.List(got), sets.List(want))
+		}
 	})
 })
