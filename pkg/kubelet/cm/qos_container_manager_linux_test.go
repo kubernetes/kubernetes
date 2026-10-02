@@ -735,7 +735,7 @@ func TestQOSCPUConfigUpdate(t *testing.T) {
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 
-			err = testContainerManager.Start(ctx, func() v1.ResourceList { return v1.ResourceList{} }, testCase.testPods)
+			err = testContainerManager.Start(ctx, func() v1.ResourceList { return v1.ResourceList{} }, testCase.testPods, nil)
 
 			if err != nil {
 				t.Fatalf("Start() failed: %s", err)
@@ -819,5 +819,24 @@ func TestQOSCPUConfigUpdate(t *testing.T) {
 				)
 			}
 		})
+	}
+}
+
+// newPartitionTestPod returns a pod with a single container of the given
+// requests and limits, in "cpu/memory" form; an empty string leaves both unset.
+func newPartitionTestPod(namespace, requests, limits string) *v1.Pod {
+	toList := func(s string) v1.ResourceList {
+		if s == "" {
+			return nil
+		}
+		cpu, memory, _ := strings.Cut(s, "/")
+		return v1.ResourceList{v1.ResourceCPU: resource.MustParse(cpu), v1.ResourceMemory: resource.MustParse(memory)}
+	}
+	return &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: string(uuid.NewUUID()), Namespace: namespace, UID: uuid.NewUUID()},
+		Spec: v1.PodSpec{Containers: []v1.Container{{
+			Name:      "c",
+			Resources: v1.ResourceRequirements{Requests: toList(requests), Limits: toList(limits)},
+		}}},
 	}
 }
