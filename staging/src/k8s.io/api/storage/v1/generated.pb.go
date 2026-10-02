@@ -45,6 +45,8 @@ func (m *CSINode) Reset() { *m = CSINode{} }
 
 func (m *CSINodeDriver) Reset() { *m = CSINodeDriver{} }
 
+func (m *CSINodeDriverRegistration) Reset() { *m = CSINodeDriverRegistration{} }
+
 func (m *CSINodeList) Reset() { *m = CSINodeList{} }
 
 func (m *CSINodeSpec) Reset() { *m = CSINodeSpec{} }
@@ -408,6 +410,39 @@ func (m *CSINodeDriver) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	return len(dAtA) - i, nil
 }
 
+func (m *CSINodeDriverRegistration) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *CSINodeDriverRegistration) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *CSINodeDriverRegistration) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	i -= len(m.NodeID)
+	copy(dAtA[i:], m.NodeID)
+	i = encodeVarintGenerated(dAtA, i, uint64(len(m.NodeID)))
+	i--
+	dAtA[i] = 0x12
+	i -= len(m.Name)
+	copy(dAtA[i:], m.Name)
+	i = encodeVarintGenerated(dAtA, i, uint64(len(m.Name)))
+	i--
+	dAtA[i] = 0xa
+	return len(dAtA) - i, nil
+}
+
 func (m *CSINodeList) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
@@ -475,6 +510,20 @@ func (m *CSINodeSpec) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
+	if len(m.DriverRegistrations) > 0 {
+		for iNdEx := len(m.DriverRegistrations) - 1; iNdEx >= 0; iNdEx-- {
+			{
+				size, err := m.DriverRegistrations[iNdEx].MarshalToSizedBuffer(dAtA[:i])
+				if err != nil {
+					return 0, err
+				}
+				i -= size
+				i = encodeVarintGenerated(dAtA, i, uint64(size))
+			}
+			i--
+			dAtA[i] = 0x12
+		}
+	}
 	if len(m.Drivers) > 0 {
 		for iNdEx := len(m.Drivers) - 1; iNdEx >= 0; iNdEx-- {
 			{
@@ -1515,6 +1564,19 @@ func (m *CSINodeDriver) Size() (n int) {
 	return n
 }
 
+func (m *CSINodeDriverRegistration) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	l = len(m.Name)
+	n += 1 + l + sovGenerated(uint64(l))
+	l = len(m.NodeID)
+	n += 1 + l + sovGenerated(uint64(l))
+	return n
+}
+
 func (m *CSINodeList) Size() (n int) {
 	if m == nil {
 		return 0
@@ -1540,6 +1602,12 @@ func (m *CSINodeSpec) Size() (n int) {
 	_ = l
 	if len(m.Drivers) > 0 {
 		for _, e := range m.Drivers {
+			l = e.Size()
+			n += 1 + l + sovGenerated(uint64(l))
+		}
+	}
+	if len(m.DriverRegistrations) > 0 {
+		for _, e := range m.DriverRegistrations {
 			l = e.Size()
 			n += 1 + l + sovGenerated(uint64(l))
 		}
@@ -1960,6 +2028,17 @@ func (this *CSINodeDriver) String() string {
 	}, "")
 	return s
 }
+func (this *CSINodeDriverRegistration) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&CSINodeDriverRegistration{`,
+		`Name:` + fmt.Sprintf("%v", this.Name) + `,`,
+		`NodeID:` + fmt.Sprintf("%v", this.NodeID) + `,`,
+		`}`,
+	}, "")
+	return s
+}
 func (this *CSINodeList) String() string {
 	if this == nil {
 		return "nil"
@@ -1985,8 +2064,14 @@ func (this *CSINodeSpec) String() string {
 		repeatedStringForDrivers += strings.Replace(strings.Replace(f.String(), "CSINodeDriver", "CSINodeDriver", 1), `&`, ``, 1) + ","
 	}
 	repeatedStringForDrivers += "}"
+	repeatedStringForDriverRegistrations := "[]CSINodeDriverRegistration{"
+	for _, f := range this.DriverRegistrations {
+		repeatedStringForDriverRegistrations += strings.Replace(strings.Replace(f.String(), "CSINodeDriverRegistration", "CSINodeDriverRegistration", 1), `&`, ``, 1) + ","
+	}
+	repeatedStringForDriverRegistrations += "}"
 	s := strings.Join([]string{`&CSINodeSpec{`,
 		`Drivers:` + repeatedStringForDrivers + `,`,
+		`DriverRegistrations:` + repeatedStringForDriverRegistrations + `,`,
 		`}`,
 	}, "")
 	return s
@@ -3148,6 +3233,120 @@ func (m *CSINodeDriver) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+func (m *CSINodeDriverRegistration) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowGenerated
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: CSINodeDriverRegistration: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: CSINodeDriverRegistration: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Name", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Name = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field NodeID", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.NodeID = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipGenerated(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
 func (m *CSINodeList) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -3325,6 +3524,40 @@ func (m *CSINodeSpec) Unmarshal(dAtA []byte) error {
 			}
 			m.Drivers = append(m.Drivers, CSINodeDriver{})
 			if err := m.Drivers[len(m.Drivers)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field DriverRegistrations", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.DriverRegistrations = append(m.DriverRegistrations, CSINodeDriverRegistration{})
+			if err := m.DriverRegistrations[len(m.DriverRegistrations)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex
