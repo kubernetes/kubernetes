@@ -7500,6 +7500,10 @@ const (
 	// LoadBalancerIPModeProxy indicates that traffic is delivered to the node or pod with
 	// the destination set to the node's IP and port or the pod's IP and port.
 	LoadBalancerIPModeProxy LoadBalancerIPMode = "Proxy"
+	// LoadBalancerIPModeRouter indicates that traffic is delivered to the node with
+	// the destination set to the load-balancer's IP and port, and that the node's
+	// routing table is used to forward traffic when no endpoints are available.
+	LoadBalancerIPModeRouter LoadBalancerIPMode = "Router"
 )
 
 // ImageVolumeSource represents a image volume resource.
