@@ -317,11 +317,18 @@ func handleList(ctx context.Context, r rest.Lister, scope *RequestScope, req *ht
 	defer span.End(500 * time.Millisecond)
 	req = req.WithContext(ctx)
 
+	listStart := time.Now()
 	result, err := r.List(ctx, &opts)
 	if err != nil {
 		return err
 	}
+	listDuration := time.Since(listStart)
+	transformStart := time.Now()
 	transformResponseObject(ctx, scope, req, w, http.StatusOK, outputMediaType, result)
+	transformDuration := time.Since(transformStart)
+	if total := listDuration + transformDuration; total > 10*time.Second {
+		klog.FromContext(ctx).V(2).Info("TRACE-LIST", "path", req.URL.Path, "total", total, "list", listDuration, "transform", transformDuration, "mediaType", outputMediaType.Accepted.MediaType, "acceptEncoding", req.Header.Get("Accept-Encoding"))
+	}
 	return nil
 }
 
