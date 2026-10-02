@@ -100,16 +100,14 @@ func (strategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) fie
 		oldOverhead = oldObj.Overhead.PodFixed
 	}
 	// an overhead value the stored object already carries was accepted when it was written; see
-	// kubernetes/kubernetes#141166. The key must match the location validateOverhead uses
-	// ("overhead", giving the lookup "overhead/limits"). This also covers a stored indivisible
-	// hugepages value: validateResourceQuantityHugePageValue ratchets an exact (location, name,
-	// quantity) match the same way, so a per-value StoredResourceQuantities hit is enough here
-	// without the coarser, whole-overhead AllowIndivisibleHugePagesValues flag pods use, which
-	// would let a changed or unrelated new hugepages entry through too.
+	// kubernetes/kubernetes#141166. It is stored at the location corevalidation.ValidateOverhead
+	// looks it up under. This also covers a stored indivisible hugepages value:
+	// validateResourceQuantityHugePageValue ratchets an exact (location, name, quantity) match the
+	// same way, so a per-value StoredResourceQuantities hit is enough here without the coarser,
+	// whole-overhead AllowIndivisibleHugePagesValues flag pods use, which would let a changed or
+	// unrelated new hugepages entry through too.
 	opts := corevalidation.PodValidationOptions{
-		StoredResourceQuantities: corevalidation.StoredResourceQuantitiesOfLocatedLists(map[string]core.ResourceList{
-			"overhead/limits": oldOverhead,
-		}),
+		StoredResourceQuantities: corevalidation.StoredResourceQuantitiesOfOverhead(oldOverhead),
 	}
 	errorList := validation.ValidateRuntimeClass(newObj, opts)
 	errorList = append(errorList, validation.ValidateRuntimeClassUpdate(newObj, oldObj)...)

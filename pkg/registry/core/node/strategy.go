@@ -160,10 +160,7 @@ func (nodeStrategy) Canonicalize(obj runtime.Object) {
 // ValidateUpdate is the default update validation for an end user.
 func (nodeStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	oldNode := old.(*api.Node)
-	stored := validation.StoredResourceQuantitiesOfLocatedLists(map[string]api.ResourceList{
-		"capacity":    oldNode.Status.Capacity,
-		"allocatable": oldNode.Status.Allocatable,
-	})
+	stored := validation.StoredResourceQuantitiesOfNodeStatus(&oldNode.Status)
 	errorList := validation.ValidateNode(obj.(*api.Node), stored)
 	return append(errorList, validation.ValidateNodeUpdate(obj.(*api.Node), oldNode)...)
 }

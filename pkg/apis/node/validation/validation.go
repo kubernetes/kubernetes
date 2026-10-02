@@ -65,11 +65,9 @@ func ValidateRuntimeClassUpdate(new, old *node.RuntimeClass) field.ErrorList {
 }
 
 func validateOverhead(overhead *node.Overhead, fldPath *field.Path, opts corevalidation.PodValidationOptions) field.ErrorList {
-	// reuse the ResourceRequirements validation logic. The location here ("overhead", giving the
-	// lookup key "overhead/limits") must match what ValidateRuntimeClassUpdate's caller stores the
-	// old overhead under (see runtimeclass.strategy.ValidateUpdate).
-	return corevalidation.ValidateContainerResourceRequirements(&core.ResourceRequirements{Limits: overhead.PodFixed}, nil, fldPath,
-		opts, "overhead")
+	// reuse the pod overhead validation, which looks stored values up where
+	// runtimeclass.strategy's ValidateUpdate stores them (StoredResourceQuantitiesOfOverhead).
+	return corevalidation.ValidateOverhead(overhead.PodFixed, fldPath, opts)
 }
 
 func validateScheduling(s *node.Scheduling, fldPath *field.Path) field.ErrorList {

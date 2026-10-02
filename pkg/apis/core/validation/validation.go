@@ -365,10 +365,11 @@ func ValidateRuntimeClassName(name string, fldPath *field.Path) field.ErrorList 
 	return allErrs
 }
 
-// validateOverhead can be used to check whether the given Overhead is valid.
-func validateOverhead(overhead core.ResourceList, fldPath *field.Path, opts PodValidationOptions) field.ErrorList {
+// ValidateOverhead validates a pod's or a RuntimeClass's overhead, looking stored values up at the
+// location StoredResourceQuantitiesOf and StoredResourceQuantitiesOfOverhead store them under.
+func ValidateOverhead(overhead core.ResourceList, fldPath *field.Path, opts PodValidationOptions) field.ErrorList {
 	// reuse the ResourceRequirements validation logic
-	return ValidateContainerResourceRequirements(&core.ResourceRequirements{Limits: overhead}, nil, fldPath, opts, "overhead:")
+	return ValidateContainerResourceRequirements(&core.ResourceRequirements{Limits: overhead}, nil, fldPath, opts, resourcesLocation(overheadKind, ""))
 }
 
 // Validates that given value is not negative.
@@ -2384,8 +2385,8 @@ func ValidationOptionsForPersistentVolumeClaim(pvc, oldPvc *core.PersistentVolum
 	// a status.capacity or status.allocatedResources value the stored claim already holds was
 	// accepted when it was written
 	opts.StoredResourceQuantities = StoredResourceQuantitiesOfLocatedLists(map[string]core.ResourceList{
-		"capacity":           oldPvc.Status.Capacity,
-		"allocatedResources": oldPvc.Status.AllocatedResources,
+		capacityLocation:           oldPvc.Status.Capacity,
+		allocatedResourcesLocation: oldPvc.Status.AllocatedResources,
 	})
 
 	// If the old object had an invalid API group in the data source or data source reference, continue to allow it in the new object
@@ -2773,7 +2774,7 @@ func ValidatePersistentVolumeClaimStatusUpdate(newPvc, oldPvc *core.PersistentVo
 
 	capPath := field.NewPath("status", "capacity")
 	for r, qty := range newPvc.Status.Capacity {
-		if validationOpts.StoredResourceQuantities.Has("capacity", r, qty) {
+		if validationOpts.StoredResourceQuantities.Has(capacityLocation, r, qty) {
 			continue
 		}
 		allErrs = append(allErrs, validateBasicResource(qty, capPath.Key(string(r)))...)
@@ -2799,7 +2800,7 @@ func ValidatePersistentVolumeClaimStatusUpdate(newPvc, oldPvc *core.PersistentVo
 				allErrs = append(allErrs, errs...)
 				continue
 			}
-			if validationOpts.StoredResourceQuantities.Has("allocatedResources", r, qty) {
+			if validationOpts.StoredResourceQuantities.Has(allocatedResourcesLocation, r, qty) {
 				continue
 			}
 
@@ -3886,7 +3887,7 @@ func validateEphemeralContainers(ephemeralContainers []core.EphemeralContainer, 
 		idxPath := fldPath.Index(i)
 
 		c := (*core.Container)(&ec.EphemeralContainerCommon)
-		allErrs = append(allErrs, validateContainerCommon("ephemeralContainer", c, volumes, podClaimNames, idxPath, opts, podRestartPolicy, hostUsers)...)
+		allErrs = append(allErrs, validateContainerCommon(ephemeralContainerKind, c, volumes, podClaimNames, idxPath, opts, podRestartPolicy, hostUsers)...)
 		// Ephemeral containers don't need looser constraints for pod templates, so it's convenient to apply both validations
 		// here where we've already converted EphemeralContainerCommon to Container.
 		allErrs = append(allErrs, validateContainerOnlyForPod(c, idxPath)...)
@@ -3959,7 +3960,7 @@ func validateInitContainers(containers []core.Container, os *core.PodOS, regular
 		idxPath := fldPath.Index(i)
 
 		// Apply the validation common to all container types
-		allErrs = append(allErrs, validateContainerCommon("initContainer", &ctr, volumes, podClaimNames, idxPath, opts, podRestartPolicy, hostUsers)...)
+		allErrs = append(allErrs, validateContainerCommon(initContainerKind, &ctr, volumes, podClaimNames, idxPath, opts, podRestartPolicy, hostUsers)...)
 
 		restartAlways := false
 		// Apply the validation specific to init containers
@@ -4024,7 +4025,7 @@ func validateInitContainers(containers []core.Container, os *core.PodOS, regular
 // container list validation to require a properly formatted name, image, etc. kind identifies which
 // of the three lists ctr comes from ("container", "initContainer" or "ephemeralContainer"), so the
 // resource-quantity ratchet can tell apart a container that kept its resources from one that moved
-// lists with the same name (see podResourcesLocation).
+// lists with the same name (see resourcesLocation).
 func validateContainerCommon(kind string, ctr *core.Container, volumes map[string]core.VolumeSource, podClaimNames sets.Set[string], path *field.Path, opts PodValidationOptions, podRestartPolicy *core.RestartPolicy, hostUsers bool) field.ErrorList {
 	var allErrs field.ErrorList
 
@@ -4062,7 +4063,7 @@ func validateContainerCommon(kind string, ctr *core.Container, volumes map[strin
 	allErrs = append(allErrs, ValidateVolumeMounts(ctr.VolumeMounts, volDevices, volumes, ctr, path.Child("volumeMounts"), opts)...)
 	allErrs = append(allErrs, ValidateVolumeDevices(ctr.VolumeDevices, volMounts, volumes, path.Child("volumeDevices"))...)
 	allErrs = append(allErrs, validatePullPolicy(ctr.ImagePullPolicy, path.Child("imagePullPolicy"))...)
-	allErrs = append(allErrs, ValidateContainerResourceRequirements(&ctr.Resources, podClaimNames, path.Child("resources"), opts, kind+":"+ctr.Name)...)
+	allErrs = append(allErrs, ValidateContainerResourceRequirements(&ctr.Resources, podClaimNames, path.Child("resources"), opts, resourcesLocation(kind, ctr.Name))...)
 	allErrs = append(allErrs, validateResizePolicy(ctr.ResizePolicy, path.Child("resizePolicy"), podRestartPolicy)...)
 	allErrs = append(allErrs, ValidateSecurityContext(ctr.SecurityContext, path.Child("securityContext"), hostUsers, opts.AllowSysAdminWhenPrivilegeEscalationFalse)...)
 	return allErrs
@@ -4185,7 +4186,7 @@ func validateContainers(containers []core.Container, os *core.PodOS, volumes map
 		path := fldPath.Index(i)
 
 		// Apply validation common to all containers
-		allErrs = append(allErrs, validateContainerCommon("container", &ctr, volumes, podClaimNames, path, opts, podRestartPolicy, hostUsers)...)
+		allErrs = append(allErrs, validateContainerCommon(containerKind, &ctr, volumes, podClaimNames, path, opts, podRestartPolicy, hostUsers)...)
 
 		// Container names must be unique within the list of regular containers.
 		// Collisions with init or ephemeral container names will be detected by the init or ephemeral
@@ -4910,7 +4911,7 @@ func ValidatePodSpec(spec *core.PodSpec, podMeta *metav1.ObjectMeta, fldPath *fi
 	}
 
 	if spec.Overhead != nil {
-		allErrs = append(allErrs, validateOverhead(spec.Overhead, fldPath.Child("overhead"), opts)...)
+		allErrs = append(allErrs, ValidateOverhead(spec.Overhead, fldPath.Child("overhead"), opts)...)
 	}
 
 	if spec.OS != nil {
@@ -4958,7 +4959,7 @@ func validatePodResources(spec *core.PodSpec, podClaimNames sets.Set[string], fl
 
 	// validatePodResourceRequirements checks if resource names and quantities are
 	// valid, and requests are less than limits.
-	allErrs = append(allErrs, validatePodResourceRequirements(spec.Resources, podClaimNames, resourcesFldPath, opts, "pod:")...)
+	allErrs = append(allErrs, validatePodResourceRequirements(spec.Resources, podClaimNames, resourcesFldPath, opts, resourcesLocation(podKind, ""))...)
 	allErrs = append(allErrs, validatePodResourceConsistency(spec, resourcesFldPath)...)
 	return allErrs
 }
@@ -7700,7 +7701,7 @@ func ValidateNodeResources(node *core.Node, stored StoredResourceQuantitySet) fi
 
 	// Validate resource quantities in capacity.
 	for k, v := range node.Status.Capacity {
-		if stored.Has("capacity", k, v) {
+		if stored.Has(capacityLocation, k, v) {
 			continue
 		}
 		resPath := field.NewPath("status", "capacity", string(k))
@@ -7709,7 +7710,7 @@ func ValidateNodeResources(node *core.Node, stored StoredResourceQuantitySet) fi
 
 	// Validate resource quantities in allocatable.
 	for k, v := range node.Status.Allocatable {
-		if stored.Has("allocatable", k, v) {
+		if stored.Has(allocatableLocation, k, v) {
 			continue
 		}
 		resPath := field.NewPath("status", "allocatable", string(k))
@@ -7728,10 +7729,7 @@ func ValidateNodeUpdate(node, oldNode *core.Node) field.ErrorList {
 	// if !apiequality.Semantic.DeepEqual(node.Status, core.NodeStatus{}) {
 	// 	allErrs = append(allErrs, field.Invalid("status", node.Status, "must be empty"))
 	// }
-	allErrs = append(allErrs, ValidateNodeResources(node, StoredResourceQuantitiesOfLocatedLists(map[string]core.ResourceList{
-		"capacity":    oldNode.Status.Capacity,
-		"allocatable": oldNode.Status.Allocatable,
-	}))...)
+	allErrs = append(allErrs, ValidateNodeResources(node, StoredResourceQuantitiesOfNodeStatus(&oldNode.Status))...)
 
 	// TODO: dedup the validation checks in ValidateNode() and ValidateNodeUpdate() since both these functions get called during node update.
 	statusField := field.NewPath("status")
@@ -8311,14 +8309,11 @@ func validateBasicResource(quantity resource.Quantity, fldPath *field.Path) fiel
 	return field.ErrorList{}
 }
 
-// location identifies which field requirements belongs to (a "kind:name" pair such as
-// "container:web", or "pod:"/"overhead:" for the pod's own resources/overhead); it scopes the
-// StoredResourceQuantities lookup to that one field so a value stored under a different field is
-// never mistaken for this one unchanged. Callers build this the same way podResourcesLocation
-// does (kind+":"+name), because validateResourceRequirements appends "/limits" or "/requests" to
-// it directly rather than calling that helper; the two must stay in sync, or the ratchet just
-// stops matching (fails safe: everything gets fully revalidated, nothing is skipped that
-// shouldn't be). See podResourcesLocation and StoredResourceQuantitiesOf.
+// location identifies which field requirements belongs to, built by resourcesLocation (for example
+// resourcesLocation(containerKind, "web"), or resourcesLocation(podKind, "") for the pod's own
+// resources); it scopes the StoredResourceQuantities lookup to that one field so a value stored
+// under a different field is never mistaken for this one unchanged. The lookup and the stored set
+// both build their keys with resourcesLocationKey. See StoredResourceQuantitiesOf.
 func validatePodResourceRequirements(requirements *core.ResourceRequirements, podClaimNames sets.Set[string], fldPath *field.Path, opts PodValidationOptions, location string) field.ErrorList {
 	return validateResourceRequirements(requirements, validatePodResourceName, podClaimNames, fldPath, opts, location)
 }
@@ -8345,13 +8340,13 @@ func validateResourceRequirements(requirements *core.ResourceRequirements, resou
 		allErrs = append(allErrs, resourceNameFn(resourceName, fldPath)...)
 
 		// Validate resource quantity.
-		if !opts.StoredResourceQuantities.Has(location+"/limits", resourceName, quantity) {
+		if !opts.StoredResourceQuantities.Has(resourcesLocationKey(location, limitsList), resourceName, quantity) {
 			allErrs = append(allErrs, ValidateResourceQuantityValue(resourceName, quantity, fldPath)...)
 		}
 
 		if helper.IsHugePageResourceName(resourceName) {
 			limContainsHugePages = true
-			if err := validateResourceQuantityHugePageValue(resourceName, quantity, location+"/limits", opts); err != nil {
+			if err := validateResourceQuantityHugePageValue(resourceName, quantity, resourcesLocationKey(location, limitsList), opts); err != nil {
 				allErrs = append(allErrs, field.Invalid(fldPath, quantity.String(), err.Error()))
 			}
 		}
@@ -8366,7 +8361,7 @@ func validateResourceRequirements(requirements *core.ResourceRequirements, resou
 		allErrs = append(allErrs, resourceNameFn(resourceName, fldPath)...)
 
 		// Validate resource quantity.
-		if !opts.StoredResourceQuantities.Has(location+"/requests", resourceName, quantity) {
+		if !opts.StoredResourceQuantities.Has(resourcesLocationKey(location, requestsList), resourceName, quantity) {
 			allErrs = append(allErrs, ValidateResourceQuantityValue(resourceName, quantity, fldPath)...)
 		}
 
@@ -8384,7 +8379,7 @@ func validateResourceRequirements(requirements *core.ResourceRequirements, resou
 		}
 		if helper.IsHugePageResourceName(resourceName) {
 			reqContainsHugePages = true
-			if err := validateResourceQuantityHugePageValue(resourceName, quantity, location+"/requests", opts); err != nil {
+			if err := validateResourceQuantityHugePageValue(resourceName, quantity, resourcesLocationKey(location, requestsList), opts); err != nil {
 				allErrs = append(allErrs, field.Invalid(fldPath, quantity.String(), err.Error()))
 			}
 		}
@@ -8671,7 +8666,7 @@ func isIntegerResourceValue(q resource.Quantity) bool {
 // container's limits versus another's, or a Node's capacity versus its allocatable) so that a
 // genuinely new occurrence of a value in a different field is never mistaken for the same field
 // left unchanged. Equality is Quantity.Cmp, the same rule the pre-existing ResourceQuota ratchet
-// (isStoredQuantity, below) uses, not a string match: String() only canonicalizes within a single
+// (isStoredQuantity, above) uses, not a string match: String() only canonicalizes within a single
 // format, so "500m" and "5e-1" are equal quantities that would otherwise miss each other. The
 // meaning of a location string is owned by the caller that builds and reads a given set; this type
 // only needs it to be used consistently between the two.
@@ -8711,44 +8706,92 @@ func StoredResourceQuantitiesOfLocatedLists(lists map[string]core.ResourceList) 
 	return set
 }
 
-// podResourcesLocation is the StoredResourceQuantitySet location for a container's (or the pod
-// level's, or the pod's overhead's) limits or requests. Container names are unique across
-// containers, initContainers and ephemeralContainers WITHIN one spec version (enforced elsewhere),
-// but not across an update: a pod template update can move a container between those three lists,
-// so the container kind is part of the location too, not just its name. field is "pod" for
-// spec.Resources and "overhead" for spec.Overhead — both distinct from any container kind, and from
-// each other, so a value stored in one is never mistaken for the same value newly appearing in the
-// other.
-func podResourcesLocation(kind, field, list string) string {
-	return kind + ":" + field + "/" + list
+// Locations of the Node and PersistentVolumeClaim status lists whose stored quantities an update
+// ratchets; the stored sets and the lookups both use these.
+const (
+	capacityLocation           = "capacity"
+	allocatableLocation        = "allocatable"
+	allocatedResourcesLocation = "allocatedResources"
+)
+
+// StoredResourceQuantitiesOfNodeStatus collects the quantities a stored Node's status.capacity and
+// status.allocatable hold, at the locations ValidateNodeResources looks them up under.
+func StoredResourceQuantitiesOfNodeStatus(status *core.NodeStatus) StoredResourceQuantitySet {
+	if status == nil {
+		return nil
+	}
+	return StoredResourceQuantitiesOfLocatedLists(map[string]core.ResourceList{
+		capacityLocation:    status.Capacity,
+		allocatableLocation: status.Allocatable,
+	})
+}
+
+// The kinds of resources fields a location names, and the two lists under each.
+const (
+	containerKind          = "container"
+	initContainerKind      = "initContainer"
+	ephemeralContainerKind = "ephemeralContainer"
+	podKind                = "pod"
+	overheadKind           = "overhead"
+
+	limitsList   = "limits"
+	requestsList = "requests"
+)
+
+// StoredResourceQuantitiesOfOverhead collects the quantities a stored RuntimeClass's overhead holds,
+// at the location ValidateOverhead looks them up under.
+func StoredResourceQuantitiesOfOverhead(overhead core.ResourceList) StoredResourceQuantitySet {
+	return StoredResourceQuantitiesOfLocatedLists(map[string]core.ResourceList{
+		resourcesLocationKey(resourcesLocation(overheadKind, ""), limitsList): overhead,
+	})
+}
+
+// resourcesLocation is the StoredResourceQuantitySet location of one resources field: kind is one
+// of the container kinds with the container's name, or podKind for spec.Resources and overheadKind
+// for an overhead, with an empty name. Container names are unique across containers,
+// initContainers and ephemeralContainers WITHIN one spec version (enforced elsewhere), but not
+// across an update: a pod template update can move a container between containers and
+// initContainers, so the container kind is part of the location too, not just its name. podKind
+// and overheadKind are distinct from any container kind and from each other, so a value stored in
+// one is never mistaken for the same value newly appearing in the other.
+func resourcesLocation(kind, name string) string {
+	return kind + ":" + name
+}
+
+// resourcesLocationKey is the key under which the limits or requests (limitsList or requestsList)
+// of location are stored and looked up. Both sides go through it, so they cannot drift apart.
+func resourcesLocationKey(location, list string) string {
+	return location + "/" + list
 }
 
 // StoredResourceQuantitiesOf collects the (resource name, quantity) pairs held by each container's,
 // spec.Resources', and spec.Overhead's limits and requests in spec, each under its own location.
-// See StoredResourceQuantitiesOfLocatedLists and podResourcesLocation.
+// See StoredResourceQuantitiesOfLocatedLists and resourcesLocation.
 func StoredResourceQuantitiesOf(spec *core.PodSpec) StoredResourceQuantitySet {
 	if spec == nil {
 		return nil
 	}
 	lists := map[string]core.ResourceList{}
-	add := func(kind, field string, resources core.ResourceRequirements) {
-		lists[podResourcesLocation(kind, field, "limits")] = resources.Limits
-		lists[podResourcesLocation(kind, field, "requests")] = resources.Requests
+	add := func(kind, name string, resources core.ResourceRequirements) {
+		lists[resourcesLocationKey(resourcesLocation(kind, name), limitsList)] = resources.Limits
+		lists[resourcesLocationKey(resourcesLocation(kind, name), requestsList)] = resources.Requests
 	}
 	for i := range spec.Containers {
-		add("container", spec.Containers[i].Name, spec.Containers[i].Resources)
+		add(containerKind, spec.Containers[i].Name, spec.Containers[i].Resources)
 	}
 	for i := range spec.InitContainers {
-		add("initContainer", spec.InitContainers[i].Name, spec.InitContainers[i].Resources)
+		add(initContainerKind, spec.InitContainers[i].Name, spec.InitContainers[i].Resources)
 	}
+	// Ephemeral containers cannot set resources today; their location is kept for symmetry, so an
+	// allowance added later is ratcheted the same way.
 	for i := range spec.EphemeralContainers {
-		add("ephemeralContainer", spec.EphemeralContainers[i].Name, spec.EphemeralContainers[i].Resources)
+		add(ephemeralContainerKind, spec.EphemeralContainers[i].Name, spec.EphemeralContainers[i].Resources)
 	}
 	if spec.Resources != nil {
-		add("pod", "", *spec.Resources)
+		add(podKind, "", *spec.Resources)
 	}
 	if spec.Overhead != nil {
-		lists[podResourcesLocation("overhead", "", "limits")] = spec.Overhead
+		lists[resourcesLocationKey(resourcesLocation(overheadKind, ""), limitsList)] = spec.Overhead
 	}
 	return StoredResourceQuantitiesOfLocatedLists(lists)
 }
