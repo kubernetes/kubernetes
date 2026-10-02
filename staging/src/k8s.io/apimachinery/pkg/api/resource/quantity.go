@@ -880,7 +880,8 @@ func (q *Quantity) UnmarshalCBOR(value []byte) error {
 // value in the given format.
 func NewDecimalQuantity(b inf.Dec, format Format) *Quantity {
 	return &Quantity{
-		d:      infDecAmount{&b},
+		// b is a shallow copy and shares the big.Int.abs slice from the original, so we make a defensive copy.
+		d:      infDecAmount{new(inf.Dec).Set(&b)},
 		Format: format,
 	}
 }
