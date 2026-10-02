@@ -538,7 +538,7 @@ func (cm *containerManagerImpl) setupNode(ctx context.Context, activePods Active
 		if err := cm.createNodeAllocatableCgroups(logger); err != nil {
 			return err
 		}
-		err = cm.qosContainerManager.Start(ctx, cm.GetNodeAllocatableAbsolute, activePods)
+		err = cm.qosContainerManager.Start(ctx, cm.GetNodeAllocatableAbsolute, activePods, nil)
 		if err != nil {
 			return fmt.Errorf("failed to initialize top level QOS containers: %v", err)
 		}
