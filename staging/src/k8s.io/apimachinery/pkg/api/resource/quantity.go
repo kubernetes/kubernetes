@@ -102,6 +102,9 @@ import (
 // writing some sort of special handling code in the hopes that that will
 // cause implementors to also use a fixed point implementation.
 //
+// ---
+// Quantity is a value type. Each shallow copy is independent from its source.
+//
 // +protobuf=true
 // +protobuf.embed=string
 // +protobuf.options.marshal=false
@@ -427,6 +430,7 @@ func ParseQuantity(str string) (Quantity, error) {
 
 // DeepCopy returns a deep-copy of the Quantity value.  Note that the method
 // receiver is a value, so we can mutate it in-place and return it.
+// Quantity is a value type. Each shallow copy is independent from its source.
 func (q Quantity) DeepCopy() Quantity {
 	if q.d.Dec != nil {
 		tmp := &inf.Dec{}
@@ -673,7 +677,8 @@ func (q *Quantity) Add(y Quantity) {
 	} else if q.IsZero() {
 		q.Format = y.Format
 	}
-	q.ToDec().d.Dec.Add(q.d.Dec, y.internalReadOnlyDec())
+	q.ToDec()
+	q.d.Dec = new(inf.Dec).Add(q.d.Dec, y.internalReadOnlyDec())
 }
 
 // Sub subtracts the provided quantity from the current value in place. If the current
@@ -694,7 +699,8 @@ func (q *Quantity) Sub(y Quantity) {
 	if q.d.Dec == nil && y.d.Dec == nil && q.i.Sub(y.i) {
 		return
 	}
-	q.ToDec().d.Dec.Sub(q.d.Dec, y.internalReadOnlyDec())
+	q.ToDec()
+	q.d.Dec = new(inf.Dec).Sub(q.d.Dec, y.internalReadOnlyDec())
 }
 
 // Mul multiplies the provided y to the current value.
@@ -704,7 +710,9 @@ func (q *Quantity) Mul(y int64) bool {
 	if q.d.Dec == nil && q.i.Mul(y) {
 		return true
 	}
-	return q.ToDec().d.Dec.Mul(q.d.Dec, inf.NewDec(y, inf.Scale(0))).UnscaledBig().IsInt64()
+	q.ToDec()
+	q.d.Dec = new(inf.Dec).Mul(q.d.Dec, inf.NewDec(y, inf.Scale(0)))
+	return q.d.Dec.UnscaledBig().IsInt64()
 }
 
 // Cmp returns 0 if the quantity is equal to y, -1 if the quantity is less than y, or 1 if the
@@ -738,7 +746,7 @@ func (q *Quantity) Neg() {
 		}
 		q.ToDec()
 	}
-	q.d.Dec.Neg(q.d.Dec)
+	q.d.Dec = new(inf.Dec).Neg(q.d.Dec)
 }
 
 // Equal checks equality of two Quantities. This is useful for testing with

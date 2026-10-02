@@ -23,6 +23,7 @@ import (
 	"math/big"
 	"math/rand"
 	"os"
+	"reflect"
 	"strings"
 	"testing"
 	"unicode"
@@ -859,78 +860,337 @@ func snapshotQuantity(q *Quantity) quantityState {
 	return st
 }
 
-func sharesMemory(a, b *inf.Dec) bool {
-	if a == nil || b == nil {
-		return false
-	}
-	if a == b {
-		return true
-	}
-	aw, bw := a.UnscaledBig().Bits(), b.UnscaledBig().Bits()
-	return cap(aw) > 0 && cap(bw) > 0 && &aw[:1][0] == &bw[:1][0]
+type testMethod struct {
+	// mutatesQuantity methods are allowed to mutate the quantity but must
+	// retain the value type semantics.
+	mutatesQuantity bool
+	// calls lists the methods to be called on the quantity for testing. Each
+	// function takes the quantity receiver as the first argument and the value
+	// of the input parameter, if there is one, as the second argument.
+	calls []func(q *Quantity, y Quantity)
 }
 
-func TestQuantityReadsDoNotMutate(t *testing.T) {
+// TestQuantityMutate checks that all Quantity methods retain the value type
+// semantics. That is, changes to one copy must not be visible in the other.
+// It also checks that only methods marked as mutatesQuantity are allowed to
+// mutate the quantity.
+func TestQuantityMutate(t *testing.T) {
 	toDec := func(q Quantity) Quantity { q.ToDec(); return q }
-	reads := []struct {
-		name string
-		fn   func(q *Quantity, y Quantity) *inf.Dec
-	}{
-		{"Cmp", func(q *Quantity, y Quantity) *inf.Dec { q.Cmp(y); return nil }},
-		{"Equal", func(q *Quantity, y Quantity) *inf.Dec { q.Equal(y); return nil }},
-		{"CmpInt64", func(q *Quantity, _ Quantity) *inf.Dec { q.CmpInt64(7); return nil }},
-		{"AsDec", func(q *Quantity, _ Quantity) *inf.Dec { return q.AsDec() }},
-		{"DeepCopy", func(q *Quantity, _ Quantity) *inf.Dec { return q.DeepCopy().d.Dec }},
-		{"AsFloat64Slow", func(q *Quantity, _ Quantity) *inf.Dec { q.AsFloat64Slow(); return nil }},
-		{"AsApproximateFloat64", func(q *Quantity, _ Quantity) *inf.Dec { q.AsApproximateFloat64(); return nil }},
-		{"AsInt64", func(q *Quantity, _ Quantity) *inf.Dec { q.AsInt64(); return nil }},
-		{"AsScaledInt64", func(q *Quantity, _ Quantity) *inf.Dec { q.AsScaledInt64(Milli); return nil }},
-		{"Value", func(q *Quantity, _ Quantity) *inf.Dec { q.Value(); return nil }},
-		{"MilliValue", func(q *Quantity, _ Quantity) *inf.Dec { q.MilliValue(); return nil }},
-		{"AsScale", func(q *Quantity, _ Quantity) *inf.Dec { q.AsScale(0); return nil }},
-		{"AsCanonicalBytes", func(q *Quantity, _ Quantity) *inf.Dec { q.AsCanonicalBytes(nil); return nil }},
-		{"CanonicalizeBytes", func(q *Quantity, _ Quantity) *inf.Dec { q.CanonicalizeBytes(nil); return nil }},
-		{"Sign", func(q *Quantity, _ Quantity) *inf.Dec { q.Sign(); return nil }},
-		{"IsZero", func(q *Quantity, _ Quantity) *inf.Dec { q.IsZero(); return nil }},
-		{"String", func(q *Quantity, _ Quantity) *inf.Dec { _ = q.String(); return nil }},
-		{"MarshalJSON", func(q *Quantity, _ Quantity) *inf.Dec { _, _ = q.MarshalJSON(); return nil }},
-		{"Add argument", func(q *Quantity, y Quantity) *inf.Dec { acc := y.DeepCopy(); acc.Add(*q); return acc.d.Dec }},
-		{"Sub argument", func(q *Quantity, y Quantity) *inf.Dec { acc := y.DeepCopy(); acc.Sub(*q); return acc.d.Dec }},
+	methodInfos := map[string]testMethod{
+		"Add": {
+			mutatesQuantity: true,
+			calls: []func(q *Quantity, y Quantity){
+				func(q *Quantity, y Quantity) { q.Add(y) },
+			},
+		},
+		"AsApproximateFloat64": {
+			calls: []func(q *Quantity, y Quantity){
+				func(q *Quantity, _ Quantity) { q.AsApproximateFloat64() },
+			},
+		},
+		"AsCanonicalBytes": {
+			calls: []func(q *Quantity, y Quantity){
+				func(q *Quantity, _ Quantity) { q.AsCanonicalBytes(nil) },
+			},
+		},
+		"AsDec": {
+			calls: []func(q *Quantity, y Quantity){
+				func(q *Quantity, _ Quantity) { q.AsDec().UnscaledBig().SetInt64(0x5a5a5a5a) },
+			},
+		},
+		"AsFloat64Slow": {
+			calls: []func(q *Quantity, y Quantity){
+				func(q *Quantity, _ Quantity) { q.AsFloat64Slow() },
+			},
+		},
+		"AsInt64": {
+			calls: []func(q *Quantity, y Quantity){
+				func(q *Quantity, _ Quantity) { q.AsInt64() },
+			},
+		},
+		"AsMilliInt64": {
+			calls: []func(q *Quantity, y Quantity){
+				func(q *Quantity, _ Quantity) { q.AsMilliInt64() },
+			},
+		},
+		"AsScale": {
+			calls: []func(q *Quantity, y Quantity){
+				func(q *Quantity, _ Quantity) { q.AsScale(0) },
+			},
+		},
+		"AsScaledInt64": {
+			calls: []func(q *Quantity, y Quantity){
+				func(q *Quantity, _ Quantity) { q.AsScaledInt64(Milli) },
+			},
+		},
+		"CacheString": {
+			mutatesQuantity: true,
+			calls: []func(q *Quantity, y Quantity){
+				func(q *Quantity, _ Quantity) { q.CacheString() },
+			},
+		},
+		"CanonicalizeBytes": {
+			calls: []func(q *Quantity, y Quantity){
+				func(q *Quantity, _ Quantity) { q.CanonicalizeBytes(nil) },
+			},
+		},
+		"Cmp": {
+			calls: []func(q *Quantity, y Quantity){
+				func(q *Quantity, y Quantity) { q.Cmp(y) },
+			},
+		},
+		"CmpInt64": {
+			calls: []func(q *Quantity, y Quantity){
+				func(q *Quantity, _ Quantity) { q.CmpInt64(7) },
+			},
+		},
+		"DeepCopy": {
+			calls: []func(q *Quantity, y Quantity){
+				func(q *Quantity, _ Quantity) {
+					if d := q.DeepCopy().d.Dec; d != nil {
+						d.UnscaledBig().SetInt64(0x5a5a5a5a)
+					}
+				},
+			},
+		},
+		"DeepCopyInto": {
+			calls: []func(q *Quantity, y Quantity){
+				func(q *Quantity, _ Quantity) {
+					var out Quantity
+					q.DeepCopyInto(&out)
+					if out.d.Dec != nil {
+						out.d.Dec.UnscaledBig().SetInt64(0x5a5a5a5a)
+					}
+				},
+			},
+		},
+		"Equal": {
+			calls: []func(q *Quantity, y Quantity){
+				func(q *Quantity, y Quantity) { q.Equal(y) },
+			},
+		},
+		"IsZero": {
+			calls: []func(q *Quantity, y Quantity){
+				func(q *Quantity, _ Quantity) { q.IsZero() },
+			},
+		},
+		"Marshal": {
+			calls: []func(q *Quantity, y Quantity){
+				func(q *Quantity, _ Quantity) { _, _ = q.Marshal() },
+			},
+		},
+		"MarshalCBOR": {
+			calls: []func(q *Quantity, y Quantity){
+				func(q *Quantity, _ Quantity) { _, _ = q.MarshalCBOR() },
+			},
+		},
+		"MarshalJSON": {
+			calls: []func(q *Quantity, y Quantity){
+				func(q *Quantity, _ Quantity) { _, _ = q.MarshalJSON() },
+			},
+		},
+		"MarshalTo": {
+			calls: []func(q *Quantity, y Quantity){
+				func(q *Quantity, _ Quantity) { _, _ = q.MarshalTo(make([]byte, q.Size())) },
+			},
+		},
+		"MarshalToSizedBuffer": {
+			calls: []func(q *Quantity, y Quantity){
+				func(q *Quantity, _ Quantity) { _, _ = q.MarshalToSizedBuffer(make([]byte, q.Size())) },
+			},
+		},
+		"MilliValue": {
+			calls: []func(q *Quantity, y Quantity){
+				func(q *Quantity, _ Quantity) { q.MilliValue() },
+			},
+		},
+		"Mul": {
+			mutatesQuantity: true,
+			calls: []func(q *Quantity, y Quantity){
+				func(q *Quantity, y Quantity) { q.Mul(y.Value()) },
+			},
+		},
+		"Neg": {
+			mutatesQuantity: true,
+			calls: []func(q *Quantity, y Quantity){
+				func(q *Quantity, _ Quantity) { q.Neg() },
+			},
+		},
+		"OpenAPIModelName": {
+			calls: []func(q *Quantity, y Quantity){
+				func(q *Quantity, _ Quantity) { q.OpenAPIModelName() },
+			},
+		},
+		"OpenAPISchemaFormat": {
+			calls: []func(q *Quantity, y Quantity){
+				func(q *Quantity, _ Quantity) { q.OpenAPISchemaFormat() },
+			},
+		},
+		"OpenAPISchemaType": {
+			calls: []func(q *Quantity, y Quantity){
+				func(q *Quantity, _ Quantity) { q.OpenAPISchemaType() },
+			},
+		},
+		"OpenAPIV3OneOfTypes": {
+			calls: []func(q *Quantity, y Quantity){
+				func(q *Quantity, _ Quantity) { q.OpenAPIV3OneOfTypes() },
+			},
+		},
+		"Reset": {
+			mutatesQuantity: true,
+			calls: []func(q *Quantity, y Quantity){
+				func(q *Quantity, _ Quantity) { q.Reset() },
+			},
+		},
+		"RoundUp": {
+			mutatesQuantity: true,
+			calls: []func(q *Quantity, y Quantity){
+				func(q *Quantity, _ Quantity) { q.RoundUp(0) },
+			},
+		},
+		"ScaledValue": {
+			calls: []func(q *Quantity, y Quantity){
+				func(q *Quantity, _ Quantity) { q.ScaledValue(Kilo) },
+			},
+		},
+		"Set": {
+			mutatesQuantity: true,
+			calls: []func(q *Quantity, y Quantity){
+				func(q *Quantity, y Quantity) { q.Set(y.Value()) },
+			},
+		},
+		"SetMilli": {
+			mutatesQuantity: true,
+			calls: []func(q *Quantity, y Quantity){
+				func(q *Quantity, y Quantity) { q.SetMilli(y.Value()) },
+			},
+		},
+		"SetScaled": {
+			mutatesQuantity: true,
+			calls: []func(q *Quantity, y Quantity){
+				func(q *Quantity, y Quantity) { q.SetScaled(y.Value(), 3) },
+			},
+		},
+		"Sign": {
+			calls: []func(q *Quantity, y Quantity){
+				func(q *Quantity, _ Quantity) { q.Sign() },
+			},
+		},
+		"Size": {
+			calls: []func(q *Quantity, y Quantity){
+				func(q *Quantity, _ Quantity) { q.Size() },
+			},
+		},
+		"String": {
+			calls: []func(q *Quantity, y Quantity){
+				func(q *Quantity, _ Quantity) { _ = q.String() },
+			},
+		},
+		"Sub": {
+			mutatesQuantity: true,
+			calls: []func(q *Quantity, y Quantity){
+				func(q *Quantity, y Quantity) { q.Sub(y) },
+			},
+		},
+		"ToDec": {
+			mutatesQuantity: true,
+			calls: []func(q *Quantity, y Quantity){
+				func(q *Quantity, _ Quantity) { q.ToDec() },
+			},
+		},
+		"ToUnstructured": {
+			calls: []func(q *Quantity, y Quantity){
+				func(q *Quantity, _ Quantity) { q.ToUnstructured() },
+			},
+		},
+		"Unmarshal": {
+			mutatesQuantity: true,
+			calls: []func(q *Quantity, y Quantity){
+				func(q *Quantity, y Quantity) {
+					b, _ := y.Marshal()
+					_ = q.Unmarshal(b)
+				},
+			},
+		},
+		"UnmarshalCBOR": {
+			mutatesQuantity: true,
+			calls: []func(q *Quantity, y Quantity){
+				func(q *Quantity, y Quantity) {
+					b, _ := y.MarshalCBOR()
+					_ = q.UnmarshalCBOR(b)
+				},
+			},
+		},
+		"UnmarshalJSON": {
+			mutatesQuantity: true,
+			calls: []func(q *Quantity, y Quantity){
+				func(q *Quantity, y Quantity) {
+					b, _ := y.MarshalJSON()
+					_ = q.UnmarshalJSON(b)
+				},
+			},
+		},
+		"Value": {
+			calls: []func(q *Quantity, y Quantity){
+				func(q *Quantity, _ Quantity) { q.Value() },
+			},
+		},
 	}
-	for _, read := range reads {
-		t.Run(read.name, func(t *testing.T) {
-			table := []struct {
-				name string
-				q    Quantity
-			}{
-				{"Quantity{}", Quantity{}},
-				{"dec 0 uncached", toDec(Quantity{})},
-				{"1500m", MustParse("1500m")},
-				{"1500m uncached", intQuantity(1500, -3, DecimalSI)},
-				{"dec 1500m uncached", toDec(intQuantity(1500, -3, DecimalSI))},
-				{"50Ki", MustParse("50Ki")},
-				{"-50k uncached", intQuantity(-50, 3, BinarySI)},
-				{"dec 1.5Gi", MustParse("1.5Gi")},
-				{"dec 1.5 uncached", decQuantity(15, -1, DecimalSI)},
-				{"dec -9223372036854775809", MustParse("-9223372036854775809")},
-				{"dec 9223372036854775807", toDec(MustParse("9223372036854775807"))},
+	type input struct {
+		name string
+		q    Quantity
+	}
+	// Each call gets fresh inputs, since a later call could undo an earlier
+	// in-place write (an even number of in-place Negs restores the value).
+	inputs := func() []input {
+		return []input{
+			{"Quantity{}", Quantity{}},
+			{"dec 0 uncached", toDec(Quantity{})},
+			{"1500m", MustParse("1500m")},
+			{"1500m uncached", intQuantity(1500, -3, DecimalSI)},
+			{"dec 1500m uncached", toDec(intQuantity(1500, -3, DecimalSI))},
+			{"50Ki", MustParse("50Ki")},
+			{"-50k uncached", intQuantity(-50, 3, BinarySI)},
+			{"dec 1.5Gi", MustParse("1.5Gi")},
+			{"dec 1.5 uncached", decQuantity(15, -1, DecimalSI)},
+			{"-9223372036854775808", MustParse("-9223372036854775808")},
+			{"dec -9223372036854775809", MustParse("-9223372036854775809")},
+			{"dec 9223372036854775807", toDec(MustParse("9223372036854775807"))},
+		}
+	}
+	for method := range reflect.TypeFor[*Quantity]().Methods() {
+		t.Run(method.Name, func(t *testing.T) {
+			methodInfo, ok := methodInfos[method.Name]
+			if !ok {
+				t.Fatalf("Quantity.%s has no entry in methodInfos; add one that calls it, with mutatesQuantity set if it changes the receiver", method.Name)
 			}
-			before := make([]quantityState, len(table))
-			for i := range table {
-				before[i] = snapshotQuantity(&table[i].q)
+			if len(methodInfo.calls) == 0 {
+				t.Fatalf("methodInfos[%q] has no calls", method.Name)
 			}
-			for i := range table {
-				for j := range table {
-					x, y := &table[i], &table[j]
-					got := read.fn(&x.q, y.q)
-					if sharesMemory(got, x.q.d.Dec) || sharesMemory(got, y.q.d.Dec) {
-						t.Errorf("%s(%s, %s) returned memory shared with an operand", read.name, x.name, y.name)
+			n := len(inputs())
+			for _, call := range methodInfo.calls {
+				changed := false
+				for i := range n {
+					for j := range n {
+						in := inputs()
+						x, y := &in[i], &in[j]
+						xBefore, yBefore := snapshotQuantity(&x.q), snapshotQuantity(&y.q)
+						q := &x.q
+						if methodInfo.mutatesQuantity {
+							q = new(x.q)
+						}
+						call(q, y.q)
+						if after := snapshotQuantity(&x.q); after != xBefore {
+							t.Errorf("%s(%s, %s) changed %s from %+v to %+v", method.Name, x.name, y.name, x.name, xBefore, after)
+						}
+						if after := snapshotQuantity(&y.q); i != j && after != yBefore {
+							t.Errorf("%s(%s, %s) changed %s from %+v to %+v", method.Name, x.name, y.name, y.name, yBefore, after)
+						}
+						changed = changed || snapshotQuantity(q) != xBefore
 					}
 				}
-			}
-			for i := range table {
-				if after := snapshotQuantity(&table[i].q); after != before[i] {
-					t.Errorf("%s changed %s from %+v to %+v", read.name, table[i].name, before[i], after)
+				if methodInfo.mutatesQuantity && !changed {
+					t.Errorf("%s is marked mutatesQuantity but changed no receiver; unset mutatesQuantity or fix the call", method.Name)
 				}
 			}
 		})
@@ -947,7 +1207,7 @@ func TestQuantityNeg(t *testing.T) {
 	}
 
 	for i, item := range table {
-		out := item.a.DeepCopy()
+		out := item.a
 		out.Neg()
 		if out.Cmp(item.a) == 0 {
 			t.Errorf("%d: negating an item should not mutate the source: %s", i, out.String())
@@ -1576,8 +1836,8 @@ func TestSub(t *testing.T) {
 	}
 
 	x, y := decQuantity(15, -1, DecimalSI), decQuantity(25, -1, DecimalSI)
-	if n := testing.AllocsPerRun(100, func() { x.Sub(y) }); n != 0 {
-		t.Errorf("Sub of two inf.Dec quantities: %v allocations per call, want 0", n)
+	if n := testing.AllocsPerRun(100, func() { x.Sub(y) }); n > 2 {
+		t.Errorf("Sub of two inf.Dec quantities: %v allocations per call, want at most 2", n)
 	}
 }
 
@@ -1846,8 +2106,8 @@ func TestAdd(t *testing.T) {
 	}
 
 	x, y := decQuantity(15, -1, DecimalSI), decQuantity(25, -1, DecimalSI)
-	if n := testing.AllocsPerRun(100, func() { x.Add(y) }); n != 0 {
-		t.Errorf("Add of two inf.Dec quantities: %v allocations per call, want 0", n)
+	if n := testing.AllocsPerRun(100, func() { x.Add(y) }); n > 2 {
+		t.Errorf("Add of two inf.Dec quantities: %v allocations per call, want at most 2", n)
 	}
 }
 
