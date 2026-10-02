@@ -84,7 +84,8 @@ type Executor struct {
 	lastVictimsPendingPreemption map[types.UID]pendingVictim
 
 	// PreemptPod is a function that actually preempts a specific Pod. It returns true
-	// when the victim was preempted only in scheduler memory, without a delete call.
+	// when the victim was preempted only in scheduler memory or was already deleted,
+	// without a successful delete API call.
 	// This is exposed to be replaced during tests.
 	PreemptPod func(ctx context.Context, c fwk.PreemptionCandidate, preemptor ExecutorPreemptor, victim *v1.Pod, pluginName string) (bool, error)
 }
@@ -139,7 +140,7 @@ func NewExecutor(fh fwk.Handle, fts feature.Features) *Executor {
 						return false, err
 					}
 					logger.V(2).Info("Victim Pod is already deleted", "preemptor", klog.KObj(preemptor), "victim", klog.KObj(victim), "node", c.Name())
-					return false, nil
+					return true, nil
 				}
 			}
 			if err := schedutil.DeletePod(ctx, fh.ClientSet(), victim); err != nil {
@@ -148,7 +149,7 @@ func NewExecutor(fh fwk.Handle, fts feature.Features) *Executor {
 					return false, err
 				}
 				logger.V(2).Info("Victim Pod is already deleted", "preemptor", klog.KObj(preemptor), "victim", klog.KObj(victim), "node", c.Name())
-				return false, nil
+				return true, nil
 			}
 			logger.V(2).Info("Preemptor Pod preempted victim Pod", "preemptor", klog.KObj(preemptor), "victim", klog.KObj(victim), "node", c.Name())
 		} else {
@@ -214,7 +215,7 @@ func (e *Executor) prepareCandidateAsync(c fwk.PreemptionCandidate, preemptor Ex
 
 	errCh := parallelize.NewResultChannel[error]()
 	// PreEnqueue only watches the last victim for completion, so activate when that victim won't emit a deletion event.
-	preemptedLastVictimInMemory := false
+	activatePreemptor := false
 	preemptPod := func(index int) {
 		victim := victimPods[index]
 		if _, err := e.PreemptPod(ctx, c, preemptor, victim, pluginName); err != nil {
@@ -240,7 +241,7 @@ func (e *Executor) prepareCandidateAsync(c fwk.PreemptionCandidate, preemptor Ex
 			metrics.PreemptionGoroutinesExecutionTotal.WithLabelValues(result).Inc()
 		}()
 		defer func() {
-			if result == metrics.GoroutineResultError || preemptedLastVictimInMemory {
+			if result == metrics.GoroutineResultError || activatePreemptor {
 				// When API call isn't successful or no victim deletion event will be produced, the preemptor's
 				// Pods may get stuck in the unschedulable pod pool in the worst case.
 				e.fh.Activate(logger, preemptor.Pods())
@@ -289,12 +290,12 @@ func (e *Executor) prepareCandidateAsync(c fwk.PreemptionCandidate, preemptor Ex
 			e.lastVictimsPendingPreemption[preemptor.UID()] = pendingVictim{namespace: lastVictim.Namespace, name: lastVictim.Name}
 			e.mu.Unlock()
 
-			preemptedInMemory, err := e.PreemptPod(ctx, c, preemptor, lastVictim, pluginName)
+			shouldActivate, err := e.PreemptPod(ctx, c, preemptor, lastVictim, pluginName)
 			if err != nil {
 				utilruntime.HandleErrorWithContext(ctx, err, "Error occurred during async preemption of the last victim")
 				result = metrics.GoroutineResultError
-			} else if preemptedInMemory {
-				preemptedLastVictimInMemory = true
+			} else if shouldActivate {
+				activatePreemptor = true
 			}
 		}
 		e.mu.Lock()
