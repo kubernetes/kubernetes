@@ -691,7 +691,13 @@ func TestPrefix(t *testing.T) {
 	}
 	for configuredPrefix, effectivePrefix := range testcases {
 		t.Run(configuredPrefix, func(t *testing.T) {
-			_, store, _ := testSetup(t, withPrefix(configuredPrefix), withResourcePrefix("/pods"))
+			reverseKeyFunc := func(key string) (string, string, error) {
+				if key != "/pods/ns/pod" {
+					t.Fatalf("unexpected resource-relative key %q", key)
+				}
+				return "pod", "ns", nil
+			}
+			_, store, _ := testSetup(t, withPrefix(configuredPrefix), withResourcePrefix("/pods"), withReverseKeyFunc(reverseKeyFunc))
 			if store.pathPrefix != effectivePrefix {
 				t.Errorf("expected effective prefix %q, got %q", effectivePrefix, store.pathPrefix)
 			}
@@ -710,11 +716,78 @@ func TestPrefix(t *testing.T) {
 					}
 				}
 			}
+			key, err := store.prepareKey("/pods/ns/pod", false)
+			if err != nil {
+				t.Fatal(err)
+			}
+			name, namespace, err := store.watcher.reverseKeyFunc(storageKey(key))
+			if err != nil || name != "pod" || namespace != "ns" {
+				t.Fatalf("reverse key round trip returned name=%q namespace=%q err=%v", name, namespace, err)
+			}
 			// Root prefixes must also work when the store passes them to the estimator.
 			if err := store.EnableResourceSizeEstimation(store.getKeys); err != nil {
 				t.Fatal(err)
 			}
 		})
+	}
+}
+
+func TestNewStorageKeyReverseFunc(t *testing.T) {
+	for _, prefix := range []string{"", "/registry", "/custom/backend"} {
+		t.Run("prefix="+prefix, func(t *testing.T) {
+			called := false
+			reverseKeyFunc := func(key string) (name string, namespace string, err error) {
+				called = true
+				if key != "/pods/ns1/pod1" {
+					t.Fatalf("unexpected resource-relative key %q", key)
+				}
+				return "pod1", "ns1", nil
+			}
+			reverse := newStorageKeyReverseFunc(prefix, reverseKeyFunc)
+			name, namespace, err := reverse(storageKey(prefix + "/pods/ns1/pod1"))
+			if err != nil || name != "pod1" || namespace != "ns1" || !called {
+				t.Fatalf("reverse returned name=%q namespace=%q err=%v called=%t", name, namespace, err, called)
+			}
+
+			for _, key := range []string{
+				prefix,
+				prefix + "-other/pods/ns1/pod1",
+				prefix + "pods/ns1/pod1",
+				"other/backend/pods/ns1/pod1",
+			} {
+				called = false
+				if _, _, err := reverse(storageKey(key)); err == nil {
+					t.Errorf("reverse(%q) must reject a key outside the backend prefix", key)
+				}
+				if called {
+					t.Errorf("reverse(%q) called the resource reverse function for an invalid storage key", key)
+				}
+			}
+		})
+	}
+
+	t.Run("mismatched prefix", func(t *testing.T) {
+		reverse := newStorageKeyReverseFunc("/custom/backend", func(string) (string, string, error) {
+			t.Fatal("resource reverse function must not be called for a mismatched prefix")
+			return "", "", nil
+		})
+		if _, _, err := reverse("/other/backend/pods/ns1/pod1"); err == nil {
+			t.Fatal("storage key without the configured backend prefix must be rejected")
+		}
+	})
+
+	t.Run("callback error", func(t *testing.T) {
+		wantErr := fmt.Errorf("invalid resource key")
+		reverse := newStorageKeyReverseFunc("/registry", func(string) (string, string, error) {
+			return "", "", wantErr
+		})
+		if _, _, err := reverse("/registry/pods/"); !errors.Is(err, wantErr) {
+			t.Fatalf("expected callback error %v, got %v", wantErr, err)
+		}
+	})
+
+	if got := newStorageKeyReverseFunc("/custom/backend", nil); got != nil {
+		t.Fatal("nil ReverseKeyFunc must preserve the decode-fallback signal")
 	}
 }
 
@@ -873,6 +946,7 @@ type setupOptions struct {
 	codec          runtime.Codec
 	newFunc        func() runtime.Object
 	newListFunc    func() runtime.Object
+	reverseKeyFunc storage.ReverseKeyFunc
 	prefix         string
 	resourcePrefix string
 	groupResource  schema.GroupResource
@@ -899,6 +973,12 @@ func withPrefix(prefix string) setupOption {
 func withResourcePrefix(prefix string) setupOption {
 	return func(options *setupOptions) {
 		options.resourcePrefix = prefix
+	}
+}
+
+func withReverseKeyFunc(reverseKeyFunc storage.ReverseKeyFunc) setupOption {
+	return func(options *setupOptions) {
+		options.reverseKeyFunc = reverseKeyFunc
 	}
 }
 
@@ -949,6 +1029,7 @@ func benchmarkSetup(b *testing.B) (context.Context, *store) {
 		config.Codec,
 		config.NewFunc,
 		config.NewListFunc,
+		nil,
 		"",
 		config.ResourcePrefix,
 		config.GroupResource,
@@ -980,6 +1061,7 @@ func testSetup(t testing.TB, opts ...setupOption) (context.Context, *store, *kub
 		setupOpts.codec,
 		setupOpts.newFunc,
 		setupOpts.newListFunc,
+		setupOpts.reverseKeyFunc,
 		setupOpts.prefix,
 		setupOpts.resourcePrefix,
 		setupOpts.groupResource,

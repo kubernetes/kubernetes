@@ -91,6 +91,7 @@ type watcher struct {
 	client                   *clientv3.Client
 	codec                    runtime.Codec
 	newFunc                  func() runtime.Object
+	reverseKeyFunc           storageKeyReverseFunc
 	objectType               string
 	groupResource            schema.GroupResource
 	versioner                storage.Versioner
@@ -98,6 +99,14 @@ type watcher struct {
 	getCurrentStorageRV      func(context.Context) (uint64, error)
 	getResourceSizeEstimator func() *resourceSizeEstimator
 }
+
+// storageKey keeps backend-prefixed keys distinct from the resource-relative
+// keys accepted by storage.ReverseKeyFunc.
+type storageKey string
+
+// storageKeyReverseFunc recovers object identity from an etcd key that still
+// contains the backend-specific prefix.
+type storageKeyReverseFunc func(key storageKey) (name string, namespace string, err error)
 
 // watchChan implements watch.Interface.
 type watchChan struct {
