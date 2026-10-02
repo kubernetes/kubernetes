@@ -477,9 +477,9 @@ func TestWatchChanSyncStreamCompactionError(t *testing.T) {
 		t.Fatalf("expected ResourceExpired from a compacted revision, got %T %v", err, err)
 	}
 
-	expected := `# HELP etcd_request_errors_total [ALPHA] Etcd failed request counts for each operation and object type.
+	expected := `# HELP etcd_request_errors_total [ALPHA] Etcd failed request counts for each operation and object type. Reason response to grpc status, or transaction conflict.
 # TYPE etcd_request_errors_total counter
-etcd_request_errors_total{group="",operation="listStream",resource="pods"} 1
+etcd_request_errors_total{group="",operation="listStream",reason="OutOfRange",resource="pods"} 1
 `
 	if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(expected), "etcd_request_errors_total"); err != nil {
 		t.Error(err)

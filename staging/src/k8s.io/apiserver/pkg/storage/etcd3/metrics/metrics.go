@@ -18,9 +18,14 @@ package metrics
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
+
+	etcdrpc "go.etcd.io/etcd/api/v3/v3rpc/rpctypes"
+	grpccodes "google.golang.org/grpc/codes"
+	grpcstatus "google.golang.org/grpc/status"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/features"
@@ -31,6 +36,9 @@ import (
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/klog/v2"
 )
+
+// ErrTransactionConflict indicates that an optimistic transaction failed due to a conflict.
+var ErrTransactionConflict = errors.New("transaction conflict")
 
 /*
  * By default, all the following metrics are defined as falling under
@@ -66,10 +74,10 @@ var (
 	etcdRequestErrorCounts = compbasemetrics.NewCounterVec(
 		&compbasemetrics.CounterOpts{
 			Name:           "etcd_request_errors_total",
-			Help:           "Etcd failed request counts for each operation and object type.",
+			Help:           "Etcd failed request counts for each operation and object type. Reason response to grpc status, or transaction conflict.",
 			StabilityLevel: compbasemetrics.ALPHA,
 		},
-		[]string{"operation", "group", "resource"},
+		[]string{"operation", "group", "resource", "reason"},
 	)
 	objectCounts = compbasemetrics.NewGaugeVec(
 		&compbasemetrics.GaugeOpts{
@@ -213,8 +221,28 @@ func RecordEtcdRequest(verb string, groupResource schema.GroupResource, err erro
 	etcdRequestLatency.WithLabelValues(verb, groupResource.Group, groupResource.Resource).Observe(sinceInSeconds(startTime))
 	etcdRequestCounts.WithLabelValues(verb, groupResource.Group, groupResource.Resource).Inc()
 	if err != nil {
-		etcdRequestErrorCounts.WithLabelValues(verb, groupResource.Group, groupResource.Resource).Inc()
+		etcdRequestErrorCounts.WithLabelValues(verb, groupResource.Group, groupResource.Resource, errorReason(err)).Inc()
 	}
+}
+
+func errorReason(err error) string {
+	if errors.Is(err, ErrTransactionConflict) {
+		return "Conflict"
+	}
+	var etcdErr etcdrpc.EtcdError
+	if errors.As(err, &etcdErr) {
+		return etcdErr.Code().String()
+	}
+	if s, ok := grpcstatus.FromError(err); ok {
+		return s.Code().String()
+	}
+	if errors.Is(err, context.Canceled) {
+		return grpccodes.Canceled.String()
+	}
+	if errors.Is(err, context.DeadlineExceeded) {
+		return grpccodes.DeadlineExceeded.String()
+	}
+	return grpccodes.Unknown.String()
 }
 
 // RecordListLatency sets the storage_list_duration_seconds metric.
@@ -333,17 +361,19 @@ func (c *monitorCollector) CollectWithStability(ch chan<- compbasemetrics.Metric
 
 // OperationLatencyTracker is a pre-materialized tracker for etcd request latency and request/error counters.
 type OperationLatencyTracker struct {
-	latency  compbasemetrics.ObserverMetric
-	requests compbasemetrics.CounterMetric
-	errors   compbasemetrics.CounterMetric
+	verb          string
+	groupResource schema.GroupResource
+	latency       compbasemetrics.ObserverMetric
+	requests      compbasemetrics.CounterMetric
 }
 
 // NewOperationLatencyTracker pre-materializes etcd request metrics for a specific verb and groupResource.
 func NewOperationLatencyTracker(verb string, groupResource schema.GroupResource) *OperationLatencyTracker {
 	return &OperationLatencyTracker{
-		latency:  etcdRequestLatency.WithLabelValues(verb, groupResource.Group, groupResource.Resource),
-		requests: etcdRequestCounts.WithLabelValues(verb, groupResource.Group, groupResource.Resource),
-		errors:   etcdRequestErrorCounts.WithLabelValues(verb, groupResource.Group, groupResource.Resource),
+		verb:          verb,
+		groupResource: groupResource,
+		latency:       etcdRequestLatency.WithLabelValues(verb, groupResource.Group, groupResource.Resource),
+		requests:      etcdRequestCounts.WithLabelValues(verb, groupResource.Group, groupResource.Resource),
 	}
 }
 
@@ -352,7 +382,7 @@ func (t *OperationLatencyTracker) Record(err error, startTime time.Time) {
 	t.latency.Observe(sinceInSeconds(startTime))
 	t.requests.Inc()
 	if err != nil {
-		t.errors.Inc()
+		etcdRequestErrorCounts.WithLabelValues(t.verb, t.groupResource.Group, t.groupResource.Resource, errorReason(err)).Inc()
 	}
 }
 
