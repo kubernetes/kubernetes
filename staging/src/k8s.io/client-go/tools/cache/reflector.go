@@ -772,7 +772,7 @@ func (r *Reflector) list(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("unable to understand list result %#v (%v)", list, err)
 	}
-	initTrace.Step("Objects extracted")
+	initTrace.Step("Objects extracted", trace.Field{Key: "count", Value: len(items)})
 	if err := r.syncWith(items, resourceVersion); err != nil {
 		return fmt.Errorf("unable to sync list result: %v", err)
 	}
@@ -995,15 +995,19 @@ func handleAnyWatch(
 			w.Stop()
 		}
 	}()
+	handleStart := clock.Now()
+	var channelWaitTime, storeTime time.Duration
 
 loop:
 	for {
+		channelWaitStart := clock.Now()
 		select {
 		case <-ctx.Done():
 			return watchListBookmarkReceived, errorStopRequested
 		case err := <-errCh:
 			return watchListBookmarkReceived, err
 		case event, ok := <-w.ResultChan():
+			channelWaitTime += clock.Since(channelWaitStart)
 			if !ok {
 				break loop
 			}
@@ -1034,6 +1038,7 @@ loop:
 				continue
 			}
 			resourceVersion := meta.GetResourceVersion()
+			storeStart := clock.Now()
 			switch event.Type {
 			case watch.Added:
 				err := store.Add(event.Object)
@@ -1071,12 +1076,16 @@ loop:
 			default:
 				utilruntime.HandleErrorWithContext(ctx, err, "Unknown watch event", "reflector", name, "event", event)
 			}
+			storeTime += clock.Since(storeStart)
 			// when eventReceivedBesidesAdded is true, that indicates we are definitely past any initial synthetic Added events
 			setLastSyncResourceVersion(resourceVersion, eventReceivedBesidesAdded)
 			eventCount++
 			if exitOnWatchListBookmarkReceived && watchListBookmarkReceived {
 				stopWatcher = false
 				watchDuration := clock.Since(start)
+				if total := clock.Since(handleStart); total > 10*time.Second {
+					klog.FromContext(ctx).V(2).Info("TRACE-REFLECTOR", "reflector", name, "events", eventCount-1, "total", total, "channelWait", channelWaitTime, "store", storeTime, "other", total-channelWaitTime-storeTime)
+				}
 				klog.FromContext(ctx).V(4).Info("Exiting watch because received the bookmark that marks the end of initial events stream", "reflector", name, "totalItems", eventCount, "duration", watchDuration)
 				return watchListBookmarkReceived, nil
 			}
