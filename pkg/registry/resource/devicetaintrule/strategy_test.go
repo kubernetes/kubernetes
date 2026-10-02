@@ -364,8 +364,6 @@ func TestStatusStrategyUpdate(t *testing.T) {
 func TestDeviceTaintRuleEmptySelectorWarning(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
 	driver := "example.com"
-	allTrue := true
-	allFalse := false
 
 	testcases := map[string]struct {
 		selector      *resource.DeviceTaintSelector
@@ -384,11 +382,11 @@ func TestDeviceTaintRuleEmptySelectorWarning(t *testing.T) {
 			expectWarning: false,
 		},
 		"all-true-suppresses-warning": {
-			selector:      &resource.DeviceTaintSelector{All: &allTrue},
+			selector:      &resource.DeviceTaintSelector{All: new(true)},
 			expectWarning: false,
 		},
 		"all-false-does-not-suppress-warning": {
-			selector:      &resource.DeviceTaintSelector{All: &allFalse},
+			selector:      &resource.DeviceTaintSelector{All: new(false)},
 			expectWarning: true,
 		},
 	}

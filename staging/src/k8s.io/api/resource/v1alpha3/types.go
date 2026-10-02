@@ -240,6 +240,7 @@ type DeviceTaintRuleSpec struct {
 	// a selector, no devices are matches.
 	//
 	// +optional
+	// +k8s:optional
 	DeviceSelector *DeviceTaintSelector `json:"deviceSelector,omitempty" protobuf:"bytes,1,opt,name=deviceSelector"`
 
 	// taint is the taint that gets applied to matching devices.
@@ -301,6 +302,11 @@ type DeviceTaintSelector struct {
 	// explicitly instead.
 	//
 	// +optional
+	// +k8s:optional
+	// +k8s:alpha(since: "1.38")=+k8s:neq=false
+	// +k8s:alpha(since: "1.38")=+k8s:dependentForbidden("driver")
+	// +k8s:alpha(since: "1.38")=+k8s:dependentForbidden("pool")
+	// +k8s:alpha(since: "1.38")=+k8s:dependentForbidden("device")
 	All *bool `json:"all,omitempty" protobuf:"varint,6,opt,name=all"`
 
 	// Selectors contains the same selection criteria as a ResourceClaim.

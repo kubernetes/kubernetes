@@ -1418,6 +1418,7 @@ message DeviceTaintRuleSpec {
   // a selector, no devices are matches.
   //
   // +optional
+  // +k8s:optional
   optional DeviceTaintSelector deviceSelector = 1;
 
   // taint is the taint that gets applied to matching devices.
@@ -1501,6 +1502,11 @@ message DeviceTaintSelector {
   // explicitly instead.
   //
   // +optional
+  // +k8s:optional
+  // +k8s:alpha(since: "1.38")=+k8s:neq=false
+  // +k8s:alpha(since: "1.38")=+k8s:dependentForbidden("driver")
+  // +k8s:alpha(since: "1.38")=+k8s:dependentForbidden("pool")
+  // +k8s:alpha(since: "1.38")=+k8s:dependentForbidden("device")
   optional bool all = 6;
 }
 

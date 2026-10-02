@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/resource"
 	registry "k8s.io/kubernetes/pkg/registry/resource/devicetaintrule"
 	"k8s.io/kubernetes/test/declarative_validation/meta"
+	"k8s.io/utils/ptr"
 )
 
 func TestDeclarativeValidate(t *testing.T) {
@@ -62,6 +63,33 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 			input: mkValidDeviceTaintRule(tweakTaintEffect("BadEffect")),
 			expectedErrs: field.ErrorList{
 				field.NotSupported(field.NewPath("spec", "taint", "effect"), resource.DeviceTaintEffect("BadEffect"), []resource.DeviceTaintEffect{}).MarkBeta(),
+			},
+		},
+		"valid all: true": {
+			input: mkValidDeviceTaintRule(tweakDeviceSelector(&resource.DeviceTaintSelector{All: ptr.To(true)})),
+		},
+		"all: false": {
+			input: mkValidDeviceTaintRule(tweakDeviceSelector(&resource.DeviceTaintSelector{All: ptr.To(false)})),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "deviceSelector", "all"), false, "").WithOrigin("neq").MarkAlpha(),
+			},
+		},
+		"all: true with driver": {
+			input: mkValidDeviceTaintRule(tweakDeviceSelector(&resource.DeviceTaintSelector{All: ptr.To(true), Driver: ptr.To("example.com")})),
+			expectedErrs: field.ErrorList{
+				field.Forbidden(field.NewPath("spec", "deviceSelector", "driver"), "").WithOrigin("dependentForbidden").MarkAlpha(),
+			},
+		},
+		"all: true with pool": {
+			input: mkValidDeviceTaintRule(tweakDeviceSelector(&resource.DeviceTaintSelector{All: ptr.To(true), Pool: ptr.To("pool-a")})),
+			expectedErrs: field.ErrorList{
+				field.Forbidden(field.NewPath("spec", "deviceSelector", "pool"), "").WithOrigin("dependentForbidden").MarkAlpha(),
+			},
+		},
+		"all: true with device": {
+			input: mkValidDeviceTaintRule(tweakDeviceSelector(&resource.DeviceTaintSelector{All: ptr.To(true), Device: ptr.To("device-a")})),
+			expectedErrs: field.ErrorList{
+				field.Forbidden(field.NewPath("spec", "deviceSelector", "device"), "").WithOrigin("dependentForbidden").MarkAlpha(),
 			},
 		},
 		// TODO: Add more test cases
@@ -156,6 +184,12 @@ func mkValidDeviceTaintRule(tweaks ...func(*resource.DeviceTaintRule)) resource.
 		tweak(&rule)
 	}
 	return rule
+}
+
+func tweakDeviceSelector(selector *resource.DeviceTaintSelector) func(*resource.DeviceTaintRule) {
+	return func(r *resource.DeviceTaintRule) {
+		r.Spec.DeviceSelector = selector
+	}
 }
 
 func tweakTaintEffect(effect resource.DeviceTaintEffect) func(*resource.DeviceTaintRule) {
