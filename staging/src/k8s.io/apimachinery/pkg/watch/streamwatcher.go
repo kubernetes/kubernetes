@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 	"sync"
+	"time"
 
 	"k8s.io/klog/v2"
 
@@ -39,6 +40,11 @@ type Decoder interface {
 	// the stream that it is no longer being watched. Close() must cause any
 	// outstanding call to Decode() to return with an error of some sort.
 	Close()
+}
+
+// NetworkTimingReporter optionally reports time spent reading from a watch stream.
+type NetworkTimingReporter interface {
+	NetworkTiming() time.Duration
 }
 
 // Reporter hides the details of how an error is turned into a runtime.Object for
@@ -110,8 +116,25 @@ func (sw *StreamWatcher) receive() {
 	defer utilruntime.HandleCrashWithLogger(sw.logger)
 	defer close(sw.result)
 	defer sw.Stop()
+	start := time.Now()
+	var decodeTime, sendTime time.Duration
+	var eventCount int
+	defer func() {
+		total := time.Since(start)
+		if total <= 10*time.Second || eventCount == 0 {
+			return
+		}
+		if reporter, ok := sw.source.(NetworkTimingReporter); ok {
+			readTime := reporter.NetworkTiming()
+			sw.logger.V(2).Info("TRACE-STREAMWATCHER", "events", eventCount, "total", total, "read", readTime, "decode", decodeTime-readTime, "send", sendTime, "other", total-decodeTime-sendTime)
+			return
+		}
+		sw.logger.V(2).Info("TRACE-STREAMWATCHER", "events", eventCount, "total", total, "decode", decodeTime, "send", sendTime, "other", total-decodeTime-sendTime)
+	}()
 	for {
+		decodeStart := time.Now()
 		action, obj, err := sw.source.Decode()
+		decodeTime += time.Since(decodeStart)
 		if err != nil {
 			switch err {
 			case io.EOF:
@@ -133,13 +156,17 @@ func (sw *StreamWatcher) receive() {
 			}
 			return
 		}
+		eventCount++
+		sendStart := time.Now()
 		select {
 		case <-sw.done:
+			sendTime += time.Since(sendStart)
 			return
 		case sw.result <- Event{
 			Type:   action,
 			Object: obj,
 		}:
 		}
+		sendTime += time.Since(sendStart)
 	}
 }
