@@ -224,7 +224,27 @@ func (vec HistogramVec) GetAggregatedSampleSum() float64 {
 
 // Quantile first aggregates inner buckets of each Histogram, and then
 // computes q-th quantile of a cumulative histogram.
+//
+// If any of the wrapped histograms carries native histogram data (sparse,
+// exponentially sized buckets), that data is used in preference to the
+// classic fixed-size buckets because it yields a much more accurate
+// estimate: classic buckets are sized ahead of time and observations tend
+// to pile up in a single bucket, which makes the resulting quantile
+// meaningless.
 func (vec HistogramVec) Quantile(q float64) float64 {
+	var native []bucket
+	hasNative := false
+	for _, hist := range vec {
+		if b := hist.nativeBuckets(); b != nil {
+			hasNative = true
+			native = append(native, b...)
+		}
+	}
+	if hasNative {
+		sort.Slice(native, func(i, j int) bool { return native[i].upperBound < native[j].upperBound })
+		return nonCumulativeBucketQuantile(q, native)
+	}
+
 	var buckets []bucket
 
 	for i, hist := range vec {
@@ -324,6 +344,8 @@ func histogramVecFromMetricFamilies(metricFamilies []*dto.MetricFamily, metricNa
 
 // Bucket of a histogram
 type bucket struct {
+	// lowerBound is only used for non-cumulative (native histogram) buckets.
+	lowerBound float64
 	upperBound float64
 	count      float64
 }
@@ -361,7 +383,15 @@ func bucketQuantile(q float64, buckets []bucket) float64 {
 
 // Quantile computes q-th quantile of a cumulative histogram.
 // It's expected the histogram is valid (by calling Validate)
+//
+// If the histogram carries native histogram data (sparse, exponentially
+// sized buckets), that data is used in preference to the classic fixed-size
+// buckets, see HistogramVec.Quantile for the rationale.
 func (hist *Histogram) Quantile(q float64) float64 {
+	if native := hist.nativeBuckets(); native != nil {
+		return nonCumulativeBucketQuantile(q, native)
+	}
+
 	var buckets []bucket
 
 	for _, bckt := range hist.Bucket {
@@ -381,6 +411,139 @@ func (hist *Histogram) Quantile(q float64) float64 {
 	}
 
 	return bucketQuantile(q, buckets)
+}
+
+// nativeBuckets decodes the sparse, exponentially sized buckets of a native
+// histogram (https://www.kubernetes.dev/resources/keps/5808/)
+// into a list of non-cumulative buckets covering the real number line,
+// sorted by ascending upper bound. It returns nil if hist doesn't carry any
+// native histogram data (e.g. because native histograms are disabled or the
+// histogram has no observations).
+func (hist *Histogram) nativeBuckets() []bucket {
+	h := hist.Histogram
+	if len(h.GetPositiveSpan()) == 0 && len(h.GetNegativeSpan()) == 0 &&
+		h.GetZeroCount() == 0 && h.GetZeroCountFloat() == 0 {
+		return nil
+	}
+
+	schema := h.GetSchema()
+	var buckets []bucket
+
+	for idx, count := range decodeNativeHistogramSpans(h.GetPositiveSpan(), h.GetPositiveDelta(), h.GetPositiveCount()) {
+		if count <= 0 {
+			continue
+		}
+		lower, upper := nativeHistogramBucketBounds(schema, idx)
+		buckets = append(buckets, bucket{lowerBound: lower, upperBound: upper, count: count})
+	}
+	for idx, count := range decodeNativeHistogramSpans(h.GetNegativeSpan(), h.GetNegativeDelta(), h.GetNegativeCount()) {
+		if count <= 0 {
+			continue
+		}
+		lower, upper := nativeHistogramBucketBounds(schema, idx)
+		buckets = append(buckets, bucket{lowerBound: -upper, upperBound: -lower, count: count})
+	}
+
+	zeroCount := h.GetZeroCountFloat()
+	if zeroCount == 0 {
+		zeroCount = float64(h.GetZeroCount())
+	}
+	if zeroCount > 0 {
+		threshold := h.GetZeroThreshold()
+		buckets = append(buckets, bucket{lowerBound: -threshold, upperBound: threshold, count: zeroCount})
+	}
+
+	sort.Slice(buckets, func(i, j int) bool { return buckets[i].upperBound < buckets[j].upperBound })
+	return buckets
+}
+
+// decodeNativeHistogramSpans decodes the sparse bucket representation used by
+// native histograms (a list of spans of consecutive populated buckets, plus
+// either per-bucket count deltas or absolute counts) into a map from bucket
+// index to the (absolute) count observed in that bucket.
+func decodeNativeHistogramSpans(spans []*dto.BucketSpan, deltas []int64, counts []float64) map[int32]float64 {
+	result := make(map[int32]float64, len(deltas)+len(counts))
+	if len(counts) > 0 {
+		// Buckets store their absolute count directly.
+		i := 0
+		idx := int32(0)
+		for _, span := range spans {
+			idx += span.GetOffset()
+			for range span.GetLength() {
+				if i < len(counts) {
+					result[idx] = counts[i]
+				}
+				idx++
+				i++
+			}
+		}
+		return result
+	}
+
+	// Buckets store deltas relative to the previous populated bucket (or to
+	// zero for the first one).
+	i := 0
+	idx := int32(0)
+	running := 0.0
+	for _, span := range spans {
+		idx += span.GetOffset()
+		for range span.GetLength() {
+			if i < len(deltas) {
+				running += float64(deltas[i])
+			}
+			result[idx] = running
+			idx++
+			i++
+		}
+	}
+	return result
+}
+
+// nativeHistogramBucketBounds returns the (lowerBound, upperBound] range
+// covered by the positive bucket with the given index in a native histogram
+// with the given schema. Buckets grow exponentially with a per-bucket growth
+// factor of 2^(2^-schema).
+func nativeHistogramBucketBounds(schema, idx int32) (lower, upper float64) {
+	base := math.Pow(2, math.Pow(2, -float64(schema)))
+	return math.Pow(base, float64(idx-1)), math.Pow(base, float64(idx))
+}
+
+// nonCumulativeBucketQuantile computes the q-th quantile from a list of
+// non-cumulative buckets (as opposed to bucketQuantile, which expects
+// cumulative bucket counts and assumes the lowest bucket starts at 0).
+// Buckets must be sorted by ascending upper bound.
+func nonCumulativeBucketQuantile(q float64, buckets []bucket) float64 {
+	if q < 0 {
+		return math.Inf(-1)
+	}
+	if q > 1 {
+		return math.Inf(+1)
+	}
+	if len(buckets) == 0 {
+		return math.NaN()
+	}
+
+	var total float64
+	for _, b := range buckets {
+		total += b.count
+	}
+	if total == 0 {
+		return math.NaN()
+	}
+
+	rank := q * total
+	var cumulative float64
+	for _, b := range buckets {
+		if cumulative+b.count >= rank {
+			if b.count == 0 {
+				return b.upperBound
+			}
+			frac := (rank - cumulative) / b.count
+			return b.lowerBound + (b.upperBound-b.lowerBound)*frac
+		}
+		cumulative += b.count
+	}
+	return buckets[len(buckets)-1].upperBound
 }
 
 // Average computes histogram's average value
