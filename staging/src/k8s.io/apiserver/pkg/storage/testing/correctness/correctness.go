@@ -60,15 +60,12 @@ func correctnessTestSteps() []testStep {
 	pod4Key := mustGetKey(pod4)
 	pod5Key := mustGetKey(pod5)
 	wrongRV := "99"
-	_, invalidRVErr := storage.APIObjectVersioner{}.ParseResourceVersion("abc")
 	pod2RV := "3"
 	pod3RV8 := "8"
 	pod3RV9 := "9"
 	pod3RV10 := "10"
 	pod5RV15 := "15"
 	errCustom := fmt.Errorf("user rejected update")
-	listRecursive := ListRequest{Options: storage.ListOptions{Recursive: true, Predicate: storage.Everything}}
-	listNonRecursive := ListRequest{Options: storage.ListOptions{Predicate: storage.Everything}}
 
 	pod3v1 := pod3.DeepCopy()
 	pod3v1.Labels = map[string]string{"version": "v1"}
@@ -131,24 +128,7 @@ func correctnessTestSteps() []testStep {
 			},
 		},
 		{
-			Name: "3. Get pod1 returns success RV=2",
-			Request: Request{
-				Op:  OpGet,
-				Key: pod1Key,
-			},
-			CorrectResponse: Response{
-				Object: withRV(pod1, "2"),
-			},
-			InvalidResponses: []Response{
-				{Object: &example.Pod{}, Err: storage.NewKeyNotFoundError(pod1Key, 0)},
-				{Object: withRV(pod1, "1")},
-				{Object: withRV(pod1, "3")},
-				{Object: withRV(pod1, "uid-2")},
-				{Object: nil, Err: nil},
-			},
-		},
-		{
-			Name: "4. Create pod2 returns success RV=3",
+			Name: "3. Create pod2 returns success RV=3",
 			Request: Request{
 				Op:  OpCreate,
 				Key: pod2Key,
@@ -171,23 +151,7 @@ func correctnessTestSteps() []testStep {
 			},
 		},
 		{
-			Name: "5. Get pod2 returns success RV=3",
-			Request: Request{
-				Op:  OpGet,
-				Key: pod2Key,
-			},
-			CorrectResponse: Response{
-				Object: withRV(pod2, "3"),
-			},
-			InvalidResponses: []Response{
-				{Object: &example.Pod{}, Err: storage.NewKeyNotFoundError(pod2Key, 0)},
-				{Object: withRV(pod2, "2")},
-				{Object: withRV(pod2, "4")},
-				{Object: nil, Err: nil},
-			},
-		},
-		{
-			Name: "6. Delete pod2 with mismatched UID precondition returns invalid obj error",
+			Name: "4. Delete pod2 with mismatched UID precondition returns invalid obj error",
 			Request: Request{
 				Op:     OpDelete,
 				Key:    pod2Key,
@@ -204,7 +168,7 @@ func correctnessTestSteps() []testStep {
 			},
 		},
 		{
-			Name: "7. Delete pod2 with mismatched ResourceVersion precondition returns invalid obj error",
+			Name: "5. Delete pod2 with mismatched ResourceVersion precondition returns invalid obj error",
 			Request: Request{
 				Op:     OpDelete,
 				Key:    pod2Key,
@@ -221,7 +185,7 @@ func correctnessTestSteps() []testStep {
 			},
 		},
 		{
-			Name: "8. Delete pod1 with matching UID precondition returns success RV=4",
+			Name: "6. Delete pod1 with matching UID precondition returns success RV=4",
 			Request: Request{
 				Op:     OpDelete,
 				Key:    pod1Key,
@@ -243,7 +207,7 @@ func correctnessTestSteps() []testStep {
 			},
 		},
 		{
-			Name: "9. Delete pod1 duplicate returns NotFound",
+			Name: "7. Delete pod1 duplicate returns NotFound",
 			Request: Request{
 				Op:  OpDelete,
 				Key: pod1Key,
@@ -259,23 +223,7 @@ func correctnessTestSteps() []testStep {
 			},
 		},
 		{
-			Name: "10. Get pod1 after delete returns NotFound",
-			Request: Request{
-				Op:  OpGet,
-				Key: pod1Key,
-			},
-			CorrectResponse: Response{
-				Object: nil,
-				Err:    storage.NewKeyNotFoundError(pod1Key, 0),
-			},
-			InvalidResponses: []Response{
-				{Object: withRV(pod1, "2")},
-				{Object: withRV(pod1, "4")},
-				{Object: nil, Err: nil},
-			},
-		},
-		{
-			Name: "11. Delete pod2 with matching UID and RV preconditions returns success RV=5",
+			Name: "8. Delete pod2 with matching UID and RV preconditions returns success RV=5",
 			Request: Request{
 				Op:     OpDelete,
 				Key:    pod2Key,
@@ -297,23 +245,7 @@ func correctnessTestSteps() []testStep {
 			},
 		},
 		{
-			Name: "12. Get pod2 after delete returns NotFound",
-			Request: Request{
-				Op:  OpGet,
-				Key: pod2Key,
-			},
-			CorrectResponse: Response{
-				Object: nil,
-				Err:    storage.NewKeyNotFoundError(pod2Key, 0),
-			},
-			InvalidResponses: []Response{
-				{Object: withRV(pod2, "3")},
-				{Object: withRV(pod2, "5")},
-				{Object: nil, Err: nil},
-			},
-		},
-		{
-			Name: "13. Update non-existing pod3 with ignoreNotFound=false returns NotFound",
+			Name: "9. Update non-existing pod3 with ignoreNotFound=false returns NotFound",
 			Request: Request{
 				Op:  OpUpdate,
 				Key: pod3Key,
@@ -337,7 +269,7 @@ func correctnessTestSteps() []testStep {
 			},
 		},
 		{
-			Name: "14. Update non-existing pod3 with ignoreNotFound=true and mismatched UID precondition returns invalid obj error",
+			Name: "10. Update non-existing pod3 with ignoreNotFound=true and mismatched UID precondition returns invalid obj error",
 			Request: Request{
 				Op:  OpUpdate,
 				Key: pod3Key,
@@ -360,7 +292,7 @@ func correctnessTestSteps() []testStep {
 			},
 		},
 		{
-			Name: "15. Update non-existing pod3 with ignoreNotFound=true and failing UpdateFunc returns user error",
+			Name: "11. Update non-existing pod3 with ignoreNotFound=true and failing UpdateFunc returns user error",
 			Request: Request{
 				Op:  OpUpdate,
 				Key: pod3Key,
@@ -382,7 +314,7 @@ func correctnessTestSteps() []testStep {
 			},
 		},
 		{
-			Name: "16. Update non-existing pod3 with ignoreNotFound=true creates pod3 returns success RV=6",
+			Name: "12. Update non-existing pod3 with ignoreNotFound=true creates pod3 returns success RV=6",
 			Request: Request{
 				Op:  OpUpdate,
 				Key: pod3Key,
@@ -413,23 +345,7 @@ func correctnessTestSteps() []testStep {
 			},
 		},
 		{
-			Name: "17. Get pod3 returns success RV=6",
-			Request: Request{
-				Op:  OpGet,
-				Key: pod3Key,
-				Get: GetRequest{},
-			},
-			CorrectResponse: Response{
-				Object: withRV(pod3v1, "6"),
-			},
-			InvalidResponses: []Response{
-				{Object: withRV(pod3v1, "5")},
-				{Object: withRV(pod3v1, "7")},
-				{Object: nil, Err: storage.NewKeyNotFoundError(pod3Key, 0)},
-			},
-		},
-		{
-			Name: "18. Update pod3 with identical data returns existing pod3 RV=6",
+			Name: "13. Update pod3 with identical data returns existing pod3 RV=6",
 			Request: Request{
 				Op:  OpUpdate,
 				Key: pod3Key,
@@ -450,7 +366,7 @@ func correctnessTestSteps() []testStep {
 			},
 		},
 		{
-			Name: "19. Update pod3 modifying data returns success RV=7",
+			Name: "14. Update pod3 modifying data returns success RV=7",
 			Request: Request{
 				Op:  OpUpdate,
 				Key: pod3Key,
@@ -478,7 +394,7 @@ func correctnessTestSteps() []testStep {
 			},
 		},
 		{
-			Name: "20. Update pod3 with mismatched UID precondition returns invalid obj error",
+			Name: "15. Update pod3 with mismatched UID precondition returns invalid obj error",
 			Request: Request{
 				Op:  OpUpdate,
 				Key: pod3Key,
@@ -503,7 +419,7 @@ func correctnessTestSteps() []testStep {
 			},
 		},
 		{
-			Name: "21. Update pod3 with mismatched ResourceVersion precondition returns invalid obj error",
+			Name: "16. Update pod3 with mismatched ResourceVersion precondition returns invalid obj error",
 			Request: Request{
 				Op:  OpUpdate,
 				Key: pod3Key,
@@ -528,7 +444,7 @@ func correctnessTestSteps() []testStep {
 			},
 		},
 		{
-			Name: "22. Update pod3 with matching UID precondition returns success RV=8",
+			Name: "17. Update pod3 with matching UID precondition returns success RV=8",
 			Request: Request{
 				Op:  OpUpdate,
 				Key: pod3Key,
@@ -555,7 +471,7 @@ func correctnessTestSteps() []testStep {
 			},
 		},
 		{
-			Name: "23. Update pod3 with matching ResourceVersion precondition returns success RV=9",
+			Name: "18. Update pod3 with matching ResourceVersion precondition returns success RV=9",
 			Request: Request{
 				Op:  OpUpdate,
 				Key: pod3Key,
@@ -582,7 +498,7 @@ func correctnessTestSteps() []testStep {
 			},
 		},
 		{
-			Name: "24. Update pod3 with matching UID and ResourceVersion preconditions returns success RV=10",
+			Name: "19. Update pod3 with matching UID and ResourceVersion preconditions returns success RV=10",
 			Request: Request{
 				Op:  OpUpdate,
 				Key: pod3Key,
@@ -609,7 +525,7 @@ func correctnessTestSteps() []testStep {
 			},
 		},
 		{
-			Name: "25. Update pod3 with identical data and matching preconditions returns existing pod3 RV=10",
+			Name: "20. Update pod3 with identical data and matching preconditions returns existing pod3 RV=10",
 			Request: Request{
 				Op:  OpUpdate,
 				Key: pod3Key,
@@ -629,7 +545,7 @@ func correctnessTestSteps() []testStep {
 			},
 		},
 		{
-			Name: "26. Update pod3 where UpdateFunc returns user error returns error",
+			Name: "21. Update pod3 where UpdateFunc returns user error returns error",
 			Request: Request{
 				Op:  OpUpdate,
 				Key: pod3Key,
@@ -650,7 +566,7 @@ func correctnessTestSteps() []testStep {
 			},
 		},
 		{
-			Name: "27. Update pod3 with CachedExistingObject returns success RV=11",
+			Name: "22. Update pod3 with CachedExistingObject returns success RV=11",
 			Request: Request{
 				Op:  OpUpdate,
 				Key: pod3Key,
@@ -677,7 +593,7 @@ func correctnessTestSteps() []testStep {
 			},
 		},
 		{
-			Name: "28. Update pod3 validating ResponseMeta passed to UpdateFunc returns success RV=12",
+			Name: "23. Update pod3 validating ResponseMeta passed to UpdateFunc returns success RV=12",
 			Request: Request{
 				Op:  OpUpdate,
 				Key: pod3Key,
@@ -706,7 +622,7 @@ func correctnessTestSteps() []testStep {
 			},
 		},
 		{
-			Name: "29. Delete pod3 returns success RV=13",
+			Name: "24. Delete pod3 returns success RV=13",
 			Request: Request{
 				Op:     OpDelete,
 				Key:    pod3Key,
@@ -726,40 +642,7 @@ func correctnessTestSteps() []testStep {
 			},
 		},
 		{
-			Name: "30. Get pod3 after delete returns NotFound",
-			Request: Request{
-				Op:  OpGet,
-				Key: pod3Key,
-				Get: GetRequest{},
-			},
-			CorrectResponse: Response{
-				Object: nil,
-				Err:    storage.NewKeyNotFoundError(pod3Key, 0),
-			},
-			InvalidResponses: []Response{
-				{Object: withRV(pod3v7, "12")},
-				{Object: withRV(pod3v7, "13")},
-				{Object: nil, Err: nil},
-			},
-		},
-		{
-			Name: "31. List pods when none exist returns empty list RV=13",
-			Request: Request{
-				Op:   OpList,
-				Key:  "/pods/",
-				List: listRecursive,
-			},
-			CorrectResponse: Response{
-				Object: newTestPodList("13"),
-			},
-			InvalidResponses: []Response{
-				{Object: newTestPodList("12")},
-				{Object: newTestPodList("13", withRV(pod3v7, "12"))},
-				{Object: nil, Err: nil},
-			},
-		},
-		{
-			Name: "32. Create pod4 returns success RV=14",
+			Name: "25. Create pod4 returns success RV=14",
 			Request: Request{
 				Op:  OpCreate,
 				Key: pod4Key,
@@ -781,7 +664,7 @@ func correctnessTestSteps() []testStep {
 			},
 		},
 		{
-			Name: "33. Create pod5 in ns10 returns success RV=15",
+			Name: "26. Create pod5 in ns10 returns success RV=15",
 			Request: Request{
 				Op:  OpCreate,
 				Key: pod5Key,
@@ -803,88 +686,7 @@ func correctnessTestSteps() []testStep {
 			},
 		},
 		{
-			Name: "34. List pods returns pod4 and pod5 RV=15",
-			Request: Request{
-				Op:   OpList,
-				Key:  "/pods/",
-				List: listRecursive,
-			},
-			CorrectResponse: Response{
-				Object: newTestPodList("15", withRV(pod4, "14"), withRV(pod5, "15")),
-			},
-			InvalidResponses: []Response{
-				{Object: newTestPodList("14", withRV(pod4, "14"))},
-				{Object: newTestPodList("15", withRV(pod4, "14"))},
-				{Object: newTestPodList("15", withRV(pod5, "15"), withRV(pod4, "14"))},
-				{Object: nil, Err: nil},
-			},
-		},
-		{
-			Name: "35. List ns1 returns pod4 without pod5 from ns10 RV=15",
-			Request: Request{
-				Op:   OpList,
-				Key:  "/pods/ns1",
-				List: listRecursive,
-			},
-			CorrectResponse: Response{
-				Object: newTestPodList("15", withRV(pod4, "14")),
-			},
-			InvalidResponses: []Response{
-				{Object: newTestPodList("15", withRV(pod4, "14"), withRV(pod5, "15"))},
-				{Object: newTestPodList("14", withRV(pod4, "14"))},
-				{Object: nil, Err: nil},
-			},
-		},
-		{
-			Name: "36. List pod4 non-recursively returns pod4 RV=15",
-			Request: Request{
-				Op:   OpList,
-				Key:  pod4Key,
-				List: listNonRecursive,
-			},
-			CorrectResponse: Response{
-				Object: newTestPodList("15", withRV(pod4, "14")),
-			},
-			InvalidResponses: []Response{
-				{Object: newTestPodList("14", withRV(pod4, "14"))},
-				{Object: newTestPodList("15")},
-				{Object: nil, Err: nil},
-			},
-		},
-		{
-			Name: "37. List deleted pod3 non-recursively returns empty list RV=15",
-			Request: Request{
-				Op:   OpList,
-				Key:  pod3Key,
-				List: listNonRecursive,
-			},
-			CorrectResponse: Response{
-				Object: newTestPodList("15"),
-			},
-			InvalidResponses: []Response{
-				{Object: newTestPodList("15", withRV(pod3v7, "12"))},
-				{Object: newTestPodList("13")},
-				{Object: nil, Err: nil},
-			},
-		},
-		{
-			Name: "38. List ns1 non-recursively returns empty list RV=15",
-			Request: Request{
-				Op:   OpList,
-				Key:  "/pods/ns1",
-				List: listNonRecursive,
-			},
-			CorrectResponse: Response{
-				Object: newTestPodList("15"),
-			},
-			InvalidResponses: []Response{
-				{Object: newTestPodList("15", withRV(pod4, "14"))},
-				{Object: newTestPodList("15", withRV(pod4, "14"), withRV(pod5, "15"))},
-				{Object: nil, Err: nil},
-			},
-		},
-		{
-			Name: "39. Update existing pod4 with ignoreNotFound=true validating ResponseMeta has pod4 RV, not store RV, returns success RV=16",
+			Name: "27. Update existing pod4 with ignoreNotFound=true validating ResponseMeta has pod4 RV, not store RV, returns success RV=16",
 			Request: Request{
 				Op:  OpUpdate,
 				Key: pod4Key,
@@ -915,7 +717,7 @@ func correctnessTestSteps() []testStep {
 			},
 		},
 		{
-			Name: "40. Update pod4 with CachedExistingObject and failing UpdateFunc returns user error",
+			Name: "28. Update pod4 with CachedExistingObject and failing UpdateFunc returns user error",
 			Request: Request{
 				Op:  OpUpdate,
 				Key: pod4Key,
@@ -937,7 +739,7 @@ func correctnessTestSteps() []testStep {
 			},
 		},
 		{
-			Name: "41. Update pod4 with stale CachedExistingObject where UpdateFunc fails on stale RV retries and returns success RV=17",
+			Name: "29. Update pod4 with stale CachedExistingObject where UpdateFunc fails on stale RV retries and returns success RV=17",
 			Request: Request{
 				Op:  OpUpdate,
 				Key: pod4Key,
@@ -967,7 +769,7 @@ func correctnessTestSteps() []testStep {
 			},
 		},
 		{
-			Name: "42. Delete pod5 with matching ResourceVersion precondition returns success RV=18",
+			Name: "30. Delete pod5 with matching ResourceVersion precondition returns success RV=18",
 			Request: Request{
 				Op:     OpDelete,
 				Key:    pod5Key,
@@ -989,12 +791,104 @@ func correctnessTestSteps() []testStep {
 			},
 		},
 		{
-			Name: "43. Get existing pod4 with ignoreNotFound=true returns pod4 RV=17",
+			Name: "31. Create pod1 with ResourceVersion set returns ErrResourceVersionSetOnCreate",
 			Request: Request{
-				Op:  OpGet,
-				Key: pod4Key,
-				Get: GetRequest{Options: storage.GetOptions{IgnoreNotFound: true}},
+				Op:     OpCreate,
+				Key:    pod1Key,
+				Create: CreateRequest{Object: withRV(pod1, "5")},
 			},
+			CorrectResponse: Response{Err: storage.ErrResourceVersionSetOnCreate},
+			InvalidResponses: []Response{
+				{Object: withRV(pod1, "19")},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name: "32. Create with empty key returns empty key error",
+			Request: Request{
+				Op:     OpCreate,
+				Key:    "",
+				Create: CreateRequest{Object: pod1},
+			},
+			CorrectResponse: Response{Err: fmt.Errorf("empty key: %q", "")},
+			InvalidResponses: []Response{
+				{Object: withRV(pod1, "19")},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name: "33. Update with key containing . returns invalid key error",
+			Request: Request{
+				Op:  OpUpdate,
+				Key: "/pods/./ns1/pod4",
+				Update: UpdateRequest{
+					UpdateFunc: storage.SimpleUpdate(func(obj runtime.Object) (runtime.Object, error) { return obj, nil }),
+				},
+			},
+			CorrectResponse: Response{Err: fmt.Errorf("invalid key: %q", "/pods/./ns1/pod4")},
+			InvalidResponses: []Response{
+				{Object: nil, Err: storage.NewKeyNotFoundError("/pods/./ns1/pod4", 18)},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name: "34. Delete with key / returns empty key error",
+			Request: Request{
+				Op:  OpDelete,
+				Key: "/",
+			},
+			CorrectResponse: Response{Err: fmt.Errorf("empty key: %q", "/")},
+			InvalidResponses: []Response{
+				{Object: nil, Err: storage.NewKeyNotFoundError("/", 18)},
+				{Object: nil, Err: nil},
+			},
+		},
+	}
+}
+
+func readTestCases() []testStep {
+	pod1 := newTestPod("pod1", "ns1", types.UID("uid-1"), "")
+	pod3 := newTestPod("pod3", "ns1", types.UID("uid-3"), "")
+	pod4 := newTestPod("pod4", "ns1", types.UID("uid-4"), "")
+	pod5 := newTestPod("pod5", "ns10", types.UID("uid-5"), "")
+	pod1Key := mustGetKey(pod1)
+	pod3Key := mustGetKey(pod3)
+	pod4Key := mustGetKey(pod4)
+	pod5Key := mustGetKey(pod5)
+	_, invalidRVErr := storage.APIObjectVersioner{}.ParseResourceVersion("abc")
+	listRecursive := ListRequest{Options: storage.ListOptions{Recursive: true, Predicate: storage.Everything}}
+	listNonRecursive := ListRequest{Options: storage.ListOptions{Predicate: storage.Everything}}
+
+	return []testStep{
+		{
+			Name:    "Get existing pod",
+			Request: Request{Op: OpGet, Key: pod4Key},
+			CorrectResponse: Response{
+				Object: withLabel(pod4, "17", "version", "v2"),
+			},
+			InvalidResponses: []Response{
+				{Object: &example.Pod{}, Err: storage.NewKeyNotFoundError(pod4Key, 0)},
+				{Object: withLabel(pod4, "16", "version", "v2")},
+				{Object: withLabel(pod4, "18", "version", "v2")},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name:    "Get non-existing pod",
+			Request: Request{Op: OpGet, Key: pod1Key},
+			CorrectResponse: Response{
+				Object: nil,
+				Err:    storage.NewKeyNotFoundError(pod1Key, 0),
+			},
+			InvalidResponses: []Response{
+				{Object: withRV(pod1, "2")},
+				{Object: withRV(pod1, "4")},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name:    "Get existing pod with ignoreNotFound=true",
+			Request: Request{Op: OpGet, Key: pod4Key, Get: GetRequest{Options: storage.GetOptions{IgnoreNotFound: true}}},
 			CorrectResponse: Response{
 				Object: withLabel(pod4, "17", "version", "v2"),
 			},
@@ -1005,12 +899,8 @@ func correctnessTestSteps() []testStep {
 			},
 		},
 		{
-			Name: "44. Get deleted pod5 with ignoreNotFound=true returns empty pod",
-			Request: Request{
-				Op:  OpGet,
-				Key: pod5Key,
-				Get: GetRequest{Options: storage.GetOptions{IgnoreNotFound: true}},
-			},
+			Name:    "Get non-existing pod with ignoreNotFound=true",
+			Request: Request{Op: OpGet, Key: pod5Key, Get: GetRequest{Options: storage.GetOptions{IgnoreNotFound: true}}},
 			CorrectResponse: Response{
 				Object: &example.Pod{},
 			},
@@ -1022,7 +912,118 @@ func correctnessTestSteps() []testStep {
 			},
 		},
 		{
-			Name: "45. List pods with Exact ResourceVersion=15 returns snapshot at RV=15",
+			Name:            "Get with empty key returns empty key error",
+			Request:         Request{Op: OpGet, Key: ""},
+			CorrectResponse: Response{Err: fmt.Errorf("empty key: %q", "")},
+			InvalidResponses: []Response{
+				{Object: nil, Err: storage.NewKeyNotFoundError("", 0)},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name:            "Get with key escaping the prefix returns invalid key error",
+			Request:         Request{Op: OpGet, Key: "/pods/../secrets/s1"},
+			CorrectResponse: Response{Err: fmt.Errorf("invalid key: %q", "/pods/../secrets/s1")},
+			InvalidResponses: []Response{
+				{Object: nil, Err: storage.NewKeyNotFoundError("/pods/../secrets/s1", 0)},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name:    "List all pods",
+			Request: Request{Op: OpList, Key: "/pods/", List: listRecursive},
+			CorrectResponse: Response{
+				Object: newTestPodList("18", withLabel(pod4, "17", "version", "v2")),
+			},
+			InvalidResponses: []Response{
+				{Object: newTestPodList("17", withLabel(pod4, "17", "version", "v2"))},
+				{Object: newTestPodList("18", withLabel(pod4, "17", "version", "v2"), withRV(pod5, "15"))},
+				{Object: newTestPodList("18")},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name:    "List pods in namespace ns1",
+			Request: Request{Op: OpList, Key: "/pods/ns1", List: listRecursive},
+			CorrectResponse: Response{
+				Object: newTestPodList("18", withLabel(pod4, "17", "version", "v2")),
+			},
+			InvalidResponses: []Response{
+				{Object: newTestPodList("18", withLabel(pod4, "17", "version", "v2"), withRV(pod5, "15"))},
+				{Object: newTestPodList("17", withLabel(pod4, "17", "version", "v2"))},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name:    "List pods in empty namespace ns10",
+			Request: Request{Op: OpList, Key: "/pods/ns10", List: listRecursive},
+			CorrectResponse: Response{
+				Object: newTestPodList("18"),
+			},
+			InvalidResponses: []Response{
+				{Object: newTestPodList("17")},
+				{Object: newTestPodList("18", withRV(pod5, "15"))},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name:    "List existing pod non-recursively",
+			Request: Request{Op: OpList, Key: pod4Key, List: listNonRecursive},
+			CorrectResponse: Response{
+				Object: newTestPodList("18", withLabel(pod4, "17", "version", "v2")),
+			},
+			InvalidResponses: []Response{
+				{Object: newTestPodList("17", withLabel(pod4, "17", "version", "v2"))},
+				{Object: newTestPodList("18")},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name:    "List non-existing pod non-recursively",
+			Request: Request{Op: OpList, Key: pod3Key, List: listNonRecursive},
+			CorrectResponse: Response{
+				Object: newTestPodList("18"),
+			},
+			InvalidResponses: []Response{
+				{Object: newTestPodList("18", withLabel(pod3, "12", "version", "v7"))},
+				{Object: newTestPodList("13")},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name:    "List namespace non-recursively",
+			Request: Request{Op: OpList, Key: "/pods/ns1", List: listNonRecursive},
+			CorrectResponse: Response{
+				Object: newTestPodList("18"),
+			},
+			InvalidResponses: []Response{
+				{Object: newTestPodList("18", withLabel(pod4, "17", "version", "v2"))},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name: "List pods with Exact ResourceVersion=13 when none exist",
+			Request: Request{
+				Op:  OpList,
+				Key: "/pods/",
+				List: ListRequest{Options: storage.ListOptions{
+					ResourceVersion:      "13",
+					ResourceVersionMatch: metav1.ResourceVersionMatchExact,
+					Recursive:            true,
+					Predicate:            storage.Everything,
+				}},
+			},
+			CorrectResponse: Response{
+				Object: newTestPodList("13"),
+			},
+			InvalidResponses: []Response{
+				{Object: newTestPodList("12")},
+				{Object: newTestPodList("13", withLabel(pod3, "12", "version", "v7"))},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name: "List pods with Exact ResourceVersion=15",
 			Request: Request{
 				Op:  OpList,
 				Key: "/pods/",
@@ -1041,13 +1042,35 @@ func correctnessTestSteps() []testStep {
 				{Object: newTestPodList("16", withLabel(pod4, "16", "version", "v1"), withRV(pod5, "15"))},
 				{Object: newTestPodList("18", withLabel(pod4, "17", "version", "v2"))},
 				{Object: newTestPodList("15", withRV(pod4, "14"))},
+				{Object: newTestPodList("15", withRV(pod5, "15"), withRV(pod4, "14"))},
 				{Object: newTestPodList("15", withLabel(pod4, "17", "version", "v2"))},
 				{Object: nil, Err: storage.NewTooLargeResourceVersionError(15, 18, 0)},
 				{Object: nil, Err: nil},
 			},
 		},
 		{
-			Name: "46. List pods with NotOlderThan ResourceVersion=15 returns snapshot at RV>=15",
+			Name: "List ns1 with Exact ResourceVersion=15",
+			Request: Request{
+				Op:  OpList,
+				Key: "/pods/ns1",
+				List: ListRequest{Options: storage.ListOptions{
+					ResourceVersion:      "15",
+					ResourceVersionMatch: metav1.ResourceVersionMatchExact,
+					Recursive:            true,
+					Predicate:            storage.Everything,
+				}},
+			},
+			CorrectResponse: Response{
+				Object: newTestPodList("15", withRV(pod4, "14")),
+			},
+			InvalidResponses: []Response{
+				{Object: newTestPodList("15", withRV(pod4, "14"), withRV(pod5, "15"))},
+				{Object: newTestPodList("14", withRV(pod4, "14"))},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name: "List pods with NotOlderThan ResourceVersion=15",
 			Request: Request{
 				Op:  OpList,
 				Key: "/pods/",
@@ -1070,7 +1093,7 @@ func correctnessTestSteps() []testStep {
 			},
 		},
 		{
-			Name: "47. List pods with ResourceVersion=0 returns snapshot at RV>=1",
+			Name: "List pods with ResourceVersion=0",
 			Request: Request{
 				Op:  OpList,
 				Key: "/pods/",
@@ -1091,12 +1114,12 @@ func correctnessTestSteps() []testStep {
 			},
 		},
 		{
-			Name: "48. List pods with future ResourceVersion=99 returns TooLargeResourceVersionError",
+			Name: "List pods with future ResourceVersion=99 returns TooLargeResourceVersionError",
 			Request: Request{
 				Op:  OpList,
 				Key: "/pods/",
 				List: ListRequest{Options: storage.ListOptions{
-					ResourceVersion:      wrongRV,
+					ResourceVersion:      "99",
 					ResourceVersionMatch: metav1.ResourceVersionMatchNotOlderThan,
 					Recursive:            true,
 					Predicate:            storage.Everything,
@@ -1114,77 +1137,8 @@ func correctnessTestSteps() []testStep {
 			},
 		},
 		{
-			Name: "49. Create pod1 with ResourceVersion set returns ErrResourceVersionSetOnCreate",
-			Request: Request{
-				Op:     OpCreate,
-				Key:    pod1Key,
-				Create: CreateRequest{Object: withRV(pod1, "5")},
-			},
-			CorrectResponse: Response{Err: storage.ErrResourceVersionSetOnCreate},
-			InvalidResponses: []Response{
-				{Object: withRV(pod1, "19")},
-				{Object: nil, Err: nil},
-			},
-		},
-		{
-			Name: "50. Create with empty key returns empty key error",
-			Request: Request{
-				Op:     OpCreate,
-				Key:    "",
-				Create: CreateRequest{Object: pod1},
-			},
-			CorrectResponse: Response{Err: fmt.Errorf("empty key: %q", "")},
-			InvalidResponses: []Response{
-				{Object: withRV(pod1, "19")},
-				{Object: nil, Err: nil},
-			},
-		},
-		{
-			Name: "51. Get with key escaping the prefix returns invalid key error",
-			Request: Request{
-				Op:  OpGet,
-				Key: "/pods/../secrets/s1",
-			},
-			CorrectResponse: Response{Err: fmt.Errorf("invalid key: %q", "/pods/../secrets/s1")},
-			InvalidResponses: []Response{
-				{Object: nil, Err: storage.NewKeyNotFoundError("/pods/../secrets/s1", 0)},
-				{Object: nil, Err: nil},
-			},
-		},
-		{
-			Name: "52. Update with key containing . returns invalid key error",
-			Request: Request{
-				Op:  OpUpdate,
-				Key: "/pods/./ns1/pod4",
-				Update: UpdateRequest{
-					UpdateFunc: storage.SimpleUpdate(func(obj runtime.Object) (runtime.Object, error) { return obj, nil }),
-				},
-			},
-			CorrectResponse: Response{Err: fmt.Errorf("invalid key: %q", "/pods/./ns1/pod4")},
-			InvalidResponses: []Response{
-				{Object: nil, Err: storage.NewKeyNotFoundError("/pods/./ns1/pod4", 18)},
-				{Object: nil, Err: nil},
-			},
-		},
-		{
-			Name: "53. Delete with key / returns empty key error",
-			Request: Request{
-				Op:  OpDelete,
-				Key: "/",
-			},
-			CorrectResponse: Response{Err: fmt.Errorf("empty key: %q", "/")},
-			InvalidResponses: []Response{
-				{Object: nil, Err: storage.NewKeyNotFoundError("/", 18)},
-				{Object: nil, Err: nil},
-			},
-		},
-		{
-			Name: "54. List with key ending with .. returns invalid key error",
-			Request: Request{
-				Op:   OpList,
-				Key:  "/pods/..",
-				List: listRecursive,
-			},
+			Name:            "List with key ending with .. returns invalid key error",
+			Request:         Request{Op: OpList, Key: "/pods/..", List: listRecursive},
 			CorrectResponse: Response{Err: fmt.Errorf("invalid key: %q", "/pods/..")},
 			InvalidResponses: []Response{
 				{Object: newTestPodList("18", withLabel(pod4, "17", "version", "v2"))},
@@ -1192,7 +1146,7 @@ func correctnessTestSteps() []testStep {
 			},
 		},
 		{
-			Name: "55. List with unparsable ResourceVersion returns bad request",
+			Name: "List with unparsable ResourceVersion returns bad request",
 			Request: Request{
 				Op:  OpList,
 				Key: "/pods/",
@@ -1209,7 +1163,7 @@ func correctnessTestSteps() []testStep {
 			},
 		},
 		{
-			Name: "56. List with unknown ResourceVersionMatch returns error",
+			Name: "List with unknown ResourceVersionMatch returns error",
 			Request: Request{
 				Op:  OpList,
 				Key: "/pods/",
@@ -1394,17 +1348,12 @@ func RunTestCorrectness(ctx context.Context, t *testing.T, store storage.Interfa
 		switch step.Request.Op {
 		case OpCreate:
 			err = store.Create(ctx, step.Request.Key, step.Request.Create.Object, out, 0)
-		case OpGet:
-			err = store.Get(ctx, step.Request.Key, step.Request.Get.Options, out)
-		case OpList:
-			out = &example.PodList{}
-			err = store.GetList(ctx, step.Request.Key, step.Request.List.Options, out)
 		case OpDelete:
 			err = store.Delete(ctx, step.Request.Key, out, step.Request.Delete.Preconditions, storage.ValidateAllObjectFunc, nil, storage.DeleteOptions{})
 		case OpUpdate:
 			err = store.GuaranteedUpdate(ctx, step.Request.Key, out, step.Request.Update.IgnoreNotFound, step.Request.Update.Preconditions, step.Request.Update.UpdateFunc, step.Request.Update.CachedExistingObject)
 		default:
-			t.Fatalf("unknown operation: %v", step.Request.Op)
+			t.Fatalf("unknown mutation operation: %v", step.Request.Op)
 		}
 		var respObj runtime.Object
 		if err == nil {
@@ -1425,8 +1374,30 @@ func RunTestCorrectness(ctx context.Context, t *testing.T, store storage.Interfa
 
 	replay, err := NewReplay(initialState, operations)
 	require.NoError(t, err)
-	for _, op := range operations {
-		require.NoError(t, replay.Validate(op.Request, op.Response))
+
+	for _, tc := range readTestCases() {
+		var out runtime.Object
+		var err error
+		switch tc.Request.Op {
+		case OpGet:
+			out = &example.Pod{}
+			err = store.Get(ctx, tc.Request.Key, tc.Request.Get.Options, out)
+		case OpList:
+			out = &example.PodList{}
+			err = store.GetList(ctx, tc.Request.Key, tc.Request.List.Options, out)
+		default:
+			t.Fatalf("unknown read operation: %v", tc.Request.Op)
+		}
+		var respObj runtime.Object
+		if err == nil {
+			respObj = out
+		}
+		resp := Response{Object: respObj, Err: err}
+		ok, next, change := model.Step(tc.Request, resp)
+		require.True(t, ok, "step %s failed to match model state transition: req=%+v resp=%+v", tc.Name, tc.Request, resp)
+		require.Equal(t, model, next, "step %s", tc.Name)
+		require.Nil(t, change, "step %s", tc.Name)
+		require.NoError(t, replay.Validate(tc.Request, resp), "step %s", tc.Name)
 	}
 
 	validator := NewWatchValidator(versioner, replay, keyFunc)
