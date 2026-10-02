@@ -37,6 +37,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/client-go/util/retry"
 	resourcehelper "k8s.io/component-helpers/resource"
+	"k8s.io/dynamic-resource-allocation/resourceclaim"
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
@@ -188,11 +189,12 @@ func (pl *DynamicResources) preFilterExtendedResources(pod *v1.Pod, logger klog.
 	}
 	// Create one special claim for all extended resources backed by DRA in the Pod.
 	// Its name uses <pod name>-extended-resources- as base plus a random suffix,
-	// truncated if it would be too long.
+	// truncated if it would be too long. Pod status validation uses the same base
+	// to accept the name before ExtendedResourceClaimStatus is set.
 	//
 	// The name is picked here rather than by the apiserver so that pod status
 	// can reference the claim before it is created.
-	s.draExtendedResource.preGeneratedClaimName = pl.nameGenerator.GenerateName(pod.Name + "-extended-resources-")
+	s.draExtendedResource.preGeneratedClaimName = pl.nameGenerator.GenerateName(resourceclaim.ExtendedResourceClaimNameBase(pod.Name))
 	return &resourceapi.ResourceClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: pod.Namespace,

@@ -44,6 +44,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	ndf "k8s.io/component-helpers/nodedeclaredfeatures/features"
+	"k8s.io/dynamic-resource-allocation/resourceclaim"
 	kubeletapis "k8s.io/kubelet/pkg/apis"
 	podtest "k8s.io/kubernetes/pkg/api/pod/testing"
 	"k8s.io/kubernetes/pkg/apis/core"
@@ -17293,8 +17294,12 @@ func TestValidateAdditionalNodeAllocatableResources(t *testing.T) {
 		},
 	}
 
+	// Long enough that the name generator truncates the extended resource claim base.
+	longPodName := strings.Repeat("a", 50)
+
 	testCases := []struct {
 		name        string
+		podName     string
 		podStatus   core.PodStatus
 		spec        core.PodSpec
 		expectError bool
@@ -17793,11 +17798,254 @@ func TestValidateAdditionalNodeAllocatableResources(t *testing.T) {
 			errorField:  "status.additionalNodeAllocatableResources[0].source.name",
 			errorMsg:    "no mapping found in pod reference",
 		},
+		{
+			name: "Valid pending extended resource claim name without ExtendedResourceClaimStatus",
+			spec: core.PodSpec{
+				Containers: []core.Container{{Name: "c1", Image: "image", Resources: core.ResourceRequirements{
+					Requests: core.ResourceList{"example.com/gpu": resource.MustParse("1")},
+					Limits:   core.ResourceList{"example.com/gpu": resource.MustParse("1")},
+				}}},
+			},
+			podStatus: core.PodStatus{
+				AdditionalNodeAllocatableResources: []core.AdditionalNodeAllocatableResource{
+					{
+						Source:     core.AdditionalNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "my-pod-extended-resources-abcde"},
+						Containers: []string{"c1"},
+						Mapping: []core.NodeAllocatableMappedResources{
+							{Name: core.ResourceCPU, Quantity: new(resource.MustParse("1"))},
+						},
+					},
+				},
+			},
+			expectError: false,
+		},
+		{
+			name: "Valid pending extended resource claim name for implicit extended resource",
+			spec: core.PodSpec{
+				Containers: []core.Container{{Name: "c1", Image: "image", Resources: core.ResourceRequirements{
+					Requests: core.ResourceList{"deviceclass.resource.kubernetes.io/gpu-class": resource.MustParse("1")},
+					Limits:   core.ResourceList{"deviceclass.resource.kubernetes.io/gpu-class": resource.MustParse("1")},
+				}}},
+			},
+			podStatus: core.PodStatus{
+				AdditionalNodeAllocatableResources: []core.AdditionalNodeAllocatableResource{
+					{
+						Source:     core.AdditionalNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "my-pod-extended-resources-abcde"},
+						Containers: []string{"c1"},
+						Mapping: []core.NodeAllocatableMappedResources{
+							{Name: core.ResourceCPU, Quantity: new(resource.MustParse("1"))},
+						},
+					},
+				},
+			},
+			expectError: false,
+		},
+		{
+			name: "Valid pending extended resource claim name requested by init container",
+			spec: core.PodSpec{
+				InitContainers: []core.Container{{Name: "init1", Image: "image", Resources: core.ResourceRequirements{
+					Requests: core.ResourceList{"example.com/gpu": resource.MustParse("1")},
+					Limits:   core.ResourceList{"example.com/gpu": resource.MustParse("1")},
+				}}},
+				Containers: []core.Container{{Name: "c1", Image: "image"}},
+			},
+			podStatus: core.PodStatus{
+				AdditionalNodeAllocatableResources: []core.AdditionalNodeAllocatableResource{
+					{
+						Source:     core.AdditionalNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "my-pod-extended-resources-abcde"},
+						Containers: []string{"c1"},
+						Mapping: []core.NodeAllocatableMappedResources{
+							{Name: core.ResourceCPU, Quantity: new(resource.MustParse("1"))},
+						},
+					},
+				},
+			},
+			expectError: false,
+		},
+		{
+			name:    "Valid pending extended resource claim name for a long pod name",
+			podName: longPodName,
+			spec: core.PodSpec{
+				Containers: []core.Container{{Name: "c1", Image: "image", Resources: core.ResourceRequirements{
+					Requests: core.ResourceList{"example.com/gpu": resource.MustParse("1")},
+					Limits:   core.ResourceList{"example.com/gpu": resource.MustParse("1")},
+				}}},
+			},
+			podStatus: core.PodStatus{
+				AdditionalNodeAllocatableResources: []core.AdditionalNodeAllocatableResource{
+					{
+						Source:     core.AdditionalNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: resourceclaim.ExtendedResourceClaimNameBase(longPodName) + "abcde"},
+						Containers: []string{"c1"},
+						Mapping: []core.NodeAllocatableMappedResources{
+							{Name: core.ResourceCPU, Quantity: new(resource.MustParse("1"))},
+						},
+					},
+				},
+			},
+			expectError: false,
+		},
+		{
+			name: "Invalid duplicate pending extended resource claim name",
+			spec: core.PodSpec{
+				Containers: []core.Container{{Name: "c1", Image: "image", Resources: core.ResourceRequirements{
+					Requests: core.ResourceList{"example.com/gpu": resource.MustParse("1")},
+					Limits:   core.ResourceList{"example.com/gpu": resource.MustParse("1")},
+				}}},
+			},
+			podStatus: core.PodStatus{
+				AdditionalNodeAllocatableResources: []core.AdditionalNodeAllocatableResource{
+					{
+						Source:     core.AdditionalNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "my-pod-extended-resources-abcde"},
+						Containers: []string{"c1"},
+						Mapping: []core.NodeAllocatableMappedResources{
+							{Name: core.ResourceCPU, Quantity: new(resource.MustParse("1"))},
+						},
+					},
+					{
+						Source:     core.AdditionalNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "my-pod-extended-resources-abcde"},
+						Containers: []string{"c1"},
+						Mapping: []core.NodeAllocatableMappedResources{
+							{Name: core.ResourceCPU, Quantity: new(resource.MustParse("1"))},
+						},
+					},
+				},
+			},
+			expectError: true,
+			errorType:   field.ErrorTypeDuplicate,
+			errorField:  "status.additionalNodeAllocatableResources[1].source",
+		},
+		{
+			name: "Invalid pending extended resource claim name of another pod",
+			spec: core.PodSpec{
+				Containers: []core.Container{{Name: "c1", Image: "image", Resources: core.ResourceRequirements{
+					Requests: core.ResourceList{"example.com/gpu": resource.MustParse("1")},
+					Limits:   core.ResourceList{"example.com/gpu": resource.MustParse("1")},
+				}}},
+			},
+			podStatus: core.PodStatus{
+				AdditionalNodeAllocatableResources: []core.AdditionalNodeAllocatableResource{
+					{
+						Source:     core.AdditionalNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "other-pod-extended-resources-abcde"},
+						Containers: []string{"c1"},
+						Mapping: []core.NodeAllocatableMappedResources{
+							{Name: core.ResourceCPU, Quantity: new(resource.MustParse("1"))},
+						},
+					},
+				},
+			},
+			expectError: true,
+			errorType:   field.ErrorTypeInvalid,
+			errorField:  "status.additionalNodeAllocatableResources[0].source.name",
+			errorMsg:    "no mapping found in pod reference",
+		},
+		{
+			name: "Invalid pending claim name not generated from the extended resource claim base",
+			spec: core.PodSpec{
+				Containers: []core.Container{{Name: "c1", Image: "image", Resources: core.ResourceRequirements{
+					Requests: core.ResourceList{"example.com/gpu": resource.MustParse("1")},
+					Limits:   core.ResourceList{"example.com/gpu": resource.MustParse("1")},
+				}}},
+			},
+			podStatus: core.PodStatus{
+				AdditionalNodeAllocatableResources: []core.AdditionalNodeAllocatableResource{
+					{
+						Source:     core.AdditionalNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "my-pod-abcde"},
+						Containers: []string{"c1"},
+						Mapping: []core.NodeAllocatableMappedResources{
+							{Name: core.ResourceCPU, Quantity: new(resource.MustParse("1"))},
+						},
+					},
+				},
+			},
+			expectError: true,
+			errorType:   field.ErrorTypeInvalid,
+			errorField:  "status.additionalNodeAllocatableResources[0].source.name",
+			errorMsg:    "no mapping found in pod reference",
+		},
+		{
+			name: "Invalid pending extended resource claim name without extended resource request",
+			spec: core.PodSpec{
+				Containers: []core.Container{{Name: "c1", Image: "image", Resources: core.ResourceRequirements{
+					Requests: core.ResourceList{"cpu": resource.MustParse("1")},
+					Limits:   core.ResourceList{"cpu": resource.MustParse("1")},
+				}}},
+			},
+			podStatus: core.PodStatus{
+				AdditionalNodeAllocatableResources: []core.AdditionalNodeAllocatableResource{
+					{
+						Source:     core.AdditionalNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "my-pod-extended-resources-abcde"},
+						Containers: []string{"c1"},
+						Mapping: []core.NodeAllocatableMappedResources{
+							{Name: core.ResourceCPU, Quantity: new(resource.MustParse("1"))},
+						},
+					},
+				},
+			},
+			expectError: true,
+			errorType:   field.ErrorTypeInvalid,
+			errorField:  "status.additionalNodeAllocatableResources[0].source.name",
+			errorMsg:    "no mapping found in pod reference",
+		},
+		{
+			name: "Invalid pending extended resource claim name with zero extended resource request",
+			spec: core.PodSpec{
+				Containers: []core.Container{{Name: "c1", Image: "image", Resources: core.ResourceRequirements{
+					Requests: core.ResourceList{"example.com/gpu": resource.MustParse("0")},
+					Limits:   core.ResourceList{"example.com/gpu": resource.MustParse("0")},
+				}}},
+			},
+			podStatus: core.PodStatus{
+				AdditionalNodeAllocatableResources: []core.AdditionalNodeAllocatableResource{
+					{
+						Source:     core.AdditionalNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "my-pod-extended-resources-abcde"},
+						Containers: []string{"c1"},
+						Mapping: []core.NodeAllocatableMappedResources{
+							{Name: core.ResourceCPU, Quantity: new(resource.MustParse("1"))},
+						},
+					},
+				},
+			},
+			expectError: true,
+			errorType:   field.ErrorTypeInvalid,
+			errorField:  "status.additionalNodeAllocatableResources[0].source.name",
+			errorMsg:    "no mapping found in pod reference",
+		},
+		{
+			name: "Invalid extended resource claim name not matching ExtendedResourceClaimStatus",
+			spec: core.PodSpec{
+				Containers: []core.Container{{Name: "c1", Image: "image", Resources: core.ResourceRequirements{
+					Requests: core.ResourceList{"example.com/gpu": resource.MustParse("1")},
+					Limits:   core.ResourceList{"example.com/gpu": resource.MustParse("1")},
+				}}},
+			},
+			podStatus: core.PodStatus{
+				ExtendedResourceClaimStatus: &core.PodExtendedResourceClaimStatus{
+					ResourceClaimName: "my-pod-extended-resources-abcde",
+				},
+				AdditionalNodeAllocatableResources: []core.AdditionalNodeAllocatableResource{
+					{
+						Source:     core.AdditionalNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "my-pod-extended-resources-fghij"},
+						Containers: []string{"c1"},
+						Mapping: []core.NodeAllocatableMappedResources{
+							{Name: core.ResourceCPU, Quantity: new(resource.MustParse("1"))},
+						},
+					},
+				},
+			},
+			expectError: true,
+			errorType:   field.ErrorTypeInvalid,
+			errorField:  "status.additionalNodeAllocatableResources[0].source.name",
+			errorMsg:    "no mapping found in pod reference",
+		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			errs := validateAdditionalNodeAllocatableResources(tc.podStatus, &tc.spec, field.NewPath("status", "additionalNodeAllocatableResources"))
+			podName := tc.podName
+			if podName == "" {
+				podName = "my-pod"
+			}
+			errs := validateAdditionalNodeAllocatableResources(podName, tc.podStatus, &tc.spec, field.NewPath("status", "additionalNodeAllocatableResources"))
 
 			if !tc.expectError {
 				if len(errs) != 0 {
