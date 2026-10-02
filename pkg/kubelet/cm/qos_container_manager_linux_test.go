@@ -735,7 +735,7 @@ func TestQOSCPUConfigUpdate(t *testing.T) {
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 
-			err = testContainerManager.Start(ctx, func() v1.ResourceList { return v1.ResourceList{} }, testCase.testPods)
+			err = testContainerManager.Start(ctx, func() v1.ResourceList { return v1.ResourceList{} }, testCase.testPods, nil)
 
 			if err != nil {
 				t.Fatalf("Start() failed: %s", err)
@@ -818,6 +818,62 @@ func TestQOSCPUConfigUpdate(t *testing.T) {
 					maxRetryAttempts, foundGuaranteed, foundBurstable, foundBestEffort,
 				)
 			}
+		})
+	}
+}
+
+// newPartitionTestPod returns a pod with a single container of the given
+// requests and limits, in "cpu/memory" form; an empty string leaves both unset.
+func newPartitionTestPod(namespace, requests, limits string) *v1.Pod {
+	toList := func(s string) v1.ResourceList {
+		if s == "" {
+			return nil
+		}
+		cpu, memory, _ := strings.Cut(s, "/")
+		return v1.ResourceList{v1.ResourceCPU: resource.MustParse(cpu), v1.ResourceMemory: resource.MustParse(memory)}
+	}
+	return &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: string(uuid.NewUUID()), Namespace: namespace, UID: uuid.NewUUID()},
+		Spec: v1.PodSpec{Containers: []v1.Container{{
+			Name:      "c",
+			Resources: v1.ResourceRequirements{Requests: toList(requests), Limits: toList(limits)},
+		}}},
+	}
+}
+
+func TestQOSContainerManagerStartTakesPodsUnderRoot(t *testing.T) {
+	inQoSCgroups := newPartitionTestPod(metav1.NamespaceDefault, "1/1Gi", "1/1Gi")
+	inSibling := newPartitionTestPod("kube-system", "200m/128Mi", "200m/128Mi")
+	activePods := func() []*v1.Pod { return []*v1.Pod{inQoSCgroups} }
+	allPods := func() []*v1.Pod { return []*v1.Pod{inQoSCgroups, inSibling} }
+
+	cases := []struct {
+		name          string
+		podsUnderRoot ActivePodsFunc
+		want          []*v1.Pod
+	}{
+		{
+			name:          "pods under the root are taken as given",
+			podsUnderRoot: allPods,
+			want:          []*v1.Pod{inQoSCgroups, inSibling},
+		},
+		{
+			name: "without them, the pods under the root are the active pods",
+			want: []*v1.Pod{inQoSCgroups},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+
+			root := NewCgroupName(RootCgroupName, defaultNodeAllocatableCgroupName)
+			m := newQOSContainerManager(nil, root, NodeConfig{CgroupsPerQOS: true}, &fakeCgroupManager{}, false)
+			require.NoError(t, m.Start(ctx, func() v1.ResourceList { return v1.ResourceList{} }, activePods, tc.podsUnderRoot))
+
+			assert.Equal(t, tc.want, m.getPodsUnderRoot())
+			assert.Equal(t, []*v1.Pod{inQoSCgroups}, m.activePods())
 		})
 	}
 }
