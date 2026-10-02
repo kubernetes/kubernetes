@@ -358,6 +358,7 @@ func (o *SetOptions) setCredentialPlugin(pref *v1beta1.Preference, options []v1b
 		if len(o.AllowlistEntries) != 0 {
 			return fmt.Errorf("credential plugin allowlist entries provided when policy was not %q", v1beta1.PluginPolicyAllowlist)
 		}
+		pref.CredentialPluginAllowlist = nil
 	case v1beta1.PluginPolicyAllowlist:
 		entries, err := getAllowlistEntries(o)
 		if err != nil {
