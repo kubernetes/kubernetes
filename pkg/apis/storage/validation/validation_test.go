@@ -1442,6 +1442,132 @@ func TestCSINodeUpdateValidation(t *testing.T) {
 	}
 }
 
+func makeCSINodeWithRegistrations(drivers []storage.CSINodeDriver, registrations []storage.CSINodeDriverRegistration) *storage.CSINode {
+	return &storage.CSINode{
+		ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+		Spec: storage.CSINodeSpec{
+			Drivers:             drivers,
+			DriverRegistrations: registrations,
+		},
+	}
+}
+
+func TestCSINodeDriverRegistrationsValidation(t *testing.T) {
+	registrationsPath := field.NewPath("spec", "driverRegistrations")
+	driver := storage.CSINodeDriver{Name: "io.kubernetes.storage.csi.driver-1", NodeID: "nodeA"}
+
+	tests := []struct {
+		name          string
+		drivers       []storage.CSINodeDriver
+		registrations []storage.CSINodeDriverRegistration
+		expectedErrs  field.ErrorList
+	}{{
+		name:          "registration without a drivers entry",
+		registrations: []storage.CSINodeDriverRegistration{{Name: driver.Name, NodeID: "nodeA"}},
+	}, {
+		name:          "registration matching the drivers entry",
+		drivers:       []storage.CSINodeDriver{driver},
+		registrations: []storage.CSINodeDriverRegistration{{Name: driver.Name, NodeID: "nodeA"}},
+	}, {
+		name:    "registrations for multiple drivers",
+		drivers: []storage.CSINodeDriver{driver},
+		registrations: []storage.CSINodeDriverRegistration{
+			{Name: driver.Name, NodeID: "nodeA"},
+			{Name: "io.kubernetes.storage.csi.driver-2", NodeID: "nodeB"},
+		},
+	}, {
+		name:          "empty name",
+		registrations: []storage.CSINodeDriverRegistration{{NodeID: "nodeA"}},
+		expectedErrs:  field.ErrorList{field.Required(registrationsPath.Index(0).Child("name"), "")},
+	}, {
+		name:          "invalid name",
+		registrations: []storage.CSINodeDriverRegistration{{Name: "invalid_driver", NodeID: "nodeA"}},
+		expectedErrs:  field.ErrorList{field.Invalid(registrationsPath.Index(0).Child("name"), "invalid_driver", "")},
+	}, {
+		name:          "name too long",
+		registrations: []storage.CSINodeDriverRegistration{{Name: strings.Repeat("a", 64), NodeID: "nodeA"}},
+		expectedErrs:  field.ErrorList{field.TooLong(registrationsPath.Index(0).Child("name"), "", 63)},
+	}, {
+		name:          "empty nodeID",
+		drivers:       []storage.CSINodeDriver{driver},
+		registrations: []storage.CSINodeDriverRegistration{{Name: driver.Name}},
+		expectedErrs:  field.ErrorList{field.Required(registrationsPath.Index(0).Child("nodeID"), "")},
+	}, {
+		name:          "nodeID too long",
+		registrations: []storage.CSINodeDriverRegistration{{Name: driver.Name, NodeID: strings.Repeat("a", 257)}},
+		expectedErrs:  field.ErrorList{field.Invalid(registrationsPath.Index(0).Child("nodeID"), strings.Repeat("a", 257), "")},
+	}, {
+		name: "duplicate names",
+		registrations: []storage.CSINodeDriverRegistration{
+			{Name: driver.Name, NodeID: "nodeA"},
+			{Name: driver.Name, NodeID: "nodeA"},
+		},
+		expectedErrs: field.ErrorList{field.Duplicate(registrationsPath.Index(1).Child("name"), driver.Name)},
+	}, {
+		name:          "nodeID differs from the drivers entry",
+		drivers:       []storage.CSINodeDriver{driver},
+		registrations: []storage.CSINodeDriverRegistration{{Name: driver.Name, NodeID: "nodeB"}},
+		expectedErrs:  field.ErrorList{field.Invalid(registrationsPath.Index(0).Child("nodeID"), "nodeB", "")},
+	}}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			errs := ValidateCSINode(makeCSINodeWithRegistrations(tc.drivers, tc.registrations))
+			field.ErrorMatcher{}.ByType().ByField().Test(t, tc.expectedErrs, errs)
+		})
+	}
+}
+
+func TestCSINodeDriverRegistrationsUpdateValidation(t *testing.T) {
+	registrationsPath := field.NewPath("spec", "driverRegistrations")
+	driver := storage.CSINodeDriver{Name: "io.kubernetes.storage.csi.driver-1", NodeID: "nodeA"}
+	registration := storage.CSINodeDriverRegistration{Name: driver.Name, NodeID: "nodeA"}
+
+	tests := []struct {
+		name         string
+		old          *storage.CSINode
+		new          *storage.CSINode
+		expectedErrs field.ErrorList
+	}{{
+		name: "add a registration matching the drivers entry",
+		old:  makeCSINodeWithRegistrations([]storage.CSINodeDriver{driver}, nil),
+		new:  makeCSINodeWithRegistrations([]storage.CSINodeDriver{driver}, []storage.CSINodeDriverRegistration{registration}),
+	}, {
+		name:         "add a registration with a different nodeID than the drivers entry",
+		old:          makeCSINodeWithRegistrations([]storage.CSINodeDriver{driver}, nil),
+		new:          makeCSINodeWithRegistrations([]storage.CSINodeDriver{driver}, []storage.CSINodeDriverRegistration{{Name: driver.Name, NodeID: "nodeB"}}),
+		expectedErrs: field.ErrorList{field.Invalid(registrationsPath.Index(0).Child("nodeID"), "nodeB", "")},
+	}, {
+		name: "change the nodeID of a registration without a drivers entry",
+		old:  makeCSINodeWithRegistrations(nil, []storage.CSINodeDriverRegistration{registration}),
+		new:  makeCSINodeWithRegistrations(nil, []storage.CSINodeDriverRegistration{{Name: driver.Name, NodeID: "nodeB"}}),
+	}, {
+		name: "add the drivers entry for a registration",
+		old:  makeCSINodeWithRegistrations(nil, []storage.CSINodeDriverRegistration{registration}),
+		new:  makeCSINodeWithRegistrations([]storage.CSINodeDriver{driver}, []storage.CSINodeDriverRegistration{registration}),
+	}, {
+		name:         "change the nodeID of a registration that has a drivers entry",
+		old:          makeCSINodeWithRegistrations([]storage.CSINodeDriver{driver}, []storage.CSINodeDriverRegistration{registration}),
+		new:          makeCSINodeWithRegistrations([]storage.CSINodeDriver{driver}, []storage.CSINodeDriverRegistration{{Name: driver.Name, NodeID: "nodeB"}}),
+		expectedErrs: field.ErrorList{field.Invalid(registrationsPath.Index(0).Child("nodeID"), "nodeB", "")},
+	}, {
+		name: "remove a registration and keep the drivers entry",
+		old:  makeCSINodeWithRegistrations([]storage.CSINodeDriver{driver}, []storage.CSINodeDriverRegistration{registration}),
+		new:  makeCSINodeWithRegistrations([]storage.CSINodeDriver{driver}, nil),
+	}, {
+		name: "remove a registration and its drivers entry",
+		old:  makeCSINodeWithRegistrations([]storage.CSINodeDriver{driver}, []storage.CSINodeDriverRegistration{registration}),
+		new:  makeCSINodeWithRegistrations(nil, nil),
+	}}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			errs := ValidateCSINodeUpdate(tc.new, tc.old)
+			field.ErrorMatcher{}.ByType().ByField().Test(t, tc.expectedErrs, errs)
+		})
+	}
+}
+
 func TestCSIDriverValidation(t *testing.T) {
 	// assume this feature is on for this test, detailed enabled/disabled tests in TestMutableCSINodeAllocatableCountEnabledDisabled
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MutableCSINodeAllocatableCount, true)
