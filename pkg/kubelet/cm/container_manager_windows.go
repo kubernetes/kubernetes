@@ -317,6 +317,10 @@ func (cm *containerManagerImpl) GetPodCgroupRoot() string {
 	return ""
 }
 
+func (cm *containerManagerImpl) GetSystemPartitionCgroupRoot() string {
+	return ""
+}
+
 func (cm *containerManagerImpl) GetDevices(podUID, containerName string) []*podresourcesapi.ContainerDevices {
 	return containerDevicesFromResourceDeviceInstances(cm.deviceManager.GetDevices(podUID, containerName))
 }
