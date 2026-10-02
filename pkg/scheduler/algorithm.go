@@ -34,7 +34,6 @@ import (
 	internalcache "k8s.io/kubernetes/pkg/scheduler/backend/cache"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/parallelize"
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/dynamicresources"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	utiltrace "k8s.io/utils/trace"
 )
@@ -544,21 +543,22 @@ func (a *SchedulingAlgorithm) numFeasibleNodesToFind(percentageOfNodesToScore *i
 
 // prepareAssumedPod returns the copy of podInfo that will be recorded as assumed (bound).
 // It doesn't modify the podInfo object in cache - the caller is responsible for storing the result.
-func (a *SchedulingAlgorithm) prepareAssumedPod(logger klog.Logger, state fwk.CycleState,
-	podInfo *framework.QueuedPodInfo, host string) *framework.QueuedPodInfo {
+func (a *SchedulingAlgorithm) prepareAssumedPod(state fwk.CycleState, podInfo *framework.QueuedPodInfo, host string) *framework.QueuedPodInfo {
 
 	assumedPodInfo := podInfo.DeepCopy()
 	assumedPodInfo.Pod.Spec.NodeName = host
 	if utilfeature.DefaultFeatureGate.Enabled(features.DRANodeAllocatableResources) {
 		// If DRANodeAllocatableResources is enabled, copy the calculated extra node allocatable resources
 		// from the cycle state to the assumed pod's status. This ensures that the scheduler's
-		// cached version of the pod reflects the node allocatable resources allocated by the DRA plugin
+		// cached version of the pod reflects the node allocatable resources allocated
 		// for this scheduling cycle, making this information available for NodeInfo cache update.
 		// Any potential ExtraNodeAllocatableResources from a previously failed scheduling attempt is overwritten.
 		// This field is not explicitly cleared as the Pod object is reconstructed in handleSchedulingFailure()
 		// before re-queueing.
-		assumedPodInfo.Pod.Status.ExtraNodeAllocatableResources =
-			dynamicresources.ExtractPodExtraNodeAllocatableResources(logger, state, host)
+		assumedPodInfo.Pod.Status.ExtraNodeAllocatableResources = nil
+		if allocState := framework.GetExtraNodeAllocatableResourcesState(state); allocState != nil {
+			assumedPodInfo.Pod.Status.ExtraNodeAllocatableResources = allocState.Get(host)
+		}
 	}
 	return assumedPodInfo
 }
@@ -621,7 +621,7 @@ func (a *SchedulingAlgorithm) AssumeAndReserveInCache(ctx context.Context, state
 
 	logger := klog.FromContext(ctx)
 	host := scheduleResult.SuggestedHost
-	assumedPodInfo := a.prepareAssumedPod(logger, state, podInfo, host)
+	assumedPodInfo := a.prepareAssumedPod(state, podInfo, host)
 	if err := a.cache.AssumePod(logger, assumedPodInfo.Pod); err != nil {
 		logger.Error(err, "Scheduler cache AssumePod failed")
 		return assumedPodInfo, fwk.AsStatus(err)
@@ -661,7 +661,7 @@ func (a *SchedulingAlgorithm) AssumeAndReserveInSnapshot(ctx context.Context, st
 	logger := klog.FromContext(ctx)
 	host := scheduleResult.SuggestedHost
 
-	assumedPodInfo := a.prepareAssumedPod(logger, state, podInfo, host)
+	assumedPodInfo := a.prepareAssumedPod(state, podInfo, host)
 	if err := a.nodeInfoSnapshot.AssumePod(assumedPodInfo.PodInfo); err != nil {
 		logger.Error(err, "Scheduler snapshot AssumePod failed")
 		return fwk.AsStatus(err), nil

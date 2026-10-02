@@ -36,47 +36,8 @@ import (
 	fwk "k8s.io/kube-scheduler/framework"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 )
-
-// ExtractPodExtraNodeAllocatableResources returns a copy of the extra node
-// allocatable resources stored in state for the given node.
-//
-// A copy is required because assume() assigns the result onto the cached pod.
-// Sharing the cycle-state slice would make later in-place updates (replacing the
-// extended-resource placeholder claim name) silently mutate the scheduler cache
-// and would make the DeepEqual check in patchExtraNodeAllocatableResources a no-op.
-func ExtractPodExtraNodeAllocatableResources(logger klog.Logger, state fwk.CycleState, nodeName string) []v1.ExtraNodeAllocatableResource {
-	s, err := state.Read(names.DynamicResources)
-	if err != nil {
-		// DynamicResources plugin didn't run or no state
-		return nil
-	}
-
-	draState, ok := s.(*stateData)
-	if !ok {
-		logger.Error(errors.New("invalid DynamicResources state type"), "Failed to cast CycleState data")
-		return nil
-	}
-
-	if nodeAlloc, exists := draState.nodeAllocations[nodeName]; exists {
-		return cloneExtraNodeAllocatableResources(nodeAlloc.extraNodeAllocatableResources)
-	}
-
-	return nil
-}
-
-func cloneExtraNodeAllocatableResources(in []v1.ExtraNodeAllocatableResource) []v1.ExtraNodeAllocatableResource {
-	if in == nil {
-		return nil
-	}
-	out := make([]v1.ExtraNodeAllocatableResource, len(in))
-	for i := range in {
-		in[i].DeepCopyInto(&out[i])
-	}
-	return out
-}
 
 // calculateAndCheckNodeAllocatableResources calculates the total node-allocatable resources (e.g., CPU, memory)
 // requested by a pod, considering both its standard container requests and any additional resources
@@ -118,7 +79,8 @@ func (pl *DynamicResources) calculateAndCheckNodeAllocatableResources(ctx contex
 		return nil, nil // No nodeAllocatable resources to check
 	}
 
-	totalPodDemand, extraResources, status := pl.getPodNodeAllocatableResourceFootprint(logger, pod, allocations, nodeAllocatableClaims, nodeSlices, nodeInfo.Node())
+	otherEntries := state.extraNodeAllocatableResources.GetExcludingPlugin(nodeInfo.Node().Name, Name)
+	totalPodDemand, extraResources, status := pl.getPodNodeAllocatableResourceFootprint(logger, pod, allocations, nodeAllocatableClaims, otherEntries, nodeSlices, nodeInfo.Node())
 	if status != nil {
 		logger.V(5).Info("calculateAndCheckNodeAllocatableResources: getPodNodeAllocatableResourceFootprint failed", "status", status)
 		return nil, status
@@ -494,7 +456,8 @@ func (pl *DynamicResources) validatePodLevelResourcesCoverDRA(pod *v1.Pod) *fwk.
 }
 
 // getPodNodeAllocatableResourceFootprint determines the total nodeAllocatable resource demand of a pod.
-func (pl *DynamicResources) getPodNodeAllocatableResourceFootprint(logger klog.Logger, pod *v1.Pod, allocations map[types.UID]*resourceapi.AllocationResult, nodeAllocatableClaims []*resourceapi.ResourceClaim, slices []*resourceapi.ResourceSlice, node *v1.Node) (*framework.Resource, []v1.ExtraNodeAllocatableResource, *fwk.Status) {
+// otherEntries, recorded by other plugins, count towards the demand but are not returned.
+func (pl *DynamicResources) getPodNodeAllocatableResourceFootprint(logger klog.Logger, pod *v1.Pod, allocations map[types.UID]*resourceapi.AllocationResult, nodeAllocatableClaims []*resourceapi.ResourceClaim, otherEntries []v1.ExtraNodeAllocatableResource, slices []*resourceapi.ResourceSlice, node *v1.Node) (*framework.Resource, []v1.ExtraNodeAllocatableResource, *fwk.Status) {
 	nodeAllocatableDRAAllocations := make(map[v1.ObjectReference]*resourceapi.AllocationResult)
 	// Add pre-allocated claims
 	for _, claim := range nodeAllocatableClaims {
@@ -530,7 +493,7 @@ func (pl *DynamicResources) getPodNodeAllocatableResourceFootprint(logger klog.L
 	}
 	// Perform shallow copy - we only use the resource information from container and pod spec to calculatate the resource foot print.
 	podCopy := *pod
-	podCopy.Status.ExtraNodeAllocatableResources = extraResources
+	podCopy.Status.ExtraNodeAllocatableResources = append(otherEntries, extraResources...)
 	totalPodDemandRes := resourcehelper.PodRequests(&podCopy, optsTotal)
 
 	// The API validation in pkg/apis/core/validation/validation.go only checks pod.Spec.Resources against container
