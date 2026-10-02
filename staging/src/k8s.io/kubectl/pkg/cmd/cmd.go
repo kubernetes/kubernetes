@@ -222,9 +222,7 @@ func NewKubectlCommand(o KubectlOptions) *cobra.Command {
 	flags.BoolVar(&warningsAsErrors, "warnings-as-errors", warningsAsErrors, "Treat warnings received from the server as errors and exit with a non-zero exit code")
 
 	pref := kuberc.NewPreferences()
-	if !cmdutil.KubeRC.IsDisabled() {
-		pref.AddFlags(flags)
-	}
+	pref.AddFlags(flags)
 
 	kubeConfigFlags := o.ConfigFlags
 	if kubeConfigFlags == nil {
@@ -355,28 +353,24 @@ func NewKubectlCommand(o KubectlOptions) *cobra.Command {
 	cmds.AddCommand(apiresources.NewCmdAPIVersions(f, o.IOStreams))
 	cmds.AddCommand(apiresources.NewCmdAPIResources(f, o.IOStreams))
 	cmds.AddCommand(options.NewCmdOptions(o.IOStreams.Out))
-	if !cmdutil.KubeRC.IsDisabled() {
-		cmds.AddCommand(kuberccmd.NewCmdKubeRC(o.IOStreams))
-	}
+	cmds.AddCommand(kuberccmd.NewCmdKubeRC(o.IOStreams))
 
 	// Stop warning about normalization of flags. That makes it possible to
 	// add the klog flags later.
 	cmds.SetGlobalNormalizationFunc(cliflag.WordSepNormalizeFunc)
 
-	if !cmdutil.KubeRC.IsDisabled() {
-		existingPreRunE := cmds.PersistentPreRunE
-		cmds.PersistentPreRunE = func(cmd *cobra.Command, args []string) error {
-			if originalCommandArgs, ok := cmd.Annotations[kuberc.KubeRCOriginalCommandAnnotation]; ok {
-				originalCommand := fmt.Sprintf("%s %s", cmd.Root().Name(), originalCommandArgs)
-				klog.V(1).Info(fmt.Sprintf("original command: %q", originalCommand))
-			}
-			return existingPreRunE(cmd, args)
+	existingPreRunE := cmds.PersistentPreRunE
+	cmds.PersistentPreRunE = func(cmd *cobra.Command, args []string) error {
+		if originalCommandArgs, ok := cmd.Annotations[kuberc.KubeRCOriginalCommandAnnotation]; ok {
+			originalCommand := fmt.Sprintf("%s %s", cmd.Root().Name(), originalCommandArgs)
+			klog.V(1).Info(fmt.Sprintf("original command: %q", originalCommand))
 		}
-		_, err := pref.Apply(cmds, kubeConfigFlags, o.Arguments, o.IOStreams.ErrOut)
-		if err != nil {
-			fmt.Fprintf(o.IOStreams.ErrOut, "error occurred while applying preferences %v\n", err)
-			os.Exit(1)
-		}
+		return existingPreRunE(cmd, args)
+	}
+	_, err := pref.Apply(cmds, kubeConfigFlags, o.Arguments, o.IOStreams.ErrOut)
+	if err != nil {
+		fmt.Fprintf(o.IOStreams.ErrOut, "error occurred while applying preferences %v\n", err) //nolint:errcheck
+		os.Exit(1)
 	}
 
 	return cmds
