@@ -98,6 +98,7 @@ type Fit struct {
 	enableDRAExtendedResource                          bool
 	enableInPlacePodLevelResourcesVerticalScaling      bool
 	enableInPlacePodVerticalScalingSchedulerPreemption bool
+	enableDRANodeAllocatableResources                  bool
 	handle                                             fwk.Handle
 	*resourceAllocationScorer
 	placementScorer *resourceAllocationScorer
@@ -243,6 +244,8 @@ func NewFit(_ context.Context, plArgs runtime.Object, h fwk.Handle, fts feature.
 		enableInPlacePodLevelResourcesVerticalScaling: fts.EnableInPlacePodLevelResourcesVerticalScaling,
 
 		enableInPlacePodVerticalScalingSchedulerPreemption: fts.EnableInPlacePodVerticalScalingSchedulerPreemption,
+
+		enableDRANodeAllocatableResources: fts.EnableDRANodeAllocatableResources,
 
 		resourceAllocationScorer: scorer,
 	}
@@ -659,6 +662,7 @@ func (f *Fit) Filter(ctx context.Context, cycleState fwk.CycleState, pod *v1.Pod
 	if err != nil {
 		return fwk.AsStatus(err)
 	}
+	s = f.recomputePodResourceRequestForNode(cycleState, pod, nodeInfo, s)
 
 	var draManager fwk.SharedDRAManager
 	if f.enableDRAExtendedResource {
@@ -689,6 +693,30 @@ func (f *Fit) Filter(ctx context.Context, cycleState fwk.CycleState, pod *v1.Pod
 	}
 
 	return nil
+}
+
+// recomputePodResourceRequestForNode recomputes the pod request including the node
+// allocatable resources that other plugins recorded for nodeInfo during Filter.
+// This recomputation is necessary because the other plugins' resource footprint
+// is not known during PreFilter.
+func (f *Fit) recomputePodResourceRequestForNode(cycleState fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo, s *preFilterState) *preFilterState {
+	if !f.enableDRANodeAllocatableResources {
+		return s
+	}
+	state := framework.GetAdditionalNodeAllocatableResourcesState(cycleState)
+	if state == nil {
+		return s
+	}
+	additionalResources := state.Get(nodeInfo.Node().Name)
+	if len(additionalResources) == 0 {
+		return s
+	}
+	podCopy := *pod
+	podCopy.Status.AdditionalNodeAllocatableResources = additionalResources
+	return computePodResourceRequest(&podCopy, ResourceRequestsOptions{
+		EnablePodLevelResources:           f.enablePodLevelResources,
+		EnableDRANodeAllocatableResources: true,
+	})
 }
 
 // InsufficientResource describes what kind of resource limit is hit and caused the pod to not fit the node.
