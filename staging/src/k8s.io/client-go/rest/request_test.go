@@ -2109,7 +2109,7 @@ func TestNewWatchEventDecoder(t *testing.T) {
 				"sendInitialEvents": {tt.sendInitialEvents},
 			}}
 			stream := streaming.NewDecoder(io.NopCloser(strings.NewReader("")), scheme.Codecs.UniversalDecoder())
-			decoder := r.newWatchEventDecoder(stream, scheme.Codecs.UniversalDecoder())
+			decoder := r.newWatchEventDecoder(stream, scheme.Codecs.UniversalDecoder(), nil)
 			t.Cleanup(decoder.Close)
 
 			if tt.wantConcurrent {

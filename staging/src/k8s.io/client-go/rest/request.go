@@ -847,23 +847,24 @@ func (r *Request) newStreamWatcher(ctx context.Context, resp *http.Response) (wa
 
 	handleWarnings(ctx, resp.Header, r.warningHandler)
 
-	frameReader := framer.NewFrameReader(resp.Body)
+	networkReader := &restclientwatch.TimingReadCloser{ReadCloser: resp.Body}
+	frameReader := framer.NewFrameReader(networkReader)
 	watchEventDecoder := streaming.NewDecoder(frameReader, streamingSerializer)
 
 	return watch.NewStreamWatcherWithLogger(
 		klog.FromContext(ctx),
-		r.newWatchEventDecoder(watchEventDecoder, objectDecoder),
+		r.newWatchEventDecoder(watchEventDecoder, objectDecoder, networkReader),
 		// use 500 to indicate that the cause of the error is unknown - other error codes
 		// are more specific to HTTP interactions, and set a reason
 		errors.NewClientErrorReporter(http.StatusInternalServerError, r.verb, "ClientWatchDecoding"),
 	), nil
 }
 
-func (r *Request) newWatchEventDecoder(streamDecoder streaming.Decoder, objectDecoder runtime.Decoder) watch.Decoder {
+func (r *Request) newWatchEventDecoder(streamDecoder streaming.Decoder, objectDecoder runtime.Decoder, networkReader *restclientwatch.TimingReadCloser) watch.Decoder {
 	if clientfeatures.FeatureGates().Enabled(clientfeatures.WatchListClientConcurrentDecoding) && r.params.Get("sendInitialEvents") == "true" {
 		return restclientwatch.NewConcurrentWatchEventDecoder(streamDecoder, objectDecoder)
 	}
-	return restclientwatch.NewDecoder(streamDecoder, objectDecoder)
+	return restclientwatch.NewDecoderWithNetworkTiming(streamDecoder, objectDecoder, networkReader)
 }
 
 // updateRequestResultMetric increments the RequestResult metric counter,
