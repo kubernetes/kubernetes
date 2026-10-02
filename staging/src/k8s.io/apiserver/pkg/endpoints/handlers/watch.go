@@ -319,6 +319,7 @@ type watchResponseWriter struct {
 	contentEncoding    string
 	isWatchListRequest bool
 	writer             watchStreamWriter
+	bytesWritten       int64
 }
 
 func newWatchResponseWriter(delegateRW http.ResponseWriter, flusher http.Flusher, contentEncoding string, isWatchListRequest bool) *watchResponseWriter {
@@ -346,7 +347,9 @@ func (w *watchResponseWriter) BeginStream(mediaType string) {
 }
 
 func (w *watchResponseWriter) Write(p []byte) (int, error) {
-	return w.writer.Write(p)
+	n, err := w.writer.Write(p)
+	w.bytesWritten += int64(n)
+	return n, err
 }
 
 func (w *watchResponseWriter) Flush() error {
@@ -420,6 +423,9 @@ func (s *WatchServer) HandleHTTP(w http.ResponseWriter, req *http.Request) {
 	done := req.Context().Done()
 
 	span.AddEvent("About to start writing response")
+	var initStart time.Time
+	var encodeTime, flushTime time.Duration
+	var initEventCount int
 	for {
 		select {
 		case <-s.ServerShuttingDownCh:
@@ -440,22 +446,44 @@ func (s *WatchServer) HandleHTTP(w http.ResponseWriter, req *http.Request) {
 				// End of results.
 				return
 			}
+			if s.isWatchListRequest && initStart.IsZero() {
+				initStart = time.Now()
+			}
 			isWatchListLatencyRecordingRequired := shouldRecordWatchListLatency(req.Context(), event)
 
+			encodeStart := time.Now()
 			if err := watchEncoder.Encode(event); err != nil {
 				utilruntime.HandleErrorWithContext(req.Context(), err, "Failed to encode watch event")
 				// client disconnect.
 				return
 			}
+			if s.isWatchListRequest {
+				encodeTime += time.Since(encodeStart)
+				initEventCount++
+			}
 			recorder.RecordEvent()
 
 			if len(ch) == 0 {
+				flushStart := time.Now()
 				if err := rw.Flush(); err != nil {
 					utilruntime.HandleErrorWithContext(req.Context(), err, "Failed to flush watch response")
 					return
 				}
+				if s.isWatchListRequest {
+					flushTime += time.Since(flushStart)
+				}
 			}
 			if isWatchListLatencyRecordingRequired {
+				if !initStart.IsZero() {
+					sendingTime := time.Since(initStart)
+					var setupTime time.Duration
+					if receivedAt, ok := apirequest.ReceivedTimestampFrom(req.Context()); ok {
+						setupTime = initStart.Sub(receivedAt)
+					}
+					if total := setupTime + sendingTime; total > 10*time.Second {
+						klog.FromContext(req.Context()).V(2).Info("TRACE-WATCHLIST", "path", req.URL.Path, "events", initEventCount, "encodedBytes", rw.bytesWritten, "total", total, "setup", setupTime, "sending", sendingTime, "encode", encodeTime, "flush", flushTime, "other", sendingTime-encodeTime-flushTime, "mediaType", s.MediaType, "contentEncoding", contentEncoding)
+					}
+				}
 				// Record completion of initial listing phase for WatchList
 				receivedTimestamp, ok := apirequest.ReceivedTimestampFrom(req.Context())
 				if !ok {
