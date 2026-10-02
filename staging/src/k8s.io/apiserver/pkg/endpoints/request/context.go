@@ -35,13 +35,23 @@ const (
 )
 
 // NewContext instantiates a base context object for request flows.
+//
+// Deprecated: callers should pass a context obtained from their caller.
 func NewContext() context.Context {
 	return context.TODO()
 }
 
 // NewDefaultContext instantiates a base context object for request flows in the default namespace
+//
+// Deprecated: use DefaultContext instead.
 func NewDefaultContext() context.Context {
 	return WithNamespace(NewContext(), metav1.NamespaceDefault)
+}
+
+// DefaultContext returns a context that includes the default namespace,
+// derived from the provided parent context.
+func DefaultContext(parent context.Context) context.Context {
+	return WithNamespace(parent, metav1.NamespaceDefault)
 }
 
 // WithValue returns a copy of parent in which the value associated with key is val.
