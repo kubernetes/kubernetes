@@ -31,6 +31,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/rest/fake"
@@ -643,12 +644,14 @@ func TestRunLabelMsg(t *testing.T) {
 	tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
 
 	testCases := []struct {
-		name          string
-		args          []string
-		overwrite     bool
-		dryRun        string
-		expectedOut   string
-		expectedError error
+		name           string
+		args           []string
+		overwrite      bool
+		dryRun         string
+		output         string
+		expectedOut    string
+		expectedErrOut string
+		expectedError  error
 	}{
 		{
 			name:        "set new label",
@@ -672,11 +675,36 @@ func TestRunLabelMsg(t *testing.T) {
 			expectedOut: "pod/foo unlabeled\n",
 		},
 		{
-			name: "unset nonexisting label",
-			args: []string{"pods/foo", "foo-"},
-			expectedOut: `label "foo" not found.
-pod/foo not labeled
-`,
+			name:           "unset nonexisting label",
+			args:           []string{"pods/foo", "foo-"},
+			expectedOut:    "pod/foo not labeled\n",
+			expectedErrOut: "label \"foo\" not found.\n",
+		},
+		{
+			name:           "unset nonexisting label with name output",
+			args:           []string{"pods/foo", "foo-"},
+			output:         "name",
+			expectedOut:    "pod/foo\n",
+			expectedErrOut: "label \"foo\" not found.\n",
+		},
+		{
+			name:           "unset nonexisting label with JSON output",
+			args:           []string{"pods/foo", "foo-"},
+			output:         "json",
+			expectedErrOut: "label \"foo\" not found.\n",
+		},
+		{
+			name:           "unset nonexisting label with YAML output",
+			args:           []string{"pods/foo", "foo-"},
+			output:         "yaml",
+			expectedErrOut: "label \"foo\" not found.\n",
+		},
+		{
+			name:           "unset nonexisting label with server dry run",
+			args:           []string{"pods/foo", "foo-"},
+			dryRun:         "server",
+			expectedOut:    "pod/foo not labeled (server dry run)\n",
+			expectedErrOut: "label \"foo\" not found.\n",
 		},
 		{
 			name:        "set new label with server dry run",
@@ -706,14 +734,18 @@ pod/foo not labeled
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			iostreams, _, bufOut, _ := genericiooptions.NewTestIOStreams()
+			iostreams, _, bufOut, bufErr := genericiooptions.NewTestIOStreams()
 			cmd := NewCmdLabel(tf, iostreams)
 			cmd.SetOut(bufOut)
-			cmd.SetErr(bufOut)
+			cmd.SetErr(bufErr)
 			if tc.dryRun != "" {
 				cmd.Flags().Set("dry-run", tc.dryRun)
 			}
 			options := NewLabelOptions(iostreams)
+			if err := cmd.Flags().Set("output", tc.output); err != nil {
+				t.Fatal(err)
+			}
+			*options.PrintFlags.OutputFormat = tc.output
 			if tc.overwrite {
 				options.overwrite = true
 			}
@@ -737,7 +769,25 @@ pod/foo not labeled
 				}
 			}
 
-			if bufOut.String() != tc.expectedOut {
+			if bufErr.String() != tc.expectedErrOut {
+				t.Errorf("unexpected stderr (-want +got):\n%s", cmp.Diff(tc.expectedErrOut, bufErr.String()))
+			}
+			if tc.output == "json" || tc.output == "yaml" {
+				decoder := yaml.NewYAMLOrJSONDecoder(bufOut, 4096)
+				var pod v1.Pod
+				if err := decoder.Decode(&pod); err != nil {
+					t.Fatalf("decode %s output: %v", tc.output, err)
+				}
+				if pod.Name != "foo" || pod.Namespace != "test" {
+					t.Errorf("expected pod test/foo, got %s/%s", pod.Namespace, pod.Name)
+				}
+				if diff := cmp.Diff(map[string]string{"existing": "abc"}, pod.Labels); diff != "" {
+					t.Errorf("unexpected labels (-want +got):\n%s", diff)
+				}
+				if err := decoder.Decode(&v1.Pod{}); err != io.EOF {
+					t.Errorf("expected end of output, got %v", err)
+				}
+			} else if bufOut.String() != tc.expectedOut {
 				t.Fatalf("wrong output\ngot:\n%s\nexpected:\n%s\n", bufOut.String(), tc.expectedOut)
 			}
 		})
