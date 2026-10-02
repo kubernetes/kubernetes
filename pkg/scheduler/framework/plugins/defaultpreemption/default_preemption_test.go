@@ -1488,9 +1488,6 @@ func TestDryRunPreemption(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			sort.Slice(nodeInfos, func(i, j int) bool {
-				return nodeInfos[i].Node().Name < nodeInfos[j].Node().Name
-			})
 
 			if tt.args == nil {
 				tt.args = getDefaultDefaultPreemptionArgs()
