@@ -266,6 +266,22 @@ func TestValidateUpdate(t *testing.T) {
 		}
 	}
 }
+
+// TestValidateCreateDoesNotRatchet checks that a create is validated with no stored quantities: an
+// invalid capacity is rejected even though it is the object's own value.
+func TestValidateCreateDoesNotRatchet(t *testing.T) {
+	node := &api.Node{
+		ObjectMeta: metav1.ObjectMeta{Name: "n"},
+		Status: api.NodeStatus{
+			Capacity: api.ResourceList{api.ResourceName("example.com/a"): resource.MustParse("18446744073709551616m")},
+		},
+	}
+	errs := nodeStrategy{}.Validate(context.Background(), node)
+	if len(errs) == 0 || !strings.Contains(errs.ToAggregate().Error(), "status.capacity") {
+		t.Errorf("expected an error at status.capacity, got %v", errs)
+	}
+}
+
 func TestValidate(t *testing.T) {
 	tests := []struct {
 		node  api.Node
