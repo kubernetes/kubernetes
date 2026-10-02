@@ -29,6 +29,8 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
+	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 )
 
 func TestIsCgroupPod(t *testing.T) {
@@ -293,5 +295,311 @@ func TestGetPodContainerName(t *testing.T) {
 			require.Equalf(t, tt.wantCgroupName, actualCgroupName, "Unexpected cgroup name for pod with UID %s, container resources: %v", tt.args.pod.UID, tt.args.pod.Spec.Containers[0].Resources)
 			require.Equalf(t, tt.wantLiteralCgroupfs, actualLiteralCgroupfs, "Unexpected literal cgroupfs for pod with UID %s, container resources: %v", tt.args.pod.UID, tt.args.pod.Spec.Containers[0].Resources)
 		})
+	}
+}
+
+// testQOSContainersInfo returns the default partition QoS roots under cgroupRoot.
+func testQOSContainersInfo(cgroupRoot CgroupName) QOSContainersInfo {
+	return QOSContainersInfo{
+		Guaranteed: cgroupRoot,
+		Burstable:  NewCgroupName(cgroupRoot, strings.ToLower(string(v1.PodQOSBurstable))),
+		BestEffort: NewCgroupName(cgroupRoot, strings.ToLower(string(v1.PodQOSBestEffort))),
+	}
+}
+
+func TestGetPodContainerNameWithSystemPartition(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+
+	// newPodWithQOS returns a pod in the given namespace that lands in the given QoS class.
+	newPodWithQOS := func(uid types.UID, namespace string, qos v1.PodQOSClass) *v1.Pod {
+		pod := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{UID: uid, Namespace: namespace},
+			Spec:       v1.PodSpec{Containers: []v1.Container{{Name: "container"}}},
+		}
+		switch qos {
+		case v1.PodQOSGuaranteed:
+			pod.Spec.Containers[0].Resources = v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("1000m"),
+					v1.ResourceMemory: resource.MustParse("1G"),
+				},
+				Limits: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("1000m"),
+					v1.ResourceMemory: resource.MustParse("1G"),
+				},
+			}
+		case v1.PodQOSBurstable:
+			pod.Spec.Containers[0].Resources = v1.ResourceRequirements{
+				Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1000m")},
+			}
+		case v1.PodQOSBestEffort:
+			// no resources
+		}
+		return pod
+	}
+
+	cgroupRoot := NewCgroupName(RootCgroupName, "kubepods")
+	defaultQOS := testQOSContainersInfo(cgroupRoot)
+	systemQOS := systemPartitionQOSContainersInfo(cgroupRoot)
+	partition := &SystemPartitionConfig{Namespaces: sets.New("kube-system")}
+
+	tests := []struct {
+		name            string
+		systemPartition *SystemPartitionConfig
+		namespace       string
+		qos             v1.PodQOSClass
+		wantParent      CgroupName
+	}{
+		// No system partition: every pod keeps the default hierarchy, whatever
+		// namespace it is in.
+		{
+			name:            "no partition, system namespace, guaranteed",
+			systemPartition: nil,
+			namespace:       "kube-system",
+			qos:             v1.PodQOSGuaranteed,
+			wantParent:      defaultQOS.Guaranteed,
+		},
+		{
+			name:            "no partition, system namespace, burstable",
+			systemPartition: nil,
+			namespace:       "kube-system",
+			qos:             v1.PodQOSBurstable,
+			wantParent:      defaultQOS.Burstable,
+		},
+		{
+			name:            "no partition, system namespace, besteffort",
+			systemPartition: nil,
+			namespace:       "kube-system",
+			qos:             v1.PodQOSBestEffort,
+			wantParent:      defaultQOS.BestEffort,
+		},
+		{
+			name:            "no partition, user namespace, guaranteed",
+			systemPartition: nil,
+			namespace:       "default",
+			qos:             v1.PodQOSGuaranteed,
+			wantParent:      defaultQOS.Guaranteed,
+		},
+		{
+			name:            "no partition, user namespace, burstable",
+			systemPartition: nil,
+			namespace:       "default",
+			qos:             v1.PodQOSBurstable,
+			wantParent:      defaultQOS.Burstable,
+		},
+		{
+			name:            "no partition, user namespace, besteffort",
+			systemPartition: nil,
+			namespace:       "default",
+			qos:             v1.PodQOSBestEffort,
+			wantParent:      defaultQOS.BestEffort,
+		},
+
+		// Partition configured: only pods in a listed namespace move.
+		{
+			name:            "partition, system namespace, guaranteed",
+			systemPartition: partition,
+			namespace:       "kube-system",
+			qos:             v1.PodQOSGuaranteed,
+			wantParent:      systemQOS.Guaranteed,
+		},
+		{
+			name:            "partition, system namespace, burstable",
+			systemPartition: partition,
+			namespace:       "kube-system",
+			qos:             v1.PodQOSBurstable,
+			wantParent:      systemQOS.Burstable,
+		},
+		{
+			name:            "partition, system namespace, besteffort",
+			systemPartition: partition,
+			namespace:       "kube-system",
+			qos:             v1.PodQOSBestEffort,
+			wantParent:      systemQOS.BestEffort,
+		},
+		{
+			name:            "partition, user namespace, guaranteed",
+			systemPartition: partition,
+			namespace:       "default",
+			qos:             v1.PodQOSGuaranteed,
+			wantParent:      defaultQOS.Guaranteed,
+		},
+		{
+			name:            "partition, user namespace, burstable",
+			systemPartition: partition,
+			namespace:       "default",
+			qos:             v1.PodQOSBurstable,
+			wantParent:      defaultQOS.Burstable,
+		},
+		{
+			name:            "partition, user namespace, besteffort",
+			systemPartition: partition,
+			namespace:       "default",
+			qos:             v1.PodQOSBestEffort,
+			wantParent:      defaultQOS.BestEffort,
+		},
+	}
+
+	for _, cgroupDriver := range []string{"cgroupfs", "systemd"} {
+		for _, tt := range tests {
+			t.Run(cgroupDriver+"/"+tt.name, func(t *testing.T) {
+				m := &podContainerManagerImpl{
+					cgroupManager:           NewCgroupManager(logger, nil, cgroupDriver),
+					qosContainersInfo:       defaultQOS,
+					systemQOSContainersInfo: systemQOS,
+					systemPartition:         tt.systemPartition,
+				}
+				pod := newPodWithQOS("fake-uid", tt.namespace, tt.qos)
+				// A failure here means newPodWithQOS is wrong, not GetPodContainerName.
+				require.Equal(t, tt.qos, v1qos.GetPodQOS(pod))
+
+				gotName, gotLiteral := m.GetPodContainerName(pod)
+				wantName := NewCgroupName(tt.wantParent, GetPodCgroupNameSuffix("fake-uid"))
+				require.Equal(t, wantName, gotName)
+				if cgroupDriver == "systemd" {
+					require.Equal(t, wantName.ToSystemd(), gotLiteral)
+				} else {
+					require.Equal(t, wantName.ToCgroupfs(), gotLiteral)
+				}
+			})
+		}
+	}
+}
+
+func TestQOSContainerRoots(t *testing.T) {
+	cgroupRoot := NewCgroupName(RootCgroupName, "kubepods")
+	defaultQOS := testQOSContainersInfo(cgroupRoot)
+	systemQOS := systemPartitionQOSContainersInfo(cgroupRoot)
+
+	tests := []struct {
+		name            string
+		systemPartition *SystemPartitionConfig
+	}{
+		{
+			name:            "partition configured",
+			systemPartition: &SystemPartitionConfig{Namespaces: sets.New("kube-system")},
+		},
+		{
+			// The system partition roots stay in the list so that pod cgroups left
+			// behind after the feature is turned off are still reclaimed.
+			name:            "partition not configured",
+			systemPartition: nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			m := &podContainerManagerImpl{
+				qosContainersInfo:       defaultQOS,
+				systemQOSContainersInfo: systemQOS,
+				systemPartition:         tt.systemPartition,
+			}
+			require.ElementsMatch(t, []CgroupName{
+				defaultQOS.BestEffort, defaultQOS.Burstable, defaultQOS.Guaranteed,
+				systemQOS.BestEffort, systemQOS.Burstable, systemQOS.Guaranteed,
+			}, m.qosContainerRoots())
+		})
+	}
+}
+
+func TestIsPodCgroupInSystemPartition(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+
+	cgroupRoot := NewCgroupName(RootCgroupName, "kubepods")
+	defaultQOS := testQOSContainersInfo(cgroupRoot)
+	systemQOS := systemPartitionQOSContainersInfo(cgroupRoot)
+	podUID := types.UID("123")
+
+	testCases := []struct {
+		name           string
+		input          CgroupName
+		expectedResult bool
+		expectedUID    types.UID
+	}{
+		{
+			name:           "system partition root",
+			input:          systemQOS.Guaranteed,
+			expectedResult: false,
+			expectedUID:    types.UID(""),
+		},
+		{
+			name:           "system partition burstable root",
+			input:          systemQOS.Burstable,
+			expectedResult: false,
+			expectedUID:    types.UID(""),
+		},
+		{
+			name:           "system partition besteffort root",
+			input:          systemQOS.BestEffort,
+			expectedResult: false,
+			expectedUID:    types.UID(""),
+		},
+		{
+			name:           "guaranteed pod in system partition",
+			input:          NewCgroupName(systemQOS.Guaranteed, GetPodCgroupNameSuffix(podUID)),
+			expectedResult: true,
+			expectedUID:    podUID,
+		},
+		{
+			name:           "burstable pod in system partition",
+			input:          NewCgroupName(systemQOS.Burstable, GetPodCgroupNameSuffix(podUID)),
+			expectedResult: true,
+			expectedUID:    podUID,
+		},
+		{
+			name:           "besteffort pod in system partition",
+			input:          NewCgroupName(systemQOS.BestEffort, GetPodCgroupNameSuffix(podUID)),
+			expectedResult: true,
+			expectedUID:    podUID,
+		},
+		{
+			name:           "container of a pod in system partition",
+			input:          NewCgroupName(systemQOS.Burstable, GetPodCgroupNameSuffix(podUID), "container.scope"),
+			expectedResult: false,
+			expectedUID:    types.UID(""),
+		},
+		{
+			name:           "guaranteed pod in default partition",
+			input:          NewCgroupName(defaultQOS.Guaranteed, GetPodCgroupNameSuffix(podUID)),
+			expectedResult: true,
+			expectedUID:    podUID,
+		},
+		{
+			name:           "burstable pod in default partition",
+			input:          NewCgroupName(defaultQOS.Burstable, GetPodCgroupNameSuffix(podUID)),
+			expectedResult: true,
+			expectedUID:    podUID,
+		},
+	}
+
+	// The partition being unconfigured must not hide pod cgroups inside it, or the
+	// orphan cleanup would never reclaim what a previous configuration left behind.
+	partitions := map[string]*SystemPartitionConfig{
+		"partition configured":     {Namespaces: sets.New("kube-system")},
+		"partition not configured": nil,
+	}
+
+	for _, cgroupDriver := range []string{"cgroupfs", "systemd"} {
+		for partitionName, partition := range partitions {
+			m := &podContainerManagerImpl{
+				cgroupManager:           NewCgroupManager(logger, nil, cgroupDriver),
+				qosContainersInfo:       defaultQOS,
+				systemQOSContainersInfo: systemQOS,
+				systemPartition:         partition,
+			}
+			for _, testCase := range testCases {
+				t.Run(cgroupDriver+"/"+partitionName+"/"+testCase.name, func(t *testing.T) {
+					var name string
+					if cgroupDriver == "systemd" {
+						name = testCase.input.ToSystemd()
+					} else {
+						name = testCase.input.ToCgroupfs()
+					}
+					result, resultUID := m.IsPodCgroup(name)
+					require.Equal(t, testCase.expectedResult, result)
+					require.Equal(t, testCase.expectedUID, resultUID)
+				})
+			}
+		}
 	}
 }

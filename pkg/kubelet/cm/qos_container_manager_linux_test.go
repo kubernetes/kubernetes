@@ -27,19 +27,23 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
 	resource "k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
 	pkgfeatures "k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
+	kubeletmetrics "k8s.io/kubernetes/pkg/kubelet/metrics"
 )
 
 func activeTestPods() []*v1.Pod {
@@ -838,6 +842,256 @@ func newPartitionTestPod(namespace, requests, limits string) *v1.Pod {
 			Name:      "c",
 			Resources: v1.ResourceRequirements{Requests: toList(requests), Limits: toList(limits)},
 		}}},
+	}
+}
+
+// qosValues are the values a QoS manager computes for one QoS cgroup. A nil
+// field is left unset.
+type qosValues struct {
+	CPUShares *uint64
+	MemoryMin *int64
+	MemoryLow *int64
+	MemoryMax *int64
+}
+
+// toQOSValues extracts the values that the QoS manager put in configs.
+func toQOSValues(t *testing.T, configs map[v1.PodQOSClass]*CgroupConfig) map[v1.PodQOSClass]qosValues {
+	t.Helper()
+	unified := func(config *CgroupConfig, key string) *int64 {
+		value, found := config.ResourceParameters.Unified[key]
+		if !found {
+			return nil
+		}
+		parsed, err := strconv.ParseInt(value, 10, 64)
+		require.NoError(t, err, "%s of %s", key, config.Name)
+		return &parsed
+	}
+	values := map[v1.PodQOSClass]qosValues{}
+	for qosClass, config := range configs {
+		values[qosClass] = qosValues{
+			CPUShares: config.ResourceParameters.CPUShares,
+			MemoryMin: unified(config, Cgroup2MemoryMin),
+			MemoryLow: unified(config, Cgroup2MemoryLow),
+			MemoryMax: config.ResourceParameters.Memory,
+		}
+	}
+	return values
+}
+
+func TestQOSCgroupsWithSystemPartition(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.MemoryQoS, true)
+	kubeletmetrics.Register()
+	// The gauges are global, so leave them as other tests expect to find them.
+	t.Cleanup(func() {
+		kubeletmetrics.MemoryQoSNodeMemoryMinBytes.Set(0)
+		kubeletmetrics.MemoryQoSNodeMemoryLowBytes.Set(0)
+	})
+
+	const (
+		systemNamespace = "kube-system"
+		mi              = int64(1 << 20)
+
+		// The requests of the node's pods. A burstable pod's limits are twice
+		// its requests.
+		defaultGuaranteedCPU    = int64(1000)
+		defaultGuaranteedMemory = 1024 * mi
+		defaultBurstableCPU     = int64(500)
+		defaultBurstableMemory  = 256 * mi
+		systemGuaranteedCPU     = int64(200)
+		systemGuaranteedMemory  = 128 * mi
+		systemBurstableCPU      = int64(100)
+		systemBurstableMemory   = 64 * mi
+
+		nodeAllocatableMemory = 8192 * mi
+		partitionMemoryLimit  = 1024 * mi
+		percentReserve        = 100
+	)
+	guaranteedPod := func(namespace string, cpu, memory int64) *v1.Pod {
+		requests := fmt.Sprintf("%dm/%d", cpu, memory)
+		return newPartitionTestPod(namespace, requests, requests)
+	}
+	burstablePod := func(namespace string, cpu, memory int64) *v1.Pod {
+		return newPartitionTestPod(namespace, fmt.Sprintf("%dm/%d", cpu, memory), fmt.Sprintf("%dm/%d", 2*cpu, 2*memory))
+	}
+	// The node's pods as the kubelet lists them, both partitions mixed.
+	nodePods := []*v1.Pod{
+		guaranteedPod(metav1.NamespaceDefault, defaultGuaranteedCPU, defaultGuaranteedMemory),
+		guaranteedPod(systemNamespace, systemGuaranteedCPU, systemGuaranteedMemory),
+		burstablePod(metav1.NamespaceDefault, defaultBurstableCPU, defaultBurstableMemory),
+		burstablePod(systemNamespace, systemBurstableCPU, systemBurstableMemory),
+		newPartitionTestPod(metav1.NamespaceDefault, "", ""),
+		newPartitionTestPod(systemNamespace, "", ""),
+	}
+	activePods := func() []*v1.Pod { return nodePods }
+
+	nodeConfig := NodeConfig{
+		CgroupsPerQOS:           true,
+		MemoryReservationPolicy: kubeletconfig.TieredReservationMemoryReservationPolicy,
+	}
+	nodeRoot := NewCgroupName(RootCgroupName, defaultNodeAllocatableCgroupName)
+	partitionRoot := NewCgroupName(nodeRoot, systemPartitionCgroupName)
+	cm := &containerManagerImpl{
+		NodeConfig:                NodeConfig{SystemPartition: &SystemPartitionConfig{Namespaces: sets.New(systemNamespace)}},
+		systemPartitionQOSManager: &qosContainerManagerNoop{},
+	}
+
+	type nodeMetrics struct {
+		MemoryMin float64
+		MemoryLow float64
+	}
+	// Preset before each case, so that a manager that must not report them
+	// can be told apart from one that reports zero.
+	presetMetrics := nodeMetrics{MemoryMin: 1, MemoryLow: 2}
+
+	// The node's pods sit in two hierarchies, each written by its own QoS
+	// manager:
+	//
+	//   kubepods             [node]       protects every pod below
+	//   ├── burstable        [node]
+	//   ├── besteffort       [node]
+	//   ├── pod
+	//   └── system           [partition]  protects the partition's pods
+	//       ├── burstable    [partition]
+	//       ├── besteffort   [partition]
+	//       └── pod
+	//
+	// Each QoS cgroup counts only the pods in it, while a root counts every pod
+	// below it, since a pod's memory protection is bounded by its ancestors'.
+	// The burstable cgroup still leaves room for every other pod under the root.
+	cases := []struct {
+		name            string
+		root            CgroupName
+		skipNodeMetrics bool
+		allocatable     int64
+		activePods      ActivePodsFunc
+		podsUnderRoot   ActivePodsFunc
+		want            map[v1.PodQOSClass]qosValues
+		wantMetrics     nodeMetrics
+	}{
+		{
+			name:          "the default partition sizes its QoS cgroups by its own pods and its root by all pods",
+			root:          nodeRoot,
+			allocatable:   nodeAllocatableMemory,
+			activePods:    cm.podsInSystemPartition(activePods, false),
+			podsUnderRoot: activePods,
+			want: map[v1.PodQOSClass]qosValues{
+				v1.PodQOSGuaranteed: {
+					MemoryMin: new(defaultGuaranteedMemory + defaultBurstableMemory + systemGuaranteedMemory + systemBurstableMemory),
+					MemoryLow: new(defaultBurstableMemory + systemBurstableMemory),
+				},
+				v1.PodQOSBurstable: {
+					CPUShares: new(MilliCPUToShares(defaultBurstableCPU)),
+					MemoryLow: new(defaultBurstableMemory),
+					MemoryMax: new(nodeAllocatableMemory - (defaultGuaranteedMemory + systemGuaranteedMemory + systemBurstableMemory)),
+				},
+				v1.PodQOSBestEffort: {
+					CPUShares: new(uint64(MinShares)),
+					MemoryMax: new(nodeAllocatableMemory - (defaultGuaranteedMemory + systemGuaranteedMemory + systemBurstableMemory) - defaultBurstableMemory),
+				},
+			},
+			wantMetrics: nodeMetrics{
+				MemoryMin: float64(defaultGuaranteedMemory + systemGuaranteedMemory),
+				MemoryLow: float64(defaultBurstableMemory + systemBurstableMemory),
+			},
+		},
+		{
+			name:            "the system partition sizes its QoS cgroups by its own pods and memory limit",
+			root:            partitionRoot,
+			skipNodeMetrics: true,
+			allocatable:     partitionMemoryLimit,
+			activePods:      cm.podsInSystemPartition(activePods, true),
+			want: map[v1.PodQOSClass]qosValues{
+				// The partition root's CPU weight is the container manager's
+				// to set, so it is left alone here.
+				v1.PodQOSGuaranteed: {
+					MemoryMin: new(systemGuaranteedMemory + systemBurstableMemory),
+					MemoryLow: new(systemBurstableMemory),
+				},
+				v1.PodQOSBurstable: {
+					CPUShares: new(MilliCPUToShares(systemBurstableCPU)),
+					MemoryLow: new(systemBurstableMemory),
+					MemoryMax: new(partitionMemoryLimit - systemGuaranteedMemory),
+				},
+				v1.PodQOSBestEffort: {
+					CPUShares: new(uint64(MinShares)),
+					MemoryMax: new(partitionMemoryLimit - systemGuaranteedMemory - systemBurstableMemory),
+				},
+			},
+			// A partition only sees part of the node, so it must not report
+			// node-wide metrics.
+			wantMetrics: presetMetrics,
+		},
+		{
+			// The [node] manager as the kubelet builds it without a partition:
+			// kubepods has no system child, so the root and its QoS cgroups count
+			// the same pods.
+			name:        "a node without a partition reports the node-wide metrics",
+			root:        nodeRoot,
+			allocatable: nodeAllocatableMemory,
+			activePods:  activePods,
+			want: map[v1.PodQOSClass]qosValues{
+				v1.PodQOSGuaranteed: {
+					MemoryMin: new(defaultGuaranteedMemory + defaultBurstableMemory + systemGuaranteedMemory + systemBurstableMemory),
+					MemoryLow: new(defaultBurstableMemory + systemBurstableMemory),
+				},
+				v1.PodQOSBurstable: {
+					CPUShares: new(MilliCPUToShares(defaultBurstableCPU + systemBurstableCPU)),
+					MemoryLow: new(defaultBurstableMemory + systemBurstableMemory),
+					MemoryMax: new(nodeAllocatableMemory - (defaultGuaranteedMemory + systemGuaranteedMemory)),
+				},
+				v1.PodQOSBestEffort: {
+					CPUShares: new(uint64(MinShares)),
+					MemoryMax: new(nodeAllocatableMemory - (defaultGuaranteedMemory + systemGuaranteedMemory) - (defaultBurstableMemory + systemBurstableMemory)),
+				},
+			},
+			wantMetrics: nodeMetrics{
+				MemoryMin: float64(defaultGuaranteedMemory + systemGuaranteedMemory),
+				MemoryLow: float64(defaultBurstableMemory + systemBurstableMemory),
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			kubeletmetrics.MemoryQoSNodeMemoryMinBytes.Set(presetMetrics.MemoryMin)
+			kubeletmetrics.MemoryQoSNodeMemoryLowBytes.Set(presetMetrics.MemoryLow)
+
+			m := newQOSContainerManager(nil, tc.root, nodeConfig, &fakeCgroupManager{}, tc.skipNodeMetrics)
+			m.activePods = tc.activePods
+			m.podsUnderRoot = tc.podsUnderRoot
+			m.getNodeAllocatable = func() v1.ResourceList {
+				return v1.ResourceList{v1.ResourceMemory: *resource.NewQuantity(tc.allocatable, resource.BinarySI)}
+			}
+			m.qosContainersInfo = QOSContainersInfo{
+				Guaranteed: tc.root,
+				Burstable:  NewCgroupName(tc.root, "burstable"),
+				BestEffort: NewCgroupName(tc.root, "besteffort"),
+			}
+			configs := map[v1.PodQOSClass]*CgroupConfig{
+				v1.PodQOSGuaranteed: {Name: m.qosContainersInfo.Guaranteed, ResourceParameters: &ResourceConfig{}},
+				v1.PodQOSBurstable:  {Name: m.qosContainersInfo.Burstable, ResourceParameters: &ResourceConfig{}},
+				v1.PodQOSBestEffort: {Name: m.qosContainersInfo.BestEffort, ResourceParameters: &ResourceConfig{}},
+			}
+
+			require.NoError(t, m.setCPUCgroupConfig(configs))
+			m.setMemoryQoS(logger, configs)
+			m.setMemoryReserve(logger, configs, percentReserve)
+
+			if diff := cmp.Diff(tc.want, toQOSValues(t, configs)); diff != "" {
+				t.Errorf("unexpected QoS cgroup values (-want +got):\n%s", diff)
+			}
+
+			var gotMetrics nodeMetrics
+			var err error
+			gotMetrics.MemoryMin, err = testutil.GetGaugeMetricValue(kubeletmetrics.MemoryQoSNodeMemoryMinBytes)
+			require.NoError(t, err)
+			gotMetrics.MemoryLow, err = testutil.GetGaugeMetricValue(kubeletmetrics.MemoryQoSNodeMemoryLowBytes)
+			require.NoError(t, err)
+			if diff := cmp.Diff(tc.wantMetrics, gotMetrics); diff != "" {
+				t.Errorf("unexpected node-wide MemoryQoS metrics (-want +got):\n%s", diff)
+			}
+		})
 	}
 }
 
