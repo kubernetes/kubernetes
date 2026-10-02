@@ -481,7 +481,7 @@ func (s *WatchServer) HandleHTTP(w http.ResponseWriter, req *http.Request) {
 						setupTime = initStart.Sub(receivedAt)
 					}
 					if total := setupTime + sendingTime; total > 10*time.Second {
-						klog.FromContext(req.Context()).V(2).Info("TRACE-WATCHLIST", "path", req.URL.Path, "events", initEventCount, "encodedBytes", rw.bytesWritten, "total", total, "setup", setupTime, "sending", sendingTime, "encode", encodeTime, "flush", flushTime, "other", sendingTime-encodeTime-flushTime, "mediaType", s.MediaType, "contentEncoding", contentEncoding)
+						klog.FromContext(req.Context()).V(2).Info("TRACE-WATCHLIST", "path", req.URL.Path, "auditID", audit.GetAuditIDTruncated(req.Context()), "events", initEventCount, "encodedBytes", rw.bytesWritten, "total", total, "setup", setupTime, "sending", sendingTime, "encode", encodeTime, "flush", flushTime, "other", sendingTime-encodeTime-flushTime, "mediaType", s.MediaType, "contentEncoding", contentEncoding)
 					}
 				}
 				// Record completion of initial listing phase for WatchList
