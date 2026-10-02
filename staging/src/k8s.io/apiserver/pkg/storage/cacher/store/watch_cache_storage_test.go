@@ -23,6 +23,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -306,4 +307,161 @@ func TestWatchCacheStorageSnapshots(t *testing.T) {
 	require.NoError(t, err)
 	assert.Len(t, elements, 1)
 	assert.Equal(t, &mockObject{key: "foo", val: "600"}, elements[0].(*Element).Object)
+}
+
+func TestStoreSingleKey(t *testing.T) {
+	store := NewWatchCacheStorage(nil, testStoreIndexers())
+	testStoreSingleKey(t, store)
+}
+
+func testStoreSingleKey(t *testing.T, store *WatchCacheStorage) {
+	assertStoreEmpty(t, store, "foo")
+
+	prev, err := store.UpdateStore(watch.Added, testStorageElement("foo", "bar", 1), 1)
+	require.NoError(t, err)
+	assert.Nil(t, prev, "adding a new key replaces nothing")
+	assertStoreSingleKey(t, store, "foo", "bar", 1)
+
+	prev, err = store.UpdateStore(watch.Modified, testStorageElement("foo", "baz", 2), 2)
+	require.NoError(t, err)
+	assert.Equal(t, testStorageElement("foo", "bar", 1), prev)
+	assertStoreSingleKey(t, store, "foo", "baz", 2)
+
+	prev, err = store.UpdateStore(watch.Modified, testStorageElement("foo", "baz", 3), 3)
+	require.NoError(t, err)
+	assert.Equal(t, testStorageElement("foo", "baz", 2), prev)
+	assertStoreSingleKey(t, store, "foo", "baz", 3)
+
+	require.NoError(t, store.Replace([]*Element{testStorageElement("foo", "bar", 4)}, 4))
+	assertStoreSingleKey(t, store, "foo", "bar", 4)
+
+	prev, err = store.UpdateStore(watch.Deleted, testStorageElement("foo", "", 0), 5)
+	require.NoError(t, err)
+	assert.Equal(t, testStorageElement("foo", "bar", 4), prev)
+	assertStoreEmpty(t, store, "foo")
+
+	prev, err = store.UpdateStore(watch.Deleted, testStorageElement("foo", "", 0), 6)
+	require.NoError(t, err)
+	assert.Nil(t, prev, "deleting a missing key removes nothing")
+}
+
+func TestStoreIndexerSingleKey(t *testing.T) {
+	store := NewWatchCacheStorage(nil, testStoreIndexers())
+	testStoreIndexerSingleKey(t, store)
+}
+
+func testStoreIndexerSingleKey(t *testing.T, store *WatchCacheStorage) {
+	items, err := store.ByIndex("by_val", "bar")
+	require.NoError(t, err)
+	assert.Empty(t, items)
+
+	prev, err := store.UpdateStore(watch.Added, testStorageElement("foo", "bar", 1), 1)
+	require.NoError(t, err)
+	assert.Nil(t, prev)
+	items, err = store.ByIndex("by_val", "bar")
+	require.NoError(t, err)
+	assert.Equal(t, []interface{}{
+		testStorageElement("foo", "bar", 1),
+	}, items)
+
+	prev, err = store.UpdateStore(watch.Modified, testStorageElement("foo", "baz", 2), 2)
+	require.NoError(t, err)
+	assert.Equal(t, testStorageElement("foo", "bar", 1), prev)
+	items, err = store.ByIndex("by_val", "bar")
+	require.NoError(t, err)
+	assert.Empty(t, items)
+	items, err = store.ByIndex("by_val", "baz")
+	require.NoError(t, err)
+	assert.Equal(t, []interface{}{
+		testStorageElement("foo", "baz", 2),
+	}, items)
+
+	prev, err = store.UpdateStore(watch.Modified, testStorageElement("foo", "baz", 3), 3)
+	require.NoError(t, err)
+	assert.Equal(t, testStorageElement("foo", "baz", 2), prev)
+	items, err = store.ByIndex("by_val", "bar")
+	require.NoError(t, err)
+	assert.Empty(t, items)
+	items, err = store.ByIndex("by_val", "baz")
+	require.NoError(t, err)
+	assert.Equal(t, []interface{}{
+		testStorageElement("foo", "baz", 3),
+	}, items)
+
+	require.NoError(t, store.Replace([]*Element{
+		testStorageElement("foo", "bar", 4),
+	}, 4))
+	items, err = store.ByIndex("by_val", "bar")
+	require.NoError(t, err)
+	assert.Equal(t, []interface{}{
+		testStorageElement("foo", "bar", 4),
+	}, items)
+	items, err = store.ByIndex("by_val", "baz")
+	require.NoError(t, err)
+	assert.Empty(t, items)
+
+	prev, err = store.UpdateStore(watch.Deleted, testStorageElement("foo", "", 0), 5)
+	require.NoError(t, err)
+	assert.Equal(t, testStorageElement("foo", "bar", 4), prev)
+	items, err = store.ByIndex("by_val", "baz")
+	require.NoError(t, err)
+	assert.Empty(t, items)
+
+	prev, err = store.UpdateStore(watch.Deleted, testStorageElement("foo", "", 0), 6)
+	require.NoError(t, err)
+	assert.Nil(t, prev)
+}
+
+func assertStoreEmpty(t *testing.T, store *WatchCacheStorage, nonExistingKey string) {
+	item, ok, err := store.get(testStorageElement(nonExistingKey, "", 0))
+	require.NoError(t, err)
+	assert.False(t, ok)
+	assert.Nil(t, item)
+
+	item, ok, err = store.GetByKey(nonExistingKey)
+	require.NoError(t, err)
+	assert.False(t, ok)
+	assert.Nil(t, item)
+
+	items := store.List()
+	assert.Empty(t, items)
+}
+
+func assertStoreSingleKey(t *testing.T, store *WatchCacheStorage, expectKey, expectValue string, expectRV int) {
+	item, ok, err := store.get(testStorageElement(expectKey, "", expectRV))
+	require.NoError(t, err)
+	assert.True(t, ok)
+	assert.Equal(t, expectValue, item.(*Element).Object.(fakeObj).value)
+
+	item, ok, err = store.GetByKey(expectKey)
+	require.NoError(t, err)
+	assert.True(t, ok)
+	assert.Equal(t, expectValue, item.(*Element).Object.(fakeObj).value)
+
+	items := store.List()
+	assert.Equal(t, []interface{}{testStorageElement(expectKey, expectValue, expectRV)}, items)
+}
+
+func testStorageElement(key, value string, rv int) *Element {
+	return &Element{Key: key, Object: fakeObj{value: value, rv: rv}}
+}
+
+type fakeObj struct {
+	value string
+	rv    int
+}
+
+func (f fakeObj) GetObjectKind() schema.ObjectKind { return nil }
+func (f fakeObj) DeepCopyObject() runtime.Object   { return nil }
+
+var _ runtime.Object = (*fakeObj)(nil)
+
+func testStoreIndexFunc(obj interface{}) ([]string, error) {
+	return []string{obj.(fakeObj).value}, nil
+}
+
+func testStoreIndexers() *cache.Indexers {
+	indexers := cache.Indexers{}
+	indexers["by_val"] = testStoreIndexFunc
+	return &indexers
 }
