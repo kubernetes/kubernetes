@@ -24,6 +24,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/util/feature"
@@ -990,4 +991,71 @@ func newPodGroupCycleState() *framework.CycleState {
 	state := framework.NewCycleState()
 	state.SetPodGroupCycleState(framework.NewCycleState())
 	return state
+}
+
+func TestPrepareAssumedPodAdditionalNodeAllocatableResources(t *testing.T) {
+	const host = "node-1"
+	entries := []v1.AdditionalNodeAllocatableResource{{
+		Source:     v1.AdditionalNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "claim-1"},
+		Containers: []string{"c1"},
+		Mapping: []v1.NodeAllocatableMappedResources{{
+			Name:     v1.ResourceCPU,
+			Quantity: new(resource.MustParse("1")),
+		}},
+	}}
+
+	tests := []struct {
+		name        string
+		enableGate  bool
+		createStore bool
+		setOnNode   string
+		want        []v1.AdditionalNodeAllocatableResource
+	}{
+		{
+			name:        "gate enabled, entries recorded for host",
+			enableGate:  true,
+			createStore: true,
+			setOnNode:   host,
+			want:        entries,
+		},
+		{
+			name:        "gate enabled, entries recorded for another node",
+			enableGate:  true,
+			createStore: true,
+			setOnNode:   "node-2",
+		},
+		{
+			name:       "gate enabled, no store in cycle state",
+			enableGate: true,
+		},
+		{
+			name:        "gate disabled",
+			createStore: true,
+			setOnNode:   host,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.DRANodeAllocatableResources, tc.enableGate)
+
+			state := framework.NewCycleState()
+			if tc.createStore {
+				framework.GetOrCreateAdditionalNodeAllocatableResourcesState(state).Set(tc.setOnNode, "TestPlugin", entries)
+			}
+			podInfo, err := framework.NewPodInfo(st.MakePod().Name("pod").Namespace("ns").Obj())
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			logger, _ := ktesting.NewTestContext(t)
+			assumed := (&SchedulingAlgorithm{}).prepareAssumedPod(logger, state, &framework.QueuedPodInfo{PodInfo: podInfo}, host)
+			if diff := cmp.Diff(tc.want, assumed.Pod.Status.AdditionalNodeAllocatableResources); diff != "" {
+				t.Errorf("assumed pod AdditionalNodeAllocatableResources mismatch (-want +got):\n%s", diff)
+			}
+			if podInfo.Pod.Status.AdditionalNodeAllocatableResources != nil {
+				t.Error("prepareAssumedPod modified the original pod")
+			}
+		})
+	}
 }

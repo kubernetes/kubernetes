@@ -34,7 +34,6 @@ import (
 	internalcache "k8s.io/kubernetes/pkg/scheduler/backend/cache"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/parallelize"
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/dynamicresources"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	utiltrace "k8s.io/utils/trace"
 )
@@ -552,13 +551,15 @@ func (a *SchedulingAlgorithm) prepareAssumedPod(logger klog.Logger, state fwk.Cy
 	if utilfeature.DefaultFeatureGate.Enabled(features.DRANodeAllocatableResources) {
 		// If DRANodeAllocatableResources is enabled, copy the calculated additional node allocatable resources
 		// from the cycle state to the assumed pod's status. This ensures that the scheduler's
-		// cached version of the pod reflects the node allocatable resources allocated by the DRA plugin
+		// cached version of the pod reflects the node allocatable resources allocated
 		// for this scheduling cycle, making this information available for NodeInfo cache update.
 		// Any potential AdditionalNodeAllocatableResources from a previously failed scheduling attempt is overwritten.
 		// This field is not explicitly cleared as the Pod object is reconstructed in handleSchedulingFailure()
 		// before re-queueing.
-		assumedPodInfo.Pod.Status.AdditionalNodeAllocatableResources =
-			dynamicresources.ExtractPodAdditionalNodeAllocatableResources(logger, state, host)
+		assumedPodInfo.Pod.Status.AdditionalNodeAllocatableResources = nil
+		if allocState := framework.GetAdditionalNodeAllocatableResourcesState(state); allocState != nil {
+			assumedPodInfo.Pod.Status.AdditionalNodeAllocatableResources = allocState.Get(host)
+		}
 	}
 	return assumedPodInfo
 }

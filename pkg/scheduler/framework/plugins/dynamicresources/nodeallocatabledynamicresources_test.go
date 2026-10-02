@@ -1356,67 +1356,6 @@ func TestBuildNodeAllocatableDRAInfo(t *testing.T) {
 	}
 }
 
-func TestExtractPodAdditionalNodeAllocatableResources(t *testing.T) {
-	logger := klog.TODO()
-	nodeName := "node-a"
-	original := []v1.AdditionalNodeAllocatableResource{
-		{
-			Source:     v1.AdditionalNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: specialClaimInMemName},
-			Containers: []string{"c1"},
-			Mapping: []v1.NodeAllocatableMappedResources{{
-				Name:     v1.ResourceCPU,
-				Quantity: new(resource.MustParse("1")),
-			}},
-		},
-	}
-
-	t.Run("no cycle state", func(t *testing.T) {
-		got := ExtractPodAdditionalNodeAllocatableResources(logger, framework.NewCycleState(), nodeName)
-		if got != nil {
-			t.Errorf("ExtractPodAdditionalNodeAllocatableResources() = %v, want nil", got)
-		}
-	})
-
-	t.Run("unknown node", func(t *testing.T) {
-		state := framework.NewCycleState()
-		state.Write(stateKey, &stateData{
-			nodeAllocations: map[string]nodeAllocation{
-				nodeName: {additionalNodeAllocatableResources: cloneAdditionalNodeAllocatableResources(original)},
-			},
-		})
-		got := ExtractPodAdditionalNodeAllocatableResources(logger, state, "other-node")
-		if got != nil {
-			t.Errorf("ExtractPodAdditionalNodeAllocatableResources() = %v, want nil", got)
-		}
-	})
-
-	t.Run("returns a copy not the cycle-state slice", func(t *testing.T) {
-		state := framework.NewCycleState()
-		draState := &stateData{
-			nodeAllocations: map[string]nodeAllocation{
-				nodeName: {additionalNodeAllocatableResources: cloneAdditionalNodeAllocatableResources(original)},
-			},
-		}
-		state.Write(stateKey, draState)
-
-		got := ExtractPodAdditionalNodeAllocatableResources(logger, state, nodeName)
-		if diff := cmp.Diff(original, got); diff != "" {
-			t.Errorf("ExtractPodAdditionalNodeAllocatableResources() diff (-want +got):\n%s", diff)
-		}
-		if len(got) == 0 {
-			t.Fatal("ExtractPodAdditionalNodeAllocatableResources() returned empty status")
-		}
-
-		got[0].Source.Name = "mutated-by-caller"
-		got[0].Mapping[0].Quantity.Add(resource.MustParse("1"))
-
-		inState := draState.nodeAllocations[nodeName].additionalNodeAllocatableResources
-		if diff := cmp.Diff(original, inState); diff != "" {
-			t.Errorf("mutating extracted status changed cycle state (-want +got):\n%s", diff)
-		}
-	})
-}
-
 func TestPatchAdditionalNodeAllocatableResources(t *testing.T) {
 	pod := st.MakePod().Name("test-pod").Namespace("test-ns").UID("pod-uid").Obj()
 	placeholderStatus := []v1.AdditionalNodeAllocatableResource{
@@ -1534,7 +1473,7 @@ func TestPatchAdditionalNodeAllocatableResources(t *testing.T) {
 		{
 			name:                                    "placeholder rewritten after DeepEqual, assumed pod unchanged",
 			assumedPodStatus:                        v1.PodStatus{AdditionalNodeAllocatableResources: placeholderStatus},
-			finalAdditionalNodeAllocatableResources: cloneAdditionalNodeAllocatableResources(placeholderStatus),
+			finalAdditionalNodeAllocatableResources: []v1.AdditionalNodeAllocatableResource{*placeholderStatus[0].DeepCopy()},
 			extendedClaim:                           realClaim,
 			wantPatch:                               true,
 			wantClaimNameInPatch:                    "real-claim-name",

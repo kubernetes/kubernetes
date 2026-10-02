@@ -35,47 +35,8 @@ import (
 	fwk "k8s.io/kube-scheduler/framework"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 )
-
-// ExtractPodAdditionalNodeAllocatableResources returns a copy of the additional node
-// allocatable resources stored in state for the given node.
-//
-// A copy is required because assume() assigns the result onto the cached pod.
-// Sharing the cycle-state slice would make later in-place updates (replacing the
-// extended-resource placeholder claim name) silently mutate the scheduler cache
-// and would make the DeepEqual check in patchAdditionalNodeAllocatableResources a no-op.
-func ExtractPodAdditionalNodeAllocatableResources(logger klog.Logger, state fwk.CycleState, nodeName string) []v1.AdditionalNodeAllocatableResource {
-	s, err := state.Read(names.DynamicResources)
-	if err != nil {
-		// DynamicResources plugin didn't run or no state
-		return nil
-	}
-
-	draState, ok := s.(*stateData)
-	if !ok {
-		logger.Error(errors.New("invalid DynamicResources state type"), "Failed to cast CycleState data")
-		return nil
-	}
-
-	if nodeAlloc, exists := draState.nodeAllocations[nodeName]; exists {
-		return cloneAdditionalNodeAllocatableResources(nodeAlloc.additionalNodeAllocatableResources)
-	}
-
-	return nil
-}
-
-func cloneAdditionalNodeAllocatableResources(in []v1.AdditionalNodeAllocatableResource) []v1.AdditionalNodeAllocatableResource {
-	if in == nil {
-		return nil
-	}
-	out := make([]v1.AdditionalNodeAllocatableResource, len(in))
-	for i := range in {
-		in[i].DeepCopyInto(&out[i])
-	}
-	return out
-}
 
 // calculateAndCheckNodeAllocatableResources calculates the total node-allocatable resources (e.g., CPU, memory)
 // requested by a pod, considering both its standard container requests and any additional resources
