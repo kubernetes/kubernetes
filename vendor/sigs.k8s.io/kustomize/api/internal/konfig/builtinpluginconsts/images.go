@@ -18,5 +18,7 @@ images:
   create: true
 - path: spec/template/spec/volumes[]/image/reference
   create: true
+- path: spec/jobTemplate/spec/template/spec/volumes[]/image/reference
+  create: true
 `
 )

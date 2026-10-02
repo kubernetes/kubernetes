@@ -1,84 +1,60 @@
-# Sampling New OpenAPI Data
+# Built-in OpenAPI data
 
-[OpenAPI schema]: ./kubernetesapi/
-[Kustomization schema]: ./kustomizationapi/
-[kind]: https://hub.docker.com/r/kindest/node/tags
-
-This document describes how to fetch OpenAPI data from a
-live kubernetes API server. 
-The scripts used will create a clean [kind] instance for this purpose.
-
-## Replacing the default openapi schema version
-
-### Delete all currently built-in schema
-
-This will remove both the Kustomization and Kubernetes schemas:
+Kustomize embeds a compiled OpenAPI bundle for Kubernetes built-in types. The
+runtime artifact is:
 
 ```
-make nuke
+kubernetesapi/data/kubernetes-openapi-union-v1.21.2.bundle-v1.json.gz
 ```
 
-### Choose the new version to use
+The Kubernetes suffix identifies the newest Kubernetes schema represented by
+the bundle. `bundle-v1` is the independent artifact format version. The
+initial compiler migration uses a single v1.21.2 source, so both the coverage
+floor and ceiling are v1.21.2.
 
-The compiled-in schema version should maximize API availability with respect to all actively supported Kubernetes versions. For example, while 1.20, 1.21 and 1.22 are the actively supported versions, 1.21 is the best choice. This is because 1.21 introduces at least one new API and does not remove any, while 1.22 removes a large set of long-deprecated APIs that are still supported in 1.20/1.21.
+The bundle contains the complete OpenAPI definitions and a compact index from
+GVK to root definition and resource scope. API paths and other top-level
+OpenAPI fields are compiler inputs and are not embedded in the runtime binary.
 
-### Generating additional schema
+## Regenerating the bundle
 
-If you'd like to change the default schema version, then in the Makefile in this directory, update the `API_VERSION` to your desired version.
-
-You may need to update the version of Kind these scripts use by changing `KIND_VERSION` in the Makefile in this directory. You can find compatibility information in the [kind release notes](https://github.com/kubernetes-sigs/kind/releases).
-
-In this directory, fetch the openapi schema, generate the
-corresponding swagger.go for the kubernetes api, and update `kubernetesapi/openapiinfo.go`:
-
-```
-make all
-```
-
-If you want to run the steps individually instead of using `make all`, you can run
-the following commands:
+The checked-in source is the gzip-compressed v1.21.2 OpenAPI protobuf at:
 
 ```
-make kustomizationapi/swagger.go
-make kubernetesapi/swagger.go
-make kubernetesapi/openapiinfo.go
+kubernetesapi/v1_21_2/swagger.pb.gz
 ```
 
-You can optionally delete the old `swagger.pb` and `swagger.go` files if we no longer need to support that kubernetes version of
-openapi data. Make sure you rerun `make kubernetesapi/openapiinfo.go` after deleting any old schemas.
-
-
-#### Precomputations
-
-To avoid expensive schema lookups, some functions have precomputed results based on the schema. Unit tests
-ensure these are kept in sync with the schema; if these tests fail you will need to follow the suggested diff
-to update the precomputed results.
-
-### Run all tests
-
-At the top of the repository, run the tests.
+Its uncompressed SHA-256 is:
 
 ```
-make prow-presubmit-check >& /tmp/k.txt; echo $?
+5d171b55e9601912807a870d73ffe70bb306f5889a00e76986042a0f2d7b6bc2
 ```
 
-The exit code should be zero; if not, examine `/tmp/k.txt`.
+Source acquisition is deliberately separate from compilation. When updating
+Kubernetes, obtain the protobuf from an API server running the exact release,
+review its provenance, and use the compiler's `-legacy-proto-output` flag to
+write the deterministic checked-in `.pb.gz` archive. Update the embedded path,
+version constants, and generated bundle together. Every source's uncompressed
+digest is recorded in the bundle metadata.
 
-## Partial regeneration
-
-You can also regenerate the kubernetes api schemas specifically with:
-
-```
-rm kubernetesapi/swagger.go
-make kubernetesapi/swagger.go
-```
-
-To fetch the schema without generating the swagger.go, you can
-run:
+Regenerate the runtime bundle with:
 
 ```
-rm kubernetesapi/swagger.pb
-make kubernetesapi/swagger.pb
+make -C kyaml/openapi generate
 ```
 
-Note that generating the swagger.go will re-fetch the schema.
+The compiler performs the protobuf-to-OpenAPI conversion, constructs the GVK
+and scope index, validates local references, writes canonical JSON, and uses a
+deterministic gzip header. The generated artifact must be byte-for-byte
+reproducible. Verify it and run the OpenAPI tests with:
+
+```
+make -C kyaml/openapi verify
+```
+
+The protobuf archive is retained only as the compiler input and to preserve
+the legacy public asset API. The normal Kustomize runtime does not import that
+compatibility package.
+
+The small Kustomization schema remains as source JSON at
+`kustomizationapi/swagger.json` and is embedded directly with `go:embed`.
