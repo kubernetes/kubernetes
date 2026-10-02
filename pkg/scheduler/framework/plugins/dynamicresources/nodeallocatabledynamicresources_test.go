@@ -1700,6 +1700,68 @@ func TestClearAdditionalNodeAllocatableResources(t *testing.T) {
 	}
 }
 
+func TestGetPodNodeAllocatableResourceFootprintClaimName(t *testing.T) {
+	const preGeneratedClaimName = "test-pod-extended-resources-abcde"
+	slice := &resourceapi.ResourceSlice{
+		ObjectMeta: metav1.ObjectMeta{Name: "slice1"},
+		Spec: resourceapi.ResourceSliceSpec{
+			Pool:     resourceapi.ResourcePool{Name: "pool1"},
+			NodeName: ptr.To("test-node"),
+			Driver:   "dra.example.com",
+			Devices: []resourceapi.Device{{
+				Name: "cpu0",
+				NodeAllocatableResources: map[v1.ResourceName]resourceapi.NodeAllocatableResource{
+					v1.ResourceCPU: {Mapping: &resourceapi.NodeAllocatableMapping{DeviceMultiplier: new(resource.MustParse("1"))}},
+				},
+			}},
+		},
+	}
+	allocation := &resourceapi.AllocationResult{
+		Devices: resourceapi.DeviceAllocationResult{
+			Results: []resourceapi.DeviceRequestAllocationResult{{Driver: "dra.example.com", Pool: "pool1", Device: "cpu0"}},
+		},
+	}
+
+	tests := []struct {
+		name      string
+		claimName string
+		want      string
+	}{
+		{
+			name:      "regular claim keeps its name",
+			claimName: "user-claim",
+			want:      "user-claim",
+		},
+		{
+			name:      "in-memory extended resource claim uses the pre-generated name",
+			claimName: specialClaimInMemName,
+			want:      preGeneratedClaimName,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			pod := st.MakePod().Name("test-pod").Namespace("test-ns").Containers([]v1.Container{{Name: "c1"}}).Obj()
+			claim := &resourceapi.ResourceClaim{ObjectMeta: metav1.ObjectMeta{Name: tt.claimName, Namespace: "test-ns", UID: "claim-uid"}}
+			state := &stateData{}
+			state.draExtendedResource.preGeneratedClaimName = preGeneratedClaimName
+
+			pl := &DynamicResources{}
+			_, got, status := pl.getPodNodeAllocatableResourceFootprint(klog.TODO(), state, pod,
+				map[types.UID]*resourceapi.AllocationResult{claim.UID: allocation},
+				[]*resourceapi.ResourceClaim{claim}, []*resourceapi.ResourceSlice{slice}, nil)
+			if status != nil {
+				t.Fatalf("getPodNodeAllocatableResourceFootprint() status = %v", status)
+			}
+			if len(got) != 1 {
+				t.Fatalf("getPodNodeAllocatableResourceFootprint() returned %d entries, want 1: %+v", len(got), got)
+			}
+			if got[0].Source.Name != tt.want {
+				t.Errorf("Source.Name = %q, want %q", got[0].Source.Name, tt.want)
+			}
+		})
+	}
+}
+
 func TestNodeFitsNativeResources(t *testing.T) {
 	tests := []struct {
 		name       string

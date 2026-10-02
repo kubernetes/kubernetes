@@ -38,6 +38,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
+	apiservernames "k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/retry"
@@ -186,6 +187,8 @@ type DynamicResources struct {
 	draManager            fwk.SharedDRAManager
 	podIndexer            cache.Indexer
 	podResourceClaimIndex string
+	// nameGenerator picks the name of the extended resource claim.
+	nameGenerator apiservernames.NameGenerator
 }
 
 const (
@@ -225,7 +228,8 @@ func New(ctx context.Context, plArgs runtime.Object, fh fwk.Handle, fts feature.
 			EnableConsumableCapacity: fts.EnableDRAConsumableCapacity,
 			EnableListTypeAttributes: fts.EnableDRAListTypeAttributes,
 		}),
-		draManager: fh.SharedDRAManager(),
+		draManager:    fh.SharedDRAManager(),
+		nameGenerator: apiservernames.SimpleNameGenerator,
 	}
 
 	// Set up pod indexer for PreQueueingHint to look up pods by claim.

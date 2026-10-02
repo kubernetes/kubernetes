@@ -50,6 +50,10 @@ import (
 // PreFilter - preFilterExtendedResources()
 // - for pods using extended resources, find existing claim or create in-memory claim with temporary name "<extended-resources>"
 // - the in-memory claim is used to track and allocate resources, claim object is created in PreBind extension point.
+// - pick the name the claim will be created with, so that node allocatable
+//   resources consumed by the claim can be recorded in
+//   pod.status.additionalNodeAllocatableResources by the NodeResourcesFit
+//   plugin irrespective of the plugin order
 // - store the claim in stateData for Filter extension point
 //
 // Filter - filterExtendedResources()
@@ -94,6 +98,10 @@ const (
 type draExtendedResource struct {
 	// May have extended resource backed by DRA.
 	podScalarResources map[v1.ResourceName]int64
+
+	// preGeneratedClaimName is the name the in-memory special claim gets when it is
+	// created in PreBind. It is set once in PreFilter and read-only afterwards.
+	preGeneratedClaimName string
 }
 
 // hasDeviceClassMappedExtendedResource returns true when the given resource list has an extended resource, that has
@@ -179,16 +187,18 @@ func (pl *DynamicResources) preFilterExtendedResources(pod *v1.Pod, logger klog.
 		return extendedResourceClaim, nil
 	}
 	// Create one special claim for all extended resources backed by DRA in the Pod.
-	// Create the ResourceClaim with pod as owner, with a generated name that uses
-	// <pod name>-extended-resources- as base. The final name will get truncated if it
-	// would be too long.
+	// Its name uses <pod name>-extended-resources- as base plus a random suffix,
+	// truncated if it would be too long.
+	//
+	// The name is picked here rather than by the apiserver so that pod status
+	// can reference the claim before it is created.
+	s.draExtendedResource.preGeneratedClaimName = pl.nameGenerator.GenerateName(pod.Name + "-extended-resources-")
 	return &resourceapi.ResourceClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: pod.Namespace,
 			Name:      specialClaimInMemName,
 			// fake temporary UID for use in SignalClaimPendingAllocation
-			UID:          types.UID(uuid.NewUUID()),
-			GenerateName: pod.Name + "-extended-resources-",
+			UID: types.UID(uuid.NewUUID()),
 			OwnerReferences: []metav1.OwnerReference{
 				{
 					APIVersion: "v1",
@@ -538,13 +548,19 @@ func (pl *DynamicResources) createExtendedResourceClaimInAPI(
 	if !ok || nodeAllocation.extendedResourceClaim == nil {
 		return nil, fmt.Errorf("extended resource claim not found for node %s", nodeName)
 	}
+	if state.draExtendedResource.preGeneratedClaimName == "" {
+		return nil, fmt.Errorf("internal error: no name was picked in PreFilter for the extended resource claim of pod %s", klog.KObj(pod))
+	}
 	claim := nodeAllocation.extendedResourceClaim.DeepCopy()
 
 	logger.V(5).Info("create claim for extended resources", "pod", klog.KObj(pod), "node", nodeName, "resourceclaim", klog.Format(claim))
 	// Clear fields which must or can not be set during creation.
 	claim.Status.Allocation = nil
-	claim.Name = ""
 	claim.UID = ""
+	// Pod status may already reference this name, so the apiserver must not
+	// pick a different one. A name collision fails the create; the next
+	// scheduling attempt picks a new name.
+	claim.Name = state.draExtendedResource.preGeneratedClaimName
 
 	createdClaim, err := pl.clientset.ResourceV1().ResourceClaims(claim.Namespace).Create(ctx, claim, metav1.CreateOptions{})
 	if err != nil {
