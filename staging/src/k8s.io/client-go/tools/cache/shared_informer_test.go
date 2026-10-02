@@ -30,6 +30,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	"github.com/onsi/gomega"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -93,23 +94,28 @@ func (l *testListener) handle(obj interface{}) {
 	l.receivedItemNames = append(l.receivedItemNames, objectMeta.GetName())
 }
 
-func (l *testListener) ok() bool {
+func (l *testListener) receivedItems() sets.Set[string] {
+	l.lock.RLock()
+	defer l.lock.RUnlock()
+
+	return sets.New(l.receivedItemNames...)
+}
+
+func (l *testListener) ok(t *testing.T) {
+	t.Helper()
 	l.println("polling")
-	err := wait.PollImmediate(100*time.Millisecond, 2*time.Second, func() (bool, error) {
-		if l.satisfiedExpectations() {
-			return true, nil
-		}
-		return false, nil
-	})
-	if err != nil {
-		return false
-	}
+	gomega.NewWithT(t).Eventually(l.receivedItems).
+		WithTimeout(2*time.Second).
+		WithPolling(100*time.Millisecond).
+		Should(gomega.Equal(l.expectedItemNames), "%s: listener items", l.name)
 
 	// wait just a bit to allow any unexpected stragglers to come in
 	l.println("sleeping")
-	time.Sleep(1 * time.Second)
+	gomega.NewWithT(t).Consistently(l.receivedItems).
+		WithTimeout(1*time.Second).
+		WithPolling(100*time.Millisecond).
+		Should(gomega.Equal(l.expectedItemNames), "%s: unexpected stragglers", l.name)
 	l.println("final check")
-	return l.satisfiedExpectations()
 }
 
 func (l *testListener) satisfiedExpectations() bool {
@@ -469,9 +475,7 @@ func TestSharedInformerWatchDisruption(t *testing.T) {
 	}()
 
 	for _, listener := range listeners {
-		if !listener.ok() {
-			t.Errorf("%s: expected %v, got %v", listener.name, listener.expectedItemNames, listener.receivedItemNames)
-		}
+		listener.ok(t)
 	}
 
 	// Add pod3, bump pod2 but don't broadcast it, so that the change will be seen only on relist
@@ -480,9 +484,7 @@ func TestSharedInformerWatchDisruption(t *testing.T) {
 
 	// Ensure that nobody saw any changes
 	for _, listener := range listeners {
-		if !listener.ok() {
-			t.Errorf("%s: expected %v, got %v", listener.name, listener.expectedItemNames, listener.receivedItemNames)
-		}
+		listener.ok(t)
 	}
 
 	for _, listener := range listeners {
@@ -511,9 +513,7 @@ func TestSharedInformerWatchDisruption(t *testing.T) {
 	time.Sleep(10 * time.Millisecond)
 
 	for _, listener := range listeners {
-		if !listener.ok() {
-			t.Errorf("%s: expected %v, got %v", listener.name, listener.expectedItemNames, listener.receivedItemNames)
-		}
+		listener.ok(t)
 	}
 }
 
@@ -608,9 +608,7 @@ func TestSharedInformerTransformer(t *testing.T) {
 		wg.Wait()
 	}()
 
-	if !listenerTransformer.ok() {
-		t.Errorf("%s: expected %v, got %v", listenerTransformer.name, listenerTransformer.expectedItemNames, listenerTransformer.receivedItemNames)
-	}
+	listenerTransformer.ok(t)
 }
 
 func TestSharedInformerRemoveHandler(t *testing.T) {
@@ -968,21 +966,22 @@ func TestStateSharedInformer(t *testing.T) {
 	var wg wait.Group
 	stop := make(chan struct{})
 	wg.StartWithChannel(stop, informer.Run)
-	defer wg.Wait()
-	if !listener.ok() {
-		t.Errorf("informer did not report initial objects")
-		close(stop)
-		return
-	}
+	defer func() {
+		select {
+		case <-stop:
+		default:
+			close(stop)
+		}
+		wg.Wait()
+	}()
+	listener.ok(t)
 
 	if !isStarted(informer) {
 		t.Errorf("informer does not report to be started although handling events")
-		close(stop)
 		return
 	}
 	if informer.IsStopped() {
 		t.Errorf("informer reports to be stopped although stop channel not closed")
-		close(stop)
 		return
 	}
 
@@ -1012,19 +1011,9 @@ func TestAddOnStoppedSharedInformer(t *testing.T) {
 	defer wg.Wait()
 	close(stop)
 
-	err := wait.PollImmediate(100*time.Millisecond, 2*time.Second, func() (bool, error) {
-		if informer.IsStopped() {
-			return true, nil
-		}
-		return false, nil
-	})
+	gomega.NewWithT(t).Eventually(informer.IsStopped).WithTimeout(2 * time.Second).WithPolling(100 * time.Millisecond).Should(gomega.BeTrueBecause("informer reports not to be stopped although stop channel closed"))
 
-	if err != nil {
-		t.Errorf("informer reports not to be stopped although stop channel closed")
-		return
-	}
-
-	_, err = informer.AddEventHandlerWithResyncPeriod(listener, listener.resyncPeriod)
+	_, err := informer.AddEventHandlerWithResyncPeriod(listener, listener.resyncPeriod)
 	if err == nil {
 		t.Errorf("stopped informer did not reject add handler")
 		return
@@ -1085,10 +1074,7 @@ func TestRemoveWhileActive(t *testing.T) {
 
 	source.Add(&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod1"}})
 
-	if !listener.ok() {
-		t.Errorf("event did not occur")
-		return
-	}
+	listener.ok(t)
 
 	informer.RemoveEventHandler(handle)
 
@@ -1099,10 +1085,7 @@ func TestRemoveWhileActive(t *testing.T) {
 
 	source.Add(&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod2"}})
 
-	if !listener.ok() {
-		t.Errorf("unexpected event occurred")
-		return
-	}
+	listener.ok(t)
 }
 
 func TestAddWhileActive(t *testing.T) {
@@ -1129,10 +1112,7 @@ func TestAddWhileActive(t *testing.T) {
 
 	source.Add(&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod1"}})
 
-	if !listener1.ok() {
-		t.Errorf("events on listener1 did not occur")
-		return
-	}
+	listener1.ok(t)
 
 	select {
 	case <-handle1.HasSyncedChecker().Done():
@@ -1152,10 +1132,7 @@ func TestAddWhileActive(t *testing.T) {
 
 	source.Add(&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod2"}})
 
-	if !listener2.ok() {
-		t.Errorf("event on listener2 did not occur")
-		return
-	}
+	listener2.ok(t)
 
 	if !handle2.HasSynced() {
 		t.Error("Not synced even after processing?")
@@ -1171,10 +1148,7 @@ func TestAddWhileActive(t *testing.T) {
 	}
 
 	listener1.expectedItemNames = listener2.expectedItemNames
-	if !listener1.ok() {
-		t.Errorf("events on listener1 did not occur")
-		return
-	}
+	listener1.ok(t)
 }
 
 // TestShutdown depends on goleak.VerifyTestMain in main_test.go to verify that

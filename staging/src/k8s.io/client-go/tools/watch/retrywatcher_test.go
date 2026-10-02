@@ -27,12 +27,12 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/onsi/gomega"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
@@ -610,18 +610,11 @@ func TestRetryWatcher(t *testing.T) {
 				break
 			}
 
-			var counter uint32
 			// We always count with the last watch reestablishing which is imminent but still a race.
 			// We will wait for the last watch to reestablish to avoid it.
-			err = wait.PollImmediate(10*time.Millisecond, 10*time.Second, func() (done bool, err error) {
-				counter = atomic.LoadUint32(atomicCounter)
-				return counter == tc.watchCount, nil
-			})
-			if wait.Interrupted(err) {
-				t.Errorf("expected %d watcher starts, but it has started %d times", tc.watchCount, counter)
-			} else if err != nil {
-				t.Fatal(err)
-			}
+			gomega.NewWithT(t).Eventually(ctx, func() uint32 {
+				return atomic.LoadUint32(atomicCounter)
+			}).WithTimeout(10*time.Second).WithPolling(10*time.Millisecond).Should(gomega.Equal(tc.watchCount), "watch count")
 
 			if !reflect.DeepEqual(tc.expected, got) {
 				t.Fatalf("expected %s, got %s;\ndiff: %s", dump.Pretty(tc.expected), dump.Pretty(got), cmp.Diff(tc.expected, got))
