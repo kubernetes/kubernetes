@@ -22,9 +22,19 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/klog/v2/ktesting"
+	kubefeatures "k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
+	"k8s.io/kubernetes/pkg/kubelet/config"
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
+	"k8s.io/utils/cpuset"
 )
 
 func TestNodeAllocatableReservationForScheduling(t *testing.T) {
@@ -507,6 +517,199 @@ func TestGetCgroupConfig(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			actual := getCgroupConfigInternal(tc.resourceList, tc.compressibleResources)
 			tc.checks(actual, t)
+		})
+	}
+}
+
+func TestSystemPartitionCgroupConfig(t *testing.T) {
+	partitionRoot := NewCgroupName(RootCgroupName, defaultNodeAllocatableCgroupName, systemPartitionCgroupName)
+
+	cases := []struct {
+		name            string
+		systemPartition *SystemPartitionConfig
+		wantMemory      int64
+		wantCPUs        string
+	}{
+		{
+			name: "configured limits",
+			systemPartition: &SystemPartitionConfig{
+				MemoryLimit: new(int64(4 << 30)),
+				CPUSet:      cpuset.New(0, 1),
+				Namespaces:  sets.New("kube-system"),
+			},
+			wantMemory: 4 << 30,
+			wantCPUs:   "0-1",
+		},
+		{
+			// Limits a previous config set must not stay on the cgroup.
+			name:            "unset limits are written as unlimited",
+			systemPartition: &SystemPartitionConfig{Namespaces: sets.New("kube-system")},
+			wantMemory:      -1,
+			wantCPUs:        "0-7",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			cm := &containerManagerImpl{
+				NodeConfig:          NodeConfig{SystemPartition: tc.systemPartition},
+				systemPartitionRoot: partitionRoot,
+				cpuManager:          &allCPUsManager{cpus: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7)},
+			}
+			got := cm.systemPartitionCgroupConfig()
+			require.Equal(t, partitionRoot, got.Name)
+			require.Equal(t, tc.wantMemory, *got.ResourceParameters.Memory)
+			require.Equal(t, tc.wantCPUs, got.ResourceParameters.CPUSet.String())
+		})
+	}
+}
+
+// allCPUsManager is a CPU manager that only reports the node's CPUs.
+type allCPUsManager struct {
+	cpumanager.Manager
+	cpus cpuset.CPUSet
+}
+
+func (m *allCPUsManager) GetAllCPUs() cpuset.CPUSet {
+	return m.cpus
+}
+func TestSystemPartitionPodsAndAllocatable(t *testing.T) {
+	t.Run("without a system partition every pod is outside it", func(t *testing.T) {
+		pods := []*v1.Pod{{ObjectMeta: metav1.ObjectMeta{Name: "a", Namespace: "kube-system"}}}
+		cm := &containerManagerImpl{}
+		require.Equal(t, pods, cm.podsInSystemPartition(func() []*v1.Pod { return pods }, false)())
+		require.Empty(t, cm.podsInSystemPartition(func() []*v1.Pod { return pods }, true)())
+	})
+
+	inPartition := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "in", Namespace: "kube-system"}}
+	outside := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "out", Namespace: metav1.NamespaceDefault}}
+	activePods := func() []*v1.Pod { return []*v1.Pod{inPartition, outside} }
+	capacity := v1.ResourceList{
+		v1.ResourceCPU:    resource.MustParse("8"),
+		v1.ResourceMemory: resource.MustParse("16Gi"),
+	}
+
+	cases := []struct {
+		name        string
+		memoryLimit *int64
+		wantMemory  string
+	}{
+		{
+			name:        "the memory limit replaces the node's allocatable memory",
+			memoryLimit: new(int64(1 << 30)),
+			wantMemory:  "1Gi",
+		},
+		{
+			// Nothing bounds the partition's pods but the node then.
+			name:       "without a memory limit the node's allocatable memory is kept",
+			wantMemory: "16Gi",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			cm := &containerManagerImpl{
+				capacity: capacity,
+				NodeConfig: NodeConfig{SystemPartition: &SystemPartitionConfig{
+					MemoryLimit: tc.memoryLimit,
+					Namespaces:  sets.New("kube-system"),
+				}},
+				systemPartitionQOSManager: &qosContainerManagerNoop{},
+			}
+
+			require.Equal(t, []*v1.Pod{inPartition}, cm.podsInSystemPartition(activePods, true)())
+			require.Equal(t, []*v1.Pod{outside}, cm.podsInSystemPartition(activePods, false)())
+
+			allocatable := cm.systemPartitionAllocatable()
+			memory := allocatable[v1.ResourceMemory]
+			wantMemory := resource.MustParse(tc.wantMemory)
+			require.Equal(t, wantMemory.Value(), memory.Value())
+			cpu := allocatable[v1.ResourceCPU]
+			require.Equal(t, int64(8), cpu.Value(), "only memory is bounded by the partition")
+			// The node's own allocatable must not be changed by the partition's.
+			nodeMemory := cm.GetNodeAllocatableAbsolute()[v1.ResourceMemory]
+			wantNodeMemory := capacity[v1.ResourceMemory]
+			require.Equal(t, wantNodeMemory.Value(), nodeMemory.Value())
+		})
+	}
+}
+
+func TestUpdateSystemPartitionCPUWeight(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	partitionRoot := NewCgroupName(RootCgroupName, defaultNodeAllocatableCgroupName, systemPartitionCgroupName)
+	// The node's pods as the kubelet lists them, both partitions mixed.
+	nodePods := []*v1.Pod{
+		newPartitionTestPod("kube-system", "200m/128Mi", "200m/128Mi"),
+		newPartitionTestPod(metav1.NamespaceDefault, "1/1Gi", "1/1Gi"),
+		newPartitionTestPod("kube-system", "100m/64Mi", "200m/128Mi"),
+		newPartitionTestPod("kube-system", "", ""),
+	}
+	// A pod that sets its requests at the pod level only.
+	podLevelPod := newPartitionTestPod("kube-system", "", "")
+	podLevelPod.Spec.Resources = &v1.ResourceRequirements{
+		Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("300m"), v1.ResourceMemory: resource.MustParse("128Mi")},
+		Limits:   v1.ResourceList{v1.ResourceCPU: resource.MustParse("300m"), v1.ResourceMemory: resource.MustParse("128Mi")},
+	}
+
+	cases := []struct {
+		name              string
+		pods              []*v1.Pod
+		podLevelResources bool
+		noPods            bool
+		sourcesNotReady   bool
+		wantShares        *uint64
+	}{
+		{
+			name:       "the partition is weighted by the requests of its own pods",
+			pods:       nodePods,
+			wantShares: new(MilliCPUToShares(300)),
+		},
+		{
+			name:              "pod-level requests weight the partition",
+			pods:              append([]*v1.Pod{podLevelPod}, nodePods...),
+			podLevelResources: true,
+			wantShares:        new(MilliCPUToShares(600)),
+		},
+		{
+			name:       "an empty partition gets the minimum weight, not the cgroup default",
+			wantShares: new(uint64(MinShares)),
+		},
+		{
+			// Before the partition's QoS cgroups are set up.
+			name:   "nothing is written without the partition's pods",
+			noPods: true,
+		},
+		{
+			// Right after a kubelet restart, the pods are not known yet, and the
+			// weight left from before the restart is kept.
+			name:            "nothing is written until every pod source has been seen",
+			pods:            nodePods,
+			sourcesNotReady: true,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeatures.PodLevelResources, tc.podLevelResources)
+			fakeCM := &fakeCgroupManager{}
+			cm := &containerManagerImpl{
+				cgroupManager:             fakeCM,
+				systemPartitionRoot:       partitionRoot,
+				NodeConfig:                NodeConfig{SystemPartition: &SystemPartitionConfig{Namespaces: sets.New("kube-system")}},
+				systemPartitionQOSManager: &qosContainerManagerNoop{},
+				sourcesReady:              config.NewSourcesReady(func(sets.Set[string]) bool { return !tc.sourcesNotReady }),
+			}
+			if !tc.noPods {
+				cm.systemPartitionPods = cm.podsInSystemPartition(func() []*v1.Pod { return tc.pods }, true)
+			}
+
+			require.NoError(t, cm.updateSystemPartitionCPUWeight(logger))
+
+			if tc.wantShares == nil {
+				require.Empty(t, fakeCM.updates)
+				return
+			}
+			require.Len(t, fakeCM.updates, 1)
+			require.Equal(t, partitionRoot, fakeCM.updates[0].Name)
+			require.Equal(t, *tc.wantShares, *fakeCM.updates[0].ResourceParameters.CPUShares)
+			require.Nil(t, fakeCM.updates[0].ResourceParameters.Memory, "only the weight is written, the memory limit is left alone")
 		})
 	}
 }
