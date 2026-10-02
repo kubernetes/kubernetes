@@ -433,8 +433,18 @@ func (c *cacheWatcher) convertToWatchEvent(event *watchCacheEvent) *watch.Event 
 	return nil
 }
 
+type intervalEventTiming struct {
+	convert time.Duration
+	send    time.Duration
+}
+
+type intervalTiming struct {
+	next time.Duration
+	intervalEventTiming
+}
+
 // NOTE: sendWatchCacheEvent is assumed to not modify <event> !!!
-func (c *cacheWatcher) sendWatchCacheEvent(event *watchCacheEvent) (builtAt, sentAt time.Time) {
+func (c *cacheWatcher) sendWatchCacheEvent(event *watchCacheEvent, timing *intervalEventTiming) (builtAt, sentAt time.Time) {
 	// We need to ensure that if we put event X to the c.result, all
 	// previous events were already put into it before, no matter whether
 	// c.done is close or not.
@@ -453,18 +463,32 @@ func (c *cacheWatcher) sendWatchCacheEvent(event *watchCacheEvent) (builtAt, sen
 	default:
 	}
 
+	var convertStart time.Time
+	if timing != nil {
+		convertStart = time.Now()
+	}
 	watchEvent := c.convertToWatchEvent(event)
+	if timing != nil {
+		timing.convert += time.Since(convertStart)
+	}
 	if watchEvent == nil {
 		// Watcher is not interested in that object.
 		return time.Time{}, time.Time{}
 	}
 	builtAt = c.clock.Now()
+	var sendStart time.Time
+	if timing != nil {
+		sendStart = time.Now()
+	}
 
 	select {
 	case c.result <- *watchEvent:
 		c.markBookmarkAfterRvSent(event)
 		sentAt = c.clock.Now()
 	case <-c.done:
+	}
+	if timing != nil {
+		timing.send += time.Since(sendStart)
 	}
 	return builtAt, sentAt
 }
@@ -491,7 +515,7 @@ func (c *cacheWatcher) process(ctx context.Context) {
 					}
 					return
 				}
-				if err := c.processInitialEvents(item.interval); err != nil {
+				if err := c.processInitialEvents(ctx, item.interval); err != nil {
 					return
 				}
 				resourceVersion = item.interval.resourceVersion
@@ -525,7 +549,7 @@ func (c *cacheWatcher) process(ctx context.Context) {
 	}
 }
 
-func (c *cacheWatcher) processInitialEvents(cacheInterval *watchCacheInterval) error {
+func (c *cacheWatcher) processInitialEvents(ctx context.Context, cacheInterval *watchCacheInterval) error {
 	// Check how long we are processing initEvents.
 	// As long as these are not processed, we are not processing
 	// any incoming events, so if it takes long, we may actually
@@ -551,7 +575,10 @@ func (c *cacheWatcher) processInitialEvents(cacheInterval *watchCacheInterval) e
 
 	sendInitialEvents := (c.filter.opts.SendInitialEvents != nil && *c.filter.opts.SendInitialEvents) || (c.filter.opts.SendInitialEvents == nil && c.requiredResourceVersion == 0)
 	initEventCount := 0
+	timing := &intervalTiming{}
+	nextStart := time.Now()
 	for event, err := range cacheInterval.All() {
+		timing.next += time.Since(nextStart)
 		if err != nil {
 			// An error indicates that the cache interval
 			// has been invalidated and can no longer serve
@@ -582,8 +609,9 @@ func (c *cacheWatcher) processInitialEvents(cacheInterval *watchCacheInterval) e
 				panic(fmt.Sprintf("Watch cache non-initial interval event resourceVersion (%d) must be greater than requiredResourceVersion (%d), resource: %q, identifier: %q", event.ResourceVersion, c.requiredResourceVersion, c.groupResource, c.identifier))
 			}
 		}
-		c.sendWatchCacheEvent(event)
+		c.sendWatchCacheEvent(event, &timing.intervalEventTiming)
 		initEventCount++
+		nextStart = time.Now()
 	}
 
 	if initEventCount > 0 {
@@ -594,6 +622,10 @@ func (c *cacheWatcher) processInitialEvents(cacheInterval *watchCacheInterval) e
 		klog.V(2).Infof("processing %d initEvents of %s (%s) took %v", initEventCount, c.groupResource, c.identifier, processingTime)
 	}
 
+	if processingTime > 10*time.Second {
+		klog.FromContext(ctx).V(2).Info("TRACE-CACHER", "resource", c.groupResource, "identifier", c.identifier, "events", initEventCount, "total", processingTime, "next", timing.next, "convert", timing.convert, "send", timing.send, "other", processingTime-timing.next-timing.convert-timing.send)
+	}
+
 	// send bookmark after sending all events in cacheInterval for watchlist request
 	if cacheInterval.initialEventsEndBookmark != nil {
 		if cacheInterval.initialEventsEndBookmark.ResourceVersion != cacheInterval.resourceVersion {
@@ -602,7 +634,7 @@ func (c *cacheWatcher) processInitialEvents(cacheInterval *watchCacheInterval) e
 				panic(fmt.Sprintf("Watch cache initialEventsEndBookmark resourceVersion (%d) must equal interval resourceVersion (%d), resource: %q, identifier: %q", cacheInterval.initialEventsEndBookmark.ResourceVersion, cacheInterval.resourceVersion, c.groupResource, c.identifier))
 			}
 		}
-		c.sendWatchCacheEvent(cacheInterval.initialEventsEndBookmark)
+		c.sendWatchCacheEvent(cacheInterval.initialEventsEndBookmark, nil)
 	}
 	return nil
 }
@@ -629,7 +661,7 @@ func (c *cacheWatcher) processEvent(event *watchCacheEvent, resourceVersion uint
 				}
 			}
 		}
-		builtAt, sentAt := c.sendWatchCacheEvent(event)
+		builtAt, sentAt := c.sendWatchCacheEvent(event, nil)
 		c.observeDispatchMetrics(event, dequeuedAt, builtAt, sentAt)
 	}
 }
