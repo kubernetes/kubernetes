@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/cacher/consistency"
 	"k8s.io/apiserver/pkg/storage/cacher/metrics"
@@ -623,7 +624,7 @@ func (c *cacheWatcher) processInitialEvents(ctx context.Context, cacheInterval *
 	}
 
 	if processingTime > 10*time.Second {
-		klog.FromContext(ctx).V(2).Info("TRACE-CACHER", "resource", c.groupResource, "identifier", c.identifier, "events", initEventCount, "total", processingTime, "next", timing.next, "convert", timing.convert, "send", timing.send, "other", processingTime-timing.next-timing.convert-timing.send)
+		klog.FromContext(ctx).V(2).Info("TRACE-CACHER", "resource", c.groupResource, "auditID", audit.GetAuditIDTruncated(ctx), "identifier", c.identifier, "events", initEventCount, "total", processingTime, "next", timing.next, "convert", timing.convert, "send", timing.send, "other", processingTime-timing.next-timing.convert-timing.send)
 	}
 
 	// send bookmark after sending all events in cacheInterval for watchlist request
