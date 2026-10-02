@@ -26,6 +26,7 @@ import (
 
 // cacheIntervalSource provides the iteration logic for a watchCacheInterval.
 type cacheIntervalSource interface {
+	LoadNext(output *watchCacheEvent) (*watchCacheEvent, error)
 	Next() (*watchCacheEvent, error)
 }
 
@@ -49,6 +50,13 @@ type watchCacheInterval struct {
 // invalidated.
 func (wci *watchCacheInterval) Next() (*watchCacheEvent, error) {
 	return wci.source.Next()
+}
+
+// LoadNext loads the next item in the cache interval into output provided the cache
+// interval is still valid. An error is returned if the interval is
+// invalidated. Returns nil when the interval has no more items.
+func (wci *watchCacheInterval) LoadNext(output *watchCacheEvent) (*watchCacheEvent, error) {
+	return wci.source.LoadNext(output)
 }
 
 type indexerFunc func(int) *watchCacheEvent
@@ -236,6 +244,10 @@ func (s *historyCacheIntervalSource) Next() (*watchCacheEvent, error) {
 	return nil, nil
 }
 
+func (s *historyCacheIntervalSource) LoadNext(output *watchCacheEvent) (*watchCacheEvent, error) {
+	return s.Next()
+}
+
 func (s *historyCacheIntervalSource) fillBuffer() {
 	s.buffer.startIndex = 0
 	s.buffer.endIndex = 0
@@ -263,6 +275,10 @@ func (s *snapshotCacheIntervalSource) Next() (*watchCacheEvent, error) {
 	return event, nil
 }
 
+func (s *snapshotCacheIntervalSource) LoadNext(output *watchCacheEvent) (*watchCacheEvent, error) {
+	return s.Next()
+}
+
 // lazySnapshotCacheIntervalSource serves events from an immutable snapshot.
 // The snapshot reference is captured under the watchCache lock, but the O(N)
 // traversal that materializes the events is deferred until the first Next()
@@ -280,7 +296,7 @@ type lazySnapshotCacheIntervalSource struct {
 	currentIndex int
 }
 
-func (s *lazySnapshotCacheIntervalSource) Next() (*watchCacheEvent, error) {
+func (s *lazySnapshotCacheIntervalSource) NextElement() (*store.Element, error) {
 	if !s.loaded {
 		items, err := s.snapshot.OrderedListPrefix("", "")
 		if err != nil {
@@ -297,7 +313,35 @@ func (s *lazySnapshotCacheIntervalSource) Next() (*watchCacheEvent, error) {
 		return nil, fmt.Errorf("not a storeElement: %v", s.items[s.currentIndex])
 	}
 	s.currentIndex++
+	return elem, nil
+}
+
+func (s *lazySnapshotCacheIntervalSource) Next() (*watchCacheEvent, error) {
+	elem, err := s.NextElement()
+	if err != nil {
+		return nil, err
+	}
+	if elem == nil {
+		return nil, nil
+	}
 	return storeElementToWatchCacheEvent(elem, s.resourceVersion), nil
+}
+
+func (s *lazySnapshotCacheIntervalSource) LoadNext(output *watchCacheEvent) (*watchCacheEvent, error) {
+	elem, err := s.NextElement()
+	if err != nil {
+		return nil, err
+	}
+	if elem == nil {
+		return nil, nil
+	}
+	output.Type = watch.Added
+	output.Object = elem.Object
+	output.ObjLabels = elem.Labels
+	output.ObjFields = elem.Fields
+	output.Key = elem.Key
+	output.ResourceVersion = s.resourceVersion
+	return output, nil
 }
 
 const bufferSize = 100
