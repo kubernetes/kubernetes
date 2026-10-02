@@ -37,8 +37,13 @@ type NodePorts struct {
 
 var _ fwk.PreFilterPlugin = &NodePorts{}
 var _ fwk.FilterPlugin = &NodePorts{}
+var _ fwk.NodeLocalFilterPlugin = &NodePorts{}
 var _ fwk.EnqueueExtensions = &NodePorts{}
 var _ fwk.SignPlugin = &NodePorts{}
+
+func (pl *NodePorts) IsNodeLocal() bool {
+	return true
+}
 
 const (
 	// Name is the name of the plugin used in the plugin registry and configurations.

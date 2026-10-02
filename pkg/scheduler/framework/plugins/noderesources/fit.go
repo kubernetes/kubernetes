@@ -43,11 +43,16 @@ import (
 
 var _ fwk.PreFilterPlugin = &Fit{}
 var _ fwk.FilterPlugin = &Fit{}
+var _ fwk.NodeLocalFilterPlugin = &Fit{}
 var _ fwk.EnqueueExtensions = &Fit{}
 var _ fwk.PreScorePlugin = &Fit{}
 var _ fwk.ScorePlugin = &Fit{}
 var _ fwk.SignPlugin = &Fit{}
 var _ fwk.PlacementScorePlugin = &Fit{}
+
+func (f *Fit) IsNodeLocal() bool {
+	return true
+}
 
 const (
 	// Name is the name of the plugin used in the plugin registry and configurations.

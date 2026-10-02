@@ -1730,3 +1730,122 @@ func TestPodGroupPreemptionEvaluationDurationMetric(t *testing.T) {
 		})
 	}
 }
+
+type trackingFilter struct {
+	name            string
+	isNodeLocal     bool
+	evalCountByNode map[string]int
+}
+
+var _ fwk.NodeLocalFilterPlugin = &trackingFilter{}
+
+func (f *trackingFilter) Name() string      { return f.name }
+func (f *trackingFilter) IsNodeLocal() bool { return f.isNodeLocal }
+func (f *trackingFilter) Filter(_ context.Context, _ fwk.CycleState, _ *v1.Pod, nodeInfo fwk.NodeInfo) *fwk.Status {
+	f.evalCountByNode[nodeInfo.Node().Name]++
+	return fwk.NewStatus(fwk.Success)
+}
+
+func TestPodGroupEvaluator_ReprieveNodeLocalFilters(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GenericWorkload, true)
+	logger, ctx := ktesting.NewTestContext(t)
+
+	nodeLocalPlugin := &trackingFilter{
+		name:            "TrackingNodeLocalFilter",
+		isNodeLocal:     true,
+		evalCountByNode: make(map[string]int),
+	}
+	crossNodePlugin := &trackingFilter{
+		name:            "TrackingCrossNodeFilter",
+		isNodeLocal:     false,
+		evalCountByNode: make(map[string]int),
+	}
+
+	nodes := []*v1.Node{
+		st.MakeNode().Name("node1").Obj(),
+		st.MakeNode().Name("node2").Obj(),
+		st.MakeNode().Name("node3").Obj(),
+	}
+	initPods := []*v1.Pod{
+		st.MakePod().Name("v3").UID("v3").Node("node3").Priority(lowPriority).Obj(),
+	}
+	preemptorPods := []*v1.Pod{
+		st.MakePod().Name("p-a").UID("p-a").Priority(highPriority).Obj(),
+		st.MakePod().Name("p-b").UID("p-b").Priority(highPriority).Obj(),
+		st.MakePod().Name("p-c").UID("p-c").Priority(highPriority).Obj(),
+	}
+	preemptorPGInfo := newTestPodGroupInfo(
+		st.MakePodGroup().Name("preemptor-pg").Priority(highPriority).BasicPolicy().Obj(),
+		nil,
+		preemptorPods,
+	)
+
+	registeredPlugins := []tf.RegisterPluginFunc{
+		tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+		tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+		tf.RegisterFilterPlugin(nodeLocalPlugin.Name(), func(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
+			return nodeLocalPlugin, nil
+		}),
+		tf.RegisterFilterPlugin(crossNodePlugin.Name(), func(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
+			return crossNodePlugin, nil
+		}),
+	}
+
+	snapshot := internalcache.NewTestSnapshotWithPodGroups(initPods, nodes, nil, nil)
+	informerFactory := informers.NewSharedInformerFactory(clientsetfake.NewClientset(), 0)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	fh, err := tf.NewFramework(
+		ctx,
+		registeredPlugins, "",
+		frameworkruntime.WithPodNominator(internalqueue.NewSchedulingQueue(nil, informerFactory)),
+		frameworkruntime.WithInformerFactory(informerFactory),
+		frameworkruntime.WithParallelism(parallelize.DefaultParallelism),
+		frameworkruntime.WithSnapshotSharedLister(snapshot),
+		frameworkruntime.WithMutableSnapshotLister(snapshot),
+		frameworkruntime.WithLogger(logger),
+		frameworkruntime.WithPreemptionManager(func(fh fwk.Handle) fwk.PreemptionManager {
+			return NewPreemptionManager(fh, feature.NewSchedulerFeaturesFromGates(utilfeature.DefaultFeatureGate))
+		}),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	evaluator := &PodGroupEvaluator{
+		Handle: fh,
+	}
+
+	targetNodes := []string{"node1", "node2", "node3"}
+	mockSchedulingFunc := func(ctx context.Context) (*fwk.PodGroupAssignments, *fwk.Status) {
+		var assignments []fwk.ProposedAssignment
+		for i, p := range preemptorPods {
+			assignments = append(assignments, &mockProposedAssignment{
+				pod:        p,
+				nodeName:   targetNodes[i],
+				cycleState: framework.NewCycleState(),
+			})
+		}
+		return &fwk.PodGroupAssignments{ProposedAssignments: assignments}, fwk.NewStatus(fwk.Success)
+	}
+
+	if err := fh.MutableSnapshotSharedLister().StartMutations(); err != nil {
+		t.Fatal(err)
+	}
+	_, status := evaluator.Preempt(ctx, preemptorPGInfo, mockSchedulingFunc)
+	if err := fh.MutableSnapshotSharedLister().EndMutations(); err != nil {
+		t.Fatal(err)
+	}
+	if !status.IsSuccess() {
+		t.Fatalf("expected success status, got %v", status)
+	}
+
+	wantNodeLocalEvals := map[string]int{"node1": 1, "node2": 1, "node3": 2}
+	if diff := cmp.Diff(wantNodeLocalEvals, nodeLocalPlugin.evalCountByNode); diff != "" {
+		t.Errorf("unexpected nodeLocalPlugin evalCountByNode (-want +got):\n%s", diff)
+	}
+	wantCrossNodeEvals := map[string]int{"node1": 1, "node2": 1, "node3": 1}
+	if diff := cmp.Diff(wantCrossNodeEvals, crossNodePlugin.evalCountByNode); diff != "" {
+		t.Errorf("unexpected crossNodePlugin evalCountByNode (-want +got):\n%s", diff)
+	}
+}

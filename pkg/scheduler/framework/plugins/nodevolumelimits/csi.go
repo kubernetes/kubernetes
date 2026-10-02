@@ -75,8 +75,13 @@ type CSILimits struct {
 
 var _ fwk.PreFilterPlugin = &CSILimits{}
 var _ fwk.FilterPlugin = &CSILimits{}
+var _ fwk.NodeLocalFilterPlugin = &CSILimits{}
 var _ fwk.EnqueueExtensions = &CSILimits{}
 var _ fwk.SignPlugin = &CSILimits{}
+
+func (pl *CSILimits) IsNodeLocal() bool {
+	return true
+}
 
 // CSIName is the name of the plugin used in the plugin registry and configurations.
 const CSIName = names.NodeVolumeLimits
