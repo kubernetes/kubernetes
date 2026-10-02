@@ -51,6 +51,7 @@ import (
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
+	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/helper"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
@@ -95,6 +96,8 @@ type stateData struct {
 
 	// Allocator handles claims with structured parameters, which is all of them nowadays.
 	allocator structured.Allocator
+
+	extraNodeAllocatableResources *framework.ExtraNodeAllocatableResourcesState
 
 	// mutex must be locked while accessing any of the fields below.
 	mutex sync.Mutex
@@ -170,9 +173,6 @@ type nodeAllocation struct {
 	// containerResourceRequestMappings has the container, extended resource, and device request mappings
 	// calculated at the Filter phase, and used at the PreBind phase.
 	containerResourceRequestMappings []v1.ContainerExtendedResourceRequest
-	// extraNodeAllocatableResources stores the calculated node allocatable resource allocations through DRA.
-	// This is populated during Filter stage and passed to PreBind.
-	extraNodeAllocatableResources []v1.ExtraNodeAllocatableResource
 }
 
 // DynamicResources is a plugin that ensures that ResourceClaims are allocated.
@@ -604,6 +604,10 @@ func (pl *DynamicResources) PreFilter(ctx context.Context, state fwk.CycleState,
 		return nil, fwk.NewStatus(fwk.Skip)
 	}
 
+	if pl.fts.EnableDRANodeAllocatableResources {
+		s.extraNodeAllocatableResources = framework.GetOrCreateExtraNodeAllocatableResourcesState(state)
+	}
+
 	// Counts all claims which the scheduler needs to allocate itself.
 	numClaimsToAllocate := 0
 	s.informationsForClaim = make([]informationForClaim, claims.len())
@@ -938,6 +942,9 @@ func (pl *DynamicResources) Filter(ctx context.Context, cs fwk.CycleState, pod *
 
 	logger := klog.FromContext(ctx)
 	node := nodeInfo.Node()
+	if pl.fts.EnableDRANodeAllocatableResources && state.extraNodeAllocatableResources != nil {
+		state.extraNodeAllocatableResources.Set(node.Name, Name, nil)
+	}
 	nodeExtendedResourceClaim, containerResourceRequestMappings, status := pl.filterExtendedResources(state, pod, nodeInfo, logger)
 	if status != nil {
 		return status
@@ -1084,7 +1091,7 @@ func (pl *DynamicResources) Filter(ctx context.Context, cs fwk.CycleState, pod *
 		}
 	}
 
-	if pl.fts.EnableDRANodeAllocatableResources {
+	if pl.fts.EnableDRANodeAllocatableResources && len(unavailableClaims) == 0 {
 		var status *fwk.Status
 		extraResources, status = pl.calculateAndCheckNodeAllocatableResources(ctx, state, pod, nodeInfo, allocationsMap)
 		if status != nil {
@@ -1093,7 +1100,7 @@ func (pl *DynamicResources) Filter(ctx context.Context, cs fwk.CycleState, pod *
 	}
 
 	// Store information in state while holding the mutex.
-	if state.allocator != nil || len(unavailableClaims) > 0 || len(extraResources) > 0 {
+	if state.allocator != nil || len(unavailableClaims) > 0 {
 		state.mutex.Lock()
 		defer state.mutex.Unlock()
 	}
@@ -1113,13 +1120,16 @@ func (pl *DynamicResources) Filter(ctx context.Context, cs fwk.CycleState, pod *
 		return statusUnschedulable(logger, "resourceclaim not available on the node", "pod", klog.KObj(pod))
 	}
 
-	if state.allocator != nil || len(extraResources) > 0 {
+	if state.allocator != nil {
 		state.nodeAllocations[node.Name] = nodeAllocation{
 			allocationResults:                allocations,
 			extendedResourceClaim:            nodeExtendedResourceClaim,
 			containerResourceRequestMappings: containerResourceRequestMappings,
-			extraNodeAllocatableResources:    extraResources,
 		}
+	}
+
+	if pl.fts.EnableDRANodeAllocatableResources && state.extraNodeAllocatableResources != nil && len(extraResources) > 0 {
+		state.extraNodeAllocatableResources.Set(node.Name, Name, extraResources)
 	}
 
 	return nil
@@ -1607,11 +1617,8 @@ func (pl *DynamicResources) Unreserve(ctx context.Context, cs fwk.CycleState, po
 	}
 	pl.unreserveExtendedResourceClaim(ctx, pod, state)
 
-	if pl.fts.EnableDRANodeAllocatableResources {
-		nodeAllocations, ok := state.nodeAllocations[nodeName]
-		if ok && len(nodeAllocations.extraNodeAllocatableResources) > 0 {
-			pl.clearExtraNodeAllocatableResources(ctx, pod)
-		}
+	if pl.fts.EnableDRANodeAllocatableResources && state.extraNodeAllocatableResources.Has(nodeName) {
+		pl.clearExtraNodeAllocatableResources(ctx, pod)
 	}
 }
 
@@ -1651,9 +1658,8 @@ func (pl *DynamicResources) PreBind(ctx context.Context, cs fwk.CycleState, pod 
 	}
 
 	if pl.fts.EnableDRANodeAllocatableResources {
-		nodeAllocations, ok := state.nodeAllocations[nodeName]
-		if ok && len(nodeAllocations.extraNodeAllocatableResources) > 0 {
-			if status := pl.patchExtraNodeAllocatableResources(ctx, pod, nodeAllocations.extraNodeAllocatableResources, state.claims.extendedResourceClaim()); status != nil {
+		if extraResources := state.extraNodeAllocatableResources.Get(nodeName); len(extraResources) > 0 {
+			if status := pl.patchExtraNodeAllocatableResources(ctx, pod, extraResources, state.claims.extendedResourceClaim()); status != nil {
 				return status
 			}
 		}
