@@ -37,59 +37,78 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
-type RequestType string
+type KeyScope string
 
 const (
-	RequestTypeCreate                 RequestType = "Create"
-	RequestTypeDelete                 RequestType = "Delete"
-	RequestTypeDeleteUIDPrecondition  RequestType = "DeleteUIDPrecondition"
-	RequestTypeDeleteRVPrecondition   RequestType = "DeleteRVPrecondition"
-	RequestTypeGet                    RequestType = "Get"
-	RequestTypeGetIgnoreNotFound      RequestType = "GetIgnoreNotFound"
-	RequestTypeList                   RequestType = "List"
-	RequestTypeListNamespace          RequestType = "ListNamespace"
-	RequestTypeListNonRecursive       RequestType = "ListNonRecursive"
-	RequestTypeListRVZero             RequestType = "ListRVZero"
-	RequestTypeListRVNotOlderThan     RequestType = "ListRVNotOlderThan"
-	RequestTypeListRVExact            RequestType = "ListRVExact"
-	RequestTypeUpdate                 RequestType = "Update"
-	RequestTypeUpdateUIDPrecondition  RequestType = "UpdateUIDPrecondition"
-	RequestTypeUpdateRVPrecondition   RequestType = "UpdateRVPrecondition"
-	RequestTypeUpdateNoOp             RequestType = "UpdateNoOp"
-	RequestTypeUpdateWithCachedObject RequestType = "UpdateWithCachedObject"
-	RequestTypeUpdateIgnoreNotFound   RequestType = "UpdateIgnoreNotFound"
+	ScopeCluster   KeyScope = "Cluster"
+	ScopeNamespace KeyScope = "Namespace"
+	ScopeObject    KeyScope = "Object"
 )
 
-// WatchRequestType selects the resource version a watch starts from.
-type WatchRequestType string
+type RVType string
 
 const (
-	RVEmpty   WatchRequestType = "RVEmpty"
-	RVZero    WatchRequestType = "RVZero"
-	RVOne     WatchRequestType = "RVOne"
-	RVCurrent WatchRequestType = "RVCurrent"
-	RVPast    WatchRequestType = "RVPast"
-	RVFuture  WatchRequestType = "RVFuture"
-
-	WatchListRVEmpty   WatchRequestType = "WatchListRVEmpty"
-	WatchListRVZero    WatchRequestType = "WatchListRVZero"
-	WatchListRVCurrent WatchRequestType = "WatchListRVCurrent"
-	WatchListRVPast    WatchRequestType = "WatchListRVPast"
+	RVEmpty   RVType = "Empty"
+	RVZero    RVType = "Zero"
+	RVOne     RVType = "One"
+	RVCached  RVType = "Cached"
+	RVCurrent RVType = "Current"
+	RVPast    RVType = "Past"
+	RVFuture  RVType = "Future"
 )
+
+type RequestDistribution struct {
+	Op     []ChoiceWeight[correctness.OpType]
+	Get    GetDistribution
+	List   ListDistribution
+	Update UpdateDistribution
+	Delete DeleteDistribution
+}
+
+type GetDistribution struct {
+	IgnoreNotFound []ChoiceWeight[bool]
+}
+
+type ListDistribution struct {
+	Scope                []ChoiceWeight[KeyScope]
+	ResourceVersion      []ChoiceWeight[RVType]
+	ResourceVersionMatch []ChoiceWeight[metav1.ResourceVersionMatch]
+}
+
+type UpdateDistribution struct {
+	Preconditions  PreconditionsDistribution
+	NoOp           []ChoiceWeight[bool]
+	CachedObject   []ChoiceWeight[bool]
+	IgnoreNotFound []ChoiceWeight[bool]
+}
+
+type DeleteDistribution struct {
+	Preconditions PreconditionsDistribution
+}
+
+type PreconditionsDistribution struct {
+	UID             []ChoiceWeight[bool]
+	ResourceVersion []ChoiceWeight[bool]
+}
+
+type WatchDistribution struct {
+	SendInitialEvents []ChoiceWeight[bool]
+	ResourceVersion   []ChoiceWeight[RVType]
+}
 
 type UnaryConfig struct {
 	Concurrency         int
 	MaxOperations       int
 	Namespaces          int
 	Objects             int
-	RequestDistribution []ChoiceWeight[RequestType]
+	RequestDistribution RequestDistribution
 }
 
 type WatchConfig struct {
 	Concurrency         int
 	Duration            time.Duration
 	MaxEvents           int
-	RequestDistribution []ChoiceWeight[WatchRequestType]
+	RequestDistribution WatchDistribution
 }
 
 func generateKeys(cfg UnaryConfig) []types.NamespacedName {
@@ -120,7 +139,7 @@ func RunUnaryTraffic(ctx context.Context, store storage.Interface, cfg UnaryConf
 	if cfg.Namespaces <= 0 {
 		return nil, fmt.Errorf("namespaces must be positive")
 	}
-	if len(cfg.RequestDistribution) == 0 {
+	if len(cfg.RequestDistribution.Op) == 0 {
 		return nil, fmt.Errorf("operations must be non-empty")
 	}
 	if cfg.MaxOperations <= 0 {
@@ -208,12 +227,11 @@ func RunWatchTraffic(ctx context.Context, store storage.Interface, cfg WatchConf
 	return watches
 }
 
-func randomRequest(keys []types.NamespacedName, ops []ChoiceWeight[RequestType], cached runtime.Object) *correctness.Request {
-	selectedOp := PickRandom(ops)
+func randomRequest(keys []types.NamespacedName, dist RequestDistribution, cached runtime.Object) *correctness.Request {
 	key := keys[rand.Intn(len(keys))]
 
-	switch selectedOp {
-	case RequestTypeCreate:
+	switch selectedOp := PickRandom(dist.Op); selectedOp {
+	case correctness.OpCreate:
 		obj := validPod(key.Namespace, key.Name)
 		obj.UID = uuid.NewUUID()
 		return &correctness.Request{
@@ -223,213 +241,127 @@ func randomRequest(keys []types.NamespacedName, ops []ChoiceWeight[RequestType],
 				Object: obj,
 			},
 		}
-	case RequestTypeDelete:
-		return &correctness.Request{
-			Op:  correctness.OpDelete,
-			Key: storageKey(key),
-		}
-	case RequestTypeDeleteUIDPrecondition:
-		if cached == nil {
+	case correctness.OpDelete:
+		preconditions, ok := pickPreconditions(dist.Delete.Preconditions, cached)
+		if !ok {
 			return nil
 		}
-		accessor, err := meta.Accessor(cached)
-		if err != nil {
-			panic(err)
-		}
-		uid := accessor.GetUID()
 		return &correctness.Request{
 			Op:  correctness.OpDelete,
 			Key: storageKey(key),
 			Delete: correctness.DeleteRequest{
-				Preconditions: &storage.Preconditions{UID: &uid},
+				Preconditions: preconditions,
 			},
 		}
-	case RequestTypeDeleteRVPrecondition:
-		if cached == nil {
-			return nil
-		}
-		accessor, err := meta.Accessor(cached)
-		if err != nil {
-			panic(err)
-		}
-		rv := accessor.GetResourceVersion()
-		return &correctness.Request{
-			Op:  correctness.OpDelete,
-			Key: storageKey(key),
-			Delete: correctness.DeleteRequest{
-				Preconditions: &storage.Preconditions{ResourceVersion: &rv},
-			},
-		}
-	case RequestTypeGet:
-		return &correctness.Request{
-			Op:  correctness.OpGet,
-			Key: storageKey(key),
-		}
-	case RequestTypeGetIgnoreNotFound:
+	case correctness.OpGet:
 		return &correctness.Request{
 			Op:  correctness.OpGet,
 			Key: storageKey(key),
 			Get: correctness.GetRequest{
-				Options: storage.GetOptions{IgnoreNotFound: true},
+				Options: storage.GetOptions{IgnoreNotFound: PickRandom(dist.Get.IgnoreNotFound)},
 			},
 		}
-	case RequestTypeList:
+	case correctness.OpList:
+		opts := storage.ListOptions{Predicate: storage.Everything}
+		var listKey string
+		switch scope := PickRandom(dist.List.Scope); scope {
+		case ScopeCluster:
+			listKey, opts.Recursive = "/pods/", true
+		case ScopeNamespace:
+			listKey, opts.Recursive = "/pods/"+key.Namespace, true
+		case ScopeObject:
+			listKey, opts.Recursive = storageKey(key), false
+		default:
+			panic(fmt.Sprintf("%v: unknown list scope", scope))
+		}
+		switch rvType := PickRandom(dist.List.ResourceVersion); rvType {
+		case RVEmpty:
+		case RVZero:
+			opts.ResourceVersion = "0"
+			opts.ResourceVersionMatch = PickRandom(dist.List.ResourceVersionMatch)
+			if opts.ResourceVersionMatch == metav1.ResourceVersionMatchExact {
+				return nil
+			}
+		case RVCached:
+			if cached == nil {
+				return nil
+			}
+			accessor, err := meta.Accessor(cached)
+			if err != nil {
+				panic(err)
+			}
+			opts.ResourceVersion = accessor.GetResourceVersion()
+			opts.ResourceVersionMatch = PickRandom(dist.List.ResourceVersionMatch)
+		default:
+			panic(fmt.Sprintf("%v: unknown list RVType", rvType))
+		}
 		return &correctness.Request{
-			Op:  correctness.OpList,
-			Key: "/pods/",
-			List: correctness.ListRequest{
-				Options: storage.ListOptions{Predicate: storage.Everything, Recursive: true},
-			},
+			Op:   correctness.OpList,
+			Key:  listKey,
+			List: correctness.ListRequest{Options: opts},
 		}
-	case RequestTypeListNamespace:
-		return &correctness.Request{
-			Op:  correctness.OpList,
-			Key: "/pods/" + key.Namespace,
-			List: correctness.ListRequest{
-				Options: storage.ListOptions{Predicate: storage.Everything, Recursive: true},
-			},
-		}
-	case RequestTypeListNonRecursive:
-		return &correctness.Request{
-			Op:  correctness.OpList,
-			Key: storageKey(key),
-			List: correctness.ListRequest{
-				Options: storage.ListOptions{Predicate: storage.Everything},
-			},
-		}
-	case RequestTypeListRVZero:
-		return &correctness.Request{
-			Op:  correctness.OpList,
-			Key: "/pods/",
-			List: correctness.ListRequest{
-				Options: storage.ListOptions{
-					Predicate:       storage.Everything,
-					Recursive:       true,
-					ResourceVersion: "0",
-				},
-			},
-		}
-	case RequestTypeListRVNotOlderThan:
-		if cached == nil {
+	case correctness.OpUpdate:
+		preconditions, ok := pickPreconditions(dist.Update.Preconditions, cached)
+		if !ok {
 			return nil
 		}
-		accessor, err := meta.Accessor(cached)
-		if err != nil {
-			panic(err)
-		}
-		return &correctness.Request{
-			Op:  correctness.OpList,
-			Key: "/pods/",
-			List: correctness.ListRequest{
-				Options: storage.ListOptions{
-					Predicate:            storage.Everything,
-					Recursive:            true,
-					ResourceVersion:      accessor.GetResourceVersion(),
-					ResourceVersionMatch: metav1.ResourceVersionMatchNotOlderThan,
-				},
-			},
-		}
-	case RequestTypeListRVExact:
-		if cached == nil {
+		useCached := PickRandom(dist.Update.CachedObject)
+		if useCached && cached == nil {
 			return nil
 		}
-		accessor, err := meta.Accessor(cached)
-		if err != nil {
-			panic(err)
-		}
-		return &correctness.Request{
-			Op:  correctness.OpList,
-			Key: "/pods/",
-			List: correctness.ListRequest{
-				Options: storage.ListOptions{
-					Predicate:            storage.Everything,
-					Recursive:            true,
-					ResourceVersion:      accessor.GetResourceVersion(),
-					ResourceVersionMatch: metav1.ResourceVersionMatchExact,
-				},
-			},
-		}
-	case RequestTypeUpdate:
-		return &correctness.Request{
-			Op:  correctness.OpUpdate,
-			Key: storageKey(key),
-			Update: correctness.UpdateRequest{
-				IgnoreNotFound: false,
-				UpdateFunc:     randomUpdate(key),
-			},
-		}
-	case RequestTypeUpdateUIDPrecondition:
-		if cached == nil {
+		ignoreNotFound := PickRandom(dist.Update.IgnoreNotFound)
+		noOp := PickRandom(dist.Update.NoOp)
+		if ignoreNotFound && noOp {
 			return nil
 		}
-		accessor, err := meta.Accessor(cached)
-		if err != nil {
-			panic(err)
+		var cachedExisting runtime.Object
+		if useCached {
+			cachedExisting = cached.DeepCopyObject()
 		}
-		uid := accessor.GetUID()
-		return &correctness.Request{
-			Op:  correctness.OpUpdate,
-			Key: storageKey(key),
-			Update: correctness.UpdateRequest{
-				IgnoreNotFound: false,
-				Preconditions:  &storage.Preconditions{UID: &uid},
-				UpdateFunc:     randomUpdate(key),
-			},
-		}
-	case RequestTypeUpdateRVPrecondition:
-		if cached == nil {
-			return nil
-		}
-		accessor, err := meta.Accessor(cached)
-		if err != nil {
-			panic(err)
-		}
-		rv := accessor.GetResourceVersion()
-		return &correctness.Request{
-			Op:  correctness.OpUpdate,
-			Key: storageKey(key),
-			Update: correctness.UpdateRequest{
-				IgnoreNotFound: false,
-				Preconditions:  &storage.Preconditions{ResourceVersion: &rv},
-				UpdateFunc:     randomUpdate(key),
-			},
-		}
-	case RequestTypeUpdateNoOp:
-		return &correctness.Request{
-			Op:  correctness.OpUpdate,
-			Key: storageKey(key),
-			Update: correctness.UpdateRequest{
-				IgnoreNotFound: false,
-				UpdateFunc: storage.SimpleUpdate(func(obj runtime.Object) (runtime.Object, error) {
-					return obj.(*api.Pod).DeepCopy(), nil
-				}),
-			},
-		}
-	case RequestTypeUpdateWithCachedObject:
-		if cached == nil {
-			return nil
+		updateFn := randomUpdate(key)
+		if noOp {
+			updateFn = storage.SimpleUpdate(func(obj runtime.Object) (runtime.Object, error) {
+				return obj.(*api.Pod).DeepCopy(), nil
+			})
 		}
 		return &correctness.Request{
 			Op:  correctness.OpUpdate,
 			Key: storageKey(key),
 			Update: correctness.UpdateRequest{
-				IgnoreNotFound:       false,
-				CachedExistingObject: cached.DeepCopyObject(),
-				UpdateFunc:           randomUpdate(key),
-			},
-		}
-	case RequestTypeUpdateIgnoreNotFound:
-		return &correctness.Request{
-			Op:  correctness.OpUpdate,
-			Key: storageKey(key),
-			Update: correctness.UpdateRequest{
-				IgnoreNotFound: true,
-				UpdateFunc:     randomUpdate(key),
+				IgnoreNotFound:       ignoreNotFound,
+				Preconditions:        preconditions,
+				CachedExistingObject: cachedExisting,
+				UpdateFunc:           updateFn,
 			},
 		}
 	default:
 		panic(fmt.Sprintf("%v: unknown operation", selectedOp))
 	}
+}
+
+func pickPreconditions(dist PreconditionsDistribution, cached runtime.Object) (*storage.Preconditions, bool) {
+	useUID := PickRandom(dist.UID)
+	useRV := PickRandom(dist.ResourceVersion)
+	if !useUID && !useRV {
+		return nil, true
+	}
+	if cached == nil {
+		return nil, false
+	}
+	accessor, err := meta.Accessor(cached)
+	if err != nil {
+		panic(err)
+	}
+	var p storage.Preconditions
+	if useUID {
+		uid := accessor.GetUID()
+		p.UID = &uid
+	}
+	if useRV {
+		rv := accessor.GetResourceVersion()
+		p.ResourceVersion = &rv
+	}
+	return &p, true
 }
 
 func storageKey(key types.NamespacedName) string {
@@ -484,10 +416,14 @@ func runTraffic(ctx context.Context, store storage.Interface, request *correctne
 	return response
 }
 
-func randomWatchRequest(ctx context.Context, store storage.Interface, distribution []ChoiceWeight[WatchRequestType]) correctness.WatchRequest {
+func randomWatchRequest(ctx context.Context, store storage.Interface, distribution WatchDistribution) correctness.WatchRequest {
 	var rv string
-	watchList := false
-	switch selected := PickRandom(distribution); selected {
+	watchList := PickRandom(distribution.SendInitialEvents)
+	selected := PickRandom(distribution.ResourceVersion)
+	for watchList && selected == RVFuture {
+		selected = PickRandom(distribution.ResourceVersion)
+	}
+	switch selected {
 	case RVEmpty:
 		rv = ""
 	case RVZero:
@@ -500,14 +436,6 @@ func randomWatchRequest(ctx context.Context, store storage.Interface, distributi
 		rv = relativeRV(ctx, store, -int64(1+rand.Intn(10)))
 	case RVFuture:
 		rv = relativeRV(ctx, store, int64(1+rand.Intn(10)))
-	case WatchListRVEmpty:
-		rv, watchList = "", true
-	case WatchListRVZero:
-		rv, watchList = "0", true
-	case WatchListRVCurrent:
-		rv, watchList = relativeRV(ctx, store, 0), true
-	case WatchListRVPast:
-		rv, watchList = relativeRV(ctx, store, -int64(1+rand.Intn(10))), true
 	default:
 		panic(fmt.Sprintf("%v: unknown watch request type", selected))
 	}

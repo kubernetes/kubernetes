@@ -27,6 +27,7 @@ import (
 
 	"github.com/anishathalye/porcupine"
 	"github.com/stretchr/testify/require"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
@@ -36,61 +37,74 @@ import (
 )
 
 var (
-	requestDistribution = []ChoiceWeight[RequestType]{{
-		Choice: RequestTypeCreate,
-		Weight: 15,
-	}, {
-		Choice: RequestTypeDelete,
-		Weight: 10,
-	}, {
-		Choice: RequestTypeDeleteUIDPrecondition,
-		Weight: 5,
-	}, {
-		Choice: RequestTypeDeleteRVPrecondition,
-		Weight: 5,
-	}, {
-		Choice: RequestTypeGet,
-		Weight: 5,
-	}, {
-		Choice: RequestTypeGetIgnoreNotFound,
-		Weight: 5,
-	}, {
-		Choice: RequestTypeList,
-		Weight: 5,
-	}, {
-		Choice: RequestTypeListNamespace,
-		Weight: 5,
-	}, {
-		Choice: RequestTypeListNonRecursive,
-		Weight: 5,
-	}, {
-		Choice: RequestTypeListRVZero,
-		Weight: 5,
-	}, {
-		Choice: RequestTypeListRVNotOlderThan,
-		Weight: 5,
-	}, {
-		Choice: RequestTypeListRVExact,
-		Weight: 5,
-	}, {
-		Choice: RequestTypeUpdate,
-		Weight: 10,
-	}, {
-		Choice: RequestTypeUpdateUIDPrecondition,
-		Weight: 5,
-	}, {
-		Choice: RequestTypeUpdateRVPrecondition,
-		Weight: 5,
-	}, {
-		Choice: RequestTypeUpdateNoOp,
-		Weight: 5,
-	}, {
-		Choice: RequestTypeUpdateWithCachedObject,
-		Weight: 5,
-	}, {
-		Choice: RequestTypeUpdateIgnoreNotFound,
-		Weight: 5,
-	}}
+	requestDistribution = RequestDistribution{
+		Op: []ChoiceWeight[correctness.OpType]{
+			{Choice: correctness.OpCreate, Weight: 15},
+			{Choice: correctness.OpDelete, Weight: 20},
+			{Choice: correctness.OpGet, Weight: 10},
+			{Choice: correctness.OpList, Weight: 25},
+			{Choice: correctness.OpUpdate, Weight: 30},
+		},
+		Delete: DeleteDistribution{
+			Preconditions: PreconditionsDistribution{
+				UID: []ChoiceWeight[bool]{
+					{Choice: false, Weight: 75},
+					{Choice: true, Weight: 25},
+				},
+				ResourceVersion: []ChoiceWeight[bool]{
+					{Choice: false, Weight: 75},
+					{Choice: true, Weight: 25},
+				},
+			},
+		},
+		Get: GetDistribution{
+			IgnoreNotFound: []ChoiceWeight[bool]{
+				{Choice: false, Weight: 50},
+				{Choice: true, Weight: 50},
+			},
+		},
+		List: ListDistribution{
+			Scope: []ChoiceWeight[KeyScope]{
+				{Choice: ScopeCluster, Weight: 50},
+				{Choice: ScopeNamespace, Weight: 25},
+				{Choice: ScopeObject, Weight: 25},
+			},
+			ResourceVersion: []ChoiceWeight[RVType]{
+				{Choice: RVEmpty, Weight: 50},
+				{Choice: RVZero, Weight: 20},
+				{Choice: RVCached, Weight: 30},
+			},
+			ResourceVersionMatch: []ChoiceWeight[metav1.ResourceVersionMatch]{
+				{Choice: "", Weight: 50},
+				{Choice: metav1.ResourceVersionMatchNotOlderThan, Weight: 25},
+				{Choice: metav1.ResourceVersionMatchExact, Weight: 25},
+			},
+		},
+		Update: UpdateDistribution{
+			Preconditions: PreconditionsDistribution{
+				UID: []ChoiceWeight[bool]{
+					{Choice: false, Weight: 80},
+					{Choice: true, Weight: 20},
+				},
+				ResourceVersion: []ChoiceWeight[bool]{
+					{Choice: false, Weight: 80},
+					{Choice: true, Weight: 20},
+				},
+			},
+			NoOp: []ChoiceWeight[bool]{
+				{Choice: false, Weight: 85},
+				{Choice: true, Weight: 15},
+			},
+			CachedObject: []ChoiceWeight[bool]{
+				{Choice: false, Weight: 85},
+				{Choice: true, Weight: 15},
+			},
+			IgnoreNotFound: []ChoiceWeight[bool]{
+				{Choice: false, Weight: 85},
+				{Choice: true, Weight: 15},
+			},
+		},
+	}
 
 	unaryCfg = UnaryConfig{
 		Concurrency:         8,
@@ -100,37 +114,20 @@ var (
 		RequestDistribution: requestDistribution,
 	}
 
-	watchRequestDistribution = []ChoiceWeight[WatchRequestType]{{
-		Choice: RVEmpty,
-		Weight: 15,
-	}, {
-		Choice: RVZero,
-		Weight: 15,
-	}, {
-		Choice: RVOne,
-		Weight: 10,
-	}, {
-		Choice: RVCurrent,
-		Weight: 20,
-	}, {
-		Choice: RVPast,
-		Weight: 20,
-	}, {
-		Choice: RVFuture,
-		Weight: 20,
-	}, {
-		Choice: WatchListRVEmpty,
-		Weight: 10,
-	}, {
-		Choice: WatchListRVZero,
-		Weight: 10,
-	}, {
-		Choice: WatchListRVCurrent,
-		Weight: 10,
-	}, {
-		Choice: WatchListRVPast,
-		Weight: 10,
-	}}
+	watchRequestDistribution = WatchDistribution{
+		SendInitialEvents: []ChoiceWeight[bool]{
+			{Choice: false, Weight: 70},
+			{Choice: true, Weight: 30},
+		},
+		ResourceVersion: []ChoiceWeight[RVType]{
+			{Choice: RVEmpty, Weight: 15},
+			{Choice: RVZero, Weight: 15},
+			{Choice: RVOne, Weight: 10},
+			{Choice: RVCurrent, Weight: 20},
+			{Choice: RVPast, Weight: 20},
+			{Choice: RVFuture, Weight: 20},
+		},
+	}
 
 	watchCfg = WatchConfig{
 		Concurrency:         4,
