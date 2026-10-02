@@ -627,6 +627,22 @@ type CSINodeSpec struct {
 	// +listMapKey=name
 	// +optional
 	Drivers []CSINodeDriver `json:"drivers" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,1,rep,name=drivers"`
+
+	// driverRegistrations lists CSI drivers on this node whose topology and volume
+	// attachment limit are reported by the CSI controller instead of the node.
+	// kubelet adds an entry with the node ID returned by the driver's NodeGetInfo call,
+	// and external-attacher then adds the driver to drivers using ControllerGetNodeInfo.
+	// An entry's nodeID must match the nodeID of the drivers entry with the same name,
+	// if one exists.
+	// This is an alpha field and requires enabling the CSIControllerGetNodeInfo feature gate.
+	// +optional
+	// +k8s:optional
+	// +listType=map
+	// +listMapKey=name
+	// +patchMergeKey=name
+	// +patchStrategy=merge
+	// +featureGate=CSIControllerGetNodeInfo
+	DriverRegistrations []CSINodeDriverRegistration `json:"driverRegistrations,omitempty" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,2,rep,name=driverRegistrations"`
 }
 
 // CSINodeDriver holds information about the specification of one CSI driver installed on a node
@@ -677,6 +693,22 @@ type VolumeNodeResources struct {
 	// If this field is not specified, then the supported number of volumes on this node is unbounded.
 	// +optional
 	Count *int32 `json:"count,omitempty" protobuf:"varint,1,opt,name=count"`
+}
+
+// CSINodeDriverRegistration holds the node ID of a CSI driver whose topology and
+// volume attachment limit are reported by the CSI controller.
+type CSINodeDriverRegistration struct {
+	// name is the name of the CSI driver. This MUST be the same name returned by
+	// the CSI GetPluginName() call for that driver.
+	// +required
+	// +k8s:alpha(since: "1.38")=+k8s:required
+	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
+
+	// nodeID is the ID of the node from the driver's point of view, as returned
+	// by the driver's NodeGetInfo call.
+	// +required
+	// +k8s:alpha(since: "1.38")=+k8s:required
+	NodeID string `json:"nodeID" protobuf:"bytes,2,opt,name=nodeID"`
 }
 
 // StorageHealthStatusType describes the health status category of a storage backend.
