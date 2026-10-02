@@ -39,7 +39,7 @@ var _ = SIGDescribe("PodOSRejection", framework.WithNodeConformance(), func() {
 	ginkgo.Context("Kubelet", func() {
 		ginkgo.It("[LinuxOnly] should reject pod when the node OS doesn't match pod's OS", func(ctx context.Context) {
 			linuxNode, err := findLinuxNode(ctx, f)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to findLinuxNode(ctx, f)")
 			pod := &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "wrong-pod-os",
@@ -61,7 +61,7 @@ var _ = SIGDescribe("PodOSRejection", framework.WithNodeConformance(), func() {
 			pod = e2epod.NewPodClient(f).Create(ctx, pod)
 			// Check the pod is still not running
 			err = e2epod.WaitForPodFailedReason(ctx, f.ClientSet, pod, "PodOSNotSupported", f.Timeouts.PodStartShort)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to e2epod.WaitForPodFailedReason(ctx, f.ClientSet, pod, 'PodOSNotSupported', f.T...")
 		})
 	})
 })

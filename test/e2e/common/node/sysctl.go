@@ -96,21 +96,21 @@ var _ = SIGDescribe("Sysctls [LinuxOnly]", framework.WithNodeConformance(), func
 		// failed pods without running containers. This would create a race as the pod
 		// might have already been deleted here.
 		ev, err := e2epod.NewPodClient(f).WaitForErrorEventOrSuccess(ctx, pod)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to e2epod.NewPodClient(f).WaitForErrorEventOrSuccess(ctx, pod)")
 		gomega.Expect(ev).To(gomega.BeNil())
 
 		ginkgo.By("Waiting for pod completion")
 		err = e2epod.WaitForPodNoLongerRunningInNamespace(ctx, f.ClientSet, pod.Name, f.Namespace.Name)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to e2epod.WaitForPodNoLongerRunningInNamespace(ctx, f.ClientSet, pod.Name, f.Nam...")
 		pod, err = podClient.Get(ctx, pod.Name, metav1.GetOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to podClient.Get(ctx, pod.Name, metav1.GetOptions{})")
 
 		ginkgo.By("Checking that the pod succeeded")
 		gomega.Expect(pod.Status.Phase).To(gomega.Equal(v1.PodSucceeded))
 
 		ginkgo.By("Getting logs from the pod")
 		log, err := e2epod.GetPodLogs(ctx, f.ClientSet, f.Namespace.Name, pod.Name, pod.Spec.Containers[0].Name)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to e2epod.GetPodLogs(ctx, f.ClientSet, f.Namespace.Name, pod.Name, pod.Spec.Cont...")
 
 		ginkgo.By("Checking that the sysctl is actually updated")
 		gomega.Expect(log).To(gomega.ContainSubstring("kernel.shm_rmid_forced = 1"))
@@ -176,7 +176,7 @@ var _ = SIGDescribe("Sysctls [LinuxOnly]", framework.WithNodeConformance(), func
 		ginkgo.By("Wait for pod failed reason")
 		// watch for pod failed reason instead of termination of pod
 		err := e2epod.WaitForPodFailedReason(ctx, f.ClientSet, pod, "SysctlForbidden", f.Timeouts.PodStart)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to e2epod.WaitForPodFailedReason(ctx, f.ClientSet, pod, 'SysctlForbidden', f.Tim...")
 	})
 
 	/*
@@ -206,21 +206,21 @@ var _ = SIGDescribe("Sysctls [LinuxOnly]", framework.WithNodeConformance(), func
 		// failed pods without running containers. This would create a race as the pod
 		// might have already been deleted here.
 		ev, err := e2epod.NewPodClient(f).WaitForErrorEventOrSuccess(ctx, pod)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to e2epod.NewPodClient(f).WaitForErrorEventOrSuccess(ctx, pod)")
 		gomega.Expect(ev).To(gomega.BeNil())
 
 		ginkgo.By("Waiting for pod completion")
 		err = e2epod.WaitForPodNoLongerRunningInNamespace(ctx, f.ClientSet, pod.Name, f.Namespace.Name)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to e2epod.WaitForPodNoLongerRunningInNamespace(ctx, f.ClientSet, pod.Name, f.Nam...")
 		pod, err = podClient.Get(ctx, pod.Name, metav1.GetOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to podClient.Get(ctx, pod.Name, metav1.GetOptions{})")
 
 		ginkgo.By("Checking that the pod succeeded")
 		gomega.Expect(pod.Status.Phase).To(gomega.Equal(v1.PodSucceeded))
 
 		ginkgo.By("Getting logs from the pod")
 		log, err := e2epod.GetPodLogs(ctx, f.ClientSet, f.Namespace.Name, pod.Name, pod.Spec.Containers[0].Name)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to e2epod.GetPodLogs(ctx, f.ClientSet, f.Namespace.Name, pod.Name, pod.Spec.Cont...")
 
 		ginkgo.By("Checking that the sysctl is actually updated")
 		// Note that either "/" or "."  may be used as separators within sysctl variable names.

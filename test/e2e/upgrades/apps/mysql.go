@@ -77,7 +77,7 @@ func mysqlKubectlCreate(ns, file string) {
 
 func (t *MySQLUpgradeTest) getServiceIP(ctx context.Context, f *framework.Framework, ns, svcName string) string {
 	svc, err := f.ClientSet.CoreV1().Services(ns).Get(ctx, svcName, metav1.GetOptions{})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to f.ClientSet.CoreV1().Services(ns).Get(ctx, svcName, metav1.GetOptions{})")
 	ingress := svc.Status.LoadBalancer.Ingress
 	if len(ingress) == 0 {
 		return ""
@@ -114,18 +114,18 @@ func (t *MySQLUpgradeTest) Setup(ctx context.Context, f *framework.Framework) {
 		}
 		return true, nil
 	})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to t.countNames(); err != nil {")
 	framework.Logf("Service endpoint is up")
 
 	ginkgo.By("Adding 2 names to the database")
 	err = t.addName(strconv.Itoa(t.nextWrite))
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to t.addName(strconv.Itoa(t.nextWrite))")
 	err = t.addName(strconv.Itoa(t.nextWrite))
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to t.addName(strconv.Itoa(t.nextWrite))")
 
 	ginkgo.By("Verifying that the 2 names have been inserted")
 	count, err := t.countNames()
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to t.countNames()")
 	gomega.Expect(count).To(gomega.Equal(2))
 }
 
@@ -177,7 +177,7 @@ func (t *MySQLUpgradeTest) Test(ctx context.Context, f *framework.Framework, don
 // Teardown performs one final check of the data's availability.
 func (t *MySQLUpgradeTest) Teardown(ctx context.Context, f *framework.Framework) {
 	count, err := t.countNames()
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to t.countNames()")
 	gomega.Expect(count).To(gomega.BeNumerically(">=", t.successfulWrites), "count is too small")
 }
 

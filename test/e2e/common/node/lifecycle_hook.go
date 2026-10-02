@@ -85,7 +85,7 @@ var _ = SIGDescribe("Container Lifecycle Hook", func() {
 
 		ginkgo.BeforeEach(func(ctx context.Context) {
 			node, err := e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)")
 			targetNode = node.Name
 			nodeSelection := e2epod.NodeSelection{}
 			e2epod.SetAffinity(&nodeSelection, targetNode)
@@ -305,7 +305,7 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Restartable Init Container
 
 		ginkgo.BeforeEach(func(ctx context.Context) {
 			node, err := e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)")
 			targetNode = node.Name
 			nodeSelection := e2epod.NodeSelection{}
 			e2epod.SetAffinity(&nodeSelection, targetNode)
@@ -719,7 +719,7 @@ var _ = SIGDescribe("Lifecycle Sleep Hook", framework.WithNodeConformance(), fun
 			// transition through Terminated. The actual correctness check below uses
 			// the container's intrinsic StartedAt/FinishedAt timestamps and is unaffected
 			// by how long we waited here.
-			framework.ExpectNoError(e2epod.WaitForContainerTerminated(ctx, f.ClientSet, f.Namespace.Name, p.Name, name, f.Timeouts.PodDelete))
+			framework.ExpectNoError(e2epod.WaitForContainerTerminated(ctx, f.ClientSet, f.Namespace.Name, p.Name, name, f.Timeouts.PodDelete), "failed to e2epod.WaitForContainerTerminated(ctx, f.ClientSet, f.Namespace.Name, p.Name,...")
 
 			p, err := podClient.Get(ctx, p.Name, metav1.GetOptions{})
 			if err != nil {

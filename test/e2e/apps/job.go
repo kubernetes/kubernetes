@@ -270,7 +270,7 @@ var _ = SIGDescribe("Job", func() {
 		// volume to persist data across new Pods.
 		ginkgo.By("Looking for a node to schedule job pod")
 		node, err := e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)")
 
 		parallelism := int32(2)
 		completions := int32(4)
@@ -315,7 +315,7 @@ var _ = SIGDescribe("Job", func() {
 
 		ginkgo.By("Looking for a node to schedule job pods")
 		node, err := e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)")
 
 		ginkgo.By("Creating a job")
 		job := e2ejob.NewTestJobOnNode("failOncePerIndex", "fail-pod-ignore-on-exit-code", v1.RestartPolicyNever, parallelism, completions, nil, backoffLimit, node.Name)
@@ -360,7 +360,7 @@ var _ = SIGDescribe("Job", func() {
 
 		ginkgo.By("Looking for a node to schedule job pods")
 		node, err := e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)")
 
 		ginkgo.By("Creating a job")
 		job := e2ejob.NewTestJobOnNode("notTerminateOncePerIndex", "evicted-pod-ignore-on-disruption-condition", v1.RestartPolicyNever, parallelism, completions, nil, backoffLimit, node.Name)
@@ -981,7 +981,7 @@ done`}
 		// and use a hostPath volume to persist data across new Pods.
 		ginkgo.By("Looking for a node to schedule job pod")
 		node, err := e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)")
 
 		parallelism := int32(2)
 		completions := int32(4)
@@ -1055,7 +1055,7 @@ done`}
 		framework.ExpectNoError(err, "failed to ensure active pods == parallelism in namespace: %s", f.Namespace.Name)
 
 		ginkgo.By("delete a job")
-		framework.ExpectNoError(e2eresource.DeleteResourceAndWaitForGC(ctx, f.ClientSet, batchinternal.Kind("Job"), f.Namespace.Name, job.Name))
+		framework.ExpectNoError(e2eresource.DeleteResourceAndWaitForGC(ctx, f.ClientSet, batchinternal.Kind("Job"), f.Namespace.Name, job.Name), "failed to e2eresource.DeleteResourceAndWaitForGC(ctx, f.ClientSet, batchinternal.Kind('...")
 
 		ginkgo.By("Ensuring job was deleted")
 		_, err = e2ejob.GetJob(ctx, f.ClientSet, f.Namespace.Name, job.Name)
@@ -1250,11 +1250,11 @@ done`}
 		}
 
 		jStatusJSON, err := json.Marshal(jStatus)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to json.Marshal(jStatus)")
 		patchedStatus, err := jClient.Patch(ctx, job.Name, types.MergePatchType,
 			[]byte(`{"metadata":{"annotations":{"patchedstatus":"true"}},"status":`+string(jStatusJSON)+`}`),
 			metav1.PatchOptions{}, "status")
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to jClient.Patch(ctx, job.Name, types.MergePatchType,")
 		if condition := findConditionByType(patchedStatus.Status.Conditions, customConditionType); condition != nil {
 			if !condition.LastTransitionTime.Equal(&now1) {
 				framework.Failf("patched object should have the applied condition with LastTransitionTime %#v, got %#v instead", now1, condition.LastTransitionTime)
@@ -1281,7 +1281,7 @@ done`}
 			updatedStatus, err = jClient.UpdateStatus(ctx, statusToUpdate, metav1.UpdateOptions{})
 			return err
 		})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to jClient.UpdateStatus(ctx, statusToUpdate, metav1.UpdateOptions{})")
 		if condition := findConditionByType(updatedStatus.Status.Conditions, customConditionType); condition != nil {
 			if !condition.LastTransitionTime.Equal(&now2) {
 				framework.Failf("patched object should have the applied condition with LastTransitionTime %#v, got %#v instead", now2, condition.LastTransitionTime)
@@ -1293,9 +1293,9 @@ done`}
 		ginkgo.By("get /status")
 		jResource := schema.GroupVersionResource{Group: "batch", Version: "v1", Resource: "jobs"}
 		gottenStatus, err := f.DynamicClient.Resource(jResource).Namespace(ns).Get(ctx, job.Name, metav1.GetOptions{}, "status")
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to f.DynamicClient.Resource(jResource).Namespace(ns).Get(ctx, job.Name, metav1.G...")
 		statusUID, _, err := unstructured.NestedFieldCopy(gottenStatus.Object, "metadata", "uid")
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to unstructured.NestedFieldCopy(gottenStatus.Object, 'metadata', 'uid')")
 		gomega.Expect(string(job.UID)).To(gomega.Equal(statusUID), fmt.Sprintf("job.UID: %v expected to match statusUID: %v ", job.UID, statusUID))
 	})
 
@@ -1493,7 +1493,7 @@ done`}
 
 		ginkgo.By("Looking for a node to schedule job pod")
 		node, err := e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)")
 
 		ginkgo.By("Creating a job with container-level RestartPolicy and PodFailurePolicy")
 		job := e2ejob.NewTestJobOnNode("failOnce", "managed-by", v1.RestartPolicyNever, parallelism, completions, nil, backoffLimit, node.Name)

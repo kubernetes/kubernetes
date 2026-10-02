@@ -412,7 +412,7 @@ func WaitForPodResizeActuation(ctx context.Context, f *framework.Framework, podC
 				}
 			}
 			return nil, nil
-		})),
+		})), "failed to f.ClientSet.CoreV1().Nodes().Get(context.Background(), po...",
 	)
 
 	resizedPod, err := framework.GetObject(podClient.Get, pod.Name, metav1.GetOptions{})(ctx)
@@ -473,13 +473,13 @@ func CheckPodResized(ctx context.Context, f *framework.Framework, resizedPod *v1
 
 func MakeResizePatch(originalContainers, desiredContainers []ResizableContainerInfo, originPodResources, desiredPodResources *v1.ResourceRequirements) []byte {
 	original, err := json.Marshal(MakePodWithResizableContainers("", "", "", originalContainers, originPodResources))
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to json.Marshal(MakePodWithResizableContainers('', '', '', originalContainers, o...")
 
 	desired, err := json.Marshal(MakePodWithResizableContainers("", "", "", desiredContainers, desiredPodResources))
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to json.Marshal(MakePodWithResizableContainers('', '', '', desiredContainers, de...")
 
 	patch, err := strategicpatch.CreateTwoWayMergePatch(original, desired, v1.Pod{})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to strategicpatch.CreateTwoWayMergePatch(original, desired, v1.Pod{})")
 
 	return patch
 }

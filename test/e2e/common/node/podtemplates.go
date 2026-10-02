@@ -209,7 +209,7 @@ var _ = SIGDescribe("PodTemplates", func() {
 			updatedPT, err = ptClient.Update(ctx, ptResource, metav1.UpdateOptions{})
 			return err
 		})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to ptClient.Update(ctx, ptResource, metav1.UpdateOptions{})")
 		gomega.Expect(updatedPT.Annotations).To(gomega.HaveKeyWithValue("updated", "true"), "updated object should have the applied annotation")
 		framework.Logf("Found updated podtemplate annotation: %#v\n", updatedPT.Annotations["updated"])
 	})
