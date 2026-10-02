@@ -59,9 +59,9 @@ import (
 	"k8s.io/client-go/tools/record"
 	remotecommand "k8s.io/client-go/tools/remotecommand"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
+	"k8s.io/ktesting"
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/streaming/pkg/httpstream"
 	"k8s.io/streaming/pkg/httpstream/spdy"
 

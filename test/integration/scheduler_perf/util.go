@@ -40,6 +40,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/informers"
 	coreinformers "k8s.io/client-go/informers/core/v1"
+	"k8s.io/client-go/ktesting"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/component-base/featuregate"
@@ -56,7 +57,6 @@ import (
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 	"k8s.io/kubernetes/test/integration/framework"
 	"k8s.io/kubernetes/test/integration/util"
-	"k8s.io/kubernetes/test/utils/client-go/ktesting"
 )
 
 const (

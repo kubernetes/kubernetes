@@ -39,7 +39,7 @@ import (
 	"k8s.io/client-go/metadata"
 	metadatafake "k8s.io/client-go/metadata/fake"
 	kubetesting "k8s.io/client-go/testing"
-	"k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/ktesting"
 )
 
 func TestIsResourceMigratable(t *testing.T) {

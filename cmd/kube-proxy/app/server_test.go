@@ -43,9 +43,9 @@ import (
 	kubeproxyconfigv1alpha1 "k8s.io/kube-proxy/config/v1alpha1"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/ktesting"
 	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
 	proxymetrics "k8s.io/kubernetes/pkg/proxy/metrics"
-	"k8s.io/kubernetes/test/utils/ktesting"
 	netutils "k8s.io/utils/net"
 )
 

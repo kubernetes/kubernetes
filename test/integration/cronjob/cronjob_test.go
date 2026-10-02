@@ -30,11 +30,11 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	clientbatchv1 "k8s.io/client-go/kubernetes/typed/batch/v1"
 	restclient "k8s.io/client-go/rest"
+	"k8s.io/ktesting"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/controller/cronjob"
 	"k8s.io/kubernetes/pkg/controller/job"
 	"k8s.io/kubernetes/test/integration/framework"
-	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func setup(ctx context.Context, t *testing.T) (kubeapiservertesting.TearDownFunc, *cronjob.ControllerV2, *job.Controller, informers.SharedInformerFactory, clientset.Interface) {

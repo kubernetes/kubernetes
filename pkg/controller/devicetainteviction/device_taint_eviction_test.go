@@ -45,6 +45,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientfeatures "k8s.io/client-go/features"
 	"k8s.io/client-go/informers"
+	"k8s.io/client-go/ktesting"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
@@ -57,7 +58,6 @@ import (
 	controllertestutil "k8s.io/kubernetes/pkg/controller/testutil"
 	"k8s.io/kubernetes/pkg/features"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
-	"k8s.io/kubernetes/test/utils/client-go/ktesting"
 )
 
 func init() {

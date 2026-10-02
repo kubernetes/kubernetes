@@ -43,9 +43,9 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
+	"k8s.io/ktesting/format"
 	apimachineryutils "k8s.io/kubernetes/test/e2e/common/apimachinery"
 	"k8s.io/kubernetes/test/e2e/framework"
-	"k8s.io/kubernetes/test/utils/ktesting/format"
 	"k8s.io/utils/ptr"
 	k8sjson "sigs.k8s.io/json"
 )

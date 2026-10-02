@@ -29,9 +29,9 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"k8s.io/klog/v2"
+	"k8s.io/ktesting"
 	pluginapi "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
 	plugin "k8s.io/kubernetes/pkg/kubelet/cm/devicemanager/plugin/v1beta1"
-	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 // monitorCallback is the function called when a device's health state changes,

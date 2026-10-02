@@ -53,6 +53,7 @@ import (
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/cri-streaming/pkg/streaming/portforward"
 	"k8s.io/cri-streaming/pkg/streaming/remotecommand"
+	"k8s.io/ktesting"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
@@ -67,7 +68,6 @@ import (
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util/hostutil"
 	"k8s.io/kubernetes/pkg/volume/util/subpath"
-	"k8s.io/kubernetes/test/utils/ktesting"
 	netutils "k8s.io/utils/net"
 	"k8s.io/utils/ptr"
 )
