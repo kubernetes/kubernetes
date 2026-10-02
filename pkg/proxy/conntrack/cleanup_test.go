@@ -50,9 +50,11 @@ const (
 	testExternalIP     = "192.168.99.100"
 	testLoadBalancerIP = "1.2.3.4"
 
-	testServingEndpointIP    = "10.240.0.4"
-	testNonServingEndpointIP = "10.240.1.5"
-	testDeletedEndpointIP    = "10.240.2.6"
+	testServingEndpointIP                  = "10.240.0.4"
+	testNonServingEndpointIP               = "10.240.1.5"
+	testDeletedEndpointIP                  = "10.240.2.6"
+	testTerminatingProcessingEndpointIP    = "10.240.3.7"
+	testTerminatingNonProcessingEndpointIP = "10.240.4.8"
 
 	// testOldEndpointPort is used to cover cases when endpoint changes port,
 	// but IP remains same.
@@ -154,6 +156,22 @@ func TestCleanStaleEntries(t *testing.T) {
 				Addresses:  []string{testNonServingEndpointIP},
 				Conditions: discovery.EndpointConditions{Serving: ptr.To(false)},
 			},
+			{
+				Addresses: []string{testTerminatingProcessingEndpointIP},
+				Conditions: discovery.EndpointConditions{
+					Serving:     ptr.To(false),
+					Terminating: ptr.To(true),
+					Processing:  ptr.To(true),
+				},
+			},
+			{
+				Addresses: []string{testTerminatingNonProcessingEndpointIP},
+				Conditions: discovery.EndpointConditions{
+					Serving:     ptr.To(false),
+					Terminating: ptr.To(true),
+					Processing:  ptr.To(false),
+				},
+			},
 		},
 		Ports: []discovery.EndpointPort{
 			{
@@ -227,8 +245,17 @@ func TestCleanStaleEntries(t *testing.T) {
 		t.Fatalf("expected endpointsMap to have 3 entries, got %+v", endpointsMap)
 	}
 	for _, svcPortName := range []proxy.ServicePortName{tcpPortName, udpPortName, sctpPortName} {
-		if len(endpointsMap[svcPortName]) != 2 {
-			t.Fatalf("expected endpointsMap[%q] to have 2 entries, got %+v", svcPortName.String(), endpointsMap[svcPortName])
+		expectedCount := 2
+		if svcPortName.Protocol == v1.ProtocolUDP {
+			expectedCount = 3
+		} else {
+			// For non-UDP, we still include the non-serving but processing endpoint
+			// and the terminating but processing endpoint in the map,
+			// because we changed endpointslicecache to include them if they are processing.
+			expectedCount = 3
+		}
+		if len(endpointsMap[svcPortName]) != expectedCount {
+			t.Fatalf("expected endpointsMap[%q] to have %d entries, got %+v", svcPortName.String(), expectedCount, endpointsMap[svcPortName])
 		}
 		if endpointsMap[svcPortName][0].IP() != "10.240.0.4" {
 			t.Fatalf("expected endpointsMap[%q][0] IP to be \"10.240.0.4\", got \"%s\"", svcPortName.String(), endpointsMap[svcPortName][0].IP())
@@ -260,14 +287,15 @@ func TestCleanStaleEntries(t *testing.T) {
 		entriesBeforeCleanup = append(entriesBeforeCleanup, entry)
 	}
 
-	// we create 63 fake flow entries ( 3 Endpoints * 3 Protocols * ( 3 (ServiceIP:ServicePort) + 3 (ServiceIP:NonServicePort) + 1 (NodePort))
-	for _, dnatDest := range []string{testServingEndpointIP, testNonServingEndpointIP, testDeletedEndpointIP} {
+	// we create 84 fake flow entries ( 4 Endpoints * 3 Protocols * ( 3 (ServiceIP:ServicePort) + 3 (ServiceIP:NonServicePort) + 1 (NodePort))
+	for _, dnatDest := range []string{testServingEndpointIP, testNonServingEndpointIP, testDeletedEndpointIP, testTerminatingProcessingEndpointIP, testTerminatingNonProcessingEndpointIP} {
 		for _, proto := range []uint8{unix.IPPROTO_TCP, unix.IPPROTO_UDP, unix.IPPROTO_SCTP} {
 			for _, origDest := range []string{testClusterIP, testLoadBalancerIP, testExternalIP} {
 				for _, port := range []uint16{testServicePort, testNonServicePort} {
 					entry := generateConntrackEntry(origDest, port, dnatDest, testEndpointPort, proto)
 					entriesBeforeCleanup = append(entriesBeforeCleanup, entry)
-					if proto == unix.IPPROTO_UDP && port == testServicePort && dnatDest != testServingEndpointIP {
+					if proto == unix.IPPROTO_UDP && port == testServicePort &&
+						dnatDest != testServingEndpointIP && dnatDest != testNonServingEndpointIP && dnatDest != testTerminatingProcessingEndpointIP {
 						// we do not expect UDP entries with destination port `testServicePort` and DNATed destination
 						// address not an address of serving endpoint to be present after cleanup.
 					} else {
@@ -278,7 +306,7 @@ func TestCleanStaleEntries(t *testing.T) {
 
 			entry := generateConntrackEntry("", testServiceNodePort, dnatDest, testEndpointPort, proto)
 			entriesBeforeCleanup = append(entriesBeforeCleanup, entry)
-			if proto == unix.IPPROTO_UDP && dnatDest != testServingEndpointIP {
+			if proto == unix.IPPROTO_UDP && dnatDest != testServingEndpointIP && dnatDest != testNonServingEndpointIP && dnatDest != testTerminatingProcessingEndpointIP {
 				// we do not expect UDP entries with DNATed destination address not
 				// an address of serving endpoint to be present after cleanup.
 			} else {
