@@ -481,3 +481,91 @@ func TestDropDisabledCSINodeFields_GateOff(t *testing.T) {
 		})
 	}
 }
+
+func TestDropDisabledCSINodeFields_DriverRegistrations(t *testing.T) {
+	ctx := genericapirequest.WithRequestInfo(genericapirequest.NewContext(), &genericapirequest.RequestInfo{
+		APIGroup:   "storage.k8s.io",
+		APIVersion: "v1",
+		Resource:   "csinodes",
+	})
+
+	registrations := []storage.CSINodeDriverRegistration{
+		{Name: "valid-driver-name", NodeID: "valid-node"},
+	}
+	updatedRegistrations := []storage.CSINodeDriverRegistration{
+		{Name: "valid-driver-name", NodeID: "valid-node"},
+		{Name: "other-driver-name", NodeID: "other-node"},
+	}
+
+	tests := []struct {
+		name                  string
+		gateEnabled           bool
+		oldRegistrations      []storage.CSINodeDriverRegistration
+		create                bool
+		newRegistrations      []storage.CSINodeDriverRegistration
+		expectedRegistrations []storage.CSINodeDriverRegistration
+	}{
+		{
+			name:                  "gate=on, create; should keep",
+			gateEnabled:           true,
+			create:                true,
+			newRegistrations:      registrations,
+			expectedRegistrations: registrations,
+		},
+		{
+			name:                  "gate=on, update, old=no registrations; should keep",
+			gateEnabled:           true,
+			newRegistrations:      registrations,
+			expectedRegistrations: registrations,
+		},
+		{
+			name:                  "gate=off, create; should drop",
+			create:                true,
+			newRegistrations:      registrations,
+			expectedRegistrations: nil,
+		},
+		{
+			name:                  "gate=off, update, old=no registrations; should drop",
+			newRegistrations:      registrations,
+			expectedRegistrations: nil,
+		},
+		{
+			name:                  "gate=off, update, old=has registrations; should keep the update",
+			oldRegistrations:      registrations,
+			newRegistrations:      updatedRegistrations,
+			expectedRegistrations: updatedRegistrations,
+		},
+		{
+			name:                  "gate=off, update, old=has registrations; should allow removal",
+			oldRegistrations:      registrations,
+			newRegistrations:      nil,
+			expectedRegistrations: nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIControllerGetNodeInfo, tt.gateEnabled)
+
+			newObj := getValidCSINode("foo")
+			newObj.Spec.DriverRegistrations = tt.newRegistrations
+			if tt.create {
+				Strategy.PrepareForCreate(ctx, newObj)
+				if errs := Strategy.Validate(ctx, newObj); len(errs) != 0 {
+					t.Errorf("unexpected validation errors: %v", errs)
+				}
+			} else {
+				oldObj := getValidCSINode("foo")
+				oldObj.Spec.DriverRegistrations = tt.oldRegistrations
+				Strategy.PrepareForUpdate(ctx, newObj, oldObj)
+				if errs := Strategy.ValidateUpdate(ctx, newObj, oldObj); len(errs) != 0 {
+					t.Errorf("unexpected validation errors: %v", errs)
+				}
+			}
+
+			if !reflect.DeepEqual(newObj.Spec.DriverRegistrations, tt.expectedRegistrations) {
+				t.Errorf("expected driverRegistrations %v, got %v", tt.expectedRegistrations, newObj.Spec.DriverRegistrations)
+			}
+		})
+	}
+}
