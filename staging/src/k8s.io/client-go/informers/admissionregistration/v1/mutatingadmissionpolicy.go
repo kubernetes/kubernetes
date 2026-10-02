@@ -115,7 +115,7 @@ func NewMutatingAdmissionPolicyInformerWithOptions(client kubernetes.Interface, 
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
 func NewTypedMutatingAdmissionPolicyInformerWithOptions(client kubernetes.Interface, options internalinterfaces.InformerOptions) MutatingAdmissionPolicyIndexInformer {
-	gvr := schema.GroupVersionResource{Group: "admissionregistration.k8s.io", Version: "v1", Resource: "mutatingadmissionpolicys"}
+	gvr := schema.GroupVersionResource{Group: "admissionregistration.k8s.io", Version: "v1", Resource: "mutatingadmissionpolicies"}
 	identifier := options.InformerName.WithResource(gvr)
 	tweakListOptions := options.TweakListOptions
 	return cache.NewTypedSharedIndexInformer[*apiadmissionregistrationv1.MutatingAdmissionPolicy](cache.NewSharedIndexInformerWithOptions(

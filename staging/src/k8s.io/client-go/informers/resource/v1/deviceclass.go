@@ -115,7 +115,7 @@ func NewDeviceClassInformerWithOptions(client kubernetes.Interface, options inte
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
 func NewTypedDeviceClassInformerWithOptions(client kubernetes.Interface, options internalinterfaces.InformerOptions) DeviceClassIndexInformer {
-	gvr := schema.GroupVersionResource{Group: "resource.k8s.io", Version: "v1", Resource: "deviceclasss"}
+	gvr := schema.GroupVersionResource{Group: "resource.k8s.io", Version: "v1", Resource: "deviceclasses"}
 	identifier := options.InformerName.WithResource(gvr)
 	tweakListOptions := options.TweakListOptions
 	return cache.NewTypedSharedIndexInformer[*apiresourcev1.DeviceClass](cache.NewSharedIndexInformerWithOptions(
