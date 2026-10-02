@@ -98,6 +98,8 @@ func (r Request) Describe(output Response) string {
 			return fmt.Sprintf("%s(%s) -> Invalid %s", r.Op, r.Key, errStr)
 		case storage.IsCorruptObject(output.Err):
 			return fmt.Sprintf("%s(%s) -> Corrupt", r.Op, r.Key)
+		case storage.IsTooLargeResourceVersion(output.Err):
+			return fmt.Sprintf("%s(%s) -> Too Large RV", r.Op, r.Key)
 		default:
 			return fmt.Sprintf("%s(%s) -> %v", r.Op, r.Key, output.Err)
 		}
@@ -106,6 +108,9 @@ func (r Request) Describe(output Response) string {
 		accessor, err := meta.ListAccessor(output.Object)
 		if err != nil {
 			panic(err)
+		}
+		if r.List.Options.ResourceVersion != "" {
+			return fmt.Sprintf("%s(%s, RV=%s, Match=%s) -> RV: %s, Items: %d", r.Op, r.Key, r.List.Options.ResourceVersion, r.List.Options.ResourceVersionMatch, accessor.GetResourceVersion(), meta.LenList(output.Object))
 		}
 		return fmt.Sprintf("%s(%s) -> RV: %s, Items: %d", r.Op, r.Key, accessor.GetResourceVersion(), meta.LenList(output.Object))
 	}
@@ -156,16 +161,16 @@ type Response struct {
 // create and Object is nil for a delete. Like etcd3 and the cacher, deciding
 // what a watcher with a predicate receives requires both objects.
 type Change struct {
+	Key             string
 	ResourceVersion uint64
 	Object          runtime.Object
 	PrevObject      runtime.Object
 }
 
-// WatchRequest contains parameters for a watch stream.
+// WatchRequest contains parameters for a watch stream, exactly as passed to storage.Interface.Watch.
 type WatchRequest struct {
-	ResourceVersion string
-	// Predicate filters events. The zero value matches everything.
-	Predicate storage.SelectionPredicate
+	Key     string
+	Options storage.ListOptions
 }
 
 // WatchResponse contains the events and any terminal error received from a watch stream.

@@ -49,6 +49,9 @@ const (
 	RequestTypeList                   RequestType = "List"
 	RequestTypeListNamespace          RequestType = "ListNamespace"
 	RequestTypeListNonRecursive       RequestType = "ListNonRecursive"
+	RequestTypeListRVZero             RequestType = "ListRVZero"
+	RequestTypeListRVNotOlderThan     RequestType = "ListRVNotOlderThan"
+	RequestTypeListRVExact            RequestType = "ListRVExact"
 	RequestTypeUpdate                 RequestType = "Update"
 	RequestTypeUpdateUIDPrecondition  RequestType = "UpdateUIDPrecondition"
 	RequestTypeUpdateRVPrecondition   RequestType = "UpdateRVPrecondition"
@@ -67,6 +70,11 @@ const (
 	RVCurrent WatchRequestType = "RVCurrent"
 	RVPast    WatchRequestType = "RVPast"
 	RVFuture  WatchRequestType = "RVFuture"
+
+	WatchListRVEmpty   WatchRequestType = "WatchListRVEmpty"
+	WatchListRVZero    WatchRequestType = "WatchListRVZero"
+	WatchListRVCurrent WatchRequestType = "WatchListRVCurrent"
+	WatchListRVPast    WatchRequestType = "WatchListRVPast"
 )
 
 type UnaryConfig struct {
@@ -289,6 +297,58 @@ func randomRequest(keys []types.NamespacedName, ops []ChoiceWeight[RequestType],
 				Options: storage.ListOptions{Predicate: storage.Everything},
 			},
 		}
+	case RequestTypeListRVZero:
+		return &correctness.Request{
+			Op:  correctness.OpList,
+			Key: "/pods/",
+			List: correctness.ListRequest{
+				Options: storage.ListOptions{
+					Predicate:       storage.Everything,
+					Recursive:       true,
+					ResourceVersion: "0",
+				},
+			},
+		}
+	case RequestTypeListRVNotOlderThan:
+		if cached == nil {
+			return nil
+		}
+		accessor, err := meta.Accessor(cached)
+		if err != nil {
+			panic(err)
+		}
+		return &correctness.Request{
+			Op:  correctness.OpList,
+			Key: "/pods/",
+			List: correctness.ListRequest{
+				Options: storage.ListOptions{
+					Predicate:            storage.Everything,
+					Recursive:            true,
+					ResourceVersion:      accessor.GetResourceVersion(),
+					ResourceVersionMatch: metav1.ResourceVersionMatchNotOlderThan,
+				},
+			},
+		}
+	case RequestTypeListRVExact:
+		if cached == nil {
+			return nil
+		}
+		accessor, err := meta.Accessor(cached)
+		if err != nil {
+			panic(err)
+		}
+		return &correctness.Request{
+			Op:  correctness.OpList,
+			Key: "/pods/",
+			List: correctness.ListRequest{
+				Options: storage.ListOptions{
+					Predicate:            storage.Everything,
+					Recursive:            true,
+					ResourceVersion:      accessor.GetResourceVersion(),
+					ResourceVersionMatch: metav1.ResourceVersionMatchExact,
+				},
+			},
+		}
 	case RequestTypeUpdate:
 		return &correctness.Request{
 			Op:  correctness.OpUpdate,
@@ -425,41 +485,57 @@ func runTraffic(ctx context.Context, store storage.Interface, request *correctne
 }
 
 func randomWatchRequest(ctx context.Context, store storage.Interface, distribution []ChoiceWeight[WatchRequestType]) correctness.WatchRequest {
-	var offset int64
+	var rv string
+	watchList := false
 	switch selected := PickRandom(distribution); selected {
 	case RVEmpty:
-		return correctness.WatchRequest{ResourceVersion: ""}
+		rv = ""
 	case RVZero:
-		return correctness.WatchRequest{ResourceVersion: "0"}
+		rv = "0"
 	case RVOne:
-		return correctness.WatchRequest{ResourceVersion: "1"}
+		rv = "1"
 	case RVCurrent:
-		offset = 0
+		rv = relativeRV(ctx, store, 0)
 	case RVPast:
-		offset = -int64(1 + rand.Intn(10))
+		rv = relativeRV(ctx, store, -int64(1+rand.Intn(10)))
 	case RVFuture:
-		offset = int64(1 + rand.Intn(10))
+		rv = relativeRV(ctx, store, int64(1+rand.Intn(10)))
+	case WatchListRVEmpty:
+		rv, watchList = "", true
+	case WatchListRVZero:
+		rv, watchList = "0", true
+	case WatchListRVCurrent:
+		rv, watchList = relativeRV(ctx, store, 0), true
+	case WatchListRVPast:
+		rv, watchList = relativeRV(ctx, store, -int64(1+rand.Intn(10))), true
 	default:
 		panic(fmt.Sprintf("%v: unknown watch request type", selected))
 	}
+	opts := storage.ListOptions{ResourceVersion: rv, Predicate: storage.Everything, Recursive: true}
+	switch {
+	case watchList:
+		opts.Predicate.AllowWatchBookmarks = true
+		opts.SendInitialEvents = new(true)
+		opts.ResourceVersionMatch = metav1.ResourceVersionMatchNotOlderThan
+	case rv == "" || rv == "0":
+		// Otherwise storage starts with synthetic ADDED events for existing
+		// objects. API validation requires the match with sendInitialEvents.
+		opts.SendInitialEvents = new(false)
+		opts.ResourceVersionMatch = metav1.ResourceVersionMatchNotOlderThan
+	}
+	return correctness.WatchRequest{Key: "/pods/", Options: opts}
+}
+
+func relativeRV(ctx context.Context, store storage.Interface, offset int64) string {
 	currentRV, err := store.GetCurrentResourceVersion(ctx)
 	if err != nil {
 		panic(err)
 	}
-	rv := max(int64(currentRV)+offset, 1)
-	return correctness.WatchRequest{ResourceVersion: strconv.FormatInt(rv, 10)}
+	return strconv.FormatInt(max(int64(currentRV)+offset, 1), 10)
 }
 
 func runWatch(ctx context.Context, store storage.Interface, req correctness.WatchRequest, cfg WatchConfig) correctness.WatchResponse {
-	// Without SendInitialEvents=false, ResourceVersion="0" or "" causes storage
-	// to emit synthetic ADDED events for existing objects at their current RV.
-	sendInitialEvents := false
-	w, err := store.Watch(ctx, "/pods/", storage.ListOptions{
-		ResourceVersion:   req.ResourceVersion,
-		Predicate:         storage.Everything,
-		Recursive:         true,
-		SendInitialEvents: &sendInitialEvents,
-	})
+	w, err := store.Watch(ctx, req.Key, req.Options)
 	if err != nil {
 		if _, ok := errors.AsType[*storage.StorageError](err); ok {
 			return correctness.WatchResponse{Err: err}

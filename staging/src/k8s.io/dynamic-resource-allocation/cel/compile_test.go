@@ -485,6 +485,27 @@ var testcases = map[string]struct {
 		expectMatch: true,
 		expectCost:  11,
 	},
+	"quantity-compare-to-dec-then-is-integer": {
+		expression:  `device.capacity["dra.example.com"].memory.compareTo(quantity("1.5Gi")) >= 0 && device.capacity["dra.example.com"].memory.isInteger()`,
+		capacity:    map[resourceapi.QualifiedName]resourceapi.DeviceCapacity{"memory": {Value: resource.MustParse("2Gi")}},
+		driver:      "dra.example.com",
+		expectMatch: true,
+		expectCost:  12,
+	},
+	"quantity-greater-than-dec-then-as-integer": {
+		expression:  `device.capacity["dra.example.com"].memory.isGreaterThan(quantity("1.5Gi")) && device.capacity["dra.example.com"].memory.asInteger() == 2147483648`,
+		capacity:    map[resourceapi.QualifiedName]resourceapi.DeviceCapacity{"memory": {Value: resource.MustParse("2Gi")}},
+		driver:      "dra.example.com",
+		expectMatch: true,
+		expectCost:  12,
+	},
+	"quantity-less-than-dec-then-is-integer": {
+		expression:  `!device.capacity["dra.example.com"].memory.isLessThan(quantity("1.5Gi")) && device.capacity["dra.example.com"].memory.isInteger()`,
+		capacity:    map[resourceapi.QualifiedName]resourceapi.DeviceCapacity{"memory": {Value: resource.MustParse("2Gi")}},
+		driver:      "dra.example.com",
+		expectMatch: true,
+		expectCost:  12,
+	},
 	"all": {
 		expression: `
 device.capacity["dra.example.com"].quantity.isGreaterThan(quantity("1Ki")) &&

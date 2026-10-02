@@ -23,6 +23,7 @@ import (
 	"math/big"
 	"math/rand"
 	"os"
+	"reflect"
 	"strings"
 	"testing"
 	"unicode"
@@ -237,6 +238,49 @@ func TestQuantityCmp(t *testing.T) {
 			t.Errorf("X: %v, Y: %v, Expected: %v, Actual: %v", testCase.x, testCase.y, testCase.expect, result)
 		}
 	}
+
+	toDec := func(q Quantity) Quantity { q.ToDec(); return q }
+	table3 := []struct {
+		name string
+		rank int
+		q    Quantity
+	}{
+		{"dec -9223372036854775809", 0, MustParse("-9223372036854775809")},
+		{"-9223372036854775808", 1, MustParse("-9223372036854775808")},
+		{"-1500m", 2, MustParse("-1500m")},
+		{"-1e-2147483647 uncached", 3, intQuantity(-1, math.MinInt32+1, DecimalSI)},
+		{"Quantity{}", 4, Quantity{}},
+		{"dec 0 uncached", 4, toDec(Quantity{})},
+		{"1e-2147483647 uncached", 5, intQuantity(1, math.MinInt32+1, DecimalSI)},
+		{"dec 1e-2147483647 uncached", 5, decQuantity(1, -math.MaxInt32, DecimalSI)},
+		{"1500m", 6, MustParse("1500m")},
+		{"1500m uncached", 6, intQuantity(1500, -3, DecimalSI)},
+		{"dec 1500m", 6, toDec(MustParse("1500m"))},
+		{"7 uncached", 7, intQuantity(7, 0, DecimalSI)},
+		{"50k", 8, MustParse("50k")},
+		{"50k uncached", 8, intQuantity(50, 3, DecimalSI)},
+		{"dec 50k uncached", 8, toDec(intQuantity(50, 3, DecimalSI))},
+		{"1536Mi", 9, MustParse("1536Mi")},
+		{"dec 1.5Gi", 9, MustParse("1.5Gi")},
+		{"9223372036854775807", 10, MustParse("9223372036854775807")},
+		{"dec 9223372036854775807", 10, toDec(MustParse("9223372036854775807"))},
+		{"dec 9223372036854775808", 11, MustParse("9223372036854775808")},
+		{"1e2147483647", 12, MustParse("1e2147483647")},
+		{"dec 1e2147483647", 12, toDec(MustParse("1e2147483647"))},
+	}
+	for i := range table3 {
+		for j := range table3 {
+			x, y := &table3[i], &table3[j]
+			if got, want := x.q.Cmp(y.q), min(max(x.rank-y.rank, -1), 1); got != want {
+				t.Errorf("(%s).Cmp(%s) = %d, want %d", x.name, y.name, got, want)
+			}
+		}
+	}
+
+	x, y := decQuantity(15, -1, DecimalSI), decQuantity(25, -1, DecimalSI)
+	if n := testing.AllocsPerRun(100, func() { x.Cmp(y) }); n != 0 {
+		t.Errorf("Cmp of two inf.Dec quantities: %v allocations per call, want 0", n)
+	}
 }
 
 func TestParseQuantityString(t *testing.T) {
@@ -377,6 +421,8 @@ func quantityTestcases() []parseQuantityTestcase {
 		{"0.9n", decQuantity(1, -9, DecimalSI), "1n"},
 		{"0.00000012345", decQuantity(124, -9, DecimalSI), "124n"},
 		{"0.00000012354", decQuantity(124, -9, DecimalSI), "124n"},
+		// TODO(#141166): once the binarySI parse cap is removed these keep their
+		// value (9<<60 and (2^63-1)<<10) and round-trip as written.
 		{"9Ei", Quantity{d: maxAllowed, Format: BinarySI}, "9223372036854775807"},
 		{"9223372036854775807Ki", Quantity{d: maxAllowed, Format: BinarySI}, "9223372036854775807"},
 		{"12E", decQuantity(12, 18, DecimalSI), "12E"},
@@ -423,8 +469,10 @@ func TestQuantityParse(t *testing.T) {
 				t.Errorf("%v: unexpected error: %v", item.input, err)
 				continue
 			}
+			// TODO(#141166): uncomment with the inf.Dec parity check below.
+			// wantValue, wantOK := got.AsInt64()
 			if asDec {
-				got.AsDec()
+				got.ToDec()
 			}
 
 			if e, a := item.expect, got; e.Cmp(a) != 0 {
@@ -435,6 +483,10 @@ func TestQuantityParse(t *testing.T) {
 			}
 
 			if asDec {
+				// TODO(#141166): AsInt64 on the inf.Dec form should match the int64 form.
+				// if i, ok := got.AsInt64(); i != wantValue || ok != wantOK {
+				// 	t.Errorf("%v: AsInt64() on the inf.Dec form = (%d, %t), want (%d, %t)", item.input, i, ok, wantValue, wantOK)
+				// }
 				if i, ok := got.AsInt64(); i != 0 || ok {
 					t.Errorf("%v: expected inf.Dec to return false for AsInt64: %d", item.input, i)
 				}
@@ -464,7 +516,7 @@ func TestQuantityParse(t *testing.T) {
 			}
 
 			if asDec {
-				got.AsDec()
+				got.ToDec()
 			}
 
 			for _, format := range []Format{DecimalSI, BinarySI, DecimalExponent} {
@@ -520,7 +572,7 @@ func TestQuantityParse(t *testing.T) {
 				continue
 			}
 			if asDec {
-				got.AsDec()
+				got.ToDec()
 			}
 
 			expected := item.expect
@@ -542,7 +594,7 @@ func TestQuantityParse(t *testing.T) {
 				continue
 			}
 			if asDec {
-				got.AsDec()
+				got.ToDec()
 			}
 
 			if e, a := item.expect, got; e.Cmp(a) != 0 {
@@ -632,23 +684,47 @@ func TestQuantityRoundUp(t *testing.T) {
 		{"-9.01", 0, decQuantity(-10, 0, DecimalSI), false},
 		{"-9.01", 1, decQuantity(-10, 0, DecimalSI), false},
 		{"-9.01", 2, decQuantity(-100, 0, DecimalSI), false},
+
+		// no-op cases
+		{"0", -3, decQuantity(0, 0, DecimalSI), true},
+		{"5", -9, decQuantity(5, 0, DecimalSI), true},
+		{"5", -6, decQuantity(5, 0, DecimalSI), true},
+		{"5", -3, decQuantity(5, 0, DecimalSI), true},
+		{"-5", -3, decQuantity(-5, 0, DecimalSI), true},
+		{"50k", -3, decQuantity(50, 3, DecimalSI), true},
+		{"50k", 0, decQuantity(50, 3, DecimalSI), true},
+		{"2Gi", -3, decQuantity(2147483648, 0, BinarySI), true},
+		{"9223372036854775807", -3, decQuantity(math.MaxInt64, 0, DecimalSI), true},
+		{"-9223372036854775808", -9, decQuantity(math.MinInt64, 0, DecimalSI), true},
+		{"1000m", -3, decQuantity(1000, -3, DecimalSI), true},
+		{"1000m", -9, decQuantity(1000, -3, DecimalSI), true},
+		{"1.5", -3, decQuantity(15, -1, DecimalSI), true},
 	}
 
 	for _, asDec := range []bool{false, true} {
-		for _, item := range table {
-			got, err := ParseQuantity(item.in)
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-			expect := item.expect.DeepCopy()
-			if asDec {
-				got.AsDec()
-			}
-			if ok := got.RoundUp(item.scale); ok != item.ok {
-				t.Errorf("%s(%d,%t): unexpected ok: %t", item.in, item.scale, asDec, ok)
-			}
-			if got.Cmp(expect) != 0 {
-				t.Errorf("%s(%d,%t): unexpected round: %s vs %s", item.in, item.scale, asDec, got.String(), expect.String())
+		for _, cached := range []bool{false, true} {
+			for _, item := range table {
+				got, err := ParseQuantity(item.in)
+				if err != nil {
+					t.Fatalf("unexpected error: %v", err)
+				}
+				expect := item.expect.DeepCopy()
+				if asDec {
+					got.ToDec()
+				}
+				if cached {
+					// populate the string cache before rounding
+					_ = got.String()
+				}
+				if ok := got.RoundUp(item.scale); ok != item.ok {
+					t.Errorf("%s(%d,%t,%t): unexpected ok: %t", item.in, item.scale, asDec, cached, ok)
+				}
+				if got.Cmp(expect) != 0 {
+					t.Errorf("%s(%d,%t,%t): unexpected round: %s vs %s", item.in, item.scale, asDec, cached, got.String(), expect.String())
+				}
+				if e, a := expect.String(), got.String(); e != a {
+					t.Errorf("%s(%d,%t,%t): unexpected string: %s vs %s", item.in, item.scale, asDec, cached, a, e)
+				}
 			}
 		}
 	}
@@ -706,7 +782,7 @@ func TestQuantityCmpInt64AndDec(t *testing.T) {
 
 	for _, item := range table {
 		a, b := item.a.DeepCopy(), item.b.DeepCopy()
-		a.AsDec()
+		a.ToDec()
 		if cmp := a.Cmp(b); cmp != item.cmp {
 			t.Errorf("%#v: unexpected Cmp: %d", item, cmp)
 		}
@@ -717,7 +793,7 @@ func TestQuantityCmpInt64AndDec(t *testing.T) {
 
 	for _, item := range table {
 		a, b := item.a.DeepCopy(), item.b.DeepCopy()
-		b.AsDec()
+		b.ToDec()
 		if cmp := a.Cmp(b); cmp != item.cmp {
 			t.Errorf("%#v: unexpected Cmp: %d", item, cmp)
 		}
@@ -728,8 +804,8 @@ func TestQuantityCmpInt64AndDec(t *testing.T) {
 
 	for _, item := range table {
 		a, b := item.a.DeepCopy(), item.b.DeepCopy()
-		a.AsDec()
-		b.AsDec()
+		a.ToDec()
+		b.ToDec()
 		if cmp := a.Cmp(b); cmp != item.cmp {
 			t.Errorf("%#v: unexpected Cmp: %d", item, cmp)
 		}
@@ -767,6 +843,360 @@ func TestQuantityCmpInt64(t *testing.T) {
 	}
 }
 
+type quantityState struct {
+	i        int64Amount
+	dec      *inf.Dec
+	unscaled string
+	scale    inf.Scale
+	s        string
+	format   Format
+}
+
+func snapshotQuantity(q *Quantity) quantityState {
+	st := quantityState{i: q.i, dec: q.d.Dec, s: q.s, format: q.Format}
+	if q.d.Dec != nil {
+		st.unscaled, st.scale = q.d.Dec.UnscaledBig().String(), q.d.Dec.Scale()
+	}
+	return st
+}
+
+type testMethod struct {
+	// mutatesQuantity methods are allowed to mutate the quantity but must
+	// retain the value type semantics.
+	mutatesQuantity bool
+	// calls lists the methods to be called on the quantity for testing. Each
+	// function takes the quantity receiver as the first argument and the value
+	// of the input parameter, if there is one, as the second argument.
+	calls []func(q *Quantity, y Quantity)
+}
+
+// TestQuantityMutate checks that all Quantity methods retain the value type
+// semantics. That is, changes to one copy must not be visible in the other.
+// It also checks that only methods marked as mutatesQuantity are allowed to
+// mutate the quantity.
+func TestQuantityMutate(t *testing.T) {
+	toDec := func(q Quantity) Quantity { q.ToDec(); return q }
+	methodInfos := map[string]testMethod{
+		"Add": {
+			mutatesQuantity: true,
+			calls: []func(q *Quantity, y Quantity){
+				func(q *Quantity, y Quantity) { q.Add(y) },
+			},
+		},
+		"AsApproximateFloat64": {
+			calls: []func(q *Quantity, y Quantity){
+				func(q *Quantity, _ Quantity) { q.AsApproximateFloat64() },
+			},
+		},
+		"AsCanonicalBytes": {
+			calls: []func(q *Quantity, y Quantity){
+				func(q *Quantity, _ Quantity) { q.AsCanonicalBytes(nil) },
+			},
+		},
+		"AsDec": {
+			calls: []func(q *Quantity, y Quantity){
+				func(q *Quantity, _ Quantity) { q.AsDec().UnscaledBig().SetInt64(0x5a5a5a5a) },
+			},
+		},
+		"AsFloat64Slow": {
+			calls: []func(q *Quantity, y Quantity){
+				func(q *Quantity, _ Quantity) { q.AsFloat64Slow() },
+			},
+		},
+		"AsInt64": {
+			calls: []func(q *Quantity, y Quantity){
+				func(q *Quantity, _ Quantity) { q.AsInt64() },
+			},
+		},
+		"AsMilliInt64": {
+			calls: []func(q *Quantity, y Quantity){
+				func(q *Quantity, _ Quantity) { q.AsMilliInt64() },
+			},
+		},
+		"AsScale": {
+			calls: []func(q *Quantity, y Quantity){
+				func(q *Quantity, _ Quantity) { q.AsScale(0) },
+			},
+		},
+		"AsScaledInt64": {
+			calls: []func(q *Quantity, y Quantity){
+				func(q *Quantity, _ Quantity) { q.AsScaledInt64(Milli) },
+			},
+		},
+		"CacheString": {
+			mutatesQuantity: true,
+			calls: []func(q *Quantity, y Quantity){
+				func(q *Quantity, _ Quantity) { q.CacheString() },
+			},
+		},
+		"CanonicalizeBytes": {
+			calls: []func(q *Quantity, y Quantity){
+				func(q *Quantity, _ Quantity) { q.CanonicalizeBytes(nil) },
+			},
+		},
+		"Cmp": {
+			calls: []func(q *Quantity, y Quantity){
+				func(q *Quantity, y Quantity) { q.Cmp(y) },
+			},
+		},
+		"CmpInt64": {
+			calls: []func(q *Quantity, y Quantity){
+				func(q *Quantity, _ Quantity) { q.CmpInt64(7) },
+			},
+		},
+		"DeepCopy": {
+			calls: []func(q *Quantity, y Quantity){
+				func(q *Quantity, _ Quantity) {
+					if d := q.DeepCopy().d.Dec; d != nil {
+						d.UnscaledBig().SetInt64(0x5a5a5a5a)
+					}
+				},
+			},
+		},
+		"DeepCopyInto": {
+			calls: []func(q *Quantity, y Quantity){
+				func(q *Quantity, _ Quantity) {
+					var out Quantity
+					q.DeepCopyInto(&out)
+					if out.d.Dec != nil {
+						out.d.Dec.UnscaledBig().SetInt64(0x5a5a5a5a)
+					}
+				},
+			},
+		},
+		"Equal": {
+			calls: []func(q *Quantity, y Quantity){
+				func(q *Quantity, y Quantity) { q.Equal(y) },
+			},
+		},
+		"IsZero": {
+			calls: []func(q *Quantity, y Quantity){
+				func(q *Quantity, _ Quantity) { q.IsZero() },
+			},
+		},
+		"Marshal": {
+			calls: []func(q *Quantity, y Quantity){
+				func(q *Quantity, _ Quantity) { _, _ = q.Marshal() },
+			},
+		},
+		"MarshalCBOR": {
+			calls: []func(q *Quantity, y Quantity){
+				func(q *Quantity, _ Quantity) { _, _ = q.MarshalCBOR() },
+			},
+		},
+		"MarshalJSON": {
+			calls: []func(q *Quantity, y Quantity){
+				func(q *Quantity, _ Quantity) { _, _ = q.MarshalJSON() },
+			},
+		},
+		"MarshalTo": {
+			calls: []func(q *Quantity, y Quantity){
+				func(q *Quantity, _ Quantity) { _, _ = q.MarshalTo(make([]byte, q.Size())) },
+			},
+		},
+		"MarshalToSizedBuffer": {
+			calls: []func(q *Quantity, y Quantity){
+				func(q *Quantity, _ Quantity) { _, _ = q.MarshalToSizedBuffer(make([]byte, q.Size())) },
+			},
+		},
+		"MilliValue": {
+			calls: []func(q *Quantity, y Quantity){
+				func(q *Quantity, _ Quantity) { q.MilliValue() },
+			},
+		},
+		"Mul": {
+			mutatesQuantity: true,
+			calls: []func(q *Quantity, y Quantity){
+				func(q *Quantity, y Quantity) { q.Mul(y.Value()) },
+			},
+		},
+		"Neg": {
+			mutatesQuantity: true,
+			calls: []func(q *Quantity, y Quantity){
+				func(q *Quantity, _ Quantity) { q.Neg() },
+			},
+		},
+		"OpenAPIModelName": {
+			calls: []func(q *Quantity, y Quantity){
+				func(q *Quantity, _ Quantity) { q.OpenAPIModelName() },
+			},
+		},
+		"OpenAPISchemaFormat": {
+			calls: []func(q *Quantity, y Quantity){
+				func(q *Quantity, _ Quantity) { q.OpenAPISchemaFormat() },
+			},
+		},
+		"OpenAPISchemaType": {
+			calls: []func(q *Quantity, y Quantity){
+				func(q *Quantity, _ Quantity) { q.OpenAPISchemaType() },
+			},
+		},
+		"OpenAPIV3OneOfTypes": {
+			calls: []func(q *Quantity, y Quantity){
+				func(q *Quantity, _ Quantity) { q.OpenAPIV3OneOfTypes() },
+			},
+		},
+		"Reset": {
+			mutatesQuantity: true,
+			calls: []func(q *Quantity, y Quantity){
+				func(q *Quantity, _ Quantity) { q.Reset() },
+			},
+		},
+		"RoundUp": {
+			mutatesQuantity: true,
+			calls: []func(q *Quantity, y Quantity){
+				func(q *Quantity, _ Quantity) { q.RoundUp(0) },
+			},
+		},
+		"ScaledValue": {
+			calls: []func(q *Quantity, y Quantity){
+				func(q *Quantity, _ Quantity) { q.ScaledValue(Kilo) },
+			},
+		},
+		"Set": {
+			mutatesQuantity: true,
+			calls: []func(q *Quantity, y Quantity){
+				func(q *Quantity, y Quantity) { q.Set(y.Value()) },
+			},
+		},
+		"SetMilli": {
+			mutatesQuantity: true,
+			calls: []func(q *Quantity, y Quantity){
+				func(q *Quantity, y Quantity) { q.SetMilli(y.Value()) },
+			},
+		},
+		"SetScaled": {
+			mutatesQuantity: true,
+			calls: []func(q *Quantity, y Quantity){
+				func(q *Quantity, y Quantity) { q.SetScaled(y.Value(), 3) },
+			},
+		},
+		"Sign": {
+			calls: []func(q *Quantity, y Quantity){
+				func(q *Quantity, _ Quantity) { q.Sign() },
+			},
+		},
+		"Size": {
+			calls: []func(q *Quantity, y Quantity){
+				func(q *Quantity, _ Quantity) { q.Size() },
+			},
+		},
+		"String": {
+			calls: []func(q *Quantity, y Quantity){
+				func(q *Quantity, _ Quantity) { _ = q.String() },
+			},
+		},
+		"Sub": {
+			mutatesQuantity: true,
+			calls: []func(q *Quantity, y Quantity){
+				func(q *Quantity, y Quantity) { q.Sub(y) },
+			},
+		},
+		"ToDec": {
+			mutatesQuantity: true,
+			calls: []func(q *Quantity, y Quantity){
+				func(q *Quantity, _ Quantity) { q.ToDec() },
+			},
+		},
+		"ToUnstructured": {
+			calls: []func(q *Quantity, y Quantity){
+				func(q *Quantity, _ Quantity) { q.ToUnstructured() },
+			},
+		},
+		"Unmarshal": {
+			mutatesQuantity: true,
+			calls: []func(q *Quantity, y Quantity){
+				func(q *Quantity, y Quantity) {
+					b, _ := y.Marshal()
+					_ = q.Unmarshal(b)
+				},
+			},
+		},
+		"UnmarshalCBOR": {
+			mutatesQuantity: true,
+			calls: []func(q *Quantity, y Quantity){
+				func(q *Quantity, y Quantity) {
+					b, _ := y.MarshalCBOR()
+					_ = q.UnmarshalCBOR(b)
+				},
+			},
+		},
+		"UnmarshalJSON": {
+			mutatesQuantity: true,
+			calls: []func(q *Quantity, y Quantity){
+				func(q *Quantity, y Quantity) {
+					b, _ := y.MarshalJSON()
+					_ = q.UnmarshalJSON(b)
+				},
+			},
+		},
+		"Value": {
+			calls: []func(q *Quantity, y Quantity){
+				func(q *Quantity, _ Quantity) { q.Value() },
+			},
+		},
+	}
+	type input struct {
+		name string
+		q    Quantity
+	}
+	// Each call gets fresh inputs, since a later call could undo an earlier
+	// in-place write (an even number of in-place Negs restores the value).
+	inputs := func() []input {
+		return []input{
+			{"Quantity{}", Quantity{}},
+			{"dec 0 uncached", toDec(Quantity{})},
+			{"1500m", MustParse("1500m")},
+			{"1500m uncached", intQuantity(1500, -3, DecimalSI)},
+			{"dec 1500m uncached", toDec(intQuantity(1500, -3, DecimalSI))},
+			{"50Ki", MustParse("50Ki")},
+			{"-50k uncached", intQuantity(-50, 3, BinarySI)},
+			{"dec 1.5Gi", MustParse("1.5Gi")},
+			{"dec 1.5 uncached", decQuantity(15, -1, DecimalSI)},
+			{"-9223372036854775808", MustParse("-9223372036854775808")},
+			{"dec -9223372036854775809", MustParse("-9223372036854775809")},
+			{"dec 9223372036854775807", toDec(MustParse("9223372036854775807"))},
+		}
+	}
+	for method := range reflect.TypeFor[*Quantity]().Methods() {
+		t.Run(method.Name, func(t *testing.T) {
+			methodInfo, ok := methodInfos[method.Name]
+			if !ok {
+				t.Fatalf("Quantity.%s has no entry in methodInfos; add one that calls it, with mutatesQuantity set if it changes the receiver", method.Name)
+			}
+			if len(methodInfo.calls) == 0 {
+				t.Fatalf("methodInfos[%q] has no calls", method.Name)
+			}
+			n := len(inputs())
+			for _, call := range methodInfo.calls {
+				changed := false
+				for i := range n {
+					for j := range n {
+						in := inputs()
+						x, y := &in[i], &in[j]
+						xBefore, yBefore := snapshotQuantity(&x.q), snapshotQuantity(&y.q)
+						q := &x.q
+						if methodInfo.mutatesQuantity {
+							q = new(x.q)
+						}
+						call(q, y.q)
+						if after := snapshotQuantity(&x.q); after != xBefore {
+							t.Errorf("%s(%s, %s) changed %s from %+v to %+v", method.Name, x.name, y.name, x.name, xBefore, after)
+						}
+						if after := snapshotQuantity(&y.q); i != j && after != yBefore {
+							t.Errorf("%s(%s, %s) changed %s from %+v to %+v", method.Name, x.name, y.name, y.name, yBefore, after)
+						}
+						changed = changed || snapshotQuantity(q) != xBefore
+					}
+				}
+				if methodInfo.mutatesQuantity && !changed {
+					t.Errorf("%s is marked mutatesQuantity but changed no receiver; unset mutatesQuantity or fix the call", method.Name)
+				}
+			}
+		})
+	}
+}
+
 func TestQuantityNeg(t *testing.T) {
 	table := []struct {
 		a   Quantity
@@ -777,7 +1207,7 @@ func TestQuantityNeg(t *testing.T) {
 	}
 
 	for i, item := range table {
-		out := item.a.DeepCopy()
+		out := item.a
 		out.Neg()
 		if out.Cmp(item.a) == 0 {
 			t.Errorf("%d: negating an item should not mutate the source: %s", i, out.String())
@@ -1383,6 +1813,7 @@ func TestDeepCopy(t *testing.T) {
 }
 
 func TestSub(t *testing.T) {
+	self := decQuantity(15, -1, DecimalSI)
 	tests := []struct {
 		a        Quantity
 		b        Quantity
@@ -1394,6 +1825,7 @@ func TestSub(t *testing.T) {
 		{Quantity{Format: DecimalSI}, decQuantity(50, 0, DecimalSI), decQuantity(-50, 0, DecimalSI)},
 		{decQuantity(50, 0, DecimalSI), Quantity{Format: DecimalSI}, decQuantity(50, 0, DecimalSI)},
 		{Quantity{Format: DecimalSI}, Quantity{Format: DecimalSI}, decQuantity(0, 0, DecimalSI)},
+		{self, self, decQuantity(0, 0, DecimalSI)},
 	}
 
 	for i, test := range tests {
@@ -1401,6 +1833,11 @@ func TestSub(t *testing.T) {
 		if test.a.Cmp(test.expected) != 0 {
 			t.Errorf("[%d] Expected %q, got %q", i, test.expected.String(), test.a.String())
 		}
+	}
+
+	x, y := decQuantity(15, -1, DecimalSI), decQuantity(25, -1, DecimalSI)
+	if n := testing.AllocsPerRun(100, func() { x.Sub(y) }); n > 2 {
+		t.Errorf("Sub of two inf.Dec quantities: %v allocations per call, want at most 2", n)
 	}
 }
 
@@ -1646,6 +2083,7 @@ func TestZeroSubMostNegativeInheritsFormat(t *testing.T) {
 }
 
 func TestAdd(t *testing.T) {
+	self := decQuantity(15, -1, DecimalSI)
 	tests := []struct {
 		a        Quantity
 		b        Quantity
@@ -1657,6 +2095,7 @@ func TestAdd(t *testing.T) {
 		{Quantity{Format: DecimalSI}, decQuantity(50, 0, DecimalSI), decQuantity(50, 0, DecimalSI)},
 		{decQuantity(50, 0, DecimalSI), Quantity{Format: DecimalSI}, decQuantity(50, 0, DecimalSI)},
 		{Quantity{Format: DecimalSI}, Quantity{Format: DecimalSI}, decQuantity(0, 0, DecimalSI)},
+		{self, self, decQuantity(3, 0, DecimalSI)},
 	}
 
 	for i, test := range tests {
@@ -1664,6 +2103,11 @@ func TestAdd(t *testing.T) {
 		if test.a.Cmp(test.expected) != 0 {
 			t.Errorf("[%d] Expected %q, got %q", i, test.expected.String(), test.a.String())
 		}
+	}
+
+	x, y := decQuantity(15, -1, DecimalSI), decQuantity(25, -1, DecimalSI)
+	if n := testing.AllocsPerRun(100, func() { x.Add(y) }); n > 2 {
+		t.Errorf("Add of two inf.Dec quantities: %v allocations per call, want at most 2", n)
 	}
 }
 
@@ -1760,7 +2204,7 @@ func TestNegateRoundTrip(t *testing.T) {
 				j := rand.Int63()
 				q := *NewScaledQuantity(j, Scale(k))
 				if asDec {
-					q.AsDec()
+					q.ToDec()
 				}
 
 				b := q.DeepCopy()
@@ -1769,6 +2213,284 @@ func TestNegateRoundTrip(t *testing.T) {
 				if b.Cmp(q) != 0 {
 					t.Errorf("double negation did not cancel: %s", &q)
 				}
+			}
+		}
+	}
+}
+
+// TestQuantityAsInt64 tests AsInt64 behavior including cases where value is
+// stored as an inf.Dec.
+func TestQuantityAsInt64(t *testing.T) {
+	negatedMostNegative := *NewQuantity(math.MinInt64, DecimalSI)
+	negatedMostNegative.Neg()
+
+	dec := func(unscaled *big.Int, scale int32) Quantity {
+		return *NewDecimalQuantity(*inf.NewDecBig(unscaled, inf.Scale(scale)), DecimalSI)
+	}
+	twoTo63 := new(big.Int).Lsh(big.NewInt(1), 63)
+	twoTo70 := new(big.Int).Lsh(big.NewInt(1), 70)
+
+	table := []struct {
+		name string
+		in   Quantity
+
+		// value in int64
+		value int64
+		ok    bool
+
+		// value in inf.Dec
+		decValue int64
+		decOK    bool
+	}{
+		// Scale 0
+		{"zero", Quantity{Format: DecimalSI}, 0, true, 0, true},
+		{"small integer", MustParse("5"), 5, true, 5, true},
+		{"negative integer", MustParse("-5"), -5, true, -5, true},
+		{"max int64", MustParse("9223372036854775807"), math.MaxInt64, true, math.MaxInt64, true},
+		{"min int64", MustParse("-9223372036854775808"), math.MinInt64, true, math.MinInt64, true},
+		{"19 digits with decimal point", MustParse("1234567890.123456789G"), 1234567890123456789, true, 1234567890123456789, true},
+		{"overflows after negation", negatedMostNegative, math.MaxInt64, false, math.MaxInt64, false},
+		{"mantissa past max", dec(twoTo63, 0), math.MaxInt64, false, math.MaxInt64, false},
+		{"mantissa past min", dec(new(big.Int).Neg(new(big.Int).Add(twoTo63, big.NewInt(1))), 0), math.MinInt64, false, math.MinInt64, false},
+
+		// Scale > 0
+		{"scaled integer", MustParse("50k"), 50000, true, 50000, true},
+		{"negative scaled integer", MustParse("-50k"), -50000, true, -50000, true},
+		{"decimal point absorbed by the suffix", MustParse("1.5k"), 1500, true, 1500, true},
+		{"negative decimal point absorbed by the suffix", MustParse("-1.5k"), -1500, true, -1500, true},
+		{"decimal point absorbed by a large suffix", MustParse("1.5G"), 1500000000, true, 1500000000, true},
+		{"decimal point absorbed by the exponent", MustParse("1.5e3"), 1500, true, 1500, true},
+		{"zero at kilo scale", *NewScaledQuantity(0, Kilo), 0, true, 0, true},
+		{"zero at huge scale", *NewScaledQuantity(0, 500), 0, true, 0, true},
+		{"largest scaled value that fits", MustParse("9223372036854775k"), 9223372036854775000, true, 9223372036854775000, true},
+		{"smallest scaled overflow", MustParse("9223372036854776k"), math.MaxInt64, false, math.MaxInt64, false},
+		{"smallest negative scaled overflow", MustParse("-9223372036854776k"), math.MinInt64, false, math.MinInt64, false},
+		{"overflows positive", MustParse("100E"), math.MaxInt64, false, math.MaxInt64, false},
+		{"overflows negative", MustParse("-100E"), math.MinInt64, false, math.MinInt64, false},
+		{"overflows by exponent", MustParse("1e30"), math.MaxInt64, false, math.MaxInt64, false},
+		{"overflows negative by exponent", MustParse("-1e30"), math.MinInt64, false, math.MinInt64, false},
+		{"mantissa past max scaled up", dec(twoTo70, -3), math.MaxInt64, false, math.MaxInt64, false},
+		{"mantissa past min scaled up", dec(new(big.Int).Neg(twoTo70), -3), math.MinInt64, false, math.MinInt64, false},
+		{"zero at most negative scale", dec(big.NewInt(0), math.MinInt32), 0, true, 0, true},
+		{"one at most negative scale", dec(big.NewInt(1), math.MinInt32), math.MaxInt64, false, math.MaxInt64, false},
+		{"minus one at most negative scale", dec(big.NewInt(-1), math.MinInt32), math.MinInt64, false, math.MinInt64, false},
+
+		// Fractional digits
+		{"integral but fractionally scaled", MustParse("1000m"), 0, false, 0, false},
+		{"negative integral but fractionally scaled", MustParse("-1000m"), 0, false, 0, false},
+		{"zero at milli scale", *NewScaledQuantity(0, Milli), 0, false, 0, false},
+		{"fractional", MustParse("1500m"), 0, false, 0, false},
+		{"negative fractional", MustParse("-1500m"), 0, false, 0, false},
+		{"fractional decimal", MustParse("1.5"), 0, false, 0, false},
+		{"integral with trailing fraction zeros", MustParse("1.5000k"), 0, false, 0, false},
+		{"one at most positive scale", dec(big.NewInt(1), math.MaxInt32), 0, false, 0, false},
+		{"whole and past max with fractional digits", dec(new(big.Int).Mul(twoTo70, big.NewInt(1000)), 3), 0, false, 0, false},
+		{"fractional and past max", dec(new(big.Int).Add(twoTo70, big.NewInt(1)), 3), 0, false, 0, false},
+		{"overflows and parses to nano scale", MustParse("9223372036854775808"), 0, false, 0, false},
+		{"overflows negative and parses to nano scale", MustParse("-9223372036854775809"), 0, false, 0, false},
+		{"integral parsed past 19 digits", MustParse("1000000000000000000000m"), 0, false, 0, false},
+		{"20 digits with decimal point", MustParse("1234567890.1234567890G"), 0, false, 0, false},
+
+		// Binary suffix
+		// TODO(#141166): once the binarySI parse cap is removed this should be
+		// (math.MaxInt64, false) and -8Ei becomes (math.MinInt64, true).
+		{"binary cap", MustParse("8Ei"), 0, false, 0, false},
+		{"negative binary cap", MustParse("-8Ei"), 0, false, 0, false},
+		{"binary cap past 8Ei", MustParse("9Ei"), 0, false, 0, false},
+		{"binary cap far past 8Ei", MustParse("100Ei"), 0, false, 0, false},
+		{"binary cap from Ti", MustParse("8388608Ti"), 0, false, 0, false},
+		{"binary cap from Ki", MustParse("9223372036854775807Ki"), 0, false, 0, false},
+		{"binary whole with decimal point", MustParse("1.5Gi"), 1610612736, true, 1610612736, true},
+		{"binary whole with trailing fraction zeros", MustParse("1.5000Gi"), 1610612736, true, 1610612736, true},
+		{"binary fractional", MustParse("1.5555555555555555Gi"), 0, false, 0, false},
+		{"binary fraction rounded up to whole", MustParse("0.99999999999999999Ki"), 0, false, 0, false},
+	}
+
+	for _, item := range table {
+		t.Run(item.name, func(t *testing.T) {
+			in := item.in.DeepCopy()
+			want, wantOK := item.value, item.ok
+			if in.d.Dec != nil {
+				// TODO(#141166): drop once AsInt64 on inf.Dec matches the int64 form.
+				want, wantOK = 0, false
+			}
+			if value, ok := in.AsInt64(); value != want || ok != wantOK {
+				t.Errorf("AsInt64() = (%d, %t), want (%d, %t)", value, ok, want, wantOK)
+			}
+
+			for _, promote := range []struct {
+				name string
+				fn   func(*Quantity)
+			}{
+				{"ToDec", func(q *Quantity) { q.ToDec() }},
+			} {
+				promoted := item.in.DeepCopy()
+				promote.fn(&promoted)
+				// TODO(#141166): want (item.decValue, item.decOK) once AsInt64 on
+				// inf.Dec matches the int64 form.
+				if value, ok := promoted.AsInt64(); value != 0 || ok {
+					t.Errorf("after %s(): AsInt64() = (%d, %t), want (0, false)", promote.name, value, ok)
+				}
+			}
+		})
+	}
+}
+
+// TestQuantityAsInt64Stability test AsInt64 for Quantity operations are
+// consistent regardless of which field the value is stored in (int64 or
+// inf.Dec).
+func TestQuantityAsInt64Stability(t *testing.T) {
+	maxPlusOne := MustParse("9223372036854775807")
+	maxPlusOne.Add(MustParse("1"))
+
+	table := []struct {
+		name string
+		in   Quantity
+
+		// value in int64
+		value int64
+		ok    bool
+
+		// value in inf.Dec
+		decValue int64
+		decOK    bool
+	}{
+		{"50k", MustParse("50k"), 50000, true, 50000, true},
+		{"5", MustParse("5"), 5, true, 5, true},
+		{"0", MustParse("0"), 0, true, 0, true},
+		{"1.5k", MustParse("1.5k"), 1500, true, 1500, true},
+		{"2Gi", MustParse("2Gi"), 2147483648, true, 2147483648, true},
+		// TODO(#141166): (math.MaxInt64, false) and (math.MinInt64, true) once the
+		// binarySI parse cap is removed.
+		{"8Ei caps at max", MustParse("8Ei"), 0, false, 0, false},
+		{"-8Ei caps at -max", MustParse("-8Ei"), 0, false, 0, false},
+		{"max int64", MustParse("9223372036854775807"), math.MaxInt64, true, math.MaxInt64, true},
+		{"min int64", MustParse("-9223372036854775808"), math.MinInt64, true, math.MinInt64, true},
+		{"100E saturates", MustParse("100E"), math.MaxInt64, false, math.MaxInt64, false},
+		{"-100E saturates", MustParse("-100E"), math.MinInt64, false, math.MinInt64, false},
+		{"max int64 + 1 saturates", maxPlusOne, math.MaxInt64, false, math.MaxInt64, false},
+		{"1500m is fractional", MustParse("1500m"), 0, false, 0, false},
+		{"1.5 is fractional", MustParse("1.5"), 0, false, 0, false},
+		{"1000m is whole but stored with fractional digits", MustParse("1000m"), 0, false, 0, false},
+		{"1.0 is whole but stored with fractional digits", MustParse("1.0"), 0, false, 0, false},
+		{"1.5Gi is whole", MustParse("1.5Gi"), 1610612736, true, 1610612736, true},
+		{"1E parsed from 22 digits is whole", MustParse("1000000000000000000000m"), 0, false, 0, false},
+		{"2^63 parses to nano scale", MustParse("9223372036854775808"), 0, false, 0, false},
+	}
+
+	decZero := MustParse("0")
+	decZero.ToDec()
+	operations := []struct {
+		name string
+		fn   func(*Quantity)
+	}{
+		{"DeepCopy", func(q *Quantity) { *q = q.DeepCopy() }},
+		{"ToDec", func(q *Quantity) { q.ToDec() }},
+		{"AsDec", func(q *Quantity) { q.AsDec() }},
+		{"Cmp against an inf.Dec value", func(q *Quantity) { q.Cmp(MustParse("8Ei")) }},
+		{"Mul(1)", func(q *Quantity) { q.Mul(1) }},
+		{"ToDec then Mul(1)", func(q *Quantity) { q.ToDec(); q.Mul(1) }},
+		{"Neg twice", func(q *Quantity) { q.Neg(); q.Neg() }},
+		{"Add int64 zero", func(q *Quantity) { q.Add(Quantity{}) }},
+		{"Add inf.Dec zero", func(q *Quantity) { q.Add(decZero) }},
+		{"Sub inf.Dec zero", func(q *Quantity) { q.Sub(decZero) }},
+		{"Add 1 then Sub 1", func(q *Quantity) { q.Add(MustParse("1")); q.Sub(MustParse("1")) }},
+	}
+
+	for _, item := range table {
+		t.Run(item.name, func(t *testing.T) {
+			for _, op := range operations {
+				q := item.in.DeepCopy()
+				op.fn(&q)
+				want, wantOK := item.value, item.ok
+				if q.d.Dec != nil {
+					// TODO(#141166): want (item.decValue, item.decOK) once AsInt64 on
+					// inf.Dec matches the int64 form.
+					want, wantOK = 0, false
+				}
+				if value, ok := q.AsInt64(); value != want || ok != wantOK {
+					t.Errorf("after %s: AsInt64() = (%d, %t), want (%d, %t)", op.name, value, ok, want, wantOK)
+				}
+				if q.Cmp(item.in) != 0 {
+					t.Errorf("after %s: value changed to %s", op.name, q.String())
+				}
+			}
+		})
+	}
+}
+
+// TestQuantityRoundUpAsInt64 tests AsInt64 after RoundUp.
+func TestQuantityRoundUpAsInt64(t *testing.T) {
+	// Values that parse straight to inf.Dec only use the inf.Dec columns.
+	table := []struct {
+		in    string
+		scale Scale
+
+		// value in int64
+		value int64
+		ok    bool
+
+		// value in inf.Dec
+		decValue int64
+		decOK    bool
+	}{
+		// nothing to round
+		{"0", -3, 0, true, 0, true},
+		{"5", -3, 5, true, 5, true},
+		{"5", 0, 5, true, 5, true},
+		{"-5", -3, -5, true, -5, true},
+		{"50k", -3, 50000, true, 50000, true},
+		{"50k", 0, 50000, true, 50000, true},
+		{"1000m", -3, 0, false, 0, false},
+		{"1.5", -3, 0, false, 0, false},
+		{"9223372036854775807", -3, math.MaxInt64, true, math.MaxInt64, true},
+		{"-9223372036854775808", -9, math.MinInt64, true, math.MinInt64, true},
+		{"2Gi", -3, 2147483648, true, 2147483648, true},
+
+		// rounds to a whole number
+		{"5", 3, 1000, true, 1000, true},
+		{"50k", 6, 1000000, true, 1000000, true},
+		{"1000m", 0, 1, true, 1, true},
+		{"1500m", 0, 2, true, 2, true},
+		{"9.01", 0, 10, true, 10, true},
+		{"-9.01", 0, -10, true, -10, true},
+		{"9223372036854775807", 3, math.MaxInt64, false, math.MaxInt64, false},
+
+		// parsed straight to inf.Dec
+		{"1.5Gi", -3, 1610612736, true, 1610612736, true},
+		{"1.5Gi", 0, 1610612736, true, 1610612736, true},
+		{"1000000000000000000000m", -3, 0, false, 0, false},
+		{"1000000000000000000000m", 0, 1000000000000000000, true, 1000000000000000000, true},
+		{"9223372036854775808", 0, math.MaxInt64, false, math.MaxInt64, false},
+
+		// parse rounded up, so AsInt64 returns false
+		{"1.5555555555555555Gi", -3, 0, false, 0, false},
+		{"1.5555555555555555Gi", 0, 0, false, 0, false},
+		{"1.5555555555555555Gi", 3, 0, false, 0, false},
+		{"0.9999999999999", 0, 0, false, 0, false},
+		{"0.99999999999999999Ki", 0, 0, false, 0, false},
+		{"1.0000000001", 0, 0, false, 0, false},
+		{"-1.0000000001", 0, 0, false, 0, false},
+		// TODO(#141166): (math.MaxInt64, false) once the binarySI parse cap is removed.
+		{"8Ei", -3, 0, false, 0, false},
+		{"8Ei", 3, 0, false, 0, false},
+	}
+
+	for _, item := range table {
+		for _, asDec := range []bool{false, true} {
+			got := MustParse(item.in)
+			want, wantOK := item.value, item.ok
+			if asDec {
+				got.ToDec()
+				want, wantOK = item.decValue, item.decOK
+			}
+			got.RoundUp(item.scale)
+			if got.d.Dec != nil {
+				// TODO(#141166): drop once AsInt64 on inf.Dec matches the int64 form.
+				want, wantOK = 0, false
+			}
+			if value, ok := got.AsInt64(); value != want || ok != wantOK {
+				t.Errorf("%s RoundUp(%d) asDec=%t: AsInt64() = (%d, %t), want (%d, %t)", item.in, item.scale, asDec, value, ok, want, wantOK)
 			}
 		}
 	}

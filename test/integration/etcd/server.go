@@ -57,6 +57,7 @@ import (
 	netutils "k8s.io/utils/net"
 
 	// install all APIs
+	featuremetrics "k8s.io/component-base/metrics/prometheus/feature"
 	_ "k8s.io/kubernetes/pkg/controlplane"
 )
 
@@ -138,7 +139,7 @@ func StartRealAPIServerOrDie(t *testing.T, configFuncs ...func(*options.ServerRu
 	if len(featureOverrides) > 0 {
 		featuregatetesting.SetFeatureGatesDuringTest(t, feature.DefaultFeatureGate, featureOverrides)
 	}
-	feature.DefaultMutableFeatureGate.AddMetrics()
+	feature.DefaultMutableFeatureGate.AddMetrics(featuremetrics.RecordFeatureInfo)
 
 	completedOptions, err := opts.Complete(tCtx)
 	if err != nil {

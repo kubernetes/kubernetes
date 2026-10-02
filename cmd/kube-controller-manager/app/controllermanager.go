@@ -68,6 +68,7 @@ import (
 	logsapi "k8s.io/component-base/logs/api/v1"
 	metricsfeatures "k8s.io/component-base/metrics/features"
 	controllersmetrics "k8s.io/component-base/metrics/prometheus/controllers"
+	featuremetrics "k8s.io/component-base/metrics/prometheus/feature"
 	"k8s.io/component-base/metrics/prometheus/slis"
 	"k8s.io/component-base/term"
 	utilversion "k8s.io/component-base/version"
@@ -152,7 +153,7 @@ controller, and serviceaccounts controller.`,
 
 			// add feature enablement metrics
 			fg := s.ComponentGlobalsRegistry.FeatureGateFor(basecompatibility.DefaultKubeComponent)
-			fg.(featuregate.MutableFeatureGate).AddMetrics()
+			fg.(featuregate.MutableFeatureGate).AddMetrics(featuremetrics.RecordFeatureInfo)
 			// add component version metrics
 			s.ComponentGlobalsRegistry.AddMetrics()
 

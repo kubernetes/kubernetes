@@ -61,6 +61,7 @@ import (
 	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	logsapi "k8s.io/component-base/logs/api/v1"
+	featuremetrics "k8s.io/component-base/metrics/prometheus/feature"
 	zpagesfeatures "k8s.io/component-base/zpages/features"
 	"k8s.io/klog/v2"
 	"k8s.io/kube-aggregator/pkg/apiserver"
@@ -430,7 +431,7 @@ func StartTestServer(t ktesting.TB, instanceOptions *TestServerInstanceOptions, 
 	if len(featureOverrides) > 0 {
 		featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featureOverrides)
 	}
-	utilfeature.DefaultMutableFeatureGate.AddMetrics()
+	utilfeature.DefaultMutableFeatureGate.AddMetrics(featuremetrics.RecordFeatureInfo)
 
 	if instanceOptions.EnableCertAuth {
 		if featureGate.Enabled(genericfeatures.UnknownVersionInteroperabilityProxy) {
