@@ -111,6 +111,7 @@ import (
 	spec "k8s.io/kube-openapi/pkg/validation/spec"
 	kubeproxyconfigv1alpha1 "k8s.io/kube-proxy/config/v1alpha1"
 	configv1 "k8s.io/kube-scheduler/config/v1"
+	pkgconfigv1 "k8s.io/kubectl/pkg/config/v1"
 	pkgconfigv1alpha1 "k8s.io/kubectl/pkg/config/v1alpha1"
 	pkgconfigv1beta1 "k8s.io/kubectl/pkg/config/v1beta1"
 	kubeletconfigv1 "k8s.io/kubelet/config/v1"
@@ -1553,6 +1554,11 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		configv1.ScoringStrategy{}.OpenAPIModelName():                                                                   schema_k8sio_kube_scheduler_config_v1_ScoringStrategy(ref),
 		configv1.UtilizationShapePoint{}.OpenAPIModelName():                                                             schema_k8sio_kube_scheduler_config_v1_UtilizationShapePoint(ref),
 		configv1.VolumeBindingArgs{}.OpenAPIModelName():                                                                 schema_k8sio_kube_scheduler_config_v1_VolumeBindingArgs(ref),
+		pkgconfigv1.AliasOverride{}.OpenAPIModelName():                                                                  schema_kubectl_pkg_config_v1_AliasOverride(ref),
+		pkgconfigv1.AllowlistEntry{}.OpenAPIModelName():                                                                 schema_kubectl_pkg_config_v1_AllowlistEntry(ref),
+		pkgconfigv1.CommandDefaults{}.OpenAPIModelName():                                                                schema_kubectl_pkg_config_v1_CommandDefaults(ref),
+		pkgconfigv1.CommandOptionDefault{}.OpenAPIModelName():                                                           schema_kubectl_pkg_config_v1_CommandOptionDefault(ref),
+		pkgconfigv1.Preference{}.OpenAPIModelName():                                                                     schema_kubectl_pkg_config_v1_Preference(ref),
 		pkgconfigv1alpha1.AliasOverride{}.OpenAPIModelName():                                                            schema_kubectl_pkg_config_v1alpha1_AliasOverride(ref),
 		pkgconfigv1alpha1.CommandDefaults{}.OpenAPIModelName():                                                          schema_kubectl_pkg_config_v1alpha1_CommandDefaults(ref),
 		pkgconfigv1alpha1.CommandOptionDefault{}.OpenAPIModelName():                                                     schema_kubectl_pkg_config_v1alpha1_CommandOptionDefault(ref),
@@ -74342,11 +74348,282 @@ func schema_k8sio_kube_scheduler_config_v1_VolumeBindingArgs(ref common.Referenc
 	}
 }
 
-func schema_kubectl_pkg_config_v1alpha1_AliasOverride(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_kubectl_pkg_config_v1_AliasOverride(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
 				Description: "AliasOverride stores the alias definitions.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"name": {
+						SchemaProps: spec.SchemaProps{
+							Description: "name is the name of alias that can only include alphabetical characters If the alias name conflicts with the built-in command, built-in command will be used.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"command": {
+						SchemaProps: spec.SchemaProps{
+							Description: "command is the single or set of commands to execute, such as \"set env\" or \"create\"",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"prependArgs": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "prependArgs stores the arguments such as resource names, etc. These arguments are inserted after the alias name.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Type:   []string{"string"},
+										Format: "",
+									},
+								},
+							},
+						},
+					},
+					"appendArgs": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "appendArgs stores the arguments such as resource names, etc. These arguments are appended to the USER_ARGS.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Type:   []string{"string"},
+										Format: "",
+									},
+								},
+							},
+						},
+					},
+					"options": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "options is allocated to store the option definitions of alias. options only modify the default value of the option and if user explicitly passes a value, explicit one is used.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref(pkgconfigv1.CommandOptionDefault{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"name", "command"},
+			},
+		},
+		Dependencies: []string{
+			pkgconfigv1.CommandOptionDefault{}.OpenAPIModelName()},
+	}
+}
+
+func schema_kubectl_pkg_config_v1_AllowlistEntry(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "AllowlistEntry is an entry in the allowlist. For each allowlist item, at least one field must be nonempty. A struct with all empty fields is considered a misconfiguration error. Each field is a criterion for execution. If multiple fields are specified, then the criteria of all specified fields must be met. That is, the result of an individual entry is the logical AND of all checks corresponding to the specified fields within the entry.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"command": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Command matching is performed by first resolving the absolute path of both the plugin and the name in the allowlist entry using `exec.LookPath`. It will be called on both, and the resulting strings must be equal. If either call to `exec.LookPath` results in an error, the `Command` check will be considered a failure.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+func schema_kubectl_pkg_config_v1_CommandDefaults(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "CommandDefaults stores the commands and their associated option's default values.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"command": {
+						SchemaProps: spec.SchemaProps{
+							Description: "command refers to a command whose option's default value is changed.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"options": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "options is a list of options storing different default values.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref(pkgconfigv1.CommandOptionDefault{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"command", "options"},
+			},
+		},
+		Dependencies: []string{
+			pkgconfigv1.CommandOptionDefault{}.OpenAPIModelName()},
+	}
+}
+
+func schema_kubectl_pkg_config_v1_CommandOptionDefault(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "CommandOptionDefault stores the name and the specified default value of an option.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"name": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Option name (long form, without dashes).",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"default": {
+						SchemaProps: spec.SchemaProps{
+							Description: "In a string format of a default value. It will be parsed by kubectl to the compatible value of the option.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"name", "default"},
+			},
+		},
+	}
+}
+
+func schema_kubectl_pkg_config_v1_Preference(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "Preference stores elements of KubeRC configuration file",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"kind": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"apiVersion": {
+						SchemaProps: spec.SchemaProps{
+							Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"defaults": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "defaults allow changing default option values of commands. This is especially useful, when user doesn't want to explicitly set options each time.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref(pkgconfigv1.CommandDefaults{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
+					"aliases": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "aliases allow defining command aliases for existing kubectl commands, with optional default option values. If the alias name collides with a built-in command, built-in command always takes precedence. Option overrides defined in the defaults section do NOT apply to aliases for the same command. kubectl [ALIAS NAME] [USER_OPTIONS] [USER_EXPLICIT_ARGS] expands to kubectl [COMMAND] # built-in command alias points to\n        [KUBERC_PREPEND_ARGS]\n        [USER_OPTIONS]\n        [KUBERC_OPTIONS] # rest of the options that are not passed by user in [USER_OPTIONS]\n        [USER_EXPLICIT_ARGS]\n        [KUBERC_APPEND_ARGS]\ne.g. - name: runx\n  command: run\n  options:\n  - name: image\n    default: nginx\n  appendArgs:\n  - --\n  - custom-arg1\nFor example, if user invokes \"kubectl runx test-pod\" command, this will be expanded to \"kubectl run --image=nginx test-pod -- custom-arg1\" - name: getn\n  command: get\n  options:\n  - name: output\n    default: wide\n  prependArgs:\n  - node\n\"kubectl getn control-plane-1\" expands to \"kubectl get node control-plane-1 --output=wide\" \"kubectl getn control-plane-1 --output=json\" expands to \"kubectl get node --output=json control-plane-1\"",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref(pkgconfigv1.AliasOverride{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
+					"credentialPluginPolicy": {
+						SchemaProps: spec.SchemaProps{
+							Description: "credentialPluginPolicy specifies the policy governing which, if any, client-go credential plugins may be executed. It MUST be one of { \"\", \"AllowAll\", \"DenyAll\", \"Allowlist\" }. If the policy is \"\", then it falls back to \"AllowAll\" (this is required to maintain backward compatibility). If the policy is DenyAll, no credential plugins may run. If the policy is Allowlist, only those plugins meeting the criteria specified in the `credentialPluginAllowlist` field may run.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"credentialPluginAllowlist": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "Allowlist is a slice of allowlist entries. If any of them is a match, then the executable in question may execute. That is, the result is the logical OR of all entries in the allowlist. This list MUST NOT be supplied if the policy is not \"Allowlist\".\n\ne.g. credentialPluginAllowlist: - name: cloud-provider-plugin - name: /usr/local/bin/my-plugin In the above example, the user allows the credential plugins `cloud-provider-plugin` (found somewhere in PATH), and the plugin found at the explicit path `/usr/local/bin/my-plugin`.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref(pkgconfigv1.AllowlistEntry{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"defaults", "aliases"},
+			},
+		},
+		Dependencies: []string{
+			pkgconfigv1.AliasOverride{}.OpenAPIModelName(), pkgconfigv1.AllowlistEntry{}.OpenAPIModelName(), pkgconfigv1.CommandDefaults{}.OpenAPIModelName()},
+	}
+}
+
+func schema_kubectl_pkg_config_v1alpha1_AliasOverride(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "AliasOverride stores the alias definitions.\n\nDeprecated: this type deprecated in v1.38+, use kubectl.config.k8s.io/v1 instead.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"name": {
@@ -74434,7 +74711,7 @@ func schema_kubectl_pkg_config_v1alpha1_CommandDefaults(ref common.ReferenceCall
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "CommandDefaults stores the commands and their associated option's default values.",
+				Description: "CommandDefaults stores the commands and their associated option's default values.\n\nDeprecated: this type deprecated in v1.38+, use kubectl.config.k8s.io/v1 instead.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"command": {
@@ -74476,7 +74753,7 @@ func schema_kubectl_pkg_config_v1alpha1_CommandOptionDefault(ref common.Referenc
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "CommandOptionDefault stores the name and the specified default value of an option.",
+				Description: "CommandOptionDefault stores the name and the specified default value of an option.\n\nDeprecated: this type deprecated in v1.38+, use kubectl.config.k8s.io/v1 instead.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"name": {
@@ -74506,7 +74783,7 @@ func schema_kubectl_pkg_config_v1alpha1_Preference(ref common.ReferenceCallback)
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "Preference stores elements of KubeRC configuration file",
+				Description: "Preference stores elements of KubeRC configuration file\n\nDeprecated: this type deprecated in v1.38+, use kubectl.config.k8s.io/v1 instead.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"kind": {
@@ -74572,7 +74849,7 @@ func schema_kubectl_pkg_config_v1beta1_AliasOverride(ref common.ReferenceCallbac
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "AliasOverride stores the alias definitions.",
+				Description: "AliasOverride stores the alias definitions.\n\nDeprecated: this type deprecated in v1.38+, use kubectl.config.k8s.io/v1 instead.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"name": {
@@ -74660,7 +74937,7 @@ func schema_kubectl_pkg_config_v1beta1_AllowlistEntry(ref common.ReferenceCallba
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "AllowlistEntry is an entry in the allowlist. For each allowlist item, at least one field must be nonempty. A struct with all empty fields is considered a misconfiguration error. Each field is a criterion for execution. If multiple fields are specified, then the criteria of all specified fields must be met. That is, the result of an individual entry is the logical AND of all checks corresponding to the specified fields within the entry.",
+				Description: "AllowlistEntry is an entry in the allowlist. For each allowlist item, at least one field must be nonempty. A struct with all empty fields is considered a misconfiguration error. Each field is a criterion for execution. If multiple fields are specified, then the criteria of all specified fields must be met. That is, the result of an individual entry is the logical AND of all checks corresponding to the specified fields within the entry.\n\nDeprecated: this type deprecated in v1.38+, use kubectl.config.k8s.io/v1 instead.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"name": {
@@ -74687,7 +74964,7 @@ func schema_kubectl_pkg_config_v1beta1_CommandDefaults(ref common.ReferenceCallb
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "CommandDefaults stores the commands and their associated option's default values.",
+				Description: "CommandDefaults stores the commands and their associated option's default values.\n\nDeprecated: this type deprecated in v1.38+, use kubectl.config.k8s.io/v1 instead.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"command": {
@@ -74729,7 +75006,7 @@ func schema_kubectl_pkg_config_v1beta1_CommandOptionDefault(ref common.Reference
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "CommandOptionDefault stores the name and the specified default value of an option.",
+				Description: "CommandOptionDefault stores the name and the specified default value of an option.\n\nDeprecated: this type deprecated in v1.38+, use kubectl.config.k8s.io/v1 instead.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"name": {
@@ -74759,7 +75036,7 @@ func schema_kubectl_pkg_config_v1beta1_Preference(ref common.ReferenceCallback) 
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "Preference stores elements of KubeRC configuration file",
+				Description: "Preference stores elements of KubeRC configuration file\n\nDeprecated: this type deprecated in v1.38+, use kubectl.config.k8s.io/v1 instead.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"kind": {
