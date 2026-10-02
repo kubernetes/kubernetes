@@ -174,7 +174,7 @@ func (jm *Controller) syncGangMinCount(ctx context.Context, job *batch.Job,
 		// Basic (non-gang) policies have no minCount to reconcile, so this is a no-op.
 		return nil
 	}
-	desiredMinCount := gang.MinCount
+	desiredMinCount := desiredGangMinCount(klog.FromContext(ctx), job, gang.MinCount)
 
 	currentPGTemplate := workload.Spec.PodGroupTemplates
 	if len(currentPGTemplate) == 1 &&
@@ -197,6 +197,24 @@ func (jm *Controller) syncGangMinCount(ctx context.Context, job *batch.Job,
 		}
 	}
 	return nil
+}
+
+// desiredGangMinCount keeps an explicitly configured minCount unchanged. For
+// a defaulted minCount, it lowers the threshold when fewer completions remain
+// than the original gang size, so replacement Pods can still be admitted near
+// the end of the Job.
+func desiredGangMinCount(logger klog.Logger, job *batch.Job, defaultMinCount int32) int32 {
+	gang := job.Spec.Scheduling.SchedulingPolicy.Gang
+	if gang.MinCount != nil || job.Spec.Completions == nil {
+		return defaultMinCount
+	}
+
+	remaining := *job.Spec.Completions - job.Status.Succeeded
+	if isIndexedJob(job) && job.Status.FailedIndexes != nil {
+		failedIndexes := parseIndexesFromString(logger, *job.Status.FailedIndexes, int(*job.Spec.Completions))
+		remaining -= int32(failedIndexes.total())
+	}
+	return max(1, min(defaultMinCount, remaining))
 }
 
 // patchWorkloadMinCount sets the gang minCount on the Workload's single
