@@ -30,6 +30,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	resourcehelper "k8s.io/component-helpers/resource"
 	"k8s.io/klog/v2"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/events"
@@ -39,7 +40,161 @@ import (
 
 const (
 	defaultNodeAllocatableCgroupName = "kubepods"
+	// systemPartitionCgroupName is the name of the system partition root, created
+	// as a direct child of the node allocatable cgroup.
+	systemPartitionCgroupName = "system"
 )
+
+// systemPartitionEnabled returns true if a system partition is configured on
+// this node.
+func systemPartitionEnabled(nodeConfig NodeConfig) bool {
+	if !utilfeature.DefaultFeatureGate.Enabled(kubefeatures.NodeSystemPartition) {
+		return false
+	}
+	// The partition is a sub-hierarchy of the QoS hierarchy, so it cannot exist
+	// without it.
+	if !nodeConfig.CgroupsPerQOS {
+		return false
+	}
+	// The system partition is limited to cgroup v2 only.
+	if !libcontainercgroups.IsCgroup2UnifiedMode() {
+		return false
+	}
+	return nodeConfig.SystemPartition != nil && nodeConfig.SystemPartition.Namespaces.Len() > 0
+}
+
+// systemPartitionQOSContainersInfo returns the system partition's QoS container
+// roots under the given node allocatable cgroup root. The names are computed
+// even when no system partition is configured, so that cgroups left behind by an
+// earlier one stay visible to the orphan pod cgroup cleanup.
+func systemPartitionQOSContainersInfo(cgroupRoot CgroupName) QOSContainersInfo {
+	partitionRoot := NewCgroupName(cgroupRoot, systemPartitionCgroupName)
+	return QOSContainersInfo{
+		Guaranteed: partitionRoot,
+		Burstable:  NewCgroupName(partitionRoot, strings.ToLower(string(v1.PodQOSBurstable))),
+		BestEffort: NewCgroupName(partitionRoot, strings.ToLower(string(v1.PodQOSBestEffort))),
+	}
+}
+
+// systemPartitionConfig returns the system partition configuration in effect, or
+// nil if no system partition is configured on this node.
+func (cm *containerManagerImpl) systemPartitionConfig() *SystemPartitionConfig {
+	if cm.systemPartitionQOSManager == nil {
+		return nil
+	}
+	return cm.NodeConfig.SystemPartition
+}
+
+// systemPartitionCgroupConfig returns the cgroup configuration of the system
+// partition root. The node allocatable cgroup derives its limits from node
+// capacity, but these are the fixed budget the administrator set aside for
+// system Pods.
+func (cm *containerManagerImpl) systemPartitionCgroupConfig() *CgroupConfig {
+	spc := cm.NodeConfig.SystemPartition
+	resourceParameters := &ResourceConfig{}
+	if spc.MemoryLimit != nil {
+		memoryLimit := *spc.MemoryLimit
+		resourceParameters.Memory = &memoryLimit
+	}
+	if !spc.CPUSet.IsEmpty() {
+		resourceParameters.CPUSet = spc.CPUSet
+	}
+	return &CgroupConfig{
+		Name:               cm.systemPartitionRoot,
+		ResourceParameters: resourceParameters,
+	}
+}
+
+// createSystemPartitionCgroups creates the system partition root cgroup so that
+// the partition's QoS hierarchy can be created underneath it.
+func (cm *containerManagerImpl) createSystemPartitionCgroups(logger klog.Logger) error {
+	cgroupConfig := cm.systemPartitionCgroupConfig()
+	if cm.cgroupManager.Exists(cgroupConfig.Name) {
+		return nil
+	}
+	logger.V(2).Info("Creating system partition cgroup", "cgroupName", cgroupConfig.Name)
+	if err := cm.cgroupManager.Create(logger, cgroupConfig); err != nil {
+		logger.Error(err, "Failed to create cgroup", "cgroupName", cgroupConfig.Name)
+		return err
+	}
+	return nil
+}
+
+// enforceSystemPartitionCgroups applies the configured partition limits to the
+// system partition root. createSystemPartitionCgroups is a no-op once the cgroup
+// exists, so on a kubelet restart this is what applies them.
+func (cm *containerManagerImpl) enforceSystemPartitionCgroups(logger klog.Logger) error {
+	cgroupConfig := cm.systemPartitionCgroupConfig()
+	spc := cm.NodeConfig.SystemPartition
+	logger.V(2).Info("Enforcing system partition limits", "cgroupName", cgroupConfig.Name,
+		"memoryLimit", spc.MemoryLimit, "cpuset", spc.CPUSet.String())
+	if err := cm.cgroupManager.Update(logger, cgroupConfig); err != nil {
+		return fmt.Errorf("failed to enforce system partition limits on %q: %w", cgroupConfig.Name, err)
+	}
+	return nil
+}
+
+// podsInSystemPartition narrows activePods down to the pods that are in the
+// system partition, or to those that are not. Without a system partition, no
+// pod is in it.
+func (cm *containerManagerImpl) podsInSystemPartition(activePods ActivePodsFunc, inPartition bool) ActivePodsFunc {
+	spc := cm.systemPartitionConfig()
+	if spc == nil && !inPartition {
+		return activePods
+	}
+	return func() []*v1.Pod {
+		var pods []*v1.Pod
+		for _, pod := range activePods() {
+			if spc.HasPod(pod) == inPartition {
+				pods = append(pods, pod)
+			}
+		}
+		return pods
+	}
+}
+
+// systemPartitionAllocatable returns what the system partition's QoS cgroups
+// are sized against. Its memoryLimit bounds the partition's pods, so it takes
+// the place of the node's allocatable memory when set.
+func (cm *containerManagerImpl) systemPartitionAllocatable() v1.ResourceList {
+	allocatable := cm.GetNodeAllocatableAbsolute()
+	if spc := cm.systemPartitionConfig(); spc != nil && spc.MemoryLimit != nil {
+		allocatable[v1.ResourceMemory] = *resource.NewQuantity(*spc.MemoryLimit, resource.BinarySI)
+	}
+	return allocatable
+}
+
+// updateSystemPartitionCPUWeight sets the CPU weight of the system partition
+// root. The partition competes for CPU with the default partition's QoS
+// cgroups and guaranteed pods under the cgroup of all pods, so it is weighted
+// by the CPU requests of all its pods, as a pod cgroup is.
+func (cm *containerManagerImpl) updateSystemPartitionCPUWeight(logger klog.Logger) error {
+	if cm.systemPartitionPods == nil {
+		return nil
+	}
+	cpuShares := MilliCPUToShares(sumPodCPURequests(cm.systemPartitionPods()))
+	return cm.cgroupManager.Update(logger, &CgroupConfig{
+		Name:               cm.systemPartitionRoot,
+		ResourceParameters: &ResourceConfig{CPUShares: &cpuShares},
+	})
+}
+
+// sumPodCPURequests sums the CPU requests of the pods, in millicores.
+func sumPodCPURequests(pods []*v1.Pod) int64 {
+	var total int64
+	reuseReqs := make(v1.ResourceList, 4)
+	for _, pod := range pods {
+		req := resourcehelper.PodRequests(pod, resourcehelper.PodResourcesOptions{
+			Reuse:                                    reuseReqs,
+			SkipPodLevelResources:                    !utilfeature.DefaultFeatureGate.Enabled(kubefeatures.PodLevelResources),
+			UseDRANodeAllocatableResourceClaimStatus: utilfeature.DefaultFeatureGate.Enabled(kubefeatures.DRANodeAllocatableResources),
+		})
+		if request, found := req[v1.ResourceCPU]; found {
+			total += request.MilliValue()
+		}
+	}
+	return total
+}
 
 // createNodeAllocatableCgroups creates Node Allocatable Cgroup when CgroupsPerQOS flag is specified as true
 func (cm *containerManagerImpl) createNodeAllocatableCgroups(logger klog.Logger) error {

@@ -196,6 +196,13 @@ func (cm *FakeContainerManager) GetPodCgroupRoot() string {
 	return ""
 }
 
+func (cm *FakeContainerManager) GetSystemPartitionCgroupRoot() string {
+	cm.Lock()
+	defer cm.Unlock()
+	cm.CalledFunctions = append(cm.CalledFunctions, "GetSystemPartitionCgroupRoot")
+	return ""
+}
+
 func (cm *FakeContainerManager) GetDevices(_, _ string) []*podresourcesapi.ContainerDevices {
 	cm.Lock()
 	defer cm.Unlock()

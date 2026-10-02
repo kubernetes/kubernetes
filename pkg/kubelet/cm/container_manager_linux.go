@@ -125,6 +125,13 @@ type containerManagerImpl struct {
 	recorder record.EventRecorder
 	// Interface for QoS cgroup management
 	qosContainerManager QOSContainerManager
+	// Absolute cgroup name of the system partition root (kubepods/system).
+	systemPartitionRoot CgroupName
+	// Interface for QoS cgroup management inside the system partition.
+	systemPartitionQOSManager QOSContainerManager
+	// systemPartitionPods lists the active pods of the system partition. It is
+	// set once the system partition's QoS cgroups are set up.
+	systemPartitionPods ActivePodsFunc
 	// Interface for exporting and allocating devices reported by device plugins.
 	deviceManager devicemanager.Manager
 	// Interface for CPU affinity management.
@@ -282,6 +289,17 @@ func NewContainerManager(ctx context.Context, mountUtil mount.Interface, cadviso
 		return nil, err
 	}
 
+	// The system partition gets its own QoS sub-hierarchy rooted at
+	// <cgroupRoot>/system, managed independently from the default partition.
+	var systemPartitionRoot CgroupName
+	var systemPartitionQOSManager QOSContainerManager
+	if systemPartitionEnabled(nodeConfig) {
+		systemPartitionRoot = NewCgroupName(cgroupRoot, systemPartitionCgroupName)
+		// The node-wide MemoryQoS metrics are left to the node's QoS manager,
+		// which sees all pods.
+		systemPartitionQOSManager = newQOSContainerManager(subsystems, systemPartitionRoot, nodeConfig, cgroupManager, true)
+	}
+
 	cm := &containerManagerImpl{
 		cadvisorInterface:   cadvisorInterface,
 		mountUtil:           mountUtil,
@@ -293,6 +311,9 @@ func NewContainerManager(ctx context.Context, mountUtil mount.Interface, cadviso
 		cgroupRoot:          cgroupRoot,
 		recorder:            recorder,
 		qosContainerManager: qosContainerManager,
+
+		systemPartitionRoot:       systemPartitionRoot,
+		systemPartitionQOSManager: systemPartitionQOSManager,
 	}
 
 	cm.topologyManager, err = topologymanager.NewManager(
@@ -395,11 +416,13 @@ func NewContainerManager(ctx context.Context, mountUtil mount.Interface, cadviso
 func (cm *containerManagerImpl) NewPodContainerManager() PodContainerManager {
 	if cm.NodeConfig.CgroupsPerQOS {
 		return &podContainerManagerImpl{
-			qosContainersInfo: cm.GetQOSContainersInfo(),
-			subsystems:        cm.subsystems,
-			cgroupManager:     cm.cgroupManager,
-			podPidsLimit:      cm.PodPidsLimit,
-			enforceCPULimits:  cm.EnforceCPULimits,
+			qosContainersInfo:       cm.GetQOSContainersInfo(),
+			systemQOSContainersInfo: systemPartitionQOSContainersInfo(cm.cgroupRoot),
+			systemPartition:         cm.systemPartitionConfig(),
+			subsystems:              cm.subsystems,
+			cgroupManager:           cm.cgroupManager,
+			podPidsLimit:            cm.PodPidsLimit,
+			enforceCPULimits:        cm.EnforceCPULimits,
 			// cpuCFSQuotaPeriod is in microseconds. NodeConfig.CPUCFSQuotaPeriod is time.Duration (measured in nano seconds).
 			// Convert (cm.CPUCFSQuotaPeriod) [nanoseconds] / time.Microsecond (1000) to get cpuCFSQuotaPeriod in microseconds.
 			cpuCFSQuotaPeriod:       uint64(cm.CPUCFSQuotaPeriod / time.Microsecond),
@@ -538,15 +561,43 @@ func (cm *containerManagerImpl) setupNode(ctx context.Context, activePods Active
 		if err := cm.createNodeAllocatableCgroups(logger); err != nil {
 			return err
 		}
-		err = cm.qosContainerManager.Start(ctx, cm.GetNodeAllocatableAbsolute, activePods, nil)
+		// The default partition's QoS cgroups hold the pods outside the system
+		// partition, but the cgroup of all pods still parents every pod.
+		err = cm.qosContainerManager.Start(ctx, cm.GetNodeAllocatableAbsolute, cm.podsInSystemPartition(activePods, false), activePods)
 		if err != nil {
 			return fmt.Errorf("failed to initialize top level QOS containers: %v", err)
+		}
+		if cm.systemPartitionQOSManager != nil {
+			if err := cm.createSystemPartitionCgroups(logger); err != nil {
+				return err
+			}
+			cm.systemPartitionPods = cm.podsInSystemPartition(activePods, true)
+			if err := cm.systemPartitionQOSManager.Start(ctx, cm.systemPartitionAllocatable, cm.systemPartitionPods, nil); err != nil {
+				return fmt.Errorf("failed to initialize top level QOS containers of the system partition: %w", err)
+			}
+			// Weight the partition right away rather than on the next pod sync,
+			// so that it does not sit at the cgroup default meanwhile.
+			if err := cm.updateSystemPartitionCPUWeight(logger); err != nil {
+				return err
+			}
+			cm.periodicTasks = append(cm.periodicTasks, func() {
+				if err := cm.updateSystemPartitionCPUWeight(logger); err != nil {
+					logger.Error(err, "Failed to update the CPU weight of the system partition")
+				}
+			})
 		}
 	}
 
 	// Enforce Node Allocatable (if required)
 	if err := cm.enforceNodeAllocatableCgroups(logger); err != nil {
 		return err
+	}
+
+	// Enforce the system partition limits (if a system partition is configured)
+	if cm.systemPartitionQOSManager != nil {
+		if err := cm.enforceSystemPartitionCgroups(logger); err != nil {
+			return err
+		}
 	}
 
 	systemContainers := []*systemContainer{}
@@ -608,6 +659,16 @@ func (cm *containerManagerImpl) GetPodCgroupRoot() string {
 	return cm.cgroupManager.Name(cm.cgroupRoot)
 }
 
+// GetSystemPartitionCgroupRoot returns the literal cgroupfs value for the cgroup
+// containing the system partition's pods, or an empty string when the node has no
+// system partition.
+func (cm *containerManagerImpl) GetSystemPartitionCgroupRoot() string {
+	if cm.systemPartitionQOSManager == nil {
+		return ""
+	}
+	return cm.cgroupManager.Name(cm.systemPartitionRoot)
+}
+
 func (cm *containerManagerImpl) GetMountedSubsystems() *CgroupSubsystems {
 	return cm.subsystems
 }
@@ -617,6 +678,14 @@ func (cm *containerManagerImpl) GetQOSContainersInfo() QOSContainersInfo {
 }
 
 func (cm *containerManagerImpl) UpdateQOSCgroups(logger klog.Logger) error {
+	if cm.systemPartitionQOSManager != nil {
+		if err := cm.systemPartitionQOSManager.UpdateCgroups(logger); err != nil {
+			return err
+		}
+		if err := cm.updateSystemPartitionCPUWeight(logger); err != nil {
+			return err
+		}
+	}
 	return cm.qosContainerManager.UpdateCgroups(logger)
 }
 
