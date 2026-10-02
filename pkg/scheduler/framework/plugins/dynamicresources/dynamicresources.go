@@ -1620,10 +1620,6 @@ func (pl *DynamicResources) Unreserve(ctx context.Context, cs fwk.CycleState, po
 		}
 	}
 	pl.unreserveExtendedResourceClaim(ctx, pod, state)
-
-	if pl.fts.EnableDRANodeAllocatableResources && state.additionalNodeAllocatableResources.Has(nodeName) {
-		pl.clearAdditionalNodeAllocatableResources(ctx, pod)
-	}
 }
 
 // PreBind gets called in a separate goroutine after it has been determined
@@ -1658,14 +1654,6 @@ func (pl *DynamicResources) PreBind(ctx context.Context, cs fwk.CycleState, pod 
 			}()
 			// Updated here such that Unreserve can work with patched claim.
 			state.claims.set(index, claim)
-		}
-	}
-
-	if pl.fts.EnableDRANodeAllocatableResources {
-		if additionalResources := state.additionalNodeAllocatableResources.Get(nodeName); len(additionalResources) > 0 {
-			if status := pl.patchAdditionalNodeAllocatableResources(ctx, pod, additionalResources, state.claims.extendedResourceClaim()); status != nil {
-				return status
-			}
 		}
 	}
 

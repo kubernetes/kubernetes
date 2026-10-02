@@ -18,15 +18,12 @@ package dynamicresources
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"sort"
 
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
-	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	resourcehelper "k8s.io/component-helpers/resource"
 	"k8s.io/component-helpers/scheduling/corev1/nodeaffinity"
@@ -35,7 +32,6 @@ import (
 	fwk "k8s.io/kube-scheduler/framework"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
-	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 )
 
 // calculateAndCheckNodeAllocatableResources calculates the total node-allocatable resources (e.g., CPU, memory)
@@ -592,85 +588,4 @@ func (pl *DynamicResources) nodeFitsResources(nodeInfo fwk.NodeInfo, podRequest 
 		return fwk.NewStatus(statusCode, failureReasons...)
 	}
 	return nil
-}
-
-// replaceSpecialClaimNameInStatus rewrites the in-memory placeholder claim name
-// specialClaimInMemName ("<extended-resources>") in the given
-// AdditionalNodeAllocatableResources entries to the actual name of the extended-resource ResourceClaim created in
-// the API server during PreBind.
-//
-// It is a no-op when there is no extended-resource claim (extendedClaim == nil)
-// or the claim has not yet been created in the API server (its name is still a
-// special claim name). Entries that do not carry the placeholder name are left
-// untouched. The slice is mutated in place.
-func replaceSpecialClaimNameInStatus(extendedClaim *resourceapi.ResourceClaim, resources []v1.AdditionalNodeAllocatableResource) {
-	if extendedClaim == nil || isSpecialClaimName(extendedClaim.Name) {
-		return
-	}
-	for i := range resources {
-		if resources[i].Source.Name == specialClaimInMemName {
-			resources[i].Source.Name = extendedClaim.Name
-		}
-	}
-}
-
-func (pl *DynamicResources) patchAdditionalNodeAllocatableResources(ctx context.Context, pod *v1.Pod, additionalResources []v1.AdditionalNodeAllocatableResource, extendedClaim *resourceapi.ResourceClaim) *fwk.Status {
-
-	if len(additionalResources) == 0 {
-		return nil
-	}
-	logger := klog.FromContext(ctx)
-
-	// The incoming 'pod' is from the scheduler cache and would have AdditionalNodeAllocatableResources
-	// pre-populated in the assume phase without persisting to the API server.
-	// schedutil.PatchPodStatus skips patching if the old and new status are identical.
-	// To ensure the status is persisted to the API server we clear it in the baseStatus, forcing a patch.
-	baseStatus := pod.Status.DeepCopy()
-	if !apiequality.Semantic.DeepEqual(baseStatus.AdditionalNodeAllocatableResources, additionalResources) {
-		logger.V(5).Info("AdditionalNodeAllocatableResources difference: assumed pod status does not match calculated status", "pod", klog.KObj(pod))
-		return statusError(logger, errors.New("assumed pod status does not match calculated status to be patched"))
-	}
-
-	// After bindClaim, the in-memory placeholder "<extended-resources>" must be
-	// replaced with the real claim name before the status is persisted. This
-	// must run after the DeepEqual check: assume() copied the Filter-time
-	// status (still using the placeholder) onto the cached pod, so comparing
-	// after the rename would fail even when the assumed and calculated
-	// allocations match.
-	replaceSpecialClaimNameInStatus(extendedClaim, additionalResources)
-
-	baseStatus.AdditionalNodeAllocatableResources = nil
-
-	targetStatus := pod.Status.DeepCopy()
-
-	targetStatus.AdditionalNodeAllocatableResources = additionalResources
-	if err := schedutil.PatchPodStatus(ctx, pl.clientset, pod.Name, pod.Namespace, baseStatus, targetStatus); err != nil {
-		return statusError(logger, fmt.Errorf("updating pod %s/%s AdditionalNodeAllocatableResources: %w", pod.Namespace, pod.Name, err))
-	}
-	logger.V(5).Info("Patched pod status with AdditionalNodeAllocatableResources", "pod", klog.KObj(pod), "status", targetStatus.AdditionalNodeAllocatableResources)
-
-	return nil
-}
-
-func (pl *DynamicResources) clearAdditionalNodeAllocatableResources(ctx context.Context, pod *v1.Pod) {
-	if len(pod.Status.AdditionalNodeAllocatableResources) == 0 {
-		return
-	}
-
-	logger := klog.FromContext(ctx)
-	logger.V(5).Info("Clearing AdditionalNodeAllocatableResources on Unreserve", "pod", klog.KObj(pod))
-
-	// An explicit empty list distinguishes an intentional clear from an old
-	// client omitting a field that it does not know about. PatchPodStatus cannot
-	// preserve that distinction because the field has an omitempty JSON tag.
-	//
-	// The uid is included as a precondition so the patch cannot silently apply
-	// to a different pod object if this one got deleted and recreated with the
-	// same name in the meantime.
-	patch := fmt.Appendf(nil, `{"metadata":{"uid":%q},"status":{"additionalNodeAllocatableResources":[]}}`, pod.UID)
-	if _, err := pl.clientset.CoreV1().Pods(pod.Namespace).Patch(ctx, pod.Name, types.MergePatchType, patch, metav1.PatchOptions{}, "status"); err != nil {
-		logger.Error(err, "Failed to clear AdditionalNodeAllocatableResources on Unreserve", "pod", klog.KObj(pod))
-	} else {
-		logger.V(5).Info("Cleared AdditionalNodeAllocatableResources", "pod", klog.KObj(pod))
-	}
 }
