@@ -75,6 +75,9 @@ type ClientContentConfig struct {
 	// Negotiator is used for obtaining encoders and decoders for multiple
 	// supported media types.
 	Negotiator runtime.ClientNegotiator
+	// DropManagedFields asks the server to omit metadata.managedFields from responses.
+	// It has no effect unless the ManagedFieldsOptOutClient feature gate is enabled.
+	DropManagedFields bool
 }
 
 // RESTClient imposes common Kubernetes API conventions on a set of resource paths.
@@ -123,7 +126,7 @@ func NewRESTClient(baseURL *url.URL, versionedAPIPath string, config ClientConte
 	return &RESTClient{
 		base:             &base,
 		versionedAPIPath: versionedAPIPath,
-		content:          requestClientContentConfigProvider{base: scrubCBORContentConfigIfDisabled(config)},
+		content:          requestClientContentConfigProvider{base: configureDropManagedFields(scrubCBORContentConfigIfDisabled(config))},
 		createBackoffMgr: readExpBackoffConfig,
 		rateLimiter:      rateLimiter,
 		Client:           client,
@@ -153,6 +156,30 @@ func scrubCBORContentConfigIfDisabled(content ClientContentConfig) ClientContent
 		return content
 	}
 
+	content.AcceptContentTypes = formatAccept(clauses)
+
+	return content
+}
+
+func configureDropManagedFields(content ClientContentConfig) ClientContentConfig {
+	if content.DropManagedFields && !clientfeatures.FeatureGates().Enabled(clientfeatures.ManagedFieldsOptOutClient) {
+		content.DropManagedFields = false
+	}
+	return content
+}
+
+func acceptDroppingManagedFields(accept string) string {
+	clauses := goautoneg.ParseAccept(accept)
+	for i := range clauses {
+		if clauses[i].Params == nil {
+			clauses[i].Params = make(map[string]string, 1)
+		}
+		clauses[i].Params["drop"] = "metadata.managedFields"
+	}
+	return formatAccept(clauses)
+}
+
+func formatAccept(clauses []goautoneg.Accept) string {
 	parts := make([]string, 0, len(clauses))
 	for _, clause := range clauses {
 		// ParseAccept does not store the parameter "q" in Params.
@@ -165,9 +192,7 @@ func scrubCBORContentConfigIfDisabled(content ClientContentConfig) ClientContent
 		}
 		parts = append(parts, mime.FormatMediaType(fmt.Sprintf("%s/%s", clause.Type, clause.SubType), params))
 	}
-	content.AcceptContentTypes = strings.Join(parts, ",")
-
-	return content
+	return strings.Join(parts, ",")
 }
 
 // GetRateLimiter returns rate limiter for a given client, or nil if it's called on a nil client

@@ -33,6 +33,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	clientfeatures "k8s.io/client-go/features"
+	clientfeaturestesting "k8s.io/client-go/features/testing"
 	"k8s.io/client-go/kubernetes/scheme"
 	utiltesting "k8s.io/client-go/util/testing"
 	"k8s.io/klog/v2/ktesting"
@@ -394,4 +396,70 @@ func restClient(testServer *httptest.Server) (*RESTClient, error) {
 		Password: "pass",
 	})
 	return c, err
+}
+
+func TestDropManagedFieldsAccept(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		enabled    bool
+		drop       bool
+		request    func(*RESTClient) *Request
+		wantAccept string
+	}{
+		{
+			name:       "default",
+			enabled:    true,
+			drop:       true,
+			request:    (*RESTClient).Get,
+			wantAccept: "application/json; drop=metadata.managedFields,*/*; drop=metadata.managedFields",
+		},
+		{
+			name:    "replaced by SetHeader",
+			enabled: true,
+			drop:    true,
+			request: func(c *RESTClient) *Request {
+				return c.Get().SetHeader("Accept", "application/json;as=PartialObjectMetadata;g=meta.k8s.io;v=v1;q=0.9", "application/json")
+			},
+			wantAccept: "application/json; drop=metadata.managedFields,application/json; as=PartialObjectMetadata; drop=metadata.managedFields; g=meta.k8s.io; q=0.9; v=v1",
+		},
+		{
+			name:       "gate disabled",
+			enabled:    false,
+			drop:       true,
+			request:    (*RESTClient).Get,
+			wantAccept: "application/json, */*",
+		},
+		{
+			name:       "not opted in",
+			enabled:    true,
+			drop:       false,
+			request:    (*RESTClient).Get,
+			wantAccept: "application/json, */*",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			clientfeaturestesting.SetFeatureDuringTest(t, clientfeatures.ManagedFieldsOptOutClient, tc.enabled)
+			var accept string
+			c, err := RESTClientForConfigAndClient(&Config{
+				Host: "localhost",
+				ContentConfig: ContentConfig{
+					GroupVersion:         &v1.SchemeGroupVersion,
+					NegotiatedSerializer: scheme.Codecs.WithoutConversion(),
+					DropManagedFields:    tc.drop,
+				},
+			}, clientForFunc(func(req *http.Request) (*http.Response, error) {
+				accept = req.Header.Get("Accept")
+				return &http.Response{StatusCode: http.StatusOK, Body: http.NoBody}, nil
+			}))
+			if err != nil {
+				t.Fatalf("failed to create client: %v", err)
+			}
+			if err := tc.request(c).Do(context.Background()).Error(); err != nil {
+				t.Fatalf("request failed: %v", err)
+			}
+			if accept != tc.wantAccept {
+				t.Errorf("Accept = %q, want %q", accept, tc.wantAccept)
+			}
+		})
+	}
 }

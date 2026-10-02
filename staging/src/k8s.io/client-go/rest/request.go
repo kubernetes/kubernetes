@@ -181,7 +181,7 @@ func NewRequestWithClient(base *url.URL, versionedAPIPath string, content Client
 	return NewRequest(&RESTClient{
 		base:             base,
 		versionedAPIPath: versionedAPIPath,
-		content:          requestClientContentConfigProvider{base: content},
+		content:          requestClientContentConfigProvider{base: configureDropManagedFields(content)},
 		Client:           client,
 	})
 }
@@ -998,6 +998,13 @@ func (r *Request) newHTTPRequest(ctx context.Context) (*http.Request, error) {
 		return nil, err
 	}
 	req.Header = r.headers
+	// Rewritten at send time because callers can replace the Accept header with SetHeader.
+	if r.contentConfig.DropManagedFields {
+		if accept := r.headers.Values("Accept"); len(accept) > 0 {
+			req.Header = r.headers.Clone()
+			req.Header.Set("Accept", acceptDroppingManagedFields(strings.Join(accept, ",")))
+		}
+	}
 	return req, nil
 }
 
