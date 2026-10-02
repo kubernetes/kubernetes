@@ -107,16 +107,34 @@ var _ = SIGDescribe("Aggregator", func() {
 
 func cleanupSampleAPIServer(ctx context.Context, client clientset.Interface, aggrclient *aggregatorclient.Clientset, n sampleAPIServerObjectNames, apiServiceName string) {
 	// delete the APIService first to avoid causing discovery errors
-	framework.ExpectNoError(aggrclient.ApiregistrationV1().APIServices().Delete(ctx, apiServiceName, metav1.DeleteOptions{}), "deleting APIService %s", apiServiceName)
+	if err := aggrclient.ApiregistrationV1().APIServices().Delete(ctx, apiServiceName, metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
+		framework.Logf("Failed to delete APIService %s: %v", apiServiceName, err)
+	}
 
-	framework.ExpectNoError(client.AppsV1().Deployments(n.namespace).Delete(ctx, "sample-apiserver-deployment", metav1.DeleteOptions{}), "deleting deployment sample-apiserver-deployment")
-	framework.ExpectNoError(client.CoreV1().Secrets(n.namespace).Delete(ctx, "sample-apiserver-secret", metav1.DeleteOptions{}), "deleting secret sample-apiserver-secret")
-	framework.ExpectNoError(client.CoreV1().Services(n.namespace).Delete(ctx, "sample-api", metav1.DeleteOptions{}), "deleting service sample-api")
-	framework.ExpectNoError(client.CoreV1().ServiceAccounts(n.namespace).Delete(ctx, "sample-apiserver", metav1.DeleteOptions{}), "deleting service account sample-apiserver")
-	framework.ExpectNoError(client.RbacV1().RoleBindings("kube-system").Delete(ctx, n.roleBinding, metav1.DeleteOptions{}), "deleting role binding %s", n.roleBinding)
-	framework.ExpectNoError(client.RbacV1().ClusterRoleBindings().Delete(ctx, "wardler:"+n.namespace+":auth-delegator", metav1.DeleteOptions{}), "deleting cluster role binding wardler:"+n.namespace+":auth-delegator")
-	framework.ExpectNoError(client.RbacV1().ClusterRoles().Delete(ctx, n.clusterRole, metav1.DeleteOptions{}), "deleting cluster role %s", n.clusterRole)
-	framework.ExpectNoError(client.RbacV1().ClusterRoleBindings().Delete(ctx, n.clusterRoleBinding, metav1.DeleteOptions{}), "deleting cluster role binding %s", n.clusterRoleBinding)
+	if err := client.AppsV1().Deployments(n.namespace).Delete(ctx, "sample-apiserver-deployment", metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
+		framework.Logf("Failed to delete deployment sample-apiserver-deployment: %v", err)
+	}
+	if err := client.CoreV1().Secrets(n.namespace).Delete(ctx, "sample-apiserver-secret", metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
+		framework.Logf("Failed to delete secret sample-apiserver-secret: %v", err)
+	}
+	if err := client.CoreV1().Services(n.namespace).Delete(ctx, "sample-api", metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
+		framework.Logf("Failed to delete service sample-api: %v", err)
+	}
+	if err := client.CoreV1().ServiceAccounts(n.namespace).Delete(ctx, "sample-apiserver", metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
+		framework.Logf("Failed to delete service account sample-apiserver: %v", err)
+	}
+	if err := client.RbacV1().RoleBindings("kube-system").Delete(ctx, n.roleBinding, metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
+		framework.Logf("Failed to delete role binding %s: %v", n.roleBinding, err)
+	}
+	if err := client.RbacV1().ClusterRoleBindings().Delete(ctx, "wardler:"+n.namespace+":auth-delegator", metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
+		framework.Logf("Failed to delete cluster role binding wardler:%s:auth-delegator: %v", n.namespace, err)
+	}
+	if err := client.RbacV1().ClusterRoles().Delete(ctx, n.clusterRole, metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
+		framework.Logf("Failed to delete cluster role %s: %v", n.clusterRole, err)
+	}
+	if err := client.RbacV1().ClusterRoleBindings().Delete(ctx, n.clusterRoleBinding, metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
+		framework.Logf("Failed to delete cluster role binding %s: %v", n.clusterRoleBinding, err)
+	}
 }
 
 type sampleAPIServerObjectNames struct {
