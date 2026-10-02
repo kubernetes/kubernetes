@@ -1266,6 +1266,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		storagev1.CSIDriverSpec{}.OpenAPIModelName():                                                                    schema_k8sio_api_storage_v1_CSIDriverSpec(ref),
 		storagev1.CSINode{}.OpenAPIModelName():                                                                          schema_k8sio_api_storage_v1_CSINode(ref),
 		storagev1.CSINodeDriver{}.OpenAPIModelName():                                                                    schema_k8sio_api_storage_v1_CSINodeDriver(ref),
+		storagev1.CSINodeDriverRegistration{}.OpenAPIModelName():                                                        schema_k8sio_api_storage_v1_CSINodeDriverRegistration(ref),
 		storagev1.CSINodeList{}.OpenAPIModelName():                                                                      schema_k8sio_api_storage_v1_CSINodeList(ref),
 		storagev1.CSINodeSpec{}.OpenAPIModelName():                                                                      schema_k8sio_api_storage_v1_CSINodeSpec(ref),
 		storagev1.CSINodeStatus{}.OpenAPIModelName():                                                                    schema_k8sio_api_storage_v1_CSINodeStatus(ref),
@@ -1300,6 +1301,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		storagev1beta1.CSIDriverSpec{}.OpenAPIModelName():                                                               schema_k8sio_api_storage_v1beta1_CSIDriverSpec(ref),
 		storagev1beta1.CSINode{}.OpenAPIModelName():                                                                     schema_k8sio_api_storage_v1beta1_CSINode(ref),
 		storagev1beta1.CSINodeDriver{}.OpenAPIModelName():                                                               schema_k8sio_api_storage_v1beta1_CSINodeDriver(ref),
+		storagev1beta1.CSINodeDriverRegistration{}.OpenAPIModelName():                                                   schema_k8sio_api_storage_v1beta1_CSINodeDriverRegistration(ref),
 		storagev1beta1.CSINodeList{}.OpenAPIModelName():                                                                 schema_k8sio_api_storage_v1beta1_CSINodeList(ref),
 		storagev1beta1.CSINodeSpec{}.OpenAPIModelName():                                                                 schema_k8sio_api_storage_v1beta1_CSINodeSpec(ref),
 		storagev1beta1.CSINodeStatus{}.OpenAPIModelName():                                                               schema_k8sio_api_storage_v1beta1_CSINodeStatus(ref),
@@ -59492,6 +59494,36 @@ func schema_k8sio_api_storage_v1_CSINodeDriver(ref common.ReferenceCallback) com
 	}
 }
 
+func schema_k8sio_api_storage_v1_CSINodeDriverRegistration(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "CSINodeDriverRegistration holds the node ID of a CSI driver whose topology and volume attachment limit are reported by the CSI controller.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"name": {
+						SchemaProps: spec.SchemaProps{
+							Description: "name is the name of the CSI driver. This MUST be the same name returned by the CSI GetPluginName() call for that driver.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"nodeID": {
+						SchemaProps: spec.SchemaProps{
+							Description: "nodeID is the ID of the node from the driver's point of view, as returned by the driver's NodeGetInfo call.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"name", "nodeID"},
+			},
+		},
+	}
+}
+
 func schema_k8sio_api_storage_v1_CSINodeList(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
@@ -59572,11 +59604,34 @@ func schema_k8sio_api_storage_v1_CSINodeSpec(ref common.ReferenceCallback) commo
 							},
 						},
 					},
+					"driverRegistrations": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-map-keys": []interface{}{
+									"name",
+								},
+								"x-kubernetes-list-type":       "map",
+								"x-kubernetes-patch-merge-key": "name",
+								"x-kubernetes-patch-strategy":  "merge",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "driverRegistrations lists CSI drivers on this node whose topology and volume attachment limit are reported by the CSI controller instead of the node. kubelet adds an entry with the node ID returned by the driver's NodeGetInfo call, and external-attacher then adds the driver to drivers using ControllerGetNodeInfo. An entry's nodeID must match the nodeID of the drivers entry with the same name, if one exists. This is an alpha field and requires enabling the CSIControllerGetNodeInfo feature gate.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref(storagev1.CSINodeDriverRegistration{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
 				},
 			},
 		},
 		Dependencies: []string{
-			storagev1.CSINodeDriver{}.OpenAPIModelName()},
+			storagev1.CSINodeDriver{}.OpenAPIModelName(), storagev1.CSINodeDriverRegistration{}.OpenAPIModelName()},
 	}
 }
 
@@ -61207,6 +61262,36 @@ func schema_k8sio_api_storage_v1beta1_CSINodeDriver(ref common.ReferenceCallback
 	}
 }
 
+func schema_k8sio_api_storage_v1beta1_CSINodeDriverRegistration(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "CSINodeDriverRegistration holds the node ID of a CSI driver whose topology and volume attachment limit are reported by the CSI controller.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"name": {
+						SchemaProps: spec.SchemaProps{
+							Description: "name is the name of the CSI driver. This MUST be the same name returned by the CSI GetPluginName() call for that driver.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"nodeID": {
+						SchemaProps: spec.SchemaProps{
+							Description: "nodeID is the ID of the node from the driver's point of view, as returned by the driver's NodeGetInfo call.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"name", "nodeID"},
+			},
+		},
+	}
+}
+
 func schema_k8sio_api_storage_v1beta1_CSINodeList(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
@@ -61287,11 +61372,34 @@ func schema_k8sio_api_storage_v1beta1_CSINodeSpec(ref common.ReferenceCallback) 
 							},
 						},
 					},
+					"driverRegistrations": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-map-keys": []interface{}{
+									"name",
+								},
+								"x-kubernetes-list-type":       "map",
+								"x-kubernetes-patch-merge-key": "name",
+								"x-kubernetes-patch-strategy":  "merge",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "driverRegistrations lists CSI drivers on this node whose topology and volume attachment limit are reported by the CSI controller instead of the node. kubelet adds an entry with the node ID returned by the driver's NodeGetInfo call, and external-attacher then adds the driver to drivers using ControllerGetNodeInfo. An entry's nodeID must match the nodeID of the drivers entry with the same name, if one exists. This is an alpha field and requires enabling the CSIControllerGetNodeInfo feature gate.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref(storagev1beta1.CSINodeDriverRegistration{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
 				},
 			},
 		},
 		Dependencies: []string{
-			storagev1beta1.CSINodeDriver{}.OpenAPIModelName()},
+			storagev1beta1.CSINodeDriver{}.OpenAPIModelName(), storagev1beta1.CSINodeDriverRegistration{}.OpenAPIModelName()},
 	}
 }
 

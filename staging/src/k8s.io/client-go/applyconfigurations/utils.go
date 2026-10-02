@@ -2042,6 +2042,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsstoragev1.CSINodeApplyConfiguration{}
 	case storagev1.SchemeGroupVersion.WithKind("CSINodeDriver"):
 		return &applyconfigurationsstoragev1.CSINodeDriverApplyConfiguration{}
+	case storagev1.SchemeGroupVersion.WithKind("CSINodeDriverRegistration"):
+		return &applyconfigurationsstoragev1.CSINodeDriverRegistrationApplyConfiguration{}
 	case storagev1.SchemeGroupVersion.WithKind("CSINodeSpec"):
 		return &applyconfigurationsstoragev1.CSINodeSpecApplyConfiguration{}
 	case storagev1.SchemeGroupVersion.WithKind("CSINodeStatus"):
@@ -2096,6 +2098,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsstoragev1beta1.CSINodeApplyConfiguration{}
 	case storagev1beta1.SchemeGroupVersion.WithKind("CSINodeDriver"):
 		return &applyconfigurationsstoragev1beta1.CSINodeDriverApplyConfiguration{}
+	case storagev1beta1.SchemeGroupVersion.WithKind("CSINodeDriverRegistration"):
+		return &applyconfigurationsstoragev1beta1.CSINodeDriverRegistrationApplyConfiguration{}
 	case storagev1beta1.SchemeGroupVersion.WithKind("CSINodeSpec"):
 		return &applyconfigurationsstoragev1beta1.CSINodeSpecApplyConfiguration{}
 	case storagev1beta1.SchemeGroupVersion.WithKind("CSINodeStatus"):
