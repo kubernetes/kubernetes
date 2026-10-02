@@ -27,6 +27,7 @@ package qos
 
 import (
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	resourcehelper "k8s.io/component-helpers/resource"
 	"k8s.io/kubernetes/pkg/features"
@@ -71,4 +72,47 @@ func remainingPodMemReqPerContainer(pod *v1.Pod) int64 {
 	remainingMemory = max(remainingMemory, 0)
 	remainingMemoryPerContainer := remainingMemory / int64(numContainers)
 	return remainingMemoryPerContainer
+}
+
+// GetContainerMemoryLimit returns the memory limit to set on the container's
+// cgroup. draAllocations are the container's DRA node allocatable resources.
+// It lives here rather than in kuberuntime because oom_score_adj needs to know
+// whether a container can exceed its memory request.
+func GetContainerMemoryLimit(pod *v1.Pod, container *v1.Container, draAllocations v1.ResourceList) *resource.Quantity {
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) && resourcehelper.IsPodLevelResourcesSet(pod) {
+		// When container-level memory limit is not set, the pod-level
+		// limit is used in the calculation for components relying on linux resource limits
+		// to be set.
+		if container.Resources.Limits.Memory().IsZero() {
+			return pod.Spec.Resources.Limits.Memory()
+		}
+	}
+	limit := container.Resources.Limits.Memory()
+	draMemory, exists := draAllocations[v1.ResourceMemory]
+	if limit.IsZero() || !exists || draMemory.IsZero() {
+		return limit
+	}
+	// Only add DRA values to limits if limits are explicitly specified in the container spec.
+	// If not, we retain the current defaults which is setting to pod-level limits if specified, or unlimited.
+	if origContainer := getContainerSpec(pod, container.Name); origContainer != nil && origContainer.Resources.Limits.Memory().IsZero() {
+		return limit
+	}
+	q := limit.DeepCopy()
+	q.Add(draMemory)
+	return &q
+}
+
+// getContainerSpec returns the container spec with the given name from the pod spec.
+func getContainerSpec(pod *v1.Pod, containerName string) *v1.Container {
+	for i := range pod.Spec.Containers {
+		if pod.Spec.Containers[i].Name == containerName {
+			return &pod.Spec.Containers[i]
+		}
+	}
+	for i := range pod.Spec.InitContainers {
+		if pod.Spec.InitContainers[i].Name == containerName {
+			return &pod.Spec.InitContainers[i]
+		}
+	}
+	return nil
 }
