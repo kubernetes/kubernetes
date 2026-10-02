@@ -271,16 +271,29 @@ func (p *plainResponseWriter) Close() error {
 
 var _ watchStreamWriter = &perFlushGzipWriter{}
 
+type countingWriter struct {
+	delegate     io.Writer
+	bytesWritten int64
+}
+
+func (c *countingWriter) Write(b []byte) (int, error) {
+	n, err := c.delegate.Write(b)
+	c.bytesWritten += int64(n)
+	return n, err
+}
+
 type perFlushGzipWriter struct {
 	delegateRW http.ResponseWriter
 	flusher    http.Flusher
 	gw         *gzip.Writer
+	compressed countingWriter
 }
 
 func (p *perFlushGzipWriter) Write(b []byte) (int, error) {
 	if p.gw == nil {
 		p.gw = watchGzipPool.Get().(*gzip.Writer)
-		p.gw.Reset(p.delegateRW)
+		p.compressed.delegate = p.delegateRW
+		p.gw.Reset(&p.compressed)
 	}
 	return p.gw.Write(b)
 }
@@ -350,6 +363,13 @@ func (w *watchResponseWriter) Write(p []byte) (int, error) {
 	n, err := w.writer.Write(p)
 	w.bytesWritten += int64(n)
 	return n, err
+}
+
+func (w *watchResponseWriter) compressedBytesWritten() int64 {
+	if gzipWriter, ok := w.writer.(*perFlushGzipWriter); ok {
+		return gzipWriter.compressed.bytesWritten
+	}
+	return w.bytesWritten
 }
 
 func (w *watchResponseWriter) Flush() error {
@@ -474,16 +494,6 @@ func (s *WatchServer) HandleHTTP(w http.ResponseWriter, req *http.Request) {
 				}
 			}
 			if isWatchListLatencyRecordingRequired {
-				if !initStart.IsZero() {
-					sendingTime := time.Since(initStart)
-					var setupTime time.Duration
-					if receivedAt, ok := apirequest.ReceivedTimestampFrom(req.Context()); ok {
-						setupTime = initStart.Sub(receivedAt)
-					}
-					if total := setupTime + sendingTime; total > 10*time.Second {
-						klog.FromContext(req.Context()).V(2).Info("TRACE-WATCHLIST", "path", req.URL.Path, "auditID", audit.GetAuditIDTruncated(req.Context()), "events", initEventCount, "encodedBytes", rw.bytesWritten, "total", total, "setup", setupTime, "sending", sendingTime, "encode", encodeTime, "flush", flushTime, "other", sendingTime-encodeTime-flushTime, "mediaType", s.MediaType, "contentEncoding", contentEncoding)
-					}
-				}
 				// Record completion of initial listing phase for WatchList
 				receivedTimestamp, ok := apirequest.ReceivedTimestampFrom(req.Context())
 				if !ok {
@@ -499,9 +509,21 @@ func (s *WatchServer) HandleHTTP(w http.ResponseWriter, req *http.Request) {
 					s.watchListCompleteHook()
 				}
 				// release the gzip writer back to the pool so idle watches don't hold gzip state.
+				flushStart := time.Now()
 				if err := rw.Flush(); err != nil {
 					utilruntime.HandleErrorWithContext(req.Context(), err, "Failed to flush watch response after initial events")
 					return
+				}
+				flushTime += time.Since(flushStart)
+				if !initStart.IsZero() {
+					sendingTime := time.Since(initStart)
+					var setupTime time.Duration
+					if receivedAt, ok := apirequest.ReceivedTimestampFrom(req.Context()); ok {
+						setupTime = initStart.Sub(receivedAt)
+					}
+					if total := setupTime + sendingTime; total > 10*time.Second {
+						klog.FromContext(req.Context()).V(2).Info("TRACE-WATCHLIST", "path", req.URL.Path, "auditID", audit.GetAuditIDTruncated(req.Context()), "events", initEventCount, "uncompressedMB", float64(rw.bytesWritten)/1e6, "compressedMB", float64(rw.compressedBytesWritten())/1e6, "total", total, "setup", setupTime, "sending", sendingTime, "encode", encodeTime, "flush", flushTime, "other", sendingTime-encodeTime-flushTime, "mediaType", s.MediaType, "contentEncoding", contentEncoding)
+					}
 				}
 			}
 		}
