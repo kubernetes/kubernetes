@@ -594,28 +594,62 @@ func GetNodeExternalIPs(node *v1.Node) (ips []string) {
 func GetControlPlaneNodes(ctx context.Context, c clientset.Interface) *v1.NodeList {
 	allNodes, err := c.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
 	ExpectNoError(err, "error reading all nodes")
+	return filterControlPlaneNodes(allNodes)
+}
 
+
+// IsRetryableAPIError checks if an error from the API server is transient and should be retried.
+func IsRetryableAPIError(err error) bool {
+	if err == nil {
+		return false
+	}
+	if apierrors.IsServerTimeout(err) || apierrors.IsTooManyRequests(err) || apierrors.IsInternalError(err) || apierrors.IsServiceUnavailable(err) || apierrors.IsUnexpectedServerError(err) {
+		return true
+	}
+	errString := err.Error()
+	if strings.Contains(errString, "connection refused") || strings.Contains(errString, "connection reset by peer") {
+		return true
+	}
+	return false
+}
+
+func filterControlPlaneNodes(allNodes *v1.NodeList) *v1.NodeList {
 	var cpNodes v1.NodeList
-
 	for _, node := range allNodes.Items {
-		// Check for the control plane label
 		if _, hasLabel := node.Labels[ControlPlaneLabel]; hasLabel {
 			cpNodes.Items = append(cpNodes.Items, node)
 			continue
 		}
-
-		// Check for the specific taint
 		for _, taint := range node.Spec.Taints {
-			// NOTE the taint key is the same as the control plane label
 			if taint.Key == ControlPlaneLabel && taint.Effect == v1.TaintEffectNoSchedule {
 				cpNodes.Items = append(cpNodes.Items, node)
-				continue
+				break
 			}
 		}
 	}
-
 	return &cpNodes
 }
+
+// WaitForControlPlaneNodes returns a list of control plane nodes, retrying transient API errors.
+func WaitForControlPlaneNodes(ctx context.Context, c clientset.Interface) (*v1.NodeList, error) {
+	var cpNodes *v1.NodeList
+	err := wait.PollUntilContextTimeout(ctx, 5*time.Second, 1*time.Minute, true, func(ctx context.Context) (bool, error) {
+		allNodes, err := c.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
+		if err != nil {
+			if IsRetryableAPIError(err) {
+				return false, nil
+			}
+			return false, err
+		}
+		cpNodes = filterControlPlaneNodes(allNodes)
+		return true, nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("error waiting for control plane nodes: %w", err)
+	}
+	return cpNodes, nil
+}
+
 
 // PrettyPrintJSON converts metrics to JSON format.
 func PrettyPrintJSON(metrics interface{}) string {
