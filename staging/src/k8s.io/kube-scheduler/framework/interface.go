@@ -974,8 +974,33 @@ type PreemptionManager interface {
 	// The preemption algorithm attempts to reprieve victims in reverse order, from last to first.
 	// The preemption algorithm will pass through unsuccessful status to the caller.
 	GenerateVictims(ctx context.Context, pgInfo PodGroupInfo) ([]PreemptionVictim, *Status)
-	// Executor returns a PreemptionExecutor that can be used to actuate preemption or check preemption status.
+
+	// Executor returns a [PreemptionExecutor] that can be used to actuate preemption or check preemption status.
 	Executor() PreemptionExecutor
+
+	// NewReprieveFilter returns a [ReprieveFilter] that can be used to filter out reprieve candidates.
+	// It is called once per preemption evaluation pass after allVictims are removed from the snapshot,
+	// and the returned instance is used for the duration of that single reprieve pass and then discarded.
+	// Stateful implementations must return a fresh instance on each call.
+	// allVictims contains all victims returned by [PreemptionManager.GenerateVictims] to initialize the filter's state.
+	// The result should be non-nil, otherwise the preemption algorithm will abort evaluation without actuating preemption
+	// and return error status to the caller.
+	NewReprieveFilter(ctx context.Context, allVictims []PreemptionVictim) ReprieveFilter
+}
+
+// ReprieveFilter controls whether candidate preemption victims can be reprieved during preemption evaluation,
+// before any victim eviction is actuated.
+type ReprieveFilter interface {
+	// ShouldAttemptReprieval is called before restoring the victim and running the fit check for the preemptor.
+	// If an error is returned, the preemption algorithm will abort evaluation without actuating preemption,
+	// and pass the error status to the caller.
+	ShouldAttemptReprieval(ctx context.Context, victim PreemptionVictim) (bool, error)
+
+	// OnVictimReprieved is called on successful victim reprieval.
+	// Stateful implementations can use this function to track the currently active victims.
+	// If an error is returned, the preemption algorithm will abort evaluation without actuating preemption,
+	// and pass the error status to the caller.
+	OnVictimReprieved(ctx context.Context, victim PreemptionVictim) error
 }
 
 // PreemptionVictim represents a preemption unit that abstracts individual Pods and PodGroups,
