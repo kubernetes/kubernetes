@@ -2890,6 +2890,8 @@ func TestCreateServiceWhereFrontEndSameAsExistingLB(t *testing.T) {
 	lb, err := proxier.hcn.GetLoadBalancerByID(loadbalancerGuid1)
 	assert.Equal(t, nil, err, fmt.Sprintf("Failed to fetch loadbalancer: %s. Error: %v", loadbalancerGuid1, err))
 	assert.NotNil(t, lb, "Loadbalancer object should not be nil")
+}
+
 func TestLoadBalancerIngressIPModeProxyVSVIP(t *testing.T) {
 	testCases := []struct {
 		name               string
