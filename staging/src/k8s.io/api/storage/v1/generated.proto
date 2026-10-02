@@ -340,6 +340,22 @@ message CSINodeDriver {
   optional VolumeNodeResources allocatable = 4;
 }
 
+// CSINodeDriverRegistration holds the node ID of a CSI driver whose topology and
+// volume attachment limit are reported by the CSI controller.
+message CSINodeDriverRegistration {
+  // name is the name of the CSI driver. This MUST be the same name returned by
+  // the CSI GetPluginName() call for that driver.
+  // +required
+  // +k8s:alpha(since: "1.38")=+k8s:required
+  optional string name = 1;
+
+  // nodeID is the ID of the node from the driver's point of view, as returned
+  // by the driver's NodeGetInfo call.
+  // +required
+  // +k8s:alpha(since: "1.38")=+k8s:required
+  optional string nodeID = 2;
+}
+
 // CSINodeList is a collection of CSINode objects.
 message CSINodeList {
   // Standard list metadata
@@ -361,6 +377,22 @@ message CSINodeSpec {
   // +listMapKey=name
   // +optional
   repeated CSINodeDriver drivers = 1;
+
+  // driverRegistrations lists CSI drivers on this node whose topology and volume
+  // attachment limit are reported by the CSI controller instead of the node.
+  // kubelet adds an entry with the node ID returned by the driver's NodeGetInfo call,
+  // and external-attacher then adds the driver to drivers using ControllerGetNodeInfo.
+  // An entry's nodeID must match the nodeID of the drivers entry with the same name,
+  // if one exists.
+  // This is an alpha field and requires enabling the CSIControllerGetNodeInfo feature gate.
+  // +optional
+  // +k8s:optional
+  // +listType=map
+  // +listMapKey=name
+  // +patchMergeKey=name
+  // +patchStrategy=merge
+  // +featureGate=CSIControllerGetNodeInfo
+  repeated CSINodeDriverRegistration driverRegistrations = 2;
 }
 
 // CSINodeStatus contains health and status information for storage on a node.
