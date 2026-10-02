@@ -207,7 +207,7 @@ func TestWatchCacheBasic(t *testing.T) {
 	if err := s.Add(pod1); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	if item, ok, _ := s.storage.Get(pod1); !ok {
+	if item, ok, _ := s.storage.LatestSnapshot().GetByKey("/prefix/ns/pod"); !ok {
 		t.Errorf("didn't find pod")
 	} else {
 		expected := makeTestStoreElement(makeTestPod("pod", 1))
@@ -219,7 +219,7 @@ func TestWatchCacheBasic(t *testing.T) {
 	if err := s.Update(pod2); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	if item, ok, _ := s.storage.Get(pod2); !ok {
+	if item, ok, _ := s.storage.LatestSnapshot().GetByKey("/prefix/ns/pod"); !ok {
 		t.Errorf("didn't find pod")
 	} else {
 		expected := makeTestStoreElement(makeTestPod("pod", 2))
@@ -231,7 +231,7 @@ func TestWatchCacheBasic(t *testing.T) {
 	if err := s.Delete(pod3); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	if _, ok, _ := s.storage.Get(pod3); ok {
+	if _, ok, _ := s.storage.LatestSnapshot().GetByKey("/prefix/ns/pod"); ok {
 		t.Errorf("found pod")
 	}
 
@@ -246,8 +246,10 @@ func TestWatchCacheBasic(t *testing.T) {
 			"/prefix/ns/pod3": *makeTestStoreElement(makeTestPod("pod3", 6)),
 		}
 		items := make(map[string]store.Element)
-		for _, item := range s.storage.List() {
-			elem := item.(*store.Element)
+		for elem, err := range s.storage.LatestSnapshot().RangePrefix("", "").All() {
+			if err != nil {
+				t.Fatal(err)
+			}
 			items[elem.Key] = *elem
 		}
 		if !apiequality.Semantic.DeepEqual(expected, items) {
@@ -266,8 +268,10 @@ func TestWatchCacheBasic(t *testing.T) {
 			"/prefix/ns/pod5": *makeTestStoreElement(makeTestPod("pod5", 8)),
 		}
 		items := make(map[string]store.Element)
-		for _, item := range s.storage.List() {
-			elem := item.(*store.Element)
+		for elem, err := range s.storage.LatestSnapshot().RangePrefix("", "").All() {
+			if err != nil {
+				t.Fatal(err)
+			}
 			items[elem.Key] = *elem
 		}
 		if !apiequality.Semantic.DeepEqual(expected, items) {

@@ -32,13 +32,10 @@ import (
 )
 
 func TestWatchCacheStorageMarkConsistent(t *testing.T) {
-	keyFunc := func(obj runtime.Object) (string, error) {
-		return obj.(*mockObject).key, nil
-	}
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ListFromCacheSnapshot, true)
 
 	indexers := &cache.Indexers{}
-	s := NewWatchCacheStorage(keyFunc, indexers)
+	s := NewWatchCacheStorage(indexers)
 
 	assert.True(t, s.snapshottingEnabled)
 
@@ -77,14 +74,11 @@ func TestWatchCacheStorageMarkConsistent(t *testing.T) {
 }
 
 func TestLatestSnapshot(t *testing.T) {
-	keyFunc := func(obj runtime.Object) (string, error) {
-		return obj.(*mockObject).key, nil
-	}
 	// Latest snapshot is maintained even with snapshotting disabled.
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ListFromCacheSnapshot, false)
 
 	indexers := &cache.Indexers{}
-	s := NewWatchCacheStorage(keyFunc, indexers)
+	s := NewWatchCacheStorage(indexers)
 
 	before := s.LatestSnapshot()
 	items, err := before.OrderedListPrefix("", "")
@@ -107,13 +101,10 @@ func TestLatestSnapshot(t *testing.T) {
 }
 
 func TestWatchCacheStorageMatchExactResourceVersionFallback(t *testing.T) {
-	keyFunc := func(obj runtime.Object) (string, error) {
-		return obj.(*mockObject).key, nil
-	}
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ListFromCacheSnapshot, true)
 
 	indexers := &cache.Indexers{}
-	s := NewWatchCacheStorage(keyFunc, indexers)
+	s := NewWatchCacheStorage(indexers)
 
 	t.Log("Initially no snapshots exist, should return ResourceExpired error")
 	_, err := s.GetExactSnapshotLocked(20)
@@ -183,12 +174,8 @@ func (m *mockObject) DeepCopyObject() runtime.Object {
 func TestWatchCacheStorageSnapshots(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ListFromCacheSnapshot, true)
 
-	keyFunc := func(obj runtime.Object) (string, error) {
-		return obj.(*mockObject).key, nil
-	}
-
 	indexers := &cache.Indexers{}
-	s := NewWatchCacheStorage(keyFunc, indexers)
+	s := NewWatchCacheStorage(indexers)
 
 	assert.True(t, s.snapshottingEnabled, "Expected snapshotting to be enabled when feature gate is active")
 
@@ -310,7 +297,7 @@ func TestWatchCacheStorageSnapshots(t *testing.T) {
 }
 
 func TestStoreSingleKey(t *testing.T) {
-	store := NewWatchCacheStorage(nil, testStoreIndexers())
+	store := NewWatchCacheStorage(testStoreIndexers())
 	testStoreSingleKey(t, store)
 }
 
@@ -346,19 +333,19 @@ func testStoreSingleKey(t *testing.T, store *WatchCacheStorage) {
 }
 
 func TestStoreIndexerSingleKey(t *testing.T) {
-	store := NewWatchCacheStorage(nil, testStoreIndexers())
+	store := NewWatchCacheStorage(testStoreIndexers())
 	testStoreIndexerSingleKey(t, store)
 }
 
 func testStoreIndexerSingleKey(t *testing.T, store *WatchCacheStorage) {
-	items, err := store.ByIndex("by_val", "bar")
+	items, err := store.indexer.ByIndex("by_val", "bar")
 	require.NoError(t, err)
 	assert.Empty(t, items)
 
 	prev, err := store.UpdateStore(watch.Added, testStorageElement("foo", "bar", 1), 1)
 	require.NoError(t, err)
 	assert.Nil(t, prev)
-	items, err = store.ByIndex("by_val", "bar")
+	items, err = store.indexer.ByIndex("by_val", "bar")
 	require.NoError(t, err)
 	assert.Equal(t, []interface{}{
 		testStorageElement("foo", "bar", 1),
@@ -367,10 +354,10 @@ func testStoreIndexerSingleKey(t *testing.T, store *WatchCacheStorage) {
 	prev, err = store.UpdateStore(watch.Modified, testStorageElement("foo", "baz", 2), 2)
 	require.NoError(t, err)
 	assert.Equal(t, testStorageElement("foo", "bar", 1), prev)
-	items, err = store.ByIndex("by_val", "bar")
+	items, err = store.indexer.ByIndex("by_val", "bar")
 	require.NoError(t, err)
 	assert.Empty(t, items)
-	items, err = store.ByIndex("by_val", "baz")
+	items, err = store.indexer.ByIndex("by_val", "baz")
 	require.NoError(t, err)
 	assert.Equal(t, []interface{}{
 		testStorageElement("foo", "baz", 2),
@@ -379,10 +366,10 @@ func testStoreIndexerSingleKey(t *testing.T, store *WatchCacheStorage) {
 	prev, err = store.UpdateStore(watch.Modified, testStorageElement("foo", "baz", 3), 3)
 	require.NoError(t, err)
 	assert.Equal(t, testStorageElement("foo", "baz", 2), prev)
-	items, err = store.ByIndex("by_val", "bar")
+	items, err = store.indexer.ByIndex("by_val", "bar")
 	require.NoError(t, err)
 	assert.Empty(t, items)
-	items, err = store.ByIndex("by_val", "baz")
+	items, err = store.indexer.ByIndex("by_val", "baz")
 	require.NoError(t, err)
 	assert.Equal(t, []interface{}{
 		testStorageElement("foo", "baz", 3),
@@ -391,19 +378,19 @@ func testStoreIndexerSingleKey(t *testing.T, store *WatchCacheStorage) {
 	require.NoError(t, store.Replace([]*Element{
 		testStorageElement("foo", "bar", 4),
 	}, 4))
-	items, err = store.ByIndex("by_val", "bar")
+	items, err = store.indexer.ByIndex("by_val", "bar")
 	require.NoError(t, err)
 	assert.Equal(t, []interface{}{
 		testStorageElement("foo", "bar", 4),
 	}, items)
-	items, err = store.ByIndex("by_val", "baz")
+	items, err = store.indexer.ByIndex("by_val", "baz")
 	require.NoError(t, err)
 	assert.Empty(t, items)
 
 	prev, err = store.UpdateStore(watch.Deleted, testStorageElement("foo", "", 0), 5)
 	require.NoError(t, err)
 	assert.Equal(t, testStorageElement("foo", "bar", 4), prev)
-	items, err = store.ByIndex("by_val", "baz")
+	items, err = store.indexer.ByIndex("by_val", "baz")
 	require.NoError(t, err)
 	assert.Empty(t, items)
 
@@ -413,32 +400,26 @@ func testStoreIndexerSingleKey(t *testing.T, store *WatchCacheStorage) {
 }
 
 func assertStoreEmpty(t *testing.T, store *WatchCacheStorage, nonExistingKey string) {
-	item, ok, err := store.get(testStorageElement(nonExistingKey, "", 0))
+	snap := store.LatestSnapshot()
+	item, ok, err := snap.GetByKey(nonExistingKey)
 	require.NoError(t, err)
 	assert.False(t, ok)
 	assert.Nil(t, item)
 
-	item, ok, err = store.GetByKey(nonExistingKey)
+	items, err := snap.OrderedListPrefix("", "")
 	require.NoError(t, err)
-	assert.False(t, ok)
-	assert.Nil(t, item)
-
-	items := store.List()
 	assert.Empty(t, items)
 }
 
 func assertStoreSingleKey(t *testing.T, store *WatchCacheStorage, expectKey, expectValue string, expectRV int) {
-	item, ok, err := store.get(testStorageElement(expectKey, "", expectRV))
+	snap := store.LatestSnapshot()
+	item, ok, err := snap.GetByKey(expectKey)
 	require.NoError(t, err)
 	assert.True(t, ok)
 	assert.Equal(t, expectValue, item.(*Element).Object.(fakeObj).value)
 
-	item, ok, err = store.GetByKey(expectKey)
+	items, err := snap.OrderedListPrefix("", "")
 	require.NoError(t, err)
-	assert.True(t, ok)
-	assert.Equal(t, expectValue, item.(*Element).Object.(fakeObj).value)
-
-	items := store.List()
 	assert.Equal(t, []interface{}{testStorageElement(expectKey, expectValue, expectRV)}, items)
 }
 
