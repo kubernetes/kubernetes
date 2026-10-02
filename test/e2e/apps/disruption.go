@@ -130,7 +130,7 @@ var _ = SIGDescribe("DisruptionController", func() {
 					"minAvailable": "3%",
 				},
 			})
-			framework.ExpectNoError(err, "failed to marshal JSON for new data")
+			framework.ExpectNoError(err, "marshal JSON for new data")
 			return newBytes, nil
 		})
 		gomega.Expect(patchedPDB.Spec.MinAvailable.String()).To(gomega.Equal("3%"))
@@ -160,7 +160,7 @@ var _ = SIGDescribe("DisruptionController", func() {
 			}
 			return pdb.Status.DisruptionsAllowed > 0, nil
 		})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "get PodDisruptionBudget %q in namespace %q", defaultName, ns)
 	})
 
 	/*
@@ -189,10 +189,10 @@ var _ = SIGDescribe("DisruptionController", func() {
 		ginkgo.By("Patching PodDisruptionBudget status")
 		patched := patchPDBOrDie(ctx, cs, dc, ns, defaultName, func(old *policyv1.PodDisruptionBudget) (bytes []byte, err error) {
 			oldBytes, err := json.Marshal(old)
-			framework.ExpectNoError(err, "failed to marshal JSON for old data")
+			framework.ExpectNoError(err, "marshal JSON for old data")
 			old.Status.DisruptedPods = make(map[string]metav1.Time)
 			newBytes, err := json.Marshal(old)
-			framework.ExpectNoError(err, "failed to marshal JSON for new data")
+			framework.ExpectNoError(err, "marshal JSON for new data")
 			return jsonpatch.CreateMergePatch(oldBytes, newBytes)
 		}, "status")
 		gomega.Expect(patched.Status.DisruptedPods).To(gomega.BeEmpty(), "Expecting the PodDisruptionBudget's be empty")
@@ -313,7 +313,7 @@ var _ = SIGDescribe("DisruptionController", func() {
 
 			// Locate a running pod.
 			pod, err := locateRunningPod(ctx, cs, ns)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "find a running pod in namespace %q", ns)
 
 			e := &policyv1.Eviction{
 				ObjectMeta: metav1.ObjectMeta{
@@ -342,7 +342,7 @@ var _ = SIGDescribe("DisruptionController", func() {
 					}
 					return true, nil
 				})
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "evict Pod %q in namespace %q", e.Name, ns)
 			}
 		})...)
 	}
@@ -361,7 +361,7 @@ var _ = SIGDescribe("DisruptionController", func() {
 		waitForPodsOrDie(ctx, cs, ns, 3) // make sure that they are running and so would be evictable with a different pdb
 
 		pod, err := locateRunningPod(ctx, cs, ns)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "find a running pod in namespace %q", ns)
 		e := &policyv1.Eviction{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      pod.Name,
@@ -384,23 +384,23 @@ var _ = SIGDescribe("DisruptionController", func() {
 		waitForPodsOrDie(ctx, cs, ns, 3)
 		waitForPdbToObserveHealthyPods(ctx, cs, ns, 3, 2)
 		err = cs.CoreV1().Pods(ns).EvictV1(ctx, e)
-		framework.ExpectNoError(err) // the eviction is now allowed
+		framework.ExpectNoError(err, "evict Pod %q in namespace %q", e.Name, ns) // the eviction is now allowed
 
 		ginkgo.By("Patching the pdb to disallow a pod to be evicted")
 		patchPDBOrDie(ctx, cs, dc, ns, defaultName, func(old *policyv1.PodDisruptionBudget) (bytes []byte, err error) {
 			oldData, err := json.Marshal(old)
-			framework.ExpectNoError(err, "failed to marshal JSON for old data")
+			framework.ExpectNoError(err, "marshal JSON for old data")
 			old.Spec.MinAvailable = nil
 			maxUnavailable := intstr.FromInt32(0)
 			old.Spec.MaxUnavailable = &maxUnavailable
 			newData, err := json.Marshal(old)
-			framework.ExpectNoError(err, "failed to marshal JSON for new data")
+			framework.ExpectNoError(err, "marshal JSON for new data")
 			return jsonpatch.CreateMergePatch(oldData, newData)
 		})
 
 		waitForPodsOrDie(ctx, cs, ns, 3)
 		pod, err = locateRunningPod(ctx, cs, ns) // locate a new running pod
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "find a running pod in namespace %q", ns)
 		e = &policyv1.Eviction{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      pod.Name,
@@ -418,7 +418,7 @@ var _ = SIGDescribe("DisruptionController", func() {
 		ginkgo.By("Trying to evict the same pod we tried earlier which should now be evictable")
 		waitForPodsOrDie(ctx, cs, ns, 3)
 		err = cs.CoreV1().Pods(ns).EvictV1(ctx, e)
-		framework.ExpectNoError(err) // the eviction is now allowed
+		framework.ExpectNoError(err, "evict Pod %q in namespace %q", e.Name, ns) // the eviction is now allowed
 	})
 
 	unhealthyPodEvictionPolicyCases := []struct {
@@ -500,13 +500,13 @@ var _ = SIGDescribe("DisruptionController", func() {
 			} else {
 				ginkgo.By("Wait for pods to be running and not ready")
 				err := e2epod.VerifyPodsRunning(ctx, cs, ns, rsName, labels.SelectorFromSet(rs.Labels), false, replicas)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "verify running pods for %q in namespace %q", rsName, ns)
 				waitForPdbToObserveHealthyPods(ctx, cs, ns, 0, replicas-1)
 			}
 
 			ginkgo.By("Try to evict all pods guarded by a PDB")
 			podList, err := cs.CoreV1().Pods(ns).List(ctx, metav1.ListOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "list Pods in namespace %q", ns)
 
 			evictedPods := sets.New[string]()
 			for _, pod := range podList.Items {
@@ -528,7 +528,7 @@ var _ = SIGDescribe("DisruptionController", func() {
 			_, err = e2epod.WaitForPods(ctx, cs, ns, metav1.ListOptions{}, e2epod.Range{NoneMatching: true}, framework.PodDeleteTimeout, "evicted pods should be deleted", func(pod *v1.Pod) bool {
 				return evictedPods.Has(pod.Name) && pod.DeletionTimestamp == nil
 			})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "wait for evicted pods in namespace %q to be deleted", ns)
 		})
 	}
 })
@@ -593,11 +593,11 @@ func patchPDBOrDie(ctx context.Context, cs kubernetes.Interface, dc dynamic.Inte
 	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		old := getPDBStatusOrDie(ctx, dc, ns, name)
 		patchBytes, err := f(old)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "apply the PodDisruptionBudget update before patching")
 		if updated, err = cs.PolicyV1().PodDisruptionBudgets(ns).Patch(ctx, old.Name, types.MergePatchType, patchBytes, metav1.PatchOptions{}, subresources...); err != nil {
 			return err
 		}
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "patch PodDisruptionBudget %q in namespace %q", old.Name, ns)
 		return nil
 	})
 
@@ -809,7 +809,7 @@ func waitForPdbToObserveHealthyPods(ctx context.Context, cs kubernetes.Interface
 func getPDBStatusOrDie(ctx context.Context, dc dynamic.Interface, ns string, name string) *policyv1.PodDisruptionBudget {
 	pdbStatusResource := policyv1.SchemeGroupVersion.WithResource("poddisruptionbudgets")
 	unstruct, err := dc.Resource(pdbStatusResource).Namespace(ns).Get(ctx, name, metav1.GetOptions{}, "status")
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "get PodDisruptionBudget status %q in namespace %q", name, ns)
 	pdb, err := unstructuredToPDB(unstruct)
 	framework.ExpectNoError(err, "Getting the status of the pdb %s in namespace %s", name, ns)
 	return pdb

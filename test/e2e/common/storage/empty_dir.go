@@ -289,11 +289,11 @@ var _ = SIGDescribe("EmptyDir volumes", func() {
 
 		ginkgo.By("Creating Pod")
 		e2epod.NewPodClient(f).Create(ctx, pod)
-		framework.ExpectNoError(e2epod.WaitForPodNameRunningInNamespace(ctx, f.ClientSet, pod.Name, f.Namespace.Name))
+		framework.ExpectNoError(e2epod.WaitForPodNameRunningInNamespace(ctx, f.ClientSet, pod.Name, f.Namespace.Name), "wait for Pod %q in namespace %q to run", pod.Name, f.Namespace.Name)
 
 		ginkgo.By("Reading file content from the nginx-container")
 		result := e2epod.ExecShellInContainer(f, pod.Name, busyBoxMainContainerName, fmt.Sprintf("cat %s", busyBoxMainVolumeFilePath))
-		gomega.Expect(result).To(gomega.Equal(message), "failed to match expected string %s with %s", message, resultString)
+		gomega.Expect(result).To(gomega.Equal(message), "match expected string %s with %s", message, resultString)
 	})
 
 	f.Context("EmptyDirVolumeMode [LinuxOnly]", feature.EmptyDirVolumeMode, framework.WithFeatureGate(kubefeatures.EmptyDirVolumeMode), func() {
@@ -380,15 +380,15 @@ var _ = SIGDescribe("EmptyDir volumes", func() {
 
 		ginkgo.By("Waiting for the pod running")
 		err = e2epod.WaitForPodNameRunningInNamespace(ctx, f.ClientSet, pod.Name, f.Namespace.Name)
-		framework.ExpectNoError(err, "failed to deploy pod %s", pod.Name)
+		framework.ExpectNoError(err, "deploy pod %s", pod.Name)
 
 		ginkgo.By("Getting the pod")
 		pod, err = e2epod.NewPodClient(f).Get(ctx, pod.Name, metav1.GetOptions{})
-		framework.ExpectNoError(err, "failed to get pod %s", pod.Name)
+		framework.ExpectNoError(err, "get pod %s", pod.Name)
 
 		ginkgo.By("Reading empty dir size")
 		result := e2epod.ExecShellInContainer(f, pod.Name, busyBoxMainContainerName, fmt.Sprintf("df | grep %s | awk '{print $2}'", busyBoxMainVolumeMountPath))
-		gomega.Expect(result).To(gomega.Equal(expectedResult), "failed to match expected string %s with %s", expectedResult, result)
+		gomega.Expect(result).To(gomega.Equal(expectedResult), "match expected string %s with %s", expectedResult, result)
 	})
 })
 
