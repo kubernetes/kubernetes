@@ -27,7 +27,7 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/cli-runtime/pkg/genericiooptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
-	"k8s.io/kubectl/pkg/config/v1beta1"
+	v1 "k8s.io/kubectl/pkg/config/v1"
 	"k8s.io/kubectl/pkg/kuberc"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
@@ -180,17 +180,17 @@ func (o *SetOptions) Validate() error {
 			return fmt.Errorf("--policy is required when --section=%s", sectionCredentialPlugin)
 		}
 
-		switch v1beta1.CredentialPluginPolicy(o.PluginPolicy) {
-		case v1beta1.PluginPolicyAllowAll, v1beta1.PluginPolicyDenyAll:
+		switch v1.CredentialPluginPolicy(o.PluginPolicy) {
+		case v1.PluginPolicyAllowAll, v1.PluginPolicyDenyAll:
 			if len(o.AllowlistEntries) != 0 {
-				return fmt.Errorf("--allowlist-entry may only be used when --section=%s and --policy=%s", sectionCredentialPlugin, v1beta1.PluginPolicyAllowlist)
+				return fmt.Errorf("--allowlist-entry may only be used when --section=%s and --policy=%s", sectionCredentialPlugin, v1.PluginPolicyAllowlist)
 			}
-		case v1beta1.PluginPolicyAllowlist:
+		case v1.PluginPolicyAllowlist:
 			if len(o.AllowlistEntries) == 0 {
-				return fmt.Errorf("--allowlist-entry is required when --section=%s and --policy=%s", sectionCredentialPlugin, v1beta1.PluginPolicyAllowlist)
+				return fmt.Errorf("--allowlist-entry is required when --section=%s and --policy=%s", sectionCredentialPlugin, v1.PluginPolicyAllowlist)
 			}
 		default:
-			return fmt.Errorf(" --policy must be  %q, %q, or %q, got: %s", v1beta1.PluginPolicyAllowAll, v1beta1.PluginPolicyDenyAll, v1beta1.PluginPolicyAllowlist, o.PluginPolicy)
+			return fmt.Errorf(" --policy must be  %q, %q, or %q, got: %s", v1.PluginPolicyAllowAll, v1.PluginPolicyDenyAll, v1.PluginPolicyAllowlist, o.PluginPolicy)
 		}
 
 	}
@@ -226,16 +226,16 @@ func (o *SetOptions) Run() error {
 }
 
 // loadOrCreatePreference loads existing preference or creates a new one
-func (o *SetOptions) loadOrCreatePreference() (*v1beta1.Preference, error) {
+func (o *SetOptions) loadOrCreatePreference() (*v1.Preference, error) {
 	pref, err := kuberc.LoadPreference(o.KubeRCFile)
 	if err != nil && !os.IsNotExist(err) {
 		return nil, fmt.Errorf("error reading kuberc file: %w", err)
 	}
 
 	if os.IsNotExist(err) || pref == nil {
-		return &v1beta1.Preference{
+		return &v1.Preference{
 			TypeMeta: metav1.TypeMeta{
-				APIVersion: "kubectl.config.k8s.io/v1beta1",
+				APIVersion: "kubectl.config.k8s.io/v1",
 				Kind:       "Preference",
 			},
 		}, nil
@@ -245,8 +245,8 @@ func (o *SetOptions) loadOrCreatePreference() (*v1beta1.Preference, error) {
 }
 
 // parseOptions parses the --option flags into CommandOptionDefault structs
-func (o *SetOptions) parseOptions() ([]v1beta1.CommandOptionDefault, error) {
-	var options []v1beta1.CommandOptionDefault
+func (o *SetOptions) parseOptions() ([]v1.CommandOptionDefault, error) {
+	var options []v1.CommandOptionDefault
 
 	for _, opt := range o.Options {
 		parts := strings.SplitN(opt, "=", 2)
@@ -260,7 +260,7 @@ func (o *SetOptions) parseOptions() ([]v1beta1.CommandOptionDefault, error) {
 			return nil, fmt.Errorf("invalid option format %q, expected flag=value", opt)
 		}
 
-		options = append(options, v1beta1.CommandOptionDefault{
+		options = append(options, v1.CommandOptionDefault{
 			Name:    flagName,
 			Default: parts[1],
 		})
@@ -270,7 +270,7 @@ func (o *SetOptions) parseOptions() ([]v1beta1.CommandOptionDefault, error) {
 }
 
 // setDefaults updates the defaults section of the preference
-func (o *SetOptions) setDefaults(pref *v1beta1.Preference, options []v1beta1.CommandOptionDefault) error {
+func (o *SetOptions) setDefaults(pref *v1.Preference, options []v1.CommandOptionDefault) error {
 	for i, def := range pref.Defaults {
 		if def.Command == o.Command {
 			if !o.Overwrite {
@@ -288,7 +288,7 @@ func (o *SetOptions) setDefaults(pref *v1beta1.Preference, options []v1beta1.Com
 		}
 	}
 
-	pref.Defaults = append(pref.Defaults, v1beta1.CommandDefaults{
+	pref.Defaults = append(pref.Defaults, v1.CommandDefaults{
 		Command: o.Command,
 		Options: options,
 	})
@@ -297,7 +297,7 @@ func (o *SetOptions) setDefaults(pref *v1beta1.Preference, options []v1beta1.Com
 }
 
 // setAlias updates the aliases section of the preference
-func (o *SetOptions) setAlias(pref *v1beta1.Preference, options []v1beta1.CommandOptionDefault) error {
+func (o *SetOptions) setAlias(pref *v1.Preference, options []v1.CommandOptionDefault) error {
 	// Check if this alias already exists
 	for i, alias := range pref.Aliases {
 		if alias.Name == o.AliasName {
@@ -325,7 +325,7 @@ func (o *SetOptions) setAlias(pref *v1beta1.Preference, options []v1beta1.Comman
 				appendArgs = alias.AppendArgs
 			}
 
-			pref.Aliases[i] = v1beta1.AliasOverride{
+			pref.Aliases[i] = v1.AliasOverride{
 				Name:        o.AliasName,
 				Command:     o.Command,
 				PrependArgs: prependArgs,
@@ -336,7 +336,7 @@ func (o *SetOptions) setAlias(pref *v1beta1.Preference, options []v1beta1.Comman
 		}
 	}
 
-	pref.Aliases = append(pref.Aliases, v1beta1.AliasOverride{
+	pref.Aliases = append(pref.Aliases, v1.AliasOverride{
 		Name:        o.AliasName,
 		Command:     o.Command,
 		PrependArgs: o.PrependArgs,
@@ -348,18 +348,18 @@ func (o *SetOptions) setAlias(pref *v1beta1.Preference, options []v1beta1.Comman
 }
 
 // setCredentialPlugin sets the credential plugin policy and (optionally) the allowlist
-func (o *SetOptions) setCredentialPlugin(pref *v1beta1.Preference, options []v1beta1.CommandOptionDefault) error {
-	policy := v1beta1.CredentialPluginPolicy(o.PluginPolicy)
+func (o *SetOptions) setCredentialPlugin(pref *v1.Preference, options []v1.CommandOptionDefault) error {
+	policy := v1.CredentialPluginPolicy(o.PluginPolicy)
 
 	switch policy {
 	case "":
 		return fmt.Errorf("credential plugin policy cannot be empty")
-	case v1beta1.PluginPolicyAllowAll, v1beta1.PluginPolicyDenyAll:
+	case v1.PluginPolicyAllowAll, v1.PluginPolicyDenyAll:
 		if len(o.AllowlistEntries) != 0 {
-			return fmt.Errorf("credential plugin allowlist entries provided when policy was not %q", v1beta1.PluginPolicyAllowlist)
+			return fmt.Errorf("credential plugin allowlist entries provided when policy was not %q", v1.PluginPolicyAllowlist)
 		}
 		pref.CredentialPluginAllowlist = nil
-	case v1beta1.PluginPolicyAllowlist:
+	case v1.PluginPolicyAllowlist:
 		entries, err := getAllowlistEntries(o)
 		if err != nil {
 			return err
@@ -373,13 +373,13 @@ func (o *SetOptions) setCredentialPlugin(pref *v1beta1.Preference, options []v1b
 	return nil
 }
 
-func getAllowlistEntries(o *SetOptions) ([]v1beta1.AllowlistEntry, error) {
+func getAllowlistEntries(o *SetOptions) ([]v1.AllowlistEntry, error) {
 	if len(o.AllowlistEntries) == 0 {
-		return nil, fmt.Errorf("--allowlist-entry must be provided when policy is %q", v1beta1.PluginPolicyAllowlist)
+		return nil, fmt.Errorf("--allowlist-entry must be provided when policy is %q", v1.PluginPolicyAllowlist)
 	}
 
 	var errs []error
-	var entries []v1beta1.AllowlistEntry
+	var entries []v1.AllowlistEntry
 	for _, keyValuepairs := range o.AllowlistEntries {
 		for keyValuePair := range strings.SplitSeq(keyValuepairs, ",") {
 			field, value, hasSeparator := strings.Cut(keyValuePair, "=")
@@ -388,7 +388,7 @@ func getAllowlistEntries(o *SetOptions) ([]v1beta1.AllowlistEntry, error) {
 				continue
 			}
 
-			var entry v1beta1.AllowlistEntry
+			var entry v1.AllowlistEntry
 			switch field {
 			case allowlistEntryFieldName:
 				errs = append(errs, fmt.Errorf("allowlist entry field %q is deprecated, use %q instead", allowlistEntryFieldName, allowlistEntryFieldCommand))
