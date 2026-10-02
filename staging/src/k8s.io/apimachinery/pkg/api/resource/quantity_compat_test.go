@@ -152,7 +152,7 @@ const zeroAddHelperEnv = "KUBE_QUANTITY_ZERO_ADD_HELPER"
 
 // TestQuantityOutOfInt32ExponentZeroAdd pins the exponent reset, which 1.37 did not have:
 // with the exponent left at MinInt32, Add panics in inf.Dec.rescale or does not return.
-// The cases run in a child process, so a regression is killed instead of left running.
+// The cases run in a child process with its own timeout, so a regression is stopped instead of left running.
 func TestQuantityOutOfInt32ExponentZeroAdd(t *testing.T) {
 	if os.Getenv(zeroAddHelperEnv) == "1" {
 		for _, in := range zeroMinInt32Spellings {
@@ -169,7 +169,8 @@ func TestQuantityOutOfInt32ExponentZeroAdd(t *testing.T) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, os.Args[0], "-test.run=^TestQuantityOutOfInt32ExponentZeroAdd$", "-test.count=1")
+	// The child's own timeout is shorter than ctx, so a hang prints its stack, and it still applies if this process times out first.
+	cmd := exec.CommandContext(ctx, os.Args[0], "-test.run=^TestQuantityOutOfInt32ExponentZeroAdd$", "-test.count=1", "-test.timeout=25s")
 	cmd.Env = append(os.Environ(), zeroAddHelperEnv+"=1")
 	cmd.WaitDelay = time.Second
 	out, err := cmd.CombinedOutput()
