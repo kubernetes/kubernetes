@@ -329,7 +329,7 @@ func TestCacheIntervalNextFromWatchCache(t *testing.T) {
 					if i%bufferSize == 0 && i != c.eventsAddedToWatchcache {
 						originalCacheStartIndex := wc.history.startIndex
 						wc.history.startIndex = src.startIndex + 1
-						event, err := wci.Next()
+						event, err := src.next()
 						if err == nil {
 							t.Errorf("expected non-nil error")
 						}
@@ -352,7 +352,7 @@ func TestCacheIntervalNextFromWatchCache(t *testing.T) {
 					return
 				}
 
-				event, err := wci.Next()
+				event, err := src.next()
 				if err != nil {
 					t.Errorf("unexpected error: %v", err)
 					return
@@ -364,7 +364,7 @@ func TestCacheIntervalNextFromWatchCache(t *testing.T) {
 					t.Error(err)
 				}
 			}
-			event, err := wci.Next()
+			event, err := src.next()
 			ok := err != nil
 			if err := verifyNoEvent(ok, event); err != nil {
 				t.Error(err)
@@ -409,9 +409,10 @@ func TestCacheIntervalNextFromStore(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	src := wci.source.(*snapshotCacheIntervalSource)
 
 	for i := 0; i < numEvents; i++ {
-		event, err := wci.Next()
+		event, err := src.next()
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -429,7 +430,7 @@ func TestCacheIntervalNextFromStore(t *testing.T) {
 	}
 
 	// All events should have been consumed.
-	event, err := wci.Next()
+	event, err := src.next()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -465,10 +466,11 @@ func TestCacheIntervalFromStoreSorted(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
+			src := wci.source.(*snapshotCacheIntervalSource)
 
 			got := make([]string, 0, n)
 			for range n {
-				ev, err := wci.Next()
+				ev, err := src.next()
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -530,8 +532,7 @@ func TestCacheIntervalSourceSelection(t *testing.T) {
 }
 
 type countingSnapshot struct {
-	items                  []interface{}
-	orderedListPrefixCalls int
+	rangePrefixCalls int
 }
 
 func (s *countingSnapshot) GetByKey(string) (interface{}, bool, error) {
@@ -539,30 +540,22 @@ func (s *countingSnapshot) GetByKey(string) (interface{}, bool, error) {
 }
 
 func (s *countingSnapshot) OrderedListPrefix(_, _ string) ([]interface{}, error) {
-	s.orderedListPrefixCalls++
-	return s.items, nil
+	return nil, fmt.Errorf("OrderedListPrefix must not be called")
 }
 
 func (s *countingSnapshot) RangePrefix(_, _ string) store.Range {
-	return nil
+	s.rangePrefixCalls++
+	return store.EmptyRange()
 }
 
-// TestLazySnapshotCacheIntervalSourceEmpty checks that on an empty snapshot Next() returns
-// no events, and that repeated calls still read the snapshot only once.
 func TestLazySnapshotCacheIntervalSourceEmpty(t *testing.T) {
 	snap := &countingSnapshot{}
 	wci := newCacheIntervalFromLazySnapshot(100, snap)
 
-	for range 2 {
-		event, err := wci.Next()
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if event != nil {
-			t.Errorf("expected nil event from empty snapshot, got %v", *event)
-		}
+	for event, err := range wci.All() {
+		t.Fatalf("empty snapshot yielded (%v, %v)", event, err)
 	}
-	if snap.orderedListPrefixCalls != 1 {
-		t.Errorf("expected OrderedListPrefix to be called once, got %d", snap.orderedListPrefixCalls)
+	if snap.rangePrefixCalls != 1 {
+		t.Errorf("expected RangePrefix to be called once, got %d", snap.rangePrefixCalls)
 	}
 }
