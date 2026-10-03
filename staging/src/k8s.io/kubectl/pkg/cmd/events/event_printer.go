@@ -71,13 +71,19 @@ func (ep *EventPrinter) printOneEvent(w io.Writer, e corev1.Event) {
 	if ep.AllNamespaces {
 		fmt.Fprintf(w, "%v\t", e.Namespace)
 	}
+
+	message := strings.TrimSpace(e.Message)
+	if idx := strings.Index(message, "\n"); idx != -1 {
+		message = message[:idx] + "..."
+	}
+
 	fmt.Fprintf(w, "%s\t%s\t%s\t%s/%s\t%v\n",
 		interval,
 		printers.EscapeTerminal(e.Type),
 		printers.EscapeTerminal(e.Reason),
 		printers.EscapeTerminal(e.InvolvedObject.Kind),
 		printers.EscapeTerminal(e.InvolvedObject.Name),
-		printers.EscapeTerminal(strings.TrimSpace(e.Message)),
+		printers.EscapeTerminal(message),
 	)
 }
 
