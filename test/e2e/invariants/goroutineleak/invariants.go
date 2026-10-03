@@ -71,26 +71,6 @@ var (
 	regKubeControllerManager = regexp.MustCompile("kube-controller-manager-.*")
 )
 
-// Owners identifies who is responsible for a finding. KEP-5468 requires that
-// every invariant has documented owners which are surfaced with the result.
-type Owners struct {
-	// SIG associated with the invariant, without the "sig-" prefix.
-	SIG string
-	// Owners are the GitHub handles to assign bugs to.
-	Owners []string
-}
-
-func (o Owners) String() string {
-	return fmt.Sprintf("SIG: %s, Owners: %s", o.SIG, strings.Join(o.Owners, ", "))
-}
-
-// defaultOwners is used until per-component ownership is agreed with the
-// owning SIGs.
-var defaultOwners = Owners{
-	SIG:    "testing",
-	Owners: []string{"pohly"},
-}
-
 // PodDialer establishes a connection to a port inside a pod. The e2e suite
 // provides an implementation backed by the pod portforward subresource, which
 // is how the metrics grabber reaches components that listen on localhost.
@@ -332,7 +312,7 @@ func Report(results []Result) string {
 		if r.Err != nil || r.Total == 0 {
 			continue
 		}
-		fmt.Fprintf(&b, "\n%d leaked goroutine(s) in %s (%s)\n", r.Total, r.Component, defaultOwners)
+		fmt.Fprintf(&b, "\n%d leaked goroutine(s) in %s\n", r.Total, r.Component)
 		for _, l := range r.Leaks {
 			if l.Function == "" {
 				fmt.Fprintf(&b, "  %d x <unknown stack>\n", l.Count)
@@ -362,6 +342,7 @@ func Failure(results []Result) string {
 If this failed on a pull request, please check if the PR changes may be related to the failure.
 If not, you can also search for an existing GitHub issue before filing a new issue.
 
-If this failed in a periodic CI job, please file a bug and /assign the owners`,
+If this failed in a periodic CI job, please file a bug against the SIG which owns
+the component named above. The invariant itself is owned by SIG Testing.`,
 		total, Report(results))
 }
