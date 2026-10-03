@@ -17,6 +17,9 @@ limitations under the License.
 package workqueue
 
 import (
+	"fmt"
+	"math"
+	"math/big"
 	"testing"
 	"time"
 )
@@ -94,6 +97,45 @@ func TestItemExponentialFailureRateLimiterOverFlow(t *testing.T) {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 
+}
+
+func TestItemExponentialFailureRateLimiterFloat64Boundary(t *testing.T) {
+	baseDelays := []time.Duration{time.Millisecond, 5 * time.Millisecond, math.MaxInt64, math.MaxInt64 - 1023}
+	for exponent := 0; exponent < 63; exponent++ {
+		baseDelays = append(baseDelays, time.Duration(1)<<exponent)
+	}
+	for _, baseDelay := range baseDelays {
+		for _, maxDelay := range []time.Duration{0, time.Nanosecond, 1000 * time.Second, math.MaxInt64} {
+			t.Run(fmt.Sprintf("base=%d/max=%d", baseDelay, maxDelay), func(t *testing.T) {
+				limiter := NewTypedItemExponentialFailureRateLimiter[string](baseDelay, maxDelay)
+				max := big.NewInt(int64(maxDelay))
+				for attempt := 0; attempt < 65; attempt++ {
+					// Use exact arithmetic so the oracle does not share the float-to-duration boundary.
+					backoff := new(big.Int).Lsh(big.NewInt(int64(baseDelay)), uint(attempt))
+					want := maxDelay
+					if backoff.Cmp(max) < 0 {
+						want = time.Duration(backoff.Int64())
+					}
+					if got := limiter.When("item"); got != want {
+						t.Fatalf("attempt %d: delay = %v, want %v", attempt, got, want)
+					}
+				}
+				if got := limiter.NumRequeues("item"); got != 65 {
+					t.Errorf("requeues = %d, want 65", got)
+				}
+				if got, want := limiter.When("other"), min(baseDelay, maxDelay); got != want {
+					t.Errorf("new item delay = %v, want %v", got, want)
+				}
+				limiter.Forget("item")
+				if got := limiter.NumRequeues("item"); got != 0 {
+					t.Errorf("requeues after Forget = %d, want 0", got)
+				}
+				if got, want := limiter.When("item"), min(baseDelay, maxDelay); got != want {
+					t.Errorf("delay after Forget = %v, want %v", got, want)
+				}
+			})
+		}
+	}
 }
 
 func TestItemFastSlowRateLimiter(t *testing.T) {

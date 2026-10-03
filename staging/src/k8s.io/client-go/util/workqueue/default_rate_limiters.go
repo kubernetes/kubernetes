@@ -120,9 +120,9 @@ func (r *TypedItemExponentialFailureRateLimiter[T]) When(item T) time.Duration {
 	exp := r.failures[item]
 	r.failures[item] = r.failures[item] + 1
 
-	// The backoff is capped such that 'calculated' value never overflows.
+	// float64(math.MaxInt64) rounds up to 2^63, which cannot fit in a time.Duration.
 	backoff := float64(r.baseDelay.Nanoseconds()) * math.Pow(2, float64(exp))
-	if backoff > math.MaxInt64 {
+	if backoff >= math.MaxInt64 {
 		return r.maxDelay
 	}
 
