@@ -308,6 +308,9 @@ func (s *Model) get(key string, opts storage.GetOptions) Response {
 	if err := checkKey(key, false); err != nil {
 		return Response{Err: err}
 	}
+	if _, err := s.Versioner.ParseResourceVersion(opts.ResourceVersion); err != nil {
+		return Response{Err: err}
+	}
 	if opts.ResourceVersion != "" {
 		panic("get with resourceVersion is not supported, the model only serves the latest state")
 	}
@@ -316,7 +319,7 @@ func (s *Model) get(key string, opts storage.GetOptions) Response {
 		if opts.IgnoreNotFound {
 			return Response{Object: s.NewFunc(), Err: nil}
 		}
-		return Response{Object: nil, Err: storage.NewKeyNotFoundError(s.Prefix+key, 0)}
+		return Response{Object: nil, Err: storage.NewKeyNotFoundError(s.Prefix+key, int64(s.ResourceVersion))}
 	}
 	return Response{Object: stored.DeepCopyObject(), Err: nil}
 }
