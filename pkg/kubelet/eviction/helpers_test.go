@@ -27,6 +27,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -1294,6 +1295,50 @@ func TestSortByEvictionPriority(t *testing.T) {
 				},
 				{
 					Signal: evictionapi.SignalPIDAvailable,
+				},
+			},
+		},
+		{
+			name: "node memory before system partition memory",
+			thresholds: []evictionapi.Threshold{
+				{
+					Signal: evictionapi.SignalNodeFsAvailable,
+				},
+				{
+					Signal: evictionapi.SignalSystemPartitionMemoryAvailable,
+				},
+				{
+					Signal: evictionapi.SignalMemoryAvailable,
+				},
+			},
+			expected: []evictionapi.Threshold{
+				{
+					Signal: evictionapi.SignalMemoryAvailable,
+				},
+				{
+					Signal: evictionapi.SignalSystemPartitionMemoryAvailable,
+				},
+				{
+					Signal: evictionapi.SignalNodeFsAvailable,
+				},
+			},
+		},
+		{
+			name: "allocatable memory before system partition memory",
+			thresholds: []evictionapi.Threshold{
+				{
+					Signal: evictionapi.SignalSystemPartitionMemoryAvailable,
+				},
+				{
+					Signal: evictionapi.SignalAllocatableMemoryAvailable,
+				},
+			},
+			expected: []evictionapi.Threshold{
+				{
+					Signal: evictionapi.SignalAllocatableMemoryAvailable,
+				},
+				{
+					Signal: evictionapi.SignalSystemPartitionMemoryAvailable,
 				},
 			},
 		},
@@ -3718,6 +3763,124 @@ func TestEvictionMessage(t *testing.T) {
 					t.Errorf("Unexpected annotation value for %s key found, got: %s, want: %s", key, val, tc.expectedAnnotations[key])
 				}
 			}
+		})
+	}
+}
+
+func TestParseSystemPartitionThresholds(t *testing.T) {
+	cases := []struct {
+		name         string
+		evictionHard map[string]string
+		want         []evictionapi.Threshold
+		wantErr      bool
+	}{
+		{
+			name: "unset gives no threshold",
+		},
+		{
+			name:         "quantity",
+			evictionHard: map[string]string{"memory.available": "200Mi"},
+			want: []evictionapi.Threshold{{
+				Signal:   evictionapi.SignalSystemPartitionMemoryAvailable,
+				Operator: evictionapi.OpLessThan,
+				Value:    evictionapi.ThresholdValue{Quantity: quantityMustParse("200Mi")},
+			}},
+		},
+		{
+			name:         "percentage of the partition's memory limit",
+			evictionHard: map[string]string{"memory.available": "5%"},
+			want: []evictionapi.Threshold{{
+				Signal:   evictionapi.SignalSystemPartitionMemoryAvailable,
+				Operator: evictionapi.OpLessThan,
+				Value:    evictionapi.ThresholdValue{Percentage: 0.05},
+			}},
+		},
+		{
+			// Same as at the node level, where 0% and 100% switch a signal off.
+			name:         "0% gives no threshold",
+			evictionHard: map[string]string{"memory.available": "0%"},
+		},
+		{
+			name:         "unparsable value",
+			evictionHard: map[string]string{"memory.available": "200Mx"},
+			wantErr:      true,
+		},
+		{
+			name:         "unsupported signal",
+			evictionHard: map[string]string{"nodefs.available": "10%"},
+			wantErr:      true,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := ParseSystemPartitionThresholds(tc.evictionHard)
+			if tc.wantErr {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			if !assert.Len(t, got, len(tc.want)) {
+				return
+			}
+			for i := range tc.want {
+				assert.Equal(t, tc.want[i].Signal, got[i].Signal)
+				assert.Equal(t, tc.want[i].Operator, got[i].Operator)
+				assert.True(t, compareThresholdValue(tc.want[i].Value, got[i].Value), "want %v, got %v", tc.want[i].Value, got[i].Value)
+				assert.Nil(t, got[i].MinReclaim)
+				assert.Zero(t, got[i].GracePeriod, "the threshold is a hard one")
+			}
+		})
+	}
+}
+
+func TestParseThresholdConfigRejectsSystemPartitionSignal(t *testing.T) {
+	_, err := ParseThresholdConfig(nil, map[string]string{string(evictionapi.SignalSystemPartitionMemoryAvailable): "200Mi"}, nil, nil, nil)
+	assert.ErrorContains(t, err, "systemPartition")
+}
+
+func TestMakeSignalObservationsSystemPartition(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	available, workingSet := uint64(300*1024*1024), uint64(700*1024*1024)
+	partition := statsapi.ContainerStats{
+		Name:   statsapi.SystemContainerSystemPods,
+		Memory: &statsapi.MemoryStats{AvailableBytes: &available, WorkingSetBytes: &workingSet},
+	}
+
+	cases := []struct {
+		name             string
+		systemContainers []statsapi.ContainerStats
+		wantObservation  bool
+	}{
+		{
+			name:             "a partition with a memory limit is observed",
+			systemContainers: []statsapi.ContainerStats{partition},
+			wantObservation:  true,
+		},
+		{
+			// cadvisor reports no available bytes for an unlimited cgroup.
+			name: "a partition without a memory limit is not observed",
+			systemContainers: []statsapi.ContainerStats{{
+				Name:   statsapi.SystemContainerSystemPods,
+				Memory: &statsapi.MemoryStats{WorkingSetBytes: &workingSet},
+			}},
+		},
+		{
+			name: "a node without a partition is not observed",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			summary := &statsapi.Summary{Node: statsapi.NodeStats{SystemContainers: tc.systemContainers}}
+			observations, _ := makeSignalObservations(logger, summary)
+			observation, found := observations[evictionapi.SignalSystemPartitionMemoryAvailable]
+			assert.Equal(t, tc.wantObservation, found)
+			if !found {
+				return
+			}
+			assert.Equal(t, int64(available), observation.available.Value())
+			// The capacity is the partition's memory limit, which is what a
+			// percentage threshold is taken of.
+			assert.Equal(t, int64(available+workingSet), observation.capacity.Value())
 		})
 	}
 }
