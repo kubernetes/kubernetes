@@ -29,8 +29,8 @@ import (
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/types"
-	"k8s.io/kubernetes/pkg/scheduler"
 	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework"
+	"k8s.io/kubernetes/pkg/scheduler/framework/admission"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeaffinity"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/tainttoleration"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
@@ -430,7 +430,7 @@ func (e *PredicateFailureError) GetReason() string {
 
 // generalFilter checks a group of filterings that the kubelet cares about.
 func generalFilter(logger klog.Logger, pod *v1.Pod, nodeInfo *schedulerframework.NodeInfo) []PredicateFailureReason {
-	admissionResults := scheduler.AdmissionCheck(pod, nodeInfo, true)
+	admissionResults := admission.Check(pod, nodeInfo, true)
 	var reasons []PredicateFailureReason
 	for _, r := range admissionResults {
 		if r.InsufficientResource != nil {
