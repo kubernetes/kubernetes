@@ -20,32 +20,31 @@ import (
 	"testing"
 
 	field "k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/utils/ptr"
 )
 
 func Test(t *testing.T) {
 	st := localSchemeBuilder.Test(t)
 
 	structA1 := Struct{
-		SP: ptr.To("zero"),
-		IP: ptr.To(0),
-		BP: ptr.To(false),
-		FP: ptr.To(0.0),
+		SP: new("zero"),
+		IP: new(0),
+		BP: new(false),
+		FP: new(0.0),
 	}
 
 	// Same data, different pointers
 	structA2 := Struct{
-		SP: ptr.To("zero"),
-		IP: ptr.To(0),
-		BP: ptr.To(false),
-		FP: ptr.To(0.0),
+		SP: new("zero"),
+		IP: new(0),
+		BP: new(false),
+		FP: new(0.0),
 	}
 	// Different data.
 	structB := Struct{
-		SP: ptr.To("one"),
-		IP: ptr.To(1),
-		BP: ptr.To(true),
-		FP: ptr.To(1.1),
+		SP: new("one"),
+		IP: new(1),
+		BP: new(true),
+		FP: new(1.1),
 	}
 
 	st.Value(&structA1).OldValue(&structA1).ExpectValid()

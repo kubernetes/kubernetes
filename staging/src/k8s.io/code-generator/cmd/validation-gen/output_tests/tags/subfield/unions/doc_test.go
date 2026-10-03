@@ -20,7 +20,6 @@ import (
 	"testing"
 
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/utils/ptr"
 )
 
 func TestStructValidation(t *testing.T) {
@@ -30,7 +29,7 @@ func TestStructValidation(t *testing.T) {
 	st.Value(&Struct{
 		Subfield: SubStruct{
 			D:  "M1",
-			M1: ptr.To(1),
+			M1: new(1),
 		},
 	}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField().ByOrigin(), field.ErrorList{})
 
@@ -38,7 +37,7 @@ func TestStructValidation(t *testing.T) {
 	st.Value(&Struct{
 		Subfield: SubStruct{
 			D:  "M2",
-			M2: ptr.To(1),
+			M2: new(1),
 		},
 	}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField().ByOrigin(), field.ErrorList{})
 
@@ -46,7 +45,7 @@ func TestStructValidation(t *testing.T) {
 	st.Value(&Struct{
 		Subfield: SubStruct{
 			D:  "M1",
-			M2: ptr.To(1),
+			M2: new(1),
 		},
 	}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField().ByOrigin(), field.ErrorList{
 		field.Invalid(field.NewPath("subfield", "m1"), "", "must be specified when `d` is \"M1\"").WithOrigin("union"),
@@ -57,8 +56,8 @@ func TestStructValidation(t *testing.T) {
 	st.Value(&Struct{
 		Subfield: SubStruct{
 			D:  "M1",
-			M1: ptr.To(1),
-			M2: ptr.To(1),
+			M1: new(1),
+			M2: new(1),
 		},
 	}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField().ByOrigin(), field.ErrorList{
 		field.Invalid(field.NewPath("subfield", "m2"), "", "may only be specified when `d` is \"M2\"").WithOrigin("union"),
