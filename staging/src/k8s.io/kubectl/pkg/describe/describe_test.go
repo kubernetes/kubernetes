@@ -124,7 +124,7 @@ func TestDescribePod(t *testing.T) {
 		fake := fake.NewClientset(pod)
 		c := &describeClient{T: t, Namespace: pod.Namespace, Interface: fake}
 		d := PodDescriber{c}
-		out, err := d.Describe(pod.Namespace, pod.Name, DescriberSettings{ShowEvents: true})
+		out, err := d.Describe(pod, DescriberSettings{ShowEvents: true})
 		if err != nil {
 			t.Errorf("case %d: unexpected error: %v", i, err)
 		}
@@ -149,7 +149,7 @@ func TestDescribePodServiceAccount(t *testing.T) {
 	fake := fake.NewClientset(pod)
 	c := &describeClient{T: t, Namespace: "foo", Interface: fake}
 	d := PodDescriber{c}
-	out, err := d.Describe("foo", "bar", DescriberSettings{ShowEvents: true})
+	out, err := d.Describe(pod, DescriberSettings{ShowEvents: true})
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -195,7 +195,7 @@ func TestDescribePodEphemeralContainers(t *testing.T) {
 	fake := fake.NewClientset(pod)
 	c := &describeClient{T: t, Namespace: "foo", Interface: fake}
 	d := PodDescriber{c}
-	out, err := d.Describe("foo", "bar", DescriberSettings{ShowEvents: true})
+	out, err := d.Describe(pod, DescriberSettings{ShowEvents: true})
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -224,7 +224,7 @@ func TestDescribePodNode(t *testing.T) {
 	fake := fake.NewClientset(pod)
 	c := &describeClient{T: t, Namespace: "foo", Interface: fake}
 	d := PodDescriber{c}
-	out, err := d.Describe("foo", "bar", DescriberSettings{ShowEvents: true})
+	out, err := d.Describe(pod, DescriberSettings{ShowEvents: true})
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -257,7 +257,7 @@ func TestDescribePodTolerations(t *testing.T) {
 	fake := fake.NewClientset(pod)
 	c := &describeClient{T: t, Namespace: "foo", Interface: fake}
 	d := PodDescriber{c}
-	out, err := d.Describe("foo", "bar", DescriberSettings{})
+	out, err := d.Describe(pod, DescriberSettings{})
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -313,7 +313,7 @@ func TestDescribePodVolumes(t *testing.T) {
 	fakeClient := fake.NewClientset(pod)
 	c := &describeClient{T: t, Namespace: "foo", Interface: fakeClient}
 	d := PodDescriber{c}
-	out, err := d.Describe("foo", "bar", DescriberSettings{ShowEvents: true})
+	out, err := d.Describe(pod, DescriberSettings{ShowEvents: true})
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -345,7 +345,7 @@ func TestDescribeTopologySpreadConstraints(t *testing.T) {
 	fake := fake.NewClientset(pod)
 	c := &describeClient{T: t, Namespace: "foo", Interface: fake}
 	d := PodDescriber{c}
-	out, err := d.Describe("foo", "bar", DescriberSettings{})
+	out, err := d.Describe(pod, DescriberSettings{})
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -401,7 +401,7 @@ func TestDescribeSecret(t *testing.T) {
 			c := &describeClient{T: t, Namespace: "foo", Interface: fake}
 			d := SecretDescriber{c}
 
-			out, err := d.Describe("foo", "bar", DescriberSettings{})
+			out, err := d.Describe(secret, DescriberSettings{})
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -504,7 +504,7 @@ func TestDescribeNamespace(t *testing.T) {
 			c := &describeClient{T: t, Namespace: "", Interface: fake}
 			d := NamespaceDescriber{c}
 
-			out, err := d.Describe("", testCase.namespace.Name, DescriberSettings{ShowEvents: true})
+			out, err := d.Describe(testCase.namespace, DescriberSettings{ShowEvents: true})
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -532,7 +532,7 @@ func TestDescribePodPriority(t *testing.T) {
 	fake := fake.NewClientset(pod)
 	c := &describeClient{T: t, Namespace: "", Interface: fake}
 	d := PodDescriber{c}
-	out, err := d.Describe("", "bar", DescriberSettings{ShowEvents: true})
+	out, err := d.Describe(pod, DescriberSettings{ShowEvents: true})
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -603,7 +603,7 @@ func TestDescribePodRuntimeClass(t *testing.T) {
 			fake := fake.NewClientset(testCase.pod)
 			c := &describeClient{T: t, Interface: fake}
 			d := PodDescriber{c}
-			out, err := d.Describe("", "bar", DescriberSettings{ShowEvents: true})
+			out, err := d.Describe(testCase.pod, DescriberSettings{ShowEvents: true})
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -658,7 +658,7 @@ func TestDescribePodSchedulingGroup(t *testing.T) {
 			fake := fake.NewClientset(tc.pod)
 			c := &describeClient{T: t, Interface: fake}
 			d := PodDescriber{c}
-			out, err := d.Describe("", "bar", DescriberSettings{ShowEvents: true})
+			out, err := d.Describe(tc.pod, DescriberSettings{ShowEvents: true})
 			if err != nil {
 				t.Errorf("Unexpected error: %v", err)
 			}
@@ -727,7 +727,7 @@ func TestDescribePriorityClass(t *testing.T) {
 			fake := fake.NewClientset(testCase.priorityClass)
 			c := &describeClient{T: t, Interface: fake}
 			d := PriorityClassDescriber{c}
-			out, err := d.Describe("", "bar", DescriberSettings{ShowEvents: true})
+			out, err := d.Describe(testCase.priorityClass, DescriberSettings{ShowEvents: true})
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -758,7 +758,7 @@ func TestDescribeConfigMap(t *testing.T) {
 	fake := fake.NewClientset(configMap)
 	c := &describeClient{T: t, Namespace: "foo", Interface: fake}
 	d := ConfigMapDescriber{c}
-	out, err := d.Describe("foo", "mycm", DescriberSettings{ShowEvents: true})
+	out, err := d.Describe(configMap, DescriberSettings{ShowEvents: true})
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -832,7 +832,7 @@ func TestDescribeLimitRange(t *testing.T) {
 	fake := fake.NewClientset(limitRange)
 	c := &describeClient{T: t, Namespace: "foo", Interface: fake}
 	d := LimitRangeDescriber{c}
-	out, err := d.Describe("foo", "mylr", DescriberSettings{ShowEvents: true})
+	out, err := d.Describe(limitRange, DescriberSettings{ShowEvents: true})
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -1363,7 +1363,7 @@ func TestDescribeService(t *testing.T) {
 			fakeClient := fake.NewClientset(objects...)
 			c := &describeClient{T: t, Namespace: "foo", Interface: fakeClient}
 			d := ServiceDescriber{c}
-			out, err := d.Describe("foo", "bar", DescriberSettings{ShowEvents: true})
+			out, err := d.Describe(tc.service, DescriberSettings{ShowEvents: true})
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -1414,7 +1414,7 @@ func TestPodDescribeResultsSorted(t *testing.T) {
 	d := PodDescriber{c}
 
 	// Act
-	out, err := d.Describe("foo", "bar", DescriberSettings{ShowEvents: true})
+	out, err := d.Describe(pod, DescriberSettings{ShowEvents: true})
 
 	// Assert
 	if err != nil {
@@ -2484,7 +2484,7 @@ func TestPersistentVolumeDescriber(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			fake := fake.NewClientset(test.pv)
 			c := PersistentVolumeDescriber{fake}
-			str, err := c.Describe("foo", "bar", DescriberSettings{ShowEvents: true})
+			str, err := c.Describe(test.pv, DescriberSettings{ShowEvents: true})
 			if err != nil {
 				t.Errorf("Unexpected error for test %s: %v", test.plugin, err)
 			}
@@ -2746,7 +2746,7 @@ func TestPersistentVolumeClaimDescriber(t *testing.T) {
 				describerSettings = *defaultDescriberSettings
 			}
 
-			str, err := c.Describe("foo", "bar", describerSettings)
+			str, err := c.Describe(test.pvc, describerSettings)
 			if err != nil {
 				t.Errorf("Unexpected error for test %s: %v", test.name, err)
 			}
@@ -3580,7 +3580,7 @@ func TestDescribeDeployment(t *testing.T) {
 			objs := append([]runtime.Object{testCase.deployment}, testCase.objects...)
 			fakeClient := fake.NewClientset(objs...)
 			d := DeploymentDescriber{fakeClient}
-			out, err := d.Describe("foo", "bar", DescriberSettings{ShowEvents: true})
+			out, err := d.Describe(testCase.deployment, DescriberSettings{ShowEvents: true})
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -3693,7 +3693,7 @@ func TestDescribeJob(t *testing.T) {
 				Interface: fake.NewClientset(tc.job),
 			}
 			describer := JobDescriber{Interface: client}
-			out, err := describer.Describe(tc.job.Namespace, tc.job.Name, DescriberSettings{ShowEvents: true})
+			out, err := describer.Describe(tc.job, DescriberSettings{ShowEvents: true})
 			if err != nil {
 				t.Fatalf("unexpected error describing object: %v", err)
 			}
@@ -4061,7 +4061,7 @@ Events:       <none>
 			client := fake.NewClientset(test.input)
 			c := &describeClient{T: t, Namespace: "foo", Interface: client}
 			i := IngressDescriber{c}
-			out, err := i.Describe("foo", "bar", DescriberSettings{ShowEvents: true})
+			out, err := i.Describe(test.input, DescriberSettings{ShowEvents: true})
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -4115,7 +4115,7 @@ func TestDescribeIngressV1(t *testing.T) {
 	}
 	fakeClient := fake.NewClientset(ingress)
 	i := IngressDescriber{fakeClient}
-	out, err := i.Describe("foo", "bar", DescriberSettings{ShowEvents: true})
+	out, err := i.Describe(ingress, DescriberSettings{ShowEvents: true})
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -4176,7 +4176,7 @@ func TestDescribeStorageClass(t *testing.T) {
 	}
 	f := fake.NewClientset(storageClass)
 	s := StorageClassDescriber{f}
-	out, err := s.Describe("", "foo", DescriberSettings{ShowEvents: true})
+	out, err := s.Describe(storageClass, DescriberSettings{ShowEvents: true})
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -4222,7 +4222,7 @@ Events:       <none>
 	}
 	f := fake.NewClientset(volumeAttributesClass)
 	s := VolumeAttributesClassDescriber{f}
-	out, err := s.Describe("", "foo", DescriberSettings{ShowEvents: true})
+	out, err := s.Describe(volumeAttributesClass, DescriberSettings{ShowEvents: true})
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -4251,7 +4251,7 @@ func TestDescribeCSINode(t *testing.T) {
 	}
 	f := fake.NewClientset(csiNode)
 	s := CSINodeDescriber{f}
-	out, err := s.Describe("", "foo", DescriberSettings{ShowEvents: true})
+	out, err := s.Describe(csiNode, DescriberSettings{ShowEvents: true})
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -4281,7 +4281,7 @@ func TestDescribePodDisruptionBudgetV1(t *testing.T) {
 	}
 	f := fake.NewClientset(podDisruptionBudget)
 	s := PodDisruptionBudgetDescriber{f}
-	out, err := s.Describe("ns1", "pdb1", DescriberSettings{ShowEvents: true})
+	out, err := s.Describe(podDisruptionBudget, DescriberSettings{ShowEvents: true})
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -5167,7 +5167,7 @@ func TestDescribeHorizontalPodAutoscaler(t *testing.T) {
 			}
 			fake := fake.NewClientset(&test.hpa)
 			desc := HorizontalPodAutoscalerDescriber{fake}
-			str, err := desc.Describe("foo", "bar", DescriberSettings{ShowEvents: true})
+			str, err := desc.Describe(&test.hpa, DescriberSettings{ShowEvents: true})
 			if err != nil {
 				t.Errorf("Unexpected error for test %s: %v", test.name, err)
 			}
@@ -5262,7 +5262,7 @@ func TestDescribeHorizontalPodAutoscaler(t *testing.T) {
 			}
 			fake := fake.NewClientset(&test.hpa)
 			desc := HorizontalPodAutoscalerDescriber{fake}
-			str, err := desc.Describe("foo", "bar", DescriberSettings{ShowEvents: true})
+			str, err := desc.Describe(&test.hpa, DescriberSettings{ShowEvents: true})
 			if err != nil {
 				t.Errorf("Unexpected error for test %s: %v", test.name, err)
 			}
@@ -5433,7 +5433,7 @@ func TestDescribeEvents(t *testing.T) {
 			clientset := fake.NewClientset(obj, events)
 			d := describerFor(name, clientset)
 
-			out, err := d.Describe("foo", "bar", DescriberSettings{ShowEvents: true})
+			out, err := d.Describe(obj, DescriberSettings{ShowEvents: true})
 			if err != nil {
 				t.Errorf("unexpected error for %q: %v", name, err)
 			}
@@ -5444,7 +5444,7 @@ func TestDescribeEvents(t *testing.T) {
 				t.Errorf("events not found for %q when ShowEvents=true: %s", name, out)
 			}
 
-			out, err = d.Describe("foo", "bar", DescriberSettings{ShowEvents: false})
+			out, err = d.Describe(obj, DescriberSettings{ShowEvents: false})
 			if err != nil {
 				t.Errorf("unexpected error for %q: %s", name, err)
 			}
@@ -5623,7 +5623,7 @@ func TestDescribeResourceQuota(t *testing.T) {
 	fake := fake.NewClientset(resourceQuota)
 	c := &describeClient{T: t, Namespace: "foo", Interface: fake}
 	d := ResourceQuotaDescriber{c}
-	out, err := d.Describe("foo", "bar", DescriberSettings{ShowEvents: true})
+	out, err := d.Describe(resourceQuota, DescriberSettings{ShowEvents: true})
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -5662,7 +5662,7 @@ Parameters:
 
 	c := &describeClient{T: t, Namespace: "foo", Interface: input}
 	d := IngressClassDescriber{c}
-	out, err := d.Describe("", "example-class", DescriberSettings{})
+	out, err := d.Describe(ingressClass, DescriberSettings{})
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -5867,7 +5867,7 @@ Spec:
 	}
 	versionedFake := fake.NewClientset(networkPolicy)
 	d := NetworkPolicyDescriber{versionedFake}
-	out, err := d.Describe("default", "network-policy-1", DescriberSettings{})
+	out, err := d.Describe(networkPolicy, DescriberSettings{})
 	if err != nil {
 		t.Errorf("unexpected error: %s", err)
 	}
@@ -5995,7 +5995,7 @@ Spec:
 	}
 	versionedFake := fake.NewClientset(networkPolicy)
 	d := NetworkPolicyDescriber{versionedFake}
-	out, err := d.Describe("default", "network-policy-1", DescriberSettings{})
+	out, err := d.Describe(networkPolicy, DescriberSettings{})
 	if err != nil {
 		t.Errorf("unexpected error: %s", err)
 	}
@@ -6124,7 +6124,7 @@ Spec:
 	}
 	versionedFake := fake.NewClientset(networkPolicy)
 	d := NetworkPolicyDescriber{versionedFake}
-	out, err := d.Describe("default", "network-policy-1", DescriberSettings{})
+	out, err := d.Describe(networkPolicy, DescriberSettings{})
 	if err != nil {
 		t.Errorf("unexpected error: %s", err)
 	}
@@ -6324,7 +6324,7 @@ Spec:
 	}
 	versionedFake := fake.NewClientset(networkPolicy)
 	d := NetworkPolicyDescriber{versionedFake}
-	out, err := d.Describe("default", "network-policy-1", DescriberSettings{})
+	out, err := d.Describe(networkPolicy, DescriberSettings{})
 	if err != nil {
 		t.Errorf("unexpected error: %s", err)
 	}
@@ -6353,7 +6353,7 @@ func TestDescribeServiceAccount(t *testing.T) {
 	fake := fake.NewClientset(serviceAccount)
 	c := &describeClient{T: t, Namespace: "foo", Interface: fake}
 	d := ServiceAccountDescriber{c}
-	out, err := d.Describe("foo", "bar", DescriberSettings{ShowEvents: true})
+	out, err := d.Describe(serviceAccount, DescriberSettings{ShowEvents: true})
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -6498,7 +6498,7 @@ func TestDescribeNode(t *testing.T) {
 	)
 	c := &describeClient{T: t, Namespace: "foo", Interface: fake}
 	d := NodeDescriber{c}
-	out, err := d.Describe("foo", "bar", DescriberSettings{ShowEvents: true})
+	out, err := d.Describe(node, DescriberSettings{ShowEvents: true})
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -6650,7 +6650,7 @@ func TestDescribeNodeWithSidecar(t *testing.T) {
 	)
 	c := &describeClient{T: t, Namespace: "foo", Interface: fake}
 	d := NodeDescriber{c}
-	out, err := d.Describe("foo", "bar", DescriberSettings{ShowEvents: true})
+	out, err := d.Describe(node, DescriberSettings{ShowEvents: true})
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -6737,7 +6737,7 @@ func TestDescribeNodeWithPodLevelResources(t *testing.T) {
 	)
 	c := &describeClient{T: t, Namespace: "foo", Interface: fake}
 	d := NodeDescriber{c}
-	out, err := d.Describe("foo", "bar", DescriberSettings{ShowEvents: true})
+	out, err := d.Describe(node, DescriberSettings{ShowEvents: true})
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -6864,20 +6864,21 @@ func TestDescribeNodeWithResourceSlice(t *testing.T) {
 		getHugePageResourceList("1Gi", "0"),
 	)
 
-	fake := fake.NewClientset(
-		&corev1.Node{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "bar",
-				UID:  "uid",
-			},
-			Spec: corev1.NodeSpec{
-				Unschedulable: true,
-			},
-			Status: corev1.NodeStatus{
-				Capacity:    nodeCapacity,
-				Allocatable: nodeAllocatable,
-			},
+	node := &corev1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "bar",
+			UID:  "uid",
 		},
+		Spec: corev1.NodeSpec{
+			Unschedulable: true,
+		},
+		Status: corev1.NodeStatus{
+			Capacity:    nodeCapacity,
+			Allocatable: nodeAllocatable,
+		},
+	}
+	fake := fake.NewClientset(
+		node,
 		&resourcev1.ResourceSlice{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "slice-1",
@@ -6913,7 +6914,7 @@ func TestDescribeNodeWithResourceSlice(t *testing.T) {
 	)
 	c := &describeClient{T: t, Namespace: "foo", Interface: fake}
 	d := NodeDescriber{c}
-	out, err := d.Describe("foo", "bar", DescriberSettings{ShowEvents: true})
+	out, err := d.Describe(node, DescriberSettings{ShowEvents: true})
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -6970,7 +6971,7 @@ func TestDescribeNodeWithResourceSliceCapping(t *testing.T) {
 	fake := fake.NewClientset(objects...)
 	c := &describeClient{T: t, Namespace: "foo", Interface: fake}
 	d := NodeDescriber{c}
-	out, err := d.Describe("foo", "bar", DescriberSettings{ShowEvents: true})
+	out, err := d.Describe(node, DescriberSettings{ShowEvents: true})
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -6982,17 +6983,16 @@ func TestDescribeNodeWithResourceSliceCapping(t *testing.T) {
 }
 
 func TestDescribeNodeWithNoResourceSlices(t *testing.T) {
-	fake := fake.NewClientset(
-		&corev1.Node{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "bar",
-				UID:  "uid",
-			},
+	node := &corev1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "bar",
+			UID:  "uid",
 		},
-	)
+	}
+	fake := fake.NewClientset(node)
 	c := &describeClient{T: t, Namespace: "foo", Interface: fake}
 	d := NodeDescriber{c}
-	out, err := d.Describe("foo", "bar", DescriberSettings{ShowEvents: true})
+	out, err := d.Describe(node, DescriberSettings{ShowEvents: true})
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -7041,7 +7041,7 @@ func TestDescribeStatefulSet(t *testing.T) {
 	}
 	fake := fake.NewClientset(statefulSet)
 	d := StatefulSetDescriber{fake}
-	out, err := d.Describe("foo", "bar", DescriberSettings{ShowEvents: true})
+	out, err := d.Describe(statefulSet, DescriberSettings{ShowEvents: true})
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -7088,7 +7088,7 @@ func TestDescribeDaemonSet(t *testing.T) {
 	}
 	fake := fake.NewClientset(daemonSet)
 	d := DaemonSetDescriber{fake}
-	out, err := d.Describe("foo", "bar", DescriberSettings{ShowEvents: true})
+	out, err := d.Describe(daemonSet, DescriberSettings{ShowEvents: true})
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -7164,7 +7164,7 @@ Events:         <none>` + "\n"
 
 	c := &describeClient{T: t, Namespace: "foo", Interface: input}
 	d := EndpointSliceDescriber{c}
-	out, err := d.Describe("bar", "foo.123", DescriberSettings{ShowEvents: true})
+	out, err := d.Describe(endpointSlice, DescriberSettings{ShowEvents: true})
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -7283,7 +7283,7 @@ Events:       <none>` + "\n",
 			client := fake.NewClientset(tc.input)
 			c := &describeClient{T: t, Namespace: "foo", Interface: client}
 			d := ServiceCIDRDescriber{c}
-			out, err := d.Describe("bar", "foo.123", DescriberSettings{ShowEvents: true})
+			out, err := d.Describe(tc.input, DescriberSettings{ShowEvents: true})
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -7357,7 +7357,7 @@ Events:       <none>` + "\n",
 			client := fake.NewClientset(tc.input)
 			c := &describeClient{T: t, Namespace: "foo", Interface: client}
 			d := IPAddressDescriber{c}
-			out, err := d.Describe("bar", "foo.123", DescriberSettings{ShowEvents: true})
+			out, err := d.Describe(tc.input, DescriberSettings{ShowEvents: true})
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -7450,7 +7450,7 @@ func TestControllerRef(t *testing.T) {
 			},
 		})
 	d := ReplicationControllerDescriber{f}
-	out, err := d.Describe("foo", "bar", DescriberSettings{ShowEvents: false})
+	out, err := d.Describe(replicationController, DescriberSettings{ShowEvents: false})
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -7470,7 +7470,7 @@ func TestDescribeTerminalEscape(t *testing.T) {
 	fake := fake.NewClientset(configMap)
 	c := &describeClient{T: t, Namespace: "foo", Interface: fake}
 	d := ConfigMapDescriber{c}
-	out, err := d.Describe("foo", "mycm", DescriberSettings{ShowEvents: true})
+	out, err := d.Describe(configMap, DescriberSettings{ShowEvents: true})
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -7607,7 +7607,7 @@ func TestDescribeSeccompProfile(t *testing.T) {
 			fake := fake.NewClientset(testCase.pod)
 			c := &describeClient{T: t, Interface: fake}
 			d := PodDescriber{c}
-			out, err := d.Describe("", "", DescriberSettings{ShowEvents: true})
+			out, err := d.Describe(testCase.pod, DescriberSettings{ShowEvents: true})
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -7651,7 +7651,7 @@ func TestDescribeProjectedVolumesOptionalSecret(t *testing.T) {
 	fake := fake.NewClientset(pod)
 	c := &describeClient{T: t, Namespace: "foo", Interface: fake}
 	d := PodDescriber{c}
-	out, err := d.Describe("foo", "bar", DescriberSettings{ShowEvents: true})
+	out, err := d.Describe(pod, DescriberSettings{ShowEvents: true})
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -7745,7 +7745,7 @@ func TestDescribeCronJob(t *testing.T) {
 			fake := fake.NewClientset(testCase.cronJob)
 			c := &describeClient{T: t, Namespace: "foo", Interface: fake}
 			d := CronJobDescriber{c}
-			out, err := d.Describe("foo", "bar", DescriberSettings{ShowEvents: true})
+			out, err := d.Describe(testCase.cronJob, DescriberSettings{ShowEvents: true})
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -7956,7 +7956,7 @@ func TestDescribeReplicaSet(t *testing.T) {
 			fake := fake.NewClientset(objects...)
 			c := &describeClient{T: t, Namespace: "foo", Interface: fake}
 			d := ReplicaSetDescriber{c}
-			out, err := d.Describe(testCase.replicaSet.Namespace, testCase.replicaSet.Name, DescriberSettings{ShowEvents: true})
+			out, err := d.Describe(testCase.replicaSet, DescriberSettings{ShowEvents: true})
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -8052,7 +8052,7 @@ func TestDescribeRole(t *testing.T) {
 			fake := fake.NewClientset(testCase.role)
 			c := &describeClient{T: t, Namespace: "foo", Interface: fake}
 			d := RoleDescriber{c}
-			out, err := d.Describe("foo", "bar", DescriberSettings{})
+			out, err := d.Describe(testCase.role, DescriberSettings{})
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -8108,7 +8108,7 @@ func TestDescribeRoleBinding(t *testing.T) {
 			fake := fake.NewClientset(testCase.binding)
 			c := &describeClient{T: t, Namespace: "foo", Interface: fake}
 			d := RoleBindingDescriber{c}
-			out, err := d.Describe("foo", "bar", DescriberSettings{})
+			out, err := d.Describe(testCase.binding, DescriberSettings{})
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -8201,7 +8201,7 @@ func TestDescribeClusterRole(t *testing.T) {
 			fake := fake.NewClientset(testCase.role)
 			c := &describeClient{T: t, Interface: fake}
 			d := ClusterRoleDescriber{c}
-			out, err := d.Describe("", "bar", DescriberSettings{})
+			out, err := d.Describe(testCase.role, DescriberSettings{})
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -8284,7 +8284,7 @@ func TestDescribeClusterRoleBinding(t *testing.T) {
 			fake := fake.NewClientset(testCase.binding)
 			c := &describeClient{T: t, Interface: fake}
 			d := ClusterRoleBindingDescriber{c}
-			out, err := d.Describe("", "bar", DescriberSettings{})
+			out, err := d.Describe(testCase.binding, DescriberSettings{})
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -8357,7 +8357,7 @@ IY5vBsBP6cycvKRL1XZ43uF9e2zE2GiHBw==
 			fake := fake.NewClientset(testCase.csr)
 			c := &describeClient{T: t, Interface: fake}
 			d := CertificateSigningRequestDescriber{c}
-			out, err := d.Describe("", "bar", DescriberSettings{})
+			out, err := d.Describe(testCase.csr, DescriberSettings{})
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -8365,6 +8365,72 @@ IY5vBsBP6cycvKRL1XZ43uF9e2zE2GiHBw==
 				if !strings.Contains(out, expect) {
 					t.Errorf("expected to find %q in output: %q", expect, out)
 				}
+			}
+		})
+	}
+}
+
+func TestObjectConversion(t *testing.T) {
+	fake := fake.NewSimpleClientset()
+	c := &describeClient{T: t, Namespace: "foo", Interface: fake}
+	d := PodDescriber{c}
+	testCases := []struct {
+		name                 string
+		object               runtime.Object
+		expectedErrorMessage string
+	}{
+		{
+			name: "with unknown resource version",
+			object: &unstructured.Unstructured{
+				Object: map[string]interface{}{
+					"apiVersion": "v2",
+					"kind":       "Pod",
+				},
+			},
+			expectedErrorMessage: "failed to convert unstructured to Pod: no kind \"Pod\" is registered for version \"v2\" in scheme \"k8s.io/kubectl/pkg/scheme/scheme.go:28\"",
+		},
+		{
+			name: "with unknown resource kind",
+			object: &unstructured.Unstructured{
+				Object: map[string]interface{}{
+					"apiVersion": "v1",
+					"kind":       "Foo",
+				},
+			},
+			expectedErrorMessage: "failed to convert unstructured to Pod: no kind \"Foo\" is registered for version \"v1\" in scheme \"k8s.io/kubectl/pkg/scheme/scheme.go:28\"",
+		},
+		{
+			name: "with known but missmatched unstructured kind",
+			object: &unstructured.Unstructured{
+				Object: map[string]interface{}{
+					"apiVersion": "apps/v1",
+					"kind":       "Deployment",
+				},
+			},
+			expectedErrorMessage: "failed to convert unstructured to Pod: converting (v1.Deployment) to (v1.Pod): unknown conversion",
+		},
+		{
+			name: "with unset unstructured kind",
+			object: &unstructured.Unstructured{
+				Object: map[string]interface{}{
+					"metadata": map[string]interface{}{
+						"name": "test",
+					},
+				},
+			},
+			expectedErrorMessage: "failed to convert unstructured to Pod: Object 'Kind' is missing in 'unstructured object has no kind'",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := d.Describe(tc.object, DescriberSettings{ShowEvents: true})
+			errMsg := ""
+			if err != nil {
+				errMsg = err.Error()
+			}
+			if errMsg != tc.expectedErrorMessage {
+				t.Errorf("unexpected error: %v", err)
 			}
 		})
 	}
