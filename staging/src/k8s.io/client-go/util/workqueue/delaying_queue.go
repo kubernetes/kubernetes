@@ -275,6 +275,8 @@ const maxWait = 10 * time.Second
 // waitingLoop runs until the workqueue is shutdown and keeps a check on the list of items to be added.
 func (q *delayingType[T]) waitingLoop(logger klog.Logger) {
 	defer utilruntime.HandleCrashWithLogger(logger)
+	// Entries still waiting at shutdown are dropped
+	defer q.metrics.delayedCount(0)
 
 	// Make a placeholder channel to use when there are no items in our list
 	never := make(<-chan time.Time)
@@ -316,6 +318,7 @@ func (q *delayingType[T]) waitingLoop(logger klog.Logger) {
 			nextReadyAtTimer = q.clock.NewTimer(entry.readyAt.Sub(now))
 			nextReadyAt = nextReadyAtTimer.C()
 		}
+		q.metrics.delayedCount(len(waitingEntryByData))
 
 		select {
 		case <-q.stopCh:
