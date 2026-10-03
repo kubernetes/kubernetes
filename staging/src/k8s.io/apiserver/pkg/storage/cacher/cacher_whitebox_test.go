@@ -69,6 +69,21 @@ import (
 	cachertesting "k8s.io/apiserver/pkg/storage/cacher/testing"
 )
 
+// testPodAttrs extracts attrs the same way the test cacher does, so predicates
+// used in tests match consistently with cache ingestion.
+func testPodAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
+	pod, ok := obj.(*example.Pod)
+	if !ok {
+		return storage.DefaultNamespaceScopedAttr(obj)
+	}
+	labelsSet, fieldsSet, err := storage.DefaultNamespaceScopedAttr(pod)
+	if err != nil {
+		return nil, nil, err
+	}
+	fieldsSet["spec.nodeName"] = pod.Spec.NodeName
+	return labelsSet, fieldsSet, nil
+}
+
 func newTestCacherWithoutSyncing(s storage.Interface, c clock.WithTicker) (*Cacher, storage.Versioner, error) {
 	prefix := "/pods/"
 	config := Config{
@@ -78,22 +93,11 @@ func newTestCacherWithoutSyncing(s storage.Interface, c clock.WithTicker) (*Cach
 		EventsHistoryWindow: DefaultEventFreshDuration,
 		ResourcePrefix:      prefix,
 		KeyFunc:             func(obj runtime.Object) (string, error) { return storage.NamespaceKeyFunc(prefix, obj) },
-		GetAttrsFunc: func(obj runtime.Object) (labels.Set, fields.Set, error) {
-			pod, ok := obj.(*example.Pod)
-			if !ok {
-				return storage.DefaultNamespaceScopedAttr(obj)
-			}
-			labelsSet, fieldsSet, err := storage.DefaultNamespaceScopedAttr(obj)
-			if err != nil {
-				return nil, nil, err
-			}
-			fieldsSet["spec.nodeName"] = pod.Spec.NodeName
-			return labelsSet, fieldsSet, nil
-		},
-		NewFunc:     func() runtime.Object { return &example.Pod{} },
-		NewListFunc: func() runtime.Object { return &example.PodList{} },
-		Codec:       codecs.LegacyCodec(examplev1.SchemeGroupVersion),
-		Clock:       c,
+		GetAttrsFunc:        testPodAttrs,
+		NewFunc:             func() runtime.Object { return &example.Pod{} },
+		NewListFunc:         func() runtime.Object { return &example.PodList{} },
+		Codec:               codecs.LegacyCodec(examplev1.SchemeGroupVersion),
+		Clock:               c,
 	}
 	cacher, err := NewCacherFromConfig(config)
 
@@ -1909,12 +1913,14 @@ func TestCachingDeleteEvents(t *testing.T) {
 	defer cacher.Stop()
 
 	fooPredicate := storage.SelectionPredicate{
-		Label: labels.SelectorFromSet(map[string]string{"foo": "true"}),
-		Field: fields.Everything(),
+		Label:    labels.SelectorFromSet(map[string]string{"foo": "true"}),
+		Field:    fields.Everything(),
+		GetAttrs: testPodAttrs,
 	}
 	barPredicate := storage.SelectionPredicate{
-		Label: labels.SelectorFromSet(map[string]string{"bar": "true"}),
-		Field: fields.Everything(),
+		Label:    labels.SelectorFromSet(map[string]string{"bar": "true"}),
+		Field:    fields.Everything(),
+		GetAttrs: testPodAttrs,
 	}
 
 	createWatch := func(pred storage.SelectionPredicate) watch.Interface {
@@ -2377,8 +2383,9 @@ func BenchmarkCacher_GetList(b *testing.B) {
 					b.Fatalf("parse selector: %v", err)
 				}
 				pred := storage.SelectionPredicate{
-					Label: labels.Everything(),
-					Field: parsedField,
+					Label:    labels.Everything(),
+					Field:    parsedField,
+					GetAttrs: testPodAttrs,
 				}
 
 				// now we start benchmarking
