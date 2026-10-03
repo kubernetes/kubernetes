@@ -21,6 +21,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	podtest "k8s.io/kubernetes/pkg/api/pod/testing"
@@ -207,5 +210,41 @@ func TestValidateUpdate(t *testing.T) {
 	}
 	if !strings.Contains(errs[0].Error(), "selector") {
 		t.Fatalf("expected error related to the selector")
+	}
+}
+
+func TestWarningsOnUpdate(t *testing.T) {
+	rcWithGrace := func(generation, grace int64) *api.ReplicationController {
+		return &api.ReplicationController{
+			ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault, Generation: generation},
+			Spec: api.ReplicationControllerSpec{
+				Selector: map[string]string{"a": "b"},
+				Template: &api.PodTemplateSpec{
+					ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"a": "b"}},
+					Spec:       podtest.MakePodSpec(podtest.SetTerminationGracePeriodSeconds(grace)),
+				},
+			},
+		}
+	}
+	negative := "spec.template.spec.terminationGracePeriodSeconds: must be >= 0; negative values are invalid and will be treated as 1"
+	zero := "spec.template.spec.terminationGracePeriodSeconds: 0 turns pod deletions without an explicit grace period into force deletions; use a positive value for graceful deletion"
+	testCases := []struct {
+		name     string
+		old, new *api.ReplicationController
+		expected []string
+	}{
+		{name: "new template warns", old: rcWithGrace(1, 30), new: rcWithGrace(2, -1), expected: []string{negative}},
+		{name: "old template does not warn", old: rcWithGrace(1, -1), new: rcWithGrace(2, 30)},
+		{name: "generation unchanged", old: rcWithGrace(1, 30), new: rcWithGrace(1, -1)},
+		{name: "new zero template warns", old: rcWithGrace(1, 1), new: rcWithGrace(2, 0), expected: []string{zero}},
+		{name: "old zero template does not warn", old: rcWithGrace(1, 0), new: rcWithGrace(2, 1)},
+		{name: "stored zero is not warned again on a later update", old: rcWithGrace(1, 0), new: rcWithGrace(2, 0)},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			if diff := cmp.Diff(tc.expected, Strategy.WarningsOnUpdate(t.Context(), tc.new, tc.old), cmpopts.EquateEmpty()); diff != "" {
+				t.Errorf("unexpected warnings (-want +got):\n%s", diff)
+			}
+		})
 	}
 }
