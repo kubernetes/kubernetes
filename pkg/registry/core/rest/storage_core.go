@@ -43,6 +43,7 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/cluster/ports"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/kubeapiserver/direct"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/registry/core/componentstatus"
 	endpointsstore "k8s.io/kubernetes/pkg/registry/core/endpoint/storage"
@@ -192,6 +193,9 @@ func (p *legacyProvider) NewRESTStorage(apiResourceConfigSource serverstorage.AP
 	if err != nil {
 		return genericapiserver.APIGroupInfo{}, err
 	}
+	// Let listers handed out by the informer factory read pods straight from the watch
+	// cache backing this storage, instead of keeping a second copy in an informer.
+	direct.SetStorage(p.Informers, corev1.Resource("pods"), podStorage.Pod)
 
 	var primaryClusterIPFamily api.IPFamily
 	if netutils.IsIPv4CIDR(&p.Services.ClusterIPRange) {
