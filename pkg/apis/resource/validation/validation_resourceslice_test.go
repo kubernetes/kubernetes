@@ -2592,6 +2592,74 @@ func TestValidateResourceSliceUpdate(t *testing.T) {
 				return slice
 			},
 		},
+		"ratchet-unchanged-negative-counter-in-counter-set": {
+			oldResourceSlice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSliceWithSharedCounters(name, name, name, 1)
+				slice.Spec.SharedCounters[0].Counters = map[string]resourceapi.Counter{
+					"memory": {Value: resource.MustParse("-1Gi")},
+				}
+				return slice
+			}(),
+			update: func(slice *resourceapi.ResourceSlice) *resourceapi.ResourceSlice {
+				// No change to counter, ratcheting allows the unchanged negative counter.
+				return slice
+			},
+		},
+		"ratchet-modified-negative-counter-in-counter-set": {
+			wantFailures: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "sharedCounters").Index(0).Child("counters").Key("memory").Child("value"), "-2Gi", "must be greater than or equal to 0"),
+			},
+			oldResourceSlice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSliceWithSharedCounters(name, name, name, 1)
+				slice.Spec.SharedCounters[0].Counters = map[string]resourceapi.Counter{
+					"memory": {Value: resource.MustParse("-1Gi")},
+				}
+				return slice
+			}(),
+			update: func(slice *resourceapi.ResourceSlice) *resourceapi.ResourceSlice {
+				slice.Spec.SharedCounters[0].Counters["memory"] = resourceapi.Counter{Value: resource.MustParse("-2Gi")}
+				return slice
+			},
+		},
+		"ratchet-unchanged-negative-counter-in-consumes-counters": {
+			oldResourceSlice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSlice(name, name, name, 1)
+				slice.Spec.Devices[0].ConsumesCounters = []resourceapi.DeviceCounterConsumption{
+					{
+						CounterSet: "counterset-0",
+						Counters: map[string]resourceapi.Counter{
+							"memory": {Value: resource.MustParse("-1Gi")},
+						},
+					},
+				}
+				return slice
+			}(),
+			update: func(slice *resourceapi.ResourceSlice) *resourceapi.ResourceSlice {
+				// No change to counter, ratcheting allows it.
+				return slice
+			},
+		},
+		"ratchet-modified-negative-counter-in-consumes-counters": {
+			wantFailures: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "devices").Index(0).Child("consumesCounters").Index(0).Child("counters").Key("memory").Child("value"), "-1Gi", "must be greater than or equal to 0"),
+			},
+			oldResourceSlice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSlice(name, name, name, 1)
+				slice.Spec.Devices[0].ConsumesCounters = []resourceapi.DeviceCounterConsumption{
+					{
+						CounterSet: "counterset-0",
+						Counters: map[string]resourceapi.Counter{
+							"memory": {Value: resource.MustParse("1Gi")},
+						},
+					},
+				}
+				return slice
+			}(),
+			update: func(slice *resourceapi.ResourceSlice) *resourceapi.ResourceSlice {
+				slice.Spec.Devices[0].ConsumesCounters[0].Counters["memory"] = resourceapi.Counter{Value: resource.MustParse("-1Gi")}
+				return slice
+			},
+		},
 	}
 
 	for name, scenario := range scenarios {
