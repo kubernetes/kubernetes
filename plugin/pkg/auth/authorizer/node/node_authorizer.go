@@ -536,28 +536,42 @@ func (r *NodeAuthorizer) hasPathFrom(nodeName string, startingType vertexType, s
 	}
 
 	found := false
-	traversal := &traverse.VisitingDepthFirst{
-		EdgeFilter: func(edge graph.Edge) bool {
-			if destinationEdge, ok := edge.(*destinationEdge); ok {
-				if destinationEdge.DestinationID() != nodeVertex.ID() {
-					// Don't follow edges leading to other nodes
-					return false
+	// Walking forward from the starting vertex costs as much as that object's
+	// fan-out, which is unbounded: a secret shared by every PV in the cluster is
+	// only reached after enumerating every one of those PVs. Walking backwards
+	// from the node instead visits what that node's own pods reference, which is
+	// bounded by the pods on the node. Start from whichever end branches less.
+	// In reverse no edge filter is needed, because every edge into a node comes
+	// from an object that node already refers to.
+	if r.graph.graph.Degree(startingVertex) > r.graph.graph.Degree(nodeVertex) {
+		traversal := &traverse.VisitingDepthFirst{}
+		found = traversal.WalkTo(r.graph.graph, nodeVertex, func(n graph.Node) bool {
+			return n.ID() == startingVertex.ID()
+		}) != nil
+	} else {
+		traversal := &traverse.VisitingDepthFirst{
+			EdgeFilter: func(edge graph.Edge) bool {
+				if destinationEdge, ok := edge.(*destinationEdge); ok {
+					if destinationEdge.DestinationID() != nodeVertex.ID() {
+						// Don't follow edges leading to other nodes
+						return false
+					}
+					// We found an edge leading to the node we want
+					found = true
 				}
-				// We found an edge leading to the node we want
+				// Visit this edge
+				return true
+			},
+		}
+		traversal.Walk(r.graph.graph, startingVertex, func(n graph.Node) bool {
+			if n.ID() == nodeVertex.ID() {
+				// We found the node we want
 				found = true
 			}
-			// Visit this edge
-			return true
-		},
+			// Stop visiting if we've found the node we want
+			return found
+		})
 	}
-	traversal.Walk(r.graph.graph, startingVertex, func(n graph.Node) bool {
-		if n.ID() == nodeVertex.ID() {
-			// We found the node we want
-			found = true
-		}
-		// Stop visiting if we've found the node we want
-		return found
-	})
 	if !found {
 		return false, fmt.Errorf("node '%s' cannot get %s %s/%s, no relationship to this object was found in the node authorizer graph", nodeName, vertexTypes[startingType], startingNamespace, startingName)
 	}
