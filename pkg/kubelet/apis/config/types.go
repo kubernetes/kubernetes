@@ -277,6 +277,14 @@ type KubeletConfiguration struct {
 	// The field value must be greater than 0.
 	// If unset or 0, defaults to 2m.
 	ImageMinimumGCAge metav1.Duration
+	// ContainerGCPeriod is the period for performing container garbage collection.
+	// The field value must be greater than 0.
+	// If unset or 0, defaults to 1m.
+	ContainerGCPeriod metav1.Duration
+	// ImageGCPeriod is the period for performing image garbage collection.
+	// The field value must be greater than 0.
+	// If unset or 0, defaults to 5m.
+	ImageGCPeriod metav1.Duration
 	// ImageMaximumGCAge is the maximum age an image can be unused before it is garbage collected.
 	// The default of this field is "0s", which disables this field--meaning images won't be garbage
 	// collected based on being unused for too long.

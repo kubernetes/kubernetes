@@ -76267,6 +76267,18 @@ func schema_k8sio_kubelet_config_v1beta1_KubeletConfiguration(ref common.Referen
 							Ref:         ref(metav1.Duration{}.OpenAPIModelName()),
 						},
 					},
+					"containerGCPeriod": {
+						SchemaProps: spec.SchemaProps{
+							Description: "containerGCPeriod is the period for performing container garbage collection. The field value must be greater than 0. If unset or 0, defaults to 1m. Default: \"1m\"",
+							Ref:         ref(metav1.Duration{}.OpenAPIModelName()),
+						},
+					},
+					"imageGCPeriod": {
+						SchemaProps: spec.SchemaProps{
+							Description: "imageGCPeriod is the period for performing image garbage collection. The field value must be greater than 0. If unset or 0, defaults to 5m. Default: \"5m\"",
+							Ref:         ref(metav1.Duration{}.OpenAPIModelName()),
+						},
+					},
 					"imageMaximumGCAge": {
 						SchemaProps: spec.SchemaProps{
 							Description: "imageMaximumGCAge is the maximum age an image can be unused before it is garbage collected. The default of this field is \"0s\", which disables this field--meaning images won't be garbage collected based on being unused for too long. Default: \"0s\" (disabled)",

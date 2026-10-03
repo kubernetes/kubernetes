@@ -394,6 +394,8 @@ func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 	out.NodeStatusUpdateFrequency = in.NodeStatusUpdateFrequency
 	out.NodeStatusReportFrequency = in.NodeStatusReportFrequency
 	out.ImageMinimumGCAge = in.ImageMinimumGCAge
+	out.ContainerGCPeriod = in.ContainerGCPeriod
+	out.ImageGCPeriod = in.ImageGCPeriod
 	out.ImageMaximumGCAge = in.ImageMaximumGCAge
 	if in.ImageGCHighThresholdPercent != nil {
 		in, out := &in.ImageGCHighThresholdPercent, &out.ImageGCHighThresholdPercent
