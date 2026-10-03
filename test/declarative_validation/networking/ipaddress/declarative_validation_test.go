@@ -53,19 +53,19 @@ func TestDeclarativeValidateIPAddress(t *testing.T) {
 				"missing parentRef": {
 					input: mkValidIPAddress(withNilParentRef),
 					expectedErrs: field.ErrorList{
-						field.Required(field.NewPath("spec", "parentRef"), "").MarkBeta(),
+						field.Required(field.NewPath("spec", "parentRef"), ""),
 					},
 				},
 				"missing parentRef resource": {
 					input: mkValidIPAddress(withEmptyParentRefResource),
 					expectedErrs: field.ErrorList{
-						field.Required(field.NewPath("spec", "parentRef", "resource"), "").MarkBeta(),
+						field.Required(field.NewPath("spec", "parentRef", "resource"), ""),
 					},
 				},
 				"missing parentRef name": {
 					input: mkValidIPAddress(withEmptyParentRefName),
 					expectedErrs: field.ErrorList{
-						field.Required(field.NewPath("spec", "parentRef", "name"), "").MarkBeta(),
+						field.Required(field.NewPath("spec", "parentRef", "name"), ""),
 					},
 				},
 			}
@@ -114,7 +114,7 @@ func TestDeclarativeValidateIPAddressUpdate(t *testing.T) {
 							}, "field is immutable")
 							e.Origin = "immutable"
 							return e
-						}().MarkBeta(),
+						}(),
 					},
 				},
 				"set parentRef": {
@@ -132,7 +132,7 @@ func TestDeclarativeValidateIPAddressUpdate(t *testing.T) {
 							}, "field is immutable")
 							e.Origin = "immutable"
 							return e
-						}().MarkBeta(),
+						}(),
 					},
 				},
 				"unset parentRef": {
@@ -142,12 +142,12 @@ func TestDeclarativeValidateIPAddressUpdate(t *testing.T) {
 						withNilParentRef,
 					),
 					expectedErrs: field.ErrorList{
-						field.Required(field.NewPath("spec", "parentRef"), "").MarkBeta(),
+						field.Required(field.NewPath("spec", "parentRef"), ""),
 						func() *field.Error {
 							e := field.Invalid(field.NewPath("spec", "parentRef"), nil, "field is immutable")
 							e.Origin = "immutable"
 							return e
-						}().MarkBeta(),
+						}(),
 					},
 				},
 			}
