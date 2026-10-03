@@ -95,6 +95,23 @@ func validateOwnerReference(ownerReference metav1.OwnerReference, fldPath *field
 }
 
 // ValidateOwnerReferences validates that a set of owner references are correctly defined.
+//
+// Note on +listType=map / +listMapKey=uid: ObjectMeta.OwnerReferences carries
+// those markers, which in theory means each entry must be uniquely keyed by
+// its uid field. In practice two things prevent us from enforcing that as a
+// hard validation error today:
+//
+//  1. The OwnerReference struct itself is annotated +structType=atomic, which
+//     is semantically incompatible with acting as an SSA map-key element.
+//     Enforcing map-key uniqueness requires the list element to be a struct
+//     type, not an atomic one.
+//
+//  2. Kubernetes does not currently reject objects with duplicate UIDs in
+//     ownerReferences; adding such a check retroactively would break existing
+//     persisted objects that violate the constraint.
+//
+// Until both of these issues are resolved, uid-uniqueness in ownerReferences
+// remains documented but unenforced. See https://github.com/kubernetes/kubernetes/issues/140503.
 func ValidateOwnerReferences(ownerReferences []metav1.OwnerReference, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	firstControllerName := ""
