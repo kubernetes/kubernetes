@@ -33,6 +33,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
+	"github.com/distribution/reference"
 	netutils "k8s.io/utils/net"
 
 	v1 "k8s.io/api/core/v1"
@@ -4043,7 +4044,7 @@ func validateContainerCommon(ctr *core.Container, volumes map[string]core.Volume
 	allErrs = append(allErrs, validatePullPolicy(ctr.ImagePullPolicy, path.Child("imagePullPolicy"))...)
 	allErrs = append(allErrs, ValidateContainerResourceRequirements(&ctr.Resources, podClaimNames, path.Child("resources"), opts)...)
 	allErrs = append(allErrs, validateResizePolicy(ctr.ResizePolicy, path.Child("resizePolicy"), podRestartPolicy)...)
-	allErrs = append(allErrs, ValidateSecurityContext(ctr.SecurityContext, path.Child("securityContext"), hostUsers, opts.AllowSysAdminWhenPrivilegeEscalationFalse)...)
+	allErrs = append(allErrs, ValidateSecurityContext(ctr.SecurityContext, path.Child("securityContext"), hostUsers, opts.AllowSysAdminWhenPrivilegeEscalationFalse, opts.AllowSecurityProfileOCI)...)
 	return allErrs
 }
 
@@ -4641,6 +4642,8 @@ type PodValidationOptions struct {
 	AllowEmptyImageVolumeReference bool
 	// Allow containers to have CAP_SYS_ADMIN even if AllowPrivilegeEscalation is false
 	AllowSysAdminWhenPrivilegeEscalationFalse bool
+	// Allow seccomp profiles of type OCI
+	AllowSecurityProfileOCI bool
 	// Allow podCertificate volumes to specify ML-DSA algorithms in the keyType field
 	AllowMLDSAPodCertificateKeyTypes bool
 }
@@ -4815,6 +4818,9 @@ func ValidatePodSpec(spec *core.PodSpec, podMeta *metav1.ObjectMeta, fldPath *fi
 	allErrs = append(allErrs, validateDNSPolicy(&spec.DNSPolicy, fldPath.Child("dnsPolicy"))...)
 	allErrs = append(allErrs, unversionedvalidation.ValidateLabels(spec.NodeSelector, fldPath.Child("nodeSelector"))...)
 	allErrs = append(allErrs, validatePodSpecSecurityContext(spec.SecurityContext, spec, fldPath, fldPath.Child("securityContext"), opts)...)
+	if opts.AllowSecurityProfileOCI {
+		allErrs = append(allErrs, validatePrivilegedContainersSeccompOCI(spec, fldPath)...)
+	}
 	allErrs = append(allErrs, validateShareProcessNamespace(spec, fldPath)...)
 	allErrs = append(allErrs, validateImagePullSecrets(spec.ImagePullSecrets, fldPath.Child("imagePullSecrets"))...)
 	allErrs = append(allErrs, validateAffinity(spec.Affinity, opts, fldPath.Child("affinity"))...)
@@ -5414,14 +5420,25 @@ func validatePodAffinity(podAffinity *core.PodAffinity, allowInvalidLabelValueIn
 	return allErrs
 }
 
-func validateSeccompProfileField(sp *core.SeccompProfile, fldPath *field.Path) field.ErrorList {
+func validateSeccompProfileField(sp *core.SeccompProfile, fldPath *field.Path, allowOCI bool) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if sp == nil {
 		return allErrs
 	}
 
-	if err := validateSeccompProfileType(fldPath.Child("type"), sp.Type); err != nil {
+	if err := validateSeccompProfileType(fldPath.Child("type"), sp.Type, allowOCI); err != nil {
 		allErrs = append(allErrs, err)
+	}
+
+	switch {
+	case sp.Type == core.SeccompProfileTypeOCI && !allowOCI:
+		// The type is already rejected, and the oci field was dropped.
+	case sp.Type == core.SeccompProfileTypeOCI && sp.OCI == nil:
+		allErrs = append(allErrs, field.Required(fldPath.Child("oci"), "must be set when seccomp type is OCI"))
+	case sp.Type == core.SeccompProfileTypeOCI:
+		allErrs = append(allErrs, validateSecurityProfileOCI(sp.OCI, fldPath.Child("oci"))...)
+	case sp.OCI != nil:
+		allErrs = append(allErrs, field.Forbidden(fldPath.Child("oci"), "may only be set when seccomp type is OCI"))
 	}
 
 	if sp.Type == core.SeccompProfileTypeLocalhost {
@@ -5435,6 +5452,95 @@ func validateSeccompProfileField(sp *core.SeccompProfile, fldPath *field.Path) f
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("localhostProfile"), sp, "can only be set when seccomp type is Localhost"))
 		}
 	}
+
+	return allErrs
+}
+
+// validateSecurityProfileOCI validates the reference and the optional base
+// profile of an OCI security profile.
+func validateSecurityProfileOCI(oci *core.SecurityProfileOCI, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	refPath := fldPath.Child("ref")
+	if len(oci.Ref) == 0 {
+		allErrs = append(allErrs, field.Required(refPath, ""))
+	} else if len(oci.Ref) > maxSecurityProfileOCIRefLength {
+		allErrs = append(allErrs, field.TooLong(refPath, "", maxSecurityProfileOCIRefLength))
+	} else if msg := validateDigestedOCIReference(oci.Ref); msg != "" {
+		allErrs = append(allErrs, field.Invalid(refPath, oci.Ref, msg))
+	}
+
+	if base := oci.BaseProfile; base != nil {
+		basePath := fldPath.Child("baseProfile")
+		switch base.Type {
+		case core.SecurityProfileOCIBaseTypeLocalhost:
+			if base.LocalhostProfile == nil || *base.LocalhostProfile == "" {
+				allErrs = append(allErrs, field.Required(basePath.Child("localhostProfile"), "must be set when base profile type is Localhost"))
+			} else {
+				allErrs = append(allErrs, validateLocalDescendingPath(*base.LocalhostProfile, basePath.Child("localhostProfile"))...)
+			}
+		case core.SecurityProfileOCIBaseTypeRuntimeDefault:
+			if base.LocalhostProfile != nil {
+				allErrs = append(allErrs, field.Forbidden(basePath.Child("localhostProfile"), "may only be set when base profile type is Localhost"))
+			}
+		case "":
+			allErrs = append(allErrs, field.Required(basePath.Child("type"), "type is required when baseProfile is set"))
+		default:
+			allErrs = append(allErrs, field.NotSupported(basePath.Child("type"), base.Type, []core.SecurityProfileOCIBaseType{core.SecurityProfileOCIBaseTypeLocalhost, core.SecurityProfileOCIBaseTypeRuntimeDefault}))
+		}
+	}
+
+	return allErrs
+}
+
+// maxSecurityProfileOCIRefLength bounds OCI profile references. The reference
+// parser bounds the repository path at 255 characters but not the registry, and
+// a canonical reference with a full DNS name, a port, and a sha512 digest stays
+// well below this limit.
+const maxSecurityProfileOCIRefLength = 1024
+
+// validateDigestedOCIReference returns an error message if ref is not a
+// canonical, digest-pinned OCI reference without a tag. The digest algorithm
+// must be registered with go-digest, which are sha256, sha384, and sha512.
+func validateDigestedOCIReference(ref string) string {
+	named, err := reference.ParseNamed(ref)
+	if err != nil {
+		return fmt.Sprintf("must be a digest-pinned reference in canonical form (<registry>/<repository>@<algorithm>:<digest>): %v", err)
+	}
+	if _, ok := named.(reference.Tagged); ok {
+		return "must not contain a tag"
+	}
+	if _, ok := named.(reference.Digested); !ok {
+		return "must be pinned by digest (<registry>/<repository>@<algorithm>:<digest>)"
+	}
+	return ""
+}
+
+// validatePrivilegedContainersSeccompOCI rejects privileged containers whose
+// effective seccomp profile is of type OCI. Container runtimes do not apply
+// seccomp profiles to privileged containers, so the profile would be ignored.
+func validatePrivilegedContainersSeccompOCI(spec *core.PodSpec, specPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	var podProfile *core.SeccompProfile
+	if spec.SecurityContext != nil {
+		podProfile = spec.SecurityContext.SeccompProfile
+	}
+
+	podshelper.VisitContainersWithPath(spec, specPath, func(c *core.Container, cFldPath *field.Path) bool {
+		sc := c.SecurityContext
+		if sc == nil || sc.Privileged == nil || !*sc.Privileged {
+			return true
+		}
+		profile := podProfile
+		if sc.SeccompProfile != nil {
+			profile = sc.SeccompProfile
+		}
+		if profile != nil && profile.Type == core.SeccompProfileTypeOCI {
+			allErrs = append(allErrs, field.Forbidden(cFldPath.Child("securityContext", "privileged"), "privileged containers cannot use a seccomp profile of type OCI; set a seccompProfile of another type on the container"))
+		}
+		return true
+	})
 
 	return allErrs
 }
@@ -5467,14 +5573,18 @@ func ValidateSeccompPodAnnotations(annotations map[string]string, fldPath *field
 }
 
 // ValidateSeccompProfileType tests that the argument is a valid SeccompProfileType.
-func validateSeccompProfileType(fldPath *field.Path, seccompProfileType core.SeccompProfileType) *field.Error {
-	switch seccompProfileType {
-	case core.SeccompProfileTypeLocalhost, core.SeccompProfileTypeRuntimeDefault, core.SeccompProfileTypeUnconfined:
-		return nil
-	case "":
+func validateSeccompProfileType(fldPath *field.Path, seccompProfileType core.SeccompProfileType, allowOCI bool) *field.Error {
+	supported := []core.SeccompProfileType{core.SeccompProfileTypeLocalhost, core.SeccompProfileTypeRuntimeDefault, core.SeccompProfileTypeUnconfined}
+	if allowOCI {
+		supported = append(supported, core.SeccompProfileTypeOCI)
+	}
+	switch {
+	case seccompProfileType == "":
 		return field.Required(fldPath, "type is required when seccompProfile is set")
+	case slices.Contains(supported, seccompProfileType):
+		return nil
 	default:
-		return field.NotSupported(fldPath, seccompProfileType, []core.SeccompProfileType{core.SeccompProfileTypeLocalhost, core.SeccompProfileTypeRuntimeDefault, core.SeccompProfileTypeUnconfined})
+		return field.NotSupported(fldPath, seccompProfileType, supported)
 	}
 }
 
@@ -5730,7 +5840,7 @@ func validatePodSpecSecurityContext(securityContext *core.PodSecurityContext, sp
 			allErrs = append(allErrs, validateFSGroupChangePolicy(securityContext.FSGroupChangePolicy, fldPath.Child("fsGroupChangePolicy"))...)
 		}
 
-		allErrs = append(allErrs, validateSeccompProfileField(securityContext.SeccompProfile, fldPath.Child("seccompProfile"))...)
+		allErrs = append(allErrs, validateSeccompProfileField(securityContext.SeccompProfile, fldPath.Child("seccompProfile"), opts.AllowSecurityProfileOCI)...)
 		allErrs = append(allErrs, validateWindowsSecurityContextOptions(securityContext.WindowsOptions, fldPath.Child("windowsOptions"))...)
 		allErrs = append(allErrs, ValidateAppArmorProfileField(securityContext.AppArmorProfile, fldPath.Child("appArmorProfile"))...)
 
@@ -5854,6 +5964,10 @@ func validateSeccompAnnotationsAndFieldsMatch(annotationValue string, seccompFie
 		} else if seccompField.LocalhostProfile == nil || strings.TrimPrefix(annotationValue, v1.SeccompLocalhostProfileNamePrefix) != *seccompField.LocalhostProfile {
 			return field.Forbidden(fldPath.Child("localhostProfile"), "seccomp profile in annotation and field must match")
 		}
+
+	case core.SeccompProfileTypeOCI:
+		// No annotation value represents an OCI profile.
+		return field.Forbidden(fldPath.Child("type"), "seccomp type in annotation and field must match")
 	}
 
 	return nil
@@ -8839,7 +8953,7 @@ func validateEndpointPort(port *core.EndpointPort, requireName bool, fldPath *fi
 }
 
 // ValidateSecurityContext ensures the security context contains valid settings
-func ValidateSecurityContext(sc *core.SecurityContext, fldPath *field.Path, hostUsers, allowSysAdminWhenPrivilegeEscalationFalse bool) field.ErrorList {
+func ValidateSecurityContext(sc *core.SecurityContext, fldPath *field.Path, hostUsers, allowSysAdminWhenPrivilegeEscalationFalse, allowSecurityProfileOCI bool) field.ErrorList {
 	allErrs := field.ErrorList{}
 	// this should only be true for testing since SecurityContext is defaulted by the core
 	if sc == nil {
@@ -8873,7 +8987,7 @@ func ValidateSecurityContext(sc *core.SecurityContext, fldPath *field.Path, host
 		}
 
 	}
-	allErrs = append(allErrs, validateSeccompProfileField(sc.SeccompProfile, fldPath.Child("seccompProfile"))...)
+	allErrs = append(allErrs, validateSeccompProfileField(sc.SeccompProfile, fldPath.Child("seccompProfile"), allowSecurityProfileOCI)...)
 	if sc.AllowPrivilegeEscalation != nil && !*sc.AllowPrivilegeEscalation {
 		if sc.Privileged != nil && *sc.Privileged {
 			allErrs = append(allErrs, field.Invalid(fldPath, sc, "cannot set `allowPrivilegeEscalation` to false and `privileged` to true"))

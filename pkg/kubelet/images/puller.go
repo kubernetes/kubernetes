@@ -36,6 +36,9 @@ type pullResult struct {
 
 type imagePuller interface {
 	pullImage(context.Context, kubecontainer.ImageSpec, []credentialprovider.TrackedAuthConfig, chan<- pullResult, *runtimeapi.PodSandboxConfig)
+	// pullSecurityProfile pulls a security profile, sharing the limits of
+	// image pulls, and returns whether it was already present.
+	pullSecurityProfile(context.Context, kubecontainer.ImageSpec, []credentialprovider.TrackedAuthConfig, *runtimeapi.PodSandboxConfig, runtimeapi.SecurityProfileKind) (bool, error)
 }
 
 var _, _ imagePuller = &parallelImagePuller{}, &serialImagePuller{}
@@ -73,6 +76,21 @@ func (pip *parallelImagePuller) pullImage(ctx context.Context, spec kubecontaine
 	}
 }
 
+func (pip *parallelImagePuller) pullSecurityProfile(ctx context.Context, spec kubecontainer.ImageSpec, credentials []credentialprovider.TrackedAuthConfig, podSandboxConfig *runtimeapi.PodSandboxConfig, kind runtimeapi.SecurityProfileKind) (bool, error) {
+	if err := ctx.Err(); err != nil {
+		return false, err
+	}
+	if pip.tokens != nil {
+		select {
+		case pip.tokens <- struct{}{}:
+		case <-ctx.Done():
+			return false, ctx.Err()
+		}
+		defer func() { <-pip.tokens }()
+	}
+	return pip.imageService.PullSecurityProfile(ctx, spec, credentials, podSandboxConfig, kind)
+}
+
 // Maximum number of image pull requests than can be queued.
 const maxImagePullRequests = 10
 
@@ -93,6 +111,8 @@ type imagePullRequest struct {
 	credentials      []credentialprovider.TrackedAuthConfig
 	pullChan         chan<- pullResult
 	podSandboxConfig *runtimeapi.PodSandboxConfig
+	// pull, if set, replaces the image pull, for pulls that share the queue.
+	pull func()
 }
 
 func (sip *serialImagePuller) pullImage(ctx context.Context, spec kubecontainer.ImageSpec, credentials []credentialprovider.TrackedAuthConfig, pullChan chan<- pullResult, podSandboxConfig *runtimeapi.PodSandboxConfig) {
@@ -105,8 +125,41 @@ func (sip *serialImagePuller) pullImage(ctx context.Context, spec kubecontainer.
 	}
 }
 
+func (sip *serialImagePuller) pullSecurityProfile(ctx context.Context, spec kubecontainer.ImageSpec, credentials []credentialprovider.TrackedAuthConfig, podSandboxConfig *runtimeapi.PodSandboxConfig, kind runtimeapi.SecurityProfileKind) (bool, error) {
+	type result struct {
+		cached bool
+		err    error
+	}
+	done := make(chan result, 1)
+	request := &imagePullRequest{
+		pull: func() {
+			if err := ctx.Err(); err != nil {
+				done <- result{err: err}
+				return
+			}
+			cached, err := sip.imageService.PullSecurityProfile(ctx, spec, credentials, podSandboxConfig, kind)
+			done <- result{cached: cached, err: err}
+		},
+	}
+	select {
+	case sip.pullRequests <- request:
+	case <-ctx.Done():
+		return false, ctx.Err()
+	}
+	select {
+	case r := <-done:
+		return r.cached, r.err
+	case <-ctx.Done():
+		return false, ctx.Err()
+	}
+}
+
 func (sip *serialImagePuller) processImagePullRequests() {
 	for pullRequest := range sip.pullRequests {
+		if pullRequest.pull != nil {
+			pullRequest.pull()
+			continue
+		}
 		startTime := time.Now()
 		imageRef, creds, err := sip.imageService.PullImage(pullRequest.ctx, pullRequest.spec, pullRequest.credentials, pullRequest.podSandboxConfig)
 		var size uint64

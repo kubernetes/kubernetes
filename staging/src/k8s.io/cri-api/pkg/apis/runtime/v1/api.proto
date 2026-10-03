@@ -249,6 +249,56 @@ service ImageService {
     rpc ImageStatus(ImageStatusRequest) returns (ImageStatusResponse) {}
     // PullImage pulls an image with authentication config.
     rpc PullImage(PullImageRequest) returns (PullImageResponse) {}
+    // PullSecurityProfile pulls a security profile with authentication config
+    // and caches it in the runtime's storage, if it is not already present.
+    // The pulled profile is applied by passing its reference in
+    // SecurityProfile.oci_ref to RunPodSandbox or CreateContainer.
+    //
+    // The reference must resolve to an image manifest (an image index is
+    // rejected) describing an OCI artifact with exactly one layer. The layer
+    // blob is the raw profile document, not a tar archive, and runtimes must
+    // not require a particular layer media type. The runtime identifies the
+    // kind from the manifest's config media type (see SecurityProfileKind).
+    // If the config is the empty descriptor (application/vnd.oci.empty.v1+json),
+    // the manifest's artifactType must be the kind's config media type
+    // instead; if both are set, they must match.
+    // Runtimes must enforce a maximum size of the profile layer (1 MiB
+    // recommended as the default), checking the descriptor size before
+    // downloading and the bytes read while downloading. The content is valid
+    // if it passes the strict decoding and artifact validation of
+    // sigs.k8s.io/security-profiles-merger. The manifest, layer count, size,
+    // and content are validated on every call, regardless of how the content
+    // got into the runtime's storage.
+    //
+    // The runtime owns the lifecycle of pulled profiles. Pulled profiles must
+    // not be returned by ListImages or StreamImages; content pulled with
+    // PullImage, for example for an image volume, is not affected, even if
+    // it is the same artifact, so runtimes that keep both in one store must
+    // track which call pulled the content. Runtimes look up pulled profiles
+    // by the digest of the reference, whatever its algorithm. The kubelet
+    // does not pass profile references to ImageStatus or RemoveImage and
+    // does not garbage collect profiles.
+    // The kubelet may call PullSecurityProfile repeatedly for the same
+    // reference, and a call for a present profile must not contact the
+    // registry, unless the runtime has to verify the profile against a
+    // signature policy that applies to this request but not to the earlier
+    // pull. Runtimes should keep profiles referenced by existing
+    // sandboxes; an evicted profile is pulled again on the next call.
+    //
+    // Registry unavailability, signature validation failures, and permanent
+    // rejections are reported with the well-known error messages
+    // RegistryUnavailable, SignatureValidationFailed, and
+    // SecurityProfileInvalid as the prefix of the gRPC status message.
+    // SecurityProfileInvalid must only be used for properties of the request
+    // or the artifact itself: an unsupported kind, a reference that is not
+    // canonical and digest-pinned, the manifest, the media type, the layer
+    // count, the size, or the content. The kubelet treats
+    // SecurityProfileInvalid and the gRPC code Unimplemented as permanent and
+    // retries all other errors with backoff, including authentication and
+    // authorization failures.
+    // Feature gate: SecurityProfileOCI
+    // See https://kep.k8s.io/6061 for more details.
+    rpc PullSecurityProfile(PullSecurityProfileRequest) returns (PullSecurityProfileResponse) {}
     // RemoveImage removes the image.
     // This call is idempotent, and must not return an error if the image has
     // already been removed.
@@ -532,6 +582,16 @@ message SecurityProfile {
         Unconfined = 1;
         // A pre-defined profile on the node should be used.
         Localhost = 2;
+        // A profile previously pulled with PullSecurityProfile should be
+        // used, merged with the runtime's configured baseline. If the profile
+        // is not present, runtimes must fail the call and must not pull it.
+        // Only supported for seccomp: runtimes must reject OCI in the
+        // apparmor field with InvalidArgument until AppArmor support is
+        // defined. Runtimes that support it report
+        // RuntimeFeatures.security_profile_oci.
+        // Feature gate: SecurityProfileOCI
+        // See https://kep.k8s.io/6061 for more details.
+        OCI = 3;
     }
     // Indicator which `ProfileType` should be applied.
     ProfileType profile_type = 1;
@@ -539,6 +599,54 @@ message SecurityProfile {
     // Must only be set if `ProfileType` is `Localhost`.
     // For seccomp, it must be an absolute path to the seccomp profile.
     // For AppArmor, this field is the AppArmor `<profile name>/`
+    string localhost_ref = 2;
+    // oci_ref is the digest-pinned reference of a profile previously pulled
+    // with PullSecurityProfile, as written in the pod spec (for example
+    // "registry.example.com/profile@sha256:abc123...").
+    // It is the same string as image.image and image.user_specified_image
+    // of the PullSecurityProfile request, because the pod spec only allows
+    // canonical, digest-pinned references.
+    // The runtime uses it to look up the cached profile content and must
+    // accept it even when a mirror served the content.
+    // Must be set if `ProfileType` is `OCI`; runtimes must ignore it for
+    // other profile types.
+    string oci_ref = 3;
+    // base_profile specifies an optional base profile to merge with the OCI
+    // profile. Only meaningful if `ProfileType` is `OCI`; runtimes must
+    // ignore it for other profile types.
+    // The runtime intersects the OCI profile, the base profile, and its own
+    // configured baseline, so that the effective profile permits an
+    // operation only if all inputs permit it.
+    // The configured baseline is the runtime default profile unless the node
+    // administrator configured a different profile. A RuntimeDefault base
+    // profile therefore only adds restrictions on nodes with such a
+    // configuration.
+    // When unset, the runtime uses its configured baseline only.
+    SecurityProfileBase base_profile = 4;
+}
+
+// SecurityProfileBase specifies the base profile of an OCI security profile.
+// The kubelet sets it in SecurityProfile.base_profile when the pod spec
+// includes a base profile next to the OCI reference.
+message SecurityProfileBase {
+    // Available base profile types.
+    enum BaseType {
+        // The runtime uses its configured baseline. This is equivalent to
+        // not setting base_profile at all; the kubelet never sends it and
+        // omits base_profile instead, so runtimes only need to treat it as
+        // unset.
+        BaseTypeUnspecified = 0;
+        // The container runtime default profile is used as the base.
+        RuntimeDefault = 1;
+        // A pre-defined profile on the node is used as the base.
+        Localhost = 2;
+    }
+    // Indicator which `BaseType` should be applied.
+    BaseType type = 1;
+    // Absolute path to the base profile on the node.
+    // Must be set if `BaseType` is `Localhost`; runtimes must ignore it for
+    // other base types.
+    // Same semantics as SecurityProfile.localhost_ref.
     string localhost_ref = 2;
 }
 
@@ -1813,6 +1921,49 @@ message PullImageResponse {
     string image_ref = 1;
 }
 
+// SecurityProfileKind identifies the security mechanism of a profile pulled
+// with PullSecurityProfile.
+enum SecurityProfileKind {
+    // Unspecified kind. Runtimes reject it like an unsupported kind.
+    SecurityProfileKindUnspecified = 0;
+    // A seccomp profile as defined by the OCI runtime spec (linux.seccomp),
+    // with the config media type
+    // application/vnd.cncf.seccomp-profile.config.v1+json.
+    Seccomp = 1;
+    // An AppArmor profile, with the config media type
+    // application/vnd.cncf.apparmor-profile.config.v1+json.
+    // Reserved: runtimes reject it like an unsupported kind until AppArmor
+    // support is defined.
+    AppArmor = 2;
+}
+
+message PullSecurityProfileRequest {
+    // Spec of the profile, using the same ImageSpec message as PullImage.
+    // image.image and image.user_specified_image both hold the reference as
+    // written in the pod spec, which is canonical and digest-pinned (for
+    // example "registry.example.com/profile@sha256:abc123..."), and
+    // image.runtime_handler selects the runtime handler, which keeps profile
+    // pulls on the same credential path as image pulls.
+    ImageSpec image = 1;
+    // Authentication configuration for pulling the profile, resolved by the
+    // kubelet the same way as for PullImage.
+    AuthConfig auth = 2;
+    // Config of the PodSandbox, which is used to pull the profile in
+    // PodSandbox context.
+    PodSandboxConfig sandbox_config = 3;
+    // profile_kind identifies the expected security mechanism. The runtime
+    // rejects artifacts whose config media type does not match it. Kinds the
+    // runtime does not support are rejected with gRPC code InvalidArgument
+    // and the SecurityProfileInvalid well-known error message.
+    SecurityProfileKind profile_kind = 4;
+}
+
+message PullSecurityProfileResponse {
+    // cached is true if the profile was already present in the runtime's
+    // storage and no registry request was made.
+    bool cached = 1;
+}
+
 message RemoveImageRequest {
     // Spec of the image to remove.
     ImageSpec image = 1;
@@ -1904,6 +2055,13 @@ message RuntimeFeatures {
     // mount_options is set to true if the runtime supports additional bind
     // mount options (noexec, nodev, nosuid) on container mounts.
     bool mount_options = 3;
+    // security_profile_oci is set to true if the runtime supports the
+    // PullSecurityProfile RPC for seccomp profiles and OCI SecurityProfiles in
+    // the seccomp fields of sandboxes and containers. It does not cover
+    // AppArmor, whose support will be reported separately.
+    // Feature gate: SecurityProfileOCI
+    // See https://kep.k8s.io/6061 for more details.
+    bool security_profile_oci = 4;
 }
 
 message StatusResponse {

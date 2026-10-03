@@ -391,6 +391,13 @@ var (
 	// TODO: document the feature (when to use this feature for a test)
 	SeccompDefault = framework.WithFeature(framework.ValidFeatures.Add("SeccompDefault"))
 
+	// Owner: sig-node
+	// KEP: https://kep.k8s.io/6061
+	// Marks tests of seccomp profiles of type OCI, which require the
+	// `SecurityProfileOCI` feature gate and a container runtime that supports
+	// the PullSecurityProfile CRI call.
+	SecurityProfileOCI = framework.WithFeature(framework.ValidFeatures.Add("SecurityProfileOCI"))
+
 	// Owner: sig-storage
 	// KEP: https://kep.k8s.io/3314
 	// Tests marked with this feature require:

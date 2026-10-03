@@ -34,6 +34,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	ndf "k8s.io/component-helpers/nodedeclaredfeatures"
+	"k8s.io/component-helpers/nodedeclaredfeatures/features/securityprofileoci"
 	ndftesting "k8s.io/component-helpers/nodedeclaredfeatures/testing"
 	"k8s.io/component-helpers/storage/volume"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
@@ -3159,6 +3160,66 @@ func TestNodeDeclaredFeaturesFilter(t *testing.T) {
 				if err != nil {
 					t.Errorf("Expected pod to be unschedulable, but it was not: %v", err)
 				}
+			}
+		})
+	}
+}
+
+// TestSecurityProfileOCINodeDeclaredFeature checks that pods with a seccomp
+// profile of type OCI are only scheduled to nodes declaring the feature.
+func TestSecurityProfileOCINodeDeclaredFeature(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SecurityProfileOCI, true)
+
+	ociPod := func(name string) *v1.Pod {
+		pod := st.MakePod().Name(name).
+			Containers([]v1.Container{{Name: "c", Image: imageutils.GetPauseImageName()}}).Obj()
+		pod.Spec.SecurityContext = &v1.PodSecurityContext{SeccompProfile: &v1.SeccompProfile{
+			Type: v1.SeccompProfileTypeOCI,
+			OCI:  &v1.SecurityProfileOCI{Ref: "registry.example.com/profile@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"},
+		}}
+		return pod
+	}
+	nodeWithFeature := st.MakeNode().Name("node-with-feature").DeclaredFeatures([]string{securityprofileoci.SecurityProfileOCI}).Obj()
+	nodeWithoutFeature := st.MakeNode().Name("node-without-feature").DeclaredFeatures([]string{}).Obj()
+
+	tests := []struct {
+		name         string
+		nodes        []*v1.Node
+		expectedNode string
+	}{{
+		name:         "scheduled to the node declaring the feature",
+		nodes:        []*v1.Node{nodeWithFeature, nodeWithoutFeature},
+		expectedNode: "node-with-feature",
+	}, {
+		name:  "unschedulable without a node declaring the feature",
+		nodes: []*v1.Node{nodeWithoutFeature},
+	}}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			testCtx := testutils.InitTestSchedulerWithNS(t, "security-profile-oci")
+			cs := testCtx.ClientSet
+			ns := testCtx.NS.Name
+			for _, node := range tt.nodes {
+				if _, err := testutils.CreateNode(cs, node.DeepCopy()); err != nil {
+					t.Fatalf("Failed to create node %v: %v", node.Name, err)
+				}
+			}
+			if err := testutils.WaitForNodesInCache(testCtx.Ctx, testCtx.Scheduler, len(tt.nodes)); err != nil {
+				t.Fatalf("Failed to wait for nodes in cache: %v", err)
+			}
+
+			pod := ociPod("oci")
+			pod.Namespace = ns
+			if _, err := cs.CoreV1().Pods(ns).Create(testCtx.Ctx, pod, metav1.CreateOptions{}); err != nil {
+				t.Fatalf("Failed to create pod: %v", err)
+			}
+			if tt.expectedNode != "" {
+				if err := wait.PollUntilContextTimeout(testCtx.Ctx, pollInterval, wait.ForeverTestTimeout, false, testutils.PodScheduledIn(cs, ns, pod.Name, []string{tt.expectedNode})); err != nil {
+					t.Errorf("Expected pod to be scheduled to %s: %v", tt.expectedNode, err)
+				}
+			} else if err := wait.PollUntilContextTimeout(testCtx.Ctx, pollInterval, wait.ForeverTestTimeout, false, testutils.PodUnschedulable(cs, ns, pod.Name)); err != nil {
+				t.Errorf("Expected pod to be unschedulable: %v", err)
 			}
 		})
 	}
