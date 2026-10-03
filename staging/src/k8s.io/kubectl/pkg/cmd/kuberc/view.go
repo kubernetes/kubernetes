@@ -26,8 +26,7 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/genericiooptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
-
-	"k8s.io/kubectl/pkg/config/v1beta1"
+	v1 "k8s.io/kubectl/pkg/config/v1"
 	"k8s.io/kubectl/pkg/kuberc"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
@@ -112,7 +111,7 @@ func (o *ViewOptions) Validate() error {
 
 // Run executes the view command
 func (o *ViewOptions) Run() error {
-	pref, err := kuberc.LoadPreference(o.KubeRCFile)
+	pref, err := kuberc.LoadPreference(o.KubeRCFile, o.ErrOut)
 	if err != nil {
 		if !os.IsNotExist(err) {
 			return fmt.Errorf("error reading kuberc file: %w", err)
@@ -138,10 +137,10 @@ func (o *ViewOptions) Run() error {
 	}
 
 	if pref.Aliases == nil {
-		pref.Aliases = []v1beta1.AliasOverride{}
+		pref.Aliases = []v1.AliasOverride{}
 	}
 	if pref.Defaults == nil {
-		pref.Defaults = []v1beta1.CommandDefaults{}
+		pref.Defaults = []v1.CommandDefaults{}
 	}
 
 	printer, err := o.PrintFlags.ToPrinter()

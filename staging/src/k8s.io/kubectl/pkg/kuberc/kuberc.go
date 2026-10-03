@@ -393,7 +393,7 @@ func DefaultGetPreferences(kuberc string, errOut io.Writer) (*config.Preference,
 		return nil, nil
 	}
 
-	preference, err := decodePreference(kubeRCFile)
+	preference, err := decodePreference(kubeRCFile, errOut)
 	switch {
 	case preference != nil && runtime.IsStrictDecodingError(err):
 		// just warn about strict decoding errors if we got a usable Preference object back

@@ -17,6 +17,7 @@ limitations under the License.
 package kuberc
 
 import (
+	"io"
 	"path/filepath"
 	"testing"
 
@@ -38,10 +39,18 @@ func TestDecodePreference(t *testing.T) {
 			kuberc:           filepath.Join("..", "..", "testdata", "kuberc", "v1beta1.kuberc"),
 			expectedDefaults: []string{"v1beta1-apply", "v1beta1-delete"},
 		},
-		"first known version (v1beta1) with all versions": {
+		"v1": {
+			kuberc:           filepath.Join("..", "..", "testdata", "kuberc", "v1.kuberc"),
+			expectedDefaults: []string{"v1-apply", "v1-delete"},
+		},
+		"first known version (v1) with all known versions": {
 			kuberc:           filepath.Join("..", "..", "testdata", "kuberc", "allversions.kuberc"),
 			expectedAliases:  []string{"getn", "runx"},
-			expectedDefaults: []string{"v1beta1-apply", "v1beta1-delete"},
+			expectedDefaults: []string{"v1-apply", "v1-delete"},
+		},
+		"first known (v1) with multiple versions (unknown, v1, v1beta1)": {
+			kuberc:           filepath.Join("..", "..", "testdata", "kuberc", "multiple5.kuberc"),
+			expectedDefaults: []string{"v1-apply", "v1-delete"},
 		},
 		"first known (v1beta1) with multiple versions (unknown, v1beta1, v1alpha1)": {
 			kuberc:           filepath.Join("..", "..", "testdata", "kuberc", "multiple1.kuberc"),
@@ -75,7 +84,7 @@ func TestDecodePreference(t *testing.T) {
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
-			actual, err := decodePreference(tc.kuberc)
+			actual, err := decodePreference(tc.kuberc, io.Discard)
 			if len(tc.expectedError) != 0 {
 				require.ErrorContains(t, err, tc.expectedError, "wrong expected error")
 				return
@@ -97,7 +106,7 @@ func TestDecodePreference(t *testing.T) {
 }
 
 func TestDecodeEmptyPreference(t *testing.T) {
-	actual, err := decodePreference(filepath.Join("..", "..", "testdata", "kuberc", "empty.kuberc"))
+	actual, err := decodePreference(filepath.Join("..", "..", "testdata", "kuberc", "empty.kuberc"), io.Discard)
 	require.NoError(t, err, "unexpected error")
 	require.Nil(t, actual, "unexpected preferences")
 }
