@@ -53,6 +53,9 @@ func TestFeatureRequirementsConsistency(t *testing.T) {
 			if reqs.RequiredRuntimeFeatures != nil {
 				discoverCfg.RuntimeFeatures = *reqs.RequiredRuntimeFeatures
 			}
+			if reqs.RequiredStaticConfig != nil {
+				discoverCfg.StaticConfig = *reqs.RequiredStaticConfig
+			}
 
 			featureEnabled := registeredFeature.Discover(discoverCfg)
 			if !featureEnabled {
