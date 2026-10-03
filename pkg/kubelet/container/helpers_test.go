@@ -1670,6 +1670,62 @@ func TestShouldAllContainersRestart(t *testing.T) {
 			nil,
 			false,
 		},
+		{
+			"pod marked with condition but deleting/terminating",
+			&v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					DeletionTimestamp: &metav1.Time{Time: time.Now()},
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name:          "regular",
+							RestartPolicy: &restartPolicyNever,
+						},
+					},
+				},
+			},
+			&PodStatus{
+				ContainerStatuses: []*Status{
+					{
+						Name:  "regular",
+						State: ContainerStateRunning,
+					},
+				},
+			},
+			&v1.PodStatus{
+				Conditions: []v1.PodCondition{RestartAllContainersCondition},
+			},
+			false,
+		},
+		{
+			"regular container exited with matching rules but pod deleting/terminating",
+			&v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					DeletionTimestamp: &metav1.Time{Time: time.Now()},
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name:               "regular",
+							RestartPolicy:      &restartPolicyNever,
+							RestartPolicyRules: []v1.ContainerRestartRule{restartRuleRestartAllContainers},
+						},
+					},
+				},
+			},
+			&PodStatus{
+				ContainerStatuses: []*Status{
+					{
+						Name:     "regular",
+						State:    ContainerStateExited,
+						ExitCode: 42,
+					},
+				},
+			},
+			nil,
+			false,
+		},
 	}
 
 	for _, tc := range testcases {
