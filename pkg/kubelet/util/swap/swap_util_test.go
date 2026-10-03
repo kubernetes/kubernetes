@@ -19,7 +19,6 @@ package swap
 import (
 	"testing"
 
-	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
@@ -59,8 +58,7 @@ Filename				Type		Size		Used		Priority
 			expectedEnabled: false,
 		},
 	}
-	tCtx := ktesting.Init(t)
-	logger := klog.FromContext(tCtx)
+	logger, _ := ktesting.NewTestContext(t)
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
