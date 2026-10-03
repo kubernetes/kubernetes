@@ -856,7 +856,6 @@ func TestPriorityLevelConfigurationValidation(t *testing.T) {
 		priorityLevelConfiguration: exemptTypeRepurposed,
 		expectedErrors: field.ErrorList{
 			field.Invalid(field.NewPath("spec").Child("type"), flowcontrol.PriorityLevelEnablementLimited, "must be 'Exempt' if and only if `name` is 'exempt'"),
-			field.Forbidden(field.NewPath("spec").Child("exempt"), "must be nil if the type is Limited").MarkCoveredByDeclarative(),
 			field.Invalid(field.NewPath("spec"), exemptTypeRepurposed.Spec, "spec of 'exempt' except the 'spec.exempt' field must equal the fixed value"),
 		},
 	}, {
@@ -869,7 +868,6 @@ func TestPriorityLevelConfigurationValidation(t *testing.T) {
 		},
 		expectedErrors: field.ErrorList{
 			field.Invalid(field.NewPath("spec"), badExemptSpec3, "spec of 'exempt' except the 'spec.exempt' field must equal the fixed value"),
-			field.Forbidden(field.NewPath("spec").Child("limited"), "must be nil if the type is not Limited").MarkCoveredByDeclarative(),
 		},
 	}, {
 		name: "admins are allowed to change the Exempt field of the 'exempt' pl",
@@ -880,32 +878,6 @@ func TestPriorityLevelConfigurationValidation(t *testing.T) {
 			Spec: validChangesInExemptFieldOfExemptPLFn(),
 		},
 		expectedErrors: field.ErrorList{},
-	}, {
-		name: "limited must not set exempt priority level configuration for borrowing",
-		priorityLevelConfiguration: &flowcontrol.PriorityLevelConfiguration{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "broken-limited",
-			},
-			Spec: flowcontrol.PriorityLevelConfigurationSpec{
-				Type:   flowcontrol.PriorityLevelEnablementLimited,
-				Exempt: &flowcontrol.ExemptPriorityLevelConfiguration{},
-			},
-		},
-		expectedErrors: field.ErrorList{
-			field.Forbidden(field.NewPath("spec").Child("exempt"), "must be nil if the type is Limited").MarkCoveredByDeclarative(),
-			field.Required(field.NewPath("spec").Child("limited"), "must not be empty when type is Limited").MarkCoveredByDeclarative(),
-		},
-	}, {
-		name: "limited requires more details",
-		priorityLevelConfiguration: &flowcontrol.PriorityLevelConfiguration{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "broken-limited",
-			},
-			Spec: flowcontrol.PriorityLevelConfigurationSpec{
-				Type: flowcontrol.PriorityLevelEnablementLimited,
-			},
-		},
-		expectedErrors: field.ErrorList{field.Required(field.NewPath("spec").Child("limited"), "must not be empty when type is Limited").MarkCoveredByDeclarative()},
 	}, {
 		name: "max-in-flight should work",
 		priorityLevelConfiguration: &flowcontrol.PriorityLevelConfiguration{
@@ -1126,19 +1098,6 @@ func TestPriorityLevelConfigurationValidation(t *testing.T) {
 		requestGV: &schema.GroupVersion{},
 		expectedErrors: field.ErrorList{
 			field.Forbidden(field.NewPath("metadata").Child("annotations"), fmt.Sprintf("annotation '%s' is forbidden", flowcontrolv1beta3.PriorityLevelPreserveZeroConcurrencySharesKey)),
-		},
-	}, {
-		name: "spec.type empty should fail with required",
-		priorityLevelConfiguration: &flowcontrol.PriorityLevelConfiguration{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "test-empty-type",
-			},
-			Spec: flowcontrol.PriorityLevelConfigurationSpec{
-				Type: "",
-			},
-		},
-		expectedErrors: field.ErrorList{
-			field.Required(field.NewPath("spec").Child("type"), "").MarkCoveredByDeclarative(),
 		},
 	}, {
 		name: "spec.limited.limitResponse.type empty should fail with required",
