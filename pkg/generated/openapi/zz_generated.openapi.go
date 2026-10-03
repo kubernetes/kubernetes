@@ -14554,7 +14554,7 @@ func schema_k8sio_api_autoscaling_v1_HorizontalPodAutoscalerSpec(ref common.Refe
 					},
 					"minReplicas": {
 						SchemaProps: spec.SchemaProps{
-							Description: "minReplicas is the lower limit for the number of replicas to which the autoscaler can scale down.  It defaults to 1 pod.  minReplicas is allowed to be 0 if the alpha feature gate HPAScaleToZero is enabled and at least one Object or External metric is configured.  Scaling is active as long as at least one metric value is available.",
+							Description: "minReplicas is the lower limit for the number of replicas to which the autoscaler can scale down.  It defaults to 1 pod.  minReplicas is allowed to be 0 if the beta feature gate HPAScaleToZero is enabled (the default as of 1.37) and at least one Object or External metric is configured.  Scaling is active as long as at least one metric value is available.",
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
@@ -15558,7 +15558,7 @@ func schema_k8sio_api_autoscaling_v2_HorizontalPodAutoscalerSpec(ref common.Refe
 					},
 					"minReplicas": {
 						SchemaProps: spec.SchemaProps{
-							Description: "minReplicas is the lower limit for the number of replicas to which the autoscaler can scale down.  It defaults to 1 pod.  minReplicas is allowed to be 0 if the alpha feature gate HPAScaleToZero is enabled and at least one Object or External metric is configured.  Scaling is active as long as at least one metric value is available.",
+							Description: "minReplicas is the lower limit for the number of replicas to which the autoscaler can scale down.  It defaults to 1 pod.  minReplicas is allowed to be 0 if the beta feature gate HPAScaleToZero is enabled (the default as of 1.37) and at least one Object or External metric is configured.  Scaling is active as long as at least one metric value is available.",
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
