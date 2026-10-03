@@ -24,6 +24,8 @@ import (
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/version"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/util/feature"
@@ -342,5 +344,238 @@ func TestVolumeAttachmentValidation(t *testing.T) {
 				t.Errorf("Validation of object unexpectedly succeeded")
 			}
 		})
+	}
+}
+
+func TestGetAttrs(t *testing.T) {
+	va := &storage.VolumeAttachment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   "test-va",
+			Labels: map[string]string{"app": "test"},
+		},
+		Spec: storage.VolumeAttachmentSpec{
+			Attacher: "csi.test.io",
+			NodeName: "node-1",
+		},
+	}
+
+	lbls, flds, err := GetAttrs(va)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if lbls["app"] != "test" {
+		t.Errorf("expected label app=test, got %v", lbls)
+	}
+
+	if flds.Get("spec.nodeName") != "node-1" {
+		t.Errorf("expected field spec.nodeName=node-1, got %v", flds.Get("spec.nodeName"))
+	}
+
+	if flds.Get("metadata.name") != "test-va" {
+		t.Errorf("expected field metadata.name=test-va, got %v", flds.Get("metadata.name"))
+	}
+}
+
+func TestGetAttrs_NotVolumeAttachment(t *testing.T) {
+	pod := &api.Pod{}
+	_, _, err := GetAttrs(pod)
+	if err == nil {
+		t.Fatal("expected error for non-VolumeAttachment object")
+	}
+}
+
+func TestToSelectableFields(t *testing.T) {
+	tests := []struct {
+		name     string
+		va       *storage.VolumeAttachment
+		expected map[string]string
+	}{
+		{
+			name: "basic fields",
+			va: &storage.VolumeAttachment{
+				ObjectMeta: metav1.ObjectMeta{Name: "va-1"},
+				Spec: storage.VolumeAttachmentSpec{
+					NodeName: "node-abc",
+				},
+			},
+			expected: map[string]string{
+				"metadata.name": "va-1",
+				"spec.nodeName": "node-abc",
+			},
+		},
+		{
+			name: "empty nodeName",
+			va: &storage.VolumeAttachment{
+				ObjectMeta: metav1.ObjectMeta{Name: "va-2"},
+				Spec: storage.VolumeAttachmentSpec{
+					NodeName: "",
+				},
+			},
+			expected: map[string]string{
+				"metadata.name": "va-2",
+				"spec.nodeName": "",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := ToSelectableFields(tt.va)
+			for k, v := range tt.expected {
+				if got.Get(k) != v {
+					t.Errorf("field %s: expected %q, got %q", k, v, got.Get(k))
+				}
+			}
+		})
+	}
+}
+
+func TestMatchVolumeAttachment(t *testing.T) {
+	tests := []struct {
+		name        string
+		label       labels.Selector
+		field       fields.Selector
+		va          *storage.VolumeAttachment
+		expectMatch bool
+	}{
+		{
+			name:  "match by nodeName",
+			label: labels.Everything(),
+			field: fields.ParseSelectorOrDie("spec.nodeName=node-1"),
+			va: &storage.VolumeAttachment{
+				ObjectMeta: metav1.ObjectMeta{Name: "va-1"},
+				Spec: storage.VolumeAttachmentSpec{
+					NodeName: "node-1",
+				},
+			},
+			expectMatch: true,
+		},
+		{
+			name:  "no match by nodeName",
+			label: labels.Everything(),
+			field: fields.ParseSelectorOrDie("spec.nodeName=node-1"),
+			va: &storage.VolumeAttachment{
+				ObjectMeta: metav1.ObjectMeta{Name: "va-2"},
+				Spec: storage.VolumeAttachmentSpec{
+					NodeName: "node-2",
+				},
+			},
+			expectMatch: false,
+		},
+		{
+			name:  "match by metadata.name",
+			label: labels.Everything(),
+			field: fields.ParseSelectorOrDie("metadata.name=va-specific"),
+			va: &storage.VolumeAttachment{
+				ObjectMeta: metav1.ObjectMeta{Name: "va-specific"},
+				Spec: storage.VolumeAttachmentSpec{
+					NodeName: "node-1",
+				},
+			},
+			expectMatch: true,
+		},
+		{
+			name:  "match by label",
+			label: labels.SelectorFromSet(labels.Set{"app": "csi"}),
+			field: fields.Everything(),
+			va: &storage.VolumeAttachment{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "va-3",
+					Labels: map[string]string{"app": "csi"},
+				},
+				Spec: storage.VolumeAttachmentSpec{
+					NodeName: "node-1",
+				},
+			},
+			expectMatch: true,
+		},
+		{
+			name:  "match by both nodeName and label",
+			label: labels.SelectorFromSet(labels.Set{"app": "csi"}),
+			field: fields.ParseSelectorOrDie("spec.nodeName=node-1"),
+			va: &storage.VolumeAttachment{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "va-4",
+					Labels: map[string]string{"app": "csi"},
+				},
+				Spec: storage.VolumeAttachmentSpec{
+					NodeName: "node-1",
+				},
+			},
+			expectMatch: true,
+		},
+		{
+			name:  "no match - label mismatch",
+			label: labels.SelectorFromSet(labels.Set{"app": "csi"}),
+			field: fields.ParseSelectorOrDie("spec.nodeName=node-1"),
+			va: &storage.VolumeAttachment{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "va-5",
+					Labels: map[string]string{"app": "other"},
+				},
+				Spec: storage.VolumeAttachmentSpec{
+					NodeName: "node-1",
+				},
+			},
+			expectMatch: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			predicate := MatchVolumeAttachment(tt.label, tt.field)
+			matched, err := predicate.Matches(tt.va)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if matched != tt.expectMatch {
+				t.Errorf("expected match=%v, got %v", tt.expectMatch, matched)
+			}
+		})
+	}
+}
+
+func TestNodeNameTriggerFunc(t *testing.T) {
+	va := &storage.VolumeAttachment{
+		Spec: storage.VolumeAttachmentSpec{
+			NodeName: "my-node",
+		},
+	}
+	if got := NodeNameTriggerFunc(va); got != "my-node" {
+		t.Errorf("expected 'my-node', got %q", got)
+	}
+}
+
+func TestNodeNameIndexFunc(t *testing.T) {
+	va := &storage.VolumeAttachment{
+		Spec: storage.VolumeAttachmentSpec{
+			NodeName: "index-node",
+		},
+	}
+
+	vals, err := NodeNameIndexFunc(va)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(vals) != 1 || vals[0] != "index-node" {
+		t.Errorf("expected [index-node], got %v", vals)
+	}
+}
+
+func TestNodeNameIndexFunc_WrongType(t *testing.T) {
+	_, err := NodeNameIndexFunc("not-a-va")
+	if err == nil {
+		t.Fatal("expected error for wrong type")
+	}
+}
+
+func TestIndexers(t *testing.T) {
+	indexers := Indexers()
+	if indexers == nil {
+		t.Fatal("expected non-nil indexers")
+	}
+	if _, ok := (*indexers)["f:spec.nodeName"]; !ok {
+		t.Error("expected indexer for f:spec.nodeName")
 	}
 }
