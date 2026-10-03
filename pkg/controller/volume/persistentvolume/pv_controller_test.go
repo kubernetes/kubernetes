@@ -449,7 +449,7 @@ func TestAnnealMigrationAnnotations(t *testing.T) {
 			expClaimAnnotations:  map[string]string{volume.AnnStorageProvisioner: migratedPlugin, volume.AnnMigratedTo: migratedDriver},
 		},
 		{
-			name:                 "migration on with Beta storage provisioner annontation",
+			name:                 "migration on with Beta storage provisioner annotation",
 			volumeAnnotations:    map[string]string{volume.AnnDynamicallyProvisioned: migratedPlugin},
 			expVolumeAnnotations: map[string]string{volume.AnnDynamicallyProvisioned: migratedPlugin, volume.AnnMigratedTo: migratedDriver},
 			claimAnnotations:     map[string]string{volume.AnnBetaStorageProvisioner: migratedPlugin},
@@ -470,7 +470,7 @@ func TestAnnealMigrationAnnotations(t *testing.T) {
 			expClaimAnnotations:  map[string]string{volume.AnnStorageProvisioner: nonmigratedPlugin},
 		},
 		{
-			name:                 "migration off removes migrated to (rollback) with Beta storage provisioner annontation",
+			name:                 "migration off removes migrated to (rollback) with Beta storage provisioner annotation",
 			volumeAnnotations:    map[string]string{volume.AnnDynamicallyProvisioned: nonmigratedPlugin, volume.AnnMigratedTo: nonmigratedDriver},
 			expVolumeAnnotations: map[string]string{volume.AnnDynamicallyProvisioned: nonmigratedPlugin},
 			claimAnnotations:     map[string]string{volume.AnnBetaStorageProvisioner: nonmigratedPlugin, volume.AnnMigratedTo: nonmigratedDriver},
