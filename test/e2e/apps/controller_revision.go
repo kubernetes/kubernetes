@@ -66,7 +66,7 @@ var _ = SIGDescribe("ControllerRevision", framework.WithSerial(), func() {
 		if daemonsets != nil && len(daemonsets.Items) > 0 {
 			for _, ds := range daemonsets.Items {
 				ginkgo.By(fmt.Sprintf("Deleting DaemonSet %q", ds.Name))
-				framework.ExpectNoError(e2eresource.DeleteResourceAndWaitForGC(ctx, f.ClientSet, extensionsinternal.Kind("DaemonSet"), f.Namespace.Name, ds.Name))
+				framework.ExpectNoError(e2eresource.DeleteResourceAndWaitForGC(ctx, f.ClientSet, extensionsinternal.Kind("DaemonSet"), f.Namespace.Name, ds.Name), "failed to e2eresource.DeleteResourceAndWaitForGC(ctx, f.ClientSet, extensionsinternal.K...")
 				err = wait.PollUntilContextTimeout(ctx, dsRetryPeriod, dsRetryTimeout, true, checkRunningOnNoNodes(f, &ds))
 				framework.ExpectNoError(err, "error waiting for daemon pod to be reaped")
 			}
@@ -82,7 +82,7 @@ var _ = SIGDescribe("ControllerRevision", framework.WithSerial(), func() {
 			framework.Logf("unable to dump pods: %v", err)
 		}
 		err = clearDaemonSetNodeLabels(ctx, f.ClientSet)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to clearDaemonSetNodeLabels(ctx, f.ClientSet)")
 	})
 
 	f = framework.NewDefaultFramework("controllerrevisions")
@@ -100,12 +100,12 @@ var _ = SIGDescribe("ControllerRevision", framework.WithSerial(), func() {
 		c = f.ClientSet
 
 		updatedNS, err := patchNamespaceAnnotations(ctx, c, ns)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to patchNamespaceAnnotations(ctx, c, ns)")
 
 		ns = updatedNS.Name
 
 		err = clearDaemonSetNodeLabels(ctx, c)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to clearDaemonSetNodeLabels(ctx, c)")
 	})
 
 	/*
@@ -133,13 +133,13 @@ var _ = SIGDescribe("ControllerRevision", framework.WithSerial(), func() {
 
 		ginkgo.By(fmt.Sprintf("Creating DaemonSet %q", dsName))
 		testDaemonset, err := csAppsV1.DaemonSets(ns).Create(ctx, newDaemonSetWithLabel(dsName, image, dsLabel), metav1.CreateOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to csAppsV1.DaemonSets(ns).Create(ctx, newDaemonSetWithLabel(dsName, image, dsLa...")
 
 		ginkgo.By("Check that daemon pods launch on every node of the cluster.")
 		err = wait.PollUntilContextTimeout(ctx, dsRetryPeriod, dsRetryTimeout, true, checkRunningOnAllNodes(f, testDaemonset))
 		framework.ExpectNoError(err, "error waiting for daemon pod to start")
 		err = e2edaemonset.CheckDaemonStatus(ctx, f, dsName)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to e2edaemonset.CheckDaemonStatus(ctx, f, dsName)")
 
 		ginkgo.By(fmt.Sprintf("Confirm DaemonSet %q successfully created with %q label", dsName, dsLabelSelector))
 		dsList, err := csAppsV1.DaemonSets("").List(ctx, metav1.ListOptions{LabelSelector: dsLabelSelector})
@@ -147,7 +147,7 @@ var _ = SIGDescribe("ControllerRevision", framework.WithSerial(), func() {
 		gomega.Expect(dsList.Items).To(gomega.HaveLen(1), "filtered list wasn't found")
 
 		ds, err := c.AppsV1().DaemonSets(ns).Get(ctx, dsName, metav1.GetOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to c.AppsV1().DaemonSets(ns).Get(ctx, dsName, metav1.GetOptions{})")
 
 		// Listing across all namespaces to verify api endpoint: listAppsV1ControllerRevisionForAllNamespaces
 		ginkgo.By(fmt.Sprintf("Listing all ControllerRevisions with label %q", dsLabelSelector))

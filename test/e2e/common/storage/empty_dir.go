@@ -289,7 +289,7 @@ var _ = SIGDescribe("EmptyDir volumes", func() {
 
 		ginkgo.By("Creating Pod")
 		e2epod.NewPodClient(f).Create(ctx, pod)
-		framework.ExpectNoError(e2epod.WaitForPodNameRunningInNamespace(ctx, f.ClientSet, pod.Name, f.Namespace.Name))
+		framework.ExpectNoError(e2epod.WaitForPodNameRunningInNamespace(ctx, f.ClientSet, pod.Name, f.Namespace.Name), "failed to e2epod.WaitForPodNameRunningInNamespace(ctx, f.ClientSet, pod.Name, f.Namespa...")
 
 		ginkgo.By("Reading file content from the nginx-container")
 		result := e2epod.ExecShellInContainer(f, pod.Name, busyBoxMainContainerName, fmt.Sprintf("cat %s", busyBoxMainVolumeFilePath))

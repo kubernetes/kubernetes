@@ -123,7 +123,7 @@ while true; do sleep 1; done
 					}, ContainerStatusRetryTimeout, ContainerStatusPollInterval).Should(gomega.Equal(testCase.Ready))
 
 					status, err := terminateContainer.GetStatus(ctx)
-					framework.ExpectNoError(err)
+					framework.ExpectNoError(err, "failed to terminateContainer.GetStatus(ctx)")
 
 					ginkgo.By(fmt.Sprintf("Container '%s': should get the expected 'State'", testContainer.Name))
 					gomega.Expect(GetContainerState(status.State)).To(gomega.Equal(testCase.State))
@@ -159,7 +159,7 @@ while true; do sleep 1; done
 
 				ginkgo.By("get the container status")
 				status, err := c.GetStatus(ctx)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "failed to c.GetStatus(ctx)")
 
 				ginkgo.By("the container should be terminated")
 				gomega.Expect(GetContainerState(status.State)).To(gomega.Equal(ContainerStateTerminated))
@@ -266,7 +266,7 @@ while true; do sleep 1; done
 				var err error
 
 				registryAddress, registryNodeNames, err = e2eregistry.SetupRegistry(ctx, f, true)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "failed to e2eregistry.SetupRegistry(ctx, f, true)")
 				gomega.Expect(registryNodeNames).ToNot(gomega.BeEmpty())
 				// we need to wait for the registry to be removed and so we need to delete the whole NS ourselves
 				ginkgo.DeferCleanup(func(ctx context.Context) {
@@ -278,12 +278,12 @@ while true; do sleep 1; done
 				// we might be told to use a different docker config JSON.
 				if framework.TestContext.DockerConfigFile != "" {
 					contents, err := os.ReadFile(framework.TestContext.DockerConfigFile)
-					framework.ExpectNoError(err)
+					framework.ExpectNoError(err, "failed to os.ReadFile(framework.TestContext.DockerConfigFile)")
 					secret.Data[v1.DockerConfigJsonKey] = contents
 				}
 				ginkgo.By("create image pull secret")
 				pullSecret, err = f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Create(ctx, secret, metav1.CreateOptions{})
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "failed to f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Create(ctx, secret, metav1.Cre...")
 			})
 
 			f.It("should not be able to pull image from invalid registry", f.WithNodeConformance(), func(ctx context.Context) {

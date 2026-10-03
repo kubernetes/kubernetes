@@ -143,7 +143,7 @@ func (r *RestartDaemonConfig) kill(ctx context.Context) {
 	}
 	framework.Logf("Killing %v", r)
 	_, err := e2essh.NodeExec(ctx, r.nodeName, killCmd, framework.TestContext.Provider)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to e2essh.NodeExec(ctx, r.nodeName, killCmd, framework.TestContext.Provider)")
 }
 
 // Restart checks if the daemon is up, kills it, and waits till it comes back up
@@ -188,7 +188,7 @@ func replacePods(pods []*v1.Pod, store cache.Store) {
 	for i := range pods {
 		found = append(found, pods[i])
 	}
-	framework.ExpectNoError(store.Replace(found, "0"))
+	framework.ExpectNoError(store.Replace(found, "0"), "failed to store.Replace(found, '0')")
 }
 
 // getContainerRestarts returns the count of container restarts across all pods matching the given labelSelector,
@@ -196,7 +196,7 @@ func replacePods(pods []*v1.Pod, store cache.Store) {
 func getContainerRestarts(ctx context.Context, c clientset.Interface, ns string, labelSelector labels.Selector) (int, []string) {
 	options := metav1.ListOptions{LabelSelector: labelSelector.String()}
 	pods, err := c.CoreV1().Pods(ns).List(ctx, options)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to c.CoreV1().Pods(ns).List(ctx, options)")
 	failedContainers := 0
 	containerRestartNodes := sets.NewString()
 	for _, p := range pods.Items {
@@ -234,7 +234,7 @@ var _ = SIGDescribe("DaemonRestart", framework.WithDisruptive(), framework.WithP
 			Replicas:    numPods,
 			CreatedPods: &[]*v1.Pod{},
 		}
-		framework.ExpectNoError(e2erc.RunRC(ctx, config))
+		framework.ExpectNoError(e2erc.RunRC(ctx, config), "failed to e2erc.RunRC(ctx, config)")
 		replacePods(*config.CreatedPods, existingPods)
 
 		// The following code continues to run after the BeforeEach and thus
@@ -292,7 +292,7 @@ var _ = SIGDescribe("DaemonRestart", framework.WithDisruptive(), framework.WithP
 			// that it had the opportunity to create/delete pods, if it were going to do so. Scaling the RC
 			// to the same size achieves this, because the scale operation advances the RC's sequence number
 			// and awaits it to be observed and reported back in the RC's status.
-			framework.ExpectNoError(e2erc.ScaleRC(ctx, f.ClientSet, f.ScalesGetter, ns, rcName, numPods, true))
+			framework.ExpectNoError(e2erc.ScaleRC(ctx, f.ClientSet, f.ScalesGetter, ns, rcName, numPods, true), "failed to e2erc.ScaleRC(ctx, f.ClientSet, f.ScalesGetter, ns, rcName, numPods, true)")
 
 			// Only check the keys, the pods can be different if the kubelet updated it.
 			// TODO: Can it really?
@@ -330,9 +330,9 @@ var _ = SIGDescribe("DaemonRestart", framework.WithDisruptive(), framework.WithP
 			restarter.kill(ctx)
 			// This is best effort to try and create pods while the scheduler is down,
 			// since we don't know exactly when it is restarted after the kill signal.
-			framework.ExpectNoError(e2erc.ScaleRC(ctx, f.ClientSet, f.ScalesGetter, ns, rcName, numPods+5, false))
+			framework.ExpectNoError(e2erc.ScaleRC(ctx, f.ClientSet, f.ScalesGetter, ns, rcName, numPods+5, false), "failed to e2erc.ScaleRC(ctx, f.ClientSet, f.ScalesGetter, ns, rcName, numPods+5, false)")
 			restarter.waitUp(ctx)
-			framework.ExpectNoError(e2erc.ScaleRC(ctx, f.ClientSet, f.ScalesGetter, ns, rcName, numPods+5, true))
+			framework.ExpectNoError(e2erc.ScaleRC(ctx, f.ClientSet, f.ScalesGetter, ns, rcName, numPods+5, true), "failed to e2erc.ScaleRC(ctx, f.ClientSet, f.ScalesGetter, ns, rcName, numPods+5, true)")
 		}
 	})
 

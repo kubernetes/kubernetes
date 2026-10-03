@@ -298,7 +298,7 @@ var _ = SIGDescribe("Pods", func() {
 
 		// We need to wait for the pod to be running, otherwise the deletion
 		// may be carried out immediately rather than gracefully.
-		framework.ExpectNoError(e2epod.WaitForPodNameRunningInNamespace(ctx, f.ClientSet, pod.Name, f.Namespace.Name))
+		framework.ExpectNoError(e2epod.WaitForPodNameRunningInNamespace(ctx, f.ClientSet, pod.Name, f.Namespace.Name), "failed to e2epod.WaitForPodNameRunningInNamespace(ctx, f.ClientSet, pod.Name, f.Namespa...")
 		// save the running pod
 		pod, err = podClient.Get(ctx, pod.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err, "failed to GET scheduled pod")
@@ -383,7 +383,7 @@ var _ = SIGDescribe("Pods", func() {
 			pod.Labels["time"] = value
 		})
 
-		framework.ExpectNoError(e2epod.WaitForPodNameRunningInNamespace(ctx, f.ClientSet, pod.Name, f.Namespace.Name))
+		framework.ExpectNoError(e2epod.WaitForPodNameRunningInNamespace(ctx, f.ClientSet, pod.Name, f.Namespace.Name), "failed to e2epod.WaitForPodNameRunningInNamespace(ctx, f.ClientSet, pod.Name, f.Namespa...")
 
 		ginkgo.By("verifying the updated pod is in kubernetes")
 		selector = labels.SelectorFromSet(labels.Set(map[string]string{"time": value}))
@@ -437,7 +437,7 @@ var _ = SIGDescribe("Pods", func() {
 			pod.Spec.ActiveDeadlineSeconds = &newDeadline
 		})
 
-		framework.ExpectNoError(e2epod.WaitForPodTerminatedInNamespace(ctx, f.ClientSet, pod.Name, "DeadlineExceeded", f.Namespace.Name))
+		framework.ExpectNoError(e2epod.WaitForPodTerminatedInNamespace(ctx, f.ClientSet, pod.Name, "DeadlineExceeded", f.Namespace.Name), "failed to e2epod.WaitForPodTerminatedInNamespace(ctx, f.ClientSet, pod.Name, 'DeadlineE...")
 	})
 
 	/*
@@ -714,7 +714,7 @@ var _ = SIGDescribe("Pods", func() {
 		})
 
 		time.Sleep(syncLoopFrequency)
-		framework.ExpectNoError(e2epod.WaitForPodNameRunningInNamespace(ctx, f.ClientSet, pod.Name, f.Namespace.Name))
+		framework.ExpectNoError(e2epod.WaitForPodNameRunningInNamespace(ctx, f.ClientSet, pod.Name, f.Namespace.Name), "failed to e2epod.WaitForPodNameRunningInNamespace(ctx, f.ClientSet, pod.Name, f.Namespa...")
 
 		ginkgo.By("get restart delay after image update")
 		delayAfterUpdate, err := getRestartDelay(ctx, podClient, podName, containerName)
@@ -810,7 +810,7 @@ var _ = SIGDescribe("Pods", func() {
 		validatePodReadiness := func(expectReady bool) {
 			err := wait.Poll(time.Second, time.Minute, func() (bool, error) {
 				pod, err := podClient.Get(ctx, podName, metav1.GetOptions{})
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "failed to podClient.Get(ctx, podName, metav1.GetOptions{})")
 				podReady := podutils.IsPodReady(pod)
 				res := expectReady == podReady
 				if !res {
@@ -818,19 +818,19 @@ var _ = SIGDescribe("Pods", func() {
 				}
 				return res, nil
 			})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to podClient.Get(ctx, podName, metav1.GetOptions{})")
 		}
 
 		ginkgo.By("submitting the pod to kubernetes")
 		e2epod.NewPodClient(f).Create(ctx, pod)
-		framework.ExpectNoError(e2epod.WaitForPodNameRunningInNamespace(ctx, f.ClientSet, pod.Name, f.Namespace.Name))
+		framework.ExpectNoError(e2epod.WaitForPodNameRunningInNamespace(ctx, f.ClientSet, pod.Name, f.Namespace.Name), "failed to e2epod.WaitForPodNameRunningInNamespace(ctx, f.ClientSet, pod.Name, f.Namespa...")
 		if podClient.PodIsReady(ctx, podName) {
 			framework.Failf("Expect pod(%s/%s)'s Ready condition to be false initially.", f.Namespace.Name, pod.Name)
 		}
 
 		ginkgo.By(fmt.Sprintf("patching pod status with condition %q to true", readinessGate1))
 		_, err := podClient.Patch(ctx, podName, types.StrategicMergePatchType, []byte(fmt.Sprintf(patchStatusFmt, readinessGate1, "True")), metav1.PatchOptions{}, "status")
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to podClient.Patch(ctx, podName, types.StrategicMergePatchType, []byte(fmt.Sprin...")
 		// Sleep for 10 seconds.
 		time.Sleep(syncLoopFrequency)
 		// Verify the pod is still not ready
@@ -840,12 +840,12 @@ var _ = SIGDescribe("Pods", func() {
 
 		ginkgo.By(fmt.Sprintf("patching pod status with condition %q to true", readinessGate2))
 		_, err = podClient.Patch(ctx, podName, types.StrategicMergePatchType, []byte(fmt.Sprintf(patchStatusFmt, readinessGate2, "True")), metav1.PatchOptions{}, "status")
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to podClient.Patch(ctx, podName, types.StrategicMergePatchType, []byte(fmt.Sprin...")
 		validatePodReadiness(true)
 
 		ginkgo.By(fmt.Sprintf("patching pod status with condition %q to false", readinessGate1))
 		_, err = podClient.Patch(ctx, podName, types.StrategicMergePatchType, []byte(fmt.Sprintf(patchStatusFmt, readinessGate1, "False")), metav1.PatchOptions{}, "status")
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to podClient.Patch(ctx, podName, types.StrategicMergePatchType, []byte(fmt.Sprin...")
 		validatePodReadiness(false)
 
 	})

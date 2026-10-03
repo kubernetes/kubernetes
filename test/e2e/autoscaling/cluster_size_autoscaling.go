@@ -158,7 +158,7 @@ func increaseClusterSizeWithTimeout(ctx context.Context, f *framework.Framework,
 	labels := map[string]string{
 		"anti-affinity": "yes",
 	}
-	framework.ExpectNoError(runAntiAffinityPods(ctx, f, f.Namespace.Name, targetNodeCount, "increase-size-pod", labels, labels))
+	framework.ExpectNoError(runAntiAffinityPods(ctx, f, f.Namespace.Name, targetNodeCount, "increase-size-pod", labels, labels), "failed to runAntiAffinityPods(ctx, f, f.Namespace.Name, targetNodeCount, 'increase-size...")
 	cleanupFunc := func() error {
 		return e2erc.DeleteRCAndWaitForGC(ctx, f.ClientSet, f.Namespace.Name, "increase-size-pod")
 	}
@@ -171,8 +171,8 @@ func increaseClusterSizeWithTimeout(ctx context.Context, f *framework.Framework,
 
 	// Verify that cluster size is increased
 	framework.ExpectNoError(WaitForClusterSizeFuncWithUnready(ctx, f.ClientSet,
-		func(size int) bool { return size >= targetNodeCount }, timeout, 0))
-	framework.ExpectNoError(waitForAllCaPodsReadyInNamespace(ctx, f, c))
+		func(size int) bool { return size >= targetNodeCount }, timeout, 0), "failed to cleanupFunc()")
+	framework.ExpectNoError(waitForAllCaPodsReadyInNamespace(ctx, f, c), "failed to waitForAllCaPodsReadyInNamespace(ctx, f, c)")
 	return cleanupFunc
 }
 

@@ -79,7 +79,7 @@ var _ = SIGDescribe(feature.HPA, "Horizontal pod autoscaling (external metrics)"
 
 		ginkgo.By(fmt.Sprintf("Setting %s metric value to 0", metricName))
 		err := metricsController.SetMetricValue(ctx, metricName, 0, nil)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to metricsController.SetMetricValue(ctx, metricName, 0, nil)")
 
 		ginkgo.By("Waiting for HPA to scale down to min replicas")
 		rc.WaitForReplicas(ctx, int(*hpa.Spec.MinReplicas), maxResourceConsumerDelay+waitBuffer)
@@ -133,14 +133,14 @@ var _ = SIGDescribe(feature.HPA, framework.WithFeatureGate(features.HPAScaleToZe
 
 			ginkgo.By(fmt.Sprintf("Setting %s metric value to 0 to trigger scale to zero", metricName))
 			err := metricsController.SetMetricValue(ctx, metricName, 0, nil)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to metricsController.SetMetricValue(ctx, metricName, 0, nil)")
 
 			ginkgo.By("Waiting for HPA to scale down to zero replicas")
 			rc.WaitForReplicas(ctx, 0, maxHPAReactionTime+maxResourceConsumerDelay+waitBuffer)
 
 			ginkgo.By("Verifying the ScaledToZero condition is True")
 			updatedHPA, err := f.ClientSet.AutoscalingV2().HorizontalPodAutoscalers(f.Namespace.Name).Get(ctx, hpa.Name, metav1.GetOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to f.ClientSet.AutoscalingV2().HorizontalPodAutoscalers(f.Namespace.Name).Get(ct...")
 			var scaledToZeroCondition *v2.HorizontalPodAutoscalerCondition
 			for i := range updatedHPA.Status.Conditions {
 				if updatedHPA.Status.Conditions[i].Type == v2.ScaledToZero {
@@ -153,7 +153,7 @@ var _ = SIGDescribe(feature.HPA, framework.WithFeatureGate(features.HPAScaleToZe
 
 			ginkgo.By(fmt.Sprintf("Setting %s metric value to 200 to trigger scale from zero", metricName))
 			err = metricsController.SetMetricValue(ctx, metricName, 200, nil)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to metricsController.SetMetricValue(ctx, metricName, 200, nil)")
 
 			ginkgo.By("Waiting for HPA to scale back up from zero")
 			rc.WaitForReplicas(ctx, int(hpa.Spec.MaxReplicas), maxHPAReactionTime+maxResourceConsumerDelay+waitBuffer)
