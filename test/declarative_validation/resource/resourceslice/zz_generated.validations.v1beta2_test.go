@@ -107,10 +107,18 @@ func init() {
 				{ErrorType: "FieldValueNotSupported"},
 				{ErrorType: "FieldValueRequired"},
 			},
+			"spec.driver": {
+				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
+				{ErrorType: "FieldValueRequired"},
+			},
 			"spec.partitionTypeAttribute": {
 				{ErrorType: "FieldValueForbidden"},
 				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-resource-fully-qualified-name"},
 				{ErrorType: "FieldValueTooLong", Origin: "format=k8s-resource-fully-qualified-name"},
+			},
+			"spec.pool.name": {
+				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
+				{ErrorType: "FieldValueRequired"},
 			},
 			"spec.sharedCounters": {
 				{ErrorType: "FieldValueTooMany", Origin: "maxItems"},
