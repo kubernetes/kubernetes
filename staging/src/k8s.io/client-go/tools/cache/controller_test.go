@@ -1333,7 +1333,15 @@ func TestStoreResourceVersionWithNonMetaTransform(t *testing.T) {
 			Namespace: "default",
 		},
 	})
+
+	done := make(chan struct{})
 	t.Cleanup(func() {
+		select {
+		case <-done:
+		case <-time.After(5 * time.Second):
+			t.Errorf("controller failed to stop")
+		}
+
 		source.Shutdown()
 	})
 
@@ -1374,7 +1382,12 @@ func TestStoreResourceVersionWithNonMetaTransform(t *testing.T) {
 		},
 	}
 	c := New(cfg)
-	go c.RunWithContext(ctx)
+
+	go func() {
+		defer close(done)
+		c.RunWithContext(ctx)
+	}()
+
 	if !WaitForCacheSync(ctx.Done(), c.HasSynced) {
 		t.Fatal("Timed out waiting for cache sync")
 	}
