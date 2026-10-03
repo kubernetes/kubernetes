@@ -19,18 +19,24 @@ limitations under the License.
 package cm
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
+	kubefeatures "k8s.io/kubernetes/pkg/features"
 )
 
 func TestIsCgroupPod(t *testing.T) {
@@ -601,5 +607,182 @@ func TestIsPodCgroupInSystemPartition(t *testing.T) {
 				})
 			}
 		}
+	}
+}
+
+// destroyRecordingCgroupManager records the cgroups it is asked to destroy.
+type destroyRecordingCgroupManager struct {
+	fakeCgroupManager
+	destroyed []CgroupName
+}
+
+func (m *destroyRecordingCgroupManager) Destroy(_ klog.Logger, config *CgroupConfig) error {
+	m.destroyed = append(m.destroyed, config.Name)
+	return nil
+}
+
+func TestRemoveStalePodCgroup(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	cgroupRoot := NewCgroupName(RootCgroupName, defaultNodeAllocatableCgroupName)
+	defaultQOS := QOSContainersInfo{
+		Guaranteed: cgroupRoot,
+		Burstable:  NewCgroupName(cgroupRoot, strings.ToLower(string(v1.PodQOSBurstable))),
+		BestEffort: NewCgroupName(cgroupRoot, strings.ToLower(string(v1.PodQOSBestEffort))),
+	}
+	systemQOS := systemPartitionQOSContainersInfo(cgroupRoot)
+	partition := &SystemPartitionConfig{Namespaces: sets.New("kube-system")}
+	systemPod := newPartitionTestPod("kube-system", "100m/64Mi", "200m/128Mi")
+	userPod := newPartitionTestPod(metav1.NamespaceDefault, "100m/64Mi", "200m/128Mi")
+
+	cases := []struct {
+		name            string
+		systemPartition *SystemPartitionConfig
+		pod             *v1.Pod
+		// leftover is the pod cgroup left in the other partition, if any.
+		leftover *CgroupName
+	}{
+		{
+			name:            "a pod moved into the partition leaves its default cgroup behind",
+			systemPartition: partition,
+			pod:             systemPod,
+			leftover:        new(podCgroupNameIn(defaultQOS, systemPod)),
+		},
+		{
+			name:     "a pod moved out of the partition leaves its partition cgroup behind",
+			pod:      systemPod,
+			leftover: new(podCgroupNameIn(systemQOS, systemPod)),
+		},
+		{
+			name:            "nothing is destroyed when no cgroup is left in the other partition",
+			systemPartition: partition,
+			pod:             userPod,
+		},
+		{
+			name: "nothing is destroyed on a node that never had a partition",
+			pod:  userPod,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			mountPoint := t.TempDir()
+			if tc.leftover != nil {
+				require.NoError(t, os.MkdirAll(filepath.Join(mountPoint, tc.leftover.ToCgroupfs()), 0o755))
+			}
+			cgroupManager := &destroyRecordingCgroupManager{}
+			m := &podContainerManagerImpl{
+				qosContainersInfo:       defaultQOS,
+				systemQOSContainersInfo: systemQOS,
+				systemPartition:         tc.systemPartition,
+				subsystems:              &CgroupSubsystems{MountPoints: map[string]string{"memory": mountPoint}},
+				cgroupManager:           cgroupManager,
+			}
+
+			m.removeStalePodCgroup(logger, tc.pod)
+
+			if tc.leftover == nil {
+				require.Empty(t, cgroupManager.destroyed, "Destroy should not be called without a leftover cgroup")
+				return
+			}
+			require.Equal(t, []CgroupName{*tc.leftover}, cgroupManager.destroyed)
+		})
+	}
+}
+
+func TestGetPodContainerNameKeepsRunOncePodInPlace(t *testing.T) {
+	cgroupRoot := NewCgroupName(RootCgroupName, defaultNodeAllocatableCgroupName)
+	defaultQOS := QOSContainersInfo{
+		Guaranteed: cgroupRoot,
+		Burstable:  NewCgroupName(cgroupRoot, strings.ToLower(string(v1.PodQOSBurstable))),
+		BestEffort: NewCgroupName(cgroupRoot, strings.ToLower(string(v1.PodQOSBestEffort))),
+	}
+	systemQOS := systemPartitionQOSContainersInfo(cgroupRoot)
+	partition := &SystemPartitionConfig{Namespaces: sets.New("kube-system")}
+	newPod := func(restartPolicy v1.RestartPolicy) *v1.Pod {
+		pod := newPartitionTestPod("kube-system", "100m/64Mi", "200m/128Mi")
+		pod.Spec.RestartPolicy = restartPolicy
+		return pod
+	}
+	// The container restarts on its own although the pod does not.
+	restartableContainer := newPod(v1.RestartPolicyNever)
+	restartableContainer.Spec.Containers[0].RestartPolicy = new(v1.ContainerRestartPolicyAlways)
+
+	cases := []struct {
+		name                  string
+		systemPartition       *SystemPartitionConfig
+		pod                   *v1.Pod
+		containerRestartRules bool
+		// existing is the qos hierarchy the pod's cgroup already exists in, if any.
+		existing *QOSContainersInfo
+		want     QOSContainersInfo
+	}{
+		{
+			name:            "a run-once pod stays out of the partition it was started outside of",
+			systemPartition: partition,
+			pod:             newPod(v1.RestartPolicyNever),
+			existing:        &defaultQOS,
+			want:            defaultQOS,
+		},
+		{
+			name:     "a run-once pod stays in the partition after it is turned off",
+			pod:      newPod(v1.RestartPolicyNever),
+			existing: &systemQOS,
+			want:     systemQOS,
+		},
+		{
+			name:            "a new run-once pod is placed in its partition",
+			systemPartition: partition,
+			pod:             newPod(v1.RestartPolicyNever),
+			want:            systemQOS,
+		},
+		{
+			name:            "a run-once pod already in its partition stays there",
+			systemPartition: partition,
+			pod:             newPod(v1.RestartPolicyNever),
+			existing:        &systemQOS,
+			want:            systemQOS,
+		},
+		{
+			name:            "a pod that restarts is moved into its partition",
+			systemPartition: partition,
+			pod:             newPod(v1.RestartPolicyOnFailure),
+			existing:        &defaultQOS,
+			want:            systemQOS,
+		},
+		{
+			name:                  "a pod with a restartable container is moved into its partition",
+			systemPartition:       partition,
+			pod:                   restartableContainer,
+			containerRestartRules: true,
+			existing:              &defaultQOS,
+			want:                  systemQOS,
+		},
+		{
+			// Without the feature, the kubelet does not restart the container
+			// either, so the pod is still one that runs once.
+			name:            "a restartable container counts only with ContainerRestartRules",
+			systemPartition: partition,
+			pod:             restartableContainer,
+			existing:        &defaultQOS,
+			want:            defaultQOS,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeatures.ContainerRestartRules, tc.containerRestartRules)
+			mountPoint := t.TempDir()
+			if tc.existing != nil {
+				require.NoError(t, os.MkdirAll(filepath.Join(mountPoint, podCgroupNameIn(*tc.existing, tc.pod).ToCgroupfs()), 0o755))
+			}
+			m := &podContainerManagerImpl{
+				qosContainersInfo:       defaultQOS,
+				systemQOSContainersInfo: systemQOS,
+				systemPartition:         tc.systemPartition,
+				subsystems:              &CgroupSubsystems{MountPoints: map[string]string{"memory": mountPoint}},
+				cgroupManager:           &fakeCgroupManager{},
+			}
+
+			got, _ := m.GetPodContainerName(tc.pod)
+			require.Equal(t, podCgroupNameIn(tc.want, tc.pod), got)
+		})
 	}
 }

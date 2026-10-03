@@ -933,6 +933,7 @@ func TestQOSCgroupsWithSystemPartition(t *testing.T) {
 	partitionRoot := NewCgroupName(nodeRoot, systemPartitionCgroupName)
 	cm := &containerManagerImpl{
 		NodeConfig:                NodeConfig{SystemPartition: &SystemPartitionConfig{Namespaces: sets.New(systemNamespace)}},
+		qosContainerManager:       &qosContainerManagerNoop{},
 		systemPartitionQOSManager: &qosContainerManagerNoop{},
 	}
 

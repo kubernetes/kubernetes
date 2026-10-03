@@ -19,6 +19,9 @@ limitations under the License.
 package cm
 
 import (
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -768,6 +771,7 @@ func TestSystemPartitionPodsAndAllocatable(t *testing.T) {
 					MemoryLimit: tc.memoryLimit,
 					Namespaces:  sets.New("kube-system"),
 				}},
+				qosContainerManager:       &qosContainerManagerNoop{},
 				systemPartitionQOSManager: &qosContainerManagerNoop{},
 			}
 
@@ -849,6 +853,7 @@ func TestUpdateSystemPartitionCPUWeight(t *testing.T) {
 				cgroupManager:             fakeCM,
 				systemPartitionRoot:       partitionRoot,
 				NodeConfig:                NodeConfig{SystemPartition: &SystemPartitionConfig{Namespaces: sets.New("kube-system")}},
+				qosContainerManager:       &qosContainerManagerNoop{},
 				systemPartitionQOSManager: &qosContainerManagerNoop{},
 				sourcesReady:              config.NewSourcesReady(func(sets.Set[string]) bool { return !tc.sourcesNotReady }),
 			}
@@ -868,4 +873,43 @@ func TestUpdateSystemPartitionCPUWeight(t *testing.T) {
 			require.Nil(t, fakeCM.updates[0].ResourceParameters.Memory, "only the weight is written, the memory limit is left alone")
 		})
 	}
+}
+
+func TestSystemPartitionMembershipFollowsPlacement(t *testing.T) {
+	cgroupRoot := NewCgroupName(RootCgroupName, defaultNodeAllocatableCgroupName)
+	defaultQOS := QOSContainersInfo{
+		Guaranteed: cgroupRoot,
+		Burstable:  NewCgroupName(cgroupRoot, strings.ToLower(string(v1.PodQOSBurstable))),
+		BestEffort: NewCgroupName(cgroupRoot, strings.ToLower(string(v1.PodQOSBestEffort))),
+	}
+	systemPod := newPartitionTestPod("kube-system", "100m/64Mi", "200m/128Mi")
+	userPod := newPartitionTestPod(metav1.NamespaceDefault, "100m/64Mi", "200m/128Mi")
+	// A run-once pod of the partition's namespace, started before the partition
+	// was turned on, still runs in the default hierarchy.
+	runOncePod := newPartitionTestPod("kube-system", "100m/64Mi", "200m/128Mi")
+	runOncePod.Spec.RestartPolicy = v1.RestartPolicyNever
+	activePods := func() []*v1.Pod { return []*v1.Pod{systemPod, userPod, runOncePod} }
+
+	mountPoint := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(mountPoint, podCgroupNameIn(defaultQOS, runOncePod).ToCgroupfs()), 0o755))
+	cm := &containerManagerImpl{
+		cgroupRoot:                cgroupRoot,
+		subsystems:                &CgroupSubsystems{MountPoints: map[string]string{"memory": mountPoint}},
+		cgroupManager:             &fakeCgroupManager{},
+		NodeConfig:                NodeConfig{SystemPartition: &SystemPartitionConfig{Namespaces: sets.New("kube-system")}},
+		qosContainerManager:       &qosContainerManagerImpl{qosContainersInfo: defaultQOS},
+		systemPartitionQOSManager: &qosContainerManagerNoop{},
+	}
+
+	require.True(t, cm.IsPodInSystemPartition(systemPod))
+	require.False(t, cm.IsPodInSystemPartition(userPod))
+	require.False(t, cm.IsPodInSystemPartition(runOncePod),
+		"a run-once pod belongs where its cgroup is, not where its namespace says")
+	require.Equal(t, []*v1.Pod{systemPod}, cm.podsInSystemPartition(activePods, true)(),
+		"the partition's QoS cgroups should count only the pods running in it")
+	require.Equal(t, []*v1.Pod{userPod, runOncePod}, cm.podsInSystemPartition(activePods, false)(),
+		"the default QoS cgroups should count the run-once pod still running there")
+
+	cm.systemPartitionQOSManager = nil
+	require.False(t, cm.IsPodInSystemPartition(systemPod), "no pod is in the partition of a node without one")
 }

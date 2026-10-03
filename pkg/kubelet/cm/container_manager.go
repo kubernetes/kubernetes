@@ -124,6 +124,10 @@ type ContainerManager interface {
 	// partition's pods, or an empty string when the node has no system partition.
 	GetSystemPartitionCgroupRoot() string
 
+	// IsPodInSystemPartition reports whether the pod's cgroup belongs in the
+	// system partition. It is false on a node without a system partition.
+	IsPodInSystemPartition(pod *v1.Pod) bool
+
 	// GetPluginRegistrationHandlers returns a set of plugin registration handlers
 	// The pluginwatcher's Handlers allow to have a single module for handling
 	// registration.

@@ -141,6 +141,10 @@ func (cm *containerManagerStub) GetSystemPartitionCgroupRoot() string {
 	return ""
 }
 
+func (cm *containerManagerStub) IsPodInSystemPartition(_ *v1.Pod) bool {
+	return false
+}
+
 func (cm *containerManagerStub) GetDevices(_, _ string) []*podresourcesapi.ContainerDevices {
 	return nil
 }

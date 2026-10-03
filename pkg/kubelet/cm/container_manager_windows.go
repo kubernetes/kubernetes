@@ -320,6 +320,10 @@ func (cm *containerManagerImpl) GetSystemPartitionCgroupRoot() string {
 	return ""
 }
 
+func (cm *containerManagerImpl) IsPodInSystemPartition(_ *v1.Pod) bool {
+	return false
+}
+
 func (cm *containerManagerImpl) GetDevices(podUID, containerName string) []*podresourcesapi.ContainerDevices {
 	return containerDevicesFromResourceDeviceInstances(cm.deviceManager.GetDevices(podUID, containerName))
 }

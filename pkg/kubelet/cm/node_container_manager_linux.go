@@ -21,6 +21,8 @@ package cm
 import (
 	"errors"
 	"fmt"
+	"os"
+	"path"
 	"strconv"
 	"strings"
 	"time"
@@ -73,6 +75,81 @@ func systemPartitionQOSContainersInfo(cgroupRoot CgroupName) QOSContainersInfo {
 		Guaranteed: partitionRoot,
 		Burstable:  NewCgroupName(partitionRoot, strings.ToLower(string(v1.PodQOSBurstable))),
 		BestEffort: NewCgroupName(partitionRoot, strings.ToLower(string(v1.PodQOSBestEffort))),
+	}
+}
+
+// cgroupPathExists reports whether the cgroup directory is present in any of the
+// mounted subsystems.
+func (cm *containerManagerImpl) cgroupPathExists(name CgroupName) bool {
+	return cgroupPathExists(cm.subsystems, cm.cgroupManager, name)
+}
+
+// cgroupPathExists reports whether the cgroup directory is present in any of the
+// mounted subsystems. Unlike CgroupManager.Exists, it does not depend on which
+// controllers the cgroup has enabled.
+func cgroupPathExists(subsystems *CgroupSubsystems, cgroupManager CgroupManager, name CgroupName) bool {
+	cgroupfsName := cgroupManager.Name(name)
+	for _, mountPoint := range subsystems.MountPoints {
+		if _, err := os.Stat(path.Join(mountPoint, cgroupfsName)); err == nil {
+			return true
+		}
+	}
+	return false
+}
+
+// cgroupHasChildren reports whether the cgroup has any child cgroup in any of the
+// mounted subsystems.
+func (cm *containerManagerImpl) cgroupHasChildren(name CgroupName) (bool, error) {
+	cgroupfsName := cm.cgroupManager.Name(name)
+	for _, mountPoint := range cm.subsystems.MountPoints {
+		entries, err := os.ReadDir(path.Join(mountPoint, cgroupfsName))
+		if err != nil {
+			if os.IsNotExist(err) {
+				continue
+			}
+			return false, err
+		}
+		for _, entry := range entries {
+			if entry.IsDir() {
+				return true, nil
+			}
+		}
+	}
+	return false, nil
+}
+
+// cleanupSystemPartitionCgroups removes the cgroups of a system partition that is
+// no longer configured, so that disabling the feature does not leak the hierarchy.
+// It only removes empty cgroups. Pod cgroups still inside the partition are left
+// to the orphan pod cgroup cleanup, which kills their processes and waits for
+// volume teardown first. That runs asynchronously, so this is a periodic task
+// that retries until the partition is empty.
+func (cm *containerManagerImpl) cleanupSystemPartitionCgroups(logger klog.Logger) {
+	qosContainersInfo := systemPartitionQOSContainersInfo(cm.cgroupRoot)
+	partitionRoot := qosContainersInfo.Guaranteed
+	if !cm.cgroupPathExists(partitionRoot) {
+		return
+	}
+
+	// The QoS roots have to go before the partition root that parents them.
+	for _, name := range []CgroupName{qosContainersInfo.Burstable, qosContainersInfo.BestEffort, partitionRoot} {
+		if !cm.cgroupPathExists(name) {
+			continue
+		}
+		hasChildren, err := cm.cgroupHasChildren(name)
+		if err != nil {
+			logger.Error(err, "Failed to inspect leftover system partition cgroup", "cgroupName", name)
+			return
+		}
+		if hasChildren {
+			logger.V(4).Info("Leftover system partition cgroup still has pod cgroups, deferring removal", "cgroupName", name)
+			return
+		}
+		if err := cm.cgroupManager.Destroy(logger, &CgroupConfig{Name: name}); err != nil {
+			logger.Error(err, "Failed to remove leftover system partition cgroup", "cgroupName", name)
+			return
+		}
+		logger.V(2).Info("Removed leftover system partition cgroup", "cgroupName", name)
 	}
 }
 
@@ -143,18 +220,34 @@ func (cm *containerManagerImpl) enforceSystemPartitionCgroups(logger klog.Logger
 	return nil
 }
 
+// IsPodInSystemPartition reports whether the pod's cgroup belongs in the system
+// partition. It is false on a node without a system partition.
+func (cm *containerManagerImpl) IsPodInSystemPartition(pod *v1.Pod) bool {
+	spc := cm.systemPartitionConfig()
+	if spc == nil {
+		return false
+	}
+	pcm := &podContainerManagerImpl{
+		qosContainersInfo:       cm.GetQOSContainersInfo(),
+		systemQOSContainersInfo: systemPartitionQOSContainersInfo(cm.cgroupRoot),
+		systemPartition:         spc,
+		subsystems:              cm.subsystems,
+		cgroupManager:           cm.cgroupManager,
+	}
+	return pcm.inSystemPartition(pod)
+}
+
 // podsInSystemPartition narrows activePods down to the pods that are in the
 // system partition, or to those that are not. Without a system partition, no
 // pod is in it.
 func (cm *containerManagerImpl) podsInSystemPartition(activePods ActivePodsFunc, inPartition bool) ActivePodsFunc {
-	spc := cm.systemPartitionConfig()
-	if spc == nil && !inPartition {
+	if cm.systemPartitionConfig() == nil && !inPartition {
 		return activePods
 	}
 	return func() []*v1.Pod {
 		var pods []*v1.Pod
 		for _, pod := range activePods() {
-			if spc.HasPod(pod) == inPartition {
+			if cm.IsPodInSystemPartition(pod) == inPartition {
 				pods = append(pods, pod)
 			}
 		}

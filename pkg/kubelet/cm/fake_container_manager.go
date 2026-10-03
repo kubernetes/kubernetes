@@ -203,6 +203,13 @@ func (cm *FakeContainerManager) GetSystemPartitionCgroupRoot() string {
 	return ""
 }
 
+func (cm *FakeContainerManager) IsPodInSystemPartition(_ *v1.Pod) bool {
+	cm.Lock()
+	defer cm.Unlock()
+	cm.CalledFunctions = append(cm.CalledFunctions, "IsPodInSystemPartition")
+	return false
+}
+
 func (cm *FakeContainerManager) GetDevices(_, _ string) []*podresourcesapi.ContainerDevices {
 	cm.Lock()
 	defer cm.Unlock()

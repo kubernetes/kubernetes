@@ -586,6 +586,11 @@ func (cm *containerManagerImpl) setupNode(ctx context.Context, activePods Active
 					logger.Error(err, "Failed to update the CPU weight of the system partition")
 				}
 			}, time.Minute, wait.NeverStop)
+		} else {
+			// Reclaim the hierarchy that a previously enabled system partition may have left behind.
+			cm.periodicTasks = append(cm.periodicTasks, func() {
+				cm.cleanupSystemPartitionCgroups(logger)
+			})
 		}
 	}
 
