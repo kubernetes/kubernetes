@@ -17,6 +17,7 @@ limitations under the License.
 package util
 
 import (
+	"math"
 	"os"
 	"reflect"
 	"runtime"
@@ -152,25 +153,40 @@ func TestCalculateTimeoutForVolume(t *testing.T) {
 		t.Errorf("Expected 2147483640 for timeout but got %v", timeout)
 	}
 
-	// TODO(#141166): The size fits int64 but the product does not fit int32; the timeout must be at most math.MaxInt32.
+	// The size fits int64 but the product does not fit int32.
 	pv.Spec.Capacity[v1.ResourceStorage] = resource.MustParse("71582789Gi")
 	timeout = CalculateTimeoutForVolume(50, 30, pv)
-	if timeout != 2147483670 {
-		t.Errorf("Expected 2147483670 for timeout but got %v", timeout)
+	if timeout != math.MaxInt32 {
+		t.Errorf("Expected %v for timeout but got %v", int64(math.MaxInt32), timeout)
 	}
 
-	// TODO(#141166): The timeout must be at most math.MaxInt32.
 	pv.Spec.Capacity[v1.ResourceStorage] = resource.MustParse("100E")
 	timeout = CalculateTimeoutForVolume(50, 30, pv)
-	if timeout != 257698037730 {
-		t.Errorf("Expected 257698037730 for timeout but got %v", timeout)
+	if timeout != math.MaxInt32 {
+		t.Errorf("Expected %v for timeout but got %v", int64(math.MaxInt32), timeout)
 	}
 
-	// TODO(#141166): The timeout must be at most math.MaxInt32.
+	// Past int64: Value() saturates, and the timeout is still capped.
 	pv.Spec.Capacity[v1.ResourceStorage] = resource.MustParse("18446744073709551616")
 	timeout = CalculateTimeoutForVolume(50, 30, pv)
-	if timeout != 257698037730 {
-		t.Errorf("Expected 257698037730 for timeout but got %v", timeout)
+	if timeout != math.MaxInt32 {
+		t.Errorf("Expected %v for timeout but got %v", int64(math.MaxInt32), timeout)
+	}
+
+	// A large increment must not wrap the product. The increment is an int32
+	// flag with no validation bound, and at this size the Gi count is
+	// 8589934591, so anything above 1073741824 overflows the multiplication.
+	pv.Spec.Capacity[v1.ResourceStorage] = resource.MustParse("100E")
+	timeout = CalculateTimeoutForVolume(50, math.MaxInt32, pv)
+	if timeout != math.MaxInt32 {
+		t.Errorf("Expected %v for timeout but got %v", int64(math.MaxInt32), timeout)
+	}
+
+	// The product fits int64 but not int32.
+	pv.Spec.Capacity[v1.ResourceStorage] = resource.MustParse("2Gi")
+	timeout = CalculateTimeoutForVolume(50, math.MaxInt32, pv)
+	if timeout != math.MaxInt32 {
+		t.Errorf("Expected %v for timeout but got %v", int64(math.MaxInt32), timeout)
 	}
 }
 
