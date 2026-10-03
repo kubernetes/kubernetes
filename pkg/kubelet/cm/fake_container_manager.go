@@ -203,6 +203,13 @@ func (cm *FakeContainerManager) GetSystemPartitionCgroupRoot() string {
 	return ""
 }
 
+func (cm *FakeContainerManager) PartitionStats(_ klog.Logger) map[string]PartitionStats {
+	cm.Lock()
+	defer cm.Unlock()
+	cm.CalledFunctions = append(cm.CalledFunctions, "PartitionStats")
+	return nil
+}
+
 func (cm *FakeContainerManager) GetDevices(_, _ string) []*podresourcesapi.ContainerDevices {
 	cm.Lock()
 	defer cm.Unlock()

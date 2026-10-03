@@ -19,6 +19,10 @@ limitations under the License.
 package cm
 
 import (
+	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -27,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/uuid"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2/ktesting"
@@ -709,6 +714,97 @@ func TestSystemPartitionCgroupConfig(t *testing.T) {
 			require.Equal(t, partitionRoot, got.Name)
 			// Nothing is derived from node capacity, unlike the node allocatable cgroup.
 			tc.checks(t, got.ResourceParameters)
+		})
+	}
+}
+
+// memoryUsageCgroupManager reports a fixed memory usage, or fails to read it.
+type memoryUsageCgroupManager struct {
+	fakeCgroupManager
+	usage int64
+	err   error
+}
+
+func (m *memoryUsageCgroupManager) MemoryUsage(_ CgroupName) (int64, error) {
+	return m.usage, m.err
+}
+
+func TestPartitionStats(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+
+	cgroupRoot := NewCgroupName(RootCgroupName, defaultNodeAllocatableCgroupName)
+	systemQOS := systemPartitionQOSContainersInfo(cgroupRoot)
+	defaultQOS := QOSContainersInfo{
+		Guaranteed: cgroupRoot,
+		Burstable:  NewCgroupName(cgroupRoot, strings.ToLower(string(v1.PodQOSBurstable))),
+		BestEffort: NewCgroupName(cgroupRoot, strings.ToLower(string(v1.PodQOSBestEffort))),
+	}
+	// One pod cgroup per QoS class in both partitions. The system partition's
+	// Guaranteed pods sit right beside its burstable and besteffort QoS
+	// cgroups, which must not be counted as pods.
+	var cgroupDirs []string
+	for _, qos := range []QOSContainersInfo{systemQOS, defaultQOS} {
+		for _, root := range []CgroupName{qos.Guaranteed, qos.Burstable, qos.BestEffort} {
+			pod := NewCgroupName(root, GetPodCgroupNameSuffix(uuid.NewUUID()))
+			cgroupDirs = append(cgroupDirs, pod.ToCgroupfs())
+		}
+	}
+
+	cases := []struct {
+		name        string
+		noPartition bool
+		cgroupDirs  []string
+		memoryErr   error
+		want        map[string]PartitionStats
+	}{
+		{
+			name:        "a node without a system partition reports nothing",
+			noPartition: true,
+			cgroupDirs:  cgroupDirs,
+		},
+		{
+			name:       "only pods of the system partition are counted",
+			cgroupDirs: cgroupDirs,
+			want: map[string]PartitionStats{
+				systemPartitionCgroupName: {MemoryUsageBytes: new(int64(1 << 20)), Pods: new(int64(3))},
+			},
+		},
+		{
+			// Series must stay present for a configured partition, so that it can
+			// be told apart from a node without one.
+			name: "a partition with no pods reports zero",
+			want: map[string]PartitionStats{
+				systemPartitionCgroupName: {MemoryUsageBytes: new(int64(1 << 20)), Pods: new(int64(0))},
+			},
+		},
+		{
+			name:       "an unreadable memory usage does not hide the pod count",
+			cgroupDirs: cgroupDirs,
+			memoryErr:  fmt.Errorf("memory.current: no such file"),
+			want: map[string]PartitionStats{
+				systemPartitionCgroupName: {Pods: new(int64(3))},
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			mountPoint := t.TempDir()
+			for _, dir := range tc.cgroupDirs {
+				require.NoError(t, os.MkdirAll(filepath.Join(mountPoint, dir), 0o755))
+			}
+
+			cm := &containerManagerImpl{
+				cgroupRoot:          cgroupRoot,
+				subsystems:          &CgroupSubsystems{MountPoints: map[string]string{"memory": mountPoint}},
+				cgroupManager:       &memoryUsageCgroupManager{usage: 1 << 20, err: tc.memoryErr},
+				systemPartitionRoot: NewCgroupName(cgroupRoot, systemPartitionCgroupName),
+			}
+			if !tc.noPartition {
+				cm.systemPartitionQOSManager = &qosContainerManagerNoop{}
+			}
+
+			require.Equal(t, tc.want, cm.PartitionStats(logger))
 		})
 	}
 }
