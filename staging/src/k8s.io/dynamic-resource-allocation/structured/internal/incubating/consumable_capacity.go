@@ -23,7 +23,7 @@ import (
 
 	resourceapi "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	"k8s.io/utils/ptr"
+	draapi "k8s.io/dynamic-resource-allocation/api"
 )
 
 // errCapacityRequestNotRepresentable signals that a capacity request, or the
@@ -41,82 +41,146 @@ var errCapacityRequestNotRepresentable = errors.New("capacity request cannot be 
 // rather than recording it.
 var errNegativeCapacity = errors.New("capacity value is negative")
 
-// CmpRequestOverCapacity checks whether the new capacity request can be added within the given capacity,
+// capacityNameForStatus returns the QualifiedName which is to be used in the
+// ResourceClaim status. deviceCapacity must be the map the key was resolved from
+// (see resolveDeviceCapacity).
+//
+// The DRA CPU driver 0.2.0 looks up capacity names up in the status using the
+// exact same form as in its ResourceSlices. Kubernetes 1.37 wrote (and will
+// look up) that spelling too, so we must keep doing so for now to support
+// downgrades and not break the DRA CPU driver. This might be changed to
+// using the unqualified name (shorter) when the driver is fixed and Kubernetes
+// 1.37 no longer needs to be supported.
+func capacityNameForStatus(name draapi.FullyQualifiedName, driver draapi.UniqueString, capacity draapi.DeviceCapacities) resourceapi.QualifiedName {
+	if name.Domain != driver || capacity.DriverNameQualifiedIDs.Has(name.Identifier) {
+		// Use fully-qualified format, the domain is something else or
+		// the slice used the driver name as domain.
+		return resourceapi.QualifiedName(name.String())
+	}
+	// Normal driver-scoped name which was stored in the sliced without domain.
+	return resourceapi.QualifiedName(name.Identifier.String())
+}
+
+// cmpRequestOverCapacity checks whether the new capacity request can be added within the given capacity,
 // and checks whether the requested value is against the capacity requestPolicy.
-func CmpRequestOverCapacity(currentConsumedCapacity ConsumedCapacity, deviceRequestCapacity *resourceapi.CapacityRequirements,
-	allowMultipleAllocations *bool, capacity map[resourceapi.QualifiedName]resourceapi.DeviceCapacity, allocatingCapacity ConsumedCapacity, fractionalCapacityRange bool) (bool, error) {
-	if requestsContainNonExistCapacity(deviceRequestCapacity, capacity) {
+// It returns the requested capacity with names where the domain has been backfilled
+// with the driver name if needed, false if the device does not have the requested capacity,
+// or an error if the request is invalid.
+//
+// There are four distinct capacity-shaped inputs:
+//   - requestedCapacity comes from the ResourceClaim request.
+//     The names may or may not include the driver name as domain.
+//   - device.Capacity is the device's published capacity: for each capacity name, the total
+//     Value available and the RequestPolicy governing how a request is rounded. It comes
+//     straight from the ResourceSlice and never changes during allocation.
+//     The names may or may not include the driver name as domain.
+//   - currentConsumedCapacity is what has already been consumed on this device by claims
+//     that were allocated before this allocation run started (the empty ConsumedCapacity if
+//     the device wasn't previously allocated at all).
+//     Names are fully-qualified.
+//   - allocatingCapacity is what the allocator has provisionally reserved on this device so
+//     far during this in-progress run (other requests it has tentatively assigned to this
+//     device in this backtracking search, not yet committed).
+//     Names are fully-qualified.
+func cmpRequestOverCapacity(currentConsumedCapacity ConsumedCapacity, requestedCapacity *resourceapi.CapacityRequirements, device deviceWithID, allocatingCapacity ConsumedCapacity, fractionalCapacityRange bool) (map[draapi.FullyQualifiedName]resource.Quantity, bool, error) {
+	resolvedRequests, ok, err := resolveCapacityRequests(requestedCapacity, device)
+	if err != nil {
+		return nil, false, err
+	}
+	if !ok {
 		// This device does not define a requested capacity. A different device may,
 		// so report it as not satisfiable rather than a fatal error: false with a nil
 		// error means "skip this device", a non-nil error means "abort allocation".
-		return false, nil
+		return nil, false, nil
 	}
 	// First resolve every requested capacity. A request that cannot be represented is a
 	// fatal error that must abort regardless of map iteration order, so representability
 	// is checked for all capacities before any soft "not satisfiable" return below.
 	// Interleaving the two in one loop would let the outcome, skip or abort, depend on
 	// which capacity the map happens to visit first.
-	consumed := make(map[resourceapi.QualifiedName]resource.Quantity, len(capacity))
-	for name, cap := range capacity {
+	consumed := make(map[draapi.FullyQualifiedName]resource.Quantity, device.Capacity.Len())
+	for name, cap := range device.Capacity.Entries() {
 		var requestedValPtr *resource.Quantity
-		if deviceRequestCapacity != nil && deviceRequestCapacity.Requests != nil {
-			if requestedVal, requestedFound := deviceRequestCapacity.Requests[name]; requestedFound {
-				requestedValPtr = &requestedVal
-			}
+		if requestedVal, requestedFound := resolvedRequests[name]; requestedFound {
+			requestedValPtr = &requestedVal
 		}
 		consumedCapacity, err := calculateConsumedCapacity(requestedValPtr, cap, fractionalCapacityRange)
 		if err != nil {
 			// The request is not representable in this capacity's range arithmetic.
 			// Surface a fatal error so the allocator aborts instead of retrying other
 			// devices, which a user-controlled out-of-range request could abuse.
-			return false, fmt.Errorf("capacity %q: %w", name, err)
+			return nil, false, fmt.Errorf("capacity %q: %w", name, err)
 		}
 		if consumedCapacity.Sign() < 0 {
 			// A negative capacity cannot come from a request the allocator should honor;
 			// recording it would over-allocate the device. Abort rather than skip, since a
 			// stored object from before stricter validation is a data problem, not a
 			// per-device mismatch that another device could satisfy.
-			return false, fmt.Errorf("capacity %q: %w", name, errNegativeCapacity)
+			return nil, false, fmt.Errorf("capacity %q: %w", name, errNegativeCapacity)
 		}
 		consumed[name] = consumedCapacity
 	}
 	// The policy and capacity checks are soft: they skip this device rather than abort.
 	clone := currentConsumedCapacity.Clone()
-	for name, cap := range capacity {
+	for name, cap := range device.Capacity.Entries() {
 		consumedCapacity := consumed[name]
 		if violatesPolicy(consumedCapacity, cap.RequestPolicy, fractionalCapacityRange) {
-			return false, nil
+			return nil, false, nil
 		}
 		// If the current clone already contains an entry for this capacity, add the consumedCapacity to it.
 		// Otherwise, initialize it with calculated consumedCapacity.
 		if _, allocatedFound := clone[name]; allocatedFound {
 			clone[name].Add(consumedCapacity)
 		} else {
-			clone[name] = ptr.To(consumedCapacity.DeepCopy())
+			clone[name] = new(consumedCapacity.DeepCopy())
 		}
 		// If allocatingCapacity contains an entry for this capacity, add its value to clone as well.
 		if allocatingVal, allocatingFound := allocatingCapacity[name]; allocatingFound {
 			clone[name].Add(*allocatingVal)
 		}
-		if clone[name].Cmp(cap.Value) > 0 {
-			return false, nil
+		if clone[name].Cmp(*cap.Value.Quantity) > 0 {
+			return nil, false, nil
 		}
 	}
-	return true, nil
+	return resolvedRequests, true, nil
 }
 
-// requestsNonExistCapacity returns true if requests contain non-exist capacity.
-func requestsContainNonExistCapacity(deviceRequestCapacity *resourceapi.CapacityRequirements,
-	capacity map[resourceapi.QualifiedName]resourceapi.DeviceCapacity) bool {
+// resolveCapacityRequests resolves every request in deviceRequestCapacity against capacity,
+// returning the requested quantities keyed by the fully-qualified name of the capacity entry
+// they refer to. ok is false if any request does not match a capacity entry, in which case
+// the device does not satisfy the request.
+//
+// A claim's requests are not guaranteed to be free of names that resolve to the same
+// fully-qualified name either: nothing prevents a request from naming a capacity both
+// implicitly (e.g. "bandwidth") and explicitly qualified with the driver as domain (e.g.
+// "<driver>/bandwidth"). Unlike a device's published capacity (see resolveDeviceCapacity),
+// this is treated as an error instead of resolved by precedence: a user-supplied request
+// map has no equivalent trust relationship, so failing loudly is preferable to silently
+// picking one of the two conflicting values.
+func resolveCapacityRequests(deviceRequestCapacity *resourceapi.CapacityRequirements, device deviceWithID) (map[draapi.FullyQualifiedName]resource.Quantity, bool, error) {
 	if deviceRequestCapacity == nil || deviceRequestCapacity.Requests == nil {
-		return false
+		return nil, true, nil
 	}
-	for name := range deviceRequestCapacity.Requests {
-		if _, found := capacity[name]; !found {
-			return true
+	resolved := make(map[draapi.FullyQualifiedName]resource.Quantity, len(deviceRequestCapacity.Requests))
+	for reqName, reqVal := range deviceRequestCapacity.Requests {
+		key := draapi.MakeFullyQualifiedName(reqName, device.id.Driver, device.slice.LookupUniqueString)
+		_, ok := device.Capacity.Lookup(key)
+		if !ok {
+			return nil, false, nil
 		}
+		if _, alreadyResolved := resolved[key]; alreadyResolved {
+			// The other spelling is whichever of the qualified and unqualified form
+			// reqName isn't: if reqName lacks the domain, it must have been added
+			// under the qualified form, and vice versa.
+			other := key.String()
+			if string(reqName) == key.String() {
+				other = key.Identifier.String()
+			}
+			return nil, false, fmt.Errorf("capacity %q requested both as %q and as %q", key.Identifier, reqName, other)
+		}
+		resolved[key] = reqVal
 	}
-	return false
+	return resolved, true, nil
 }
 
 // calculateConsumedCapacity returns valid capacity to be consumed regarding the requested capacity and device capacity policy.
@@ -124,7 +188,7 @@ func requestsContainNonExistCapacity(deviceRequestCapacity *resourceapi.Capacity
 // If no requestPolicy, return capacity.Value.
 // If no requestVal, fill the quantity by fillEmptyRequest function
 // Otherwise, use requestPolicy to calculate the consumed capacity from request if applicable.
-func calculateConsumedCapacity(requestedVal *resource.Quantity, capacity resourceapi.DeviceCapacity, fractionalCapacityRange bool) (resource.Quantity, error) {
+func calculateConsumedCapacity(requestedVal *resource.Quantity, capacity draapi.DeviceCapacity, fractionalCapacityRange bool) (resource.Quantity, error) {
 	if requestedVal == nil {
 		return fillEmptyRequest(capacity), nil
 	}
@@ -143,7 +207,7 @@ func calculateConsumedCapacity(requestedVal *resource.Quantity, capacity resourc
 // fillEmptyRequest
 // return requestPolicy.default if defined.
 // Otherwise, return capacity value.
-func fillEmptyRequest(capacity resourceapi.DeviceCapacity) resource.Quantity {
+func fillEmptyRequest(capacity draapi.DeviceCapacity) resource.Quantity {
 	if capacity.RequestPolicy != nil && capacity.RequestPolicy.Default != nil {
 		return capacity.RequestPolicy.Default.DeepCopy()
 	}
@@ -235,26 +299,23 @@ func roundUpValidValues(requestedVal *resource.Quantity, validValues []resource.
 	return *requestedVal
 }
 
-// GetConsumedCapacityFromRequest returns valid consumed capacity,
+// getConsumedCapacityFromRequest returns valid consumed capacity,
 // according to claim request and defined capacity.
-func GetConsumedCapacityFromRequest(requestedCapacity *resourceapi.CapacityRequirements,
-	consumableCapacity map[resourceapi.QualifiedName]resourceapi.DeviceCapacity, fractionalCapacityRange bool) (map[resourceapi.QualifiedName]resource.Quantity, error) {
-	consumedCapacity := make(map[resourceapi.QualifiedName]resource.Quantity)
-	for name, cap := range consumableCapacity {
+func getConsumedCapacityFromRequest(resolvedRequests map[draapi.FullyQualifiedName]resource.Quantity, device deviceWithID, fractionalCapacityRange bool) (ConsumedCapacity, error) {
+	consumedCapacity := NewConsumedCapacity()
+	for name, cap := range device.Capacity.Entries() {
 		var requestedValPtr *resource.Quantity
-		if requestedCapacity != nil && requestedCapacity.Requests != nil {
-			if requestedVal, requestedFound := requestedCapacity.Requests[name]; requestedFound {
-				requestedValPtr = &requestedVal
-			}
+		if requestedVal, requestedFound := resolvedRequests[name]; requestedFound {
+			requestedValPtr = &requestedVal
 		}
-		capacity, err := calculateConsumedCapacity(requestedValPtr, cap, fractionalCapacityRange)
+		consumed, err := calculateConsumedCapacity(requestedValPtr, cap, fractionalCapacityRange)
 		if err != nil {
 			// Feasibility already ran, so this should not happen. Return the error
 			// rather than a raw request so a future caller cannot record an
 			// unrepresentable value as consumed capacity.
 			return nil, fmt.Errorf("capacity %q: %w", name, err)
 		}
-		consumedCapacity[name] = capacity
+		consumedCapacity[name] = new(consumed)
 	}
 	return consumedCapacity, nil
 }

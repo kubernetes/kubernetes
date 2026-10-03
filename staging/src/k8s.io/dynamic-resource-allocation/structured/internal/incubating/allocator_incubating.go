@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	apiservercel "k8s.io/apiserver/pkg/cel"
 	draapi "k8s.io/dynamic-resource-allocation/api"
 	"k8s.io/dynamic-resource-allocation/cel"
 	"k8s.io/dynamic-resource-allocation/resourceclaim"
@@ -61,11 +62,6 @@ func NewConsumedCapacity() ConsumedCapacity {
 	return internal.NewConsumedCapacity()
 }
 
-func NewDeviceConsumedCapacity(deviceID DeviceID,
-	consumedCapacity map[resourceapi.QualifiedName]resource.Quantity) DeviceConsumedCapacity {
-	return internal.NewDeviceConsumedCapacity(deviceID, consumedCapacity)
-}
-
 func NewConsumedCapacityCollection() ConsumedCapacityCollection {
 	return internal.NewConsumedCapacityCollection()
 }
@@ -87,9 +83,9 @@ type Allocator struct {
 	features       Features
 	allocatedState AllocatedState
 	classLister    DeviceClassLister
-	slicesOnNode   map[string][]*resourceapi.ResourceSlice
-	slicesShared   []*resourceapi.ResourceSlice
-	allSlices      []*resourceapi.ResourceSlice
+	slicesOnNode   map[string][]*draapi.ResourceSlice
+	slicesShared   []*draapi.ResourceSlice
+	allSlices      []*draapi.ResourceSlice
 	celCache       *cel.Cache
 	// availableCounters contains the available counters for each
 	// resource pool. It acts as a cache that is updated the first time
@@ -119,11 +115,11 @@ func NewAllocator(ctx context.Context,
 	features Features,
 	allocatedState AllocatedState,
 	classLister DeviceClassLister,
-	slices []*resourceapi.ResourceSlice,
+	slices []*draapi.ResourceSlice,
 	celCache *cel.Cache,
 ) (*Allocator, error) {
-	slicesOnNode := make(map[string][]*resourceapi.ResourceSlice)
-	slicesShared := make([]*resourceapi.ResourceSlice, 0)
+	slicesOnNode := make(map[string][]*draapi.ResourceSlice)
+	slicesShared := make([]*draapi.ResourceSlice, 0)
 	for _, slice := range slices {
 		nodeName := ptr.Deref(slice.Spec.NodeName, "")
 		if nodeName == "" {
@@ -276,7 +272,8 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node, claims []*resou
 		for i, constraint := range claim.Spec.Devices.Constraints {
 			switch {
 			case constraint.MatchAttribute != nil:
-				matchAttribute := resourceapi.FullyQualifiedName(*constraint.MatchAttribute)
+				matchAttribute := string(*constraint.MatchAttribute)
+				domain, id, _ := strings.Cut(matchAttribute, "/")
 				logger := alloc.logger
 				if loggerV := alloc.logger.V(6); loggerV.Enabled() {
 					logger = klog.LoggerWithName(logger, "matchAttributeConstraint")
@@ -285,11 +282,12 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node, claims []*resou
 				m := &matchAttributeConstraint{
 					logger:        logger,
 					requestNames:  sets.New(constraint.Requests...),
-					attributeName: matchAttribute,
+					attributeName: draapi.FullyQualifiedName{Domain: draapi.MakeUniqueString(domain), Identifier: draapi.MakeUniqueString(id)},
 				}
 				constraints[i] = m
 			case constraint.DistinctAttribute != nil:
-				distinctAttribute := resourceapi.FullyQualifiedName(*constraint.DistinctAttribute)
+				distinctAttribute := string(*constraint.DistinctAttribute)
+				domain, id, _ := strings.Cut(distinctAttribute, "/")
 				logger := alloc.logger
 				if loggerV := alloc.logger.V(6); loggerV.Enabled() {
 					logger = klog.LoggerWithName(logger, "distinctAttributeConstraint")
@@ -298,7 +296,7 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node, claims []*resou
 				m := &distinctAttributeConstraint{
 					logger:        logger,
 					requestNames:  sets.New(constraint.Requests...),
-					attributeName: distinctAttribute,
+					attributeName: draapi.FullyQualifiedName{Domain: draapi.MakeUniqueString(domain), Identifier: draapi.MakeUniqueString(id)},
 				}
 				constraints[i] = m
 			default:
@@ -366,8 +364,8 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node, claims []*resou
 			var consumedCapacity map[resourceapi.QualifiedName]resource.Quantity
 			if internal.consumedCapacity != nil {
 				consumedCapacity = make(map[resourceapi.QualifiedName]resource.Quantity, len(internal.consumedCapacity))
-				for key, val := range internal.consumedCapacity {
-					consumedCapacity[key] = val.DeepCopy()
+				for name, val := range internal.consumedCapacity {
+					consumedCapacity[capacityNameForStatus(name, internal.id.Driver, internal.Device.Capacity)] = val.DeepCopy()
 				}
 			}
 			allocationResult.Devices.Results[i] = resourceapi.DeviceRequestAllocationResult{
@@ -569,7 +567,7 @@ func (alloc *allocator) validateDeviceRequest(request requestAccessor, parentReq
 		// better to wait. This does not matter yet as long the incomplete pool
 		// has some matching device.
 		requestData.allDevices = make([]deviceWithID, 0, resourceapi.AllocationResultsMaxSize)
-		emptyConsumedCapacity := NewConsumedCapacity() // reusable: CmpRequestOverCapacity clones/reads only
+		emptyConsumedCapacity := NewConsumedCapacity() // reusable: cmpRequestOverCapacity clones/reads only
 		for _, pool := range pools {
 			if pool.IsIncomplete {
 				return requestData, fmt.Errorf("claim %s, request %s: asks for all devices, but resource pool %s is currently being updated%w", klog.KObj(claim), request.name(), pool.PoolID, internal.ErrFailedAllocationOnNode)
@@ -594,8 +592,8 @@ func (alloc *allocator) validateDeviceRequest(request requestAccessor, parentReq
 							// Static capacity only: remaining capacity is checked in allocateDevice
 							// so capacity-blocked matching devices stay in allDevices and All fails.
 							apiDevice := slice.Spec.Devices[deviceIndex]
-							success, err := CmpRequestOverCapacity(emptyConsumedCapacity, requestData.request.capacities(),
-								apiDevice.AllowMultipleAllocations, apiDevice.Capacity, emptyConsumedCapacity, alloc.features.FractionalCapacityRange)
+							_, success, err := cmpRequestOverCapacity(emptyConsumedCapacity, requestData.request.capacities(),
+								device, emptyConsumedCapacity, alloc.features.FractionalCapacityRange)
 							if err != nil {
 								return requestData, fmt.Errorf("claim %s, request %s: checking capacity for device %s: %w", klog.KObj(claim), requestData.request.name(), apiDevice.Name, err)
 							}
@@ -737,7 +735,7 @@ type internalDeviceResult struct {
 	id               DeviceID
 	shareID          *types.UID
 	slice            *draapi.ResourceSlice
-	consumedCapacity map[resourceapi.QualifiedName]resource.Quantity
+	consumedCapacity ConsumedCapacity
 	adminAccess      *bool
 }
 
@@ -794,9 +792,9 @@ type constraint interface {
 type matchAttributeConstraint struct {
 	logger        klog.Logger // Includes name and attribute name, so no need to repeat in log messages.
 	requestNames  sets.Set[string]
-	attributeName resourceapi.FullyQualifiedName
+	attributeName draapi.FullyQualifiedName
 
-	attribute  *resourceapi.DeviceAttribute
+	attribute  any
 	numDevices int
 }
 
@@ -807,10 +805,21 @@ func (m *matchAttributeConstraint) add(requestName, subRequestName string, devic
 		return true
 	}
 
-	attribute := lookupAttribute(device, deviceID, m.attributeName)
+	attribute := device.Attributes.Lookup(m.attributeName)
 	if attribute == nil {
 		// Doesn't have the attribute.
 		m.logger.V(7).Info("Constraint not satisfied, attribute not set")
+		return false
+	}
+
+	switch attribute.(type) {
+	case string:
+	case int64:
+	case bool:
+	case apiservercel.Semver:
+	default:
+		// Unknown value type, cannot match.
+		m.logger.V(7).Info("Match attribute type unknown", "candidate", attribute)
 		return false
 	}
 
@@ -822,33 +831,50 @@ func (m *matchAttributeConstraint) add(requestName, subRequestName string, devic
 		return true
 	}
 
-	switch {
-	case attribute.StringValue != nil:
-		if m.attribute.StringValue == nil || *attribute.StringValue != *m.attribute.StringValue {
-			m.logger.V(7).Info("String values different")
+	switch candidate := attribute.(type) {
+	case string:
+		existing, ok := m.attribute.(string)
+		if !ok {
+			m.logger.V(7).Info("Attribute types don't match", "existing", m.attribute, "candidate", attribute)
 			return false
 		}
-	case attribute.IntValue != nil:
-		if m.attribute.IntValue == nil || *attribute.IntValue != *m.attribute.IntValue {
-			m.logger.V(7).Info("Int values different")
+		if existing != candidate {
+			m.logger.V(7).Info("Attribute values don't match", "existing", m.attribute, "candidate", attribute)
 			return false
 		}
-	case attribute.BoolValue != nil:
-		if m.attribute.BoolValue == nil || *attribute.BoolValue != *m.attribute.BoolValue {
-			m.logger.V(7).Info("Bool values different")
+	case int64:
+		existing, ok := m.attribute.(int64)
+		if !ok {
+			m.logger.V(7).Info("Attribute types don't match", "existing", m.attribute, "candidate", attribute)
 			return false
 		}
-	case attribute.VersionValue != nil:
-		// semver 2.0.0 requires that version strings are in their
-		// minimal form (in particular, no leading zeros). Therefore a
-		// strict "exact equal" check can do a string comparison.
-		if m.attribute.VersionValue == nil || *attribute.VersionValue != *m.attribute.VersionValue {
-			m.logger.V(7).Info("Version values different")
+		if existing != candidate {
+			m.logger.V(7).Info("Attribute values don't match", "existing", m.attribute, "candidate", attribute)
+			return false
+		}
+	case bool:
+		existing, ok := m.attribute.(bool)
+		if !ok {
+			m.logger.V(7).Info("Attribute types don't match", "existing", m.attribute, "candidate", attribute)
+			return false
+		}
+		if existing != candidate {
+			m.logger.V(7).Info("Attribute values don't match", "existing", m.attribute, "candidate", attribute)
+			return false
+		}
+	case apiservercel.Semver:
+		existing, ok := m.attribute.(apiservercel.Semver)
+		if !ok {
+			m.logger.V(7).Info("Attribute types don't match", "existing", m.attribute, "candidate", attribute)
+			return false
+		}
+		if !existing.Version.Equals(candidate.Version) {
+			m.logger.V(7).Info("Attribute values don't match", "existing", m.attribute, "candidate", attribute)
 			return false
 		}
 	default:
 		// Unknown value type, cannot match.
-		m.logger.V(7).Info("Match attribute type unknown")
+		m.logger.V(7).Info("Match attribute type unknown", "candidate", attribute)
 		return false
 	}
 
@@ -874,31 +900,6 @@ func (m *matchAttributeConstraint) matches(requestName, subRequestName string) b
 		fullSubRequestName := fmt.Sprintf("%s/%s", requestName, subRequestName)
 		return m.requestNames.Has(requestName) || m.requestNames.Has(fullSubRequestName)
 	}
-}
-
-func lookupAttribute(device *draapi.Device, deviceID DeviceID, attributeName resourceapi.FullyQualifiedName) *resourceapi.DeviceAttribute {
-	// Fully-qualified match?
-	if attr, ok := device.Attributes[resourceapi.QualifiedName(attributeName)]; ok {
-		return &attr
-	}
-	index := strings.Index(string(attributeName), "/")
-	if index < 0 {
-		// Should not happen for a valid fully qualified name.
-		return nil
-	}
-
-	if string(attributeName[0:index]) != deviceID.Driver.String() {
-		// Not an attribute of the driver and not found above,
-		// so it is not available.
-		return nil
-	}
-
-	// Domain matches the driver, so let's check just the ID.
-	if attr, ok := device.Attributes[resourceapi.QualifiedName(attributeName[index+1:])]; ok {
-		return &attr
-	}
-
-	return nil
 }
 
 // allocateOne iterates over all eligible devices (not in use, match selector,
@@ -1132,8 +1133,13 @@ func (alloc *allocator) allocateOne(r deviceIndices, allocateSubRequest bool, st
 				}
 				if alloc.features.ConsumableCapacity {
 					// Next validate whether resource request over capacity
-					device := slice.Spec.Devices[deviceIndex]
-					success, err := alloc.CmpRequestOverCapacity(requestData.request, slice, device)
+					device := deviceWithID{
+						Device: &slice.Spec.Devices[deviceIndex],
+						id:     deviceID,
+						slice:  slice,
+						pool:   pool,
+					}
+					_, success, err := alloc.cmpRequestOverCapacity(requestData.request, device)
 					if err != nil {
 						return false, fmt.Errorf("claim %s, request %s: checking capacity for device %s: %w", klog.KObj(claim), requestData.request.name(), deviceID, err)
 					}
@@ -1216,7 +1222,7 @@ func (alloc *allocator) isSelectable(r requestIndices, requestData requestData, 
 	}
 
 	if requestData.class != nil {
-		match, err := alloc.selectorsMatch(r, device, deviceID, requestData.class, requestData.class.Spec.Selectors)
+		match, err := alloc.selectorsMatch(r, slice, device, deviceID, requestData.class, requestData.class.Spec.Selectors)
 		if err != nil {
 			return false, err
 		}
@@ -1227,7 +1233,7 @@ func (alloc *allocator) isSelectable(r requestIndices, requestData requestData, 
 	}
 
 	request := requestData.request
-	match, err := alloc.selectorsMatch(r, device, deviceID, nil, request.selectors())
+	match, err := alloc.selectorsMatch(r, slice, device, deviceID, nil, request.selectors())
 	if err != nil {
 		return false, err
 	}
@@ -1252,21 +1258,17 @@ func (alloc *allocator) isSelectable(r requestIndices, requestData requestData, 
 
 }
 
-// CmpRequestOverCapacity checks if the given device has sufficient remaining capacity
+// cmpRequestOverCapacity checks if the given device has sufficient remaining capacity
 // to satisfy the resource request.
-// Return true if success.
-func (alloc *allocator) CmpRequestOverCapacity(request requestAccessor, slice *draapi.ResourceSlice, device draapi.Device) (bool, error) {
-	deviceID := DeviceID{Driver: slice.Spec.Driver, Pool: slice.Spec.Pool.Name, Device: device.Name}
-	allocatingCapacity := alloc.allocatingCapacity[deviceID]
-	allowMultipleAllocations := device.AllowMultipleAllocations
-	capacities := device.Capacity
-	if allocatedCapacity, found := alloc.allocatedState.AggregatedCapacity[deviceID]; found {
-		return CmpRequestOverCapacity(allocatedCapacity, request.capacities(), allowMultipleAllocations, capacities, allocatingCapacity, alloc.features.FractionalCapacityRange)
+func (alloc *allocator) cmpRequestOverCapacity(request requestAccessor, device deviceWithID) (map[draapi.FullyQualifiedName]resource.Quantity, bool, error) {
+	allocatingCapacity := alloc.allocatingCapacity[device.id]
+	if allocatedCapacity, found := alloc.allocatedState.AggregatedCapacity[device.id]; found {
+		return cmpRequestOverCapacity(allocatedCapacity, request.capacities(), device, allocatingCapacity, alloc.features.FractionalCapacityRange)
 	}
-	return CmpRequestOverCapacity(NewConsumedCapacity(), request.capacities(), allowMultipleAllocations, capacities, allocatingCapacity, alloc.features.FractionalCapacityRange)
+	return cmpRequestOverCapacity(NewConsumedCapacity(), request.capacities(), device, allocatingCapacity, alloc.features.FractionalCapacityRange)
 }
 
-func (alloc *allocator) selectorsMatch(r requestIndices, device *draapi.Device, deviceID DeviceID, class *resourceapi.DeviceClass, selectors []resourceapi.DeviceSelector) (bool, error) {
+func (alloc *allocator) selectorsMatch(r requestIndices, slice *draapi.ResourceSlice, device *draapi.Device, deviceID DeviceID, class *resourceapi.DeviceClass, selectors []resourceapi.DeviceSelector) (bool, error) {
 	for i, selector := range selectors {
 		expr := alloc.celCache.GetOrCompile(selector.CEL.Expression)
 		if expr.Error != nil {
@@ -1281,13 +1283,7 @@ func (alloc *allocator) selectorsMatch(r requestIndices, device *draapi.Device, 
 			return false, fmt.Errorf("claim %s: selector #%d: CEL compile error: %w", klog.KObj(alloc.claimsToAllocate[r.claimIndex]), i, expr.Error)
 		}
 
-		// If this conversion turns out to be expensive, the CEL package could be converted
-		// to use unique strings.
-		var d resourceapi.Device
-		if err := draapi.Convert_api_Device_To_v1_Device(device, &d, nil); err != nil {
-			return false, fmt.Errorf("convert Device %s: %w", deviceID, err)
-		}
-		matches, details, err := expr.DeviceMatches(alloc.ctx, cel.Device{Driver: deviceID.Driver.String(), AllowMultipleAllocations: d.AllowMultipleAllocations, Attributes: d.Attributes, Capacity: d.Capacity})
+		matches, details, err := expr.DeviceMatches(alloc.ctx, cel.Device{Driver: deviceID.Driver.String(), AllowMultipleAllocations: device.AllowMultipleAllocations, Attributes: device.Attributes, Capacity: device.Capacity, LookupUniqueString: slice.LookupUniqueString})
 		if class != nil {
 			alloc.logger.V(7).Info("CEL result", "device", deviceID, "class", klog.KObj(class), "selector", i, "expression", selector.CEL.Expression, "matches", matches, "actualCost", ptr.Deref(details.ActualCost(), 0), "err", err)
 		} else {
@@ -1434,11 +1430,11 @@ func (alloc *allocator) allocateDevice(r deviceIndices, device deviceWithID, mus
 		state.deviceMarked = true
 	}
 
-	consumedCapacity := make(map[resourceapi.QualifiedName]resource.Quantity, 0)
+	consumedCapacity := NewConsumedCapacity()
 	var shareID *types.UID
 	if alloc.features.ConsumableCapacity {
 		// Validate whether resource request over capacity
-		success, err := alloc.CmpRequestOverCapacity(requestData.request, device.slice, *device.Device)
+		resolvedRequests, success, err := alloc.cmpRequestOverCapacity(requestData.request, device)
 		if err != nil {
 			// The overflow guard already ran during validation, so an error here is
 			// unexpected. Roll back and surface it rather than swallowing it.
@@ -1452,7 +1448,7 @@ func (alloc *allocator) allocateDevice(r deviceIndices, device deviceWithID, mus
 		}
 
 		if allowMultipleAllocations {
-			consumedCapacity, err = GetConsumedCapacityFromRequest(request.capacities(), device.Capacity, alloc.features.FractionalCapacityRange)
+			consumedCapacity, err = getConsumedCapacityFromRequest(resolvedRequests, device, alloc.features.FractionalCapacityRange)
 			if err != nil {
 				alloc.rollbackDevice(r, device, baseRequestName, subRequestName, state)
 				return false, nil, fmt.Errorf("claim %s, request %s: computing consumed capacity for device %s: %w", klog.KObj(claim), requestData.request.name(), device.id, err)
@@ -1465,7 +1461,7 @@ func (alloc *allocator) allocateDevice(r deviceIndices, device deviceWithID, mus
 			// share skip the counter check, so record whether it predated this
 			// share; rollback must not delete it while another share still needs it.
 			_, state.capacityEntryExisted = alloc.allocatingCapacity[device.id]
-			alloc.allocatingCapacity.Insert(NewDeviceConsumedCapacity(device.id, consumedCapacity))
+			alloc.allocatingCapacity.Insert(DeviceConsumedCapacity{DeviceID: device.id, ConsumedCapacity: consumedCapacity})
 			state.capacityInserted = true
 			state.consumedCapacity = consumedCapacity
 		}
@@ -1508,7 +1504,7 @@ type deviceRollbackState struct {
 	capacityEntryExisted bool
 	resultAdded          bool
 	previousNumResults   int
-	consumedCapacity     map[resourceapi.QualifiedName]resource.Quantity
+	consumedCapacity     ConsumedCapacity
 }
 
 // rollbackDevice reverses the mutations recorded in state, in the opposite order
@@ -1519,7 +1515,7 @@ func (alloc *allocator) rollbackDevice(r deviceIndices, device deviceWithID, bas
 		alloc.result[r.claimIndex].devices = alloc.result[r.claimIndex].devices[:state.previousNumResults]
 	}
 	if state.capacityInserted {
-		alloc.allocatingCapacity.Remove(NewDeviceConsumedCapacity(device.id, state.consumedCapacity))
+		alloc.allocatingCapacity.Remove(DeviceConsumedCapacity{DeviceID: device.id, ConsumedCapacity: state.consumedCapacity})
 		if state.capacityEntryExisted {
 			// Remove drops the entry once it becomes empty, which also erases the
 			// shared marker that the earlier share still relies on. Restore an empty

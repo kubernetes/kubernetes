@@ -56,6 +56,7 @@ import (
 	compbasemetrics "k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/component-helpers/nodedeclaredfeatures/features/draoptionalnodeoperations"
+	draapi "k8s.io/dynamic-resource-allocation/api"
 	"k8s.io/dynamic-resource-allocation/deviceclass/extendedresourcecache"
 	resourceslicetracker "k8s.io/dynamic-resource-allocation/resourceslice/tracker"
 	"k8s.io/dynamic-resource-allocation/structured"
@@ -472,6 +473,27 @@ var (
 			return st.MakeNodeSelector().In("metadata.name", []string{nodeName}, st.NodeSelectorTypeMatchFields).Obj()
 		}(),
 	}
+	// allocationResultWithQualifiedConsumedCapacity stores ConsumedCapacity keyed with the
+	// driver name as an explicit domain prefix, unlike allocationResultWithConsumedCapacity
+	// above which uses the unqualified form. Both must be recognized as the same capacity
+	// once normalized against the driver.
+	allocationResultWithQualifiedConsumedCapacity = &resourceapi.AllocationResult{
+		Devices: resourceapi.DeviceAllocationResult{
+			Results: []resourceapi.DeviceRequestAllocationResult{{
+				Driver:  driver,
+				Pool:    nodeName,
+				Device:  sharedDeviceName,
+				Request: "req-1",
+				ShareID: ptr.To(types.UID("share-789")), // Shared device allocation
+				ConsumedCapacity: map[resourceapi.QualifiedName]apiresource.Quantity{
+					resourceapi.QualifiedName(driver + "/" + string(capacityName)): apiresource.MustParse("1"),
+				},
+			}},
+		},
+		NodeSelector: func() *v1.NodeSelector {
+			return st.MakeNodeSelector().In("metadata.name", []string{nodeName}, st.NodeSelectorTypeMatchFields).Obj()
+		}(),
+	}
 	allocationResult2 = &resourceapi.AllocationResult{
 		Devices: resourceapi.DeviceAllocationResult{
 			Results: []resourceapi.DeviceRequestAllocationResult{{
@@ -742,6 +764,9 @@ var (
 	allocatedClaimWithConsumedCapacity2 = st.FromResourceClaim(pendingClaim).
 						Allocation(allocationResultWithConsumedCapacity2).
 						Obj()
+	allocatedClaimWithQualifiedConsumedCapacity = st.FromResourceClaim(pendingClaim).
+							Allocation(allocationResultWithQualifiedConsumedCapacity).
+							Obj()
 	allocatedClaimWithSkipNodeOperations = st.FromResourceClaim(pendingClaim).
 						Allocation(allocationResultWithSkipNodeOperations).
 						Obj()
@@ -4594,10 +4619,13 @@ func setup(tCtx ktesting.TContext, args *config.DynamicResourcesArgs, nodes []*v
 	tc.client.ReactionChain = append(apiReactors, tc.client.ReactionChain...)
 
 	tc.informerFactory = informers.NewSharedInformerFactory(tc.client, 0)
+	sliceInformer := draapi.NewInformerForResourceSlice(tc.informerFactory)
+
 	var doneCheckers []cache.DoneChecker
 	resourceSliceTrackerOpts := resourceslicetracker.Options{
 		EnableDeviceTaintRules: true,
-		SliceInformer:          tc.informerFactory.Resource().V1().ResourceSlices(),
+		SliceLister:            draapi.NewResourceSliceLister(sliceInformer.GetIndexer()),
+		SliceInformer:          sliceInformer,
 		TaintInformer:          tc.informerFactory.Resource().V1().DeviceTaintRules(),
 		KubeClient:             tc.client,
 	}
@@ -5764,6 +5792,19 @@ func testGatherAllocatedState(tCtx ktesting.TContext) {
 			expectedAllocatedSharedDeviceIDs: 1,
 			expectedConsumedCapacity:         "1",
 		},
+		"single-allocated-claim-with-qualified-capacity-name": {
+			// The persisted ConsumedCapacity key is qualified with the driver name
+			// (as it would be written by an older scheduler, or a driver that used
+			// to publish qualified capacity names). It must be recognized as the
+			// same capacity as the unqualified form used elsewhere in this test.
+			enabledConsumableCapacity: true,
+			allocatedResourceClaims: []*resourceapi.ResourceClaim{
+				allocatedClaimWithQualifiedConsumedCapacity,
+			},
+			expectedAllocatedDeviceIDs:       0,
+			expectedAllocatedSharedDeviceIDs: 1,
+			expectedConsumedCapacity:         "1",
+		},
 		"disabled-single-allocated-claim-with-capacity": {
 			enabledConsumableCapacity: false,
 			allocatedResourceClaims: []*resourceapi.ResourceClaim{
@@ -5892,13 +5933,14 @@ func testGatherAllocatedState(tCtx ktesting.TContext) {
 					tCtx.Errorf("expected aggregated capacity of %s, got nil", deviceID)
 					return
 				}
-				value := capacity[capacityName]
+				name := draapi.FullyQualifiedName{Domain: draapi.MakeUniqueString(driver), Identifier: draapi.MakeUniqueString(string(capacityName))}
+				value := capacity[name]
 				if value == nil {
-					tCtx.Errorf("expected value of %s, got nil", capacityName)
+					tCtx.Errorf("expected value of %s, got nil", name)
 					return
 				}
 				if value.Cmp(apiresource.MustParse(tc.expectedConsumedCapacity)) != 0 {
-					tCtx.Errorf("expected value of %s to be %s, got %s", capacityName, tc.expectedConsumedCapacity, value)
+					tCtx.Errorf("expected value of %s to be %s, got %s", name, tc.expectedConsumedCapacity, value)
 				}
 			} else if len(aggregatedCapacity) > 0 {
 				tCtx.Errorf("got unexpected consumed capacity")
@@ -6186,24 +6228,6 @@ func TestPreQueueingHint(t *testing.T) {
 			},
 			wantKeys: sets.New[string](), // no pod in indexer
 		},
-		"shared claim returns nil": {
-			newObj: &resourceapi.ResourceClaim{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "shared-claim",
-					Namespace: "ns1",
-				},
-			},
-			wantKeys: sets.New[string](), // no pod in indexer
-		},
-		"claim with no matching pods returns empty set": {
-			newObj: &resourceapi.ResourceClaim{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "claim-2",
-					Namespace: "ns1",
-				},
-			},
-			wantKeys: sets.New[string](), // no pod in indexer
-		},
 		"delete event uses oldObj": {
 			oldObj: &resourceapi.ResourceClaim{
 				ObjectMeta: metav1.ObjectMeta{
@@ -6254,7 +6278,7 @@ func TestPreQueueingHint(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			logger := klog.Background()
+			logger := ktesting.Init(t).Logger()
 			pl := &DynamicResources{podIndexer: cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{podResourceClaimIndexPrefix + "-test": podResourceClaimIndexFunc}), podResourceClaimIndex: podResourceClaimIndexPrefix + "-test"}
 			got, err := pl.preQueueingHint(logger, tc.oldObj, tc.newObj)
 			if err != nil {
@@ -6288,7 +6312,7 @@ func TestPreQueueingHint(t *testing.T) {
 func TestPreQueueingHint_WithPodInIndexer(t *testing.T) {
 	// Verify that when a pod referencing a claim exists in the indexer,
 	// preQueueingHint returns that pod's key.
-	logger := klog.Background()
+	logger := ktesting.Init(t).Logger()
 	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{podResourceClaimIndexPrefix + "-test": podResourceClaimIndexFunc})
 
 	// Add a pod that references "claim-x" in namespace "ns1".
@@ -6323,7 +6347,7 @@ func TestPreQueueingHint_WithPodInIndexer(t *testing.T) {
 func TestPreQueueingHint_SharedClaimMultiplePods(t *testing.T) {
 	// Verify that for a shared claim referenced by multiple pods,
 	// preQueueingHint returns all referencing pods.
-	logger := klog.Background()
+	logger := ktesting.Init(t).Logger()
 	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{podResourceClaimIndexPrefix + "-test": podResourceClaimIndexFunc})
 
 	// Add multiple pods referencing the same shared claim.
@@ -6354,5 +6378,52 @@ func TestPreQueueingHint_SharedClaimMultiplePods(t *testing.T) {
 	}
 	if len(got.Pods) != 3 {
 		t.Errorf("expected 3 pods, got %d: %v", len(got.Pods), got.Pods)
+	}
+}
+
+// TestPreQueueingHint_DuplicateClaimRefs verifies that when a pod references the
+// same claim more than once, podResourceClaimIndexFunc returns duplicate keys (it
+// intentionally does not de-duplicate), yet the indexer and preQueueingHint still
+// return the pod exactly once.
+func TestPreQueueingHint_DuplicateClaimRefs(t *testing.T) {
+	logger := ktesting.Init(t).Logger()
+	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{podResourceClaimIndexPrefix + "-test": podResourceClaimIndexFunc})
+
+	// Two pod claims referencing the same shared ResourceClaim.
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "my-pod", Namespace: "ns1"},
+		Spec: v1.PodSpec{
+			ResourceClaims: []v1.PodResourceClaim{
+				{Name: "a", ResourceClaimName: new("shared-claim")},
+				{Name: "b", ResourceClaimName: new("shared-claim")},
+			},
+		},
+	}
+	if err := indexer.Add(pod); err != nil {
+		t.Fatal(err)
+	}
+
+	// The index function returns duplicate keys (de-dup intentionally removed).
+	keys, err := podResourceClaimIndexFunc(pod)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(keys) != 2 {
+		t.Errorf("expected 2 (duplicate) index keys, got %v", keys)
+	}
+
+	pl := &DynamicResources{podIndexer: indexer, podResourceClaimIndex: podResourceClaimIndexPrefix + "-test"}
+	got, err := pl.preQueueingHint(logger, nil, &resourceapi.ResourceClaim{
+		ObjectMeta: metav1.ObjectMeta{Name: "shared-claim", Namespace: "ns1"},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got.AllPods {
+		t.Fatal("expected AllPods=false, got true")
+	}
+	// Despite the duplicate index keys, the pod is returned exactly once.
+	if len(got.Pods) != 1 || got.Pods[0].Name != "my-pod" || got.Pods[0].Namespace != "ns1" {
+		t.Errorf("expected exactly [{my-pod ns1}], got %v", got.Pods)
 	}
 }

@@ -19,15 +19,15 @@ package experimental
 import (
 	"fmt"
 
-	resourceapi "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	apiservercel "k8s.io/apiserver/pkg/cel"
 	draapi "k8s.io/dynamic-resource-allocation/api"
 	"k8s.io/klog/v2"
 )
 
 // attributeProvider defines how constraints retrieve device attributes.
 type attributeProvider interface {
-	lookupAttribute(request *requestData, device *draapi.Device, deviceID DeviceID, attributeName resourceapi.FullyQualifiedName) (*resourceapi.DeviceAttribute, error)
+	lookupAttribute(request *requestData, device *draapi.Device, deviceID DeviceID, attribute draapi.FullyQualifiedName) (any, error)
 }
 
 // distinctAttributeConstraint compares an attribute value across devices.
@@ -40,11 +40,11 @@ type attributeProvider interface {
 type distinctAttributeConstraint struct {
 	logger            klog.Logger // Includes name and attribute name, so no need to repeat in log messages.
 	requestNames      sets.Set[string]
-	attributeName     resourceapi.FullyQualifiedName
+	attributeName     draapi.FullyQualifiedName
 	features          Features
 	attributeProvider attributeProvider
 
-	attributes []*resourceapi.DeviceAttribute
+	attributes []any
 }
 
 func (m *distinctAttributeConstraint) add(request *requestData, device *draapi.Device, deviceID DeviceID) (bool, error) {
@@ -63,7 +63,7 @@ func (m *distinctAttributeConstraint) add(request *requestData, device *draapi.D
 		return false, nil
 	}
 
-	if !m.matchesAttribute(*attribute) {
+	if !m.matchesAttribute(attribute) {
 		m.logger.V(7).Info("Constraint not satisfied, has some duplicated attributes")
 		return false, nil
 	}
@@ -93,12 +93,12 @@ func (m *distinctAttributeConstraint) matches(request *requestData) bool {
 	}
 }
 
-func (m *distinctAttributeConstraint) matchesAttribute(attribute resourceapi.DeviceAttribute) bool {
+func (m *distinctAttributeConstraint) matchesAttribute(attribute any) bool {
 	if m.features.ListTypeAttributes {
 		// Set-based comparison for ListAttributes feature:
 		// Check that the new device's attribute set is disjoint from all existing devices.
 		// This implements "Pairwise Disjoint" semantics for distinct attributes.
-		newSet := attributeAsSet(&attribute)
+		newSet := attributeAsSet(attribute)
 		if newSet == nil {
 			m.logger.V(7).Info("Unknown attribute type")
 			return false
@@ -126,35 +126,54 @@ func (m *distinctAttributeConstraint) matchesAttribute(attribute resourceapi.Dev
 
 	// Scalar comparison (existing behavior)
 	for _, attr := range m.attributes {
-		switch {
-		case attribute.StringValue != nil:
-			if attr.StringValue != nil && *attribute.StringValue == *attr.StringValue {
+		switch existing := attr.(type) {
+		case string:
+			candidate, ok := attribute.(string)
+			if !ok {
+				m.logger.V(7).Info("Attribute types don't match", "existing", attr, "candidate", attribute)
+				return true
+			}
+			if existing == candidate {
 				m.logger.V(7).Info("String values duplicated")
 				return false
 			}
-		case attribute.IntValue != nil:
-			if attr.IntValue != nil && *attribute.IntValue == *attr.IntValue {
+			m.logger.V(7).Info("Attribute values don't match", "existing", attr, "candidate", attribute)
+		case int64:
+			candidate, ok := attribute.(int64)
+			if !ok {
+				m.logger.V(7).Info("Attribute types don't match", "existing", attr, "candidate", attribute)
+				return true
+			}
+			if existing == candidate {
 				m.logger.V(7).Info("Int values duplicated")
 				return false
 			}
-		case attribute.BoolValue != nil:
-			if attr.BoolValue != nil && *attribute.BoolValue == *attr.BoolValue {
+			m.logger.V(7).Info("Attribute values don't match", "existing", attr, "candidate", attribute)
+		case bool:
+			candidate, ok := attribute.(bool)
+			if !ok {
+				m.logger.V(7).Info("Attribute types don't match", "existing", attr, "candidate", attribute)
+				return true
+			}
+			if existing == candidate {
 				m.logger.V(7).Info("Bool values duplicated")
 				return false
 			}
-		case attribute.VersionValue != nil:
-			// semver 2.0.0 requires that version strings are in their
-			// minimal form (in particular, no leading zeros). Therefore a
-			// strict "exact equal" check can do a string comparison.
-			if attr.VersionValue != nil && *attribute.VersionValue == *attr.VersionValue {
+			m.logger.V(7).Info("Attribute values don't match", "existing", attr, "candidate", attribute)
+		case apiservercel.Semver:
+			candidate, ok := attribute.(apiservercel.Semver)
+			if !ok {
+				m.logger.V(7).Info("Attribute types don't match", "existing", attr, "candidate", attribute)
+				return true
+			}
+			if existing.Version.Equals(candidate.Version) {
 				m.logger.V(7).Info("Version values duplicated")
 				return false
 			}
+			m.logger.V(7).Info("Attribute values don't match", "existing", attr, "candidate", attribute)
 		default:
 			// Unknown value type, cannot match.
-			// This condition should not be reached
-			// as the unknown value type should be failed on CEL compile (getAttributeValue).
-			m.logger.V(7).Info("Distinct attribute type unknown")
+			m.logger.V(7).Info("Distinct attribute type unknown", "existing", attr)
 			return false
 		}
 	}
