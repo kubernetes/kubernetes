@@ -308,19 +308,6 @@ func (tc *Controller) addPodEvictionRetry(podRef NamespacedObject, createdAt, fi
 	return item, true
 }
 
-// cancelPodEvictionRetry removes any active retry token for nsName.
-// Returns true if a token was present and removed.
-func (tc *Controller) cancelPodEvictionRetry(nsName types.NamespacedName) bool {
-	key := nsName.String()
-	tc.podEvictionLock.Lock()
-	defer tc.podEvictionLock.Unlock()
-	if _, ok := tc.podEvictionTokens[key]; !ok {
-		return false
-	}
-	delete(tc.podEvictionTokens, key)
-	return true
-}
-
 // podEvictionRetryMatches reports whether item is still the current,
 // authoritative retry token for its pod. An item that has been superseded
 // by a newer producer or explicitly cancelled returns false and must be

@@ -302,7 +302,9 @@ func TestCreatePod(t *testing.T) {
 				controller.Run(ctx)
 			})
 
-			podIndexer.Add(item.pod)
+			if err := podIndexer.Add(item.pod); err != nil {
+				t.Fatalf("Failed to add pod to indexer: %v", err)
+			}
 			controller.PodUpdated(nil, item.pod)
 
 			verifyPodActions(t, item.description, fakeClientset, item.expectPatch, item.expectDelete)
