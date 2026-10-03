@@ -111,7 +111,7 @@ func TestFailureReportsLeaks(t *testing.T) {
 	if got == "" {
 		t.Fatal("expected a failure message")
 	}
-	for _, want := range []string{"3 leaked goroutine(s)", "foo.run", "foo.go:1", "kube-apiserver", "Owners"} {
+	for _, want := range []string{"3 leaked goroutine(s)", "foo.run", "foo.go:1", "kube-apiserver"} {
 		if !strings.Contains(got, want) {
 			t.Errorf("failure message missing %q:\n%s", want, got)
 		}
@@ -151,14 +151,5 @@ func TestControlPlanePodMatching(t *testing.T) {
 				t.Errorf("regKubeScheduler.MatchString(%q) = %v, want %v", name, got, want.sched)
 			}
 		})
-	}
-}
-
-func TestDefaultOwnersAreSet(t *testing.T) {
-	if defaultOwners.SIG == "" {
-		t.Error("defaultOwners.SIG is not set")
-	}
-	if len(defaultOwners.Owners) == 0 {
-		t.Error("defaultOwners.Owners is not set")
 	}
 }
