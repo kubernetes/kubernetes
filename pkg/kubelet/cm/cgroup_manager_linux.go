@@ -45,7 +45,14 @@ const (
 	// Cgroup2MemoryLow is memory.low for cgroup v2
 	Cgroup2MemoryLow string = "memory.low"
 	// Cgroup2MemoryHigh is memory.high for cgroup v2
-	Cgroup2MemoryHigh      string = "memory.high"
+	Cgroup2MemoryHigh string = "memory.high"
+	// Cgroup2MemoryMax resets a cgroup v2 memory setting to the kernel default.
+	// It is written e.g. to memory.high to clear throttling, including on
+	// runtimes that leave absent Unified keys untouched: under the systemd
+	// driver runc turns the max unified value into the MemoryHigh infinity
+	// property, while an absent key leaves systemd re-applying the old number
+	// on every realization.
+	Cgroup2MemoryMax       string = "max"
 	Cgroup2MaxCpuLimit     string = "max"
 	Cgroup2MaxSwapFilename string = "memory.swap.max"
 )
