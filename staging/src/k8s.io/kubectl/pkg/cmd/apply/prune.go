@@ -134,7 +134,9 @@ func (p *pruner) prune(namespace string, mapping *meta.RESTMapping) error {
 		if err != nil {
 			return err
 		}
-		printer.PrintObj(obj, p.out)
+		if err := printer.PrintObj(obj, p.out); err != nil {
+			return err
+		}
 	}
 	return nil
 }
