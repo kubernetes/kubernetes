@@ -821,3 +821,97 @@ func TestQOSCPUConfigUpdate(t *testing.T) {
 		})
 	}
 }
+
+func TestSetMemoryReservation(t *testing.T) {
+	const (
+		guaranteedBytes  = 128 * 1024 * 1024      // 128Mi
+		burstableBytes   = 384 * 1024 * 1024      // 384Mi
+		allocatableBytes = 2 * 1024 * 1024 * 1024 // 2Gi
+	)
+	tests := []struct {
+		name string
+
+		pods               []*v1.Pod
+		allocatable        v1.ResourceList
+		percentReserve     int64
+		expectedBurstable  int64
+		expectedBestEffort int64
+	}{
+		{
+			name: "Memory with 20% reserve",
+			pods: activeTestPods(),
+			allocatable: v1.ResourceList{
+				v1.ResourceMemory: resource.MustParse("2Gi"),
+			},
+			percentReserve:     20,
+			expectedBurstable:  allocatableBytes - (guaranteedBytes * 20 / 100),
+			expectedBestEffort: allocatableBytes - (guaranteedBytes * 20 / 100) - (burstableBytes * 20 / 100),
+		},
+		{
+			name: "Memory with 100% reserve",
+			pods: activeTestPods(),
+			allocatable: v1.ResourceList{
+				v1.ResourceMemory: resource.MustParse("2Gi"),
+			},
+			percentReserve:     100,
+			expectedBurstable:  allocatableBytes - (guaranteedBytes * 100 / 100),
+			expectedBestEffort: allocatableBytes - (guaranteedBytes * 100 / 100) - (burstableBytes * 100 / 100),
+		},
+		{
+			name: "Memory with 33% reserve (integer division truncation)",
+			pods: activeTestPods(),
+			allocatable: v1.ResourceList{
+				v1.ResourceMemory: resource.MustParse("2Gi"),
+			},
+			percentReserve:     33,
+			expectedBurstable:  allocatableBytes - (guaranteedBytes * 33 / 100),
+			expectedBestEffort: allocatableBytes - (guaranteedBytes * 33 / 100) - (burstableBytes * 33 / 100),
+		},
+		{
+			name: "Only guaranteed pods, no burstable",
+			pods: activeTestPods()[:1], // only the guaranteed pod
+			allocatable: v1.ResourceList{
+				v1.ResourceMemory: resource.MustParse("2Gi"),
+			},
+			percentReserve:     100,
+			expectedBurstable:  allocatableBytes - guaranteedBytes,
+			expectedBestEffort: allocatableBytes - guaranteedBytes, // burstable request = 0, so no further reserve
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			logger, _ := ktesting.NewTestContext(t)
+
+			m, err := createTestQOSContainerManager(logger)
+			require.NoError(t, err)
+
+			m.activePods = func() []*v1.Pod {
+				return tc.pods
+			}
+			m.getNodeAllocatable = func() v1.ResourceList {
+				return tc.allocatable
+			}
+
+			configs := map[v1.PodQOSClass]*CgroupConfig{
+				v1.PodQOSBurstable: {
+					ResourceParameters: &ResourceConfig{},
+				},
+				v1.PodQOSBestEffort: {
+					ResourceParameters: &ResourceConfig{},
+				},
+			}
+
+			m.setMemoryReserve(logger, configs, tc.percentReserve)
+			
+
+			logger.V(2).Info("Memory reservation test", "expectedBurstable", tc.expectedBurstable, "actualBurstable", *configs[v1.PodQOSBurstable].ResourceParameters.Memory)
+			assert.Equal(t, tc.expectedBurstable, *configs[v1.PodQOSBurstable].ResourceParameters.Memory)
+			
+			logger.V(2).Info("Memory reservation test", "expectedBestEffort", tc.expectedBestEffort, "actualBestEffort", *configs[v1.PodQOSBestEffort].ResourceParameters.Memory)
+			assert.Equal(t, tc.expectedBestEffort, *configs[v1.PodQOSBestEffort].ResourceParameters.Memory)
+
+		})
+	}
+
+}
