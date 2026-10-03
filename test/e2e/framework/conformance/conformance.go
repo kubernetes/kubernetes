@@ -648,8 +648,9 @@ func TestResource(ctx context.Context, f *framework.Framework, tc ResourceTestca
 
 		if expected != nil {
 			if tc.VerifyContent() {
-				diff := compareObjects(expected, actual)
-				failures.Add(fmt.Sprintf("%s: unexpected actual object (- expected, + actual):\n%s", what, diff))
+				if diff := compareObjects(expected, actual); diff != "" {
+					failures.Add(fmt.Sprintf("%s: unexpected actual object (- expected, + actual):\n%s", what, diff))
+				}
 			} else {
 				failures.G().Expect(actual.GetName()).Should(gomega.Equal(expected.GetName()), "%s: name in returned object", what)
 				failures.G().Expect(actual.GetNamespace()).Should(gomega.Equal(expected.GetNamespace()), "%s: namespace in returned object", what)
