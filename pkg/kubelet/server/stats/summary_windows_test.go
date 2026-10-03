@@ -86,9 +86,9 @@ func TestSummaryProvider(t *testing.T) {
 	assert.Equal(podStats[0].Memory.UsageBytes, summary.Node.SystemContainers[0].Memory.UsageBytes)
 	assert.Equal(podStats[0].Memory.AvailableBytes, summary.Node.SystemContainers[0].Memory.AvailableBytes)
 	assert.Equal(statsapi.SystemContainerWindowsGlobalCommitMemory, summary.Node.SystemContainers[1].Name)
-	assert.NotEqual(nil, summary.Node.SystemContainers[1].Memory)
-	assert.NotEqual(nil, summary.Node.SystemContainers[1].Memory.AvailableBytes)
-	assert.NotEqual(nil, summary.Node.SystemContainers[1].Memory.UsageBytes)
+	assert.NotNil(summary.Node.SystemContainers[1].Memory)
+	assert.NotNil(summary.Node.SystemContainers[1].Memory.AvailableBytes)
+	assert.NotNil(summary.Node.SystemContainers[1].Memory.UsageBytes)
 	assert.Equal(summary.Pods, podStats)
 }
 
