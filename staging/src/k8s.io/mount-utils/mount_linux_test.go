@@ -1009,3 +1009,123 @@ func TestIsLikelyNotMountPoint(t *testing.T) {
 		}
 	}
 }
+
+// TestCheckDeviceReadable covers the data-path availability probe performed
+// before concluding a device is blank.
+//
+// Note the guard's narrow scope: it only rejects devices whose first block
+// cannot be read at all. Devices that are partially readable (first block
+// readable, other offsets failing) are a known, accepted limitation and are
+// not covered by this probe.
+func TestCheckDeviceReadable(t *testing.T) {
+	testCases := []struct {
+		name          string
+		fileSize      int
+		expectedError bool
+	}{
+		{
+			name:          "readable device",
+			fileSize:      4096,
+			expectedError: false,
+		},
+		{
+			name:          "readable device larger than one block",
+			fileSize:      8192,
+			expectedError: false,
+		},
+		{
+			// A partial read returning io.EOF is still a readable device.
+			name:          "device smaller than one block",
+			fileSize:      512,
+			expectedError: false,
+		},
+		{
+			name:          "empty file",
+			fileSize:      0,
+			expectedError: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			devicePath := filepath.Join(t.TempDir(), "dev")
+			if err := os.WriteFile(devicePath, make([]byte, tc.fileSize), 0600); err != nil {
+				t.Fatalf("failed to create test device: %v", err)
+			}
+
+			err := checkDeviceReadable(devicePath)
+			if tc.expectedError && err == nil {
+				t.Errorf("Expect error from checkDeviceReadable(%s)", devicePath)
+			}
+			if !tc.expectedError && err != nil {
+				t.Errorf("Expect no error from checkDeviceReadable(%s): %v", devicePath, err)
+			}
+		})
+	}
+
+	t.Run("nonexistent device path keeps historical behavior", func(t *testing.T) {
+		err := checkDeviceReadable(filepath.Join(t.TempDir(), "nonexistent"))
+		if err != nil {
+			t.Errorf("Expect no error for nonexistent path, got: %v", err)
+		}
+	})
+}
+
+// fakeBlkidExit2 returns a FakeCommandAction simulating blkid exiting with
+// code 2 (no filesystem detected), as blkid does for both blank disks and
+// unreadable devices.
+func fakeBlkidExit2() testexec.FakeCommandAction {
+	return func(cmd string, args ...string) utilexec.Cmd {
+		fakeCmd := &testexec.FakeCmd{}
+		fakeCmd.CombinedOutputScript = append(fakeCmd.CombinedOutputScript, func() ([]byte, []byte, error) {
+			return nil, nil, &testexec.FakeExitError{Status: 2}
+		})
+		return fakeCmd
+	}
+}
+
+func TestGetDiskFormatUnreadableDevice(t *testing.T) {
+	t.Run("blank but readable device returns empty format", func(t *testing.T) {
+		devicePath := filepath.Join(t.TempDir(), "blank-dev")
+		if err := os.WriteFile(devicePath, make([]byte, 4096), 0600); err != nil {
+			t.Fatalf("failed to create test device: %v", err)
+		}
+
+		format, err := getDiskFormat(&testexec.FakeExec{CommandScript: []testexec.FakeCommandAction{fakeBlkidExit2()}}, devicePath)
+		if err != nil {
+			t.Fatalf("Expect no error, got: %v", err)
+		}
+		if format != "" {
+			t.Errorf("Expect empty format, got: %q", format)
+		}
+	})
+
+	t.Run("unreadable device returns error", func(t *testing.T) {
+		devicePath := filepath.Join(t.TempDir(), "unreadable-dev")
+		f, err := os.Create(devicePath)
+		if err != nil {
+			t.Fatalf("failed to create test device: %v", err)
+		}
+		if err := f.Close(); err != nil {
+			t.Fatalf("failed to close test device: %v", err)
+		}
+
+		format, err := getDiskFormat(&testexec.FakeExec{CommandScript: []testexec.FakeCommandAction{fakeBlkidExit2()}}, devicePath)
+		if err == nil {
+			t.Errorf("Expect error for unreadable device, got format %q", format)
+		}
+	})
+
+	t.Run("nonexistent device path keeps historical behavior", func(t *testing.T) {
+		// Existing tests and callers probe paths that may not exist on the
+		// host (e.g. /dev/fake-disk); getDiskFormat must keep returning an
+		// empty format without error in that case.
+		format, err := getDiskFormat(&testexec.FakeExec{CommandScript: []testexec.FakeCommandAction{fakeBlkidExit2()}}, "/nonexistent/fake-disk")
+		if err != nil {
+			t.Fatalf("Expect no error for nonexistent path, got: %v", err)
+		}
+		if format != "" {
+			t.Errorf("Expect empty format, got: %q", format)
+		}
+	})
+}
