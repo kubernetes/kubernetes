@@ -462,6 +462,15 @@ func tweakTainted(key string) nodeTweak {
 	}
 }
 
+func tweakCondition(condType v1.NodeConditionType, status v1.ConditionStatus) nodeTweak {
+	return func(n *v1.Node) {
+		n.Status.Conditions = append(n.Status.Conditions, v1.NodeCondition{
+			Type:   condType,
+			Status: status,
+		})
+	}
+}
+
 type serverTest struct {
 	server      httpServer
 	url         url
@@ -530,6 +539,62 @@ func TestHealthzServer(t *testing.T) {
 		},
 	}
 	testHTTPHandler(hsTest, http.StatusServiceUnavailable, expectedPayload, t)
+
+	// Should return 503 "ServiceUnavailable" if node has network-unavailable taint
+	nodeManager.update(makeNode(tweakTainted(v1.TaintNodeNetworkUnavailable)))
+	expectedPayload = ProxyHealth{
+		CurrentTime:  fakeClock.Now(),
+		LastUpdated:  fakeClock.Now(),
+		Healthy:      true,
+		NodeEligible: ptr.To(false),
+		Status: map[v1.IPFamily]ProxierHealth{
+			v1.IPv4Protocol: {LastUpdated: fakeClock.Now(), Healthy: true},
+			v1.IPv6Protocol: {LastUpdated: fakeClock.Now(), Healthy: true},
+		},
+	}
+	testHTTPHandler(hsTest, http.StatusServiceUnavailable, expectedPayload, t)
+
+	// Should return 503 "ServiceUnavailable" if node has out-of-service taint
+	nodeManager.update(makeNode(tweakTainted(v1.TaintNodeOutOfService)))
+	expectedPayload = ProxyHealth{
+		CurrentTime:  fakeClock.Now(),
+		LastUpdated:  fakeClock.Now(),
+		Healthy:      true,
+		NodeEligible: ptr.To(false),
+		Status: map[v1.IPFamily]ProxierHealth{
+			v1.IPv4Protocol: {LastUpdated: fakeClock.Now(), Healthy: true},
+			v1.IPv6Protocol: {LastUpdated: fakeClock.Now(), Healthy: true},
+		},
+	}
+	testHTTPHandler(hsTest, http.StatusServiceUnavailable, expectedPayload, t)
+
+	// Should return 503 "ServiceUnavailable" if node has NetworkUnavailable condition set to True
+	nodeManager.update(makeNode(tweakCondition(v1.NodeNetworkUnavailable, v1.ConditionTrue)))
+	expectedPayload = ProxyHealth{
+		CurrentTime:  fakeClock.Now(),
+		LastUpdated:  fakeClock.Now(),
+		Healthy:      true,
+		NodeEligible: ptr.To(false),
+		Status: map[v1.IPFamily]ProxierHealth{
+			v1.IPv4Protocol: {LastUpdated: fakeClock.Now(), Healthy: true},
+			v1.IPv6Protocol: {LastUpdated: fakeClock.Now(), Healthy: true},
+		},
+	}
+	testHTTPHandler(hsTest, http.StatusServiceUnavailable, expectedPayload, t)
+
+	// Should return 200 "OK" if node has NetworkUnavailable condition set to False
+	nodeManager.update(makeNode(tweakCondition(v1.NodeNetworkUnavailable, v1.ConditionFalse)))
+	expectedPayload = ProxyHealth{
+		CurrentTime:  fakeClock.Now(),
+		LastUpdated:  fakeClock.Now(),
+		Healthy:      true,
+		NodeEligible: ptr.To(true),
+		Status: map[v1.IPFamily]ProxierHealth{
+			v1.IPv4Protocol: {LastUpdated: fakeClock.Now(), Healthy: true},
+			v1.IPv6Protocol: {LastUpdated: fakeClock.Now(), Healthy: true},
+		},
+	}
+	testHTTPHandler(hsTest, http.StatusOK, expectedPayload, t)
 
 	// Should return 200 "OK" if we've synced a node, tainted in any other way
 	nodeManager.update(makeNode(tweakTainted("other")))
