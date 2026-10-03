@@ -70,19 +70,19 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 		"invalid attacher (required)": {
 			input: mkValidVolumeAttachment(TweakAttacher("")),
 			expectedErrs: field.ErrorList{
-				field.Required(field.NewPath("spec", "attacher"), "").MarkBeta(),
+				field.Required(field.NewPath("spec", "attacher"), ""),
 			},
 		},
 		"attacher with special characters": {
 			input: mkValidVolumeAttachment(TweakAttacher("asdadasd&@!")),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("spec", "attacher"), "", "").WithOrigin("format=k8s-long-name-caseless").MarkBeta(),
+				field.Invalid(field.NewPath("spec", "attacher"), "", "").WithOrigin("format=k8s-long-name-caseless"),
 			},
 		},
 		"attacher with number of characters exceeds 63": {
 			input: mkValidVolumeAttachment(TweakAttacher(strings.Repeat("a", 64))),
 			expectedErrs: field.ErrorList{
-				field.TooLong(field.NewPath("spec", "attacher"), strings.Repeat("a", 64), 63).WithOrigin("maxLength").MarkBeta(),
+				field.TooLong(field.NewPath("spec", "attacher"), strings.Repeat("a", 64), 63).WithOrigin("maxLength"),
 			},
 		},
 	}
@@ -119,7 +119,7 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 			oldInput: mkValidVolumeAttachment(),
 			newInput: mkValidVolumeAttachment(TweakAttacher("different.com")),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("spec"), nil, "field is immutable").WithOrigin("immutable").MarkBeta(),
+				field.Invalid(field.NewPath("spec"), nil, "field is immutable").WithOrigin("immutable"),
 			},
 		},
 	}
