@@ -1612,11 +1612,22 @@ func TestAsyncPreemption(t *testing.T) {
 					CompletePreemption: "preemptor",
 				},
 				{
+					Name: "schedule the preemptor Pod again (clearing NominatedNodeName triggers requeue)",
+					SchedulePod: &asyncframework.SchedulePod{
+						PodName:       "preemptor",
+						ExpectInQueue: true,
+					},
+				},
+				{
 					Name: "schedule the preemptor Pod again and expect it to be unschedulable (resources are still reserved by the victim)",
 					SchedulePod: &asyncframework.SchedulePod{
 						PodName:             "preemptor",
 						ExpectUnschedulable: true,
 					},
+				},
+				{
+					Name:                     "verify preemptor remains in unschedulable queue while resources are reserved",
+					VerifyPodInUnschedulable: "preemptor",
 				},
 				{
 					Name:       "resume binding of the blocked pod",
@@ -1733,11 +1744,22 @@ func TestAsyncPreemption(t *testing.T) {
 					CompletePreemption: "preemptor",
 				},
 				{
+					Name: "schedule the preemptor Pod again (clearing NominatedNodeName triggers requeue)",
+					SchedulePod: &asyncframework.SchedulePod{
+						PodName:       "preemptor",
+						ExpectInQueue: true,
+					},
+				},
+				{
 					Name: "schedule the preemptor Pod again and expect it to be unschedulable (resources are still reserved by the victim)",
 					SchedulePod: &asyncframework.SchedulePod{
 						PodName:             "preemptor",
 						ExpectUnschedulable: true,
 					},
+				},
+				{
+					Name:                     "verify preemptor remains in unschedulable queue while resources are reserved",
+					VerifyPodInUnschedulable: "preemptor",
 				},
 				{
 					Name:       "resume binding of the blocked pod",
@@ -1789,7 +1811,8 @@ func TestAsyncPreemption(t *testing.T) {
 				{
 					Name: "schedule the mid-priority preemptor Pod",
 					SchedulePod: &asyncframework.SchedulePod{
-						PodName: "preemptor-mid-priority",
+						PodName:             "preemptor-mid-priority",
+						ExpectUnschedulable: true,
 					},
 				},
 				{
