@@ -63,8 +63,6 @@ func TestValidateKubeProxyConfiguration(t *testing.T) {
 			FlushFrequency: logsapi.TimeOrMetaDuration{Duration: metav1.Duration{Duration: logsapi.LogFlushFreqDefault}},
 		},
 	}
-	newPath := field.NewPath("KubeProxyConfiguration")
-
 	testCases := map[string]struct {
 		mutateConfigFunc func(*kubeproxyconfig.KubeProxyConfiguration)
 		expectedErrs     field.ErrorList
@@ -129,51 +127,51 @@ func TestValidateKubeProxyConfiguration(t *testing.T) {
 			mutateConfigFunc: func(config *kubeproxyconfig.KubeProxyConfiguration) {
 				config.BindAddress = "10.10.12.11:2000"
 			},
-			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("BindAddress"), "10.10.12.11:2000", "not a valid textual representation of an IP address")},
+			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("bindAddress"), "10.10.12.11:2000", "not a valid textual representation of an IP address")},
 		},
 		"invalid HealthzBindAddress": {
 			mutateConfigFunc: func(config *kubeproxyconfig.KubeProxyConfiguration) {
 				config.HealthzBindAddress = "0.0.0.0"
 			},
-			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("HealthzBindAddress"), "0.0.0.0", "must be IP:port")},
+			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("healthzBindAddress"), "0.0.0.0", "must be IP:port")},
 		},
 		"invalid MetricsBindAddress": {
 			mutateConfigFunc: func(config *kubeproxyconfig.KubeProxyConfiguration) {
 				config.MetricsBindAddress = "127.0.0.1"
 			},
-			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("MetricsBindAddress"), "127.0.0.1", "must be IP:port")},
+			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("metricsBindAddress"), "127.0.0.1", "must be IP:port")},
 		},
 		"ConfigSyncPeriod must be > 0": {
 			mutateConfigFunc: func(config *kubeproxyconfig.KubeProxyConfiguration) {
 				config.ConfigSyncPeriod = metav1.Duration{Duration: -1 * time.Second}
 			},
-			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("ConfigSyncPeriod"), metav1.Duration{Duration: -1 * time.Second}, "must be greater than 0")},
+			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("configSyncPeriod"), metav1.Duration{Duration: -1 * time.Second}, "must be greater than 0")},
 		},
 		"SyncPeriod must be > 0": {
 			mutateConfigFunc: func(config *kubeproxyconfig.KubeProxyConfiguration) {
 				config.SyncPeriod = metav1.Duration{Duration: -5 * time.Second}
 			},
-			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("SyncPeriod"), metav1.Duration{Duration: -5 * time.Second}, "must be greater than 0"),
-				field.Invalid(newPath.Child("SyncPeriod"), metav1.Duration{Duration: 2 * time.Second}, "must be greater than or equal to KubeProxyConfiguration.MinSyncPeriod")},
+			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("iptables", "syncPeriod"), metav1.Duration{Duration: -5 * time.Second}, "must be greater than 0"),
+				field.Invalid(field.NewPath("iptables", "syncPeriod"), metav1.Duration{Duration: 2 * time.Second}, "must be greater than or equal to iptables.minSyncPeriod")},
 		},
 		"MinSyncPeriod must be > 0": {
 			mutateConfigFunc: func(config *kubeproxyconfig.KubeProxyConfiguration) {
 				config.MinSyncPeriod = metav1.Duration{Duration: -2 * time.Second}
 			},
-			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("MinSyncPeriod"), metav1.Duration{Duration: -2 * time.Second}, "must be greater than or equal to 0")},
+			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("iptables", "minSyncPeriod"), metav1.Duration{Duration: -2 * time.Second}, "must be greater than or equal to 0")},
 		},
 		"SyncPeriod must be >= MinSyncPeriod": {
 			mutateConfigFunc: func(config *kubeproxyconfig.KubeProxyConfiguration) {
 				config.SyncPeriod = metav1.Duration{Duration: 1 * time.Second}
 				config.MinSyncPeriod = metav1.Duration{Duration: 5 * time.Second}
 			},
-			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("SyncPeriod"), metav1.Duration{Duration: 5 * time.Second}, "must be greater than or equal to KubeProxyConfiguration.MinSyncPeriod")},
+			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("iptables", "syncPeriod"), metav1.Duration{Duration: 5 * time.Second}, "must be greater than or equal to iptables.minSyncPeriod")},
 		},
 		"invalid DetectLocalMode": {
 			mutateConfigFunc: func(config *kubeproxyconfig.KubeProxyConfiguration) {
 				config.DetectLocalMode = "Guess"
 			},
-			expectedErrs: field.ErrorList{field.NotSupported(newPath.Child("DetectLocalMode"), "Guess", []string{"ClusterCIDR", "NodeCIDR", "BridgeInterface", "InterfaceNamePrefix", ""})},
+			expectedErrs: field.ErrorList{field.NotSupported(field.NewPath("detectLocalMode"), "Guess", []string{"ClusterCIDR", "NodeCIDR", "BridgeInterface", "InterfaceNamePrefix", ""})},
 		},
 		"invalid logging format": {
 			mutateConfigFunc: func(config *kubeproxyconfig.KubeProxyConfiguration) {
@@ -182,7 +180,7 @@ func TestValidateKubeProxyConfiguration(t *testing.T) {
 					FlushFrequency: logsapi.TimeOrMetaDuration{Duration: metav1.Duration{Duration: logsapi.LogFlushFreqDefault}},
 				}
 			},
-			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("logging.format"), "unsupported format", "Unsupported log format")},
+			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("logging", "format"), "unsupported format", "Unsupported log format")},
 		},
 	}
 
@@ -201,7 +199,7 @@ func TestValidateKubeProxyConfiguration(t *testing.T) {
 }
 
 func TestValidateKubeProxyIPTablesConfiguration(t *testing.T) {
-	newPath := field.NewPath("KubeProxyConfiguration")
+	newPath := field.NewPath("iptables")
 
 	for name, testCase := range map[string]struct {
 		config       kubeproxyconfig.KubeProxyIPTablesConfiguration
@@ -217,18 +215,18 @@ func TestValidateKubeProxyIPTablesConfiguration(t *testing.T) {
 			config: kubeproxyconfig.KubeProxyIPTablesConfiguration{
 				MasqueradeBit: ptr.To[int32](-10),
 			},
-			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("KubeIPTablesConfiguration.MasqueradeBit"), ptr.To[int32](-10), "must be within the range [0, 31]")},
+			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("masqueradeBit"), ptr.To[int32](-10), "must be within the range [0, 31]")},
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
-			errs := validateKubeProxyIPTablesConfiguration(testCase.config, newPath.Child("KubeIPTablesConfiguration"))
+			errs := validateKubeProxyIPTablesConfiguration(testCase.config, newPath)
 			assert.Equal(t, testCase.expectedErrs, errs, "did not get expected validation errors")
 		})
 	}
 }
 
 func TestValidateKubeProxyIPVSConfiguration(t *testing.T) {
-	newPath := field.NewPath("KubeProxyConfiguration")
+	newPath := field.NewPath("ipvs")
 	for name, testCase := range map[string]struct {
 		config       kubeproxyconfig.KubeProxyIPVSConfiguration
 		expectedErrs field.ErrorList
@@ -255,20 +253,19 @@ func TestValidateKubeProxyIPVSConfiguration(t *testing.T) {
 				UDPTimeout:    metav1.Duration{Duration: -1 * time.Second},
 				TCPFinTimeout: metav1.Duration{Duration: -1 * time.Second},
 			},
-			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("KubeIPVSConfiguration.TCPTimeout"), metav1.Duration{Duration: -1 * time.Second}, "must be greater than or equal to 0"),
-				field.Invalid(newPath.Child("KubeIPVSConfiguration.TCPFinTimeout"), metav1.Duration{Duration: -1 * time.Second}, "must be greater than or equal to 0"),
-				field.Invalid(newPath.Child("KubeIPVSConfiguration.UDPTimeout"), metav1.Duration{Duration: -1 * time.Second}, "must be greater than or equal to 0")},
+			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("tcpTimeout"), metav1.Duration{Duration: -1 * time.Second}, "must be greater than or equal to 0"),
+				field.Invalid(newPath.Child("tcpFinTimeout"), metav1.Duration{Duration: -1 * time.Second}, "must be greater than or equal to 0"),
+				field.Invalid(newPath.Child("udpTimeout"), metav1.Duration{Duration: -1 * time.Second}, "must be greater than or equal to 0")},
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
-			errs := validateKubeProxyIPVSConfiguration(testCase.config, newPath.Child("KubeIPVSConfiguration"))
+			errs := validateKubeProxyIPVSConfiguration(testCase.config, newPath)
 			assert.Equal(t, testCase.expectedErrs, errs, "did not get expected validation errors")
 		})
 	}
 }
 
 func TestValidateKubeProxyLinuxConfiguration(t *testing.T) {
-	newPath := field.NewPath("KubeProxyConfiguration")
 	for name, testCase := range map[string]struct {
 		config       kubeproxyconfig.KubeProxyLinuxConfiguration
 		expectedErrs field.ErrorList
@@ -313,7 +310,7 @@ func TestValidateKubeProxyLinuxConfiguration(t *testing.T) {
 				},
 				OOMScoreAdj: ptr.To[int32](0),
 			},
-			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("KubeProxyLinuxConfiguration.KubeProxyConntrackConfiguration.MaxPerCore"), ptr.To[int32](-1), "must be greater than or equal to 0")},
+			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("conntrack", "maxPerCore"), ptr.To[int32](-1), "must be greater than or equal to 0")},
 		},
 		"invalid minimum < 0": {
 			config: kubeproxyconfig.KubeProxyLinuxConfiguration{
@@ -327,7 +324,7 @@ func TestValidateKubeProxyLinuxConfiguration(t *testing.T) {
 				},
 				OOMScoreAdj: ptr.To[int32](0),
 			},
-			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("KubeProxyLinuxConfiguration.KubeProxyConntrackConfiguration.Min"), ptr.To[int32](-1), "must be greater than or equal to 0")},
+			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("conntrack", "min"), ptr.To[int32](-1), "must be greater than or equal to 0")},
 		},
 		"invalid TCPEstablishedTimeout < 0": {
 			config: kubeproxyconfig.KubeProxyLinuxConfiguration{
@@ -341,7 +338,7 @@ func TestValidateKubeProxyLinuxConfiguration(t *testing.T) {
 				},
 				OOMScoreAdj: ptr.To[int32](0),
 			},
-			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("KubeProxyLinuxConfiguration.KubeProxyConntrackConfiguration.TCPEstablishedTimeout"), &metav1.Duration{Duration: -5 * time.Second}, "must be greater than or equal to 0")},
+			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("conntrack", "tcpEstablishedTimeout"), &metav1.Duration{Duration: -5 * time.Second}, "must be greater than or equal to 0")},
 		},
 		"invalid TCPCloseWaitTimeout < 0": {
 			config: kubeproxyconfig.KubeProxyLinuxConfiguration{
@@ -355,7 +352,7 @@ func TestValidateKubeProxyLinuxConfiguration(t *testing.T) {
 				},
 				OOMScoreAdj: ptr.To[int32](0),
 			},
-			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("KubeProxyLinuxConfiguration.KubeProxyConntrackConfiguration.TCPCloseWaitTimeout"), &metav1.Duration{Duration: -5 * time.Second}, "must be greater than or equal to 0")},
+			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("conntrack", "tcpCloseWaitTimeout"), &metav1.Duration{Duration: -5 * time.Second}, "must be greater than or equal to 0")},
 		},
 		"invalid UDPTimeout < 0": {
 			config: kubeproxyconfig.KubeProxyLinuxConfiguration{
@@ -369,7 +366,7 @@ func TestValidateKubeProxyLinuxConfiguration(t *testing.T) {
 				},
 				OOMScoreAdj: ptr.To[int32](999),
 			},
-			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("KubeProxyLinuxConfiguration.KubeProxyConntrackConfiguration.UDPTimeout"), metav1.Duration{Duration: -5 * time.Second}, "must be greater than or equal to 0")},
+			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("conntrack", "udpTimeout"), metav1.Duration{Duration: -5 * time.Second}, "must be greater than or equal to 0")},
 		},
 		"invalid UDPStreamTimeout < 0": {
 			config: kubeproxyconfig.KubeProxyLinuxConfiguration{
@@ -383,7 +380,7 @@ func TestValidateKubeProxyLinuxConfiguration(t *testing.T) {
 				},
 				OOMScoreAdj: ptr.To[int32](-999),
 			},
-			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("KubeProxyLinuxConfiguration.KubeProxyConntrackConfiguration.UDPStreamTimeout"), metav1.Duration{Duration: -5 * time.Second}, "must be greater than or equal to 0")},
+			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("conntrack", "udpStreamTimeout"), metav1.Duration{Duration: -5 * time.Second}, "must be greater than or equal to 0")},
 		},
 		"invalid OOMScoreAdj < -1000": {
 			config: kubeproxyconfig.KubeProxyLinuxConfiguration{
@@ -397,7 +394,7 @@ func TestValidateKubeProxyLinuxConfiguration(t *testing.T) {
 				},
 				OOMScoreAdj: ptr.To[int32](-1001),
 			},
-			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("KubeProxyLinuxConfiguration.OOMScoreAdj"), int32(-1001), "must be within the range [-1000, 1000]")},
+			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("oomScoreAdj"), int32(-1001), "must be within the range [-1000, 1000]")},
 		},
 		"invalid OOMScoreAdj > 1000": {
 			config: kubeproxyconfig.KubeProxyLinuxConfiguration{
@@ -411,11 +408,11 @@ func TestValidateKubeProxyLinuxConfiguration(t *testing.T) {
 				},
 				OOMScoreAdj: ptr.To[int32](1001),
 			},
-			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("KubeProxyLinuxConfiguration.OOMScoreAdj"), int32(1001), "must be within the range [-1000, 1000]")},
+			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("oomScoreAdj"), int32(1001), "must be within the range [-1000, 1000]")},
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
-			errs := validateKubeProxyLinuxConfiguration(testCase.config, newPath.Child("KubeProxyLinuxConfiguration"))
+			errs := validateKubeProxyLinuxConfiguration(testCase.config, nil)
 			assert.Equal(t, testCase.expectedErrs, errs, "did not get expected validation errors")
 		})
 	}
@@ -430,7 +427,7 @@ func TestValidateProxyMode(t *testing.T) {
 }
 
 func testValidateProxyModeLinux(t *testing.T) {
-	newPath := field.NewPath("KubeProxyConfiguration")
+	newPath := field.NewPath("mode")
 	for name, testCase := range map[string]struct {
 		mode                kubeproxyconfig.ProxyMode
 		expectedErrs        field.ErrorList
@@ -460,7 +457,7 @@ func testValidateProxyModeLinux(t *testing.T) {
 		"ipvs is not allowed - with KubeProxyIPVS feature gate disabled": {
 			mode:                kubeproxyconfig.ProxyModeIPVS,
 			enableKubeProxyIPVS: new(false),
-			expectedErrs:        field.ErrorList{field.Invalid(newPath.Child("ProxyMode"), "ipvs", "must be iptables, nftables or blank (blank means the best-available proxy [currently iptables])")},
+			expectedErrs:        field.ErrorList{field.Invalid(newPath, "ipvs", "must be iptables, nftables or blank (blank means the best-available proxy [currently iptables])")},
 		},
 		"nftables is allowed": {
 			mode: kubeproxyconfig.ProxyModeNFTables,
@@ -476,11 +473,11 @@ func testValidateProxyModeLinux(t *testing.T) {
 
 		"winkernel is not allowed": {
 			mode:         kubeproxyconfig.ProxyModeKernelspace,
-			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("ProxyMode"), "kernelspace", "must be iptables, ipvs, nftables or blank (blank means the best-available proxy [currently iptables])")},
+			expectedErrs: field.ErrorList{field.Invalid(newPath, "kernelspace", "must be iptables, ipvs, nftables or blank (blank means the best-available proxy [currently iptables])")},
 		},
 		"invalid mode non-existent": {
 			mode:         kubeproxyconfig.ProxyMode("non-existing"),
-			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("ProxyMode"), "non-existing", "must be iptables, ipvs, nftables or blank (blank means the best-available proxy [currently iptables])")},
+			expectedErrs: field.ErrorList{field.Invalid(newPath, "non-existing", "must be iptables, ipvs, nftables or blank (blank means the best-available proxy [currently iptables])")},
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -501,7 +498,7 @@ func testValidateProxyModeWindows(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("Skipping failing test on Windows.")
 	}
-	newPath := field.NewPath("KubeProxyConfiguration")
+	newPath := field.NewPath("mode")
 	for name, testCase := range map[string]struct {
 		mode         kubeproxyconfig.ProxyMode
 		expectedErrs field.ErrorList
@@ -514,19 +511,19 @@ func testValidateProxyModeWindows(t *testing.T) {
 		},
 		"iptables is not allowed": {
 			mode:         kubeproxyconfig.ProxyModeIPTables,
-			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("ProxyMode"), "iptables", "must be kernelspace or blank (blank means the most-available proxy [currently kernelspace])")},
+			expectedErrs: field.ErrorList{field.Invalid(newPath, "iptables", "must be kernelspace or blank (blank means the most-available proxy [currently kernelspace])")},
 		},
 		"ipvs is not allowed": {
 			mode:         kubeproxyconfig.ProxyModeIPVS,
-			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("ProxyMode"), "ipvs", "must be kernelspace or blank (blank means the most-available proxy [currently kernelspace])")},
+			expectedErrs: field.ErrorList{field.Invalid(newPath, "ipvs", "must be kernelspace or blank (blank means the most-available proxy [currently kernelspace])")},
 		},
 		"nftables is not allowed": {
 			mode:         kubeproxyconfig.ProxyModeNFTables,
-			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("ProxyMode"), "nftables", "must be kernelspace or blank (blank means the most-available proxy [currently kernelspace])")},
+			expectedErrs: field.ErrorList{field.Invalid(newPath, "nftables", "must be kernelspace or blank (blank means the most-available proxy [currently kernelspace])")},
 		},
 		"invalid mode non-existent": {
 			mode:         kubeproxyconfig.ProxyMode("non-existing"),
-			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("ProxyMode"), "non-existing", "must be kernelspace or blank (blank means the most-available proxy [currently kernelspace])")},
+			expectedErrs: field.ErrorList{field.Invalid(newPath, "non-existing", "must be kernelspace or blank (blank means the most-available proxy [currently kernelspace])")},
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -537,7 +534,7 @@ func testValidateProxyModeWindows(t *testing.T) {
 }
 
 func TestValidateClientConnectionConfiguration(t *testing.T) {
-	newPath := field.NewPath("KubeProxyConfiguration")
+	newPath := field.NewPath("clientConnection")
 	for name, testCase := range map[string]struct {
 		ccc          componentbaseconfig.ClientConnectionConfiguration
 		expectedErrs field.ErrorList
@@ -552,7 +549,7 @@ func TestValidateClientConnectionConfiguration(t *testing.T) {
 		},
 		"burst < 0": {
 			ccc:          componentbaseconfig.ClientConnectionConfiguration{Burst: -5},
-			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("Burst"), int64(-5), "must be greater than or equal to 0")},
+			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("burst"), int64(-5), "must be greater than or equal to 0")},
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -566,7 +563,7 @@ func TestValidateClientConnectionConfiguration(t *testing.T) {
 }
 
 func TestValidateHostPort(t *testing.T) {
-	newPath := field.NewPath("KubeProxyConfiguration")
+	newPath := field.NewPath("healthzBindAddress")
 	for name, testCase := range map[string]struct {
 		ip           string
 		expectedErrs field.ErrorList
@@ -582,27 +579,27 @@ func TestValidateHostPort(t *testing.T) {
 		},
 		"missing port": {
 			ip:           "10.10.10.10",
-			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("HealthzBindAddress"), "10.10.10.10", "must be IP:port")},
+			expectedErrs: field.ErrorList{field.Invalid(newPath, "10.10.10.10", "must be IP:port")},
 		},
 		"digits outside of 1-255": {
 			ip:           "123.456.789.10:12345",
-			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("HealthzBindAddress"), "123.456.789.10", "must be a valid IP")},
+			expectedErrs: field.ErrorList{field.Invalid(newPath, "123.456.789.10", "must be a valid IP")},
 		},
 		"invalid named-port": {
 			ip:           "10.10.10.10:foo",
-			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("HealthzBindAddress"), "foo", "must be a valid port")},
+			expectedErrs: field.ErrorList{field.Invalid(newPath, "foo", "must be a valid port")},
 		},
 		"port cannot be 0": {
 			ip:           "10.10.10.10:0",
-			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("HealthzBindAddress"), "0", "must be a valid port")},
+			expectedErrs: field.ErrorList{field.Invalid(newPath, "0", "must be a valid port")},
 		},
 		"port is greater than allowed range": {
 			ip:           "10.10.10.10:65536",
-			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("HealthzBindAddress"), "65536", "must be a valid port")},
+			expectedErrs: field.ErrorList{field.Invalid(newPath, "65536", "must be a valid port")},
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
-			errs := validateHostPort(testCase.ip, newPath.Child("HealthzBindAddress"))
+			errs := validateHostPort(testCase.ip, newPath)
 			if len(testCase.expectedErrs) == 0 {
 				assert.Equal(t, field.ErrorList{}, errs, "expected no validation errors")
 			} else {
@@ -613,7 +610,7 @@ func TestValidateHostPort(t *testing.T) {
 }
 
 func TestValidateKubeProxyNodePortAddress(t *testing.T) {
-	newPath := field.NewPath("KubeProxyConfiguration")
+	newPath := field.NewPath("nodePortAddresses")
 	for name, testCase := range map[string]struct {
 		addresses    []string
 		expectedErrs field.ErrorList
@@ -671,11 +668,11 @@ func TestValidateKubeProxyNodePortAddress(t *testing.T) {
 		},
 		"duplicate keyword": {
 			addresses:    []string{kubeproxyconfig.NodePortAddressesLocalhost, kubeproxyconfig.NodePortAddressesLocalhost},
-			expectedErrs: field.ErrorList{field.Duplicate(newPath.Child("NodePortAddresses[1]"), kubeproxyconfig.NodePortAddressesLocalhost)},
+			expectedErrs: field.ErrorList{field.Duplicate(newPath.Index(1), kubeproxyconfig.NodePortAddressesLocalhost)},
 		},
 		"duplicate keyword separated by other values": {
 			addresses:    []string{kubeproxyconfig.NodePortAddressesPrimary, "10.0.0.0/8", kubeproxyconfig.NodePortAddressesPrimary},
-			expectedErrs: field.ErrorList{field.Duplicate(newPath.Child("NodePortAddresses[2]"), kubeproxyconfig.NodePortAddressesPrimary)},
+			expectedErrs: field.ErrorList{field.Duplicate(newPath.Index(2), kubeproxyconfig.NodePortAddressesPrimary)},
 		},
 		"duplicate CIDRs are allowed": {
 			addresses: []string{"10.0.0.0/8", "10.0.0.0/8", kubeproxyconfig.NodePortAddressesLocalhost},
@@ -688,40 +685,40 @@ func TestValidateKubeProxyNodePortAddress(t *testing.T) {
 		},
 		"typo'd keyword": {
 			addresses:    []string{"Localhost"},
-			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("NodePortAddresses[0]"), "Localhost", "must be a valid CIDR or one of the keywords 'primary', 'localhost', 'all'")},
+			expectedErrs: field.ErrorList{field.Invalid(newPath.Index(0), "Localhost", "must be a valid CIDR or one of the keywords 'primary', 'localhost', 'all'")},
 		},
 		"typo'd keyword combined with valid keyword": {
 			addresses:    []string{kubeproxyconfig.NodePortAddressesPrimary, "locahost"},
-			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("NodePortAddresses[1]"), "locahost", "must be a valid CIDR or one of the keywords 'primary', 'localhost', 'all'")},
+			expectedErrs: field.ErrorList{field.Invalid(newPath.Index(1), "locahost", "must be a valid CIDR or one of the keywords 'primary', 'localhost', 'all'")},
 		},
 		"invalid foo address": {
 			addresses:    []string{"foo"},
-			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("NodePortAddresses[0]"), "foo", "must be a valid CIDR or one of the keywords 'primary', 'localhost', 'all'")},
+			expectedErrs: field.ErrorList{field.Invalid(newPath.Index(0), "foo", "must be a valid CIDR or one of the keywords 'primary', 'localhost', 'all'")},
 		},
 		"invalid octet address": {
 			addresses:    []string{"10.0.0.0/0", "1.2.3"},
-			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("NodePortAddresses[1]"), "1.2.3", "must be a valid CIDR or one of the keywords 'primary', 'localhost', 'all'")},
+			expectedErrs: field.ErrorList{field.Invalid(newPath.Index(1), "1.2.3", "must be a valid CIDR or one of the keywords 'primary', 'localhost', 'all'")},
 		},
 		"address cannot be 0": {
 			addresses:    []string{"127.0.0.1/32", "0", "1.2.3.0/24"},
-			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("NodePortAddresses[1]"), "0", "must be a valid CIDR or one of the keywords 'primary', 'localhost', 'all'")},
+			expectedErrs: field.ErrorList{field.Invalid(newPath.Index(1), "0", "must be a valid CIDR or one of the keywords 'primary', 'localhost', 'all'")},
 		},
 		"address missing subnet range": {
 			addresses:    []string{"127.0.0.1/32", "10.20.30.40", "1.2.3.0/24"},
-			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("NodePortAddresses[1]"), "10.20.30.40", "must be a valid CIDR or one of the keywords 'primary', 'localhost', 'all'")},
+			expectedErrs: field.ErrorList{field.Invalid(newPath.Index(1), "10.20.30.40", "must be a valid CIDR or one of the keywords 'primary', 'localhost', 'all'")},
 		},
 		"missing ipv6 subnet ranges": {
 			addresses: []string{"::0", "::1", "2001:db8::/32"},
-			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("NodePortAddresses[0]"), "::0", "must be a valid CIDR or one of the keywords 'primary', 'localhost', 'all'"),
-				field.Invalid(newPath.Child("NodePortAddresses[1]"), "::1", "must be a valid CIDR or one of the keywords 'primary', 'localhost', 'all'")},
+			expectedErrs: field.ErrorList{field.Invalid(newPath.Index(0), "::0", "must be a valid CIDR or one of the keywords 'primary', 'localhost', 'all'"),
+				field.Invalid(newPath.Index(1), "::1", "must be a valid CIDR or one of the keywords 'primary', 'localhost', 'all'")},
 		},
 		"invalid ipv6 ip format": {
 			addresses:    []string{"::1/128", "2001:db8::/32", "2001:db8:xyz/64"},
-			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("NodePortAddresses[2]"), "2001:db8:xyz/64", "must be a valid CIDR or one of the keywords 'primary', 'localhost', 'all'")},
+			expectedErrs: field.ErrorList{field.Invalid(newPath.Index(2), "2001:db8:xyz/64", "must be a valid CIDR or one of the keywords 'primary', 'localhost', 'all'")},
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
-			errs := validateKubeProxyNodePortAddress(testCase.addresses, newPath.Child("NodePortAddresses"))
+			errs := validateKubeProxyNodePortAddress(testCase.addresses, newPath)
 			if len(testCase.expectedErrs) == 0 {
 				assert.Equal(t, field.ErrorList{}, errs, "expected no validation errors")
 			} else {
@@ -732,7 +729,7 @@ func TestValidateKubeProxyNodePortAddress(t *testing.T) {
 }
 
 func TestValidateKubeProxyExcludeCIDRs(t *testing.T) {
-	newPath := field.NewPath("KubeProxyConfiguration")
+	newPath := field.NewPath("ipvs", "excludeCIDRs")
 	for name, testCase := range map[string]struct {
 		addresses    []string
 		expectedErrs field.ErrorList
@@ -775,32 +772,32 @@ func TestValidateKubeProxyExcludeCIDRs(t *testing.T) {
 		},
 		"invalid foo address": {
 			addresses:    []string{"foo"},
-			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("ExcludeCIDRS[0]"), "foo", "must be a valid CIDR")},
+			expectedErrs: field.ErrorList{field.Invalid(newPath.Index(0), "foo", "must be a valid CIDR")},
 		},
 		"invalid octet address": {
 			addresses:    []string{"10.0.0.0/0", "1.2.3"},
-			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("ExcludeCIDRS[1]"), "1.2.3", "must be a valid CIDR")},
+			expectedErrs: field.ErrorList{field.Invalid(newPath.Index(1), "1.2.3", "must be a valid CIDR")},
 		},
 		"address cannot be 0": {
 			addresses:    []string{"127.0.0.1/32", "0", "1.2.3.0/24"},
-			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("ExcludeCIDRS[1]"), "0", "must be a valid CIDR")},
+			expectedErrs: field.ErrorList{field.Invalid(newPath.Index(1), "0", "must be a valid CIDR")},
 		},
 		"address missing subnet range": {
 			addresses:    []string{"127.0.0.1/32", "10.20.30.40", "1.2.3.0/24"},
-			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("ExcludeCIDRS[1]"), "10.20.30.40", "must be a valid CIDR")},
+			expectedErrs: field.ErrorList{field.Invalid(newPath.Index(1), "10.20.30.40", "must be a valid CIDR")},
 		},
 		"missing ipv6 subnet ranges": {
 			addresses: []string{"::0", "::1", "2001:db8::/32"},
-			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("ExcludeCIDRS[0]"), "::0", "must be a valid CIDR"),
-				field.Invalid(newPath.Child("ExcludeCIDRS[1]"), "::1", "must be a valid CIDR")},
+			expectedErrs: field.ErrorList{field.Invalid(newPath.Index(0), "::0", "must be a valid CIDR"),
+				field.Invalid(newPath.Index(1), "::1", "must be a valid CIDR")},
 		},
 		"invalid ipv6 ip format": {
 			addresses:    []string{"::1/128", "2001:db8::/32", "2001:db8:xyz/64"},
-			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("ExcludeCIDRS[2]"), "2001:db8:xyz/64", "must be a valid CIDR")},
+			expectedErrs: field.ErrorList{field.Invalid(newPath.Index(2), "2001:db8:xyz/64", "must be a valid CIDR")},
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
-			errs := validateIPVSExcludeCIDRs(testCase.addresses, newPath.Child("ExcludeCIDRS"))
+			errs := validateIPVSExcludeCIDRs(testCase.addresses, newPath)
 			if len(testCase.expectedErrs) == 0 {
 				assert.Equal(t, field.ErrorList{}, errs, "expected no validation errors")
 			} else {
@@ -811,8 +808,6 @@ func TestValidateKubeProxyExcludeCIDRs(t *testing.T) {
 }
 
 func TestValidateDetectLocalConfiguration(t *testing.T) {
-	newPath := field.NewPath("KubeProxyConfiguration")
-
 	testCases := []struct {
 		name         string
 		mode         kubeproxyconfig.LocalMode
@@ -841,7 +836,7 @@ func TestValidateDetectLocalConfiguration(t *testing.T) {
 			config: kubeproxyconfig.DetectLocalConfiguration{
 				InterfaceNamePrefix: "",
 			},
-			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("DetectLocal").Child("InterfacePrefix"), "", "must not be empty")},
+			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("detectLocal", "interfaceNamePrefix"), "", "must not be empty")},
 		},
 		{
 			name: "bridgeInterfaceName is empty",
@@ -849,7 +844,7 @@ func TestValidateDetectLocalConfiguration(t *testing.T) {
 			config: kubeproxyconfig.DetectLocalConfiguration{
 				InterfaceNamePrefix: "eth0", // we won't care about prefix since mode is not prefix
 			},
-			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("DetectLocal").Child("InterfaceName"), "", "must not be empty")},
+			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("detectLocal", "bridgeInterface"), "", "must not be empty")},
 		},
 		{
 			name: "valid cluster cidr",
@@ -865,7 +860,7 @@ func TestValidateDetectLocalConfiguration(t *testing.T) {
 			config: kubeproxyconfig.DetectLocalConfiguration{
 				ClusterCIDRs: []string{"192.168.59.0/24", "fd00:192:168::/64", "10.0.0.0/16"},
 			},
-			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("DetectLocal").Child("ClusterCIDRs"), []string{"192.168.59.0/24", "fd00:192:168::/64", "10.0.0.0/16"}, "must be a either a single CIDR or dual-stack pair of CIDRs (e.g. [10.100.0.0/16, fde4:8dba:82e1::/48]")},
+			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("clusterCIDR"), []string{"192.168.59.0/24", "fd00:192:168::/64", "10.0.0.0/16"}, "must be a either a single CIDR or dual-stack pair of CIDRs (e.g. [10.100.0.0/16, fde4:8dba:82e1::/48]")},
 		},
 		{
 			name: "invalid cluster cidr",
@@ -873,7 +868,7 @@ func TestValidateDetectLocalConfiguration(t *testing.T) {
 			config: kubeproxyconfig.DetectLocalConfiguration{
 				ClusterCIDRs: []string{"192.168.59.0"},
 			},
-			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("DetectLocal").Child("ClusterCIDRs").Index(0), "192.168.59.0", "must be a valid CIDR block (e.g. 10.100.0.0/16 or fde4:8dba:82e1::/48)")},
+			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("clusterCIDR"), "192.168.59.0", "must be a valid CIDR block (e.g. 10.100.0.0/16 or fde4:8dba:82e1::/48)")},
 		},
 		{
 			name: "empty cluster cidrs with cluster cidr mode",
@@ -887,7 +882,7 @@ func TestValidateDetectLocalConfiguration(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			errs := validateDetectLocalConfiguration(tc.mode, tc.config, newPath.Child("DetectLocal"))
+			errs := validateDetectLocalConfiguration(tc.mode, tc.config, nil)
 			assert.Equalf(t, len(tc.expectedErrs), len(errs),
 				"expected %d errors, got %d errors: %v", len(tc.expectedErrs), len(errs), errs,
 			)
@@ -899,7 +894,7 @@ func TestValidateDetectLocalConfiguration(t *testing.T) {
 }
 
 func TestValidateDualStackCIDRStrings(t *testing.T) {
-	newPath := field.NewPath("KubeProxyConfiguration")
+	newPath := field.NewPath("clusterCIDR")
 
 	testCases := []struct {
 		name         string
@@ -909,7 +904,7 @@ func TestValidateDualStackCIDRStrings(t *testing.T) {
 		{
 			name:         "empty cidr string",
 			cidrStrings:  []string{},
-			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("DualStackCIDRList"), []string{}, "must contain at least one CIDR")},
+			expectedErrs: field.ErrorList{field.Invalid(newPath, []string{}, "must contain at least one CIDR")},
 		},
 		{
 			name:         "single ipv4 cidr",
@@ -929,28 +924,28 @@ func TestValidateDualStackCIDRStrings(t *testing.T) {
 		{
 			name:         "multiple ipv4 cidrs",
 			cidrStrings:  []string{"10.100.0.0/16", "192.168.0.0/16", "fde4:8dba:82e1::/48"},
-			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("DualStackCIDRList"), []string{"10.100.0.0/16", "192.168.0.0/16", "fde4:8dba:82e1::/48"}, "must be a either a single CIDR or dual-stack pair of CIDRs (e.g. [10.100.0.0/16, fde4:8dba:82e1::/48]")},
+			expectedErrs: field.ErrorList{field.Invalid(newPath, []string{"10.100.0.0/16", "192.168.0.0/16", "fde4:8dba:82e1::/48"}, "must be a either a single CIDR or dual-stack pair of CIDRs (e.g. [10.100.0.0/16, fde4:8dba:82e1::/48]")},
 		},
 		{
 			name:         "multiple ipv6 cidrs",
 			cidrStrings:  []string{"fd00:10:96::/112", "fde4:8dba:82e1::/48"},
-			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("DualStackCIDRList"), []string{"fd00:10:96::/112", "fde4:8dba:82e1::/48"}, "must be a either a single CIDR or dual-stack pair of CIDRs (e.g. [10.100.0.0/16, fde4:8dba:82e1::/48]")},
+			expectedErrs: field.ErrorList{field.Invalid(newPath, []string{"fd00:10:96::/112", "fde4:8dba:82e1::/48"}, "must be a either a single CIDR or dual-stack pair of CIDRs (e.g. [10.100.0.0/16, fde4:8dba:82e1::/48]")},
 		},
 		{
 			name:         "malformed ipv4 cidr",
 			cidrStrings:  []string{"fde4:8dba:82e1::/48", "172.16.200.0:24"},
-			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("DualStackCIDRList").Index(1), "172.16.200.0:24", "must be a valid CIDR block (e.g. 10.100.0.0/16 or fde4:8dba:82e1::/48)")},
+			expectedErrs: field.ErrorList{field.Invalid(newPath, "172.16.200.0:24", "must be a valid CIDR block (e.g. 10.100.0.0/16 or fde4:8dba:82e1::/48)")},
 		},
 		{
 			name:         "malformed ipv6 cidr",
 			cidrStrings:  []string{"fd00:10:96::", "192.168.0.0/16"},
-			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("DualStackCIDRList").Index(0), "fd00:10:96::", "must be a valid CIDR block (e.g. 10.100.0.0/16 or fde4:8dba:82e1::/48)")},
+			expectedErrs: field.ErrorList{field.Invalid(newPath, "fd00:10:96::", "must be a valid CIDR block (e.g. 10.100.0.0/16 or fde4:8dba:82e1::/48)")},
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			errs := validateDualStackCIDRStrings(tc.cidrStrings, newPath.Child("DualStackCIDRList"))
+			errs := validateDualStackCIDRStrings(tc.cidrStrings, newPath)
 			assert.Equalf(t, len(tc.expectedErrs), len(errs),
 				"expected %d errors, got %d errors: %v", len(tc.expectedErrs), len(errs), errs,
 			)
