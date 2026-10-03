@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"maps"
 	"reflect"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -616,6 +617,55 @@ func TestDescribePodRuntimeClass(t *testing.T) {
 				if strings.Contains(out, unexpected) {
 					t.Errorf("unexpected to find %q in output: %q", unexpected, out)
 				}
+			}
+		})
+	}
+}
+
+func TestDescribePodSchedulingGates(t *testing.T) {
+	testCases := []struct {
+		name       string
+		gates      []corev1.PodSchedulingGate
+		expected   *regexp.Regexp
+		unexpected string
+	}{
+		{
+			name:     "pod with one scheduling gate",
+			gates:    []corev1.PodSchedulingGate{{Name: "example.com/foo"}},
+			expected: regexp.MustCompile(`\nScheduling Gates:\s+example\.com/foo\n`),
+		},
+		{
+			name:     "pod with several scheduling gates",
+			gates:    []corev1.PodSchedulingGate{{Name: "example.com/foo"}, {Name: "example.com/bar"}},
+			expected: regexp.MustCompile(`\nScheduling Gates:\s+example\.com/foo\n\s+example\.com/bar\n`),
+		},
+		{
+			name:       "pod without scheduling gates",
+			unexpected: "Scheduling Gates:",
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			pod := &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "bar",
+				},
+				Spec: corev1.PodSpec{
+					SchedulingGates: tc.gates,
+				},
+			}
+			fake := fake.NewClientset(pod)
+			c := &describeClient{T: t, Interface: fake}
+			d := PodDescriber{c}
+			out, err := d.Describe("", "bar", DescriberSettings{ShowEvents: true})
+			if err != nil {
+				t.Errorf("Unexpected error: %v", err)
+			}
+			if tc.expected != nil && !tc.expected.MatchString(out) {
+				t.Errorf("Expected output to match %q, got: %q", tc.expected, out)
+			}
+			if len(tc.unexpected) > 0 && strings.Contains(out, tc.unexpected) {
+				t.Errorf("Unexpected to find %q in output: %q", tc.unexpected, out)
 			}
 		})
 	}

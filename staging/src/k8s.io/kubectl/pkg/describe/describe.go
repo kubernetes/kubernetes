@@ -869,6 +869,7 @@ func describePod(pod *corev1.Pod, events *corev1.EventList) (string, error) {
 		printLabelsMultiline(w, "Node-Selectors", pod.Spec.NodeSelector)
 		printPodTolerationsMultiline(w, "Tolerations", pod.Spec.Tolerations)
 		describeTopologySpreadConstraints(pod.Spec.TopologySpreadConstraints, w, "")
+		describeSchedulingGates(pod.Spec.SchedulingGates, w, "")
 		if pod.Spec.SchedulingGroup != nil {
 			describeSchedulingGroup(pod.Spec.SchedulingGroup, w, "")
 		}
@@ -1000,6 +1001,23 @@ func describeVolumes(volumes []corev1.Volume, w PrefixWriter, space string) {
 		default:
 			w.Write(LEVEL_1, "<unknown>\n")
 		}
+	}
+}
+
+// describeSchedulingGates prints the gates that keep a pod from being
+// scheduled. Gates are removed as they are cleared, so nothing is printed
+// for a pod that is not held back.
+func describeSchedulingGates(gates []corev1.PodSchedulingGate, w PrefixWriter, space string) {
+	if len(gates) == 0 {
+		return
+	}
+
+	w.Write(LEVEL_0, "%sScheduling Gates:\t", space)
+	for i, gate := range gates {
+		if i != 0 {
+			w.Write(LEVEL_0, "%s\t", space)
+		}
+		w.Write(LEVEL_0, "%s\n", gate.Name)
 	}
 }
 
