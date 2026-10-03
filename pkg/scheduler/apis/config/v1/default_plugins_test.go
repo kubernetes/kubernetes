@@ -152,7 +152,7 @@ func TestApplyFeatureGates(t *testing.T) {
 						{Name: names.PodTopologySpread, Weight: ptr.To[int32](2)},
 						{Name: names.InterPodAffinity, Weight: ptr.To[int32](2)},
 						{Name: names.DynamicResources, Weight: ptr.To[int32](2)},
-						{Name: names.DefaultPreemption},
+						{Name: names.DefaultPreemption, Weight: ptr.To[int32](1000)},
 						{Name: names.NodeResourcesBalancedAllocation, Weight: ptr.To[int32](1)},
 						{Name: names.ImageLocality, Weight: ptr.To[int32](1)},
 						{Name: names.DefaultBinder},
@@ -186,7 +186,7 @@ func TestApplyFeatureGates(t *testing.T) {
 						{Name: names.PodTopologySpread, Weight: ptr.To[int32](2)},
 						{Name: names.InterPodAffinity, Weight: ptr.To[int32](2)},
 						{Name: names.DynamicResources, Weight: ptr.To[int32](2)},
-						{Name: names.DefaultPreemption},
+						{Name: names.DefaultPreemption, Weight: ptr.To[int32](1000)},
 						{Name: names.NodeResourcesBalancedAllocation, Weight: ptr.To[int32](1)},
 						{Name: names.ImageLocality, Weight: ptr.To[int32](1)},
 						{Name: names.DefaultBinder},
@@ -640,6 +640,38 @@ func TestMergePlugins(t *testing.T) {
 			},
 			expectedPlugins: &v1.Plugins{
 				MultiPoint: v1.PluginSet{
+					Disabled: []v1.Plugin{
+						{Name: "DefaultPlugin"},
+					},
+				},
+			},
+		},
+		{
+			name: "reordering default MultiPoint plugin without explicit weight preserves default weight",
+			defaultPlugins: &v1.Plugins{
+				MultiPoint: v1.PluginSet{
+					Enabled: []v1.Plugin{
+						{Name: "DefaultPlugin", Weight: ptr.To[int32](1000)},
+					},
+				},
+			},
+			customPlugins: &v1.Plugins{
+				MultiPoint: v1.PluginSet{
+					Enabled: []v1.Plugin{
+						{Name: "CustomPlugin"},
+						{Name: "DefaultPlugin"},
+					},
+					Disabled: []v1.Plugin{
+						{Name: "DefaultPlugin"},
+					},
+				},
+			},
+			expectedPlugins: &v1.Plugins{
+				MultiPoint: v1.PluginSet{
+					Enabled: []v1.Plugin{
+						{Name: "CustomPlugin"},
+						{Name: "DefaultPlugin", Weight: ptr.To[int32](1000)},
+					},
 					Disabled: []v1.Plugin{
 						{Name: "DefaultPlugin"},
 					},
