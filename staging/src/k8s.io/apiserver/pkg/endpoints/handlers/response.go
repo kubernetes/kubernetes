@@ -166,18 +166,51 @@ type watchEncoder struct {
 }
 
 type watchEncoderTiming struct {
-	events      int
-	total       time.Duration
-	min         time.Duration
-	max         time.Duration
-	object      time.Duration
-	watchEvent  time.Duration
-	framedWrite time.Duration
+	events             int
+	total              time.Duration
+	min                time.Duration
+	max                time.Duration
+	object             time.Duration
+	watchEvent         time.Duration
+	framedWrite        time.Duration
+	totalBuckets       watchEncoderLatencyBuckets
+	framedWriteBuckets watchEncoderLatencyBuckets
 }
 
-func (t *watchEncoderTiming) recordEvent(duration time.Duration) {
+var watchEncoderLatencyBounds = [...]time.Duration{
+	10 * time.Microsecond,
+	25 * time.Microsecond,
+	50 * time.Microsecond,
+	100 * time.Microsecond,
+	250 * time.Microsecond,
+	time.Millisecond,
+	10 * time.Millisecond,
+	25 * time.Millisecond,
+	50 * time.Millisecond,
+	100 * time.Millisecond,
+	250 * time.Millisecond,
+	time.Second,
+}
+
+const watchEncoderLatencyBucketLabels = "<10us,<25us,<50us,<100us,<250us,<1ms,<10ms,<25ms,<50ms,<100ms,<250ms,<1s,>=1s"
+
+type watchEncoderLatencyBuckets [len(watchEncoderLatencyBounds) + 1]uint64
+
+func (b *watchEncoderLatencyBuckets) observe(duration time.Duration) {
+	for i, bound := range watchEncoderLatencyBounds {
+		if duration < bound {
+			b[i]++
+			return
+		}
+	}
+	b[len(b)-1]++
+}
+
+func (t *watchEncoderTiming) recordEvent(duration, framedWriteDuration time.Duration) {
 	t.events++
 	t.total += duration
+	t.totalBuckets.observe(duration)
+	t.framedWriteBuckets.observe(framedWriteDuration)
 	if t.events == 1 || duration < t.min {
 		t.min = duration
 	}
@@ -241,9 +274,10 @@ func (e *watchEncoder) Encode(event watch.Event) error {
 	if e.timing == nil {
 		return e.encode(event)
 	}
+	framedWriteBefore := e.timing.framedWrite
 	start := time.Now()
 	err := e.encode(event)
-	e.timing.recordEvent(time.Since(start))
+	e.timing.recordEvent(time.Since(start), e.timing.framedWrite-framedWriteBefore)
 	return err
 }
 
