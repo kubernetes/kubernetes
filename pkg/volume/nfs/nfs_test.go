@@ -21,6 +21,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/mount-utils"
 
 	v1 "k8s.io/api/core/v1"
@@ -103,6 +104,8 @@ func doTestPlugin(t *testing.T, spec *volume.Spec, expectedDevice string) {
 	}
 	defer os.RemoveAll(tmpDir)
 
+	tCtx := ktesting.Init(t)
+
 	plugMgr := volume.VolumePluginMgr{}
 	plugMgr.InitPlugins(ProbeVolumePlugins(volume.VolumeConfig{}), nil /* prober */, volumetest.NewFakeVolumeHost(t, tmpDir, nil, nil))
 	plug, err := plugMgr.FindPluginByName("kubernetes.io/nfs")
@@ -123,7 +126,7 @@ func doTestPlugin(t *testing.T, spec *volume.Spec, expectedDevice string) {
 	if volumePath != expectedPath {
 		t.Errorf("Unexpected path, expected %q, got: %q", expectedPath, volumePath)
 	}
-	if err := mounter.SetUp(volume.MounterArgs{}); err != nil {
+	if err := mounter.SetUp(tCtx, volume.MounterArgs{}); err != nil {
 		t.Errorf("Expected success, got: %v", err)
 	}
 	if _, err := os.Stat(volumePath); err != nil {

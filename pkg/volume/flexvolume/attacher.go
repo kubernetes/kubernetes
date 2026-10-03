@@ -70,7 +70,7 @@ func (a *flexVolumeAttacher) GetDeviceMountPath(spec *volume.Spec) (string, erro
 }
 
 // MountDevice is part of the volume.Attacher interface
-func (a *flexVolumeAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMountPath string, _ volume.DeviceMounterArgs) error {
+func (a *flexVolumeAttacher) MountDevice(logger klog.Logger, spec *volume.Spec, devicePath string, deviceMountPath string, _ volume.DeviceMounterArgs) error {
 	// Mount only once.
 	alreadyMounted, err := prepareForMount(a.plugin.host.GetMounter(), deviceMountPath)
 	if err != nil {
@@ -97,7 +97,7 @@ func (a *flexVolumeAttacher) MountDevice(spec *volume.Spec, devicePath string, d
 	return err
 }
 
-func (a *flexVolumeAttacher) VolumesAreAttached(specs []*volume.Spec, nodeName types.NodeName) (map[*volume.Spec]bool, error) {
+func (a *flexVolumeAttacher) VolumesAreAttached(logger klog.Logger, specs []*volume.Spec, nodeName types.NodeName) (map[*volume.Spec]bool, error) {
 	volumesAttachedCheck := make(map[*volume.Spec]bool)
 	for _, spec := range specs {
 		volumesAttachedCheck[spec] = true

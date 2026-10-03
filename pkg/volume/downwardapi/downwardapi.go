@@ -17,6 +17,7 @@ limitations under the License.
 package downwardapi
 
 import (
+	"context"
 	"fmt"
 	"path/filepath"
 
@@ -80,7 +81,7 @@ func (plugin *downwardAPIPlugin) CanSupport(spec *volume.Spec) bool {
 	return spec.Volume != nil && spec.Volume.DownwardAPI != nil
 }
 
-func (plugin *downwardAPIPlugin) RequiresRemount(spec *volume.Spec) bool {
+func (plugin *downwardAPIPlugin) RequiresRemount(logger klog.Logger, spec *volume.Spec) bool {
 	return true
 }
 
@@ -88,7 +89,7 @@ func (plugin *downwardAPIPlugin) SupportsMountOption() bool {
 	return false
 }
 
-func (plugin *downwardAPIPlugin) SupportsSELinuxContextMount(spec *volume.Spec) (bool, error) {
+func (plugin *downwardAPIPlugin) SupportsSELinuxContextMount(logger klog.Logger, spec *volume.Spec) (bool, error) {
 	return false, nil
 }
 
@@ -163,27 +164,28 @@ func (d *downwardAPIVolume) GetAttributes() volume.Attributes {
 // This function is not idempotent by design. We want the data to be refreshed periodically.
 // The internal sync interval of kubelet will drive the refresh of data.
 // TODO: Add volume specific ticker and refresh loop
-func (b *downwardAPIVolumeMounter) SetUp(mounterArgs volume.MounterArgs) error {
-	return b.SetUpAt(b.GetPath(), mounterArgs)
+func (b *downwardAPIVolumeMounter) SetUp(ctx context.Context, mounterArgs volume.MounterArgs) error {
+	return b.SetUpAt(ctx, b.GetPath(), mounterArgs)
 }
 
-func (b *downwardAPIVolumeMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs) error {
+func (b *downwardAPIVolumeMounter) SetUpAt(ctx context.Context, dir string, mounterArgs volume.MounterArgs) error {
+	logger := klog.FromContext(ctx)
 	klog.V(3).Infof("Setting up a downwardAPI volume %v for pod %v/%v at %v", b.volName, b.pod.Namespace, b.pod.Name, dir)
 	// Wrap EmptyDir. Here we rely on the idempotency of the wrapped plugin to avoid repeatedly mounting
-	wrapped, err := b.plugin.host.NewWrapperMounter(b.volName, wrappedVolumeSpec(), b.pod)
+	wrapped, err := b.plugin.host.NewWrapperMounter(logger, b.volName, wrappedVolumeSpec(), b.pod)
 	if err != nil {
 		klog.Errorf("Couldn't setup downwardAPI volume %v for pod %v/%v: %s", b.volName, b.pod.Namespace, b.pod.Name, err.Error())
 		return err
 	}
 
-	data, err := CollectData(b.source.Items, b.pod, b.plugin.host, b.source.DefaultMode, b.source.DefaultUser)
+	data, err := CollectData(ctx, b.source.Items, b.pod, b.plugin.host, b.source.DefaultMode, b.source.DefaultUser)
 	if err != nil {
 		klog.Errorf("Error preparing data for downwardAPI volume %v for pod %v/%v: %s", b.volName, b.pod.Namespace, b.pod.Name, err.Error())
 		return err
 	}
 
 	setupSuccess := false
-	if err := wrapped.SetUpAt(dir, mounterArgs); err != nil {
+	if err := wrapped.SetUpAt(ctx, dir, mounterArgs); err != nil {
 		klog.Errorf("Unable to setup downwardAPI volume %v for pod %v/%v: %s", b.volName, b.pod.Namespace, b.pod.Name, err.Error())
 		return err
 	}
@@ -235,7 +237,7 @@ func (b *downwardAPIVolumeMounter) SetUpAt(dir string, mounterArgs volume.Mounte
 // Map's value is the (sorted) content of the field to be dumped in the file.
 //
 // Note: this function is exported so that it can be called from the projection volume driver
-func CollectData(items []v1.DownwardAPIVolumeFile, pod *v1.Pod, host volume.VolumeHost, defaultMode *int32, defaultUser *int64) (map[string]volumeutil.FileProjection, error) {
+func CollectData(ctx context.Context, items []v1.DownwardAPIVolumeFile, pod *v1.Pod, host volume.VolumeHost, defaultMode *int32, defaultUser *int64) (map[string]volumeutil.FileProjection, error) {
 	if defaultMode == nil {
 		return nil, fmt.Errorf("no defaultMode used, not even the default value for it")
 	}
@@ -262,7 +264,7 @@ func CollectData(items []v1.DownwardAPIVolumeFile, pod *v1.Pod, host volume.Volu
 			}
 		} else if fileInfo.ResourceFieldRef != nil {
 			containerName := fileInfo.ResourceFieldRef.ContainerName
-			nodeAllocatable, err := host.GetNodeAllocatable()
+			nodeAllocatable, err := host.GetNodeAllocatable(ctx)
 			if err != nil {
 				errlist = append(errlist, err)
 			} else if values, err := resource.ExtractResourceValueByContainerNameAndNodeAllocatable(fileInfo.ResourceFieldRef, pod, containerName, nodeAllocatable); err != nil {

@@ -17,6 +17,7 @@ limitations under the License.
 package configmap
 
 import (
+	"context"
 	"fmt"
 
 	"k8s.io/klog/v2"
@@ -45,7 +46,7 @@ const (
 // configMapPlugin implements the VolumePlugin interface.
 type configMapPlugin struct {
 	host         volume.VolumeHost
-	getConfigMap func(namespace, name string) (*v1.ConfigMap, error)
+	getConfigMap func(ctx context.Context, namespace, name string) (*v1.ConfigMap, error)
 }
 
 var _ volume.VolumePlugin = &configMapPlugin{}
@@ -80,7 +81,7 @@ func (plugin *configMapPlugin) CanSupport(spec *volume.Spec) bool {
 	return spec.Volume != nil && spec.Volume.ConfigMap != nil
 }
 
-func (plugin *configMapPlugin) RequiresRemount(spec *volume.Spec) bool {
+func (plugin *configMapPlugin) RequiresRemount(logger klog.Logger, spec *volume.Spec) bool {
 	return true
 }
 
@@ -88,7 +89,7 @@ func (plugin *configMapPlugin) SupportsMountOption() bool {
 	return false
 }
 
-func (plugin *configMapPlugin) SupportsSELinuxContextMount(spec *volume.Spec) (bool, error) {
+func (plugin *configMapPlugin) SupportsSELinuxContextMount(logger klog.Logger, spec *volume.Spec) (bool, error) {
 	return false, nil
 }
 
@@ -152,7 +153,7 @@ type configMapVolumeMounter struct {
 
 	source       v1.ConfigMapVolumeSource
 	pod          v1.Pod
-	getConfigMap func(namespace, name string) (*v1.ConfigMap, error)
+	getConfigMap func(ctx context.Context, namespace, name string) (*v1.ConfigMap, error)
 }
 
 var _ volume.Mounter = &configMapVolumeMounter{}
@@ -175,21 +176,22 @@ func wrappedVolumeSpec() volume.Spec {
 	}
 }
 
-func (b *configMapVolumeMounter) SetUp(mounterArgs volume.MounterArgs) error {
-	return b.SetUpAt(b.GetPath(), mounterArgs)
+func (b *configMapVolumeMounter) SetUp(ctx context.Context, mounterArgs volume.MounterArgs) error {
+	return b.SetUpAt(ctx, b.GetPath(), mounterArgs)
 }
 
-func (b *configMapVolumeMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs) error {
+func (b *configMapVolumeMounter) SetUpAt(ctx context.Context, dir string, mounterArgs volume.MounterArgs) error {
+	logger := klog.FromContext(ctx)
 	klog.V(3).Infof("Setting up volume %v for pod %v at %v", b.volName, b.pod.UID, dir)
 
 	// Wrap EmptyDir, let it do the setup.
-	wrapped, err := b.plugin.host.NewWrapperMounter(b.volName, wrappedVolumeSpec(), &b.pod)
+	wrapped, err := b.plugin.host.NewWrapperMounter(logger, b.volName, wrappedVolumeSpec(), &b.pod)
 	if err != nil {
 		return err
 	}
 
 	optional := b.source.Optional != nil && *b.source.Optional
-	configMap, err := b.getConfigMap(b.pod.Namespace, b.source.Name)
+	configMap, err := b.getConfigMap(context.TODO(), b.pod.Namespace, b.source.Name)
 	if err != nil {
 		if !(errors.IsNotFound(err) && optional) {
 			klog.Errorf("Couldn't get configMap %v/%v: %v", b.pod.Namespace, b.source.Name, err)
@@ -216,7 +218,7 @@ func (b *configMapVolumeMounter) SetUpAt(dir string, mounterArgs volume.MounterA
 	}
 
 	setupSuccess := false
-	if err := wrapped.SetUpAt(dir, mounterArgs); err != nil {
+	if err := wrapped.SetUpAt(ctx, dir, mounterArgs); err != nil {
 		return err
 	}
 	if err := volumeutil.MakeNestedMountpoints(b.volName, dir, b.pod); err != nil {

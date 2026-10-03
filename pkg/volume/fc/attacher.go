@@ -66,7 +66,7 @@ func (attacher *fcAttacher) Attach(spec *volume.Spec, nodeName types.NodeName) (
 	return "", nil
 }
 
-func (attacher *fcAttacher) VolumesAreAttached(specs []*volume.Spec, nodeName types.NodeName) (map[*volume.Spec]bool, error) {
+func (attacher *fcAttacher) VolumesAreAttached(logger klog.Logger, specs []*volume.Spec, nodeName types.NodeName) (map[*volume.Spec]bool, error) {
 	volumesAttachedCheck := make(map[*volume.Spec]bool)
 	for _, spec := range specs {
 		volumesAttachedCheck[spec] = true
@@ -75,7 +75,7 @@ func (attacher *fcAttacher) VolumesAreAttached(specs []*volume.Spec, nodeName ty
 	return volumesAttachedCheck, nil
 }
 
-func (plugin *fcPlugin) VerifyExhaustedResource(spec *volume.Spec) bool {
+func (plugin *fcPlugin) VerifyExhaustedResource(_ klog.Logger, _ *volume.Spec) bool {
 	return false
 }
 
@@ -99,7 +99,7 @@ func (attacher *fcAttacher) GetDeviceMountPath(
 	return attacher.manager.MakeGlobalPDName(*mounter.fcDisk), nil
 }
 
-func (attacher *fcAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMountPath string, mountArgs volume.DeviceMounterArgs) error {
+func (attacher *fcAttacher) MountDevice(logger klog.Logger, spec *volume.Spec, devicePath string, deviceMountPath string, mountArgs volume.DeviceMounterArgs) error {
 	mounter := attacher.host.GetMounter()
 	notMnt, err := mounter.IsLikelyNotMountPoint(deviceMountPath)
 	if err != nil {
@@ -205,7 +205,7 @@ func (detacher *fcDetacher) UnmountDevice(deviceMountPath string) error {
 	return nil
 }
 
-func (plugin *fcPlugin) CanAttach(spec *volume.Spec) (bool, error) {
+func (plugin *fcPlugin) CanAttach(logger klog.Logger, spec *volume.Spec) (bool, error) {
 	return true, nil
 }
 

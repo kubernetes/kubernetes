@@ -635,7 +635,8 @@ func Test_GetAttachedVolumes_Positive_OneVolumeTwoNodes(t *testing.T) {
 	volumeSpec := controllervolumetesting.GetTestVolumeSpec(string(volumeName), volumeName)
 	node1Name := types.NodeName("node1-name")
 	devicePath := "fake/device/path"
-	plugin, err := volumePluginMgr.FindAttachablePluginBySpec(volumeSpec)
+	logger, _ := ktesting.NewTestContext(t)
+	plugin, err := volumePluginMgr.FindAttachablePluginBySpec(logger, volumeSpec)
 	if err != nil || plugin == nil {
 		t.Fatalf("Failed to get volume plugin from spec %v, %v", volumeSpec, err)
 	}
@@ -643,7 +644,6 @@ func Test_GetAttachedVolumes_Positive_OneVolumeTwoNodes(t *testing.T) {
 	if err != nil || uniqueVolumeName == "" {
 		t.Fatalf("Failed to get uniqueVolumeName from spec %v, %v", volumeSpec, err)
 	}
-	logger, _ := ktesting.NewTestContext(t)
 	generatedVolumeName1, add1Err := asw.AddVolumeNode(logger, uniqueVolumeName, volumeSpec, node1Name, devicePath, true)
 	if add1Err != nil {
 		t.Fatalf("AddVolumeNode failed. Expected: <no error> Actual: <%v>", add1Err)
@@ -718,12 +718,13 @@ func Test_SetVolumesMountedByNode_Positive_Set(t *testing.T) {
 func Test_SetVolumesMountedByNode_Positive_SetBeforeVolumeAdded(t *testing.T) {
 	// Arrange
 	volumePluginMgr, _ := volumetesting.GetTestVolumePluginMgr(t)
+	logger, _ := ktesting.NewTestContext(t)
 	asw := NewActualStateOfWorld(volumePluginMgr)
 	volumeName := v1.UniqueVolumeName("volume-name")
 	volumeSpec := controllervolumetesting.GetTestVolumeSpec(string(volumeName), volumeName)
 	nodeName := types.NodeName("node-name")
 	devicePath := "fake/device/path"
-	plugin, err := volumePluginMgr.FindAttachablePluginBySpec(volumeSpec)
+	plugin, err := volumePluginMgr.FindAttachablePluginBySpec(logger, volumeSpec)
 	if err != nil || plugin == nil {
 		t.Fatalf("Failed to get volume plugin from spec %v, %v", volumeSpec, err)
 	}
@@ -731,7 +732,6 @@ func Test_SetVolumesMountedByNode_Positive_SetBeforeVolumeAdded(t *testing.T) {
 	if err != nil || uniqueVolumeName == "" {
 		t.Fatalf("Failed to get uniqueVolumeName from spec %v, %v", volumeSpec, err)
 	}
-	logger, _ := ktesting.NewTestContext(t)
 
 	// Act
 	asw.SetVolumesMountedByNode(logger, []v1.UniqueVolumeName{uniqueVolumeName}, nodeName)
@@ -1179,7 +1179,7 @@ func Test_GetAttachedVolumesForNode_Positive_OneVolumeTwoNodes(t *testing.T) {
 	node1Name := types.NodeName("node1-name")
 	devicePath := "fake/device/path"
 	logger, _ := ktesting.NewTestContext(t)
-	plugin, err := volumePluginMgr.FindAttachablePluginBySpec(volumeSpec)
+	plugin, err := volumePluginMgr.FindAttachablePluginBySpec(logger, volumeSpec)
 	if err != nil || plugin == nil {
 		t.Fatalf("Failed to get volume plugin from spec %v, %v", volumeSpec, err)
 	}
@@ -1224,7 +1224,7 @@ func Test_OneVolumeTwoNodes_TwoDevicePaths(t *testing.T) {
 	node1Name := types.NodeName("node1-name")
 	devicePath1 := "fake/device/path1"
 	logger, _ := ktesting.NewTestContext(t)
-	plugin, err := volumePluginMgr.FindAttachablePluginBySpec(volumeSpec)
+	plugin, err := volumePluginMgr.FindAttachablePluginBySpec(logger, volumeSpec)
 	if err != nil || plugin == nil {
 		t.Fatalf("Failed to get volume plugin from spec %v, %v", volumeSpec, err)
 	}
@@ -1337,6 +1337,7 @@ func Test_updateNodeStatusUpdateNeededError(t *testing.T) {
 // Verify GetAttachState returns AttachedState
 // Verify GetAttachedVolumes return this volume
 func Test_MarkVolumeAsAttached(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	// Arrange
 	volumePluginMgr, _ := volumetesting.GetTestVolumePluginMgr(t)
 	asw := NewActualStateOfWorld(volumePluginMgr)
@@ -1346,13 +1347,12 @@ func Test_MarkVolumeAsAttached(t *testing.T) {
 	nodeName := types.NodeName("node-name")
 	devicePath := "fake/device/path"
 
-	plugin, err := volumePluginMgr.FindAttachablePluginBySpec(volumeSpec)
+	plugin, err := volumePluginMgr.FindAttachablePluginBySpec(logger, volumeSpec)
 	if err != nil || plugin == nil {
 		t.Fatalf("Failed to get volume plugin from spec %v, %v", volumeSpec, err)
 	}
 
 	// Act
-	logger, _ := ktesting.NewTestContext(t)
 	err = asw.MarkVolumeAsAttached(logger, volumeName, volumeSpec, nodeName, devicePath)
 
 	// Assert
@@ -1376,6 +1376,7 @@ func Test_MarkVolumeAsAttached(t *testing.T) {
 // Verify GetAttachState returns UncertainState
 // Verify GetAttachedVolumes return this volume
 func Test_MarkVolumeAsUncertain(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	// Arrange
 	volumePluginMgr, _ := volumetesting.GetTestVolumePluginMgr(t)
 	asw := NewActualStateOfWorld(volumePluginMgr)
@@ -1383,13 +1384,12 @@ func Test_MarkVolumeAsUncertain(t *testing.T) {
 	volumeSpec := controllervolumetesting.GetTestVolumeSpec(string(volumeName), volumeName)
 	nodeName := types.NodeName("node-name")
 
-	plugin, err := volumePluginMgr.FindAttachablePluginBySpec(volumeSpec)
+	plugin, err := volumePluginMgr.FindAttachablePluginBySpec(logger, volumeSpec)
 	if err != nil || plugin == nil {
 		t.Fatalf("Failed to get volume plugin from spec %v, %v", volumeSpec, err)
 	}
 
 	// Act
-	logger, _ := ktesting.NewTestContext(t)
 	err = asw.MarkVolumeAsUncertain(logger, volumeName, volumeSpec, nodeName)
 
 	// Assert

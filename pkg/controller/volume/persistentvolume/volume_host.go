@@ -17,6 +17,7 @@ limitations under the License.
 package persistentvolume
 
 import (
+	"context"
 	"fmt"
 
 	"k8s.io/klog/v2"
@@ -63,7 +64,7 @@ func (ctrl *PersistentVolumeController) GetKubeClient() clientset.Interface {
 	return ctrl.kubeClient
 }
 
-func (ctrl *PersistentVolumeController) NewWrapperMounter(volName string, spec vol.Spec, pod *v1.Pod) (vol.Mounter, error) {
+func (ctrl *PersistentVolumeController) NewWrapperMounter(logger klog.Logger, volName string, spec vol.Spec, pod *v1.Pod) (vol.Mounter, error) {
 	return nil, fmt.Errorf("PersistentVolumeController.NewWrapperMounter is not implemented")
 }
 
@@ -75,22 +76,22 @@ func (ctrl *PersistentVolumeController) GetMounter() mount.Interface {
 	return nil
 }
 
-func (ctrl *PersistentVolumeController) GetNodeAllocatable() (v1.ResourceList, error) {
+func (ctrl *PersistentVolumeController) GetNodeAllocatable(_ context.Context) (v1.ResourceList, error) {
 	return v1.ResourceList{}, nil
 }
 
-func (ctrl *PersistentVolumeController) GetAttachedVolumesFromNodeStatus() (map[v1.UniqueVolumeName]string, error) {
+func (ctrl *PersistentVolumeController) GetAttachedVolumesFromNodeStatus(_ context.Context) (map[v1.UniqueVolumeName]string, error) {
 	return map[v1.UniqueVolumeName]string{}, nil
 }
 
-func (ctrl *PersistentVolumeController) GetSecretFunc() func(namespace, name string) (*v1.Secret, error) {
-	return func(_, _ string) (*v1.Secret, error) {
+func (ctrl *PersistentVolumeController) GetSecretFunc() func(ctx context.Context, namespace, name string) (*v1.Secret, error) {
+	return func(_ context.Context, _, _ string) (*v1.Secret, error) {
 		return nil, fmt.Errorf("GetSecret unsupported in PersistentVolumeController")
 	}
 }
 
-func (ctrl *PersistentVolumeController) GetConfigMapFunc() func(namespace, name string) (*v1.ConfigMap, error) {
-	return func(_, _ string) (*v1.ConfigMap, error) {
+func (ctrl *PersistentVolumeController) GetConfigMapFunc() func(ctx context.Context, namespace, name string) (*v1.ConfigMap, error) {
+	return func(_ context.Context, _, _ string) (*v1.ConfigMap, error) {
 		return nil, fmt.Errorf("GetConfigMap unsupported in PersistentVolumeController")
 	}
 }
@@ -108,7 +109,7 @@ func (ctrl *PersistentVolumeController) DeleteServiceAccountTokenFunc() func(typ
 	}
 }
 
-func (ctrl *PersistentVolumeController) GetNodeLabels() (map[string]string, error) {
+func (ctrl *PersistentVolumeController) GetNodeLabels(_ context.Context) (map[string]string, error) {
 	return nil, fmt.Errorf("GetNodeLabels() unsupported in PersistentVolumeController")
 }
 
