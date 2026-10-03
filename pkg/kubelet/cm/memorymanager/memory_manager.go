@@ -146,12 +146,15 @@ type manager struct {
 var _ Manager = &manager{}
 
 // NewManager returns new instance of the memory manager
-func NewManager(logger klog.Logger, policyName string, machineInfo *cadvisorapi.MachineInfo, nodeAllocatableReservation v1.ResourceList, reservedMemory []kubeletconfig.MemoryReservation, stateFileDirectory string, affinity topologymanager.Store) (Manager, error) {
+func NewManager(logger klog.Logger, policyName string, policyOptions map[string]string, machineInfo *cadvisorapi.MachineInfo, nodeAllocatableReservation v1.ResourceList, reservedMemory []kubeletconfig.MemoryReservation, stateFileDirectory string, affinity topologymanager.Store) (Manager, error) {
 	var policy Policy
 
 	switch policyType(policyName) {
 
 	case policyTypeNone:
+		if len(policyOptions) > 0 {
+			return nil, fmt.Errorf("policy %q does not support policy options %v", policyTypeNone, policyOptions)
+		}
 		policy = NewPolicyNone(logger)
 
 	case PolicyTypeStatic:
@@ -164,12 +167,20 @@ func NewManager(logger klog.Logger, policyName string, machineInfo *cadvisorapi.
 			return nil, err
 		}
 
-		policy, err = NewPolicyStatic(logger, machineInfo, systemReserved, affinity)
+		opts, err := NewPolicyOptions(logger, policyOptions)
+		if err != nil {
+			return nil, err
+		}
+
+		policy, err = NewPolicyStatic(logger, machineInfo, systemReserved, affinity, opts)
 		if err != nil {
 			return nil, err
 		}
 
 	case policyTypeBestEffort:
+		if len(policyOptions) > 0 {
+			return nil, fmt.Errorf("policy %q does not support policy options %v", policyTypeBestEffort, policyOptions)
+		}
 		if runtime.GOOS == "windows" {
 			systemReserved, err := getSystemReservedMemory(machineInfo, nodeAllocatableReservation, reservedMemory)
 			if err != nil {

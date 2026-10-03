@@ -262,6 +262,7 @@ var (
 		"MaxOpenFiles",
 		"MaxPods",
 		"MemoryManagerPolicy",
+		"MemoryManagerPolicyOptions[*]",
 		"MemorySwap.SwapBehavior",
 		"MergeDefaultEvictionSettings",
 		"NodeLeaseDurationSeconds",
