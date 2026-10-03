@@ -176,6 +176,10 @@ func ProbeVolumePlugins(config volume.VolumeConfig) []volume.VolumePlugin {
 //	volume.RegisterPlugin(&FakePlugin{"fake-name"})
 type FakeVolumePlugin struct {
 	sync.RWMutex
+	// GlobalVolumes is what ListGlobalVolumes reports.
+	GlobalVolumes []volume.GlobalVolume
+	// ListGlobalVolumesErr makes ListGlobalVolumes fail.
+	ListGlobalVolumesErr   error
 	PluginName             string
 	Host                   volume.VolumeHost
 	Config                 volume.VolumeConfig
@@ -496,6 +500,17 @@ func (plugin *FakeVolumePlugin) ConstructBlockVolumeSpec(podUID types.UID, volum
 
 func (plugin *FakeVolumePlugin) GetDeviceMountRefs(deviceMountPath string) ([]string, error) {
 	return []string{}, nil
+}
+
+// ListGlobalVolumes reports whatever the test put in GlobalVolumes, so that
+// reconstruction of mounts with no pod directory can be exercised.
+func (plugin *FakeVolumePlugin) ListGlobalVolumes() ([]volume.GlobalVolume, error) {
+	plugin.RLock()
+	defer plugin.RUnlock()
+	if plugin.ListGlobalVolumesErr != nil {
+		return nil, plugin.ListGlobalVolumesErr
+	}
+	return plugin.GlobalVolumes, nil
 }
 
 // Expandable volume support
@@ -1751,3 +1766,5 @@ func MetricsEqualIgnoreTimestamp(a *volume.Metrics, b *volume.Metrics) bool {
 func ContainsAccessMode(modes []v1.PersistentVolumeAccessMode, mode v1.PersistentVolumeAccessMode) bool {
 	return slices.Contains(modes, mode)
 }
+
+var _ volume.GlobalVolumeListerPlugin = &FakeVolumePlugin{}
