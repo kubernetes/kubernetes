@@ -4888,6 +4888,20 @@
   componentEndpoints:
   - component: kubelet
     endpoint: /metrics
+- name: topology_manager_numa_score_selection_total
+  subsystem: kubelet
+  help: 'The number of NUMA node selections in which the numa-allocation-strategy
+    policy option changed the outcome, that is the selected hint differs from the
+    one the narrowest/closest tiebreak would have picked. Counted once per hint merge:
+    once per admitted container under the container scope, once per admitted pod under
+    the pod scope.'
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - numa_allocation_strategy
+  componentEndpoints:
+  - component: kubelet
+    endpoint: /metrics
 - name: volume_metric_collection_duration_seconds
   subsystem: kubelet
   help: Duration in seconds to calculate volume stats
