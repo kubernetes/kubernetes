@@ -18,9 +18,11 @@ package deployment
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	apps "k8s.io/api/apps/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
@@ -215,6 +217,35 @@ func TestDeploymentController_reconcileOldReplicaSets(t *testing.T) {
 			continue
 		}
 		continue
+	}
+}
+
+func TestDeploymentController_reconcileOldReplicaSetsScaleError(t *testing.T) {
+	// Scale-down should run (same setup as an existing reconcileOldReplicaSets case),
+	// but the ReplicaSet update fails. That error must surface so the workqueue retries.
+	newSelector := map[string]string{"foo": "new"}
+	oldSelector := map[string]string{"foo": "old"}
+	newRS := rs("foo-new", 0, newSelector, noTimestamp)
+	oldRS := rs("foo-old", 10, oldSelector, noTimestamp)
+	oldRS.Status.AvailableReplicas = 10
+	oldRSs := []*apps.ReplicaSet{oldRS}
+	allRSs := []*apps.ReplicaSet{oldRS, newRS}
+	maxSurge := intstr.FromInt32(0)
+	maxUnavailable := intstr.FromInt32(2)
+	deployment := newDeployment("foo", 10, nil, &maxSurge, &maxUnavailable, newSelector)
+
+	fakeClientset := fake.Clientset{}
+	fakeClientset.PrependReactor("update", "replicasets", func(action core.Action) (bool, runtime.Object, error) {
+		return true, nil, fmt.Errorf("fake scale-down update failure")
+	})
+	controller := &DeploymentController{
+		client:        &fakeClientset,
+		eventRecorder: &record.FakeRecorder{},
+	}
+	_, ctx := ktesting.NewTestContext(t)
+	_, err := controller.reconcileOldReplicaSets(ctx, allRSs, oldRSs, newRS, deployment)
+	if err == nil {
+		t.Fatalf("expected scale-down error to be returned, got nil")
 	}
 }
 
