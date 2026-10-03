@@ -429,6 +429,13 @@ message UserNamespace {
     repeated IDMapping gids = 3;
 }
 
+// CgroupNamespace describes the intended cgroup namespace configuration for a pod sandbox.
+message CgroupNamespace {
+    // Mode is the NamespaceMode for this CgroupNamespace.
+    // Note: NamespaceMode for CgroupNamespace currently supports only POD and NODE, not CONTAINER OR TARGET.
+    NamespaceMode mode = 1;
+}
+
 // NamespaceOption provides options for Linux namespaces.
 message NamespaceOption {
     // Network namespace for this container/sandbox.
@@ -454,6 +461,13 @@ message NamespaceOption {
     // must be assumed.  This is done for backward compatibility with older Kubelet versions that
     // do not set a user namespace.
     UserNamespace userns_options = 5;
+    // CgroupnsOptions for this pod sandbox.
+    // If the struct is nil, then the following mode must be assumed:
+    //   POD for non-privileged pods on cgroup v2 nodes.
+    //   NODE for other cases.
+    // This is done for backward compatibility with older Kubelet versions that
+    // do not support explicitly configuring a cgroup namespace.
+    CgroupNamespace cgroupns_options = 6;
 }
 
 // SupplementalGroupsPolicy defines how supplemental groups 
@@ -1882,6 +1896,10 @@ message RuntimeHandlerFeatures {
     // user_namespaces is set to true if the runtime handler supports user namespaces as implemented
     // in Kubernetes. This means support for both, user namespaces and idmap mounts.
     bool user_namespaces = 2;
+
+    // cgroup_namespaces is set to true if the runtime handler supports cgroup namespaces as implemented
+    // in Kubernetes.
+    bool cgroup_namespaces = 3;
 }
 
 message RuntimeHandler {
