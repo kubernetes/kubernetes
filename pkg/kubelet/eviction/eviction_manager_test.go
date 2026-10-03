@@ -27,6 +27,7 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -3294,5 +3295,153 @@ func TestContainerEphemeralStorageLimitEvictionForRestartableInitContainers(t *t
 	}
 	if len(evictedPods) != 1 || evictedPods[0].Name != pod.Name {
 		t.Fatalf("Expected evicted pod %q, got %v", pod.Name, evictedPods)
+	}
+}
+
+// withSystemPartitionMemory adds the system partition's entry to a summary.
+func withSystemPartitionMemory(summary *statsapi.Summary, availableBytes, workingSetBytes string) *statsapi.Summary {
+	available := uint64(quantityMustParse(availableBytes).Value())
+	workingSet := uint64(quantityMustParse(workingSetBytes).Value())
+	summary.Node.SystemContainers = append(summary.Node.SystemContainers, statsapi.ContainerStats{
+		Name: statsapi.SystemContainerSystemPods,
+		Memory: &statsapi.MemoryStats{
+			AvailableBytes:  &available,
+			WorkingSetBytes: &workingSet,
+		},
+	})
+	return summary
+}
+
+func TestSystemPartitionMemoryPressure(t *testing.T) {
+	const systemNamespace = "kube-system"
+	podsToMake := []struct {
+		podToMake
+		namespace string
+	}{
+		// Ranked first on the node as a whole, but it is outside the partition.
+		{podToMake{name: "user-best-effort-high-usage", priority: lowPriority, requests: newResourceList("", "", ""), limits: newResourceList("", "", ""), memoryWorkingSet: "2Gi"}, metav1.NamespaceDefault},
+		{podToMake{name: "system-guaranteed", priority: defaultPriority, requests: newResourceList("100m", "500Mi", ""), limits: newResourceList("100m", "500Mi", ""), memoryWorkingSet: "400Mi"}, systemNamespace},
+		{podToMake{name: "system-burstable-above-requests", priority: defaultPriority, requests: newResourceList("100m", "100Mi", ""), limits: newResourceList("200m", "1Gi", ""), memoryWorkingSet: "400Mi"}, systemNamespace},
+	}
+
+	cases := []struct {
+		name                  string
+		systemPartitionHasPod func(*v1.Pod) bool
+		// nodeAvailable is the node's memory left once the partition is low. The
+		// node threshold is 100Mi.
+		nodeAvailable          string
+		wantEvicted            string
+		wantNodeMemoryPressure bool
+	}{
+		{
+			name:                  "only a pod of the partition is evicted",
+			systemPartitionHasPod: func(pod *v1.Pod) bool { return pod.Namespace == systemNamespace },
+			wantEvicted:           "system-burstable-above-requests",
+		},
+		{
+			// Node pressure is handled first, ranking every pod on the node.
+			name:                   "node pressure takes precedence over the partition's",
+			systemPartitionHasPod:  func(pod *v1.Pod) bool { return pod.Namespace == systemNamespace },
+			nodeAvailable:          "50Mi",
+			wantEvicted:            "user-best-effort-high-usage",
+			wantNodeMemoryPressure: true,
+		},
+		{
+			name:                  "nothing is evicted when no pod is in the partition",
+			systemPartitionHasPod: func(*v1.Pod) bool { return false },
+		},
+		{
+			// No systemPartitionPodFunc, as on a node without a system partition.
+			name: "nothing is evicted without a way to list the partition's pods",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
+			pods := []*v1.Pod{}
+			podStats := map[*v1.Pod]statsapi.PodStats{}
+			for _, p := range podsToMake {
+				pod, podStat := makePodWithMemoryStats(p.name, p.priority, p.requests, p.limits, p.memoryWorkingSet)
+				pod.Namespace = p.namespace
+				pods = append(pods, pod)
+				podStats[pod] = podStat
+			}
+			activePodsFunc := func() []*v1.Pod { return pods }
+
+			fakeClock := testingclock.NewFakeClock(time.Now())
+			podKiller := &mockPodKiller{}
+			diskInfoProvider := &mockDiskInfoProvider{dedicatedImageFs: new(false)}
+			diskGC := &mockDiskGC{err: nil}
+			thresholds, err := ParseThresholdConfig(nil, map[string]string{"memory.available": "100Mi"}, nil, nil, nil)
+			require.NoError(t, err)
+			partitionThresholds, err := ParseSystemPartitionThresholds(map[string]string{"memory.available": "200Mi"})
+			require.NoError(t, err)
+			thresholds = append(thresholds, partitionThresholds...)
+			nodeAvailable := tc.nodeAvailable
+			if nodeAvailable == "" {
+				nodeAvailable = "4Gi"
+			}
+
+			// The node as a whole has plenty of memory, so only the partition
+			// threshold can be met.
+			summaryProvider := &fakeSummaryProvider{result: withSystemPartitionMemory(makeMemoryStats("4Gi", podStats), "1Gi", "800Mi")}
+			manager := &managerImpl{
+				clock:       fakeClock,
+				killPodFunc: podKiller.killPodNow,
+				imageGC:     diskGC,
+				containerGC: diskGC,
+				config: Config{
+					MaxPodGracePeriodSeconds: 5,
+					PressureTransitionPeriod: time.Minute * 5,
+					Thresholds:               thresholds,
+				},
+				recorder:                     &record.FakeRecorder{},
+				summaryProvider:              summaryProvider,
+				nodeRef:                      &v1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test")},
+				nodeConditionsLastObservedAt: nodeConditionsObservedAt{},
+				thresholdsFirstObservedAt:    thresholdsObservedAt{},
+			}
+			if tc.systemPartitionHasPod != nil {
+				manager.systemPartitionPodFunc = func() []*v1.Pod {
+					var partitionPods []*v1.Pod
+					for _, pod := range pods {
+						if tc.systemPartitionHasPod(pod) {
+							partitionPods = append(partitionPods, pod)
+						}
+					}
+					return partitionPods
+				}
+			}
+
+			_, err = manager.synchronize(tCtx, diskInfoProvider, activePodsFunc)
+			require.NoError(t, err)
+			require.Nil(t, podKiller.pod, "nothing should be evicted while the partition has memory left")
+
+			fakeClock.Step(1 * time.Minute)
+			summaryProvider.result = withSystemPartitionMemory(makeMemoryStats(nodeAvailable, podStats), "100Mi", "1700Mi")
+			_, err = manager.synchronize(tCtx, diskInfoProvider, activePodsFunc)
+			require.NoError(t, err)
+
+			if tc.wantEvicted == "" {
+				require.Nil(t, podKiller.pod, "no pod outside the partition may be evicted for the partition's pressure")
+			} else {
+				require.NotNil(t, podKiller.pod, "a pod should be evicted once the partition crosses its threshold")
+				require.Equal(t, tc.wantEvicted, podKiller.pod.Name)
+				require.Equal(t, int64(1), *podKiller.gracePeriodOverride, "a hard threshold evicts immediately")
+				if !tc.wantNodeMemoryPressure {
+					status := &v1.PodStatus{}
+					podKiller.statusFn(status)
+					require.Contains(t, status.Message, "The node's system partition was low on resource: memory. Threshold quantity: 200Mi, available: 100Mi.")
+				}
+			}
+
+			require.Equal(t, tc.wantNodeMemoryPressure, manager.IsUnderMemoryPressure(), "only node pressure is node MemoryPressure")
+			if !tc.wantNodeMemoryPressure {
+				// The rest of the node is fine, so user pods must still be admitted.
+				bestEffortPod, _ := makePodWithMemoryStats("best-admit", defaultPriority, newResourceList("", "", ""), newResourceList("", "", ""), "0Gi")
+				require.True(t, manager.Admit(tCtx, &lifecycle.PodAdmitAttributes{Pod: bestEffortPod}).Admit)
+			}
+		})
 	}
 }

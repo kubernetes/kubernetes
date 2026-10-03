@@ -1262,6 +1262,50 @@ func (_c *MockContainerManager_GetResources_Call) RunAndReturn(run func(ctx cont
 	return _c
 }
 
+// GetSystemPartitionCgroupRoot provides a mock function for the type MockContainerManager
+func (_mock *MockContainerManager) GetSystemPartitionCgroupRoot() string {
+	ret := _mock.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetSystemPartitionCgroupRoot")
+	}
+
+	var r0 string
+	if returnFunc, ok := ret.Get(0).(func() string); ok {
+		r0 = returnFunc()
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+	return r0
+}
+
+// MockContainerManager_GetSystemPartitionCgroupRoot_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetSystemPartitionCgroupRoot'
+type MockContainerManager_GetSystemPartitionCgroupRoot_Call struct {
+	*mock.Call
+}
+
+// GetSystemPartitionCgroupRoot is a helper method to define mock.On call
+func (_e *MockContainerManager_Expecter) GetSystemPartitionCgroupRoot() *MockContainerManager_GetSystemPartitionCgroupRoot_Call {
+	return &MockContainerManager_GetSystemPartitionCgroupRoot_Call{Call: _e.mock.On("GetSystemPartitionCgroupRoot")}
+}
+
+func (_c *MockContainerManager_GetSystemPartitionCgroupRoot_Call) Run(run func()) *MockContainerManager_GetSystemPartitionCgroupRoot_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockContainerManager_GetSystemPartitionCgroupRoot_Call) Return(s string) *MockContainerManager_GetSystemPartitionCgroupRoot_Call {
+	_c.Call.Return(s)
+	return _c
+}
+
+func (_c *MockContainerManager_GetSystemPartitionCgroupRoot_Call) RunAndReturn(run func() string) *MockContainerManager_GetSystemPartitionCgroupRoot_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // InternalContainerLifecycle provides a mock function for the type MockContainerManager
 func (_mock *MockContainerManager) InternalContainerLifecycle(logger klog.Logger) cm.InternalContainerLifecycle {
 	ret := _mock.Called(logger)
@@ -1357,6 +1401,59 @@ func (_c *MockContainerManager_NewPodContainerManager_Call) Return(podContainerM
 }
 
 func (_c *MockContainerManager_NewPodContainerManager_Call) RunAndReturn(run func() cm.PodContainerManager) *MockContainerManager_NewPodContainerManager_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// PartitionStats provides a mock function for the type MockContainerManager
+func (_mock *MockContainerManager) PartitionStats(logger klog.Logger) map[string]cm.PartitionStats {
+	ret := _mock.Called(logger)
+
+	if len(ret) == 0 {
+		panic("no return value specified for PartitionStats")
+	}
+
+	var r0 map[string]cm.PartitionStats
+	if returnFunc, ok := ret.Get(0).(func(klog.Logger) map[string]cm.PartitionStats); ok {
+		r0 = returnFunc(logger)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(map[string]cm.PartitionStats)
+		}
+	}
+	return r0
+}
+
+// MockContainerManager_PartitionStats_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'PartitionStats'
+type MockContainerManager_PartitionStats_Call struct {
+	*mock.Call
+}
+
+// PartitionStats is a helper method to define mock.On call
+//   - logger klog.Logger
+func (_e *MockContainerManager_Expecter) PartitionStats(logger any) *MockContainerManager_PartitionStats_Call {
+	return &MockContainerManager_PartitionStats_Call{Call: _e.mock.On("PartitionStats", logger)}
+}
+
+func (_c *MockContainerManager_PartitionStats_Call) Run(run func(logger klog.Logger)) *MockContainerManager_PartitionStats_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 klog.Logger
+		if args[0] != nil {
+			arg0 = args[0].(klog.Logger)
+		}
+		run(
+			arg0,
+		)
+	})
+	return _c
+}
+
+func (_c *MockContainerManager_PartitionStats_Call) Return(stringToPartitionStats map[string]cm.PartitionStats) *MockContainerManager_PartitionStats_Call {
+	_c.Call.Return(stringToPartitionStats)
+	return _c
+}
+
+func (_c *MockContainerManager_PartitionStats_Call) RunAndReturn(run func(logger klog.Logger) map[string]cm.PartitionStats) *MockContainerManager_PartitionStats_Call {
 	_c.Call.Return(run)
 	return _c
 }

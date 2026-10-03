@@ -47,7 +47,7 @@ const (
 )
 
 type QOSContainerManager interface {
-	Start(context.Context, func() v1.ResourceList, ActivePodsFunc) error
+	Start(ctx context.Context, getNodeAllocatable func() v1.ResourceList, activePods ActivePodsFunc, podsUnderRoot ActivePodsFunc) error
 	GetQOSContainersInfo() QOSContainersInfo
 	UpdateCgroups(logger klog.Logger) error
 }
@@ -62,6 +62,17 @@ type qosContainerManagerImpl struct {
 	cgroupRoot              CgroupName
 	qosReserved             map[v1.ResourceName]int64
 	memoryReservationPolicy kubeletconfig.MemoryReservationPolicy
+	// skipNodeMetrics is set when the root covers only part of the node's
+	// pods, so that node-wide metrics are not overwritten with a partial sum.
+	// TODO: The node-wide metrics assume a single QoS manager per node. With
+	// several, either compute them from all of the node's pods passed to every
+	// manager, so that they all write the same value, or publish them from the
+	// container manager, which sees the whole node, and drop this field.
+	skipNodeMetrics bool
+	// podsUnderRoot returns all pods whose pod cgroups are under cgroupRoot.
+	// It may be wider than activePods when some pods live in sibling cgroup
+	// hierarchies under the same root, such as a node partition.
+	podsUnderRoot ActivePodsFunc
 }
 
 func NewQOSContainerManager(subsystems *CgroupSubsystems, cgroupRoot CgroupName, nodeConfig NodeConfig, cgroupManager CgroupManager) (QOSContainerManager, error) {
@@ -71,20 +82,36 @@ func NewQOSContainerManager(subsystems *CgroupSubsystems, cgroupRoot CgroupName,
 		}, nil
 	}
 
+	return newQOSContainerManager(subsystems, cgroupRoot, nodeConfig, cgroupManager, false), nil
+}
+
+// newQOSContainerManager returns a QoS manager for the root. skipNodeMetrics
+// is for a root that holds only part of the node's pods.
+func newQOSContainerManager(subsystems *CgroupSubsystems, cgroupRoot CgroupName, nodeConfig NodeConfig, cgroupManager CgroupManager, skipNodeMetrics bool) *qosContainerManagerImpl {
 	return &qosContainerManagerImpl{
 		subsystems:              subsystems,
 		cgroupManager:           cgroupManager,
 		cgroupRoot:              cgroupRoot,
 		qosReserved:             nodeConfig.QOSReserved,
 		memoryReservationPolicy: nodeConfig.MemoryReservationPolicy,
-	}, nil
+		skipNodeMetrics:         skipNodeMetrics,
+	}
+}
+
+// getPodsUnderRoot returns all pods under the root, which are the active pods
+// unless podsUnderRoot says otherwise.
+func (m *qosContainerManagerImpl) getPodsUnderRoot() []*v1.Pod {
+	if m.podsUnderRoot == nil {
+		return m.activePods()
+	}
+	return m.podsUnderRoot()
 }
 
 func (m *qosContainerManagerImpl) GetQOSContainersInfo() QOSContainersInfo {
 	return m.qosContainersInfo
 }
 
-func (m *qosContainerManagerImpl) Start(ctx context.Context, getNodeAllocatable func() v1.ResourceList, activePods ActivePodsFunc) error {
+func (m *qosContainerManagerImpl) Start(ctx context.Context, getNodeAllocatable func() v1.ResourceList, activePods ActivePodsFunc, podsUnderRoot ActivePodsFunc) error {
 	logger := klog.FromContext(ctx)
 	cm := m.cgroupManager
 	rootContainer := m.cgroupRoot
@@ -173,6 +200,7 @@ func (m *qosContainerManagerImpl) Start(ctx context.Context, getNodeAllocatable 
 	}
 	m.getNodeAllocatable = getNodeAllocatable
 	m.activePods = activePods
+	m.podsUnderRoot = podsUnderRoot
 
 	// update qos cgroup tiers on startup and in periodic intervals
 	// to ensure desired state is in sync with actual state.
@@ -242,16 +270,15 @@ func (m *qosContainerManagerImpl) setCPUCgroupConfig(configs map[v1.PodQOSClass]
 	return nil
 }
 
-// getQoSMemoryRequests sums and returns the memory request of all pods for
+// getQoSMemoryRequests sums and returns the memory request of the pods for
 // guaranteed and burstable qos classes.
-func (m *qosContainerManagerImpl) getQoSMemoryRequests() map[v1.PodQOSClass]int64 {
+func getQoSMemoryRequests(pods []*v1.Pod) map[v1.PodQOSClass]int64 {
 	qosMemoryRequests := map[v1.PodQOSClass]int64{
 		v1.PodQOSGuaranteed: 0,
 		v1.PodQOSBurstable:  0,
 	}
 
 	// Sum the pod limits for pods in each QOS class
-	pods := m.activePods()
 	reuseReqs := make(v1.ResourceList, 4)
 	for _, pod := range pods {
 		podMemoryRequest := int64(0)
@@ -274,11 +301,14 @@ func (m *qosContainerManagerImpl) getQoSMemoryRequests() map[v1.PodQOSClass]int6
 	return qosMemoryRequests
 }
 
-// setMemoryReserve sums the memory limits of all pods in a QOS class,
-// calculates QOS class memory limits, and set those limits in the
-// CgroupConfig for each QOS class.
+// setMemoryReserve calculates the QOS class memory limits and sets them in the
+// CgroupConfig for each QOS class. The burstable cgroup is limited so that the
+// requests of every non-best-effort pod under the root but outside it stay
+// reserved, which includes the pods of sibling hierarchies under the root. The
+// best effort cgroup additionally leaves the burstable cgroup's requests.
 func (m *qosContainerManagerImpl) setMemoryReserve(logger klog.Logger, configs map[v1.PodQOSClass]*CgroupConfig, percentReserve int64) {
-	qosMemoryRequests := m.getQoSMemoryRequests()
+	qosMemoryRequests := getQoSMemoryRequests(m.activePods())
+	rootMemoryRequests := getQoSMemoryRequests(m.getPodsUnderRoot())
 
 	resources := m.getNodeAllocatable()
 	allocatableResource, ok := resources[v1.ResourceMemory]
@@ -297,7 +327,12 @@ func (m *qosContainerManagerImpl) setMemoryReserve(logger klog.Logger, configs m
 	}
 
 	// Calculate QOS memory limits
-	burstableLimit := allocatable - (qosMemoryRequests[v1.PodQOSGuaranteed] * percentReserve / 100)
+	// Reserve memory for the guaranteed and burstable pods under the root that
+	// are outside the burstable cgroup. These are the guaranteed pods, plus any
+	// burstable pods in sibling hierarchies such as a node partition.
+	reservedOutsideBurstable := rootMemoryRequests[v1.PodQOSGuaranteed] +
+		rootMemoryRequests[v1.PodQOSBurstable] - qosMemoryRequests[v1.PodQOSBurstable]
+	burstableLimit := allocatable - (reservedOutsideBurstable * percentReserve / 100)
 	bestEffortLimit := burstableLimit - (qosMemoryRequests[v1.PodQOSBurstable] * percentReserve / 100)
 	configs[v1.PodQOSBurstable].ResourceParameters.Memory = &burstableLimit
 	configs[v1.PodQOSBestEffort].ResourceParameters.Memory = &bestEffortLimit
@@ -347,25 +382,32 @@ func (m *qosContainerManagerImpl) setMemoryQoS(logger klog.Logger, configs map[v
 		setUnified(v1.PodQOSGuaranteed, Cgroup2MemoryMin, 0)
 		setUnified(v1.PodQOSGuaranteed, Cgroup2MemoryLow, 0)
 		setUnified(v1.PodQOSBurstable, Cgroup2MemoryLow, 0)
-		kubeletmetrics.MemoryQoSNodeMemoryMinBytes.Set(0)
-		kubeletmetrics.MemoryQoSNodeMemoryLowBytes.Set(0)
+		if !m.skipNodeMetrics {
+			kubeletmetrics.MemoryQoSNodeMemoryMinBytes.Set(0)
+			kubeletmetrics.MemoryQoSNodeMemoryLowBytes.Set(0)
+		}
 		return
 	}
 
-	qosMemoryRequests := m.getQoSMemoryRequests()
+	qosMemoryRequests := getQoSMemoryRequests(m.activePods())
+	rootMemoryRequests := getQoSMemoryRequests(m.getPodsUnderRoot())
 
-	burstableRequests := qosMemoryRequests[v1.PodQOSBurstable]
-	guaranteedRequests := qosMemoryRequests[v1.PodQOSGuaranteed]
+	rootBurstableRequests := rootMemoryRequests[v1.PodQOSBurstable]
+	rootGuaranteedRequests := rootMemoryRequests[v1.PodQOSGuaranteed]
 
-	kubeletmetrics.MemoryQoSNodeMemoryMinBytes.Set(float64(guaranteedRequests))
-	kubeletmetrics.MemoryQoSNodeMemoryLowBytes.Set(float64(burstableRequests))
+	if !m.skipNodeMetrics {
+		kubeletmetrics.MemoryQoSNodeMemoryMinBytes.Set(float64(rootGuaranteedRequests))
+		kubeletmetrics.MemoryQoSNodeMemoryLowBytes.Set(float64(rootBurstableRequests))
+	}
 
 	// Root (kubepods.slice): ancestor coverage for both protection chains.
 	// v1.PodQOSGuaranteed is the map key for the root cgroup, not per-pod config.
-	setUnified(v1.PodQOSGuaranteed, Cgroup2MemoryMin, guaranteedRequests+burstableRequests)
-	setUnified(v1.PodQOSGuaranteed, Cgroup2MemoryLow, burstableRequests)
+	// A pod's protection is bounded by its ancestors', so the root covers all
+	// pods under it, including those of sibling hierarchies.
+	setUnified(v1.PodQOSGuaranteed, Cgroup2MemoryMin, rootGuaranteedRequests+rootBurstableRequests)
+	setUnified(v1.PodQOSGuaranteed, Cgroup2MemoryLow, rootBurstableRequests)
 
-	setUnified(v1.PodQOSBurstable, Cgroup2MemoryLow, burstableRequests)
+	setUnified(v1.PodQOSBurstable, Cgroup2MemoryLow, qosMemoryRequests[v1.PodQOSBurstable])
 }
 
 func (m *qosContainerManagerImpl) UpdateCgroups(logger klog.Logger) error {
@@ -460,7 +502,7 @@ func (m *qosContainerManagerNoop) GetQOSContainersInfo() QOSContainersInfo {
 	return QOSContainersInfo{}
 }
 
-func (m *qosContainerManagerNoop) Start(_ context.Context, _ func() v1.ResourceList, _ ActivePodsFunc) error {
+func (m *qosContainerManagerNoop) Start(_ context.Context, _ func() v1.ResourceList, _ ActivePodsFunc, _ ActivePodsFunc) error {
 	return nil
 }
 

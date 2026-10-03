@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/eviction"
 	"k8s.io/kubernetes/pkg/kubelet/kubeletconfig"
 	kubelettypes "k8s.io/kubernetes/pkg/kubelet/types"
 	utilnode "k8s.io/kubernetes/pkg/util/node"
@@ -317,6 +318,35 @@ func (kl *Kubelet) GetNodeConfig() cm.NodeConfig {
 // GetPodCgroupRoot returns the listeral cgroupfs value for the cgroup containing all pods
 func (kl *Kubelet) GetPodCgroupRoot() string {
 	return kl.containerManager.GetPodCgroupRoot()
+}
+
+// GetSystemPartitionCgroupRoot returns the literal cgroupfs value for the cgroup
+// containing the system partition's pods, or an empty string when the node has no
+// system partition.
+func (kl *Kubelet) GetSystemPartitionCgroupRoot() string {
+	return kl.containerManager.GetSystemPartitionCgroupRoot()
+}
+
+// systemPartitionPodFunc returns a function listing the allocated pods of the
+// system partition, or nil when the node has no system partition. It draws from
+// the same pods as the eviction manager's podFunc, so both rank the same pods.
+func (kl *Kubelet) systemPartitionPodFunc() eviction.ActivePodsFunc {
+	if kl.containerManager.GetSystemPartitionCgroupRoot() == "" {
+		return nil
+	}
+	sp := kl.containerManager.GetNodeConfig().SystemPartition
+	if sp == nil {
+		return nil
+	}
+	return func() []*v1.Pod {
+		var pods []*v1.Pod
+		for _, pod := range kl.getAllocatedPods() {
+			if sp.HasPod(pod) {
+				pods = append(pods, pod)
+			}
+		}
+		return pods
+	}
 }
 
 // getHostIPsAnyWay attempts to return the host IPs from kubelet's nodeInfo, or
