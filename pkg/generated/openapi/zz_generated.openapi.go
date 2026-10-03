@@ -28686,7 +28686,7 @@ func schema_k8sio_api_core_v1_PodSpec(ref common.ReferenceCallback) common.OpenA
 					},
 					"terminationGracePeriodSeconds": {
 						SchemaProps: spec.SchemaProps{
-							Description: "terminationGracePeriodSeconds is the optional duration in seconds the pod needs to terminate gracefully. May be decreased in delete request. Value must be non-negative integer. The value zero indicates stop immediately via the kill signal (no opportunity to shut down). If this value is nil, the default grace period will be used instead. The grace period is the duration in seconds after the processes running in the pod are sent a termination signal and the time when the processes are forcibly halted with a kill signal. Set this value longer than the expected cleanup time for your process. Defaults to 30 seconds.",
+							Description: "terminationGracePeriodSeconds is the optional duration in seconds the pod needs to terminate gracefully. The delete that starts the deletion may override it, later ones may only shorten it. Must be non-negative. Zero makes a delete request that starts the deletion without gracePeriodSeconds a force deletion, which does not wait for the pod to terminate. For each container, the kubelet waits up to the grace period for its preStop hook, then gives the runtime the rest, at least a short minimum, to stop it. Zero does not always skip preStop hooks. Set it above your cleanup time. Defaults to 30 seconds.",
 							Type:        []string{"integer"},
 							Format:      "int64",
 						},
@@ -29785,7 +29785,7 @@ func schema_k8sio_api_core_v1_Probe(ref common.ReferenceCallback) common.OpenAPI
 					},
 					"terminationGracePeriodSeconds": {
 						SchemaProps: spec.SchemaProps{
-							Description: "terminationGracePeriodSeconds is the optional duration in seconds the pod needs to terminate gracefully upon probe failure. The grace period is the duration in seconds after the processes running in the pod are sent a termination signal and the time when the processes are forcibly halted with a kill signal. Set this value longer than the expected cleanup time for your process. If this value is nil, the pod's terminationGracePeriodSeconds will be used. Otherwise, this value overrides the value provided by the pod spec. Value must be non-negative integer. The value zero indicates stop immediately via the kill signal (no opportunity to shut down). This is a beta field and requires enabling ProbeTerminationGracePeriod feature gate. Minimum value is 1. spec.terminationGracePeriodSeconds is used if unset.",
+							Description: "terminationGracePeriodSeconds is the optional duration in seconds the container needs to terminate gracefully upon probe failure. The kubelet waits up to the grace period for the preStop hook to complete, then asks the container runtime to stop the container within the remaining time or a short minimum, whichever is longer. Set this value longer than the expected cleanup time for your process. If this value is nil, the pod's terminationGracePeriodSeconds will be used. Otherwise, this value overrides the value provided by the pod spec. Minimum value is 1. Must not be set for readiness probes.",
 							Type:        []string{"integer"},
 							Format:      "int64",
 						},

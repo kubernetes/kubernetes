@@ -3051,16 +3051,14 @@ type Probe struct {
 	// Defaults to 3. Minimum value is 1.
 	// +optional
 	FailureThreshold int32 `json:"failureThreshold,omitempty" protobuf:"varint,6,opt,name=failureThreshold"`
-	// terminationGracePeriodSeconds is the optional duration in seconds the pod needs to terminate gracefully upon probe failure.
-	// The grace period is the duration in seconds after the processes running in the pod are sent
-	// a termination signal and the time when the processes are forcibly halted with a kill signal.
+	// terminationGracePeriodSeconds is the optional duration in seconds the container needs to terminate gracefully upon probe failure.
+	// The kubelet waits up to the grace period for the preStop hook to complete, then asks the
+	// container runtime to stop the container within the remaining time or a short minimum,
+	// whichever is longer.
 	// Set this value longer than the expected cleanup time for your process.
 	// If this value is nil, the pod's terminationGracePeriodSeconds will be used. Otherwise, this
 	// value overrides the value provided by the pod spec.
-	// Value must be non-negative integer. The value zero indicates stop immediately via
-	// the kill signal (no opportunity to shut down).
-	// This is a beta field and requires enabling ProbeTerminationGracePeriod feature gate.
-	// Minimum value is 1. spec.terminationGracePeriodSeconds is used if unset.
+	// Minimum value is 1. Must not be set for readiness probes.
 	// +optional
 	TerminationGracePeriodSeconds *int64 `json:"terminationGracePeriodSeconds,omitempty" protobuf:"varint,7,opt,name=terminationGracePeriodSeconds"`
 }
@@ -4510,13 +4508,13 @@ type PodSpec struct {
 	// More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#restart-policy
 	// +optional
 	RestartPolicy RestartPolicy `json:"restartPolicy,omitempty" protobuf:"bytes,3,opt,name=restartPolicy,casttype=RestartPolicy"`
-	// terminationGracePeriodSeconds is the optional duration in seconds the pod needs to terminate gracefully. May be decreased in delete request.
-	// Value must be non-negative integer. The value zero indicates stop immediately via
-	// the kill signal (no opportunity to shut down).
-	// If this value is nil, the default grace period will be used instead.
-	// The grace period is the duration in seconds after the processes running in the pod are sent
-	// a termination signal and the time when the processes are forcibly halted with a kill signal.
-	// Set this value longer than the expected cleanup time for your process.
+	// terminationGracePeriodSeconds is the optional duration in seconds the pod needs to terminate gracefully.
+	// The delete that starts the deletion may override it, later ones may only shorten it.
+	// Must be non-negative. Zero makes a delete request that starts the deletion
+	// without gracePeriodSeconds a force deletion, which does not wait for the pod to terminate.
+	// For each container, the kubelet waits up to the grace period for its preStop hook,
+	// then gives the runtime the rest, at least a short minimum, to stop it.
+	// Zero does not always skip preStop hooks. Set it above your cleanup time.
 	// Defaults to 30 seconds.
 	// +optional
 	TerminationGracePeriodSeconds *int64 `json:"terminationGracePeriodSeconds,omitempty" protobuf:"varint,4,opt,name=terminationGracePeriodSeconds"`
