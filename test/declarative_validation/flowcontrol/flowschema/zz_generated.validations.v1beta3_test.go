@@ -42,6 +42,12 @@ func init() {
 			"metadata.generation": {
 				{ErrorType: "FieldValueInvalid", Origin: "minimum"},
 			},
+			"metadata.labels": {
+				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-label-key"},
+			},
+			"metadata.labels[*]": {
+				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-label-value"},
+			},
 			"metadata.managedFields[*].operation": {
 				{ErrorType: "FieldValueNotSupported"},
 				{ErrorType: "FieldValueRequired"},
