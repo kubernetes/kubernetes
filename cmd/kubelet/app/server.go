@@ -1466,14 +1466,33 @@ func parseSystemPartition(logger klog.Logger, machineInfo *cadvisorapi.MachineIn
 	parsed := &cm.SystemPartitionConfig{
 		Namespaces: sets.New(sp.Namespaces...),
 	}
+	var memoryLimit resource.Quantity
 	if sp.MemoryLimit != "" {
 		q, err := resource.ParseQuantity(sp.MemoryLimit)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse memoryLimit %q: %w", sp.MemoryLimit, err)
 		}
+		memoryLimit = q
 		limit := q.Value()
 		parsed.MemoryLimit = &limit
 	}
+	thresholds, err := eviction.ParseSystemPartitionThresholds(sp.EvictionHard)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse evictionHard %q: %w", sp.EvictionHard, err)
+	}
+	// The memory left in the partition is measured against memoryLimit, so
+	// there is nothing to measure without one.
+	if len(sp.EvictionHard) > 0 && parsed.MemoryLimit == nil {
+		return nil, fmt.Errorf("evictionHard requires memoryLimit to be set")
+	}
+	for _, threshold := range thresholds {
+		// A threshold at or above the limit is met all the time, and would keep
+		// evicting the partition's Pods however little they use.
+		if q := evictionapi.GetThresholdQuantity(threshold.Value, &memoryLimit); q.Cmp(memoryLimit) >= 0 {
+			return nil, fmt.Errorf("evictionHard %v %q must be less than memoryLimit %q", evictionapi.SignalMemoryAvailable, sp.EvictionHard[string(evictionapi.SignalMemoryAvailable)], sp.MemoryLimit)
+		}
+	}
+	parsed.EvictionThresholds = thresholds
 	if sp.CPUSet != "" {
 		cpus, err := cpuset.Parse(sp.CPUSet)
 		if err != nil {

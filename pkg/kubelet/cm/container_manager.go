@@ -212,6 +212,9 @@ type SystemPartitionConfig struct {
 	MemoryLimit *int64
 	CPUSet      cpuset.CPUSet
 	Namespaces  sets.Set[string]
+	// EvictionThresholds are enforced against the memory left in the partition,
+	// and only evict the partition's Pods.
+	EvictionThresholds []evictionapi.Threshold
 }
 
 // HasPod returns true if the pod belongs to the system partition and must
