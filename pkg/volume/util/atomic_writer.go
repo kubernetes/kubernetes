@@ -85,6 +85,23 @@ const (
 	newDataDirName = "..data_tmp"
 )
 
+// IsTargetPopulated reports whether the given AtomicWriter target directory has
+// already been successfully written to at least once. It is detected via the
+// presence of the "..data" symlink, which Write only creates after a payload has
+// been fully and atomically projected. Volume plugins use this to distinguish a
+// first-time setup from a periodic resync: an already-populated directory may be
+// bind-mounted into a running container, so it must not be torn down when a later
+// write fails (see https://github.com/kubernetes/kubernetes/issues/113242).
+//
+// Only a definitive "does not exist" is treated as not-populated. On any other
+// Lstat error (e.g. a transient failure) the target is conservatively reported as
+// populated, so a volume that may be bind-mounted into a running container is not
+// torn down on the basis of an inconclusive check.
+func IsTargetPopulated(targetDir string) bool {
+	_, err := os.Lstat(filepath.Join(targetDir, dataDirName))
+	return !os.IsNotExist(err)
+}
+
 // Write does an atomic projection of the given payload into the writer's target
 // directory.  Input paths must not begin with '..'.
 // setPerms is an optional pointer to a function that caller can provide to set the
@@ -196,6 +213,16 @@ func (w *AtomicWriter) Write(payload map[string]FileProjection, setPerms func(su
 			return err
 		}
 		tsDirName := filepath.Base(tsDir)
+		published := false
+		defer func() {
+			// A failed resync must reclaim its staging data without removing
+			// the volume root or a generation that readers can already see.
+			if !published {
+				if err := os.RemoveAll(tsDir); err != nil {
+					klog.Errorf("%s: error removing new ts directory %s: %v", w.logContext, tsDir, err)
+				}
+			}
+		}()
 
 		// (6)
 		if err = w.writePayloadToDir(cleanPayload, tsDir); err != nil {
@@ -215,14 +242,15 @@ func (w *AtomicWriter) Write(payload map[string]FileProjection, setPerms func(su
 		// (8)
 		newDataDirPath := filepath.Join(w.targetDir, newDataDirName)
 		if err = os.Symlink(tsDirName, newDataDirPath); err != nil {
-			if err := os.RemoveAll(tsDir); err != nil {
-				klog.Errorf("%s: error removing new ts directory %s: %v", w.logContext, tsDir, err)
-			}
 			klog.Errorf("%s: error creating symbolic link for atomic update: %v", w.logContext, err)
 			return err
 		}
 
 		// (9)
+		// On Windows the swap is not atomic: the existing data directory symlink
+		// is removed before the new one is created. If creating the new symlink
+		// fails, the target is left without a data directory symlink, and so no
+		// longer reports as populated, until the next successful write.
 		if runtime.GOOS == "windows" {
 			if err := os.Remove(dataDirPath); err != nil {
 				klog.Errorf("%s: error removing data dir directory %s: %v", w.logContext, dataDirPath, err)
@@ -238,12 +266,10 @@ func (w *AtomicWriter) Write(payload map[string]FileProjection, setPerms func(su
 			if err := os.Remove(newDataDirPath); err != nil && err != os.ErrNotExist {
 				klog.Errorf("%s: error removing new data dir directory %s: %v", w.logContext, newDataDirPath, err)
 			}
-			if err := os.RemoveAll(tsDir); err != nil {
-				klog.Errorf("%s: error removing new ts directory %s: %v", w.logContext, tsDir, err)
-			}
 			klog.Errorf("%s: error renaming symbolic link for data directory %s: %v", w.logContext, newDataDirPath, err)
 			return err
 		}
+		published = true
 	}
 
 	// (10)
@@ -410,6 +436,9 @@ func (w *AtomicWriter) newTimestampDir() (string, error) {
 	err = os.Chmod(tsDir, 0755)
 	if err != nil {
 		klog.Errorf("%s: unable to set mode on new temp directory: %v", w.logContext, err)
+		if removeErr := os.RemoveAll(tsDir); removeErr != nil {
+			klog.Errorf("%s: error removing new ts directory %s: %v", w.logContext, tsDir, removeErr)
+		}
 		return "", err
 	}
 
