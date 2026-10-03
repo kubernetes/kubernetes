@@ -137,11 +137,19 @@ var baseOpts = []VersionedOptions{
 			ext.Sets(),
 		},
 	},
+	// IP Library
 	{
 		IntroducedVersion: version.MajorMinor(1, 30),
 		EnvOptions: []cel.EnvOption{
 			UnversionedLib(library.IP),
-			UnversionedLib(library.CIDR),
+		},
+	},
+	// CIDR Library v0
+	{
+		IntroducedVersion: version.MajorMinor(1, 30),
+		RemovedVersion:    version.MajorMinor(1, 37),
+		EnvOptions: []cel.EnvOption{
+			library.CIDR(library.CIDRVersion(0)),
 		},
 	},
 	// Format Library
@@ -183,6 +191,13 @@ var baseOpts = []VersionedOptions{
 		IntroducedVersion: version.MajorMinor(1, 37),
 		EnvOptions: []cel.EnvOption{
 			library.Lists(library.ListsVersion(1)),
+		},
+	},
+	// CIDR Library v1
+	{
+		IntroducedVersion: version.MajorMinor(1, 37),
+		EnvOptions: []cel.EnvOption{
+			library.CIDR(library.CIDRVersion(1)),
 		},
 	},
 	StrictCostOpt,
