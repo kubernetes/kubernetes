@@ -232,9 +232,9 @@ type PodWorkers interface {
 	//
 	// Intended for use by subsystem sync loops to know when to start tearing down
 	// resources that are used by running containers. Callers should ensure that
-	// runtime content they own is not required for post-termination - for instance
-	// containers are required in docker to preserve pod logs until after the pod
-	// is deleted.
+	// runtime content they own is not required for post-termination. For instance,
+	// kubelet still uses runtime container status to locate pod logs, and its
+	// normal container removal path removes those logs.
 	ShouldPodRuntimeBeRemoved(uid types.UID) bool
 	// ShouldPodContentBeRemoved returns true if resource managers within the Kubelet
 	// should aggressively cleanup all content related to the pod. This is true
