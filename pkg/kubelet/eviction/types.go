@@ -55,6 +55,9 @@ type Config struct {
 	KernelMemcgNotification bool
 	// PodCgroupRoot is the cgroup which contains all pods.
 	PodCgroupRoot string
+	// SystemPartitionHasPod reports whether the pod is in the node's system
+	// partition. It is nil when the node has no system partition.
+	SystemPartitionHasPod func(pod *v1.Pod) bool
 }
 
 // Manager evaluates when an eviction threshold for node stability has been met on the node.
