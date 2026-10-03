@@ -1771,6 +1771,66 @@ func Test_isSchedulableAfterNodeChange(t *testing.T) {
 			}).Obj(),
 			expectedHint: fwk.Queue,
 		},
+		"queue-nominated-pod-when-nominated-node-memory-decreases": {
+			pod: func() *v1.Pod {
+				p := newResourcePod(framework.Resource{Memory: 4})
+				p.Status.NominatedNodeName = "target-node"
+				return p
+			}(),
+			oldObj: st.MakeNode().Name("target-node").Capacity(map[v1.ResourceName]string{
+				v1.ResourceMemory: "8",
+			}).Obj(),
+			newObj: st.MakeNode().Name("target-node").Capacity(map[v1.ResourceName]string{
+				v1.ResourceMemory: "2",
+			}).Obj(),
+			expectedHint: fwk.Queue,
+		},
+		"queue-nominated-pod-when-nominated-node-scalar-resource-decreases": {
+			pod: func() *v1.Pod {
+				p := newResourcePod(framework.Resource{
+					ScalarResources: map[v1.ResourceName]int64{extendedResourceA: 2},
+				})
+				p.Status.NominatedNodeName = "target-node"
+				return p
+			}(),
+			oldObj: st.MakeNode().Name("target-node").Capacity(map[v1.ResourceName]string{
+				extendedResourceA: "4",
+			}).Obj(),
+			newObj: st.MakeNode().Name("target-node").Capacity(map[v1.ResourceName]string{
+				extendedResourceA: "1",
+			}).Obj(),
+			expectedHint: fwk.Queue,
+		},
+		"skip-queue-nominated-pod-when-non-requested-resource-decreases-on-nominated-node": {
+			pod: func() *v1.Pod {
+				p := newResourcePod(framework.Resource{Memory: 4})
+				p.Status.NominatedNodeName = "target-node"
+				return p
+			}(),
+			oldObj: st.MakeNode().Name("target-node").Capacity(map[v1.ResourceName]string{
+				v1.ResourceMemory: "8",
+				extendedResourceA: "4",
+			}).Obj(),
+			newObj: st.MakeNode().Name("target-node").Capacity(map[v1.ResourceName]string{
+				v1.ResourceMemory: "8",
+				extendedResourceA: "1",
+			}).Obj(),
+			expectedHint: fwk.QueueSkip,
+		},
+		"skip-queue-nominated-pod-when-different-node-decreases": {
+			pod: func() *v1.Pod {
+				p := newResourcePod(framework.Resource{Memory: 4})
+				p.Status.NominatedNodeName = "target-node"
+				return p
+			}(),
+			oldObj: st.MakeNode().Name("other-node").Capacity(map[v1.ResourceName]string{
+				v1.ResourceMemory: "8",
+			}).Obj(),
+			newObj: st.MakeNode().Name("other-node").Capacity(map[v1.ResourceName]string{
+				v1.ResourceMemory: "2",
+			}).Obj(),
+			expectedHint: fwk.QueueSkip,
+		},
 	}
 
 	for name, tc := range testcases {
@@ -2339,6 +2399,111 @@ func testHaveAnyRequestedResourcesIncreased(tCtx ktesting.TContext) {
 			}
 			if got := haveAnyRequestedResourcesIncreased(tc.pod, tc.originalNode, tc.modifiedNode, draManager, ResourceRequestsOptions{EnableDRAExtendedResource: tc.draExtendedResourceEnabled}); got != tc.expected {
 				tCtx.Errorf("expected: %v, got: %v", tc.expected, got)
+			}
+		})
+	}
+}
+
+func TestHaveAnyRequestedResourcesDecreased(t *testing.T) {
+	testCases := map[string]struct {
+		pod          *v1.Pod
+		originalNode *v1.Node
+		modifiedNode *v1.Node
+		expected     bool
+	}{
+		"no-requested-resources": {
+			pod: newResourcePod(framework.Resource{}),
+			originalNode: st.MakeNode().Capacity(map[v1.ResourceName]string{
+				v1.ResourceCPU:    "2",
+				v1.ResourceMemory: "2",
+			}).Obj(),
+			modifiedNode: st.MakeNode().Capacity(map[v1.ResourceName]string{
+				v1.ResourceCPU:    "1",
+				v1.ResourceMemory: "1",
+			}).Obj(),
+			expected: false,
+		},
+		"cpu-decreased": {
+			pod: newResourcePod(framework.Resource{MilliCPU: 500}),
+			originalNode: st.MakeNode().Capacity(map[v1.ResourceName]string{
+				v1.ResourceCPU: "2",
+			}).Obj(),
+			modifiedNode: st.MakeNode().Capacity(map[v1.ResourceName]string{
+				v1.ResourceCPU: "1",
+			}).Obj(),
+			expected: true,
+		},
+		"memory-decreased": {
+			pod: newResourcePod(framework.Resource{Memory: 4}),
+			originalNode: st.MakeNode().Capacity(map[v1.ResourceName]string{
+				v1.ResourceMemory: "8",
+			}).Obj(),
+			modifiedNode: st.MakeNode().Capacity(map[v1.ResourceName]string{
+				v1.ResourceMemory: "2",
+			}).Obj(),
+			expected: true,
+		},
+		"ephemeral-storage-decreased": {
+			pod: newResourcePod(framework.Resource{EphemeralStorage: 4}),
+			originalNode: st.MakeNode().Capacity(map[v1.ResourceName]string{
+				v1.ResourceEphemeralStorage: "8",
+			}).Obj(),
+			modifiedNode: st.MakeNode().Capacity(map[v1.ResourceName]string{
+				v1.ResourceEphemeralStorage: "2",
+			}).Obj(),
+			expected: true,
+		},
+		"scalar-resource-decreased": {
+			pod: newResourcePod(framework.Resource{
+				ScalarResources: map[v1.ResourceName]int64{extendedResourceA: 2},
+			}),
+			originalNode: st.MakeNode().Capacity(map[v1.ResourceName]string{
+				extendedResourceA: "4",
+			}).Obj(),
+			modifiedNode: st.MakeNode().Capacity(map[v1.ResourceName]string{
+				extendedResourceA: "1",
+			}).Obj(),
+			expected: true,
+		},
+		"non-requested-resource-decreased": {
+			pod: newResourcePod(framework.Resource{MilliCPU: 500}),
+			originalNode: st.MakeNode().Capacity(map[v1.ResourceName]string{
+				v1.ResourceCPU:    "2",
+				v1.ResourceMemory: "8",
+			}).Obj(),
+			modifiedNode: st.MakeNode().Capacity(map[v1.ResourceName]string{
+				v1.ResourceCPU:    "2",
+				v1.ResourceMemory: "2",
+			}).Obj(),
+			expected: false,
+		},
+		"resources-increased-not-decreased": {
+			pod: newResourcePod(framework.Resource{Memory: 2}),
+			originalNode: st.MakeNode().Capacity(map[v1.ResourceName]string{
+				v1.ResourceMemory: "4",
+			}).Obj(),
+			modifiedNode: st.MakeNode().Capacity(map[v1.ResourceName]string{
+				v1.ResourceMemory: "8",
+			}).Obj(),
+			expected: false,
+		},
+		"resources-unchanged": {
+			pod: newResourcePod(framework.Resource{Memory: 2, MilliCPU: 500}),
+			originalNode: st.MakeNode().Capacity(map[v1.ResourceName]string{
+				v1.ResourceCPU:    "2",
+				v1.ResourceMemory: "4",
+			}).Obj(),
+			modifiedNode: st.MakeNode().Capacity(map[v1.ResourceName]string{
+				v1.ResourceCPU:    "2",
+				v1.ResourceMemory: "4",
+			}).Obj(),
+			expected: false,
+		},
+	}
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			if got := haveAnyRequestedResourcesDecreased(tc.pod, tc.originalNode, tc.modifiedNode, ResourceRequestsOptions{}); got != tc.expected {
+				t.Errorf("expected %v, got %v", tc.expected, got)
 			}
 		})
 	}
