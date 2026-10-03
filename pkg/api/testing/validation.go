@@ -155,6 +155,11 @@ func VerifyVersionedValidationEquivalence(t *testing.T, obj, old runtime.Object,
 			if !found {
 				continue // done already
 			}
+
+			for _, mapFunc := range opts.MapErrorLists {
+				lv, rv = mapFunc(lk, rk, lv, rv)
+			}
+
 			if len(lv) != len(rv) {
 				t.Errorf("different error count (%d vs. %d)\n%s: %v\n%s: %v", len(lv), len(rv), lk, fmtErrs(lv), rk, fmtErrs(rv))
 				continue
@@ -221,6 +226,8 @@ func convertToInternal(t *testing.T, scheme *runtime.Scheme, obj runtime.Object)
 
 type ValidationTestConfig func(*validationOption)
 
+type MapErrorListForGroupVersions func(gvLeft, gvRight string, errListLeft, errListRight field.ErrorList) (newErrListLeft, newErrListRight field.ErrorList)
+
 // validationOptions encapsulates optional parameters for validation equivalence tests.
 type validationOption struct {
 	// SubResources are the subresources to validate.
@@ -231,6 +238,9 @@ type validationOption struct {
 	// IgnoreObjectConversions skips the tests if the conversion from the internal object
 	// to the versioned object fails.
 	IgnoreObjectConversionErrors bool
+
+	// MapErrorLists allows ignoring specific differences between API versions, e.g. missing fields.
+	MapErrorLists []MapErrorListForGroupVersions
 
 	// Fuzzer is the fuzzer to use for generating test objects.
 	Fuzzer *randfill.Filler
@@ -254,6 +264,13 @@ func WithSubResources(subResources ...string) ValidationTestConfig {
 func WithNormalizationRules(rules ...field.NormalizationRule) ValidationTestConfig {
 	return func(o *validationOption) {
 		o.NormalizationRules = rules
+	}
+}
+
+// WithMapErrorListsFuncs allows ignoring specific differences between API versions, e.g. missing fields.
+func WithMapErrorListsFuncs(mapErrorListFuncs ...MapErrorListForGroupVersions) ValidationTestConfig {
+	return func(o *validationOption) {
+		o.MapErrorLists = append(o.MapErrorLists, mapErrorListFuncs...)
 	}
 }
 

@@ -30,3 +30,7 @@ func Convert_v1beta1_EgressSelection_To_apiserver_EgressSelection(in *EgressSele
 	}
 	return nil
 }
+
+func Convert_apiserver_WebhookConfiguration_To_v1beta1_WebhookConfiguration(in *apiserver.WebhookConfiguration, out *WebhookConfiguration, s conversion.Scope) error {
+	return autoConvert_apiserver_WebhookConfiguration_To_v1beta1_WebhookConfiguration(in, out, s)
+}
