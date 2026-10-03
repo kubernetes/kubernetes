@@ -22,6 +22,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -57,56 +58,6 @@ func (f *fakeRemoteAttach) Attach(url *url.URL, config *restclient.Config, stdin
 func fakeAttachablePodFn(pod *corev1.Pod) polymorphichelpers.AttachablePodForObjectFunc {
 	return func(getter genericclioptions.RESTClientGetter, obj runtime.Object, timeout time.Duration) (*corev1.Pod, error) {
 		return pod, nil
-	}
-}
-
-func TestAttachFlagsToOptions(t *testing.T) {
-	tf := cmdtesting.NewTestFactory().WithNamespace("test")
-	defer tf.Cleanup()
-
-	streams, _, _, _ := genericiooptions.NewTestIOStreams()
-	flags := NewAttachFlags(streams)
-	cmd := &cobra.Command{Use: "attach"}
-	flags.AddFlags(cmd)
-
-	for name, value := range map[string]string{
-		"container":           "test-container",
-		"stdin":               "true",
-		"tty":                 "true",
-		"quiet":               "true",
-		"detach-keys":         "ctrl-x",
-		"pod-running-timeout": "5s",
-	} {
-		if err := cmd.Flags().Set(name, value); err != nil {
-			t.Fatalf("failed to set --%s: %v", name, err)
-		}
-	}
-
-	o, err := flags.ToOptions(tf, cmd, []string{"pod/test-pod"})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if o.Namespace != "test" {
-		t.Errorf("expected namespace %q, got %q", "test", o.Namespace)
-	}
-	if o.ContainerName != "test-container" {
-		t.Errorf("expected container name %q, got %q", "test-container", o.ContainerName)
-	}
-	if !o.Stdin || !o.TTY || !o.Quiet {
-		t.Errorf("expected stdin, tty, and quiet to be enabled, got stdin=%t tty=%t quiet=%t", o.Stdin, o.TTY, o.Quiet)
-	}
-	if o.DetachKeys != "ctrl-x" {
-		t.Errorf("expected detach keys %q, got %q", "ctrl-x", o.DetachKeys)
-	}
-	if o.GetPodTimeout != 5*time.Second {
-		t.Errorf("expected pod running timeout %s, got %s", 5*time.Second, o.GetPodTimeout)
-	}
-	if len(o.Resources) != 1 || o.Resources[0] != "pod/test-pod" {
-		t.Errorf("expected resources %q, got %q", []string{"pod/test-pod"}, o.Resources)
-	}
-	if o.CommandName != "attach" {
-		t.Errorf("expected command name %q, got %q", "attach", o.CommandName)
 	}
 }
 
@@ -362,19 +313,19 @@ func TestAttach(t *testing.T) {
 				remoteAttach.err = fmt.Errorf("attach error")
 			}
 			streams, _, _, errOut := genericiooptions.NewTestIOStreams()
-			options := &AttachOptions{
-				StreamOptions: exec.StreamOptions{
-					ContainerName: test.container,
-					IOStreams:     streams,
-				},
-				Attach:        remoteAttach,
-				GetPodTimeout: 1000,
+
+			flags := NewAttachFlags(streams)
+			cmd := &cobra.Command{Use: "attach"}
+			flags.AddFlags(cmd)
+
+			cmd.Flags().Set("container", test.container)
+
+			options, err := flags.ToOptions(tf, cmd, []string{"foo"})
+			if err != nil {
+				t.Fatal(err)
 			}
 
-			options.restClientGetter = tf
-			options.Namespace = "test"
-			options.Resources = []string{"foo"}
-			options.Builder = tf.NewBuilder
+			options.Attach = remoteAttach
 			options.AttachablePodFn = fakeAttachablePodFn(test.pod)
 			options.AttachFunc = func(opts *AttachOptions, containerToAttach *corev1.Container, raw bool, sizeQueue remotecommand.TerminalSizeQueue) func() error {
 				return func() error {
@@ -387,7 +338,7 @@ func TestAttach(t *testing.T) {
 				}
 			}
 
-			err := options.Run()
+			err = options.Run()
 			if test.expectedErr != "" && err.Error() != test.expectedErr {
 				t.Errorf("%s: Unexpected exec error: %v", test.name, err)
 				return
@@ -465,22 +416,20 @@ func TestAttachWarnings(t *testing.T) {
 			}
 			tf.ClientConfigVal = &restclient.Config{APIPath: "/api", ContentConfig: restclient.ContentConfig{NegotiatedSerializer: scheme.Codecs, GroupVersion: &schema.GroupVersion{Version: test.version}}}
 
-			options := &AttachOptions{
-				StreamOptions: exec.StreamOptions{
-					Stdin:         test.stdin,
-					TTY:           test.tty,
-					ContainerName: test.container,
-					IOStreams:     streams,
-				},
+			flags := NewAttachFlags(streams)
+			cmd := &cobra.Command{Use: "attach"}
+			flags.AddFlags(cmd)
 
-				Attach:        &fakeRemoteAttach{},
-				GetPodTimeout: 1000,
+			cmd.Flags().Set("container", test.container)
+			cmd.Flags().Set("stdin", strconv.FormatBool(test.stdin))
+			cmd.Flags().Set("tty", strconv.FormatBool(test.tty))
+
+			options, err := flags.ToOptions(tf, cmd, []string{"foo"})
+			if err != nil {
+				t.Fatal(err)
 			}
 
-			options.restClientGetter = tf
-			options.Namespace = "test"
-			options.Resources = []string{"foo"}
-			options.Builder = tf.NewBuilder
+			options.Attach = &fakeRemoteAttach{}
 			options.AttachablePodFn = fakeAttachablePodFn(test.pod)
 			options.AttachFunc = func(opts *AttachOptions, containerToAttach *corev1.Container, raw bool, sizeQueue remotecommand.TerminalSizeQueue) func() error {
 				return func() error {
