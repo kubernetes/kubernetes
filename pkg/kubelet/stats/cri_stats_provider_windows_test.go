@@ -463,6 +463,14 @@ func Test_criStatsProvider_makeWinContainerStats(t *testing.T) {
 	memoryUsagePageFaults := uint64(200)
 	logStatsUsed := uint64(5000)
 	logStatsInodesUsed := uint64(5050)
+	// CRI reports the writable layer usage of the Windows container rootfs.
+	writableLayerUsedBytes := uint64(0x77778888)
+	// The node-level filesystem stats that back the container rootfs capacity
+	// and available bytes (matched by the writable layer's FS mountpoint).
+	rootFsMountpoint := "C:"
+	rootFsAvailableBytes := uint64(0x11112222)
+	rootFsCapacityBytes := uint64(0xAAAA0000)
+	rootFsUsageBytes := writableLayerUsedBytes
 
 	// getPodContainerLogStats is called during makeWindowsContainerStats to populate ContainerStats.Logs
 	c0LogStats := &volume.Metrics{
@@ -510,6 +518,18 @@ func Test_criStatsProvider_makeWinContainerStats(t *testing.T) {
 				Value: memoryUsagePageFaults,
 			},
 		},
+		// The writable layer is what the Windows runtime charges against the
+		// per-container rootfs cap. Verify it is surfaced as container rootfs
+		// usage in the summary API.
+		WritableLayer: &runtimeapi.WindowsFilesystemUsage{
+			Timestamp: int64(777777),
+			FsId: &runtimeapi.FilesystemIdentifier{
+				Mountpoint: rootFsMountpoint,
+			},
+			UsedBytes: &runtimeapi.UInt64Value{
+				Value: writableLayerUsedBytes,
+			},
+		},
 	}
 
 	inputContainer := &runtimeapi.Container{
@@ -528,8 +548,17 @@ func Test_criStatsProvider_makeWinContainerStats(t *testing.T) {
 		Uid:       "sb0-uid",
 	}
 
+	fsIDtoInfo := map[string]*cadvisorapi.FsInfo{
+		rootFsMountpoint: {
+			Mountpoint: rootFsMountpoint,
+			Available:  rootFsAvailableBytes,
+			Capacity:   rootFsCapacityBytes,
+			Usage:      rootFsUsageBytes,
+		},
+	}
+
 	logger, _ := ktesting.NewTestContext(t)
-	got, err := p.makeWinContainerStats(logger, inputStats, inputContainer, inputRootFsInfo, make(map[string]*cadvisorapi.FsInfo), inputPodSandboxMetadata)
+	got, err := p.makeWinContainerStats(logger, inputStats, inputContainer, inputRootFsInfo, fsIDtoInfo, inputPodSandboxMetadata)
 
 	expected := &statsapi.ContainerStats{
 		Name:      "c0",
@@ -546,7 +575,12 @@ func Test_criStatsProvider_makeWinContainerStats(t *testing.T) {
 			WorkingSetBytes: ptr.To[uint64](memoryUsageWorkingSetBytes),
 			PageFaults:      ptr.To[uint64](memoryUsagePageFaults),
 		},
-		Rootfs: &statsapi.FsStats{},
+		Rootfs: &statsapi.FsStats{
+			Time:           v1.NewTime(time.Unix(0, int64(777777))),
+			UsedBytes:      ptr.To[uint64](writableLayerUsedBytes),
+			AvailableBytes: ptr.To[uint64](rootFsAvailableBytes),
+			CapacityBytes:  ptr.To[uint64](rootFsCapacityBytes),
+		},
 		Logs: &statsapi.FsStats{
 			Time:       c0LogStats.Time,
 			UsedBytes:  ptr.To[uint64](logStatsUsed),
