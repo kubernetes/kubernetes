@@ -425,11 +425,24 @@ func normalizeElementOrder(patch, serverOnly, patchOrder, serverOrder []interfac
 // example usage: using server-only items as left and patch items as right. We insert server-only items
 // to patch list. We use the order of live object as record for comparison.
 func mergeSortedSlice(left, right, serverOrder []interface{}, mergeKey string, kind reflect.Kind) []interface{} {
+	var orderIndex *sliceOrderIndex
+	if len(serverOrder) >= 32 && len(left)+len(right) >= 32 && len(left) > 0 && len(right) > 0 {
+		lookup := newSliceOrderIndex(serverOrder, mergeKey, kind, len(left)+len(right))
+		if lookup.positions != nil {
+			orderIndex = &lookup
+		}
+	}
 	// Returns if l is less than r, and if both have been found.
 	// If l and r both present and l is in front of r, l is less than r.
 	less := func(l, r interface{}) (bool, bool) {
-		li := index(serverOrder, l, mergeKey, kind)
-		ri := index(serverOrder, r, mergeKey, kind)
+		var li, ri int
+		if orderIndex == nil {
+			li = index(serverOrder, l, mergeKey, kind)
+			ri = index(serverOrder, r, mergeKey, kind)
+		} else {
+			li = orderIndex.index(l)
+			ri = orderIndex.index(r)
+		}
 		if li >= 0 && ri >= 0 {
 			return li < ri, true
 		} else {
@@ -497,6 +510,71 @@ func index(l []interface{}, valToLookUp interface{}, mergeKey string, kind refle
 	return -1
 }
 
+type sliceOrderIndex struct {
+	order     []interface{}
+	mergeKey  string
+	kind      reflect.Kind
+	positions map[interface{}]int
+}
+
+func newSliceOrderIndex(order []interface{}, mergeKey string, kind reflect.Kind, itemCount int) sliceOrderIndex {
+	result := sliceOrderIndex{order: order, mergeKey: mergeKey, kind: kind}
+	// Short lists do not repay the cost of allocating and filling an index.
+	if len(order) < 32 || itemCount < 32 {
+		return result
+	}
+	positions := make(map[interface{}]int, len(order))
+	for i, item := range order {
+		value := sliceOrderValue(item, mergeKey, kind)
+		// Retain the linear lookup for values that cannot be used as map keys.
+		if !sliceOrderValueComparable(value) {
+			return result
+		}
+		if _, found := positions[value]; !found {
+			positions[value] = i
+		}
+	}
+	result.positions = positions
+	return result
+}
+
+func (s *sliceOrderIndex) index(item interface{}) int {
+	if s.positions == nil {
+		return index(s.order, item, s.mergeKey, s.kind)
+	}
+	value := sliceOrderValue(item, s.mergeKey, s.kind)
+	if !sliceOrderValueComparable(value) {
+		return -1
+	}
+	if position, found := s.positions[value]; found {
+		return position
+	}
+	return -1
+}
+
+func sliceOrderValue(item interface{}, mergeKey string, kind reflect.Kind) interface{} {
+	if kind == reflect.Map {
+		typedItem, _ := item.(map[string]interface{})
+		return typedItem[mergeKey]
+	}
+	return item
+}
+
+func sliceOrderValueComparable(value interface{}) bool {
+	valueType := reflect.TypeOf(value)
+	if valueType == nil {
+		return true
+	}
+	if !valueType.Comparable() {
+		return false
+	}
+	// Arrays and structs can contain interfaces holding uncomparable values.
+	if valueType.Kind() == reflect.Array || valueType.Kind() == reflect.Struct {
+		return reflect.ValueOf(value).Comparable()
+	}
+	return true
+}
+
 // extractToDeleteItems takes a list and
 // returns 2 lists: one contains items that should be kept and the other contains items to be deleted.
 func extractToDeleteItems(l []interface{}) ([]interface{}, []interface{}, error) {
@@ -532,14 +610,26 @@ func normalizeSliceOrder(toSort, order []interface{}, mergeKey string, kind refl
 		}
 	}
 
-	sort.SliceStable(toSort, func(i, j int) bool {
-		if ii := index(order, toSort[i], mergeKey, kind); ii >= 0 {
-			if ij := index(order, toSort[j], mergeKey, kind); ij >= 0 {
-				return ii < ij
+	if len(order) < 32 || len(toSort) < 32 {
+		sort.SliceStable(toSort, func(i, j int) bool {
+			if ii := index(order, toSort[i], mergeKey, kind); ii >= 0 {
+				if ij := index(order, toSort[j], mergeKey, kind); ij >= 0 {
+					return ii < ij
+				}
 			}
-		}
-		return true
-	})
+			return true
+		})
+	} else {
+		orderIndex := newSliceOrderIndex(order, mergeKey, kind, len(toSort))
+		sort.SliceStable(toSort, func(i, j int) bool {
+			if ii := orderIndex.index(toSort[i]); ii >= 0 {
+				if ij := orderIndex.index(toSort[j]); ij >= 0 {
+					return ii < ij
+				}
+			}
+			return true
+		})
+	}
 	toSort = append(toSort, toDelete...)
 	return toSort, nil
 }
