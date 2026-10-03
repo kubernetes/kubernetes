@@ -132,6 +132,10 @@ func ParseToLabelSelector(selector string) (*LabelSelector, error) {
 			op = LabelSelectorOpIn
 		case selection.NotIn:
 			op = LabelSelectorOpNotIn
+		case selection.NotEquals:
+			// "key!=value" has no LabelSelector operator of its own, but it
+			// selects exactly what "key notin (value)" selects.
+			op = LabelSelectorOpNotIn
 		case selection.Exists:
 			op = LabelSelectorOpExists
 		case selection.DoesNotExist:
