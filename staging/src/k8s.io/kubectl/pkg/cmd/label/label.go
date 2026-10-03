@@ -276,6 +276,18 @@ func (o *LabelOptions) RunLabel() error {
 		return fmt.Errorf("--resource-version may only be used with a single resource")
 	}
 
+	// YAMLPrinter writes "---" only between objects printed by the same printer.
+	// Rebuilding it per object drops the separator. The name printer is still
+	// rebuilt so its operation text stays per object.
+	var yamlPrinter printers.ResourcePrinter
+	if o.outputFormat == "yaml" {
+		var err error
+		yamlPrinter, err = o.ToPrinter("")
+		if err != nil {
+			return err
+		}
+	}
+
 	// TODO: support bulk generic output a la Get
 	return r.Visit(func(info *resource.Info, err error) error {
 		if err != nil {
@@ -385,6 +397,9 @@ func (o *LabelOptions) RunLabel() error {
 			return nil
 		}
 
+		if yamlPrinter != nil {
+			return yamlPrinter.PrintObj(info.Object, o.Out)
+		}
 		printer, err := o.ToPrinter(dataChangeMsg)
 		if err != nil {
 			return err
