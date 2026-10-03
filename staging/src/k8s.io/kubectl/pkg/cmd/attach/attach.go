@@ -70,6 +70,25 @@ const (
 	defaultDetachSequence = "ctrl-p,ctrl-q"
 )
 
+// AttachFlags directly reflect the information that CLI is gathering via flags.
+type AttachFlags struct {
+	ContainerName string
+	Stdin         bool
+	TTY           bool
+	Quiet         bool
+	DetachKeys    string
+
+	genericiooptions.IOStreams
+}
+
+// NewAttachFlags returns a default AttachFlags
+func NewAttachFlags(streams genericiooptions.IOStreams) *AttachFlags {
+	return &AttachFlags{
+		DetachKeys: defaultDetachSequence,
+		IOStreams:  streams,
+	}
+}
+
 // AttachOptions declare the arguments accepted by the Attach command
 type AttachOptions struct {
 	exec.StreamOptions
@@ -94,20 +113,62 @@ type AttachOptions struct {
 	Config        *restclient.Config
 }
 
-// NewAttachOptions creates the options for attach
-func NewAttachOptions(streams genericiooptions.IOStreams) *AttachOptions {
-	return &AttachOptions{
-		StreamOptions: exec.StreamOptions{
-			IOStreams: streams,
-		},
-		Attach:     &DefaultRemoteAttach{},
-		AttachFunc: DefaultAttachFunc,
+// ToOptions converts from CLI inputs to runtime inputs.
+func (flags *AttachFlags) ToOptions(f cmdutil.Factory, cmd *cobra.Command, args []string) (*AttachOptions, error) {
+	namespace, _, err := f.ToRawKubeConfigLoader().Namespace()
+	if err != nil {
+		return nil, err
 	}
+
+	getPodTimeout, err := cmdutil.GetPodRunningTimeoutFlag(cmd)
+	if err != nil {
+		return nil, err
+	}
+
+	config, err := f.ToRESTConfig()
+	if err != nil {
+		return nil, err
+	}
+
+	o := &AttachOptions{
+		Namespace:     namespace,
+		ContainerName: flags.ContainerName,
+		Stdin:         flags.Stdin,
+		TTY:           flags.TTY,
+		Quiet:         flags.Quiet,
+		IOStreams:     flags.IOStreams,
+
+		DetachKeys:  flags.DetachKeys,
+		CommandName: cmd.CommandPath(),
+
+		AttachFunc:       DefaultAttachFunc,
+		Resources:        args,
+		Builder:          f.NewBuilder,
+		AttachablePodFn:  polymorphichelpers.AttachablePodForObjectFn,
+		restClientGetter: f,
+
+		Attach:        &DefaultRemoteAttach{},
+		GetPodTimeout: getPodTimeout,
+		Config:        config,
+	}
+
+	return o, nil
+}
+
+// AddFlags registers flags for the attach command.
+func (flags *AttachFlags) AddFlags(cmd *cobra.Command) {
+	cmdutil.AddPodRunningTimeoutFlag(cmd, defaultPodAttachTimeout)
+	cmdutil.AddContainerVarFlags(cmd, &flags.ContainerName, flags.ContainerName)
+	cmd.Flags().BoolVarP(&flags.Stdin, "stdin", "i", flags.Stdin, "Pass stdin to the container")
+	cmd.Flags().BoolVarP(&flags.TTY, "tty", "t", flags.TTY, "Stdin is a TTY")
+	cmd.Flags().BoolVarP(&flags.Quiet, "quiet", "q", flags.Quiet, "Only print output from the remote session")
+	cmd.Flags().StringVar(&flags.DetachKeys, "detach-keys", flags.DetachKeys, "Override the key sequence for detaching a container")
 }
 
 // NewCmdAttach returns the attach Cobra command
 func NewCmdAttach(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
-	o := NewAttachOptions(streams)
+	flags := NewAttachFlags(streams)
+
 	cmd := &cobra.Command{
 		Use:                   "attach (POD | TYPE/NAME) -c CONTAINER",
 		DisableFlagsInUseLine: true,
@@ -116,17 +177,15 @@ func NewCmdAttach(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.
 		Example:               attachExample,
 		ValidArgsFunction:     completion.PodResourceNameCompletionFunc(f),
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(o.Complete(f, cmd, args))
+			o, err := flags.ToOptions(f, cmd, args)
+			cmdutil.CheckErr(err)
 			cmdutil.CheckErr(o.Validate())
 			cmdutil.CheckErr(o.Run())
 		},
 	}
-	cmdutil.AddPodRunningTimeoutFlag(cmd, defaultPodAttachTimeout)
-	cmdutil.AddContainerVarFlags(cmd, &o.ContainerName, o.ContainerName)
-	cmd.Flags().BoolVarP(&o.Stdin, "stdin", "i", o.Stdin, "Pass stdin to the container")
-	cmd.Flags().BoolVarP(&o.TTY, "tty", "t", o.TTY, "Stdin is a TTY")
-	cmd.Flags().BoolVarP(&o.Quiet, "quiet", "q", o.Quiet, "Only print output from the remote session")
-	cmd.Flags().StringVar(&o.DetachKeys, "detach-keys", defaultDetachSequence, "Override the key sequence for detaching a container")
+
+	flags.AddFlags(cmd)
+
 	return cmd
 }
 
@@ -207,38 +266,6 @@ func createExecutor(url *url.URL, config *restclient.Config) (remotecommand.Exec
 		}
 	}
 	return exec, nil
-}
-
-// Complete verifies command line arguments and loads data from the command environment
-func (o *AttachOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
-	var err error
-	o.Namespace, _, err = f.ToRawKubeConfigLoader().Namespace()
-	if err != nil {
-		return err
-	}
-
-	o.AttachablePodFn = polymorphichelpers.AttachablePodForObjectFn
-
-	o.GetPodTimeout, err = cmdutil.GetPodRunningTimeoutFlag(cmd)
-	if err != nil {
-		return cmdutil.UsageErrorf(cmd, "%s", err.Error())
-	}
-
-	o.Builder = f.NewBuilder
-	o.Resources = args
-	o.restClientGetter = f
-
-	config, err := f.ToRESTConfig()
-	if err != nil {
-		return err
-	}
-	o.Config = config
-
-	if o.CommandName == "" {
-		o.CommandName = cmd.CommandPath()
-	}
-
-	return nil
 }
 
 // Validate checks that the provided attach options are specified.
