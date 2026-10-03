@@ -18,6 +18,7 @@ package tokenfile
 
 import (
 	"context"
+	"crypto/subtle"
 	"encoding/csv"
 	"fmt"
 	"io"
@@ -91,9 +92,17 @@ func NewCSV(path string) (*TokenAuthenticator, error) {
 }
 
 func (a *TokenAuthenticator) AuthenticateToken(ctx context.Context, value string) (*authenticator.Response, bool, error) {
-	user, ok := a.tokens[value]
-	if !ok {
-		return nil, false, nil
+	// Linear scan with crypto/subtle.ConstantTimeCompare to avoid the
+	// byte-by-byte timing oracle on the map-lookup memcmp step at the bucket.
+	// The sibling bootstrap token authenticator (plugin/pkg/auth/authenticator/
+	// token/bootstrap/bootstrap.go) uses the same idiom for its token-vs-secret
+	// compare. Static token files are typically small (the feature is deprecated
+	// per KEP-2799), so the O(N) scan cost is acceptable.
+	valueBytes := []byte(value)
+	for storedToken, info := range a.tokens {
+		if subtle.ConstantTimeCompare([]byte(storedToken), valueBytes) == 1 {
+			return &authenticator.Response{User: info}, true, nil
+		}
 	}
-	return &authenticator.Response{User: user}, true, nil
+	return nil, false, nil
 }
