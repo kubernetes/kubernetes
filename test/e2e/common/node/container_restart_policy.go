@@ -27,6 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 
@@ -176,6 +177,14 @@ var _ = SIGDescribe("Pod Extended (container restart policy)", framework.WithNod
 var _ = SIGDescribe("Pod Extended (RestartAllContainers)", framework.WithSlow(), framework.WithNodeConformance(), framework.WithFeatureGate(features.ContainerRestartRules), framework.WithFeatureGate(features.RestartAllContainersOnContainerExits), func() {
 	f := framework.NewDefaultFramework("pods")
 	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
+
+	// RestartAllContainers is not supported on Windows: under Hyper-V isolation
+	// the pod sandbox is the Utility VM, which is destroyed when its containers
+	// are removed, so the in-place reset never completes and the pod latches to
+	// Failed before any container restarts.
+	ginkgo.BeforeEach(func() {
+		e2eskipper.SkipIfNodeOSDistroIs("windows")
+	})
 
 	ginkgo.Describe("RestartAllContainers", func() {
 		var (
