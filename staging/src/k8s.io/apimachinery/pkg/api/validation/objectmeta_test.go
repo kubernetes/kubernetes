@@ -734,6 +734,22 @@ func TestValidateObjectMetaDeclaratively(t *testing.T) {
 				field.TooLong(fldPath.Child("annotations"), "", TotalAnnotationSizeLimitB).MarkFromImperative(),
 			},
 		},
+		{
+			name:              "invalid finalizer format",
+			obj:               mkMeta(tweakFinalizers([]string{"invalid/format/slash"})),
+			requiresNamespace: true,
+			expectedErrs: field.ErrorList{
+				field.Invalid(fldPath.Child("finalizers").Index(0), "invalid/format/slash", "").WithOrigin("format=k8s-label-key").MarkAlpha(),
+			},
+		},
+		{
+			name:              "conflicting finalizers",
+			obj:               mkMeta(tweakFinalizers([]string{metav1.FinalizerOrphanDependents, metav1.FinalizerDeleteDependents})),
+			requiresNamespace: true,
+			expectedErrs: field.ErrorList{
+				field.Invalid(fldPath.Child("finalizers"), []string{metav1.FinalizerOrphanDependents, metav1.FinalizerDeleteDependents}, "finalizer orphan and foregroundDeletion cannot be both set").MarkFromImperative(),
+			},
+		},
 	}
 
 	matcher := field.ErrorMatcher{}.ByField().ByType().BySource().ByOrigin()
@@ -896,6 +912,24 @@ func TestValidateObjectMetaDeclaratively(t *testing.T) {
 				field.Invalid(fldPath.Child("deletionGracePeriodSeconds"), &gracePeriod40, "").WithOrigin("immutable").MarkAlpha(),
 			},
 		},
+		{
+			name:              "invalid finalizer format on update",
+			obj:               mkMeta(tweakResourceVersion("2"), tweakFinalizers([]string{"invalid/format/slash"})),
+			oldObj:            mkMeta(tweakResourceVersion("1")),
+			requiresNamespace: true,
+			expectedErrs: field.ErrorList{
+				field.Invalid(fldPath.Child("finalizers").Index(0), "invalid/format/slash", "").WithOrigin("format=k8s-label-key").MarkAlpha(),
+			},
+		},
+		{
+			name:              "no new finalizers if deleted on update",
+			obj:               mkMeta(tweakResourceVersion("2"), tweakDeletionTimestamp(&now), tweakFinalizers([]string{"example.com/a", "example.com/b"})),
+			oldObj:            mkMeta(tweakResourceVersion("1"), tweakDeletionTimestamp(&now), tweakFinalizers([]string{"example.com/a"})),
+			requiresNamespace: true,
+			expectedErrs: field.ErrorList{
+				field.Forbidden(fldPath.Child("finalizers"), "no new finalizers can be added if the object is being deleted, found new finalizers []string{\"example.com/b\"}").MarkFromImperative(),
+			},
+		},
 	}
 
 	for _, tc := range updateCases {
@@ -943,6 +977,10 @@ func tweakGeneration(g int64) func(*metav1.ObjectMeta) {
 
 func tweakAnnotations(ann map[string]string) func(*metav1.ObjectMeta) {
 	return func(o *metav1.ObjectMeta) { o.Annotations = ann }
+}
+
+func tweakFinalizers(f []string) func(*metav1.ObjectMeta) {
+	return func(o *metav1.ObjectMeta) { o.Finalizers = f }
 }
 
 func tweakManagedFields(entries ...metav1.ManagedFieldsEntry) func(*metav1.ObjectMeta) {
