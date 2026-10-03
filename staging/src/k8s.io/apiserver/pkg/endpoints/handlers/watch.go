@@ -360,15 +360,23 @@ func (w *watchResponseWriter) Close() error {
 // HandleHTTP serves a series of encoded events via HTTP with Transfer-Encoding: chunked.
 // or over a websocket connection.
 func (s *WatchServer) HandleHTTP(w http.ResponseWriter, req *http.Request) {
-	ctx := req.Context()
-	ctx, span := tracing.Start(ctx, "WatchServer.HandleHTTP",
-		attribute.String("audit-id", audit.GetAuditIDTruncated(ctx)),
-		attribute.String("method", req.Method),
-		attribute.String("url", req.URL.Path),
-		attribute.String("protocol", req.Proto),
-		attribute.String("mediaType", s.MediaType),
-		attribute.String("encoder", string(s.Encoder.Identifier())))
-	req = req.WithContext(ctx)
+	var span *tracing.Span
+	if s.isWatchListRequest {
+		ctx := req.Context()
+		ctx, span = tracing.Start(ctx, "WatchServer.HandleHTTP",
+			attribute.String("audit-id", audit.GetAuditIDTruncated(ctx)),
+			attribute.String("method", req.Method),
+			attribute.String("url", req.URL.Path),
+			attribute.String("protocol", req.Proto),
+			attribute.String("mediaType", s.MediaType),
+			attribute.String("encoder", string(s.Encoder.Identifier())))
+		req = req.WithContext(ctx)
+		defer func() {
+			if span != nil {
+				span.End(5 * time.Second)
+			}
+		}()
+	}
 	defer func() {
 		if s.MemoryAllocator != nil {
 			runtime.AllocatorPool.Put(s.MemoryAllocator)
@@ -419,7 +427,9 @@ func (s *WatchServer) HandleHTTP(w http.ResponseWriter, req *http.Request) {
 	ch := s.Watching.ResultChan()
 	done := req.Context().Done()
 
-	span.AddEvent("About to start writing response")
+	if span != nil {
+		span.AddEvent("About to start writing response")
+	}
 	for {
 		select {
 		case <-s.ServerShuttingDownCh:
@@ -466,8 +476,11 @@ func (s *WatchServer) HandleHTTP(w http.ResponseWriter, req *http.Request) {
 					auditID := audit.GetAuditIDTruncated(req.Context())
 					klog.V(3).InfoS("WatchList initial events sent", "path", req.URL.Path, "auditID", auditID, "initLatency", initLatency)
 					httplog.AddKeyValue(req.Context(), "watchlist_init_latency", initLatency)
-					span.AddEvent("Writing initial events done")
-					span.End(5 * time.Second)
+					if span != nil {
+						span.AddEvent("Writing initial events done")
+						span.End(5 * time.Second)
+						span = nil
+					}
 					s.watchListCompleteHook()
 				}
 				// release the gzip writer back to the pool so idle watches don't hold gzip state.
