@@ -23,9 +23,11 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
+	apitest "k8s.io/cri-api/pkg/apis/testing"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/test/utils/ktesting"
@@ -417,6 +419,248 @@ func TestContainerGC(t *testing.T) {
 				assert.NoError(t, err)
 				assert.Equal(t, &fakeContainers[remain].ContainerStatus, resp.Status)
 			}
+		})
+	}
+}
+
+func TestRemoveOldestNSandboxes(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	fakeRuntime, _, m, err := createTestRuntimeManager(tCtx)
+	require.NoError(t, err)
+
+	makeSandboxInfo := func(id string, createTime int64, attempt uint32, active bool) sandboxGCInfo {
+		return sandboxGCInfo{id: id, createTime: createTime, attempt: attempt, active: active}
+	}
+	makeFakeSandbox := func(id string) *apitest.FakePodSandbox {
+		return &apitest.FakePodSandbox{
+			PodSandboxStatus: runtimeapi.PodSandboxStatus{
+				Id:    id,
+				State: runtimeapi.PodSandboxState_SANDBOX_NOTREADY,
+			},
+		}
+	}
+
+	for _, test := range []struct {
+		description string
+		sandboxes   []sandboxGCInfo
+		toRemove    int
+		remain      []string // sandbox ids that should remain after GC
+	}{
+		{
+			description: "same attempt: newest created sandbox is kept (createTime secondary sort)",
+			sandboxes: []sandboxGCInfo{
+				makeSandboxInfo("s1", 1, 0, false),
+				makeSandboxInfo("s2", 2, 0, false),
+				makeSandboxInfo("s3", 3, 0, false),
+			},
+			toRemove: 2,
+			remain:   []string{"s3"},
+		},
+		{
+			description: "different attempts: higher attempt sandbox is kept regardless of createTime (attempt primary sort)",
+			sandboxes: []sandboxGCInfo{
+				makeSandboxInfo("sA", 100, 2, false),
+				makeSandboxInfo("sB", 200, 1, false),
+				makeSandboxInfo("sC", 300, 0, false),
+			},
+			toRemove: 2,
+			remain:   []string{"sA"},
+		},
+		{
+			description: "different attempts: lower attempt sandbox is removed first even if it was created later",
+			sandboxes: []sandboxGCInfo{
+				makeSandboxInfo("sA", 300, 2, false),
+				makeSandboxInfo("sB", 200, 1, false),
+				makeSandboxInfo("sC", 100, 0, false),
+			},
+			toRemove: 1,
+			remain:   []string{"sA", "sB"},
+		},
+		{
+			description: "same attempt and createTime: smaller id is kept (id tertiary sort)",
+			sandboxes: []sandboxGCInfo{
+				makeSandboxInfo("s3", 5, 0, false),
+				makeSandboxInfo("s1", 5, 0, false),
+				makeSandboxInfo("s2", 5, 0, false),
+			},
+			toRemove: 2,
+			remain:   []string{"s1"},
+		},
+		{
+			description: "active sandboxes are never removed even when toRemove covers all",
+			sandboxes: []sandboxGCInfo{
+				makeSandboxInfo("s1", 1, 0, false),
+				makeSandboxInfo("s2", 2, 0, true),
+				makeSandboxInfo("s3", 3, 0, false),
+			},
+			toRemove: 3,
+			remain:   []string{"s2"},
+		},
+		{
+			description: "active sandbox with highest attempt is kept while lower attempt inactive sandboxes are removed",
+			sandboxes: []sandboxGCInfo{
+				makeSandboxInfo("sA", 100, 2, true),
+				makeSandboxInfo("sB", 200, 1, false),
+				makeSandboxInfo("sC", 300, 0, false),
+			},
+			toRemove: 3,
+			remain:   []string{"sA"},
+		},
+		{
+			description: "nothing is removed when toRemove is zero",
+			sandboxes: []sandboxGCInfo{
+				makeSandboxInfo("s1", 1, 0, false),
+				makeSandboxInfo("s2", 2, 0, false),
+				makeSandboxInfo("s3", 3, 0, false),
+			},
+			toRemove: 0,
+			remain:   []string{"s1", "s2", "s3"},
+		},
+	} {
+		t.Run(test.description, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
+			var fakeSandboxes []*apitest.FakePodSandbox
+			for _, s := range test.sandboxes {
+				fakeSandboxes = append(fakeSandboxes, makeFakeSandbox(s.id))
+			}
+			fakeRuntime.SetFakeSandboxes(fakeSandboxes)
+
+			m.containerGC.removeOldestNSandboxes(tCtx, test.sandboxes, test.toRemove)
+
+			remainList, err := fakeRuntime.ListPodSandbox(tCtx, nil)
+			require.NoError(t, err)
+			var remainIDs []string
+			for _, s := range remainList {
+				remainIDs = append(remainIDs, s.Id)
+			}
+			assert.ElementsMatch(t, test.remain, remainIDs)
+		})
+	}
+}
+
+func TestRemoveOldestN(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	fakeRuntime, _, m, err := createTestRuntimeManager(tCtx)
+	require.NoError(t, err)
+
+	makeInfo := func(fc *apitest.FakeContainer) containerGCInfo {
+		var attempt uint32
+		if fc.Metadata != nil {
+			attempt = fc.Metadata.Attempt
+		}
+		return containerGCInfo{
+			id:         fc.Id,
+			name:       fc.Metadata.Name,
+			createTime: fc.CreatedAt,
+			unknown:    fc.State == runtimeapi.ContainerState_CONTAINER_UNKNOWN,
+			attempt:    attempt,
+		}
+	}
+	idsOf := func(cs []containerGCInfo) []string {
+		ids := make([]string, 0, len(cs))
+		for _, c := range cs {
+			ids = append(ids, c.id)
+		}
+		return ids
+	}
+
+	for _, test := range []struct {
+		description string
+		templates   []containerTemplate
+		toRemove    int
+		remain      []int // template indexes of remaining containers
+	}{
+		{
+			description: "same attempt: newest created containers are kept (createTime secondary sort)",
+			templates: []containerTemplate{
+				makeGCContainer("foo", "bar1", 0, 1, runtimeapi.ContainerState_CONTAINER_EXITED),
+				makeGCContainer("foo", "bar2", 0, 2, runtimeapi.ContainerState_CONTAINER_EXITED),
+				makeGCContainer("foo", "bar3", 0, 3, runtimeapi.ContainerState_CONTAINER_EXITED),
+			},
+			toRemove: 2,
+			remain:   []int{2},
+		},
+		{
+			description: "different attempts: higher attempt container is kept regardless of createTime (attempt primary sort)",
+			templates: []containerTemplate{
+				makeGCContainer("foo", "bar", 2, 100, runtimeapi.ContainerState_CONTAINER_EXITED),
+				makeGCContainer("foo", "bar", 1, 200, runtimeapi.ContainerState_CONTAINER_EXITED),
+				makeGCContainer("foo", "bar", 0, 300, runtimeapi.ContainerState_CONTAINER_EXITED),
+			},
+			toRemove: 2,
+			remain:   []int{0},
+		},
+		{
+			description: "different attempts: lower attempt container is removed first even if it was created later",
+			templates: []containerTemplate{
+				makeGCContainer("foo", "bar", 2, 300, runtimeapi.ContainerState_CONTAINER_EXITED),
+				makeGCContainer("foo", "bar", 1, 200, runtimeapi.ContainerState_CONTAINER_EXITED),
+				makeGCContainer("foo", "bar", 0, 100, runtimeapi.ContainerState_CONTAINER_EXITED),
+			},
+			toRemove: 1,
+			remain:   []int{0, 1},
+		},
+		{
+			description: "same attempt and createTime: smaller id is kept (id tertiary sort)",
+			templates: []containerTemplate{
+				makeGCContainer("foo", "barC", 0, 5, runtimeapi.ContainerState_CONTAINER_EXITED),
+				makeGCContainer("foo", "barA", 0, 5, runtimeapi.ContainerState_CONTAINER_EXITED),
+				makeGCContainer("foo", "barB", 0, 5, runtimeapi.ContainerState_CONTAINER_EXITED),
+			},
+			toRemove: 2,
+			remain:   []int{1},
+		},
+		{
+			description: "unknown container is stopped before removal",
+			templates: []containerTemplate{
+				makeGCContainer("foo", "bar", 1, 2, runtimeapi.ContainerState_CONTAINER_EXITED),
+				makeGCContainer("foo", "bar", 0, 1, runtimeapi.ContainerState_CONTAINER_UNKNOWN),
+			},
+			toRemove: 1,
+			remain:   []int{0},
+		},
+		{
+			description: "nothing is removed when toRemove is zero",
+			templates: []containerTemplate{
+				makeGCContainer("foo", "bar", 1, 1, runtimeapi.ContainerState_CONTAINER_EXITED),
+				makeGCContainer("foo", "bar", 0, 0, runtimeapi.ContainerState_CONTAINER_EXITED),
+			},
+			toRemove: 0,
+			remain:   []int{0, 1},
+		},
+	} {
+		t.Run(test.description, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
+			fakeContainers := makeFakeContainers(tCtx, m, test.templates)
+			fakeRuntime.SetFakeContainers(fakeContainers)
+
+			infos := make([]containerGCInfo, 0, len(fakeContainers))
+			for _, fc := range fakeContainers {
+				infos = append(infos, makeInfo(fc))
+			}
+
+			kept := m.containerGC.removeOldestN(tCtx, infos, test.toRemove)
+
+			// The returned slice reflects the newest-first ordering of the kept containers.
+			var keptIdx []int
+			for _, k := range kept {
+				for idx, fc := range fakeContainers {
+					if fc.Id == k.id {
+						keptIdx = append(keptIdx, idx)
+						break
+					}
+				}
+			}
+			assert.Equal(t, test.remain, keptIdx)
+
+			// Verify the actual runtime state matches the returned kept containers.
+			remainList, err := fakeRuntime.ListContainers(tCtx, nil)
+			require.NoError(t, err)
+			var remainIDs []string
+			for _, c := range remainList {
+				remainIDs = append(remainIDs, c.Id)
+			}
+			assert.ElementsMatch(t, idsOf(kept), remainIDs)
 		})
 	}
 }
