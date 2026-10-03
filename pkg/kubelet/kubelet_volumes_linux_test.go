@@ -182,7 +182,7 @@ func TestCleanupOrphanedPodDirs(t *testing.T) {
 				}
 			}
 
-			err := kubelet.cleanupOrphanedPodDirs(logger, tc.pods, nil)
+			err := kubelet.cleanupOrphanedPodDirs(logger, tc.pods, nil, func(_ types.UID) bool { return true })
 			if tc.expectErr && err == nil {
 				t.Errorf("%s failed: expected error, got success", name)
 			}

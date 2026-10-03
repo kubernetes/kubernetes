@@ -658,6 +658,10 @@ func (f *FakeSourcesReady) AllReady() bool {
 	return f.ready
 }
 
+func (f *FakeSourcesReady) SourceForPodReady(types.UID) bool {
+	return f.ready
+}
+
 func (f *FakeSourcesReady) AddSource(source string) {}
 
 func assertErrorWithCode(t *testing.T, err error, expectedCode codes.Code, expectedMsg string) {
