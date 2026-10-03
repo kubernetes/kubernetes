@@ -3296,3 +3296,44 @@ func TestContainerEphemeralStorageLimitEvictionForRestartableInitContainers(t *t
 		t.Fatalf("Expected evicted pod %q, got %v", pod.Name, evictedPods)
 	}
 }
+
+func TestContainerEphemeralStorageLimitEvictionWithDedicatedImageFs(t *testing.T) {
+	tCtx := ktesting.Init(t)
+
+	pod := newPod("container-ephemeral-storage-limit", 0, []v1.Container{
+		newContainer("writer", nil, newResourceList("", "", "500Mi")),
+		newContainer("sidecar", nil, newResourceList("", "", "500Mi")),
+	}, nil)
+
+	writer := resource.MustParse("700Mi")
+	writerUsed := uint64(writer.Value())
+	zeroUsed := uint64(0)
+	podStats := statsapi.PodStats{
+		Containers: []statsapi.ContainerStats{
+			{
+				Name:   "writer",
+				Logs:   &statsapi.FsStats{UsedBytes: &zeroUsed},
+				Rootfs: &statsapi.FsStats{UsedBytes: &writerUsed},
+			},
+			{
+				Name:   "sidecar",
+				Logs:   &statsapi.FsStats{UsedBytes: &zeroUsed},
+				Rootfs: &statsapi.FsStats{UsedBytes: &zeroUsed},
+			},
+		},
+	}
+
+	podKiller := &mockPodKiller{}
+	mgr := &managerImpl{
+		killPodFunc:      podKiller.killPodNow,
+		recorder:         &record.FakeRecorder{},
+		dedicatedImageFs: ptr.To(true),
+	}
+
+	if !mgr.containerEphemeralStorageLimitEviction(tCtx.Logger(), podStats, pod) {
+		t.Fatalf("expected pod eviction")
+	}
+	if podKiller.pod != pod {
+		t.Fatalf("expected pod %q to be evicted", pod.Name)
+	}
+}
