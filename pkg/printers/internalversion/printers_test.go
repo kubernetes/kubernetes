@@ -1387,6 +1387,29 @@ func TestPrintPod(t *testing.T) {
 			[]metav1.TableRow{{Cells: []interface{}{"test6", "1/2", "Running", "6", "<unknown>"}}},
 		},
 		{
+			// Test pod has 1 init container in ContainerCreating state
+			api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-init-creating"},
+				Spec:       api.PodSpec{InitContainers: make([]api.Container, 1), Containers: make([]api.Container, 1)},
+				Status: api.PodStatus{
+					Phase: "podPhase",
+					InitContainerStatuses: []api.ContainerStatus{
+						{
+							Ready: false,
+							State: api.ContainerState{Waiting: &api.ContainerStateWaiting{Reason: "ContainerCreating"}},
+						},
+					},
+					ContainerStatuses: []api.ContainerStatus{
+						{
+							Ready: false,
+							State: api.ContainerState{Waiting: &api.ContainerStateWaiting{Reason: "PodInitializing"}},
+						},
+					},
+				},
+			},
+			[]metav1.TableRow{{Cells: []interface{}{"test-init-creating", "0/1", "Init:ContainerCreating", "0", "<unknown>"}}},
+		},
+		{
 			// Test pod has 1 init container restarting and 1 container not running
 			api.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "test7"},
