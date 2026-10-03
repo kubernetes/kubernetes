@@ -101,7 +101,13 @@ const (
 	// SystemContainerMisc is the container name for the system container tracking non-kubernetes processes.
 	SystemContainerMisc = "misc"
 	// SystemContainerPods is the container name for the system container tracking user pods.
+	// Its usage covers every pod on the node, including the pods reported separately as
+	// SystemContainerSystemPods.
 	SystemContainerPods = "pods"
+	// SystemContainerSystemPods is the container name for the system container tracking the
+	// pods of the node's system partition. It is only reported when a system partition is
+	// configured, and its usage is a subset of SystemContainerPods.
+	SystemContainerSystemPods = "system-pods"
 	// SystemContainerWindowsGlobalCommitMemory (only used on Windows) is the container name for the system container
 	// tracking global commit memory usage and is used for memory-pressure eviction.
 	SystemContainerWindowsGlobalCommitMemory = "windows-global-commit-memory"

@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"sigs.k8s.io/randfill"
 
 	v1 "k8s.io/api/core/v1"
@@ -78,6 +79,7 @@ func TestSummaryProviderGetStatsNoSplitFileSystem(t *testing.T) {
 	mockStatsProvider.EXPECT().GetNode(ctx).Return(node, nil)
 	mockStatsProvider.EXPECT().GetNodeConfig().Return(nodeConfig)
 	mockStatsProvider.EXPECT().GetPodCgroupRoot().Return(cgroupRoot)
+	mockStatsProvider.EXPECT().GetSystemPartitionCgroupRoot().Return("")
 	mockStatsProvider.EXPECT().ListPodStats(ctx).Return(podStats, nil).Maybe()
 	mockStatsProvider.EXPECT().ListPodStatsAndUpdateCPUNanoCoreUsage(ctx).Return(podStats, nil)
 	mockStatsProvider.EXPECT().ImageFsStats(ctx).Return(imageFsStats, imageFsStats, nil)
@@ -179,6 +181,7 @@ func TestSummaryProviderGetStatsSplitImageFs(t *testing.T) {
 	mockStatsProvider.EXPECT().GetNode(ctx).Return(node, nil)
 	mockStatsProvider.EXPECT().GetNodeConfig().Return(nodeConfig)
 	mockStatsProvider.EXPECT().GetPodCgroupRoot().Return(cgroupRoot)
+	mockStatsProvider.EXPECT().GetSystemPartitionCgroupRoot().Return("")
 	mockStatsProvider.EXPECT().ListPodStats(ctx).Return(podStats, nil).Maybe()
 	mockStatsProvider.EXPECT().ListPodStatsAndUpdateCPUNanoCoreUsage(ctx).Return(podStats, nil)
 	mockStatsProvider.EXPECT().RootFsStats().Return(rootFsStats, nil)
@@ -279,6 +282,7 @@ func TestSummaryProviderGetCPUAndMemoryStats(t *testing.T) {
 	mockStatsProvider.EXPECT().GetNode(ctx).Return(node, nil)
 	mockStatsProvider.EXPECT().GetNodeConfig().Return(nodeConfig)
 	mockStatsProvider.EXPECT().GetPodCgroupRoot().Return(cgroupRoot)
+	mockStatsProvider.EXPECT().GetSystemPartitionCgroupRoot().Return("")
 	mockStatsProvider.EXPECT().ListPodCPUAndMemoryStats(ctx).Return(podStats, nil)
 	mockStatsProvider.EXPECT().GetCgroupCPUAndMemoryStats("/", false).Return(cgroupStatsMap["/"].cs, nil)
 	mockStatsProvider.EXPECT().GetCgroupCPUAndMemoryStats("/runtime", false).Return(cgroupStatsMap["/runtime"].cs, nil)
@@ -327,6 +331,107 @@ func TestSummaryProviderGetCPUAndMemoryStats(t *testing.T) {
 	assert.Equal(summary.Pods, podStats)
 }
 
+func TestSummaryProviderGetStatsWithSystemPartition(t *testing.T) {
+	ctx := t.Context()
+	assert := assert.New(t)
+
+	const systemPartitionCgroupRoot = "/kubepods/system"
+
+	podStats := []statsapi.PodStats{
+		{
+			PodRef:    statsapi.PodReference{Name: "test-pod", Namespace: "test-namespace", UID: "UID_test-pod"},
+			StartTime: metav1.NewTime(time.Now()),
+		},
+	}
+	cgroupStatsMap := map[string]struct {
+		cs *statsapi.ContainerStats
+		ns *statsapi.NetworkStats
+	}{
+		"/":            {cs: getContainerStats(), ns: getNetworkStats()},
+		"/runtime":     {cs: getContainerStats(), ns: getNetworkStats()},
+		"/misc":        {cs: getContainerStats(), ns: getNetworkStats()},
+		"/kubelet":     {cs: getContainerStats(), ns: getNetworkStats()},
+		"/pods":        {cs: getContainerStats(), ns: getNetworkStats()},
+		"/system-pods": {cs: getContainerStats(), ns: getNetworkStats()},
+	}
+
+	mockStatsProvider := statstest.NewMockProvider(t)
+	mockStatsProvider.EXPECT().GetNode(ctx).Return(node, nil)
+	mockStatsProvider.EXPECT().GetNodeConfig().Return(nodeConfig)
+	mockStatsProvider.EXPECT().GetPodCgroupRoot().Return(cgroupRoot)
+	mockStatsProvider.EXPECT().GetSystemPartitionCgroupRoot().Return(systemPartitionCgroupRoot)
+	mockStatsProvider.EXPECT().ListPodStats(ctx).Return(podStats, nil).Maybe()
+	mockStatsProvider.EXPECT().ListPodStatsAndUpdateCPUNanoCoreUsage(ctx).Return(podStats, nil)
+	mockStatsProvider.EXPECT().ImageFsStats(ctx).Return(imageFsStats, imageFsStats, nil)
+	mockStatsProvider.EXPECT().RootFsStats().Return(rootFsStats, nil)
+	mockStatsProvider.EXPECT().RlimitStats().Return(rlimitStats, nil)
+	mockStatsProvider.EXPECT().GetCgroupStats(ctx, "/", true).Return(cgroupStatsMap["/"].cs, cgroupStatsMap["/"].ns, nil)
+	mockStatsProvider.EXPECT().GetCgroupStats(ctx, "/runtime", false).Return(cgroupStatsMap["/runtime"].cs, cgroupStatsMap["/runtime"].ns, nil)
+	mockStatsProvider.EXPECT().GetCgroupStats(ctx, "/misc", false).Return(cgroupStatsMap["/misc"].cs, cgroupStatsMap["/misc"].ns, nil)
+	mockStatsProvider.EXPECT().GetCgroupStats(ctx, "/kubelet", false).Return(cgroupStatsMap["/kubelet"].cs, cgroupStatsMap["/kubelet"].ns, nil)
+	mockStatsProvider.EXPECT().GetCgroupStats(ctx, cgroupRoot, true).Return(cgroupStatsMap["/pods"].cs, cgroupStatsMap["/pods"].ns, nil)
+	mockStatsProvider.EXPECT().GetCgroupStats(ctx, systemPartitionCgroupRoot, true).Return(cgroupStatsMap["/system-pods"].cs, cgroupStatsMap["/system-pods"].ns, nil)
+
+	provider := summaryProviderImpl{kubeletCreationTime: metav1.Now(), systemBootTime: metav1.Now(), provider: mockStatsProvider}
+	summary, err := provider.Get(ctx, true)
+	require.NoError(t, err)
+
+	assert.Len(summary.Node.SystemContainers, 5)
+
+	systemPods := findSystemContainer(summary.Node.SystemContainers, statsapi.SystemContainerSystemPods)
+	require.NotNil(t, systemPods, "the system partition should be reported as its own system container")
+	assert.Equal(cgroupStatsMap["/system-pods"].cs.CPU, systemPods.CPU)
+	assert.Equal(cgroupStatsMap["/system-pods"].cs.Memory, systemPods.Memory)
+
+	// The partition is a subtree of the pod cgroup root, so it is reported in
+	// addition to "pods" rather than carved out of it.
+	pods := findSystemContainer(summary.Node.SystemContainers, statsapi.SystemContainerPods)
+	require.NotNil(t, pods, "the pod cgroup root should still be reported")
+	assert.Equal(cgroupStatsMap["/pods"].cs.CPU, pods.CPU)
+	assert.Equal(cgroupStatsMap["/pods"].cs.Memory, pods.Memory)
+}
+
+func TestSummaryProviderGetCPUAndMemoryStatsWithSystemPartition(t *testing.T) {
+	ctx := t.Context()
+	assert := assert.New(t)
+
+	const systemPartitionCgroupRoot = "/kubepods/system"
+
+	cgroupStatsMap := map[string]struct {
+		cs *statsapi.ContainerStats
+	}{
+		"/":            {cs: getVolumeCPUAndMemoryStats()},
+		"/runtime":     {cs: getVolumeCPUAndMemoryStats()},
+		"/misc":        {cs: getVolumeCPUAndMemoryStats()},
+		"/kubelet":     {cs: getVolumeCPUAndMemoryStats()},
+		"/pods":        {cs: getVolumeCPUAndMemoryStats()},
+		"/system-pods": {cs: getVolumeCPUAndMemoryStats()},
+	}
+
+	mockStatsProvider := statstest.NewMockProvider(t)
+	mockStatsProvider.EXPECT().GetNode(ctx).Return(node, nil)
+	mockStatsProvider.EXPECT().GetNodeConfig().Return(nodeConfig)
+	mockStatsProvider.EXPECT().GetPodCgroupRoot().Return(cgroupRoot)
+	mockStatsProvider.EXPECT().GetSystemPartitionCgroupRoot().Return(systemPartitionCgroupRoot)
+	mockStatsProvider.EXPECT().ListPodCPUAndMemoryStats(ctx).Return(nil, nil)
+	mockStatsProvider.EXPECT().GetCgroupCPUAndMemoryStats("/", false).Return(cgroupStatsMap["/"].cs, nil)
+	mockStatsProvider.EXPECT().GetCgroupCPUAndMemoryStats("/runtime", false).Return(cgroupStatsMap["/runtime"].cs, nil)
+	mockStatsProvider.EXPECT().GetCgroupCPUAndMemoryStats("/misc", false).Return(cgroupStatsMap["/misc"].cs, nil)
+	mockStatsProvider.EXPECT().GetCgroupCPUAndMemoryStats("/kubelet", false).Return(cgroupStatsMap["/kubelet"].cs, nil)
+	mockStatsProvider.EXPECT().GetCgroupCPUAndMemoryStats(cgroupRoot, false).Return(cgroupStatsMap["/pods"].cs, nil)
+	mockStatsProvider.EXPECT().GetCgroupCPUAndMemoryStats(systemPartitionCgroupRoot, false).Return(cgroupStatsMap["/system-pods"].cs, nil)
+
+	provider := NewSummaryProvider(ctx, mockStatsProvider)
+	summary, err := provider.GetCPUAndMemoryStats(ctx)
+	require.NoError(t, err)
+
+	assert.Len(summary.Node.SystemContainers, 5)
+	systemPods := findSystemContainer(summary.Node.SystemContainers, statsapi.SystemContainerSystemPods)
+	require.NotNil(t, systemPods, "the system partition should be reported on the CPU and memory path too")
+	assert.Equal(cgroupStatsMap["/system-pods"].cs.CPU, systemPods.CPU)
+	assert.Equal(cgroupStatsMap["/system-pods"].cs.Memory, systemPods.Memory)
+}
+
 func getFsStats() *statsapi.FsStats {
 	f := randfill.New().NilChance(0)
 	v := &statsapi.FsStats{}
@@ -369,4 +474,14 @@ func getRlimitStats() *statsapi.RlimitStats {
 	v := &statsapi.RlimitStats{}
 	f.Fill(v)
 	return v
+}
+
+// findSystemContainer returns the system container with the given name, or nil.
+func findSystemContainer(stats []statsapi.ContainerStats, name string) *statsapi.ContainerStats {
+	for i := range stats {
+		if stats[i].Name == name {
+			return &stats[i]
+		}
+	}
+	return nil
 }
