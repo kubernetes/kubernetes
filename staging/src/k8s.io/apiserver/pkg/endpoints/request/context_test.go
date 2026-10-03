@@ -17,11 +17,34 @@ limitations under the License.
 package request
 
 import (
+	"context"
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/authentication/user"
 )
+
+func TestDefaultContext(t *testing.T) {
+	parent, cancel := context.WithCancel(
+		WithNamespace(t.Context(), "other"),
+	)
+	defer cancel()
+
+	ctx := DefaultContext(parent)
+
+	result, ok := NamespaceFrom(ctx)
+	if !ok {
+		t.Fatal("expected namespace in context")
+	}
+	if result != metav1.NamespaceDefault {
+		t.Fatalf("expected namespace %q, got %q", metav1.NamespaceDefault, result)
+	}
+
+	cancel()
+	if err := ctx.Err(); err != context.Canceled {
+		t.Fatalf("expected cancellation to propagate, got %v", err)
+	}
+}
 
 // TestNamespaceContext validates that a namespace can be get/set on a context object
 func TestNamespaceContext(t *testing.T) {
