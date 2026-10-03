@@ -19,8 +19,20 @@ package v1beta1
 import (
 	"fmt"
 
+	batchv1beta1 "k8s.io/api/batch/v1beta1"
+	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/kubernetes/pkg/apis/batch"
 )
+
+// Convert_batch_CronJobStatus_To_v1beta1_CronJobStatus converts the internal
+// CronJobStatus to the v1beta1 version. The nextScheduleTime field is only
+// present in the internal and batch/v1 types (it was added alongside the
+// CronJobsNextScheduleTime feature); it does not exist in the deprecated
+// batch/v1beta1 CronJob and is intentionally dropped here.
+func Convert_batch_CronJobStatus_To_v1beta1_CronJobStatus(in *batch.CronJobStatus, out *batchv1beta1.CronJobStatus, s conversion.Scope) error {
+	return autoConvert_batch_CronJobStatus_To_v1beta1_CronJobStatus(in, out, s)
+}
 
 func addConversionFuncs(scheme *runtime.Scheme) error {
 	var err error
