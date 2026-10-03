@@ -876,3 +876,524 @@ func getNotStartedStatus(cName string) v1.ContainerStatus {
 		Started: ptr.To(false),
 	}
 }
+
+// linuxUser builds a ContainerUser reporting the given observed UID/GID/supplementalGroups.
+func linuxUser(uid, gid int64, supplementalGroups ...int64) *v1.ContainerUser {
+	return &v1.ContainerUser{Linux: &v1.LinuxContainerUser{UID: uid, GID: gid, SupplementalGroups: supplementalGroups}}
+}
+
+func TestGenerateInsecureIDCondition(t *testing.T) {
+	hostUsersFalse := false
+
+	for desc, test := range map[string]struct {
+		generate              func(pod *v1.Pod, oldPodStatus *v1.PodStatus, containerStatuses []v1.ContainerStatus) v1.PodCondition
+		expectedType          v1.PodConditionType
+		pod                   *v1.Pod
+		containerStatuses     []v1.ContainerStatus
+		expectedStatus        v1.ConditionStatus
+		expectedReason        string
+		expectMessageContains []string
+		expectMessageExcludes []string
+	}{
+		"UID: implicitly-root: no runAsUser anywhere": {
+			generate:     GenerateInsecureUserIDCondition,
+			expectedType: v1.InsecureUserID,
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{Name: "c1"}},
+				},
+			},
+			containerStatuses: []v1.ContainerStatus{
+				{Name: "c1", User: linuxUser(0, 0)},
+			},
+			expectedStatus:        v1.ConditionTrue,
+			expectedReason:        ImplicitlyInsecureUserID,
+			expectMessageContains: []string{"c1"},
+		},
+		"UID: explicitly-root: container sets runAsUser=0": {
+			generate:     GenerateInsecureUserIDCondition,
+			expectedType: v1.InsecureUserID,
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{
+						Name:            "c1",
+						SecurityContext: &v1.SecurityContext{RunAsUser: ptr.To[int64](0)},
+					}},
+				},
+			},
+			containerStatuses: []v1.ContainerStatus{
+				{Name: "c1", User: linuxUser(0, 0)},
+			},
+			expectedStatus: v1.ConditionFalse,
+		},
+		"UID: explicitly-root: pod sets runAsUser=0": {
+			generate:     GenerateInsecureUserIDCondition,
+			expectedType: v1.InsecureUserID,
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					SecurityContext: &v1.PodSecurityContext{RunAsUser: ptr.To[int64](0)},
+					Containers:      []v1.Container{{Name: "c1"}},
+				},
+			},
+			containerStatuses: []v1.ContainerStatus{
+				{Name: "c1", User: linuxUser(0, 0)},
+			},
+			expectedStatus: v1.ConditionFalse,
+		},
+		"UID: non-root: actual UID is non-zero": {
+			generate:     GenerateInsecureUserIDCondition,
+			expectedType: v1.InsecureUserID,
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{Name: "c1"}},
+				},
+			},
+			containerStatuses: []v1.ContainerStatus{
+				{Name: "c1", User: linuxUser(1000, 1000)},
+			},
+			expectedStatus: v1.ConditionFalse,
+		},
+		"UID: user namespaces: hostUsers=false exempts pod even if reported UID is 0": {
+			generate:     GenerateInsecureUserIDCondition,
+			expectedType: v1.InsecureUserID,
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					HostUsers:  &hostUsersFalse,
+					Containers: []v1.Container{{Name: "c1"}},
+				},
+			},
+			containerStatuses: []v1.ContainerStatus{
+				{Name: "c1", User: linuxUser(0, 0)},
+			},
+			expectedStatus: v1.ConditionFalse,
+		},
+		"UID: container not started yet: no User reported": {
+			generate:     GenerateInsecureUserIDCondition,
+			expectedType: v1.InsecureUserID,
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{Name: "c1"}},
+				},
+			},
+			containerStatuses: []v1.ContainerStatus{
+				{Name: "c1"},
+			},
+			expectedStatus:        v1.ConditionUnknown,
+			expectMessageContains: []string{"c1"},
+		},
+		"UID: multiple containers: only offenders named in message": {
+			generate:     GenerateInsecureUserIDCondition,
+			expectedType: v1.InsecureUserID,
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{Name: "c1"},
+						{Name: "c2", SecurityContext: &v1.SecurityContext{RunAsUser: ptr.To[int64](0)}},
+					},
+				},
+			},
+			containerStatuses: []v1.ContainerStatus{
+				{Name: "c1", User: linuxUser(0, 0)},
+				{Name: "c2", User: linuxUser(0, 0)},
+			},
+			expectedStatus:        v1.ConditionTrue,
+			expectedReason:        ImplicitlyInsecureUserID,
+			expectMessageContains: []string{"c1"},
+			expectMessageExcludes: []string{"c2"},
+		},
+		"UID: ephemeral container: implicitly-root": {
+			generate:     GenerateInsecureUserIDCondition,
+			expectedType: v1.InsecureUserID,
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers:          []v1.Container{{Name: "c1", SecurityContext: &v1.SecurityContext{RunAsUser: ptr.To[int64](1000)}}},
+					EphemeralContainers: []v1.EphemeralContainer{{EphemeralContainerCommon: v1.EphemeralContainerCommon{Name: "debug"}}},
+				},
+			},
+			containerStatuses: []v1.ContainerStatus{
+				{Name: "c1", User: linuxUser(1000, 1000)},
+				{Name: "debug", User: linuxUser(0, 0)},
+			},
+			expectedStatus:        v1.ConditionTrue,
+			expectedReason:        ImplicitlyInsecureUserID,
+			expectMessageContains: []string{"debug"},
+		},
+		"GID: implicitly-root": {
+			generate:     GenerateInsecureGroupIDCondition,
+			expectedType: v1.InsecureGroupID,
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{Name: "c1"}},
+				},
+			},
+			containerStatuses: []v1.ContainerStatus{
+				{Name: "c1", User: linuxUser(1000, 0)},
+			},
+			expectedStatus: v1.ConditionTrue,
+			expectedReason: ImplicitlyInsecureGroupID,
+		},
+		"GID: explicitly-root: container sets runAsGroup=0": {
+			generate:     GenerateInsecureGroupIDCondition,
+			expectedType: v1.InsecureGroupID,
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{
+						Name:            "c1",
+						SecurityContext: &v1.SecurityContext{RunAsGroup: ptr.To[int64](0)},
+					}},
+				},
+			},
+			containerStatuses: []v1.ContainerStatus{
+				{Name: "c1", User: linuxUser(1000, 0)},
+			},
+			expectedStatus: v1.ConditionFalse,
+		},
+		"GID: explicitly-root: pod sets runAsGroup=0": {
+			generate:     GenerateInsecureGroupIDCondition,
+			expectedType: v1.InsecureGroupID,
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					SecurityContext: &v1.PodSecurityContext{RunAsGroup: ptr.To[int64](0)},
+					Containers:      []v1.Container{{Name: "c1"}},
+				},
+			},
+			containerStatuses: []v1.ContainerStatus{
+				{Name: "c1", User: linuxUser(1000, 0)},
+			},
+			expectedStatus: v1.ConditionFalse,
+		},
+		"GID: supplementalGroups: implicitly-root via supplementalGroupsPolicy=Merge": {
+			generate:     GenerateInsecureGroupIDCondition,
+			expectedType: v1.InsecureGroupID,
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{
+						Name:            "c1",
+						SecurityContext: &v1.SecurityContext{RunAsGroup: ptr.To[int64](1000)},
+					}},
+				},
+			},
+			containerStatuses: []v1.ContainerStatus{
+				{Name: "c1", User: linuxUser(1000, 1000, 0, 1000)},
+			},
+			expectedStatus:        v1.ConditionTrue,
+			expectedReason:        ImplicitlyInsecureGroupID,
+			expectMessageContains: []string{"merged into supplementalGroups"},
+		},
+		"GID: supplementalGroups: explicitly-root via fsGroup=0": {
+			generate:     GenerateInsecureGroupIDCondition,
+			expectedType: v1.InsecureGroupID,
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					SecurityContext: &v1.PodSecurityContext{FSGroup: ptr.To[int64](0)},
+					Containers: []v1.Container{{
+						Name:            "c1",
+						SecurityContext: &v1.SecurityContext{RunAsGroup: ptr.To[int64](1000)},
+					}},
+				},
+			},
+			containerStatuses: []v1.ContainerStatus{
+				{Name: "c1", User: linuxUser(1000, 1000, 0, 1000)},
+			},
+			expectedStatus: v1.ConditionFalse,
+		},
+		"GID: supplementalGroups: primary GID mirroring is not double-reported": {
+			generate:     GenerateInsecureGroupIDCondition,
+			expectedType: v1.InsecureGroupID,
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{Name: "c1"}},
+				},
+			},
+			containerStatuses: []v1.ContainerStatus{
+				{Name: "c1", User: linuxUser(1000, 0, 0)},
+			},
+			expectedStatus:        v1.ConditionTrue,
+			expectedReason:        ImplicitlyInsecureGroupID,
+			expectMessageContains: []string{"without runAsGroup set"},
+		},
+		"GID: supplementalGroups: combined with primary-GID container in the same pod": {
+			generate:     GenerateInsecureGroupIDCondition,
+			expectedType: v1.InsecureGroupID,
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{Name: "c1"},
+						{Name: "c2", SecurityContext: &v1.SecurityContext{RunAsGroup: ptr.To[int64](1000)}},
+					},
+				},
+			},
+			containerStatuses: []v1.ContainerStatus{
+				{Name: "c1", User: linuxUser(1000, 0)},
+				{Name: "c2", User: linuxUser(1000, 1000, 0, 1000)},
+			},
+			expectedStatus: v1.ConditionTrue,
+			expectedReason: ImplicitlyInsecureGroupID,
+			expectMessageContains: []string{
+				"[c1] running as GID 0 without runAsGroup set",
+				"[c2] running with GID 0 merged into supplementalGroups",
+			},
+		},
+		"GID: container not started yet: no User reported": {
+			generate:     GenerateInsecureGroupIDCondition,
+			expectedType: v1.InsecureGroupID,
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{Name: "c1"}},
+				},
+			},
+			containerStatuses: []v1.ContainerStatus{
+				{Name: "c1"},
+			},
+			expectedStatus:        v1.ConditionUnknown,
+			expectMessageContains: []string{"c1"},
+		},
+		"UID: one container insecure, one not started yet: insecure wins over unknown": {
+			generate:     GenerateInsecureUserIDCondition,
+			expectedType: v1.InsecureUserID,
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{Name: "c1"},
+						{Name: "c2"},
+					},
+				},
+			},
+			containerStatuses: []v1.ContainerStatus{
+				{Name: "c1", User: linuxUser(0, 0)},
+				{Name: "c2"},
+			},
+			expectedStatus:        v1.ConditionTrue,
+			expectedReason:        ImplicitlyInsecureUserID,
+			expectMessageContains: []string{"c1"},
+		},
+		"UID: one container secure, one not started yet: unknown wins over false": {
+			generate:     GenerateInsecureUserIDCondition,
+			expectedType: v1.InsecureUserID,
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{Name: "c1"},
+						{Name: "c2"},
+					},
+				},
+			},
+			containerStatuses: []v1.ContainerStatus{
+				{Name: "c1", User: linuxUser(1000, 1000)},
+				{Name: "c2"},
+			},
+			expectedStatus:        v1.ConditionUnknown,
+			expectMessageContains: []string{"c2"},
+			expectMessageExcludes: []string{"c1"},
+		},
+	} {
+		t.Run(desc, func(t *testing.T) {
+			condition := test.generate(test.pod, &v1.PodStatus{}, test.containerStatuses)
+			require.Equal(t, test.expectedType, condition.Type)
+			require.Equal(t, test.expectedStatus, condition.Status)
+			require.Equal(t, test.expectedReason, condition.Reason)
+			for _, want := range test.expectMessageContains {
+				assert.Contains(t, condition.Message, want)
+			}
+			for _, notWant := range test.expectMessageExcludes {
+				assert.NotContains(t, condition.Message, notWant)
+			}
+		})
+	}
+}
+
+func TestIsPodExplicitlyInsecureID(t *testing.T) {
+	for desc, test := range map[string]struct {
+		check             func(pod *v1.Pod, containerStatuses []v1.ContainerStatus) bool
+		pod               *v1.Pod
+		containerStatuses []v1.ContainerStatus
+		want              bool
+	}{
+		"UID: explicit: container sets runAsUser=0": {
+			check: IsPodExplicitlyInsecureUserID,
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{
+						Name:            "c1",
+						SecurityContext: &v1.SecurityContext{RunAsUser: ptr.To[int64](0)},
+					}},
+				},
+			},
+			containerStatuses: []v1.ContainerStatus{{Name: "c1", User: linuxUser(0, 0)}},
+			want:              true,
+		},
+		"UID: implicit: no runAsUser set": {
+			check: IsPodExplicitlyInsecureUserID,
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{Name: "c1"}},
+				},
+			},
+			containerStatuses: []v1.ContainerStatus{{Name: "c1", User: linuxUser(0, 0)}},
+			want:              false,
+		},
+		"UID: requested a different UID than observed": {
+			check: IsPodExplicitlyInsecureUserID,
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{
+						Name:            "c1",
+						SecurityContext: &v1.SecurityContext{RunAsUser: ptr.To[int64](1000)},
+					}},
+				},
+			},
+			containerStatuses: []v1.ContainerStatus{{Name: "c1", User: linuxUser(0, 0)}},
+			want:              false,
+		},
+		"UID: ephemeral container: explicitly requests runAsUser=0": {
+			check: IsPodExplicitlyInsecureUserID,
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{Name: "c1"}},
+					EphemeralContainers: []v1.EphemeralContainer{{EphemeralContainerCommon: v1.EphemeralContainerCommon{
+						Name:            "debug",
+						SecurityContext: &v1.SecurityContext{RunAsUser: ptr.To[int64](0)},
+					}}},
+				},
+			},
+			containerStatuses: []v1.ContainerStatus{
+				{Name: "c1", User: linuxUser(1000, 1000)},
+				{Name: "debug", User: linuxUser(0, 0)},
+			},
+			want: true,
+		},
+		"UID: user namespaces: hostUsers=false exempts pod": {
+			check: IsPodExplicitlyInsecureUserID,
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					HostUsers: new(bool),
+					Containers: []v1.Container{{
+						Name:            "c1",
+						SecurityContext: &v1.SecurityContext{RunAsUser: ptr.To[int64](0)},
+					}},
+				},
+			},
+			containerStatuses: []v1.ContainerStatus{{Name: "c1", User: linuxUser(0, 0)}},
+			want:              false,
+		},
+		"GID: explicit: container sets runAsGroup=0": {
+			check: IsPodExplicitlyInsecureGroupID,
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{
+						Name:            "c1",
+						SecurityContext: &v1.SecurityContext{RunAsGroup: ptr.To[int64](0)},
+					}},
+				},
+			},
+			containerStatuses: []v1.ContainerStatus{{Name: "c1", User: linuxUser(1000, 0)}},
+			want:              true,
+		},
+		"GID: implicit: no runAsGroup set": {
+			check: IsPodExplicitlyInsecureGroupID,
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{Name: "c1"}},
+				},
+			},
+			containerStatuses: []v1.ContainerStatus{{Name: "c1", User: linuxUser(1000, 0)}},
+			want:              false,
+		},
+		"GID: requested a different GID than observed": {
+			check: IsPodExplicitlyInsecureGroupID,
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{
+						Name:            "c1",
+						SecurityContext: &v1.SecurityContext{RunAsGroup: ptr.To[int64](1000)},
+					}},
+				},
+			},
+			containerStatuses: []v1.ContainerStatus{{Name: "c1", User: linuxUser(1000, 0)}},
+			want:              false,
+		},
+		"GID: ephemeral container: explicitly requests runAsGroup=0": {
+			check: IsPodExplicitlyInsecureGroupID,
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{Name: "c1"}},
+					EphemeralContainers: []v1.EphemeralContainer{{EphemeralContainerCommon: v1.EphemeralContainerCommon{
+						Name:            "debug",
+						SecurityContext: &v1.SecurityContext{RunAsGroup: ptr.To[int64](0)},
+					}}},
+				},
+			},
+			containerStatuses: []v1.ContainerStatus{
+				{Name: "c1", User: linuxUser(1000, 1000)},
+				{Name: "debug", User: linuxUser(0, 0)},
+			},
+			want: true,
+		},
+		"GID: user namespaces: hostUsers=false exempts pod": {
+			check: IsPodExplicitlyInsecureGroupID,
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					HostUsers: new(bool),
+					Containers: []v1.Container{{
+						Name:            "c1",
+						SecurityContext: &v1.SecurityContext{RunAsGroup: ptr.To[int64](0)},
+					}},
+				},
+			},
+			containerStatuses: []v1.ContainerStatus{{Name: "c1", User: linuxUser(1000, 0)}},
+			want:              false,
+		},
+		"supplementalGroups: implicit: supplementalGroupsPolicy=Merge pulls in GID 0": {
+			check: IsPodImplicitlyInsecureSupplementalGroups,
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{
+						Name:            "c1",
+						SecurityContext: &v1.SecurityContext{RunAsGroup: ptr.To[int64](1000)},
+					}},
+				},
+			},
+			containerStatuses: []v1.ContainerStatus{{Name: "c1", User: linuxUser(1000, 1000, 0, 1000)}},
+			want:              true,
+		},
+		"supplementalGroups: explicit: pod sets fsGroup=0": {
+			check: IsPodExplicitlyInsecureSupplementalGroups,
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					SecurityContext: &v1.PodSecurityContext{FSGroup: ptr.To[int64](0)},
+					Containers: []v1.Container{{
+						Name:            "c1",
+						SecurityContext: &v1.SecurityContext{RunAsGroup: ptr.To[int64](1000)},
+					}},
+				},
+			},
+			containerStatuses: []v1.ContainerStatus{{Name: "c1", User: linuxUser(1000, 1000, 0, 1000)}},
+			want:              true,
+		},
+		"supplementalGroups: primary GID mirroring is excluded from the supplementalGroups check": {
+			check: IsPodImplicitlyInsecureSupplementalGroups,
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{Name: "c1"}},
+				},
+			},
+			containerStatuses: []v1.ContainerStatus{{Name: "c1", User: linuxUser(1000, 0, 0)}},
+			want:              false,
+		},
+		"supplementalGroups: user namespaces: hostUsers=false exempts pod": {
+			check: IsPodImplicitlyInsecureSupplementalGroups,
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					HostUsers:  new(bool),
+					Containers: []v1.Container{{Name: "c1"}},
+				},
+			},
+			containerStatuses: []v1.ContainerStatus{{Name: "c1", User: linuxUser(1000, 1000, 0, 1000)}},
+			want:              false,
+		},
+	} {
+		t.Run(desc, func(t *testing.T) {
+			require.Equal(t, test.want, test.check(test.pod, test.containerStatuses))
+		})
+	}
+}

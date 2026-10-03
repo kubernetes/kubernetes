@@ -113,6 +113,7 @@ func NewHollowKubelet(
 		NodeStartupLatencyTracker: nodeStartupLatencyTracker,
 		TracerProvider:            noopoteltrace.NewTracerProvider(),
 		Recorder:                  &record.FakeRecorder{}, // With real recorder we attempt to read /dev/kmsg.
+		InsecureIDEventRecorder:   &record.FakeRecorder{},
 	}
 
 	return &HollowKubelet{

@@ -3862,6 +3862,12 @@ const (
 	PodResizeInProgress PodConditionType = "PodResizeInProgress"
 	// AllContainersRestarting indicates that all containers of the pod is being restarted.
 	AllContainersRestarting PodConditionType = "AllContainersRestarting"
+	// InsecureUserID indicates that one or more containers of the pod are running as
+	// UID 0 without the pod or container spec explicitly requesting it via runAsUser.
+	InsecureUserID PodConditionType = "InsecureUserID"
+	// InsecureGroupID indicates that one or more containers of the pod are running as
+	// GID 0 without the pod or container spec explicitly requesting it via runAsGroup.
+	InsecureGroupID PodConditionType = "InsecureGroupID"
 )
 
 // These are reasons for a pod's transition to a condition.

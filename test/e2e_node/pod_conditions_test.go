@@ -29,11 +29,13 @@ import (
 
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eevents "k8s.io/kubernetes/test/e2e/framework/events"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
@@ -76,7 +78,186 @@ var _ = SIGDescribe("Pod conditions managed by Kubelet", func() {
 		ginkgo.It("a pod failing to mount volumes (Secret) and with init containers should report just the scheduled condition set", runPodFailingConditionsTest(f, true, false, typeSecret))
 		addAfterEachForCleaningUpPods(f)
 	})
+
+	f.Context("including InsecureUserID and InsecureGroupID conditions", f.WithSerial(), framework.WithFeatureGate(features.InsecurePodWarnings), func() {
+		tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
+			if initialConfig.FeatureGates == nil {
+				initialConfig.FeatureGates = map[string]bool{}
+			}
+			initialConfig.FeatureGates[string(features.InsecurePodWarnings)] = true
+		})
+
+		ginkgo.It("a pod without runAsUser/runAsGroup should get both conditions set to true and a combined event", func(ctx context.Context) {
+			p := e2epod.NewPodClient(f).Create(ctx, insecureIDTestPod("implicitly-insecure", nil, nil))
+
+			framework.ExpectNoError(e2epod.WaitTimeoutForPodReadyInNamespace(ctx, f.ClientSet, p.Name, f.Namespace.Name, framework.PodStartTimeout))
+			waitForPodConditionWithStatus(ctx, f, p.Name, v1.InsecureUserID, true)
+			waitForPodConditionWithStatus(ctx, f, p.Name, v1.InsecureGroupID, true)
+
+			eventSelector := fields.Set{
+				"involvedObject.kind": "Pod",
+				"involvedObject.name": p.Name,
+				"reason":              "ImplicitlyInsecureUserAndGroupID",
+			}.AsSelector().String()
+			framework.ExpectNoError(e2eevents.WaitTimeoutForEvent(ctx, f.ClientSet, f.Namespace.Name, eventSelector, "", framework.PodEventTimeout))
+		})
+
+		ginkgo.It("a pod with only runAsGroup explicitly set to 0 should get only the InsecureUserID condition set to true", func(ctx context.Context) {
+			zero := int64(0)
+			p := e2epod.NewPodClient(f).Create(ctx, insecureIDTestPod("implicitly-insecure-uid-only", nil, &zero))
+
+			framework.ExpectNoError(e2epod.WaitTimeoutForPodReadyInNamespace(ctx, f.ClientSet, p.Name, f.Namespace.Name, framework.PodStartTimeout))
+			waitForPodConditionWithStatus(ctx, f, p.Name, v1.InsecureUserID, true)
+			waitForPodConditionWithStatus(ctx, f, p.Name, v1.InsecureGroupID, false)
+
+			eventSelector := fields.Set{
+				"involvedObject.kind": "Pod",
+				"involvedObject.name": p.Name,
+				"reason":              "ImplicitlyInsecureUserID",
+			}.AsSelector().String()
+			framework.ExpectNoError(e2eevents.WaitTimeoutForEvent(ctx, f.ClientSet, f.Namespace.Name, eventSelector, "", framework.PodEventTimeout))
+		})
+
+		ginkgo.It("a pod with only runAsUser explicitly set to 0 should get only the InsecureGroupID condition set to true", func(ctx context.Context) {
+			zero := int64(0)
+			p := e2epod.NewPodClient(f).Create(ctx, insecureIDTestPod("implicitly-insecure-gid-only", &zero, nil))
+
+			framework.ExpectNoError(e2epod.WaitTimeoutForPodReadyInNamespace(ctx, f.ClientSet, p.Name, f.Namespace.Name, framework.PodStartTimeout))
+			waitForPodConditionWithStatus(ctx, f, p.Name, v1.InsecureUserID, false)
+			waitForPodConditionWithStatus(ctx, f, p.Name, v1.InsecureGroupID, true)
+
+			eventSelector := fields.Set{
+				"involvedObject.kind": "Pod",
+				"involvedObject.name": p.Name,
+				"reason":              "ImplicitlyInsecureGroupID",
+			}.AsSelector().String()
+			framework.ExpectNoError(e2eevents.WaitTimeoutForEvent(ctx, f.ClientSet, f.Namespace.Name, eventSelector, "", framework.PodEventTimeout))
+		})
+
+		ginkgo.It("a pod with runAsUser/runAsGroup explicitly set to 0 should get both conditions set to false", func(ctx context.Context) {
+			zero := int64(0)
+			p := e2epod.NewPodClient(f).Create(ctx, insecureIDTestPod("explicitly-insecure", &zero, &zero))
+
+			framework.ExpectNoError(e2epod.WaitTimeoutForPodReadyInNamespace(ctx, f.ClientSet, p.Name, f.Namespace.Name, framework.PodStartTimeout))
+			waitForPodConditionWithStatus(ctx, f, p.Name, v1.InsecureUserID, false)
+			waitForPodConditionWithStatus(ctx, f, p.Name, v1.InsecureGroupID, false)
+		})
+
+		ginkgo.It("a pod running as non-root should get both conditions set to false", func(ctx context.Context) {
+			nonRoot := int64(1000)
+			p := e2epod.NewPodClient(f).Create(ctx, insecureIDTestPod("secure-pod", &nonRoot, &nonRoot))
+
+			framework.ExpectNoError(e2epod.WaitTimeoutForPodReadyInNamespace(ctx, f.ClientSet, p.Name, f.Namespace.Name, framework.PodStartTimeout))
+			waitForPodConditionWithStatus(ctx, f, p.Name, v1.InsecureUserID, false)
+			waitForPodConditionWithStatus(ctx, f, p.Name, v1.InsecureGroupID, false)
+		})
+
+		ginkgo.It("a pod with hostUsers false should get both conditions set to false even when running as root", func(ctx context.Context) {
+			if !supportsUserNS(ctx, f) {
+				e2eskipper.Skipf("runtime does not support user namespaces")
+			}
+
+			hostUsersFalse := false
+			pod := insecureIDTestPod("root-in-userns", nil, nil)
+			pod.Spec.HostUsers = &hostUsersFalse
+			p := e2epod.NewPodClient(f).Create(ctx, pod)
+
+			framework.ExpectNoError(e2epod.WaitTimeoutForPodReadyInNamespace(ctx, f.ClientSet, p.Name, f.Namespace.Name, framework.PodStartTimeout))
+			waitForPodConditionWithStatus(ctx, f, p.Name, v1.InsecureUserID, false)
+			waitForPodConditionWithStatus(ctx, f, p.Name, v1.InsecureGroupID, false)
+		})
+
+		ginkgo.It("a pod with an implicitly-insecure init container should get both conditions set to true even if the main container is secure", func(ctx context.Context) {
+			nonRoot := int64(1000)
+			pod := insecureIDTestPod("implicitly-insecure-init-container", &nonRoot, &nonRoot)
+			pod.Spec.InitContainers = []v1.Container{
+				{
+					Name:    "init",
+					Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+					Command: []string{"sh", "-c", "true"},
+				},
+			}
+			p := e2epod.NewPodClient(f).Create(ctx, pod)
+
+			framework.ExpectNoError(e2epod.WaitTimeoutForPodReadyInNamespace(ctx, f.ClientSet, p.Name, f.Namespace.Name, framework.PodStartTimeout))
+			waitForPodConditionWithStatus(ctx, f, p.Name, v1.InsecureUserID, true)
+			waitForPodConditionWithStatus(ctx, f, p.Name, v1.InsecureGroupID, true)
+		})
+
+		ginkgo.It("a pod with an implicitly-insecure ephemeral container should get both conditions set to true even if the main container is secure", func(ctx context.Context) {
+			nonRoot := int64(1000)
+			pod := insecureIDTestPod("implicitly-insecure-ephemeral-container", &nonRoot, &nonRoot)
+			p := e2epod.NewPodClient(f).Create(ctx, pod)
+			framework.ExpectNoError(e2epod.WaitTimeoutForPodReadyInNamespace(ctx, f.ClientSet, p.Name, f.Namespace.Name, framework.PodStartTimeout))
+			waitForPodConditionWithStatus(ctx, f, p.Name, v1.InsecureUserID, false)
+			waitForPodConditionWithStatus(ctx, f, p.Name, v1.InsecureGroupID, false)
+
+			ec := &v1.EphemeralContainer{
+				EphemeralContainerCommon: v1.EphemeralContainerCommon{
+					Name:    "debug",
+					Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+					Command: []string{"sleep", "3600"},
+				},
+			}
+			framework.ExpectNoError(e2epod.NewPodClient(f).AddEphemeralContainerSync(ctx, p, ec, framework.PodStartTimeout))
+			waitForPodConditionWithStatus(ctx, f, p.Name, v1.InsecureUserID, true)
+			waitForPodConditionWithStatus(ctx, f, p.Name, v1.InsecureGroupID, true)
+		})
+
+		ginkgo.It("should report implicitly and explicitly insecure pod counts in kubelet metrics", func(ctx context.Context) {
+			zero := int64(0)
+			implicit := e2epod.NewPodClient(f).Create(ctx, insecureIDTestPod("metrics-implicitly-insecure", nil, nil))
+			explicit := e2epod.NewPodClient(f).Create(ctx, insecureIDTestPod("metrics-explicitly-insecure", &zero, &zero))
+
+			framework.ExpectNoError(e2epod.WaitTimeoutForPodReadyInNamespace(ctx, f.ClientSet, implicit.Name, f.Namespace.Name, framework.PodStartTimeout))
+			framework.ExpectNoError(e2epod.WaitTimeoutForPodReadyInNamespace(ctx, f.ClientSet, explicit.Name, f.Namespace.Name, framework.PodStartTimeout))
+
+			gomega.Eventually(ctx, func(ctx context.Context) error {
+				m, err := getKubeletMetrics(ctx)
+				if err != nil {
+					return err
+				}
+				for _, tc := range []struct{ declaration, idType string }{
+					{"implicit", "uid"},
+					{"implicit", "gid"},
+					{"explicit", "uid"},
+					{"explicit", "gid"},
+				} {
+					value, err := getCounterMetricValue(m, "kubelet_insecure_pods", map[string]string{"declaration": tc.declaration, "id_type": tc.idType})
+					if err != nil {
+						return err
+					}
+					if value < 1 {
+						return fmt.Errorf("expected kubelet_insecure_pods{declaration=%q,id_type=%q} to be >= 1, got %v", tc.declaration, tc.idType, value)
+					}
+				}
+				return nil
+			}, framework.PodStartTimeout).Should(gomega.Succeed())
+		})
+		addAfterEachForCleaningUpPods(f)
+	})
 })
+
+// insecureIDTestPod returns a pod spec running busybox with the given runAsUser/runAsGroup
+// (nil leaves the field unset).
+func insecureIDTestPod(name string, runAsUser, runAsGroup *int64) *v1.Pod {
+	return &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: name},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:    "c",
+					Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+					Command: []string{"sleep", "3600"},
+					SecurityContext: &v1.SecurityContext{
+						RunAsUser:  runAsUser,
+						RunAsGroup: runAsGroup,
+					},
+				},
+			},
+		},
+	}
+}
 
 func runPodFailingConditionsTest(f *framework.Framework, hasInitContainers, checkPodReadyToStart bool, volumeSource string) func(ctx context.Context) {
 	return func(ctx context.Context) {
@@ -292,6 +473,18 @@ func getTransitionTimeForPodConditionWithStatus(pod *v1.Pod, condType v1.PodCond
 		}
 	}
 	return time.Time{}, fmt.Errorf("condition: %s not found for pod", condType)
+}
+
+// waitForPodConditionWithStatus polls until the pod's condition reaches the expected status.
+func waitForPodConditionWithStatus(ctx context.Context, f *framework.Framework, podName string, condType v1.PodConditionType, expectedStatus bool) {
+	gomega.Eventually(ctx, func(ctx context.Context) error {
+		p, err := e2epod.NewPodClient(f).Get(ctx, podName, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+		_, err = getTransitionTimeForPodConditionWithStatus(p, condType, expectedStatus)
+		return err
+	}, framework.PodStartTimeout).Should(gomega.Succeed())
 }
 
 func webserverPodSpec(podName, containerName, initContainerName string, addInitContainer bool) *v1.Pod {

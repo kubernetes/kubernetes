@@ -1891,7 +1891,10 @@ metadata:
 			podName := "e2e-test-agnhost-pod"
 			agnhostImage := imageutils.GetE2EImage(imageutils.Agnhost)
 			ginkgo.By("running the image " + agnhostImage)
-			e2ekubectl.RunKubectlOrDie(ns, "run", podName, "--image="+agnhostImage, podRunningTimeoutArg, "--labels=run="+podName)
+			// Run as a non-root UID/GID to avoid kubelet's ImplicitlyInsecure*ID warnings
+			// (when the InsecurePodWarnings gate is set).
+			e2ekubectl.RunKubectlOrDie(ns, "run", podName, "--image="+agnhostImage, podRunningTimeoutArg, "--labels=run="+podName,
+				"--overrides={\"spec\":{\"securityContext\":{\"runAsUser\":1000,\"runAsGroup\":1000}}}")
 
 			ginkgo.By("verifying the pod " + podName + " is running")
 			label := labels.SelectorFromSet(map[string]string{"run": podName})
