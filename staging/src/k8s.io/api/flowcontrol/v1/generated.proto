@@ -152,6 +152,7 @@ message FlowSchemaSpec {
   // if it is an empty slice, there will be no requests matching the FlowSchema.
   // +listType=atomic
   // +optional
+  // +k8s:alpha(since: "1.38")=+k8s:optional
   repeated PolicyRulesWithSubjects rules = 4;
 }
 
@@ -173,6 +174,7 @@ message GroupSubject {
   // well-known group names.
   // Required.
   // +required
+  // +k8s:alpha(since: "1.38")=+k8s:required
   optional string name = 1;
 }
 
@@ -298,6 +300,7 @@ message PolicyRulesWithSubjects {
   // +listType=atomic
   // Required.
   // +required
+  // +k8s:alpha(since: "1.38")=+k8s:required
   repeated Subject subjects = 1;
 
   // resourceRules is a slice of ResourcePolicyRules that identify matching requests according to their verb and the
@@ -532,18 +535,26 @@ message Subject {
   // Required
   // +required
   // +unionDiscriminator
+  // +k8s:alpha(since: "1.38")=+k8s:required
+  // +k8s:alpha(since: "1.38")=+k8s:modeDiscriminator
   optional string kind = 1;
 
   // user matches based on username.
   // +optional
+  // +k8s:alpha(since: "1.38")=+k8s:optional
+  // +k8s:alpha(since: "1.38")=+k8s:ifMode("User")=+k8s:required
   optional UserSubject user = 2;
 
   // group matches based on user group name.
   // +optional
+  // +k8s:alpha(since: "1.38")=+k8s:optional
+  // +k8s:alpha(since: "1.38")=+k8s:ifMode("Group")=+k8s:required
   optional GroupSubject group = 3;
 
   // serviceAccount matches ServiceAccounts.
   // +optional
+  // +k8s:alpha(since: "1.38")=+k8s:optional
+  // +k8s:alpha(since: "1.38")=+k8s:ifMode("ServiceAccount")=+k8s:required
   optional ServiceAccountSubject serviceAccount = 4;
 }
 

@@ -103,8 +103,112 @@ func Validate_FlowSchema(
 		errs = append(errs, fn(fldPath.Child("metadata"), &obj.ObjectMeta, oldVal, oldObj != nil)...)
 	}
 
-	// field flowcontrolv1beta3.FlowSchema.Spec has no validation
+	{ // field flowcontrolv1beta3.FlowSchema.Spec
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *flowcontrolv1beta3.FlowSchemaSpec,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if validate.SemanticDeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_FlowSchemaSpec(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *flowcontrolv1beta3.FlowSchema) *flowcontrolv1beta3.FlowSchemaSpec {
+				return &oldObj.Spec
+			})
+		errs = append(errs, fn(fldPath.Child("spec"), &obj.Spec, oldVal, oldObj != nil)...)
+	}
+
 	// field flowcontrolv1beta3.FlowSchema.Status has no validation
+	return errs
+}
+
+// Validate_FlowSchemaSpec validates an instance of FlowSchemaSpec according
+// to declarative validation rules in the API schema.
+func Validate_FlowSchemaSpec(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *flowcontrolv1beta3.FlowSchemaSpec) (errs field.ErrorList) {
+
+	// field flowcontrolv1beta3.FlowSchemaSpec.PriorityLevelConfiguration has no validation
+	// field flowcontrolv1beta3.FlowSchemaSpec.MatchingPrecedence has no validation
+	// field flowcontrolv1beta3.FlowSchemaSpec.DistinguisherMethod has no validation
+
+	{ // field flowcontrolv1beta3.FlowSchemaSpec.Rules
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj []flowcontrolv1beta3.PolicyRulesWithSubjects,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if validate.SemanticDeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			// iterate the list and call the type's validation function
+			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_PolicyRulesWithSubjects); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *flowcontrolv1beta3.FlowSchemaSpec) []flowcontrolv1beta3.PolicyRulesWithSubjects {
+				return oldObj.Rules
+			})
+		errs = append(errs, fn(fldPath.Child("rules"), obj.Rules, oldVal, oldObj != nil)...)
+	}
+
+	return errs
+}
+
+// Validate_GroupSubject validates an instance of GroupSubject according
+// to declarative validation rules in the API schema.
+func Validate_GroupSubject(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *flowcontrolv1beta3.GroupSubject) (errs field.ErrorList) {
+
+	{ // field flowcontrolv1beta3.GroupSubject.Name
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *string,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *flowcontrolv1beta3.GroupSubject) *string {
+				return &oldObj.Name
+			})
+		errs = append(errs, fn(fldPath.Child("name"), &obj.Name, oldVal, oldObj != nil)...)
+	}
+
 	return errs
 }
 
@@ -237,6 +341,50 @@ func Validate_LimitedPriorityLevelConfiguration(
 
 	// field flowcontrolv1beta3.LimitedPriorityLevelConfiguration.LendablePercent has no validation
 	// field flowcontrolv1beta3.LimitedPriorityLevelConfiguration.BorrowingLimitPercent has no validation
+	return errs
+}
+
+// Validate_PolicyRulesWithSubjects validates an instance of PolicyRulesWithSubjects according
+// to declarative validation rules in the API schema.
+func Validate_PolicyRulesWithSubjects(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *flowcontrolv1beta3.PolicyRulesWithSubjects) (errs field.ErrorList) {
+
+	{ // field flowcontrolv1beta3.PolicyRulesWithSubjects.Subjects
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj []flowcontrolv1beta3.Subject,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if validate.SemanticDeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.RequiredSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			// iterate the list and call the type's validation function
+			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_Subject); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *flowcontrolv1beta3.PolicyRulesWithSubjects) []flowcontrolv1beta3.Subject {
+				return oldObj.Subjects
+			})
+		errs = append(errs, fn(fldPath.Child("subjects"), obj.Subjects, oldVal, oldObj != nil)...)
+	}
+
+	// field flowcontrolv1beta3.PolicyRulesWithSubjects.ResourceRules has no validation
+	// field flowcontrolv1beta3.PolicyRulesWithSubjects.NonResourceRules has no validation
 	return errs
 }
 
@@ -451,6 +599,217 @@ func Validate_PriorityLevelConfigurationSpec(
 				return oldObj.Exempt
 			})
 		errs = append(errs, fn(fldPath.Child("exempt"), obj.Exempt, oldVal, oldObj != nil)...)
+	}
+
+	return errs
+}
+
+// Validate_Subject validates an instance of Subject according
+// to declarative validation rules in the API schema.
+func Validate_Subject(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *flowcontrolv1beta3.Subject) (errs field.ErrorList) {
+
+	if e := validate.Discriminated(ctx, op, fldPath, obj, oldObj, "group",
+		func(obj *flowcontrolv1beta3.Subject) *flowcontrolv1beta3.GroupSubject { return obj.Group },
+		func(obj *flowcontrolv1beta3.Subject) flowcontrolv1beta3.SubjectKind { return obj.Kind }, validate.DirectEqual,
+		func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *flowcontrolv1beta3.GroupSubject) field.ErrorList {
+			errs := field.ErrorList{}
+			errs = append(errs, validate.ForbiddenPointer(ctx, op, fldPath, obj, oldObj).MarkAlpha()...)
+			return errs
+		},
+		[]validate.DiscriminatedRule[*flowcontrolv1beta3.GroupSubject, flowcontrolv1beta3.SubjectKind]{
+
+			{
+				Value: "Group",
+				Validation: func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *flowcontrolv1beta3.GroupSubject) field.ErrorList {
+					errs := field.ErrorList{}
+					earlyReturn := false
+					if e := validate.RequiredPointer(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
+						errs = append(errs, e...)
+						earlyReturn = true
+					}
+					if earlyReturn {
+						return errs
+					}
+					return errs
+				},
+			},
+		}); len(e) != 0 {
+		errs = append(errs, e...)
+	}
+	if e := validate.Discriminated(ctx, op, fldPath, obj, oldObj, "serviceAccount",
+		func(obj *flowcontrolv1beta3.Subject) *flowcontrolv1beta3.ServiceAccountSubject {
+			return obj.ServiceAccount
+		},
+		func(obj *flowcontrolv1beta3.Subject) flowcontrolv1beta3.SubjectKind { return obj.Kind }, validate.DirectEqual,
+		func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *flowcontrolv1beta3.ServiceAccountSubject) field.ErrorList {
+			errs := field.ErrorList{}
+			errs = append(errs, validate.ForbiddenPointer(ctx, op, fldPath, obj, oldObj).MarkAlpha()...)
+			return errs
+		},
+		[]validate.DiscriminatedRule[*flowcontrolv1beta3.ServiceAccountSubject, flowcontrolv1beta3.SubjectKind]{
+
+			{
+				Value: "ServiceAccount",
+				Validation: func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *flowcontrolv1beta3.ServiceAccountSubject) field.ErrorList {
+					errs := field.ErrorList{}
+					earlyReturn := false
+					if e := validate.RequiredPointer(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
+						errs = append(errs, e...)
+						earlyReturn = true
+					}
+					if earlyReturn {
+						return errs
+					}
+					return errs
+				},
+			},
+		}); len(e) != 0 {
+		errs = append(errs, e...)
+	}
+	if e := validate.Discriminated(ctx, op, fldPath, obj, oldObj, "user",
+		func(obj *flowcontrolv1beta3.Subject) *flowcontrolv1beta3.UserSubject { return obj.User },
+		func(obj *flowcontrolv1beta3.Subject) flowcontrolv1beta3.SubjectKind { return obj.Kind }, validate.DirectEqual,
+		func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *flowcontrolv1beta3.UserSubject) field.ErrorList {
+			errs := field.ErrorList{}
+			errs = append(errs, validate.ForbiddenPointer(ctx, op, fldPath, obj, oldObj).MarkAlpha()...)
+			return errs
+		},
+		[]validate.DiscriminatedRule[*flowcontrolv1beta3.UserSubject, flowcontrolv1beta3.SubjectKind]{
+
+			{
+				Value: "User",
+				Validation: func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *flowcontrolv1beta3.UserSubject) field.ErrorList {
+					errs := field.ErrorList{}
+					earlyReturn := false
+					if e := validate.RequiredPointer(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
+						errs = append(errs, e...)
+						earlyReturn = true
+					}
+					if earlyReturn {
+						return errs
+					}
+					return errs
+				},
+			},
+		}); len(e) != 0 {
+		errs = append(errs, e...)
+	}
+
+	{ // field flowcontrolv1beta3.Subject.Kind
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *flowcontrolv1beta3.SubjectKind,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *flowcontrolv1beta3.Subject) *flowcontrolv1beta3.SubjectKind {
+				return &oldObj.Kind
+			})
+		errs = append(errs, fn(fldPath.Child("kind"), &obj.Kind, oldVal, oldObj != nil)...)
+	}
+
+	{ // field flowcontrolv1beta3.Subject.User
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *flowcontrolv1beta3.UserSubject,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *flowcontrolv1beta3.Subject) *flowcontrolv1beta3.UserSubject {
+				return oldObj.User
+			})
+		errs = append(errs, fn(fldPath.Child("user"), obj.User, oldVal, oldObj != nil)...)
+	}
+
+	{ // field flowcontrolv1beta3.Subject.Group
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *flowcontrolv1beta3.GroupSubject,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_GroupSubject(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *flowcontrolv1beta3.Subject) *flowcontrolv1beta3.GroupSubject {
+				return oldObj.Group
+			})
+		errs = append(errs, fn(fldPath.Child("group"), obj.Group, oldVal, oldObj != nil)...)
+	}
+
+	{ // field flowcontrolv1beta3.Subject.ServiceAccount
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *flowcontrolv1beta3.ServiceAccountSubject,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *flowcontrolv1beta3.Subject) *flowcontrolv1beta3.ServiceAccountSubject {
+				return oldObj.ServiceAccount
+			})
+		errs = append(errs, fn(fldPath.Child("serviceAccount"), obj.ServiceAccount, oldVal, oldObj != nil)...)
 	}
 
 	return errs
