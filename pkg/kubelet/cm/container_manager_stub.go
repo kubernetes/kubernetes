@@ -145,6 +145,10 @@ func (cm *containerManagerStub) IsPodInSystemPartition(_ *v1.Pod) bool {
 	return false
 }
 
+func (cm *containerManagerStub) PartitionStats(_ klog.Logger) map[string]PartitionStats {
+	return nil
+}
+
 func (cm *containerManagerStub) GetDevices(_, _ string) []*podresourcesapi.ContainerDevices {
 	return nil
 }

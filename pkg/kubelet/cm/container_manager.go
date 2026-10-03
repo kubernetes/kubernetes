@@ -128,6 +128,10 @@ type ContainerManager interface {
 	// system partition. It is false on a node without a system partition.
 	IsPodInSystemPartition(pod *v1.Pod) bool
 
+	// PartitionStats returns the current usage of each node partition, keyed by
+	// partition name. A node without partitions returns nil.
+	PartitionStats(logger klog.Logger) map[string]PartitionStats
+
 	// GetPluginRegistrationHandlers returns a set of plugin registration handlers
 	// The pluginwatcher's Handlers allow to have a single module for handling
 	// registration.
@@ -228,6 +232,18 @@ func (c *SystemPartitionConfig) HasPod(pod *v1.Pod) bool {
 		return false
 	}
 	return c.Namespaces.Has(pod.Namespace)
+}
+
+// PartitionStats is the current usage of a node partition. A field is nil when
+// it could not be read.
+type PartitionStats struct {
+	// MemoryUsageBytes is the memory charged to the partition's cgroup,
+	// including its page cache.
+	MemoryUsageBytes *int64
+	// Pods is the number of pod cgroups in the partition. It counts where pods
+	// actually are, so a pod waiting to be moved in or out is still reported
+	// under the partition it was created in.
+	Pods *int64
 }
 
 type NodeAllocatableConfig struct {

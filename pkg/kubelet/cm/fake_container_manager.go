@@ -210,6 +210,13 @@ func (cm *FakeContainerManager) IsPodInSystemPartition(_ *v1.Pod) bool {
 	return false
 }
 
+func (cm *FakeContainerManager) PartitionStats(_ klog.Logger) map[string]PartitionStats {
+	cm.Lock()
+	defer cm.Unlock()
+	cm.CalledFunctions = append(cm.CalledFunctions, "PartitionStats")
+	return nil
+}
+
 func (cm *FakeContainerManager) GetDevices(_, _ string) []*podresourcesapi.ContainerDevices {
 	cm.Lock()
 	defer cm.Unlock()
