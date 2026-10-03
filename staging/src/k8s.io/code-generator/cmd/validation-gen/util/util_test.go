@@ -652,6 +652,55 @@ func TestParseSignedInt(t *testing.T) {
 			bitSize:       8,
 			expectedError: true,
 		},
+		// --- symbolic values ---
+		{
+			name:        "int32 symbolic MIN",
+			in:          "MIN",
+			bitSize:     32,
+			expectedOut: -2147483648,
+		},
+		{
+			name:        "int32 symbolic MAX",
+			in:          "MAX",
+			bitSize:     32,
+			expectedOut: 2147483647,
+		},
+		{
+			name:        "int64 symbolic MIN",
+			in:          "MIN",
+			bitSize:     64,
+			expectedOut: -9223372036854775808,
+		},
+		{
+			name:        "int64 symbolic MAX",
+			in:          "MAX",
+			bitSize:     64,
+			expectedOut: 9223372036854775807,
+		},
+		{
+			name:        "int16 symbolic MIN",
+			in:          "MIN",
+			bitSize:     16,
+			expectedOut: -32768,
+		},
+		{
+			name:        "int16 symbolic MAX",
+			in:          "MAX",
+			bitSize:     16,
+			expectedOut: 32767,
+		},
+		{
+			name:        "int8 symbolic MIN",
+			in:          "MIN",
+			bitSize:     8,
+			expectedOut: -128,
+		},
+		{
+			name:        "int8 symbolic MAX",
+			in:          "MAX",
+			bitSize:     8,
+			expectedOut: 127,
+		},
 		// --- canonical form rejection ---
 		{
 			name:          "leading zeros rejected",
@@ -819,6 +868,55 @@ func TestParseUnsignedInt(t *testing.T) {
 			in:          "4294967296",
 			bitSize:     64,
 			expectedOut: 4294967296,
+		},
+		// --- symbolic values ---
+		{
+			name:        "uint64 symbolic MIN",
+			in:          "MIN",
+			bitSize:     64,
+			expectedOut: 0,
+		},
+		{
+			name:        "uint64 symbolic MAX",
+			in:          "MAX",
+			bitSize:     64,
+			expectedOut: 18446744073709551615,
+		},
+		{
+			name:        "uint32 symbolic MIN",
+			in:          "MIN",
+			bitSize:     32,
+			expectedOut: 0,
+		},
+		{
+			name:        "uint32 symbolic MAX",
+			in:          "MAX",
+			bitSize:     32,
+			expectedOut: 4294967295,
+		},
+		{
+			name:        "uint16 symbolic MIN",
+			in:          "MIN",
+			bitSize:     16,
+			expectedOut: 0,
+		},
+		{
+			name:        "uint16 symbolic MAX",
+			in:          "MAX",
+			bitSize:     16,
+			expectedOut: 65535,
+		},
+		{
+			name:        "uint8 symbolic MIN",
+			in:          "MIN",
+			bitSize:     8,
+			expectedOut: 0,
+		},
+		{
+			name:        "uint8 symbolic MAX",
+			in:          "MAX",
+			bitSize:     8,
+			expectedOut: 255,
 		},
 		// --- canonical form rejection ---
 		{
