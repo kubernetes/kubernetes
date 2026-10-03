@@ -223,38 +223,46 @@ func (m *kubeGenericRuntimeManager) generateLinuxContainerResources(ctx context.
 			utilfeature.DefaultFeatureGate.Enabled(kubefeatures.PodLevelResources) &&
 			resourcehelper.IsPodLevelResourcesSet(pod) &&
 			!pod.Spec.Resources.Limits.Memory().IsZero()
-		if m.memoryThrottlingFactor != nil && !skipContainerMemoryHigh && (memoryRequest != memoryLimitSpec || memoryRequest == 0) {
-			memoryLimitVal := memoryLimitSpec
-			if _, exists := draAllocations[v1.ResourceMemory]; exists && memoryLimit != nil && memoryLimitSpec != 0 {
-				// memoryLimit computed above should include DRA already.
-				// We use the DRA-inflated memory limit to calculate the throttling threshold (memory.high)
-				// so that Burstable pods are not throttled early at their standard Spec limit.
-				// However, the QoS classification remains strictly based on the pure spec requests and limits
-				// and does not consider DRA. With DRA node allocatable claims, we continue to
-				// 1. Skip setting memory.high for guaranteed pods.
-				// 2. Set memory.high based on node memory capacity for besteffort pods.
-				memoryLimitVal = memoryLimit.Value()
-			}
-			// The formula for memory.high for container cgroup is modified in Alpha stage of the feature in K8s v1.27.
-			// It will be set based on formula:
-			// `memory.high=floor[(requests.memory + memory throttling factor * (limits.memory or node allocatable memory - requests.memory))/pageSize] * pageSize`
-			// More info: https://git.k8s.io/enhancements/keps/sig-node/2570-memory-qos
-			memoryHigh := int64(0)
-			if memoryLimitVal != 0 {
-				memoryHigh = int64(math.Floor(
-					float64(memoryRequest)+
-						(float64(memoryLimitVal)-float64(memoryRequest))*float64(*m.memoryThrottlingFactor))/float64(defaultPageSize)) * defaultPageSize
-			} else {
-				allocatable := m.getNodeAllocatable()
-				allocatableMemory, ok := allocatable[v1.ResourceMemory]
-				if ok && allocatableMemory.Value() > 0 {
+		if m.memoryThrottlingFactor != nil && !skipContainerMemoryHigh {
+			if memoryRequest != memoryLimitSpec || memoryRequest == 0 {
+				memoryLimitVal := memoryLimitSpec
+				if _, exists := draAllocations[v1.ResourceMemory]; exists && memoryLimit != nil && memoryLimitSpec != 0 {
+					// memoryLimit computed above should include DRA already.
+					// We use the DRA-inflated memory limit to calculate the throttling threshold (memory.high)
+					// so that Burstable pods are not throttled early at their standard Spec limit.
+					// However, the QoS classification remains strictly based on the pure spec requests and limits
+					// and does not consider DRA. With DRA node allocatable claims, we continue to
+					// 1. Skip setting memory.high for guaranteed pods.
+					// 2. Set memory.high based on node memory capacity for besteffort pods.
+					memoryLimitVal = memoryLimit.Value()
+				}
+				// The formula for memory.high for container cgroup is modified in Alpha stage of the feature in K8s v1.27.
+				// It will be set based on formula:
+				// `memory.high=floor[(requests.memory + memory throttling factor * (limits.memory or node allocatable memory - requests.memory))/pageSize] * pageSize`
+				// More info: https://git.k8s.io/enhancements/keps/sig-node/2570-memory-qos
+				memoryHigh := int64(0)
+				if memoryLimitVal != 0 {
 					memoryHigh = int64(math.Floor(
 						float64(memoryRequest)+
-							(float64(allocatableMemory.Value())-float64(memoryRequest))*(*m.memoryThrottlingFactor))/float64(defaultPageSize)) * defaultPageSize
+							(float64(memoryLimitVal)-float64(memoryRequest))*float64(*m.memoryThrottlingFactor))/float64(defaultPageSize)) * defaultPageSize
+				} else {
+					allocatable := m.getNodeAllocatable()
+					allocatableMemory, ok := allocatable[v1.ResourceMemory]
+					if ok && allocatableMemory.Value() > 0 {
+						memoryHigh = int64(math.Floor(
+							float64(memoryRequest)+
+								(float64(allocatableMemory.Value())-float64(memoryRequest))*(*m.memoryThrottlingFactor))/float64(defaultPageSize)) * defaultPageSize
+					}
 				}
-			}
-			if memoryHigh != 0 && memoryHigh > memoryRequest {
-				unified[cm.Cgroup2MemoryHigh] = strconv.FormatInt(memoryHigh, 10)
+				if memoryHigh != 0 && memoryHigh > memoryRequest {
+					unified[cm.Cgroup2MemoryHigh] = strconv.FormatInt(memoryHigh, 10)
+				}
+			} else {
+				// Request equals limit, so the container must not be throttled.
+				// Reset explicitly: runtimes leave absent Unified keys untouched
+				// on UpdateContainerResources, which would otherwise keep a stale
+				// memory.high from before an in-place resize.
+				unified[cm.Cgroup2MemoryHigh] = "max"
 			}
 		}
 		if len(unified) > 0 {

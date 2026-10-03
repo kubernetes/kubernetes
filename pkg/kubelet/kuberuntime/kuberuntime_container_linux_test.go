@@ -726,6 +726,9 @@ func TestGenerateContainerConfigWithMemoryQoSEnforced(t *testing.T) {
 	type expectedResult struct {
 		memoryLow  int64 // set to -1 if skipped for the pod
 		memoryHigh int64 // set to -1 if skipped for the pod
+		// memoryHighMax indicates memory.high must be "max" (request equals limit,
+		// so throttling is explicitly cleared instead of omitting the key).
+		memoryHighMax bool
 	}
 
 	tests := []struct {
@@ -762,12 +765,12 @@ func TestGenerateContainerConfigWithMemoryQoSEnforced(t *testing.T) {
 			},
 		},
 		{
-			name:               "Guaranteed pod (256Mi requests, 256Mi limits) - skip setting memory.high",
+			name:               "Guaranteed pod (256Mi requests, 256Mi limits) - reset memory.high to max",
 			pod:                pod4,
 			draNodeAllocatable: false,
 			expected: &expectedResult{
-				memoryLow:  -1, // -1 is used to indicate that the setting is omitted
-				memoryHigh: -1, // -1 is used to indicate that the setting is omitted
+				memoryLow:     -1, // -1 is used to indicate that the setting is omitted
+				memoryHighMax: true,
 			},
 		},
 		{
@@ -789,12 +792,12 @@ func TestGenerateContainerConfigWithMemoryQoSEnforced(t *testing.T) {
 			},
 		},
 		{
-			name:               "Guaranteed pod with DRA (256Mi requests, 256Mi limits + 256Mi DRA) - skip setting memory.high",
+			name:               "Guaranteed pod with DRA (256Mi requests, 256Mi limits + 256Mi DRA) - reset memory.high to max",
 			pod:                pod7,
 			draNodeAllocatable: true,
 			expected: &expectedResult{
-				memoryLow:  -1, // -1 is used to indicate that the setting is omitted
-				memoryHigh: -1, // -1 is used to indicate that the setting is omitted
+				memoryLow:     -1, // -1 is used to indicate that the setting is omitted
+				memoryHighMax: true,
 			},
 		},
 		{
@@ -822,7 +825,9 @@ func TestGenerateContainerConfigWithMemoryQoSEnforced(t *testing.T) {
 			assert.Equal(t, strconv.FormatInt(test.expected.memoryLow, 10), unified["memory.low"], test.name)
 		}
 
-		if test.expected.memoryHigh == -1 {
+		if test.expected.memoryHighMax {
+			assert.Equal(t, "max", unified["memory.high"], test.name)
+		} else if test.expected.memoryHigh == -1 {
 			_, exists := unified["memory.high"]
 			assert.False(t, exists, test.name)
 		} else {
@@ -2939,8 +2944,9 @@ func TestContainerMemoryHighSkippedWithPodLevelResources(t *testing.T) {
 		assert.Equal(t, strconv.FormatInt(expectedHigh, 10), actualHigh)
 	})
 
-	// memory.high is skipped when container memory req==limit regardless of pod QoS class.
-	t.Run("burstable pod with container memory req==limit skips memory.high", func(t *testing.T) {
+	// memory.high is reset to max when container memory req==limit regardless of pod QoS class,
+	// so an in-place resize landing on req==limit clears any previous throttle.
+	t.Run("burstable pod with container memory req==limit resets memory.high to max", func(t *testing.T) {
 		burstablePod := &v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				UID:       "12345678",
@@ -2965,7 +2971,57 @@ func TestContainerMemoryHighSkippedWithPodLevelResources(t *testing.T) {
 			},
 		}
 		lcr := m.generateLinuxContainerResources(tCtx, burstablePod, &burstablePod.Spec.Containers[0], true)
-		_, ok := lcr.Unified[cm.Cgroup2MemoryHigh]
-		assert.False(t, ok, "memory.high should NOT be set when container memory req==limit, even if pod is Burstable")
+		assert.Equal(t, "max", lcr.Unified[cm.Cgroup2MemoryHigh], "memory.high should be reset to max when container memory req==limit, even if pod is Burstable")
 	})
+}
+
+// Resizing a container's memory request up to its limit must clear memory.high.
+// Runtimes leave absent Unified keys untouched on UpdateContainerResources, so
+// omitting the key keeps the throttle computed for the previous request.
+func TestGenerateLinuxContainerResourcesMemoryHighResetWhenRequestEqualsLimit(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	_, _, m, err := createTestRuntimeManager(tCtx)
+	require.NoError(t, err)
+	m.memoryReservationPolicy = kubeletconfiginternal.TieredReservationMemoryReservationPolicy
+	m.memoryThrottlingFactor = new(float64(0.9))
+
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:       "12345678",
+			Name:      "resize-test",
+			Namespace: "test",
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:  "c1",
+					Image: "busybox",
+				},
+			},
+		},
+	}
+	setMemory := func(request, limit string) {
+		pod.Spec.Containers[0].Resources = v1.ResourceRequirements{
+			Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse(request)},
+			Limits:   v1.ResourceList{v1.ResourceMemory: resource.MustParse(limit)},
+		}
+	}
+	expectedHigh := func(request, limit int64) string {
+		pageSize := int64(os.Getpagesize())
+		return strconv.FormatInt(int64(math.Floor(
+			float64(request)+
+				(float64(limit)-float64(request))*float64(*m.memoryThrottlingFactor))/float64(pageSize))*pageSize, 10)
+	}
+
+	setMemory("256Mi", "512Mi")
+	lcr := m.generateLinuxContainerResources(tCtx, pod, &pod.Spec.Containers[0], true)
+	assert.Equal(t, expectedHigh(256*1024*1024, 512*1024*1024), lcr.Unified[cm.Cgroup2MemoryHigh])
+
+	setMemory("400Mi", "512Mi")
+	lcr = m.generateLinuxContainerResources(tCtx, pod, &pod.Spec.Containers[0], true)
+	assert.Equal(t, expectedHigh(400*1024*1024, 512*1024*1024), lcr.Unified[cm.Cgroup2MemoryHigh])
+
+	setMemory("512Mi", "512Mi")
+	lcr = m.generateLinuxContainerResources(tCtx, pod, &pod.Spec.Containers[0], true)
+	assert.Equal(t, "max", lcr.Unified[cm.Cgroup2MemoryHigh], "memory.high must be reset to max once request equals limit")
 }
