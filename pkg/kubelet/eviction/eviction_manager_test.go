@@ -73,15 +73,23 @@ func (m *mockPodKiller) killPodNow(pod *v1.Pod, evict bool, gracePeriodOverride 
 type mockDiskInfoProvider struct {
 	dedicatedImageFs     *bool
 	dedicatedContainerFs *bool
+	imageFsError         error
+	containerFsError     error
 }
 
 // HasDedicatedImageFs returns the mocked value
 func (m *mockDiskInfoProvider) HasDedicatedImageFs(_ context.Context) (bool, error) {
+	if m.imageFsError != nil {
+		return false, m.imageFsError
+	}
 	return ptr.Deref(m.dedicatedImageFs, false), nil
 }
 
 // HasDedicatedContainerFs returns the mocked value
 func (m *mockDiskInfoProvider) HasDedicatedContainerFs(_ context.Context) (bool, error) {
+	if m.containerFsError != nil {
+		return false, m.containerFsError
+	}
 	return ptr.Deref(m.dedicatedContainerFs, false), nil
 }
 
@@ -3296,3 +3304,108 @@ func TestContainerEphemeralStorageLimitEvictionForRestartableInitContainers(t *t
 		t.Fatalf("Expected evicted pod %q, got %v", pod.Name, evictedPods)
 	}
 }
+
+func TestSynchronizeHasDedicatedImageFsError(t *testing.T) {
+	_, tCtx := ktesting.NewTestContext(t)
+	fakeClock := testingclock.NewFakeClock(time.Now())
+
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-pod",
+			Namespace: "test-ns",
+			UID:       types.UID("test-pod-uid"),
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:  "test-container",
+					Image: "image",
+				},
+			},
+		},
+	}
+
+	// Configure memory threshold and disk threshold
+	config := Config{
+		Thresholds: []evictionapi.Threshold{
+			{
+				Signal:   evictionapi.SignalMemoryAvailable,
+				Operator: evictionapi.OpLessThan,
+				Value: evictionapi.ThresholdValue{
+					Quantity: resource.NewQuantity(100, resource.BinarySI),
+				},
+			},
+			{
+				Signal:   evictionapi.SignalNodeFsAvailable,
+				Operator: evictionapi.OpLessThan,
+				Value: evictionapi.ThresholdValue{
+					Quantity: resource.NewQuantity(100, resource.BinarySI),
+				},
+			},
+		},
+	}
+
+	// Memory stat triggers threshold (available 50 < 100)
+	summaryProvider := &fakeSummaryProvider{
+		result: statsapi.Summary{
+			Node: statsapi.NodeStats{
+				Memory: &statsapi.MemoryStats{
+					AvailableBytes:  ptr.To(uint64(50)),
+					WorkingSetBytes: ptr.To(uint64(1000)),
+				},
+				Fs: &statsapi.FsStats{
+					AvailableBytes: ptr.To(uint64(50)),
+					CapacityBytes:  ptr.To(uint64(1000)),
+				},
+			},
+		},
+	}
+
+	nodeRef := &v1.ObjectReference{
+		Kind: "Node",
+		Name: "test-node",
+	}
+	podKiller := &mockPodKiller{}
+
+	mgrImpl, _ := NewManager(summaryProvider, config, podKiller.killPodNow, &mockDiskGC{}, &mockDiskGC{}, &record.FakeRecorder{}, nodeRef, fakeClock, false)
+	mgr := mgrImpl.(*managerImpl)
+
+	activePodsFunc := func() []*v1.Pod {
+		return []*v1.Pod{pod}
+	}
+
+	// Step 1: diskInfoProvider returns error for HasDedicatedImageFs
+	failingDiskInfoProvider := &mockDiskInfoProvider{
+		imageFsError: fmt.Errorf("transient CRI error"),
+	}
+
+	// synchronize should NOT return an error despite HasDedicatedImageFs error
+	evictedPods, err := mgr.synchronize(tCtx, failingDiskInfoProvider, activePodsFunc)
+	if err != nil {
+		t.Fatalf("synchronize should not return error when HasDedicatedImageFs fails, got: %v", err)
+	}
+
+	// Memory pressure condition should be set, but not disk pressure (since disk signals skipped)
+	if !mgr.IsUnderMemoryPressure() {
+		t.Errorf("Expected node to be under memory pressure")
+	}
+	if mgr.IsUnderDiskPressure() {
+		t.Errorf("Expected node NOT to be under disk pressure while HasDedicatedImageFs fails")
+	}
+	if len(evictedPods) != 1 {
+		t.Errorf("Expected memory eviction to evict 1 pod, got %d", len(evictedPods))
+	}
+
+	// Step 2: subsequent sync when HasDedicatedImageFs succeeds
+	workingDiskInfoProvider := &mockDiskInfoProvider{
+		dedicatedImageFs: ptr.To(false),
+	}
+	_, err = mgr.synchronize(tCtx, workingDiskInfoProvider, activePodsFunc)
+	if err != nil {
+		t.Fatalf("synchronize should succeed when HasDedicatedImageFs succeeds, got: %v", err)
+	}
+	if !mgr.IsUnderDiskPressure() {
+		t.Errorf("Expected node to be under disk pressure after HasDedicatedImageFs succeeds")
+	}
+}
+
