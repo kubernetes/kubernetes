@@ -114,6 +114,19 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 				field.NotSupported(field.NewPath("spec", "usages").Index(0), api.KeyUsage("unknown"), allValidUsages).MarkAlpha(),
 			},
 		},
+		"spec.expirationSeconds: exactly minimum = valid": {
+			input: makeValidCSR(func(csr *api.CertificateSigningRequest) {
+				csr.Spec.ExpirationSeconds = ptr.To(int32(600))
+			}),
+		},
+		"spec.expirationSeconds: below minimum = invalid": {
+			input: makeValidCSR(func(csr *api.CertificateSigningRequest) {
+				csr.Spec.ExpirationSeconds = ptr.To(int32(599))
+			}),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "expirationSeconds"), nil, "").WithOrigin("minimum").MarkAlpha(),
+			},
+		},
 	}
 	for k, tc := range testCases {
 		t.Run(k, func(t *testing.T) {
