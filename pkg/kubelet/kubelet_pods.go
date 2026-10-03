@@ -2301,22 +2301,65 @@ func (kl *Kubelet) convertToAPIPodLevelResourcesStatus(logger klog.Logger, alloc
 		}
 	}
 
+	// Ensure CPU request is not lost when cgroup value is unavailable and old
+	// status was already truncated. This mirrors the memory request fallback
+	// above and prevents state-dependent propagation of missing keys when only
+	// memory is resized.
+	if _, found := resources.Requests[v1.ResourceCPU]; !found {
+		opts := resourcehelper.PodResourcesOptions{
+			SkipPodLevelResources:                    !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources),
+			UseDRANodeAllocatableResourceClaimStatus: utilfeature.DefaultFeatureGate.Enabled(features.DRANodeAllocatableResources),
+		}
+		aggregatedResources := resourcehelper.PodRequests(allocatedPod, opts)
+		if val, ok := aggregatedResources[v1.ResourceCPU]; ok {
+			resources.Requests[v1.ResourceCPU] = val
+		}
+	}
+
 	if cpuLimit != nil {
 		// If both the allocated & actual resources are at
 		// or below the minimum effective limit, preserve the
 		// allocated value in the API to avoid confusion and simplify comparisons.
 		if cpuLimit.MilliValue() > cm.MinMilliCPULimit || resources.Limits.Cpu().MilliValue() > cm.MinMilliCPULimit {
 			resources.Limits[v1.ResourceCPU] = cpuLimit.DeepCopy()
+		} else {
+			preserveOldResourcesValue(v1.ResourceCPU, oldPodStatus.Resources.Limits, resources.Limits)
 		}
 	} else {
 		preserveOldResourcesValue(v1.ResourceCPU, oldPodStatus.Resources.Limits, resources.Limits)
 
 	}
 
+	// Fallback for CPU limit when cgroup and old status are both missing.
+	// Without this, a CPU-only resize can leave limits.cpu empty, and the
+	// missing key then propagates via preserveOld on the next resize.
+	if _, found := resources.Limits[v1.ResourceCPU]; !found {
+		opts := resourcehelper.PodResourcesOptions{
+			SkipPodLevelResources:                    !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources),
+			UseDRANodeAllocatableResourceClaimStatus: utilfeature.DefaultFeatureGate.Enabled(features.DRANodeAllocatableResources),
+		}
+		aggregatedLimits := resourcehelper.PodLimits(allocatedPod, opts)
+		if val, ok := aggregatedLimits[v1.ResourceCPU]; ok {
+			resources.Limits[v1.ResourceCPU] = val
+		}
+	}
+
 	if memoryLimit != nil {
 		resources.Limits[v1.ResourceMemory] = memoryLimit.DeepCopy()
 	} else {
 		preserveOldResourcesValue(v1.ResourceMemory, oldPodStatus.Resources.Limits, resources.Limits)
+	}
+
+	// Ensure memory limit is not lost when cgroup is unavailable.
+	if _, found := resources.Limits[v1.ResourceMemory]; !found {
+		opts := resourcehelper.PodResourcesOptions{
+			SkipPodLevelResources:                    !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources),
+			UseDRANodeAllocatableResourceClaimStatus: utilfeature.DefaultFeatureGate.Enabled(features.DRANodeAllocatableResources),
+		}
+		aggregatedLimits := resourcehelper.PodLimits(allocatedPod, opts)
+		if val, ok := aggregatedLimits[v1.ResourceMemory]; ok {
+			resources.Limits[v1.ResourceMemory] = val
+		}
 	}
 
 	return resources
