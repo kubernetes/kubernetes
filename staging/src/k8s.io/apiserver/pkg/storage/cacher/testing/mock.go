@@ -121,6 +121,7 @@ func (d *MockStorage) Stats(_ context.Context) (storage.Stats, error) {
 func (d *MockStorage) EnableResourceSizeEstimation(storage.KeysFunc) error {
 	return nil
 }
+func (d *MockStorage) DisableResourceSizeEstimation() {}
 func (d *MockStorage) ReadinessCheck() error {
 	return nil
 }
