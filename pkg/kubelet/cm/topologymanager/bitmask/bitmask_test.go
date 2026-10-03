@@ -18,8 +18,39 @@ package bitmask
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 )
+
+func TestString(t *testing.T) {
+	tcases := []struct {
+		name     string
+		bits     []int
+		expected string
+	}{
+		{name: "empty", expected: "00"},
+		{name: "bit zero", bits: []int{0}, expected: "01"},
+		{name: "bit one", bits: []int{1}, expected: "10"},
+		{name: "first two-bit boundary", bits: []int{2}, expected: "0100"},
+		{name: "bit three", bits: []int{3}, expected: "1000"},
+		{name: "second two-bit boundary", bits: []int{4}, expected: "010000"},
+		{name: "bit five", bits: []int{5}, expected: "100000"},
+		{name: "multiple bits", bits: []int{0, 2, 4}, expected: "010101"},
+		{name: "highest two-bit boundary", bits: []int{62}, expected: "01" + strings.Repeat("0", 62)},
+		{name: "highest bit", bits: []int{63}, expected: "1" + strings.Repeat("0", 63)},
+	}
+	for _, tc := range tcases {
+		t.Run(tc.name, func(t *testing.T) {
+			mask, err := NewBitMask(tc.bits...)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if actual := mask.String(); actual != tc.expected {
+				t.Errorf("Expected mask to be %q, got %q", tc.expected, actual)
+			}
+		})
+	}
+}
 
 func TestNewEmptyiBitMask(t *testing.T) {
 	tcases := []struct {
