@@ -25,6 +25,7 @@ import (
 	"testing"
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -76,6 +77,50 @@ func TestFieldManagerUpdateNoErrors(t *testing.T) {
 
 	if after := f.ManagedFields(); !apiequality.Semantic.DeepEqual(before, after) {
 		t.Fatalf("expected idempotence, but managedFields changed:\nbefore: %v\n after: %v", mustMarshal(before), mustMarshal(after))
+	}
+}
+
+func TestApplyPatchObjectSchemaErrorReturnsBadRequest(t *testing.T) {
+	manager, err := internal.NewStructuredMergeManager(
+		fakeTypeConverter,
+		&internaltesting.FakeObjectConvertor{},
+		&internaltesting.FakeObjectDefaulter{},
+		schema.FromAPIVersionAndKind("v1", "Pod").GroupVersion(),
+		schema.FromAPIVersionAndKind("v1", "Pod").GroupVersion(),
+		nil,
+	)
+	if err != nil {
+		t.Fatalf("failed to create structured merge manager: %v", err)
+	}
+
+	liveObj := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": "v1",
+			"kind":       "Pod",
+			"metadata": map[string]interface{}{
+				"name": "test-pod",
+			},
+		},
+	}
+	patchObj := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": "v1",
+			"kind":       "Pod",
+			"metadata": map[string]interface{}{
+				"name": "test-pod",
+			},
+			"spec": map[string]interface{}{
+				"fieldNotDeclaredInSchema": "value",
+			},
+		},
+	}
+
+	_, _, err = manager.Apply(liveObj, patchObj, internal.NewEmptyManaged(), "fieldmanager_test_apply", false)
+	if err == nil {
+		t.Fatal("expected apply to fail for a field not declared in the schema")
+	}
+	if !apierrors.IsBadRequest(err) {
+		t.Fatalf("expected bad request error, got %T: %v", err, err)
 	}
 }
 
