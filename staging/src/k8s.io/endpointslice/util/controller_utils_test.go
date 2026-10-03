@@ -953,10 +953,66 @@ func TestNewPortMapKey_NilVsEmptySlice(t *testing.T) {
 	var nilPorts []discovery.EndpointPort
 	emptyPorts := []discovery.EndpointPort{}
 
-	nilKey := NewPortMapKey(nilPorts)
-	emptyKey := NewPortMapKey(emptyPorts)
+	nilKey := NewPortMapKey(nilPorts, discovery.AddressTypeIPv4)
+	emptyKey := NewPortMapKey(emptyPorts, discovery.AddressTypeIPv4)
 
 	if nilKey != emptyKey {
 		t.Errorf("NewPortMapKey should return the same key for nil and empty slice, got nil=%q empty=%q", nilKey, emptyKey)
+	}
+}
+
+func TestNewPortMapKey_AddressType(t *testing.T) {
+	emptyPorts := []discovery.EndpointPort{}
+
+	keyv4 := NewPortMapKey(emptyPorts, discovery.AddressTypeIPv4)
+	keyv6 := NewPortMapKey(emptyPorts, discovery.AddressTypeIPv6)
+	keyFQDN := NewPortMapKey(emptyPorts, discovery.AddressTypeFQDN)
+
+	if keyv4 == keyv6 {
+		t.Errorf("NewPortMapKey should return different keys for different address types, got keyv4=%q keyv6=%q", keyv4, keyv6)
+	}
+	if keyv4 == keyFQDN {
+		t.Errorf("NewPortMapKey should return different keys for different address types, got keyv4=%q keyFQDN=%q", keyv4, keyFQDN)
+	}
+	if keyv6 == keyFQDN {
+		t.Errorf("NewPortMapKey should return different keys for different address types, got keyv6=%q keyFQDN=%q", keyv6, keyFQDN)
+	}
+}
+
+func TestPortMapKey_AddressType(t *testing.T) {
+	tests := []struct {
+		name string // description of this test case
+		// Named input parameters for receiver constructor.
+		endpointPorts []discovery.EndpointPort
+		addrType      discovery.AddressType
+		want          discovery.AddressType
+	}{
+		{
+			name:          "IPv4 address type",
+			endpointPorts: []discovery.EndpointPort{},
+			addrType:      discovery.AddressTypeIPv4,
+			want:          discovery.AddressTypeIPv4,
+		},
+		{
+			name:          "IPv6 address type",
+			endpointPorts: []discovery.EndpointPort{},
+			addrType:      discovery.AddressTypeIPv6,
+			want:          discovery.AddressTypeIPv6,
+		},
+		{
+			name:          "FQDN address type",
+			endpointPorts: []discovery.EndpointPort{},
+			addrType:      discovery.AddressTypeFQDN,
+			want:          discovery.AddressTypeFQDN,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			pk := NewPortMapKey(tt.endpointPorts, tt.addrType)
+			got := pk.AddressType()
+			if got != tt.want {
+				t.Errorf("AddressType() = %v, want %v", got, tt.want)
+			}
+		})
 	}
 }
