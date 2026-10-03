@@ -4536,7 +4536,44 @@ type SeccompProfile struct {
 	// LocalhostProfile cannot be an absolute nor a descending path.
 	// +optional
 	LocalhostProfile *string
+	// Use a profile stored as an artifact in an OCI registry.
+	// +featureGate=SecurityProfileOCI
+	// +optional
+	OCI *SecurityProfileOCI
 }
+
+// SecurityProfileOCI references a security profile stored as an artifact in an
+// OCI registry, with an optional base profile.
+type SecurityProfileOCI struct {
+	// Fully qualified, digest-pinned OCI reference of the profile.
+	Ref string
+	// Base profile that the container runtime merges with the OCI profile and
+	// its own configured baseline.
+	// +optional
+	BaseProfile *SecurityProfileOCIBase
+}
+
+// SecurityProfileOCIBase specifies the base profile of an OCI security profile.
+// +union
+type SecurityProfileOCIBase struct {
+	// +unionDiscriminator
+	Type SecurityProfileOCIBaseType
+	// Load a base profile defined in a static file on the node.
+	// LocalhostProfile cannot be an absolute nor an ascending path.
+	// +optional
+	LocalhostProfile *string
+}
+
+// SecurityProfileOCIBaseType defines the supported base profile types of an
+// OCI security profile.
+type SecurityProfileOCIBaseType string
+
+const (
+	// SecurityProfileOCIBaseTypeRuntimeDefault represents the default container runtime profile.
+	SecurityProfileOCIBaseTypeRuntimeDefault SecurityProfileOCIBaseType = "RuntimeDefault"
+	// SecurityProfileOCIBaseTypeLocalhost represents custom made profiles stored on the node's disk.
+	SecurityProfileOCIBaseTypeLocalhost SecurityProfileOCIBaseType = "Localhost"
+)
 
 // SeccompProfileType defines the supported seccomp profile types.
 type SeccompProfileType string
@@ -4548,6 +4585,8 @@ const (
 	SeccompProfileTypeRuntimeDefault SeccompProfileType = "RuntimeDefault"
 	// SeccompProfileTypeLocalhost represents custom made profiles stored on the node's disk.
 	SeccompProfileTypeLocalhost SeccompProfileType = "Localhost"
+	// SeccompProfileTypeOCI represents profiles pulled from an OCI registry.
+	SeccompProfileTypeOCI SeccompProfileType = "OCI"
 )
 
 // AppArmorProfile defines a pod or container's AppArmor settings.

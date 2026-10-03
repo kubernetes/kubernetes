@@ -456,6 +456,10 @@ func (m *SecretVolumeSource) Reset() { *m = SecretVolumeSource{} }
 
 func (m *SecurityContext) Reset() { *m = SecurityContext{} }
 
+func (m *SecurityProfileOCI) Reset() { *m = SecurityProfileOCI{} }
+
+func (m *SecurityProfileOCIBase) Reset() { *m = SecurityProfileOCIBase{} }
+
 func (m *SerializedReference) Reset() { *m = SerializedReference{} }
 
 func (m *Service) Reset() { *m = Service{} }
@@ -12700,6 +12704,18 @@ func (m *SeccompProfile) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
+	if m.OCI != nil {
+		{
+			size, err := m.OCI.MarshalToSizedBuffer(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarintGenerated(dAtA, i, uint64(size))
+		}
+		i--
+		dAtA[i] = 0x1a
+	}
 	if m.LocalhostProfile != nil {
 		i -= len(*m.LocalhostProfile)
 		copy(dAtA[i:], *m.LocalhostProfile)
@@ -13240,6 +13256,81 @@ func (m *SecurityContext) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 		i--
 		dAtA[i] = 0xa
 	}
+	return len(dAtA) - i, nil
+}
+
+func (m *SecurityProfileOCI) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *SecurityProfileOCI) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *SecurityProfileOCI) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if m.BaseProfile != nil {
+		{
+			size, err := m.BaseProfile.MarshalToSizedBuffer(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarintGenerated(dAtA, i, uint64(size))
+		}
+		i--
+		dAtA[i] = 0x12
+	}
+	i -= len(m.Ref)
+	copy(dAtA[i:], m.Ref)
+	i = encodeVarintGenerated(dAtA, i, uint64(len(m.Ref)))
+	i--
+	dAtA[i] = 0xa
+	return len(dAtA) - i, nil
+}
+
+func (m *SecurityProfileOCIBase) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *SecurityProfileOCIBase) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *SecurityProfileOCIBase) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if m.LocalhostProfile != nil {
+		i -= len(*m.LocalhostProfile)
+		copy(dAtA[i:], *m.LocalhostProfile)
+		i = encodeVarintGenerated(dAtA, i, uint64(len(*m.LocalhostProfile)))
+		i--
+		dAtA[i] = 0x12
+	}
+	i -= len(m.Type)
+	copy(dAtA[i:], m.Type)
+	i = encodeVarintGenerated(dAtA, i, uint64(len(m.Type)))
+	i--
+	dAtA[i] = 0xa
 	return len(dAtA) - i, nil
 }
 
@@ -20063,6 +20154,10 @@ func (m *SeccompProfile) Size() (n int) {
 		l = len(*m.LocalhostProfile)
 		n += 1 + l + sovGenerated(uint64(l))
 	}
+	if m.OCI != nil {
+		l = m.OCI.Size()
+		n += 1 + l + sovGenerated(uint64(l))
+	}
 	return n
 }
 
@@ -20254,6 +20349,36 @@ func (m *SecurityContext) Size() (n int) {
 	}
 	if m.AppArmorProfile != nil {
 		l = m.AppArmorProfile.Size()
+		n += 1 + l + sovGenerated(uint64(l))
+	}
+	return n
+}
+
+func (m *SecurityProfileOCI) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	l = len(m.Ref)
+	n += 1 + l + sovGenerated(uint64(l))
+	if m.BaseProfile != nil {
+		l = m.BaseProfile.Size()
+		n += 1 + l + sovGenerated(uint64(l))
+	}
+	return n
+}
+
+func (m *SecurityProfileOCIBase) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	l = len(m.Type)
+	n += 1 + l + sovGenerated(uint64(l))
+	if m.LocalhostProfile != nil {
+		l = len(*m.LocalhostProfile)
 		n += 1 + l + sovGenerated(uint64(l))
 	}
 	return n
@@ -24509,6 +24634,7 @@ func (this *SeccompProfile) String() string {
 	s := strings.Join([]string{`&SeccompProfile{`,
 		`Type:` + fmt.Sprintf("%v", this.Type) + `,`,
 		`LocalhostProfile:` + valueToStringGenerated(this.LocalhostProfile) + `,`,
+		`OCI:` + strings.Replace(this.OCI.String(), "SecurityProfileOCI", "SecurityProfileOCI", 1) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -24650,6 +24776,28 @@ func (this *SecurityContext) String() string {
 		`WindowsOptions:` + strings.Replace(this.WindowsOptions.String(), "WindowsSecurityContextOptions", "WindowsSecurityContextOptions", 1) + `,`,
 		`SeccompProfile:` + strings.Replace(this.SeccompProfile.String(), "SeccompProfile", "SeccompProfile", 1) + `,`,
 		`AppArmorProfile:` + strings.Replace(this.AppArmorProfile.String(), "AppArmorProfile", "AppArmorProfile", 1) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *SecurityProfileOCI) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&SecurityProfileOCI{`,
+		`Ref:` + fmt.Sprintf("%v", this.Ref) + `,`,
+		`BaseProfile:` + strings.Replace(this.BaseProfile.String(), "SecurityProfileOCIBase", "SecurityProfileOCIBase", 1) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *SecurityProfileOCIBase) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&SecurityProfileOCIBase{`,
+		`Type:` + fmt.Sprintf("%v", this.Type) + `,`,
+		`LocalhostProfile:` + valueToStringGenerated(this.LocalhostProfile) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -64232,6 +64380,42 @@ func (m *SeccompProfile) Unmarshal(dAtA []byte) error {
 			s := string(dAtA[iNdEx:postIndex])
 			m.LocalhostProfile = &s
 			iNdEx = postIndex
+		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field OCI", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.OCI == nil {
+				m.OCI = &SecurityProfileOCI{}
+			}
+			if err := m.OCI.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
 			skippy, err := skipGenerated(dAtA[iNdEx:])
@@ -65795,6 +65979,239 @@ func (m *SecurityContext) Unmarshal(dAtA []byte) error {
 			if err := m.AppArmorProfile.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipGenerated(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *SecurityProfileOCI) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowGenerated
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: SecurityProfileOCI: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: SecurityProfileOCI: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Ref", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Ref = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field BaseProfile", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.BaseProfile == nil {
+				m.BaseProfile = &SecurityProfileOCIBase{}
+			}
+			if err := m.BaseProfile.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipGenerated(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *SecurityProfileOCIBase) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowGenerated
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: SecurityProfileOCIBase: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: SecurityProfileOCIBase: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Type", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Type = SecurityProfileOCIBaseType(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field LocalhostProfile", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			s := string(dAtA[iNdEx:postIndex])
+			m.LocalhostProfile = &s
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex

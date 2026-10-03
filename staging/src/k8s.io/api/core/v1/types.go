@@ -5337,6 +5337,10 @@ type SeccompProfile struct {
 	// Localhost - a profile defined in a file on the node should be used.
 	// RuntimeDefault - the container runtime default profile should be used.
 	// Unconfined - no profile should be applied.
+	// OCI - a profile pulled from an OCI registry should be used, merged with the
+	// container runtime's configured baseline. Privileged containers cannot use
+	// it, whether it is set on the container or inherited from the pod. This is
+	// an alpha value and requires enabling the SecurityProfileOCI feature gate.
 	// +unionDiscriminator
 	Type SeccompProfileType `json:"type" protobuf:"bytes,1,opt,name=type,casttype=SeccompProfileType"`
 	// localhostProfile indicates a profile defined in a file on the node should be used.
@@ -5345,7 +5349,69 @@ type SeccompProfile struct {
 	// Must be set if type is "Localhost". Must NOT be set for any other type.
 	// +optional
 	LocalhostProfile *string `json:"localhostProfile,omitempty" protobuf:"bytes,2,opt,name=localhostProfile"`
+	// oci specifies a seccomp profile stored as an artifact in an OCI registry.
+	// The container runtime merges the profile with its configured baseline, so
+	// the effective profile permits an operation only if all inputs permit it.
+	// Must be set if type is "OCI". Must NOT be set for any other type.
+	// This is an alpha field and requires enabling the SecurityProfileOCI feature gate.
+	// +featureGate=SecurityProfileOCI
+	// +optional
+	OCI *SecurityProfileOCI `json:"oci,omitempty" protobuf:"bytes,3,opt,name=oci"`
 }
+
+// SecurityProfileOCI references a security profile stored as an artifact in an
+// OCI registry, with an optional base profile.
+type SecurityProfileOCI struct {
+	// ref is the OCI reference of the profile.
+	// It must be a digest-pinned reference in canonical form,
+	// registry/repository@<algorithm>:<digest>, with the registry spelled out
+	// (for example docker.io/library/profile, not profile or docker.io/profile).
+	// Tags are rejected. The digest algorithm must be sha256, sha384, or sha512.
+	// The maximum length is 1024 characters.
+	// Pull secrets are assembled in the same way as for the container image by
+	// looking up node credentials, SA image pull secrets, and pod spec image pull secrets.
+	// +required
+	Ref string `json:"ref" protobuf:"bytes,1,opt,name=ref"`
+	// baseProfile optionally specifies a base profile that the container
+	// runtime merges with the OCI profile and its own configured baseline.
+	// The effective profile permits an operation only if all inputs permit it.
+	// When omitted, the container runtime's configured baseline is the only base.
+	// +optional
+	BaseProfile *SecurityProfileOCIBase `json:"baseProfile,omitempty" protobuf:"bytes,2,opt,name=baseProfile"`
+}
+
+// SecurityProfileOCIBase specifies the base profile of an OCI security profile.
+// +union
+type SecurityProfileOCIBase struct {
+	// type indicates which kind of base profile will be applied.
+	// Valid options are:
+	//
+	// Localhost - a profile defined in a file on the node should be used.
+	// RuntimeDefault - the container runtime default profile should be used.
+	// +unionDiscriminator
+	// +required
+	Type SecurityProfileOCIBaseType `json:"type" protobuf:"bytes,1,opt,name=type,casttype=SecurityProfileOCIBaseType"`
+	// localhostProfile indicates a base profile defined in a file on the node
+	// should be used. The profile must be preconfigured on the node to work.
+	// Must be a non-empty descending path, relative to the kubelet's configured seccomp profile location.
+	// Must be set if type is "Localhost". Must NOT be set for any other type.
+	// +optional
+	LocalhostProfile *string `json:"localhostProfile,omitempty" protobuf:"bytes,2,opt,name=localhostProfile"`
+}
+
+// SecurityProfileOCIBaseType defines the supported base profile types of an
+// OCI security profile.
+// +enum
+// +k8s:validation-gen-nolint
+type SecurityProfileOCIBaseType string
+
+const (
+	// SecurityProfileOCIBaseTypeRuntimeDefault represents the default container runtime profile.
+	SecurityProfileOCIBaseTypeRuntimeDefault SecurityProfileOCIBaseType = "RuntimeDefault"
+	// SecurityProfileOCIBaseTypeLocalhost indicates a profile defined in a file on the node should be used.
+	// For seccomp, the file's location is relative to <kubelet-root-dir>/seccomp.
+	SecurityProfileOCIBaseTypeLocalhost SecurityProfileOCIBaseType = "Localhost"
+)
 
 // SeccompProfileType defines the supported seccomp profile types.
 // +enum
@@ -5360,6 +5426,8 @@ const (
 	// SeccompProfileTypeLocalhost indicates a profile defined in a file on the node should be used.
 	// The file's location relative to <kubelet-root-dir>/seccomp.
 	SeccompProfileTypeLocalhost SeccompProfileType = "Localhost"
+	// SeccompProfileTypeOCI indicates a profile pulled from an OCI registry should be used.
+	SeccompProfileTypeOCI SeccompProfileType = "OCI"
 )
 
 // AppArmorProfile defines a pod or container's AppArmor settings.
