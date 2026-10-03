@@ -299,6 +299,22 @@ type PodSpecApplyConfiguration struct {
 	// Responders are not supported when the pod is part of a PodGroup (.spec.schedulingGroup is set).
 	// This field can only be set on creation and is immutable afterwards.
 	EvictionResponders []EvictionResponderApplyConfiguration `json:"evictionResponders,omitempty"`
+	// defaultNetwork selects the pod's default network.
+	// "Pod" gives the pod its own network namespace attached to the default
+	// pod network, "Host" runs the pod in the host network namespace
+	// (equivalent to hostNetwork: true and kept in sync with it), and
+	// "None" gives the pod an isolated network namespace with only a
+	// loopback interface, not attached to the default pod network and with
+	// no automatic network plumbing.
+	// Defaults to "Pod", or to "Host" when hostNetwork is true; setting
+	// "Host" sets hostNetwork to true. "None" may not be combined with
+	// hostNetwork: true.
+	// When "None" is selected, dnsPolicy defaults to "None" and
+	// enableServiceLinks defaults to false (both may be overridden), and
+	// features that require networking (such as hostPorts and network-based
+	// probes and lifecycle handlers) are forbidden.
+	// This field is immutable.
+	DefaultNetwork *corev1.PodDefaultNetwork `json:"defaultNetwork,omitempty"`
 }
 
 // PodSpecApplyConfiguration constructs a declarative configuration of the PodSpec type for use with
@@ -714,5 +730,13 @@ func (b *PodSpecApplyConfiguration) WithEvictionResponders(values ...*EvictionRe
 		}
 		b.EvictionResponders = append(b.EvictionResponders, *values[i])
 	}
+	return b
+}
+
+// WithDefaultNetwork sets the DefaultNetwork field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the DefaultNetwork field is set to the value of the last call.
+func (b *PodSpecApplyConfiguration) WithDefaultNetwork(value corev1.PodDefaultNetwork) *PodSpecApplyConfiguration {
+	b.DefaultNetwork = &value
 	return b
 }

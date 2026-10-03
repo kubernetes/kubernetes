@@ -66,6 +66,30 @@ func TestGeneratePodSandboxConfig(t *testing.T) {
 	assert.Equal(t, expectedLogDirectory, podSandboxConfig.LogDirectory)
 	assert.Equal(t, expectedMetadata, podSandboxConfig.Metadata)
 	assert.Equal(t, expectedPortMappings, podSandboxConfig.PortMappings)
+	assert.Equal(t, runtimeapi.PodSandboxDefaultNetwork_DEFAULT_NETWORK_POD, podSandboxConfig.DefaultNetwork)
+}
+
+func TestGeneratePodSandboxConfigDefaultNetwork(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	_, _, m, err := createTestRuntimeManager(tCtx)
+	require.NoError(t, err)
+
+	for desc, tc := range map[string]struct {
+		defaultNetwork *v1.PodDefaultNetwork
+		expected       runtimeapi.PodSandboxDefaultNetwork
+	}{
+		"unset": {defaultNetwork: nil, expected: runtimeapi.PodSandboxDefaultNetwork_DEFAULT_NETWORK_POD},
+		"Pod":   {defaultNetwork: ptr.To(v1.PodDefaultNetworkPod), expected: runtimeapi.PodSandboxDefaultNetwork_DEFAULT_NETWORK_POD},
+		"None":  {defaultNetwork: ptr.To(v1.PodDefaultNetworkNone), expected: runtimeapi.PodSandboxDefaultNetwork_DEFAULT_NETWORK_NONE},
+	} {
+		t.Run(desc, func(t *testing.T) {
+			pod := newTestPod()
+			pod.Spec.DefaultNetwork = tc.defaultNetwork
+			podSandboxConfig, err := m.generatePodSandboxConfig(tCtx, pod, 1)
+			require.NoError(t, err)
+			assert.Equal(t, tc.expected, podSandboxConfig.DefaultNetwork)
+		})
+	}
 }
 
 // TestCreatePodSandbox tests creating sandbox and its corresponding pod log directory.

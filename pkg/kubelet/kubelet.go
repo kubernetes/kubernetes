@@ -2149,8 +2149,8 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 
 	kl.statusManager.SetPodStatus(logger, pod, apiPodStatus)
 
-	// If the network plugin is not ready, only start the pod if it uses the host network
-	if err := kl.runtimeState.networkErrors(); err != nil && !kubecontainer.IsHostNetworkPod(pod) {
+	// If the network plugin is not ready, only start pods that do not use the pod network.
+	if err := kl.runtimeState.networkErrors(); err != nil && !kubecontainer.IsHostNetworkPod(pod) && !kubecontainer.IsNetworkIsolatedPod(pod) {
 		kl.recorder.WithLogger(logger).Eventf(pod, v1.EventTypeWarning, events.NetworkNotReady, "%s: %v", NetworkNotReadyErrorMsg, err)
 		return false, nil, fmt.Errorf("%s: %v", NetworkNotReadyErrorMsg, err)
 	}

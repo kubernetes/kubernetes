@@ -425,6 +425,7 @@ template:
         subPath: subPathValue
         subPathExpr: subPathExprValue
       workingDir: workingDirValue
+    defaultNetwork: defaultNetworkValue
     dnsConfig:
       nameservers:
       - nameserversValue

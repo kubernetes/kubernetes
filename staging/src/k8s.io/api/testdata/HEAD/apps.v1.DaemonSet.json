@@ -1902,7 +1902,8 @@
             "name": "nameValue",
             "priority": 2
           }
-        ]
+        ],
+        "defaultNetwork": "defaultNetworkValue"
       }
     },
     "updateStrategy": {

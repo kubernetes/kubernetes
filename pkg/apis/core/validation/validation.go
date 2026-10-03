@@ -4151,6 +4151,100 @@ func validatePodHostName(spec *core.PodSpec, fldPath *field.Path) field.ErrorLis
 	return allErrs
 }
 
+// isPodDefaultNetworkNone reports whether the spec opts out of the default pod network.
+func isPodDefaultNetworkNone(spec *core.PodSpec) bool {
+	return spec.DefaultNetwork != nil && *spec.DefaultNetwork == core.PodDefaultNetworkNone
+}
+
+// validatePodDefaultNetwork validates the interactions of spec.defaultNetwork
+// with hostNetwork and the network-dependent fields. Enum membership is
+// validated declaratively (+k8s:enum on PodDefaultNetwork).
+func validatePodDefaultNetwork(spec *core.PodSpec, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if spec.DefaultNetwork == nil {
+		return allErrs
+	}
+	netPath := fldPath.Child("defaultNetwork")
+
+	switch *spec.DefaultNetwork {
+	case core.PodDefaultNetworkPod:
+		// Defaulting maps this combination to "Host"; only an internal client
+		// that bypassed defaulting can get here.
+		if spec.HostNetwork {
+			allErrs = append(allErrs, field.Invalid(netPath, *spec.DefaultNetwork, `must be "Host" when hostNetwork is true`))
+		}
+	case core.PodDefaultNetworkHost:
+		if !spec.HostNetwork {
+			allErrs = append(allErrs, field.Invalid(netPath, *spec.DefaultNetwork, `hostNetwork must be true when defaultNetwork is "Host"`))
+		}
+	case core.PodDefaultNetworkNone:
+		allErrs = append(allErrs, validateIsolatedPodSpec(spec, fldPath)...)
+	}
+	return allErrs
+}
+
+// validateIsolatedPodSpec enforces that a defaultNetwork "None" pod requests no
+// feature that cannot work without a pod IP. dnsPolicy and enableServiceLinks
+// are not validated: they are defaulted for "None" pods but remain overridable
+// for integrations that provide connectivity by other means.
+func validateIsolatedPodSpec(spec *core.PodSpec, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	const forbiddenDetail = `may not be set when defaultNetwork is "None"`
+
+	if spec.HostNetwork {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("defaultNetwork"), core.PodDefaultNetworkNone, `must not be "None" when hostNetwork is true`))
+	}
+
+	podshelper.VisitContainersWithPath(spec, fldPath, func(c *core.Container, cFldPath *field.Path) bool {
+		// The kubelet runs httpGet, tcpSocket and grpc probes from the host
+		// against the pod IP; without a pod IP only exec probes can work.
+		checkProbe := func(probe *core.Probe, probePath *field.Path) {
+			if probe == nil {
+				return
+			}
+			if probe.HTTPGet != nil {
+				allErrs = append(allErrs, field.Forbidden(probePath.Child("httpGet"), forbiddenDetail))
+			}
+			if probe.TCPSocket != nil {
+				allErrs = append(allErrs, field.Forbidden(probePath.Child("tcpSocket"), forbiddenDetail))
+			}
+			if probe.GRPC != nil {
+				allErrs = append(allErrs, field.Forbidden(probePath.Child("grpc"), forbiddenDetail))
+			}
+		}
+		checkProbe(c.LivenessProbe, cFldPath.Child("livenessProbe"))
+		checkProbe(c.ReadinessProbe, cFldPath.Child("readinessProbe"))
+		checkProbe(c.StartupProbe, cFldPath.Child("startupProbe"))
+
+		if c.Lifecycle != nil {
+			checkHandler := func(h *core.LifecycleHandler, hPath *field.Path) {
+				if h == nil {
+					return
+				}
+				if h.HTTPGet != nil {
+					allErrs = append(allErrs, field.Forbidden(hPath.Child("httpGet"), forbiddenDetail))
+				}
+				if h.TCPSocket != nil {
+					allErrs = append(allErrs, field.Forbidden(hPath.Child("tcpSocket"), forbiddenDetail))
+				}
+			}
+			checkHandler(c.Lifecycle.PostStart, cFldPath.Child("lifecycle", "postStart"))
+			checkHandler(c.Lifecycle.PreStop, cFldPath.Child("lifecycle", "preStop"))
+		}
+
+		// hostPort forwards host traffic to the pod IP; there is none.
+		portsPath := cFldPath.Child("ports")
+		for i, port := range c.Ports {
+			if port.HostPort > 0 {
+				allErrs = append(allErrs, field.Forbidden(portsPath.Index(i).Child("hostPort"), forbiddenDetail))
+			}
+		}
+		return true
+	})
+
+	return allErrs
+}
+
 // validateContainers is called by pod spec and template validation to validate the list of regular containers.
 func validateContainers(containers []core.Container, os *core.PodOS, volumes map[string]core.VolumeSource, podClaimNames sets.Set[string], gracePeriod *int64, fldPath *field.Path, opts PodValidationOptions, podRestartPolicy *core.RestartPolicy, hostUsers bool) field.ErrorList {
 	allErrs := field.ErrorList{}
@@ -4283,11 +4377,14 @@ func validateSchedulingGates(schedulingGates []core.PodSchedulingGate, fldPath *
 	return allErrs
 }
 
-func validatePodDNSConfig(dnsConfig *core.PodDNSConfig, dnsPolicy *core.DNSPolicy, fldPath *field.Path, opts PodValidationOptions) field.ErrorList {
+// validatePodDNSConfig validates dnsConfig. When requireNameserversForDNSNone is
+// true a dnsPolicy of "None" must come with at least one nameserver; pods that
+// are not attached to the default pod network are exempt and get an empty
+// resolv.conf instead.
+func validatePodDNSConfig(dnsConfig *core.PodDNSConfig, dnsPolicy *core.DNSPolicy, requireNameserversForDNSNone bool, fldPath *field.Path, opts PodValidationOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
 
-	// Validate DNSNone case. Must provide at least one DNS name server.
-	if dnsPolicy != nil && *dnsPolicy == core.DNSNone {
+	if requireNameserversForDNSNone && dnsPolicy != nil && *dnsPolicy == core.DNSNone {
 		if dnsConfig == nil {
 			return append(allErrs, field.Required(fldPath, fmt.Sprintf("must provide `dnsConfig` when `dnsPolicy` is %s", core.DNSNone)))
 		}
@@ -4689,6 +4786,19 @@ func validatePodIPs(pod, oldPod *core.Pod) field.ErrorList {
 
 	podIPsField := field.NewPath("status", "podIPs")
 
+	// A pod that is not attached to the default pod network never has pod IPs.
+	// Rejecting them here turns the guarantee into an API invariant and makes a
+	// kubelet that ignored the field (fail open) visible.
+	if isPodDefaultNetworkNone(&pod.Spec) {
+		if len(pod.Status.PodIP) > 0 {
+			allErrs = append(allErrs, field.Forbidden(field.NewPath("status", "podIP"), `must be empty when spec.defaultNetwork is "None"`))
+		}
+		if len(pod.Status.PodIPs) > 0 {
+			allErrs = append(allErrs, field.Forbidden(podIPsField, `must be empty when spec.defaultNetwork is "None"`))
+		}
+		return allErrs
+	}
+
 	// all new PodIPs must be valid IPs, but existing invalid ones can be kept.
 	var existingPodIPs []string
 	if oldPod != nil {
@@ -4818,13 +4928,14 @@ func ValidatePodSpec(spec *core.PodSpec, podMeta *metav1.ObjectMeta, fldPath *fi
 	allErrs = append(allErrs, validateShareProcessNamespace(spec, fldPath)...)
 	allErrs = append(allErrs, validateImagePullSecrets(spec.ImagePullSecrets, fldPath.Child("imagePullSecrets"))...)
 	allErrs = append(allErrs, validateAffinity(spec.Affinity, opts, fldPath.Child("affinity"))...)
-	allErrs = append(allErrs, validatePodDNSConfig(spec.DNSConfig, &spec.DNSPolicy, fldPath.Child("dnsConfig"), opts)...)
+	allErrs = append(allErrs, validatePodDNSConfig(spec.DNSConfig, &spec.DNSPolicy, !isPodDefaultNetworkNone(spec), fldPath.Child("dnsConfig"), opts)...)
 	allErrs = append(allErrs, validateReadinessGates(spec.ReadinessGates, fldPath.Child("readinessGates"))...)
 	allErrs = append(allErrs, validateSchedulingGates(spec.SchedulingGates, fldPath.Child("schedulingGates"))...)
 	allErrs = append(allErrs, validateTopologySpreadConstraints(spec.TopologySpreadConstraints, fldPath.Child("topologySpreadConstraints"), opts)...)
 	allErrs = append(allErrs, validateWindowsHostProcessPod(spec, fldPath)...)
 	allErrs = append(allErrs, validateHostUsers(spec, fldPath, opts)...)
 	allErrs = append(allErrs, validatePodHostName(spec, fldPath)...)
+	allErrs = append(allErrs, validatePodDefaultNetwork(spec, fldPath)...)
 	if len(spec.ServiceAccountName) > 0 {
 		for _, msg := range ValidateServiceAccountName(spec.ServiceAccountName, false) {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("serviceAccountName"), spec.ServiceAccountName, msg))
