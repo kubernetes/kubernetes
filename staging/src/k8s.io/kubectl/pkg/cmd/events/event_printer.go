@@ -38,6 +38,17 @@ type EventPrinter struct {
 	headersPrinted bool
 }
 
+// cellBreakChars are characters that cause cell value truncation.
+// Formfeed is included because tabwriter treats it as a newline.
+const cellBreakChars = "\f\n\r"
+
+func escapeCell(str string) string {
+	if breakIndex := strings.IndexAny(str, cellBreakChars); breakIndex >= 0 {
+		str = str[:breakIndex] + "..."
+	}
+	return printers.EscapeTerminal(str)
+}
+
 // PrintObj prints different type of event objects.
 func (ep *EventPrinter) PrintObj(obj runtime.Object, out io.Writer) error {
 	if !ep.NoHeaders && !ep.headersPrinted {
@@ -69,15 +80,15 @@ func (ep *EventPrinter) printHeadings(w io.Writer) {
 func (ep *EventPrinter) printOneEvent(w io.Writer, e corev1.Event) {
 	interval := getInterval(e)
 	if ep.AllNamespaces {
-		fmt.Fprintf(w, "%v\t", e.Namespace)
+		fmt.Fprintf(w, "%v\t", escapeCell(e.Namespace))
 	}
 	fmt.Fprintf(w, "%s\t%s\t%s\t%s/%s\t%v\n",
 		interval,
-		printers.EscapeTerminal(e.Type),
-		printers.EscapeTerminal(e.Reason),
-		printers.EscapeTerminal(e.InvolvedObject.Kind),
-		printers.EscapeTerminal(e.InvolvedObject.Name),
-		printers.EscapeTerminal(strings.TrimSpace(e.Message)),
+		escapeCell(e.Type),
+		escapeCell(e.Reason),
+		escapeCell(e.InvolvedObject.Kind),
+		escapeCell(e.InvolvedObject.Name),
+		escapeCell(strings.TrimSpace(e.Message)),
 	)
 }
 
