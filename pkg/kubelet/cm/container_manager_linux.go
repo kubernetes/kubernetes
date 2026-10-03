@@ -344,6 +344,13 @@ func NewContainerManager(ctx context.Context, mountUtil mount.Interface, cadviso
 	metrics.RegisterCollectors(cm.draManager.NewMetricsCollector())
 	cm.kubeClient = kubeClient
 
+	// A system partition without a cpuset does not confine its pods' CPUs, so they can
+	// still be pinned like any other pod.
+	var sharedPoolOnly cpumanager.SharedPoolOnlyFunc
+	if spc := cm.systemPartitionConfig(); spc != nil && !spc.CPUSet.IsEmpty() {
+		sharedPoolOnly = spc.HasPod
+	}
+
 	// Initialize CPU manager
 	cm.cpuManager, err = cpumanager.NewManager(
 		logger,
@@ -355,6 +362,7 @@ func NewContainerManager(ctx context.Context, mountUtil mount.Interface, cadviso
 		cm.GetNodeAllocatableReservation(),
 		nodeConfig.KubeletRootDir,
 		cm.topologyManager,
+		sharedPoolOnly,
 	)
 	if err != nil {
 		logger.Error(err, "Failed to initialize cpu manager")
