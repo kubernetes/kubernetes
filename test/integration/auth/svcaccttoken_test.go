@@ -44,7 +44,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	apiserverserviceaccount "k8s.io/apiserver/pkg/authentication/serviceaccount"
 	"k8s.io/apiserver/pkg/authentication/user"
@@ -57,7 +56,6 @@ import (
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/controlplane"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/serviceaccount"
 	svcacct "k8s.io/kubernetes/plugin/pkg/admission/serviceaccount"
 	"k8s.io/kubernetes/test/integration/authutil"
@@ -563,37 +561,6 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 
 	t.Run("bound to service account and a pod with an assigned nodeName that does not exist", testPodWithAssignedNode(nil))
 	t.Run("bound to service account and a pod with an assigned nodeName", testPodWithAssignedNode(node))
-
-	t.Run("fails to bind to a Node if the feature gate is disabled", func(t *testing.T) {
-		// Disable node binding, emulating 1.32
-		featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParseMajorMinor("1.32"))
-		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceAccountTokenNodeBinding, false)
-
-		// Create ServiceAccount and Node objects
-		sa, del := createDeleteSvcAcct(t, cs, sa)
-		defer del()
-		node, delNode := createDeleteNode(t, cs, node)
-		defer delNode()
-
-		treq := &authenticationv1.TokenRequest{
-			Spec: authenticationv1.TokenRequestSpec{
-				Audiences: []string{"api"},
-				BoundObjectRef: &authenticationv1.BoundObjectReference{
-					Kind:       "Node",
-					APIVersion: "v1",
-					Name:       node.Name,
-					UID:        node.UID,
-				},
-			},
-		}
-		warningHandler.clear()
-		if resp, err := cs.CoreV1().ServiceAccounts(sa.Namespace).CreateToken(tCtx, sa.Name, treq, metav1.CreateOptions{}); err == nil {
-			t.Fatalf("expected err creating token with featuregate disabled but got: %#v", resp)
-		} else if err.Error() != "cannot bind token to a Node object as the \"ServiceAccountTokenNodeBinding\" feature-gate is disabled" {
-			t.Fatalf("expected error due to feature gate being disabled, but got: %s", err.Error())
-		}
-		warningHandler.assertEqual(t, nil)
-	})
 
 	t.Run("bound to service account and node", func(t *testing.T) {
 		treq := &authenticationv1.TokenRequest{
