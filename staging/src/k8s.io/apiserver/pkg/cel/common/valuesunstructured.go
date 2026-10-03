@@ -29,6 +29,7 @@ import (
 	"k8s.io/kube-openapi/pkg/validation/strfmt"
 
 	"k8s.io/apimachinery/pkg/api/equality"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apiserver/pkg/cel"
 )
 
@@ -159,6 +160,12 @@ func UnstructuredToVal(unstructured interface{}, schema Schema) ref.Val {
 				return types.NewErr("Invalid byte formatted string %s: %v", str, err)
 			}
 			return types.Bytes(base64)
+		case "quantity":
+			quantity, err := resource.ParseQuantity(str)
+			if err != nil {
+				return types.NewErr("Invalid quantity formatted string %s: %v", str, err)
+			}
+			return cel.Quantity{Quantity: &quantity}
 		}
 
 		return types.String(str)
