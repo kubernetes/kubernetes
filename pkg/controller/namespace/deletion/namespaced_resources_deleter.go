@@ -551,6 +551,7 @@ func (d *namespacedResourcesDeleter) deleteAllContent(ctx context.Context, ns *v
 		// Check if any pods remain before proceeding to delete other resources
 		if numRemainingTotals.gvrToNumRemaining[podsGVR] > 0 {
 			logger.V(5).Info("Namespace controller - pods still remain, delaying deletion of other resources", "namespace", namespace)
+			conditionUpdater.ProcessContentTotals(numRemainingTotals)
 			if hasChanged := conditionUpdater.Update(ns); hasChanged {
 				if _, err = d.nsClient.UpdateStatus(ctx, ns, metav1.UpdateOptions{}); err != nil {
 					utilruntime.HandleErrorWithContext(ctx, err, "Couldn't update status condition for namespace", "namespace", namespace)
