@@ -308,7 +308,7 @@ type PrefixTransformer struct {
 	prefix []byte
 	stale  bool
 	err    error
-	reads  uint64
+	reads  atomic.Uint64
 }
 
 func NewPrefixTransformer(prefix []byte, stale bool) *PrefixTransformer {
@@ -318,8 +318,18 @@ func NewPrefixTransformer(prefix []byte, stale bool) *PrefixTransformer {
 	}
 }
 
+func CopyPrefixTransformer(source *PrefixTransformer) *PrefixTransformer {
+	copy := &PrefixTransformer{
+		prefix: source.prefix,
+		stale:  source.stale,
+		err:    source.err,
+	}
+	copy.reads.Store(source.reads.Load())
+	return copy
+}
+
 func (p *PrefixTransformer) TransformFromStorage(ctx context.Context, data []byte, dataCtx value.Context) ([]byte, bool, error) {
-	atomic.AddUint64(&p.reads, 1)
+	p.reads.Add(1)
 	if dataCtx == nil {
 		panic("no context provided")
 	}
@@ -339,7 +349,7 @@ func (p *PrefixTransformer) TransformToStorage(ctx context.Context, data []byte,
 }
 
 func (p *PrefixTransformer) GetReadsAndReset() uint64 {
-	return atomic.SwapUint64(&p.reads, 0)
+	return p.reads.Swap(0)
 }
 
 // reproducingTransformer is a custom test-only transformer used purely
@@ -351,7 +361,7 @@ type reproducingTransformer struct {
 	wrapped value.Transformer
 	store   storage.Interface
 
-	index      uint32
+	index      atomic.Uint32
 	nextObject func(uint32) (string, *example.Pod)
 }
 
@@ -367,7 +377,7 @@ func (rt *reproducingTransformer) TransformToStorage(ctx context.Context, data [
 }
 
 func (rt *reproducingTransformer) createObject(ctx context.Context) error {
-	key, obj := rt.nextObject(atomic.AddUint32(&rt.index, 1))
+	key, obj := rt.nextObject(rt.index.Add(1))
 	out := &example.Pod{}
 	return rt.store.Create(ctx, key, obj, out, 0)
 }
