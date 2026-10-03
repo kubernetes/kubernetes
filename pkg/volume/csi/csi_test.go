@@ -21,6 +21,7 @@ import (
 	"math/rand"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 	"time"
 
@@ -32,7 +33,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
 	fakeclient "k8s.io/client-go/kubernetes/fake"
-	utiltesting "k8s.io/client-go/util/testing"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 )
@@ -221,11 +221,7 @@ func TestCSI_VolumeAll(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			tmpDir, err := utiltesting.MkTmpdir("csi-test")
-			if err != nil {
-				t.Fatalf("can't create temp dir: %v", err)
-			}
-			defer os.RemoveAll(tmpDir)
+			tmpDir := t.TempDir()
 
 			var driverInfo *storage.CSIDriver
 			objs := []runtime.Object{}
@@ -245,11 +241,17 @@ func TestCSI_VolumeAll(t *testing.T) {
 				Spec: api.NodeSpec{},
 			})
 
+			volSpec := test.specFunc(test.specName, test.driver, test.volName)
+			if volSpec != nil && volSpec.PersistentVolume != nil {
+				objs = append(objs, volSpec.PersistentVolume)
+			}
+
 			client := fakeclient.NewSimpleClientset(objs...)
 
 			factory := informers.NewSharedInformerFactory(client, time.Hour /* disable resync */)
 			csiDriverInformer := factory.Storage().V1().CSIDrivers()
-			volumeAttachmentInformer := factory.Storage().V1().VolumeAttachments()
+			vaLister := factory.Storage().V1().VolumeAttachments().Lister()
+			pvLister := factory.Core().V1().PersistentVolumes().Lister()
 			if driverInfo != nil {
 				csiDriverInformer.Informer().GetStore().Add(driverInfo)
 			}
@@ -263,14 +265,14 @@ func TestCSI_VolumeAll(t *testing.T) {
 				ProbeVolumePlugins(),
 				"fakeNode",
 				csiDriverInformer.Lister(),
-				volumeAttachmentInformer.Lister(),
+				vaLister,
+				pvLister,
 			)
 			attachDetachPlugMgr := attachDetachVolumeHost.GetPluginMgr()
 			csiClient := setupClient(t, true)
 
-			volSpec := test.specFunc(test.specName, test.driver, test.volName)
 			pod := test.podFunc()
-			attachName := getAttachmentName(test.volName, test.driver, string(attachDetachVolumeHost.GetNodeName()))
+			attachName := GetVolumeAttachmentName(test.volName, test.driver, string(attachDetachVolumeHost.GetNodeName()))
 			t.Log("csiTest.VolumeAll starting...")
 
 			// *************** Attach/Mount volume resources ****************//
@@ -305,14 +307,15 @@ func TestCSI_VolumeAll(t *testing.T) {
 				}
 
 				// creates VolumeAttachment and blocks until it is marked attached (done by external attacher)
-				go func() {
+				var attachWG sync.WaitGroup
+				attachWG.Go(func() {
 					attachID, err := volAttacher.Attach(volSpec, attachDetachVolumeHost.GetNodeName())
 					if err != nil {
 						t.Errorf("csiTest.VolumeAll attacher.Attach failed: %s", err)
 						return
 					}
 					t.Logf("csiTest.VolumeAll got attachID %s", attachID)
-				}()
+				})
 
 				// Simulates external-attacher and marks VolumeAttachment.Status.Attached = true
 				markVolumeAttached(t, attachDetachVolumeHost.GetKubeClient(), nil, attachName, storage.VolumeAttachmentStatus{Attached: true})
@@ -329,6 +332,9 @@ func TestCSI_VolumeAll(t *testing.T) {
 
 				t.Log("csiTest.VolumeAll attacher.WaitForAttach succeeded OK, attachment ID:", devicePath)
 
+				// Wait for the attach goroutine to observe the attachment before Detach deletes it.
+				attachWG.Wait()
+
 			} else {
 				t.Log("csiTest.VolumeAll volume attacher not found, skipping attachment")
 			}
@@ -342,7 +348,7 @@ func TestCSI_VolumeAll(t *testing.T) {
 				ProbeVolumePlugins(),
 				"fakeNode",
 				csiDriverInformer.Lister(),
-				volumeAttachmentInformer.Lister(),
+				vaLister,
 			)
 			kubeletPlugMgr := kubeletVolumeHost.GetPluginMgr()
 
