@@ -73,6 +73,13 @@ const (
 	// "application/apply-patch+yaml".
 	ClientsPreferCBOR Feature = "ClientsPreferCBOR"
 
+	// owner: @hoskeri
+	// beta: v1.37
+	//
+	// If enabled, the exec credential plugin will attempt to decode a metav1.Status
+	// from the plugin's stdout when it fails with a non-zero exit code.
+	ExecPluginStatusError Feature = "ExecPluginStatusError"
+
 	// owner: @deads2k
 	// beta: v1.33
 	//
@@ -123,6 +130,9 @@ var defaultVersionedKubernetesFeatureGates = map[Feature]VersionedSpecs{
 	},
 	ClientsPreferCBOR: {
 		{Version: version.MustParse("1.32"), Default: false, PreRelease: Alpha},
+	},
+	ExecPluginStatusError: {
+		{Version: version.MustParse("1.37"), Default: true, PreRelease: Beta},
 	},
 	InOrderInformers: {
 		{Version: version.MustParse("1.33"), Default: true, PreRelease: Beta},
