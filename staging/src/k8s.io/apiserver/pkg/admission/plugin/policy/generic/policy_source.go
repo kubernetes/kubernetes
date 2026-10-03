@@ -78,7 +78,8 @@ type paramInfo struct {
 	mapping meta.RESTMapping
 
 	// When the param is changed, or the informer is done being used, the cancel
-	// func should be called to stop/cleanup the original informer
+	// func should be called to stop/cleanup the original informer.
+	// No-op for shared informer factory informers, which cannot be stopped.
 	cancelFunc func()
 
 	// The lister for this param
@@ -416,9 +417,9 @@ func (s *policySource[P, B, E]) ensureParamsForPolicyLocked(paramSource *schema.
 	}
 
 	// We are not watching this param. Start an informer for it.
-	instanceContext, instanceCancel := context.WithCancel(s.ctx)
-
 	var informer informers.GenericInformer
+
+	cancelFunc := func() {}
 
 	// Try to see if our provided informer factory has an informer for this type.
 	// We assume the informer is already started, and starts all types associated
@@ -426,9 +427,9 @@ func (s *policySource[P, B, E]) ensureParamsForPolicyLocked(paramSource *schema.
 	if genericInformer, err := s.informerFactory.ForResource(mapping.Resource); err == nil {
 		informer = genericInformer
 
-		// Start the informer
-		s.informerFactory.Start(instanceContext.Done())
-
+		// Shared with the other factory consumers, so it outlives this paramKind.
+		// The factory cannot restart an informer it has already started.
+		s.informerFactory.Start(s.ctx.Done())
 	} else {
 		// Dynamic JSON informer fallback.
 		// Cannot use shared dynamic informer since it would be impossible
@@ -444,13 +445,17 @@ func (s *policySource[P, B, E]) ensureParamsForPolicyLocked(paramSource *schema.
 			cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
 			nil,
 		)
+
+		// Owned by this paramKind alone, so it is safe to stop.
+		instanceContext, instanceCancel := context.WithCancel(s.ctx)
+		cancelFunc = instanceCancel
 		go informer.Informer().Run(instanceContext.Done())
 	}
 
 	klog.Infof("informer started for %v", *paramSource)
 	ret := &paramInfo{
 		mapping:    *mapping,
-		cancelFunc: instanceCancel,
+		cancelFunc: cancelFunc,
 		informer:   informer,
 	}
 	s.paramsCRDControllers[*paramSource] = ret
