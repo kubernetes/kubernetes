@@ -381,6 +381,14 @@ func TestDeviceTaintRuleEmptySelectorWarning(t *testing.T) {
 			selector:      &resource.DeviceTaintSelector{Driver: &driver},
 			expectWarning: false,
 		},
+		"all-true-suppresses-warning": {
+			selector:      &resource.DeviceTaintSelector{All: new(true)},
+			expectWarning: false,
+		},
+		"all-false-does-not-suppress-warning": {
+			selector:      &resource.DeviceTaintSelector{All: new(false)},
+			expectWarning: true,
+		},
 	}
 
 	for name, tc := range testcases {
