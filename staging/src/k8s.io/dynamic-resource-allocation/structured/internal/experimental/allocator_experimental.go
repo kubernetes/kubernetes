@@ -1849,6 +1849,16 @@ func taintTolerated(taint resourceapi.DeviceTaint, request requestAccessor) bool
 //
 // Gets called only if the partitionable devices feature is enabled and the device
 // consumes counters.
+//
+// Not checked: whether the counters consumed by allocated devices are still what
+// they were at allocation time. They are read from the devices' current entries
+// in the pool, so an allocated device that the driver has removed from the pool
+// consumes nothing, and one whose ConsumesCounters has changed consumes the new
+// amounts. Detecting this would need either allocation-time state in the claim
+// status or extra work on the allocation path for drivers which behave correctly.
+// Drivers must keep an allocated device, with unchanged counter consumption, in
+// the pool until it is released. See https://kep.k8s.io/4815 and
+// https://github.com/kubernetes/kubernetes/issues/140802.
 func (alloc *allocator) checkAvailableCounters(device deviceWithID) (bool, error) {
 	pool := device.pool
 	poolID := pool.PoolID
@@ -2015,6 +2025,12 @@ func (alloc *allocator) deallocateCountersForDevice(device deviceWithID) {
 // exactly like checkAvailableCounters does for counters: an allocated device's
 // consumption is assumed stable in the slice. A device that is allocated but no
 // longer present in the slice contributes nothing, just as its counters do not.
+//
+// Not checked: whether an allocated device's compatibility groups are still what
+// they were at allocation time, for the same reasons as in checkAvailableCounters.
+// A candidate can therefore be admitted next to an allocated device that the
+// driver has removed from the pool or republished with different groups. See
+// https://kep.k8s.io/5963 and https://github.com/kubernetes/kubernetes/issues/140802.
 //
 // The result is computed once per pool and cached, mirroring availableCounters.
 func (alloc *allocator) compatibilityGroupsBaselineForPool(pool *Pool) map[string]compatibilityGroupIntersection {
