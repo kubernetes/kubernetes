@@ -47,7 +47,8 @@ service ExternalJWTSigner {
   
   message SignJWTRequest {
     // URL-safe base64 wrapped payload to be signed.
-    // Exactly as it appears in the second segment of the JWT
+    // Exactly as it appears in the second segment of the JWT.
+    // Do NOT base64url-encode this value again — it is already encoded.
     string claims = 1;
   }
   
