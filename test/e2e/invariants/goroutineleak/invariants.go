@@ -57,7 +57,7 @@ const (
 	scrapeTimeout = 30 * time.Second
 
 	// kubeSchedulerPort and kubeControllerManagerPort are the default status
-	// server ports, the same values used by the e2e metrics grabber.
+	// server ports, the same values used by test/e2e/framework/metrics/metrics_grabber.go.
 	kubeSchedulerPort         = 10259
 	kubeControllerManagerPort = 10257
 )
@@ -94,6 +94,8 @@ var defaultOwners = Owners{
 // PodDialer establishes a connection to a port inside a pod. The e2e suite
 // provides an implementation backed by the pod portforward subresource, which
 // is how the metrics grabber reaches components that listen on localhost.
+//
+// This is an interface to support mocking the real dialer in unit tests.
 type PodDialer interface {
 	DialPod(ctx context.Context, namespace, podName string, port int) (net.Conn, error)
 }
