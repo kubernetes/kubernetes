@@ -23,6 +23,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -609,4 +610,145 @@ func TestCloseIdleConnections(t *testing.T) {
 	case <-time.After(30 * time.Second):
 		t.Fatal("timeout waiting for connection to be closed")
 	}
+}
+
+func TestStaggeredRetries(t *testing.T) {
+	apiServiceName := "remote.group"
+	apiServices := []runtime.Object{newRemoteAPIService(apiServiceName)}
+	services := []*v1.Service{newService("foo", "bar", testServicePort, testServicePortName)}
+	endpointSlices := []*discoveryv1.EndpointSlice{newEndpointSliceWithAddress("foo", "bar", testServicePort, testServicePortName)}
+
+	apiServiceIndexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+	serviceIndexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+	endpointSliceIndexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+
+	for _, obj := range apiServices {
+		apiServiceIndexer.Add(obj)
+	}
+	for _, obj := range services {
+		serviceIndexer.Add(obj)
+	}
+	for _, obj := range endpointSlices {
+		endpointSliceIndexer.Add(obj)
+	}
+
+	endpointSliceGetter, _ := proxy.NewEndpointSliceListerGetter(discoveryv1listers.NewEndpointSliceLister(endpointSliceIndexer))
+
+	t.Run("success on first attempt makes only one request", func(t *testing.T) {
+		var requestCount int
+		var mu sync.Mutex
+		testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			mu.Lock()
+			requestCount++
+			mu.Unlock()
+			w.WriteHeader(http.StatusOK)
+		}))
+		defer testServer.Close()
+
+		fakeClient := fake.NewSimpleClientset(apiServices...)
+		c := AvailableConditionController{
+			apiServiceClient:    fakeClient.ApiregistrationV1(),
+			apiServiceLister:    listers.NewAPIServiceLister(apiServiceIndexer),
+			serviceLister:       v1listers.NewServiceLister(serviceIndexer),
+			endpointSliceGetter: endpointSliceGetter,
+			serviceResolver:     &fakeServiceResolver{url: testServer.URL},
+			metrics:             availabilitymetrics.New(),
+		}
+
+		err := c.sync(apiServiceName)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		mu.Lock()
+		defer mu.Unlock()
+		if requestCount != 1 {
+			t.Errorf("expected exactly 1 request, got %d", requestCount)
+		}
+	})
+
+	t.Run("immediate failures trigger fast-path retries", func(t *testing.T) {
+		var requestCount int
+		var mu sync.Mutex
+		testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			mu.Lock()
+			requestCount++
+			mu.Unlock()
+			w.WriteHeader(http.StatusInternalServerError)
+		}))
+		defer testServer.Close()
+
+		fakeClient := fake.NewSimpleClientset(apiServices...)
+		c := AvailableConditionController{
+			apiServiceClient:    fakeClient.ApiregistrationV1(),
+			apiServiceLister:    listers.NewAPIServiceLister(apiServiceIndexer),
+			serviceLister:       v1listers.NewServiceLister(serviceIndexer),
+			endpointSliceGetter: endpointSliceGetter,
+			serviceResolver:     &fakeServiceResolver{url: testServer.URL},
+			metrics:             availabilitymetrics.New(),
+		}
+
+		startTime := time.Now()
+		err := c.sync(apiServiceName)
+		duration := time.Since(startTime)
+
+		if err == nil {
+			t.Fatal("expected failure")
+		}
+
+		mu.Lock()
+		defer mu.Unlock()
+		if requestCount != 5 {
+			t.Errorf("expected 5 attempts on failure, got %d", requestCount)
+		}
+		if duration > 1*time.Second {
+			t.Errorf("expected 5 immediate failures to take under 1 second, took %v", duration)
+		}
+	})
+
+	t.Run("slow requests trigger staggered fallback attempts", func(t *testing.T) {
+		var requestCount int
+		var mu sync.Mutex
+		testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			mu.Lock()
+			idx := requestCount
+			requestCount++
+			mu.Unlock()
+
+			if idx == 0 {
+				time.Sleep(1500 * time.Millisecond)
+				w.WriteHeader(http.StatusInternalServerError)
+			} else {
+				w.WriteHeader(http.StatusOK)
+			}
+		}))
+		defer testServer.Close()
+
+		fakeClient := fake.NewSimpleClientset(apiServices...)
+		c := AvailableConditionController{
+			apiServiceClient:    fakeClient.ApiregistrationV1(),
+			apiServiceLister:    listers.NewAPIServiceLister(apiServiceIndexer),
+			serviceLister:       v1listers.NewServiceLister(serviceIndexer),
+			endpointSliceGetter: endpointSliceGetter,
+			serviceResolver:     &fakeServiceResolver{url: testServer.URL},
+			metrics:             availabilitymetrics.New(),
+		}
+
+		startTime := time.Now()
+		err := c.sync(apiServiceName)
+		duration := time.Since(startTime)
+
+		if err != nil {
+			t.Fatalf("expected successful sync, got err: %v", err)
+		}
+
+		mu.Lock()
+		defer mu.Unlock()
+		if requestCount != 2 {
+			t.Errorf("expected 2 requests due to staggering, got %d", requestCount)
+		}
+		if duration > 1300*time.Millisecond {
+			t.Errorf("expected staggered success to return around 1s, took %v", duration)
+		}
+	})
 }
