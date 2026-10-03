@@ -179,35 +179,40 @@ func TestGzipNewReaderFailsOnUncompressedContent(t *testing.T) {
 
 func TestPerFlushGzipWriter(t *testing.T) {
 	scenarios := []struct {
-		name          string
-		writes        []string
-		flushPerWrite bool
-		expected      string
+		name                 string
+		writes               []string
+		flushPerWrite        bool
+		expected             string
+		expectedStreamResets int
 	}{
 		{
-			name:          "single event with flush",
-			writes:        []string{"hello"},
-			flushPerWrite: true,
-			expected:      "hello",
+			name:                 "single event with flush",
+			writes:               []string{"hello"},
+			flushPerWrite:        true,
+			expected:             "hello",
+			expectedStreamResets: 1,
 		},
 		{
-			name:          "flush after every write produces concatenated gzip members",
-			writes:        []string{"first", "second", "third"},
-			flushPerWrite: true,
-			expected:      "firstsecondthird",
+			name:                 "flush after every write produces concatenated gzip members",
+			writes:               []string{"first", "second", "third"},
+			flushPerWrite:        true,
+			expected:             "firstsecondthird",
+			expectedStreamResets: 3,
 		},
 		{
-			name:          "flush only at the end produces a single gzip member",
-			writes:        []string{"first", "second", "third"},
-			flushPerWrite: false,
-			expected:      "firstsecondthird",
+			name:                 "flush only at the end produces a single gzip member",
+			writes:               []string{"first", "second", "third"},
+			flushPerWrite:        false,
+			expected:             "firstsecondthird",
+			expectedStreamResets: 1,
 		},
 	}
 
 	for _, scenario := range scenarios {
 		t.Run(scenario.name, func(t *testing.T) {
 			recorder := httptest.NewRecorder()
-			w := &perFlushGzipWriter{delegateRW: recorder, flusher: recorder}
+			timing := &watchGzipTiming{}
+			w := &perFlushGzipWriter{delegateRW: recorder, flusher: recorder, compressed: countingWriter{timing: timing}}
 			for _, msg := range scenario.writes {
 				_, err := w.Write([]byte(msg))
 				require.NoError(t, err)
@@ -224,6 +229,8 @@ func TestPerFlushGzipWriter(t *testing.T) {
 			got, err := io.ReadAll(gr)
 			require.NoError(t, err)
 			require.Equal(t, scenario.expected, string(got))
+			require.Equal(t, scenario.expectedStreamResets, timing.streamResets)
+			require.NotZero(t, timing.gzip+timing.responseWrite+timing.responseFlush)
 		})
 	}
 }
