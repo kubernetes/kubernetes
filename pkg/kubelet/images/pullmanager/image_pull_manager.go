@@ -54,7 +54,8 @@ type PullManager struct {
 	intentAccessors *StripedLockSet // image -> sync.Mutex
 	intentCounters  *sync.Map       // image -> number of current in-flight pulls
 
-	pulledAccessors *StripedLockSet // imageRef -> sync.Mutex
+	preloadedAccessors *StripedLockSet // imageRef -> sync.Mutex
+	pulledAccessors    *StripedLockSet // imageRef -> sync.Mutex
 }
 
 func NewImagePullManager(ctx context.Context, recordsAccessor PullRecordsAccessor, imagePullPolicy ImagePullPolicyEnforcer, imageService kubecontainer.ImageService, lockStripesNum int32) (*PullManager, error) {
@@ -68,7 +69,8 @@ func NewImagePullManager(ctx context.Context, recordsAccessor PullRecordsAccesso
 		intentAccessors: NewStripedLockSet(lockStripesNum),
 		intentCounters:  &sync.Map{},
 
-		pulledAccessors: NewStripedLockSet(lockStripesNum),
+		preloadedAccessors: NewStripedLockSet(lockStripesNum),
+		pulledAccessors:    NewStripedLockSet(lockStripesNum),
 	}
 
 	m.initialize(ctx)
@@ -89,13 +91,23 @@ func (f *PullManager) RecordPullIntent(logger klog.Logger, image string) error {
 }
 
 func (f *PullManager) RecordImagePulled(ctx context.Context, image, imageRef string, credentials *kubeletconfiginternal.ImagePullCredentials) {
-	logger := klog.FromContext(ctx)
+	logger := klog.FromContext(ctx).WithValues("image", image, "imageRef", imageRef)
 	if err := f.writePulledRecordIfChanged(ctx, image, imageRef, credentials); err != nil {
-		logger.Error(err, "failed to write image pulled record", "imageRef", imageRef)
+		logger.Error(err, "failed to write image pulled record")
 		return
 	}
 
-	// Notice we don't decrement in case of record write error, which leaves dangling
+	func() {
+		f.preloadedAccessors.Lock(imageRef)
+		defer f.preloadedAccessors.Unlock(imageRef)
+		if err := f.recordsAccessor.DeleteImagePreloadedRecordObservedImage(logger, image, imageRef); err != nil {
+			// Deletion error of the preloaded record is informational - pulled records for (imageRef, image)
+			// always takes priority when determining if the image was preloaded
+			logger.Error(err, "failed to delete ImagePreloadedRecord")
+		}
+	}()
+
+	// Notice we don't decrement in case of pulled record write error, which leaves dangling
 	// imagePullIntents and refCount in the intentCounters map.
 	// This is done so that the successfully pulled image is still considered as pulled by the kubelet.
 	// The kubelet will attempt to turn the imagePullIntent into a pulled record again when
@@ -115,6 +127,7 @@ func (f *PullManager) RecordImagePulled(ctx context.Context, image, imageRef str
 // accessed the next time.
 func (f *PullManager) writePulledRecordIfChanged(ctx context.Context, image, imageRef string, credentials *kubeletconfiginternal.ImagePullCredentials) error {
 	logger := klog.FromContext(ctx)
+
 	f.pulledAccessors.Lock(imageRef)
 	defer f.pulledAccessors.Unlock(imageRef)
 
@@ -153,6 +166,38 @@ func (f *PullManager) writePulledRecordIfChanged(ctx context.Context, image, ima
 	}
 
 	return f.recordsAccessor.WriteImagePulledRecord(logger, pulledRecord)
+}
+
+func (f *PullManager) lockedWritePreloadedRecordIfChanged(ctx context.Context, image, imageRef string) error {
+	logger := klog.FromContext(ctx)
+
+	sanitizedImage, err := trimImageTagDigest(image)
+	if err != nil {
+		return fmt.Errorf("invalid image name %q: %w", image, err)
+	}
+
+	preloadedRecord, err := f.recordsAccessor.GetImagePreloadedRecord(imageRef)
+	if err != nil {
+		logger.Info("failed to retrieve an ImagePreloadedRecord", "image", image, "err", err)
+		preloadedRecord = nil
+	}
+
+	if preloadedRecord == nil {
+		preloadedRecord = &kubeletconfiginternal.ImagePreloadedRecord{
+			ImageRef: imageRef,
+			ObservedImages: map[string]kubeletconfiginternal.PreloadedImage{
+				sanitizedImage: {},
+			},
+		}
+	} else {
+		if _, ok := preloadedRecord.ObservedImages[sanitizedImage]; ok {
+			return nil
+		}
+		preloadedRecord.ObservedImages[sanitizedImage] = kubeletconfiginternal.PreloadedImage{}
+	}
+
+	preloadedRecord.LastUpdatedTime = metav1.Time{Time: time.Now()}
+	return f.recordsAccessor.WriteImagePreloadedRecord(logger, preloadedRecord)
 }
 
 func (f *PullManager) RecordImagePullFailed(ctx context.Context, image string) {
@@ -195,52 +240,20 @@ func (f *PullManager) MustAttemptImagePull(ctx context.Context, image, imageRef 
 		recordMustAttemptImagePullResult(resultForMetrics)
 	}()
 
-	var imagePulledByKubelet bool
+	sanitizedImage, err := trimImageTagDigest(image)
+	if err != nil {
+		resultForMetrics = checkResultError
+		logger.Error(err, "failed to parse image name, forcing image credentials reverification", "image", image)
+		return true, nil
+	}
+
 	var pulledRecord *kubeletconfiginternal.ImagePulledRecord
-
-	err := func() error {
-		// don't allow changes to the files we're using for our decision
-		f.pulledAccessors.Lock(imageRef)
-		defer f.pulledAccessors.Unlock(imageRef)
-		f.intentAccessors.Lock(image)
-		defer f.intentAccessors.Unlock(image)
-
-		var err error
-		var exists bool
-		pulledRecord, exists, err = f.recordsAccessor.GetImagePulledRecord(imageRef)
-		switch {
-		case err != nil:
-			return err
-		case exists:
-			imagePulledByKubelet = true
-		case pulledRecord != nil:
-			imagePulledByKubelet = true
-		default:
-			// optimized check - we can check the intent number, however, if it's zero
-			// it may only mean kubelet restarted since writing the intent record and
-			// we must fall back to the actual cache
-			imagePulledByKubelet = f.getIntentCounterForImage(image) > 0
-			if imagePulledByKubelet {
-				break
-			}
-
-			if exists, err := f.recordsAccessor.ImagePullIntentExists(image); err != nil {
-				return fmt.Errorf("failed to check existence of an image pull intent: %w", err)
-			} else if exists {
-				imagePulledByKubelet = true
-			}
-		}
-
-		return nil
-	}()
-
+	pulledRecord, isExempted, err := f.isExemptedByPolicy(ctx, image, sanitizedImage, imageRef)
 	if err != nil {
 		resultForMetrics = checkResultError
 		logger.Error(err, "Unable to access cache records about image pulls")
 		return true, nil
-	}
-
-	if !f.imagePolicyEnforcer.RequireCredentialVerificationForImage(image, imagePulledByKubelet) {
+	} else if isExempted {
 		resultForMetrics = checkResultCredentialPolicyAllowed
 		return false, nil
 	}
@@ -248,13 +261,6 @@ func (f *PullManager) MustAttemptImagePull(ctx context.Context, image, imageRef 
 	if pulledRecord == nil {
 		// we have no proper records of the image being pulled in the past, we can short-circuit here
 		resultForMetrics = checkResultMustAuthenticate
-		return true, nil
-	}
-
-	sanitizedImage, err := trimImageTagDigest(image)
-	if err != nil {
-		resultForMetrics = checkResultError
-		logger.Error(err, "failed to parse image name, forcing image credentials reverification", "image", sanitizedImage)
 		return true, nil
 	}
 
@@ -328,14 +334,128 @@ func (f *PullManager) MustAttemptImagePull(ctx context.Context, image, imageRef 
 	return true, nil
 }
 
+// isExemptedByPolicy returns a pulled record for the given imageRef if one is found,
+// and true if the image is exempted from credential reverification by image reverification
+// policy.
+func (f *PullManager) isExemptedByPolicy(ctx context.Context, image, sanitizedImage string, imageRef string) (*kubeletconfiginternal.ImagePulledRecord, bool, error) {
+	logger := klog.FromContext(ctx).WithValues("image", image, "imageRef", imageRef)
+	ctx = klog.NewContext(ctx, logger)
+
+	// don't allow changes to the files we're using for our decision
+	f.pulledAccessors.Lock(imageRef)
+	defer f.pulledAccessors.Unlock(imageRef)
+	f.preloadedAccessors.Lock(imageRef)
+	defer f.preloadedAccessors.Unlock(imageRef)
+	f.intentAccessors.Lock(image)
+	defer f.intentAccessors.Unlock(image)
+
+	var (
+		pulledRecord             *kubeletconfiginternal.ImagePulledRecord
+		imageRefPulledByKubelet  bool // do we have a pulled record for the given image ref
+		imageNamePulledByKubelet bool // do we have an intent/pulled record for the given image name
+	)
+
+	err := func() error {
+		var exists bool
+		var err error
+		pulledRecord, exists, err = f.recordsAccessor.GetImagePulledRecord(imageRef)
+		if err != nil {
+			return err
+		}
+		switch {
+		case err != nil:
+			return err
+		case pulledRecord != nil:
+			imageRefPulledByKubelet = true
+			_, imageNamePulledByKubelet = pulledRecord.CredentialMapping[sanitizedImage]
+		case exists:
+			imageRefPulledByKubelet = true
+		}
+
+		if imageNamePulledByKubelet {
+			return nil
+		}
+
+		// we have a preloaded record for the imageName but we should still check if by any chance
+		// we're not currently pulling the image
+		imageNamePulledByKubelet, err = f.lockedImagePullIntentExists(image)
+		if err != nil {
+			return err
+		}
+		if imageNamePulledByKubelet {
+			imageRefPulledByKubelet = true
+		}
+		return nil
+	}()
+	if err != nil {
+		return nil, false, err
+	}
+
+	isPulledByKubelet := func() bool {
+		if imageNamePulledByKubelet {
+			return true
+		}
+
+		if !imageRefPulledByKubelet {
+			return false
+		}
+
+		// we're tracking an image ref and have no pulled/pulling record for the imageName
+		preloadedRecord, err := f.recordsAccessor.GetImagePreloadedRecord(imageRef)
+		if err != nil {
+			logger.Error(err, "failed to read ImagePreloadedRecord, ignoring it")
+			return true
+		}
+		if preloadedRecord == nil {
+			return true
+		}
+		_, imageTrackedAsPreloaded := preloadedRecord.ObservedImages[sanitizedImage]
+		return !imageTrackedAsPreloaded
+	}()
+
+	if !f.imagePolicyEnforcer.RequireCredentialVerificationForImage(image, isPulledByKubelet) {
+		if !imageNamePulledByKubelet && !imageRefPulledByKubelet {
+			if err := f.lockedWritePreloadedRecordIfChanged(ctx, image, imageRef); err != nil {
+				logger.Error(err, "failed to record image as preloaded")
+			}
+		}
+		return pulledRecord, true, nil
+	}
+
+	return pulledRecord, false, nil
+}
+
+// lockedImagePullIntentExists is an optimized check for pull intent existence.
+// It checks the intent number, however, if it's zero it may only mean kubelet
+// restarted since writing the intent record and we must fall back to the
+// actual cache
+func (f *PullManager) lockedImagePullIntentExists(image string) (bool, error) {
+	if f.getIntentCounterForImage(image) > 0 {
+		return true, nil
+	}
+
+	exists, err := f.recordsAccessor.ImagePullIntentExists(image)
+	if err != nil {
+		return false, fmt.Errorf("failed to check existence of an image pull intent: %w", err)
+	}
+	return exists, nil
+}
+
 func (f *PullManager) PruneUnknownRecords(ctx context.Context, imageList []string, until time.Time) {
 	f.pulledAccessors.GlobalLock()
 	defer f.pulledAccessors.GlobalUnlock()
+	f.preloadedAccessors.GlobalLock()
+	defer f.preloadedAccessors.GlobalUnlock()
 
 	logger := klog.FromContext(ctx)
 	pulledRecords, err := f.recordsAccessor.ListImagePulledRecords()
 	if err != nil {
 		logger.Error(err, "there were errors listing ImagePulledRecords, garbage collection will proceed with incomplete records list")
+	}
+
+	preloadedRecords, err := f.recordsAccessor.ListImagePreloadedRecords()
+	if err != nil {
+		logger.Error(err, "there were errors listing ImagePreloadedRecords, garbage collection will proceed with incomplete records list")
 	}
 
 	imagesInUse := sets.New(imageList...)
@@ -351,6 +471,21 @@ func (f *PullManager) PruneUnknownRecords(ctx context.Context, imageList []strin
 
 		if err := f.recordsAccessor.DeleteImagePulledRecord(logger, imageRecord.ImageRef); err != nil {
 			logger.Error(err, "failed to remove an ImagePulledRecord", "imageRef", imageRecord.ImageRef)
+		}
+	}
+
+	for _, imageRecord := range preloadedRecords {
+		if !imageRecord.LastUpdatedTime.Time.Before(until) {
+			// the image record was only updated after the GC started
+			continue
+		}
+
+		if imagesInUse.Has(imageRecord.ImageRef) {
+			continue
+		}
+
+		if err := f.recordsAccessor.DeleteImagePreloadedRecord(logger, imageRecord.ImageRef); err != nil {
+			logger.Error(err, "failed to remove an ImagePreloadedRecord", "imageRef", imageRecord.ImageRef)
 		}
 	}
 
@@ -391,10 +526,13 @@ func (f *PullManager) initialize(ctx context.Context) {
 		existingRecordedImages := searchForExistingTagDigest(inFlightPulls, imageObj)
 
 		for _, image := range existingRecordedImages.UnsortedList() {
-
 			if err := f.writePulledRecordIfChanged(ctx, image, imageObj.ID, nil); err != nil {
-				logger.Error(err, "failed to write an image pull record", "imageRef", imageObj.ID)
+				logger.Error(err, "failed to write an image pull record", "imageRef", imageObj.ID, "imageName", image)
 				continue
+			}
+
+			if err := f.recordsAccessor.DeleteImagePreloadedRecordObservedImage(logger, image, imageObj.ID); err != nil {
+				logger.Error(err, "failed to remove image preloaded record", "imageRef", imageObj.ID, "imageName", image)
 			}
 
 			if err := f.recordsAccessor.DeleteImagePullIntent(logger, image); err != nil {

@@ -42,6 +42,14 @@ var (
 			StabilityLevel: metrics.ALPHA,
 		},
 	)
+	fsPreloadedRecordsSize = metrics.NewGauge(
+		&metrics.GaugeOpts{
+			Subsystem:      kubeletmetrics.KubeletSubsystem,
+			Name:           "imagemanager_ondisk_preloadedrecords",
+			Help:           "Number of ImagePreloadedRecords stored on disk.",
+			StabilityLevel: metrics.ALPHA,
+		},
+	)
 	fsPulledRecordsSize = metrics.NewGauge(
 		&metrics.GaugeOpts{
 			Subsystem:      kubeletmetrics.KubeletSubsystem,
@@ -55,6 +63,14 @@ var (
 			Subsystem:      kubeletmetrics.KubeletSubsystem,
 			Name:           "imagemanager_inmemory_pullintents_usage_percent",
 			Help:           "The ImagePullIntents in-memory cache usage in percent.",
+			StabilityLevel: metrics.ALPHA,
+		},
+	)
+	inMemPreloadedRecordsPercent = metrics.NewGauge(
+		&metrics.GaugeOpts{
+			Subsystem:      kubeletmetrics.KubeletSubsystem,
+			Name:           "imagemanager_inmemory_preloadedrecords_usage_percent",
+			Help:           "The ImagePreloadedRecords in-memory cache usage in percent.",
 			StabilityLevel: metrics.ALPHA,
 		},
 	)
@@ -79,8 +95,10 @@ var (
 
 func init() {
 	legacyregistry.MustRegister(fsPullIntentsSize)
+	legacyregistry.MustRegister(fsPreloadedRecordsSize)
 	legacyregistry.MustRegister(fsPulledRecordsSize)
 	legacyregistry.MustRegister(inMemIntentsPercent)
+	legacyregistry.MustRegister(inMemPreloadedRecordsPercent)
 	legacyregistry.MustRegister(inMemPulledRecordsPercent)
 	legacyregistry.MustRegister(mustPullChecksTotal)
 }
@@ -89,20 +107,23 @@ func init() {
 // and updates its record metrics on write operations.
 type meteringRecordsAccessor struct {
 	sizeExposedPullRecordsAccessor
-	intentsSize       *metrics.Gauge
-	pulledRecordsSize *metrics.Gauge
+	intentsSize          *metrics.Gauge
+	preloadedRecordsSize *metrics.Gauge
+	pulledRecordsSize    *metrics.Gauge
 }
 
 type sizeExposedPullRecordsAccessor interface {
 	PullRecordsAccessor
 	intentsSize() (uint, error)
+	preloadedRecordsSize() (uint, error)
 	pulledRecordsSize() (uint, error)
 }
 
-func NewMeteringRecordsAccessor(pullRecordsAccessor sizeExposedPullRecordsAccessor, intentsSize, pulledRecordsSize *metrics.Gauge) *meteringRecordsAccessor {
+func NewMeteringRecordsAccessor(pullRecordsAccessor sizeExposedPullRecordsAccessor, intentsSize, preloadedRecordsSize, pulledRecordsSize *metrics.Gauge) *meteringRecordsAccessor {
 	return &meteringRecordsAccessor{
 		sizeExposedPullRecordsAccessor: pullRecordsAccessor,
 		intentsSize:                    intentsSize,
+		preloadedRecordsSize:           preloadedRecordsSize,
 		pulledRecordsSize:              pulledRecordsSize,
 	}
 }
@@ -120,6 +141,30 @@ func (m *meteringRecordsAccessor) DeleteImagePullIntent(logger klog.Logger, imag
 		return err
 	}
 	m.recordIntentsSize(logger)
+	return nil
+}
+
+func (m *meteringRecordsAccessor) WriteImagePreloadedRecord(logger klog.Logger, record *kubeletconfiginternal.ImagePreloadedRecord) error {
+	if err := m.sizeExposedPullRecordsAccessor.WriteImagePreloadedRecord(logger, record); err != nil {
+		return err
+	}
+	m.recordPreloadedRecordsSize(logger)
+	return nil
+}
+
+func (m *meteringRecordsAccessor) DeleteImagePreloadedRecordObservedImage(logger klog.Logger, imageName, imageRef string) error {
+	if err := m.sizeExposedPullRecordsAccessor.DeleteImagePreloadedRecordObservedImage(logger, imageName, imageRef); err != nil {
+		return err
+	}
+	m.recordPreloadedRecordsSize(logger)
+	return nil
+}
+
+func (m *meteringRecordsAccessor) DeleteImagePreloadedRecord(logger klog.Logger, imageRef string) error {
+	if err := m.sizeExposedPullRecordsAccessor.DeleteImagePreloadedRecord(logger, imageRef); err != nil {
+		return err
+	}
+	m.recordPreloadedRecordsSize(logger)
 	return nil
 }
 
@@ -146,6 +191,15 @@ func (m *meteringRecordsAccessor) recordIntentsSize(logger klog.Logger) {
 		return
 	}
 	m.intentsSize.Set(float64(intentsSize))
+}
+
+func (m *meteringRecordsAccessor) recordPreloadedRecordsSize(logger klog.Logger) {
+	preloadedRecordsSize, err := m.sizeExposedPullRecordsAccessor.preloadedRecordsSize()
+	if err != nil {
+		logger.V(4).Info("failed to read number of ImagePreloadedRecords, can't update metric", "metricName", m.preloadedRecordsSize.Name, "error", err)
+		return
+	}
+	m.preloadedRecordsSize.Set(float64(preloadedRecordsSize))
 }
 
 func (m *meteringRecordsAccessor) recordPulledRecordsSize(logger klog.Logger) {
