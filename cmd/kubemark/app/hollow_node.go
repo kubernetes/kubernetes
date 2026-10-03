@@ -82,7 +82,7 @@ const (
 )
 
 // TODO(#45650): Refactor hollow-node into hollow-kubelet and hollow-proxy
-// and make the config driven.
+// and make the config driven. See https://github.com/kubernetes/kubernetes/issues/45650 for tracking.
 var knownMorphs = sets.NewString("kubelet", "proxy")
 
 func (c *hollowNodeConfig) addFlags(fs *pflag.FlagSet) {
