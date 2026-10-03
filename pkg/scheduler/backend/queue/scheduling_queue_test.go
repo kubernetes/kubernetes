@@ -1530,6 +1530,141 @@ func TestPriorityQueue_Pop(t *testing.T) {
 	}
 }
 
+func TestPriorityQueue_QueuedPodGroupInfoChildrenSorted(t *testing.T) {
+	now := metav1.Now()
+	rootCompositePodGroup := fwk.NewGenericCompositePodGroup(st.MakeCompositePodGroup().Name("cpg-root").Namespace("ns1").CreationTimestamp(now).Obj())
+	childCompositePodGroup1 := fwk.NewGenericCompositePodGroup(st.MakeCompositePodGroup().Name("child1").Namespace("ns1").ParentCompositePodGroup("cpg-root").CreationTimestamp(now).Obj())
+	childPodGroup1 := fwk.NewGenericPodGroup(st.MakePodGroup().Name("child1").Namespace("ns1").UID("child1-uid1").ParentCompositePodGroup("cpg-root").CreationTimestamp(now).Obj())
+	childPodGroup1Recreated := fwk.NewGenericPodGroup(st.MakePodGroup().Name("child1").Namespace("ns1").UID("child1-uid2").ParentCompositePodGroup("cpg-root").CreationTimestamp(metav1.NewTime(now.Add(time.Minute))).Obj())
+	childPodGroup2 := fwk.NewGenericPodGroup(st.MakePodGroup().Name("child2").Namespace("ns1").ParentCompositePodGroup("cpg-root").CreationTimestamp(now).Obj())
+	childPodGroup3 := fwk.NewGenericPodGroup(st.MakePodGroup().Name("child3").Namespace("ns1").ParentCompositePodGroup("cpg-root").CreationTimestamp(now).Obj())
+	grandChildPodGroup1 := fwk.NewGenericPodGroup(st.MakePodGroup().Name("grand-child1").Namespace("ns1").ParentCompositePodGroup("child1").CreationTimestamp(now).Obj())
+	grandChildPodGroup2 := fwk.NewGenericPodGroup(st.MakePodGroup().Name("grand-child2").Namespace("ns1").ParentCompositePodGroup("child1").CreationTimestamp(now).Obj())
+	pod1 := st.MakePod().Name("pod-1").Namespace("ns1").UID("pod-1-uid").PodGroupName("child1").Obj()
+	pod2 := st.MakePod().Name("pod-2").Namespace("ns1").UID("pod-2-uid").PodGroupName("child2").Obj()
+
+	var flattenChildrenPreOrder func(children []*framework.PodGroupInfo) []fwk.EntityKey
+	flattenChildrenPreOrder = func(children []*framework.PodGroupInfo) []fwk.EntityKey {
+		var order []fwk.EntityKey
+		for _, child := range children {
+			order = append(order, child.GetKey())
+			order = append(order, flattenChildrenPreOrder(child.Children)...)
+		}
+		return order
+	}
+
+	tests := []struct {
+		name                string
+		actions             func(t *testing.T, ctx context.Context, q *PriorityQueue)
+		wantOrderedChildren []fwk.EntityKey
+	}{
+		{
+			name: "children added before root is queued",
+			wantOrderedChildren: []fwk.EntityKey{
+				fwk.CompositePodGroupKey("ns1", "child1"),
+				fwk.PodGroupKey("ns1", "grand-child1"),
+				fwk.PodGroupKey("ns1", "grand-child2"),
+				fwk.PodGroupKey("ns1", "child1"),
+				fwk.PodGroupKey("ns1", "child3"),
+			},
+		},
+		{
+			name: "child added while root is already in active queue",
+			actions: func(t *testing.T, ctx context.Context, q *PriorityQueue) {
+				q.AddGenericPodGroup(klog.FromContext(ctx), childPodGroup2)
+			},
+			wantOrderedChildren: []fwk.EntityKey{
+				fwk.CompositePodGroupKey("ns1", "child1"),
+				fwk.PodGroupKey("ns1", "grand-child1"),
+				fwk.PodGroupKey("ns1", "grand-child2"),
+				fwk.PodGroupKey("ns1", "child1"),
+				fwk.PodGroupKey("ns1", "child2"),
+				fwk.PodGroupKey("ns1", "child3"),
+			},
+		},
+		{
+			name: "child recreated via update while root is in active queue",
+			actions: func(t *testing.T, ctx context.Context, q *PriorityQueue) {
+				q.UpdateGenericPodGroup(klog.FromContext(ctx), childPodGroup1Recreated)
+			},
+			wantOrderedChildren: []fwk.EntityKey{
+				fwk.CompositePodGroupKey("ns1", "child1"),
+				fwk.PodGroupKey("ns1", "grand-child1"),
+				fwk.PodGroupKey("ns1", "grand-child2"),
+				fwk.PodGroupKey("ns1", "child3"),
+				fwk.PodGroupKey("ns1", "child1"),
+			},
+		},
+		{
+			name: "child added after root is popped and then requeued back",
+			actions: func(t *testing.T, ctx context.Context, q *PriorityQueue) {
+				logger := klog.FromContext(ctx)
+				popped, err := q.Pop(logger)
+				if err != nil {
+					t.Fatalf("Pop() returned unexpected error: %v", err)
+				}
+				poppedGroup, ok := popped.(*framework.QueuedPodGroupInfo)
+				if !ok {
+					t.Fatalf("Failed to convert entity to *framework.QueuedPodGroupInfo: %T", popped)
+				}
+				q.AddGenericPodGroup(logger, childPodGroup2)
+				q.Add(ctx, pod2)
+				if err := q.AddAttemptedPodGroupIfNeeded(logger, poppedGroup, q.SchedulingCycle(), fwk.NewStatus(fwk.Unschedulable)); err != nil {
+					t.Fatalf("AddAttemptedPodGroupIfNeeded() returned unexpected error: %v", err)
+				}
+			},
+			wantOrderedChildren: []fwk.EntityKey{
+				fwk.CompositePodGroupKey("ns1", "child1"),
+				fwk.PodGroupKey("ns1", "grand-child1"),
+				fwk.PodGroupKey("ns1", "grand-child2"),
+				fwk.PodGroupKey("ns1", "child1"),
+				fwk.PodGroupKey("ns1", "child2"),
+				fwk.PodGroupKey("ns1", "child3"),
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.GenericWorkload:                 true,
+				features.TopologyAwareWorkloadScheduling: true,
+				features.CompositePodGroup:               true,
+			})
+
+			logger, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+
+			q := NewTestQueue(ctx, newDefaultQueueSort())
+			defer q.Close()
+
+			// Groups are added out of order on purpose, so the queue has to sort the children by itself.
+			for _, gpg := range []*fwk.GenericPodGroup{rootCompositePodGroup, childCompositePodGroup1, childPodGroup3, childPodGroup1, grandChildPodGroup2, grandChildPodGroup1} {
+				q.AddGenericPodGroup(logger, gpg)
+			}
+			q.Add(ctx, pod1)
+
+			if tt.actions != nil {
+				tt.actions(t, ctx, q)
+			}
+
+			rootLookup := newCompositePodGroupInfoForLookup("ns1", "cpg-root")
+			var gotOrderedChildren []fwk.EntityKey
+			q.activeQ.underRLock(func(unlockedActiveQ unlockedActiveQueueReader) {
+				entity := q.getEntityFromAnyQueue(unlockedActiveQ, rootLookup)
+				if entity == nil {
+					t.Fatalf("expected cpg-root to be present in queue")
+				}
+				gotOrderedChildren = flattenChildrenPreOrder(entity.(*framework.QueuedPodGroupInfo).Children)
+			})
+			if diff := cmp.Diff(tt.wantOrderedChildren, gotOrderedChildren); diff != "" {
+				t.Errorf("unexpected children order in queue (-want, +got):\n%s", diff)
+			}
+		})
+	}
+}
+
 func TestPriorityQueue_Update(t *testing.T) {
 	c := testingclock.NewFakeClock(time.Now())
 
