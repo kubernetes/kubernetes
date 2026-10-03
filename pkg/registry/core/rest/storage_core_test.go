@@ -21,8 +21,10 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
+	serviceaccountstore "k8s.io/kubernetes/pkg/registry/core/serviceaccount/storage"
 )
 
 func TestGetServersToValidate(t *testing.T) {
@@ -36,6 +38,33 @@ func TestGetServersToValidate(t *testing.T) {
 		if _, ok := servers[server]; !ok {
 			t.Errorf("server list missing: %s", server)
 		}
+	}
+}
+
+func TestAddStorageCleanup(t *testing.T) {
+	ownerDestroyed := false
+	ownedDestroyed := false
+	owner := &serviceaccountstore.REST{
+		Store: &genericregistry.Store{
+			DestroyFunc: func() {
+				ownerDestroyed = true
+			},
+		},
+	}
+	owned := &genericregistry.Store{
+		DestroyFunc: func() {
+			ownedDestroyed = true
+		},
+	}
+
+	addStorageCleanup(owner, owned)
+	owner.Destroy()
+
+	if !ownerDestroyed {
+		t.Error("owner storage was not destroyed")
+	}
+	if !ownedDestroyed {
+		t.Error("owned storage was not destroyed")
 	}
 }
 

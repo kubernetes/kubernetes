@@ -134,16 +134,17 @@ func (c *GenericConfig) NewRESTStorage(apiResourceConfigSource serverstorage.API
 
 	if resource := "serviceaccounts"; apiResourceConfigSource.ResourceEnabled(corev1.SchemeGroupVersion.WithResource(resource)) {
 		var serviceAccountStorage *serviceaccountstore.REST
+		var internalSecretStorage *secretstore.REST
 		var err error
 		if c.ServiceAccountIssuer != nil {
 			// The ServiceAccount storage reads secrets to mint legacy tokens,
 			// so it needs the secret store even when secrets are not served.
 			if secretGetter == nil {
-				secretStorage, err := secretstore.NewREST(restOptionsGetter)
+				internalSecretStorage, err = secretstore.NewREST(restOptionsGetter)
 				if err != nil {
 					return genericapiserver.APIGroupInfo{}, err
 				}
-				secretGetter = secretStorage.Store
+				secretGetter = internalSecretStorage.Store
 			}
 			serviceAccountStorage, err = serviceaccountstore.NewREST(restOptionsGetter, c.ServiceAccountIssuer, c.APIAudiences, authorizerfactory.NewAlwaysDenyAuthorizer(), c.ServiceAccountMaxExpiration, newNotFoundGetter(schema.GroupResource{Resource: "pods"}), secretGetter, newNotFoundGetter(schema.GroupResource{Resource: "nodes"}),
 				notFoundValidatingWebhookConfigurations{}, notFoundMutatingWebhookConfigurations{}, c.ExtendExpiration, c.MaxExtendedExpiration)
@@ -152,7 +153,13 @@ func (c *GenericConfig) NewRESTStorage(apiResourceConfigSource serverstorage.API
 				notFoundValidatingWebhookConfigurations{}, notFoundMutatingWebhookConfigurations{}, false, c.MaxExtendedExpiration)
 		}
 		if err != nil {
+			if internalSecretStorage != nil {
+				internalSecretStorage.Destroy()
+			}
 			return genericapiserver.APIGroupInfo{}, err
+		}
+		if internalSecretStorage != nil {
+			addStorageCleanup(serviceAccountStorage, internalSecretStorage)
 		}
 		storage[resource] = serviceAccountStorage
 		if serviceAccountStorage.Token != nil {
@@ -165,6 +172,16 @@ func (c *GenericConfig) NewRESTStorage(apiResourceConfigSource serverstorage.API
 	}
 
 	return apiGroupInfo, nil
+}
+
+func addStorageCleanup(owner *serviceaccountstore.REST, owned rest.Storage) {
+	previousDestroy := owner.DestroyFunc
+	owner.DestroyFunc = func() {
+		if previousDestroy != nil {
+			previousDestroy()
+		}
+		owned.Destroy()
+	}
 }
 
 func (c *GenericConfig) GroupName() string {
