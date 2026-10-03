@@ -264,6 +264,12 @@ type MemoryStats struct {
 	// Cumulative number of major page faults.
 	// +optional
 	MajorPageFaults *uint64 `json:"majorPageFaults,omitempty"`
+	// Cumulative count of cgroup v2 memory.high throttle events.
+	// +optional
+	HighEvents *uint64 `json:"highEvents,omitempty"`
+	// Cumulative count of cgroup v2 memory.max limit hit events.
+	// +optional
+	MaxEvents *uint64 `json:"maxEvents,omitempty"`
 	// Memory PSI stats.
 	// +optional
 	PSI *PSIStats `json:"psi,omitempty"`
