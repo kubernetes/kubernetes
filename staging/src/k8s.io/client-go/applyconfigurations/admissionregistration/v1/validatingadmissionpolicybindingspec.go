@@ -40,7 +40,7 @@ type ValidatingAdmissionPolicyBindingSpecApplyConfiguration struct {
 	// Note that this is intersected with the policy's matchConstraints, so only requests that are matched by the policy can be selected by this.
 	// If this is unset, all resources matched by the policy are validated by this binding
 	// When resourceRules is unset, it does not constrain resource matching. If a resource is matched by the other fields of this object, it will be validated.
-	// Note that this is differs from ValidatingAdmissionPolicy matchConstraints, where resourceRules are required.
+	// Note that this differs from the ValidatingAdmissionPolicy matchConstraints, where resourceRules are required.
 	MatchResources *MatchResourcesApplyConfiguration `json:"matchResources,omitempty"`
 	// validationActions declares how Validations of the referenced ValidatingAdmissionPolicy are enforced.
 	// If a validation evaluates to false it is always enforced according to these actions.
