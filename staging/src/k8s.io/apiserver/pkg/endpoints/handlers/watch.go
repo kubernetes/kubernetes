@@ -439,6 +439,10 @@ func (s *WatchServer) HandleHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 
 	watchEncoder := newWatchEncoder(req.Context(), gvr, s.EmbeddedEncoder, s.Encoder, recorder)
+	// Per-stage clocks run for every initial event, so only collect them when the trace can be emitted.
+	if s.isWatchListRequest && klog.V(2).Enabled() {
+		watchEncoder.enableTiming()
+	}
 	ch := s.Watching.ResultChan()
 	done := req.Context().Done()
 
@@ -522,7 +526,10 @@ func (s *WatchServer) HandleHTTP(w http.ResponseWriter, req *http.Request) {
 						setupTime = initStart.Sub(receivedAt)
 					}
 					if total := setupTime + sendingTime; total > 10*time.Second {
+						encoderTiming := watchEncoder.timingSnapshot()
+						encoderOther := encoderTiming.other()
 						klog.FromContext(req.Context()).V(2).Info("TRACE-WATCHLIST", "path", req.URL.Path, "auditID", audit.GetAuditIDTruncated(req.Context()), "events", initEventCount, "uncompressedMB", float64(rw.bytesWritten)/1e6, "compressedMB", float64(rw.compressedBytesWritten())/1e6, "total", total, "setup", setupTime, "sending", sendingTime, "encode", encodeTime, "flush", flushTime, "other", sendingTime-encodeTime-flushTime, "mediaType", s.MediaType, "contentEncoding", contentEncoding)
+						klog.FromContext(req.Context()).V(2).Info("TRACE-WATCHLIST-ENCODER", "path", req.URL.Path, "auditID", audit.GetAuditIDTruncated(req.Context()), "events", encoderTiming.events, "total", encoderTiming.total, "avg", encoderTiming.average(encoderTiming.total), "min", encoderTiming.min, "max", encoderTiming.max, "objectEncode", encoderTiming.object, "objectEncodeAvg", encoderTiming.average(encoderTiming.object), "watchEventEncode", encoderTiming.watchEvent, "watchEventEncodeAvg", encoderTiming.average(encoderTiming.watchEvent), "framedWrite", encoderTiming.framedWrite, "framedWriteAvg", encoderTiming.average(encoderTiming.framedWrite), "other", encoderOther, "otherAvg", encoderTiming.average(encoderOther), "mediaType", s.MediaType, "contentEncoding", contentEncoding)
 					}
 				}
 			}

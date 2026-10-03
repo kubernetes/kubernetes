@@ -363,6 +363,35 @@ func TestAsPartialObjectMetadataList(t *testing.T) {
 	}
 }
 
+func TestWatchEncoderTiming(t *testing.T) {
+	timing := watchEncoderTiming{
+		object:      2 * time.Millisecond,
+		watchEvent:  3 * time.Millisecond,
+		framedWrite: 4 * time.Millisecond,
+	}
+	timing.recordEvent(6 * time.Millisecond)
+	timing.recordEvent(8 * time.Millisecond)
+
+	if got, want := timing.events, 2; got != want {
+		t.Errorf("events = %d, want %d", got, want)
+	}
+	if got, want := timing.total, 14*time.Millisecond; got != want {
+		t.Errorf("total = %v, want %v", got, want)
+	}
+	if got, want := timing.average(timing.total), 7*time.Millisecond; got != want {
+		t.Errorf("average = %v, want %v", got, want)
+	}
+	if got, want := timing.min, 6*time.Millisecond; got != want {
+		t.Errorf("min = %v, want %v", got, want)
+	}
+	if got, want := timing.max, 8*time.Millisecond; got != want {
+		t.Errorf("max = %v, want %v", got, want)
+	}
+	if got, want := timing.other(), 5*time.Millisecond; got != want {
+		t.Errorf("other = %v, want %v", got, want)
+	}
+}
+
 func TestWatchEncoderIdentifier(t *testing.T) {
 	eventFields := reflect.VisibleFields(reflect.TypeOf(metav1.WatchEvent{}))
 	if len(eventFields) != 2 {

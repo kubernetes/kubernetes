@@ -24,6 +24,7 @@ import (
 	"net/http"
 	"reflect"
 	"slices"
+	"time"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -161,6 +162,51 @@ type watchEncoder struct {
 
 	currentEmbeddedIdentifier runtime.Identifier
 	identifiers               map[watch.EventType]runtime.Identifier
+	timing                    *watchEncoderTiming
+}
+
+type watchEncoderTiming struct {
+	events      int
+	total       time.Duration
+	min         time.Duration
+	max         time.Duration
+	object      time.Duration
+	watchEvent  time.Duration
+	framedWrite time.Duration
+}
+
+func (t *watchEncoderTiming) recordEvent(duration time.Duration) {
+	t.events++
+	t.total += duration
+	if t.events == 1 || duration < t.min {
+		t.min = duration
+	}
+	if duration > t.max {
+		t.max = duration
+	}
+}
+
+func (t watchEncoderTiming) average(duration time.Duration) time.Duration {
+	if t.events == 0 {
+		return 0
+	}
+	return duration / time.Duration(t.events)
+}
+
+func (t watchEncoderTiming) other() time.Duration {
+	return t.total - t.object - t.watchEvent - t.framedWrite
+}
+
+type watchEncoderTimingWriter struct {
+	delegate io.Writer
+	timing   *watchEncoderTiming
+}
+
+func (w *watchEncoderTimingWriter) Write(p []byte) (int, error) {
+	start := time.Now()
+	n, err := w.delegate.Write(p)
+	w.timing.framedWrite += time.Since(start)
+	return n, err
 }
 
 func newWatchEncoder(ctx context.Context, gvr schema.GroupVersionResource, embeddedEncoder runtime.Encoder, encoder runtime.Encoder, framer io.Writer) *watchEncoder {
@@ -175,11 +221,33 @@ func newWatchEncoder(ctx context.Context, gvr schema.GroupVersionResource, embed
 	}
 }
 
+func (e *watchEncoder) enableTiming() {
+	e.timing = &watchEncoderTiming{}
+	e.framer = &watchEncoderTimingWriter{delegate: e.framer, timing: e.timing}
+}
+
+func (e *watchEncoder) timingSnapshot() watchEncoderTiming {
+	if e.timing == nil {
+		return watchEncoderTiming{}
+	}
+	return *e.timing
+}
+
 // Encode encodes a given watch event.
 // NOTE: if events object is implementing the CacheableObject interface,
 //
 //	the serialized version is cached in that object [not the event itself].
 func (e *watchEncoder) Encode(event watch.Event) error {
+	if e.timing == nil {
+		return e.encode(event)
+	}
+	start := time.Now()
+	err := e.encode(event)
+	e.timing.recordEvent(time.Since(start))
+	return err
+}
+
+func (e *watchEncoder) encode(event watch.Event) error {
 	encodeFunc := func(obj runtime.Object, w io.Writer) error {
 		return e.doEncode(obj, event, w)
 	}
@@ -192,8 +260,15 @@ func (e *watchEncoder) Encode(event watch.Event) error {
 func (e *watchEncoder) doEncode(obj runtime.Object, event watch.Event, w io.Writer) error {
 	defer e.buffer.Reset()
 
+	var start time.Time
+	if e.timing != nil {
+		start = time.Now()
+	}
 	if err := e.embeddedEncoder.Encode(obj, e.buffer); err != nil {
 		return fmt.Errorf("unable to encode watch object %T: %v", obj, err)
+	}
+	if e.timing != nil {
+		e.timing.object += time.Since(start)
 	}
 
 	// ContentType is not required here because we are defaulting to the serializer type.
@@ -203,8 +278,14 @@ func (e *watchEncoder) doEncode(obj runtime.Object, event watch.Event, w io.Writ
 	}
 
 	defer e.eventBuffer.Reset()
+	if e.timing != nil {
+		start = time.Now()
+	}
 	if err := e.encoder.Encode(outEvent, e.eventBuffer); err != nil {
 		return fmt.Errorf("unable to encode watch object %T: %v (%#v)", outEvent, err, e)
+	}
+	if e.timing != nil {
+		e.timing.watchEvent += time.Since(start)
 	}
 
 	_, err := w.Write(e.eventBuffer.Bytes())
