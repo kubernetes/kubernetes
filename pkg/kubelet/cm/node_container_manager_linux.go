@@ -36,6 +36,7 @@ import (
 	"k8s.io/klog/v2"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/events"
+	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/stats/pidlimit"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
@@ -201,6 +202,11 @@ func (cm *containerManagerImpl) enforceSystemPartitionCgroups(logger klog.Logger
 	if err := cm.cgroupManager.Update(logger, cgroupConfig); err != nil {
 		return fmt.Errorf("failed to enforce system partition limits on %q: %w", cgroupConfig.Name, err)
 	}
+	// Report the limit from where it is written, so the gauge and the cgroup can
+	// never disagree.
+	if spc.MemoryLimit != nil {
+		metrics.PartitionMemoryLimitBytes.WithLabelValues(systemPartitionCgroupName).Set(float64(*spc.MemoryLimit))
+	}
 	return nil
 }
 
@@ -264,6 +270,31 @@ func sumPodCPURequests(pods []*v1.Pod) int64 {
 		}
 	}
 	return total
+}
+
+// PartitionStats returns the current usage of each partition, keyed by
+// partition name.
+func (cm *containerManagerImpl) PartitionStats(logger klog.Logger) map[string]PartitionStats {
+	if cm.systemPartitionQOSManager == nil {
+		return nil
+	}
+	// This runs on every metrics scrape, so a failed read is left to the next
+	// scrape instead of being logged each time at a visible level.
+	var stats PartitionStats
+	if usage, err := cm.cgroupManager.MemoryUsage(cm.systemPartitionRoot); err == nil {
+		stats.MemoryUsageBytes = &usage
+	} else {
+		logger.V(4).Info("Failed to read the memory usage of the system partition", "cgroupName", cm.systemPartitionRoot, "err", err)
+	}
+	info := systemPartitionQOSContainersInfo(cm.cgroupRoot)
+	roots := []CgroupName{info.Guaranteed, info.Burstable, info.BestEffort}
+	if pods, err := podCgroupsUnder(logger, cm.subsystems, cm.cgroupManager, roots); err == nil {
+		count := int64(len(pods))
+		stats.Pods = &count
+	} else {
+		logger.V(4).Info("Failed to count the pods of the system partition", "cgroupName", cm.systemPartitionRoot, "err", err)
+	}
+	return map[string]PartitionStats{systemPartitionCgroupName: stats}
 }
 
 // createNodeAllocatableCgroups creates Node Allocatable Cgroup when CgroupsPerQOS flag is specified as true
