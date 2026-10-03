@@ -111,7 +111,7 @@ func (m *podContainerManagerImpl) EnsureExists(logger klog.Logger, pod *v1.Pod) 
 		if err := m.cgroupManager.Create(logger, containerConfig); err != nil {
 			return fmt.Errorf("failed to create container for %v : %v", podContainerName, err)
 		}
-
+		m.removeStalePodCgroup(logger, pod)
 	}
 	return nil
 }
@@ -164,6 +164,30 @@ func (m *podContainerManagerImpl) GetPodContainerName(pod *v1.Pod) (CgroupName, 
 	cgroupfsName := m.cgroupManager.Name(cgroupName)
 
 	return cgroupName, cgroupfsName
+}
+
+// removeStalePodCgroup removes the pod's cgroup in the partition it does not
+// belong to. Turning the system partition on or off moves a pod between
+// hierarchies, and the cgroup it was created under is left behind holding
+// nothing. Nothing else removes it while the pod runs, because the orphan
+// pod cgroup cleanup only reclaims cgroups of pods that are gone.
+func (m *podContainerManagerImpl) removeStalePodCgroup(logger klog.Logger, pod *v1.Pod) {
+	var stale CgroupName
+	if m.systemPartition.HasPod(pod) {
+		stale = podCgroupNameIn(m.qosContainersInfo, pod)
+	} else {
+		stale = podCgroupNameIn(m.systemQOSContainersInfo, pod)
+	}
+	// No Exists() guard here. The cgroup v2's Exists() can false-negative on
+	// a cgroup that still exists but lost a delegated controller (e.g. systemd drops
+	// "cpuset" once a slice empties). Destroy is already a no-op if it's gone.
+	if err := m.cgroupManager.Destroy(logger, &CgroupConfig{Name: stale}); err != nil {
+		logger.V(4).Info("Failed to remove the pod cgroup left in the other partition",
+			"pod", klog.KObj(pod), "cgroupName", stale, "err", err)
+		return
+	}
+	logger.V(2).Info("Removed the pod cgroup left in the other partition",
+		"pod", klog.KObj(pod), "cgroupName", stale)
 }
 
 func (m *podContainerManagerImpl) GetPodCgroupMemoryUsage(pod *v1.Pod) (uint64, error) {
