@@ -2025,9 +2025,6 @@ func (p *PriorityQueue) getEntityFromAnyQueue(unlockedActiveQ unlockedActiveQueu
 		return existing
 	}
 	if existing = p.unschedulableEntities.get(entityLookup); existing != nil {
-		if existing.Gated() {
-			return existing
-		}
 		return existing
 	}
 	return nil
