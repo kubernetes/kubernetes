@@ -103,7 +103,9 @@ func validateResources(groupResources []audit.GroupResources, fldPath *field.Pat
 			// reference: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md
 			// an error is returned for group name like rbac.authorization.k8s.io/v1beta1
 			// rbac.authorization.k8s.io is the valid one
-			if msgs := validation.NameIsDNSSubdomain(groupResource.Group, false); len(msgs) != 0 {
+			// Group names may be prefixed with '*.' to match all subgroups, e.g. '*.example.com'
+			group := maskLeadingWildcardForGroup(groupResource.Group)
+			if msgs := validation.NameIsDNSSubdomain(group, false); len(msgs) != 0 {
 				allErrs = append(allErrs, field.Invalid(fldPath.Child("group"), groupResource.Group, strings.Join(msgs, ",")))
 			}
 		}
@@ -130,4 +132,11 @@ func validateOmitStages(omitStages []audit.Stage, fldPath *field.Path) field.Err
 		}
 	}
 	return allErrs
+}
+
+func maskLeadingWildcardForGroup(group string) string {
+	if len(group) > 2 && strings.HasPrefix(group, "*.") {
+		return group[2:]
+	}
+	return group
 }

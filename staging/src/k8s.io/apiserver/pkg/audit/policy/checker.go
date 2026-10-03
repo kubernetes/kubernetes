@@ -191,7 +191,7 @@ func ruleMatchesResource(r *audit.PolicyRule, attrs authorizer.Attributes) bool 
 	name := attrs.GetName()
 
 	for _, gr := range r.Resources {
-		if gr.Group == apiGroup || gr.Group == "*" {
+		if apiGroupMatches(apiGroup, gr) {
 			if len(gr.Resources) == 0 {
 				return true
 			}
@@ -224,6 +224,13 @@ func hasString(slice []string, value string) bool {
 		}
 	}
 	return false
+}
+
+func apiGroupMatches(apiGroup string, gr audit.GroupResources) bool {
+	if strings.HasPrefix(gr.Group, "*.") {
+		return strings.HasSuffix(apiGroup, gr.Group[1:])
+	}
+	return gr.Group == "*" || gr.Group == apiGroup
 }
 
 type fakePolicyRuleEvaluator struct {
