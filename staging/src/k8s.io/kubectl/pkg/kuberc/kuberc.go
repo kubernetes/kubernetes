@@ -238,10 +238,27 @@ func (p *Preferences) applyAliases(rootCmd *cobra.Command, kuberc *config.Prefer
 	var aliasArgs *aliasing
 	var commandName string // first "non-flag" arguments
 	var commandIndex int
-	for index, arg := range args[1:] {
-		if !strings.HasPrefix(arg, "-") && !strings.HasPrefix(arg, cobra.ShellCompRequestCmd) {
+	for index := 1; index < len(args); index++ {
+		arg := args[index]
+		if arg == "--" {
+			break
+		}
+		if strings.HasPrefix(arg, "-") {
+			var flag *pflag.Flag
+			if strings.HasPrefix(arg, "--") {
+				flag = rootCmd.Flag(arg[2:])
+			} else if len(arg) == 2 {
+				flag = rootCmd.Flags().ShorthandLookup(arg[1:])
+			}
+			// Flags with separate values must not let those values become command names.
+			if flag != nil && flag.NoOptDefVal == "" {
+				index++
+			}
+			continue
+		}
+		if !strings.HasPrefix(arg, cobra.ShellCompRequestCmd) {
 			commandName = arg
-			commandIndex = index + 1
+			commandIndex = index
 			break
 		}
 	}
