@@ -242,8 +242,8 @@ if [[ -z "${KUBERNETES_SKIP_CONFIRM-}" ]]; then
 fi
 
 if "${need_download}"; then
-  if [[ $(which gsutil) ]] && [[ "$kubernetes_tar_url" =~ ^https://storage.googleapis.com/.* ]]; then
-    gsutil cp "${kubernetes_tar_url//'https://storage.googleapis.com/'/gs://}" "${file}"
+  if [[ $(which gcloud) ]] && [[ "$kubernetes_tar_url" =~ ^https://storage.googleapis.com/.* ]]; then
+    gcloud storage cp "${kubernetes_tar_url}" "${file}"
   elif [[ $(which curl) ]]; then
     # if the url belongs to GCS API we should use oauth2_token in the headers
     curl_headers=""
@@ -255,7 +255,7 @@ if "${need_download}"; then
   elif [[ $(which wget) ]]; then
     wget "${kubernetes_tar_url}"
   else
-    echo "Couldn't find gsutil, curl, or wget.  Bailing out."
+    echo "Couldn't find gcloud, curl, or wget.  Bailing out."
     exit 1
   fi
 fi
