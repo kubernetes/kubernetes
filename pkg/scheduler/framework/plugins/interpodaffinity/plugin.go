@@ -19,6 +19,7 @@ package interpodaffinity
 import (
 	"context"
 	"fmt"
+	"os"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -51,6 +52,12 @@ type InterPodAffinity struct {
 	nsLister                                           listersv1.NamespaceLister
 	enableInPlacePodVerticalScalingSchedulerPreemption bool
 	enableInterPodAffinityHostnameFastPath             bool
+
+	existingPodCache *ExisingPodCacheProxy
+	incomingPodCache *IncomingPodCacheProxy
+
+	filteringExistingPodCache *FilteringExisingPodCacheProxy
+	filteringIncomingPodCache *FilteringIncomingPodCacheProxy
 }
 
 // Name returns name of the plugin. It is used in logs, etc.
@@ -97,7 +104,7 @@ func (pl *InterPodAffinity) EventsToRegister(_ context.Context) ([]fwk.ClusterEv
 }
 
 // New initializes a new plugin and returns it.
-func New(_ context.Context, plArgs runtime.Object, h fwk.Handle, fts feature.Features) (fwk.Plugin, error) {
+func New(ctx context.Context, plArgs runtime.Object, h fwk.Handle, fts feature.Features) (fwk.Plugin, error) {
 	if h.SnapshotSharedLister() == nil {
 		return nil, fmt.Errorf("SnapshotSharedlister is nil")
 	}
@@ -115,6 +122,47 @@ func New(_ context.Context, plArgs runtime.Object, h fwk.Handle, fts feature.Fea
 		nsLister:     h.SharedInformerFactory().Core().V1().Namespaces().Lister(),
 		enableInPlacePodVerticalScalingSchedulerPreemption: fts.EnableInPlacePodVerticalScalingSchedulerPreemption,
 		enableInterPodAffinityHostnameFastPath:             fts.EnableInterPodAffinityHostnameFastPath,
+	}
+	enableInterPodAffinityCache := os.Getenv("EnableInterPodAffinityCache") == "true"
+	if enableInterPodAffinityCache {
+		klog.Info("Create interpodaffinity cache for plugin.")
+		pl.incomingPodCache = NewIncomingPodCacheProxy(
+			ctx,
+			h.SharedInformerFactory().Core().V1().Pods().Lister(),
+			h.SharedInformerFactory().Core().V1().Pods(),
+			h.SharedInformerFactory().Core().V1().Namespaces(),
+			h.SharedInformerFactory().Core().V1().Nodes(),
+			h.SnapshotSharedLister(),
+		)
+		pl.filteringIncomingPodCache = NewFilteringIncomingPodCacheProxy(
+			ctx,
+			h.SharedInformerFactory().Core().V1().Pods().Lister(),
+			h.SharedInformerFactory().Core().V1().Pods(),
+			h.SharedInformerFactory().Core().V1().Namespaces(),
+			h.SharedInformerFactory().Core().V1().Nodes(),
+			h.SnapshotSharedLister(),
+		)
+		pl.filteringExistingPodCache = NewFilteringExistingPodCacheProxy(
+			ctx,
+			h.SharedInformerFactory().Core().V1().Pods(),
+			h.SharedInformerFactory().Core().V1().Pods().Lister(),
+			h.SharedInformerFactory().Core().V1().Namespaces().Lister(),
+			h.SharedInformerFactory().Core().V1().Namespaces(),
+			h.SharedInformerFactory().Core().V1().Nodes(),
+			h.SnapshotSharedLister(),
+		)
+		if !args.IgnorePreferredTermsOfExistingPods {
+			pl.existingPodCache = NewExistingPodCacheProxy(
+				ctx,
+				pl.args,
+				h.SharedInformerFactory().Core().V1().Pods(),
+				h.SharedInformerFactory().Core().V1().Pods().Lister(),
+				h.SharedInformerFactory().Core().V1().Namespaces().Lister(),
+				h.SharedInformerFactory().Core().V1().Namespaces(),
+				h.SharedInformerFactory().Core().V1().Nodes(),
+				h.SnapshotSharedLister(),
+			)
+		}
 	}
 
 	return pl, nil

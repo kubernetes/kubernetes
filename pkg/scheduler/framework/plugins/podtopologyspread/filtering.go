@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"maps"
 	"math"
+	"sync"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -40,6 +41,9 @@ const preFilterStateKey = "PreFilter" + Name
 // An empty preFilterState object denotes it's a legit state and is set in PreFilter phase.
 // Fields are exported for comparison during testing.
 type preFilterState struct {
+	// We only clone once in preemption, therefore lock is needed for map read/write
+	lock sync.RWMutex
+
 	Constraints []topologySpreadConstraint
 	// CriticalPaths is a slice indexed by constraint index.
 	// Per each entry, we record 2 critical paths instead of all critical paths.
@@ -166,6 +170,8 @@ func (pl *PodTopologySpread) AddPod(ctx context.Context, cycleState fwk.CycleSta
 		return fwk.AsStatus(err)
 	}
 
+	s.lock.Lock()
+	defer s.lock.Unlock()
 	pl.updateWithPod(logger, s, podInfoToAdd.GetPod(), podToSchedule, nodeInfo.Node(), 1)
 	return nil
 }
@@ -178,6 +184,8 @@ func (pl *PodTopologySpread) RemovePod(ctx context.Context, cycleState fwk.Cycle
 		return fwk.AsStatus(err)
 	}
 
+	s.lock.Lock()
+	defer s.lock.Unlock()
 	pl.updateWithPod(logger, s, podInfoToRemove.GetPod(), podToSchedule, nodeInfo.Node(), -1)
 	return nil
 }
@@ -248,6 +256,7 @@ func (pl *PodTopologySpread) calPreFilterState(ctx context.Context, pod *v1.Pod,
 	}
 
 	logger := klog.FromContext(ctx)
+	// s is a new instance here, so it is not nessessary to lock it.
 	s := preFilterState{
 		Constraints:       constraints,
 		CriticalPaths:     make([]*criticalPaths, len(constraints)),
@@ -330,6 +339,9 @@ func (pl *PodTopologySpread) Filter(ctx context.Context, cycleState fwk.CycleSta
 	if len(s.Constraints) == 0 {
 		return nil
 	}
+
+	s.lock.RLock()
+	defer s.lock.RUnlock()
 
 	logger := klog.FromContext(ctx)
 	podLabelSet := labels.Set(pod.Labels)
