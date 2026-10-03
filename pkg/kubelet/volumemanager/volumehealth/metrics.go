@@ -23,6 +23,11 @@ import (
 	"k8s.io/component-base/metrics/legacyregistry"
 )
 
+const (
+	ProbeVolume  = "volume"
+	ProbeStorage = "storage"
+)
+
 var (
 	registerMetrics sync.Once
 
@@ -34,11 +39,21 @@ var (
 		},
 		[]string{"driver_name", "status", "reason"},
 	)
+
+	unknownConditionTotal = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Name:           "csi_volume_health_unknown_status_total",
+			Help:           "Cumulative count of CSI volume and storage health conditions observed by Kubelet with a status value unknown to this manager, broken down by driver, probe and status.",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"driver_name", "probe", "status"},
+	)
 )
 
 func registerHealthMetrics() {
 	registerMetrics.Do(func() {
 		legacyregistry.MustRegister(csiNodeStorageHealthStatus)
+		legacyregistry.MustRegister(unknownConditionTotal)
 	})
 }
 
@@ -52,7 +67,17 @@ func setStorageHealthGauges(driverName string, conditions []storageHealthKey) {
 	}
 }
 
+func RecordUnknownCondition(driverName string, probe string, conditions []unknownConditionKey) {
+	for _, uc := range conditions {
+		unknownConditionTotal.WithLabelValues(driverName, probe, uc.status).Inc()
+	}
+}
+
 type storageHealthKey struct {
 	status string
 	reason string
+}
+
+type unknownConditionKey struct {
+	status string
 }

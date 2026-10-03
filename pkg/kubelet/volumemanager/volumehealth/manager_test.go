@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/features"
@@ -70,26 +71,26 @@ func (t *testStatusUpdater) callCount() int {
 type fakeHealthClient struct {
 	supportsVolumeHealth  bool
 	supportsStorageHealth bool
-	volumeConditions      []v1.VolumeHealthCondition
-	storageConditions     []storagev1.StorageHealthCondition
+	volumeConditions      csi.VolumeHealthResult
+	storageConditions     csi.StorageHealthResult
 	volumeErr             error
 	storageErr            error
 	volumeCalls           int
 	storageCalls          int
 }
 
-func (f *fakeHealthClient) NodeGetVolumeHealth(ctx context.Context, volID, stagingTargetPath, volumePublishPath string) ([]v1.VolumeHealthCondition, error) {
+func (f *fakeHealthClient) NodeGetVolumeHealth(ctx context.Context, volID, stagingTargetPath, volumePublishPath string) (csi.VolumeHealthResult, error) {
 	f.volumeCalls++
 	if f.volumeErr != nil {
-		return nil, f.volumeErr
+		return csi.VolumeHealthResult{}, f.volumeErr
 	}
 	return f.volumeConditions, nil
 }
 
-func (f *fakeHealthClient) NodeGetStorageHealth(ctx context.Context, secrets map[string]string) ([]storagev1.StorageHealthCondition, error) {
+func (f *fakeHealthClient) NodeGetStorageHealth(ctx context.Context, secrets map[string]string) (csi.StorageHealthResult, error) {
 	f.storageCalls++
 	if f.storageErr != nil {
-		return nil, f.storageErr
+		return csi.StorageHealthResult{}, f.storageErr
 	}
 	return f.storageConditions, nil
 }
@@ -180,11 +181,17 @@ func TestProbeVolumeHealth(t *testing.T) {
 	degraded := []v1.VolumeHealthCondition{{
 		Status: v1.VolumeHealthDegraded, Reason: "DiskSlow", Message: "slow disk",
 	}}
-
+	inaccessible := []v1.VolumeHealthCondition{{
+		Status: v1.VolumeHealthInaccessible, Reason: "VolumeUnreachable", Message: "volume is inaccessible",
+	}}
+	unknown := []csi.UnknownCondition{{
+		Status: "UNKNOWN_STATUS_TYPE", Reason: "VendorSpecificError", Message: "Unknown condition reported by driver",
+	}}
 	type step struct {
-		volumeConditions []v1.VolumeHealthCondition
-		volumeErr        error
-		wantCallCount    int
+		volumeConditions        []v1.VolumeHealthCondition
+		unknownVolumeConditions []csi.UnknownCondition
+		volumeErr               error
+		wantCallCount           int
 	}
 
 	tests := []struct {
@@ -231,6 +238,21 @@ func TestProbeVolumeHealth(t *testing.T) {
 				{wantCallCount: 0},
 			},
 		},
+		{
+			name:                 "clearance: Inaccessible volume gets all-unknown reply to clear conditions and increment metric",
+			supportsVolumeHealth: true,
+			steps: []step{
+				{volumeConditions: inaccessible, wantCallCount: 1},
+				{unknownVolumeConditions: unknown, wantCallCount: 2},
+			},
+		},
+		{
+			name:                 "mixed known/unknown case",
+			supportsVolumeHealth: true,
+			steps: []step{
+				{volumeConditions: degraded, unknownVolumeConditions: unknown, wantCallCount: 1},
+			},
+		},
 	}
 
 	for _, tc := range tests {
@@ -239,9 +261,12 @@ func TestProbeVolumeHealth(t *testing.T) {
 			client := &fakeHealthClient{supportsVolumeHealth: tc.supportsVolumeHealth}
 			m := newTestManager(t, status, client)
 
+			registerHealthMetrics()
+			unknownConditionTotal.Reset()
+			expectedMetricVal := 0.0
 			prevCalls := 0
 			for i, s := range tc.steps {
-				client.volumeConditions = s.volumeConditions
+				client.volumeConditions = csi.VolumeHealthResult{Conditions: s.volumeConditions, Unknown: s.unknownVolumeConditions}
 				client.volumeErr = s.volumeErr
 				m.probeVolumeHealth(context.Background())
 
@@ -263,6 +288,20 @@ func TestProbeVolumeHealth(t *testing.T) {
 								i, j, want.Status, want.Reason, last.conditions[j].Status, last.conditions[j].Reason)
 						}
 					}
+					if s.unknownVolumeConditions != nil {
+						expectedMetricVal += float64(len(s.unknownVolumeConditions))
+						drivername := m.listDrivers()[0]
+						status := s.unknownVolumeConditions[0].Status
+						c := unknownConditionTotal.WithLabelValues(drivername, string(ProbeVolume), status)
+						val, err := testutil.GetCounterMetricValue(c)
+						if err != nil {
+							t.Fatalf("failed to scrape metric counter: %v", err)
+						}
+						if val != expectedMetricVal {
+							t.Fatalf("expeceted metric value to be %v got, %v", expectedMetricVal, val)
+						}
+					}
+
 				}
 				prevCalls = got
 			}
@@ -277,11 +316,17 @@ func TestProbeStorageHealth(t *testing.T) {
 	degraded := []storagev1.StorageHealthCondition{{
 		Status: storagev1.StorageDegraded, Reason: "PoolFull", Message: "pool nearly full",
 	}}
-
+	unreachable := []storagev1.StorageHealthCondition{{
+		Status: storagev1.StorageUnreachable, Reason: "StorageUnreachable", Message: "storage is inaccessible",
+	}}
+	unknown := []csi.UnknownCondition{{
+		Status: "UNKNOWN_STATUS_TYPE", Reason: "VendorSpecificError", Message: "Unknown condition reported by driver",
+	}}
 	type step struct {
-		storageConditions []storagev1.StorageHealthCondition
-		storageErr        error
-		wantCallCount     int
+		storageConditions        []storagev1.StorageHealthCondition
+		unknownStorageConditions []csi.UnknownCondition
+		storageErr               error
+		wantCallCount            int
 	}
 
 	tests := []struct {
@@ -328,6 +373,21 @@ func TestProbeStorageHealth(t *testing.T) {
 				{wantCallCount: 0},
 			},
 		},
+		{
+			name:                  "clearance:  storage gets all-unknown reply to clear conditions and increment metric",
+			supportsStorageHealth: true,
+			steps: []step{
+				{storageConditions: unreachable, wantCallCount: 1},
+				{unknownStorageConditions: unknown, wantCallCount: 2},
+			},
+		},
+		{
+			name:                  "mixed known/unknown case",
+			supportsStorageHealth: true,
+			steps: []step{
+				{storageConditions: degraded, unknownStorageConditions: unknown, wantCallCount: 1},
+			},
+		},
 	}
 
 	for _, tc := range tests {
@@ -336,10 +396,12 @@ func TestProbeStorageHealth(t *testing.T) {
 			updater := &fakeCSINodeUpdater{}
 			m := newTestManager(t, &testStatusUpdater{}, client)
 			m.csiNodeUpdater = func() CSINodeUpdater { return updater }
-
+			registerHealthMetrics()
+			unknownConditionTotal.Reset()
+			expectedMetricVal := 0.0
 			prevCalls := 0
 			for i, s := range tc.steps {
-				client.storageConditions = s.storageConditions
+				client.storageConditions = csi.StorageHealthResult{Conditions: s.storageConditions, Unknown: s.unknownStorageConditions}
 				client.storageErr = s.storageErr
 				m.probeStorageHealth(context.Background())
 
@@ -364,6 +426,19 @@ func TestProbeStorageHealth(t *testing.T) {
 							updater.mu.Unlock()
 							t.Fatalf("step %d: condition %d: want {%s,%s}, got {%s,%s}",
 								i, j, want.Status, want.Reason, last.conditions[j].Status, last.conditions[j].Reason)
+						}
+					}
+					if len(s.unknownStorageConditions) > 0 {
+						expectedMetricVal += float64(len(s.unknownStorageConditions))
+						drivername := m.listDrivers()[0]
+						status := s.unknownStorageConditions[0].Status
+						c := unknownConditionTotal.WithLabelValues(drivername, ProbeStorage, status)
+						val, err := testutil.GetCounterMetricValue(c)
+						if err != nil {
+							t.Fatalf("failed to scrape metric counter: %v", err)
+						}
+						if val != expectedMetricVal {
+							t.Fatalf("expeceted metric value to be %v got, %v", expectedMetricVal, val)
 						}
 					}
 				}

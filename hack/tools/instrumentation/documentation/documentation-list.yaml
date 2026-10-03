@@ -2579,6 +2579,19 @@
   componentEndpoints:
   - component: kubelet
     endpoint: /metrics
+- name: csi_volume_health_unknown_status_total
+  help: Cumulative count of CSI volume and storage health conditions observed by Kubelet
+    with a status value unknown to this manager, broken down by driver, probe and
+    status.
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - driver_name
+  - probe
+  - status
+  componentEndpoints:
+  - component: kubelet
+    endpoint: /metrics
 - name: stale_sync_skips_total
   subsystem: daemonset_controller
   help: Total number of DaemonSet syncs skipped due to a stale watch cache.
