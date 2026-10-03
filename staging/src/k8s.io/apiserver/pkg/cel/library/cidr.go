@@ -172,10 +172,7 @@ func (*cidrs) ProgramOptions() []cel.ProgramOption {
 }
 
 func stringToCIDR(arg ref.Val) ref.Val {
-	s, ok := arg.Value().(string)
-	if !ok {
-		return types.MaybeNoSuchOverloadErr(arg)
-	}
+	s := arg.Value().(string)
 
 	net, err := parseCIDR(s)
 	if err != nil {
@@ -188,11 +185,7 @@ func stringToCIDR(arg ref.Val) ref.Val {
 }
 
 func cidrToString(arg ref.Val) ref.Val {
-	cidr, ok := arg.(apiservercel.CIDR)
-	if !ok {
-		return types.MaybeNoSuchOverloadErr(arg)
-	}
-
+	cidr := arg.(apiservercel.CIDR)
 	return types.String(cidr.Prefix.String())
 }
 
@@ -205,72 +198,39 @@ func cidrContainsCIDRString(arg ref.Val, other ref.Val) ref.Val {
 }
 
 func cidrContainsIP(arg ref.Val, other ref.Val) ref.Val {
-	cidr, ok := arg.(apiservercel.CIDR)
-	if !ok {
-		return types.MaybeNoSuchOverloadErr(other)
-	}
-
-	ip, ok := other.(apiservercel.IP)
-	if !ok {
-		return types.MaybeNoSuchOverloadErr(arg)
-	}
-
+	cidr := arg.(apiservercel.CIDR)
+	ip := other.(apiservercel.IP)
 	return types.Bool(cidr.Contains(ip.Addr))
 }
 
 func cidrContainsCIDR(arg ref.Val, other ref.Val) ref.Val {
-	cidr, ok := arg.(apiservercel.CIDR)
-	if !ok {
-		return types.MaybeNoSuchOverloadErr(arg)
-	}
-
-	containsCIDR, ok := other.(apiservercel.CIDR)
-	if !ok {
-		return types.MaybeNoSuchOverloadErr(other)
-	}
-
+	cidr := arg.(apiservercel.CIDR)
+	containsCIDR := other.(apiservercel.CIDR)
 	return types.Bool(cidr.Overlaps(containsCIDR.Prefix) && cidr.Prefix.Bits() <= containsCIDR.Prefix.Bits())
 }
 
 func prefixLength(arg ref.Val) ref.Val {
-	cidr, ok := arg.(apiservercel.CIDR)
-	if !ok {
-		return types.MaybeNoSuchOverloadErr(arg)
-	}
-
+	cidr := arg.(apiservercel.CIDR)
 	return types.Int(cidr.Prefix.Bits())
 }
 
 func isCIDR(arg ref.Val) ref.Val {
-	s, ok := arg.Value().(string)
-	if !ok {
-		return types.MaybeNoSuchOverloadErr(arg)
-	}
-
+	s := arg.Value().(string)
 	_, err := parseCIDR(s)
 	return types.Bool(err == nil)
 }
 
 func cidrToIP(arg ref.Val) ref.Val {
-	cidr, ok := arg.(apiservercel.CIDR)
-	if !ok {
-		return types.MaybeNoSuchOverloadErr(arg)
-	}
-
+	cidr := arg.(apiservercel.CIDR)
 	return apiservercel.IP{
 		Addr: cidr.Prefix.Addr(),
 	}
 }
 
 func masked(arg ref.Val) ref.Val {
-	cidr, ok := arg.(apiservercel.CIDR)
-	if !ok {
-		return types.MaybeNoSuchOverloadErr(arg)
-	}
-
-	maskedCIDR := cidr.Prefix.Masked()
+	cidr := arg.(apiservercel.CIDR)
 	return apiservercel.CIDR{
-		Prefix: maskedCIDR,
+		Prefix: cidr.Prefix.Masked(),
 	}
 }
 
