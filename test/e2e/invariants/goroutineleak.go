@@ -87,8 +87,7 @@ func RegisterGoroutineLeakFlags(fs *flag.FlagSet) {
 }
 
 // podDialer adapts the e2e pod dialer to the interface used by the
-// goroutineleak package, which stays free of e2e framework imports so that it
-// can be tested and reused without a cluster.
+// goroutineleak package.
 type podDialer struct {
 	dialer *e2epod.Dialer
 }
