@@ -718,6 +718,10 @@ type PodGroupInfo interface {
 	// or the default policy (PreemptLowerPriority) if not set.
 	// It should be used only when the PodGroupPreemptionPolicy feature gate is enabled.
 	GetPreemptionPolicy() v1.PreemptionPolicy
+	// IsGang returns true if the scheduling policy of the group is Gang.
+	IsGang() bool
+	// GetMinCount returns the min count for a pod group or a composite pod group. For basic groups it returns 1.
+	GetMinCount() int
 }
 
 // Placement determines the resources to be considered when scheduling a pod group.
@@ -942,4 +946,26 @@ func (gpg *GenericPodGroup) HasDisruptionModeAll() bool {
 		return true
 	}
 	return false
+}
+
+// IsGang returns true if the scheduling policy of the group is Gang.
+func (gpg *GenericPodGroup) IsGang() bool {
+	if cpg := gpg.CompositePodGroup; cpg != nil {
+		return cpg.Spec.SchedulingPolicy.Gang != nil
+	}
+	return gpg.PodGroup.Spec.SchedulingPolicy.Gang != nil
+}
+
+// GetMinCount returns the min count for a pod group or a composite pod group. For basic groups it returns 1.
+func (gpg *GenericPodGroup) GetMinCount() int {
+	if cpg := gpg.CompositePodGroup; cpg != nil {
+		if cpg.Spec.SchedulingPolicy.Gang != nil {
+			return int(cpg.Spec.SchedulingPolicy.Gang.MinGroupCount)
+		}
+		return 1
+	}
+	if gpg.PodGroup.Spec.SchedulingPolicy.Gang != nil {
+		return int(gpg.PodGroup.Spec.SchedulingPolicy.Gang.MinCount)
+	}
+	return 1
 }
