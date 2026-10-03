@@ -50,8 +50,8 @@ import (
 	clientgoclientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/keyutil"
-	basecompatibility "k8s.io/component-base/compatibility"
 	metricsfeatures "k8s.io/component-base/metrics/features"
+	basecompatibility "k8s.io/component-base/compatibility"
 	aggregatorapiserver "k8s.io/kube-aggregator/pkg/apiserver"
 	openapicommon "k8s.io/kube-openapi/pkg/common"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
@@ -131,6 +131,8 @@ func BuildGenericConfig(
 	storageFactory *serverstorage.DefaultStorageFactory,
 	lastErr error,
 ) {
+	metricsfeatures.ApplyFeatureGates(utilfeature.DefaultFeatureGate)
+
 	codecs := legacyscheme.Codecs
 	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.CBORServingAndStorage) {
 		codecs = serializer.NewCodecFactory(legacyscheme.Scheme, serializer.WithSerializer(cbor.NewSerializerInfo))
@@ -300,7 +302,6 @@ func CreateConfig(
 ) {
 	proxyTransport := CreateProxyTransport()
 
-	metricsfeatures.ApplyFeatureGates(utilfeature.DefaultFeatureGate)
 	opts.Metrics.Apply()
 	serviceaccount.RegisterMetrics()
 
