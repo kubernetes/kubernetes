@@ -930,6 +930,11 @@ func TestWorkloadForest_GetRootLookupInfoForCPG(t *testing.T) {
 	cpg2WithParent := st.MakeCompositePodGroup().Name("cpg2").Namespace("ns1").ParentCompositePodGroup("cpg1").Obj()
 	cpg3WithCycle := st.MakeCompositePodGroup().Name("cpg3").Namespace("ns1").ParentCompositePodGroup("cpg4").Obj()
 	cpg4WithCycle := st.MakeCompositePodGroup().Name("cpg4").Namespace("ns1").ParentCompositePodGroup("cpg3").Obj()
+	cpgDepth1 := st.MakeCompositePodGroup().Name("cpg-d1").Namespace("ns1").Obj()
+	cpgDepth2 := st.MakeCompositePodGroup().Name("cpg-d2").Namespace("ns1").ParentCompositePodGroup("cpg-d1").Obj()
+	cpgDepth3 := st.MakeCompositePodGroup().Name("cpg-d3").Namespace("ns1").ParentCompositePodGroup("cpg-d2").Obj()
+	cpgDepth4 := st.MakeCompositePodGroup().Name("cpg-d4").Namespace("ns1").ParentCompositePodGroup("cpg-d3").Obj()
+	cpgDepth5 := st.MakeCompositePodGroup().Name("cpg-d5").Namespace("ns1").ParentCompositePodGroup("cpg-d4").Obj()
 
 	tests := []struct {
 		name        string
@@ -967,7 +972,23 @@ func TestWorkloadForest_GetRootLookupInfoForCPG(t *testing.T) {
 			name:        "cpg cycle detection",
 			initialCPGs: []*schedulingv1alpha3.CompositePodGroup{cpg3WithCycle, cpg4WithCycle},
 			cpg:         cpg3WithCycle,
-			wantInfo:    nil, // cycle returns nil, false
+			wantInfo:    nil,
+		},
+		{
+			name:        "cpg at max tree depth (4 nodes)",
+			initialCPGs: []*schedulingv1alpha3.CompositePodGroup{cpgDepth1, cpgDepth2, cpgDepth3, cpgDepth4},
+			cpg:         cpgDepth4,
+			wantInfo: &framework.QueuedPodGroupInfo{
+				PodGroupInfo: &framework.PodGroupInfo{
+					GenericPodGroup: fwk.NewGenericCompositePodGroup(cpgDepth1),
+				},
+			},
+		},
+		{
+			name:        "cpg depth exceeded (5 nodes)",
+			initialCPGs: []*schedulingv1alpha3.CompositePodGroup{cpgDepth1, cpgDepth2, cpgDepth3, cpgDepth4, cpgDepth5},
+			cpg:         cpgDepth5,
+			wantInfo:    nil,
 		},
 	}
 
@@ -994,9 +1015,13 @@ func TestWorkloadForest_GetLeafPodGroups(t *testing.T) {
 	pg1 := st.MakePodGroup().Name("pg1").Namespace("ns1").UID("uid1").Obj()
 	pg2WithParent := st.MakePodGroup().Name("pg2").Namespace("ns1").UID("uid2").ParentCompositePodGroup("cpg1").Obj()
 	pg3WithParent := st.MakePodGroup().Name("pg3").Namespace("ns1").UID("uid3").ParentCompositePodGroup("cpg2").Obj()
+	pgUnderCPG3 := st.MakePodGroup().Name("pg4").Namespace("ns1").UID("uid4").ParentCompositePodGroup("cpg3").Obj()
+	pgUnderCPG4 := st.MakePodGroup().Name("pg5").Namespace("ns1").UID("uid5").ParentCompositePodGroup("cpg4").Obj()
 
 	cpg1 := st.MakeCompositePodGroup().Name("cpg1").Namespace("ns1").Obj()
 	cpg2WithParent := st.MakeCompositePodGroup().Name("cpg2").Namespace("ns1").ParentCompositePodGroup("cpg1").Obj()
+	cpg3WithParent := st.MakeCompositePodGroup().Name("cpg3").Namespace("ns1").ParentCompositePodGroup("cpg2").Obj()
+	cpg4WithParent := st.MakeCompositePodGroup().Name("cpg4").Namespace("ns1").ParentCompositePodGroup("cpg3").Obj()
 
 	tests := []struct {
 		name                       string
@@ -1057,6 +1082,45 @@ func TestWorkloadForest_GetLeafPodGroups(t *testing.T) {
 			rootLookupInfo:             newQueuedPodGroupInfoForLookup("ns1", "missing", fwk.CompositePodGroupKeyType),
 			wantLeaves:                 nil,
 			isCompositePodGroupEnabled: false,
+		},
+		{
+			name:             "5 cpg levels exceed max tree depth, fails closed instead of truncating",
+			initialPodGroups: []*schedulingv1beta1.PodGroup{pg2WithParent},
+			initialCPGs: []*schedulingv1alpha3.CompositePodGroup{
+				cpg1,
+				cpg2WithParent,
+				cpg3WithParent,
+				cpg4WithParent,
+				st.MakeCompositePodGroup().Name("cpg5").Namespace("ns1").ParentCompositePodGroup("cpg4").Obj(),
+			},
+			rootLookupInfo:             newQueuedPodGroupInfoForLookup("ns1", "cpg1", fwk.CompositePodGroupKeyType),
+			wantLeaves:                 nil,
+			isCompositePodGroupEnabled: true,
+		},
+		{
+			name:             "3 cpg levels with pod group on the 4th level is within max tree depth",
+			initialPodGroups: []*schedulingv1beta1.PodGroup{pgUnderCPG3},
+			initialCPGs: []*schedulingv1alpha3.CompositePodGroup{
+				cpg1,
+				cpg2WithParent,
+				cpg3WithParent,
+			},
+			rootLookupInfo:             newQueuedPodGroupInfoForLookup("ns1", "cpg1", fwk.CompositePodGroupKeyType),
+			wantLeaves:                 []*schedulingv1beta1.PodGroup{pgUnderCPG3},
+			isCompositePodGroupEnabled: true,
+		},
+		{
+			name:             "4 cpg levels with pod group on the 5th level exceeds max tree depth",
+			initialPodGroups: []*schedulingv1beta1.PodGroup{pgUnderCPG4},
+			initialCPGs: []*schedulingv1alpha3.CompositePodGroup{
+				cpg1,
+				cpg2WithParent,
+				cpg3WithParent,
+				cpg4WithParent,
+			},
+			rootLookupInfo:             newQueuedPodGroupInfoForLookup("ns1", "cpg1", fwk.CompositePodGroupKeyType),
+			wantLeaves:                 nil,
+			isCompositePodGroupEnabled: true,
 		},
 	}
 
@@ -1129,8 +1193,7 @@ func TestWorkloadForest_BuildPodGroupInfoForPG(t *testing.T) {
 			}
 
 			logger, _ := ktesting.NewTestContext(t)
-			visited := sets.New[fwk.EntityKey]()
-			gotInfo := wf.buildPodGroupInfo(logger, fwk.NewGenericPodGroup(tt.pg), visited)
+			gotInfo := wf.buildPodGroupInfo(logger, fwk.NewGenericPodGroup(tt.pg), 0)
 
 			if diff := cmp.Diff(tt.wantInfo, gotInfo); diff != "" {
 				t.Errorf("Unexpected PodGroupInfo (-want,+got)\n%s", diff)
@@ -1178,6 +1241,20 @@ func TestWorkloadForest_BuildPodGroupInfoForCPG(t *testing.T) {
 			},
 			isCompositePodGroupEnabled: false,
 		},
+		{
+			name:             "build info for cpg with branch exceeding max tree depth returns nil instead of truncating",
+			initialPodGroups: []*schedulingv1beta1.PodGroup{pg1WithParent},
+			initialCPGs: []*schedulingv1alpha3.CompositePodGroup{
+				cpg1,
+				st.MakeCompositePodGroup().Name("cpg2").Namespace("ns1").ParentCompositePodGroup("cpg1").Obj(),
+				st.MakeCompositePodGroup().Name("cpg3").Namespace("ns1").ParentCompositePodGroup("cpg2").Obj(),
+				st.MakeCompositePodGroup().Name("cpg4").Namespace("ns1").ParentCompositePodGroup("cpg3").Obj(),
+				st.MakeCompositePodGroup().Name("cpg5").Namespace("ns1").ParentCompositePodGroup("cpg4").Obj(),
+			},
+			cpg:                        cpg1,
+			wantInfo:                   nil,
+			isCompositePodGroupEnabled: true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -1191,8 +1268,7 @@ func TestWorkloadForest_BuildPodGroupInfoForCPG(t *testing.T) {
 			}
 
 			logger, _ := ktesting.NewTestContext(t)
-			visited := sets.New[fwk.EntityKey]()
-			gotInfo := wf.buildPodGroupInfo(logger, fwk.NewGenericCompositePodGroup(tt.cpg), visited)
+			gotInfo := wf.buildPodGroupInfo(logger, fwk.NewGenericCompositePodGroup(tt.cpg), 0)
 
 			// Note: Children are sorted by name in buildPodGroupInfoForCPG, so it is deterministic.
 			if diff := cmp.Diff(tt.wantInfo, gotInfo); diff != "" {

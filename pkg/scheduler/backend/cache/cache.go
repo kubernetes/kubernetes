@@ -1265,6 +1265,7 @@ func (cache *cacheImpl) BuildHierarchySnapshotFromPod(pod *v1.Pod) (fwk.PodGroup
 
 	if cache.compositePodGroupEnabled && pg.Spec.ParentCompositePodGroupName != nil {
 		currentKey = fwk.CompositePodGroupKey(pod.Namespace, *pg.Spec.ParentCompositePodGroupName)
+		foundRoot := false
 		for range schedulingv1alpha3.WorkloadMaxTreeDepth - 1 {
 			cpgs, exists := cache.compositePodGroupStates[currentKey]
 			if !exists {
@@ -1275,16 +1276,19 @@ func (cache *cacheImpl) BuildHierarchySnapshotFromPod(pod *v1.Pod) (fwk.PodGroup
 				return nil, fmt.Errorf("composite pod group object not found in state for %s", currentKey.String())
 			}
 			if cpg.Spec.ParentCompositePodGroupName == nil {
+				foundRoot = true
 				break
 			}
 			currentKey = fwk.CompositePodGroupKey(pod.Namespace, *cpg.Spec.ParentCompositePodGroupName)
+		}
+		if !foundRoot {
+			return nil, fmt.Errorf("hierarchy exceeded maximum tree depth at %s, possibly caused by cycle or deep hierarchy", currentKey.String())
 		}
 	}
 
 	// 2. We have the root key. Now traverse downwards and update the snapshot.
 	snapshot := NewEmptySnapshot()
-	visited := sets.New[fwk.EntityKey]()
-	err := cache.buildPodGroupStateSnapshotTree(currentKey, snapshot, visited)
+	err := cache.buildPodGroupStateSnapshotTree(currentKey, snapshot, 0)
 	if err != nil {
 		return nil, err
 	}
@@ -1293,11 +1297,10 @@ func (cache *cacheImpl) BuildHierarchySnapshotFromPod(pod *v1.Pod) (fwk.PodGroup
 
 // buildPodGroupStateSnapshotTree recursively builds a snapshot of the pod group state tree starting from the given key.
 // It assumes that the cache lock is held by the caller.
-func (cache *cacheImpl) buildPodGroupStateSnapshotTree(key fwk.EntityKey, snapshot *Snapshot, visited sets.Set[fwk.EntityKey]) error {
-	if visited.Has(key) {
-		return fmt.Errorf("cycle detected in composite pod group hierarchy: %s", key.String())
+func (cache *cacheImpl) buildPodGroupStateSnapshotTree(key fwk.EntityKey, snapshot *Snapshot, depth int) error {
+	if depth >= schedulingv1alpha3.WorkloadMaxTreeDepth {
+		return fmt.Errorf("hierarchy exceeded maximum tree depth at %s, possibly caused by cycle or deep hierarchy", key.String())
 	}
-	visited.Insert(key)
 
 	switch key.Type {
 	case fwk.PodGroupKeyType:
@@ -1316,7 +1319,7 @@ func (cache *cacheImpl) buildPodGroupStateSnapshotTree(key fwk.EntityKey, snapsh
 
 		children := cpgs.children.Clone()
 		for childKey := range children {
-			if err := cache.buildPodGroupStateSnapshotTree(childKey, snapshot, visited); err != nil {
+			if err := cache.buildPodGroupStateSnapshotTree(childKey, snapshot, depth+1); err != nil {
 				return err
 			}
 		}
@@ -1332,13 +1335,7 @@ func (cache *cacheImpl) GetRootKeyForGroup(key fwk.EntityKey) (fwk.EntityKey, bo
 	defer cache.mu.RUnlock()
 
 	currentKey := key
-	visited := sets.New[fwk.EntityKey]()
-	for {
-		if visited.Has(currentKey) {
-			return fwk.EntityKey{}, false, fmt.Errorf("cycle detected in the hierarchy: %v", visited.UnsortedList())
-		}
-		visited.Insert(currentKey)
-
+	for range schedulingv1alpha3.WorkloadMaxTreeDepth {
 		switch currentKey.Type {
 		case fwk.PodGroupKeyType:
 			pgs, exists := cache.podGroupStates[currentKey]
@@ -1370,4 +1367,5 @@ func (cache *cacheImpl) GetRootKeyForGroup(key fwk.EntityKey) (fwk.EntityKey, bo
 			return fwk.EntityKey{}, false, fmt.Errorf("pod key type not supported in GetRootKeyForGroup for %s", currentKey.String())
 		}
 	}
+	return fwk.EntityKey{}, false, fmt.Errorf("hierarchy exceeded maximum tree depth at %s, possibly caused by cycle or deep hierarchy", currentKey.String())
 }
