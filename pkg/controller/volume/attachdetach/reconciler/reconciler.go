@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 // Package reconciler implements interfaces that attempt to reconcile the
-// desired state of the with the actual state of the world by triggering
+// desired state of the world with the actual state of the world by triggering
 // actions.
 package reconciler
 
@@ -108,15 +108,16 @@ type reconciler struct {
 }
 
 func (rc *reconciler) Run(ctx context.Context) {
-	wait.UntilWithContext(ctx, rc.reconciliationLoopFunc(ctx), rc.loopPeriod)
+	wait.UntilWithContext(ctx, rc.reconciliationLoopFunc(), rc.loopPeriod)
 }
 
-// reconciliationLoopFunc this can be disabled via cli option disableReconciliation.
-// It periodically checks whether the attached volumes from actual state
-// are still attached to the node and update the status if they are not.
-func (rc *reconciler) reconciliationLoopFunc(ctx context.Context) func(context.Context) {
+// reconciliationLoopFunc periodically checks whether volumes in the actual
+// state are still attached to their nodes and updates the actual state if they
+// are not. This check can be disabled with the
+// --disable-attach-detach-reconcile-sync flag.
+// See https://kubernetes.io/docs/reference/command-line-tools-reference/kube-controller-manager/#disable-attach-detach-reconcile-sync
+func (rc *reconciler) reconciliationLoopFunc() func(context.Context) {
 	return func(ctx context.Context) {
-
 		rc.reconcile(ctx)
 		logger := klog.FromContext(ctx)
 		if rc.disableReconciliationSync {
