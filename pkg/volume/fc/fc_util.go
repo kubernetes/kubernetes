@@ -326,10 +326,19 @@ func (util *fcUtil) detachFCDisk(io ioHandler, exec utilexec.Interface, devicePa
 // DetachBlockFCDisk detaches a volume from kubelet node, removes scsi device file
 // such as /dev/sdX from the node, and then removes loopback for the scsi device.
 func (util *fcUtil) DetachBlockFCDisk(c fcDiskUnmapper, mapPath, devicePath string) error {
+	return util.detachBlockFCDisk(c, mapPath, devicePath, os.ReadDir)
+}
+
+func (util *fcUtil) detachBlockFCDisk(c fcDiskUnmapper, mapPath, devicePath string, readDir func(string) ([]os.DirEntry, error)) error {
+	rememberedDevicePathMissing := false
+
 	// Check if devicePath is valid
 	if len(devicePath) != 0 {
-		if pathExists, pathErr := checkPathExists(devicePath); !pathExists || pathErr != nil {
+		if pathExists, pathErr := checkPathExists(devicePath); pathErr != nil {
 			return pathErr
+		} else if !pathExists {
+			rememberedDevicePathMissing = true
+			devicePath = ""
 		}
 	} else {
 		// TODO: FC plugin can't obtain the devicePath from kubelet because devicePath
@@ -358,8 +367,11 @@ func (util *fcUtil) DetachBlockFCDisk(c fcDiskUnmapper, mapPath, devicePath stri
 	if strings.Contains(volumeInfo, "-lun-") {
 		searchPath = byPath
 	}
-	fis, err := os.ReadDir(searchPath)
+	fis, err := readDir(searchPath)
 	if err != nil {
+		if rememberedDevicePathMissing && os.IsNotExist(err) {
+			return nil
+		}
 		return err
 	}
 	for _, fi := range fis {
@@ -370,10 +382,16 @@ func (util *fcUtil) DetachBlockFCDisk(c fcDiskUnmapper, mapPath, devicePath stri
 		}
 	}
 	if len(devicePath) == 0 {
+		if rememberedDevicePathMissing {
+			return nil
+		}
 		return fmt.Errorf("fc: failed to find corresponding device from searchPath: %v", searchPath)
 	}
 	dstPath, err := c.io.EvalSymlinks(devicePath)
 	if err != nil {
+		if rememberedDevicePathMissing && os.IsNotExist(err) {
+			return nil
+		}
 		return err
 	}
 	klog.V(4).Infof("fc: find destination device path from symlink: %v", dstPath)
