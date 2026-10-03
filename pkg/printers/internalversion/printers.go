@@ -1331,7 +1331,13 @@ func printJob(obj *batch.Job, options printers.GenerateOptions) ([]metav1.TableR
 	} else if hasJobCondition(obj.Status.Conditions, batch.JobSuccessCriteriaMet) {
 		status = "SuccessCriteriaMet"
 	} else {
-		status = "Running"
+		// Active includes pending and running pods; Ready counts pods that satisfy readiness.
+		// Avoid implying containers are executing when no pod is ready yet (for example, all pods still Pending).
+		if obj.Status.Active > 0 && obj.Status.Ready != nil && *obj.Status.Ready == 0 {
+			status = "Pending"
+		} else {
+			status = "Running"
+		}
 	}
 
 	row.Cells = append(row.Cells, obj.Name, status, completions, jobDuration, translateTimestampSince(obj.CreationTimestamp))
