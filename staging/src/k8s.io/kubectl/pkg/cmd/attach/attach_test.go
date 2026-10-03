@@ -28,6 +28,7 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -318,7 +319,7 @@ func TestAttach(t *testing.T) {
 			cmd := &cobra.Command{Use: "attach"}
 			flags.AddFlags(cmd)
 
-			cmd.Flags().Set("container", test.container)
+			require.NoError(t, cmd.Flags().Set("container", test.container))
 
 			options, err := flags.ToOptions(tf, cmd, []string{"foo"})
 			if err != nil {
@@ -420,9 +421,9 @@ func TestAttachWarnings(t *testing.T) {
 			cmd := &cobra.Command{Use: "attach"}
 			flags.AddFlags(cmd)
 
-			cmd.Flags().Set("container", test.container)
-			cmd.Flags().Set("stdin", strconv.FormatBool(test.stdin))
-			cmd.Flags().Set("tty", strconv.FormatBool(test.tty))
+			require.NoError(t, cmd.Flags().Set("container", test.container))
+			require.NoError(t, cmd.Flags().Set("stdin", strconv.FormatBool(test.stdin)))
+			require.NoError(t, cmd.Flags().Set("tty", strconv.FormatBool(test.tty)))
 
 			options, err := flags.ToOptions(tf, cmd, []string{"foo"})
 			if err != nil {
