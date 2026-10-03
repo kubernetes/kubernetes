@@ -31,49 +31,20 @@ import (
 
 // GetResourceRequestQuantity finds and returns the request quantity for a specific resource.
 func GetResourceRequestQuantity(pod *v1.Pod, resourceName v1.ResourceName) resource.Quantity {
-	requestQuantity := resource.Quantity{}
-
-	switch resourceName {
-	case v1.ResourceCPU:
-		requestQuantity = resource.Quantity{Format: resource.DecimalSI}
-	case v1.ResourceMemory, v1.ResourceStorage, v1.ResourceEphemeralStorage:
-		requestQuantity = resource.Quantity{Format: resource.BinarySI}
-	default:
-		requestQuantity = resource.Quantity{Format: resource.DecimalSI}
-	}
-
-	// Supported pod level resources will be used instead of container level ones when available
-	hasPodLevelResources := utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) && resourcehelper.IsPodLevelResourcesSet(pod)
-
+	// Supported pod level resources will be used instead of container level ones when available.
 	// TODO(pravk03): considering DRA Node Allocatable resources for eviction ranking.
-	if rQuantity, ok := resourcehelper.PodRequests(pod, resourcehelper.PodResourcesOptions{SkipContainerLevelResources: hasPodLevelResources, ExcludeOverhead: true})[resourceName]; ok {
-		requestQuantity.Add(rQuantity)
-	}
-
-	// Add overhead for running a pod
-	// to the total requests if the resource total is non-zero
-	if pod.Spec.Overhead != nil {
-		if podOverhead, ok := pod.Spec.Overhead[resourceName]; ok && !requestQuantity.IsZero() {
-			requestQuantity.Add(podOverhead)
-		}
-	}
-
-	return requestQuantity
+	hasPodLevelResources := utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) && resourcehelper.IsPodLevelResourcesSet(pod)
+	return resourcehelper.GetResourceRequestQuantity(pod, resourceName, resourcehelper.PodResourcesOptions{
+		SkipContainerLevelResources: hasPodLevelResources,
+	})
 }
 
 // GetResourceRequest finds and returns the request value for a specific resource.
 func GetResourceRequest(pod *v1.Pod, resource v1.ResourceName) int64 {
-	if resource == v1.ResourcePods {
-		return 1
-	}
-
-	requestQuantity := GetResourceRequestQuantity(pod, resource)
-
-	if resource == v1.ResourceCPU {
-		return requestQuantity.MilliValue()
-	}
-
-	return requestQuantity.Value()
+	hasPodLevelResources := utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) && resourcehelper.IsPodLevelResourcesSet(pod)
+	return resourcehelper.GetResourceRequest(pod, resource, resourcehelper.PodResourcesOptions{
+		SkipContainerLevelResources: hasPodLevelResources,
+	})
 }
 
 // ExtractResourceValueByContainerName extracts the value of a resource
@@ -206,5 +177,5 @@ func MergeContainerResourceLimits(container *v1.Container,
 // IsHugePageResourceName returns true if the resource name has the huge page
 // resource prefix.
 func IsHugePageResourceName(name v1.ResourceName) bool {
-	return strings.HasPrefix(string(name), v1.ResourceHugePagesPrefix)
+	return resourcehelper.IsHugePageResourceName(name)
 }
