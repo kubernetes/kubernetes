@@ -119,6 +119,7 @@ type LeaseCandidateSpec struct {
 	// may reference the same Lease.name.
 	// This field is immutable.
 	// +required
+	// +k8s:beta(since: "1.37")=+k8s:required
 	LeaseName string `json:"leaseName" protobuf:"bytes,1,name=leaseName"`
 	// pingTime is the last time that the server has requested the LeaseCandidate
 	// to renew. It is only done during leader election to check if any
