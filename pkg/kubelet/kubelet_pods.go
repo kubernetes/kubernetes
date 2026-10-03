@@ -2225,17 +2225,22 @@ func (kl *Kubelet) convertToAPIPodLevelResourcesStatus(logger klog.Logger, alloc
 	// output inconsistent. We should decide if the information is useful enough to
 	//  outweigh the consistency issues,
 	pcm := kl.containerManager.NewPodContainerManager()
-	memoryConfig, err := pcm.GetPodCgroupConfig(allocatedPod, v1.ResourceMemory)
-	if err != nil {
-		logger.Error(err, "failed to read memory cgroup config for the pod", "podName", allocatedPod.Name)
+	var memoryConfig, cpuConfig *cm.ResourceConfig
+	// Phase stays Running through teardown after the pod cgroup is gone.
+	// Skip the read so that expected ENOENT is not logged at error level.
+	if pcm.Exists(allocatedPod) {
+		var err error
+		memoryConfig, err = pcm.GetPodCgroupConfig(allocatedPod, v1.ResourceMemory)
+		if err != nil {
+			logPodCgroupReadError(logger, err, "failed to read memory cgroup config for the pod", allocatedPod.Name)
+		}
+		cpuConfig, err = pcm.GetPodCgroupConfig(allocatedPod, v1.ResourceCPU)
+		if err != nil {
+			logPodCgroupReadError(logger, err, "failed to read cpu cgroup config for the pod", allocatedPod.Name)
+		}
 	}
+
 	memoryLimit := cm.MemoryLimitsFromConfig(memoryConfig)
-	cpuConfig, err := pcm.GetPodCgroupConfig(allocatedPod, v1.ResourceCPU)
-	if err != nil {
-		logger.Error(err, "failed to read memory cgroup limits for the pod", "podName", allocatedPod.Name)
-
-	}
-
 	cpuRequest := cm.CPURequestsFromConfig(cpuConfig)
 	cpuLimit := cm.CPULimitsFromConfig(cpuConfig)
 
@@ -2320,6 +2325,16 @@ func (kl *Kubelet) convertToAPIPodLevelResourcesStatus(logger klog.Logger, alloc
 	}
 
 	return resources
+}
+
+// logPodCgroupReadError logs a failed cgroup read. ENOENT is expected when
+// teardown races the Exists check, so it is not an error-level event.
+func logPodCgroupReadError(logger klog.Logger, err error, msg, podName string) {
+	if os.IsNotExist(err) {
+		logger.V(4).Info(msg, "err", err, "podName", podName)
+		return
+	}
+	logger.Error(err, msg, "podName", podName)
 }
 
 // convertToAPIContainerStatuses converts the given internal container
