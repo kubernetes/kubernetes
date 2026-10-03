@@ -19,6 +19,7 @@ package populator
 import (
 	"context"
 	"fmt"
+	"slices"
 	"testing"
 	"time"
 
@@ -181,6 +182,92 @@ func TestFindAndAddNewPods_WithDifferentConditions(t *testing.T) {
 					pod.UID, tc.expectedFound, podsInDSW)
 			}
 		})
+	}
+}
+
+// fakePodObjectRegistrar records the pods registered via RegisterPod so tests
+// can assert that the populator registers a pod's secrets/configmaps when it
+// processes the pod's volumes.
+type fakePodObjectRegistrar struct {
+	registered []kubetypes.UID
+}
+
+func (f *fakePodObjectRegistrar) RegisterPod(pod *v1.Pod) {
+	f.registered = append(f.registered, pod.UID)
+}
+
+func (f *fakePodObjectRegistrar) hasRegistered(uid kubetypes.UID) bool {
+	return slices.Contains(f.registered, uid)
+}
+
+// TestProcessPodVolumes_RegistersObjects verifies that the populator registers
+// a pod's secrets and config maps (via the secret/configmap managers) while
+// processing the pod, independent of the kubelet's SyncPod path. This is the
+// fix for https://github.com/kubernetes/kubernetes/issues/140037, where the
+// volume reconciler could fetch a secret/configmap before SyncPod had
+// registered it, producing a transient "object not registered" FailedMount.
+func TestProcessPodVolumes_RegistersObjects(t *testing.T) {
+	dswp, fakePodManager, _ := prepareDswpWithVolume(t)
+	secretRegistrar := &fakePodObjectRegistrar{}
+	configMapRegistrar := &fakePodObjectRegistrar{}
+	dswp.secretManager = secretRegistrar
+	dswp.configMapManager = configMapRegistrar
+
+	containers := []v1.Container{
+		{
+			VolumeMounts: []v1.VolumeMount{
+				{
+					Name:      "dswp-test-volume-name",
+					MountPath: "/mnt",
+				},
+			},
+		},
+	}
+	pod := createPodWithVolume("dswp-test-pod", "dswp-test-volume-name", "file-bound", containers)
+	fakePodManager.AddPod(pod)
+
+	tCtx := ktesting.Init(t)
+	dswp.findAndAddNewPods(tCtx)
+
+	// The pod's volume must have been queued in the desired state of world,
+	// proving processPodVolumes ran to completion...
+	if !dswp.desiredStateOfWorld.GetPods()[types.UniquePodName(pod.UID)] {
+		t.Fatalf("expected pod %v to be added to the desired state of world", pod.UID)
+	}
+	// ...and its secrets and config maps must have been registered.
+	if !secretRegistrar.hasRegistered(pod.UID) {
+		t.Errorf("expected pod %v secrets to be registered with the secret manager", pod.UID)
+	}
+	if !configMapRegistrar.hasRegistered(pod.UID) {
+		t.Errorf("expected pod %v config maps to be registered with the configmap manager", pod.UID)
+	}
+}
+
+// TestProcessPodVolumes_NilObjectManagers ensures the populator does not panic
+// when the secret/configmap managers are absent (standalone kubelet mode).
+func TestProcessPodVolumes_NilObjectManagers(t *testing.T) {
+	dswp, fakePodManager, _ := prepareDswpWithVolume(t)
+	// secretManager and configMapManager are intentionally left nil.
+
+	containers := []v1.Container{
+		{
+			VolumeMounts: []v1.VolumeMount{
+				{
+					Name:      "dswp-test-volume-name",
+					MountPath: "/mnt",
+				},
+			},
+		},
+	}
+	pod := createPodWithVolume("dswp-test-pod", "dswp-test-volume-name", "file-bound", containers)
+	fakePodManager.AddPod(pod)
+
+	tCtx := ktesting.Init(t)
+	// Must not panic with nil managers.
+	dswp.findAndAddNewPods(tCtx)
+
+	if !dswp.desiredStateOfWorld.GetPods()[types.UniquePodName(pod.UID)] {
+		t.Fatalf("expected pod %v to be added to the desired state of world", pod.UID)
 	}
 }
 
