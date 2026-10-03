@@ -150,6 +150,7 @@ type fromUnstructuredContext struct {
 	// the full path to each unknown field in the
 	// object.
 	unknownFieldErrors []error
+	topLevelKeys       map[string]interface{}
 }
 
 // pushMatchedKeyTracker adds a placeholder set for tracking
@@ -237,6 +238,12 @@ func (c *fromUnstructuredContext) pushKey(key string) {
 // It uses encoding/json/Unmarshaler if object implements it or reflection if not.
 // It takes a validationDirective that indicates how to behave when it encounters unknown fields.
 func (c *unstructuredConverter) FromUnstructuredWithValidation(u map[string]interface{}, obj interface{}, returnUnknownFields bool) error {
+	return c.FromUnstructuredWithValidationTopLevel(u, obj, returnUnknownFields, nil)
+}
+
+// FromUnstructuredWithValidationTopLevel converts an object from map[string]interface{} representation into obj,
+// updating only the top-level struct fields whose JSON names appear in topLevelKeys when topLevelKeys is non-nil.
+func (c *unstructuredConverter) FromUnstructuredWithValidationTopLevel(u map[string]interface{}, obj interface{}, returnUnknownFields bool, topLevelKeys map[string]interface{}) error {
 	t := reflect.TypeOf(obj)
 	value := reflect.ValueOf(obj)
 	if t.Kind() != reflect.Pointer || value.IsNil() {
@@ -245,9 +252,10 @@ func (c *unstructuredConverter) FromUnstructuredWithValidation(u map[string]inte
 
 	fromUnstructuredContext := &fromUnstructuredContext{
 		returnUnknownFields: returnUnknownFields,
+		topLevelKeys:        topLevelKeys,
 	}
 	err := fromUnstructured(reflect.ValueOf(u), value.Elem(), fromUnstructuredContext)
-	if c.mismatchDetection {
+	if c.mismatchDetection && topLevelKeys == nil {
 		newObj := reflect.New(t.Elem()).Interface()
 		newErr := fromUnstructuredViaJSON(u, newObj)
 		if (err != nil) != (newErr != nil) {
@@ -533,7 +541,9 @@ func structFromUnstructured(sv, dv reflect.Value, ctx *fromUnstructuredContext) 
 		ctx.parentPath = ctx.parentPath[:pathLen]
 		ctx.isInlined = svInlined
 	}()
+	var topLevelKeys map[string]interface{}
 	if !svInlined {
+		topLevelKeys, ctx.topLevelKeys = ctx.topLevelKeys, nil
 		ctx.pushMatchedKeyTracker()
 	}
 	for i := 0; i < dt.NumField(); i++ {
@@ -555,6 +565,12 @@ func structFromUnstructured(sv, dv reflect.Value, ctx *fromUnstructuredContext) 
 			// the parentPath to indicate that we are one level
 			// deeper.
 			ctx.recordMatchedKey(fieldInfo.name)
+			if topLevelKeys != nil {
+				if _, ok := topLevelKeys[fieldInfo.name]; !ok && !value.TypeReflectEntryOf(fv.Type()).CanConvertToUnstructured() {
+					continue
+				}
+				fv.SetZero()
+			}
 			value := unwrapInterface(sv.MapIndex(fieldInfo.nameValue))
 			if value.IsValid() {
 				ctx.isInlined = false
@@ -610,6 +626,16 @@ func (c *unstructuredConverter) ToUnstructured(obj interface{}) (map[string]inte
 		}
 	}
 	if err != nil {
+		return nil, err
+	}
+	return u, nil
+}
+
+// ToUnstructuredTopLevel converts the top-level struct fields of obj whose JSON names
+// appear in topLevelKeys (plus inlined fields) into map[string]interface{}.
+func (c *unstructuredConverter) ToUnstructuredTopLevel(obj interface{}, topLevelKeys map[string]interface{}) (map[string]interface{}, error) {
+	u := map[string]interface{}{}
+	if err := structToUnstructuredTopLevel(reflect.ValueOf(obj).Elem(), reflect.ValueOf(&u).Elem(), topLevelKeys); err != nil {
 		return nil, err
 	}
 	return u, nil
@@ -811,6 +837,10 @@ func isEmpty(v reflect.Value) bool {
 }
 
 func structToUnstructured(sv, dv reflect.Value) error {
+	return structToUnstructuredTopLevel(sv, dv, nil)
+}
+
+func structToUnstructuredTopLevel(sv, dv reflect.Value, topLevelKeys map[string]interface{}) error {
 	st, dt := sv.Type(), dv.Type()
 	if dt.Kind() == reflect.Interface && dv.NumMethod() == 0 {
 		dv.Set(reflect.MakeMapWithSize(mapStringInterfaceType, st.NumField()))
@@ -829,6 +859,11 @@ func structToUnstructured(sv, dv reflect.Value) error {
 		if fieldInfo.name == "-" {
 			// This field should be skipped.
 			continue
+		}
+		if topLevelKeys != nil && len(fieldInfo.name) > 0 && !value.TypeReflectEntryOf(fv.Type()).CanConvertToUnstructured() {
+			if _, ok := topLevelKeys[fieldInfo.name]; !ok {
+				continue
+			}
 		}
 		if fieldInfo.omitempty && isEmpty(fv) {
 			// omitempty fields should be ignored.
