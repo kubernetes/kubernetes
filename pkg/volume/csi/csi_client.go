@@ -736,6 +736,8 @@ func (c *csiDriverClient) NodeGetStorageHealth(ctx context.Context, secrets map[
 	return mapStorageBackendHealth(resp.GetBackendHealth())
 }
 
+const maxVolumeHealthConditions = 16
+
 func mapVolumeHealthConditions(vh *csipbv1.VolumeHealth) []api.VolumeHealthCondition {
 	if vh == nil {
 		return nil
@@ -744,7 +746,12 @@ func mapVolumeHealthConditions(vh *csipbv1.VolumeHealth) []api.VolumeHealthCondi
 	if len(entries) == 0 {
 		return nil
 	}
-	out := make([]api.VolumeHealthCondition, 0, len(entries))
+	out := make([]api.VolumeHealthCondition, 0, min(len(entries), maxVolumeHealthConditions))
+	type conditionKey struct {
+		status api.VolumeHealthStatusType
+		reason string
+	}
+	seen := make(map[conditionKey]struct{}, len(entries))
 	for _, entry := range entries {
 		if entry == nil {
 			continue
@@ -753,11 +760,19 @@ func mapVolumeHealthConditions(vh *csipbv1.VolumeHealth) []api.VolumeHealthCondi
 		if !ok {
 			continue
 		}
+		key := conditionKey{status: status, reason: entry.GetReason()}
+		if _, exists := seen[key]; exists {
+			continue
+		}
+		seen[key] = struct{}{}
 		out = append(out, api.VolumeHealthCondition{
 			Status:  status,
 			Reason:  entry.GetReason(),
 			Message: entry.GetMessage(),
 		})
+		if len(out) == maxVolumeHealthConditions {
+			break
+		}
 	}
 	return out
 }
