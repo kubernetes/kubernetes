@@ -201,6 +201,18 @@ func TestIsMemberOf(t *testing.T) {
 	}
 }
 
+func TestPodInOrdinalRange(t *testing.T) {
+	set := newStatefulSet(3)
+	pod := newStatefulSetPod(set, 1)
+	if !podInOrdinalRange(pod, set) {
+		t.Error("podInOrdinalRange returned false for a canonical Pod name")
+	}
+	pod.Name = set.Name + "-01"
+	if podInOrdinalRange(pod, set) {
+		t.Error("podInOrdinalRange returned true for a non-canonical Pod name")
+	}
+}
+
 func TestIdentityMatches(t *testing.T) {
 	set := newStatefulSet(3)
 	pod := newStatefulSetPod(set, 1)
@@ -487,11 +499,11 @@ func TestIsClaimOwnerUpToDate(t *testing.T) {
 					logger := klog.FromContext(ctx)
 					claim := v1.PersistentVolumeClaim{}
 					claim.Name = "target-claim"
-					pod := v1.Pod{}
-					pod.Name = fmt.Sprintf("pod-%d", tc.ordinal)
-					pod.GetObjectMeta().SetUID("pod-123")
 					set := apps.StatefulSet{}
 					set.Name = "stateful-set"
+					pod := v1.Pod{}
+					pod.Name = fmt.Sprintf("%s-%d", set.Name, tc.ordinal)
+					pod.GetObjectMeta().SetUID("pod-123")
 					set.GetObjectMeta().SetUID("ss-456")
 					set.Spec.PersistentVolumeClaimRetentionPolicy = &apps.StatefulSetPersistentVolumeClaimRetentionPolicy{
 						WhenScaled:  tc.scaleDownPolicy,
@@ -546,7 +558,7 @@ func TestClaimOwnerUpToDateEdgeCases(t *testing.T) {
 			name: "normal controller, pod",
 			ownerRefs: []metav1.OwnerReference{
 				{
-					Name:       "pod-1",
+					Name:       "stateful-set-1",
 					APIVersion: "v1",
 					Kind:       "Pod",
 					UID:        "pod-123",
@@ -563,7 +575,7 @@ func TestClaimOwnerUpToDateEdgeCases(t *testing.T) {
 			name: "non-controller causes policy mismatch, pod",
 			ownerRefs: []metav1.OwnerReference{
 				{
-					Name:       "pod-1",
+					Name:       "stateful-set-1",
 					APIVersion: "v1",
 					Kind:       "Pod",
 					UID:        "pod-123",
@@ -579,7 +591,7 @@ func TestClaimOwnerUpToDateEdgeCases(t *testing.T) {
 			name: "stale controller does not affect policy, pod",
 			ownerRefs: []metav1.OwnerReference{
 				{
-					Name:       "pod-1",
+					Name:       "stateful-set-1",
 					APIVersion: "v1",
 					Kind:       "Pod",
 					UID:        "pod-stale",
@@ -596,7 +608,7 @@ func TestClaimOwnerUpToDateEdgeCases(t *testing.T) {
 			name: "unexpected controller causes policy mismatch, pod",
 			ownerRefs: []metav1.OwnerReference{
 				{
-					Name:       "pod-1",
+					Name:       "stateful-set-1",
 					APIVersion: "v1",
 					Kind:       "Pod",
 					UID:        "pod-123",
@@ -695,14 +707,14 @@ func TestClaimOwnerUpToDateEdgeCases(t *testing.T) {
 	for _, tc := range testCases {
 		claim := v1.PersistentVolumeClaim{}
 		claim.Name = "target-claim"
-		pod := v1.Pod{}
-		pod.Name = "pod-1"
-		pod.GetObjectMeta().SetUID("pod-123")
 		set := apps.StatefulSet{}
 		set.Name = "stateful-set"
 		set.GetObjectMeta().SetUID("ss-456")
 		set.Spec.PersistentVolumeClaimRetentionPolicy = &tc.policy
 		set.Spec.Replicas = ptr.To(int32(1))
+		pod := v1.Pod{}
+		pod.Name = "stateful-set-1"
+		pod.GetObjectMeta().SetUID("pod-123")
 		claim.SetOwnerReferences(tc.ownerRefs)
 		got := isClaimOwnerUpToDate(logger, &claim, &set, &pod)
 		if got != tc.shouldMatch {
@@ -797,9 +809,9 @@ func TestUpdateClaimOwnerRefForSetAndPod(t *testing.T) {
 			}
 			pod := v1.Pod{}
 			if tc.condemned {
-				pod.Name = "pod-8"
+				pod.Name = "ss-8"
 			} else {
-				pod.Name = "pod-1"
+				pod.Name = "ss-1"
 			}
 			pod.SetUID("pod-456")
 			claim := v1.PersistentVolumeClaim{}
@@ -984,7 +996,7 @@ func TestUpdateClaimControllerRef(t *testing.T) {
 			WhenDeleted: apps.DeletePersistentVolumeClaimRetentionPolicyType,
 		}
 		pod := v1.Pod{}
-		pod.Name = "pod-0"
+		pod.Name = "sts-0"
 		pod.SetUID("456")
 		claim := v1.PersistentVolumeClaim{}
 		claim.SetOwnerReferences(tc.originalRefs)

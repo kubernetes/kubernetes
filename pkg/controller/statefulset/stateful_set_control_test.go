@@ -657,7 +657,7 @@ func UpdatePodFailure(t *testing.T, set *apps.StatefulSet, invariants invariantF
 		t.Fatalf("Expected 3 pods, got %d", len(pods))
 	}
 	sort.Sort(ascendingOrdinal(pods))
-	pods[0].Name = "goo-0"
+	pods[0].Labels[apps.StatefulSetPodNameLabel] = "not-" + pods[0].Name
 	om.podsIndexer.Update(pods[0])
 
 	// now it should fail
