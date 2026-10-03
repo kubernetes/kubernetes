@@ -30,7 +30,6 @@ import (
 	"k8s.io/component-base/metrics"
 
 	resourcehelper "k8s.io/component-helpers/resource"
-	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 )
 
 type resourceLifecycleDescriptors struct {
@@ -143,9 +142,9 @@ func (c *podResourceCollector) CollectWithStability(ch chan<- metrics.Metric) {
 					unitName = "bytes"
 				default:
 					switch {
-					case v1helper.IsHugePageResourceName(resourceName):
+					case resourcehelper.IsHugePageResourceName(resourceName):
 						unitName = "bytes"
-					case v1helper.IsAttachableVolumeResourceName(resourceName):
+					case resourcehelper.IsAttachableVolumeResourceName(resourceName):
 						unitName = "integer"
 					}
 				}
