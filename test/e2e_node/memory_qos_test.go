@@ -1416,5 +1416,48 @@ var _ = SIGDescribe("MemoryQoS", framework.WithSerial(), func() {
 				gomega.Equal(newRequest.Value()),
 				"pod memory.low should update to new request after IPPR resize")
 		})
+
+		ginkgo.It("should update pod-level memory.low after request-only Burstable pod resize", func(ctx context.Context) {
+			configureMemoryQoSWithPolicy(ctx, 0.9, kubeletconfig.TieredReservationMemoryReservationPolicy)
+
+			initialRequest := resource.MustParse("128Mi")
+			limit := resource.MustParse("256Mi")
+			pod := memqosMakePod("memqos-resize-req-only", f.Namespace.Name,
+				v1.ResourceList{
+					v1.ResourceMemory: initialRequest,
+					v1.ResourceCPU:    resource.MustParse("50m"),
+				},
+				v1.ResourceList{
+					v1.ResourceMemory: limit,
+					v1.ResourceCPU:    resource.MustParse("100m"),
+				},
+			)
+			pod.Spec.Containers[0].ResizePolicy = []v1.ContainerResizePolicy{
+				{ResourceName: v1.ResourceMemory, RestartPolicy: v1.NotRequired},
+				{ResourceName: v1.ResourceCPU, RestartPolicy: v1.NotRequired},
+			}
+			pod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
+
+			podCgroupPath := memqosGetPodCgroupPath(pod, cgroupDriver)
+			gomega.Expect(podCgroupPath).NotTo(gomega.BeEmpty())
+
+			ginkgo.By("Resizing only the memory request via IPPR, limit unchanged")
+			pod, err := f.ClientSet.CoreV1().Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
+			framework.ExpectNoError(err)
+
+			newRequest := resource.MustParse("192Mi")
+			pod.Spec.Containers[0].Resources.Requests[v1.ResourceMemory] = newRequest
+			_, err = f.ClientSet.CoreV1().Pods(pod.Namespace).UpdateResize(ctx, pod.Name, pod, metav1.UpdateOptions{})
+			framework.ExpectNoError(err)
+
+			ginkgo.By("Verifying pod-level memory.low followed the request-only resize")
+			gomega.Eventually(ctx, func() int64 {
+				val, _ := memqosReadCgroupInt64(podCgroupPath, cgroupMemoryLow)
+				framework.Logf("Pod memory.low after request-only resize: got=%d, expected=%d", val, newRequest.Value())
+				return val
+			}).WithTimeout(2*time.Minute).WithPolling(5*time.Second).Should(
+				gomega.Equal(newRequest.Value()),
+				"pod memory.low should follow a request-only IPPR resize")
+		})
 	})
 })
