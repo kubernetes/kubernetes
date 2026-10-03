@@ -131,34 +131,37 @@ func NewController(ctx context.Context, podInformer coreinformers.PodInformer,
 		workerLoopPeriod: time.Second,
 	}
 
-	_, _ = serviceInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
+	_, err := serviceInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		AddFunc: c.onServiceUpdate,
 		UpdateFunc: func(old, cur interface{}) {
 			c.onServiceUpdate(cur)
 		},
 		DeleteFunc: c.onServiceDelete,
 	}, cache.HandlerOptions{Logger: &logger})
+	utilruntime.Must(err)
 	c.serviceLister = serviceInformer.Lister()
 	c.servicesSynced = serviceInformer.Informer().HasSynced
 
-	_, _ = podInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
+	_, err = podInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		AddFunc:    func(obj interface{}) { c.onPodUpdate(nil, obj) },
 		UpdateFunc: c.onPodUpdate,
 		DeleteFunc: func(obj interface{}) { c.onPodUpdate(obj, nil) },
 	}, cache.HandlerOptions{Logger: &logger})
+	utilruntime.Must(err)
 	c.podLister = podInformer.Lister()
 	c.podsSynced = podInformer.Informer().HasSynced
 
 	c.nodeLister = nodeInformer.Lister()
 	c.nodesSynced = nodeInformer.Informer().HasSynced
 
-	_, _ = endpointSliceInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
+	_, err = endpointSliceInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		AddFunc: c.onEndpointSliceAdd,
 		UpdateFunc: func(oldObj, newObj interface{}) {
 			c.onEndpointSliceUpdate(logger, oldObj, newObj)
 		},
 		DeleteFunc: c.onEndpointSliceDelete,
 	}, cache.HandlerOptions{Logger: &logger})
+	utilruntime.Must(err)
 
 	c.endpointSliceLister = endpointSliceInformer.Lister()
 	c.endpointSlicesSynced = endpointSliceInformer.Informer().HasSynced
@@ -173,7 +176,7 @@ func NewController(ctx context.Context, podInformer coreinformers.PodInformer,
 
 	c.endpointUpdatesBatchPeriod = endpointUpdatesBatchPeriod
 
-	_, _ = nodeInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
+	_, err = nodeInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(_ interface{}) {
 			c.addNode()
 		},
@@ -184,6 +187,7 @@ func NewController(ctx context.Context, podInformer coreinformers.PodInformer,
 			c.deleteNode()
 		},
 	}, cache.HandlerOptions{Logger: &logger})
+	utilruntime.Must(err)
 	c.topologyCache = topologycache.NewTopologyCache()
 
 	c.reconciler = endpointslicerec.NewReconciler(
