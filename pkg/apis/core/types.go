@@ -3368,6 +3368,13 @@ const (
 	PodResizeInProgress PodConditionType = "PodResizeInProgress"
 	// AllContainersRestarting indicates that all containers of the pod is being restarted.
 	AllContainersRestarting PodConditionType = "AllContainersRestarting"
+	// PodRestored records the outcome of the one-time restore requested by spec.restoreFrom.
+	// Unknown means the restore is in progress, True means it completed, and False
+	// means it failed. A terminal outcome is retained across kubelet and container
+	// restarts to prevent replaying the checkpoint. ObservedGeneration records the
+	// Pod generation at which the restore started and is not advanced afterwards.
+	// This condition is set only when PodLevelCheckpointRestore is enabled.
+	PodRestored PodConditionType = "PodRestored"
 )
 
 // PodCondition represents pod's condition
@@ -4203,6 +4210,53 @@ type PodSpec struct {
 	// +featureGate=EvictionRequestAPI
 	// +optional
 	EvictionResponders []EvictionResponder
+	// restoreFrom specifies a PodCheckpoint in this Pod's namespace to restore
+	// this Pod from. When set, the Pod is restored from that checkpoint's archive
+	// instead of being created from scratch; the kubelet resolves the reference to
+	// the on-node archive via the PodCheckpoint's status.
+	// The Pod spec must match status.checkpointedPodTemplate.spec, except for
+	// nodeName, restoreFrom, ephemeralContainers, and schedulingGates. Scheduling
+	// directives, including node-identity constraints, and resource requests and
+	// limits must match the captured values, with the checkpoint-node affinity
+	// constraint added by admission.
+	// Ephemeral containers are not checkpointed. Scheduling gates may delay restore
+	// and be removed before scheduling. Do not set nodeName on creation; admission
+	// pins restore to the checkpoint's node through required node affinity.
+	// Workload updates, including resize and adding ephemeral containers, are
+	// rejected until PodRestored=True. Resize may be requested after restore.
+	// This field is immutable. Restoring from another checkpoint requires creating
+	// a new Pod; in-place restore of an existing Pod is not supported.
+	// +featureGate=PodLevelCheckpointRestore
+	// +optional
+	RestoreFrom *CheckpointReference
+}
+
+// CheckpointReference identifies a PodCheckpoint and specifies options for
+// restoring a Pod from it.
+type CheckpointReference struct {
+	// name is the name of a PodCheckpoint in the Pod's namespace.
+	// +required
+	Name string
+
+	// options contains opaque runtime-specific options for this restore attempt.
+	// Empty options use runtime defaults. Each key must appear in this Pod's
+	// RuntimeClass podCheckpoint.allowedRestoreOptions; without a RuntimeClass
+	// or allowlist, only empty options are permitted. Admission and the kubelet
+	// check the keys, and the kubelet passes the map unchanged to
+	// RestorePodRequest.options as untrusted user input. The runtime must reject
+	// unsupported, invalid, or unsafe values. Options must not contain secrets
+	// or override administrator configuration, security constraints, or the
+	// Pod's allocated devices. Administrator settings belong in node or runtime
+	// configuration.
+	//
+	// Restore options are independent of the options used to create the checkpoint
+	// and are not stored in the PodCheckpoint. Requirements intrinsic to the
+	// checkpoint are recorded in runtime-owned checkpoint data instead.
+	// At most 64 entries are allowed, with keys of at most 256 bytes and values
+	// of at most 4096 bytes.
+	// +optional
+	// +mapType=atomic
+	Options map[string]string
 }
 
 // PodResourceClaim references exactly one ResourceClaim through a ClaimSource.
@@ -4814,6 +4868,7 @@ type PodStatus struct {
 	Phase PodPhase
 	// +optional
 	Conditions []PodCondition
+
 	// A human readable message indicating details about why the pod is in this state.
 	// +optional
 	Message string

@@ -37,11 +37,12 @@ func (Overhead) SwaggerDoc() map[string]string {
 }
 
 var map_RuntimeClass = map[string]string{
-	"":           "RuntimeClass defines a class of container runtime supported in the cluster. The RuntimeClass is used to determine which container runtime is used to run all containers in a pod. RuntimeClasses are manually defined by a user or cluster provisioner, and referenced in the PodSpec. The Kubelet is responsible for resolving the RuntimeClassName reference before running the pod.  For more details, see https://kubernetes.io/docs/concepts/containers/runtime-class/",
-	"metadata":   "metadata is the standard object metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
-	"handler":    "handler specifies the underlying runtime and configuration that the CRI implementation will use to handle pods of this class. The possible values are specific to the node & CRI configuration.  It is assumed that all handlers are available on every node, and handlers of the same name are equivalent on every node. For example, a handler called \"runc\" might specify that the runc OCI runtime (using native Linux containers) will be used to run the containers in a pod. The Handler must be lowercase, conform to the DNS Label (RFC 1123) requirements, and is immutable.",
-	"overhead":   "overhead represents the resource overhead associated with running a pod for a given RuntimeClass. For more details, see\n https://kubernetes.io/docs/concepts/scheduling-eviction/pod-overhead/",
-	"scheduling": "scheduling holds the scheduling constraints to ensure that pods running with this RuntimeClass are scheduled to nodes that support it. If scheduling is nil, this RuntimeClass is assumed to be supported by all nodes.",
+	"":              "RuntimeClass defines a class of container runtime supported in the cluster. The RuntimeClass is used to determine which container runtime is used to run all containers in a pod. RuntimeClasses are manually defined by a user or cluster provisioner, and referenced in the PodSpec. The Kubelet is responsible for resolving the RuntimeClassName reference before running the pod.  For more details, see https://kubernetes.io/docs/concepts/containers/runtime-class/",
+	"metadata":      "metadata is the standard object metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+	"handler":       "handler specifies the underlying runtime and configuration that the CRI implementation will use to handle pods of this class. The possible values are specific to the node & CRI configuration.  It is assumed that all handlers are available on every node, and handlers of the same name are equivalent on every node. For example, a handler called \"runc\" might specify that the runc OCI runtime (using native Linux containers) will be used to run the containers in a pod. The Handler must be lowercase, conform to the DNS Label (RFC 1123) requirements, and is immutable.",
+	"overhead":      "overhead represents the resource overhead associated with running a pod for a given RuntimeClass. For more details, see\n https://kubernetes.io/docs/concepts/scheduling-eviction/pod-overhead/",
+	"scheduling":    "scheduling holds the scheduling constraints to ensure that pods running with this RuntimeClass are scheduled to nodes that support it. If scheduling is nil, this RuntimeClass is assumed to be supported by all nodes.",
+	"podCheckpoint": "podCheckpoint lists the runtime-specific option keys that users may supply when checkpointing or restoring Pods of this RuntimeClass. If unset, users cannot supply options; checkpoint and restore use the runtime's defaults. Administrator settings belong in the runtime's configuration, not in user-supplied options. Values are validated by the runtime. This field is alpha-level and requires PodLevelCheckpointRestore.",
 }
 
 func (RuntimeClass) SwaggerDoc() map[string]string {
@@ -56,6 +57,16 @@ var map_RuntimeClassList = map[string]string{
 
 func (RuntimeClassList) SwaggerDoc() map[string]string {
 	return map_RuntimeClassList
+}
+
+var map_RuntimeClassPodCheckpoint = map[string]string{
+	"":                         "RuntimeClassPodCheckpoint configures user-supplied checkpoint and restore options for a runtime handler. It permits option keys, not administrator configuration or secrets. Administrators should only allow documented keys that are safe for untrusted users. The runtime must reject unsupported or unsafe values, including values that grant privileges, select unallocated devices, or override administrator configuration.",
+	"allowedCheckpointOptions": "allowedCheckpointOptions lists the keys users may set in PodCheckpoint.spec.checkpointOptions for Pods of this RuntimeClass. An empty list permits no keys. Each key must be nonempty and at most 256 bytes; at most 64 distinct keys may be listed. Keys are matched exactly and are case-sensitive; wildcards have no special meaning. The runtime must validate values for every allowed key.",
+	"allowedRestoreOptions":    "allowedRestoreOptions lists the keys users may set in Pod.spec.restoreFrom.options for Pods of this RuntimeClass. An empty list permits no keys. Each key must be nonempty and at most 256 bytes; at most 64 distinct keys may be listed. Keys are matched exactly and are case-sensitive; wildcards have no special meaning. The runtime must validate values for every allowed key.",
+}
+
+func (RuntimeClassPodCheckpoint) SwaggerDoc() map[string]string {
+	return map_RuntimeClassPodCheckpoint
 }
 
 var map_Scheduling = map[string]string{

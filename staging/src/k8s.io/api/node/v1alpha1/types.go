@@ -24,6 +24,10 @@ import (
 // +genclient
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:defaulter-gen=false
+// +k8s:prerelease-lifecycle-gen:introduced=1.12
+// +k8s:prerelease-lifecycle-gen:deprecated=1.14
+// +k8s:prerelease-lifecycle-gen:removed=1.16
 
 // RuntimeClass defines a class of container runtime supported in the cluster.
 // The RuntimeClass is used to determine which container runtime is used to run
@@ -111,6 +115,10 @@ type Scheduling struct {
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:defaulter-gen=false
+// +k8s:prerelease-lifecycle-gen:introduced=1.12
+// +k8s:prerelease-lifecycle-gen:deprecated=1.14
+// +k8s:prerelease-lifecycle-gen:removed=1.16
 
 // RuntimeClassList is a list of RuntimeClass objects.
 type RuntimeClassList struct {

@@ -119,6 +119,8 @@ const (
 	InitContainer SyncAction = "InitContainer"
 	// CreatePodSandbox action
 	CreatePodSandbox SyncAction = "CreatePodSandbox"
+	// RestorePodSandbox action is included when the sandbox is restored from a checkpoint
+	RestorePodSandbox SyncAction = "RestorePodSandbox"
 	// ConfigPodSandbox action
 	ConfigPodSandbox SyncAction = "ConfigPodSandbox"
 	// KillPodSandbox action

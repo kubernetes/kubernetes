@@ -387,6 +387,41 @@ message CephFSVolumeSource {
   optional bool readOnly = 6;
 }
 
+// CheckpointReference identifies a PodCheckpoint and specifies options for
+// restoring a Pod from it.
+// +structType=atomic
+message CheckpointReference {
+  // name is the name of a PodCheckpoint in the Pod's namespace.
+  // +required
+  // +k8s:required
+  // +k8s:format=k8s-long-name
+  optional string name = 1;
+
+  // options contains opaque runtime-specific options for this restore attempt.
+  // Empty options use runtime defaults. Each key must appear in this Pod's
+  // RuntimeClass podCheckpoint.allowedRestoreOptions; without a RuntimeClass
+  // or allowlist, only empty options are permitted. Admission and the kubelet
+  // check the keys, and the kubelet passes the map unchanged to
+  // RestorePodRequest.options as untrusted user input. The runtime must reject
+  // unsupported, invalid, or unsafe values. Options must not contain secrets
+  // or override administrator configuration, security constraints, or the
+  // Pod's allocated devices. Administrator settings belong in node or runtime
+  // configuration.
+  //
+  // Restore options are independent of the options used to create the
+  // checkpoint and are not stored in the PodCheckpoint. Requirements intrinsic
+  // to the checkpoint are recorded in runtime-owned checkpoint data instead.
+  // At most 64 entries are allowed, with keys of at most 256 bytes and values
+  // of at most 4096 bytes.
+  // +optional
+  // +mapType=atomic
+  // +k8s:optional
+  // +k8s:maxProperties=64
+  // +k8s:eachKey=+k8s:maxBytes=256
+  // +k8s:eachVal=+k8s:maxBytes=4096
+  map<string, string> options = 2;
+}
+
 // Represents a cinder volume resource in Openstack.
 // A Cinder volume must exist before mounting to a container.
 // The volume must also be in the same region as the kubelet.
@@ -3956,6 +3991,7 @@ message Pod {
   // spec is the specification of the desired behavior of the pod.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
   // +optional
+  // +k8s:subfield(restoreFrom)=+k8s:immutable
   optional PodSpec spec = 2;
 
   // status is the most recently observed status of the pod.
@@ -5111,6 +5147,27 @@ message PodSpec {
   // +k8s:maxItems=10
   // +k8s:alpha(since: "1.37")=+k8s:dependentForbidden("schedulingGroup")
   repeated EvictionResponder evictionResponders = 44;
+
+  // restoreFrom specifies a PodCheckpoint in this Pod's namespace to restore
+  // this Pod from. When set, the Pod is restored from that checkpoint's archive
+  // instead of being created from scratch; the kubelet resolves the reference to
+  // the on-node archive via the PodCheckpoint's status.
+  // The Pod spec must match status.checkpointedPodTemplate.spec, except for
+  // nodeName, restoreFrom, ephemeralContainers, and schedulingGates. Scheduling
+  // directives, including node-identity constraints, and resource requests and
+  // limits must match the captured values, with the checkpoint-node affinity
+  // constraint added by admission.
+  // Ephemeral containers are not checkpointed. Scheduling gates may delay restore
+  // and be removed before scheduling. Do not set nodeName on creation; admission
+  // pins restore to the checkpoint's node through required node affinity.
+  // Workload updates, including resize and adding ephemeral containers, are
+  // rejected until PodRestored=True. Resize may be requested after restore.
+  // This field is immutable. Restoring from another checkpoint requires creating
+  // a new Pod; in-place restore of an existing Pod is not supported.
+  // +featureGate=PodLevelCheckpointRestore
+  // +optional
+  // +k8s:optional
+  optional CheckpointReference restoreFrom = 45;
 }
 
 // PodStatus represents information about the status of a pod. Status may trail the actual

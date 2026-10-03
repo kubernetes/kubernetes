@@ -119,7 +119,7 @@ func StartRealAPIServerOrDie(t *testing.T, configFuncs ...func(*options.ServerRu
 	opts.Options.Authentication.ServiceAccounts.Issuers = []string{"https://foo.bar.example.com"}
 	opts.Options.Authentication.ServiceAccounts.KeyFiles = []string{saSigningKeyFile.Name()}
 	opts.Options.Authorization.Modes = []string{"RBAC"}
-	opts.Options.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount"}
+	opts.Options.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount", "PodCheckpoint"}
 	opts.Options.APIEnablement.RuntimeConfig["api/all"] = "true"
 	for _, f := range configFuncs {
 		f(opts)

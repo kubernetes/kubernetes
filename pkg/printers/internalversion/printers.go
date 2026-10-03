@@ -524,6 +524,15 @@ func AddHandlers(h printers.PrintHandler) {
 	_ = h.TableHandler(runtimeClassColumnDefinitions, printRuntimeClass)
 	_ = h.TableHandler(runtimeClassColumnDefinitions, printRuntimeClassList)
 
+	podCheckpointColumnDefinitions := []metav1.TableColumnDefinition{
+		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
+		{Name: "Source Pod", Type: "string", Description: "The name of the pod being checkpointed."},
+		{Name: "Status", Type: "string", Description: "The reason for the Ready condition, or Pending if checkpointing has not started."},
+		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
+	}
+	_ = h.TableHandler(podCheckpointColumnDefinitions, printPodCheckpoint)
+	_ = h.TableHandler(podCheckpointColumnDefinitions, printPodCheckpointList)
+
 	volumeAttachmentColumnDefinitions := []metav1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
 		{Name: "Attacher", Type: "string", Format: "name", Description: storagev1.VolumeAttachmentSpec{}.SwaggerDoc()["attacher"]},
@@ -3039,6 +3048,36 @@ func printRuntimeClassList(list *nodeapi.RuntimeClassList, options printers.Gene
 	for i := range list.Items {
 		r, err := printRuntimeClass(&list.Items[i], options)
 
+		if err != nil {
+			return nil, err
+		}
+		rows = append(rows, r...)
+	}
+	return rows, nil
+}
+
+func printPodCheckpoint(obj *nodeapi.PodCheckpoint, options printers.GenerateOptions) ([]metav1.TableRow, error) {
+	sourcePod := "<none>"
+	if obj.Spec.SourcePod != nil {
+		sourcePod = obj.Spec.SourcePod.Name
+	}
+	status := nodeapi.PodCheckpointReasonPending
+	if condition := meta.FindStatusCondition(obj.Status.Conditions, nodeapi.PodCheckpointConditionReady); condition != nil {
+		status = string(condition.Status)
+		if condition.Reason != "" {
+			status = condition.Reason
+		}
+	}
+	return []metav1.TableRow{{
+		Object: runtime.RawExtension{Object: obj},
+		Cells:  []interface{}{obj.Name, sourcePod, status, translateTimestampSince(obj.CreationTimestamp)},
+	}}, nil
+}
+
+func printPodCheckpointList(list *nodeapi.PodCheckpointList, options printers.GenerateOptions) ([]metav1.TableRow, error) {
+	rows := make([]metav1.TableRow, 0, len(list.Items))
+	for i := range list.Items {
+		r, err := printPodCheckpoint(&list.Items[i], options)
 		if err != nil {
 			return nil, err
 		}

@@ -36,6 +36,11 @@ metadata:
 overhead:
   podFixed:
     podFixedKey: "0"
+podCheckpoint:
+  allowedCheckpointOptions:
+  - allowedCheckpointOptionsValue
+  allowedRestoreOptions:
+  - allowedRestoreOptionsValue
 scheduling:
   nodeSelector:
     nodeSelectorKey: nodeSelectorValue

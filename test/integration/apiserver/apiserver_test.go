@@ -3907,7 +3907,7 @@ func TestDefaultStorageEncoding(t *testing.T) {
 		kubeapiservertesting.NewDefaultTestServerOptions(),
 		[]string{
 			"--runtime-config=api/all=true",
-			"--disable-admission-plugins=ServiceAccount",
+			"--disable-admission-plugins=ServiceAccount,PodCheckpoint",
 		},
 		storageConfig,
 	)

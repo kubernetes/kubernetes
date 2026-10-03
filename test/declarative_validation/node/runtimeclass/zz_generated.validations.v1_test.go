@@ -66,6 +66,22 @@ func init() {
 			"metadata.uid": {
 				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
 			},
+			"podCheckpoint.allowedCheckpointOptions": {
+				{ErrorType: "FieldValueTooMany", Origin: "maxItems"},
+			},
+			"podCheckpoint.allowedCheckpointOptions[*]": {
+				{ErrorType: "FieldValueDuplicate"},
+				{ErrorType: "FieldValueTooLong", Origin: "maxBytes"},
+				{ErrorType: "FieldValueTooShort", Origin: "minLength"},
+			},
+			"podCheckpoint.allowedRestoreOptions": {
+				{ErrorType: "FieldValueTooMany", Origin: "maxItems"},
+			},
+			"podCheckpoint.allowedRestoreOptions[*]": {
+				{ErrorType: "FieldValueDuplicate"},
+				{ErrorType: "FieldValueTooLong", Origin: "maxBytes"},
+				{ErrorType: "FieldValueTooShort", Origin: "minLength"},
+			},
 			"scheduling.tolerations[*].key": {
 				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-label-key"},
 			},
