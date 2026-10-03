@@ -7181,3 +7181,97 @@ func TestDeleteHPAClearsConsistencyStore(t *testing.T) {
 		})
 	}
 }
+
+// TestObjectMetricAverageValueMetricName verifies that the ScalingActive condition
+// message for an Object metric with an AverageValue target does NOT say "external metric".
+func TestObjectMetricAverageValueMetricName(t *testing.T) {
+	targetAverageValue := resource.MustParse("10")
+	fixture := horizontalScenario{
+		minReplicas:    2,
+		maxReplicas:    6,
+		specReplicas:   3,
+		statusReplicas: 3,
+		metricsTarget: []autoscalingv2.MetricSpec{
+			{
+				Type: autoscalingv2.ObjectMetricSourceType,
+				Object: &autoscalingv2.ObjectMetricSource{
+					DescribedObject: autoscalingv2.CrossVersionObjectReference{
+						APIVersion: "apps/v1",
+						Kind:       "Deployment",
+						Name:       "some-deployment",
+					},
+					Metric: autoscalingv2.MetricIdentifier{
+						Name: "qps",
+					},
+					Target: autoscalingv2.MetricTarget{
+						Type:         autoscalingv2.AverageValueMetricType,
+						AverageValue: &targetAverageValue,
+					},
+				},
+			},
+		},
+		resource: &fakeResource{
+			name:       "some-deployment",
+			apiVersion: "apps/v1",
+			kind:       "Deployment",
+		},
+		// 40000 milli-units = 40 units / 3 pods ≈ 13 > 10 target => scales up.
+		reportedLevels: []uint64{40000},
+	}
+
+	logger, _ := ktesting.NewTestContext(t)
+	fakeWatch := watch.NewFakeWithOptions(watch.FakeOptions{Logger: &logger})
+
+	testClient := &fake.Clientset{}
+	testClient.AddWatchReactor("*", core.DefaultWatchReactor(fakeWatch, nil))
+	AddListPodsReactor(testClient, &fixture)
+
+	fakeScaleClient := &scalefake.FakeScaleClient{}
+	AddGetScaleReactor(fakeScaleClient, "deployments", &fixture)
+	AddUpdateScaleReactor(fakeScaleClient, "deployments")
+
+	fakeMetricsClient := &metricsfake.Clientset{}
+	AddListPodMetricsReactor(fakeMetricsClient, &fixture)
+
+	eventClient := &fake.Clientset{}
+	AddCreateEventReactor(eventClient)
+
+	fakeCmClient := &cmfake.FakeCustomMetricsClient{}
+	AddGetCustomMetricsReactor(fakeCmClient, &fixture)
+
+	fakeEMClient := &emfake.FakeExternalMetricsClient{}
+	AddListExternalMetricsReactor(fakeEMClient, &fixture)
+
+	setup := newHorizontalSetup(t, &fixture, testClient, eventClient, fakeMetricsClient, fakeCmClient, fakeEMClient, fakeScaleClient)
+	hpa := buildHPA(t, &fixture)
+	key := fmt.Sprintf("%s/%s", hpa.Namespace, hpa.Name)
+
+	hpaKey := selectors.Key{Name: hpa.Name, Namespace: hpa.Namespace}
+	setup.controller.selectorTracker.PutIfAbsent(hpa.Namespace, hpaKey, labels.Nothing())
+
+	err := setup.controller.reconcileAutoscaler(setup.ctx, hpa, key)
+	require.NoError(t, err)
+
+	// Find the ScalingActive condition in the HPA status update and check its Message.
+	found := false
+	for _, action := range setup.testClient.Actions() {
+		if action.GetVerb() != "update" || action.GetResource().Resource != "horizontalpodautoscalers" {
+			continue
+		}
+		updatedHPA := action.(core.UpdateAction).GetObject().(*autoscalingv2.HorizontalPodAutoscaler)
+		for _, cond := range updatedHPA.Status.Conditions {
+			if cond.Type != autoscalingv2.ScalingActive {
+				continue
+			}
+			found = true
+			t.Logf("ScalingActive message: %q", cond.Message)
+			assert.NotContains(t, cond.Message, "external metric",
+				"Object/AverageValue metric must not produce 'external metric' in condition message")
+			assert.Contains(t, cond.Message, "Deployment",
+				"Object/AverageValue metric should contain the DescribedObject Kind in condition message")
+		}
+	}
+	if !found {
+		t.Fatal("ScalingActive condition not found in updated HPA status")
+	}
+}
