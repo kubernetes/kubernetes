@@ -294,6 +294,7 @@ func TestConfigToExecClusterRoundtrip(t *testing.T) {
 		expected.WarningHandlerWithContext = nil
 		expected.Timeout = 0
 		expected.Dial = nil
+		expected.ConnectionPool = nil
 
 		// Manually set URLs so we don't get an error when parsing these during the roundtrip.
 		if expected.Host != "" {
