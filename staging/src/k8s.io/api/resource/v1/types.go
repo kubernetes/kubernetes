@@ -469,9 +469,6 @@ type Device struct {
 	// If set to true, the scheduler will set the ResourceClaim.Status.Allocation.NodeSelector
 	// to match the node where the allocation was made.
 	//
-	// This is a beta field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus
-	// feature gates.
-	//
 	// +optional
 	// +featureGate=DRADeviceBindingConditions,DRAResourceClaimDeviceStatus
 	BindsToNode *bool `json:"bindsToNode,omitempty" protobuf:"varint,9,opt,name=bindsToNode"`
@@ -484,9 +481,6 @@ type Device struct {
 	// The maximum number of binding conditions is 4.
 	//
 	// The conditions must be a valid condition type string.
-	//
-	// This is a beta field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus
-	// feature gates.
 	//
 	// +optional
 	// +listType=atomic
@@ -502,9 +496,6 @@ type Device struct {
 	// The maximum number of binding failure conditions is 4.
 	//
 	// The conditions must be a valid condition type string.
-	//
-	// This is a beta field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus
-	// feature gates.
 	//
 	// +optional
 	// +listType=atomic
@@ -2167,9 +2158,6 @@ type AllocationResult struct {
 	// allocationTimestamp stores the time when the resources were allocated.
 	// This field is not guaranteed to be set, in which case that time is unknown.
 	//
-	// This is a beta field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus
-	// feature gate.
-	//
 	// +optional
 	// +featureGate=DRADeviceBindingConditions,DRAResourceClaimDeviceStatus
 	AllocationTimestamp *metav1.Time `json:"allocationTimestamp,omitempty" protobuf:"bytes,5,opt,name=allocationTimestamp"`
@@ -2275,9 +2263,6 @@ type DeviceRequestAllocationResult struct {
 	// bindingConditions contains a copy of the BindingConditions
 	// from the corresponding ResourceSlice at the time of allocation.
 	//
-	// This is a beta field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus
-	// feature gates.
-	//
 	// +optional
 	// +listType=atomic
 	// +featureGate=DRADeviceBindingConditions,DRAResourceClaimDeviceStatus
@@ -2287,9 +2272,6 @@ type DeviceRequestAllocationResult struct {
 
 	// bindingFailureConditions contains a copy of the BindingFailureConditions
 	// from the corresponding ResourceSlice at the time of allocation.
-	//
-	// This is a beta field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus
-	// feature gates.
 	//
 	// +optional
 	// +listType=atomic
