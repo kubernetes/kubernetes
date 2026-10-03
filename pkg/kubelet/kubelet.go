@@ -1064,7 +1064,6 @@ func NewMainKubelet(ctx context.Context,
 	}
 	klet.pluginManager = pluginmanager.NewPluginManager(
 		klet.getPluginsRegistrationDir(), /* sockDir */
-		kubeDeps.Recorder,
 	)
 
 	// If the experimentalMounterPathFlag is set, we do not want to
