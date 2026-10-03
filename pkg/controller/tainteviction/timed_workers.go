@@ -33,6 +33,10 @@ type WorkArgs struct {
 	Object NamespacedObject
 	// CreatedAt is set when the work item is accepted into the queue.
 	CreatedAt time.Time
+	// nodeName identifies the node whose taints produced this eviction decision.
+	nodeName string
+	// taintSet identifies the NoExecute taints that produced this eviction decision.
+	taintSet string
 }
 
 // KeyFromWorkArgs creates a key for the given `WorkArgs`.
@@ -62,6 +66,13 @@ func NewWorkArgsWithUID(name, namespace string, uid types.UID) *WorkArgs {
 	}
 }
 
+func newPodEvictionWorkArgs(name, namespace string, uid types.UID, nodeName, taintSet string) *WorkArgs {
+	args := NewWorkArgsWithUID(name, namespace, uid)
+	args.nodeName = nodeName
+	args.taintSet = taintSet
+	return args
+}
+
 // TimedWorker is a responsible for executing a function no earlier than at FireAt time.
 type TimedWorker struct {
 	WorkItem  *WorkArgs
@@ -77,21 +88,26 @@ type TimedWorker struct {
 // it. When a worker is replaced (via UpdateWork or CancelWork), a fresh
 // token is allocated, so the old goroutine can detect on completion that its
 // entry has been superseded and skip the delete(q.workers, key) call.
-// The zero-size field ensures no two allocations share an address while
-// keeping the struct size minimal.
+// The field ensures no two allocations share an address.
 type timedWorkerToken struct {
 	_ byte
 }
 
 type timedWorkerEntry struct {
-	worker *TimedWorker
-	token  *timedWorkerToken
+	worker    *TimedWorker
+	token     *timedWorkerToken
+	workItem  *WorkArgs
+	createdAt time.Time
+	fireAt    time.Time
 }
 
 // createWorker creates a TimedWorker that will execute `f` not earlier than `fireAt`.
 // Returns nil if the work was started immediately and doesn't need a timer.
 func createWorker(ctx context.Context, wg *sync.WaitGroup, args *WorkArgs, createdAt time.Time, fireAt time.Time, f func(ctx context.Context, fireAt time.Time, args *WorkArgs) error, clock clock.WithDelayedExecution) *TimedWorker {
-	delay := fireAt.Sub(createdAt)
+	delay := fireAt.Sub(clock.Now())
+	if !fireAt.After(createdAt) {
+		delay = 0
+	}
 	logger := klog.FromContext(ctx)
 
 	worker := TimedWorker{
@@ -175,51 +191,57 @@ func (q *TimedWorkerQueue) getWrappedWorkerFunc(key string, token *timedWorkerTo
 	}
 }
 
-// AddWork adds a work to the WorkerQueue which will be executed not earlier than `fireAt`.
-// If replace is false, an existing work item will not get replaced, otherwise it
-// gets canceled and the new one is added instead.
-func (q *TimedWorkerQueue) AddWork(ctx context.Context, args *WorkArgs, createdAt time.Time, fireAt time.Time) {
-	key := args.KeyFromWorkArgs()
-	logger := klog.FromContext(ctx)
-
-	q.Lock()
-	defer q.Unlock()
-	if _, exists := q.workers[key]; exists {
-		logger.V(4).Info("Trying to add already existing work, skipping", "item", key, "createTime", createdAt, "firedTime", fireAt)
-		return
-	}
-	logger.V(4).Info("Adding TimedWorkerQueue item and to be fired at firedTime", "item", key, "createTime", createdAt, "firedTime", fireAt)
-	args.CreatedAt = createdAt
-	token := &timedWorkerToken{}
-	worker := createWorker(ctx, &q.workerWG, args, createdAt, fireAt, q.getWrappedWorkerFunc(key, token), q.clock)
-	q.workers[key] = timedWorkerEntry{worker: worker, token: token}
-}
-
-// UpdateWork adds or replaces a work item such that it will be executed not earlier than `fireAt`.
-// This is a cheap no-op when the old and new fireAt are the same.
-func (q *TimedWorkerQueue) UpdateWork(ctx context.Context, args *WorkArgs, createdAt time.Time, fireAt time.Time) {
+// AddWork adds work that will be executed no earlier than fireAt. It returns
+// true when the requested work owns the key, either because it was added or an
+// identical item was already present. Conflicting existing work is preserved.
+func (q *TimedWorkerQueue) AddWork(ctx context.Context, args *WorkArgs, createdAt time.Time, fireAt time.Time) bool {
 	key := args.KeyFromWorkArgs()
 	logger := klog.FromContext(ctx)
 
 	q.Lock()
 	defer q.Unlock()
 	if entry, exists := q.workers[key]; exists {
-		if entry.worker == nil {
-			logger.V(4).Info("Keeping existing work, already in progress", "item", key)
-			return
+		if entry.workItem.Object == args.Object && entry.workItem.nodeName == args.nodeName && entry.workItem.taintSet == args.taintSet && entry.createdAt.Equal(createdAt) && entry.fireAt.Equal(fireAt) {
+			logger.V(4).Info("Keeping identical existing work", "item", key, "createTime", createdAt, "firedTime", fireAt)
+			return true
 		}
-		if entry.worker.FireAt.Compare(fireAt) == 0 {
-			logger.V(4).Info("Keeping existing work, same time", "item", key, "createTime", entry.worker.CreatedAt, "firedTime", entry.worker.FireAt)
-			return
-		}
-		logger.V(4).Info("Replacing existing work", "item", key, "createTime", entry.worker.CreatedAt, "firedTime", entry.worker.FireAt)
-		entry.worker.Cancel()
+		logger.V(4).Info("Conflicting work already owns key", "item", key, "createTime", createdAt, "firedTime", fireAt)
+		return false
 	}
 	logger.V(4).Info("Adding TimedWorkerQueue item and to be fired at firedTime", "item", key, "createTime", createdAt, "firedTime", fireAt)
 	args.CreatedAt = createdAt
 	token := &timedWorkerToken{}
 	worker := createWorker(ctx, &q.workerWG, args, createdAt, fireAt, q.getWrappedWorkerFunc(key, token), q.clock)
-	q.workers[key] = timedWorkerEntry{worker: worker, token: token}
+	q.workers[key] = timedWorkerEntry{worker: worker, token: token, workItem: args, createdAt: createdAt, fireAt: fireAt}
+	return true
+}
+
+// UpdateWork adds or replaces a work item such that it will be executed not earlier than `fireAt`.
+// It returns true when existing work was replaced.
+func (q *TimedWorkerQueue) UpdateWork(ctx context.Context, args *WorkArgs, createdAt time.Time, fireAt time.Time) bool {
+	key := args.KeyFromWorkArgs()
+	logger := klog.FromContext(ctx)
+
+	q.Lock()
+	defer q.Unlock()
+	replaced := false
+	if entry, exists := q.workers[key]; exists {
+		if entry.workItem.Object == args.Object && entry.workItem.nodeName == args.nodeName && entry.workItem.taintSet == args.taintSet && entry.createdAt.Equal(createdAt) && entry.fireAt.Equal(fireAt) {
+			logger.V(4).Info("Keeping identical existing work", "item", key, "createTime", entry.createdAt, "firedTime", entry.fireAt)
+			return false
+		}
+		logger.V(4).Info("Replacing existing work", "item", key, "createTime", entry.createdAt, "firedTime", entry.fireAt)
+		if entry.worker != nil {
+			entry.worker.Cancel()
+		}
+		replaced = true
+	}
+	logger.V(4).Info("Adding TimedWorkerQueue item and to be fired at firedTime", "item", key, "createTime", createdAt, "firedTime", fireAt)
+	args.CreatedAt = createdAt
+	token := &timedWorkerToken{}
+	worker := createWorker(ctx, &q.workerWG, args, createdAt, fireAt, q.getWrappedWorkerFunc(key, token), q.clock)
+	q.workers[key] = timedWorkerEntry{worker: worker, token: token, workItem: args, createdAt: createdAt, fireAt: fireAt}
+	return replaced
 }
 
 // CancelWork removes scheduled function execution from the queue. Returns true if work was cancelled.
