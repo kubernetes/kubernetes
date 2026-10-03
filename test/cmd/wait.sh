@@ -163,12 +163,17 @@ EOF
         deploy/test-3)
     # Command: Wait with jsonpath without value with check-once behavior
     output_message_2=$(kubectl wait --for=jsonpath='{.status.replicas}' deploy/test-3 --timeout=0 2>&1)
+    # Command: Wait with a filter expression using the != operator
+    output_message_3=$(kubectl wait \
+        --for='jsonpath={.spec.template.spec.containers[?(@.name!="nginx")].image}=busybox' \
+        deploy/test-3)
     set -o errexit
 
     # Post-Condition: Wait succeed
     kube::test::if_has_string "${output_message_0}" 'deployment.apps/test-3 condition met'
     kube::test::if_has_string "${output_message_1}" 'deployment.apps/test-3 condition met'
     kube::test::if_has_string "${output_message_2}" 'deployment.apps/test-3 condition met'
+    kube::test::if_has_string "${output_message_3}" 'deployment.apps/test-3 condition met'
 
     # Clean deployment
     kubectl delete deployment test-3
