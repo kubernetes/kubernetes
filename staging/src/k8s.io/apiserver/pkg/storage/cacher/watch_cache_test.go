@@ -695,7 +695,7 @@ func TestDynamicCache(t *testing.T) {
 		lowerBoundCapacity int
 		upperBoundCapacity int
 		interval           time.Duration
-		expectCapacity     int
+		expectCapacity     []int
 		expectStartIndex   int
 	}{
 		{
@@ -705,7 +705,7 @@ func TestDynamicCache(t *testing.T) {
 			lowerBoundCapacity: 5 / 2,
 			upperBoundCapacity: 5 * 2,
 			interval:           DefaultEventFreshDuration / 6,
-			expectCapacity:     10,
+			expectCapacity:     []int{10},
 			expectStartIndex:   0,
 		},
 		{
@@ -715,7 +715,7 @@ func TestDynamicCache(t *testing.T) {
 			lowerBoundCapacity: 5 / 2,
 			upperBoundCapacity: 5 * 2,
 			interval:           DefaultEventFreshDuration / 4,
-			expectCapacity:     5,
+			expectCapacity:     []int{5},
 			expectStartIndex:   0,
 		},
 		{
@@ -725,7 +725,7 @@ func TestDynamicCache(t *testing.T) {
 			lowerBoundCapacity: 5 / 2,
 			upperBoundCapacity: 5 * 2,
 			interval:           DefaultEventFreshDuration + time.Second,
-			expectCapacity:     2,
+			expectCapacity:     []int{5, 2},
 			expectStartIndex:   3,
 		},
 		{
@@ -735,7 +735,7 @@ func TestDynamicCache(t *testing.T) {
 			lowerBoundCapacity: 3,
 			upperBoundCapacity: 5 * 2,
 			interval:           DefaultEventFreshDuration + time.Second,
-			expectCapacity:     3,
+			expectCapacity:     []int{5, 3},
 			expectStartIndex:   2,
 		},
 		{
@@ -745,7 +745,7 @@ func TestDynamicCache(t *testing.T) {
 			lowerBoundCapacity: 5 / 2,
 			upperBoundCapacity: 8,
 			interval:           DefaultEventFreshDuration / 6,
-			expectCapacity:     8,
+			expectCapacity:     []int{8},
 			expectStartIndex:   0,
 		},
 		{
@@ -756,7 +756,7 @@ func TestDynamicCache(t *testing.T) {
 			lowerBoundCapacity: 5 / 2,
 			upperBoundCapacity: 5 * 2,
 			interval:           DefaultEventFreshDuration / 6,
-			expectCapacity:     10,
+			expectCapacity:     []int{10},
 			expectStartIndex:   3,
 		},
 		{
@@ -767,7 +767,7 @@ func TestDynamicCache(t *testing.T) {
 			lowerBoundCapacity: 5 / 2,
 			upperBoundCapacity: 5 * 2,
 			interval:           DefaultEventFreshDuration / 4,
-			expectCapacity:     5,
+			expectCapacity:     []int{5},
 			expectStartIndex:   3,
 		},
 		{
@@ -778,7 +778,7 @@ func TestDynamicCache(t *testing.T) {
 			lowerBoundCapacity: 5 / 2,
 			upperBoundCapacity: 5 * 2,
 			interval:           DefaultEventFreshDuration + time.Second,
-			expectCapacity:     2,
+			expectCapacity:     []int{5, 2},
 			expectStartIndex:   6,
 		},
 		{
@@ -789,7 +789,7 @@ func TestDynamicCache(t *testing.T) {
 			lowerBoundCapacity: 3,
 			upperBoundCapacity: 5 * 2,
 			interval:           DefaultEventFreshDuration + time.Second,
-			expectCapacity:     3,
+			expectCapacity:     []int{5, 3},
 			expectStartIndex:   5,
 		},
 		{
@@ -800,7 +800,7 @@ func TestDynamicCache(t *testing.T) {
 			lowerBoundCapacity: 5 / 2,
 			upperBoundCapacity: 8,
 			interval:           DefaultEventFreshDuration / 6,
-			expectCapacity:     8,
+			expectCapacity:     []int{8},
 			expectStartIndex:   3,
 		},
 		{
@@ -810,7 +810,7 @@ func TestDynamicCache(t *testing.T) {
 			lowerBoundCapacity: 8 / 2,
 			upperBoundCapacity: 8 * 2,
 			interval:           DefaultEventFreshDuration / 9,
-			expectCapacity:     16,
+			expectCapacity:     []int{16},
 			expectStartIndex:   0,
 		},
 		{
@@ -820,7 +820,7 @@ func TestDynamicCache(t *testing.T) {
 			lowerBoundCapacity: 8 / 2,
 			upperBoundCapacity: 8 * 2,
 			interval:           DefaultEventFreshDuration / 8,
-			expectCapacity:     8,
+			expectCapacity:     []int{8},
 			expectStartIndex:   0,
 		},
 		{
@@ -830,7 +830,7 @@ func TestDynamicCache(t *testing.T) {
 			lowerBoundCapacity: 8 / 2,
 			upperBoundCapacity: 8 * 2,
 			interval:           DefaultEventFreshDuration/2 + time.Second,
-			expectCapacity:     4,
+			expectCapacity:     []int{8, 4},
 			expectStartIndex:   4,
 		},
 		{
@@ -840,7 +840,7 @@ func TestDynamicCache(t *testing.T) {
 			lowerBoundCapacity: 7,
 			upperBoundCapacity: 8 * 2,
 			interval:           DefaultEventFreshDuration/2 + time.Second,
-			expectCapacity:     7,
+			expectCapacity:     []int{8, 7},
 			expectStartIndex:   1,
 		},
 		{
@@ -850,7 +850,7 @@ func TestDynamicCache(t *testing.T) {
 			lowerBoundCapacity: 8 / 2,
 			upperBoundCapacity: 10,
 			interval:           DefaultEventFreshDuration / 9,
-			expectCapacity:     10,
+			expectCapacity:     []int{10},
 			expectStartIndex:   0,
 		},
 		{
@@ -861,7 +861,7 @@ func TestDynamicCache(t *testing.T) {
 			lowerBoundCapacity: 8 / 2,
 			upperBoundCapacity: 8 * 2,
 			interval:           DefaultEventFreshDuration / 9,
-			expectCapacity:     16,
+			expectCapacity:     []int{16},
 			expectStartIndex:   3,
 		},
 		{
@@ -872,7 +872,7 @@ func TestDynamicCache(t *testing.T) {
 			lowerBoundCapacity: 8 / 2,
 			upperBoundCapacity: 8 * 2,
 			interval:           DefaultEventFreshDuration / 8,
-			expectCapacity:     8,
+			expectCapacity:     []int{8},
 			expectStartIndex:   3,
 		},
 		{
@@ -883,7 +883,7 @@ func TestDynamicCache(t *testing.T) {
 			lowerBoundCapacity: 8 / 2,
 			upperBoundCapacity: 8 * 2,
 			interval:           DefaultEventFreshDuration/2 + time.Second,
-			expectCapacity:     4,
+			expectCapacity:     []int{8, 4},
 			expectStartIndex:   7,
 		},
 		{
@@ -894,7 +894,7 @@ func TestDynamicCache(t *testing.T) {
 			lowerBoundCapacity: 7,
 			upperBoundCapacity: 8 * 2,
 			interval:           DefaultEventFreshDuration/2 + time.Second,
-			expectCapacity:     7,
+			expectCapacity:     []int{8, 7},
 			expectStartIndex:   4,
 		},
 		{
@@ -905,7 +905,7 @@ func TestDynamicCache(t *testing.T) {
 			lowerBoundCapacity: 8 / 2,
 			upperBoundCapacity: 10,
 			interval:           DefaultEventFreshDuration / 9,
-			expectCapacity:     10,
+			expectCapacity:     []int{10},
 			expectStartIndex:   3,
 		},
 	}
@@ -920,9 +920,11 @@ func TestDynamicCache(t *testing.T) {
 			store.history.upperBoundCapacity = test.upperBoundCapacity
 			loadEventWithDuration(store, test.eventCount, test.interval)
 			nextInterval := store.config.clock.Now().Add(time.Duration(test.interval.Nanoseconds() * int64(test.eventCount)))
-			store.history.resizeCacheLocked(nextInterval)
-			if store.history.capacity != test.expectCapacity {
-				t.Errorf("expect capacity %d, but get %d", test.expectCapacity, store.history.capacity)
+			for i, expectCapacity := range test.expectCapacity {
+				store.history.resizeCacheLocked(nextInterval)
+				if store.history.capacity != expectCapacity {
+					t.Errorf("resize call %d: expect capacity %d, but get %d", i+1, expectCapacity, store.history.capacity)
+				}
 			}
 
 			// check cache's startIndex, endIndex and all elements.
@@ -931,6 +933,78 @@ func TestDynamicCache(t *testing.T) {
 			}
 			if store.history.endIndex != test.startIndex+test.eventCount {
 				t.Errorf("expect endIndex %d get %d", test.startIndex+test.eventCount, store.history.endIndex)
+			}
+			if !checkCacheElements(store) {
+				t.Errorf("some elements locations in cache is wrong")
+			}
+		})
+	}
+}
+
+func TestDynamicCacheCapacitySequences(t *testing.T) {
+	const (
+		fast  = time.Second
+		slow  = DefaultEventFreshDuration/2 + time.Second
+		quiet = 10 * time.Minute
+		burst = time.Millisecond
+	)
+
+	tests := []struct {
+		name           string
+		capacity       int
+		gaps           []time.Duration
+		expectCapacity []int
+	}{
+		{
+			name:           "fresh traffic grows the cache once it is full",
+			capacity:       4,
+			gaps:           []time.Duration{fast, fast, fast, fast, fast, fast},
+			expectCapacity: []int{4, 4, 4, 4, 8, 8},
+		},
+		{
+			name:     "sustained slow traffic shrinks only on the 2nd consecutive signal",
+			capacity: 8,
+			gaps: []time.Duration{
+				slow, slow, slow, slow, slow, slow, slow, slow, // fill the cache
+				slow, // 1st shrink signal: streak starts, no shrink yet
+				slow, // 2nd consecutive signal: halve to 4
+				slow, // at capacity 4 the quarter spans a single slow gap (<eventFreshDuration): stable
+			},
+			expectCapacity: []int{8, 8, 8, 8, 8, 8, 8, 8, 8, 4, 4},
+		},
+		{
+			name:     "burst after a quiet period does not shrink the cache",
+			capacity: 8,
+			gaps: []time.Duration{
+				fast, fast, fast, fast, fast, fast, fast, fast, // fill the cache
+				quiet,        // 1st shrink signal after the silence: streak starts
+				burst,        // burst arrives: resets the streak, do not halved the cache
+				burst, burst, // burst continues: quarter is fresh again, no shrink
+			},
+			expectCapacity: []int{8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if len(test.gaps) != len(test.expectCapacity) {
+				t.Fatalf("gaps and expectCapacity must have the same length")
+			}
+			store := newTestWatchCache(test.capacity, DefaultEventFreshDuration, &cache.Indexers{})
+			defer store.Stop()
+			store.history.lowerBoundCapacity = 2
+			store.history.upperBoundCapacity = 16
+
+			eventTime := store.config.clock.Now()
+			for i, gap := range test.gaps {
+				eventTime = eventTime.Add(gap)
+				store.history.updateCache(&watchCacheEvent{
+					Key:        fmt.Sprintf("event-%d", i),
+					RecordTime: eventTime,
+				})
+				if store.history.capacity != test.expectCapacity[i] {
+					t.Errorf("event %d (gap %v): expect capacity %d, but get %d", i, gap, test.expectCapacity[i], store.history.capacity)
+				}
 			}
 			if !checkCacheElements(store) {
 				t.Errorf("some elements locations in cache is wrong")
