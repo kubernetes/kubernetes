@@ -34,7 +34,15 @@ func (l Logs) Install(c *restful.Container) {
 	ws := new(restful.WebService)
 	ws.Path("/logs")
 	ws.Doc("get log files")
-	ws.Route(ws.GET("/{logpath:*}").To(logFileHandler).Param(ws.PathParameter("logpath", "path to the log").DataType("string")))
+
+	ws.Route(ws.GET("/{logpath:*}").
+		To(logFileHandler).
+		Param(
+			ws.PathParameter("logpath", "path to the log").
+				DataType("string"),
+		),
+	)
+
 	ws.Route(ws.GET("/").To(logFileListHandler))
 
 	c.Add(ws)
@@ -57,8 +65,9 @@ func logFileListHandler(req *restful.Request, resp *restful.Response) {
 	http.ServeFile(resp.ResponseWriter, req.Request, logdir)
 }
 
-// logFileNameIsTooLong checks filename length, returns true if it's longer than 255.
-// cause http.ServeFile returns default error code 500 except for NotExist and Forbidden, but we need to separate the real 500 from oversize filename here.
+// logFileNameIsTooLong checks path length, returns true if it can exist according to length
+// used to avoid http.ServeFile return 500 statusCode
+// we need to separate the real 500 from oversize filename here
 func logFileNameIsTooLong(filePath string) bool {
 	_, err := os.Stat(filePath)
 	if err != nil {
