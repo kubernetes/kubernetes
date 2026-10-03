@@ -164,6 +164,7 @@ func NewContainerManager(ctx context.Context, mountUtil mount.Interface, cadviso
 			cm.GetNodeAllocatableReservation(),
 			nodeConfig.KubeletRootDir,
 			cm.topologyManager,
+			nil, // The system partition is Linux only.
 		)
 		if err != nil {
 			logger.Error(err, "Failed to initialize cpu manager")
