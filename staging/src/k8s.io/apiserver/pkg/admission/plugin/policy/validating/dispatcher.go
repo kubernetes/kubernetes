@@ -148,14 +148,15 @@ func (c *dispatcher) Dispatch(ctx context.Context, a admission.Attributes, o adm
 				continue
 			}
 
-			params, err := generic.CollectParams(
+			params, err := generic.CollectParamsWithContext(
+				ctx,
 				hook.Policy.Spec.ParamKind,
 				hook.ParamInformer,
+				hook.ParamMapping,
 				hook.ParamScope,
 				binding.Spec.ParamRef,
 				a.GetNamespace(),
 				hook.DynamicClient,
-				hook.RESTMapper,
 			)
 
 			if err != nil {
