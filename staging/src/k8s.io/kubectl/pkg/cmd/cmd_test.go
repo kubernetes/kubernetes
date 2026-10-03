@@ -19,6 +19,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"reflect"
 	"slices"
 	"strings"
@@ -170,6 +171,63 @@ func TestKubectlSubcommandShadowPlugin(t *testing.T) {
 
 			if pluginsHandler.executed {
 				expectKubectlPathEnvironmentVariable(t, pluginsHandler.withEnv)
+			}
+		})
+	}
+}
+
+func TestKubectlCommandHandlesAliasesWithLeadingFlags(t *testing.T) {
+	t.Setenv("KUBECTL_KUBERC", "true")
+	t.Setenv("KUBERC", "")
+	kubercPath := filepath.Join(t.TempDir(), "kuberc")
+	err := os.WriteFile(kubercPath, []byte(`apiVersion: kubectl.config.k8s.io/v1beta1
+kind: Preference
+aliases:
+- name: clientversion
+  command: version
+  appendArgs:
+  - --client=true
+`), 0600)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tests := []struct {
+		name string
+		args []string
+	}{
+		{
+			name: "kuberc with equals",
+			args: []string{"kubectl", "--kuberc=" + kubercPath, "clientversion"},
+		},
+		{
+			name: "kuberc with separate value",
+			args: []string{"kubectl", "--kuberc", kubercPath, "clientversion"},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			pluginsHandler := &testPluginHandler{
+				pluginsDirectory: "plugin/testdata",
+				validPrefixes:    plugin.ValidPluginFilenamePrefixes,
+			}
+			ioStreams, _, out, errOut := genericiooptions.NewTestIOStreams()
+			root := NewDefaultKubectlCommandWithArgs(KubectlOptions{
+				PluginHandler: pluginsHandler,
+				Arguments:     test.args,
+				IOStreams:     ioStreams,
+			})
+			if pluginsHandler.lookedup || pluginsHandler.executed {
+				t.Fatal("alias was handled as a plugin")
+			}
+			if err := root.Execute(); err != nil {
+				t.Fatal(err)
+			}
+			if !strings.Contains(out.String(), "Client Version:") {
+				t.Fatalf("alias did not execute version: %s", out.String())
+			}
+			if errOut.Len() != 0 {
+				t.Fatalf("unexpected error output: %s", errOut.String())
 			}
 		})
 	}

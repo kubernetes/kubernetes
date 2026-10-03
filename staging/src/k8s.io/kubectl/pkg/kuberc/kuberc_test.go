@@ -27,6 +27,7 @@ import (
 	"testing"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 	"github.com/stretchr/testify/require"
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -2667,6 +2668,109 @@ func TestApplyAlias(t *testing.T) {
 					t.Fatalf("missing command '%s' in original command '%s'", expectedArg, originalCommand)
 				}
 			}
+		})
+	}
+}
+
+func TestApplyAliasWithLeadingFlags(t *testing.T) {
+	tests := []struct {
+		name  string
+		flags []string
+	}{
+		{
+			name:  "kuberc with equals",
+			flags: []string{"--kuberc=/tmp/kuberc"},
+		},
+		{
+			name:  "kuberc with separate value",
+			flags: []string{"--kuberc", "/tmp/kuberc"},
+		},
+		{
+			name:  "kuberc value matches alias",
+			flags: []string{"--kuberc", "gp"},
+		},
+		{
+			name:  "multiple flags with separate values",
+			flags: []string{"--kuberc", "/tmp/kuberc", "--context", "test-context", "--namespace", "test-ns"},
+		},
+		{
+			name:  "shorthand with separate value",
+			flags: []string{"-n", "test-ns"},
+		},
+		{
+			name:  "shorthand with attached value",
+			flags: []string{"-ntest-ns"},
+		},
+		{
+			name:  "shorthand with equals",
+			flags: []string{"-n=test-ns"},
+		},
+		{
+			name:  "flag value matches alias",
+			flags: []string{"--context", "gp"},
+		},
+		{
+			name:  "empty flag value",
+			flags: []string{"--context", ""},
+		},
+		{
+			name:  "boolean flag without value",
+			flags: []string{"--warnings-as-errors"},
+		},
+		{
+			name:  "boolean flag with equals",
+			flags: []string{"--warnings-as-errors=false", "--kuberc", "/tmp/kuberc"},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			rootCmd := &cobra.Command{Use: "root"}
+			executed := false
+			getCmd := &cobra.Command{
+				Use: "get",
+				RunE: func(cmd *cobra.Command, args []string) error {
+					executed = true
+					require.Equal(t, []string{"pods", "my-pod", "tail"}, args)
+					require.Equal(t, "json", cmd.Flag("output").Value.String())
+					return nil
+				},
+			}
+			getCmd.Flags().StringP("output", "o", "", "")
+			rootCmd.AddCommand(getCmd)
+			opts := genericclioptions.NewConfigFlags(false)
+			opts.AddFlags(rootCmd.PersistentFlags())
+			rootCmd.PersistentFlags().Bool("warnings-as-errors", false, "")
+			pref := NewPreferences().(*Preferences)
+			pref.AddFlags(rootCmd.PersistentFlags())
+			pref.getPreferencesFunc = func(string, io.Writer) (*config.Preference, error) {
+				return &config.Preference{
+					Aliases: []config.AliasOverride{
+						{
+							Name:        "gp",
+							Command:     "get",
+							PrependArgs: []string{"pods"},
+							AppendArgs:  []string{"tail"},
+							Options:     []config.CommandOptionDefault{{Name: "output", Default: "wide"}},
+						},
+					},
+				}, nil
+			}
+			args := append([]string{"root"}, test.flags...)
+			args = append(args, "gp", "my-pod", "--output=json")
+			expectedArgs := append([]string{"root"}, test.flags...)
+			expectedArgs = append(expectedArgs, "gp", "pods", "my-pod", "--output=json", "tail")
+			errWriter := &bytes.Buffer{}
+
+			actualArgs, err := pref.Apply(rootCmd, opts, args, errWriter)
+			require.NoError(t, err)
+			require.Equal(t, expectedArgs, actualArgs)
+			require.Empty(t, errWriter.String())
+			rootCmd.PersistentFlags().VisitAll(func(flag *pflag.Flag) {
+				require.False(t, flag.Changed, "flag %s was parsed while applying aliases", flag.Name)
+			})
+			require.NoError(t, rootCmd.Execute())
+			require.True(t, executed)
 		})
 	}
 }
