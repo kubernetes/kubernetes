@@ -746,8 +746,15 @@ func TestSkipPodGroupPodSchedule(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{Name: "pg", Namespace: "default"},
 	}
 
-	podGroupInfo := newQueuedPodGroupInfo(&framework.PodGroupInfo{GenericPodGroup: fwk.NewGenericPodGroup(testPodGroup)}, qInfo1, qInfo2, qInfo3)
-
+	podGroupInfo := &framework.QueuedPodGroupInfo{
+		PodGroupInfo: &framework.PodGroupInfo{
+			GenericPodGroup: fwk.NewGenericPodGroup(testPodGroup),
+			UnscheduledPods: []*v1.Pod{},
+		},
+	}
+	podGroupInfo.AddPod(qInfo1)
+	podGroupInfo.AddPod(qInfo2)
+	podGroupInfo.AddPod(qInfo3)
 	logger, ctx := ktesting.NewTestContext(t)
 
 	cache := internalcache.New(ctx, nil, true, true /* CompositePodGroup */)
