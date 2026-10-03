@@ -175,3 +175,13 @@
 # but nonpointerstructs does not understand that invariant.
 - text: "nonpointerstructs: field VolumeAttachmentSpec.Source is a non-pointer struct with no required fields."
   path: "staging/src/k8s.io/api/storage/(v1|v1alpha1|v1beta1)/types.go"
+
+# Defaults - Existing violations in core/v1
+# GRPCAction.Service in core/v1 omits omitempty; adding it would be a breaking serialization change.
+- text: "defaults: field GRPCAction\\.Service has a default value but does not have omitempty in its json tag"
+  path: "staging/src/k8s.io/api/core/v1/types\\.go"
+
+# LocalObjectReference.Name retains +kubebuilder:default alongside +default for backwards compatibility with downstream controller-gen < 0.16.
+- text: "defaults: field LocalObjectReference\\.Name should use only the marker \\+default, \\+kubebuilder:default is not required"
+  path: "staging/src/k8s.io/api/core/v1/types\\.go"
+
