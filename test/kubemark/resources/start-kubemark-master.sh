@@ -392,18 +392,6 @@ rules:
       - group: "" # core
         resources: ["configmaps"]
   - level: None
-    users: ["kubelet"] # legacy kubelet identity
-    verbs: ["get"]
-    resources:
-      - group: "" # core
-        resources: ["nodes", "nodes/status"]
-  - level: None
-    userGroups: ["system:nodes"]
-    verbs: ["get"]
-    resources:
-      - group: "" # core
-        resources: ["nodes", "nodes/status"]
-  - level: None
     users:
       - system:kube-controller-manager
       - system:kube-scheduler
