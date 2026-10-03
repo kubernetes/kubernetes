@@ -176,6 +176,37 @@ func TestGetSchemaObject(t *testing.T) {
 	}
 }
 
+func TestGetRaw(t *testing.T) {
+	tf := cmdtesting.NewTestFactory()
+	defer tf.Cleanup()
+
+	const response = `{"gitVersion":"v1.test"}`
+	tf.Client = &fake.RESTClient{
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+			if req.Method != http.MethodGet || req.URL.Path != "/version" {
+				t.Errorf("unexpected request: %s %s", req.Method, req.URL.Path)
+			}
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Header:     cmdtesting.DefaultHeader(),
+				Body:       cmdtesting.BytesBody([]byte(response)),
+			}, nil
+		}),
+	}
+	tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
+
+	streams, _, buf, _ := genericiooptions.NewTestIOStreams()
+	cmd := NewCmdGet("kubectl", tf, streams)
+	if err := cmd.Flags().Set("raw", "/version"); err != nil {
+		t.Fatal(err)
+	}
+	cmd.Run(cmd, nil)
+
+	if got := buf.String(); got != response {
+		t.Errorf("expected %q, got %q", response, got)
+	}
+}
+
 func TestGetObjects(t *testing.T) {
 	pods, _, _ := cmdtesting.TestData()
 
