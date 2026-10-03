@@ -107,6 +107,15 @@ type Allocator struct {
 	// amount of work the allocator had to do to allocate devices
 	// for the claims.
 	numAllocateOneInvocations atomic.Int64
+	// newConstraints, when set, produces caller-supplied constraints
+	// for each Allocate invocation.
+	newConstraints internal.NewAllocationConstraintFunc
+}
+
+// SetAllocationConstraintProvider installs a provider of caller-supplied
+// constraints. A nil provider restores the default behaviour.
+func (a *Allocator) SetAllocationConstraintProvider(fn internal.NewAllocationConstraintFunc) {
+	a.newConstraints = fn
 }
 
 var _ internal.AllocatorExtended = &Allocator{}
@@ -157,6 +166,7 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node, claims []*resou
 		claimsToAllocate:     claims,
 		deviceMatchesRequest: make(map[matchKey]bool),
 		constraints:          make([][]constraint, len(claims)),
+		callerConstraints:    make([][]callerConstraint, len(claims)),
 		consumedCounters:     make(map[PoolID]counterSets),
 		requestData:          make(map[requestIndices]requestData),
 		result:               make([]internalAllocationResult, len(claims)),
@@ -316,6 +326,29 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node, claims []*resou
 	// can serve as key because they are static for the duration of
 	// the Allocate call and can be compared in Go.
 	alloc.deviceMatchesRequest = make(map[matchKey]bool)
+
+	// Produce caller-supplied constraints, if a provider is installed.
+	// The provider is called once per Allocate, so it can build per-node
+	// state and share it across all candidate evaluations for this node.
+	// The claim index and class name are filled in at add() time, where
+	// the allocator knows which request is being satisfied.
+	if a.newConstraints != nil {
+		outer, err := a.newConstraints(ctx, node, claims)
+		if err != nil {
+			return nil, fmt.Errorf("%w: producing caller constraints: %w", internal.ErrFailedAllocationOnNode, err)
+		}
+		for claimIdx := range claims {
+			// The provider returns one flat list. Distribute the entries
+			// across claims by index modulo, matching how a caller that
+			// returns one constraint per claim would lay them out.
+			for i := claimIdx; i < len(outer); i += len(claims) {
+				alloc.callerConstraints[claimIdx] = append(alloc.callerConstraints[claimIdx], callerConstraint{
+					claim: claims[claimIdx],
+					outer: outer[i],
+				})
+			}
+		}
+	}
 
 	// We can estimate the size based on what we need to allocate.
 	alloc.allocatingDevices = make(map[DeviceID]sets.Set[int], minDevicesTotal)
@@ -638,7 +671,8 @@ type allocator struct {
 	claimsToAllocate     []*resourceapi.ResourceClaim
 	pools                []*Pool
 	deviceMatchesRequest map[matchKey]bool
-	constraints          [][]constraint // one list of constraints per claim
+	constraints          [][]constraint       // one list of constraints per claim
+	callerConstraints    [][]callerConstraint // one list of caller-supplied constraints per claim
 	// consumedCounters keeps track of the counters consumed by all devices
 	// that are in the process of being allocated.
 	// The keys in the map are resource pool IDs (driver name and pool name).
@@ -782,6 +816,52 @@ type constraint interface {
 	// For every successful add there is exactly one matching removed call
 	// with the exact same parameters.
 	remove(requestName, subRequestName string, device *draapi.Device, deviceID DeviceID)
+}
+
+// callerConstraint adapts an internal.AllocationConstraint to the per-node
+// state the allocator tracks. The capacity map is populated at the call site,
+// after the allocator has computed the final rounded values.
+type callerConstraint struct {
+	claim *resourceapi.ResourceClaim
+	outer internal.AllocationConstraint
+}
+
+// add is called with the class name of the request currently being
+// satisfied, which the allocator knows at the call site.
+func (c *callerConstraint) add(requestName, subRequestName, deviceClassName string,
+	device *draapi.Device, deviceID DeviceID,
+	consumedCapacity map[resourceapi.QualifiedName]resource.Quantity,
+	adminAccess bool) bool {
+	request := requestName
+	if subRequestName != "" {
+		request = requestName + "/" + subRequestName
+	}
+	return c.outer.Add(internal.DeviceAllocation{
+		Claim:            c.claim,
+		Request:          request,
+		DeviceClassName:  deviceClassName,
+		Device:           deviceID,
+		ConsumedCapacity: consumedCapacity,
+		AdminAccess:      adminAccess,
+	})
+}
+
+func (c *callerConstraint) remove(requestName, subRequestName, deviceClassName string,
+	device *draapi.Device, deviceID DeviceID,
+	consumedCapacity map[resourceapi.QualifiedName]resource.Quantity,
+	adminAccess bool) {
+	request := requestName
+	if subRequestName != "" {
+		request = requestName + "/" + subRequestName
+	}
+	c.outer.Remove(internal.DeviceAllocation{
+		Claim:            c.claim,
+		Request:          request,
+		DeviceClassName:  deviceClassName,
+		Device:           deviceID,
+		ConsumedCapacity: consumedCapacity,
+		AdminAccess:      adminAccess,
+	})
 }
 
 // matchAttributeConstraint compares an attribute value across devices.
@@ -1471,6 +1551,29 @@ func (alloc *allocator) allocateDevice(r deviceIndices, device deviceWithID, mus
 		}
 	}
 
+	// Caller-supplied constraints run after capacity computation so that
+	// they see the final rounded values, and before the result is recorded
+	// so that rejection rolls back cleanly. Rejection backtracks exactly
+	// like a DeviceConstraint violation.
+	state.callerConsumedCapacity = consumedCapacity
+	state.callerAdminAccess = request.adminAccess()
+	state.callerDeviceClassName = ""
+	if requestData.class != nil {
+		state.callerDeviceClassName = requestData.class.Name
+	}
+	for i := range alloc.callerConstraints[r.claimIndex] {
+		if !alloc.callerConstraints[r.claimIndex][i].add(baseRequestName, subRequestName,
+			state.callerDeviceClassName, device.Device, device.id,
+			consumedCapacity, state.callerAdminAccess) {
+			alloc.rollbackDevice(r, device, baseRequestName, subRequestName, state)
+			if must {
+				return false, nil, fmt.Errorf("claim %s, request %s: cannot add device %s because a caller constraint would not be satisfied", klog.KObj(claim), request.name(), device.id)
+			}
+			return false, nil, nil
+		}
+		state.callerConstraintsAdded++
+	}
+
 	result := internalDeviceResult{
 		request:       request.name(),
 		parentRequest: parentRequestName,
@@ -1501,14 +1604,20 @@ func (alloc *allocator) allocateDevice(r deviceIndices, device deviceWithID, mus
 // candidate so rollbackDevice can undo them, both when the candidate is rejected
 // and when the backtracking search abandons a previously successful candidate.
 type deviceRollbackState struct {
-	countersReserved     bool
-	constraintsAdded     int
-	deviceMarked         bool
-	capacityInserted     bool
-	capacityEntryExisted bool
-	resultAdded          bool
-	previousNumResults   int
-	consumedCapacity     map[resourceapi.QualifiedName]resource.Quantity
+	countersReserved       bool
+	constraintsAdded       int
+	callerConstraintsAdded int
+	deviceMarked           bool
+	capacityInserted       bool
+	capacityEntryExisted   bool
+	resultAdded            bool
+	previousNumResults     int
+	consumedCapacity       map[resourceapi.QualifiedName]resource.Quantity
+	// callerConsumedCapacity records the capacity map passed to the caller
+	// constraints so that rollback can replay it in Remove.
+	callerConsumedCapacity map[resourceapi.QualifiedName]resource.Quantity
+	callerAdminAccess      bool
+	callerDeviceClassName  string
 }
 
 // rollbackDevice reverses the mutations recorded in state, in the opposite order
@@ -1531,6 +1640,11 @@ func (alloc *allocator) rollbackDevice(r deviceIndices, device deviceWithID, bas
 	}
 	if state.deviceMarked {
 		alloc.allocatingDevices[device.id].Delete(r.claimIndex)
+	}
+	for i := state.callerConstraintsAdded - 1; i >= 0; i-- {
+		alloc.callerConstraints[r.claimIndex][i].remove(baseRequestName, subRequestName,
+			state.callerDeviceClassName, device.Device, device.id,
+			state.callerConsumedCapacity, state.callerAdminAccess)
 	}
 	for i := state.constraintsAdded - 1; i >= 0; i-- {
 		alloc.constraints[r.claimIndex][i].remove(baseRequestName, subRequestName, device.Device, device.id)
