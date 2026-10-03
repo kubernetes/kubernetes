@@ -47,7 +47,7 @@ const (
 	CloudNodeAdditionalLabelsReconciliation featuregate.Feature = "CloudNodeAdditionalLabelsReconciliation"
 
 	// owner: @jefftree, @tchap
-	//
+	// kep:  http://kep.k8s.io/5366
 	// Make kube-controller-manager release leader election lock on exit.
 	ControllerManagerReleaseLeaderElectionLockOnExit featuregate.Feature = "ControllerManagerReleaseLeaderElectionLockOnExit"
 )
@@ -70,5 +70,6 @@ var versionedCloudPublicFeatureGates = map[featuregate.Feature]featuregate.Versi
 	},
 	ControllerManagerReleaseLeaderElectionLockOnExit: {
 		{Version: version.MustParse("1.36"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.37"), Default: true, PreRelease: featuregate.Beta},
 	},
 }
