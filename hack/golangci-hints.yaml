@@ -225,7 +225,7 @@ linters:
       # OptionalOrRequired is being enabled over time. For now, each API group should be added to this list until we comb through each group and fix the missing tags.
       # The nonpointerstructs linter is included here as well as these two should be enabled hand-in-hand on each API group.
       - text: "must be marked as optional or required|is a non-pointer struct with no required fields."
-        path: "staging/src/k8s.io/api/(admissionregistration|autoscaling|certificates|core|extensions)"
+        path: "staging/src/k8s.io/api/(autoscaling|certificates|core|extensions)"
       
       # nonpointerstructs/optionalorrequired - IngressBackend and ServiceBackendPort are "oneOf"-shaped
       # structs (validation requires exactly one of Resource/Service, or Name/Number, to be set) but
@@ -267,6 +267,12 @@ linters:
       # Validation requires exactly one of spec.resourceAttributes or spec.nonResourceAttributes, so an empty spec is always rejected and the field is required in practice.
       - text: "nonpointerstructs: field (SubjectAccessReview|SelfSubjectAccessReview|LocalSubjectAccessReview)\\.Spec is a non-pointer struct with no required fields\\..*"
         path: "staging/src/k8s.io/api/authorization/(v1|v1beta1)/types\\.go"
+      
+      # The (ValidatingWebhook|MutatingWebhook).ClientConfig fields hold a union type, but nonpointerstructs does not understand unions today.
+      # Validation requires exactly one of clientConfig.url or clientConfig.service (reported as `clientConfig: Required value`),
+      # so an empty clientConfig is always rejected and the field is required in practice.
+      - text: "nonpointerstructs: field (ValidatingWebhook|MutatingWebhook)\\.ClientConfig is a non-pointer struct with no required fields\\..*"
+        path: "staging/src/k8s.io/api/admissionregistration/(v1|v1beta1)/types\\.go"
       
       # NoReferences - Existing fields that use Reference/References suffixes instead of Ref/Refs.
       # These fields use the Reference suffix, but renaming them would be a breaking change, so they are allowlisted.

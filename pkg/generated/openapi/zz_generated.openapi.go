@@ -1634,6 +1634,7 @@ func schema_k8sio_api_admissionregistration_v1_ApplyConfiguration(ref common.Ref
 						},
 					},
 				},
+				Required: []string{"expression"},
 			},
 		},
 	}
@@ -1714,6 +1715,7 @@ func schema_k8sio_api_admissionregistration_v1_JSONPatch(ref common.ReferenceCal
 						},
 					},
 				},
+				Required: []string{"expression"},
 			},
 		},
 	}
@@ -1861,6 +1863,7 @@ func schema_k8sio_api_admissionregistration_v1_MutatingAdmissionPolicy(ref commo
 						},
 					},
 				},
+				Required: []string{"spec"},
 			},
 		},
 		Dependencies: []string{
@@ -1904,6 +1907,7 @@ func schema_k8sio_api_admissionregistration_v1_MutatingAdmissionPolicyBinding(re
 						},
 					},
 				},
+				Required: []string{"spec"},
 			},
 		},
 		Dependencies: []string{
@@ -1988,6 +1992,7 @@ func schema_k8sio_api_admissionregistration_v1_MutatingAdmissionPolicyBindingSpe
 						},
 					},
 				},
+				Required: []string{"policyName"},
 			},
 		},
 		Dependencies: []string{
@@ -2140,6 +2145,7 @@ func schema_k8sio_api_admissionregistration_v1_MutatingAdmissionPolicySpec(ref c
 						},
 					},
 				},
+				Required: []string{"matchConstraints", "mutations", "reinvocationPolicy"},
 			},
 		},
 		Dependencies: []string{
@@ -2547,6 +2553,7 @@ func schema_k8sio_api_admissionregistration_v1_NamedRuleWithOperations(ref commo
 						},
 					},
 				},
+				Required: []string{"operations", "apiGroups", "apiVersions", "resources"},
 			},
 			VendorExtensible: spec.VendorExtensible{
 				Extensions: spec.Extensions{
@@ -2579,6 +2586,7 @@ func schema_k8sio_api_admissionregistration_v1_ParamKind(ref common.ReferenceCal
 						},
 					},
 				},
+				Required: []string{"apiVersion", "kind"},
 			},
 			VendorExtensible: spec.VendorExtensible{
 				Extensions: spec.Extensions{
@@ -2710,6 +2718,7 @@ func schema_k8sio_api_admissionregistration_v1_Rule(ref common.ReferenceCallback
 						},
 					},
 				},
+				Required: []string{"apiGroups", "apiVersions", "resources"},
 			},
 		},
 	}
@@ -2808,6 +2817,7 @@ func schema_k8sio_api_admissionregistration_v1_RuleWithOperations(ref common.Ref
 						},
 					},
 				},
+				Required: []string{"operations", "apiGroups", "apiVersions", "resources"},
 			},
 		},
 	}
@@ -2933,6 +2943,7 @@ func schema_k8sio_api_admissionregistration_v1_ValidatingAdmissionPolicy(ref com
 						},
 					},
 				},
+				Required: []string{"spec"},
 			},
 		},
 		Dependencies: []string{
@@ -3249,6 +3260,7 @@ func schema_k8sio_api_admissionregistration_v1_ValidatingAdmissionPolicySpec(ref
 						},
 					},
 				},
+				Required: []string{"matchConstraints"},
 			},
 		},
 		Dependencies: []string{
@@ -3676,6 +3688,7 @@ func schema_k8sio_api_admissionregistration_v1alpha1_ApplyConfiguration(ref comm
 						},
 					},
 				},
+				Required: []string{"expression"},
 			},
 		},
 	}
@@ -3756,6 +3769,7 @@ func schema_k8sio_api_admissionregistration_v1alpha1_JSONPatch(ref common.Refere
 						},
 					},
 				},
+				Required: []string{"expression"},
 			},
 		},
 	}
@@ -3902,6 +3916,7 @@ func schema_k8sio_api_admissionregistration_v1alpha1_MutatingAdmissionPolicy(ref
 						},
 					},
 				},
+				Required: []string{"spec"},
 			},
 		},
 		Dependencies: []string{
@@ -3945,6 +3960,7 @@ func schema_k8sio_api_admissionregistration_v1alpha1_MutatingAdmissionPolicyBind
 						},
 					},
 				},
+				Required: []string{"spec"},
 			},
 		},
 		Dependencies: []string{
@@ -4029,6 +4045,7 @@ func schema_k8sio_api_admissionregistration_v1alpha1_MutatingAdmissionPolicyBind
 						},
 					},
 				},
+				Required: []string{"policyName"},
 			},
 		},
 		Dependencies: []string{
@@ -4181,6 +4198,7 @@ func schema_k8sio_api_admissionregistration_v1alpha1_MutatingAdmissionPolicySpec
 						},
 					},
 				},
+				Required: []string{"matchConstraints", "mutations", "reinvocationPolicy"},
 			},
 		},
 		Dependencies: []string{
@@ -4337,6 +4355,7 @@ func schema_k8sio_api_admissionregistration_v1alpha1_NamedRuleWithOperations(ref
 						},
 					},
 				},
+				Required: []string{"operations", "apiGroups", "apiVersions", "resources"},
 			},
 			VendorExtensible: spec.VendorExtensible{
 				Extensions: spec.Extensions{
@@ -4369,6 +4388,7 @@ func schema_k8sio_api_admissionregistration_v1alpha1_ParamKind(ref common.Refere
 						},
 					},
 				},
+				Required: []string{"apiVersion", "kind"},
 			},
 			VendorExtensible: spec.VendorExtensible{
 				Extensions: spec.Extensions{
@@ -4503,6 +4523,7 @@ func schema_k8sio_api_admissionregistration_v1alpha1_ValidatingAdmissionPolicy(r
 						},
 					},
 				},
+				Required: []string{"spec"},
 			},
 		},
 		Dependencies: []string{
@@ -4819,6 +4840,7 @@ func schema_k8sio_api_admissionregistration_v1alpha1_ValidatingAdmissionPolicySp
 						},
 					},
 				},
+				Required: []string{"matchConstraints"},
 			},
 		},
 		Dependencies: []string{
@@ -4963,6 +4985,7 @@ func schema_k8sio_api_admissionregistration_v1beta1_ApplyConfiguration(ref commo
 						},
 					},
 				},
+				Required: []string{"expression"},
 			},
 		},
 	}
@@ -5043,6 +5066,7 @@ func schema_k8sio_api_admissionregistration_v1beta1_JSONPatch(ref common.Referen
 						},
 					},
 				},
+				Required: []string{"expression"},
 			},
 		},
 	}
@@ -5189,6 +5213,7 @@ func schema_k8sio_api_admissionregistration_v1beta1_MutatingAdmissionPolicy(ref 
 						},
 					},
 				},
+				Required: []string{"spec"},
 			},
 		},
 		Dependencies: []string{
@@ -5232,6 +5257,7 @@ func schema_k8sio_api_admissionregistration_v1beta1_MutatingAdmissionPolicyBindi
 						},
 					},
 				},
+				Required: []string{"spec"},
 			},
 		},
 		Dependencies: []string{
@@ -5316,6 +5342,7 @@ func schema_k8sio_api_admissionregistration_v1beta1_MutatingAdmissionPolicyBindi
 						},
 					},
 				},
+				Required: []string{"policyName"},
 			},
 		},
 		Dependencies: []string{
@@ -5467,6 +5494,7 @@ func schema_k8sio_api_admissionregistration_v1beta1_MutatingAdmissionPolicySpec(
 						},
 					},
 				},
+				Required: []string{"matchConstraints", "mutations", "reinvocationPolicy"},
 			},
 		},
 		Dependencies: []string{
@@ -5871,6 +5899,7 @@ func schema_k8sio_api_admissionregistration_v1beta1_NamedRuleWithOperations(ref 
 						},
 					},
 				},
+				Required: []string{"operations", "apiGroups", "apiVersions", "resources"},
 			},
 			VendorExtensible: spec.VendorExtensible{
 				Extensions: spec.Extensions{
@@ -5903,6 +5932,7 @@ func schema_k8sio_api_admissionregistration_v1beta1_ParamKind(ref common.Referen
 						},
 					},
 				},
+				Required: []string{"apiVersion", "kind"},
 			},
 			VendorExtensible: spec.VendorExtensible{
 				Extensions: spec.Extensions{
@@ -6081,6 +6111,7 @@ func schema_k8sio_api_admissionregistration_v1beta1_ValidatingAdmissionPolicy(re
 						},
 					},
 				},
+				Required: []string{"spec"},
 			},
 		},
 		Dependencies: []string{
@@ -6396,6 +6427,7 @@ func schema_k8sio_api_admissionregistration_v1beta1_ValidatingAdmissionPolicySpe
 						},
 					},
 				},
+				Required: []string{"matchConstraints"},
 			},
 		},
 		Dependencies: []string{
