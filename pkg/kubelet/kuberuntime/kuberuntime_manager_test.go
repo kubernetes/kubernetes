@@ -25,6 +25,7 @@ import (
 	goruntime "runtime"
 	"sort"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -659,44 +660,49 @@ func TestKillPod(t *testing.T) {
 }
 
 func TestSyncPod(t *testing.T) {
-	tCtx := ktesting.Init(t)
-	fakeRuntime, fakeImage, m, err := createTestRuntimeManager(tCtx)
-	assert.NoError(t, err)
+	for _, parallelOps := range []bool{false, true} {
+		t.Run(fmt.Sprintf("KubeletParallelContainerOps=%v", parallelOps), func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KubeletParallelContainerOps, parallelOps)
+			tCtx := ktesting.Init(t)
+			fakeRuntime, fakeImage, m, err := createTestRuntimeManager(tCtx)
+			require.NoError(t, err)
 
-	containers := []v1.Container{
-		{
-			Name:            "foo1",
-			Image:           "busybox",
-			ImagePullPolicy: v1.PullIfNotPresent,
-		},
-		{
-			Name:            "foo2",
-			Image:           "alpine",
-			ImagePullPolicy: v1.PullIfNotPresent,
-		},
-	}
-	pod := &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			UID:       "12345678",
-			Name:      "foo",
-			Namespace: "new",
-		},
-		Spec: v1.PodSpec{
-			Containers: containers,
-		},
-	}
+			containers := []v1.Container{
+				{
+					Name:            "foo1",
+					Image:           "busybox",
+					ImagePullPolicy: v1.PullIfNotPresent,
+				},
+				{
+					Name:            "foo2",
+					Image:           "alpine",
+					ImagePullPolicy: v1.PullIfNotPresent,
+				},
+			}
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					UID:       "12345678",
+					Name:      "foo",
+					Namespace: "new",
+				},
+				Spec: v1.PodSpec{
+					Containers: containers,
+				},
+			}
 
-	backOff := flowcontrol.NewBackOff(time.Second, time.Minute)
-	result := m.SyncPod(tCtx, pod, &kubecontainer.PodStatus{}, []v1.Secret{}, backOff, false)
-	assert.NoError(t, result.Error())
-	assert.Len(t, fakeRuntime.Containers, 2)
-	assert.Len(t, fakeImage.Images, 2)
-	assert.Len(t, fakeRuntime.Sandboxes, 1)
-	for _, sandbox := range fakeRuntime.Sandboxes {
-		assert.Equal(t, runtimeapi.PodSandboxState_SANDBOX_READY, sandbox.State)
-	}
-	for _, c := range fakeRuntime.Containers {
-		assert.Equal(t, runtimeapi.ContainerState_CONTAINER_RUNNING, c.State)
+			backOff := flowcontrol.NewBackOff(time.Second, time.Minute)
+			result := m.SyncPod(tCtx, pod, &kubecontainer.PodStatus{}, []v1.Secret{}, backOff, false)
+			require.NoError(t, result.Error())
+			assert.Len(t, fakeRuntime.Containers, 2)
+			assert.Len(t, fakeImage.Images, 2)
+			assert.Len(t, fakeRuntime.Sandboxes, 1)
+			for _, sandbox := range fakeRuntime.Sandboxes {
+				assert.Equal(t, runtimeapi.PodSandboxState_SANDBOX_READY, sandbox.State)
+			}
+			for _, c := range fakeRuntime.Containers {
+				assert.Equal(t, runtimeapi.ContainerState_CONTAINER_RUNNING, c.State)
+			}
+		})
 	}
 }
 
@@ -5173,6 +5179,7 @@ func TestDoPodResizeAction(t *testing.T) {
 
 type mockVolumeResizeRuntimeHelper struct {
 	containertest.FakeRuntimeHelper
+	mu          sync.Mutex
 	resizeCalls []mockResizeCall
 	resizeErr   error
 }
@@ -5183,6 +5190,8 @@ type mockResizeCall struct {
 }
 
 func (f *mockVolumeResizeRuntimeHelper) ResizeEphemeralVolume(_ *v1.Pod, volumeName string, newSize *resource.Quantity) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	f.resizeCalls = append(f.resizeCalls, mockResizeCall{volumeName: volumeName, newSize: newSize})
 	return f.resizeErr
 }
@@ -5375,118 +5384,154 @@ func TestDoPodResizeAction_Volumes(t *testing.T) {
 			expectedActuated:  map[string]*resource.Quantity{},
 			expectedResultErr: true,
 		},
+		{
+			testName:          "Successful volume downsize and upsize with multiple volumes",
+			volumesToDownsize: []string{"down-vol", "down-vol-2"},
+			volumesToUpsize:   []string{"up-vol", "up-vol-2"},
+			expectedCalls: []mockResizeCall{
+				{volumeName: "down-vol", newSize: resource.NewQuantity(100, resource.BinarySI)},
+				{volumeName: "down-vol-2", newSize: resource.NewQuantity(100, resource.BinarySI)},
+				{volumeName: "up-vol", newSize: resource.NewQuantity(200, resource.BinarySI)},
+				{volumeName: "up-vol-2", newSize: resource.NewQuantity(200, resource.BinarySI)},
+			},
+			expectedActuated: map[string]*resource.Quantity{
+				"down-vol":   resource.NewQuantity(100, resource.BinarySI),
+				"down-vol-2": resource.NewQuantity(100, resource.BinarySI),
+				"up-vol":     resource.NewQuantity(200, resource.BinarySI),
+				"up-vol-2":   resource.NewQuantity(200, resource.BinarySI),
+			},
+		},
 	} {
 		t.Run(tc.testName, func(t *testing.T) {
-			_, _, m, err := createTestRuntimeManager(tCtx)
-			require.NoError(t, err)
+			for _, parallelOps := range []bool{false, true} {
+				t.Run(fmt.Sprintf("%s/parallel=%v", tc.testName, parallelOps), func(t *testing.T) {
+					featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KubeletParallelContainerOps, parallelOps)
 
-			mockCM := cmtesting.NewMockContainerManager(t)
-			mockCM.EXPECT().PodHasExclusiveCPUs(mock.Anything, mock.Anything).Return(false).Maybe()
-			mockCM.EXPECT().ContainerHasExclusiveCPUs(mock.Anything, mock.Anything, mock.Anything).Return(false).Maybe()
-			m.containerManager = mockCM
-			mockPCM := cmtesting.NewMockPodContainerManager(t)
-			mockCM.EXPECT().NewPodContainerManager().Return(mockPCM)
+					_, _, m, err := createTestRuntimeManager(tCtx)
+					require.NoError(t, err)
 
-			mockPCM.EXPECT().GetPodCgroupConfig(mock.Anything, v1.ResourceMemory).Return(&cm.ResourceConfig{
-				Memory: new(int64(200)),
-			}, nil).Maybe()
-			mockPCM.EXPECT().GetPodCgroupConfig(mock.Anything, v1.ResourceCPU).Return(&cm.ResourceConfig{
-				CPUShares: new(cm.MilliCPUToShares(100)),
-				CPUQuota:  new(cm.MilliCPUToQuota(100, cm.QuotaPeriod)),
-			}, nil).Maybe()
+					mockCM := cmtesting.NewMockContainerManager(t)
+					mockCM.EXPECT().PodHasExclusiveCPUs(mock.Anything, mock.Anything).Return(false).Maybe()
+					mockCM.EXPECT().ContainerHasExclusiveCPUs(mock.Anything, mock.Anything, mock.Anything).Return(false).Maybe()
+					m.containerManager = mockCM
+					mockPCM := cmtesting.NewMockPodContainerManager(t)
+					mockCM.EXPECT().NewPodContainerManager().Return(mockPCM)
 
-			pod := &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					UID: "test-pod-uid",
-				},
-				Spec: v1.PodSpec{
-					Volumes: []v1.Volume{
-						{
-							Name: "down-vol",
-							VolumeSource: v1.VolumeSource{
-								EmptyDir: &v1.EmptyDirVolumeSource{
-									Medium:    v1.StorageMediumMemory,
-									SizeLimit: resource.NewQuantity(100, resource.BinarySI),
+					mockPCM.EXPECT().GetPodCgroupConfig(mock.Anything, v1.ResourceMemory).Return(&cm.ResourceConfig{
+						Memory: new(int64(200)),
+					}, nil).Maybe()
+					mockPCM.EXPECT().GetPodCgroupConfig(mock.Anything, v1.ResourceCPU).Return(&cm.ResourceConfig{
+						CPUShares: new(cm.MilliCPUToShares(100)),
+						CPUQuota:  new(cm.MilliCPUToQuota(100, cm.QuotaPeriod)),
+					}, nil).Maybe()
+
+					pod := &v1.Pod{
+						ObjectMeta: metav1.ObjectMeta{
+							UID: "test-pod-uid",
+						},
+						Spec: v1.PodSpec{
+							Volumes: []v1.Volume{
+								{
+									Name: "down-vol",
+									VolumeSource: v1.VolumeSource{
+										EmptyDir: &v1.EmptyDirVolumeSource{
+											Medium:    v1.StorageMediumMemory,
+											SizeLimit: resource.NewQuantity(100, resource.BinarySI),
+										},
+									},
+								},
+								{
+									Name: "up-vol",
+									VolumeSource: v1.VolumeSource{
+										EmptyDir: &v1.EmptyDirVolumeSource{
+											Medium:    v1.StorageMediumMemory,
+											SizeLimit: resource.NewQuantity(200, resource.BinarySI),
+										},
+									},
+								},
+								{
+									Name: "down-vol-2",
+									VolumeSource: v1.VolumeSource{
+										EmptyDir: &v1.EmptyDirVolumeSource{
+											Medium:    v1.StorageMediumMemory,
+											SizeLimit: resource.NewQuantity(100, resource.BinarySI),
+										},
+									},
+								},
+								{
+									Name: "up-vol-2",
+									VolumeSource: v1.VolumeSource{
+										EmptyDir: &v1.EmptyDirVolumeSource{
+											Medium:    v1.StorageMediumMemory,
+											SizeLimit: resource.NewQuantity(200, resource.BinarySI),
+										},
+									},
 								},
 							},
 						},
-						{
-							Name: "up-vol",
-							VolumeSource: v1.VolumeSource{
-								EmptyDir: &v1.EmptyDirVolumeSource{
-									Medium:    v1.StorageMediumMemory,
-									SizeLimit: resource.NewQuantity(200, resource.BinarySI),
-								},
-							},
-						},
-					},
-				},
-			}
-
-			// Pre-seed initial state for both volumes so we can observe state changes
-			require.NoError(t, m.actuatedState.SetEmptyDirVolumeLimit(pod.UID, "down-vol", resource.NewQuantity(300, resource.BinarySI)))
-			require.NoError(t, m.actuatedState.SetEmptyDirVolumeLimit(pod.UID, "up-vol", resource.NewQuantity(50, resource.BinarySI)))
-
-			helper := &mockVolumeResizeRuntimeHelper{
-				resizeErr: tc.injectResizeError,
-			}
-			m.runtimeHelper = helper
-
-			var volumesToDownsize []v1.Volume
-			for _, name := range tc.volumesToDownsize {
-				for _, vol := range pod.Spec.Volumes {
-					if vol.Name == name {
-						volumesToDownsize = append(volumesToDownsize, vol)
 					}
-				}
-			}
-			var volumesToUpsize []v1.Volume
-			for _, name := range tc.volumesToUpsize {
-				for _, vol := range pod.Spec.Volumes {
-					if vol.Name == name {
-						volumesToUpsize = append(volumesToUpsize, vol)
+
+					// Pre-seed initial state for volumes so we can observe state changes
+					require.NoError(t, m.actuatedState.SetEmptyDirVolumeLimit(pod.UID, "down-vol", resource.NewQuantity(300, resource.BinarySI)))
+					require.NoError(t, m.actuatedState.SetEmptyDirVolumeLimit(pod.UID, "down-vol-2", resource.NewQuantity(300, resource.BinarySI)))
+					require.NoError(t, m.actuatedState.SetEmptyDirVolumeLimit(pod.UID, "up-vol", resource.NewQuantity(50, resource.BinarySI)))
+					require.NoError(t, m.actuatedState.SetEmptyDirVolumeLimit(pod.UID, "up-vol-2", resource.NewQuantity(50, resource.BinarySI)))
+
+					helper := &mockVolumeResizeRuntimeHelper{
+						resizeErr: tc.injectResizeError,
 					}
-				}
-			}
+					m.runtimeHelper = helper
 
-			podStatus := &kubecontainer.PodStatus{}
-			actions := podActions{
-				VolumesToDownsize: volumesToDownsize,
-				VolumesToUpsize:   volumesToUpsize,
-				SandboxID:         "sandbox-id",
-			}
+					var volumesToDownsize []v1.Volume
+					for _, name := range tc.volumesToDownsize {
+						for _, vol := range pod.Spec.Volumes {
+							if vol.Name == name {
+								volumesToDownsize = append(volumesToDownsize, vol)
+							}
+						}
+					}
+					var volumesToUpsize []v1.Volume
+					for _, name := range tc.volumesToUpsize {
+						for _, vol := range pod.Spec.Volumes {
+							if vol.Name == name {
+								volumesToUpsize = append(volumesToUpsize, vol)
+							}
+						}
+					}
 
-			result := m.doPodResizeAction(tCtx, pod, podStatus, actions)
+					podStatus := &kubecontainer.PodStatus{}
+					actions := podActions{
+						VolumesToDownsize: volumesToDownsize,
+						VolumesToUpsize:   volumesToUpsize,
+						SandboxID:         "sandbox-id",
+					}
 
-			if tc.expectedResultErr {
-				require.Error(t, result.Error)
-			} else {
-				require.NoError(t, result.Error)
-			}
+					result := m.doPodResizeAction(tCtx, pod, podStatus, actions)
 
-			require.Len(t, helper.resizeCalls, len(tc.expectedCalls), "number of ResizeEphemeralVolume calls")
-			for idx, expectedCall := range tc.expectedCalls {
-				actualCall := helper.resizeCalls[idx]
-				assert.Equal(t, expectedCall.volumeName, actualCall.volumeName)
-				if expectedCall.newSize == nil {
-					assert.Nil(t, actualCall.newSize)
-				} else {
-					require.NotNil(t, actualCall.newSize)
-					assert.Equal(t, expectedCall.newSize.Value(), actualCall.newSize.Value())
-				}
-			}
+					if tc.expectedResultErr {
+						require.Error(t, result.Error)
+					} else {
+						require.NoError(t, result.Error)
+					}
 
-			// Check final actuated state
-			for volName, expectedLimit := range tc.expectedActuated {
-				limit, found := m.actuatedState.GetEmptyDirVolumeLimit(pod.UID, volName)
-				require.True(t, found, "actuated state should exist for %s", volName)
-				assert.Equal(t, expectedLimit.Value(), limit.Value(), "actuated state for %s", volName)
-			}
-			// If downsize failed, upsize is not executed and up-vol stays at initial state (50)
-			if tc.expectedResultErr {
-				limit, found := m.actuatedState.GetEmptyDirVolumeLimit(pod.UID, "up-vol")
-				require.True(t, found)
-				assert.Equal(t, int64(50), limit.Value())
+					require.Len(t, helper.resizeCalls, len(tc.expectedCalls), "number of ResizeEphemeralVolume calls")
+					downCount := len(tc.volumesToDownsize)
+					assert.ElementsMatch(t, tc.expectedCalls[:downCount], helper.resizeCalls[:downCount], "downsize calls should happen first")
+					assert.ElementsMatch(t, tc.expectedCalls[downCount:], helper.resizeCalls[downCount:], "upsize calls should happen after downsize")
+
+					// Check final actuated state
+					for volName, expectedLimit := range tc.expectedActuated {
+						limit, found := m.actuatedState.GetEmptyDirVolumeLimit(pod.UID, volName)
+						require.True(t, found, "actuated state should exist for %s", volName)
+						assert.Equal(t, expectedLimit.Value(), limit.Value(), "actuated state for %s", volName)
+					}
+					// If downsize failed, upsize is not executed and up-vol stays at initial state (50)
+					if tc.expectedResultErr {
+						limit, found := m.actuatedState.GetEmptyDirVolumeLimit(pod.UID, "up-vol")
+						require.True(t, found)
+						assert.Equal(t, int64(50), limit.Value())
+					}
+				})
 			}
 		})
 	}
@@ -6977,4 +7022,453 @@ func TestSysctlFiltering(t *testing.T) {
 			}
 		})
 	}
+}
+
+type barrierRuntimeService struct {
+	*apitest.FakeRuntimeService
+	onCreateContainer          func(ctx context.Context, podSandboxID string, config *runtimeapi.ContainerConfig, sandboxConfig *runtimeapi.PodSandboxConfig) error
+	onStopContainer            func(ctx context.Context, containerID string, timeout int64) error
+	onUpdateContainerResources func(ctx context.Context, containerID string, resources *runtimeapi.ContainerResources) error
+}
+
+func (b *barrierRuntimeService) CreateContainer(ctx context.Context, podSandboxID string, config *runtimeapi.ContainerConfig, sandboxConfig *runtimeapi.PodSandboxConfig) (string, error) {
+	if b.onCreateContainer != nil {
+		if err := b.onCreateContainer(ctx, podSandboxID, config, sandboxConfig); err != nil {
+			return "", err
+		}
+	}
+	return b.FakeRuntimeService.CreateContainer(ctx, podSandboxID, config, sandboxConfig)
+}
+
+func (b *barrierRuntimeService) StopContainer(ctx context.Context, containerID string, timeout int64) error {
+	if b.onStopContainer != nil {
+		if err := b.onStopContainer(ctx, containerID, timeout); err != nil {
+			return err
+		}
+	}
+	return b.FakeRuntimeService.StopContainer(ctx, containerID, timeout)
+}
+
+func (b *barrierRuntimeService) UpdateContainerResources(ctx context.Context, containerID string, resources *runtimeapi.ContainerResources) error {
+	if b.onUpdateContainerResources != nil {
+		if err := b.onUpdateContainerResources(ctx, containerID, resources); err != nil {
+			return err
+		}
+	}
+	return b.FakeRuntimeService.UpdateContainerResources(ctx, containerID, resources)
+}
+
+func TestSyncPodParallelContainerKills(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KubeletParallelContainerOps, true)
+
+	fakeRuntime, _, m, err := createTestRuntimeManager(tCtx)
+	require.NoError(t, err)
+
+	pod, _ := makeBasePodAndStatus()
+	makeAndSetFakePod(tCtx, m, fakeRuntime, pod)
+	runtimePod, err := m.GetPod(tCtx, pod.UID)
+	require.NoError(t, err)
+	podStatus, err := m.GetPodStatus(tCtx, runtimePod)
+	require.NoError(t, err)
+	// Mutate hashes of all 3 containers so computePodActions marks all 3 in ContainersToKill.
+	for _, cs := range podStatus.ContainerStatuses {
+		cs.Hash = 999999
+	}
+
+	var (
+		stopWg    sync.WaitGroup
+		releaseCh = make(chan struct{})
+	)
+	stopWg.Add(3)
+	go func() {
+		stopWg.Wait()
+		close(releaseCh)
+	}()
+
+	m.runtimeService = &barrierRuntimeService{
+		FakeRuntimeService: fakeRuntime,
+		onStopContainer: func(ctx context.Context, _ string, _ int64) error {
+			stopWg.Done()
+			<-releaseCh
+			return nil
+		},
+	}
+
+	backOff := flowcontrol.NewBackOff(time.Second, time.Minute)
+	result := m.SyncPod(tCtx, pod, podStatus, []v1.Secret{}, backOff, false)
+	require.NoError(t, result.Error())
+}
+
+type barrierVolumeResizeHelper struct {
+	containertest.FakeRuntimeHelper
+	onResize func(volumeName string, newSize *resource.Quantity) error
+}
+
+func (b *barrierVolumeResizeHelper) ResizeEphemeralVolume(_ *v1.Pod, volumeName string, newSize *resource.Quantity) error {
+	return b.onResize(volumeName, newSize)
+}
+
+func TestDoPodResizeActionVolumesParallel(t *testing.T) {
+	if goruntime.GOOS != "linux" {
+		t.Skip("unsupported OS")
+	}
+
+	tCtx := ktesting.Init(t)
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.InPlacePodVerticalScalingMemoryBackedVolumes: true,
+		features.KubeletParallelContainerOps:                  true,
+	})
+
+	_, _, m, err := createTestRuntimeManager(tCtx)
+	require.NoError(t, err)
+
+	mockCM := cmtesting.NewMockContainerManager(t)
+	mockCM.EXPECT().PodHasExclusiveCPUs(mock.Anything, mock.Anything).Return(false).Maybe()
+	mockCM.EXPECT().ContainerHasExclusiveCPUs(mock.Anything, mock.Anything, mock.Anything).Return(false).Maybe()
+	m.containerManager = mockCM
+	mockPCM := cmtesting.NewMockPodContainerManager(t)
+	mockCM.EXPECT().NewPodContainerManager().Return(mockPCM)
+	mockPCM.EXPECT().GetPodCgroupConfig(mock.Anything, v1.ResourceMemory).Return(&cm.ResourceConfig{Memory: new(int64(200))}, nil).Maybe()
+	mockPCM.EXPECT().GetPodCgroupConfig(mock.Anything, v1.ResourceCPU).Return(&cm.ResourceConfig{
+		CPUShares: new(cm.MilliCPUToShares(100)),
+		CPUQuota:  new(cm.MilliCPUToQuota(100, cm.QuotaPeriod)),
+	}, nil).Maybe()
+
+	var (
+		mu             sync.Mutex
+		downFinished   int
+		upStartedEarly bool
+		downWg         sync.WaitGroup
+		downReleaseCh  = make(chan struct{})
+		upWg           sync.WaitGroup
+		upReleaseCh    = make(chan struct{})
+	)
+	downWg.Add(2)
+	go func() {
+		downWg.Wait()
+		close(downReleaseCh)
+	}()
+	upWg.Add(2)
+	go func() {
+		upWg.Wait()
+		close(upReleaseCh)
+	}()
+
+	m.runtimeHelper = &barrierVolumeResizeHelper{
+		onResize: func(volumeName string, _ *resource.Quantity) error {
+			if strings.HasPrefix(volumeName, "down-") {
+				downWg.Done()
+				<-downReleaseCh
+				mu.Lock()
+				downFinished++
+				mu.Unlock()
+			} else {
+				mu.Lock()
+				if downFinished < 2 {
+					upStartedEarly = true
+				}
+				mu.Unlock()
+				upWg.Done()
+				<-upReleaseCh
+			}
+			return nil
+		},
+	}
+
+	vol := func(name string, size int64) v1.Volume {
+		return v1.Volume{
+			Name: name,
+			VolumeSource: v1.VolumeSource{
+				EmptyDir: &v1.EmptyDirVolumeSource{
+					Medium:    v1.StorageMediumMemory,
+					SizeLimit: resource.NewQuantity(size, resource.BinarySI),
+				},
+			},
+		}
+	}
+
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{UID: "vol-resize-uid"},
+		Spec: v1.PodSpec{
+			Volumes: []v1.Volume{
+				vol("down-1", 100),
+				vol("down-2", 100),
+				vol("up-1", 300),
+				vol("up-2", 300),
+			},
+		},
+	}
+
+	actions := podActions{
+		VolumesToDownsize: []v1.Volume{pod.Spec.Volumes[0], pod.Spec.Volumes[1]},
+		VolumesToUpsize:   []v1.Volume{pod.Spec.Volumes[2], pod.Spec.Volumes[3]},
+		SandboxID:         "sandbox-id",
+	}
+
+	res := m.doPodResizeAction(tCtx, pod, &kubecontainer.PodStatus{}, actions)
+	require.NoError(t, res.Error)
+	assert.False(t, upStartedEarly, "volume upsizes must not start before all volume downsizes complete")
+}
+
+func TestUpdatePodContainerResourcesParallelOrdering(t *testing.T) {
+	if goruntime.GOOS != "linux" {
+		t.Skip("in-place resize is only supported on Linux")
+	}
+
+	tCtx := ktesting.Init(t)
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.InPlacePodVerticalScaling:   true,
+		features.KubeletParallelContainerOps: true,
+	})
+
+	fakeRuntime, _, m, err := createTestRuntimeManager(tCtx)
+	require.NoError(t, err)
+	m.machineInfo.MemoryCapacity = 17179860387
+	m.cpuCFSQuota = true
+
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:       "resize-pod-uid",
+			Name:      "resize-pod",
+			Namespace: "default",
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{Name: "down1", Image: "busybox"},
+				{Name: "down2", Image: "busybox"},
+				{Name: "up1", Image: "busybox"},
+				{Name: "up2", Image: "busybox"},
+			},
+		},
+	}
+	_, fakeContainers := makeAndSetFakePod(tCtx, m, fakeRuntime, pod)
+
+	var (
+		mu             sync.Mutex
+		downFinished   int
+		upStartedEarly bool
+		downWg         sync.WaitGroup
+		downReleaseCh  = make(chan struct{})
+		upWg           sync.WaitGroup
+		upReleaseCh    = make(chan struct{})
+	)
+	downWg.Add(2)
+	go func() {
+		downWg.Wait()
+		close(downReleaseCh)
+	}()
+	upWg.Add(2)
+	go func() {
+		upWg.Wait()
+		close(upReleaseCh)
+	}()
+
+	downIDs := sets.New(fakeContainers[0].Id, fakeContainers[1].Id)
+	m.runtimeService = &barrierRuntimeService{
+		FakeRuntimeService: fakeRuntime,
+		onUpdateContainerResources: func(ctx context.Context, containerID string, _ *runtimeapi.ContainerResources) error {
+			if downIDs.Has(containerID) {
+				downWg.Done()
+				<-downReleaseCh
+				mu.Lock()
+				downFinished++
+				mu.Unlock()
+			} else {
+				mu.Lock()
+				if downFinished < 2 {
+					upStartedEarly = true
+				}
+				mu.Unlock()
+				upWg.Done()
+				<-upReleaseCh
+			}
+			return nil
+		},
+	}
+
+	containersToUpdate := []containerToUpdateInfo{
+		{
+			container:                 &pod.Spec.Containers[0],
+			kubeContainerID:           kubecontainer.ContainerID{Type: "fakeRuntime", ID: fakeContainers[0].Id},
+			desiredContainerResources: resourceRequirements{memoryLimit: 100, memoryRequest: 100, cpuLimit: 100, cpuRequest: 100},
+			currentContainerResources: &resourceRequirements{memoryLimit: 200, memoryRequest: 200, cpuLimit: 100, cpuRequest: 100},
+		},
+		{
+			container:                 &pod.Spec.Containers[1],
+			kubeContainerID:           kubecontainer.ContainerID{Type: "fakeRuntime", ID: fakeContainers[1].Id},
+			desiredContainerResources: resourceRequirements{memoryLimit: 100, memoryRequest: 100, cpuLimit: 100, cpuRequest: 100},
+			currentContainerResources: &resourceRequirements{memoryLimit: 200, memoryRequest: 200, cpuLimit: 100, cpuRequest: 100},
+		},
+		{
+			container:                 &pod.Spec.Containers[2],
+			kubeContainerID:           kubecontainer.ContainerID{Type: "fakeRuntime", ID: fakeContainers[2].Id},
+			desiredContainerResources: resourceRequirements{memoryLimit: 300, memoryRequest: 300, cpuLimit: 100, cpuRequest: 100},
+			currentContainerResources: &resourceRequirements{memoryLimit: 200, memoryRequest: 200, cpuLimit: 100, cpuRequest: 100},
+		},
+		{
+			container:                 &pod.Spec.Containers[3],
+			kubeContainerID:           kubecontainer.ContainerID{Type: "fakeRuntime", ID: fakeContainers[3].Id},
+			desiredContainerResources: resourceRequirements{memoryLimit: 300, memoryRequest: 300, cpuLimit: 100, cpuRequest: 100},
+			currentContainerResources: &resourceRequirements{memoryLimit: 200, memoryRequest: 200, cpuLimit: 100, cpuRequest: 100},
+		},
+	}
+
+	err = m.updatePodContainerResources(tCtx, pod, v1.ResourceMemory, containersToUpdate)
+	require.NoError(t, err)
+	assert.False(t, upStartedEarly, "container upsizes must not start before all container downsizes complete")
+}
+
+type barrierImageService struct {
+	*apitest.FakeImageService
+	onPullImage func(ctx context.Context, image *runtimeapi.ImageSpec) error
+}
+
+func (b *barrierImageService) PullImage(ctx context.Context, image *runtimeapi.ImageSpec, auth *runtimeapi.AuthConfig, podSandboxConfig *runtimeapi.PodSandboxConfig) (string, error) {
+	if b.onPullImage != nil {
+		if err := b.onPullImage(ctx, image); err != nil {
+			return "", err
+		}
+	}
+	return b.FakeImageService.PullImage(ctx, image, auth, podSandboxConfig)
+}
+
+func TestGetImageVolumesParallel(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.ImageVolume:                 true,
+		features.KubeletParallelContainerOps: true,
+	})
+
+	_, fakeImage, m, err := createTestRuntimeManager(tCtx)
+	require.NoError(t, err)
+
+	var (
+		pullWg    sync.WaitGroup
+		releaseCh = make(chan struct{})
+	)
+	pullWg.Add(2)
+	go func() {
+		pullWg.Wait()
+		close(releaseCh)
+	}()
+
+	m.imageService = &barrierImageService{
+		FakeImageService: fakeImage,
+		onPullImage: func(ctx context.Context, _ *runtimeapi.ImageSpec) error {
+			pullWg.Done()
+			<-releaseCh
+			return nil
+		},
+	}
+
+	pod := &v1.Pod{
+		Spec: v1.PodSpec{
+			Volumes: []v1.Volume{
+				{Name: "vol1", VolumeSource: v1.VolumeSource{Image: &v1.ImageVolumeSource{Reference: "img1:latest", PullPolicy: v1.PullAlways}}},
+				{Name: "vol2", VolumeSource: v1.VolumeSource{Image: &v1.ImageVolumeSource{Reference: "img2:latest", PullPolicy: v1.PullAlways}}},
+			},
+		},
+	}
+	podSandboxConfig := &runtimeapi.PodSandboxConfig{
+		Metadata: &runtimeapi.PodSandboxMetadata{Name: "pod", Namespace: "default", Uid: "uid"},
+	}
+
+	pulls, err := m.getImageVolumes(tCtx, pod, podSandboxConfig, nil)
+	require.NoError(t, err)
+	assert.Len(t, pulls, 2)
+}
+
+func TestSyncPodParallelContainerStarts(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KubeletParallelContainerOps, true)
+
+	fakeRuntime, _, m, err := createTestRuntimeManager(tCtx)
+	require.NoError(t, err)
+
+	var (
+		enteredWg sync.WaitGroup
+		releaseCh = make(chan struct{})
+	)
+	enteredWg.Add(3)
+	go func() {
+		enteredWg.Wait()
+		close(releaseCh)
+	}()
+
+	m.runtimeService = &barrierRuntimeService{
+		FakeRuntimeService: fakeRuntime,
+		onCreateContainer: func(ctx context.Context, _ string, config *runtimeapi.ContainerConfig, _ *runtimeapi.PodSandboxConfig) error {
+			if config.Metadata.Name == "fail-container" {
+				enteredWg.Done()
+				<-releaseCh
+				return errors.New("injected create failure")
+			}
+			enteredWg.Done()
+			<-releaseCh
+			return nil
+		},
+	}
+
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:       "parallel-start-uid",
+			Name:      "parallel-start-pod",
+			Namespace: "default",
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{Name: "c1", Image: "busybox", ImagePullPolicy: v1.PullIfNotPresent},
+				{Name: "fail-container", Image: "busybox", ImagePullPolicy: v1.PullIfNotPresent},
+				{Name: "c2", Image: "alpine", ImagePullPolicy: v1.PullIfNotPresent},
+			},
+		},
+	}
+
+	backOff := flowcontrol.NewBackOff(time.Second, time.Minute)
+	result := m.SyncPod(tCtx, pod, &kubecontainer.PodStatus{}, []v1.Secret{}, backOff, false)
+	// SyncPod returns an error because fail-container failed, but c1 and c2 must still be created and started concurrently.
+	require.Error(t, result.Error())
+	assert.Len(t, fakeRuntime.Containers, 2)
+	for _, c := range fakeRuntime.Containers {
+		assert.Equal(t, runtimeapi.ContainerState_CONTAINER_RUNNING, c.State)
+	}
+}
+
+func TestSyncPodParallelEphemeralContainerStarts(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KubeletParallelContainerOps, true)
+
+	fakeRuntime, _, m, err := createTestRuntimeManager(tCtx)
+	require.NoError(t, err)
+
+	pod, podStatus := makeBasePodAndStatus()
+	pod.Spec.EphemeralContainers = []v1.EphemeralContainer{
+		{EphemeralContainerCommon: v1.EphemeralContainerCommon{Name: "eph1", Image: "busybox", ImagePullPolicy: v1.PullIfNotPresent}},
+		{EphemeralContainerCommon: v1.EphemeralContainerCommon{Name: "eph2", Image: "alpine", ImagePullPolicy: v1.PullIfNotPresent}},
+	}
+
+	var (
+		enteredWg sync.WaitGroup
+		releaseCh = make(chan struct{})
+	)
+	enteredWg.Add(2)
+	go func() {
+		enteredWg.Wait()
+		close(releaseCh)
+	}()
+
+	m.runtimeService = &barrierRuntimeService{
+		FakeRuntimeService: fakeRuntime,
+		onCreateContainer: func(ctx context.Context, _ string, _ *runtimeapi.ContainerConfig, _ *runtimeapi.PodSandboxConfig) error {
+			enteredWg.Done()
+			<-releaseCh
+			return nil
+		},
+	}
+
+	backOff := flowcontrol.NewBackOff(time.Second, time.Minute)
+	result := m.SyncPod(tCtx, pod, podStatus, []v1.Secret{}, backOff, false)
+	require.NoError(t, result.Error())
+	assert.Len(t, fakeRuntime.Containers, 2)
 }
