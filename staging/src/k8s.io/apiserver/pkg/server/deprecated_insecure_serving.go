@@ -42,9 +42,10 @@ type DeprecatedInsecureServingInfo struct {
 // the initial listen call fails. It does not block.
 func (s *DeprecatedInsecureServingInfo) Serve(handler http.Handler, shutdownTimeout time.Duration, stopCh <-chan struct{}) error {
 	insecureServer := &http.Server{
-		Addr:           s.Listener.Addr().String(),
-		Handler:        handler,
-		MaxHeaderBytes: 1 << 20,
+		Addr:                s.Listener.Addr().String(),
+		Handler:             handler,
+		MaxHeaderBytes:      1 << 20,
+		MaxHeaderValueCount: maxHeaderValueCount,
 
 		IdleTimeout:       90 * time.Second, // matches http.DefaultTransport keep-alive timeout
 		ReadHeaderTimeout: 32 * time.Second, // just shy of requestTimeoutUpperBound
