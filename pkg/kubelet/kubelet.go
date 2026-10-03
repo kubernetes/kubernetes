@@ -1799,6 +1799,11 @@ func (kl *Kubelet) initializeModules(ctx context.Context) error {
 		collectors.NewVolumeStatsCollector(kl),
 		collectors.NewLogMetricsCollector(kl.StatsProvider.ListPodStats),
 	)
+	if utilfeature.DefaultFeatureGate.Enabled(features.NodeSystemPartition) {
+		metrics.RegisterCollectors(collectors.NewPartitionMetricsCollector(func() map[string]cm.PartitionStats {
+			return kl.containerManager.PartitionStats(logger)
+		}))
+	}
 	metrics.SetNodeName(kl.nodeName)
 	servermetrics.Register()
 

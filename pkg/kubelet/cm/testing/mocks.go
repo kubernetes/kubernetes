@@ -1405,6 +1405,59 @@ func (_c *MockContainerManager_NewPodContainerManager_Call) RunAndReturn(run fun
 	return _c
 }
 
+// PartitionStats provides a mock function for the type MockContainerManager
+func (_mock *MockContainerManager) PartitionStats(logger klog.Logger) map[string]cm.PartitionStats {
+	ret := _mock.Called(logger)
+
+	if len(ret) == 0 {
+		panic("no return value specified for PartitionStats")
+	}
+
+	var r0 map[string]cm.PartitionStats
+	if returnFunc, ok := ret.Get(0).(func(klog.Logger) map[string]cm.PartitionStats); ok {
+		r0 = returnFunc(logger)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(map[string]cm.PartitionStats)
+		}
+	}
+	return r0
+}
+
+// MockContainerManager_PartitionStats_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'PartitionStats'
+type MockContainerManager_PartitionStats_Call struct {
+	*mock.Call
+}
+
+// PartitionStats is a helper method to define mock.On call
+//   - logger klog.Logger
+func (_e *MockContainerManager_Expecter) PartitionStats(logger any) *MockContainerManager_PartitionStats_Call {
+	return &MockContainerManager_PartitionStats_Call{Call: _e.mock.On("PartitionStats", logger)}
+}
+
+func (_c *MockContainerManager_PartitionStats_Call) Run(run func(logger klog.Logger)) *MockContainerManager_PartitionStats_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 klog.Logger
+		if args[0] != nil {
+			arg0 = args[0].(klog.Logger)
+		}
+		run(
+			arg0,
+		)
+	})
+	return _c
+}
+
+func (_c *MockContainerManager_PartitionStats_Call) Return(stringToPartitionStats map[string]cm.PartitionStats) *MockContainerManager_PartitionStats_Call {
+	_c.Call.Return(stringToPartitionStats)
+	return _c
+}
+
+func (_c *MockContainerManager_PartitionStats_Call) RunAndReturn(run func(logger klog.Logger) map[string]cm.PartitionStats) *MockContainerManager_PartitionStats_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // PodHasExclusiveCPUs provides a mock function for the type MockContainerManager
 func (_mock *MockContainerManager) PodHasExclusiveCPUs(logger klog.Logger, pod *v1.Pod) bool {
 	ret := _mock.Called(logger, pod)

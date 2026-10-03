@@ -321,6 +321,10 @@ func (cm *containerManagerImpl) GetSystemPartitionCgroupRoot() string {
 	return ""
 }
 
+func (cm *containerManagerImpl) PartitionStats(_ klog.Logger) map[string]PartitionStats {
+	return nil
+}
+
 func (cm *containerManagerImpl) GetDevices(podUID, containerName string) []*podresourcesapi.ContainerDevices {
 	return containerDevicesFromResourceDeviceInstances(cm.deviceManager.GetDevices(podUID, containerName))
 }
