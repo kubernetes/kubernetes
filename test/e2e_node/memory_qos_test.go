@@ -789,6 +789,50 @@ var _ = SIGDescribe("MemoryQoS", framework.WithSerial(), func() {
 				"memory.high should be 'max' after resize with MemoryQoS disabled")
 		})
 
+		ginkgo.It("should reset memory.high to max when resize lands on request == limit", func(ctx context.Context) {
+			configureMemoryQoSWithPolicy(ctx, 0.9, kubeletconfig.TieredReservationMemoryReservationPolicy)
+
+			pod := memqosMakePod("memqos-resize-to-equal", f.Namespace.Name,
+				v1.ResourceList{
+					v1.ResourceMemory: resource.MustParse("128Mi"),
+					v1.ResourceCPU:    resource.MustParse("50m"),
+				},
+				v1.ResourceList{
+					v1.ResourceMemory: resource.MustParse("256Mi"),
+					v1.ResourceCPU:    resource.MustParse("100m"),
+				},
+			)
+			pod.Spec.Containers[0].ResizePolicy = []v1.ContainerResizePolicy{
+				{ResourceName: v1.ResourceMemory, RestartPolicy: v1.NotRequired},
+				{ResourceName: v1.ResourceCPU, RestartPolicy: v1.NotRequired},
+			}
+			pod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
+
+			podCgroupPath := memqosGetPodCgroupPath(pod, cgroupDriver)
+			containerCgroupPath := memqosGetContainerCgroupPath(podCgroupPath, pod.Status.ContainerStatuses[0].ContainerID, cgroupDriver)
+
+			memHigh, err := memqosReadCgroupFile(containerCgroupPath, cgroupMemoryHigh)
+			framework.ExpectNoError(err)
+			framework.Logf("memory.high with request < limit: %s", memHigh)
+			gomega.Expect(memHigh).NotTo(gomega.Equal("max"),
+				"memory.high should be a computed value when request < limit")
+
+			ginkgo.By("Resizing the request up to the limit via IPPR")
+			pod, err = f.ClientSet.CoreV1().Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
+			framework.ExpectNoError(err)
+
+			pod.Spec.Containers[0].Resources.Requests[v1.ResourceMemory] = resource.MustParse("256Mi")
+			_, err = f.ClientSet.CoreV1().Pods(pod.Namespace).UpdateResize(ctx, pod.Name, pod, metav1.UpdateOptions{})
+			framework.ExpectNoError(err)
+
+			ginkgo.By("Verifying memory.high is reset to max once request equals limit")
+			gomega.Eventually(ctx, func() string {
+				val, _ := memqosReadCgroupFile(containerCgroupPath, cgroupMemoryHigh)
+				return val
+			}).WithTimeout(2*time.Minute).WithPolling(5*time.Second).Should(gomega.Equal("max"),
+				"memory.high should be 'max' after resize to request == limit")
+		})
+
 		ginkgo.It("should set memory.high after updating memoryThrottlingFactor from nil to 0.9 and resizing", func(ctx context.Context) {
 			ginkgo.By("Starting kubelet with MemoryQoS enabled but memoryThrottlingFactor=nil (default)")
 			newCfg := oldCfg.DeepCopy()
