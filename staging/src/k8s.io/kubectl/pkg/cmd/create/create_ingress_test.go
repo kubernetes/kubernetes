@@ -142,6 +142,24 @@ func TestCreateIngressValidation(t *testing.T) {
 			},
 			expected: "rule foo.com/=svc:http,tls,garbage is invalid and should be in format host/path=svcname:svcport[,tls[=secret]]",
 		},
+		"invalid rule with an equals sign in the path": {
+			rules: []string{
+				"foo.com/a=b=svc:http",
+			},
+			expected: "rule foo.com/a=b=svc:http is invalid and should be in format host/path=svcname:svcport[,tls[=secret]]",
+		},
+		"invalid rule with a comma in the path": {
+			rules: []string{
+				"foo.com/a,b=svc:http",
+			},
+			expected: "rule foo.com/a,b=svc:http is invalid and should be in format host/path=svcname:svcport[,tls[=secret]]",
+		},
+		"invalid rule with a newline in the path": {
+			rules: []string{
+				"foo.com/a\nb=svc:http",
+			},
+			expected: "rule foo.com/a\nb=svc:http is invalid and should be in format host/path=svcname:svcport[,tls[=secret]]",
+		},
 	}
 
 	for name, tc := range tests {
