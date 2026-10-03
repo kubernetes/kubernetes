@@ -1017,6 +1017,12 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.37"
+- name: KubeletOOMScoreAdjTieBreak
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.38"
 - name: KubeletPodResourcesDynamicResources
   versionedSpecs:
   - default: false
