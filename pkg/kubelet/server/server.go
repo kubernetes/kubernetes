@@ -55,6 +55,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/proxy"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
@@ -248,6 +249,31 @@ func ListenAndServeKubeletReadOnlyServer(
 		logger.Error(err, "Failed to listen and serve")
 		os.Exit(1)
 	}
+}
+
+// ListenAndServeHealthzServer initializes a server to respond to HTTP healthz network requests on the Kubelet.
+func ListenAndServeHealthzServer(
+	ctx context.Context,
+	host HostInterface,
+	address string,
+	port int) {
+	if port <= 0 {
+		return
+	}
+	logger := klog.FromContext(ctx)
+	logger.Info("Starting to listen healthz", "address", address, "port", port)
+	mux := http.NewServeMux()
+	healthz.InstallHandler(mux,
+		healthz.PingHealthz,
+		healthz.LogHealthz,
+		healthz.NamedCheck("syncloop", host.SyncLoopHealthCheck),
+	)
+	go wait.UntilWithContext(ctx, func(ctx context.Context) {
+		err := http.ListenAndServe(net.JoinHostPort(address, strconv.Itoa(port)), mux)
+		if err != nil {
+			logger.Error(err, "Failed to start healthz server")
+		}
+	}, 5*time.Second)
 }
 
 // ListenAndServePodResources initializes a gRPC server to serve the PodResources service

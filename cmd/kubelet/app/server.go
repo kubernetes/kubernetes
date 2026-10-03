@@ -27,7 +27,6 @@ import (
 	"io/fs"
 	"math"
 	"net"
-	"net/http"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -65,7 +64,6 @@ import (
 	utilversion "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/server/flagz"
-	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/apiserver/pkg/server/signals"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
@@ -988,17 +986,6 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 		return err
 	}
 
-	if s.HealthzPort > 0 {
-		mux := http.NewServeMux()
-		healthz.InstallHandler(mux)
-		go wait.UntilWithContext(ctx, func(ctx context.Context) {
-			err := http.ListenAndServe(net.JoinHostPort(s.HealthzBindAddress, strconv.Itoa(int(s.HealthzPort))), mux)
-			if err != nil {
-				logger.Error(err, "Failed to start healthz server")
-			}
-		}, 5*time.Second)
-	}
-
 	// If systemd is used, notify it that we have started
 	go daemon.SdNotify(false, "READY=1")
 
@@ -1351,6 +1338,9 @@ func startKubelet(ctx context.Context, k kubelet.Bootstrap, podCfg *config.PodCo
 	}
 	if kubeCfg.ReadOnlyPort > 0 {
 		go k.ListenAndServeReadOnly(ctx, netutils.ParseIPSloppy(kubeCfg.Address), uint(kubeCfg.ReadOnlyPort), kubeDeps.TracerProvider)
+	}
+	if kubeCfg.HealthzPort > 0 {
+		go k.ListenAndServeHealthz(ctx, kubeCfg.HealthzBindAddress, int(kubeCfg.HealthzPort))
 	}
 
 	go k.ListenAndServePodResources(ctx)
