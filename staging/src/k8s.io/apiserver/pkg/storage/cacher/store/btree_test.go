@@ -162,3 +162,7 @@ func (f fakeSnapshot) OrderedListPrefix(prefixKey, continueKey string) ([]interf
 func (f fakeSnapshot) RangePrefix(prefixKey, continueKey string) Range {
 	return nil
 }
+
+func (f fakeSnapshot) ResourceVersion() uint64 {
+	return uint64(f.rv)
+}
