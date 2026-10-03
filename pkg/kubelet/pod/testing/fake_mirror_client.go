@@ -19,6 +19,7 @@ package testing
 import (
 	"context"
 	"sync"
+	"time"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -33,6 +34,10 @@ type FakeMirrorClient struct {
 	mirrorPods   sets.Set[string]
 	createCounts map[string]int
 	deleteCounts map[string]int
+	// DeleteDelay simulates a slow API server. When non-zero,
+	// DeleteMirrorPod blocks for this duration unless the context
+	// expires first, in which case it returns the context error.
+	DeleteDelay time.Duration
 }
 
 func NewFakeMirrorClient() *FakeMirrorClient {
@@ -53,7 +58,14 @@ func (fmc *FakeMirrorClient) CreateMirrorPod(_ context.Context, pod *v1.Pod) err
 }
 
 // TODO (Robert Krawitz): Implement UID checking
-func (fmc *FakeMirrorClient) DeleteMirrorPod(_ context.Context, podFullName string, _ *types.UID) (bool, error) {
+func (fmc *FakeMirrorClient) DeleteMirrorPod(ctx context.Context, podFullName string, _ *types.UID) (bool, error) {
+	if fmc.DeleteDelay > 0 {
+		select {
+		case <-time.After(fmc.DeleteDelay):
+		case <-ctx.Done():
+			return false, ctx.Err()
+		}
+	}
 	fmc.mirrorPodLock.Lock()
 	defer fmc.mirrorPodLock.Unlock()
 	fmc.mirrorPods.Delete(podFullName)
