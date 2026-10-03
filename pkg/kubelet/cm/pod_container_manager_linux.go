@@ -111,7 +111,7 @@ func (m *podContainerManagerImpl) EnsureExists(logger klog.Logger, pod *v1.Pod) 
 		if err := m.cgroupManager.Create(logger, containerConfig); err != nil {
 			return fmt.Errorf("failed to create container for %v : %v", podContainerName, err)
 		}
-
+		m.removeStalePodCgroup(logger, pod)
 	}
 	return nil
 }
@@ -126,8 +126,8 @@ func (m *podContainerManagerImpl) applyPodLevelMemoryHigh(pod *v1.Pod, rc *Resou
 }
 
 // qosContainersInfoForPod returns the QoS container roots of the partition the
-// pod belongs to. Pods in the system partition get that partition's own QoS
-// hierarchy. All other pods get the default one directly under kubepods.
+// pod belongs to: the system partition's own QoS hierarchy, or the default one
+// directly under kubepods.
 func (m *podContainerManagerImpl) qosContainersInfoForPod(pod *v1.Pod) QOSContainersInfo {
 	if m.systemPartition.HasPod(pod) {
 		return m.systemQOSContainersInfo
@@ -164,6 +164,32 @@ func (m *podContainerManagerImpl) GetPodContainerName(pod *v1.Pod) (CgroupName, 
 	cgroupfsName := m.cgroupManager.Name(cgroupName)
 
 	return cgroupName, cgroupfsName
+}
+
+// removeStalePodCgroup removes the pod's cgroup in the partition it does not
+// belong to. Turning the system partition on or off moves a pod between
+// hierarchies, and the cgroup it was created under is left behind holding
+// nothing. Nothing else removes it while the pod runs, because the orphan
+// pod cgroup cleanup only reclaims cgroups of pods that are gone.
+func (m *podContainerManagerImpl) removeStalePodCgroup(logger klog.Logger, pod *v1.Pod) {
+	var stale CgroupName
+	if m.systemPartition.HasPod(pod) {
+		stale = podCgroupNameIn(m.qosContainersInfo, pod)
+	} else {
+		stale = podCgroupNameIn(m.systemQOSContainersInfo, pod)
+	}
+	// Most pods leave nothing behind, so skip the Destroy, a D-Bus call with
+	// the systemd driver, unless there is a cgroup to remove.
+	if !cgroupPathExists(m.subsystems, m.cgroupManager, stale) {
+		return
+	}
+	if err := m.cgroupManager.Destroy(logger, &CgroupConfig{Name: stale}); err != nil {
+		logger.V(4).Info("Failed to remove the pod cgroup left in the other partition",
+			"pod", klog.KObj(pod), "cgroupName", stale, "err", err)
+		return
+	}
+	logger.V(2).Info("Removed the pod cgroup left in the other partition",
+		"pod", klog.KObj(pod), "cgroupName", stale)
 }
 
 func (m *podContainerManagerImpl) GetPodCgroupMemoryUsage(pod *v1.Pod) (uint64, error) {
