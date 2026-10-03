@@ -398,6 +398,147 @@ func TestControllerSync(t *testing.T) {
 	}
 }
 
+func storeVersion(t *testing.T, prefix string, c cache.Store, version string, expectedReturn bool) {
+	pv := newVolume("pvName", "1Gi", "", "", v1.VolumeAvailable, v1.PersistentVolumeReclaimDelete, classEmpty)
+	pv.ResourceVersion = version
+	logger, _ := ktesting.NewTestContext(t)
+	ret, err := storeObjectUpdate(logger, c, pv, "volume")
+	if err != nil {
+		t.Errorf("%s: expected storeObjectUpdate to succeed, got: %v", prefix, err)
+	}
+	if expectedReturn != ret {
+		t.Errorf("%s: expected storeObjectUpdate to return %v, got: %v", prefix, expectedReturn, ret)
+	}
+
+	// find the stored version
+
+	pvObj, found, err := c.GetByKey("pvName")
+	if err != nil {
+		t.Errorf("expected volume 'pvName' in the cache, got error instead: %v", err)
+	}
+	if !found {
+		t.Errorf("expected volume 'pvName' in the cache but it was not found")
+	}
+	pv, ok := pvObj.(*v1.PersistentVolume)
+	if !ok {
+		t.Errorf("expected volume in the cache, got different object instead: %#v", pvObj)
+	}
+
+	if ret {
+		if pv.ResourceVersion != version {
+			t.Errorf("expected volume with version %s in the cache, got %s instead", version, pv.ResourceVersion)
+		}
+	} else {
+		if pv.ResourceVersion == version {
+			t.Errorf("expected volume with version other than %s in the cache, got %s instead", version, pv.ResourceVersion)
+		}
+	}
+}
+
+// TestControllerCache tests func storeObjectUpdate()
+func TestControllerCache(t *testing.T) {
+	// Cache under test
+	c := cache.NewStore(cache.DeletionHandlingMetaNamespaceKeyFunc)
+
+	// Store new PV
+	storeVersion(t, "Step1", c, "1", true)
+	// Store the same PV
+	storeVersion(t, "Step2", c, "1", true)
+	// Store newer PV
+	storeVersion(t, "Step3", c, "2", true)
+	// Store older PV - simulating old "PV updated" event or periodic sync with
+	// old data
+	storeVersion(t, "Step4", c, "1", false)
+	// Store newer PV - test integer parsing ("2" > "10" as string,
+	// while 2 < 10 as integers)
+	storeVersion(t, "Step5", c, "10", true)
+}
+
+func TestControllerCacheParsingError(t *testing.T) {
+	c := cache.NewStore(cache.DeletionHandlingMetaNamespaceKeyFunc)
+	// There must be something in the cache to compare with
+	storeVersion(t, "Step1", c, "1", true)
+
+	pv := newVolume("pvName", "1Gi", "", "", v1.VolumeAvailable, v1.PersistentVolumeReclaimDelete, classEmpty)
+	pv.ResourceVersion = "xxx"
+	logger, _ := ktesting.NewTestContext(t)
+	_, err := storeObjectUpdate(logger, c, pv, "volume")
+	if err == nil {
+		t.Errorf("Expected parsing error, got nil instead")
+	}
+}
+
+// TestIsVolumeReleased verifies that isVolumeReleased does not treat a volume
+// as released purely because its claim is momentarily missing from
+// ctrl.claims. That cache is populated asynchronously from the claim
+// informer and can lag behind the API server (e.g. right after a relist);
+// isVolumeReleased must fall back to a live check before authorizing
+// permanent deletion of the volume's backing storage.
+func TestIsVolumeReleased(t *testing.T) {
+	const claimUID = "uid-is-released-1"
+	const claimName = "claim-is-released-1"
+
+	tests := []struct {
+		name string
+		// claimCached: the claim is present in ctrl.claims.
+		claimCached bool
+		// claimLive: a claim with the same UID exists on the API server.
+		claimLive        bool
+		expectedReleased bool
+	}{
+		{
+			name:             "claim is cached and still bound, volume is not released",
+			claimCached:      true,
+			claimLive:        true,
+			expectedReleased: false,
+		},
+		{
+			name:             "claim is genuinely gone from cache and API server, volume is released",
+			claimCached:      false,
+			claimLive:        false,
+			expectedReleased: true,
+		},
+		{
+			name:             "claim missing only from ctrl.claims but still live, volume must not be released",
+			claimCached:      false,
+			claimLive:        true,
+			expectedReleased: false,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			claim := newClaim(claimName, claimUID, "1Gi", "", v1.ClaimBound, nil)
+			pv := newVolume("volume-is-released-1", "1Gi", claimUID, claimName, v1.VolumeBound, v1.PersistentVolumeReclaimDelete, classEmpty)
+
+			client := fake.NewSimpleClientset()
+			logger, ctx := ktesting.NewTestContext(t)
+			if test.claimLive {
+				if _, err := client.CoreV1().PersistentVolumeClaims(claim.Namespace).Create(ctx, claim, metav1.CreateOptions{}); err != nil {
+					t.Fatalf("Failed to create live claim: %v", err)
+				}
+			}
+
+			ctrl, err := newTestController(ctx, client, nil, false)
+			if err != nil {
+				t.Fatalf("Failed to create controller: %v", err)
+			}
+			if test.claimCached {
+				if err := ctrl.claims.Add(claim); err != nil {
+					t.Fatalf("Failed to seed claim cache: %v", err)
+				}
+			}
+
+			released, err := ctrl.isVolumeReleased(ctx, logger, pv)
+			if err != nil {
+				t.Fatalf("isVolumeReleased returned unexpected error: %v", err)
+			}
+			if released != test.expectedReleased {
+				t.Errorf("isVolumeReleased() = %v, want %v", released, test.expectedReleased)
+			}
+		})
+	}
+}
 func makeStorageClass(scName string, mode *storagev1.VolumeBindingMode) *storagev1.StorageClass {
 	return &storagev1.StorageClass{
 		ObjectMeta: metav1.ObjectMeta{
