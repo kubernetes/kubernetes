@@ -575,6 +575,13 @@ func NewMainKubelet(ctx context.Context,
 		KernelMemcgNotification:  kernelMemcgNotification,
 		PodCgroupRoot:            kubeDeps.ContainerManager.GetPodCgroupRoot(),
 	}
+	// The root is empty unless the container manager actually runs a system
+	// partition, e.g. not on cgroup v1 even with one configured.
+	if kubeDeps.ContainerManager.GetSystemPartitionCgroupRoot() != "" {
+		if sp := kubeDeps.ContainerManager.GetNodeConfig().SystemPartition; sp != nil {
+			evictionConfig.Thresholds = append(evictionConfig.Thresholds, sp.EvictionThresholds...)
+		}
+	}
 
 	var serviceLister corelisters.ServiceLister
 	var serviceHasSynced cache.InformerSynced
@@ -1867,7 +1874,7 @@ func (kl *Kubelet) initializeRuntimeDependentModules(ctx context.Context) {
 	}
 	// eviction manager must start after cadvisor because it needs to know if the container runtime has a dedicated imagefs
 	// Eviction decisions are based on the allocated (rather than desired) pod resources.
-	kl.evictionManager.Start(ctx, kl.StatsProvider, kl.getAllocatedPods, kl.PodIsFinished, evictionMonitoringPeriod)
+	kl.evictionManager.Start(ctx, kl.StatsProvider, kl.getAllocatedPods, kl.systemPartitionPodFunc(), kl.PodIsFinished, evictionMonitoringPeriod)
 
 	// container log manager must start after container runtime is up to retrieve information from container runtime
 	// and inform container to reopen log file after log rotation.

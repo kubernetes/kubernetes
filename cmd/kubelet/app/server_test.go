@@ -34,6 +34,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubelet/app/options"
 	kubeletconfiginternal "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
+	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
 	"k8s.io/utils/cpuset"
 )
 
@@ -682,6 +683,76 @@ func TestParseSystemPartition(t *testing.T) {
 			want: &cm.SystemPartitionConfig{
 				Namespaces: sets.New("kube-system"),
 			},
+		},
+		{
+			name: "memory eviction threshold",
+			input: &kubeletconfiginternal.SystemPartitionConfiguration{
+				MemoryLimit:  "1Gi",
+				EvictionHard: map[string]string{"memory.available": "5%"},
+				Namespaces:   []string{"kube-system"},
+			},
+			want: &cm.SystemPartitionConfig{
+				MemoryLimit: &gib,
+				Namespaces:  sets.New("kube-system"),
+				EvictionThresholds: []evictionapi.Threshold{{
+					Signal:   evictionapi.SignalSystemPartitionMemoryAvailable,
+					Operator: evictionapi.OpLessThan,
+					Value:    evictionapi.ThresholdValue{Percentage: 0.05},
+				}},
+			},
+		},
+		{
+			name: "unparsable memory eviction threshold",
+			input: &kubeletconfiginternal.SystemPartitionConfiguration{
+				MemoryLimit:  "1Gi",
+				EvictionHard: map[string]string{"memory.available": "5x%"},
+				Namespaces:   []string{"kube-system"},
+			},
+			wantErr: `failed to parse evictionHard map["memory.available":"5x%"]: `,
+		},
+		{
+			name: "memory eviction threshold above 100%",
+			input: &kubeletconfiginternal.SystemPartitionConfiguration{
+				MemoryLimit:  "1Gi",
+				EvictionHard: map[string]string{"memory.available": "150%"},
+				Namespaces:   []string{"kube-system"},
+			},
+			wantErr: `failed to parse evictionHard map["memory.available":"150%"]: eviction percentage threshold`,
+		},
+		{
+			name: "non-positive memory eviction threshold",
+			input: &kubeletconfiginternal.SystemPartitionConfiguration{
+				MemoryLimit:  "1Gi",
+				EvictionHard: map[string]string{"memory.available": "0"},
+				Namespaces:   []string{"kube-system"},
+			},
+			wantErr: `failed to parse evictionHard map["memory.available":"0"]: eviction threshold`,
+		},
+		{
+			name: "unsupported eviction signal",
+			input: &kubeletconfiginternal.SystemPartitionConfiguration{
+				MemoryLimit:  "1Gi",
+				EvictionHard: map[string]string{"nodefs.available": "10%"},
+				Namespaces:   []string{"kube-system"},
+			},
+			wantErr: `failed to parse evictionHard map["nodefs.available":"10%"]: unsupported system partition eviction signal nodefs.available`,
+		},
+		{
+			name: "memory eviction threshold without memory limit",
+			input: &kubeletconfiginternal.SystemPartitionConfiguration{
+				EvictionHard: map[string]string{"memory.available": "200Mi"},
+				Namespaces:   []string{"kube-system"},
+			},
+			wantErr: `evictionHard requires memoryLimit to be set`,
+		},
+		{
+			name: "memory eviction threshold not below memory limit",
+			input: &kubeletconfiginternal.SystemPartitionConfiguration{
+				MemoryLimit:  "1Gi",
+				EvictionHard: map[string]string{"memory.available": "1Gi"},
+				Namespaces:   []string{"kube-system"},
+			},
+			wantErr: `evictionHard memory.available "1Gi" must be less than memoryLimit "1Gi"`,
 		},
 		{
 			name: "unparsable memory limit",
