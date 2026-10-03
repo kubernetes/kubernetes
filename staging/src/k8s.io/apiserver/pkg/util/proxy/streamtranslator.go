@@ -75,7 +75,7 @@ func (h *StreamTranslatorHandler) ServeHTTP(w http.ResponseWriter, req *http.Req
 	spdyRoundTripper, err := spdy.NewRoundTripperWithConfig(spdy.RoundTripperConfig{UpgradeTransport: h.Transport, PingPeriod: 5 * time.Second})
 	if err != nil {
 		metrics.IncStreamTranslatorRequest(req.Context(), strconv.Itoa(http.StatusInternalServerError))
-		websocketStreams.writeStatus(apierrors.NewInternalError(err)) //nolint:errcheck
+		websocketStreams.finish(req.Context(), apierrors.NewInternalError(err))
 		return
 	}
 	spdyExecutor, err := remotecommand.NewSPDYExecutorRejectRedirects(
@@ -86,7 +86,7 @@ func (h *StreamTranslatorHandler) ServeHTTP(w http.ResponseWriter, req *http.Req
 	)
 	if err != nil {
 		metrics.IncStreamTranslatorRequest(req.Context(), strconv.Itoa(http.StatusInternalServerError))
-		websocketStreams.writeStatus(apierrors.NewInternalError(err)) //nolint:errcheck
+		websocketStreams.finish(req.Context(), apierrors.NewInternalError(err))
 		return
 	}
 
@@ -125,27 +125,25 @@ func (h *StreamTranslatorHandler) ServeHTTP(w http.ResponseWriter, req *http.Req
 	// through the websocket error stream.
 	err = spdyExecutor.StreamWithContext(req.Context(), opts)
 	if err != nil {
-		//nolint:errcheck   // Ignore writeStatus returned error
 		if statusErr, ok := err.(*apierrors.StatusError); ok {
 			// Increment status code returned within status error.
 			metrics.IncStreamTranslatorRequest(req.Context(), strconv.Itoa(int(statusErr.Status().Code)))
-			websocketStreams.writeStatus(statusErr)
+			websocketStreams.finish(req.Context(), statusErr)
 		} else if exitErr, ok := err.(exec.CodeExitError); ok && exitErr.Exited() {
 			// Returned an exit code from the container, so not an error in
 			// stream translator--add StatusOK to metrics.
 			metrics.IncStreamTranslatorRequest(req.Context(), strconv.Itoa(http.StatusOK))
-			websocketStreams.writeStatus(codeExitToStatusError(exitErr))
+			websocketStreams.finish(req.Context(), codeExitToStatusError(exitErr))
 		} else {
 			metrics.IncStreamTranslatorRequest(req.Context(), strconv.Itoa(http.StatusInternalServerError))
-			websocketStreams.writeStatus(apierrors.NewInternalError(err))
+			websocketStreams.finish(req.Context(), apierrors.NewInternalError(err))
 		}
 		return
 	}
 
 	metrics.IncStreamTranslatorRequest(req.Context(), strconv.Itoa(http.StatusOK))
-	// Write the success status back to the WebSocket client.
-	//nolint:errcheck
-	websocketStreams.writeStatus(&apierrors.StatusError{ErrStatus: metav1.Status{
+	// Report success to the WebSocket client and let it close the connection.
+	websocketStreams.finish(req.Context(), &apierrors.StatusError{ErrStatus: metav1.Status{
 		Status: metav1.StatusSuccess,
 	}})
 }

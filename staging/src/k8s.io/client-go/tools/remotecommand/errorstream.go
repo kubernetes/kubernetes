@@ -29,6 +29,13 @@ type errorStreamDecoder interface {
 	decode(message []byte) error
 }
 
+// emptyErrorStreamDecoder is implemented by decoders for protocols in which the
+// server always sends a status before it closes the error stream, so an error
+// stream that ends without any data means the session was cut short.
+type emptyErrorStreamDecoder interface {
+	decodeEmpty() error
+}
+
 // watchErrorStream watches the errorStream for remote command error data,
 // decodes it with the given errorStreamDecoder, sends the decoded error (or nil if the remote
 // command exited successfully) to the returned error channel, and closes it.
@@ -46,7 +53,11 @@ func watchErrorStream(logger klog.Logger, errorStream io.Reader, d errorStreamDe
 		case len(message) > 0:
 			errorChan <- d.decode(message)
 		default:
-			errorChan <- nil
+			if ed, ok := d.(emptyErrorStreamDecoder); ok {
+				errorChan <- ed.decodeEmpty()
+			} else {
+				errorChan <- nil
+			}
 		}
 		close(errorChan)
 	}()
