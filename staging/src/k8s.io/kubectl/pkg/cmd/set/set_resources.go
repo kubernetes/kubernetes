@@ -317,7 +317,7 @@ func parseResourceList(spec string) (v1.ResourceList, error) {
 	result := v1.ResourceList{}
 	for resourceStatement := range strings.SplitSeq(spec, ",") {
 		parts := strings.Split(resourceStatement, "=")
-		if len(parts) != 2 {
+		if len(parts) != 2 || parts[0] == "" {
 			return nil, fmt.Errorf("invalid argument syntax %v, expected <resource>=<value>", resourceStatement)
 		}
 		resourceName := v1.ResourceName(parts[0])

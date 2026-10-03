@@ -133,3 +133,44 @@ func TestCreateQuota(t *testing.T) {
 		})
 	}
 }
+
+func TestPopulateResourceListV1(t *testing.T) {
+	tests := map[string]struct {
+		spec        string
+		expectError bool
+	}{
+		"single resource": {
+			spec: "cpu=1",
+		},
+		"multiple resources": {
+			spec: "cpu=1,pods=42",
+		},
+		"empty resource name": {
+			spec:        "=1",
+			expectError: true,
+		},
+		"empty resource name among valid entries": {
+			spec:        "cpu=1,=2",
+			expectError: true,
+		},
+		"missing equals": {
+			spec:        "cpu",
+			expectError: true,
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			_, err := populateResourceListV1(tc.spec)
+			if tc.expectError {
+				if err == nil {
+					t.Fatalf("expected error for spec %q", tc.spec)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error for spec %q: %v", tc.spec, err)
+			}
+		})
+	}
+}

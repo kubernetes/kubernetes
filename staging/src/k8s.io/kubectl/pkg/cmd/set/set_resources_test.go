@@ -628,3 +628,44 @@ func TestSetResourcesRemoteWithSpecificContainers(t *testing.T) {
 		})
 	}
 }
+
+func TestParseResourceList(t *testing.T) {
+	tests := map[string]struct {
+		spec        string
+		expectError bool
+	}{
+		"single resource": {
+			spec: "cpu=200m",
+		},
+		"multiple resources": {
+			spec: "cpu=200m,memory=512Mi",
+		},
+		"empty resource name": {
+			spec:        "=1",
+			expectError: true,
+		},
+		"empty resource name among valid entries": {
+			spec:        "cpu=1,=2",
+			expectError: true,
+		},
+		"missing equals": {
+			spec:        "cpu",
+			expectError: true,
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			_, err := parseResourceList(tc.spec)
+			if tc.expectError {
+				if err == nil {
+					t.Fatalf("expected error for spec %q", tc.spec)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error for spec %q: %v", tc.spec, err)
+			}
+		})
+	}
+}
