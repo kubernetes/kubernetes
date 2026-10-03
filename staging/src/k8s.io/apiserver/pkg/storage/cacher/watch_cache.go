@@ -139,6 +139,7 @@ func newWatchCache(
 	groupResource schema.GroupResource,
 	progressRequester *progress.ConditionalProgressRequester,
 	getCurrentRV func(context.Context) (uint64, error),
+	stopCh <-chan struct{},
 ) *watchCache {
 	config := &ImmutableWatchCacheConfig{
 		keyFunc:           keyFunc,
@@ -159,6 +160,23 @@ func newWatchCache(
 	}
 	wc.cond = sync.NewCond(wc.RLocker())
 	wc.config.indexValidator = wc.history.isIndexValidLocked
+
+	// Idle sweeper: periodically try to shrink the watch cache even while idle,
+	// so a burst-inflated ring can deflate without waiting for new events.
+	go func() {
+		ticker := clock.NewTicker(eventFreshDuration)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-stopCh:
+				return
+			case <-ticker.C():
+				wc.Lock()
+				wc.history.resizeCacheLocked(clock.Now())
+				wc.Unlock()
+			}
+		}
+	}()
 
 	return wc
 }
