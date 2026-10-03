@@ -23,7 +23,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"net"
 	"net/http"
 	"net/http/httptrace"
@@ -48,7 +47,6 @@ import (
 	kubeopenapi "k8s.io/kube-openapi/pkg/common"
 
 	"github.com/google/go-cmp/cmp"
-	"golang.org/x/net/http2"
 )
 
 func TestMain(m *testing.M) {
@@ -1011,16 +1009,16 @@ func newClient(useNewConnection bool) *http.Client {
 	clientCACertPool.AppendCertsFromPEM(backendCrt)
 	tlsConfig := &tls.Config{
 		RootCAs:    clientCACertPool,
-		NextProtos: []string{http2.NextProtoTLS},
+		NextProtos: []string{"h2"},
 	}
 
 	tr := &http.Transport{
 		TLSClientConfig:   tlsConfig,
 		DisableKeepAlives: useNewConnection,
 	}
-	if err := http2.ConfigureTransport(tr); err != nil {
-		log.Fatalf("Failed to configure HTTP2 transport: %v", err)
-	}
+	tr.Protocols = new(http.Protocols)
+	tr.Protocols.SetHTTP1(true)
+	tr.Protocols.SetHTTP2(true)
 	return &http.Client{
 		Timeout:   0,
 		Transport: tr,

@@ -27,11 +27,10 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"reflect"
+	"strings"
 	"sync"
 	"testing"
 	"time"
-
-	"golang.org/x/net/http2"
 )
 
 func TestProbabilisticGoawayDecider(t *testing.T) {
@@ -166,13 +165,8 @@ func newTestGOAWAYServer() (*httptest.Server, error) {
 
 	s := httptest.NewUnstartedServer(mux)
 
-	http2Options := &http2.Server{}
-
-	if err := http2.ConfigureServer(s.Config, http2Options); err != nil {
-		return nil, fmt.Errorf("failed to configure test server to be HTTP2 server, err: %v", err)
-	}
-
-	s.TLS = s.Config.TLSConfig
+	// Offer both protocols, as the x/net ConfigureServer did.
+	s.TLS = &tls.Config{NextProtos: []string{"h2", "http/1.1"}}
 
 	return s, nil
 }
@@ -181,7 +175,7 @@ func newTestGOAWAYServer() (*httptest.Server, error) {
 type watchResponse struct {
 	// body is the response data which test GOAWAY server sent to client
 	body []byte
-	// err will be set to be a non-nil value if watch request is not end with EOF nor http2.GoAwayError
+	// err will be set to be a non-nil value if watch request is not end with EOF nor a GOAWAY error
 	err error
 }
 
@@ -227,10 +221,11 @@ func requestGOAWAYServer(client *http.Client, serverBaseURL, url string) (<-chan
 				n, err := resp.Body.Read(buffer)
 				if err != nil {
 					// urlWatch will receive io.EOF,
-					// urlWatchWithGoaway will receive http2.GoAwayError
+					// urlWatchWithGoaway may receive the transport's GOAWAY error,
+					// whose type is internal to net/http; match its message.
 					if err == io.EOF {
 						err = nil
-					} else if _, ok := err.(http2.GoAwayError); ok {
+					} else if strings.Contains(err.Error(), "server sent GOAWAY") {
 						err = nil
 					}
 
@@ -320,7 +315,7 @@ func TestClientReceivedGOAWAY(t *testing.T) {
 			}
 			tlsConfig := &tls.Config{
 				InsecureSkipVerify: true,
-				NextProtos:         []string{http2.NextProtoTLS},
+				NextProtos:         []string{"h2"},
 			}
 			tr := &http.Transport{
 				TLSHandshakeTimeout: 10 * time.Second,
@@ -332,9 +327,9 @@ func TestClientReceivedGOAWAY(t *testing.T) {
 					return dialFn(network, addr, tlsConfig)
 				},
 			}
-			if err := http2.ConfigureTransport(tr); err != nil {
-				t.Fatalf("failed to configure http transport, err: %v", err)
-			}
+			tr.Protocols = new(http.Protocols)
+			tr.Protocols.SetHTTP1(true)
+			tr.Protocols.SetHTTP2(true)
 
 			client := &http.Client{
 				Transport: tr,
@@ -383,13 +378,8 @@ func TestGOAWAYHTTP1Requests(t *testing.T) {
 		w.Write([]byte("hello"))
 	}), 1))
 
-	http2Options := &http2.Server{}
-
-	if err := http2.ConfigureServer(s.Config, http2Options); err != nil {
-		t.Fatalf("failed to configure test server to be HTTP2 server, err: %v", err)
-	}
-
-	s.TLS = s.Config.TLSConfig
+	// Offer both protocols, as the x/net ConfigureServer did.
+	s.TLS = &tls.Config{NextProtos: []string{"h2", "http/1.1"}}
 	s.StartTLS()
 	defer s.Close()
 
@@ -427,16 +417,16 @@ func TestGOAWAYConcurrency(t *testing.T) {
 	// create the http client
 	tlsConfig := &tls.Config{
 		InsecureSkipVerify: true,
-		NextProtos:         []string{http2.NextProtoTLS},
+		NextProtos:         []string{"h2"},
 	}
 	tr := &http.Transport{
 		TLSHandshakeTimeout: 10 * time.Second,
 		TLSClientConfig:     tlsConfig,
 		MaxIdleConnsPerHost: 25,
 	}
-	if err := http2.ConfigureTransport(tr); err != nil {
-		t.Fatalf("failed to configure http transport, err: %v", err)
-	}
+	tr.Protocols = new(http.Protocols)
+	tr.Protocols.SetHTTP1(true)
+	tr.Protocols.SetHTTP2(true)
 
 	client := &http.Client{
 		Transport: tr,
