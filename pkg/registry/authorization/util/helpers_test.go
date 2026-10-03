@@ -18,9 +18,11 @@ package util
 
 import (
 	"errors"
+	"fmt"
 	"reflect"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
@@ -587,6 +589,220 @@ func TestAuthorizationAttributesFrom(t *testing.T) {
 					t.Logf("labelSelectorErr=%q", got.LabelSelectorParsingErr)
 				}
 				t.Errorf("AuthorizationAttributesFrom(), got:\n%#v\nwant:\n%#v", got, tt.want)
+			}
+		})
+	}
+}
+
+// TestConditionsAwareDecisionToSARStatus verifies the decision→status transform.
+// The function has no branching by feature gate or client options; those live in the
+// REST handlers. It simply maps the six leaf/composite decision shapes to their
+// SubjectAccessReviewStatus counterparts.
+func TestConditionsAwareDecisionToSARStatus(t *testing.T) {
+	// makeCondAllowDecision returns a ConditionsMap decision with a single Allow condition.
+	// The condition's effect is expressed by which slice it is placed into (deny/nop/allow) of
+	// ConditionsAwareDecisionConditionsMap, since GenericCondition does not carry an Effect field.
+	makeCondAllowDecision := func() authorizer.ConditionsAwareDecision {
+		return authorizer.ConditionsAwareDecisionConditionsMap(
+			nil, nil,
+			[]authorizer.Condition{authorizer.GenericCondition{ID: "example.com/cond1", Condition: "object.metadata.name == 'foo'", Type: "example.com/cel", Description: "allow foo"}},
+		)
+	}
+	makeCondDenyDecision := func() authorizer.ConditionsAwareDecision {
+		return authorizer.ConditionsAwareDecisionConditionsMap(
+			[]authorizer.Condition{authorizer.GenericCondition{ID: "example.com/cond1", Condition: "object.metadata.name == 'foo'", Type: "example.com/cel", Description: "deny foo"}},
+			nil, nil,
+		)
+	}
+
+	// unionOf builds a Union ConditionsAwareDecision from the given named sub-decisions,
+	// using the ConditionsAwareDecisionUnion builder. Each sub-decision carries an authorizer
+	// name that is preserved by ToDecision and later surfaced in the serialized output.
+	type namedSub struct {
+		name string
+		d    authorizer.ConditionsAwareDecision
+	}
+	unionOf := func(subs ...namedSub) authorizer.ConditionsAwareDecision {
+		var u authorizer.ConditionsAwareDecisionUnion
+		for _, s := range subs {
+			u.Add(s.name, s.d)
+		}
+		return u.ToDecision()
+	}
+
+	tests := []struct {
+		name     string
+		decision authorizer.ConditionsAwareDecision
+		want     authorizationapi.SubjectAccessReviewStatus
+	}{
+		{
+			name:     "unconditional allow with evaluation error",
+			decision: authorizer.ConditionsAwareDecisionAllow("RBAC: allowed", fmt.Errorf("partial error")),
+			want: authorizationapi.SubjectAccessReviewStatus{
+				Allowed:         true,
+				Reason:          "RBAC: allowed",
+				EvaluationError: "partial error",
+			},
+		},
+		{
+			name:     "unconditional deny",
+			decision: authorizer.ConditionsAwareDecisionDeny("Node: denied", nil),
+			want: authorizationapi.SubjectAccessReviewStatus{
+				Denied: true,
+				Reason: "Node: denied",
+			},
+		},
+		{
+			name:     "no opinion",
+			decision: authorizer.ConditionsAwareDecisionNoOpinion("no rules matched", nil),
+			want: authorizationapi.SubjectAccessReviewStatus{
+				Reason: "no rules matched",
+			},
+		},
+		{
+			name:     "conditional allow serializes to ConditionsMap in ConditionalDecision",
+			decision: makeCondAllowDecision(),
+			want: authorizationapi.SubjectAccessReviewStatus{
+				ConditionalDecision: &authorizationapi.ConditionsAwareDecision{
+					Type: authorizationapi.ConditionsAwareDecisionTypeConditionsMap,
+					ConditionsMap: &authorizationapi.ConditionsMap{
+						DenyConditions:      []authorizationapi.Condition{},
+						NoOpinionConditions: []authorizationapi.Condition{},
+						AllowConditions: []authorizationapi.Condition{
+							{
+								ID:          "example.com/cond1",
+								Condition:   "object.metadata.name == 'foo'",
+								Type:        "example.com/cel",
+								Description: "allow foo",
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name:     "conditional deny serializes to ConditionsMap in ConditionalDecision",
+			decision: makeCondDenyDecision(),
+			want: authorizationapi.SubjectAccessReviewStatus{
+				ConditionalDecision: &authorizationapi.ConditionsAwareDecision{
+					Type: authorizationapi.ConditionsAwareDecisionTypeConditionsMap,
+					ConditionsMap: &authorizationapi.ConditionsMap{
+						DenyConditions: []authorizationapi.Condition{
+							{
+								ID:          "example.com/cond1",
+								Condition:   "object.metadata.name == 'foo'",
+								Type:        "example.com/cel",
+								Description: "deny foo",
+							},
+						},
+						NoOpinionConditions: []authorizationapi.Condition{},
+						AllowConditions:     []authorizationapi.Condition{},
+					},
+				},
+			},
+		},
+		{
+			name: "union serializes recursively, preserving authorizer names",
+			decision: unionOf(
+				namedSub{name: "cond-deny.example.com", d: makeCondDenyDecision()},
+				namedSub{name: "noop.example.com", d: authorizer.ConditionsAwareDecisionNoOpinion("no-opinion-reason", fmt.Errorf("no-opinion-err"))},
+				namedSub{name: "inner-union.example.com", d: unionOf(
+					namedSub{name: "inner-noop.example.com", d: authorizer.ConditionsAwareDecisionNoOpinion("", nil)},
+					namedSub{name: "cond-allow.example.com", d: makeCondAllowDecision()},
+				)},
+				namedSub{name: "deny.example.com", d: authorizer.ConditionsAwareDecisionDeny("", nil)},
+			),
+			want: authorizationapi.SubjectAccessReviewStatus{
+				ConditionalDecision: &authorizationapi.ConditionsAwareDecision{
+					Type: authorizationapi.ConditionsAwareDecisionTypeUnion,
+					Union: []authorizationapi.NamedConditionsAwareDecision{
+						{
+							AuthorizerName: "cond-deny.example.com",
+							Decision: authorizationapi.ConditionsAwareDecision{
+								Type: authorizationapi.ConditionsAwareDecisionTypeConditionsMap,
+								ConditionsMap: &authorizationapi.ConditionsMap{
+									DenyConditions: []authorizationapi.Condition{
+										{
+											ID:          "example.com/cond1",
+											Condition:   "object.metadata.name == 'foo'",
+											Type:        "example.com/cel",
+											Description: "deny foo",
+										},
+									},
+									NoOpinionConditions: []authorizationapi.Condition{},
+									AllowConditions:     []authorizationapi.Condition{},
+								},
+							},
+						},
+						{
+							AuthorizerName: "noop.example.com",
+							Decision: authorizationapi.ConditionsAwareDecision{
+								Type: authorizationapi.ConditionsAwareDecisionTypeNoOpinion,
+								NoOpinion: &authorizationapi.UnconditionalDecision{
+									Reason:          "no-opinion-reason",
+									EvaluationError: "no-opinion-err",
+								},
+							},
+						},
+						{
+							AuthorizerName: "inner-union.example.com",
+							Decision: authorizationapi.ConditionsAwareDecision{
+								Type: authorizationapi.ConditionsAwareDecisionTypeUnion,
+								Union: []authorizationapi.NamedConditionsAwareDecision{
+									{
+										AuthorizerName: "inner-noop.example.com",
+										Decision: authorizationapi.ConditionsAwareDecision{
+											Type:      authorizationapi.ConditionsAwareDecisionTypeNoOpinion,
+											NoOpinion: &authorizationapi.UnconditionalDecision{},
+										},
+									},
+									{
+										AuthorizerName: "cond-allow.example.com",
+										Decision: authorizationapi.ConditionsAwareDecision{
+											Type: authorizationapi.ConditionsAwareDecisionTypeConditionsMap,
+											ConditionsMap: &authorizationapi.ConditionsMap{
+												DenyConditions:      []authorizationapi.Condition{},
+												NoOpinionConditions: []authorizationapi.Condition{},
+												AllowConditions: []authorizationapi.Condition{
+													{
+														ID:          "example.com/cond1",
+														Condition:   "object.metadata.name == 'foo'",
+														Type:        "example.com/cel",
+														Description: "allow foo",
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+						{
+							AuthorizerName: "deny.example.com",
+							Decision: authorizationapi.ConditionsAwareDecision{
+								Type: authorizationapi.ConditionsAwareDecisionTypeDeny,
+								Deny: &authorizationapi.UnconditionalDecision{},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	// attrs is only consulted by BuildEvaluationError, which reads the field/label selectors.
+	// A zero-value AttributesRecord has no selectors, so no side-channel errors are added.
+	attrs := authorizer.AttributesRecord{
+		User:     &user.DefaultInfo{Name: "foo"},
+		Verb:     "create",
+		Resource: "pods",
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := ConditionsAwareDecisionToSARStatus(t.Context(), attrs, tt.decision)
+			if diff := cmp.Diff(tt.want, got); diff != "" {
+				t.Errorf("ConditionsAwareDecisionToSARStatus() mismatch (-want +got):\n%s", diff)
 			}
 		})
 	}
