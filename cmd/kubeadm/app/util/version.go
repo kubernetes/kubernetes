@@ -202,8 +202,7 @@ func fetchFromURL(url string, timeout time.Duration) (string, error) {
 	bodyString := strings.TrimSpace(string(body))
 
 	if resp.StatusCode != http.StatusOK {
-		msg := fmt.Sprintf("unable to fetch file. URL: %q, status: %v", url, resp.Status)
-		return bodyString, errors.New(msg)
+		return bodyString, fmt.Errorf("unable to fetch file. URL: %q, status: %v", url, resp.Status)
 	}
 	return bodyString, nil
 }

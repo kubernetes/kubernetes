@@ -156,6 +156,7 @@ func NewStaticPolicyOptions(policyOptions map[string]string) (StaticPolicyOption
 	}
 
 	// TODO(@Jeffwan): Remove this check after more compatibility tests are done.
+	// See https://github.com/kubernetes/kubernetes/issues/115486 for tracking.
 	if opts.DistributeCPUsAcrossNUMA && opts.DistributeCPUsAcrossCores {
 		return opts, fmt.Errorf("static policy options %s and %s can not be used at the same time", DistributeCPUsAcrossNUMAOption, DistributeCPUsAcrossCoresOption)
 	}
