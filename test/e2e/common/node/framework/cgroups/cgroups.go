@@ -19,6 +19,7 @@ package cgroups
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -216,27 +217,23 @@ func getExpectedMemLimitString(memLimit *resource.Quantity, podOnCgroupv2 bool) 
 	return expectedMemLimitString
 }
 
-func verifyContainerCPUWeight(ctx context.Context, f *framework.Framework, pod *v1.Pod, containerName string, expectedResources *v1.ResourceRequirements, podOnCgroupv2 bool) error {
-	cpuWeightCgPath := getCgroupCPURequestPath(cgroupFsPath, podOnCgroupv2)
-	cpuReq := expectedResources.Requests.Cpu()
-	// Bug - Skip comparing cpu.weight if cpu requests are not set for pod with only
-	// pod-level limits. There's a bug in calculation of cpu.weight when containers without
-	// limits are resized and then restarted because of pod-level limits resize.
-	// Check for cpu.weight when the bug is fixed - https://github.com/kubernetes/kubernetes/issues/135260
-	if cpuReq.IsZero() && pod.Spec.Resources != nil {
-		return nil
+// limitsWithPodFallback returns the container's expected CPU and memory limits, using the pod-level limit for any it does not set.
+func limitsWithPodFallback(pod *v1.Pod, expected *v1.ResourceRequirements) (cpu, mem *resource.Quantity) {
+	cpu, mem = expected.Limits.Cpu(), expected.Limits.Memory()
+	if pod.Spec.Resources != nil {
+		if cpu.IsZero() {
+			cpu = pod.Spec.Resources.Limits.Cpu()
+		}
+		if mem.IsZero() {
+			mem = pod.Spec.Resources.Limits.Memory()
+		}
 	}
-
-	_, err := retrieveCgroupValueInt(ctx, f, pod.Name, containerName, cpuWeightCgPath, true)
-	return err
+	return cpu, mem
 }
 
 func VerifyContainerCPULimit(ctx context.Context, f *framework.Framework, pod *v1.Pod, containerName string, expectedResources *v1.ResourceRequirements, podOnCgroupv2 bool) error {
 	cpuLimCgPath := getCgroupCPULimitPath(cgroupFsPath, podOnCgroupv2)
-	cpuLim := expectedResources.Limits.Cpu()
-	if cpuLim.IsZero() && pod.Spec.Resources != nil {
-		cpuLim = pod.Spec.Resources.Limits.Cpu()
-	}
+	cpuLim, _ := limitsWithPodFallback(pod, expectedResources)
 	expectedCPULimits := getCPULimitCgroupExpectations(cpuLim, podOnCgroupv2)
 	if err := VerifyCgroupValue(ctx, f, pod, containerName, cpuLimCgPath, expectedCPULimits...); err != nil {
 		return fmt.Errorf("failed to verify cpu limit cgroup value: %w", err)
@@ -246,10 +243,7 @@ func VerifyContainerCPULimit(ctx context.Context, f *framework.Framework, pod *v
 
 func VerifyContainerMemoryLimit(ctx context.Context, f *framework.Framework, pod *v1.Pod, containerName string, expectedResources *v1.ResourceRequirements, podOnCgroupv2 bool) error {
 	memLimCgPath := getCgroupMemLimitPath(cgroupFsPath, podOnCgroupv2)
-	memLim := expectedResources.Limits.Memory()
-	if memLim.IsZero() && pod.Spec.Resources != nil {
-		memLim = pod.Spec.Resources.Limits.Memory()
-	}
+	_, memLim := limitsWithPodFallback(pod, expectedResources)
 	expectedMemLim := getExpectedMemLimitString(memLim, podOnCgroupv2)
 	if expectedMemLim == "0" {
 		return nil
@@ -260,12 +254,132 @@ func VerifyContainerMemoryLimit(ctx context.Context, f *framework.Framework, pod
 	return nil
 }
 
+// VerifyContainerCgroupValues checks the container's memory limit, CPU limit and CPU weight, one exec per attempt.
 func VerifyContainerCgroupValues(ctx context.Context, f *framework.Framework, pod *v1.Pod, tc *v1.Container, podOnCgroupv2 bool) error {
-	var errs []error
-	errs = append(errs, VerifyContainerMemoryLimit(ctx, f, pod, tc.Name, &tc.Resources, podOnCgroupv2))
-	errs = append(errs, VerifyContainerCPULimit(ctx, f, pod, tc.Name, &tc.Resources, podOnCgroupv2))
-	errs = append(errs, verifyContainerCPUWeight(ctx, f, pod, tc.Name, &tc.Resources, podOnCgroupv2))
-	return utilerrors.NewAggregate(errs)
+	return verifyCgroupExpectations(ctx, f, pod, tc.Name, containerCgroupExpectations(pod, tc, podOnCgroupv2))
+}
+
+// containerCgroupExpectations lists the files VerifyContainerCgroupValues reads and the values they may hold.
+func containerCgroupExpectations(pod *v1.Pod, tc *v1.Container, podOnCgroupv2 bool) []cgroupExpectation {
+	cpuLim, memLim := limitsWithPodFallback(pod, &tc.Resources)
+	var checks []cgroupExpectation
+	if want := getExpectedMemLimitString(memLim, podOnCgroupv2); want != "0" {
+		checks = append(checks, cgroupExpectation{path: getCgroupMemLimitPath(cgroupFsPath, podOnCgroupv2), values: []string{want}})
+	}
+	cpuLimits := getCPULimitCgroupExpectations(cpuLim, podOnCgroupv2)
+	checks = append(checks, cgroupExpectation{path: getCgroupCPULimitPath(cgroupFsPath, podOnCgroupv2), values: cpuLimits})
+	// Bug - Skip comparing cpu.weight if cpu requests are not set for pod with only
+	// pod-level limits. There's a bug in calculation of cpu.weight when containers without
+	// limits are resized and then restarted because of pod-level limits resize.
+	// Check for cpu.weight when the bug is fixed - https://github.com/kubernetes/kubernetes/issues/135260
+	if !tc.Resources.Requests.Cpu().IsZero() || pod.Spec.Resources == nil {
+		checks = append(checks, cgroupExpectation{path: getCgroupCPURequestPath(cgroupFsPath, podOnCgroupv2)})
+	}
+	return checks
+}
+
+// cgroupExpectation is a cgroup file and the values its first line may hold; no values means any positive integer.
+type cgroupExpectation struct {
+	path   string
+	values []string
+}
+
+func (c cgroupExpectation) check(value, cName string) error {
+	if len(c.values) == 0 {
+		v, err := strconv.ParseInt(value, 10, 64)
+		if err != nil {
+			return fmt.Errorf("cgroup value %q for container %q was not an integer: %w", c.path, cName, err)
+		}
+		if v <= 0 {
+			return fmt.Errorf("cgroup value %q for container %q was %d; expected > 0", c.path, cName, v)
+		}
+		return nil
+	}
+	if !slices.Contains(c.values, value) {
+		return fmt.Errorf("value of cgroup %q for container %q was %q; expected one of %q", c.path, cName, value, c.values)
+	}
+	return nil
+}
+
+func (c cgroupExpectation) String() string {
+	if len(c.values) == 0 {
+		return c.path + " > 0"
+	}
+	return fmt.Sprintf("%s in %q", c.path, c.values)
+}
+
+// readCgroupScript prints "ok:" and the first line of each path argument, or "err:" if it cannot be read.
+const readCgroupScript = `for p in "$@"; do if v=$(head -n 1 "$p"); then printf 'ok:%s\n' "$v"; else echo err:; fi; done`
+
+// cgroupRead is the result of reading one file in a batch.
+type cgroupRead struct {
+	value string
+	ok    bool
+}
+
+// readCgroupValues reads the first line of every path in one exec, in order.
+func readCgroupValues(f *framework.Framework, podName, cName string, paths []string) ([]cgroupRead, error) {
+	args := append([]string{"/bin/sh", "-c", readCgroupScript, "sh"}, paths...)
+	out, _, err := e2epod.ExecCommandInContainerWithFullOutput(f, podName, cName, args...)
+	if err != nil {
+		return nil, err
+	}
+	return parseCgroupReads(out, len(paths))
+}
+
+// parseCgroupReads splits the output of readCgroupScript into one result per path; records are never blank, so the exec helper's trimming cannot drop one.
+func parseCgroupReads(out string, n int) ([]cgroupRead, error) {
+	records := strings.Split(strings.TrimSuffix(out, "\n"), "\n")
+	if len(records) != n {
+		return nil, fmt.Errorf("expected %d records, got %q", n, out)
+	}
+	reads := make([]cgroupRead, n)
+	for i, r := range records {
+		if v, ok := strings.CutPrefix(r, "ok:"); ok {
+			reads[i] = cgroupRead{value: strings.TrimSpace(v), ok: true}
+		} else if r != "err:" {
+			return nil, fmt.Errorf("unexpected record %q in %q", r, out)
+		}
+	}
+	return reads, nil
+}
+
+// classifyCgroupReads fails on any wrong value, even next to an unread file, and retries on unread files.
+func classifyCgroupReads(reads []cgroupRead, checks []cgroupExpectation, cName string) (retry, terminal error) {
+	var mismatches []error
+	var unread []string
+	for i, c := range checks {
+		if !reads[i].ok {
+			unread = append(unread, c.path)
+			continue
+		}
+		if err := c.check(reads[i].value, cName); err != nil {
+			mismatches = append(mismatches, err)
+		}
+	}
+	if err := utilerrors.NewAggregate(mismatches); err != nil {
+		return nil, err
+	}
+	if len(unread) > 0 {
+		return fmt.Errorf("cgroup files not readable yet for container %q: %v", cName, unread), nil
+	}
+	return nil, nil
+}
+
+// verifyCgroupExpectations repeats the read until every file is read, and fails at once on a wrong value.
+func verifyCgroupExpectations(ctx context.Context, f *framework.Framework, pod *v1.Pod, cName string, checks []cgroupExpectation) error {
+	paths := make([]string, len(checks))
+	for i, c := range checks {
+		paths[i] = c.path
+	}
+	framework.Logf("Namespace %s Pod %s Container %s - checking cgroup values %v", pod.Namespace, pod.Name, cName, checks)
+	return framework.Gomega().Eventually(ctx, framework.HandleRetry(func(ctx context.Context) (error, error) {
+		reads, err := readCgroupValues(f, pod.Name, cName, paths)
+		if err != nil {
+			return fmt.Errorf("failed to read cgroup values for container %q: %w", cName, err), nil
+		}
+		return classifyCgroupReads(reads, checks, cName)
+	})).WithTimeout(framework.PollShortTimeout).Should(gomega.Succeed())
 }
 
 func verifyPodCPUWeight(ctx context.Context, f *framework.Framework, pod *v1.Pod, expectedResources *v1.ResourceRequirements, podOnCgroupv2 bool) error {
