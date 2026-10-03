@@ -5446,6 +5446,95 @@ func TestJobGangSchedulingElasticScaling(t *testing.T) {
 	}
 }
 
+func TestJobGangSchedulingMinCountTracksRemainingWork(t *testing.T) {
+	featuregatetesting.SetFeatureGatesDuringTest(t, feature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.GenericWorkload: true,
+		features.WorkloadWithJob: true,
+	})
+
+	for _, tc := range []struct {
+		name           string
+		completionMode batchv1.CompletionMode
+		failIndex      bool
+		wantMinCount   int32
+	}{
+		{name: "indexed", completionMode: batchv1.IndexedCompletion, wantMinCount: 2},
+		{name: "non-indexed", completionMode: batchv1.NonIndexedCompletion, wantMinCount: 2},
+		{name: "indexed with a permanently failed index", completionMode: batchv1.IndexedCompletion, failIndex: true, wantMinCount: 1},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			closeFn, restConfig, clientSet, ns := setup(t, "gang-remaining-work")
+			t.Cleanup(closeFn)
+			ctx, cancel := startJobControllerAndWaitForCaches(t, restConfig)
+			t.Cleanup(cancel)
+
+			job := &batchv1.Job{
+				Spec: batchv1.JobSpec{
+					Parallelism:    ptr.To[int32](3),
+					Completions:    ptr.To[int32](3),
+					CompletionMode: &tc.completionMode,
+					Scheduling: &batchv1.JobSchedulingConfiguration{
+						SchedulingPolicy: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{
+							Gang: &schedulingv1alpha3.WorkloadPodGroupGangSchedulingPolicy{},
+						},
+					},
+				},
+			}
+			if tc.failIndex {
+				job.Spec.BackoffLimitPerIndex = ptr.To[int32](1)
+				job.Spec.PodFailurePolicy = &batchv1.PodFailurePolicy{Rules: []batchv1.PodFailurePolicyRule{{
+					Action: batchv1.PodFailurePolicyActionFailIndex,
+					OnExitCodes: &batchv1.PodFailurePolicyOnExitCodesRequirement{
+						Operator: batchv1.PodFailurePolicyOnExitCodesOpIn,
+						Values:   []int32{13},
+					},
+				}}}
+			}
+			jobObj, err := createJobWithDefaults(ctx, clientSet, ns.Name, job)
+			if err != nil {
+				t.Fatalf("Failed to create Job: %v", err)
+			}
+
+			workload := waitForWorkload(ctx, t, clientSet, jobObj, false, wait.ForeverTestTimeout)
+			podGroup := waitForPodGroup(ctx, t, clientSet, jobObj, false, wait.ForeverTestTimeout)
+			validateJobsPodsStatusOnly(ctx, t, clientSet, jobObj, "", podsByStatus{
+				Active: 3, Ready: ptr.To[int32](0), Terminating: ptr.To[int32](0),
+			})
+
+			if _, err := setJobPodsPhase(ctx, clientSet, jobObj, v1.PodSucceeded, 1); err != nil {
+				t.Fatalf("Failed to complete a Job Pod: %v", err)
+			}
+			if tc.failIndex {
+				if _, err := updateJobPodsStatus(ctx, clientSet, jobObj, func(p *v1.Pod) bool {
+					p.Status.Phase = v1.PodFailed
+					p.Status.ContainerStatuses = []v1.ContainerStatus{{
+						State: v1.ContainerState{Terminated: &v1.ContainerStateTerminated{ExitCode: 13, FinishedAt: metav1.Now()}},
+					}}
+					return true
+				}, 1); err != nil {
+					t.Fatalf("Failed to permanently fail a Job index: %v", err)
+				}
+			}
+
+			if err := wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
+				wl, err := clientSet.SchedulingV1beta1().Workloads(ns.Name).Get(ctx, workload.Name, metav1.GetOptions{})
+				if err != nil {
+					return false, err
+				}
+				pg, err := clientSet.SchedulingV1beta1().PodGroups(ns.Name).Get(ctx, podGroup.Name, metav1.GetOptions{})
+				if err != nil {
+					return false, err
+				}
+				wlGang := wl.Spec.PodGroupTemplates[0].SchedulingPolicy.Gang
+				pgGang := pg.Spec.SchedulingPolicy.Gang
+				return wlGang != nil && wlGang.MinCount == tc.wantMinCount && pgGang != nil && pgGang.MinCount == tc.wantMinCount, nil
+			}); err != nil {
+				t.Errorf("Workload/PodGroup gang minCount did not reach %d for the remaining work: %v", tc.wantMinCount, err)
+			}
+		})
+	}
+}
+
 func TestJobGangSchedulingSuspendResume(t *testing.T) {
 	featuregatetesting.SetFeatureGatesDuringTest(t, feature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 		features.GenericWorkload: true,
