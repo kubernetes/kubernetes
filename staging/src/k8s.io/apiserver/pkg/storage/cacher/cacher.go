@@ -1327,7 +1327,11 @@ func (c *Cacher) getWatchCacheResourceVersion(ctx context.Context, parsedWatchRe
 	if opts.SendInitialEvents == nil && opts.ResourceVersion == "" {
 		return 0, nil
 	}
+	start := time.Now()
 	rv, err := c.storage.GetCurrentResourceVersion(ctx)
+	if isListWatchRequest(opts) {
+		klog.FromContext(ctx).V(2).Info("TRACE-WATCHLIST-RV", "resource", c.groupResource, "auditID", audit.GetAuditIDTruncated(ctx), "duration", time.Since(start), "resourceVersion", rv, "err", err)
+	}
 	return rv, err
 }
 
