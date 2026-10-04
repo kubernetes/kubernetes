@@ -35,6 +35,7 @@ type CustomResourceDefinitionSpecApplyConfiguration struct {
 	// The custom resources are served under `/apis/<group>/<version>/...`.
 	// Must match the name of the first item in the `versions` list if `version` and `versions` are both specified.
 	// Optional if `versions` is specified.
+	//
 	// Deprecated: use `versions` instead.
 	Version *string `json:"version,omitempty"`
 	// names specify the resource and kind names for the custom resource.
@@ -77,6 +78,7 @@ type CustomResourceDefinitionSpecApplyConfiguration struct {
 	// apiVersion, kind, metadata and known fields inside metadata are always preserved.
 	// If false, schemas must be defined for all versions.
 	// Defaults to true in v1beta for backwards compatibility.
+	//
 	// Deprecated: will be required to be false in v1. Preservation of unknown fields can be specified
 	// in the validation schema using the `x-kubernetes-preserve-unknown-fields: true` extension.
 	// See https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/#field-pruning for details.
