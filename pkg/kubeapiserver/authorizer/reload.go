@@ -29,6 +29,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	authzconfig "k8s.io/apiserver/pkg/apis/apiserver"
+	apiservervalidation "k8s.io/apiserver/pkg/apis/apiserver/validation"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/authorization/authorizerfactory"
@@ -177,16 +178,28 @@ func (r *reloadableAuthorizerResolver) newForConfig(authzConfig *authzconfig.Aut
 			if !configuredAuthorizer.Webhook.CacheUnauthorizedRequests {
 				unauthorizedTTL = 0
 			}
+			webhookMetrics := kubeapiserverWebhookMetrics{WebhookMetrics: webhookmetrics.NewWebhookMetrics(), MatcherMetrics: authorizationcel.NewMatcherMetrics()}
+			var matcher webhook.Matcher
+			celMatcher, fieldErrs := apiservervalidation.ValidateAndCompileMatchConditions(r.compiler, configuredAuthorizer.Webhook.MatchConditions)
+			if err := fieldErrs.ToAggregate(); err != nil {
+				return nil, nil, err
+			}
+			// Leave the interface nil when there are no match conditions; a nil *CELMatcher inside it would not be nil.
+			if celMatcher != nil {
+				celMatcher.AuthorizerType = "Webhook"
+				celMatcher.AuthorizerName = configuredAuthorizer.Name
+				celMatcher.Metrics = webhookMetrics
+				matcher = celMatcher
+			}
 			webhookAuthorizer, err := webhook.New(clientConfig,
 				configuredAuthorizer.Webhook.SubjectAccessReviewVersion,
 				authorizedTTL,
 				unauthorizedTTL,
 				*r.initialConfig.WebhookRetryBackoff,
 				decisionOnError,
-				configuredAuthorizer.Webhook.MatchConditions,
+				matcher,
 				configuredAuthorizer.Name,
-				kubeapiserverWebhookMetrics{WebhookMetrics: webhookmetrics.NewWebhookMetrics(), MatcherMetrics: authorizationcel.NewMatcherMetrics()},
-				r.compiler,
+				webhookMetrics,
 			)
 			if err != nil {
 				return nil, nil, err
