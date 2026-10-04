@@ -583,7 +583,7 @@ func (s *WatchServer) HandleHTTP(w http.ResponseWriter, req *http.Request) {
 					if receivedAt, ok := apirequest.ReceivedTimestampFrom(req.Context()); ok {
 						setupTime = initStart.Sub(receivedAt)
 					}
-					if total := setupTime + sendingTime; total > 10*time.Second {
+					if total := setupTime + sendingTime; total > 7500*time.Millisecond {
 						encoderTiming := watchEncoder.timingSnapshot()
 						encoderOther := encoderTiming.other()
 						klog.FromContext(req.Context()).V(2).Info("TRACE-WATCHLIST", "path", req.URL.Path, "auditID", audit.GetAuditIDTruncated(req.Context()), "events", initEventCount, "uncompressedMB", float64(rw.bytesWritten)/1e6, "compressedMB", float64(rw.compressedBytesWritten())/1e6, "total", total, "setup", setupTime, "sending", sendingTime, "encode", encodeTime, "flush", flushTime, "other", sendingTime-encodeTime-flushTime, "mediaType", s.MediaType, "contentEncoding", contentEncoding)
