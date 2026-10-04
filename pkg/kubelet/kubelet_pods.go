@@ -995,16 +995,20 @@ func (kl *Kubelet) makeEnvironmentVariables(ctx context.Context, pod *v1.Pod, co
 					return result, err
 				}
 
-				runtimeVal, err = envutil.ParseEnv(envFilePath, key)
+				var found bool
+				runtimeVal, found, err = envutil.ParseEnv(envFilePath, key)
 				if err != nil {
+					// A missing file is the same case as a missing key when optional is set.
+					if optional && goerrors.Is(err, os.ErrNotExist) {
+						continue
+					}
 					logger.Error(err, "Failed to parse env file", "pod", klog.KObj(pod))
 					return result, fmt.Errorf("couldn't parse env file")
 				}
 
-				// If the key was not found, and it's not optional, return an error
-				if runtimeVal == "" {
+				// An empty value is a real assignment. Only a missing key is absent.
+				if !found {
 					if optional {
-						// If the key doesn't exist, and it's optional, skip this environment variable
 						continue
 					}
 					return result, fmt.Errorf("environment variable key %q not found in file %q", key, envFilePath)

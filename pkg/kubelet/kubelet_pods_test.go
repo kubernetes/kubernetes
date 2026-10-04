@@ -9424,6 +9424,61 @@ func TestMakeEnvironmentVariablesWithFileKeyRef(t *testing.T) {
 				return []string{createEnvFile("config.env", content)}
 			},
 		},
+		{
+			name: "optional missing file skips the variable",
+			container: &v1.Container{
+				Env: []v1.EnvVar{
+					{
+						Name: "MY_VAR",
+						ValueFrom: &v1.EnvVarSource{
+							FileKeyRef: &v1.FileKeySelector{
+								VolumeName: "config-volume",
+								Path:       "missing.env",
+								Key:        "MY_VAR",
+								Optional:   ptr.To(true),
+							},
+						},
+					},
+				},
+			},
+			podVolumes: map[string]kubecontainer.VolumeInfo{
+				"config-volume": {
+					Mounter: &testVolumeMounter{path: tmpDir},
+				},
+			},
+			expectedEnvs: nil,
+			setupFiles: func() []string {
+				return nil
+			},
+		},
+		{
+			name: "empty value is present",
+			container: &v1.Container{
+				Env: []v1.EnvVar{
+					{
+						Name: "EMPTY",
+						ValueFrom: &v1.EnvVarSource{
+							FileKeyRef: &v1.FileKeySelector{
+								VolumeName: "config-volume",
+								Path:       "config.env",
+								Key:        "EMPTY",
+							},
+						},
+					},
+				},
+			},
+			podVolumes: map[string]kubecontainer.VolumeInfo{
+				"config-volume": {
+					Mounter: &testVolumeMounter{path: tmpDir},
+				},
+			},
+			expectedEnvs: []kubecontainer.EnvVar{
+				{Name: "EMPTY", Value: ""},
+			},
+			setupFiles: func() []string {
+				return []string{createEnvFile("config.env", "EMPTY=''\n")}
+			},
+		},
 	}
 
 	for _, tc := range testCases {

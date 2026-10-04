@@ -63,6 +63,7 @@ func TestParseEnv(t *testing.T) {
 		key         string
 		wantValue   string
 		wantErr     bool
+		wantMissing bool
 		errContains string
 	}
 	tests := []testCase{
@@ -102,8 +103,9 @@ KEY3='val3'
 			envContent: `KEY1='foo'
 KEY2='bar'
 `,
-			key:       "KEY3",
-			wantValue: ``,
+			key:         "KEY3",
+			wantValue:   ``,
+			wantMissing: true,
 		},
 		{
 			name: "value with embedded #",
@@ -577,11 +579,14 @@ huHhWsWslkcntkKp0V1Jc8oGv86Dp5mPhpfpMOK+vCe2TrS/saes9fNVxjorSpLl4xTU/V
 			if err := tmpFile.Close(); err != nil {
 				t.Fatalf("failed to close temp file: %v", err)
 			}
-			gotValue, err := ParseEnv(tmpFile.Name(), tt.key)
+			gotValue, found, err := ParseEnv(tmpFile.Name(), tt.key)
 			if tt.wantErr {
 				if err == nil {
 					t.Errorf("expected error, got none")
 					return
+				}
+				if found {
+					t.Errorf("found = true, want false on error")
 				}
 				if tt.errContains != "" && !strings.Contains(err.Error(), tt.errContains) {
 					t.Errorf("error = %v, want error containing %q", err, tt.errContains)
@@ -592,8 +597,14 @@ huHhWsWslkcntkKp0V1Jc8oGv86Dp5mPhpfpMOK+vCe2TrS/saes9fNVxjorSpLl4xTU/V
 				t.Errorf("unexpected error: %v", err)
 				return
 			}
+			if found == tt.wantMissing {
+				t.Errorf("found = %v, want %v", found, !tt.wantMissing)
+			}
 			if gotValue != tt.wantValue {
 				t.Errorf("got %q, want %q", gotValue, tt.wantValue)
+			}
+			if tt.wantMissing {
+				return
 			}
 
 			// Verify shell behavior matches our parser
