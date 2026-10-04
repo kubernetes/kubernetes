@@ -20,6 +20,8 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"sort"
+	"strings"
 	"testing"
 	"time"
 
@@ -28,10 +30,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	compbasemetrics "k8s.io/component-base/metrics"
+	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/klog/v2/ktesting"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	"k8s.io/kubernetes/pkg/scheduler/metrics"
 )
 
 // nodeInfoLister declares a fwk.NodeInfo type for testing.
@@ -195,6 +200,83 @@ func newTestNodes(n []string) *testSortedScoredNodes {
 	return &testSortedScoredNodes{Nodes: n}
 }
 
+const (
+	batchAttemptsHelp        = "Counts of results when we attempt to use batching, by scheduler profile. 'no_hint' covers every pod that asked for a hint and got none, including pods that later fail to schedule. 'hint_used' and 'hint_not_used' are recorded only when a node is selected, and say whether it was the hinted one."
+	batchCacheFlushedHelp    = "Counts of batch cache flushes by reason and scheduler profile. A flush discards a usable batch state. 'pod_skipped' means the previous pod was handled by another profile or failed to schedule, 'node_missing' means a node needed to reuse the state is no longer in the snapshot, and the 'filter_error', 'prescore_error', 'rescore_error' and 'normalize_error' reasons mean that phase failed while rescoring."
+	storeScheduleResultsHelp = "Counts of the outcomes of storing scheduling results for batching, by scheduler profile. 'stored' means the pod seeded a batch, 'pod_not_batchable' means the pod has no signature, and 'empty_list' means no other feasible nodes were left to cache. Pods that used the hinted node store nothing."
+)
+
+func resetBatchMetrics() {
+	metrics.BatchAttemptStats.Reset()
+	metrics.BatchCacheFlushed.Reset()
+	metrics.StoreScheduleResultsTotal.Reset()
+	metrics.BatchRescoreAttempts.Reset()
+	metrics.BatchRescoreDuration.Reset()
+	metrics.GetNodeHintDuration.Reset()
+	metrics.StoreScheduleResultsDuration.Reset()
+}
+
+// batchCounterText renders the expected exposition text of a counter with a "profile" label and one more label.
+func batchCounterText(name, help, profile, label string, want map[string]int) string {
+	if len(want) == 0 {
+		return ""
+	}
+	keys := make([]string, 0, len(want))
+	for k := range want {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	var sb strings.Builder
+	fmt.Fprintf(&sb, "# HELP %s [ALPHA] %s\n# TYPE %s counter\n", name, help, name)
+	for _, k := range keys {
+		fmt.Fprintf(&sb, "%s{profile=%q,%s=%q} %d\n", name, profile, label, k, want[k])
+	}
+	return sb.String()
+}
+
+// assertBatchCounters checks batch_attempts_total, batch_cache_flushed_total and batch_rescore_attempts_total.
+func assertBatchCounters(t *testing.T, profile string, attempts, flushes map[string]int, rescoreAttempts int) {
+	t.Helper()
+	attemptsText := batchCounterText("scheduler_batch_attempts_total", batchAttemptsHelp, profile, "result", attempts)
+	if err := testutil.GatherAndCompare(metrics.GetGather(), strings.NewReader(attemptsText), "scheduler_batch_attempts_total"); err != nil {
+		t.Errorf("unexpected batch_attempts_total metric output:\n%v", err)
+	}
+	flushText := batchCounterText("scheduler_batch_cache_flushed_total", batchCacheFlushedHelp, profile, "reason", flushes)
+	if err := testutil.GatherAndCompare(metrics.GetGather(), strings.NewReader(flushText), "scheduler_batch_cache_flushed_total"); err != nil {
+		t.Errorf("unexpected batch_cache_flushed_total metric output:\n%v", err)
+	}
+	rescoreText := ""
+	if rescoreAttempts > 0 {
+		rescoreText = fmt.Sprintf("# HELP scheduler_batch_rescore_attempts_total [ALPHA] Counts of rescore attempts during opportunistic batching, by scheduler profile.\n"+
+			"# TYPE scheduler_batch_rescore_attempts_total counter\n"+
+			"scheduler_batch_rescore_attempts_total{profile=%q} %d\n", profile, rescoreAttempts)
+	}
+	if err := testutil.GatherAndCompare(metrics.GetGather(), strings.NewReader(rescoreText), "scheduler_batch_rescore_attempts_total"); err != nil {
+		t.Errorf("unexpected batch_rescore_attempts_total metric output:\n%v", err)
+	}
+}
+
+// assertStoreResults checks store_schedule_results_total, keyed by the "result" label.
+func assertStoreResults(t *testing.T, profile string, want map[string]int) {
+	t.Helper()
+	text := batchCounterText("scheduler_store_schedule_results_total", storeScheduleResultsHelp, profile, "result", want)
+	if err := testutil.GatherAndCompare(metrics.GetGather(), strings.NewReader(text), "scheduler_store_schedule_results_total"); err != nil {
+		t.Errorf("unexpected store_schedule_results_total metric output:\n%v", err)
+	}
+}
+
+func assertHistogramCount(t *testing.T, name string, m compbasemetrics.ObserverMetric, want uint64) {
+	t.Helper()
+	got, err := testutil.GetHistogramMetricCount(m)
+	if err != nil {
+		t.Errorf("Failed to get %s sampleCount, err: %v", name, err)
+		return
+	}
+	if got != want {
+		t.Errorf("%s: expected %d samples, got %d", name, want, got)
+	}
+}
+
 func TestBatchBasic(t *testing.T) {
 	// This test first let OpportunisticBatch handle the first pod, and then see how it behaves with the second pod.
 	tests := []struct {
@@ -218,6 +300,9 @@ func TestBatchBasic(t *testing.T) {
 		genericWorkloadEnabled     bool
 		expectedHint               string
 		expectedState              *batchState
+		expectedAttempts           map[string]int
+		expectedFlushes            map[string]int
+		expectedStoreResults       map[string]int
 	}{
 		{
 			name:                          "a second pod with the same signature gets a hint",
@@ -230,6 +315,9 @@ func TestBatchBasic(t *testing.T) {
 			secondSig:                     "sig",
 			secondChosenNode:              "n1",
 			expectedHint:                  "n1",
+			expectedAttempts:              map[string]int{metrics.BatchAttemptNoHint: 1, metrics.BatchAttemptHintUsed: 1},
+			expectedFlushes:               nil,
+			expectedStoreResults:          map[string]int{metrics.StoreResultStored: 1},
 		},
 		{
 			name:                          "a second pod with a different signature doesn't get a hint",
@@ -242,6 +330,9 @@ func TestBatchBasic(t *testing.T) {
 			secondSig:                     "sig2",
 			secondChosenNode:              "n1",
 			expectedHint:                  "",
+			expectedAttempts:              map[string]int{metrics.BatchAttemptNoHint: 2},
+			expectedFlushes:               map[string]int{metrics.BatchFlushPodIncompatible: 1},
+			expectedStoreResults:          map[string]int{metrics.StoreResultStored: 1, metrics.StoreResultEmptyList: 1},
 		},
 		{
 			name:                          "pod doesn't get hint if previous pod didn't scheduled",
@@ -254,6 +345,9 @@ func TestBatchBasic(t *testing.T) {
 			secondSig:                     "sig",
 			secondChosenNode:              "n1",
 			expectedHint:                  "",
+			expectedAttempts:              map[string]int{metrics.BatchAttemptNoHint: 2},
+			expectedFlushes:               nil,
+			expectedStoreResults:          map[string]int{metrics.StoreResultEmptyList: 1},
 		},
 		{
 			name:                          "empty list",
@@ -266,6 +360,9 @@ func TestBatchBasic(t *testing.T) {
 			secondSig:                     "sig",
 			secondChosenNode:              "n4",
 			expectedHint:                  "",
+			expectedAttempts:              map[string]int{metrics.BatchAttemptNoHint: 2},
+			expectedFlushes:               nil,
+			expectedStoreResults:          map[string]int{metrics.StoreResultEmptyList: 2},
 		},
 		{
 			name:                          "nil list",
@@ -278,6 +375,9 @@ func TestBatchBasic(t *testing.T) {
 			secondSig:                     "sig",
 			secondChosenNode:              "n4",
 			expectedHint:                  "",
+			expectedAttempts:              map[string]int{metrics.BatchAttemptNoHint: 2},
+			expectedFlushes:               nil,
+			expectedStoreResults:          map[string]int{metrics.StoreResultEmptyList: 2},
 		},
 		{
 			name:                          "pod doesn't get hint because the previous pod is to a different profile",
@@ -291,6 +391,9 @@ func TestBatchBasic(t *testing.T) {
 			secondSig:                     "sig",
 			secondChosenNode:              "n1",
 			expectedHint:                  "",
+			expectedAttempts:              map[string]int{metrics.BatchAttemptNoHint: 2},
+			expectedFlushes:               map[string]int{metrics.BatchFlushPodSkipped: 1},
+			expectedStoreResults:          map[string]int{metrics.StoreResultStored: 1, metrics.StoreResultEmptyList: 1},
 		},
 		{
 			name:                          "pod doesn't use batch from preceding pod when they are from the same cycle state, but GenericWorkload is disabled",
@@ -305,6 +408,9 @@ func TestBatchBasic(t *testing.T) {
 			secondChosenNode:              "n1",
 			genericWorkloadEnabled:        false,
 			expectedHint:                  "",
+			expectedAttempts:              map[string]int{metrics.BatchAttemptNoHint: 2},
+			expectedFlushes:               map[string]int{metrics.BatchFlushPodSkipped: 1},
+			expectedStoreResults:          map[string]int{metrics.StoreResultStored: 1, metrics.StoreResultEmptyList: 1},
 		},
 		{
 			name:                          "pod uses batch from preceding pod when they are from the same cycle state and GenericWorkload is enabled",
@@ -319,6 +425,9 @@ func TestBatchBasic(t *testing.T) {
 			secondChosenNode:              "n1",
 			genericWorkloadEnabled:        true,
 			expectedHint:                  "n1",
+			expectedAttempts:              map[string]int{metrics.BatchAttemptNoHint: 1, metrics.BatchAttemptHintUsed: 1},
+			expectedFlushes:               nil,
+			expectedStoreResults:          map[string]int{metrics.StoreResultStored: 1},
 		},
 		{
 			name:                          "pod uses batch from preceding pod and leaves remaining batch to next pod",
@@ -335,6 +444,9 @@ func TestBatchBasic(t *testing.T) {
 				signature:   []byte("sig"),
 				sortedNodes: newTestNodes([]string{"n2"}),
 			},
+			expectedAttempts:     map[string]int{metrics.BatchAttemptNoHint: 1, metrics.BatchAttemptHintUsed: 1},
+			expectedFlushes:      nil,
+			expectedStoreResults: map[string]int{metrics.StoreResultStored: 1},
 		},
 		{
 			name:                          "a second pod with a nominated node does not get a hint",
@@ -348,6 +460,9 @@ func TestBatchBasic(t *testing.T) {
 			secondSig:                     "sig",
 			secondChosenNode:              "n1",
 			expectedHint:                  "",
+			expectedAttempts:              map[string]int{metrics.BatchAttemptNoHint: 2},
+			expectedFlushes:               map[string]int{metrics.BatchFlushPodNominated: 1},
+			expectedStoreResults:          map[string]int{metrics.StoreResultStored: 1, metrics.StoreResultEmptyList: 1},
 		},
 	}
 
@@ -356,6 +471,7 @@ func TestBatchBasic(t *testing.T) {
 			_, ctx := ktesting.NewTestContext(t)
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
+			resetBatchMetrics()
 			testFwk, lister, err := newBatchTestFramework(ctx, nil, nil)
 			if err != nil {
 				t.Fatalf("Failed to create framework for testing: %v", err)
@@ -430,6 +546,23 @@ func TestBatchBasic(t *testing.T) {
 					t.Fatalf("Diff between sortedNodes (-want,+got):\n%s", nodesDiff)
 				}
 			}
+
+			profile := testFwk.ProfileName()
+			assertBatchCounters(t, profile, tt.expectedAttempts, tt.expectedFlushes, 0)
+			assertStoreResults(t, profile, tt.expectedStoreResults)
+
+			wantHinted, wantNoHint := uint64(0), uint64(2)
+			if tt.expectedHint != "" {
+				wantHinted, wantNoHint = 1, 1
+			}
+			assertHistogramCount(t, metrics.GetNodeHintDuration.Name, metrics.GetNodeHintDuration.WithLabelValues("hint", profile), wantHinted)
+			assertHistogramCount(t, metrics.GetNodeHintDuration.Name, metrics.GetNodeHintDuration.WithLabelValues("no_hint", profile), wantNoHint)
+
+			wantStores := uint64(1)
+			if tt.firstPodScheduledSuccessfully {
+				wantStores += 1
+			}
+			assertHistogramCount(t, metrics.StoreScheduleResultsDuration.Name, metrics.StoreScheduleResultsDuration.WithLabelValues(profile), wantStores)
 		})
 	}
 }
@@ -524,56 +657,68 @@ func TestBatchRescore(t *testing.T) {
 		cachedNodeMissing      bool
 		expectedHint           string
 		expectedRemainingNodes []string
+		wantFlushReason        string
+		wantRescoreAttempts    int
 	}{
 		{
 			name:                   "rescored node wins",
 			score:                  100,
 			expectedHint:           "n2",
 			expectedRemainingNodes: []string{"n1"},
+			wantFlushReason:        "",
+			wantRescoreAttempts:    1,
 		},
 		{
 			name:                   "rescored node loses",
 			score:                  10,
 			expectedHint:           "n1",
 			expectedRemainingNodes: []string{"n2"},
+			wantFlushReason:        "",
+			wantRescoreAttempts:    1,
 		},
 		{
-			name:                   "filter error gives no hint",
-			score:                  100,
-			filterErr:              true,
-			expectedHint:           "",
-			expectedRemainingNodes: []string{"n1"},
+			name:                "filter error gives no hint",
+			score:               100,
+			filterErr:           true,
+			expectedHint:        "",
+			wantFlushReason:     metrics.BatchFlushFilterError,
+			wantRescoreAttempts: 0,
 		},
 		{
-			name:                   "prescore error gives no hint",
-			preScoreErr:            true,
-			expectedHint:           "",
-			expectedRemainingNodes: []string{"n1"},
+			name:                "prescore error gives no hint",
+			preScoreErr:         true,
+			expectedHint:        "",
+			wantFlushReason:     metrics.BatchFlushPreScoreError,
+			wantRescoreAttempts: 1,
 		},
 		{
-			name:                   "score error gives no hint",
-			scoreErr:               true,
-			expectedHint:           "",
-			expectedRemainingNodes: []string{"n1"},
+			name:                "score error gives no hint",
+			scoreErr:            true,
+			expectedHint:        "",
+			wantFlushReason:     metrics.BatchFlushRescoreError,
+			wantRescoreAttempts: 1,
 		},
 		{
-			name:                   "normalize error gives no hint",
-			normErr:                true,
-			expectedHint:           "",
-			expectedRemainingNodes: []string{"n1"},
+			name:                "normalize error gives no hint",
+			normErr:             true,
+			expectedHint:        "",
+			wantFlushReason:     metrics.BatchFlushNormalizeError,
+			wantRescoreAttempts: 1,
 		},
 		{
-			name:                   "chosen node missing from lister gives no hint",
-			chosenNodeMissing:      true,
-			expectedHint:           "",
-			expectedRemainingNodes: []string{"n1"},
+			name:                "chosen node missing from lister gives no hint",
+			chosenNodeMissing:   true,
+			expectedHint:        "",
+			wantFlushReason:     metrics.BatchFlushNodeMissing,
+			wantRescoreAttempts: 0,
 		},
 		{
-			name:                   "cached node missing from lister gives no hint",
-			score:                  100,
-			cachedNodeMissing:      true,
-			expectedHint:           "",
-			expectedRemainingNodes: []string{"n1"},
+			name:                "cached node missing from lister gives no hint",
+			score:               100,
+			cachedNodeMissing:   true,
+			expectedHint:        "",
+			wantFlushReason:     metrics.BatchFlushNodeMissing,
+			wantRescoreAttempts: 1,
 		},
 	}
 
@@ -624,12 +769,28 @@ func TestBatchRescore(t *testing.T) {
 			}
 
 			pod2 := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod2", UID: types.UID(nonBlockingPodID("2"))}}
+			resetBatchMetrics()
 			hint := batch.GetNodeHint(ctx, pod2, sig, framework.NewCycleState(), 2)
 
 			if hint != tt.expectedHint {
 				t.Fatalf("got hint %q, expected %q", hint, tt.expectedHint)
 			}
 
+			var wantFlushes, wantAttempts map[string]int
+			if tt.wantFlushReason != "" {
+				wantFlushes = map[string]int{tt.wantFlushReason: 1}
+			}
+			if hint == "" {
+				wantAttempts = map[string]int{metrics.BatchAttemptNoHint: 1}
+			}
+			profile := testFwk.ProfileName()
+			assertBatchCounters(t, profile, wantAttempts, wantFlushes, tt.wantRescoreAttempts)
+			assertHistogramCount(t, metrics.BatchRescoreDuration.Name, metrics.BatchRescoreDuration.WithLabelValues(profile), uint64(tt.wantRescoreAttempts))
+
+			// Every flush in this test discards a usable state, so GetNodeHint must drop it.
+			if tt.wantFlushReason != "" && batch.state != nil {
+				t.Fatal("expected batch state to be dropped")
+			}
 			if tt.expectedRemainingNodes != nil {
 				if batch.state == nil || batch.state.sortedNodes == nil {
 					t.Fatal("expected non-nil batch state after hint")
@@ -679,6 +840,8 @@ func TestBatchRescoreChain(t *testing.T) {
 	n2Info.SetNode(&v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "n2", UID: "n2"}})
 	lister.nodes = nodeInfoLister{n1Info, n2Info}
 
+	resetBatchMetrics()
+
 	// Pod2: rescore fires (n2 still feasible), n2 wins.
 	pod2 := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod2", UID: types.UID(nonBlockingPodID("2"))}}
 	hint2 := batch.GetNodeHint(ctx, pod2, sig, framework.NewCycleState(), 2)
@@ -699,5 +862,100 @@ func TestBatchRescoreChain(t *testing.T) {
 	}
 	if got := batch.state.sortedNodes.Pop().Name; got != "n1" {
 		t.Fatalf("remaining node after pod3: got %q, want %q", got, "n1")
+	}
+
+	profile := testFwk.ProfileName()
+	assertBatchCounters(t, profile, map[string]int{metrics.BatchAttemptHintUsed: 1}, nil, 2)
+	assertHistogramCount(t, metrics.BatchRescoreDuration.Name, metrics.BatchRescoreDuration.WithLabelValues(profile), 2)
+}
+
+// TestBatchMetricsOtherPaths covers the batch_attempts_total, batch_cache_flushed_total and
+// store_schedule_results_total series that TestBatchBasic and TestBatchRescore can't reach through the usual flow.
+func TestBatchMetricsOtherPaths(t *testing.T) {
+	sig := fwk.PodSignature("sig")
+	otherNodes := func() framework.SortedScoredNodes { return newTestNodes([]string{"n1"}) }
+	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod", UID: types.UID(nonBlockingPodID("1"))}}
+
+	tests := []struct {
+		name             string
+		run              func(ctx context.Context, batch *OpportunisticBatch)
+		wantAttempts     map[string]int
+		wantFlushes      map[string]int
+		wantStoreResults map[string]int
+	}{
+		{
+			name: "hint given but a different node was chosen",
+			run: func(ctx context.Context, batch *OpportunisticBatch) {
+				batch.StoreScheduleResults(ctx, sig, "n1", "n2", otherNodes(), 1)
+			},
+			wantAttempts:     map[string]int{metrics.BatchAttemptHintNotUsed: 1},
+			wantStoreResults: map[string]int{metrics.StoreResultStored: 1},
+		},
+		{
+			name: "pod without a signature replaces clears a usable state",
+			run: func(ctx context.Context, batch *OpportunisticBatch) {
+				batch.StoreScheduleResults(ctx, sig, "", "n2", otherNodes(), 1)
+				batch.StoreScheduleResults(ctx, nil, "", "n3", otherNodes(), 2)
+			},
+			wantStoreResults: map[string]int{metrics.StoreResultStored: 1, metrics.StoreResultPodNotBatchable: 1},
+		},
+		{
+			name: "pod with no other nodes replaces a usable state",
+			run: func(ctx context.Context, batch *OpportunisticBatch) {
+				batch.StoreScheduleResults(ctx, sig, "", "n2", otherNodes(), 1)
+				batch.StoreScheduleResults(ctx, sig, "", "n3", nil, 2)
+			},
+			wantStoreResults: map[string]int{metrics.StoreResultStored: 1, metrics.StoreResultEmptyList: 1},
+		},
+		{
+			name: "pods that can't seed a batch are counted with no state",
+			run: func(ctx context.Context, batch *OpportunisticBatch) {
+				batch.StoreScheduleResults(ctx, nil, "", "n3", nil, 1)
+				batch.StoreScheduleResults(ctx, sig, "", "n3", nil, 2)
+			},
+			wantStoreResults: map[string]int{metrics.StoreResultPodNotBatchable: 1, metrics.StoreResultEmptyList: 1},
+		},
+		{
+			name: "batch state older than maxBatchAge expires",
+			run: func(ctx context.Context, batch *OpportunisticBatch) {
+				batch.StoreScheduleResults(ctx, sig, "", "n2", otherNodes(), 1)
+				batch.state.creationTime = time.Now().Add(-2 * time.Minute)
+				batch.GetNodeHint(ctx, pod, sig, framework.NewCycleState(), 2)
+			},
+			wantAttempts:     map[string]int{metrics.BatchAttemptNoHint: 1},
+			wantFlushes:      map[string]int{metrics.BatchFlushExpired: 1},
+			wantStoreResults: map[string]int{metrics.StoreResultStored: 1},
+		},
+		{
+			name: "a flush is reported once when the following pods fail to schedule",
+			run: func(ctx context.Context, batch *OpportunisticBatch) {
+				batch.StoreScheduleResults(ctx, sig, "", "n2", otherNodes(), 1)
+				for cycle := int64(2); cycle <= 4; cycle++ {
+					batch.GetNodeHint(ctx, pod, fwk.PodSignature("other"), framework.NewCycleState(), cycle)
+				}
+			},
+			wantAttempts:     map[string]int{metrics.BatchAttemptNoHint: 3},
+			wantFlushes:      map[string]int{metrics.BatchFlushPodIncompatible: 1},
+			wantStoreResults: map[string]int{metrics.StoreResultStored: 1},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+			resetBatchMetrics()
+
+			testFwk, _, err := newBatchTestFramework(ctx, nil, nil)
+			if err != nil {
+				t.Fatalf("Failed to create framework: %v", err)
+			}
+			batch := newOpportunisticBatch(testFwk, false, time.Minute)
+			tt.run(ctx, batch)
+
+			assertBatchCounters(t, testFwk.ProfileName(), tt.wantAttempts, tt.wantFlushes, 0)
+			assertStoreResults(t, testFwk.ProfileName(), tt.wantStoreResults)
+		})
 	}
 }

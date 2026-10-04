@@ -6391,7 +6391,10 @@
     endpoint: /metrics
 - name: batch_attempts_total
   subsystem: scheduler
-  help: Counts of results when we attempt to use batching, by scheduler profile.
+  help: Counts of results when we attempt to use batching, by scheduler profile. 'no_hint'
+    covers every pod that asked for a hint and got none, including pods that later
+    fail to schedule. 'hint_used' and 'hint_not_used' are recorded only when a node
+    is selected, and say whether it was the hinted one.
   type: Counter
   stabilityLevel: ALPHA
   labels:
@@ -6402,7 +6405,11 @@
     endpoint: /metrics
 - name: batch_cache_flushed_total
   subsystem: scheduler
-  help: Counts of cache flushes by reason and scheduler profile.
+  help: Counts of batch cache flushes by reason and scheduler profile. A flush discards
+    a usable batch state. 'pod_skipped' means the previous pod was handled by another
+    profile or failed to schedule, 'node_missing' means a node needed to reuse the
+    state is no longer in the snapshot, and the 'filter_error', 'prescore_error',
+    'rescore_error' and 'normalize_error' reasons mean that phase failed while rescoring.
   type: Counter
   stabilityLevel: ALPHA
   labels:
@@ -6920,6 +6927,20 @@
   - 0.00512
   - 0.01024
   - 0.02048
+  componentEndpoints:
+  - component: kube-scheduler
+    endpoint: /metrics
+- name: store_schedule_results_total
+  subsystem: scheduler
+  help: Counts of the outcomes of storing scheduling results for batching, by scheduler
+    profile. 'stored' means the pod seeded a batch, 'pod_not_batchable' means the
+    pod has no signature, and 'empty_list' means no other feasible nodes were left
+    to cache. Pods that used the hinted node store nothing.
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - profile
+  - result
   componentEndpoints:
   - component: kube-scheduler
     endpoint: /metrics
