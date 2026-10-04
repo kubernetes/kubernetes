@@ -28,24 +28,36 @@ import (
 // magicString is used for the hacky label test in checkLabels. Remove once fixed.
 const magicString = "zZgWfBxLqvG8kc8IMv3POi2Bb0tZI3vAnBx+gBaFi9FyPzB/CzKUer1yufDa"
 
-// observeWithExemplar is a wrapper for [prometheus.ExemplarAdder.ExemplarObserver],
-// which falls back to [prometheus.Observer.Observe] if no labels are provided.
+// observeWithExemplar records val on obs. If labels is non-nil and obs
+// implements [prometheus.ExemplarObserver], the exemplar is attached via
+// ObserveWithExemplar; otherwise the exemplar is dropped and the value is
+// recorded with a plain [prometheus.Observer.Observe]. This mirrors the
+// safe-cast pattern in [prometheus.Timer.ObserveDurationWithExemplar] and
+// ensures we never panic when callers pass an ObserverVec backed by a
+// summary, which cannot carry exemplars in the Prometheus exposition format.
 func observeWithExemplar(obs prometheus.Observer, val float64, labels map[string]string) {
-	if labels == nil {
-		obs.Observe(val)
-		return
+	if labels != nil {
+		if eo, ok := obs.(prometheus.ExemplarObserver); ok {
+			eo.ObserveWithExemplar(val, labels)
+			return
+		}
 	}
-	obs.(prometheus.ExemplarObserver).ObserveWithExemplar(val, labels)
+	obs.Observe(val)
 }
 
-// addWithExemplar is a wrapper for [prometheus.ExemplarAdder.AddWithExemplar],
-// which falls back to [prometheus.Counter.Add] if no labels are provided.
-func addWithExemplar(obs prometheus.Counter, val float64, labels map[string]string) {
-	if labels == nil {
-		obs.Add(val)
-		return
+// addWithExemplar records val on c. If labels is non-nil and c implements
+// [prometheus.ExemplarAdder], the exemplar is attached via AddWithExemplar;
+// otherwise the exemplar is dropped and the value is recorded with a plain
+// [prometheus.Counter.Add]. The safe-cast keeps the helper robust against
+// custom Counter implementations that do not advertise exemplar support.
+func addWithExemplar(c prometheus.Counter, val float64, labels map[string]string) {
+	if labels != nil {
+		if ea, ok := c.(prometheus.ExemplarAdder); ok {
+			ea.AddWithExemplar(val, labels)
+			return
+		}
 	}
-	obs.(prometheus.ExemplarAdder).AddWithExemplar(val, labels)
+	c.Add(val)
 }
 
 // InstrumentHandlerInFlight is a middleware that wraps the provided
@@ -97,10 +109,10 @@ func InstrumentHandlerDuration(obs prometheus.ObserverVec, next http.Handler, op
 			next.ServeHTTP(d, r)
 
 			l := labels(code, method, r.Method, d.Status(), hOpts.extraMethods...)
-			for label, resolve := range hOpts.extraLabelsFromCtx {
-				l[label] = resolve(r.Context())
+			for label, resolve := range hOpts.extraLabelsFromRequest {
+				l[label] = resolve(r)
 			}
-			observeWithExemplar(obs.With(l), time.Since(now).Seconds(), hOpts.getExemplarFn(r.Context()))
+			observeWithExemplar(obs.With(l), time.Since(now).Seconds(), hOpts.getExemplarFn(r))
 		}
 	}
 
@@ -108,10 +120,10 @@ func InstrumentHandlerDuration(obs prometheus.ObserverVec, next http.Handler, op
 		now := time.Now()
 		next.ServeHTTP(w, r)
 		l := labels(code, method, r.Method, 0, hOpts.extraMethods...)
-		for label, resolve := range hOpts.extraLabelsFromCtx {
-			l[label] = resolve(r.Context())
+		for label, resolve := range hOpts.extraLabelsFromRequest {
+			l[label] = resolve(r)
 		}
-		observeWithExemplar(obs.With(l), time.Since(now).Seconds(), hOpts.getExemplarFn(r.Context()))
+		observeWithExemplar(obs.With(l), time.Since(now).Seconds(), hOpts.getExemplarFn(r))
 	}
 }
 
@@ -147,10 +159,10 @@ func InstrumentHandlerCounter(counter *prometheus.CounterVec, next http.Handler,
 			next.ServeHTTP(d, r)
 
 			l := labels(code, method, r.Method, d.Status(), hOpts.extraMethods...)
-			for label, resolve := range hOpts.extraLabelsFromCtx {
-				l[label] = resolve(r.Context())
+			for label, resolve := range hOpts.extraLabelsFromRequest {
+				l[label] = resolve(r)
 			}
-			addWithExemplar(counter.With(l), 1, hOpts.getExemplarFn(r.Context()))
+			addWithExemplar(counter.With(l), 1, hOpts.getExemplarFn(r))
 		}
 	}
 
@@ -158,10 +170,10 @@ func InstrumentHandlerCounter(counter *prometheus.CounterVec, next http.Handler,
 		next.ServeHTTP(w, r)
 
 		l := labels(code, method, r.Method, 0, hOpts.extraMethods...)
-		for label, resolve := range hOpts.extraLabelsFromCtx {
-			l[label] = resolve(r.Context())
+		for label, resolve := range hOpts.extraLabelsFromRequest {
+			l[label] = resolve(r)
 		}
-		addWithExemplar(counter.With(l), 1, hOpts.getExemplarFn(r.Context()))
+		addWithExemplar(counter.With(l), 1, hOpts.getExemplarFn(r))
 	}
 }
 
@@ -200,10 +212,10 @@ func InstrumentHandlerTimeToWriteHeader(obs prometheus.ObserverVec, next http.Ha
 		now := time.Now()
 		d := newDelegator(w, func(status int) {
 			l := labels(code, method, r.Method, status, hOpts.extraMethods...)
-			for label, resolve := range hOpts.extraLabelsFromCtx {
-				l[label] = resolve(r.Context())
+			for label, resolve := range hOpts.extraLabelsFromRequest {
+				l[label] = resolve(r)
 			}
-			observeWithExemplar(obs.With(l), time.Since(now).Seconds(), hOpts.getExemplarFn(r.Context()))
+			observeWithExemplar(obs.With(l), time.Since(now).Seconds(), hOpts.getExemplarFn(r))
 		})
 		next.ServeHTTP(d, r)
 	}
@@ -244,10 +256,10 @@ func InstrumentHandlerRequestSize(obs prometheus.ObserverVec, next http.Handler,
 			size := computeApproximateRequestSize(r)
 
 			l := labels(code, method, r.Method, d.Status(), hOpts.extraMethods...)
-			for label, resolve := range hOpts.extraLabelsFromCtx {
-				l[label] = resolve(r.Context())
+			for label, resolve := range hOpts.extraLabelsFromRequest {
+				l[label] = resolve(r)
 			}
-			observeWithExemplar(obs.With(l), float64(size), hOpts.getExemplarFn(r.Context()))
+			observeWithExemplar(obs.With(l), float64(size), hOpts.getExemplarFn(r))
 		}
 	}
 
@@ -256,10 +268,10 @@ func InstrumentHandlerRequestSize(obs prometheus.ObserverVec, next http.Handler,
 		size := computeApproximateRequestSize(r)
 
 		l := labels(code, method, r.Method, 0, hOpts.extraMethods...)
-		for label, resolve := range hOpts.extraLabelsFromCtx {
-			l[label] = resolve(r.Context())
+		for label, resolve := range hOpts.extraLabelsFromRequest {
+			l[label] = resolve(r)
 		}
-		observeWithExemplar(obs.With(l), float64(size), hOpts.getExemplarFn(r.Context()))
+		observeWithExemplar(obs.With(l), float64(size), hOpts.getExemplarFn(r))
 	}
 }
 
@@ -296,10 +308,10 @@ func InstrumentHandlerResponseSize(obs prometheus.ObserverVec, next http.Handler
 		next.ServeHTTP(d, r)
 
 		l := labels(code, method, r.Method, d.Status(), hOpts.extraMethods...)
-		for label, resolve := range hOpts.extraLabelsFromCtx {
-			l[label] = resolve(r.Context())
+		for label, resolve := range hOpts.extraLabelsFromRequest {
+			l[label] = resolve(r)
 		}
-		observeWithExemplar(obs.With(l), float64(d.Written()), hOpts.getExemplarFn(r.Context()))
+		observeWithExemplar(obs.With(l), float64(d.Written()), hOpts.getExemplarFn(r))
 	})
 }
 
@@ -366,7 +378,7 @@ func checkLabels(c prometheus.Collector) (code, method bool) {
 			panic("metric partitioned with non-supported labels")
 		}
 	}
-	return
+	return code, method
 }
 
 func isLabelCurried(c prometheus.Collector, label string) bool {

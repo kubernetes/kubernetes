@@ -59,6 +59,14 @@ func TruePredicateExtender(pod *v1.Pod, node fwk.NodeInfo) *fwk.Status {
 	return fwk.NewStatus(fwk.Success)
 }
 
+// OccupiedNodePredicateExtender returns unschedulable if the node already has pods.
+func OccupiedNodePredicateExtender(pod *v1.Pod, node fwk.NodeInfo) *fwk.Status {
+	if len(node.GetPods()) > 0 {
+		return fwk.NewStatus(fwk.Unschedulable, fmt.Sprintf("node %q is occupied", node.Node().Name))
+	}
+	return fwk.NewStatus(fwk.Success)
+}
+
 // Node1PredicateExtender implements FitPredicate function to return true
 // when the given node's name is "node1"; otherwise return false.
 func Node1PredicateExtender(pod *v1.Pod, node fwk.NodeInfo) *fwk.Status {

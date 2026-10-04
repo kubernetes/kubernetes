@@ -370,7 +370,7 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 			restartKubelet(ctx, true)
 
 			ginkgo.By("Wait for node to be ready again")
-			e2enode.WaitForAllNodesSchedulable(ctx, f.ClientSet, 5*time.Minute)
+			framework.ExpectNoError(e2enode.WaitForAllNodesSchedulable(ctx, f.ClientSet, 5*time.Minute))
 
 			ginkgo.By("Waiting for resource to become available on the local node after restart")
 			gomega.Eventually(ctx, func() bool {
@@ -421,7 +421,7 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 			framework.ExpectNoError(err)
 
 			ginkgo.By("Wait for node to be ready again")
-			e2enode.WaitForAllNodesSchedulable(ctx, f.ClientSet, 5*time.Minute)
+			framework.ExpectNoError(e2enode.WaitForAllNodesSchedulable(ctx, f.ClientSet, 5*time.Minute))
 
 			ginkgo.By("Waiting for container to restart")
 			ensurePodContainerRestart(ctx, f, pod1.Name, pod1.Name)
@@ -435,7 +435,7 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 			restartKubelet(ctx, true)
 
 			ginkgo.By("Wait for node to be ready again")
-			e2enode.WaitForAllNodesSchedulable(ctx, f.ClientSet, 5*time.Minute)
+			framework.ExpectNoError(e2enode.WaitForAllNodesSchedulable(ctx, f.ClientSet, 5*time.Minute))
 
 			ginkgo.By("Checking an instance of the pod is running")
 			gomega.Eventually(ctx, getPodByName).
@@ -535,7 +535,7 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 			framework.ExpectNoError(err)
 
 			ginkgo.By("Wait for node to be ready again")
-			e2enode.WaitForAllNodesSchedulable(ctx, f.ClientSet, 5*time.Minute)
+			framework.ExpectNoError(e2enode.WaitForAllNodesSchedulable(ctx, f.ClientSet, 5*time.Minute))
 
 			ginkgo.By("Re-Register resources and delete the plugin pod")
 			gp := int64(0)
@@ -592,7 +592,7 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 			restartKubelet(ctx, true)
 
 			ginkgo.By("Wait for node to be ready again")
-			e2enode.WaitForAllNodesSchedulable(ctx, f.ClientSet, 5*time.Minute)
+			framework.ExpectNoError(e2enode.WaitForAllNodesSchedulable(ctx, f.ClientSet, 5*time.Minute))
 
 			ginkgo.By("Checking the same instance of the pod is still running after kubelet restart")
 			gomega.Eventually(ctx, getPodByName).
@@ -658,7 +658,7 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 
 			// wait until the kubelet health check will fail
 			gomega.Eventually(ctx, func() bool {
-				ok := kubeletHealthCheck(kubeletHealthCheckURL)
+				ok := e2enode.HealthCheck(kubeletHealthCheckURL)
 				framework.Logf("kubelet health check at %q value=%v", kubeletHealthCheckURL, ok)
 				return ok
 			}, f.Timeouts.PodStart, f.Timeouts.Poll).Should(gomega.BeFalseBecause("expected kubelet health check to be failed"))
@@ -1007,7 +1007,7 @@ func testDevicePluginNodeReboot(f *framework.Framework, pluginSockDir string) {
 			restartKubelet(ctx)
 
 			ginkgo.By("Wait for node to be ready again")
-			e2enode.WaitForAllNodesSchedulable(ctx, f.ClientSet, 5*time.Minute)
+			framework.ExpectNoError(e2enode.WaitForAllNodesSchedulable(ctx, f.ClientSet, 5*time.Minute))
 
 			ginkgo.By("Waiting for the pod to fail with admission error as device plugin hasn't re-registered yet")
 			gomega.Eventually(ctx, getPod).

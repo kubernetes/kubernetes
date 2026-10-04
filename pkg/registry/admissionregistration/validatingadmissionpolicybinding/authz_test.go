@@ -37,7 +37,7 @@ func TestAuthorization(t *testing.T) {
 	for _, tc := range []struct {
 		name              string
 		userInfo          user.Info
-		auth              AuthFunc
+		auth              authorizer.AuthorizerFunc
 		policyGetter      PolicyGetterFunc
 		resourceResolver  resolver.ResourceResolverFunc
 		expectErrContains string
@@ -218,12 +218,6 @@ func TestAuthorization(t *testing.T) {
 			})
 		})
 	}
-}
-
-type AuthFunc func(ctx context.Context, a authorizer.Attributes) (authorized authorizer.Decision, reason string, err error)
-
-func (f AuthFunc) Authorize(ctx context.Context, a authorizer.Attributes) (authorized authorizer.Decision, reason string, err error) {
-	return f(ctx, a)
 }
 
 type PolicyGetterFunc func(ctx context.Context, name string) (*admissionregistration.ValidatingAdmissionPolicy, error)

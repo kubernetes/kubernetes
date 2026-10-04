@@ -201,22 +201,22 @@ func getContainerInfoFromAnnotations(ctx context.Context, annotations map[string
 	if containerInfo.RestartCount, err = getIntValueFromLabel(logger, annotations, containerRestartCountLabel); err != nil {
 		logger.Error(err, "Unable to get label value from annotations", "label", containerRestartCountLabel, "annotations", annotations)
 	}
-	if containerInfo.PodDeletionGracePeriod, err = getInt64PointerFromLabel(logger, annotations, podDeletionGracePeriodLabel); err != nil {
+	if containerInfo.PodDeletionGracePeriod, err = getInt64PointerFromLabel(annotations, podDeletionGracePeriodLabel); err != nil {
 		logger.Error(err, "Unable to get label value from annotations", "label", podDeletionGracePeriodLabel, "annotations", annotations)
 	}
-	if containerInfo.PodTerminationGracePeriod, err = getInt64PointerFromLabel(logger, annotations, podTerminationGracePeriodLabel); err != nil {
+	if containerInfo.PodTerminationGracePeriod, err = getInt64PointerFromLabel(annotations, podTerminationGracePeriodLabel); err != nil {
 		logger.Error(err, "Unable to get label value from annotations", "label", podTerminationGracePeriodLabel, "annotations", annotations)
 	}
 
 	preStopHandler := &v1.LifecycleHandler{}
-	if found, err := getJSONObjectFromLabel(logger, annotations, containerPreStopHandlerLabel, preStopHandler); err != nil {
+	if found, err := getJSONObjectFromLabel(annotations, containerPreStopHandlerLabel, preStopHandler); err != nil {
 		logger.Error(err, "Unable to get label value from annotations", "label", containerPreStopHandlerLabel, "annotations", annotations)
 	} else if found {
 		containerInfo.PreStopHandler = preStopHandler
 	}
 
 	containerPorts := []v1.ContainerPort{}
-	if found, err := getJSONObjectFromLabel(logger, annotations, containerPortsLabel, &containerPorts); err != nil {
+	if found, err := getJSONObjectFromLabel(annotations, containerPortsLabel, &containerPorts); err != nil {
 		logger.Error(err, "Unable to get label value from annotations", "label", containerPortsLabel, "annotations", annotations)
 	} else if found {
 		containerInfo.ContainerPorts = containerPorts
@@ -266,7 +266,7 @@ func getUint64ValueFromLabel(ctx context.Context, labels map[string]string, labe
 	return 0, nil
 }
 
-func getInt64PointerFromLabel(logger klog.Logger, labels map[string]string, label string) (*int64, error) {
+func getInt64PointerFromLabel(labels map[string]string, label string) (*int64, error) {
 	if strValue, found := labels[label]; found {
 		int64Value, err := strconv.ParseInt(strValue, 10, 64)
 		if err != nil {
@@ -275,17 +275,15 @@ func getInt64PointerFromLabel(logger klog.Logger, labels map[string]string, labe
 		return &int64Value, nil
 	}
 	// If the label is not found, return pointer nil.
-	logger.V(4).Info("Label not found", "label", label)
 	return nil, nil
 }
 
 // getJSONObjectFromLabel returns a bool value indicating whether an object is found.
-func getJSONObjectFromLabel(logger klog.Logger, labels map[string]string, label string, value interface{}) (bool, error) {
+func getJSONObjectFromLabel(labels map[string]string, label string, value interface{}) (bool, error) {
 	if strValue, found := labels[label]; found {
 		err := json.Unmarshal([]byte(strValue), value)
 		return found, err
 	}
 	// If the label is not found, return not found.
-	logger.V(4).Info("Label not found", "label", label)
 	return false, nil
 }

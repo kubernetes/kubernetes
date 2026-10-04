@@ -34,12 +34,12 @@ import (
 // and adds who information via Subject.
 // Deprecated in v1.17 in favor of rbac.authorization.k8s.io/v1 ClusterRoleBinding, and will no longer be served in v1.22.
 type ClusterRoleBindingApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration `json:",inline"`
-	// Standard object's metadata.
+	v1.TypeMetaApplyConfiguration `json:""`
+	// metadata is the standard object's metadata.
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	// Subjects holds references to the objects the role applies to.
+	// subjects holds references to the objects the role applies to.
 	Subjects []SubjectApplyConfiguration `json:"subjects,omitempty"`
-	// RoleRef can only reference a ClusterRole in the global namespace.
+	// roleRef can only reference a ClusterRole in the global namespace.
 	// If the RoleRef cannot be resolved, the Authorizer must return an error.
 	RoleRef *RoleRefApplyConfiguration `json:"roleRef,omitempty"`
 }

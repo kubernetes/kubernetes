@@ -37,6 +37,7 @@ import (
 	"k8s.io/client-go/tools/events"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
+	extenderv1 "k8s.io/kube-scheduler/extender/v1"
 )
 
 // Code is the Status code/type which is returned from plugins.
@@ -74,7 +75,10 @@ const (
 	// When the scheduling queue requeues Pods, which was rejected with UnschedulableAndUnresolvable in the last scheduling,
 	// the Pod goes through backoff.
 	UnschedulableAndUnresolvable
-	// Wait is used when a Permit plugin finds a pod scheduling should wait.
+	// Wait is used in the following scenarios:
+	// - when a Permit plugin finds a pod scheduling should wait.
+	// - when a PlacementFeasible plugin finds a pod group cannot be scheduled in the current partially evaluated placement,
+	//   but may become schedulable once more pods are evaluated.
 	Wait
 	// Skip is used in the following scenarios:
 	// - when a Bind plugin chooses to skip binding.
@@ -285,7 +289,9 @@ type NodeScore struct {
 type NodePluginScores struct {
 	// Name is node name.
 	Name string
-	// Scores is scores from plugins and extenders.
+	// RawScores holds Score() output for each active scoring plugin, before normalization is applied.
+	RawScores []PluginScore
+	// Scores is normalized weighted scores from plugins and extenders.
 	Scores []PluginScore
 	// TotalScore is the total score in Scores.
 	TotalScore int64
@@ -445,31 +451,33 @@ type Plugin interface {
 type PreEnqueuePlugin interface {
 	Plugin
 	// PreEnqueue is called prior to adding Pods to activeQ or backoffQ.
+	// An unsuccessful status marks the pod as gated and moves it to unschedulableQ.
+	// Gated pods are only re-evaluated on events registered by the gating plugin or wildcard events.
 	PreEnqueue(ctx context.Context, p *v1.Pod) *Status
 }
 
-// LessFunc is the function to sort pod info
-type LessFunc func(podInfo1, podInfo2 QueuedPodInfo) bool
+// LessFunc is the function to sort entity info
+type LessFunc func(entity1, entity2 QueuedEntityInfo) bool
 
 // QueueSortPlugin is an interface that must be implemented by "QueueSort" plugins.
-// These plugins are used to sort pods in the scheduling queue. Only one queue sort
+// These plugins are used to sort entities in the scheduling queue. Only one queue sort
 // plugin may be enabled at a time.
 type QueueSortPlugin interface {
 	Plugin
-	// Less are used to sort pods in the scheduling queue.
-	Less(QueuedPodInfo, QueuedPodInfo) bool
+	// Less are used to sort entities in the scheduling queue.
+	Less(QueuedEntityInfo, QueuedEntityInfo) bool
 }
 
 // EnqueueExtensions is an optional interface that plugins can implement to efficiently
 // move unschedulable Pods in internal scheduling queues.
-// In the scheduler, Pods can be unschedulable by PreEnqueue, PreFilter, Filter, Reserve, and Permit plugins,
+// In the scheduler, Pods can be unschedulable by PreEnqueue, PreFilter, Filter, Reserve, Permit and PlacementFeasible plugins,
 // and Pods rejected by these plugins are requeued based on this extension point.
 // Failures from other extension points are regarded as temporal errors (e.g., network failure),
 // and the scheduler requeue Pods without this extension point - always requeue Pods to activeQ after backoff.
 // This is because such temporal errors cannot be resolved by specific cluster events,
 // and we have no choose but keep retrying scheduling until the failure is resolved.
 //
-// Plugins that make pod unschedulable (PreEnqueue, PreFilter, Filter, Reserve, and Permit plugins) must implement this interface,
+// Plugins that make pod unschedulable (PreEnqueue, PreFilter, Filter, Reserve, Permit and PlacementFeasible plugins) must implement this interface,
 // otherwise the default implementation will be used, which is less efficient in requeueing Pods rejected by the plugin.
 //
 // Also, if EventsToRegister returns an empty list, that means the Pods failed by the plugin are not requeued by any events,
@@ -496,6 +504,11 @@ type EnqueueExtensions interface {
 // PreFilterExtensions is an interface that is included in plugins that allow specifying
 // callbacks to make incremental updates to its supposedly pre-calculated
 // state.
+// Note: In some contexts (e.g., preemption), the passed NodeInfo might be a shared, non-snapshotted
+// instance (especially for remote nodes affected by cross-node victims). Implementations
+// must treat the nodeInfo parameter as read-only and must NOT mutate it (e.g., by calling
+// RemovePod or AddPodInfo). Additionally, plugins that read NodeInfo directly during Filter
+// (rather than CycleState) will observe stale state for those remote nodes.
 type PreFilterExtensions interface {
 	// AddPod is called by the framework while trying to evaluate the impact
 	// of adding podToAdd to the node while scheduling podToSchedule.
@@ -586,6 +599,33 @@ type PostFilterPlugin interface {
 	// a preemption plugin may choose to return nominatedNodeName, so that framework can reuse that to update the
 	// preemptor pod's .spec.status.nominatedNodeName field.
 	PostFilter(ctx context.Context, state CycleState, pod *v1.Pod, filteredNodeStatusMap NodeToStatusReader) (*PostFilterResult, *Status)
+}
+
+// PodGroupSchedulingFunc is a function that will be run to check feasibility of a pod group scheduling.
+type PodGroupSchedulingFunc func(ctx context.Context) (*PodGroupAssignments, *Status)
+
+// PodGroupPostFilterResult stores information about nominated nodes for a pod group.
+type PodGroupPostFilterResult struct {
+	// NominatingInfos maps pods in the pod group to their nominated node info. It only contains pods that have a nominated node.
+	NominatingInfos map[types.NamespacedName]*NominatingInfo
+}
+
+// PodGroupPostFilterPlugin is an interface for "PodGroupPostFilter" plugins. These plugins are called
+// after a PodGroup cannot be scheduled.
+type PodGroupPostFilterPlugin interface {
+	Plugin
+
+	// PodGroupPostFilter is called by the scheduling framework
+	// when the pod group scheduling cycle failed.
+	//
+	//
+	// A PodGroupPostFilter plugin should return one of the following statuses:
+	// - Unschedulable: the plugin gets executed successfully but the PodGroup cannot be made schedulable.
+	// - UnschedulableAndUnresolvable: the plugin gets executed successfully but the PodGroup cannot be made schedulable,
+	//   and other PodGroupPostFilter plugins cannot make the group schedulable so evaluation of subsequent plugins is skipped.
+	// - Success: the plugin gets executed successfully, the PodGroup can be made schedulable and evaluation of subsequent plugins is skipped.
+	// - Error: the plugin aborts due to some internal error.
+	PodGroupPostFilter(ctx context.Context, state PodGroupCycleState, pgInfo PodGroupInfo, pgSchedulingFunc PodGroupSchedulingFunc) (*PodGroupPostFilterResult, *Status)
 }
 
 // PreScorePlugin is an interface for "PreScore" plugin. PreScore is an
@@ -793,12 +833,40 @@ type PlacementScorePlugin interface {
 	// ScorePlacement calculates a score for a given Placement.
 	// This function is called only for Placements that have been deemed feasible for the sufficient number of pods in the PodGroup scheduling cycle.
 	// The PodGroupAssignments indicates the node assigned to each pod within this Placement.
+	// The state is scoped to the Placement being scored and can be used to access the owning PodGroup cycle state.
 	// The returned score is a int64 with higher scores generally indicating more preferable Placements.
 	// Plugins can implement various scoring strategies, such as bin packing to minimize resource fragmentation.
-	ScorePlacement(ctx context.Context, state PodGroupCycleState, podGroup PodGroupInfo, placement *PodGroupAssignments) (int64, *Status)
+	ScorePlacement(ctx context.Context, state PlacementCycleState, podGroup PodGroupInfo, placement *PodGroupAssignments) (int64, *Status)
 
 	// PlacementScoreExtensions returns a PlacementScoreExtensions interface if it implements one, or nil if does not.
 	PlacementScoreExtensions() PlacementScoreExtensions
+}
+
+// PlacementFeasiblePlugin is an interface for plugins that are called after each pod in a pod group is evaluated.
+// It is used to determine if a pod group is schedulable, may become schedulable or will not become schedulable regardless of the scheduling result of the remaining pods in the pod group.
+type PlacementFeasiblePlugin interface {
+	Plugin
+
+	// PlacementFeasible is called after each pod in a pod group is evaluated.
+	// placementProgress contains information that plugins might additionally need when determining whether pod group scheduling placement is feasible.
+	// Return Wait status if the pod group cannot be scheduled in the current partially evaluated placement, but may become schedulable once more pods are evaluated.
+	// Return Unschedulable status if the pod group cannot be scheduled in the current placement.
+	// The scheduler will give up this placement and won't even evaluate remaining pods. The placement will remain eligible for preemption.
+	// Return Success status if the pod group can be scheduled in the current partially evaluated placement.
+	// After returning Success, the plugin should keep returning Success for the remaining pods.
+	PlacementFeasible(ctx context.Context, placementCycleState PlacementCycleState, podGroupInfo PodGroupInfo, placementProgress PlacementProgress) *Status
+}
+
+// PlacementProgress contains information that plugins implementing the PlacementFeasiblePlugin
+// can use when determining whether pod group scheduling placement is feasible.
+// It contains information about the children evaluation progress for the current pod group placement.
+type PlacementProgress struct {
+	// Remaining is the number of children that have not been evaluated yet in the current scheduling cycle. For pod groups, this is the number of unscheduled pods.
+	Remaining int
+	// Scheduled is the number of children scheduled so far in the current pod group scheduling cycle
+	// for a particular (composite) pod group and placement. For a pod group the field includes the pods that are assigned
+	// or assumed in the current PodGroup scheduling cycle.
+	Scheduled int
 }
 
 // Handle provides data and some tools that plugins can use. It is
@@ -825,6 +893,11 @@ type Handle interface {
 	//
 	// Instead, they should use the resources getting from Informer created from SharedInformerFactory().
 	SnapshotSharedLister() SharedLister
+
+	// MutableSnapshotSharedLister returns a lister that supports mutating the snapshot.
+	// It extends SharedLister interface.
+	// Only PodGroupPostFilter extension point can use this.
+	MutableSnapshotSharedLister() MutableSnapshotSharedLister
 
 	// IterateOverWaitingPods acquires a read lock and iterates over the WaitingPods map.
 	IterateOverWaitingPods(callback func(WaitingPod))
@@ -890,6 +963,83 @@ type Handle interface {
 
 	// SignPod creates a PodSignature for a pod.
 	SignPod(ctx context.Context, pod *v1.Pod) PodSignature
+
+	// PreemptionManager returns PreemptionManager that can be used to customize preemption logic.
+	PreemptionManager() PreemptionManager
+}
+
+// PreemptionManager is an interface that allows customization of the preemption logic.
+type PreemptionManager interface {
+	// GenerateVictims generates candidate victims for the PodGroup preemption.
+	// The preemption algorithm attempts to reprieve victims in reverse order, from last to first.
+	// The preemption algorithm will pass through unsuccessful status to the caller.
+	GenerateVictims(ctx context.Context, pgInfo PodGroupInfo) ([]PreemptionVictim, *Status)
+
+	// Executor returns a [PreemptionExecutor] that can be used to actuate preemption or check preemption status.
+	Executor() PreemptionExecutor
+
+	// NewReprieveFilter returns a [ReprieveFilter] that can be used to filter out reprieve candidates.
+	// It is called once per preemption evaluation pass after allVictims are removed from the snapshot,
+	// and the returned instance is used for the duration of that single reprieve pass and then discarded.
+	// Stateful implementations must return a fresh instance on each call.
+	// allVictims contains all victims returned by [PreemptionManager.GenerateVictims] to initialize the filter's state.
+	// The result should be non-nil, otherwise the preemption algorithm will abort evaluation without actuating preemption
+	// and return error status to the caller.
+	NewReprieveFilter(ctx context.Context, allVictims []PreemptionVictim) ReprieveFilter
+}
+
+// ReprieveFilter controls whether candidate preemption victims can be reprieved during preemption evaluation,
+// before any victim eviction is actuated.
+type ReprieveFilter interface {
+	// ShouldAttemptReprieval is called before restoring the victim and running the fit check for the preemptor.
+	// If an error is returned, the preemption algorithm will abort evaluation without actuating preemption,
+	// and pass the error status to the caller.
+	ShouldAttemptReprieval(ctx context.Context, victim PreemptionVictim) (bool, error)
+
+	// OnVictimReprieved is called on successful victim reprieval.
+	// Stateful implementations can use this function to track the currently active victims.
+	// If an error is returned, the preemption algorithm will abort evaluation without actuating preemption,
+	// and pass the error status to the caller.
+	OnVictimReprieved(ctx context.Context, victim PreemptionVictim) error
+}
+
+// PreemptionVictim represents a preemption unit that abstracts individual Pods and PodGroups,
+// ensuring that atomic entities are treated as a single unit during eviction.
+type PreemptionVictim interface {
+	// Pods returns the list of all Pods that belong to this preemption unit.
+	// Evicting this unit implies evicting all Pods in this list.
+	Pods() []PodInfo
+
+	// NumPDBViolations returns the number of PDB violations that evicting this victim would cause.
+	// This value is used for metrics and doesn't impact victim selection.
+	NumPDBViolations() int
+}
+
+// PreemptionExecutor is an interface that provides preemption actuation and tracking operations.
+type PreemptionExecutor interface {
+	// IsPodRunningPreemption returns true if the pod is currently triggering preemption asynchronously.
+	IsPodRunningPreemption(podUID types.UID) bool
+	// IsPodGroupRunningPreemption returns true if the pod group is currently triggering preemption asynchronously.
+	IsPodGroupRunningPreemption(podGroupUID types.UID) bool
+	// IsPodGroupWaitingForVictims returns true if the pod group is currently waiting for victims to be removed.
+	// This function is called within snapshot context.
+	IsPodGroupWaitingForVictims(pgInfo PodGroupInfo) bool
+	// ActuatePodPreemption actuates preemption for a single pod given the selected candidate.
+	ActuatePodPreemption(ctx context.Context, candidate PreemptionCandidate, pod *v1.Pod, pluginName string) *Status
+	// ActuatePodGroupPreemption actuates preemption for a pod group given the selected candidate.
+	ActuatePodGroupPreemption(ctx context.Context, candidate PreemptionCandidate, pgInfo PodGroupInfo, pluginName string) *Status
+}
+
+// PreemptionCandidate represents the final set of victims that should be evicted for the preemptor to fit the node.
+type PreemptionCandidate interface {
+	// Victims wraps a list of to-be-preempted Pods and the number of PDB violations.
+	Victims() *extenderv1.Victims
+	// Name returns the target node name (or "cluster" for pod group preemption) where the preemptor gets nominated to run.
+	Name() string
+	// NumPodGroupDisruptions returns the number of preemption units that affect pod groups.
+	// A single preemption unit can be all pods in a pod group (for DisruptionMode=all) or a single pod (for DisruptionMode=single).
+	// This value is used for metrics and doesn't impact victim actuation.
+	NumPodGroupDisruptions() int
 }
 
 // Parallelizer helps run scheduling operations in parallel chunks where possible, to improve performance and CPU utilization.
@@ -901,9 +1051,9 @@ type Parallelizer interface {
 // PodActivator abstracts operations in the scheduling queue.
 type PodActivator interface {
 	// Activate moves the given pods to activeQ.
-	// If a pod isn't found in unschedulablePods or backoffQ and it's in-flight,
+	// If a pod isn't found in unschedulableEntities or backoffQ and it's in-flight,
 	// the wildcard event is registered so that the pod will be requeued when it comes back.
-	// But, if a pod isn't found in unschedulablePods or backoffQ and it's not in-flight (i.e., completely unknown pod),
+	// But, if a pod isn't found in unschedulableEntities or backoffQ and it's not in-flight (i.e., completely unknown pod),
 	// Activate would ignore the pod.
 	Activate(logger klog.Logger, pods map[string]*v1.Pod)
 }
@@ -918,7 +1068,7 @@ type PodNominator interface {
 	// UpdateNominatedPod updates the <oldPod> with <newPod>.
 	UpdateNominatedPod(logger klog.Logger, oldPod *v1.Pod, newPodInfo PodInfo)
 	// NominatedPodsForNode returns nominatedPods on the given node.
-	NominatedPodsForNode(nodeName string) []PodInfo
+	NominatedPodsForNode(logger klog.Logger, nodeName string) []PodInfo
 }
 
 // PluginsRunner abstracts operations to run some plugins.
@@ -949,4 +1099,12 @@ type PluginsRunner interface {
 	// PreFilter plugins. It returns directly if any of the plugins return any
 	// status other than Success.
 	RunPreFilterExtensionRemovePod(ctx context.Context, state CycleState, podToSchedule *v1.Pod, podInfoToRemove PodInfo, nodeInfo NodeInfo) *Status
+	// RunReservePluginsReserve runs the Reserve method of the set of
+	// configured Reserve plugins. If any of these calls returns an error, it
+	// does not continue running the remaining ones and returns the error. In
+	// such case, pod will not be scheduled.
+	RunReservePluginsReserve(ctx context.Context, state CycleState, pod *v1.Pod, nodeName string) *Status
+	// RunReservePluginsUnreserve runs the Unreserve method of the set of
+	// configured Reserve plugins.
+	RunReservePluginsUnreserve(ctx context.Context, state CycleState, pod *v1.Pod, nodeName string)
 }

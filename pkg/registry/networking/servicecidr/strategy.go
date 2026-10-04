@@ -19,7 +19,7 @@ package servicecidr
 import (
 	"context"
 
-	"sigs.k8s.io/structured-merge-diff/v6/fieldpath"
+	"sigs.k8s.io/structured-merge-diff/v7/fieldpath"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"

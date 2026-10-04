@@ -106,7 +106,7 @@ func schema_apimachinery_pkg_api_resource_Quantity(ref common.ReferenceCallback)
 	return common.EmbedOpenAPIDefinitionIntoV2Extension(common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "Quantity is a fixed-point representation of a number. It provides convenient marshaling/unmarshaling in JSON and YAML, in addition to String() and AsInt64() accessors.\n\nThe serialization format is:\n\n``` <quantity>        ::= <signedNumber><suffix>\n\n\t(Note that <suffix> may be empty, from the \"\" case in <decimalSI>.)\n\n<digit>           ::= 0 | 1 | ... | 9 <digits>          ::= <digit> | <digit><digits> <number>          ::= <digits> | <digits>.<digits> | <digits>. | .<digits> <sign>            ::= \"+\" | \"-\" <signedNumber>    ::= <number> | <sign><number> <suffix>          ::= <binarySI> | <decimalExponent> | <decimalSI> <binarySI>        ::= Ki | Mi | Gi | Ti | Pi | Ei\n\n\t(International System of units; See: http://physics.nist.gov/cuu/Units/binary.html)\n\n<decimalSI>       ::= m | \"\" | k | M | G | T | P | E\n\n\t(Note that 1024 = 1Ki but 1000 = 1k; I didn't choose the capitalization.)\n\n<decimalExponent> ::= \"e\" <signedNumber> | \"E\" <signedNumber> ```\n\nNo matter which of the three exponent forms is used, no quantity may represent a number greater than 2^63-1 in magnitude, nor may it have more than 3 decimal places. Numbers larger or more precise will be capped or rounded up. (E.g.: 0.1m will rounded up to 1m.) This may be extended in the future if we require larger or smaller quantities.\n\nWhen a Quantity is parsed from a string, it will remember the type of suffix it had, and will use the same type again when it is serialized.\n\nBefore serializing, Quantity will be put in \"canonical form\". This means that Exponent/suffix will be adjusted up or down (with a corresponding increase or decrease in Mantissa) such that:\n\n- No precision is lost - No fractional digits will be emitted - The exponent (or suffix) is as large as possible.\n\nThe sign will be omitted unless the number is negative.\n\nExamples:\n\n- 1.5 will be serialized as \"1500m\" - 1.5Gi will be serialized as \"1536Mi\"\n\nNote that the quantity will NEVER be internally represented by a floating point number. That is the whole point of this exercise.\n\nNon-canonical values will still parse as long as they are well formed, but will be re-emitted in their canonical form. (So always use canonical form, or don't diff.)\n\nThis format is intended to make it difficult to use these numbers without writing some sort of special handling code in the hopes that that will cause implementors to also use a fixed point implementation.",
+				Description: "Quantity is a fixed-point representation of a number. It provides convenient marshaling/unmarshaling in JSON and YAML, in addition to String() and AsInt64() accessors.\n\nThe serialization format is:\n\n- `<quantity>`: `<signedNumber><suffix>`\n\n- `<digit>`: `0 | 1 | ... | 9`\n\n- `<digits>`: `<digit> | <digit><digits>`\n\n- `<number>`: `<digits> | <digits>.<digits> | <digits>. | .<digits>`\n\n- `<sign>`: `\"+\" | \"-\"`\n\n- `<signedNumber>`: `<number> | <sign><number>`\n\n- `<signedDigits>`: `<digits> | <sign><digits>`\n\n- `<suffix>`: `<binarySI> | <decimalExponent> | <decimalSI>`\n\n- `<binarySI>`: `Ki | Mi | Gi | Ti | Pi | Ei`\n\n- `<decimalSI>`: `n | u | m | \"\" | k | M | G | T | P | E`\n\n- `<decimalExponent>`: `\"e\" <signedDigits> | \"E\" <signedDigits>`\n\nNote that `<suffix>` may be empty, from the `\"\"` case in `<decimalSI>`. For `<binarySI>`, 1024 = 1Ki but 1000 = 1k; I didn't choose the capitalization. See http://physics.nist.gov/cuu/Units/binary.html.\n\nA decimal quantity is not capped at 2^63-1 in magnitude, and no quantity is limited to three decimal places: \"18446744073709551616\" keeps its value, and \"1.2345\" keeps its precision (String reports it as \"1234500u\"). Parsing does cap a binarySI quantity, silently, at 2^63-1: \"8Ei\" parses as 2^63-1. Parsing also preserves a value only down to nano, rounding a finer non-zero value away from zero, so \"0.9n\" becomes \"1n\". The int64 accessors round and may overflow on top of that: see Value, MilliValue and ScaledValue.\n\nWhen a Quantity is parsed from a string, it will remember the type of suffix it had, and will use the same type again when it is serialized.\n\nBefore serializing, Quantity will be put in \"canonical form\". This means that Exponent/suffix will be adjusted up or down (with a corresponding increase or decrease in Mantissa) such that:\n\n- No precision is lost\n\n- No fractional digits will be emitted\n\n- The exponent (or suffix) is as large as possible.\n\nThe sign will be omitted unless the number is negative.\n\nExamples:\n\n- 1.5 will be serialized as \"1500m\"\n\n- 1.5Gi will be serialized as \"1536Mi\"\n\nNote that the quantity will NEVER be internally represented by a floating point number. That is the whole point of this exercise.\n\nNon-canonical values will still parse as long as they are well formed, but will be re-emitted in their canonical form. (So always use canonical form, or don't diff.)\n\nThis format is intended to make it difficult to use these numbers without writing some sort of special handling code in the hopes that that will cause implementors to also use a fixed point implementation.",
 				OneOf:       common.GenerateOpenAPIV3OneOfSchema(resource.Quantity{}.OpenAPIV3OneOfTypes()),
 				Format:      resource.Quantity{}.OpenAPISchemaFormat(),
 			},
@@ -114,7 +114,7 @@ func schema_apimachinery_pkg_api_resource_Quantity(ref common.ReferenceCallback)
 	}, common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "Quantity is a fixed-point representation of a number. It provides convenient marshaling/unmarshaling in JSON and YAML, in addition to String() and AsInt64() accessors.\n\nThe serialization format is:\n\n``` <quantity>        ::= <signedNumber><suffix>\n\n\t(Note that <suffix> may be empty, from the \"\" case in <decimalSI>.)\n\n<digit>           ::= 0 | 1 | ... | 9 <digits>          ::= <digit> | <digit><digits> <number>          ::= <digits> | <digits>.<digits> | <digits>. | .<digits> <sign>            ::= \"+\" | \"-\" <signedNumber>    ::= <number> | <sign><number> <suffix>          ::= <binarySI> | <decimalExponent> | <decimalSI> <binarySI>        ::= Ki | Mi | Gi | Ti | Pi | Ei\n\n\t(International System of units; See: http://physics.nist.gov/cuu/Units/binary.html)\n\n<decimalSI>       ::= m | \"\" | k | M | G | T | P | E\n\n\t(Note that 1024 = 1Ki but 1000 = 1k; I didn't choose the capitalization.)\n\n<decimalExponent> ::= \"e\" <signedNumber> | \"E\" <signedNumber> ```\n\nNo matter which of the three exponent forms is used, no quantity may represent a number greater than 2^63-1 in magnitude, nor may it have more than 3 decimal places. Numbers larger or more precise will be capped or rounded up. (E.g.: 0.1m will rounded up to 1m.) This may be extended in the future if we require larger or smaller quantities.\n\nWhen a Quantity is parsed from a string, it will remember the type of suffix it had, and will use the same type again when it is serialized.\n\nBefore serializing, Quantity will be put in \"canonical form\". This means that Exponent/suffix will be adjusted up or down (with a corresponding increase or decrease in Mantissa) such that:\n\n- No precision is lost - No fractional digits will be emitted - The exponent (or suffix) is as large as possible.\n\nThe sign will be omitted unless the number is negative.\n\nExamples:\n\n- 1.5 will be serialized as \"1500m\" - 1.5Gi will be serialized as \"1536Mi\"\n\nNote that the quantity will NEVER be internally represented by a floating point number. That is the whole point of this exercise.\n\nNon-canonical values will still parse as long as they are well formed, but will be re-emitted in their canonical form. (So always use canonical form, or don't diff.)\n\nThis format is intended to make it difficult to use these numbers without writing some sort of special handling code in the hopes that that will cause implementors to also use a fixed point implementation.",
+				Description: "Quantity is a fixed-point representation of a number. It provides convenient marshaling/unmarshaling in JSON and YAML, in addition to String() and AsInt64() accessors.\n\nThe serialization format is:\n\n- `<quantity>`: `<signedNumber><suffix>`\n\n- `<digit>`: `0 | 1 | ... | 9`\n\n- `<digits>`: `<digit> | <digit><digits>`\n\n- `<number>`: `<digits> | <digits>.<digits> | <digits>. | .<digits>`\n\n- `<sign>`: `\"+\" | \"-\"`\n\n- `<signedNumber>`: `<number> | <sign><number>`\n\n- `<signedDigits>`: `<digits> | <sign><digits>`\n\n- `<suffix>`: `<binarySI> | <decimalExponent> | <decimalSI>`\n\n- `<binarySI>`: `Ki | Mi | Gi | Ti | Pi | Ei`\n\n- `<decimalSI>`: `n | u | m | \"\" | k | M | G | T | P | E`\n\n- `<decimalExponent>`: `\"e\" <signedDigits> | \"E\" <signedDigits>`\n\nNote that `<suffix>` may be empty, from the `\"\"` case in `<decimalSI>`. For `<binarySI>`, 1024 = 1Ki but 1000 = 1k; I didn't choose the capitalization. See http://physics.nist.gov/cuu/Units/binary.html.\n\nA decimal quantity is not capped at 2^63-1 in magnitude, and no quantity is limited to three decimal places: \"18446744073709551616\" keeps its value, and \"1.2345\" keeps its precision (String reports it as \"1234500u\"). Parsing does cap a binarySI quantity, silently, at 2^63-1: \"8Ei\" parses as 2^63-1. Parsing also preserves a value only down to nano, rounding a finer non-zero value away from zero, so \"0.9n\" becomes \"1n\". The int64 accessors round and may overflow on top of that: see Value, MilliValue and ScaledValue.\n\nWhen a Quantity is parsed from a string, it will remember the type of suffix it had, and will use the same type again when it is serialized.\n\nBefore serializing, Quantity will be put in \"canonical form\". This means that Exponent/suffix will be adjusted up or down (with a corresponding increase or decrease in Mantissa) such that:\n\n- No precision is lost\n\n- No fractional digits will be emitted\n\n- The exponent (or suffix) is as large as possible.\n\nThe sign will be omitted unless the number is negative.\n\nExamples:\n\n- 1.5 will be serialized as \"1500m\"\n\n- 1.5Gi will be serialized as \"1536Mi\"\n\nNote that the quantity will NEVER be internally represented by a floating point number. That is the whole point of this exercise.\n\nNon-canonical values will still parse as long as they are well formed, but will be re-emitted in their canonical form. (So always use canonical form, or don't diff.)\n\nThis format is intended to make it difficult to use these numbers without writing some sort of special handling code in the hopes that that will cause implementors to also use a fixed point implementation.",
 				Type:        resource.Quantity{}.OpenAPISchemaType(),
 				Format:      resource.Quantity{}.OpenAPISchemaFormat(),
 			},
@@ -191,8 +191,7 @@ func schema_pkg_apis_meta_v1_APIGroup(ref common.ReferenceCallback) common.OpenA
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(v1.GroupVersionForDiscovery{}.OpenAPIModelName()),
+										Ref: ref(v1.GroupVersionForDiscovery{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -217,8 +216,7 @@ func schema_pkg_apis_meta_v1_APIGroup(ref common.ReferenceCallback) common.OpenA
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(v1.ServerAddressByClientCIDR{}.OpenAPIModelName()),
+										Ref: ref(v1.ServerAddressByClientCIDR{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -266,8 +264,7 @@ func schema_pkg_apis_meta_v1_APIGroupList(ref common.ReferenceCallback) common.O
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(v1.APIGroup{}.OpenAPIModelName()),
+										Ref: ref(v1.APIGroup{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -342,9 +339,8 @@ func schema_pkg_apis_meta_v1_APIResource(ref common.ReferenceCallback) common.Op
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -362,9 +358,8 @@ func schema_pkg_apis_meta_v1_APIResource(ref common.ReferenceCallback) common.Op
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -382,9 +377,8 @@ func schema_pkg_apis_meta_v1_APIResource(ref common.ReferenceCallback) common.Op
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -445,8 +439,7 @@ func schema_pkg_apis_meta_v1_APIResourceList(ref common.ReferenceCallback) commo
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(v1.APIResource{}.OpenAPIModelName()),
+										Ref: ref(v1.APIResource{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -494,9 +487,8 @@ func schema_pkg_apis_meta_v1_APIVersions(ref common.ReferenceCallback) common.Op
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -514,8 +506,7 @@ func schema_pkg_apis_meta_v1_APIVersions(ref common.ReferenceCallback) common.Op
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(v1.ServerAddressByClientCIDR{}.OpenAPIModelName()),
+										Ref: ref(v1.ServerAddressByClientCIDR{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -563,9 +554,8 @@ func schema_pkg_apis_meta_v1_ApplyOptions(ref common.ReferenceCallback) common.O
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -647,7 +637,7 @@ func schema_pkg_apis_meta_v1_Condition(ref common.ReferenceCallback) common.Open
 						},
 					},
 				},
-				Required: []string{"type", "status", "lastTransitionTime", "reason", "message"},
+				Required: []string{"type", "status", "lastTransitionTime", "reason"},
 			},
 		},
 		Dependencies: []string{
@@ -688,9 +678,8 @@ func schema_pkg_apis_meta_v1_CreateOptions(ref common.ReferenceCallback) common.
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -776,9 +765,8 @@ func schema_pkg_apis_meta_v1_DeleteOptions(ref common.ReferenceCallback) common.
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -846,9 +834,8 @@ func schema_pkg_apis_meta_v1_FieldSelectorRequirement(ref common.ReferenceCallba
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -1131,9 +1118,8 @@ func schema_pkg_apis_meta_v1_LabelSelector(ref common.ReferenceCallback) common.
 								Allows: true,
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -1151,8 +1137,7 @@ func schema_pkg_apis_meta_v1_LabelSelector(ref common.ReferenceCallback) common.
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(v1.LabelSelectorRequirement{}.OpenAPIModelName()),
+										Ref: ref(v1.LabelSelectorRequirement{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -1206,9 +1191,8 @@ func schema_pkg_apis_meta_v1_LabelSelectorRequirement(ref common.ReferenceCallba
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -1581,9 +1565,8 @@ func schema_pkg_apis_meta_v1_ObjectMeta(ref common.ReferenceCallback) common.Ope
 								Allows: true,
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -1597,9 +1580,8 @@ func schema_pkg_apis_meta_v1_ObjectMeta(ref common.ReferenceCallback) common.Ope
 								Allows: true,
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -1622,8 +1604,7 @@ func schema_pkg_apis_meta_v1_ObjectMeta(ref common.ReferenceCallback) common.Ope
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(v1.OwnerReference{}.OpenAPIModelName()),
+										Ref: ref(v1.OwnerReference{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -1642,9 +1623,8 @@ func schema_pkg_apis_meta_v1_ObjectMeta(ref common.ReferenceCallback) common.Ope
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -1662,8 +1642,7 @@ func schema_pkg_apis_meta_v1_ObjectMeta(ref common.ReferenceCallback) common.Ope
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(v1.ManagedFieldsEntry{}.OpenAPIModelName()),
+										Ref: ref(v1.ManagedFieldsEntry{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -1813,8 +1792,7 @@ func schema_pkg_apis_meta_v1_PartialObjectMetadataList(ref common.ReferenceCallb
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(v1.PartialObjectMetadata{}.OpenAPIModelName()),
+										Ref: ref(v1.PartialObjectMetadata{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -1873,9 +1851,8 @@ func schema_pkg_apis_meta_v1_PatchOptions(ref common.ReferenceCallback) common.O
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -1954,9 +1931,8 @@ func schema_pkg_apis_meta_v1_RootPaths(ref common.ReferenceCallback) common.Open
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -2172,8 +2148,7 @@ func schema_pkg_apis_meta_v1_StatusDetails(ref common.ReferenceCallback) common.
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(v1.StatusCause{}.OpenAPIModelName()),
+										Ref: ref(v1.StatusCause{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -2234,8 +2209,7 @@ func schema_pkg_apis_meta_v1_Table(ref common.ReferenceCallback) common.OpenAPID
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(v1.TableColumnDefinition{}.OpenAPIModelName()),
+										Ref: ref(v1.TableColumnDefinition{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -2253,8 +2227,7 @@ func schema_pkg_apis_meta_v1_Table(ref common.ReferenceCallback) common.OpenAPID
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(v1.TableRow{}.OpenAPIModelName()),
+										Ref: ref(v1.TableRow{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -2395,8 +2368,7 @@ func schema_pkg_apis_meta_v1_TableRow(ref common.ReferenceCallback) common.OpenA
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(v1.TableRowCondition{}.OpenAPIModelName()),
+										Ref: ref(v1.TableRowCondition{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -2563,9 +2535,8 @@ func schema_pkg_apis_meta_v1_UpdateOptions(ref common.ReferenceCallback) common.
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -2624,7 +2595,7 @@ func schema_k8sio_apimachinery_pkg_runtime_RawExtension(ref common.ReferenceCall
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "RawExtension is used to hold extensions in external versions.\n\nTo use this, make a field which has RawExtension as its type in your external, versioned struct, and Object in your internal struct. You also need to register your various plugin types.\n\n// Internal package:\n\n\ttype MyAPIObject struct {\n\t\truntime.TypeMeta `json:\",inline\"`\n\t\tMyPlugin runtime.Object `json:\"myPlugin\"`\n\t}\n\n\ttype PluginA struct {\n\t\tAOption string `json:\"aOption\"`\n\t}\n\n// External package:\n\n\ttype MyAPIObject struct {\n\t\truntime.TypeMeta `json:\",inline\"`\n\t\tMyPlugin runtime.RawExtension `json:\"myPlugin\"`\n\t}\n\n\ttype PluginA struct {\n\t\tAOption string `json:\"aOption\"`\n\t}\n\n// On the wire, the JSON will look something like this:\n\n\t{\n\t\t\"kind\":\"MyAPIObject\",\n\t\t\"apiVersion\":\"v1\",\n\t\t\"myPlugin\": {\n\t\t\t\"kind\":\"PluginA\",\n\t\t\t\"aOption\":\"foo\",\n\t\t},\n\t}\n\nSo what happens? Decode first uses json or yaml to unmarshal the serialized data into your external MyAPIObject. That causes the raw JSON to be stored, but not unpacked. The next step is to copy (using pkg/conversion) into the internal struct. The runtime package's DefaultScheme has conversion functions installed which will unpack the JSON stored in RawExtension, turning it into the correct object type, and storing it in the Object. (TODO: In the case where the object is of an unknown type, a runtime.Unknown object will be created and stored.)",
+				Description: "RawExtension is used to hold extensions in external versions.\n\nTo use this, make a field which has RawExtension as its type in your external, versioned struct, and Object in your internal struct. You also need to register your various plugin types.\n\n// Internal package:\n\n\ttype MyAPIObject struct {\n\t\truntime.TypeMeta `json:\"\"`\n\t\tMyPlugin runtime.Object `json:\"myPlugin\"`\n\t}\n\n\ttype PluginA struct {\n\t\tAOption string `json:\"aOption\"`\n\t}\n\n// External package:\n\n\ttype MyAPIObject struct {\n\t\truntime.TypeMeta `json:\"\"`\n\t\tMyPlugin runtime.RawExtension `json:\"myPlugin\"`\n\t}\n\n\ttype PluginA struct {\n\t\tAOption string `json:\"aOption\"`\n\t}\n\n// On the wire, the JSON will look something like this:\n\n\t{\n\t\t\"kind\":\"MyAPIObject\",\n\t\t\"apiVersion\":\"v1\",\n\t\t\"myPlugin\": {\n\t\t\t\"kind\":\"PluginA\",\n\t\t\t\"aOption\":\"foo\",\n\t\t},\n\t}\n\nSo what happens? Decode first uses json or yaml to unmarshal the serialized data into your external MyAPIObject. That causes the raw JSON to be stored, but not unpacked. The next step is to copy (using pkg/conversion) into the internal struct. The runtime package's DefaultScheme has conversion functions installed which will unpack the JSON stored in RawExtension, turning it into the correct object type, and storing it in the Object. (TODO: In the case where the object is of an unknown type, a runtime.Unknown object will be created and stored.)",
 				Type:        []string{"object"},
 			},
 		},
@@ -2635,7 +2606,7 @@ func schema_k8sio_apimachinery_pkg_runtime_TypeMeta(ref common.ReferenceCallback
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "TypeMeta is shared by all top level objects. The proper way to use it is to inline it in your type, like this:\n\n\ttype MyAwesomeAPIObject struct {\n\t     runtime.TypeMeta    `json:\",inline\"`\n\t     ... // other fields\n\t}\n\nfunc (obj *MyAwesomeAPIObject) SetGroupVersionKind(gvk *metav1.GroupVersionKind) { metav1.UpdateTypeMeta(obj,gvk) }; GroupVersionKind() *GroupVersionKind\n\nTypeMeta is provided here for convenience. You may use it directly from this package or define your own with the same fields.",
+				Description: "TypeMeta is shared by all top level objects. The proper way to use it is to inline it in your type, like this:\n\n\ttype MyAwesomeAPIObject struct {\n\t     runtime.TypeMeta    `json:\"\"`\n\t     ... // other fields\n\t}\n\nfunc (obj *MyAwesomeAPIObject) SetGroupVersionKind(gvk *metav1.GroupVersionKind) { metav1.UpdateTypeMeta(obj,gvk) }; GroupVersionKind() *GroupVersionKind\n\nTypeMeta is provided here for convenience. You may use it directly from this package or define your own with the same fields.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"apiVersion": {
@@ -2843,9 +2814,8 @@ func schema_pkg_apis_wardle_v1alpha1_Fischer(ref common.ReferenceCallback) commo
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -2892,8 +2862,7 @@ func schema_pkg_apis_wardle_v1alpha1_FischerList(ref common.ReferenceCallback) c
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(v1alpha1.Fischer{}.OpenAPIModelName()),
+										Ref: ref(v1alpha1.Fischer{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -2987,8 +2956,7 @@ func schema_pkg_apis_wardle_v1alpha1_FlunderList(ref common.ReferenceCallback) c
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(v1alpha1.Flunder{}.OpenAPIModelName()),
+										Ref: ref(v1alpha1.Flunder{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -3119,8 +3087,7 @@ func schema_pkg_apis_wardle_v1beta1_FlunderList(ref common.ReferenceCallback) co
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(v1beta1.Flunder{}.OpenAPIModelName()),
+										Ref: ref(v1beta1.Flunder{}.OpenAPIModelName()),
 									},
 								},
 							},

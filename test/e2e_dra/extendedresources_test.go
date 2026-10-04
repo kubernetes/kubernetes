@@ -24,10 +24,10 @@ import (
 	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/dynamic-resource-allocation/resourceslice"
+	"k8s.io/kubernetes/test/e2e/dra/test-driver/app"
 	drautils "k8s.io/kubernetes/test/e2e/dra/utils"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -81,46 +81,141 @@ func testExtendedResource(tCtx ktesting.TContext, b *drautils.Builder, resourceT
 
 		return func(tCtx ktesting.TContext) {
 			// After downgrade: verify all pods still run correctly with their claims
-			podNames := []string{podBefore.Name, podAfter.Name}
-			claimNames := make([]string, 0, len(podNames))
-
-			for _, podName := range podNames {
-				pod, err := tCtx.Client().CoreV1().Pods(namespace).Get(tCtx, podName, metav1.GetOptions{})
-				tCtx.ExpectNoError(err, "get %s pod %s", resourceType, podName)
+			pods := []*v1.Pod{podBefore, podAfter}
+			for _, pod := range pods {
 				verifyPodRunningWithClaim(tCtx, b, pod, resourceName)
+			}
 
-				// Collect claim name before cleanup
-				if pod.Status.ExtendedResourceClaimStatus != nil {
-					claimNames = append(claimNames, pod.Status.ExtendedResourceClaimStatus.ResourceClaimName)
-				}
+			// Collect claim names before deleting pods so GC can be verified.
+			claimNames := make([]string, 0, len(pods))
+			for _, pod := range pods {
+				claimNames = append(claimNames, claimNameFromPod(tCtx, pod))
 			}
 
 			// Clean up pods
 			tCtx.Logf("Cleaning up %s resource pods after downgrade", resourceType)
-			for _, podName := range podNames {
-				tCtx.ExpectNoError(e2epod.DeletePodWithWaitByName(tCtx, tCtx.Client(), podName, namespace), "delete %s pod %s", resourceType, podName)
+			for _, pod := range pods {
+				tCtx.ExpectNoError(e2epod.DeletePodWithWaitByName(tCtx, tCtx.Client(), pod.Name, namespace))
 			}
 			tCtx.Logf("Successfully cleaned up %s resource pods", resourceType)
 
-			// Verify that ResourceClaims for our pods are cleaned up by garbage collector
-			remainingClaims := claimNames
-			tCtx.Eventually(func(tCtx ktesting.TContext) int {
-				stillExisting := make([]string, 0, len(remainingClaims))
-				for _, claimName := range remainingClaims {
-					_, err := tCtx.Client().ResourceV1().ResourceClaims(namespace).Get(tCtx, claimName, metav1.GetOptions{})
-					if err == nil {
-						stillExisting = append(stillExisting, claimName)
-					} else if !apierrors.IsNotFound(err) {
-						// If we get a real API error (not NotFound), fail immediately
-						tCtx.ExpectNoError(err, "unexpected error checking ResourceClaim %s", claimName)
-					}
-					// If IsNotFound, the claim has been deleted (expected behavior)
-				}
-				remainingClaims = stillExisting
-				return len(remainingClaims)
-			}).WithTimeout(3*time.Minute).Should(gomega.Equal(0), "ResourceClaims for %s pods should be garbage collected", resourceType)
+			eventuallyClaimsGone(tCtx, claimNames, 3*time.Minute)
+		}
+	}
+}
 
-			tCtx.Logf("Verified ResourceClaims for %s resource were garbage collected", resourceType)
+// extendedResourceGateCycle implements the DRAExtendedResource feature gate ON→OFF→ON cycle test:
+//
+//   - Phase 0 (gate ON): create a survivor pod and a to-delete pod with extended resource
+//     claims and verify they run and are allocated.
+//   - Phase 1 (gate OFF): assert survivor claims are preserved; verify that a new
+//     DeviceClass.ExtendedResourceName field is stripped by the apiserver; verify that a
+//     probe pod stays Pending without a special claim; delete to-delete pod and verify
+//     its claim is garbage collected.
+//   - Phase 2 (gate ON again): wait for kubelet's reconcile loop to unprepare the claim
+//     deleted in phase 1; verify the survivor still runs; allocate a fresh pod end-to-end;
+//     clean up.
+func extendedResourceGateCycle(tCtx ktesting.TContext, b *drautils.Builder) gateOffFunc {
+	var podSurvivor, podToDelete *v1.Pod
+	var resourceName v1.ResourceName
+	tCtx.Run("pods-with-extended-resource-running", func(tCtx ktesting.TContext) {
+		resourceName = createDeviceClassForExtendedResource(tCtx, b, resourceTypeExplicit)
+		podSurvivor = createPodWithExtendedResource(tCtx, b, "survivor", resourceName)
+		verifyPodRunningWithClaim(tCtx, b, podSurvivor, resourceName)
+		podToDelete = createPodWithExtendedResource(tCtx, b, "to-delete", resourceName)
+		verifyPodRunningWithClaim(tCtx, b, podToDelete, resourceName)
+	})
+
+	return func(tCtx ktesting.TContext) gateOnAgainFunc {
+		tCtx.Run("survivor-pods-still-running", func(tCtx ktesting.TContext) {
+			tCtx.ExpectNoError(e2epod.WaitForPodRunningInNamespace(tCtx, tCtx.Client(), podSurvivor))
+			tCtx.ExpectNoError(e2epod.WaitForPodRunningInNamespace(tCtx, tCtx.Client(), podToDelete))
+		})
+
+		// Verify that each pod's special ResourceClaim still exists and is allocated.
+		tCtx.Run("survivor-claim-preserved", func(tCtx ktesting.TContext) {
+			for _, pod := range []*v1.Pod{podSurvivor, podToDelete} {
+				claimName := claimNameFromPod(tCtx, pod)
+				claim, err := tCtx.Client().ResourceV1().ResourceClaims(pod.Namespace).Get(tCtx, claimName, metav1.GetOptions{})
+				tCtx.ExpectNoError(err, "get ResourceClaim %s", claimName)
+				tCtx.Expect(claim.Status.Allocation).ToNot(gomega.BeNil(),
+					"ResourceClaim %s must still be allocated", claimName)
+			}
+		})
+
+		tCtx.Run("new-deviceclass-field-stripped", func(tCtx ktesting.TContext) {
+			dc := b.ClassWithExtendedResource(string(resourceName))
+			dc.Name += "-post-off"
+			created := b.Create(tCtx, dc)[0].(*resourceapi.DeviceClass)
+			tCtx.Expect(created.Spec.ExtendedResourceName).To(gomega.BeNil(),
+				"DeviceClass.Spec.ExtendedResourceName must be stripped when gate is off")
+		})
+
+		// check that probe stays Pending and never gets a special claim.
+		tCtx.Run("probe-pod-pending-no-special-claim", func(tCtx ktesting.TContext) {
+			probePod := createPodWithExtendedResource(tCtx, b, "probe-off", resourceName)
+			tCtx.WithStep("probe pod stays Pending").
+				Consistently(func(tCtx ktesting.TContext) v1.PodPhase {
+					p, err := tCtx.Client().CoreV1().Pods(probePod.Namespace).Get(tCtx, probePod.Name, metav1.GetOptions{})
+					tCtx.ExpectNoError(err)
+					tCtx.Expect(p.Status.ExtendedResourceClaimStatus).To(gomega.BeNil(),
+						"probe pod must not get a special claim when gate is off")
+					return p.Status.Phase
+				}).WithTimeout(30 * time.Second).Should(gomega.Equal(v1.PodPending))
+
+			// Cleanup probe pod.
+			tCtx.ExpectNoError(e2epod.DeletePodWithWaitByName(tCtx, tCtx.Client(), probePod.Name, probePod.Namespace))
+		})
+
+		var toDeleteClaimName string
+		tCtx.Run("delete-pod-triggers-gc-with-gate-off", func(tCtx ktesting.TContext) {
+			// KEP-required: deleting a pod with gate OFF must let the GC (not
+			// the apiserver) remove the claim, and node accounting must release
+			// the device.
+			toDeleteClaimName = claimNameFromPod(tCtx, podToDelete)
+			tCtx.ExpectNoError(e2epod.DeletePodWithWaitByName(tCtx, tCtx.Client(), podToDelete.Name, podToDelete.Namespace))
+			eventuallyClaimsGone(tCtx, []string{toDeleteClaimName}, 3*time.Minute)
+			tCtx.ExpectNoError(e2epod.WaitForPodRunningInNamespace(tCtx, tCtx.Client(), podSurvivor))
+		})
+
+		return func(tCtx ktesting.TContext) {
+			// Wait for kubelet's reconcile loop (period: 60s) to call NodeUnprepareResources
+			// for to-delete, which was deleted while the gate was OFF. The reconcile loop
+			// only calls unprepare when the gate is ON, so this must happen after the flip.
+			tCtx.Run("wait-for-claim-unprepared", func(tCtx ktesting.TContext) {
+				for host, plugin := range b.Driver.Nodes {
+					tCtx.WithStep(fmt.Sprintf("wait for claim %s on %s to be unprepared", toDeleteClaimName, host)).
+						Eventually(func(ktesting.TContext) []app.ClaimID {
+							return plugin.GetPreparedResources()
+						}).WithTimeout(3*time.Minute).ShouldNot(gomega.ContainElement(gomega.HaveField("Name", gomega.HavePrefix(toDeleteClaimName))),
+						// HavePrefix because app.ClaimID.Name is "<claimName>/<device>", not the bare claim name.
+						"claim %s on host %s should be unprepared after gate re-enable", toDeleteClaimName, host)
+				}
+			})
+
+			tCtx.Run("survivor-pod-survives-reenable", func(tCtx ktesting.TContext) {
+				verifyPodRunningWithClaim(tCtx, b, podSurvivor, resourceName)
+			})
+
+			var freshPod *v1.Pod
+			tCtx.Run("fresh-pod-allocates-end-to-end", func(tCtx ktesting.TContext) {
+				freshPod = createPodWithExtendedResource(tCtx, b, "fresh", resourceName)
+				verifyPodRunningWithClaim(tCtx, b, freshPod, resourceName)
+			})
+
+			claimNames := []string{
+				claimNameFromPod(tCtx, podSurvivor),
+				claimNameFromPod(tCtx, freshPod),
+			}
+
+			tCtx.Run("cleanup-pods", func(tCtx ktesting.TContext) {
+				tCtx.ExpectNoError(e2epod.DeletePodWithWaitByName(tCtx, tCtx.Client(), podSurvivor.Name, podSurvivor.Namespace))
+				tCtx.ExpectNoError(e2epod.DeletePodWithWaitByName(tCtx, tCtx.Client(), freshPod.Name, freshPod.Namespace))
+			})
+
+			tCtx.Run("claims-GC", func(tCtx ktesting.TContext) {
+				eventuallyClaimsGone(tCtx, claimNames, 3*time.Minute)
+			})
 		}
 	}
 }
@@ -147,6 +242,17 @@ func createDeviceClassForExtendedResource(tCtx ktesting.TContext, b *drautils.Bu
 		tCtx.Fatalf("invalid resource type %q", resourceType)
 		return ""
 	}
+}
+
+// claimNameFromPod re-fetches the pod and returns the ResourceClaim name from
+// pod.Status.ExtendedResourceClaimStatus.
+func claimNameFromPod(tCtx ktesting.TContext, pod *v1.Pod) string {
+	tCtx.Helper()
+	p, err := tCtx.Client().CoreV1().Pods(pod.Namespace).Get(tCtx, pod.Name, metav1.GetOptions{})
+	tCtx.ExpectNoError(err, "get pod %s", pod.Name)
+	tCtx.Expect(p.Status.ExtendedResourceClaimStatus).ToNot(gomega.BeNil(),
+		"pod %s must have ExtendedResourceClaimStatus", pod.Name)
+	return p.Status.ExtendedResourceClaimStatus.ResourceClaimName
 }
 
 // createPodWithExtendedResource creates a pod with the given name requesting an extended resource.

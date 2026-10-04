@@ -97,7 +97,7 @@ func (opt *constantFoldingOptimizer) Optimize(ctx *OptimizerContext, a *ast.AST)
 				continue
 			}
 			// Late-bound function calls cannot be folded.
-			if fold.Kind() == ast.CallKind && isLateBoundFunctionCall(ctx, a, fold) {
+			if fold.Kind() == ast.CallKind && isLateBoundFunctionCall(ctx, fold) {
 				continue
 			}
 			// Otherwise, assume all context is needed to evaluate the expression.
@@ -168,7 +168,7 @@ func (opt *constantFoldingOptimizer) tryFold(ctx *OptimizerContext, a *ast.AST, 
 	return nil
 }
 
-func isLateBoundFunctionCall(ctx *OptimizerContext, a *ast.AST, expr ast.Expr) bool {
+func isLateBoundFunctionCall(ctx *OptimizerContext, expr ast.Expr) bool {
 	call := expr.AsCall()
 	function := ctx.Functions()[call.FunctionName()]
 	if function == nil {
@@ -518,7 +518,7 @@ func (opt *constantFoldingOptimizer) constantExprMatcher(ctx *OptimizerContext, 
 				constantExprs = false
 			}
 			// Late-bound function calls cannot be folded.
-			if e.Kind() == ast.CallKind && isLateBoundFunctionCall(ctx, a, e) {
+			if e.Kind() == ast.CallKind && isLateBoundFunctionCall(ctx, e) {
 				constantExprs = false
 			}
 		})

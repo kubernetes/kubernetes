@@ -145,6 +145,9 @@ type PodStatusApplyConfiguration struct {
 	// (see https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#extended-resources).
 	// Examples include "cpu", "memory", "ephemeral-storage", and hugepages.
 	NodeAllocatableResourceClaimStatuses []NodeAllocatableResourceClaimStatusApplyConfiguration `json:"nodeAllocatableResourceClaimStatuses,omitempty"`
+	// volumeHealth contains node-reported health for each volume the pod is using.
+	// Populated by the kubelet on the pod's node.
+	VolumeHealth []PodVolumeHealthApplyConfiguration `json:"volumeHealth,omitempty"`
 }
 
 // PodStatusApplyConfiguration constructs a declarative configuration of the PodStatus type for use with
@@ -357,6 +360,19 @@ func (b *PodStatusApplyConfiguration) WithNodeAllocatableResourceClaimStatuses(v
 			panic("nil value passed to WithNodeAllocatableResourceClaimStatuses")
 		}
 		b.NodeAllocatableResourceClaimStatuses = append(b.NodeAllocatableResourceClaimStatuses, *values[i])
+	}
+	return b
+}
+
+// WithVolumeHealth adds the given value to the VolumeHealth field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, values provided by each call will be appended to the VolumeHealth field.
+func (b *PodStatusApplyConfiguration) WithVolumeHealth(values ...*PodVolumeHealthApplyConfiguration) *PodStatusApplyConfiguration {
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithVolumeHealth")
+		}
+		b.VolumeHealth = append(b.VolumeHealth, *values[i])
 	}
 	return b
 }

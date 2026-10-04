@@ -221,7 +221,7 @@ func (f *fixture) run_(ctx context.Context, deploymentName string, startInformer
 	if startInformers {
 		stopCh := make(chan struct{})
 		defer close(stopCh)
-		informers.Start(stopCh)
+		informers.StartWithContext(ctx)
 	}
 
 	err = c.syncDeployment(ctx, deploymentName)
@@ -497,7 +497,7 @@ func TestGetReplicaSetsForDeployment(t *testing.T) {
 	}
 	stopCh := make(chan struct{})
 	defer close(stopCh)
-	informers.Start(stopCh)
+	informers.StartWithContext(ctx)
 
 	rsList, err := c.getReplicaSetsForDeployment(ctx, d1)
 	if err != nil {
@@ -549,7 +549,7 @@ func TestGetReplicaSetsForDeploymentAdoptRelease(t *testing.T) {
 	}
 	stopCh := make(chan struct{})
 	defer close(stopCh)
-	informers.Start(stopCh)
+	informers.StartWithContext(ctx)
 
 	rsList, err := c.getReplicaSetsForDeployment(ctx, d)
 	if err != nil {
@@ -598,7 +598,7 @@ func TestGetPodMapForReplicaSets(t *testing.T) {
 	}
 	stopCh := make(chan struct{})
 	defer close(stopCh)
-	informers.Start(stopCh)
+	informers.StartWithContext(ctx)
 
 	podMap, err := c.getPodMapForDeployment(d, f.rsLister)
 	if err != nil {
@@ -1003,7 +1003,7 @@ func BenchmarkGetPodMapForDeployment(b *testing.B) {
 			}
 			stopCh := make(chan struct{})
 			defer close(stopCh)
-			informers.Start(stopCh)
+			informers.StartWithContext(ctx)
 
 			b.ReportAllocs()
 			b.ResetTimer()

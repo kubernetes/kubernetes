@@ -83,6 +83,7 @@ func NewDefaultReaderProtocols() map[string]ReaderProtocolConfig {
 type Reader = streamws.Reader
 
 func NewReader(r io.Reader, ping bool, protocols map[string]ReaderProtocolConfig) *Reader {
+	//nolint:logcheck // Intentionally using the non-contextual variant here.
 	return streamws.NewReader(r, ping, protocols)
 }
 

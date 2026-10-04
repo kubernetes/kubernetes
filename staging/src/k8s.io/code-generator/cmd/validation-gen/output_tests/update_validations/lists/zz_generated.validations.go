@@ -25,7 +25,6 @@ import (
 	context "context"
 	fmt "fmt"
 
-	equality "k8s.io/apimachinery/pkg/api/equality"
 	operation "k8s.io/apimachinery/pkg/api/operation"
 	safe "k8s.io/apimachinery/pkg/api/safe"
 	validate "k8s.io/apimachinery/pkg/api/validate"
@@ -117,12 +116,12 @@ func Validate_T1(
 			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
 			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
+				if validate.SemanticDeepEqual(obj, oldObj) {
 					return nil
 				}
 			}
 			// iterate the list and call the type's validation function
-			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_M1); len(e) != 0 {
+			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_M1); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return

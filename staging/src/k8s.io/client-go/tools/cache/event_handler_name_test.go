@@ -17,6 +17,7 @@ limitations under the License.
 package cache
 
 import (
+	"reflect"
 	"testing"
 )
 
@@ -27,6 +28,7 @@ func (m mockHandler) OnUpdate(any, any) {}
 func (m mockHandler) OnDelete(any)      {}
 
 func TestNameForHandler(t *testing.T) {
+	pkgPrefix := reflect.TypeFor[mockHandler]().PkgPath() + "."
 	emptyHandler := ResourceEventHandlerFuncs{}
 
 	for name, tc := range map[string]struct {
@@ -38,19 +40,19 @@ func TestNameForHandler(t *testing.T) {
 				UpdateFunc: emptyHandler.OnUpdate,
 				DeleteFunc: func(any) {},
 			},
-			wantName: "k8s.io/client-go/tools/cache.ResourceEventHandlerFuncs.OnUpdate-fm+k8s.io/client-go/tools/cache.TestNameForHandler.func1", // Testcase must come first to get func1.
+			wantName: pkgPrefix + "ResourceEventHandlerFuncs.OnUpdate-fm+" + pkgPrefix + "TestNameForHandler.func1", // Testcase must come first to get func1.
 		},
 		"add": {
 			handler:  ResourceEventHandlerFuncs{AddFunc: func(any) {}},
-			wantName: "k8s.io/client-go/tools/cache.TestNameForHandler",
+			wantName: pkgPrefix + "TestNameForHandler",
 		},
 		"update": {
 			handler:  ResourceEventHandlerFuncs{UpdateFunc: func(any, any) {}},
-			wantName: "k8s.io/client-go/tools/cache.TestNameForHandler",
+			wantName: pkgPrefix + "TestNameForHandler",
 		},
 		"delete": {
 			handler:  ResourceEventHandlerFuncs{DeleteFunc: func(any) {}},
-			wantName: "k8s.io/client-go/tools/cache.TestNameForHandler",
+			wantName: pkgPrefix + "TestNameForHandler",
 		},
 		"all": {
 			handler: ResourceEventHandlerFuncs{
@@ -58,19 +60,19 @@ func TestNameForHandler(t *testing.T) {
 				UpdateFunc: func(any, any) {},
 				DeleteFunc: func(any) {},
 			},
-			wantName: "k8s.io/client-go/tools/cache.TestNameForHandler",
+			wantName: pkgPrefix + "TestNameForHandler",
 		},
 		"ptrToFuncs": {
 			handler:  &ResourceEventHandlerFuncs{AddFunc: func(any) {}},
-			wantName: "k8s.io/client-go/tools/cache.TestNameForHandler",
+			wantName: pkgPrefix + "TestNameForHandler",
 		},
 		"struct": {
 			handler:  mockHandler{},
-			wantName: "k8s.io/client-go/tools/cache.mockHandler",
+			wantName: pkgPrefix + "mockHandler",
 		},
 		"ptrToStruct": {
 			handler:  &mockHandler{},
-			wantName: "k8s.io/client-go/tools/cache.mockHandler",
+			wantName: pkgPrefix + "mockHandler",
 		},
 		"nil": {
 			handler:  nil,

@@ -1204,12 +1204,14 @@ func TestFilterEventRecorder(t *testing.T) {
 	obj := &v1.ObjectReference{FieldPath: "foo"}
 	filtered.Event(obj, "Normal", "Reason", "Message")
 	filtered.Eventf(obj, "Normal", "Reason", "MessageFmt")
+	//nolint:forbidigo // Legacy usage
 	filtered.AnnotatedEventf(obj, map[string]string{"a": "b"}, "Normal", "Reason", "MessageFmt")
 
 	// don't record events for implicit container
 	implicit := &v1.ObjectReference{FieldPath: "implicitly required container foo"}
 	filtered.Event(implicit, "Normal", "Reason", "Message")
 	filtered.Eventf(implicit, "Normal", "Reason", "MessageFmt")
+	//nolint:forbidigo // Legacy usage
 	filtered.AnnotatedEventf(implicit, map[string]string{"a": "b"}, "Normal", "Reason", "MessageFmt")
 
 	assert.Len(t, recorder.events, 1, "Expected only one event of each type to be recorded, got events: %v", recorder.events)

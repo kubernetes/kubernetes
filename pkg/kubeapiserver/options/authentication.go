@@ -722,6 +722,8 @@ func (o *BuiltInAuthenticationOptions) ApplyTo(
 			versionedInformer.Core().V1().ServiceAccounts().Lister(),
 			versionedInformer.Core().V1().Pods().Lister(),
 			nodeLister,
+			versionedInformer.Admissionregistration().V1().ValidatingWebhookConfigurations().Lister(),
+			versionedInformer.Admissionregistration().V1().MutatingWebhookConfigurations().Lister(),
 		)
 	}
 	authenticatorConfig.SecretsWriter = extclient.CoreV1()

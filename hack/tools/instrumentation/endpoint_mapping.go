@@ -18,6 +18,7 @@ package main
 
 import (
 	"os"
+	"slices"
 	"sort"
 	"strings"
 
@@ -27,11 +28,10 @@ import (
 )
 
 type endpointMappingConfig struct {
-	CoreComponents       map[string][]string `yaml:"coreComponents"`
-	StandaloneComponents map[string][]string `yaml:"standaloneComponents"`
-	SharedPaths          []string            `yaml:"sharedPaths"`
-	EndpointMappings     []endpointMapping   `yaml:"endpointMappings"`
-	DefaultEndpoint      string              `yaml:"defaultEndpoint"`
+	CoreComponents   map[string][]string `yaml:"coreComponents"`
+	SharedPaths      []string            `yaml:"sharedPaths"`
+	EndpointMappings []endpointMapping   `yaml:"endpointMappings"`
+	DefaultEndpoint  string              `yaml:"defaultEndpoint"`
 }
 
 type endpointMapping struct {
@@ -62,51 +62,40 @@ func (c *endpointMappingConfig) inferComponentEndpoints(filePath string) []metri
 		return c.allCoreComponentEndpoints(endpoint)
 	}
 
-	component := c.inferComponent(filePath, c.CoreComponents)
-	if component != "" {
-		return []metric.ComponentEndpoint{{
+	components := c.inferComponents(filePath, c.CoreComponents)
+
+	var endpoints []metric.ComponentEndpoint
+	for _, component := range components {
+		endpoints = append(endpoints, metric.ComponentEndpoint{
 			Component: component,
 			Endpoint:  endpoint,
-		}}
+		})
 	}
 
-	component = c.inferComponent(filePath, c.StandaloneComponents)
-	if component != "" {
-		return []metric.ComponentEndpoint{{
-			Component: component,
-			Endpoint:  endpoint,
-		}}
-	}
-
-	return nil
+	return endpoints
 }
 
 func (c *endpointMappingConfig) isSharedPath(filePath string) bool {
 	for _, pattern := range c.SharedPaths {
-		if strings.Contains(filePath, pattern) {
+		if strings.HasPrefix(filePath, pattern) {
 			return true
 		}
 	}
 	return false
 }
 
-func (c *endpointMappingConfig) inferComponent(filePath string, components map[string][]string) string {
-	// Sort component names for deterministic iteration order
-	componentNames := make([]string, 0, len(components))
-	for name := range components {
-		componentNames = append(componentNames, name)
-	}
-	sort.Strings(componentNames)
-
-	for _, component := range componentNames {
-		patterns := components[component]
+func (c *endpointMappingConfig) inferComponents(filePath string, components map[string][]string) []string {
+	var matchingComponents []string
+	for component, patterns := range components {
 		for _, pattern := range patterns {
-			if strings.Contains(filePath, pattern) {
-				return component
+			if strings.HasPrefix(filePath, pattern) {
+				matchingComponents = append(matchingComponents, component)
 			}
 		}
 	}
-	return ""
+	// Sort to ensure consistent result, regardless of map iteration order.
+	slices.Sort(matchingComponents)
+	return matchingComponents
 }
 
 func (c *endpointMappingConfig) inferEndpoint(filePath string) string {

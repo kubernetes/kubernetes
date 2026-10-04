@@ -20,16 +20,18 @@ import (
 	"context"
 	"time"
 
+	"sigs.k8s.io/structured-merge-diff/v7/fieldpath"
+
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/resource"
 	"k8s.io/kubernetes/pkg/apis/resource/validation"
-	"sigs.k8s.io/structured-merge-diff/v6/fieldpath"
 )
 
 // deviceTaintRuleStrategy implements behavior for DeviceTaintRule objects
@@ -58,6 +60,9 @@ func (*deviceTaintRuleStrategy) GetResetFields() map[fieldpath.APIVersion]*field
 		"resource.k8s.io/v1beta2": fieldpath.NewSet(
 			fieldpath.MakePathOrDie("status"),
 		),
+		"resource.k8s.io/v1": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("status"),
+		),
 	}
 
 	return fields
@@ -76,6 +81,22 @@ func (*deviceTaintRuleStrategy) Validate(ctx context.Context, obj runtime.Object
 }
 
 func (*deviceTaintRuleStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
+	rule := obj.(*resource.DeviceTaintRule)
+	return warningsForDeviceTaintRule(rule)
+}
+
+// warningsForDeviceTaintRule returns a warning when spec.deviceSelector is
+// present but empty (driver, pool, and device all unset). Such a selector
+// matches every device from every driver in the cluster, which is easy to
+// trigger by mistake. See https://github.com/kubernetes/kubernetes/issues/141422.
+func warningsForDeviceTaintRule(rule *resource.DeviceTaintRule) []string {
+	sel := rule.Spec.DeviceSelector
+	if sel != nil && sel.Driver == nil && sel.Pool == nil && sel.Device == nil {
+		return []string{
+			field.NewPath("spec", "deviceSelector").String() +
+				": an empty selector matches every device from every driver in the cluster",
+		}
+	}
 	return nil
 }
 
@@ -119,11 +140,19 @@ func (*deviceTaintRuleStrategy) ValidateUpdate(ctx context.Context, obj, old run
 }
 
 func (*deviceTaintRuleStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
-	return nil
+	rule := obj.(*resource.DeviceTaintRule)
+	return warningsForDeviceTaintRule(rule)
 }
 
 func (*deviceTaintRuleStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {
-	return true
+	reqInfo, _ := request.RequestInfoFrom(ctx)
+	if reqInfo != nil && (reqInfo.APIVersion == "v1beta2" || reqInfo.APIVersion == "v1alpha3") {
+		// Historic behavior for all known old versions, cannot change that anymore.
+		return true
+	}
+	// Prevent unconditional updates for v1 and all other future versions.
+	// Better late than never...
+	return false
 }
 
 type deviceTaintRuleStatusStrategy struct {
@@ -139,6 +168,10 @@ func (*deviceTaintRuleStatusStrategy) GetResetFields() map[fieldpath.APIVersion]
 			fieldpath.MakePathOrDie("spec"),
 		),
 		"resource.k8s.io/v1beta2": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("metadata"),
+			fieldpath.MakePathOrDie("spec"),
+		),
+		"resource.k8s.io/v1": fieldpath.NewSet(
 			fieldpath.MakePathOrDie("metadata"),
 			fieldpath.MakePathOrDie("spec"),
 		),

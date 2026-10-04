@@ -22,7 +22,6 @@ import (
 	"testing"
 	"time"
 
-	apiextensions "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/client-go/discovery/cached/memory"
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
@@ -33,11 +32,10 @@ import (
 )
 
 type data struct {
-	restConfig    *rest.Config
-	restMapper    *restmapper.DeferredDiscoveryRESTMapper
-	client        clientset.Interface
-	dynamic       dynamic.Interface
-	apiextensions apiextensions.Interface
+	restConfig *rest.Config
+	restMapper *restmapper.DeferredDiscoveryRESTMapper
+	client     clientset.Interface
+	dynamic    dynamic.Interface
 }
 
 type dataKeyType struct{}
@@ -63,20 +61,23 @@ func set(tCtx ktesting.TContext, data data) TContext {
 // having to pass all of them down into call chains of test helper functions as
 // separate parameters.
 //
-// All methods which have a [ktesting.TContext] in their prototype get
-// overridden such that they work with a TContext instead. This ensures
-// that the new methods are always accessible.
+// All methods which return the base TContext get overridden such that the
+// extended TContext is returned instead. This ensures that the new methods are
+// always accessible. Callbacks can use a base or extended TContext.
 //
-// When calling functions which expect a [ktesting.TContext] pass
+// When calling functions which expect the base TContext, pass
 // the TContext field embedded here.
 type TContext struct {
 	ktesting.TContext
 }
 
 // RESTConfig returns a copy of the config for a rest client with the UserAgent
-// set to include the current test name or nil if not available. Several typed
-// clients using this config are available through [Client], [Dynamic],
-// [APIExtensions].
+// set to include the current test name or nil if not available. Typed
+// clients using this config are available through [Client] and [Dynamic].
+//
+// A [k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset.Client] can
+// be created locally in tests with
+// [k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset.NewForConfigOrDie].
 func (tCtx TContext) RESTConfig() *rest.Config {
 	return rest.CopyConfig(get(tCtx).restConfig)
 }
@@ -84,9 +85,8 @@ func (tCtx TContext) RESTConfig() *rest.Config {
 func (tCtx TContext) RESTMapper() *restmapper.DeferredDiscoveryRESTMapper {
 	return get(tCtx).restMapper
 }
-func (tCtx TContext) Client() clientset.Interface            { return get(tCtx).client }
-func (tCtx TContext) Dynamic() dynamic.Interface             { return get(tCtx).dynamic }
-func (tCtx TContext) APIExtensions() apiextensions.Interface { return get(tCtx).apiextensions }
+func (tCtx TContext) Client() clientset.Interface { return get(tCtx).client }
+func (tCtx TContext) Dynamic() dynamic.Interface  { return get(tCtx).dynamic }
 
 // WithRESTConfig initializes all client-go clients with new clients
 // created for the config. The current test name gets included in the UserAgent.
@@ -98,7 +98,6 @@ func WithRESTConfig(tCtx ktesting.TContext, cfg *rest.Config) TContext {
 	data.restConfig = cfg
 	data.client = clientset.NewForConfigOrDie(cfg)
 	data.dynamic = dynamic.NewForConfigOrDie(cfg)
-	data.apiextensions = apiextensions.NewForConfigOrDie(cfg)
 	cachedDiscovery := memory.NewMemCacheClient(data.client.Discovery())
 	data.restMapper = restmapper.NewDeferredDiscoveryRESTMapper(cachedDiscovery)
 	return set(tCtx, data)
@@ -109,18 +108,24 @@ func (tCtx TContext) WithRESTConfig(cfg *rest.Config) TContext {
 }
 
 // WithClients uses an existing config and clients.
-func WithClients(tCtx ktesting.TContext, cfg *rest.Config, mapper *restmapper.DeferredDiscoveryRESTMapper, client clientset.Interface, dynamic dynamic.Interface, apiextensions apiextensions.Interface) TContext {
+//
+// ktesting itself does not care which of these parameters are nil,
+// but consumers of the resulting TContext might need real instances.
+func WithClients(tCtx ktesting.TContext, cfg *rest.Config, mapper *restmapper.DeferredDiscoveryRESTMapper, client clientset.Interface, dynamic dynamic.Interface) TContext {
 	return set(tCtx, data{
-		restConfig:    cfg,
-		restMapper:    mapper,
-		client:        client,
-		dynamic:       dynamic,
-		apiextensions: apiextensions,
+		restConfig: cfg,
+		restMapper: mapper,
+		client:     client,
+		dynamic:    dynamic,
 	})
 }
 
-func (tCtx TContext) WithClients(cfg *rest.Config, mapper *restmapper.DeferredDiscoveryRESTMapper, client clientset.Interface, dynamic dynamic.Interface, apiextensions apiextensions.Interface) TContext {
-	return WithClients(tCtx.TContext, cfg, mapper, client, dynamic, apiextensions)
+// WithClients returns a new TContext with the given config and clients.
+//
+// ktesting itself does not care which of these parameters are nil,
+// but consumers of the resulting TContext might need real instances.
+func (tCtx TContext) WithClients(cfg *rest.Config, mapper *restmapper.DeferredDiscoveryRESTMapper, client clientset.Interface, dynamic dynamic.Interface) TContext {
+	return WithClients(tCtx.TContext, cfg, mapper, client, dynamic)
 }
 
 // See [ktesting.TB].

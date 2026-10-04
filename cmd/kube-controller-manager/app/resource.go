@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/featuregate"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/names"
@@ -35,8 +34,6 @@ func newDeviceTaintEvictionControllerDescriptor() *ControllerDescriptor {
 		name:        names.DeviceTaintEvictionController,
 		constructor: newDeviceTaintEvictionController,
 		requiredFeatureGates: []featuregate.Feature{
-			// TODO update app.TestFeatureGatedControllersShouldNotDefineAliases when removing these feature gates.
-			features.DynamicResourceAllocation,
 			features.DRADeviceTaints,
 		},
 	}
@@ -48,18 +45,17 @@ func newDeviceTaintEvictionController(ctx context.Context, controllerContext Con
 		return nil, err
 	}
 
-	deviceTaintEvictionController := devicetainteviction.New(
+	controller := devicetainteviction.New(
 		client,
 		controllerContext.InformerFactory.Core().V1().Pods(),
 		controllerContext.InformerFactory.Resource().V1().ResourceClaims(),
 		controllerContext.InformerFactory.Resource().V1().ResourceSlices(),
-		controllerContext.InformerFactory.Resource().V1beta2().DeviceTaintRules(),
+		controllerContext.InformerFactory.Resource().V1().DeviceTaintRules(),
 		controllerContext.InformerFactory.Resource().V1().DeviceClasses(),
 		controllerName,
-		utilfeature.DefaultFeatureGate.Enabled(features.DRAWorkloadResourceClaims),
 	)
 	return newControllerLoop(func(ctx context.Context) {
-		if err := deviceTaintEvictionController.Run(ctx, int(controllerContext.ComponentConfig.DeviceTaintEvictionController.ConcurrentSyncs)); err != nil {
+		if err := controller.Run(ctx, int(controllerContext.ComponentConfig.DeviceTaintEvictionController.ConcurrentSyncs)); err != nil {
 			klog.FromContext(ctx).Error(err, "Device taint processing leading to Pod eviction failed and is now paused")
 		}
 		<-ctx.Done()
@@ -71,9 +67,6 @@ func newResourceClaimControllerDescriptor() *ControllerDescriptor {
 		name:        names.ResourceClaimController,
 		aliases:     []string{"resource-claim-controller"},
 		constructor: newResourceClaimController,
-		requiredFeatureGates: []featuregate.Feature{
-			features.DynamicResourceAllocation, // TODO update app.TestFeatureGatedControllersShouldNotDefineAliases when removing this feature
-		},
 	}
 }
 
@@ -83,16 +76,11 @@ func newResourceClaimController(ctx context.Context, controllerContext Controlle
 		return nil, err
 	}
 
-	ephemeralController, err := resourceclaim.NewController(
+	controller, err := resourceclaim.NewController(
 		klog.FromContext(ctx),
-		resourceclaim.Features{
-			AdminAccess:            utilfeature.DefaultFeatureGate.Enabled(features.DRAAdminAccess),
-			PrioritizedList:        utilfeature.DefaultFeatureGate.Enabled(features.DRAPrioritizedList),
-			WorkloadResourceClaims: utilfeature.DefaultFeatureGate.Enabled(features.DRAWorkloadResourceClaims),
-		},
 		client,
 		controllerContext.InformerFactory.Core().V1().Pods(),
-		controllerContext.InformerFactory.Scheduling().V1alpha2().PodGroups(),
+		controllerContext.InformerFactory.Scheduling().V1beta1().PodGroups(),
 		controllerContext.InformerFactory.Resource().V1().ResourceClaims(),
 		controllerContext.InformerFactory.Resource().V1().ResourceClaimTemplates())
 	if err != nil {
@@ -100,7 +88,7 @@ func newResourceClaimController(ctx context.Context, controllerContext Controlle
 	}
 
 	return newControllerLoop(func(ctx context.Context) {
-		ephemeralController.Run(ctx, int(controllerContext.ComponentConfig.ResourceClaimController.ConcurrentSyncs))
+		controller.Run(ctx, int(controllerContext.ComponentConfig.ResourceClaimController.ConcurrentSyncs))
 	}, controllerName), nil
 }
 
@@ -126,6 +114,7 @@ func newResourcePoolStatusRequestController(ctx context.Context, controllerConte
 		controllerContext.InformerFactory.Resource().V1alpha3().ResourcePoolStatusRequests(),
 		controllerContext.InformerFactory.Resource().V1().ResourceSlices(),
 		controllerContext.InformerFactory.Resource().V1().ResourceClaims(),
+		controllerContext.InformerFactory.Resource().V1().DeviceTaintRules(),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to init resourcepoolstatusrequest controller: %w", err)

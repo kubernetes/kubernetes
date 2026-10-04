@@ -56,12 +56,6 @@ func register(global *flag.FlagSet, local *pflag.FlagSet, globalName string) {
 	}
 }
 
-// registerDeprecated registers the flag with register, and then marks it deprecated
-func registerDeprecated(global *flag.FlagSet, local *pflag.FlagSet, globalName, deprecated string) {
-	register(global, local, globalName)
-	local.Lookup(normalize(globalName)).Deprecated = deprecated
-}
-
 // addCredentialProviderFlags adds flags from k8s.io/kubernetes/pkg/credentialprovider
 func addCredentialProviderFlags(fs *pflag.FlagSet) {
 	// lookup flags in global flag set and re-register the values with our flagset

@@ -148,8 +148,7 @@ const (
 // window is chosen.
 //
 // The tolerance is applied to the metric values and prevents scaling too
-// eagerly for small metric variations. (Note that setting a tolerance requires
-// the beta HPAConfigurableTolerance feature gate to be enabled.)
+// eagerly for small metric variations.
 type HPAScalingRules struct {
 	// StabilizationWindowSeconds is the number of seconds for which past recommendations should be
 	// considered while scaling up or scaling down.
@@ -177,9 +176,6 @@ type HPAScalingRules struct {
 	// For example, if autoscaling is configured with a memory consumption target of 100Mi,
 	// and scale-down and scale-up tolerances of 5% and 1% respectively, scaling will be
 	// triggered when the actual consumption falls below 95Mi or exceeds 101Mi.
-	//
-	// This is an beta field and requires the HPAConfigurableTolerance feature
-	// gate to be enabled.
 	//
 	// +featureGate=HPAConfigurableTolerance
 	// +optional
@@ -455,6 +451,12 @@ type HorizontalPodAutoscalerCondition struct {
 	// the transition
 	// +optional
 	Message string
+
+	// observedGeneration represents the .metadata.generation that the condition was set based upon.
+	// For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+	// with respect to the current state of the instance.
+	// +optional
+	ObservedGeneration *int64
 }
 
 // MetricStatus describes the last-read state of a single metric.

@@ -17,6 +17,8 @@ limitations under the License.
 package benchmark
 
 import (
+	"time"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/scheduler"
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
@@ -42,6 +44,7 @@ type schedulerPerfOptions struct {
 	preRunFn                PreRunFn
 	prepareFn               HookFn
 	nodeUpdateFn            NodeUpdateFn
+	podsSchedulingTimeout   time.Duration
 }
 
 // WithPrepareFn is the option to set a function that is called
@@ -67,5 +70,13 @@ func WithNodeUpdateFn(fn NodeUpdateFn) SchedulerPerfOption {
 func WithPreRunFn(preRunFn PreRunFn) SchedulerPerfOption {
 	return func(s *schedulerPerfOptions) {
 		s.preRunFn = preRunFn
+	}
+}
+
+// WithPodsSchedulingTimeout is the option to set a custom timeout
+// specifically for waiting for pods to be scheduled.
+func WithPodsSchedulingTimeout(timeout time.Duration) SchedulerPerfOption {
+	return func(s *schedulerPerfOptions) {
+		s.podsSchedulingTimeout = timeout
 	}
 }

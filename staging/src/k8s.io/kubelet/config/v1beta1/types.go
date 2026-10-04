@@ -114,11 +114,35 @@ const (
 	TieredReservationMemoryReservationPolicy MemoryReservationPolicy = "TieredReservation"
 )
 
+// CertificateKeyAlgorithmType defines the type of key algorithm used for certificate signing requests.
+type CertificateKeyAlgorithmType string
+
+const (
+	// CertificateKeyAlgorithmECDSAP256 defines the ECDSA key algorithm type with curve P256.
+	CertificateKeyAlgorithmECDSAP256 CertificateKeyAlgorithmType = "ECDSA-P256"
+	// CertificateKeyAlgorithmECDSAP384 defines the ECDSA key algorithm type with curve P384.
+	CertificateKeyAlgorithmECDSAP384 CertificateKeyAlgorithmType = "ECDSA-P384"
+	// CertificateKeyAlgorithmRSA2048 defines the RSA key algorithm type with key size 2048 bits.
+	CertificateKeyAlgorithmRSA2048 CertificateKeyAlgorithmType = "RSA-2048"
+	// CertificateKeyAlgorithmRSA3072 defines the RSA key algorithm type with key size 3072 bits.
+	CertificateKeyAlgorithmRSA3072 CertificateKeyAlgorithmType = "RSA-3072"
+	// CertificateKeyAlgorithmRSA4096 defines the RSA key algorithm type with key size 4096 bits.
+	CertificateKeyAlgorithmRSA4096 CertificateKeyAlgorithmType = "RSA-4096"
+	// CertificateKeyAlgorithmMLDSA44 defines the ML-DSA-44 key algorithm variant.
+	CertificateKeyAlgorithmMLDSA44 CertificateKeyAlgorithmType = "ML-DSA-44"
+	// CertificateKeyAlgorithmMLDSA65 defines the ML-DSA-65 key algorithm variant.
+	CertificateKeyAlgorithmMLDSA65 CertificateKeyAlgorithmType = "ML-DSA-65"
+	// CertificateKeyAlgorithmMLDSA87 defines the ML-DSA-87 key algorithm variant.
+	CertificateKeyAlgorithmMLDSA87 CertificateKeyAlgorithmType = "ML-DSA-87"
+	// CertificateKeyAlgorithmDefault is the default key algorithm (ECDSA P-256).
+	CertificateKeyAlgorithmDefault = CertificateKeyAlgorithmECDSAP256
+)
+
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // KubeletConfiguration contains the configuration for the Kubelet
 type KubeletConfiguration struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 
 	// enableServer enables Kubelet's secured server.
 	// Note: Kubelet's insecure port is controlled by the readOnlyPort option.
@@ -221,6 +245,31 @@ type KubeletConfiguration struct {
 	// Default: false
 	// +optional
 	ServerTLSBootstrap bool `json:"serverTLSBootstrap,omitempty"`
+	// clientCertificateKeyAlgorithm specifies the key algorithm to use when generating
+	// client certificate signing requests during certificate rotation.
+	// This field only takes effect when rotateCertificates is true. It controls keys
+	// generated for initial and renewal CSRs; it does not alter supplied static
+	// credentials.
+	// Note: ML-DSA algorithms require TLS 1.3 and peers that support the selected
+	// signature algorithm. Go rejects ML-DSA certificates under TLS 1.2.
+	// Valid values are: "ECDSA-P256", "ECDSA-P384", "RSA-2048", "RSA-3072", "RSA-4096",
+	// "ML-DSA-44", "ML-DSA-65", "ML-DSA-87".
+	// When omitted, defaults to "ECDSA-P256".
+	// +optional
+	ClientCertificateKeyAlgorithm *CertificateKeyAlgorithmType `json:"clientCertificateKeyAlgorithm,omitempty"`
+	// serverCertificateKeyAlgorithm specifies the key algorithm to use when generating
+	// server certificate signing requests during certificate rotation.
+	// This field only takes effect when serverTLSBootstrap is true. It is not used
+	// for self-signed serving certificates.
+	// Changing this value does not immediately replace an existing certificate;
+	// the new algorithm takes effect at the next certificate renewal.
+	// Note: ML-DSA algorithms require TLS 1.3 and peers that support the selected
+	// signature algorithm. Go rejects ML-DSA certificates under TLS 1.2.
+	// Valid values are: "ECDSA-P256", "ECDSA-P384", "RSA-2048", "RSA-3072", "RSA-4096",
+	// "ML-DSA-44", "ML-DSA-65", "ML-DSA-87".
+	// When omitted, defaults to "ECDSA-P256".
+	// +optional
+	ServerCertificateKeyAlgorithm *CertificateKeyAlgorithmType `json:"serverCertificateKeyAlgorithm,omitempty"`
 	// authentication specifies how requests to the Kubelet's server are authenticated.
 	// Defaults:
 	//   anonymous:
@@ -328,18 +377,18 @@ type KubeletConfiguration struct {
 	// +optional
 	StreamingConnectionIdleTimeout metav1.Duration `json:"streamingConnectionIdleTimeout,omitempty"`
 	// nodeStatusUpdateFrequency is the frequency that kubelet computes node
-	// status. If node lease feature is not enabled, it is also the frequency that
-	// kubelet posts node status to master.
-	// Note: When node lease feature is not enabled, be cautious when changing the
-	// constant, it must work with nodeMonitorGracePeriod in nodecontroller.
+	// status and checks if an update to the API server is necessary. Status
+	// is posted to the API server either when it changes or when
+	// nodeStatusReportFrequency has elapsed since the last report.
 	// Default: "10s"
 	// +optional
 	NodeStatusUpdateFrequency metav1.Duration `json:"nodeStatusUpdateFrequency,omitempty"`
 	// nodeStatusReportFrequency is the frequency that kubelet posts node
-	// status to master if node status does not change. Kubelet will ignore this
-	// frequency and post node status immediately if any change is detected. It is
-	// only used when node lease feature is enabled. nodeStatusReportFrequency's
-	// default value is 5m. But if nodeStatusUpdateFrequency is set explicitly,
+	// status to the API server if node status does not change. Kubelet will
+	// ignore this frequency and post node status immediately if any change
+	// is detected.
+	// nodeStatusReportFrequency's default value is 5m. But if
+	// nodeStatusUpdateFrequency is set explicitly,
 	// nodeStatusReportFrequency's default value will be set to
 	// nodeStatusUpdateFrequency for backward compatibility.
 	// Default: "5m"
@@ -772,6 +821,12 @@ type KubeletConfiguration struct {
 	// Default: []
 	// +optional
 	AllowedUnsafeSysctls []string `json:"allowedUnsafeSysctls,omitempty"`
+	// DefaultPodSysctls is a set of default sysctls that will be applied to all pods.
+	// It can be overridden by sysctls set in pod spec.securityContext.sysctls.
+	// Support namespaced groups: `kernel.shm*`, `kernel.msg*`, `kernel.sem`, `fs.mqueue.*`, `net.*`, `kernel.domainname`, and `user.*`.
+	// For example: {"net.ipv4.ip_forward": "1", "kernel.shmall": "1048576"}
+	// +optional
+	DefaultPodSysctls map[string]string `json:"defaultPodSysctls,omitempty"`
 	// volumePluginDir is the full path of the directory in which to search
 	// for additional third party volume plugins.
 	// Default: "/usr/libexec/kubernetes/kubelet-plugins/volume/exec/"
@@ -893,9 +948,9 @@ type KubeletConfiguration struct {
 	// MemoryThrottlingFactor specifies the factor multiplied by the memory limit or node allocatable memory
 	// when setting the cgroupv2 memory.high value to enforce MemoryQoS.
 	// Decreasing this factor will set lower high limit for container cgroups and put heavier reclaim pressure
-	// while increasing will put less reclaim pressure.
+	// while increasing will put less reclaim pressure. If nil, memory.high is not set.
 	// See https://kep.k8s.io/2570 for more details.
-	// Default: 0.9
+	// Default: nil
 	// +featureGate=MemoryQoS
 	// +optional
 	MemoryThrottlingFactor *float64 `json:"memoryThrottlingFactor,omitempty"`
@@ -1040,7 +1095,7 @@ type KubeletAnonymousAuthentication struct {
 // This type is used internally by the Kubelet for tracking checkpointed dynamic configs.
 // It exists in the kubeletconfig API group because it is classified as a versioned input to the Kubelet.
 type SerializedNodeConfigSource struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 	// source is the source that we are serializing.
 	// +optional
 	Source v1.NodeConfigSource `json:"source,omitempty" protobuf:"bytes,1,opt,name=source"`
@@ -1084,7 +1139,7 @@ type CrashLoopBackOffConfig struct {
 // each exec credential provider. Kubelet reads this configuration from disk and enables
 // each provider as specified by the CredentialProvider type.
 type CredentialProviderConfig struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 
 	// providers is a list of credential provider plugins that will be enabled by the kubelet.
 	// Multiple providers may match against a single image, in which case credentials
@@ -1172,7 +1227,7 @@ type UserNamespaces struct {
 //
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type ImagePullIntent struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 
 	// Image is the image spec from a Container's `image` field.
 	// The filename is a SHA-256 hash of this value. This is to avoid filename-unsafe
@@ -1188,7 +1243,7 @@ type ImagePullIntent struct {
 //
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type ImagePulledRecord struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 
 	// LastUpdatedTime is the time of the last update to this record
 	LastUpdatedTime metav1.Time `json:"lastUpdatedTime"`

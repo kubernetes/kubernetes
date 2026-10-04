@@ -28,6 +28,13 @@ import (
 )
 
 const tagEnumType = "enum"
+
+// Declarative validation spells the enum tag with the "k8s:" prefix. It is
+// equivalent to +enum, and is expected to eventually replace it. Until then a
+// type may carry both spellings, so they are treated as aliases rather than as
+// separate signals.
+const tagK8sEnumType = "k8s:enum"
+
 const enumTypeDescriptionHeader = "Possible enum values:"
 
 type enumValue struct {
@@ -163,14 +170,16 @@ func (ev *enumValue) Description() string {
 }
 
 // isEnumType checks if a given type is an enum by the definition
-// An enum type should be an alias of string and has tag '+enum' in its comment.
+// An enum type should be an alias of string and has tag '+enum' or '+k8s:enum'
+// in its comment.
 // Additionally, pass the type of builtin 'string' to check against.
 func isEnumType(stringType *types.Type, t *types.Type) bool {
 	return t.Kind == types.Alias && t.Underlying == stringType && hasEnumTag(t)
 }
 
 func hasEnumTag(t *types.Type) bool {
-	return gengo.ExtractCommentTags("+", t.CommentLines)[tagEnumType] != nil
+	tags := gengo.ExtractCommentTags("+", t.CommentLines)
+	return tags[tagEnumType] != nil || tags[tagK8sEnumType] != nil
 }
 
 // whitespaceRegex is the regex for consecutive whitespaces.

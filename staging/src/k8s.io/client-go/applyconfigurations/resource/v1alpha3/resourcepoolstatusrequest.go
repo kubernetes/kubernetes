@@ -34,13 +34,13 @@ import (
 // based on the provided filters. Once status is set, the request is considered complete and will not be reprocessed.
 // Users should delete and recreate requests to get updated information.
 type ResourcePoolStatusRequestApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration `json:",inline"`
-	// Standard object metadata
+	v1.TypeMetaApplyConfiguration `json:""`
+	// metadata is the standard object metadata.
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	// Spec defines the filters for which pools to include in the status.
+	// spec defines the filters for which pools to include in the status.
 	// The spec is immutable once created.
 	Spec *ResourcePoolStatusRequestSpecApplyConfiguration `json:"spec,omitempty"`
-	// Status is populated by the controller with the calculated pool status.
+	// status is populated by the controller with the calculated pool status.
 	// When status is non-nil, the request is considered complete and the
 	// entire object becomes immutable.
 	Status *ResourcePoolStatusRequestStatusApplyConfiguration `json:"status,omitempty"`

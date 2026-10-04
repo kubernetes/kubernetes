@@ -69,8 +69,7 @@ func (p PodDirIO) Mkdir(path string) error {
 func (p PodDirIO) CreateFile(path string, content io.Reader) error {
 	// Piping the content into dd via stdin turned out to be unreliable.
 	// Sometimes dd would stop after writing zero bytes, without an error
-	// from ExecWithOptions (reported as
-	// https://github.com/kubernetes/kubernetes/issues/112834).
+	// from Exec (reported as https://github.com/kubernetes/kubernetes/issues/112834).
 	//
 	// Therefore the content is now encoded inside the command itself.
 	data, err := io.ReadAll(content)
@@ -105,7 +104,7 @@ func (p PodDirIO) RemoveAll(path string) error {
 }
 
 func (p PodDirIO) execute(command []string, stdin io.Reader) (string, string, error) {
-	stdout, stderr, err := e2epod.ExecWithOptionsTCtx(p.TCtx, e2epod.ExecOptions{
+	stdout, stderr, err := e2epod.Exec(p.TCtx, e2epod.ExecOptions{
 		Command:       command,
 		Namespace:     p.Namespace,
 		PodName:       p.PodName,

@@ -407,7 +407,7 @@ func (c *gcmCipher) readCipherPacket(seqNum uint32, r io.Reader) ([]byte, error)
 		return nil, fmt.Errorf("ssh: illegal padding %d", padding)
 	}
 
-	if int(padding+1) >= len(plain) {
+	if int(padding)+1 >= len(plain) {
 		return nil, fmt.Errorf("ssh: padding %d too large", padding)
 	}
 	plain = plain[1 : length-uint32(padding)]

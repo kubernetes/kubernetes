@@ -24,7 +24,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/peterbourgon/diskv"
+	"github.com/peterbourgon/diskv/v3"
 	"k8s.io/client-go/third_party/forked/httpcache"
 	"k8s.io/klog/v2"
 )
@@ -60,7 +60,7 @@ func (rt *cacheRoundTripper) CancelRequest(req *http.Request) {
 	if cr, ok := rt.rt.Transport.(canceler); ok {
 		cr.CancelRequest(req)
 	} else {
-		klog.Errorf("CancelRequest not implemented by %T", rt.rt.Transport)
+		klog.FromContext(req.Context()).Error(nil, "CancelRequest not implemented by round-tripper", "type", fmt.Sprintf("%T", rt.rt.Transport))
 	}
 }
 

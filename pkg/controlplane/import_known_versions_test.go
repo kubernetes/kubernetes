@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
+	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
 	apinamingtest "k8s.io/apimachinery/pkg/api/apitesting/naming"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -75,6 +76,17 @@ var typesAllowedTags = map[reflect.Type]bool{
 	reflect.TypeOf(metav1.Status{}):                   true,
 	reflect.TypeOf(metav1.Condition{}):                true,
 	reflect.TypeOf(runtime.RawExtension{}):            true,
+}
+
+func init() {
+	for _, t := range []reflect.Type{
+		reflect.TypeFor[schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy](),
+		reflect.TypeFor[schedulingv1alpha3.WorkloadPodGroupSchedulingConstraints](),
+		reflect.TypeFor[schedulingv1alpha3.WorkloadPodGroupDisruptionMode](),
+		reflect.TypeFor[schedulingv1alpha3.WorkloadPodGroupResourceClaim](),
+	} {
+		typesAllowedTags[t] = true
+	}
 }
 
 // These fields are limited exceptions to the standard JSON naming structure.

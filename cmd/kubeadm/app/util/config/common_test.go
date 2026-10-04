@@ -19,15 +19,11 @@ package config
 import (
 	"fmt"
 	"reflect"
-	"strings"
 	"testing"
-	"time"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/lithammer/dedent"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/util/version"
@@ -35,7 +31,6 @@ import (
 	"sigs.k8s.io/yaml"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmapiv1old "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta4"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
@@ -104,6 +99,7 @@ func TestValidateSupportedVersion(t *testing.T) {
 				Version: "v1beta3",
 				Kind:    "ClusterConfiguration",
 			},
+			expectedErr: true,
 		},
 		{
 			gvk: schema.GroupVersionKind{
@@ -239,7 +235,7 @@ func TestVerifyAPIServerBindAddress(t *testing.T) {
 // and add negative and positive test cases for the experimental API.
 func TestMigrateOldConfig(t *testing.T) {
 	var (
-		gv    = kubeadmapiv1old.SchemeGroupVersion.String()
+		gv    = kubeadmapiv1.SchemeGroupVersion.String()
 		gvNew = kubeadmapiv1.SchemeGroupVersion.String()
 	)
 	tests := []struct {
@@ -459,193 +455,13 @@ func TestMigrateOldConfig(t *testing.T) {
 	}
 }
 
-// Test the migration of all breaking changes in v1beta4, marked as "MIGRATED" in the YAML below:
-// - ExtraArgs
-// - ClusterConfiguration.APIServer.TimeoutForControlPlane -> {Init|Join}Configuration.Timeout.ControlPlaneComponentHealthCheck
-// - JoinConfiguration.Discovery.Timeout -> JoinConfiguration.Timeout.Discovery
-func TestMigrateV1Beta3WithBreakingChanges(t *testing.T) {
-	var (
-		gv         = kubeadmapiv1old.SchemeGroupVersion.String()
-		gvNew      = kubeadmapiv1.SchemeGroupVersion.String()
-		criSocket  = fmt.Sprintf("%s:///some-socket-path", kubeadmapiv1.DefaultContainerRuntimeURLScheme)
-		caCertPath = kubeadmapiv1.DefaultCACertPath
-
-		input = dedent.Dedent(fmt.Sprintf(`
-		apiVersion: %s
-		bootstrapTokens:
-		- groups:
-		  - system:bootstrappers:kubeadm:default-node-token
-		  token: n32eo4.cci2j99rnn8fmv42
-		  ttl: 24h0m0s
-		  usages:
-		  - signing
-		  - authentication
-		kind: InitConfiguration
-		localAPIEndpoint:
-		  advertiseAddress: 1.2.3.4
-		  bindPort: 6443
-		nodeRegistration:
-		  criSocket: %[2]s
-		  kubeletExtraArgs: # MIGRATED
-		    foo: bar
-		  name: node
-		---
-		apiServer:
-		  timeoutForControlPlane: 2m32s # MIGRATED
-		  extraArgs: # MIGRATED
-		    foo: bar
-		apiVersion: %[1]s
-		controllerManager:
-		  extraArgs: # MIGRATED
-		    foo: bar
-		etcd:
-		  local:
-		    extraArgs: # MIGRATED
-		      foo: bar
-		kind: ClusterConfiguration
-		kubernetesVersion: v1.10.0
-		scheduler:
-		  extraArgs: # MIGRATED
-		    foo: bar
-		---
-		apiVersion: %[1]s
-		kind: JoinConfiguration
-		nodeRegistration:
-		  criSocket: %[2]s
-		  imagePullPolicy: IfNotPresent
-		  kubeletExtraArgs: # MIGRATED
-		    foo: baz
-		  name: foo
-		  taints: null
-		discovery:
-		  bootstrapToken:
-		    apiServerEndpoint: some-address:6443
-		    token: abcdef.0123456789abcdef
-		    unsafeSkipCAVerification: true
-		  tlsBootstrapToken: abcdef.0123456789abcdef
-		  timeout: 2m10s # MIGRATED
-		`, gv, criSocket))
-
-		expectedOutput = dedent.Dedent(fmt.Sprintf(`
-		apiVersion: %s
-		bootstrapTokens:
-		- groups:
-		  - system:bootstrappers:kubeadm:default-node-token
-		  token: n32eo4.cci2j99rnn8fmv42
-		  ttl: 24h0m0s
-		  usages:
-		  - signing
-		  - authentication
-		kind: InitConfiguration
-		localAPIEndpoint:
-		  advertiseAddress: 1.2.3.4
-		  bindPort: 6443
-		nodeRegistration:
-		  criSocket: %[2]s
-		  imagePullPolicy: IfNotPresent
-		  imagePullSerial: true
-		  kubeletExtraArgs:
-		  - name: foo
-		    value: bar
-		  name: node
-		  taints:
-		  - effect: NoSchedule
-		    key: node-role.kubernetes.io/control-plane
-		timeouts:
-		  controlPlaneComponentHealthCheck: 2m32s
-		  discovery: 5m0s
-		  etcdAPICall: 2m0s
-		  kubeletHealthCheck: 4m0s
-		  kubernetesAPICall: 1m0s
-		  tlsBootstrap: 5m0s
-		  upgradeManifests: 5m0s
-		---
-		apiServer:
-		  extraArgs:
-		  - name: foo
-		    value: bar
-		apiVersion: %[1]s
-		caCertificateValidityPeriod: 87600h0m0s
-		certificateValidityPeriod: 8760h0m0s
-		certificatesDir: /etc/kubernetes/pki
-		clusterName: kubernetes
-		controllerManager:
-		  extraArgs:
-		  - name: foo
-		    value: bar
-		dns: {}
-		encryptionAlgorithm: RSA-2048
-		etcd:
-		  local:
-		    dataDir: /var/lib/etcd
-		    extraArgs:
-		    - name: foo
-		      value: bar
-		imageRepository: registry.k8s.io
-		kind: ClusterConfiguration
-		kubernetesVersion: v1.10.0
-		networking:
-		  dnsDomain: cluster.local
-		  serviceSubnet: 10.96.0.0/12
-		proxy: {}
-		scheduler:
-		  extraArgs:
-		  - name: foo
-		    value: bar
-		---
-		apiVersion: %[1]s
-		caCertPath: %[3]s
-		discovery:
-		  bootstrapToken:
-		    apiServerEndpoint: some-address:6443
-		    token: abcdef.0123456789abcdef
-		    unsafeSkipCAVerification: true
-		  tlsBootstrapToken: abcdef.0123456789abcdef
-		kind: JoinConfiguration
-		nodeRegistration:
-		  criSocket: %[2]s
-		  imagePullPolicy: IfNotPresent
-		  imagePullSerial: true
-		  kubeletExtraArgs:
-		  - name: foo
-		    value: baz
-		  name: foo
-		  taints: null
-		timeouts:
-		  controlPlaneComponentHealthCheck: 2m32s
-		  discovery: 2m10s
-		  etcdAPICall: 2m0s
-		  kubeletHealthCheck: 4m0s
-		  kubernetesAPICall: 1m0s
-		  tlsBootstrap: 5m0s
-		  upgradeManifests: 5m0s
-		`, gvNew, criSocket, caCertPath))
-	)
-
-	b, err := MigrateOldConfig([]byte(input), false, defaultEmptyMigrateMutators())
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	// Trim one leading new line as MigrateOldConfig does the same
-	expectedOutput = strings.TrimLeft(expectedOutput, "\n")
-
-	// Split string lines in the diff
-	diff := cmp.Diff(expectedOutput, string(b), cmpopts.AcyclicTransformer("multiline", func(s string) []string {
-		return strings.Split(s, "\n")
-	}))
-	if len(diff) > 0 {
-		t.Fatalf("unexpected diff (-want,+got):\n%s", diff)
-	}
-}
-
 // NOTE: do not delete this test once an older API is removed and there is only one API left.
 // Update the inline "gv" and "gvNew" variables, to have the GroupVersion String of
 // the API to be tested. If there are no experimental APIs make "gvNew" point to
 // an non-experimental API.
 func TestValidateConfig(t *testing.T) {
 	var (
-		gv    = kubeadmapiv1old.SchemeGroupVersion.String()
+		gv    = kubeadmapiv1.SchemeGroupVersion.String()
 		gvNew = kubeadmapiv1.SchemeGroupVersion.String()
 	)
 	tests := []struct {
@@ -880,8 +696,18 @@ func TestNormalizeKubernetesVersion(t *testing.T) {
 	}
 }
 
-// TODO: update the test cases for this test once v1beta3 is removed.
-func TestDefaultMigrateMutators(t *testing.T) {
+func TestMigrateMutators(t *testing.T) {
+	testMutators := &migrateMutators{
+		migrateMutator{
+			in: []any{(*kubeadmapi.ClusterConfiguration)(nil)},
+			mutateFunc: func(in []any) error {
+				a := in[0].(*kubeadmapi.ClusterConfiguration)
+				a.DNS.Disabled = true
+				return nil
+			},
+		},
+	}
+
 	tests := []struct {
 		name          string
 		mutators      migrateMutators
@@ -891,72 +717,50 @@ func TestDefaultMigrateMutators(t *testing.T) {
 		expectedError bool
 	}{
 		{
-			name:     "mutate InitConfiguration",
-			mutators: defaultMigrateMutators(),
-			input: []any{&kubeadmapi.InitConfiguration{
-				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
-					APIServer: kubeadmapi.APIServer{
-						TimeoutForControlPlane: &metav1.Duration{
-							Duration: 1234 * time.Millisecond,
-						},
-					},
+			name:     "test mutation of ClusterConfiguration",
+			mutators: *testMutators,
+			input: []any{&kubeadmapi.ClusterConfiguration{
+				DNS: kubeadmapi.DNS{
+					Disabled: false,
 				},
-				Timeouts: &kubeadmapi.Timeouts{
-					ControlPlaneComponentHealthCheck: &metav1.Duration{},
+			},
+			},
+			expected: []any{&kubeadmapi.ClusterConfiguration{
+				DNS: kubeadmapi.DNS{
+					Disabled: true,
 				},
-			}},
-			expected: []any{&kubeadmapi.InitConfiguration{
-				Timeouts: &kubeadmapi.Timeouts{
-					ControlPlaneComponentHealthCheck: &metav1.Duration{
-						Duration: 1234 * time.Millisecond,
-					},
-				},
-			}},
+			},
+			},
 		},
 		{
-			name:     "mutate JoinConfiguration",
+			name:     "support mutation of InitConfiguration",
 			mutators: defaultMigrateMutators(),
-			input: []any{&kubeadmapi.JoinConfiguration{
-				Discovery: kubeadmapi.Discovery{
-					Timeout: &metav1.Duration{
-						Duration: 1234 * time.Microsecond,
-					},
-				},
-				Timeouts: &kubeadmapi.Timeouts{
-					Discovery: &metav1.Duration{},
-				},
-			}},
-			expected: []any{&kubeadmapi.JoinConfiguration{
-				Timeouts: &kubeadmapi.Timeouts{
-					Discovery: &metav1.Duration{
-						Duration: 1234 * time.Microsecond,
-					},
-				},
-			}},
+			input: []any{
+				&kubeadmapi.InitConfiguration{},
+			},
+			expected: []any{
+				&kubeadmapi.InitConfiguration{},
+			},
 		},
 		{
-			name:     "diff when mutating InitConfiguration",
+			name:     "support mutation of ResetConfiguration",
 			mutators: defaultMigrateMutators(),
-			input: []any{&kubeadmapi.InitConfiguration{
-				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
-					APIServer: kubeadmapi.APIServer{
-						TimeoutForControlPlane: &metav1.Duration{
-							Duration: 1234 * time.Millisecond,
-						},
-					},
-				},
-				Timeouts: &kubeadmapi.Timeouts{
-					ControlPlaneComponentHealthCheck: &metav1.Duration{},
-				},
-			}},
-			expected: []any{&kubeadmapi.InitConfiguration{
-				Timeouts: &kubeadmapi.Timeouts{
-					ControlPlaneComponentHealthCheck: &metav1.Duration{
-						Duration: 1 * time.Millisecond, // a different value
-					},
-				},
-			}},
-			expectedDiff: true,
+			input: []any{
+				&kubeadmapi.ResetConfiguration{},
+			},
+			expected: []any{
+				&kubeadmapi.ResetConfiguration{},
+			},
+		},
+		{
+			name:     "support mutation of UpgradeConfiguration",
+			mutators: defaultMigrateMutators(),
+			input: []any{
+				&kubeadmapi.UpgradeConfiguration{},
+			},
+			expected: []any{
+				&kubeadmapi.UpgradeConfiguration{},
+			},
 		},
 		{
 			name:          "expect an error for a missing mutator",

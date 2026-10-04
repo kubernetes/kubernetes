@@ -83,7 +83,7 @@ func testExtendedResource(tCtx ktesting.TContext, enabled, explicit bool) {
 				"Type":    gomega.Equal(v1.PodScheduled),
 				"Status":  gomega.Equal(v1.ConditionFalse),
 				"Reason":  gomega.Equal("Unschedulable"),
-				"Message": gomega.Equal(fmt.Sprintf("0/8 nodes are available: 8 Insufficient %s. no new claims to deallocate, preemption: 0/8 nodes are available: 8 Preemption is not helpful for scheduling.", resourceName)),
+				"Message": gomega.Equal(fmt.Sprintf("0/8 nodes are available: 8 Insufficient %s. preemption: 0/8 nodes are available: 8 Preemption is not helpful for scheduling.", resourceName)),
 			}),
 		))
 	}

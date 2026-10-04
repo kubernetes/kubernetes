@@ -207,11 +207,10 @@ func goListDriver(cfg *Config, runner *gocommand.Runner, overlay string, pattern
 	// doesn't exist.
 extractQueries:
 	for _, pattern := range patterns {
-		eqidx := strings.Index(pattern, "=")
-		if eqidx < 0 {
+		query, value, ok := strings.Cut(pattern, "=")
+		if !ok {
 			restPatterns = append(restPatterns, pattern)
 		} else {
-			query, value := pattern[:eqidx], pattern[eqidx+len("="):]
 			switch query {
 			case "file":
 				containFiles = append(containFiles, value)
@@ -563,8 +562,18 @@ func (state *golistState) createDriverResponse(words ...string) (*DriverResponse
 			} else {
 				// golang/go#38990: go list silently fails to do cgo processing
 				pkg.CompiledGoFiles = nil
+
+				var msg strings.Builder
+				fmt.Fprintf(&msg, "go list failed to return CompiledGoFiles for %q.\n", p.Name)
+
+				for _, err := range p.DepsErrors {
+					msg.WriteString(strings.TrimSpace(err.Err))
+					msg.WriteByte('\n')
+				}
+
+				msg.WriteString("This may indicate failure to perform cgo processing; try building at the command line. See https://golang.org/issue/38990.")
 				pkg.Errors = append(pkg.Errors, Error{
-					Msg:  "go list failed to return CompiledGoFiles. This may indicate failure to perform cgo processing; try building at the command line. See https://golang.org/issue/38990.",
+					Msg:  msg.String(),
 					Kind: ListError,
 				})
 			}

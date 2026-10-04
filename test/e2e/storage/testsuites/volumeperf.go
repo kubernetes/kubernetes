@@ -88,7 +88,8 @@ func (t *volumePerformanceTestSuite) GetTestSuiteInfo() storageframework.TestSui
 	return t.tsInfo
 }
 
-func (t *volumePerformanceTestSuite) SkipUnsupportedTests(driver storageframework.TestDriver, pattern storageframework.TestPattern) {
+func (t *volumePerformanceTestSuite) SkipUnsupportedTests(driver storageframework.TestDriver, pattern storageframework.TestPattern) string {
+	return ""
 }
 
 func (t *volumePerformanceTestSuite) DefineTests(driver storageframework.TestDriver, pattern storageframework.TestPattern) {

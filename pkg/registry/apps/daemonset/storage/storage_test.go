@@ -25,7 +25,6 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
-	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistrytest "k8s.io/apiserver/pkg/registry/generic/testing"
 	"k8s.io/apiserver/pkg/registry/rest"
@@ -189,7 +188,8 @@ func TestUpdateStatus(t *testing.T) {
 	defer storage.Store.DestroyFunc()
 
 	dsStart := newValidDaemonSet()
-	ctx := genericapirequest.WithNamespace(genericapirequest.NewDefaultContext(), dsStart.Namespace)
+	ctx := genericregistrytest.NewNamespaceScopeContext(storage.Store, dsStart.Namespace)
+	statusCtx := genericregistrytest.NewNamespaceScopeContext(storage.Store, dsStart.Namespace, "status")
 	key, _ := storage.KeyFunc(ctx, dsStart.Name)
 	err := storage.Storage.Create(ctx, key, dsStart, nil, 0, false)
 	if err != nil {
@@ -198,7 +198,7 @@ func TestUpdateStatus(t *testing.T) {
 
 	ds := dsStart.DeepCopy()
 	ds.Status.ObservedGeneration = 1
-	_, _, err = statusStorage.Update(ctx, ds.Name, rest.DefaultUpdatedObjectInfo(ds), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{})
+	_, _, err = statusStorage.Update(statusCtx, ds.Name, rest.DefaultUpdatedObjectInfo(ds), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{})
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}

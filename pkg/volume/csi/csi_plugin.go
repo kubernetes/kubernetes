@@ -102,7 +102,7 @@ var PluginHandler = &RegistrationHandler{}
 
 // ValidatePlugin is called by kubelet's plugin watcher upon detection
 // of a new registration socket opened by CSI Driver registrar side car.
-func (h *RegistrationHandler) ValidatePlugin(pluginName string, endpoint string, versions []string) error {
+func (h *RegistrationHandler) ValidatePlugin(ctx context.Context, pluginName string, endpoint string, versions []string) error {
 	klog.Info(log("Trying to validate a new CSI Driver with name: %s endpoint: %s versions: %s",
 		pluginName, endpoint, strings.Join(versions, ",")))
 
@@ -115,7 +115,7 @@ func (h *RegistrationHandler) ValidatePlugin(pluginName string, endpoint string,
 }
 
 // RegisterPlugin is called when a plugin can be registered
-func (h *RegistrationHandler) RegisterPlugin(pluginName string, endpoint string, versions []string, pluginClientTimeout *time.Duration) error {
+func (h *RegistrationHandler) RegisterPlugin(ctx context.Context, pluginName string, endpoint string, versions []string, pluginClientTimeout *time.Duration) error {
 	klog.Info(log("Register new plugin with name: %s at endpoint: %s", pluginName, endpoint))
 
 	highestSupportedVersion, err := h.validateVersions("RegisterPlugin", pluginName, endpoint, versions)
@@ -143,10 +143,10 @@ func (h *RegistrationHandler) RegisterPlugin(pluginName string, endpoint string,
 		timeout = *pluginClientTimeout
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	newCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
-	driverNodeID, maxVolumePerNode, accessibleTopology, err := csi.NodeGetInfo(ctx)
+	driverNodeID, maxVolumePerNode, accessibleTopology, err := csi.NodeGetInfo(newCtx)
 	if err != nil {
 		if unregErr := unregisterDriver(pluginName); unregErr != nil {
 			klog.Error(log("registrationHandler.RegisterPlugin failed to unregister plugin due to previous error: %v", unregErr))
@@ -267,7 +267,7 @@ func (h *RegistrationHandler) validateVersions(callerName, pluginName string, en
 
 // DeRegisterPlugin is called when a plugin removed its socket, signaling
 // it is no longer available
-func (h *RegistrationHandler) DeRegisterPlugin(pluginName, endpoint string) {
+func (h *RegistrationHandler) DeRegisterPlugin(ctx context.Context, pluginName, endpoint string) {
 	klog.Info(log("registrationHandler.DeRegisterPlugin request for plugin %s, endpoint %s", pluginName, endpoint))
 	if err := unregisterDriver(pluginName); err != nil {
 		klog.Error(log("registrationHandler.DeRegisterPlugin failed: %v", err))

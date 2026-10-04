@@ -292,8 +292,8 @@ func TestVACProtectionController(t *testing.T) {
 		}
 
 		// Create the controller
-		logger, _ := ktesting.NewTestContext(t)
-		ctrl, err := NewVACProtectionController(logger, client, pvcInformer, pvInformer, vacInformer)
+		logger, ctx := ktesting.NewTestContext(t)
+		ctrl, err := NewVACProtectionController(ctx, client, pvcInformer, pvInformer, vacInformer)
 		require.NoError(t, err, "failed to create controller")
 
 		// Start the test by simulating an event

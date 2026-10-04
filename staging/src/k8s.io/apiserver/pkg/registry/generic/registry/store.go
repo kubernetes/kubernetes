@@ -23,7 +23,7 @@ import (
 	"sync"
 	"time"
 
-	"sigs.k8s.io/structured-merge-diff/v6/fieldpath"
+	"sigs.k8s.io/structured-merge-diff/v7/fieldpath"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -119,19 +119,33 @@ type Store struct {
 	// SingularQualifiedResource is the singular name of the resource.
 	SingularQualifiedResource schema.GroupResource
 
-	// KeyRootFunc returns the root etcd key for this resource; should not
-	// include trailing "/".  This is used for operations that work on the
-	// entire collection (listing and watching).
+	// KeyRootFunc returns the resource-relative key prefix for this resource;
+	// should not include trailing "/". This is used for operations that work
+	// on the entire collection (listing and watching). For example, it returns
+	// "/pods" or "/pods/<namespace>" for pods, and "/persistentvolumes" for
+	// persistent volumes.
 	//
 	// KeyRootFunc and KeyFunc must be supplied together or not at all.
 	KeyRootFunc func(ctx context.Context) string
 
-	// KeyFunc returns the key for a specific object in the collection.
-	// KeyFunc is called for Create/Update/Get/Delete. Note that 'namespace'
-	// can be gotten from ctx.
+	// KeyFunc returns the resource-relative key for a specific object in the
+	// collection. KeyFunc is called for Create/Update/Get/Delete. Note that
+	// 'namespace' can be gotten from ctx. For example, it returns
+	// "/pods/<namespace>/<name>" or "/persistentvolumes/<name>".
 	//
 	// KeyFunc and KeyRootFunc must be supplied together or not at all.
 	KeyFunc func(ctx context.Context, name string) (string, error)
+
+	// ReverseKeyFunc recovers an object's name and namespace from the
+	// resource-relative key produced by KeyFunc. It may be supplied with custom
+	// KeyRootFunc and KeyFunc implementations whose key format differs from the
+	// default "<resource-prefix>/<namespace>/<name>" or
+	// "<resource-prefix>/<name>" format.
+	//
+	// If custom key funcs are supplied without ReverseKeyFunc, storage
+	// features that need object identity from a key must fall back to decoding
+	// the stored object.
+	ReverseKeyFunc storage.ReverseKeyFunc
 
 	// ObjectNameFunc returns the name of an object or an error.
 	ObjectNameFunc func(obj runtime.Object) (string, error)
@@ -266,6 +280,7 @@ const (
 
 // NamespaceKeyRootFunc is the default function for constructing storage paths
 // to resource directories enforcing namespace rules.
+// prefix must start with "/" and must not end with "/".
 func NamespaceKeyRootFunc(ctx context.Context, prefix string) string {
 	key := prefix
 	ns, ok := genericapirequest.NamespaceFrom(ctx)
@@ -278,6 +293,7 @@ func NamespaceKeyRootFunc(ctx context.Context, prefix string) string {
 // NamespaceKeyFunc is the default function for constructing storage paths to
 // a resource relative to the given prefix enforcing namespace rules. If the
 // context does not contain a namespace, it errors.
+// prefix must start with "/" and must not end with "/".
 func NamespaceKeyFunc(ctx context.Context, prefix string, name string) (string, error) {
 	key := NamespaceKeyRootFunc(ctx, prefix)
 	ns, ok := genericapirequest.NamespaceFrom(ctx)
@@ -296,6 +312,7 @@ func NamespaceKeyFunc(ctx context.Context, prefix string, name string) (string, 
 
 // NoNamespaceKeyFunc is the default function for constructing storage paths
 // to a resource relative to the given prefix without a namespace.
+// prefix must start with "/" and must not end with "/".
 func NoNamespaceKeyFunc(ctx context.Context, prefix string, name string) (string, error) {
 	if len(name) == 0 {
 		return "", apierrors.NewBadRequest("Name parameter required.")
@@ -305,6 +322,110 @@ func NoNamespaceKeyFunc(ctx context.Context, prefix string, name string) (string
 	}
 	key := prefix + "/" + name
 	return key, nil
+}
+
+// NoNamespaceReverseKeyFunc returns a function that recovers a cluster-scoped
+// object's name from a resource-relative key formatted as
+// "<resourcePrefix>/<name>". resourcePrefix must start with "/" and must not
+// end with "/"; name must be non-empty and must not contain "/".
+func NoNamespaceReverseKeyFunc(resourcePrefix string) storage.ReverseKeyFunc {
+	keyPrefix := resourcePrefix + "/"
+	return func(key string) (name string, namespace string, err error) {
+		name, found := strings.CutPrefix(key, keyPrefix)
+		if !found {
+			return "", "", fmt.Errorf("key %q does not have resource prefix %q", key, resourcePrefix)
+		}
+		if name == "" || strings.Contains(name, "/") {
+			return "", "", fmt.Errorf("key %q must contain exactly one non-empty name segment after resource prefix %q", key, resourcePrefix)
+		}
+		return name, "", nil
+	}
+}
+
+// NamespaceReverseKeyFunc returns a function that recovers a namespaced
+// object's namespace and name from a resource-relative key formatted as
+// "<resourcePrefix>/<namespace>/<name>". resourcePrefix must start with "/"
+// and must not end with "/"; namespace and name must be non-empty and must not
+// contain "/".
+func NamespaceReverseKeyFunc(resourcePrefix string) storage.ReverseKeyFunc {
+	keyPrefix := resourcePrefix + "/"
+	return func(key string) (name string, namespace string, err error) {
+		instance, found := strings.CutPrefix(key, keyPrefix)
+		if !found {
+			return "", "", fmt.Errorf("key %q does not have resource prefix %q", key, resourcePrefix)
+		}
+		namespace, name, found = strings.Cut(instance, "/")
+		if !found || namespace == "" || name == "" || strings.Contains(name, "/") {
+			return "", "", fmt.Errorf("key %q must contain exactly two non-empty namespace and name segments after resource prefix %q", key, resourcePrefix)
+		}
+		return name, namespace, nil
+	}
+}
+
+type storeKeyFuncs struct {
+	// requestKeyRootFunc returns the resource-relative key prefix for list and
+	// watch requests, for example "/pods" or "/pods/<namespace>".
+	requestKeyRootFunc func(ctx context.Context) string
+	// requestKeyFunc returns the resource-relative key for a single object, for
+	// example "/pods/<namespace>/<name>" or "/persistentvolumes/<name>".
+	requestKeyFunc func(ctx context.Context, name string) (string, error)
+	// objectKeyFunc returns the same resource-relative key as requestKeyFunc,
+	// deriving namespace and name from object metadata for watch-cache callers.
+	objectKeyFunc func(obj runtime.Object) (string, error)
+	// reverseKeyFunc recovers object identity from the same resource-relative
+	// key domain produced by requestKeyFunc.
+	reverseKeyFunc storage.ReverseKeyFunc
+}
+
+func defaultStoreKeyFuncs(prefix string, isNamespaced bool) storeKeyFuncs {
+	if isNamespaced {
+		return newStoreKeyFuncs(
+			isNamespaced,
+			func(ctx context.Context) string {
+				return NamespaceKeyRootFunc(ctx, prefix)
+			},
+			func(ctx context.Context, name string) (string, error) {
+				return NamespaceKeyFunc(ctx, prefix, name)
+			},
+			NamespaceReverseKeyFunc(prefix),
+		)
+	}
+
+	return newStoreKeyFuncs(
+		isNamespaced,
+		func(ctx context.Context) string {
+			return prefix
+		},
+		func(ctx context.Context, name string) (string, error) {
+			return NoNamespaceKeyFunc(ctx, prefix, name)
+		},
+		NoNamespaceReverseKeyFunc(prefix),
+	)
+}
+
+func newStoreKeyFuncs(
+	isNamespaced bool,
+	requestKeyRootFunc func(ctx context.Context) string,
+	requestKeyFunc func(ctx context.Context, name string) (string, error),
+	reverseKeyFunc storage.ReverseKeyFunc,
+) storeKeyFuncs {
+	return storeKeyFuncs{
+		requestKeyRootFunc: requestKeyRootFunc,
+		requestKeyFunc:     requestKeyFunc,
+		objectKeyFunc: func(obj runtime.Object) (string, error) {
+			accessor, err := meta.Accessor(obj)
+			if err != nil {
+				return "", err
+			}
+
+			ctx := genericapirequest.NewContext()
+			if isNamespaced {
+				ctx = genericapirequest.WithNamespace(ctx, accessor.GetNamespace())
+			}
+			return requestKeyFunc(ctx, accessor.GetName())
+		},
+		reverseKeyFunc: reverseKeyFunc,
+	}
 }
 
 // New implements RESTStorage.New.
@@ -593,6 +714,26 @@ func ShouldDeleteDuringUpdate(ctx context.Context, key string, obj, existing run
 	return oldMeta.GetDeletionGracePeriodSeconds() == nil || *oldMeta.GetDeletionGracePeriodSeconds() == 0
 }
 
+func setRVFromNotFound(err error, lastKnown runtime.Object, returnDeletedObject bool) runtime.Object {
+	obj := lastKnown.DeepCopyObject()
+	accessor, aErr := meta.Accessor(obj)
+	if aErr != nil {
+		return obj
+	}
+	if returnDeletedObject {
+		// clear the resource version since we can't return an RV that corresponds to both the object content and the storage version
+		accessor.SetResourceVersion("")
+	} else {
+		if rv, ok := storage.ResourceVersion(err); ok && rv != "" {
+			accessor.SetResourceVersion(rv)
+		} else {
+			// clear the resource version since we don't know the storage version at this point
+			accessor.SetResourceVersion("")
+		}
+	}
+	return obj
+}
+
 // deleteWithoutFinalizers handles deleting an object ignoring its finalizer list.
 // Used for objects that are either been finalized or have never initialized.
 func (e *Store) deleteWithoutFinalizers(ctx context.Context, name, key string, obj runtime.Object, preconditions *storage.Preconditions, options *metav1.DeleteOptions) (runtime.Object, bool, error) {
@@ -604,6 +745,7 @@ func (e *Store) deleteWithoutFinalizers(ctx context.Context, name, key string, o
 		// requests to remove all finalizers from the object, so we
 		// ignore the NotFound error.
 		if storage.IsNotFound(err) {
+			obj = setRVFromNotFound(err, obj, e.ReturnDeletedObject)
 			_, err := e.finalizeDelete(ctx, obj, true, options)
 			// clients are expecting an updated object if a PUT succeeded,
 			// but finalizeDelete returns a metav1.Status, so return
@@ -612,10 +754,15 @@ func (e *Store) deleteWithoutFinalizers(ctx context.Context, name, key string, o
 		}
 		return nil, false, storeerr.InterpretDeleteError(err, e.qualifiedResourceFromContext(ctx), name)
 	}
-	_, err := e.finalizeDelete(ctx, out, true, options)
-	// clients are expecting an updated object if a PUT succeeded, but
-	// finalizeDelete returns a metav1.Status, so return the object in
-	// the request instead.
+	// clients are expecting the updated object if a PUT succeeded. We preserve
+	// any other updates in 'obj' but update its resource version to match the
+	// actual deletion transaction.
+	if outAccessor, err := meta.Accessor(out); err == nil {
+		if objAccessor, err := meta.Accessor(obj); err == nil {
+			objAccessor.SetResourceVersion(outAccessor.GetResourceVersion())
+		}
+	}
+	_, err := e.finalizeDelete(ctx, obj, true, options)
 	return obj, false, err
 }
 
@@ -1072,6 +1219,7 @@ func (e *Store) updateForGracefulDeletionAndFinalizers(ctx context.Context, name
 				return nil, err
 			}
 			if pendingGraceful {
+				lastExisting = existing
 				return nil, errAlreadyDeleting
 			}
 
@@ -1131,7 +1279,11 @@ func (e *Store) updateForGracefulDeletionAndFinalizers(ctx context.Context, name
 		// we should fall through and truly delete the object.
 		return nil, false, true, out, lastExisting
 	case errAlreadyDeleting:
-		out, err = e.finalizeDelete(ctx, in, true, options)
+		target := in
+		if lastExisting != nil {
+			target = lastExisting
+		}
+		out, err = e.finalizeDelete(ctx, target, true, options)
 		return err, false, false, out, lastExisting
 	default:
 		return storeerr.InterpretUpdateError(err, e.qualifiedResourceFromContext(ctx), name), false, false, out, lastExisting
@@ -1222,6 +1374,7 @@ func (e *Store) Delete(ctx context.Context, name string, deleteValidation rest.V
 		if storage.IsNotFound(err) && ignoreNotFound && lastExisting != nil {
 			// The lastExisting object may not be the last state of the object
 			// before its deletion, but it's the best approximation.
+			lastExisting = setRVFromNotFound(err, lastExisting, e.ReturnDeletedObject)
 			out, err := e.finalizeDelete(ctx, lastExisting, true, options)
 			return out, true, err
 		}
@@ -1419,6 +1572,7 @@ func (e *Store) finalizeDelete(ctx context.Context, obj runtime.Object, runHooks
 		UID:   accessor.GetUID(),
 	}
 	status := &metav1.Status{Status: metav1.StatusSuccess, Details: details}
+	status.ResourceVersion = accessor.GetResourceVersion()
 	return status, nil
 }
 
@@ -1586,43 +1740,20 @@ func (e *Store) CompleteWithOptions(options *generic.StoreOptions) error {
 	if !strings.HasPrefix(prefix, "/") {
 		prefix = "/" + prefix
 	}
-	if prefix == "/" {
+	prefix = strings.TrimRight(prefix, "/")
+	if prefix == "" {
 		return fmt.Errorf("store for %s has an invalid prefix %q", e.DefaultQualifiedResource.String(), opts.ResourcePrefix)
 	}
 
-	// Set the default behavior for storage key generation
+	var keyFuncs storeKeyFuncs
 	if e.KeyRootFunc == nil && e.KeyFunc == nil {
-		if isNamespaced {
-			e.KeyRootFunc = func(ctx context.Context) string {
-				return NamespaceKeyRootFunc(ctx, prefix)
-			}
-			e.KeyFunc = func(ctx context.Context, name string) (string, error) {
-				return NamespaceKeyFunc(ctx, prefix, name)
-			}
-		} else {
-			e.KeyRootFunc = func(ctx context.Context) string {
-				return prefix
-			}
-			e.KeyFunc = func(ctx context.Context, name string) (string, error) {
-				return NoNamespaceKeyFunc(ctx, prefix, name)
-			}
-		}
+		keyFuncs = defaultStoreKeyFuncs(prefix, isNamespaced)
+	} else {
+		keyFuncs = newStoreKeyFuncs(isNamespaced, e.KeyRootFunc, e.KeyFunc, e.ReverseKeyFunc)
 	}
-
-	// We adapt the store's keyFunc so that we can use it with the StorageDecorator
-	// without making any assumptions about where objects are stored in etcd
-	keyFunc := func(obj runtime.Object) (string, error) {
-		accessor, err := meta.Accessor(obj)
-		if err != nil {
-			return "", err
-		}
-
-		if isNamespaced {
-			return e.KeyFunc(genericapirequest.WithNamespace(genericapirequest.NewContext(), accessor.GetNamespace()), accessor.GetName())
-		}
-
-		return e.KeyFunc(genericapirequest.NewContext(), accessor.GetName())
-	}
+	e.KeyRootFunc = keyFuncs.requestKeyRootFunc
+	e.KeyFunc = keyFuncs.requestKeyFunc
+	e.ReverseKeyFunc = keyFuncs.reverseKeyFunc
 
 	if e.DeleteCollectionWorkers == 0 {
 		e.DeleteCollectionWorkers = opts.DeleteCollectionWorkers
@@ -1646,7 +1777,8 @@ func (e *Store) CompleteWithOptions(options *generic.StoreOptions) error {
 		e.Storage.Storage, e.DestroyFunc, err = opts.Decorator(
 			opts.StorageConfig,
 			prefix,
-			keyFunc,
+			keyFuncs.objectKeyFunc,
+			keyFuncs.reverseKeyFunc,
 			e.NewFunc,
 			e.NewListFunc,
 			attrFunc,

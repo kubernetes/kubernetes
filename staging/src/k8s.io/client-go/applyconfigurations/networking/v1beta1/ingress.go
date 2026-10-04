@@ -35,8 +35,8 @@ import (
 // externally-reachable urls, load balance traffic, terminate SSL, offer name
 // based virtual hosting etc.
 type IngressApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration `json:",inline"`
-	// Standard object's metadata.
+	v1.TypeMetaApplyConfiguration `json:""`
+	// metadata is the standard object metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
 	// spec is the desired state of the Ingress.

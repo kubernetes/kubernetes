@@ -683,6 +683,35 @@ func TestPlaceHolderSliceCompare(t *testing.T) {
 			y:    &discovery.EndpointSlice{AddressType: discovery.AddressTypeIPv6},
 			want: false,
 		},
+
+		{
+			desc: "OwnerReferences with different UID",
+			x: &discovery.EndpointSlice{ObjectMeta: metav1.ObjectMeta{
+				OwnerReferences: []metav1.OwnerReference{{UID: "uid-1"}},
+			}},
+			y: &discovery.EndpointSlice{ObjectMeta: metav1.ObjectMeta{
+				OwnerReferences: []metav1.OwnerReference{{UID: "uid-2"}},
+			}},
+			want: false,
+		},
+		{
+			desc: "OwnerReferences with different length",
+			x: &discovery.EndpointSlice{ObjectMeta: metav1.ObjectMeta{
+				OwnerReferences: []metav1.OwnerReference{{UID: "uid-1"}},
+			}},
+			y:    &discovery.EndpointSlice{},
+			want: false,
+		},
+		{
+			desc: "OwnerReferences matching",
+			x: &discovery.EndpointSlice{ObjectMeta: metav1.ObjectMeta{
+				OwnerReferences: []metav1.OwnerReference{{UID: "uid-1"}},
+			}},
+			y: &discovery.EndpointSlice{ObjectMeta: metav1.ObjectMeta{
+				OwnerReferences: []metav1.OwnerReference{{UID: "uid-1"}},
+			}},
+			want: true,
+		},
 	}
 	for _, tc := range testCases {
 		t.Run(tc.desc, func(t *testing.T) {
@@ -1136,6 +1165,108 @@ func TestReconcileEndpointSlicesReplaceDeprecated(t *testing.T) {
 
 	// ensure cache mutation has not occurred
 	cmc.Check(t)
+}
+
+func TestReconcilerDeleteEndpointSlice(t *testing.T) {
+	deletePaths := []struct {
+		name   string
+		delete func(*testing.T, *Reconciler, *corev1.Service, *discovery.EndpointSlice) error
+	}{
+		{
+			name: "unsupported address type",
+			delete: func(t *testing.T, r *Reconciler, service *corev1.Service, slice *discovery.EndpointSlice) error {
+				logger, _ := ktesting.NewTestContext(t)
+				return r.Reconcile(logger, service, nil, []*discovery.EndpointSlice{slice}, time.Now())
+			},
+		},
+		{
+			name: "finalize",
+			delete: func(_ *testing.T, r *Reconciler, service *corev1.Service, slice *discovery.EndpointSlice) error {
+				return r.finalize(service, nil, nil, []*discovery.EndpointSlice{slice}, time.Now())
+			},
+		},
+	}
+
+	testCases := []struct {
+		name                 string
+		createStoredSlice    bool
+		wantDeletionExpected bool
+		wantDeleteMetric     float64
+	}{
+		{
+			name: "already deleted",
+		},
+		{
+			name:                 "existing slice",
+			createStoredSlice:    true,
+			wantDeletionExpected: true,
+			wantDeleteMetric:     1,
+		},
+	}
+
+	for _, deletePath := range deletePaths {
+		t.Run(deletePath.name, func(t *testing.T) {
+			for _, testCase := range testCases {
+				t.Run(testCase.name, func(t *testing.T) {
+					client := newClientset()
+					resetMetrics()
+					namespace := "test"
+					service, endpointMeta := newServiceAndEndpointMeta("foo", namespace)
+					cachedSlice := newEmptyEndpointSlice(1, namespace, endpointMeta, service)
+					cachedSlice.Generation = 1
+					cachedSlice.AddressType = discovery.AddressTypeIPv6
+					cachedSlice.Labels = map[string]string{
+						discovery.LabelManagedBy:   controllerName,
+						discovery.LabelServiceName: service.Name,
+					}
+
+					if testCase.createStoredSlice {
+						createEndpointSlices(t, client, namespace, []*discovery.EndpointSlice{cachedSlice})
+					}
+					client.ClearActions()
+
+					r := newReconciler(client, nil, defaultMaxEndpointsPerSlice)
+					r.endpointSliceTracker.Update(cachedSlice)
+
+					if err := deletePath.delete(t, r, &service, cachedSlice); err != nil {
+						t.Fatalf("Expected EndpointSlice deletion to succeed, got %v", err)
+					}
+					expectActions(t, client.Actions(), 1, "delete", "endpointslices")
+
+					expectedGeneration := cachedSlice.Generation
+					if testCase.wantDeletionExpected {
+						expectedGeneration = -1
+					}
+					expectTrackedGeneration(t, r.endpointSliceTracker, cachedSlice, expectedGeneration)
+
+					//nolint:staticcheck // intentionally asserting the deprecated metric during the deprecation period
+					deleted, err := testutil.GetCounterMetricValue(metrics.EndpointSliceChanges.WithLabelValues("delete"))
+					if err != nil {
+						t.Fatalf("Failed to get EndpointSlice deletion metric: %v", err)
+					}
+					if deleted != testCase.wantDeleteMetric {
+						t.Errorf("Expected EndpointSlice deletion metric %v, got %v", testCase.wantDeleteMetric, deleted)
+					}
+					deletedTotal, err := testutil.GetCounterMetricValue(metrics.EndpointSliceChangesTotal.WithLabelValues("delete"))
+					if err != nil {
+						t.Fatalf("Failed to get EndpointSlice deletion total metric: %v", err)
+					}
+					if deletedTotal != testCase.wantDeleteMetric {
+						t.Errorf("Expected EndpointSlice deletion total metric %v, got %v", testCase.wantDeleteMetric, deletedTotal)
+					}
+					if deletePath.name == "finalize" {
+						changed, err := testutil.GetHistogramMetricValue(metrics.EndpointSlicesChangedPerSync.WithLabelValues("Disabled", ""))
+						if err != nil {
+							t.Fatalf("Failed to get EndpointSlice changes per sync metric: %v", err)
+						}
+						if changed != 1 {
+							t.Errorf("Expected EndpointSlice changes per sync metric 1, got %v", changed)
+						}
+					}
+				})
+			}
+		})
+	}
 }
 
 // In this test, we want to verify that a Service recreation will result in new
@@ -2169,9 +2300,8 @@ func TestReconcile_TrafficDistribution(t *testing.T) {
 		name string
 		desc string
 
-		preferSameFeatureGateEnabled bool
-		trafficDistribution          *string
-		topologyAnnotation           string
+		trafficDistribution *string
+		topologyAnnotation  string
 
 		// Defines how many hints belong to a particular zone/node
 		wantHintsDistributionByZone map[string]int
@@ -2254,11 +2384,10 @@ func TestReconcile_TrafficDistribution(t *testing.T) {
 			},
 		},
 		{
-			name:                         "trafficDistribution=PreferSameNode, PSTD enabled",
-			desc:                         "When trafficDistribution is PreferSameNode and PreferSameTrafficDistribution is enabled, both zone and node hints should be filled out",
-			preferSameFeatureGateEnabled: true,
-			trafficDistribution:          ptr.To(corev1.ServiceTrafficDistributionPreferSameNode),
-			topologyAnnotation:           "Disabled",
+			name:                "trafficDistribution=PreferSameNode",
+			desc:                "When trafficDistribution is PreferSameNode, both zone and node hints should be filled out",
+			trafficDistribution: ptr.To(corev1.ServiceTrafficDistributionPreferSameNode),
+			topologyAnnotation:  "Disabled",
 			wantHintsDistributionByZone: map[string]int{
 				"zone-a": 1, // {pod-0}
 				"zone-b": 3, // {pod-1, pod-2, pod-3}
@@ -2286,27 +2415,6 @@ func TestReconcile_TrafficDistribution(t *testing.T) {
 				},
 			},
 		},
-		{
-			name:                         "trafficDistribution=PreferSameZone, PSTD disabled",
-			desc:                         "When trafficDistribution is PreferSameZone and PreferSameTrafficDistribution is disabled, no hints should be set",
-			preferSameFeatureGateEnabled: false,
-			trafficDistribution:          ptr.To(corev1.ServiceTrafficDistributionPreferSameZone),
-			topologyAnnotation:           "Disabled",
-			wantHintsDistributionByZone:  map[string]int{"": 6}, // Equivalent to no hints.
-			wantMetrics: expectedMetrics{
-				desiredSlices:                   1,
-				actualSlices:                    1,
-				desiredEndpoints:                6,
-				addedPerSync:                    6,
-				removedPerSync:                  0,
-				numCreated:                      1,
-				numUpdated:                      0,
-				numDeleted:                      0,
-				slicesChangedPerSync:            1, // 1 means both topologyAnnotation and trafficDistribution were not used.
-				slicesChangedPerSyncTopology:    0, // 0 means topologyAnnotation was not used.
-				slicesChangedPerSyncTrafficDist: 0, // 0 means trafficDistribution was not used.
-			},
-		},
 	}
 
 	// Make assertions.
@@ -2318,7 +2426,6 @@ func TestReconcile_TrafficDistribution(t *testing.T) {
 			resetMetrics()
 
 			r := newReconciler(client, nodes, defaultMaxEndpointsPerSlice)
-			r.preferSameTrafficDistribution = tc.preferSameFeatureGateEnabled
 			r.topologyCache = topologycache.NewTopologyCache()
 			r.topologyCache.SetNodes(logger, nodes)
 
@@ -2598,17 +2705,32 @@ func expectMetrics(t *testing.T, em expectedMetrics) {
 	if actualCreated != float64(em.numCreated) {
 		t.Errorf("Expected endpointSliceChangesCreated to be %d, got %v", em.numCreated, actualCreated)
 	}
+	actualCreatedTotal, err := testutil.GetCounterMetricValue(metrics.EndpointSliceChangesTotal.WithLabelValues("create"))
+	handleErr(t, err, "endpointSliceChangesTotalCreated")
+	if actualCreatedTotal != float64(em.numCreated) {
+		t.Errorf("Expected endpointSliceChangesTotalCreated to be %d, got %v", em.numCreated, actualCreatedTotal)
+	}
 
 	actualUpdated, err := testutil.GetCounterMetricValue(metrics.EndpointSliceChanges.WithLabelValues("update"))
 	handleErr(t, err, "endpointSliceChangesUpdated")
 	if actualUpdated != float64(em.numUpdated) {
 		t.Errorf("Expected endpointSliceChangesUpdated to be %d, got %v", em.numUpdated, actualUpdated)
 	}
+	actualUpdatedTotal, err := testutil.GetCounterMetricValue(metrics.EndpointSliceChangesTotal.WithLabelValues("update"))
+	handleErr(t, err, "endpointSliceChangesTotalUpdated")
+	if actualUpdatedTotal != float64(em.numUpdated) {
+		t.Errorf("Expected endpointSliceChangesTotalUpdated to be %d, got %v", em.numUpdated, actualUpdatedTotal)
+	}
 
 	actualDeleted, err := testutil.GetCounterMetricValue(metrics.EndpointSliceChanges.WithLabelValues("delete"))
 	handleErr(t, err, "desiredEndpointSlices")
 	if actualDeleted != float64(em.numDeleted) {
 		t.Errorf("Expected endpointSliceChangesDeleted to be %d, got %v", em.numDeleted, actualDeleted)
+	}
+	actualDeletedTotal, err := testutil.GetCounterMetricValue(metrics.EndpointSliceChangesTotal.WithLabelValues("delete"))
+	handleErr(t, err, "endpointSliceChangesTotalDeleted")
+	if actualDeletedTotal != float64(em.numDeleted) {
+		t.Errorf("Expected endpointSliceChangesTotalDeleted to be %d, got %v", em.numDeleted, actualDeletedTotal)
 	}
 
 	actualSlicesChangedPerSync, err := testutil.GetHistogramMetricValue(metrics.EndpointSlicesChangedPerSync.WithLabelValues("Disabled", ""))
@@ -2677,6 +2799,7 @@ func resetMetrics() {
 	metrics.EndpointsAddedPerSync.Reset()
 	metrics.EndpointsRemovedPerSync.Reset()
 	metrics.EndpointSliceChanges.Reset()
+	metrics.EndpointSliceChangesTotal.Reset()
 	metrics.EndpointSlicesChangedPerSync.Reset()
 	metrics.EndpointSliceSyncs.Reset()
 	metrics.ServicesCountByTrafficDistribution.Reset()

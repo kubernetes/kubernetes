@@ -115,7 +115,6 @@ func (f *trInFlow) getSize() uint32 {
 	return atomic.LoadUint32(&f.effectiveWindowSize)
 }
 
-// TODO(mmukhi): Simplify this code.
 // inFlow deals with inbound flow control
 type inFlow struct {
 	mu sync.Mutex
@@ -174,14 +173,14 @@ func (f *inFlow) maybeAdjust(n uint32) uint32 {
 // onData is invoked when some data frame is received. It updates pendingData.
 func (f *inFlow) onData(n uint32) error {
 	f.mu.Lock()
+	defer f.mu.Unlock()
+
 	f.pendingData += n
 	if f.pendingData+f.pendingUpdate > f.limit+f.delta {
 		limit := f.limit
 		rcvd := f.pendingData + f.pendingUpdate
-		f.mu.Unlock()
 		return fmt.Errorf("received %d-bytes data exceeding the limit %d bytes", rcvd, limit)
 	}
-	f.mu.Unlock()
 	return nil
 }
 
@@ -189,8 +188,9 @@ func (f *inFlow) onData(n uint32) error {
 // to be sent to the peer.
 func (f *inFlow) onRead(n uint32) uint32 {
 	f.mu.Lock()
+	defer f.mu.Unlock()
+
 	if f.pendingData == 0 {
-		f.mu.Unlock()
 		return 0
 	}
 	f.pendingData -= n
@@ -205,9 +205,7 @@ func (f *inFlow) onRead(n uint32) uint32 {
 	if f.pendingUpdate >= f.limit/4 {
 		wu := f.pendingUpdate
 		f.pendingUpdate = 0
-		f.mu.Unlock()
 		return wu
 	}
-	f.mu.Unlock()
 	return 0
 }

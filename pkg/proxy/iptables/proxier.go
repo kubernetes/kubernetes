@@ -307,12 +307,6 @@ func NewProxier(ctx context.Context,
 	go ipt.Monitor(kubeProxyCanaryChain, []utiliptables.Table{utiliptables.TableMangle, utiliptables.TableNAT, utiliptables.TableFilter},
 		proxier.forceSyncProxyRules, syncPeriod, wait.NeverStop)
 
-	if ipt.HasRandomFully() {
-		logger.V(2).Info("Iptables supports --random-fully")
-	} else {
-		logger.V(2).Info("Iptables does not support --random-fully")
-	}
-
 	return proxier, nil
 }
 
@@ -754,15 +748,12 @@ func (proxier *Proxier) syncProxyRules() (retryError error) {
 		"-A", string(kubePostroutingChain),
 		"-j", "MARK", "--xor-mark", proxier.masqueradeMark,
 	)
-	masqRule := []string{
+	proxier.natRules.Write(
 		"-A", string(kubePostroutingChain),
 		"-m", "comment", "--comment", `"kubernetes service traffic requiring SNAT"`,
 		"-j", "MASQUERADE",
-	}
-	if proxier.iptables.HasRandomFully() {
-		masqRule = append(masqRule, "--random-fully")
-	}
-	proxier.natRules.Write(masqRule)
+		"--random-fully",
+	)
 
 	// Install the kubernetes-specific masquerade mark rule. We use a whole chain for
 	// this so that it is easier to flush and change, for example if the mark
@@ -1429,9 +1420,9 @@ func (proxier *Proxier) syncProxyRules() (retryError error) {
 		proxier.logger.Error(err, "Error syncing healthcheck endpoints")
 	}
 
-	if endpointUpdateResult.ConntrackCleanupRequired {
+	if endpointUpdateResult.ConntrackCleanupRequired || serviceUpdateResult.ConntrackCleanupRequired {
 		// Finish housekeeping, clear stale conntrack entries for UDP Services
-		conntrack.CleanStaleEntries(proxier.conntrack, proxier.ipFamily, proxier.svcPortMap, proxier.endpointsMap)
+		conntrack.CleanStaleEntries(proxier.conntrack, proxier.ipFamily, proxier.svcPortMap, proxier.endpointsMap, serviceUpdateResult.DeletedServices)
 	}
 	return
 }

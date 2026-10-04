@@ -26,10 +26,11 @@ import (
 	fmt "fmt"
 
 	rbacv1 "k8s.io/api/rbac/v1"
-	equality "k8s.io/apimachinery/pkg/api/equality"
 	operation "k8s.io/apimachinery/pkg/api/operation"
 	safe "k8s.io/apimachinery/pkg/api/safe"
 	validate "k8s.io/apimachinery/pkg/api/validate"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	validation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	field "k8s.io/apimachinery/pkg/util/validation/field"
 )
@@ -109,7 +110,28 @@ func Validate_ClusterRole(
 	obj, oldObj *rbacv1.ClusterRole) (errs field.ErrorList) {
 
 	// field rbacv1.ClusterRole.TypeMeta has no validation
-	// field rbacv1.ClusterRole.ObjectMeta has no validation
+
+	{ // field rbacv1.ClusterRole.ObjectMeta
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *metav1.ObjectMeta,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if validate.SemanticDeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call the type's validation function
+			errs = append(errs, validation.Validate_ObjectMeta(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *rbacv1.ClusterRole) *metav1.ObjectMeta {
+				return &oldObj.ObjectMeta
+			})
+		errs = append(errs, fn(fldPath.Child("metadata"), &obj.ObjectMeta, oldVal, oldObj != nil)...)
+	}
 
 	{ // field rbacv1.ClusterRole.Rules
 		fn := func(
@@ -118,20 +140,20 @@ func Validate_ClusterRole(
 			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
 			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
+				if validate.SemanticDeepEqual(obj, oldObj) {
 					return nil
 				}
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkBeta().MarkShortCircuit(); len(e) != 0 {
 				earlyReturn = true
 			}
 			if earlyReturn {
 				return // do not proceed
 			}
 			// iterate the list and call the type's validation function
-			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_PolicyRule); len(e) != 0 {
+			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_PolicyRule); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return
@@ -154,7 +176,28 @@ func Validate_ClusterRoleBinding(
 	obj, oldObj *rbacv1.ClusterRoleBinding) (errs field.ErrorList) {
 
 	// field rbacv1.ClusterRoleBinding.TypeMeta has no validation
-	// field rbacv1.ClusterRoleBinding.ObjectMeta has no validation
+
+	{ // field rbacv1.ClusterRoleBinding.ObjectMeta
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *metav1.ObjectMeta,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if validate.SemanticDeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call the type's validation function
+			errs = append(errs, validation.Validate_ObjectMeta(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *rbacv1.ClusterRoleBinding) *metav1.ObjectMeta {
+				return &oldObj.ObjectMeta
+			})
+		errs = append(errs, fn(fldPath.Child("metadata"), &obj.ObjectMeta, oldVal, oldObj != nil)...)
+	}
 
 	{ // field rbacv1.ClusterRoleBinding.Subjects
 		fn := func(
@@ -163,20 +206,20 @@ func Validate_ClusterRoleBinding(
 			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
 			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
+				if validate.SemanticDeepEqual(obj, oldObj) {
 					return nil
 				}
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkBeta().MarkShortCircuit(); len(e) != 0 {
 				earlyReturn = true
 			}
 			if earlyReturn {
 				return // do not proceed
 			}
 			// iterate the list and call the type's validation function
-			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_Subject); len(e) != 0 {
+			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_Subject); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return
@@ -198,6 +241,15 @@ func Validate_ClusterRoleBinding(
 				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
 					return nil
 				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
 			}
 			// call the type's validation function
 			errs = append(errs, Validate_RoleRef(ctx, op, fldPath, obj, oldObj)...)
@@ -226,13 +278,13 @@ func Validate_PolicyRule(
 			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
 			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
+				if validate.SemanticDeepEqual(obj, oldObj) {
 					return nil
 				}
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.RequiredSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+			if e := validate.RequiredSlice(ctx, op, fldPath, obj, oldObj).MarkBeta().MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
@@ -262,7 +314,28 @@ func Validate_Role(
 	obj, oldObj *rbacv1.Role) (errs field.ErrorList) {
 
 	// field rbacv1.Role.TypeMeta has no validation
-	// field rbacv1.Role.ObjectMeta has no validation
+
+	{ // field rbacv1.Role.ObjectMeta
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *metav1.ObjectMeta,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if validate.SemanticDeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call the type's validation function
+			errs = append(errs, validation.Validate_ObjectMeta(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *rbacv1.Role) *metav1.ObjectMeta {
+				return &oldObj.ObjectMeta
+			})
+		errs = append(errs, fn(fldPath.Child("metadata"), &obj.ObjectMeta, oldVal, oldObj != nil)...)
+	}
 
 	{ // field rbacv1.Role.Rules
 		fn := func(
@@ -271,20 +344,20 @@ func Validate_Role(
 			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
 			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
+				if validate.SemanticDeepEqual(obj, oldObj) {
 					return nil
 				}
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkBeta().MarkShortCircuit(); len(e) != 0 {
 				earlyReturn = true
 			}
 			if earlyReturn {
 				return // do not proceed
 			}
 			// iterate the list and call the type's validation function
-			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_PolicyRule); len(e) != 0 {
+			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_PolicyRule); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return
@@ -306,7 +379,28 @@ func Validate_RoleBinding(
 	obj, oldObj *rbacv1.RoleBinding) (errs field.ErrorList) {
 
 	// field rbacv1.RoleBinding.TypeMeta has no validation
-	// field rbacv1.RoleBinding.ObjectMeta has no validation
+
+	{ // field rbacv1.RoleBinding.ObjectMeta
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *metav1.ObjectMeta,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if validate.SemanticDeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call the type's validation function
+			errs = append(errs, validation.Validate_ObjectMeta(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *rbacv1.RoleBinding) *metav1.ObjectMeta {
+				return &oldObj.ObjectMeta
+			})
+		errs = append(errs, fn(fldPath.Child("metadata"), &obj.ObjectMeta, oldVal, oldObj != nil)...)
+	}
 
 	{ // field rbacv1.RoleBinding.Subjects
 		fn := func(
@@ -315,20 +409,20 @@ func Validate_RoleBinding(
 			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
 			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
+				if validate.SemanticDeepEqual(obj, oldObj) {
 					return nil
 				}
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkBeta().MarkShortCircuit(); len(e) != 0 {
 				earlyReturn = true
 			}
 			if earlyReturn {
 				return // do not proceed
 			}
 			// iterate the list and call the type's validation function
-			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_Subject); len(e) != 0 {
+			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_Subject); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return
@@ -396,7 +490,7 @@ func Validate_RoleRef(
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkBeta().MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
@@ -437,7 +531,7 @@ func Validate_Subject(
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkBeta().MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}

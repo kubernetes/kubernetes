@@ -195,7 +195,7 @@ func (s SettingID) String() string {
 }
 
 // validWireHeaderFieldName reports whether v is a valid header field
-// name (key). See httpguts.ValidHeaderName for the base rules.
+// name (key). See httpguts.ValidHeaderFieldName for the base rules.
 //
 // Further, http2 says:
 //

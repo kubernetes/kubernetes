@@ -17,11 +17,47 @@ limitations under the License.
 package resourceclaim
 
 import (
+	"iter"
 	"slices"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/utils/ptr"
 )
+
+// PodClaims returns an iterator over the names of all ResourceClaims currently
+// referenced by or created for the Pod, along with a boolean indicating
+// whether IsForPod must be called to verify ownership.
+//
+// This includes both explicit claims in pod.Spec.ResourceClaims (once created)
+// and any DRA-backed extended resource claim in pod.Status.ExtendedResourceClaimStatus.
+// Claims that have not been created yet (ErrClaimNotFound), are not needed
+// (nil name), or use an unsupported API field (ErrAPIUnsupported) are skipped.
+func PodClaims(pod *corev1.Pod) iter.Seq2[string, bool] {
+	return func(yield func(string, bool) bool) {
+		if pod == nil {
+			return
+		}
+		for i := range pod.Spec.ResourceClaims {
+			claimName, mustCheckOwner, err := Name(pod, &pod.Spec.ResourceClaims[i])
+			if err != nil || claimName == nil {
+				// Name only returns an error when a template claim has not been
+				// created yet (ErrClaimNotFound) or when neither ResourceClaimName
+				// nor ResourceClaimTemplateName is set (ErrAPIUnsupported). In both
+				// cases, or when claimName is nil (claim not needed), there is no
+				// existing ResourceClaim to yield.
+				continue
+			}
+			if !yield(*claimName, mustCheckOwner) {
+				return
+			}
+		}
+		if pod.Status.ExtendedResourceClaimStatus != nil && pod.Status.ExtendedResourceClaimStatus.ResourceClaimName != "" {
+			if !yield(pod.Status.ExtendedResourceClaimStatus.ResourceClaimName, true) {
+				return
+			}
+		}
+	}
+}
 
 // PodStatusEqual checks that both slices have the same number
 // of entries and that the pairs of entries are semantically

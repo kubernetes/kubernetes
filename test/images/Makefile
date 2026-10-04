@@ -16,6 +16,10 @@ REPO_ROOT:=${CURDIR}/../..
 REGISTRY ?= registry.k8s.io/e2e-test-images
 DOCKER_CERT_BASE_PATH ?=
 GOLANG_VERSION=$(shell cat $(REPO_ROOT)/.go-version)
+# Digest pinned so builds don't wait on a golang:$(GOLANG_VERSION) tag existing.
+# GOTOOLCHAIN selects the go version we build with.
+# This is the latest as of 2026-08-27
+GOLANG_IMAGE?=golang@sha256:0ecdc2a9f6156af6451080bfe3d8382a662fcc4e209608c6f919e643453514c1
 export
 
 ifndef WHAT

@@ -18,6 +18,8 @@ package sliceofstruct
 
 import (
 	"testing"
+
+	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
 func Test(t *testing.T) {
@@ -41,6 +43,18 @@ func Test(t *testing.T) {
 	}).ExpectValidateFalseByPath(map[string][]string{
 		"listNonComparableField[0]": {"field Struct.ListNonComparableField[*]"},
 		"listNonComparableField[1]": {"field Struct.ListNonComparableField[*]"},
+	})
+
+	// Iteration does not short-circuit. The first element's required failure
+	// suppresses neither the maxLength tag on the same subfield nor the
+	// subfield(b) chain, for that element or any other.
+	st.Value(&Struct{
+		ShortCircuitField: []ShortCircuitStruct{{A: "", B: "x"}, {A: "toolong", B: "y"}},
+	}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
+		field.Required(field.NewPath("shortCircuitField").Index(0).Child("a"), ""),
+		field.TooLong(field.NewPath("shortCircuitField").Index(1).Child("a"), "", 3),
+		field.Invalid(field.NewPath("shortCircuitField").Index(0).Child("b"), "x", "").WithOrigin("validateFalse"),
+		field.Invalid(field.NewPath("shortCircuitField").Index(1).Child("b"), "y", "").WithOrigin("validateFalse"),
 	})
 
 	// Test validation ratcheting.

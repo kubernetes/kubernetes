@@ -20,6 +20,10 @@ limitations under the License.
 // +k8s:prerelease-lifecycle-gen=true
 // +k8s:openapi-model-package=io.k8s.api.resource.v1
 // +groupName=resource.k8s.io
+// +k8s:validation-gen=TypesWithSuffix=DeviceAttribute
+// +k8s:validation-gen=TypesWithSuffix=NetworkDeviceData
+// +k8s:validation-gen-input=k8s.io/api/resource/v1
+// +k8s:validation-gen-scheme-registry=nil
 
 // Package v1 is the v1 version of the resource API.
 package v1

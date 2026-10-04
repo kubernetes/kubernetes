@@ -17,6 +17,7 @@ limitations under the License.
 // +k8s:deepcopy-gen=package
 // +k8s:conversion-gen=k8s.io/pod-security-admission/admission/api
 // +k8s:defaulter-gen=TypeMeta
+// +k8s:validation-gen=false
 // +groupName=pod-security.admission.config.k8s.io
 
 // Package v1 contains PodSecurity admission configuration file types

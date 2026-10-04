@@ -638,7 +638,7 @@ func WaitTimeoutForPodReadyInNamespace(ctx context.Context, c clientset.Interfac
 	return WaitForPodCondition(ctx, c, namespace, podName, "running and ready", timeout, func(pod *v1.Pod) (bool, error) {
 		switch pod.Status.Phase {
 		case v1.PodFailed, v1.PodSucceeded:
-			return false, gomega.StopTrying(fmt.Sprintf("The phase of Pod %s is %s which is unexpected.", pod.Name, pod.Status.Phase))
+			return false, gomega.StopTrying(fmt.Sprintf("Expected pod to reach phase %q and be ready, got final phase %q instead:\n%s", v1.PodRunning, pod.Status.Phase, format.Object(pod, 1)))
 		case v1.PodRunning:
 			return podutils.IsPodReady(pod), nil
 		}
@@ -810,40 +810,6 @@ func WaitForPodsWithLabel(ctx context.Context, c clientset.Interface, ns string,
 func WaitForPodsWithLabelRunningReady(ctx context.Context, c clientset.Interface, ns string, label labels.Selector, num int, timeout time.Duration) (pods *v1.PodList, err error) {
 	opts := metav1.ListOptions{LabelSelector: label.String()}
 	return WaitForPods(ctx, c, ns, opts, Range{MinFound: num, AllMatching: true}, timeout, "be running and ready", RunningReady)
-}
-
-// WaitForNRestartablePods tries to list restarting pods using ps until it finds expect of them,
-// returning their names if it can do so before timeout.
-func WaitForNRestartablePods(ctx context.Context, ps *testutils.PodStore, expect int, timeout time.Duration) ([]string, error) {
-	var pods []*v1.Pod
-
-	get := func(ctx context.Context) ([]*v1.Pod, error) {
-		return ps.List(), nil
-	}
-
-	match := func(allPods []*v1.Pod) (func() string, error) {
-		pods = FilterNonRestartablePods(allPods)
-		if len(pods) != expect {
-			return func() string {
-				return fmt.Sprintf("expected to find non-restartable %d pods, but found %d:\n%s", expect, len(pods), format.Object(pods, 1))
-			}, nil
-		}
-		return nil, nil
-	}
-
-	err := framework.Gomega().
-		Eventually(ctx, framework.HandleRetry(get)).
-		WithTimeout(timeout).
-		Should(framework.MakeMatcher(match))
-	if err != nil {
-		return nil, err
-	}
-
-	podNames := make([]string, len(pods))
-	for i, p := range pods {
-		podNames[i] = p.Name
-	}
-	return podNames, nil
 }
 
 // WaitForPodContainerToFail waits for the given Pod container to fail with the given reason, specifically due to

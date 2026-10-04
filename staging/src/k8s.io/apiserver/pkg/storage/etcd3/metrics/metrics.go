@@ -18,18 +18,27 @@ package metrics
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
 
+	etcdrpc "go.etcd.io/etcd/api/v3/v3rpc/rpctypes"
+	grpccodes "google.golang.org/grpc/codes"
+	grpcstatus "google.golang.org/grpc/status"
+
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage"
+	storagemetrics "k8s.io/apiserver/pkg/storage/metrics"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	compbasemetrics "k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/klog/v2"
 )
+
+// ErrTransactionConflict indicates that an optimistic transaction failed due to a conflict.
+var ErrTransactionConflict = errors.New("transaction conflict")
 
 /*
  * By default, all the following metrics are defined as falling under
@@ -65,10 +74,10 @@ var (
 	etcdRequestErrorCounts = compbasemetrics.NewCounterVec(
 		&compbasemetrics.CounterOpts{
 			Name:           "etcd_request_errors_total",
-			Help:           "Etcd failed request counts for each operation and object type.",
+			Help:           "Etcd failed request counts for each operation and object type. Reason response to grpc status, or transaction conflict.",
 			StabilityLevel: compbasemetrics.ALPHA,
 		},
-		[]string{"operation", "group", "resource"},
+		[]string{"operation", "group", "resource", "reason"},
 	)
 	objectCounts = compbasemetrics.NewGaugeVec(
 		&compbasemetrics.GaugeOpts{
@@ -94,16 +103,6 @@ var (
 			StabilityLevel: compbasemetrics.ALPHA,
 		},
 		[]string{"group", "resource"},
-	)
-	dbTotalSize = compbasemetrics.NewGaugeVec(
-		&compbasemetrics.GaugeOpts{
-			Subsystem:         "apiserver",
-			Name:              "storage_db_total_size_in_bytes",
-			Help:              "Total size of the storage database file physically allocated in bytes.",
-			StabilityLevel:    compbasemetrics.ALPHA,
-			DeprecatedVersion: "1.28.0",
-		},
-		[]string{"endpoint"},
 	)
 	storageSizeDescription   = compbasemetrics.NewDesc("apiserver_storage_size_bytes", "Size of the storage database file physically allocated in bytes.", []string{"storage_cluster_id"}, nil, compbasemetrics.STABLE, "")
 	storageMonitor           = &monitorCollector{monitorGetter: func() ([]Monitor, error) { return nil, nil }}
@@ -142,38 +141,6 @@ var (
 		},
 		[]string{},
 	)
-	listStorageCount = compbasemetrics.NewCounterVec(
-		&compbasemetrics.CounterOpts{
-			Name:           "apiserver_storage_list_total",
-			Help:           "Number of LIST requests served from storage",
-			StabilityLevel: compbasemetrics.ALPHA,
-		},
-		[]string{"group", "resource"},
-	)
-	listStorageNumFetched = compbasemetrics.NewCounterVec(
-		&compbasemetrics.CounterOpts{
-			Name:           "apiserver_storage_list_fetched_objects_total",
-			Help:           "Number of objects read from storage in the course of serving a LIST request",
-			StabilityLevel: compbasemetrics.ALPHA,
-		},
-		[]string{"group", "resource"},
-	)
-	listStorageNumSelectorEvals = compbasemetrics.NewCounterVec(
-		&compbasemetrics.CounterOpts{
-			Name:           "apiserver_storage_list_evaluated_objects_total",
-			Help:           "Number of objects tested in the course of serving a LIST request from storage",
-			StabilityLevel: compbasemetrics.ALPHA,
-		},
-		[]string{"group", "resource"},
-	)
-	listStorageNumReturned = compbasemetrics.NewCounterVec(
-		&compbasemetrics.CounterOpts{
-			Name:           "apiserver_storage_list_returned_objects_total",
-			Help:           "Number of objects returned for a LIST request from storage",
-			StabilityLevel: compbasemetrics.ALPHA,
-		},
-		[]string{"group", "resource"},
-	)
 	decodeErrorCounts = compbasemetrics.NewCounterVec(
 		&compbasemetrics.CounterOpts{
 			Namespace:      "apiserver",
@@ -182,6 +149,17 @@ var (
 			StabilityLevel: compbasemetrics.ALPHA,
 		},
 		[]string{"group", "resource"},
+	)
+	listLatency = compbasemetrics.NewHistogramVec(
+		&compbasemetrics.HistogramOpts{
+			Namespace: "apiserver",
+			Name:      "storage_list_duration_seconds",
+			Help:      "Latency of the storage layer GetList call in seconds, including object decode, split by whether etcd RangeStream was used.",
+			Buckets: []float64{0.005, 0.025, 0.05, 0.1, 0.2, 0.4, 0.6, 0.8, 1.0, 1.25, 1.5, 2, 3,
+				4, 5, 6, 8, 10, 15, 20, 30, 45, 60},
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+		[]string{"streamed", "group", "resource"},
 	)
 )
 
@@ -197,17 +175,13 @@ func Register() {
 		legacyregistry.MustRegister(objectCounts)
 		legacyregistry.MustRegister(resourceSizeEstimate)
 		legacyregistry.MustRegister(newObjectCounts)
-		legacyregistry.MustRegister(dbTotalSize)
 		legacyregistry.CustomMustRegister(storageMonitor)
 		legacyregistry.MustRegister(etcdEventsReceivedCounts)
 		legacyregistry.MustRegister(etcdBookmarkCounts)
 		legacyregistry.MustRegister(etcdBookmarkTotal)
 		legacyregistry.MustRegister(etcdLeaseObjectCounts)
-		legacyregistry.MustRegister(listStorageCount)
-		legacyregistry.MustRegister(listStorageNumFetched)
-		legacyregistry.MustRegister(listStorageNumSelectorEvals)
-		legacyregistry.MustRegister(listStorageNumReturned)
 		legacyregistry.MustRegister(decodeErrorCounts)
+		legacyregistry.MustRegister(listLatency)
 	})
 }
 
@@ -247,8 +221,37 @@ func RecordEtcdRequest(verb string, groupResource schema.GroupResource, err erro
 	etcdRequestLatency.WithLabelValues(verb, groupResource.Group, groupResource.Resource).Observe(sinceInSeconds(startTime))
 	etcdRequestCounts.WithLabelValues(verb, groupResource.Group, groupResource.Resource).Inc()
 	if err != nil {
-		etcdRequestErrorCounts.WithLabelValues(verb, groupResource.Group, groupResource.Resource).Inc()
+		etcdRequestErrorCounts.WithLabelValues(verb, groupResource.Group, groupResource.Resource, errorReason(err)).Inc()
 	}
+}
+
+func errorReason(err error) string {
+	if errors.Is(err, ErrTransactionConflict) {
+		return "Conflict"
+	}
+	var etcdErr etcdrpc.EtcdError
+	if errors.As(err, &etcdErr) {
+		return etcdErr.Code().String()
+	}
+	if s, ok := grpcstatus.FromError(err); ok {
+		return s.Code().String()
+	}
+	if errors.Is(err, context.Canceled) {
+		return grpccodes.Canceled.String()
+	}
+	if errors.Is(err, context.DeadlineExceeded) {
+		return grpccodes.DeadlineExceeded.String()
+	}
+	return grpccodes.Unknown.String()
+}
+
+// RecordListLatency sets the storage_list_duration_seconds metric.
+func RecordListLatency(groupResource schema.GroupResource, streamed bool, startTime time.Time) {
+	streamedLabel := "false"
+	if streamed {
+		streamedLabel = "true"
+	}
+	listLatency.WithLabelValues(streamedLabel, groupResource.Group, groupResource.Resource).Observe(sinceInSeconds(startTime))
 }
 
 // RecordEtcdEvent updated the etcd_events_received_total metric.
@@ -279,12 +282,6 @@ var sinceInSeconds = func(start time.Time) float64 {
 	return time.Since(start).Seconds()
 }
 
-// UpdateEtcdDbSize sets the etcd_db_total_size_in_bytes metric.
-// Deprecated: Metric etcd_db_total_size_in_bytes will be replaced with apiserver_storage_size_bytes
-func UpdateEtcdDbSize(ep string, size int64) {
-	dbTotalSize.WithLabelValues(ep).Set(float64(size))
-}
-
 // SetStorageMonitorGetter sets monitor getter to allow monitoring etcd stats.
 func SetStorageMonitorGetter(getter func() ([]Monitor, error)) {
 	storageMonitor.setGetter(getter)
@@ -297,12 +294,9 @@ func UpdateLeaseObjectCount(count int64) {
 	etcdLeaseObjectCounts.WithLabelValues().Observe(float64(count))
 }
 
-// RecordStorageListMetrics notes various metrics of the cost to serve a LIST request
-func RecordStorageListMetrics(groupResource schema.GroupResource, numFetched, numEvald, numReturned int) {
-	listStorageCount.WithLabelValues(groupResource.Group, groupResource.Resource).Inc()
-	listStorageNumFetched.WithLabelValues(groupResource.Group, groupResource.Resource).Add(float64(numFetched))
-	listStorageNumSelectorEvals.WithLabelValues(groupResource.Group, groupResource.Resource).Add(float64(numEvald))
-	listStorageNumReturned.WithLabelValues(groupResource.Group, groupResource.Resource).Add(float64(numReturned))
+// RecordStorageListMetrics notes various metrics of the cost to serve a LIST request.
+func RecordStorageListMetrics(groupResource schema.GroupResource, index string, numFetched, numEvald, numReturned int) {
+	storagemetrics.RecordStorageListMetrics(groupResource, storagemetrics.StorageBackendEtcd, index, numFetched, numEvald, numReturned)
 }
 
 type Monitor interface {
@@ -362,5 +356,44 @@ func (c *monitorCollector) CollectWithStability(ch chan<- compbasemetrics.Metric
 			klog.ErrorS(err, "Failed to create metric", "storage_cluster_id", storageClusterID)
 		}
 		ch <- metric
+	}
+}
+
+// OperationLatencyTracker is a pre-materialized tracker for etcd request latency and request/error counters.
+type OperationLatencyTracker struct {
+	verb          string
+	groupResource schema.GroupResource
+	latency       compbasemetrics.ObserverMetric
+	requests      compbasemetrics.CounterMetric
+}
+
+// NewOperationLatencyTracker pre-materializes etcd request metrics for a specific verb and groupResource.
+func NewOperationLatencyTracker(verb string, groupResource schema.GroupResource) *OperationLatencyTracker {
+	return &OperationLatencyTracker{
+		verb:          verb,
+		groupResource: groupResource,
+		latency:       etcdRequestLatency.WithLabelValues(verb, groupResource.Group, groupResource.Resource),
+		requests:      etcdRequestCounts.WithLabelValues(verb, groupResource.Group, groupResource.Resource),
+	}
+}
+
+// Record records latency, request count, and error count if applicable.
+func (t *OperationLatencyTracker) Record(err error, startTime time.Time) {
+	t.latency.Observe(sinceInSeconds(startTime))
+	t.requests.Inc()
+	if err != nil {
+		etcdRequestErrorCounts.WithLabelValues(t.verb, t.groupResource.Group, t.groupResource.Resource, errorReason(err)).Inc()
+	}
+}
+
+// EtcdMetricsTracker holds pre-materialized metric trackers for etcd3 storage operations.
+type EtcdMetricsTracker struct {
+	Get *OperationLatencyTracker
+}
+
+// NewEtcdMetricsTracker initializes pre-materialized metric trackers for a given GroupResource.
+func NewEtcdMetricsTracker(groupResource schema.GroupResource) *EtcdMetricsTracker {
+	return &EtcdMetricsTracker{
+		Get: NewOperationLatencyTracker("get", groupResource),
 	}
 }

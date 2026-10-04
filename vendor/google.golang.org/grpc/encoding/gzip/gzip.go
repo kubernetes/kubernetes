@@ -81,6 +81,8 @@ func (z *writer) Close() error {
 	return z.Writer.Close()
 }
 
+var _ io.Closer = &reader{}
+
 type reader struct {
 	*gzip.Reader
 	pool *sync.Pool
@@ -102,12 +104,14 @@ func (c *compressor) Decompress(r io.Reader) (io.Reader, error) {
 	return z, nil
 }
 
-func (z *reader) Read(p []byte) (n int, err error) {
-	n, err = z.Reader.Read(p)
-	if err == io.EOF {
-		z.pool.Put(z)
-	}
+func (r *reader) Read(p []byte) (n int, err error) {
+	n, err = r.Reader.Read(p)
 	return n, err
+}
+
+func (r *reader) Close() error {
+	defer r.pool.Put(r)
+	return r.Reader.Close()
 }
 
 func (c *compressor) Name() string {

@@ -17,6 +17,7 @@ limitations under the License.
 package ingressclass
 
 import (
+	"strings"
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -25,14 +26,16 @@ import (
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	networking "k8s.io/kubernetes/pkg/apis/networking"
 	registry "k8s.io/kubernetes/pkg/registry/networking/ingressclass"
+	"k8s.io/kubernetes/test/declarative_validation/meta"
 )
 
-func TestDeclarativeValidateParameter(t *testing.T) {
+func TestDeclarativeValidateIngressClass(t *testing.T) {
 	for _, apiVersion := range apiVersions {
 		t.Run(apiVersion, func(t *testing.T) {
 			ctx := genericapirequest.WithRequestInfo(
 				genericapirequest.NewDefaultContext(),
 				&genericapirequest.RequestInfo{
+					APIPrefix:         "apis",
 					APIGroup:          "networking.k8s.io",
 					APIVersion:        apiVersion,
 					Resource:          "ingressclasses",
@@ -58,14 +61,46 @@ func TestDeclarativeValidateParameter(t *testing.T) {
 						obj.Spec.Parameters.Name = ""
 					}),
 					expectedErrs: field.ErrorList{
-						field.Required(field.NewPath("spec", "parameters", "name"), "").MarkAlpha()},
+						field.Required(field.NewPath("spec", "parameters", "name"), "").MarkBeta()},
 				},
 				"missing parameter kind": {
 					input: mkValidIngressClass(func(obj *networking.IngressClass) {
 						obj.Spec.Parameters.Kind = ""
 					}),
 					expectedErrs: field.ErrorList{
-						field.Required(field.NewPath("spec", "parameters", "kind"), "").MarkAlpha(),
+						field.Required(field.NewPath("spec", "parameters", "kind"), "").MarkBeta(),
+					},
+				},
+				"controller is required": {
+					input: mkValidIngressClass(func(obj *networking.IngressClass) {
+						obj.Spec.Controller = ""
+					}),
+					expectedErrs: field.ErrorList{
+						field.Required(field.NewPath("spec", "controller"), "").MarkAlpha(),
+					},
+				},
+				"controller at max length (250 bytes)": {
+					input: mkValidIngressClass(func(obj *networking.IngressClass) {
+						obj.Spec.Controller = "example.com/" + strings.Repeat("a", 238)
+					}),
+				},
+				"controller max length cannot be longer than 250 bytes": {
+					input: mkValidIngressClass(func(obj *networking.IngressClass) {
+						obj.Spec.Controller = "example.com/" + strings.Repeat("a", 239)
+					}),
+					expectedErrs: field.ErrorList{
+						field.TooLong(field.NewPath("spec", "controller"), "",
+							250).WithOrigin("maxBytes").MarkAlpha(),
+					},
+				},
+				"missing controller and parameter name": {
+					input: mkValidIngressClass(func(obj *networking.IngressClass) {
+						obj.Spec.Controller = ""
+						obj.Spec.Parameters.Name = ""
+					}),
+					expectedErrs: field.ErrorList{
+						field.Required(field.NewPath("spec", "controller"), "").MarkAlpha(),
+						field.Required(field.NewPath("spec", "parameters", "name"), "").MarkBeta(),
 					},
 				},
 			}
@@ -80,11 +115,13 @@ func TestDeclarativeValidateParameter(t *testing.T) {
 					)
 				})
 			}
+			obj := mkValidIngressClass()
+			meta.RunObjectMetaTestCases(t, ctx, &obj, registry.Strategy, meta.WithStringentFinalizerValidation())
 		})
 	}
 }
 
-func TestDeclarativeValidateUpdateParameters(t *testing.T) {
+func TestDeclarativeValidateIngressClassUpdate(t *testing.T) {
 	for _, apiVersion := range apiVersions {
 		t.Run(apiVersion, func(t *testing.T) {
 			testCases := map[string]struct {
@@ -93,62 +130,58 @@ func TestDeclarativeValidateUpdateParameters(t *testing.T) {
 				expectedErrs field.ErrorList
 			}{
 				"valid update": {
-					oldObj: mkValidIngressClass(func(obj *networking.IngressClass) {
-						obj.ResourceVersion = "1"
-					}),
-					updateObj: mkValidIngressClass(func(obj *networking.IngressClass) {
-						obj.ResourceVersion = "1"
-					}),
+					oldObj:    mkValidIngressClass(),
+					updateObj: mkValidIngressClass(),
 				},
 				"nil parameters update": {
-					oldObj: mkValidIngressClass(func(obj *networking.IngressClass) {
-						obj.ResourceVersion = "1"
-					}),
+					oldObj: mkValidIngressClass(),
 					updateObj: mkValidIngressClass(func(obj *networking.IngressClass) {
-						obj.ResourceVersion = "1"
 						obj.Spec.Parameters = nil
 					}),
 				},
 				"update fails when parameters name is cleared": {
-					oldObj: mkValidIngressClass(func(obj *networking.IngressClass) {
-						obj.ResourceVersion = "1"
-					}),
+					oldObj: mkValidIngressClass(),
 					updateObj: mkValidIngressClass(func(obj *networking.IngressClass) {
-						obj.ResourceVersion = "1"
 						obj.Spec.Parameters.Name = ""
 					}),
 					expectedErrs: field.ErrorList{
-						field.Required(field.NewPath("spec", "parameters", "name"), "").MarkAlpha(),
+						field.Required(field.NewPath("spec", "parameters", "name"), "").MarkBeta(),
 					},
 				},
 				"update fails when parameters kind is cleared": {
-					oldObj: mkValidIngressClass(func(obj *networking.IngressClass) {
-						obj.ResourceVersion = "1"
-					}),
+					oldObj: mkValidIngressClass(),
 					updateObj: mkValidIngressClass(func(obj *networking.IngressClass) {
-						obj.ResourceVersion = "1"
 						obj.Spec.Parameters.Kind = ""
 					}),
 					expectedErrs: field.ErrorList{
-						field.Required(field.NewPath("spec", "parameters", "kind"), "").MarkAlpha(),
+						field.Required(field.NewPath("spec", "parameters", "kind"), "").MarkBeta(),
+					},
+				},
+				"controller is immutable": {
+					oldObj: mkValidIngressClass(),
+					updateObj: mkValidIngressClass(func(obj *networking.IngressClass) {
+						obj.Spec.Controller = "example1.com/ingress-controller"
+					}),
+					expectedErrs: field.ErrorList{
+						field.Invalid(field.NewPath("spec", "controller"), "", "").WithOrigin("immutable").MarkAlpha(),
 					},
 				},
 			}
 
+			ctx := genericapirequest.WithRequestInfo(
+				genericapirequest.NewDefaultContext(),
+				&genericapirequest.RequestInfo{
+					APIPrefix:         "apis",
+					APIGroup:          "networking.k8s.io",
+					APIVersion:        apiVersion,
+					Resource:          "ingressclasses",
+					Name:              "valid-ingress-class",
+					IsResourceRequest: true,
+					Verb:              "update",
+				},
+			)
 			for name, tc := range testCases {
 				t.Run(name, func(t *testing.T) {
-					ctx := genericapirequest.WithRequestInfo(
-						genericapirequest.NewDefaultContext(),
-						&genericapirequest.RequestInfo{
-							APIPrefix:         "apis",
-							APIGroup:          "networking.k8s.io",
-							APIVersion:        apiVersion,
-							Resource:          "ingressclasses",
-							Name:              "valid-ingress-class",
-							IsResourceRequest: true,
-							Verb:              "update",
-						},
-					)
 					apitesting.VerifyUpdateValidationEquivalence(
 						t,
 						ctx,
@@ -159,6 +192,9 @@ func TestDeclarativeValidateUpdateParameters(t *testing.T) {
 					)
 				})
 			}
+
+			updateObj := mkValidIngressClass()
+			meta.RunObjectMetaUpdateTestCases(t, ctx, &updateObj, registry.Strategy, meta.WithStringentFinalizerValidation())
 		})
 	}
 }
@@ -182,6 +218,7 @@ func mkValidIngressClass(tweaks ...func(obj *networking.IngressClass)) networkin
 			},
 		},
 	}
+	obj.ResourceVersion = "1"
 
 	for _, tweak := range tweaks {
 		tweak(&obj)

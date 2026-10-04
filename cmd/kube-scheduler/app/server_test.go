@@ -214,13 +214,32 @@ leaderElection:
 		name                 string
 		flags                []string
 		registryOptions      []Option
-		restoreFeatures      map[featuregate.Feature]bool
 		wantPlugins          map[string]*config.Plugins
 		wantLeaderElection   *componentbaseconfig.LeaderElectionConfiguration
 		wantClientConnection *componentbaseconfig.ClientConnectionConfiguration
 		wantErr              bool
 		wantFeaturesGates    map[string]bool
 	}{
+		{
+			name: "default config with beta feature explicitly enabled",
+			flags: []string{
+				"--kubeconfig", configKubeconfig,
+				"--feature-gates=StorageCapacityScoring=true",
+			},
+			wantPlugins: map[string]*config.Plugins{
+				"default-scheduler": defaults.ExpandedPluginsV1,
+			},
+		},
+		{
+			name: "default config with beta feature explicitly disabled",
+			flags: []string{
+				"--kubeconfig", configKubeconfig,
+				"--feature-gates=StorageCapacityScoring=false",
+			},
+			wantPlugins: map[string]*config.Plugins{
+				"default-scheduler": defaults.ExpandedPluginsV1,
+			},
+		},
 		{
 			name: "component configuration v1 with only scheduler name configured",
 			flags: []string{
@@ -252,6 +271,7 @@ leaderElection:
 					// With this (and only this?!) config comes DynamicResources after DefaultPreemption.
 					plugins.PreEnqueue.Enabled[1], plugins.PreEnqueue.Enabled[2] = plugins.PreEnqueue.Enabled[2], plugins.PreEnqueue.Enabled[1]
 					plugins.PostFilter.Enabled[0], plugins.PostFilter.Enabled[1] = plugins.PostFilter.Enabled[1], plugins.PostFilter.Enabled[0]
+					plugins.PodGroupPostFilter.Enabled[0], plugins.PodGroupPostFilter.Enabled[1] = plugins.PodGroupPostFilter.Enabled[1], plugins.PodGroupPostFilter.Enabled[0]
 					plugins.Filter.Enabled = []config.Plugin{
 						{Name: "NodeResourcesFit"},
 						{Name: "NodePorts"},
@@ -260,6 +280,7 @@ leaderElection:
 					plugins.PreFilter.Enabled = []config.Plugin{
 						{Name: "NodeResourcesFit"},
 						{Name: "NodePorts"},
+						{Name: "TaintToleration"},
 						{Name: "DynamicResources"},
 					}
 					plugins.PreScore.Enabled = []config.Plugin{
@@ -428,7 +449,8 @@ leaderElection:
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
 			componentGlobalsRegistry := basecompatibility.NewComponentGlobalsRegistry()
-			verKube := basecompatibility.NewEffectiveVersionFromString("1.32", "1.31", "1.31")
+			// set binary version to v1.37+ since StorageCapacityScoring (Beta in v1.37) is enabled by default
+			verKube := basecompatibility.NewEffectiveVersionFromString("1.37", "1.31", "1.31")
 			fg := feature.DefaultFeatureGate.DeepCopy()
 			utilruntime.Must(fg.AddVersioned(map[featuregate.Feature]featuregate.VersionedSpecs{
 				"kubeA": {

@@ -17,6 +17,7 @@ limitations under the License.
 package allocation
 
 import (
+	"context"
 	"fmt"
 
 	v1 "k8s.io/api/core/v1"
@@ -38,12 +39,11 @@ import (
 
 // NewPodResizesAdmitHandler returns a PodAdmitHandler which is used to evaluate
 // if a pod resize can be allocated by the kubelet.
-func NewPodResizesAdmitHandler(containerManager cm.ContainerManager, containerRuntime kubecontainer.Runtime, allocationManager Manager, logger klog.Logger) lifecycle.PodAdmitHandler {
+func NewPodResizesAdmitHandler(containerManager cm.ContainerManager, containerRuntime kubecontainer.Runtime, allocationManager Manager) lifecycle.PodAdmitHandler {
 	return &podResizesAdmitHandler{
 		containerManager:  containerManager,
 		containerRuntime:  containerRuntime,
 		allocationManager: allocationManager,
-		logger:            logger,
 	}
 }
 
@@ -51,14 +51,14 @@ type podResizesAdmitHandler struct {
 	containerManager  cm.ContainerManager
 	containerRuntime  kubecontainer.Runtime
 	allocationManager Manager
-	logger            klog.Logger
 }
 
-func (h *podResizesAdmitHandler) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
+func (h *podResizesAdmitHandler) Admit(ctx context.Context, attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
 	if attrs.Operation != lifecycle.ResizeOperation {
 		return lifecycle.PodAdmitResult{Admit: true}
 	}
 
+	logger := klog.FromContext(ctx)
 	pod := attrs.Pod
 	allocatedPod, _ := h.allocationManager.UpdatePodFromAllocation(pod)
 	if resizable, msg, reason := IsInPlacePodVerticalScalingAllowed(pod); !resizable {
@@ -79,12 +79,18 @@ func (h *podResizesAdmitHandler) Admit(attrs *lifecycle.PodAdmitAttributes) life
 		}
 	}
 
+	if disallowed, msg, reason := disallowResizeForMemoryBackedVolumes(pod, allocatedPod, h.containerManager.GetNodeConfig().CgroupVersion); disallowed {
+		logger.V(3).Info(msg, "pod", format.Pod(pod))
+		metrics.PodInfeasibleResizes.WithLabelValues(reason).Inc()
+		return lifecycle.PodAdmitResult{Admit: false, Reason: v1.PodReasonInfeasible, Message: msg}
+	}
+
 	if v1qos.GetPodQOS(pod) == v1.PodQOSGuaranteed {
 		if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingExclusiveCPUs) &&
 			h.containerManager.GetNodeConfig().CPUManagerPolicy == string(cpumanager.PolicyStatic) &&
 			h.guaranteedPodResourceResizeRequired(pod, v1.ResourceCPU) {
 			msg := fmt.Sprintf("Resize is infeasible for Guaranteed Pods alongside CPU Manager policy \"%s\"", string(cpumanager.PolicyStatic))
-			h.logger.V(3).Info(msg, "pod", format.Pod(pod))
+			logger.V(3).Info(msg, "pod", format.Pod(pod))
 			metrics.PodInfeasibleResizes.WithLabelValues("guaranteed_pod_cpu_manager_static_policy").Inc()
 			return lifecycle.PodAdmitResult{Admit: false, Reason: v1.PodReasonInfeasible, Message: msg}
 		}
@@ -92,13 +98,30 @@ func (h *podResizesAdmitHandler) Admit(attrs *lifecycle.PodAdmitAttributes) life
 			h.containerManager.GetNodeConfig().MemoryManagerPolicy == string(memorymanager.PolicyTypeStatic) &&
 			h.guaranteedPodResourceResizeRequired(pod, v1.ResourceMemory) {
 			msg := fmt.Sprintf("Resize is infeasible for Guaranteed Pods alongside Memory Manager policy \"%s\"", string(memorymanager.PolicyTypeStatic))
-			h.logger.V(3).Info(msg, "pod", format.Pod(pod))
+			logger.V(3).Info(msg, "pod", format.Pod(pod))
 			metrics.PodInfeasibleResizes.WithLabelValues("guaranteed_pod_memory_manager_static_policy").Inc()
 			return lifecycle.PodAdmitResult{Admit: false, Reason: v1.PodReasonInfeasible, Message: msg}
 		}
 	}
 
 	return lifecycle.PodAdmitResult{Admit: true}
+}
+
+func disallowResizeForMemoryBackedVolumes(desiredPod, allocatedPod *v1.Pod, cgroupVersion int) (bool, string, string) {
+	if desiredPod == nil || allocatedPod == nil {
+		return false, "", ""
+	}
+
+	if IsMemoryBackedVolumeResizeRequested(allocatedPod, desiredPod) {
+		if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingMemoryBackedVolumes) {
+			return true, "Memory-backed emptyDir volume resize is disabled", "memory_volume_resize_gate_off"
+		}
+		if cgroupVersion == 1 {
+			return true, "Memory-backed emptyDir volume resize is not supported on cgroups v1", "cgroups_v1_unsupported"
+		}
+	}
+
+	return false, "", ""
 }
 
 func disallowResizeForSwappableContainers(runtime kubecontainer.Runtime, desiredPod, allocatedPod *v1.Pod) (bool, string) {
@@ -144,6 +167,24 @@ func (h *podResizesAdmitHandler) guaranteedPodResourceResizeRequired(pod *v1.Pod
 		allocatedresources, _ := h.allocationManager.GetContainerResourceAllocation(pod.UID, container.Name)
 		// For Guaranteed pods, requests must equal limits, so checking requests is sufficient.
 		if !requestedResources.Requests[resourceName].Equal(allocatedresources.Requests[resourceName]) {
+			return true
+		}
+	}
+	return false
+}
+
+// IsMemoryBackedVolumeResizeRequested returns true if any of the pod's memory-backed emptyDir volumes has its size limit changed.
+func IsMemoryBackedVolumeResizeRequested(desiredPod, allocatedPod *v1.Pod) bool {
+	if len(allocatedPod.Spec.Volumes) != len(desiredPod.Spec.Volumes) {
+		// Validation should prevent this from ever happening, but if it does, assume no resize.
+		return false
+	}
+	for i, allocatedVol := range allocatedPod.Spec.Volumes {
+		if !VolHasMemoryBackedEmptyDirSizeLimit(&allocatedVol) {
+			continue
+		}
+		desiredVol := desiredPod.Spec.Volumes[i]
+		if !apiequality.Semantic.DeepEqual(allocatedVol.EmptyDir.SizeLimit, desiredVol.EmptyDir.SizeLimit) {
 			return true
 		}
 	}

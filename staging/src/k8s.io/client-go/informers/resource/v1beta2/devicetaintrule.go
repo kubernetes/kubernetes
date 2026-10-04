@@ -34,11 +34,39 @@ import (
 )
 
 // DeviceTaintRuleInformer provides access to a shared informer and lister for
-// DeviceTaintRules.
+// DeviceTaintRules. Prefer using the type-safe variant (see [TypedDeviceTaintRuleInformer]).
 type DeviceTaintRuleInformer interface {
 	Informer() cache.SharedIndexInformer
 	Lister() resourcev1beta2.DeviceTaintRuleLister
 }
+
+// TypedDeviceTaintRuleInformer provides access to a shared informer and lister for
+// DeviceTaintRules, including the type-safe TypedInformer variant.
+// It is a superset of DeviceTaintRuleInformer.
+type TypedDeviceTaintRuleInformer interface {
+	Informer() cache.SharedIndexInformer
+	TypedInformer() DeviceTaintRuleIndexInformer
+	Lister() resourcev1beta2.DeviceTaintRuleLister
+}
+
+// DeviceTaintRuleIndexInformer is a wrapper around the underlying [cache.SharedIndexInformer]
+// with type-safe variants of several methods.
+type DeviceTaintRuleIndexInformer cache.TypedSharedIndexInformer[*apiresourcev1beta2.DeviceTaintRule]
+
+// DeviceTaintRuleHandlerFuncs is a specialization of [cache.TypedResourceEventHandlerFuncs] for DeviceTaintRule.
+type DeviceTaintRuleHandlerFuncs = cache.TypedResourceEventHandlerFuncs[*apiresourcev1beta2.DeviceTaintRule]
+
+// DeviceTaintRuleDetailedHandlerFuncs is a specialization of [cache.TypedResourceEventHandlerDetailedFuncs] for DeviceTaintRule.
+type DeviceTaintRuleDetailedHandlerFuncs = cache.TypedResourceEventHandlerDetailedFuncs[*apiresourcev1beta2.DeviceTaintRule]
+
+// DeviceTaintRuleFilteringHandler is a specialization of [cache.TypedFilteringResourceEventHandler] for DeviceTaintRule.
+type DeviceTaintRuleFilteringHandler = cache.TypedFilteringResourceEventHandler[*apiresourcev1beta2.DeviceTaintRule]
+
+// DeviceTaintRuleIndexers is a specialization of [cache.TypedIndexers] for DeviceTaintRule.
+type DeviceTaintRuleIndexers = cache.TypedIndexers[*apiresourcev1beta2.DeviceTaintRule]
+
+// DeletedDeviceTaintRule is a specialization of [cache.DeletedObject] for DeviceTaintRule.
+type DeletedDeviceTaintRule = cache.DeletedObject[*apiresourcev1beta2.DeviceTaintRule]
 
 type deviceTaintRuleInformer struct {
 	factory          internalinterfaces.SharedInformerFactory
@@ -48,25 +76,49 @@ type deviceTaintRuleInformer struct {
 // NewDeviceTaintRuleInformer constructs a new informer for DeviceTaintRule type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedDeviceTaintRuleInformer]).
 func NewDeviceTaintRuleInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
 	return NewDeviceTaintRuleInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers})
+}
+
+// NewTypedDeviceTaintRuleInformer constructs a new informer for DeviceTaintRule type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedDeviceTaintRuleInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers DeviceTaintRuleIndexers) DeviceTaintRuleIndexInformer {
+	return NewTypedDeviceTaintRuleInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.TypedIndexersToIndexers(indexers)})
 }
 
 // NewFilteredDeviceTaintRuleInformer constructs a new informer for DeviceTaintRule type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedFilteredDeviceTaintRuleInformer]).
 func NewFilteredDeviceTaintRuleInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
-	return NewDeviceTaintRuleInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
+	return NewTypedDeviceTaintRuleInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
+}
+
+// NewTypedFilteredDeviceTaintRuleInformer constructs a new informer for DeviceTaintRule type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedFilteredDeviceTaintRuleInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers DeviceTaintRuleIndexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) DeviceTaintRuleIndexInformer {
+	return NewTypedDeviceTaintRuleInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.TypedIndexersToIndexers(indexers), TweakListOptions: tweakListOptions})
 }
 
 // NewDeviceTaintRuleInformerWithOptions constructs a new informer for DeviceTaintRule type with additional options.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedDeviceTaintRuleInformerWithOptions]).
 func NewDeviceTaintRuleInformerWithOptions(client kubernetes.Interface, options internalinterfaces.InformerOptions) cache.SharedIndexInformer {
+	return NewTypedDeviceTaintRuleInformerWithOptions(client, options)
+}
+
+// NewTypedDeviceTaintRuleInformerWithOptions constructs a new informer for DeviceTaintRule type with additional options.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedDeviceTaintRuleInformerWithOptions(client kubernetes.Interface, options internalinterfaces.InformerOptions) DeviceTaintRuleIndexInformer {
 	gvr := schema.GroupVersionResource{Group: "resource.k8s.io", Version: "v1beta2", Resource: "devicetaintrules"}
 	identifier := options.InformerName.WithResource(gvr)
 	tweakListOptions := options.TweakListOptions
-	return cache.NewSharedIndexInformerWithOptions(
+	return cache.NewTypedSharedIndexInformer[*apiresourcev1beta2.DeviceTaintRule](cache.NewSharedIndexInformerWithOptions(
 		cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
 			ListFunc: func(opts v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
@@ -99,17 +151,57 @@ func NewDeviceTaintRuleInformerWithOptions(client kubernetes.Interface, options 
 			Indexers:     options.Indexers,
 			Identifier:   identifier,
 		},
-	)
+	))
 }
 
 func (f *deviceTaintRuleInformer) defaultInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewDeviceTaintRuleInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
+	return NewTypedDeviceTaintRuleInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
 }
 
 func (f *deviceTaintRuleInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&apiresourcev1beta2.DeviceTaintRule{}, f.defaultInformer)
+	return f.TypedInformer()
+}
+
+func (f *deviceTaintRuleInformer) TypedInformer() DeviceTaintRuleIndexInformer {
+	return cache.NewTypedSharedIndexInformer[*apiresourcev1beta2.DeviceTaintRule](f.factory.InformerFor(&apiresourcev1beta2.DeviceTaintRule{}, f.defaultInformer))
 }
 
 func (f *deviceTaintRuleInformer) Lister() resourcev1beta2.DeviceTaintRuleLister {
 	return resourcev1beta2.NewDeviceTaintRuleLister(f.Informer().GetIndexer())
+}
+
+// ToTypedDeviceTaintRuleInformer converts an untyped informer into a TypedDeviceTaintRuleInformer.
+//
+// WARNING: this conversion is only safe if the informer handles objects of type
+// *DeviceTaintRule. If that is not the case, calling type-safe methods of the returned
+// TypedDeviceTaintRuleInformer leads to runtime panics. A safer alternative is to pass
+// around a TypedDeviceTaintRuleInformer instances that was obtained from a
+// SharedInformerFactory.
+func ToTypedDeviceTaintRuleInformer(informer DeviceTaintRuleInformer) TypedDeviceTaintRuleInformer {
+	if informer, ok := informer.(TypedDeviceTaintRuleInformer); ok {
+		return informer
+	}
+	return &deviceTaintRuleTypedInformerAdapter{informer}
+}
+
+type deviceTaintRuleTypedInformerAdapter struct {
+	DeviceTaintRuleInformer
+}
+
+func (a *deviceTaintRuleTypedInformerAdapter) TypedInformer() DeviceTaintRuleIndexInformer {
+	return cache.NewTypedSharedIndexInformer[*apiresourcev1beta2.DeviceTaintRule](a.Informer())
+}
+
+// ToDeviceTaintRuleIndexInformer converts an untyped informer into a DeviceTaintRuleIndexInformer.
+//
+// WARNING: this conversion is only safe if the informer handles objects of type
+// *DeviceTaintRule. If that is not the case, calling type-safe methods of the returned
+// DeviceTaintRuleIndexInformer leads to runtime panics. A safer alternative is to pass
+// around a DeviceTaintRuleIndexInformer instances that was obtained from a
+// SharedInformerFactory.
+func ToDeviceTaintRuleIndexInformer(informer cache.SharedIndexInformer) DeviceTaintRuleIndexInformer {
+	if informer, ok := informer.(DeviceTaintRuleIndexInformer); ok {
+		return informer
+	}
+	return cache.NewTypedSharedIndexInformer[*apiresourcev1beta2.DeviceTaintRule](informer)
 }

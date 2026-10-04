@@ -152,8 +152,8 @@ func TestSyncHandler(t *testing.T) {
 			defer ec.queue.ShutDown()
 
 			// Ensure informers are up-to-date.
-			informerFactory.Start(ctx.Done())
-			informerFactory.WaitForCacheSync(ctx.Done())
+			informerFactory.StartWithContext(ctx)
+			informerFactory.WaitForCacheSyncWithContext(ctx)
 			cache.WaitForCacheSync(ctx.Done(), podInformer.Informer().HasSynced, pvcInformer.Informer().HasSynced)
 
 			err = ec.syncHandler(context.TODO(), tc.podKey)

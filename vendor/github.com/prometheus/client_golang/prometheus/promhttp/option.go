@@ -15,6 +15,7 @@ package promhttp
 
 import (
 	"context"
+	"net/http"
 
 	"github.com/prometheus/client_golang/prometheus"
 )
@@ -24,28 +25,31 @@ type Option interface {
 	apply(*options)
 }
 
+// LabelValueFromRequest is used to compute the label value from request.
+type LabelValueFromRequest func(request *http.Request) string
+
 // LabelValueFromCtx are used to compute the label value from request context.
 // Context can be filled with values from request through middleware.
 type LabelValueFromCtx func(ctx context.Context) string
 
 // options store options for both a handler or round tripper.
 type options struct {
-	extraMethods       []string
-	getExemplarFn      func(requestCtx context.Context) prometheus.Labels
-	extraLabelsFromCtx map[string]LabelValueFromCtx
+	extraMethods           []string
+	getExemplarFn          func(req *http.Request) prometheus.Labels
+	extraLabelsFromRequest map[string]LabelValueFromRequest
 }
 
 func defaultOptions() *options {
 	return &options{
-		getExemplarFn:      func(ctx context.Context) prometheus.Labels { return nil },
-		extraLabelsFromCtx: map[string]LabelValueFromCtx{},
+		getExemplarFn:          func(req *http.Request) prometheus.Labels { return nil },
+		extraLabelsFromRequest: map[string]LabelValueFromRequest{},
 	}
 }
 
 func (o *options) emptyDynamicLabels() prometheus.Labels {
 	labels := prometheus.Labels{}
 
-	for label := range o.extraLabelsFromCtx {
+	for label := range o.extraLabelsFromRequest {
 		labels[label] = ""
 	}
 
@@ -66,12 +70,30 @@ func WithExtraMethods(methods ...string) Option {
 	})
 }
 
-// WithExemplarFromContext allows to inject function that will get exemplar from context that will be put to counter and histogram metrics.
+// WithExemplarFromRequest allows you to inject a function that will get exemplar from request that will be put to counter and histogram metrics.
+// If the function returns nil labels or the metric does not support exemplars, no exemplar will be added (noop), but
+// metric will continue to observe/increment.
+func WithExemplarFromRequest(getExemplarFn func(req *http.Request) prometheus.Labels) Option {
+	return optionApplyFunc(func(o *options) {
+		o.getExemplarFn = getExemplarFn
+	})
+}
+
+// WithExemplarFromContext allows you to inject a function that will get exemplar from context that will be put to counter and histogram metrics.
 // If the function returns nil labels or the metric does not support exemplars, no exemplar will be added (noop), but
 // metric will continue to observe/increment.
 func WithExemplarFromContext(getExemplarFn func(requestCtx context.Context) prometheus.Labels) Option {
 	return optionApplyFunc(func(o *options) {
-		o.getExemplarFn = getExemplarFn
+		o.getExemplarFn = func(req *http.Request) prometheus.Labels {
+			return getExemplarFn(req.Context())
+		}
+	})
+}
+
+// WithLabelFromRequest registers a label for dynamic resolution with access to the request.
+func WithLabelFromRequest(name string, valueFn LabelValueFromRequest) Option {
+	return optionApplyFunc(func(o *options) {
+		o.extraLabelsFromRequest[name] = valueFn
 	})
 }
 
@@ -79,6 +101,8 @@ func WithExemplarFromContext(getExemplarFn func(requestCtx context.Context) prom
 // See the example for ExampleInstrumentHandlerWithLabelResolver for example usage
 func WithLabelFromCtx(name string, valueFn LabelValueFromCtx) Option {
 	return optionApplyFunc(func(o *options) {
-		o.extraLabelsFromCtx[name] = valueFn
+		o.extraLabelsFromRequest[name] = func(req *http.Request) string {
+			return valueFn(req.Context())
+		}
 	})
 }

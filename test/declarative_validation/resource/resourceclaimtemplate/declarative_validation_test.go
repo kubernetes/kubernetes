@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/resource"
 	"k8s.io/kubernetes/pkg/apis/resource/validation"
 	registry "k8s.io/kubernetes/pkg/registry/resource/resourceclaimtemplate"
+	"k8s.io/kubernetes/test/declarative_validation/meta"
 	pointer "k8s.io/utils/ptr"
 )
 
@@ -43,9 +44,11 @@ func TestDeclarativeValidate(t *testing.T) {
 
 func testDeclarativeValidate(t *testing.T, apiVersion string) {
 	ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
-		APIGroup:   "resource.k8s.io",
-		APIVersion: apiVersion,
-		Resource:   "resourceclaimtemplates",
+		APIGroup:          "resource.k8s.io",
+		APIVersion:        apiVersion,
+		Resource:          "resourceclaimtemplates",
+		IsResourceRequest: true,
+		Verb:              "create",
 	})
 	fakeClient := fake.NewClientset()
 	nsClient := fakeClient.CoreV1().Namespaces()
@@ -72,75 +75,75 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 		"invalid requests, too many": {
 			input: mkValidResourceClaimTemplate(tweakDevicesRequests(33)),
 			expectedErrs: field.ErrorList{
-				field.TooMany(field.NewPath("spec", "spec", "devices", "requests"), 33, 32).WithOrigin("maxItems").MarkAlpha(),
+				field.TooMany(field.NewPath("spec", "spec", "devices", "requests"), 33, 32).WithOrigin("maxItems").MarkBeta(),
 			},
 		},
 		"invalid requests, duplicate name": {
 			input: mkValidResourceClaimTemplate(tweakAddDeviceRequest(mkDeviceRequest("req-0"))),
 			expectedErrs: field.ErrorList{
-				field.Duplicate(field.NewPath("spec", "spec", "devices", "requests").Index(1), "req-0").MarkAlpha(),
+				field.Duplicate(field.NewPath("spec", "spec", "devices", "requests").Index(1), "req-0").MarkBeta(),
 			},
 		},
 		"invalid constraints, too many": {
 			input: mkValidResourceClaimTemplate(tweakDevicesConstraints(33)),
 			expectedErrs: field.ErrorList{
-				field.TooMany(field.NewPath("spec", "spec", "devices", "constraints"), 33, 32).WithOrigin("maxItems").MarkAlpha(),
+				field.TooMany(field.NewPath("spec", "spec", "devices", "constraints"), 33, 32).WithOrigin("maxItems").MarkBeta(),
 			},
 		},
 		"invalid config, too many": {
 			input: mkValidResourceClaimTemplate(tweakDevicesConfigs(33)),
 			expectedErrs: field.ErrorList{
-				field.TooMany(field.NewPath("spec", "spec", "devices", "config"), 33, 32).WithOrigin("maxItems").MarkAlpha(),
+				field.TooMany(field.NewPath("spec", "spec", "devices", "config"), 33, 32).WithOrigin("maxItems").MarkBeta(),
 			},
 		},
 		"invalid firstAvailable, too many": {
 			input: mkValidResourceClaimTemplate(tweakFirstAvailable(9)),
 			expectedErrs: field.ErrorList{
-				field.TooMany(field.NewPath("spec", "spec", "devices", "requests").Index(0).Child("firstAvailable"), 9, 8).WithOrigin("maxItems").MarkAlpha(),
+				field.TooMany(field.NewPath("spec", "spec", "devices", "requests").Index(0).Child("firstAvailable"), 9, 8).WithOrigin("maxItems").MarkBeta(),
 			},
 		},
 		"invalid firstAvailable, duplicate name": {
 			input: mkValidResourceClaimTemplate(tweakDuplicateFirstAvailableName("sub-0")),
 			expectedErrs: field.ErrorList{
-				field.Duplicate(field.NewPath("spec", "spec", "devices", "requests").Index(0).Child("firstAvailable").Index(1), "sub-0").MarkAlpha(),
+				field.Duplicate(field.NewPath("spec", "spec", "devices", "requests").Index(0).Child("firstAvailable").Index(1), "sub-0").MarkBeta(),
 			},
 		},
 		"invalid selectors, too many": {
 			input: mkValidResourceClaimTemplate(tweakExactlySelectors(33)),
 			expectedErrs: field.ErrorList{
-				field.TooMany(field.NewPath("spec", "spec", "devices", "requests").Index(0).Child("exactly", "selectors"), 33, 32).WithOrigin("maxItems").MarkCoveredByDeclarative().MarkAlpha(),
+				field.TooMany(field.NewPath("spec", "spec", "devices", "requests").Index(0).Child("exactly", "selectors"), 33, 32).WithOrigin("maxItems").MarkCoveredByDeclarative().MarkBeta(),
 			},
 		},
 		"invalid subrequest selectors, too many": {
 			input: mkValidResourceClaimTemplate(tweakSubRequestSelectors(33)),
 			expectedErrs: field.ErrorList{
-				field.TooMany(field.NewPath("spec", "spec", "devices", "requests").Index(0).Child("firstAvailable").Index(0).Child("selectors"), 33, 32).WithOrigin("maxItems").MarkAlpha(),
+				field.TooMany(field.NewPath("spec", "spec", "devices", "requests").Index(0).Child("firstAvailable").Index(0).Child("selectors"), 33, 32).WithOrigin("maxItems").MarkBeta(),
 			},
 		},
 		"invalid constraint requests, too many": {
 			input: mkValidResourceClaimTemplate(tweakConstraintRequests(33)),
 			expectedErrs: field.ErrorList{
-				field.TooMany(field.NewPath("spec", "spec", "devices", "requests"), 33, 32).WithOrigin("maxItems").MarkAlpha(),
-				field.TooMany(field.NewPath("spec", "spec", "devices", "constraints").Index(0).Child("requests"), 33, 32).WithOrigin("maxItems").MarkAlpha(),
+				field.TooMany(field.NewPath("spec", "spec", "devices", "requests"), 33, 32).WithOrigin("maxItems").MarkBeta(),
+				field.TooMany(field.NewPath("spec", "spec", "devices", "constraints").Index(0).Child("requests"), 33, 32).WithOrigin("maxItems").MarkBeta(),
 			},
 		},
 		"invalid config requests, too many": {
 			input: mkValidResourceClaimTemplate(tweakConfigRequests(33)),
 			expectedErrs: field.ErrorList{
-				field.TooMany(field.NewPath("spec", "spec", "devices", "requests"), 33, 32).WithOrigin("maxItems").MarkAlpha(),
-				field.TooMany(field.NewPath("spec", "spec", "devices", "config").Index(0).Child("requests"), 33, 32).WithOrigin("maxItems").MarkAlpha(),
+				field.TooMany(field.NewPath("spec", "spec", "devices", "requests"), 33, 32).WithOrigin("maxItems").MarkBeta(),
+				field.TooMany(field.NewPath("spec", "spec", "devices", "config").Index(0).Child("requests"), 33, 32).WithOrigin("maxItems").MarkBeta(),
 			},
 		},
 		"invalid constraint requests, duplicate name": {
 			input: mkValidResourceClaimTemplate(tweakDuplicateConstraintRequest("req-0")),
 			expectedErrs: field.ErrorList{
-				field.Duplicate(field.NewPath("spec", "spec", "devices", "constraints").Index(0).Child("requests").Index(1), "req-0").MarkAlpha(),
+				field.Duplicate(field.NewPath("spec", "spec", "devices", "constraints").Index(0).Child("requests").Index(1), "req-0").MarkBeta(),
 			},
 		},
 		"invalid config requests, duplicate name": {
 			input: mkValidResourceClaimTemplate(tweakDuplicateConfigRequest("req-0")),
 			expectedErrs: field.ErrorList{
-				field.Duplicate(field.NewPath("spec", "spec", "devices", "config").Index(0).Child("requests").Index(1), "req-0").MarkAlpha(),
+				field.Duplicate(field.NewPath("spec", "spec", "devices", "config").Index(0).Child("requests").Index(1), "req-0").MarkBeta(),
 			},
 		},
 		"valid opaque driver, lowercase": {
@@ -155,32 +158,32 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 		"invalid opaque driver, empty": {
 			input: mkValidResourceClaimTemplate(tweakDeviceConfigWithDriver("")),
 			expectedErrs: field.ErrorList{
-				field.Required(opaqueDriverPath, "").MarkAlpha(),
+				field.Required(opaqueDriverPath, "").MarkBeta(),
 			},
 		},
 		"invalid opaque driver, too long - 64 characters": {
 			input: mkValidResourceClaimTemplate(tweakDeviceConfigWithDriver(strings.Repeat("a", 64))),
 			expectedErrs: field.ErrorList{
-				field.TooLong(opaqueDriverPath, "", 63).WithOrigin("maxLength").MarkAlpha(),
+				field.TooLong(opaqueDriverPath, "", 63).WithOrigin("maxLength").MarkBeta(),
 			},
 		},
 		"invalid opaque driver, too long - 255 characters": {
 			input: mkValidResourceClaimTemplate(tweakDeviceConfigWithDriver(strings.Repeat("a", 255))),
 			expectedErrs: field.ErrorList{
-				field.TooLong(opaqueDriverPath, "", 63).WithOrigin("maxLength").MarkAlpha(),
-				field.Invalid(opaqueDriverPath, "", "").WithOrigin("format=k8s-long-name-caseless").MarkAlpha(),
+				field.TooLong(opaqueDriverPath, "", 63).WithOrigin("maxLength").MarkBeta(),
+				field.Invalid(opaqueDriverPath, "", "").WithOrigin("format=k8s-long-name-caseless").MarkBeta(),
 			},
 		},
 		"invalid opaque driver, invalid character": {
 			input: mkValidResourceClaimTemplate(tweakDeviceConfigWithDriver("dra_example.com")),
 			expectedErrs: field.ErrorList{
-				field.Invalid(opaqueDriverPath, "dra_example.com", "").WithOrigin("format=k8s-long-name-caseless").MarkAlpha(),
+				field.Invalid(opaqueDriverPath, "dra_example.com", "").WithOrigin("format=k8s-long-name-caseless").MarkBeta(),
 			},
 		},
 		"invalid opaque driver, invalid DNS name (leading dot)": {
 			input: mkValidResourceClaimTemplate(tweakDeviceConfigWithDriver(".example.com")),
 			expectedErrs: field.ErrorList{
-				field.Invalid(opaqueDriverPath, ".example.com", "").WithOrigin("format=k8s-long-name-caseless").MarkAlpha(),
+				field.Invalid(opaqueDriverPath, ".example.com", "").WithOrigin("format=k8s-long-name-caseless").MarkBeta(),
 			},
 		},
 		"valid Exactly.Tolerations.Key": {
@@ -198,7 +201,7 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 				{Key: "invalid_key!", Operator: resource.DeviceTolerationOpExists, Effect: resource.DeviceTaintEffectNoSchedule},
 			})),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("spec", "spec", "devices", "requests").Index(0).Child("exactly", "tolerations").Index(0).Child("key"), "invalid_key!", "").WithOrigin("format=k8s-label-key").MarkAlpha(),
+				field.Invalid(field.NewPath("spec", "spec", "devices", "requests").Index(0).Child("exactly", "tolerations").Index(0).Child("key"), "invalid_key!", "").WithOrigin("format=k8s-label-key").MarkBeta(),
 			},
 		},
 		"invalid Exactly.Tolerations.Key - multiple slashes": {
@@ -206,7 +209,7 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 				{Key: "a/b/c", Operator: resource.DeviceTolerationOpExists, Effect: resource.DeviceTaintEffectNoSchedule},
 			})),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("spec", "spec", "devices", "requests").Index(0).Child("exactly", "tolerations").Index(0).Child("key"), "a/b/c", "").WithOrigin("format=k8s-label-key").MarkAlpha(),
+				field.Invalid(field.NewPath("spec", "spec", "devices", "requests").Index(0).Child("exactly", "tolerations").Index(0).Child("key"), "a/b/c", "").WithOrigin("format=k8s-label-key").MarkBeta(),
 			},
 		},
 		"valid FirstAvailable.Tolerations.Key": {
@@ -224,7 +227,7 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 				{Key: "invalid_key!", Operator: resource.DeviceTolerationOpExists, Effect: resource.DeviceTaintEffectNoSchedule},
 			})),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("spec", "spec", "devices", "requests").Index(0).Child("firstAvailable").Index(0).Child("tolerations").Index(0).Child("key"), "invalid_key!", "").WithOrigin("format=k8s-label-key").MarkAlpha(),
+				field.Invalid(field.NewPath("spec", "spec", "devices", "requests").Index(0).Child("firstAvailable").Index(0).Child("tolerations").Index(0).Child("key"), "invalid_key!", "").WithOrigin("format=k8s-label-key").MarkBeta(),
 			},
 		},
 		"invalid FirstAvailable.Tolerations.Key - multiple slashes": {
@@ -232,7 +235,7 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 				{Key: "a/b/c", Operator: resource.DeviceTolerationOpExists, Effect: resource.DeviceTaintEffectNoSchedule},
 			})),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("spec", "spec", "devices", "requests").Index(0).Child("firstAvailable").Index(0).Child("tolerations").Index(0).Child("key"), "a/b/c", "").WithOrigin("format=k8s-label-key").MarkAlpha(),
+				field.Invalid(field.NewPath("spec", "spec", "devices", "requests").Index(0).Child("firstAvailable").Index(0).Child("tolerations").Index(0).Child("key"), "a/b/c", "").WithOrigin("format=k8s-label-key").MarkBeta(),
 			},
 		},
 		"valid DeviceAllocationMode - All": {
@@ -245,7 +248,7 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 					field.NewPath("spec", "spec", "devices", "requests").Index(0).Child("exactly", "allocationMode"),
 					resource.DeviceAllocationMode("InvalidMode"),
 					[]string{"All", "ExactCount"},
-				).MarkAlpha(),
+				).MarkBeta(),
 			},
 		},
 		"valid DeviceAllocationMode - FirstAvailable": {
@@ -258,7 +261,7 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 					field.NewPath("spec", "spec", "devices", "requests").Index(0).Child("firstAvailable").Index(0).Child("allocationMode"),
 					resource.DeviceAllocationMode("InvalidMode"),
 					[]string{"All", "ExactCount"},
-				).MarkAlpha(),
+				).MarkBeta(),
 			},
 		},
 		"valid firstAvailable class name": {
@@ -267,13 +270,13 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 		"invalid firstAvailable class name - invalid characters": {
 			input: mkValidResourceClaimTemplate(tweakFirstAvailableDeviceClassName("Class&")),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("spec", "spec", "devices", "requests").Index(0).Child("firstAvailable").Index(0).Child("deviceClassName"), "Class&", "").WithOrigin("format=k8s-long-name").MarkAlpha(),
+				field.Invalid(field.NewPath("spec", "spec", "devices", "requests").Index(0).Child("firstAvailable").Index(0).Child("deviceClassName"), "Class&", "").WithOrigin("format=k8s-long-name").MarkBeta(),
 			},
 		},
 		"invalid firstAvailable class name - empty": {
 			input: mkValidResourceClaimTemplate(tweakFirstAvailableDeviceClassName("")),
 			expectedErrs: field.ErrorList{
-				field.Required(field.NewPath("spec", "spec", "devices", "requests").Index(0).Child("firstAvailable").Index(0).Child("deviceClassName"), "").MarkAlpha(),
+				field.Required(field.NewPath("spec", "spec", "devices", "requests").Index(0).Child("firstAvailable").Index(0).Child("deviceClassName"), "").MarkBeta(),
 			},
 		},
 		"valid DeviceTolerationOperator/Effect - Exactly": {
@@ -291,7 +294,7 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 				tweakExactlyTolerations([]resource.DeviceToleration{{Key: "key", Value: "value", Effect: resource.DeviceTaintEffectNoSchedule, Operator: ""}}),
 			),
 			expectedErrs: field.ErrorList{
-				field.Required(field.NewPath("spec", "spec", "devices", "requests").Index(0).Child("exactly", "tolerations").Index(0).Child("operator"), "").MarkAlpha(),
+				field.Required(field.NewPath("spec", "spec", "devices", "requests").Index(0).Child("exactly", "tolerations").Index(0).Child("operator"), "").MarkBeta(),
 			},
 		},
 		"invalid DeviceTolerationOperator - Exactly": {
@@ -308,7 +311,7 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 					field.NewPath("spec", "spec", "devices", "requests").Index(0).Child("exactly", "tolerations").Index(0).Child("operator"),
 					resource.DeviceTolerationOperator("InvalidOp"),
 					[]string{"Equal", "Exists"},
-				).MarkAlpha(),
+				).MarkBeta(),
 			},
 		},
 		"invalid DeviceTaintEffect - Exactly": {
@@ -325,7 +328,7 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 					field.NewPath("spec", "spec", "devices", "requests").Index(0).Child("exactly", "tolerations").Index(0).Child("effect"),
 					resource.DeviceTaintEffect("InvalidEffect"),
 					[]string{"NoExecute", "NoSchedule"},
-				).MarkAlpha(),
+				).MarkBeta(),
 			},
 		},
 		"valid DeviceTolerationOperator/Effect - FirstAvailable": {
@@ -344,7 +347,7 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 				tweakFirstAvailableTolerations([]resource.DeviceToleration{{Key: "key", Value: "value", Effect: resource.DeviceTaintEffectNoSchedule, Operator: ""}}),
 			),
 			expectedErrs: field.ErrorList{
-				field.Required(field.NewPath("spec", "spec", "devices", "requests").Index(0).Child("firstAvailable").Index(0).Child("tolerations").Index(0).Child("operator"), "").MarkAlpha(),
+				field.Required(field.NewPath("spec", "spec", "devices", "requests").Index(0).Child("firstAvailable").Index(0).Child("tolerations").Index(0).Child("operator"), "").MarkBeta(),
 			},
 		},
 		"invalid DeviceTolerationOperator - FirstAvailable": {
@@ -361,7 +364,7 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 					field.NewPath("spec", "spec", "devices", "requests").Index(0).Child("firstAvailable").Index(0).Child("tolerations").Index(0).Child("operator"),
 					resource.DeviceTolerationOperator("InvalidOp"),
 					[]string{"Equal", "Exists"},
-				).MarkAlpha(),
+				).MarkBeta(),
 			},
 		},
 		"invalid DeviceTaintEffect - FirstAvailable": {
@@ -378,26 +381,124 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 					field.NewPath("spec", "spec", "devices", "requests").Index(0).Child("firstAvailable").Index(0).Child("tolerations").Index(0).Child("effect"),
 					resource.DeviceTaintEffect("InvalidEffect"),
 					[]string{"NoExecute", "NoSchedule"},
-				).MarkAlpha(),
+				).MarkBeta(),
 			},
 		},
 		"invalid match attribute": {
 			input: mkValidResourceClaimTemplate(tweakMatchAttribute("invalid!")),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("spec", "spec", "devices", "constraints").Index(0).Child("matchAttribute"), "invalid!", "").WithOrigin("format=k8s-resource-fully-qualified-name").MarkAlpha(),
+				field.Invalid(field.NewPath("spec", "spec", "devices", "constraints").Index(0).Child("matchAttribute"), "invalid!", "").WithOrigin("format=k8s-resource-fully-qualified-name").MarkBeta(),
 			},
 		},
 		"match attribute without domain": {
 			input: mkValidResourceClaimTemplate(tweakMatchAttribute("nodomain")),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("spec", "spec", "devices", "constraints").Index(0).Child("matchAttribute"), "nodomain", "a fully qualified name must be a domain and a name separated by a slash").WithOrigin("format=k8s-resource-fully-qualified-name").MarkAlpha(),
+				field.Invalid(field.NewPath("spec", "spec", "devices", "constraints").Index(0).Child("matchAttribute"), "nodomain", "a fully qualified name must be a domain and a name separated by a slash").WithOrigin("format=k8s-resource-fully-qualified-name").MarkBeta(),
 			},
 		},
 		"match attribute empty": {
 			input: mkValidResourceClaimTemplate(tweakMatchAttribute("")),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("spec", "spec", "devices", "constraints").Index(0).Child("matchAttribute"), "", "").WithOrigin("format=k8s-resource-fully-qualified-name").MarkAlpha(),
+				field.Invalid(field.NewPath("spec", "spec", "devices", "constraints").Index(0).Child("matchAttribute"), "", "").WithOrigin("format=k8s-resource-fully-qualified-name").MarkBeta(),
 			},
+		},
+		"match attribute with long name": {
+			input: mkValidResourceClaimTemplate(tweakMatchAttribute("domain/" + strings.Repeat("a", 33))),
+			expectedErrs: field.ErrorList{
+				field.TooLong(field.NewPath("spec", "spec", "devices", "constraints").Index(0).Child("matchAttribute"), "", 32).WithOrigin("format=k8s-resource-fully-qualified-name").MarkBeta(),
+			},
+		},
+		"invalid distinct attribute": {
+			input: mkValidResourceClaimTemplate(tweakDistinctAttribute("nodomain")),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "spec", "devices", "constraints").Index(0).Child("distinctAttribute"), "nodomain", "a fully qualified name must be a domain and a name separated by a slash").WithOrigin("format=k8s-resource-fully-qualified-name").MarkBeta(),
+			},
+		},
+		"distinct attribute with long name": {
+			input: mkValidResourceClaimTemplate(tweakDistinctAttribute("domain/" + strings.Repeat("a", 33))),
+			expectedErrs: field.ErrorList{
+				field.TooLong(field.NewPath("spec", "spec", "devices", "constraints").Index(0).Child("distinctAttribute"), "", 32).WithOrigin("format=k8s-resource-fully-qualified-name").MarkBeta(),
+			},
+		},
+
+		"valid exactly derived attributes, valid name": {
+			input: mkValidResourceClaimTemplate(tweakExactlyDerivedAttributeName("derived/attribute")),
+		},
+		"invalid exactly derived attributes, invalid name": {
+			input: mkValidResourceClaimTemplate(tweakExactlyDerivedAttributeName("invalid name")),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "spec", "devices", "requests").Index(0).Child("exactly", "derivedAttributes").Index(0).Child("name"), "invalid name", "name part must consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character (e.g. 'MyName',  or 'my.name',  or '123-abc', regex used for validation is '([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]')").WithOrigin("format=k8s-resource-fully-qualified-name"),
+				field.Invalid(field.NewPath("spec", "spec", "devices", "constraints").Index(0).Child("matchAttribute"), "invalid name", "name part must consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character (e.g. 'MyName',  or 'my.name',  or '123-abc', regex used for validation is '([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]')").WithOrigin("format=k8s-resource-fully-qualified-name").MarkBeta(),
+			},
+		},
+		"invalid exactly derived attributes, long name": {
+			input: mkValidResourceClaimTemplate(tweakExactlyDerivedAttributeName("domain/" + strings.Repeat("a", 33))),
+			expectedErrs: field.ErrorList{
+				field.TooLong(field.NewPath("spec", "spec", "devices", "requests").Index(0).Child("exactly", "derivedAttributes").Index(0).Child("name"), "", 32).WithOrigin("format=k8s-resource-fully-qualified-name"),
+				field.TooLong(field.NewPath("spec", "spec", "devices", "constraints").Index(0).Child("matchAttribute"), "", 32).WithOrigin("format=k8s-resource-fully-qualified-name").MarkBeta(),
+			},
+		},
+		"invalid exactly derived attributes, empty name": {
+			input: mkValidResourceClaimTemplate(tweakExactlyDerivedAttributeName("")),
+			expectedErrs: field.ErrorList{
+				field.Required(field.NewPath("spec", "spec", "devices", "requests").Index(0).Child("exactly", "derivedAttributes").Index(0).Child("name"), ""),
+			},
+		},
+		"invalid exactly derived attributes, empty expression": {
+			input: mkValidResourceClaimTemplate(tweakExactlyDerivedAttributeExpression("")),
+			expectedErrs: field.ErrorList{
+				field.Required(field.NewPath("spec", "spec", "devices", "requests").Index(0).Child("exactly", "derivedAttributes").Index(0).Child("expression"), ""),
+			},
+		},
+		"invalid exactly derived attributes, too many": {
+			input: mkValidResourceClaimTemplate(tweakExactlyDerivedAttributesCount(33)),
+			expectedErrs: field.ErrorList{
+				field.TooMany(field.NewPath("spec", "spec", "devices", "requests").Index(0).Child("exactly", "derivedAttributes"), 33, 32).WithOrigin("maxItems"),
+				field.TooMany(field.NewPath("spec", "spec", "devices", "constraints"), 33, 32).WithOrigin("maxItems").MarkBeta(),
+			},
+		},
+		"valid exactly derived attributes, max allowed": {
+			input: mkValidResourceClaimTemplate(tweakExactlyDerivedAttributesCount(32)),
+		},
+
+		"valid firstAvailable derived attributes, valid name": {
+			input: mkValidResourceClaimTemplate(tweakFirstAvailableDerivedAttributeName("derived/attribute")),
+		},
+		"invalid firstAvailable derived attributes, invalid name": {
+			input: mkValidResourceClaimTemplate(tweakFirstAvailableDerivedAttributeName("invalid name")),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "spec", "devices", "requests").Index(0).Child("firstAvailable").Index(0).Child("derivedAttributes").Index(0).Child("name"), "invalid name", "name part must consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character (e.g. 'MyName',  or 'my.name',  or '123-abc', regex used for validation is '([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]')").WithOrigin("format=k8s-resource-fully-qualified-name"),
+				field.Invalid(field.NewPath("spec", "spec", "devices", "constraints").Index(0).Child("matchAttribute"), "invalid name", "name part must consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character (e.g. 'MyName',  or 'my.name',  or '123-abc', regex used for validation is '([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]')").WithOrigin("format=k8s-resource-fully-qualified-name").MarkBeta(),
+			},
+		},
+		"invalid firstAvailable derived attributes, long name": {
+			input: mkValidResourceClaimTemplate(tweakFirstAvailableDerivedAttributeName("domain/" + strings.Repeat("a", 33))),
+			expectedErrs: field.ErrorList{
+				field.TooLong(field.NewPath("spec", "spec", "devices", "requests").Index(0).Child("firstAvailable").Index(0).Child("derivedAttributes").Index(0).Child("name"), "", 32).WithOrigin("format=k8s-resource-fully-qualified-name"),
+				field.TooLong(field.NewPath("spec", "spec", "devices", "constraints").Index(0).Child("matchAttribute"), "", 32).WithOrigin("format=k8s-resource-fully-qualified-name").MarkBeta(),
+			},
+		},
+		"invalid firstAvailable derived attributes, empty name": {
+			input: mkValidResourceClaimTemplate(tweakFirstAvailableDerivedAttributeName("")),
+			expectedErrs: field.ErrorList{
+				field.Required(field.NewPath("spec", "spec", "devices", "requests").Index(0).Child("firstAvailable").Index(0).Child("derivedAttributes").Index(0).Child("name"), ""),
+			},
+		},
+		"invalid firstAvailable derived attributes, empty expression": {
+			input: mkValidResourceClaimTemplate(tweakFirstAvailableDerivedAttributeExpression("")),
+			expectedErrs: field.ErrorList{
+				field.Required(field.NewPath("spec", "spec", "devices", "requests").Index(0).Child("firstAvailable").Index(0).Child("derivedAttributes").Index(0).Child("expression"), ""),
+			},
+		},
+		"invalid firstAvailable derived attributes, too many": {
+			input: mkValidResourceClaimTemplate(tweakFirstAvailableDerivedAttributesCount(33)),
+			expectedErrs: field.ErrorList{
+				field.TooMany(field.NewPath("spec", "spec", "devices", "requests").Index(0).Child("firstAvailable").Index(0).Child("derivedAttributes"), 33, 32).WithOrigin("maxItems"),
+				field.TooMany(field.NewPath("spec", "spec", "devices", "constraints"), 33, 32).WithOrigin("maxItems").MarkBeta(),
+			},
+		},
+		"valid firstAvailable derived attributes, max allowed": {
+			input: mkValidResourceClaimTemplate(tweakFirstAvailableDerivedAttributesCount(32)),
 		},
 		// TODO: Add more test cases
 	}
@@ -407,6 +508,9 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 			apitesting.VerifyValidationEquivalence(t, ctx, &tc.input, Strategy, tc.expectedErrs, apitesting.WithNormalizationRules(validation.ResourceNormalizationRules...))
 		})
 	}
+
+	obj := mkValidResourceClaimTemplate()
+	meta.RunObjectMetaTestCases(t, ctx, &obj, Strategy, meta.WithStringentFinalizerValidation())
 }
 
 func TestDeclarativeValidateUpdate(t *testing.T) {
@@ -419,9 +523,11 @@ func TestDeclarativeValidateUpdate(t *testing.T) {
 
 func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 	ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
-		APIGroup:   "resource.k8s.io",
-		APIVersion: apiVersion,
-		Resource:   "resourceclaimtemplates",
+		APIGroup:          "resource.k8s.io",
+		APIVersion:        apiVersion,
+		Resource:          "resourceclaimtemplates",
+		IsResourceRequest: true,
+		Verb:              "update",
 	})
 	fakeClient := fake.NewClientset()
 	nsClient := fakeClient.CoreV1().Namespaces()
@@ -446,6 +552,9 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 			apitesting.VerifyUpdateValidationEquivalence(t, ctx, &tc.update, &tc.old, Strategy, tc.expectedErrs, apitesting.WithNormalizationRules(validation.ResourceNormalizationRules...))
 		})
 	}
+
+	updateObj := mkValidResourceClaimTemplate()
+	meta.RunObjectMetaUpdateTestCases(t, ctx, &updateObj, Strategy, meta.WithStringentFinalizerValidation())
 }
 
 // --- Builders & tweaks ---
@@ -709,6 +818,150 @@ func tweakMatchAttribute(val string) func(*resource.ResourceClaimTemplate) {
 		fullyQualifiedName := resource.FullyQualifiedName(val)
 		rct.Spec.Spec.Devices.Constraints = []resource.DeviceConstraint{
 			{MatchAttribute: &fullyQualifiedName},
+		}
+	}
+}
+
+func tweakDistinctAttribute(val string) func(*resource.ResourceClaimTemplate) {
+	return func(rct *resource.ResourceClaimTemplate) {
+		fullyQualifiedName := resource.FullyQualifiedName(val)
+		rct.Spec.Spec.Devices.Constraints = []resource.DeviceConstraint{
+			{DistinctAttribute: &fullyQualifiedName},
+		}
+	}
+}
+
+func tweakExactlyDerivedAttributeName(name string) func(*resource.ResourceClaimTemplate) {
+	return func(rct *resource.ResourceClaimTemplate) {
+		for i := range rct.Spec.Spec.Devices.Requests {
+			if rct.Spec.Spec.Devices.Requests[i].Exactly != nil {
+				attrName := resource.FullyQualifiedName(name)
+				rct.Spec.Spec.Devices.Requests[i].Exactly.DerivedAttributes = []resource.DeviceDerivedAttribute{
+					{Name: attrName, Expression: "true"},
+				}
+				if name != "" {
+					rct.Spec.Spec.Devices.Constraints = append(rct.Spec.Spec.Devices.Constraints, resource.DeviceConstraint{
+						Requests:       []string{rct.Spec.Spec.Devices.Requests[i].Name},
+						MatchAttribute: &attrName,
+					})
+				}
+			}
+		}
+	}
+}
+
+func tweakFirstAvailableDerivedAttributeName(name string) func(*resource.ResourceClaimTemplate) {
+	return func(rct *resource.ResourceClaimTemplate) {
+		for i := range rct.Spec.Spec.Devices.Requests {
+			rct.Spec.Spec.Devices.Requests[i].Exactly = nil
+			attrName := resource.FullyQualifiedName(name)
+			rct.Spec.Spec.Devices.Requests[i].FirstAvailable = []resource.DeviceSubRequest{
+				{
+					Name:            "sub-0",
+					DeviceClassName: "class",
+					AllocationMode:  resource.DeviceAllocationModeAll,
+					DerivedAttributes: []resource.DeviceDerivedAttribute{
+						{Name: attrName, Expression: "true"},
+					},
+				},
+			}
+			if name != "" {
+				rct.Spec.Spec.Devices.Constraints = append(rct.Spec.Spec.Devices.Constraints, resource.DeviceConstraint{
+					Requests:       []string{rct.Spec.Spec.Devices.Requests[i].Name},
+					MatchAttribute: &attrName,
+				})
+			}
+		}
+	}
+}
+
+func tweakExactlyDerivedAttributesCount(count int) func(*resource.ResourceClaimTemplate) {
+	return func(rct *resource.ResourceClaimTemplate) {
+		for i := range rct.Spec.Spec.Devices.Requests {
+			if rct.Spec.Spec.Devices.Requests[i].Exactly != nil {
+				rct.Spec.Spec.Devices.Requests[i].Exactly.DerivedAttributes = nil
+				for j := range count {
+					attrName := resource.FullyQualifiedName(fmt.Sprintf("derived/attr%d", j))
+					rct.Spec.Spec.Devices.Requests[i].Exactly.DerivedAttributes = append(rct.Spec.Spec.Devices.Requests[i].Exactly.DerivedAttributes,
+						resource.DeviceDerivedAttribute{
+							Name:       attrName,
+							Expression: "true",
+						},
+					)
+					rct.Spec.Spec.Devices.Constraints = append(rct.Spec.Spec.Devices.Constraints, resource.DeviceConstraint{
+						Requests:       []string{rct.Spec.Spec.Devices.Requests[i].Name},
+						MatchAttribute: &attrName,
+					})
+				}
+			}
+		}
+	}
+}
+
+func tweakFirstAvailableDerivedAttributesCount(count int) func(*resource.ResourceClaimTemplate) {
+	return func(rct *resource.ResourceClaimTemplate) {
+		for i := range rct.Spec.Spec.Devices.Requests {
+			rct.Spec.Spec.Devices.Requests[i].Exactly = nil
+			rct.Spec.Spec.Devices.Requests[i].FirstAvailable = []resource.DeviceSubRequest{
+				{
+					Name:            "sub-0",
+					DeviceClassName: "class",
+					AllocationMode:  resource.DeviceAllocationModeAll,
+				},
+			}
+			for j := range count {
+				attrName := resource.FullyQualifiedName(fmt.Sprintf("derived/attr%d", j))
+				rct.Spec.Spec.Devices.Requests[i].FirstAvailable[0].DerivedAttributes = append(rct.Spec.Spec.Devices.Requests[i].FirstAvailable[0].DerivedAttributes,
+					resource.DeviceDerivedAttribute{
+						Name:       attrName,
+						Expression: "true",
+					},
+				)
+				rct.Spec.Spec.Devices.Constraints = append(rct.Spec.Spec.Devices.Constraints, resource.DeviceConstraint{
+					Requests:       []string{rct.Spec.Spec.Devices.Requests[i].Name},
+					MatchAttribute: &attrName,
+				})
+			}
+		}
+	}
+}
+
+func tweakExactlyDerivedAttributeExpression(expr string) func(*resource.ResourceClaimTemplate) {
+	return func(rct *resource.ResourceClaimTemplate) {
+		for i := range rct.Spec.Spec.Devices.Requests {
+			if rct.Spec.Spec.Devices.Requests[i].Exactly != nil {
+				attrName := resource.FullyQualifiedName("derived/attr")
+				rct.Spec.Spec.Devices.Requests[i].Exactly.DerivedAttributes = []resource.DeviceDerivedAttribute{
+					{Name: attrName, Expression: expr},
+				}
+				rct.Spec.Spec.Devices.Constraints = append(rct.Spec.Spec.Devices.Constraints, resource.DeviceConstraint{
+					Requests:       []string{rct.Spec.Spec.Devices.Requests[i].Name},
+					MatchAttribute: &attrName,
+				})
+			}
+		}
+	}
+}
+
+func tweakFirstAvailableDerivedAttributeExpression(expr string) func(*resource.ResourceClaimTemplate) {
+	return func(rct *resource.ResourceClaimTemplate) {
+		for i := range rct.Spec.Spec.Devices.Requests {
+			rct.Spec.Spec.Devices.Requests[i].Exactly = nil
+			attrName := resource.FullyQualifiedName("derived/attr")
+			rct.Spec.Spec.Devices.Requests[i].FirstAvailable = []resource.DeviceSubRequest{
+				{
+					Name:            "sub-0",
+					DeviceClassName: "class",
+					AllocationMode:  resource.DeviceAllocationModeAll,
+					DerivedAttributes: []resource.DeviceDerivedAttribute{
+						{Name: attrName, Expression: expr},
+					},
+				},
+			}
+			rct.Spec.Spec.Devices.Constraints = append(rct.Spec.Spec.Devices.Constraints, resource.DeviceConstraint{
+				Requests:       []string{rct.Spec.Spec.Devices.Requests[i].Name},
+				MatchAttribute: &attrName,
+			})
 		}
 	}
 }

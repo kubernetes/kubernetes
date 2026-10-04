@@ -89,6 +89,9 @@ type maintenanceServer struct {
 	cg     ConfigGetter
 
 	healthNotifier notifier
+
+	// we want compile errors if new methods are added
+	pb.UnsafeMaintenanceServer
 }
 
 func NewMaintenanceServer(s *etcdserver.EtcdServer, healthNotifier notifier) pb.MaintenanceServer {
@@ -364,7 +367,7 @@ func (ams *authMaintenanceServer) Alarm(ctx context.Context, ar *pb.AlarmRequest
 }
 
 func (ams *authMaintenanceServer) Status(ctx context.Context, ar *pb.StatusRequest) (*pb.StatusResponse, error) {
-	if err := ams.isPermitted(ctx); err != nil {
+	if err := ams.requireAuthInfo(ctx); err != nil {
 		return nil, togRPCError(err)
 	}
 

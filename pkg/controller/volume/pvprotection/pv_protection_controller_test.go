@@ -209,8 +209,11 @@ func TestPVProtectionController(t *testing.T) {
 		}
 
 		// Create the controller
-		logger, _ := ktesting.NewTestContext(t)
-		ctrl := NewPVProtectionController(logger, pvInformer, client)
+		logger, ctx := ktesting.NewTestContext(t)
+		ctrl, err := NewPVProtectionController(ctx, pvInformer, client)
+		if err != nil {
+			t.Fatalf("unexpected error constructing controller: %v", err)
+		}
 
 		// Start the test by simulating an event
 		if test.updatedPV != nil {

@@ -23,13 +23,13 @@ package v1alpha1
 //
 // ImageReviewSpec is a description of the pod creation request.
 type ImageReviewSpecApplyConfiguration struct {
-	// Containers is a list of a subset of the information in each container of the Pod being created.
+	// containers is a list of a subset of the information in each container of the Pod being created.
 	Containers []ImageReviewContainerSpecApplyConfiguration `json:"containers,omitempty"`
-	// Annotations is a list of key-value pairs extracted from the Pod's annotations.
+	// annotations is a list of key-value pairs extracted from the Pod's annotations.
 	// It only includes keys which match the pattern `*.image-policy.k8s.io/*`.
 	// It is up to each webhook backend to determine how to interpret these annotations, if at all.
 	Annotations map[string]string `json:"annotations,omitempty"`
-	// Namespace is the namespace the pod is being created in.
+	// namespace is the namespace the pod is being created in.
 	Namespace *string `json:"namespace,omitempty"`
 }
 

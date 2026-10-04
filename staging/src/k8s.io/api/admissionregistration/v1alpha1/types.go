@@ -27,6 +27,7 @@ type Rule = v1.Rule
 
 // ScopeType specifies a scope for a Rule.
 // +enum
+// +k8s:validation-gen-nolint
 type ScopeType = v1.ScopeType
 
 const (
@@ -42,6 +43,7 @@ const (
 // ParameterNotFoundActionType specifies a failure policy that defines how a binding
 // is evaluated when the param referred by its perNamespaceParamRef is not found.
 // +enum
+// +k8s:validation-gen-nolint
 type ParameterNotFoundActionType string
 
 const (
@@ -53,6 +55,7 @@ const (
 
 // FailurePolicyType specifies a failure policy that defines how unrecognized errors from the admission endpoint are handled.
 // +enum
+// +k8s:validation-gen-nolint
 type FailurePolicyType string
 
 const (
@@ -64,6 +67,7 @@ const (
 
 // MatchPolicyType specifies the type of match policy.
 // +enum
+// +k8s:validation-gen-nolint
 type MatchPolicyType string
 
 const (
@@ -79,11 +83,14 @@ const (
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:prerelease-lifecycle-gen:introduced=1.26
+// +k8s:prerelease-lifecycle-gen:deprecated=1.29
+// +k8s:prerelease-lifecycle-gen:removed=1.32
+// +k8s:prerelease-lifecycle-gen:replacement=admissionregistration.k8s.io,v1,ValidatingAdmissionPolicy
 
 // ValidatingAdmissionPolicy describes the definition of an admission validation policy that accepts or rejects an object without changing it.
 // +k8s:supportsSubresource="/status"
 type ValidatingAdmissionPolicy struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 	// metadata is the standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
@@ -110,6 +117,9 @@ type ValidatingAdmissionPolicyStatus struct {
 	// +optional
 	// +listType=map
 	// +listMapKey=type
+	// +k8s:alpha(since: "1.37")=+k8s:optional
+	// +k8s:alpha(since: "1.37")=+k8s:listType=map
+	// +k8s:alpha(since: "1.37")=+k8s:listMapKey=type
 	Conditions []metav1.Condition `json:"conditions,omitempty" protobuf:"bytes,3,rep,name=conditions"`
 }
 
@@ -136,10 +146,13 @@ type ExpressionWarning struct {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:prerelease-lifecycle-gen:introduced=1.26
+// +k8s:prerelease-lifecycle-gen:deprecated=1.29
+// +k8s:prerelease-lifecycle-gen:removed=1.32
+// +k8s:prerelease-lifecycle-gen:replacement=admissionregistration.k8s.io,v1,ValidatingAdmissionPolicyList
 
 // ValidatingAdmissionPolicyList is a list of ValidatingAdmissionPolicy.
 type ValidatingAdmissionPolicyList struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 	// metadata is the standard list metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
 	// +optional
@@ -375,6 +388,9 @@ type AuditAnnotation struct {
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:prerelease-lifecycle-gen:introduced=1.26
+// +k8s:prerelease-lifecycle-gen:deprecated=1.29
+// +k8s:prerelease-lifecycle-gen:removed=1.32
+// +k8s:prerelease-lifecycle-gen:replacement=admissionregistration.k8s.io,v1,ValidatingAdmissionPolicyBinding
 
 // ValidatingAdmissionPolicyBinding binds the ValidatingAdmissionPolicy with paramerized resources.
 // ValidatingAdmissionPolicyBinding and parameter CRDs together define how cluster administrators configure policies for clusters.
@@ -388,7 +404,7 @@ type AuditAnnotation struct {
 // Adding/removing policies, bindings, or params can not affect whether a
 // given (policy, binding, param) combination is within its own CEL budget.
 type ValidatingAdmissionPolicyBinding struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 	// metadata is the standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
@@ -399,10 +415,13 @@ type ValidatingAdmissionPolicyBinding struct {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:prerelease-lifecycle-gen:introduced=1.26
+// +k8s:prerelease-lifecycle-gen:deprecated=1.29
+// +k8s:prerelease-lifecycle-gen:removed=1.32
+// +k8s:prerelease-lifecycle-gen:replacement=admissionregistration.k8s.io,v1,ValidatingAdmissionPolicyBindingList
 
 // ValidatingAdmissionPolicyBindingList is a list of ValidatingAdmissionPolicyBinding.
 type ValidatingAdmissionPolicyBindingList struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 	// metadata is the standard list metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
 	// +optional
@@ -417,7 +436,7 @@ type ValidatingAdmissionPolicyBindingSpec struct {
 	// If the referenced resource does not exist, this binding is considered invalid and will be ignored
 	// Required.
 	// +required
-	// +k8s:alpha(since: "1.36")=+k8s:required
+	// +k8s:beta(since: "1.37")=+k8s:required
 	PolicyName string `json:"policyName,omitempty" protobuf:"bytes,1,rep,name=policyName"`
 
 	// paramRef specifies the parameter resource used to configure the admission control policy.
@@ -476,7 +495,7 @@ type ValidatingAdmissionPolicyBindingSpec struct {
 	// Required.
 	// +listType=set
 	// +required
-	// +k8s:alpha(since: "1.36")=+k8s:required
+	// +k8s:beta(since: "1.37")=+k8s:required
 	ValidationActions []ValidationAction `json:"validationActions,omitempty" protobuf:"bytes,4,rep,name=validationActions"`
 }
 
@@ -629,6 +648,7 @@ type MatchResources struct {
 
 // ValidationAction specifies a policy enforcement action.
 // +enum
+// +k8s:validation-gen-nolint
 type ValidationAction string
 
 const (
@@ -653,7 +673,7 @@ type NamedRuleWithOperations struct {
 	// +optional
 	ResourceNames []string `json:"resourceNames,omitempty" protobuf:"bytes,1,rep,name=resourceNames"`
 	// RuleWithOperations is a tuple of Operations and Resources.
-	RuleWithOperations `json:",inline" protobuf:"bytes,2,opt,name=ruleWithOperations"`
+	RuleWithOperations `json:"" protobuf:"bytes,2,opt,name=ruleWithOperations"`
 }
 
 // RuleWithOperations is a tuple of Operations and Resources. It is recommended to make
@@ -662,6 +682,7 @@ type RuleWithOperations = v1.RuleWithOperations
 
 // OperationType specifies an operation for a request.
 // +enum
+// +k8s:validation-gen-nolint
 type OperationType = v1.OperationType
 
 // The constants should be kept in sync with those defined in k8s.io/kubernetes/pkg/admission/interface.go.
@@ -677,10 +698,12 @@ const (
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:prerelease-lifecycle-gen:introduced=1.32
+// +k8s:prerelease-lifecycle-gen:deprecated=1.35
+// +k8s:prerelease-lifecycle-gen:replacement=admissionregistration.k8s.io,v1,MutatingAdmissionPolicy
 
 // MutatingAdmissionPolicy describes the definition of an admission mutation policy that mutates the object coming into admission chain.
 type MutatingAdmissionPolicy struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 	// metadata is the standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
@@ -690,10 +713,12 @@ type MutatingAdmissionPolicy struct {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:prerelease-lifecycle-gen:introduced=1.32
+// +k8s:prerelease-lifecycle-gen:deprecated=1.35
+// +k8s:prerelease-lifecycle-gen:replacement=admissionregistration.k8s.io,v1,MutatingAdmissionPolicyList
 
 // MutatingAdmissionPolicyList is a list of MutatingAdmissionPolicy.
 type MutatingAdmissionPolicyList struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 	// metadata is the standard list metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
 	// +optional
@@ -812,6 +837,7 @@ type Mutation struct {
 
 // PatchType specifies the type of patch operation for a mutation.
 // +enum
+// +k8s:validation-gen-nolint
 type PatchType string
 
 const (
@@ -939,6 +965,7 @@ type JSONPatch struct {
 // ReinvocationPolicyType specifies what type of policy is used when other admission plugins also perform
 // modifications.
 // +enum
+// +k8s:validation-gen-nolint
 type ReinvocationPolicyType = v1.ReinvocationPolicyType
 
 const (
@@ -955,6 +982,8 @@ const (
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:prerelease-lifecycle-gen:introduced=1.32
+// +k8s:prerelease-lifecycle-gen:deprecated=1.35
+// +k8s:prerelease-lifecycle-gen:replacement=admissionregistration.k8s.io,v1,MutatingAdmissionPolicyBinding
 
 // MutatingAdmissionPolicyBinding binds the MutatingAdmissionPolicy with parametrized resources.
 // MutatingAdmissionPolicyBinding and the optional parameter resource together define how cluster administrators
@@ -968,7 +997,7 @@ const (
 // Adding/removing policies, bindings, or params can not affect whether a
 // given (policy, binding, param) combination is within its own CEL budget.
 type MutatingAdmissionPolicyBinding struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 	// metadata is the standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
@@ -978,10 +1007,12 @@ type MutatingAdmissionPolicyBinding struct {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:prerelease-lifecycle-gen:introduced=1.32
+// +k8s:prerelease-lifecycle-gen:deprecated=1.35
+// +k8s:prerelease-lifecycle-gen:replacement=admissionregistration.k8s.io,v1,MutatingAdmissionPolicyBindingList
 
 // MutatingAdmissionPolicyBindingList is a list of MutatingAdmissionPolicyBinding.
 type MutatingAdmissionPolicyBindingList struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 	// metadata is the standard list metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
 	// +optional

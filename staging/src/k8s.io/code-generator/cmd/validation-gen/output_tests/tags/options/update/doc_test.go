@@ -39,9 +39,9 @@ func Test(t *testing.T) {
 		UpdateNoModifyDisabled: "hhh",
 	}
 
-	st.Value(&structA).OldValue(&structA).ExpectValid()
+	st.Value(&structA).OldValue(&structA).Opts(map[string]bool{"FeatureX": false}).ExpectValid()
 
-	st.Value(&structB).OldValue(&structA).ExpectMatches(
+	st.Value(&structB).OldValue(&structA).Opts(map[string]bool{"FeatureX": false}).ExpectMatches(
 		field.ErrorMatcher{}.ByType().ByField().ByOrigin().ByDetailSubstring(),
 		field.ErrorList{
 			field.Invalid(field.NewPath("immutableDisabled"), nil, "").WithOrigin("immutable"),
@@ -49,7 +49,7 @@ func Test(t *testing.T) {
 		},
 	)
 
-	st.Value(&structB).OldValue(&structA).Opts([]string{"FeatureX"}).ExpectMatches(
+	st.Value(&structB).OldValue(&structA).Opts(map[string]bool{"FeatureX": true}).ExpectMatches(
 		field.ErrorMatcher{}.ByType().ByField().ByOrigin().ByDetailSubstring(),
 		field.ErrorList{
 			field.Invalid(field.NewPath("immutableEnabled"), nil, "").WithOrigin("immutable"),

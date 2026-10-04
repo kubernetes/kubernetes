@@ -34,11 +34,39 @@ import (
 )
 
 // ResourceQuotaInformer provides access to a shared informer and lister for
-// ResourceQuotas.
+// ResourceQuotas. Prefer using the type-safe variant (see [TypedResourceQuotaInformer]).
 type ResourceQuotaInformer interface {
 	Informer() cache.SharedIndexInformer
 	Lister() corev1.ResourceQuotaLister
 }
+
+// TypedResourceQuotaInformer provides access to a shared informer and lister for
+// ResourceQuotas, including the type-safe TypedInformer variant.
+// It is a superset of ResourceQuotaInformer.
+type TypedResourceQuotaInformer interface {
+	Informer() cache.SharedIndexInformer
+	TypedInformer() ResourceQuotaIndexInformer
+	Lister() corev1.ResourceQuotaLister
+}
+
+// ResourceQuotaIndexInformer is a wrapper around the underlying [cache.SharedIndexInformer]
+// with type-safe variants of several methods.
+type ResourceQuotaIndexInformer cache.TypedSharedIndexInformer[*apicorev1.ResourceQuota]
+
+// ResourceQuotaHandlerFuncs is a specialization of [cache.TypedResourceEventHandlerFuncs] for ResourceQuota.
+type ResourceQuotaHandlerFuncs = cache.TypedResourceEventHandlerFuncs[*apicorev1.ResourceQuota]
+
+// ResourceQuotaDetailedHandlerFuncs is a specialization of [cache.TypedResourceEventHandlerDetailedFuncs] for ResourceQuota.
+type ResourceQuotaDetailedHandlerFuncs = cache.TypedResourceEventHandlerDetailedFuncs[*apicorev1.ResourceQuota]
+
+// ResourceQuotaFilteringHandler is a specialization of [cache.TypedFilteringResourceEventHandler] for ResourceQuota.
+type ResourceQuotaFilteringHandler = cache.TypedFilteringResourceEventHandler[*apicorev1.ResourceQuota]
+
+// ResourceQuotaIndexers is a specialization of [cache.TypedIndexers] for ResourceQuota.
+type ResourceQuotaIndexers = cache.TypedIndexers[*apicorev1.ResourceQuota]
+
+// DeletedResourceQuota is a specialization of [cache.DeletedObject] for ResourceQuota.
+type DeletedResourceQuota = cache.DeletedObject[*apicorev1.ResourceQuota]
 
 type resourceQuotaInformer struct {
 	factory          internalinterfaces.SharedInformerFactory
@@ -49,25 +77,49 @@ type resourceQuotaInformer struct {
 // NewResourceQuotaInformer constructs a new informer for ResourceQuota type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedResourceQuotaInformer]).
 func NewResourceQuotaInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
 	return NewResourceQuotaInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers})
+}
+
+// NewTypedResourceQuotaInformer constructs a new informer for ResourceQuota type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedResourceQuotaInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers ResourceQuotaIndexers) ResourceQuotaIndexInformer {
+	return NewTypedResourceQuotaInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.TypedIndexersToIndexers(indexers)})
 }
 
 // NewFilteredResourceQuotaInformer constructs a new informer for ResourceQuota type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedFilteredResourceQuotaInformer]).
 func NewFilteredResourceQuotaInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
-	return NewResourceQuotaInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
+	return NewTypedResourceQuotaInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
+}
+
+// NewTypedFilteredResourceQuotaInformer constructs a new informer for ResourceQuota type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedFilteredResourceQuotaInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers ResourceQuotaIndexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) ResourceQuotaIndexInformer {
+	return NewTypedResourceQuotaInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.TypedIndexersToIndexers(indexers), TweakListOptions: tweakListOptions})
 }
 
 // NewResourceQuotaInformerWithOptions constructs a new informer for ResourceQuota type with additional options.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedResourceQuotaInformerWithOptions]).
 func NewResourceQuotaInformerWithOptions(client kubernetes.Interface, namespace string, options internalinterfaces.InformerOptions) cache.SharedIndexInformer {
+	return NewTypedResourceQuotaInformerWithOptions(client, namespace, options)
+}
+
+// NewTypedResourceQuotaInformerWithOptions constructs a new informer for ResourceQuota type with additional options.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedResourceQuotaInformerWithOptions(client kubernetes.Interface, namespace string, options internalinterfaces.InformerOptions) ResourceQuotaIndexInformer {
 	gvr := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "resourcequotas"}
 	identifier := options.InformerName.WithResource(gvr)
 	tweakListOptions := options.TweakListOptions
-	return cache.NewSharedIndexInformerWithOptions(
+	return cache.NewTypedSharedIndexInformer[*apicorev1.ResourceQuota](cache.NewSharedIndexInformerWithOptions(
 		cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
 			ListFunc: func(opts metav1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
@@ -100,17 +152,57 @@ func NewResourceQuotaInformerWithOptions(client kubernetes.Interface, namespace 
 			Indexers:     options.Indexers,
 			Identifier:   identifier,
 		},
-	)
+	))
 }
 
 func (f *resourceQuotaInformer) defaultInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewResourceQuotaInformerWithOptions(client, f.namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
+	return NewTypedResourceQuotaInformerWithOptions(client, f.namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
 }
 
 func (f *resourceQuotaInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&apicorev1.ResourceQuota{}, f.defaultInformer)
+	return f.TypedInformer()
+}
+
+func (f *resourceQuotaInformer) TypedInformer() ResourceQuotaIndexInformer {
+	return cache.NewTypedSharedIndexInformer[*apicorev1.ResourceQuota](f.factory.InformerFor(&apicorev1.ResourceQuota{}, f.defaultInformer))
 }
 
 func (f *resourceQuotaInformer) Lister() corev1.ResourceQuotaLister {
 	return corev1.NewResourceQuotaLister(f.Informer().GetIndexer())
+}
+
+// ToTypedResourceQuotaInformer converts an untyped informer into a TypedResourceQuotaInformer.
+//
+// WARNING: this conversion is only safe if the informer handles objects of type
+// *ResourceQuota. If that is not the case, calling type-safe methods of the returned
+// TypedResourceQuotaInformer leads to runtime panics. A safer alternative is to pass
+// around a TypedResourceQuotaInformer instances that was obtained from a
+// SharedInformerFactory.
+func ToTypedResourceQuotaInformer(informer ResourceQuotaInformer) TypedResourceQuotaInformer {
+	if informer, ok := informer.(TypedResourceQuotaInformer); ok {
+		return informer
+	}
+	return &resourceQuotaTypedInformerAdapter{informer}
+}
+
+type resourceQuotaTypedInformerAdapter struct {
+	ResourceQuotaInformer
+}
+
+func (a *resourceQuotaTypedInformerAdapter) TypedInformer() ResourceQuotaIndexInformer {
+	return cache.NewTypedSharedIndexInformer[*apicorev1.ResourceQuota](a.Informer())
+}
+
+// ToResourceQuotaIndexInformer converts an untyped informer into a ResourceQuotaIndexInformer.
+//
+// WARNING: this conversion is only safe if the informer handles objects of type
+// *ResourceQuota. If that is not the case, calling type-safe methods of the returned
+// ResourceQuotaIndexInformer leads to runtime panics. A safer alternative is to pass
+// around a ResourceQuotaIndexInformer instances that was obtained from a
+// SharedInformerFactory.
+func ToResourceQuotaIndexInformer(informer cache.SharedIndexInformer) ResourceQuotaIndexInformer {
+	if informer, ok := informer.(ResourceQuotaIndexInformer); ok {
+		return informer
+	}
+	return cache.NewTypedSharedIndexInformer[*apicorev1.ResourceQuota](informer)
 }

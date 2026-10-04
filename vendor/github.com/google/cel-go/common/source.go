@@ -74,6 +74,12 @@ func NewTextSource(text string) Source {
 	return NewStringSource(text, "<input>")
 }
 
+// NewTextSourceWithLimit creates a new Source from the input text string while
+// enforcing a maximum code point count when needed.
+func NewTextSourceWithLimit(text string, limit int) (Source, error) {
+	return NewStringSourceWithLimit(text, "<input>", limit)
+}
+
 // NewStringSource creates a new Source from the given contents and description.
 func NewStringSource(contents string, description string) Source {
 	// Compute line offsets up front as they are referred to frequently.
@@ -83,6 +89,23 @@ func NewStringSource(contents string, description string) Source {
 		description: description,
 		lineOffsets: offs,
 	}
+}
+
+// NewStringSourceWithLimit creates a new Source from the given contents and
+// description while enforcing a maximum code point count when needed.
+func NewStringSourceWithLimit(contents string, description string, limit int) (Source, error) {
+	if limit < 0 || len(contents) <= limit {
+		return NewStringSource(contents, description), nil
+	}
+	buf, offs, err := runes.NewBufferAndLineOffsetsWithLimit(contents, limit)
+	if err != nil {
+		return nil, err
+	}
+	return &sourceImpl{
+		Buffer:      buf,
+		description: description,
+		lineOffsets: offs,
+	}, nil
 }
 
 // NewInfoSource creates a new Source from a SourceInfo.

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // Package global provides the OpenTelemetry global API.
-package global // import "go.opentelemetry.io/otel/internal/global"
+package global
 
 import (
 	"go.opentelemetry.io/otel/internal/errorhandler"

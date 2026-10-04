@@ -27,6 +27,19 @@ import (
 	structpb "google.golang.org/protobuf/types/known/structpb"
 )
 
+var (
+	pbComponentMap = map[exprpb.SourceInfo_Extension_Component]ExtensionComponent{
+		exprpb.SourceInfo_Extension_COMPONENT_PARSER:       ComponentParser,
+		exprpb.SourceInfo_Extension_COMPONENT_TYPE_CHECKER: ComponentTypeChecker,
+		exprpb.SourceInfo_Extension_COMPONENT_RUNTIME:      ComponentRuntime,
+	}
+	componentPBMap = map[ExtensionComponent]exprpb.SourceInfo_Extension_Component{
+		ComponentParser:      exprpb.SourceInfo_Extension_COMPONENT_PARSER,
+		ComponentTypeChecker: exprpb.SourceInfo_Extension_COMPONENT_TYPE_CHECKER,
+		ComponentRuntime:     exprpb.SourceInfo_Extension_COMPONENT_RUNTIME,
+	}
+)
+
 // ToProto converts an AST to a CheckedExpr protobouf.
 func ToProto(ast *AST) (*exprpb.CheckedExpr, error) {
 	refMap := make(map[int64]*exprpb.Reference, len(ast.ReferenceMap()))
@@ -534,6 +547,25 @@ func SourceInfoToProto(info *SourceInfo) (*exprpb.SourceInfo, error) {
 		}
 		sourceInfo.MacroCalls[id] = call
 	}
+	for _, ext := range info.Extensions() {
+		var components []exprpb.SourceInfo_Extension_Component
+		for _, c := range ext.Components {
+			comp, found := componentPBMap[c]
+			if found {
+				components = append(components, comp)
+			}
+		}
+		ver := &exprpb.SourceInfo_Extension_Version{
+			Major: ext.Version.Major,
+			Minor: ext.Version.Minor,
+		}
+		pbExt := &exprpb.SourceInfo_Extension{
+			Id:                 ext.ID,
+			Version:            ver,
+			AffectedComponents: components,
+		}
+		sourceInfo.Extensions = append(sourceInfo.Extensions, pbExt)
+	}
 	return sourceInfo, nil
 }
 
@@ -555,6 +587,23 @@ func ProtoToSourceInfo(info *exprpb.SourceInfo) (*SourceInfo, error) {
 			return nil, err
 		}
 		sourceInfo.SetMacroCall(id, call)
+	}
+	for _, pbExt := range info.GetExtensions() {
+		var components []ExtensionComponent
+		for _, c := range pbExt.GetAffectedComponents() {
+			comp, found := pbComponentMap[*c.Enum()]
+			if found {
+				components = append(components, comp)
+			}
+		}
+		sourceInfo.AddExtension(NewExtension(
+			pbExt.GetId(),
+			NewExtensionVersion(
+				pbExt.GetVersion().GetMajor(),
+				pbExt.GetVersion().GetMinor(),
+			),
+			components...,
+		))
 	}
 	return sourceInfo, nil
 }

@@ -24,11 +24,9 @@ package v1alpha1
 import (
 	unsafe "unsafe"
 
-	v1 "k8s.io/api/core/v1"
 	nodev1alpha1 "k8s.io/api/node/v1alpha1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
-	core "k8s.io/kubernetes/pkg/apis/core"
 	node "k8s.io/kubernetes/pkg/apis/node"
 )
 
@@ -83,7 +81,7 @@ func RegisterConversions(s *runtime.Scheme) error {
 }
 
 func autoConvert_v1alpha1_Overhead_To_node_Overhead(in *nodev1alpha1.Overhead, out *node.Overhead, s conversion.Scope) error {
-	out.PodFixed = *(*core.ResourceList)(unsafe.Pointer(&in.PodFixed))
+	*out = *(*node.Overhead)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -93,7 +91,7 @@ func Convert_v1alpha1_Overhead_To_node_Overhead(in *nodev1alpha1.Overhead, out *
 }
 
 func autoConvert_node_Overhead_To_v1alpha1_Overhead(in *node.Overhead, out *nodev1alpha1.Overhead, s conversion.Scope) error {
-	out.PodFixed = *(*v1.ResourceList)(unsafe.Pointer(&in.PodFixed))
+	*out = *(*nodev1alpha1.Overhead)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -159,8 +157,7 @@ func Convert_node_RuntimeClassList_To_v1alpha1_RuntimeClassList(in *node.Runtime
 }
 
 func autoConvert_v1alpha1_Scheduling_To_node_Scheduling(in *nodev1alpha1.Scheduling, out *node.Scheduling, s conversion.Scope) error {
-	out.NodeSelector = *(*map[string]string)(unsafe.Pointer(&in.NodeSelector))
-	out.Tolerations = *(*[]core.Toleration)(unsafe.Pointer(&in.Tolerations))
+	*out = *(*node.Scheduling)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -170,8 +167,7 @@ func Convert_v1alpha1_Scheduling_To_node_Scheduling(in *nodev1alpha1.Scheduling,
 }
 
 func autoConvert_node_Scheduling_To_v1alpha1_Scheduling(in *node.Scheduling, out *nodev1alpha1.Scheduling, s conversion.Scope) error {
-	out.NodeSelector = *(*map[string]string)(unsafe.Pointer(&in.NodeSelector))
-	out.Tolerations = *(*[]v1.Toleration)(unsafe.Pointer(&in.Tolerations))
+	*out = *(*nodev1alpha1.Scheduling)(unsafe.Pointer(in))
 	return nil
 }
 

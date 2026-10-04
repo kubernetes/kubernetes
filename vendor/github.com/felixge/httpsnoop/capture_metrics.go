@@ -69,6 +69,16 @@ func (m *Metrics) CaptureMetrics(w http.ResponseWriter, fn func(http.ResponseWri
 				}
 			},
 
+			WriteString: func(next WriteStringFunc) WriteStringFunc {
+				return func(s string) (int, error) {
+					n, err := next(s)
+
+					m.Written += int64(n)
+					headerWritten = true
+					return n, err
+				}
+			},
+
 			ReadFrom: func(next ReadFromFunc) ReadFromFunc {
 				return func(src io.Reader) (int64, error) {
 					n, err := next(src)
@@ -81,6 +91,31 @@ func (m *Metrics) CaptureMetrics(w http.ResponseWriter, fn func(http.ResponseWri
 		}
 	)
 
+	// defer to ensure duration is updated even if the handler panics
+	defer func() {
+		m.Duration += time.Since(start)
+	}()
 	fn(Wrap(w, hooks))
-	m.Duration += time.Since(start)
+}
+
+// deadliner defines two methods introduced in go 1.20. The standard library
+// seems not to provide an interface we can import, hence its definition here.
+type deadliner interface {
+	SetReadDeadline(deadline time.Time) error
+	SetWriteDeadline(deadline time.Time) error
+}
+
+// fullDuplexEnabler defines a method introduced in go 1.21. The standard
+// library seems not to provide an interface we can import, hence its definition
+// here.
+type fullDuplexEnabler interface {
+	EnableFullDuplex() error
+}
+
+// httpFlushError defines a method introduced in go 1.20. The standard
+// library seems not to provide an interface we can import, hence its definition
+// here.
+// See https://github.com/golang/go/blob/go1.20/src/net/http/responsecontroller.go#L50
+type httpFlushError interface {
+	FlushError() error
 }

@@ -32,7 +32,6 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
-	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/network/common"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
@@ -79,9 +78,7 @@ var _ = common.SIGDescribe("DNS", func() {
 	})
 
 	// Added due to #8512. This is critical for GCE and GKE deployments.
-	ginkgo.It("should provide DNS for the cluster [Provider:GCE]", func(ctx context.Context) {
-		e2eskipper.SkipUnlessProviderIs("gce")
-
+	f.It("should provide DNS for the cluster", f.WithProvider("gce"), func(ctx context.Context) {
 		namesToResolve := []string{"google.com"}
 		// Windows containers do not have a route to the GCE metadata server by default.
 		if !framework.NodeOSDistroIs("windows") {
@@ -497,7 +494,7 @@ var _ = common.SIGDescribe("DNS", func() {
 
 		runCommand := func(arg string) string {
 			cmd := []string{"/agnhost", arg}
-			stdout, stderr, err := e2epod.ExecWithOptions(f, e2epod.ExecOptions{
+			stdout, stderr, err := e2epod.Exec(f.TContext(ctx), e2epod.ExecOptions{
 				Command:       cmd,
 				Namespace:     f.Namespace.Name,
 				PodName:       testAgnhostPod.Name,
@@ -571,7 +568,7 @@ var _ = common.SIGDescribe("DNS", func() {
 		ginkgo.By("Verifying customized DNS option is configured on pod...")
 		// TODO: Figure out a better way other than checking the actual resolv,conf file.
 		cmd := []string{"cat", "/etc/resolv.conf"}
-		stdout, stderr, err := e2epod.ExecWithOptions(f, e2epod.ExecOptions{
+		stdout, stderr, err := e2epod.Exec(f.TContext(ctx), e2epod.ExecOptions{
 			Command:       cmd,
 			Namespace:     f.Namespace.Name,
 			PodName:       testUtilsPod.Name,
@@ -591,7 +588,7 @@ var _ = common.SIGDescribe("DNS", func() {
 		// - DNS query is sent to the specified server.
 		cmd = []string{"dig", "+short", "+search", testDNSNameShort}
 		digFunc := func() (bool, error) {
-			stdout, stderr, err := e2epod.ExecWithOptions(f, e2epod.ExecOptions{
+			stdout, stderr, err := e2epod.Exec(f.TContext(ctx), e2epod.ExecOptions{
 				Command:       cmd,
 				Namespace:     f.Namespace.Name,
 				PodName:       testUtilsPod.Name,

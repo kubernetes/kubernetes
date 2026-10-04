@@ -22,6 +22,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
@@ -30,6 +31,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/apiserver/pkg/features"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/util/x509metrics"
 	"k8s.io/client-go/rest"
 	"k8s.io/utils/lru"
@@ -194,20 +197,36 @@ func (cm *ClientManager) hookClientConfig(cc ClientConfig) (*rest.Config, error)
 			cfg.TLSClientConfig.ServerName = serverName
 		}
 
-		delegateDialer := cfg.Dial
-		if delegateDialer == nil {
-			var d net.Dialer
-			delegateDialer = d.DialContext
-		}
-		cfg.Dial = func(ctx context.Context, network, addr string) (net.Conn, error) {
-			if addr == host {
-				u, err := cm.serviceResolver.ResolveEndpoint(cc.Service.Namespace, cc.Service.Name, port)
-				if err != nil {
-					return nil, err
-				}
-				addr = u.Host
+		if !utilfeature.DefaultFeatureGate.Enabled(features.WebhookRoundTripLoadBalancing) {
+			delegateDialer := cfg.Dial
+			if delegateDialer == nil {
+				var d net.Dialer
+				delegateDialer = d.DialContext
 			}
-			return delegateDialer(ctx, network, addr)
+			cfg.Dial = func(ctx context.Context, network, addr string) (net.Conn, error) {
+				if addr == host {
+					u, err := cm.serviceResolver.ResolveEndpoint(cc.Service.Namespace, cc.Service.Name, port)
+					if err != nil {
+						return nil, err
+					}
+					addr = u.Host
+				}
+				return delegateDialer(ctx, network, addr)
+			}
+		} else {
+			// Use a custom roundtripper since http transport caches
+			// the connections by the URL. Host. The service resolver
+			// provides the actual endpoint address, if we use a custom
+			// dialer then the cached connection may not be closed.
+			cfg.Wrap(func(rt http.RoundTripper) http.RoundTripper {
+				return &resolvingRoundTripper{
+					delegate:        rt,
+					serviceResolver: cm.serviceResolver,
+					namespace:       cc.Service.Namespace,
+					serviceName:     cc.Service.Name,
+					port:            port,
+				}
+			})
 		}
 
 		return complete(cfg)
@@ -254,4 +273,37 @@ func isLocalHost(u *url.URL) bool {
 		return netIP.IsLoopback()
 	}
 	return false
+}
+
+// resolvingRoundTripper is a roundtripper that resolves the endpoint address
+// for the given service and updates the request URL to use the resolved endpoint address.
+type resolvingRoundTripper struct {
+	delegate        http.RoundTripper
+	serviceResolver ServiceResolver
+	namespace       string
+	serviceName     string
+	port            int32
+}
+
+func (r *resolvingRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+	serverName := r.serviceName + "." + r.namespace + ".svc"
+	host := net.JoinHostPort(serverName, strconv.Itoa(int(r.port)))
+	if req.URL.Host != host {
+		return r.delegate.RoundTrip(req)
+	}
+	u, err := r.serviceResolver.ResolveEndpoint(r.namespace, r.serviceName, r.port)
+	if err != nil {
+		return nil, err
+	}
+	newReq := req.Clone(req.Context())
+	// Preserve the original Host header
+	if len(newReq.Host) == 0 {
+		newReq.Host = req.URL.Host
+	}
+	newReq.URL.Host = u.Host
+	return r.delegate.RoundTrip(newReq)
+}
+
+func (r *resolvingRoundTripper) WrappedRoundTripper() http.RoundTripper {
+	return r.delegate
 }

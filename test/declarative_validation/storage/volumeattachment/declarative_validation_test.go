@@ -26,6 +26,7 @@ import (
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	storage "k8s.io/kubernetes/pkg/apis/storage"
 	registry "k8s.io/kubernetes/pkg/registry/storage/volumeattachment"
+	"k8s.io/kubernetes/test/declarative_validation/meta"
 )
 
 func TestDeclarativeValidate(t *testing.T) {
@@ -69,19 +70,19 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 		"invalid attacher (required)": {
 			input: mkValidVolumeAttachment(TweakAttacher("")),
 			expectedErrs: field.ErrorList{
-				field.Required(field.NewPath("spec", "attacher"), "").MarkAlpha(),
+				field.Required(field.NewPath("spec", "attacher"), "").MarkBeta(),
 			},
 		},
 		"attacher with special characters": {
 			input: mkValidVolumeAttachment(TweakAttacher("asdadasd&@!")),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("spec", "attacher"), "", "").WithOrigin("format=k8s-long-name-caseless").MarkAlpha(),
+				field.Invalid(field.NewPath("spec", "attacher"), "", "").WithOrigin("format=k8s-long-name-caseless").MarkBeta(),
 			},
 		},
 		"attacher with number of characters exceeds 63": {
 			input: mkValidVolumeAttachment(TweakAttacher(strings.Repeat("a", 64))),
 			expectedErrs: field.ErrorList{
-				field.TooLong(field.NewPath("spec", "attacher"), strings.Repeat("a", 64), 63).WithOrigin("maxLength").MarkAlpha(),
+				field.TooLong(field.NewPath("spec", "attacher"), strings.Repeat("a", 64), 63).WithOrigin("maxLength").MarkBeta(),
 			},
 		},
 	}
@@ -91,6 +92,9 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 			apitesting.VerifyValidationEquivalence(t, ctx, &tc.input, registry.Strategy, tc.expectedErrs)
 		})
 	}
+
+	obj := mkValidVolumeAttachment()
+	meta.RunObjectMetaTestCases(t, ctx, &obj, registry.Strategy, meta.WithStringentFinalizerValidation())
 }
 
 func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
@@ -115,16 +119,20 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 			oldInput: mkValidVolumeAttachment(),
 			newInput: mkValidVolumeAttachment(TweakAttacher("different.com")),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("spec"), nil, "field is immutable").WithOrigin("immutable").MarkAlpha(),
+				field.Invalid(field.NewPath("spec"), nil, "field is immutable").WithOrigin("immutable").MarkBeta(),
 			},
 		},
 	}
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
+			tc.oldInput.ObjectMeta.ResourceVersion = "1"
+			tc.newInput.ObjectMeta.ResourceVersion = "2"
 			apitesting.VerifyUpdateValidationEquivalence(t, ctx, &tc.newInput, &tc.oldInput, registry.Strategy, tc.expectedErrs)
 		})
 	}
+	updateObj := mkValidVolumeAttachment()
+	meta.RunObjectMetaUpdateTestCases(t, ctx, &updateObj, registry.Strategy, meta.WithStringentFinalizerValidation())
 }
 
 func TweakAttacher(attacher string) func(obj *storage.VolumeAttachment) {

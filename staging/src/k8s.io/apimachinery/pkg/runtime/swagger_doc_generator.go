@@ -25,7 +25,10 @@ import (
 	"go/token"
 	"io"
 	"reflect"
+	"strconv"
 	"strings"
+
+	"k8s.io/apimachinery/pkg/util/errors"
 )
 
 // Pair of strings. We keed the name of fields and the doc
@@ -94,23 +97,29 @@ func fmtRawDoc(rawDoc string) string {
 
 // fieldName returns the name of the field as it should appear in JSON format
 // "-" indicates that this field is not part of the JSON representation
-func fieldName(field *ast.Field) string {
+func fieldName(field *ast.Field) (string, error) {
 	jsonTag := ""
 	if field.Tag != nil {
-		jsonTag = reflect.StructTag(field.Tag.Value[1 : len(field.Tag.Value)-1]).Get("json") // Delete first and last quotation
-		if strings.Contains(jsonTag, "inline") {
-			return "-"
+		var jsonTagExists bool
+		tagValue, err := strconv.Unquote(field.Tag.Value)
+		if err != nil {
+			return "", err
+		}
+		jsonTag, jsonTagExists = reflect.StructTag(tagValue).Lookup("json") // Delete first and last quotation
+		// field is embedded, json tag is declared and has an empty name
+		if field.Names == nil && jsonTagExists && (jsonTag == "" || strings.HasPrefix(jsonTag, ",")) {
+			return "-", nil
 		}
 	}
 
 	jsonTag = strings.Split(jsonTag, ",")[0] // This can return "-"
 	if jsonTag == "" {
 		if field.Names != nil {
-			return field.Names[0].Name
+			return field.Names[0].Name, nil
 		}
-		return field.Type.(*ast.Ident).Name
+		return field.Type.(*ast.Ident).Name, nil
 	}
-	return jsonTag
+	return jsonTag, nil
 }
 
 // A buffer of lines that will be written.
@@ -171,8 +180,9 @@ func writeMapBody(b *buffer, kubeType []Pair, indent int) {
 // array. Each type is again represented as an array (we have to use arrays as we
 // need to be sure for the order of the fields). This function returns fields and
 // struct definitions that have no documentation as {name, ""}.
-func ParseDocumentationFrom(src string) []KubeTypes {
+func ParseDocumentationFrom(src string) ([]KubeTypes, error) {
 	var docForTypes []KubeTypes
+	var errs []error
 
 	pkg := astFrom(src)
 
@@ -182,7 +192,9 @@ func ParseDocumentationFrom(src string) []KubeTypes {
 			ks = append(ks, Pair{kubType.Name, fmtRawDoc(kubType.Doc)})
 
 			for _, field := range structType.Fields.List {
-				if n := fieldName(field); n != "-" {
+				if n, err := fieldName(field); err != nil {
+					errs = append(errs, err)
+				} else if n != "-" {
 					fieldDoc := fmtRawDoc(field.Doc.Text())
 					ks = append(ks, Pair{n, fieldDoc})
 				}
@@ -191,7 +203,7 @@ func ParseDocumentationFrom(src string) []KubeTypes {
 		}
 	}
 
-	return docForTypes
+	return docForTypes, errors.NewAggregate(errs)
 }
 
 // WriteSwaggerDocFunc writes a declaration of a function as a string. This function is used in

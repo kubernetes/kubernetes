@@ -361,7 +361,7 @@ func (j *JSONPath) findFieldInValue(value *reflect.Value, node *FieldNode) (refl
 	var inlineValue *reflect.Value
 	for ix := 0; ix < t.NumField(); ix++ {
 		f := t.Field(ix)
-		jsonTag := f.Tag.Get("json")
+		jsonTag, _ := f.Tag.Lookup("json")
 		parts := strings.Split(jsonTag, ",")
 		if len(parts) == 0 {
 			continue
@@ -369,7 +369,7 @@ func (j *JSONPath) findFieldInValue(value *reflect.Value, node *FieldNode) (refl
 		if parts[0] == node.Value {
 			return value.Field(ix), nil
 		}
-		if len(parts[0]) == 0 {
+		if len(parts[0]) == 0 && f.Anonymous {
 			val := value.Field(ix)
 			inlineValue = &val
 		}

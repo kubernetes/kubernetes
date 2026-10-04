@@ -36,17 +36,18 @@ import (
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	genericapifilters "k8s.io/apiserver/pkg/endpoints/filters"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
-	"k8s.io/apiserver/pkg/server"
 	genericfilters "k8s.io/apiserver/pkg/server/filters"
 	"k8s.io/apiserver/pkg/server/flagz"
 	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/apiserver/pkg/server/mux"
 	"k8s.io/apiserver/pkg/server/routes"
+	"k8s.io/apiserver/pkg/server/signals"
 	"k8s.io/apiserver/pkg/server/statusz"
 	"k8s.io/apiserver/pkg/util/compatibility"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/events"
 	"k8s.io/client-go/tools/leaderelection"
 	cliflag "k8s.io/component-base/cli/flag"
@@ -58,6 +59,7 @@ import (
 	logsapi "k8s.io/component-base/logs/api/v1"
 	"k8s.io/component-base/metrics/features"
 	"k8s.io/component-base/metrics/legacyregistry"
+	featuremetrics "k8s.io/component-base/metrics/prometheus/feature"
 	"k8s.io/component-base/metrics/prometheus/slis"
 	"k8s.io/component-base/term"
 	utilversion "k8s.io/component-base/version"
@@ -150,10 +152,18 @@ func runCommand(cmd *cobra.Command, opts *options.Options, registryOptions ...Op
 	}
 	cliflag.PrintFlags(cmd.Flags())
 
+	if opts.InformerName == nil {
+		informerName, err := cache.NewInformerName("kube-scheduler")
+		if err != nil {
+			return err
+		}
+		opts.InformerName = informerName
+	}
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	go func() {
-		stopCh := server.SetupSignalHandler()
+		stopCh := signals.SetupSignalHandler()
 		<-stopCh
 		cancel()
 	}()
@@ -163,7 +173,7 @@ func runCommand(cmd *cobra.Command, opts *options.Options, registryOptions ...Op
 		return err
 	}
 	// add feature enablement metrics
-	fg.(featuregate.MutableFeatureGate).AddMetrics()
+	fg.(featuregate.MutableFeatureGate).AddMetrics(featuremetrics.RecordFeatureInfo)
 	// add component version metrics
 	opts.ComponentGlobalsRegistry.AddMetrics()
 

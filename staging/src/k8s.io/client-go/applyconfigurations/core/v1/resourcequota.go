@@ -32,14 +32,14 @@ import (
 //
 // ResourceQuota sets aggregate quota restrictions enforced per namespace
 type ResourceQuotaApplyConfiguration struct {
-	metav1.TypeMetaApplyConfiguration `json:",inline"`
-	// Standard object's metadata.
+	metav1.TypeMetaApplyConfiguration `json:""`
+	// metadata is the standard object's metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	// Spec defines the desired quota.
+	// spec defines the desired quota.
 	// https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
 	Spec *ResourceQuotaSpecApplyConfiguration `json:"spec,omitempty"`
-	// Status defines the actual enforced quota and its current usage.
+	// status defines the actual enforced quota and its current usage.
 	// https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
 	Status *ResourceQuotaStatusApplyConfiguration `json:"status,omitempty"`
 }

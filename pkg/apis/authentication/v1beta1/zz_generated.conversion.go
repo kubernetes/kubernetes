@@ -184,8 +184,7 @@ func Convert_authentication_TokenReview_To_v1beta1_TokenReview(in *authenticatio
 }
 
 func autoConvert_v1beta1_TokenReviewSpec_To_authentication_TokenReviewSpec(in *authenticationv1beta1.TokenReviewSpec, out *authentication.TokenReviewSpec, s conversion.Scope) error {
-	out.Token = in.Token
-	out.Audiences = *(*[]string)(unsafe.Pointer(&in.Audiences))
+	*out = *(*authentication.TokenReviewSpec)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -195,8 +194,7 @@ func Convert_v1beta1_TokenReviewSpec_To_authentication_TokenReviewSpec(in *authe
 }
 
 func autoConvert_authentication_TokenReviewSpec_To_v1beta1_TokenReviewSpec(in *authentication.TokenReviewSpec, out *authenticationv1beta1.TokenReviewSpec, s conversion.Scope) error {
-	out.Token = in.Token
-	out.Audiences = *(*[]string)(unsafe.Pointer(&in.Audiences))
+	*out = *(*authenticationv1beta1.TokenReviewSpec)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -206,12 +204,7 @@ func Convert_authentication_TokenReviewSpec_To_v1beta1_TokenReviewSpec(in *authe
 }
 
 func autoConvert_v1beta1_TokenReviewStatus_To_authentication_TokenReviewStatus(in *authenticationv1beta1.TokenReviewStatus, out *authentication.TokenReviewStatus, s conversion.Scope) error {
-	out.Authenticated = in.Authenticated
-	if err := Convert_v1beta1_UserInfo_To_authentication_UserInfo(&in.User, &out.User, s); err != nil {
-		return err
-	}
-	out.Audiences = *(*[]string)(unsafe.Pointer(&in.Audiences))
-	out.Error = in.Error
+	*out = *(*authentication.TokenReviewStatus)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -221,12 +214,7 @@ func Convert_v1beta1_TokenReviewStatus_To_authentication_TokenReviewStatus(in *a
 }
 
 func autoConvert_authentication_TokenReviewStatus_To_v1beta1_TokenReviewStatus(in *authentication.TokenReviewStatus, out *authenticationv1beta1.TokenReviewStatus, s conversion.Scope) error {
-	out.Authenticated = in.Authenticated
-	if err := Convert_authentication_UserInfo_To_v1beta1_UserInfo(&in.User, &out.User, s); err != nil {
-		return err
-	}
-	out.Audiences = *(*[]string)(unsafe.Pointer(&in.Audiences))
-	out.Error = in.Error
+	*out = *(*authenticationv1beta1.TokenReviewStatus)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -236,10 +224,7 @@ func Convert_authentication_TokenReviewStatus_To_v1beta1_TokenReviewStatus(in *a
 }
 
 func autoConvert_v1beta1_UserInfo_To_authentication_UserInfo(in *authenticationv1beta1.UserInfo, out *authentication.UserInfo, s conversion.Scope) error {
-	out.Username = in.Username
-	out.UID = in.UID
-	out.Groups = *(*[]string)(unsafe.Pointer(&in.Groups))
-	out.Extra = *(*map[string]authentication.ExtraValue)(unsafe.Pointer(&in.Extra))
+	*out = *(*authentication.UserInfo)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -249,10 +234,7 @@ func Convert_v1beta1_UserInfo_To_authentication_UserInfo(in *authenticationv1bet
 }
 
 func autoConvert_authentication_UserInfo_To_v1beta1_UserInfo(in *authentication.UserInfo, out *authenticationv1beta1.UserInfo, s conversion.Scope) error {
-	out.Username = in.Username
-	out.UID = in.UID
-	out.Groups = *(*[]string)(unsafe.Pointer(&in.Groups))
-	out.Extra = *(*map[string]authenticationv1beta1.ExtraValue)(unsafe.Pointer(&in.Extra))
+	*out = *(*authenticationv1beta1.UserInfo)(unsafe.Pointer(in))
 	return nil
 }
 

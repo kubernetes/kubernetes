@@ -68,7 +68,16 @@ var _ = sigDescribe(feature.Windows, "SecurityContext", skipUnlessWindows(func()
 			"involvedObject.namespace": podInvalid.Namespace,
 			"reason":                   events.FailedCreatePodSandBox,
 		}.AsSelector().String()
-		hcsschimError := "The user name or password is incorrect."
+		// An invalid RunAsUserName surfaces as different Win32 errors depending on the
+		// Windows base image's account name-resolution path, so match on any of the known
+		// messages:
+		//   - ltsc2022: ERROR_LOGON_FAILURE (1326) -> "The user name or password is incorrect."
+		//   - ltsc2025: ERROR_NO_SUCH_DOMAIN (1355) -> the local lookup falls through to a
+		//     domain-contact attempt, which fails first since the container has no domain.
+		hcsschimErrors := []string{
+			"The user name or password is incorrect.",
+			"The specified domain either does not exist or could not be contacted.",
+		}
 
 		// Hostprocess updated the cri to pass RunAsUserName to sandbox: https://github.com/kubernetes/kubernetes/pull/99576/commits/51a02fdb80cb7ba042a66362eb76facd2fd82401
 		// Some runtimes might use that and set the username on the podsandbox. Containerd 1.6+ is known to do this.
@@ -78,13 +87,15 @@ var _ = sigDescribe(feature.Windows, "SecurityContext", skipUnlessWindows(func()
 		// sandbox failed or workload pod failed.
 		framework.Logf("Waiting for pod %s to enter the error state.", podInvalid.Name)
 		gomega.Eventually(ctx, func(ctx context.Context) bool {
-			failedSandbox, err := eventOccurred(ctx, f.ClientSet, podInvalid.Namespace, failedSandboxEventSelector, hcsschimError)
-			if err != nil {
-				framework.Logf("Error retrieving events for pod. Ignoring...")
-			}
-			if failedSandbox {
-				framework.Logf("Found Expected Event 'Failed to Create Pod Sandbox' with message containing: %s", hcsschimError)
-				return true
+			for _, hcsschimError := range hcsschimErrors {
+				failedSandbox, err := eventOccurred(ctx, f.ClientSet, podInvalid.Namespace, failedSandboxEventSelector, hcsschimError)
+				if err != nil {
+					framework.Logf("Error retrieving events for pod. Ignoring...")
+				}
+				if failedSandbox {
+					framework.Logf("Found Expected Event 'Failed to Create Pod Sandbox' with message containing: %s", hcsschimError)
+					return true
+				}
 			}
 
 			framework.Logf("No Sandbox error found. Looking for failure in workload pods")

@@ -25,7 +25,6 @@ import (
 	unsafe "unsafe"
 
 	storagemigrationv1beta1 "k8s.io/api/storagemigration/v1beta1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	storagemigration "k8s.io/kubernetes/pkg/apis/storagemigration"
@@ -136,7 +135,7 @@ func Convert_storagemigration_StorageVersionMigrationList_To_v1beta1_StorageVers
 }
 
 func autoConvert_v1beta1_StorageVersionMigrationSpec_To_storagemigration_StorageVersionMigrationSpec(in *storagemigrationv1beta1.StorageVersionMigrationSpec, out *storagemigration.StorageVersionMigrationSpec, s conversion.Scope) error {
-	out.Resource = in.Resource
+	*out = *(*storagemigration.StorageVersionMigrationSpec)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -146,7 +145,7 @@ func Convert_v1beta1_StorageVersionMigrationSpec_To_storagemigration_StorageVers
 }
 
 func autoConvert_storagemigration_StorageVersionMigrationSpec_To_v1beta1_StorageVersionMigrationSpec(in *storagemigration.StorageVersionMigrationSpec, out *storagemigrationv1beta1.StorageVersionMigrationSpec, s conversion.Scope) error {
-	out.Resource = in.Resource
+	*out = *(*storagemigrationv1beta1.StorageVersionMigrationSpec)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -156,8 +155,7 @@ func Convert_storagemigration_StorageVersionMigrationSpec_To_v1beta1_StorageVers
 }
 
 func autoConvert_v1beta1_StorageVersionMigrationStatus_To_storagemigration_StorageVersionMigrationStatus(in *storagemigrationv1beta1.StorageVersionMigrationStatus, out *storagemigration.StorageVersionMigrationStatus, s conversion.Scope) error {
-	out.Conditions = *(*[]v1.Condition)(unsafe.Pointer(&in.Conditions))
-	out.ResourceVersion = in.ResourceVersion
+	*out = *(*storagemigration.StorageVersionMigrationStatus)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -167,8 +165,7 @@ func Convert_v1beta1_StorageVersionMigrationStatus_To_storagemigration_StorageVe
 }
 
 func autoConvert_storagemigration_StorageVersionMigrationStatus_To_v1beta1_StorageVersionMigrationStatus(in *storagemigration.StorageVersionMigrationStatus, out *storagemigrationv1beta1.StorageVersionMigrationStatus, s conversion.Scope) error {
-	out.Conditions = *(*[]v1.Condition)(unsafe.Pointer(&in.Conditions))
-	out.ResourceVersion = in.ResourceVersion
+	*out = *(*storagemigrationv1beta1.StorageVersionMigrationStatus)(unsafe.Pointer(in))
 	return nil
 }
 

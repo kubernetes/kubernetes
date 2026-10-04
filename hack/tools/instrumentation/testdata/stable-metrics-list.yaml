@@ -98,6 +98,31 @@
   stabilityLevel: BETA
   labels:
   - priority_level
+- name: priority_level_seat_utilization
+  subsystem: flowcontrol
+  namespace: apiserver
+  help: Observations, at the end of every nanosecond, of utilization of seats for
+    any stage of execution (but only initial stage for WATCHes)
+  type: TimingRatioHistogram
+  stabilityLevel: BETA
+  labels:
+  - priority_level
+  buckets:
+  - 0
+  - 0.1
+  - 0.2
+  - 0.3
+  - 0.4
+  - 0.5
+  - 0.6
+  - 0.7
+  - 0.8
+  - 0.9
+  - 0.95
+  - 0.99
+  - 1
+  constLabels:
+    phase: executing
 - name: rejected_requests_total
   subsystem: flowcontrol
   namespace: apiserver
@@ -183,6 +208,33 @@
   help: Number of times declarative validation has panicked during validation.
   type: Counter
   stabilityLevel: BETA
+- name: watch_events_sizes
+  subsystem: apiserver
+  help: Watch event size distribution in bytes
+  type: Histogram
+  stabilityLevel: BETA
+  labels:
+  - group
+  - resource
+  - version
+  buckets:
+  - 1024
+  - 2048
+  - 4096
+  - 8192
+  - 16384
+  - 32768
+  - 65536
+  - 131072
+- name: watch_events_total
+  subsystem: apiserver
+  help: Number of events sent in watch clients
+  type: Counter
+  stabilityLevel: BETA
+  labels:
+  - group
+  - resource
+  - version
 - name: watch_list_duration_seconds
   subsystem: apiserver
   help: Response latency distribution in seconds for watch list requests broken by
@@ -202,8 +254,12 @@
   - 0.6
   - 0.8
   - 1
+  - 1.25
+  - 1.5
   - 2
+  - 3
   - 4
+  - 5
   - 6
   - 8
   - 10
@@ -212,6 +268,26 @@
   - 30
   - 45
   - 60
+  - 90
+  - 120
+  - 180
+  - 300
+- name: x509_insecure_sha1_total
+  subsystem: webhooks
+  namespace: apiserver
+  help: Counts the number of requests to servers with insecure SHA1 signatures in
+    their serving certificate OR the number of connection failures due to the insecure
+    SHA1 signatures (either/or, based on the runtime environment)
+  type: Counter
+  stabilityLevel: BETA
+- name: x509_missing_san_total
+  subsystem: webhooks
+  namespace: apiserver
+  help: Counts the number of requests to servers missing SAN extension in their serving
+    certificate OR the number of connection failures due to the lack of x509 certificate
+    SAN extension missing (either/or, based on the runtime environment)
+  type: Counter
+  stabilityLevel: BETA
 - name: disabled_metrics_total
   help: The count of disabled metrics.
   type: Counter
@@ -483,13 +559,43 @@
 - name: plugin_evaluation_total
   subsystem: scheduler
   help: Number of attempts to schedule pods by each plugin and the extension point
-    (available only in PreFilter, Filter, PreScore, and Score).
+    (available only in PreFilter, Filter, PreScore, and Score), by scheduler profile.
   type: Counter
   stabilityLevel: BETA
   labels:
   - extension_point
   - plugin
   - profile
+- name: plugin_execution_duration_seconds
+  subsystem: scheduler
+  help: Duration for running a plugin at a specific extension point.
+  type: Histogram
+  stabilityLevel: BETA
+  labels:
+  - extension_point
+  - plugin
+  - status
+  buckets:
+  - 1e-05
+  - 1.5000000000000002e-05
+  - 2.2500000000000005e-05
+  - 3.375000000000001e-05
+  - 5.062500000000001e-05
+  - 7.593750000000002e-05
+  - 0.00011390625000000003
+  - 0.00017085937500000006
+  - 0.0002562890625000001
+  - 0.00038443359375000017
+  - 0.0005766503906250003
+  - 0.0008649755859375004
+  - 0.0012974633789062506
+  - 0.0019461950683593758
+  - 0.0029192926025390638
+  - 0.004378938903808595
+  - 0.006568408355712893
+  - 0.009852612533569338
+  - 0.014778918800354007
+  - 0.02216837820053101
 - name: pod_scheduling_sli_duration_seconds
   subsystem: scheduler
   help: E2e latency for a pod being scheduled, from the time the pod enters the scheduling
@@ -519,16 +625,52 @@
   - 1310.72
   - 2621.44
   - 5242.88
+- name: scheduling_algorithm_duration_seconds
+  subsystem: scheduler
+  help: Scheduling algorithm latency in seconds
+  type: Histogram
+  stabilityLevel: BETA
+  buckets:
+  - 0.001
+  - 0.002
+  - 0.004
+  - 0.008
+  - 0.016
+  - 0.032
+  - 0.064
+  - 0.128
+  - 0.256
+  - 0.512
+  - 1.024
+  - 2.048
+  - 4.096
+  - 8.192
+  - 16.384
 - name: unschedulable_pods
   subsystem: scheduler
-  help: The number of unschedulable pods broken down by plugin name. A pod will increment
-    the gauge for all plugins that caused it to not schedule and so this metric have
-    meaning only when broken down by plugin.
+  help: The number of unschedulable pods broken down by plugin name and scheduler
+    profile. A pod will increment the gauge for all plugins that caused it to not
+    schedule and so this metric has meaning only when broken down by plugin.
   type: Gauge
   stabilityLevel: BETA
   labels:
   - plugin
   - profile
+- name: legacy_tokens_total
+  subsystem: serviceaccount
+  help: Cumulative legacy service account tokens used
+  type: Counter
+  stabilityLevel: BETA
+- name: stale_tokens_total
+  subsystem: serviceaccount
+  help: Cumulative stale projected service account tokens used
+  type: Counter
+  stabilityLevel: BETA
+- name: valid_tokens_total
+  subsystem: serviceaccount
+  help: Cumulative valid projected service account tokens used
+  type: Counter
+  stabilityLevel: BETA
 - name: storage_operation_duration_seconds
   help: Storage operation duration
   type: Histogram
@@ -552,6 +694,13 @@
   - 120
   - 300
   - 600
+- name: volume_operation_errors_total
+  help: Total volume operation errors
+  type: Counter
+  stabilityLevel: BETA
+  labels:
+  - operation_name
+  - plugin_name
 - name: volume_operation_total_seconds
   help: Storage operation end to end duration in seconds
   type: Histogram
@@ -1003,7 +1152,8 @@
   stabilityLevel: STABLE
 - name: framework_extension_point_duration_seconds
   subsystem: scheduler
-  help: Latency for running all plugins of a specific extension point.
+  help: Latency for running all plugins of a specific extension point, by scheduler
+    profile.
   type: Histogram
   stabilityLevel: STABLE
   labels:
@@ -1027,9 +1177,10 @@
   subsystem: scheduler
   help: Number of pending pods, by the queue type. 'active' means number of pods in
     activeQ; 'backoff' means number of pods in backoffQ; 'unschedulable' means number
-    of pods in unschedulablePods that the scheduler attempted to schedule and failed;
-    'gated' is the number of unschedulable pods that the scheduler never attempted
-    to schedule because they are gated.
+    of pods in unschedulableEntities that the scheduler attempted to schedule and
+    failed; 'gated' is the number of unschedulable pods that the scheduler never attempted
+    to schedule because they are gated; 'incomplete' means number of pods in incompletePodGroupPods;
+    'pending' means number of pods in pendingPodGroupPods.
   type: Gauge
   stabilityLevel: STABLE
   labels:
@@ -1052,7 +1203,8 @@
   stabilityLevel: STABLE
 - name: preemption_victims
   subsystem: scheduler
-  help: Number of selected preemption victims
+  help: Number of selected preemption victims for preemption initiated by a single
+    pod
   type: Histogram
   stabilityLevel: STABLE
   buckets:
@@ -1073,8 +1225,9 @@
   - queue
 - name: schedule_attempts_total
   subsystem: scheduler
-  help: Number of attempts to schedule pods, by the result. 'unschedulable' means
-    a pod could not be scheduled, while 'error' means an internal scheduler problem.
+  help: Number of attempts to schedule pods, by the result and scheduler profile.
+    'unschedulable' means a pod could not be scheduled, while 'error' means an internal
+    scheduler problem.
   type: Counter
   stabilityLevel: STABLE
   labels:
@@ -1082,7 +1235,8 @@
   - result
 - name: scheduling_attempt_duration_seconds
   subsystem: scheduler
-  help: Scheduling attempt latency in seconds (scheduling algorithm + binding)
+  help: Scheduling attempt latency in seconds (scheduling algorithm + binding), by
+    scheduler profile.
   type: Histogram
   stabilityLevel: STABLE
   labels:

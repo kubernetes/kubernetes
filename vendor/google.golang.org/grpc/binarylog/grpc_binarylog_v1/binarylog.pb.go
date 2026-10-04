@@ -679,7 +679,7 @@ func (x *Message) GetData() []byte {
 // A list of metadata pairs, used in the payload of client header,
 // server header, and server trailer.
 // Implementations may omit some entries to honor the header limits
-// of GRPC_BINARY_LOG_CONFIG.
+// of GRPC_BINARY_LOG_FILTER.
 //
 // Header keys added by gRPC are omitted. To be more specific,
 // implementations will not log the following entries, and this is
@@ -689,7 +689,9 @@ func (x *Message) GetData() []byte {
 //     or keys like 'lb-token'
 //   - transport specific entries, including but not limited to:
 //     ':path', ':authority', 'content-encoding', 'user-agent', 'te', etc
-//   - entries added for call credentials
+//   - entries added for call credentials (on client side, excludes all
+//     such headers; on server side, excludes only the "authorization"
+//     header)
 //
 // Implementations must always log grpc-trace-bin if it is present.
 // Practically speaking it will only be visible on server side because

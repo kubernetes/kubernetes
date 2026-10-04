@@ -1,7 +1,7 @@
 // Copyright The OpenTelemetry Authors
 // SPDX-License-Identifier: Apache-2.0
 
-package telemetry // import "go.opentelemetry.io/otel/trace/internal/telemetry"
+package telemetry
 
 import (
 	"encoding/json"

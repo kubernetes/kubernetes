@@ -17,10 +17,20 @@ limitations under the License.
 package webhook
 
 import (
+	"context"
+	"encoding/pem"
+	"net/http"
+	"net/http/httptest"
+	"net/url"
+	"sync/atomic"
 	"testing"
 
 	"golang.org/x/net/http2"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apiserver/pkg/features"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/rest"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 )
 
 func TestWebhookClientConfig(t *testing.T) {
@@ -88,4 +98,156 @@ func allowHTTP2(nextProtos []string) bool {
 	}
 	// the transport explicitly set NextProtos and excluded http/2
 	return false
+}
+
+type fakeAuthInfoResolver struct{}
+
+func (f *fakeAuthInfoResolver) ClientConfigFor(server string) (*rest.Config, error) {
+	return &rest.Config{
+		TLSClientConfig: rest.TLSClientConfig{
+			ServerName: "example.com",
+		},
+	}, nil
+}
+
+func (f *fakeAuthInfoResolver) ClientConfigForService(serviceName, namespace string, port int) (*rest.Config, error) {
+	return &rest.Config{
+		TLSClientConfig: rest.TLSClientConfig{
+			ServerName: "example.com",
+		},
+	}, nil
+}
+
+// fakeDynamicServiceResolver returns the next endpoint in the list for each request.
+type fakeDynamicServiceResolver struct {
+	endpoints []*url.URL
+	counter   int32
+}
+
+func (f *fakeDynamicServiceResolver) ResolveEndpoint(namespace, name string, port int32) (*url.URL, error) {
+	val := atomic.AddInt32(&f.counter, 1) - 1
+	if val >= int32(len(f.endpoints)) {
+		val = int32(len(f.endpoints)) - 1
+	}
+	return f.endpoints[val], nil
+}
+
+// TestWebhookClientIdleConnectionIPReuse tests that the webhook client follow the resolver
+// endpoint instead of reusing the previous endpoint when there are IP address changes.
+func TestWebhookClientIdleConnectionIPReuse(t *testing.T) {
+	tests := []struct {
+		name                   string
+		enableFeatureGate      bool
+		expectedServerACalls   int32
+		expectedServerBCalls   int32
+		expectedSecondResponse string
+	}{
+		{
+			name:                   "feature gate enabled - round-trip load balancing routes to Server B",
+			enableFeatureGate:      true,
+			expectedServerACalls:   1,
+			expectedServerBCalls:   1,
+			expectedSecondResponse: "ServerB",
+		},
+		{
+			name:                   "feature gate disabled - dialer resolution caches to Server A",
+			enableFeatureGate:      false,
+			expectedServerACalls:   2,
+			expectedServerBCalls:   0,
+			expectedSecondResponse: "ServerA",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WebhookRoundTripLoadBalancing, tc.enableFeatureGate)
+
+			var serverACalls int32
+			serverA := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				atomic.AddInt32(&serverACalls, 1)
+				w.WriteHeader(http.StatusOK)
+				_, _ = w.Write([]byte("ServerA"))
+			}))
+			defer serverA.Close()
+
+			var serverBCalls int32
+			serverB := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				atomic.AddInt32(&serverBCalls, 1)
+				w.WriteHeader(http.StatusOK)
+				_, _ = w.Write([]byte("ServerB"))
+			}))
+			defer serverB.Close()
+
+			urlA, err := url.Parse(serverA.URL)
+			if err != nil {
+				t.Fatal(err)
+			}
+			urlB, err := url.Parse(serverB.URL)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			// Combine CAs from both test servers
+			var caBundle []byte
+			for _, cert := range serverA.TLS.Certificates[0].Certificate {
+				caBundle = append(caBundle, pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: cert})...)
+			}
+			for _, cert := range serverB.TLS.Certificates[0].Certificate {
+				caBundle = append(caBundle, pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: cert})...)
+			}
+
+			resolver := &fakeDynamicServiceResolver{
+				endpoints: []*url.URL{urlA, urlB},
+			}
+
+			cm, err := NewClientManager([]schema.GroupVersion{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			cm.SetAuthenticationInfoResolver(&fakeAuthInfoResolver{})
+			cm.SetServiceResolver(resolver)
+
+			cc := ClientConfig{
+				Name:     "test-webhook",
+				CABundle: caBundle,
+				Service: &ClientConfigService{
+					Name:      "test-service",
+					Namespace: "default",
+					Port:      443,
+				},
+			}
+
+			client, err := cm.HookClient(cc)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			// Request 1: Resolves to Server A
+			req1 := client.Post().Body([]byte("test"))
+			res1, err := req1.DoRaw(context.Background())
+			if err != nil {
+				t.Fatalf("First request failed: %v", err)
+			}
+			if string(res1) != "ServerA" {
+				t.Errorf("Expected Response ServerA, got %s", string(res1))
+			}
+
+			// Request 2: Resolves to Server B if feature gate enabled, Server A if disabled
+			req2 := client.Post().Body([]byte("test"))
+			res2, err := req2.DoRaw(context.Background())
+			if err != nil {
+				t.Fatalf("Second request failed: %v", err)
+			}
+			if string(res2) != tc.expectedSecondResponse {
+				t.Errorf("Expected Response %s, got %s", tc.expectedSecondResponse, string(res2))
+			}
+
+			if callsA := atomic.LoadInt32(&serverACalls); callsA != tc.expectedServerACalls {
+				t.Errorf("Expected %d calls to Server A, got %d", tc.expectedServerACalls, callsA)
+			}
+			if callsB := atomic.LoadInt32(&serverBCalls); callsB != tc.expectedServerBCalls {
+				t.Errorf("Expected %d calls to Server B, got %d", tc.expectedServerBCalls, callsB)
+			}
+		})
+	}
 }

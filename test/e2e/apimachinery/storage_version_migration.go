@@ -20,7 +20,7 @@ import (
 	"context"
 	"time"
 
-	storagemigrationv1beta1 "k8s.io/api/storagemigration/v1beta1"
+	svmv1 "k8s.io/api/storagemigration/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2econformance "k8s.io/kubernetes/test/e2e/framework/conformance"
@@ -38,22 +38,22 @@ var _ = SIGDescribe("StorageVersionMigration", func() {
 		/*
 		   Release: v1.37
 		   Testname: CRUD operations for storageversionmigrations
-		   Description: kube-apiserver must support create/update/list/patch/delete operations for storagemigration.k8s.io/v1beta1 StorageVersionMigration.
+		   Description: kube-apiserver must support create/update/list/patch/delete operations for storagemigration.k8s.io/v1 StorageVersionMigration.
 		*/
-		f.It("storagemigration.k8s.io/v1beta1 StorageVersionMigration", f.WithFeatureGate("StorageVersionMigrator"), func(ctx context.Context) {
+		framework.ConformanceIt("storagemigration.k8s.io/v1 StorageVersionMigration", func(ctx context.Context) {
 			e2econformance.TestResource(ctx, f,
-				&e2econformance.ResourceTestcase[*storagemigrationv1beta1.StorageVersionMigration]{
-					GVR:        storagemigrationv1beta1.SchemeGroupVersion.WithResource("storageversionmigrations"),
+				&e2econformance.ResourceTestcase[*svmv1.StorageVersionMigration]{
+					GVR:        svmv1.SchemeGroupVersion.WithResource("storageversionmigrations"),
 					Namespaced: ptr.To(false),
-					InitialSpec: &storagemigrationv1beta1.StorageVersionMigration{
-						Spec: storagemigrationv1beta1.StorageVersionMigrationSpec{
+					InitialSpec: &svmv1.StorageVersionMigration{
+						Spec: svmv1.StorageVersionMigrationSpec{
 							Resource: metav1.GroupResource{
 								Group:    "",
 								Resource: "foo",
 							},
 						},
 					},
-					UpdateSpec: func(obj *storagemigrationv1beta1.StorageVersionMigration) *storagemigrationv1beta1.StorageVersionMigration {
+					UpdateSpec: func(obj *svmv1.StorageVersionMigration) *svmv1.StorageVersionMigration {
 						// Spec is immutable, so let's add a label instead.
 						if obj.Labels == nil {
 							obj.Labels = make(map[string]string)
@@ -61,7 +61,7 @@ var _ = SIGDescribe("StorageVersionMigration", func() {
 						obj.Labels["test.storagemigration.example.com"] = "test"
 						return obj
 					},
-					UpdateStatus: func(obj *storagemigrationv1beta1.StorageVersionMigration) *storagemigrationv1beta1.StorageVersionMigration {
+					UpdateStatus: func(obj *svmv1.StorageVersionMigration) *svmv1.StorageVersionMigration {
 						obj.Status.Conditions = append(obj.Status.Conditions, metav1.Condition{
 							Type:               "TestCondition",
 							Status:             metav1.ConditionTrue,

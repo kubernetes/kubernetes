@@ -1,15 +1,9 @@
 syntax = "proto3";
 package membershippb;
 
-import "gogoproto/gogo.proto";
 import "etcd/api/versionpb/version.proto";
 
 option go_package = "go.etcd.io/etcd/api/v3/membershippb";
-
-option (gogoproto.marshaler_all) = true;
-option (gogoproto.sizer_all) = true;
-option (gogoproto.unmarshaler_all) = true;
-option (gogoproto.goproto_getters_all) = false;
 
 // RaftAttributes represents the raft related attributes of an etcd member.
 message RaftAttributes {

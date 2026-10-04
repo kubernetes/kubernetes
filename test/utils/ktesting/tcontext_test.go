@@ -18,6 +18,7 @@ package ktesting_test
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"testing"
 	"testing/synctest"
@@ -56,35 +57,75 @@ func TestCancelAutomatic(t *testing.T) {
 	}()
 }
 
-func TestSyncTestInit(t *testing.T) {
-	synctest.Test(t, func(t *testing.T) {
-		// This must work inside a synctest bubble, despite Deadline panicking there.
-		// We then don't have a deadline.
-		tCtx := ktesting.Init(t)
-		deadline, ok := tCtx.Deadline()
-		if ok {
-			tCtx.Errorf("Expected no deadline, got %s", deadline)
+func TestCancelBeforeCleanup(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		// Blocks until the context gets canceled automatically.
+		<-tCtx.Done()
+	}()
+
+	// This gets registered *after* Init and thus, due to the usual LIFO
+	// order of Cleanup callbacks, runs *before* ktesting's own internal
+	// callback which guarantees eventual cancellation as a fallback.
+	// Nonetheless, tCtx must already be canceled here: like
+	// [testing.T.Context], it gets derived from testing.T's own context,
+	// which the "testing" package cancels before any Cleanup-registered
+	// function runs, this one included.
+	t.Cleanup(func() {
+		select {
+		case <-done:
+		case <-time.After(10 * time.Second):
+			// Propagating the test context cancellation is not immediate because
+			// context.AfterFunc runs our callback in a goroutine, therefore
+			// we need the additional 10 second grace period.
+			t.Fatal("tCtx should already have been canceled by the time this Cleanup function runs")
 		}
-		if !tCtx.IsSyncTest() {
-			tCtx.Errorf("Expected to run as synctest")
+
+		// The explanation must be more useful than the generic
+		// "context canceled" which a plain [testing.T.Context] would
+		// provide.
+		cause := context.Cause(tCtx)
+		if expected := fmt.Sprintf("test %s is cleaning up", t.Name()); cause == nil || cause.Error() != expected {
+			t.Errorf("expected cancellation cause %q, got: %v", expected, cause)
 		}
 	})
 }
 
-func TestNormalInit(t *testing.T) {
-	// The outcome depends on how the unit test was started.
-	// See below for deterministic deadline/no deadline testing.
-	expectDeadline, expectOK := t.Deadline()
-	expectDeadline = expectDeadline.Add(-ktesting.CleanupGracePeriod)
+func TestRunCancelBeforeCleanup(t *testing.T) {
 	tCtx := ktesting.Init(t)
-	actualDeadline, actualOK := tCtx.Deadline()
-	tCtx.Expect(actualOK).To(gomega.Equal(expectOK), "have deadline")
-	if expectOK {
-		tCtx.Expect(actualDeadline).To(gomega.BeTemporally("~", expectDeadline, 2*time.Second), "deadline")
-	}
-	if tCtx.IsSyncTest() {
-		tCtx.Errorf("Expected to not run as synctest")
-	}
+
+	tCtx.Run("sub", func(tCtx ktesting.TContext) {
+		done := make(chan struct{})
+		go func() {
+			defer close(done)
+			// Blocks until the sub-test's context gets canceled automatically.
+			<-tCtx.Done()
+		}()
+
+		// See TestCancelBeforeCleanup: same reasoning applies to sub-tests.
+		tCtx.Cleanup(func() {
+			select {
+			case <-done:
+			case <-time.After(10 * time.Second):
+				t.Fatal("sub-test's TContext should already have been canceled by the time this Cleanup function runs")
+			}
+		})
+	})
+}
+
+func TestSyncTestAutoCancel(t *testing.T) {
+	tCtx := ktesting.Init(t)
+
+	// Without synchronous cancellation before the callback returns, this
+	// goroutine would still be blocked and synctest would panic with
+	// "deadlock: main bubble goroutine has exited but blocked goroutines remain".
+	tCtx.SyncTest("sub", func(tCtx ktesting.TContext) {
+		go func() {
+			<-tCtx.Done()
+		}()
+	})
 }
 
 func TestNoDeadline(t *testing.T) {
@@ -104,7 +145,7 @@ func TestDeadline(t *testing.T) {
 		tCtx := ktesting.Init(mockT)
 		actualDeadline, ok := tCtx.Deadline()
 		if ok {
-			expectDeadline := mockDeadline.Add(-ktesting.CleanupGracePeriod)
+			expectDeadline := mockDeadline.Add(-ktesting.DefaultCleanupGracePeriod)
 			tCtx.Expect(actualDeadline).To(gomega.BeTemporally("==", expectDeadline), "deadline")
 		} else {
 			tCtx.Error("Expected a deadline, got none")

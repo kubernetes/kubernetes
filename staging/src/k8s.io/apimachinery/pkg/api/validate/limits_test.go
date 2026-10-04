@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"testing"
+	"time"
 
 	"k8s.io/apimachinery/pkg/api/operation"
 	"k8s.io/apimachinery/pkg/api/validate/constraints"
@@ -423,6 +424,19 @@ func doTestMinimum[T constraints.Integer](t *testing.T, cases []minimumTestCase[
 	}
 }
 
+func TestMinimumDuration(t *testing.T) {
+	doTestMinimum(t, []minimumTestCase[time.Duration]{{
+		min:   time.Second,
+		value: time.Second,
+	}, {
+		min:   time.Second,
+		value: time.Second - time.Nanosecond,
+		wantErrs: field.ErrorList{
+			field.Invalid(field.NewPath("fldpath"), nil, "must be greater than or equal to 1s").WithOrigin("minimum"),
+		},
+	}})
+}
+
 func TestMaximum(t *testing.T) {
 	testMaximumPositive[int](t)
 	testMaximumNegative[int](t)
@@ -499,6 +513,19 @@ func doTestMaximum[T constraints.Integer](t *testing.T, cases []maximumTestCase[
 			matcher.Test(t, tc.wantErrs, gotErrs)
 		})
 	}
+}
+
+func TestMaximumDuration(t *testing.T) {
+	doTestMaximum(t, []maximumTestCase[time.Duration]{{
+		max:   time.Second,
+		value: time.Second,
+	}, {
+		max:   time.Second,
+		value: time.Second + time.Nanosecond,
+		wantErrs: field.ErrorList{
+			field.Invalid(field.NewPath("fldpath"), nil, "must be less than or equal to 1s").WithOrigin("maximum"),
+		},
+	}})
 }
 
 func TestMaxBytes(t *testing.T) {
@@ -580,6 +607,40 @@ func TestMaxBytes(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			v := tc.value
 			gotErrs := MaxBytes(context.Background(), operation.Operation{}, field.NewPath("fldpath"), &v, nil, tc.max)
+			matcher.Test(t, tc.wantErrs, gotErrs)
+		})
+	}
+}
+
+func TestMaxBytesSlice(t *testing.T) {
+	cases := []struct {
+		name     string
+		value    []byte
+		max      int
+		wantErrs field.ErrorList
+	}{{
+		name:     "nil slice",
+		value:    nil,
+		max:      0,
+		wantErrs: nil,
+	}, {
+		name:     "exactly max bytes",
+		value:    []byte("abcdefghij"),
+		max:      10,
+		wantErrs: nil,
+	}, {
+		name:  "more bytes than max",
+		value: []byte("abcdefghijk"),
+		max:   10,
+		wantErrs: field.ErrorList{
+			field.TooLong(field.NewPath("fldpath"), "", 10).WithOrigin("maxBytes"),
+		},
+	}}
+
+	matcher := field.ErrorMatcher{}.ByOrigin().ByDetailSubstring().ByField().ByType()
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			gotErrs := MaxBytesSlice(context.Background(), operation.Operation{}, field.NewPath("fldpath"), tc.value, nil, tc.max)
 			matcher.Test(t, tc.wantErrs, gotErrs)
 		})
 	}

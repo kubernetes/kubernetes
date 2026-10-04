@@ -22,6 +22,8 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+
+	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -89,10 +91,19 @@ func TestJobStrategy_PrepareForUpdate(t *testing.T) {
 		},
 	}
 
+	gangScheduling := func(minCount int32) *batch.JobSchedulingConfiguration {
+		return &batch.JobSchedulingConfiguration{
+			SchedulingPolicy: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{
+				Gang: &schedulingv1alpha3.WorkloadPodGroupGangSchedulingPolicy{MinCount: new(minCount)},
+			},
+		}
+	}
+
 	cases := map[string]struct {
-		job        batch.Job
-		updatedJob batch.Job
-		wantJob    batch.Job
+		enableWorkloadWithJob bool
+		job                   batch.Job
+		updatedJob            batch.Job
+		wantJob               batch.Job
 	}{
 		"update job with a new field and successPolicy": {
 			job: batch.Job{
@@ -366,10 +377,92 @@ func TestJobStrategy_PrepareForUpdate(t *testing.T) {
 				},
 			},
 		},
+		"scheduling retained on update when feature gate disabled and old value set": {
+			enableWorkloadWithJob: false,
+			job: batch.Job{
+				ObjectMeta: getValidObjectMeta(0),
+				Spec: batch.JobSpec{
+					Selector:   validSelector,
+					Template:   validPodTemplateSpec,
+					Scheduling: gangScheduling(2),
+				},
+			},
+			updatedJob: batch.Job{
+				ObjectMeta: getValidObjectMeta(0),
+				Spec: batch.JobSpec{
+					Selector:   validSelector,
+					Template:   validPodTemplateSpec,
+					Scheduling: gangScheduling(4),
+				},
+			},
+			wantJob: batch.Job{
+				ObjectMeta: getValidObjectMeta(1),
+				Spec: batch.JobSpec{
+					Selector:   validSelector,
+					Template:   validPodTemplateSpec,
+					Scheduling: gangScheduling(4),
+				},
+			},
+		},
+		"scheduling dropped on update when feature gate disabled and old value unset": {
+			enableWorkloadWithJob: false,
+			job: batch.Job{
+				ObjectMeta: getValidObjectMeta(0),
+				Spec: batch.JobSpec{
+					Selector: validSelector,
+					Template: validPodTemplateSpec,
+				},
+			},
+			updatedJob: batch.Job{
+				ObjectMeta: getValidObjectMeta(0),
+				Spec: batch.JobSpec{
+					Selector:   validSelector,
+					Template:   validPodTemplateSpec,
+					Scheduling: gangScheduling(2),
+				},
+			},
+			wantJob: batch.Job{
+				ObjectMeta: getValidObjectMeta(0),
+				Spec: batch.JobSpec{
+					Selector: validSelector,
+					Template: validPodTemplateSpec,
+				},
+			},
+		},
+		"scheduling retained on update when feature gate enabled and old value unset": {
+			enableWorkloadWithJob: true,
+			job: batch.Job{
+				ObjectMeta: getValidObjectMeta(0),
+				Spec: batch.JobSpec{
+					Selector: validSelector,
+					Template: validPodTemplateSpec,
+				},
+			},
+			updatedJob: batch.Job{
+				ObjectMeta: getValidObjectMeta(0),
+				Spec: batch.JobSpec{
+					Selector:   validSelector,
+					Template:   validPodTemplateSpec,
+					Scheduling: gangScheduling(2),
+				},
+			},
+			wantJob: batch.Job{
+				ObjectMeta: getValidObjectMeta(1),
+				Spec: batch.JobSpec{
+					Selector:   validSelector,
+					Template:   validPodTemplateSpec,
+					Scheduling: gangScheduling(2),
+				},
+			},
+		},
 	}
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.GenericWorkload: tc.enableWorkloadWithJob,
+				features.WorkloadWithJob: tc.enableWorkloadWithJob,
+			})
 			ctx := genericapirequest.NewDefaultContext()
 
 			Strategy.PrepareForUpdate(ctx, &tc.updatedJob, &tc.job)
@@ -410,9 +503,8 @@ func TestJobStrategy_PrepareForCreate(t *testing.T) {
 	}
 
 	cases := map[string]struct {
-		enableJobManageBy bool
-		job               batch.Job
-		wantJob           batch.Job
+		job     batch.Job
+		wantJob batch.Job
 	}{
 		"generate selectors": {
 			job: batch.Job{
@@ -535,28 +627,7 @@ func TestJobStrategy_PrepareForCreate(t *testing.T) {
 				},
 			},
 		},
-		"managedBy field is dropped when the feature gate is disabled": {
-			enableJobManageBy: false,
-			job: batch.Job{
-				ObjectMeta: getValidObjectMeta(0),
-				Spec: batch.JobSpec{
-					Selector:       validSelector,
-					ManualSelector: ptr.To(false),
-					Template:       validPodTemplateSpec,
-					ManagedBy:      ptr.To("custom-controller-name"),
-				},
-			},
-			wantJob: batch.Job{
-				ObjectMeta: getValidObjectMeta(1),
-				Spec: batch.JobSpec{
-					Selector:       validSelector,
-					ManualSelector: ptr.To(false),
-					Template:       expectedPodTemplateSpec,
-				},
-			},
-		},
-		"managedBy field is set when the feature gate is enabled": {
-			enableJobManageBy: true,
+		"managedBy field is set": {
 			job: batch.Job{
 				ObjectMeta: getValidObjectMeta(0),
 				Spec: batch.JobSpec{
@@ -580,13 +651,6 @@ func TestJobStrategy_PrepareForCreate(t *testing.T) {
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			if !tc.enableJobManageBy {
-				// TODO: this will be removed in 1.38
-				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, utilversion.MustParse("1.32"))
-			}
-			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-				features.JobManagedBy: tc.enableJobManageBy,
-			})
 			ctx := genericapirequest.NewDefaultContext()
 
 			Strategy.PrepareForCreate(ctx, &tc.job)
@@ -632,6 +696,13 @@ func TestJobStrategy_ValidateUpdate(t *testing.T) {
 	validPodTemplateSpecNever := *validPodTemplateSpec.DeepCopy()
 	validPodTemplateSpecNever.Spec.RestartPolicy = api.RestartPolicyNever
 	now := metav1.Now()
+	gangScheduling := func(minCount int32) *batch.JobSchedulingConfiguration {
+		return &batch.JobSchedulingConfiguration{
+			SchedulingPolicy: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{
+				Gang: &schedulingv1alpha3.WorkloadPodGroupGangSchedulingPolicy{MinCount: new(minCount)},
+			},
+		}
+	}
 	cases := map[string]struct {
 		enableMutablePodResourcesForSuspendedJobs bool
 		job                                       *batch.Job
@@ -828,6 +899,47 @@ func TestJobStrategy_ValidateUpdate(t *testing.T) {
 			},
 			update: func(job *batch.Job) {
 				job.Annotations["hello"] = "world"
+			},
+		},
+		"gang minCount update within parallelism is valid": {
+			job: &batch.Job{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "myjob",
+					Namespace:       metav1.NamespaceDefault,
+					ResourceVersion: "0",
+				},
+				Spec: batch.JobSpec{
+					Selector:       validSelector,
+					Template:       validPodTemplateSpec,
+					ManualSelector: new(true),
+					Parallelism:    ptr.To[int32](4),
+					Scheduling:     gangScheduling(2),
+				},
+			},
+			update: func(job *batch.Job) {
+				job.Spec.Scheduling.SchedulingPolicy.Gang.MinCount = ptr.To[int32](4)
+			},
+		},
+		"gang minCount update exceeding parallelism is rejected": {
+			job: &batch.Job{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "myjob",
+					Namespace:       metav1.NamespaceDefault,
+					ResourceVersion: "0",
+				},
+				Spec: batch.JobSpec{
+					Selector:       validSelector,
+					Template:       validPodTemplateSpec,
+					ManualSelector: new(true),
+					Parallelism:    ptr.To[int32](4),
+					Scheduling:     gangScheduling(2),
+				},
+			},
+			update: func(job *batch.Job) {
+				job.Spec.Scheduling.SchedulingPolicy.Gang.MinCount = ptr.To[int32](8)
+			},
+			wantErrs: field.ErrorList{
+				{Type: field.ErrorTypeInvalid, Field: "spec.scheduling.schedulingPolicy.gang.minCount"},
 			},
 		},
 	}
@@ -1092,6 +1204,32 @@ func TestJobStrategy_ValidateUpdate_MutablePodResources(t *testing.T) {
 			},
 			wantErrs: field.ErrorList{
 				{Type: field.ErrorTypeInvalid, Field: "spec.template.spec"},
+			},
+		},
+		"feature gate enabled - pod resource update allowed for suspended Job without Suspended condition but never started": {
+			enableFeatureGate: true,
+			job: &batch.Job{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "myjob",
+					Namespace:       metav1.NamespaceDefault,
+					ResourceVersion: "0",
+				},
+				Spec: batch.JobSpec{
+					Selector:       validSelector,
+					Template:       validPodTemplateSpec,
+					ManualSelector: ptr.To(true),
+					Parallelism:    ptr.To[int32](1),
+					Suspend:        ptr.To(true),
+				},
+				Status: batch.JobStatus{
+					Active:    0,
+					StartTime: nil,
+				},
+			},
+			update: func(job *batch.Job) {
+				job.Spec.Template.Spec.Containers[0].Resources.Requests = api.ResourceList{
+					api.ResourceCPU: resource.MustParse("200m"),
+				}
 			},
 		},
 		"feature gate enabled - job resuming (suspend=false) but JobSuspended condition still true - resource updates rejected": {
@@ -1841,8 +1979,6 @@ func TestStatusStrategy_ValidateUpdate(t *testing.T) {
 	nowPlusMinute := metav1.Time{Time: now.Add(time.Minute)}
 
 	cases := map[string]struct {
-		enableJobManagedBy bool
-
 		job      *batch.Job
 		newJob   *batch.Job
 		wantJob  *batch.Job
@@ -1886,31 +2022,7 @@ func TestStatusStrategy_ValidateUpdate(t *testing.T) {
 				},
 			},
 		},
-		"invalid addition of both Failed=True and Complete=True; allowed because feature gate disabled": {
-			enableJobManagedBy: false,
-			job: &batch.Job{
-				ObjectMeta: validObjectMeta,
-			},
-			newJob: &batch.Job{
-				ObjectMeta: validObjectMeta,
-				Status: batch.JobStatus{
-					StartTime:      &now,
-					CompletionTime: &now,
-					Conditions: []batch.JobCondition{
-						{
-							Type:   batch.JobComplete,
-							Status: api.ConditionTrue,
-						},
-						{
-							Type:   batch.JobFailed,
-							Status: api.ConditionTrue,
-						},
-					},
-				},
-			},
-		},
 		"invalid addition of both Failed=True and Complete=True": {
-			enableJobManagedBy: true,
 			job: &batch.Job{
 				ObjectMeta: validObjectMeta,
 			},
@@ -1938,7 +2050,6 @@ func TestStatusStrategy_ValidateUpdate(t *testing.T) {
 			},
 		},
 		"invalid addition of Complete=True without SuccessCriteriaMet=True": {
-			enableJobManagedBy: true,
 			job: &batch.Job{
 				ObjectMeta: validObjectMeta,
 			},
@@ -1960,7 +2071,6 @@ func TestStatusStrategy_ValidateUpdate(t *testing.T) {
 			},
 		},
 		"invalid addition of Failed=True without FailureTarget=True": {
-			enableJobManagedBy: true,
 			job: &batch.Job{
 				ObjectMeta: validObjectMeta,
 			},
@@ -1981,7 +2091,6 @@ func TestStatusStrategy_ValidateUpdate(t *testing.T) {
 			},
 		},
 		"completionTime can be removed to fix still running job": {
-			enableJobManagedBy: true,
 			job: &batch.Job{
 				ObjectMeta: validObjectMeta,
 				Status: batch.JobStatus{
@@ -1997,7 +2106,6 @@ func TestStatusStrategy_ValidateUpdate(t *testing.T) {
 			},
 		},
 		"invalid attempt to transition to Failed=True without startTime": {
-			enableJobManagedBy: true,
 			job: &batch.Job{
 				ObjectMeta: validObjectMeta,
 				Status: batch.JobStatus{
@@ -2029,7 +2137,6 @@ func TestStatusStrategy_ValidateUpdate(t *testing.T) {
 			},
 		},
 		"invalid attempt to transition to Complete=True without startTime": {
-			enableJobManagedBy: true,
 			job: &batch.Job{
 				ObjectMeta: validObjectMeta,
 				Status: batch.JobStatus{
@@ -2062,7 +2169,6 @@ func TestStatusStrategy_ValidateUpdate(t *testing.T) {
 			},
 		},
 		"invalid attempt to transition to Complete=True with active > 0": {
-			enableJobManagedBy: true,
 			job: &batch.Job{
 				ObjectMeta: validObjectMeta,
 				Status: batch.JobStatus{
@@ -2099,7 +2205,6 @@ func TestStatusStrategy_ValidateUpdate(t *testing.T) {
 			},
 		},
 		"invalid attempt to transition to Failed=True with terminating > 0": {
-			enableJobManagedBy: true,
 			job: &batch.Job{
 				ObjectMeta: validObjectMeta,
 				Status: batch.JobStatus{
@@ -2135,7 +2240,6 @@ func TestStatusStrategy_ValidateUpdate(t *testing.T) {
 			},
 		},
 		"invalid attempt to transition to Failed=True with active > 0": {
-			enableJobManagedBy: true,
 			job: &batch.Job{
 				ObjectMeta: validObjectMeta,
 				Status: batch.JobStatus{
@@ -2171,7 +2275,6 @@ func TestStatusStrategy_ValidateUpdate(t *testing.T) {
 			},
 		},
 		"invalid attempt to transition to Failed=True with uncountedTerminatedPods.Failed>0": {
-			enableJobManagedBy: true,
 			job: &batch.Job{
 				ObjectMeta: validObjectMeta,
 				Status: batch.JobStatus{
@@ -2211,7 +2314,6 @@ func TestStatusStrategy_ValidateUpdate(t *testing.T) {
 			},
 		},
 		"invalid attempt to update uncountedTerminatedPods.Succeeded for Complete job": {
-			enableJobManagedBy: true,
 			job: &batch.Job{
 				ObjectMeta: validObjectMeta,
 				Status: batch.JobStatus{
@@ -2249,7 +2351,6 @@ func TestStatusStrategy_ValidateUpdate(t *testing.T) {
 			},
 		},
 		"non-empty uncountedTerminatedPods for complete job, unrelated update": {
-			enableJobManagedBy: true,
 			job: &batch.Job{
 				ObjectMeta: validObjectMeta,
 				Status: batch.JobStatus{
@@ -2288,7 +2389,6 @@ func TestStatusStrategy_ValidateUpdate(t *testing.T) {
 			},
 		},
 		"invalid attempt to transition to Complete=True with uncountedTerminatedPods.Succeeded>0": {
-			enableJobManagedBy: true,
 			job: &batch.Job{
 				ObjectMeta: validObjectMeta,
 				Status: batch.JobStatus{
@@ -2329,7 +2429,6 @@ func TestStatusStrategy_ValidateUpdate(t *testing.T) {
 			},
 		},
 		"invalid addition Complete=True without setting CompletionTime": {
-			enableJobManagedBy: true,
 			job: &batch.Job{
 				ObjectMeta: validObjectMeta,
 				Status: batch.JobStatus{
@@ -2363,7 +2462,6 @@ func TestStatusStrategy_ValidateUpdate(t *testing.T) {
 			},
 		},
 		"invalid attempt to remove completionTime": {
-			enableJobManagedBy: true,
 			job: &batch.Job{
 				ObjectMeta: validObjectMeta,
 				Status: batch.JobStatus{
@@ -2394,7 +2492,6 @@ func TestStatusStrategy_ValidateUpdate(t *testing.T) {
 			},
 		},
 		"verify startTime can be cleared for suspended job": {
-			enableJobManagedBy: true,
 			job: &batch.Job{
 				ObjectMeta: validObjectMeta,
 				Spec: batch.JobSpec{
@@ -2415,7 +2512,6 @@ func TestStatusStrategy_ValidateUpdate(t *testing.T) {
 			},
 		},
 		"verify startTime cannot be removed for unsuspended job": {
-			enableJobManagedBy: true,
 			job: &batch.Job{
 				ObjectMeta: validObjectMeta,
 				Status: batch.JobStatus{
@@ -2433,7 +2529,6 @@ func TestStatusStrategy_ValidateUpdate(t *testing.T) {
 			},
 		},
 		"verify startTime cannot be updated for unsuspended job": {
-			enableJobManagedBy: true,
 			job: &batch.Job{
 				ObjectMeta: validObjectMeta,
 				Status: batch.JobStatus{
@@ -2451,7 +2546,6 @@ func TestStatusStrategy_ValidateUpdate(t *testing.T) {
 			},
 		},
 		"verify startTime can be updated when resuming job (JobSuspended: True -> False)": {
-			enableJobManagedBy: true,
 			job: &batch.Job{
 				ObjectMeta: validObjectMeta,
 				Status: batch.JobStatus{
@@ -2478,7 +2572,6 @@ func TestStatusStrategy_ValidateUpdate(t *testing.T) {
 			},
 		},
 		"invalid attempt to set completionTime before startTime": {
-			enableJobManagedBy: true,
 			job: &batch.Job{
 				ObjectMeta: validObjectMeta,
 				Status: batch.JobStatus{
@@ -2513,7 +2606,6 @@ func TestStatusStrategy_ValidateUpdate(t *testing.T) {
 			},
 		},
 		"invalid attempt to modify completionTime": {
-			enableJobManagedBy: true,
 			job: &batch.Job{
 				ObjectMeta: validObjectMeta,
 				Status: batch.JobStatus{
@@ -2544,7 +2636,6 @@ func TestStatusStrategy_ValidateUpdate(t *testing.T) {
 			},
 		},
 		"invalid removal of terminal condition Failed=True": {
-			enableJobManagedBy: true,
 			job: &batch.Job{
 				ObjectMeta: validObjectMeta,
 				Status: batch.JobStatus{
@@ -2564,7 +2655,6 @@ func TestStatusStrategy_ValidateUpdate(t *testing.T) {
 			},
 		},
 		"invalid removal of terminal condition Complete=True": {
-			enableJobManagedBy: true,
 			job: &batch.Job{
 				ObjectMeta: validObjectMeta,
 				Status: batch.JobStatus{
@@ -2584,7 +2674,6 @@ func TestStatusStrategy_ValidateUpdate(t *testing.T) {
 			},
 		},
 		"invalid removal of terminal condition FailureTarget=True": {
-			enableJobManagedBy: true,
 			job: &batch.Job{
 				ObjectMeta: validObjectMeta,
 				Status: batch.JobStatus{
@@ -2604,7 +2693,6 @@ func TestStatusStrategy_ValidateUpdate(t *testing.T) {
 			},
 		},
 		"invalid addition of FailureTarget=True when Complete=True": {
-			enableJobManagedBy: true,
 			job: &batch.Job{
 				ObjectMeta: validObjectMeta,
 				Status: batch.JobStatus{
@@ -2640,7 +2728,6 @@ func TestStatusStrategy_ValidateUpdate(t *testing.T) {
 			},
 		},
 		"invalid attempt setting of CompletionTime when there is no Complete condition": {
-			enableJobManagedBy: true,
 			job: &batch.Job{
 				ObjectMeta: validObjectMeta,
 			},
@@ -2655,7 +2742,6 @@ func TestStatusStrategy_ValidateUpdate(t *testing.T) {
 			},
 		},
 		"invalid CompletionTime when there is no Complete condition, but allowed": {
-			enableJobManagedBy: true,
 			job: &batch.Job{
 				ObjectMeta: validObjectMeta,
 				Status: batch.JobStatus{
@@ -2671,7 +2757,6 @@ func TestStatusStrategy_ValidateUpdate(t *testing.T) {
 			},
 		},
 		"invalid attempt setting CompletedIndexes when non-indexed completion mode is used": {
-			enableJobManagedBy: true,
 			job: &batch.Job{
 				ObjectMeta: validObjectMeta,
 				Spec: batch.JobSpec{
@@ -2695,7 +2780,6 @@ func TestStatusStrategy_ValidateUpdate(t *testing.T) {
 			},
 		},
 		"invalid because CompletedIndexes set when non-indexed completion mode is used; but allowed": {
-			enableJobManagedBy: true,
 			job: &batch.Job{
 				ObjectMeta: validObjectMeta,
 				Spec: batch.JobSpec{
@@ -2719,7 +2803,6 @@ func TestStatusStrategy_ValidateUpdate(t *testing.T) {
 			},
 		},
 		"invalid attempt setting FailedIndexes when not backoffLimitPerIndex": {
-			enableJobManagedBy: true,
 			job: &batch.Job{
 				ObjectMeta: validObjectMeta,
 				Spec: batch.JobSpec{
@@ -2742,7 +2825,6 @@ func TestStatusStrategy_ValidateUpdate(t *testing.T) {
 			},
 		},
 		"invalid attempt to decrease the failed counter": {
-			enableJobManagedBy: true,
 			job: &batch.Job{
 				ObjectMeta: validObjectMeta,
 				Spec: batch.JobSpec{
@@ -2766,7 +2848,6 @@ func TestStatusStrategy_ValidateUpdate(t *testing.T) {
 			},
 		},
 		"invalid attempt to decrease the succeeded counter": {
-			enableJobManagedBy: true,
 			job: &batch.Job{
 				ObjectMeta: validObjectMeta,
 				Spec: batch.JobSpec{
@@ -2790,7 +2871,6 @@ func TestStatusStrategy_ValidateUpdate(t *testing.T) {
 			},
 		},
 		"invalid attempt to set bad format for CompletedIndexes": {
-			enableJobManagedBy: true,
 			job: &batch.Job{
 				ObjectMeta: validObjectMeta,
 				Spec: batch.JobSpec{
@@ -2813,7 +2893,6 @@ func TestStatusStrategy_ValidateUpdate(t *testing.T) {
 			},
 		},
 		"invalid format for CompletedIndexes, but allowed": {
-			enableJobManagedBy: true,
 			job: &batch.Job{
 				ObjectMeta: validObjectMeta,
 				Spec: batch.JobSpec{
@@ -2837,7 +2916,6 @@ func TestStatusStrategy_ValidateUpdate(t *testing.T) {
 			},
 		},
 		"invalid attempt to set bad format for FailedIndexes": {
-			enableJobManagedBy: true,
 			job: &batch.Job{
 				ObjectMeta: validObjectMeta,
 				Spec: batch.JobSpec{
@@ -2862,7 +2940,6 @@ func TestStatusStrategy_ValidateUpdate(t *testing.T) {
 			},
 		},
 		"invalid format for FailedIndexes, but allowed": {
-			enableJobManagedBy: true,
 			job: &batch.Job{
 				ObjectMeta: validObjectMeta,
 				Spec: batch.JobSpec{
@@ -2888,7 +2965,6 @@ func TestStatusStrategy_ValidateUpdate(t *testing.T) {
 			},
 		},
 		"more ready pods than active, but allowed": {
-			enableJobManagedBy: true,
 			job: &batch.Job{
 				ObjectMeta: validObjectMeta,
 				Spec: batch.JobSpec{
@@ -2912,7 +2988,6 @@ func TestStatusStrategy_ValidateUpdate(t *testing.T) {
 			},
 		},
 		"invalid addition of both FailureTarget=True and Complete=True": {
-			enableJobManagedBy: true,
 			job: &batch.Job{
 				ObjectMeta: validObjectMeta,
 			},
@@ -2939,7 +3014,6 @@ func TestStatusStrategy_ValidateUpdate(t *testing.T) {
 			},
 		},
 		"invalid failedIndexes, which overlap with completedIndexes": {
-			enableJobManagedBy: true,
 			job: &batch.Job{
 				ObjectMeta: validObjectMeta,
 				Spec: batch.JobSpec{
@@ -2967,7 +3041,6 @@ func TestStatusStrategy_ValidateUpdate(t *testing.T) {
 			},
 		},
 		"failedIndexes overlap with completedIndexes, unrelated field change": {
-			enableJobManagedBy: true,
 			job: &batch.Job{
 				ObjectMeta: validObjectMeta,
 				Spec: batch.JobSpec{
@@ -2989,35 +3062,6 @@ func TestStatusStrategy_ValidateUpdate(t *testing.T) {
 					FailedIndexes:    ptr.To("0,2"),
 					CompletedIndexes: "2-4",
 					Active:           1,
-				},
-			},
-		},
-		"valid update of Job if SuccessCriteriaMet already present for NonIndexed Jobs; JobManagedBy disabled": {
-			enableJobManagedBy: false,
-			job: &batch.Job{
-				ObjectMeta: validObjectMeta,
-				Spec:       batch.JobSpec{},
-				Status: batch.JobStatus{
-					Conditions: []batch.JobCondition{{
-						Type:   batch.JobSuccessCriteriaMet,
-						Status: api.ConditionTrue,
-					}},
-				},
-			},
-			newJob: &batch.Job{
-				ObjectMeta: validObjectMeta,
-				Spec:       batch.JobSpec{},
-				Status: batch.JobStatus{
-					Conditions: []batch.JobCondition{
-						{
-							Type:   batch.JobSuccessCriteriaMet,
-							Status: api.ConditionTrue,
-						},
-						{
-							Type:   batch.JobComplete,
-							Status: api.ConditionTrue,
-						},
-					},
 				},
 			},
 		},
@@ -3096,6 +3140,8 @@ func TestStatusStrategy_ValidateUpdate(t *testing.T) {
 				},
 			},
 			wantErrs: field.ErrorList{
+				{Type: field.ErrorTypeInvalid, Field: "status.conditions"},
+				{Type: field.ErrorTypeRequired, Field: "status.startTime"},
 				{Type: field.ErrorTypeInvalid, Field: "status.conditions"},
 			},
 		},
@@ -3216,42 +3262,6 @@ func TestStatusStrategy_ValidateUpdate(t *testing.T) {
 				{Type: field.ErrorTypeInvalid, Field: "status.conditions"},
 			},
 		},
-		"valid addition of Complete for Job with SuccessCriteriaMet": {
-			job: &batch.Job{
-				ObjectMeta: validObjectMeta,
-				Spec: batch.JobSpec{
-					CompletionMode: completionModePtr(batch.IndexedCompletion),
-					Completions:    ptr.To[int32](10),
-					SuccessPolicy:  validSuccessPolicy,
-				},
-				Status: batch.JobStatus{
-					Conditions: []batch.JobCondition{{
-						Type:   batch.JobSuccessCriteriaMet,
-						Status: api.ConditionTrue,
-					}},
-				},
-			},
-			newJob: &batch.Job{
-				ObjectMeta: validObjectMeta,
-				Spec: batch.JobSpec{
-					CompletionMode: completionModePtr(batch.IndexedCompletion),
-					Completions:    ptr.To[int32](10),
-					SuccessPolicy:  validSuccessPolicy,
-				},
-				Status: batch.JobStatus{
-					Conditions: []batch.JobCondition{
-						{
-							Type:   batch.JobSuccessCriteriaMet,
-							Status: api.ConditionTrue,
-						},
-						{
-							Type:   batch.JobComplete,
-							Status: api.ConditionTrue,
-						},
-					},
-				},
-			},
-		},
 		"invalid addition of Complete for Job with SuccessPolicy unless SuccessCriteriaMet": {
 			job: &batch.Job{
 				ObjectMeta: validObjectMeta,
@@ -3278,6 +3288,9 @@ func TestStatusStrategy_ValidateUpdate(t *testing.T) {
 				},
 			},
 			wantErrs: field.ErrorList{
+				{Type: field.ErrorTypeRequired, Field: "status.completionTime"},
+				{Type: field.ErrorTypeInvalid, Field: "status.conditions"},
+				{Type: field.ErrorTypeRequired, Field: "status.startTime"},
 				{Type: field.ErrorTypeInvalid, Field: "status.conditions"},
 			},
 		},
@@ -3341,21 +3354,6 @@ func TestStatusStrategy_ValidateUpdate(t *testing.T) {
 				{Type: field.ErrorTypeInvalid, Field: "status.conditions"},
 			},
 		},
-		"valid addition of SuccessCriteriaMet when JobManagedBy is enabled": {
-			enableJobManagedBy: true,
-			job: &batch.Job{
-				ObjectMeta: validObjectMeta,
-			},
-			newJob: &batch.Job{
-				ObjectMeta: validObjectMeta,
-				Status: batch.JobStatus{
-					Conditions: []batch.JobCondition{{
-						Type:   batch.JobSuccessCriteriaMet,
-						Status: api.ConditionTrue,
-					}},
-				},
-			},
-		},
 		"valid addition of SuccessCriteriaMet": {
 			job: &batch.Job{
 				ObjectMeta: validObjectMeta,
@@ -3371,7 +3369,6 @@ func TestStatusStrategy_ValidateUpdate(t *testing.T) {
 			},
 		},
 		"invalid attempt to set more ready pods than active": {
-			enableJobManagedBy: true,
 			job: &batch.Job{
 				ObjectMeta: validObjectMeta,
 				Spec: batch.JobSpec{
@@ -3393,7 +3390,6 @@ func TestStatusStrategy_ValidateUpdate(t *testing.T) {
 			},
 		},
 		"valid transition to Complete for suspended Job with completions=0; without startTime": {
-			enableJobManagedBy: true,
 			job: &batch.Job{
 				ObjectMeta: validObjectMeta,
 				Spec: batch.JobSpec{
@@ -3425,14 +3421,6 @@ func TestStatusStrategy_ValidateUpdate(t *testing.T) {
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			if !tc.enableJobManagedBy {
-				// TODO: this will be removed in 1.37.
-				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, utilversion.MustParse("1.33"))
-			}
-			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-				features.JobManagedBy: tc.enableJobManagedBy,
-			})
-
 			errs := StatusStrategy.ValidateUpdate(ctx, tc.newJob, tc.job)
 			if diff := cmp.Diff(tc.wantErrs, errs, ignoreErrValueDetail); diff != "" {
 				t.Errorf("Unexpected errors (-want,+got):\n%s", diff)
@@ -3833,6 +3821,32 @@ func TestJobStrategy_ValidateUpdate_MutableSchedulingDirectives(t *testing.T) {
 			},
 			wantErrs: field.ErrorList{
 				{Type: field.ErrorTypeInvalid, Field: "spec.template"},
+			},
+		},
+		"feature gate enabled - scheduling directives update allowed for suspended Job without Suspended condition but never started": {
+			enableFeatureGate: true,
+			job: &batch.Job{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "myjob",
+					Namespace:       metav1.NamespaceDefault,
+					ResourceVersion: "0",
+				},
+				Spec: batch.JobSpec{
+					Selector:       validSelector,
+					Template:       validPodTemplateSpec,
+					ManualSelector: ptr.To(true),
+					Parallelism:    ptr.To[int32](1),
+					Suspend:        ptr.To(true),
+				},
+				Status: batch.JobStatus{
+					Active:    0,
+					StartTime: nil,
+				},
+			},
+			update: func(job *batch.Job) {
+				job.Spec.Template.Spec.NodeSelector = map[string]string{
+					"key": "value",
+				}
 			},
 		},
 	}

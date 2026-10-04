@@ -41,6 +41,7 @@ type DeviceClassInterface interface {
 	Create(ctx context.Context, deviceClass *resourcev1.DeviceClass, opts metav1.CreateOptions) (*resourcev1.DeviceClass, error)
 	Update(ctx context.Context, deviceClass *resourcev1.DeviceClass, opts metav1.UpdateOptions) (*resourcev1.DeviceClass, error)
 	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
+	DeleteWithResult(ctx context.Context, name string, opts metav1.DeleteOptions) (metav1.APIResult, error)
 	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Get(ctx context.Context, name string, opts metav1.GetOptions) (*resourcev1.DeviceClass, error)
 	List(ctx context.Context, opts metav1.ListOptions) (*resourcev1.DeviceClassList, error)

@@ -19,17 +19,18 @@ package podresources
 
 import (
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/klog/v2"
 	podresourcesapi "k8s.io/kubelet/pkg/apis/podresources/v1"
 )
 
 // DevicesProvider knows how to provide the devices used by the given container
 type DevicesProvider interface {
 	// UpdateAllocatedDevices frees any Devices that are bound to terminated pods.
-	UpdateAllocatedDevices()
+	UpdateAllocatedDevices(logger klog.Logger)
 	// GetDevices returns information about the devices assigned to pods and containers
 	GetDevices(podUID, containerName string) []*podresourcesapi.ContainerDevices
 	// GetAllocatableDevices returns information about all the devices known to the manager
-	GetAllocatableDevices() []*podresourcesapi.ContainerDevices
+	GetAllocatableDevices(logger klog.Logger) []*podresourcesapi.ContainerDevices
 }
 
 // PodsProvider knows how to provide the pods admitted by the node
@@ -41,22 +42,26 @@ type PodsProvider interface {
 
 // CPUsProvider knows how to provide the cpus used by the given container
 type CPUsProvider interface {
-	// GetCPUs returns information about the cpus assigned to pods and containers
-	GetCPUs(podUID, containerName string) []int64
-	// GetAllocatableCPUs returns the allocatable (not allocated) CPUs
+	// GetCPUs returns information about the cpus assigned to containers
+	GetCPUs(pod *v1.Pod, container *v1.Container) []int64
+	// GetPodCPUs returns information about the cpus assigned to a pod
+	GetPodCPUs(podUID string) []int64
+	// GetAllocatableCPUs returns the allocatable cpus from the node
 	GetAllocatableCPUs() []int64
 }
 
 type MemoryProvider interface {
 	// GetMemory returns information about the memory assigned to containers
-	GetMemory(podUID, containerName string) []*podresourcesapi.ContainerMemory
+	GetMemory(logger klog.Logger, pod *v1.Pod, container *v1.Container) []*podresourcesapi.ContainerMemory
+	// GetPodMemory returns information about the memory assigned to a pod
+	GetPodMemory(logger klog.Logger, podUID string) []*podresourcesapi.ContainerMemory
 	// GetAllocatableMemory returns the allocatable memory from the node
-	GetAllocatableMemory() []*podresourcesapi.ContainerMemory
+	GetAllocatableMemory(logger klog.Logger) []*podresourcesapi.ContainerMemory
 }
 
 type DynamicResourcesProvider interface {
 	// GetDynamicResources returns information about dynamic resources assigned to pods and containers
-	GetDynamicResources(pod *v1.Pod, container *v1.Container) []*podresourcesapi.DynamicResource
+	GetDynamicResources(logger klog.Logger, pod *v1.Pod, container *v1.Container) []*podresourcesapi.DynamicResource
 }
 
 type PodResourcesProviders struct {

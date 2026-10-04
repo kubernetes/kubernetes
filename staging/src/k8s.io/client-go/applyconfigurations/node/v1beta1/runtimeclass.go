@@ -38,7 +38,8 @@ import (
 // pod.  For more details, see
 // https://git.k8s.io/enhancements/keps/sig-node/585-runtime-class
 type RuntimeClassApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration `json:",inline"`
+	v1.TypeMetaApplyConfiguration `json:""`
+	// metadata is the standard object metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
 	// handler specifies the underlying runtime and configuration that the CRI

@@ -640,8 +640,8 @@ func TestWatchControllers(t *testing.T) {
 		client,
 		BurstReplicas,
 	)
-	informers.Start(stopCh)
-	informers.WaitForCacheSync(stopCh)
+	informers.StartWithContext(tCtx)
+	informers.WaitForCacheSyncWithContext(tCtx)
 
 	var testRSSpec apps.ReplicaSet
 	received := make(chan string)
@@ -879,7 +879,7 @@ func TestControllerUpdateRequeue(t *testing.T) {
 	manager.podControl = &fakePodControl
 
 	// Enqueue once. Then process it. Disable rate-limiting for this.
-	manager.queue = workqueue.NewTypedRateLimitingQueue(workqueue.NewTypedMaxOfRateLimiter[string]())
+	manager.queue = workqueue.NewTypedRateLimitingQueue(workqueue.NewTypedMaxOfRateLimiter[string]()) //nolint:logcheck // Intentionally testing old API here.
 	manager.enqueueRS(rs)
 	manager.processNextWorkItem(ctx)
 	// It should have been requeued.
@@ -1210,8 +1210,8 @@ func TestExpectationsOnRecreate(t *testing.T) {
 		client,
 		100,
 	)
-	f.Start(stopCh)
-	f.WaitForCacheSync(stopCh)
+	f.StartWithContext(tCtx)
+	f.WaitForCacheSyncWithContext(tCtx)
 	fakePodControl := controller.FakePodControl{}
 	manager.podControl = &fakePodControl
 

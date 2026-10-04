@@ -26,7 +26,7 @@ func Test(t *testing.T) {
 
 	st.Value(&Struct{
 		// All zero values
-	}).ExpectValid()
+	}).Opts(map[string]bool{"FeatureX": false}).ExpectValid()
 
 	st.Value(&Struct{
 		UnionField: Union{
@@ -42,7 +42,7 @@ func Test(t *testing.T) {
 			{Name: "succeeded"},
 			{Name: "failed"},
 		},
-	}).Opts([]string{"FeatureX"}).ExpectMatches(
+	}).Opts(map[string]bool{"FeatureX": true}).ExpectMatches(
 		field.ErrorMatcher{}.ByType().ByField().ByOrigin(),
 		field.ErrorList{
 			field.Invalid(field.NewPath("unionField", "xDisabledField"), "", "").WithOrigin("union"),
@@ -66,7 +66,7 @@ func Test(t *testing.T) {
 			{Name: "succeeded"},
 			{Name: "failed"},
 		},
-	}).ExpectValid()
+	}).Opts(map[string]bool{"FeatureX": false}).ExpectValid()
 
 	st.Value(&Struct{
 		UnionFieldDisabled: UnionDisabled{
@@ -82,7 +82,7 @@ func Test(t *testing.T) {
 			{Name: "succeeded"},
 			{Name: "failed"},
 		},
-	}).ExpectMatches(
+	}).Opts(map[string]bool{"FeatureX": false}).ExpectMatches(
 		field.ErrorMatcher{}.ByType().ByField().ByOrigin(),
 		field.ErrorList{
 			field.Invalid(field.NewPath("unionFieldDisabled", "xDisabledField"), "", "").WithOrigin("union"),
@@ -106,5 +106,5 @@ func Test(t *testing.T) {
 			{Name: "succeeded"},
 			{Name: "failed"},
 		},
-	}).Opts([]string{"FeatureX"}).ExpectValid()
+	}).Opts(map[string]bool{"FeatureX": true}).ExpectValid()
 }

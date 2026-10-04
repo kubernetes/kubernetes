@@ -24,29 +24,32 @@ import (
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:prerelease-lifecycle-gen:introduced=1.35
+// +k8s:prerelease-lifecycle-gen:deprecated=1.37
+// +k8s:prerelease-lifecycle-gen:replacement=storagemigration.k8s.io,v1,StorageVersionMigration
 
 // StorageVersionMigration represents a migration of stored data to the latest
 // storage version.
 // +k8s:supportsSubresource="/status"
 type StorageVersionMigration struct {
-	metav1.TypeMeta `json:",inline"`
-	// Standard object metadata.
+	metav1.TypeMeta `json:""`
+	// metadata is the standard object metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
-	// Specification of the migration.
-	// +optional
+	// spec is the specification of the migration.
+	// +required
 	Spec StorageVersionMigrationSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
-	// Status of the migration.
+	// status is the status of the migration.
 	// +optional
 	Status StorageVersionMigrationStatus `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"`
 }
 
 // Spec of the storage version migration.
 type StorageVersionMigrationSpec struct {
-	// The resource that is being migrated. The migrator sends requests to
+	// resource is the resource that is being migrated. The migrator sends requests to
 	// the endpoint serving the resource.
 	// Immutable.
+	// +required
 	Resource metav1.GroupResource `json:"resource" protobuf:"bytes,1,opt,name=resource"`
 }
 
@@ -63,25 +66,31 @@ const (
 
 // Status of the storage version migration.
 type StorageVersionMigrationStatus struct {
-	// The latest available observations of the migration's current state.
+	// conditions is the latest available observations of the migration's current state.
 	// +patchMergeKey=type
 	// +patchStrategy=merge
 	// +listType=map
 	// +listMapKey=type
 	// +optional
+	// +k8s:alpha(since: "1.37")=+k8s:optional
+	// +k8s:alpha(since: "1.37")=+k8s:listType=map
+	// +k8s:alpha(since: "1.37")=+k8s:listMapKey=type
 	Conditions []metav1.Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,1,rep,name=conditions"`
-	// ResourceVersion to compare with the GC cache for performing the migration.
+	// resourceVersion is the resource version to compare with the GC cache for performing the migration.
 	// This is the current resource version of given group, version and resource when
 	// kube-controller-manager first observes this StorageVersionMigration resource.
+	// +optional
 	ResourceVersion string `json:"resourceVersion,omitempty" protobuf:"bytes,2,opt,name=resourceVersion"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:prerelease-lifecycle-gen:introduced=1.35
+// +k8s:prerelease-lifecycle-gen:deprecated=1.37
+// +k8s:prerelease-lifecycle-gen:replacement=storagemigration.k8s.io,v1,StorageVersionMigrationList
 
 // StorageVersionMigrationList is a collection of storage version migrations.
 type StorageVersionMigrationList struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 
 	// Standard list metadata
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata

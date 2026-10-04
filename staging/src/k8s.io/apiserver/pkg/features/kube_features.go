@@ -44,24 +44,24 @@ const (
 	// Assigns each kube-apiserver an ID in a cluster.
 	APIServerIdentity featuregate.Feature = "APIServerIdentity"
 
+	// owner: @pmengelbert
+	// kep: https://kep.k8s.io/6060
+	//
+	// Controls whether the apiserver supports dispensing tokens for authenticating
+	// the Kubernetes API Server and Aggregated API Servers to webhooks.
+	APIServerWebhookAuthenticationToken featuregate.Feature = "APIServerWebhookAuthenticationToken"
+
 	// owner: @linxiulei
 	//
 	// Enables serving watch requests in separate goroutines.
 	APIServingWithRoutine featuregate.Feature = "APIServingWithRoutine"
-
-	// owner: @jefftree
-	//
-	// Remove the v2beta1 apidiscovery.k8s.io/v2beta1 group version. Aggregated
-	// discovery implements its own handlers and follows a different lifecycle than
-	// traditional k8s resources.
-	AggregatedDiscoveryRemoveBetaType featuregate.Feature = "AggregatedDiscoveryRemoveBetaType"
 
 	// owner: @modulitos
 	//
 	// Allow user.DefaultInfo.UID to be set from x509 cert during cert auth.
 	AllowParsingUserUIDFromCertAuth featuregate.Feature = "AllowParsingUserUIDFromCertAuth"
 
-	// owner: @stlaz @tkashem @dgrisonnet
+	// owner: @stlaz @tkashem @dgrisonnet @ibihim
 	// kep: https://kep.k8s.io/3926
 	//
 	// Enables the cluster admin to identify resources that fail to
@@ -104,10 +104,10 @@ const (
 	// kep: http://kep.k8s.io/5073
 	// beta: v1.33
 	//
-	// Enables running declarative validation of APIs, where declared. When enabled, APIs with
-	// declarative validation rules will validate objects using the generated
-	// declarative validation code and compare the results to the regular imperative validation.
-	// See DeclarativeValidationBeta for more.
+	// When enabled, results of declarative validation are compared against handwritten
+	// validation and mismatches are logged as metrics. Declarative validation itself is
+	// always executed independent of this gate; per-tag enforcement is controlled by the
+	// lifecycle prefix and the DeclarativeValidationBeta gate.
 	DeclarativeValidation featuregate.Feature = "DeclarativeValidation"
 
 	// owner: @jpbetz @aaron-prindle @yongruilin
@@ -120,11 +120,10 @@ const (
 	// In Shadow mode, declarative validation is executed and mismatches against handwritten
 	// validation are logged as metrics, but failures do not reject requests.
 	// Handwritten validation remains authoritative and enforced.
-	// Enforcement logic for resources using WithDeclarativeEnforcement():
+	// Enforcement by lifecycle prefix:
 	// - Standard tags (no prefix): Always Enforced (Bypasses this gate).
 	// - Beta tags (+k8s:beta): Enforced when this gate is enabled (default), otherwise Shadowed.
 	// - Alpha tags (+k8s:alpha): Always Shadowed.
-	// This gate has no effect if the master DeclarativeValidation feature gate is disabled.
 	DeclarativeValidationBeta featuregate.Feature = "DeclarativeValidationBeta"
 
 	// owner: @jpbetz @aaron-prindle @yongruilin
@@ -147,6 +146,19 @@ const (
 	// Enabled cache inconsistency detection.
 	DetectCacheInconsistency featuregate.Feature = "DetectCacheInconsistency"
 
+	// owner: @jefftree
+	//
+	// Enables the RangeStream RPC for list operations in etcd.
+	EtcdRangeStream featuregate.Feature = "EtcdRangeStream"
+
+	// owner: @aramase @BenTheElder
+	// kep: https://kep.k8s.io/5793
+	//
+	// Enables excluding the same set of authentication and authorization virtual resources
+	// from ValidatingAdmissionWebhook and MutatingAdmissionWebhook that ValidatingAdmissionPolicy
+	// and MutatingAdmissionPolicy already exclude.
+	ExcludeAdmissionWebhookVirtualResources featuregate.Feature = "ExcludeAdmissionWebhookVirtualResources"
+
 	// owner: @aramase
 	// kep: https://kep.k8s.io/3299
 	// deprecated: v1.28
@@ -159,6 +171,14 @@ const (
 	//
 	// Enables generating snapshots of watch cache store and using them to serve LIST requests.
 	ListFromCacheSnapshot featuregate.Feature = "ListFromCacheSnapshot"
+
+	// owner: @yongruilin
+	// kep: https://kep.k8s.io/5958
+	//
+	// Enables the "drop=metadata.managedFields" Accept header parameter, which serves
+	// responses with metadata.managedFields omitted. When disabled the parameter is
+	// ignored rather than rejected, and responses are unchanged.
+	ManagedFieldsOptOut featuregate.Feature = "ManagedFieldsOptOut"
 
 	// owner: @aramase @BenTheElder
 	// kep: https://kep.k8s.io/5793
@@ -272,6 +292,19 @@ const (
 	//
 	// Allow the API server to stream individual items instead of chunking
 	WatchList featuregate.Feature = "WatchList"
+
+	// owner: @p0lyn0mial
+	//
+	// Enables compression for WatchList responses
+	WatchListCompression featuregate.Feature = "WatchListCompression"
+
+	// owner: @aojea
+	// beta: v1.37
+	//
+	// Enables using a custom resolving RoundTripper to load-balance admission
+	// webhook requests across service endpoints instead of caching connections
+	// by service name.
+	WebhookRoundTripLoadBalancing featuregate.Feature = "WebhookRoundTripLoadBalancing"
 )
 
 func init() {
@@ -296,14 +329,12 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.26"), Default: true, PreRelease: featuregate.Beta},
 	},
 
-	APIServingWithRoutine: {
-		{Version: version.MustParse("1.30"), Default: false, PreRelease: featuregate.Alpha},
+	APIServerWebhookAuthenticationToken: {
+		{Version: version.MustParse("1.37"), Default: false, PreRelease: featuregate.Alpha},
 	},
 
-	AggregatedDiscoveryRemoveBetaType: {
-		{Version: version.MustParse("1.0"), Default: false, PreRelease: featuregate.GA},
-		{Version: version.MustParse("1.33"), Default: true, PreRelease: featuregate.Deprecated},
-		{Version: version.MustParse("1.35"), Default: true, PreRelease: featuregate.Deprecated, LockToDefault: true},
+	APIServingWithRoutine: {
+		{Version: version.MustParse("1.30"), Default: false, PreRelease: featuregate.Alpha},
 	},
 
 	AllowParsingUserUIDFromCertAuth: {
@@ -312,6 +343,7 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 
 	AllowUnsafeMalformedObjectDeletion: {
 		{Version: version.MustParse("1.32"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.37"), Default: true, PreRelease: featuregate.Beta},
 	},
 
 	CBORServingAndStorage: {
@@ -320,6 +352,7 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 
 	ConcurrentWatchObjectDecode: {
 		{Version: version.MustParse("1.31"), Default: false, PreRelease: featuregate.Beta},
+		{Version: version.MustParse("1.37"), Default: true, PreRelease: featuregate.Beta},
 	},
 
 	ConsistentListFromCacheSkipTimeoutFallback: {
@@ -348,10 +381,19 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 	DeclarativeValidationTakeover: {
 		{Version: version.MustParse("1.33"), Default: false, PreRelease: featuregate.Beta},
 		{Version: version.MustParse("1.36"), Default: false, PreRelease: featuregate.Deprecated},
+		{Version: version.MustParse("1.37"), Default: false, PreRelease: featuregate.Deprecated, LockToDefault: true},
 	},
 
 	DetectCacheInconsistency: {
 		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.Beta},
+	},
+
+	EtcdRangeStream: {
+		{Version: version.MustParse("1.37"), Default: true, PreRelease: featuregate.Beta},
+	},
+
+	ExcludeAdmissionWebhookVirtualResources: {
+		{Version: version.MustParse("1.37"), Default: true, PreRelease: featuregate.Beta},
 	},
 
 	KMSv1: {
@@ -365,8 +407,13 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.Beta},
 	},
 
+	ManagedFieldsOptOut: {
+		{Version: version.MustParse("1.38"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
 	ManifestBasedAdmissionControlConfig: {
 		{Version: version.MustParse("1.36"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.37"), Default: true, PreRelease: featuregate.Beta},
 	},
 
 	MutatingAdmissionPolicy: {
@@ -433,6 +480,7 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 	WatchCacheInitializationPostStartHook: {
 		{Version: version.MustParse("1.31"), Default: false, PreRelease: featuregate.Beta},
 		{Version: version.MustParse("1.36"), Default: true, PreRelease: featuregate.Beta},
+		{Version: version.MustParse("1.37"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 	},
 
 	WatchList: {
@@ -441,5 +489,13 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		// switch this back to false because the json and proto streaming encoders appear to work better.
 		{Version: version.MustParse("1.33"), Default: false, PreRelease: featuregate.Beta},
 		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.Beta},
+	},
+
+	WatchListCompression: {
+		{Version: version.MustParse("1.37"), Default: true, PreRelease: featuregate.Beta},
+	},
+
+	WebhookRoundTripLoadBalancing: {
+		{Version: version.MustParse("1.37"), Default: true, PreRelease: featuregate.Beta},
 	},
 }

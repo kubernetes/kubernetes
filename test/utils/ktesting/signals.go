@@ -21,8 +21,11 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"os"
 	"os/signal"
+	"reflect"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -42,6 +45,8 @@ var (
 
 const ginkgoSpecContextKey = "GINKGO_SPEC_CONTEXT"
 
+// Ginkgo specifies https://pkg.go.dev/github.com/onsi/ginkgo/v2@v2.32.1/internal#SpecContext.
+// But Gomega only needs AttachProgressReporter, so we only support that.
 type ginkgoReporter interface {
 	AttachProgressReporter(reporter func() string) func()
 }
@@ -60,6 +65,7 @@ type progressReporter struct {
 	reportMutex     sync.Mutex
 	reporterCounter int64
 	reporters       map[int64]func() string
+	runningTests    map[string]struct{} // cannot use sets.Set here (import restriction)
 	out             io.Writer
 	closeOut        func() error
 }
@@ -81,16 +87,39 @@ var _ ginkgoReporter = &progressReporter{}
 // Inside a bubble, signal.Notify fails with "select on synctest channel from
 // outside bubble" if (and only if) it gets called for the first time, so we
 // have to avoid setting up signal handling to be on the safe side.
+// We still register the sync test, but progress reporting will only work
+// if some other tests sets up the signal handling.
 func (p *progressReporter) init(tb TB, isSyncTest bool) context.Context {
-	if isSyncTest {
-		return context.Background()
+	tbType := reflect.TypeOf(tb)
+	if tbType.Kind() == reflect.Pointer {
+		tbType = tbType.Elem()
 	}
-	if _, ok := tb.(testing.TB); !ok {
-		// Not in a Go unit test.
+	tbPkg := tbType.PkgPath()
+	if strings.Contains(tbPkg, "k8s.io/kubernetes/test/e2e/framework") ||
+		strings.Contains(tbPkg, "github.com/onsi/ginkgo") {
+		// Do nothing when running under Ginkgo.
+		// It wouldn't be wrong to register the running test,
+		// but it's useless and visible to users in the Ginkgo timeline
+		// of a test when the registered cleanup callback runs.
 		return context.Background()
 	}
 
+	// Register the test. Even if we can't set up progress reporting,
+	// someone else might and then this test will show up.
 	tb.Helper()
+	p.trackRunningTest(tb)
+
+	if _, ok := tb.(testing.TB); !ok {
+		// Not in a Go unit test: don't handle progress signals.
+		// This ensures that we don't interfere with e.g. Ginkgo
+		// signal handling.
+		return context.Background()
+	}
+
+	if isSyncTest {
+		// Cannot initialize progress signal handling.
+		return context.Background()
+	}
 
 	// If already interrupted, then don't start the new test.
 	// This is necessary because normally CTRL-C would exit
@@ -204,6 +233,44 @@ func (p *progressReporter) detachProgressReporter(id int64) {
 	delete(p.reporters, id)
 }
 
+// addRunningTest records that a test with the given name is now running, so
+// that it shows up in the next progress report. It returns true if the name
+// was newly added, i.e. the caller is responsible for eventually calling
+// removeRunningTest. Because test names are unique, a second call for the
+// same name (for example because Init got called more than once for the
+// same test) is a no-op and returns false.
+func (p *progressReporter) addRunningTest(name string) bool {
+	p.reportMutex.Lock()
+	defer p.reportMutex.Unlock()
+
+	if _, ok := p.runningTests[name]; ok {
+		return false
+	}
+	if p.runningTests == nil {
+		p.runningTests = make(map[string]struct{})
+	}
+	p.runningTests[name] = struct{}{}
+	return true
+}
+
+func (p *progressReporter) removeRunningTest(name string) {
+	p.reportMutex.Lock()
+	defer p.reportMutex.Unlock()
+
+	delete(p.runningTests, name)
+}
+
+// trackRunningTest registers tb's name so that it shows up in the "Currently
+// running" list of a progress report, removing it again through tb.Cleanup.
+// It is safe to call more than once for the same tb (for example, because
+// Init gets called again just to obtain a TContext): only the first call
+// adds the name and registers the cleanup callback that removes it.
+func (p *progressReporter) trackRunningTest(tb TB) {
+	if p.addRunningTest(tb.Name()) {
+		tb.Cleanup(func() { p.removeRunningTest(tb.Name()) })
+	}
+}
+
 func (p *progressReporter) run() {
 	for {
 		_, ok := <-p.progressChannel
@@ -215,18 +282,24 @@ func (p *progressReporter) run() {
 	}
 }
 
-// dumpProgress is less useful than the Ginkgo progress report. We can't fix
-// that we don't know which tests are currently running and instead have to
-// rely on "go test -v" for that.
-//
-// But perhaps dumping goroutines and their callstacks is useful anyway?  TODO:
-// look at how Ginkgo does it and replicate some of it.
+// dumpProgress is less useful than the Ginkgo progress report because it
+// cannot show source code backtraces for the running tests. But at least
+// the names of the currently running tests are included, which helps
+// figuring out where a test binary got stuck.
 func (p *progressReporter) dumpProgress() {
 	p.reportMutex.Lock()
 	defer p.reportMutex.Unlock()
 
 	var buffer strings.Builder
 	buffer.WriteString("You requested a progress report.\n")
+	if len(p.runningTests) == 0 {
+		buffer.WriteString("Currently there is no test running.\n")
+	} else {
+		buffer.WriteString("Currently running:\n")
+		for _, name := range slices.Sorted(maps.Keys(p.runningTests)) {
+			buffer.WriteString("\t" + name + "\n")
+		}
+	}
 	if len(p.reporters) == 0 {
 		buffer.WriteString("Currently there is no information about test progress available.\n")
 	}

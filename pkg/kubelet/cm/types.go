@@ -125,7 +125,7 @@ type PodContainerManager interface {
 	ReduceCPULimits(logger klog.Logger, name CgroupName) error
 
 	// GetAllPodsFromCgroups enumerates the set of pod uids to their associated cgroup based on state of cgroupfs system.
-	GetAllPodsFromCgroups() (map[types.UID]CgroupName, error)
+	GetAllPodsFromCgroups(logger klog.Logger) (map[types.UID]CgroupName, error)
 
 	// IsPodCgroup returns true if the literal cgroupfs name corresponds to a pod
 	IsPodCgroup(cgroupfs string) (bool, types.UID)

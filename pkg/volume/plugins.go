@@ -262,6 +262,14 @@ type NodeExpandableVolumePlugin interface {
 	NodeExpand(resizeOptions NodeResizeOptions) (bool, error)
 }
 
+// ResizableEphemeralVolumePlugin is an extended interface of VolumePlugin and is used for volumes that
+// can be directly resized on the node without going through the standard async reconciler flow.
+type ResizableEphemeralVolumePlugin interface {
+	VolumePlugin
+	// ResizeEphemeralVolume resizes the volume on the node.
+	ResizeEphemeralVolume(spec *Spec, pod *v1.Pod, newSize *resource.Quantity) error
+}
+
 // BlockVolumePlugin is an extend interface of VolumePlugin and is used for block volumes support.
 type BlockVolumePlugin interface {
 	VolumePlugin
@@ -308,11 +316,11 @@ type KubeletVolumeHost interface {
 	GetHostUtil() hostutil.HostUtils
 
 	// Returns trust anchors from the named ClusterTrustBundle.
-	GetTrustAnchorsByName(name string, allowMissing bool) ([]byte, error)
+	GetTrustAnchorsByName(ctx context.Context, name string, allowMissing bool) ([]byte, error)
 
 	// Returns trust anchors from the ClusterTrustBundles selected by signer
 	// name and label selector.
-	GetTrustAnchorsBySigner(signerName string, labelSelector *metav1.LabelSelector, allowMissing bool) ([]byte, error)
+	GetTrustAnchorsBySigner(ctx context.Context, signerName string, labelSelector *metav1.LabelSelector, allowMissing bool) ([]byte, error)
 
 	// Returns the credential bundle for the specified podCertificate projected volume source.
 	GetPodCertificateCredentialBundle(ctx context.Context, namespace, podName, podUID, volumeName string, sourceIndex int) ([]byte, []byte, error)

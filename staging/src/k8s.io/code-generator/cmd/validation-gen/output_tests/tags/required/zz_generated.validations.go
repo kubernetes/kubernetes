@@ -25,7 +25,6 @@ import (
 	context "context"
 	fmt "fmt"
 
-	equality "k8s.io/apimachinery/pkg/api/equality"
 	operation "k8s.io/apimachinery/pkg/api/operation"
 	safe "k8s.io/apimachinery/pkg/api/safe"
 	validate "k8s.io/apimachinery/pkg/api/validate"
@@ -489,6 +488,29 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("byteField"), &obj.ByteField, oldVal, oldObj != nil)...)
 	}
 
+	{ // field Struct.OtherStructField
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *OtherStruct,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// +k8s:required on non-pointer struct fields is purely documentation
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_OtherStruct(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *Struct) *OtherStruct {
+				return &oldObj.OtherStructField
+			})
+		errs = append(errs, fn(fldPath.Child("otherStructField"), &obj.OtherStructField, oldVal, oldObj != nil)...)
+	}
+
 	{ // field Struct.OtherStructPtrField
 		fn := func(
 			fldPath *field.Path,
@@ -530,7 +552,7 @@ func Validate_Struct(
 			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
 			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
+				if validate.SemanticDeepEqual(obj, oldObj) {
 					return nil
 				}
 			}
@@ -562,7 +584,7 @@ func Validate_Struct(
 			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
 			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
+				if validate.SemanticDeepEqual(obj, oldObj) {
 					return nil
 				}
 			}
@@ -596,7 +618,7 @@ func Validate_Struct(
 			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
 			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
+				if validate.SemanticDeepEqual(obj, oldObj) {
 					return nil
 				}
 			}
@@ -628,7 +650,7 @@ func Validate_Struct(
 			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
 			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
+				if validate.SemanticDeepEqual(obj, oldObj) {
 					return nil
 				}
 			}
@@ -660,7 +682,7 @@ func Validate_Struct(
 			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
 			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
+				if validate.SemanticDeepEqual(obj, oldObj) {
 					return nil
 				}
 			}

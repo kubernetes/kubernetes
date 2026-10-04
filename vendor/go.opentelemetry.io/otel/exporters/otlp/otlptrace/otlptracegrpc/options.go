@@ -1,7 +1,7 @@
 // Copyright The OpenTelemetry Authors
 // SPDX-License-Identifier: Apache-2.0
 
-package otlptracegrpc // import "go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
+package otlptracegrpc
 
 import (
 	"fmt"
@@ -190,6 +190,16 @@ func WithGRPCConn(conn *grpc.ClientConn) Option {
 // If unset, the default timeout will be set to 10 seconds.
 func WithTimeout(duration time.Duration) Option {
 	return wrappedOption{otlpconfig.WithTimeout(duration)}
+}
+
+// WithMaxRequestSize sets the maximum size, in bytes, of a serialized export
+// request, before compression, that the exporter will send.
+//
+// If size is less than or equal to zero, no request-size limit is applied.
+// Disabling the limit is not recommended because it can lead to excessive
+// resource consumption or abuse.
+func WithMaxRequestSize(size int) Option {
+	return wrappedOption{otlpconfig.WithMaxRequestSize(size)}
 }
 
 // WithRetry sets the retry policy for transient retryable errors that may be

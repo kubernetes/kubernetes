@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 // Note: no types match this.
-// +k8s:validation-gen=TypeMeta
+// +k8s:validation-gen=TypesWithField=TypeMeta
 // +k8s:validation-gen-scheme-registry=k8s.io/code-generator/cmd/validation-gen/testscheme.Scheme
 // +k8s:validation-gen-test-fixture=validateFalse
 

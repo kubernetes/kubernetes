@@ -42,12 +42,14 @@ import (
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 )
 
+var defaultedMode bool
+
 // platformApplyDefaults is called after parsing command-line flags and/or reading the
 // config file, to apply platform-specific default values to config.
 func (o *Options) platformApplyDefaults(config *kubeproxyconfig.KubeProxyConfiguration) {
 	if config.Mode == "" {
-		o.logger.Info("Using iptables proxy")
 		config.Mode = kubeproxyconfig.ProxyModeIPTables
+		defaultedMode = true
 	}
 
 	if config.Mode == kubeproxyconfig.ProxyModeNFTables && len(config.NodePortAddresses) == 0 {
@@ -134,6 +136,11 @@ func (s *ProxyServer) createProxier(ctx context.Context, config *kubeproxyconfig
 	localDetectors := getLocalDetectors(logger, s.PrimaryIPFamily, config, s.podCIDRs)
 
 	if config.Mode == kubeproxyconfig.ProxyModeIPTables {
+		if defaultedMode {
+			message := "No kube-proxy mode specified: defaulting to 'iptables'. Note that in Kubernetes 1.40 the default mode will switch to 'nftables'. If you wish to continue using 'iptables' mode, you must explicitly specify 'mode: iptables' in the kube-proxy config file, or '--proxy-mode iptables' on the kube-proxy command line."
+			logger.Error(nil, message)
+			s.Recorder.Eventf(s.NodeRef, nil, v1.EventTypeWarning, "KubeProxyDefaultMode", "StartKubeProxy", message)
+		}
 		logger.Info("Using iptables Proxier")
 		ipts := utiliptables.NewBestEffort()
 
@@ -182,7 +189,7 @@ func (s *ProxyServer) createProxier(ctx context.Context, config *kubeproxyconfig
 		ipts := utiliptables.NewBestEffort()
 
 		logger.Info("Using ipvs Proxier")
-		message := "The ipvs proxier is now deprecated and may be removed in a future release. Please use 'nftables' instead."
+		message := "The ipvs proxier has been deprecated and will be disabled by default in Kubernetes 1.40 and removed in Kubernetes 1.43. Migrate to the 'nftables' proxier instead."
 		logger.Error(nil, message)
 		s.Recorder.Eventf(s.NodeRef, nil, v1.EventTypeWarning, "IPVSDeprecation", "StartKubeProxy", message)
 		if dualStack {

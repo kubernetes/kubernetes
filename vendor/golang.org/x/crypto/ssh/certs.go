@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"slices"
 	"sort"
 	"time"
 )
@@ -229,14 +230,19 @@ func parseCert(in []byte, privAlgo string) (*Certificate, error) {
 		return nil, err
 	}
 	c.Reserved = g.Reserved
+	// Reject a certificate whose signature key is itself a certificate before
+	// parsing it. Certificates signed by certificates are not supported (see
+	// PROTOCOL.certkeys), and rejecting after ParsePublicKey returns would allow
+	// a chain of nested certificates to recurse once per level, exhausting the
+	// goroutine stack.
+	if sigAlgo, _, ok := parseString(g.SignatureKey); !ok {
+		return nil, errShortRead
+	} else if _, ok := certKeyAlgoNames[string(sigAlgo)]; ok {
+		return nil, fmt.Errorf("ssh: the signature key type %q is invalid for certificates", sigAlgo)
+	}
 	k, err := ParsePublicKey(g.SignatureKey)
 	if err != nil {
 		return nil, err
-	}
-	// The Type() function is intended to return only certificate key types, but
-	// we use certKeyAlgoNames anyway for safety, to match [Certificate.Type].
-	if _, ok := certKeyAlgoNames[k.Type()]; ok {
-		return nil, fmt.Errorf("ssh: the signature key type %q is invalid for certificates", k.Type())
 	}
 	c.SignatureKey = k
 	c.Signature, rest, ok = parseSignatureBody(g.Signature)
@@ -300,8 +306,11 @@ const sourceAddressCriticalOption = "source-address"
 // minimally, the IsAuthority callback should be set.
 type CertChecker struct {
 	// SupportedCriticalOptions lists the CriticalOptions that the
-	// server application layer understands. These are only used
-	// for user certificates.
+	// application layer understands. A certificate carrying a critical
+	// option that is not listed here is rejected.
+	// CertChecker.Authenticate additionally accepts the source-address
+	// option, which the server enforces on the Permissions that
+	// Authenticate returns.
 	SupportedCriticalOptions []string
 
 	// IsUserAuthority should return true if the key is recognized as an
@@ -348,6 +357,9 @@ func (c *CertChecker) CheckHostKey(addr string, remote net.Addr, key PublicKey) 
 	if cert.CertType != HostCert {
 		return fmt.Errorf("ssh: certificate presented as a host key has type %d", cert.CertType)
 	}
+	if c.IsHostAuthority == nil {
+		return errors.New("ssh: cannot verify certificate, IsHostAuthority not set")
+	}
 	if !c.IsHostAuthority(cert.SignatureKey, addr) {
 		return fmt.Errorf("ssh: no authorities for hostname: %v", addr)
 	}
@@ -361,8 +373,9 @@ func (c *CertChecker) CheckHostKey(addr string, remote net.Addr, key PublicKey) 
 	return c.CheckCert(hostname, cert)
 }
 
-// Authenticate checks a user certificate. Authenticate can be used as
-// a value for ServerConfig.PublicKeyCallback.
+// Authenticate checks a user certificate. Authenticate can be used as a value
+// for ServerConfig.PublicKeyCallback. The source-address critical option is
+// allowed, as it will be enforced by the server.
 func (c *CertChecker) Authenticate(conn ConnMetadata, pubKey PublicKey) (*Permissions, error) {
 	cert, ok := pubKey.(*Certificate)
 	if !ok {
@@ -375,11 +388,17 @@ func (c *CertChecker) Authenticate(conn ConnMetadata, pubKey PublicKey) (*Permis
 	if cert.CertType != UserCert {
 		return nil, fmt.Errorf("ssh: cert has type %d", cert.CertType)
 	}
+	if c.IsUserAuthority == nil {
+		return nil, errors.New("ssh: cannot verify certificate, IsUserAuthority not set")
+	}
 	if !c.IsUserAuthority(cert.SignatureKey) {
 		return nil, fmt.Errorf("ssh: certificate signed by unrecognized authority")
 	}
-
-	if err := c.CheckCert(conn.User(), cert); err != nil {
+	// The source-address critical option is enforced by serverAuthenticate,
+	// so it is supported regardless of SupportedCriticalOptions
+	cc := *c
+	cc.SupportedCriticalOptions = append(slices.Clip(cc.SupportedCriticalOptions), sourceAddressCriticalOption)
+	if err := cc.CheckCert(conn.User(), cert); err != nil {
 		return nil, err
 	}
 
@@ -387,27 +406,15 @@ func (c *CertChecker) Authenticate(conn ConnMetadata, pubKey PublicKey) (*Permis
 }
 
 // CheckCert checks CriticalOptions, ValidPrincipals, revocation, timestamp and
-// the signature of the certificate.
+// the signature of the certificate. Critical options that are not listed in
+// SupportedCriticalOptions are rejected.
 func (c *CertChecker) CheckCert(principal string, cert *Certificate) error {
 	if c.IsRevoked != nil && c.IsRevoked(cert) {
 		return fmt.Errorf("ssh: certificate serial %d revoked", cert.Serial)
 	}
 
 	for opt := range cert.CriticalOptions {
-		// sourceAddressCriticalOption will be enforced by
-		// serverAuthenticate
-		if opt == sourceAddressCriticalOption {
-			continue
-		}
-
-		found := false
-		for _, supp := range c.SupportedCriticalOptions {
-			if supp == opt {
-				found = true
-				break
-			}
-		}
-		if !found {
+		if !slices.Contains(c.SupportedCriticalOptions, opt) {
 			return fmt.Errorf("ssh: unsupported critical option %q in certificate", opt)
 		}
 	}
@@ -438,7 +445,17 @@ func (c *CertChecker) CheckCert(principal string, cert *Certificate) error {
 	if before := int64(cert.ValidBefore); cert.ValidBefore != uint64(CertTimeInfinity) && (unixNow >= before || before < 0) {
 		return fmt.Errorf("ssh: cert has expired")
 	}
-	if err := cert.SignatureKey.Verify(cert.bytesForSigning(), cert.Signature); err != nil {
+	// Match OpenSSH: the SK user-presence flag is never enforced on a
+	// certificate's CA signature. OpenSSH calls sshkey_verify with
+	// detailsp==NULL in sshkey.c:cert_parse, so the UP/UV flags are
+	// not even extracted. The UP bit on a CA signature reflects the
+	// CA operator's presence at signing time, which has no bearing on
+	// whether the user being authenticated is present now; enforcing
+	// it here would only break interop with certificates issued by
+	// non-interactive SK CAs. skKeyWithoutUP is a no-op for non-SK
+	// keys (the common case).
+	caKey := skKeyWithoutUP(cert.SignatureKey)
+	if err := caKey.Verify(cert.bytesForSigning(), cert.Signature); err != nil {
 		return fmt.Errorf("ssh: certificate signature does not verify")
 	}
 

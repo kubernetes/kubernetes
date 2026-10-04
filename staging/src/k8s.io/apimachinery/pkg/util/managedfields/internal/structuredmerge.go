@@ -19,9 +19,9 @@ package internal
 import (
 	"fmt"
 
-	"sigs.k8s.io/structured-merge-diff/v6/fieldpath"
-	"sigs.k8s.io/structured-merge-diff/v6/merge"
-	"sigs.k8s.io/structured-merge-diff/v6/typed"
+	"sigs.k8s.io/structured-merge-diff/v7/fieldpath"
+	"sigs.k8s.io/structured-merge-diff/v7/merge"
+	"sigs.k8s.io/structured-merge-diff/v7/typed"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"

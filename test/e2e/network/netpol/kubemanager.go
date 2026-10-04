@@ -236,7 +236,7 @@ func (k *kubeManager) probeConnectivity(args *probeConnectivityArgs) (bool, stri
 
 // executeRemoteCommand executes a remote shell command on the given pod.
 func (k *kubeManager) executeRemoteCommand(namespace string, pod string, command []string) (string, string, error) {
-	return e2epod.ExecWithOptions(k.framework, e2epod.ExecOptions{
+	return e2epod.Exec(k.framework.TContext(context.Background()), e2epod.ExecOptions{
 		Command:            command,
 		Namespace:          namespace,
 		PodName:            pod,

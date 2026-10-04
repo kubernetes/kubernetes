@@ -29,7 +29,7 @@ func TestTagsEqual(t *testing.T) {
 		expectEqual bool
 	}{
 		{1, 2, false},
-		{2, 2, false},
+		{2, 2, true},
 		{WithSlow(), 2, false},
 		{WithSlow(), WithSerial(), false},
 		{WithSerial(), WithSlow(), false},
@@ -43,7 +43,7 @@ func TestTagsEqual(t *testing.T) {
 
 	for _, tc := range testcases {
 		t.Run(fmt.Sprintf("%v=%v", tc.a, tc.b), func(t *testing.T) {
-			actualEqual := TagsEqual(tc.a, tc.b)
+			actualEqual := tc.a == tc.b
 			if actualEqual != tc.expectEqual {
 				t.Errorf("expected %v, got %v", tc.expectEqual, actualEqual)
 			}

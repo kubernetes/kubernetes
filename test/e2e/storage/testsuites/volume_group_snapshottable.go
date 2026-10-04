@@ -35,7 +35,6 @@ import (
 	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
-	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2estatefulset "k8s.io/kubernetes/test/e2e/framework/statefulset"
 	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
 	storageframework "k8s.io/kubernetes/test/e2e/storage/framework"
@@ -50,6 +49,7 @@ type volumeGroupSnapshottableTest struct {
 	volumeResources []*storageframework.VolumeResource
 	snapshots       []*storageframework.VolumeGroupSnapshotResource
 	numReplicas     int
+	claimSize       string
 }
 
 // VolumeGroupSnapshottableTestSuite represents a test suite for testing volume group snapshot functionality.
@@ -84,14 +84,15 @@ func InitCustomGroupSnapshottableTestSuite(patterns []storageframework.TestPatte
 }
 
 // SkipUnsupportedTests skips tests if the driver does not support group snapshots.
-func (s *VolumeGroupSnapshottableTestSuite) SkipUnsupportedTests(driver storageframework.TestDriver, pattern storageframework.TestPattern) {
+func (s *VolumeGroupSnapshottableTestSuite) SkipUnsupportedTests(driver storageframework.TestDriver, pattern storageframework.TestPattern) string {
 	// Check preconditions.
 	dInfo := driver.GetDriverInfo()
 	ok := false
 	_, ok = driver.(storageframework.VolumeGroupSnapshottableTestDriver)
 	if !dInfo.Capabilities[storageframework.CapVolumeGroupSnapshot] || !ok {
-		e2eskipper.Skipf("Driver %q does not support group snapshots - skipping", dInfo.Name)
+		return fmt.Sprintf("Driver %q does not support group snapshots", dInfo.Name)
 	}
+	return ""
 }
 
 // GetTestSuiteInfo returns the test suite information for the VolumeGroupSnapshottableTestSuite.
@@ -122,12 +123,18 @@ func (s *VolumeGroupSnapshottableTestSuite) DefineTests(driver storageframework.
 				cs = f.ClientSet
 				config := driver.PrepareTest(ctx, f)
 
+				testVolumeSizeRange := s.GetTestSuiteInfo().SupportedSizeRange
+				driverVolumeSizeRange := driver.GetDriverInfo().SupportedSizeRange
+				claimSize, err := utils.GetSizeRangesIntersection(testVolumeSizeRange, driverVolumeSizeRange)
+				framework.ExpectNoError(err, "determine intersection of test size range %+v and driver size range %+v", testVolumeSizeRange, driverVolumeSizeRange)
+
 				groupTest = &volumeGroupSnapshottableTest{
 					config:          config,
 					volumeResources: []*storageframework.VolumeResource{},
 					snapshots:       []*storageframework.VolumeGroupSnapshotResource{},
 					pods:            []*v1.Pod{},
 					numReplicas:     3,
+					claimSize:       claimSize,
 				}
 			}
 
@@ -192,7 +199,7 @@ func (s *VolumeGroupSnapshottableTestSuite) DefineTests(driver storageframework.
 									},
 									Resources: v1.VolumeResourceRequirements{
 										Requests: v1.ResourceList{
-											v1.ResourceStorage: resource.MustParse(s.GetTestSuiteInfo().SupportedSizeRange.Min),
+											v1.ResourceStorage: resource.MustParse(groupTest.claimSize),
 										},
 									},
 									StorageClassName: &volumeResource.Sc.Name,
@@ -303,7 +310,7 @@ func (s *VolumeGroupSnapshottableTestSuite) DefineTests(driver storageframework.
 					gomega.Expect(volumeSnapshotInfoList).ShouldNot(gomega.BeNil(), "failed to get group snapshot handle list")
 					gomega.Expect(volumeSnapshotInfoList).Should(gomega.HaveLen(groupTest.numReplicas), "failed to verify snapshot handle list length")
 				}
-				claimSize := s.GetTestSuiteInfo().SupportedSizeRange.Min
+				claimSize := groupTest.claimSize
 
 				ginkgo.By("creating restored PVCs from snapshots")
 				restoredPVCs := []*v1.PersistentVolumeClaim{}

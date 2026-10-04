@@ -21,7 +21,7 @@ package winstats
 import (
 	"sync"
 
-	cadvisorapi "github.com/google/cadvisor/info/v1"
+	cadvisorapi "github.com/google/cadvisor/lib/model"
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"

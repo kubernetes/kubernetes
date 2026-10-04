@@ -101,8 +101,6 @@ type Options struct {
 
 	// AllowNonStructural indicates swagger should be built for a schema that fits into the structural type but does not meet all structural invariants
 	AllowNonStructural bool
-
-	IncludeSelectableFields bool
 }
 
 func generateBuilder(crd *apiextensionsv1.CustomResourceDefinition, version string, opts Options) (*builder, error) {
@@ -413,10 +411,8 @@ func (b *builder) buildKubeNative(crd *apiextensionsv1.CustomResourceDefinition,
 		},
 	})
 
-	if opts.IncludeSelectableFields {
-		if selectableFields := buildSelectableFields(crd, b.version); selectableFields != nil {
-			ret.AddExtension(endpoints.RouteMetaSelectableFields, selectableFields)
-		}
+	if selectableFields := buildSelectableFields(crd, b.version); selectableFields != nil {
+		ret.AddExtension(endpoints.RouteMetaSelectableFields, selectableFields)
 	}
 
 	return ret
@@ -520,10 +516,8 @@ func (b *builder) buildListSchema(crd *apiextensionsv1.CustomResourceDefinition,
 			"kind":    b.listKind,
 		},
 	})
-	if opts.IncludeSelectableFields {
-		if selectableFields := buildSelectableFields(crd, b.version); selectableFields != nil {
-			s.AddExtension(endpoints.RouteMetaSelectableFields, selectableFields)
-		}
+	if selectableFields := buildSelectableFields(crd, b.version); selectableFields != nil {
+		s.AddExtension(endpoints.RouteMetaSelectableFields, selectableFields)
 	}
 	return s
 }
@@ -552,7 +546,7 @@ func (b *builder) getOpenAPIConfig() *common.Config {
 				},
 			},
 		},
-		GetOperationIDAndTags: openapi.GetOperationIDAndTags,
+		GetOperationIDAndTagsFromRoute: openapi.GetOperationIDAndTagsFromRoute,
 		GetDefinitionName: func(name string) (string, spec.Extensions) {
 			buildDefinitions.Do(generateBuildDefinitionsFunc)
 			return namer.GetDefinitionName(name)
@@ -586,7 +580,7 @@ func (b *builder) getOpenAPIV3Config() *common.OpenAPIV3Config {
 				},
 			},
 		},
-		GetOperationIDAndTags: openapi.GetOperationIDAndTags,
+		GetOperationIDAndTagsFromRoute: openapi.GetOperationIDAndTagsFromRoute,
 		GetDefinitionName: func(name string) (string, spec.Extensions) {
 			buildDefinitions.Do(generateBuildDefinitionsFunc)
 			return namer.GetDefinitionName(name)

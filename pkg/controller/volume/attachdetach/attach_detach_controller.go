@@ -132,7 +132,10 @@ func NewAttachDetachController(
 		nodesSynced: nodeInformer.Informer().HasSynced,
 		pvcQueue: workqueue.NewTypedRateLimitingQueueWithConfig(
 			workqueue.DefaultTypedControllerRateLimiter[string](),
-			workqueue.TypedRateLimitingQueueConfig[string]{Name: "pvcs"},
+			workqueue.TypedRateLimitingQueueConfig[string]{
+				Logger: new(klog.FromContext(ctx)),
+				Name:   "pvcs",
+			},
 		),
 	}
 
@@ -193,7 +196,7 @@ func NewAttachDetachController(
 		adc.csiMigratedPluginManager,
 		adc.intreeToCSITranslator)
 
-	podInformer.Informer().AddEventHandler(kcache.ResourceEventHandlerFuncs{
+	_, err := podInformer.Informer().AddEventHandlerWithOptions(kcache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			adc.podAdd(logger, obj)
 		},
@@ -203,7 +206,10 @@ func NewAttachDetachController(
 		DeleteFunc: func(obj interface{}) {
 			adc.podDelete(logger, obj)
 		},
-	})
+	}, kcache.HandlerOptions{Logger: &logger})
+	if err != nil {
+		return nil, fmt.Errorf("could not add pod event handler: %w", err)
+	}
 
 	// This custom indexer will index pods by its PVC keys. Then we don't need
 	// to iterate all pods every time to find pods which reference given PVC.
@@ -211,7 +217,7 @@ func NewAttachDetachController(
 		return nil, fmt.Errorf("could not initialize attach detach controller: %w", err)
 	}
 
-	nodeInformer.Informer().AddEventHandler(kcache.ResourceEventHandlerFuncs{
+	_, err = nodeInformer.Informer().AddEventHandlerWithOptions(kcache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			adc.nodeAdd(logger, obj)
 		},
@@ -221,16 +227,22 @@ func NewAttachDetachController(
 		DeleteFunc: func(obj interface{}) {
 			adc.nodeDelete(logger, obj)
 		},
-	})
+	}, kcache.HandlerOptions{Logger: &logger})
+	if err != nil {
+		return nil, fmt.Errorf("could not add node event handler: %w", err)
+	}
 
-	pvcInformer.Informer().AddEventHandler(kcache.ResourceEventHandlerFuncs{
+	_, err = pvcInformer.Informer().AddEventHandlerWithOptions(kcache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			adc.enqueuePVC(obj)
 		},
 		UpdateFunc: func(old, new interface{}) {
 			adc.enqueuePVC(new)
 		},
-	})
+	}, kcache.HandlerOptions{Logger: &logger})
+	if err != nil {
+		return nil, fmt.Errorf("could not add pvc event handler: %w", err)
+	}
 
 	return adc, nil
 }
@@ -323,7 +335,7 @@ type attachDetachController struct {
 }
 
 func (adc *attachDetachController) Run(ctx context.Context) {
-	defer runtime.HandleCrash()
+	defer runtime.HandleCrashWithContext(ctx)
 
 	// Start events processing pipeline.
 	adc.broadcaster.StartStructuredLogging(3)
@@ -729,7 +741,7 @@ func (adc *attachDetachController) processVolumeAttachments(logger klog.Logger) 
 		}
 
 		if plugin == nil {
-			plugin, err = adc.volumePluginMgr.FindAttachablePluginBySpec(volumeSpec)
+			plugin, err = volumeutil.FindDetachablePluginBySpec(volumeSpec, &adc.volumePluginMgr)
 			if err != nil || plugin == nil {
 				// Currently VA objects are created for CSI volumes only. nil plugin is unexpected, generate a warning
 				logger.Info("Skipping processing the volume on node, no attacher interface found", "node", klog.KRef("", string(nodeName)), "PV", klog.KRef("", *pvName), "err", err)

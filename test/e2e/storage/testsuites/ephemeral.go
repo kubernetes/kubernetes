@@ -95,10 +95,11 @@ func (p *ephemeralTestSuite) GetTestSuiteInfo() storageframework.TestSuiteInfo {
 	return p.tsInfo
 }
 
-func (p *ephemeralTestSuite) SkipUnsupportedTests(driver storageframework.TestDriver, pattern storageframework.TestPattern) {
+func (p *ephemeralTestSuite) SkipUnsupportedTests(driver storageframework.TestDriver, pattern storageframework.TestPattern) string {
 	if pattern.VolMode == v1.PersistentVolumeBlock {
-		skipTestIfBlockNotSupported(driver)
+		return checkIfBlockNotSupported(driver)
 	}
+	return ""
 }
 
 func (p *ephemeralTestSuite) DefineTests(driver storageframework.TestDriver, pattern storageframework.TestPattern) {

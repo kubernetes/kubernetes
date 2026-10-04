@@ -239,6 +239,108 @@ func TestLabelKey(t *testing.T) {
 	}
 }
 
+func TestPrefixedLabelKey(t *testing.T) {
+	ctx := context.Background()
+	fldPath := field.NewPath("test")
+
+	testCases := []struct {
+		name     string
+		input    string
+		wantErrs field.ErrorList
+	}{{
+		name:  "valid key",
+		input: "app",
+		wantErrs: field.ErrorList{
+			field.Invalid(fldPath, nil, "").WithOrigin("format=k8s-prefixed-label-key"),
+		},
+	}, {
+		name:  "valid key with dash",
+		input: "app-name",
+		wantErrs: field.ErrorList{
+			field.Invalid(fldPath, nil, "").WithOrigin("format=k8s-prefixed-label-key"),
+		},
+	}, {
+		name:  "valid key with dot",
+		input: "app.name",
+		wantErrs: field.ErrorList{
+			field.Invalid(fldPath, nil, "").WithOrigin("format=k8s-prefixed-label-key"),
+		},
+	}, {
+		name:  "valid key with underscore",
+		input: "app_name",
+		wantErrs: field.ErrorList{
+			field.Invalid(fldPath, nil, "").WithOrigin("format=k8s-prefixed-label-key"),
+		},
+	}, {
+		name:     "valid key with prefix",
+		input:    "example.com/app",
+		wantErrs: nil,
+	}, {
+		name:     "valid key with long prefix",
+		input:    strings.Repeat("a", 63) + "." + strings.Repeat("b", 63) + "." + strings.Repeat("c", 63) + "." + strings.Repeat("d", 55) + "/app",
+		wantErrs: nil,
+	}, {
+		name:  "invalid: empty string",
+		input: "",
+		wantErrs: field.ErrorList{
+			field.Invalid(fldPath, nil, "").WithOrigin("format=k8s-prefixed-label-key"),
+		},
+	}, {
+		name:  "invalid: starts with dash",
+		input: "-app",
+		wantErrs: field.ErrorList{
+			field.Invalid(fldPath, nil, "").WithOrigin("format=k8s-prefixed-label-key"),
+		},
+	}, {
+		name:  "invalid: ends with dash",
+		input: "app-",
+		wantErrs: field.ErrorList{
+			field.Invalid(fldPath, nil, "").WithOrigin("format=k8s-prefixed-label-key"),
+		},
+	}, {
+		name:  "invalid: contains invalid characters",
+		input: "app^",
+		wantErrs: field.ErrorList{
+			field.Invalid(fldPath, nil, "").WithOrigin("format=k8s-prefixed-label-key"),
+		},
+	}, {
+		name:  "invalid: name too long",
+		input: strings.Repeat("a", 64),
+		wantErrs: field.ErrorList{
+			field.Invalid(fldPath, nil, "").WithOrigin("format=k8s-prefixed-label-key"),
+		},
+	}, {
+		name:  "invalid: prefix too long",
+		input: strings.Repeat("a", 254) + "/app",
+		wantErrs: field.ErrorList{
+			field.Invalid(fldPath, nil, "").WithOrigin("format=k8s-prefixed-label-key"),
+		},
+	}, {
+		name:  "invalid: prefix is not a DNS subdomain",
+		input: "example-.com/app",
+		wantErrs: field.ErrorList{
+			field.Invalid(fldPath, nil, "").WithOrigin("format=k8s-prefixed-label-key"),
+		},
+	}, {
+		name:     "nil value",
+		input:    "", // This will be handled by setting value to nil in the test runner
+		wantErrs: nil,
+	}}
+
+	matcher := field.ErrorMatcher{}.ByType().ByField().ByOrigin()
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			var value *string
+			if tc.name != "nil value" {
+				v := tc.input
+				value = &v
+			}
+			gotErrs := PrefixedLabelKey(ctx, operation.Operation{}, fldPath, value, nil)
+			matcher.Test(t, tc.wantErrs, gotErrs)
+		})
+	}
+}
+
 func TestK8sUUID(t *testing.T) {
 	ctx := context.Background()
 	fldPath := field.NewPath("test")
@@ -820,9 +922,35 @@ func TestResourceFullyQualifiedName(t *testing.T) {
 		input:    "prefix.com/Name",
 		wantErrs: nil, // no errors, C-identifiers can have uppercase letters
 	}, {
-		name:     "invalid: more than one slash",
-		input:    "prefix.com/name/extra",
-		wantErrs: nil, // This is not validated, yet.
+		name:  "invalid: more than one slash",
+		input: "prefix.com/name/extra",
+		wantErrs: field.ErrorList{
+			field.Invalid(fldPath, "prefix.com/name/extra", "must not contain more than one slash").WithOrigin("format=k8s-resource-fully-qualified-name"),
+		},
+	}, {
+		name:  "invalid: many slashes",
+		input: "prefix.com/a/b/c/d",
+		wantErrs: field.ErrorList{
+			field.Invalid(fldPath, "prefix.com/a/b/c/d", "must not contain more than one slash").WithOrigin("format=k8s-resource-fully-qualified-name"),
+		},
+	}, {
+		name:  "invalid: trailing slash after a qualified name",
+		input: "prefix.com/name/",
+		wantErrs: field.ErrorList{
+			field.Invalid(fldPath, "prefix.com/name/", "must not contain more than one slash").WithOrigin("format=k8s-resource-fully-qualified-name"),
+		},
+	}, {
+		name:  "invalid: empty segment between slashes",
+		input: "prefix.com//name",
+		wantErrs: field.ErrorList{
+			field.Invalid(fldPath, "prefix.com//name", "must not contain more than one slash").WithOrigin("format=k8s-resource-fully-qualified-name"),
+		},
+	}, {
+		name:  "invalid: leading slash before a qualified name",
+		input: "/prefix.com/name",
+		wantErrs: field.ErrorList{
+			field.Invalid(fldPath, "/prefix.com/name", "must not contain more than one slash").WithOrigin("format=k8s-resource-fully-qualified-name"),
+		},
 	}, {
 		name:  "invalid: empty name",
 		input: "prefix.com/",

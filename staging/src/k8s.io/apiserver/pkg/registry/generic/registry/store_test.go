@@ -43,6 +43,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/selection"
+	"k8s.io/apimachinery/pkg/util/resourceversion"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -143,6 +144,351 @@ func (t *testRESTStrategy) Canonicalize(obj runtime.Object) {}
 
 func NewTestGenericStoreRegistry(t *testing.T) (factory.DestroyFunc, *Store) {
 	return newTestGenericStoreRegistry(t, scheme, false)
+}
+
+func TestCompleteWithOptionsDefaultsStoreKeyFuncs(t *testing.T) {
+	testCases := []struct {
+		name           string
+		namespaced     bool
+		ctx            context.Context
+		resourcePrefix string
+		expectRootKey  string
+		expectKey      string
+		expectName     string
+		expectNS       string
+	}{
+		{
+			name:           "namespaced",
+			namespaced:     true,
+			ctx:            genericapirequest.WithNamespace(genericapirequest.NewContext(), "ns1"),
+			resourcePrefix: "pods",
+			expectRootKey:  "/pods/ns1",
+			expectKey:      "/pods/ns1/pod1",
+			expectName:     "pod1",
+			expectNS:       "ns1",
+		},
+		{
+			name:           "cluster scoped",
+			namespaced:     false,
+			ctx:            genericapirequest.NewContext(),
+			resourcePrefix: "pods",
+			expectRootKey:  "/pods",
+			expectKey:      "/pods/pod1",
+			expectName:     "pod1",
+		},
+		{
+			name:           "resource prefix with trailing slash",
+			namespaced:     true,
+			ctx:            genericapirequest.WithNamespace(genericapirequest.NewContext(), "ns1"),
+			resourcePrefix: "pods/",
+			expectRootKey:  "/pods/ns1",
+			expectKey:      "/pods/ns1/pod1",
+			expectName:     "pod1",
+			expectNS:       "ns1",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			destroyFunc, store := NewTestGenericStoreRegistry(t)
+			defer destroyFunc()
+
+			strategy := &testRESTStrategy{scheme, names.SimpleNameGenerator, tc.namespaced, false, true}
+			store.CreateStrategy = strategy
+			store.UpdateStrategy = strategy
+			store.DeleteStrategy = strategy
+			store.KeyRootFunc = nil
+			store.KeyFunc = nil
+			store.TableConvertor = rest.NewDefaultTableConvertor(store.DefaultQualifiedResource)
+
+			err := store.CompleteWithOptions(&generic.StoreOptions{
+				RESTOptions: generic.RESTOptions{ResourcePrefix: tc.resourcePrefix},
+			})
+			if err != nil {
+				t.Fatalf("CompleteWithOptions failed: %v", err)
+			}
+
+			if store.KeyRootFunc == nil {
+				t.Fatal("KeyRootFunc was not defaulted")
+			}
+			if got := store.KeyRootFunc(tc.ctx); got != tc.expectRootKey {
+				t.Fatalf("KeyRootFunc returned %q, expect %q", got, tc.expectRootKey)
+			}
+
+			if store.KeyFunc == nil {
+				t.Fatal("KeyFunc was not defaulted")
+			}
+			got, err := store.KeyFunc(tc.ctx, "pod1")
+			if err != nil {
+				t.Fatalf("KeyFunc failed: %v", err)
+			}
+			if got != tc.expectKey {
+				t.Fatalf("KeyFunc returned %q, expect %q", got, tc.expectKey)
+			}
+			if store.ReverseKeyFunc == nil {
+				t.Fatal("ReverseKeyFunc was not defaulted")
+			}
+			name, namespace, err := store.ReverseKeyFunc(tc.expectKey)
+			if err != nil {
+				t.Fatalf("ReverseKeyFunc failed: %v", err)
+			}
+			if name != tc.expectName || namespace != tc.expectNS {
+				t.Fatalf("ReverseKeyFunc returned name=%q namespace=%q, expect name=%q namespace=%q", name, namespace, tc.expectName, tc.expectNS)
+			}
+		})
+	}
+}
+
+func TestDefaultStoreKeyFuncs(t *testing.T) {
+	testCases := []struct {
+		name              string
+		namespaced        bool
+		ctx               context.Context
+		obj               runtime.Object
+		keyName           string
+		expectRootKey     string
+		expectKey         string
+		expectKeyErr      bool
+		expectCacheKey    string
+		expectCacheKeyErr bool
+	}{
+		{
+			name:           "namespaced",
+			namespaced:     true,
+			ctx:            genericapirequest.WithNamespace(genericapirequest.NewContext(), "ns1"),
+			obj:            &example.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: "ns1", Name: "pod1"}},
+			keyName:        "pod1",
+			expectRootKey:  "/pods/ns1",
+			expectKey:      "/pods/ns1/pod1",
+			expectCacheKey: "/pods/ns1/pod1",
+		},
+		{
+			name:              "namespaced no namespace",
+			namespaced:        true,
+			ctx:               genericapirequest.NewContext(),
+			obj:               &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod1"}},
+			keyName:           "pod1",
+			expectRootKey:     "/pods",
+			expectKeyErr:      true,
+			expectCacheKeyErr: true,
+		},
+		{
+			name:              "namespaced empty name",
+			namespaced:        true,
+			ctx:               genericapirequest.WithNamespace(genericapirequest.NewContext(), "ns1"),
+			obj:               &example.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: "ns1"}},
+			expectRootKey:     "/pods/ns1",
+			expectKeyErr:      true,
+			expectCacheKeyErr: true,
+		},
+		{
+			name:              "namespaced name containing slash",
+			namespaced:        true,
+			ctx:               genericapirequest.WithNamespace(genericapirequest.NewContext(), "ns1"),
+			obj:               &example.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: "ns1", Name: "pod/1"}},
+			keyName:           "pod/1",
+			expectRootKey:     "/pods/ns1",
+			expectKeyErr:      true,
+			expectCacheKeyErr: true,
+		},
+		{
+			name:           "cluster scoped",
+			namespaced:     false,
+			ctx:            genericapirequest.NewContext(),
+			obj:            &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod1"}},
+			keyName:        "pod1",
+			expectRootKey:  "/pods",
+			expectKey:      "/pods/pod1",
+			expectCacheKey: "/pods/pod1",
+		},
+		{
+			name:           "cluster scoped ignores unexpected namespace",
+			namespaced:     false,
+			ctx:            genericapirequest.WithNamespace(genericapirequest.NewContext(), "ns1"),
+			obj:            &example.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: "ns1", Name: "pod1"}},
+			keyName:        "pod1",
+			expectRootKey:  "/pods",
+			expectKey:      "/pods/pod1",
+			expectCacheKey: "/pods/pod1",
+		},
+		{
+			name:              "cluster scoped empty name",
+			namespaced:        false,
+			ctx:               genericapirequest.NewContext(),
+			obj:               &example.Pod{},
+			expectRootKey:     "/pods",
+			expectKeyErr:      true,
+			expectCacheKeyErr: true,
+		},
+		{
+			name:              "cluster scoped name containing slash",
+			namespaced:        false,
+			ctx:               genericapirequest.NewContext(),
+			obj:               &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod/1"}},
+			keyName:           "pod/1",
+			expectRootKey:     "/pods",
+			expectKeyErr:      true,
+			expectCacheKeyErr: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			keyFuncs := defaultStoreKeyFuncs("/pods", tc.namespaced)
+
+			if got := keyFuncs.requestKeyRootFunc(tc.ctx); got != tc.expectRootKey {
+				t.Fatalf("requestKeyRootFunc returned %q, expect %q", got, tc.expectRootKey)
+			}
+
+			gotKey, err := keyFuncs.requestKeyFunc(tc.ctx, tc.keyName)
+			if (err != nil) != tc.expectKeyErr {
+				t.Fatalf("requestKeyFunc error = %v, expectErr %t", err, tc.expectKeyErr)
+			}
+			if err == nil && gotKey != tc.expectKey {
+				t.Fatalf("requestKeyFunc returned %q, expect %q", gotKey, tc.expectKey)
+			}
+
+			gotCacheKey, err := keyFuncs.objectKeyFunc(tc.obj)
+			if (err != nil) != tc.expectCacheKeyErr {
+				t.Fatalf("objectKeyFunc error = %v, expectErr %t", err, tc.expectCacheKeyErr)
+			}
+			if err == nil && gotCacheKey != tc.expectCacheKey {
+				t.Fatalf("objectKeyFunc returned %q, expect %q", gotCacheKey, tc.expectCacheKey)
+			}
+
+			if tc.expectKey != "" {
+				if keyFuncs.reverseKeyFunc == nil {
+					t.Fatal("ReverseKeyFunc is nil")
+				}
+				name, namespace, err := keyFuncs.reverseKeyFunc(tc.expectKey)
+				if err != nil {
+					t.Fatalf("ReverseKeyFunc error = %v", err)
+				}
+				accessor, err := meta.Accessor(tc.obj)
+				if err != nil {
+					t.Fatalf("failed to access test object: %v", err)
+				}
+				expectedNamespace := ""
+				if tc.namespaced {
+					expectedNamespace = accessor.GetNamespace()
+				}
+				if name != accessor.GetName() || namespace != expectedNamespace {
+					t.Fatalf("ReverseKeyFunc returned name=%q namespace=%q, expect name=%q namespace=%q", name, namespace, accessor.GetName(), expectedNamespace)
+				}
+			}
+		})
+	}
+}
+
+func TestReverseKeyFunc(t *testing.T) {
+	namespacedReverseKeyFunc := NamespaceReverseKeyFunc("/pods")
+	clusterScopedReverseKeyFunc := NoNamespaceReverseKeyFunc("/nodes")
+	testCases := []struct {
+		name           string
+		reverseKeyFunc storage.ReverseKeyFunc
+		key            string
+		expectName     string
+		expectNS       string
+		expectErr      bool
+	}{
+		{
+			name:           "namespaced",
+			reverseKeyFunc: namespacedReverseKeyFunc,
+			key:            "/pods/ns1/pod1",
+			expectName:     "pod1",
+			expectNS:       "ns1",
+		},
+		{
+			name:           "cluster scoped",
+			reverseKeyFunc: clusterScopedReverseKeyFunc,
+			key:            "/nodes/node1",
+			expectName:     "node1",
+		},
+		{
+			name:           "namespaced rejects a different resource prefix",
+			reverseKeyFunc: namespacedReverseKeyFunc,
+			key:            "/services/ns1/pod1",
+			expectErr:      true,
+		},
+		{
+			name:           "namespaced rejects an extra instance segment",
+			reverseKeyFunc: namespacedReverseKeyFunc,
+			key:            "/pods/ns1/pod1/extra",
+			expectErr:      true,
+		},
+		{
+			name:           "namespaced requires non-empty namespace",
+			reverseKeyFunc: namespacedReverseKeyFunc,
+			key:            "/pods//pod1",
+			expectErr:      true,
+		},
+		{
+			name:           "namespaced requires non-empty name",
+			reverseKeyFunc: namespacedReverseKeyFunc,
+			key:            "/pods/ns1/",
+			expectErr:      true,
+		},
+		{
+			name:           "cluster scoped rejects an extra instance segment",
+			reverseKeyFunc: clusterScopedReverseKeyFunc,
+			key:            "/nodes/group/node1",
+			expectErr:      true,
+		},
+		{
+			name:           "cluster scoped requires non-empty name",
+			reverseKeyFunc: clusterScopedReverseKeyFunc,
+			key:            "/nodes/",
+			expectErr:      true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			name, namespace, err := tc.reverseKeyFunc(tc.key)
+			if (err != nil) != tc.expectErr {
+				t.Fatalf("reverseKeyFunc error = %v, expectErr %t", err, tc.expectErr)
+			}
+			if err != nil {
+				return
+			}
+			if name != tc.expectName || namespace != tc.expectNS {
+				t.Fatalf("reverseKeyFunc returned name=%q namespace=%q, expect name=%q namespace=%q", name, namespace, tc.expectName, tc.expectNS)
+			}
+		})
+	}
+}
+
+func TestNewStoreKeyFuncsPreservesCustomReverseKeyFunc(t *testing.T) {
+	customReverseKeyFunc := func(key string) (name string, namespace string, err error) {
+		if key != "/custom/ns1/pod1" {
+			return "", "", fmt.Errorf("unexpected key %q", key)
+		}
+		return "pod1", "ns1", nil
+	}
+	keyFuncs := newStoreKeyFuncs(
+		true,
+		func(context.Context) string { return "/custom" },
+		func(context.Context, string) (string, error) { return "/custom/ns1/pod1", nil },
+		customReverseKeyFunc,
+	)
+
+	name, namespace, err := keyFuncs.reverseKeyFunc("/custom/ns1/pod1")
+	if err != nil {
+		t.Fatalf("custom ReverseKeyFunc failed: %v", err)
+	}
+	if name != "pod1" || namespace != "ns1" {
+		t.Fatalf("custom ReverseKeyFunc returned name=%q namespace=%q", name, namespace)
+	}
+
+	keyFuncs = newStoreKeyFuncs(
+		true,
+		func(context.Context) string { return "/custom" },
+		func(context.Context, string) (string, error) { return "/custom/ns1/pod1", nil },
+		nil,
+	)
+	if keyFuncs.reverseKeyFunc != nil {
+		t.Fatal("custom key funcs without ReverseKeyFunc must preserve the decode-fallback signal")
+	}
 }
 
 func getPodAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
@@ -2403,7 +2749,7 @@ func newTestGenericStoreRegistry(t *testing.T, scheme *runtime.Scheme, hasCacheE
 	newListFunc := func() runtime.Object { return &example.PodList{} }
 
 	sc.Codec = apitesting.TestStorageCodec(codecs, examplev1.SchemeGroupVersion)
-	s, dFunc, err := factory.Create(*sc.ForResource(schema.GroupResource{Resource: "pods"}), newFunc, newListFunc, "/pods")
+	s, dFunc, err := factory.Create(*sc.ForResource(schema.GroupResource{Resource: "pods"}), newFunc, newListFunc, nil, "/pods")
 	if err != nil {
 		t.Fatalf("Error creating storage: %v", err)
 	}
@@ -2950,5 +3296,347 @@ func TestValidateIndexers(t *testing.T) {
 		if !tc.expectedError && err != nil {
 			t.Errorf("%v: expected no error, but got %v", tc.name, err)
 		}
+	}
+}
+
+func TestUpdateEmptyFinalizersRV(t *testing.T) {
+	podName := "foo"
+	podWithFinalizer := &example.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: podName, Finalizers: []string{"foo.com/x"}},
+		Spec:       example.PodSpec{NodeName: "machine"},
+	}
+
+	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), "test")
+	destroyFunc, registry := newTestGenericStoreRegistry(t, scheme, false)
+	defer destroyFunc()
+
+	// 1. Create the pod with finalizer
+	if _, err := registry.Create(ctx, podWithFinalizer, rest.ValidateAllObjectFunc, &metav1.CreateOptions{}); err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	// 2. Delete object with nil delete options to mark it as deleting but not delete it immediately
+	_, wasDeleted, err := registry.Delete(ctx, podName, rest.ValidateAllObjectFunc, nil)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	if wasDeleted {
+		t.Fatalf("Expected pod not to be deleted immediately")
+	}
+
+	// 3. Retrieve the pod to get the latest ResourceVersion with DeletionTimestamp set
+	obj, err := registry.Get(ctx, podName, &metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	podAfterDelete := obj.(*example.Pod)
+	if podAfterDelete.DeletionTimestamp == nil {
+		t.Fatalf("Expected DeletionTimestamp to be set")
+	}
+
+	// 4. Perform an Update that removes the finalizer AND makes another change (Spec.NodeName)
+	podWithNoFinalizer := &example.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: podName, ResourceVersion: podAfterDelete.ResourceVersion},
+		Spec:       example.PodSpec{NodeName: "anothermachine"},
+	}
+
+	// Enable ReturnDeletedObject on registry to return the full object
+	registry.ReturnDeletedObject = true
+
+	updatedObj, creating, err := registry.Update(ctx, podName, rest.DefaultUpdatedObjectInfo(podWithNoFinalizer), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{})
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	if creating {
+		t.Fatalf("Expected creating to be false")
+	}
+
+	updatedPod, ok := updatedObj.(*example.Pod)
+	if !ok {
+		t.Fatalf("Expected updated object to be *example.Pod, got %T", updatedObj)
+	}
+
+	// Verify that the finalizer is gone
+	if len(updatedPod.Finalizers) != 0 {
+		t.Errorf("Expected finalizers to be empty, but got %v", updatedPod.Finalizers)
+	}
+	// Verify that other changes (Spec.NodeName) are correctly reflected in the returned object
+	if updatedPod.Spec.NodeName != "anothermachine" {
+		t.Errorf("Expected Spec.NodeName to be %q, but got %q", "anothermachine", updatedPod.Spec.NodeName)
+	}
+	// Verify that the returned ResourceVersion is greater than the one before the update (indicating it represents the deletion transaction)
+	cmp, err := resourceversion.CompareResourceVersion(updatedPod.ResourceVersion, podAfterDelete.ResourceVersion)
+	if err != nil {
+		t.Fatalf("Unexpected error comparing resource versions: %v", err)
+	}
+	if cmp <= 0 {
+		t.Errorf("Expected ResourceVersion %q to be greater than the one before update %q", updatedPod.ResourceVersion, podAfterDelete.ResourceVersion)
+	}
+}
+
+func TestStoreDeleteRaceRV(t *testing.T) {
+	podName := "foo"
+	pod := &example.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: podName},
+		Spec:       example.PodSpec{NodeName: "machine"},
+	}
+	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), "test")
+
+	testCases := []struct {
+		name                string
+		raceAlreadyDeleting bool
+		returnDeletedObject bool
+		expectedWasDeleted  bool
+		expectEmptyRV       bool
+	}{
+		{
+			name:                "404 Physical Deletion race, ReturnDeletedObject=true",
+			raceAlreadyDeleting: false,
+			returnDeletedObject: true,
+			expectedWasDeleted:  true,
+			expectEmptyRV:       true, // setRVFromNotFound clears RV when returning object
+		},
+		{
+			name:                "404 Physical Deletion race, ReturnDeletedObject=false",
+			raceAlreadyDeleting: false,
+			returnDeletedObject: false,
+			expectedWasDeleted:  true,
+			expectEmptyRV:       false, // setRVFromNotFound populates RV from NotFound error
+		},
+		{
+			name:                "AlreadyDeleting Update race, ReturnDeletedObject=true",
+			raceAlreadyDeleting: true,
+			returnDeletedObject: true,
+			expectedWasDeleted:  false, // object is not deleted immediately
+			expectEmptyRV:       false, // returns the deleting object with its RV
+		},
+		{
+			name:                "AlreadyDeleting Update race, ReturnDeletedObject=false",
+			raceAlreadyDeleting: true,
+			returnDeletedObject: false,
+			expectedWasDeleted:  false, // object is not deleted immediately
+			expectEmptyRV:       false, // returns Status with object's RV
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			destroyFunc, registry := newTestGenericStoreRegistry(t, scheme, false)
+			defer destroyFunc()
+
+			defaultDeleteStrategy := testRESTStrategy{scheme, names.SimpleNameGenerator, true, false, true}
+			registry.DeleteStrategy = testGracefulStrategy{defaultDeleteStrategy}
+			registry.ReturnDeletedObject = tc.returnDeletedObject
+
+			objCreated, err := registry.Create(ctx, pod, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			createdPod := objCreated.(*example.Pod)
+			podKey, _ := registry.KeyFunc(ctx, podName)
+
+			racingStorage := &racingDeleteStorage{
+				Interface:           registry.Storage.Storage,
+				t:                   t,
+				keyToRace:           podKey,
+				raceAlreadyDeleting: tc.raceAlreadyDeleting,
+			}
+			registry.Storage.Storage = racingStorage
+
+			var gracePeriod int64
+			if tc.raceAlreadyDeleting {
+				gracePeriod = 30 // graceful delete to trigger GuaranteedUpdate
+			} else {
+				gracePeriod = 0 // delete immediately to trigger storage.Delete
+			}
+			delOpts := &metav1.DeleteOptions{GracePeriodSeconds: &gracePeriod}
+
+			obj, wasDeleted, err := registry.Delete(ctx, podName, rest.ValidateAllObjectFunc, delOpts)
+			if err != nil {
+				t.Fatalf("Unexpected error: %v", err)
+			}
+			if wasDeleted != tc.expectedWasDeleted {
+				t.Fatalf("Expected wasDeleted=%v, got %v", tc.expectedWasDeleted, wasDeleted)
+			}
+
+			var returnedRV string
+			if tc.returnDeletedObject {
+				returnedAccessor, err := meta.Accessor(obj)
+				if err != nil {
+					t.Fatalf("Failed to get accessor: %v", err)
+				}
+				returnedRV = returnedAccessor.GetResourceVersion()
+			} else {
+				statusObj, ok := obj.(*metav1.Status)
+				if !ok {
+					t.Fatalf("Expected *metav1.Status, got %T", obj)
+				}
+				returnedRV = statusObj.ResourceVersion
+			}
+
+			if tc.expectEmptyRV {
+				if returnedRV != "" {
+					t.Errorf("Expected empty ResourceVersion, but got %q", returnedRV)
+				}
+			} else {
+				if returnedRV == "" {
+					t.Errorf("Expected non-empty ResourceVersion")
+				}
+				cmp, err := resourceversion.CompareResourceVersion(returnedRV, createdPod.ResourceVersion)
+				if err != nil {
+					t.Fatalf("Unexpected error comparing resource versions: %v", err)
+				}
+				if cmp <= 0 {
+					t.Errorf("Expected final ResourceVersion %q to be greater than created ResourceVersion %q", returnedRV, createdPod.ResourceVersion)
+				}
+				racingStorage.capturedRVMux.Lock()
+				expectedRV := racingStorage.capturedRV
+				racingStorage.capturedRVMux.Unlock()
+				if returnedRV != expectedRV {
+					t.Errorf("Expected final ResourceVersion to be identical to actual deletion revision (%q), but got %q", expectedRV, returnedRV)
+				}
+			}
+		})
+	}
+}
+
+type racingDeleteStorage struct {
+	storage.Interface
+	t                   *testing.T
+	keyToRace           string
+	raceAlreadyDeleting bool
+	once                sync.Once
+	capturedRV          string
+	capturedRVMux       sync.Mutex
+}
+
+func (s *racingDeleteStorage) Delete(ctx context.Context, key string, out runtime.Object, preconditions *storage.Preconditions, validateDeletion storage.ValidateObjectFunc, cachedExistingObject runtime.Object, opts storage.DeleteOptions) error {
+	if key == s.keyToRace && !s.raceAlreadyDeleting {
+		s.once.Do(func() {
+			// Perform the delete operation directly against the underlying storage.
+			// This deletes the key and increments revision so the subsequent delete gets NotFound.
+			err := s.Interface.Delete(ctx, key, out, nil, validateDeletion, nil, opts)
+			if err != nil {
+				s.t.Errorf("Failed to delete key in racing goroutine: %v", err)
+			}
+			if acc, err := meta.Accessor(out); err == nil {
+				s.capturedRVMux.Lock()
+				s.capturedRV = acc.GetResourceVersion()
+				s.capturedRVMux.Unlock()
+			}
+		})
+	}
+	return s.Interface.Delete(ctx, key, out, preconditions, validateDeletion, cachedExistingObject, opts)
+}
+
+func (s *racingDeleteStorage) GuaranteedUpdate(ctx context.Context, key string, destination runtime.Object, ignoreNotFound bool, preconditions *storage.Preconditions, tryUpdate storage.UpdateFunc, cachedExistingObject runtime.Object) error {
+	if key == s.keyToRace && s.raceAlreadyDeleting {
+		s.once.Do(func() {
+			// Concurrently mark the object as deleting directly in storage before GuaranteedUpdate's update loop executes.
+			out := &example.Pod{}
+			err := s.Interface.GuaranteedUpdate(ctx, key, out, false, nil, storage.SimpleUpdate(func(existing runtime.Object) (runtime.Object, error) {
+				p := existing.(*example.Pod)
+				now := metav1.Now()
+				p.DeletionTimestamp = &now
+				period := int64(30)
+				p.DeletionGracePeriodSeconds = &period
+				return p, nil
+			}), nil)
+			if err != nil {
+				s.t.Fatalf("Failed to mark object as deleting in racing goroutine: %v", err)
+			}
+			acc, err := meta.Accessor(out)
+			if err != nil {
+				s.t.Fatalf("Failed to get accessor: %v", err)
+			}
+			s.capturedRVMux.Lock()
+			s.capturedRV = acc.GetResourceVersion()
+			s.capturedRVMux.Unlock()
+		})
+	}
+	return s.Interface.GuaranteedUpdate(ctx, key, destination, ignoreNotFound, preconditions, tryUpdate, cachedExistingObject)
+}
+
+func TestStorePendingGracefulDeleteRV(t *testing.T) {
+	podName := "foo"
+	pod := &example.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: podName},
+		Spec:       example.PodSpec{NodeName: "machine"},
+	}
+	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), "test")
+
+	testCases := []struct {
+		name                string
+		returnDeletedObject bool
+	}{
+		{"ReturnDeletedObject=true", true},
+		{"ReturnDeletedObject=false", false},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			destroyFunc, registry := newTestGenericStoreRegistry(t, scheme, false)
+			defer destroyFunc()
+
+			defaultDeleteStrategy := testRESTStrategy{scheme, names.SimpleNameGenerator, true, false, true}
+			registry.DeleteStrategy = testGracefulStrategy{defaultDeleteStrategy}
+			registry.ReturnDeletedObject = tc.returnDeletedObject
+
+			// 1. Create pod
+			if _, err := registry.Create(ctx, pod, rest.ValidateAllObjectFunc, &metav1.CreateOptions{}); err != nil {
+				t.Fatalf("Unexpected error: %v", err)
+			}
+
+			// 2. Perform initial graceful delete with 30s grace period to transition pod into pendingGraceful state
+			gracePeriod := int64(30)
+			delOpts := &metav1.DeleteOptions{GracePeriodSeconds: &gracePeriod}
+			_, wasDeleted, err := registry.Delete(ctx, podName, rest.ValidateAllObjectFunc, delOpts)
+			if err != nil {
+				t.Fatalf("Unexpected error on initial delete: %v", err)
+			}
+			if wasDeleted {
+				t.Fatalf("Expected pod not to be deleted immediately")
+			}
+
+			// 3. Fetch current pod from storage to get the expected ResourceVersion after graceful deletion was initiated
+			obj, err := registry.Get(ctx, podName, &metav1.GetOptions{})
+			if err != nil {
+				t.Fatalf("Unexpected error on Get(): %v", err)
+			}
+			podAfterFirstDelete := obj.(*example.Pod)
+			if podAfterFirstDelete.DeletionTimestamp == nil {
+				t.Fatalf("Expected DeletionTimestamp to be set")
+			}
+			expectedRV := podAfterFirstDelete.ResourceVersion
+
+			// 4. Perform second delete with equal or longer grace period (30s).
+			// This exercises the `if pendingGraceful` branch in Store.Delete().
+			resObj, wasDeleted, err := registry.Delete(ctx, podName, rest.ValidateAllObjectFunc, delOpts)
+			if err != nil {
+				t.Fatalf("Unexpected error on second delete: %v", err)
+			}
+			if wasDeleted {
+				t.Fatalf("Expected wasDeleted to be false for pending graceful delete")
+			}
+
+			var returnedRV string
+			if tc.returnDeletedObject {
+				returnedPod, ok := resObj.(*example.Pod)
+				if !ok {
+					t.Fatalf("Expected *example.Pod, got %T", resObj)
+				}
+				returnedRV = returnedPod.ResourceVersion
+			} else {
+				statusObj, ok := resObj.(*metav1.Status)
+				if !ok {
+					t.Fatalf("Expected *metav1.Status, got %T", resObj)
+				}
+				returnedRV = statusObj.ResourceVersion
+			}
+
+			if returnedRV != expectedRV {
+				t.Errorf("Expected ResourceVersion %q, got %q", expectedRV, returnedRV)
+			}
+		})
 	}
 }

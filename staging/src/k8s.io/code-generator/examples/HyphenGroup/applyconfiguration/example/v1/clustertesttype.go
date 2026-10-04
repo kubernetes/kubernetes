@@ -27,7 +27,7 @@ import (
 // ClusterTestTypeApplyConfiguration represents a declarative configuration of the ClusterTestType type for use
 // with apply.
 type ClusterTestTypeApplyConfiguration struct {
-	metav1.TypeMetaApplyConfiguration    `json:",inline"`
+	metav1.TypeMetaApplyConfiguration    `json:""`
 	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
 	Status                               *ClusterTestTypeStatusApplyConfiguration `json:"status,omitempty"`
 }

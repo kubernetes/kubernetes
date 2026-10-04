@@ -23,6 +23,8 @@ import (
 	"testing"
 	"time"
 
+	"sigs.k8s.io/structured-merge-diff/v7/fieldpath"
+
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -32,18 +34,26 @@ import (
 	"k8s.io/apimachinery/pkg/util/managedfields/internal"
 	internaltesting "k8s.io/apimachinery/pkg/util/managedfields/internal/testing"
 	"k8s.io/apimachinery/pkg/util/managedfields/managedfieldstest"
-	"sigs.k8s.io/structured-merge-diff/v6/fieldpath"
 )
 
-type fakeManager struct{}
+type fakeManager struct {
+	Manager internal.Manager
+	Error   error
+}
 
 var _ internal.Manager = &fakeManager{}
 
-func (*fakeManager) Update(_, newObj runtime.Object, managed internal.Managed, _ string) (runtime.Object, internal.Managed, error) {
+func (f *fakeManager) Update(liveObj, newObj runtime.Object, managed internal.Managed, manager string) (runtime.Object, internal.Managed, error) {
+	if f.Error != nil {
+		return nil, nil, f.Error
+	}
+	if f.Manager != nil {
+		return f.Manager.Update(liveObj, newObj, managed, manager)
+	}
 	return newObj, managed, nil
 }
 
-func (*fakeManager) Apply(_, _ runtime.Object, _ internal.Managed, _ string, _ bool) (runtime.Object, internal.Managed, error) {
+func (f *fakeManager) Apply(_, _ runtime.Object, _ internal.Managed, _ string, _ bool) (runtime.Object, internal.Managed, error) {
 	panic("not implemented")
 }
 

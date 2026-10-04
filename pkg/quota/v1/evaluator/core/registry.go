@@ -59,7 +59,7 @@ func NewEvaluators(f quota.ListerForResourceFunc, i informers.SharedInformerFact
 	if isEnabled(corev1.SchemeGroupVersion.WithResource("persistentvolumeclaims")) {
 		result = append(result, NewPersistentVolumeClaimEvaluator(f))
 	}
-	if isEnabled(resourcev1.SchemeGroupVersion.WithResource("resourceclaims")) && utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
+	if isEnabled(resourcev1.SchemeGroupVersion.WithResource("resourceclaims")) {
 		var claimGetter resourceClaimPodOwnerGetter
 		var podLister corev1listers.PodLister
 		var deviceClassMapping *extendedresourcecache.ExtendedResourceCache

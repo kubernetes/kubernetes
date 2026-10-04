@@ -162,12 +162,7 @@ func Convert_output_BootstrapToken_To_v1alpha3_BootstrapToken(in *output.Bootstr
 }
 
 func autoConvert_v1alpha3_Certificate_To_output_Certificate(in *Certificate, out *output.Certificate, s conversion.Scope) error {
-	out.Name = in.Name
-	out.ExpirationDate = in.ExpirationDate
-	out.ResidualTimeSeconds = in.ResidualTimeSeconds
-	out.ExternallyManaged = in.ExternallyManaged
-	out.CAName = in.CAName
-	out.Missing = in.Missing
+	*out = *(*output.Certificate)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -177,12 +172,7 @@ func Convert_v1alpha3_Certificate_To_output_Certificate(in *Certificate, out *ou
 }
 
 func autoConvert_output_Certificate_To_v1alpha3_Certificate(in *output.Certificate, out *Certificate, s conversion.Scope) error {
-	out.Name = in.Name
-	out.ExpirationDate = in.ExpirationDate
-	out.ResidualTimeSeconds = in.ResidualTimeSeconds
-	out.ExternallyManaged = in.ExternallyManaged
-	out.CAName = in.CAName
-	out.Missing = in.Missing
+	*out = *(*Certificate)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -214,10 +204,7 @@ func Convert_output_CertificateExpirationInfo_To_v1alpha3_CertificateExpirationI
 }
 
 func autoConvert_v1alpha3_ComponentConfigVersionState_To_output_ComponentConfigVersionState(in *ComponentConfigVersionState, out *output.ComponentConfigVersionState, s conversion.Scope) error {
-	out.Group = in.Group
-	out.CurrentVersion = in.CurrentVersion
-	out.PreferredVersion = in.PreferredVersion
-	out.ManualUpgradeRequired = in.ManualUpgradeRequired
+	*out = *(*output.ComponentConfigVersionState)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -227,10 +214,7 @@ func Convert_v1alpha3_ComponentConfigVersionState_To_output_ComponentConfigVersi
 }
 
 func autoConvert_output_ComponentConfigVersionState_To_v1alpha3_ComponentConfigVersionState(in *output.ComponentConfigVersionState, out *ComponentConfigVersionState, s conversion.Scope) error {
-	out.Group = in.Group
-	out.CurrentVersion = in.CurrentVersion
-	out.PreferredVersion = in.PreferredVersion
-	out.ManualUpgradeRequired = in.ManualUpgradeRequired
+	*out = *(*ComponentConfigVersionState)(unsafe.Pointer(in))
 	return nil
 }
 

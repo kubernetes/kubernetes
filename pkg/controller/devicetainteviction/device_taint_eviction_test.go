@@ -37,8 +37,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
-	resourcebeta "k8s.io/api/resource/v1beta2"
-	schedulingapi "k8s.io/api/scheduling/v1alpha2"
+	schedulingapi "k8s.io/api/scheduling/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -59,7 +58,6 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	"k8s.io/kubernetes/test/utils/client-go/ktesting"
-	"k8s.io/utils/ptr"
 )
 
 func init() {
@@ -115,11 +113,11 @@ func l[T any](items ...T) []T {
 func setup(tCtx ktesting.TContext, workloadResourceClaimsEnabled bool) *testContext {
 	fakeClientset := fake.NewClientset()
 	informerFactory := informers.NewSharedInformerFactory(fakeClientset, 0)
-	controller := New(fakeClientset,
+	controller := newWithFeatures(fakeClientset,
 		informerFactory.Core().V1().Pods(),
 		informerFactory.Resource().V1().ResourceClaims(),
 		informerFactory.Resource().V1().ResourceSlices(),
-		informerFactory.Resource().V1beta2().DeviceTaintRules(),
+		informerFactory.Resource().V1().DeviceTaintRules(),
 		informerFactory.Resource().V1().DeviceClasses(),
 		"device-taint-eviction",
 		workloadResourceClaimsEnabled,
@@ -155,7 +153,7 @@ type state struct {
 	pods            []*v1.Pod
 	allocatedClaims []allocatedClaim
 	slices          []*resourceapi.ResourceSlice
-	rules           []*resourcebeta.DeviceTaintRule
+	rules           []*resourceapi.DeviceTaintRule
 	ruleStats       map[types.UID]taintRuleStats
 
 	// Pods might have been queued in the past and then not removed when removing from deletePodAt.
@@ -168,7 +166,7 @@ type state struct {
 // step describes a state after handling ready work items and how much to move time forward.
 type step struct {
 	pods        []*v1.Pod
-	rules       []*resourcebeta.DeviceTaintRule
+	rules       []*resourceapi.DeviceTaintRule
 	ruleStats   map[types.UID]taintRuleStats
 	deletePodAt evictMap
 
@@ -382,95 +380,95 @@ var (
 		slice.Spec.Pool.Generation++
 		return slice
 	}()
-	ruleEvict = &resourcebeta.DeviceTaintRule{
+	ruleEvict = &resourceapi.DeviceTaintRule{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "evict",
 			UID:  "1234",
 		},
 
-		Spec: resourcebeta.DeviceTaintRuleSpec{
-			DeviceSelector: &resourcebeta.DeviceTaintSelector{
-				Driver: ptr.To(driver),
+		Spec: resourceapi.DeviceTaintRuleSpec{
+			DeviceSelector: &resourceapi.DeviceTaintSelector{
+				Driver: new(driver),
 			},
-			Taint: resourcebeta.DeviceTaint{
+			Taint: resourceapi.DeviceTaint{
 				Key:       taint.Key,
 				Value:     taint.Value,
-				Effect:    resourcebeta.DeviceTaintEffect(taint.Effect),
+				Effect:    resourceapi.DeviceTaintEffect(taint.Effect),
 				TimeAdded: taint.TimeAdded,
 			},
 		},
 	}
-	ruleEvictInstance1 = &resourcebeta.DeviceTaintRule{
+	ruleEvictInstance1 = &resourceapi.DeviceTaintRule{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "evict-instance",
 			UID:  "1234",
 		},
 
-		Spec: resourcebeta.DeviceTaintRuleSpec{
-			DeviceSelector: &resourcebeta.DeviceTaintSelector{
-				Driver: ptr.To(driver),
-				Device: ptr.To("instance"),
+		Spec: resourceapi.DeviceTaintRuleSpec{
+			DeviceSelector: &resourceapi.DeviceTaintSelector{
+				Driver: new(driver),
+				Device: new("instance"),
 			},
-			Taint: resourcebeta.DeviceTaint{
+			Taint: resourceapi.DeviceTaint{
 				Key:       taint.Key,
 				Value:     taint.Value,
-				Effect:    resourcebeta.DeviceTaintEffect(taint.Effect),
+				Effect:    resourceapi.DeviceTaintEffect(taint.Effect),
 				TimeAdded: taintTime,
 			},
 		},
 	}
 	taintTimeLater          = metav1Time(taintTime.Add(40 * time.Second))
-	ruleEvictInstance2Later = &resourcebeta.DeviceTaintRule{
+	ruleEvictInstance2Later = &resourceapi.DeviceTaintRule{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "evict-instance-no-execute",
 			UID:  "5678",
 		},
 
-		Spec: resourcebeta.DeviceTaintRuleSpec{
-			DeviceSelector: &resourcebeta.DeviceTaintSelector{
-				Driver: ptr.To(driver),
-				Device: ptr.To("instance-no-execute"),
+		Spec: resourceapi.DeviceTaintRuleSpec{
+			DeviceSelector: &resourceapi.DeviceTaintSelector{
+				Driver: new(driver),
+				Device: new("instance-no-execute"),
 			},
-			Taint: resourcebeta.DeviceTaint{
+			Taint: resourceapi.DeviceTaint{
 				Key:       taint.Key,
 				Value:     taint.Value,
-				Effect:    resourcebeta.DeviceTaintEffect(taint.Effect),
+				Effect:    resourceapi.DeviceTaintEffect(taint.Effect),
 				TimeAdded: taintTimeLater,
 			},
 		},
 	}
-	ruleNone = &resourcebeta.DeviceTaintRule{
+	ruleNone = &resourceapi.DeviceTaintRule{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "evict",
 			UID:  "1234",
 		},
 
-		Spec: resourcebeta.DeviceTaintRuleSpec{
-			DeviceSelector: &resourcebeta.DeviceTaintSelector{
-				Driver: ptr.To(driver),
+		Spec: resourceapi.DeviceTaintRuleSpec{
+			DeviceSelector: &resourceapi.DeviceTaintSelector{
+				Driver: new(driver),
 			},
-			Taint: resourcebeta.DeviceTaint{
+			Taint: resourceapi.DeviceTaint{
 				Key:       taint.Key,
 				Value:     taint.Value,
-				Effect:    resourcebeta.DeviceTaintEffectNone,
+				Effect:    resourceapi.DeviceTaintEffectNone,
 				TimeAdded: taint.TimeAdded,
 			},
 		},
 	}
-	ruleEvictOther = &resourcebeta.DeviceTaintRule{
+	ruleEvictOther = &resourceapi.DeviceTaintRule{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "evict-other",
 			UID:  "1234-other",
 		},
 
-		Spec: resourcebeta.DeviceTaintRuleSpec{
-			DeviceSelector: &resourcebeta.DeviceTaintSelector{
-				Device: ptr.To("instance"),
+		Spec: resourceapi.DeviceTaintRuleSpec{
+			DeviceSelector: &resourceapi.DeviceTaintSelector{
+				Device: new("instance"),
 			},
-			Taint: resourcebeta.DeviceTaint{
+			Taint: resourceapi.DeviceTaint{
 				Key:       taint.Key,
 				Value:     taint.Value,
-				Effect:    resourcebeta.DeviceTaintEffect(taint.Effect),
+				Effect:    resourceapi.DeviceTaintEffect(taint.Effect),
 				TimeAdded: taint.TimeAdded,
 			},
 		},
@@ -545,7 +543,7 @@ var (
 			Operator:          resourceapi.DeviceTolerationOpEqual,
 			Value:             taintValue,
 			Effect:            resourceapi.DeviceTaintEffectNoExecute,
-			TolerationSeconds: ptr.To(int64(tolerationDuration.Seconds())),
+			TolerationSeconds: new(int64(tolerationDuration.Seconds())),
 		}}
 		return claim
 	}()
@@ -618,6 +616,17 @@ var (
 				// its claim generated for it. Not used in practice.
 				ResourceClaimName: nil,
 			},
+		}
+		return pod
+	}()
+	podWithoutClaimsScheduled = st.MakePod().Name(podName).Namespace(namespace).
+					UID(podUID).
+					Node(nodeName).
+					Obj()
+	podWithExtendedResourceClaimInStatus = func() *v1.Pod {
+		pod := podWithoutClaimsScheduled.DeepCopy()
+		pod.Status.ExtendedResourceClaimStatus = &v1.PodExtendedResourceClaimStatus{
+			ResourceClaimName: claimName,
 		}
 		return pod
 	}()
@@ -699,7 +708,7 @@ func newEvictionTime(when *metav1.Time, args ...any) *evictionAndReason {
 		case *resourceapi.ResourceSlice:
 			reason = append(reason, trackedTaint{slice: sliceDeviceTaint{slice: obj, deviceName: args[i+1].(string), taintIndex: args[i+2].(int)}})
 			i += 3
-		case *resourcebeta.DeviceTaintRule:
+		case *resourceapi.DeviceTaintRule:
 			reason = append(reason, trackedTaint{rule: obj})
 			i++
 		default:
@@ -725,7 +734,7 @@ func newWorkItem(obj metav1.Object) workItem {
 	ref := newObject(obj)
 	var item workItem
 	switch obj.(type) {
-	case *resourcebeta.DeviceTaintRule:
+	case *resourceapi.DeviceTaintRule:
 		item.ruleRef = ref
 	case *v1.Pod:
 		item.podRef = ref
@@ -775,10 +784,10 @@ func listEvents(tCtx ktesting.TContext) []v1.Event {
 	return events.Items
 }
 
-func inProgress(rule *resourcebeta.DeviceTaintRule, status bool, reason, message string, when *metav1.Time) *resourcebeta.DeviceTaintRule {
+func inProgress(rule *resourceapi.DeviceTaintRule, status bool, reason, message string, when *metav1.Time) *resourceapi.DeviceTaintRule {
 	rule = rule.DeepCopy()
 	condition := metav1.Condition{
-		Type:               resourcebeta.DeviceTaintConditionEvictionInProgress,
+		Type:               resourceapi.DeviceTaintConditionEvictionInProgress,
 		Status:             metav1.ConditionFalse,
 		Reason:             reason,
 		Message:            message,
@@ -1321,6 +1330,50 @@ func testController(tCtx ktesting.TContext) {
 			},
 			wantEvents: l(deletePodEvent),
 		},
+		"evict-pod-extended-resourceclaim": {
+			events: []any{
+				add(sliceTainted),
+				add(slice2),
+				add(inUseClaim),
+				add(podWithExtendedResourceClaimInStatus),
+			},
+			finalState: state{
+				slices:          l(sliceTainted, slice2),
+				allocatedClaims: l(ac(inUseClaim, newEvictionTime(taintTime, sliceTainted, sliceTainted.Spec.Devices[0].Name, 0))),
+				deletePodAt:     evictMap{newObject(podWithExtendedResourceClaimInStatus): *newEvictionTime(taintTime, sliceTainted, sliceTainted.Spec.Devices[0].Name, 0)},
+				queued:          MockState[workItem]{Ready: newWorkItems(podWithExtendedResourceClaimInStatus)},
+			},
+			wantEvents: l(deletePodEvent),
+		},
+		"evict-pod-extended-resourceclaim-status-update": {
+			initialState: state{
+				pods:            l(podWithoutClaimsScheduled),
+				slices:          l(sliceTainted, slice2),
+				allocatedClaims: l(ac(inUseClaim, newEvictionTime(taintTime, sliceTainted, sliceTainted.Spec.Devices[0].Name, 0))),
+			},
+			events: []any{
+				update(podWithoutClaimsScheduled, podWithExtendedResourceClaimInStatus),
+			},
+			finalState: state{
+				slices:          l(sliceTainted, slice2),
+				allocatedClaims: l(ac(inUseClaim, newEvictionTime(taintTime, sliceTainted, sliceTainted.Spec.Devices[0].Name, 0))),
+				deletePodAt:     evictMap{newObject(podWithExtendedResourceClaimInStatus): *newEvictionTime(taintTime, sliceTainted, sliceTainted.Spec.Devices[0].Name, 0)},
+				queued:          MockState[workItem]{Ready: newWorkItems(podWithExtendedResourceClaimInStatus)},
+			},
+			wantEvents: l(deletePodEvent),
+		},
+		"no-evict-extended-resourceclaim-wrong-owner": {
+			events: []any{
+				add(sliceTainted),
+				add(slice2),
+				add(inUseClaimOld), // pod not the owner
+				add(podWithExtendedResourceClaimInStatus),
+			},
+			finalState: state{
+				slices:          l(sliceTainted, slice2),
+				allocatedClaims: l(ac(inUseClaimOld, newEvictionTime(taintTime, sliceTainted, sliceTainted.Spec.Devices[0].Name, 0))),
+			},
+		},
 		"evict-pod-later": {
 			events: []any{
 				add(sliceTainted),
@@ -1359,17 +1412,17 @@ func testController(tCtx ktesting.TContext) {
 							Operator:          resourceapi.DeviceTolerationOpEqual,
 							Value:             taintValue,
 							Effect:            resourceapi.DeviceTaintEffectNoExecute,
-							TolerationSeconds: ptr.To(int64(20)),
+							TolerationSeconds: new(int64(20)),
 						},
 						{
 							Operator:          resourceapi.DeviceTolerationOpExists,
 							Effect:            resourceapi.DeviceTaintEffectNoExecute,
-							TolerationSeconds: ptr.To(int64(60)),
+							TolerationSeconds: new(int64(60)),
 						},
 						{
 							Operator:          resourceapi.DeviceTolerationOpExists,
 							Effect:            resourceapi.DeviceTaintEffectNoExecute,
-							TolerationSeconds: ptr.To(int64(30)),
+							TolerationSeconds: new(int64(30)),
 						},
 					}
 					return claim
@@ -1386,17 +1439,17 @@ func testController(tCtx ktesting.TContext) {
 							Operator:          resourceapi.DeviceTolerationOpEqual,
 							Value:             taintValue,
 							Effect:            resourceapi.DeviceTaintEffectNoExecute,
-							TolerationSeconds: ptr.To(int64(20)),
+							TolerationSeconds: new(int64(20)),
 						},
 						{
 							Operator:          resourceapi.DeviceTolerationOpExists,
 							Effect:            resourceapi.DeviceTaintEffectNoExecute,
-							TolerationSeconds: ptr.To(int64(60)),
+							TolerationSeconds: new(int64(60)),
 						},
 						{
 							Operator:          resourceapi.DeviceTolerationOpExists,
 							Effect:            resourceapi.DeviceTaintEffectNoExecute,
-							TolerationSeconds: ptr.To(int64(30)),
+							TolerationSeconds: new(int64(30)),
 						},
 					}
 					return claim
@@ -1428,7 +1481,7 @@ func testController(tCtx ktesting.TContext) {
 						Operator:          resourceapi.DeviceTolerationOpEqual,
 						Value:             taintValue,
 						Effect:            resourceapi.DeviceTaintEffectNoExecute,
-						TolerationSeconds: ptr.To(int64(60)),
+						TolerationSeconds: new(int64(60)),
 					}}
 					return claim
 				}()),
@@ -1443,7 +1496,7 @@ func testController(tCtx ktesting.TContext) {
 						Operator:          resourceapi.DeviceTolerationOpEqual,
 						Value:             taintValue,
 						Effect:            resourceapi.DeviceTaintEffectNoExecute,
-						TolerationSeconds: ptr.To(int64(60)),
+						TolerationSeconds: new(int64(60)),
 					}}
 					return claim
 				}(), newEvictionTime(taintTime, sliceTainted, sliceTainted.Spec.Devices[0].Name, 0))),
@@ -1489,7 +1542,7 @@ func testController(tCtx ktesting.TContext) {
 						{
 							Operator:          resourceapi.DeviceTolerationOpExists,
 							Effect:            resourceapi.DeviceTaintEffectNoExecute,
-							TolerationSeconds: ptr.To(int64(60)),
+							TolerationSeconds: new(int64(60)),
 						},
 						{
 							Operator: resourceapi.DeviceTolerationOpExists,
@@ -1508,7 +1561,7 @@ func testController(tCtx ktesting.TContext) {
 						{
 							Operator:          resourceapi.DeviceTolerationOpExists,
 							Effect:            resourceapi.DeviceTaintEffectNoExecute,
-							TolerationSeconds: ptr.To(int64(60)),
+							TolerationSeconds: new(int64(60)),
 						},
 						{
 							Operator: resourceapi.DeviceTolerationOpExists,
@@ -1564,13 +1617,13 @@ func testController(tCtx ktesting.TContext) {
 							Operator:          resourceapi.DeviceTolerationOpExists,
 							Key:               taint1.Key,
 							Effect:            resourceapi.DeviceTaintEffectNoExecute,
-							TolerationSeconds: ptr.To(int64(60)),
+							TolerationSeconds: new(int64(60)),
 						},
 						{
 							Operator:          resourceapi.DeviceTolerationOpExists,
 							Key:               taint2.Key,
 							Effect:            resourceapi.DeviceTaintEffectNoExecute,
-							TolerationSeconds: ptr.To(int64(30)),
+							TolerationSeconds: new(int64(30)),
 						},
 					}
 					return claim
@@ -1586,13 +1639,13 @@ func testController(tCtx ktesting.TContext) {
 							Operator:          resourceapi.DeviceTolerationOpExists,
 							Key:               taint1.Key,
 							Effect:            resourceapi.DeviceTaintEffectNoExecute,
-							TolerationSeconds: ptr.To(int64(60)),
+							TolerationSeconds: new(int64(60)),
 						},
 						{
 							Operator:          resourceapi.DeviceTolerationOpExists,
 							Key:               taint2.Key,
 							Effect:            resourceapi.DeviceTaintEffectNoExecute,
-							TolerationSeconds: ptr.To(int64(30)),
+							TolerationSeconds: new(int64(30)),
 						},
 					}
 					return claim
@@ -1859,7 +1912,7 @@ func testController(tCtx ktesting.TContext) {
 					claim.Status.Allocation.Devices.Results[0].Tolerations = []resourceapi.DeviceToleration{{
 						Operator:          resourceapi.DeviceTolerationOpExists,
 						Effect:            resourceapi.DeviceTaintEffectNoExecute,
-						TolerationSeconds: ptr.To(int64(60)),
+						TolerationSeconds: new(int64(60)),
 					}}
 					return claim
 				}(), newEvictionTime(metav1Time(taintTime.Add(60*time.Second))))),
@@ -1875,7 +1928,7 @@ func testController(tCtx ktesting.TContext) {
 					claim.Status.Allocation.Devices.Results[0].Tolerations = []resourceapi.DeviceToleration{{
 						Operator:          resourceapi.DeviceTolerationOpExists,
 						Effect:            resourceapi.DeviceTaintEffectNoExecute,
-						TolerationSeconds: ptr.To(int64(60)),
+						TolerationSeconds: new(int64(60)),
 					}}
 					return claim
 				}(), newEvictionTime(metav1Time(taintTime.Add(60*time.Second))))),
@@ -1971,7 +2024,7 @@ func testController(tCtx ktesting.TContext) {
 				if depth >= numEvents {
 					// Define a sub-test which runs the current permutation of events.
 					events := make([]any, numEvents)
-					for i := 0; i < numEvents; i++ {
+					for i := range numEvents {
 						events[i] = tc.events[permutation[i]]
 					}
 					tc := tc
@@ -1986,7 +2039,7 @@ func testController(tCtx ktesting.TContext) {
 					})
 					return
 				}
-				for i := 0; i < numEvents; i++ {
+				for i := range numEvents {
 					if slices.Index(permutation[0:depth], i) != -1 {
 						// Already taken.
 						continue
@@ -2031,7 +2084,7 @@ func testHandlers(tContext *testContext, tc testCase) {
 		}
 		return false, nil, nil
 	})
-	ruleStore := tContext.informerFactory.Resource().V1beta2().DeviceTaintRules().Informer().GetStore()
+	ruleStore := tContext.informerFactory.Resource().V1().DeviceTaintRules().Informer().GetStore()
 	for _, rule := range tc.initialState.rules {
 		tContext.ExpectNoError(ruleStore.Add(rule))
 		tContext.ExpectNoError(tContext.client.Tracker().Add(rule))
@@ -2084,7 +2137,7 @@ func testHandlers(tContext *testContext, tc testCase) {
 		pods, err := tContext.client.CoreV1().Pods("").List(tContext, metav1.ListOptions{})
 		tContext.ExpectNoError(err, prefix+"list pods")
 		assertEqual(tContext, state.pods, trimPods(pods.Items), prefix+"pods after flushing work queue")
-		rules, err := tContext.client.ResourceV1beta2().DeviceTaintRules().List(tContext, metav1.ListOptions{})
+		rules, err := tContext.client.ResourceV1().DeviceTaintRules().List(tContext, metav1.ListOptions{})
 		tContext.ExpectNoError(err, prefix+"list rules")
 		actualRules := trimRules(rules.Items)
 		assertEqual(tContext, state.rules, actualRules, prefix+"rules after flushing work queue")
@@ -2153,16 +2206,16 @@ func applyEventPair(tContext *testContext, event any) {
 			tContext.ExpectNoError(tContext.client.Tracker().Add(obj))
 		}
 		tContext.handlePodChange(pair[0], pair[1])
-	case [2]*resourcebeta.DeviceTaintRule:
-		store := tContext.informerFactory.Resource().V1beta2().DeviceTaintRules().Informer().GetStore()
+	case [2]*resourceapi.DeviceTaintRule:
+		store := tContext.informerFactory.Resource().V1().DeviceTaintRules().Informer().GetStore()
 		switch {
 		case pair[0] != nil && pair[1] != nil:
 			obj := pair[1].DeepCopy()
 			tContext.ExpectNoError(store.Update(obj))
-			tContext.ExpectNoError(tContext.client.Tracker().Update(resourcebeta.SchemeGroupVersion.WithResource("devicetaintrules"), obj, pair[1].Namespace))
+			tContext.ExpectNoError(tContext.client.Tracker().Update(resourceapi.SchemeGroupVersion.WithResource("devicetaintrules"), obj, pair[1].Namespace))
 		case pair[0] != nil:
 			tContext.ExpectNoError(store.Delete(pair[0]))
-			tContext.ExpectNoError(tContext.client.Tracker().Delete(resourcebeta.SchemeGroupVersion.WithResource("devicetaintrules"), pair[0].Namespace, pair[0].Name))
+			tContext.ExpectNoError(tContext.client.Tracker().Delete(resourceapi.SchemeGroupVersion.WithResource("devicetaintrules"), pair[0].Namespace, pair[0].Name))
 		default:
 			obj := pair[1].DeepCopy()
 			tContext.ExpectNoError(store.Add(obj))
@@ -2183,7 +2236,7 @@ func trimPods(objs []v1.Pod) (trimmed []*v1.Pod) {
 	return trimmed
 }
 
-func trimRules(objs []resourcebeta.DeviceTaintRule) (trimmed []*resourcebeta.DeviceTaintRule) {
+func trimRules(objs []resourceapi.DeviceTaintRule) (trimmed []*resourceapi.DeviceTaintRule) {
 	for _, in := range objs {
 		out := in.DeepCopy()
 		out.ManagedFields = nil
@@ -2200,10 +2253,9 @@ func newTestController(tCtx ktesting.TContext) *Controller {
 		informerFactory.Core().V1().Pods(),
 		informerFactory.Resource().V1().ResourceClaims(),
 		informerFactory.Resource().V1().ResourceSlices(),
-		informerFactory.Resource().V1beta2().DeviceTaintRules(),
+		informerFactory.Resource().V1().DeviceTaintRules(),
 		informerFactory.Resource().V1().DeviceClasses(),
 		"device-taint-eviction",
-		utilfeature.DefaultFeatureGate.Enabled(features.DRAWorkloadResourceClaims),
 	)
 	controller.metrics = metrics.New()
 	// Always log, not matter what the -v value is.
@@ -2357,7 +2409,7 @@ func testEviction(tCtx ktesting.TContext) {
 		tCtx.SyncTest(name, func(tCtx ktesting.TContext) {
 			start := time.Now()
 			fakeClientset := fake.NewClientset(tt.initialObjects...)
-			tCtx = tCtx.WithClients(nil, nil, fakeClientset, nil, nil)
+			tCtx = tCtx.WithClients(nil, nil, fakeClientset, nil)
 
 			var podGets int
 			var podUpdates int
@@ -2388,16 +2440,13 @@ func testEviction(tCtx ktesting.TContext) {
 			controller := newTestController(tCtx)
 
 			var wg sync.WaitGroup
-			defer func() {
+			tCtx.Cleanup(func() {
 				tCtx.Log("Waiting for goroutine termination...")
-				tCtx.Cancel("time to stop")
 				wg.Wait()
-			}()
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
+			})
+			wg.Go(func() {
 				tCtx.AssertNoError(controller.Run(tCtx, 10 /* workers */), "eviction controller failed")
-			}()
+			})
 
 			// Eventually the controller should have synced it's informers.
 			tCtx.Wait()
@@ -2484,15 +2533,14 @@ func synctestDeviceTaintRule(tCtx ktesting.TContext, toleration, slowDelete bool
 			tCtx.Logf("Proceeding with pod deletion")
 		}}
 	}
-	tCtx = tCtx.WithClients(nil, nil, client, nil, nil)
+	tCtx = tCtx.WithClients(nil, nil, client, nil)
 	controller := newTestController(tCtx)
 
 	var wg sync.WaitGroup
-	defer func() {
+	tCtx.Cleanup(func() {
 		tCtx.Log("Waiting for goroutine termination...")
-		tCtx.Cancel("time to stop")
 		wg.Wait()
-	}()
+	})
 	wg.Go(func() {
 		// Run with 1 worker to ensure sequential execution. Concurrent workers cause
 		// non-deterministic ordering of status updates, leading to flakes in Status assertions.
@@ -2513,11 +2561,11 @@ func synctestDeviceTaintRule(tCtx ktesting.TContext, toleration, slowDelete bool
 	time.Sleep(20 * time.Second)
 	updated := metav1.Now()
 	rule = rule.DeepCopy() // fake.NewClientset does not copy! Perhaps it should?!
-	rule.Spec.Taint.Effect = resourcebeta.DeviceTaintEffectNoExecute
+	rule.Spec.Taint.Effect = resourceapi.DeviceTaintEffectNoExecute
 	// The real apiserver is going to bump this automatically in 1.36,
 	// but in a unit test we have to do it manually.
 	rule.Spec.Taint.TimeAdded = &updated
-	rule, err := tCtx.Client().ResourceV1beta2().DeviceTaintRules().Update(tCtx, rule, metav1.UpdateOptions{})
+	rule, err := tCtx.Client().ResourceV1().DeviceTaintRules().Update(tCtx, rule, metav1.UpdateOptions{})
 	tCtx.ExpectNoError(err, "update rule")
 
 	// Wait for eviction.
@@ -2557,7 +2605,7 @@ func synctestDeviceTaintRule(tCtx ktesting.TContext, toleration, slowDelete bool
 	assertEqual(tCtx, map[types.UID]taintRuleStats{rule.UID: {numEvictedPods: 1}}, controller.taintRuleStats, "taint rule statistics should have counted the pod")
 
 	// Delete the rule and verify that we don't leak memory by still tracking it.
-	err = tCtx.Client().ResourceV1beta2().DeviceTaintRules().Delete(tCtx, rule.Name, metav1.DeleteOptions{})
+	err = tCtx.Client().ResourceV1().DeviceTaintRules().Delete(tCtx, rule.Name, metav1.DeleteOptions{})
 	tCtx.ExpectNoError(err, "delete rule")
 	tCtx.Wait()
 	deleted := metav1.Now()
@@ -2569,7 +2617,7 @@ func synctestDeviceTaintRule(tCtx ktesting.TContext, toleration, slowDelete bool
 	tCtx.ExpectNoError(testPodDeletionsMetrics(controller, slowDeleteDelay))
 }
 
-func check(tCtx ktesting.TContext, prefix string, expectRules []*resourcebeta.DeviceTaintRule, expectPods []*v1.Pod) {
+func check(tCtx ktesting.TContext, prefix string, expectRules []*resourceapi.DeviceTaintRule, expectPods []*v1.Pod) {
 	tCtx.Helper()
 
 	opts := []cmp.Option{
@@ -2584,7 +2632,7 @@ func check(tCtx ktesting.TContext, prefix string, expectRules []*resourcebeta.De
 	actualPods, err := tCtx.Client().CoreV1().Pods("").List(tCtx, metav1.ListOptions{})
 	tCtx.ExpectNoError(err, prefix+"list pods")
 	assertEqual(tCtx, expectPods, trimPods(actualPods.Items), prefix+"pods", opts...)
-	rules, err := tCtx.Client().ResourceV1beta2().DeviceTaintRules().List(tCtx, metav1.ListOptions{})
+	rules, err := tCtx.Client().ResourceV1().DeviceTaintRules().List(tCtx, metav1.ListOptions{})
 	tCtx.ExpectNoError(err, prefix+"list rules")
 	assertEqual(tCtx, expectRules, trimRules(rules.Items), prefix+"rules", opts...)
 }
@@ -2677,7 +2725,7 @@ func doCancelEviction(tCtx ktesting.TContext, deletePod bool) {
 		return false, nil, nil
 	})
 
-	tCtx = tCtx.WithClients(nil, nil, fakeClientset, nil, nil)
+	tCtx = tCtx.WithClients(nil, nil, fakeClientset, nil)
 	controller := newTestController(tCtx)
 
 	podEvicting := false
@@ -2692,16 +2740,13 @@ func doCancelEviction(tCtx ktesting.TContext, deletePod bool) {
 	}
 
 	var wg sync.WaitGroup
-	defer func() {
+	tCtx.Cleanup(func() {
 		tCtx.Log("Waiting for goroutine termination...")
-		tCtx.Cancel("time to stop")
 		wg.Wait()
-	}()
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	})
+	wg.Go(func() {
 		tCtx.AssertNoError(controller.Run(tCtx, 10 /* workers */), "eviction controller failed")
-	}()
+	})
 
 	// Eventually the pod gets scheduled for eviction.
 	tCtx.Wait()
@@ -2763,7 +2808,7 @@ func synctestParallelPodDeletion(tCtx ktesting.TContext) {
 		inUseClaim,
 		pod,
 	)
-	tCtx = tCtx.WithClients(nil, nil, fakeClientset, nil, nil)
+	tCtx = tCtx.WithClients(nil, nil, fakeClientset, nil)
 
 	pod, err := fakeClientset.CoreV1().Pods(pod.Namespace).Get(tCtx, pod.Name, metav1.GetOptions{})
 	tCtx.ExpectNoError(err, "get pod before eviction")
@@ -2791,16 +2836,13 @@ func synctestParallelPodDeletion(tCtx ktesting.TContext) {
 	controller := newTestController(tCtx)
 
 	var wg sync.WaitGroup
-	defer func() {
+	tCtx.Cleanup(func() {
 		tCtx.Log("Waiting for goroutine termination...")
-		tCtx.Cancel("time to stop")
 		wg.Wait()
-	}()
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	})
+	wg.Go(func() {
 		tCtx.AssertNoError(controller.Run(tCtx, 10 /* workers */), "eviction controller failed")
-	}()
+	})
 
 	// We don't want any events.
 	tCtx.Wait()
@@ -2826,7 +2868,7 @@ func synctestRetry(tCtx ktesting.TContext) {
 		inUseClaim,
 		pod,
 	)
-	tCtx = tCtx.WithClients(nil, nil, fakeClientset, nil, nil)
+	tCtx = tCtx.WithClients(nil, nil, fakeClientset, nil)
 
 	pod, err := fakeClientset.CoreV1().Pods(pod.Namespace).Get(tCtx, pod.Name, metav1.GetOptions{})
 	tCtx.ExpectNoError(err, "get pod before eviction")
@@ -2860,16 +2902,13 @@ func synctestRetry(tCtx ktesting.TContext) {
 	controller := newTestController(tCtx)
 
 	var wg sync.WaitGroup
-	defer func() {
+	tCtx.Cleanup(func() {
 		tCtx.Log("Waiting for goroutine termination...")
-		tCtx.Cancel("time to stop")
 		wg.Wait()
-	}()
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	})
+	wg.Go(func() {
 		tCtx.AssertNoError(controller.Run(tCtx, 10 /* workers */), "eviction controller failed")
-	}()
+	})
 
 	expectLatencies := []time.Duration{5 * time.Millisecond /* default exponential retry */}
 

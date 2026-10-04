@@ -179,7 +179,7 @@ func (tx *Transaction) Destroy(obj Object) {
 		}
 	}
 
-	if tx.emulateDestroy && !tx.nftContext.hasDestroy {
+	if tx.emulateDestroy && !tx.hasDestroy {
 		tx.operations = append(tx.operations, operation{verb: addVerb, obj: obj})
 		tx.operations = append(tx.operations, operation{verb: deleteVerb, obj: obj})
 	} else {

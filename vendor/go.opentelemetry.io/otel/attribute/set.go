@@ -1,7 +1,7 @@
 // Copyright The OpenTelemetry Authors
 // SPDX-License-Identifier: Apache-2.0
 
-package attribute // import "go.opentelemetry.io/otel/attribute"
+package attribute
 
 import (
 	"cmp"
@@ -313,6 +313,9 @@ func filteredToFront(slice []KeyValue, keep Filter) int {
 // Filter returns a filtered copy of this Set. See the documentation for
 // NewSetWithSortableFiltered for more details.
 func (l *Set) Filter(re Filter) (Set, []KeyValue) {
+	if l == nil {
+		return emptySet, nil
+	}
 	if re == nil {
 		return *l, nil
 	}
@@ -401,7 +404,7 @@ func computeDataFixed(kvs []KeyValue) any {
 func computeDataReflect(kvs []KeyValue) any {
 	at := reflect.New(reflect.ArrayOf(len(kvs), keyValueType)).Elem()
 	for i, keyValue := range kvs {
-		*(at.Index(i).Addr().Interface().(*KeyValue)) = keyValue
+		*at.Index(i).Addr().Interface().(*KeyValue) = keyValue
 	}
 	return at.Interface()
 }
@@ -415,7 +418,7 @@ func (l *Set) MarshalJSON() ([]byte, error) {
 func (l Set) MarshalLog() any {
 	kvs := make(map[string]string)
 	for _, kv := range l.ToSlice() {
-		kvs[string(kv.Key)] = kv.Value.Emit()
+		kvs[string(kv.Key)] = kv.Value.String()
 	}
 	return kvs
 }

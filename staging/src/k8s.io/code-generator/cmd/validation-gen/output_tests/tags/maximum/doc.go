@@ -14,14 +14,18 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// +k8s:validation-gen=TypeMeta
+// +k8s:validation-gen=TypesWithField=TypeMeta
 // +k8s:validation-gen-scheme-registry=k8s.io/code-generator/cmd/validation-gen/testscheme.Scheme
 
 // This is a test package.
 // +k8s:validation-gen-nolint
 package maximum
 
-import "k8s.io/code-generator/cmd/validation-gen/testscheme"
+import (
+	"time"
+
+	"k8s.io/code-generator/cmd/validation-gen/testscheme"
+)
 
 var localSchemeBuilder = testscheme.New()
 
@@ -53,6 +57,9 @@ type Struct struct {
 	Uint32Field uint32 `json:"uint32Field"`
 	// +k8s:maximum=1
 	Uint64Field uint64 `json:"uint64Field"`
+
+	// +k8s:maximum="500ns"
+	DurationField time.Duration `json:"durationField"`
 
 	TypedefField    IntType  `json:"typedefField"`
 	TypedefPtrField *IntType `json:"typedefPtrField"`

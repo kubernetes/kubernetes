@@ -31,7 +31,6 @@ import (
 // definitions are maintained. This ensures that any changes to these types
 // require autoscaler approval.
 type DeviceID = schedulerapi.DeviceID
-type SharedDeviceID = schedulerapi.SharedDeviceID
 type AllocatedState = schedulerapi.AllocatedState
 type ConsumedCapacity = schedulerapi.ConsumedCapacity
 type ConsumedCapacityCollection = schedulerapi.ConsumedCapacityCollection
@@ -40,10 +39,6 @@ type DeviceConsumedCapacity = schedulerapi.DeviceConsumedCapacity
 // Wrapper functions that delegate to the schedulerapi package
 func MakeDeviceID(driver, pool, device string) DeviceID {
 	return schedulerapi.MakeDeviceID(driver, pool, device)
-}
-
-func MakeSharedDeviceID(deviceID DeviceID, shareID *types.UID) SharedDeviceID {
-	return schedulerapi.MakeSharedDeviceID(deviceID, shareID)
 }
 
 func NewConsumedCapacity() ConsumedCapacity {
@@ -56,6 +51,29 @@ func NewConsumedCapacityCollection() ConsumedCapacityCollection {
 
 func NewDeviceConsumedCapacity(deviceID DeviceID, consumedCapacity map[resourceapi.QualifiedName]resource.Quantity) DeviceConsumedCapacity {
 	return schedulerapi.NewDeviceConsumedCapacity(deviceID, consumedCapacity)
+}
+
+// IsDeviceAllocated checks if a device is allocated, considering both fully allocated devices
+// and partially consumed devices when consumable capacity is enabled.
+func IsDeviceAllocated(deviceID DeviceID, allocatedState *AllocatedState) bool {
+	// Check if device is fully allocated (traditional case).
+	if allocatedState.AllocatedDevices.Has(deviceID) {
+		return true
+	}
+
+	// Check if device is partially consumed via shared allocations (consumable capacity case).
+	if allocatedState.AllocatedSharedDeviceIDs.Has(deviceID) {
+		return true
+	}
+
+	// For scheduler-generated state, consumed capacity is recorded together with
+	// a shared device ID. Keep this check to preserve IsDeviceAllocated semantics
+	// and handle manually constructed or future AllocatedState producers.
+	if _, hasConsumedCapacity := allocatedState.AggregatedCapacity[deviceID]; hasConsumedCapacity {
+		return true
+	}
+
+	return false
 }
 
 // GenerateShareID is a helper function that generates a new share ID.

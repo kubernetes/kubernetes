@@ -143,11 +143,10 @@ func NewManager(
 }
 
 // Admit rejects a pod if its not safe to admit for node stability.
-func (m *managerImpl) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
+func (m *managerImpl) Admit(ctx context.Context, attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
 	m.RLock()
 	defer m.RUnlock()
 
-	ctx := context.Background()
 	logger := klog.FromContext(ctx)
 
 	if len(m.nodeConditions) == 0 {
@@ -548,6 +547,11 @@ func (m *managerImpl) emptyDirLimitEviction(logger klog.Logger, podStats statsap
 	for i := range pod.Spec.Volumes {
 		source := &pod.Spec.Volumes[i].VolumeSource
 		if source.EmptyDir != nil {
+			if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingMemoryBackedVolumes) && source.EmptyDir.Medium == v1.StorageMediumMemory {
+				// Memory-backed emptyDir volumes are backed by tmpfs, which has its size limit
+				// enforced by the kernel. Eviction manager enforcement is not needed.
+				continue
+			}
 			size := source.EmptyDir.SizeLimit
 			used := podVolumeUsed[pod.Spec.Volumes[i].Name]
 			if used != nil && size != nil && size.Sign() == 1 && used.Cmp(*size) > 0 {
@@ -593,7 +597,11 @@ func (m *managerImpl) containerEphemeralStorageLimitEviction(logger klog.Logger,
 	thresholdsMap := make(map[string]*resource.Quantity)
 	for _, container := range pod.Spec.Containers {
 		ephemeralLimit := container.Resources.Limits.StorageEphemeral()
-		if ephemeralLimit != nil && ephemeralLimit.Value() != 0 {
+		// Use IsZero rather than Value to test whether a limit is set. Value can
+		// overflow an int64 and returns 0 when it does, so a large but valid limit
+		// such as "100E" would otherwise be mistaken for an unset limit and never
+		// enforced. The comparison below uses Cmp, which is overflow-safe.
+		if ephemeralLimit != nil && !ephemeralLimit.IsZero() {
 			thresholdsMap[container.Name] = ephemeralLimit
 		}
 	}
@@ -602,7 +610,7 @@ func (m *managerImpl) containerEphemeralStorageLimitEviction(logger klog.Logger,
 			continue
 		}
 		ephemeralLimit := container.Resources.Limits.StorageEphemeral()
-		if ephemeralLimit != nil && ephemeralLimit.Value() != 0 {
+		if ephemeralLimit != nil && !ephemeralLimit.IsZero() {
 			thresholdsMap[container.Name] = ephemeralLimit
 		}
 	}
@@ -635,6 +643,7 @@ func (m *managerImpl) evictPod(logger klog.Logger, pod *v1.Pod, gracePeriodOverr
 		return false
 	}
 	// record that we are evicting the pod
+	//nolint:forbidigo // Legacy usage
 	m.recorder.AnnotatedEventf(pod, annotations, v1.EventTypeWarning, Reason, "%s", evictMsg)
 	// this is a blocking call and should only return when the pod and its containers are killed.
 	logger.V(3).Info("Evicting pod", "pod", klog.KObj(pod), "podUID", pod.UID, "message", evictMsg)

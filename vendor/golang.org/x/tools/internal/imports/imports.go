@@ -74,6 +74,10 @@ func Process(filename string, src []byte, opt *Options) (formatted []byte, err e
 // Note that filename's directory influences which imports can be chosen,
 // so it is important that filename be accurate.
 func FixImports(ctx context.Context, filename string, src []byte, goroot string, logf func(string, ...any), source Source) (fixes []*ImportFix, err error) {
+	if source == nil {
+		// In case someone adds a defective call from a new place
+		panic("source is nil")
+	}
 	ctx, done := event.Start(ctx, "imports.FixImports")
 	defer done()
 

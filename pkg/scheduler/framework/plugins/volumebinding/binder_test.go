@@ -43,7 +43,6 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
 	_ "k8s.io/klog/v2/ktesting/init"
-	"k8s.io/kubernetes/pkg/controller"
 	pvtesting "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/testing"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 )
@@ -139,6 +138,8 @@ type testEnv struct {
 	internalPodInformer     coreinformers.PodInformer
 	internalNodeInformer    coreinformers.NodeInformer
 	internalCSINodeInformer storageinformers.CSINodeInformer
+	internalPVInformer      coreinformers.PersistentVolumeInformer
+	internalPVCInformer     coreinformers.PersistentVolumeClaimInformer
 
 	// For CSIStorageCapacity feature testing:
 	internalCSIDriverInformer          storageinformers.CSIDriverInformer
@@ -153,18 +154,19 @@ func newTestBinder(t *testing.T, ctx context.Context) *testEnv {
 	client.AddWatchReactor("*", func(action k8stesting.Action) (handled bool, ret watch.Interface, err error) {
 		gvr := action.GetResource()
 		ns := action.GetNamespace()
-		watch, err := reactor.Watch(gvr, ns)
+		watch, err := reactor.Watch(logger, gvr, ns)
 		if err != nil {
 			return false, nil, err
 		}
 		return true, watch, nil
 	})
-	informerFactory := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
+	informerFactory := informers.NewSharedInformerFactory(client, 0)
 
 	podInformer := informerFactory.Core().V1().Pods()
 	nodeInformer := informerFactory.Core().V1().Nodes()
 	csiNodeInformer := informerFactory.Storage().V1().CSINodes()
 	pvcInformer := informerFactory.Core().V1().PersistentVolumeClaims()
+	pvInformer := informerFactory.Core().V1().PersistentVolumes()
 	classInformer := informerFactory.Storage().V1().StorageClasses()
 	csiDriverInformer := informerFactory.Storage().V1().CSIDrivers()
 	csiStorageCapacityInformer := informerFactory.Storage().V1().CSIStorageCapacities()
@@ -180,7 +182,7 @@ func newTestBinder(t *testing.T, ctx context.Context) *testEnv {
 		nodeInformer,
 		csiNodeInformer,
 		pvcInformer,
-		informerFactory.Core().V1().PersistentVolumes(),
+		pvInformer,
 		classInformer,
 		capacityCheck,
 		10*time.Second)
@@ -269,6 +271,8 @@ func newTestBinder(t *testing.T, ctx context.Context) *testEnv {
 		internalPodInformer:     podInformer,
 		internalNodeInformer:    nodeInformer,
 		internalCSINodeInformer: csiNodeInformer,
+		internalPVInformer:      pvInformer,
+		internalPVCInformer:     pvcInformer,
 
 		internalCSIDriverInformer:          csiDriverInformer,
 		internalCSIStorageCapacityInformer: csiStorageCapacityInformer,
@@ -303,7 +307,7 @@ func (env *testEnv) addCSIStorageCapacities(capacities []*storagev1.CSIStorageCa
 
 func (env *testEnv) initClaims(t *testing.T, cachedPVCs []*v1.PersistentVolumeClaim, apiPVCs []*v1.PersistentVolumeClaim) {
 	for _, pvc := range cachedPVCs {
-		if err := env.internalBinder.pvcCache.store.Add(pvc); err != nil {
+		if err := env.internalPVCInformer.Informer().GetIndexer().Add(pvc); err != nil {
 			t.Fatalf("error adding PVC %s/%s to cache: %v", pvc.Namespace, pvc.Name, err)
 		}
 		if apiPVCs == nil {
@@ -317,7 +321,7 @@ func (env *testEnv) initClaims(t *testing.T, cachedPVCs []*v1.PersistentVolumeCl
 
 func (env *testEnv) initVolumes(t *testing.T, cachedPVs []*v1.PersistentVolume, apiPVs []*v1.PersistentVolume) {
 	for _, pv := range cachedPVs {
-		if err := env.internalBinder.pvCache.store.Add(pv); err != nil {
+		if err := env.internalPVInformer.Informer().GetIndexer().Add(pv); err != nil {
 			t.Fatalf("error adding PV %s to cache: %v", pv.Name, err)
 		}
 		if apiPVs == nil {
@@ -375,7 +379,7 @@ func (env *testEnv) updateClaims(ctx context.Context, pvcs []*v1.PersistentVolum
 
 func (env *testEnv) deleteVolumes(t *testing.T, pvs []*v1.PersistentVolume) {
 	for _, pv := range pvs {
-		if err := env.internalBinder.pvCache.store.Delete(pv); err != nil {
+		if err := env.internalPVInformer.Informer().GetIndexer().Delete(pv); err != nil {
 			t.Fatalf("Error deleting PV %s: %v", pv.Name, err)
 		}
 	}
@@ -383,7 +387,7 @@ func (env *testEnv) deleteVolumes(t *testing.T, pvs []*v1.PersistentVolume) {
 
 func (env *testEnv) deleteClaims(t *testing.T, pvcs []*v1.PersistentVolumeClaim) {
 	for _, pvc := range pvcs {
-		if err := env.internalBinder.pvcCache.store.Delete(pvc); err != nil {
+		if err := env.internalPVCInformer.Informer().GetIndexer().Delete(pvc); err != nil {
 			t.Fatalf("Error deleting PVC %s/%s: %v", pvc.Namespace, pvc.Name, err)
 		}
 	}

@@ -574,10 +574,15 @@ func ValidateIngressClassUpdate(newIngressClass, oldIngressClass *networking.Ing
 // validateIngressClassSpec ensures that IngressClassSpec fields are valid.
 func validateIngressClassSpec(spec *networking.IngressClassSpec, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	if len(spec.Controller) > maxLenIngressClassController {
-		allErrs = append(allErrs, field.TooLong(fldPath.Child("controller"), "" /*unused*/, maxLenIngressClassController))
+	if len(spec.Controller) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("controller"), "").MarkCoveredByDeclarative())
+	} else {
+		if len(spec.Controller) > maxLenIngressClassController {
+			allErrs = append(allErrs, field.TooLong(fldPath.Child("controller"), "", /*unused*/
+				maxLenIngressClassController).MarkCoveredByDeclarative().WithOrigin("maxBytes"))
+		}
+		allErrs = append(allErrs, validation.IsDomainPrefixedPath(fldPath.Child("controller"), spec.Controller)...)
 	}
-	allErrs = append(allErrs, validation.IsDomainPrefixedPath(fldPath.Child("controller"), spec.Controller)...)
 	allErrs = append(allErrs, validateIngressClassParametersReference(spec.Parameters, fldPath.Child("parameters"))...)
 	return allErrs
 }
@@ -585,7 +590,7 @@ func validateIngressClassSpec(spec *networking.IngressClassSpec, fldPath *field.
 // validateIngressClassSpecUpdate ensures that IngressClassSpec updates are
 // valid.
 func validateIngressClassSpecUpdate(newSpec, oldSpec *networking.IngressClassSpec, fldPath *field.Path) field.ErrorList {
-	return apivalidation.ValidateImmutableField(newSpec.Controller, oldSpec.Controller, fldPath.Child("controller"))
+	return apivalidation.ValidateImmutableField(newSpec.Controller, oldSpec.Controller, fldPath.Child("controller")).MarkCoveredByDeclarative().WithOrigin("immutable")
 }
 
 // validateIngressTypedLocalObjectReference ensures that Parameters fields are valid.
@@ -639,7 +644,7 @@ func validateIngressClassParametersReference(params *networking.IngressClassPara
 	}
 
 	if params.Kind == "" {
-		allErrs = append(allErrs, field.Required(fldPath.Child("kind"), "")).MarkCoveredByDeclarative()
+		allErrs = append(allErrs, field.Required(fldPath.Child("kind"), "").MarkCoveredByDeclarative())
 	} else {
 		for _, msg := range content.IsPathSegmentName(params.Kind) {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("kind"), params.Kind, msg))
@@ -647,7 +652,7 @@ func validateIngressClassParametersReference(params *networking.IngressClassPara
 	}
 
 	if params.Name == "" {
-		allErrs = append(allErrs, field.Required(fldPath.Child("name"), "")).MarkCoveredByDeclarative()
+		allErrs = append(allErrs, field.Required(fldPath.Child("name"), "").MarkCoveredByDeclarative())
 	} else {
 		for _, msg := range content.IsPathSegmentName(params.Name) {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("name"), params.Name, msg))

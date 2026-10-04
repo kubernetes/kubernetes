@@ -12,8 +12,6 @@
 // limitations under the License.
 
 //go:build linux && (arm || arm64)
-// +build linux
-// +build arm arm64
 
 package procfs
 

@@ -261,6 +261,79 @@ func (x *ActivationInfo) GetLabels() map[string]string {
 	return nil
 }
 
+// MountCapabilities describes mount handling that a component performs itself,
+// so that the mount manager does not perform it on the component's behalf.
+//
+// A shim advertises this as an extension of its BootstrapResult. A runtime
+// may be able to handle a mount more efficiently than the host can; a VM
+// based runtime, for example, may pass a disk image directly to the guest
+// instead of having a loop device set up for it on the host.
+//
+// Mount types and transforms are named with open ended strings, so
+// supporting a new one of either is not a change to this protocol.
+type MountCapabilities struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	// Types are the mount types the sender performs itself, such as "erofs" or
+	// "loop". These are base mount types, with any transform prefixes removed.
+	Types []string `protobuf:"bytes,1,rep,name=types,proto3" json:"types,omitempty"`
+	// Transforms are the mount transforms the sender applies itself, such as
+	// "format", "mkfs" or "mkdir".
+	//
+	// A transform is named on its own, without the "/<mount-type>" suffix that
+	// appears in a mount type, so "format" covers the mount types "format/bind"
+	// and "format/mkdir/overlay" alike.
+	Transforms []string `protobuf:"bytes,2,rep,name=transforms,proto3" json:"transforms,omitempty"`
+}
+
+func (x *MountCapabilities) Reset() {
+	*x = MountCapabilities{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_types_mount_proto_msgTypes[3]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *MountCapabilities) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*MountCapabilities) ProtoMessage() {}
+
+func (x *MountCapabilities) ProtoReflect() protoreflect.Message {
+	mi := &file_types_mount_proto_msgTypes[3]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use MountCapabilities.ProtoReflect.Descriptor instead.
+func (*MountCapabilities) Descriptor() ([]byte, []int) {
+	return file_types_mount_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *MountCapabilities) GetTypes() []string {
+	if x != nil {
+		return x.Types
+	}
+	return nil
+}
+
+func (x *MountCapabilities) GetTransforms() []string {
+	if x != nil {
+		return x.Transforms
+	}
+	return nil
+}
+
 var File_types_mount_proto protoreflect.FileDescriptor
 
 var file_types_mount_proto_rawDesc = []byte{
@@ -308,11 +381,16 @@ var file_types_mount_proto_rawDesc = []byte{
 	0x65, 0x6c, 0x73, 0x1a, 0x39, 0x0a, 0x0b, 0x4c, 0x61, 0x62, 0x65, 0x6c, 0x73, 0x45, 0x6e, 0x74,
 	0x72, 0x79, 0x12, 0x10, 0x0a, 0x03, 0x6b, 0x65, 0x79, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52,
 	0x03, 0x6b, 0x65, 0x79, 0x12, 0x14, 0x0a, 0x05, 0x76, 0x61, 0x6c, 0x75, 0x65, 0x18, 0x02, 0x20,
-	0x01, 0x28, 0x09, 0x52, 0x05, 0x76, 0x61, 0x6c, 0x75, 0x65, 0x3a, 0x02, 0x38, 0x01, 0x42, 0x32,
-	0x5a, 0x30, 0x67, 0x69, 0x74, 0x68, 0x75, 0x62, 0x2e, 0x63, 0x6f, 0x6d, 0x2f, 0x63, 0x6f, 0x6e,
-	0x74, 0x61, 0x69, 0x6e, 0x65, 0x72, 0x64, 0x2f, 0x63, 0x6f, 0x6e, 0x74, 0x61, 0x69, 0x6e, 0x65,
-	0x72, 0x64, 0x2f, 0x61, 0x70, 0x69, 0x2f, 0x74, 0x79, 0x70, 0x65, 0x73, 0x3b, 0x74, 0x79, 0x70,
-	0x65, 0x73, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
+	0x01, 0x28, 0x09, 0x52, 0x05, 0x76, 0x61, 0x6c, 0x75, 0x65, 0x3a, 0x02, 0x38, 0x01, 0x22, 0x49,
+	0x0a, 0x11, 0x4d, 0x6f, 0x75, 0x6e, 0x74, 0x43, 0x61, 0x70, 0x61, 0x62, 0x69, 0x6c, 0x69, 0x74,
+	0x69, 0x65, 0x73, 0x12, 0x14, 0x0a, 0x05, 0x74, 0x79, 0x70, 0x65, 0x73, 0x18, 0x01, 0x20, 0x03,
+	0x28, 0x09, 0x52, 0x05, 0x74, 0x79, 0x70, 0x65, 0x73, 0x12, 0x1e, 0x0a, 0x0a, 0x74, 0x72, 0x61,
+	0x6e, 0x73, 0x66, 0x6f, 0x72, 0x6d, 0x73, 0x18, 0x02, 0x20, 0x03, 0x28, 0x09, 0x52, 0x0a, 0x74,
+	0x72, 0x61, 0x6e, 0x73, 0x66, 0x6f, 0x72, 0x6d, 0x73, 0x42, 0x32, 0x5a, 0x30, 0x67, 0x69, 0x74,
+	0x68, 0x75, 0x62, 0x2e, 0x63, 0x6f, 0x6d, 0x2f, 0x63, 0x6f, 0x6e, 0x74, 0x61, 0x69, 0x6e, 0x65,
+	0x72, 0x64, 0x2f, 0x63, 0x6f, 0x6e, 0x74, 0x61, 0x69, 0x6e, 0x65, 0x72, 0x64, 0x2f, 0x61, 0x70,
+	0x69, 0x2f, 0x74, 0x79, 0x70, 0x65, 0x73, 0x3b, 0x74, 0x79, 0x70, 0x65, 0x73, 0x62, 0x06, 0x70,
+	0x72, 0x6f, 0x74, 0x6f, 0x33,
 }
 
 var (
@@ -327,22 +405,23 @@ func file_types_mount_proto_rawDescGZIP() []byte {
 	return file_types_mount_proto_rawDescData
 }
 
-var file_types_mount_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
+var file_types_mount_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
 var file_types_mount_proto_goTypes = []interface{}{
 	(*Mount)(nil),                 // 0: containerd.types.Mount
 	(*ActiveMount)(nil),           // 1: containerd.types.ActiveMount
 	(*ActivationInfo)(nil),        // 2: containerd.types.ActivationInfo
-	nil,                           // 3: containerd.types.ActiveMount.DataEntry
-	nil,                           // 4: containerd.types.ActivationInfo.LabelsEntry
-	(*timestamppb.Timestamp)(nil), // 5: google.protobuf.Timestamp
+	(*MountCapabilities)(nil),     // 3: containerd.types.MountCapabilities
+	nil,                           // 4: containerd.types.ActiveMount.DataEntry
+	nil,                           // 5: containerd.types.ActivationInfo.LabelsEntry
+	(*timestamppb.Timestamp)(nil), // 6: google.protobuf.Timestamp
 }
 var file_types_mount_proto_depIdxs = []int32{
 	0, // 0: containerd.types.ActiveMount.mount:type_name -> containerd.types.Mount
-	5, // 1: containerd.types.ActiveMount.mounted_at:type_name -> google.protobuf.Timestamp
-	3, // 2: containerd.types.ActiveMount.data:type_name -> containerd.types.ActiveMount.DataEntry
+	6, // 1: containerd.types.ActiveMount.mounted_at:type_name -> google.protobuf.Timestamp
+	4, // 2: containerd.types.ActiveMount.data:type_name -> containerd.types.ActiveMount.DataEntry
 	1, // 3: containerd.types.ActivationInfo.active:type_name -> containerd.types.ActiveMount
 	0, // 4: containerd.types.ActivationInfo.system:type_name -> containerd.types.Mount
-	4, // 5: containerd.types.ActivationInfo.labels:type_name -> containerd.types.ActivationInfo.LabelsEntry
+	5, // 5: containerd.types.ActivationInfo.labels:type_name -> containerd.types.ActivationInfo.LabelsEntry
 	6, // [6:6] is the sub-list for method output_type
 	6, // [6:6] is the sub-list for method input_type
 	6, // [6:6] is the sub-list for extension type_name
@@ -392,6 +471,18 @@ func file_types_mount_proto_init() {
 				return nil
 			}
 		}
+		file_types_mount_proto_msgTypes[3].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*MountCapabilities); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
@@ -399,7 +490,7 @@ func file_types_mount_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_types_mount_proto_rawDesc,
 			NumEnums:      0,
-			NumMessages:   5,
+			NumMessages:   6,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

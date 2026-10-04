@@ -35,8 +35,8 @@ import (
 //
 // VolumeAttachment objects are non-namespaced.
 type VolumeAttachmentApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration `json:",inline"`
-	// Standard object metadata.
+	v1.TypeMetaApplyConfiguration `json:""`
+	// metadata is the standard object metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
 	// spec represents specification of the desired attach/detach volume behavior.

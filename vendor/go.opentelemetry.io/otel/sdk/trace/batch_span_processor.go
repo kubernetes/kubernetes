@@ -1,11 +1,12 @@
 // Copyright The OpenTelemetry Authors
 // SPDX-License-Identifier: Apache-2.0
 
-package trace // import "go.opentelemetry.io/otel/sdk/trace"
+package trace
 
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -163,19 +164,21 @@ func (bsp *batchSpanProcessor) Shutdown(ctx context.Context) error {
 	bsp.stopOnce.Do(func() {
 		bsp.stopped.Store(true)
 		wait := make(chan struct{})
+		// exportErr is written by the goroutine before closing wait.
+		// It is only read in the <-wait case, so there is no race.
+		var exportErr error
 		go func() {
 			close(bsp.stopCh)
 			bsp.stopWait.Wait()
 			if bsp.e != nil {
-				if err := bsp.e.Shutdown(ctx); err != nil {
-					otel.Handle(err)
-				}
+				exportErr = bsp.e.Shutdown(ctx)
 			}
 			close(wait)
 		}()
-		// Wait until the wait group is done or the context is cancelled
+		// Wait until the channel is ready or the context is canceled.
 		select {
 		case <-wait:
+			err = exportErr
 		case <-ctx.Done():
 			err = ctx.Err()
 		}
@@ -433,11 +436,11 @@ func (bsp *batchSpanProcessor) enqueueDrop(ctx context.Context, sd ReadOnlySpan)
 func (bsp *batchSpanProcessor) MarshalLog() any {
 	return struct {
 		Type         string
-		SpanExporter SpanExporter
+		SpanExporter string
 		Config       BatchSpanProcessorOptions
 	}{
 		Type:         "BatchSpanProcessor",
-		SpanExporter: bsp.e,
+		SpanExporter: fmt.Sprintf("%T", bsp.e),
 		Config:       bsp.o,
 	}
 }

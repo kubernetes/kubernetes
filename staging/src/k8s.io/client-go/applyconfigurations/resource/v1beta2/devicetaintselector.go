@@ -25,10 +25,10 @@ package v1beta2
 // The empty selector matches all devices. Without a selector, no devices
 // are matched.
 type DeviceTaintSelectorApplyConfiguration struct {
-	// If driver is set, only devices from that driver are selected.
+	// driver is the driver name. If driver is set, only devices from that driver are selected.
 	// This fields corresponds to slice.spec.driver.
 	Driver *string `json:"driver,omitempty"`
-	// If pool is set, only devices in that pool are selected.
+	// pool is the pool name. If pool is set, only devices in that pool are selected.
 	//
 	// Also setting the driver name may be useful to avoid
 	// ambiguity when different drivers use the same pool name,
@@ -37,7 +37,7 @@ type DeviceTaintSelectorApplyConfiguration struct {
 	// drivers with node-local devices use the node name as
 	// their pool name.
 	Pool *string `json:"pool,omitempty"`
-	// If device is set, only devices with that name are selected.
+	// device is the device name. If device is set, only devices with that name are selected.
 	// This field corresponds to slice.spec.devices[].name.
 	//
 	// Setting also driver and pool may be required to avoid ambiguity,

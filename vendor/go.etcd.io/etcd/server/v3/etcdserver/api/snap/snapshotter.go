@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"go.uber.org/zap"
+	"google.golang.org/protobuf/proto"
 
 	"go.etcd.io/etcd/client/pkg/v3/verify"
 	pioutil "go.etcd.io/etcd/pkg/v3/ioutil"
@@ -51,8 +52,9 @@ var (
 )
 
 type Snapshotter struct {
-	lg  *zap.Logger
-	dir string
+	lg       *zap.Logger
+	dir      string
+	fsyncDir func(string) error
 }
 
 func New(lg *zap.Logger, dir string) *Snapshotter {
@@ -60,26 +62,28 @@ func New(lg *zap.Logger, dir string) *Snapshotter {
 		lg = zap.NewNop()
 	}
 	return &Snapshotter{
-		lg:  lg,
-		dir: dir,
+		lg:       lg,
+		dir:      dir,
+		fsyncDir: fsyncSnapDir,
 	}
 }
 
-func (s *Snapshotter) SaveSnap(snapshot raftpb.Snapshot) error {
+// TODO: change signature of IsEmptySnap to accept a pointer
+func (s *Snapshotter) SaveSnap(snapshot *raftpb.Snapshot) error {
 	if raft.IsEmptySnap(snapshot) {
 		return nil
 	}
-	return s.save(&snapshot)
+	return s.save(snapshot)
 }
 
 func (s *Snapshotter) save(snapshot *raftpb.Snapshot) error {
 	start := time.Now()
 
-	fname := fmt.Sprintf("%016x-%016x%s", snapshot.Metadata.Term, snapshot.Metadata.Index, snapSuffix)
-	b := pbutil.MustMarshal(snapshot)
+	fname := fmt.Sprintf("%016x-%016x%s", snapshot.Metadata.GetTerm(), snapshot.Metadata.GetIndex(), snapSuffix)
+	b := pbutil.MustMarshalMessage(snapshot)
 	crc := crc32.Update(0, crcTable, b)
-	snap := snappb.Snapshot{Crc: crc, Data: b}
-	d, err := snap.Marshal()
+	snap := snappb.Snapshot{Crc: &crc, Data: b}
+	d, err := proto.Marshal(&snap)
 	if err != nil {
 		return err
 	}
@@ -110,11 +114,11 @@ func (s *Snapshotter) Load() (*raftpb.Snapshot, error) {
 }
 
 // LoadNewestAvailable loads the newest snapshot available that is in walSnaps.
-func (s *Snapshotter) LoadNewestAvailable(walSnaps []walpb.Snapshot) (*raftpb.Snapshot, error) {
+func (s *Snapshotter) LoadNewestAvailable(walSnaps []*walpb.Snapshot) (*raftpb.Snapshot, error) {
 	return s.loadMatching(func(snapshot *raftpb.Snapshot) bool {
 		m := snapshot.Metadata
 		for i := len(walSnaps) - 1; i >= 0; i-- {
-			if m.Term == walSnaps[i].Term && m.Index == walSnaps[i].Index {
+			if m.GetTerm() == walSnaps[i].GetTerm() && m.GetIndex() == walSnaps[i].GetIndex() {
 				return true
 			}
 		}
@@ -167,28 +171,28 @@ func Read(lg *zap.Logger, snapname string) (*raftpb.Snapshot, error) {
 	}
 
 	var serializedSnap snappb.Snapshot
-	if err = serializedSnap.Unmarshal(b); err != nil {
+	if err = proto.Unmarshal(b, &serializedSnap); err != nil {
 		lg.Warn("failed to unmarshal snappb.Snapshot", zap.String("path", snapname), zap.Error(err))
 		return nil, err
 	}
 
-	if len(serializedSnap.Data) == 0 || serializedSnap.Crc == 0 {
+	if len(serializedSnap.Data) == 0 || serializedSnap.GetCrc() == 0 {
 		lg.Warn("failed to read empty snapshot data", zap.String("path", snapname))
 		return nil, ErrEmptySnapshot
 	}
 
 	crc := crc32.Update(0, crcTable, serializedSnap.Data)
-	if crc != serializedSnap.Crc {
+	if crc != serializedSnap.GetCrc() {
 		lg.Warn("snap file is corrupt",
 			zap.String("path", snapname),
-			zap.Uint32("prev-crc", serializedSnap.Crc),
+			zap.Uint32("prev-crc", serializedSnap.GetCrc()),
 			zap.Uint32("new-crc", crc),
 		)
 		return nil, ErrCRCMismatch
 	}
 
 	var snap raftpb.Snapshot
-	if err = snap.Unmarshal(serializedSnap.Data); err != nil {
+	if err = proto.Unmarshal(serializedSnap.Data, &snap); err != nil {
 		lg.Warn("failed to unmarshal raftpb.Snapshot", zap.String("path", snapname), zap.Error(err))
 		return nil, err
 	}
@@ -252,7 +256,7 @@ func (s *Snapshotter) cleanupSnapdir(filenames []string) (names []string, err er
 	return names, nil
 }
 
-func (s *Snapshotter) ReleaseSnapDBs(snap raftpb.Snapshot) error {
+func (s *Snapshotter) ReleaseSnapDBs(snap *raftpb.Snapshot) error {
 	dir, err := os.Open(s.dir)
 	if err != nil {
 		return err
@@ -270,7 +274,7 @@ func (s *Snapshotter) ReleaseSnapDBs(snap raftpb.Snapshot) error {
 				s.lg.Error("failed to parse index from filename", zap.String("path", filename), zap.String("error", err.Error()))
 				continue
 			}
-			if index < snap.Metadata.Index {
+			if index < snap.Metadata.GetIndex() {
 				s.lg.Info("found orphaned .snap.db file; deleting", zap.String("path", filename))
 				if rmErr := os.Remove(filepath.Join(s.dir, filename)); rmErr != nil && !os.IsNotExist(rmErr) {
 					s.lg.Error("failed to remove orphaned .snap.db file", zap.String("path", filename), zap.String("error", rmErr.Error()))

@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/klog/v2"
+	"k8s.io/utils/clock"
 	"k8s.io/utils/ptr"
 )
 
@@ -41,14 +42,17 @@ var (
 	DefaultFeatureSupportChecker FeatureSupportChecker = newDefaultFeatureSupportChecker()
 )
 
+// rangeStreamRecheckInterval is how long RangeStream stays marked unsupported
+// before Supports reports it supported again. See storage.RangeStream.
+const rangeStreamRecheckInterval = 10 * time.Minute
+
 // FeatureSupportChecker to define Supports functions.
 type FeatureSupportChecker interface {
-	// Supports check if the feature is supported or not by checking internal cache.
-	// By default all calls to this function before calling CheckClient returns false.
-	// Returns true if all endpoints in etcd clients are supporting the feature.
-	// If client A supports and client B doesn't support the feature, the `Supports` will
-	// first return true at client A initializtion and then return false on client B
-	// initialzation, it can flip the support at runtime.
+	// Supports reports whether the etcd backend supports the given feature, from
+	// the result cached by CheckClient/MarkUnsupported. Before support is known it
+	// returns the feature's default, documented on the Feature constants (see
+	// storage.RequestWatchProgress and storage.RangeStream). Support can flip at
+	// runtime as endpoints are checked.
 	Supports(feature storage.Feature) bool
 	// CheckClient works with etcd client to recalcualte feature support and cache it internally.
 	// All etcd clients should support feature to cause `Supports` return true.
@@ -56,18 +60,31 @@ type FeatureSupportChecker interface {
 	// first return true at client A initializtion and then return false on client B
 	// initialzation, it can flip the support at runtime.
 	CheckClient(ctx context.Context, c client, feature storage.Feature)
+	// MarkUnsupported records that an etcd endpoint reported the feature
+	// unimplemented. See the Feature constants for per-feature recheck behavior
+	// (e.g. storage.RangeStream).
+	MarkUnsupported(feature storage.Feature)
 }
 
 type defaultFeatureSupportChecker struct {
-	lock                    sync.Mutex
-	progressNotifySupported *bool
-	checkingEndpoint        map[string]struct{}
+	lock                     sync.Mutex
+	progressNotifySupported  *bool
+	rangeStreamUnsupportedAt time.Time
+	clock                    clock.Clock
+	checkingEndpoint         map[string]struct{}
 }
 
 func newDefaultFeatureSupportChecker() *defaultFeatureSupportChecker {
 	return &defaultFeatureSupportChecker{
 		checkingEndpoint: make(map[string]struct{}),
+		clock:            clock.RealClock{},
 	}
+}
+
+// NewDefaultFeatureSupportChecker returns a new FeatureSupportChecker.
+// DefaultFeatureSupportChecker is the shared instance used by the storage layer.
+func NewDefaultFeatureSupportChecker() FeatureSupportChecker {
+	return newDefaultFeatureSupportChecker()
 }
 
 // Supports can check the featue from anywhere without storage if it was cached before.
@@ -78,6 +95,14 @@ func (f *defaultFeatureSupportChecker) Supports(feature storage.Feature) bool {
 		defer f.lock.Unlock()
 
 		return ptr.Deref(f.progressNotifySupported, false)
+	case storage.RangeStream:
+		f.lock.Lock()
+		defer f.lock.Unlock()
+
+		if f.rangeStreamUnsupportedAt.IsZero() {
+			return true
+		}
+		return f.clock.Since(f.rangeStreamUnsupportedAt) >= rangeStreamRecheckInterval
 	default:
 		runtime.HandleError(fmt.Errorf("feature %q is not implemented in DefaultFeatureSupportChecker", feature))
 		return false
@@ -89,6 +114,17 @@ func (f *defaultFeatureSupportChecker) CheckClient(ctx context.Context, c client
 	switch feature {
 	case storage.RequestWatchProgress:
 		f.checkClient(ctx, c)
+	default:
+		runtime.HandleError(fmt.Errorf("feature %q is not implemented in DefaultFeatureSupportChecker", feature))
+	}
+}
+
+func (f *defaultFeatureSupportChecker) MarkUnsupported(feature storage.Feature) {
+	switch feature {
+	case storage.RangeStream:
+		f.lock.Lock()
+		defer f.lock.Unlock()
+		f.rangeStreamUnsupportedAt = f.clock.Now()
 	default:
 		runtime.HandleError(fmt.Errorf("feature %q is not implemented in DefaultFeatureSupportChecker", feature))
 	}

@@ -41,6 +41,7 @@ type StorageClassInterface interface {
 	Create(ctx context.Context, storageClass *storagev1.StorageClass, opts metav1.CreateOptions) (*storagev1.StorageClass, error)
 	Update(ctx context.Context, storageClass *storagev1.StorageClass, opts metav1.UpdateOptions) (*storagev1.StorageClass, error)
 	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
+	DeleteWithResult(ctx context.Context, name string, opts metav1.DeleteOptions) (metav1.APIResult, error)
 	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Get(ctx context.Context, name string, opts metav1.GetOptions) (*storagev1.StorageClass, error)
 	List(ctx context.Context, opts metav1.ListOptions) (*storagev1.StorageClassList, error)

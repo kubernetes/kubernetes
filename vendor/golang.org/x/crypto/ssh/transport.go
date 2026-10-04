@@ -331,13 +331,19 @@ func exchangeVersions(rw io.ReadWriter, versionLine []byte) (them []byte, err er
 // chars
 const maxVersionStringBytes = 255
 
+// maxPreVersionLines is the maximum number of lines sent by the peer
+// before the version string. Each of these lines is limited to a maximum
+// of maxVersionStringBytes chars. Lines sent before the version string
+// are silently ignored.
+const maxPreVersionLines = 1024
+
 // Read version string as specified by RFC 4253, section 4.2.
 func readVersion(r io.Reader) ([]byte, error) {
 	versionString := make([]byte, 0, 64)
 	var ok bool
 	var buf [1]byte
 
-	for length := 0; length < maxVersionStringBytes; length++ {
+	for lines := 0; len(versionString) < maxVersionStringBytes && lines < maxPreVersionLines; {
 		_, err := io.ReadFull(r, buf[:])
 		if err != nil {
 			return nil, err
@@ -347,9 +353,9 @@ func readVersion(r io.Reader) ([]byte, error) {
 		if buf[0] == '\n' {
 			if !bytes.HasPrefix(versionString, []byte("SSH-")) {
 				// RFC 4253 says we need to ignore all version string lines
-				// except the one containing the SSH version (provided that
-				// all the lines do not exceed 255 bytes in total).
+				// except the one containing the SSH version.
 				versionString = versionString[:0]
+				lines++
 				continue
 			}
 			ok = true

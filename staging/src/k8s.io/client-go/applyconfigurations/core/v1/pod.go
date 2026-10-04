@@ -33,14 +33,14 @@ import (
 // Pod is a collection of containers that can run on a host. This resource is created
 // by clients and scheduled onto hosts.
 type PodApplyConfiguration struct {
-	metav1.TypeMetaApplyConfiguration `json:",inline"`
-	// Standard object's metadata.
+	metav1.TypeMetaApplyConfiguration `json:""`
+	// metadata is the standard object's metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	// Specification of the desired behavior of the pod.
+	// spec is the specification of the desired behavior of the pod.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
 	Spec *PodSpecApplyConfiguration `json:"spec,omitempty"`
-	// Most recently observed status of the pod.
+	// status is the most recently observed status of the pod.
 	// This data may not be up to date.
 	// Populated by the system.
 	// Read-only.

@@ -69,8 +69,7 @@ func TestWebhookConverterWithoutWatchCache(t *testing.T) {
 func TestWebhookNotCalledForUnusedVersions(t *testing.T) {
 	ctx := context.Background()
 
-	etcd3watcher.TestOnlySetFatalOnDecodeError(false)
-	defer etcd3watcher.TestOnlySetFatalOnDecodeError(true)
+	etcd3watcher.TestOnlySetFatalOnDecodeError(t, false)
 
 	tearDown, config, options, err := fixtures.StartDefaultServer(t, "--watch-cache=true")
 	if err != nil {
@@ -268,8 +267,7 @@ func testWebhookConverter(t *testing.T, watchCache bool) {
 	// TODO: Added for integration testing of conversion webhooks, where decode errors due to conversion webhook failures need to be tested.
 	// Maybe we should identify conversion webhook related errors in decoding to avoid triggering this? Or maybe having this special casing
 	// of test cases in production code should be removed?
-	etcd3watcher.TestOnlySetFatalOnDecodeError(false)
-	defer etcd3watcher.TestOnlySetFatalOnDecodeError(true)
+	etcd3watcher.TestOnlySetFatalOnDecodeError(t, false)
 
 	// To avoid the high cost of restarting the API server for every test case, we start
 	// the infrastructure (API Server + Webhook Server) ONCE at the beginning of the test.

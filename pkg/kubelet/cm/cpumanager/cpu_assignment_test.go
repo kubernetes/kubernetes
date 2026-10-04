@@ -83,6 +83,18 @@ func TestCPUAccumulatorFreeSockets(t *testing.T) {
 			[]int{},
 		},
 		{
+			"dual socket, non-uniform CPUs per socket, HT, 1 socket free",
+			topoDualSocketMultiNumaPerSocketMixedChips,
+			mustParseCPUSet(t, "4-47,52-95"),
+			[]int{1},
+		},
+		{
+			"dual socket, non-uniform CPUs per socket, HT, 0 socket free",
+			topoDualSocketMultiNumaPerSocketMixedChips,
+			mustParseCPUSet(t, "4-15,17-47,52-63,65-95"),
+			[]int{},
+		},
+		{
 			"dual numa, multi socket per per socket, HT, 4 sockets free",
 			fakeTopoMultiSocketDualSocketPerNumaHT,
 			mustParseCPUSet(t, "0-79"),
@@ -319,6 +331,18 @@ func TestCPUAccumulatorFreeCores(t *testing.T) {
 			[]int{},
 		},
 		{
+			"single socket, 7 HT cores free (1 partially consumed) + 4 ST cores free",
+			topoSingleSocketSingleNumaPerSocketPCoreHTECoreST,
+			mustParseCPUSet(t, "1-15,24-27"),
+			[]int{40, 41, 42, 43, 4, 8, 12, 16, 20, 24, 28},
+		},
+		{
+			"single socket, 0 HT cores free (8 partially consumed) + 12 ST cores free",
+			topoSingleSocketSingleNumaPerSocketPCoreHTECoreST,
+			mustParseCPUSet(t, "0,2,4,6,8,10,12,14,16-27"),
+			[]int{32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43},
+		},
+		{
 			"dual socket HT, 6 cores free",
 			topoDualSocketHT,
 			cpuset.New(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11),
@@ -399,6 +423,208 @@ func TestCPUAccumulatorFreeCPUs(t *testing.T) {
 		t.Run(tc.description, func(t *testing.T) {
 			acc := newCPUAccumulator(logger, tc.topo, tc.availableCPUs, 0, CPUSortingStrategyPacked)
 			result := acc.freeCPUs()
+			if !reflect.DeepEqual(result, tc.expect) {
+				t.Errorf("expected %v to equal %v", result, tc.expect)
+			}
+		})
+	}
+}
+
+func TestCPUAccumulatorFreeCPUsSpreadRoundRobin(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	testCases := []struct {
+		description   string
+		topo          *topology.CPUTopology
+		availableCPUs cpuset.CPUSet
+		expect        []int
+	}{
+		// Synthetic topology: contiguous sibling IDs, not representative of known hardware.
+		{
+			description: "contiguous sibling CPU IDs",
+			topo: &topology.CPUTopology{
+				NumCPUs:    8,
+				NumSockets: 1,
+				NumCores:   4,
+				CPUDetails: map[int]topology.CPUInfo{
+					0: {CoreID: 0, SocketID: 0, NUMANodeID: 0},
+					1: {CoreID: 0, SocketID: 0, NUMANodeID: 0},
+					2: {CoreID: 1, SocketID: 0, NUMANodeID: 0},
+					3: {CoreID: 1, SocketID: 0, NUMANodeID: 0},
+					4: {CoreID: 2, SocketID: 0, NUMANodeID: 0},
+					5: {CoreID: 2, SocketID: 0, NUMANodeID: 0},
+					6: {CoreID: 3, SocketID: 0, NUMANodeID: 0},
+					7: {CoreID: 3, SocketID: 0, NUMANodeID: 0},
+				},
+			},
+			availableCPUs: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7),
+			expect:        []int{0, 2, 4, 6, 1, 3, 5, 7},
+		},
+		{
+			description:   "interleaved sibling CPU IDs",
+			topo:          topoSingleSocketHT,
+			availableCPUs: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7),
+			expect:        []int{0, 1, 2, 3, 4, 5, 6, 7},
+		},
+		// Synthetic topology: arbitrary CPU numbering, does not correspond to known hardware.
+		{
+			description: "arbitrary logical CPU numbering",
+			topo: &topology.CPUTopology{
+				NumCPUs:    8,
+				NumSockets: 1,
+				NumCores:   4,
+				CPUDetails: map[int]topology.CPUInfo{
+					0:  {CoreID: 0, SocketID: 0, NUMANodeID: 0},
+					7:  {CoreID: 0, SocketID: 0, NUMANodeID: 0},
+					2:  {CoreID: 1, SocketID: 0, NUMANodeID: 0},
+					11: {CoreID: 1, SocketID: 0, NUMANodeID: 0},
+					5:  {CoreID: 2, SocketID: 0, NUMANodeID: 0},
+					9:  {CoreID: 2, SocketID: 0, NUMANodeID: 0},
+					1:  {CoreID: 3, SocketID: 0, NUMANodeID: 0},
+					14: {CoreID: 3, SocketID: 0, NUMANodeID: 0},
+				},
+			},
+			availableCPUs: cpuset.New(0, 1, 2, 5, 7, 9, 11, 14),
+			expect:        []int{0, 2, 5, 1, 7, 11, 9, 14},
+		},
+		// Synthetic topology: dual-socket layout synthesized for spread verification, not a specific product.
+		{
+			description: "multiple sockets",
+			topo: &topology.CPUTopology{
+				NumCPUs:    16,
+				NumSockets: 2,
+				NumCores:   8,
+				CPUDetails: map[int]topology.CPUInfo{
+					0:  {CoreID: 0, SocketID: 0, NUMANodeID: 0},
+					1:  {CoreID: 0, SocketID: 0, NUMANodeID: 0},
+					2:  {CoreID: 1, SocketID: 0, NUMANodeID: 0},
+					3:  {CoreID: 1, SocketID: 0, NUMANodeID: 0},
+					4:  {CoreID: 2, SocketID: 0, NUMANodeID: 0},
+					5:  {CoreID: 2, SocketID: 0, NUMANodeID: 0},
+					6:  {CoreID: 3, SocketID: 0, NUMANodeID: 0},
+					7:  {CoreID: 3, SocketID: 0, NUMANodeID: 0},
+					8:  {CoreID: 4, SocketID: 1, NUMANodeID: 1},
+					9:  {CoreID: 4, SocketID: 1, NUMANodeID: 1},
+					10: {CoreID: 5, SocketID: 1, NUMANodeID: 1},
+					11: {CoreID: 5, SocketID: 1, NUMANodeID: 1},
+					12: {CoreID: 6, SocketID: 1, NUMANodeID: 1},
+					13: {CoreID: 6, SocketID: 1, NUMANodeID: 1},
+					14: {CoreID: 7, SocketID: 1, NUMANodeID: 1},
+					15: {CoreID: 7, SocketID: 1, NUMANodeID: 1},
+				},
+			},
+			availableCPUs: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15),
+			expect:        []int{0, 2, 4, 6, 1, 3, 5, 7, 8, 10, 12, 14, 9, 11, 13, 15},
+		},
+		// Synthetic topology: partially populated cores on contiguous sibling layout, not modeled on real hardware.
+		{
+			description: "partially allocated cores",
+			topo: &topology.CPUTopology{
+				NumCPUs:    8,
+				NumSockets: 1,
+				NumCores:   4,
+				CPUDetails: map[int]topology.CPUInfo{
+					0: {CoreID: 0, SocketID: 0, NUMANodeID: 0},
+					1: {CoreID: 0, SocketID: 0, NUMANodeID: 0},
+					2: {CoreID: 1, SocketID: 0, NUMANodeID: 0},
+					3: {CoreID: 1, SocketID: 0, NUMANodeID: 0},
+					4: {CoreID: 2, SocketID: 0, NUMANodeID: 0},
+					5: {CoreID: 2, SocketID: 0, NUMANodeID: 0},
+					6: {CoreID: 3, SocketID: 0, NUMANodeID: 0},
+					7: {CoreID: 3, SocketID: 0, NUMANodeID: 0},
+				},
+			},
+			availableCPUs: cpuset.New(0, 2, 3, 4, 6, 7),
+			expect:        []int{0, 4, 2, 6, 3, 7},
+		},
+		// Synthetic topology: 3 threads per core is not common hardware; validates multi-thread spread.
+		{
+			description: "more than two CPUs per core",
+			topo: &topology.CPUTopology{
+				NumCPUs:    9,
+				NumSockets: 1,
+				NumCores:   3,
+				CPUDetails: map[int]topology.CPUInfo{
+					0: {CoreID: 0, SocketID: 0, NUMANodeID: 0},
+					1: {CoreID: 0, SocketID: 0, NUMANodeID: 0},
+					2: {CoreID: 0, SocketID: 0, NUMANodeID: 0},
+					3: {CoreID: 1, SocketID: 0, NUMANodeID: 0},
+					4: {CoreID: 1, SocketID: 0, NUMANodeID: 0},
+					5: {CoreID: 1, SocketID: 0, NUMANodeID: 0},
+					6: {CoreID: 2, SocketID: 0, NUMANodeID: 0},
+					7: {CoreID: 2, SocketID: 0, NUMANodeID: 0},
+					8: {CoreID: 2, SocketID: 0, NUMANodeID: 0},
+				},
+			},
+			availableCPUs: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7, 8),
+			expect:        []int{0, 3, 6, 1, 4, 7, 2, 5, 8},
+		},
+		// Synthetic topology: multi-NUMA per socket, shows spread ignores NUMA hierarchy and still round-robins per core within each socket.
+		{
+			description: "spread across multi-NUMA sockets round-robins per core",
+			topo: &topology.CPUTopology{
+				NumCPUs:      8,
+				NumSockets:   2,
+				NumCores:     4,
+				NumNUMANodes: 4,
+				CPUDetails: map[int]topology.CPUInfo{
+					0: {CoreID: 0, SocketID: 0, NUMANodeID: 0},
+					1: {CoreID: 0, SocketID: 0, NUMANodeID: 0},
+					2: {CoreID: 1, SocketID: 0, NUMANodeID: 1},
+					3: {CoreID: 1, SocketID: 0, NUMANodeID: 1},
+					4: {CoreID: 2, SocketID: 1, NUMANodeID: 2},
+					5: {CoreID: 2, SocketID: 1, NUMANodeID: 2},
+					6: {CoreID: 3, SocketID: 1, NUMANodeID: 3},
+					7: {CoreID: 3, SocketID: 1, NUMANodeID: 3},
+				},
+			},
+			availableCPUs: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7),
+			expect:        []int{0, 2, 1, 3, 4, 6, 5, 7},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			acc := newCPUAccumulator(logger, tc.topo, tc.availableCPUs, 0, CPUSortingStrategySpread)
+			result := acc.freeCPUs()
+			if !reflect.DeepEqual(result, tc.expect) {
+				t.Errorf("expected %v to equal %v", result, tc.expect)
+			}
+		})
+	}
+}
+
+func TestSortAvailableUncoreCaches(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	testCases := []struct {
+		description   string
+		topo          *topology.CPUTopology
+		availableCPUs cpuset.CPUSet
+		expect        []int
+	}{
+		{
+			description:   "topology with 1 (default) uncore cache, 0 cpus reserved",
+			topo:          topoDualSocketMultiNumaPerSocketHT,
+			availableCPUs: mustParseCPUSet(t, "0-79"),
+			expect:        []int{0},
+		},
+		{
+			description:   "topology with 2 uncore caches, multi numa per uncore, 2 cpus reserved",
+			topo:          topoDualSocketSubNumaPerSocketHTMonolithicUncore,
+			availableCPUs: mustParseCPUSet(t, "1-119,121-239"), // two cpu(s) from uncore0 reserved
+			expect:        []int{0, 1},
+		},
+		{
+			description:   "topology with 24 uncore caches, single numa per uncore, 3 cpus reserved",
+			topo:          topoDualSocketSingleNumaPerSocketSMTUncore,
+			availableCPUs: mustParseCPUSet(t, "0-90,92-151,153-282,284-383"), // two cpu(s) from uncore11 and one from uncore19 reserved
+			expect:        []int{11, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 19, 12, 13, 14, 15, 16, 17, 18, 20, 21, 22, 23},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			acc := newCPUAccumulator(logger, tc.topo, tc.availableCPUs, 0, CPUSortingStrategyPacked)
+			result := acc.sortAvailableUncoreCaches()
 			if !reflect.DeepEqual(result, tc.expect) {
 				t.Errorf("expected %v to equal %v", result, tc.expect)
 			}
@@ -676,6 +902,15 @@ func TestTakeByTopologyNUMAPacked(t *testing.T) {
 			"",
 			mustParseCPUSet(t, "0-29,40-69,30,31,70,71"),
 		},
+		{
+			"allocate 2 cpus from non-uniform topology with 1 cpu reserved",
+			topoSingleSocketSingleNumaPerSocketPCoreHTECoreST,
+			StaticPolicyOptions{},
+			mustParseCPUSet(t, "1-27"), // 0 is reserved
+			2,
+			"",
+			mustParseCPUSet(t, "16-17"),
+		},
 		// Test cases for PreferAlignByUncoreCache
 		{
 			"take cpus from two full UncoreCaches and partial from a single UncoreCache",
@@ -851,7 +1086,7 @@ func TestTakeByTopologyWithSpreadPhysicalCPUsPreferredOption(t *testing.T) {
 			mustParseCPUSet(t, "0-287"),
 			12,
 			"",
-			mustParseCPUSet(t, "0-2,9-10,13-14,21-22,25-26,33"),
+			cpuset.New(0, 50, 57, 58, 71, 72, 79, 80, 87, 88, 95, 96),
 		},
 	}
 
@@ -873,6 +1108,7 @@ func TestTakeByTopologyWithSpreadPhysicalCPUsPreferredOption(t *testing.T) {
 type takeByTopologyExtendedTestCase struct {
 	description   string
 	topo          *topology.CPUTopology
+	opts          StaticPolicyOptions
 	availableCPUs cpuset.CPUSet
 	numCPUs       int
 	cpuGroupSize  int
@@ -888,6 +1124,7 @@ func commonTakeByTopologyExtendedTestCases(t *testing.T) []takeByTopologyExtende
 		extendedTestCases = append(extendedTestCases, takeByTopologyExtendedTestCase{
 			tc.description,
 			tc.topo,
+			tc.opts,
 			tc.availableCPUs,
 			tc.numCPUs,
 			1,
@@ -900,6 +1137,7 @@ func commonTakeByTopologyExtendedTestCases(t *testing.T) []takeByTopologyExtende
 		{
 			"allocate 4 full cores with 2 distributed across each NUMA node",
 			topoDualSocketHT,
+			StaticPolicyOptions{},
 			mustParseCPUSet(t, "0-11"),
 			8,
 			1,
@@ -909,6 +1147,7 @@ func commonTakeByTopologyExtendedTestCases(t *testing.T) []takeByTopologyExtende
 		{
 			"allocate 32 full cores with 8 distributed across each NUMA node",
 			topoDualSocketMultiNumaPerSocketHT,
+			StaticPolicyOptions{},
 			mustParseCPUSet(t, "0-79"),
 			64,
 			1,
@@ -918,6 +1157,7 @@ func commonTakeByTopologyExtendedTestCases(t *testing.T) []takeByTopologyExtende
 		{
 			"allocate 24 full cores with 8 distributed across the first 3 NUMA nodes",
 			topoDualSocketMultiNumaPerSocketHT,
+			StaticPolicyOptions{},
 			mustParseCPUSet(t, "0-79"),
 			48,
 			1,
@@ -927,6 +1167,7 @@ func commonTakeByTopologyExtendedTestCases(t *testing.T) []takeByTopologyExtende
 		{
 			"allocate 24 full cores with 8 distributed across the first 3 NUMA nodes (taking all but 2 from the first NUMA node)",
 			topoDualSocketMultiNumaPerSocketHT,
+			StaticPolicyOptions{},
 			mustParseCPUSet(t, "1-29,32-39,41-69,72-79"),
 			48,
 			1,
@@ -936,6 +1177,7 @@ func commonTakeByTopologyExtendedTestCases(t *testing.T) []takeByTopologyExtende
 		{
 			"allocate 24 full cores with 8 distributed across the last 3 NUMA nodes (even though all 8 could be allocated from the first NUMA node)",
 			topoDualSocketMultiNumaPerSocketHT,
+			StaticPolicyOptions{},
 			mustParseCPUSet(t, "2-29,31-39,42-69,71-79"),
 			48,
 			1,
@@ -945,6 +1187,7 @@ func commonTakeByTopologyExtendedTestCases(t *testing.T) []takeByTopologyExtende
 		{
 			"allocate 8 full cores with 2 distributed across each NUMA node",
 			topoDualSocketMultiNumaPerSocketHT,
+			StaticPolicyOptions{},
 			mustParseCPUSet(t, "0-2,10-12,20-22,30-32,40-41,50-51,60-61,70-71"),
 			16,
 			1,
@@ -954,6 +1197,7 @@ func commonTakeByTopologyExtendedTestCases(t *testing.T) []takeByTopologyExtende
 		{
 			"allocate 8 full cores with 2 distributed across each NUMA node",
 			topoDualSocketMultiNumaPerSocketHT,
+			StaticPolicyOptions{},
 			mustParseCPUSet(t, "0-2,10-12,20-22,30-32,40-41,50-51,60-61,70-71"),
 			16,
 			1,
@@ -972,6 +1216,7 @@ func TestTakeByTopologyNUMADistributed(t *testing.T) {
 		{
 			"take one cpu from dual socket with HT - core from Socket 0",
 			topoDualSocketHT,
+			StaticPolicyOptions{},
 			cpuset.New(1, 2, 3, 4, 5, 7, 8, 9, 10, 11),
 			1,
 			1,
@@ -981,6 +1226,7 @@ func TestTakeByTopologyNUMADistributed(t *testing.T) {
 		{
 			"take one cpu from dual socket with HT - core from Socket 0 - cpuGroupSize 2",
 			topoDualSocketHT,
+			StaticPolicyOptions{},
 			cpuset.New(1, 2, 3, 4, 5, 7, 8, 9, 10, 11),
 			1,
 			2,
@@ -990,6 +1236,7 @@ func TestTakeByTopologyNUMADistributed(t *testing.T) {
 		{
 			"allocate 13 full cores distributed across the first 2 NUMA nodes",
 			topoDualSocketMultiNumaPerSocketHT,
+			StaticPolicyOptions{},
 			mustParseCPUSet(t, "0-79"),
 			26,
 			1,
@@ -999,6 +1246,7 @@ func TestTakeByTopologyNUMADistributed(t *testing.T) {
 		{
 			"allocate 13 full cores distributed across the first 2 NUMA nodes (cpuGroupSize 2)",
 			topoDualSocketMultiNumaPerSocketHT,
+			StaticPolicyOptions{},
 			mustParseCPUSet(t, "0-79"),
 			26,
 			2,
@@ -1008,6 +1256,7 @@ func TestTakeByTopologyNUMADistributed(t *testing.T) {
 		{
 			"allocate 31 full cores with 15 CPUs distributed across each NUMA node and 1 CPU spilling over to each of NUMA 0, 1",
 			topoDualSocketMultiNumaPerSocketHT,
+			StaticPolicyOptions{},
 			mustParseCPUSet(t, "0-79"),
 			62,
 			1,
@@ -1017,6 +1266,7 @@ func TestTakeByTopologyNUMADistributed(t *testing.T) {
 		{
 			"allocate 31 full cores with 14 CPUs distributed across each NUMA node and 2 CPUs spilling over to each of NUMA 0, 1, 2 (cpuGroupSize 2)",
 			topoDualSocketMultiNumaPerSocketHT,
+			StaticPolicyOptions{},
 			mustParseCPUSet(t, "0-79"),
 			62,
 			2,
@@ -1026,6 +1276,7 @@ func TestTakeByTopologyNUMADistributed(t *testing.T) {
 		{
 			"allocate 31 full cores with 15 CPUs distributed across each NUMA node and 1 CPU spilling over to each of NUMA 2, 3 (to keep balance)",
 			topoDualSocketMultiNumaPerSocketHT,
+			StaticPolicyOptions{},
 			mustParseCPUSet(t, "0-8,10-18,20-39,40-48,50-58,60-79"),
 			62,
 			1,
@@ -1035,6 +1286,7 @@ func TestTakeByTopologyNUMADistributed(t *testing.T) {
 		{
 			"allocate 31 full cores with 14 CPUs distributed across each NUMA node and 2 CPUs spilling over to each of NUMA 0, 2, 3 (to keep balance with cpuGroupSize 2)",
 			topoDualSocketMultiNumaPerSocketHT,
+			StaticPolicyOptions{},
 			mustParseCPUSet(t, "0-8,10-18,20-39,40-48,50-58,60-79"),
 			62,
 			2,
@@ -1044,6 +1296,7 @@ func TestTakeByTopologyNUMADistributed(t *testing.T) {
 		{
 			"ensure bestRemainder chosen with NUMA nodes that have enough CPUs to satisfy the request",
 			topoDualSocketMultiNumaPerSocketHT,
+			StaticPolicyOptions{},
 			mustParseCPUSet(t, "0-3,10-13,20-23,30-36,40-43,50-53,60-63,70-76"),
 			34,
 			1,
@@ -1053,17 +1306,63 @@ func TestTakeByTopologyNUMADistributed(t *testing.T) {
 		{
 			"ensure previous failure encountered on live machine has been fixed (1/1)",
 			topoDualSocketMultiNumaPerSocketHTLarge,
+			StaticPolicyOptions{},
 			mustParseCPUSet(t, "0,128,30,31,158,159,43-47,171-175,62,63,190,191,75-79,203-207,94,96,222,223,101-111,229-239,126,127,254,255"),
 			28,
 			1,
 			"",
 			mustParseCPUSet(t, "43-47,75-79,96,101-105,171-174,203-206,229-232"),
 		},
+		// availableCPUs: Socket 0 has 126 CPUs, Socket 1 has 126 CPUs
+		// Socket 0: NUMA 0: CPU 0-15, 128-143   (32 CPUs);  NUMA 1: CPU 16-31, 144-159   (32 CPUs)
+		//           NUMA 2: CPU 32-47, 160-175  (32 CPUs);  NUMA 3: CPU 48-62, 176-190   (30 CPUs)
+		// Socket 1: NUMA 4: CPU 64-79, 192-207  (32 CPUs);  NUMA 5: CPU 80-95, 208-223   (32 CPUs)
+		//           NUMA 6: CPU 96-111, 224-239 (32 CPUs);  NUMA 7: CPU 112-126, 240-254 (30 CPUs)
+		//
+		// expResult: 120 CPUs from Socket 0 only (30 CPUs per NUMA × 4 NUMA nodes)
+		// Socket 0: NUMA 0: CPU 0-14, 128-142   (30 CPUs);  NUMA 1: CPU 16-30, 144-158   (30 CPUs)
+		//           NUMA 2: CPU 32-46, 160-174  (30 CPUs);  NUMA 3: CPU 48-62, 176-190   (30 CPUs)
+		//
+		// With AlignBySocket=true, should prefer NUMA nodes within the same socket.
+		// Without deep copy (bestCombo = combo), result will be wrong: CPUs from NUMA 0,1,3,6 (cross-socket)
+		// Fix: use deep copy bestCombo = append([]int(nil), combo...)
+		{
+			"distribute 120 CPUs across 4 NUMA nodes within same Socket 0, with AlignBySocket=true from dual socket multi-NUMA with HT (large)",
+			topoDualSocketMultiNumaPerSocketHTLarge,
+			StaticPolicyOptions{AlignBySocket: true},
+			mustParseCPUSet(t, "0-62,64-126,128-190,192-254"),
+			120,
+			1,
+			"",
+			mustParseCPUSet(t, "0-14,16-30,32-46,48-62,128-142,144-158,160-174,176-190"),
+		},
+		// availableCPUs: All 256 CPUs from both sockets
+		// Socket 0: NUMA 0: CPU 0-15, 128-143   (32 CPUs);  NUMA 1: CPU 16-31, 144-159   (32 CPUs)
+		//           NUMA 2: CPU 32-47, 160-175  (32 CPUs);  NUMA 3: CPU 48-63, 176-191   (32 CPUs)
+		// Socket 1: NUMA 4: CPU 64-79, 192-207  (32 CPUs);  NUMA 5: CPU 80-95, 208-223   (32 CPUs)
+		//           NUMA 6: CPU 96-111, 224-239 (32 CPUs);  NUMA 7: CPU 112-127, 240-255 (32 CPUs)
+		//
+		// expResult: 128 CPUs from Socket 0 only (full socket)
+		// Socket 0: CPU 0-63, 128-191 (all CPUs from NUMA 0,1,2,3)
+		//
+		// With AlignBySocket=true, should prefer NUMA nodes within the same socket.
+		// Without deep copy (bestCombo = combo), result will be wrong: CPUs from NUMA 0,1,2,7 (cross-socket)
+		// Fix: use deep copy bestCombo = append([]int(nil), combo...)
+		{
+			"distribute 128 CPUs across all NUMA nodes within same Socket 0 from dual socket multi-NUMA with HT (large)",
+			topoDualSocketMultiNumaPerSocketHTLarge,
+			StaticPolicyOptions{AlignBySocket: true},
+			mustParseCPUSet(t, "0-255"),
+			128,
+			1,
+			"",
+			mustParseCPUSet(t, "0-63,128-191"),
+		},
 	}...)
 
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
-			result, err := takeByTopologyNUMADistributed(logger, tc.topo, tc.availableCPUs, tc.numCPUs, tc.cpuGroupSize, CPUSortingStrategyPacked)
+			result, err := takeByTopologyNUMADistributed(logger, tc.topo, tc.availableCPUs, tc.numCPUs, tc.cpuGroupSize, CPUSortingStrategyPacked, tc.opts.AlignBySocket, 0)
 			if err != nil {
 				if tc.expErr == "" {
 					t.Errorf("unexpected error [%v]", err)
@@ -1086,4 +1385,159 @@ func mustParseCPUSet(t *testing.T, s string) cpuset.CPUSet {
 		t.Errorf("parsing %q: %v", s, err)
 	}
 	return cpus
+}
+
+func TestTakeByTopologyNUMADistributedWithMinNUMAHint(t *testing.T) {
+	// This test verifies the fix for https://github.com/kubernetes/kubernetes/issues/139430
+	// When TopologyManager selects a 4-NUMA affinity (e.g., for GPU alignment),
+	// CPUManager should not shrink the allocation to fewer NUMA nodes even if
+	// fewer nodes could satisfy the CPU count.
+	logger, _ := ktesting.NewTestContext(t)
+
+	testCases := []struct {
+		description      string
+		topo             *topology.CPUTopology
+		availableCPUs    cpuset.CPUSet
+		numCPUs          int
+		cpuGroupSize     int
+		alignBySocket    bool
+		minNUMAsFromHint int
+		expNUMAs         cpuset.CPUSet // expected set of NUMA node IDs in result
+	}{
+		{
+			// 4 NUMA nodes, 20 CPUs each (80 total). Request 30 CPUs.
+			// Without hint: minNUMAs=2 (30 fits in 2 NUMAs of 20 each)
+			// With hint=4: must use all 4 NUMAs
+			description:      "30 CPUs with 4-NUMA hint should distribute across all 4 NUMAs",
+			topo:             topoDualSocketMultiNumaPerSocketHT,
+			availableCPUs:    mustParseCPUSet(t, "0-79"),
+			numCPUs:          30,
+			cpuGroupSize:     1,
+			minNUMAsFromHint: 4,
+			expNUMAs:         cpuset.New(0, 1, 2, 3),
+		},
+		{
+			// Same topology, no hint (0) → should use minimum NUMAs (2)
+			description:      "30 CPUs without hint should pack into minimum NUMAs",
+			topo:             topoDualSocketMultiNumaPerSocketHT,
+			availableCPUs:    mustParseCPUSet(t, "0-79"),
+			numCPUs:          30,
+			cpuGroupSize:     1,
+			minNUMAsFromHint: 0,
+			expNUMAs:         cpuset.New(0, 1),
+		},
+		{
+			// 4 NUMA hint but only need 10 CPUs (fits in 1 NUMA)
+			// hint=4 should still force 4-NUMA distribution
+			description:      "10 CPUs with 4-NUMA hint should distribute across all 4 NUMAs",
+			topo:             topoDualSocketMultiNumaPerSocketHT,
+			availableCPUs:    mustParseCPUSet(t, "0-79"),
+			numCPUs:          10,
+			cpuGroupSize:     1,
+			minNUMAsFromHint: 4,
+			expNUMAs:         cpuset.New(0, 1, 2, 3),
+		},
+		{
+			// Regression guard: hint exceeds available NUMA nodes (8 > 4).
+			// Should gracefully fall back to the original algorithm behavior
+			// (minimum NUMAs needed) without panicking or erroring.
+			description:      "hint exceeds max NUMAs should fallback to minimum (regression guard)",
+			topo:             topoDualSocketMultiNumaPerSocketHT,
+			availableCPUs:    mustParseCPUSet(t, "0-79"),
+			numCPUs:          30,
+			cpuGroupSize:     1,
+			minNUMAsFromHint: 8,
+			expNUMAs:         cpuset.New(0, 1),
+		},
+		{
+			// Regression guard: hint smaller than computed minNUMAs.
+			// 30 CPUs on 4x20 topology → minNUMAs=2. hint=1 is below that.
+			// Should NOT reduce below the computed minimum; keeps original behavior.
+			description:      "hint smaller than minNUMAs should not reduce distribution (regression guard)",
+			topo:             topoDualSocketMultiNumaPerSocketHT,
+			availableCPUs:    mustParseCPUSet(t, "0-79"),
+			numCPUs:          30,
+			cpuGroupSize:     1,
+			minNUMAsFromHint: 1,
+			expNUMAs:         cpuset.New(0, 1),
+		},
+		{
+			// cpuGroupSize=2 with 4-NUMA hint: verifies that CPU grouping
+			// constraint is compatible with NUMA hint enforcement.
+			// 20 CPUs with groups of 2 across 4 NUMAs → 5 CPUs per NUMA (valid).
+			description:      "cpuGroupSize=2 with 4-NUMA hint should distribute respecting group size",
+			topo:             topoDualSocketMultiNumaPerSocketHT,
+			availableCPUs:    mustParseCPUSet(t, "0-79"),
+			numCPUs:          20,
+			cpuGroupSize:     2,
+			minNUMAsFromHint: 4,
+			expNUMAs:         cpuset.New(0, 1, 2, 3),
+		},
+		{
+			// cpuGroupSize=2 without hint: should use minimum NUMAs.
+			// 20 CPUs with groups of 2 on 4x20 topology → fits in 1 NUMA.
+			description:      "cpuGroupSize=2 without hint should pack into minimum NUMAs",
+			topo:             topoDualSocketMultiNumaPerSocketHT,
+			availableCPUs:    mustParseCPUSet(t, "0-79"),
+			numCPUs:          20,
+			cpuGroupSize:     2,
+			minNUMAsFromHint: 0,
+			expNUMAs:         cpuset.New(0),
+		},
+		{
+			// alignBySocket=true with 4-NUMA hint: verifies that socket alignment
+			// is compatible with NUMA hint enforcement. Topology has 2 sockets
+			// with 2 NUMAs each; hint=4 means all NUMAs across both sockets.
+			description:      "alignBySocket=true with 4-NUMA hint should distribute across all NUMAs",
+			topo:             topoDualSocketMultiNumaPerSocketHT,
+			availableCPUs:    mustParseCPUSet(t, "0-79"),
+			numCPUs:          40,
+			cpuGroupSize:     1,
+			alignBySocket:    true,
+			minNUMAsFromHint: 4,
+			expNUMAs:         cpuset.New(0, 1, 2, 3),
+		},
+		{
+			// NUMA subset constraint: availableCPUs only contains CPUs from
+			// NUMA 1,2,3 (not NUMA 0). This simulates the real scenario where
+			// TopologyManager's alignedCPUs pre-filters the input pool to only
+			// the NUMA nodes selected by device affinity. With hint=3, the
+			// allocation should distribute across exactly NUMA 1, 2, 3 and
+			// must NOT allocate any CPU from NUMA 0 (which is not in the pool).
+			// This proves the NUMA-subset constraint is enforced by input
+			// filtering (alignedCPUs) rather than needing the full bitmask.
+			// Actual NUMA-CPU mapping for topoDualSocketMultiNumaPerSocketHT:
+			// NUMA 0: CPU 0-9, 40-49 (Socket 0)
+			// NUMA 1: CPU 10-19, 50-59 (Socket 0)
+			// NUMA 2: CPU 20-29, 60-69 (Socket 1)
+			// NUMA 3: CPU 30-39, 70-79 (Socket 1)
+			description:      "NUMA subset - hint=3 with CPUs only from NUMA 1,2,3 should not use NUMA 0",
+			topo:             topoDualSocketMultiNumaPerSocketHT,
+			availableCPUs:    mustParseCPUSet(t, "10-39,50-79"), // NUMA 1(10-19,50-59) + NUMA 2(20-29,60-69) + NUMA 3(30-39,70-79)
+			numCPUs:          15,
+			cpuGroupSize:     1,
+			minNUMAsFromHint: 3,
+			expNUMAs:         cpuset.New(1, 2, 3),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			result, err := takeByTopologyNUMADistributed(logger, tc.topo, tc.availableCPUs, tc.numCPUs, tc.cpuGroupSize, CPUSortingStrategyPacked, tc.alignBySocket, tc.minNUMAsFromHint)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			// Collect the set of NUMA node IDs represented in the result.
+			numaNodesBuilder := cpuset.New()
+			for _, cpuID := range result.UnsortedList() {
+				numaNodesBuilder = numaNodesBuilder.Union(cpuset.New(tc.topo.CPUDetails[cpuID].NUMANodeID))
+			}
+
+			if !numaNodesBuilder.Equals(tc.expNUMAs) {
+				t.Errorf("expected NUMA nodes %s, got %s (result CPUs: %s)",
+					tc.expNUMAs, numaNodesBuilder, result)
+			}
+		})
+	}
 }

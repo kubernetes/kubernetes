@@ -25,6 +25,7 @@ import (
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	networking "k8s.io/kubernetes/pkg/apis/networking"
 	registry "k8s.io/kubernetes/pkg/registry/networking/networkpolicy"
+	"k8s.io/kubernetes/test/declarative_validation/meta"
 )
 
 func TestDeclarativeValidateIPBlockCIDR(t *testing.T) {
@@ -34,6 +35,7 @@ func TestDeclarativeValidateIPBlockCIDR(t *testing.T) {
 			ctx := genericapirequest.WithRequestInfo(
 				genericapirequest.NewDefaultContext(),
 				&genericapirequest.RequestInfo{
+					APIPrefix:         "apis",
 					APIGroup:          "networking.k8s.io",
 					APIVersion:        apiVersion,
 					Resource:          "networkpolicies",
@@ -58,7 +60,7 @@ func TestDeclarativeValidateIPBlockCIDR(t *testing.T) {
 						field.Required(
 							field.NewPath("spec", "ingress").Index(0).Child("from").Index(0).Child("ipBlock", "cidr"),
 							"",
-						).MarkAlpha(),
+						).MarkBeta(),
 					},
 				},
 				"egress rule rejects empty CIDR in ipBlock": {
@@ -67,7 +69,7 @@ func TestDeclarativeValidateIPBlockCIDR(t *testing.T) {
 						field.Required(
 							field.NewPath("spec", "egress").Index(0).Child("to").Index(0).Child("ipBlock", "cidr"),
 							"",
-						).MarkAlpha(),
+						).MarkBeta(),
 					},
 				},
 			}
@@ -83,6 +85,9 @@ func TestDeclarativeValidateIPBlockCIDR(t *testing.T) {
 					)
 				})
 			}
+
+			obj := mkValidNetworkPolicy("ingress")
+			meta.RunObjectMetaTestCases(t, ctx, &obj, registry.Strategy, meta.WithStringentFinalizerValidation())
 		})
 	}
 }
@@ -90,6 +95,18 @@ func TestDeclarativeValidateIPBlockCIDR(t *testing.T) {
 func TestDeclarativeValidateIPBlockCIDRUpdate(t *testing.T) {
 	for _, apiVersion := range apiVersions {
 		t.Run(apiVersion, func(t *testing.T) {
+			ctx := genericapirequest.WithRequestInfo(
+				genericapirequest.NewDefaultContext(),
+				&genericapirequest.RequestInfo{
+					APIPrefix:         "apis",
+					APIGroup:          "networking.k8s.io",
+					APIVersion:        apiVersion,
+					Resource:          "networkpolicies",
+					Name:              "valid-network-policy",
+					IsResourceRequest: true,
+					Verb:              "update",
+				},
+			)
 			testCases := map[string]struct {
 				oldObj       networking.NetworkPolicy
 				updateObj    networking.NetworkPolicy
@@ -110,7 +127,7 @@ func TestDeclarativeValidateIPBlockCIDRUpdate(t *testing.T) {
 						field.Required(
 							field.NewPath("spec", "ingress").Index(0).Child("from").Index(0).Child("ipBlock", "cidr"),
 							"",
-						).MarkAlpha(),
+						).MarkBeta(),
 					},
 				},
 
@@ -121,26 +138,13 @@ func TestDeclarativeValidateIPBlockCIDRUpdate(t *testing.T) {
 						field.Required(
 							field.NewPath("spec", "egress").Index(0).Child("to").Index(0).Child("ipBlock", "cidr"),
 							"",
-						).MarkAlpha(),
+						).MarkBeta(),
 					},
 				},
 			}
 
 			for name, tc := range testCases {
 				t.Run(name, func(t *testing.T) {
-					ctx := genericapirequest.WithRequestInfo(
-						genericapirequest.NewDefaultContext(),
-						&genericapirequest.RequestInfo{
-							APIPrefix:         "apis",
-							APIGroup:          "networking.k8s.io",
-							APIVersion:        apiVersion,
-							Resource:          "networkpolicies",
-							Name:              "valid-network-policy",
-							IsResourceRequest: true,
-							Verb:              "update",
-						},
-					)
-
 					apitesting.VerifyUpdateValidationEquivalence(
 						t,
 						ctx,
@@ -151,6 +155,8 @@ func TestDeclarativeValidateIPBlockCIDRUpdate(t *testing.T) {
 					)
 				})
 			}
+			updateObj := mkValidNetworkPolicy("ingress")
+			meta.RunObjectMetaUpdateTestCases(t, ctx, &updateObj, registry.Strategy, meta.WithStringentFinalizerValidation())
 		})
 	}
 }

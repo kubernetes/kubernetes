@@ -126,16 +126,7 @@ func (l *baseList) Add(other ref.Val) ref.Val {
 	if !ok {
 		return MaybeNoSuchOverloadErr(other)
 	}
-	if l.Size() == IntZero {
-		return other
-	}
-	if otherList.Size() == IntZero {
-		return l
-	}
-	return &concatList{
-		Adapter:  l.Adapter,
-		prevList: l,
-		nextList: otherList}
+	return newConcatList(l.Adapter, l, otherList)
 }
 
 // Contains implements the traits.Container interface method.
@@ -353,9 +344,27 @@ func (l *mutableList) ToImmutableList() traits.Lister {
 // The `Adapter` enables native type to CEL type conversions.
 type concatList struct {
 	Adapter
-	value    any
-	prevList traits.Lister
-	nextList traits.Lister
+	value      any
+	prevList   traits.Lister
+	nextList   traits.Lister
+	cachedSize ref.Val
+}
+
+func newConcatList(adapter Adapter, prevList, nextList traits.Lister) ref.Val {
+	prevSize := prevList.Size().(Int)
+	nextSize := nextList.Size().(Int)
+	if prevSize == IntZero {
+		return nextList.(ref.Val)
+	}
+	if nextSize == IntZero {
+		return prevList.(ref.Val)
+	}
+	return &concatList{
+		Adapter:    adapter,
+		prevList:   prevList,
+		nextList:   nextList,
+		cachedSize: prevSize.Add(nextSize),
+	}
 }
 
 // Add implements the traits.Adder interface method.
@@ -364,16 +373,7 @@ func (l *concatList) Add(other ref.Val) ref.Val {
 	if !ok {
 		return MaybeNoSuchOverloadErr(other)
 	}
-	if l.Size() == IntZero {
-		return other
-	}
-	if otherList.Size() == IntZero {
-		return l
-	}
-	return &concatList{
-		Adapter:  l.Adapter,
-		prevList: l,
-		nextList: otherList}
+	return newConcatList(l.Adapter, l, otherList)
 }
 
 // Contains implements the traits.Container interface method.
@@ -477,7 +477,7 @@ func (l *concatList) Iterator() traits.Iterator {
 
 // Size implements the traits.Sizer interface method.
 func (l *concatList) Size() ref.Val {
-	return l.prevList.Size().(Int).Add(l.nextList.Size())
+	return l.cachedSize
 }
 
 // String converts the concatenated list to a human-readable string.

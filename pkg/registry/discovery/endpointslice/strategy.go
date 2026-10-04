@@ -33,14 +33,12 @@ import (
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage/names"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/apis/discovery"
 	"k8s.io/kubernetes/pkg/apis/discovery/validation"
 	endpointslicecontroller "k8s.io/kubernetes/pkg/controller/endpointslice"
 	endpointslicemirroringcontroller "k8s.io/kubernetes/pkg/controller/endpointslicemirroring"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 // endpointSliceStrategy implements verification logic for Replication.
@@ -140,37 +138,11 @@ func (endpointSliceStrategy) AllowUnconditionalUpdate(ctx context.Context) bool 
 }
 
 // dropDisabledConditionsOnCreate will drop any fields that are disabled.
-func dropDisabledFieldsOnCreate(endpointSlice *discovery.EndpointSlice) {
-	if utilfeature.DefaultFeatureGate.Enabled(features.PreferSameTrafficDistribution) {
-		return
-	}
-
-	for i := range endpointSlice.Endpoints {
-		if endpointSlice.Endpoints[i].Hints != nil {
-			endpointSlice.Endpoints[i].Hints.ForNodes = nil
-		}
-	}
-}
+func dropDisabledFieldsOnCreate(endpointSlice *discovery.EndpointSlice) {}
 
 // dropDisabledFieldsOnUpdate will drop any disable fields that have not already
 // been set on the EndpointSlice.
-func dropDisabledFieldsOnUpdate(oldEPS, newEPS *discovery.EndpointSlice) {
-	if utilfeature.DefaultFeatureGate.Enabled(features.PreferSameTrafficDistribution) {
-		return
-	}
-
-	for _, ep := range oldEPS.Endpoints {
-		if ep.Hints != nil && ep.Hints.ForNodes != nil {
-			return
-		}
-	}
-
-	for i := range newEPS.Endpoints {
-		if newEPS.Endpoints[i].Hints != nil {
-			newEPS.Endpoints[i].Hints.ForNodes = nil
-		}
-	}
-}
+func dropDisabledFieldsOnUpdate(oldEPS, newEPS *discovery.EndpointSlice) {}
 
 // dropTopologyOnV1 on V1 request wipes the DeprecatedTopology field  and copies
 // the NodeName value into DeprecatedTopology

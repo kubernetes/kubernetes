@@ -25,13 +25,13 @@ func Test(t *testing.T) {
 
 	st.Value(&Struct{
 		// All zero values
-	}).ExpectValidateFalseByPath(map[string][]string{
+	}).Opts(map[string]bool{"FeatureX": false}).ExpectValidateFalseByPath(map[string][]string{
 		"metadataDisabled.xDisabledField": {"field Struct.ObjectMetaDisabled.XDisabledField"},
 	})
 
 	st.Value(&Struct{
 		// All zero values
-	}).Opts([]string{"FeatureX"}).ExpectValidateFalseByPath(map[string][]string{
+	}).Opts(map[string]bool{"FeatureX": true}).ExpectValidateFalseByPath(map[string][]string{
 		"metadata.xEnabledField": {"field Struct.ObjectMeta.XEnabledField"},
 	})
 }
