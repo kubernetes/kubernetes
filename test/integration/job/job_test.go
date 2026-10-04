@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
 	"sort"
 	"strconv"
 	"strings"
@@ -33,13 +34,13 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	eventsv1 "k8s.io/api/events/v1"
-	schedulingv1alpha2 "k8s.io/api/scheduling/v1alpha2"
+	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
+	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
-	utilversion "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/util/feature"
@@ -57,6 +58,7 @@ import (
 	"k8s.io/klog/v2/ktesting"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	apischeduling "k8s.io/kubernetes/pkg/apis/scheduling"
 	"k8s.io/kubernetes/pkg/controller"
 	jobcontroller "k8s.io/kubernetes/pkg/controller/job"
 	"k8s.io/kubernetes/pkg/controller/job/metrics"
@@ -1066,55 +1068,12 @@ func TestDelayTerminalPhaseCondition(t *testing.T) {
 	}
 
 	testCases := map[string]struct {
-		enableJobManagedBy bool
-
 		job                batchv1.Job
 		action             func(context.Context, clientset.Interface, *batchv1.Job)
 		wantInterimStatus  *batchv1.JobStatus
 		wantTerminalStatus batchv1.JobStatus
 	}{
-		"job backoff limit exceeded; JobManagedBy disabled": {
-			job: batchv1.Job{
-				Spec: batchv1.JobSpec{
-					Parallelism:  ptr.To[int32](2),
-					Completions:  ptr.To[int32](2),
-					Template:     podTemplateSpec,
-					BackoffLimit: ptr.To[int32](0),
-				},
-			},
-			action: failOnePod,
-			wantInterimStatus: &batchv1.JobStatus{
-				Failed:      2,
-				Terminating: ptr.To[int32](1),
-				Ready:       ptr.To[int32](0),
-				Conditions: []batchv1.JobCondition{
-					{
-						Type:   batchv1.JobFailureTarget,
-						Status: v1.ConditionTrue,
-						Reason: batchv1.JobReasonBackoffLimitExceeded,
-					},
-				},
-			},
-			wantTerminalStatus: batchv1.JobStatus{
-				Failed:      2,
-				Ready:       ptr.To[int32](0),
-				Terminating: ptr.To[int32](0),
-				Conditions: []batchv1.JobCondition{
-					{
-						Type:   batchv1.JobFailureTarget,
-						Status: v1.ConditionTrue,
-						Reason: batchv1.JobReasonBackoffLimitExceeded,
-					},
-					{
-						Type:   batchv1.JobFailed,
-						Status: v1.ConditionTrue,
-						Reason: batchv1.JobReasonBackoffLimitExceeded,
-					},
-				},
-			},
-		},
-		"job backoff limit exceeded; JobManagedBy enabled": {
-			enableJobManagedBy: true,
+		"job backoff limit exceeded": {
 			job: batchv1.Job{
 				Spec: batchv1.JobSpec{
 					Parallelism:  ptr.To[int32](2),
@@ -1154,53 +1113,7 @@ func TestDelayTerminalPhaseCondition(t *testing.T) {
 				},
 			},
 		},
-		"job scale down to meet completions; JobManagedBy disabled": {
-			job: batchv1.Job{
-				Spec: batchv1.JobSpec{
-					Parallelism:    ptr.To[int32](2),
-					Completions:    ptr.To[int32](2),
-					CompletionMode: ptr.To(batchv1.IndexedCompletion),
-					Template:       podTemplateSpec,
-				},
-			},
-			action: succeedOnePodAndScaleDown,
-			wantInterimStatus: &batchv1.JobStatus{
-				Succeeded:        1,
-				Ready:            ptr.To[int32](0),
-				Terminating:      ptr.To[int32](1),
-				CompletedIndexes: "0",
-				Conditions: []batchv1.JobCondition{
-					{
-						Type:    batchv1.JobSuccessCriteriaMet,
-						Status:  v1.ConditionTrue,
-						Reason:  batchv1.JobReasonCompletionsReached,
-						Message: "Reached expected number of succeeded pods",
-					},
-				},
-			},
-			wantTerminalStatus: batchv1.JobStatus{
-				Succeeded:        1,
-				Ready:            ptr.To[int32](0),
-				Terminating:      ptr.To[int32](0),
-				CompletedIndexes: "0",
-				Conditions: []batchv1.JobCondition{
-					{
-						Type:    batchv1.JobSuccessCriteriaMet,
-						Status:  v1.ConditionTrue,
-						Reason:  batchv1.JobReasonCompletionsReached,
-						Message: "Reached expected number of succeeded pods",
-					},
-					{
-						Type:    batchv1.JobComplete,
-						Status:  v1.ConditionTrue,
-						Reason:  batchv1.JobReasonCompletionsReached,
-						Message: "Reached expected number of succeeded pods",
-					},
-				},
-			},
-		},
-		"job scale down to meet completions; JobManagedBy enabled": {
-			enableJobManagedBy: true,
+		"job scale down to meet completions": {
 			job: batchv1.Job{
 				Spec: batchv1.JobSpec{
 					Parallelism:    ptr.To[int32](2),
@@ -1252,13 +1165,6 @@ func TestDelayTerminalPhaseCondition(t *testing.T) {
 	for name, test := range testCases {
 		t.Run(name, func(t *testing.T) {
 			resetMetrics()
-			if !test.enableJobManagedBy {
-				// TODO: this will be removed in 1.38.
-				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, feature.DefaultFeatureGate, utilversion.MustParse("1.34"))
-			}
-			featuregatetesting.SetFeatureGatesDuringTest(t, feature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-				features.JobManagedBy: test.enableJobManagedBy,
-			})
 
 			ctx, cancel := startJobControllerAndWaitForCaches(t, restConfig)
 			t.Cleanup(cancel)
@@ -1708,7 +1614,7 @@ func TestBackoffLimitPerIndex(t *testing.T) {
 
 // TestManagedBy verifies the Job controller correctly makes a decision to
 // reconcile or skip reconciliation of the Job depending on the Job's managedBy
-// field, and the enablement of the JobManagedBy feature gate.
+// field.
 func TestManagedBy(t *testing.T) {
 	const blockDeletionFinalizerForTest string = "fake.example.com/blockDeletion"
 	customControllerName := "example.com/custom-job-controller"
@@ -1723,13 +1629,11 @@ func TestManagedBy(t *testing.T) {
 		},
 	}
 	testCases := map[string]struct {
-		enableJobManagedBy                     bool
 		job                                    batchv1.Job
 		wantReconciledByBuiltInController      bool
 		wantJobByExternalControllerTotalMetric metricLabelsWithValue
 	}{
 		"the Job controller reconciles jobs without the managedBy": {
-			enableJobManagedBy: true,
 			job: batchv1.Job{
 				Spec: batchv1.JobSpec{
 					Template: podTemplateSpec,
@@ -1745,7 +1649,6 @@ func TestManagedBy(t *testing.T) {
 			},
 		},
 		"the Job controller reconciles jobs with the well known value of the managedBy field": {
-			enableJobManagedBy: true,
 			job: batchv1.Job{
 				Spec: batchv1.JobSpec{
 					Template:  podTemplateSpec,
@@ -1758,22 +1661,7 @@ func TestManagedBy(t *testing.T) {
 				Value:  0,
 			},
 		},
-		"the Job controller reconciles an unsuspended with the custom value of managedBy; feature disabled": {
-			enableJobManagedBy: false,
-			job: batchv1.Job{
-				Spec: batchv1.JobSpec{
-					Template:  podTemplateSpec,
-					ManagedBy: ptr.To(customControllerName),
-				},
-			},
-			wantReconciledByBuiltInController: true,
-			wantJobByExternalControllerTotalMetric: metricLabelsWithValue{
-				Labels: []string{customControllerName},
-				Value:  0,
-			},
-		},
 		"the Job controller does not reconcile an unsuspended with the custom value of managedBy": {
-			enableJobManagedBy: true,
 			job: batchv1.Job{
 				Spec: batchv1.JobSpec{
 					Suspend:   ptr.To(false),
@@ -1788,7 +1676,6 @@ func TestManagedBy(t *testing.T) {
 			},
 		},
 		"the Job controller does not reconcile a suspended with the custom value of managedBy": {
-			enableJobManagedBy: true,
 			job: batchv1.Job{
 				Spec: batchv1.JobSpec{
 					Suspend:   ptr.To(true),
@@ -1808,10 +1695,6 @@ func TestManagedBy(t *testing.T) {
 	t.Cleanup(closeFn)
 	for name, test := range testCases {
 		t.Run(name, func(t *testing.T) {
-			// TODO: this will be removed in 1.38.
-			featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, feature.DefaultFeatureGate, utilversion.MustParse("1.34"))
-			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobManagedBy, test.enableJobManagedBy)
-
 			ctx, cancel := startJobControllerAndWaitForCaches(t, restConfig)
 			t.Cleanup(cancel)
 
@@ -1852,108 +1735,6 @@ func TestManagedBy(t *testing.T) {
 			}
 		})
 	}
-}
-
-// TestManagedBy_Reenabling verifies handling a Job with a custom value of the
-// managedBy field by the Job controller, as the JobManagedBy feature gate is
-// disabled and reenabled again. First, when the feature gate is enabled, the
-// synchronization is skipped, when it is disabled the synchronization is starts,
-// and is disabled again with re-enabling of the feature gate.
-func TestManagedBy_Reenabling(t *testing.T) {
-	customControllerName := "example.com/custom-job-controller"
-	// TODO: this will be removed in 1.38.
-	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, feature.DefaultFeatureGate, utilversion.MustParse("1.34"))
-	featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobManagedBy, true)
-
-	closeFn, restConfig, clientSet, ns := setup(t, "managed-by-reenabling")
-	t.Cleanup(closeFn)
-	ctx, cancel := startJobControllerAndWaitForCaches(t, restConfig)
-	t.Cleanup(func() {
-		cancel()
-	})
-	resetMetrics()
-
-	baseJob := batchv1.Job{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "custom-job-test",
-			Namespace: ns.Name,
-		},
-		Spec: batchv1.JobSpec{
-			Completions: ptr.To[int32](1),
-			Parallelism: ptr.To[int32](1),
-			Template: v1.PodTemplateSpec{
-				Spec: v1.PodSpec{
-					Containers: []v1.Container{
-						{
-							Name:  "main-container",
-							Image: "foo",
-						},
-					},
-				},
-			},
-			ManagedBy: &customControllerName,
-		},
-	}
-	jobObj, err := createJobWithDefaults(ctx, clientSet, ns.Name, &baseJob)
-	if err != nil {
-		t.Fatalf("Error %v when creating the job %q", err, klog.KObj(jobObj))
-	}
-	jobClient := clientSet.BatchV1().Jobs(jobObj.Namespace)
-
-	validateCounterMetric(ctx, t, metrics.JobByExternalControllerTotal, metricLabelsWithValue{
-		Labels: []string{customControllerName},
-		Value:  1,
-	})
-
-	time.Sleep(sleepDurationForControllerLatency)
-	jobObj, err = jobClient.Get(ctx, jobObj.Name, metav1.GetOptions{})
-	if err != nil {
-		t.Fatalf("Error %v when getting the latest job %v", err, klog.KObj(jobObj))
-	}
-	if diff := cmp.Diff(batchv1.JobStatus{}, jobObj.Status); diff != "" {
-		t.Fatalf("Unexpected status (-want/+got): %s", diff)
-	}
-
-	// Disable the feature gate and restart the controller
-	featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobManagedBy, false)
-	cancel()
-	resetMetrics()
-	ctx, cancel = startJobControllerAndWaitForCaches(t, restConfig)
-
-	// Verify the built-in controller reconciles the Job
-	validateJobsPodsStatusOnly(ctx, t, clientSet, jobObj, "", podsByStatus{
-		Active:      1,
-		Ready:       ptr.To[int32](0),
-		Terminating: ptr.To[int32](0),
-	})
-
-	validateCounterMetric(ctx, t, metrics.JobByExternalControllerTotal, metricLabelsWithValue{
-		Labels: []string{customControllerName},
-		Value:  0,
-	})
-
-	// Reenable the feature gate and restart the controller
-	featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobManagedBy, true)
-	cancel()
-	resetMetrics()
-	ctx, cancel = startJobControllerAndWaitForCaches(t, restConfig)
-
-	// Marking the pod as finished, but it does not result in updating of the Job status.
-	if _, err := setJobPodsPhase(ctx, clientSet, jobObj, v1.PodSucceeded, 1); err != nil {
-		t.Fatalf("Error %v when setting phase %s on the pod of job %v", err, v1.PodSucceeded, klog.KObj(jobObj))
-	}
-
-	validateCounterMetric(ctx, t, metrics.JobByExternalControllerTotal, metricLabelsWithValue{
-		Labels: []string{customControllerName},
-		Value:  1,
-	})
-
-	time.Sleep(sleepDurationForControllerLatency)
-	validateJobsPodsStatusOnly(ctx, t, clientSet, jobObj, "", podsByStatus{
-		Active:      1,
-		Ready:       ptr.To[int32](0),
-		Terminating: ptr.To[int32](0),
-	})
 }
 
 // TestImmediateJobRecreation verifies that the replacement Job creates the Pods
@@ -2053,6 +1834,133 @@ func TestImmediateJobRecreation(t *testing.T) {
 	}
 }
 
+// TestJobRecreationClearsPodExpectations verifies that a replacement Job is
+// reconciled after the old Job leaves a pending Pod creation expectation. The
+// test blocks the old Pod POST, replaces the Job, waits for the informer to
+// observe the replacement UID, releases the POST, and verifies reconciliation.
+func TestJobRecreationClearsPodExpectations(t *testing.T) {
+	baseJob := batchv1.Job{
+		ObjectMeta: metav1.ObjectMeta{Name: "test-job"},
+		Spec: batchv1.JobSpec{
+			Completions: ptr.To[int32](1),
+			Parallelism: ptr.To[int32](1),
+		},
+	}
+	suspendedJob := baseJob.DeepCopy()
+	suspendedJob.Spec.Suspend = new(true)
+	unsuspendedJob := baseJob.DeepCopy()
+	unsuspendedJob.Spec.Suspend = new(false)
+	tests := map[string]struct {
+		baseJob            batchv1.Job
+		replacementJob     batchv1.Job
+		wantConditionTypes []batchv1.JobConditionType
+		wantPodsStatus     podsByStatus
+	}{
+		"suspended replacement": {
+			baseJob:            *baseJob.DeepCopy(),
+			replacementJob:     *suspendedJob,
+			wantConditionTypes: []batchv1.JobConditionType{batchv1.JobSuspended},
+			wantPodsStatus: podsByStatus{
+				Ready:       ptr.To[int32](0),
+				Terminating: ptr.To[int32](0),
+			},
+		},
+		"unsuspended replacement": {
+			baseJob:        *baseJob.DeepCopy(),
+			replacementJob: *unsuspendedJob,
+			wantPodsStatus: podsByStatus{
+				Active:      1,
+				Ready:       ptr.To[int32](0),
+				Terminating: ptr.To[int32](0),
+			},
+		},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			testJobRecreationClearsPodExpectations(t, tc.baseJob, tc.replacementJob, tc.wantConditionTypes, tc.wantPodsStatus)
+		})
+	}
+}
+
+func testJobRecreationClearsPodExpectations(t *testing.T, baseJob, replacementJob batchv1.Job, wantConditionTypes []batchv1.JobConditionType, wantPodsStatus podsByStatus) {
+	closeFn, restConfig, clientSet, ns := setup(t, "recreate-job-expectations")
+	t.Cleanup(closeFn)
+
+	// Phase 1: Block the old Job's Pod POST after its expectation is recorded.
+	podCreateStarted := make(chan struct{})
+	allowPodCreate := make(chan struct{})
+	var blockOnce sync.Once
+	restConfig.WrapTransport = func(rt http.RoundTripper) http.RoundTripper {
+		return roundTripperFunc(func(req *http.Request) (*http.Response, error) {
+			if req.Method == http.MethodPost && strings.HasSuffix(req.URL.Path, "/pods") {
+				blockOnce.Do(func() {
+					close(podCreateStarted)
+					<-allowPodCreate
+				})
+			}
+			return rt.RoundTrip(req)
+		})
+	}
+	t.Cleanup(func() {
+		select {
+		case <-allowPodCreate:
+		default:
+			close(allowPodCreate)
+		}
+	})
+
+	informerSet := informers.NewSharedInformerFactoryWithOptions(clientset.NewForConfigOrDie(restclient.AddUserAgent(restConfig, "job-informers")), 0)
+	jc, ctx, cancel := createJobControllerWithSharedInformers(t, restConfig, informerSet)
+	t.Cleanup(cancel)
+	informerSet.Start(ctx.Done())
+	go jc.Run(ctx, 1)
+	informerSet.WaitForCacheSync(ctx.Done())
+
+	baseJob.Namespace = ns.Name
+	oldJob, err := createJobWithDefaults(ctx, clientSet, ns.Name, &baseJob)
+	if err != nil {
+		t.Fatalf("Failed to create Job: %v", err)
+	}
+
+	select {
+	case <-podCreateStarted:
+	case <-time.After(wait.ForeverTestTimeout):
+		t.Fatal("Timed out waiting for the old Job's Pod creation to start")
+	}
+
+	// Phase 2: Replace the Job and wait for the informer to observe its new UID.
+	jobClient := clientSet.BatchV1().Jobs(ns.Name)
+	if err := jobClient.Delete(ctx, oldJob.Name, metav1.DeleteOptions{PropagationPolicy: ptr.To(metav1.DeletePropagationBackground)}); err != nil {
+		t.Fatalf("Failed to delete old Job: %v", err)
+	}
+	replacementJob.Namespace = ns.Name
+	newJob, err := createJobWithDefaults(ctx, clientSet, ns.Name, &replacementJob)
+	if err != nil {
+		t.Fatalf("Failed to create replacement Job: %v", err)
+	}
+
+	err = wait.PollUntilContextTimeout(ctx, 10*time.Millisecond, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
+		cachedJob, err := informerSet.Batch().V1().Jobs().Lister().Jobs(ns.Name).Get(newJob.Name)
+		return err == nil && cachedJob.UID == newJob.UID, nil
+	})
+	if err != nil {
+		t.Fatalf("Timed out waiting for the informer to observe the replacement Job: %v", err)
+	}
+	close(allowPodCreate)
+
+	// Phase 3: Verify the replacement is reconciled after the old POST completes.
+	for _, conditionType := range wantConditionTypes {
+		validateJobCondition(ctx, t, clientSet, newJob, conditionType)
+	}
+	validateJobsPodsStatusOnlyWithTimeout(ctx, t, clientSet, newJob, "after recreation", wantPodsStatus, 5*time.Second)
+}
+
+type roundTripperFunc func(*http.Request) (*http.Response, error)
+
+func (f roundTripperFunc) RoundTrip(req *http.Request) (*http.Response, error) {
+	return f(req)
+}
+
 // TestManagedBy_RecreatedJob verifies that the Job controller skips
 // reconciliation of a job with managedBy field, when this is a recreated job,
 // and there is still a pending sync queued for the previous job.
@@ -2063,8 +1971,6 @@ func TestImmediateJobRecreation(t *testing.T) {
 // on the new job, but is skipped.
 func TestManagedBy_RecreatedJob(t *testing.T) {
 	customControllerName := "example.com/custom-job-controller"
-	featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobManagedBy, true)
-
 	closeFn, restConfig, clientSet, ns := setup(t, "managed-by-recreate-job")
 	t.Cleanup(closeFn)
 	ctx, cancel := startJobControllerAndWaitForCaches(t, restConfig)
@@ -2144,8 +2050,6 @@ func TestManagedBy_RecreatedJob(t *testing.T) {
 // when one forks the controller and does not rename the finalizer.
 func TestManagedBy_UsingReservedJobFinalizers(t *testing.T) {
 	customControllerName := "example.com/custom-job-controller"
-	featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobManagedBy, true)
-
 	closeFn, restConfig, clientSet, ns := setup(t, "managed-by-reserved-finalizers")
 	t.Cleanup(closeFn)
 	ctx, cancel := startJobControllerAndWaitForCaches(t, restConfig)
@@ -3638,8 +3542,6 @@ func TestSuspendJob(t *testing.T) {
 // TestStartTimeUpdateOnResume verifies that the job controller can update startTime
 // when resuming a suspended job (https://github.com/kubernetes/kubernetes/issues/134521).
 func TestStartTimeUpdateOnResume(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobManagedBy, true)
-
 	closeFn, restConfig, clientSet, ns := setup(t, "suspend-starttime-validation")
 	t.Cleanup(closeFn)
 	ctx, cancel := startJobControllerAndWaitForCaches(t, restConfig)
@@ -4256,6 +4158,79 @@ func TestMutableSchedulingDirectivesForSuspendedJobs(t *testing.T) {
 	}
 }
 
+// TestMutableSchedulingDirectivesForSuspendedJobsNotYetStarted verifies that
+// scheduling directives can be mutated on a suspended Job that has never started,
+// even before the JobSuspended condition is set by the job controller.
+func TestMutableSchedulingDirectivesForSuspendedJobsNotYetStarted(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.MutableSchedulingDirectivesForSuspendedJobs, true)
+
+	closeFn, restConfig, clientSet, ns := setup(t, "mutable-scheduling-directives-not-started")
+	t.Cleanup(closeFn)
+	ctx, cancel := startJobControllerAndWaitForCaches(t, restConfig)
+	t.Cleanup(cancel)
+
+	// Create a suspended Job.
+	job, err := createJobWithDefaults(ctx, clientSet, ns.Name, &batchv1.Job{
+		Spec: batchv1.JobSpec{
+			Parallelism: ptr.To[int32](1),
+			Completions: ptr.To[int32](1),
+			Suspend:     ptr.To(true),
+		},
+	})
+	if err != nil {
+		t.Fatalf("Failed to create Job: %v", err)
+	}
+
+	// Immediately update the nodeSelector without waiting for the JobSuspended
+	// condition to be set. This simulates external controllers (e.g. MultiKueue)
+	// that inject scheduling directives right after creating a suspended Job.
+	nodeSelector := map[string]string{"foo": "bar"}
+	job.Spec.Template.Spec.NodeSelector = nodeSelector
+	_, err = clientSet.BatchV1().Jobs(ns.Name).Update(ctx, job, metav1.UpdateOptions{})
+	if err != nil {
+		t.Fatalf("Failed to update scheduling directives on suspended Job that was never started: %v", err)
+	}
+}
+
+// TestMutablePodResourcesForSuspendedJobsNotYetStarted verifies that
+// pod resources can be mutated on a suspended Job that has never started,
+// even before the JobSuspended condition is set by the job controller.
+func TestMutablePodResourcesForSuspendedJobsNotYetStarted(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.MutablePodResourcesForSuspendedJobs, true)
+
+	closeFn, restConfig, clientSet, ns := setup(t, "mutable-pod-resources-not-started")
+	t.Cleanup(closeFn)
+	ctx, cancel := startJobControllerAndWaitForCaches(t, restConfig)
+	t.Cleanup(cancel)
+
+	// Create a suspended Job.
+	job, err := createJobWithDefaults(ctx, clientSet, ns.Name, &batchv1.Job{
+		Spec: batchv1.JobSpec{
+			Parallelism: ptr.To[int32](1),
+			Completions: ptr.To[int32](1),
+			Suspend:     ptr.To(true),
+		},
+	})
+	if err != nil {
+		t.Fatalf("Failed to create Job: %v", err)
+	}
+
+	// Immediately update the pod resources without waiting for the JobSuspended
+	// condition to be set. This simulates external controllers (e.g. MultiKueue)
+	// that inject resource requirements right after creating a suspended Job.
+	wantResources := v1.ResourceRequirements{
+		Requests: v1.ResourceList{
+			v1.ResourceCPU:    resource.MustParse("200m"),
+			v1.ResourceMemory: resource.MustParse("256Mi"),
+		},
+	}
+	job.Spec.Template.Spec.Containers[0].Resources = wantResources
+	_, err = clientSet.BatchV1().Jobs(ns.Name).Update(ctx, job, metav1.UpdateOptions{})
+	if err != nil {
+		t.Fatalf("Failed to update pod resources on suspended Job that was never started: %v", err)
+	}
+}
+
 type podsByStatus struct {
 	Active      int
 	Ready       *int32
@@ -4658,7 +4633,7 @@ func setup(t testing.TB, nsBaseName string) (framework.TearDownFunc, *restclient
 	// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
 	flags := framework.DefaultTestServerFlags()
 	if feature.DefaultFeatureGate.Enabled(features.GenericWorkload) {
-		flags = append(flags, "--runtime-config=scheduling.k8s.io/v1alpha2=true")
+		flags = append(flags, "--runtime-config=scheduling.k8s.io/v1beta1=true")
 	}
 	server := kubeapiservertesting.StartTestServerOrDie(t, nil, flags, framework.SharedEtcd())
 
@@ -4714,8 +4689,8 @@ func createJobControllerWithSharedInformers(tb testing.TB, restConfig *restclien
 	var err error
 	if feature.DefaultFeatureGate.Enabled(features.WorkloadWithJob) {
 		jc, err = jobcontroller.NewController(ctx, clientSet, informerSet.Core().V1().Pods(), informerSet.Batch().V1().Jobs(),
-			informerSet.Scheduling().V1alpha2().Workloads(),
-			informerSet.Scheduling().V1alpha2().PodGroups())
+			informerSet.Scheduling().V1beta1().Workloads(),
+			informerSet.Scheduling().V1beta1().PodGroups())
 	} else {
 		jc, err = jobcontroller.NewController(ctx, clientSet, informerSet.Core().V1().Pods(), informerSet.Batch().V1().Jobs(), nil, nil)
 	}
@@ -4780,11 +4755,11 @@ func waitForPodsToBeActive(ctx context.Context, t *testing.T, jobClient typedv1.
 
 // waitForWorkload waits for a Workload owned by the given Job to appear
 // (expectAbsent=false) or to not exist (expectAbsent=true).
-func waitForWorkload(ctx context.Context, t *testing.T, clientSet clientset.Interface, job *batchv1.Job, expectAbsent bool, timeout time.Duration) *schedulingv1alpha2.Workload {
+func waitForWorkload(ctx context.Context, t *testing.T, clientSet clientset.Interface, job *batchv1.Job, expectAbsent bool, timeout time.Duration) *schedulingv1beta1.Workload {
 	t.Helper()
-	var workload *schedulingv1alpha2.Workload
+	var workload *schedulingv1beta1.Workload
 	err := wait.PollUntilContextTimeout(ctx, waitInterval, timeout, true, func(ctx context.Context) (bool, error) {
-		workloads, listErr := clientSet.SchedulingV1alpha2().Workloads(job.Namespace).List(ctx, metav1.ListOptions{})
+		workloads, listErr := clientSet.SchedulingV1beta1().Workloads(job.Namespace).List(ctx, metav1.ListOptions{})
 		if listErr != nil {
 			return false, listErr
 		}
@@ -4809,11 +4784,11 @@ func waitForWorkload(ctx context.Context, t *testing.T, clientSet clientset.Inte
 
 // waitForPodGroup waits for a PodGroup owned by the given Job to appear
 // (expectAbsent=false) or to not exist (expectAbsent=true).
-func waitForPodGroup(ctx context.Context, t *testing.T, clientSet clientset.Interface, job *batchv1.Job, expectAbsent bool, timeout time.Duration) *schedulingv1alpha2.PodGroup {
+func waitForPodGroup(ctx context.Context, t *testing.T, clientSet clientset.Interface, job *batchv1.Job, expectAbsent bool, timeout time.Duration) *schedulingv1beta1.PodGroup {
 	t.Helper()
-	var podGroup *schedulingv1alpha2.PodGroup
+	var podGroup *schedulingv1beta1.PodGroup
 	err := wait.PollUntilContextTimeout(ctx, waitInterval, timeout, true, func(ctx context.Context) (bool, error) {
-		podGroups, listErr := clientSet.SchedulingV1alpha2().PodGroups(job.Namespace).List(ctx, metav1.ListOptions{})
+		podGroups, listErr := clientSet.SchedulingV1beta1().PodGroups(job.Namespace).List(ctx, metav1.ListOptions{})
 		if listErr != nil {
 			return false, listErr
 		}
@@ -5096,8 +5071,9 @@ func TestMutablePodResourcesWithPodReplacementPolicyFailed(t *testing.T) {
 
 func TestJobGangScheduling(t *testing.T) {
 	featuregatetesting.SetFeatureGatesDuringTest(t, feature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-		features.GenericWorkload: true,
-		features.WorkloadWithJob: true,
+		features.GenericWorkload:                 true,
+		features.WorkloadWithJob:                 true,
+		features.TopologyAwareWorkloadScheduling: true,
 	})
 
 	cases := map[string]struct {
@@ -5108,52 +5084,58 @@ func TestJobGangScheduling(t *testing.T) {
 		suspend        bool
 		// restarts the controller after the Workload is created
 		// and verifies the Workload UID is preserved.
-		simulateRestart bool
-		// attempts to update parallelism after creation and
-		// expects an Invalid error.
-		updateParallelism *int32
+		simulateRestart   bool
+		wantGangMinCount  *int32
+		wantDisruptionAll bool
+		wantTopologyKey   string
 	}{
 		"eligible job creates workload and podgroup": {
 			jobSpec: batchv1.JobSpec{
 				Parallelism:    ptr.To[int32](4),
 				Completions:    ptr.To[int32](4),
-				CompletionMode: ptr.To(batchv1.IndexedCompletion),
+				CompletionMode: new(batchv1.IndexedCompletion),
 			},
 			expectWorkload: true,
 			expectPodGroup: true,
 			wantActivePods: 4,
 		},
-		"non-indexed job": {
+		"non-indexed basic job still materializes objects (Universal Representation)": {
 			jobSpec: batchv1.JobSpec{
 				Parallelism: ptr.To[int32](3),
 			},
+			expectWorkload: true,
+			expectPodGroup: true,
 			wantActivePods: 3,
 		},
-		"parallelism=1": {
+		"single-pod basic job materializes objects": {
 			jobSpec: batchv1.JobSpec{
 				Parallelism:    ptr.To[int32](1),
 				Completions:    ptr.To[int32](1),
-				CompletionMode: ptr.To(batchv1.IndexedCompletion),
+				CompletionMode: new(batchv1.IndexedCompletion),
 			},
+			expectWorkload: true,
+			expectPodGroup: true,
 			wantActivePods: 1,
 		},
-		"completions != parallelism": {
+		"completions != parallelism basic job materializes objects": {
 			jobSpec: batchv1.JobSpec{
 				Parallelism:    ptr.To[int32](2),
 				Completions:    ptr.To[int32](5),
-				CompletionMode: ptr.To(batchv1.IndexedCompletion),
+				CompletionMode: new(batchv1.IndexedCompletion),
 			},
+			expectWorkload: true,
+			expectPodGroup: true,
 			wantActivePods: 2,
 		},
 		"high-level controller owns scheduling objects via existing schedulingGroup": {
 			jobSpec: batchv1.JobSpec{
 				Parallelism:    ptr.To[int32](4),
 				Completions:    ptr.To[int32](4),
-				CompletionMode: ptr.To(batchv1.IndexedCompletion),
+				CompletionMode: new(batchv1.IndexedCompletion),
 				Template: v1.PodTemplateSpec{
 					Spec: v1.PodSpec{
 						SchedulingGroup: &v1.PodSchedulingGroup{
-							PodGroupName: ptr.To("external-pod-group"),
+							PodGroupName: new("external-pod-group"),
 						},
 						Containers:    []v1.Container{{Name: "foo", Image: "bar"}},
 						RestartPolicy: v1.RestartPolicyNever,
@@ -5166,8 +5148,8 @@ func TestJobGangScheduling(t *testing.T) {
 			jobSpec: batchv1.JobSpec{
 				Parallelism:    ptr.To[int32](4),
 				Completions:    ptr.To[int32](4),
-				CompletionMode: ptr.To(batchv1.IndexedCompletion),
-				Suspend:        ptr.To(true),
+				CompletionMode: new(batchv1.IndexedCompletion),
+				Suspend:        new(true),
 			},
 			expectWorkload: true,
 			expectPodGroup: true,
@@ -5178,23 +5160,76 @@ func TestJobGangScheduling(t *testing.T) {
 			jobSpec: batchv1.JobSpec{
 				Parallelism:    ptr.To[int32](4),
 				Completions:    ptr.To[int32](4),
-				CompletionMode: ptr.To(batchv1.IndexedCompletion),
+				CompletionMode: new(batchv1.IndexedCompletion),
 			},
 			expectWorkload:  true,
 			expectPodGroup:  true,
 			wantActivePods:  4,
 			simulateRestart: true,
 		},
-		"parallelism update blocked": {
+		"gang job with all-or-nothing disruption mode": {
 			jobSpec: batchv1.JobSpec{
 				Parallelism:    ptr.To[int32](4),
 				Completions:    ptr.To[int32](4),
-				CompletionMode: ptr.To(batchv1.IndexedCompletion),
+				CompletionMode: new(batchv1.IndexedCompletion),
+				Scheduling: &batchv1.JobSchedulingConfiguration{
+					SchedulingPolicy: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{
+						Gang: &schedulingv1alpha3.WorkloadPodGroupGangSchedulingPolicy{MinCount: ptr.To[int32](4)},
+					},
+					DisruptionMode: &schedulingv1alpha3.WorkloadPodGroupDisruptionMode{
+						All: &schedulingv1alpha3.WorkloadPodGroupAllDisruptionMode{},
+					},
+				},
 			},
 			expectWorkload:    true,
 			expectPodGroup:    true,
 			wantActivePods:    4,
-			updateParallelism: ptr.To[int32](2),
+			wantGangMinCount:  ptr.To[int32](4),
+			wantDisruptionAll: true,
+		},
+		"gang job with topology constraint": {
+			jobSpec: batchv1.JobSpec{
+				Parallelism:    ptr.To[int32](4),
+				Completions:    ptr.To[int32](4),
+				CompletionMode: new(batchv1.IndexedCompletion),
+				Scheduling: &batchv1.JobSchedulingConfiguration{
+					SchedulingPolicy: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{
+						Gang: &schedulingv1alpha3.WorkloadPodGroupGangSchedulingPolicy{MinCount: ptr.To[int32](2)},
+					},
+					SchedulingConstraints: &schedulingv1alpha3.WorkloadPodGroupSchedulingConstraints{
+						Topology: []schedulingv1alpha3.TopologyConstraint{{Key: "topology.kubernetes.io/rack"}},
+					},
+				},
+			},
+			expectWorkload:   true,
+			expectPodGroup:   true,
+			wantActivePods:   4,
+			wantGangMinCount: ptr.To[int32](2),
+			wantTopologyKey:  "topology.kubernetes.io/rack",
+		},
+		"gang job with disruption and topology": {
+			jobSpec: batchv1.JobSpec{
+				Parallelism:    ptr.To[int32](6),
+				Completions:    ptr.To[int32](6),
+				CompletionMode: new(batchv1.IndexedCompletion),
+				Scheduling: &batchv1.JobSchedulingConfiguration{
+					SchedulingPolicy: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{
+						Gang: &schedulingv1alpha3.WorkloadPodGroupGangSchedulingPolicy{MinCount: ptr.To[int32](6)},
+					},
+					DisruptionMode: &schedulingv1alpha3.WorkloadPodGroupDisruptionMode{
+						All: &schedulingv1alpha3.WorkloadPodGroupAllDisruptionMode{},
+					},
+					SchedulingConstraints: &schedulingv1alpha3.WorkloadPodGroupSchedulingConstraints{
+						Topology: []schedulingv1alpha3.TopologyConstraint{{Key: "topology.kubernetes.io/zone"}},
+					},
+				},
+			},
+			expectWorkload:    true,
+			expectPodGroup:    true,
+			wantActivePods:    6,
+			wantGangMinCount:  ptr.To[int32](6),
+			wantDisruptionAll: true,
+			wantTopologyKey:   "topology.kubernetes.io/zone",
 		},
 	}
 
@@ -5225,7 +5260,7 @@ func TestJobGangScheduling(t *testing.T) {
 					t.Errorf("Expected 0 pods for suspended job, got %d", len(jobPods))
 				}
 				_, err = updateJob(ctx, clientSet.BatchV1().Jobs(ns.Name), jobObj.Name, func(j *batchv1.Job) {
-					j.Spec.Suspend = ptr.To(false)
+					j.Spec.Suspend = new(false)
 				})
 				if err != nil {
 					t.Fatalf("Failed to unsuspend job: %v", err)
@@ -5258,8 +5293,8 @@ func TestJobGangScheduling(t *testing.T) {
 
 			// Wait for Workload and PodGroup (present or absent).
 			absentTimeout := 10 * time.Second
-			var workload *schedulingv1alpha2.Workload
-			var podGroup *schedulingv1alpha2.PodGroup
+			var workload *schedulingv1beta1.Workload
+			var podGroup *schedulingv1beta1.PodGroup
 			if tc.expectWorkload {
 				workload = waitForWorkload(ctx, t, clientSet, jobObj, false, wait.ForeverTestTimeout)
 			} else {
@@ -5306,21 +5341,306 @@ func TestJobGangScheduling(t *testing.T) {
 				}
 			}
 
-			// Validate parallelism update is blocked.
-			if tc.updateParallelism != nil {
-				_, err = updateJob(ctx, clientSet.BatchV1().Jobs(ns.Name), jobObj.Name, func(j *batchv1.Job) {
-					j.Spec.Parallelism = tc.updateParallelism
-				})
-				if err == nil {
-					t.Fatal("Expected error when updating parallelism of gang-scheduled job, got nil")
+			if workload != nil && podGroup != nil {
+				if len(workload.Spec.PodGroupTemplates) != 1 {
+					t.Fatalf("expected exactly one PodGroupTemplate, got %d", len(workload.Spec.PodGroupTemplates))
 				}
-				if !apierrors.IsForbidden(err) {
-					t.Errorf("Expected Forbidden error, got: %v", err)
+				pgt := workload.Spec.PodGroupTemplates[0]
+
+				if tc.wantGangMinCount != nil {
+					if pgt.SchedulingPolicy.Gang == nil || pgt.SchedulingPolicy.Gang.MinCount != *tc.wantGangMinCount {
+						t.Errorf("Workload gang = %+v, want minCount %d", pgt.SchedulingPolicy.Gang, *tc.wantGangMinCount)
+					}
+					if podGroup.Spec.SchedulingPolicy.Gang == nil || podGroup.Spec.SchedulingPolicy.Gang.MinCount != *tc.wantGangMinCount {
+						t.Errorf("PodGroup gang = %+v, want minCount %d", podGroup.Spec.SchedulingPolicy.Gang, *tc.wantGangMinCount)
+					}
 				}
-				if !strings.Contains(err.Error(), "cannot change parallelism") {
-					t.Errorf("Expected error to contain %q, got: %v", "cannot change parallelism", err)
+
+				if tc.wantDisruptionAll {
+					if pgt.DisruptionMode == nil || pgt.DisruptionMode.All == nil {
+						t.Errorf("Workload disruptionMode = %+v, want All", pgt.DisruptionMode)
+					}
+					if podGroup.Spec.DisruptionMode == nil || podGroup.Spec.DisruptionMode.All == nil {
+						t.Errorf("PodGroup disruptionMode = %+v, want All", podGroup.Spec.DisruptionMode)
+					}
+				}
+
+				if tc.wantTopologyKey != "" {
+					if pgt.SchedulingConstraints == nil || len(pgt.SchedulingConstraints.Topology) != 1 ||
+						pgt.SchedulingConstraints.Topology[0].Key != tc.wantTopologyKey {
+						t.Errorf("Workload topology = %+v, want key %q", pgt.SchedulingConstraints, tc.wantTopologyKey)
+					}
+					if podGroup.Spec.SchedulingConstraints == nil || len(podGroup.Spec.SchedulingConstraints.Topology) != 1 ||
+						podGroup.Spec.SchedulingConstraints.Topology[0].Key != tc.wantTopologyKey {
+						t.Errorf("PodGroup topology = %+v, want key %q", podGroup.Spec.SchedulingConstraints, tc.wantTopologyKey)
+					}
 				}
 			}
+
 		})
+	}
+}
+
+func TestJobGangSchedulingElasticScaling(t *testing.T) {
+	featuregatetesting.SetFeatureGatesDuringTest(t, feature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.GenericWorkload: true,
+		features.WorkloadWithJob: true,
+	})
+
+	closeFn, restConfig, clientSet, ns := setup(t, "gang-elastic")
+	t.Cleanup(closeFn)
+	ctx, cancel := startJobControllerAndWaitForCaches(t, restConfig)
+	t.Cleanup(cancel)
+
+	jobObj, err := createJobWithDefaults(ctx, clientSet, ns.Name, &batchv1.Job{
+		Spec: batchv1.JobSpec{
+			Parallelism:    ptr.To[int32](8),
+			Completions:    ptr.To[int32](8),
+			CompletionMode: new(batchv1.IndexedCompletion),
+			Scheduling: &batchv1.JobSchedulingConfiguration{
+				SchedulingPolicy: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{
+					Gang: &schedulingv1alpha3.WorkloadPodGroupGangSchedulingPolicy{MinCount: ptr.To[int32](4)},
+				},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("Failed to create Job: %v", err)
+	}
+
+	workload := waitForWorkload(ctx, t, clientSet, jobObj, false, wait.ForeverTestTimeout)
+	podGroup := waitForPodGroup(ctx, t, clientSet, jobObj, false, wait.ForeverTestTimeout)
+
+	// The compiled objects carry the requested gang minCount.
+	if len(workload.Spec.PodGroupTemplates) != 1 || workload.Spec.PodGroupTemplates[0].SchedulingPolicy.Gang == nil {
+		t.Fatalf("expected a single gang PodGroupTemplate, got %+v", workload.Spec.PodGroupTemplates)
+	}
+	if got := workload.Spec.PodGroupTemplates[0].SchedulingPolicy.Gang.MinCount; got != 4 {
+		t.Errorf("Workload gang minCount = %d, want 4", got)
+	}
+	if podGroup.Spec.SchedulingPolicy.Gang == nil || podGroup.Spec.SchedulingPolicy.Gang.MinCount != 4 {
+		t.Errorf("PodGroup gang minCount = %+v, want 4", podGroup.Spec.SchedulingPolicy.Gang)
+	}
+
+	// Elastic scaling: bump minCount and verify it propagates to both objects.
+	if _, err := updateJob(ctx, clientSet.BatchV1().Jobs(ns.Name), jobObj.Name, func(j *batchv1.Job) {
+		j.Spec.Scheduling.SchedulingPolicy.Gang.MinCount = ptr.To[int32](6)
+	}); err != nil {
+		t.Fatalf("Failed to update gang minCount: %v", err)
+	}
+
+	if err := wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
+		wl, err := clientSet.SchedulingV1beta1().Workloads(ns.Name).Get(ctx, workload.Name, metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+		pg, err := clientSet.SchedulingV1beta1().PodGroups(ns.Name).Get(ctx, podGroup.Name, metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+		wlGang := wl.Spec.PodGroupTemplates[0].SchedulingPolicy.Gang
+		pgGang := pg.Spec.SchedulingPolicy.Gang
+		return wlGang != nil && wlGang.MinCount == 6 && pgGang != nil && pgGang.MinCount == 6, nil
+	}); err != nil {
+		t.Errorf("Workload/PodGroup gang minCount not updated to 6: %v", err)
+	}
+}
+
+func TestJobGangSchedulingSuspendResume(t *testing.T) {
+	featuregatetesting.SetFeatureGatesDuringTest(t, feature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.GenericWorkload: true,
+		features.WorkloadWithJob: true,
+	})
+
+	closeFn, restConfig, clientSet, ns := setup(t, "gang-suspend")
+	t.Cleanup(closeFn)
+	ctx, cancel := startJobControllerAndWaitForCaches(t, restConfig)
+	t.Cleanup(cancel)
+
+	// Create suspended: the Workload/PodGroup must exist before any pods.
+	jobObj, err := createJobWithDefaults(ctx, clientSet, ns.Name, &batchv1.Job{
+		Spec: batchv1.JobSpec{
+			Parallelism:    new(int32(4)),
+			Completions:    new(int32(4)),
+			CompletionMode: new(batchv1.IndexedCompletion),
+			Suspend:        new(true),
+			Scheduling: &batchv1.JobSchedulingConfiguration{
+				SchedulingPolicy: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{
+					Gang: &schedulingv1alpha3.WorkloadPodGroupGangSchedulingPolicy{MinCount: ptr.To[int32](4)},
+				},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("Failed to create Job: %v", err)
+	}
+
+	workload := waitForWorkload(ctx, t, clientSet, jobObj, false, wait.ForeverTestTimeout)
+	podGroup := waitForPodGroup(ctx, t, clientSet, jobObj, false, wait.ForeverTestTimeout)
+	workloadUID, podGroupUID := workload.UID, podGroup.UID
+	validateJobsPodsStatusOnly(ctx, t, clientSet, jobObj, "", podsByStatus{
+		Active: 0, Ready: new(int32(0)), Terminating: new(int32(0)),
+	})
+
+	setSuspend := func(suspend bool) {
+		if _, err := updateJob(ctx, clientSet.BatchV1().Jobs(ns.Name), jobObj.Name, func(j *batchv1.Job) {
+			j.Spec.Suspend = new(suspend)
+		}); err != nil {
+			t.Fatalf("Failed to set suspend=%v: %v", suspend, err)
+		}
+	}
+	verifyPodsInPodGroup := func(stage string) {
+		pods, err := getJobPods(ctx, t, clientSet, jobObj, func(v1.PodStatus) bool { return true })
+		if err != nil {
+			t.Fatalf("[%s] Failed to get job pods: %v", stage, err)
+		}
+		for _, pod := range pods {
+			if pod.Spec.SchedulingGroup == nil || pod.Spec.SchedulingGroup.PodGroupName == nil ||
+				*pod.Spec.SchedulingGroup.PodGroupName != podGroup.Name {
+				t.Errorf("[%s] Pod %s schedulingGroup = %+v, want podGroupName %q", stage, pod.Name, pod.Spec.SchedulingGroup, podGroup.Name)
+			}
+		}
+	}
+
+	// Resume: pods are created and wired to the existing PodGroup.
+	setSuspend(false)
+	validateJobsPodsStatusOnly(ctx, t, clientSet, jobObj, "", podsByStatus{
+		Active: 4, Ready: new(int32(0)), Terminating: new(int32(0)),
+	})
+	verifyPodsInPodGroup("after resume")
+
+	// Suspend: pods are removed, but the scheduling objects persist unchanged.
+	setSuspend(true)
+	validateJobsPodsStatusOnly(ctx, t, clientSet, jobObj, "", podsByStatus{
+		Active: 0, Ready: new(int32(0)), Terminating: new(int32(0)),
+	})
+	if wl := waitForWorkload(ctx, t, clientSet, jobObj, false, wait.ForeverTestTimeout); wl.UID != workloadUID {
+		t.Errorf("Workload was recreated across suspend: UID %v, want %v", wl.UID, workloadUID)
+	}
+	if pg := waitForPodGroup(ctx, t, clientSet, jobObj, false, wait.ForeverTestTimeout); pg.UID != podGroupUID {
+		t.Errorf("PodGroup was recreated across suspend: UID %v, want %v", pg.UID, podGroupUID)
+	}
+
+	// Resume again: the same objects are reused and pods are rewired to them.
+	setSuspend(false)
+	validateJobsPodsStatusOnly(ctx, t, clientSet, jobObj, "", podsByStatus{
+		Active: 4, Ready: new(int32(0)), Terminating: new(int32(0)),
+	})
+	verifyPodsInPodGroup("after second resume")
+}
+
+// TestJobDelegatedPodGroup verifies that a non-root Job whose parent controller
+// owns the Workload and delegates PodGroup management (via the group-template
+// annotation) gets a PodGroup materialized from the parent's persisted template,
+// without the Job controller creating or taking ownership of a Workload.
+func TestJobDelegatedPodGroup(t *testing.T) {
+	featuregatetesting.SetFeatureGatesDuringTest(t, feature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.GenericWorkload: true,
+		features.WorkloadWithJob: true,
+	})
+
+	closeFn, restConfig, clientSet, ns := setup(t, "delegated-podgroup")
+	t.Cleanup(closeFn)
+	ctx, cancel := startJobControllerAndWaitForCaches(t, restConfig)
+	t.Cleanup(cancel)
+
+	const (
+		parentKind   = "SuperJob"
+		parentGroup  = "example.com"
+		parentName   = "parent-superjob"
+		templateName = "workers"
+	)
+
+	// A parent-owned Workload with a named gang template. Its spec.controllerRef
+	// points at the parent controller so the Job controller can discover it. The
+	// delegated PodGroup must be materialized from this persisted template rather
+	// than compiled from the Job spec.
+	parentWorkload, err := clientSet.SchedulingV1beta1().Workloads(ns.Name).Create(ctx, &schedulingv1beta1.Workload{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "parent-workload",
+			Namespace: ns.Name,
+		},
+		Spec: schedulingv1beta1.WorkloadSpec{
+			ControllerRef: &schedulingv1beta1.TypedLocalObjectReference{
+				APIGroup: parentGroup,
+				Kind:     parentKind,
+				Name:     parentName,
+			},
+			PodGroupTemplates: []schedulingv1beta1.PodGroupTemplate{{
+				Name: templateName,
+				SchedulingPolicy: schedulingv1beta1.PodGroupSchedulingPolicy{
+					Gang: &schedulingv1beta1.GangSchedulingPolicy{MinCount: 3},
+				},
+			}},
+		},
+	}, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Failed to create parent Workload: %v", err)
+	}
+
+	// A non-root Job owned by the parent controller, delegating PodGroup
+	// management via the group-template annotation.
+	jobObj, err := createJobWithDefaults(ctx, clientSet, ns.Name, &batchv1.Job{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        "delegated-job",
+			Annotations: map[string]string{apischeduling.GroupTemplateNameAnnotation: templateName},
+			OwnerReferences: []metav1.OwnerReference{{
+				APIVersion: parentGroup + "/v1",
+				Kind:       parentKind,
+				Name:       parentName,
+				UID:        types.UID("parent-superjob-uid"),
+				Controller: new(true),
+			}},
+		},
+		Spec: batchv1.JobSpec{
+			Parallelism:    new(int32(3)),
+			Completions:    new(int32(3)),
+			CompletionMode: new(batchv1.IndexedCompletion),
+		},
+	})
+	if err != nil {
+		t.Fatalf("Failed to create delegated Job: %v", err)
+	}
+
+	// The controller creates a PodGroup owned by the Job, but never a Workload
+	// (the parent owns the only Workload).
+	podGroup := waitForPodGroup(ctx, t, clientSet, jobObj, false, wait.ForeverTestTimeout)
+	waitForWorkload(ctx, t, clientSet, jobObj, true, 10*time.Second)
+
+	// The PodGroup is materialized from the parent's persisted template.
+	if podGroup.Spec.WorkloadRef == nil ||
+		podGroup.Spec.WorkloadRef.WorkloadName != parentWorkload.Name ||
+		podGroup.Spec.WorkloadRef.TemplateName != templateName {
+		t.Errorf("PodGroup workloadRef = %+v, want workload %q template %q",
+			podGroup.Spec.WorkloadRef, parentWorkload.Name, templateName)
+	}
+	if podGroup.Spec.SchedulingPolicy.Gang == nil || podGroup.Spec.SchedulingPolicy.Gang.MinCount != 3 {
+		t.Errorf("PodGroup gang = %+v, want minCount 3", podGroup.Spec.SchedulingPolicy.Gang)
+	}
+
+	// The PodGroup carries a controller ownerRef to the Job and does NOT link the
+	// parent-owned Workload as an owner (delegated mode).
+	var hasJobController bool
+	for _, ref := range podGroup.OwnerReferences {
+		if ref.Kind == "Workload" {
+			t.Errorf("delegated PodGroup unexpectedly links Workload owner %q", ref.Name)
+		}
+		if ref.Kind == "Job" && ref.UID == jobObj.UID && ref.Controller != nil && *ref.Controller {
+			hasJobController = true
+		}
+	}
+	if !hasJobController {
+		t.Errorf("PodGroup missing controller ownerReference to Job %q; got %+v", jobObj.Name, podGroup.OwnerReferences)
+	}
+
+	// The delegated Job never takes ownership of the parent Workload.
+	gotParent, err := clientSet.SchedulingV1beta1().Workloads(ns.Name).Get(ctx, parentWorkload.Name, metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("Failed to get parent Workload: %v", err)
+	}
+	for _, ref := range gotParent.OwnerReferences {
+		if ref.UID == jobObj.UID {
+			t.Errorf("parent Workload unexpectedly owned by delegated Job %q", jobObj.Name)
+		}
 	}
 }

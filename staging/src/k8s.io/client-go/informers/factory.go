@@ -41,6 +41,7 @@ import (
 	extensions "k8s.io/client-go/informers/extensions"
 	flowcontrol "k8s.io/client-go/informers/flowcontrol"
 	internalinterfaces "k8s.io/client-go/informers/internalinterfaces"
+	lifecycle "k8s.io/client-go/informers/lifecycle"
 	networking "k8s.io/client-go/informers/networking"
 	node "k8s.io/client-go/informers/node"
 	policy "k8s.io/client-go/informers/policy"
@@ -275,17 +276,17 @@ func (f *sharedInformerFactory) InformerFor(obj runtime.Object, newFunc internal
 //	defer factory.Shutdown()    // Returns immediately if nothing was started.
 //	genericInformer := factory.ForResource(resource)
 //	typedInformer := factory.SomeAPIGroup().V1().SomeType()
-//	handle, err := typeInformer.Informer().AddEventHandler(...)
+//	handle, err := typedInformer.Informer().AddEventHandler(...)
 //	if err != nil {
 //	    return fmt.Errorf("register event handler: %v", err)
 //	}
-//	defer typeInformer.Informer().RemoveEventHandler(handle) // Avoids leaking goroutines.
+//	defer typedInformer.Informer().RemoveEventHandler(handle) // Avoids leaking goroutines.
 //	factory.StartWithContext(ctx)                            // Start processing these informers.
 //	synced := factory.WaitForCacheSyncWithContext(ctx)
 //	if err := synced.AsError(); err != nil {
 //	    return err
 //	}
-//	for v := range synced {
+//	for v := range synced.Synced {
 //	    // Only if desired log some information similar to this.
 //	    fmt.Fprintf(os.Stdout, "cache synced: %s", v)
 //	}
@@ -330,7 +331,7 @@ type SharedInformerFactory interface {
 	// WaitForCacheSync blocks until all started informers' caches were synced
 	// or the stop channel gets closed.
 	//
-	// Contextual logging: WaitForCacheSync should be used instead of WaitForCacheSync in code which supports contextual logging. It also returns a more useful result.
+	// Contextual logging: WaitForCacheSyncWithContext should be used instead of WaitForCacheSync in code which supports contextual logging. It also returns a more useful result.
 	WaitForCacheSync(stopCh <-chan struct{}) map[reflect.Type]bool
 
 	// WaitForCacheSyncWithContext blocks until all started informers' caches were synced
@@ -356,6 +357,7 @@ type SharedInformerFactory interface {
 	Events() events.Interface
 	Extensions() extensions.Interface
 	Flowcontrol() flowcontrol.Interface
+	Lifecycle() lifecycle.Interface
 	Networking() networking.Interface
 	Node() node.Interface
 	Policy() policy.Interface
@@ -412,6 +414,10 @@ func (f *sharedInformerFactory) Extensions() extensions.Interface {
 
 func (f *sharedInformerFactory) Flowcontrol() flowcontrol.Interface {
 	return flowcontrol.New(f, f.namespace, f.tweakListOptions)
+}
+
+func (f *sharedInformerFactory) Lifecycle() lifecycle.Interface {
+	return lifecycle.New(f, f.namespace, f.tweakListOptions)
 }
 
 func (f *sharedInformerFactory) Networking() networking.Interface {

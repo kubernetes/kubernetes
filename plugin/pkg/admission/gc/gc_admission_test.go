@@ -100,6 +100,16 @@ func (fakeAuthorizer) Authorize(ctx context.Context, a authorizer.Attributes) (a
 	return authorizer.DecisionAllow, "", nil
 }
 
+// ConditionsAwareAuthorize is not conditions-aware, converts the Authorize decision.
+func (f fakeAuthorizer) ConditionsAwareAuthorize(ctx context.Context, a authorizer.Attributes) authorizer.ConditionsAwareDecision {
+	return authorizer.ConditionsAwareDecisionFromParts(f.Authorize(ctx, a))
+}
+
+// EvaluateConditions is not supported by this authorizer.
+func (fakeAuthorizer) EvaluateConditions(_ context.Context, _ authorizer.ConditionsAwareDecision, _ authorizer.ConditionsData) (authorizer.Decision, string, error) {
+	return authorizer.DecisionDeny, "", authorizer.ErrorConditionEvaluationNotSupported
+}
+
 // newGCPermissionsEnforcement returns the admission controller configured for testing.
 func newGCPermissionsEnforcement() (*gcPermissionsEnforcement, error) {
 	// the pods/status endpoint is ignored by this plugin since old kubelets

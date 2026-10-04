@@ -20,14 +20,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	celgo "github.com/google/cel-go/cel"
-	celtypes "github.com/google/cel-go/common/types"
 	"strings"
 
-	"sigs.k8s.io/structured-merge-diff/v6/fieldpath"
-	"sigs.k8s.io/structured-merge-diff/v6/schema"
-	"sigs.k8s.io/structured-merge-diff/v6/typed"
-	"sigs.k8s.io/structured-merge-diff/v6/value"
+	celgo "github.com/google/cel-go/cel"
+	celtypes "github.com/google/cel-go/common/types"
+
+	"sigs.k8s.io/structured-merge-diff/v7/fieldpath"
+	"sigs.k8s.io/structured-merge-diff/v7/schema"
+	"sigs.k8s.io/structured-merge-diff/v7/typed"
+	"sigs.k8s.io/structured-merge-diff/v7/value"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -107,8 +108,8 @@ func (e *applyConfigPatcher) Patch(ctx context.Context, r Request, runtimeCELCos
 	}
 
 	patchObject := unstructured.Unstructured{Object: value}
-	patchObject.SetGroupVersionKind(r.VersionedAttributes.VersionedObject.GetObjectKind().GroupVersionKind())
-	patched, err := ApplyStructuredMergeDiff(r.TypeConverter, r.VersionedAttributes.VersionedObject, &patchObject)
+	patchObject.SetGroupVersionKind(r.VersionedAttributes.VersionedObject.Object().GetObjectKind().GroupVersionKind())
+	patched, err := ApplyStructuredMergeDiff(r.TypeConverter, r.VersionedAttributes.VersionedObject.Object(), &patchObject)
 	if err != nil {
 		return nil, fmt.Errorf("error applying patch: %w", err)
 	}

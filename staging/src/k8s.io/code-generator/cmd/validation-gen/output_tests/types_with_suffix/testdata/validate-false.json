@@ -1,0 +1,18 @@
+{
+  "*primitives.EnumRequest": {
+    "": [
+      "type EnumRequest"
+    ]
+  },
+  "*primitives.StructRequest": {
+    "s": [
+      "field StructRequest.S"
+    ],
+    "t2": [
+      "field StructRequest.T2"
+    ],
+    "t2.i": [
+      "field T2.I"
+    ]
+  }
+}

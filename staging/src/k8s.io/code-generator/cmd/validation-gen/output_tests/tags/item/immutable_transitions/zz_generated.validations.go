@@ -25,7 +25,6 @@ import (
 	context "context"
 	fmt "fmt"
 
-	equality "k8s.io/apimachinery/pkg/api/equality"
 	operation "k8s.io/apimachinery/pkg/api/operation"
 	safe "k8s.io/apimachinery/pkg/api/safe"
 	validate "k8s.io/apimachinery/pkg/api/validate"
@@ -71,19 +70,19 @@ func Validate_Struct(
 			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
 			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
+				if validate.SemanticDeepEqual(obj, oldObj) {
 					return nil
 				}
 			}
 			// call field-attached validations
 			// lists with map semantics require unique keys
-			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
-				func(a Item, b Item) bool { return a.Key1 == b.Key1 }); len(e) != 0 {
+			if e := validate.ValSliceUnique(ctx, op, fldPath, obj, oldObj,
+				func(a *Item, b *Item) bool { return a.Key1 == b.Key1 }); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			func() { // cohort = "{"key1": "a"}"
 				earlyReturn := false
-				if e := validate.SliceItem(ctx, op, fldPath, obj, oldObj,
+				if e := validate.ValSliceItem(ctx, op, fldPath, obj, oldObj,
 					func(item *Item) bool { return item.Key1 == "a" }, validate.DirectEqual, validate.Immutable).MarkShortCircuit(); len(e) != 0 {
 					errs = append(errs, e...)
 					earlyReturn = true
@@ -92,13 +91,13 @@ func Validate_Struct(
 					return // do not proceed
 				}
 			}()
-			func() { // cohort = "{"key1": "b"}"
+			func() { // cohort = "{"key1": "b"}.stringField"
 				earlyReturn := false
-				if e := validate.SliceItem(ctx, op, fldPath, obj, oldObj,
+				if e := validate.ValSliceItem(ctx, op, fldPath, obj, oldObj,
 					func(item *Item) bool { return item.Key1 == "b" }, validate.DirectEqual,
 					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *Item) field.ErrorList {
 						return validate.Subfield(ctx, op, fldPath, obj, oldObj, "stringField",
-							func(o *Item) *string { return &o.StringField }, validate.DirectEqualPtr, validate.Immutable)
+							func(o *Item) *string { return &o.StringField }, validate.DirectEqual, validate.Immutable)
 					}).MarkShortCircuit(); len(e) != 0 {
 					errs = append(errs, e...)
 					earlyReturn = true

@@ -104,14 +104,13 @@ func (r *LogREST) Get(ctx context.Context, name string, opts runtime.Object) (ru
 		return nil, err
 	}
 	return &genericrest.LocationStreamer{
-		Location:                              location,
-		Transport:                             transport,
-		ContentType:                           "text/plain",
-		Flush:                                 logOpts.Follow,
-		ResponseChecker:                       genericrest.NewGenericHttpResponseChecker(api.Resource("pods/log"), name),
-		RedirectChecker:                       genericrest.PreventRedirects,
-		TLSVerificationErrorCounter:           podLogsTLSFailure,
-		DeprecatedTLSVerificationErrorCounter: deprecatedPodLogsTLSFailure,
+		Location:                    location,
+		Transport:                   transport,
+		ContentType:                 "text/plain",
+		Flush:                       logOpts.Follow,
+		ResponseChecker:             genericrest.NewGenericHttpResponseChecker(api.Resource("pods/log"), name),
+		RedirectChecker:             genericrest.PreventRedirects,
+		TLSVerificationErrorCounter: podLogsTLSFailure,
 	}, nil
 }
 
@@ -127,8 +126,6 @@ func countSkipTLSMetric(insecureSkipTLSVerifyBackend bool) {
 		return
 	}
 	counter.Inc()
-
-	deprecatedPodLogsUsage.WithLabelValues(usageType).Inc()
 }
 
 // NewGetOptions creates a new options object

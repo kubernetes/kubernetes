@@ -27,7 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
-	"k8s.io/client-go/tools/cache"
+	clientcache "k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2/ktesting"
 	_ "k8s.io/klog/v2/ktesting/init" // Add command line flags.
 	"k8s.io/utils/ptr"
@@ -61,7 +61,7 @@ func TestHandlers(t *testing.T) {
 	updatedClass := class.DeepCopy()
 	updatedClass.Spec.ExtendedResourceName = nil
 
-	firstHandler := &cache.ResourceEventHandlerFuncs{
+	firstHandler := &clientcache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			if obj != class {
 				t.Errorf("first handler expected added object %v, got %v", class, obj)
@@ -94,7 +94,7 @@ func TestHandlers(t *testing.T) {
 		},
 	}
 	erCache := NewExtendedResourceCache(logger, firstHandler)
-	secondHandler := &cache.ResourceEventHandlerFuncs{
+	secondHandler := &clientcache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			if obj != class {
 				t.Errorf("second handler expected added object %v, got %v", class, obj)
@@ -289,8 +289,9 @@ func testExtendedResourceCache(t *testing.T) {
 		t.Errorf("Expected to find device class 'gpu-class-0' for 'test.com/gpu' after modification, got %v", deviceClass)
 	}
 	// Should not have the old mapping for example.com/gpu
-	if cache.GetDeviceClass("example.com/gpu") != nil {
-		t.Errorf("Expected 'example.com/gpu' to be removed after modification, got %s", cache.GetDeviceClass("example.com/gpu"))
+	deviceClass = cache.GetDeviceClass("example.com/gpu")
+	if deviceClass == nil || deviceClass.Name != "gpu-class-4" {
+		t.Errorf("Expected 'example.com/gpu' to be promoted to 'gpu-class-4' after modification, got %v", deviceClass)
 	}
 
 	// Test deleting a device class
@@ -377,6 +378,345 @@ func testDeviceClassMapping(t *testing.T) {
 	}
 }
 
+func newDeviceClass(name, explicitName string, created time.Time) *resourceapi.DeviceClass {
+	class := &resourceapi.DeviceClass{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:              name,
+			CreationTimestamp: metav1.Time{Time: created},
+		},
+	}
+	if explicitName != "" {
+		class.Spec.ExtendedResourceName = new(string)
+		*class.Spec.ExtendedResourceName = explicitName
+	}
+	return class
+}
+
+func TestReadersCannotObservePartialUpdate(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	cache := NewExtendedResourceCache(logger)
+
+	class := newDeviceClass("class-a", "example.com/gpu", time.Unix(100, 0))
+	cache.OnAdd(class, false)
+
+	renamed := class.DeepCopy()
+	renamed.Spec.ExtendedResourceName = new(string)
+	*renamed.Spec.ExtendedResourceName = "my.com/gpu"
+
+	// Suspend the update right between the forward and reverse mapping
+	// updates, then check that readers still observe a consistent state.
+	entered := make(chan struct{})
+	release := make(chan struct{})
+	cache.testHook = func() {
+		close(entered)
+		<-release
+	}
+
+	updateDone := make(chan struct{})
+	go func() {
+		cache.OnUpdate(class, renamed)
+		close(updateDone)
+	}()
+
+	<-entered
+	// The forward mapping was updated already, the reverse mapping is not
+	// yet. A reader starting now must not observe anything until the whole
+	// event has been applied.
+	read := make(chan string, 1)
+	go func() {
+		read <- cache.GetExtendedResource("class-a")
+	}()
+	select {
+	case name := <-read:
+		close(release)
+		t.Fatalf("reader observed the reverse mapping while the update was in flight: %q", name)
+	case <-time.After(time.Second):
+	}
+	close(release)
+	<-updateDone
+	if name := <-read; name != "my.com/gpu" {
+		t.Errorf("expected the reverse mapping to be updated atomically with the forward mapping, got %q", name)
+	}
+	if got := cache.GetDeviceClass("my.com/gpu"); got != renamed {
+		t.Errorf("expected the new explicit mapping to be visible, got %v", got)
+	}
+	if got := cache.GetDeviceClass("example.com/gpu"); got != nil {
+		t.Errorf("expected the old explicit mapping to be removed, got %v", got)
+	}
+}
+
+func TestSameClassUpdateReplacesStaleObject(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	cache := NewExtendedResourceCache(logger)
+
+	class := newDeviceClass("class-a", "example.com/gpu", time.Unix(100, 0))
+	cache.OnAdd(class, false)
+
+	// Update the class while keeping the same extended resource name and
+	// creation timestamp. The cache must serve the freshly updated object,
+	// not the stale one.
+	updated := class.DeepCopy()
+	updated.Spec.Config = []resourceapi.DeviceClassConfiguration{{}}
+	cache.OnUpdate(class, updated)
+
+	if got := cache.GetDeviceClass("example.com/gpu"); got != updated {
+		t.Errorf("expected explicit mapping to point at the updated object, got %v", got)
+	}
+	if got := cache.GetDeviceClass("deviceclass.resource.kubernetes.io/class-a"); got != updated {
+		t.Errorf("expected default mapping to point at the updated object, got %v", got)
+	}
+	if got := cache.GetExtendedResource("class-a"); got != "example.com/gpu" {
+		t.Errorf("expected the reverse mapping to be preserved, got %q", got)
+	}
+}
+
+func TestCollisionLoserKeepsImplicitMapping(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	cache := NewExtendedResourceCache(logger)
+
+	winner := newDeviceClass("class-winner", "example.com/gpu", time.Unix(200, 0))
+	loser := newDeviceClass("class-loser", "example.com/gpu", time.Unix(100, 0))
+	cache.OnAdd(winner, false)
+	cache.OnAdd(loser, false)
+
+	if got := cache.GetDeviceClass("example.com/gpu"); got != winner {
+		t.Errorf("expected the newer class to win the explicit mapping, got %v", got)
+	}
+	// The loser stays reachable via its own unique implicit name, which
+	// cannot collide with the explicit name of another class.
+	if got := cache.GetDeviceClass("deviceclass.resource.kubernetes.io/class-loser"); got != loser {
+		t.Errorf("expected the loser's default mapping to be registered, got %v", got)
+	}
+	if got := cache.GetDeviceClass("deviceclass.resource.kubernetes.io/class-winner"); got != winner {
+		t.Errorf("expected the winner's default mapping to be registered, got %v", got)
+	}
+}
+
+func TestCollisionLoserDeleteKeepsWinner(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	cache := NewExtendedResourceCache(logger)
+
+	winner := newDeviceClass("class-winner", "example.com/gpu", time.Unix(200, 0))
+	loser := newDeviceClass("class-loser", "example.com/gpu", time.Unix(100, 0))
+	cache.OnAdd(winner, false)
+	cache.OnAdd(loser, false)
+
+	cache.OnDelete(loser)
+
+	// Deleting the loser must not take down the winner's mapping for the
+	// shared explicit name.
+	if got := cache.GetDeviceClass("example.com/gpu"); got != winner {
+		t.Errorf("expected the winner to keep the explicit mapping, got %v", got)
+	}
+	if got := cache.GetDeviceClass("deviceclass.resource.kubernetes.io/class-loser"); got != nil {
+		t.Errorf("expected the loser's default mapping to be removed, got %v", got)
+	}
+	if got := cache.GetExtendedResource("class-loser"); got != "" {
+		t.Errorf("expected the loser's reverse mapping to be removed, got %q", got)
+	}
+}
+
+func TestCollisionWinnerDeletePromotesRunnerUp(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	cache := NewExtendedResourceCache(logger)
+
+	older := newDeviceClass("class-older", "example.com/gpu", time.Unix(100, 0))
+	newer := newDeviceClass("class-newer", "example.com/gpu", time.Unix(200, 0))
+	cache.OnAdd(older, false)
+	cache.OnAdd(newer, false)
+
+	// Deleting the winner must promote the runner-up.
+	cache.OnDelete(newer)
+	if got := cache.GetDeviceClass("example.com/gpu"); got != older {
+		t.Errorf("expected the runner-up to be promoted, got %v", got)
+	}
+
+	cache.OnDelete(older)
+	if got := cache.GetDeviceClass("example.com/gpu"); got != nil {
+		t.Errorf("expected the explicit mapping to be removed once all candidates are gone, got %v", got)
+	}
+	if got := cache.GetDeviceClass("deviceclass.resource.kubernetes.io/class-newer"); got != nil {
+		t.Errorf("expected the winner's default mapping to be removed, got %v", got)
+	}
+	if got := cache.GetExtendedResource("class-newer"); got != "" {
+		t.Errorf("expected the winner's reverse mapping to be removed, got %q", got)
+	}
+}
+
+func TestCollisionWinnerRenamePromotesRunnerUp(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	cache := NewExtendedResourceCache(logger)
+
+	older := newDeviceClass("class-older", "example.com/gpu", time.Unix(100, 0))
+	newer := newDeviceClass("class-newer", "example.com/gpu", time.Unix(200, 0))
+	cache.OnAdd(older, false)
+	cache.OnAdd(newer, false)
+
+	renamed := newer.DeepCopy()
+	renamed.Spec.ExtendedResourceName = new(string)
+	*renamed.Spec.ExtendedResourceName = "new.example.com/gpu"
+	cache.OnUpdate(newer, renamed)
+
+	// Renaming the winner must promote the runner-up for the old name.
+	if got := cache.GetDeviceClass("example.com/gpu"); got != older {
+		t.Errorf("expected the runner-up to be promoted after winner rename, got %v", got)
+	}
+	if got := cache.GetDeviceClass("new.example.com/gpu"); got != renamed {
+		t.Errorf("expected the renamed class to own its new name, got %v", got)
+	}
+	if got := cache.GetDeviceClass("deviceclass.resource.kubernetes.io/class-newer"); got != renamed {
+		t.Errorf("expected the renamed class's default mapping to be updated, got %v", got)
+	}
+	if got := cache.GetExtendedResource("class-newer"); got != "new.example.com/gpu" {
+		t.Errorf("expected the renamed class's reverse mapping to be updated, got %q", got)
+	}
+}
+
+func TestCollisionLoserRenameKeepsWinner(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	cache := NewExtendedResourceCache(logger)
+
+	winner := newDeviceClass("class-winner", "example.com/gpu", time.Unix(200, 0))
+	loser := newDeviceClass("class-loser", "example.com/gpu", time.Unix(100, 0))
+	cache.OnAdd(winner, false)
+	cache.OnAdd(loser, false)
+
+	renamed := loser.DeepCopy()
+	renamed.Spec.ExtendedResourceName = new(string)
+	*renamed.Spec.ExtendedResourceName = "new.example.com/gpu"
+	cache.OnUpdate(loser, renamed)
+
+	// Renaming the loser must not take down the winner's mapping for the
+	// old name, even though the loser used to declare it.
+	if got := cache.GetDeviceClass("example.com/gpu"); got != winner {
+		t.Errorf("expected the winner to keep the explicit mapping, got %v", got)
+	}
+	if got := cache.GetDeviceClass("new.example.com/gpu"); got != renamed {
+		t.Errorf("expected the renamed class to own its new name, got %v", got)
+	}
+	if got := cache.GetDeviceClass("deviceclass.resource.kubernetes.io/class-loser"); got != renamed {
+		t.Errorf("expected the renamed class's default mapping to be updated, got %v", got)
+	}
+	if got := cache.GetExtendedResource("class-loser"); got != "new.example.com/gpu" {
+		t.Errorf("expected the renamed loser's reverse mapping to be updated, got %q", got)
+	}
+}
+
+func TestCollisionWinnerKeyOnlyTombstonePromotesRunnerUp(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	cache := NewExtendedResourceCache(logger)
+
+	older := newDeviceClass("class-older", "example.com/gpu", time.Unix(100, 0))
+	newer := newDeviceClass("class-newer", "example.com/gpu", time.Unix(200, 0))
+	cache.OnAdd(older, false)
+	cache.OnAdd(newer, false)
+
+	// DeltaFIFO.Replace can emit a tombstone whose Obj is nil when the key
+	// is no longer available from knownObjects. All mappings are keyed by
+	// class name, so the key alone must suffice to remove the deleted class.
+	cache.OnDelete(clientcache.DeletedFinalStateUnknown{Key: newer.Name, Obj: nil})
+
+	// The runner-up must be promoted despite the missing object.
+	if got := cache.GetDeviceClass("example.com/gpu"); got != older {
+		t.Errorf("expected the runner-up to be promoted, got %v", got)
+	}
+	// The default mapping and the reverse mapping must be removed.
+	if got := cache.GetDeviceClass("deviceclass.resource.kubernetes.io/class-newer"); got != nil {
+		t.Errorf("expected the deleted class's default mapping to be removed, got %v", got)
+	}
+	if got := cache.GetExtendedResource("class-newer"); got != "" {
+		t.Errorf("expected the deleted class's reverse mapping to be removed, got %q", got)
+	}
+}
+
+func TestCollisionPromotedLoserIsFresh(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	cache := NewExtendedResourceCache(logger)
+
+	winner := newDeviceClass("class-winner", "example.com/gpu", time.Unix(200, 0))
+	loser := newDeviceClass("class-loser", "example.com/gpu", time.Unix(100, 0))
+	cache.OnAdd(winner, false)
+	cache.OnAdd(loser, false)
+
+	// Update the loser while it is still the runner-up.
+	updatedLoser := loser.DeepCopy()
+	updatedLoser.Spec.Config = []resourceapi.DeviceClassConfiguration{{}}
+	cache.OnUpdate(loser, updatedLoser)
+
+	// Deleting the winner must promote the freshly updated runner-up, not a
+	// stale copy of the loser.
+	cache.OnDelete(winner)
+	if got := cache.GetDeviceClass("example.com/gpu"); got != updatedLoser {
+		t.Errorf("expected the fresh runner-up to be promoted, got %v", got)
+	}
+}
+
+func TestCollisionEqualTimestampTieBreak(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	cache := NewExtendedResourceCache(logger)
+
+	classA := newDeviceClass("class-a", "example.com/gpu", time.Unix(100, 0))
+	classB := newDeviceClass("class-b", "example.com/gpu", time.Unix(100, 0))
+	cache.OnAdd(classA, false)
+	cache.OnAdd(classB, false)
+
+	// Equal creation timestamps: the lexicographically first name wins.
+	if got := cache.GetDeviceClass("example.com/gpu"); got != classA {
+		t.Errorf("expected the lexicographically first name to win the tie, got %v", got)
+	}
+
+	renamed := classA.DeepCopy()
+	renamed.Spec.ExtendedResourceName = new(string)
+	*renamed.Spec.ExtendedResourceName = "new.example.com/gpu"
+	cache.OnUpdate(classA, renamed)
+
+	// Renaming the tie winner promotes the runner-up.
+	if got := cache.GetDeviceClass("example.com/gpu"); got != classB {
+		t.Errorf("expected the runner-up to be promoted after tie winner rename, got %v", got)
+	}
+	if got := cache.GetDeviceClass("new.example.com/gpu"); got != renamed {
+		t.Errorf("expected the renamed class to own its new name, got %v", got)
+	}
+	if got := cache.GetExtendedResource("class-a"); got != "new.example.com/gpu" {
+		t.Errorf("expected the renamed class's reverse mapping to be updated, got %q", got)
+	}
+}
+
+func TestBetterDeviceClass(t *testing.T) {
+	older := newDeviceClass("class-older", "example.com/gpu", time.Unix(100, 0))
+	newer := newDeviceClass("class-newer", "example.com/gpu", time.Unix(200, 0))
+	other := newDeviceClass("class-a", "example.com/gpu", time.Unix(100, 0))
+
+	// Newer classes win over older ones.
+	if betterDeviceClass(older, newer) {
+		t.Error("expected the older class to lose")
+	}
+	if !betterDeviceClass(newer, older) {
+		t.Error("expected the newer class to win")
+	}
+	// Equal creation timestamps: the lexicographically first name wins.
+	if !betterDeviceClass(other, older) {
+		t.Error("expected the lexicographically first name to win the tie")
+	}
+	if betterDeviceClass(older, other) {
+		t.Error("expected the lexicographically later name to lose the tie")
+	}
+	// A class is never better than itself.
+	if betterDeviceClass(older, older) {
+		t.Error("expected a class to not be better than itself")
+	}
+	// A nil class never wins, and never blocks a non-nil one.
+	if betterDeviceClass(nil, older) {
+		t.Error("expected a nil class to lose")
+	}
+	if betterDeviceClass(nil, nil) {
+		t.Error("expected a nil class to lose against another nil class")
+	}
+	if !betterDeviceClass(older, nil) {
+		t.Error("expected a class to win against a nil incumbent")
+	}
+}
+
 func setup(t *testing.T) (context.Context, *fake.Clientset, *ExtendedResourceCache) {
 	logger, ctx := ktesting.NewTestContext(t)
 	ctx, cancel := context.WithCancel(ctx)
@@ -397,7 +737,7 @@ func setup(t *testing.T) (context.Context, *fake.Clientset, *ExtendedResourceCac
 		informerFactory.Shutdown()
 	})
 	informerFactory.WaitForCacheSync(ctx.Done())
-	cache.WaitForNamedCacheSyncWithContext(ctx, handle.HasSynced)
+	clientcache.WaitForNamedCacheSyncWithContext(ctx, handle.HasSynced)
 
 	// fake.Clientset suffers from a race condition related to informers:
 	// it does not implement resource version support in its Watch

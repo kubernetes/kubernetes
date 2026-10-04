@@ -210,6 +210,16 @@ func TestMakeUserNsManager(t *testing.T) {
 			mappingLen:     65536,
 			maxPods:        2,
 		},
+		{
+			name:           "range ends at INVALID_UID",
+			mappingFirstID: 65536,
+			mappingLen:     (1 << 32) - 65536,
+		},
+		{
+			name:           "range ends past INVALID_UID",
+			mappingFirstID: 327680,
+			mappingLen:     4294836224,
+		},
 	}
 
 	for _, tc := range cases {

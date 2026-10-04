@@ -68,9 +68,9 @@ func init() {
 }
 
 type testPatchType struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 
-	TestPatchSubType `json:",inline"`
+	TestPatchSubType `json:""`
 }
 
 // We explicitly make it public as private types doesn't

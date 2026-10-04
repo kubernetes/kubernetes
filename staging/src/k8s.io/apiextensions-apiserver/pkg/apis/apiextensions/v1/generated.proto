@@ -322,7 +322,6 @@ message CustomResourceDefinitionVersion {
   // A maximum of 8 selectable fields are allowed.
   // See https://kubernetes.io/docs/concepts/overview/working-with-objects/field-selectors
   //
-  // +featureGate=CustomResourceFieldSelectors
   // +optional
   // +listType=atomic
   repeated SelectableField selectableFields = 9;
@@ -773,7 +772,6 @@ message ValidationRule {
   //
   // May not be set unless `oldSelf` is used in `rule`.
   //
-  // +featureGate=CRDValidationRatcheting
   // +optional
   optional bool optionalOldSelf = 6;
 }

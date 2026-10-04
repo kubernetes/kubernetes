@@ -36,11 +36,60 @@ func (c canceledError) Is(target error) bool {
 	return target == context.Canceled
 }
 
+// testContext returns the context associated with tb, as implemented by
+// [testing.T], [testing.B] and [testing.F] via their Context method. It
+// returns nil when tb doesn't support that, for example for Ginkgo.
+//
+// That context gets canceled by the "testing" package itself as soon as the
+// test function returns, before its Cleanup-registered functions run.
+func testContext(tb TB) context.Context {
+	if withCtx, ok := tb.(interface{ Context() context.Context }); ok {
+		return withCtx.Context()
+	}
+	return nil
+}
+
+// runWhenDone arranges for the callback to be invoked once as soon as possible after
+// the test represented by tb is done, ideally already before its
+// Cleanup-registered functions run. This is possible when tb's own test
+// context can be observed (see [testContext]) because that one gets
+// canceled at exactly that point. A final tb.Cleanup callback guarantees
+// that cancel really does get called (also for TB implementations without
+// their own context).
+func runWhenDone(tb TB, cb func()) {
+	if tbCtx := testContext(tb); tbCtx != nil {
+		done := make(chan struct{})
+		run := func() {
+			defer close(done)
+			cb()
+		}
+		stop := context.AfterFunc(tbCtx, run)
+		tb.Cleanup(func() {
+			// If tbCtx isn't canceled yet, cancel it ourselves instead of
+			// waiting for done. This is needed for TB implementations
+			// (like Ginkgo's, arguably a bug there) which cancel tbCtx
+			// via their own Cleanup, which runs after ours (LIFO order)
+			// and thus would never unblock <-done.
+			if stop() {
+				run()
+				return
+			}
+			// Wait for execution via AfterFunc.
+			<-done
+		})
+		return
+	}
+	// Fallback: run it as cleanup.
+	tb.Cleanup(func() {
+		cb()
+	})
+}
+
 // withTimeout corresponds to [context.WithTimeout]. In contrast to
 // [context.WithTimeout], it automatically cancels during test cleanup, provides
 // the given cause when the deadline is reached, and its cancel function
 // requires a cause.
-func withTimeout(ctx context.Context, tb TB, timeout time.Duration, timeoutCause string) (context.Context, func(cause string)) {
+func withTimeout(ctx context.Context, tb TB, timeout time.Duration, timeoutCause string) (context.Context, func(cause error)) {
 	tb.Helper()
 
 	now := time.Now()
@@ -50,12 +99,15 @@ func withTimeout(ctx context.Context, tb TB, timeout time.Duration, timeoutCause
 	stopCtx, stop := context.WithCancel(ctx) // Only used internally, doesn't need a cause.
 	done := make(chan struct{})
 	tb.Cleanup(func() {
-		cancel(cleanupErr(tb.Name()))
+		// This gets registered before cancel and thus runs after it.
 		stop()
 		// Wait for goroutine termination. This is important because
 		// otherwise the goroutine might log through tb *after* the
 		// test has already finished, which causes a panic.
 		<-done
+	})
+	runWhenDone(tb, func() {
+		cancel(cleanupErr(tb.Name()))
 	})
 	go func() {
 		defer close(done)
@@ -86,13 +138,7 @@ func withTimeout(ctx context.Context, tb TB, timeout time.Duration, timeoutCause
 	}
 
 	// We always have a deadline.
-	return deadlineContext{Context: cancelCtx, deadline: deadline}, func(cause string) {
-		var cancelCause error
-		if cause != "" {
-			cancelCause = canceledError(cause)
-		}
-		cancel(cancelCause)
-	}
+	return deadlineContext{Context: cancelCtx, deadline: deadline}, cancel
 }
 
 type deadlineContext struct {

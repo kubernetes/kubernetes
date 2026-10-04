@@ -79,7 +79,7 @@ func newServiceAccountTokenController(
 		return nil, fmt.Errorf("failed to build token generator: %w", err)
 	}
 	tokenController, err := serviceaccountcontroller.NewTokensController(
-		klog.FromContext(ctx),
+		ctx,
 		controllerContext.InformerFactory.Core().V1().ServiceAccounts(),
 		controllerContext.InformerFactory.Core().V1().Secrets(),
 		client,

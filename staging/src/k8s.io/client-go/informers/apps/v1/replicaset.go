@@ -34,11 +34,39 @@ import (
 )
 
 // ReplicaSetInformer provides access to a shared informer and lister for
-// ReplicaSets.
+// ReplicaSets. Prefer using the type-safe variant (see [TypedReplicaSetInformer]).
 type ReplicaSetInformer interface {
 	Informer() cache.SharedIndexInformer
 	Lister() appsv1.ReplicaSetLister
 }
+
+// TypedReplicaSetInformer provides access to a shared informer and lister for
+// ReplicaSets, including the type-safe TypedInformer variant.
+// It is a superset of ReplicaSetInformer.
+type TypedReplicaSetInformer interface {
+	Informer() cache.SharedIndexInformer
+	TypedInformer() ReplicaSetIndexInformer
+	Lister() appsv1.ReplicaSetLister
+}
+
+// ReplicaSetIndexInformer is a wrapper around the underlying [cache.SharedIndexInformer]
+// with type-safe variants of several methods.
+type ReplicaSetIndexInformer cache.TypedSharedIndexInformer[*apiappsv1.ReplicaSet]
+
+// ReplicaSetHandlerFuncs is a specialization of [cache.TypedResourceEventHandlerFuncs] for ReplicaSet.
+type ReplicaSetHandlerFuncs = cache.TypedResourceEventHandlerFuncs[*apiappsv1.ReplicaSet]
+
+// ReplicaSetDetailedHandlerFuncs is a specialization of [cache.TypedResourceEventHandlerDetailedFuncs] for ReplicaSet.
+type ReplicaSetDetailedHandlerFuncs = cache.TypedResourceEventHandlerDetailedFuncs[*apiappsv1.ReplicaSet]
+
+// ReplicaSetFilteringHandler is a specialization of [cache.TypedFilteringResourceEventHandler] for ReplicaSet.
+type ReplicaSetFilteringHandler = cache.TypedFilteringResourceEventHandler[*apiappsv1.ReplicaSet]
+
+// ReplicaSetIndexers is a specialization of [cache.TypedIndexers] for ReplicaSet.
+type ReplicaSetIndexers = cache.TypedIndexers[*apiappsv1.ReplicaSet]
+
+// DeletedReplicaSet is a specialization of [cache.DeletedObject] for ReplicaSet.
+type DeletedReplicaSet = cache.DeletedObject[*apiappsv1.ReplicaSet]
 
 type replicaSetInformer struct {
 	factory          internalinterfaces.SharedInformerFactory
@@ -49,25 +77,49 @@ type replicaSetInformer struct {
 // NewReplicaSetInformer constructs a new informer for ReplicaSet type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedReplicaSetInformer]).
 func NewReplicaSetInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
 	return NewReplicaSetInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers})
+}
+
+// NewTypedReplicaSetInformer constructs a new informer for ReplicaSet type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedReplicaSetInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers ReplicaSetIndexers) ReplicaSetIndexInformer {
+	return NewTypedReplicaSetInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.TypedIndexersToIndexers(indexers)})
 }
 
 // NewFilteredReplicaSetInformer constructs a new informer for ReplicaSet type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedFilteredReplicaSetInformer]).
 func NewFilteredReplicaSetInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
-	return NewReplicaSetInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
+	return NewTypedReplicaSetInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
+}
+
+// NewTypedFilteredReplicaSetInformer constructs a new informer for ReplicaSet type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedFilteredReplicaSetInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers ReplicaSetIndexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) ReplicaSetIndexInformer {
+	return NewTypedReplicaSetInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.TypedIndexersToIndexers(indexers), TweakListOptions: tweakListOptions})
 }
 
 // NewReplicaSetInformerWithOptions constructs a new informer for ReplicaSet type with additional options.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedReplicaSetInformerWithOptions]).
 func NewReplicaSetInformerWithOptions(client kubernetes.Interface, namespace string, options internalinterfaces.InformerOptions) cache.SharedIndexInformer {
+	return NewTypedReplicaSetInformerWithOptions(client, namespace, options)
+}
+
+// NewTypedReplicaSetInformerWithOptions constructs a new informer for ReplicaSet type with additional options.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedReplicaSetInformerWithOptions(client kubernetes.Interface, namespace string, options internalinterfaces.InformerOptions) ReplicaSetIndexInformer {
 	gvr := schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "replicasets"}
 	identifier := options.InformerName.WithResource(gvr)
 	tweakListOptions := options.TweakListOptions
-	return cache.NewSharedIndexInformerWithOptions(
+	return cache.NewTypedSharedIndexInformer[*apiappsv1.ReplicaSet](cache.NewSharedIndexInformerWithOptions(
 		cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
 			ListFunc: func(opts metav1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
@@ -100,17 +152,57 @@ func NewReplicaSetInformerWithOptions(client kubernetes.Interface, namespace str
 			Indexers:     options.Indexers,
 			Identifier:   identifier,
 		},
-	)
+	))
 }
 
 func (f *replicaSetInformer) defaultInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewReplicaSetInformerWithOptions(client, f.namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
+	return NewTypedReplicaSetInformerWithOptions(client, f.namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
 }
 
 func (f *replicaSetInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&apiappsv1.ReplicaSet{}, f.defaultInformer)
+	return f.TypedInformer()
+}
+
+func (f *replicaSetInformer) TypedInformer() ReplicaSetIndexInformer {
+	return cache.NewTypedSharedIndexInformer[*apiappsv1.ReplicaSet](f.factory.InformerFor(&apiappsv1.ReplicaSet{}, f.defaultInformer))
 }
 
 func (f *replicaSetInformer) Lister() appsv1.ReplicaSetLister {
 	return appsv1.NewReplicaSetLister(f.Informer().GetIndexer())
+}
+
+// ToTypedReplicaSetInformer converts an untyped informer into a TypedReplicaSetInformer.
+//
+// WARNING: this conversion is only safe if the informer handles objects of type
+// *ReplicaSet. If that is not the case, calling type-safe methods of the returned
+// TypedReplicaSetInformer leads to runtime panics. A safer alternative is to pass
+// around a TypedReplicaSetInformer instances that was obtained from a
+// SharedInformerFactory.
+func ToTypedReplicaSetInformer(informer ReplicaSetInformer) TypedReplicaSetInformer {
+	if informer, ok := informer.(TypedReplicaSetInformer); ok {
+		return informer
+	}
+	return &replicaSetTypedInformerAdapter{informer}
+}
+
+type replicaSetTypedInformerAdapter struct {
+	ReplicaSetInformer
+}
+
+func (a *replicaSetTypedInformerAdapter) TypedInformer() ReplicaSetIndexInformer {
+	return cache.NewTypedSharedIndexInformer[*apiappsv1.ReplicaSet](a.Informer())
+}
+
+// ToReplicaSetIndexInformer converts an untyped informer into a ReplicaSetIndexInformer.
+//
+// WARNING: this conversion is only safe if the informer handles objects of type
+// *ReplicaSet. If that is not the case, calling type-safe methods of the returned
+// ReplicaSetIndexInformer leads to runtime panics. A safer alternative is to pass
+// around a ReplicaSetIndexInformer instances that was obtained from a
+// SharedInformerFactory.
+func ToReplicaSetIndexInformer(informer cache.SharedIndexInformer) ReplicaSetIndexInformer {
+	if informer, ok := informer.(ReplicaSetIndexInformer); ok {
+		return informer
+	}
+	return cache.NewTypedSharedIndexInformer[*apiappsv1.ReplicaSet](informer)
 }

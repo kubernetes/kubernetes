@@ -118,7 +118,7 @@ func Convert_example2_TestTypeList_To_v1_TestTypeList(in *example2.TestTypeList,
 }
 
 func autoConvert_v1_TestTypeStatus_To_example2_TestTypeStatus(in *TestTypeStatus, out *example2.TestTypeStatus, s conversion.Scope) error {
-	out.Blah = in.Blah
+	*out = *(*example2.TestTypeStatus)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -128,7 +128,7 @@ func Convert_v1_TestTypeStatus_To_example2_TestTypeStatus(in *TestTypeStatus, ou
 }
 
 func autoConvert_example2_TestTypeStatus_To_v1_TestTypeStatus(in *example2.TestTypeStatus, out *TestTypeStatus, s conversion.Scope) error {
-	out.Blah = in.Blah
+	*out = *(*TestTypeStatus)(unsafe.Pointer(in))
 	return nil
 }
 

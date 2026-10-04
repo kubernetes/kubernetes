@@ -32,14 +32,17 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	apiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller/statefulset"
 	"k8s.io/kubernetes/pkg/controlplane"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/integration/framework"
 	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/ptr"
@@ -124,8 +127,7 @@ func TestVolumeTemplateNoopUpdate(t *testing.T) {
 }
 
 func TestSpecReplicasChange(t *testing.T) {
-	tCtx, closeFn, rm, informers, c := scSetup(t)
-	defer closeFn()
+	tCtx, rm, informers, c := scSetup(t)
 	ns := framework.CreateNamespaceOrDie(c, "test-spec-replicas-change", t)
 	defer framework.DeleteNamespaceOrDie(c, ns, t)
 	cancel := runControllerAndInformers(tCtx, rm, informers)
@@ -167,8 +169,7 @@ func TestSpecReplicasChange(t *testing.T) {
 }
 
 func TestDeletingAndTerminatingPods(t *testing.T) {
-	tCtx, closeFn, rm, informers, c := scSetup(t)
-	defer closeFn()
+	tCtx, rm, informers, c := scSetup(t)
 	ns := framework.CreateNamespaceOrDie(c, "test-deleting-and-failed-pods", t)
 	defer framework.DeleteNamespaceOrDie(c, ns, t)
 	cancel := runControllerAndInformers(tCtx, rm, informers)
@@ -285,8 +286,7 @@ func TestStatefulSetAvailable(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			tCtx, closeFn, rm, informers, c := scSetup(t)
-			defer closeFn()
+			tCtx, rm, informers, c := scSetup(t)
 			ns := framework.CreateNamespaceOrDie(c, "test-available-pods", t)
 			defer framework.DeleteNamespaceOrDie(c, ns, t)
 			cancel := runControllerAndInformers(tCtx, rm, informers)
@@ -384,8 +384,7 @@ func TestStatefulSetStatusWithPodFail(t *testing.T) {
 			}
 		},
 	})
-	defer closeFn()
-	defer tCtx.Cancel("test has completed")
+	tCtx.Cleanup(closeFn)
 	resyncPeriod := 12 * time.Hour
 	informers := informers.NewSharedInformerFactory(clientset.NewForConfigOrDie(restclient.AddUserAgent(config, "statefulset-informers")), resyncPeriod)
 	ssc := statefulset.NewStatefulSetController(
@@ -468,8 +467,7 @@ func TestAutodeleteOwnerRefs(t *testing.T) {
 		},
 	}
 
-	tCtx, closeFn, rm, informers, c := scSetup(t)
-	defer closeFn()
+	tCtx, rm, informers, c := scSetup(t)
 	cancel := runControllerAndInformers(tCtx, rm, informers)
 	defer cancel()
 
@@ -511,8 +509,7 @@ func TestAutodeleteOwnerRefs(t *testing.T) {
 }
 
 func TestDeletingPodForRollingUpdatePartition(t *testing.T) {
-	tCtx, closeFn, rm, informers, c := scSetup(t)
-	defer closeFn()
+	tCtx, rm, informers, c := scSetup(t)
 	ns := framework.CreateNamespaceOrDie(c, "test-deleting-pod-for-rolling-update-partition", t)
 	defer framework.DeleteNamespaceOrDie(c, ns, t)
 	cancel := runControllerAndInformers(tCtx, rm, informers)
@@ -690,8 +687,7 @@ func TestStatefulSetStartOrdinal(t *testing.T) {
 		},
 	}
 
-	tCtx, closeFn, rm, informers, c := scSetup(t)
-	defer closeFn()
+	tCtx, rm, informers, c := scSetup(t)
 	cancel := runControllerAndInformers(tCtx, rm, informers)
 	defer cancel()
 
@@ -764,8 +760,7 @@ func TestStatefulSetStartOrdinal(t *testing.T) {
 	}
 }
 func TestStatefulSetPodSubdomain(t *testing.T) {
-	tCtx, closeFn, rm, informers, c := scSetup(t)
-	defer closeFn()
+	tCtx, rm, informers, c := scSetup(t)
 	ns := framework.CreateNamespaceOrDie(c, "test-pod-subdomain", t)
 	defer framework.DeleteNamespaceOrDie(c, ns, t)
 	cancel := runControllerAndInformers(tCtx, rm, informers)
@@ -792,6 +787,133 @@ func TestStatefulSetPodSubdomain(t *testing.T) {
 	for _, pod := range pods.Items {
 		if pod.Spec.Subdomain != serviceName {
 			t.Errorf("Pod %s has incorrect subdomain: got %s, want %s", pod.Name, pod.Spec.Subdomain, serviceName)
+		}
+	}
+}
+
+func TestRecreateStatefulSetUpdate(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetRecreateStrategy, true)
+	tCtx, rm, informers, c := scSetup(t)
+	ns := framework.CreateNamespaceOrDie(c, "test-recreate-update", t)
+	defer framework.DeleteNamespaceOrDie(c, ns, t)
+	cancel := runControllerAndInformers(tCtx, rm, informers)
+	defer cancel()
+
+	createHeadlessService(t, c, newHeadlessService(ns.Name))
+	labelMap := labelMap()
+	sts := newSTS("sts", ns.Name, 3)
+	sts.Spec.UpdateStrategy = appsv1.StatefulSetUpdateStrategy{
+		Type: appsv1.RecreateStatefulSetStrategyType,
+	}
+	stss, _ := createSTSsPods(t, c, []*appsv1.StatefulSet{sts}, []*v1.Pod{})
+	sts = stss[0]
+	waitSTSStable(t, c, sts)
+
+	podClient := c.CoreV1().Pods(ns.Name)
+	pods := getPods(t, podClient, labelMap)
+	if len(pods.Items) != 3 {
+		t.Fatalf("len(pods) = %d, want 3", len(pods.Items))
+	}
+	setPodsReadyCondition(t, c, pods, v1.ConditionTrue, time.Now())
+
+	stsClient := c.AppsV1().StatefulSets(ns.Name)
+	sts, err := stsClient.Get(tCtx, sts.Name, metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("Failed to get StatefulSet: %v", err)
+	}
+	oldCurrentRevision := sts.Status.CurrentRevision
+
+	// oldPodUIDs will be used to make sure all old pods were deleted
+	pods = getPods(t, podClient, labelMap)
+	oldPodUIDs := make(map[string]types.UID)
+	for _, pod := range pods.Items {
+		oldPodUIDs[pod.Name] = pod.UID
+	}
+
+	// oldPVCUIDs will be used to make sure all pvcs are preserved after recreate
+	pvcClient := c.CoreV1().PersistentVolumeClaims(ns.Name)
+	oldPVCs := getStatefulSetPVCs(t, pvcClient, sts)
+	oldPVCUIDs := make(map[string]types.UID)
+	for _, pvc := range oldPVCs {
+		oldPVCUIDs[pvc.Name] = pvc.UID
+	}
+
+	newImage := "new-image"
+	updateSTS(t, stsClient, sts.Name, func(sts *appsv1.StatefulSet) {
+		sts.Spec.Template.Spec.Containers[0].Image = newImage
+	})
+
+	if err := wait.PollUntilContextTimeout(tCtx, pollInterval, pollTimeout, false, func(ctx context.Context) (bool, error) {
+		ss, err := stsClient.Get(ctx, sts.Name, metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+		currentPods := getPods(t, podClient, labelMap)
+
+		// At no point mixed revisions should exists between pods in recreate
+		revisions := make(map[string]bool)
+		for _, pod := range currentPods.Items {
+			rev := pod.Labels[appsv1.ControllerRevisionHashLabelKey]
+			if rev != "" {
+				revisions[rev] = true
+			}
+		}
+		if len(revisions) > 1 {
+			return false, fmt.Errorf("found mixed revisions among pods: %v", revisions)
+		}
+
+		pendingPods := v1.PodList{}
+		for _, pod := range currentPods.Items {
+			if pod.Status.Phase == v1.PodPending {
+				pendingPods.Items = append(pendingPods.Items, pod)
+			}
+		}
+		if len(pendingPods.Items) > 0 {
+			setPodsReadyCondition(t, c, &pendingPods, v1.ConditionTrue, time.Now())
+		}
+
+		return ss.Status.ReadyReplicas == *ss.Spec.Replicas &&
+			ss.Status.CurrentRevision == ss.Status.UpdateRevision, nil
+	}); err != nil {
+		t.Fatalf("Timed out waiting for recreate update to complete: %v", err)
+	}
+
+	sts, err = stsClient.Get(tCtx, sts.Name, metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("Failed to get StatefulSet after update: %v", err)
+	}
+
+	if sts.Status.CurrentRevision == oldCurrentRevision {
+		t.Fatalf("CurrentRevision should have changed from %s after recreate", oldCurrentRevision)
+	}
+
+	// Verify all pods were recreated and have the new image.
+	pods = getPods(t, podClient, labelMap)
+	if len(pods.Items) != int(*sts.Spec.Replicas) {
+		t.Fatalf("Expected %d pods, got %d", *sts.Spec.Replicas, len(pods.Items))
+	}
+	for _, pod := range pods.Items {
+		if oldUID, ok := oldPodUIDs[pod.Name]; ok && pod.UID == oldUID {
+			t.Fatalf("Pod %s was not recreated", pod.Name)
+		}
+		if pod.Spec.Containers[0].Image != newImage {
+			t.Fatalf("Pod %s has image %s, want %s", pod.Name, pod.Spec.Containers[0].Image, newImage)
+		}
+	}
+
+	// Verify PVCs were preserved through the recreate.
+	newPVCs := getStatefulSetPVCs(t, pvcClient, sts)
+	if len(newPVCs) != len(oldPVCs) {
+		t.Fatalf("PVC count changed: before=%d, after=%d", len(oldPVCs), len(newPVCs))
+	}
+	for _, pvc := range newPVCs {
+		oldUID, ok := oldPVCUIDs[pvc.Name]
+		if !ok {
+			t.Fatalf("Unexpected PVC %s appeared after recreate", pvc.Name)
+		}
+		if pvc.UID != oldUID {
+			t.Fatalf("PVC %s was recreated (UID changed from %s to %s), should be preserved",
+				pvc.Name, oldUID, pvc.UID)
 		}
 	}
 }

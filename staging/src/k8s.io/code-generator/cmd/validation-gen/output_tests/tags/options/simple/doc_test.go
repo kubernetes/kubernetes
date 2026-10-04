@@ -17,7 +17,10 @@ limitations under the License.
 package simple
 
 import (
+	"errors"
 	"testing"
+
+	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
 func Test(t *testing.T) {
@@ -25,7 +28,7 @@ func Test(t *testing.T) {
 
 	st.Value(&Struct{
 		// All zero values
-	}).ExpectValidateFalseByPath(map[string][]string{
+	}).Opts(map[string]bool{"FeatureX": false, "FeatureY": false}).ExpectValidateFalseByPath(map[string][]string{
 		// All ifDisabled validations should trigger
 		"xDisabledField": {"field Struct.XDisabledField"},
 		"yDisabledField": {"field Struct.YDisabledField"},
@@ -34,7 +37,7 @@ func Test(t *testing.T) {
 
 	st.Value(&Struct{
 		// All zero values
-	}).Opts([]string{"FeatureX", "FeatureY"}).ExpectValidateFalseByPath(map[string][]string{
+	}).Opts(map[string]bool{"FeatureX": true, "FeatureY": true}).ExpectValidateFalseByPath(map[string][]string{
 		// All ifEnabled validations should trigger
 		"xEnabledField":     {"field Struct.XEnabledField"},
 		"yEnabledField":     {"field Struct.YEnabledField"},
@@ -44,7 +47,7 @@ func Test(t *testing.T) {
 
 	st.Value(&Struct{
 		// All zero values
-	}).Opts([]string{"FeatureX"}).ExpectValidateFalseByPath(map[string][]string{
+	}).Opts(map[string]bool{"FeatureX": true, "FeatureY": false}).ExpectValidateFalseByPath(map[string][]string{
 		// All ifEnabled validations should trigger
 		"xEnabledField":  {"field Struct.XEnabledField"},
 		"yDisabledField": {"field Struct.YDisabledField"},
@@ -56,9 +59,23 @@ func Test(t *testing.T) {
 
 	st.Value(&Struct{
 		// All zero values
-	}).Opts([]string{"FeatureY"}).ExpectValidateFalseByPath(map[string][]string{
+	}).Opts(map[string]bool{"FeatureX": false, "FeatureY": true}).ExpectValidateFalseByPath(map[string][]string{
 		// All ifEnabled validations should trigger
 		"xDisabledField": {"field Struct.XDisabledField"},
 		"yEnabledField":  {"field Struct.YEnabledField"},
+	})
+
+	// No options declared: every referenced option is undeclared.
+	internal := func(p string) *field.Error {
+		return field.InternalError(field.NewPath(p), errors.New(""))
+	}
+	st.Value(&Struct{}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
+		internal("xEnabledField"),
+		internal("xDisabledField"),
+		internal("yEnabledField"),
+		internal("yDisabledField"),
+		internal("xyMixedField"), // ifEnabled(FeatureX)
+		internal("xyMixedField"), // ifDisabled(FeatureY)
+		internal("nilableAliasField"),
 	})
 }

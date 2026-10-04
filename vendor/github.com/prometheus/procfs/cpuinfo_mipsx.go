@@ -12,8 +12,6 @@
 // limitations under the License.
 
 //go:build linux && (mips || mipsle || mips64 || mips64le)
-// +build linux
-// +build mips mipsle mips64 mips64le
 
 package procfs
 

@@ -25,6 +25,8 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/apimachinery/pkg/runtime/serializer/cbor"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -42,9 +44,11 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/util/openapi"
 	utilpeerproxy "k8s.io/apiserver/pkg/util/peerproxy"
+	"k8s.io/apiserver/pkg/util/proxy"
 	"k8s.io/client-go/dynamic"
 	clientgoinformers "k8s.io/client-go/informers"
 	clientgoclientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/keyutil"
 	basecompatibility "k8s.io/component-base/compatibility"
 	metricsfeatures "k8s.io/component-base/metrics/features"
@@ -75,6 +79,10 @@ type Extra struct {
 
 	EnableLogsSupport bool
 	ProxyTransport    *http.Transport
+
+	// EndpointSliceGetter is a getter to look up endpoint slices for IP routing.
+	// If nil, endpoint slice routing is unavailable.
+	EndpointSliceGetter proxy.EndpointSliceGetter
 
 	// PeerProxy, if not nil, sets proxy transport between kube-apiserver peers for requests
 	// that can not be served locally
@@ -116,13 +124,18 @@ func BuildGenericConfig(
 	schemes []*runtime.Scheme,
 	resourceConfig *serverstorage.ResourceConfig,
 	getOpenAPIDefinitions func(ref openapicommon.ReferenceCallback) map[string]openapicommon.OpenAPIDefinition,
+	informerName *cache.InformerName,
 ) (
 	genericConfig *genericapiserver.Config,
 	versionedInformers clientgoinformers.SharedInformerFactory,
 	storageFactory *serverstorage.DefaultStorageFactory,
 	lastErr error,
 ) {
-	genericConfig = genericapiserver.NewConfig(legacyscheme.Codecs)
+	codecs := legacyscheme.Codecs
+	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.CBORServingAndStorage) {
+		codecs = serializer.NewCodecFactory(legacyscheme.Scheme, serializer.WithSerializer(cbor.NewSerializerInfo))
+	}
+	genericConfig = genericapiserver.NewConfig(codecs)
 	genericConfig.Flagz = s.Flagz
 	genericConfig.MergedResourceConfig = resourceConfig
 
@@ -155,7 +168,12 @@ func BuildGenericConfig(
 		}
 		return obj, nil
 	}
-	versionedInformers = clientgoinformers.NewSharedInformerFactoryWithOptions(clientgoExternalClient, 10*time.Minute, clientgoinformers.WithTransform(trim))
+	versionedInformers = clientgoinformers.NewSharedInformerFactoryWithOptions(
+		clientgoExternalClient,
+		10*time.Minute,
+		clientgoinformers.WithTransform(trim),
+		clientgoinformers.WithInformerName(informerName),
+	)
 
 	if lastErr = s.Features.ApplyTo(genericConfig, clientgoExternalClient, versionedInformers); lastErr != nil {
 		return
@@ -235,7 +253,7 @@ func BuildGenericConfig(
 }
 
 // BuildAuthorizer constructs the authorizer. If authorization is not set in s, it returns nil, nil, false, nil
-func BuildAuthorizer(ctx context.Context, s options.CompletedOptions, egressSelector *egressselector.EgressSelector, apiserverID string, versionedInformers clientgoinformers.SharedInformerFactory) (authorizer.UnconditionalAuthorizer, authorizer.RuleResolver, bool, error) {
+func BuildAuthorizer(ctx context.Context, s options.CompletedOptions, egressSelector *egressselector.EgressSelector, apiserverID string, versionedInformers clientgoinformers.SharedInformerFactory) (authorizer.Authorizer, authorizer.RuleResolver, bool, error) {
 	authorizationConfig, err := s.Authorization.ToAuthorizationConfig(versionedInformers)
 	if err != nil {
 		return nil, nil, false, err
@@ -271,6 +289,7 @@ func CreateConfig(
 	opts options.CompletedOptions,
 	genericConfig *genericapiserver.Config,
 	versionedInformers clientgoinformers.SharedInformerFactory,
+	endpointSliceGetter proxy.EndpointSliceGetter,
 	storageFactory *serverstorage.DefaultStorageFactory,
 	serviceResolver aggregatorapiserver.ServiceResolver,
 	additionalInitializers []admission.PluginInitializer,
@@ -301,6 +320,8 @@ func CreateConfig(
 			ExtendExpiration:                    opts.Authentication.ServiceAccounts.ExtendExpiration,
 
 			VersionedInformers: versionedInformers,
+
+			EndpointSliceGetter: endpointSliceGetter,
 
 			CoordinatedLeadershipLeaseDuration: opts.CoordinatedLeadershipLeaseDuration,
 			CoordinatedLeadershipRenewDeadline: opts.CoordinatedLeadershipRenewDeadline,

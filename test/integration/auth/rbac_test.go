@@ -95,7 +95,7 @@ func (getter *testRESTOptionsGetter) GetRESTOptions(resource schema.GroupResourc
 	return generic.RESTOptions{StorageConfig: storageConfig, Decorator: generic.UndecoratedStorage, ResourcePrefix: resource.Resource}, nil
 }
 
-func newRBACAuthorizer(t *testing.T, config *controlplane.Config) (authorizer.UnconditionalAuthorizer, func()) {
+func newRBACAuthorizer(t *testing.T, config *controlplane.Config) (authorizer.Authorizer, func()) {
 	optsGetter := &testRESTOptionsGetter{config}
 	roleRest, err := rolestore.NewREST(optsGetter)
 	if err != nil {
@@ -566,9 +566,16 @@ func TestRBAC(t *testing.T) {
 					// Append our custom test authenticator
 					config.ControlPlane.Generic.Authentication.Authenticator = unionauthn.New(config.ControlPlane.Generic.Authentication.Authenticator, authenticator)
 					// Append our custom test authorizer
-					var rbacAuthz authorizer.UnconditionalAuthorizer
+					var rbacAuthz authorizer.Authorizer
 					rbacAuthz, tearDownAuthorizerFn = newRBACAuthorizer(t, config)
-					config.ControlPlane.Generic.Authorization.Authorizer = unionauthz.New(config.ControlPlane.Generic.Authorization.Authorizer, rbacAuthz)
+					authz, err := unionauthz.New(
+						unionauthz.NamedAuthorizer{AuthorizerName: "default", Authorizer: config.ControlPlane.Generic.Authorization.Authorizer},
+						unionauthz.NamedAuthorizer{AuthorizerName: "rbac-test", Authorizer: rbacAuthz},
+					)
+					if err != nil {
+						t.Fatalf("unionauthz.New: %v", err)
+					}
+					config.ControlPlane.Generic.Authorization.Authorizer = authz
 				},
 			})
 			defer tearDownFn()
@@ -972,7 +979,7 @@ func TestRBACContextContamination(t *testing.T) {
 			tearDownAuthorizerFn()
 		}
 	}()
-	var rbacAuthz authorizer.UnconditionalAuthorizer
+	var rbacAuthz authorizer.Authorizer
 	_, kubeConfig, tearDownFn := framework.StartTestServer(context.Background(), t, framework.TestServerSetup{
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
 			// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
@@ -987,7 +994,14 @@ func TestRBACContextContamination(t *testing.T) {
 			config.ControlPlane.Generic.Authentication.Authenticator = unionauthn.New(config.ControlPlane.Generic.Authentication.Authenticator, authenticator)
 			// Append our custom test authorizer
 			rbacAuthz, tearDownAuthorizerFn = newRBACAuthorizer(t, config)
-			config.ControlPlane.Generic.Authorization.Authorizer = unionauthz.New(config.ControlPlane.Generic.Authorization.Authorizer, rbacAuthz)
+			authz, err := unionauthz.New(
+				unionauthz.NamedAuthorizer{AuthorizerName: "default", Authorizer: config.ControlPlane.Generic.Authorization.Authorizer},
+				unionauthz.NamedAuthorizer{AuthorizerName: "rbac-test", Authorizer: rbacAuthz},
+			)
+			if err != nil {
+				t.Fatalf("unionauthz.New: %v", err)
+			}
+			config.ControlPlane.Generic.Authorization.Authorizer = authz
 		},
 	})
 	defer tearDownFn()

@@ -25,6 +25,7 @@ import (
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/watch"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -1086,7 +1087,7 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 								Image: defaultImage,
 								Command: ExecCommand(regular1, execCommand{
 									Delay:    10,
-									ExitCode: -1,
+									ExitCode: 1,
 								}),
 							},
 						},
@@ -1596,7 +1597,7 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 								Image: defaultImage,
 								Command: ExecCommand(regular1, execCommand{
 									Delay:    20,
-									ExitCode: -1,
+									ExitCode: 1,
 								}),
 							},
 						},
@@ -2201,6 +2202,9 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 							Delay:    600,
 							ExitCode: 0,
 						}),
+						Lifecycle: &v1.Lifecycle{
+							PostStart: startedPostStartGate(),
+						},
 						RestartPolicy: &containerRestartPolicyAlways,
 					},
 					{
@@ -2218,6 +2222,9 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 							Delay:    600,
 							ExitCode: 0,
 						}),
+						Lifecycle: &v1.Lifecycle{
+							PostStart: startedPostStartGate(),
+						},
 						RestartPolicy: &containerRestartPolicyAlways,
 					},
 					{
@@ -5220,7 +5227,13 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 				err = client.Delete(ctx, pod.Name, metav1.DeleteOptions{GracePeriodSeconds: &grace})
 				framework.ExpectNoError(err)
 				ginkgo.By("waiting for the pod to disappear")
-				err = e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, pod.Name, pod.Namespace, 120*time.Second)
+				err = framework.Gomega().Eventually(ctx, framework.HandleRetry(func(ctx context.Context) (*v1.Pod, error) {
+					pod, err := f.ClientSet.CoreV1().Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
+					if apierrors.IsNotFound(err) {
+						return nil, nil
+					}
+					return pod, err
+				})).WithTimeout(120 * time.Second).WithPolling(100 * time.Millisecond).Should(gomega.BeNil())
 				framework.ExpectNoError(err)
 
 				buffer := int64(2)
@@ -6395,6 +6408,183 @@ var _ = SIGDescribe(framework.WithSerial(), "Not Change Container Status", frame
 	f := framework.NewDefaultFramework("not-change-container-status-test-serial")
 	addAfterEachForCleaningUpPods(f)
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
+
+	// Regression test for https://github.com/kubernetes/kubernetes/issues/141155.
+	ginkgo.It("should gate probes when a container exits while the kubelet is stopped", func(ctx context.Context) {
+		pod := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "startup-gate-kubelet-restart",
+			},
+			Spec: v1.PodSpec{
+				TerminationGracePeriodSeconds: ptr.To[int64](2),
+				RestartPolicy:                 v1.RestartPolicyAlways,
+				Containers: []v1.Container{
+					{
+						Name:  "busybox",
+						Image: imageutils.GetE2EImage(imageutils.BusyBox),
+						Command: []string{"/bin/sh", "-c", `
+instance=initial
+if test -f /state/container-seen; then
+  instance=replacement
+else
+  touch /state/container-seen
+fi
+echo "$instance" > /state/instance
+sleep 3600
+`},
+						StartupProbe: &v1.Probe{
+							ProbeHandler: v1.ProbeHandler{
+								Exec: &v1.ExecAction{
+									Command: []string{"/bin/sh", "-c", `test "$(cat /state/instance)" = "initial" || test -f /state/allow-startup`},
+								},
+							},
+							// Widen the interval in which an incorrectly inherited Started
+							// status would allow the other probe workers to run.
+							PeriodSeconds:    10,
+							FailureThreshold: 100,
+						},
+						LivenessProbe: &v1.Probe{
+							ProbeHandler: v1.ProbeHandler{
+								Exec: &v1.ExecAction{
+									Command: []string{"/bin/sh", "-c", `
+if test "$(cat /state/instance)" = "replacement"; then
+  touch /state/liveness-ran-on-replacement
+fi
+exit 0
+`},
+								},
+							},
+							PeriodSeconds:    1,
+							FailureThreshold: 1,
+						},
+						ReadinessProbe: &v1.Probe{
+							ProbeHandler: v1.ProbeHandler{
+								Exec: &v1.ExecAction{
+									Command: []string{"/bin/sh", "-c", `
+if test "$(cat /state/instance)" = "replacement"; then
+  touch /state/readiness-ran-on-replacement
+fi
+exit 0
+`},
+								},
+							},
+							PeriodSeconds:    1,
+							FailureThreshold: 1,
+						},
+						VolumeMounts: []v1.VolumeMount{
+							{Name: "state", MountPath: "/state"},
+						},
+					},
+				},
+				Volumes: []v1.Volume{
+					{
+						Name:         "state",
+						VolumeSource: v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{}},
+					},
+				},
+			},
+		}
+
+		podClient := e2epod.NewPodClient(f)
+		pod = podClient.Create(ctx, pod)
+
+		ginkgo.By("Waiting for the initial container to pass its probes")
+		err := e2epod.WaitForPodCondition(ctx, f.ClientSet, pod.Namespace, pod.Name, "initial container started and ready", f.Timeouts.PodStart,
+			func(p *v1.Pod) (bool, error) {
+				if len(p.Status.ContainerStatuses) != 1 {
+					return false, nil
+				}
+				status := p.Status.ContainerStatuses[0]
+				return status.State.Running != nil && status.Started != nil && *status.Started && status.Ready, nil
+			})
+		framework.ExpectNoError(err)
+
+		pod, err = podClient.Get(ctx, pod.Name, metav1.GetOptions{})
+		framework.ExpectNoError(err)
+		initialContainerID := pod.Status.ContainerStatuses[0].ContainerID
+
+		ginkgo.By("Finding the pod sandbox")
+		runtimeService, _, err := getCRIClient(ctx)
+		framework.ExpectNoError(err)
+		sandboxes, err := runtimeService.ListPodSandbox(ctx, &runtimeapi.PodSandboxFilter{})
+		framework.ExpectNoError(err)
+		var podSandboxID string
+		for _, sandbox := range sandboxes {
+			if sandbox.Metadata != nil && sandbox.Metadata.Name == pod.Name && sandbox.Metadata.Namespace == pod.Namespace {
+				podSandboxID = sandbox.Id
+				break
+			}
+		}
+		gomega.Expect(podSandboxID).ToNot(gomega.BeEmpty(), "pod sandbox for %s/%s was not found", pod.Namespace, pod.Name)
+
+		ginkgo.By("Stopping the kubelet and the pod sandbox")
+		restartKubelet := mustStopKubelet(ctx, f)
+		err = runtimeService.StopPodSandbox(ctx, podSandboxID)
+		framework.ExpectNoError(err)
+
+		ginkgo.By("Restarting the kubelet")
+		restartKubelet(ctx)
+
+		ginkgo.By("Waiting for the replacement container to remain gated by startup")
+		err = e2epod.WaitForPodCondition(ctx, f.ClientSet, pod.Namespace, pod.Name, "replacement container running but not started", f.Timeouts.PodStart,
+			func(p *v1.Pod) (bool, error) {
+				if len(p.Status.ContainerStatuses) != 1 {
+					return false, nil
+				}
+				status := p.Status.ContainerStatuses[0]
+				return status.ContainerID != "" && status.ContainerID != initialContainerID && status.State.Running != nil && status.Started != nil && !*status.Started, nil
+			})
+		framework.ExpectNoError(err)
+
+		gomega.Consistently(ctx, func(ctx context.Context) error {
+			currentPod, err := podClient.Get(ctx, pod.Name, metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+			if len(currentPod.Status.ContainerStatuses) != 1 {
+				return fmt.Errorf("got %d container statuses, want 1", len(currentPod.Status.ContainerStatuses))
+			}
+			status := currentPod.Status.ContainerStatuses[0]
+			if status.ContainerID == initialContainerID {
+				return fmt.Errorf("container ID still refers to the initial container %q", initialContainerID)
+			}
+			if status.Started == nil || *status.Started {
+				return fmt.Errorf("replacement container Started is %v, want false", status.Started)
+			}
+			if status.Ready {
+				return fmt.Errorf("replacement container is ready before startup succeeded")
+			}
+			if status.RestartCount != 1 {
+				return fmt.Errorf("replacement container restart count is %d, want 1", status.RestartCount)
+			}
+			return nil
+		}, 5*time.Second, f.Timeouts.Poll).Should(gomega.Succeed())
+
+		_, stderr, err := e2epod.ExecCommandInContainerWithFullOutput(f, pod.Name, "busybox", "/bin/sh", "-c",
+			"test ! -e /state/liveness-ran-on-replacement && test ! -e /state/readiness-ran-on-replacement")
+		framework.ExpectNoError(err, "liveness or readiness probe ran against the replacement container before startup succeeded: %s", stderr)
+
+		ginkgo.By("Allowing startup to succeed")
+		_, stderr, err = e2epod.ExecCommandInContainerWithFullOutput(f, pod.Name, "busybox", "touch", "/state/allow-startup")
+		framework.ExpectNoError(err, "failed to allow the replacement container startup probe to succeed: %s", stderr)
+
+		err = e2epod.WaitForPodCondition(ctx, f.ClientSet, pod.Namespace, pod.Name, "replacement container started and ready", f.Timeouts.PodStart,
+			func(p *v1.Pod) (bool, error) {
+				if len(p.Status.ContainerStatuses) != 1 {
+					return false, nil
+				}
+				status := p.Status.ContainerStatuses[0]
+				return status.ContainerID != initialContainerID && status.Started != nil && *status.Started && status.Ready && status.RestartCount == 1, nil
+			})
+		framework.ExpectNoError(err)
+
+		gomega.Eventually(ctx, func() error {
+			_, _, err := e2epod.ExecCommandInContainerWithFullOutput(f, pod.Name, "busybox", "/bin/sh", "-c",
+				"test -e /state/liveness-ran-on-replacement && test -e /state/readiness-ran-on-replacement")
+			return err
+		}, f.Timeouts.PodStart, f.Timeouts.Poll).Should(gomega.Succeed(), "liveness and readiness probes should run after startup succeeds")
+	})
+
 	ginkgo.When("a Pod is running", func() {
 		testKubeletRestart := func(ctx context.Context, pod *v1.Pod) {
 			client := e2epod.NewPodClient(f)
@@ -6966,9 +7156,18 @@ var _ = SIGDescribe(framework.WithSerial(), "Not Change Container Status", frame
 				framework.ExpectNoError(err, "failed to remove /tmp/ready from container %s", c.Name)
 			}
 
-			ginkgo.By("Waiting for the pod to become NotReady")
-			err = e2epod.WaitForPodCondition(ctx, f.ClientSet, pod.Namespace, pod.Name, "PodNotReady", f.Timeouts.PodStart,
+			ginkgo.By("Waiting for the pod and all containers to become NotReady")
+			err = e2epod.WaitForPodCondition(ctx, f.ClientSet, pod.Namespace, pod.Name, "PodNotReady with all containers not ready", f.Timeouts.PodStart,
 				func(p *v1.Pod) (bool, error) {
+					// PodReady becomes false after the first readiness failure, so wait for every container status update.
+					if len(p.Status.ContainerStatuses) != len(pod.Spec.Containers) {
+						return false, nil
+					}
+					for _, status := range p.Status.ContainerStatuses {
+						if status.Ready {
+							return false, nil
+						}
+					}
 					for _, cond := range p.Status.Conditions {
 						if cond.Type == v1.PodReady && cond.Status == v1.ConditionFalse {
 							return true, nil

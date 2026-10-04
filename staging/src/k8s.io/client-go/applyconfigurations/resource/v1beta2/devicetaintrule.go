@@ -34,14 +34,14 @@ import (
 // This has the same effect as if the taint was specified directly
 // in the ResourceSlice by the DRA driver.
 type DeviceTaintRuleApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration `json:",inline"`
-	// Standard object metadata
+	v1.TypeMetaApplyConfiguration `json:""`
+	// metadata is the standard object metadata.
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	// Spec specifies the selector and one taint.
+	// spec specifies the selector and one taint.
 	//
 	// Changing the spec automatically increments the metadata.generation number.
 	Spec *DeviceTaintRuleSpecApplyConfiguration `json:"spec,omitempty"`
-	// Status provides information about what was requested in the spec.
+	// status provides information about what was requested in the spec.
 	Status *DeviceTaintRuleStatusApplyConfiguration `json:"status,omitempty"`
 }
 

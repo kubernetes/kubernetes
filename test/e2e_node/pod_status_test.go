@@ -26,6 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	admissionapi "k8s.io/pod-security-admission/api"
 )
@@ -97,7 +98,7 @@ var _ = SIGDescribe(framework.WithSerial(), "Pods status phase", func() {
 		ginkgo.By("Stopping the kubelet")
 		startKubelet := mustStopKubelet(ctx, f)
 		gomega.Eventually(ctx, func() bool {
-			return kubeletHealthCheck(kubeletHealthCheckURL)
+			return e2enode.HealthCheck(kubeletHealthCheckURL)
 		}, f.Timeouts.PodStart, f.Timeouts.Poll).Should(gomega.BeFalseBecause("kubelet should be stopped"))
 
 		ginkgo.By("Stopping the pod sandbox")

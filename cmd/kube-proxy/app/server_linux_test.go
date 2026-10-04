@@ -29,7 +29,7 @@ import (
 
 	"github.com/spf13/pflag"
 	v1 "k8s.io/api/core/v1"
-	proxyconfigapi "k8s.io/kubernetes/pkg/proxy/apis/config"
+	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
 	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
 	"k8s.io/kubernetes/test/utils/ktesting"
 )
@@ -37,51 +37,51 @@ import (
 func Test_platformApplyDefaults(t *testing.T) {
 	testCases := []struct {
 		name                string
-		mode                proxyconfigapi.ProxyMode
-		expectedMode        proxyconfigapi.ProxyMode
-		detectLocal         proxyconfigapi.LocalMode
-		expectedDetectLocal proxyconfigapi.LocalMode
+		mode                kubeproxyconfig.ProxyMode
+		expectedMode        kubeproxyconfig.ProxyMode
+		detectLocal         kubeproxyconfig.LocalMode
+		expectedDetectLocal kubeproxyconfig.LocalMode
 	}{
 		{
 			name:                "defaults",
 			mode:                "",
-			expectedMode:        proxyconfigapi.ProxyModeIPTables,
+			expectedMode:        kubeproxyconfig.ProxyModeIPTables,
 			detectLocal:         "",
-			expectedDetectLocal: proxyconfigapi.LocalModeClusterCIDR,
+			expectedDetectLocal: kubeproxyconfig.LocalModeClusterCIDR,
 		},
 		{
 			name:                "explicit",
-			mode:                proxyconfigapi.ProxyModeIPTables,
-			expectedMode:        proxyconfigapi.ProxyModeIPTables,
-			detectLocal:         proxyconfigapi.LocalModeClusterCIDR,
-			expectedDetectLocal: proxyconfigapi.LocalModeClusterCIDR,
+			mode:                kubeproxyconfig.ProxyModeIPTables,
+			expectedMode:        kubeproxyconfig.ProxyModeIPTables,
+			detectLocal:         kubeproxyconfig.LocalModeClusterCIDR,
+			expectedDetectLocal: kubeproxyconfig.LocalModeClusterCIDR,
 		},
 		{
 			name:                "override mode",
 			mode:                "ipvs",
-			expectedMode:        proxyconfigapi.ProxyModeIPVS,
+			expectedMode:        kubeproxyconfig.ProxyModeIPVS,
 			detectLocal:         "",
-			expectedDetectLocal: proxyconfigapi.LocalModeClusterCIDR,
+			expectedDetectLocal: kubeproxyconfig.LocalModeClusterCIDR,
 		},
 		{
 			name:                "override detect-local",
 			mode:                "",
-			expectedMode:        proxyconfigapi.ProxyModeIPTables,
+			expectedMode:        kubeproxyconfig.ProxyModeIPTables,
 			detectLocal:         "NodeCIDR",
-			expectedDetectLocal: proxyconfigapi.LocalModeNodeCIDR,
+			expectedDetectLocal: kubeproxyconfig.LocalModeNodeCIDR,
 		},
 		{
 			name:                "override both",
 			mode:                "ipvs",
-			expectedMode:        proxyconfigapi.ProxyModeIPVS,
+			expectedMode:        kubeproxyconfig.ProxyModeIPVS,
 			detectLocal:         "NodeCIDR",
-			expectedDetectLocal: proxyconfigapi.LocalModeNodeCIDR,
+			expectedDetectLocal: kubeproxyconfig.LocalModeNodeCIDR,
 		},
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			options := NewOptions()
-			config := &proxyconfigapi.KubeProxyConfiguration{
+			config := &kubeproxyconfig.KubeProxyConfiguration{
 				Mode:            tc.mode,
 				DetectLocalMode: tc.detectLocal,
 			}
@@ -100,7 +100,7 @@ func Test_platformApplyDefaults(t *testing.T) {
 func Test_getLocalDetectors(t *testing.T) {
 	cases := []struct {
 		name            string
-		config          *proxyconfigapi.KubeProxyConfiguration
+		config          *kubeproxyconfig.KubeProxyConfiguration
 		primaryIPFamily v1.IPFamily
 		nodePodCIDRs    []string
 		expected        map[v1.IPFamily]proxyutil.LocalTrafficDetector
@@ -108,9 +108,9 @@ func Test_getLocalDetectors(t *testing.T) {
 		// LocalModeClusterCIDR
 		{
 			name: "LocalModeClusterCIDR, single-stack IPv4 cluster",
-			config: &proxyconfigapi.KubeProxyConfiguration{
-				DetectLocalMode: proxyconfigapi.LocalModeClusterCIDR,
-				DetectLocal: proxyconfigapi.DetectLocalConfiguration{
+			config: &kubeproxyconfig.KubeProxyConfiguration{
+				DetectLocalMode: kubeproxyconfig.LocalModeClusterCIDR,
+				DetectLocal: kubeproxyconfig.DetectLocalConfiguration{
 					ClusterCIDRs: []string{"10.0.0.0/14"},
 				},
 			},
@@ -122,9 +122,9 @@ func Test_getLocalDetectors(t *testing.T) {
 		},
 		{
 			name: "LocalModeClusterCIDR, single-stack IPv6 cluster",
-			config: &proxyconfigapi.KubeProxyConfiguration{
-				DetectLocalMode: proxyconfigapi.LocalModeClusterCIDR,
-				DetectLocal: proxyconfigapi.DetectLocalConfiguration{
+			config: &kubeproxyconfig.KubeProxyConfiguration{
+				DetectLocalMode: kubeproxyconfig.LocalModeClusterCIDR,
+				DetectLocal: kubeproxyconfig.DetectLocalConfiguration{
 					ClusterCIDRs: []string{"2002:0:0:1234::/64"},
 				},
 			},
@@ -136,9 +136,9 @@ func Test_getLocalDetectors(t *testing.T) {
 		},
 		{
 			name: "LocalModeClusterCIDR, single-stack IPv6 cluster with single-stack IPv4 config",
-			config: &proxyconfigapi.KubeProxyConfiguration{
-				DetectLocalMode: proxyconfigapi.LocalModeClusterCIDR,
-				DetectLocal: proxyconfigapi.DetectLocalConfiguration{
+			config: &kubeproxyconfig.KubeProxyConfiguration{
+				DetectLocalMode: kubeproxyconfig.LocalModeClusterCIDR,
+				DetectLocal: kubeproxyconfig.DetectLocalConfiguration{
 					ClusterCIDRs: []string{"10.0.0.0/14"},
 				},
 			},
@@ -152,9 +152,9 @@ func Test_getLocalDetectors(t *testing.T) {
 		},
 		{
 			name: "LocalModeClusterCIDR, single-stack IPv4 cluster with single-stack IPv6 config",
-			config: &proxyconfigapi.KubeProxyConfiguration{
-				DetectLocalMode: proxyconfigapi.LocalModeClusterCIDR,
-				DetectLocal: proxyconfigapi.DetectLocalConfiguration{
+			config: &kubeproxyconfig.KubeProxyConfiguration{
+				DetectLocalMode: kubeproxyconfig.LocalModeClusterCIDR,
+				DetectLocal: kubeproxyconfig.DetectLocalConfiguration{
 					ClusterCIDRs: []string{"2002:0:0:1234::/64"},
 				},
 			},
@@ -168,9 +168,9 @@ func Test_getLocalDetectors(t *testing.T) {
 		},
 		{
 			name: "LocalModeClusterCIDR, dual-stack IPv4-primary cluster",
-			config: &proxyconfigapi.KubeProxyConfiguration{
-				DetectLocalMode: proxyconfigapi.LocalModeClusterCIDR,
-				DetectLocal: proxyconfigapi.DetectLocalConfiguration{
+			config: &kubeproxyconfig.KubeProxyConfiguration{
+				DetectLocalMode: kubeproxyconfig.LocalModeClusterCIDR,
+				DetectLocal: kubeproxyconfig.DetectLocalConfiguration{
 					ClusterCIDRs: []string{"10.0.0.0/14", "2002:0:0:1234::/64"},
 				},
 			},
@@ -182,9 +182,9 @@ func Test_getLocalDetectors(t *testing.T) {
 		},
 		{
 			name: "LocalModeClusterCIDR, dual-stack IPv6-primary cluster",
-			config: &proxyconfigapi.KubeProxyConfiguration{
-				DetectLocalMode: proxyconfigapi.LocalModeClusterCIDR,
-				DetectLocal: proxyconfigapi.DetectLocalConfiguration{
+			config: &kubeproxyconfig.KubeProxyConfiguration{
+				DetectLocalMode: kubeproxyconfig.LocalModeClusterCIDR,
+				DetectLocal: kubeproxyconfig.DetectLocalConfiguration{
 					ClusterCIDRs: []string{"2002:0:0:1234::/64", "10.0.0.0/14"},
 				},
 			},
@@ -196,9 +196,9 @@ func Test_getLocalDetectors(t *testing.T) {
 		},
 		{
 			name: "LocalModeClusterCIDR, IPv4-primary kube-proxy / IPv6-primary config",
-			config: &proxyconfigapi.KubeProxyConfiguration{
-				DetectLocalMode: proxyconfigapi.LocalModeClusterCIDR,
-				DetectLocal: proxyconfigapi.DetectLocalConfiguration{
+			config: &kubeproxyconfig.KubeProxyConfiguration{
+				DetectLocalMode: kubeproxyconfig.LocalModeClusterCIDR,
+				DetectLocal: kubeproxyconfig.DetectLocalConfiguration{
 					ClusterCIDRs: []string{"2002:0:0:1234::/64", "10.0.0.0/14"},
 				},
 			},
@@ -210,9 +210,9 @@ func Test_getLocalDetectors(t *testing.T) {
 		},
 		{
 			name: "LocalModeClusterCIDR, no ClusterCIDR",
-			config: &proxyconfigapi.KubeProxyConfiguration{
-				DetectLocalMode: proxyconfigapi.LocalModeClusterCIDR,
-				DetectLocal: proxyconfigapi.DetectLocalConfiguration{
+			config: &kubeproxyconfig.KubeProxyConfiguration{
+				DetectLocalMode: kubeproxyconfig.LocalModeClusterCIDR,
+				DetectLocal: kubeproxyconfig.DetectLocalConfiguration{
 					ClusterCIDRs: []string{""},
 				},
 			},
@@ -225,9 +225,9 @@ func Test_getLocalDetectors(t *testing.T) {
 		// LocalModeNodeCIDR
 		{
 			name: "LocalModeNodeCIDR, single-stack IPv4 cluster",
-			config: &proxyconfigapi.KubeProxyConfiguration{
-				DetectLocalMode: proxyconfigapi.LocalModeNodeCIDR,
-				DetectLocal: proxyconfigapi.DetectLocalConfiguration{
+			config: &kubeproxyconfig.KubeProxyConfiguration{
+				DetectLocalMode: kubeproxyconfig.LocalModeNodeCIDR,
+				DetectLocal: kubeproxyconfig.DetectLocalConfiguration{
 					ClusterCIDRs: []string{"10.0.0.0/14"},
 				},
 			},
@@ -240,9 +240,9 @@ func Test_getLocalDetectors(t *testing.T) {
 		},
 		{
 			name: "LocalModeNodeCIDR, single-stack IPv6 cluster",
-			config: &proxyconfigapi.KubeProxyConfiguration{
-				DetectLocalMode: proxyconfigapi.LocalModeNodeCIDR,
-				DetectLocal: proxyconfigapi.DetectLocalConfiguration{
+			config: &kubeproxyconfig.KubeProxyConfiguration{
+				DetectLocalMode: kubeproxyconfig.LocalModeNodeCIDR,
+				DetectLocal: kubeproxyconfig.DetectLocalConfiguration{
 					ClusterCIDRs: []string{"2002:0:0:1234::/64"},
 				},
 			},
@@ -255,9 +255,9 @@ func Test_getLocalDetectors(t *testing.T) {
 		},
 		{
 			name: "LocalModeNodeCIDR, single-stack IPv6 cluster with single-stack IPv4 config",
-			config: &proxyconfigapi.KubeProxyConfiguration{
-				DetectLocalMode: proxyconfigapi.LocalModeNodeCIDR,
-				DetectLocal: proxyconfigapi.DetectLocalConfiguration{
+			config: &kubeproxyconfig.KubeProxyConfiguration{
+				DetectLocalMode: kubeproxyconfig.LocalModeNodeCIDR,
+				DetectLocal: kubeproxyconfig.DetectLocalConfiguration{
 					ClusterCIDRs: []string{"10.0.0.0/14"},
 				},
 			},
@@ -272,9 +272,9 @@ func Test_getLocalDetectors(t *testing.T) {
 		},
 		{
 			name: "LocalModeNodeCIDR, single-stack IPv4 cluster with single-stack IPv6 config",
-			config: &proxyconfigapi.KubeProxyConfiguration{
-				DetectLocalMode: proxyconfigapi.LocalModeNodeCIDR,
-				DetectLocal: proxyconfigapi.DetectLocalConfiguration{
+			config: &kubeproxyconfig.KubeProxyConfiguration{
+				DetectLocalMode: kubeproxyconfig.LocalModeNodeCIDR,
+				DetectLocal: kubeproxyconfig.DetectLocalConfiguration{
 					ClusterCIDRs: []string{"2002:0:0:1234::/64"},
 				},
 			},
@@ -289,9 +289,9 @@ func Test_getLocalDetectors(t *testing.T) {
 		},
 		{
 			name: "LocalModeNodeCIDR, dual-stack IPv4-primary cluster",
-			config: &proxyconfigapi.KubeProxyConfiguration{
-				DetectLocalMode: proxyconfigapi.LocalModeNodeCIDR,
-				DetectLocal: proxyconfigapi.DetectLocalConfiguration{
+			config: &kubeproxyconfig.KubeProxyConfiguration{
+				DetectLocalMode: kubeproxyconfig.LocalModeNodeCIDR,
+				DetectLocal: kubeproxyconfig.DetectLocalConfiguration{
 					ClusterCIDRs: []string{"10.0.0.0/14", "2002:0:0:1234::/64"},
 				},
 			},
@@ -304,9 +304,9 @@ func Test_getLocalDetectors(t *testing.T) {
 		},
 		{
 			name: "LocalModeNodeCIDR, dual-stack IPv6-primary cluster",
-			config: &proxyconfigapi.KubeProxyConfiguration{
-				DetectLocalMode: proxyconfigapi.LocalModeNodeCIDR,
-				DetectLocal: proxyconfigapi.DetectLocalConfiguration{
+			config: &kubeproxyconfig.KubeProxyConfiguration{
+				DetectLocalMode: kubeproxyconfig.LocalModeNodeCIDR,
+				DetectLocal: kubeproxyconfig.DetectLocalConfiguration{
 					ClusterCIDRs: []string{"2002:0:0:1234::/64", "10.0.0.0/14"},
 				},
 			},
@@ -319,9 +319,9 @@ func Test_getLocalDetectors(t *testing.T) {
 		},
 		{
 			name: "LocalModeNodeCIDR, IPv6-primary kube-proxy / IPv4-primary config",
-			config: &proxyconfigapi.KubeProxyConfiguration{
-				DetectLocalMode: proxyconfigapi.LocalModeNodeCIDR,
-				DetectLocal: proxyconfigapi.DetectLocalConfiguration{
+			config: &kubeproxyconfig.KubeProxyConfiguration{
+				DetectLocalMode: kubeproxyconfig.LocalModeNodeCIDR,
+				DetectLocal: kubeproxyconfig.DetectLocalConfiguration{
 					ClusterCIDRs: []string{"10.0.0.0/14", "2002:0:0:1234::/64"},
 				},
 			},
@@ -334,9 +334,9 @@ func Test_getLocalDetectors(t *testing.T) {
 		},
 		{
 			name: "LocalModeNodeCIDR, no PodCIDRs",
-			config: &proxyconfigapi.KubeProxyConfiguration{
-				DetectLocalMode: proxyconfigapi.LocalModeNodeCIDR,
-				DetectLocal: proxyconfigapi.DetectLocalConfiguration{
+			config: &kubeproxyconfig.KubeProxyConfiguration{
+				DetectLocalMode: kubeproxyconfig.LocalModeNodeCIDR,
+				DetectLocal: kubeproxyconfig.DetectLocalConfiguration{
 					ClusterCIDRs: []string{""},
 				},
 			},
@@ -350,9 +350,9 @@ func Test_getLocalDetectors(t *testing.T) {
 		// unknown mode
 		{
 			name: "unknown LocalMode",
-			config: &proxyconfigapi.KubeProxyConfiguration{
-				DetectLocalMode: proxyconfigapi.LocalMode("abcd"),
-				DetectLocal: proxyconfigapi.DetectLocalConfiguration{
+			config: &kubeproxyconfig.KubeProxyConfiguration{
+				DetectLocalMode: kubeproxyconfig.LocalMode("abcd"),
+				DetectLocal: kubeproxyconfig.DetectLocalConfiguration{
 					ClusterCIDRs: []string{"10.0.0.0/14"},
 				},
 			},
@@ -365,9 +365,9 @@ func Test_getLocalDetectors(t *testing.T) {
 		// LocalModeBridgeInterface
 		{
 			name: "LocalModeBridgeInterface",
-			config: &proxyconfigapi.KubeProxyConfiguration{
-				DetectLocalMode: proxyconfigapi.LocalModeBridgeInterface,
-				DetectLocal: proxyconfigapi.DetectLocalConfiguration{
+			config: &kubeproxyconfig.KubeProxyConfiguration{
+				DetectLocalMode: kubeproxyconfig.LocalModeBridgeInterface,
+				DetectLocal: kubeproxyconfig.DetectLocalConfiguration{
 					BridgeInterface: "eth",
 				},
 			},
@@ -379,9 +379,9 @@ func Test_getLocalDetectors(t *testing.T) {
 		},
 		{
 			name: "LocalModeBridgeInterface, strange bridge name",
-			config: &proxyconfigapi.KubeProxyConfiguration{
-				DetectLocalMode: proxyconfigapi.LocalModeBridgeInterface,
-				DetectLocal: proxyconfigapi.DetectLocalConfiguration{
+			config: &kubeproxyconfig.KubeProxyConfiguration{
+				DetectLocalMode: kubeproxyconfig.LocalModeBridgeInterface,
+				DetectLocal: kubeproxyconfig.DetectLocalConfiguration{
 					BridgeInterface: "1234567890123456789",
 				},
 			},
@@ -394,9 +394,9 @@ func Test_getLocalDetectors(t *testing.T) {
 		// LocalModeInterfaceNamePrefix
 		{
 			name: "LocalModeInterfaceNamePrefix",
-			config: &proxyconfigapi.KubeProxyConfiguration{
-				DetectLocalMode: proxyconfigapi.LocalModeInterfaceNamePrefix,
-				DetectLocal: proxyconfigapi.DetectLocalConfiguration{
+			config: &kubeproxyconfig.KubeProxyConfiguration{
+				DetectLocalMode: kubeproxyconfig.LocalModeInterfaceNamePrefix,
+				DetectLocal: kubeproxyconfig.DetectLocalConfiguration{
 					InterfaceNamePrefix: "eth",
 				},
 			},
@@ -408,9 +408,9 @@ func Test_getLocalDetectors(t *testing.T) {
 		},
 		{
 			name: "LocalModeInterfaceNamePrefix, strange interface name",
-			config: &proxyconfigapi.KubeProxyConfiguration{
-				DetectLocalMode: proxyconfigapi.LocalModeInterfaceNamePrefix,
-				DetectLocal: proxyconfigapi.DetectLocalConfiguration{
+			config: &kubeproxyconfig.KubeProxyConfiguration{
+				DetectLocalMode: kubeproxyconfig.LocalModeInterfaceNamePrefix,
+				DetectLocal: kubeproxyconfig.DetectLocalConfiguration{
 					InterfaceNamePrefix: "1234567890123456789",
 				},
 			},

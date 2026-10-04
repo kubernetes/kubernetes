@@ -99,7 +99,7 @@ func (s *SelectionPredicate) Matches(obj runtime.Object) (bool, error) {
 			return matched, err
 		}
 	}
-	if s.Empty() {
+	if s.labelFieldEmpty() {
 		return true, nil
 	}
 	labels, fields, err := s.GetAttrs(obj)
@@ -153,7 +153,17 @@ func (s *SelectionPredicate) MatchesSingle() (string, bool) {
 
 // Empty returns true if the predicate performs no filtering.
 func (s *SelectionPredicate) Empty() bool {
-	return s.Label.Empty() && s.Field.Empty()
+	// Check the selector before the feature gate: Empty is called per event on
+	// watch paths, and the nil check is free while the gate lookup is not.
+	if s.ShardSelector != nil && !s.ShardSelector.Empty() &&
+		utilfeature.DefaultFeatureGate.Enabled(features.ShardedListAndWatch) {
+		return false
+	}
+	return s.labelFieldEmpty()
+}
+
+func (s *SelectionPredicate) labelFieldEmpty() bool {
+	return (s.Label == nil || s.Label.Empty()) && (s.Field == nil || s.Field.Empty())
 }
 
 // For any index defined by IndexFields, if a matcher can match only (a subset)

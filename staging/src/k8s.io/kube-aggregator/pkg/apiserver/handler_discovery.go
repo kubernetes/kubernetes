@@ -24,7 +24,6 @@ import (
 	"time"
 
 	apidiscoveryv2 "k8s.io/api/apidiscovery/v2"
-	apidiscoveryv2conversion "k8s.io/apiserver/pkg/apis/apidiscovery/v2"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -187,8 +186,6 @@ func NewDiscoveryManager(
 ) DiscoveryAggregationController {
 	discoveryScheme := runtime.NewScheme()
 	utilruntime.Must(apidiscoveryv2.AddToScheme(discoveryScheme))
-	// Register conversion for apidiscovery
-	utilruntime.Must(apidiscoveryv2conversion.RegisterConversions(discoveryScheme))
 	codecs := serializer.NewCodecFactory(discoveryScheme)
 
 	return &discoveryManager{

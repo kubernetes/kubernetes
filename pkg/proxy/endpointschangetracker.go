@@ -237,15 +237,31 @@ func (em EndpointsMap) Update(ect *EndpointsChangeTracker) UpdateEndpointsMapRes
 // Merge ensures that the current EndpointsMap contains all <service, endpoints> pairs from the EndpointsMap passed in.
 func (em EndpointsMap) merge(other EndpointsMap) {
 	for svcPortName := range other {
-		em[svcPortName] = other[svcPortName]
+		epList := other[svcPortName]
+		if _, exists := em[svcPortName]; !exists {
+			klog.V(3).InfoS("Adding new service endpoints", "portName", svcPortName, "endpoints", formatEndpointsList(epList))
+		} else {
+			klog.V(3).InfoS("Updating existing service endpoints", "portName", svcPortName, "endpoints", formatEndpointsList(epList))
+		}
+		em[svcPortName] = epList
 	}
 }
 
 // Unmerge removes the <service, endpoints> pairs from the current EndpointsMap which are contained in the EndpointsMap passed in.
 func (em EndpointsMap) unmerge(other EndpointsMap) {
 	for svcPortName := range other {
+		klog.V(3).InfoS("Removing service endpoints", "portName", svcPortName)
 		delete(em, svcPortName)
 	}
+}
+
+// formatEndpointsList returns a string list converted from an endpoints list.
+func formatEndpointsList(endpoints []Endpoint) []string {
+	var formattedList []string
+	for _, ep := range endpoints {
+		formattedList = append(formattedList, ep.String())
+	}
+	return formattedList
 }
 
 // getLocalEndpointIPs returns endpoints IPs if given endpoint is local - local means the endpoint is running in same host as kube-proxy.

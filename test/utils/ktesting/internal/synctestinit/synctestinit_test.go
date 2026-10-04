@@ -23,7 +23,7 @@ import (
 	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
-// TestSyncTestInit matches the corresponding test in the main package. It
+// TestSyncTestInit matches the corresponding test in the core package. It
 // exists here as the only test inside this package because signal.Notify fails
 // inside a synctest bubble when called for the first time in a process and we
 // want to enforce that situation.

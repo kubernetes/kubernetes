@@ -36,7 +36,6 @@ import (
 // TestCrossGroupStorage tests to make sure that all objects stored in an expected location in etcd can be converted/read.
 func TestCrossGroupStorage(t *testing.T) {
 	apiServer := StartRealAPIServerOrDie(t)
-	defer apiServer.Cleanup()
 
 	etcdStorageData := GetEtcdStorageData()
 

@@ -19,6 +19,7 @@ package usernamespaceshostnetwork
 import (
 	"testing"
 
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/component-helpers/nodedeclaredfeatures/types"
 )
 
@@ -95,6 +96,76 @@ func TestDiscoverFeature(t *testing.T) {
 			result := Feature.Discover(cfg)
 			if result != tt.expected {
 				t.Fatalf("Feature.Discover() = %v, want %v", result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestRequirements(t *testing.T) {
+	reqs := Feature.Requirements()
+	if reqs == nil {
+		t.Fatalf("Requirements returned nil")
+	}
+	if len(reqs.EnabledFeatureGates) != 1 || reqs.EnabledFeatureGates[0] != UserNamespacesHostNetworkSupportFeatureGate {
+		t.Fatalf("unexpected required feature gates: %v", reqs.EnabledFeatureGates)
+	}
+	if reqs.RequiredRuntimeFeatures == nil || !reqs.RequiredRuntimeFeatures.UserNamespacesHostNetwork {
+		t.Fatalf("unexpected required runtime features: %v", reqs.RequiredRuntimeFeatures)
+	}
+}
+
+func TestName(t *testing.T) {
+	if Feature.Name() != UserNamespacesHostNetworkSupport {
+		t.Fatalf("expected Name to be %s, got %s", UserNamespacesHostNetworkSupport, Feature.Name())
+	}
+}
+
+func TestInferForScheduling(t *testing.T) {
+	falseVal := false
+	trueVal := true
+
+	tests := []struct {
+		name        string
+		hostNetwork bool
+		hostUsers   *bool
+		expected    bool
+	}{
+		{
+			name:        "HostNetwork true, HostUsers false",
+			hostNetwork: true,
+			hostUsers:   &falseVal,
+			expected:    true,
+		},
+		{
+			name:        "HostNetwork true, HostUsers nil",
+			hostNetwork: true,
+			hostUsers:   nil,
+			expected:    false,
+		},
+		{
+			name:        "HostNetwork true, HostUsers true",
+			hostNetwork: true,
+			hostUsers:   &trueVal,
+			expected:    false,
+		},
+		{
+			name:        "HostNetwork false, HostUsers false",
+			hostNetwork: false,
+			hostUsers:   &falseVal,
+			expected:    false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			podSpec := &v1.PodSpec{
+				HostNetwork: tt.hostNetwork,
+				HostUsers:   tt.hostUsers,
+			}
+			podInfo := &types.PodInfo{Spec: podSpec}
+			result := Feature.InferForScheduling(podInfo)
+			if result != tt.expected {
+				t.Fatalf("InferForScheduling() = %v, want %v", result, tt.expected)
 			}
 		})
 	}

@@ -32,8 +32,8 @@ import (
 //
 // PersistentVolumeClaim is a user's request for and claim to a persistent volume
 type PersistentVolumeClaimApplyConfiguration struct {
-	metav1.TypeMetaApplyConfiguration `json:",inline"`
-	// Standard object's metadata.
+	metav1.TypeMetaApplyConfiguration `json:""`
+	// metadata is the standard object metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
 	// spec defines the desired characteristics of a volume requested by a pod author.

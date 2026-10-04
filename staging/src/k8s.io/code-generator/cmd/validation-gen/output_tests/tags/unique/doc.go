@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// +k8s:validation-gen=TypeMeta
+// +k8s:validation-gen=TypesWithField=TypeMeta
 // +k8s:validation-gen-scheme-registry=k8s.io/code-generator/cmd/validation-gen/testscheme.Scheme
 
 // This is a test package.
@@ -81,6 +81,17 @@ type Struct struct {
 	// +k8s:listMapKey=key1
 	// +k8s:listMapKey=key2
 	SliceMapFieldWithMultiplePtrKeys []ItemWithMultiplePtrKeys `json:"sliceMapFieldWithMultiplePtrKeys"`
+
+	// unique=set on slice of pointers to primitive
+	// +k8s:listType=atomic
+	// +k8s:unique=set
+	PrimitivePointerListUniqueSet []*string `json:"primitivePointerListUniqueSet"`
+
+	// unique=map on slice of pointers to struct
+	// +k8s:listType=atomic
+	// +k8s:unique=map
+	// +k8s:listMapKey=key
+	PointerListUniqueMap []*Item `json:"pointerListUniqueMap"`
 }
 
 type Item struct {

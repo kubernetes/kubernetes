@@ -520,24 +520,28 @@ func handleAttachPod(f cmdutil.Factory, podClient corev1client.PodsGetter, ns, n
 	}
 
 	// Fetch and display any logs that were printed before attach connects.
+	var logsSinceTime *metav1.Time
 	ctrName, err := opts.GetContainerName(pod)
 	if err == nil {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		if logErr := logOpts(ctx, f, pod, opts, &corev1.PodLogOptions{
 			Container: ctrName,
 			Follow:    false,
-		}); logErr != nil {
-			if opts.ErrOut != nil {
-				//nolint:errcheck
-				fmt.Fprintf(opts.ErrOut, "warning: couldn't fetch pre-attach logs: %v\n", logErr)
-			}
+		}); logErr == nil {
+			t := metav1.Now()
+			logsSinceTime = &t
+		} else if opts.ErrOut != nil {
+			//nolint:errcheck
+			fmt.Fprintf(opts.ErrOut, "warning: couldn't fetch pre-attach logs: %v\n", logErr)
 		}
 		cancel()
 	}
 
 	if err := opts.Run(); err != nil {
 		fmt.Fprintf(opts.ErrOut, "warning: couldn't attach to pod/%s, falling back to streaming logs: %v\n", name, err)
-		return logOpts(context.Background(), f, pod, opts, nil)
+		return logOpts(context.Background(), f, pod, opts, &corev1.PodLogOptions{
+			SinceTime: logsSinceTime,
+		})
 	}
 	return nil
 }
@@ -582,7 +586,7 @@ func getRestartPolicy(restart string, interactive bool) (corev1.RestartPolicy, e
 	case corev1.RestartPolicyAlways, corev1.RestartPolicyNever, corev1.RestartPolicyOnFailure:
 		return restartPolicy, nil
 	default:
-		return "", fmt.Errorf("invalid restart policy: %s", restart)
+		return "", fmt.Errorf("invalid restart policy: %s, valid values are: %s, %s, %s", restart, corev1.RestartPolicyAlways, corev1.RestartPolicyOnFailure, corev1.RestartPolicyNever)
 	}
 }
 
@@ -594,7 +598,7 @@ func getImagePullPolicy(pullPolicy string) (corev1.PullPolicy, error) {
 	case "":
 		return "", nil
 	default:
-		return "", fmt.Errorf("invalid image pull policy: %s", pullPolicy)
+		return "", fmt.Errorf("invalid image pull policy: %s, valid values are: %s, %s, %s", pullPolicy, corev1.PullAlways, corev1.PullIfNotPresent, corev1.PullNever)
 	}
 }
 

@@ -25,7 +25,6 @@ import (
 	context "context"
 	fmt "fmt"
 
-	equality "k8s.io/apimachinery/pkg/api/equality"
 	operation "k8s.io/apimachinery/pkg/api/operation"
 	safe "k8s.io/apimachinery/pkg/api/safe"
 	validate "k8s.io/apimachinery/pkg/api/validate"
@@ -71,15 +70,15 @@ func Validate_Struct(
 			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
 			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
+				if validate.SemanticDeepEqual(obj, oldObj) {
 					return nil
 				}
 			}
 			// call field-attached validations
 			if e := validate.IfOption(ctx, op, fldPath, obj, oldObj, "FeatureX", true,
 				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj []ListItem) field.ErrorList {
-					return validate.Unique(ctx, op, fldPath, obj, oldObj,
-						func(a ListItem, b ListItem) bool { return a.Name == b.Name })
+					return validate.ValSliceUnique(ctx, op, fldPath, obj, oldObj,
+						func(a *ListItem, b *ListItem) bool { return a.Name == b.Name })
 				}); len(e) != 0 {
 				errs = append(errs, e...)
 			}
@@ -99,15 +98,15 @@ func Validate_Struct(
 			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
 			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
+				if validate.SemanticDeepEqual(obj, oldObj) {
 					return nil
 				}
 			}
 			// call field-attached validations
 			if e := validate.IfOption(ctx, op, fldPath, obj, oldObj, "FeatureX", false,
 				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj []ListItem) field.ErrorList {
-					return validate.Unique(ctx, op, fldPath, obj, oldObj,
-						func(a ListItem, b ListItem) bool { return a.Name == b.Name })
+					return validate.ValSliceUnique(ctx, op, fldPath, obj, oldObj,
+						func(a *ListItem, b *ListItem) bool { return a.Name == b.Name })
 				}); len(e) != 0 {
 				errs = append(errs, e...)
 			}
@@ -127,14 +126,14 @@ func Validate_Struct(
 			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
 			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
+				if validate.SemanticDeepEqual(obj, oldObj) {
 					return nil
 				}
 			}
 			// call field-attached validations
 			if e := validate.IfOption(ctx, op, fldPath, obj, oldObj, "FeatureX", true,
 				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj []ListItem) field.ErrorList {
-					return validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil,
+					return validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil,
 						func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *ListItem) field.ErrorList {
 							return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.ListEachVal/val")
 						})
@@ -157,14 +156,14 @@ func Validate_Struct(
 			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
 			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
+				if validate.SemanticDeepEqual(obj, oldObj) {
 					return nil
 				}
 			}
 			// call field-attached validations
 			if e := validate.IfOption(ctx, op, fldPath, obj, oldObj, "FeatureX", false,
 				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj []ListItem) field.ErrorList {
-					return validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil,
+					return validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil,
 						func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *ListItem) field.ErrorList {
 							return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.ListEachValDisabled/val")
 						})

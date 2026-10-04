@@ -106,6 +106,16 @@ func (r *NodeAuthorizer) RulesFor(ctx context.Context, user user.Info, namespace
 	return nil, nil, false, nil
 }
 
+// ConditionsAwareAuthorize is not conditions-aware, converts the Authorize decision.
+func (r *NodeAuthorizer) ConditionsAwareAuthorize(ctx context.Context, attrs authorizer.Attributes) authorizer.ConditionsAwareDecision {
+	return authorizer.ConditionsAwareDecisionFromParts(r.Authorize(ctx, attrs))
+}
+
+// EvaluateConditions is not supported by this authorizer.
+func (*NodeAuthorizer) EvaluateConditions(_ context.Context, _ authorizer.ConditionsAwareDecision, _ authorizer.ConditionsData) (authorizer.Decision, string, error) {
+	return authorizer.DecisionDeny, "", authorizer.ErrorConditionEvaluationNotSupported
+}
+
 func (r *NodeAuthorizer) Authorize(ctx context.Context, attrs authorizer.Attributes) (authorizer.Decision, string, error) {
 	nodeName, isNode := r.identifier.NodeIdentity(attrs.GetUser())
 	if !isNode {
@@ -308,17 +318,31 @@ func (r *NodeAuthorizer) authorizeLease(nodeName string, attrs authorizer.Attrib
 
 // authorizeCSINode authorizes node requests to CSINode storage.k8s.io/csinodes
 func (r *NodeAuthorizer) authorizeCSINode(nodeName string, attrs authorizer.Attributes) (authorizer.Decision, string, error) {
-	// allowed verbs: get, create, update, patch, delete
 	verb := attrs.GetVerb()
-	switch verb {
-	case "get", "create", "update", "patch", "delete":
-		// ok
+	switch attrs.GetSubresource() {
+	case "":
+		// allowed verbs: get, create, update, patch, delete
+		switch verb {
+		case "get", "create", "update", "patch", "delete":
+			// ok
+		default:
+			klog.V(2).Infof("NODE DENY: '%s' %#v", nodeName, attrs)
+			return authorizer.DecisionNoOpinion, "can only get, create, update, patch, or delete a CSINode", nil
+		}
+	case "status":
+		if !r.features.Enabled(features.CSIVolumeHealth) {
+			klog.V(2).Infof("NODE DENY: '%s' %#v", nodeName, attrs)
+			return authorizer.DecisionNoOpinion, "CSINode status access requires CSIVolumeHealth feature", nil
+		}
+		// allowed verbs: get, update, patch (for CSI volume health reporting)
+		switch verb {
+		case "get", "update", "patch":
+			// ok
+		default:
+			klog.V(2).Infof("NODE DENY: '%s' %#v", nodeName, attrs)
+			return authorizer.DecisionNoOpinion, "can only get, update, or patch CSINode status", nil
+		}
 	default:
-		klog.V(2).Infof("NODE DENY: '%s' %#v", nodeName, attrs)
-		return authorizer.DecisionNoOpinion, "can only get, create, update, patch, or delete a CSINode", nil
-	}
-
-	if len(attrs.GetSubresource()) > 0 {
 		klog.V(2).Infof("NODE DENY: '%s' %#v", nodeName, attrs)
 		return authorizer.DecisionNoOpinion, "cannot authorize CSINode subresources", nil
 	}

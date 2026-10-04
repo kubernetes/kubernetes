@@ -666,6 +666,10 @@ profiles:
 								Name: "VolumeBinding",
 								Args: &kubeschedulerconfig.VolumeBindingArgs{
 									BindTimeoutSeconds: 600,
+									Shape: []kubeschedulerconfig.UtilizationShapePoint{
+										{Utilization: 0, Score: 10},
+										{Utilization: 100, Score: 0},
+									},
 								},
 							},
 						},
@@ -789,6 +793,10 @@ profiles:
 								Name: "VolumeBinding",
 								Args: &kubeschedulerconfig.VolumeBindingArgs{
 									BindTimeoutSeconds: 600,
+									Shape: []kubeschedulerconfig.UtilizationShapePoint{
+										{Utilization: 0, Score: 10},
+										{Utilization: 100, Score: 0},
+									},
 								},
 							},
 						},
@@ -930,6 +938,10 @@ profiles:
 								Name: "VolumeBinding",
 								Args: &kubeschedulerconfig.VolumeBindingArgs{
 									BindTimeoutSeconds: 600,
+									Shape: []kubeschedulerconfig.UtilizationShapePoint{
+										{Utilization: 0, Score: 10},
+										{Utilization: 100, Score: 0},
+									},
 								},
 							},
 						},

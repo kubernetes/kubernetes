@@ -104,6 +104,11 @@ func (attacher *iscsiAttacher) GetDeviceMountPath(
 }
 
 func (attacher *iscsiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMountPath string, mountArgs volume.DeviceMounterArgs) error {
+	pluginDir := attacher.host.GetPluginDir(iscsiPluginName)
+	if err := validateISCSIPluginPath(deviceMountPath, pluginDir); err != nil {
+		return err
+	}
+
 	mounter := attacher.host.GetMounter()
 	notMnt, err := mounter.IsLikelyNotMountPoint(deviceMountPath)
 	if err != nil {
@@ -169,6 +174,11 @@ func (detacher *iscsiDetacher) Detach(volumeName string, nodeName types.NodeName
 }
 
 func (detacher *iscsiDetacher) UnmountDevice(deviceMountPath string) error {
+	pluginDir := detacher.host.GetPluginDir(iscsiPluginName)
+	if err := validateISCSIPluginPath(deviceMountPath, pluginDir); err != nil {
+		return err
+	}
+
 	unMounter := volumeSpecToUnmounter(detacher.mounter, detacher.host, detacher.plugin)
 	err := detacher.manager.DetachDisk(*unMounter, deviceMountPath)
 	if err != nil {

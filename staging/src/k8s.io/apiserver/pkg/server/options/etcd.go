@@ -62,8 +62,6 @@ type EtcdOptions struct {
 
 	// Set EnableWatchCache to false to disable all watch caches
 	EnableWatchCache bool
-	// Set DefaultWatchCacheSize to zero to disable watch caches for those resources that have no explicit cache size set
-	DefaultWatchCacheSize int
 	// WatchCacheSizes represents override to a given resource
 	WatchCacheSizes []string
 
@@ -83,7 +81,6 @@ func NewEtcdOptions(backendConfig *storagebackend.Config) *EtcdOptions {
 		DeleteCollectionWorkers: 1,
 		EnableGarbageCollection: true,
 		EnableWatchCache:        true,
-		DefaultWatchCacheSize:   100,
 	}
 	options.StorageConfig.CountMetricPollPeriod = time.Minute
 	return options
@@ -150,11 +147,12 @@ func (s *EtcdOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.BoolVar(&s.EnableWatchCache, "watch-cache", s.EnableWatchCache,
 		"Enable watch caching in the apiserver")
 
-	fs.IntVar(&s.DefaultWatchCacheSize, "default-watch-cache-size", s.DefaultWatchCacheSize,
+	defaultWatchCacheSize := 100
+	fs.IntVar(&defaultWatchCacheSize, "default-watch-cache-size", defaultWatchCacheSize,
 		"Default watch cache size. If zero, watch cache will be disabled for resources that do not have a default watch size set.")
 
 	fs.MarkDeprecated("default-watch-cache-size",
-		"watch caches are sized automatically and this flag will be removed in a future version")
+		"Watch caches are sized automatically. This flag is no-op and it will be removed in a future version.")
 
 	fs.StringSliceVar(&s.WatchCacheSizes, "watch-cache-sizes", s.WatchCacheSizes, ""+
 		"Watch cache size settings for some resources (pods, nodes, etc.), comma separated. "+
@@ -252,11 +250,12 @@ func (s *EtcdOptions) ApplyWithStorageFactoryTo(factory serverstorage.StorageFac
 }
 
 type monitorCache struct {
-	mu       sync.RWMutex
-	closed   bool
-	monitors []metrics.Monitor
-	factory  serverstorage.StorageFactory
-	stopCh   <-chan struct{}
+	mu          sync.RWMutex
+	initialized bool
+	closed      bool
+	monitors    []metrics.Monitor
+	factory     serverstorage.StorageFactory
+	stopCh      <-chan struct{}
 }
 
 var createMonitor = storagefactory.CreateMonitor
@@ -279,7 +278,7 @@ func (c *monitorCache) get() ([]metrics.Monitor, error) {
 		c.mu.RUnlock()
 		return nil, fmt.Errorf("monitor cache is closed")
 	}
-	if c.monitors != nil {
+	if c.initialized {
 		result := c.monitors
 		c.mu.RUnlock()
 		return result, nil
@@ -297,7 +296,7 @@ func (c *monitorCache) initialize() ([]metrics.Monitor, error) {
 	if c.closed {
 		return nil, fmt.Errorf("monitor cache is closed")
 	}
-	if c.monitors != nil {
+	if c.initialized {
 		return c.monitors, nil
 	}
 
@@ -313,6 +312,7 @@ func (c *monitorCache) initialize() ([]metrics.Monitor, error) {
 		monitors = append(monitors, m)
 	}
 	c.monitors = monitors
+	c.initialized = true
 
 	go func() {
 		<-c.stopCh

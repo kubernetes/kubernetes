@@ -36,7 +36,6 @@ import (
 	autoscalingapiv2 "k8s.io/api/autoscaling/v2"
 	batchapiv1 "k8s.io/api/batch/v1"
 	certificatesapiv1 "k8s.io/api/certificates/v1"
-	certificatesv1alpha1 "k8s.io/api/certificates/v1alpha1"
 	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
 	coordinationapiv1 "k8s.io/api/coordination/v1"
 	coordinationv1alpha2 "k8s.io/api/coordination/v1alpha2"
@@ -44,6 +43,7 @@ import (
 	apiv1 "k8s.io/api/core/v1"
 	discoveryv1 "k8s.io/api/discovery/v1"
 	eventsv1 "k8s.io/api/events/v1"
+	lifecyclev1alpha1 "k8s.io/api/lifecycle/v1alpha1"
 	networkingapiv1 "k8s.io/api/networking/v1"
 	networkingapiv1beta1 "k8s.io/api/networking/v1beta1"
 	nodev1 "k8s.io/api/node/v1"
@@ -54,17 +54,18 @@ import (
 	resourcev1beta1 "k8s.io/api/resource/v1beta1"
 	resourcev1beta2 "k8s.io/api/resource/v1beta2"
 	schedulingapiv1 "k8s.io/api/scheduling/v1"
-	schedulingapiv1alpha2 "k8s.io/api/scheduling/v1alpha2"
+	schedulingapiv1alpha3 "k8s.io/api/scheduling/v1alpha3"
+	schedulingapiv1beta1 "k8s.io/api/scheduling/v1beta1"
 	storageapiv1 "k8s.io/api/storage/v1"
 	storageapiv1alpha1 "k8s.io/api/storage/v1alpha1"
 	storageapiv1beta1 "k8s.io/api/storage/v1beta1"
+	svmv1 "k8s.io/api/storagemigration/v1"
 	svmv1beta1 "k8s.io/api/storagemigration/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apiserver/pkg/endpoints/discovery"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	discoveryclient "k8s.io/client-go/kubernetes/typed/discovery/v1"
@@ -79,7 +80,6 @@ import (
 	"k8s.io/kubernetes/pkg/controlplane/controller/defaultservicecidr"
 	"k8s.io/kubernetes/pkg/controlplane/controller/kubernetesservice"
 	"k8s.io/kubernetes/pkg/controlplane/reconcilers"
-	"k8s.io/kubernetes/pkg/features"
 	kubeoptions "k8s.io/kubernetes/pkg/kubeapiserver/options"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 
@@ -97,6 +97,7 @@ import (
 	discoveryrest "k8s.io/kubernetes/pkg/registry/discovery/rest"
 	eventsrest "k8s.io/kubernetes/pkg/registry/events/rest"
 	flowcontrolrest "k8s.io/kubernetes/pkg/registry/flowcontrol/rest"
+	lifecyclerest "k8s.io/kubernetes/pkg/registry/lifecycle/rest"
 	networkingrest "k8s.io/kubernetes/pkg/registry/networking/rest"
 	noderest "k8s.io/kubernetes/pkg/registry/node/rest"
 	policyrest "k8s.io/kubernetes/pkg/registry/policy/rest"
@@ -371,19 +372,17 @@ func (c CompletedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		return nil
 	})
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.MultiCIDRServiceAllocator) {
-		s.ControlPlane.GenericAPIServer.AddPostStartHookOrDie("start-kubernetes-service-cidr-controller", func(hookContext genericapiserver.PostStartHookContext) error {
-			controller := defaultservicecidr.NewController(
-				c.Extra.ServiceIPRange,
-				c.Extra.SecondaryServiceIPRange,
-				client,
-			)
-			// The default serviceCIDR must exist before the apiserver is healthy
-			// otherwise the allocators for Services will not work.
-			controller.Start(hookContext)
-			return nil
-		})
-	}
+	s.ControlPlane.GenericAPIServer.AddPostStartHookOrDie("start-kubernetes-service-cidr-controller", func(hookContext genericapiserver.PostStartHookContext) error {
+		controller := defaultservicecidr.NewController(
+			c.Extra.ServiceIPRange,
+			c.Extra.SecondaryServiceIPRange,
+			client,
+		)
+		// The default serviceCIDR must exist before the apiserver is healthy
+		// otherwise the allocators for Services will not work.
+		controller.Start(hookContext)
+		return nil
+	})
 
 	return s, nil
 
@@ -402,6 +401,8 @@ func (c CompletedConfig) StorageProviders(client *kubernetes.Clientset) ([]contr
 			NodePortRange:           c.Extra.ServiceNodePortRange,
 			IPRepairInterval:        c.Extra.RepairServicesInterval,
 		},
+		EndpointSliceGetter: c.ControlPlane.Extra.EndpointSliceGetter,
+		Authorizer:          c.ControlPlane.Generic.Authorization.Authorizer,
 	}, c.ControlPlane.Generic.Authorization.Authorizer)
 	if err != nil {
 		return nil, err
@@ -424,6 +425,7 @@ func (c CompletedConfig) StorageProviders(client *kubernetes.Clientset) ([]contr
 		certificatesrest.RESTStorageProvider{Authorizer: c.ControlPlane.Generic.Authorization.Authorizer},
 		coordinationrest.RESTStorageProvider{},
 		discoveryrest.StorageProvider{},
+		lifecyclerest.RESTStorageProvider{},
 		networkingrest.RESTStorageProvider{},
 		noderest.RESTStorageProvider{},
 		policyrest.RESTStorageProvider{},
@@ -476,6 +478,7 @@ var (
 		resourcev1.SchemeGroupVersion,
 		storageapiv1.SchemeGroupVersion,
 		schedulingapiv1.SchemeGroupVersion,
+		svmv1.SchemeGroupVersion,
 	}
 
 	// genericBetaAPIGroupVersionsDisabledByDefault is for all future beta groupVersions for API groups provided by GenericStorageProviders.
@@ -495,6 +498,7 @@ var (
 		networkingapiv1beta1.SchemeGroupVersion,
 		resourcev1beta1.SchemeGroupVersion,
 		resourcev1beta2.SchemeGroupVersion,
+		schedulingapiv1beta1.SchemeGroupVersion,
 	}
 
 	// genericAlphaAPIGroupVersionsDisabledByDefault holds the alpha APIs we have for API groups provided by GenericStorageProviders. They are always disabled by default.
@@ -504,12 +508,12 @@ var (
 		authenticationv1alpha1.SchemeGroupVersion,
 		apiserverinternalv1alpha1.SchemeGroupVersion,
 		coordinationv1alpha2.SchemeGroupVersion,
-		certificatesv1alpha1.SchemeGroupVersion,
 	}
 	// alphaAPIGroupVersionsDisabledByDefault holds the alpha APIs we have for additional API groups only provided in kube-apiserver. They are always disabled by default.
 	alphaAPIGroupVersionsDisabledByDefault = []schema.GroupVersion{
+		lifecyclev1alpha1.SchemeGroupVersion,
 		resourcev1alpha3.SchemeGroupVersion,
-		schedulingapiv1alpha2.SchemeGroupVersion,
+		schedulingapiv1alpha3.SchemeGroupVersion,
 		storageapiv1alpha1.SchemeGroupVersion,
 	}
 )

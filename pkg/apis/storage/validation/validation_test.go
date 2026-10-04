@@ -23,6 +23,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -35,7 +36,6 @@ import (
 var (
 	deleteReclaimPolicy = api.PersistentVolumeReclaimDelete
 	immediateMode1      = storage.VolumeBindingImmediate
-	immediateMode2      = storage.VolumeBindingImmediate
 	waitingMode         = storage.VolumeBindingWaitForFirstConsumer
 	invalidMode         = storage.VolumeBindingMode("foo")
 	inlineSpec          = api.PersistentVolumeSpec{
@@ -119,11 +119,6 @@ func TestValidateStorageClass(t *testing.T) {
 			Parameters: map[string]string{
 				"": "value",
 			},
-			ReclaimPolicy: &deleteReclaimPolicy,
-		},
-		"provisioner: Required value": {
-			ObjectMeta:    metav1.ObjectMeta{Name: "foo"},
-			Provisioner:   "",
 			ReclaimPolicy: &deleteReclaimPolicy,
 		},
 		"too long parameters": {
@@ -646,62 +641,6 @@ func TestValidateVolumeBindingMode(t *testing.T) {
 		}
 		if !testCase.shouldSucceed && len(errs) == 0 {
 			t.Errorf("Expected failure for test %q, got success", testName)
-		}
-	}
-}
-
-type updateTest struct {
-	oldClass      *storage.StorageClass
-	newClass      *storage.StorageClass
-	shouldSucceed bool
-}
-
-func TestValidateUpdateVolumeBindingMode(t *testing.T) {
-	noBinding := makeClass(nil, nil)
-	immediateBinding1 := makeClass(&immediateMode1, nil)
-	immediateBinding2 := makeClass(&immediateMode2, nil)
-	waitBinding := makeClass(&waitingMode, nil)
-
-	cases := map[string]updateTest{
-		"old and new no mode": {
-			oldClass:      noBinding,
-			newClass:      noBinding,
-			shouldSucceed: true,
-		},
-		"old and new same mode ptr": {
-			oldClass:      immediateBinding1,
-			newClass:      immediateBinding1,
-			shouldSucceed: true,
-		},
-		"old and new same mode value": {
-			oldClass:      immediateBinding1,
-			newClass:      immediateBinding2,
-			shouldSucceed: true,
-		},
-		"old no mode, new mode": {
-			oldClass:      noBinding,
-			newClass:      waitBinding,
-			shouldSucceed: false,
-		},
-		"old mode, new no mode": {
-			oldClass:      waitBinding,
-			newClass:      noBinding,
-			shouldSucceed: false,
-		},
-		"old and new different modes": {
-			oldClass:      waitBinding,
-			newClass:      immediateBinding1,
-			shouldSucceed: false,
-		},
-	}
-
-	for testName, testCase := range cases {
-		errs := ValidateStorageClassUpdate(testCase.newClass, testCase.oldClass)
-		if testCase.shouldSucceed && len(errs) != 0 {
-			t.Errorf("Expected success for %v, got %v", testName, errs)
-		}
-		if !testCase.shouldSucceed && len(errs) == 0 {
-			t.Errorf("Expected failure for %v, got success", testName)
 		}
 	}
 }
@@ -2085,6 +2024,51 @@ func TestCSIDriverValidationUpdate(t *testing.T) {
 	}
 }
 
+// TestCSIDriverAttachRequiredFieldPath pins the field path reported for
+// spec.attachRequired. Both call sites used to report "spec.attachedRequired",
+// which is not a field in the API; TestCSIDriverValidation and
+// TestCSIDriverValidationUpdate only assert whether an error was returned, so
+// nothing caught it.
+func TestCSIDriverAttachRequiredFieldPath(t *testing.T) {
+	objectMeta := metav1.ObjectMeta{Name: "test-driver", ResourceVersion: "1"}
+	driver := func(attachRequired *bool) *storage.CSIDriver {
+		return &storage.CSIDriver{
+			ObjectMeta: objectMeta,
+			Spec: storage.CSIDriverSpec{
+				AttachRequired:                attachRequired,
+				PodInfoOnMount:                new(false),
+				StorageCapacity:               new(true),
+				SELinuxMount:                  new(false),
+				PreventPodSchedulingIfMissing: new(false),
+			},
+		}
+	}
+
+	tests := []struct {
+		name string
+		errs field.ErrorList
+	}{{
+		name: "immutable on update",
+		errs: ValidateCSIDriverUpdate(driver(new(true)), driver(new(false))),
+	}, {
+		name: "required on create",
+		errs: ValidateCSIDriver(driver(nil)),
+	}}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			var got []string
+			for _, err := range test.errs {
+				got = append(got, err.Field)
+				if err.Field == "spec.attachRequired" {
+					return
+				}
+			}
+			t.Errorf("no error on spec.attachRequired, got errors on %v", got)
+		})
+	}
+}
+
 func TestCSIDriverStorageCapacityEnablement(t *testing.T) {
 	run := func(t *testing.T, withField bool) {
 		driverName := "test-driver"
@@ -2093,13 +2077,15 @@ func TestCSIDriverStorageCapacityEnablement(t *testing.T) {
 		requiresRepublish := true
 		storageCapacity := true
 		seLinuxMount := false
+		preventPodSchedulingIfMissing := false
 		csiDriver := storage.CSIDriver{
 			ObjectMeta: metav1.ObjectMeta{Name: driverName},
 			Spec: storage.CSIDriverSpec{
-				AttachRequired:    &attachRequired,
-				PodInfoOnMount:    &podInfoOnMount,
-				RequiresRepublish: &requiresRepublish,
-				SELinuxMount:      &seLinuxMount,
+				AttachRequired:                &attachRequired,
+				PodInfoOnMount:                &podInfoOnMount,
+				RequiresRepublish:             &requiresRepublish,
+				SELinuxMount:                  &seLinuxMount,
+				PreventPodSchedulingIfMissing: &preventPodSchedulingIfMissing,
 			},
 		}
 		if withField {
@@ -2286,6 +2272,7 @@ func TestCSIServiceAccountToken(t *testing.T) {
 		test.csiDriver.Spec.PodInfoOnMount = new(bool)
 		test.csiDriver.Spec.StorageCapacity = new(bool)
 		test.csiDriver.Spec.SELinuxMount = new(bool)
+		test.csiDriver.Spec.PreventPodSchedulingIfMissing = new(bool)
 		if errs := ValidateCSIDriver(test.csiDriver); test.wantErr != (len(errs) != 0) {
 			t.Errorf("ValidateCSIDriver = %v, want err: %v", errs, test.wantErr)
 		}
@@ -2306,7 +2293,7 @@ func TestCSIDriverValidationSELinuxMountEnabledDisabled(t *testing.T) {
 	}, {
 		name:              "feature enabled, non-nil value",
 		featureEnabled:    true,
-		seLinuxMountValue: ptr.To(true),
+		seLinuxMountValue: new(true),
 		expectError:       false,
 	}, {
 		name:              "feature disabled, nil value",
@@ -2316,7 +2303,7 @@ func TestCSIDriverValidationSELinuxMountEnabledDisabled(t *testing.T) {
 	}, {
 		name:              "feature disabled, non-nil value",
 		featureEnabled:    false,
-		seLinuxMountValue: ptr.To(true),
+		seLinuxMountValue: new(true),
 		expectError:       false,
 	}}
 	for _, test := range tests {
@@ -2328,11 +2315,12 @@ func TestCSIDriverValidationSELinuxMountEnabledDisabled(t *testing.T) {
 			csiDriver := &storage.CSIDriver{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 				Spec: storage.CSIDriverSpec{
-					AttachRequired:    ptr.To(true),
-					PodInfoOnMount:    ptr.To(true),
-					RequiresRepublish: ptr.To(true),
-					StorageCapacity:   ptr.To(true),
-					SELinuxMount:      test.seLinuxMountValue,
+					AttachRequired:                new(true),
+					PodInfoOnMount:                new(true),
+					RequiresRepublish:             new(true),
+					StorageCapacity:               new(true),
+					SELinuxMount:                  test.seLinuxMountValue,
+					PreventPodSchedulingIfMissing: new(false),
 				},
 			}
 			err := ValidateCSIDriver(csiDriver)
@@ -2361,18 +2349,18 @@ func TestCSIDriverValidationSELinuxMountEnabledDisabled(t *testing.T) {
 		name:           "feature enabled, nil->set",
 		featureEnabled: true,
 		oldValue:       nil,
-		newValue:       ptr.To(true),
+		newValue:       new(true),
 		expectError:    false,
 	}, {
 		name:           "feature enabled, set->set",
 		featureEnabled: true,
-		oldValue:       ptr.To(true),
-		newValue:       ptr.To(true),
+		oldValue:       new(true),
+		newValue:       new(true),
 		expectError:    false,
 	}, {
 		name:           "feature enabled, set->nil",
 		featureEnabled: true,
-		oldValue:       ptr.To(true),
+		oldValue:       new(true),
 		newValue:       nil,
 		expectError:    true, // populated by defaulting and required when feature is enabled
 	}, {
@@ -2385,18 +2373,18 @@ func TestCSIDriverValidationSELinuxMountEnabledDisabled(t *testing.T) {
 		name:           "feature disabled, nil->set",
 		featureEnabled: false,
 		oldValue:       nil,
-		newValue:       ptr.To(true),
+		newValue:       new(true),
 		expectError:    false,
 	}, {
 		name:           "feature disabled, set->set",
 		featureEnabled: false,
-		oldValue:       ptr.To(true),
-		newValue:       ptr.To(true),
+		oldValue:       new(true),
+		newValue:       new(true),
 		expectError:    false,
 	}, {
 		name:           "feature disabled, set->nil",
 		featureEnabled: false,
-		oldValue:       ptr.To(true),
+		oldValue:       new(true),
 		newValue:       nil,
 		expectError:    false,
 	}}
@@ -2409,11 +2397,12 @@ func TestCSIDriverValidationSELinuxMountEnabledDisabled(t *testing.T) {
 			oldCSIDriver := &storage.CSIDriver{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo", ResourceVersion: "1"},
 				Spec: storage.CSIDriverSpec{
-					AttachRequired:    ptr.To(true),
-					PodInfoOnMount:    ptr.To(true),
-					RequiresRepublish: ptr.To(true),
-					StorageCapacity:   ptr.To(true),
-					SELinuxMount:      test.oldValue,
+					AttachRequired:                new(true),
+					PodInfoOnMount:                new(true),
+					RequiresRepublish:             new(true),
+					StorageCapacity:               new(true),
+					SELinuxMount:                  test.oldValue,
+					PreventPodSchedulingIfMissing: new(false),
 				},
 			}
 			newCSIDriver := oldCSIDriver.DeepCopy()
@@ -2735,5 +2724,152 @@ func TestValidateVolumeAttributesClassUpdate(t *testing.T) {
 		if !testCase.shouldSucceed && len(errs) == 0 {
 			t.Errorf("Expected failure for %v, got success", testName)
 		}
+	}
+}
+
+func TestValidateCSINodeStatusUpdate(t *testing.T) {
+	old := storage.CSINode{
+		ObjectMeta: metav1.ObjectMeta{Name: "node1", ResourceVersion: "1"},
+		Spec: storage.CSINodeSpec{
+			Drivers: []storage.CSINodeDriver{
+				{Name: "driver1", NodeID: "node1"},
+			},
+		},
+	}
+	newNode := func(health ...storage.StorageHealth) storage.CSINode {
+		return storage.CSINode{
+			ObjectMeta: metav1.ObjectMeta{Name: "node1", ResourceVersion: "2"},
+			Spec:       old.Spec,
+			Status:     storage.CSINodeStatus{StorageHealth: health},
+		}
+	}
+
+	tests := []struct {
+		name        string
+		new         storage.CSINode
+		isErr       bool
+		expectedErr string
+	}{
+		{
+			name: "valid status with StorageUnreachable",
+			new: newNode(storage.StorageHealth{Name: "driver1", HealthConditions: []storage.StorageHealthCondition{
+				{Status: storage.StorageUnreachable, Reason: "BackendDown"},
+			}}),
+		},
+		{
+			name: "valid status with StorageDegraded",
+			new: newNode(storage.StorageHealth{Name: "driver1", HealthConditions: []storage.StorageHealthCondition{
+				{Status: storage.StorageDegraded, Reason: "HighLatency"},
+			}}),
+		},
+		{
+			name: "empty status is valid",
+			new:  newNode(),
+		},
+		{
+			name: "invalid status type",
+			new: newNode(storage.StorageHealth{Name: "driver1", HealthConditions: []storage.StorageHealthCondition{
+				{Status: "InvalidType", Reason: "SomeReason"},
+			}}),
+			isErr:       true,
+			expectedErr: "status.storageHealth[0].healthConditions[0].status",
+		},
+		{
+			name: "empty driver name",
+			new: newNode(storage.StorageHealth{HealthConditions: []storage.StorageHealthCondition{
+				{Status: storage.StorageUnreachable, Reason: "BackendDown"},
+			}}),
+			isErr:       true,
+			expectedErr: "status.storageHealth[0].name",
+		},
+		{
+			name: "empty reason",
+			new: newNode(storage.StorageHealth{Name: "driver1", HealthConditions: []storage.StorageHealthCondition{
+				{Status: storage.StorageUnreachable},
+			}}),
+			isErr:       true,
+			expectedErr: "status.storageHealth[0].healthConditions[0].reason",
+		},
+		{
+			name: "invalid reason format",
+			new: newNode(storage.StorageHealth{Name: "driver1", HealthConditions: []storage.StorageHealthCondition{
+				{Status: storage.StorageUnreachable, Reason: "invalid;val"},
+			}}),
+			isErr:       true,
+			expectedErr: "status.storageHealth[0].healthConditions[0].reason",
+		},
+		{
+			name: "duplicate driver",
+			new: newNode(
+				storage.StorageHealth{Name: "driver1"},
+				storage.StorageHealth{Name: "driver1"},
+			),
+			isErr:       true,
+			expectedErr: "status.storageHealth[1]",
+		},
+		{
+			name: "duplicate conditions are allowed within the bound",
+			new: newNode(storage.StorageHealth{Name: "driver1", HealthConditions: []storage.StorageHealthCondition{
+				{Status: storage.StorageUnreachable, Reason: "BackendDown"},
+				{Status: storage.StorageUnreachable, Reason: "BackendDown"},
+			}}),
+		},
+		{
+			name: "reason too long",
+			new: newNode(storage.StorageHealth{Name: "driver1", HealthConditions: []storage.StorageHealthCondition{
+				{Status: storage.StorageUnreachable, Reason: strings.Repeat("a", 257)},
+			}}),
+			isErr:       true,
+			expectedErr: "status.storageHealth[0].healthConditions[0].reason",
+		},
+		{
+			name: "too many conditions",
+			new: newNode(storage.StorageHealth{
+				Name:             "driver1",
+				HealthConditions: make([]storage.StorageHealthCondition, maxStorageHealthConditions+1),
+			}),
+			isErr:       true,
+			expectedErr: "status.storageHealth[0].healthConditions",
+		},
+		{
+			name: "invalid access mode",
+			new: newNode(storage.StorageHealth{Name: "driver1", HealthConditions: []storage.StorageHealthCondition{{
+				Status: storage.StorageUnreachable, Reason: "BackendDown", AccessMode: ptr.To(api.PersistentVolumeAccessMode("invalid")),
+			}}}),
+			isErr:       true,
+			expectedErr: "status.storageHealth[0].healthConditions[0].accessMode",
+		},
+		{
+			name: "invalid volume mode",
+			new: newNode(storage.StorageHealth{Name: "driver1", HealthConditions: []storage.StorageHealthCondition{{
+				Status: storage.StorageUnreachable, Reason: "BackendDown", VolumeMode: ptr.To(api.PersistentVolumeMode("invalid")),
+			}}}),
+			isErr:       true,
+			expectedErr: "status.storageHealth[0].healthConditions[0].volumeMode",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			errs := ValidateCSINodeStatusUpdate(&tt.new, &old)
+			if tt.isErr && len(errs) == 0 {
+				t.Errorf("expected error but got none")
+			}
+			if !tt.isErr && len(errs) > 0 {
+				t.Errorf("unexpected errors: %v", errs)
+			}
+			if tt.isErr && len(errs) > 0 && tt.expectedErr != "" {
+				found := false
+				for _, err := range errs {
+					if strings.Contains(err.Field, tt.expectedErr) {
+						found = true
+						break
+					}
+				}
+				if !found {
+					t.Errorf("expected error containing %q but got: %v", tt.expectedErr, errs)
+				}
+			}
+		})
 	}
 }

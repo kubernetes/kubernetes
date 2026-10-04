@@ -37,14 +37,18 @@ func StorageWithCacher() generic.StorageDecorator {
 	return func(
 		storageConfig *storagebackend.ConfigForResource,
 		resourcePrefix string,
-		keyFunc func(obj runtime.Object) (string, error),
+		cacheKeyFunc generic.CacheKeyFunc,
+		reverseKeyFunc storage.ReverseKeyFunc,
 		newFunc func() runtime.Object,
 		newListFunc func() runtime.Object,
 		getAttrsFunc storage.AttrFunc,
 		triggerFuncs storage.IndexerFuncs,
 		indexers *cache.Indexers) (storage.Interface, factory.DestroyFunc, error) {
 
-		s, d, err := generic.NewRawStorage(storageConfig, newFunc, newListFunc, resourcePrefix)
+		if cacheKeyFunc == nil {
+			return nil, nil, fmt.Errorf("cache key func must be provided when storage caching is enabled")
+		}
+		s, d, err := generic.NewRawStorage(storageConfig, newFunc, newListFunc, reverseKeyFunc, resourcePrefix)
 		if err != nil {
 			return s, d, err
 		}
@@ -59,7 +63,7 @@ func StorageWithCacher() generic.StorageDecorator {
 			GroupResource:       storageConfig.GroupResource,
 			EventsHistoryWindow: storageConfig.EventsHistoryWindow,
 			ResourcePrefix:      resourcePrefix,
-			KeyFunc:             keyFunc,
+			KeyFunc:             cacheKeyFunc,
 			NewFunc:             newFunc,
 			NewListFunc:         newListFunc,
 			GetAttrsFunc:        getAttrsFunc,

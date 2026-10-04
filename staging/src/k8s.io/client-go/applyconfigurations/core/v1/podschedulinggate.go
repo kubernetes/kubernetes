@@ -23,7 +23,7 @@ package v1
 //
 // PodSchedulingGate is associated to a Pod to guard its scheduling.
 type PodSchedulingGateApplyConfiguration struct {
-	// Name of the scheduling gate.
+	// name of the scheduling gate.
 	// Each scheduling gate must have a unique name field.
 	Name *string `json:"name,omitempty"`
 }

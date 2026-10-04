@@ -31,6 +31,7 @@ import (
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/apis/certificates"
 	registry "k8s.io/kubernetes/pkg/registry/certificates/clustertrustbundle"
+	"k8s.io/kubernetes/test/declarative_validation/meta"
 )
 
 func mustMakeTestCert(t *testing.T) string {
@@ -104,7 +105,6 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 		APIGroup:          "certificates.k8s.io",
 		APIVersion:        apiVersion,
 		Resource:          "clustertrustbundles",
-		Name:              "test-bundle",
 		IsResourceRequest: true,
 		Verb:              "create",
 	})
@@ -128,6 +128,8 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 			apitesting.VerifyValidationEquivalence(t, ctx, &tc.input, registry.Strategy, tc.expectedErrs)
 		})
 	}
+	obj := mkValidBundle(t, tweakName("test-bundle"), tweakSignerName(""))
+	meta.RunObjectMetaTestCases(t, ctx, &obj, registry.Strategy, meta.WithStringentFinalizerValidation())
 }
 
 func TestDeclarativeValidateUpdate(t *testing.T) {
@@ -139,6 +141,16 @@ func TestDeclarativeValidateUpdate(t *testing.T) {
 }
 
 func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
+	ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
+		APIPrefix:         "apis",
+		APIGroup:          "certificates.k8s.io",
+		APIVersion:        apiVersion,
+		Resource:          "clustertrustbundles",
+		Name:              "valid-obj",
+		IsResourceRequest: true,
+		Verb:              "update",
+	})
+
 	testCases := map[string]struct {
 		oldObj       certificates.ClusterTrustBundle
 		updateObj    certificates.ClusterTrustBundle
@@ -175,18 +187,12 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 	}
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
-			ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
-				APIPrefix:         "apis",
-				APIGroup:          "certificates.k8s.io",
-				APIVersion:        apiVersion,
-				Resource:          "clustertrustbundles",
-				Name:              tc.oldObj.Name,
-				IsResourceRequest: true,
-				Verb:              "update",
-			})
 			tc.oldObj.ResourceVersion = "1"
 			tc.updateObj.ResourceVersion = "2"
 			apitesting.VerifyUpdateValidationEquivalence(t, ctx, &tc.updateObj, &tc.oldObj, registry.Strategy, tc.expectedErrs)
 		})
 	}
+
+	updateObj := mkValidBundle(t, tweakName("test-bundle"), tweakSignerName(""))
+	meta.RunObjectMetaUpdateTestCases(t, ctx, &updateObj, registry.Strategy, meta.WithStringentFinalizerValidation())
 }

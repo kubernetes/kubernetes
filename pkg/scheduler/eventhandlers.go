@@ -23,6 +23,8 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
+	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -30,6 +32,7 @@ import (
 	"k8s.io/client-go/dynamic/dynamicinformer"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/component-helpers/resource"
 	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	corev1nodeaffinity "k8s.io/component-helpers/scheduling/corev1/nodeaffinity"
 	"k8s.io/dynamic-resource-allocation/deviceclass/extendedresourcecache"
@@ -131,10 +134,12 @@ func (sched *Scheduler) addPod(obj interface{}) {
 		return
 	}
 
+	isPodDeferred := utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingSchedulerPreemption) && resource.IsPodResizeDeferred(pod)
+	if responsibleForPod(pod, sched.Profiles) && (!assignedPod(pod) || isPodDeferred) {
+		sched.addPodToSchedulingQueue(pod)
+	}
 	if assignedPod(pod) {
 		sched.addAssignedPodToCache(pod)
-	} else if responsibleForPod(pod, sched.Profiles) {
-		sched.addPodToSchedulingQueue(pod)
 	}
 }
 
@@ -152,6 +157,26 @@ func (sched *Scheduler) updatePod(oldObj, newObj interface{}) {
 	}
 
 	if assignedPod(oldPod) {
+		if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingSchedulerPreemption) && responsibleForPod(newPod, sched.Profiles) {
+			oldDeferred := resource.IsPodResizeDeferred(oldPod)
+			newDeferred := resource.IsPodResizeDeferred(newPod)
+
+			if !oldDeferred && newDeferred {
+				// When an assigned pod transitions to a deferred resize,
+				// we must add it to the scheduling queue so the scheduler can evaluate feasibility and run preemption on the assigned node.
+				logger.V(3).Info("Assigned pod transitioned to deferred resize, adding to scheduling queue", "pod", klog.KObj(newPod))
+				sched.addPodToSchedulingQueue(newPod)
+			} else if oldDeferred && !newDeferred {
+				// When an assigned pod is no longer deferred,
+				// remove it from the scheduling queue so the scheduler stops evaluating preemption for it.
+				logger.V(3).Info("Assigned pod is no longer deferred, removing from scheduling queue", "pod", klog.KObj(newPod))
+				sched.deletePodFromSchedulingQueue(newPod, false)
+			} else if oldDeferred && newDeferred {
+				// If the pod's spec mutates while queued for a deferred resize (e.g., resource requests updated), update its queue representation.
+				logger.V(3).Info("Assigned pod spec changed while deferred, updating scheduling queue", "pod", klog.KObj(newPod))
+				sched.SchedulingQueue.Update(klog.NewContext(context.Background(), logger), oldPod, newPod)
+			}
+		}
 		sched.updateAssignedPodInCache(oldPod, newPod)
 	} else if assignedPod(newPod) {
 		// This update means binding operation. We can treat it as adding the pod to a cache
@@ -177,6 +202,11 @@ func (sched *Scheduler) deletePod(obj interface{}) {
 		pod = t
 		if assignedPod(pod) {
 			sched.deleteAssignedPodFromCache(pod)
+			if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingSchedulerPreemption) && resource.IsPodResizeDeferred(pod) && responsibleForPod(pod, sched.Profiles) {
+				// Assigned pods are normally not tracked by the scheduling queue, but if an assigned pod with a deferred resize
+				// is deleted from the cluster, we must explicitly remove it from the scheduling queue.
+				sched.deletePodFromSchedulingQueue(pod, false)
+			}
 		} else if responsibleForPod(pod, sched.Profiles) {
 			// Passing "false" means that removal from the scheduling queue is caused by
 			// removal of the pod from the cluster, not by a binding event.
@@ -212,7 +242,7 @@ func (sched *Scheduler) addPodToSchedulingQueue(pod *v1.Pod) {
 	logger.V(3).Info("Add event for unscheduled pod", "pod", klog.KObj(pod))
 	sched.Cache.AddPodGroupMember(pod)
 	sched.SchedulingQueue.Add(klog.NewContext(context.Background(), logger), pod)
-	if utilfeature.DefaultFeatureGate.Enabled(features.GangScheduling) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload) {
 		sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, framework.EventUnscheduledPodAdd, nil, pod, nil)
 	}
 }
@@ -262,8 +292,8 @@ func (sched *Scheduler) handleAssumedPodDeletion(pod *v1.Pod) {
 	if !fwk.RejectWaitingPod(pod.UID) {
 		// 2. If the pod is no longer waiting (e.g., it's in PreBind or Bind), we can't quickly reject it.
 		//    We must explicitly remove it from the cache here to free up its assumed resources.
-		if err := sched.Cache.ForgetPod(logger, pod); err != nil {
-			utilruntime.HandleErrorWithLogger(logger, err, "Scheduler cache ForgetPod failed", "pod", klog.KObj(pod))
+		if err := sched.Cache.RemoveAssumedPod(logger, pod); err != nil {
+			utilruntime.HandleErrorWithLogger(logger, err, "Scheduler cache RemoveAssumedPod failed", "pod", klog.KObj(pod))
 		}
 	}
 
@@ -332,7 +362,7 @@ func (sched *Scheduler) deletePodFromSchedulingQueue(pod *v1.Pod, inBinding bool
 	logger := sched.logger
 
 	logger.V(3).Info("Delete event for unscheduled pod", "pod", klog.KObj(pod))
-	sched.SchedulingQueue.Delete(pod)
+	sched.SchedulingQueue.Delete(logger, pod)
 	if inBinding {
 		// In the case of a binding, the rest can be skipped because it is not really a pod removal operation, but a binding.
 		// Any necessary notifications will be sent by the binding process, unless it was an unlikely external binding.
@@ -340,7 +370,6 @@ func (sched *Scheduler) deletePodFromSchedulingQueue(pod *v1.Pod, inBinding bool
 		// once the https://github.com/kubernetes/kubernetes/issues/134859 is fixed.
 		return
 	}
-	sched.Cache.RemovePodGroupMember(pod)
 	isAssumed, err := sched.Cache.IsAssumedPod(pod)
 	if err != nil {
 		utilruntime.HandleErrorWithLogger(logger, err, "Failed to check whether pod is assumed", "pod", klog.KObj(pod))
@@ -349,7 +378,11 @@ func (sched *Scheduler) deletePodFromSchedulingQueue(pod *v1.Pod, inBinding bool
 		// Assumed pod is deleted. We should handle that differently,
 		// because we can't delete such pod from any structure directly.
 		sched.handleAssumedPodDeletion(pod)
-	} else if pod.Status.NominatedNodeName != "" {
+		return
+	}
+	// If the pod is not assumed, we must clean pod group state explicitly here.
+	sched.Cache.RemovePodGroupMember(pod)
+	if pod.Status.NominatedNodeName != "" {
 		// When a pod that had nominated node is deleted, it can unblock scheduling of other pods,
 		// because the lower or equal priority pods treat such a pod as if it was assigned.
 		// Note that a nominated pod can fall into `handleAssumedPodDeletion` case as well,
@@ -358,10 +391,10 @@ func (sched *Scheduler) deletePodFromSchedulingQueue(pod *v1.Pod, inBinding bool
 	}
 }
 
-// getLEPriorityPreCheck is a PreEnqueueCheck function that selects only lower or equal priority pods.
+// getLEPriorityPreCheck is a PreEnqueueCheck function that selects only lower or equal priority entities.
 func getLEPriorityPreCheck(priority int32) queue.PreEnqueueCheck {
-	return func(pod *v1.Pod) bool {
-		return corev1helpers.PodPriority(pod) <= priority
+	return func(entity framework.QueuedEntityInfo) bool {
+		return entity.GetPriority() <= priority
 	}
 }
 
@@ -432,6 +465,148 @@ func responsibleForPod(pod *v1.Pod, profiles profile.Map) bool {
 	return profiles.HandlesSchedulerName(pod.Spec.SchedulerName)
 }
 
+func (sched *Scheduler) addPodGroup(obj any) {
+	evt := fwk.ClusterEvent{Resource: fwk.PodGroup, ActionType: fwk.Add}
+	defer metrics.EventHandlingLatency.ObserveSince(time.Now(), evt.Label())()
+	logger := sched.logger
+	pg, ok := obj.(*schedulingv1beta1.PodGroup)
+	if !ok {
+		utilruntime.HandleErrorWithLogger(logger, nil, "Cannot convert to *v1beta1.PodGroup", "obj", obj)
+		return
+	}
+
+	logger.V(3).Info("Add event for pod group", "podGroup", klog.KObj(pg))
+	gpg := fwk.NewGenericPodGroup(pg)
+	sched.Cache.AddGenericPodGroup(gpg)
+	sched.SchedulingQueue.AddGenericPodGroup(logger, gpg)
+	sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, evt, nil, pg, nil)
+}
+
+func (sched *Scheduler) updatePodGroup(oldObj, newObj any) {
+	evt := fwk.ClusterEvent{Resource: fwk.PodGroup, ActionType: fwk.Update}
+	defer metrics.EventHandlingLatency.ObserveSince(time.Now(), evt.Label())()
+	logger := sched.logger
+	oldPG, ok := oldObj.(*schedulingv1beta1.PodGroup)
+	if !ok {
+		utilruntime.HandleErrorWithLogger(logger, nil, "Cannot convert oldObj to *v1beta1.PodGroup", "oldObj", oldObj)
+		return
+	}
+	newPG, ok := newObj.(*schedulingv1beta1.PodGroup)
+	if !ok {
+		utilruntime.HandleErrorWithLogger(logger, nil, "Cannot convert newObj to *v1beta1.PodGroup", "newObj", newObj)
+		return
+	}
+
+	if oldPG.ResourceVersion == newPG.ResourceVersion {
+		return
+	}
+
+	logger.V(4).Info("Update event for pod group", "podGroup", klog.KObj(newPG))
+	gpg := fwk.NewGenericPodGroup(newPG)
+	sched.Cache.UpdateGenericPodGroup(logger, gpg)
+	sched.SchedulingQueue.UpdateGenericPodGroup(logger, gpg)
+	sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, evt, oldPG, newPG, nil)
+}
+
+func (sched *Scheduler) deletePodGroup(obj any) {
+	evt := fwk.ClusterEvent{Resource: fwk.PodGroup, ActionType: fwk.Delete}
+	defer metrics.EventHandlingLatency.ObserveSince(time.Now(), evt.Label())()
+
+	logger := sched.logger
+	var pg *schedulingv1beta1.PodGroup
+	switch t := obj.(type) {
+	case *schedulingv1beta1.PodGroup:
+		pg = t
+	case cache.DeletedFinalStateUnknown:
+		var ok bool
+		pg, ok = t.Obj.(*schedulingv1beta1.PodGroup)
+		if !ok {
+			utilruntime.HandleErrorWithLogger(logger, nil, "Cannot convert to *v1beta1.PodGroup", "obj", t.Obj)
+			return
+		}
+	default:
+		utilruntime.HandleErrorWithLogger(logger, nil, "Cannot convert to *v1beta1.PodGroup", "obj", t)
+		return
+	}
+
+	logger.V(3).Info("Delete event for pod group", "podGroup", klog.KObj(pg))
+	gpg := fwk.NewGenericPodGroup(pg)
+	sched.Cache.RemoveGenericPodGroup(logger, gpg)
+	sched.SchedulingQueue.DeleteGenericPodGroup(logger, gpg)
+	sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, evt, pg, nil, nil)
+}
+
+func (sched *Scheduler) addCompositePodGroup(obj any) {
+	evt := fwk.ClusterEvent{Resource: fwk.CompositePodGroup, ActionType: fwk.Add}
+	defer metrics.EventHandlingLatency.ObserveSince(time.Now(), evt.Label())()
+	logger := sched.logger
+	cpg, ok := obj.(*schedulingv1alpha3.CompositePodGroup)
+	if !ok {
+		utilruntime.HandleErrorWithLogger(logger, nil, "Cannot convert to *v1alpha3.CompositePodGroup", "obj", obj)
+		return
+	}
+
+	logger.V(3).Info("Add event for composite pod group", "compositePodGroup", klog.KObj(cpg))
+	gpg := fwk.NewGenericCompositePodGroup(cpg)
+	sched.Cache.AddGenericPodGroup(gpg)
+	sched.SchedulingQueue.AddGenericPodGroup(logger, gpg)
+	sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, evt, nil, cpg, nil)
+}
+
+func (sched *Scheduler) updateCompositePodGroup(oldObj, newObj any) {
+	evt := fwk.ClusterEvent{Resource: fwk.CompositePodGroup, ActionType: fwk.Update}
+	defer metrics.EventHandlingLatency.ObserveSince(time.Now(), evt.Label())()
+	logger := sched.logger
+	oldCPG, ok := oldObj.(*schedulingv1alpha3.CompositePodGroup)
+	if !ok {
+		utilruntime.HandleErrorWithLogger(logger, nil, "Cannot convert oldObj to *v1alpha3.CompositePodGroup", "oldObj", oldObj)
+		return
+	}
+	newCPG, ok := newObj.(*schedulingv1alpha3.CompositePodGroup)
+	if !ok {
+		utilruntime.HandleErrorWithLogger(logger, nil, "Cannot convert newObj to *v1alpha3.CompositePodGroup", "newObj", newObj)
+		return
+	}
+
+	if oldCPG.ResourceVersion == newCPG.ResourceVersion {
+		return
+	}
+
+	logger.V(4).Info("Update event for composite pod group", "compositePodGroup", klog.KObj(newCPG))
+	gpg := fwk.NewGenericCompositePodGroup(newCPG)
+	sched.Cache.UpdateGenericPodGroup(logger, gpg)
+	sched.SchedulingQueue.UpdateGenericPodGroup(logger, gpg)
+	sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, evt, oldCPG, newCPG, nil)
+}
+
+func (sched *Scheduler) deleteCompositePodGroup(obj any) {
+	evt := fwk.ClusterEvent{Resource: fwk.CompositePodGroup, ActionType: fwk.Delete}
+	defer metrics.EventHandlingLatency.ObserveSince(time.Now(), evt.Label())()
+
+	logger := sched.logger
+	var cpg *schedulingv1alpha3.CompositePodGroup
+	switch t := obj.(type) {
+	case *schedulingv1alpha3.CompositePodGroup:
+		cpg = t
+	case cache.DeletedFinalStateUnknown:
+		var ok bool
+		cpg, ok = t.Obj.(*schedulingv1alpha3.CompositePodGroup)
+		if !ok {
+			utilruntime.HandleErrorWithLogger(logger, nil, "Cannot convert to *v1alpha3.CompositePodGroup", "obj", t.Obj)
+			return
+		}
+	default:
+		utilruntime.HandleErrorWithLogger(logger, nil, "Cannot convert to *v1alpha3.CompositePodGroup", "obj", t)
+		return
+	}
+
+	logger.V(3).Info("Delete event for composite pod group", "compositePodGroup", klog.KObj(cpg))
+	gpg := fwk.NewGenericCompositePodGroup(cpg)
+	sched.Cache.RemoveGenericPodGroup(logger, gpg)
+	sched.SchedulingQueue.DeleteGenericPodGroup(logger, gpg)
+	sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, evt, cpg, nil, nil)
+}
+
 const (
 	// syncedPollPeriod controls how often you look at the status of your sync funcs
 	syncedPollPeriod = 100 * time.Millisecond
@@ -489,6 +664,28 @@ func addAllEventHandlers(
 	}
 	handlers = append(handlers, handlerRegistration)
 
+	if utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload) {
+		if handlerRegistration, err = informerFactory.Scheduling().V1beta1().PodGroups().Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+			AddFunc:    sched.addPodGroup,
+			UpdateFunc: sched.updatePodGroup,
+			DeleteFunc: sched.deletePodGroup,
+		}); err != nil {
+			return err
+		}
+		handlers = append(handlers, handlerRegistration)
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.CompositePodGroup) {
+		if handlerRegistration, err = informerFactory.Scheduling().V1alpha3().CompositePodGroups().Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+			AddFunc:    sched.addCompositePodGroup,
+			UpdateFunc: sched.updateCompositePodGroup,
+			DeleteFunc: sched.deleteCompositePodGroup,
+		}); err != nil {
+			return err
+		}
+		handlers = append(handlers, handlerRegistration)
+	}
+
 	buildEvtResHandler := func(at fwk.ActionType, resource fwk.EventResource) cache.ResourceEventHandlerFuncs {
 		funcs := cache.ResourceEventHandlerFuncs{}
 		if at&fwk.Add != 0 {
@@ -519,8 +716,12 @@ func addAllEventHandlers(
 
 	for gvk, at := range gvkMap {
 		switch gvk {
-		case fwk.Node, fwk.Pod:
-			// Do nothing.
+		case fwk.Node:
+			// Node informer is already registered above.
+		case fwk.Pod, fwk.AssignedPod, fwk.UnscheduledPod, fwk.TargetPod:
+			// Pod informer is already registered above. AssignedPod,
+			// UnscheduledPod, and TargetPod are logical Pod event resources
+			// emitted from the Pod add/update/delete handlers.
 		case fwk.CSINode:
 			if handlerRegistration, err = informerFactory.Storage().V1().CSINodes().Informer().AddEventHandler(
 				buildEvtResHandler(at, fwk.CSINode),
@@ -571,42 +772,36 @@ func addAllEventHandlers(
 			}
 			handlers = append(handlers, handlerRegistration)
 		case fwk.ResourceClaim:
-			if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
-				handlerRegistration = resourceClaimCache.AddEventHandler(
-					buildEvtResHandler(at, fwk.ResourceClaim),
-				)
-				handlers = append(handlers, handlerRegistration)
-			}
+			handlerRegistration = resourceClaimCache.AddEventHandler(
+				buildEvtResHandler(at, fwk.ResourceClaim),
+			)
+			handlers = append(handlers, handlerRegistration)
 		case fwk.ResourceSlice:
-			if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
-				if handlerRegistration, err = resourceSliceTracker.AddEventHandler(
-					buildEvtResHandler(at, fwk.ResourceSlice),
-				); err != nil {
-					return err
-				}
-				handlers = append(handlers, handlerRegistration)
+			if handlerRegistration, err = resourceSliceTracker.AddEventHandler(
+				buildEvtResHandler(at, fwk.ResourceSlice),
+			); err != nil {
+				return err
 			}
+			handlers = append(handlers, handlerRegistration)
 		case fwk.DeviceClass:
-			if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
-				handler := cache.ResourceEventHandler(buildEvtResHandler(at, fwk.DeviceClass))
-				if utilfeature.DefaultFeatureGate.Enabled(features.DRAExtendedResource) {
-					// Inject updating of the cache before the scheduler event handlers ("chaining")
-					// to ensure that the cache gets updated before the scheduler kicks off
-					// pod scheduling based on a DeviceClass event.
-					//
-					// We know that this is a DefaultDRAManager and we know that it
-					// uses an ExtendedResourceCache, so no need for type checks.
-					erCache := draManager.DeviceClassResolver().(*extendedresourcecache.ExtendedResourceCache)
-					erCache.AddEventHandler(handler)
-					handler = erCache
-				}
-				if handlerRegistration, err = informerFactory.Resource().V1().DeviceClasses().Informer().AddEventHandler(
-					handler,
-				); err != nil {
-					return err
-				}
-				handlers = append(handlers, handlerRegistration)
+			handler := cache.ResourceEventHandler(buildEvtResHandler(at, fwk.DeviceClass))
+			if utilfeature.DefaultFeatureGate.Enabled(features.DRAExtendedResource) {
+				// Inject updating of the cache before the scheduler event handlers ("chaining")
+				// to ensure that the cache gets updated before the scheduler kicks off
+				// pod scheduling based on a DeviceClass event.
+				//
+				// We know that this is a DefaultDRAManager and we know that it
+				// uses an ExtendedResourceCache, so no need for type checks.
+				erCache := draManager.DeviceClassResolver().(*extendedresourcecache.ExtendedResourceCache)
+				erCache.AddEventHandler(handler)
+				handler = erCache
 			}
+			if handlerRegistration, err = informerFactory.Resource().V1().DeviceClasses().Informer().AddEventHandler(
+				handler,
+			); err != nil {
+				return err
+			}
+			handlers = append(handlers, handlerRegistration)
 		case fwk.StorageClass:
 			if handlerRegistration, err = informerFactory.Storage().V1().StorageClasses().Informer().AddEventHandler(
 				buildEvtResHandler(at, fwk.StorageClass),
@@ -621,15 +816,8 @@ func addAllEventHandlers(
 				return err
 			}
 			handlers = append(handlers, handlerRegistration)
-		case fwk.PodGroup:
-			if utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload) {
-				if handlerRegistration, err = informerFactory.Scheduling().V1alpha2().PodGroups().Informer().AddEventHandler(
-					buildEvtResHandler(at, fwk.PodGroup),
-				); err != nil {
-					return err
-				}
-				handlers = append(handlers, handlerRegistration)
-			}
+		case fwk.PodGroup, fwk.CompositePodGroup:
+			// Do nothing. Registered explicitly.
 		default:
 			// Tests may not instantiate dynInformerFactory.
 			if dynInformerFactory == nil {

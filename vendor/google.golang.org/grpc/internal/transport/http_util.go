@@ -300,24 +300,29 @@ func decodeGrpcMessageUnchecked(msg string) string {
 
 type bufWriter struct {
 	pool      *imem.SimpleBufferPool
-	buf       []byte
+	bufHandle *[]byte
 	offset    int
 	batchSize int
 	conn      io.Writer
 	err       error
 }
 
+// unsharedBufWriter keeps the unshared slice header in the writer allocation.
+type unsharedBufWriter struct {
+	bufWriter
+	buf []byte
+}
+
 func newBufWriter(conn io.Writer, batchSize int, pool *imem.SimpleBufferPool) *bufWriter {
-	w := &bufWriter{
-		batchSize: batchSize,
-		conn:      conn,
-		pool:      pool,
+	if pool == nil && batchSize > 0 {
+		w := &unsharedBufWriter{
+			bufWriter: bufWriter{batchSize: batchSize, conn: conn},
+			buf:       make([]byte, batchSize),
+		}
+		w.bufHandle = &w.buf
+		return &w.bufWriter
 	}
-	// this indicates that we should use non shared buf
-	if pool == nil {
-		w.buf = make([]byte, batchSize)
-	}
-	return w
+	return &bufWriter{batchSize: batchSize, conn: conn, pool: pool}
 }
 
 func (w *bufWriter) Write(b []byte) (int, error) {
@@ -328,13 +333,13 @@ func (w *bufWriter) Write(b []byte) (int, error) {
 		n, err := w.conn.Write(b)
 		return n, toIOError(err)
 	}
-	if w.buf == nil {
-		b := w.pool.Get(w.batchSize)
-		w.buf = *b
+	if w.bufHandle == nil {
+		w.bufHandle = w.pool.Get(w.batchSize)
 	}
+	buf := *w.bufHandle
 	written := 0
 	for len(b) > 0 {
-		copied := copy(w.buf[w.offset:], b)
+		copied := copy(buf[w.offset:], b)
 		b = b[copied:]
 		written += copied
 		w.offset += copied
@@ -350,13 +355,15 @@ func (w *bufWriter) Write(b []byte) (int, error) {
 
 func (w *bufWriter) Flush() error {
 	err := w.flushKeepBuffer()
-	// Only release the buffer if we are in a "shared" mode
-	if w.buf != nil && w.pool != nil {
-		b := w.buf
-		w.pool.Put(&b)
-		w.buf = nil
-	}
+	w.releaseBuffer()
 	return err
+}
+
+func (w *bufWriter) releaseBuffer() {
+	if w.pool != nil && w.bufHandle != nil {
+		w.pool.Put(w.bufHandle)
+		w.bufHandle = nil
+	}
 }
 
 func (w *bufWriter) flushKeepBuffer() error {
@@ -366,9 +373,13 @@ func (w *bufWriter) flushKeepBuffer() error {
 	if w.offset == 0 {
 		return nil
 	}
-	_, w.err = w.conn.Write(w.buf[:w.offset])
+	buf := *w.bufHandle
+	_, w.err = w.conn.Write(buf[:w.offset])
 	w.err = toIOError(w.err)
 	w.offset = 0
+	if w.err != nil {
+		w.releaseBuffer()
+	}
 	return w.err
 }
 

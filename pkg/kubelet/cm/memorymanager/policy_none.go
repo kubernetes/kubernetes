@@ -17,10 +17,13 @@ limitations under the License.
 package memorymanager
 
 import (
+	"context"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/kubelet/cm/memorymanager/state"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
+	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 )
 
 const policyTypeNone policyType = "None"
@@ -32,7 +35,7 @@ type none struct{}
 var _ Policy = &none{}
 
 // NewPolicyNone returns new none policy instance
-func NewPolicyNone(logger klog.Logger) Policy {
+func NewPolicyNone(_ klog.Logger) Policy {
 	return &none{}
 }
 
@@ -40,39 +43,39 @@ func (p *none) Name() string {
 	return string(policyTypeNone)
 }
 
-func (p *none) Start(logger klog.Logger, s state.State) error {
+func (p *none) Start(logger klog.Logger, _ state.State) error {
 	logger.Info("Start")
 	return nil
 }
 
 // Allocate call is idempotent
-func (p *none) Allocate(_ klog.Logger, s state.State, pod *v1.Pod, container *v1.Container) error {
+func (p *none) Allocate(_ context.Context, _ state.State, _ *v1.Pod, _ *v1.Container, _ lifecycle.Operation) error {
 	return nil
 }
 
 // RemoveContainer call is idempotent
-func (p *none) RemoveContainer(_ klog.Logger, s state.State, podUID string, containerName string) {
+func (p *none) RemoveContainer(_ klog.Logger, _ state.State, _ string, _ string) {
 }
 
 // GetTopologyHints implements the topologymanager.HintProvider Interface
 // and is consulted to achieve NUMA aware resource alignment among this
 // and other resource controllers.
-func (p *none) GetTopologyHints(_ klog.Logger, s state.State, pod *v1.Pod, container *v1.Container) map[string][]topologymanager.TopologyHint {
+func (p *none) GetTopologyHints(_ klog.Logger, _ state.State, _ *v1.Pod, _ *v1.Container, _ lifecycle.Operation) map[string][]topologymanager.TopologyHint {
 	return nil
 }
 
 // GetPodTopologyHints implements the topologymanager.HintProvider Interface
 // and is consulted to achieve NUMA aware resource alignment among this
 // and other resource controllers.
-func (p *none) GetPodTopologyHints(_ klog.Logger, s state.State, pod *v1.Pod) map[string][]topologymanager.TopologyHint {
+func (p *none) GetPodTopologyHints(_ klog.Logger, _ state.State, _ *v1.Pod, _ lifecycle.Operation) map[string][]topologymanager.TopologyHint {
 	return nil
 }
 
-func (p *none) AllocatePod(_ klog.Logger, s state.State, pod *v1.Pod) error {
+func (p *none) AllocatePod(_ klog.Logger, _ state.State, _ *v1.Pod, _ lifecycle.Operation) error {
 	return nil
 }
 
 // GetAllocatableMemory returns the amount of allocatable memory for each NUMA node
-func (p *none) GetAllocatableMemory(s state.State) []state.Block {
+func (p *none) GetAllocatableMemory(_ state.State) []state.Block {
 	return []state.Block{}
 }

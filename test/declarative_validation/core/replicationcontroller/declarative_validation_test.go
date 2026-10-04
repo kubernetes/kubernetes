@@ -28,13 +28,19 @@ import (
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	registry "k8s.io/kubernetes/pkg/registry/core/replicationcontroller"
+	poddeclarativevalidation "k8s.io/kubernetes/test/declarative_validation/core/pod"
+	"k8s.io/kubernetes/test/declarative_validation/meta"
 	"k8s.io/utils/ptr"
 )
 
 func TestDeclarativeValidate(t *testing.T) {
 	ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
-		APIGroup:   "",
-		APIVersion: "v1",
+		APIPrefix:         "api",
+		APIGroup:          "",
+		APIVersion:        "v1",
+		Resource:          "replicationcontrollers",
+		IsResourceRequest: true,
+		Verb:              "create",
 	})
 	testCases := map[string]struct {
 		input        api.ReplicationController
@@ -68,7 +74,7 @@ func TestDeclarativeValidate(t *testing.T) {
 				rc.Name = "-this-is-not-a-label"
 			}),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("metadata.name"), nil, "").WithOrigin("format=k8s-long-name").MarkAlpha(),
+				field.Invalid(field.NewPath("metadata.name"), nil, "").WithOrigin("format=k8s-long-name").MarkBeta(),
 			},
 		},
 		"name: invalid subdomain format": {
@@ -76,7 +82,7 @@ func TestDeclarativeValidate(t *testing.T) {
 				rc.Name = ".this.is.not.a.subdomain"
 			}),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("metadata.name"), nil, "").WithOrigin("format=k8s-long-name").MarkAlpha(),
+				field.Invalid(field.NewPath("metadata.name"), nil, "").WithOrigin("format=k8s-long-name").MarkBeta(),
 			},
 		},
 		"name: label format with trailing dash": {
@@ -84,7 +90,7 @@ func TestDeclarativeValidate(t *testing.T) {
 				rc.Name = "this-is-a-label-"
 			}),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("metadata.name"), nil, "").WithOrigin("format=k8s-long-name").MarkAlpha(),
+				field.Invalid(field.NewPath("metadata.name"), nil, "").WithOrigin("format=k8s-long-name").MarkBeta(),
 			},
 		},
 		"name: subdomain format with trailing dash": {
@@ -92,7 +98,7 @@ func TestDeclarativeValidate(t *testing.T) {
 				rc.Name = "this.is.a.subdomain-"
 			}),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("metadata.name"), nil, "").WithOrigin("format=k8s-long-name").MarkAlpha(),
+				field.Invalid(field.NewPath("metadata.name"), nil, "").WithOrigin("format=k8s-long-name").MarkBeta(),
 			},
 		},
 		"name: long label format": {
@@ -110,7 +116,7 @@ func TestDeclarativeValidate(t *testing.T) {
 				rc.Name = strings.Repeat("x", 254)
 			}),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("metadata.name"), nil, "").WithOrigin("format=k8s-long-name").MarkAlpha(),
+				field.Invalid(field.NewPath("metadata.name"), nil, "").WithOrigin("format=k8s-long-name").MarkBeta(),
 			},
 		},
 		"name: too long subdomain format": {
@@ -118,7 +124,7 @@ func TestDeclarativeValidate(t *testing.T) {
 				rc.Name = strings.Repeat("x.", 126) + "xx"
 			}),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("metadata.name"), nil, "").WithOrigin("format=k8s-long-name").MarkAlpha(),
+				field.Invalid(field.NewPath("metadata.name"), nil, "").WithOrigin("format=k8s-long-name").MarkBeta(),
 			},
 		},
 		// metadata.generateName (note: it's is not really validated)
@@ -159,7 +165,7 @@ func TestDeclarativeValidate(t *testing.T) {
 				rc.Spec.Replicas = nil
 			}),
 			expectedErrs: field.ErrorList{
-				field.Required(field.NewPath("spec.replicas"), "").MarkAlpha(),
+				field.Required(field.NewPath("spec.replicas"), ""),
 			},
 		},
 		"replicas: 0": {
@@ -171,7 +177,7 @@ func TestDeclarativeValidate(t *testing.T) {
 		"replicas: negative": {
 			input: mkValidReplicationController(setSpecReplicas(-1)),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("spec.replicas"), nil, "").WithOrigin("minimum").MarkAlpha(),
+				field.Invalid(field.NewPath("spec.replicas"), nil, "").WithOrigin("minimum"),
 			},
 		},
 		// spec.minReadySeconds
@@ -184,7 +190,40 @@ func TestDeclarativeValidate(t *testing.T) {
 		"minReadySeconds: negative": {
 			input: mkValidReplicationController(setSpecMinReadySeconds(-1)),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("spec.minReadySeconds"), nil, "").WithOrigin("minimum").MarkAlpha(),
+				field.Invalid(field.NewPath("spec.minReadySeconds"), nil, "").WithOrigin("minimum"),
+			},
+		},
+		// spec.template.spec.tolerations[*].key
+		"tolerations: valid key": {
+			input: mkValidReplicationController(setSpecTolerations(api.Toleration{Key: "example.com/valid-key", Operator: api.TolerationOpExists})),
+		},
+		"tolerations: valid key without prefix": {
+			input: mkValidReplicationController(setSpecTolerations(api.Toleration{Key: "simple-key", Operator: api.TolerationOpExists})),
+		},
+		"tolerations: invalid key format": {
+			input: mkValidReplicationController(setSpecTolerations(api.Toleration{Key: "invalid key", Operator: api.TolerationOpExists})),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec.template.spec.tolerations").Index(0).Child("key"), nil, "").WithOrigin("format=k8s-label-key").MarkAlpha(),
+			},
+		},
+		"activeDeadlineSeconds minimum boundary violation": {
+			input: mkValidReplicationController(func(rc *api.ReplicationController) {
+				deadline := int64(0)
+				rc.Spec.Template.Spec.ActiveDeadlineSeconds = &deadline
+			}),
+			expectedErrs: field.ErrorList{
+				field.Forbidden(field.NewPath("spec", "template", "spec", "activeDeadlineSeconds"), "activeDeadlineSeconds in ReplicationController is not Supported").MarkFromImperative(),
+				field.Invalid(field.NewPath("spec.template.spec.activeDeadlineSeconds"), int64(0), "").WithOrigin("minimum").MarkAlpha(),
+			},
+		},
+		"activeDeadlineSeconds maximum boundary violation": {
+			input: mkValidReplicationController(func(rc *api.ReplicationController) {
+				deadline := int64(2147483648)
+				rc.Spec.Template.Spec.ActiveDeadlineSeconds = &deadline
+			}),
+			expectedErrs: field.ErrorList{
+				field.Forbidden(field.NewPath("spec", "template", "spec", "activeDeadlineSeconds"), "activeDeadlineSeconds in ReplicationController is not Supported").MarkFromImperative(),
+				field.Invalid(field.NewPath("spec.template.spec.activeDeadlineSeconds"), int64(2147483648), "").WithOrigin("maximum").MarkAlpha(),
 			},
 		},
 	}
@@ -193,12 +232,23 @@ func TestDeclarativeValidate(t *testing.T) {
 			apitesting.VerifyValidationEquivalence(t, ctx, &tc.input, registry.Strategy, tc.expectedErrs)
 		})
 	}
+	obj := mkValidReplicationController()
+	meta.RunObjectMetaTestCases(t, ctx, &obj, registry.Strategy, meta.WithStringentFinalizerValidation())
+	poddeclarativevalidation.RunDeclarativeValidateEvictionRespondersTestCases(t, ctx, registry.Strategy, field.NewPath("spec", "template", "spec"), new(mkValidReplicationController()), func(baseObj *api.ReplicationController, responders []api.EvictionResponder, schedulingGroup *api.PodSchedulingGroup) {
+		baseObj.Spec.Template.Spec.EvictionResponders = responders
+		baseObj.Spec.Template.Spec.SchedulingGroup = schedulingGroup
+	})
 }
 
 func TestDeclarativeValidateUpdate(t *testing.T) {
 	ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
-		APIGroup:   "",
-		APIVersion: "v1",
+		APIPrefix:         "api",
+		APIGroup:          "",
+		APIVersion:        "v1",
+		Resource:          "replicationcontrollers",
+		Name:              "valid-obj",
+		IsResourceRequest: true,
+		Verb:              "update",
 	})
 	testCases := map[string]struct {
 		old          api.ReplicationController
@@ -236,7 +286,7 @@ func TestDeclarativeValidateUpdate(t *testing.T) {
 				rc.Spec.Replicas = nil
 			}),
 			expectedErrs: field.ErrorList{
-				field.Required(field.NewPath("spec.replicas"), "").MarkAlpha(),
+				field.Required(field.NewPath("spec.replicas"), ""),
 			},
 		},
 		"replicas: 0": {
@@ -251,7 +301,7 @@ func TestDeclarativeValidateUpdate(t *testing.T) {
 			old:    mkValidReplicationController(),
 			update: mkValidReplicationController(setSpecReplicas(-1)),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("spec.replicas"), nil, "").WithOrigin("minimum").MarkAlpha(),
+				field.Invalid(field.NewPath("spec.replicas"), nil, "").WithOrigin("minimum"),
 			},
 		},
 		// spec.minReadySeconds
@@ -267,7 +317,7 @@ func TestDeclarativeValidateUpdate(t *testing.T) {
 			old:    mkValidReplicationController(),
 			update: mkValidReplicationController(setSpecMinReadySeconds(-1)),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("spec.minReadySeconds"), nil, "").WithOrigin("minimum").MarkAlpha(),
+				field.Invalid(field.NewPath("spec.minReadySeconds"), nil, "").WithOrigin("minimum"),
 			},
 		},
 	}
@@ -278,6 +328,8 @@ func TestDeclarativeValidateUpdate(t *testing.T) {
 			apitesting.VerifyUpdateValidationEquivalence(t, ctx, &tc.update, &tc.old, registry.Strategy, tc.expectedErrs)
 		})
 	}
+	updateObj := mkValidReplicationController()
+	meta.RunObjectMetaUpdateTestCases(t, ctx, &updateObj, registry.Strategy, meta.WithStringentFinalizerValidation())
 }
 
 // mkValidReplicationController produces a ReplicationController which passes
@@ -311,5 +363,11 @@ func setSpecReplicas(val int32) func(rc *api.ReplicationController) {
 func setSpecMinReadySeconds(val int32) func(rc *api.ReplicationController) {
 	return func(rc *api.ReplicationController) {
 		rc.Spec.MinReadySeconds = val
+	}
+}
+
+func setSpecTolerations(tolerations ...api.Toleration) func(rc *api.ReplicationController) {
+	return func(rc *api.ReplicationController) {
+		rc.Spec.Template.Spec.Tolerations = tolerations
 	}
 }

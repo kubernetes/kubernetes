@@ -34,11 +34,39 @@ import (
 )
 
 // EventInformer provides access to a shared informer and lister for
-// Events.
+// Events. Prefer using the type-safe variant (see [TypedEventInformer]).
 type EventInformer interface {
 	Informer() cache.SharedIndexInformer
 	Lister() corev1.EventLister
 }
+
+// TypedEventInformer provides access to a shared informer and lister for
+// Events, including the type-safe TypedInformer variant.
+// It is a superset of EventInformer.
+type TypedEventInformer interface {
+	Informer() cache.SharedIndexInformer
+	TypedInformer() EventIndexInformer
+	Lister() corev1.EventLister
+}
+
+// EventIndexInformer is a wrapper around the underlying [cache.SharedIndexInformer]
+// with type-safe variants of several methods.
+type EventIndexInformer cache.TypedSharedIndexInformer[*apicorev1.Event]
+
+// EventHandlerFuncs is a specialization of [cache.TypedResourceEventHandlerFuncs] for Event.
+type EventHandlerFuncs = cache.TypedResourceEventHandlerFuncs[*apicorev1.Event]
+
+// EventDetailedHandlerFuncs is a specialization of [cache.TypedResourceEventHandlerDetailedFuncs] for Event.
+type EventDetailedHandlerFuncs = cache.TypedResourceEventHandlerDetailedFuncs[*apicorev1.Event]
+
+// EventFilteringHandler is a specialization of [cache.TypedFilteringResourceEventHandler] for Event.
+type EventFilteringHandler = cache.TypedFilteringResourceEventHandler[*apicorev1.Event]
+
+// EventIndexers is a specialization of [cache.TypedIndexers] for Event.
+type EventIndexers = cache.TypedIndexers[*apicorev1.Event]
+
+// DeletedEvent is a specialization of [cache.DeletedObject] for Event.
+type DeletedEvent = cache.DeletedObject[*apicorev1.Event]
 
 type eventInformer struct {
 	factory          internalinterfaces.SharedInformerFactory
@@ -49,25 +77,49 @@ type eventInformer struct {
 // NewEventInformer constructs a new informer for Event type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedEventInformer]).
 func NewEventInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
 	return NewEventInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers})
+}
+
+// NewTypedEventInformer constructs a new informer for Event type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedEventInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers EventIndexers) EventIndexInformer {
+	return NewTypedEventInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.TypedIndexersToIndexers(indexers)})
 }
 
 // NewFilteredEventInformer constructs a new informer for Event type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedFilteredEventInformer]).
 func NewFilteredEventInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
-	return NewEventInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
+	return NewTypedEventInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
+}
+
+// NewTypedFilteredEventInformer constructs a new informer for Event type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedFilteredEventInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers EventIndexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) EventIndexInformer {
+	return NewTypedEventInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.TypedIndexersToIndexers(indexers), TweakListOptions: tweakListOptions})
 }
 
 // NewEventInformerWithOptions constructs a new informer for Event type with additional options.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedEventInformerWithOptions]).
 func NewEventInformerWithOptions(client kubernetes.Interface, namespace string, options internalinterfaces.InformerOptions) cache.SharedIndexInformer {
+	return NewTypedEventInformerWithOptions(client, namespace, options)
+}
+
+// NewTypedEventInformerWithOptions constructs a new informer for Event type with additional options.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedEventInformerWithOptions(client kubernetes.Interface, namespace string, options internalinterfaces.InformerOptions) EventIndexInformer {
 	gvr := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "events"}
 	identifier := options.InformerName.WithResource(gvr)
 	tweakListOptions := options.TweakListOptions
-	return cache.NewSharedIndexInformerWithOptions(
+	return cache.NewTypedSharedIndexInformer[*apicorev1.Event](cache.NewSharedIndexInformerWithOptions(
 		cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
 			ListFunc: func(opts metav1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
@@ -100,17 +152,57 @@ func NewEventInformerWithOptions(client kubernetes.Interface, namespace string, 
 			Indexers:     options.Indexers,
 			Identifier:   identifier,
 		},
-	)
+	))
 }
 
 func (f *eventInformer) defaultInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewEventInformerWithOptions(client, f.namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
+	return NewTypedEventInformerWithOptions(client, f.namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
 }
 
 func (f *eventInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&apicorev1.Event{}, f.defaultInformer)
+	return f.TypedInformer()
+}
+
+func (f *eventInformer) TypedInformer() EventIndexInformer {
+	return cache.NewTypedSharedIndexInformer[*apicorev1.Event](f.factory.InformerFor(&apicorev1.Event{}, f.defaultInformer))
 }
 
 func (f *eventInformer) Lister() corev1.EventLister {
 	return corev1.NewEventLister(f.Informer().GetIndexer())
+}
+
+// ToTypedEventInformer converts an untyped informer into a TypedEventInformer.
+//
+// WARNING: this conversion is only safe if the informer handles objects of type
+// *Event. If that is not the case, calling type-safe methods of the returned
+// TypedEventInformer leads to runtime panics. A safer alternative is to pass
+// around a TypedEventInformer instances that was obtained from a
+// SharedInformerFactory.
+func ToTypedEventInformer(informer EventInformer) TypedEventInformer {
+	if informer, ok := informer.(TypedEventInformer); ok {
+		return informer
+	}
+	return &eventTypedInformerAdapter{informer}
+}
+
+type eventTypedInformerAdapter struct {
+	EventInformer
+}
+
+func (a *eventTypedInformerAdapter) TypedInformer() EventIndexInformer {
+	return cache.NewTypedSharedIndexInformer[*apicorev1.Event](a.Informer())
+}
+
+// ToEventIndexInformer converts an untyped informer into a EventIndexInformer.
+//
+// WARNING: this conversion is only safe if the informer handles objects of type
+// *Event. If that is not the case, calling type-safe methods of the returned
+// EventIndexInformer leads to runtime panics. A safer alternative is to pass
+// around a EventIndexInformer instances that was obtained from a
+// SharedInformerFactory.
+func ToEventIndexInformer(informer cache.SharedIndexInformer) EventIndexInformer {
+	if informer, ok := informer.(EventIndexInformer); ok {
+		return informer
+	}
+	return cache.NewTypedSharedIndexInformer[*apicorev1.Event](informer)
 }

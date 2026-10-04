@@ -1,0 +1,9 @@
+# Importing the generic API server, directly or transitively, pulls admission,
+# the CEL stack and etcd storage into kube-proxy and grows the binary by a
+# tenth. kube-proxy only needs healthz, metrics and signal handling, which
+# live in leaf packages under pkg/server.
+rules:
+  - selectorRegexp: ^k8s[.]io/apiserver/pkg/server(/options)?$
+    forbiddenPrefixes:
+      - ''
+    transitive: true

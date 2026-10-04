@@ -21,12 +21,10 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	kubeoptions "k8s.io/kubernetes/pkg/kubeapiserver/options"
-	"k8s.io/kubernetes/plugin/pkg/admission/job"
 	"k8s.io/kubernetes/plugin/pkg/admission/limitranger"
 	"k8s.io/kubernetes/plugin/pkg/admission/network/defaultingressclass"
 	"k8s.io/kubernetes/plugin/pkg/admission/nodedeclaredfeatures"
 	"k8s.io/kubernetes/plugin/pkg/admission/nodetaint"
-	"k8s.io/kubernetes/plugin/pkg/admission/podgroup"
 	"k8s.io/kubernetes/plugin/pkg/admission/podresize"
 	"k8s.io/kubernetes/plugin/pkg/admission/podtopologylabels"
 	podpriority "k8s.io/kubernetes/plugin/pkg/admission/priority"
@@ -50,9 +48,7 @@ var intentionallyOffPlugins = sets.New[string](
 	defaultingressclass.PluginName,          // DefaultIngressClass
 	podsecurity.PluginName,                  // PodSecurity
 	podtopologylabels.PluginName,            // PodTopologyLabels
-	podgroup.PluginName,                     // PodGroupWorkloadExists
 	nodedeclaredfeatures.PluginName,         // NodeDeclaredFeatures
-	job.PluginName,                          // JobValidation
 	podresize.PluginName,                    // PodResize
 )
 

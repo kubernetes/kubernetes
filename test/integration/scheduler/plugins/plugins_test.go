@@ -39,7 +39,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	listersv1 "k8s.io/client-go/listers/core/v1"
-	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/klog/v2"
 	configv1 "k8s.io/kube-scheduler/config/v1"
 	fwk "k8s.io/kube-scheduler/framework"
@@ -80,7 +79,7 @@ func newPlugin(plugin fwk.Plugin) frameworkruntime.PluginFactory {
 
 type QueueSortPlugin struct {
 	// lessFunc is used to compare two queued pod infos.
-	lessFunc func(info1, info2 fwk.QueuedPodInfo) bool
+	lessFunc func(info1, info2 fwk.QueuedEntityInfo) bool
 }
 
 type PreEnqueuePlugin struct {
@@ -168,11 +167,25 @@ type PostFilterPlugin struct {
 }
 
 type ReservePlugin struct {
+	mutex                 sync.Mutex
 	name                  string
 	numReserveCalled      int
 	failReserve           bool
 	numUnreserveCalled    int
 	pluginInvokeEventChan chan pluginInvokeEvent
+}
+
+func (rp *ReservePlugin) deepCopy() *ReservePlugin {
+	rp.mutex.Lock()
+	defer rp.mutex.Unlock()
+
+	return &ReservePlugin{
+		name:                  rp.name,
+		numReserveCalled:      rp.numReserveCalled,
+		failReserve:           rp.failReserve,
+		numUnreserveCalled:    rp.numUnreserveCalled,
+		pluginInvokeEventChan: rp.pluginInvokeEventChan,
+	}
 }
 
 type PreScorePlugin struct {
@@ -333,7 +346,7 @@ func (ep *QueueSortPlugin) Name() string {
 	return queuesortPluginName
 }
 
-func (ep *QueueSortPlugin) Less(info1, info2 fwk.QueuedPodInfo) bool {
+func (ep *QueueSortPlugin) Less(info1, info2 fwk.QueuedEntityInfo) bool {
 	if ep.lessFunc != nil {
 		return ep.lessFunc(info1, info2)
 	}
@@ -341,7 +354,7 @@ func (ep *QueueSortPlugin) Less(info1, info2 fwk.QueuedPodInfo) bool {
 	return true
 }
 
-func NewQueueSortPlugin(lessFunc func(info1, info2 fwk.QueuedPodInfo) bool) *QueueSortPlugin {
+func NewQueueSortPlugin(lessFunc func(info1, info2 fwk.QueuedEntityInfo) bool) *QueueSortPlugin {
 	return &QueueSortPlugin{
 		lessFunc: lessFunc,
 	}
@@ -455,8 +468,12 @@ func (rp *ReservePlugin) Name() string {
 // Reserve is a test function that increments an intenral counter and returns
 // an error or nil, depending on the value of "failReserve".
 func (rp *ReservePlugin) Reserve(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) *fwk.Status {
+	rp.mutex.Lock()
 	rp.numReserveCalled++
-	if rp.failReserve {
+	failReserve := rp.failReserve
+	rp.mutex.Unlock()
+
+	if failReserve {
 		return fwk.NewStatus(fwk.Error, fmt.Sprintf("injecting failure for pod %v", pod.Name))
 	}
 	return nil
@@ -466,11 +483,16 @@ func (rp *ReservePlugin) Reserve(ctx context.Context, state fwk.CycleState, pod 
 // an event to a channel. While Unreserve implementations should normally be
 // idempotent, we relax that requirement here for testing purposes.
 func (rp *ReservePlugin) Unreserve(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) {
+	rp.mutex.Lock()
 	rp.numUnreserveCalled++
-	if rp.pluginInvokeEventChan != nil {
+	numUnreserveCalled := rp.numUnreserveCalled
+	pluginInvokeEventChan := rp.pluginInvokeEventChan
+	rp.mutex.Unlock()
+
+	if pluginInvokeEventChan != nil {
 		select {
 		case <-ctx.Done():
-		case rp.pluginInvokeEventChan <- pluginInvokeEvent{pluginName: rp.Name(), val: rp.numUnreserveCalled}:
+		case pluginInvokeEventChan <- pluginInvokeEvent{pluginName: rp.Name(), val: numUnreserveCalled}:
 		}
 	}
 }
@@ -804,13 +826,13 @@ func TestQueueSortPlugin(t *testing.T) {
 		name           string
 		podNames       []string
 		expectedOrder  []string
-		customLessFunc func(info1, info2 fwk.QueuedPodInfo) bool
+		customLessFunc func(info1, info2 fwk.QueuedEntityInfo) bool
 	}{
 		{
 			name:          "timestamp_sort_order",
 			podNames:      []string{"pod-1", "pod-2", "pod-3"},
 			expectedOrder: []string{"pod-1", "pod-2", "pod-3"},
-			customLessFunc: func(info1, info2 fwk.QueuedPodInfo) bool {
+			customLessFunc: func(info1, info2 fwk.QueuedEntityInfo) bool {
 				return info1.GetTimestamp().Before(info2.GetTimestamp())
 			},
 		},
@@ -818,9 +840,9 @@ func TestQueueSortPlugin(t *testing.T) {
 			name:          "priority_sort_order",
 			podNames:      []string{"pod-1", "pod-2", "pod-3"},
 			expectedOrder: []string{"pod-3", "pod-2", "pod-1"}, // depends on pod priority
-			customLessFunc: func(info1, info2 fwk.QueuedPodInfo) bool {
-				p1 := corev1helpers.PodPriority(info1.GetPodInfo().GetPod())
-				p2 := corev1helpers.PodPriority(info2.GetPodInfo().GetPod())
+			customLessFunc: func(info1, info2 fwk.QueuedEntityInfo) bool {
+				p1 := info1.GetPriority()
+				p2 := info2.GetPriority()
 				return (p1 > p2) || (p1 == p2 && info1.GetTimestamp().Before(info2.GetTimestamp()))
 			},
 		},
@@ -864,9 +886,9 @@ func TestQueueSortPlugin(t *testing.T) {
 
 			actualOrder := make([]string, len(tt.expectedOrder))
 			for i := 0; i < len(tt.expectedOrder); i++ {
-				queueInfo := testutils.NextPodOrDie(t, testCtx)
-				actualOrder[i] = queueInfo.Pod.Name
-				t.Logf("Popped Pod %q", queueInfo.Pod.Name)
+				entity := testutils.NextEntityOrDie(t, testCtx)
+				actualOrder[i] = entity.GetName()
+				t.Logf("Popped entity (Pod) %q", entity.GetName())
 			}
 			if diff := cmp.Diff(tt.expectedOrder, actualOrder); diff != "" {
 				t.Errorf("Expected Pod order (-want,+got):\n%s", diff)
@@ -1204,7 +1226,7 @@ func TestReservePluginReserve(t *testing.T) {
 				}
 			}
 
-			if reservePlugin.numReserveCalled == 0 {
+			if reservePlugin.deepCopy().numReserveCalled == 0 {
 				t.Errorf("Expected the reserve plugin to be called.")
 			}
 		})
@@ -1471,18 +1493,19 @@ func TestUnReserveReservePlugins(t *testing.T) {
 				}
 
 				for i, pl := range test.plugins {
+					p := pl.deepCopy()
 					if i <= test.failPluginIdx {
-						if pl.numReserveCalled != 1 {
-							t.Errorf("Reserve Plugins %s numReserveCalled = %d, want 1.", pl.name, pl.numReserveCalled)
+						if p.numReserveCalled != 1 {
+							t.Errorf("Reserve Plugins %s numReserveCalled = %d, want 1.", p.name, p.numReserveCalled)
 						}
 					} else {
-						if pl.numReserveCalled != 0 {
-							t.Errorf("Reserve Plugins %s numReserveCalled = %d, want 0.", pl.name, pl.numReserveCalled)
+						if p.numReserveCalled != 0 {
+							t.Errorf("Reserve Plugins %s numReserveCalled = %d, want 0.", p.name, p.numReserveCalled)
 						}
 					}
 
-					if pl.numUnreserveCalled != 1 {
-						t.Errorf("Reserve Plugin %s numUnreserveCalled = %d, want 1.", pl.name, pl.numUnreserveCalled)
+					if p.numUnreserveCalled != 1 {
+						t.Errorf("Reserve Plugin %s numUnreserveCalled = %d, want 1.", p.name, p.numUnreserveCalled)
 					}
 				}
 			} else {
@@ -1491,11 +1514,12 @@ func TestUnReserveReservePlugins(t *testing.T) {
 				}
 
 				for _, pl := range test.plugins {
-					if pl.numReserveCalled != 1 {
-						t.Errorf("Reserve Plugin %s numReserveCalled = %d, want 1.", pl.name, pl.numReserveCalled)
+					p := pl.deepCopy()
+					if p.numReserveCalled != 1 {
+						t.Errorf("Reserve Plugin %s numReserveCalled = %d, want 1.", p.name, p.numReserveCalled)
 					}
-					if pl.numUnreserveCalled != 0 {
-						t.Errorf("Reserve Plugin %s numUnreserveCalled = %d, want 0.", pl.name, pl.numUnreserveCalled)
+					if p.numUnreserveCalled != 0 {
+						t.Errorf("Reserve Plugin %s numUnreserveCalled = %d, want 0.", p.name, p.numUnreserveCalled)
 					}
 				}
 			}
@@ -1564,8 +1588,9 @@ func TestUnReservePermitPlugins(t *testing.T) {
 				}
 
 				// Verify the Reserve Plugins
-				if reservePlugin.numUnreserveCalled != 1 {
-					t.Errorf("Reserve Plugin %s numUnreserveCalled = %d, want 1.", reservePlugin.name, reservePlugin.numUnreserveCalled)
+				p := reservePlugin.deepCopy()
+				if p.numUnreserveCalled != 1 {
+					t.Errorf("Reserve Plugin %s numUnreserveCalled = %d, want 1.", p.name, p.numUnreserveCalled)
 				}
 			} else {
 				if err = testutils.WaitForPodToSchedule(testCtx.Ctx, testCtx.ClientSet, pod); err != nil {
@@ -1573,12 +1598,13 @@ func TestUnReservePermitPlugins(t *testing.T) {
 				}
 
 				// Verify the Reserve Plugins
-				if reservePlugin.numUnreserveCalled != 0 {
-					t.Errorf("Reserve Plugin %s numUnreserveCalled = %d, want 0.", reservePlugin.name, reservePlugin.numUnreserveCalled)
+				p := reservePlugin.deepCopy()
+				if p.numUnreserveCalled != 0 {
+					t.Errorf("Reserve Plugin %s numUnreserveCalled = %d, want 0.", p.name, p.numUnreserveCalled)
 				}
 			}
 
-			if test.plugin.numPermitCalled != 1 {
+			if test.plugin.deepCopy().numPermitCalled != 1 {
 				t.Errorf("Expected the Permit plugin to be called.")
 			}
 		})
@@ -1637,8 +1663,9 @@ func TestUnReservePreBindPlugins(t *testing.T) {
 				}
 
 				// Verify the Reserve Plugins
-				if reservePlugin.numUnreserveCalled != 1 {
-					t.Errorf("Reserve Plugin %s numUnreserveCalled = %d, want 1.", reservePlugin.name, reservePlugin.numUnreserveCalled)
+				p := reservePlugin.deepCopy()
+				if p.numUnreserveCalled != 1 {
+					t.Errorf("Reserve Plugin %s numUnreserveCalled = %d, want 1.", p.name, p.numUnreserveCalled)
 				}
 			} else {
 				if err = testutils.WaitForPodToSchedule(testCtx.Ctx, testCtx.ClientSet, pod); err != nil {
@@ -1646,8 +1673,9 @@ func TestUnReservePreBindPlugins(t *testing.T) {
 				}
 
 				// Verify the Reserve Plugins
-				if reservePlugin.numUnreserveCalled != 0 {
-					t.Errorf("Reserve Plugin %s numUnreserveCalled = %d, want 0.", reservePlugin.name, reservePlugin.numUnreserveCalled)
+				p := reservePlugin.deepCopy()
+				if p.numUnreserveCalled != 0 {
+					t.Errorf("Reserve Plugin %s numUnreserveCalled = %d, want 0.", p.name, p.numUnreserveCalled)
 				}
 			}
 
@@ -1709,8 +1737,9 @@ func TestUnReserveBindPlugins(t *testing.T) {
 				}
 
 				// Verify the Reserve Plugins
-				if reservePlugin.numUnreserveCalled != 1 {
-					t.Errorf("Reserve Plugin %s numUnreserveCalled = %d, want 1.", reservePlugin.name, reservePlugin.numUnreserveCalled)
+				p := reservePlugin.deepCopy()
+				if p.numUnreserveCalled != 1 {
+					t.Errorf("Reserve Plugin %s numUnreserveCalled = %d, want 1.", p.name, p.numUnreserveCalled)
 				}
 			} else {
 				if err = testutils.WaitForPodToSchedule(testCtx.Ctx, testCtx.ClientSet, pod); err != nil {
@@ -1718,8 +1747,9 @@ func TestUnReserveBindPlugins(t *testing.T) {
 				}
 
 				// Verify the Reserve Plugins
-				if reservePlugin.numUnreserveCalled != 0 {
-					t.Errorf("Reserve Plugin %s numUnreserveCalled = %d, want 0.", reservePlugin.name, reservePlugin.numUnreserveCalled)
+				p := reservePlugin.deepCopy()
+				if p.numUnreserveCalled != 0 {
+					t.Errorf("Reserve Plugin %s numUnreserveCalled = %d, want 0.", p.name, p.numUnreserveCalled)
 				}
 			}
 
@@ -1895,8 +1925,8 @@ func TestBindPlugin(t *testing.T) {
 				}); err != nil {
 					t.Errorf("Expected the postbind plugin to be called once, was called %d times.", postBindPlugin.numPostBindCalled)
 				}
-				if reservePlugin.numUnreserveCalled != 0 {
-					t.Errorf("Expected unreserve to not be called, was called %d times.", reservePlugin.numUnreserveCalled)
+				if p := reservePlugin.deepCopy(); p.numUnreserveCalled != 0 {
+					t.Errorf("Expected unreserve to not be called, was called %d times.", p.numUnreserveCalled)
 				}
 			} else if test.expectBindFailed {
 				// bind plugin fails to bind the pod
@@ -2143,7 +2173,7 @@ func TestMultiplePermitPlugins(t *testing.T) {
 		t.Errorf("Expected the pod to be scheduled. error: %v", err)
 	}
 
-	if perPlugin1.numPermitCalled == 0 || perPlugin2.numPermitCalled == 0 {
+	if perPlugin1.deepCopy().numPermitCalled == 0 || perPlugin2.deepCopy().numPermitCalled == 0 {
 		t.Errorf("Expected the permit plugin to be called.")
 	}
 }
@@ -2212,6 +2242,11 @@ func TestCoSchedulingWithPermitPlugin(t *testing.T) {
 		},
 	}
 
+	podPairMatches := func(waitingPod, pairedPod, podAName, podBName string) bool {
+		return (waitingPod == podAName && pairedPod == podBName) ||
+			(waitingPod == podBName && pairedPod == podAName)
+	}
+
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 
@@ -2250,10 +2285,10 @@ func TestCoSchedulingWithPermitPlugin(t *testing.T) {
 				if err = testutils.WaitForPodUnschedulable(testCtx.Ctx, testCtx.ClientSet, podB); err != nil {
 					t.Errorf("Didn't expect the second pod to be scheduled. error: %v", err)
 				}
-				if !((permitPlugin.waitingPod == podA.Name && permitPlugin.rejectingPod == podB.Name) ||
-					(permitPlugin.waitingPod == podB.Name && permitPlugin.rejectingPod == podA.Name)) {
+				p := permitPlugin.deepCopy()
+				if !podPairMatches(p.waitingPod, p.rejectingPod, podA.Name, podB.Name) {
 					t.Errorf("Expect one pod to wait and another pod to reject instead %s waited and %s rejected.",
-						permitPlugin.waitingPod, permitPlugin.rejectingPod)
+						p.waitingPod, p.rejectingPod)
 				}
 			} else {
 				if err = testutils.WaitForPodToSchedule(testCtx.Ctx, testCtx.ClientSet, podA); err != nil {
@@ -2262,10 +2297,10 @@ func TestCoSchedulingWithPermitPlugin(t *testing.T) {
 				if err = testutils.WaitForPodToSchedule(testCtx.Ctx, testCtx.ClientSet, podB); err != nil {
 					t.Errorf("Expected the second pod to be scheduled. error: %v", err)
 				}
-				if !((permitPlugin.waitingPod == podA.Name && permitPlugin.allowingPod == podB.Name) ||
-					(permitPlugin.waitingPod == podB.Name && permitPlugin.allowingPod == podA.Name)) {
+				p := permitPlugin.deepCopy()
+				if !podPairMatches(p.waitingPod, p.allowingPod, podA.Name, podB.Name) {
 					t.Errorf("Expect one pod to wait and another pod to allow instead %s waited and %s allowed.",
-						permitPlugin.waitingPod, permitPlugin.allowingPod)
+						p.waitingPod, p.allowingPod)
 				}
 			}
 
@@ -2462,7 +2497,7 @@ func TestPreemptWithPermitPlugin(t *testing.T) {
 	testContext := testutils.InitTestAPIServer(t, "preempt-with-permit-plugin", nil)
 
 	ns := testContext.NS.Name
-	lowPriority, highPriority := int32(100), int32(300)
+	lowPriority, midPriority, highPriority := int32(100), int32(150), int32(300)
 	resReq := map[v1.ResourceName]string{
 		v1.ResourceCPU:    "200m",
 		v1.ResourceMemory: "200",
@@ -2490,7 +2525,7 @@ func TestPreemptWithPermitPlugin(t *testing.T) {
 			name:                   "waiting pod is not physically deleted upon preemption",
 			maxNumWaitingPodCalled: 2,
 			runningPod:             st.MakePod().Name("running-pod").Namespace(ns).Priority(lowPriority).Req(resReq).ZeroTerminationGracePeriod().Obj(),
-			waitingPod:             st.MakePod().Name("waiting-pod").Namespace(ns).Priority(lowPriority).Req(resReq).ZeroTerminationGracePeriod().Obj(),
+			waitingPod:             st.MakePod().Name("waiting-pod").Namespace(ns).Priority(midPriority).Req(resReq).ZeroTerminationGracePeriod().Obj(),
 			preemptor:              st.MakePod().Name("preemptor-pod").Namespace(ns).Priority(highPriority).Req(preemptorReq).ZeroTerminationGracePeriod().Obj(),
 		},
 		{
@@ -2625,7 +2660,7 @@ func TestPreemptWithPermitPlugin(t *testing.T) {
 					}
 				}
 
-				if permitPlugin.numPermitCalled == 0 {
+				if permitPlugin.deepCopy().numPermitCalled == 0 {
 					t.Errorf("Expected the permit plugin to be called.")
 				}
 			}

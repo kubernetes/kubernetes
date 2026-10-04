@@ -78,8 +78,8 @@ func getUnionValidations(shared map[string]unions, context Context) (Validations
 }
 
 const (
-	unionDiscriminatorTagName = "k8s:unionDiscriminator"
-	unionMemberTagName        = "k8s:unionMember"
+	unionDiscriminatorTagName = "unionDiscriminator"
+	unionMemberTagName        = "unionMember"
 )
 
 type unionDiscriminatorTagValidator struct {

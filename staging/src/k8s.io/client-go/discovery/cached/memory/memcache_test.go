@@ -17,6 +17,7 @@ limitations under the License.
 package memory
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -35,10 +36,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/discovery"
-	"k8s.io/client-go/discovery/fake"
 	"k8s.io/client-go/openapi"
 	"k8s.io/client-go/rest"
 	testutil "k8s.io/client-go/util/testing"
+	"k8s.io/klog/v2/ktesting"
 )
 
 type resourceMapEntry struct {
@@ -47,7 +48,10 @@ type resourceMapEntry struct {
 }
 
 type fakeDiscovery struct {
-	*fake.FakeDiscovery
+	// Intentionally limited to discovery.DiscoveryInterface because that is all that this
+	// code knows about and partly overrides. *fake.FakeDiscovery would inherit
+	// e.g. ServerGroupsWithContext which then would have to be overridden.
+	discovery.DiscoveryInterface
 
 	lock         sync.Mutex
 	groupList    *metav1.APIGroupList
@@ -73,34 +77,77 @@ func (c *fakeDiscovery) ServerGroups() (*metav1.APIGroupList, error) {
 	return c.groupList, c.groupListErr
 }
 
+// fakeDiscoveryWithContext is a variant of fakeDiscovery which supports only the *WithContext methods.
+type fakeDiscoveryWithContext struct {
+	*fakeDiscovery
+	discovery.DiscoveryInterfaceWithContext
+
+	// Invoked at the end of each ServerGroupsWithContext.
+	serverGroupsWithContextPostCallback func()
+}
+
+func (c *fakeDiscoveryWithContext) ServerResourcesForGroupVersion(groupVersion string) (*metav1.APIResourceList, error) {
+	panic("fakeDiscoveryWithContext.ServerResourcesForGroupVersion should not have been called")
+}
+
+func (c *fakeDiscoveryWithContext) ServerGroups() (*metav1.APIGroupList, error) {
+	panic("fakeDiscoveryWithContext.ServerGroups should not have been called")
+}
+
+func (c *fakeDiscoveryWithContext) ServerResourcesForGroupVersionWithContext(ctx context.Context, groupVersion string) (*metav1.APIResourceList, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	return c.fakeDiscovery.ServerResourcesForGroupVersion(groupVersion)
+}
+
+func (c *fakeDiscoveryWithContext) ServerGroupsWithContext(ctx context.Context) (*metav1.APIGroupList, error) {
+	if c.serverGroupsWithContextPostCallback != nil {
+		defer c.serverGroupsWithContextPostCallback()
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	return c.fakeDiscovery.ServerGroups()
+}
+
 func TestClient(t *testing.T) {
-	fake := &fakeDiscovery{
-		groupList: &metav1.APIGroupList{
-			Groups: []metav1.APIGroup{{
-				Name: "astronomy",
-				Versions: []metav1.GroupVersionForDiscovery{{
-					GroupVersion: "astronomy/v8beta1",
-					Version:      "v8beta1",
-				}},
-			}},
-		},
-		resourceMap: map[string]*resourceMapEntry{
-			"astronomy/v8beta1": {
-				list: &metav1.APIResourceList{
-					GroupVersion: "astronomy/v8beta1",
-					APIResources: []metav1.APIResource{{
-						Name:         "dwarfplanets",
-						SingularName: "dwarfplanet",
-						Namespaced:   true,
-						Kind:         "DwarfPlanet",
-						ShortNames:   []string{"dp"},
+	newFake := func() *fakeDiscovery {
+		return &fakeDiscovery{
+			groupList: &metav1.APIGroupList{
+				Groups: []metav1.APIGroup{{
+					Name: "astronomy",
+					Versions: []metav1.GroupVersionForDiscovery{{
+						GroupVersion: "astronomy/v8beta1",
+						Version:      "v8beta1",
 					}},
+				}},
+			},
+			resourceMap: map[string]*resourceMapEntry{
+				"astronomy/v8beta1": {
+					list: &metav1.APIResourceList{
+						GroupVersion: "astronomy/v8beta1",
+						APIResources: []metav1.APIResource{{
+							Name:         "dwarfplanets",
+							SingularName: "dwarfplanet",
+							Namespaced:   true,
+							Kind:         "DwarfPlanet",
+							ShortNames:   []string{"dp"},
+						}},
+					},
 				},
 			},
-		},
+		}
 	}
+	fake := newFake()
+	fakeWithContext := &fakeDiscoveryWithContext{fakeDiscovery: newFake()}
 
-	c := NewMemCacheClient(fake)
+	t.Run("DiscoveryInterface", func(t *testing.T) { testClient(t, fake, fake) })
+	t.Run("DiscoveryInterfaceWithContext", func(t *testing.T) { testClient(t, fakeWithContext.fakeDiscovery, fakeWithContext) })
+}
+
+func testClient(t *testing.T, fake *fakeDiscovery, delegate discovery.DiscoveryInterface) {
+	c := NewMemCacheClient(delegate)
 	if c.Fresh() {
 		t.Errorf("Expected not fresh.")
 	}
@@ -161,6 +208,62 @@ func TestClient(t *testing.T) {
 	}
 	if e, a := fake.resourceMap["astronomy/v8beta1"].list, r; !reflect.DeepEqual(e, a) {
 		t.Errorf("Expected %#v, got %#v", e, a)
+	}
+}
+
+func TestRetryAfterCancellation(t *testing.T) {
+	fake := &fakeDiscoveryWithContext{
+		fakeDiscovery: &fakeDiscovery{
+			groupList: &metav1.APIGroupList{
+				Groups: []metav1.APIGroup{{
+					Name: "astronomy",
+					Versions: []metav1.GroupVersionForDiscovery{{
+						GroupVersion: "astronomy/v8beta1",
+						Version:      "v8beta1",
+					}},
+				}},
+			},
+			resourceMap: map[string]*resourceMapEntry{
+				"astronomy/v8beta1": {
+					list: &metav1.APIResourceList{
+						GroupVersion: "astronomy/v8beta1",
+						APIResources: []metav1.APIResource{{
+							Name:         "dwarfplanets",
+							SingularName: "dwarfplanet",
+							Namespaced:   true,
+							Kind:         "DwarfPlanet",
+							ShortNames:   []string{"dp"},
+						}},
+					},
+				},
+			},
+		},
+	}
+
+	ctx := context.Background()
+	cancelCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	c := NewMemCacheClientWithContext(fake)
+
+	// The context gets canceled in the middle of refreshLocked.
+	// This is important for code path which handles per-gv errors.
+	fake.serverGroupsWithContextPostCallback = cancel
+	_, err := c.ServerResourcesForGroupVersionWithContext(cancelCtx, "astronomy/v8beta1")
+	if err == nil {
+		t.Errorf("Expected error")
+	}
+
+	// This retries the lookup with a fresh context.
+	r, err := c.ServerResourcesForGroupVersionWithContext(ctx, "astronomy/v8beta1")
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	if e, a := fake.resourceMap["astronomy/v8beta1"].list, r; !reflect.DeepEqual(e, a) {
+		t.Errorf("Expected %#v, got %#v", e, a)
+	}
+	if !c.FreshWithContext(ctx) {
+		t.Errorf("Expected not fresh.")
 	}
 }
 
@@ -435,6 +538,8 @@ func TestOpenAPIMemCache(t *testing.T) {
 					continue
 				}
 
+				// This is the original OpenAPI client. It is not affected
+				// by client.Invalidate() below.
 				pathsAgain, err := openapiClient.Paths()
 				if !assert.NoError(t, err) {
 					continue
@@ -445,7 +550,8 @@ func TestOpenAPIMemCache(t *testing.T) {
 					continue
 				}
 
-				assert.Equal(t, reflect.ValueOf(paths).Pointer(), reflect.ValueOf(pathsAgain).Pointer())
+				// The map itself might be different, but the content should not be.
+				assert.Equal(t, reflect.ValueOf(paths[k]).Pointer(), reflect.ValueOf(pathsAgain[k]).Pointer())
 				assert.Equal(t, reflect.ValueOf(original).Pointer(), reflect.ValueOf(schemaAgain).Pointer())
 
 				// Invalidate and try again. This time pointers should not be equal
@@ -457,6 +563,76 @@ func TestOpenAPIMemCache(t *testing.T) {
 				}
 
 				schemaAgain, err = pathsAgain[k].Schema(contentType)
+				if !assert.NoError(t, err) {
+					continue
+				}
+
+				assert.NotEqual(t, reflect.ValueOf(paths[k]).Pointer(), reflect.ValueOf(pathsAgain[k]).Pointer())
+				assert.NotEqual(t, reflect.ValueOf(original).Pointer(), reflect.ValueOf(schemaAgain).Pointer())
+				assert.Equal(t, original, schemaAgain)
+			}
+		})
+	}
+}
+
+// Tests that schema instances returned by openapi are cached and returned after
+// successive calls.
+func TestOpenAPIMemCacheWithContext(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+	fakeServer, err := testutil.NewFakeOpenAPIV3Server("../../testdata")
+	require.NoError(t, err)
+	defer fakeServer.HttpServer.Close()
+
+	require.NotEmpty(t, fakeServer.ServedDocuments)
+
+	client := NewMemCacheClientWithContext(
+		discovery.NewDiscoveryClientForConfigOrDie(
+			&rest.Config{Host: fakeServer.HttpServer.URL},
+		),
+	)
+	openapiClient := client.OpenAPIV3WithContext(ctx)
+
+	paths, err := openapiClient.PathsWithContext(ctx)
+	require.NoError(t, err)
+
+	contentTypes := []string{
+		runtime.ContentTypeJSON, openapi.ContentTypeOpenAPIV3PB,
+	}
+
+	for _, contentType := range contentTypes {
+		t.Run(contentType, func(t *testing.T) {
+			//nolint:testifylint // "for error assertions use require" is a false positive here, we abort the iteration on failures.
+			for k, v := range paths {
+				original, err := v.SchemaWithContext(ctx, contentType)
+				if !assert.NoError(t, err) {
+					continue
+				}
+
+				// This is the original OpenAPI client. It is not affected
+				// by client.Invalidate() below.
+				pathsAgain, err := openapiClient.PathsWithContext(ctx)
+				if !assert.NoError(t, err) {
+					continue
+				}
+
+				schemaAgain, err := pathsAgain[k].SchemaWithContext(ctx, contentType)
+				if !assert.NoError(t, err) {
+					continue
+				}
+
+				// When using the *WithContext API, the map itself is cached.
+				assert.Equal(t, reflect.ValueOf(paths).Pointer(), reflect.ValueOf(pathsAgain).Pointer())
+				assert.Equal(t, reflect.ValueOf(original).Pointer(), reflect.ValueOf(schemaAgain).Pointer())
+
+				// Invalidate and try again. This time pointers should not be equal
+				client.InvalidateWithContext(ctx)
+
+				pathsAgain, err = client.OpenAPIV3WithContext(ctx).PathsWithContext(ctx)
+				if !assert.NoError(t, err) {
+					continue
+				}
+
+				schemaAgain, err = pathsAgain[k].SchemaWithContext(ctx, contentType)
 				if !assert.NoError(t, err) {
 					continue
 				}

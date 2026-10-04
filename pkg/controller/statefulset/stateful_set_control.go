@@ -18,8 +18,11 @@ package statefulset
 
 import (
 	"context"
+	"fmt"
+	"slices"
 	"sort"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"k8s.io/klog/v2"
@@ -27,6 +30,7 @@ import (
 
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -533,6 +537,51 @@ func (ssc *defaultStatefulSetControl) processCondemned(ctx context.Context, set 
 	return true, ssc.podControl.DeleteStatefulPod(set, condemned[i])
 }
 
+// processCondemnedPods fixes retention-policy claims and processes Pods
+// whose ordinals are outside the desired replica range.
+func (ssc *defaultStatefulSetControl) processCondemnedPods(
+	ctx context.Context,
+	set *apps.StatefulSet,
+	updateSet *apps.StatefulSet,
+	firstUnavailablePod *v1.Pod,
+	monotonic bool,
+	condemned []*v1.Pod,
+	now time.Time,
+) (bool, error) {
+	fixPodClaim := func(i int) (bool, error) {
+		matchPolicy, err := ssc.podControl.ClaimsMatchRetentionPolicy(ctx, updateSet, condemned[i])
+		if err != nil {
+			return true, err
+		}
+
+		if !matchPolicy {
+			if err := ssc.podControl.UpdatePodClaimForRetentionPolicy(ctx, updateSet, condemned[i]); err != nil {
+				return true, err
+			}
+		}
+
+		return false, nil
+	}
+
+	if shouldExit, err := runForAll(condemned, fixPodClaim, monotonic); shouldExit || err != nil {
+		return shouldExit, err
+	}
+
+	processCondemnedFn := func(i int) (bool, error) {
+		return ssc.processCondemned(
+			ctx,
+			set,
+			firstUnavailablePod,
+			monotonic,
+			condemned,
+			i,
+			now,
+		)
+	}
+
+	return runForAll(condemned, processCondemnedFn, monotonic)
+}
+
 func runForAll(pods []*v1.Pod, fn func(i int) (bool, error), monotonic bool) (bool, error) {
 	if monotonic {
 		for i := range pods {
@@ -569,6 +618,13 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(ctx context.Context, set
 		return nil, err
 	}
 
+	// emit a warning and return if Recreate strategy is used and the feature gate is off
+	if set.Spec.UpdateStrategy.Type == apps.RecreateStatefulSetStrategyType && !utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetRecreateStrategy) {
+		errMsg := fmt.Errorf("statefulset %s/%s uses Recreate strategy but feature gate %s is disabled", set.Namespace, set.Name, features.StatefulSetRecreateStrategy)
+		ssc.podControl.recorder.Event(set, v1.EventTypeWarning, "UnknownStrategy", errMsg.Error())
+		return nil, errMsg
+	}
+
 	// set the generation, and revisions in the returned status
 	status := apps.StatefulSetStatus{}
 	status.ObservedGeneration = set.Generation
@@ -576,6 +632,8 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(ctx context.Context, set
 	status.UpdateRevision = updateRevision.Name
 	status.CollisionCount = new(int32)
 	*status.CollisionCount = collisionCount
+
+	status.Conditions = append(status.Conditions, set.Status.Conditions...)
 
 	updateStatus(&status, set.Spec.MinReadySeconds, currentRevision, updateRevision, now, pods)
 
@@ -648,7 +706,53 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(ctx context.Context, set
 
 	monotonic := !allowsBurst(set)
 
-	// First, process each living replica. Exit if we run into an error or something blocking in monotonic mode.
+	if set.Spec.UpdateStrategy.Type == apps.RecreateStatefulSetStrategyType {
+		if !utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetRecreateStrategy) {
+			errMsg := fmt.Errorf("statefulset %s/%s uses Recreate strategy but feature gate %s is disabled", set.Namespace, set.Name, features.StatefulSetRecreateStrategy)
+			ssc.podControl.recorder.Event(set, v1.EventTypeWarning, "UnknownStrategy", errMsg.Error())
+			return &status, errMsg
+		}
+
+		allOldPodsTerminated, err := ssc.recreateDeleteAndWait(ctx, set, updateRevision, replicas, condemned, &status)
+		if err != nil {
+			updateStatus(&status, set.Spec.MinReadySeconds, currentRevision, updateRevision, now, replicas, condemned)
+			return &status, err
+		}
+		// Return if any pod with old revision has not been completely terminated
+		if !allOldPodsTerminated {
+			updateStatus(&status, set.Spec.MinReadySeconds, currentRevision, updateRevision, now, replicas, condemned)
+			return &status, nil
+		}
+		if currentRevision.Name != updateRevision.Name {
+			setProgressingCondition(&status, v1.ConditionTrue, RecreateInProgressReason, "Waiting for new-revision pods to be created")
+		}
+	}
+
+	// Parallel Pod management does not require ordered processing. Process
+	// condemned Pods first so scale down can release resources before the
+	// controller attempts to create missing Pods in the desired ordinal range.
+
+	processCondemnedPodsFn := func() (bool, error) {
+		return ssc.processCondemnedPods(
+			ctx,
+			set,
+			updateSet,
+			firstUnavailablePod,
+			monotonic,
+			condemned,
+			now,
+		)
+	}
+
+	if !monotonic {
+		if shouldExit, err := processCondemnedPodsFn(); shouldExit || err != nil {
+			updateStatus(&status, set.Spec.MinReadySeconds, currentRevision, updateRevision, now, replicas, condemned)
+			return &status, err
+		}
+	}
+
+	// Process each living replica. Exit if we run into an error or something
+	// blocking in monotonic mode.
 	processReplicaFn := func(i int) (bool, error) {
 		return ssc.processReplica(ctx, set, updateSet, monotonic, replicas, i, now)
 	}
@@ -657,40 +761,22 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(ctx context.Context, set
 		return &status, err
 	}
 
-	// Fix pod claims for condemned pods, if necessary.
-	fixPodClaim := func(i int) (bool, error) {
-		if matchPolicy, err := ssc.podControl.ClaimsMatchRetentionPolicy(ctx, updateSet, condemned[i]); err != nil {
-			return true, err
-		} else if !matchPolicy {
-			if err := ssc.podControl.UpdatePodClaimForRetentionPolicy(ctx, updateSet, condemned[i]); err != nil {
-				return true, err
-			}
+	// Preserve the existing processing order for OrderedReady StatefulSets.
+	if monotonic {
+		// We will wait for all predecessors to be Running and Available prior to attempting a deletion.
+		// We will terminate Pods in a monotonically decreasing order.
+		// Note that we do not resurrect Pods in this interval. Also note that scaling will take precedence over
+		// updates.
+		if shouldExit, err := processCondemnedPodsFn(); shouldExit || err != nil {
+			updateStatus(&status, set.Spec.MinReadySeconds, currentRevision, updateRevision, now, replicas, condemned)
+			return &status, err
 		}
-		return false, nil
-	}
-	if shouldExit, err := runForAll(condemned, fixPodClaim, monotonic); shouldExit || err != nil {
-		updateStatus(&status, set.Spec.MinReadySeconds, currentRevision, updateRevision, now, replicas, condemned)
-		return &status, err
-	}
-
-	// At this point, in monotonic mode all of the current Replicas are Running, Ready and Available,
-	// and we can consider termination.
-	// We will wait for all predecessors to be Running and Available prior to attempting a deletion.
-	// We will terminate Pods in a monotonically decreasing order.
-	// Note that we do not resurrect Pods in this interval. Also note that scaling will take precedence over
-	// updates.
-	processCondemnedFn := func(i int) (bool, error) {
-		return ssc.processCondemned(ctx, set, firstUnavailablePod, monotonic, condemned, i, now)
-	}
-	if shouldExit, err := runForAll(condemned, processCondemnedFn, monotonic); shouldExit || err != nil {
-		updateStatus(&status, set.Spec.MinReadySeconds, currentRevision, updateRevision, now, replicas, condemned)
-		return &status, err
 	}
 
 	updateStatus(&status, set.Spec.MinReadySeconds, currentRevision, updateRevision, now, replicas, condemned)
 
-	// for the OnDelete strategy we short circuit. Pods will be updated when they are manually deleted.
-	if set.Spec.UpdateStrategy.Type == apps.OnDeleteStatefulSetStrategyType {
+	// for the OnDelete or Recreate strategy we short circuit.
+	if set.Spec.UpdateStrategy.Type == apps.OnDeleteStatefulSetStrategyType || set.Spec.UpdateStrategy.Type == apps.RecreateStatefulSetStrategyType {
 		return &status, nil
 	}
 
@@ -724,7 +810,6 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(ctx context.Context, set
 			return &status, err
 		}
 
-		// wait for unavailable Pods on update
 		if isUnavailable(replicas[target], set.Spec.MinReadySeconds, now) {
 			logger.V(4).Info("StatefulSet is waiting for Pod to update",
 				"statefulSet", klog.KObj(set), "pod", klog.KObj(replicas[target]))
@@ -733,6 +818,53 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(ctx context.Context, set
 
 	}
 	return &status, nil
+}
+
+// recreateDeleteAndWait handles the first two phases of the Recreate update strategy:
+//  1. NeedsDeletion: Delete all created, non-terminating pods not on the update revision.
+//  2. WaitingTermination: Wait for all old-revision pods to be fully removed.
+//
+// Returns true when all old-revision pods are gone and creation can proceed
+// via the shared reconcile loop. Returns false when deletion or termination
+// is still in progress.
+func (ssc *defaultStatefulSetControl) recreateDeleteAndWait(ctx context.Context, set *apps.StatefulSet, updateRevision *apps.ControllerRevision, replicas, condemned []*v1.Pod, status *apps.StatefulSetStatus) (bool, error) {
+	logger := klog.FromContext(ctx)
+
+	allPods := slices.Concat(replicas, condemned)
+
+	var recreateInProgress atomic.Bool
+	// process pods in non monotonic mode
+	processRecreateFn := func(i int) (bool, error) {
+		if allPods[i] == nil || !isCreated(allPods[i]) {
+			return false, nil
+		}
+		if getPodRevision(allPods[i]) != updateRevision.Name {
+			// as long as there are pods still with old updateRevision then recreate has not yet completed
+			recreateInProgress.Store(true)
+
+			if isTerminating(allPods[i]) {
+				return false, nil
+			}
+			logger.V(4).Info("Recreate: deleting old revision pod", "statefulSet", klog.KObj(set), "pod", klog.KObj(allPods[i]))
+			if err := ssc.podControl.DeleteStatefulPod(set, allPods[i]); err != nil {
+				if !apierrors.IsNotFound(err) {
+					return false, err
+				}
+			}
+		}
+		return true, nil
+	}
+
+	if _, err := runForAll(allPods, processRecreateFn, false); err != nil {
+		return false, err
+	}
+
+	if recreateInProgress.Load() {
+		setProgressingCondition(status, v1.ConditionTrue, RecreateInProgressReason, "Deleting old revision pods")
+		return false, nil
+	}
+
+	return true, nil
 }
 
 func updateStatefulSetAfterInvariantEstablished(ctx context.Context, ssc *defaultStatefulSetControl, set *apps.StatefulSet, replicas []*v1.Pod, updateRevision *apps.ControllerRevision, status apps.StatefulSetStatus, now time.Time) (*apps.StatefulSetStatus, error) {

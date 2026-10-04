@@ -25,28 +25,43 @@ import (
 func TestScaledValueInternal(t *testing.T) {
 	tests := []struct {
 		unscaled *big.Int
-		scale    int
-		newScale int
+		scale    int64
+		newScale int64
 
 		want int64
 	}{
 		// remain scale
 		{big.NewInt(1000), 0, 0, 1000},
+		{big.NewInt(-1000), 0, 0, -1000},
 
 		// scale down
 		{big.NewInt(1000), 0, -3, 1},
 		{big.NewInt(1000), 3, 0, 1},
+		{big.NewInt(-1000), 3, 0, -1},
 		{big.NewInt(0), 3, 0, 0},
 
-		// always round up
+		// scale down rounds away from zero
 		{big.NewInt(999), 3, 0, 1},
 		{big.NewInt(500), 3, 0, 1},
 		{big.NewInt(499), 3, 0, 1},
 		{big.NewInt(1), 3, 0, 1},
+		{big.NewInt(-1), 3, 0, -1},
+		{big.NewInt(-499), 3, 0, -1},
+		{big.NewInt(-500), 3, 0, -1},
+		{big.NewInt(-999), 3, 0, -1},
+		{big.NewInt(-1500), 3, 0, -2},
 		// large scaled value does not lose precision
 		{big.NewInt(0).Sub(maxInt64, bigOne), 1, 0, (math.MaxInt64-1)/10 + 1},
-		// large intermediate result.
+		// large intermediate result, positive and negative, forces the big.Int path
 		{big.NewInt(1).Exp(big.NewInt(10), big.NewInt(100), nil), 100, 0, 1},
+		{big.NewInt(0).Neg(big.NewInt(1).Exp(big.NewInt(10), big.NewInt(100), nil)), 100, 0, -1},
+		// a dif at or above log10MaxInt64 (19) forces the big.Int path with a
+		// non-zero remainder, exercising the DivMod rounding in both signs.
+		{big.NewInt(5), 19, 0, 1},
+		{big.NewInt(-5), 19, 0, -1},
+		// negative unscaled values outside the int64 range force the big.Int path;
+		// result fits in int64 after scaling.
+		{big.NewInt(0).Mul(minInt64, bigThousand), 3, 0, math.MinInt64},
 
 		// scale up
 		{big.NewInt(0), 0, 3, 0},
@@ -59,9 +74,12 @@ func TestScaledValueInternal(t *testing.T) {
 
 	for i, tt := range tests {
 		old := (&big.Int{}).Set(tt.unscaled)
-		got := scaledValue(tt.unscaled, tt.scale, tt.newScale)
+		got, ok := scaledValue(tt.unscaled, tt.scale, tt.newScale)
 		if got != tt.want {
 			t.Errorf("#%d: got = %v, want %v", i, got, tt.want)
+		}
+		if !ok {
+			t.Errorf("#%d: reported overflow, want a representable value", i)
 		}
 		if tt.unscaled.Cmp(old) != 0 {
 			t.Errorf("#%d: unscaled = %v, want %v", i, tt.unscaled, old)

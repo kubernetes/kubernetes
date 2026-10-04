@@ -1,7 +1,7 @@
 // Copyright The OpenTelemetry Authors
 // SPDX-License-Identifier: Apache-2.0
 
-package instrumentation // import "go.opentelemetry.io/otel/sdk/instrumentation"
+package instrumentation
 
 import "go.opentelemetry.io/otel/attribute"
 

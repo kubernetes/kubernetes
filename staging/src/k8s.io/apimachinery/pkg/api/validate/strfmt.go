@@ -97,6 +97,28 @@ func LabelKey[T ~string](_ context.Context, op operation.Operation, fldPath *fie
 	return allErrs
 }
 
+// PrefixedLabelKey verifies that the specified value is a valid label key with
+// a domain prefix.
+// A prefixed label key is composed of a prefix and a name, separated by a '/'.
+// The name part is required and must:
+//   - be 63 characters or less
+//   - begin and end with an alphanumeric character ([a-z0-9A-Z])
+//   - contain only alphanumeric characters, dashes (-), underscores (_), or dots (.)
+//
+// The prefix must:
+//   - be a DNS subdomain
+//   - be no more than 253 characters
+func PrefixedLabelKey[T ~string](_ context.Context, op operation.Operation, fldPath *field.Path, value, _ *T) field.ErrorList {
+	if value == nil {
+		return nil
+	}
+	var allErrs field.ErrorList
+	for _, msg := range content.IsPrefixedLabelKey((string)(*value)) {
+		allErrs = append(allErrs, field.Invalid(fldPath, *value, msg).WithOrigin("format=k8s-prefixed-label-key"))
+	}
+	return allErrs
+}
+
 // LongNameCaseless verifies that the specified value is a valid "long name"
 // (sometimes known as a "DNS subdomain"), but is case-insensitive.
 //   - must not be empty
@@ -240,7 +262,8 @@ func ExtendedResourceName[T ~string](_ context.Context, op operation.Operation, 
 // resourcesQualifiedName verifies that the specified value is a valid Kubernetes resources
 // qualified name.
 //   - must not be empty
-//   - must be composed of an optional prefix and a name, separated by a slash (e.g., "prefix/name")
+//   - must be composed of an optional prefix and a name, separated by a single
+//     slash (e.g., "prefix/name")
 //   - the prefix, if specified, must be a DNS subdomain
 //   - the name part must be a C identifier
 //   - the name part must be no more than 32 characters
@@ -250,10 +273,7 @@ func resourcesQualifiedName[T ~string](ctx context.Context, op operation.Operati
 	}
 	var allErrs field.ErrorList
 	s := string(*value)
-	parts := strings.Split(s, "/")
-	// TODO: This validation and the corresponding handwritten validation validateQualifiedName in
-	// pkg/apis/resource/validation/validation.go are not validating whether there are more than 1
-	// slash. This should be fixed in both places.
+	parts := strings.SplitN(s, "/", 3)
 	switch len(parts) {
 	case 1:
 		allErrs = append(allErrs, validateCIdentifier(parts[0], resourceDeviceMaxLength, fldPath)...)
@@ -271,6 +291,8 @@ func resourcesQualifiedName[T ~string](ctx context.Context, op operation.Operati
 		} else {
 			allErrs = append(allErrs, validateCIdentifier(parts[1], resourceDeviceMaxLength, fldPath)...)
 		}
+	default:
+		allErrs = append(allErrs, field.Invalid(fldPath, s, "must not contain more than one slash"))
 	}
 	return allErrs
 }

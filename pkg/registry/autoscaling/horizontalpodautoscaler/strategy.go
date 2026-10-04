@@ -19,6 +19,8 @@ package horizontalpodautoscaler
 import (
 	"context"
 
+	"sigs.k8s.io/structured-merge-diff/v7/fieldpath"
+
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -29,7 +31,6 @@ import (
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/apis/autoscaling/validation"
 	"k8s.io/kubernetes/pkg/features"
-	"sigs.k8s.io/structured-merge-diff/v6/fieldpath"
 )
 
 // autoscalerStrategy implements behavior for HorizontalPodAutoscalers
@@ -87,8 +88,7 @@ func (autoscalerStrategy) Validate(ctx context.Context, obj runtime.Object) fiel
 // DeclarativeValidationConfig implements rest.DeclarativeValidationConfigurer to supply declarative
 // validation options.
 func (autoscalerStrategy) DeclarativeValidationConfig(ctx context.Context, obj, oldObj runtime.Object) rest.DeclarativeValidationConfig {
-	var options []string
-	// Pass HPAScaleToZero when the gate is enabled, OR (on update) when the
+	// HPAScaleToZero is enabled when its gate is enabled, or (on update) when the
 	// existing object already has MinReplicas == 0.
 	enableScaleToZero := utilfeature.DefaultFeatureGate.Enabled(features.HPAScaleToZero)
 	if !enableScaleToZero && oldObj != nil {
@@ -98,10 +98,9 @@ func (autoscalerStrategy) DeclarativeValidationConfig(ctx context.Context, obj, 
 			}
 		}
 	}
-	if enableScaleToZero {
-		options = append(options, "HPAScaleToZero")
-	}
-	return rest.DeclarativeValidationConfig{Options: options}
+	return rest.DeclarativeValidationConfig{Options: map[string]bool{
+		string(features.HPAScaleToZero): enableScaleToZero,
+	}}
 }
 
 // WarningsOnCreate returns warnings for the creation of the given object.
@@ -192,7 +191,7 @@ func (autoscalerStatusStrategy) WarningsOnUpdate(ctx context.Context, obj, old r
 func validationOptionsForHorizontalPodAutoscaler(newHPA, oldHPA *autoscaling.HorizontalPodAutoscaler) validation.HorizontalPodAutoscalerSpecValidationOptions {
 	opts := validation.HorizontalPodAutoscalerSpecValidationOptions{
 		MinReplicasLowerBound:           1,
-		ScaleTargetRefValidationOptions: validation.CrossVersionObjectReferenceValidationOptions{AllowInvalidAPIVersion: false, AllowEmptyAPIGroup: false},
+		ScaleTargetRefValidationOptions: validation.CrossVersionObjectReferenceValidationOptions{AllowInvalidAPIVersion: false, AllowEmptyAPIGroup: false, RequiredCoveredByDeclarative: true},
 		ObjectMetricsValidationOptions: validation.CrossVersionObjectReferenceValidationOptions{
 			AllowInvalidAPIVersion: false, AllowEmptyAPIGroup: true,
 		},

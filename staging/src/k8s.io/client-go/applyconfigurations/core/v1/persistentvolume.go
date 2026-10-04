@@ -34,8 +34,8 @@ import (
 // It is analogous to a node.
 // More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes
 type PersistentVolumeApplyConfiguration struct {
-	metav1.TypeMetaApplyConfiguration `json:",inline"`
-	// Standard object's metadata.
+	metav1.TypeMetaApplyConfiguration `json:""`
+	// metadata is the standard object metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
 	// spec defines a specification of a persistent volume owned by the cluster.

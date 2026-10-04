@@ -26,7 +26,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistrytest "k8s.io/apiserver/pkg/registry/generic/testing"
 	"k8s.io/apiserver/pkg/registry/rest"
@@ -252,7 +251,8 @@ func TestUpdateStatus(t *testing.T) {
 	defer storage.Store.DestroyFunc()
 
 	ingStart := validIngress()
-	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), namespace)
+	ctx := genericregistrytest.NewNamespaceScopeContext(storage.Store, namespace)
+	statusCtx := genericregistrytest.NewNamespaceScopeContext(storage.Store, namespace, "status")
 	key, _ := storage.KeyFunc(ctx, ingStart.Name)
 	err := storage.Storage.Create(ctx, key, ingStart, nil, 0, false)
 	if err != nil {
@@ -265,7 +265,7 @@ func TestUpdateStatus(t *testing.T) {
 			IP: defaultLoadBalancer,
 		},
 	}
-	_, _, err = statusStorage.Update(ctx, ing.Name, rest.DefaultUpdatedObjectInfo(ing), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{})
+	_, _, err = statusStorage.Update(statusCtx, ing.Name, rest.DefaultUpdatedObjectInfo(ing), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{})
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}

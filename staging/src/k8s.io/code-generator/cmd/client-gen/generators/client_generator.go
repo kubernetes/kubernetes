@@ -28,6 +28,7 @@ import (
 	"k8s.io/code-generator/cmd/client-gen/generators/scheme"
 	"k8s.io/code-generator/cmd/client-gen/generators/util"
 	clientgentypes "k8s.io/code-generator/cmd/client-gen/types"
+	"k8s.io/code-generator/pkg/apidefinitions"
 	codegennamer "k8s.io/code-generator/pkg/namer"
 	genutil "k8s.io/code-generator/pkg/util"
 	"k8s.io/gengo/v2"
@@ -274,20 +275,18 @@ NextGroup:
 // applyGroupOverrides applies group name overrides to each package, if applicable. If there is a
 // comment of the form "// +groupName=somegroup" or "// +groupName=somegroup.foo.bar.io", use the
 // first field (somegroup) as the name of the group in Go code, e.g. as the func name in a clientset.
-//
-// If the first field of the groupName is not unique within the clientset, use "// +groupName=unique
 func applyGroupOverrides(universe types.Universe, args *args.Args) error {
 	// Create a map from "old GV" to "new GV" so we know what changes we need to make.
 	changes := make(map[clientgentypes.GroupVersion]clientgentypes.GroupVersion)
 	for gv, inputDir := range args.GroupVersionPackages() {
 		p := universe.Package(inputDir)
-		override, err := genutil.ExtractCommentTagsWithoutArguments("+", []string{"groupName"}, p.Comments)
+		override, ok, err := apidefinitions.GroupNameForPackage(p.Comments)
 		if err != nil {
-			return fmt.Errorf("cannot extract groupName tags: %w", err)
+			return err
 		}
-		if override["groupName"] != nil {
+		if ok {
 			newGV := clientgentypes.GroupVersion{
-				Group:   clientgentypes.Group(override["groupName"][0]),
+				Group:   clientgentypes.Group(override),
 				Version: gv.Version,
 			}
 			changes[gv] = newGV
@@ -363,10 +362,23 @@ func GetTargets(context *generator.Context, args *args.Args) []generator.Target 
 		klog.Fatalf("cannot apply group overrides: %v", err)
 	}
 
+	var idOpts []apidefinitions.Option
+	if len(args.LintRules) > 0 {
+		idOpts = append(idOpts, apidefinitions.WithLintRules(args.LintRules...))
+	}
+
 	gvToTypes := map[clientgentypes.GroupVersion][]*types.Type{}
 	groupGoNames := make(map[clientgentypes.GroupVersion]string)
 	for gv, inputDir := range args.GroupVersionPackages() {
 		p := context.Universe.Package(inputDir)
+
+		info, err := apidefinitions.Identify(p, apidefinitions.Client, idOpts...)
+		if err != nil {
+			klog.Fatal(err)
+		}
+		if !info.ShouldGenerate() {
+			continue
+		}
 
 		// If there's a comment of the form "// +groupGoName=SomeUniqueShortName", use that as
 		// the Go group identifier in CamelCase. It defaults

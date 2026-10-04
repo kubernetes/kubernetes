@@ -150,7 +150,7 @@ FIELDS:
 			t.Fatalf("Couldn't find schema %v", test.gvk)
 		}
 		buf := bytes.Buffer{}
-		if err := PrintModelDescription(test.path, &buf, schema, test.gvk, false); err != nil {
+		if err := PrintModelDescription(test.path, &buf, schema, test.gvk, false, 0); err != nil {
 			t.Fatalf("Failed to PrintModelDescription for path %v: %v", test.path, err)
 		}
 		got := buf.String()
@@ -159,6 +159,86 @@ FIELDS:
 		}
 	}
 }
+
+// TestModelMaxDepth is an integration-style test for the v1 (OpenAPIv2) render
+// path. It exercises PrintModelDescription end-to-end with exact expected
+// outputs across the boundary values of --max-depth.
+func TestModelMaxDepth(t *testing.T) {
+	gvk := schema.GroupVersionKind{
+		Group:   "",
+		Version: "v1",
+		Kind:    "OneKind",
+	}
+	schemaForKind := resources.LookupResource(gvk)
+	if schemaForKind == nil {
+		t.Fatalf("Couldn't find schema %v", gvk)
+	}
+
+	unlimitedWant := `KIND:     OneKind
+VERSION:  v1
+
+DESCRIPTION:
+     OneKind has a short description
+
+FIELDS:
+   field1	<Object>
+      array	<[]integer>
+      int	<integer>
+      object	<map[string]string>
+      primitive	<string>
+      string	<string>
+   field2	<[]map[string]string>
+`
+
+	tests := []struct {
+		name     string
+		maxDepth int
+		want     string
+	}{
+		{
+			name:     "depth 0 means unlimited",
+			maxDepth: 0,
+			want:     unlimitedWant,
+		},
+		{
+			name:     "depth 1 prints only top-level fields",
+			maxDepth: 1,
+			want: `KIND:     OneKind
+VERSION:  v1
+
+DESCRIPTION:
+     OneKind has a short description
+
+FIELDS:
+   field1	<Object>
+   field2	<[]map[string]string>
+`,
+		},
+		{
+			name:     "depth 2 reaches the leaves",
+			maxDepth: 2,
+			want:     unlimitedWant,
+		},
+		{
+			name:     "depth larger than schema equals unlimited",
+			maxDepth: 100,
+			want:     unlimitedWant,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var buf bytes.Buffer
+			if err := PrintModelDescription(nil, &buf, schemaForKind, gvk, true, tt.maxDepth); err != nil {
+				t.Fatalf("PrintModelDescription: %v", err)
+			}
+			if got := buf.String(); got != tt.want {
+				t.Errorf("Got:\n%v\nWant:\n%v\n", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestCRDModel(t *testing.T) {
 	gvk := schema.GroupVersionKind{
 		Group:   "",
@@ -187,7 +267,7 @@ DESCRIPTION:
 
 	for _, test := range tests {
 		buf := bytes.Buffer{}
-		if err := PrintModelDescription(test.path, &buf, schema, gvk, false); err != nil {
+		if err := PrintModelDescription(test.path, &buf, schema, gvk, false, 0); err != nil {
 			t.Fatalf("Failed to PrintModelDescription for path %v: %v", test.path, err)
 		}
 		got := buf.String()

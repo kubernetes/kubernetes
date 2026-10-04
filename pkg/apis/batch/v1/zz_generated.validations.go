@@ -26,12 +26,17 @@ import (
 	fmt "fmt"
 
 	batchv1 "k8s.io/api/batch/v1"
-	equality "k8s.io/apimachinery/pkg/api/equality"
+	apicorev1 "k8s.io/api/core/v1"
+	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
 	operation "k8s.io/apimachinery/pkg/api/operation"
 	safe "k8s.io/apimachinery/pkg/api/safe"
 	validate "k8s.io/apimachinery/pkg/api/validate"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	validation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	field "k8s.io/apimachinery/pkg/util/validation/field"
+	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
+	v1alpha3 "k8s.io/kubernetes/pkg/apis/scheduling/v1alpha3"
 )
 
 func init() { localSchemeBuilder.Register(RegisterValidations) }
@@ -54,6 +59,21 @@ func RegisterValidations(scheme *runtime.Scheme) error {
 				field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath())),
 			}
 		})
+	// type Job
+	scheme.AddValidationFunc(
+		(*batchv1.Job)(nil),
+		func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+			switch op.Request.SubresourcePath() {
+			case "/", "/status":
+				return Validate_Job(
+					ctx, op, nil, /* fldPath */
+					obj.(*batchv1.Job),
+					safe.Cast[*batchv1.Job](oldObj))
+			}
+			return field.ErrorList{
+				field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath())),
+			}
+		})
 	return nil
 }
 
@@ -64,7 +84,28 @@ func Validate_CronJob(
 	obj, oldObj *batchv1.CronJob) (errs field.ErrorList) {
 
 	// field batchv1.CronJob.TypeMeta has no validation
-	// field batchv1.CronJob.ObjectMeta has no validation
+
+	{ // field batchv1.CronJob.ObjectMeta
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *metav1.ObjectMeta,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if validate.SemanticDeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call the type's validation function
+			errs = append(errs, validation.Validate_ObjectMeta(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *batchv1.CronJob) *metav1.ObjectMeta {
+				return &oldObj.ObjectMeta
+			})
+		errs = append(errs, fn(fldPath.Child("metadata"), &obj.ObjectMeta, oldVal, oldObj != nil)...)
+	}
 
 	{ // field batchv1.CronJob.Spec
 		fn := func(
@@ -73,7 +114,7 @@ func Validate_CronJob(
 			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
 			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
+				if validate.SemanticDeepEqual(obj, oldObj) {
 					return nil
 				}
 			}
@@ -111,7 +152,7 @@ func Validate_CronJobSpec(
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
@@ -131,8 +172,596 @@ func Validate_CronJobSpec(
 	// field batchv1.CronJobSpec.StartingDeadlineSeconds has no validation
 	// field batchv1.CronJobSpec.ConcurrencyPolicy has no validation
 	// field batchv1.CronJobSpec.Suspend has no validation
-	// field batchv1.CronJobSpec.JobTemplate has no validation
+
+	{ // field batchv1.CronJobSpec.JobTemplate
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *batchv1.JobTemplateSpec,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if validate.SemanticDeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_JobTemplateSpec(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *batchv1.CronJobSpec) *batchv1.JobTemplateSpec {
+				return &oldObj.JobTemplate
+			})
+		errs = append(errs, fn(fldPath.Child("jobTemplate"), &obj.JobTemplate, oldVal, oldObj != nil)...)
+	}
+
 	// field batchv1.CronJobSpec.SuccessfulJobsHistoryLimit has no validation
 	// field batchv1.CronJobSpec.FailedJobsHistoryLimit has no validation
+	return errs
+}
+
+// Validate_Job validates an instance of Job according
+// to declarative validation rules in the API schema.
+func Validate_Job(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *batchv1.Job) (errs field.ErrorList) {
+
+	// field batchv1.Job.TypeMeta has no validation
+
+	{ // field batchv1.Job.ObjectMeta
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *metav1.ObjectMeta,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if validate.SemanticDeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call the type's validation function
+			errs = append(errs, validation.Validate_ObjectMeta(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *batchv1.Job) *metav1.ObjectMeta {
+				return &oldObj.ObjectMeta
+			})
+		errs = append(errs, fn(fldPath.Child("metadata"), &obj.ObjectMeta, oldVal, oldObj != nil)...)
+	}
+
+	{ // field batchv1.Job.Spec
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *batchv1.JobSpec,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if validate.SemanticDeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_JobSpec(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *batchv1.Job) *batchv1.JobSpec {
+				return &oldObj.Spec
+			})
+		errs = append(errs, fn(fldPath.Child("spec"), &obj.Spec, oldVal, oldObj != nil)...)
+	}
+
+	// field batchv1.Job.Status has no validation
+	return errs
+}
+
+// Validate_JobSchedulingConfiguration validates an instance of JobSchedulingConfiguration according
+// to declarative validation rules in the API schema.
+func Validate_JobSchedulingConfiguration(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *batchv1.JobSchedulingConfiguration) (errs field.ErrorList) {
+
+	{ // field batchv1.JobSchedulingConfiguration.SchedulingPolicy
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if validate.SemanticDeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if e := validate.UpdatePointer(ctx, op, fldPath, obj, oldObj, validate.NoSet, validate.NoUnset).MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			// call the type's validation function
+			errs = append(errs, v1alpha3.Validate_WorkloadPodGroupSchedulingPolicy(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *batchv1.JobSchedulingConfiguration) *schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy {
+				return oldObj.SchedulingPolicy
+			})
+		errs = append(errs, fn(fldPath.Child("schedulingPolicy"), obj.SchedulingPolicy, oldVal, oldObj != nil)...)
+	}
+
+	{ // field batchv1.JobSchedulingConfiguration.SchedulingConstraints
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *schedulingv1alpha3.WorkloadPodGroupSchedulingConstraints,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if validate.SemanticDeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			// call the type's validation function
+			errs = append(errs, v1alpha3.Validate_WorkloadPodGroupSchedulingConstraints(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *batchv1.JobSchedulingConfiguration) *schedulingv1alpha3.WorkloadPodGroupSchedulingConstraints {
+				return oldObj.SchedulingConstraints
+			})
+		errs = append(errs, fn(fldPath.Child("schedulingConstraints"), obj.SchedulingConstraints, oldVal, oldObj != nil)...)
+	}
+
+	{ // field batchv1.JobSchedulingConfiguration.DisruptionMode
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *schedulingv1alpha3.WorkloadPodGroupDisruptionMode,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if validate.SemanticDeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			// call the type's validation function
+			errs = append(errs, v1alpha3.Validate_WorkloadPodGroupDisruptionMode(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *batchv1.JobSchedulingConfiguration) *schedulingv1alpha3.WorkloadPodGroupDisruptionMode {
+				return oldObj.DisruptionMode
+			})
+		errs = append(errs, fn(fldPath.Child("disruptionMode"), obj.DisruptionMode, oldVal, oldObj != nil)...)
+	}
+
+	{ // field batchv1.JobSchedulingConfiguration.ResourceClaims
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj []schedulingv1alpha3.WorkloadPodGroupResourceClaim,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if validate.SemanticDeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 4).MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			// lists with map semantics require unique keys
+			if e := validate.ValSliceUnique(ctx, op, fldPath, obj, oldObj,
+				func(a *schedulingv1alpha3.WorkloadPodGroupResourceClaim, b *schedulingv1alpha3.WorkloadPodGroupResourceClaim) bool {
+					return a.Name == b.Name
+				}); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			// iterate the list and call the type's validation function
+			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj,
+				func(a *schedulingv1alpha3.WorkloadPodGroupResourceClaim, b *schedulingv1alpha3.WorkloadPodGroupResourceClaim) bool {
+					return a.Name == b.Name
+				}, validate.SemanticDeepEqual, v1alpha3.Validate_WorkloadPodGroupResourceClaim); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *batchv1.JobSchedulingConfiguration) []schedulingv1alpha3.WorkloadPodGroupResourceClaim {
+				return oldObj.ResourceClaims
+			})
+		errs = append(errs, fn(fldPath.Child("resourceClaims"), obj.ResourceClaims, oldVal, oldObj != nil)...)
+	}
+
+	return errs
+}
+
+// Validate_JobSpec validates an instance of JobSpec according
+// to declarative validation rules in the API schema.
+func Validate_JobSpec(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *batchv1.JobSpec) (errs field.ErrorList) {
+
+	if e := validate.DependentRequired(ctx, op, fldPath, obj, oldObj, "maxFailedIndexes",
+		func(obj *batchv1.JobSpec) bool {
+			if obj == nil {
+				return false
+			}
+			return obj.MaxFailedIndexes != nil
+		}, "backoffLimitPerIndex",
+		func(obj *batchv1.JobSpec) bool {
+			if obj == nil {
+				return false
+			}
+			return obj.BackoffLimitPerIndex != nil
+		}).MarkAlpha(); len(e) != 0 {
+		errs = append(errs, e...)
+	}
+
+	{ // field batchv1.JobSpec.Parallelism
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *int32,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			if e := validate.Minimum(ctx, op, fldPath, obj, oldObj, 0).MarkAlpha(); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *batchv1.JobSpec) *int32 {
+				return oldObj.Parallelism
+			})
+		errs = append(errs, fn(fldPath.Child("parallelism"), obj.Parallelism, oldVal, oldObj != nil)...)
+	}
+
+	{ // field batchv1.JobSpec.Completions
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *int32,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			if e := validate.Minimum(ctx, op, fldPath, obj, oldObj, 0).MarkAlpha(); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *batchv1.JobSpec) *int32 {
+				return oldObj.Completions
+			})
+		errs = append(errs, fn(fldPath.Child("completions"), obj.Completions, oldVal, oldObj != nil)...)
+	}
+
+	{ // field batchv1.JobSpec.ActiveDeadlineSeconds
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *int64,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			if e := validate.Minimum(ctx, op, fldPath, obj, oldObj, 0).MarkAlpha(); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *batchv1.JobSpec) *int64 {
+				return oldObj.ActiveDeadlineSeconds
+			})
+		errs = append(errs, fn(fldPath.Child("activeDeadlineSeconds"), obj.ActiveDeadlineSeconds, oldVal, oldObj != nil)...)
+	}
+
+	// field batchv1.JobSpec.PodFailurePolicy has no validation
+	// field batchv1.JobSpec.SuccessPolicy has no validation
+
+	{ // field batchv1.JobSpec.BackoffLimit
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *int32,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			if e := validate.Minimum(ctx, op, fldPath, obj, oldObj, 0).MarkAlpha(); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *batchv1.JobSpec) *int32 {
+				return oldObj.BackoffLimit
+			})
+		errs = append(errs, fn(fldPath.Child("backoffLimit"), obj.BackoffLimit, oldVal, oldObj != nil)...)
+	}
+
+	{ // field batchv1.JobSpec.BackoffLimitPerIndex
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *int32,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			if e := validate.Minimum(ctx, op, fldPath, obj, oldObj, 0).MarkAlpha(); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *batchv1.JobSpec) *int32 {
+				return oldObj.BackoffLimitPerIndex
+			})
+		errs = append(errs, fn(fldPath.Child("backoffLimitPerIndex"), obj.BackoffLimitPerIndex, oldVal, oldObj != nil)...)
+	}
+
+	{ // field batchv1.JobSpec.MaxFailedIndexes
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *int32,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			if e := validate.Minimum(ctx, op, fldPath, obj, oldObj, 0).MarkAlpha(); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *batchv1.JobSpec) *int32 {
+				return oldObj.MaxFailedIndexes
+			})
+		errs = append(errs, fn(fldPath.Child("maxFailedIndexes"), obj.MaxFailedIndexes, oldVal, oldObj != nil)...)
+	}
+
+	// field batchv1.JobSpec.Selector has no validation
+	// field batchv1.JobSpec.ManualSelector has no validation
+
+	{ // field batchv1.JobSpec.Template
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *apicorev1.PodTemplateSpec,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if validate.SemanticDeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call the type's validation function
+			errs = append(errs, corev1.Validate_PodTemplateSpec(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *batchv1.JobSpec) *apicorev1.PodTemplateSpec {
+				return &oldObj.Template
+			})
+		errs = append(errs, fn(fldPath.Child("template"), &obj.Template, oldVal, oldObj != nil)...)
+	}
+
+	{ // field batchv1.JobSpec.TTLSecondsAfterFinished
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *int32,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			if e := validate.Minimum(ctx, op, fldPath, obj, oldObj, 0).MarkAlpha(); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *batchv1.JobSpec) *int32 {
+				return oldObj.TTLSecondsAfterFinished
+			})
+		errs = append(errs, fn(fldPath.Child("ttlSecondsAfterFinished"), obj.TTLSecondsAfterFinished, oldVal, oldObj != nil)...)
+	}
+
+	// field batchv1.JobSpec.CompletionMode has no validation
+	// field batchv1.JobSpec.Suspend has no validation
+	// field batchv1.JobSpec.PodReplacementPolicy has no validation
+	// field batchv1.JobSpec.ManagedBy has no validation
+
+	{ // field batchv1.JobSpec.Scheduling
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *batchv1.JobSchedulingConfiguration,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if validate.SemanticDeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.IfOption(ctx, op, fldPath, obj, oldObj, "WorkloadWithJob", false, validate.ForbiddenPointer).MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if e := validate.IfOption(ctx, op, fldPath, obj, oldObj, "WorkloadWithJob", false, validate.OptionalPointer).MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if e := validate.UpdatePointer(ctx, op, fldPath, obj, oldObj, validate.NoSet, validate.NoUnset).MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_JobSchedulingConfiguration(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *batchv1.JobSpec) *batchv1.JobSchedulingConfiguration {
+				return oldObj.Scheduling
+			})
+		errs = append(errs, fn(fldPath.Child("scheduling"), obj.Scheduling, oldVal, oldObj != nil)...)
+	}
+
+	return errs
+}
+
+// Validate_JobTemplateSpec validates an instance of JobTemplateSpec according
+// to declarative validation rules in the API schema.
+func Validate_JobTemplateSpec(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *batchv1.JobTemplateSpec) (errs field.ErrorList) {
+
+	// field batchv1.JobTemplateSpec.ObjectMeta has no validation
+
+	{ // field batchv1.JobTemplateSpec.Spec
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *batchv1.JobSpec,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if validate.SemanticDeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_JobSpec(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *batchv1.JobTemplateSpec) *batchv1.JobSpec {
+				return &oldObj.Spec
+			})
+		errs = append(errs, fn(fldPath.Child("spec"), &obj.Spec, oldVal, oldObj != nil)...)
+	}
+
 	return errs
 }

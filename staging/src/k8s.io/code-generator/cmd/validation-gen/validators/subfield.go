@@ -26,7 +26,7 @@ import (
 )
 
 const (
-	subfieldTagName = "k8s:subfield"
+	subfieldTagName = "subfield"
 )
 
 func init() {
@@ -41,13 +41,13 @@ func (stv *subfieldTagValidator) Init(cfg Config) {
 	stv.validator = cfg.TagValidator
 }
 
-func (subfieldTagValidator) TagName() string {
+func (*subfieldTagValidator) TagName() string {
 	return subfieldTagName
 }
 
 var subfieldTagValidScopes = sets.New(ScopeType, ScopeField, ScopeListVal, ScopeMapKey, ScopeMapVal)
 
-func (subfieldTagValidator) ValidScopes() sets.Set[Scope] {
+func (*subfieldTagValidator) ValidScopes() sets.Set[Scope] {
 	return subfieldTagValidScopes
 }
 
@@ -55,7 +55,7 @@ var (
 	validateSubfield = types.Name{Package: libValidationPkg, Name: "Subfield"}
 )
 
-func (stv subfieldTagValidator) GetValidations(context Context, tag codetags.Tag) (Validations, error) {
+func (stv *subfieldTagValidator) GetValidations(context Context, tag codetags.Tag) (Validations, error) {
 	args := tag.Args
 	// This tag can apply to value and pointer fields, as well as typedefs
 	// (which should never be pointers). We need to check the concrete type.
@@ -100,40 +100,42 @@ func (stv subfieldTagValidator) GetValidations(context Context, tag codetags.Tag
 	}
 	getFn.Body = fmt.Sprintf("return %so.%s", fieldExprPrefix, submemb.Name)
 
-	// equivArg is the function that is used to compare the correlated
-	// elements in the old and new lists, for ratcheting.
-	var equivArg any
-
-	// directComparable is used to determine whether we can use the direct
-	// comparison operator "==" or need to use the semantic DeepEqual when
-	// looking up and comparing correlated list elements for validation ratcheting.
-	directComparable := util.IsDirectComparable(util.NonPointer(util.NativeType(submemb.Type)))
-	if directComparable {
+	// equivArg compares the correlated elements in the old and new lists, for
+	// ratcheting. directComparable selects "==" vs semantic DeepEqual.
+	var equivArg any = DeepEqualFunc{}
+	if util.IsDirectComparable(util.NonPointer(util.NativeType(submemb.Type))) {
 		// It must be a pointer, since other nilable types are not directly
 		// comparable.
-		equivArg = Identifier(validateDirectEqualPtr)
-	} else {
-		equivArg = Identifier(validateSemanticDeepEqual)
+		equivArg = Identifier(validateDirectEqual)
 	}
 
-	validations, err := stv.validator.ExtractTagValidations(subContext, *tag.ValueTag)
+	tagValidations, err := stv.validator.ExtractTagValidations(subContext, *tag.ValueTag)
 	if err != nil {
 		return Validations{}, err
 	}
 
-	mapped := WrapFunctions(validations, func(fn FunctionGen, scope DeferredScope) FunctionGen {
-		// This functions will be emitted without cohort, like Union validations.
+	// These validations are the parent's own, independent of the subfield's
+	// type validations. Content validators ignore nil, so an absent subfield
+	// is simply not validated here.
+	mapped := WrapFunctions(tagValidations, func(fn FunctionGen, scope DeferredScope) FunctionGen {
+		// ParentContext functions (e.g. Union) emit without a cohort.
 		if scope == ParentContext {
 			return fn
 		}
 		f := Function(subfieldTagName, fn.Flags, validateSubfield, subname, getFn, equivArg,
 			WrapperFunction{Function: fn, ObjType: submemb.Type, PathFragment: "." + subname})
+		// The cohort is the short-circuit scope: name the whole path, or
+		// chains through a common hop suppress each other.
 		f.Cohort = subname
+		if fn.Cohort != "" {
+			f.Cohort = subname + "." + fn.Cohort
+		}
 		return f
 	})
 
 	for i := range mapped.Deferred {
-		// The validations are of the subfields and should be scoped to the field.
+		// The validations belong to the subfield, so re-scope ParentContext
+		// (which would target the enclosing struct) to ThisContext.
 		if mapped.Deferred[i].Scope == ParentContext {
 			mapped.Deferred[i].Scope = ThisContext
 		}
@@ -142,7 +144,7 @@ func (stv subfieldTagValidator) GetValidations(context Context, tag codetags.Tag
 	return mapped, nil
 }
 
-func (stv subfieldTagValidator) Docs() TagDoc {
+func (stv *subfieldTagValidator) Docs() TagDoc {
 	return TagDoc{
 		Tag:            stv.TagName(),
 		StabilityLevel: TagStabilityLevelStable,

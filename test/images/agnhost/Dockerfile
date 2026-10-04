@@ -17,11 +17,11 @@
 # is linked against musl libc.
 ARG BASEIMAGE=alpine
 
-# latest as of 2026-05-08
-FROM golang@sha256:efaccb5b497e90df3ebe5216cc25cd9f98e73874e2d638b56e38d4a3f098c41c AS preparer
+# digest pinned in test/images/Makefile, GOTOOLCHAIN selects the go version
+ARG GOLANG_IMAGE=golang:latest
+FROM ${GOLANG_IMAGE} AS preparer
 
-ARG GOLANG_VERSION
-ARG GOTOOLCHAIN=go${GOLANG_VERSION}
+ARG GOTOOLCHAIN=auto
 RUN go install github.com/google/go-containerregistry/cmd/crane@latest && \
     apt-get update && apt-get install -y jq
 
@@ -47,7 +47,7 @@ ARG TARGETARCH
 # - util-linux-misc: includes ipcs used in SELinux tests
 # from iperf image
 # install necessary packages: iperf, bash
-RUN apk --update add bind-tools curl netcat-openbsd iproute2 iperf bash util-linux-misc && rm -rf /var/cache/apk/* \
+RUN apk --update add bind-tools curl netcat-openbsd iproute2 iperf bash util-linux-misc socat && rm -rf /var/cache/apk/* \
     && ln -s /usr/bin/iperf /usr/local/bin/iperf \
     && ls -altrh /usr/local/bin/iperf
 

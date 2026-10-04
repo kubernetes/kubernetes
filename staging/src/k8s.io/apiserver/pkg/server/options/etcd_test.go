@@ -63,7 +63,6 @@ func TestEtcdOptionsValidate(t *testing.T) {
 				DeleteCollectionWorkers: 1,
 				EnableGarbageCollection: true,
 				EnableWatchCache:        true,
-				DefaultWatchCacheSize:   100,
 				EtcdServersOverrides:    []string{"/events#http://127.0.0.1:4002"},
 			},
 			expectErr: "--etcd-servers must be specified",
@@ -87,7 +86,6 @@ func TestEtcdOptionsValidate(t *testing.T) {
 				DeleteCollectionWorkers: 1,
 				EnableGarbageCollection: true,
 				EnableWatchCache:        true,
-				DefaultWatchCacheSize:   100,
 				EtcdServersOverrides:    []string{"/events#http://127.0.0.1:4002"},
 			},
 			expectErr: "--storage-backend invalid, allowed values: etcd3. If not specified, it will default to 'etcd3'",
@@ -111,7 +109,6 @@ func TestEtcdOptionsValidate(t *testing.T) {
 				DeleteCollectionWorkers: 1,
 				EnableGarbageCollection: true,
 				EnableWatchCache:        true,
-				DefaultWatchCacheSize:   100,
 				EtcdServersOverrides:    []string{"/events/http://127.0.0.1:4002"},
 			},
 			expectErr: "--etcd-servers-overrides invalid, must be of format: group/resource#servers, where servers are URLs, semicolon separated",
@@ -136,7 +133,6 @@ func TestEtcdOptionsValidate(t *testing.T) {
 				DeleteCollectionWorkers:                 1,
 				EnableGarbageCollection:                 true,
 				EnableWatchCache:                        true,
-				DefaultWatchCacheSize:                   100,
 				EtcdServersOverrides:                    []string{"/events#http://127.0.0.1:4002"},
 			},
 			expectErr: "--encryption-provider-config-automatic-reload must be set with --encryption-provider-config",
@@ -160,7 +156,6 @@ func TestEtcdOptionsValidate(t *testing.T) {
 				DeleteCollectionWorkers: 1,
 				EnableGarbageCollection: true,
 				EnableWatchCache:        true,
-				DefaultWatchCacheSize:   100,
 				EtcdServersOverrides:    []string{"/events#http://127.0.0.1:4002"},
 			},
 		},
@@ -560,6 +555,23 @@ func TestMonitorCache(t *testing.T) {
 				}
 				if _, err := cache.get(); err == nil || err.Error() != "monitor cache is closed" {
 					t.Fatalf("expected closed-cache error, got %v", err)
+				}
+			},
+		},
+		{
+			name: "marks initialized after first get",
+			test: func(t *testing.T) {
+				cache := newTestCache(t)
+				setCreateMonitor(t, func(cfg storagebackend.Config) (metrics.Monitor, error) {
+					return &fakeMonitor{}, nil
+				})
+
+				if _, err := cache.get(); err != nil {
+					t.Fatalf("get() returned error: %v", err)
+				}
+
+				if !cache.initialized {
+					t.Fatal("expected cache to be marked initialized after first get()")
 				}
 			},
 		},

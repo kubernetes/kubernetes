@@ -1,0 +1,10 @@
+version: v2
+deps:
+  # For google/rpc/status.proto
+  - buf.build/googleapis/googleapis:004180b77378443887d3b55cabc00384
+modules:
+  - path: .
+    # example/ has own buf.yaml and buf.gen.yaml to not have
+    # TTRPC prefix.
+    excludes:
+      - example

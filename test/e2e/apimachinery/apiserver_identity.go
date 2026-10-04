@@ -35,7 +35,6 @@ import (
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
-	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 	admissionapi "k8s.io/pod-security-admission/api"
 )
@@ -84,9 +83,7 @@ var _ = SIGDescribe("kube-apiserver identity", feature.APIServerIdentity, func()
 	f := framework.NewDefaultFramework("kube-apiserver-identity")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
-	f.It("kube-apiserver identity should persist after restart", f.WithDisruptive(), func(ctx context.Context) {
-		e2eskipper.SkipUnlessProviderIs("gce")
-
+	f.It("kube-apiserver identity should persist after restart", f.WithDisruptive(), f.WithProvider("gce"), func(ctx context.Context) {
 		client := f.ClientSet
 
 		var controlPlaneNodes []v1.Node

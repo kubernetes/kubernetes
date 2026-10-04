@@ -23,8 +23,7 @@ package testing
 import (
 	"context"
 
-	v10 "github.com/google/cadvisor/info/v1"
-	"github.com/google/cadvisor/info/v2"
+	"github.com/google/cadvisor/lib/model"
 	mock "github.com/stretchr/testify/mock"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -96,7 +95,7 @@ type MockProvider_GetCgroupCPUAndMemoryStats_Call struct {
 // GetCgroupCPUAndMemoryStats is a helper method to define mock.On call
 //   - cgroupName string
 //   - updateStats bool
-func (_e *MockProvider_Expecter) GetCgroupCPUAndMemoryStats(cgroupName interface{}, updateStats interface{}) *MockProvider_GetCgroupCPUAndMemoryStats_Call {
+func (_e *MockProvider_Expecter) GetCgroupCPUAndMemoryStats(cgroupName any, updateStats any) *MockProvider_GetCgroupCPUAndMemoryStats_Call {
 	return &MockProvider_GetCgroupCPUAndMemoryStats_Call{Call: _e.mock.On("GetCgroupCPUAndMemoryStats", cgroupName, updateStats)}
 }
 
@@ -129,8 +128,8 @@ func (_c *MockProvider_GetCgroupCPUAndMemoryStats_Call) RunAndReturn(run func(cg
 }
 
 // GetCgroupStats provides a mock function for the type MockProvider
-func (_mock *MockProvider) GetCgroupStats(cgroupName string, updateStats bool) (*v1alpha1.ContainerStats, *v1alpha1.NetworkStats, error) {
-	ret := _mock.Called(cgroupName, updateStats)
+func (_mock *MockProvider) GetCgroupStats(ctx context.Context, cgroupName string, updateStats bool) (*v1alpha1.ContainerStats, *v1alpha1.NetworkStats, error) {
+	ret := _mock.Called(ctx, cgroupName, updateStats)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetCgroupStats")
@@ -139,25 +138,25 @@ func (_mock *MockProvider) GetCgroupStats(cgroupName string, updateStats bool) (
 	var r0 *v1alpha1.ContainerStats
 	var r1 *v1alpha1.NetworkStats
 	var r2 error
-	if returnFunc, ok := ret.Get(0).(func(string, bool) (*v1alpha1.ContainerStats, *v1alpha1.NetworkStats, error)); ok {
-		return returnFunc(cgroupName, updateStats)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, bool) (*v1alpha1.ContainerStats, *v1alpha1.NetworkStats, error)); ok {
+		return returnFunc(ctx, cgroupName, updateStats)
 	}
-	if returnFunc, ok := ret.Get(0).(func(string, bool) *v1alpha1.ContainerStats); ok {
-		r0 = returnFunc(cgroupName, updateStats)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, bool) *v1alpha1.ContainerStats); ok {
+		r0 = returnFunc(ctx, cgroupName, updateStats)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*v1alpha1.ContainerStats)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func(string, bool) *v1alpha1.NetworkStats); ok {
-		r1 = returnFunc(cgroupName, updateStats)
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string, bool) *v1alpha1.NetworkStats); ok {
+		r1 = returnFunc(ctx, cgroupName, updateStats)
 	} else {
 		if ret.Get(1) != nil {
 			r1 = ret.Get(1).(*v1alpha1.NetworkStats)
 		}
 	}
-	if returnFunc, ok := ret.Get(2).(func(string, bool) error); ok {
-		r2 = returnFunc(cgroupName, updateStats)
+	if returnFunc, ok := ret.Get(2).(func(context.Context, string, bool) error); ok {
+		r2 = returnFunc(ctx, cgroupName, updateStats)
 	} else {
 		r2 = ret.Error(2)
 	}
@@ -170,25 +169,31 @@ type MockProvider_GetCgroupStats_Call struct {
 }
 
 // GetCgroupStats is a helper method to define mock.On call
+//   - ctx context.Context
 //   - cgroupName string
 //   - updateStats bool
-func (_e *MockProvider_Expecter) GetCgroupStats(cgroupName interface{}, updateStats interface{}) *MockProvider_GetCgroupStats_Call {
-	return &MockProvider_GetCgroupStats_Call{Call: _e.mock.On("GetCgroupStats", cgroupName, updateStats)}
+func (_e *MockProvider_Expecter) GetCgroupStats(ctx any, cgroupName any, updateStats any) *MockProvider_GetCgroupStats_Call {
+	return &MockProvider_GetCgroupStats_Call{Call: _e.mock.On("GetCgroupStats", ctx, cgroupName, updateStats)}
 }
 
-func (_c *MockProvider_GetCgroupStats_Call) Run(run func(cgroupName string, updateStats bool)) *MockProvider_GetCgroupStats_Call {
+func (_c *MockProvider_GetCgroupStats_Call) Run(run func(ctx context.Context, cgroupName string, updateStats bool)) *MockProvider_GetCgroupStats_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 string
+		var arg0 context.Context
 		if args[0] != nil {
-			arg0 = args[0].(string)
+			arg0 = args[0].(context.Context)
 		}
-		var arg1 bool
+		var arg1 string
 		if args[1] != nil {
-			arg1 = args[1].(bool)
+			arg1 = args[1].(string)
+		}
+		var arg2 bool
+		if args[2] != nil {
+			arg2 = args[2].(bool)
 		}
 		run(
 			arg0,
 			arg1,
+			arg2,
 		)
 	})
 	return _c
@@ -199,7 +204,7 @@ func (_c *MockProvider_GetCgroupStats_Call) Return(containerStats *v1alpha1.Cont
 	return _c
 }
 
-func (_c *MockProvider_GetCgroupStats_Call) RunAndReturn(run func(cgroupName string, updateStats bool) (*v1alpha1.ContainerStats, *v1alpha1.NetworkStats, error)) *MockProvider_GetCgroupStats_Call {
+func (_c *MockProvider_GetCgroupStats_Call) RunAndReturn(run func(ctx context.Context, cgroupName string, updateStats bool) (*v1alpha1.ContainerStats, *v1alpha1.NetworkStats, error)) *MockProvider_GetCgroupStats_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -239,7 +244,7 @@ type MockProvider_GetNode_Call struct {
 
 // GetNode is a helper method to define mock.On call
 //   - context1 context.Context
-func (_e *MockProvider_Expecter) GetNode(context1 interface{}) *MockProvider_GetNode_Call {
+func (_e *MockProvider_Expecter) GetNode(context1 any) *MockProvider_GetNode_Call {
 	return &MockProvider_GetNode_Call{Call: _e.mock.On("GetNode", context1)}
 }
 
@@ -345,7 +350,7 @@ type MockProvider_GetPodByCgroupfs_Call struct {
 
 // GetPodByCgroupfs is a helper method to define mock.On call
 //   - cgroupfs string
-func (_e *MockProvider_Expecter) GetPodByCgroupfs(cgroupfs interface{}) *MockProvider_GetPodByCgroupfs_Call {
+func (_e *MockProvider_Expecter) GetPodByCgroupfs(cgroupfs any) *MockProvider_GetPodByCgroupfs_Call {
 	return &MockProvider_GetPodByCgroupfs_Call{Call: _e.mock.On("GetPodByCgroupfs", cgroupfs)}
 }
 
@@ -408,7 +413,7 @@ type MockProvider_GetPodByName_Call struct {
 // GetPodByName is a helper method to define mock.On call
 //   - namespace string
 //   - name string
-func (_e *MockProvider_Expecter) GetPodByName(namespace interface{}, name interface{}) *MockProvider_GetPodByName_Call {
+func (_e *MockProvider_Expecter) GetPodByName(namespace any, name any) *MockProvider_GetPodByName_Call {
 	return &MockProvider_GetPodByName_Call{Call: _e.mock.On("GetPodByName", namespace, name)}
 }
 
@@ -531,26 +536,26 @@ func (_c *MockProvider_GetPods_Call) RunAndReturn(run func() []*v1.Pod) *MockPro
 }
 
 // GetRequestedContainersInfo provides a mock function for the type MockProvider
-func (_mock *MockProvider) GetRequestedContainersInfo(containerName string, options v2.RequestOptions) (map[string]*v10.ContainerInfo, error) {
+func (_mock *MockProvider) GetRequestedContainersInfo(containerName string, options model.RequestOptions) (map[string]*model.ContainerInfo, error) {
 	ret := _mock.Called(containerName, options)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetRequestedContainersInfo")
 	}
 
-	var r0 map[string]*v10.ContainerInfo
+	var r0 map[string]*model.ContainerInfo
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(string, v2.RequestOptions) (map[string]*v10.ContainerInfo, error)); ok {
+	if returnFunc, ok := ret.Get(0).(func(string, model.RequestOptions) (map[string]*model.ContainerInfo, error)); ok {
 		return returnFunc(containerName, options)
 	}
-	if returnFunc, ok := ret.Get(0).(func(string, v2.RequestOptions) map[string]*v10.ContainerInfo); ok {
+	if returnFunc, ok := ret.Get(0).(func(string, model.RequestOptions) map[string]*model.ContainerInfo); ok {
 		r0 = returnFunc(containerName, options)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(map[string]*v10.ContainerInfo)
+			r0 = ret.Get(0).(map[string]*model.ContainerInfo)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func(string, v2.RequestOptions) error); ok {
+	if returnFunc, ok := ret.Get(1).(func(string, model.RequestOptions) error); ok {
 		r1 = returnFunc(containerName, options)
 	} else {
 		r1 = ret.Error(1)
@@ -565,20 +570,20 @@ type MockProvider_GetRequestedContainersInfo_Call struct {
 
 // GetRequestedContainersInfo is a helper method to define mock.On call
 //   - containerName string
-//   - options v2.RequestOptions
-func (_e *MockProvider_Expecter) GetRequestedContainersInfo(containerName interface{}, options interface{}) *MockProvider_GetRequestedContainersInfo_Call {
+//   - options model.RequestOptions
+func (_e *MockProvider_Expecter) GetRequestedContainersInfo(containerName any, options any) *MockProvider_GetRequestedContainersInfo_Call {
 	return &MockProvider_GetRequestedContainersInfo_Call{Call: _e.mock.On("GetRequestedContainersInfo", containerName, options)}
 }
 
-func (_c *MockProvider_GetRequestedContainersInfo_Call) Run(run func(containerName string, options v2.RequestOptions)) *MockProvider_GetRequestedContainersInfo_Call {
+func (_c *MockProvider_GetRequestedContainersInfo_Call) Run(run func(containerName string, options model.RequestOptions)) *MockProvider_GetRequestedContainersInfo_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 string
 		if args[0] != nil {
 			arg0 = args[0].(string)
 		}
-		var arg1 v2.RequestOptions
+		var arg1 model.RequestOptions
 		if args[1] != nil {
-			arg1 = args[1].(v2.RequestOptions)
+			arg1 = args[1].(model.RequestOptions)
 		}
 		run(
 			arg0,
@@ -588,12 +593,12 @@ func (_c *MockProvider_GetRequestedContainersInfo_Call) Run(run func(containerNa
 	return _c
 }
 
-func (_c *MockProvider_GetRequestedContainersInfo_Call) Return(stringToContainerInfo map[string]*v10.ContainerInfo, err error) *MockProvider_GetRequestedContainersInfo_Call {
+func (_c *MockProvider_GetRequestedContainersInfo_Call) Return(stringToContainerInfo map[string]*model.ContainerInfo, err error) *MockProvider_GetRequestedContainersInfo_Call {
 	_c.Call.Return(stringToContainerInfo, err)
 	return _c
 }
 
-func (_c *MockProvider_GetRequestedContainersInfo_Call) RunAndReturn(run func(containerName string, options v2.RequestOptions) (map[string]*v10.ContainerInfo, error)) *MockProvider_GetRequestedContainersInfo_Call {
+func (_c *MockProvider_GetRequestedContainersInfo_Call) RunAndReturn(run func(containerName string, options model.RequestOptions) (map[string]*model.ContainerInfo, error)) *MockProvider_GetRequestedContainersInfo_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -641,7 +646,7 @@ type MockProvider_ImageFsStats_Call struct {
 
 // ImageFsStats is a helper method to define mock.On call
 //   - ctx context.Context
-func (_e *MockProvider_Expecter) ImageFsStats(ctx interface{}) *MockProvider_ImageFsStats_Call {
+func (_e *MockProvider_Expecter) ImageFsStats(ctx any) *MockProvider_ImageFsStats_Call {
 	return &MockProvider_ImageFsStats_Call{Call: _e.mock.On("ImageFsStats", ctx)}
 }
 
@@ -703,7 +708,7 @@ type MockProvider_ListBlockVolumesForPod_Call struct {
 
 // ListBlockVolumesForPod is a helper method to define mock.On call
 //   - podUID types.UID
-func (_e *MockProvider_Expecter) ListBlockVolumesForPod(podUID interface{}) *MockProvider_ListBlockVolumesForPod_Call {
+func (_e *MockProvider_Expecter) ListBlockVolumesForPod(podUID any) *MockProvider_ListBlockVolumesForPod_Call {
 	return &MockProvider_ListBlockVolumesForPod_Call{Call: _e.mock.On("ListBlockVolumesForPod", podUID)}
 }
 
@@ -765,7 +770,7 @@ type MockProvider_ListPodCPUAndMemoryStats_Call struct {
 
 // ListPodCPUAndMemoryStats is a helper method to define mock.On call
 //   - ctx context.Context
-func (_e *MockProvider_Expecter) ListPodCPUAndMemoryStats(ctx interface{}) *MockProvider_ListPodCPUAndMemoryStats_Call {
+func (_e *MockProvider_Expecter) ListPodCPUAndMemoryStats(ctx any) *MockProvider_ListPodCPUAndMemoryStats_Call {
 	return &MockProvider_ListPodCPUAndMemoryStats_Call{Call: _e.mock.On("ListPodCPUAndMemoryStats", ctx)}
 }
 
@@ -827,7 +832,7 @@ type MockProvider_ListPodStats_Call struct {
 
 // ListPodStats is a helper method to define mock.On call
 //   - ctx context.Context
-func (_e *MockProvider_Expecter) ListPodStats(ctx interface{}) *MockProvider_ListPodStats_Call {
+func (_e *MockProvider_Expecter) ListPodStats(ctx any) *MockProvider_ListPodStats_Call {
 	return &MockProvider_ListPodStats_Call{Call: _e.mock.On("ListPodStats", ctx)}
 }
 
@@ -889,7 +894,7 @@ type MockProvider_ListPodStatsAndUpdateCPUNanoCoreUsage_Call struct {
 
 // ListPodStatsAndUpdateCPUNanoCoreUsage is a helper method to define mock.On call
 //   - ctx context.Context
-func (_e *MockProvider_Expecter) ListPodStatsAndUpdateCPUNanoCoreUsage(ctx interface{}) *MockProvider_ListPodStatsAndUpdateCPUNanoCoreUsage_Call {
+func (_e *MockProvider_Expecter) ListPodStatsAndUpdateCPUNanoCoreUsage(ctx any) *MockProvider_ListPodStatsAndUpdateCPUNanoCoreUsage_Call {
 	return &MockProvider_ListPodStatsAndUpdateCPUNanoCoreUsage_Call{Call: _e.mock.On("ListPodStatsAndUpdateCPUNanoCoreUsage", ctx)}
 }
 
@@ -951,7 +956,7 @@ type MockProvider_ListVolumesForPod_Call struct {
 
 // ListVolumesForPod is a helper method to define mock.On call
 //   - podUID types.UID
-func (_e *MockProvider_Expecter) ListVolumesForPod(podUID interface{}) *MockProvider_ListVolumesForPod_Call {
+func (_e *MockProvider_Expecter) ListVolumesForPod(podUID any) *MockProvider_ListVolumesForPod_Call {
 	return &MockProvider_ListVolumesForPod_Call{Call: _e.mock.On("ListVolumesForPod", podUID)}
 }
 
@@ -1151,7 +1156,7 @@ type MockSummaryProvider_Get_Call struct {
 // Get is a helper method to define mock.On call
 //   - ctx context.Context
 //   - updateStats bool
-func (_e *MockSummaryProvider_Expecter) Get(ctx interface{}, updateStats interface{}) *MockSummaryProvider_Get_Call {
+func (_e *MockSummaryProvider_Expecter) Get(ctx any, updateStats any) *MockSummaryProvider_Get_Call {
 	return &MockSummaryProvider_Get_Call{Call: _e.mock.On("Get", ctx, updateStats)}
 }
 
@@ -1218,7 +1223,7 @@ type MockSummaryProvider_GetCPUAndMemoryStats_Call struct {
 
 // GetCPUAndMemoryStats is a helper method to define mock.On call
 //   - ctx context.Context
-func (_e *MockSummaryProvider_Expecter) GetCPUAndMemoryStats(ctx interface{}) *MockSummaryProvider_GetCPUAndMemoryStats_Call {
+func (_e *MockSummaryProvider_Expecter) GetCPUAndMemoryStats(ctx any) *MockSummaryProvider_GetCPUAndMemoryStats_Call {
 	return &MockSummaryProvider_GetCPUAndMemoryStats_Call{Call: _e.mock.On("GetCPUAndMemoryStats", ctx)}
 }
 

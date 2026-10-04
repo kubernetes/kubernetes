@@ -32,11 +32,21 @@ const (
 	// the network namespace
 	NetNamespace = Namespace("Net")
 
+	// refer to https://man7.org/linux/man-pages/man7/uts_namespaces.7.html
+	// the UTS namespace
+	UTSNamespace = Namespace("UTS")
+
+	// refer to https://man7.org/linux/man-pages/man7/user_namespaces.7.html
+	// the User namespace
+	UserNamespace = Namespace("User")
+
 	// the zero value if no namespace is known
 	UnknownNamespace = Namespace("")
 )
 
 var nameToNamespace = map[string]Namespace{
+	// UTS namespace parameters
+	"kernel.domainname": UTSNamespace,
 	// kernel semaphore parameters: SEMMSL, SEMMNS, SEMOPM, and SEMMNI.
 	"kernel.sem": IPCNamespace,
 	// kernel shared memory limits include shmall, shmmax, shmmni, and shm_rmid_forced.
@@ -59,6 +69,8 @@ var prefixToNamespace = map[string]Namespace{
 	// mqueue filesystem provides the necessary kernel features to enable the creation
 	// of a user space library that implements the POSIX message queues API.
 	"fs.mqueue": IPCNamespace,
+	// user namespace sysctls
+	"user": UserNamespace,
 }
 
 // namespaceOf returns the namespace of the Linux kernel for a sysctl, or

@@ -26,13 +26,13 @@ import (
 // MinError returns a string explanation of a "must be greater than or equal"
 // validation failure.
 func MinError[T constraints.Integer](min T) string {
-	return fmt.Sprintf("must be greater than or equal to %d", min)
+	return fmt.Sprintf("must be greater than or equal to %v", min)
 }
 
 // MaxError returns a string explanation of a "must be less than or equal"
 // validation failure.
 func MaxError[T constraints.Integer](max T) string {
-	return fmt.Sprintf("must be less than or equal to %d", max)
+	return fmt.Sprintf("must be less than or equal to %v", max)
 }
 
 // MaxLenError returns a string explanation of a "string too long" validation

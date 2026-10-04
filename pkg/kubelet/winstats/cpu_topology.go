@@ -23,7 +23,7 @@ import (
 	"syscall"
 	"unsafe"
 
-	cadvisorapi "github.com/google/cadvisor/info/v1"
+	cadvisorapi "github.com/google/cadvisor/lib/model"
 
 	"k8s.io/klog/v2"
 )

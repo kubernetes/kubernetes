@@ -49,6 +49,7 @@ func (s *store) scheduleCompaction(compactMainRev, prevCompactRev int64) (KeyVal
 
 		tx := s.b.BatchTx()
 		tx.LockOutsideApply()
+		// gofail: var compactAfterAcquiredBatchTxLock struct{}
 		keys, values := tx.UnsafeRange(schema.Key, last, end, int64(batchNum))
 		for i := range keys {
 			rev = BytesToRev(keys[i])
@@ -71,6 +72,7 @@ func (s *store) scheduleCompaction(compactMainRev, prevCompactRev int64) (KeyVal
 				"finished scheduled compaction",
 				zap.Int64("compact-revision", compactMainRev),
 				zap.Duration("took", time.Since(totalStart)),
+				zap.Int("number-of-keys-compacted", keyCompactions),
 				zap.Uint32("hash", hash.Hash),
 				zap.Int64("current-db-size-bytes", size),
 				zap.String("current-db-size", humanize.Bytes(uint64(size))),

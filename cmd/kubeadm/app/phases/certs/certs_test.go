@@ -30,11 +30,12 @@ import (
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	certstestutil "k8s.io/kubernetes/cmd/kubeadm/app/util/certs"
+	certstestutil "k8s.io/kubernetes/cmd/kubeadm/app/util/certs/testing"
+	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config/testing"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
+	filesutil "k8s.io/kubernetes/cmd/kubeadm/app/util/files/testing"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
 	pkiutiltesting "k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil/testing"
-	testutil "k8s.io/kubernetes/cmd/kubeadm/test"
 )
 
 func TestWriteCertificateAuthorityFilesIfNotExist(t *testing.T) {
@@ -57,7 +58,7 @@ func TestWriteCertificateAuthorityFilesIfNotExist(t *testing.T) {
 		},
 		{ // some file exists, but it is not a valid ca cert > err
 			setupFunc: func(pkiDir string) error {
-				testutil.SetupEmptyFiles(t, pkiDir, "dummy.crt")
+				filesutil.SetupEmptyFiles(t, pkiDir, "dummy.crt")
 				return nil
 			},
 			expectedError: true,
@@ -97,7 +98,7 @@ func TestWriteCertificateAuthorityFilesIfNotExist(t *testing.T) {
 		}
 
 		// asserts expected files are there
-		testutil.AssertFileExists(t, tmpdir, "dummy.key", "dummy.crt")
+		filesutil.AssertFileExists(t, tmpdir, "dummy.key", "dummy.crt")
 
 		// check created cert
 		resultingCaCert, _, err := pkiutil.TryLoadCertAndKeyFromDisk(tmpdir, "dummy")
@@ -159,7 +160,7 @@ func TestWriteCertificateFilesIfNotExist(t *testing.T) {
 		},
 		{ // some file exists, but it is not a valid cert > err
 			setupFunc: func(pkiDir string) error {
-				testutil.SetupEmptyFiles(t, pkiDir, "dummy.crt")
+				filesutil.SetupEmptyFiles(t, pkiDir, "dummy.crt")
 				return nil
 			},
 			expectedError: true,
@@ -201,7 +202,7 @@ func TestWriteCertificateFilesIfNotExist(t *testing.T) {
 		}
 
 		// asserts expected files are there
-		testutil.AssertFileExists(t, tmpdir, "dummy.key", "dummy.crt")
+		filesutil.AssertFileExists(t, tmpdir, "dummy.key", "dummy.crt")
 
 		// check created cert
 		resultingCert, _, err := pkiutil.TryLoadCertAndKeyFromDisk(tmpdir, "dummy")
@@ -241,7 +242,7 @@ func TestCreateServiceAccountKeyAndPublicKeyFiles(t *testing.T) {
 		{ // some file exists, but it is not a valid key > err
 			name: "empty key",
 			setupFunc: func(pkiDir string) error {
-				testutil.SetupEmptyFiles(t, pkiDir, kubeadmconstants.ServiceAccountPrivateKeyName)
+				filesutil.SetupEmptyFiles(t, pkiDir, kubeadmconstants.ServiceAccountPrivateKeyName)
 				return nil
 			},
 			expectedErr: true,
@@ -412,7 +413,7 @@ func TestCreatePKIAssetsWithSparseCerts(t *testing.T) {
 
 			tmpdir := t.TempDir()
 
-			cfg := testutil.GetDefaultInternalConfig(t)
+			cfg := configutil.GetDefaultInternalConfig(t)
 			cfg.ClusterConfiguration.CertificatesDir = tmpdir
 
 			certstestutil.WritePKIFiles(t, tmpdir, test.Files)
@@ -697,7 +698,7 @@ func TestCreateCertificateFilesMethods(t *testing.T) {
 		}
 
 		// asserts expected files are there
-		testutil.AssertFileExists(t, tmpdir, test.expectedFiles...)
+		filesutil.AssertFileExists(t, tmpdir, test.expectedFiles...)
 	}
 }
 

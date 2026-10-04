@@ -1,10 +1,11 @@
 // Copyright The OpenTelemetry Authors
 // SPDX-License-Identifier: Apache-2.0
 
-package otelhttp // import "go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
+package otelhttp
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptrace"
@@ -15,7 +16,7 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/propagation"
-	otelsemconv "go.opentelemetry.io/otel/semconv/v1.40.0"
+	otelsemconv "go.opentelemetry.io/otel/semconv/v1.43.0"
 	"go.opentelemetry.io/otel/trace"
 
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp/internal/request"
@@ -142,6 +143,9 @@ func (t *Transport) RoundTrip(r *http.Request) (*http.Response, error) {
 	t.propagators.Inject(ctx, propagation.HeaderCarrier(r.Header))
 
 	res, err := t.rt.RoundTrip(r)
+	if err == nil {
+		res, err = ensureResponseBody(t.rt, r, res)
+	}
 
 	// Record the metrics on error or no error.
 	statusCode := 0
@@ -160,7 +164,9 @@ func (t *Transport) RoundTrip(r *http.Request) (*http.Response, error) {
 		},
 		t.semconv.MetricOptions(semconv.MetricAttributes{
 			Req:                  r,
+			Resp:                 res,
 			StatusCode:           statusCode,
+			Err:                  err,
 			AdditionalAttributes: append(labeler.Get(), t.metricAttributesFromRequest(r)...),
 		}),
 	)
@@ -180,6 +186,20 @@ func (t *Transport) RoundTrip(r *http.Request) (*http.Response, error) {
 	span.SetStatus(t.semconv.Status(res.StatusCode))
 
 	return res, nil
+}
+
+func ensureResponseBody(rt http.RoundTripper, r *http.Request, res *http.Response) (*http.Response, error) {
+	switch {
+	case res == nil:
+		return nil, fmt.Errorf("http: RoundTripper implementation (%T) returned a nil *Response with a nil error", rt)
+	case res.Body != nil:
+		return res, nil
+	case res.ContentLength > 0 && r.Method != http.MethodHead:
+		return nil, fmt.Errorf("http: RoundTripper implementation (%T) returned a *Response with content length %d but a nil Body", rt, res.ContentLength)
+	default:
+		res.Body = http.NoBody
+		return res, nil
+	}
 }
 
 func (t *Transport) metricAttributesFromRequest(r *http.Request) []attribute.KeyValue {

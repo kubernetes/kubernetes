@@ -27,13 +27,13 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	v1 "k8s.io/api/core/v1"
+	schedulingapi "k8s.io/api/scheduling/v1beta1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/informers"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	"k8s.io/client-go/kubernetes/fake"
-	testutils "k8s.io/kubernetes/test/utils"
 	"k8s.io/kubernetes/test/utils/client-go/ktesting"
 	"k8s.io/utils/ptr"
 )
@@ -109,7 +109,7 @@ func TestRunOp(t *testing.T) {
 			op: &createNodesOp{
 				Opcode:                   createNodesOpcode,
 				Count:                    3,
-				LabelNodePrepareStrategy: testutils.NewLabelNodePrepareStrategy("test-label", "value1", "value2", "value3"),
+				LabelNodePrepareStrategy: NewLabelNodePrepareStrategy("test-label", "value1", "value2", "value3"),
 			},
 			verifyFuncs: []verifyFunc{
 				verifyCount(3),
@@ -121,7 +121,7 @@ func TestRunOp(t *testing.T) {
 			op: &createNodesOp{
 				Opcode:                  createNodesOpcode,
 				Count:                   2,
-				UniqueNodeLabelStrategy: testutils.NewUniqueNodeLabelStrategy("unique-test-label"),
+				UniqueNodeLabelStrategy: NewUniqueNodeLabelStrategy("unique-test-label"),
 			},
 			verifyFuncs: []verifyFunc{
 				verifyCount(2),
@@ -133,7 +133,7 @@ func TestRunOp(t *testing.T) {
 			op: &createNodesOp{
 				Opcode: createNodesOpcode,
 				Count:  2,
-				NodeAllocatableStrategy: testutils.NewNodeAllocatableStrategy(
+				NodeAllocatableStrategy: NewNodeAllocatableStrategy(
 					map[v1.ResourceName]string{
 						v1.ResourceCPU:    "2",
 						v1.ResourceMemory: "4Gi",
@@ -396,16 +396,137 @@ func TestRunOp(t *testing.T) {
 					}),
 			},
 		},
+		{
+
+			name: "Create Pods with Signature Labels from File",
+			op: &createPodsOp{
+				Opcode: createPodsOpcode,
+				Count:  3,
+				PodTemplatePath: createObjTemplateFile(t,
+					&v1.Pod{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "custom-pod-{{.Index}}",
+						},
+						Spec: v1.PodSpec{
+							Containers: []v1.Container{
+								{
+									Name:  "container",
+									Image: "pause",
+								},
+							},
+						},
+					}),
+				SkipWaitToCompletion: true,
+				SignatureBatchSize:   2,
+			},
+			verifyFuncs: []verifyFunc{
+				verifyCount(3),
+				verifyPodSignature(2),
+			},
+		},
+		{
+			name: "Create Pods with Signature Labels from File (unset SignatureBatchSize)",
+			op: &createPodsOp{
+				Opcode: createPodsOpcode,
+				Count:  3,
+				PodTemplatePath: createObjTemplateFile(t,
+					&v1.Pod{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "custom-pod-{{.Index}}",
+						},
+						Spec: v1.PodSpec{
+							Containers: []v1.Container{
+								{
+									Name:  "container",
+									Image: "pause",
+								},
+							},
+						},
+					}),
+				SkipWaitToCompletion: true,
+			},
+			verifyFuncs: []verifyFunc{
+				verifyCount(3),
+				verifyPodSignature(1),
+			},
+		},
+		{
+			name: "Create Pods with Invalid SignatureBatchSize",
+			op: &createPodsOp{
+				Opcode:             createPodsOpcode,
+				Count:              1,
+				SignatureBatchSize: -1,
+			},
+			expectedFailure: true,
+		},
+		{
+			name: "Create PodGroups",
+			op: &createPodGroups{
+				Opcode:       createPodGroupsOpcode,
+				Namespace:    "namespace-0",
+				TemplatePath: *newPodGroupTemplateFile(t, "namespace-0"),
+				Count:        2,
+			},
+			verifyFuncs: []verifyFunc{
+				verifyCount(2),
+				verifyNamespaceCreated("namespace-0"),
+				verifyObj(
+					&schedulingapi.PodGroup{
+						ObjectMeta: metav1.ObjectMeta{
+							Namespace: "namespace-0",
+						},
+						Spec: schedulingapi.PodGroupSpec{
+							SchedulingPolicy: schedulingapi.PodGroupSchedulingPolicy{
+								Gang: &schedulingapi.GangSchedulingPolicy{
+									MinCount: 3,
+								},
+							},
+						},
+					}),
+			},
+		},
+		{
+			name: "Create PodGroups with Invalid Template Path",
+			op: &createPodGroups{
+				Opcode:       createPodGroupsOpcode,
+				Namespace:    "namespace-0",
+				TemplatePath: "non-existent-file.yaml",
+				Count:        1,
+			},
+			expectedFailure: true,
+		},
+		{
+			name: "Create PodGroups with empty namespace",
+			op: &createPodGroups{
+				Opcode:       createPodGroupsOpcode,
+				Namespace:    "",
+				TemplatePath: *newPodGroupTemplateFile(t, ""),
+				Count:        1,
+			},
+			expectedFailure: true,
+		},
+		{
+			name: "Create PodGroups with zero count",
+			op: &createPodGroups{
+				Opcode:       createPodGroupsOpcode,
+				Namespace:    "namespace-0",
+				TemplatePath: *newPodGroupTemplateFile(t, "namespace-0"),
+				Count:        0,
+			},
+			expectedFailure: true,
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tCtx := ktesting.Init(t)
 			client := fake.NewSimpleClientset()
-			tCtx = tCtx.WithClients(nil, nil, client, nil, nil)
+			tCtx = tCtx.WithClients(nil, nil, client, nil)
 
 			informerFactory := informers.NewSharedInformerFactory(client, 0)
 			podInformer := informerFactory.Core().V1().Pods()
+			podGroupInformer := informerFactory.Scheduling().V1beta1().PodGroups()
+			podGroupInformer.Informer()
 			informerFactory.Start(tCtx.Done())
 			informerFactory.WaitForCacheSync(tCtx.Done())
 
@@ -415,25 +536,28 @@ func TestRunOp(t *testing.T) {
 				testCase: &testCase{
 					DefaultPodTemplatePath: newPodTemplateFile(t, "namespace-0"),
 				},
-				podInformer: podInformer,
-				workload:    tt.workload,
+				podInformer:      podInformer,
+				podGroupInformer: podGroupInformer,
+				workload:         tt.workload,
 			}
 
 			opToRun := tt.op
 			opIndex := 0
-			if tt.workload != nil {
-				if patchable, ok := tt.op.(interface {
-					patchParams(w *Workload) (realOp, error)
-				}); ok {
-					patchedOp, err := patchable.patchParams(tt.workload)
-					if err != nil {
-						t.Fatalf("Failed to patch params: %v", err)
-					}
-					opToRun = patchedOp
-				}
+			w := tt.workload
+			if w == nil {
+				w = &Workload{}
 			}
 
-			err := exec.runOp(tCtx, opToRun, opIndex)
+			var err error
+			if patchable, ok := tt.op.(interface {
+				patchParams(w *Workload) (realOp, error)
+			}); ok {
+				opToRun, err = patchable.patchParams(w)
+			}
+
+			if err == nil {
+				err = exec.runOp(tCtx, opToRun, opIndex)
+			}
 
 			if tt.expectedFailure {
 				if err == nil {
@@ -482,8 +606,39 @@ func verifyCount(expectedCount int) verifyFunc {
 			if got := len(pods.Items); got != expectedCount {
 				return fmt.Errorf("unexpected pod count: got %d, want %d", got, expectedCount)
 			}
+		case *createPodGroups:
+			pgs, err := tCtx.Client().SchedulingV1beta1().PodGroups(concreteOp.Namespace).List(tCtx, metav1.ListOptions{})
+			if err != nil {
+				return fmt.Errorf("failed to list pod groups: %w", err)
+			}
+			if got := len(pgs.Items); got != expectedCount {
+				return fmt.Errorf("unexpected pod group count: got %d, want %d", got, expectedCount)
+			}
 		default:
 			return fmt.Errorf("verifyCount doesn't support this operation type: %T", op)
+		}
+		return nil
+	}
+}
+
+func verifyPodSignature(batchSize int) verifyFunc {
+	return func(t *testing.T, tCtx ktesting.TContext, op realOp, opIndex int) error {
+		pods, err := tCtx.Client().CoreV1().Pods(metav1.NamespaceAll).List(tCtx, metav1.ListOptions{})
+		if err != nil {
+			return err
+		}
+		if len(pods.Items) == 0 {
+			return fmt.Errorf("no pods found")
+		}
+		for i, pod := range pods.Items {
+			val, ok := pod.Labels["signature"]
+			if !ok {
+				return fmt.Errorf("pod %s missing signature label", pod.Name)
+			}
+			expected := fmt.Sprintf("signature-label-%d", i/batchSize)
+			if val != expected {
+				return fmt.Errorf("pod %d: unexpected signature: got %q, want %q", i, val, expected)
+			}
 		}
 		return nil
 	}
@@ -623,6 +778,34 @@ func verifyObj(expectedObj any) verifyFunc {
 			}
 			got = gotPods
 			want = wantPods
+		case *createPodGroups:
+			expectedPodGroupTemplate, ok := expectedObj.(*schedulingapi.PodGroup)
+			if !ok {
+				return fmt.Errorf("expectedObj must be *schedulingapi.PodGroup when op is *createPodGroups, got %T", expectedObj)
+			}
+
+			namespace := expectedPodGroupTemplate.Namespace
+			if namespace == "" {
+				return fmt.Errorf("expectedPodGroupTemplate.Namespace must be set")
+			}
+
+			podGroupsList, listErr := tCtx.Client().SchedulingV1beta1().PodGroups(namespace).List(tCtx, metav1.ListOptions{})
+			if listErr != nil {
+				return fmt.Errorf("failed to list pod groups: %w", listErr)
+			}
+			gotPodGroups := podGroupsList.Items
+
+			wantPodGroups := make([]schedulingapi.PodGroup, len(gotPodGroups))
+			for i := range gotPodGroups {
+				wantPodGroups[i] = *expectedPodGroupTemplate
+			}
+
+			cmpOpts = []cmp.Option{
+				cmpopts.EquateEmpty(),
+				cmpOptsIgnoreObjectMeta,
+			}
+			got = gotPodGroups
+			want = wantPodGroups
 		default:
 			return fmt.Errorf("verifyObj doesn't support this operation type for cmp.Diff: %T", opDetails)
 		}
@@ -660,7 +843,7 @@ func createObjTemplateFile(t *testing.T, obj any) *string {
 	}()
 
 	switch obj := obj.(type) {
-	case *v1.Node, *v1.Pod, *v1.PersistentVolume, *v1.PersistentVolumeClaim:
+	case *v1.Node, *v1.Pod, *v1.PersistentVolume, *v1.PersistentVolumeClaim, *schedulingapi.PodGroup:
 		if err := json.NewEncoder(f).Encode(obj); err != nil {
 			t.Fatalf("Failed to encode the template to %s: %v", templateFile, err)
 		}
@@ -950,6 +1133,23 @@ func newPodTemplateFile(t *testing.T, namespace string) *string {
 	return createObjTemplateFile(t, pod)
 }
 
+func newPodGroupTemplateFile(t *testing.T, namespace string) *string {
+	pg := &schedulingapi.PodGroup{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "gang-{{.Index}}",
+			Namespace: namespace,
+		},
+		Spec: schedulingapi.PodGroupSpec{
+			SchedulingPolicy: schedulingapi.PodGroupSchedulingPolicy{
+				Gang: &schedulingapi.GangSchedulingPolicy{
+					MinCount: 3,
+				},
+			},
+		},
+	}
+	return createObjTemplateFile(t, pg)
+}
+
 func newPersistentVolumeTemplateFile(t *testing.T) *string {
 	pv := &v1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
@@ -995,4 +1195,140 @@ func verifyNamespaceCreated(expectedNamespace string) verifyFunc {
 		}
 		return nil
 	}
+}
+
+func TestProfileCollection(t *testing.T) {
+	t.Run("successful collection", func(t *testing.T) {
+		tCtx := ktesting.Init(t)
+		tempDir := t.TempDir()
+		profilePath := filepath.Join(tempDir, "cpu-profile.out")
+
+		exec := &WorkloadExecutor{}
+		startOp := &startCollectingProfileOp{
+			Opcode:   startCollectingProfileOpcode,
+			Type:     "CPU",
+			FilePath: profilePath,
+		}
+
+		if err := exec.runOp(tCtx, startOp, 0); err != nil {
+			t.Fatalf("Failed to start CPU profile collection: %v", err)
+		}
+		if exec.cpuProfileFile == nil {
+			t.Fatalf("Expected cpuProfileFile to be set, got nil")
+		}
+
+		stopOp := &stopCollectingProfileOp{
+			Opcode: stopCollectingProfileOpcode,
+			Type:   "CPU",
+		}
+		if err := exec.runOp(tCtx, stopOp, 0); err != nil {
+			t.Fatalf("Failed to stop CPU profile collection: %v", err)
+		}
+		if exec.cpuProfileFile != nil {
+			t.Fatalf("Expected cpuProfileFile to be nil after stop, got %v", exec.cpuProfileFile)
+		}
+		if _, err := os.Stat(profilePath); err != nil {
+			t.Fatalf("Expected profile file %q to exist, got error: %v", profilePath, err)
+		}
+	})
+
+	t.Run("start while already ongoing", func(t *testing.T) {
+		tCtx := ktesting.Init(t)
+		tempDir := t.TempDir()
+		profilePath := filepath.Join(tempDir, "cpu-profile.out")
+
+		exec := &WorkloadExecutor{}
+		startOp := &startCollectingProfileOp{
+			Opcode:   startCollectingProfileOpcode,
+			Type:     "CPU",
+			FilePath: profilePath,
+		}
+
+		if err := exec.runOp(tCtx, startOp, 0); err != nil {
+			t.Fatalf("Failed to start CPU profile collection: %v", err)
+		}
+		if err := exec.runOp(tCtx, startOp, 0); err == nil {
+			t.Fatalf("Expected error starting profile collection while already ongoing, got nil")
+		}
+
+		if err := exec.runOp(tCtx, &stopCollectingProfileOp{
+			Opcode: stopCollectingProfileOpcode,
+			Type:   "CPU",
+		}, 0); err != nil {
+			t.Fatalf("Failed to stop CPU profile collection: %v", err)
+		}
+	})
+
+	t.Run("stop without starting", func(t *testing.T) {
+		tCtx := ktesting.Init(t)
+		exec := &WorkloadExecutor{}
+		stopOp := &stopCollectingProfileOp{
+			Opcode: stopCollectingProfileOpcode,
+			Type:   "CPU",
+		}
+
+		if err := exec.runOp(tCtx, stopOp, 0); err == nil {
+			t.Fatalf("Expected error stopping profile collection without starting, got nil")
+		}
+	})
+
+	t.Run("invalid profile for start", func(t *testing.T) {
+		startOp := &startCollectingProfileOp{
+			Opcode:   startCollectingProfileOpcode,
+			Type:     "MEMORY",
+			FilePath: "some-path.out",
+		}
+		if err := startOp.isValid(true); err == nil {
+			t.Fatalf("Expected error for invalid profile type, got nil")
+		}
+	})
+
+	t.Run("invalid profile for stop", func(t *testing.T) {
+		stopOp := &stopCollectingProfileOp{
+			Opcode: stopCollectingProfileOpcode,
+			Type:   "MEMORY",
+		}
+		if err := stopOp.isValid(true); err == nil {
+			t.Fatalf("Expected error for invalid profile type, got nil")
+		}
+	})
+
+	t.Run("successful collection with dataItemsDir", func(t *testing.T) {
+		tCtx := ktesting.Init(t)
+		tempDir := t.TempDir()
+		oldDataItemsDir := dataItemsDir
+		dataItemsDir = ptr.To(tempDir)
+		defer func() { dataItemsDir = oldDataItemsDir }()
+
+		profileName := "cpu-profile.out"
+		expectedPath := filepath.Join(tempDir, profileName)
+
+		exec := &WorkloadExecutor{}
+		startOp := &startCollectingProfileOp{
+			Opcode:   startCollectingProfileOpcode,
+			Type:     "CPU",
+			FilePath: profileName,
+		}
+
+		if err := exec.runOp(tCtx, startOp, 0); err != nil {
+			t.Fatalf("Failed to start CPU profile collection: %v", err)
+		}
+		if exec.cpuProfileFile == nil {
+			t.Fatalf("Expected cpuProfileFile to be set, got nil")
+		}
+
+		stopOp := &stopCollectingProfileOp{
+			Opcode: stopCollectingProfileOpcode,
+			Type:   "CPU",
+		}
+		if err := exec.runOp(tCtx, stopOp, 0); err != nil {
+			t.Fatalf("Failed to stop CPU profile collection: %v", err)
+		}
+		if exec.cpuProfileFile != nil {
+			t.Fatalf("Expected cpuProfileFile to be nil after stop, got %v", exec.cpuProfileFile)
+		}
+		if _, err := os.Stat(expectedPath); err != nil {
+			t.Fatalf("Expected profile file %q to exist, got error: %v", expectedPath, err)
+		}
+	})
 }

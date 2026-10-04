@@ -41,6 +41,11 @@ const (
 	// Enable webhook in cloud controller manager
 	CloudControllerManagerWebhook featuregate.Feature = "CloudControllerManagerWebhook"
 
+	// owner: @stblatzheim
+	//
+	// Periodically reconcile node labels returned in InstanceMetadata.AdditionalLabels.
+	CloudNodeAdditionalLabelsReconciliation featuregate.Feature = "CloudNodeAdditionalLabelsReconciliation"
+
 	// owner: @jefftree, @tchap
 	//
 	// Make kube-controller-manager release leader election lock on exit.
@@ -59,6 +64,9 @@ var versionedCloudPublicFeatureGates = map[featuregate.Feature]featuregate.Versi
 	},
 	CloudControllerManagerWebhook: {
 		{Version: version.MustParse("1.27"), Default: false, PreRelease: featuregate.Alpha},
+	},
+	CloudNodeAdditionalLabelsReconciliation: {
+		{Version: version.MustParse("1.38"), Default: false, PreRelease: featuregate.Alpha},
 	},
 	ControllerManagerReleaseLeaderElectionLockOnExit: {
 		{Version: version.MustParse("1.36"), Default: false, PreRelease: featuregate.Alpha},

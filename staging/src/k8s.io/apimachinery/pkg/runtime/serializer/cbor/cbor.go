@@ -68,8 +68,9 @@ type Serializer interface {
 var _ Serializer = &serializer{}
 
 type options struct {
-	strict    bool
-	transcode bool
+	strict                       bool
+	transcode                    bool
+	streamingCollectionsEncoding bool
 }
 
 type Option func(*options)
@@ -89,6 +90,13 @@ func Strict(s bool) Option {
 func Transcode(s bool) Option {
 	return func(opts *options) {
 		opts.transcode = s
+	}
+}
+
+// StreamingCollectionsEncoding is used for testing purposes only.
+func StreamingCollectionsEncoding(s bool) Option {
+	return func(opts *options) {
+		opts.streamingCollectionsEncoding = s
 	}
 }
 
@@ -114,6 +122,7 @@ func newSerializer(metaFactory metaFactory, creater runtime.ObjectCreater, typer
 		typer:       typer,
 	}
 	s.options.transcode = true
+	s.options.streamingCollectionsEncoding = true
 	for _, o := range options {
 		o(&s.options)
 	}
@@ -147,13 +156,23 @@ func (s *serializer) EncodeNondeterministic(obj runtime.Object, w io.Writer) err
 }
 
 func (s *serializer) encode(mode modes.EncMode, obj runtime.Object, w io.Writer) error {
+	if _, err := w.Write(selfDescribedCBOR); err != nil {
+		return err
+	}
+
+	if s.options.streamingCollectionsEncoding {
+		ok, err := streamEncodeCollections(obj, w, mode)
+		if err != nil {
+			return err
+		}
+		if ok {
+			return nil
+		}
+	}
+
 	var v interface{} = obj
 	if u, ok := obj.(runtime.Unstructured); ok {
 		v = u.UnstructuredContent()
-	}
-
-	if _, err := w.Write(selfDescribedCBOR); err != nil {
-		return err
 	}
 
 	return mode.MarshalTo(v, w)

@@ -127,6 +127,14 @@ EOF
   output_message=$(! kubectl kuberc set --kuberc="$KUBERC_FILE" --section=credentialplugin --policy=Allowlist --allowlist-entry=command=barbaz --allowlist-entry=command= 2>&1)
   kube::test::if_has_string "${output_message}" "empty value in allowlist entry for field \"command\""
 
+  # Test: switching from Allowlist to AllowAll removes the allowlist
+  kubectl kuberc set --kuberc="$KUBERC_FILE" --section=credentialplugin --policy=AllowAll
+  output_message=$(kubectl kuberc view --kuberc="$KUBERC_FILE")
+  kube::test::if_has_string "${output_message}" "credentialPluginPolicy: AllowAll"
+  kube::test::if_has_not_string "${output_message}" "command: foobar"
+  # Restore credential plugin policy back to the original Allowlist
+  kubectl kuberc set --kuberc="$KUBERC_FILE" --section=credentialplugin --policy=Allowlist --allowlist-entry=command=foobar
+
   # Restore getn alias back to "namespace" for remaining tests
   kubectl kuberc set --kuberc="$KUBERC_FILE" --section=aliases --name=getn --command=get --prependarg=namespace --option=output=wide --overwrite
   # Restore get defaults back to namespace=test-kuberc-ns and output=json for remaining tests

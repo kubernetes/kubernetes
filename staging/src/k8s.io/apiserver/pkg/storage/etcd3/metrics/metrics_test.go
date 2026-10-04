@@ -227,9 +227,51 @@ etcd_request_duration_seconds_count{group="bar",operation="foo",resource="baz"} 
 # HELP etcd_requests_total [ALPHA] Etcd request counts for each operation and object type.
 # TYPE etcd_requests_total counter
 etcd_requests_total{group="bar",operation="foo",resource="baz"} 1
-# HELP etcd_request_errors_total [ALPHA] Etcd failed request counts for each operation and object type.
+# HELP etcd_request_errors_total [ALPHA] Etcd failed request counts for each operation and object type. Reason response to grpc status, or transaction conflict.
 # TYPE etcd_request_errors_total counter
-etcd_request_errors_total{group="bar",operation="foo",resource="baz"} 1
+etcd_request_errors_total{group="bar",operation="foo",reason="Unknown",resource="baz"} 1
+`,
+		},
+		{
+			desc:          "conflict_request",
+			operation:     "update",
+			groupResource: schema.GroupResource{Group: "bar", Resource: "baz"},
+			err:           ErrTransactionConflict,
+			startTime:     time.Unix(0, 0), // 0.3s
+			want: `# HELP etcd_request_duration_seconds [ALPHA] Etcd request latency in seconds for each operation and object type.
+# TYPE etcd_request_duration_seconds histogram
+etcd_request_duration_seconds_bucket{group="bar",operation="update",resource="baz",le="0.005"} 0
+etcd_request_duration_seconds_bucket{group="bar",operation="update",resource="baz",le="0.025"} 0
+etcd_request_duration_seconds_bucket{group="bar",operation="update",resource="baz",le="0.05"} 0
+etcd_request_duration_seconds_bucket{group="bar",operation="update",resource="baz",le="0.1"} 0
+etcd_request_duration_seconds_bucket{group="bar",operation="update",resource="baz",le="0.2"} 0
+etcd_request_duration_seconds_bucket{group="bar",operation="update",resource="baz",le="0.4"} 1
+etcd_request_duration_seconds_bucket{group="bar",operation="update",resource="baz",le="0.6"} 1
+etcd_request_duration_seconds_bucket{group="bar",operation="update",resource="baz",le="0.8"} 1
+etcd_request_duration_seconds_bucket{group="bar",operation="update",resource="baz",le="1"} 1
+etcd_request_duration_seconds_bucket{group="bar",operation="update",resource="baz",le="1.25"} 1
+etcd_request_duration_seconds_bucket{group="bar",operation="update",resource="baz",le="1.5"} 1
+etcd_request_duration_seconds_bucket{group="bar",operation="update",resource="baz",le="2"} 1
+etcd_request_duration_seconds_bucket{group="bar",operation="update",resource="baz",le="3"} 1
+etcd_request_duration_seconds_bucket{group="bar",operation="update",resource="baz",le="4"} 1
+etcd_request_duration_seconds_bucket{group="bar",operation="update",resource="baz",le="5"} 1
+etcd_request_duration_seconds_bucket{group="bar",operation="update",resource="baz",le="6"} 1
+etcd_request_duration_seconds_bucket{group="bar",operation="update",resource="baz",le="8"} 1
+etcd_request_duration_seconds_bucket{group="bar",operation="update",resource="baz",le="10"} 1
+etcd_request_duration_seconds_bucket{group="bar",operation="update",resource="baz",le="15"} 1
+etcd_request_duration_seconds_bucket{group="bar",operation="update",resource="baz",le="20"} 1
+etcd_request_duration_seconds_bucket{group="bar",operation="update",resource="baz",le="30"} 1
+etcd_request_duration_seconds_bucket{group="bar",operation="update",resource="baz",le="45"} 1
+etcd_request_duration_seconds_bucket{group="bar",operation="update",resource="baz",le="60"} 1
+etcd_request_duration_seconds_bucket{group="bar",operation="update",resource="baz",le="+Inf"} 1
+etcd_request_duration_seconds_sum{group="bar",operation="update",resource="baz"} 0.3
+etcd_request_duration_seconds_count{group="bar",operation="update",resource="baz"} 1
+# HELP etcd_requests_total [ALPHA] Etcd request counts for each operation and object type.
+# TYPE etcd_requests_total counter
+etcd_requests_total{group="bar",operation="update",resource="baz"} 1
+# HELP etcd_request_errors_total [ALPHA] Etcd failed request counts for each operation and object type. Reason response to grpc status, or transaction conflict.
+# TYPE etcd_request_errors_total counter
+etcd_request_errors_total{group="bar",operation="update",reason="Conflict",resource="baz"} 1
 `,
 		},
 	}
@@ -439,4 +481,26 @@ func (m fakeEtcdMonitor) Monitor(_ context.Context) (StorageMetrics, error) {
 
 func (m fakeEtcdMonitor) Close() error {
 	return nil
+}
+func BenchmarkEtcdGetMetrics_Dynamic(b *testing.B) {
+	gr := schema.GroupResource{Group: "apps", Resource: "deployments"}
+	startTime := time.Now()
+	b.ResetTimer()
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			RecordEtcdRequest("get", gr, nil, startTime)
+		}
+	})
+}
+
+func BenchmarkEtcdGetMetrics_Tracker(b *testing.B) {
+	gr := schema.GroupResource{Group: "apps", Resource: "deployments"}
+	tracker := NewEtcdMetricsTracker(gr)
+	startTime := time.Now()
+	b.ResetTimer()
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			tracker.Get.Record(nil, startTime)
+		}
+	})
 }

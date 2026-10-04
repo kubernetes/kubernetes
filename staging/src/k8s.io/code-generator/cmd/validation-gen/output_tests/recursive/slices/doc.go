@@ -39,10 +39,14 @@ var localSchemeBuilder = testscheme.New()
 // * T2 should call eachVal(T1).
 // * T3 should call T4.
 // * T4 should call eachVal(T3).
+// * T5 and T6 hold a slice of themselves, reached via T1 so the slice type is
+//   still being discovered when its own field is processed.
 
 type T1 struct {
-	T2 T2 `json:"t2"`
-	T3 T3 `json:"t3"`
+	T2 T2   `json:"t2"`
+	T3 T3   `json:"t3"`
+	T5 []T5 `json:"t5"`
+	T6 []T6 `json:"t6"`
 }
 
 type T2 struct {
@@ -56,4 +60,15 @@ type T3 struct {
 
 type T4 struct {
 	ST3 []T3 `json:"st3"`
+}
+
+type T5 struct {
+	// +k8s:validateFalse="type T5.T5"
+	T5 []T5 `json:"t5"`
+}
+
+type T6 struct {
+	// +k8s:validateFalse="type T6.S"
+	S  string `json:"s"`
+	T6 []T6   `json:"t6"`
 }

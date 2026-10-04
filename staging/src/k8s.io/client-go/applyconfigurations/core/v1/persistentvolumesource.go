@@ -62,7 +62,7 @@ type PersistentVolumeSourceApplyConfiguration struct {
 	// are redirected to the cinder.csi.openstack.org CSI driver.
 	// More info: https://examples.k8s.io/mysql-cinder-pd/README.md
 	Cinder *CinderPersistentVolumeSourceApplyConfiguration `json:"cinder,omitempty"`
-	// cephFS represents a Ceph FS mount on the host that shares a pod's lifetime.
+	// cephfs represents a Ceph FS mount on the host that shares a pod's lifetime.
 	// Deprecated: CephFS is deprecated and the in-tree cephfs type is no longer supported.
 	CephFS *CephFSPersistentVolumeSourceApplyConfiguration `json:"cephfs,omitempty"`
 	// fc represents a Fibre Channel resource that is attached to a kubelet's host machine and then exposed to the pod.
@@ -101,7 +101,7 @@ type PersistentVolumeSourceApplyConfiguration struct {
 	ScaleIO *ScaleIOPersistentVolumeSourceApplyConfiguration `json:"scaleIO,omitempty"`
 	// local represents directly-attached storage with node affinity
 	Local *LocalVolumeSourceApplyConfiguration `json:"local,omitempty"`
-	// storageOS represents a StorageOS volume that is attached to the kubelet's host machine and mounted into the pod.
+	// storageos represents a StorageOS volume that is attached to the kubelet's host machine and mounted into the pod.
 	// Deprecated: StorageOS is deprecated and the in-tree storageos type is no longer supported.
 	// More info: https://examples.k8s.io/volumes/storageos/README.md
 	StorageOS *StorageOSPersistentVolumeSourceApplyConfiguration `json:"storageos,omitempty"`

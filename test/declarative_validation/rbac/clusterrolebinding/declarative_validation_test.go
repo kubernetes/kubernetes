@@ -25,6 +25,7 @@ import (
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	rbac "k8s.io/kubernetes/pkg/apis/rbac"
 	registry "k8s.io/kubernetes/pkg/registry/rbac/clusterrolebinding"
+	"k8s.io/kubernetes/test/declarative_validation/meta"
 )
 
 func TestDeclarativeValidate(t *testing.T) {
@@ -35,8 +36,10 @@ func TestDeclarativeValidate(t *testing.T) {
 
 func testDeclarativeValidate(t *testing.T, apiVersion string) {
 	ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
-		APIGroup:   "rbac.authorization.k8s.io",
-		APIVersion: apiVersion,
+		APIGroup:          "rbac.authorization.k8s.io",
+		APIVersion:        apiVersion,
+		IsResourceRequest: true,
+		Verb:              "create",
 	})
 	testCases := map[string]struct {
 		input        rbac.ClusterRoleBinding
@@ -48,13 +51,13 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 		"missing roleRef.name": {
 			input: mkValidClusterRoleBinding(tweakRoleRefName("")),
 			expectedErrs: field.ErrorList{
-				field.Required(field.NewPath("roleRef", "name"), "").MarkAlpha(),
+				field.Required(field.NewPath("roleRef", "name"), "").MarkBeta(),
 			},
 		},
 		"missing subjects[0].name": {
 			input: mkValidClusterRoleBinding(tweakSubjectName(0, "")),
 			expectedErrs: field.ErrorList{
-				field.Required(field.NewPath("subjects").Index(0).Child("name"), "").MarkAlpha(),
+				field.Required(field.NewPath("subjects").Index(0).Child("name"), "").MarkBeta(),
 			},
 		},
 		// TODO: Add more test cases
@@ -64,6 +67,9 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 			apitesting.VerifyValidationEquivalence(t, ctx, &tc.input, registry.Strategy, tc.expectedErrs)
 		})
 	}
+
+	obj := mkValidClusterRoleBinding()
+	meta.RunObjectMetaTestCases(t, ctx, &obj, registry.Strategy, meta.WithStringentFinalizerValidation())
 }
 
 func TestDeclarativeValidateUpdate(t *testing.T) {
@@ -74,8 +80,10 @@ func TestDeclarativeValidateUpdate(t *testing.T) {
 
 func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 	ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
-		APIGroup:   "rbac.authorization.k8s.io",
-		APIVersion: apiVersion,
+		APIGroup:          "rbac.authorization.k8s.io",
+		APIVersion:        apiVersion,
+		IsResourceRequest: true,
+		Verb:              "update",
 	})
 	testCases := map[string]struct {
 		old          rbac.ClusterRoleBinding
@@ -86,11 +94,35 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 			old:    mkValidClusterRoleBinding(),
 			update: mkValidClusterRoleBinding(),
 		},
+		"roleRef changed - invalid": {
+			old:    mkValidClusterRoleBinding(),
+			update: mkValidClusterRoleBinding(tweakRoleRefName("different-role")),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("roleRef"), nil, "field is immutable").WithOrigin("immutable").MarkAlpha(),
+			},
+		},
+		"roleRef set from unset - invalid": {
+			old:    mkValidClusterRoleBinding(tweakRoleRef(rbac.RoleRef{})),
+			update: mkValidClusterRoleBinding(),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("roleRef"), nil, "field is immutable").WithOrigin("immutable").MarkAlpha(),
+			},
+		},
+		"roleRef unset from set - invalid": {
+			old:    mkValidClusterRoleBinding(),
+			update: mkValidClusterRoleBinding(tweakRoleRef(rbac.RoleRef{})),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("roleRef"), nil, "field is immutable").WithOrigin("immutable").MarkAlpha(),
+				field.Required(field.NewPath("roleRef", "name"), "").MarkShortCircuitedInDV(),
+				field.NotSupported(field.NewPath("roleRef", "kind"), "", []string{}).MarkFromImperative(),
+				field.NotSupported(field.NewPath("roleRef", "apiGroup"), "", []string{}).MarkFromImperative(),
+			},
+		},
 		"invalid update clearing subjects[0].name": {
 			old:    mkValidClusterRoleBinding(),
 			update: mkValidClusterRoleBinding(tweakSubjectName(0, "")),
 			expectedErrs: field.ErrorList{
-				field.Required(field.NewPath("subjects").Index(0).Child("name"), "").MarkAlpha(),
+				field.Required(field.NewPath("subjects").Index(0).Child("name"), "").MarkBeta(),
 			},
 		},
 		// TODO: Add more test cases
@@ -102,6 +134,9 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 			apitesting.VerifyUpdateValidationEquivalence(t, ctx, &tc.update, &tc.old, registry.Strategy, tc.expectedErrs)
 		})
 	}
+
+	updateObj := mkValidClusterRoleBinding()
+	meta.RunObjectMetaUpdateTestCases(t, ctx, &updateObj, registry.Strategy, meta.WithStringentFinalizerValidation())
 }
 
 func mkValidClusterRoleBinding(tweaks ...func(*rbac.ClusterRoleBinding)) rbac.ClusterRoleBinding {
@@ -128,6 +163,12 @@ func mkValidClusterRoleBinding(tweaks ...func(*rbac.ClusterRoleBinding)) rbac.Cl
 func tweakRoleRefName(name string) func(*rbac.ClusterRoleBinding) {
 	return func(crb *rbac.ClusterRoleBinding) {
 		crb.RoleRef.Name = name
+	}
+}
+
+func tweakRoleRef(roleRef rbac.RoleRef) func(*rbac.ClusterRoleBinding) {
+	return func(crb *rbac.ClusterRoleBinding) {
+		crb.RoleRef = roleRef
 	}
 }
 

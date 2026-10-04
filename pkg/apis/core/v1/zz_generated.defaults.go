@@ -521,6 +521,7 @@ func SetObjectDefaults_Pod(in *corev1.Pod) {
 		SetDefaults_ResourceList(&in.Spec.Resources.Limits)
 		SetDefaults_ResourceList(&in.Spec.Resources.Requests)
 	}
+	SetDefaults_PodStatus(&in.Status)
 	for i := range in.Status.InitContainerStatuses {
 		a := &in.Status.InitContainerStatuses[i]
 		SetDefaults_ResourceList(&a.AllocatedResources)

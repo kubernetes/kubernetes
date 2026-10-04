@@ -25,6 +25,7 @@ import (
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	networking "k8s.io/kubernetes/pkg/apis/networking"
 	registry "k8s.io/kubernetes/pkg/registry/networking/ipaddress"
+	"k8s.io/kubernetes/test/declarative_validation/meta"
 )
 
 func TestDeclarativeValidateIPAddress(t *testing.T) {
@@ -33,6 +34,7 @@ func TestDeclarativeValidateIPAddress(t *testing.T) {
 			ctx := genericapirequest.WithRequestInfo(
 				genericapirequest.NewDefaultContext(),
 				&genericapirequest.RequestInfo{
+					APIPrefix:         "apis",
 					APIGroup:          "networking.k8s.io",
 					APIVersion:        apiVersion,
 					Resource:          "ipaddresses",
@@ -51,19 +53,19 @@ func TestDeclarativeValidateIPAddress(t *testing.T) {
 				"missing parentRef": {
 					input: mkValidIPAddress(withNilParentRef),
 					expectedErrs: field.ErrorList{
-						field.Required(field.NewPath("spec", "parentRef"), "").MarkAlpha(),
+						field.Required(field.NewPath("spec", "parentRef"), "").MarkBeta(),
 					},
 				},
 				"missing parentRef resource": {
 					input: mkValidIPAddress(withEmptyParentRefResource),
 					expectedErrs: field.ErrorList{
-						field.Required(field.NewPath("spec", "parentRef", "resource"), "").MarkAlpha(),
+						field.Required(field.NewPath("spec", "parentRef", "resource"), "").MarkBeta(),
 					},
 				},
 				"missing parentRef name": {
 					input: mkValidIPAddress(withEmptyParentRefName),
 					expectedErrs: field.ErrorList{
-						field.Required(field.NewPath("spec", "parentRef", "name"), "").MarkAlpha(),
+						field.Required(field.NewPath("spec", "parentRef", "name"), "").MarkBeta(),
 					},
 				},
 			}
@@ -78,6 +80,9 @@ func TestDeclarativeValidateIPAddress(t *testing.T) {
 					)
 				})
 			}
+
+			obj := mkValidIPAddress()
+			meta.RunObjectMetaTestCases(t, ctx, &obj, registry.Strategy, meta.WithStringentFinalizerValidation())
 		})
 	}
 }
@@ -109,7 +114,7 @@ func TestDeclarativeValidateIPAddressUpdate(t *testing.T) {
 							}, "field is immutable")
 							e.Origin = "immutable"
 							return e
-						}().MarkAlpha(),
+						}().MarkBeta(),
 					},
 				},
 				"set parentRef": {
@@ -127,7 +132,7 @@ func TestDeclarativeValidateIPAddressUpdate(t *testing.T) {
 							}, "field is immutable")
 							e.Origin = "immutable"
 							return e
-						}().MarkAlpha(),
+						}().MarkBeta(),
 					},
 				},
 				"unset parentRef": {
@@ -137,31 +142,30 @@ func TestDeclarativeValidateIPAddressUpdate(t *testing.T) {
 						withNilParentRef,
 					),
 					expectedErrs: field.ErrorList{
-						field.Required(field.NewPath("spec", "parentRef"), "").MarkAlpha(),
+						field.Required(field.NewPath("spec", "parentRef"), "").MarkBeta(),
 						func() *field.Error {
 							e := field.Invalid(field.NewPath("spec", "parentRef"), nil, "field is immutable")
 							e.Origin = "immutable"
 							return e
-						}().MarkAlpha(),
+						}().MarkBeta(),
 					},
 				},
 			}
 
+			ctx := genericapirequest.WithRequestInfo(
+				genericapirequest.NewDefaultContext(),
+				&genericapirequest.RequestInfo{
+					APIPrefix:         "apis",
+					APIGroup:          "networking.k8s.io",
+					APIVersion:        apiVersion,
+					Resource:          "ipaddresses",
+					Name:              "192.168.1.1",
+					IsResourceRequest: true,
+					Verb:              "update",
+				},
+			)
 			for name, tc := range testCases {
 				t.Run(name, func(t *testing.T) {
-					ctx := genericapirequest.WithRequestInfo(
-						genericapirequest.NewDefaultContext(),
-						&genericapirequest.RequestInfo{
-							APIPrefix:         "apis",
-							APIGroup:          "networking.k8s.io",
-							APIVersion:        apiVersion,
-							Resource:          "ipaddresses",
-							Name:              "192.168.1.1",
-							IsResourceRequest: true,
-							Verb:              "update",
-						},
-					)
-
 					apitesting.VerifyUpdateValidationEquivalence(
 						t,
 						ctx,
@@ -172,6 +176,8 @@ func TestDeclarativeValidateIPAddressUpdate(t *testing.T) {
 					)
 				})
 			}
+			obj := mkValidIPAddress()
+			meta.RunObjectMetaUpdateTestCases(t, ctx, &obj, registry.Strategy, meta.WithStringentFinalizerValidation())
 		})
 	}
 }

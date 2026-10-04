@@ -80,8 +80,7 @@ func autoConvert_config_GarbageCollectorControllerConfiguration_To_v1alpha1_Garb
 }
 
 func autoConvert_v1alpha1_GroupResource_To_config_GroupResource(in *configv1alpha1.GroupResource, out *config.GroupResource, s conversion.Scope) error {
-	out.Group = in.Group
-	out.Resource = in.Resource
+	*out = *(*config.GroupResource)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -91,8 +90,7 @@ func Convert_v1alpha1_GroupResource_To_config_GroupResource(in *configv1alpha1.G
 }
 
 func autoConvert_config_GroupResource_To_v1alpha1_GroupResource(in *config.GroupResource, out *configv1alpha1.GroupResource, s conversion.Scope) error {
-	out.Group = in.Group
-	out.Resource = in.Resource
+	*out = *(*configv1alpha1.GroupResource)(unsafe.Pointer(in))
 	return nil
 }
 

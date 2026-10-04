@@ -81,6 +81,32 @@ func TestGetRestartPolicy(t *testing.T) {
 	}
 }
 
+func TestGetRestartPolicyErrorListsValidValues(t *testing.T) {
+	_, err := getRestartPolicy("never", false)
+	if err == nil {
+		t.Fatal("expected error for lowercase 'never'")
+	}
+	errMsg := err.Error()
+	for _, policy := range []corev1.RestartPolicy{corev1.RestartPolicyAlways, corev1.RestartPolicyOnFailure, corev1.RestartPolicyNever} {
+		if !strings.Contains(errMsg, string(policy)) {
+			t.Errorf("error message %q does not contain valid value %q", errMsg, policy)
+		}
+	}
+}
+
+func TestGetImagePullPolicyErrorListsValidValues(t *testing.T) {
+	_, err := getImagePullPolicy("always")
+	if err == nil {
+		t.Fatal("expected error for lowercase 'always'")
+	}
+	errMsg := err.Error()
+	for _, policy := range []corev1.PullPolicy{corev1.PullAlways, corev1.PullIfNotPresent, corev1.PullNever} {
+		if !strings.Contains(errMsg, string(policy)) {
+			t.Errorf("error message %q does not contain valid value %q", errMsg, policy)
+		}
+	}
+}
+
 func TestRunArgsFollowDashRules(t *testing.T) {
 	tests := []struct {
 		args          []string

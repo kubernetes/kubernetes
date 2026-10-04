@@ -14,6 +14,11 @@ func (s *PidsGroup) Name() string {
 	return "pids"
 }
 
+// ID returns the controller ID for pids subsystem.
+func (s *PidsGroup) ID() cgroups.Controller {
+	return cgroups.Pids
+}
+
 func (s *PidsGroup) Apply(path string, _ *cgroups.Resources, pid int) error {
 	return apply(path, pid)
 }

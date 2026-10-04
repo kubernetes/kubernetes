@@ -27,7 +27,7 @@ import (
 	"testing"
 	"time"
 
-	certsv1beta1 "k8s.io/api/certificates/v1beta1"
+	certsv1 "k8s.io/api/certificates/v1"
 	corev1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
 	storagev1 "k8s.io/api/storage/v1"
@@ -37,6 +37,8 @@ import (
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	corev1listers "k8s.io/client-go/listers/core/v1"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/auth/nodeidentifier"
@@ -100,6 +102,18 @@ func TestNodeAuthorizer(t *testing.T) {
 	podCertificateProjectionDisabled := func(t testing.TB) featuregate.FeatureGate {
 		f := utilfeature.DefaultFeatureGate.DeepCopy()
 		featuregatetesting.SetFeatureGateDuringTest(t, f, features.PodCertificateRequest, false)
+		return f
+	}
+
+	csiVolumeHealthEnabled := func(t testing.TB) featuregate.FeatureGate {
+		f := utilfeature.DefaultFeatureGate.DeepCopy()
+		featuregatetesting.SetFeatureGateDuringTest(t, f, features.CSIVolumeHealth, true)
+		return f
+	}
+
+	csiVolumeHealthDisabled := func(t testing.TB) featuregate.FeatureGate {
+		f := utilfeature.DefaultFeatureGate.DeepCopy()
+		featuregatetesting.SetFeatureGateDuringTest(t, f, features.CSIVolumeHealth, false)
 		return f
 	}
 
@@ -433,7 +447,7 @@ func TestNodeAuthorizer(t *testing.T) {
 		},
 		// CSINode
 		{
-			name:   "disallowed CSINode with subresource - feature enabled",
+			name:   "disallowed CSINode with unknown subresource",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "csinodes", Subresource: "csiDrivers", APIGroup: "storage.k8s.io", Name: "node0"},
 			expect: authorizer.DecisionNoOpinion,
 		},
@@ -491,6 +505,73 @@ func TestNodeAuthorizer(t *testing.T) {
 			name:   "allowed delete CSINode",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "delete", Resource: "csinodes", APIGroup: "storage.k8s.io", Name: "node0"},
 			expect: authorizer.DecisionAllow,
+		},
+		{
+			name:     "allowed get CSINode status",
+			attrs:    authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "csinodes", Subresource: "status", APIGroup: "storage.k8s.io", Name: "node0"},
+			expect:   authorizer.DecisionAllow,
+			features: csiVolumeHealthEnabled,
+		},
+		{
+			name:     "allowed update CSINode status",
+			attrs:    authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "update", Resource: "csinodes", Subresource: "status", APIGroup: "storage.k8s.io", Name: "node0"},
+			expect:   authorizer.DecisionAllow,
+			features: csiVolumeHealthEnabled,
+		},
+		{
+			name:     "allowed patch CSINode status",
+			attrs:    authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "patch", Resource: "csinodes", Subresource: "status", APIGroup: "storage.k8s.io", Name: "node0"},
+			expect:   authorizer.DecisionAllow,
+			features: csiVolumeHealthEnabled,
+		},
+		{
+			name:         "disallowed get CSINode status - feature disabled",
+			attrs:        authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "csinodes", Subresource: "status", APIGroup: "storage.k8s.io", Name: "node0"},
+			expect:       authorizer.DecisionNoOpinion,
+			features:     csiVolumeHealthDisabled,
+			expectReason: "CSINode status access requires CSIVolumeHealth feature",
+		},
+		{
+			name:         "disallowed update CSINode status - feature disabled",
+			attrs:        authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "update", Resource: "csinodes", Subresource: "status", APIGroup: "storage.k8s.io", Name: "node0"},
+			expect:       authorizer.DecisionNoOpinion,
+			features:     csiVolumeHealthDisabled,
+			expectReason: "CSINode status access requires CSIVolumeHealth feature",
+		},
+		{
+			name:         "disallowed patch CSINode status - feature disabled",
+			attrs:        authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "patch", Resource: "csinodes", Subresource: "status", APIGroup: "storage.k8s.io", Name: "node0"},
+			expect:       authorizer.DecisionNoOpinion,
+			features:     csiVolumeHealthDisabled,
+			expectReason: "CSINode status access requires CSIVolumeHealth feature",
+		},
+		{
+			name:         "disallowed get another node's CSINode status",
+			attrs:        authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "csinodes", Subresource: "status", APIGroup: "storage.k8s.io", Name: "node1"},
+			expect:       authorizer.DecisionNoOpinion,
+			features:     csiVolumeHealthEnabled,
+			expectReason: "can only access CSINode with the same name as the requesting node",
+		},
+		{
+			name:         "disallowed update another node's CSINode status",
+			attrs:        authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "update", Resource: "csinodes", Subresource: "status", APIGroup: "storage.k8s.io", Name: "node1"},
+			expect:       authorizer.DecisionNoOpinion,
+			features:     csiVolumeHealthEnabled,
+			expectReason: "can only access CSINode with the same name as the requesting node",
+		},
+		{
+			name:         "disallowed patch another node's CSINode status",
+			attrs:        authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "patch", Resource: "csinodes", Subresource: "status", APIGroup: "storage.k8s.io", Name: "node1"},
+			expect:       authorizer.DecisionNoOpinion,
+			features:     csiVolumeHealthEnabled,
+			expectReason: "can only access CSINode with the same name as the requesting node",
+		},
+		{
+			name:         "disallowed delete CSINode status",
+			attrs:        authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "delete", Resource: "csinodes", Subresource: "status", APIGroup: "storage.k8s.io", Name: "node0"},
+			expect:       authorizer.DecisionNoOpinion,
+			features:     csiVolumeHealthEnabled,
+			expectReason: "can only get, update, or patch CSINode status",
 		},
 		// ResourceSlice
 		{
@@ -842,8 +923,10 @@ func TestNodeAuthorizerSharedResources(t *testing.T) {
 	node2 := &user.DefaultInfo{Name: "system:node:node2", Groups: []string{"system:nodes"}}
 	node3 := &user.DefaultInfo{Name: "system:node:node3", Groups: []string{"system:nodes"}}
 
-	g.AddPod(&corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{Name: "pod1-node1", Namespace: "ns1"},
+	p := newTestGraphPopulator(g)
+
+	p.addPod(&corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "pod1-node1", Namespace: "ns1", UID: types.UID("uid1")},
 		Spec: corev1.PodSpec{
 			NodeName: "node1",
 			Volumes: []corev1.Volume{
@@ -853,8 +936,8 @@ func TestNodeAuthorizerSharedResources(t *testing.T) {
 			},
 		},
 	})
-	g.AddPod(&corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{Name: "pod2-node2", Namespace: "ns1"},
+	p.addPod(&corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "pod2-node2", Namespace: "ns1", UID: types.UID("uid2")},
 		Spec: corev1.PodSpec{
 			NodeName: "node2",
 			Volumes: []corev1.Volume{
@@ -865,7 +948,7 @@ func TestNodeAuthorizerSharedResources(t *testing.T) {
 	})
 
 	pod3 := &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{Name: "pod3-node3", Namespace: "ns1"},
+		ObjectMeta: metav1.ObjectMeta{Name: "pod3-node3", Namespace: "ns1", UID: types.UID("uid3")},
 		Spec: corev1.PodSpec{
 			NodeName: "node3",
 			Volumes: []corev1.Volume{
@@ -873,7 +956,7 @@ func TestNodeAuthorizerSharedResources(t *testing.T) {
 			},
 		},
 	}
-	g.AddPod(pod3)
+	p.addPod(pod3)
 
 	testcases := []struct {
 		User      user.Info
@@ -933,8 +1016,10 @@ func TestNodeAuthorizerSharedResources(t *testing.T) {
 		}
 
 		// should trigger recalculation of the shared secret index
-		pod3.Spec.Volumes = nil
-		g.AddPod(pod3)
+		newPod3 := pod3.DeepCopy()
+		newPod3.UID = types.UID("uid3-new")
+		newPod3.Spec.Volumes = nil
+		p.updatePod(pod3, newPod3)
 
 		decision, _, err = authz.Authorize(context.Background(), node3SharedSecretGet)
 		if err != nil {
@@ -943,6 +1028,45 @@ func TestNodeAuthorizerSharedResources(t *testing.T) {
 		if decision == authorizer.DecisionAllow {
 			t.Errorf("unexpectedly allowed")
 		}
+	}
+}
+
+type testGraphPopulator struct {
+	*graphPopulator
+	indexer cache.Indexer
+}
+
+func newTestGraphPopulator(g *Graph) *testGraphPopulator {
+	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+	return &testGraphPopulator{
+		graphPopulator: &graphPopulator{
+			graph:     g,
+			podQueue:  newRateLimitingQueue("test_node_authorizer_pod_populator"),
+			podLister: corev1listers.NewPodLister(indexer),
+		},
+		indexer: indexer,
+	}
+}
+
+func (p *testGraphPopulator) addPod(pod *corev1.Pod) {
+	if err := p.indexer.Add(pod); err != nil {
+		panic(err)
+	}
+	p.graphPopulator.addPod(pod)
+	p.drainQueue()
+}
+
+func (p *testGraphPopulator) updatePod(oldPod, newPod *corev1.Pod) {
+	if err := p.indexer.Add(newPod); err != nil {
+		panic(err)
+	}
+	p.graphPopulator.updatePod(oldPod, newPod)
+	p.drainQueue()
+}
+
+func (p *testGraphPopulator) drainQueue() {
+	for p.podQueue.Len() > 0 {
+		processNextWorkItem(p.podQueue, p.processPodKey)
 	}
 }
 
@@ -1006,8 +1130,7 @@ func TestNodeAuthorizerAddEphemeralContainers(t *testing.T) {
 			},
 		},
 	}
-	p := &graphPopulator{}
-	p.graph = g
+	p := newTestGraphPopulator(g)
 	p.addPod(pod)
 
 	testcases := []struct {
@@ -1055,6 +1178,119 @@ func TestNodeAuthorizerAddEphemeralContainers(t *testing.T) {
 		if decision != tc.Decision {
 			t.Errorf("%d: expected %v, got %v", i, tc.Decision, decision)
 		}
+	}
+}
+
+// TestNodeAuthorizerUpdateExtendedResourceClaim checks that a node gains
+// authorization to read its pod's synthesized ResourceClaim once the scheduler
+// writes ExtendedResourceClaimStatus into the pod — even when the pod carries
+// no standard Spec.ResourceClaims entries.
+//
+// Background: the graph populator's updatePod has a fast-path that skips
+// AddPod when the pod's node assignment, UID, ephemeral containers, and
+// ResourceClaimStatuses are all unchanged. For pods that use the
+// DRAExtendedResource path (e.g. a plain nvidia.com/gpu request),
+// ResourceClaimStatuses is nil both before and after the scheduler writes
+// the synthesized claim name, and ExtendedResourceClaimStatus may change
+// under rare condition after a pod is bound to a node, so the fast-path
+// would fire prematurely and the claim→pod→node edge would never be added
+// to the authorization graph.
+func TestNodeAuthorizerUpdateExtendedResourceClaim(t *testing.T) {
+	g := NewGraph()
+	identifier := nodeidentifier.NewDefaultNodeIdentifier()
+	authz := NewAuthorizer(g, identifier, bootstrappolicy.NodeRules())
+
+	node1 := &user.DefaultInfo{Name: "system:node:node1", Groups: []string{"system:nodes"}}
+
+	// The pod has been bound to node1, but the scheduler has written
+	// extended-claim-0, not extended-claim-1, to ExtendedResourceClaimStatus.
+	// There are no standard Spec.ResourceClaims, so ResourceClaimStatuses
+	// stays nil throughout.
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "pod1",
+			Namespace: "ns1",
+			UID:       "pod1uid",
+		},
+		Spec: corev1.PodSpec{
+			NodeName: "node1",
+		},
+		Status: corev1.PodStatus{
+			ExtendedResourceClaimStatus: &corev1.PodExtendedResourceClaimStatus{
+				ResourceClaimName: "extended-claim-0",
+				RequestMappings: []corev1.ContainerExtendedResourceRequest{
+					{
+						ContainerName: "container0",
+						ResourceName:  "example.com/gpu",
+						RequestName:   "request",
+					},
+				},
+			},
+		},
+	}
+
+	p := newTestGraphPopulator(g)
+	p.addPod(pod)
+
+	// Before the scheduler swaps the synthesized claim name, extended-claim-1
+	// is not in the graph and node1 should have no opinion on it.
+	decision, _, err := authz.Authorize(context.Background(), authorizer.AttributesRecord{
+		User:            node1,
+		ResourceRequest: true,
+		Verb:            "get",
+		Resource:        "resourceclaims",
+		APIGroup:        "resource.k8s.io",
+		Namespace:       "ns1",
+		Name:            "extended-claim-1",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if decision != authorizer.DecisionNoOpinion {
+		t.Errorf("before ExtendedResourceClaimStatus is updated to extended-claim-1: want NoOpinion, got %v", decision)
+	}
+
+	// The scheduler swaps the synthesized ResourceClaim from extended-claim-0
+	// to extended-claim-1. updatePod must recognize that ExtendedResourceClaimStatus
+	// changed and rebuild the graph edge rather than taking the fast-path early
+	// exit.
+	updatedPod := pod.DeepCopy()
+	updatedPod.Status.ExtendedResourceClaimStatus.ResourceClaimName = "extended-claim-1"
+	p.updatePod(pod, updatedPod)
+
+	// The node that hosts the pod should now be permitted to read the claim.
+	decision, _, err = authz.Authorize(context.Background(), authorizer.AttributesRecord{
+		User:            node1,
+		ResourceRequest: true,
+		Verb:            "get",
+		Resource:        "resourceclaims",
+		APIGroup:        "resource.k8s.io",
+		Namespace:       "ns1",
+		Name:            "extended-claim-1",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if decision != authorizer.DecisionAllow {
+		t.Errorf("after ExtendedResourceClaimStatus is updated to extended-claim-1: want Allow, got %v", decision)
+	}
+
+	// A node that does not host the pod must not gain access to the claim.
+	node2 := &user.DefaultInfo{Name: "system:node:node2", Groups: []string{"system:nodes"}}
+	decision, _, err = authz.Authorize(context.Background(), authorizer.AttributesRecord{
+		User:            node2,
+		ResourceRequest: true,
+		Verb:            "get",
+		Resource:        "resourceclaims",
+		APIGroup:        "resource.k8s.io",
+		Namespace:       "ns1",
+		Name:            "extended-claim-1",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if decision != authorizer.DecisionNoOpinion {
+		t.Errorf("node2 should not access a claim belonging to node1's pod: want NoOpinion, got %v", decision)
 	}
 }
 
@@ -1413,23 +1649,23 @@ func BenchmarkAuthorization(b *testing.B) {
 	}
 }
 
-func populate(graph *Graph, nodes []*corev1.Node, pods []*corev1.Pod, pvs []*corev1.PersistentVolume, attachments []*storagev1.VolumeAttachment, slices []*resourceapi.ResourceSlice, pcrs []*certsv1beta1.PodCertificateRequest) {
+func populate(graph *Graph, nodes []*corev1.Node, pods []*corev1.Pod, pvs []*corev1.PersistentVolume, attachments []*storagev1.VolumeAttachment, slices []*resourceapi.ResourceSlice, pcrs []*certsv1.PodCertificateRequest) {
 	p := &graphPopulator{}
 	p.graph = graph
 	for _, pod := range pods {
-		p.addPod(pod)
+		p.processAddOrUpdatePod(pod)
 	}
 	for _, pv := range pvs {
-		p.addPV(pv)
+		p.processAddOrUpdatePV(pv)
 	}
 	for _, attachment := range attachments {
-		p.addVolumeAttachment(attachment)
+		p.processAddOrUpdateVolumeAttachment(attachment)
 	}
 	for _, slice := range slices {
-		p.addResourceSlice(slice)
+		p.processAddResourceSlice(slice)
 	}
 	for _, pcr := range pcrs {
-		p.addPCR(pcr)
+		p.processAddPCR(pcr)
 	}
 }
 
@@ -1444,13 +1680,13 @@ func randomSubset(a, b int, randPerm func(int) []int) []int {
 // the secret/configmap/pvc/node references in the pod and pv objects are named to indicate the connections between the objects.
 // for example, secret0-pod0-node0 is a secret referenced by pod0 which is bound to node0.
 // when populated into the graph, the node authorizer should allow node0 to access that secret, but not node1.
-func generate(opts *sampleDataOpts) ([]*corev1.Node, []*corev1.Pod, []*corev1.PersistentVolume, []*storagev1.VolumeAttachment, []*resourceapi.ResourceSlice, []*certsv1beta1.PodCertificateRequest) {
+func generate(opts *sampleDataOpts) ([]*corev1.Node, []*corev1.Pod, []*corev1.PersistentVolume, []*storagev1.VolumeAttachment, []*resourceapi.ResourceSlice, []*certsv1.PodCertificateRequest) {
 	nodes := make([]*corev1.Node, 0, opts.nodes)
 	pods := make([]*corev1.Pod, 0, opts.nodes*opts.podsPerNode)
 	pvs := make([]*corev1.PersistentVolume, 0, (opts.nodes*opts.podsPerNode*opts.uniquePVCsPerPod)+(opts.sharedPVCsPerPod*opts.namespaces))
 	attachments := make([]*storagev1.VolumeAttachment, 0, opts.nodes*opts.attachmentsPerNode)
 	slices := make([]*resourceapi.ResourceSlice, 0, opts.nodes*opts.nodeResourceSlicesPerNode)
-	pcrs := make([]*certsv1beta1.PodCertificateRequest, 0, opts.nodes*opts.podsPerNode*opts.podCertificateRequestsPerPod)
+	pcrs := make([]*certsv1.PodCertificateRequest, 0, opts.nodes*opts.podsPerNode*opts.podCertificateRequestsPerPod)
 
 	r := rand.New(rand.NewSource(12345))
 
@@ -1492,9 +1728,9 @@ func generate(opts *sampleDataOpts) ([]*corev1.Node, []*corev1.Pod, []*corev1.Pe
 	return nodes, pods, pvs, attachments, slices, pcrs
 }
 
-func generatePod(name, namespace, nodeName, svcAccountName string, opts *sampleDataOpts, randPerm func(int) []int) (*corev1.Pod, []*corev1.PersistentVolume, []*certsv1beta1.PodCertificateRequest) {
+func generatePod(name, namespace, nodeName, svcAccountName string, opts *sampleDataOpts, randPerm func(int) []int) (*corev1.Pod, []*corev1.PersistentVolume, []*certsv1.PodCertificateRequest) {
 	pvs := make([]*corev1.PersistentVolume, 0, opts.uniquePVCsPerPod+opts.sharedPVCsPerPod)
-	pcrs := make([]*certsv1beta1.PodCertificateRequest, 0, opts.podCertificateRequestsPerPod)
+	pcrs := make([]*certsv1.PodCertificateRequest, 0, opts.podCertificateRequestsPerPod)
 
 	pod := &corev1.Pod{}
 	pod.Name = name
@@ -1582,12 +1818,12 @@ func generatePod(name, namespace, nodeName, svcAccountName string, opts *sampleD
 	}
 
 	for i := 0; i < opts.podCertificateRequestsPerPod; i++ {
-		pcr := &certsv1beta1.PodCertificateRequest{
+		pcr := &certsv1.PodCertificateRequest{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: pod.ObjectMeta.Namespace,
 				Name:      fmt.Sprintf("pcr%d-%s", i, pod.ObjectMeta.Name),
 			},
-			Spec: certsv1beta1.PodCertificateRequestSpec{
+			Spec: certsv1.PodCertificateRequestSpec{
 				PodName:            pod.ObjectMeta.Name,
 				PodUID:             pod.ObjectMeta.UID,
 				ServiceAccountName: pod.Spec.ServiceAccountName,

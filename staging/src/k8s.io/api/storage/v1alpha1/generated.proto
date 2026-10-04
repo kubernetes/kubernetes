@@ -55,7 +55,7 @@ option go_package = "k8s.io/api/storage/v1alpha1";
 // the scheduler assumes that capacity is insufficient and tries some other
 // node.
 message CSIStorageCapacity {
-  // Standard object's metadata. The name has no particular meaning. It must be
+  // metadata is the standard object metadata. The name has no particular meaning. It must be
   // be a DNS subdomain (dots allowed, 253 characters). To ensure that
   // there are no conflicts with other CSI drivers on the cluster, the recommendation
   // is to use csisc-<uuid>, a generated name, or a reverse-domain name which ends
@@ -82,6 +82,7 @@ message CSIStorageCapacity {
   // the CSIStorageCapacity object is obsolete and should be removed by its
   // creator.
   // This field is immutable.
+  // +required
   optional string storageClassName = 3;
 
   // capacity is the value reported by the CSI driver in its GetCapacityResponse
@@ -127,14 +128,14 @@ message CSIStorageCapacityList {
 //
 // VolumeAttachment objects are non-namespaced.
 message VolumeAttachment {
-  // Standard object metadata.
+  // metadata is the standard object metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // spec represents specification of the desired attach/detach volume behavior.
   // Populated by the Kubernetes system.
-  // +k8s:alpha(since: "1.36")=+k8s:immutable
+  // +k8s:beta(since: "1.37")=+k8s:immutable
   // +required
   optional VolumeAttachmentSpec spec = 2;
 
@@ -180,15 +181,17 @@ message VolumeAttachmentSpec {
   // attacher indicates the name of the volume driver that MUST handle this
   // request. This is the name returned by GetPluginName().
   // +required
-  // +k8s:alpha(since: "1.36")=+k8s:required
-  // +k8s:alpha(since: "1.36")=+k8s:format="k8s-long-name-caseless"
-  // +k8s:alpha(since: "1.36")=+k8s:maxLength=63
+  // +k8s:beta(since: "1.37")=+k8s:required
+  // +k8s:beta(since: "1.37")=+k8s:format="k8s-long-name-caseless"
+  // +k8s:beta(since: "1.37")=+k8s:maxLength=63
   optional string attacher = 1;
 
   // source represents the volume that should be attached.
+  // +required
   optional VolumeAttachmentSource source = 2;
 
   // nodeName represents the node that the volume should be attached to.
+  // +required
   optional string nodeName = 3;
 }
 
@@ -197,6 +200,7 @@ message VolumeAttachmentStatus {
   // attached indicates the volume is successfully attached.
   // This field must only be set by the entity completing the attach
   // operation, i.e. the external-attacher.
+  // +optional
   optional bool attached = 1;
 
   // attachmentMetadata is populated with any
@@ -224,13 +228,14 @@ message VolumeAttachmentStatus {
 // defined by the CSI driver. The class can be specified during dynamic provisioning
 // of PersistentVolumeClaims, and changed in the PersistentVolumeClaim spec after provisioning.
 message VolumeAttributesClass {
-  // Standard object's metadata.
+  // metadata is the standard object metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
-  // Name of the CSI driver
+  // driverName is the name of the CSI driver
   // This field is immutable.
+  // +required
   optional string driverName = 2;
 
   // parameters hold volume attributes defined by the CSI driver. These values
@@ -246,6 +251,7 @@ message VolumeAttributesClass {
   // a cumulative max size of 256K. If the CSI driver rejects invalid parameters,
   // the target PersistentVolumeClaim will be set to an "Infeasible" state in the
   // modifyVolumeStatus field.
+  // +required
   map<string, string> parameters = 3;
 }
 

@@ -25,12 +25,13 @@ import (
 	context "context"
 	fmt "fmt"
 
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	storagev1beta1 "k8s.io/api/storage/v1beta1"
-	equality "k8s.io/apimachinery/pkg/api/equality"
 	operation "k8s.io/apimachinery/pkg/api/operation"
 	safe "k8s.io/apimachinery/pkg/api/safe"
 	validate "k8s.io/apimachinery/pkg/api/validate"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	validation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	field "k8s.io/apimachinery/pkg/util/validation/field"
 )
@@ -40,6 +41,51 @@ func init() { localSchemeBuilder.Register(RegisterValidations) }
 // RegisterValidations adds validation functions to the given scheme.
 // Public to allow building arbitrary schemes.
 func RegisterValidations(scheme *runtime.Scheme) error {
+	// type CSIDriver
+	scheme.AddValidationFunc(
+		(*storagev1beta1.CSIDriver)(nil),
+		func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+			switch op.Request.SubresourcePath() {
+			case "/":
+				return Validate_CSIDriver(
+					ctx, op, nil, /* fldPath */
+					obj.(*storagev1beta1.CSIDriver),
+					safe.Cast[*storagev1beta1.CSIDriver](oldObj))
+			}
+			return field.ErrorList{
+				field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath())),
+			}
+		})
+	// type CSINode
+	scheme.AddValidationFunc(
+		(*storagev1beta1.CSINode)(nil),
+		func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+			switch op.Request.SubresourcePath() {
+			case "/", "/status":
+				return Validate_CSINode(
+					ctx, op, nil, /* fldPath */
+					obj.(*storagev1beta1.CSINode),
+					safe.Cast[*storagev1beta1.CSINode](oldObj))
+			}
+			return field.ErrorList{
+				field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath())),
+			}
+		})
+	// type CSIStorageCapacity
+	scheme.AddValidationFunc(
+		(*storagev1beta1.CSIStorageCapacity)(nil),
+		func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+			switch op.Request.SubresourcePath() {
+			case "/":
+				return Validate_CSIStorageCapacity(
+					ctx, op, nil, /* fldPath */
+					obj.(*storagev1beta1.CSIStorageCapacity),
+					safe.Cast[*storagev1beta1.CSIStorageCapacity](oldObj))
+			}
+			return field.ErrorList{
+				field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath())),
+			}
+		})
 	// type StorageClass
 	scheme.AddValidationFunc(
 		(*storagev1beta1.StorageClass)(nil),
@@ -70,7 +116,264 @@ func RegisterValidations(scheme *runtime.Scheme) error {
 				field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath())),
 			}
 		})
+	// type VolumeAttributesClass
+	scheme.AddValidationFunc(
+		(*storagev1beta1.VolumeAttributesClass)(nil),
+		func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+			switch op.Request.SubresourcePath() {
+			case "/":
+				return Validate_VolumeAttributesClass(
+					ctx, op, nil, /* fldPath */
+					obj.(*storagev1beta1.VolumeAttributesClass),
+					safe.Cast[*storagev1beta1.VolumeAttributesClass](oldObj))
+			}
+			return field.ErrorList{
+				field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath())),
+			}
+		})
 	return nil
+}
+
+// Validate_CSIDriver validates an instance of CSIDriver according
+// to declarative validation rules in the API schema.
+func Validate_CSIDriver(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *storagev1beta1.CSIDriver) (errs field.ErrorList) {
+
+	// field storagev1beta1.CSIDriver.TypeMeta has no validation
+
+	{ // field storagev1beta1.CSIDriver.ObjectMeta
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *v1.ObjectMeta,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if validate.SemanticDeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call the type's validation function
+			errs = append(errs, validation.Validate_ObjectMeta(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *storagev1beta1.CSIDriver) *v1.ObjectMeta {
+				return &oldObj.ObjectMeta
+			})
+		errs = append(errs, fn(fldPath.Child("metadata"), &obj.ObjectMeta, oldVal, oldObj != nil)...)
+	}
+
+	{ // field storagev1beta1.CSIDriver.Spec
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *storagev1beta1.CSIDriverSpec,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if validate.SemanticDeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_CSIDriverSpec(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *storagev1beta1.CSIDriver) *storagev1beta1.CSIDriverSpec {
+				return &oldObj.Spec
+			})
+		errs = append(errs, fn(fldPath.Child("spec"), &obj.Spec, oldVal, oldObj != nil)...)
+	}
+
+	return errs
+}
+
+// Validate_CSIDriverSpec validates an instance of CSIDriverSpec according
+// to declarative validation rules in the API schema.
+func Validate_CSIDriverSpec(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *storagev1beta1.CSIDriverSpec) (errs field.ErrorList) {
+
+	// field storagev1beta1.CSIDriverSpec.AttachRequired has no validation
+	// field storagev1beta1.CSIDriverSpec.PodInfoOnMount has no validation
+
+	{ // field storagev1beta1.CSIDriverSpec.VolumeLifecycleModes
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj []storagev1beta1.VolumeLifecycleMode,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if validate.SemanticDeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *storagev1beta1.CSIDriverSpec) []storagev1beta1.VolumeLifecycleMode {
+				return oldObj.VolumeLifecycleModes
+			})
+		errs = append(errs, fn(fldPath.Child("volumeLifecycleModes"), obj.VolumeLifecycleModes, oldVal, oldObj != nil)...)
+	}
+
+	// field storagev1beta1.CSIDriverSpec.StorageCapacity has no validation
+	// field storagev1beta1.CSIDriverSpec.FSGroupPolicy has no validation
+	// field storagev1beta1.CSIDriverSpec.TokenRequests has no validation
+	// field storagev1beta1.CSIDriverSpec.RequiresRepublish has no validation
+	// field storagev1beta1.CSIDriverSpec.SELinuxMount has no validation
+	// field storagev1beta1.CSIDriverSpec.NodeAllocatableUpdatePeriodSeconds has no validation
+	// field storagev1beta1.CSIDriverSpec.ServiceAccountTokenInSecrets has no validation
+	// field storagev1beta1.CSIDriverSpec.PreventPodSchedulingIfMissing has no validation
+	return errs
+}
+
+// Validate_CSINode validates an instance of CSINode according
+// to declarative validation rules in the API schema.
+func Validate_CSINode(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *storagev1beta1.CSINode) (errs field.ErrorList) {
+
+	// field storagev1beta1.CSINode.TypeMeta has no validation
+
+	{ // field storagev1beta1.CSINode.ObjectMeta
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *v1.ObjectMeta,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if validate.SemanticDeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call the type's validation function
+			errs = append(errs, validation.Validate_ObjectMeta(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *storagev1beta1.CSINode) *v1.ObjectMeta {
+				return &oldObj.ObjectMeta
+			})
+		errs = append(errs, fn(fldPath.Child("metadata"), &obj.ObjectMeta, oldVal, oldObj != nil)...)
+	}
+
+	// field storagev1beta1.CSINode.Spec has no validation
+
+	{ // field storagev1beta1.CSINode.Status
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *storagev1beta1.CSINodeStatus,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if validate.SemanticDeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_CSINodeStatus(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *storagev1beta1.CSINode) *storagev1beta1.CSINodeStatus {
+				return &oldObj.Status
+			})
+		errs = append(errs, fn(fldPath.Child("status"), &obj.Status, oldVal, oldObj != nil)...)
+	}
+
+	return errs
+}
+
+// Validate_CSINodeStatus validates an instance of CSINodeStatus according
+// to declarative validation rules in the API schema.
+func Validate_CSINodeStatus(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *storagev1beta1.CSINodeStatus) (errs field.ErrorList) {
+
+	{ // field storagev1beta1.CSINodeStatus.StorageHealth
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj []storagev1beta1.StorageHealth,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if validate.SemanticDeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			// iterate the list and call the type's validation function
+			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_StorageHealth); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *storagev1beta1.CSINodeStatus) []storagev1beta1.StorageHealth {
+				return oldObj.StorageHealth
+			})
+		errs = append(errs, fn(fldPath.Child("storageHealth"), obj.StorageHealth, oldVal, oldObj != nil)...)
+	}
+
+	return errs
+}
+
+// Validate_CSIStorageCapacity validates an instance of CSIStorageCapacity according
+// to declarative validation rules in the API schema.
+func Validate_CSIStorageCapacity(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *storagev1beta1.CSIStorageCapacity) (errs field.ErrorList) {
+
+	// field storagev1beta1.CSIStorageCapacity.TypeMeta has no validation
+
+	{ // field storagev1beta1.CSIStorageCapacity.ObjectMeta
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *v1.ObjectMeta,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if validate.SemanticDeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call the type's validation function
+			errs = append(errs, validation.Validate_ObjectMeta(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *storagev1beta1.CSIStorageCapacity) *v1.ObjectMeta {
+				return &oldObj.ObjectMeta
+			})
+		errs = append(errs, fn(fldPath.Child("metadata"), &obj.ObjectMeta, oldVal, oldObj != nil)...)
+	}
+
+	// field storagev1beta1.CSIStorageCapacity.NodeTopology has no validation
+	// field storagev1beta1.CSIStorageCapacity.StorageClassName has no validation
+	// field storagev1beta1.CSIStorageCapacity.Capacity has no validation
+	// field storagev1beta1.CSIStorageCapacity.MaximumVolumeSize has no validation
+	return errs
 }
 
 // Validate_StorageClass validates an instance of StorageClass according
@@ -80,7 +383,28 @@ func Validate_StorageClass(
 	obj, oldObj *storagev1beta1.StorageClass) (errs field.ErrorList) {
 
 	// field storagev1beta1.StorageClass.TypeMeta has no validation
-	// field storagev1beta1.StorageClass.ObjectMeta has no validation
+
+	{ // field storagev1beta1.StorageClass.ObjectMeta
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *v1.ObjectMeta,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if validate.SemanticDeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call the type's validation function
+			errs = append(errs, validation.Validate_ObjectMeta(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *storagev1beta1.StorageClass) *v1.ObjectMeta {
+				return &oldObj.ObjectMeta
+			})
+		errs = append(errs, fn(fldPath.Child("metadata"), &obj.ObjectMeta, oldVal, oldObj != nil)...)
+	}
 
 	{ // field storagev1beta1.StorageClass.Provisioner
 		fn := func(
@@ -95,11 +419,11 @@ func Validate_StorageClass(
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
-			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
@@ -122,17 +446,17 @@ func Validate_StorageClass(
 			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
 			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
+				if validate.SemanticDeepEqual(obj, oldObj) {
 					return nil
 				}
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
-			if e := validate.OptionalMap(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+			if e := validate.OptionalMap(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
 				earlyReturn = true
 			}
 			if earlyReturn {
@@ -150,7 +474,7 @@ func Validate_StorageClass(
 	{ // field storagev1beta1.StorageClass.ReclaimPolicy
 		fn := func(
 			fldPath *field.Path,
-			obj, oldObj *v1.PersistentVolumeReclaimPolicy,
+			obj, oldObj *corev1.PersistentVolumeReclaimPolicy,
 			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
 			if oldValueCorrelated && op.Type == operation.Update {
@@ -160,11 +484,11 @@ func Validate_StorageClass(
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
-			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
 				earlyReturn = true
 			}
 			if earlyReturn {
@@ -173,7 +497,7 @@ func Validate_StorageClass(
 			return
 		}
 		oldVal := safe.Field(oldObj,
-			func(oldObj *storagev1beta1.StorageClass) *v1.PersistentVolumeReclaimPolicy {
+			func(oldObj *storagev1beta1.StorageClass) *corev1.PersistentVolumeReclaimPolicy {
 				return oldObj.ReclaimPolicy
 			})
 		errs = append(errs, fn(fldPath.Child("reclaimPolicy"), obj.ReclaimPolicy, oldVal, oldObj != nil)...)
@@ -195,11 +519,11 @@ func Validate_StorageClass(
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
-			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
 				earlyReturn = true
 			}
 			if earlyReturn {
@@ -218,6 +542,45 @@ func Validate_StorageClass(
 	return errs
 }
 
+// Validate_StorageHealth validates an instance of StorageHealth according
+// to declarative validation rules in the API schema.
+func Validate_StorageHealth(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *storagev1beta1.StorageHealth) (errs field.ErrorList) {
+
+	{ // field storagev1beta1.StorageHealth.Name
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *string,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *storagev1beta1.StorageHealth) *string {
+				return &oldObj.Name
+			})
+		errs = append(errs, fn(fldPath.Child("name"), &obj.Name, oldVal, oldObj != nil)...)
+	}
+
+	// field storagev1beta1.StorageHealth.HealthConditions has no validation
+	return errs
+}
+
 // Validate_VolumeAttachment validates an instance of VolumeAttachment according
 // to declarative validation rules in the API schema.
 func Validate_VolumeAttachment(
@@ -225,7 +588,28 @@ func Validate_VolumeAttachment(
 	obj, oldObj *storagev1beta1.VolumeAttachment) (errs field.ErrorList) {
 
 	// field storagev1beta1.VolumeAttachment.TypeMeta has no validation
-	// field storagev1beta1.VolumeAttachment.ObjectMeta has no validation
+
+	{ // field storagev1beta1.VolumeAttachment.ObjectMeta
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *v1.ObjectMeta,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if validate.SemanticDeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call the type's validation function
+			errs = append(errs, validation.Validate_ObjectMeta(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *storagev1beta1.VolumeAttachment) *v1.ObjectMeta {
+				return &oldObj.ObjectMeta
+			})
+		errs = append(errs, fn(fldPath.Child("metadata"), &obj.ObjectMeta, oldVal, oldObj != nil)...)
+	}
 
 	{ // field storagev1beta1.VolumeAttachment.Spec
 		fn := func(
@@ -234,13 +618,13 @@ func Validate_VolumeAttachment(
 			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
 			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
+				if validate.SemanticDeepEqual(obj, oldObj) {
 					return nil
 				}
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj).MarkBeta().MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
@@ -281,17 +665,17 @@ func Validate_VolumeAttachmentSpec(
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkBeta().MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
 			if earlyReturn {
 				return // do not proceed
 			}
-			if e := validate.LongNameCaseless(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
+			if e := validate.LongNameCaseless(ctx, op, fldPath, obj, oldObj).MarkBeta(); len(e) != 0 {
 				errs = append(errs, e...)
 			}
-			if e := validate.MaxLength(ctx, op, fldPath, obj, oldObj, 63).MarkAlpha(); len(e) != 0 {
+			if e := validate.MaxLength(ctx, op, fldPath, obj, oldObj, 63).MarkBeta(); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return
@@ -305,5 +689,40 @@ func Validate_VolumeAttachmentSpec(
 
 	// field storagev1beta1.VolumeAttachmentSpec.Source has no validation
 	// field storagev1beta1.VolumeAttachmentSpec.NodeName has no validation
+	return errs
+}
+
+// Validate_VolumeAttributesClass validates an instance of VolumeAttributesClass according
+// to declarative validation rules in the API schema.
+func Validate_VolumeAttributesClass(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *storagev1beta1.VolumeAttributesClass) (errs field.ErrorList) {
+
+	// field storagev1beta1.VolumeAttributesClass.TypeMeta has no validation
+
+	{ // field storagev1beta1.VolumeAttributesClass.ObjectMeta
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *v1.ObjectMeta,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if validate.SemanticDeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call the type's validation function
+			errs = append(errs, validation.Validate_ObjectMeta(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *storagev1beta1.VolumeAttributesClass) *v1.ObjectMeta {
+				return &oldObj.ObjectMeta
+			})
+		errs = append(errs, fn(fldPath.Child("metadata"), &obj.ObjectMeta, oldVal, oldObj != nil)...)
+	}
+
+	// field storagev1beta1.VolumeAttributesClass.DriverName has no validation
+	// field storagev1beta1.VolumeAttributesClass.Parameters has no validation
 	return errs
 }

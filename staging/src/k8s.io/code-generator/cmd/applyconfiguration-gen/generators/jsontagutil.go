@@ -42,25 +42,23 @@ func (t JSONTags) String() string {
 	if t.omitempty {
 		tag += ",omitempty"
 	}
-	if t.inline {
-		tag += ",inline"
-	}
 	return tag
 }
 
 func lookupJSONTags(m types.Member) (JSONTags, bool) {
-	tag := reflect.StructTag(m.Tags).Get("json")
-	if tag == "" || tag == "-" {
+	tag, exists := reflect.StructTag(m.Tags).Lookup("json")
+	if !exists || tag == "-" {
 		return JSONTags{}, false
 	}
 	name, opts := parseTag(tag)
+	inline := m.Embedded && name == ""
 	if name == "" {
 		name = m.Name
 	}
 	return JSONTags{
 		name:      name,
 		omit:      false,
-		inline:    opts.Contains("inline"),
+		inline:    inline,
 		omitempty: opts.Contains("omitempty"),
 	}, true
 }

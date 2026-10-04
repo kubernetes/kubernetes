@@ -31,7 +31,7 @@ type PersistentVolumeSpecApplyConfiguration struct {
 	// More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#capacity
 	Capacity *corev1.ResourceList `json:"capacity,omitempty"`
 	// persistentVolumeSource is the actual volume backing the persistent volume.
-	PersistentVolumeSourceApplyConfiguration `json:",inline"`
+	PersistentVolumeSourceApplyConfiguration `json:""`
 	// accessModes contains all ways the volume can be mounted.
 	// More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#access-modes
 	AccessModes []corev1.PersistentVolumeAccessMode `json:"accessModes,omitempty"`
@@ -60,7 +60,7 @@ type PersistentVolumeSpecApplyConfiguration struct {
 	// This field influences the scheduling of pods that use this volume.
 	// This field is mutable if MutablePVNodeAffinity feature gate is enabled.
 	NodeAffinity *VolumeNodeAffinityApplyConfiguration `json:"nodeAffinity,omitempty"`
-	// Name of VolumeAttributesClass to which this persistent volume belongs. Empty value
+	// volumeAttributesClassName is the name of VolumeAttributesClass to which this persistent volume belongs. Empty value
 	// is not allowed. When this field is not set, it indicates that this volume does not belong to any
 	// VolumeAttributesClass. This field is mutable and can be changed by the CSI driver
 	// after a volume has been updated successfully to a new class.

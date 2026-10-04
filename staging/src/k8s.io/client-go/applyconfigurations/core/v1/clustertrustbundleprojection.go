@@ -29,26 +29,30 @@ import (
 // ClusterTrustBundle objects and project their contents into the pod
 // filesystem.
 type ClusterTrustBundleProjectionApplyConfiguration struct {
-	// Select a single ClusterTrustBundle by object name.  Mutually-exclusive
+	// name selects a single ClusterTrustBundle by object name.  Mutually-exclusive
 	// with signerName and labelSelector.
 	Name *string `json:"name,omitempty"`
-	// Select all ClusterTrustBundles that match this signer name.
+	// signerName selects all ClusterTrustBundles that match this signer name.
 	// Mutually-exclusive with name.  The contents of all selected
 	// ClusterTrustBundles will be unified and deduplicated.
 	SignerName *string `json:"signerName,omitempty"`
-	// Select all ClusterTrustBundles that match this label selector.  Only has
+	// labelSelector selects all ClusterTrustBundles that match this label selector.  Only has
 	// effect if signerName is set.  Mutually-exclusive with name.  If unset,
 	// interpreted as "match nothing".  If set but empty, interpreted as "match
 	// everything".
 	LabelSelector *metav1.LabelSelectorApplyConfiguration `json:"labelSelector,omitempty"`
-	// If true, don't block pod startup if the referenced ClusterTrustBundle(s)
+	// optional indicates that if true, don't block pod startup if the referenced ClusterTrustBundle(s)
 	// aren't available.  If using name, then the named ClusterTrustBundle is
 	// allowed not to exist.  If using signerName, then the combination of
 	// signerName and labelSelector is allowed to match zero
 	// ClusterTrustBundles.
 	Optional *bool `json:"optional,omitempty"`
-	// Relative path from the volume root to write the bundle.
+	// path is the relative path from the volume root to write the bundle.
 	Path *string `json:"path,omitempty"`
+	// user is Optional: The owner UID of the created file.
+	// If specified, the item-level user field takes precedence over defaultUser.
+	// (Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.
+	User *int64 `json:"user,omitempty"`
 }
 
 // ClusterTrustBundleProjectionApplyConfiguration constructs a declarative configuration of the ClusterTrustBundleProjection type for use with
@@ -94,5 +98,13 @@ func (b *ClusterTrustBundleProjectionApplyConfiguration) WithOptional(value bool
 // If called multiple times, the Path field is set to the value of the last call.
 func (b *ClusterTrustBundleProjectionApplyConfiguration) WithPath(value string) *ClusterTrustBundleProjectionApplyConfiguration {
 	b.Path = &value
+	return b
+}
+
+// WithUser sets the User field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the User field is set to the value of the last call.
+func (b *ClusterTrustBundleProjectionApplyConfiguration) WithUser(value int64) *ClusterTrustBundleProjectionApplyConfiguration {
+	b.User = &value
 	return b
 }

@@ -121,7 +121,11 @@ func (p Properties) BoundaryAfter() bool {
 //
 // When all 6 bits are zero, the character is inert, meaning it is never
 // influenced by normalization.
+//
+// We set flags to 0x80 (high bit 7 unused in quick check data) to indicate an invalid rune.
 type qcInfo uint8
+
+func (p Properties) isInvalid() bool { return p.flags == 0x80 }
 
 func (p Properties) isYesC() bool { return p.flags&0x10 == 0 }
 func (p Properties) isYesD() bool { return p.flags&0x4 == 0 }
@@ -187,30 +191,30 @@ func (p Properties) TrailCCC() uint8 {
 	return ccc[p.tccc]
 }
 
+// Recomposition
+// Each entry of recompMapPacked holds the two runes of the key and the
+// composed rune of the value packed into a big-endian uint64 as three
+// 21-bit fields, which is wide enough for any rune.
+// Note that the recomposition map for NFC and NFKC are identical.
+
+const recompShift = 21
+
 func buildRecompMap() {
-	recompMap = make(map[uint32]rune, len(recompMapPacked)/8)
+	recompMap = make(map[uint64]rune, len(recompMapPacked)/8)
 	var buf [8]byte
 	for i := 0; i < len(recompMapPacked); i += 8 {
 		copy(buf[:], recompMapPacked[i:i+8])
-		key := binary.BigEndian.Uint32(buf[:4])
-		val := binary.BigEndian.Uint32(buf[4:])
-		recompMap[key] = rune(val)
+		e := binary.BigEndian.Uint64(buf[:])
+		recompMap[e>>recompShift] = rune(e & (1<<recompShift - 1))
 	}
 }
-
-// Recomposition
-// We use 32-bit keys instead of 64-bit for the two codepoint keys.
-// This clips off the bits of three entries, but we know this will not
-// result in a collision. In the unlikely event that changes to
-// UnicodeData.txt introduce collisions, the compiler will catch it.
-// Note that the recomposition map for NFC and NFKC are identical.
 
 // combine returns the combined rune or 0 if it doesn't exist.
 //
 // The caller is responsible for calling
 // recompMapOnce.Do(buildRecompMap) sometime before this is called.
 func combine(a, b rune) rune {
-	key := uint32(uint16(a))<<16 + uint32(uint16(b))
+	key := uint64(a)<<recompShift | uint64(b)
 	if recompMap == nil {
 		panic("caller error") // see func comment
 	}
@@ -247,6 +251,9 @@ func (f Form) PropertiesString(s string) Properties {
 // to a Properties.  See the comment at the top of the file
 // for more information on the format.
 func compInfo(v uint16, sz int) Properties {
+	if sz == 0 {
+		return Properties{flags: 0x80, size: 1}
+	}
 	if v == 0 {
 		return Properties{size: uint8(sz)}
 	} else if v >= 0x8000 {
@@ -254,7 +261,7 @@ func compInfo(v uint16, sz int) Properties {
 			size:  uint8(sz),
 			ccc:   uint8(v),
 			tccc:  uint8(v),
-			flags: qcInfo(v >> 8),
+			flags: qcInfo(v>>8) & 0x3f,
 		}
 		if p.ccc > 0 || p.combinesBackward() {
 			p.nLead = uint8(p.flags & 0x3)

@@ -24,7 +24,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
-	schedulingapi "k8s.io/api/scheduling/v1alpha2"
+	schedulingapi "k8s.io/api/scheduling/v1beta1"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -83,8 +83,6 @@ type CoreResourceEnqueueTestCase struct {
 	InitialVolumeAttachment []*storagev1.VolumeAttachment
 	// InitialDeviceClasses are the list of DeviceClass to be created at first.
 	InitialDeviceClasses []*resourceapi.DeviceClass
-	// InitialWorkloads is the list of Workloads to be created at first.
-	InitialWorkloads []*schedulingapi.Workload
 	// InitialPodGroups is the list of PodGroups to be created at first.
 	InitialPodGroups []*schedulingapi.PodGroup
 	// Pods are the list of Pods to be created.
@@ -113,9 +111,9 @@ type CoreResourceEnqueueTestCase struct {
 	EnableDRAExtendedResource bool
 	// EnableNodeDeclaredFeatures indicates if the test case runs with the NodeDeclaredFeatures feature gate enabled.
 	EnableNodeDeclaredFeatures bool
-	// EnableGangScheduling indicates wether the test case should run with feature gates
-	// GenericWorkload and GangScheduling enabled or not.
-	EnableGangScheduling bool
+	// EnableGenericWorkload indicates wether the test case should run with feature gate
+	// GenericWorkload enabled or not.
+	EnableGenericWorkload bool
 }
 
 // We define all the test cases here in the one place,
@@ -2529,11 +2527,8 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 		InitialNodes: []*v1.Node{
 			st.MakeNode().Name("fake-node1").Obj(),
 		},
-		InitialWorkloads: []*schedulingapi.Workload{
-			st.MakeWorkload().Name("w").PodGroupTemplate(st.MakePodGroupTemplate().Name("t").MinCount(2).Obj()).Obj(),
-		},
 		InitialPodGroups: []*schedulingapi.PodGroup{
-			st.MakePodGroup().Name("pg1").MinCount(2).TemplateRef("t", "w").Obj(),
+			st.MakePodGroup().Name("pg1").MinCount(2).WorkloadRef("w", "t").Obj(),
 		},
 		Pods: []*v1.Pod{
 			st.MakePod().Name("pod1").Container("image").PodGroupName("pg1").Obj(),
@@ -2548,7 +2543,7 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 		},
 		ExpectedInitialRejectingPhase: rejectingPhasePreEnqueue,
 		WantRequeuedPods:              sets.New("pod1", "pod3"),
-		EnableGangScheduling:          true,
+		EnableGenericWorkload:         true,
 	},
 	{
 		Name:          "Pod rejected by the GangScheduling plugin is requeued when a matching pod group is created",
@@ -2556,23 +2551,20 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 		InitialNodes: []*v1.Node{
 			st.MakeNode().Name("fake-node1").Obj(),
 		},
-		InitialWorkloads: []*schedulingapi.Workload{
-			st.MakeWorkload().Name("w").PodGroupTemplate(st.MakePodGroupTemplate().Name("t").MinCount(1).Obj()).Obj(),
-		},
 		Pods: []*v1.Pod{
 			st.MakePod().Name("pod1").Container("image").PodGroupName("pg1").Obj(),
 			st.MakePod().Name("pod2").Container("image").PodGroupName("pg2").Obj(),
 		},
 		TriggerFn: func(testCtx *testutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
-			pg := st.MakePodGroup().Name("pg1").MinCount(1).TemplateRef("t", "w").Obj()
-			if _, err := testCtx.ClientSet.SchedulingV1alpha2().PodGroups(testCtx.NS.Name).Create(testCtx.Ctx, pg, metav1.CreateOptions{}); err != nil {
+			pg := st.MakePodGroup().Name("pg1").MinCount(1).WorkloadRef("w", "t").Obj()
+			if _, err := testCtx.ClientSet.SchedulingV1beta1().PodGroups(testCtx.NS.Name).Create(testCtx.Ctx, pg, metav1.CreateOptions{}); err != nil {
 				return nil, fmt.Errorf("failed to create PodGroup %q: %w", pg.Name, err)
 			}
 			return map[fwk.ClusterEvent]uint64{{Resource: fwk.PodGroup, ActionType: fwk.Add}: 1}, nil
 		},
 		ExpectedInitialRejectingPhase: rejectingPhasePreEnqueue,
 		WantRequeuedPods:              sets.New("pod1"),
-		EnableGangScheduling:          true,
+		EnableGenericWorkload:         true,
 	},
 }
 
@@ -2598,10 +2590,9 @@ func RunTestCoreResourceEnqueue(t *testing.T, tt *CoreResourceEnqueueTestCase) {
 		ndfFramework := ndf.New([]ndf.Feature{mockFeature})
 		ndftesting.SetFrameworkDuringTest(t, *ndfFramework)
 	}
-	if tt.EnableGangScheduling {
+	if tt.EnableGenericWorkload {
 		featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 			features.GenericWorkload: true,
-			features.GangScheduling:  true,
 		})
 	}
 	logger, _ := ktesting.NewTestContext(t)
@@ -2704,16 +2695,9 @@ func RunTestCoreResourceEnqueue(t *testing.T, tt *CoreResourceEnqueueTestCase) {
 		}
 	}
 
-	for _, w := range tt.InitialWorkloads {
-		w.Namespace = ns
-		if _, err := cs.SchedulingV1alpha2().Workloads(ns).Create(testCtx.Ctx, w, metav1.CreateOptions{}); err != nil {
-			t.Fatalf("Failed to create a Workload %q: %v", w.Name, err)
-		}
-	}
-
 	for _, pg := range tt.InitialPodGroups {
 		pg.Namespace = ns
-		if _, err := cs.SchedulingV1alpha2().PodGroups(ns).Create(testCtx.Ctx, pg, metav1.CreateOptions{}); err != nil {
+		if _, err := cs.SchedulingV1beta1().PodGroups(ns).Create(testCtx.Ctx, pg, metav1.CreateOptions{}); err != nil {
 			t.Fatalf("Failed to create a PodGroup %q: %v", pg.Name, err)
 		}
 	}

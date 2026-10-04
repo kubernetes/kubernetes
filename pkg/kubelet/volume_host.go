@@ -52,6 +52,7 @@ import (
 // kubelet - used by VolumeHost methods to expose kubelet specific parameters
 // plugins - used to initialize volumePluginMgr
 func NewInitializedVolumePluginMgr(
+	logger klog.Logger,
 	kubelet *Kubelet,
 	secretManager secret.Manager,
 	configMapManager configmap.Manager,
@@ -59,10 +60,6 @@ func NewInitializedVolumePluginMgr(
 	clusterTrustBundleManager clustertrustbundle.Manager,
 	plugins []volume.VolumePlugin,
 	prober volume.DynamicPluginProber) (*volume.VolumePluginMgr, error) {
-
-	// Use context.TODO() because we currently do not have a proper context to pass in.
-	// Replace this with an appropriate context when refactoring this function to accept a context parameter.
-	logger := klog.FromContext(context.TODO())
 
 	// Initialize csiDriverLister before calling InitPlugins
 	var informerFactory informers.SharedInformerFactory
@@ -265,12 +262,12 @@ func (kvh *kubeletVolumeHost) DeleteServiceAccountTokenFunc() func(podUID types.
 	return kvh.tokenManager.DeleteServiceAccountToken
 }
 
-func (kvh *kubeletVolumeHost) GetTrustAnchorsByName(name string, allowMissing bool) ([]byte, error) {
-	return kvh.clusterTrustBundleManager.GetTrustAnchorsByName(name, allowMissing)
+func (kvh *kubeletVolumeHost) GetTrustAnchorsByName(ctx context.Context, name string, allowMissing bool) ([]byte, error) {
+	return kvh.clusterTrustBundleManager.GetTrustAnchorsByName(ctx, name, allowMissing)
 }
 
-func (kvh *kubeletVolumeHost) GetTrustAnchorsBySigner(signerName string, labelSelector *metav1.LabelSelector, allowMissing bool) ([]byte, error) {
-	return kvh.clusterTrustBundleManager.GetTrustAnchorsBySigner(signerName, labelSelector, allowMissing)
+func (kvh *kubeletVolumeHost) GetTrustAnchorsBySigner(ctx context.Context, signerName string, labelSelector *metav1.LabelSelector, allowMissing bool) ([]byte, error) {
+	return kvh.clusterTrustBundleManager.GetTrustAnchorsBySigner(ctx, signerName, labelSelector, allowMissing)
 }
 
 func (kvh *kubeletVolumeHost) GetPodCertificateCredentialBundle(ctx context.Context, namespace, podName, podUID, volumeName string, sourceIndex int) ([]byte, []byte, error) {

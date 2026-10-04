@@ -31,7 +31,6 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	clientset "k8s.io/client-go/kubernetes"
 	apimachineryutils "k8s.io/kubernetes/test/e2e/common/apimachinery"
-	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/network/common"
 	admissionapi "k8s.io/pod-security-admission/api"
@@ -41,8 +40,8 @@ import (
 	"github.com/onsi/gomega"
 )
 
-var _ = common.SIGDescribe("IngressClass", feature.Ingress, func() {
-	f := framework.NewDefaultFramework("ingressclass")
+var _ = common.SIGDescribe("DefaultIngressClass", func() {
+	f := framework.NewDefaultFramework("defaultingressclass")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	var cs clientset.Interface
 	ginkgo.BeforeEach(func() {
@@ -166,6 +165,15 @@ var _ = common.SIGDescribe("IngressClass", feature.Ingress, func() {
 		}); err != nil {
 			framework.Failf("Failed to create ingress when two ingressClasses are marked as default ,got error %v", err)
 		}
+	})
+})
+
+var _ = common.SIGDescribe("IngressClass", func() {
+	f := framework.NewDefaultFramework("ingressclass")
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
+	var cs clientset.Interface
+	ginkgo.BeforeEach(func() {
+		cs = f.ClientSet
 	})
 
 	f.It("should allow IngressClass to have Namespace-scoped parameters", f.WithSerial(), func(ctx context.Context) {

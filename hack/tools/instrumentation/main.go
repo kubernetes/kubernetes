@@ -112,7 +112,13 @@ func main() {
 		for scanner.Scan() {
 			arg := scanner.Text()
 			ms, es := searchPathForStableMetrics(arg, endpointConfig)
-			stableMetrics = append(stableMetrics, ms...)
+			for _, m := range ms {
+				fqName := m.BuildFQName()
+				if _, ok := stableMetricNames[fqName]; !ok {
+					stableMetrics = append(stableMetrics, m)
+				}
+				stableMetricNames[fqName] = struct{}{}
+			}
 			errors = append(errors, es...)
 		}
 	}

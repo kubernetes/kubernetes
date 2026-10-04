@@ -191,4 +191,39 @@ func init() {
 		fixtureKey{level: api.LevelBaseline, version: api.MajorMinorVersion(1, 32), check: "sysctls"},
 		fixtureDataV1Dot32,
 	)
+
+	fixtureDataV1Dot37 := fixtureGenerator{
+		expectErrorSubstring: "forbidden sysctl",
+		generatePass: func(p *corev1.Pod, _ api.Level) []*corev1.Pod {
+			if p.Spec.SecurityContext == nil {
+				p.Spec.SecurityContext = &corev1.PodSecurityContext{}
+			}
+			return []*corev1.Pod{
+				// security context with no sysctls
+				tweak(p, func(p *corev1.Pod) { p.Spec.SecurityContext.Sysctls = nil }),
+				// sysctls with name="net.ipv4.tcp_slow_start_after_idle", "net.ipv4.tcp_notsent_lowat"
+				tweak(p, func(p *corev1.Pod) {
+					p.Spec.SecurityContext.Sysctls = []corev1.Sysctl{
+						{Name: "net.ipv4.tcp_slow_start_after_idle", Value: "0"},
+						{Name: "net.ipv4.tcp_notsent_lowat", Value: "16384"},
+					}
+				}),
+			}
+		},
+		generateFail: func(p *corev1.Pod) []*corev1.Pod {
+			if p.Spec.SecurityContext == nil {
+				p.Spec.SecurityContext = &corev1.PodSecurityContext{}
+			}
+			return []*corev1.Pod{
+				// sysctls with out of allowed name
+				tweak(p, func(p *corev1.Pod) {
+					p.Spec.SecurityContext.Sysctls = []corev1.Sysctl{{Name: "othersysctl", Value: "other"}}
+				}),
+			}
+		},
+	}
+	registerFixtureGenerator(
+		fixtureKey{level: api.LevelBaseline, version: api.MajorMinorVersion(1, 37), check: "sysctls"},
+		fixtureDataV1Dot37,
+	)
 }

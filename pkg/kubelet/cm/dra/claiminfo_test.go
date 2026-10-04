@@ -17,6 +17,7 @@ limitations under the License.
 package dra
 
 import (
+	"encoding/json"
 	"errors"
 	"path"
 	"reflect"
@@ -29,7 +30,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	klogtesting "k8s.io/klog/v2/ktesting"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm/dra/state"
 	"k8s.io/kubernetes/test/utils/ktesting"
 )
@@ -897,4 +901,101 @@ func TestSyncToCheckpoint(t *testing.T) {
 			require.NoError(t, err)
 		})
 	}
+}
+
+func TestNewClaimInfoSkipNodeOperations(t *testing.T) {
+	t.Run("feature gate enabled", func(t *testing.T) {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAOptionalNodeOperations, true)
+		claim := &resourceapi.ResourceClaim{
+			ObjectMeta: metav1.ObjectMeta{Name: "c", Namespace: "ns", UID: "uid"},
+			Status: resourceapi.ResourceClaimStatus{
+				Allocation: &resourceapi.AllocationResult{
+					Devices: resourceapi.DeviceAllocationResult{
+						Results: []resourceapi.DeviceRequestAllocationResult{
+							{Driver: "driver-a", Device: "dev1", SkipNodeOperations: []resourceapi.SkipNodeOperation{resourceapi.SkipNodeOperationAll}},
+							{Driver: "driver-a", Device: "dev2", SkipNodeOperations: []resourceapi.SkipNodeOperation{resourceapi.SkipNodeOperationAll}},
+							{Driver: "driver-b", Device: "dev3", SkipNodeOperations: []resourceapi.SkipNodeOperation{resourceapi.SkipNodeOperationAll}},
+							{Driver: "driver-b", Device: "dev4", SkipNodeOperations: nil},
+							{Driver: "driver-c", Device: "dev5", SkipNodeOperations: []resourceapi.SkipNodeOperation{resourceapi.SkipNodeOperationNodeUnprepareResources}},
+							{Driver: "driver-d", Device: "dev6", SkipNodeOperations: []resourceapi.SkipNodeOperation{resourceapi.SkipNodeOperationAll}},
+							{Driver: "driver-d", Device: "dev7", SkipNodeOperations: []resourceapi.SkipNodeOperation{resourceapi.SkipNodeOperationNodeUnprepareResources}},
+							{Driver: "driver-e", Device: "dev8", SkipNodeOperations: []resourceapi.SkipNodeOperation{resourceapi.SkipNodeOperationNodeUnprepareResources}},
+							{Driver: "driver-e", Device: "dev9", SkipNodeOperations: nil},
+							{Driver: "driver-f", Device: "dev10", SkipNodeOperations: []resourceapi.SkipNodeOperation{"UnknownRpcCall"}},
+							{Driver: "driver-g", Device: "dev11", SkipNodeOperations: []resourceapi.SkipNodeOperation{resourceapi.SkipNodeOperationAll, resourceapi.SkipNodeOperationNodePrepareResources}},
+							{Driver: "driver-g", Device: "dev12", SkipNodeOperations: []resourceapi.SkipNodeOperation{resourceapi.SkipNodeOperationNodePrepareResources}},
+							{Driver: "driver-h", Device: "dev13", SkipNodeOperations: []resourceapi.SkipNodeOperation{resourceapi.SkipNodeOperationNodeUnprepareResources}},
+							{Driver: "driver-h", Device: "dev14", SkipNodeOperations: []resourceapi.SkipNodeOperation{resourceapi.SkipNodeOperationAll, resourceapi.SkipNodeOperationNodePrepareResources}},
+						},
+					},
+				},
+			},
+		}
+
+		info, err := newClaimInfoFromClaim(claim)
+		require.NoError(t, err)
+		assert.Equal(t, []resourceapi.SkipNodeOperation{resourceapi.SkipNodeOperationAll}, info.DriverState["driver-a"].SkipNodeOperations, "all devices specify SkipNodeOperationAll")
+		assert.Empty(t, info.DriverState["driver-b"].SkipNodeOperations, "mixed SkipNodeOperationAll and nil results in no skip")
+		assert.Equal(t, []resourceapi.SkipNodeOperation{resourceapi.SkipNodeOperationNodeUnprepareResources}, info.DriverState["driver-c"].SkipNodeOperations, "device specifies SkipNodeOperationNodeUnprepareResources")
+		assert.Equal(t, []resourceapi.SkipNodeOperation{resourceapi.SkipNodeOperationNodeUnprepareResources}, info.DriverState["driver-d"].SkipNodeOperations, "mixed SkipNodeOperationAll and SkipNodeOperationNodeUnprepareResources results in SkipNodeOperationNodeUnprepareResources")
+		assert.Empty(t, info.DriverState["driver-e"].SkipNodeOperations, "mixed SkipNodeOperationNodeUnprepareResources and nil results in no skip")
+		assert.Equal(t, []resourceapi.SkipNodeOperation{"UnknownRpcCall"}, info.DriverState["driver-f"].SkipNodeOperations, "unknown operation preserved in state")
+		assert.False(t, info.DriverState["driver-f"].Skips(resourceapi.SkipNodeOperationNodePrepareResources), "unknown operation does not skip NodePrepareResources")
+		assert.False(t, info.DriverState["driver-f"].Skips(resourceapi.SkipNodeOperationNodeUnprepareResources), "unknown operation does not skip NodeUnprepareResources")
+		assert.Equal(t, []resourceapi.SkipNodeOperation{resourceapi.SkipNodeOperationNodePrepareResources}, info.DriverState["driver-g"].SkipNodeOperations, "result specifying All+NodePrepare combined with result specifying NodePrepare skips NodePrepare")
+		assert.Equal(t, []resourceapi.SkipNodeOperation{resourceapi.SkipNodeOperationNodeUnprepareResources}, info.DriverState["driver-h"].SkipNodeOperations, "result specifying NodeUnprepare combined with result specifying All+NodePrepare skips NodeUnprepare only")
+	})
+
+	t.Run("feature gate disabled", func(t *testing.T) {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAOptionalNodeOperations, false)
+		claim := &resourceapi.ResourceClaim{
+			ObjectMeta: metav1.ObjectMeta{Name: "c", Namespace: "ns", UID: "uid"},
+			Status: resourceapi.ResourceClaimStatus{
+				Allocation: &resourceapi.AllocationResult{
+					Devices: resourceapi.DeviceAllocationResult{
+						Results: []resourceapi.DeviceRequestAllocationResult{
+							{Driver: "driver-a", Device: "dev1", SkipNodeOperations: []resourceapi.SkipNodeOperation{resourceapi.SkipNodeOperationAll}},
+						},
+					},
+				},
+			},
+		}
+
+		_, err := newClaimInfoFromClaim(claim)
+		require.ErrorContains(t, err, "DRAOptionalNodeOperations feature gate is disabled")
+	})
+}
+
+func TestCheckpointVersionCompatibility(t *testing.T) {
+	checkpointVersionN := `[{"claimUID":"uid-1","claimName":"claim-1","namespace":"default","driverState":{"gpu.com":{"skipNodeOperations":["*"]}}}]`
+	var stateVersionN []state.ClaimInfoState
+	err := json.Unmarshal([]byte(checkpointVersionN), &stateVersionN)
+	require.NoError(t, err)
+	require.Len(t, stateVersionN, 1)
+	assert.Equal(t, []resourceapi.SkipNodeOperation{resourceapi.SkipNodeOperationAll}, stateVersionN[0].DriverState["gpu.com"].SkipNodeOperations)
+
+	checkpointVersionNMinus1 := `[{"claimUID":"uid-2","claimName":"claim-2","namespace":"default","driverState":{"gpu.com":{"devices":[]}}}]`
+	var stateFromOlder []state.ClaimInfoState
+	err = json.Unmarshal([]byte(checkpointVersionNMinus1), &stateFromOlder)
+	require.NoError(t, err)
+	require.Len(t, stateFromOlder, 1)
+	assert.Empty(t, stateFromOlder[0].DriverState["gpu.com"].SkipNodeOperations)
+
+	type olderDriverState struct {
+		Devices []state.Device
+	}
+	type olderClaimInfoState struct {
+		ClaimUID    types.UID
+		ClaimName   string
+		Namespace   string
+		DriverState map[string]olderDriverState
+	}
+	var olderState []olderClaimInfoState
+	err = json.Unmarshal([]byte(checkpointVersionN), &olderState)
+	require.NoError(t, err)
+	require.Len(t, olderState, 1)
+	assert.Equal(t, types.UID("uid-1"), olderState[0].ClaimUID)
+	assert.Equal(t, "claim-1", olderState[0].ClaimName)
+	assert.Equal(t, "default", olderState[0].Namespace)
+	assert.Contains(t, olderState[0].DriverState, "gpu.com")
 }

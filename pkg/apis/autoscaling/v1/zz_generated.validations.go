@@ -26,10 +26,11 @@ import (
 	fmt "fmt"
 
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
-	equality "k8s.io/apimachinery/pkg/api/equality"
 	operation "k8s.io/apimachinery/pkg/api/operation"
 	safe "k8s.io/apimachinery/pkg/api/safe"
 	validate "k8s.io/apimachinery/pkg/api/validate"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	validation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	field "k8s.io/apimachinery/pkg/util/validation/field"
 )
@@ -72,6 +73,74 @@ func RegisterValidations(scheme *runtime.Scheme) error {
 	return nil
 }
 
+// Validate_CrossVersionObjectReference validates an instance of CrossVersionObjectReference according
+// to declarative validation rules in the API schema.
+func Validate_CrossVersionObjectReference(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *autoscalingv1.CrossVersionObjectReference) (errs field.ErrorList) {
+
+	{ // field autoscalingv1.CrossVersionObjectReference.Kind
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *string,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *autoscalingv1.CrossVersionObjectReference) *string {
+				return &oldObj.Kind
+			})
+		errs = append(errs, fn(fldPath.Child("kind"), &obj.Kind, oldVal, oldObj != nil)...)
+	}
+
+	{ // field autoscalingv1.CrossVersionObjectReference.Name
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *string,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *autoscalingv1.CrossVersionObjectReference) *string {
+				return &oldObj.Name
+			})
+		errs = append(errs, fn(fldPath.Child("name"), &obj.Name, oldVal, oldObj != nil)...)
+	}
+
+	// field autoscalingv1.CrossVersionObjectReference.APIVersion has no validation
+	return errs
+}
+
 // Validate_HorizontalPodAutoscaler validates an instance of HorizontalPodAutoscaler according
 // to declarative validation rules in the API schema.
 func Validate_HorizontalPodAutoscaler(
@@ -79,7 +148,28 @@ func Validate_HorizontalPodAutoscaler(
 	obj, oldObj *autoscalingv1.HorizontalPodAutoscaler) (errs field.ErrorList) {
 
 	// field autoscalingv1.HorizontalPodAutoscaler.TypeMeta has no validation
-	// field autoscalingv1.HorizontalPodAutoscaler.ObjectMeta has no validation
+
+	{ // field autoscalingv1.HorizontalPodAutoscaler.ObjectMeta
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *metav1.ObjectMeta,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if validate.SemanticDeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call the type's validation function
+			errs = append(errs, validation.Validate_ObjectMeta(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *autoscalingv1.HorizontalPodAutoscaler) *metav1.ObjectMeta {
+				return &oldObj.ObjectMeta
+			})
+		errs = append(errs, fn(fldPath.Child("metadata"), &obj.ObjectMeta, oldVal, oldObj != nil)...)
+	}
 
 	{ // field autoscalingv1.HorizontalPodAutoscaler.Spec
 		fn := func(
@@ -88,7 +178,7 @@ func Validate_HorizontalPodAutoscaler(
 			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
 			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
+				if validate.SemanticDeepEqual(obj, oldObj) {
 					return nil
 				}
 			}
@@ -113,7 +203,27 @@ func Validate_HorizontalPodAutoscalerSpec(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *autoscalingv1.HorizontalPodAutoscalerSpec) (errs field.ErrorList) {
 
-	// field autoscalingv1.HorizontalPodAutoscalerSpec.ScaleTargetRef has no validation
+	{ // field autoscalingv1.HorizontalPodAutoscalerSpec.ScaleTargetRef
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *autoscalingv1.CrossVersionObjectReference,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_CrossVersionObjectReference(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *autoscalingv1.HorizontalPodAutoscalerSpec) *autoscalingv1.CrossVersionObjectReference {
+				return &oldObj.ScaleTargetRef
+			})
+		errs = append(errs, fn(fldPath.Child("scaleTargetRef"), &obj.ScaleTargetRef, oldVal, oldObj != nil)...)
+	}
 
 	{ // field autoscalingv1.HorizontalPodAutoscalerSpec.MinReplicas
 		fn := func(
@@ -128,7 +238,7 @@ func Validate_HorizontalPodAutoscalerSpec(
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkBeta().MarkShortCircuit(); len(e) != 0 {
 				earlyReturn = true
 			}
 			if earlyReturn {
@@ -137,13 +247,13 @@ func Validate_HorizontalPodAutoscalerSpec(
 			if e := validate.IfOption(ctx, op, fldPath, obj, oldObj, "HPAScaleToZero", true,
 				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *int32) field.ErrorList {
 					return validate.Minimum(ctx, op, fldPath, obj, oldObj, 0)
-				}).MarkAlpha(); len(e) != 0 {
+				}).MarkBeta(); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			if e := validate.IfOption(ctx, op, fldPath, obj, oldObj, "HPAScaleToZero", false,
 				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *int32) field.ErrorList {
 					return validate.Minimum(ctx, op, fldPath, obj, oldObj, 1)
-				}).MarkAlpha(); len(e) != 0 {
+				}).MarkBeta(); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return
@@ -168,14 +278,14 @@ func Validate_HorizontalPodAutoscalerSpec(
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkBeta().MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
 			if earlyReturn {
 				return // do not proceed
 			}
-			if e := validate.Minimum(ctx, op, fldPath, obj, oldObj, 1).MarkAlpha(); len(e) != 0 {
+			if e := validate.Minimum(ctx, op, fldPath, obj, oldObj, 1).MarkBeta(); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return
@@ -245,7 +355,7 @@ func Validate_ScaleSpec(
 				}
 			}
 			// call field-attached validations
-			if e := validate.Minimum(ctx, op, fldPath, obj, oldObj, 0).MarkAlpha(); len(e) != 0 {
+			if e := validate.Minimum(ctx, op, fldPath, obj, oldObj, 0).MarkBeta(); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return

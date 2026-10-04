@@ -32,7 +32,7 @@ import (
 //
 // Flunder is an example type with a spec and a status.
 type FlunderApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
+	v1.TypeMetaApplyConfiguration    `json:""`
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
 	Spec                             *FlunderSpecApplyConfiguration `json:"spec,omitempty"`
 	Status                           *wardlev1beta1.FlunderStatus   `json:"status,omitempty"`

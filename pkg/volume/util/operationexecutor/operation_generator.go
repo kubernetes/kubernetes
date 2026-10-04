@@ -89,6 +89,7 @@ func NewOperationGenerator(kubeClient clientset.Interface,
 	recorder record.EventRecorder,
 	blkUtil volumepathhandler.BlockVolumePathHandler) OperationGenerator {
 
+	util.RegisterMetrics()
 	return &operationGenerator{
 		kubeClient:      kubeClient,
 		volumePluginMgr: volumePluginMgr,
@@ -354,7 +355,7 @@ func (og *operationGenerator) GenerateDetachVolumeFunc(
 	var err error
 
 	if volumeToDetach.VolumeSpec != nil {
-		attachableVolumePlugin, err = findDetachablePluginBySpec(volumeToDetach.VolumeSpec, og.volumePluginMgr)
+		attachableVolumePlugin, err = util.FindDetachablePluginBySpec(volumeToDetach.VolumeSpec, og.volumePluginMgr)
 		if err != nil || attachableVolumePlugin == nil {
 			return volumetypes.GeneratedOperations{}, volumeToDetach.GenerateErrorDetailed("DetachVolume.findDetachablePluginBySpec failed", err)
 		}
@@ -541,6 +542,7 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 			}
 
 			// Mount device to global mount path
+			og.markVolumeMountAsAttempted(actualStateOfWorld, volumeToMount.PodName, volumeToMount.VolumeName)
 			err = volumeDeviceMounter.MountDevice(
 				volumeToMount.VolumeSpec,
 				devicePath,
@@ -580,6 +582,7 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 		}
 
 		// Execute mount
+		og.markVolumeMountAsAttempted(actualStateOfWorld, volumeToMount.PodName, volumeToMount.VolumeName)
 		mountErr := volumeMounter.SetUp(volume.MounterArgs{
 			FsUser:              util.FsUserFrom(volumeToMount.Pod),
 			FsGroup:             fsGroup,
@@ -588,6 +591,7 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 			Recorder:            og.recorder,
 			SELinuxLabel:        volumeToMount.SELinuxLabel,
 			ReconstructedVolume: actualStateOfWorld.IsVolumeReconstructed(volumeToMount.VolumeName, volumeToMount.PodName),
+			IsRemount:           isRemount,
 		})
 		// Update actual state of world
 		markOpts := MarkVolumeOpts{
@@ -669,6 +673,12 @@ func (og *operationGenerator) checkForFailedMount(volumeToMount VolumeToMount, m
 	if volumetypes.IsFilesystemMismatchError(mountError) {
 		simpleMsg, _ := volumeToMount.GenerateMsg("MountVolume failed", mountError.Error())
 		og.recorder.Eventf(pv, v1.EventTypeWarning, kevents.FailedMountOnFilesystemMismatch, "%s", simpleMsg)
+	}
+}
+
+func (og *operationGenerator) markVolumeMountAsAttempted(actualStateOfWorld ActualStateOfWorldMounterUpdater, podName volumetypes.UniquePodName, volumeName v1.UniqueVolumeName) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.CSIVolumeHealth) {
+		actualStateOfWorld.MarkVolumeAsMountAttempted(podName, volumeName)
 	}
 }
 
@@ -873,6 +883,11 @@ func (og *operationGenerator) GenerateUnmountDeviceFunc(
 		// use hostutil.PathIsDevice to check if the path is a device,
 		// if so use hostutil.DeviceOpened to check if the device is in use anywhere
 		// else on the system. Retry if it returns true.
+		// Note: this in-use safety check only takes effect on platforms with a
+		// device node tree (Linux). On Windows, hostutil.PathIsDevice and
+		// hostutil.DeviceOpened always report (false, nil), so the check is a
+		// no-op there; Node.status.volumesAttached[].devicePath carries the CSI
+		// VolumeID on Windows rather than a device path.
 		deviceOpened, deviceOpenedErr := isDeviceOpened(deviceToDetach, hostutil)
 		if deviceOpenedErr != nil {
 			return volumetypes.NewOperationContext(nil, deviceOpenedErr, migrated)
@@ -1004,6 +1019,7 @@ func (og *operationGenerator) GenerateMapVolumeFunc(
 		// Call SetUpDevice if blockVolumeMapper implements CustomBlockVolumeMapper
 		if customBlockVolumeMapper, ok := blockVolumeMapper.(volume.CustomBlockVolumeMapper); ok && actualStateOfWorld.GetDeviceMountState(volumeToMount.VolumeName) != DeviceGloballyMounted {
 			var mapErr error
+			og.markVolumeMountAsAttempted(actualStateOfWorld, volumeToMount.PodName, volumeToMount.VolumeName)
 			stagingPath, mapErr = customBlockVolumeMapper.SetUpDevice()
 			if mapErr != nil {
 				og.markDeviceErrorState(volumeToMount, devicePath, globalMapPath, mapErr, actualStateOfWorld)
@@ -1346,6 +1362,11 @@ func (og *operationGenerator) GenerateUnmapDeviceFunc(
 		// use hostutil.PathIsDevice to check if the path is a device,
 		// if so use hostutil.DeviceOpened to check if the device is in use anywhere
 		// else on the system. Retry if it returns true.
+		// Note: this in-use safety check only takes effect on platforms with a
+		// device node tree (Linux). On Windows, hostutil.PathIsDevice and
+		// hostutil.DeviceOpened always report (false, nil), so the check is a
+		// no-op there; Node.status.volumesAttached[].devicePath carries the CSI
+		// VolumeID on Windows rather than a device path.
 		deviceOpened, deviceOpenedErr := isDeviceOpened(deviceToDetach, hostutil)
 		if deviceOpenedErr != nil {
 			return volumetypes.NewOperationContext(nil, deviceOpenedErr, migrated)
@@ -1649,7 +1670,7 @@ func (og *operationGenerator) GenerateExpandAndRecoverVolumeFunc(
 	}, nil
 }
 
-// Deprecated: This function should not called by any controller code in future and should be removed
+// Deprecated: This function should not be called by any controller code in future and should be removed
 // from kubernetes code
 func (og *operationGenerator) expandAndRecoverFunction(resizeOpts inTreeResizeOpts) inTreeResizeResponse {
 	pvc := resizeOpts.pvc
@@ -2175,6 +2196,9 @@ func checkNodeAffinity(og *operationGenerator, volumeToMount VolumeToMount) erro
 }
 
 // isDeviceOpened checks the device status if the device is in use anywhere else on the system
+// The check is meaningful only on platforms with a device node tree (Linux): on Windows,
+// hostutil.PathIsDevice and hostutil.DeviceOpened always report (false, nil), so this
+// unconditionally reports the device as not in use; detach proceeds without the check.
 func isDeviceOpened(deviceToDetach AttachedVolume, hostUtil hostutil.HostUtils) (bool, error) {
 	isDevicePath, devicePathErr := hostUtil.PathIsDevice(deviceToDetach.DevicePath)
 	var deviceOpened bool
@@ -2194,28 +2218,6 @@ func isDeviceOpened(deviceToDetach AttachedVolume, hostUtil hostutil.HostUtils) 
 		}
 	}
 	return deviceOpened, nil
-}
-
-// findDetachablePluginBySpec is a variant of VolumePluginMgr.FindAttachablePluginByName() function.
-// The difference is that it bypass the CanAttach() check for CSI plugin, i.e. it assumes all CSI plugin supports detach.
-// The intention here is that a CSI plugin volume can end up in an Uncertain state,  so that a detach
-// operation will help it to detach no matter it actually has the ability to attach/detach.
-func findDetachablePluginBySpec(spec *volume.Spec, pm *volume.VolumePluginMgr) (volume.AttachableVolumePlugin, error) {
-	volumePlugin, err := pm.FindPluginBySpec(spec)
-	if err != nil {
-		return nil, err
-	}
-	if attachableVolumePlugin, ok := volumePlugin.(volume.AttachableVolumePlugin); ok {
-		if attachableVolumePlugin.GetPluginName() == "kubernetes.io/csi" {
-			return attachableVolumePlugin, nil
-		}
-		if canAttach, err := attachableVolumePlugin.CanAttach(spec); err != nil {
-			return nil, err
-		} else if canAttach {
-			return attachableVolumePlugin, nil
-		}
-	}
-	return nil, nil
 }
 
 func getMigratedStatusBySpec(spec *volume.Spec) bool {

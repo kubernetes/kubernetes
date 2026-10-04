@@ -89,20 +89,22 @@ type RESTUpdateStrategy interface {
 }
 
 // TODO: add other common fields that require global validation.
-func validateCommonFields(obj, old runtime.Object, strategy RESTUpdateStrategy) (field.ErrorList, error) {
+func validateCommonFields(obj, old runtime.Object, strategy RESTUpdateStrategy) field.ErrorList {
 	allErrs := field.ErrorList{}
 	objectMeta, err := meta.Accessor(obj)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get new object metadata: %v", err)
+		allErrs = append(allErrs, field.InternalError(field.NewPath("metadata"), fmt.Errorf("failed to get new object metadata: %w", err)))
+		return allErrs
 	}
 	oldObjectMeta, err := meta.Accessor(old)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get old object metadata: %v", err)
+		allErrs = append(allErrs, field.InternalError(field.NewPath("metadata"), fmt.Errorf("failed to get old object metadata: %w", err)))
+		return allErrs
 	}
 	allErrs = append(allErrs, genericvalidation.ValidateObjectMetaAccessor(objectMeta, strategy.NamespaceScoped(), validatePathSegment, field.NewPath("metadata"))...)
 	allErrs = append(allErrs, genericvalidation.ValidateObjectMetaAccessorUpdate(objectMeta, oldObjectMeta, field.NewPath("metadata"))...)
 
-	return allErrs, nil
+	return allErrs
 }
 
 // BeforeUpdate ensures that common operations for all resources are performed on update. It only returns
@@ -149,17 +151,7 @@ func BeforeUpdate(strategy RESTUpdateStrategy, ctx context.Context, obj, old run
 	if oldMeta.GetDeletionGracePeriodSeconds() != nil && objectMeta.GetDeletionGracePeriodSeconds() == nil {
 		objectMeta.SetDeletionGracePeriodSeconds(oldMeta.GetDeletionGracePeriodSeconds())
 	}
-
-	// Ensure some common fields, like UID, are validated for all resources.
-	errs, err := validateCommonFields(obj, old, strategy)
-	if err != nil {
-		return errors.NewInternalError(err)
-	}
-
-	errs = append(errs, strategy.ValidateUpdate(ctx, obj, old)...)
-	if dv, ok := strategy.(DeclarativeValidationStrategy); ok {
-		errs = dv.ValidateDeclaratively(ctx, obj, old, errs, operation.Update, dv.DeclarativeValidationConfig(ctx, obj, old))
-	}
+	errs := ValidateUpdate(ctx, obj, old, strategy)
 	if len(errs) > 0 {
 		RecordDuplicateValidationErrors(ctx, kind.GroupKind(), errs)
 		return errors.NewInvalid(kind.GroupKind(), objectMeta.GetName(), errs)
@@ -172,6 +164,20 @@ func BeforeUpdate(strategy RESTUpdateStrategy, ctx context.Context, obj, old run
 	strategy.Canonicalize(obj)
 
 	return nil
+}
+
+// ValidateUpdate performs common and strategy-specific validation for an update operation.
+func ValidateUpdate(ctx context.Context, obj runtime.Object, old runtime.Object, strategy RESTUpdateStrategy) field.ErrorList {
+
+	// TODO: Replace this check with the ObjectMeta name validation (validatePathSegment) once we are sure that all other validations are covered by strategy.Validate and strategy.ValidateDeclaratively.
+	// Ensure some common fields, like UID, are validated for all resources.
+	errs := validateCommonFields(obj, old, strategy)
+
+	errs = append(errs, strategy.ValidateUpdate(ctx, obj, old)...)
+	if dv, ok := strategy.(DeclarativeValidationStrategy); ok {
+		errs = dv.ValidateDeclaratively(ctx, obj, old, errs, operation.Update, dv.DeclarativeValidationConfig(ctx, obj, old))
+	}
+	return errs
 }
 
 // TransformFunc is a function to transform and return newObj

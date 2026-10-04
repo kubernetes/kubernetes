@@ -33,10 +33,11 @@ import (
 
 type REST struct {
 	authorizer authorizer.UnconditionalAuthorizer
+	scheme     *runtime.Scheme
 }
 
-func NewREST(authorizer authorizer.UnconditionalAuthorizer) *REST {
-	return &REST{authorizer}
+func NewREST(authorizer authorizer.UnconditionalAuthorizer, scheme *runtime.Scheme) *REST {
+	return &REST{authorizer, scheme}
 }
 
 func (r *REST) NamespaceScoped() bool {
@@ -64,7 +65,7 @@ func (r *REST) Create(ctx context.Context, obj runtime.Object, createValidation 
 	if !ok {
 		return nil, apierrors.NewBadRequest(fmt.Sprintf("not a SelfSubjectAccessReview: %#v", obj))
 	}
-	if errs := authorizationvalidation.ValidateSelfSubjectAccessReview(selfSAR); len(errs) > 0 {
+	if errs := authorizationvalidation.ValidateSelfSubjectAccessReviewCreate(ctx, r.scheme, selfSAR); len(errs) > 0 {
 		return nil, apierrors.NewInvalid(authorizationapi.Kind(selfSAR.Kind), "", errs)
 	}
 	userToCheck, exists := genericapirequest.UserFrom(ctx)

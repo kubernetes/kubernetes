@@ -343,6 +343,16 @@ func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 		*out = make([]int32, len(*in))
 		copy(*out, *in)
 	}
+	if in.ClientCertificateKeyAlgorithm != nil {
+		in, out := &in.ClientCertificateKeyAlgorithm, &out.ClientCertificateKeyAlgorithm
+		*out = new(CertificateKeyAlgorithmType)
+		**out = **in
+	}
+	if in.ServerCertificateKeyAlgorithm != nil {
+		in, out := &in.ServerCertificateKeyAlgorithm, &out.ServerCertificateKeyAlgorithm
+		*out = new(CertificateKeyAlgorithmType)
+		**out = **in
+	}
 	in.Authentication.DeepCopyInto(&out.Authentication)
 	out.Authorization = in.Authorization
 	if in.RegistryPullQPS != nil {
@@ -574,6 +584,13 @@ func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 		in, out := &in.AllowedUnsafeSysctls, &out.AllowedUnsafeSysctls
 		*out = make([]string, len(*in))
 		copy(*out, *in)
+	}
+	if in.DefaultPodSysctls != nil {
+		in, out := &in.DefaultPodSysctls, &out.DefaultPodSysctls
+		*out = make(map[string]string, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
 	}
 	in.Logging.DeepCopyInto(&out.Logging)
 	if in.EnableSystemLogHandler != nil {

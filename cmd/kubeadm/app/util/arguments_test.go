@@ -140,6 +140,77 @@ func TestArgumentsToCommand(t *testing.T) {
 				"--d=true",
 			},
 		},
+		{
+			name: "append to an existing argument",
+			base: []kubeadmapi.Arg{
+				{Name: "admission-control", Value: "NamespaceLifecycle"},
+				{Name: "allow-privileged", Value: "true"},
+			},
+			overrides: []kubeadmapi.Arg{
+				{Name: "admission-control", Value: ",LimitRanger", MergeMethod: kubeadmapi.ArgMergeMethodAppend},
+			},
+			expected: []string{
+				"--admission-control=NamespaceLifecycle,LimitRanger",
+				"--allow-privileged=true",
+			},
+		},
+		{
+			name: "prepend to an existing argument",
+			base: []kubeadmapi.Arg{
+				{Name: "admission-control", Value: "NamespaceLifecycle"},
+				{Name: "allow-privileged", Value: "true"},
+			},
+			overrides: []kubeadmapi.Arg{
+				{Name: "admission-control", Value: "LimitRanger,", MergeMethod: kubeadmapi.ArgMergeMethodPrepend},
+			},
+			expected: []string{
+				"--admission-control=LimitRanger,NamespaceLifecycle",
+				"--allow-privileged=true",
+			},
+		},
+		{
+			name: "merged args keep their position; replace args go to the end",
+			base: []kubeadmapi.Arg{
+				{Name: "c", Value: "base"},
+				{Name: "a", Value: "base"},
+				{Name: "b", Value: "base"},
+			},
+			overrides: []kubeadmapi.Arg{
+				{Name: "b", Value: ",app", MergeMethod: kubeadmapi.ArgMergeMethodAppend},
+				{Name: "a", Value: "pre,", MergeMethod: kubeadmapi.ArgMergeMethodPrepend},
+				{Name: "c", Value: "replaced"},
+			},
+			expected: []string{
+				"--a=pre,base",
+				"--b=base,app",
+				"--c=replaced",
+			},
+		},
+		{
+			name: "the last override wins for append/prepend",
+			base: []kubeadmapi.Arg{
+				{Name: "admission-control", Value: "NamespaceLifecycle"},
+			},
+			overrides: []kubeadmapi.Arg{
+				{Name: "admission-control", Value: ",First", MergeMethod: kubeadmapi.ArgMergeMethodAppend},
+				{Name: "admission-control", Value: ",Last", MergeMethod: kubeadmapi.ArgMergeMethodAppend},
+			},
+			expected: []string{
+				"--admission-control=NamespaceLifecycle,Last",
+			},
+		},
+		{
+			name: "append/prepend with no matching base arg is dropped",
+			base: []kubeadmapi.Arg{
+				{Name: "allow-privileged", Value: "true"},
+			},
+			overrides: []kubeadmapi.Arg{
+				{Name: "admission-control", Value: ",LimitRanger", MergeMethod: kubeadmapi.ArgMergeMethodAppend},
+			},
+			expected: []string{
+				"--allow-privileged=true",
+			},
+		},
 	}
 
 	for _, rt := range tests {

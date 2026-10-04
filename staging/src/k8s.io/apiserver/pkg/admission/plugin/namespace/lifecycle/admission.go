@@ -102,6 +102,11 @@ func (l *Lifecycle) Admit(ctx context.Context, a admission.Attributes, o admissi
 		return nil
 	}
 
+	// always allow updates to other resources
+	if a.GetOperation() == admission.Update {
+		return nil
+	}
+
 	// always allow access review checks.  Returning status about the namespace would be leaking information
 	if isAccessReview(a) {
 		return nil

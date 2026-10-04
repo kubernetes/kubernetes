@@ -122,26 +122,33 @@ var unusedSinceNowFunc = metav1.Now
 type podUsageCheckFunc func(logger klog.Logger, pod *v1.Pod, pvc *v1.PersistentVolumeClaim) bool
 
 // NewPVCProtectionController returns a new instance of PVCProtectionController.
-func NewPVCProtectionController(logger klog.Logger, pvcInformer coreinformers.PersistentVolumeClaimInformer, podInformer coreinformers.PodInformer, cl clientset.Interface) (*Controller, error) {
+func NewPVCProtectionController(ctx context.Context, pvcInformer coreinformers.PersistentVolumeClaimInformer, podInformer coreinformers.PodInformer, cl clientset.Interface) (*Controller, error) {
+	logger := klog.FromContext(ctx)
 	e := &Controller{
 		client: cl,
 		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
 			workqueue.DefaultTypedControllerRateLimiter[string](),
-			workqueue.TypedRateLimitingQueueConfig[string]{Name: "pvcprotection"},
+			workqueue.TypedRateLimitingQueueConfig[string]{
+				Logger: &logger,
+				Name:   "pvcprotection",
+			},
 		),
 		pvcProcessingStore: NewPVCProcessingStore(),
 	}
 
 	e.pvcLister = pvcInformer.Lister()
 	e.pvcListerSynced = pvcInformer.Informer().HasSynced
-	pvcInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	_, err := pvcInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			e.pvcAddedUpdated(logger, obj)
 		},
 		UpdateFunc: func(old, new interface{}) {
 			e.pvcAddedUpdated(logger, new)
 		},
-	})
+	}, cache.HandlerOptions{Logger: &logger})
+	if err != nil {
+		return nil, fmt.Errorf("could not add PVC event handler: %w", err)
+	}
 
 	e.podLister = podInformer.Lister()
 	e.podListerSynced = podInformer.Informer().HasSynced
@@ -149,7 +156,7 @@ func NewPVCProtectionController(logger klog.Logger, pvcInformer coreinformers.Pe
 	if err := common.AddIndexerIfNotPresent(e.podIndexer, common.PodPVCIndex, common.PodPVCIndexFunc()); err != nil {
 		return nil, fmt.Errorf("could not initialize pvc protection controller: %w", err)
 	}
-	podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	_, err = podInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			e.podAddedDeletedUpdated(logger, nil, obj, false)
 		},
@@ -159,14 +166,17 @@ func NewPVCProtectionController(logger klog.Logger, pvcInformer coreinformers.Pe
 		UpdateFunc: func(old, new interface{}) {
 			e.podAddedDeletedUpdated(logger, old, new, false)
 		},
-	})
+	}, cache.HandlerOptions{Logger: &logger})
+	if err != nil {
+		return nil, fmt.Errorf("could not add Pod event handler: %w", err)
+	}
 
 	return e, nil
 }
 
 // Run runs the controller goroutines.
 func (c *Controller) Run(ctx context.Context, workers int) {
-	defer utilruntime.HandleCrash()
+	defer utilruntime.HandleCrashWithContext(ctx)
 
 	logger := klog.FromContext(ctx)
 	logger.Info("Starting PVC protection controller")
@@ -236,7 +246,7 @@ func (c *Controller) processPVCsByNamespace(ctx context.Context) bool {
 			c.queue.Forget(pvcKey)
 		} else {
 			c.queue.AddRateLimited(pvcKey)
-			utilruntime.HandleError(fmt.Errorf("PVC %v/%v failed with: %w", pvcName, namespace, err))
+			utilruntime.HandleError(fmt.Errorf("PVC %v/%v failed with: %w", namespace, pvcName, err))
 		}
 		c.queue.Done(pvcKey)
 	}
@@ -260,7 +270,9 @@ func (c *Controller) processPVC(ctx context.Context, pvcNamespace, pvcName strin
 		return err
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.PersistentVolumeClaimUnusedSinceTime) && pvc.DeletionTimestamp == nil {
+	if utilfeature.DefaultFeatureGate.Enabled(features.PersistentVolumeClaimUnusedSinceTime) &&
+		pvc.DeletionTimestamp == nil && pvc.Status.Phase == v1.ClaimBound {
+		// Avoid conflict with PV controller binding process.
 		isUsed, err := c.isBeingUsedWith(ctx, pvc, lazyLivePodList, c.podUsesPVCForUnusedSince)
 		if err != nil {
 			return err

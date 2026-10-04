@@ -55,6 +55,20 @@ Example:
 
     base64.encode(b'hello') // return 'aGVsbG8='
 
+### JSON.Encode
+
+Introduced at version: 1
+
+Encodes a CEL value to a JSON string.
+
+    json.encode(<dyn>) -> <string>
+
+Examples:
+
+    json.encode('hello')                      // return '"hello"'
+    json.encode([1, 'two', true])             // return '[1,"two",true]'
+    json.encode({'items': [1, 'two', false]}) // return '{"items":[1,"two",false]}'
+
 ## Math
 
 Math helper macros and functions.

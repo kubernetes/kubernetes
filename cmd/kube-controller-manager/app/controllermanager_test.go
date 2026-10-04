@@ -26,14 +26,12 @@ import (
 	"github.com/google/go-cmp/cmp"
 
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apiserver/pkg/server/healthz"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/names"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 func TestControllerNamesConsistency(t *testing.T) {
@@ -157,11 +155,6 @@ func TestFeatureGatedControllersShouldNotDefineAliases(t *testing.T) {
 			continue
 		}
 
-		// DO NOT ADD any new controllers here. one controller is an exception, because it was added before this test was introduced
-		if name == names.ResourceClaimController {
-			continue
-		}
-
 		areAllRequiredFeaturesAlpha := true
 		for _, feature := range requiredFeatureGates {
 			if !alphaFeatures.Has(string(feature)) {
@@ -173,63 +166,6 @@ func TestFeatureGatedControllersShouldNotDefineAliases(t *testing.T) {
 		if areAllRequiredFeaturesAlpha {
 			t.Errorf("alias check failed: controller name %q should not be aliased as it is still guarded by alpha feature gates (%v) and thus should have only a canonical name", name, requiredFeatureGates)
 		}
-	}
-}
-
-// TestTaintEvictionControllerGating ensures that it is possible to run taint-manager as a separated controller
-// only when the SeparateTaintEvictionController feature is enabled
-func TestTaintEvictionControllerGating(t *testing.T) {
-	tests := []struct {
-		name               string
-		enableFeatureGate  bool
-		expectInitFuncCall bool
-	}{
-		{
-			name:               "standalone taint-eviction-controller should run when SeparateTaintEvictionController feature gate is enabled",
-			enableFeatureGate:  true,
-			expectInitFuncCall: true,
-		},
-		{
-			name:               "standalone taint-eviction-controller should not run when SeparateTaintEvictionController feature gate is not enabled",
-			enableFeatureGate:  false,
-			expectInitFuncCall: false,
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.33"))
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SeparateTaintEvictionController, test.enableFeatureGate)
-			_, ctx := ktesting.NewTestContext(t)
-			ctx, cancel := context.WithCancel(ctx)
-			defer cancel()
-
-			controllerCtx := ControllerContext{}
-			controllerCtx.ComponentConfig.Generic.Controllers = []string{names.TaintEvictionController}
-
-			initFuncCalled := false
-
-			taintEvictionControllerDescriptor := NewControllerDescriptors()[names.TaintEvictionController]
-			taintEvictionControllerDescriptor.constructor = func(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error) {
-				initFuncCalled = true
-				return newControllerLoop(func(ctx context.Context) {}, controllerName), nil
-			}
-
-			var healthChecks mockHealthCheckAdder
-			if err := runControllers(ctx, controllerCtx, map[string]*ControllerDescriptor{
-				names.TaintEvictionController: taintEvictionControllerDescriptor,
-			}, &healthChecks); err != nil {
-				t.Errorf("starting a TaintEvictionController controller should not return an error")
-			}
-			if test.expectInitFuncCall != initFuncCalled {
-				t.Errorf("TaintEvictionController init call check failed: expected=%v, got=%v", test.expectInitFuncCall, initFuncCalled)
-			}
-			hasHealthCheck := len(healthChecks.Checks) > 0
-			expectHealthCheck := test.expectInitFuncCall
-			if expectHealthCheck != hasHealthCheck {
-				t.Errorf("TaintEvictionController healthCheck check failed: expected=%v, got=%v", expectHealthCheck, hasHealthCheck)
-			}
-		})
 	}
 }
 
@@ -266,17 +202,41 @@ func TestRunControllers(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			_, ctx := ktesting.NewTestContext(t)
 			controllerCtx := ControllerContext{}
+			controllerCtx.ComponentConfig.Generic.Controllers = []string{"controller-A"}
 
 			// testCtx is used to make sure the controller failing to shut down can exit after the test is finished.
 			testCtx, cancelTest := context.WithCancel(ctx)
 			defer cancelTest()
+
+			initFuncCalled := false
+			descriptor := &ControllerDescriptor{
+				name: "controller-A",
+				constructor: func(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error) {
+					initFuncCalled = true
+					return tc.newController(testCtx), nil
+				},
+			}
+
+			var healthChecks mockHealthCheckAdder
+			controllers, err := BuildControllers(ctx, controllerCtx, map[string]*ControllerDescriptor{
+				"controller-A": descriptor,
+			}, nil, &healthChecks)
+			if err != nil {
+				t.Fatalf("unexpected error building controllers: %v", err)
+			}
+			if !initFuncCalled {
+				t.Errorf("controller constructor was not called")
+			}
+			if len(healthChecks.Checks) == 0 {
+				t.Errorf("expected health check to be added")
+			}
 
 			// ctx is used to wait in the controller for shutdown and also to start the shutdown timeout in RunControllers.
 			// To start the shutdown timeout immediately, we start with a cancelled context already.
 			ctx, cancelController := context.WithCancel(ctx)
 			cancelController()
 
-			cleanShutdown := RunControllers(ctx, controllerCtx, []Controller{tc.newController(testCtx)}, 0, tc.shutdownTimeout)
+			cleanShutdown := RunControllers(ctx, controllerCtx, controllers, 0, tc.shutdownTimeout)
 			if cleanShutdown != tc.expectedCleanTermination {
 				t.Errorf("expected clean shutdown %v, got %v", tc.expectedCleanTermination, cleanShutdown)
 			}

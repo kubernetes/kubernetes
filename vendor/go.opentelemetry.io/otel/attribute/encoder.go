@@ -1,7 +1,7 @@
 // Copyright The OpenTelemetry Authors
 // SPDX-License-Identifier: Apache-2.0
 
-package attribute // import "go.opentelemetry.io/otel/attribute"
+package attribute
 
 import (
 	"bytes"
@@ -105,7 +105,9 @@ func (d *defaultAttrEncoder) Encode(iter Iterator) string {
 		if keyValue.Value.Type() == STRING {
 			copyAndEscape(buf, keyValue.Value.AsString())
 		} else {
-			_, _ = buf.WriteString(keyValue.Value.Emit())
+			_, _ = buf.WriteString(
+				keyValue.Value.Emit(),
+			) //nolint:staticcheck // Preserve the existing default encoder output.
 		}
 	}
 	return buf.String()

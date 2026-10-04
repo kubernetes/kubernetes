@@ -26,26 +26,9 @@ import (
 	"github.com/stretchr/testify/require"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
-	oteltrace "go.opentelemetry.io/otel/trace"
-	"go.opentelemetry.io/otel/trace/noop"
-	internalapi "k8s.io/cri-api/pkg/apis"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/cri-client/pkg/util"
 )
-
-func createRemoteImageServiceWithTracerProvider(ctx context.Context, endpoint string, tp oteltrace.TracerProvider, t *testing.T) internalapi.ImageManagerService {
-	imageService, err := NewRemoteImageService(ctx, endpoint, defaultConnectionTimeout, tp, false)
-	require.NoError(t, err)
-
-	return imageService
-}
-
-func createRemoteImageServiceWithoutTracerProvider(ctx context.Context, endpoint string, t *testing.T) internalapi.ImageManagerService {
-	imageService, err := NewRemoteImageService(ctx, endpoint, defaultConnectionTimeout, noop.NewTracerProvider(), false)
-	require.NoError(t, err)
-
-	return imageService
-}
 
 func TestImageServiceSpansWithTP(t *testing.T) {
 	fakeRuntime, endpoint := createAndStartFakeRemoteRuntime(t)
@@ -63,7 +46,12 @@ func TestImageServiceSpansWithTP(t *testing.T) {
 		sdktrace.WithBatcher(exp),
 	)
 	ctx := context.Background()
-	imgSvc := createRemoteImageServiceWithTracerProvider(ctx, endpoint, tp, t)
+	imgSvc, err := NewRemoteImageServiceBuilder().
+		WithEndpoint(endpoint).
+		WithConnectionTimeout(defaultConnectionTimeout).
+		WithTracerProvider(tp).
+		Build(ctx)
+	require.NoError(t, err)
 	imgRef, err := imgSvc.PullImage(ctx, &runtimeapi.ImageSpec{Image: "busybox"}, nil, nil)
 	assert.NoError(t, err)
 	assert.Equal(t, "busybox", imgRef)
@@ -89,7 +77,11 @@ func TestImageServiceSpansWithoutTP(t *testing.T) {
 		sdktrace.WithBatcher(exp),
 	)
 	ctx := context.Background()
-	imgSvc := createRemoteImageServiceWithoutTracerProvider(ctx, endpoint, t)
+	imgSvc, err := NewRemoteImageServiceBuilder().
+		WithEndpoint(endpoint).
+		WithConnectionTimeout(defaultConnectionTimeout).
+		Build(ctx)
+	require.NoError(t, err)
 	imgRef, err := imgSvc.PullImage(ctx, &runtimeapi.ImageSpec{Image: "busybox"}, nil, nil)
 	assert.NoError(t, err)
 	assert.Equal(t, "busybox", imgRef)
@@ -97,6 +89,19 @@ func TestImageServiceSpansWithoutTP(t *testing.T) {
 	err = tp.ForceFlush(ctx)
 	require.NoError(t, err)
 	assert.Empty(t, exp.GetSpans())
+}
+
+func TestImageServiceBuildValidatesRequiredOptions(t *testing.T) {
+	ctx := context.Background()
+	_, err := NewRemoteImageServiceBuilder().
+		WithConnectionTimeout(defaultConnectionTimeout).
+		Build(ctx)
+	require.ErrorContains(t, err, "endpoint is required")
+
+	_, err = NewRemoteImageServiceBuilder().
+		WithEndpoint("unix:///tmp/cri-client-test.sock").
+		Build(ctx)
+	require.ErrorContains(t, err, "connectionTimeout must be positive")
 }
 
 func TestNewRemoteImageServiceUnixSocketEndpoint(t *testing.T) {
@@ -118,7 +123,11 @@ func TestNewRemoteImageServiceUnixSocketEndpoint(t *testing.T) {
 	}()
 
 	ctx := context.Background()
-	imgSvc := createRemoteImageServiceWithoutTracerProvider(ctx, endpoint, t)
+	imgSvc, err := NewRemoteImageServiceBuilder().
+		WithEndpoint(endpoint).
+		WithConnectionTimeout(defaultConnectionTimeout).
+		Build(ctx)
+	require.NoError(t, err)
 	info, err := imgSvc.ImageFsInfo(ctx)
 	require.NoError(t, err)
 	assert.NotNil(t, info)

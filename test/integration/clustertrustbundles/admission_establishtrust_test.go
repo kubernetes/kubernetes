@@ -24,7 +24,7 @@ import (
 	"math/big"
 	"testing"
 
-	certsv1beta1 "k8s.io/api/certificates/v1beta1"
+	certsv1 "k8s.io/api/certificates/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -74,7 +74,7 @@ func TestCTBAttestPlugin(t *testing.T) {
 		t.Run(tc.description, func(t *testing.T) {
 			ctx := context.Background()
 
-			server := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--authorization-mode=RBAC", "--feature-gates=ClusterTrustBundle=true", fmt.Sprintf("--runtime-config=%s=true", certsv1beta1.SchemeGroupVersion)}, framework.SharedEtcd())
+			server := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--authorization-mode=RBAC", "--feature-gates=ClusterTrustBundle=true", fmt.Sprintf("--runtime-config=%s=true", certsv1.SchemeGroupVersion)}, framework.SharedEtcd())
 			defer server.TearDownFn()
 
 			client := kubernetes.NewForConfigOrDie(server.ClientConfig)
@@ -88,11 +88,11 @@ func TestCTBAttestPlugin(t *testing.T) {
 			testUserConfig.Impersonate = rest.ImpersonationConfig{UserName: "test-user"}
 			testUserClient := kubernetes.NewForConfigOrDie(testUserConfig)
 
-			bundle := &certsv1beta1.ClusterTrustBundle{
+			bundle := &certsv1.ClusterTrustBundle{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: tc.trustBundleName,
 				},
-				Spec: certsv1beta1.ClusterTrustBundleSpec{
+				Spec: certsv1.ClusterTrustBundleSpec{
 					SignerName: tc.targetSignerName,
 					TrustBundle: mustMakePEMBlock("CERTIFICATE", nil, mustMakeCertificate(t, &x509.Certificate{
 						SerialNumber: big.NewInt(0),
@@ -104,7 +104,7 @@ func TestCTBAttestPlugin(t *testing.T) {
 					})),
 				},
 			}
-			_, err := testUserClient.CertificatesV1beta1().ClusterTrustBundles().Create(ctx, bundle, metav1.CreateOptions{})
+			_, err := testUserClient.CertificatesV1().ClusterTrustBundles().Create(ctx, bundle, metav1.CreateOptions{})
 			if err != nil && err.Error() != tc.wantError {
 				t.Fatalf("Bad error while creating ClusterTrustBundle; got %q want %q", err.Error(), tc.wantError)
 			} else if err == nil && tc.wantError != "" {

@@ -297,7 +297,7 @@ func (un *unparser) visitConstVal(val ref.Val) error {
 		// represent the float using the minimum required digits
 		d := strconv.FormatFloat(float64(val), 'g', -1, 64)
 		un.str.WriteString(d)
-		if !strings.Contains(d, ".") {
+		if !strings.ContainsAny(d, ".eE") {
 			un.str.WriteString(".0")
 		}
 	case types.Int:

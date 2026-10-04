@@ -15,6 +15,11 @@ func (s *HugetlbGroup) Name() string {
 	return "hugetlb"
 }
 
+// ID returns the controller ID for hugetlb subsystem.
+func (s *HugetlbGroup) ID() cgroups.Controller {
+	return cgroups.HugeTLB
+}
+
 func (s *HugetlbGroup) Apply(path string, _ *cgroups.Resources, pid int) error {
 	return apply(path, pid)
 }

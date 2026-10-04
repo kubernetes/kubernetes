@@ -23,7 +23,6 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
-	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistrytest "k8s.io/apiserver/pkg/registry/generic/testing"
 	"k8s.io/apiserver/pkg/registry/rest"
@@ -118,7 +117,7 @@ func TestDeleteSystemPriorityClass(t *testing.T) {
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
 	key := "/priorityclasses/test/system-node-critical"
-	ctx := genericapirequest.NewContext()
+	ctx := genericregistrytest.NewClusterScopeContext(storage.Store)
 	pc := schedulingapiv1.SystemPriorityClasses()[0]
 	internalPc := &scheduling.PriorityClass{}
 	if err := schedulingapiv1.Convert_v1_PriorityClass_To_scheduling_PriorityClass(pc, internalPc, nil); err != nil {

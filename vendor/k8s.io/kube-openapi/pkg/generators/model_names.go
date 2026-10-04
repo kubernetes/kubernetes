@@ -19,7 +19,6 @@ package generators
 import (
 	"fmt"
 	"io"
-	"path/filepath"
 	"strings"
 
 	"k8s.io/gengo/v2"
@@ -27,7 +26,6 @@ import (
 	"k8s.io/gengo/v2/namer"
 	"k8s.io/gengo/v2/types"
 	"k8s.io/klog/v2"
-	"k8s.io/kube-openapi/pkg/generators/apidefinitions"
 )
 
 const (
@@ -40,51 +38,6 @@ func extractOpenAPISchemaNamePackage(comments []string) (string, error) {
 		return "", err
 	}
 	return v.Value, nil
-}
-
-// resolvePackageModelPackage returns the OpenAPI model package for pkg.
-//
-// The package's model package is derived from two yaml files:
-//   - apiversion.yaml in pkg's directory provides the version,
-//   - apigroup.yaml in the parent directory provides spec.modelPackage,
-//
-// joined as "<spec.modelPackage>.<version>" (e.g. "io.k8s.api.apps" + "v1"
-// → "io.k8s.api.apps.v1").
-//
-// The legacy +k8s:openapi-model-package= tag, if present, must agree with
-// the derived value; an empty result means the package opts out of openapi
-// model naming.
-func resolvePackageModelPackage(pkg *types.Package) (string, error) {
-	tagPackage, err := extractOpenAPISchemaNamePackage(pkg.Comments)
-	if err != nil {
-		return "", err
-	}
-	apiVersion, err := apidefinitions.LoadAPIVersion(pkg.Dir)
-	if err != nil {
-		return "", err
-	}
-	if apiVersion == nil {
-		// No apiversion.yaml: fall back to whatever the tag says (possibly "").
-		return tagPackage, nil
-	}
-	parentDir := filepath.Dir(pkg.Dir)
-	apiGroup, err := apidefinitions.LoadAPIGroup(parentDir)
-	if err != nil {
-		return "", err
-	}
-	if apiGroup == nil {
-		if tagPackage != "" {
-			return "", fmt.Errorf("in package %s: %s declares +k8s:openapi-model-package=%q but no apigroup.yaml is present in the parent directory %s to derive a model package",
-				pkg.Dir, filepath.Join(pkg.Dir, "doc.go"), tagPackage, parentDir)
-		}
-		return "", nil
-	}
-	derived := apiGroup.ModelPackageFor(apiVersion.VersionFromName())
-	if tagPackage != "" && tagPackage != derived {
-		return "", fmt.Errorf("in package %s: parent apigroup.yaml derives model package %q for version %q but +k8s:openapi-model-package tag is %q. Please make them match or remove the tag.",
-			pkg.Dir, derived, apiVersion.VersionFromName(), tagPackage)
-	}
-	return derived, nil
 }
 
 func singularTag(tagName string, comments []string) (*gengo.Tag, error) {

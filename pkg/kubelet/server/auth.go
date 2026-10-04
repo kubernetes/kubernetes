@@ -101,6 +101,8 @@ func (n nodeAuthorizerAttributesGetter) GetRequestAttributes(ctx context.Context
 	var subresources []string
 	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletFineGrainedAuthz) {
 		switch {
+		case isSubpath(requestPath, allocatedPodsPath):
+			subresources = append(subresources, "pods")
 		case isSubpath(requestPath, podsPath):
 			subresources = append(subresources, "pods")
 		case isSubpath(requestPath, healthz.DefaultHealthzPath):

@@ -67,7 +67,7 @@ type resourceMetricsClient struct {
 func (c *resourceMetricsClient) GetResourceMetric(ctx context.Context, resource v1.ResourceName, namespace string, selector labels.Selector, container string) (PodMetricsInfo, time.Time, error) {
 	metrics, err := c.client.PodMetricses(namespace).List(ctx, metav1.ListOptions{LabelSelector: selector.String()})
 	if err != nil {
-		return nil, time.Time{}, fmt.Errorf("unable to fetch metrics from resource metrics API: %v", err)
+		return nil, time.Time{}, fmt.Errorf("unable to fetch metrics from resource metrics API: %w", err)
 	}
 
 	if len(metrics.Items) == 0 {
@@ -143,7 +143,7 @@ type customMetricsClient struct {
 func (c *customMetricsClient) GetRawMetric(metricName string, namespace string, selector labels.Selector, metricSelector labels.Selector) (PodMetricsInfo, time.Time, error) {
 	metrics, err := c.client.NamespacedMetrics(namespace).GetForObjects(schema.GroupKind{Kind: "Pod"}, selector, metricName, metricSelector)
 	if err != nil {
-		return nil, time.Time{}, fmt.Errorf("unable to fetch metrics from custom metrics API: %v", err)
+		return nil, time.Time{}, fmt.Errorf("unable to fetch metrics from custom metrics API: %w", err)
 	}
 
 	if len(metrics.Items) == 0 {
@@ -184,7 +184,7 @@ func (c *customMetricsClient) GetObjectMetric(metricName string, namespace strin
 	}
 
 	if err != nil {
-		return 0, time.Time{}, fmt.Errorf("unable to fetch metrics from custom metrics API: %v", err)
+		return 0, time.Time{}, fmt.Errorf("unable to fetch metrics from custom metrics API: %w", err)
 	}
 
 	return metricValue.Value.MilliValue(), metricValue.Timestamp.Time, nil
@@ -201,7 +201,7 @@ type externalMetricsClient struct {
 func (c *externalMetricsClient) GetExternalMetric(metricName, namespace string, selector labels.Selector) ([]int64, time.Time, error) {
 	metrics, err := c.client.NamespacedMetrics(namespace).List(metricName, selector)
 	if err != nil {
-		return []int64{}, time.Time{}, fmt.Errorf("unable to fetch metrics from external metrics API: %v", err)
+		return []int64{}, time.Time{}, fmt.Errorf("unable to fetch metrics from external metrics API: %w", err)
 	}
 
 	if len(metrics.Items) == 0 {

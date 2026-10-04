@@ -24,8 +24,6 @@ import (
 	"math"
 	"sync"
 	"time"
-
-	"k8s.io/utils/clock"
 )
 
 var (
@@ -41,9 +39,6 @@ var (
 // random token for their retrieval. The requestCache is used for building streaming URLs without
 // the need to encode every request parameter in the URL.
 type requestCache struct {
-	// clock is used to obtain the current time
-	clock clock.Clock
-
 	// tokens maps the generate token to the request for fast retrieval.
 	tokens map[string]*list.Element
 	// ll maintains an age-ordered request list for faster garbage collection of expired requests.
@@ -63,7 +58,6 @@ type cacheEntry struct {
 
 func newRequestCache() *requestCache {
 	return &requestCache{
-		clock:  clock.RealClock{},
 		ll:     list.New(),
 		tokens: make(map[string]*list.Element),
 	}
@@ -84,7 +78,11 @@ func (c *requestCache) Insert(req request) (token string, err error) {
 	if err != nil {
 		return "", err
 	}
-	ele := c.ll.PushFront(&cacheEntry{token, req, c.clock.Now().Add(cacheTTL)})
+	ele := c.ll.PushFront(&cacheEntry{
+		token:      token,
+		req:        req,
+		expireTime: time.Now().Add(cacheTTL),
+	})
 
 	c.tokens[token] = ele
 	return token, nil
@@ -102,7 +100,7 @@ func (c *requestCache) Consume(token string) (req request, found bool) {
 	delete(c.tokens, token)
 
 	entry := ele.Value.(*cacheEntry)
-	if c.clock.Now().After(entry.expireTime) {
+	if time.Now().After(entry.expireTime) {
 		// Entry already expired.
 		return nil, false
 	}
@@ -131,7 +129,7 @@ func (c *requestCache) uniqueToken() (string, error) {
 
 // Must be write-locked prior to calling.
 func (c *requestCache) gc() {
-	now := c.clock.Now()
+	now := time.Now()
 	for c.ll.Len() > 0 {
 		oldest := c.ll.Back()
 		entry := oldest.Value.(*cacheEntry)

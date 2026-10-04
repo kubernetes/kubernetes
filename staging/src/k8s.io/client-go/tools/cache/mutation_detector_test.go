@@ -53,7 +53,10 @@ func TestMutationDetector(t *testing.T) {
 		period:         1 * time.Second,
 		retainDuration: 2 * time.Minute,
 		failureFunc: func(message string) {
-			mutationFound <- true
+			select {
+			case mutationFound <- true:
+			case <-stopCh:
+			}
 		},
 	}
 	informer.cacheMutationDetector = detector
@@ -63,8 +66,14 @@ func TestMutationDetector(t *testing.T) {
 
 	wait.PollImmediate(100*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
 		detector.addedObjsLock.Lock()
-		defer detector.addedObjsLock.Unlock()
-		return len(detector.addedObjs) > 0, nil
+		addedLen := len(detector.addedObjs)
+		detector.addedObjsLock.Unlock()
+
+		detector.compareObjectsLock.Lock()
+		cachedLen := len(detector.cachedObjs)
+		detector.compareObjectsLock.Unlock()
+
+		return addedLen+cachedLen > 0, nil
 	})
 
 	detector.compareObjectsLock.Lock()

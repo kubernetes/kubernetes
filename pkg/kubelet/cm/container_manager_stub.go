@@ -73,7 +73,7 @@ func (cm *containerManagerStub) GetQOSContainersInfo() QOSContainersInfo {
 	return QOSContainersInfo{}
 }
 
-func (cm *containerManagerStub) UpdateQOSCgroups(logger klog.Logger) error {
+func (cm *containerManagerStub) UpdateQOSCgroups(_ klog.Logger) error {
 	return nil
 }
 
@@ -85,7 +85,7 @@ func (cm *containerManagerStub) GetNodeAllocatableReservation() v1.ResourceList 
 	return nil
 }
 
-func (cm *containerManagerStub) GetCapacity(localStorageCapacityIsolation bool) v1.ResourceList {
+func (cm *containerManagerStub) GetCapacity(_ klog.Logger, localStorageCapacityIsolation bool) v1.ResourceList {
 	if !localStorageCapacityIsolation {
 		return v1.ResourceList{}
 	}
@@ -105,7 +105,7 @@ func (cm *containerManagerStub) GetHealthCheckers() []healthz.HealthChecker {
 	return []healthz.HealthChecker{}
 }
 
-func (cm *containerManagerStub) GetDevicePluginResourceCapacity() (v1.ResourceList, v1.ResourceList, []string) {
+func (cm *containerManagerStub) GetDevicePluginResourceCapacity(_ klog.Logger) (v1.ResourceList, v1.ResourceList, []string) {
 	return cm.extendedPluginResources, cm.extendedPluginResources, []string{}
 }
 
@@ -113,7 +113,7 @@ func (m *podContainerManagerStub) GetPodCgroupConfig(_ *v1.Pod, _ v1.ResourceNam
 	return nil, fmt.Errorf("not implemented")
 }
 
-func (m *podContainerManagerStub) SetPodCgroupConfig(logger klog.Logger, pod *v1.Pod, resourceConfig *ResourceConfig) error {
+func (m *podContainerManagerStub) SetPodCgroupConfig(_ klog.Logger, _ *v1.Pod, _ *ResourceConfig) error {
 	return fmt.Errorf("not implemented")
 }
 
@@ -121,7 +121,7 @@ func (cm *containerManagerStub) NewPodContainerManager() PodContainerManager {
 	return &podContainerManagerStub{}
 }
 
-func (cm *containerManagerStub) GetResources(ctx context.Context, pod *v1.Pod, container *v1.Container) (*kubecontainer.RunContainerOptions, error) {
+func (cm *containerManagerStub) GetResources(_ context.Context, _ *v1.Pod, _ *v1.Container) (*kubecontainer.RunContainerOptions, error) {
 	return &kubecontainer.RunContainerOptions{}, nil
 }
 
@@ -129,8 +129,8 @@ func (cm *containerManagerStub) UpdatePluginResources(*schedulerframework.NodeIn
 	return nil
 }
 
-func (cm *containerManagerStub) InternalContainerLifecycle() InternalContainerLifecycle {
-	return &internalContainerLifecycleImpl{cm.cpuManager, cm.memoryManager, topologymanager.NewFakeManager()}
+func (cm *containerManagerStub) InternalContainerLifecycle(logger klog.Logger) InternalContainerLifecycle {
+	return &internalContainerLifecycleImpl{cm.cpuManager, cm.memoryManager, topologymanager.NewFakeManager(logger)}
 }
 
 func (cm *containerManagerStub) GetPodCgroupRoot() string {
@@ -141,7 +141,7 @@ func (cm *containerManagerStub) GetDevices(_, _ string) []*podresourcesapi.Conta
 	return nil
 }
 
-func (cm *containerManagerStub) GetAllocatableDevices() []*podresourcesapi.ContainerDevices {
+func (cm *containerManagerStub) GetAllocatableDevices(_ klog.Logger) []*podresourcesapi.ContainerDevices {
 	return nil
 }
 
@@ -149,15 +149,19 @@ func (cm *containerManagerStub) ShouldResetExtendedResourceCapacity() bool {
 	return cm.shouldResetExtendedResourceCapacity
 }
 
-func (cm *containerManagerStub) GetAllocateResourcesPodAdmitHandler() lifecycle.PodAdmitHandler {
-	return topologymanager.NewFakeManager()
+func (cm *containerManagerStub) GetAllocateResourcesPodAdmitHandler(logger klog.Logger) lifecycle.PodAdmitHandler {
+	return topologymanager.NewFakeManager(logger)
 }
 
-func (cm *containerManagerStub) UpdateAllocatedDevices() {
+func (cm *containerManagerStub) UpdateAllocatedDevices(_ klog.Logger) {
 	return
 }
 
-func (cm *containerManagerStub) GetCPUs(_, _ string) []int64 {
+func (cm *containerManagerStub) GetCPUs(_ *v1.Pod, _ *v1.Container) []int64 {
+	return nil
+}
+
+func (cm *containerManagerStub) GetPodCPUs(_ string) []int64 {
 	return nil
 }
 
@@ -165,15 +169,19 @@ func (cm *containerManagerStub) GetAllocatableCPUs() []int64 {
 	return nil
 }
 
-func (cm *containerManagerStub) GetMemory(_, _ string) []*podresourcesapi.ContainerMemory {
+func (cm *containerManagerStub) GetMemory(_ klog.Logger, _ *v1.Pod, _ *v1.Container) []*podresourcesapi.ContainerMemory {
 	return nil
 }
 
-func (cm *containerManagerStub) GetAllocatableMemory() []*podresourcesapi.ContainerMemory {
+func (cm *containerManagerStub) GetPodMemory(_ klog.Logger, _ string) []*podresourcesapi.ContainerMemory {
 	return nil
 }
 
-func (cm *containerManagerStub) GetDynamicResources(pod *v1.Pod, container *v1.Container) []*podresourcesapi.DynamicResource {
+func (cm *containerManagerStub) GetAllocatableMemory(_ klog.Logger) []*podresourcesapi.ContainerMemory {
+	return nil
+}
+
+func (cm *containerManagerStub) GetDynamicResources(_ klog.Logger, _ *v1.Pod, _ *v1.Container) []*podresourcesapi.DynamicResource {
 	return nil
 }
 
@@ -181,30 +189,30 @@ func (cm *containerManagerStub) GetNodeAllocatableAbsolute() v1.ResourceList {
 	return nil
 }
 
-func (cm *containerManagerStub) PrepareDynamicResources(ctx context.Context, pod *v1.Pod) error {
+func (cm *containerManagerStub) PrepareDynamicResources(_ context.Context, _ *v1.Pod) error {
 	return nil
 }
 
-func (cm *containerManagerStub) UnprepareDynamicResources(ctx context.Context, pod *v1.Pod) error {
+func (cm *containerManagerStub) UnprepareDynamicResources(_ context.Context, _ *v1.Pod) error {
 	return nil
 }
 
-func (cm *containerManagerStub) PodMightNeedToUnprepareResources(UID types.UID) bool {
+func (cm *containerManagerStub) PodMightNeedToUnprepareResources(_ types.UID) bool {
 	return false
 }
 
-func (cm *containerManagerStub) UpdateAllocatedResourcesStatus(pod *v1.Pod, status *v1.PodStatus) {
+func (cm *containerManagerStub) UpdateAllocatedResourcesStatus(_ klog.Logger, _ *v1.Pod, _ *v1.PodStatus) {
 }
 
 func (cm *containerManagerStub) Updates() <-chan resourceupdates.Update {
 	return nil
 }
 
-func (cm *containerManagerStub) PodHasExclusiveCPUs(pod *v1.Pod) bool {
+func (cm *containerManagerStub) PodHasExclusiveCPUs(_ klog.Logger, _ *v1.Pod) bool {
 	return false
 }
 
-func (cm *containerManagerStub) ContainerHasExclusiveCPUs(pod *v1.Pod, container *v1.Container) bool {
+func (cm *containerManagerStub) ContainerHasExclusiveCPUs(_ klog.Logger, _ *v1.Pod, _ *v1.Container) bool {
 	return false
 }
 

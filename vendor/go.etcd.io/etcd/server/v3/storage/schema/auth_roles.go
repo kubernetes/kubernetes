@@ -16,6 +16,7 @@ package schema
 
 import (
 	"go.uber.org/zap"
+	"google.golang.org/protobuf/proto"
 
 	"go.etcd.io/etcd/api/v3/authpb"
 	"go.etcd.io/etcd/server/v3/storage/backend"
@@ -48,7 +49,7 @@ func (atx *authBatchTx) UnsafeGetAllRoles() []*authpb.Role {
 }
 
 func (atx *authBatchTx) UnsafePutRole(role *authpb.Role) {
-	b, err := role.Marshal()
+	b, err := proto.Marshal(role)
 	if err != nil {
 		atx.lg.Panic(
 			"failed to marshal 'authpb.Role'",
@@ -75,7 +76,7 @@ func unsafeGetRole(lg *zap.Logger, tx backend.UnsafeReader, roleName string) *au
 	}
 
 	role := &authpb.Role{}
-	err := role.Unmarshal(vs[0])
+	err := proto.Unmarshal(vs[0], role)
 	if err != nil {
 		lg.Panic("failed to unmarshal 'authpb.Role'", zap.Error(err))
 	}
@@ -95,7 +96,7 @@ func unsafeGetAllRoles(lg *zap.Logger, tx backend.UnsafeReader) []*authpb.Role {
 	roles := make([]*authpb.Role, len(vs))
 	for i := range vs {
 		role := &authpb.Role{}
-		err := role.Unmarshal(vs[i])
+		err := proto.Unmarshal(vs[i], role)
 		if err != nil {
 			lg.Panic("failed to unmarshal 'authpb.Role'", zap.Error(err))
 		}

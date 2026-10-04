@@ -27,11 +27,12 @@ import (
 //
 // ResourceFieldSelector represents container resources (cpu, memory) and their output format
 type ResourceFieldSelectorApplyConfiguration struct {
-	// Container name: required for volumes, optional for env vars
+	// containerName is the name of the container: required for volumes, optional for env vars
 	ContainerName *string `json:"containerName,omitempty"`
-	// Required: resource to select
+	// resource is the resource to select
 	Resource *string `json:"resource,omitempty"`
-	// Specifies the output format of the exposed resources, defaults to "1"
+	// divisor optionally indicates how the resource from the container should be scaled.
+	// If unset or 0, the resource is not scaled (divisor is treated as 1).
 	Divisor *resource.Quantity `json:"divisor,omitempty"`
 }
 

@@ -15,12 +15,12 @@ import (
 	"sync"
 )
 
-// errGoexit indicates the runtime.Goexit was called in
-// the user given function.
+// errGoexit indicates runtime.Goexit was called in
+// the user-given function.
 var errGoexit = errors.New("runtime.Goexit was called")
 
 // A panicError is an arbitrary value recovered from a panic
-// with the stack trace during the execution of given function.
+// with the stack trace during the execution of the given function.
 type panicError struct {
 	value any
 	stack []byte
@@ -204,7 +204,7 @@ func (g *Group) doCall(c *call, key string, fn func() (any, error)) {
 	}
 }
 
-// Forget tells the singleflight to forget about a key.  Future calls
+// Forget tells the singleflight to forget about a key. Future calls
 // to Do for this key will call the function rather than waiting for
 // an earlier call to complete.
 func (g *Group) Forget(key string) {

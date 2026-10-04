@@ -43,7 +43,7 @@ var (
 	durationForStuckMount = 110 * time.Second
 )
 
-var _ = utils.SIGDescribe(feature.Flexvolumes, "Detaching volumes", func() {
+var _ = utils.SIGDescribe(feature.Flexvolumes, "Detaching volumes", framework.WithProvider("gce", "local"), func() {
 	f := framework.NewDefaultFramework("flexvolume")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
@@ -55,7 +55,6 @@ var _ = utils.SIGDescribe(feature.Flexvolumes, "Detaching volumes", func() {
 	var suffix string
 
 	ginkgo.BeforeEach(func(ctx context.Context) {
-		e2eskipper.SkipUnlessProviderIs("gce", "local")
 		e2eskipper.SkipUnlessMasterOSDistroIs("debian", "ubuntu", "gci", "custom")
 		e2eskipper.SkipUnlessNodeOSDistroIs("debian", "ubuntu", "gci", "custom")
 		e2eskipper.SkipUnlessSSHKeyPresent()

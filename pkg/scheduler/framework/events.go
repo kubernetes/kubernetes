@@ -36,10 +36,10 @@ const (
 	BackoffComplete = "BackoffComplete"
 	// PopFromBackoffQ is the event when a pod is popped from backoffQ when activeQ is empty.
 	PopFromBackoffQ = "PopFromBackoffQ"
-	// ForceActivate is the event when a pod is moved from unschedulablePods/backoffQ
+	// ForceActivate is the event when a pod is moved from unschedulableEntities/backoffQ
 	// to activeQ. Usually it's triggered by plugin implementations.
 	ForceActivate = "ForceActivate"
-	// UnschedulableTimeout is the event when a pod is moved from unschedulablePods
+	// UnschedulableTimeout is the event when a pod is moved from unschedulableEntities
 	// due to the timeout specified at pod-max-in-unschedulable-pods-duration.
 	UnschedulableTimeout = "UnschedulableTimeout"
 )
@@ -61,7 +61,7 @@ var (
 	EventTargetPodUpdate = fwk.ClusterEvent{Resource: fwk.TargetPod, ActionType: fwk.Update}
 	// EventUnschedulableTimeout is the event when a pod stays in unschedulable for longer than timeout.
 	EventUnschedulableTimeout = fwk.ClusterEvent{Resource: fwk.WildCard, ActionType: fwk.All, CustomLabel: UnschedulableTimeout}
-	// EventForceActivate is the event when a pod is moved from unschedulablePods/backoffQ to activeQ.
+	// EventForceActivate is the event when a pod is moved from unschedulableEntities/backoffQ to activeQ.
 	EventForceActivate = fwk.ClusterEvent{Resource: fwk.WildCard, ActionType: fwk.All, CustomLabel: ForceActivate}
 )
 
@@ -81,11 +81,10 @@ func PodSchedulingPropertiesChange(newPod *v1.Pod, oldPod *v1.Pod, isTargetPod b
 	podChangeExtractors := []podChangeExtractor{
 		extractPodLabelsChange,
 		extractPodScaleDown,
+		extractPodScaleUp,
 		extractPodSchedulingGateEliminatedChange,
 		extractPodTolerationChange,
-	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
-		podChangeExtractors = append(podChangeExtractors, extractPodGeneratedResourceClaimChange)
+		extractPodGeneratedResourceClaimChange,
 	}
 
 	for _, fn := range podChangeExtractors {
@@ -124,6 +123,31 @@ func extractPodScaleDown(newPod, oldPod *v1.Pod) fwk.ActionType {
 		if oldReq.MilliValue() > newReq.MilliValue() {
 			// The resource request of rName is scaled down.
 			return fwk.UpdatePodScaleDown
+		}
+	}
+
+	return fwk.None
+}
+
+// extractPodScaleUp interprets the update of a pod and returns PodRequestScaledUp event if any pod's resource request(s) is scaled up.
+func extractPodScaleUp(newPod, oldPod *v1.Pod) fwk.ActionType {
+	opt := resource.PodResourcesOptions{
+		UseStatusResources: utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling),
+		InPlacePodLevelResourcesVerticalScalingEnabled: utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling),
+	}
+	newPodRequests := resource.PodRequests(newPod, opt)
+	oldPodRequests := resource.PodRequests(oldPod, opt)
+
+	for rName, newReq := range newPodRequests {
+		oldReq, ok := oldPodRequests[rName]
+		if !ok {
+			// The resource request of rName is added.
+			return fwk.UpdatePodScaleUp
+		}
+
+		if newReq.MilliValue() > oldReq.MilliValue() {
+			// The resource request of rName is scaled up.
+			return fwk.UpdatePodScaleUp
 		}
 	}
 
@@ -176,6 +200,7 @@ func NodeSchedulingPropertiesChange(newNode *v1.Node, oldNode *v1.Node) (events 
 		extractNodeTaintsChange,
 		extractNodeConditionsChange,
 		extractNodeAnnotationsChange,
+		extractNodePreemptionPolicyChange,
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.NodeDeclaredFeatures) {
@@ -191,6 +216,13 @@ func NodeSchedulingPropertiesChange(newNode *v1.Node, oldNode *v1.Node) (events 
 }
 
 type nodeChangeExtractor func(newNode *v1.Node, oldNode *v1.Node) fwk.ActionType
+
+func extractNodePreemptionPolicyChange(newNode *v1.Node, oldNode *v1.Node) fwk.ActionType {
+	if !equality.Semantic.DeepEqual(oldNode.Spec.PodPreemptionPolicy, newNode.Spec.PodPreemptionPolicy) {
+		return fwk.UpdateNodePreemptionPolicy
+	}
+	return fwk.None
+}
 
 func extractNodeAllocatableChange(newNode *v1.Node, oldNode *v1.Node) fwk.ActionType {
 	if !equality.Semantic.DeepEqual(oldNode.Status.Allocatable, newNode.Status.Allocatable) {

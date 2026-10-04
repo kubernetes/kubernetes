@@ -17,9 +17,12 @@ limitations under the License.
 package app
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/onsi/gomega/gcustom"
+	"github.com/onsi/gomega/types"
+
 	testdriver "k8s.io/kubernetes/test/e2e/dra/test-driver/app"
 )
 
@@ -85,6 +88,28 @@ var NodeUnprepareResourcesSucceeded = gcustom.MakeMatcher(func(actualCalls []tes
 	}
 	return false, nil
 }).WithMessage("contain successful NodeUnprepareResources call")
+
+// NodeUnprepareResourcesInProgress checks that a NodeUnprepareResources call has been received and has not returned yet.
+var NodeUnprepareResourcesInProgress = gcustom.MakeMatcher(func(actualCalls []testdriver.GRPCCall) (bool, error) {
+	for _, call := range actualCalls {
+		if strings.HasSuffix(call.FullMethod, "/NodeUnprepareResources") && call.Response == nil && call.Err == nil {
+			return true, nil
+		}
+	}
+	return false, nil
+}).WithMessage("contain NodeUnprepareResources call in progress")
+
+// NodeUnprepareResourcesSucceededAfter checks that a NodeUnprepareResources call recorded after the first n calls succeeded.
+func NodeUnprepareResourcesSucceededAfter(n int) types.GomegaMatcher {
+	return gcustom.MakeMatcher(func(actualCalls []testdriver.GRPCCall) (bool, error) {
+		for i, call := range actualCalls {
+			if i >= n && strings.HasSuffix(call.FullMethod, "/NodeUnprepareResources") && call.Response != nil && call.Err == nil {
+				return true, nil
+			}
+		}
+		return false, nil
+	}).WithMessage(fmt.Sprintf("contain successful NodeUnprepareResources call after the first %d calls", n))
+}
 
 // NodeUnprepareResoucesFailed checks that NodeUnprepareResources API has been called and returned an error
 var NodeUnprepareResourcesFailed = gcustom.MakeMatcher(func(actualCalls []testdriver.GRPCCall) (bool, error) {

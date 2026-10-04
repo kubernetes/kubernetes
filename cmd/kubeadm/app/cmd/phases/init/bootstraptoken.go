@@ -108,6 +108,11 @@ func runBootstrapToken(c workflow.RunData) error {
 		return err
 	}
 
+	// Create RBAC rules that allow the API server kubelet client to access the kubelet API
+	if err := nodebootstraptokenphase.AllowAPIServerToAccessKubeletAPI(client); err != nil {
+		return errors.Wrap(err, "error allowing API server to access kubelet API")
+	}
+
 	// Create the cluster-info ConfigMap with the associated RBAC rules
 	if err := clusterinfophase.CreateBootstrapConfigMapIfNotExists(client, kubeconfig); err != nil {
 		return errors.Wrap(err, "error creating bootstrap ConfigMap")

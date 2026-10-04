@@ -17,6 +17,7 @@ limitations under the License.
 package framework
 
 import (
+	"context"
 	"fmt"
 	"path"
 	"reflect"
@@ -349,13 +350,42 @@ func expandGinkgoArgs(leafNode bool, offset ginkgo.Offset, text string, args []a
 		}
 	}
 
+	var providerChecks [][]string
+	skipUnlessProviderIs := func() {
+		for _, supportedProviders := range providerChecks {
+			if !ProviderIs(supportedProviders...) {
+				ginkgo.Skip(fmt.Sprintf("Only supported for providers %v (not %s)", supportedProviders, TestContext.Provider))
+			}
+		}
+	}
+	injectSkipUnlessProviderIs := func() {
+		if leafNode {
+			// Check directly inside It.
+			skipUnlessProviderIs()
+		} else {
+			// Insert BeforeEach with the same check.
+			ginkgo.BeforeEach(skipUnlessProviderIs)
+		}
+	}
+
 	haveEmptyStrings := false
 	for _, arg := range args {
 		switch arg := arg.(type) {
 		case featureGate:
 			addFeatureGate(arg.name, arg.spec, true)
 		case label:
-			fullLabel := strings.Join(arg.parts, ":")
+			fullLabel := arg.String()
+			if arg.parts[0] == "Provider" {
+				providerChecks = append(providerChecks, strings.Split(arg.parts[1], ","))
+				// Only add text, not as label: Ginkgo labels must not contain commas.
+				// We could split up into separate labels, but then the semantic is not clear:
+				// [Provider:gce,aws] means "provider must be one of these two",
+				// but [Provider:gce] [Provider:aws] could be either that or "must be
+				// gce and aws", i.e. the test always needs to be skipped (for example,
+				// because there are different independent WithProvider calls in different places).
+				texts = append(texts, fmt.Sprintf("[%s]", fullLabel))
+				continue
+			}
 			addLabel(fullLabel)
 			if !leafNodeLabels.Has(fullLabel) {
 				texts = append(texts, fmt.Sprintf("[%s]", fullLabel))
@@ -377,6 +407,34 @@ func expandGinkgoArgs(leafNode bool, offset ginkgo.Offset, text string, args []a
 				haveEmptyStrings = true
 			}
 			texts = append(texts, arg)
+		case func(context.Context):
+			// Wrapping shows up in stack backtraces. Avoid it if possible.
+			if len(providerChecks) > 0 {
+				body := arg
+				arg = func(ctx context.Context) {
+					injectSkipUnlessProviderIs()
+					body(ctx)
+				}
+			}
+			ginkgoArgs = append(ginkgoArgs, arg)
+		case func(ginkgo.SpecContext):
+			if len(providerChecks) > 0 {
+				body := arg
+				arg = func(ctx ginkgo.SpecContext) {
+					injectSkipUnlessProviderIs()
+					body(ctx)
+				}
+			}
+			ginkgoArgs = append(ginkgoArgs, arg)
+		case func():
+			if len(providerChecks) > 0 {
+				body := arg
+				arg = func() {
+					injectSkipUnlessProviderIs()
+					body()
+				}
+			}
+			ginkgoArgs = append(ginkgoArgs, arg)
 		default:
 			ginkgoArgs = append(ginkgoArgs, arg)
 		}
@@ -639,6 +697,29 @@ func withEnvironment(name Environment) interface{} {
 	return newLabel("Environment", string(name))
 }
 
+// WithProvider specifies that a certain test or group of tests depend on
+// features that are only available with one of the listed cluster providers.
+// It inserts the [Provider: <provider1>,<provider2>, ...] tag into the test name
+// and injects a runtime skip check at the start of the function.
+//
+// Filtering by provider is a legacy mechanism with unclear semantics: which
+// provider supports which features is undefined. Prefer defining features and
+// calling WithFeature instead.
+//
+// Note that this must come before the function in the Describe/Context/It call!
+func WithProvider(providers ...string) interface{} {
+	return withProvider(providers)
+}
+
+// WithProvider is a shorthand for the corresponding package function.
+func (f *Framework) WithProvider(providers ...string) interface{} {
+	return withProvider(providers)
+}
+
+func withProvider(providers []string) interface{} {
+	return newLabel("Provider", strings.Join(providers, ","))
+}
+
 // WithConformance specifies that a certain test or group of tests must pass in
 // all conformant Kubernetes clusters. The return value may be passed as additional
 // argument to the framework wrappers and the Ginkgo functions directly.
@@ -783,37 +864,27 @@ func withKubeletMinVersion(version string) interface{} {
 	return newLabel("KubeletMinVersion", version)
 }
 
+// label must be comparable, some code uses that to detect feature.Windows.
 type label struct {
 	// parts get concatenated with ":" to build the full label.
-	parts []string
+	parts [2]string
+	len   int
+}
+
+func (l label) String() string {
+	if l.len == 2 {
+		return l.parts[0] + ":" + l.parts[1]
+	}
+	return l.parts[0]
 }
 
 func newLabel(parts ...string) label {
-	return label{
-		parts: parts,
-	}
-}
-
-// TagsEqual can be used to check whether two tags are the same.
-// It's safe to compare e.g. the result of WithSlow() against the result
-// of WithSerial(), the result will be false. False is also returned
-// when a parameter is some completely different value.
-func TagsEqual(a, b interface{}) bool {
-	switch a := a.(type) {
-	case label:
-		b, ok := b.(label)
-		if !ok {
-			return false
-		}
-		return slices.Equal(a.parts, b.parts)
-	case featureGate:
-		b, ok := b.(featureGate)
-		if !ok {
-			return false
-		}
-		return a == b
+	switch len(parts) {
+	case 1:
+		return label{parts: [2]string{parts[0], ""}, len: 1}
+	case 2:
+		return label{parts: [2]string{parts[0], parts[1]}, len: 2}
 	default:
-		// Unknown tag, cannot compare.
-		return false
+		panic(fmt.Sprintf("invalid number of part strings: %v", parts))
 	}
 }

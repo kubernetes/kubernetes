@@ -23,7 +23,7 @@ package v1
 //
 // SleepAction describes a "sleep" action.
 type SleepActionApplyConfiguration struct {
-	// Seconds is the number of seconds to sleep.
+	// seconds is the number of seconds to sleep.
 	Seconds *int64 `json:"seconds,omitempty"`
 }
 

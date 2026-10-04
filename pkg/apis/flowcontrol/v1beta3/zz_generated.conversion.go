@@ -271,8 +271,7 @@ func RegisterConversions(s *runtime.Scheme) error {
 }
 
 func autoConvert_v1beta3_ExemptPriorityLevelConfiguration_To_flowcontrol_ExemptPriorityLevelConfiguration(in *flowcontrolv1beta3.ExemptPriorityLevelConfiguration, out *flowcontrol.ExemptPriorityLevelConfiguration, s conversion.Scope) error {
-	out.NominalConcurrencyShares = (*int32)(unsafe.Pointer(in.NominalConcurrencyShares))
-	out.LendablePercent = (*int32)(unsafe.Pointer(in.LendablePercent))
+	*out = *(*flowcontrol.ExemptPriorityLevelConfiguration)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -282,8 +281,7 @@ func Convert_v1beta3_ExemptPriorityLevelConfiguration_To_flowcontrol_ExemptPrior
 }
 
 func autoConvert_flowcontrol_ExemptPriorityLevelConfiguration_To_v1beta3_ExemptPriorityLevelConfiguration(in *flowcontrol.ExemptPriorityLevelConfiguration, out *flowcontrolv1beta3.ExemptPriorityLevelConfiguration, s conversion.Scope) error {
-	out.NominalConcurrencyShares = (*int32)(unsafe.Pointer(in.NominalConcurrencyShares))
-	out.LendablePercent = (*int32)(unsafe.Pointer(in.LendablePercent))
+	*out = *(*flowcontrolv1beta3.ExemptPriorityLevelConfiguration)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -293,7 +291,7 @@ func Convert_flowcontrol_ExemptPriorityLevelConfiguration_To_v1beta3_ExemptPrior
 }
 
 func autoConvert_v1beta3_FlowDistinguisherMethod_To_flowcontrol_FlowDistinguisherMethod(in *flowcontrolv1beta3.FlowDistinguisherMethod, out *flowcontrol.FlowDistinguisherMethod, s conversion.Scope) error {
-	out.Type = flowcontrol.FlowDistinguisherMethodType(in.Type)
+	*out = *(*flowcontrol.FlowDistinguisherMethod)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -303,7 +301,7 @@ func Convert_v1beta3_FlowDistinguisherMethod_To_flowcontrol_FlowDistinguisherMet
 }
 
 func autoConvert_flowcontrol_FlowDistinguisherMethod_To_v1beta3_FlowDistinguisherMethod(in *flowcontrol.FlowDistinguisherMethod, out *flowcontrolv1beta3.FlowDistinguisherMethod, s conversion.Scope) error {
-	out.Type = flowcontrolv1beta3.FlowDistinguisherMethodType(in.Type)
+	*out = *(*flowcontrolv1beta3.FlowDistinguisherMethod)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -345,11 +343,7 @@ func Convert_flowcontrol_FlowSchema_To_v1beta3_FlowSchema(in *flowcontrol.FlowSc
 }
 
 func autoConvert_v1beta3_FlowSchemaCondition_To_flowcontrol_FlowSchemaCondition(in *flowcontrolv1beta3.FlowSchemaCondition, out *flowcontrol.FlowSchemaCondition, s conversion.Scope) error {
-	out.Type = flowcontrol.FlowSchemaConditionType(in.Type)
-	out.Status = flowcontrol.ConditionStatus(in.Status)
-	out.LastTransitionTime = in.LastTransitionTime
-	out.Reason = in.Reason
-	out.Message = in.Message
+	*out = *(*flowcontrol.FlowSchemaCondition)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -359,11 +353,7 @@ func Convert_v1beta3_FlowSchemaCondition_To_flowcontrol_FlowSchemaCondition(in *
 }
 
 func autoConvert_flowcontrol_FlowSchemaCondition_To_v1beta3_FlowSchemaCondition(in *flowcontrol.FlowSchemaCondition, out *flowcontrolv1beta3.FlowSchemaCondition, s conversion.Scope) error {
-	out.Type = flowcontrolv1beta3.FlowSchemaConditionType(in.Type)
-	out.Status = flowcontrolv1beta3.ConditionStatus(in.Status)
-	out.LastTransitionTime = in.LastTransitionTime
-	out.Reason = in.Reason
-	out.Message = in.Message
+	*out = *(*flowcontrolv1beta3.FlowSchemaCondition)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -395,12 +385,7 @@ func Convert_flowcontrol_FlowSchemaList_To_v1beta3_FlowSchemaList(in *flowcontro
 }
 
 func autoConvert_v1beta3_FlowSchemaSpec_To_flowcontrol_FlowSchemaSpec(in *flowcontrolv1beta3.FlowSchemaSpec, out *flowcontrol.FlowSchemaSpec, s conversion.Scope) error {
-	if err := Convert_v1beta3_PriorityLevelConfigurationReference_To_flowcontrol_PriorityLevelConfigurationReference(&in.PriorityLevelConfiguration, &out.PriorityLevelConfiguration, s); err != nil {
-		return err
-	}
-	out.MatchingPrecedence = in.MatchingPrecedence
-	out.DistinguisherMethod = (*flowcontrol.FlowDistinguisherMethod)(unsafe.Pointer(in.DistinguisherMethod))
-	out.Rules = *(*[]flowcontrol.PolicyRulesWithSubjects)(unsafe.Pointer(&in.Rules))
+	*out = *(*flowcontrol.FlowSchemaSpec)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -410,12 +395,7 @@ func Convert_v1beta3_FlowSchemaSpec_To_flowcontrol_FlowSchemaSpec(in *flowcontro
 }
 
 func autoConvert_flowcontrol_FlowSchemaSpec_To_v1beta3_FlowSchemaSpec(in *flowcontrol.FlowSchemaSpec, out *flowcontrolv1beta3.FlowSchemaSpec, s conversion.Scope) error {
-	if err := Convert_flowcontrol_PriorityLevelConfigurationReference_To_v1beta3_PriorityLevelConfigurationReference(&in.PriorityLevelConfiguration, &out.PriorityLevelConfiguration, s); err != nil {
-		return err
-	}
-	out.MatchingPrecedence = in.MatchingPrecedence
-	out.DistinguisherMethod = (*flowcontrolv1beta3.FlowDistinguisherMethod)(unsafe.Pointer(in.DistinguisherMethod))
-	out.Rules = *(*[]flowcontrolv1beta3.PolicyRulesWithSubjects)(unsafe.Pointer(&in.Rules))
+	*out = *(*flowcontrolv1beta3.FlowSchemaSpec)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -425,7 +405,7 @@ func Convert_flowcontrol_FlowSchemaSpec_To_v1beta3_FlowSchemaSpec(in *flowcontro
 }
 
 func autoConvert_v1beta3_FlowSchemaStatus_To_flowcontrol_FlowSchemaStatus(in *flowcontrolv1beta3.FlowSchemaStatus, out *flowcontrol.FlowSchemaStatus, s conversion.Scope) error {
-	out.Conditions = *(*[]flowcontrol.FlowSchemaCondition)(unsafe.Pointer(&in.Conditions))
+	*out = *(*flowcontrol.FlowSchemaStatus)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -435,7 +415,7 @@ func Convert_v1beta3_FlowSchemaStatus_To_flowcontrol_FlowSchemaStatus(in *flowco
 }
 
 func autoConvert_flowcontrol_FlowSchemaStatus_To_v1beta3_FlowSchemaStatus(in *flowcontrol.FlowSchemaStatus, out *flowcontrolv1beta3.FlowSchemaStatus, s conversion.Scope) error {
-	out.Conditions = *(*[]flowcontrolv1beta3.FlowSchemaCondition)(unsafe.Pointer(&in.Conditions))
+	*out = *(*flowcontrolv1beta3.FlowSchemaStatus)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -445,7 +425,7 @@ func Convert_flowcontrol_FlowSchemaStatus_To_v1beta3_FlowSchemaStatus(in *flowco
 }
 
 func autoConvert_v1beta3_GroupSubject_To_flowcontrol_GroupSubject(in *flowcontrolv1beta3.GroupSubject, out *flowcontrol.GroupSubject, s conversion.Scope) error {
-	out.Name = in.Name
+	*out = *(*flowcontrol.GroupSubject)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -455,7 +435,7 @@ func Convert_v1beta3_GroupSubject_To_flowcontrol_GroupSubject(in *flowcontrolv1b
 }
 
 func autoConvert_flowcontrol_GroupSubject_To_v1beta3_GroupSubject(in *flowcontrol.GroupSubject, out *flowcontrolv1beta3.GroupSubject, s conversion.Scope) error {
-	out.Name = in.Name
+	*out = *(*flowcontrolv1beta3.GroupSubject)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -465,8 +445,7 @@ func Convert_flowcontrol_GroupSubject_To_v1beta3_GroupSubject(in *flowcontrol.Gr
 }
 
 func autoConvert_v1beta3_LimitResponse_To_flowcontrol_LimitResponse(in *flowcontrolv1beta3.LimitResponse, out *flowcontrol.LimitResponse, s conversion.Scope) error {
-	out.Type = flowcontrol.LimitResponseType(in.Type)
-	out.Queuing = (*flowcontrol.QueuingConfiguration)(unsafe.Pointer(in.Queuing))
+	*out = *(*flowcontrol.LimitResponse)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -476,8 +455,7 @@ func Convert_v1beta3_LimitResponse_To_flowcontrol_LimitResponse(in *flowcontrolv
 }
 
 func autoConvert_flowcontrol_LimitResponse_To_v1beta3_LimitResponse(in *flowcontrol.LimitResponse, out *flowcontrolv1beta3.LimitResponse, s conversion.Scope) error {
-	out.Type = flowcontrolv1beta3.LimitResponseType(in.Type)
-	out.Queuing = (*flowcontrolv1beta3.QueuingConfiguration)(unsafe.Pointer(in.Queuing))
+	*out = *(*flowcontrolv1beta3.LimitResponse)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -487,12 +465,7 @@ func Convert_flowcontrol_LimitResponse_To_v1beta3_LimitResponse(in *flowcontrol.
 }
 
 func autoConvert_v1beta3_LimitedPriorityLevelConfiguration_To_flowcontrol_LimitedPriorityLevelConfiguration(in *flowcontrolv1beta3.LimitedPriorityLevelConfiguration, out *flowcontrol.LimitedPriorityLevelConfiguration, s conversion.Scope) error {
-	out.NominalConcurrencyShares = in.NominalConcurrencyShares
-	if err := Convert_v1beta3_LimitResponse_To_flowcontrol_LimitResponse(&in.LimitResponse, &out.LimitResponse, s); err != nil {
-		return err
-	}
-	out.LendablePercent = (*int32)(unsafe.Pointer(in.LendablePercent))
-	out.BorrowingLimitPercent = (*int32)(unsafe.Pointer(in.BorrowingLimitPercent))
+	*out = *(*flowcontrol.LimitedPriorityLevelConfiguration)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -502,12 +475,7 @@ func Convert_v1beta3_LimitedPriorityLevelConfiguration_To_flowcontrol_LimitedPri
 }
 
 func autoConvert_flowcontrol_LimitedPriorityLevelConfiguration_To_v1beta3_LimitedPriorityLevelConfiguration(in *flowcontrol.LimitedPriorityLevelConfiguration, out *flowcontrolv1beta3.LimitedPriorityLevelConfiguration, s conversion.Scope) error {
-	out.NominalConcurrencyShares = in.NominalConcurrencyShares
-	if err := Convert_flowcontrol_LimitResponse_To_v1beta3_LimitResponse(&in.LimitResponse, &out.LimitResponse, s); err != nil {
-		return err
-	}
-	out.LendablePercent = (*int32)(unsafe.Pointer(in.LendablePercent))
-	out.BorrowingLimitPercent = (*int32)(unsafe.Pointer(in.BorrowingLimitPercent))
+	*out = *(*flowcontrolv1beta3.LimitedPriorityLevelConfiguration)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -517,8 +485,7 @@ func Convert_flowcontrol_LimitedPriorityLevelConfiguration_To_v1beta3_LimitedPri
 }
 
 func autoConvert_v1beta3_NonResourcePolicyRule_To_flowcontrol_NonResourcePolicyRule(in *flowcontrolv1beta3.NonResourcePolicyRule, out *flowcontrol.NonResourcePolicyRule, s conversion.Scope) error {
-	out.Verbs = *(*[]string)(unsafe.Pointer(&in.Verbs))
-	out.NonResourceURLs = *(*[]string)(unsafe.Pointer(&in.NonResourceURLs))
+	*out = *(*flowcontrol.NonResourcePolicyRule)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -528,8 +495,7 @@ func Convert_v1beta3_NonResourcePolicyRule_To_flowcontrol_NonResourcePolicyRule(
 }
 
 func autoConvert_flowcontrol_NonResourcePolicyRule_To_v1beta3_NonResourcePolicyRule(in *flowcontrol.NonResourcePolicyRule, out *flowcontrolv1beta3.NonResourcePolicyRule, s conversion.Scope) error {
-	out.Verbs = *(*[]string)(unsafe.Pointer(&in.Verbs))
-	out.NonResourceURLs = *(*[]string)(unsafe.Pointer(&in.NonResourceURLs))
+	*out = *(*flowcontrolv1beta3.NonResourcePolicyRule)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -539,9 +505,7 @@ func Convert_flowcontrol_NonResourcePolicyRule_To_v1beta3_NonResourcePolicyRule(
 }
 
 func autoConvert_v1beta3_PolicyRulesWithSubjects_To_flowcontrol_PolicyRulesWithSubjects(in *flowcontrolv1beta3.PolicyRulesWithSubjects, out *flowcontrol.PolicyRulesWithSubjects, s conversion.Scope) error {
-	out.Subjects = *(*[]flowcontrol.Subject)(unsafe.Pointer(&in.Subjects))
-	out.ResourceRules = *(*[]flowcontrol.ResourcePolicyRule)(unsafe.Pointer(&in.ResourceRules))
-	out.NonResourceRules = *(*[]flowcontrol.NonResourcePolicyRule)(unsafe.Pointer(&in.NonResourceRules))
+	*out = *(*flowcontrol.PolicyRulesWithSubjects)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -551,9 +515,7 @@ func Convert_v1beta3_PolicyRulesWithSubjects_To_flowcontrol_PolicyRulesWithSubje
 }
 
 func autoConvert_flowcontrol_PolicyRulesWithSubjects_To_v1beta3_PolicyRulesWithSubjects(in *flowcontrol.PolicyRulesWithSubjects, out *flowcontrolv1beta3.PolicyRulesWithSubjects, s conversion.Scope) error {
-	out.Subjects = *(*[]flowcontrolv1beta3.Subject)(unsafe.Pointer(&in.Subjects))
-	out.ResourceRules = *(*[]flowcontrolv1beta3.ResourcePolicyRule)(unsafe.Pointer(&in.ResourceRules))
-	out.NonResourceRules = *(*[]flowcontrolv1beta3.NonResourcePolicyRule)(unsafe.Pointer(&in.NonResourceRules))
+	*out = *(*flowcontrolv1beta3.PolicyRulesWithSubjects)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -585,11 +547,7 @@ func autoConvert_flowcontrol_PriorityLevelConfiguration_To_v1beta3_PriorityLevel
 }
 
 func autoConvert_v1beta3_PriorityLevelConfigurationCondition_To_flowcontrol_PriorityLevelConfigurationCondition(in *flowcontrolv1beta3.PriorityLevelConfigurationCondition, out *flowcontrol.PriorityLevelConfigurationCondition, s conversion.Scope) error {
-	out.Type = flowcontrol.PriorityLevelConfigurationConditionType(in.Type)
-	out.Status = flowcontrol.ConditionStatus(in.Status)
-	out.LastTransitionTime = in.LastTransitionTime
-	out.Reason = in.Reason
-	out.Message = in.Message
+	*out = *(*flowcontrol.PriorityLevelConfigurationCondition)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -599,11 +557,7 @@ func Convert_v1beta3_PriorityLevelConfigurationCondition_To_flowcontrol_Priority
 }
 
 func autoConvert_flowcontrol_PriorityLevelConfigurationCondition_To_v1beta3_PriorityLevelConfigurationCondition(in *flowcontrol.PriorityLevelConfigurationCondition, out *flowcontrolv1beta3.PriorityLevelConfigurationCondition, s conversion.Scope) error {
-	out.Type = flowcontrolv1beta3.PriorityLevelConfigurationConditionType(in.Type)
-	out.Status = flowcontrolv1beta3.ConditionStatus(in.Status)
-	out.LastTransitionTime = in.LastTransitionTime
-	out.Reason = in.Reason
-	out.Message = in.Message
+	*out = *(*flowcontrolv1beta3.PriorityLevelConfigurationCondition)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -655,7 +609,7 @@ func Convert_flowcontrol_PriorityLevelConfigurationList_To_v1beta3_PriorityLevel
 }
 
 func autoConvert_v1beta3_PriorityLevelConfigurationReference_To_flowcontrol_PriorityLevelConfigurationReference(in *flowcontrolv1beta3.PriorityLevelConfigurationReference, out *flowcontrol.PriorityLevelConfigurationReference, s conversion.Scope) error {
-	out.Name = in.Name
+	*out = *(*flowcontrol.PriorityLevelConfigurationReference)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -665,7 +619,7 @@ func Convert_v1beta3_PriorityLevelConfigurationReference_To_flowcontrol_Priority
 }
 
 func autoConvert_flowcontrol_PriorityLevelConfigurationReference_To_v1beta3_PriorityLevelConfigurationReference(in *flowcontrol.PriorityLevelConfigurationReference, out *flowcontrolv1beta3.PriorityLevelConfigurationReference, s conversion.Scope) error {
-	out.Name = in.Name
+	*out = *(*flowcontrolv1beta3.PriorityLevelConfigurationReference)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -675,9 +629,7 @@ func Convert_flowcontrol_PriorityLevelConfigurationReference_To_v1beta3_Priority
 }
 
 func autoConvert_v1beta3_PriorityLevelConfigurationSpec_To_flowcontrol_PriorityLevelConfigurationSpec(in *flowcontrolv1beta3.PriorityLevelConfigurationSpec, out *flowcontrol.PriorityLevelConfigurationSpec, s conversion.Scope) error {
-	out.Type = flowcontrol.PriorityLevelEnablement(in.Type)
-	out.Limited = (*flowcontrol.LimitedPriorityLevelConfiguration)(unsafe.Pointer(in.Limited))
-	out.Exempt = (*flowcontrol.ExemptPriorityLevelConfiguration)(unsafe.Pointer(in.Exempt))
+	*out = *(*flowcontrol.PriorityLevelConfigurationSpec)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -687,9 +639,7 @@ func Convert_v1beta3_PriorityLevelConfigurationSpec_To_flowcontrol_PriorityLevel
 }
 
 func autoConvert_flowcontrol_PriorityLevelConfigurationSpec_To_v1beta3_PriorityLevelConfigurationSpec(in *flowcontrol.PriorityLevelConfigurationSpec, out *flowcontrolv1beta3.PriorityLevelConfigurationSpec, s conversion.Scope) error {
-	out.Type = flowcontrolv1beta3.PriorityLevelEnablement(in.Type)
-	out.Limited = (*flowcontrolv1beta3.LimitedPriorityLevelConfiguration)(unsafe.Pointer(in.Limited))
-	out.Exempt = (*flowcontrolv1beta3.ExemptPriorityLevelConfiguration)(unsafe.Pointer(in.Exempt))
+	*out = *(*flowcontrolv1beta3.PriorityLevelConfigurationSpec)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -699,7 +649,7 @@ func Convert_flowcontrol_PriorityLevelConfigurationSpec_To_v1beta3_PriorityLevel
 }
 
 func autoConvert_v1beta3_PriorityLevelConfigurationStatus_To_flowcontrol_PriorityLevelConfigurationStatus(in *flowcontrolv1beta3.PriorityLevelConfigurationStatus, out *flowcontrol.PriorityLevelConfigurationStatus, s conversion.Scope) error {
-	out.Conditions = *(*[]flowcontrol.PriorityLevelConfigurationCondition)(unsafe.Pointer(&in.Conditions))
+	*out = *(*flowcontrol.PriorityLevelConfigurationStatus)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -709,7 +659,7 @@ func Convert_v1beta3_PriorityLevelConfigurationStatus_To_flowcontrol_PriorityLev
 }
 
 func autoConvert_flowcontrol_PriorityLevelConfigurationStatus_To_v1beta3_PriorityLevelConfigurationStatus(in *flowcontrol.PriorityLevelConfigurationStatus, out *flowcontrolv1beta3.PriorityLevelConfigurationStatus, s conversion.Scope) error {
-	out.Conditions = *(*[]flowcontrolv1beta3.PriorityLevelConfigurationCondition)(unsafe.Pointer(&in.Conditions))
+	*out = *(*flowcontrolv1beta3.PriorityLevelConfigurationStatus)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -719,9 +669,7 @@ func Convert_flowcontrol_PriorityLevelConfigurationStatus_To_v1beta3_PriorityLev
 }
 
 func autoConvert_v1beta3_QueuingConfiguration_To_flowcontrol_QueuingConfiguration(in *flowcontrolv1beta3.QueuingConfiguration, out *flowcontrol.QueuingConfiguration, s conversion.Scope) error {
-	out.Queues = in.Queues
-	out.HandSize = in.HandSize
-	out.QueueLengthLimit = in.QueueLengthLimit
+	*out = *(*flowcontrol.QueuingConfiguration)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -731,9 +679,7 @@ func Convert_v1beta3_QueuingConfiguration_To_flowcontrol_QueuingConfiguration(in
 }
 
 func autoConvert_flowcontrol_QueuingConfiguration_To_v1beta3_QueuingConfiguration(in *flowcontrol.QueuingConfiguration, out *flowcontrolv1beta3.QueuingConfiguration, s conversion.Scope) error {
-	out.Queues = in.Queues
-	out.HandSize = in.HandSize
-	out.QueueLengthLimit = in.QueueLengthLimit
+	*out = *(*flowcontrolv1beta3.QueuingConfiguration)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -743,11 +689,7 @@ func Convert_flowcontrol_QueuingConfiguration_To_v1beta3_QueuingConfiguration(in
 }
 
 func autoConvert_v1beta3_ResourcePolicyRule_To_flowcontrol_ResourcePolicyRule(in *flowcontrolv1beta3.ResourcePolicyRule, out *flowcontrol.ResourcePolicyRule, s conversion.Scope) error {
-	out.Verbs = *(*[]string)(unsafe.Pointer(&in.Verbs))
-	out.APIGroups = *(*[]string)(unsafe.Pointer(&in.APIGroups))
-	out.Resources = *(*[]string)(unsafe.Pointer(&in.Resources))
-	out.ClusterScope = in.ClusterScope
-	out.Namespaces = *(*[]string)(unsafe.Pointer(&in.Namespaces))
+	*out = *(*flowcontrol.ResourcePolicyRule)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -757,11 +699,7 @@ func Convert_v1beta3_ResourcePolicyRule_To_flowcontrol_ResourcePolicyRule(in *fl
 }
 
 func autoConvert_flowcontrol_ResourcePolicyRule_To_v1beta3_ResourcePolicyRule(in *flowcontrol.ResourcePolicyRule, out *flowcontrolv1beta3.ResourcePolicyRule, s conversion.Scope) error {
-	out.Verbs = *(*[]string)(unsafe.Pointer(&in.Verbs))
-	out.APIGroups = *(*[]string)(unsafe.Pointer(&in.APIGroups))
-	out.Resources = *(*[]string)(unsafe.Pointer(&in.Resources))
-	out.ClusterScope = in.ClusterScope
-	out.Namespaces = *(*[]string)(unsafe.Pointer(&in.Namespaces))
+	*out = *(*flowcontrolv1beta3.ResourcePolicyRule)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -771,8 +709,7 @@ func Convert_flowcontrol_ResourcePolicyRule_To_v1beta3_ResourcePolicyRule(in *fl
 }
 
 func autoConvert_v1beta3_ServiceAccountSubject_To_flowcontrol_ServiceAccountSubject(in *flowcontrolv1beta3.ServiceAccountSubject, out *flowcontrol.ServiceAccountSubject, s conversion.Scope) error {
-	out.Namespace = in.Namespace
-	out.Name = in.Name
+	*out = *(*flowcontrol.ServiceAccountSubject)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -782,8 +719,7 @@ func Convert_v1beta3_ServiceAccountSubject_To_flowcontrol_ServiceAccountSubject(
 }
 
 func autoConvert_flowcontrol_ServiceAccountSubject_To_v1beta3_ServiceAccountSubject(in *flowcontrol.ServiceAccountSubject, out *flowcontrolv1beta3.ServiceAccountSubject, s conversion.Scope) error {
-	out.Namespace = in.Namespace
-	out.Name = in.Name
+	*out = *(*flowcontrolv1beta3.ServiceAccountSubject)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -793,10 +729,7 @@ func Convert_flowcontrol_ServiceAccountSubject_To_v1beta3_ServiceAccountSubject(
 }
 
 func autoConvert_v1beta3_Subject_To_flowcontrol_Subject(in *flowcontrolv1beta3.Subject, out *flowcontrol.Subject, s conversion.Scope) error {
-	out.Kind = flowcontrol.SubjectKind(in.Kind)
-	out.User = (*flowcontrol.UserSubject)(unsafe.Pointer(in.User))
-	out.Group = (*flowcontrol.GroupSubject)(unsafe.Pointer(in.Group))
-	out.ServiceAccount = (*flowcontrol.ServiceAccountSubject)(unsafe.Pointer(in.ServiceAccount))
+	*out = *(*flowcontrol.Subject)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -806,10 +739,7 @@ func Convert_v1beta3_Subject_To_flowcontrol_Subject(in *flowcontrolv1beta3.Subje
 }
 
 func autoConvert_flowcontrol_Subject_To_v1beta3_Subject(in *flowcontrol.Subject, out *flowcontrolv1beta3.Subject, s conversion.Scope) error {
-	out.Kind = flowcontrolv1beta3.SubjectKind(in.Kind)
-	out.User = (*flowcontrolv1beta3.UserSubject)(unsafe.Pointer(in.User))
-	out.Group = (*flowcontrolv1beta3.GroupSubject)(unsafe.Pointer(in.Group))
-	out.ServiceAccount = (*flowcontrolv1beta3.ServiceAccountSubject)(unsafe.Pointer(in.ServiceAccount))
+	*out = *(*flowcontrolv1beta3.Subject)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -819,7 +749,7 @@ func Convert_flowcontrol_Subject_To_v1beta3_Subject(in *flowcontrol.Subject, out
 }
 
 func autoConvert_v1beta3_UserSubject_To_flowcontrol_UserSubject(in *flowcontrolv1beta3.UserSubject, out *flowcontrol.UserSubject, s conversion.Scope) error {
-	out.Name = in.Name
+	*out = *(*flowcontrol.UserSubject)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -829,7 +759,7 @@ func Convert_v1beta3_UserSubject_To_flowcontrol_UserSubject(in *flowcontrolv1bet
 }
 
 func autoConvert_flowcontrol_UserSubject_To_v1beta3_UserSubject(in *flowcontrol.UserSubject, out *flowcontrolv1beta3.UserSubject, s conversion.Scope) error {
-	out.Name = in.Name
+	*out = *(*flowcontrolv1beta3.UserSubject)(unsafe.Pointer(in))
 	return nil
 }
 

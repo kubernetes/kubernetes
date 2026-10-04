@@ -59,7 +59,8 @@ fi
 kube_master_image="${KUBE_GCE_MASTER_IMAGE:-}"
 if [[ -z "${kube_master_image}" ]]; then
   # remove architecture:X86_64 once we move on from ubuntu jammy as that image family has both X86_64 and ARM images
-  kube_master_image=$(gcloud compute images list --project="${MASTER_IMAGE_PROJECT}" --no-standard-images --filter="family:${MASTER_IMAGE_FAMILY} architecture:X86_64" --format 'value(name)')
+  # a family may briefly contain more than one non-deprecated image; take the newest (the family head)
+  kube_master_image=$(gcloud compute images list --project="${MASTER_IMAGE_PROJECT}" --no-standard-images --filter="family:${MASTER_IMAGE_FAMILY} architecture:X86_64" --sort-by='~creationTimestamp' --limit=1 --format 'value(name)')
 fi
 
 echo "Using image: ${kube_master_image} from project: ${MASTER_IMAGE_PROJECT} as master image" >&2
@@ -79,7 +80,8 @@ function set-linux-node-image() {
   kube_node_image="${KUBE_GCE_NODE_IMAGE:-}"
   if [[ -z "${kube_node_image}" ]]; then
     # remove architecture:X86_64 once we move on from ubuntu jammy as that image family has both X86_64 and ARM images
-    kube_node_image=$(gcloud compute images list --project="${NODE_IMAGE_PROJECT}" --no-standard-images --filter="family:${NODE_IMAGE_FAMILY} architecture:X86_64" --format 'value(name)')
+    # a family may briefly contain more than one non-deprecated image; take the newest (the family head)
+    kube_node_image=$(gcloud compute images list --project="${NODE_IMAGE_PROJECT}" --no-standard-images --filter="family:${NODE_IMAGE_FAMILY} architecture:X86_64" --sort-by='~creationTimestamp' --limit=1 --format 'value(name)')
   fi
 
   echo "Using image: ${kube_node_image} from project: ${NODE_IMAGE_PROJECT} as node image" >&2
@@ -1128,11 +1130,6 @@ DOCKER_REGISTRY_MIRROR_URL: $(yaml-quote "${DOCKER_REGISTRY_MIRROR_URL:-}")
 ENABLE_L7_LOADBALANCING: $(yaml-quote "${ENABLE_L7_LOADBALANCING:-none}")
 ENABLE_CLUSTER_LOGGING: $(yaml-quote "${ENABLE_CLUSTER_LOGGING:-false}")
 ENABLE_AUTH_PROVIDER_GCP: $(yaml-quote "${ENABLE_AUTH_PROVIDER_GCP:-true}")
-ENABLE_NODE_PROBLEM_DETECTOR: $(yaml-quote "${ENABLE_NODE_PROBLEM_DETECTOR:-none}")
-NODE_PROBLEM_DETECTOR_VERSION: $(yaml-quote "${NODE_PROBLEM_DETECTOR_VERSION:-}")
-NODE_PROBLEM_DETECTOR_TAR_HASH: $(yaml-quote "${NODE_PROBLEM_DETECTOR_TAR_HASH:-}")
-NODE_PROBLEM_DETECTOR_RELEASE_PATH: $(yaml-quote "${NODE_PROBLEM_DETECTOR_RELEASE_PATH:-}")
-NODE_PROBLEM_DETECTOR_CUSTOM_FLAGS: $(yaml-quote "${NODE_PROBLEM_DETECTOR_CUSTOM_FLAGS:-}")
 CNI_STORAGE_URL_BASE: $(yaml-quote "${CNI_STORAGE_URL_BASE:-}")
 CNI_TAR_PREFIX: $(yaml-quote "${CNI_TAR_PREFIX:-}")
 CNI_VERSION: $(yaml-quote "${CNI_VERSION:-}")
@@ -1151,7 +1148,6 @@ ENABLE_DNS_HORIZONTAL_AUTOSCALER: $(yaml-quote "${ENABLE_DNS_HORIZONTAL_AUTOSCAL
 KUBE_PROXY_TOKEN: $(yaml-quote "${KUBE_PROXY_TOKEN:-}")
 KUBE_PROXY_MODE: $(yaml-quote "${KUBE_PROXY_MODE:-iptables}")
 DETECT_LOCAL_MODE: $(yaml-quote "${DETECT_LOCAL_MODE:-}")
-NODE_PROBLEM_DETECTOR_TOKEN: $(yaml-quote "${NODE_PROBLEM_DETECTOR_TOKEN:-}")
 ADMISSION_CONTROL: $(yaml-quote "${ADMISSION_CONTROL:-}")
 MASTER_IP_RANGE: $(yaml-quote "${MASTER_IP_RANGE}")
 RUNTIME_CONFIG: $(yaml-quote "${RUNTIME_CONFIG}")
@@ -1615,13 +1611,6 @@ WINDOWS_INFRA_CONTAINER: $(yaml-quote "${WINDOWS_INFRA_CONTAINER}")
 WINDOWS_ENABLE_PIGZ: $(yaml-quote "${WINDOWS_ENABLE_PIGZ}")
 WINDOWS_ENABLE_HYPERV: $(yaml-quote "${WINDOWS_ENABLE_HYPERV}")
 ENABLE_AUTH_PROVIDER_GCP: $(yaml-quote "${ENABLE_AUTH_PROVIDER_GCP}")
-ENABLE_NODE_PROBLEM_DETECTOR: $(yaml-quote "${WINDOWS_ENABLE_NODE_PROBLEM_DETECTOR}")
-NODE_PROBLEM_DETECTOR_VERSION: $(yaml-quote "${NODE_PROBLEM_DETECTOR_VERSION}")
-NODE_PROBLEM_DETECTOR_TAR_HASH: $(yaml-quote "${NODE_PROBLEM_DETECTOR_TAR_HASH}")
-NODE_PROBLEM_DETECTOR_RELEASE_PATH: $(yaml-quote "${NODE_PROBLEM_DETECTOR_RELEASE_PATH}")
-NODE_PROBLEM_DETECTOR_CUSTOM_FLAGS: $(yaml-quote "${WINDOWS_NODE_PROBLEM_DETECTOR_CUSTOM_FLAGS}")
-NODE_PROBLEM_DETECTOR_TOKEN: $(yaml-quote "${NODE_PROBLEM_DETECTOR_TOKEN:-}")
-WINDOWS_NODEPROBLEMDETECTOR_KUBECONFIG_FILE: $(yaml-quote "${WINDOWS_NODEPROBLEMDETECTOR_KUBECONFIG_FILE}")
 AUTH_PROVIDER_GCP_STORAGE_PATH: $(yaml-quote "${AUTH_PROVIDER_GCP_STORAGE_PATH}")
 AUTH_PROVIDER_GCP_VERSION: $(yaml-quote "${AUTH_PROVIDER_GCP_VERSION}")
 AUTH_PROVIDER_GCP_HASH_WINDOWS_AMD64: $(yaml-quote "${AUTH_PROVIDER_GCP_HASH_WINDOWS_AMD64}")
@@ -2080,7 +2069,6 @@ function parse-master-env() {
   local master_env
   master_env=$(get-master-env)
   KUBE_PROXY_TOKEN=$(get-env-val "${master_env}" "KUBE_PROXY_TOKEN")
-  NODE_PROBLEM_DETECTOR_TOKEN=$(get-env-val "${master_env}" "NODE_PROBLEM_DETECTOR_TOKEN")
   CA_CERT_BASE64=$(get-env-val "${master_env}" "CA_CERT")
   CA_KEY_BASE64=$(get-env-val "${master_env}" "CA_KEY")
   KUBEAPISERVER_CERT_BASE64=$(get-env-val "${master_env}" "KUBEAPISERVER_CERT")
@@ -2903,9 +2891,6 @@ function create-master() {
   # computer) can forget it later. This should disappear with
   # http://issue.k8s.io/3168
   KUBE_PROXY_TOKEN=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
-  if [[ "${ENABLE_NODE_PROBLEM_DETECTOR:-}" == "standalone" ]]; then
-    NODE_PROBLEM_DETECTOR_TOKEN=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
-  fi
 
   # Reserve the master's IP so that it can later be transferred to another VM
   # without disrupting the kubelets.

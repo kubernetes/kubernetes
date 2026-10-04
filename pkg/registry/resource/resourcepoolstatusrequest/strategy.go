@@ -19,15 +19,18 @@ package resourcepoolstatusrequest
 import (
 	"context"
 
+	"sigs.k8s.io/structured-merge-diff/v7/fieldpath"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage/names"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/resource"
 	"k8s.io/kubernetes/pkg/apis/resource/validation"
-	"sigs.k8s.io/structured-merge-diff/v6/fieldpath"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 // resourcePoolStatusRequestStrategy implements behavior for ResourcePoolStatusRequest objects
@@ -62,6 +65,18 @@ func (*resourcePoolStatusRequestStrategy) PrepareForCreate(ctx context.Context, 
 	request := obj.(*resource.ResourcePoolStatusRequest)
 	// Status must not be set by user on create.
 	request.Status = nil
+	dropDisabledDRAPartitionableDevicesTypeFields(request, nil)
+}
+
+// dropDisabledDRAPartitionableDevicesTypeFields removes the partition type
+// default when the feature is disabled, unless the old request already set it.
+func dropDisabledDRAPartitionableDevicesTypeFields(request, oldRequest *resource.ResourcePoolStatusRequest) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.DRAPartitionableDevicesType) ||
+		(oldRequest != nil && oldRequest.Spec.DefaultPartitionTypeAttribute != nil) {
+		return
+	}
+
+	request.Spec.DefaultPartitionTypeAttribute = nil
 }
 
 func (*resourcePoolStatusRequestStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
@@ -69,10 +84,12 @@ func (*resourcePoolStatusRequestStrategy) Validate(ctx context.Context, obj runt
 	return validation.ValidateResourcePoolStatusRequest(request)
 }
 
-// DeclarativeValidationConfig implements rest.DeclarativeValidationConfigurer to supply declarative
-// validation options to the generic BeforeCreate/BeforeUpdate code path.
+// DeclarativeValidationConfig declares the options referenced by this type's tags,
+// mapped to whether each is enabled.
 func (*resourcePoolStatusRequestStrategy) DeclarativeValidationConfig(ctx context.Context, obj, oldObj runtime.Object) rest.DeclarativeValidationConfig {
-	return rest.DeclarativeValidationConfig{DeclarativeEnforcement: true}
+	return rest.DeclarativeValidationConfig{Options: map[string]bool{
+		string(features.DRAPartitionableDevicesType): utilfeature.DefaultFeatureGate.Enabled(features.DRAPartitionableDevicesType),
+	}}
 }
 
 func (*resourcePoolStatusRequestStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
@@ -91,6 +108,7 @@ func (*resourcePoolStatusRequestStrategy) PrepareForUpdate(ctx context.Context, 
 	oldRequest := old.(*resource.ResourcePoolStatusRequest)
 	// Status is not updated via the main resource endpoint
 	request.Status = oldRequest.Status
+	dropDisabledDRAPartitionableDevicesTypeFields(request, oldRequest)
 }
 
 func (*resourcePoolStatusRequestStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {

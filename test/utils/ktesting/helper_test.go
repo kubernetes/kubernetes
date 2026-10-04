@@ -54,6 +54,8 @@ func (tc testcase) run(t *testing.T) {
 		t.Logf("Trace:\n%s\n", trace)
 		tCtx.Assert(duration).To(gomega.Equal(tc.expectDuration), "callback invocation duration %s")
 		tCtx.Assert(normalize(trace)).To(gomega.Equal(tc.expectTrace))
+		// mockTB does not implement cleanup, so we have to remove the test ourselves.
+		defaultProgressReporter.removeRunningTest(buffer.Name())
 	})
 }
 

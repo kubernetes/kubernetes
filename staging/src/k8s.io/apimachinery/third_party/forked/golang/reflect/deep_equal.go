@@ -199,7 +199,7 @@ func (e Equalities) deepValueEqual(v1, v2 reflect.Value, visited map[visit]bool,
 			return v1.IsNil() == v2.IsNil()
 		}
 		return e.deepValueEqual(v1.Elem(), v2.Elem(), visited, equateNilAndEmpty, depth+1)
-	case reflect.Ptr:
+	case reflect.Pointer:
 		return e.deepValueEqual(v1.Elem(), v2.Elem(), visited, equateNilAndEmpty, depth+1)
 	case reflect.Struct:
 		for i, n := 0, v1.NumField(); i < n; i++ {
@@ -253,9 +253,30 @@ func (e Equalities) deepValueEqual(v1, v2 reflect.Value, visited map[visit]bool,
 		return false
 	default:
 		// Normal equality suffices
-		if !v1.CanInterface() || !v2.CanInterface() {
-			panic(unexportedTypePanic{})
-		}
+		return defaultEqual(v1, v2)
+	}
+}
+
+func defaultEqual(v1, v2 reflect.Value) bool {
+	if !v1.CanInterface() || !v2.CanInterface() {
+		panic(unexportedTypePanic{})
+	}
+	// Compare the common kinds directly as an optimization to avoid
+	// allocating in Interface().
+	switch v1.Kind() {
+	case reflect.String:
+		return v1.String() == v2.String()
+	case reflect.Bool:
+		return v1.Bool() == v2.Bool()
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		return v1.Int() == v2.Int()
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
+		return v1.Uint() == v2.Uint()
+	case reflect.Float32, reflect.Float64:
+		return v1.Float() == v2.Float()
+	case reflect.Complex64, reflect.Complex128:
+		return v1.Complex() == v2.Complex()
+	default:
 		return v1.Interface() == v2.Interface()
 	}
 }
@@ -348,7 +369,7 @@ func (e Equalities) deepValueDerive(v1, v2 reflect.Value, visited map[visit]bool
 		if v1.IsNil() || v1.Len() == 0 {
 			return true
 		}
-		if v1.Len() > v2.Len() {
+		if v1.Len() != v2.Len() {
 			return false
 		}
 		if v1.Pointer() == v2.Pointer() {
@@ -409,10 +430,7 @@ func (e Equalities) deepValueDerive(v1, v2 reflect.Value, visited map[visit]bool
 		return false
 	default:
 		// Normal equality suffices
-		if !v1.CanInterface() || !v2.CanInterface() {
-			panic(unexportedTypePanic{})
-		}
-		return v1.Interface() == v2.Interface()
+		return defaultEqual(v1, v2)
 	}
 }
 

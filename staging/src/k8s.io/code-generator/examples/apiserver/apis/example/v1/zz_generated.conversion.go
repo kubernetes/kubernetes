@@ -425,10 +425,7 @@ func Convert_example_MemoryDifferent_To_v1_MemoryDifferent(in *example.MemoryDif
 }
 
 func autoConvert_v1_MemoryIdentical_To_example_MemoryIdentical(in *MemoryIdentical, out *example.MemoryIdentical, s conversion.Scope) error {
-	out.Items = (*example.MemoryIdentical)(unsafe.Pointer(in.Items))
-	out.Properties = *(*map[string]example.MemoryIdentical)(unsafe.Pointer(&in.Properties))
-	out.AllOf = *(*[]example.MemoryIdentical)(unsafe.Pointer(&in.AllOf))
-	out.Bool = in.Bool
+	*out = *(*example.MemoryIdentical)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -438,10 +435,7 @@ func Convert_v1_MemoryIdentical_To_example_MemoryIdentical(in *MemoryIdentical, 
 }
 
 func autoConvert_example_MemoryIdentical_To_v1_MemoryIdentical(in *example.MemoryIdentical, out *MemoryIdentical, s conversion.Scope) error {
-	out.Items = (*MemoryIdentical)(unsafe.Pointer(in.Items))
-	out.Properties = *(*map[string]MemoryIdentical)(unsafe.Pointer(&in.Properties))
-	out.AllOf = *(*[]MemoryIdentical)(unsafe.Pointer(&in.AllOf))
-	out.Bool = in.Bool
+	*out = *(*MemoryIdentical)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -499,7 +493,7 @@ func Convert_example_TestTypeList_To_v1_TestTypeList(in *example.TestTypeList, o
 }
 
 func autoConvert_v1_TestTypeStatus_To_example_TestTypeStatus(in *TestTypeStatus, out *example.TestTypeStatus, s conversion.Scope) error {
-	out.Blah = in.Blah
+	*out = *(*example.TestTypeStatus)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -509,7 +503,7 @@ func Convert_v1_TestTypeStatus_To_example_TestTypeStatus(in *TestTypeStatus, out
 }
 
 func autoConvert_example_TestTypeStatus_To_v1_TestTypeStatus(in *example.TestTypeStatus, out *TestTypeStatus, s conversion.Scope) error {
-	out.Blah = in.Blah
+	*out = *(*TestTypeStatus)(unsafe.Pointer(in))
 	return nil
 }
 

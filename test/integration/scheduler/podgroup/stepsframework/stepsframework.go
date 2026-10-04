@@ -23,12 +23,16 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	schedulingapi "k8s.io/api/scheduling/v1alpha2"
+	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
+	schedulingapi "k8s.io/api/scheduling/v1beta1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/util/retry"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/scheduler/backend/queue"
 	testutils "k8s.io/kubernetes/test/integration/util"
 )
@@ -39,10 +43,9 @@ type WaitForAnyPodsScheduled struct {
 	NumUnschedulable int
 }
 
-type PodGroupConditionCheck struct {
-	PodGroupName    string
-	ConditionStatus metav1.ConditionStatus
-	Reason          string
+type Groups struct {
+	PodGroups          []string
+	CompositePodGroups []string
 }
 
 type VerifyAssignments struct {
@@ -53,6 +56,17 @@ type VerifyAssignments struct {
 type VerifyAssignedInOneDomain struct {
 	Pods        []string
 	TopologyKey string
+}
+
+type VerifyPodsSchedulingAttempts struct {
+	PodNames     []string
+	PodGroupName string
+	Attempts     int
+}
+
+type UpdatePod struct {
+	PodName  string
+	ModifyFn func(*v1.Pod)
 }
 
 // Step is allowing us to create a test in a more readable way.
@@ -105,10 +119,8 @@ type VerifyAssignedInOneDomain struct {
 //			},
 //			{
 //				Name: "Verify PodGroup condition is set to Scheduled",
-//				WaitForPodGroupCondition: &stepsframework.PodGroupConditionCheck{
-//					PodGroupName:    "pg1",
-//					ConditionStatus: metav1.ConditionTrue,
-//					Reason:          "Scheduled",
+//				WaitForGroupsScheduled: &stepsframework.Groups{
+//					PodGroups: []string{"pg1"},
 //				},
 //			},
 //		}
@@ -122,31 +134,65 @@ type Step struct {
 	CreateNodes []*v1.Node
 	// CreatePodGroup is use to create a pod group and wait for it to be ready.
 	CreatePodGroup *schedulingapi.PodGroup
+	// UpdatePodGroup is used to update an existing pod group and wait for it to propagate.
+	UpdatePodGroup *schedulingapi.PodGroup
+	// DeletePodGroup is used to delete a pod group by name and wait for it to propagate.
+	DeletePodGroup string
+	// CreateCompositePodGroup is used to create a composite pod group and wait for it to be ready.
+	CreateCompositePodGroup *schedulingv1alpha3.CompositePodGroup
+	// UpdateCompositePodGroup is used to update an existing composite pod group and wait for it to propagate.
+	UpdateCompositePodGroup *schedulingv1alpha3.CompositePodGroup
 	// CreatePods is use to create pods in the cluster.
 	CreatePods []*v1.Pod
+	// CreatePodsInOrder is use to create pods in the cluster and have them enqueued by the scheduler in the specified order.
+	CreatePodsInOrder []*v1.Pod
 	// CreateWorkloads is use to create workloads in the cluster.
 	CreateWorkloads []*schedulingapi.Workload
 	// DeletePods is use to delete pods from the cluster.
 	DeletePods []string
-	// DeleteWorkloads is use to delete workloads from the cluster.
-	WaitForPodsGatedOnPreEnqueue []string
+	// UpdatePod is used to mutate any field of the pod.
+	UpdatePod *UpdatePod
+	// UpdatePodStatus is used to mutate the status subresource of the pod,
+	// such as NominatedNodeName, which UpdatePod cannot touch.
+	UpdatePodStatus *UpdatePod
+	// WaitForPodsNominated waits until the named pods carry the expected
+	// NominatedNodeName in the scheduling queue. Keyed by pod name. This is a
+	// queue-level barrier so a following step can rely on the scheduler reading
+	// the nominated node during the placement cycle.
+	WaitForPodsNominated map[string]string
+	// WaitForPodsInActiveQ is used to check if the pods are present in ActiveQ.
+	WaitForPodsInActiveQ []string
+	// WaitForPodsInUnschedulableEntities is use to wait for pods to be in unschedulableEntities.
+	WaitForPodsInUnschedulableEntities []string
+	// WaitForPodsInIncompletePodGroupPods is use to wait for pods to be in incompletePodGroupPods.
+	WaitForPodsInIncompletePodGroupPods []string
 	// WaitForPodsUnschedulable is use to wait for pods to be unschedulable.
 	WaitForPodsUnschedulable []string
+	// WaitForPodsSchedulingError is use to wait for pods to get scheduling error status.
+	WaitForPodsSchedulingError []string
 	// WaitForPodsScheduled is use to wait for pods to be scheduled.
 	WaitForPodsScheduled []string
 	// WaitForPodsRemoved is use to wait for pods to be removed.
 	WaitForPodsRemoved []string
 	// WaitForAnyPodsScheduled is use to wait for any pod in the pod group to be scheduled.
 	WaitForAnyPodsScheduled *WaitForAnyPodsScheduled
-	// WaitForPodGroupCondition is use to wait for a pod group to have a certain condition.
-	WaitForPodGroupCondition *PodGroupConditionCheck
+	// WaitForGroupsScheduled is used to wait for PodGroups and CompositePodGroups to have Scheduled condition.
+	WaitForGroupsScheduled *Groups
+	// WaitForGroupsUnschedulable is used to wait for PodGroups and CompositePodGroups to have Unschedulable condition.
+	WaitForGroupsUnschedulable *Groups
 	// VerifyAssignments is use to verify that the pods are assigned to the correct nodes.
 	VerifyAssignments *VerifyAssignments
 	// VerifyAssignedInOneDomain is use to verify that the pods are assigned to nodes in the same domain.
 	VerifyAssignedInOneDomain *VerifyAssignedInOneDomain
+	// VerifyPodSchedulingAttempts is used to check the scheduling attempts of a pods.
+	VerifyPodSchedulingAttempts *VerifyPodsSchedulingAttempts
+	// RunScheduleOne is use to run the scheduling once.
+	// This operation should be used only when the test is not deploying the scheduler's goroutine
+	// (testCtx.Scheduler.Run).
+	RunScheduleOne bool
 }
 
-func podInUnschedulablePods(queue queue.SchedulingQueue, podName string) bool {
+func podInUnschedulableEntities(queue queue.SchedulingQueue, podName string) bool {
 	unschedPods := queue.UnschedulablePods()
 	for _, pod := range unschedPods {
 		if pod.Name == podName {
@@ -156,9 +202,30 @@ func podInUnschedulablePods(queue queue.SchedulingQueue, podName string) bool {
 	return false
 }
 
+func podSchedulingAttempted(cs kubernetes.Interface, ns, name string) wait.ConditionWithContextFunc {
+	return func(ctx context.Context) (bool, error) {
+		pod, err := cs.CoreV1().Pods(ns).Get(ctx, name, metav1.GetOptions{})
+		if err != nil {
+			return false, nil
+		}
+		_, cond := podutil.GetPodCondition(&pod.Status, v1.PodScheduled)
+		return cond != nil, nil
+	}
+}
+
+func podInIncompletePodGroupPods(queue queue.SchedulingQueue, podName string) bool {
+	incompletePods := queue.IncompletePodGroupPodsPods()
+	for _, pod := range incompletePods {
+		if pod.Name == podName {
+			return true
+		}
+	}
+	return false
+}
+
 func podGroupHasScheduledCondition(cs kubernetes.Interface, ns, name string, status metav1.ConditionStatus, reason string) wait.ConditionWithContextFunc {
 	return func(ctx context.Context) (bool, error) {
-		pg, err := cs.SchedulingV1alpha2().PodGroups(ns).Get(ctx, name, metav1.GetOptions{})
+		pg, err := cs.SchedulingV1beta1().PodGroups(ns).Get(ctx, name, metav1.GetOptions{})
 		if err != nil {
 			if apierrors.IsNotFound(err) {
 				return false, nil
@@ -166,7 +233,26 @@ func podGroupHasScheduledCondition(cs kubernetes.Interface, ns, name string, sta
 			return false, err
 		}
 		for _, c := range pg.Status.Conditions {
-			if c.Type == schedulingapi.PodGroupScheduled &&
+			if c.Type == schedulingapi.PodGroupInitiallyScheduled &&
+				c.Status == status && c.Reason == reason {
+				return true, nil
+			}
+		}
+		return false, nil
+	}
+}
+
+func compositePodGroupHasScheduledCondition(cs kubernetes.Interface, ns, name string, status metav1.ConditionStatus, reason string) wait.ConditionWithContextFunc {
+	return func(ctx context.Context) (bool, error) {
+		cpg, err := cs.SchedulingV1alpha3().CompositePodGroups(ns).Get(ctx, name, metav1.GetOptions{})
+		if err != nil {
+			if apierrors.IsNotFound(err) {
+				return false, nil
+			}
+			return false, err
+		}
+		for _, c := range cpg.Status.Conditions {
+			if c.Type == schedulingv1alpha3.CompositePodGroupInitiallyScheduled &&
 				c.Status == status && c.Reason == reason {
 				return true, nil
 			}
@@ -182,11 +268,20 @@ func createNodes(testCtx *testutils.TestContext, nodes []*v1.Node) error {
 		if _, err := cs.CoreV1().Nodes().Create(testCtx.Ctx, n, metav1.CreateOptions{}); err != nil {
 			return fmt.Errorf("failed to create node %s: %w", n.Name, err)
 		}
+		err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, wait.ForeverTestTimeout, false,
+			func(_ context.Context) (bool, error) {
+				_, err := testCtx.Scheduler.Cache.GetNode(n.Name)
+				return err == nil, nil
+			},
+		)
+		if err != nil {
+			return fmt.Errorf("failed to wait for node %s to be in the scheduler cache: %w", n.Name, err)
+		}
 	}
 	return nil
 }
 
-func createPods(testCtx *testutils.TestContext, ns string, pods []*v1.Pod) error {
+func createPods(testCtx *testutils.TestContext, ns string, pods []*v1.Pod, preserveOrder bool) error {
 	cs := testCtx.ClientSet
 	for _, pod := range pods {
 		p := pod.DeepCopy()
@@ -194,6 +289,79 @@ func createPods(testCtx *testutils.TestContext, ns string, pods []*v1.Pod) error
 		if _, err := cs.CoreV1().Pods(ns).Create(testCtx.Ctx, p, metav1.CreateOptions{}); err != nil {
 			return fmt.Errorf("failed to create pod %s: %w", p.Name, err)
 		}
+		if preserveOrder {
+			podSchedulingAttemptedFn := podSchedulingAttempted(cs, ns, p.Name)
+			err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 10*time.Second, false, func(ctx context.Context) (bool, error) {
+				_, ok := testCtx.Scheduler.SchedulingQueue.GetPod(ctx, p.Name, p.Namespace, p.Spec.SchedulingGroup)
+				if ok {
+					return true, nil
+				}
+				// The pod may have gotten queued and had a scheduling attempt between
+				// polls. A PodScheduled condition, either true or false, proves the
+				// scheduler has observed the pod.
+				return podSchedulingAttemptedFn(ctx)
+			})
+			if err != nil {
+				return fmt.Errorf("failed to ensure queueing order of pod %s: %w", p.Name, err)
+			}
+		}
+	}
+	return nil
+}
+
+func createCompositePodGroup(testCtx *testutils.TestContext, ns string, cpg *schedulingv1alpha3.CompositePodGroup) error {
+	cs := testCtx.ClientSet
+	cpgCopy := cpg.DeepCopy()
+	cpgCopy.Namespace = ns
+	if _, err := cs.SchedulingV1alpha3().CompositePodGroups(ns).Create(testCtx.Ctx, cpgCopy, metav1.CreateOptions{}); err != nil {
+		return fmt.Errorf("failed to create composite pod group %s: %w", cpgCopy.Name, err)
+	}
+	err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, wait.ForeverTestTimeout, false,
+		func(_ context.Context) (bool, error) {
+			_, err := testCtx.InformerFactory.Scheduling().V1alpha3().CompositePodGroups().Lister().CompositePodGroups(ns).Get(cpgCopy.Name)
+			if err != nil {
+				if apierrors.IsNotFound(err) {
+					return false, nil
+				}
+				return false, err
+			}
+			return true, nil
+		},
+	)
+	if err != nil {
+		return fmt.Errorf("failed to wait for composite pod group %s to be discoverable by scheduler: %w", cpgCopy.Name, err)
+	}
+	return nil
+}
+
+func updateCompositePodGroup(testCtx *testutils.TestContext, ns string, cpg *schedulingv1alpha3.CompositePodGroup) error {
+	cs := testCtx.ClientSet
+	cpgCopy := cpg.DeepCopy()
+	cpgCopy.Namespace = ns
+
+	existing, err := cs.SchedulingV1alpha3().CompositePodGroups(ns).Get(testCtx.Ctx, cpgCopy.Name, metav1.GetOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to get existing composite pod group %s for update: %w", cpgCopy.Name, err)
+	}
+	cpgCopy.ResourceVersion = existing.ResourceVersion
+
+	if _, err := cs.SchedulingV1alpha3().CompositePodGroups(ns).Update(testCtx.Ctx, cpgCopy, metav1.UpdateOptions{}); err != nil {
+		return fmt.Errorf("failed to update composite pod group %s: %w", cpgCopy.Name, err)
+	}
+	err = wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, wait.ForeverTestTimeout, false,
+		func(_ context.Context) (bool, error) {
+			listerCPG, err := testCtx.InformerFactory.Scheduling().V1alpha3().CompositePodGroups().Lister().CompositePodGroups(ns).Get(cpgCopy.Name)
+			if err != nil {
+				return false, err
+			}
+			if apiequality.Semantic.DeepEqual(listerCPG.Spec.SchedulingPolicy, cpgCopy.Spec.SchedulingPolicy) {
+				return true, nil
+			}
+			return false, nil
+		},
+	)
+	if err != nil {
+		return fmt.Errorf("failed to wait for composite pod group %s update to be discoverable by scheduler: %w", cpgCopy.Name, err)
 	}
 	return nil
 }
@@ -202,12 +370,12 @@ func createPodGroup(testCtx *testutils.TestContext, ns string, pg *schedulingapi
 	cs := testCtx.ClientSet
 	pgCopy := pg.DeepCopy()
 	pgCopy.Namespace = ns
-	if _, err := cs.SchedulingV1alpha2().PodGroups(ns).Create(testCtx.Ctx, pgCopy, metav1.CreateOptions{}); err != nil {
+	if _, err := cs.SchedulingV1beta1().PodGroups(ns).Create(testCtx.Ctx, pgCopy, metav1.CreateOptions{}); err != nil {
 		return fmt.Errorf("failed to create pod group %s: %w", pgCopy.Name, err)
 	}
 	err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, wait.ForeverTestTimeout, false,
 		func(_ context.Context) (bool, error) {
-			_, err := testCtx.InformerFactory.Scheduling().V1alpha2().PodGroups().Lister().PodGroups(ns).Get(pgCopy.Name)
+			_, err := testCtx.InformerFactory.Scheduling().V1beta1().PodGroups().Lister().PodGroups(ns).Get(pgCopy.Name)
 			if err != nil {
 				if apierrors.IsNotFound(err) {
 					return false, nil
@@ -223,12 +391,75 @@ func createPodGroup(testCtx *testutils.TestContext, ns string, pg *schedulingapi
 	return nil
 }
 
+func updatePodGroup(testCtx *testutils.TestContext, ns string, pg *schedulingapi.PodGroup) error {
+	cs := testCtx.ClientSet
+	pgCopy := pg.DeepCopy()
+	pgCopy.Namespace = ns
+
+	existing, err := cs.SchedulingV1beta1().PodGroups(ns).Get(testCtx.Ctx, pgCopy.Name, metav1.GetOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to get existing pod group %s for update: %w", pgCopy.Name, err)
+	}
+	pgCopy.ResourceVersion = existing.ResourceVersion
+
+	if _, err := cs.SchedulingV1beta1().PodGroups(ns).Update(testCtx.Ctx, pgCopy, metav1.UpdateOptions{}); err != nil {
+		return fmt.Errorf("failed to update pod group %s: %w", pgCopy.Name, err)
+	}
+	err = wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, wait.ForeverTestTimeout, false,
+		func(_ context.Context) (bool, error) {
+			listerPG, err := testCtx.InformerFactory.Scheduling().V1beta1().PodGroups().Lister().PodGroups(ns).Get(pgCopy.Name)
+			if err != nil {
+				return false, err
+			}
+			if apiequality.Semantic.DeepEqual(listerPG.Spec.SchedulingPolicy, pgCopy.Spec.SchedulingPolicy) {
+				return true, nil
+			}
+			return false, nil
+		},
+	)
+	if err != nil {
+		return fmt.Errorf("failed to wait for pod group %s update to be discoverable by scheduler: %w", pgCopy.Name, err)
+	}
+	return nil
+}
+
+func deletePodGroup(testCtx *testutils.TestContext, ns string, pgName string) error {
+	cs := testCtx.ClientSet
+
+	pg, err := cs.SchedulingV1beta1().PodGroups(ns).Get(testCtx.Ctx, pgName, metav1.GetOptions{})
+	if err == nil && len(pg.Finalizers) > 0 {
+		pg.Finalizers = nil
+		if _, err = cs.SchedulingV1beta1().PodGroups(ns).Update(testCtx.Ctx, pg, metav1.UpdateOptions{}); err != nil {
+			return fmt.Errorf("failed to clear finalizers of pod group %s: %w", pgName, err)
+		}
+	}
+	if err := cs.SchedulingV1beta1().PodGroups(ns).Delete(testCtx.Ctx, pgName, metav1.DeleteOptions{}); err != nil {
+		return fmt.Errorf("failed to delete pod group %s: %w", pgName, err)
+	}
+	err = wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, wait.ForeverTestTimeout, false,
+		func(_ context.Context) (bool, error) {
+			_, err := testCtx.InformerFactory.Scheduling().V1beta1().PodGroups().Lister().PodGroups(ns).Get(pgName)
+			if err != nil {
+				if apierrors.IsNotFound(err) {
+					return true, nil
+				}
+				return false, err
+			}
+			return false, nil
+		},
+	)
+	if err != nil {
+		return fmt.Errorf("failed to wait for pod group %s deletion to propagate: %w", pgName, err)
+	}
+	return nil
+}
+
 func createWorkloads(testCtx *testutils.TestContext, ns string, wls []*schedulingapi.Workload) error {
 	cs := testCtx.ClientSet
 	for _, wl := range wls {
 		wlCopy := wl.DeepCopy()
 		wlCopy.Namespace = ns
-		if _, err := cs.SchedulingV1alpha2().Workloads(ns).Create(testCtx.Ctx, wlCopy, metav1.CreateOptions{}); err != nil {
+		if _, err := cs.SchedulingV1beta1().Workloads(ns).Create(testCtx.Ctx, wlCopy, metav1.CreateOptions{}); err != nil {
 			return fmt.Errorf("failed to create workload %s: %w", wlCopy.Name, err)
 		}
 	}
@@ -241,34 +472,103 @@ func deletePods(testCtx *testutils.TestContext, ns string, podNames []string) er
 		if err := cs.CoreV1().Pods(ns).Delete(testCtx.Ctx, podName, metav1.DeleteOptions{}); err != nil {
 			return fmt.Errorf("failed to delete pod %s: %w", podName, err)
 		}
-		err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, wait.ForeverTestTimeout, false,
-			func(_ context.Context) (bool, error) {
-				_, err := cs.CoreV1().Pods(ns).Get(testCtx.Ctx, podName, metav1.GetOptions{})
-				if err != nil {
-					if apierrors.IsNotFound(err) {
-						return true, nil
-					}
-					return false, err
-				}
-				return false, nil
-			},
-		)
+	}
+	return nil
+}
+
+func updatePod(testCtx *testutils.TestContext, ns string, update *UpdatePod) error {
+	cs := testCtx.ClientSet
+	p, err := cs.CoreV1().Pods(ns).Get(testCtx.Ctx, update.PodName, metav1.GetOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to get pod %s for update: %w", update.PodName, err)
+	}
+	update.ModifyFn(p)
+	_, err = cs.CoreV1().Pods(ns).Update(testCtx.Ctx, p, metav1.UpdateOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to update pod %s: %w", update.PodName, err)
+	}
+	return nil
+}
+
+func updatePodStatus(testCtx *testutils.TestContext, ns string, update *UpdatePod) error {
+	cs := testCtx.ClientSet
+	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		p, err := cs.CoreV1().Pods(ns).Get(testCtx.Ctx, update.PodName, metav1.GetOptions{})
 		if err != nil {
-			return fmt.Errorf("failed to wait for pod %s to be no longer visible in scheduler: %w", podName, err)
+			return fmt.Errorf("failed to get pod %s for status update: %w", update.PodName, err)
+		}
+		update.ModifyFn(p)
+		_, err = cs.CoreV1().Pods(ns).UpdateStatus(testCtx.Ctx, p, metav1.UpdateOptions{})
+		if err != nil {
+			return fmt.Errorf("failed to update status of pod %s: %w", update.PodName, err)
+		}
+		return nil
+	})
+}
+
+func waitForPodsNominated(testCtx *testutils.TestContext, nominated map[string]string) error {
+	err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, wait.ForeverTestTimeout, false,
+		func(_ context.Context) (bool, error) {
+			pods, _ := testCtx.Scheduler.SchedulingQueue.PendingPods()
+			matched := 0
+			for _, p := range pods {
+				want, ok := nominated[p.Name]
+				if !ok {
+					continue
+				}
+				if p.Status.NominatedNodeName != want {
+					return false, nil
+				}
+				matched++
+			}
+			return matched == len(nominated), nil
+		})
+	if err != nil {
+		return fmt.Errorf("failed to wait for pods %v to be nominated in the scheduling queue: %w", nominated, err)
+	}
+	return nil
+}
+
+func waitForPodsInActiveQ(testCtx *testutils.TestContext, podNames []string) error {
+	for _, podName := range podNames {
+		err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 10*time.Second, false, func(ctx context.Context) (bool, error) {
+			for _, p := range testCtx.Scheduler.SchedulingQueue.PodsInActiveQ() {
+				if p.Name == podName {
+					return true, nil
+				}
+			}
+			return false, nil
+		})
+		if err != nil {
+			return fmt.Errorf("failed to wait for pod %s to be in active queue: %w", podName, err)
 		}
 	}
 	return nil
 }
 
-func waitForPodsGatedOnPreEnqueue(testCtx *testutils.TestContext, ns string, podNames []string) error {
+func waitForPodsInUnschedulableEntities(testCtx *testutils.TestContext, ns string, podNames []string) error {
 	for _, podName := range podNames {
 		err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, wait.ForeverTestTimeout, false,
 			func(_ context.Context) (bool, error) {
-				return podInUnschedulablePods(testCtx.Scheduler.SchedulingQueue, podName), nil
+				return podInUnschedulableEntities(testCtx.Scheduler.SchedulingQueue, podName), nil
 			},
 		)
 		if err != nil {
-			return fmt.Errorf("failed to wait for pod %s to be in unschedulable pods pool: %w", podName, err)
+			return fmt.Errorf("failed to wait for pod %s to be in unschedulable entities: %w", podName, err)
+		}
+	}
+	return nil
+}
+
+func waitForPodsInIncompletePodGroupPods(testCtx *testutils.TestContext, ns string, podNames []string) error {
+	for _, podName := range podNames {
+		err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, wait.ForeverTestTimeout, false,
+			func(_ context.Context) (bool, error) {
+				return podInIncompletePodGroupPods(testCtx.Scheduler.SchedulingQueue, podName), nil
+			},
+		)
+		if err != nil {
+			return fmt.Errorf("failed to wait for pod %s to be in incompletePodGroupPods: %w", podName, err)
 		}
 	}
 	return nil
@@ -281,6 +581,18 @@ func waitForPodsUnschedulable(testCtx *testutils.TestContext, ns string, podName
 			testutils.PodUnschedulable(cs, ns, podName))
 		if err != nil {
 			return fmt.Errorf("failed to wait for pod %s to be unschedulable: %w", podName, err)
+		}
+	}
+	return nil
+}
+
+func waitForPodsSchedulingError(testCtx *testutils.TestContext, ns string, podNames []string) error {
+	cs := testCtx.ClientSet
+	for _, podName := range podNames {
+		err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, wait.ForeverTestTimeout, false,
+			testutils.PodSchedulingError(cs, ns, podName))
+		if err != nil {
+			return fmt.Errorf("failed to wait for pod %s to get scheduling error: %w", podName, err)
 		}
 	}
 	return nil
@@ -338,15 +650,70 @@ func waitForAnyPodsScheduled(testCtx *testutils.TestContext, ns string, waitAny 
 	return nil
 }
 
-func waitForPodGroupCondition(testCtx *testutils.TestContext, ns string, check *PodGroupConditionCheck) error {
+func waitForPodGroupsScheduled(testCtx *testutils.TestContext, ns string, pgNames []string) error {
 	cs := testCtx.ClientSet
-	err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, wait.ForeverTestTimeout, false,
-		podGroupHasScheduledCondition(cs, ns, check.PodGroupName, check.ConditionStatus, check.Reason))
-	if err != nil {
-		return fmt.Errorf("failed to wait for PodGroup %s condition (status=%s, reason=%s): %w",
-			check.PodGroupName, check.ConditionStatus, check.Reason, err)
+	for _, pgName := range pgNames {
+		err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, wait.ForeverTestTimeout, false,
+			podGroupHasScheduledCondition(cs, ns, pgName, metav1.ConditionTrue, schedulingapi.PodGroupReasonScheduled))
+		if err != nil {
+			return fmt.Errorf("failed to wait for PodGroup %s condition (status=%s, reason=%s): %w",
+				pgName, metav1.ConditionTrue, schedulingapi.PodGroupReasonScheduled, err)
+		}
 	}
 	return nil
+}
+
+func waitForPodGroupsUnschedulable(testCtx *testutils.TestContext, ns string, pgNames []string) error {
+	cs := testCtx.ClientSet
+	for _, pgName := range pgNames {
+		err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, wait.ForeverTestTimeout, false,
+			podGroupHasScheduledCondition(cs, ns, pgName, metav1.ConditionFalse, schedulingapi.PodGroupReasonUnschedulable))
+		if err != nil {
+			return fmt.Errorf("failed to wait for PodGroup %s condition (status=%s, reason=%s): %w",
+				pgName, metav1.ConditionFalse, schedulingapi.PodGroupReasonUnschedulable, err)
+		}
+	}
+	return nil
+}
+
+func waitForCompositePodGroupsScheduled(testCtx *testutils.TestContext, ns string, cpgNames []string) error {
+	cs := testCtx.ClientSet
+	for _, cpgName := range cpgNames {
+		err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, wait.ForeverTestTimeout, false,
+			compositePodGroupHasScheduledCondition(cs, ns, cpgName, metav1.ConditionTrue, schedulingv1alpha3.CompositePodGroupReasonScheduled))
+		if err != nil {
+			return fmt.Errorf("failed to wait for CompositePodGroup %s condition (status=%s, reason=%s): %w",
+				cpgName, metav1.ConditionTrue, schedulingv1alpha3.CompositePodGroupReasonScheduled, err)
+		}
+	}
+	return nil
+}
+
+func waitForCompositePodGroupsUnschedulable(testCtx *testutils.TestContext, ns string, cpgNames []string) error {
+	cs := testCtx.ClientSet
+	for _, cpgName := range cpgNames {
+		err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, wait.ForeverTestTimeout, false,
+			compositePodGroupHasScheduledCondition(cs, ns, cpgName, metav1.ConditionFalse, schedulingv1alpha3.CompositePodGroupReasonUnschedulable))
+		if err != nil {
+			return fmt.Errorf("failed to wait for CompositePodGroup %s condition (status=%s, reason=%s): %w",
+				cpgName, metav1.ConditionFalse, schedulingv1alpha3.CompositePodGroupReasonUnschedulable, err)
+		}
+	}
+	return nil
+}
+
+func waitForGroupsScheduled(testCtx *testutils.TestContext, ns string, groups *Groups) error {
+	if err := waitForCompositePodGroupsScheduled(testCtx, ns, groups.CompositePodGroups); err != nil {
+		return err
+	}
+	return waitForPodGroupsScheduled(testCtx, ns, groups.PodGroups)
+}
+
+func waitForGroupsUnschedulable(testCtx *testutils.TestContext, ns string, groups *Groups) error {
+	if err := waitForCompositePodGroupsUnschedulable(testCtx, ns, groups.CompositePodGroups); err != nil {
+		return err
+	}
+	return waitForPodGroupsUnschedulable(testCtx, ns, groups.PodGroups)
 }
 
 func verifyAssignments(testCtx *testutils.TestContext, ns string, verify *VerifyAssignments) error {
@@ -396,6 +763,26 @@ func verifyAssignedInOneDomain(testCtx *testutils.TestContext, ns string, verify
 	return nil
 }
 
+func verifyPodSchedulingAttempts(testCtx *testutils.TestContext, ns string, check *VerifyPodsSchedulingAttempts) error {
+	podGroupName := check.PodGroupName
+	for _, podName := range check.PodNames {
+		pInfo, ok := testCtx.Scheduler.SchedulingQueue.GetPod(testCtx.Ctx, podName, ns, &v1.PodSchedulingGroup{
+			PodGroupName: &podGroupName,
+		})
+		if !ok {
+			return fmt.Errorf("pod %s not found in scheduling queue", podName)
+		}
+		if pInfo.Attempts != check.Attempts {
+			return fmt.Errorf("expected pod %s scheduling attempts to be %d, but got %d", podName, check.Attempts, pInfo.Attempts)
+		}
+	}
+	return nil
+}
+
+func runScheduleOne(testCtx *testutils.TestContext) {
+	testCtx.Scheduler.ScheduleOne(testCtx.Ctx)
+}
+
 // RunSteps executes steps in the given order. It executes only first encountered operation in step.
 // If there is no operation in the step, it will return an error.
 // If there is an error in any step, it will stop and return the error.
@@ -410,29 +797,57 @@ func RunSteps(testCtx *testutils.TestContext, t *testing.T, ns string, steps []S
 		case step.CreateNodes != nil:
 			err = createNodes(testCtx, step.CreateNodes)
 		case step.CreatePods != nil:
-			err = createPods(testCtx, ns, step.CreatePods)
+			err = createPods(testCtx, ns, step.CreatePods, false)
+		case step.CreatePodsInOrder != nil:
+			err = createPods(testCtx, ns, step.CreatePodsInOrder, true)
+		case step.CreateCompositePodGroup != nil:
+			err = createCompositePodGroup(testCtx, ns, step.CreateCompositePodGroup)
+		case step.UpdateCompositePodGroup != nil:
+			err = updateCompositePodGroup(testCtx, ns, step.UpdateCompositePodGroup)
 		case step.CreatePodGroup != nil:
 			err = createPodGroup(testCtx, ns, step.CreatePodGroup)
+		case step.UpdatePodGroup != nil:
+			err = updatePodGroup(testCtx, ns, step.UpdatePodGroup)
+		case step.DeletePodGroup != "":
+			err = deletePodGroup(testCtx, ns, step.DeletePodGroup)
 		case step.CreateWorkloads != nil:
 			err = createWorkloads(testCtx, ns, step.CreateWorkloads)
 		case step.DeletePods != nil:
 			err = deletePods(testCtx, ns, step.DeletePods)
-		case step.WaitForPodsGatedOnPreEnqueue != nil:
-			err = waitForPodsGatedOnPreEnqueue(testCtx, ns, step.WaitForPodsGatedOnPreEnqueue)
+		case step.UpdatePod != nil:
+			err = updatePod(testCtx, ns, step.UpdatePod)
+		case step.UpdatePodStatus != nil:
+			err = updatePodStatus(testCtx, ns, step.UpdatePodStatus)
+		case step.WaitForPodsNominated != nil:
+			err = waitForPodsNominated(testCtx, step.WaitForPodsNominated)
+		case step.WaitForPodsInActiveQ != nil:
+			err = waitForPodsInActiveQ(testCtx, step.WaitForPodsInActiveQ)
+		case step.WaitForPodsInUnschedulableEntities != nil:
+			err = waitForPodsInUnschedulableEntities(testCtx, ns, step.WaitForPodsInUnschedulableEntities)
+		case step.WaitForPodsInIncompletePodGroupPods != nil:
+			err = waitForPodsInIncompletePodGroupPods(testCtx, ns, step.WaitForPodsInIncompletePodGroupPods)
 		case step.WaitForPodsUnschedulable != nil:
 			err = waitForPodsUnschedulable(testCtx, ns, step.WaitForPodsUnschedulable)
+		case step.WaitForPodsSchedulingError != nil:
+			err = waitForPodsSchedulingError(testCtx, ns, step.WaitForPodsSchedulingError)
 		case step.WaitForPodsScheduled != nil:
 			err = waitForPodsScheduled(testCtx, ns, step.WaitForPodsScheduled)
 		case step.WaitForPodsRemoved != nil:
 			err = waitForPodsRemoved(testCtx, ns, step.WaitForPodsRemoved)
 		case step.WaitForAnyPodsScheduled != nil:
 			err = waitForAnyPodsScheduled(testCtx, ns, step.WaitForAnyPodsScheduled)
-		case step.WaitForPodGroupCondition != nil:
-			err = waitForPodGroupCondition(testCtx, ns, step.WaitForPodGroupCondition)
+		case step.WaitForGroupsScheduled != nil:
+			err = waitForGroupsScheduled(testCtx, ns, step.WaitForGroupsScheduled)
+		case step.WaitForGroupsUnschedulable != nil:
+			err = waitForGroupsUnschedulable(testCtx, ns, step.WaitForGroupsUnschedulable)
 		case step.VerifyAssignments != nil:
 			err = verifyAssignments(testCtx, ns, step.VerifyAssignments)
 		case step.VerifyAssignedInOneDomain != nil:
 			err = verifyAssignedInOneDomain(testCtx, ns, step.VerifyAssignedInOneDomain)
+		case step.VerifyPodSchedulingAttempts != nil:
+			err = verifyPodSchedulingAttempts(testCtx, ns, step.VerifyPodSchedulingAttempts)
+		case step.RunScheduleOne:
+			runScheduleOne(testCtx)
 		default:
 			err = fmt.Errorf("no operation specified for step %d (%s)", i, step.Name)
 		}

@@ -23,7 +23,7 @@ package v1
 //
 // PodIP represents a single IP address allocated to the pod.
 type PodIPApplyConfiguration struct {
-	// IP is the IP address assigned to the pod
+	// ip is the IP address assigned to the pod
 	IP *string `json:"ip,omitempty"`
 }
 

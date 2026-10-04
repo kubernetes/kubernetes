@@ -18,6 +18,7 @@ package validators
 
 import (
 	"fmt"
+	"time"
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -27,15 +28,15 @@ import (
 )
 
 const (
-	minItemsTagName      = "k8s:minItems"
-	maxItemsTagName      = "k8s:maxItems"
-	minimumTagName       = "k8s:minimum"
-	maximumTagName       = "k8s:maximum"
-	minLengthTagName     = "k8s:minLength"
-	maxLengthTagName     = "k8s:maxLength"
-	maxBytesTagName      = "k8s:maxBytes"
-	maxPropertiesTagName = "k8s:maxProperties"
-	minPropertiesTagName = "k8s:minProperties"
+	minItemsTagName      = "minItems"
+	maxItemsTagName      = "maxItems"
+	minimumTagName       = "minimum"
+	maximumTagName       = "maximum"
+	minLengthTagName     = "minLength"
+	maxLengthTagName     = "maxLength"
+	maxBytesTagName      = "maxBytes"
+	maxPropertiesTagName = "maxProperties"
+	minPropertiesTagName = "minProperties"
 )
 
 func init() {
@@ -118,15 +119,23 @@ func (maxBytesTagValidator) ValidScopes() sets.Set[Scope] {
 	return maxBytesTagValidScopes
 }
 
-var maxBytesValidator = types.Name{Package: libValidationPkg, Name: "MaxBytes"}
+var (
+	maxBytesValidator      = types.Name{Package: libValidationPkg, Name: "MaxBytes"}
+	maxBytesSliceValidator = types.Name{Package: libValidationPkg, Name: "MaxBytesSlice"}
+)
 
 func (maxBytesTagValidator) GetValidations(context Context, tag codetags.Tag) (Validations, error) {
 	var result Validations
 
 	// This tag can apply to value and pointer fields, as well as typedefs
 	// (which should never be pointers). We need to check the concrete type.
-	if t := util.NonPointer(util.NativeType(context.Type)); t != types.String {
-		return Validations{}, fmt.Errorf("can only be used on string types (%s)", rootTypeString(context.Type, t))
+	// Byte slices are strings on the wire, so they are limited in bytes, too.
+	t := util.NonPointer(util.NativeType(context.Type))
+	validator := maxBytesValidator
+	if t.Kind == types.Slice && util.NativeType(t.Elem) == types.Byte {
+		validator = maxBytesSliceValidator
+	} else if t != types.String {
+		return Validations{}, fmt.Errorf("can only be used on string and []byte types (%s)", rootTypeString(context.Type, t))
 	}
 
 	intVal, err := util.ParseInt(tag.Value)
@@ -136,7 +145,7 @@ func (maxBytesTagValidator) GetValidations(context Context, tag codetags.Tag) (V
 	if intVal < 0 {
 		return result, fmt.Errorf("must be greater than or equal to zero")
 	}
-	result.AddFunction(Function(maxBytesTagName, DefaultFlags, maxBytesValidator, intVal).
+	result.AddFunction(Function(maxBytesTagName, DefaultFlags, validator, intVal).
 		WithEmits(Emission{field.ErrorTypeTooLong, "maxBytes", ""}))
 	return result, nil
 }
@@ -144,10 +153,10 @@ func (maxBytesTagValidator) GetValidations(context Context, tag codetags.Tag) (V
 func (mbtv maxBytesTagValidator) Docs() TagDoc {
 	return TagDoc{
 		Tag:            mbtv.TagName(),
-		StabilityLevel: TagStabilityLevelBeta,
+		StabilityLevel: TagStabilityLevelStable,
 		Scopes:         sets.List(mbtv.ValidScopes()),
-		Description: `Indicates that a string field has a limit on its length in bytes.
-		This could only allow as few as N/4 multi-byte characters.
+		Description: `Indicates that a string or []byte field has a limit on its length in bytes.
+		For strings, this could only allow as few as N/4 multi-byte characters.
 		If you want to limit length of characters specifically, use maxLength.`,
 		Payloads: []TagPayloadDoc{{
 			Description: "<non-negative integer>",
@@ -414,33 +423,12 @@ var minimumValidator = types.Name{Package: libValidationPkg, Name: "Minimum"}
 
 func (minimumTagValidator) GetValidations(context Context, tag codetags.Tag) (Validations, error) {
 	var result Validations
-
-	// This tag can apply to value and pointer fields, as well as typedefs
-	// (which should never be pointers). We need to check the concrete type.
-	t := util.NonPointer(util.NativeType(context.Type))
-	if !types.IsInteger(t) {
-		return result, fmt.Errorf("can only be used on integer types (%s)", rootTypeString(context.Type, t))
-	}
-
-	bitSize, err := intBitSize(t)
+	limit, err := parseNumericLimit(context, tag)
 	if err != nil {
 		return result, err
 	}
-	if isUnsignedInt(t) {
-		uintVal, err := util.ParseUnsignedInt(tag.Value, bitSize)
-		if err != nil {
-			return result, fmt.Errorf("failed to parse tag payload: %w", err)
-		}
-		result.AddFunction(Function(minimumTagName, DefaultFlags, minimumValidator, uintVal).
-			WithEmits(Emission{field.ErrorTypeInvalid, "minimum", ""}))
-	} else {
-		intVal, err := util.ParseSignedInt(tag.Value, bitSize)
-		if err != nil {
-			return result, fmt.Errorf("failed to parse tag payload: %w", err)
-		}
-		result.AddFunction(Function(minimumTagName, DefaultFlags, minimumValidator, intVal).
-			WithEmits(Emission{field.ErrorTypeInvalid, "minimum", ""}))
-	}
+	result.AddFunction(Function(minimumTagName, DefaultFlags, minimumValidator, limit).
+		WithEmits(Emission{field.ErrorTypeInvalid, "minimum", ""}))
 	return result, nil
 }
 
@@ -453,8 +441,11 @@ func (mtv minimumTagValidator) Docs() TagDoc {
 		Payloads: []TagPayloadDoc{{
 			Description: "<integer>",
 			Docs:        "This field must be greater than or equal to X.",
+		}, {
+			Description: `"<duration>"`,
+			Docs:        "This time.Duration field must be greater than or equal to X, a Go duration string.",
 		}},
-		PayloadsType:     codetags.ValueTypeInt,
+		PayloadsType:     codetags.ValueTypeRaw,
 		PayloadsRequired: true,
 	}
 }
@@ -477,33 +468,12 @@ var maximumValidator = types.Name{Package: libValidationPkg, Name: "Maximum"}
 
 func (maximumTagValidator) GetValidations(context Context, tag codetags.Tag) (Validations, error) {
 	var result Validations
-
-	// This tag can apply to value and pointer fields, as well as typedefs
-	// (which should never be pointers). We need to check the concrete type.
-	t := util.NonPointer(util.NativeType(context.Type))
-	if !types.IsInteger(t) {
-		return result, fmt.Errorf("can only be used on integer types (%s)", rootTypeString(context.Type, t))
-	}
-
-	bitSize, err := intBitSize(t)
+	limit, err := parseNumericLimit(context, tag)
 	if err != nil {
 		return result, err
 	}
-	if isUnsignedInt(t) {
-		uintVal, err := util.ParseUnsignedInt(tag.Value, bitSize)
-		if err != nil {
-			return result, fmt.Errorf("failed to parse tag payload: %w", err)
-		}
-		result.AddFunction(Function(maximumTagName, DefaultFlags, maximumValidator, uintVal).
-			WithEmits(Emission{field.ErrorTypeInvalid, "maximum", ""}))
-	} else {
-		intVal, err := util.ParseSignedInt(tag.Value, bitSize)
-		if err != nil {
-			return result, fmt.Errorf("failed to parse tag payload: %w", err)
-		}
-		result.AddFunction(Function(maximumTagName, DefaultFlags, maximumValidator, intVal).
-			WithEmits(Emission{field.ErrorTypeInvalid, "maximum", ""}))
-	}
+	result.AddFunction(Function(maximumTagName, DefaultFlags, maximumValidator, limit).
+		WithEmits(Emission{field.ErrorTypeInvalid, "maximum", ""}))
 	return result, nil
 }
 
@@ -516,9 +486,53 @@ func (mtv maximumTagValidator) Docs() TagDoc {
 		Payloads: []TagPayloadDoc{{
 			Description: "<integer>",
 			Docs:        "This field must be less than or equal to X.",
+		}, {
+			Description: `"<duration>"`,
+			Docs:        "This time.Duration field must be less than or equal to X, a Go duration string.",
 		}},
-		PayloadsType:     codetags.ValueTypeInt,
+		PayloadsType:     codetags.ValueTypeRaw,
 		PayloadsRequired: true,
+	}
+}
+
+var durationType = types.Name{Package: "time", Name: "Duration"}
+
+// parseNumericLimit parses a minimum or maximum payload for the field's type.
+func parseNumericLimit(context Context, tag codetags.Tag) (any, error) {
+	// This tag can apply to value and pointer fields, as well as typedefs
+	// (which should never be pointers). We need to check the concrete type.
+	t := util.NonPointer(util.NativeType(context.Type))
+	switch {
+	// time.Duration is an int64, so check it before the integer case.
+	case util.NonPointer(context.Type).Name == durationType:
+		if tag.ValueType != codetags.ValueTypeString {
+			return nil, fmt.Errorf("type mismatch: field is a time.Duration, but payload is of type %s", tag.ValueType)
+		}
+		d, err := time.ParseDuration(tag.Value)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse tag payload: %w", err)
+		}
+		return int64(d), nil
+	case types.IsInteger(t):
+		if tag.ValueType != codetags.ValueTypeInt {
+			return nil, fmt.Errorf("type mismatch: field is an integer, but payload is of type %s", tag.ValueType)
+		}
+		bitSize, err := intBitSize(t)
+		if err != nil {
+			return nil, err
+		}
+		var limit any
+		if isUnsignedInt(t) {
+			limit, err = util.ParseUnsignedInt(tag.Value, bitSize)
+		} else {
+			limit, err = util.ParseSignedInt(tag.Value, bitSize)
+		}
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse tag payload: %w", err)
+		}
+		return limit, nil
+	default:
+		return nil, fmt.Errorf("can only be used on integer types (%s)", rootTypeString(context.Type, t))
 	}
 }
 

@@ -34,11 +34,11 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/certs/renewal"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/controlplane"
 	etcdphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/etcd"
-	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	dryrunutil "k8s.io/kubernetes/cmd/kubeadm/app/util/dryrun"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 	etcdutil "k8s.io/kubernetes/cmd/kubeadm/app/util/etcd"
+	filesutil "k8s.io/kubernetes/cmd/kubeadm/app/util/files"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/image"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/staticpod"
 )
@@ -116,7 +116,7 @@ func NewKubeStaticPodPathManagerUsingTempDirs(kubernetesDir, patchesDir string, 
 
 // MoveFile should move a file from oldPath to newPath
 func (spm *KubeStaticPodPathManager) MoveFile(oldPath, newPath string) error {
-	return kubeadmutil.MoveFile(oldPath, newPath)
+	return filesutil.MoveFile(oldPath, newPath)
 }
 
 // KubernetesDir should point to the directory Kubernetes owns for storing various configuration files
@@ -296,7 +296,7 @@ func performEtcdStaticPodUpgrade(certsRenewMgr *renewal.Manager, client clientse
 	// Backing up etcd data store
 	backupEtcdDir := pathMgr.BackupEtcdDir()
 	runningEtcdDir := cfg.Etcd.Local.DataDir
-	output, err := kubeadmutil.CopyDir(runningEtcdDir, backupEtcdDir)
+	output, err := filesutil.CopyDir(runningEtcdDir, backupEtcdDir)
 	if err != nil {
 		return true, errors.Wrapf(err, "failed to back up etcd data, output: %q", output)
 	}
@@ -561,7 +561,7 @@ func rollbackEtcdData(cfg *kubeadmapi.InitConfiguration, pathMgr StaticPodPathMa
 	backupEtcdDir := pathMgr.BackupEtcdDir()
 	runningEtcdDir := cfg.Etcd.Local.DataDir
 
-	output, err := kubeadmutil.CopyDir(backupEtcdDir, runningEtcdDir)
+	output, err := filesutil.CopyDir(backupEtcdDir, runningEtcdDir)
 	if err != nil {
 		// Let the user know there we're problems, but we tried to reçover
 		return errors.Wrapf(err, "couldn't recover etcd database with error, the location of etcd backup: %s, output: %q", backupEtcdDir, output)

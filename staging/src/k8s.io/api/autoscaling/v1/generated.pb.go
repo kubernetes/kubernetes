@@ -410,6 +410,11 @@ func (m *HorizontalPodAutoscalerCondition) MarshalToSizedBuffer(dAtA []byte) (in
 	_ = i
 	var l int
 	_ = l
+	if m.ObservedGeneration != nil {
+		i = encodeVarintGenerated(dAtA, i, uint64(*m.ObservedGeneration))
+		i--
+		dAtA[i] = 0x30
+	}
 	i -= len(m.Message)
 	copy(dAtA[i:], m.Message)
 	i = encodeVarintGenerated(dAtA, i, uint64(len(m.Message)))
@@ -1344,6 +1349,9 @@ func (m *HorizontalPodAutoscalerCondition) Size() (n int) {
 	n += 1 + l + sovGenerated(uint64(l))
 	l = len(m.Message)
 	n += 1 + l + sovGenerated(uint64(l))
+	if m.ObservedGeneration != nil {
+		n += 1 + sovGenerated(uint64(*m.ObservedGeneration))
+	}
 	return n
 }
 
@@ -1708,6 +1716,7 @@ func (this *HorizontalPodAutoscalerCondition) String() string {
 		`LastTransitionTime:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.LastTransitionTime), "Time", "v1.Time", 1), `&`, ``, 1) + `,`,
 		`Reason:` + fmt.Sprintf("%v", this.Reason) + `,`,
 		`Message:` + fmt.Sprintf("%v", this.Message) + `,`,
+		`ObservedGeneration:` + valueToStringGenerated(this.ObservedGeneration) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -3101,6 +3110,26 @@ func (m *HorizontalPodAutoscalerCondition) Unmarshal(dAtA []byte) error {
 			}
 			m.Message = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
+		case 6:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ObservedGeneration", wireType)
+			}
+			var v int64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				v |= int64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			m.ObservedGeneration = &v
 		default:
 			iNdEx = preIndex
 			skippy, err := skipGenerated(dAtA[iNdEx:])

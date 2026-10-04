@@ -21,6 +21,8 @@ import (
 	"fmt"
 	"strconv"
 
+	"sigs.k8s.io/structured-merge-diff/v7/fieldpath"
+
 	batchv1 "k8s.io/api/batch/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -45,7 +47,6 @@ import (
 	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/utils/ptr"
-	"sigs.k8s.io/structured-merge-diff/v6/fieldpath"
 )
 
 // jobStrategy implements verification logic for Replication Controllers.
@@ -92,17 +93,13 @@ func (jobStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
 
 // PrepareForCreate clears the status of a job before creation.
 func (jobStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
-	job := obj.(*batch.Job)
-	generateSelectorIfNeeded(job)
-	job.Status = batch.JobStatus{}
+	newJob := obj.(*batch.Job)
+	generateSelectorIfNeeded(newJob)
+	newJob.Status = batch.JobStatus{}
+	newJob.Generation = 1
 
-	job.Generation = 1
-
-	if !utilfeature.DefaultFeatureGate.Enabled(features.JobManagedBy) {
-		job.Spec.ManagedBy = nil
-	}
-
-	pod.DropDisabledTemplateFields(&job.Spec.Template, nil)
+	job.DropDisabledFields(&newJob.Spec, nil)
+	pod.DropDisabledTemplateFields(&newJob.Spec.Template, nil)
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
@@ -110,6 +107,8 @@ func (jobStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object
 	newJob := obj.(*batch.Job)
 	oldJob := old.(*batch.Job)
 	newJob.Status = oldJob.Status
+
+	job.DropDisabledFields(&newJob.Spec, &oldJob.Spec)
 
 	pod.DropDisabledTemplateFields(&newJob.Spec.Template, &oldJob.Spec.Template)
 
@@ -125,7 +124,25 @@ func (jobStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object
 func (jobStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	job := obj.(*batch.Job)
 	opts := validationOptionsForJob(job, nil)
-	return batchvalidation.ValidateJob(job, opts)
+	return batchvalidation.ValidateJobCreate(job, opts)
+}
+
+// DeclarativeValidationConfig declares the options referenced by this type's tags,
+// mapped to whether each is enabled.
+func (jobStrategy) DeclarativeValidationConfig(ctx context.Context, obj, oldObj runtime.Object) rest.DeclarativeValidationConfig {
+	return rest.DeclarativeValidationConfig{Options: map[string]bool{
+		string(features.WorkloadWithJob): utilfeature.DefaultFeatureGate.Enabled(features.WorkloadWithJob),
+	}}
+}
+
+// shouldAllowMutablePodTemplate returns true if the Job's pod template should
+// be mutable. This is safe for suspended jobs with no active pods that either
+// have never started or have the JobSuspended condition set.
+func shouldAllowMutablePodTemplate(job *batch.Job) bool {
+	suspended := job.Spec.Suspend != nil && *job.Spec.Suspend
+	notStarted := job.Status.StartTime == nil
+	hasSuspendedCondition := batchvalidation.IsConditionTrue(job.Status.Conditions, batch.JobSuspended)
+	return suspended && (notStarted || hasSuspendedCondition) && job.Status.Active == 0
 }
 
 func validationOptionsForJob(newJob, oldJob *batch.Job) batchvalidation.JobValidationOptions {
@@ -147,11 +164,12 @@ func validationOptionsForJob(newJob, oldJob *batch.Job) batchvalidation.JobValid
 		suspended := oldJob.Spec.Suspend != nil && *oldJob.Spec.Suspend
 		notStarted := oldJob.Status.StartTime == nil
 		opts.AllowMutableSchedulingDirectives = suspended && notStarted
+		allowMutablePodTemplate := shouldAllowMutablePodTemplate(oldJob)
 		if utilfeature.DefaultFeatureGate.Enabled(features.MutablePodResourcesForSuspendedJobs) {
-			opts.AllowMutablePodResources = suspended && batchvalidation.IsConditionTrue(oldJob.Status.Conditions, batch.JobSuspended) && oldJob.Status.Active == 0
+			opts.AllowMutablePodResources = allowMutablePodTemplate
 		}
 		if utilfeature.DefaultFeatureGate.Enabled(features.MutableSchedulingDirectivesForSuspendedJobs) {
-			opts.AllowMutableSchedulingDirectives = suspended && batchvalidation.IsConditionTrue(oldJob.Status.Conditions, batch.JobSuspended) && oldJob.Status.Active == 0
+			opts.AllowMutableSchedulingDirectives = allowMutablePodTemplate
 		}
 		// Validation should not fail jobs if they don't have the new labels.
 		// This can be removed once we have high confidence that both labels exist (1.30 at least)
@@ -255,9 +273,7 @@ func (jobStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) 
 	oldJob := old.(*batch.Job)
 
 	opts := validationOptionsForJob(job, oldJob)
-	validationErrorList := batchvalidation.ValidateJob(job, opts)
-	updateErrorList := batchvalidation.ValidateJobUpdate(job, oldJob, opts)
-	return append(validationErrorList, updateErrorList...)
+	return batchvalidation.ValidateJobUpdate(job, oldJob, opts)
 }
 
 // WarningsOnUpdate returns warnings for the given update.
@@ -303,78 +319,74 @@ func (jobStatusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Ob
 
 // getStatusValidationOptions returns validation options for Job status
 func getStatusValidationOptions(newJob, oldJob *batch.Job) batchvalidation.JobStatusValidationOptions {
-	if utilfeature.DefaultFeatureGate.Enabled(features.JobManagedBy) {
-		// A strengthened validation of the Job status transitions is needed since the
-		// Job managedBy field let's the Job object be controlled by external
-		// controllers. We want to make sure the transitions done by the external
-		// controllers meet the expectations of the clients of the Job API.
-		// For example, we verify that a Job in terminal state (Failed or Complete)
-		// does not flip to a non-terminal state.
-		//
-		// In the checks below we fail validation for Job status fields (or conditions) only if they change their values
-		// (compared to the oldJob). This allows proceeding with status updates unrelated to the fields violating the
-		// checks, while blocking bad status updates for jobs with correct status.
-		//
-		// Also note, there is another reason we run the validation rules only
-		// if the associated status fields changed. We do it also because some of
-		// the validation rules might be temporarily violated just after a user
-		// updating the spec. In that case we want to give time to the Job
-		// controller to "fix" the status in the following sync. For example, the
-		// rule for checking the format of completedIndexes expects them to be
-		// below .spec.completions, however, this it is ok if the
-		// status.completedIndexes go beyond completions just after a user scales
-		// down a Job.
-		isIndexed := ptr.Deref(newJob.Spec.CompletionMode, batch.NonIndexedCompletion) == batch.IndexedCompletion
+	// A strengthened validation of the Job status transitions is needed since the
+	// Job managedBy field let's the Job object be controlled by external
+	// controllers. We want to make sure the transitions done by the external
+	// controllers meet the expectations of the clients of the Job API.
+	// For example, we verify that a Job in terminal state (Failed or Complete)
+	// does not flip to a non-terminal state.
+	//
+	// In the checks below we fail validation for Job status fields (or conditions) only if they change their values
+	// (compared to the oldJob). This allows proceeding with status updates unrelated to the fields violating the
+	// checks, while blocking bad status updates for jobs with correct status.
+	//
+	// Also note, there is another reason we run the validation rules only
+	// if the associated status fields changed. We do it also because some of
+	// the validation rules might be temporarily violated just after a user
+	// updating the spec. In that case we want to give time to the Job
+	// controller to "fix" the status in the following sync. For example, the
+	// rule for checking the format of completedIndexes expects them to be
+	// below .spec.completions, however, this it is ok if the
+	// status.completedIndexes go beyond completions just after a user scales
+	// down a Job.
+	isIndexed := ptr.Deref(newJob.Spec.CompletionMode, batch.NonIndexedCompletion) == batch.IndexedCompletion
 
-		isJobFinishedChanged := batchvalidation.IsJobFinished(oldJob) != batchvalidation.IsJobFinished(newJob)
-		isJobCompleteChanged := batchvalidation.IsJobComplete(oldJob) != batchvalidation.IsJobComplete(newJob)
-		isJobFailedChanged := batchvalidation.IsJobFailed(oldJob) != batchvalidation.IsJobFailed(newJob)
-		isJobFailureTargetChanged := batchvalidation.IsConditionTrue(oldJob.Status.Conditions, batch.JobFailureTarget) != batchvalidation.IsConditionTrue(newJob.Status.Conditions, batch.JobFailureTarget)
-		isJobSuccessCriteriaMetChanged := batchvalidation.IsConditionTrue(oldJob.Status.Conditions, batch.JobSuccessCriteriaMet) != batchvalidation.IsConditionTrue(newJob.Status.Conditions, batch.JobSuccessCriteriaMet)
-		isCompletedIndexesChanged := oldJob.Status.CompletedIndexes != newJob.Status.CompletedIndexes
-		isFailedIndexesChanged := !ptr.Equal(oldJob.Status.FailedIndexes, newJob.Status.FailedIndexes)
-		isActiveChanged := oldJob.Status.Active != newJob.Status.Active
-		isStartTimeChanged := !ptr.Equal(oldJob.Status.StartTime, newJob.Status.StartTime)
-		isCompletionTimeChanged := !ptr.Equal(oldJob.Status.CompletionTime, newJob.Status.CompletionTime)
-		isUncountedTerminatedPodsChanged := !apiequality.Semantic.DeepEqual(oldJob.Status.UncountedTerminatedPods, newJob.Status.UncountedTerminatedPods)
-		isReadyChanged := !ptr.Equal(oldJob.Status.Ready, newJob.Status.Ready)
-		isTerminatingChanged := !ptr.Equal(oldJob.Status.Terminating, newJob.Status.Terminating)
-		isSuspendedWithZeroCompletions := ptr.Equal(newJob.Spec.Suspend, ptr.To(true)) && ptr.Equal(newJob.Spec.Completions, ptr.To[int32](0))
-		// Detect job resume via condition changes (JobSuspended: True -> False)
-		// This handles the case where the controller updates status after the user has already
-		// changed spec.suspend=false, which is the scenario from https://github.com/kubernetes/kubernetes/issues/134521
-		isJobResuming := batchvalidation.IsConditionTrue(oldJob.Status.Conditions, batch.JobSuspended) &&
-			batchvalidation.IsConditionFalse(newJob.Status.Conditions, batch.JobSuspended)
+	isJobFinishedChanged := batchvalidation.IsJobFinished(oldJob) != batchvalidation.IsJobFinished(newJob)
+	isJobCompleteChanged := batchvalidation.IsJobComplete(oldJob) != batchvalidation.IsJobComplete(newJob)
+	isJobFailedChanged := batchvalidation.IsJobFailed(oldJob) != batchvalidation.IsJobFailed(newJob)
+	isJobFailureTargetChanged := batchvalidation.IsConditionTrue(oldJob.Status.Conditions, batch.JobFailureTarget) != batchvalidation.IsConditionTrue(newJob.Status.Conditions, batch.JobFailureTarget)
+	isJobSuccessCriteriaMetChanged := batchvalidation.IsConditionTrue(oldJob.Status.Conditions, batch.JobSuccessCriteriaMet) != batchvalidation.IsConditionTrue(newJob.Status.Conditions, batch.JobSuccessCriteriaMet)
+	isCompletedIndexesChanged := oldJob.Status.CompletedIndexes != newJob.Status.CompletedIndexes
+	isFailedIndexesChanged := !ptr.Equal(oldJob.Status.FailedIndexes, newJob.Status.FailedIndexes)
+	isActiveChanged := oldJob.Status.Active != newJob.Status.Active
+	isStartTimeChanged := !ptr.Equal(oldJob.Status.StartTime, newJob.Status.StartTime)
+	isCompletionTimeChanged := !ptr.Equal(oldJob.Status.CompletionTime, newJob.Status.CompletionTime)
+	isUncountedTerminatedPodsChanged := !apiequality.Semantic.DeepEqual(oldJob.Status.UncountedTerminatedPods, newJob.Status.UncountedTerminatedPods)
+	isReadyChanged := !ptr.Equal(oldJob.Status.Ready, newJob.Status.Ready)
+	isTerminatingChanged := !ptr.Equal(oldJob.Status.Terminating, newJob.Status.Terminating)
+	isSuspendedWithZeroCompletions := ptr.Equal(newJob.Spec.Suspend, new(true)) && ptr.Equal(newJob.Spec.Completions, ptr.To[int32](0))
+	// Detect job resume via condition changes (JobSuspended: True -> False)
+	// This handles the case where the controller updates status after the user has already
+	// changed spec.suspend=false, which is the scenario from https://github.com/kubernetes/kubernetes/issues/134521
+	isJobResuming := batchvalidation.IsConditionTrue(oldJob.Status.Conditions, batch.JobSuspended) &&
+		batchvalidation.IsConditionFalse(newJob.Status.Conditions, batch.JobSuspended)
 
-		return batchvalidation.JobStatusValidationOptions{
-			// We allow to decrease the counter for succeeded pods for jobs which
-			// have equal parallelism and completions, as they can be scaled-down.
-			RejectDecreasingSucceededCounter:             !isIndexed || !ptr.Equal(newJob.Spec.Completions, newJob.Spec.Parallelism),
-			RejectDecreasingFailedCounter:                true,
-			RejectDisablingTerminalCondition:             true,
-			RejectInvalidCompletedIndexes:                isCompletedIndexesChanged,
-			RejectInvalidFailedIndexes:                   isFailedIndexesChanged,
-			RejectCompletedIndexesForNonIndexedJob:       isCompletedIndexesChanged,
-			RejectFailedIndexesForNoBackoffLimitPerIndex: isFailedIndexesChanged,
-			RejectFailedIndexesOverlappingCompleted:      isFailedIndexesChanged || isCompletedIndexesChanged,
-			RejectFailedJobWithoutFailureTarget:          isJobFailedChanged || isFailedIndexesChanged,
-			RejectCompleteJobWithoutSuccessCriteriaMet:   isJobCompleteChanged || isJobSuccessCriteriaMetChanged,
-			RejectFinishedJobWithActivePods:              isJobFinishedChanged || isActiveChanged,
-			RejectFinishedJobWithoutStartTime:            (isJobFinishedChanged || isStartTimeChanged) && !isSuspendedWithZeroCompletions,
-			RejectFinishedJobWithUncountedTerminatedPods: isJobFinishedChanged || isUncountedTerminatedPodsChanged,
-			RejectStartTimeUpdateForUnsuspendedJob:       isStartTimeChanged && !isJobResuming,
-			RejectCompletionTimeBeforeStartTime:          isStartTimeChanged || isCompletionTimeChanged,
-			RejectMutatingCompletionTime:                 true,
-			RejectNotCompleteJobWithCompletionTime:       isJobCompleteChanged || isCompletionTimeChanged,
-			RejectCompleteJobWithoutCompletionTime:       isJobCompleteChanged || isCompletionTimeChanged,
-			RejectCompleteJobWithFailedCondition:         isJobCompleteChanged || isJobFailedChanged,
-			RejectCompleteJobWithFailureTargetCondition:  isJobCompleteChanged || isJobFailureTargetChanged,
-			RejectMoreReadyThanActivePods:                isReadyChanged || isActiveChanged,
-			RejectFinishedJobWithTerminatingPods:         isJobFinishedChanged || isTerminatingChanged,
-		}
+	return batchvalidation.JobStatusValidationOptions{
+		// We allow to decrease the counter for succeeded pods for jobs which
+		// have equal parallelism and completions, as they can be scaled-down.
+		RejectDecreasingSucceededCounter:             !isIndexed || !ptr.Equal(newJob.Spec.Completions, newJob.Spec.Parallelism),
+		RejectDecreasingFailedCounter:                true,
+		RejectDisablingTerminalCondition:             true,
+		RejectInvalidCompletedIndexes:                isCompletedIndexesChanged,
+		RejectInvalidFailedIndexes:                   isFailedIndexesChanged,
+		RejectCompletedIndexesForNonIndexedJob:       isCompletedIndexesChanged,
+		RejectFailedIndexesForNoBackoffLimitPerIndex: isFailedIndexesChanged,
+		RejectFailedIndexesOverlappingCompleted:      isFailedIndexesChanged || isCompletedIndexesChanged,
+		RejectFailedJobWithoutFailureTarget:          isJobFailedChanged || isFailedIndexesChanged,
+		RejectCompleteJobWithoutSuccessCriteriaMet:   isJobCompleteChanged || isJobSuccessCriteriaMetChanged,
+		RejectFinishedJobWithActivePods:              isJobFinishedChanged || isActiveChanged,
+		RejectFinishedJobWithoutStartTime:            (isJobFinishedChanged || isStartTimeChanged) && !isSuspendedWithZeroCompletions,
+		RejectFinishedJobWithUncountedTerminatedPods: isJobFinishedChanged || isUncountedTerminatedPodsChanged,
+		RejectStartTimeUpdateForUnsuspendedJob:       isStartTimeChanged && !isJobResuming,
+		RejectCompletionTimeBeforeStartTime:          isStartTimeChanged || isCompletionTimeChanged,
+		RejectMutatingCompletionTime:                 true,
+		RejectNotCompleteJobWithCompletionTime:       isJobCompleteChanged || isCompletionTimeChanged,
+		RejectCompleteJobWithoutCompletionTime:       isJobCompleteChanged || isCompletionTimeChanged,
+		RejectCompleteJobWithFailedCondition:         isJobCompleteChanged || isJobFailedChanged,
+		RejectCompleteJobWithFailureTargetCondition:  isJobCompleteChanged || isJobFailureTargetChanged,
+		RejectMoreReadyThanActivePods:                isReadyChanged || isActiveChanged,
+		RejectFinishedJobWithTerminatingPods:         isJobFinishedChanged || isTerminatingChanged,
 	}
-
-	return batchvalidation.JobStatusValidationOptions{}
 }
 
 // WarningsOnUpdate returns warnings for the given update.

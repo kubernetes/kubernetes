@@ -28,6 +28,7 @@ registry.k8s.io/e2e-test-images/perl
 registry.k8s.io/e2e-test-images/regression-issue-74839
 registry.k8s.io/e2e-test-images/resource-consumer
 registry.k8s.io/e2e-test-images/sample-apiserver
+registry.k8s.io/e2e-test-images/sample-device-plugin
 registry.k8s.io/e2e-test-images/volume/iscsi
 registry.k8s.io/e2e-test-images/volume/nfs
 registry.k8s.io/etcd

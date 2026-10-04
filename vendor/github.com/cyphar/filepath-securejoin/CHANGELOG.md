@@ -6,6 +6,17 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased] ##
 
+## [0.7.0] - 2025-06-17 ##
+
+> You talk of times of peace for all, and then prepare for war.
+
+### Changed ###
+- Update to `cyphar.com/go-pathrs@0.2.5`, which included a build-time API
+  breakage that we needed to work around. The API of this library is unchanged
+  by this, but users should make sure to update to `v0.7.0` of
+  `filepath-securejoin` if they use the `libpathrs` built tag and have update
+  to `libpathrs` `v0.2.5`.
+
 ## [0.6.1] - 2025-11-19 ##
 
 > At last up jumped the cunning spider, and fiercely held her fast.

@@ -27,7 +27,7 @@ import (
 )
 
 const (
-	itemTagName = "k8s:item"
+	itemTagName = "item"
 )
 
 func init() {
@@ -43,11 +43,13 @@ type keyValuePair struct {
 
 type itemTagValidator struct {
 	validator  TagValidationExtractor
+	prefix     string
 	listByPath map[string]*listMetadata
 }
 
 func (itv *itemTagValidator) Init(cfg Config) {
 	itv.validator = cfg.TagValidator
+	itv.prefix = cfg.TagPrefix
 }
 
 func (itemTagValidator) TagName() string {
@@ -61,7 +63,8 @@ func (itemTagValidator) ValidScopes() sets.Set[Scope] {
 }
 
 var (
-	validateSliceItem = types.Name{Package: libValidationPkg, Name: "SliceItem"}
+	validateValSliceItem = types.Name{Package: libValidationPkg, Name: "ValSliceItem"}
+	validatePtrSliceItem = types.Name{Package: libValidationPkg, Name: "PtrSliceItem"}
 )
 
 func (itv *itemTagValidator) GetValidations(context Context, tag codetags.Tag) (Validations, error) {
@@ -75,6 +78,11 @@ func (itv *itemTagValidator) GetValidations(context Context, tag codetags.Tag) (
 		return Validations{}, fmt.Errorf("can only be used on list types")
 	}
 	elemT := util.NonPointer(util.NativeType(nt.Elem))
+
+	validateFunc := validateValSliceItem
+	if nt.Elem.Kind == types.Pointer {
+		validateFunc = validatePtrSliceItem
+	}
 	if elemT.Kind != types.Struct {
 		return Validations{}, fmt.Errorf("can only be used on lists of structs")
 	}
@@ -123,8 +131,11 @@ func (itv *itemTagValidator) GetValidations(context Context, tag codetags.Tag) (
 			}
 			deferredResult := Validations{}
 			for _, vfn := range validations.Functions {
-				f := Function(itemTagName, vfn.Flags, validateSliceItem, matchArg, equivArg, WrapperFunction{Function: vfn, ObjType: elemT})
+				f := Function(itemTagName, vfn.Flags, validateFunc, matchArg, equivArg, WrapperFunction{Function: vfn, ObjType: elemT})
 				f.Cohort = itemKey
+				if vfn.Cohort != "" {
+					f.Cohort = itemKey + "." + vfn.Cohort
+				}
 				vfn = f
 				deferredResult.AddFunction(vfn)
 			}
@@ -163,12 +174,15 @@ func (itv *itemTagValidator) GetValidations(context Context, tag codetags.Tag) (
 					// We reach here if the original deferred scope was ParentContext.
 					// Because the parent of a list element is the list itself, the generated
 					// function `fn` (e.g. a union validation) already expects the full list
-					// as its argument. If we didn't skip wrapping, validateSliceItem would
+					// as its argument. If we didn't skip wrapping, validateValSliceItem would
 					// mistakenly attempt to pass individual list elements to it.
 					return fn
 				}
-				f := Function(itemTagName, fn.Flags, validateSliceItem, matchArg, equivArg, WrapperFunction{Function: fn, ObjType: elemT})
+				f := Function(itemTagName, fn.Flags, validateFunc, matchArg, equivArg, WrapperFunction{Function: fn, ObjType: elemT})
 				f.Cohort = itemKey
+				if fn.Cohort != "" {
+					f.Cohort = itemKey + "." + fn.Cohort
+				}
 				return f
 			}, d.Scope), nil
 		}))
@@ -223,7 +237,7 @@ func (itv *itemTagValidator) prepareArgs(context Context, criteria []keyValuePai
 	if directComparable {
 		equivArg = Identifier(validateDirectEqual)
 	} else {
-		equivArg = Identifier(validateSemanticDeepEqual)
+		equivArg = DeepEqualFunc{}
 	}
 	return matchArg, equivArg, nil
 }
@@ -282,12 +296,12 @@ func (itv itemTagValidator) Docs() TagDoc {
 		Tag:            itv.TagName(),
 		StabilityLevel: TagStabilityLevelStable,
 		Scopes:         sets.List(itv.ValidScopes()),
-		Description: "Declares a validation for an item of a slice declared as a +k8s:listType=map. " +
+		Description: "Declares a validation for an item of a slice declared as a +" + itv.prefix + listTypeTagName + "=map. " +
 			"The item to match is declared by providing field-value pair arguments. All key fields must be specified.",
-		Usage: "+k8s:item(stringKey: \"value\", intKey: 42, boolKey: true)=<validation-tag>",
+		Usage: "+" + itv.prefix + itemTagName + "(stringKey: \"value\", intKey: 42, boolKey: true)=<validation-tag>",
 		Docs: "Arguments must be named with the JSON names of the list-map key fields. " +
 			"Values can be strings, integers, or booleans. " +
-			"For example: +k8s:item(name: \"myname\", priority: 10, enabled: true)=<chained-validation-tag>",
+			"For example: +" + itv.prefix + itemTagName + "(name: \"myname\", priority: 10, enabled: true)=<chained-validation-tag>",
 		AcceptsUnknownArgs: true,
 		Payloads: []TagPayloadDoc{{
 			Description: "<validation-tag>",

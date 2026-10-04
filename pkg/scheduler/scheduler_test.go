@@ -45,6 +45,9 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/events"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/component-base/metrics/legacyregistry"
+	fifometrics "k8s.io/component-base/metrics/prometheus/clientgo/fifo"
+	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
 	fwk "k8s.io/kube-scheduler/framework"
@@ -59,8 +62,10 @@ import (
 	apicalls "k8s.io/kubernetes/pkg/scheduler/framework/api_calls"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultbinder"
+	plfeature "k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/queuesort"
+	"k8s.io/kubernetes/pkg/scheduler/framework/preemption"
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	"k8s.io/kubernetes/pkg/scheduler/profile"
@@ -83,11 +88,14 @@ func TestSchedulerCreation(t *testing.T) {
 		"Foo": defaultbinder.New,
 	}
 	cases := []struct {
-		name          string
-		opts          []Option
-		wantErr       string
-		wantProfiles  []string
-		wantExtenders []string
+		name                            string
+		isSchedulerAsyncAPICallsEnabled bool
+		opts                            []Option
+		wantErr                         string
+		wantProfiles                    []string
+		wantExtenders                   []string
+		wantNodeInfoSnapshot            *internalcache.Snapshot
+		wantAPIDispatcher               bool
 	}{
 		{
 			name: "valid out-of-tree registry",
@@ -190,10 +198,28 @@ func TestSchedulerCreation(t *testing.T) {
 			wantProfiles:  []string{"default-scheduler"},
 			wantExtenders: []string{"http://extender.kube-system/"},
 		},
+		{
+			name:                            "With SchedulerAsyncAPICalls enabled",
+			isSchedulerAsyncAPICallsEnabled: true,
+			opts: []Option{
+				WithProfiles(
+					schedulerapi.KubeSchedulerProfile{
+						SchedulerName: "default-scheduler",
+						Plugins: &schedulerapi.Plugins{
+							QueueSort: schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: "PrioritySort"}}},
+							Bind:      schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: "DefaultBinder"}}},
+						},
+					},
+				),
+			},
+			wantProfiles:      []string{"default-scheduler"},
+			wantAPIDispatcher: true,
+		},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.SchedulerAsyncAPICalls, tc.isSchedulerAsyncAPICallsEnabled)
 			client := fake.NewClientset()
 			informerFactory := informers.NewSharedInformerFactory(client, 0)
 
@@ -222,6 +248,10 @@ func TestSchedulerCreation(t *testing.T) {
 				t.Fatalf("Failed to create scheduler: %v", err)
 			}
 
+			if gotAPIDispatcher := s.APIDispatcher != nil; tc.wantAPIDispatcher != gotAPIDispatcher {
+				t.Errorf("Unexpected APIDispatcher state, want: %v, got: %v", tc.wantAPIDispatcher, gotAPIDispatcher)
+			}
+
 			// Profiles
 			profiles := make([]string, 0, len(s.Profiles))
 			for name := range s.Profiles {
@@ -234,16 +264,6 @@ func TestSchedulerCreation(t *testing.T) {
 
 			// Extenders
 			if len(tc.wantExtenders) != 0 {
-				// Scheduler.Extenders
-				extenders := make([]string, 0, len(s.Extenders))
-				for _, e := range s.Extenders {
-					extenders = append(extenders, e.Name())
-				}
-				if diff := cmp.Diff(tc.wantExtenders, extenders); diff != "" {
-					t.Errorf("unexpected extenders (-want, +got):\n%s", diff)
-				}
-
-				// fwk.Handle.Extenders()
 				for _, p := range s.Profiles {
 					extenders := make([]string, 0, len(p.Extenders()))
 					for _, e := range p.Extenders() {
@@ -310,7 +330,7 @@ func TestFailureHandler(t *testing.T) {
 
 				recorder := metrics.NewMetricsAsyncRecorder(3, 20*time.Microsecond, ctx.Done())
 				queue := internalqueue.NewPriorityQueue(nil, informerFactory, internalqueue.WithClock(testingclock.NewFakeClock(time.Now())), internalqueue.WithMetricsRecorder(recorder), internalqueue.WithAPIDispatcher(apiDispatcher))
-				schedulerCache := internalcache.New(ctx, apiDispatcher, false)
+				schedulerCache := internalcache.New(ctx, apiDispatcher, false, false)
 
 				queue.Add(ctx, testPod)
 
@@ -328,7 +348,7 @@ func TestFailureHandler(t *testing.T) {
 					if err := podInformer.Informer().GetStore().Delete(testPod); err != nil {
 						t.Fatal(err)
 					}
-					queue.Delete(testPod)
+					queue.Delete(logger, testPod)
 				}
 
 				s, schedFramework, err := initScheduler(ctx, schedulerCache, queue, apiDispatcher, client, informerFactory)
@@ -341,7 +361,7 @@ func TestFailureHandler(t *testing.T) {
 
 				var got *v1.Pod
 				if tt.podUpdatedDuringScheduling {
-					pInfo, ok := queue.GetPod(testPod.Name, testPod.Namespace)
+					pInfo, ok := queue.GetPod(ctx, testPod.Name, testPod.Namespace, testPod.Spec.SchedulingGroup)
 					if !ok {
 						t.Fatalf("Failed to get pod %s/%s from queue", testPod.Namespace, testPod.Name)
 					}
@@ -384,7 +404,7 @@ func TestFailureHandler_PodAlreadyBound(t *testing.T) {
 			}
 
 			queue := internalqueue.NewPriorityQueue(nil, informerFactory, internalqueue.WithClock(testingclock.NewFakeClock(time.Now())), internalqueue.WithAPIDispatcher(apiDispatcher))
-			schedulerCache := internalcache.New(ctx, apiDispatcher, false)
+			schedulerCache := internalcache.New(ctx, apiDispatcher, false, false)
 
 			// Add node to schedulerCache no matter it's deleted in API server or not.
 			schedulerCache.AddNode(logger, &nodeFoo)
@@ -443,8 +463,8 @@ func TestWithPercentageOfNodesToScore(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Failed to create scheduler: %v", err)
 			}
-			if sched.percentageOfNodesToScore != tt.wantedPercentageOfNodesToScore {
-				t.Errorf("scheduler.percercentageOfNodesToScore = %v, want %v", sched.percentageOfNodesToScore, tt.wantedPercentageOfNodesToScore)
+			if sched.algorithm.percentageOfNodesToScore != tt.wantedPercentageOfNodesToScore {
+				t.Errorf("scheduler.percentageOfNodesToScore = %v, want %v", sched.algorithm.percentageOfNodesToScore, tt.wantedPercentageOfNodesToScore)
 			}
 		})
 	}
@@ -503,13 +523,17 @@ func initScheduler(ctx context.Context, cache internalcache.Cache, queue interna
 	}
 
 	s := &Scheduler{
-		Cache:           cache,
-		client:          client,
-		StopEverything:  ctx.Done(),
-		SchedulingQueue: queue,
-		APIDispatcher:   apiDispatcher,
-		Profiles:        profile.Map{testSchedulerName: fwk},
-		logger:          logger,
+		Cache:            cache,
+		nodeInfoSnapshot: internalcache.NewEmptySnapshot(),
+		client:           client,
+		StopEverything:   ctx.Done(),
+		SchedulingQueue:  queue,
+		APIDispatcher:    apiDispatcher,
+		Profiles:         profile.Map{testSchedulerName: fwk},
+		logger:           logger,
+	}
+	if err := s.initAlgorithm(); err != nil {
+		return nil, nil, err
 	}
 	s.applyDefaultHandlers()
 
@@ -580,7 +604,7 @@ func TestInitPluginsWithIndexers(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			fakeInformerFactory := NewInformerFactory(&fake.Clientset{}, 0*time.Second)
+			fakeInformerFactory := NewInformerFactory(&fake.Clientset{}, 0*time.Second, nil)
 
 			var registerPluginFuncs []tf.RegisterPluginFunc
 			for name, entrypoint := range tt.entrypoints {
@@ -842,9 +866,7 @@ func Test_UnionedGVKs(t *testing.T) {
 		plugins                         schedulerapi.PluginSet
 		want                            map[fwk.EventResource]fwk.ActionType
 		enableInPlacePodVerticalScaling bool
-		enableDynamicResourceAllocation bool
-		enableNodeDeclaredFeatures      bool
-		enableGangScheduling            bool
+		enableGenericWorkload           bool
 	}{
 		{
 			name: "filter without EnqueueExtensions plugin",
@@ -896,9 +918,8 @@ func Test_UnionedGVKs(t *testing.T) {
 				fwk.DeviceClass:           fwk.All,
 				fwk.PodGroup:              fwk.All,
 			},
-			enableGangScheduling:            true,
+			enableGenericWorkload:           true,
 			enableInPlacePodVerticalScaling: true,
-			enableDynamicResourceAllocation: true,
 		},
 		{
 			name: "node plugin",
@@ -961,24 +982,7 @@ func Test_UnionedGVKs(t *testing.T) {
 			want: map[fwk.EventResource]fwk.ActionType{},
 		},
 		{
-			name:    "plugins with default profile (queueingHint/InPlacePodVerticalScaling: enabled)",
-			plugins: schedulerapi.PluginSet{Enabled: defaults.PluginsV1.MultiPoint.Enabled},
-			want: map[fwk.EventResource]fwk.ActionType{
-				fwk.AssignedPod:           fwk.Add | fwk.UpdatePodLabel | fwk.UpdatePodScaleDown | fwk.Delete,
-				fwk.TargetPod:             fwk.UpdatePodLabel | fwk.UpdatePodToleration | fwk.UpdatePodSchedulingGatesEliminated | fwk.UpdatePodScaleDown,
-				fwk.Node:                  fwk.Add | fwk.UpdateNodeAllocatable | fwk.UpdateNodeLabel | fwk.UpdateNodeTaint | fwk.Delete,
-				fwk.CSINode:               fwk.All - fwk.Delete,
-				fwk.CSIDriver:             fwk.Update,
-				fwk.CSIStorageCapacity:    fwk.All - fwk.Delete,
-				fwk.PersistentVolume:      fwk.All - fwk.Delete,
-				fwk.PersistentVolumeClaim: fwk.All - fwk.Delete,
-				fwk.StorageClass:          fwk.All - fwk.Delete,
-				fwk.VolumeAttachment:      fwk.Delete,
-			},
-			enableInPlacePodVerticalScaling: true,
-		},
-		{
-			name:    "plugins with default profile (queueingHint/DynamicResourceAllocation: enabled)",
+			name:    "plugins with default profile (InPlacePodVerticalScaling disabled)",
 			plugins: schedulerapi.PluginSet{Enabled: defaults.PluginsV1.MultiPoint.Enabled},
 			want: map[fwk.EventResource]fwk.ActionType{
 				fwk.AssignedPod:           fwk.Add | fwk.UpdatePodLabel | fwk.Delete,
@@ -992,13 +996,12 @@ func Test_UnionedGVKs(t *testing.T) {
 				fwk.StorageClass:          fwk.All - fwk.Delete,
 				fwk.VolumeAttachment:      fwk.Delete,
 				fwk.DeviceClass:           fwk.All - fwk.Delete,
-				fwk.ResourceClaim:         fwk.All - fwk.Delete,
+				fwk.ResourceClaim:         fwk.All,
 				fwk.ResourceSlice:         fwk.All - fwk.Delete,
 			},
-			enableDynamicResourceAllocation: true,
 		},
 		{
-			name:    "plugins with default profile (NodeDeclaredFeatures: enabled)",
+			name:    "plugins with default profile",
 			plugins: defaults.PluginsV1.MultiPoint,
 			want: map[fwk.EventResource]fwk.ActionType{
 				// NodeDeclaredFeatures adds fwk.Update
@@ -1014,11 +1017,9 @@ func Test_UnionedGVKs(t *testing.T) {
 				fwk.StorageClass:          fwk.All - fwk.Delete,
 				fwk.VolumeAttachment:      fwk.Delete,
 				fwk.DeviceClass:           fwk.All - fwk.Delete,
-				fwk.ResourceClaim:         fwk.All - fwk.Delete,
+				fwk.ResourceClaim:         fwk.All,
 				fwk.ResourceSlice:         fwk.All - fwk.Delete,
 			},
-			enableDynamicResourceAllocation: true,
-			enableNodeDeclaredFeatures:      true,
 			enableInPlacePodVerticalScaling: true,
 		},
 		{
@@ -1040,9 +1041,9 @@ func Test_UnionedGVKs(t *testing.T) {
 			plugins: schedulerapi.PluginSet{Enabled: append(defaults.PluginsV1.MultiPoint.Enabled, schedulerapi.Plugin{Name: names.GangScheduling})},
 			want: map[fwk.EventResource]fwk.ActionType{
 				fwk.AssignedPod:           fwk.Add | fwk.UpdatePodLabel | fwk.UpdatePodScaleDown | fwk.Delete,
-				fwk.TargetPod:             fwk.UpdatePodLabel | fwk.UpdatePodGeneratedResourceClaim | fwk.UpdatePodScaleDown | fwk.UpdatePodToleration | fwk.UpdatePodSchedulingGatesEliminated,
+				fwk.TargetPod:             fwk.UpdatePodLabel | fwk.UpdatePodGeneratedResourceClaim | fwk.UpdatePodScaleDown | fwk.UpdatePodToleration | fwk.UpdatePodSchedulingGatesEliminated | fwk.Update,
 				fwk.UnscheduledPod:        fwk.Add,
-				fwk.Node:                  fwk.Add | fwk.UpdateNodeAllocatable | fwk.UpdateNodeLabel | fwk.UpdateNodeTaint | fwk.Delete,
+				fwk.Node:                  fwk.Add | fwk.UpdateNodeAllocatable | fwk.UpdateNodeLabel | fwk.UpdateNodeTaint | fwk.Delete | fwk.UpdateNodeDeclaredFeature,
 				fwk.CSINode:               fwk.All - fwk.Delete,
 				fwk.CSIDriver:             fwk.Update,
 				fwk.CSIStorageCapacity:    fwk.All - fwk.Delete,
@@ -1051,45 +1052,42 @@ func Test_UnionedGVKs(t *testing.T) {
 				fwk.StorageClass:          fwk.All - fwk.Delete,
 				fwk.VolumeAttachment:      fwk.Delete,
 				fwk.DeviceClass:           fwk.All - fwk.Delete,
-				fwk.ResourceClaim:         fwk.All - fwk.Delete,
+				fwk.ResourceClaim:         fwk.All,
 				fwk.ResourceSlice:         fwk.All - fwk.Delete,
-				fwk.PodGroup:              fwk.Add,
+				fwk.PodGroup:              fwk.Add | fwk.Update,
 			},
-			enableGangScheduling:            true,
+			enableGenericWorkload:           true,
 			enableInPlacePodVerticalScaling: true,
-			enableDynamicResourceAllocation: true,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			pluginConfig := defaults.PluginConfigsV1
 
-			if !tt.enableDynamicResourceAllocation {
-				// Set emulated version before setting other feature gates, since it can impact feature dependencies.
-				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, feature.DefaultFeatureGate, version.MustParse("1.33"))
-			} else if !tt.enableInPlacePodVerticalScaling {
+			if !tt.enableInPlacePodVerticalScaling {
 				// In place pod resize GA'd in 1.35. Set emulation version to 1.34 for tests that do not have the flag set
 				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, feature.DefaultFeatureGate, version.MustParse("1.34"))
 				// DRADeviceBindingConditions is alpha in 1.34 (disabled by default).
 				// Strip BindingTimeout from DynamicResources args to avoid validation failure.
+				// StorageCapacityScoring is alpha in 1.34 (disabled by default).
+				// Strip Shape from VolumeBinding args to avoid validation failure.
+				// BindTimeoutSeconds: 600 is the default value of VolumeBindingArgs when StorageCapacityScoring is disabled.
 				pluginConfig = slices.Clone(pluginConfig)
 				for i := range pluginConfig {
-					if pluginConfig[i].Name == "DynamicResources" {
+					switch pluginConfig[i].Name {
+					case "DynamicResources":
 						pluginConfig[i].Args = &schedulerapi.DynamicResourcesArgs{}
-						break
+					case "VolumeBinding":
+						pluginConfig[i].Args = &schedulerapi.VolumeBindingArgs{BindTimeoutSeconds: 600}
 					}
 				}
 			} else {
-				featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.NodeDeclaredFeatures, tt.enableNodeDeclaredFeatures)
 				featuregatetesting.SetFeatureGatesDuringTest(t, feature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-					features.NodeDeclaredFeatures: tt.enableNodeDeclaredFeatures,
-					features.GenericWorkload:      tt.enableGangScheduling,
-					features.GangScheduling:       tt.enableGangScheduling,
+					features.GenericWorkload: tt.enableGenericWorkload,
 				})
 			}
 			featuregatetesting.SetFeatureGatesDuringTest(t, feature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 				features.InPlacePodVerticalScaling: tt.enableInPlacePodVerticalScaling,
-				features.DynamicResourceAllocation: tt.enableDynamicResourceAllocation,
 			})
 
 			_, ctx := ktesting.NewTestContext(t)
@@ -1129,9 +1127,15 @@ func Test_UnionedGVKs(t *testing.T) {
 }
 
 func newFramework(ctx context.Context, r frameworkruntime.Registry, profile schedulerapi.KubeSchedulerProfile) (framework.Framework, error) {
+	snapshot := internalcache.NewSnapshot(nil, nil)
 	return frameworkruntime.NewFramework(ctx, r, &profile,
-		frameworkruntime.WithSnapshotSharedLister(internalcache.NewSnapshot(nil, nil)),
+		frameworkruntime.WithSnapshotSharedLister(snapshot),
+		frameworkruntime.WithMutableSnapshotLister(snapshot),
 		frameworkruntime.WithInformerFactory(informers.NewSharedInformerFactory(fake.NewClientset(), 0)),
+		frameworkruntime.WithPodGroupManager(internalcache.New(ctx, nil, false, false /* CompositePodGroup */)),
+		frameworkruntime.WithPreemptionManager(func(fh fwk.Handle) fwk.PreemptionManager {
+			return preemption.NewPreemptionManager(fh, plfeature.Features{})
+		}),
 	)
 }
 
@@ -1296,7 +1300,7 @@ func (pl *fakeQueueSortPlugin) Name() string {
 	return queueSort
 }
 
-func (pl *fakeQueueSortPlugin) Less(_, _ fwk.QueuedPodInfo) bool {
+func (pl *fakeQueueSortPlugin) Less(_, _ fwk.QueuedEntityInfo) bool {
 	return false
 }
 
@@ -1472,7 +1476,7 @@ func TestNewInformerFactoryTrim(t *testing.T) {
 	}}
 	require.NoError(t, cs.Tracker().Add(pd))
 
-	informerFactory := NewInformerFactory(cs, 0)
+	informerFactory := NewInformerFactory(cs, 0, nil)
 	lister := informerFactory.Core().V1().Pods().Lister()
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -1483,4 +1487,35 @@ func TestNewInformerFactoryTrim(t *testing.T) {
 	p, err := lister.Pods("default").Get("test")
 	require.NoError(t, err)
 	require.Empty(t, p.GetManagedFields(), "expected managedFields to be trimmed by the transform")
+}
+
+func TestNewInformerFactoryMetrics(t *testing.T) {
+	cache.ResetInformerNamesForTesting()
+	fifometrics.Register()
+
+	informerName, err := cache.NewInformerName("kube-scheduler")
+	require.NoError(t, err)
+	defer informerName.Release()
+
+	cs := fake.NewClientset()
+	informerFactory := NewInformerFactory(cs, 0, informerName)
+	// The pod informer is built by the scheduler itself rather than by the factory,
+	// so make sure it carries the identity too.
+	informerFactory.Core().V1().Pods().Informer()
+	informerFactory.Core().V1().Nodes().Informer()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	informerFactory.Start(ctx.Done())
+	informerFactory.WaitForCacheSync(ctx.Done())
+
+	want := `
+# HELP informer_queued_items [ALPHA] Number of items currently queued in the FIFO.
+# TYPE informer_queued_items gauge
+informer_queued_items{group="",name="kube-scheduler",resource="nodes",version="v1"} 0
+informer_queued_items{group="",name="kube-scheduler",resource="pods",version="v1"} 0
+`
+	if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(want), "informer_queued_items"); err != nil {
+		t.Error(err)
+	}
 }

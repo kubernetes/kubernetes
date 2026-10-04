@@ -23,9 +23,11 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	node "k8s.io/kubernetes/pkg/apis/node"
 	"k8s.io/kubernetes/pkg/apis/node/validation"
 	registry "k8s.io/kubernetes/pkg/registry/node/runtimeclass"
+	"k8s.io/kubernetes/test/declarative_validation/meta"
 )
 
 func mkRuntimeClassHandlerOnly(tweaks ...func(*node.RuntimeClass)) node.RuntimeClass {
@@ -47,8 +49,10 @@ func TestRuntimeClass_DeclarativeValidate_Create(t *testing.T) {
 			ctx := genericapirequest.WithRequestInfo(
 				genericapirequest.NewDefaultContext(),
 				&genericapirequest.RequestInfo{
-					APIGroup:   "node.k8s.io",
-					APIVersion: apiVersion,
+					APIGroup:          "node.k8s.io",
+					APIVersion:        apiVersion,
+					IsResourceRequest: true,
+					Verb:              "create",
 				},
 			)
 
@@ -67,7 +71,7 @@ func TestRuntimeClass_DeclarativeValidate_Create(t *testing.T) {
 						rc.Handler = ""
 					}),
 					expectedErrs: field.ErrorList{
-						field.Required(field.NewPath("handler"), "must be a valid DNS label").MarkAlpha(),
+						field.Required(field.NewPath("handler"), "must be a valid DNS label"),
 					},
 				},
 				"handler with special characters": {
@@ -76,7 +80,7 @@ func TestRuntimeClass_DeclarativeValidate_Create(t *testing.T) {
 					}),
 					expectedErrs: field.ErrorList{
 						field.Invalid(field.NewPath("handler"),
-							"", "").WithOrigin("format=k8s-short-name").MarkAlpha(),
+							"", "").WithOrigin("format=k8s-short-name"),
 					},
 				},
 				"handler with uppercase and special characters": {
@@ -85,7 +89,7 @@ func TestRuntimeClass_DeclarativeValidate_Create(t *testing.T) {
 					}),
 					expectedErrs: field.ErrorList{
 						field.Invalid(field.NewPath("handler"),
-							"", "").WithOrigin("format=k8s-short-name").MarkAlpha(),
+							"", "").WithOrigin("format=k8s-short-name"),
 					},
 				},
 				"handler exceeds length with invalid characters": {
@@ -94,7 +98,33 @@ func TestRuntimeClass_DeclarativeValidate_Create(t *testing.T) {
 					}),
 					expectedErrs: field.ErrorList{
 						field.Invalid(field.NewPath("handler"),
-							"", "").WithOrigin("format=k8s-short-name").MarkAlpha(),
+							"", "").WithOrigin("format=k8s-short-name"),
+					},
+				},
+				"scheduling toleration with valid key": {
+					obj: mkRuntimeClassHandlerOnly(func(rc *node.RuntimeClass) {
+						rc.Scheduling = &node.Scheduling{
+							Tolerations: []api.Toleration{{Key: "example.com/valid-key", Operator: api.TolerationOpExists}},
+						}
+					}),
+					expectedErrs: field.ErrorList{},
+				},
+				"scheduling toleration with valid key without prefix": {
+					obj: mkRuntimeClassHandlerOnly(func(rc *node.RuntimeClass) {
+						rc.Scheduling = &node.Scheduling{
+							Tolerations: []api.Toleration{{Key: "simple-key", Operator: api.TolerationOpExists}},
+						}
+					}),
+					expectedErrs: field.ErrorList{},
+				},
+				"scheduling toleration with invalid key format": {
+					obj: mkRuntimeClassHandlerOnly(func(rc *node.RuntimeClass) {
+						rc.Scheduling = &node.Scheduling{
+							Tolerations: []api.Toleration{{Key: "invalid key", Operator: api.TolerationOpExists}},
+						}
+					}),
+					expectedErrs: field.ErrorList{
+						field.Invalid(field.NewPath("scheduling", "tolerations").Index(0).Child("key"), nil, "").WithOrigin("format=k8s-label-key").MarkAlpha(),
 					},
 				},
 			}
@@ -105,6 +135,9 @@ func TestRuntimeClass_DeclarativeValidate_Create(t *testing.T) {
 						apitesting.WithNormalizationRules(validation.NodeNormalizationRules...))
 				})
 			}
+
+			obj := mkRuntimeClassHandlerOnly()
+			meta.RunObjectMetaTestCases(t, ctx, &obj, registry.Strategy, meta.WithValidationConfig(apitesting.WithNormalizationRules(validation.NodeNormalizationRules...)))
 		})
 	}
 }
@@ -115,10 +148,17 @@ func TestRuntimeClass_DeclarativeValidate_Update(t *testing.T) {
 			ctx := genericapirequest.WithRequestInfo(
 				genericapirequest.NewDefaultContext(),
 				&genericapirequest.RequestInfo{
-					APIGroup:   "node.k8s.io",
-					APIVersion: apiVersion,
+					APIGroup:          "node.k8s.io",
+					APIVersion:        apiVersion,
+					IsResourceRequest: true,
+					Verb:              "update",
 				},
 			)
+
+			meta.RunObjectMetaUpdateTestCases(t, ctx, &node.RuntimeClass{
+				ObjectMeta: metav1.ObjectMeta{Name: "myrc"},
+				Handler:    "runc",
+			}, registry.Strategy, meta.WithValidationConfig(apitesting.WithNormalizationRules(validation.NodeNormalizationRules...)))
 
 			tests := map[string]struct {
 				oldObj, newObj node.RuntimeClass
@@ -138,7 +178,7 @@ func TestRuntimeClass_DeclarativeValidate_Update(t *testing.T) {
 					}),
 					expectedErrs: field.ErrorList{
 						field.Invalid(field.NewPath("handler"), "",
-							"").WithOrigin("immutable").MarkAlpha(),
+							"").WithOrigin("immutable"),
 					},
 				},
 			}

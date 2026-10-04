@@ -27,7 +27,7 @@ import (
 //
 // DeleteOptions may be provided when deleting an API object.
 type DeleteOptionsApplyConfiguration struct {
-	TypeMetaApplyConfiguration `json:",inline"`
+	TypeMetaApplyConfiguration `json:""`
 	// The duration in seconds before the object should be deleted. Value must be non-negative integer.
 	// The value zero indicates delete immediately. If this value is nil, the default grace period for the
 	// specified type will be used.

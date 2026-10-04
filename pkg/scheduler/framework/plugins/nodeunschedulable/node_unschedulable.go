@@ -21,11 +21,10 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-helpers/resource"
 	v1helper "k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 	"k8s.io/kubernetes/pkg/scheduler/util"
@@ -33,8 +32,12 @@ import (
 
 // NodeUnschedulable plugin filters nodes that set node.Spec.Unschedulable=true unless
 // the pod tolerates {key=node.kubernetes.io/unschedulable, effect:NoSchedule} taint.
-type NodeUnschedulable struct{}
+type NodeUnschedulable struct {
+	enableInPlacePodVerticalScalingSchedulerPreemption bool
+	enableTaintTolerationComparisonOperators           bool
+}
 
+var _ fwk.PreFilterPlugin = &NodeUnschedulable{}
 var _ fwk.FilterPlugin = &NodeUnschedulable{}
 var _ fwk.EnqueueExtensions = &NodeUnschedulable{}
 var _ fwk.SignPlugin = &NodeUnschedulable{}
@@ -77,7 +80,7 @@ func (pl *NodeUnschedulable) isSchedulableAfterTargetPodTolerationChange(logger 
 	if v1helper.TolerationsTolerateTaint(logger, modifiedPod.Spec.Tolerations, &v1.Taint{
 		Key:    v1.TaintNodeUnschedulable,
 		Effect: v1.TaintEffectNoSchedule,
-	}, utilfeature.DefaultFeatureGate.Enabled(features.TaintTolerationComparisonOperators)) {
+	}, pl.enableTaintTolerationComparisonOperators) {
 		// This update makes the pod tolerate the unschedulable taint.
 		logger.V(5).Info("a new toleration is added for the unschedulable Pod, and it may make it schedulable", "pod", klog.KObj(modifiedPod))
 		return fwk.Queue, nil
@@ -121,8 +124,24 @@ func (pl *NodeUnschedulable) SignPod(ctx context.Context, pod *v1.Pod) ([]fwk.Si
 	}, nil
 }
 
+// PreFilter invoked at the prefilter extension point.
+func (pl *NodeUnschedulable) PreFilter(ctx context.Context, cycleState fwk.CycleState, pod *v1.Pod, nodes []fwk.NodeInfo) (*fwk.PreFilterResult, *fwk.Status) {
+	if pl.enableInPlacePodVerticalScalingSchedulerPreemption && resource.IsPodResizeDeferred(pod) {
+		return nil, fwk.NewStatus(fwk.Skip)
+	}
+	return nil, nil
+}
+
+// PreFilterExtensions do not exist for this plugin.
+func (pl *NodeUnschedulable) PreFilterExtensions() fwk.PreFilterExtensions {
+	return nil
+}
+
 // Filter invoked at the filter extension point.
 func (pl *NodeUnschedulable) Filter(ctx context.Context, _ fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) *fwk.Status {
+	if pl.enableInPlacePodVerticalScalingSchedulerPreemption && resource.IsPodResizeDeferred(pod) {
+		return nil
+	}
 	node := nodeInfo.Node()
 
 	if !node.Spec.Unschedulable {
@@ -134,7 +153,7 @@ func (pl *NodeUnschedulable) Filter(ctx context.Context, _ fwk.CycleState, pod *
 	podToleratesUnschedulable := v1helper.TolerationsTolerateTaint(logger, pod.Spec.Tolerations, &v1.Taint{
 		Key:    v1.TaintNodeUnschedulable,
 		Effect: v1.TaintEffectNoSchedule,
-	}, utilfeature.DefaultFeatureGate.Enabled(features.TaintTolerationComparisonOperators))
+	}, pl.enableTaintTolerationComparisonOperators)
 	if !podToleratesUnschedulable {
 		return fwk.NewStatus(fwk.UnschedulableAndUnresolvable, ErrReasonUnschedulable)
 	}
@@ -143,6 +162,9 @@ func (pl *NodeUnschedulable) Filter(ctx context.Context, _ fwk.CycleState, pod *
 }
 
 // New initializes a new plugin and returns it.
-func New(_ context.Context, _ runtime.Object, _ fwk.Handle, _ feature.Features) (fwk.Plugin, error) {
-	return &NodeUnschedulable{}, nil
+func New(_ context.Context, _ runtime.Object, _ fwk.Handle, fts feature.Features) (fwk.Plugin, error) {
+	return &NodeUnschedulable{
+		enableInPlacePodVerticalScalingSchedulerPreemption: fts.EnableInPlacePodVerticalScalingSchedulerPreemption,
+		enableTaintTolerationComparisonOperators:           fts.EnableTaintTolerationComparisonOperators,
+	}, nil
 }

@@ -25,7 +25,6 @@ import (
 	context "context"
 	fmt "fmt"
 
-	equality "k8s.io/apimachinery/pkg/api/equality"
 	operation "k8s.io/apimachinery/pkg/api/operation"
 	safe "k8s.io/apimachinery/pkg/api/safe"
 	validate "k8s.io/apimachinery/pkg/api/validate"
@@ -71,22 +70,22 @@ func Validate_ListMapItemStruct(
 			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
 			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
+				if validate.SemanticDeepEqual(obj, oldObj) {
 					return nil
 				}
 			}
 			// call field-attached validations
 			// lists with map semantics require unique keys
-			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
-				func(a MapItem, b MapItem) bool { return a.Key == b.Key }); len(e) != 0 {
+			if e := validate.ValSliceUnique(ctx, op, fldPath, obj, oldObj,
+				func(a *MapItem, b *MapItem) bool { return a.Key == b.Key }); len(e) != 0 {
 				errs = append(errs, e...)
 			}
-			func() { // cohort = "{"key": "foo"}"
-				if e := validate.SliceItem(ctx, op, fldPath, obj, oldObj,
+			func() { // cohort = "{"key": "foo"}.value"
+				if e := validate.ValSliceItem(ctx, op, fldPath, obj, oldObj,
 					func(item *MapItem) bool { return item.Key == "foo" }, validate.DirectEqual,
 					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *MapItem) field.ErrorList {
 						return validate.Subfield(ctx, op, fldPath, obj, oldObj, "value",
-							func(o *MapItem) *int { return &o.Value }, validate.DirectEqualPtr,
+							func(o *MapItem) *int { return &o.Value }, validate.DirectEqual,
 							func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *int) field.ErrorList {
 								return validate.Minimum(ctx, op, fldPath, obj, oldObj, 10)
 							})
@@ -110,22 +109,22 @@ func Validate_ListMapItemStruct(
 			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
 			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
+				if validate.SemanticDeepEqual(obj, oldObj) {
 					return nil
 				}
 			}
 			// call field-attached validations
 			// lists with map semantics require unique keys
-			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
-				func(a MapItem, b MapItem) bool { return a.Key == b.Key }); len(e) != 0 {
+			if e := validate.ValSliceUnique(ctx, op, fldPath, obj, oldObj,
+				func(a *MapItem, b *MapItem) bool { return a.Key == b.Key }); len(e) != 0 {
 				errs = append(errs, e...)
 			}
-			func() { // cohort = "{"key": "foo"}"
-				if e := validate.SliceItem(ctx, op, fldPath, obj, oldObj,
+			func() { // cohort = "{"key": "foo"}.value"
+				if e := validate.ValSliceItem(ctx, op, fldPath, obj, oldObj,
 					func(item *MapItem) bool { return item.Key == "foo" }, validate.DirectEqual,
 					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *MapItem) field.ErrorList {
 						return validate.Subfield(ctx, op, fldPath, obj, oldObj, "value",
-							func(o *MapItem) *int { return &o.Value }, validate.DirectEqualPtr,
+							func(o *MapItem) *int { return &o.Value }, validate.DirectEqual,
 							func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *int) field.ErrorList {
 								return validate.Minimum(ctx, op, fldPath, obj, oldObj, 10)
 							})
@@ -149,22 +148,22 @@ func Validate_ListMapItemStruct(
 			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
 			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
+				if validate.SemanticDeepEqual(obj, oldObj) {
 					return nil
 				}
 			}
 			// call field-attached validations
 			// lists with map semantics require unique keys
-			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
-				func(a MapItem, b MapItem) bool { return a.Key == b.Key }); len(e) != 0 {
+			if e := validate.ValSliceUnique(ctx, op, fldPath, obj, oldObj,
+				func(a *MapItem, b *MapItem) bool { return a.Key == b.Key }); len(e) != 0 {
 				errs = append(errs, e...)
 			}
-			func() { // cohort = "{"key": "foo"}"
-				if e := validate.SliceItem(ctx, op, fldPath, obj, oldObj,
+			func() { // cohort = "{"key": "foo"}.value"
+				if e := validate.ValSliceItem(ctx, op, fldPath, obj, oldObj,
 					func(item *MapItem) bool { return item.Key == "foo" }, validate.DirectEqual,
 					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *MapItem) field.ErrorList {
 						return validate.Subfield(ctx, op, fldPath, obj, oldObj, "value",
-							func(o *MapItem) *int { return &o.Value }, validate.DirectEqualPtr,
+							func(o *MapItem) *int { return &o.Value }, validate.DirectEqual,
 							func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *int) field.ErrorList {
 								return validate.Minimum(ctx, op, fldPath, obj, oldObj, 10).MarkAlpha()
 							})
@@ -188,22 +187,22 @@ func Validate_ListMapItemStruct(
 			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
 			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
+				if validate.SemanticDeepEqual(obj, oldObj) {
 					return nil
 				}
 			}
 			// call field-attached validations
 			// lists with map semantics require unique keys
-			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
-				func(a MapItem, b MapItem) bool { return a.Key == b.Key }); len(e) != 0 {
+			if e := validate.ValSliceUnique(ctx, op, fldPath, obj, oldObj,
+				func(a *MapItem, b *MapItem) bool { return a.Key == b.Key }); len(e) != 0 {
 				errs = append(errs, e...)
 			}
-			func() { // cohort = "{"key": "foo"}"
-				if e := validate.SliceItem(ctx, op, fldPath, obj, oldObj,
+			func() { // cohort = "{"key": "foo"}.value"
+				if e := validate.ValSliceItem(ctx, op, fldPath, obj, oldObj,
 					func(item *MapItem) bool { return item.Key == "foo" }, validate.DirectEqual,
 					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *MapItem) field.ErrorList {
 						return validate.Subfield(ctx, op, fldPath, obj, oldObj, "value",
-							func(o *MapItem) *int { return &o.Value }, validate.DirectEqualPtr,
+							func(o *MapItem) *int { return &o.Value }, validate.DirectEqual,
 							func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *int) field.ErrorList {
 								return validate.Minimum(ctx, op, fldPath, obj, oldObj, 10).MarkAlpha()
 							})
@@ -227,22 +226,22 @@ func Validate_ListMapItemStruct(
 			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
 			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
+				if validate.SemanticDeepEqual(obj, oldObj) {
 					return nil
 				}
 			}
 			// call field-attached validations
 			// lists with map semantics require unique keys
-			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
-				func(a MapItem, b MapItem) bool { return a.Key == b.Key }); len(e) != 0 {
+			if e := validate.ValSliceUnique(ctx, op, fldPath, obj, oldObj,
+				func(a *MapItem, b *MapItem) bool { return a.Key == b.Key }); len(e) != 0 {
 				errs = append(errs, e...)
 			}
-			func() { // cohort = "{"key": "foo"}"
-				if e := validate.SliceItem(ctx, op, fldPath, obj, oldObj,
+			func() { // cohort = "{"key": "foo"}.value"
+				if e := validate.ValSliceItem(ctx, op, fldPath, obj, oldObj,
 					func(item *MapItem) bool { return item.Key == "foo" }, validate.DirectEqual,
 					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *MapItem) field.ErrorList {
 						return validate.Subfield(ctx, op, fldPath, obj, oldObj, "value",
-							func(o *MapItem) *int { return &o.Value }, validate.DirectEqualPtr,
+							func(o *MapItem) *int { return &o.Value }, validate.DirectEqual,
 							func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *int) field.ErrorList {
 								return validate.Minimum(ctx, op, fldPath, obj, oldObj, 10)
 							})
@@ -266,22 +265,22 @@ func Validate_ListMapItemStruct(
 			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
 			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
+				if validate.SemanticDeepEqual(obj, oldObj) {
 					return nil
 				}
 			}
 			// call field-attached validations
 			// lists with map semantics require unique keys
-			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
-				func(a MapItem, b MapItem) bool { return a.Key == b.Key }); len(e) != 0 {
+			if e := validate.ValSliceUnique(ctx, op, fldPath, obj, oldObj,
+				func(a *MapItem, b *MapItem) bool { return a.Key == b.Key }); len(e) != 0 {
 				errs = append(errs, e...)
 			}
-			func() { // cohort = "{"key": "foo"}"
-				if e := validate.SliceItem(ctx, op, fldPath, obj, oldObj,
+			func() { // cohort = "{"key": "foo"}.value"
+				if e := validate.ValSliceItem(ctx, op, fldPath, obj, oldObj,
 					func(item *MapItem) bool { return item.Key == "foo" }, validate.DirectEqual,
 					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *MapItem) field.ErrorList {
 						return validate.Subfield(ctx, op, fldPath, obj, oldObj, "value",
-							func(o *MapItem) *int { return &o.Value }, validate.DirectEqualPtr,
+							func(o *MapItem) *int { return &o.Value }, validate.DirectEqual,
 							func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *int) field.ErrorList {
 								return validate.Minimum(ctx, op, fldPath, obj, oldObj, 10).MarkBeta()
 							})
@@ -305,22 +304,22 @@ func Validate_ListMapItemStruct(
 			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
 			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
+				if validate.SemanticDeepEqual(obj, oldObj) {
 					return nil
 				}
 			}
 			// call field-attached validations
 			// lists with map semantics require unique keys
-			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
-				func(a MapItem, b MapItem) bool { return a.Key == b.Key }); len(e) != 0 {
+			if e := validate.ValSliceUnique(ctx, op, fldPath, obj, oldObj,
+				func(a *MapItem, b *MapItem) bool { return a.Key == b.Key }); len(e) != 0 {
 				errs = append(errs, e...)
 			}
-			func() { // cohort = "{"key": "foo"}"
-				if e := validate.SliceItem(ctx, op, fldPath, obj, oldObj,
+			func() { // cohort = "{"key": "foo"}.value"
+				if e := validate.ValSliceItem(ctx, op, fldPath, obj, oldObj,
 					func(item *MapItem) bool { return item.Key == "foo" }, validate.DirectEqual,
 					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *MapItem) field.ErrorList {
 						return validate.Subfield(ctx, op, fldPath, obj, oldObj, "value",
-							func(o *MapItem) *int { return &o.Value }, validate.DirectEqualPtr,
+							func(o *MapItem) *int { return &o.Value }, validate.DirectEqual,
 							func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *int) field.ErrorList {
 								return validate.Minimum(ctx, op, fldPath, obj, oldObj, 10).MarkBeta()
 							})

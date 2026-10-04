@@ -49,9 +49,9 @@ type (
 )
 
 const (
-	PermRead      = authpb.READ
-	PermWrite     = authpb.WRITE
-	PermReadWrite = authpb.READWRITE
+	PermRead      = authpb.Permission_READ
+	PermWrite     = authpb.Permission_WRITE
+	PermReadWrite = authpb.Permission_READWRITE
 )
 
 type UserAddOptions authpb.UserAddOptions
