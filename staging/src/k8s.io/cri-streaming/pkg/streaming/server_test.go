@@ -27,9 +27,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gorilla/websocket"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/net/websocket"
 
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	remotecommandserver "k8s.io/cri-streaming/pkg/streaming/remotecommand"
@@ -436,10 +436,10 @@ func dialWebSocket(t *testing.T, reqURL *url.URL) *websocket.Conn {
 		t.Fatalf("unsupported URL scheme %q", wsURL.Scheme)
 	}
 
-	dialer := websocket.Dialer{
-		Subprotocols: []string{"v4.channel.k8s.io"},
-	}
-	conn, _, err := dialer.Dial(wsURL.String(), nil)
+	config, err := websocket.NewConfig(wsURL.String(), "http://localhost")
+	require.NoError(t, err)
+	config.Protocol = []string{"v4.channel.k8s.io"}
+	conn, err := websocket.DialConfig(config)
 	require.NoError(t, err)
 	return conn
 }
@@ -449,14 +449,14 @@ func writeWebSocketPayload(t *testing.T, conn *websocket.Conn, channel byte, pay
 	frame := make([]byte, len(payload)+1)
 	frame[0] = channel
 	copy(frame[1:], payload)
-	require.NoError(t, conn.WriteMessage(websocket.BinaryMessage, frame))
+	require.NoError(t, websocket.Message.Send(conn, frame))
 }
 
 func requireWebSocketPayload(t *testing.T, conn *websocket.Conn, channel byte, expected []byte, skipEmpty bool) {
 	t.Helper()
 	for {
-		_, frame, err := conn.ReadMessage()
-		require.NoError(t, err)
+		var frame []byte
+		require.NoError(t, websocket.Message.Receive(conn, &frame))
 		if len(frame) == 0 {
 			continue
 		}

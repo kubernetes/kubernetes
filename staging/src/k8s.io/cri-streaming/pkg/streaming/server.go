@@ -30,8 +30,6 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	restful "github.com/emicklei/go-restful/v3"
-
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/cri-streaming/pkg/streaming/portforward"
 	remotecommandserver "k8s.io/cri-streaming/pkg/streaming/remotecommand"
@@ -125,28 +123,24 @@ func NewServer(config Config, runtime Runtime) (Server, error) {
 		}
 	}
 
-	ws := &restful.WebService{}
+	mux := http.NewServeMux()
 	endpoints := []struct {
 		path    string
-		handler restful.RouteFunction
+		handler http.HandlerFunc
 	}{
 		{"/exec/{token}", s.serveExec},
 		{"/attach/{token}", s.serveAttach},
 		{"/portforward/{token}", s.servePortForward},
 	}
-	// If serving relative to a base path, set that here.
+	// If serving relative to a base path, set that here. The leading "/" keeps
+	// the pattern rooted when path.Dir returns "." for an empty base path.
 	pathPrefix := path.Dir(s.config.BaseURL.Path)
 	for _, e := range endpoints {
 		for _, method := range []string{"GET", "POST"} {
-			ws.Route(ws.
-				Method(method).
-				Path(path.Join(pathPrefix, e.path)).
-				To(e.handler))
+			mux.HandleFunc(method+" "+path.Join("/", pathPrefix, e.path), e.handler)
 		}
 	}
-	handler := restful.NewContainer()
-	handler.Add(ws)
-	s.handler = handler
+	s.handler = mux
 	s.server = &http.Server{
 		Addr:      s.config.Addr,
 		Handler:   s.handler,
@@ -265,16 +259,16 @@ func (s *server) buildURL(method, token string) string {
 	}).String()
 }
 
-func (s *server) serveExec(req *restful.Request, resp *restful.Response) {
-	token := req.PathParameter("token")
+func (s *server) serveExec(w http.ResponseWriter, req *http.Request) {
+	token := req.PathValue("token")
 	cachedRequest, ok := s.cache.Consume(token)
 	if !ok {
-		http.NotFound(resp.ResponseWriter, req.Request)
+		http.NotFound(w, req)
 		return
 	}
 	exec, ok := cachedRequest.(*runtimeapi.ExecRequest)
 	if !ok {
-		http.NotFound(resp.ResponseWriter, req.Request)
+		http.NotFound(w, req)
 		return
 	}
 
@@ -286,8 +280,8 @@ func (s *server) serveExec(req *restful.Request, resp *restful.Response) {
 	}
 
 	remotecommandserver.ServeExec(
-		resp.ResponseWriter,
-		req.Request,
+		w,
+		req,
 		s.runtime,
 		"", // unused: podName
 		"", // unusued: podUID
@@ -299,16 +293,16 @@ func (s *server) serveExec(req *restful.Request, resp *restful.Response) {
 		s.config.SupportedRemoteCommandProtocols)
 }
 
-func (s *server) serveAttach(req *restful.Request, resp *restful.Response) {
-	token := req.PathParameter("token")
+func (s *server) serveAttach(w http.ResponseWriter, req *http.Request) {
+	token := req.PathValue("token")
 	cachedRequest, ok := s.cache.Consume(token)
 	if !ok {
-		http.NotFound(resp.ResponseWriter, req.Request)
+		http.NotFound(w, req)
 		return
 	}
 	attach, ok := cachedRequest.(*runtimeapi.AttachRequest)
 	if !ok {
-		http.NotFound(resp.ResponseWriter, req.Request)
+		http.NotFound(w, req)
 		return
 	}
 
@@ -319,8 +313,8 @@ func (s *server) serveAttach(req *restful.Request, resp *restful.Response) {
 		TTY:    attach.Tty,
 	}
 	remotecommandserver.ServeAttach(
-		resp.ResponseWriter,
-		req.Request,
+		w,
+		req,
 		s.runtime,
 		"", // unused: podName
 		"", // unusued: podUID
@@ -331,28 +325,28 @@ func (s *server) serveAttach(req *restful.Request, resp *restful.Response) {
 		s.config.SupportedRemoteCommandProtocols)
 }
 
-func (s *server) servePortForward(req *restful.Request, resp *restful.Response) {
-	token := req.PathParameter("token")
+func (s *server) servePortForward(w http.ResponseWriter, req *http.Request) {
+	token := req.PathValue("token")
 	cachedRequest, ok := s.cache.Consume(token)
 	if !ok {
-		http.NotFound(resp.ResponseWriter, req.Request)
+		http.NotFound(w, req)
 		return
 	}
 	pf, ok := cachedRequest.(*runtimeapi.PortForwardRequest)
 	if !ok {
-		http.NotFound(resp.ResponseWriter, req.Request)
+		http.NotFound(w, req)
 		return
 	}
 
 	portForwardOptions, err := portforward.BuildV4Options(pf.Port)
 	if err != nil {
-		resp.WriteError(http.StatusBadRequest, err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
 	portforward.ServePortForward(
-		resp.ResponseWriter,
-		req.Request,
+		w,
+		req,
 		s.runtime,
 		pf.PodSandboxId,
 		"", // unused: podUID

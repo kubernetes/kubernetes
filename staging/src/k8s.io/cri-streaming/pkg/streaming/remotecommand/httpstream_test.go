@@ -21,10 +21,11 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"runtime"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
-	"go.uber.org/goleak"
 )
 
 func TestHandleResizeEvents(t *testing.T) {
@@ -64,6 +65,7 @@ func TestHandleResizeEvents(t *testing.T) {
 				resizeChan:   make(chan TerminalSize),
 			}
 
+			before := runtime.NumGoroutine()
 			go handleResizeEvents(ctx, connCtx.resizeStream, connCtx.resizeChan)
 			if testCase.readFromChannel {
 				gotTerminalSize := <-connCtx.resizeChan
@@ -73,7 +75,14 @@ func TestHandleResizeEvents(t *testing.T) {
 				cancel()
 			}
 
-			goleak.VerifyNone(t)
+			// The goroutine count dropping back to its pre-spawn value proves
+			// handleResizeEvents returned without anyone draining the channel.
+			for deadline := time.Now().Add(10 * time.Second); runtime.NumGoroutine() > before; {
+				if time.Now().After(deadline) {
+					t.Fatal("handleResizeEvents goroutine leaked")
+				}
+				time.Sleep(time.Millisecond)
+			}
 			cancel()
 		})
 	}
