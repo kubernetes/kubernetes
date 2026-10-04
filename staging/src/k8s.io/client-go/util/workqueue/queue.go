@@ -80,6 +80,7 @@ func (q *queue[T]) Pop() (item T) {
 }
 
 // QueueConfig specifies optional configurations to customize an Interface.
+//
 // Deprecated: use TypedQueueConfig instead.
 type QueueConfig = TypedQueueConfig[any]
 
@@ -129,6 +130,7 @@ func NewTypedWithConfig[T comparable](config TypedQueueConfig[T]) *Typed[T] {
 }
 
 // NewNamed creates a new named queue.
+//
 // Deprecated: Use NewWithConfig instead.
 func NewNamed(name string) *Type {
 	return NewWithConfig(QueueConfig{
@@ -184,6 +186,7 @@ func newQueue[T comparable](c clock.WithTicker, queue Queue[T], metrics queueMet
 const defaultUnfinishedWorkUpdatePeriod = 500 * time.Millisecond
 
 // Type is a work queue (see the package comment).
+//
 // Deprecated: Use Typed instead.
 type Type = Typed[any]
 

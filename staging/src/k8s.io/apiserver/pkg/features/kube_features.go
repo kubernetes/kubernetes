@@ -161,7 +161,8 @@ const (
 
 	// owner: @aramase
 	// kep: https://kep.k8s.io/3299
-	// deprecated: v1.28
+	//
+	// Deprecated: v1.28
 	//
 	// Enables KMS v1 API for encryption at rest.
 	KMSv1 featuregate.Feature = "KMSv1"

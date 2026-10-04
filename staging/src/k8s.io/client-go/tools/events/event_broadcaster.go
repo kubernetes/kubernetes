@@ -466,6 +466,7 @@ func (e *eventBroadcasterImpl) startRecordingEvents(ctx context.Context) error {
 }
 
 // StartRecordingToSink starts sending events received from the specified eventBroadcaster to the given sink.
+//
 // Deprecated: use StartRecordingToSinkWithContext instead.
 func (e *eventBroadcasterImpl) StartRecordingToSink(stopCh <-chan struct{}) {
 	err := e.StartRecordingToSinkWithContext(wait.ContextForChannel(stopCh))

@@ -58,6 +58,12 @@ linters:
       - linters:
           - gocritic
         text: "ifElseChain: rewrite if-else to switch statement"
+      # API types are fixed in a separate sweep because the change regenerates
+      # OpenAPI and apply configurations: https://github.com/kubernetes/kubernetes/issues/133566
+      - linters:
+          - gocritic
+        text: "deprecatedComment:"
+        path: (^|/)apis/|^staging/src/k8s\.io/api/
 
       # Only packages listed here opt into the strict "exported symbols must be documented".
       #
@@ -549,7 +555,6 @@ linters:
         - assignOp # https://github.com/kubernetes/kubernetes/issues/117288#issuecomment-1507008918
         - captLocal
         - commentFormatting
-        - deprecatedComment
         - elseif
         # The following have few (single-digit) occurrences left in k/k and wouldn't be too onerous to enable
         - exitAfterDefer
