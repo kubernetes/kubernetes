@@ -32,9 +32,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/kubernetes/fake"
 	clientsetscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/testing"
@@ -57,9 +57,11 @@ import (
 //   - If the above fails try to GET or LIST the object from the fake client store, unless
 //     a user reactor was added with PrependReactor() or AppendReactor().
 type DryRun struct {
-	fakeClient    *fake.Clientset
+	fake          *testing.Fake
+	fakeClient    clientset.Interface
 	client        clientset.Interface
 	dynamicClient dynamic.Interface
+	serverVersion *version.Info
 
 	writer      io.Writer
 	marshalFunc func(runtime.Object, schema.GroupVersion) ([]byte, error)
@@ -67,9 +69,21 @@ type DryRun struct {
 
 // NewDryRun creates a new DryRun object that only has a fake client.
 func NewDryRun() *DryRun {
-	d := &DryRun{}
-	d.fakeClient = fake.NewSimpleClientset()
+	d := &DryRun{
+		fake:          &testing.Fake{},
+		serverVersion: constants.CurrentKubernetesVersion.Info(),
+	}
+	tracker := testing.NewObjectTracker(clientsetscheme.Scheme, clientsetscheme.Codecs.UniversalDecoder())
+	d.fake.AddReactor("*", "*", testing.ObjectReaction(tracker))
 	d.addReactors()
+	// Requests never leave the process: pin JSON so no content negotiation is needed
+	// and drop client-side rate limiting. The config is static, so this cannot panic.
+	d.fakeClient = clientset.NewForConfigOrDie(&rest.Config{
+		Transport:          newDryRunRoundTripper(d),
+		ContentType:        runtime.ContentTypeJSON,
+		AcceptContentTypes: runtime.ContentTypeJSON,
+		QPS:                -1,
+	})
 	return d
 }
 
@@ -126,16 +140,22 @@ func (d *DryRun) WithDefaultMarshalFunction() *DryRun {
 	return d
 }
 
+// WithServerVersion sets the version that the fake client serves at /version.
+func (d *DryRun) WithServerVersion(v *version.Info) *DryRun {
+	d.serverVersion = v
+	return d
+}
+
 // PrependReactor prepends a new reactor in the fake client ReactorChain at position 1.
 // Keeps position 0 for the log reactor:
 // [ log, r, ... rest of the chain, default fake client reactor ]
 func (d *DryRun) PrependReactor(r *testing.SimpleReactor) *DryRun {
-	log := d.fakeClient.Fake.ReactionChain[0]
-	chain := make([]testing.Reactor, len(d.fakeClient.Fake.ReactionChain)+1)
+	log := d.fake.ReactionChain[0]
+	chain := make([]testing.Reactor, len(d.fake.ReactionChain)+1)
 	chain[0] = log
 	chain[1] = r
-	copy(chain[2:], d.fakeClient.Fake.ReactionChain[1:])
-	d.fakeClient.Fake.ReactionChain = chain
+	copy(chain[2:], d.fake.ReactionChain[1:])
+	d.fake.ReactionChain = chain
 	return d
 }
 
@@ -143,10 +163,10 @@ func (d *DryRun) PrependReactor(r *testing.SimpleReactor) *DryRun {
 // Keeps position len-1 for the default fake client reactor.
 // [ log, rest of the chain... , r, default fake client reactor ]
 func (d *DryRun) AppendReactor(r *testing.SimpleReactor) *DryRun {
-	sz := len(d.fakeClient.Fake.ReactionChain)
-	def := d.fakeClient.Fake.ReactionChain[sz-1]
-	d.fakeClient.Fake.ReactionChain[sz-1] = r
-	d.fakeClient.Fake.ReactionChain = append(d.fakeClient.Fake.ReactionChain, def)
+	sz := len(d.fake.ReactionChain)
+	def := d.fake.ReactionChain[sz-1]
+	d.fake.ReactionChain[sz-1] = r
+	d.fake.ReactionChain = append(d.fake.ReactionChain, def)
 	return d
 }
 
@@ -160,7 +180,8 @@ func (d *DryRun) DynamicClient() dynamic.Interface {
 	return d.dynamicClient
 }
 
-// FakeClient returns the fake client for this DryRun.
+// FakeClient returns the fake client for this DryRun. It is a real clientset whose
+// transport answers every request from the reactor chain instead of a server.
 func (d *DryRun) FakeClient() clientset.Interface {
 	return d.fakeClient
 }
@@ -225,7 +246,7 @@ func (d *DryRun) addReactors() {
 			},
 		},
 	}
-	d.fakeClient.Fake.ReactionChain = append(reactors, d.fakeClient.Fake.ReactionChain...)
+	d.fake.ReactionChain = append(reactors, d.fake.ReactionChain...)
 }
 
 // handleGetAction tries to handle all GET actions with the dynamic client.

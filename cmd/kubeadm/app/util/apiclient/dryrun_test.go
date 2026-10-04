@@ -79,7 +79,7 @@ func TestPrependAppendReactor(t *testing.T) {
 	qux := &clienttesting.SimpleReactor{Verb: "qux"}
 
 	d := NewDryRun()
-	lenBefore := len(d.fakeClient.Fake.ReactionChain)
+	lenBefore := len(d.fake.ReactionChain)
 	d.PrependReactor(foo).PrependReactor(bar).
 		AppendReactor(baz).AppendReactor(qux)
 
@@ -93,12 +93,12 @@ func TestPrependAppendReactor(t *testing.T) {
 	}
 	expectedLen := lenBefore + len(expectedIdx)
 
-	if len(d.fakeClient.Fake.ReactionChain) != expectedLen {
+	if len(d.fake.ReactionChain) != expectedLen {
 		t.Fatalf("expected len of reactor chain: %d, got: %d",
-			expectedLen, len(d.fakeClient.Fake.ReactionChain))
+			expectedLen, len(d.fake.ReactionChain))
 	}
 
-	for actual, r := range d.fakeClient.Fake.ReactionChain {
+	for actual, r := range d.fake.ReactionChain {
 		s := r.(*clienttesting.SimpleReactor)
 		expected, exists := expectedIdx[s.Verb]
 		if exists {
