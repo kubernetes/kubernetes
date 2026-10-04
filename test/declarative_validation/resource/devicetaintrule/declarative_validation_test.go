@@ -26,7 +26,6 @@ import (
 	"k8s.io/kubernetes/pkg/apis/resource"
 	registry "k8s.io/kubernetes/pkg/registry/resource/devicetaintrule"
 	"k8s.io/kubernetes/test/declarative_validation/meta"
-	"k8s.io/utils/ptr"
 )
 
 func TestDeclarativeValidate(t *testing.T) {
@@ -66,28 +65,28 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 			},
 		},
 		"valid all: true": {
-			input: mkValidDeviceTaintRule(tweakDeviceSelector(&resource.DeviceTaintSelector{All: ptr.To(true)})),
+			input: mkValidDeviceTaintRule(tweakDeviceSelector(&resource.DeviceTaintSelector{All: new(true)})),
 		},
 		"all: false": {
-			input: mkValidDeviceTaintRule(tweakDeviceSelector(&resource.DeviceTaintSelector{All: ptr.To(false)})),
+			input: mkValidDeviceTaintRule(tweakDeviceSelector(&resource.DeviceTaintSelector{All: new(false)})),
 			expectedErrs: field.ErrorList{
 				field.Invalid(field.NewPath("spec", "deviceSelector", "all"), false, "").WithOrigin("neq").MarkAlpha(),
 			},
 		},
 		"all: true with driver": {
-			input: mkValidDeviceTaintRule(tweakDeviceSelector(&resource.DeviceTaintSelector{All: ptr.To(true), Driver: ptr.To("example.com")})),
+			input: mkValidDeviceTaintRule(tweakDeviceSelector(&resource.DeviceTaintSelector{All: new(true), Driver: new("example.com")})),
 			expectedErrs: field.ErrorList{
 				field.Forbidden(field.NewPath("spec", "deviceSelector", "driver"), "").WithOrigin("dependentForbidden").MarkAlpha(),
 			},
 		},
 		"all: true with pool": {
-			input: mkValidDeviceTaintRule(tweakDeviceSelector(&resource.DeviceTaintSelector{All: ptr.To(true), Pool: ptr.To("pool-a")})),
+			input: mkValidDeviceTaintRule(tweakDeviceSelector(&resource.DeviceTaintSelector{All: new(true), Pool: new("pool-a")})),
 			expectedErrs: field.ErrorList{
 				field.Forbidden(field.NewPath("spec", "deviceSelector", "pool"), "").WithOrigin("dependentForbidden").MarkAlpha(),
 			},
 		},
 		"all: true with device": {
-			input: mkValidDeviceTaintRule(tweakDeviceSelector(&resource.DeviceTaintSelector{All: ptr.To(true), Device: ptr.To("device-a")})),
+			input: mkValidDeviceTaintRule(tweakDeviceSelector(&resource.DeviceTaintSelector{All: new(true), Device: new("device-a")})),
 			expectedErrs: field.ErrorList{
 				field.Forbidden(field.NewPath("spec", "deviceSelector", "device"), "").WithOrigin("dependentForbidden").MarkAlpha(),
 			},

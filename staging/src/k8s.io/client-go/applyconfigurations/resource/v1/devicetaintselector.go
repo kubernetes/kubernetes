@@ -43,8 +43,8 @@ type DeviceTaintSelectorApplyConfiguration struct {
 	// Setting also driver and pool may be required to avoid ambiguity,
 	// but is not required.
 	Device *string `json:"device,omitempty"`
-	// all, if set to true, explicitly selects every device from every
-	// driver in the cluster. It must not be combined with driver, pool,
+	// all explicitly selects every device from every driver in the
+	// cluster when set to true. It must not be combined with driver, pool,
 	// or device: those must all be unset when all is true.
 	//
 	// Leaving driver, pool, and device all unset also selects every

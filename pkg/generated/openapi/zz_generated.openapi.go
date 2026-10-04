@@ -49378,7 +49378,7 @@ func schema_k8sio_api_resource_v1_DeviceTaintSelector(ref common.ReferenceCallba
 					},
 					"all": {
 						SchemaProps: spec.SchemaProps{
-							Description: "all, if set to true, explicitly selects every device from every driver in the cluster. It must not be combined with driver, pool, or device: those must all be unset when all is true.\n\nLeaving driver, pool, and device all unset also selects every device, for historical reasons, but doing so without setting all is deprecated and may be rejected in a future release. Set all explicitly instead.",
+							Description: "all explicitly selects every device from every driver in the cluster when set to true. It must not be combined with driver, pool, or device: those must all be unset when all is true.\n\nLeaving driver, pool, and device all unset also selects every device, for historical reasons, but doing so without setting all is deprecated and may be rejected in a future release. Set all explicitly instead.",
 							Type:        []string{"boolean"},
 							Format:      "",
 						},
@@ -50607,7 +50607,7 @@ func schema_k8sio_api_resource_v1alpha3_DeviceTaintSelector(ref common.Reference
 					},
 					"all": {
 						SchemaProps: spec.SchemaProps{
-							Description: "all, if set to true, explicitly selects every device from every driver in the cluster. It must not be combined with driver, pool, or device: those must all be unset when all is true.\n\nLeaving driver, pool, and device all unset also selects every device, for historical reasons, but doing so without setting all is deprecated and may be rejected in a future release. Set all explicitly instead.",
+							Description: "all explicitly selects every device from every driver in the cluster when set to true. It must not be combined with driver, pool, or device: those must all be unset when all is true.\n\nLeaving driver, pool, and device all unset also selects every device, for historical reasons, but doing so without setting all is deprecated and may be rejected in a future release. Set all explicitly instead.",
 							Type:        []string{"boolean"},
 							Format:      "",
 						},
@@ -55262,7 +55262,7 @@ func schema_k8sio_api_resource_v1beta2_DeviceTaintSelector(ref common.ReferenceC
 					},
 					"all": {
 						SchemaProps: spec.SchemaProps{
-							Description: "all, if set to true, explicitly selects every device from every driver in the cluster. It must not be combined with driver, pool, or device: those must all be unset when all is true.\n\nLeaving driver, pool, and device all unset also selects every device, for historical reasons, but doing so without setting all is deprecated and may be rejected in a future release. Set all explicitly instead.",
+							Description: "all explicitly selects every device from every driver in the cluster when set to true. It must not be combined with driver, pool, or device: those must all be unset when all is true.\n\nLeaving driver, pool, and device all unset also selects every device, for historical reasons, but doing so without setting all is deprecated and may be rejected in a future release. Set all explicitly instead.",
 							Type:        []string{"boolean"},
 							Format:      "",
 						},
