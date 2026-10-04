@@ -68,11 +68,13 @@ func (t TTY) IsTerminalOut() bool {
 }
 
 // IsTerminal returns whether the passed object is a terminal or not.
+//
 // Deprecated: use printers.IsTerminal instead.
 var IsTerminal = printers.IsTerminal
 
 // AllowsColorOutput returns true if the specified writer is a terminal and
 // the process environment indicates color output is supported and desired.
+//
 // Deprecated: use printers.AllowsColorOutput instead.
 var AllowsColorOutput = printers.AllowsColorOutput
 

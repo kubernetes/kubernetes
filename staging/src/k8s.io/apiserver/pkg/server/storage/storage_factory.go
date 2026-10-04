@@ -54,6 +54,7 @@ type StorageFactory interface {
 
 	// Backends gets all backends for all registered storage destinations.
 	// Used for getting all instances for health validations.
+	//
 	// Deprecated: Use Configs instead
 	Backends() []Backend
 }
@@ -306,6 +307,7 @@ func (s *DefaultStorageFactory) Backends() []Backend {
 
 // Backends returns all backends for all registered storage destinations.
 // Used for getting all instances for health validations.
+//
 // Deprecated: Validate health by passing storagebackend.Config directly to storagefactory.CreateProber.
 func Backends(storageConfig storagebackend.Config) []Backend {
 	return backends(storageConfig, nil)

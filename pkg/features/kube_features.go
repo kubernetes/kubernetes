@@ -641,7 +641,6 @@ const (
 	KubeletPodResourcesGet featuregate.Feature = "KubeletPodResourcesGet"
 
 	// owner: @ffromani
-	// Deprecated: v1.34
 	//
 	// issue: https://github.com/kubernetes/kubernetes/issues/119423
 	// Disables restricted output for the podresources API list endpoint.
