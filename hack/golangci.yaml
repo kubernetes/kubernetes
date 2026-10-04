@@ -58,12 +58,12 @@ linters:
       - linters:
           - gocritic
         text: "ifElseChain: rewrite if-else to switch statement"
-      # API types are fixed in a separate sweep because the change regenerates
-      # OpenAPI and apply configurations: https://github.com/kubernetes/kubernetes/issues/133566
+
+      # The CRD "deprecated" field documents itself; gocritic reads "deprecated in..." as a malformed notice.
       - linters:
           - gocritic
         text: "deprecatedComment:"
-        path: (^|/)apis/|^staging/src/k8s\.io/api/
+        source: "// deprecated indicates this version of the custom resource API is deprecated"
 
       # Only packages listed here opt into the strict "exported symbols must be documented".
       #
