@@ -69,6 +69,7 @@ func TestWebSocketClient_LoopbackStdinToStdout(t *testing.T) {
 		if err != nil {
 			t.Fatalf("error copying STDIN to STDOUT: %v", err)
 		}
+		writeSuccessStatus(t, conns.writeStatus)
 	}))
 	defer websocketServer.Close()
 
@@ -144,6 +145,7 @@ func TestWebSocketClient_DifferentBufferSizes(t *testing.T) {
 			if err != nil {
 				t.Fatalf("error copying STDIN to STDOUT: %v", err)
 			}
+			writeSuccessStatus(t, conns.writeStatus)
 		}))
 		defer websocketServer.Close()
 
@@ -218,6 +220,7 @@ func TestWebSocketClient_LoopbackStdinAsPipe(t *testing.T) {
 		if err != nil {
 			t.Fatalf("error copying STDIN to STDOUT: %v", err)
 		}
+		writeSuccessStatus(t, conns.writeStatus)
 	}))
 	defer websocketServer.Close()
 
@@ -299,6 +302,7 @@ func TestWebSocketClient_LoopbackStdinToStderr(t *testing.T) {
 		if err != nil {
 			t.Fatalf("error copying STDIN to STDERR: %v", err)
 		}
+		writeSuccessStatus(t, conns.writeStatus)
 	}))
 	defer websocketServer.Close()
 
@@ -373,6 +377,7 @@ func TestWebSocketClient_MultipleReadChannels(t *testing.T) {
 		if err != nil {
 			t.Errorf("error copying STDIN to STDOUT: %v", err)
 		}
+		writeSuccessStatus(t, conns.writeStatus)
 	}))
 	defer websocketServer.Close()
 	// Now create the WebSocket client (executor), and point it to the "websocketServer".
@@ -633,6 +638,7 @@ func TestWebSocketClient_MultipleWriteChannels(t *testing.T) {
 		}
 		stdinReader.Close() // Stops the random STDIN stream generation
 		wg.Wait()           // Wait for all bytes copied from STDIN to STDOUT
+		writeSuccessStatus(t, conns.writeStatus)
 	}))
 	defer websocketServer.Close()
 	// Now create the WebSocket client (executor), and point it to the "websocketServer".
@@ -1390,6 +1396,7 @@ func TestWebSocketClient_ProxySucceeds(t *testing.T) {
 			if err != nil {
 				t.Fatalf("error copying STDIN to STDOUT: %v", err)
 			}
+			writeSuccessStatus(t, conns.writeStatus)
 		}))
 		defer websocketServer.Close() //nolint:errcheck
 
