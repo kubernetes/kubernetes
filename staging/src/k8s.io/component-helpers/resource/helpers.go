@@ -61,6 +61,7 @@ type PodResourcesOptions struct {
 	// SkipContainerLevelResources
 	SkipContainerLevelResources bool
 	// Use AdditionalNodeAllocatableResources from pod status to compute the effective pod resource request.
+	// Only entries accounted to the pod are used, see IsAccountedToPod.
 	UseAdditionalNodeAllocatableResources bool
 }
 
@@ -498,7 +499,7 @@ func reuseOrClearResourceList(reuse v1.ResourceList) v1.ResourceList {
 func GetContainerDRAAllocations(pod *v1.Pod, containerName string) v1.ResourceList {
 	draAllocations := make(v1.ResourceList)
 	for _, res := range pod.Status.AdditionalNodeAllocatableResources {
-		if !slices.Contains(res.Containers, containerName) {
+		if !slices.Contains(res.Containers, containerName) || !IsAccountedToPod(res.Source) {
 			continue
 		}
 		// Add Mapping resources
@@ -543,9 +544,18 @@ func addDRANodeAllocatableLimits(specLimits v1.ResourceList, pod *v1.Pod, opts P
 	return specLimits
 }
 
+// IsAccountedToPod reports whether the entries of source are part of the
+// requests of each pod that references it and applies to pod's cgroup calculations.
+func IsAccountedToPod(source v1.AdditionalNodeAllocatableReference) bool {
+	return source.APIGroup == "resource.k8s.io" && source.Kind == "ResourceClaim"
+}
+
 func addAdditionalNodeAllocatableResources(resources v1.ResourceList, pod *v1.Pod, opts PodResourcesOptions) {
 	if opts.UseAdditionalNodeAllocatableResources && len(pod.Status.AdditionalNodeAllocatableResources) > 0 {
 		for _, res := range pod.Status.AdditionalNodeAllocatableResources {
+			if !IsAccountedToPod(res.Source) {
+				continue
+			}
 			// TODO(pravk03): Handle claim references by init containers and peak resource calculation based on that.
 			// Currently, any DRA allocation is always added into the pod footprint.
 			for _, mapping := range res.Mapping {

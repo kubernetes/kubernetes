@@ -3396,6 +3396,84 @@ func TestFitFilterWithAdditionalNodeAllocatableResources(t *testing.T) {
 	}
 }
 
+// TestFitFilterNodeReservations shows that a node reservation is counted once
+// per node while a ResourceClaim is accounted to every pod that references it.
+// The node has 4 CPU. Each pod requests 1 CPU in its spec; a mapped source adds
+// 2 CPU.
+func TestFitFilterNodeReservations(t *testing.T) {
+	testCtx := ktesting.Init(t)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRANodeAllocatableResources, true)
+	nodeName := "node-1"
+	pool := v1.AdditionalNodeAllocatableReference{APIGroup: "example.com", Kind: "Pool", Name: "pool1"}
+	otherPool := v1.AdditionalNodeAllocatableReference{APIGroup: "example.com", Kind: "Pool", Name: "pool2"}
+	claim := v1.AdditionalNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "claim1"}
+	mapped := func(source v1.AdditionalNodeAllocatableReference) []v1.AdditionalNodeAllocatableResource {
+		return []v1.AdditionalNodeAllocatableResource{{
+			Source:     source,
+			Containers: []string{"c1"},
+			Mapping:    []v1.NodeAllocatableMappedResources{{Name: v1.ResourceCPU, Quantity: ptr.To(resource.MustParse("2"))}},
+		}}
+	}
+	existingPod := func(entries []v1.AdditionalNodeAllocatableResource) *v1.Pod {
+		pod := st.MakePod().UID("existing").Name("existing").Namespace("test-ns").Node(nodeName).Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj()
+		pod.Status.AdditionalNodeAllocatableResources = entries
+		return pod
+	}
+	pod := st.MakePod().UID("new").Name("new").Namespace("test-ns").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj()
+
+	tests := []struct {
+		name       string
+		existing   *v1.Pod
+		entries    []v1.AdditionalNodeAllocatableResource
+		wantStatus *fwk.Status
+	}{
+		{
+			// Node: 1 (existing) + 2 (pool1 reservation) = 3. Pod: 1, the node already holds pool1. 4 <= 4.
+			name:     "reservation held by the node is counted once",
+			existing: existingPod(mapped(pool)),
+			entries:  mapped(pool),
+		},
+		{
+			// Node: 3. Pod: 1 + 2 (pool2, first pod to hold it). 6 > 4.
+			name:       "reservation new to the node is counted on its first pod",
+			existing:   existingPod(mapped(pool)),
+			entries:    mapped(otherPool),
+			wantStatus: fwk.NewStatus(fwk.Unschedulable, getErrReason(v1.ResourceCPU)),
+		},
+		{
+			// Node: 1 + 2 (claim1, accounted to the existing pod) = 3. Pod: 1 + 2 (claim1 again). 6 > 4.
+			name:       "claim is accounted to every pod",
+			existing:   existingPod(mapped(claim)),
+			entries:    mapped(claim),
+			wantStatus: fwk.NewStatus(fwk.Unschedulable, getErrReason(v1.ResourceCPU)),
+		},
+	}
+
+	for _, test := range tests {
+		testCtx.Run(test.name, func(tCtx ktesting.TContext) {
+			node := st.MakeNode().Name(nodeName).Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Obj()
+			nodeInfo := framework.NewNodeInfo(test.existing)
+			nodeInfo.SetNode(node)
+
+			p, err := NewFit(tCtx, &config.NodeResourcesFitArgs{ScoringStrategy: defaultScoringStrategy}, nil, plfeature.Features{
+				EnableDRANodeAllocatableResources: true,
+			})
+			tCtx.ExpectNoError(err, "create fit plugin")
+
+			cycleState := newNodeAllocatableCycleState(map[string][]v1.AdditionalNodeAllocatableResource{nodeName: test.entries})
+			_, preFilterStatus := p.(fwk.PreFilterPlugin).PreFilter(tCtx, cycleState, pod, nil)
+			if !preFilterStatus.IsSuccess() {
+				tCtx.Errorf("prefilter failed with status: %v", preFilterStatus)
+			}
+
+			gotStatus := p.(fwk.FilterPlugin).Filter(tCtx, cycleState, pod, nodeInfo)
+			if diff := cmp.Diff(test.wantStatus, gotStatus); diff != "" {
+				tCtx.Errorf("status does not match (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}
+
 func TestFitPreBindAndUnreserveWithAdditionalNodeAllocatableResources(t *testing.T) {
 	testCtx := ktesting.Init(t)
 	nodeName := "node-1"

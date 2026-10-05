@@ -341,6 +341,25 @@ func computePodResourceRequest(pod *v1.Pod, opts ResourceRequestsOptions) *preFi
 	return result
 }
 
+// computePodResourceRequestForNode is computePodResourceRequest plus the node
+// reservations that pod would be the first on nodeInfo to hold. Reservations
+// the node already holds are part of its Requested and are not counted again.
+func computePodResourceRequestForNode(pod *v1.Pod, nodeInfo fwk.NodeInfo, opts ResourceRequestsOptions) *preFilterState {
+	result := computePodResourceRequest(pod, opts)
+	if !opts.EnableDRANodeAllocatableResources {
+		return result
+	}
+	// Deduplicate the requests that are not directly accounted to this pod. The node
+	// counts each such source once, so add it only if no existing pod on the node
+	// references it.
+	for _, res := range pod.Status.AdditionalNodeAllocatableResources {
+		if !resource.IsAccountedToPod(res.Source) && !nodeInfo.HasNodeAllocatableReservation(pod.Namespace, res.Source) {
+			result.Add(framework.NodeReservationRequests(res))
+		}
+	}
+	return result
+}
+
 // PreFilter invoked at the prefilter extension point.
 func (f *Fit) PreFilter(ctx context.Context, cycleState fwk.CycleState, pod *v1.Pod, nodes []fwk.NodeInfo) (*fwk.PreFilterResult, *fwk.Status) {
 	result := computePodResourceRequest(pod, ResourceRequestsOptions{EnablePodLevelResources: f.enablePodLevelResources})
@@ -719,7 +738,7 @@ func (f *Fit) recomputePodResourceRequestForNode(cycleState fwk.CycleState, pod 
 	}
 	podCopy := *pod
 	podCopy.Status.AdditionalNodeAllocatableResources = additionalResources
-	return computePodResourceRequest(&podCopy, ResourceRequestsOptions{
+	return computePodResourceRequestForNode(&podCopy, nodeInfo, ResourceRequestsOptions{
 		EnablePodLevelResources:           f.enablePodLevelResources,
 		EnableDRANodeAllocatableResources: true,
 	})
@@ -741,7 +760,7 @@ type InsufficientResource struct {
 
 // Fits checks if node have enough resources to host the pod.
 func Fits(pod *v1.Pod, nodeInfo fwk.NodeInfo, draManager fwk.SharedDRAManager, opts ResourceRequestsOptions) []InsufficientResource {
-	return fitsRequest(computePodResourceRequest(pod, opts), nodeInfo, nil, nil, draManager, opts, pod)
+	return fitsRequest(computePodResourceRequestForNode(pod, nodeInfo, opts), nodeInfo, nil, nil, draManager, opts, pod)
 }
 
 func fitsRequest(podRequest *preFilterState, nodeInfo fwk.NodeInfo, ignoredExtendedResources, ignoredResourceGroups sets.Set[string], draManager fwk.SharedDRAManager, opts ResourceRequestsOptions, pod *v1.Pod) []InsufficientResource {

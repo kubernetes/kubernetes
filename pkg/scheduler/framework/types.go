@@ -209,12 +209,49 @@ type NodeInfo struct {
 	// Keys are in the format "namespace/name".
 	PVCRefCounts map[string]int
 
+	// NodeReservations tracks the entries that are not accounted to any pod,
+	// see resourcehelper.IsAccountedToPod. Each source is folded into Requested
+	// once, while at least one pod on the node references it. It is nil when
+	// the node holds no reservation.
+	NodeReservations map[NodeAllocatableReservationKey]*NodeAllocatableReservation
+
 	// Whenever NodeInfo changes, generation is bumped.
 	// This is used to avoid cloning it if the object didn't change.
 	Generation int64
 
 	// DeclaredFeatures is a set of features published by the node
 	DeclaredFeatures ndf.FeatureSet
+}
+
+// NodeAllocatableReservationKey identifies the source of a node reservation. Source names
+// are scoped to the pod's namespace.
+type NodeAllocatableReservationKey struct {
+	Namespace string
+	Source    v1.AdditionalNodeAllocatableReference
+}
+
+// NodeAllocatableReservation is an amount of node allocatable resources that a source
+// holds on the node. It is not accounted to any pod and is unrelated to the
+// Reserve extension point.
+type NodeAllocatableReservation struct {
+	// RefCount is the number of pods on the node that reference the source.
+	RefCount int
+	// Requested is the amount folded into NodeInfo.Requested while RefCount > 0.
+	Requested *Resource
+}
+
+// NodeReservationRequests returns the amount that res reserves on the node:
+// its mapping, independent of how many pods reference the source.
+func NodeReservationRequests(res v1.AdditionalNodeAllocatableResource) v1.ResourceList {
+	requests := v1.ResourceList{}
+	for _, mapping := range res.Mapping {
+		if mapping.Quantity != nil {
+			q := requests[mapping.Name]
+			q.Add(*mapping.Quantity)
+			requests[mapping.Name] = q
+		}
+	}
+	return requests
 }
 
 func (n *NodeInfo) GetPods() []fwk.PodInfo {
@@ -255,6 +292,12 @@ func (n *NodeInfo) GetImageStates() map[string]*fwk.ImageStateSummary {
 
 func (n *NodeInfo) GetPVCRefCounts() map[string]int {
 	return n.PVCRefCounts
+}
+
+// HasNodeAllocatableReservation implements fwk.NodeInfo.
+func (n *NodeInfo) HasNodeAllocatableReservation(namespace string, source v1.AdditionalNodeAllocatableReference) bool {
+	_, ok := n.NodeReservations[NodeAllocatableReservationKey{Namespace: namespace, Source: source}]
+	return ok
 }
 
 func (n *NodeInfo) GetGeneration() int64 {
@@ -345,6 +388,12 @@ func (n *NodeInfo) SnapshotConcrete() *NodeInfo {
 	}
 	for key, value := range n.PVCRefCounts {
 		clone.PVCRefCounts[key] = value
+	}
+	if len(n.NodeReservations) > 0 {
+		clone.NodeReservations = make(map[NodeAllocatableReservationKey]*NodeAllocatableReservation, len(n.NodeReservations))
+		for key, reservation := range n.NodeReservations {
+			clone.NodeReservations[key] = &NodeAllocatableReservation{RefCount: reservation.RefCount, Requested: reservation.Requested.Clone()}
+		}
 	}
 
 	return clone
@@ -460,23 +509,29 @@ func (n *NodeInfo) RemovePod(logger klog.Logger, pod *v1.Pod) error {
 // The sign will be set to `+1` when AddPod and to `-1` when RemovePod.
 func (n *NodeInfo) update(podInfo fwk.PodInfo, sign int64) {
 	podResource := podInfo.CalculateResource()
-	n.Requested.MilliCPU += sign * podResource.Resource.GetMilliCPU()
-	n.Requested.Memory += sign * podResource.Resource.GetMemory()
-	n.Requested.EphemeralStorage += sign * podResource.Resource.GetEphemeralStorage()
-	if n.Requested.ScalarResources == nil && len(podResource.Resource.GetScalarResources()) > 0 {
-		n.Requested.ScalarResources = map[v1.ResourceName]int64{}
-	}
-	for rName, rQuant := range podResource.Resource.GetScalarResources() {
-		n.Requested.ScalarResources[rName] += sign * rQuant
-	}
+	n.addRequested(podResource.Resource, sign)
 	n.NonZeroRequested.MilliCPU += sign * podResource.Non0CPU
 	n.NonZeroRequested.Memory += sign * podResource.Non0Mem
 
 	// Consume ports when pod added or release ports when pod removed.
 	n.updateUsedPorts(podInfo.GetPod(), sign > 0)
 	n.updatePVCRefCounts(podInfo.GetPod(), sign > 0)
+	n.updateNodeReservations(podInfo.GetPod(), sign)
 
 	n.Generation = nextGeneration()
+}
+
+// addRequested adds (sign +1) or subtracts (sign -1) res from Requested.
+func (n *NodeInfo) addRequested(res fwk.Resource, sign int64) {
+	n.Requested.MilliCPU += sign * res.GetMilliCPU()
+	n.Requested.Memory += sign * res.GetMemory()
+	n.Requested.EphemeralStorage += sign * res.GetEphemeralStorage()
+	if n.Requested.ScalarResources == nil && len(res.GetScalarResources()) > 0 {
+		n.Requested.ScalarResources = map[v1.ResourceName]int64{}
+	}
+	for rName, rQuant := range res.GetScalarResources() {
+		n.Requested.ScalarResources[rName] += sign * rQuant
+	}
 }
 
 // updateUsedPorts updates the UsedPorts of NodeInfo.
@@ -501,6 +556,54 @@ func (n *NodeInfo) updatePVCRefCounts(pod *v1.Pod, add bool) {
 				delete(n.PVCRefCounts, key)
 			}
 		}
+	}
+}
+
+// updateNodeReservations holds a node reservation from the first pod on the
+// node that references its source until the last such pod leaves. The amount
+// is fixed by the first pod. Entries accounted to the pod are not handled
+// here: they are already part of CalculateResource.
+func (n *NodeInfo) updateNodeReservations(pod *v1.Pod, sign int64) {
+	if len(pod.Status.AdditionalNodeAllocatableResources) == 0 ||
+		!utilfeature.DefaultFeatureGate.Enabled(features.DRANodeAllocatableResources) {
+		return
+	}
+	for _, res := range pod.Status.AdditionalNodeAllocatableResources {
+		if resourcehelper.IsAccountedToPod(res.Source) {
+			// CalculateResource already counts these in the pod's requests.
+			continue
+		}
+		key := NodeAllocatableReservationKey{Namespace: pod.Namespace, Source: res.Source}
+		reservation := n.NodeReservations[key]
+		if sign > 0 {
+			if reservation == nil {
+				reservation = &NodeAllocatableReservation{Requested: NewResource(NodeReservationRequests(res))}
+				n.addRequested(reservation.Requested, 1)
+				n.NonZeroRequested.MilliCPU += reservation.Requested.MilliCPU
+				n.NonZeroRequested.Memory += reservation.Requested.Memory
+				if n.NodeReservations == nil {
+					n.NodeReservations = map[NodeAllocatableReservationKey]*NodeAllocatableReservation{}
+				}
+				n.NodeReservations[key] = reservation
+			}
+			reservation.RefCount++
+			continue
+		}
+		if reservation == nil {
+			continue
+		}
+		reservation.RefCount--
+		if reservation.RefCount > 0 {
+			continue
+		}
+		n.addRequested(reservation.Requested, -1)
+		n.NonZeroRequested.MilliCPU -= reservation.Requested.MilliCPU
+		n.NonZeroRequested.Memory -= reservation.Requested.Memory
+		delete(n.NodeReservations, key)
+	}
+	// Keep the zero value nil so NodeInfo comparisons in tests stay simple.
+	if len(n.NodeReservations) == 0 {
+		n.NodeReservations = nil
 	}
 }
 
