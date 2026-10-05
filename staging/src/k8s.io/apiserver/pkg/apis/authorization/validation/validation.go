@@ -21,6 +21,7 @@ import (
 	"fmt"
 
 	authorizationv1 "k8s.io/api/authorization/v1"
+	authorizationv1alpha1 "k8s.io/api/authorization/v1alpha1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/operation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -238,6 +239,71 @@ func validateLabelSelectorAttributes(selector *authorizationv1.LabelSelectorAttr
 	return allErrs
 }
 
+// ValidateAuthorizationConditionsReview validates a AuthorizationConditionsReview and returns an
+// ErrorList with any errors.
+func ValidateAuthorizationConditionsReview(acr *authorizationv1alpha1.AuthorizationConditionsReview) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if acr.Request != nil {
+		allErrs = append(allErrs, ValidateAuthorizationConditionsRequest(acr.Request, field.NewPath("request"))...)
+	}
+	if acr.Response != nil {
+		allErrs = append(allErrs, ValidateAuthorizationConditionsResponse(acr.Response, field.NewPath("response"))...)
+	}
+
+	objectMetaShallowCopy := acr.ObjectMeta
+	objectMetaShallowCopy.ManagedFields = nil
+	if !apiequality.Semantic.DeepEqual(metav1.ObjectMeta{}, objectMetaShallowCopy) {
+		allErrs = append(allErrs, field.Invalid(field.NewPath("metadata"), acr.ObjectMeta, `must be empty`))
+	}
+	return allErrs
+}
+
+// ValidateAuthorizationConditionsRequest validates a AuthorizationConditionsRequest and returns an
+// ErrorList with any errors.
+func ValidateAuthorizationConditionsRequest(req *authorizationv1alpha1.AuthorizationConditionsRequest, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+
+	// Only conditional decisions need to be evaluated. Declarative validation covers type being required, only validate if set.
+	switch req.Decision.Type {
+	case "":
+		// missing, required error handled by DV
+	case authorizationv1.ConditionsAwareDecisionTypeConditionsMap,
+		authorizationv1.ConditionsAwareDecisionTypeUnion:
+		// ok
+	case authorizationv1.ConditionsAwareDecisionTypeAllow, authorizationv1.ConditionsAwareDecisionTypeNoOpinion, authorizationv1.ConditionsAwareDecisionTypeDeny:
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("decision", "type"), req.Decision.Type, "must be a conditional decision"))
+	default:
+		// unknown type, invalid error handled by DV
+	}
+	// That a ConditionsMap has between 1 and 128 conditions is enforced by authorizer.ConditionsAwareDecisionConditionsMap(...)
+
+	// Note: One could consider validating request.admissionRequest here, either declaratively or manually.
+	// However, the original AdmissionRequest does not have any validation.
+	return allErrs
+}
+
+// ValidateAuthorizationConditionsResponse validates a AuthorizationConditionsResponse and returns an
+// ErrorList with any errors.
+func ValidateAuthorizationConditionsResponse(resp *authorizationv1alpha1.AuthorizationConditionsResponse, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+
+	// Declarative validation covers type being required, only validate if set
+	switch resp.Decision.Type {
+	case "":
+		// missing, required error handled by DV
+	case authorizationv1.ConditionsAwareDecisionTypeDeny,
+		authorizationv1.ConditionsAwareDecisionTypeNoOpinion,
+		authorizationv1.ConditionsAwareDecisionTypeAllow:
+		// ok
+	case authorizationv1.ConditionsAwareDecisionTypeConditionsMap, authorizationv1.ConditionsAwareDecisionTypeUnion:
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("decision", "type"), resp.Decision.Type, "currently must evaluate to an unconditional decision"))
+	default:
+		// unknown type, invalid error handled by DV
+	}
+
+	return allErrs
+}
+
 // GetDeclarativeValidationOptions returns the options used in the authorization.k8s.io API group
 // DeclarativeValidationConfig returns the declarative validation config for the
 // authorization.k8s.io API group.
@@ -263,6 +329,24 @@ func CombinedValidateSubjectAccessReviewCreate(ctx context.Context, sar *authori
 		Options: DeclarativeValidationConfig().Options,
 	}
 	declarativeErrs := authorizationv1.Validate_SubjectAccessReview(ctx, op, nil /* fldPath */, sar, nil)
+	errs = append(errs, declarativeErrs...)
+	return errs
+}
+
+// CombinedValidateAuthorizationConditionsReviewCreate calls both the handwritten and declarative validations for AuthorizationConditionsReview.
+func CombinedValidateAuthorizationConditionsReviewCreate(ctx context.Context, acr *authorizationv1alpha1.AuthorizationConditionsReview) (errs field.ErrorList) {
+	defer func() {
+		if r := recover(); r != nil {
+			errs = append(errs, field.InternalError(nil, fmt.Errorf("panic during ACR validation: %v", r)))
+		}
+	}()
+	errs = ValidateAuthorizationConditionsReview(acr)
+
+	op := operation.Operation{
+		Type:    operation.Create,
+		Options: DeclarativeValidationConfig().Options,
+	}
+	declarativeErrs := authorizationv1alpha1.Validate_AuthorizationConditionsReview(ctx, op, nil /* fldPath */, acr, nil)
 	errs = append(errs, declarativeErrs...)
 	return errs
 }

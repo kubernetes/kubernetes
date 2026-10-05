@@ -22,6 +22,7 @@ import (
 	"slices"
 
 	authorizationv1 "k8s.io/api/authorization/v1"
+	authorizationv1alpha1 "k8s.io/api/authorization/v1alpha1"
 	authorizationv1beta1 "k8s.io/api/authorization/v1beta1"
 	"k8s.io/apimachinery/pkg/api/operation"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -99,4 +100,19 @@ func ValidateLocalSubjectAccessReviewCreate(ctx context.Context, scheme *runtime
 	errs := apiservervalidation.ValidateLocalSubjectAccessReview(versionedSAR)
 	dv := rest.DeclarativeValidation{Scheme: scheme}
 	return dv.ValidateDeclaratively(ctx, sar, nil, errs, operation.Create, apiservervalidation.DeclarativeValidationConfig())
+}
+
+// ValidateAuthorizationConditionsReviewCreate is the single composition of handwritten and declarative
+// AuthorizationConditionsReview validation.
+func ValidateAuthorizationConditionsReviewCreate(ctx context.Context, scheme *runtime.Scheme, acr *authorizationapi.AuthorizationConditionsReview) field.ErrorList {
+	// The hand-written validations are written only once, for the most recent external API version, so that also k8s.io/apiserver
+	// importers can make use of the validations.
+	versionedACR := &authorizationv1alpha1.AuthorizationConditionsReview{}
+	if err := scheme.Convert(acr, versionedACR, nil); err != nil {
+		return field.ErrorList{field.InternalError(nil, fmt.Errorf("unexpected, could not convert internal AuthorizationConditionsReview to v1alpha1: %w", err))}
+	}
+
+	errs := apiservervalidation.ValidateAuthorizationConditionsReview(versionedACR)
+	dv := rest.DeclarativeValidation{Scheme: scheme}
+	return dv.ValidateDeclaratively(ctx, acr, nil, errs, operation.Create, apiservervalidation.DeclarativeValidationConfig())
 }

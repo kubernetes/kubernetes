@@ -23,9 +23,12 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
+	admissionv1 "k8s.io/api/admission/v1"
 	authorizationv1 "k8s.io/api/authorization/v1"
+	authorizationv1alpha1 "k8s.io/api/authorization/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/apiserver/pkg/authorization/authorizer"
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -649,6 +652,184 @@ func TestValidateLocalSAR(t *testing.T) {
 	}
 }
 
+// TestValidateAuthorizationConditionsReview exercises AuthorizationConditionsReview
+// validation through CombinedValidateAuthorizationConditionsReviewCreate, which is what
+// the webhook authorizer actually calls: the handwritten checks plus the generated
+// declarative ones.
+//
+// Two rules are handwritten. ObjectMeta must be empty, since the review is a
+// non-persisted request/response envelope, with ManagedFields exempt because the API
+// machinery may set it. And response.decision.type must be an unconditional decision,
+// because evaluating conditions can only ever produce Allow, Deny or NoOpinion.
+// Everything else, including the contents of the conditions, comes from declarative
+// validation.
+func TestValidateAuthorizationConditionsReview(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ConditionalAuthorization, true)
+
+	// A response must echo the UID of the request it is answering, so both sides of a
+	// valid envelope carry the same one.
+	const uid = "test-uid"
+
+	conditionsMapDecision := authorizationv1.ConditionsAwareDecision{
+		Type: authorizationv1.ConditionsAwareDecisionTypeConditionsMap,
+		ConditionsMap: &authorizationv1.ConditionsMap{
+			DenyConditions:      []authorizationv1.Condition{{ID: "example.com/deny-1", Type: "example.com/type-1"}},
+			NoOpinionConditions: []authorizationv1.Condition{{ID: "example.com/no-op-1"}},
+			AllowConditions:     []authorizationv1.Condition{{ID: "example.com/allow-1", Type: "example.io/allow-type"}},
+		},
+	}
+	denyDecision := authorizationv1.ConditionsAwareDecision{
+		Type: authorizationv1.ConditionsAwareDecisionTypeDeny,
+		Deny: &authorizationv1.UnconditionalDecision{Reason: "denied"},
+	}
+	allowDecision := authorizationv1.ConditionsAwareDecision{
+		Type:  authorizationv1.ConditionsAwareDecisionTypeAllow,
+		Allow: &authorizationv1.UnconditionalDecision{Reason: "allowed"},
+	}
+	noOpinionDecision := authorizationv1.ConditionsAwareDecision{
+		Type:      authorizationv1.ConditionsAwareDecisionTypeNoOpinion,
+		NoOpinion: &authorizationv1.UnconditionalDecision{},
+	}
+
+	testCases := []struct {
+		name             string
+		objectMeta       metav1.ObjectMeta
+		requestDecision  authorizationv1.ConditionsAwareDecision
+		responseDecision authorizationv1.ConditionsAwareDecision
+		// msgs is the exact, ordered list of expected errors; nil means valid.
+		msgs []string
+	}{{
+		name:             "conditional request, unconditional deny response",
+		requestDecision:  conditionsMapDecision,
+		responseDecision: denyDecision,
+	}, {
+		name:             "unconditional allow response",
+		requestDecision:  conditionsMapDecision,
+		responseDecision: allowDecision,
+	}, {
+		name:             "unconditional no-opinion response",
+		requestDecision:  conditionsMapDecision,
+		responseDecision: noOpinionDecision,
+	}, {
+		name:             "only ManagedFields on ObjectMeta is allowed",
+		objectMeta:       metav1.ObjectMeta{ManagedFields: []metav1.ManagedFieldsEntry{{Manager: "test"}}},
+		requestDecision:  conditionsMapDecision,
+		responseDecision: allowDecision,
+	}, {
+		name:             "non-empty ObjectMeta",
+		objectMeta:       metav1.ObjectMeta{Name: "a-name"},
+		requestDecision:  conditionsMapDecision,
+		responseDecision: allowDecision,
+		msgs:             []string{`metadata: Invalid value: {"name":"a-name"}: must be empty`},
+	}, {
+		// The type is required, which only declarative validation reports; the
+		// handwritten unconditional-only check deliberately skips an unset type.
+		name:             "unset response decision type",
+		requestDecision:  conditionsMapDecision,
+		responseDecision: authorizationv1.ConditionsAwareDecision{},
+		msgs:             []string{"response.decision.type: Required value"},
+	}, {
+		// A conditional response cannot be the result of evaluating conditions.
+		name:             "ConditionsMap response is not supported",
+		requestDecision:  conditionsMapDecision,
+		responseDecision: conditionsMapDecision,
+		msgs:             []string{`response.decision.type: Invalid value: "ConditionsMap": currently must evaluate to an unconditional decision`},
+	}, {
+		name:            "Union response is not supported",
+		requestDecision: conditionsMapDecision,
+		responseDecision: authorizationv1.ConditionsAwareDecision{
+			Type: authorizationv1.ConditionsAwareDecisionTypeUnion,
+			Union: []authorizationv1.NamedConditionsAwareDecision{{
+				AuthorizerName: "cm",
+				Decision:       conditionsMapDecision,
+			}},
+		},
+		msgs: []string{`response.decision.type: Invalid value: "Union": currently must evaluate to an unconditional decision`},
+	}, {
+		name:             "unrecognized response type is not supported",
+		requestDecision:  conditionsMapDecision,
+		responseDecision: authorizationv1.ConditionsAwareDecision{Type: "SomeFutureType"},
+		msgs: []string{
+			`response.decision.type: Unsupported value: "SomeFutureType": supported values: "Allow", "ConditionsMap", "Deny", "NoOpinion", "Union"`,
+		},
+	}, {
+		name: "Union request",
+		requestDecision: authorizationv1.ConditionsAwareDecision{
+			Type: authorizationv1.ConditionsAwareDecisionTypeUnion,
+			Union: []authorizationv1.NamedConditionsAwareDecision{{
+				AuthorizerName: "cm",
+				Decision:       conditionsMapDecision,
+			}},
+		},
+		responseDecision: allowDecision,
+	}, {
+		// Unconditional decisions have nothing to evaluate.
+		name:             "unconditional allow request is not supported",
+		requestDecision:  allowDecision,
+		responseDecision: allowDecision,
+		msgs:             []string{`request.decision.type: Invalid value: "Allow": must be a conditional decision`},
+	}, {
+		name:             "unconditional deny request is not supported",
+		requestDecision:  denyDecision,
+		responseDecision: denyDecision,
+		msgs:             []string{`request.decision.type: Invalid value: "Deny": must be a conditional decision`},
+	}, {
+		name:             "unrecognized request type is not supported",
+		requestDecision:  authorizationv1.ConditionsAwareDecision{Type: "SomeFutureType"},
+		responseDecision: allowDecision,
+		msgs: []string{
+			`request.decision.type: Unsupported value: "SomeFutureType": supported values: "Allow", "ConditionsMap", "Deny", "NoOpinion", "Union"`,
+		},
+	}, {
+		// The conditions in the request are reported by declarative validation; the
+		// handwritten validators no longer descend into a decision at all.
+		name: "malformed request conditions are reported by declarative validation",
+		requestDecision: authorizationv1.ConditionsAwareDecision{
+			Type: authorizationv1.ConditionsAwareDecisionTypeConditionsMap,
+			ConditionsMap: &authorizationv1.ConditionsMap{
+				DenyConditions: []authorizationv1.Condition{{
+					ID:          "no-slash",
+					Type:        "also-no-slash",
+					Condition:   strings.Repeat("a", authorizer.MaxConditionBytes+1),
+					Description: strings.Repeat("b", authorizer.MaxConditionDescriptionBytes+1),
+				}},
+			},
+		},
+		responseDecision: allowDecision,
+		msgs: []string{
+			`request.decision.conditionsMap.denyConditions[0].id: Invalid value: "no-slash": must include a prefix (e.g. 'example.com/key')`,
+			"request.decision.conditionsMap.denyConditions[0].condition: Too long: may not be more than 10240 bytes",
+			`request.decision.conditionsMap.denyConditions[0].type: Invalid value: "also-no-slash": must include a prefix (e.g. 'example.com/key')`,
+			"request.decision.conditionsMap.denyConditions[0].description: Too long: may not be more than 1024 bytes",
+		},
+	}}
+
+	for _, c := range testCases {
+		t.Run(c.name, func(t *testing.T) {
+			acr := &authorizationv1alpha1.AuthorizationConditionsReview{
+				ObjectMeta: c.objectMeta,
+				Request: &authorizationv1alpha1.AuthorizationConditionsRequest{
+					AdmissionRequest: &admissionv1.AdmissionRequest{UID: uid},
+					Decision:         c.requestDecision,
+				},
+				Response: &authorizationv1alpha1.AuthorizationConditionsResponse{
+					UID:      uid,
+					Decision: c.responseDecision,
+				},
+			}
+			assertErrors(t, CombinedValidateAuthorizationConditionsReviewCreate(context.Background(), acr), c.msgs)
+		})
+	}
+
+	// The request and response are each optional on the wire, so an envelope carrying
+	// neither is structurally valid; the webhook authorizer checks for a missing
+	// response separately.
+	t.Run("nil request and response", func(t *testing.T) {
+		assertErrors(t, CombinedValidateAuthorizationConditionsReviewCreate(context.Background(),
+			&authorizationv1alpha1.AuthorizationConditionsReview{}), nil)
+	})
+}
+
 // Matching complete error strings rather than substrings means a change to an error's
 // type (for example Invalid to Forbidden) or to its wording is caught here.
 func assertErrors(t *testing.T, errs field.ErrorList, want []string) {
@@ -994,6 +1175,76 @@ func TestCombinedValidateSubjectAccessReviewCreate(t *testing.T) {
 			`spec.authorizationOptions.handledDecisionTypes: Invalid value: ["Allow","Deny"]: set must at least contain {Allow, Deny, NoOpinion}`,
 			"status.conditionalDecision: Forbidden: can only be set when the client opted into conditions-awareness",
 			"status.conditionalDecision.conditionsMap: Invalid value: \"\": must be specified when `type` is \"ConditionsMap\"",
+		})
+	})
+}
+
+// TestCombinedValidateAuthorizationConditionsReviewCreate covers the same composition
+// and panic guard for AuthorizationConditionsReview.
+func TestCombinedValidateAuthorizationConditionsReviewCreate(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ConditionalAuthorization, true)
+
+	conditionsMapDecision := authorizationv1.ConditionsAwareDecision{
+		Type: authorizationv1.ConditionsAwareDecisionTypeConditionsMap,
+		ConditionsMap: &authorizationv1.ConditionsMap{
+			AllowConditions: []authorizationv1.Condition{{ID: "example.com/allow", Type: "example.com/opaque"}},
+		},
+	}
+
+	t.Run("recovers a panic", func(t *testing.T) {
+		errs := CombinedValidateAuthorizationConditionsReviewCreate(context.Background(), nil)
+
+		if len(errs) != 1 {
+			t.Fatalf("expected exactly 1 error, got: %v", errs)
+		}
+		if got, want := errs[0].Type, field.ErrorTypeInternal; got != want {
+			t.Errorf("expected type %q, got %q", want, got)
+		}
+		if !strings.HasPrefix(errs[0].Detail, "panic during ACR validation: ") {
+			t.Errorf("expected the detail to report a recovered panic, got %q", errs[0].Detail)
+		}
+	})
+
+	t.Run("valid review", func(t *testing.T) {
+		acr := &authorizationv1alpha1.AuthorizationConditionsReview{
+			Request: &authorizationv1alpha1.AuthorizationConditionsRequest{
+				AdmissionRequest: &admissionv1.AdmissionRequest{UID: "test-uid"},
+				Decision:         conditionsMapDecision,
+			},
+			Response: &authorizationv1alpha1.AuthorizationConditionsResponse{
+				UID: "test-uid",
+				Decision: authorizationv1.ConditionsAwareDecision{
+					Type:  authorizationv1.ConditionsAwareDecisionTypeAllow,
+					Allow: &authorizationv1.UnconditionalDecision{Reason: "allowed"},
+				},
+			},
+		}
+		assertErrors(t, CombinedValidateAuthorizationConditionsReviewCreate(context.Background(), acr), nil)
+	})
+
+	t.Run("handwritten and declarative errors are combined", func(t *testing.T) {
+		// A conditional response is rejected by the handwritten check, while the
+		// non-domain-prefixed condition ID in the request is reported by declarative
+		// validation, which is the only layer that still descends into conditions.
+		acr := &authorizationv1alpha1.AuthorizationConditionsReview{
+			Request: &authorizationv1alpha1.AuthorizationConditionsRequest{
+				AdmissionRequest: &admissionv1.AdmissionRequest{UID: "test-uid"},
+				Decision: authorizationv1.ConditionsAwareDecision{
+					Type: authorizationv1.ConditionsAwareDecisionTypeConditionsMap,
+					ConditionsMap: &authorizationv1.ConditionsMap{
+						AllowConditions: []authorizationv1.Condition{{ID: "nodomain", Type: "example.com/opaque"}},
+					},
+				},
+			},
+			Response: &authorizationv1alpha1.AuthorizationConditionsResponse{
+				UID:      "test-uid",
+				Decision: conditionsMapDecision,
+			},
+		}
+
+		assertErrors(t, CombinedValidateAuthorizationConditionsReviewCreate(context.Background(), acr), []string{
+			`response.decision.type: Invalid value: "ConditionsMap": currently must evaluate to an unconditional decision`,
+			`request.decision.conditionsMap.allowConditions[0].id: Invalid value: "nodomain": must include a prefix (e.g. 'example.com/key')`,
 		})
 	})
 }

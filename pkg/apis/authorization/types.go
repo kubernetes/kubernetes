@@ -18,6 +18,8 @@ package authorization
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/kubernetes/pkg/apis/admission"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -474,4 +476,49 @@ type UnconditionalDecision struct {
 	// For instance, RBAC can be missing a role, but enough roles are still present and bound to reason about the request.
 	// +optional
 	EvaluationError string
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// AuthorizationConditionsReview describes a request to evaluate authorization conditions.
+type AuthorizationConditionsReview struct {
+	metav1.TypeMeta
+	// metadata is the standard list metadata.
+	// In AuthorizationConditionsReview, it must be an empty struct.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
+	// +optional
+	metav1.ObjectMeta
+
+	// Request describes the attributes for the authorization conditions request.
+	// +optional
+	Request *AuthorizationConditionsRequest
+	// Response describes the attributes for the authorization conditions response.
+	// +optional
+	Response *AuthorizationConditionsResponse
+}
+
+// AuthorizationConditionsRequest describes the authorization conditions request.
+type AuthorizationConditionsRequest struct {
+	// Decision contains the conditional decision the authorizer authored at authorization time.
+	// +required
+	Decision ConditionsAwareDecision
+
+	// AdmissionRequest may contain additional information for evaluating the conditions.
+	// +required
+	AdmissionRequest *admission.AdmissionRequest
+}
+
+// AuthorizationConditionsResponse describes an authorization conditions response.
+type AuthorizationConditionsResponse struct {
+	// UID is an identifier for the individual request/response.
+	// This must be copied over from request.admissionRequest.uid of the corresponding
+	// AuthorizationConditionsReview.
+	// It is possible that the same request content (except uid) is sent to the
+	// authorizer multiple times.
+	// +required
+	UID types.UID
+
+	// Decision contains the authorizer's decision after seeing the data.
+	// +required
+	Decision ConditionsAwareDecision
 }

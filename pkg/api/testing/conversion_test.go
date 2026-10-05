@@ -249,6 +249,8 @@ func TestMemoryIdenticalConversion(t *testing.T) {
 		"SubjectAccessReview.authorization.k8s.io",
 		"SelfSubjectAccessReview.authorization.k8s.io",
 		"LocalSubjectAccessReview.authorization.k8s.io",
+		// Embeds admission.AdmissionRequest, whose internal runtime.Object fields are converted from runtime.RawExtension:
+		"AuthorizationConditionsReview.authorization.k8s.io",
 
 		// Generic meta-list type (metainternalversion.List vs metav1.List):
 		"List",
