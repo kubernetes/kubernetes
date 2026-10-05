@@ -65,6 +65,10 @@ func (r *REST) Create(ctx context.Context, obj runtime.Object, createValidation 
 	if !ok {
 		return nil, apierrors.NewBadRequest(fmt.Sprintf("not a SelfSubjectAccessReview: %#v", obj))
 	}
+	// Clear status so it's not taken into account during input validation.
+	// This is important, as we cannot make validation stricter; in k8s 1.37 and before, the client was able to pass a bogus status without a validation error.
+	selfSAR.Status = authorizationapi.SubjectAccessReviewStatus{}
+
 	if errs := authorizationvalidation.ValidateSelfSubjectAccessReviewCreate(ctx, r.scheme, selfSAR); len(errs) > 0 {
 		return nil, apierrors.NewInvalid(authorizationapi.Kind(selfSAR.Kind), "", errs)
 	}
