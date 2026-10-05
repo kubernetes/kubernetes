@@ -40,7 +40,7 @@ WHYDEADCODE_BIN="$(which whydeadcode)"
 pushd "${KUBE_ROOT}"
 
 # Define an array of binaries to check
-BINARIES=("kube-apiserver" "kubelet" "kube-controller-manager" "kube-scheduler" "kube-proxy")
+BINARIES=("kube-apiserver" "kubelet" "kube-controller-manager" "kube-scheduler" "kube-proxy" "kubectl")
 FAILED=false
 FAILED_BINARIES=()
 

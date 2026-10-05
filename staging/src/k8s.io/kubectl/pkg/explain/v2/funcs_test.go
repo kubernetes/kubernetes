@@ -19,10 +19,10 @@ package v2_test
 import (
 	"bytes"
 	"testing"
-	"text/template"
 
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/cli-runtime/third_party/forked/golang/text/template"
 	v2 "k8s.io/kubectl/pkg/explain/v2"
 )
 
