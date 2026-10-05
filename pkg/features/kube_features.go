@@ -1732,6 +1732,7 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 	KubeletServiceAccountTokenForCredentialProviders: {
 		{Version: version.MustParse("1.33"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.Beta},
+		{Version: version.MustParse("1.38"), Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // GA in 1.38; remove in 1.41
 	},
 
 	LocalStorageCapacityIsolationFSQuotaMonitoring: {
@@ -2018,6 +2019,7 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 	ServiceAccountNodeAudienceRestriction: {
 		{Version: version.MustParse("1.32"), Default: false, PreRelease: featuregate.Beta},
 		{Version: version.MustParse("1.33"), Default: true, PreRelease: featuregate.Beta},
+		{Version: version.MustParse("1.38"), Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // GA in 1.38; remove in 1.41
 	},
 
 	ServiceAccountTokenJTI: {

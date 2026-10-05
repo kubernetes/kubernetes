@@ -1105,6 +1105,10 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.34"
+  - default: true
+    lockToDefault: true
+    preRelease: GA
+    version: "1.38"
 - name: KubeProxyIPVS
   versionedSpecs:
   - default: true
@@ -1806,6 +1810,10 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.33"
+  - default: true
+    lockToDefault: true
+    preRelease: GA
+    version: "1.38"
 - name: ServiceAccountTokenJTI
   versionedSpecs:
   - default: false

@@ -1718,7 +1718,8 @@ func Test_nodePlugin_Admit(t *testing.T) {
 			features:        feature.DefaultFeatureGate,
 			setupFunc: func(t *testing.T) {
 				t.Helper()
-				featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.ServiceAccountNodeAudienceRestriction, true)
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, feature.DefaultFeatureGate, version.MustParse("1.37"))
+				featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.ServiceAccountNodeAudienceRestriction, false)
 			},
 			attributes: admission.NewAttributesRecord(makeTokenRequest(coremypodWithPVCAndCSI.Name, v1mypodWithPVCAndCSI.UID, []string{"foo"}), nil, tokenrequestKind, coremypod.Namespace, "mysa", svcacctResource, "token", admission.Create, &metav1.CreateOptions{}, false, mynode),
 		},
@@ -1744,6 +1745,7 @@ func Test_nodePlugin_Admit(t *testing.T) {
 			features:        feature.DefaultFeatureGate,
 			setupFunc: func(t *testing.T) {
 				t.Helper()
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, feature.DefaultFeatureGate, version.MustParse("1.37"))
 				featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.ServiceAccountNodeAudienceRestriction, false)
 			},
 			attributes: admission.NewAttributesRecord(makeTokenRequest(coremypodWithPVCAndCSI.Name, v1mypodWithPVCAndCSI.UID, []string{"foo"}), nil, tokenrequestKind, coremypod.Namespace, "mysa", svcacctResource, "token", admission.Create, &metav1.CreateOptions{}, false, mynode),
@@ -1755,6 +1757,7 @@ func Test_nodePlugin_Admit(t *testing.T) {
 			features:        feature.DefaultFeatureGate,
 			setupFunc: func(t *testing.T) {
 				t.Helper()
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, feature.DefaultFeatureGate, version.MustParse("1.37"))
 				featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.ServiceAccountNodeAudienceRestriction, false)
 			},
 			attributes: admission.NewAttributesRecord(makeTokenRequest(coremypodWithCSI.Name, v1mypodWithCSI.UID, []string{"foo"}), nil, tokenrequestKind, coremypod.Namespace, "mysa", svcacctResource, "token", admission.Create, &metav1.CreateOptions{}, false, mynode),

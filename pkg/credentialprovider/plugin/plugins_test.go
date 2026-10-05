@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/cache"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -196,7 +197,7 @@ func TestNewExternalCredentialProviderDockerKeyring(t *testing.T) {
 	testCases := []struct {
 		name                         string
 		setupProviders               func()
-		featureGateEnabled           bool
+		disableFeatureGate           bool
 		expectedProviderCount        int
 		expectedPodNamespace         string
 		expectedPodName              string
@@ -220,12 +221,11 @@ func TestNewExternalCredentialProviderDockerKeyring(t *testing.T) {
 			expectedProviderCount: 2,
 		},
 		{
-			name: "feature gate enabled - pod information should be set",
+			name: "pod information should be set",
 			setupProviders: func() {
 				mockProvider := createTestPluginProvider(credentialprovider.DockerConfig{})
 				registerCredentialProviderPlugin("test-provider", mockProvider)
 			},
-			featureGateEnabled:           true,
 			expectedProviderCount:        1,
 			expectedPodNamespace:         "test-namespace",
 			expectedPodName:              "test-pod",
@@ -234,12 +234,12 @@ func TestNewExternalCredentialProviderDockerKeyring(t *testing.T) {
 			validatePerPodProviderFields: true,
 		},
 		{
-			name: "feature gate disabled - pod information should be empty",
+			name: "feature gate disabled in emulated version - pod information should be empty",
 			setupProviders: func() {
 				mockProvider := createTestPluginProvider(credentialprovider.DockerConfig{})
 				registerCredentialProviderPlugin("test-provider", mockProvider)
 			},
-			featureGateEnabled:           false,
+			disableFeatureGate:           true,
 			expectedProviderCount:        1,
 			expectedPodNamespace:         "",
 			expectedPodName:              "",
@@ -253,7 +253,10 @@ func TestNewExternalCredentialProviderDockerKeyring(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			setupTestProviders(t)
 
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KubeletServiceAccountTokenForCredentialProviders, tc.featureGateEnabled)
+			if tc.disableFeatureGate {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.37"))
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KubeletServiceAccountTokenForCredentialProviders, false)
+			}
 
 			tc.setupProviders()
 
