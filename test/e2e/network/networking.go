@@ -33,7 +33,6 @@ import (
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
-	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 	"k8s.io/kubernetes/test/e2e/network/common"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 	admissionapi "k8s.io/pod-security-admission/api"
@@ -545,15 +544,11 @@ var _ = common.SIGDescribe("Networking", func() {
 
 	})
 
-	f.It("should recreate its iptables rules if they are deleted", f.WithDisruptive(), f.WithProvider(framework.ProvidersWithSSH...), func(ctx context.Context) {
-		e2eskipper.SkipUnlessSSHKeyPresent()
-
-		hosts, err := e2essh.NodeSSHHosts(ctx, f.ClientSet)
-		framework.ExpectNoError(err, "failed to find external/internal IPs for every node")
-		if len(hosts) == 0 {
-			framework.Failf("No ssh-able nodes")
-		}
-		host := hosts[0]
+	f.It("should recreate its iptables rules if they are deleted", f.WithDisruptive(), func(ctx context.Context) {
+		node, err := e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)
+		framework.ExpectNoError(err, "failed to find a ready schedulable node")
+		hostExec := utils.NewHostExec(f)
+		ginkgo.DeferCleanup(hostExec.Cleanup)
 
 		ns := f.Namespace.Name
 		numPods, servicePort := 3, defaultServeHostnameServicePort
@@ -568,9 +563,9 @@ var _ = common.SIGDescribe("Networking", func() {
 		// restart iptables"?). So instead we just manually delete all "KUBE-"
 		// chains.
 
-		ginkgo.By("dumping iptables rules on node " + host)
-		result, err := e2essh.SSH(ctx, "sudo iptables-save", host, framework.TestContext.Provider)
-		e2essh.LogResult(result)
+		ginkgo.By("dumping iptables rules on node " + node.Name)
+		result, err := hostExec.Execute(ctx, "iptables-save", node)
+		utils.LogResult(result)
 		if err != nil || result.Code != 0 {
 			framework.Failf("couldn't dump iptable rules: %v", err)
 		}
@@ -589,21 +584,21 @@ var _ = common.SIGDescribe("Networking", func() {
 
 			// Delete jumps from non-KUBE chains to KUBE chains
 			if !strings.HasPrefix(line, "-A KUBE-") && strings.Contains(line, "-j KUBE-") {
-				deleteRuleCmds = append(deleteRuleCmds, fmt.Sprintf("sudo iptables -t %s -D %s || true", table, line[3:]))
+				deleteRuleCmds = append(deleteRuleCmds, fmt.Sprintf("iptables -t %s -D %s || true", table, line[3:]))
 			}
 			// Flush and delete all KUBE chains
 			if strings.HasPrefix(line, ":KUBE-") {
 				chain := strings.Split(line, " ")[0][1:]
-				deleteRuleCmds = append(deleteRuleCmds, fmt.Sprintf("sudo iptables -t %s -F %s || true", table, chain))
-				deleteChainCmds = append(deleteChainCmds, fmt.Sprintf("sudo iptables -t %s -X %s || true", table, chain))
+				deleteRuleCmds = append(deleteRuleCmds, fmt.Sprintf("iptables -t %s -F %s || true", table, chain))
+				deleteChainCmds = append(deleteChainCmds, fmt.Sprintf("iptables -t %s -X %s || true", table, chain))
 			}
 		}
 		cmd := strings.Join(append(deleteRuleCmds, deleteChainCmds...), "\n")
 
 		ginkgo.By("deleting all KUBE-* iptables chains")
-		result, err = e2essh.SSH(ctx, cmd, host, framework.TestContext.Provider)
+		result, err = hostExec.Execute(ctx, cmd, node)
 		if err != nil || result.Code != 0 {
-			e2essh.LogResult(result)
+			utils.LogResult(result)
 			framework.Failf("couldn't delete iptable rules: %v", err)
 		}
 
@@ -612,9 +607,9 @@ var _ = common.SIGDescribe("Networking", func() {
 
 		ginkgo.By("verifying that kubelet rules are eventually recreated")
 		err = utilwait.PollImmediate(framework.Poll, framework.RestartNodeReadyAgainTimeout, func() (bool, error) {
-			result, err = e2essh.SSH(ctx, "sudo iptables-save -t mangle", host, framework.TestContext.Provider)
+			result, err = hostExec.Execute(ctx, "iptables-save -t mangle", node)
 			if err != nil || result.Code != 0 {
-				e2essh.LogResult(result)
+				utils.LogResult(result)
 				return false, err
 			}
 
@@ -624,7 +619,7 @@ var _ = common.SIGDescribe("Networking", func() {
 			return false, nil
 		})
 		if err != nil {
-			e2essh.LogResult(result)
+			utils.LogResult(result)
 		}
 		framework.ExpectNoError(err, "kubelet did not recreate its iptables rules")
 	})

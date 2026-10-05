@@ -19,7 +19,6 @@ package node
 import (
 	"context"
 	"fmt"
-	"net"
 	"sort"
 	"strconv"
 	"strings"
@@ -33,7 +32,7 @@ import (
 	e2ekubelet "k8s.io/kubernetes/test/e2e/framework/kubelet"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
-	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
+	"k8s.io/kubernetes/test/e2e/storage/utils"
 	testutils "k8s.io/kubernetes/test/utils"
 	admissionapi "k8s.io/pod-security-admission/api"
 
@@ -43,7 +42,7 @@ import (
 
 // This test checks if node-problem-detector (NPD) runs fine without error on
 // the up to 10 nodes in the cluster. NPD's functionality is tested in e2e_node tests.
-var _ = SIGDescribe("NodeProblemDetector", feature.NodeProblemDetector, framework.WithProvider(framework.ProvidersWithSSH...), framework.WithProvider("gce"), func() {
+var _ = SIGDescribe("NodeProblemDetector", feature.NodeProblemDetector, framework.WithProvider("gce"), func() {
 	const (
 		pollInterval      = 1 * time.Second
 		pollTimeout       = 1 * time.Minute
@@ -53,41 +52,26 @@ var _ = SIGDescribe("NodeProblemDetector", feature.NodeProblemDetector, framewor
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	ginkgo.BeforeEach(func(ctx context.Context) {
-		e2eskipper.SkipUnlessSSHKeyPresent()
 		e2eskipper.SkipUnlessNodeOSDistroIs("gci", "ubuntu")
 		e2enode.WaitForTotalHealthy(ctx, f.ClientSet, time.Minute)
 	})
 
 	ginkgo.It("should run without error", func(ctx context.Context) {
-		ginkgo.By("Getting all nodes and their SSH-able IP addresses")
+		ginkgo.By("Getting all ready schedulable nodes")
 		readyNodes, err := e2enode.GetReadySchedulableNodes(ctx, f.ClientSet)
 		framework.ExpectNoError(err)
 
-		nodes := []v1.Node{}
-		hosts := []string{}
-		for _, node := range readyNodes.Items {
-			host := ""
-			for _, addr := range node.Status.Addresses {
-				if addr.Type == v1.NodeExternalIP {
-					host = net.JoinHostPort(addr.Address, "22")
-					break
-				}
-			}
-			// Not every node has to have an external IP address.
-			if len(host) > 0 {
-				nodes = append(nodes, node)
-				hosts = append(hosts, host)
-			}
-		}
-
+		nodes := readyNodes.Items
 		if len(nodes) == 0 {
-			ginkgo.Skip("Skipping test due to lack of ready nodes with public IP")
+			ginkgo.Skip("Skipping test due to lack of ready nodes")
 		}
 
 		if len(nodes) > maxNodesToProcess {
 			nodes = nodes[:maxNodesToProcess]
-			hosts = hosts[:maxNodesToProcess]
 		}
+
+		hostExec := utils.NewHostExec(f)
+		ginkgo.DeferCleanup(hostExec.Cleanup)
 
 		isStandaloneMode := make(map[string]bool)
 		cpuUsageStats := make(map[string][]float64)
@@ -102,14 +86,16 @@ var _ = SIGDescribe("NodeProblemDetector", feature.NodeProblemDetector, framewor
 		// KubeletStart event since there is no easy way to check when test has actually started.
 		checkForKubeletStart := false
 
-		for _, host := range hosts {
+		for i := range nodes {
+			node := &nodes[i]
+			host := node.Name
 			cpuUsageStats[host] = []float64{}
 			uptimeStats[host] = []float64{}
 			rssStats[host] = []float64{}
 			workingSetStats[host] = []float64{}
 
 			cmd := "systemctl status node-problem-detector.service"
-			result, err := e2essh.SSH(ctx, cmd, host, framework.TestContext.Provider)
+			result, err := hostExec.Execute(ctx, cmd, node)
 			isStandaloneMode[host] = (err == nil && result.Code == 0)
 
 			if isStandaloneMode[host] {
@@ -118,22 +104,22 @@ var _ = SIGDescribe("NodeProblemDetector", feature.NodeProblemDetector, framewor
 				// showing up, because string text "[n]ode-problem-detector" does not
 				// match regular expression "[n]ode-problem-detector".
 				psCmd := "ps aux | grep [n]ode-problem-detector"
-				result, err = e2essh.SSH(ctx, psCmd, host, framework.TestContext.Provider)
+				result, err = hostExec.Execute(ctx, psCmd, node)
 				framework.ExpectNoError(err)
 				gomega.Expect(result.Code).To(gomega.Equal(0))
 				gomega.Expect(result.Stdout).To(gomega.ContainSubstring("node-problem-detector"))
 
 				ginkgo.By(fmt.Sprintf("Check node-problem-detector is running fine on node %q", host))
-				journalctlCmd := "sudo journalctl -r -u node-problem-detector"
-				result, err = e2essh.SSH(ctx, journalctlCmd, host, framework.TestContext.Provider)
+				journalctlCmd := "journalctl -r -u node-problem-detector"
+				result, err = hostExec.Execute(ctx, journalctlCmd, node)
 				framework.ExpectNoError(err)
 				gomega.Expect(result.Code).To(gomega.Equal(0))
 				gomega.Expect(result.Stdout).NotTo(gomega.ContainSubstring("node-problem-detector.service: Failed"))
 
 				// We only will check for the KubeletStart even if parsing of date here succeeded.
 				ginkgo.By(fmt.Sprintf("Check when node-problem-detector started on node %q", host))
-				npdStartTimeCommand := "sudo systemctl show --timestamp=utc node-problem-detector -P ActiveEnterTimestamp"
-				result, err = e2essh.SSH(ctx, npdStartTimeCommand, host, framework.TestContext.Provider)
+				npdStartTimeCommand := "systemctl show --timestamp=utc node-problem-detector -P ActiveEnterTimestamp"
+				result, err = hostExec.Execute(ctx, npdStartTimeCommand, node)
 				framework.ExpectNoError(err)
 				gomega.Expect(result.Code).To(gomega.Equal(0))
 
@@ -146,15 +132,15 @@ var _ = SIGDescribe("NodeProblemDetector", feature.NodeProblemDetector, framewor
 					checkForKubeletStart = time.Since(st) < time.Hour
 				}
 
-				cpuUsage, uptime := getCPUStat(ctx, f, host)
+				cpuUsage, uptime := getCPUStat(ctx, hostExec, node)
 				cpuUsageStats[host] = append(cpuUsageStats[host], cpuUsage)
 				uptimeStats[host] = append(uptimeStats[host], uptime)
 
 			}
 			ginkgo.By(fmt.Sprintf("Inject log to trigger DockerHung on node %q", host))
 			log := "INFO: task docker:12345 blocked for more than 120 seconds."
-			injectLogCmd := "sudo sh -c \"echo 'kernel: " + log + "' >> /dev/kmsg\""
-			result, err = e2essh.SSH(ctx, injectLogCmd, host, framework.TestContext.Provider)
+			injectLogCmd := "echo 'kernel: " + log + "' >> /dev/kmsg"
+			result, err = hostExec.Execute(ctx, injectLogCmd, node)
 			framework.ExpectNoError(err)
 			gomega.Expect(result.Code).To(gomega.Equal(0))
 		}
@@ -162,18 +148,20 @@ var _ = SIGDescribe("NodeProblemDetector", feature.NodeProblemDetector, framewor
 		ginkgo.By("Gather node-problem-detector cpu and memory stats")
 		numIterations := 60
 		for i := 1; i <= numIterations; i++ {
-			for j, host := range hosts {
+			for j := range nodes {
+				node := &nodes[j]
+				host := node.Name
 				if isStandaloneMode[host] {
-					rss, workingSet := getMemoryStat(ctx, f, host)
+					rss, workingSet := getMemoryStat(ctx, hostExec, node)
 					rssStats[host] = append(rssStats[host], rss)
 					workingSetStats[host] = append(workingSetStats[host], workingSet)
 					if i == numIterations {
-						cpuUsage, uptime := getCPUStat(ctx, f, host)
+						cpuUsage, uptime := getCPUStat(ctx, hostExec, node)
 						cpuUsageStats[host] = append(cpuUsageStats[host], cpuUsage)
 						uptimeStats[host] = append(uptimeStats[host], uptime)
 					}
 				} else {
-					cpuUsage, rss, workingSet := getNpdPodStat(ctx, f, nodes[j].Name)
+					cpuUsage, rss, workingSet := getNpdPodStat(ctx, f, host)
 					cpuUsageStats[host] = append(cpuUsageStats[host], cpuUsage)
 					rssStats[host] = append(rssStats[host], rss)
 					workingSetStats[host] = append(workingSetStats[host], workingSet)
@@ -185,7 +173,8 @@ var _ = SIGDescribe("NodeProblemDetector", feature.NodeProblemDetector, framewor
 		cpuStatsMsg := "CPU (core):"
 		rssStatsMsg := "RSS (MB):"
 		workingSetStatsMsg := "WorkingSet (MB):"
-		for i, host := range hosts {
+		for i := range nodes {
+			host := nodes[i].Name
 			if isStandaloneMode[host] {
 				// When in standalone mode, NPD is running as systemd service. We
 				// calculate its cpu usage from cgroup cpuacct value differences.
@@ -285,17 +274,17 @@ func verifyNodeCondition(ctx context.Context, f *framework.Framework, condition 
 	return nil
 }
 
-func getMemoryStat(ctx context.Context, f *framework.Framework, host string) (rss, workingSet float64) {
+func getMemoryStat(ctx context.Context, hostExec utils.HostExec, node *v1.Node) (rss, workingSet float64) {
 	var memCmd string
 
-	isCgroupV2 := isHostRunningCgroupV2(ctx, f, host)
+	isCgroupV2 := isHostRunningCgroupV2(ctx, hostExec, node)
 	if isCgroupV2 {
 		memCmd = "cat /sys/fs/cgroup/system.slice/node-problem-detector.service/memory.current && cat /sys/fs/cgroup/system.slice/node-problem-detector.service/memory.stat"
 	} else {
 		memCmd = "cat /sys/fs/cgroup/memory/system.slice/node-problem-detector.service/memory.usage_in_bytes && cat /sys/fs/cgroup/memory/system.slice/node-problem-detector.service/memory.stat"
 	}
 
-	result, err := e2essh.SSH(ctx, memCmd, host, framework.TestContext.Provider)
+	result, err := hostExec.Execute(ctx, memCmd, node)
 	framework.ExpectNoError(err)
 	gomega.Expect(result.Code).To(gomega.Equal(0))
 	lines := strings.Split(result.Stdout, "\n")
@@ -341,15 +330,15 @@ func getMemoryStat(ctx context.Context, f *framework.Framework, host string) (rs
 	return
 }
 
-func getCPUStat(ctx context.Context, f *framework.Framework, host string) (usage, uptime float64) {
+func getCPUStat(ctx context.Context, hostExec utils.HostExec, node *v1.Node) (usage, uptime float64) {
 	var cpuCmd string
-	if isHostRunningCgroupV2(ctx, f, host) {
+	if isHostRunningCgroupV2(ctx, hostExec, node) {
 		cpuCmd = " cat /sys/fs/cgroup/cpu.stat | grep 'usage_usec' | sed 's/[^0-9]*//g' && cat /proc/uptime | awk '{print $1}'"
 	} else {
 		cpuCmd = "cat /sys/fs/cgroup/cpu/system.slice/node-problem-detector.service/cpuacct.usage && cat /proc/uptime | awk '{print $1}'"
 	}
 
-	result, err := e2essh.SSH(ctx, cpuCmd, host, framework.TestContext.Provider)
+	result, err := hostExec.Execute(ctx, cpuCmd, node)
 	framework.ExpectNoError(err)
 	gomega.Expect(result.Code).To(gomega.Equal(0))
 	lines := strings.Split(result.Stdout, "\n")
@@ -364,8 +353,8 @@ func getCPUStat(ctx context.Context, f *framework.Framework, host string) (usage
 	return
 }
 
-func isHostRunningCgroupV2(ctx context.Context, f *framework.Framework, host string) bool {
-	result, err := e2essh.SSH(ctx, "stat -fc %T /sys/fs/cgroup/", host, framework.TestContext.Provider)
+func isHostRunningCgroupV2(ctx context.Context, hostExec utils.HostExec, node *v1.Node) bool {
+	result, err := hostExec.Execute(ctx, "stat -fc %T /sys/fs/cgroup/", node)
 	framework.ExpectNoError(err)
 	gomega.Expect(result.Code).To(gomega.Equal(0))
 
