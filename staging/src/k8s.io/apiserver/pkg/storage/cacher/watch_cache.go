@@ -303,6 +303,7 @@ func (w *watchCache) UpdateResourceVersion(resourceVersion string) {
 	func() {
 		w.Lock()
 		defer w.Unlock()
+		w.storage.UpdateResourceVersion(rv)
 		w.resourceVersion = rv
 		w.cond.Broadcast()
 	}()

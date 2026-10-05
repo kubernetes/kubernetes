@@ -64,6 +64,7 @@ type Snapshot interface {
 	GetByKey(key string) (item interface{}, exists bool, err error)
 	OrderedListPrefix(prefix, continueKey string) ([]interface{}, error)
 	RangePrefix(prefix, continueKey string) Range
+	ResourceVersion() uint64
 }
 
 // Range is the elements of a Snapshot with a given key prefix, in key
