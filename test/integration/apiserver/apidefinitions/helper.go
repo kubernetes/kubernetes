@@ -77,7 +77,7 @@ func (d *Definition) ResourceClient() dynamic.ResourceInterface {
 // set of custom resources discoverable and tested.
 func TestAllDefinitions(t *testing.T, testNamespace string, testFunc DefinitionTestFunc) {
 	server, err := apiservertesting.StartTestServer(t, apiservertesting.NewDefaultTestServerOptions(), []string{
-		"--disable-admission-plugins", "ServiceAccount,TaintNodesByCondition",
+		"--disable-admission-plugins", "ServiceAccount,TaintNodesByCondition,PodCheckpoint",
 		// Enable all APIs and features
 		"--runtime-config=api/all=true",
 		"--feature-gates=AllAlpha=true,AllBeta=true",

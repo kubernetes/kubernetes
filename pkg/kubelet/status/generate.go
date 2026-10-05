@@ -19,12 +19,14 @@ package status
 import (
 	"fmt"
 	"strings"
+	"unicode/utf8"
 
 	v1 "k8s.io/api/core/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/events"
 	runtimeutil "k8s.io/kubernetes/pkg/kubelet/kuberuntime/util"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
@@ -45,6 +47,53 @@ const (
 	// RestartAllContainersStarted says that a container exited and triggered RestartAllContainer action.
 	RestartAllContainersStarted = "RestartAllContainersStarted"
 )
+
+// SetPodRestoredCondition records a restore transition without advancing the
+// generation captured when the one-time operation started.
+func SetPodRestoredCondition(pod *v1.Pod, podStatus *v1.PodStatus, state v1.ConditionStatus, reason, message string) {
+	generation := pod.Generation
+	if _, old := podutil.GetPodCondition(podStatus, v1.PodRestored); old != nil {
+		if old.Status == v1.ConditionTrue || old.Status == v1.ConditionFalse {
+			return
+		}
+		generation = old.ObservedGeneration
+	}
+	// Runtime error details must fit the API's condition message limit so a
+	// large error cannot prevent publication of a terminal restore outcome.
+	const maxMessageBytes = 32768
+	message = strings.ToValidUTF8(message, "\uFFFD")
+	if len(message) > maxMessageBytes {
+		end := maxMessageBytes
+		for !utf8.RuneStart(message[end]) {
+			end--
+		}
+		message = message[:end]
+	}
+	podutil.UpdatePodCondition(podStatus, &v1.PodCondition{
+		Type: v1.PodRestored, Status: state, Reason: reason, Message: message,
+		ObservedGeneration: generation,
+	})
+}
+
+// GeneratePodRestoredCondition preserves the durable restore outcome. A sandbox
+// observed after an interrupted status publication completes the same attempt;
+// subsequent sandbox loss must not cause that checkpoint to be restored again.
+func GeneratePodRestoredCondition(pod *v1.Pod, oldPodStatus *v1.PodStatus, podStatus *kubecontainer.PodStatus, blocked bool) v1.PodCondition {
+	current := v1.PodStatus{}
+	if _, old := podutil.GetPodCondition(oldPodStatus, v1.PodRestored); old != nil {
+		current.Conditions = []v1.PodCondition{*old}
+	}
+	if podStatus != nil && len(podStatus.SandboxStatuses) > 0 {
+		SetPodRestoredCondition(pod, &current, v1.ConditionTrue, "RestoreCompleted", "pod was restored from checkpoint")
+	} else {
+		message := "pod restore is in progress"
+		if blocked {
+			message = "waiting for another restore of the same pod (namespace/name) to finish"
+		}
+		SetPodRestoredCondition(pod, &current, v1.ConditionUnknown, events.RestoreInProgress, message)
+	}
+	return current.Conditions[0]
+}
 
 // GenerateContainersReadyCondition returns the status of "ContainersReady" condition.
 // The status of "ContainersReady" condition is true when all containers are ready.

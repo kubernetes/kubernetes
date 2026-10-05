@@ -18,12 +18,16 @@ package status
 
 import (
 	"reflect"
+	"strings"
 	"testing"
+	"time"
+	"unicode/utf8"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -711,6 +715,86 @@ func TestGeneratePodReadyToStartContainersCondition(t *testing.T) {
 			require.Equal(t, test.expected.Status, condition.Status)
 			require.Equal(t, test.expected.Reason, condition.Reason)
 			require.Equal(t, test.expected.Message, condition.Message)
+		})
+	}
+}
+
+func TestGeneratePodRestoredCondition(t *testing.T) {
+	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Generation: 7}, Spec: v1.PodSpec{RestoreFrom: &v1.CheckpointReference{Name: "checkpoint"}}}
+	sandbox := &kubecontainer.PodStatus{SandboxStatuses: []*runtimeapi.PodSandboxStatus{{State: runtimeapi.PodSandboxState_SANDBOX_READY}}}
+	started := metav1.NewTime(time.Unix(100, 0))
+	for name, tc := range map[string]struct {
+		old        *v1.PodCondition
+		runtime    *kubecontainer.PodStatus
+		blocked    bool
+		want       v1.ConditionStatus
+		generation int64
+	}{
+		"start":                            {want: v1.ConditionUnknown, generation: 7},
+		"blocked":                          {blocked: true, want: v1.ConditionUnknown, generation: 7},
+		"observed sandbox":                 {runtime: sandbox, want: v1.ConditionTrue, generation: 7},
+		"completion after kubelet restart": {old: &v1.PodCondition{Type: v1.PodRestored, Status: v1.ConditionUnknown, ObservedGeneration: 3, LastTransitionTime: started}, runtime: sandbox, want: v1.ConditionTrue, generation: 3},
+		"in progress retains generation":   {old: &v1.PodCondition{Type: v1.PodRestored, Status: v1.ConditionUnknown, ObservedGeneration: 3, LastTransitionTime: started}, want: v1.ConditionUnknown, generation: 3},
+		"completed survives sandbox loss":  {old: &v1.PodCondition{Type: v1.PodRestored, Status: v1.ConditionTrue, ObservedGeneration: 3, Reason: "RestoreCompleted", LastTransitionTime: started}, want: v1.ConditionTrue, generation: 3},
+		"failed survives restart":          {old: &v1.PodCondition{Type: v1.PodRestored, Status: v1.ConditionFalse, ObservedGeneration: 3, Reason: "RestoreInterrupted", LastTransitionTime: started}, want: v1.ConditionFalse, generation: 3},
+		"failed does not become completed": {old: &v1.PodCondition{Type: v1.PodRestored, Status: v1.ConditionFalse, ObservedGeneration: 3, Reason: "RestoreInterrupted", LastTransitionTime: started}, runtime: sandbox, want: v1.ConditionFalse, generation: 3},
+	} {
+		t.Run(name, func(t *testing.T) {
+			old := &v1.PodStatus{}
+			if tc.old != nil {
+				old.Conditions = []v1.PodCondition{*tc.old}
+			}
+			before := old.DeepCopy()
+			got := GeneratePodRestoredCondition(pod, old, tc.runtime, tc.blocked)
+			require.Equal(t, v1.PodRestored, got.Type)
+			require.Equal(t, tc.want, got.Status)
+			require.Equal(t, tc.generation, got.ObservedGeneration)
+			require.False(t, got.LastTransitionTime.IsZero())
+			require.Equal(t, before, old, "must not mutate cached status")
+			if tc.old != nil && tc.old.Status == got.Status {
+				require.Equal(t, started, got.LastTransitionTime)
+			}
+			if tc.old != nil && tc.old.Status != v1.ConditionUnknown {
+				require.Equal(t, *tc.old, got)
+			}
+			if tc.blocked {
+				require.Contains(t, got.Message, "waiting for another restore")
+			}
+		})
+	}
+}
+
+func TestSetPodRestoredCondition(t *testing.T) {
+	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Generation: 3}}
+	for _, terminal := range []v1.ConditionStatus{v1.ConditionTrue, v1.ConditionFalse} {
+		t.Run(string(terminal), func(t *testing.T) {
+			status := v1.PodStatus{Conditions: []v1.PodCondition{{Type: v1.PodReady, Status: v1.ConditionFalse}}}
+			SetPodRestoredCondition(pod, &status, v1.ConditionUnknown, "RestoreInProgress", "restoring")
+			newer := pod.DeepCopy()
+			newer.Generation = 8
+			SetPodRestoredCondition(newer, &status, terminal, "Recorded", "done")
+			require.Equal(t, int64(3), status.Conditions[1].ObservedGeneration)
+			before := status.DeepCopy()
+			SetPodRestoredCondition(newer, &status, v1.ConditionUnknown, "RestoreInProgress", "retry")
+			require.Equal(t, *before, status, "terminal restore cannot be replayed")
+		})
+	}
+}
+
+func TestPodRestoredConditionBoundsRuntimeError(t *testing.T) {
+	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Generation: 1}}
+	for name, message := range map[string]string{
+		"ASCII":         strings.Repeat("a", 32769),
+		"multibyte":     strings.Repeat("界", 11000),
+		"invalid UTF-8": strings.Repeat("\x80a", 17000),
+	} {
+		t.Run(name, func(t *testing.T) {
+			status := v1.PodStatus{}
+			SetPodRestoredCondition(pod, &status, v1.ConditionFalse, "RestoreFailed", message)
+			condition := status.Conditions[0]
+			require.Equal(t, v1.ConditionFalse, condition.Status)
+			require.LessOrEqual(t, len(condition.Message), 32768)
+			require.True(t, utf8.ValidString(condition.Message))
 		})
 	}
 }

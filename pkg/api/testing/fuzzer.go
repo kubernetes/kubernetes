@@ -40,6 +40,7 @@ import (
 	extensionsfuzzer "k8s.io/kubernetes/pkg/apis/extensions/fuzzer"
 	flowcontrolfuzzer "k8s.io/kubernetes/pkg/apis/flowcontrol/fuzzer"
 	networkingfuzzer "k8s.io/kubernetes/pkg/apis/networking/fuzzer"
+	"k8s.io/kubernetes/pkg/apis/node"
 	policyfuzzer "k8s.io/kubernetes/pkg/apis/policy/fuzzer"
 	rbacfuzzer "k8s.io/kubernetes/pkg/apis/rbac/fuzzer"
 	resourcefuzzer "k8s.io/kubernetes/pkg/apis/resource/fuzzer"
@@ -51,6 +52,12 @@ import (
 // values in a Kubernetes context.
 func overrideGenericFuncs(codecs runtimeserializer.CodecFactory) []interface{} {
 	return []interface{}{
+		func(rc *node.RuntimeClass, c randfill.Continue) {
+			c.FillNoCustom(rc)
+			// Legacy unserved versions cannot represent the v1-only policy.
+			// Its serialization is covered by a dedicated v1 round-trip test.
+			rc.PodCheckpoint = nil
+		},
 		func(j *runtime.Object, c randfill.Continue) {
 			// TODO: uncomment when round trip starts from a versioned object
 			if true { // c.Bool() {

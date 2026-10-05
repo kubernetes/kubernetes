@@ -1,0 +1,380 @@
+/*
+Copyright The Kubernetes Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package kubelet
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"time"
+
+	v1 "k8s.io/api/core/v1"
+	nodev1alpha1 "k8s.io/api/node/v1alpha1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	apimeta "k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/wait"
+	nodeinformers "k8s.io/client-go/informers/node/v1alpha1"
+	nodelisters "k8s.io/client-go/listers/node/v1alpha1"
+	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/util/retry"
+	"k8s.io/client-go/util/workqueue"
+	"k8s.io/klog/v2"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	checkpointutil "k8s.io/kubernetes/pkg/apis/node/util"
+	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/util/parsers"
+)
+
+const podCheckpointWatchWorkers = 2
+
+const podCheckpointSourceIndex = "sourcePod"
+
+var errPodCheckpointInFlight = errors.New("pod checkpoint is waiting for another pod operation")
+var errPodCheckpointNotPending = errors.New("pod checkpoint was replaced or already completed")
+var errPodCheckpointPolicyUnavailable = errors.New("pod checkpoint is waiting for RuntimeClass option policy")
+
+func podCheckpointTerminal(pc *nodev1alpha1.PodCheckpoint) bool {
+	cond := apimeta.FindStatusCondition(pc.Status.Conditions, nodev1alpha1.PodCheckpointConditionReady)
+	return cond != nil && (cond.Status == metav1.ConditionTrue || cond.Reason == nodev1alpha1.PodCheckpointReasonFailed || cond.Reason == nodev1alpha1.PodCheckpointReasonSourcePodReplaced)
+}
+
+// podCheckpointWatchState connects local Pod observation with the checkpoint
+// watch so either event ordering eventually schedules the checkpoint.
+type podCheckpointWatchState struct {
+	indexer cache.Indexer
+	lister  nodelisters.PodCheckpointLister
+	kubelet *Kubelet
+	queue   workqueue.TypedRateLimitingInterface[string]
+}
+
+func (kl *Kubelet) enqueuePodCheckpoints(pod *v1.Pod) {
+	state := kl.podCheckpointWatch.Load()
+	if state == nil {
+		return
+	}
+	checkpoints, err := state.indexer.ByIndex(podCheckpointSourceIndex, pod.Namespace+"/"+pod.Name)
+	if err != nil {
+		utilruntime.HandleError(fmt.Errorf("failed to find checkpoints for Pod %s/%s: %w", pod.Namespace, pod.Name, err))
+		return
+	}
+	for _, checkpoint := range checkpoints {
+		key, err := cache.MetaNamespaceKeyFunc(checkpoint)
+		if err == nil {
+			state.queue.Add(key)
+		}
+	}
+}
+
+// Index by both namespace and name so Pod additions only visit checkpoints
+// referencing that Pod, regardless of how many checkpoints the cluster retains.
+func podCheckpointSourceIndexFunc(obj interface{}) ([]string, error) {
+	checkpoint, ok := obj.(*nodev1alpha1.PodCheckpoint)
+	if !ok {
+		return nil, fmt.Errorf("expected PodCheckpoint, got %T", obj)
+	}
+	if checkpoint.Spec.SourcePod == nil || checkpoint.Spec.SourcePod.Name == "" {
+		return nil, nil
+	}
+	return []string{checkpoint.Namespace + "/" + checkpoint.Spec.SourcePod.Name}, nil
+}
+
+// startPodCheckpointWatch runs a node-side watch on PodCheckpoint objects and
+// executes checkpoints for the pods this kubelet runs (KEP-5823). The kubelet,
+// not a control-plane controller, is the component that performs a checkpoint:
+// it observes PodCheckpoint objects and acts on those whose source pod
+// (spec.sourcePodName) it manages, so no control-plane-to-kubelet call is
+// needed. For alpha the watch is cluster-wide and filtered locally by pod
+// ownership; PodCheckpoint objects are low-volume and short-lived, so this is
+// acceptable. Narrowing the watch to this node with a field selector is a
+// non-breaking follow-up. It runs until ctx is cancelled.
+func (kl *Kubelet) startPodCheckpointWatch(ctx context.Context) {
+	defer utilruntime.HandleCrash()
+	logger := klog.FromContext(ctx)
+
+	if kl.kubeClient == nil {
+		logger.Info("Skipping PodCheckpoint watch: kubelet has no API client")
+		return
+	}
+
+	queue := workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[string]())
+	defer queue.ShutDown()
+
+	informer := nodeinformers.NewPodCheckpointInformer(kl.kubeClient, metav1.NamespaceAll, 0, cache.Indexers{
+		cache.NamespaceIndex:     cache.MetaNamespaceIndexFunc,
+		podCheckpointSourceIndex: podCheckpointSourceIndexFunc,
+	})
+	state := &podCheckpointWatchState{indexer: informer.GetIndexer(), lister: nodelisters.NewPodCheckpointLister(informer.GetIndexer()), queue: queue, kubelet: kl}
+	if _, err := informer.AddEventHandler(cache.ResourceEventHandlerFuncs{AddFunc: state.enqueue, UpdateFunc: state.enqueueUpdate}); err != nil {
+		logger.Error(err, "Failed to register PodCheckpoint event handler")
+		return
+	}
+	kl.podCheckpointWatch.Store(state)
+	defer kl.podCheckpointWatch.Store(nil)
+
+	go informer.Run(ctx.Done())
+	if !cache.WaitForCacheSync(ctx.Done(), informer.HasSynced) {
+		logger.Error(nil, "Failed to sync PodCheckpoint informer cache")
+		return
+	}
+
+	logger.Info("Starting PodCheckpoint watch")
+	defer logger.Info("Shutting down PodCheckpoint watch")
+
+	for range podCheckpointWatchWorkers {
+		go wait.UntilWithContext(ctx, state.runWorker, time.Second)
+	}
+	<-ctx.Done()
+}
+
+func (s *podCheckpointWatchState) enqueue(obj interface{}) {
+	key, err := cache.MetaNamespaceKeyFunc(obj)
+	if err != nil {
+		utilruntime.HandleError(err)
+		return
+	}
+	s.queue.Add(key)
+}
+
+func (s *podCheckpointWatchState) enqueueUpdate(_, obj interface{}) { s.enqueue(obj) }
+
+func (s *podCheckpointWatchState) runWorker(ctx context.Context) {
+	for s.processNext(ctx) {
+	}
+}
+
+func (s *podCheckpointWatchState) processNext(ctx context.Context) bool {
+	key, quit := s.queue.Get()
+	if quit {
+		return false
+	}
+	defer s.queue.Done(key)
+	err := s.kubelet.syncPodCheckpoint(ctx, key)
+	if errors.Is(err, errPodCheckpointInFlight) {
+		s.queue.Forget(key)
+		s.queue.AddAfter(key, time.Second)
+	} else if err != nil && !errors.Is(err, errPodCheckpointNotPending) {
+		utilruntime.HandleError(fmt.Errorf("PodCheckpoint %q sync failed: %w", key, err))
+		s.queue.AddRateLimited(key)
+	} else {
+		s.queue.Forget(key)
+	}
+	return true
+}
+
+// syncPodCheckpoint reconciles a single PodCheckpoint. It is a no-op for objects
+// in a terminal state and for objects whose source pod is not managed by this
+// kubelet (another node's kubelet handles those). For a pending object whose
+// source pod runs here it pins the instance by UID, records the in-progress
+// status and the captured pod template, and starts the checkpoint via the CRI
+// path (Kubelet.CheckpointPod), which finalizes the status asynchronously.
+func (kl *Kubelet) syncPodCheckpoint(ctx context.Context, key string) error {
+	namespace, name, err := cache.SplitMetaNamespaceKey(key)
+	if err != nil {
+		return err
+	}
+
+	state := kl.podCheckpointWatch.Load()
+	if state == nil {
+		return errors.New("PodCheckpoint informer is not initialized")
+	}
+	pc, err := state.lister.PodCheckpoints(namespace).Get(name)
+	if apierrors.IsNotFound(err) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	if _, blocked := kl.checkpointCleanupBlocked.Load(pc.UID); blocked {
+		// Startup recovery could not safely remove the deterministic output for
+		// this object. Leave it in progress so cleanup can be retried on the next
+		// kubelet start instead of overwriting or orphaning the existing data.
+		return nil
+	}
+
+	// Skip objects that have reached a terminal state.
+	if podCheckpointTerminal(pc) {
+		return nil
+	}
+
+	// A checkpoint can arrive before the Pod manager observes its source.
+	// Local Pod additions requeue matching checkpoints from the informer store.
+	if pc.Spec.SourcePod == nil || pc.Spec.SourcePod.Name == "" {
+		// Validation rejects an unset source pod reference; nothing to act on.
+		return nil
+	}
+	sourcePodName := pc.Spec.SourcePod.Name
+	pod, ok := kl.podManager.GetPodByName(namespace, sourcePodName)
+	if !ok {
+		return nil
+	}
+
+	// Pin the source pod instance by UID. A pod name can be reused, so a recorded
+	// UID that no longer matches the live pod means the original instance was
+	// replaced; fail rather than checkpoint the wrong instance.
+	if uid := pc.Spec.SourcePod.UID; uid != nil && *uid != pod.UID {
+		return kl.writePodCheckpointStatus(ctx, namespace, name, pc.UID, metav1.ConditionFalse,
+			nodev1alpha1.PodCheckpointReasonSourcePodReplaced,
+			fmt.Sprintf("source pod %q has UID %q but spec.sourcePod.uid pins it to %q; the original instance was replaced", sourcePodName, pod.UID, *uid),
+			nil, nil)
+	}
+	if pc.Status.SourcePodUID != nil && *pc.Status.SourcePodUID != pod.UID {
+		return kl.writePodCheckpointStatus(ctx, namespace, name, pc.UID, metav1.ConditionFalse,
+			nodev1alpha1.PodCheckpointReasonSourcePodReplaced,
+			fmt.Sprintf("source pod %q UID changed from %q to %q; the original instance was replaced", sourcePodName, *pc.Status.SourcePodUID, pod.UID),
+			nil, nil)
+	}
+
+	// A checkpoint is already running for this pod; wait for it to finalize.
+	if _, inFlight := kl.checkpointsInFlight.Load(pod.UID); inFlight {
+		return errPodCheckpointInFlight
+	}
+
+	// Pin the source instance before execution. CheckpointPod captures the
+	// template after reading runtime status so its image references describe
+	// the same running containers selected for the CRI request.
+	sourcePodUID := pod.UID
+	if err := kl.writePodCheckpointStatus(ctx, namespace, name, pc.UID, metav1.ConditionFalse,
+		nodev1alpha1.PodCheckpointReasonInProgress, "checkpoint in progress",
+		nil, &sourcePodUID); err != nil {
+		return err
+	}
+
+	// CheckpointPod validates preconditions synchronously, creates the
+	// kubelet-owned output directory, and runs the CRI call in the background.
+	// The checkpoint timeout is enforced by the kubelet via the gRPC call
+	// deadline inside CheckpointPod, not via a request field. CheckpointPod
+	// clamps this to the configured ceiling (PodCheckpointTimeout); an unset
+	// TimeoutSeconds (zero timeout here) falls back to that ceiling, so the
+	// operation always has a deadline. Validation bounds a set value to
+	// [1, 3600] seconds.
+	var timeout time.Duration
+	if pc.Spec.TimeoutSeconds != nil {
+		timeout = time.Duration(*pc.Spec.TimeoutSeconds) * time.Second
+	}
+	if err := kl.CheckpointPod(ctx, pod.UID, kubecontainer.GetPodFullName(pod), namespace, name, pc.UID, timeout, pc.Spec.CheckpointOptions); err != nil {
+		if errors.Is(err, errPodCheckpointInFlight) || errors.Is(err, errPodCheckpointNotPending) || errors.Is(err, errPodCheckpointPolicyUnavailable) {
+			return err
+		}
+		// A non-nil error is a synchronous setup/precondition failure (the
+		// background checkpoint has not started); record it as failed.
+		if statusErr := kl.finalizePodCheckpoint(ctx, namespace, name, pc.UID, false, "", fmt.Sprintf("checkpoint failed: %v", err)); statusErr != nil {
+			return fmt.Errorf("checkpoint setup failed (%w) and failed to record terminal status: %w", err, statusErr)
+		}
+		return nil
+	}
+	return nil
+}
+
+// writePodCheckpointStatus sets the PodCheckpoint "Ready" condition and the
+// kubelet-owned status fields (nodeName=self, and, when provided, the pinned
+// sourcePodUID and the captured pod template) via the status subresource under
+// RetryOnConflict. It is used for the in-progress and SourcePodReplaced
+// transitions; the terminal Completed/Failed transition is written by
+// finalizePodCheckpoint.
+func (kl *Kubelet) writePodCheckpointStatus(ctx context.Context, namespace, name string, checkpointUID types.UID, status metav1.ConditionStatus, reason, message string, template *v1.PodTemplateSpec, sourcePodUID *types.UID) error {
+	if kl.kubeClient == nil {
+		return errors.New("cannot update PodCheckpoint: kubelet has no API client")
+	}
+	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		pc, err := kl.kubeClient.NodeV1alpha1().PodCheckpoints(namespace).Get(ctx, name, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+		// The informer may lag a completion or a delete/recreate. Do not let an
+		// old queue entry overwrite the result or start another runtime operation.
+		if pc.UID != checkpointUID || podCheckpointTerminal(pc) {
+			return errPodCheckpointNotPending
+		}
+
+		apimeta.SetStatusCondition(&pc.Status.Conditions, metav1.Condition{
+			Type:               nodev1alpha1.PodCheckpointConditionReady,
+			Status:             status,
+			Reason:             reason,
+			Message:            message,
+			ObservedGeneration: pc.Generation,
+		})
+		pc.Status.NodeName = new(string(kl.nodeName))
+		if sourcePodUID != nil {
+			pc.Status.SourcePodUID = sourcePodUID
+		}
+		if template != nil {
+			pc.Status.CheckpointedPodTemplate = template
+			pc.Status.CheckpointedContainers = checkpointedContainerStatuses(&template.Spec)
+		}
+
+		_, err = kl.kubeClient.NodeV1alpha1().PodCheckpoints(namespace).UpdateStatus(ctx, pc, metav1.UpdateOptions{})
+		return err
+	})
+}
+
+// capturePodCheckpointTemplate uses the runtime snapshot that selected the CRI
+// container IDs. Resolving the spec's tag again could select an image different
+// from the one running in those containers.
+func (kl *Kubelet) capturePodCheckpointTemplate(ctx context.Context, namespace, name string, checkpointUID types.UID, pod *v1.Pod, podStatus *kubecontainer.PodStatus) error {
+	template := checkpointutil.SanitizePodTemplate(pod)
+	pinImage := func(container *v1.Container) error {
+		status := podStatus.FindContainerStatusByName(container.Name)
+		if status == nil || status.State != kubecontainer.ContainerStateRunning {
+			return fmt.Errorf("cannot capture checkpoint template: container %q is not running", container.Name)
+		}
+		repository, _, digest, err := parsers.ParseImageName(status.ImageRef)
+		if err != nil || digest == "" {
+			return fmt.Errorf("cannot capture checkpoint template: runtime must report a repository digest reference for container %q, got %q", container.Name, status.ImageRef)
+		}
+		container.Image = repository + "@" + digest
+		return nil
+	}
+	for i := range template.Spec.InitContainers {
+		container := &template.Spec.InitContainers[i]
+		if podutil.IsRestartableInitContainer(container) {
+			if err := pinImage(container); err != nil {
+				return err
+			}
+		}
+	}
+	for i := range template.Spec.Containers {
+		if err := pinImage(&template.Spec.Containers[i]); err != nil {
+			return err
+		}
+	}
+	return kl.writePodCheckpointStatus(ctx, namespace, name, checkpointUID, metav1.ConditionFalse,
+		nodev1alpha1.PodCheckpointReasonInProgress, "checkpoint in progress", template, &pod.UID)
+}
+
+// checkpointedContainerStatuses builds the convenience status list of the
+// containers captured in a checkpoint: running restartable init (sidecar)
+// containers followed by regular containers, mirroring the selection in
+// checkpointPodContainerIDs. Container names are unique within a pod, so a
+// single list covers both.
+func checkpointedContainerStatuses(spec *v1.PodSpec) []nodev1alpha1.PodCheckpointContainerStatus {
+	out := make([]nodev1alpha1.PodCheckpointContainerStatus, 0, len(spec.InitContainers)+len(spec.Containers))
+	for i := range spec.InitContainers {
+		if podutil.IsRestartableInitContainer(&spec.InitContainers[i]) {
+			out = append(out, nodev1alpha1.PodCheckpointContainerStatus{Name: spec.InitContainers[i].Name})
+		}
+	}
+	for _, ctr := range spec.Containers {
+		out = append(out, nodev1alpha1.PodCheckpointContainerStatus{Name: ctr.Name})
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
+}

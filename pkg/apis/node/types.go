@@ -60,6 +60,23 @@ type RuntimeClass struct {
 	// nodes.
 	// +optional
 	Scheduling *Scheduling
+
+	// podCheckpoint permits user-supplied checkpoint and restore option keys
+	// for this runtime handler. An unset policy permits no user options.
+	// +optional
+	PodCheckpoint *RuntimeClassPodCheckpoint
+}
+
+// RuntimeClassPodCheckpoint configures the runtime-specific option keys users
+// may supply. Administrator configuration remains separate in the runtime.
+type RuntimeClassPodCheckpoint struct {
+	// allowedCheckpointOptions lists keys permitted in checkpoint requests.
+	// +optional
+	AllowedCheckpointOptions []string
+
+	// allowedRestoreOptions lists keys permitted in restore requests.
+	// +optional
+	AllowedRestoreOptions []string
 }
 
 // Overhead structure represents the resource overhead associated with running a pod.

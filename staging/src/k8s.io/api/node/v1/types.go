@@ -70,6 +70,55 @@ type RuntimeClass struct {
 	// +optional
 	// +k8s:alpha(since: "1.37")=+k8s:optional
 	Scheduling *Scheduling `json:"scheduling,omitempty" protobuf:"bytes,4,opt,name=scheduling"`
+
+	// podCheckpoint lists the runtime-specific option keys that users may supply
+	// when checkpointing or restoring Pods of this RuntimeClass. If unset, users
+	// cannot supply options; checkpoint and restore use the runtime's defaults.
+	// Administrator settings belong in the runtime's configuration, not in
+	// user-supplied options. Values are validated by the runtime.
+	// This field is alpha-level and requires PodLevelCheckpointRestore.
+	// +featureGate=PodLevelCheckpointRestore
+	// +optional
+	// +k8s:optional
+	PodCheckpoint *RuntimeClassPodCheckpoint `json:"podCheckpoint,omitempty" protobuf:"bytes,5,opt,name=podCheckpoint"`
+}
+
+// RuntimeClassPodCheckpoint configures user-supplied checkpoint and restore
+// options for a runtime handler. It permits option keys, not administrator
+// configuration or secrets. Administrators should only allow documented keys
+// that are safe for untrusted users. The runtime must reject unsupported or
+// unsafe values, including values that grant privileges, select unallocated
+// devices, or override administrator configuration.
+type RuntimeClassPodCheckpoint struct {
+	// allowedCheckpointOptions lists the keys users may set in
+	// PodCheckpoint.spec.checkpointOptions for Pods of this RuntimeClass.
+	// An empty list permits no keys. Each key must be nonempty and at most
+	// 256 bytes; at most 64 distinct keys may be listed.
+	// Keys are matched exactly and are case-sensitive; wildcards have no special
+	// meaning. The runtime must validate values for every allowed key.
+	// +optional
+	// +listType=set
+	// +k8s:listType=set
+	// +k8s:optional
+	// +k8s:maxItems=64
+	// +k8s:eachVal=+k8s:minLength=1
+	// +k8s:eachVal=+k8s:maxBytes=256
+	AllowedCheckpointOptions []string `json:"allowedCheckpointOptions,omitempty" protobuf:"bytes,1,rep,name=allowedCheckpointOptions"`
+
+	// allowedRestoreOptions lists the keys users may set in
+	// Pod.spec.restoreFrom.options for Pods of this RuntimeClass.
+	// An empty list permits no keys. Each key must be nonempty and at most
+	// 256 bytes; at most 64 distinct keys may be listed.
+	// Keys are matched exactly and are case-sensitive; wildcards have no special
+	// meaning. The runtime must validate values for every allowed key.
+	// +optional
+	// +listType=set
+	// +k8s:listType=set
+	// +k8s:optional
+	// +k8s:maxItems=64
+	// +k8s:eachVal=+k8s:minLength=1
+	// +k8s:eachVal=+k8s:maxBytes=256
+	AllowedRestoreOptions []string `json:"allowedRestoreOptions,omitempty" protobuf:"bytes,2,rep,name=allowedRestoreOptions"`
 }
 
 // Overhead structure represents the resource overhead associated with running a pod.
