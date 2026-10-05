@@ -24,7 +24,6 @@ import (
 	"sync/atomic"
 
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage/cacher/key"
@@ -32,9 +31,8 @@ import (
 	"k8s.io/client-go/tools/cache"
 )
 
-func NewWatchCacheStorage(keyFunc func(runtime.Object) (string, error), indexers *cache.Indexers) *WatchCacheStorage {
+func NewWatchCacheStorage(indexers *cache.Indexers) *WatchCacheStorage {
 	storage := &WatchCacheStorage{
-		keyFunc:             keyFunc,
 		store:               newBtreeStore(btreeDegree),
 		indexer:             newIndexer(ElementIndexers(indexers)),
 		snapshots:           newSnapshotter(),
@@ -48,8 +46,6 @@ func NewWatchCacheStorage(keyFunc func(runtime.Object) (string, error), indexers
 }
 
 type WatchCacheStorage struct {
-	keyFunc func(runtime.Object) (string, error)
-
 	// ResourceVersion of the last list result (populated via ReplaceLocked() method).
 	listResourceVersion uint64
 
@@ -182,49 +178,6 @@ func (s sortableStoreElements) Swap(i, j int) {
 	s[i], s[j] = s[j], s[i]
 }
 
-// Get takes runtime.Object as a parameter. However, it returns
-// pointer to <storeElement>.
-func (w *WatchCacheStorage) Get(obj interface{}) (interface{}, bool, error) {
-	object, ok := obj.(runtime.Object)
-	if !ok {
-		return nil, false, fmt.Errorf("obj does not implement runtime.Object interface: %v", obj)
-	}
-	key, err := w.keyFunc(object)
-	if err != nil {
-		return nil, false, fmt.Errorf("couldn't compute key: %w", err)
-	}
-
-	return w.get(&Element{Key: key, Object: object})
-}
-
-func (w *WatchCacheStorage) get(obj interface{}) (item interface{}, exists bool, err error) {
-	return w.latestSnapshot.Load().Get(obj)
-}
-
-// GetByKey returns pointer to <storeElement>.
-func (w *WatchCacheStorage) GetByKey(key string) (item interface{}, exists bool, err error) {
-	return w.latestSnapshot.Load().GetByKey(key)
-}
-
-func (w *WatchCacheStorage) OrderedListPrefix(prefix, continueKey string) ([]interface{}, error) {
-	return w.latestSnapshot.Load().OrderedListPrefix(prefix, continueKey)
-}
-
-func (w *WatchCacheStorage) ListKeys() []string {
-	return w.latestSnapshot.Load().ListKeys()
-}
-
-// List returns list of pointers to <Element> objects.
-func (w *WatchCacheStorage) List() []interface{} {
-	return w.latestSnapshot.Load().List()
-}
-
-func (w *WatchCacheStorage) ByIndex(indexName, indexValue string) ([]interface{}, error) {
-	w.lock.RLock()
-	defer w.lock.RUnlock()
-	return w.indexer.ByIndex(indexName, indexValue)
-}
-
 // UpdateStore executes a mutation (Add, Update, Delete) on the underlying store.
 // It returns the element that was previously stored under the same key, if any.
 func (w *WatchCacheStorage) UpdateStore(eventType watch.EventType, elem *Element, resourceVersion uint64) (prev *Element, err error) {
@@ -296,7 +249,9 @@ func (w *WatchCacheStorage) GetExactSnapshotLocked(resourceVersion uint64) (Snap
 
 // GetByIndexSnapshot retrieves elements by index and wraps them in a Snapshot.
 func (w *WatchCacheStorage) GetByIndexSnapshot(indexName, value string) (Snapshot, error) {
-	result, err := w.ByIndex(indexName, value)
+	w.lock.RLock()
+	defer w.lock.RUnlock()
+	result, err := w.indexer.ByIndex(indexName, value)
 	if err != nil {
 		return nil, err
 	}

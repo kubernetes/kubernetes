@@ -17,7 +17,6 @@ limitations under the License.
 package store
 
 import (
-	"fmt"
 	"iter"
 	"strings"
 
@@ -46,33 +45,6 @@ func (s *btreeStore) Clone() *btreeStore {
 
 func (s *btreeStore) deleteElem(storeElem *Element) (*Element, bool) {
 	return s.tree.Delete(storeElem)
-}
-
-func (s *btreeStore) List() []interface{} {
-	items := make([]interface{}, 0, s.tree.Len())
-	s.tree.Ascend(func(item *Element) bool {
-		items = append(items, item)
-		return true
-	})
-	return items
-}
-
-func (s *btreeStore) ListKeys() []string {
-	items := make([]string, 0, s.tree.Len())
-	s.tree.Ascend(func(item *Element) bool {
-		items = append(items, item.Key)
-		return true
-	})
-	return items
-}
-
-func (s *btreeStore) Get(obj interface{}) (item interface{}, exists bool, err error) {
-	storeElem, ok := obj.(*Element)
-	if !ok {
-		return nil, false, fmt.Errorf("obj is not a storeElement")
-	}
-	item, exists = s.tree.Get(storeElem)
-	return item, exists, nil
 }
 
 func (s *btreeStore) GetByKey(key string) (item interface{}, exists bool, err error) {

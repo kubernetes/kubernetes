@@ -26,7 +26,7 @@ import (
 )
 
 func TestStoreListOrdered(t *testing.T) {
-	store := NewWatchCacheStorage(nil, nil)
+	store := NewWatchCacheStorage(nil)
 	prev, err := store.UpdateStore(watch.Added, testStorageElement("foo3", "bar3", 1), 1)
 	require.NoError(t, err)
 	assert.Nil(t, prev)
@@ -36,15 +36,17 @@ func TestStoreListOrdered(t *testing.T) {
 	prev, err = store.UpdateStore(watch.Added, testStorageElement("foo2", "bar1", 3), 3)
 	require.NoError(t, err)
 	assert.Nil(t, prev)
+	items, err := store.LatestSnapshot().OrderedListPrefix("", "")
+	require.NoError(t, err)
 	assert.Equal(t, []interface{}{
 		testStorageElement("foo1", "bar2", 2),
 		testStorageElement("foo2", "bar1", 3),
 		testStorageElement("foo3", "bar3", 1),
-	}, store.List())
+	}, items)
 }
 
 func TestStoreListPrefix(t *testing.T) {
-	store := NewWatchCacheStorage(nil, nil)
+	store := NewWatchCacheStorage(nil)
 	prev, err := store.UpdateStore(watch.Added, testStorageElement("foo3", "bar3", 1), 1)
 	require.NoError(t, err)
 	assert.Nil(t, prev)
@@ -58,7 +60,7 @@ func TestStoreListPrefix(t *testing.T) {
 	require.NoError(t, err)
 	assert.Nil(t, prev)
 
-	items, err := store.OrderedListPrefix("foo", "")
+	items, err := store.LatestSnapshot().OrderedListPrefix("foo", "")
 	require.NoError(t, err)
 	assert.Equal(t, []interface{}{
 		testStorageElement("foo1", "bar2", 2),
@@ -66,26 +68,26 @@ func TestStoreListPrefix(t *testing.T) {
 		testStorageElement("foo3", "bar3", 1),
 	}, items)
 
-	items, err = store.OrderedListPrefix("foo2", "")
+	items, err = store.LatestSnapshot().OrderedListPrefix("foo2", "")
 	require.NoError(t, err)
 	assert.Equal(t, []interface{}{
 		testStorageElement("foo2", "bar1", 3),
 	}, items)
 
-	items, err = store.OrderedListPrefix("foo", "foo1\x00")
+	items, err = store.LatestSnapshot().OrderedListPrefix("foo", "foo1\x00")
 	require.NoError(t, err)
 	assert.Equal(t, []interface{}{
 		testStorageElement("foo2", "bar1", 3),
 		testStorageElement("foo3", "bar3", 1),
 	}, items)
 
-	items, err = store.OrderedListPrefix("foo", "foo2\x00")
+	items, err = store.LatestSnapshot().OrderedListPrefix("foo", "foo2\x00")
 	require.NoError(t, err)
 	assert.Equal(t, []interface{}{
 		testStorageElement("foo3", "bar3", 1),
 	}, items)
 
-	items, err = store.OrderedListPrefix("bar", "")
+	items, err = store.LatestSnapshot().OrderedListPrefix("bar", "")
 	require.NoError(t, err)
 	assert.Equal(t, []interface{}{
 		testStorageElement("bar", "baz", 4),
