@@ -368,3 +368,144 @@
       podsPerGroup: 16
       gangCpuRequest: 3970m
 
+# GangPreemptionHeroWorkload exercises preemption for the large hero workload:
+# 1. All workloads are configured for 1 pod/node (70% of 4000m node capacity = 2800m CPU + hostPortBase).
+# 2. Initial cluster occupancy is 60% (leaving 40% of nodes free):
+#    - Training (Medium Priority 10000, 30% of cluster): 3 PodGroups of 10% cluster size each.
+#    - Large Batch (Low Priority 100, ~20% of cluster): large PodGroups.
+#    - Small Batch (Low Priority 100, ~10% of cluster): small PodGroups.
+# 3. A single Hero High-Priority PodGroup (Priority 1000000, 50% of cluster) is submitted,
+#    preempting ~10% of the cluster from low-priority batch workloads while reprieving
+#    all medium-priority training workloads (30%) and the remaining low-priority batch workloads (20%).
+- name: GangPreemptionHeroWorkload
+  featureGates:
+    GenericWorkload: true
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $initNodes
+  - opcode: createNamespaces
+    prefix: gang-preempt
+    count: 4
+  # Training (Medium Priority 10000): 30% of cluster
+  - opcode: createPodGroups
+    countParam: $trainingGroups
+    namespace: gang-preempt-1
+    templatePath: templates/podgroup.yaml
+    templateParams:
+      podsPerGroup: $trainingPodsPerGroup
+      priority: 10000
+  - opcode: createPods
+    countParam: $trainingGroups
+    countMultiplierParam: $trainingPodsPerGroup
+    namespace: gang-preempt-1
+    podTemplatePath: templates/gang-pod.yaml
+    templateParams:
+      podsPerGroup: $trainingPodsPerGroup
+      cpuRequest: 2800m
+      hostPortBase: 8000
+      priority: 10000
+  # Large Batch (Low Priority 100): ~20% of cluster
+  - opcode: createPodGroups
+    countParam: $largeBatchGroups
+    namespace: gang-preempt-2
+    templatePath: templates/podgroup.yaml
+    templateParams:
+      podsPerGroup: $largeBatchPodsPerGroup
+      priority: 100
+  - opcode: createPods
+    countParam: $largeBatchGroups
+    countMultiplierParam: $largeBatchPodsPerGroup
+    namespace: gang-preempt-2
+    podTemplatePath: templates/gang-pod.yaml
+    templateParams:
+      podsPerGroup: $largeBatchPodsPerGroup
+      cpuRequest: 2800m
+      hostPortBase: 8000
+      priority: 100
+  # Small Batch (Low Priority 100): ~10% of cluster
+  - opcode: createPodGroups
+    countParam: $smallBatchGroups
+    namespace: gang-preempt-3
+    templatePath: templates/podgroup.yaml
+    templateParams:
+      podsPerGroup: $smallBatchPodsPerGroup
+      priority: 100
+  - opcode: createPods
+    countParam: $smallBatchGroups
+    countMultiplierParam: $smallBatchPodsPerGroup
+    namespace: gang-preempt-3
+    podTemplatePath: templates/gang-pod.yaml
+    templateParams:
+      podsPerGroup: $smallBatchPodsPerGroup
+      cpuRequest: 2800m
+      hostPortBase: 8000
+      priority: 100
+  # Hero Workload (High Priority 1000000): 50% of cluster
+  - opcode: createPodGroups
+    countParam: $heroGroups
+    namespace: gang-preempt-0
+    templatePath: templates/podgroup.yaml
+    templateParams:
+      podsPerGroup: $heroPodsPerGroup
+      priority: 1000000
+  - opcode: createPods
+    collectMetrics: true
+    countParam: $heroGroups
+    countMultiplierParam: $heroPodsPerGroup
+    namespace: gang-preempt-0
+    podTemplatePath: templates/gang-pod.yaml
+    templateParams:
+      podsPerGroup: $heroPodsPerGroup
+      cpuRequest: 2800m
+      hostPortBase: 9000
+      priority: 1000000
+  workloads:
+  - name: 10Nodes_Hero5Pods_60PctOccupied
+    labels: [short, integration-test]
+    params:
+      initNodes: 10
+      trainingGroups: 3
+      trainingPodsPerGroup: 1
+      largeBatchGroups: 1
+      largeBatchPodsPerGroup: 2
+      smallBatchGroups: 1
+      smallBatchPodsPerGroup: 1
+      heroGroups: 1
+      heroPodsPerGroup: 5
+  - name: 100Nodes_Hero50Pods_60PctOccupied
+    labels: [performance]
+    params:
+      initNodes: 100
+      trainingGroups: 3
+      trainingPodsPerGroup: 10
+      largeBatchGroups: 1
+      largeBatchPodsPerGroup: 20
+      smallBatchGroups: 2
+      smallBatchPodsPerGroup: 5
+      heroGroups: 1
+      heroPodsPerGroup: 50
+  - name: 1000Nodes_Hero500Pods_60PctOccupied
+    labels: [performance]
+    params:
+      initNodes: 1000
+      trainingGroups: 3
+      trainingPodsPerGroup: 100
+      largeBatchGroups: 1
+      largeBatchPodsPerGroup: 200
+      smallBatchGroups: 2
+      smallBatchPodsPerGroup: 50
+      heroGroups: 1
+      heroPodsPerGroup: 500
+  - name: 4900Nodes_Hero2450Pods_60PctOccupied
+    labels: [performance]
+    params:
+      initNodes: 4900
+      trainingGroups: 3
+      trainingPodsPerGroup: 490
+      largeBatchGroups: 3
+      largeBatchPodsPerGroup: 250
+      smallBatchGroups: 14
+      smallBatchPodsPerGroup: 50
+      heroGroups: 1
+      heroPodsPerGroup: 2450
+
