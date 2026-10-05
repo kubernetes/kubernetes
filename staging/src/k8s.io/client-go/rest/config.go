@@ -318,7 +318,8 @@ type ContentConfig struct {
 	// TODO: NegotiatedSerializer will be phased out as internal clients are removed
 	//   from Kubernetes.
 	NegotiatedSerializer runtime.NegotiatedSerializer
-	// DropManagedFields asks the server to omit metadata.managedFields from responses.
+	// DropManagedFields asks the server to omit metadata.managedFields from responses,
+	// and strips it from decoded objects when the server returns it anyway.
 	// Leave it unset for clients that read managedFields, such as callers of the Extract
 	// functions of apply configurations. It has no effect unless the
 	// ManagedFieldsOptOutClient feature gate is enabled.
