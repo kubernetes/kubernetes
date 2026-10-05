@@ -69,7 +69,41 @@ func NewReplay(initialState *Model, history []Operation) (*Replay, error) {
 // Validate checks that the response of a non-consistent read matches the
 // response produced by executing req on the model state at the response's RV.
 func (r *Replay) Validate(req Request, resp Response) error {
-	if req.Op != OpList || req.List.Options.ResourceVersion == "" || resp.Err != nil {
+	switch req.Op {
+	case OpGet:
+		return r.validateGet(req, resp)
+	case OpList:
+		return r.validateList(req, resp)
+	default:
+		return nil
+	}
+}
+
+func (r *Replay) validateGet(req Request, resp Response) error {
+	opts := req.Get.Options
+	if opts.ResourceVersion == "" {
+		return nil
+	}
+	reqRV, err := r.versioner.ParseResourceVersion(opts.ResourceVersion)
+	if err != nil || storage.IsTooLargeResourceVersion(resp.Err) {
+		return nil
+	}
+	for rv, state := range r.states {
+		if rv < reqRV {
+			continue
+		}
+		// Cacher returns NotFound errors without the underlying etcd prefix.
+		stateWithoutPrefix := *state
+		stateWithoutPrefix.Prefix = ""
+		if reflect.DeepEqual(state.get(req.Key, opts), resp) || reflect.DeepEqual(stateWithoutPrefix.get(req.Key, opts), resp) {
+			return nil
+		}
+	}
+	return fmt.Errorf("get(%s, RV=%s) response %+v does not match any state at RV >= %d", req.Key, opts.ResourceVersion, resp, reqRV)
+}
+
+func (r *Replay) validateList(req Request, resp Response) error {
+	if req.List.Options.ResourceVersion == "" || resp.Err != nil {
 		return nil
 	}
 	if resp.Object == nil {
