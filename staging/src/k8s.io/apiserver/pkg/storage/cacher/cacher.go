@@ -1503,7 +1503,7 @@ func (c *Cacher) serveSyncCohort(lead int, budget *int, now time.Time) {
 	s.cut = false
 	s.blockedCount, s.pendingOpen = 0, 0
 	lastScannedRV := leadW.position
-	historyEnd := false
+	historyEnd := true
 	// The cohort is members[lead:end) less the ones an earlier cohort
 	// served; end advances with the scan over the members whose start
 	// position is below the scanned event, and active counts the cohort
@@ -1515,28 +1515,25 @@ func (c *Cacher) serveSyncCohort(lead int, budget *int, now time.Time) {
 	// the way must not take the whole budget before it got its share.
 	// Followers are offered nothing past cutRV.
 	end, active := lead, 0
-	budgetSpent := false
 	cutRV := uint64(0)
-	for {
-		if *budget == 0 {
-			budgetSpent = true
+	for ev, err := range interval.All() {
+		if err != nil {
+			// Invalidated mid scan: what was scanned stands, the rest is
+			// retried by the next pass from the members' positions.
+			historyEnd = false
 			break
 		}
-		if s.cut && members[lead].blocked {
+		if *budget == 0 {
+			// A budget ran out before this event could be scanned:
+			// this event is not consumed and the next pass reads it again.
+			// When the budget runs out at the last event in the interval,
+			// the loop exits cleanly with historyEnd true so the cohort
+			// can resync this pass.
+			historyEnd = false
 			break
 		}
 		if !s.cut && s.pushBudget <= 0 {
 			s.cut, cutRV = true, lastScannedRV
-		}
-		ev, err := interval.Next()
-		if err != nil {
-			// Invalidated mid scan: what was scanned stands, the rest is
-			// retried by the next pass from the members' positions.
-			break
-		}
-		if ev == nil {
-			historyEnd = true
-			break
 		}
 		*budget--
 		rv := ev.ResourceVersion
@@ -1555,21 +1552,17 @@ func (c *Cacher) serveSyncCohort(lead int, budget *int, now time.Time) {
 		s.scanned[idx].triggerValues, s.scanned[idx].triggerSupported = c.triggerValuesThreadUnsafe(ev)
 		lastScannedRV = rv
 		c.offerScanned(idx, now)
+		if s.cut && members[lead].blocked {
+			historyEnd = false
+			break
+		}
 		if !s.cut && s.blockedCount == active && s.pendingOpen == 0 {
 			// Every member offered something has a full input, and every
 			// eager one among them holds all the owed events the retry
 			// rounds can push; a member above this point gets its own
 			// cohort.
+			historyEnd = false
 			break
-		}
-	}
-	if budgetSpent {
-		// A budget ran out exactly at the last event scanned: one more
-		// read tells whether the history end was reached, so the cohort
-		// can resync this pass. An event returned here is not consumed;
-		// the next pass reads it again.
-		if ev, err := interval.Next(); err == nil && ev == nil {
-			historyEnd = true
 		}
 	}
 
