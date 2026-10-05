@@ -751,10 +751,7 @@ func (p *Parser) AllAnswers() ([]Resource, error) {
 	//
 	// Pre-allocate up to a certain limit, since p.header is
 	// untrusted data.
-	n := int(p.header.answers)
-	if n > 20 {
-		n = 20
-	}
+	n := min(int(p.header.answers), 20)
 	as := make([]Resource, 0, n)
 	for {
 		a, err := p.Answer()
@@ -804,10 +801,7 @@ func (p *Parser) AllAuthorities() ([]Resource, error) {
 	//
 	// Pre-allocate up to a certain limit, since p.header is
 	// untrusted data.
-	n := int(p.header.authorities)
-	if n > 10 {
-		n = 10
-	}
+	n := min(int(p.header.authorities), 10)
 	as := make([]Resource, 0, n)
 	for {
 		a, err := p.Authority()
@@ -857,10 +851,7 @@ func (p *Parser) AllAdditionals() ([]Resource, error) {
 	//
 	// Pre-allocate up to a certain limit, since p.header is
 	// untrusted data.
-	n := int(p.header.additionals)
-	if n > 10 {
-		n = 10
-	}
+	n := min(int(p.header.additionals), 10)
 	as := make([]Resource, 0, n)
 	for {
 		a, err := p.Additional()
@@ -2085,7 +2076,11 @@ Loop:
 					return off, errInvalidName
 				}
 			}
-
+			// Reject names that are too long while unpacking
+			// See issue golang/go#77540
+			if len(name)+(endOff-currOff) >= nonEncodedNameMax {
+				return off, errNameTooLong
+			}
 			name = append(name, msg[currOff:endOff]...)
 			name = append(name, '.')
 			currOff = endOff
@@ -2110,9 +2105,6 @@ Loop:
 	}
 	if len(name) == 0 {
 		name = append(name, '.')
-	}
-	if len(name) > nonEncodedNameMax {
-		return off, errNameTooLong
 	}
 	n.Length = uint8(len(name))
 	if ptr == 0 {

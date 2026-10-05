@@ -552,8 +552,8 @@ func TestExpectationsOnRecreate(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	f.Start(ctx.Done())
-	for ty, ok := range f.WaitForCacheSync(ctx.Done()) {
+	f.StartWithContext(ctx)
+	for ty, ok := range f.WaitForCacheSyncWithContext(ctx).Synced {
 		if !ok {
 			t.Fatalf("caches failed to sync: %v", ty)
 		}
@@ -3621,7 +3621,7 @@ func TestStoreDaemonSetStatus(t *testing.T) {
 				}
 				return true, ds, nil
 			})
-			if err := storeDaemonSetStatus(context.TODO(), fakeClient.AppsV1().DaemonSets("default"), ds, 2, 2, 2, 2, 2, 2, 2, true); err != tt.expectedError {
+			if _, err := storeDaemonSetStatus(context.TODO(), fakeClient.AppsV1().DaemonSets("default"), ds, 2, 2, 2, 2, 2, 2, 2, true); !errors.Is(err, tt.expectedError) {
 				t.Errorf("storeDaemonSetStatus() got %v, expected %v", err, tt.expectedError)
 			}
 			if getCalled != tt.expectedGetCalled {

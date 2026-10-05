@@ -162,8 +162,7 @@ var _ = SIGDescribe("Deployment", func() {
 	framework.ConformanceIt("deployment should support proportional scaling", func(ctx context.Context) {
 		testProportionalScalingDeployment(ctx, f)
 	})
-	ginkgo.It("should not disrupt a cloud load-balancer's connectivity during rollout", func(ctx context.Context) {
-		e2eskipper.SkipUnlessProviderIs("aws", "azure", "gce")
+	f.It("should not disrupt a cloud load-balancer's connectivity during rollout", f.WithProvider("aws", "azure", "gce"), func(ctx context.Context) {
 		e2eskipper.SkipIfIPv6("aws")
 		nodes, err := e2enode.GetReadySchedulableNodes(ctx, c)
 		framework.ExpectNoError(err)
@@ -1043,7 +1042,7 @@ func testIterativeDeployments(ctx context.Context, f *framework.Framework) {
 	framework.ExpectNoError(err)
 
 	iterations := 20
-	for i := 0; i < iterations; i++ {
+	for i := range iterations {
 		if r := rand.Float32(); r < 0.6 {
 			time.Sleep(time.Duration(float32(i) * r * float32(time.Second)))
 		}

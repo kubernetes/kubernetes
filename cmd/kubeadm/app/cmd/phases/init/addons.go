@@ -114,11 +114,11 @@ func runCoreDNSAddon(c workflow.RunData) error {
 
 // runKubeProxyAddon installs KubeProxy addon to a Kubernetes cluster
 func runKubeProxyAddon(c workflow.RunData) error {
-	cfg, client, _, out, err := getInitData(c)
+	cfg, client, patchesDir, out, err := getInitData(c)
 	if err != nil {
 		return err
 	}
-	return proxyaddon.EnsureProxyAddon(&cfg.ClusterConfiguration, &cfg.LocalAPIEndpoint, client, out, printManifest)
+	return proxyaddon.EnsureProxyAddon(&cfg.ClusterConfiguration, &cfg.LocalAPIEndpoint, client, patchesDir, out, printManifest)
 }
 
 func getAddonPhaseFlags(name string) []string {

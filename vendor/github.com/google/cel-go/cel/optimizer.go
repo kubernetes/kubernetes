@@ -15,6 +15,7 @@
 package cel
 
 import (
+	"fmt"
 	"sort"
 
 	"github.com/google/cel-go/common"
@@ -29,17 +30,43 @@ import (
 // passes to ensure that the final optimized output is a valid expression with metadata consistent
 // with what would have been generated from a parsed and checked expression.
 //
-// Note: source position information is best-effort and likely wrong, but optimized expressions
+// Note: source position information is best-effort and incomplete, but optimized expressions
 // should be suitable for calls to parser.Unparse.
 type StaticOptimizer struct {
 	optimizers []ASTOptimizer
+	// If set, Optimize() will use this Source instead of the one from the AST.
+	sourceOverride *Source
 }
+
+type OptimizerOption func(*StaticOptimizer) (*StaticOptimizer, error)
 
 // NewStaticOptimizer creates a StaticOptimizer with a sequence of ASTOptimizer's to be applied
 // to a checked expression.
-func NewStaticOptimizer(optimizers ...ASTOptimizer) *StaticOptimizer {
-	return &StaticOptimizer{
-		optimizers: optimizers,
+func NewStaticOptimizer(options ...any) (*StaticOptimizer, error) {
+	so := &StaticOptimizer{}
+	var err error
+	for _, opt := range options {
+		switch v := opt.(type) {
+		case ASTOptimizer:
+			so.optimizers = append(so.optimizers, v)
+		case OptimizerOption:
+			so, err = v(so)
+			if err != nil {
+				return nil, err
+			}
+		default:
+			return nil, fmt.Errorf("unsupported option: %v", v)
+		}
+	}
+	return so, nil
+}
+
+// OptimizeWithSource overrides the source used by the optimizer.
+// Note this will cause the source info from the AST passed to Optimize() to be discarded.
+func OptimizeWithSource(source Source) OptimizerOption {
+	return func(so *StaticOptimizer) (*StaticOptimizer, error) {
+		so.sourceOverride = &source
+		return so, nil
 	}
 }
 
@@ -49,15 +76,21 @@ func NewStaticOptimizer(optimizers ...ASTOptimizer) *StaticOptimizer {
 func (opt *StaticOptimizer) Optimize(env *Env, a *Ast) (*Ast, *Issues) {
 	// Make a copy of the AST to be optimized.
 	optimized := ast.Copy(a.NativeRep())
+	source := a.Source()
+	sourceInfo := optimized.SourceInfo()
+	if opt.sourceOverride != nil {
+		source = *opt.sourceOverride
+		sourceInfo = ast.NewSourceInfo(*opt.sourceOverride)
+	}
 	ids := newIDGenerator(ast.MaxID(a.NativeRep()))
 
 	// Create the optimizer context, could be pooled in the future.
-	issues := NewIssues(common.NewErrors(a.Source()))
+	issues := NewIssues(common.NewErrors(source))
 	baseFac := ast.NewExprFactory()
 	exprFac := &optimizerExprFactory{
 		idGenerator: ids,
 		fac:         baseFac,
-		sourceInfo:  optimized.SourceInfo(),
+		sourceInfo:  sourceInfo,
 	}
 	ctx := &OptimizerContext{
 		optimizerExprFactory: exprFac,
@@ -80,7 +113,7 @@ func (opt *StaticOptimizer) Optimize(env *Env, a *Ast) (*Ast, *Issues) {
 
 		// Recheck the updated expression for any possible type-agreement or validation errors.
 		parsed := &Ast{
-			source: a.Source(),
+			source: source,
 			impl:   ast.NewAST(expr, info)}
 		checked, iss := ctx.Check(parsed)
 		if iss.Err() != nil {
@@ -91,7 +124,7 @@ func (opt *StaticOptimizer) Optimize(env *Env, a *Ast) (*Ast, *Issues) {
 
 	// Return the optimized result.
 	return &Ast{
-		source: a.Source(),
+		source: source,
 		impl:   optimized,
 	}, nil
 }
@@ -100,6 +133,8 @@ func (opt *StaticOptimizer) Optimize(env *Env, a *Ast) (*Ast, *Issues) {
 // that the ids within the expression correspond to the ids within macros.
 func normalizeIDs(idGen ast.IDGenerator, optimized ast.Expr, info *ast.SourceInfo) {
 	optimized.RenumberIDs(idGen)
+	info.RenumberIDs(idGen)
+
 	if len(info.MacroCalls()) == 0 {
 		return
 	}
@@ -259,6 +294,9 @@ func (opt *optimizerExprFactory) CopyASTAndMetadata(a *ast.AST) ast.Expr {
 	copyExpr, copyInfo := opt.CopyAST(a)
 	for macroID, call := range copyInfo.MacroCalls() {
 		opt.SetMacroCall(macroID, call)
+	}
+	for id, offset := range copyInfo.OffsetRanges() {
+		opt.sourceInfo.SetOffsetRange(id, offset)
 	}
 	return copyExpr
 }

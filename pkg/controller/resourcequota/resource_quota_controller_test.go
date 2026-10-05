@@ -134,7 +134,7 @@ func setupQuotaController(t *testing.T, kubeClient kubernetes.Interface, lister 
 		t.Fatal(err)
 	}
 	stop := make(chan struct{})
-	informerFactory.Start(stop)
+	informerFactory.StartWithContext(ctx)
 	return quotaController{qc, stop}
 }
 

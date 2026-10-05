@@ -19,6 +19,7 @@ package certificate
 import (
 	"bytes"
 	"context"
+	"crypto"
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
@@ -43,6 +44,7 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	certificatesclient "k8s.io/client-go/kubernetes/typed/certificates/v1beta1"
 	clienttesting "k8s.io/client-go/testing"
+	"k8s.io/client-go/util/keyutil"
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
 	netutils "k8s.io/utils/net"
@@ -1184,6 +1186,200 @@ func TestContext(t *testing.T) {
 		return m.Current() != nil
 	}, 10*time.Second, time.Microsecond, "current certificate")
 	require.Contains(t, logger.GetSink().(ktesting.Underlier).GetBuffer().String(), "certificate: Rotating certificates", "contextual log output from manager.rotateCerts")
+}
+
+// testGenerateECKeyPEM1 is a EC P-256 private key fixture.
+// This key is for testing purposes only and is not considered secure.
+const testGenerateECKeyPEM1 = `-----BEGIN EC PRIVATE KEY-----
+MHcCAQEEIHb7bL0ccx8oLfPycKQT/R2sKrPH8LU5CnDz/65jUjWooAoGCCqGSM49
+AwEHoUQDQgAExNsMY0QTw83e3eFOZMLqpT6vqEAvpSMo5+9TSU/faJScYeSsHxlK
+tO96nbPcQbWCMGjhrpBWYZcn07iu125DpA==
+-----END EC PRIVATE KEY-----
+`
+
+// testGenerateECKeyPEM2 is a EC P-256 private key fixture.
+// This key is for testing purposes only and is not considered secure.
+const testGenerateECKeyPEM2 = `-----BEGIN EC PRIVATE KEY-----
+MHcCAQEEIGy34cJkuN1N5chK9kLnf/Y5OT1rulnzyz6qignGpOJvoAoGCCqGSM49
+AwEHoUQDQgAE5CqbCF3D+r/QNUv8yrr/+kqOMTP6PGUe2G4AFvisUqGx0KoRj5dq
+F3qmQC6E+3zzI7+uhpZ3Ju/+696ZQ6GrJQ==
+-----END EC PRIVATE KEY-----
+`
+
+// testGenerateRSAKeyPEM1 is a RSA 2048 private key fixture.
+// This key is for testing purposes only and is not considered secure.
+const testGenerateRSAKeyPEM1 = `-----BEGIN PRIVATE KEY-----
+MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQDFav2tigP5v/EM
+x3ktZ+me1/h+L8zfA/djb58M2GiBZMMfyCpHrLxiBrrj5eRH6HUuETHk8cMymmg1
+HfzJ7P03/1W99vSiZMe1jsScZUeXZMiqJjF2UkiaJ73I/8xyzz+M/+E1UfZctjqm
+gV7R8ATivtKXhOW0GPgrYShZ+62pAaZfYixVNxs9LhNmv0BGGLtPsJ4bdcc0lD1b
+e/n0wFhAN59QwOaTUvRnQtYK8hYXSG/v5sFTsMkc1ZXwyqA360UX3lcYogDx510R
+SraUAu3Z+Lf4xbokczdEewZJ5jtAG85IwiFQLm8+hkWUx5PWYZH4yyTZhKqKebd3
+CirlHBzBAgMBAAECggEADjbPNQ4u4xiS09y444VhKMgGuESGImM4DgzHYuFiBORV
+uEAX6zk2Bx4nmVPAGqf+EpG3tJ2Y9FfHEQFWZiOOHS4L5QrsP5UKBrnU0NM/UwM1
+VNWTJ3XH4cbiv0og/6iJvC6K7zqLhnldwlymOxoQ//0apJYzrm1DJmcZxKt+Vstg
+gVUV7umoIsfE8YpFH4qECXAuixQ0vWi99BGuyLlnaeYP65QD6sRpkn9TZisMTpZX
+GTP/PsRdKJ2rohO3/VjsZytBYsr6ibBk+FZ/+EmRYLKF5m+kROefHYyKpUgKDV+v
+d5UwREsfs4MxU1IXjEROOWsdAHa+98S74+A5PBiiUQKBgQDwUAVtzODkdBb9LGUF
+428pumAgox16UFG6Qh0LNNmp77VztolXKRUg40EKIm3qD7BmlR2fjI7YMbjjNlFE
+XfCDWifBU+sOtHyVa+3rrjeBj13noAq3nXKEOagO6FowGgrD0eC9QTur09yG4dun
+fYKXjvRlTFm1MVBKDy7noJq+6wKBgQDSTiL8q4PD9pheIcz0VmJ8B4W7JCPwNn+r
+2mKcls23nIbYiweg14ZKEACby6py1L3+h2Trzy7ktnEsjqxRA/UqC7X56obqLJ7c
+34zOuZXytwsDEzQZgDWBEP3Hd65eCtiSkdOVKsI5wubS9idyCtPZC4LsWdKFc5S4
+rNwSD6ugAwKBgEyYpPJXgEMxAXbW5KhY0sDRJ/yfITEwUqx0kD9XLB2vSv3D68i9
+Tn+6D6wER1Z4g7hexR9qtMkSKCU71fFdo+CqJsvHTL/WJXOXADHDyOth4AOJDoFy
+DOM6YWfHBaAZXN8HkYOhPDzLfZn8eX/MUIiwRxPWny1St42zgzbPCSPbAoGAXrCX
+yDRhi6ZITHnjklAi371zVSOcmteu/G3D4MV1sqpjfLR8psrjyA0UeRFmmXV4ZlYH
+9rS+ZHRQ2MMUixXBGUFUmkYioOWeUczF1X5yKWqJJsVKvACiFo7T9S/J7sXrZXML
+VSp/cQp0a6AxeoOthxhLxqdaxoOX/t6159vuZokCgYEA0VcQlf0nTABk6UaJptJf
+CUOQPW3bNxHoiv5q0ZbVPIOGIRNlK4CsORdeh+tQiCuWYk1YzWk0zrKlEnPhjsml
+N9Yi/TjuQRxDA97qeRMq2i35g/UHO2LZVdc96owTojs5Snxop32nbEV9zsrBjybG
+T4kkiBn7MJZZreDWZUZWpC4=
+-----END PRIVATE KEY-----
+`
+
+// testGenerateRSAKeyPEMInsecure is a RSA 1024 private key fixture.
+// This key is for testing purposes only and is not considered secure.
+const testGenerateRSAKeyPEMInsecure = `-----BEGIN PRIVATE KEY-----
+MIICdgIBADANBgkqhkiG9w0BAQEFAASCAmAwggJcAgEAAoGBALB6f6vwyY0IZWcE
+Fv8ViUi5kZ64sWUAiWnQhfK0lrAtICJCqy2p95cloaAVNpqvX6uLK3odT0aA7vRZ
+PXtYhDtpYTSHvvbAXbHUPl9/u3EPSQ1ByOtdAPio8DmMdWD6xRK4JjfHhH6bLsI+
+VHblKik/+BK+xgVo1VuNoRWC8NYRAgMBAAECgYALCs0mgGFSE2CJ5LP+J7YwcFkD
+1AVYfyM59VfOPv2vPhGUxzRf/fKtmMePRUiGfvrm2EVDBaa2T/6zmApcZ4ZVeSf8
+izNQilInGkCyOQhEbIJ+CE9IUXQG9h5qwdsM9Ehb6+ZkdF/JatkzKtceC0PYlSw8
+ZouKqMKMylvEXHLr6QJBAOSY7MRdsip/lAaNJOk/1JCqblV15DS9WpxzDZ1+JBhp
+NYrnEy7qe/p1tUKBQMt3nM2Kt1N2HXyPhWVhMvpitkkCQQDFoi2T9T31nVm/4HFV
+ALK5wt3FU0MLLn+E+km/++SUjVebtjCC5Gxz+ByAsj963jhCdh+2EzgyPkOKGK5a
+LwGJAkBBjuXgDuroqzvdgR8D0a15a5dG5Q90XJWe5pQSBbn+UjXrxwdGXjL+CkHY
+d88ISx5qCA05X1dngJWGFJEVI7gZAkAbWHFOA6TrEzaT4g5MYKhaI6hj4T1pkql6
+UNdbhRL/qv7wQKk9szV+ZlorRH6cFZtbNtT0cHxaF1tpBDk7qT1hAkEAs8WLPccN
+N2BAYjQjJanWfMAIyHPdwenmKhlvkWFvnwZWQecHXDmfHZlEREqpkd9IxOIGNii7
+OiCuooK0UDdbPw==
+-----END PRIVATE KEY-----
+`
+
+// testGenerateECKeyPEMInsecure is a EC P-224 private key fixture.
+// This key is for testing purposes only and is not considered secure.
+const testGenerateECKeyPEMInsecure = `-----BEGIN PRIVATE KEY-----
+MHgCAQAwEAYHKoZIzj0CAQYFK4EEACEEYTBfAgEBBByl2nOZXdac4dWx0UvrHn8G
+P3p+oI+mjH6Znno3oTwDOgAE5/S2xcvEyJWSOjNilulwy9YnPOPubuZ4ztOh95kU
+eaVq8eqxqzGSxwanMrwbD/1PQ97kNdi53No=
+-----END PRIVATE KEY-----
+`
+
+func TestGenerateKeyConfig(t *testing.T) {
+	parsedECKey1 := parsePEMKey(t, testGenerateECKeyPEM1)
+	parsedECKey2 := parsePEMKey(t, testGenerateECKeyPEM2)
+	parsedRSAKey1 := parsePEMKey(t, testGenerateRSAKeyPEM1)
+
+	fixedErr := errors.New("some error")
+
+	testCases := []struct {
+		name        string
+		generateKey func() (crypto.Signer, error)
+		wantKey     crypto.Signer
+		wantErr     error
+	}{
+		{
+			name:        "nil returns default EC key (key1)",
+			generateKey: nil,
+			wantKey:     parsedECKey1,
+		},
+		{
+			name:        "returns custom EC key (key2)",
+			generateKey: func() (crypto.Signer, error) { return parsedECKey2, nil },
+			wantKey:     parsedECKey2,
+		},
+		{
+			name:        "returns custom RSA key",
+			generateKey: func() (crypto.Signer, error) { return parsedRSAKey1, nil },
+			wantKey:     parsedRSAKey1,
+		},
+		{
+			name:        "simulate parsing error",
+			generateKey: func() (crypto.Signer, error) { return nil, fixedErr },
+			wantErr:     fixedErr,
+		},
+	}
+
+	// Setup default overload.
+	orig := generateKeyFunc
+	generateKeyFunc = func() (crypto.Signer, error) { return parsedECKey1, nil }
+	defer func() { generateKeyFunc = orig }()
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			m := manager{
+				getTemplate: func() *x509.CertificateRequest { return &x509.CertificateRequest{} },
+				generateKey: tc.generateKey,
+				now:         time.Now,
+				ctx:         ctx,
+			}
+			_, _, _, key, err := m.generateCSR()
+			if tc.wantErr != nil {
+				if !errors.Is(err, tc.wantErr) {
+					t.Errorf("expected error %v, got %v", tc.wantErr, err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if key != tc.wantKey {
+				t.Errorf("expected key: %T, got: %T", tc.wantKey, key)
+			}
+		})
+	}
+}
+
+func TestValidateKeyStrength(t *testing.T) {
+	testCases := []struct {
+		name    string
+		key     crypto.Signer
+		wantErr bool
+	}{
+		{
+			name:    "RSA 1024 is insecure",
+			key:     parsePEMKey(t, testGenerateRSAKeyPEMInsecure),
+			wantErr: true,
+		},
+		{
+			name:    "ECDSA P-224 is insecure",
+			key:     parsePEMKey(t, testGenerateECKeyPEMInsecure),
+			wantErr: true,
+		},
+		{
+			name:    "RSA 2048 is secure",
+			key:     parsePEMKey(t, testGenerateRSAKeyPEM1),
+			wantErr: false,
+		},
+		{
+			name:    "ECDSA P-256 is secure",
+			key:     parsePEMKey(t, testGenerateECKeyPEM1),
+			wantErr: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := validateKeyStrength(tc.key)
+			if tc.wantErr != (err != nil) {
+				t.Errorf("expected error: %v, got: %v, error: %v",
+					tc.wantErr, err != nil, err)
+			}
+		})
+	}
+}
+
+func parsePEMKey(t *testing.T, pem string) crypto.Signer {
+	t.Helper()
+
+	k, err := keyutil.ParsePrivateKeyPEM([]byte(pem))
+	if err != nil {
+		t.Fatalf("failed to parse key fixture: %v", err)
+	}
+	return k.(crypto.Signer)
 }
 
 type fakeClientFailureType int

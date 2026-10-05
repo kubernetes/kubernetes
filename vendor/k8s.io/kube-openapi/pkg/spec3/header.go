@@ -17,11 +17,10 @@ limitations under the License.
 package spec3
 
 import (
-	"encoding/json"
+	"encoding/json/jsontext"
+	jsonv2 "encoding/json/v2"
 
-	"github.com/go-openapi/swag"
 	"k8s.io/kube-openapi/pkg/internal"
-	jsonv2 "k8s.io/kube-openapi/pkg/internal/third_party/go-json-experiment/json"
 	"k8s.io/kube-openapi/pkg/validation/spec"
 )
 
@@ -36,59 +35,31 @@ type Header struct {
 
 // MarshalJSON is a custom marshal function that knows how to encode Header as JSON
 func (h *Header) MarshalJSON() ([]byte, error) {
-	if internal.UseOptimizedJSONMarshalingV3 {
-		return internal.DeterministicMarshal(h)
-	}
-	b1, err := json.Marshal(h.Refable)
-	if err != nil {
-		return nil, err
-	}
-	b2, err := json.Marshal(h.HeaderProps)
-	if err != nil {
-		return nil, err
-	}
-	b3, err := json.Marshal(h.VendorExtensible)
-	if err != nil {
-		return nil, err
-	}
-	return swag.ConcatJSON(b1, b2, b3), nil
+	return internal.DeterministicMarshal(h)
 }
 
-func (h *Header) MarshalNextJSON(opts jsonv2.MarshalOptions, enc *jsonv2.Encoder) error {
+func (h *Header) MarshalJSONTo(enc *jsontext.Encoder) error {
 	var x struct {
 		Ref         string              `json:"$ref,omitempty"`
-		HeaderProps headerPropsOmitZero `json:",inline"`
-		spec.Extensions
+		HeaderProps headerPropsOmitZero `json:",embed"`
+		Extensions  spec.Extensions     `json:",embed"`
 	}
 	x.Ref = h.Refable.Ref.String()
 	x.Extensions = internal.SanitizeExtensions(h.Extensions)
 	x.HeaderProps = headerPropsOmitZero(h.HeaderProps)
-	return opts.MarshalNext(enc, x)
+	return jsonv2.MarshalEncode(enc, x)
 }
 
 func (h *Header) UnmarshalJSON(data []byte) error {
-	if internal.UseOptimizedJSONUnmarshalingV3 {
-		return jsonv2.Unmarshal(data, h)
-	}
-	if err := json.Unmarshal(data, &h.Refable); err != nil {
-		return err
-	}
-	if err := json.Unmarshal(data, &h.HeaderProps); err != nil {
-		return err
-	}
-	if err := json.Unmarshal(data, &h.VendorExtensible); err != nil {
-		return err
-	}
-
-	return nil
+	return jsonv2.Unmarshal(data, h)
 }
 
-func (h *Header) UnmarshalNextJSON(opts jsonv2.UnmarshalOptions, dec *jsonv2.Decoder) error {
+func (h *Header) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	var x struct {
-		spec.Extensions
+		Extensions spec.Extensions `json:",embed"`
 		HeaderProps
 	}
-	if err := opts.UnmarshalNext(dec, &x); err != nil {
+	if err := jsonv2.UnmarshalDecode(dec, &x); err != nil {
 		return err
 	}
 	if err := internal.JSONRefFromMap(&h.Ref.Ref, x.Extensions); err != nil {

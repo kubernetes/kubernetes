@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"slices"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -114,14 +115,7 @@ func (gc *GarbageCollector) deleteOwnerRefJSONMergePatch(item *node, ownerUIDs .
 	expectedObjectMeta.ResourceVersion = accessor.GetResourceVersion()
 	refs := accessor.GetOwnerReferences()
 	for _, ref := range refs {
-		var skip bool
-		for _, ownerUID := range ownerUIDs {
-			if ref.UID == ownerUID {
-				skip = true
-				break
-			}
-		}
-		if !skip {
+		if !slices.Contains(ownerUIDs, ref.UID) {
 			expectedObjectMeta.OwnerReferences = append(expectedObjectMeta.OwnerReferences, ref)
 		}
 	}

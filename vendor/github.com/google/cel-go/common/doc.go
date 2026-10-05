@@ -37,6 +37,8 @@ const (
 	DocMacro
 	// DocExample represents example documentation.
 	DocExample
+	// DocField represents documentation for a struct field.
+	DocField
 )
 
 // Doc holds the documentation details for a specific program element like
@@ -160,6 +162,17 @@ func NewExampleDoc(ex string) *Doc {
 	return &Doc{
 		Kind:        DocExample,
 		Description: ex,
+	}
+}
+
+// NewFieldDoc creates a new Doc struct for documenting a struct field.
+func NewFieldDoc(name, celType, description string, examples ...*Doc) *Doc {
+	return &Doc{
+		Kind:        DocField,
+		Name:        name,
+		Type:        celType,
+		Description: description,
+		Children:    examples,
 	}
 }
 

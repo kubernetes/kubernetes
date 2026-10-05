@@ -24,8 +24,6 @@ import (
 	"io"
 	"net/http"
 	"strconv"
-	"strings"
-	"sync"
 	"time"
 
 	"go.opentelemetry.io/otel/attribute"
@@ -34,22 +32,29 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/httpstream/wsstream"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/endpoints/handlers/negotiation"
 	"k8s.io/apiserver/pkg/endpoints/metrics"
 	"k8s.io/apiserver/pkg/endpoints/request"
-	"k8s.io/apiserver/pkg/registry/rest"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/util/flushwriter"
 	"k8s.io/component-base/tracing"
+	"k8s.io/streaming/pkg/httpstream/wsstream"
 )
 
-// StreamObject performs input stream negotiation from a ResourceStreamer and writes that to the response.
+// resourceStreamer is the method set of k8s.io/apiserver/pkg/registry/rest.ResourceStreamer. It is
+// declared here so that this package does not import registry/rest, which pulls the admission and
+// CEL packages into every binary that serves /flagz or /statusz. writers_test.go asserts that the
+// two interfaces stay assignable to each other.
+type resourceStreamer interface {
+	InputStream(ctx context.Context, apiVersion, acceptHeader string) (stream io.ReadCloser, flush bool, mimeType string, err error)
+}
+
+// StreamObject performs input stream negotiation from a rest.ResourceStreamer and writes that to the response.
 // If the client requests a websocket upgrade, negotiate for a websocket reader protocol (because many
 // browser clients cannot easily handle binary streaming protocols).
-func StreamObject(statusCode int, gv schema.GroupVersion, s runtime.NegotiatedSerializer, stream rest.ResourceStreamer, w http.ResponseWriter, req *http.Request) {
+func StreamObject(statusCode int, gv schema.GroupVersion, s runtime.NegotiatedSerializer, stream resourceStreamer, w http.ResponseWriter, req *http.Request) {
 	out, flush, contentType, err := stream.InputStream(req.Context(), gv.String(), req.Header.Get("Accept"))
 	if err != nil {
 		ErrorNegotiated(err, s, gv, w, req)
@@ -104,9 +109,18 @@ func SerializeObject(mediaType string, encoder runtime.Encoder, hw http.Response
 	w := &deferredResponseWriter{
 		mediaType:       mediaType,
 		statusCode:      statusCode,
-		contentEncoding: negotiateContentEncoding(req),
+		contentEncoding: responseContentEncodingSupported(req),
 		hw:              hw,
 		ctx:             ctx,
+	}
+
+	var memoryAllocator runtime.MemoryAllocator
+	if encoderWithAllocator, supportsAllocator := encoder.(runtime.EncoderWithAllocator); supportsAllocator {
+		memoryAllocator = runtime.AllocatorPool.Get().(*runtime.Allocator)
+		encoder = runtime.NewEncoderWithAllocator(encoderWithAllocator, memoryAllocator)
+	}
+	if memoryAllocator != nil {
+		defer runtime.AllocatorPool.Put(memoryAllocator)
 	}
 
 	err := encoder.Encode(object, w)
@@ -120,7 +134,8 @@ func SerializeObject(mediaType string, encoder runtime.Encoder, hw http.Response
 	}
 
 	// make a best effort to write the object if a failure is detected
-	utilruntime.HandleError(fmt.Errorf("apiserver was unable to write a JSON response: %v", err))
+	utilruntime.HandleError(fmt.Errorf("apiserver was unable to write a %s response: %w", w.mediaType, err))
+	w.discardBufferedResponse()
 	status := ErrorToAPIStatus(err)
 	candidateStatusCode := int(status.Code)
 	// if the current status code is successful, allow the error's status code to overwrite it
@@ -133,26 +148,14 @@ func SerializeObject(mediaType string, encoder runtime.Encoder, hw http.Response
 		output = []byte(fmt.Sprintf("%s: %s", status.Reason, status.Message))
 	}
 	if _, err := w.Write(output); err != nil {
-		utilruntime.HandleError(fmt.Errorf("apiserver was unable to write a fallback JSON response: %v", err))
+		utilruntime.HandleError(fmt.Errorf("apiserver was unable to write a fallback %s response: %w", w.mediaType, err))
 	}
 	w.Close()
 }
 
-var gzipPool = &sync.Pool{
-	New: func() interface{} {
-		gw, err := gzip.NewWriterLevel(nil, defaultGzipContentEncodingLevel)
-		if err != nil {
-			panic(err)
-		}
-		return gw
-	},
-}
+var gzipPool = NewGzipWriterPoolOrDie()
 
 const (
-	// defaultGzipContentEncodingLevel is set to 1 which uses least CPU compared to higher levels, yet offers
-	// similar compression ratios (off by at most 1.5x, but typically within 1.1x-1.3x). For further details see -
-	// https://github.com/kubernetes/kubernetes/issues/112296
-	defaultGzipContentEncodingLevel = 1
 	// defaultGzipThresholdBytes is compared to the size of the first write from the stream
 	// (usually the entire object), and if the size is smaller no gzipping will be performed
 	// if the client requests it.
@@ -161,34 +164,6 @@ const (
 	// When streaming JSON first write is "{", while Kubernetes protobuf starts unique 4 byte header.
 	firstWriteStreamingThresholdBytes = 4
 )
-
-// negotiateContentEncoding returns a supported client-requested content encoding for the
-// provided request. It will return the empty string if no supported content encoding was
-// found or if response compression is disabled.
-func negotiateContentEncoding(req *http.Request) string {
-	encoding := req.Header.Get("Accept-Encoding")
-	if len(encoding) == 0 {
-		return ""
-	}
-	if !utilfeature.DefaultFeatureGate.Enabled(features.APIResponseCompression) {
-		return ""
-	}
-	for len(encoding) > 0 {
-		var token string
-		if next := strings.Index(encoding, ","); next != -1 {
-			token = encoding[:next]
-			encoding = encoding[next+1:]
-		} else {
-			token = encoding
-			encoding = ""
-		}
-		switch strings.TrimSpace(token) {
-		case "gzip":
-			return "gzip"
-		}
-	}
-	return ""
-}
 
 type deferredResponseWriter struct {
 	mediaType       string
@@ -243,6 +218,14 @@ func (w *deferredResponseWriter) Write(p []byte) (n int, err error) {
 		}
 		return len(p), err
 	}
+}
+
+func (w *deferredResponseWriter) discardBufferedResponse() {
+	if w.hasWritten {
+		return
+	}
+	w.hasBuffered = false
+	w.buffer = nil
 }
 
 func (w *deferredResponseWriter) unbufferedWrite(p []byte) (n int, err error) {
@@ -321,7 +304,7 @@ func (w *deferredResponseWriter) Close() (err error) {
 
 // WriteObjectNegotiated renders an object in the content type negotiated by the client.
 func WriteObjectNegotiated(s runtime.NegotiatedSerializer, restrictions negotiation.EndpointRestrictions, gv schema.GroupVersion, w http.ResponseWriter, req *http.Request, statusCode int, object runtime.Object, listGVKInContentType bool) {
-	stream, ok := object.(rest.ResourceStreamer)
+	stream, ok := object.(resourceStreamer)
 	if ok {
 		requestInfo, _ := request.RequestInfoFrom(req.Context())
 		metrics.RecordLongRunning(req, requestInfo, metrics.APIServerComponent, func() {

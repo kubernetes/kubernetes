@@ -113,9 +113,7 @@ func (s *Server) Serve(ctx context.Context, l net.Listener) error {
 					backoff *= 2
 				}
 
-				if max := time.Second; backoff > max {
-					backoff = max
-				}
+				backoff = min(time.Second, backoff)
 
 				sleep := time.Duration(rand.Int63n(int64(backoff)))
 				log.G(ctx).WithError(err).Errorf("ttrpc: failed accept; backoff %v", sleep)
@@ -285,7 +283,7 @@ func (cs connState) String() string {
 	}
 }
 
-func (s *Server) newConn(conn net.Conn, handshake interface{}) (*serverConn, error) {
+func (s *Server) newConn(conn net.Conn, handshake any) (*serverConn, error) {
 	c := &serverConn{
 		server:    s,
 		conn:      conn,
@@ -303,7 +301,7 @@ func (s *Server) newConn(conn net.Conn, handshake interface{}) (*serverConn, err
 type serverConn struct {
 	server    *Server
 	conn      net.Conn
-	handshake interface{} // data from handshake, not used for now
+	handshake any // data from handshake, not used for now
 	state     atomic.Value
 
 	shutdownOnce sync.Once
@@ -415,10 +413,11 @@ func (c *serverConn) run(sctx context.Context) {
 					if !sendStatus(mh.StreamID, status.Newf(codes.InvalidArgument, "StreamID is no longer active")) {
 						return
 					}
+					continue
 				}
 				sh := i.(*streamHandler)
 				if mh.Flags&flagNoData != flagNoData {
-					unmarshal := func(obj interface{}) error {
+					unmarshal := func(obj any) error {
 						err := protoUnmarshal(p, obj)
 						ch.putmbuf(p)
 						return err
@@ -428,6 +427,7 @@ func (c *serverConn) run(sctx context.Context) {
 						if !sendStatus(mh.StreamID, status.Newf(codes.InvalidArgument, "data handling error: %v", err)) {
 							return
 						}
+						continue
 					}
 				}
 
@@ -437,6 +437,7 @@ func (c *serverConn) run(sctx context.Context) {
 						if !sendStatus(mh.StreamID, status.Newf(codes.InvalidArgument, "data close message cannot include data")) {
 							return
 						}
+						continue
 					}
 				}
 			} else if mh.Type == messageTypeRequest {
@@ -567,8 +568,6 @@ func (c *serverConn) run(sctx context.Context) {
 	}
 }
 
-var noopFunc = func() {}
-
 func getRequestContext(ctx context.Context, req *Request) (retCtx context.Context, cancel func()) {
 	if len(req.Metadata) > 0 {
 		md := MD{}
@@ -576,11 +575,10 @@ func getRequestContext(ctx context.Context, req *Request) (retCtx context.Contex
 		ctx = WithMetadata(ctx, md)
 	}
 
-	cancel = noopFunc
 	if req.TimeoutNano == 0 {
-		return ctx, cancel
+		// Cancellable so handlers' deferred cancel propagates to RecvMsg.
+		return context.WithCancel(ctx)
 	}
 
-	ctx, cancel = context.WithTimeout(ctx, time.Duration(req.TimeoutNano))
-	return ctx, cancel
+	return context.WithTimeout(ctx, time.Duration(req.TimeoutNano))
 }

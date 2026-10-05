@@ -19,6 +19,7 @@ package apps
 import (
 	"context"
 	"fmt"
+	"slices"
 	"time"
 
 	batchv1 "k8s.io/api/batch/v1"
@@ -26,7 +27,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/pkg/util/slice"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ejob "k8s.io/kubernetes/test/e2e/framework/job"
 	admissionapi "k8s.io/pod-security-admission/api"
@@ -57,7 +57,7 @@ func cleanupJob(ctx context.Context, f *framework.Framework, job *batchv1.Job) {
 
 	framework.Logf("Remove the Job's dummy finalizer; the Job should be deleted cascadingly")
 	removeFinalizerFunc := func(j *batchv1.Job) {
-		j.ObjectMeta.Finalizers = slice.RemoveString(j.ObjectMeta.Finalizers, dummyFinalizer, nil)
+		j.ObjectMeta.Finalizers = slices.DeleteFunc(j.ObjectMeta.Finalizers, func(actual string) bool { return actual == dummyFinalizer })
 	}
 	_, err := updateJobWithRetries(ctx, c, ns, job.Name, removeFinalizerFunc)
 	framework.ExpectNoError(err)

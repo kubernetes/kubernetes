@@ -62,7 +62,14 @@ func (l *StreamingListTypeJSONTags) Validate(t *types.Type) ([]string, error) {
 	for _, m := range t.Members {
 		switch m.Name {
 		case "TypeMeta":
-			if reflect.StructTag(m.Tags).Get("json") != ",inline" {
+			if !m.Embedded {
+				// field must be embedded to inline
+				fields = append(fields, "TypeMeta")
+			} else if jsonTag, jsonTagExists := reflect.StructTag(m.Tags).Lookup("json"); !jsonTagExists {
+				// field should declare a json tag to indicate it is serialized
+				fields = append(fields, "TypeMeta")
+			} else if jsonTag != "" && jsonTag != ",inline" {
+				// expect a completely empty json tag (preferred) or an empty name segment and only an ,inline directive (previously used)
 				fields = append(fields, "TypeMeta")
 			}
 		case "ListMeta":

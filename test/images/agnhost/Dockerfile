@@ -12,11 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# If we ever move agnhost away from alpine, we may need changes to
+# test/e2e/network/dns.go, which assumes that agnhost's `dig` binary
+# is linked against musl libc.
 ARG BASEIMAGE=alpine
-ARG GOLANG_VERSION
 
-FROM golang:$GOLANG_VERSION AS preparer
+# digest pinned in test/images/Makefile, GOTOOLCHAIN selects the go version
+ARG GOLANG_IMAGE=golang:latest
+FROM ${GOLANG_IMAGE} AS preparer
 
+ARG GOTOOLCHAIN=auto
 RUN go install github.com/google/go-containerregistry/cmd/crane@latest && \
     apt-get update && apt-get install -y jq
 
@@ -29,8 +34,7 @@ RUN chmod +x /prepare_registry.sh
 RUN /prepare_registry.sh
 
 FROM $BASEIMAGE AS main
-
-CROSS_BUILD_COPY qemu-QEMUARCH-static /usr/bin/
+ARG TARGETARCH
 
 # from dnsutils image
 # install necessary packages:
@@ -43,11 +47,11 @@ CROSS_BUILD_COPY qemu-QEMUARCH-static /usr/bin/
 # - util-linux-misc: includes ipcs used in SELinux tests
 # from iperf image
 # install necessary packages: iperf, bash
-RUN apk --update add bind-tools curl netcat-openbsd iproute2 iperf bash util-linux-misc && rm -rf /var/cache/apk/* \
+RUN apk --update add bind-tools curl netcat-openbsd iproute2 iperf bash util-linux-misc socat && rm -rf /var/cache/apk/* \
     && ln -s /usr/bin/iperf /usr/local/bin/iperf \
     && ls -altrh /usr/local/bin/iperf
 
-ADD https://github.com/coredns/coredns/releases/download/v1.6.2/coredns_1.6.2_linux_BASEARCH.tgz /coredns.tgz
+ADD https://github.com/coredns/coredns/releases/download/v1.6.2/coredns_1.6.2_linux_${TARGETARCH}.tgz /coredns.tgz
 RUN tar -xzvf /coredns.tgz && rm -f /coredns.tgz
 
 # PORT 80 needed by: test-webserver

@@ -17,6 +17,8 @@ limitations under the License.
 package qos
 
 import (
+	"slices"
+
 	v1 "k8s.io/api/core/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	resourcehelper "k8s.io/component-helpers/resource"
@@ -64,7 +66,7 @@ func GetContainerOOMScoreAdjust(pod *v1.Pod, container *v1.Container, memoryCapa
 	// which use more than their request will have an OOM score of 1000 and will be prime
 	// targets for OOM kills.
 	// Note that this is a heuristic, it won't work if a container has many small processes.
-	containerMemReq := container.Resources.Requests.Memory().Value()
+	containerMemReq := getEffectiveContainerMemoryRequest(pod, container)
 
 	var oomScoreAdjust, remainingReqPerContainer int64
 	// When PodLevelResources feature is enabled, the OOM score adjustment formula is modified
@@ -88,7 +90,7 @@ func GetContainerOOMScoreAdjust(pod *v1.Pod, container *v1.Container, memoryCapa
 	// calculate the oom score adjustment based on: max-memory( currentSideCarContainer , min-memory(regular containers) ) .
 	if isSidecarContainer(pod, container) {
 		// check min memory quantity in regular containers
-		minMemoryRequest := minRegularContainerMemory(*pod)
+		minMemoryRequest := minRegularContainerMemory(pod)
 
 		// When calculating minMemoryOomScoreAdjust for sidecar containers with PodLevelResources enabled,
 		// we add the per-container share of unallocated pod memory requests to the minimum memory request.
@@ -132,4 +134,51 @@ func isSidecarContainer(pod *v1.Pod, container *v1.Container) bool {
 		}
 	}
 	return false
+}
+
+// getEffectiveContainerMemoryRequest returns the effective container memory request,
+// including DRA memory allocations if the feature is enabled.
+// If multiple containers share a single DRA memory claim, the claim's memory quantity
+// is divided equally among the sharing containers.
+func getEffectiveContainerMemoryRequest(pod *v1.Pod, container *v1.Container) int64 {
+	memReq := container.Resources.Requests.Memory().Value()
+	if !utilfeature.DefaultFeatureGate.Enabled(features.DRANodeAllocatableResources) {
+		return memReq
+	}
+
+	var draMemoryShare int64
+	for _, claimStatus := range pod.Status.NodeAllocatableResourceClaimStatuses {
+		// Check if this container references the claim
+		if !slices.Contains(claimStatus.Containers, container.Name) {
+			continue
+		}
+
+		numRefs := int64(len(claimStatus.Containers))
+
+		// Add Mapping memory resources share. Since mapping resources represent a fixed allocation
+		// shared by all referencing containers in the pod, we divide it equally.
+		for _, mapping := range claimStatus.Mapping {
+			if mapping.Name == v1.ResourceMemory && mapping.Quantity != nil {
+				draMemoryShare += mapping.Quantity.Value() / numRefs
+			}
+		}
+
+		// Add Overhead memory resources share.
+		for _, overhead := range claimStatus.Overhead {
+			if overhead.Name == v1.ResourceMemory {
+				// PerPod overhead is applied once per pod. We split it equally among the
+				// referencing containers.
+				if overhead.PerPod != nil {
+					draMemoryShare += overhead.PerPod.Value() / numRefs
+				}
+				// PerContainer overhead is applied per container
+				// reference. Therefore, each container gets its full share without division.
+				if overhead.PerContainer != nil {
+					draMemoryShare += overhead.PerContainer.Value()
+				}
+			}
+		}
+	}
+
+	return memReq + draMemoryShare
 }

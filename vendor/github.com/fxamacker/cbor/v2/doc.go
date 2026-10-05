@@ -56,20 +56,30 @@ modes won't accidentally change at runtime after they're created.
 
 Modes are intended to be reused and are safe for concurrent use.
 
-EncMode and DecMode Interfaces
+EncMode, UserBufferEncMode, and DecMode Interfaces
 
 	// EncMode interface uses immutable options and is safe for concurrent use.
 	type EncMode interface {
-		Marshal(v interface{}) ([]byte, error)
+		Marshal(v any) ([]byte, error)
 		NewEncoder(w io.Writer) *Encoder
-		EncOptions() EncOptions  // returns copy of options
+		EncOptions() EncOptions
+	}
+
+	// UserBufferEncMode extends EncMode with MarshalToBuffer, which supports
+	// user specified buffer rather than encoding into the built-in buffer pool.
+	type UserBufferEncMode interface {
+		EncMode
+		MarshalToBuffer(v any, buf *bytes.Buffer) error
 	}
 
 	// DecMode interface uses immutable options and is safe for concurrent use.
 	type DecMode interface {
-		Unmarshal(data []byte, v interface{}) error
+		Unmarshal(data []byte, v any) error
+		UnmarshalFirst(data []byte, v any) (rest []byte, err error)
+		Valid(data []byte) error          // Deprecated: use Wellformed instead.
+		Wellformed(data []byte) error
 		NewDecoder(r io.Reader) *Decoder
-		DecOptions() DecOptions  // returns copy of options
+		DecOptions() DecOptions
 	}
 
 Using Default Encoding Mode

@@ -182,13 +182,14 @@ func (h *peerProxyHandler) WrapHandler(handler http.Handler) http.Handler {
 		// find servers that are capable of serving this request
 		peerServerIDs := h.findServiceableByPeerFromPeerDiscoveryCache(gvr)
 		if len(peerServerIDs) == 0 {
-			klog.Errorf("gvr %v is not served by anything in this cluster", gvr)
+			klog.V(3).Infof("gvr %v is not served by anything in this cluster", gvr)
 			handler.ServeHTTP(w, r)
 			return
 		}
 
 		peerEndpoints, err := h.resolveServingLocation(peerServerIDs)
 		if err != nil {
+			metrics.IncPeerProxyError(ctx, metrics.ProxyErrorEndpointResolution, gvr.Group, gvr.Version, gvr.Resource)
 			gv := schema.GroupVersion{Group: gvr.Group, Version: gvr.Version}
 			klog.ErrorS(err, "error finding serviceable-by apiservers for the requested resource", "gvr", gvr)
 			responsewriters.ErrorNegotiated(apierrors.NewServiceUnavailable("Error getting ip and port info of the remote server while proxying"), h.serializer, gv, w, r)
@@ -197,7 +198,7 @@ func (h *peerProxyHandler) WrapHandler(handler http.Handler) http.Handler {
 
 		endpointIndex := rand.Intn(len(peerEndpoints))
 		peerEndpoint := peerEndpoints[endpointIndex]
-		h.proxyRequestToDestinationAPIServer(r, w, peerEndpoint)
+		h.proxyRequestToDestinationAPIServer(r, w, peerEndpoint, gvr)
 	})
 }
 
@@ -238,7 +239,7 @@ func (h *peerProxyHandler) hostportInfo(apiserverKey string) (string, error) {
 	return hostPort, nil
 }
 
-func (h *peerProxyHandler) proxyRequestToDestinationAPIServer(req *http.Request, rw http.ResponseWriter, host string) {
+func (h *peerProxyHandler) proxyRequestToDestinationAPIServer(req *http.Request, rw http.ResponseWriter, host string, gvr schema.GroupVersionResource) {
 	// write a new location based on the existing request pointed at the target service
 	location := &url.URL{}
 	location.Scheme = "https"
@@ -252,6 +253,7 @@ func (h *peerProxyHandler) proxyRequestToDestinationAPIServer(req *http.Request,
 
 	proxyRoundTripper, err := h.buildProxyRoundtripper(req)
 	if err != nil {
+		metrics.IncPeerProxyError(req.Context(), metrics.ProxyErrorTransport, gvr.Group, gvr.Version, gvr.Resource)
 		klog.Errorf("failed to build proxy round tripper: %v", err)
 		return
 	}
@@ -261,7 +263,7 @@ func (h *peerProxyHandler) proxyRequestToDestinationAPIServer(req *http.Request,
 	handler := proxy.NewUpgradeAwareHandler(location, proxyRoundTripper, true, false, &responder{w: w, ctx: req.Context()})
 	klog.Infof("Proxying request for %s from %s to %s", req.URL.Path, req.Host, location.Host)
 	handler.ServeHTTP(w, newReq)
-	metrics.IncPeerProxiedRequest(req.Context(), strconv.Itoa(delegate.Status()))
+	metrics.IncPeerProxiedRequest(req.Context(), strconv.Itoa(delegate.Status()), gvr.Group, gvr.Version, gvr.Resource)
 }
 
 func (h *peerProxyHandler) buildProxyRoundtripper(req *http.Request) (http.RoundTripper, error) {

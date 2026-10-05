@@ -29,14 +29,17 @@ import (
 // +k8s:prerelease-lifecycle-gen:introduced=1.6
 
 // SubjectAccessReview checks whether or not a user or group can perform an action.
+// +k8s:supportsSubresource="/status"
 type SubjectAccessReview struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 	// metadata is the standard list metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
+	// +k8s:opaqueType
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// spec holds information about the request being evaluated
+	// +required
 	Spec SubjectAccessReviewSpec `json:"spec" protobuf:"bytes,2,opt,name=spec"`
 
 	// status is filled in by the server and indicates whether the request is allowed or not
@@ -53,14 +56,17 @@ type SubjectAccessReview struct {
 // SelfSubjectAccessReview checks whether or the current user can perform an action.  Not filling in a
 // spec.namespace means "in all namespaces".  Self is a special case, because users should always be able
 // to check whether they can perform an action
+// +k8s:supportsSubresource="/status"
 type SelfSubjectAccessReview struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 	// metadata is the standard list metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
+	// +k8s:opaqueType
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// spec holds information about the request being evaluated.  user and groups must be empty
+	// +required
 	Spec SelfSubjectAccessReviewSpec `json:"spec" protobuf:"bytes,2,opt,name=spec"`
 
 	// status is filled in by the server and indicates whether the request is allowed or not
@@ -76,15 +82,18 @@ type SelfSubjectAccessReview struct {
 // LocalSubjectAccessReview checks whether or not a user or group can perform an action in a given namespace.
 // Having a namespace scoped resource makes it much easier to grant namespace scoped policy that includes permissions
 // checking.
+// +k8s:supportsSubresource="/status"
 type LocalSubjectAccessReview struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 	// metadata is the standard list metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
+	// +k8s:opaqueType
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// spec holds information about the request being evaluated.  spec.namespace must be equal to the namespace
 	// you made the request against.  If empty, it is defaulted.
+	// +required
 	Spec SubjectAccessReviewSpec `json:"spec" protobuf:"bytes,2,opt,name=spec"`
 
 	// status is filled in by the server and indicates whether the request is allowed or not
@@ -195,9 +204,13 @@ type NonResourceAttributes struct {
 type SubjectAccessReviewSpec struct {
 	// resourceAttributes describes information for a resource access request
 	// +optional
+	// +k8s:alpha(since: "1.37")=+k8s:optional
+	// +k8s:alpha(since: "1.37")=+k8s:unionMember
 	ResourceAttributes *ResourceAttributes `json:"resourceAttributes,omitempty" protobuf:"bytes,1,opt,name=resourceAttributes"`
 	// nonResourceAttributes describes information for a non-resource access request
 	// +optional
+	// +k8s:alpha(since: "1.37")=+k8s:optional
+	// +k8s:alpha(since: "1.37")=+k8s:unionMember
 	NonResourceAttributes *NonResourceAttributes `json:"nonResourceAttributes,omitempty" protobuf:"bytes,2,opt,name=nonResourceAttributes"`
 
 	// user is the user you're testing for.
@@ -231,15 +244,20 @@ func (t ExtraValue) String() string {
 type SelfSubjectAccessReviewSpec struct {
 	// resourceAttributes describes information for a resource access request
 	// +optional
+	// +k8s:alpha(since: "1.37")=+k8s:optional
+	// +k8s:alpha(since: "1.37")=+k8s:unionMember
 	ResourceAttributes *ResourceAttributes `json:"resourceAttributes,omitempty" protobuf:"bytes,1,opt,name=resourceAttributes"`
 	// nonResourceAttributes describes information for a non-resource access request
 	// +optional
+	// +k8s:alpha(since: "1.37")=+k8s:optional
+	// +k8s:alpha(since: "1.37")=+k8s:unionMember
 	NonResourceAttributes *NonResourceAttributes `json:"nonResourceAttributes,omitempty" protobuf:"bytes,2,opt,name=nonResourceAttributes"`
 }
 
 // SubjectAccessReviewStatus
 type SubjectAccessReviewStatus struct {
-	// allowed is required. True if the action would be allowed, false otherwise.
+	// allowed is set to true if the action is allowed, and should be set to false otherwise.
+	// +optional
 	Allowed bool `json:"allowed" protobuf:"varint,1,opt,name=allowed"`
 	// denied is optional. True if the action would be denied, otherwise
 	// false. If both allowed is false and denied is false, then the
@@ -269,14 +287,17 @@ type SubjectAccessReviewStatus struct {
 // or to quickly let an end user reason about their permissions. It should NOT Be used by external systems to
 // drive authorization decisions as this raises confused deputy, cache lifetime/revocation, and correctness concerns.
 // SubjectAccessReview, and LocalAccessReview are the correct way to defer authorization decisions to the API server.
+// +k8s:supportsSubresource="/status"
 type SelfSubjectRulesReview struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 	// metadata is the standard list metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
+	// +k8s:opaqueType
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// spec holds information about the request being evaluated.
+	// +required
 	Spec SelfSubjectRulesReviewSpec `json:"spec" protobuf:"bytes,2,opt,name=spec"`
 
 	// status is filled in by the server and indicates the set of actions a user can perform.
@@ -287,6 +308,7 @@ type SelfSubjectRulesReview struct {
 // SelfSubjectRulesReviewSpec defines the specification for SelfSubjectRulesReview.
 type SelfSubjectRulesReviewSpec struct {
 	// namespace to evaluate rules for. Required.
+	// +required
 	Namespace string `json:"namespace,omitempty" protobuf:"bytes,1,opt,name=namespace"`
 }
 
@@ -297,14 +319,17 @@ type SelfSubjectRulesReviewSpec struct {
 type SubjectRulesReviewStatus struct {
 	// resourceRules is the list of actions the subject is allowed to perform on resources.
 	// The list ordering isn't significant, may contain duplicates, and possibly be incomplete.
+	// +optional
 	// +listType=atomic
 	ResourceRules []ResourceRule `json:"resourceRules" protobuf:"bytes,1,rep,name=resourceRules"`
 	// nonResourceRules is the list of actions the subject is allowed to perform on non-resources.
 	// The list ordering isn't significant, may contain duplicates, and possibly be incomplete.
+	// +optional
 	// +listType=atomic
 	NonResourceRules []NonResourceRule `json:"nonResourceRules" protobuf:"bytes,2,rep,name=nonResourceRules"`
 	// incomplete is true when the rules returned by this call are incomplete. This is most commonly
 	// encountered when an authorizer, such as an external authorizer, doesn't support rules evaluation.
+	// +optional
 	Incomplete bool `json:"incomplete" protobuf:"bytes,3,rep,name=incomplete"`
 	// evaluationError can appear in combination with Rules. It indicates an error occurred during
 	// rule evaluation, such as an authorizer that doesn't support rule evaluation, and that
@@ -317,6 +342,7 @@ type SubjectRulesReviewStatus struct {
 // may contain duplicates, and possibly be incomplete.
 type ResourceRule struct {
 	// verbs is a list of kubernetes resource API verbs, like: get, list, watch, create, update, delete, proxy.  "*" means all.
+	// +optional
 	// +listType=atomic
 	Verbs []string `json:"verbs" protobuf:"bytes,1,rep,name=verbs"`
 
@@ -339,6 +365,7 @@ type ResourceRule struct {
 // NonResourceRule holds information that describes a rule for the non-resource
 type NonResourceRule struct {
 	// verbs is a list of kubernetes non-resource API verbs, like: get, post, put, delete, patch, head, options.  "*" means all.
+	// +optional
 	// +listType=atomic
 	Verbs []string `json:"verbs" protobuf:"bytes,1,rep,name=verbs"`
 

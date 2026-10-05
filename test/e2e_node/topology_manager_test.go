@@ -18,20 +18,24 @@ package e2enode
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/wait"
+	resourcehelper "k8s.io/component-helpers/resource"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
@@ -93,6 +97,16 @@ func detectCoresPerSocket() int {
 	return coreCount
 }
 
+func detectSockets() int {
+	outData, err := exec.Command("/bin/sh", "-c", "lscpu | grep \"Socket(s):\" | cut -d \":\" -f 2").Output()
+	framework.ExpectNoError(err)
+
+	socketCount, err := strconv.Atoi(strings.TrimSpace(string(outData)))
+	framework.ExpectNoError(err)
+
+	return socketCount
+}
+
 func detectThreadPerCore() int {
 	outData, err := exec.Command("/bin/sh", "-c", "lscpu | grep \"Thread(s) per core:\" | cut -d \":\" -f 2").Output()
 	framework.ExpectNoError(err)
@@ -128,7 +142,7 @@ func detectNUMADistances(numaNodes int) map[int][]int {
 	ginkgo.GinkgoHelper()
 
 	nodeToDistances := make(map[int][]int)
-	for i := 0; i < numaNodes; i++ {
+	for i := range numaNodes {
 		outData, err := os.ReadFile(fmt.Sprintf("/sys/devices/system/node/node%d/distance", i))
 		framework.ExpectNoError(err)
 
@@ -196,7 +210,7 @@ func makeTopologyManagerTestPod(podName string, tmCtnAttributes, tmInitCtnAttrib
 }
 
 func findNUMANodeWithoutSRIOVDevicesFromConfigMap(configMap *v1.ConfigMap, numaNodes int) (int, bool) {
-	for nodeNum := 0; nodeNum < numaNodes; nodeNum++ {
+	for nodeNum := range numaNodes {
 		value, ok := configMap.Annotations[fmt.Sprintf("pcidevice_node%d", nodeNum)]
 		if !ok {
 			framework.Logf("missing pcidevice annotation for NUMA node %d", nodeNum)
@@ -233,7 +247,7 @@ func findNUMANodeWithoutSRIOVDevicesFromSysfs(numaNodes int) (int, bool) {
 		return -1, false
 	}
 
-	for nodeNum := 0; nodeNum < numaNodes; nodeNum++ {
+	for nodeNum := range numaNodes {
 		v := pciPerNuma[nodeNum]
 		if v == 0 {
 			framework.Logf("NUMA node %d has no SRIOV devices attached", nodeNum)
@@ -449,6 +463,9 @@ func runTopologyManagerPolicySuiteTests(ctx context.Context, f *framework.Framew
 	ginkgo.By("running a non-Gu pod")
 	runNonGuPodTest(ctx, f, cpuCap, cpuset.New())
 
+	ginkgo.By("waiting for available CPU before running a Gu pod")
+	waitForAvailableNodeCPUOrSkip(ctx, f, int64(1000), 30*time.Second)
+
 	ginkgo.By("running a Gu pod")
 	runGuPodTest(ctx, f, 1, cpuset.New())
 
@@ -470,10 +487,115 @@ func runTopologyManagerPolicySuiteTests(ctx context.Context, f *framework.Framew
 	runMultipleGuPods(ctx, f)
 }
 
+func waitForAvailableNodeCPUOrSkip(ctx context.Context, f *framework.Framework, requiredMilliCPU int64, timeout time.Duration) {
+	ginkgo.GinkgoHelper()
+
+	pollInterval := 2 * time.Second
+	timeoutCause := errors.New("timed out waiting for CPU headroom")
+	waitCtx, cancel := context.WithTimeoutCause(ctx, timeout, timeoutCause)
+	defer cancel()
+
+	var (
+		nodeName            string
+		allocatableMilliCPU int64
+		requestedMilliCPU   int64
+		availableMilliCPU   int64
+		requestingPods      []string
+	)
+
+	err := wait.PollUntilContextCancel(waitCtx, pollInterval, true, func(ctx context.Context) (bool, error) {
+		node := getLocalNode(ctx, f)
+		nodeName = node.Name
+		allocatableCPU := node.Status.Allocatable[v1.ResourceCPU]
+		allocatableMilliCPU = allocatableCPU.MilliValue()
+
+		var err error
+		requestedMilliCPU, requestingPods, err = getNodeRequestedMilliCPU(ctx, f, nodeName)
+		if err != nil {
+			return false, err
+		}
+
+		availableMilliCPU = allocatableMilliCPU - requestedMilliCPU
+		if availableMilliCPU >= requiredMilliCPU {
+			framework.Logf(
+				"node %q has enough available CPU: allocatable=%dm requested=%dm available=%dm required=%dm",
+				nodeName,
+				allocatableMilliCPU,
+				requestedMilliCPU,
+				availableMilliCPU,
+				requiredMilliCPU,
+			)
+			return true, nil
+		}
+
+		framework.Logf(
+			"waiting for CPU headroom on node %q: need %dm available CPU, got %dm (allocatable=%dm requested=%dm)",
+			nodeName,
+			requiredMilliCPU,
+			availableMilliCPU,
+			allocatableMilliCPU,
+			requestedMilliCPU,
+		)
+		return false, nil
+	})
+	if err == nil {
+		return
+	}
+
+	if errors.Is(context.Cause(waitCtx), timeoutCause) {
+		details := strings.Join(requestingPods, ", ")
+		if details == "" {
+			details = "none"
+		}
+		e2eskipper.Skipf(
+			"Skipping Gu pod test due to CPU pressure on node %q: need %dm available CPU, got %dm (allocatable=%dm requested=%dm). Active pod requests: %s",
+			nodeName,
+			requiredMilliCPU,
+			availableMilliCPU,
+			allocatableMilliCPU,
+			requestedMilliCPU,
+			details,
+		)
+	}
+
+	framework.ExpectNoError(err)
+}
+
+func getNodeRequestedMilliCPU(ctx context.Context, f *framework.Framework, nodeName string) (int64, []string, error) {
+	pods, err := f.ClientSet.CoreV1().Pods(metav1.NamespaceAll).List(ctx, metav1.ListOptions{
+		FieldSelector: fields.OneTermEqualSelector("spec.nodeName", nodeName).String(),
+	})
+	if err != nil {
+		return 0, nil, err
+	}
+
+	var requestedMilliCPU int64
+	requestingPods := []string{}
+	for idx := range pods.Items {
+		pod := &pods.Items[idx]
+		if pod.Status.Phase == v1.PodSucceeded || pod.Status.Phase == v1.PodFailed {
+			continue
+		}
+
+		requests := resourcehelper.PodRequests(pod, resourcehelper.PodResourcesOptions{})
+		cpuRequest := requests.Cpu()
+		if cpuRequest == nil || cpuRequest.IsZero() {
+			continue
+		}
+
+		milliCPU := cpuRequest.MilliValue()
+		requestedMilliCPU += milliCPU
+		requestingPods = append(requestingPods, fmt.Sprintf("%s/%s=%dm", pod.Namespace, pod.Name, milliCPU))
+	}
+	sort.Strings(requestingPods)
+
+	return requestedMilliCPU, requestingPods, nil
+}
+
 func runTopologyManagerPositiveTest(ctx context.Context, f *framework.Framework, numPods int, ctnAttrs, initCtnAttrs []tmCtnAttribute, envInfo *testEnvInfo) {
 	podMap := make(map[string]*v1.Pod)
 
-	for podID := 0; podID < numPods; podID++ {
+	for podID := range numPods {
 		podName := fmt.Sprintf("gu-pod-%d", podID)
 		framework.Logf("creating pod %s attrs %v", podName, ctnAttrs)
 		pod := makeTopologyManagerTestPod(podName, ctnAttrs, initCtnAttrs)
@@ -497,26 +619,6 @@ func runTopologyManagerPositiveTest(ctx context.Context, f *framework.Framework,
 	}
 
 	deletePodsAsync(ctx, f, podMap)
-}
-
-func deletePodsAsync(ctx context.Context, f *framework.Framework, podMap map[string]*v1.Pod) {
-	var wg sync.WaitGroup
-	for _, pod := range podMap {
-		wg.Add(1)
-		go func(podNS, podName string) {
-			defer ginkgo.GinkgoRecover()
-			defer wg.Done()
-			deletePodSyncAndWait(ctx, f, podNS, podName)
-		}(pod.Namespace, pod.Name)
-	}
-	wg.Wait()
-}
-
-func deletePodSyncAndWait(ctx context.Context, f *framework.Framework, podNS, podName string) {
-	framework.Logf("deleting pod: %s/%s", podNS, podName)
-	deletePodSyncByName(ctx, f, podName)
-	waitForAllContainerRemoval(ctx, podName, podNS)
-	framework.Logf("deleted pod: %s/%s", podNS, podName)
 }
 
 func runTopologyManagerNegativeTest(ctx context.Context, f *framework.Framework, ctnAttrs, initCtnAttrs []tmCtnAttribute, envInfo *testEnvInfo) {
@@ -682,6 +784,7 @@ func teardownSRIOVConfigOrFail(ctx context.Context, f *framework.Framework, sd *
 func runTMScopeResourceAlignmentTestSuite(ctx context.Context, f *framework.Framework, configMap *v1.ConfigMap, reservedSystemCPUs, policy string, numaNodes, coreCount int) {
 	smtLevel := smtLevelFromSysFS()
 	sd := setupSRIOVConfigOrFail(ctx, f, configMap)
+	ginkgo.DeferCleanup(teardownSRIOVConfigOrFail, f, sd)
 	var ctnAttrs, initCtnAttrs []tmCtnAttribute
 
 	waitForSRIOVResources(ctx, f, sd)
@@ -863,8 +966,6 @@ func runTMScopeResourceAlignmentTestSuite(ctx context.Context, f *framework.Fram
 		},
 	}
 	runTopologyManagerNegativeTest(ctx, f, ctnAttrs, initCtnAttrs, envInfo)
-
-	teardownSRIOVConfigOrFail(ctx, f, sd)
 }
 
 func runTopologyManagerNodeAlignmentSuiteTests(ctx context.Context, f *framework.Framework, sd *sriovData, reservedSystemCPUs, policy string, numaNodes, coreCount int) {
@@ -1166,7 +1267,7 @@ func runPreferClosestNUMATestSuite(ctx context.Context, f *framework.Framework, 
 func runPreferClosestNUMAOptimalAllocationTest(ctx context.Context, f *framework.Framework, numaNodes int, distances map[int][]int) {
 	ginkgo.By("Admit two guaranteed pods. Both consist of 1 containers, each pod asks for cpus from 2 NUMA nodes. CPUs should be assigned from closest NUMA")
 	podMap := make(map[string]*v1.Pod)
-	for podID := 0; podID < 2; podID++ {
+	for podID := range 2 {
 		numCores := 0
 		for nodeNum := 0 + 2*podID; nodeNum <= 1+2*podID; nodeNum++ {
 			cpus, err := getCPUsPerNUMANode(nodeNum)
@@ -1210,7 +1311,7 @@ func runPreferClosestNUMASubOptimalAllocationTest(ctx context.Context, f *framew
 		e2eskipper.Skipf("Less than 5 cpus per NUMA node on this system. Skipping test.")
 	}
 	podMap := make(map[string]*v1.Pod)
-	for podID := 0; podID < 2; podID++ {
+	for podID := range 2 {
 		// asks for all but one cpus from one less than half NUMA nodes, and half from the other
 		// plus add one less than half NUMA nodes, to accommodate for reserved cpus
 		numCores := ((numaNodes/2)-1)*(len(cpusPerNUMA)-1) + (len(cpusPerNUMA) / 2) + (numaNodes/2 - 1)
@@ -1507,9 +1608,10 @@ func runNonGuPodTest(ctx context.Context, f *framework.Framework, cpuCap int64, 
 	framework.ExpectNoError(err)
 	expAllowedCPUs = expAllowedCPUs.Difference(strictReservedCPUs)
 	expAllowedCPUsListRegex = fmt.Sprintf("^%s\n$", expAllowedCPUs.String())
-	err = e2epod.NewPodClient(f).MatchContainerOutput(ctx, pod.Name, pod.Spec.Containers[0].Name, expAllowedCPUsListRegex)
-	framework.ExpectNoError(err, "expected log not found in container [%s] of pod [%s]",
-		pod.Spec.Containers[0].Name, pod.Name)
+	gomega.Eventually(ctx, func() error {
+		return e2epod.NewPodClient(f).MatchContainerOutput(ctx, pod.Name, pod.Spec.Containers[0].Name, expAllowedCPUsListRegex)
+	}).WithTimeout(30*time.Second).WithPolling(2*time.Second).Should(gomega.Succeed(),
+		"expected log not found in container [%s] of pod [%s]", pod.Spec.Containers[0].Name, pod.Name)
 
 	ginkgo.By("by deleting the pods and waiting for container removal")
 	deletePods(ctx, f, []string{pod.Name})

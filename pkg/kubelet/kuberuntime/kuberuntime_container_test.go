@@ -40,12 +40,14 @@ import (
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/kubernetes/test/utils/ktesting"
 
+	apitest "k8s.io/cri-api/pkg/apis/testing"
 	kubelettypes "k8s.io/kubelet/pkg/types"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
+	"k8s.io/kubernetes/pkg/kubelet/logs"
 )
 
 // TestRemoveContainer tests removing the container and its corresponding container logs.
@@ -53,6 +55,11 @@ func TestRemoveContainer(t *testing.T) {
 	tCtx := ktesting.Init(t)
 	fakeRuntime, _, m, err := createTestRuntimeManager(tCtx)
 	require.NoError(t, err)
+	// Swap in real ContainerLogManager for the stub.
+	logManager, err := logs.NewContainerLogManager(m.runtimeService, m.osInterface, "1", 2, 10, metav1.Duration{Duration: 10 * time.Second})
+	require.NoError(t, err)
+	m.logManager = logManager
+
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			UID:       "12345678",
@@ -71,7 +78,7 @@ func TestRemoveContainer(t *testing.T) {
 	}
 
 	// Create fake sandbox and container
-	_, fakeContainers := makeAndSetFakePod(t, m, fakeRuntime, pod)
+	_, fakeContainers := makeAndSetFakePod(tCtx, m, fakeRuntime, pod)
 	assert.Len(t, fakeContainers, 1)
 
 	containerID := fakeContainers[0].Id
@@ -89,7 +96,7 @@ func TestRemoveContainer(t *testing.T) {
 	fakeOS.Create(expectedContainerLogPath)
 	fakeOS.Create(expectedContainerLogPathRotated)
 
-	err = m.removeContainer(tCtx, containerID)
+	err = m.removeContainer(tCtx, containerID, false)
 	assert.NoError(t, err)
 
 	// Verify container log is removed.
@@ -102,6 +109,65 @@ func TestRemoveContainer(t *testing.T) {
 	containers, err := fakeRuntime.ListContainers(tCtx, &runtimeapi.ContainerFilter{Id: containerID})
 	assert.NoError(t, err)
 	assert.Empty(t, containers)
+}
+
+func TestRemoveContainer_keepLogs(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	fakeRuntime, _, m, err := createTestRuntimeManager(tCtx)
+	require.NoError(t, err)
+	// Swap in real ContainerLogManager for the stub.
+	logManager, err := logs.NewContainerLogManager(m.runtimeService, m.osInterface, "1", 2, 10, metav1.Duration{Duration: 10 * time.Second})
+	require.NoError(t, err)
+	m.logManager = logManager
+
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:       "12345678",
+			Name:      "bar",
+			Namespace: "new",
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:            "foo",
+					Image:           "busybox",
+					ImagePullPolicy: v1.PullIfNotPresent,
+				},
+			},
+		},
+	}
+
+	// Create fake sandbox and container
+	_, fakeContainers := makeAndSetFakePod(tCtx, m, fakeRuntime, pod)
+	assert.Len(t, fakeContainers, 1)
+
+	containerID := fakeContainers[0].Id
+	fakeOS := m.osInterface.(*containertest.FakeOS)
+	fakeOS.GlobFn = func(pattern, path string) bool {
+		pattern = strings.ReplaceAll(pattern, "*", ".*")
+		pattern = strings.ReplaceAll(pattern, "\\", "\\\\")
+		return regexp.MustCompile(pattern).MatchString(path)
+	}
+	podLogsDirectory := "/var/log/pods"
+	expectedContainerLogPath := filepath.Join(podLogsDirectory, "new_bar_12345678", "foo", "0.log")
+	expectedContainerLogPathRotated := filepath.Join(podLogsDirectory, "new_bar_12345678", "foo", "0.log.20060102-150405")
+
+	_, err = fakeOS.Create(expectedContainerLogPath)
+	require.NoError(t, err)
+	_, err = fakeOS.Create(expectedContainerLogPathRotated)
+	require.NoError(t, err)
+
+	err = m.removeContainer(tCtx, containerID, true)
+	require.NoError(t, err)
+
+	// Verify container logs are kept.
+	// We could not predict the order of `fakeOS.Removes`, so we use `assert.ElementsMatch` here.
+	require.Empty(t, fakeOS.Removes)
+	// Verify container is removed
+	require.Contains(t, fakeRuntime.Called, "RemoveContainer")
+	containers, err := fakeRuntime.ListContainers(tCtx, &runtimeapi.ContainerFilter{Id: containerID})
+	require.NoError(t, err)
+	require.Empty(t, containers)
 }
 
 // TestKillContainer tests killing the container in a Pod.
@@ -251,7 +317,7 @@ func TestToKubeContainerStatusWithResources(t *testing.T) {
 		t.Skip("InPlacePodVerticalScaling is not currently supported on Windows.")
 	}
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
-	tCtx := ktesting.Init(t)
+	logger, tCtx := ktesting.NewTestContext(t)
 
 	const (
 		podUID    types.UID = "12345-abcd"
@@ -425,8 +491,8 @@ func TestToKubeContainerStatusWithResources(t *testing.T) {
 			}
 
 			if test.actuatedResources != nil {
-				require.NoError(t, m.actuatedState.SetContainerResources(podUID, meta.Name, *test.actuatedResources))
-				t.Cleanup(func() { _ = m.actuatedState.RemovePod(podUID) })
+				require.NoError(t, m.actuatedState.SetContainerResources(logger, podUID, meta.Name, *test.actuatedResources))
+				t.Cleanup(func() { _ = m.actuatedState.RemovePod(logger, podUID) })
 			}
 
 			actual := m.toKubeContainerStatus(tCtx, podUID, input, cid.Type)
@@ -563,16 +629,21 @@ func testLifeCycleHook(t *testing.T, testPod *v1.Pod, testContainer *v1.Containe
 
 	fakeRunner := &containertest.FakeContainerCommandRunner{}
 	fakeHTTP := &fakeHTTP{}
-	fakePodStatusProvider := podStatusProviderFunc(func(uid types.UID, name, namespace string) (*kubecontainer.PodStatus, error) {
-		return &kubecontainer.PodStatus{
-			ID:        uid,
-			Name:      name,
-			Namespace: namespace,
+	fakePodStatusProvider := fakePodStatusProvider{
+		pod: &kubecontainer.Pod{
+			ID:        testPod.UID,
+			Name:      testPod.Name,
+			Namespace: testPod.Namespace,
+		},
+		status: &kubecontainer.PodStatus{
+			ID:        testPod.UID,
+			Name:      testPod.Name,
+			Namespace: testPod.Namespace,
 			IPs: []string{
 				"127.0.0.1",
 			},
-		}, nil
-	})
+		},
+	}
 
 	lcHanlder := lifecycle.NewHandlerRunner(
 		fakeHTTP,
@@ -624,7 +695,7 @@ func testLifeCycleHook(t *testing.T, testPod *v1.Pod, testContainer *v1.Containe
 	t.Run("PostStart-CmdExe", func(t *testing.T) {
 		tCtx := ktesting.Init(t)
 		// Fake all the things you need before trying to create a container
-		fakeSandBox, _ := makeAndSetFakePod(t, m, fakeRuntime, testPod)
+		fakeSandBox, _ := makeAndSetFakePod(tCtx, m, fakeRuntime, testPod)
 		fakeSandBoxConfig, _ := m.generatePodSandboxConfig(tCtx, testPod, 0)
 		testContainer.Lifecycle = cmdPostStart
 		fakePodStatus := &kubecontainer.PodStatus{
@@ -1008,37 +1079,175 @@ func TestKillContainerGracePeriod(t *testing.T) {
 
 // TestUpdateContainerResources tests updating a container in a Pod.
 func TestUpdateContainerResources(t *testing.T) {
+	if goruntime.GOOS != "linux" {
+		t.Skip("in-place resize is only supported on Linux")
+	}
+
 	tCtx := ktesting.Init(t)
 	fakeRuntime, _, m, errCreate := createTestRuntimeManager(tCtx)
 	require.NoError(t, errCreate)
-	pod := &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			UID:       "12345678",
-			Name:      "bar",
-			Namespace: "new",
-		},
-		Spec: v1.PodSpec{
-			Containers: []v1.Container{
-				{
-					Name:            "foo",
-					Image:           "busybox",
-					ImagePullPolicy: v1.PullIfNotPresent,
+	m.cpuCFSQuota = true
+
+	tests := []struct {
+		name                   string
+		newResources           v1.ResourceRequirements
+		expectedLinuxResources *runtimeapi.LinuxContainerResources
+	}{
+		{
+			name: "Increase CPU and Memory limits and requests",
+			newResources: v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("200m"),
+					v1.ResourceMemory: resource.MustParse("200Mi"),
 				},
+				Limits: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("400m"),
+					v1.ResourceMemory: resource.MustParse("400Mi"),
+				},
+			},
+			expectedLinuxResources: &runtimeapi.LinuxContainerResources{
+				CpuPeriod:          100000,
+				CpuQuota:           40000,
+				CpuShares:          204,
+				MemoryLimitInBytes: 419430400,
+			},
+		},
+		{
+			name: "Request CPU only, no CPU limits",
+			newResources: v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceCPU: resource.MustParse("100m"),
+				},
+			},
+			expectedLinuxResources: &runtimeapi.LinuxContainerResources{
+				CpuPeriod:          100000,
+				CpuQuota:           0,
+				CpuShares:          102,
+				MemoryLimitInBytes: 0,
+			},
+		},
+		{
+			name: "Limit CPU only, requests default to limit",
+			newResources: v1.ResourceRequirements{
+				Limits: v1.ResourceList{
+					v1.ResourceCPU: resource.MustParse("200m"),
+				},
+			},
+			expectedLinuxResources: &runtimeapi.LinuxContainerResources{
+				CpuPeriod:          100000,
+				CpuQuota:           20000,
+				CpuShares:          204,
+				MemoryLimitInBytes: 0,
+			},
+		},
+		{
+			name: "Limit Memory only, no CPU limits/requests",
+			newResources: v1.ResourceRequirements{
+				Limits: v1.ResourceList{
+					v1.ResourceMemory: resource.MustParse("500Mi"),
+				},
+			},
+			expectedLinuxResources: &runtimeapi.LinuxContainerResources{
+				CpuPeriod:          100000,
+				CpuShares:          2,
+				MemoryLimitInBytes: 524288000,
 			},
 		},
 	}
 
-	// Create fake sandbox and container
-	_, fakeContainers := makeAndSetFakePod(t, m, fakeRuntime, pod)
-	assert.Len(t, fakeContainers, 1)
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					UID:       "12345678",
+					Name:      "bar",
+					Namespace: "new",
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name:            "foo",
+							Image:           "busybox",
+							ImagePullPolicy: v1.PullIfNotPresent,
+						},
+					},
+				},
+			}
 
-	cStatus, _, err := m.getPodContainerStatuses(tCtx, pod.UID, pod.Name, pod.Namespace, "")
-	assert.NoError(t, err)
-	containerID := cStatus[0].ID
+			// Create fake sandbox and container
+			_, fakeContainers := makeAndSetFakePod(tCtx, m, fakeRuntime, pod)
+			require.Len(t, fakeContainers, 1)
+			t.Cleanup(func() {
+				fakeRuntime.Containers = make(map[string]*apitest.FakeContainer)
+				fakeRuntime.Sandboxes = make(map[string]*apitest.FakePodSandbox)
+			})
 
-	err = m.updateContainerResources(tCtx, pod, &pod.Spec.Containers[0], containerID)
-	assert.NoError(t, err)
+			runtimePod, err := m.GetPod(tCtx, pod.UID)
+			require.NoError(t, err)
+			cStatus, _, err := m.getPodContainerStatuses(tCtx, runtimePod, "")
+			require.NoError(t, err)
+			containerID := cStatus[0].ID
 
-	// Verify container is updated
-	assert.Contains(t, fakeRuntime.Called, "UpdateContainerResources")
+			// Perform resource update
+			container := pod.Spec.Containers[0].DeepCopy()
+			container.Resources = tc.newResources
+			err = m.updateContainerResources(tCtx, pod, container, containerID)
+			require.NoError(t, err)
+
+			// Verify container config resources inside the fake runtime
+			c, ok := fakeRuntime.Containers[containerID.ID]
+			require.True(t, ok)
+			require.NotNil(t, c.LinuxResources)
+			type linuxResources struct {
+				CPUPeriod          int64
+				CPUQuota           int64
+				CPUShares          int64
+				MemoryLimitInBytes int64
+			}
+			expected := linuxResources{
+				CPUPeriod:          tc.expectedLinuxResources.CpuPeriod,
+				CPUQuota:           tc.expectedLinuxResources.CpuQuota,
+				CPUShares:          tc.expectedLinuxResources.CpuShares,
+				MemoryLimitInBytes: tc.expectedLinuxResources.MemoryLimitInBytes,
+			}
+			actual := linuxResources{
+				CPUPeriod:          c.LinuxResources.CpuPeriod,
+				CPUQuota:           c.LinuxResources.CpuQuota,
+				CPUShares:          c.LinuxResources.CpuShares,
+				MemoryLimitInBytes: c.LinuxResources.MemoryLimitInBytes,
+			}
+			if diff := cmp.Diff(expected, actual); diff != "" {
+				t.Errorf("Unexpected linux resources (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestMakeMountsBindMountOptions(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	_, _, m, err := createTestRuntimeManager(tCtx)
+	require.NoError(t, err)
+
+	opts := &kubecontainer.RunContainerOptions{
+		Mounts: []kubecontainer.Mount{
+			{
+				Name:             "vol",
+				ContainerPath:    "/mnt",
+				HostPath:         "/host/path",
+				BindMountOptions: []string{"noexec", "nosuid"},
+			},
+			{
+				Name:          "vol2",
+				ContainerPath: "/mnt2",
+				HostPath:      "/host/path2",
+			},
+		},
+	}
+	container := &v1.Container{Name: "test"}
+
+	result := m.makeMounts(opts, container)
+
+	assert.Len(t, result, 2)
+	assert.Equal(t, []string{"noexec", "nosuid"}, result[0].MountOptions)
+	assert.Empty(t, result[1].MountOptions)
 }

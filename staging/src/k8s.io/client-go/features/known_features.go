@@ -38,6 +38,13 @@ const (
 	// events for items popped off the FIFO.
 	AtomicFIFO Feature = "AtomicFIFO"
 
+	// owner: @yt2985
+	// beta: 1.36
+	//
+	// If enabled, allows clients to gracefully handle Certificate Authority (CA)
+	// rotations without dropping connections or requiring a restart.
+	ClientsAllowCARotation Feature = "ClientsAllowCARotation"
+
 	// owner: @benluddy
 	// kep: https://kep.k8s.io/4222
 	// alpha: 1.32
@@ -47,6 +54,13 @@ const (
 	// "application/cbor" or "application/apply-patch+cbor" will instead write
 	// "application/json" or "application/apply-patch+yaml", respectively.
 	ClientsAllowCBOR Feature = "ClientsAllowCBOR"
+
+	// owner: @enj
+	// beta: v1.36
+	//
+	// If enabled, the client-go TLS transport cache uses weak pointers to allow
+	// garbage collection of unused transports, preventing unbounded cache growth.
+	ClientsAllowTLSCacheGC Feature = "ClientsAllowTLSCacheGC"
 
 	// owner: @benluddy
 	// kep: https://kep.k8s.io/4222
@@ -98,8 +112,14 @@ var defaultVersionedKubernetesFeatureGates = map[Feature]VersionedSpecs{
 	AtomicFIFO: {
 		{Version: version.MustParse("1.36"), Default: true, PreRelease: Beta},
 	},
+	ClientsAllowCARotation: {
+		{Version: version.MustParse("1.36"), Default: true, PreRelease: Beta},
+	},
 	ClientsAllowCBOR: {
 		{Version: version.MustParse("1.32"), Default: false, PreRelease: Alpha},
+	},
+	ClientsAllowTLSCacheGC: {
+		{Version: version.MustParse("1.36"), Default: true, PreRelease: Beta},
 	},
 	ClientsPreferCBOR: {
 		{Version: version.MustParse("1.32"), Default: false, PreRelease: Alpha},

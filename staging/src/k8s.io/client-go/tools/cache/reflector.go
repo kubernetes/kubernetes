@@ -425,14 +425,12 @@ func (r *Reflector) RunWithContext(ctx context.Context) {
 	logger.V(3).Info("Starting reflector", "type", r.typeDescription, "resyncPeriod", r.resyncPeriod, "reflector", r.name)
 	// Until runs the loop immediately (immediate=true) and resets the backoff timer after each
 	// successful iteration (sliding=true). See backoff constants at top of file for generalized QPS targets (~0.22 QPS).
-	if err := r.delayHandler.Until(ctx, true, true, func(ctx context.Context) (bool, error) {
+	_ = r.delayHandler.Until(ctx, true, true, func(ctx context.Context) (bool, error) {
 		if err := r.ListAndWatchWithContext(ctx); err != nil {
 			r.watchErrorHandler(ctx, r, err)
 		}
 		return false, nil
-	}); err != nil {
-		logger.Error(err, "Reflector stopped with error", "type", r.typeDescription, "reflector", r.name)
-	}
+	})
 	logger.V(3).Info("Stopping reflector", "type", r.typeDescription, "resyncPeriod", r.resyncPeriod, "reflector", r.name)
 }
 
@@ -729,6 +727,11 @@ func (r *Reflector) list(ctx context.Context) error {
 			// the reflector makes forward progress.
 			list, paginatedResult, err = pager.ListWithAlloc(context.Background(), metav1.ListOptions{ResourceVersion: r.relistResourceVersion()})
 		}
+		if err == nil {
+			if unsupportedList, unsupportedListGVK := isUnsupportedTableListObject(list); unsupportedList {
+				err = fmt.Errorf("unsupported list gvk: %v, type: %v", unsupportedListGVK, r.typeDescription)
+			}
+		}
 		close(listCh)
 	}()
 	select {
@@ -738,7 +741,8 @@ func (r *Reflector) list(ctx context.Context) error {
 		panic(r)
 	case <-listCh:
 	}
-	initTrace.Step("Objects listed", trace.Field{Key: "error", Value: err})
+
+	initTrace.Step("Objects listed", trace.Field{Key: "error", Value: err}, trace.Field{Key: "count", Value: meta.LenList(list)})
 	if err != nil {
 		return fmt.Errorf("failed to list %v: %w", r.typeDescription, err)
 	}
@@ -1018,14 +1022,11 @@ loop:
 					continue
 				}
 			}
-			// For now, let’s block unsupported Table
-			// resources for watchlist only
+			// we don't support receiving resources in Table format
 			// see #132926 for more info
-			if exitOnWatchListBookmarkReceived {
-				if unsupportedGVK := isUnsupportedTableObject(event.Object); unsupportedGVK {
-					utilruntime.HandleErrorWithContext(ctx, nil, "Unsupported watch event object gvk", "reflector", name, "actualGVK", event.Object.GetObjectKind().GroupVersionKind())
-					continue
-				}
+			if unsupportedGVK := isUnsupportedTableObject(event.Object); unsupportedGVK {
+				utilruntime.HandleErrorWithContext(ctx, nil, "Unsupported watch event object gvk", "reflector", name, "actualGVK", event.Object.GetObjectKind().GroupVersionKind())
+				continue
 			}
 			meta, err := meta.Accessor(event.Object)
 			if err != nil {
@@ -1320,4 +1321,13 @@ func isUnsupportedTableObject(rawObject runtime.Object) bool {
 	}
 
 	return unsupportedTableGVK[rawObject.GetObjectKind().GroupVersionKind()]
+}
+
+func isUnsupportedTableListObject(rawObject runtime.Object) (bool, schema.GroupVersionKind) {
+	unstructuredObj, ok := rawObject.(*unstructured.UnstructuredList)
+	if !ok {
+		return false, schema.GroupVersionKind{}
+	}
+
+	return unsupportedTableGVK[unstructuredObj.GetObjectKind().GroupVersionKind()], unstructuredObj.GetObjectKind().GroupVersionKind()
 }

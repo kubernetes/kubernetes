@@ -27,6 +27,7 @@ import (
 	"github.com/coreos/go-semver/semver"
 	"github.com/dustin/go-humanize"
 	"go.uber.org/zap"
+	"google.golang.org/protobuf/proto"
 
 	"go.etcd.io/etcd/api/v3/etcdserverpb"
 	"go.etcd.io/etcd/client/pkg/v3/fileutil"
@@ -37,8 +38,6 @@ import (
 	"go.etcd.io/etcd/server/v3/etcdserver/api/membership"
 	"go.etcd.io/etcd/server/v3/etcdserver/api/rafthttp"
 	"go.etcd.io/etcd/server/v3/etcdserver/api/snap"
-	"go.etcd.io/etcd/server/v3/etcdserver/api/v2discovery"
-	"go.etcd.io/etcd/server/v3/etcdserver/api/v2store"
 	"go.etcd.io/etcd/server/v3/etcdserver/api/v3discovery"
 	"go.etcd.io/etcd/server/v3/etcdserver/cindex"
 	servererrors "go.etcd.io/etcd/server/v3/etcdserver/errors"
@@ -76,8 +75,7 @@ func bootstrap(cfg config.ServerConfig) (b *bootstrappedServer, err error) {
 	}
 
 	haveWAL := wal.Exist(cfg.WALDir())
-	st := v2store.New(StoreClusterPrefix, StoreKeysPrefix)
-	backend, err := bootstrapBackend(cfg, haveWAL, st, ss)
+	backend, err := bootstrapBackend(cfg, haveWAL)
 	if err != nil {
 		return nil, err
 	}
@@ -99,11 +97,25 @@ func bootstrap(cfg config.ServerConfig) (b *bootstrappedServer, err error) {
 	}
 
 	cfg.Logger.Info("bootstrapping storage")
-	s := bootstrapStorage(cfg, st, backend, bwal, cluster)
+	s := bootstrapStorage(cfg, backend, bwal, cluster)
 
 	if err = cluster.Finalize(cfg, s); err != nil {
 		backend.Close()
 		return nil, err
+	}
+
+	if haveWAL {
+		sn := s.wal.snapshot
+		if sn == nil {
+			sn = &raftpb.Snapshot{}
+		}
+		cs := buildConfStateFromV3store(cfg.Logger, backend.be)
+
+		sn.Metadata.ConfState = &cs
+		s.wal.snapshot = sn
+
+		cfg.Logger.Info("Constructed a new raft snapshot from v3 state", zap.Uint64("index", sn.Metadata.GetIndex()),
+			zap.Uint64("term", sn.Metadata.GetTerm()), zap.String("confState", sn.Metadata.ConfState.String()))
 	}
 
 	cfg.Logger.Info("bootstrapping raft")
@@ -115,6 +127,25 @@ func bootstrap(cfg config.ServerConfig) (b *bootstrappedServer, err error) {
 		cluster: cluster,
 		raft:    raft,
 	}, nil
+}
+
+func buildConfStateFromV3store(lg *zap.Logger, be backend.Backend) raftpb.ConfState {
+	members, _ := schema.NewMembershipBackend(lg, be).MustReadMembersFromBackend()
+	var (
+		voters   []uint64
+		learners []uint64
+	)
+	for _, m := range members {
+		if m.IsLearner {
+			learners = append(learners, uint64(m.ID))
+		} else {
+			voters = append(voters, uint64(m.ID))
+		}
+	}
+	return raftpb.ConfState{
+		Voters:   voters,
+		Learners: learners,
+	}
 }
 
 type bootstrappedServer struct {
@@ -132,7 +163,6 @@ func (s *bootstrappedServer) Close() {
 type bootstrappedStorage struct {
 	backend *bootstrappedBackend
 	wal     *bootstrappedWAL
-	st      v2store.Store
 }
 
 func (s *bootstrappedStorage) Close() {
@@ -166,14 +196,13 @@ type bootstrappedRaft struct {
 	storage *raft.MemoryStorage
 }
 
-func bootstrapStorage(cfg config.ServerConfig, st v2store.Store, be *bootstrappedBackend, wal *bootstrappedWAL, cl *bootstrappedCluster) *bootstrappedStorage {
+func bootstrapStorage(cfg config.ServerConfig, be *bootstrappedBackend, wal *bootstrappedWAL, cl *bootstrappedCluster) *bootstrappedStorage {
 	if wal == nil {
 		wal = bootstrapNewWAL(cfg, cl)
 	}
 
 	return &bootstrappedStorage{
 		backend: be,
-		st:      st,
 		wal:     wal,
 	}
 }
@@ -199,7 +228,7 @@ func bootstrapSnapshot(cfg config.ServerConfig) *snap.Snapshotter {
 	return snap.New(cfg.Logger, cfg.SnapDir())
 }
 
-func bootstrapBackend(cfg config.ServerConfig, haveWAL bool, st v2store.Store, ss *snap.Snapshotter) (backend *bootstrappedBackend, err error) {
+func bootstrapBackend(cfg config.ServerConfig, haveWAL bool) (backend *bootstrappedBackend, err error) {
 	beExist := fileutil.Exist(cfg.BackendPath())
 	ci := cindex.NewConsistentIndex(nil)
 	beHooks := serverstorage.NewBackendHooks(cfg.Logger, ci)
@@ -222,7 +251,7 @@ func bootstrapBackend(cfg config.ServerConfig, haveWAL bool, st v2store.Store, s
 	// TODO(serathius): Implement schema setup in fresh storage
 	var snapshot *raftpb.Snapshot
 	if haveWAL {
-		snapshot, be, err = recoverSnapshot(cfg, st, be, beExist, beHooks, ci, ss)
+		snapshot, be, err = recoverSnapshot(cfg, be, beExist, beHooks, ci)
 		if err != nil {
 			return nil, err
 		}
@@ -262,8 +291,8 @@ func maybeDefragBackend(cfg config.ServerConfig, be backend.Backend) error {
 			zap.String("current-db-size", humanize.Bytes(uint64(size))),
 			zap.Int64("current-db-size-in-use-bytes", sizeInUse),
 			zap.String("current-db-size-in-use", humanize.Bytes(uint64(sizeInUse))),
-			zap.Uint("experimental-bootstrap-defrag-threshold-bytes", thresholdBytes),
-			zap.String("experimental-bootstrap-defrag-threshold", humanize.Bytes(uint64(thresholdBytes))),
+			zap.Uint("bootstrap-defrag-threshold-bytes", thresholdBytes),
+			zap.String("bootstrap-defrag-threshold", humanize.Bytes(uint64(thresholdBytes))),
 		)
 		return nil
 	}
@@ -332,14 +361,8 @@ func bootstrapNewClusterNoWAL(cfg config.ServerConfig, prt http.RoundTripper) (*
 		return nil, fmt.Errorf("member %s has already been bootstrapped", m.ID)
 	}
 	if cfg.ShouldDiscover() {
-		var str string
-		if cfg.DiscoveryURL != "" {
-			cfg.Logger.Warn("V2 discovery is deprecated!")
-			str, err = v2discovery.JoinCluster(cfg.Logger, cfg.DiscoveryURL, cfg.DiscoveryProxy, m.ID, cfg.InitialPeerURLsMap.String())
-		} else {
-			cfg.Logger.Info("Bootstrapping cluster using v3 discovery.")
-			str, err = v3discovery.JoinCluster(cfg.Logger, &cfg.DiscoveryCfg, m.ID, cfg.InitialPeerURLsMap.String())
-		}
+		cfg.Logger.Info("Bootstrapping cluster using v3 discovery.")
+		str, err := v3discovery.JoinCluster(cfg.Logger, &cfg.DiscoveryCfg, m.ID, cfg.InitialPeerURLsMap.String())
 		if err != nil {
 			return nil, &servererrors.DiscoveryError{Op: "join", Err: err}
 		}
@@ -387,36 +410,35 @@ func bootstrapClusterWithWAL(cfg config.ServerConfig, meta *snapshotMetadata) (*
 	}, nil
 }
 
-func recoverSnapshot(cfg config.ServerConfig, st v2store.Store, be backend.Backend, beExist bool, beHooks *serverstorage.BackendHooks, ci cindex.ConsistentIndexer, ss *snap.Snapshotter) (*raftpb.Snapshot, backend.Backend, error) {
+func recoverSnapshot(cfg config.ServerConfig, be backend.Backend, beExist bool, beHooks *serverstorage.BackendHooks, ci cindex.ConsistentIndexer) (*raftpb.Snapshot, backend.Backend, error) {
 	// Find a snapshot to start/restart a raft node
 	walSnaps, err := wal.ValidSnapshotEntries(cfg.Logger, cfg.WALDir())
 	if err != nil {
 		return nil, be, err
 	}
-	// snapshot files can be orphaned if etcd crashes after writing them but before writing the corresponding
-	// bwal log entries
-	snapshot, err := ss.LoadNewestAvailable(walSnaps)
-	if err != nil && !errors.Is(err, snap.ErrNoSnapshot) {
-		return nil, be, err
+
+	var snapshot *raftpb.Snapshot
+	if len(walSnaps) > 0 {
+		idx := len(walSnaps) - 1
+		snapshot = &raftpb.Snapshot{
+			Metadata: &raftpb.SnapshotMetadata{
+				Term:  new(walSnaps[idx].GetTerm()),
+				Index: new(walSnaps[idx].GetIndex()),
+			},
+		}
+		if walSnaps[idx].ConfState != nil {
+			snapshot.Metadata.ConfState = proto.Clone(walSnaps[idx].ConfState).(*raftpb.ConfState)
+		}
+		cfg.Logger.Info("constructed a snapshot from WAL record",
+			zap.Uint64("snapshot-index", snapshot.Metadata.GetIndex()),
+			zap.Int("snapshot-size", proto.Size(snapshot)),
+			zap.String("confState", snapshot.Metadata.ConfState.String()),
+			zap.Int("walSnaps-count", len(walSnaps)),
+		)
 	}
 
 	if snapshot != nil {
-		if err = st.Recovery(snapshot.Data); err != nil {
-			cfg.Logger.Panic("failed to recover from snapshot", zap.Error(err))
-		}
-
-		if err = serverstorage.AssertNoV2StoreContent(cfg.Logger, st, cfg.V2Deprecation); err != nil {
-			cfg.Logger.Error("illegal v2store content", zap.Error(err))
-			return nil, be, err
-		}
-
-		cfg.Logger.Info(
-			"recovered v2 store from snapshot",
-			zap.Uint64("snapshot-index", snapshot.Metadata.Index),
-			zap.String("snapshot-size", humanize.Bytes(uint64(snapshot.Size()))),
-		)
-
-		if be, err = serverstorage.RecoverSnapshotBackend(cfg, be, *snapshot, beExist, beHooks); err != nil {
+		if be, err = serverstorage.RecoverSnapshotBackend(cfg, be, snapshot, beExist, beHooks); err != nil {
 			cfg.Logger.Panic("failed to recover v3 backend from snapshot", zap.Error(err))
 		}
 		// A snapshot db may have already been recovered, and the old db should have
@@ -427,13 +449,13 @@ func recoverSnapshot(cfg config.ServerConfig, st v2store.Store, be backend.Backe
 			// TODO: remove kvindex != 0 checking when we do not expect users to upgrade
 			// etcd from pre-3.0 release.
 			kvindex := ci.ConsistentIndex()
-			if kvindex < snapshot.Metadata.Index {
+			if kvindex < snapshot.Metadata.GetIndex() {
 				if kvindex != 0 {
-					return nil, be, fmt.Errorf("database file (%v index %d) does not match with snapshot (index %d)", cfg.BackendPath(), kvindex, snapshot.Metadata.Index)
+					return nil, be, fmt.Errorf("database file (%v index %d) does not match with snapshot (index %d)", cfg.BackendPath(), kvindex, snapshot.Metadata.GetIndex())
 				}
 				cfg.Logger.Warn(
 					"consistent index was never saved",
-					zap.Uint64("snapshot-index", snapshot.Metadata.Index),
+					zap.Uint64("snapshot-index", snapshot.Metadata.GetIndex()),
 				)
 			}
 		}
@@ -447,13 +469,7 @@ func (c *bootstrappedCluster) Finalize(cfg config.ServerConfig, s *bootstrappedS
 	if !s.wal.haveWAL {
 		c.cl.SetID(c.nodeID, c.cl.ID())
 	}
-	c.cl.SetStore(s.st)
 	c.cl.SetBackend(schema.NewMembershipBackend(cfg.Logger, s.backend.be))
-
-	// Workaround the issues which have already been affected
-	// by https://github.com/etcd-io/etcd/issues/19557.
-	c.cl.SyncLearnerPromotionIfNeeded()
-
 	if s.wal.haveWAL {
 		c.cl.Recover(api.UpdateCapability)
 		if c.databaseFileMissing(s) {
@@ -571,7 +587,7 @@ func bootstrapWALFromSnapshot(cfg config.ServerConfig, snapshot *raftpb.Snapshot
 
 	if cfg.ForceNewCluster {
 		consistentIndex := ci.ConsistentIndex()
-		oldCommitIndex := bwal.st.Commit
+		oldCommitIndex := bwal.st.GetCommit()
 		// If only `HardState.Commit` increases, HardState won't be persisted
 		// to disk, even though the committed entries might have already been
 		// applied. This can result in consistent_index > CommitIndex.
@@ -581,7 +597,7 @@ func bootstrapWALFromSnapshot(cfg config.ServerConfig, snapshot *raftpb.Snapshot
 		// committed, we reset Commit to max(HardState.Commit, consistent_index).
 		//
 		// See: https://github.com/etcd-io/raft/pull/300 for more details.
-		bwal.st.Commit = max(oldCommitIndex, consistentIndex)
+		bwal.st.Commit = new(max(oldCommitIndex, consistentIndex))
 
 		// discard the previously uncommitted entries
 		bwal.ents = bwal.CommitedEntries()
@@ -593,14 +609,14 @@ func bootstrapWALFromSnapshot(cfg config.ServerConfig, snapshot *raftpb.Snapshot
 			zap.String("cluster-id", meta.clusterID.String()),
 			zap.String("local-member-id", meta.nodeID.String()),
 			zap.Uint64("wal-commit-index", oldCommitIndex),
-			zap.Uint64("commit-index", bwal.st.Commit),
+			zap.Uint64("commit-index", bwal.st.GetCommit()),
 		)
 	} else {
 		cfg.Logger.Info(
 			"restarting local member",
 			zap.String("cluster-id", meta.clusterID.String()),
 			zap.String("local-member-id", meta.nodeID.String()),
-			zap.Uint64("commit-index", bwal.st.Commit),
+			zap.Uint64("commit-index", bwal.st.GetCommit()),
 		)
 	}
 	return bwal
@@ -609,14 +625,14 @@ func bootstrapWALFromSnapshot(cfg config.ServerConfig, snapshot *raftpb.Snapshot
 // openWALFromSnapshot reads the WAL at the given snap and returns the wal, its latest HardState and cluster ID, and all entries that appear
 // after the position of the given snap in the WAL.
 // The snap must have been previously saved to the WAL, or this call will panic.
-func openWALFromSnapshot(cfg config.ServerConfig, snapshot *raftpb.Snapshot) (*wal.WAL, *raftpb.HardState, []raftpb.Entry, *raftpb.Snapshot, *snapshotMetadata) {
+func openWALFromSnapshot(cfg config.ServerConfig, snapshot *raftpb.Snapshot) (*wal.WAL, *raftpb.HardState, []*raftpb.Entry, *raftpb.Snapshot, *snapshotMetadata) {
 	var walsnap walpb.Snapshot
 	if snapshot != nil {
-		walsnap.Index, walsnap.Term = snapshot.Metadata.Index, snapshot.Metadata.Term
+		walsnap.Index, walsnap.Term = new(snapshot.Metadata.GetIndex()), new(snapshot.Metadata.GetTerm())
 	}
 	repaired := false
 	for {
-		w, err := wal.Open(cfg.Logger, cfg.WALDir(), walsnap)
+		w, err := wal.Open(cfg.Logger, cfg.WALDir(), &walsnap)
 		if err != nil {
 			cfg.Logger.Fatal("failed to open WAL", zap.Error(err))
 		}
@@ -639,11 +655,11 @@ func openWALFromSnapshot(cfg config.ServerConfig, snapshot *raftpb.Snapshot) (*w
 			continue
 		}
 		var metadata etcdserverpb.Metadata
-		pbutil.MustUnmarshal(&metadata, wmetadata)
-		id := types.ID(metadata.NodeID)
-		cid := types.ID(metadata.ClusterID)
+		pbutil.MustUnmarshalMessage(&metadata, wmetadata)
+		id := types.ID(metadata.GetNodeID())
+		cid := types.ID(metadata.GetClusterID())
 		meta := &snapshotMetadata{clusterID: cid, nodeID: id}
-		return w, &st, ents, snapshot, meta
+		return w, st, ents, snapshot, meta
 	}
 }
 
@@ -652,10 +668,10 @@ type snapshotMetadata struct {
 }
 
 func bootstrapNewWAL(cfg config.ServerConfig, cl *bootstrappedCluster) *bootstrappedWAL {
-	metadata := pbutil.MustMarshal(
+	metadata := pbutil.MustMarshalMessage(
 		&etcdserverpb.Metadata{
-			NodeID:    uint64(cl.nodeID),
-			ClusterID: uint64(cl.cl.ID()),
+			NodeID:    new(uint64(cl.nodeID)),
+			ClusterID: new(uint64(cl.cl.ID())),
 		},
 	)
 	w, err := wal.Create(cfg.Logger, cfg.WALDir(), metadata)
@@ -677,7 +693,7 @@ type bootstrappedWAL struct {
 	haveWAL  bool
 	w        *wal.WAL
 	st       *raftpb.HardState
-	ents     []raftpb.Entry
+	ents     []*raftpb.Entry
 	snapshot *raftpb.Snapshot
 	meta     *snapshotMetadata
 }
@@ -685,10 +701,10 @@ type bootstrappedWAL struct {
 func (wal *bootstrappedWAL) MemoryStorage() *raft.MemoryStorage {
 	s := raft.NewMemoryStorage()
 	if wal.snapshot != nil {
-		s.ApplySnapshot(*wal.snapshot)
+		s.ApplySnapshot(wal.snapshot)
 	}
 	if wal.st != nil {
-		s.SetHardState(*wal.st)
+		s.SetHardState(wal.st)
 	}
 	if len(wal.ents) != 0 {
 		s.Append(wal.ents)
@@ -696,13 +712,13 @@ func (wal *bootstrappedWAL) MemoryStorage() *raft.MemoryStorage {
 	return s
 }
 
-func (wal *bootstrappedWAL) CommitedEntries() []raftpb.Entry {
+func (wal *bootstrappedWAL) CommitedEntries() []*raftpb.Entry {
 	for i, ent := range wal.ents {
-		if ent.Index > wal.st.Commit {
+		if ent.GetIndex() > wal.st.GetCommit() {
 			wal.lg.Info(
 				"discarding uncommitted WAL entries",
-				zap.Uint64("entry-index", ent.Index),
-				zap.Uint64("commit-index-from-wal", wal.st.Commit),
+				zap.Uint64("entry-index", ent.GetIndex()),
+				zap.Uint64("commit-index-from-wal", wal.st.GetCommit()),
 				zap.Int("number-of-discarded-entries", len(wal.ents)-i),
 			)
 			return wal.ents[:i]
@@ -711,19 +727,19 @@ func (wal *bootstrappedWAL) CommitedEntries() []raftpb.Entry {
 	return wal.ents
 }
 
-func (wal *bootstrappedWAL) NewConfigChangeEntries() []raftpb.Entry {
+func (wal *bootstrappedWAL) NewConfigChangeEntries() []*raftpb.Entry {
 	return serverstorage.CreateConfigChangeEnts(
 		wal.lg,
 		serverstorage.GetEffectiveNodeIDsFromWALEntries(wal.lg, wal.snapshot, wal.ents),
 		uint64(wal.meta.nodeID),
-		wal.st.Term,
-		wal.st.Commit,
+		wal.st.GetTerm(),
+		wal.st.GetCommit(),
 	)
 }
 
-func (wal *bootstrappedWAL) AppendAndCommitEntries(ents []raftpb.Entry) {
+func (wal *bootstrappedWAL) AppendAndCommitEntries(ents []*raftpb.Entry) {
 	wal.ents = append(wal.ents, ents...)
-	err := wal.w.Save(raftpb.HardState{}, ents)
+	err := wal.w.Save(&raftpb.HardState{}, ents)
 	if err != nil {
 		wal.lg.Fatal("failed to save hard state and entries", zap.Error(err))
 	}

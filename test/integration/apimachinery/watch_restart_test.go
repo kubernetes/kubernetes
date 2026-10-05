@@ -211,8 +211,7 @@ func TestWatchRestartsIfTimeoutNotReached(t *testing.T) {
 	}
 
 	t.Run("group", func(t *testing.T) {
-		for _, tmptc := range tt {
-			tc := tmptc // we need to copy it for parallel runs
+		for _, tc := range tt {
 			t.Run(tc.name, func(t *testing.T) {
 				t.Parallel()
 				c, err := kubernetes.NewForConfig(server.ClientConfig)

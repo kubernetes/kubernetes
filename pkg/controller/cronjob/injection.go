@@ -111,14 +111,15 @@ func (r realJobControl) DeleteJob(namespace string, name string) error {
 
 type fakeJobControl struct {
 	sync.Mutex
-	Job           *batchv1.Job
-	Jobs          []batchv1.Job
-	DeleteJobName []string
-	Err           error
-	CreateErr     error
-	UpdateJobName []string
-	PatchJobName  []string
-	Patches       [][]byte
+	Job             *batchv1.Job
+	Jobs            []batchv1.Job
+	DeleteJobName   []string
+	Err             error
+	CreateErr       error
+	UpdateJobName   []string
+	PatchJobName    []string
+	Patches         [][]byte
+	GetJobNamespace []string
 }
 
 var _ jobControlInterface = &fakeJobControl{}
@@ -140,6 +141,7 @@ func (f *fakeJobControl) GetJob(namespace, name string) (*batchv1.Job, error) {
 	if f.Err != nil {
 		return nil, f.Err
 	}
+	f.GetJobNamespace = append(f.GetJobNamespace, namespace)
 	return f.Job, nil
 }
 

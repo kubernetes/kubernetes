@@ -20,6 +20,7 @@ import (
 	"sync"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
@@ -33,10 +34,7 @@ type stateMemory struct {
 var _ State = &stateMemory{}
 
 // NewStateMemory creates new State to track resources resourcesated to pods
-func NewStateMemory(resources PodResourceInfoMap) State {
-	// Use klog.TODO() because we currently do not have a proper logger to pass in.
-	// Replace this with an appropriate logger when refactoring this function to accept a logger parameter.
-	logger := klog.TODO()
+func NewStateMemory(logger klog.Logger, resources PodResourceInfoMap) State {
 	if resources == nil {
 		resources = PodResourceInfoMap{}
 	}
@@ -75,6 +73,25 @@ func (s *stateMemory) GetPodLevelResources(podUID types.UID) (*v1.ResourceRequir
 	return pr.PodLevelResources.DeepCopy(), ok
 }
 
+// GetEmptyDirVolumeLimit returns current resources information for emptyDir volume
+func (s *stateMemory) GetEmptyDirVolumeLimit(podUID types.UID, volumeName string) (*resource.Quantity, bool) {
+	s.RLock()
+	defer s.RUnlock()
+
+	pr, ok := s.podResources[podUID]
+	if !ok {
+		return nil, ok
+	}
+
+	sizeLimit, ok := pr.EmptyDirVolumeLimits[volumeName]
+	if !ok {
+		return nil, ok
+	}
+
+	sizeLimitCopy := sizeLimit.DeepCopy()
+	return &sizeLimitCopy, ok
+}
+
 func (s *stateMemory) GetPodResourceInfoMap() PodResourceInfoMap {
 	s.RLock()
 	defer s.RUnlock()
@@ -89,11 +106,7 @@ func (s *stateMemory) GetPodResourceInfo(podUID types.UID) (PodResourceInfo, boo
 	return resourceInfo, ok
 }
 
-func (s *stateMemory) SetContainerResources(podUID types.UID, containerName string, resources v1.ResourceRequirements) error {
-	// Use klog.TODO() because we currently do not have a proper logger to pass in.
-	// Replace this with an appropriate logger when refactoring this function to accept a logger parameter.
-	logger := klog.TODO()
-
+func (s *stateMemory) SetContainerResources(logger klog.Logger, podUID types.UID, containerName string, resources v1.ResourceRequirements) error {
 	s.Lock()
 	defer s.Unlock()
 
@@ -115,10 +128,7 @@ func (s *stateMemory) SetContainerResources(podUID types.UID, containerName stri
 	return nil
 }
 
-func (s *stateMemory) SetPodLevelResources(podUID types.UID, resources *v1.ResourceRequirements) error {
-	// Use klog.TODO() because we currently do not have a proper logger to pass in.
-	// Replace this with an appropriate logger when refactoring this function to accept a logger parameter.
-	logger := klog.TODO()
+func (s *stateMemory) SetPodLevelResources(logger klog.Logger, podUID types.UID, resources *v1.ResourceRequirements) error {
 	s.Lock()
 	defer s.Unlock()
 
@@ -135,6 +145,29 @@ func (s *stateMemory) SetPodLevelResources(podUID types.UID, resources *v1.Resou
 	return nil
 }
 
+func (s *stateMemory) SetEmptyDirVolumeLimit(podUID types.UID, volumeName string, limit *resource.Quantity) error {
+	logger := klog.TODO()
+	s.Lock()
+	defer s.Unlock()
+
+	podInfo, ok := s.podResources[podUID]
+	if !ok {
+		podInfo = PodResourceInfo{
+			ContainerResources: make(map[string]v1.ResourceRequirements),
+		}
+	}
+
+	if podInfo.EmptyDirVolumeLimits == nil {
+		podInfo.EmptyDirVolumeLimits = make(map[string]*resource.Quantity)
+	}
+
+	podInfo.EmptyDirVolumeLimits[volumeName] = limit
+	s.podResources[podUID] = podInfo
+
+	logger.V(3).Info("Updated emptyDir volume limit", "podUID", podUID, "volumeName", volumeName, "limit", limit)
+	return nil
+}
+
 func (s *stateMemory) SetPodResourceInfo(logger klog.Logger, podUID types.UID, resourceInfo PodResourceInfo) error {
 	s.Lock()
 	defer s.Unlock()
@@ -144,10 +177,7 @@ func (s *stateMemory) SetPodResourceInfo(logger klog.Logger, podUID types.UID, r
 	return nil
 }
 
-func (s *stateMemory) RemovePod(podUID types.UID) error {
-	// Use klog.TODO() because we currently do not have a proper logger to pass in.
-	// Replace this with an appropriate logger when refactoring this function to accept a logger parameter.
-	logger := klog.TODO()
+func (s *stateMemory) RemovePod(logger klog.Logger, podUID types.UID) error {
 	s.Lock()
 	defer s.Unlock()
 	delete(s.podResources, podUID)

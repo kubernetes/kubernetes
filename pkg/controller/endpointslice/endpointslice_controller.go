@@ -30,7 +30,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	discoveryinformers "k8s.io/client-go/informers/discovery/v1"
 	clientset "k8s.io/client-go/kubernetes"
@@ -48,7 +47,6 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller"
 	endpointslicepkg "k8s.io/kubernetes/pkg/controller/util/endpointslice"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 const (
@@ -90,6 +88,7 @@ func NewController(ctx context.Context, podInformer coreinformers.PodInformer,
 	client clientset.Interface,
 	endpointUpdatesBatchPeriod time.Duration,
 ) *Controller {
+	logger := klog.FromContext(ctx)
 	broadcaster := record.NewBroadcaster(record.WithContext(ctx))
 	recorder := broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "endpoint-slice-controller"})
 
@@ -111,43 +110,55 @@ func NewController(ctx context.Context, podInformer coreinformers.PodInformer,
 				&workqueue.TypedBucketRateLimiter[string]{Limiter: rate.NewLimiter(rate.Limit(10), 100)},
 			),
 			workqueue.TypedRateLimitingQueueConfig[string]{
-				Name: "endpoint_slice",
+				Logger: &logger,
+				Name:   "endpoint_slice",
 			},
 		),
-		podQueue:         workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[*endpointsliceutil.PodProjectionKey]()),
-		topologyQueue:    workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[string]()),
+		podQueue: workqueue.NewTypedRateLimitingQueueWithConfig(
+			workqueue.DefaultTypedControllerRateLimiter[*endpointsliceutil.PodProjectionKey](),
+			workqueue.TypedRateLimitingQueueConfig[*endpointsliceutil.PodProjectionKey]{
+				Logger: &logger,
+				Name:   "endpoint_slice_pods",
+			},
+		),
+		topologyQueue: workqueue.NewTypedRateLimitingQueueWithConfig(
+			workqueue.DefaultTypedControllerRateLimiter[string](),
+			workqueue.TypedRateLimitingQueueConfig[string]{
+				Logger: &logger,
+				Name:   "endpoint_slice_topology",
+			},
+		),
 		workerLoopPeriod: time.Second,
 	}
 
-	serviceInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	_, _ = serviceInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		AddFunc: c.onServiceUpdate,
 		UpdateFunc: func(old, cur interface{}) {
 			c.onServiceUpdate(cur)
 		},
 		DeleteFunc: c.onServiceDelete,
-	})
+	}, cache.HandlerOptions{Logger: &logger})
 	c.serviceLister = serviceInformer.Lister()
 	c.servicesSynced = serviceInformer.Informer().HasSynced
 
-	podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	_, _ = podInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		AddFunc:    func(obj interface{}) { c.onPodUpdate(nil, obj) },
 		UpdateFunc: c.onPodUpdate,
 		DeleteFunc: func(obj interface{}) { c.onPodUpdate(obj, nil) },
-	})
+	}, cache.HandlerOptions{Logger: &logger})
 	c.podLister = podInformer.Lister()
 	c.podsSynced = podInformer.Informer().HasSynced
 
 	c.nodeLister = nodeInformer.Lister()
 	c.nodesSynced = nodeInformer.Informer().HasSynced
 
-	logger := klog.FromContext(ctx)
-	endpointSliceInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	_, _ = endpointSliceInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		AddFunc: c.onEndpointSliceAdd,
 		UpdateFunc: func(oldObj, newObj interface{}) {
 			c.onEndpointSliceUpdate(logger, oldObj, newObj)
 		},
 		DeleteFunc: c.onEndpointSliceDelete,
-	})
+	}, cache.HandlerOptions{Logger: &logger})
 
 	c.endpointSliceLister = endpointSliceInformer.Lister()
 	c.endpointSlicesSynced = endpointSliceInformer.Informer().HasSynced
@@ -162,7 +173,7 @@ func NewController(ctx context.Context, podInformer coreinformers.PodInformer,
 
 	c.endpointUpdatesBatchPeriod = endpointUpdatesBatchPeriod
 
-	nodeInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	_, _ = nodeInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(_ interface{}) {
 			c.addNode()
 		},
@@ -172,7 +183,7 @@ func NewController(ctx context.Context, podInformer coreinformers.PodInformer,
 		DeleteFunc: func(_ interface{}) {
 			c.deleteNode()
 		},
-	})
+	}, cache.HandlerOptions{Logger: &logger})
 	c.topologyCache = topologycache.NewTopologyCache()
 
 	c.reconciler = endpointslicerec.NewReconciler(
@@ -183,7 +194,6 @@ func NewController(ctx context.Context, podInformer coreinformers.PodInformer,
 		c.topologyCache,
 		c.eventRecorder,
 		ControllerName,
-		endpointslicerec.WithPreferSameTrafficDistributionEnabled(utilfeature.DefaultFeatureGate.Enabled(features.PreferSameTrafficDistribution)),
 	)
 
 	return c
@@ -269,7 +279,7 @@ type Controller struct {
 
 // Run will not return until stopCh is closed.
 func (c *Controller) Run(ctx context.Context, workers int) {
-	defer utilruntime.HandleCrash()
+	defer utilruntime.HandleCrashWithContext(ctx)
 
 	// Start events processing pipeline.
 	c.eventBroadcaster.StartLogging(klog.Infof)

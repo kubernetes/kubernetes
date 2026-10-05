@@ -58,6 +58,7 @@ func newValidatingAdmissionPolicyStatusController(ctx context.Context, controlle
 	}
 
 	c, err := validatingadmissionpolicystatus.NewController(
+		ctx,
 		controllerContext.InformerFactory.Admissionregistration().V1().ValidatingAdmissionPolicies(),
 		client.AdmissionregistrationV1().ValidatingAdmissionPolicies(),
 		typeChecker,

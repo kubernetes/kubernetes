@@ -80,7 +80,7 @@ func ValidateNetworkPolicyPort(port *networking.NetworkPolicyPort, portPath *fie
 			}
 			if port.EndPort != nil {
 				if *port.EndPort < port.Port.IntVal {
-					allErrs = append(allErrs, field.Invalid(portPath.Child("endPort"), port.Port.IntVal, "must be greater than or equal to `port`"))
+					allErrs = append(allErrs, field.Invalid(portPath.Child("endPort"), *port.EndPort, "must be greater than or equal to `port`"))
 				}
 				for _, msg := range validation.IsValidPortNum(int(*port.EndPort)) {
 					allErrs = append(allErrs, field.Invalid(portPath.Child("endPort"), *port.EndPort, msg))
@@ -246,7 +246,7 @@ func ValidateNetworkPolicyUpdate(update, old *networking.NetworkPolicy, opts Net
 func ValidateIPBlock(ipb *networking.IPBlock, fldPath *field.Path, opts NetworkPolicyValidationOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if ipb.CIDR == "" {
-		allErrs = append(allErrs, field.Required(fldPath.Child("cidr"), ""))
+		allErrs = append(allErrs, field.Required(fldPath.Child("cidr"), "").MarkCoveredByDeclarative())
 		return allErrs
 	}
 	allErrs = append(allErrs, apivalidation.IsValidCIDRForLegacyField(fldPath.Child("cidr"), ipb.CIDR, opts.AllowCIDRsEvenIfInvalid)...)
@@ -574,10 +574,15 @@ func ValidateIngressClassUpdate(newIngressClass, oldIngressClass *networking.Ing
 // validateIngressClassSpec ensures that IngressClassSpec fields are valid.
 func validateIngressClassSpec(spec *networking.IngressClassSpec, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	if len(spec.Controller) > maxLenIngressClassController {
-		allErrs = append(allErrs, field.TooLong(fldPath.Child("controller"), "" /*unused*/, maxLenIngressClassController))
+	if len(spec.Controller) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("controller"), "").MarkCoveredByDeclarative())
+	} else {
+		if len(spec.Controller) > maxLenIngressClassController {
+			allErrs = append(allErrs, field.TooLong(fldPath.Child("controller"), "", /*unused*/
+				maxLenIngressClassController).MarkCoveredByDeclarative().WithOrigin("maxBytes"))
+		}
+		allErrs = append(allErrs, validation.IsDomainPrefixedPath(fldPath.Child("controller"), spec.Controller)...)
 	}
-	allErrs = append(allErrs, validation.IsDomainPrefixedPath(fldPath.Child("controller"), spec.Controller)...)
 	allErrs = append(allErrs, validateIngressClassParametersReference(spec.Parameters, fldPath.Child("parameters"))...)
 	return allErrs
 }
@@ -585,7 +590,7 @@ func validateIngressClassSpec(spec *networking.IngressClassSpec, fldPath *field.
 // validateIngressClassSpecUpdate ensures that IngressClassSpec updates are
 // valid.
 func validateIngressClassSpecUpdate(newSpec, oldSpec *networking.IngressClassSpec, fldPath *field.Path) field.ErrorList {
-	return apivalidation.ValidateImmutableField(newSpec.Controller, oldSpec.Controller, fldPath.Child("controller"))
+	return apivalidation.ValidateImmutableField(newSpec.Controller, oldSpec.Controller, fldPath.Child("controller")).MarkCoveredByDeclarative().WithOrigin("immutable")
 }
 
 // validateIngressTypedLocalObjectReference ensures that Parameters fields are valid.
@@ -639,7 +644,7 @@ func validateIngressClassParametersReference(params *networking.IngressClassPara
 	}
 
 	if params.Kind == "" {
-		allErrs = append(allErrs, field.Required(fldPath.Child("kind"), "")).MarkCoveredByDeclarative()
+		allErrs = append(allErrs, field.Required(fldPath.Child("kind"), "").MarkCoveredByDeclarative())
 	} else {
 		for _, msg := range content.IsPathSegmentName(params.Kind) {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("kind"), params.Kind, msg))
@@ -647,7 +652,7 @@ func validateIngressClassParametersReference(params *networking.IngressClassPara
 	}
 
 	if params.Name == "" {
-		allErrs = append(allErrs, field.Required(fldPath.Child("name"), "")).MarkCoveredByDeclarative()
+		allErrs = append(allErrs, field.Required(fldPath.Child("name"), "").MarkCoveredByDeclarative())
 	} else {
 		for _, msg := range content.IsPathSegmentName(params.Name) {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("name"), params.Name, msg))
@@ -785,7 +790,7 @@ func validateIPAddressParentReference(params *networking.ParentReference, fldPat
 	allErrs := field.ErrorList{}
 
 	if params == nil {
-		allErrs = append(allErrs, field.Required(fldPath.Child("parentRef"), ""))
+		allErrs = append(allErrs, field.Required(fldPath.Child("parentRef"), "").MarkCoveredByDeclarative())
 		return allErrs
 	}
 
@@ -799,7 +804,7 @@ func validateIPAddressParentReference(params *networking.ParentReference, fldPat
 
 	// resource is required
 	if params.Resource == "" {
-		allErrs = append(allErrs, field.Required(fldPath.Child("resource"), ""))
+		allErrs = append(allErrs, field.Required(fldPath.Child("resource"), "").MarkCoveredByDeclarative())
 	} else {
 		for _, msg := range content.IsPathSegmentName(params.Resource) {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("resource"), params.Resource, msg))
@@ -808,7 +813,7 @@ func validateIPAddressParentReference(params *networking.ParentReference, fldPat
 
 	// name is required
 	if params.Name == "" {
-		allErrs = append(allErrs, field.Required(fldPath.Child("name"), ""))
+		allErrs = append(allErrs, field.Required(fldPath.Child("name"), "").MarkCoveredByDeclarative())
 	} else {
 		for _, msg := range content.IsPathSegmentName(params.Name) {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("name"), params.Name, msg))
@@ -828,7 +833,7 @@ func validateIPAddressParentReference(params *networking.ParentReference, fldPat
 func ValidateIPAddressUpdate(update, old *networking.IPAddress) field.ErrorList {
 	var allErrs field.ErrorList
 	allErrs = append(allErrs, apivalidation.ValidateObjectMetaUpdate(&update.ObjectMeta, &old.ObjectMeta, field.NewPath("metadata"))...)
-	allErrs = append(allErrs, apivalidation.ValidateImmutableField(update.Spec.ParentRef, old.Spec.ParentRef, field.NewPath("spec").Child("parentRef"))...)
+	allErrs = append(allErrs, apivalidation.ValidateImmutableField(update.Spec.ParentRef, old.Spec.ParentRef, field.NewPath("spec").Child("parentRef")).MarkCoveredByDeclarative().WithOrigin("immutable")...)
 	return allErrs
 }
 

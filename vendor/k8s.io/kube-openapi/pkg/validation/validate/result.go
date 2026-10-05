@@ -135,13 +135,13 @@ func (r *Result) keepRelevantErrors() *Result {
 	strippedErrors := []error{}
 	for _, e := range r.Errors {
 		if strings.HasPrefix(e.Error(), "IMPORTANT!") {
-			strippedErrors = append(strippedErrors, fmt.Errorf(strings.TrimPrefix(e.Error(), "IMPORTANT!")))
+			strippedErrors = append(strippedErrors, fmt.Errorf("%s", strings.TrimPrefix(e.Error(), "IMPORTANT!")))
 		}
 	}
 	strippedWarnings := []error{}
 	for _, e := range r.Warnings {
 		if strings.HasPrefix(e.Error(), "IMPORTANT!") {
-			strippedWarnings = append(strippedWarnings, fmt.Errorf(strings.TrimPrefix(e.Error(), "IMPORTANT!")))
+			strippedWarnings = append(strippedWarnings, fmt.Errorf("%s", strings.TrimPrefix(e.Error(), "IMPORTANT!")))
 		}
 	}
 	strippedResult := new(Result)

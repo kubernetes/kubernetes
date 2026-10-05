@@ -28,6 +28,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
 	nodectlr "k8s.io/kubernetes/pkg/controller/nodelifecycle"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 // CreateNamespaceOrDie creates a namespace.
@@ -41,7 +42,7 @@ func CreateNamespaceOrDie(c clientset.Interface, baseName string, t testing.TB) 
 }
 
 // DeleteNamespaceOrDie deletes a namespace.
-func DeleteNamespaceOrDie(c clientset.Interface, ns *v1.Namespace, t testing.TB) {
+func DeleteNamespaceOrDie(c clientset.Interface, ns *v1.Namespace, t ktesting.TB) {
 	err := c.CoreV1().Namespaces().Delete(context.TODO(), ns.Name, metav1.DeleteOptions{})
 	if err != nil {
 		t.Fatalf("Failed to delete namespace: %v", err)

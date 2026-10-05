@@ -40,7 +40,6 @@ import (
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
-	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	storageframework "k8s.io/kubernetes/test/e2e/storage/framework"
 	storageutils "k8s.io/kubernetes/test/e2e/storage/utils"
 	admissionapi "k8s.io/pod-security-admission/api"
@@ -87,14 +86,15 @@ func (t *volumeLimitsTestSuite) GetTestSuiteInfo() storageframework.TestSuiteInf
 	return t.tsInfo
 }
 
-func (t *volumeLimitsTestSuite) SkipUnsupportedTests(driver storageframework.TestDriver, pattern storageframework.TestPattern) {
+func (t *volumeLimitsTestSuite) SkipUnsupportedTests(driver storageframework.TestDriver, pattern storageframework.TestPattern) string {
 	if pattern.VolType != storageframework.DynamicPV {
-		e2eskipper.Skipf("Suite %q does not support %v", t.tsInfo.Name, pattern.VolType)
+		return fmt.Sprintf("Suite %q does not support %v", t.tsInfo.Name, pattern.VolType)
 	}
 	dInfo := driver.GetDriverInfo()
 	if !dInfo.Capabilities[storageframework.CapVolumeLimits] {
-		e2eskipper.Skipf("Driver %s does not support volume limits", dInfo.Name)
+		return fmt.Sprintf("Driver %s does not support volume limits", dInfo.Name)
 	}
+	return ""
 }
 
 func (t *volumeLimitsTestSuite) DefineTests(driver storageframework.TestDriver, pattern storageframework.TestPattern) {
@@ -224,7 +224,7 @@ func (t *volumeLimitsTestSuite) DefineTests(driver storageframework.TestDriver, 
 		if pattern.VolType == storageframework.GenericEphemeralVolume {
 			// Create <limit> Pods.
 			ginkgo.By(fmt.Sprintf("Creating %d Pod(s) with one volume each", limit))
-			for i := 0; i < limit; i++ {
+			for range limit {
 				pod := StartInPodWithVolumeSource(ctx, l.cs, *l.resource.VolSource, l.ns.Name, "volume-limits", e2epod.InfiniteSleepCommand, selection)
 				l.podNames = append(l.podNames, pod.Name)
 				l.pvcNames = append(l.pvcNames, ephemeral.VolumeClaimName(pod, &pod.Spec.Volumes[0]))
@@ -233,7 +233,7 @@ func (t *volumeLimitsTestSuite) DefineTests(driver storageframework.TestDriver, 
 			// Create <limit> PVCs for one gigantic pod.
 			var pvcs []*v1.PersistentVolumeClaim
 			ginkgo.By(fmt.Sprintf("Creating %d PVC(s)", limit))
-			for i := 0; i < limit; i++ {
+			for range limit {
 				pvc := e2epv.MakePersistentVolumeClaim(e2epv.PersistentVolumeClaimConfig{
 					ClaimSize:        claimSize,
 					StorageClassName: &l.resource.Sc.Name,

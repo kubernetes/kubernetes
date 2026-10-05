@@ -20,10 +20,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 	"testing"
 	"time"
 
-	"github.com/google/go-cmp/cmp"
 	coordinationv1 "k8s.io/api/coordination/v1"
 	corev1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -32,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
@@ -253,7 +254,7 @@ func TestNewNodeLease(t *testing.T) {
 				t.Fatalf("the new lease must be newly allocated, but got same address as base")
 			}
 			if !apiequality.Semantic.DeepEqual(tc.expect, newLease) {
-				t.Errorf("unexpected result from newLease: %s", cmp.Diff(tc.expect, newLease))
+				t.Errorf("expected %#v, got %#v", tc.expect, newLease)
 			}
 		})
 	}
@@ -505,6 +506,51 @@ func TestUpdateUsingLatestLease(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestStopDoesNotBlockWhenLeaseCannotBeCreated verifies that Stop returns
+// while sync is retrying a lease create that will never succeed. sync holds
+// the reconciling lock across the retries, so Stop must interrupt them.
+func TestStopDoesNotBlockWhenLeaseCannotBeCreated(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	cl := fake.NewSimpleClientset()
+	retrying := make(chan struct{})
+	var retryingOnce sync.Once
+	cl.PrependReactor("create", "leases", func(action clienttesting.Action) (bool, runtime.Object, error) {
+		retryingOnce.Do(func() { close(retrying) })
+		return true, nil, apierrors.NewInvalid(
+			schema.GroupKind{Group: coordinationv1.GroupName, Kind: "Lease"}, "foo", nil)
+	})
+
+	c := NewController(testingclock.NewFakeClock(time.Now()), cl, "foo", 60, nil,
+		10*time.Millisecond, "foo", corev1.NamespaceNodeLease, nil)
+	go c.Run(ctx)
+
+	// Wait until sync is inside the create retry loop, holding the
+	// reconciling lock.
+	select {
+	case <-retrying:
+	case <-time.After(wait.ForeverTestTimeout):
+		t.Fatal("timed out waiting for the controller to attempt lease creation")
+	}
+
+	stopped := make(chan struct{})
+	go func() {
+		defer close(stopped)
+		c.Stop()
+	}()
+
+	select {
+	case <-stopped:
+	case <-time.After(wait.ForeverTestTimeout):
+		t.Fatal("Stop() did not return while lease creation keeps failing")
+	}
+
+	// Stop must be safe to call more than once.
+	c.Stop()
 }
 
 // setNodeOwnerFunc helps construct a newLeasePostProcessFunc which sets

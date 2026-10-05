@@ -24,6 +24,7 @@ import (
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -121,7 +122,7 @@ var _ = sigDescribe(feature.Windows, "GracefulNodeShutdown", framework.WithSeria
 		}
 
 		for _, pod := range list.Items {
-			framework.Logf("Pod (%v/%v) status conditions: %q", pod.Namespace, pod.Name, &pod.Status.Conditions)
+			framework.Logf("Pod (%v/%v) status conditions: %#v", pod.Namespace, pod.Name, pod.Status.Conditions)
 		}
 
 		// use to keep the node active before testing critical pods reaching the terminate state

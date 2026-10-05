@@ -246,8 +246,6 @@ func TestRealFIFOW_ReplaceMakesDeletionsForObjectsOnlyInQueue(t *testing.T) {
 		},
 	}
 	for _, tt := range table {
-		tt := tt
-
 		t.Run(tt.name, func(t *testing.T) {
 			// Test with a RealFIFO with a backing KnownObjects
 			fWithKnownObjects := NewRealFIFO(
@@ -574,6 +572,29 @@ func TestRealFIFO_Resync(t *testing.T) {
 	}
 	if deltas[0].Type != Sync {
 		t.Errorf("unexpected delta: %v", deltas[0])
+	}
+}
+
+func TestRealFIFO_ResyncPropagatesQueueError(t *testing.T) {
+	sentinel := errors.New("computing key failed")
+	f := NewRealFIFO(
+		func(obj interface{}) (string, error) {
+			if fifoObj, ok := obj.(testFifoObject); ok && fifoObj.name == "broken" {
+				return "", sentinel
+			}
+			return testFifoObjectKeyFunc(obj)
+		},
+		literalListerGetter(func() []testFifoObject {
+			return []testFifoObject{mkFifoObj("broken", 5)}
+		}),
+		nil,
+	)
+	err := f.Resync()
+	if err == nil {
+		t.Fatal("expected Resync to return an error when the object cannot be queued")
+	}
+	if !errors.Is(err, sentinel) {
+		t.Errorf("expected the underlying queueing error to be wrapped, got: %v", err)
 	}
 }
 
@@ -1394,8 +1415,6 @@ func TestRealFIFO_ReplaceAtomic(t *testing.T) {
 		},
 	}
 	for _, tt := range table {
-		tt := tt
-
 		t.Run(tt.name, func(t *testing.T) {
 			// Test with a RealFIFO with a backing KnownObjects
 			f := NewRealFIFO(

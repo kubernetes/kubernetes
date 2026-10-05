@@ -38,6 +38,7 @@ func newClusterRoleAggregationController(ctx context.Context, controllerContext 
 	}
 
 	crac := clusterroleaggregation.NewClusterRoleAggregation(
+		ctx,
 		controllerContext.InformerFactory.Rbac().V1().ClusterRoles(),
 		client.RbacV1(),
 	)

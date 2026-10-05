@@ -18,6 +18,7 @@ package cmd
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -388,7 +389,7 @@ func newCmdConfigImagesPull() *cobra.Command {
 			if err := containerRuntime.Connect(); err != nil {
 				return err
 			}
-			defer containerRuntime.Close()
+			defer containerRuntime.Close(context.Background())
 			return PullControlPlaneImages(containerRuntime, &internalcfg.ClusterConfiguration)
 		},
 		Args: cobra.NoArgs,

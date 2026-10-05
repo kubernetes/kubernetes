@@ -23,24 +23,27 @@ package v1
 //
 // NodeSpec describes the attributes that a node is created with.
 type NodeSpecApplyConfiguration struct {
-	// PodCIDR represents the pod IP range assigned to the node.
+	// podCIDR represents the pod IP range assigned to the node.
 	PodCIDR *string `json:"podCIDR,omitempty"`
 	// podCIDRs represents the IP ranges assigned to the node for usage by Pods on that node. If this
 	// field is specified, the 0th entry must match the podCIDR field. It may contain at most 1 value for
 	// each of IPv4 and IPv6.
 	PodCIDRs []string `json:"podCIDRs,omitempty"`
-	// ID of the node assigned by the cloud provider in the format: <ProviderName>://<ProviderSpecificNodeID>
+	// providerID is the ID of the node assigned by the cloud provider in the format: <ProviderName>://<ProviderSpecificNodeID>
 	ProviderID *string `json:"providerID,omitempty"`
-	// Unschedulable controls node schedulability of new pods. By default, node is schedulable.
+	// unschedulable controls node schedulability of new pods. By default, node is schedulable.
 	// More info: https://kubernetes.io/docs/concepts/nodes/node/#manual-node-administration
 	Unschedulable *bool `json:"unschedulable,omitempty"`
-	// If specified, the node's taints.
+	// taints if specified, is the node's taints.
 	Taints []TaintApplyConfiguration `json:"taints,omitempty"`
-	// Deprecated: Previously used to specify the source of the node's configuration for the DynamicKubeletConfig feature. This feature is removed.
+	// configSource previously used to specify the source of the node's configuration for the DynamicKubeletConfig feature. Deprecated. This feature is removed.
 	ConfigSource *NodeConfigSourceApplyConfiguration `json:"configSource,omitempty"`
-	// Deprecated. Not all kubelets will set this field. Remove field after 1.13.
+	// externalID is deprecated. Not all kubelets will set this field. Remove field after 1.13.
 	// see: https://issues.k8s.io/61966
 	DoNotUseExternalID *string `json:"externalID,omitempty"`
+	// podPreemptionPolicy controls the node-level preemption behaviors for pods on this node.
+	// This is an alpha field and requires enabling the InPlacePodVerticalScalingSchedulerPreemption feature gate.
+	PodPreemptionPolicy *NodePodPreemptionPolicyApplyConfiguration `json:"podPreemptionPolicy,omitempty"`
 }
 
 // NodeSpecApplyConfiguration constructs a declarative configuration of the NodeSpec type for use with
@@ -109,5 +112,13 @@ func (b *NodeSpecApplyConfiguration) WithConfigSource(value *NodeConfigSourceApp
 // If called multiple times, the DoNotUseExternalID field is set to the value of the last call.
 func (b *NodeSpecApplyConfiguration) WithDoNotUseExternalID(value string) *NodeSpecApplyConfiguration {
 	b.DoNotUseExternalID = &value
+	return b
+}
+
+// WithPodPreemptionPolicy sets the PodPreemptionPolicy field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the PodPreemptionPolicy field is set to the value of the last call.
+func (b *NodeSpecApplyConfiguration) WithPodPreemptionPolicy(value *NodePodPreemptionPolicyApplyConfiguration) *NodeSpecApplyConfiguration {
+	b.PodPreemptionPolicy = value
 	return b
 }

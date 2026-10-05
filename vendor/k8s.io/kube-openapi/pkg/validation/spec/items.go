@@ -15,11 +15,10 @@
 package spec
 
 import (
-	"encoding/json"
+	"encoding/json/jsontext"
+	jsonv2 "encoding/json/v2"
 
-	"github.com/go-openapi/swag"
 	"k8s.io/kube-openapi/pkg/internal"
-	jsonv2 "k8s.io/kube-openapi/pkg/internal/third_party/go-json-experiment/json"
 )
 
 const (
@@ -95,40 +94,16 @@ type Items struct {
 
 // UnmarshalJSON hydrates this items instance with the data from JSON
 func (i *Items) UnmarshalJSON(data []byte) error {
-	if internal.UseOptimizedJSONUnmarshaling {
-		return jsonv2.Unmarshal(data, i)
-	}
-
-	var validations CommonValidations
-	if err := json.Unmarshal(data, &validations); err != nil {
-		return err
-	}
-	var ref Refable
-	if err := json.Unmarshal(data, &ref); err != nil {
-		return err
-	}
-	var simpleSchema SimpleSchema
-	if err := json.Unmarshal(data, &simpleSchema); err != nil {
-		return err
-	}
-	var vendorExtensible VendorExtensible
-	if err := json.Unmarshal(data, &vendorExtensible); err != nil {
-		return err
-	}
-	i.Refable = ref
-	i.CommonValidations = validations
-	i.SimpleSchema = simpleSchema
-	i.VendorExtensible = vendorExtensible
-	return nil
+	return jsonv2.Unmarshal(data, i)
 }
 
-func (i *Items) UnmarshalNextJSON(opts jsonv2.UnmarshalOptions, dec *jsonv2.Decoder) error {
+func (i *Items) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	var x struct {
 		CommonValidations
 		SimpleSchema
-		Extensions
+		Extensions Extensions `json:",embed"`
 	}
-	if err := opts.UnmarshalNext(dec, &x); err != nil {
+	if err := jsonv2.UnmarshalDecode(dec, &x); err != nil {
 		return err
 	}
 	if err := i.Refable.Ref.fromMap(x.Extensions); err != nil {
@@ -143,38 +118,19 @@ func (i *Items) UnmarshalNextJSON(opts jsonv2.UnmarshalOptions, dec *jsonv2.Deco
 
 // MarshalJSON converts this items object to JSON
 func (i Items) MarshalJSON() ([]byte, error) {
-	if internal.UseOptimizedJSONMarshaling {
-		return internal.DeterministicMarshal(i)
-	}
-	b1, err := json.Marshal(i.CommonValidations)
-	if err != nil {
-		return nil, err
-	}
-	b2, err := json.Marshal(i.SimpleSchema)
-	if err != nil {
-		return nil, err
-	}
-	b3, err := json.Marshal(i.Refable)
-	if err != nil {
-		return nil, err
-	}
-	b4, err := json.Marshal(i.VendorExtensible)
-	if err != nil {
-		return nil, err
-	}
-	return swag.ConcatJSON(b4, b3, b1, b2), nil
+	return internal.DeterministicMarshal(i)
 }
 
-func (i Items) MarshalNextJSON(opts jsonv2.MarshalOptions, enc *jsonv2.Encoder) error {
+func (i Items) MarshalJSONTo(enc *jsontext.Encoder) error {
 	var x struct {
-		CommonValidations commonValidationsOmitZero `json:",inline"`
-		SimpleSchema      simpleSchemaOmitZero      `json:",inline"`
+		CommonValidations commonValidationsOmitZero `json:",embed"`
+		SimpleSchema      simpleSchemaOmitZero      `json:",embed"`
 		Ref               string                    `json:"$ref,omitempty"`
-		Extensions
+		Extensions        Extensions                `json:",embed"`
 	}
 	x.CommonValidations = commonValidationsOmitZero(i.CommonValidations)
 	x.SimpleSchema = simpleSchemaOmitZero(i.SimpleSchema)
 	x.Ref = i.Refable.Ref.String()
 	x.Extensions = internal.SanitizeExtensions(i.Extensions)
-	return opts.MarshalNext(enc, x)
+	return jsonv2.MarshalEncode(enc, x)
 }

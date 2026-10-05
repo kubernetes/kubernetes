@@ -32,7 +32,7 @@ func addConversionFuncs(scheme *runtime.Scheme) error {
 	if err := scheme.AddFieldLabelConversionFunc(SchemeGroupVersion.WithKind("ResourceSlice"),
 		func(label, value string) (string, string, error) {
 			switch label {
-			case "metadata.name", resourcev1beta1.ResourceSliceSelectorNodeName, resourcev1beta1.ResourceSliceSelectorDriver:
+			case "metadata.name", resourcev1beta1.ResourceSliceSelectorNodeName, resourcev1beta1.ResourceSliceSelectorDriver, resourcev1beta1.ResourceSliceSelectorPoolName:
 				return label, value, nil
 			default:
 				return "", "", fmt.Errorf("field label not supported for %s: %s", SchemeGroupVersion.WithKind("ResourceSlice"), label)
@@ -84,6 +84,17 @@ func Convert_v1beta1_DeviceRequest_To_resource_DeviceRequest(in *resourcev1beta1
 			}
 			exactDeviceRequest.Capacity = &capacity
 		}
+		if in.DerivedAttributes != nil {
+			derivedAttributes := make([]resource.DeviceDerivedAttribute, 0, len(in.DerivedAttributes))
+			for i := range in.DerivedAttributes {
+				var derivedAttribute resource.DeviceDerivedAttribute
+				if err := Convert_v1beta1_DeviceDerivedAttribute_To_resource_DeviceDerivedAttribute(&in.DerivedAttributes[i], &derivedAttribute, s); err != nil {
+					return err
+				}
+				derivedAttributes = append(derivedAttributes, derivedAttribute)
+			}
+			exactDeviceRequest.DerivedAttributes = derivedAttributes
+		}
 
 		out.Exactly = &exactDeviceRequest
 	}
@@ -97,7 +108,8 @@ func hasAnyMainRequestFieldsSet(deviceRequest *resourcev1beta1.DeviceRequest) bo
 		deviceRequest.Count != 0 ||
 		deviceRequest.AdminAccess != nil ||
 		deviceRequest.Tolerations != nil ||
-		deviceRequest.Capacity != nil
+		deviceRequest.Capacity != nil ||
+		deviceRequest.DerivedAttributes != nil
 }
 
 func Convert_resource_DeviceRequest_To_v1beta1_DeviceRequest(in *resource.DeviceRequest, out *resourcev1beta1.DeviceRequest, s conversion.Scope) error {
@@ -136,6 +148,17 @@ func Convert_resource_DeviceRequest_To_v1beta1_DeviceRequest(in *resource.Device
 				return err
 			}
 			out.Capacity = &capacity
+		}
+		if in.Exactly.DerivedAttributes != nil {
+			derivedAttributes := make([]resourcev1beta1.DeviceDerivedAttribute, 0, len(in.Exactly.DerivedAttributes))
+			for i := range in.Exactly.DerivedAttributes {
+				var derivedAttribute resourcev1beta1.DeviceDerivedAttribute
+				if err := Convert_resource_DeviceDerivedAttribute_To_v1beta1_DeviceDerivedAttribute(&in.Exactly.DerivedAttributes[i], &derivedAttribute, s); err != nil {
+					return err
+				}
+				derivedAttributes = append(derivedAttributes, derivedAttribute)
+			}
+			out.DerivedAttributes = derivedAttributes
 		}
 	}
 	return nil
@@ -220,6 +243,19 @@ func Convert_v1beta1_Device_To_resource_Device(in *resourcev1beta1.Device, out *
 		out.BindingConditions = basic.BindingConditions
 		out.BindingFailureConditions = basic.BindingFailureConditions
 		out.AllowMultipleAllocations = in.Basic.AllowMultipleAllocations
+
+		if basic.NodeAllocatableResources != nil {
+			out.NodeAllocatableResources = make(map[corev1.ResourceName]resource.NodeAllocatableResource)
+			for key, value := range basic.NodeAllocatableResources {
+				var outVal resource.NodeAllocatableResource
+				if err := autoConvert_v1beta1_NodeAllocatableResource_To_resource_NodeAllocatableResource(&value, &outVal, s); err != nil {
+					return err
+				}
+				out.NodeAllocatableResources[key] = outVal
+			}
+		} else {
+			out.NodeAllocatableResources = nil
+		}
 	}
 	return nil
 }
@@ -269,6 +305,18 @@ func Convert_resource_Device_To_v1beta1_Device(in *resource.Device, out *resourc
 	out.Basic.BindingConditions = in.BindingConditions
 	out.Basic.BindingFailureConditions = in.BindingFailureConditions
 	out.Basic.AllowMultipleAllocations = in.AllowMultipleAllocations
+	if in.NodeAllocatableResources != nil {
+		out.Basic.NodeAllocatableResources = make(map[corev1.ResourceName]resourcev1beta1.NodeAllocatableResource)
+		for key, value := range in.NodeAllocatableResources {
+			var outVal resourcev1beta1.NodeAllocatableResource
+			if err := autoConvert_resource_NodeAllocatableResource_To_v1beta1_NodeAllocatableResource(&value, &outVal, s); err != nil {
+				return err
+			}
+			out.Basic.NodeAllocatableResources[key] = outVal
+		}
+	} else {
+		out.Basic.NodeAllocatableResources = nil
+	}
 	return nil
 }
 

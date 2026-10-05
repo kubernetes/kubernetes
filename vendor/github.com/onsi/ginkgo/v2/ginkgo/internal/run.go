@@ -268,9 +268,9 @@ func runParallel(suite TestSuite, ginkgoConfig types.SuiteConfig, reporterConfig
 		fmt.Fprint(formatter.ColorableStdErr, formatter.Fiw(0, formatter.COLS, "This occurs if a parallel process exits before it reports its results to the Ginkgo CLI.  The CLI will now print out all the stdout/stderr output it's collected from the running processes.  However you may not see anything useful in these logs because the individual test processes usually intercept output to stdout/stderr in order to capture it in the spec reports.\n\nYou may want to try rerunning your test suite with {{light-gray}}--output-interceptor-mode=none{{/}} to see additional output here and debug your suite.\n"))
 		fmt.Fprintln(formatter.ColorableStdErr, "  ")
 		for proc := 1; proc <= cliConfig.ComputedProcs(); proc++ {
-			fmt.Fprintf(formatter.ColorableStdErr, formatter.F("{{bold}}Output from proc %d:{{/}}\n", proc))
+			fmt.Fprint(formatter.ColorableStdErr, formatter.F("{{bold}}Output from proc %d:{{/}}\n", proc))
 			fmt.Fprintln(os.Stderr, formatter.Fi(1, "%s", procOutput[proc-1].String()))
-			fmt.Fprintf(formatter.ColorableStdErr, formatter.F("{{bold}}Exit result of proc %d:{{/}}\n", proc))
+			fmt.Fprint(formatter.ColorableStdErr, formatter.F("{{bold}}Exit result of proc %d:{{/}}\n", proc))
 			fmt.Fprintln(os.Stderr, formatter.Fi(1, "%s\n", procExitResult[proc-1]))
 		}
 		fmt.Fprintf(os.Stderr, "** End **")

@@ -21,6 +21,7 @@ import (
 	"fmt"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	kubetypes "k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -118,7 +119,11 @@ func (f *FakeRuntimeHelper) UnprepareDynamicResources(ctx context.Context, pod *
 	return nil
 }
 
-func (f *FakeRuntimeHelper) SetPodWatchCondition(_ kubetypes.UID, _ string, _ func(*kubecontainer.PodStatus) bool) {
+func (f *FakeRuntimeHelper) RequestPodReinspect(_ kubetypes.UID) {
+	// Not implemented.
+}
+
+func (f *FakeRuntimeHelper) RequestPodRelist(_ kubetypes.UID) {
 	// Not implemented.
 }
 
@@ -127,4 +132,14 @@ func (f *FakeRuntimeHelper) PodCPUAndMemoryStats(_ context.Context, pod *v1.Pod,
 		return stats, nil
 	}
 	return nil, fmt.Errorf("stats for pod %q not found", pod.UID)
+}
+
+func (f *FakeRuntimeHelper) OnPodSandboxReady(_ context.Context, _ *v1.Pod) error {
+	// Not implemented
+	return nil
+}
+
+// ResizeEphemeralVolume is not implemented
+func (f *FakeRuntimeHelper) ResizeEphemeralVolume(pod *v1.Pod, volumeName string, newSize *resource.Quantity) error {
+	return nil
 }

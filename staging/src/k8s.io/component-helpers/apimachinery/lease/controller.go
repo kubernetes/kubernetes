@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	coordinationv1 "k8s.io/api/coordination/v1"
@@ -76,7 +75,10 @@ type controller struct {
 	newLeasePostProcessFunc ProcessLeaseFunc
 
 	reconcilingLock sync.Mutex
-	stopCalled      atomic.Bool
+	// stopCh is closed by Stop so that a sync stuck retrying a lease create
+	// releases reconcilingLock instead of blocking Stop forever.
+	stopCh   chan struct{}
+	stopOnce sync.Once
 }
 
 // NewController constructs and returns a controller
@@ -96,6 +98,7 @@ func NewController(clock clock.Clock, client clientset.Interface, holderIdentity
 		clock:                      clock,
 		onRepeatedHeartbeatFailure: onRepeatedHeartbeatFailure,
 		newLeasePostProcessFunc:    newLeasePostProcessFunc,
+		stopCh:                     make(chan struct{}),
 	}
 }
 
@@ -126,7 +129,9 @@ func (c *controller) Stop() {
 		return
 	}
 
-	c.stopCalled.Store(true)
+	// Unblock a sync stuck in backoffEnsureLease, which holds the lock
+	// acquired below.
+	c.stopOnce.Do(func() { close(c.stopCh) })
 	// Ensure that there will be no race condition with the sync.
 	c.reconcilingLock.Lock()
 	defer c.reconcilingLock.Unlock()
@@ -149,8 +154,10 @@ func (c *controller) Run(ctx context.Context) {
 }
 
 func (c *controller) sync(ctx context.Context) {
-	if c.stopCalled.Load() {
+	select {
+	case <-c.stopCh:
 		return
+	default:
 	}
 
 	c.reconcilingLock.Lock()
@@ -199,9 +206,11 @@ func (c *controller) backoffEnsureLease(ctx context.Context) (*coordinationv1.Le
 		}
 		sleep = minDuration(2*sleep, maxBackoff)
 		klog.FromContext(ctx).Error(err, "Failed to ensure lease exists, will retry", "interval", sleep)
-		// backoff wait with early return if the context gets canceled
+		// backoff wait with early return if the context gets canceled or Stop is called
 		select {
 		case <-ctx.Done():
+			return nil, false
+		case <-c.stopCh:
 			return nil, false
 		case <-time.After(sleep):
 		}

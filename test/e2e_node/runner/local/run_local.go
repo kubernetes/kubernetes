@@ -42,6 +42,7 @@ var kubeletConfigFile = flag.String("kubelet-config-file", "", "The KubeletConfi
 var debugTool = flag.String("debug-tool", "", "'delve', 'dlv' or 'gdb': run e2e_node.test under that debugger")
 
 func main() {
+	copyFlags(builder.CommandLine, flag.CommandLine)
 	klog.InitFlags(nil)
 	flag.Parse()
 
@@ -101,6 +102,12 @@ func main() {
 		klog.Exitf("Test failed: %v", err)
 	}
 	return
+}
+
+func copyFlags(from, to *flag.FlagSet) {
+	from.VisitAll(func(f *flag.Flag) {
+		to.Var(f.Value, f.Name, f.Usage)
+	})
 }
 
 func addGinkgoArgPrefix(ginkgoFlags string) string {

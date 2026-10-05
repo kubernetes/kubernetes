@@ -91,7 +91,7 @@ func (fake *FakeImpl) ListPodSandboxReturns(res []*v1.PodSandbox, err error) {
 }
 
 // NewRemoteImageService returns the new remote image service.
-func (fake *FakeImpl) NewRemoteImageService(string, time.Duration) (cri.ImageManagerService, error) {
+func (fake *FakeImpl) NewRemoteImageService(context.Context, string, time.Duration) (cri.ImageManagerService, error) {
 	fakeReturns := fake.newRemoteImageServiceReturns
 	return fakeReturns.res, fakeReturns.err
 }
@@ -105,7 +105,7 @@ func (fake *FakeImpl) NewRemoteImageServiceReturns(res cri.ImageManagerService, 
 }
 
 // NewRemoteRuntimeService returns the new remote runtime service.
-func (fake *FakeImpl) NewRemoteRuntimeService(string, time.Duration) (cri.RuntimeService, error) {
+func (fake *FakeImpl) NewRemoteRuntimeService(context.Context, string, time.Duration) (cri.RuntimeService, error) {
 	fakeReturns := fake.newRemoteRuntimeServiceReturns
 	return fakeReturns.res, fakeReturns.err
 }

@@ -49,6 +49,7 @@ import (
 	networkingv1beta1 "k8s.io/api/networking/v1beta1"
 	policyv1 "k8s.io/api/policy/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	resourcev1 "k8s.io/api/resource/v1"
 	schedulingv1 "k8s.io/api/scheduling/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -72,6 +73,7 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/reference"
 	utilcsr "k8s.io/client-go/util/certificate/csr"
+	resourcehelper "k8s.io/component-helpers/resource"
 	"k8s.io/klog/v2"
 	"k8s.io/kubectl/pkg/scheme"
 	"k8s.io/kubectl/pkg/util/certificate"
@@ -80,8 +82,7 @@ import (
 	"k8s.io/kubectl/pkg/util/fieldpath"
 	"k8s.io/kubectl/pkg/util/qos"
 	"k8s.io/kubectl/pkg/util/rbac"
-	resourcehelper "k8s.io/kubectl/pkg/util/resource"
-	"k8s.io/kubectl/pkg/util/slice"
+	kubectlresourcehelper "k8s.io/kubectl/pkg/util/resource"
 	storageutil "k8s.io/kubectl/pkg/util/storage"
 )
 
@@ -312,7 +313,7 @@ func printUnstructuredContent(w PrefixWriter, level int, content map[string]inte
 		switch typedValue := value.(type) {
 		case map[string]interface{}:
 			skipExpr := fmt.Sprintf("%s.%s", skipPrefix, field)
-			if slice.Contains[string](skip, skipExpr, nil) {
+			if slices.Contains(skip, skipExpr) {
 				continue
 			}
 			w.Write(level, "%s:\n", smartLabelFor(field))
@@ -320,7 +321,7 @@ func printUnstructuredContent(w PrefixWriter, level int, content map[string]inte
 
 		case []interface{}:
 			skipExpr := fmt.Sprintf("%s.%s", skipPrefix, field)
-			if slice.Contains[string](skip, skipExpr, nil) {
+			if slices.Contains(skip, skipExpr) {
 				continue
 			}
 			w.Write(level, "%s:\n", smartLabelFor(field))
@@ -335,7 +336,7 @@ func printUnstructuredContent(w PrefixWriter, level int, content map[string]inte
 
 		default:
 			skipExpr := fmt.Sprintf("%s.%s", skipPrefix, field)
-			if slice.Contains[string](skip, skipExpr, nil) {
+			if slices.Contains(skip, skipExpr) {
 				continue
 			}
 			w.Write(level, "%s:\t%v\n", smartLabelFor(field), typedValue)
@@ -383,7 +384,7 @@ func smartLabelFor(field string) string {
 			continue
 		}
 
-		if slice.Contains(commonAcronyms, strings.ToUpper(part), nil) {
+		if slices.Contains(commonAcronyms, strings.ToUpper(part)) {
 			part = strings.ToUpper(part)
 		} else if strings.ToLower(part) == part {
 			part = cases.Title(language.English).String(part)
@@ -868,8 +869,8 @@ func describePod(pod *corev1.Pod, events *corev1.EventList) (string, error) {
 		printLabelsMultiline(w, "Node-Selectors", pod.Spec.NodeSelector)
 		printPodTolerationsMultiline(w, "Tolerations", pod.Spec.Tolerations)
 		describeTopologySpreadConstraints(pod.Spec.TopologySpreadConstraints, w, "")
-		if pod.Spec.WorkloadRef != nil {
-			describeWorkloadReference(pod.Spec.WorkloadRef, w, "")
+		if pod.Spec.SchedulingGroup != nil {
+			describeSchedulingGroup(pod.Spec.SchedulingGroup, w, "")
 		}
 		if events != nil {
 			DescribeEvents(events, w)
@@ -1002,13 +1003,9 @@ func describeVolumes(volumes []corev1.Volume, w PrefixWriter, space string) {
 	}
 }
 
-func describeWorkloadReference(workloadRef *corev1.WorkloadReference, w PrefixWriter, space string) {
-	w.Write(LEVEL_0, "%sWorkloadRef:\n", space)
-	w.Write(LEVEL_1, "Name:\t%s\n", workloadRef.Name)
-	w.Write(LEVEL_1, "PodGroup:\t%s\n", workloadRef.PodGroup)
-	if workloadRef.PodGroupReplicaKey != "" {
-		w.Write(LEVEL_1, "PodGroupReplicaKey:\t%s\n", workloadRef.PodGroupReplicaKey)
-	}
+func describeSchedulingGroup(schedulingGroup *corev1.PodSchedulingGroup, w PrefixWriter, space string) {
+	w.Write(LEVEL_0, "%sSchedulingGroup:\n", space)
+	w.Write(LEVEL_1, "PodGroupName:\t%s\n", *schedulingGroup.PodGroupName)
 }
 
 func printHostPathVolumeSource(hostPath *corev1.HostPathVolumeSource, w PrefixWriter) {
@@ -1998,7 +1995,7 @@ func describeContainerEnvVars(container corev1.Container, resolverFn EnvVarResol
 			}
 			w.Write(LEVEL_3, "%s:\t%s (%s:%s)\n", e.Name, valueFrom, e.ValueFrom.FieldRef.APIVersion, e.ValueFrom.FieldRef.FieldPath)
 		case e.ValueFrom.ResourceFieldRef != nil:
-			valueFrom, err := resourcehelper.ExtractContainerResourceValue(e.ValueFrom.ResourceFieldRef, &container)
+			valueFrom, err := kubectlresourcehelper.ExtractContainerResourceValue(e.ValueFrom.ResourceFieldRef, &container)
 			if err != nil {
 				valueFrom = ""
 			}
@@ -2047,7 +2044,7 @@ func describeContainerEnvFrom(container corev1.Container, resolverFn EnvVarResol
 
 // DescribeProbe is exported for consumers in other API groups that have probes
 func DescribeProbe(probe *corev1.Probe) string {
-	attrs := fmt.Sprintf("delay=%ds timeout=%ds period=%ds #success=%d #failure=%d", probe.InitialDelaySeconds, probe.TimeoutSeconds, probe.PeriodSeconds, probe.SuccessThreshold, probe.FailureThreshold)
+	attrs := fmt.Sprintf("delay=%ds timeout=%ds period=%ds successThreshold=%d failureThreshold=%d", probe.InitialDelaySeconds, probe.TimeoutSeconds, probe.PeriodSeconds, probe.SuccessThreshold, probe.FailureThreshold)
 	switch {
 	case probe.Exec != nil:
 		return fmt.Sprintf("exec %v %s", probe.Exec.Command, attrs)
@@ -2235,8 +2232,8 @@ func DescribePodTemplate(template *corev1.PodTemplateSpec, w PrefixWriter) {
 	}
 	printLabelsMultiline(w, "  Node-Selectors", template.Spec.NodeSelector)
 	printPodTolerationsMultiline(w, "  Tolerations", template.Spec.Tolerations)
-	if template.Spec.WorkloadRef != nil {
-		describeWorkloadReference(template.Spec.WorkloadRef, w, "  ")
+	if template.Spec.SchedulingGroup != nil {
+		describeSchedulingGroup(template.Spec.SchedulingGroup, w, "  ")
 	}
 }
 
@@ -2427,6 +2424,11 @@ func describeCronJob(cronJob *batchv1.CronJob, events *corev1.EventList) (string
 		w.Write(LEVEL_0, "Schedule:\t%s\n", cronJob.Spec.Schedule)
 		w.Write(LEVEL_0, "Concurrency Policy:\t%s\n", cronJob.Spec.ConcurrencyPolicy)
 		w.Write(LEVEL_0, "Suspend:\t%s\n", printBoolPtr(cronJob.Spec.Suspend))
+		if cronJob.Spec.TimeZone != nil {
+			w.Write(LEVEL_0, "Time Zone:\t%s\n", *cronJob.Spec.TimeZone)
+		} else {
+			w.Write(LEVEL_0, "Time Zone:\t<unset>\n")
+		}
 		if cronJob.Spec.SuccessfulJobsHistoryLimit != nil {
 			w.Write(LEVEL_0, "Successful Job History Limit:\t%d\n", *cronJob.Spec.SuccessfulJobsHistoryLimit)
 		} else {
@@ -3476,7 +3478,15 @@ func (d *NodeDescriber) Describe(namespace, name string, describerSettings Descr
 		}
 	}
 
-	return describeNode(node, nodeNonTerminatedPodsList, events, canViewPods, &LeaseDescriber{d})
+	// Fetch ResourceSlices exclusive to this node using indexed field selector (O(1) query)
+	var resourceSlices []resourcev1.ResourceSlice
+	if sliceList, err := d.ResourceV1().ResourceSlices().List(context.TODO(), metav1.ListOptions{
+		FieldSelector: fields.Set{resourcev1.ResourceSliceSelectorNodeName: node.Name}.AsSelector().String(),
+	}); err == nil {
+		resourceSlices = sliceList.Items
+	}
+
+	return describeNode(node, nodeNonTerminatedPodsList, events, canViewPods, &LeaseDescriber{d}, resourceSlices)
 }
 
 type LeaseDescriber struct {
@@ -3484,7 +3494,7 @@ type LeaseDescriber struct {
 }
 
 func describeNode(node *corev1.Node, nodeNonTerminatedPodsList *corev1.PodList, events *corev1.EventList,
-	canViewPods bool, ld *LeaseDescriber) (string, error) {
+	canViewPods bool, ld *LeaseDescriber, resourceSlices []resourcev1.ResourceSlice) (string, error) {
 	return tabbedString(func(out io.Writer) error {
 		w := NewPrefixWriter(out)
 		w.Write(LEVEL_0, "Name:\t%s\n", node.Name)
@@ -3546,6 +3556,9 @@ func describeNode(node *corev1.Node, nodeNonTerminatedPodsList *corev1.PodList, 
 			w.Write(LEVEL_0, "Allocatable:\n")
 			printResourceList(node.Status.Allocatable)
 		}
+		if len(resourceSlices) > 0 {
+			describeNodeResourceSlices(w, resourceSlices)
+		}
 
 		w.Write(LEVEL_0, "System Info:\n")
 		w.Write(LEVEL_0, "  Machine ID:\t%s\n", node.Status.NodeInfo.MachineID)
@@ -3579,6 +3592,58 @@ func describeNode(node *corev1.Node, nodeNonTerminatedPodsList *corev1.PodList, 
 		}
 		return nil
 	})
+}
+
+// describeNodeResourceSlices displays ResourceSlices that are exclusive to this node.
+// It aggregates slices by driver/pool and shows device counts, with output capped at 10 pools.
+func describeNodeResourceSlices(w PrefixWriter, resourceSlices []resourcev1.ResourceSlice) {
+	// Aggregate by driver/pool
+	type poolInfo struct {
+		driver      string
+		pool        string
+		sliceCount  int
+		deviceCount int
+	}
+	pools := make(map[string]*poolInfo)
+
+	for _, slice := range resourceSlices {
+		key := slice.Spec.Driver + "/" + slice.Spec.Pool.Name
+		if pools[key] == nil {
+			pools[key] = &poolInfo{
+				driver: slice.Spec.Driver,
+				pool:   slice.Spec.Pool.Name,
+			}
+		}
+		pools[key].sliceCount++
+		pools[key].deviceCount += len(slice.Spec.Devices)
+	}
+
+	if len(pools) == 0 {
+		return
+	}
+
+	// Sort pool keys for consistent output
+	sortedKeys := make([]string, 0, len(pools))
+	for k := range pools {
+		sortedKeys = append(sortedKeys, k)
+	}
+	sort.Strings(sortedKeys)
+
+	w.Write(LEVEL_0, "Node-Local ResourceSlices:\n")
+	w.Write(LEVEL_1, "Driver\tPool\tSlices\tDevices\n")
+	w.Write(LEVEL_1, "------\t----\t------\t-------\n")
+
+	const maxPoolsToShow = 10
+	shown := 0
+	for _, key := range sortedKeys {
+		if shown >= maxPoolsToShow {
+			w.Write(LEVEL_1, "...and %d more pools\n", len(sortedKeys)-maxPoolsToShow)
+			break
+		}
+		p := pools[key]
+		w.Write(LEVEL_1, "%s\t%s\t%d\t%d\n", p.driver, p.pool, p.sliceCount, p.deviceCount)
+		shown++
+	}
 }
 
 func describeNodeLease(lease *coordinationv1.Lease, w PrefixWriter) {
@@ -3638,6 +3703,12 @@ func describeStatefulSet(ps *appsv1.StatefulSet, selector labels.Selector, event
 		w.Write(LEVEL_0, "Selector:\t%s\n", selector)
 		printLabelsMultiline(w, "Labels", ps.Labels)
 		printAnnotationsMultiline(w, "Annotations", ps.Annotations)
+		if len(ps.Spec.ServiceName) > 0 {
+			w.Write(LEVEL_0, "Service Name:\t%s\n", ps.Spec.ServiceName)
+		}
+		if len(ps.Spec.PodManagementPolicy) > 0 {
+			w.Write(LEVEL_0, "Pod Management Policy:\t%s\n", ps.Spec.PodManagementPolicy)
+		}
 		w.Write(LEVEL_0, "Replicas:\t%d desired | %d total\n", *ps.Spec.Replicas, ps.Status.Replicas)
 		w.Write(LEVEL_0, "Update Strategy:\t%s\n", ps.Spec.UpdateStrategy.Type)
 		if ps.Spec.UpdateStrategy.RollingUpdate != nil {
@@ -3649,7 +3720,11 @@ func describeStatefulSet(ps *appsv1.StatefulSet, selector labels.Selector, event
 				}
 			}
 		}
-
+		if ps.Spec.PersistentVolumeClaimRetentionPolicy != nil {
+			w.Write(LEVEL_0, "Persistent Volume Claim Retention Policy:\n")
+			w.Write(LEVEL_1, "WhenDeleted:\t%s\n", ps.Spec.PersistentVolumeClaimRetentionPolicy.WhenDeleted)
+			w.Write(LEVEL_1, "WhenScaled:\t%s\n", ps.Spec.PersistentVolumeClaimRetentionPolicy.WhenScaled)
+		}
 		w.Write(LEVEL_0, "Pods Status:\t%d Running / %d Waiting / %d Succeeded / %d Failed\n", running, waiting, succeeded, failed)
 		DescribePodTemplate(&ps.Spec.Template, w)
 		describeVolumeClaimTemplates(ps.Spec.VolumeClaimTemplates, w)
@@ -3979,6 +4054,15 @@ func describeHorizontalPodAutoscalerV1(hpa *autoscalingv1.HorizontalPodAutoscale
 	})
 }
 
+// percentOf returns value as a truncated percentage of total, or 0 when total
+// is 0 (for example, a node that has not reported allocatable resources yet).
+func percentOf(value, total int64) int64 {
+	if total == 0 {
+		return 0
+	}
+	return int64(float64(value) / float64(total) * 100)
+}
+
 func describeNodeResource(nodeNonTerminatedPodsList *corev1.PodList, node *corev1.Node, w PrefixWriter) {
 	w.Write(LEVEL_0, "Non-terminated Pods:\t(%d in total)\n", len(nodeNonTerminatedPodsList.Items))
 	w.Write(LEVEL_1, "Namespace\tName\t\tCPU Requests\tCPU Limits\tMemory Requests\tMemory Limits\tAge\n")
@@ -3989,15 +4073,16 @@ func describeNodeResource(nodeNonTerminatedPodsList *corev1.PodList, node *corev
 	}
 
 	for _, pod := range nodeNonTerminatedPodsList.Items {
-		req, limit := resourcehelper.PodRequestsAndLimits(&pod)
+		req := resourcehelper.PodRequests(&pod, resourcehelper.PodResourcesOptions{SkipPodLevelResources: false, UseStatusResources: true})
+		limit := resourcehelper.PodLimits(&pod, resourcehelper.PodResourcesOptions{SkipPodLevelResources: false, UseStatusResources: true})
 		cpuReq, cpuLimit, memoryReq, memoryLimit := req[corev1.ResourceCPU], limit[corev1.ResourceCPU], req[corev1.ResourceMemory], limit[corev1.ResourceMemory]
-		fractionCpuReq := float64(cpuReq.MilliValue()) / float64(allocatable.Cpu().MilliValue()) * 100
-		fractionCpuLimit := float64(cpuLimit.MilliValue()) / float64(allocatable.Cpu().MilliValue()) * 100
-		fractionMemoryReq := float64(memoryReq.Value()) / float64(allocatable.Memory().Value()) * 100
-		fractionMemoryLimit := float64(memoryLimit.Value()) / float64(allocatable.Memory().Value()) * 100
+		fractionCpuReq := percentOf(cpuReq.MilliValue(), allocatable.Cpu().MilliValue())
+		fractionCpuLimit := percentOf(cpuLimit.MilliValue(), allocatable.Cpu().MilliValue())
+		fractionMemoryReq := percentOf(memoryReq.Value(), allocatable.Memory().Value())
+		fractionMemoryLimit := percentOf(memoryLimit.Value(), allocatable.Memory().Value())
 		w.Write(LEVEL_1, "%s\t%s\t\t%s (%d%%)\t%s (%d%%)\t%s (%d%%)\t%s (%d%%)\t%s\n", pod.Namespace, pod.Name,
-			cpuReq.String(), int64(fractionCpuReq), cpuLimit.String(), int64(fractionCpuLimit),
-			memoryReq.String(), int64(fractionMemoryReq), memoryLimit.String(), int64(fractionMemoryLimit), translateTimestampSince(pod.CreationTimestamp))
+			cpuReq.String(), fractionCpuReq, cpuLimit.String(), fractionCpuLimit,
+			memoryReq.String(), fractionMemoryReq, memoryLimit.String(), fractionMemoryLimit, translateTimestampSince(pod.CreationTimestamp))
 	}
 
 	w.Write(LEVEL_0, "Allocated resources:\n  (Total limits may be over 100 percent, i.e., overcommitted.)\n")
@@ -4006,37 +4091,19 @@ func describeNodeResource(nodeNonTerminatedPodsList *corev1.PodList, node *corev
 	reqs, limits := getPodsTotalRequestsAndLimits(nodeNonTerminatedPodsList)
 	cpuReqs, cpuLimits, memoryReqs, memoryLimits, ephemeralstorageReqs, ephemeralstorageLimits :=
 		reqs[corev1.ResourceCPU], limits[corev1.ResourceCPU], reqs[corev1.ResourceMemory], limits[corev1.ResourceMemory], reqs[corev1.ResourceEphemeralStorage], limits[corev1.ResourceEphemeralStorage]
-	fractionCpuReqs := float64(0)
-	fractionCpuLimits := float64(0)
-	if allocatable.Cpu().MilliValue() != 0 {
-		fractionCpuReqs = float64(cpuReqs.MilliValue()) / float64(allocatable.Cpu().MilliValue()) * 100
-		fractionCpuLimits = float64(cpuLimits.MilliValue()) / float64(allocatable.Cpu().MilliValue()) * 100
-	}
-	fractionMemoryReqs := float64(0)
-	fractionMemoryLimits := float64(0)
-	if allocatable.Memory().Value() != 0 {
-		fractionMemoryReqs = float64(memoryReqs.Value()) / float64(allocatable.Memory().Value()) * 100
-		fractionMemoryLimits = float64(memoryLimits.Value()) / float64(allocatable.Memory().Value()) * 100
-	}
-	fractionEphemeralStorageReqs := float64(0)
-	fractionEphemeralStorageLimits := float64(0)
-	if allocatable.StorageEphemeral().Value() != 0 {
-		fractionEphemeralStorageReqs = float64(ephemeralstorageReqs.Value()) / float64(allocatable.StorageEphemeral().Value()) * 100
-		fractionEphemeralStorageLimits = float64(ephemeralstorageLimits.Value()) / float64(allocatable.StorageEphemeral().Value()) * 100
-	}
 	w.Write(LEVEL_1, "%s\t%s (%d%%)\t%s (%d%%)\n",
-		corev1.ResourceCPU, cpuReqs.String(), int64(fractionCpuReqs), cpuLimits.String(), int64(fractionCpuLimits))
+		corev1.ResourceCPU, cpuReqs.String(), percentOf(cpuReqs.MilliValue(), allocatable.Cpu().MilliValue()), cpuLimits.String(), percentOf(cpuLimits.MilliValue(), allocatable.Cpu().MilliValue()))
 	w.Write(LEVEL_1, "%s\t%s (%d%%)\t%s (%d%%)\n",
-		corev1.ResourceMemory, memoryReqs.String(), int64(fractionMemoryReqs), memoryLimits.String(), int64(fractionMemoryLimits))
+		corev1.ResourceMemory, memoryReqs.String(), percentOf(memoryReqs.Value(), allocatable.Memory().Value()), memoryLimits.String(), percentOf(memoryLimits.Value(), allocatable.Memory().Value()))
 	w.Write(LEVEL_1, "%s\t%s (%d%%)\t%s (%d%%)\n",
-		corev1.ResourceEphemeralStorage, ephemeralstorageReqs.String(), int64(fractionEphemeralStorageReqs), ephemeralstorageLimits.String(), int64(fractionEphemeralStorageLimits))
+		corev1.ResourceEphemeralStorage, ephemeralstorageReqs.String(), percentOf(ephemeralstorageReqs.Value(), allocatable.StorageEphemeral().Value()), ephemeralstorageLimits.String(), percentOf(ephemeralstorageLimits.Value(), allocatable.StorageEphemeral().Value()))
 
 	extResources := make([]string, 0, len(allocatable))
 	hugePageResources := make([]string, 0, len(allocatable))
 	for resource := range allocatable {
-		if resourcehelper.IsHugePageResourceName(resource) {
+		if kubectlresourcehelper.IsHugePageResourceName(resource) {
 			hugePageResources = append(hugePageResources, string(resource))
-		} else if !resourcehelper.IsStandardContainerResourceName(string(resource)) && resource != corev1.ResourcePods {
+		} else if !kubectlresourcehelper.IsStandardContainerResourceName(string(resource)) && resource != corev1.ResourcePods {
 			extResources = append(extResources, string(resource))
 		}
 	}
@@ -4046,14 +4113,8 @@ func describeNodeResource(nodeNonTerminatedPodsList *corev1.PodList, node *corev
 
 	for _, resource := range hugePageResources {
 		hugePageSizeRequests, hugePageSizeLimits, hugePageSizeAllocable := reqs[corev1.ResourceName(resource)], limits[corev1.ResourceName(resource)], allocatable[corev1.ResourceName(resource)]
-		fractionHugePageSizeRequests := float64(0)
-		fractionHugePageSizeLimits := float64(0)
-		if hugePageSizeAllocable.Value() != 0 {
-			fractionHugePageSizeRequests = float64(hugePageSizeRequests.Value()) / float64(hugePageSizeAllocable.Value()) * 100
-			fractionHugePageSizeLimits = float64(hugePageSizeLimits.Value()) / float64(hugePageSizeAllocable.Value()) * 100
-		}
 		w.Write(LEVEL_1, "%s\t%s (%d%%)\t%s (%d%%)\n",
-			resource, hugePageSizeRequests.String(), int64(fractionHugePageSizeRequests), hugePageSizeLimits.String(), int64(fractionHugePageSizeLimits))
+			resource, hugePageSizeRequests.String(), percentOf(hugePageSizeRequests.Value(), hugePageSizeAllocable.Value()), hugePageSizeLimits.String(), percentOf(hugePageSizeLimits.Value(), hugePageSizeAllocable.Value()))
 	}
 
 	for _, ext := range extResources {
@@ -4065,7 +4126,10 @@ func describeNodeResource(nodeNonTerminatedPodsList *corev1.PodList, node *corev
 func getPodsTotalRequestsAndLimits(podList *corev1.PodList) (reqs map[corev1.ResourceName]resource.Quantity, limits map[corev1.ResourceName]resource.Quantity) {
 	reqs, limits = map[corev1.ResourceName]resource.Quantity{}, map[corev1.ResourceName]resource.Quantity{}
 	for _, pod := range podList.Items {
-		podReqs, podLimits := resourcehelper.PodRequestsAndLimits(&pod)
+		// Use the same accounting as the per-pod rows above so that the totals
+		// agree with them while a pod is being resized in place.
+		podReqs := resourcehelper.PodRequests(&pod, resourcehelper.PodResourcesOptions{SkipPodLevelResources: false, UseStatusResources: true})
+		podLimits := resourcehelper.PodLimits(&pod, resourcehelper.PodResourcesOptions{SkipPodLevelResources: false, UseStatusResources: true})
 		for podReqName, podReqValue := range podReqs {
 			if value, ok := reqs[podReqName]; !ok {
 				reqs[podReqName] = podReqValue.DeepCopy()
@@ -5182,15 +5246,11 @@ func formatEndpointSlices(endpointSlices []discoveryv1.EndpointSlice, ports sets
 	}
 	var list []string
 	max := 3
-	more := false
 	count := 0
 	for i := range endpointSlices {
 		if len(endpointSlices[i].Ports) == 0 {
 			// It's possible to have headless services with no ports.
 			for j := range endpointSlices[i].Endpoints {
-				if len(list) == max {
-					more = true
-				}
 				isReady := endpointSlices[i].Endpoints[j].Conditions.Ready == nil || *endpointSlices[i].Endpoints[j].Conditions.Ready
 				if !isReady {
 					// ready indicates that this endpoint is prepared to receive traffic,
@@ -5200,7 +5260,7 @@ func formatEndpointSlices(endpointSlices []discoveryv1.EndpointSlice, ports sets
 					// More info: vendor/k8s.io/api/discovery/v1/types.go
 					continue
 				}
-				if !more {
+				if len(list) < max {
 					list = append(list, endpointSlices[i].Endpoints[j].Addresses[0])
 				}
 				count++
@@ -5211,9 +5271,6 @@ func formatEndpointSlices(endpointSlices []discoveryv1.EndpointSlice, ports sets
 				port := endpointSlices[i].Ports[j]
 				if ports == nil || ports.Has(*port.Name) {
 					for k := range endpointSlices[i].Endpoints {
-						if len(list) == max {
-							more = true
-						}
 						addr := endpointSlices[i].Endpoints[k].Addresses[0]
 						isReady := endpointSlices[i].Endpoints[k].Conditions.Ready == nil || *endpointSlices[i].Endpoints[k].Conditions.Ready
 						if !isReady {
@@ -5224,7 +5281,7 @@ func formatEndpointSlices(endpointSlices []discoveryv1.EndpointSlice, ports sets
 							// More info: vendor/k8s.io/api/discovery/v1/types.go
 							continue
 						}
-						if !more {
+						if len(list) < max {
 							hostPort := net.JoinHostPort(addr, strconv.Itoa(int(*port.Port)))
 							list = append(list, hostPort)
 						}
@@ -5235,7 +5292,10 @@ func formatEndpointSlices(endpointSlices []discoveryv1.EndpointSlice, ports sets
 		}
 	}
 	ret := strings.Join(list, ",")
-	if more {
+	// Only ready endpoints are listed and counted, so the "more" suffix must be
+	// derived from the ready count rather than from having visited an endpoint
+	// past the display limit, which may have been skipped as not ready.
+	if count > max {
 		return fmt.Sprintf("%s + %d more...", ret, count-max)
 	}
 	return ret

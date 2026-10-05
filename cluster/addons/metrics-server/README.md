@@ -1,6 +1,6 @@
 # Metrics Server
 
-[Metrics Server](https://github.com/kubernetes-incubator/metrics-server) exposes
+[Metrics Server](https://github.com/kubernetes-sigs/metrics-server) exposes
 core Kubernetes metrics via metrics API.
 
 More details can be found in [Core metrics pipeline documentation](https://kubernetes.io/docs/tasks/debug-application-cluster/resource-metrics-pipeline/).

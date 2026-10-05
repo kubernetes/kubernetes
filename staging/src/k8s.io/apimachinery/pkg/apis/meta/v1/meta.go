@@ -17,6 +17,7 @@ limitations under the License.
 package v1
 
 import (
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 )
@@ -63,6 +64,23 @@ type Object interface {
 	SetManagedFields(managedFields []ManagedFieldsEntry)
 }
 
+// APIResult is an interface that represents the result of an API operation.
+type APIResult interface {
+	// Get returns the result as a runtime.Object, or an error if the operation failed.
+	// If Error() returns a non-nil error, Get will return nil, err.
+	Get() (runtime.Object, error)
+
+	// StatusCode returns the HTTP status code of the response and any error encountered.
+	// If Error() returns a non-nil error that prevented a response from being read (such as a network failure),
+	// StatusCode returns 0, err.
+	// If the error was returned from the server with an HTTP status code, StatusCode returns status, err.
+	// If the operation succeeded, StatusCode returns status, nil.
+	StatusCode() (int, error)
+
+	// Error returns the error executing the request, or nil if no error occurred.
+	Error() error
+}
+
 // ListMetaAccessor retrieves the list interface from an object
 type ListMetaAccessor interface {
 	GetListMeta() ListInterface
@@ -94,6 +112,13 @@ type ListInterface interface {
 	SetRemainingItemCount(c *int64)
 }
 
+// ShardedListInterface can be implemented by list types to indicate that they
+// represent a sharded subset of the full collection rather than the complete list.
+type ShardedListInterface interface {
+	GetShardInfo() *ShardInfo
+	SetShardInfo(*ShardInfo)
+}
+
 // Type exposes the type and APIVersion of versioned or internal API objects.
 // TODO: move this, and TypeMeta and ListMeta, to a different package
 type Type interface {
@@ -113,6 +138,8 @@ func (meta *ListMeta) GetContinue() string               { return meta.Continue 
 func (meta *ListMeta) SetContinue(c string)              { meta.Continue = c }
 func (meta *ListMeta) GetRemainingItemCount() *int64     { return meta.RemainingItemCount }
 func (meta *ListMeta) SetRemainingItemCount(c *int64)    { meta.RemainingItemCount = c }
+func (meta *ListMeta) GetShardInfo() *ShardInfo          { return meta.ShardInfo }
+func (meta *ListMeta) SetShardInfo(s *ShardInfo)         { meta.ShardInfo = s }
 
 func (obj *TypeMeta) GetObjectKind() schema.ObjectKind { return obj }
 

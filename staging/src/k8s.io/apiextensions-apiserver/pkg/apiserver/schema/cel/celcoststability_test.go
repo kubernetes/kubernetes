@@ -98,8 +98,8 @@ func TestCelCostStability(t *testing.T) {
 			schema: schemas(stringType, stringType),
 			expectCost: map[string]int64{
 				ValsEqualThemselvesAndDataLiteral("self.val1", "self.val2", "'Rook takes 👑'"): 14,
-				"self.val1.startsWith('Rook')":    4,
-				"!self.val1.startsWith('knight')": 5,
+				"self.val1.startsWith('Rook')":    3,
+				"!self.val1.startsWith('knight')": 4,
 				"self.val1.matches('^[^0-9]*$')":  8,
 				"!self.val1.matches('^[0-9]*$')":  7,
 				"type(self.val1) == string":       4,
@@ -1235,12 +1235,9 @@ func TestCelCostStability(t *testing.T) {
 	}
 
 	for _, tt := range cases {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			for validRule, expectedCost := range tt.expectCost {
-				validRule := validRule
-				expectedCost := expectedCost
 				testName := validRule
 				if len(testName) > 127 {
 					testName = testName[:127]
@@ -2090,15 +2087,24 @@ func TestCelEstimatedCostStability(t *testing.T) {
 				`quantity(self.val1).isInteger()`:                                                                                        314576,
 			},
 		},
+		// Verifies that URL accessor ResultSize propagation keeps downstream
+		// string operations bounded. Without the fix, matches() on an accessor
+		// result treats the input as unbounded (~943721 for an unbound string).
+		// getEscapedPath is higher due to 3x percent-encoding expansion (%XX).
+		{name: "url accessors with bounded string",
+			schema: schemas(withMaxLength(stringType, ptr.To[int64](300))),
+			expectCost: map[string]uint64{
+				`url(self.val1).getScheme().matches('^[a-z]+$')`:       365,
+				`url(self.val1).getHostname().matches('^[a-z]+$')`:     365,
+				`url(self.val1).getEscapedPath().matches('^/[a-z]+$')`: 1206,
+			},
+		},
 	}
 
 	for _, tt := range cases {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			for validRule, expectedCost := range tt.expectCost {
-				validRule := validRule
-				expectedCost := expectedCost
 				testName := validRule
 				if len(testName) > 127 {
 					testName = testName[:127]

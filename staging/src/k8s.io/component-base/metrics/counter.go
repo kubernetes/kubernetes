@@ -139,10 +139,9 @@ type CounterVec struct {
 }
 
 var _ kubeCollector = &CounterVec{}
+var _ CounterVecMetric = &CounterVec{}
 
-// TODO: make this true: var _ CounterVecMetric = &CounterVec{}
-
-// NewCounterVec returns an object which satisfies the kubeCollector and (almost) CounterVecMetric interfaces.
+// NewCounterVec returns an object which satisfies the kubeCollector and CounterVecMetric interfaces.
 // However, the object returned will not measure anything unless the collector is first
 // registered, since the metric is lazily instantiated, and only members extracted after
 // registration will actually measure anything.

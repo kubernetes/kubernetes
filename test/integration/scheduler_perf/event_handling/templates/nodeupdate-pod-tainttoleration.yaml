@@ -4,7 +4,7 @@ metadata:
   generateName: pod-unsched-
 spec:
   tolerations:
-  - key: toleration-{{ div .Index 10 }}
+  - key: toleration-{{ DivideInt .Index 10 }}
     operator: Exists
     effect: NoSchedule
   containers:

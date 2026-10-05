@@ -34,11 +34,39 @@ import (
 )
 
 // CSINodeInformer provides access to a shared informer and lister for
-// CSINodes.
+// CSINodes. Prefer using the type-safe variant (see [TypedCSINodeInformer]).
 type CSINodeInformer interface {
 	Informer() cache.SharedIndexInformer
 	Lister() storagev1beta1.CSINodeLister
 }
+
+// TypedCSINodeInformer provides access to a shared informer and lister for
+// CSINodes, including the type-safe TypedInformer variant.
+// It is a superset of CSINodeInformer.
+type TypedCSINodeInformer interface {
+	Informer() cache.SharedIndexInformer
+	TypedInformer() CSINodeIndexInformer
+	Lister() storagev1beta1.CSINodeLister
+}
+
+// CSINodeIndexInformer is a wrapper around the underlying [cache.SharedIndexInformer]
+// with type-safe variants of several methods.
+type CSINodeIndexInformer cache.TypedSharedIndexInformer[*apistoragev1beta1.CSINode]
+
+// CSINodeHandlerFuncs is a specialization of [cache.TypedResourceEventHandlerFuncs] for CSINode.
+type CSINodeHandlerFuncs = cache.TypedResourceEventHandlerFuncs[*apistoragev1beta1.CSINode]
+
+// CSINodeDetailedHandlerFuncs is a specialization of [cache.TypedResourceEventHandlerDetailedFuncs] for CSINode.
+type CSINodeDetailedHandlerFuncs = cache.TypedResourceEventHandlerDetailedFuncs[*apistoragev1beta1.CSINode]
+
+// CSINodeFilteringHandler is a specialization of [cache.TypedFilteringResourceEventHandler] for CSINode.
+type CSINodeFilteringHandler = cache.TypedFilteringResourceEventHandler[*apistoragev1beta1.CSINode]
+
+// CSINodeIndexers is a specialization of [cache.TypedIndexers] for CSINode.
+type CSINodeIndexers = cache.TypedIndexers[*apistoragev1beta1.CSINode]
+
+// DeletedCSINode is a specialization of [cache.DeletedObject] for CSINode.
+type DeletedCSINode = cache.DeletedObject[*apistoragev1beta1.CSINode]
 
 type cSINodeInformer struct {
 	factory          internalinterfaces.SharedInformerFactory
@@ -48,25 +76,49 @@ type cSINodeInformer struct {
 // NewCSINodeInformer constructs a new informer for CSINode type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedCSINodeInformer]).
 func NewCSINodeInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
 	return NewCSINodeInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers})
+}
+
+// NewTypedCSINodeInformer constructs a new informer for CSINode type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedCSINodeInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers CSINodeIndexers) CSINodeIndexInformer {
+	return NewTypedCSINodeInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.TypedIndexersToIndexers(indexers)})
 }
 
 // NewFilteredCSINodeInformer constructs a new informer for CSINode type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedFilteredCSINodeInformer]).
 func NewFilteredCSINodeInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
-	return NewCSINodeInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
+	return NewTypedCSINodeInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
+}
+
+// NewTypedFilteredCSINodeInformer constructs a new informer for CSINode type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedFilteredCSINodeInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers CSINodeIndexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) CSINodeIndexInformer {
+	return NewTypedCSINodeInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.TypedIndexersToIndexers(indexers), TweakListOptions: tweakListOptions})
 }
 
 // NewCSINodeInformerWithOptions constructs a new informer for CSINode type with additional options.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedCSINodeInformerWithOptions]).
 func NewCSINodeInformerWithOptions(client kubernetes.Interface, options internalinterfaces.InformerOptions) cache.SharedIndexInformer {
+	return NewTypedCSINodeInformerWithOptions(client, options)
+}
+
+// NewTypedCSINodeInformerWithOptions constructs a new informer for CSINode type with additional options.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedCSINodeInformerWithOptions(client kubernetes.Interface, options internalinterfaces.InformerOptions) CSINodeIndexInformer {
 	gvr := schema.GroupVersionResource{Group: "storage.k8s.io", Version: "v1beta1", Resource: "csinodes"}
 	identifier := options.InformerName.WithResource(gvr)
 	tweakListOptions := options.TweakListOptions
-	return cache.NewSharedIndexInformerWithOptions(
+	return cache.NewTypedSharedIndexInformer[*apistoragev1beta1.CSINode](cache.NewSharedIndexInformerWithOptions(
 		cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
 			ListFunc: func(opts v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
@@ -99,17 +151,57 @@ func NewCSINodeInformerWithOptions(client kubernetes.Interface, options internal
 			Indexers:     options.Indexers,
 			Identifier:   identifier,
 		},
-	)
+	))
 }
 
 func (f *cSINodeInformer) defaultInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewCSINodeInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
+	return NewTypedCSINodeInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
 }
 
 func (f *cSINodeInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&apistoragev1beta1.CSINode{}, f.defaultInformer)
+	return f.TypedInformer()
+}
+
+func (f *cSINodeInformer) TypedInformer() CSINodeIndexInformer {
+	return cache.NewTypedSharedIndexInformer[*apistoragev1beta1.CSINode](f.factory.InformerFor(&apistoragev1beta1.CSINode{}, f.defaultInformer))
 }
 
 func (f *cSINodeInformer) Lister() storagev1beta1.CSINodeLister {
 	return storagev1beta1.NewCSINodeLister(f.Informer().GetIndexer())
+}
+
+// ToTypedCSINodeInformer converts an untyped informer into a TypedCSINodeInformer.
+//
+// WARNING: this conversion is only safe if the informer handles objects of type
+// *CSINode. If that is not the case, calling type-safe methods of the returned
+// TypedCSINodeInformer leads to runtime panics. A safer alternative is to pass
+// around a TypedCSINodeInformer instances that was obtained from a
+// SharedInformerFactory.
+func ToTypedCSINodeInformer(informer CSINodeInformer) TypedCSINodeInformer {
+	if informer, ok := informer.(TypedCSINodeInformer); ok {
+		return informer
+	}
+	return &cSINodeTypedInformerAdapter{informer}
+}
+
+type cSINodeTypedInformerAdapter struct {
+	CSINodeInformer
+}
+
+func (a *cSINodeTypedInformerAdapter) TypedInformer() CSINodeIndexInformer {
+	return cache.NewTypedSharedIndexInformer[*apistoragev1beta1.CSINode](a.Informer())
+}
+
+// ToCSINodeIndexInformer converts an untyped informer into a CSINodeIndexInformer.
+//
+// WARNING: this conversion is only safe if the informer handles objects of type
+// *CSINode. If that is not the case, calling type-safe methods of the returned
+// CSINodeIndexInformer leads to runtime panics. A safer alternative is to pass
+// around a CSINodeIndexInformer instances that was obtained from a
+// SharedInformerFactory.
+func ToCSINodeIndexInformer(informer cache.SharedIndexInformer) CSINodeIndexInformer {
+	if informer, ok := informer.(CSINodeIndexInformer); ok {
+		return informer
+	}
+	return cache.NewTypedSharedIndexInformer[*apistoragev1beta1.CSINode](informer)
 }

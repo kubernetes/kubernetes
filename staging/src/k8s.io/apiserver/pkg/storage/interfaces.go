@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -34,8 +35,14 @@ import (
 // Feature is the name of each feature in storage that we check in feature_support_checker.
 type Feature = string
 
-// RequestWatchProgress is an etcd feature that may use to check if it supported or not.
+// RequestWatchProgress is an etcd feature for progress notification requests.
+// Default: false.
 var RequestWatchProgress Feature = "RequestWatchProgress"
+
+// RangeStream is an etcd feature (etcd 3.7+) for the streaming list RPC.
+// Default: true. MarkUnsupported flips it to false on an Unimplemented response,
+// reverting to true after a recheck interval.
+var RangeStream Feature = "RangeStream"
 
 // Versioner abstracts setting and retrieving metadata fields from database response
 // onto the object ot list. It is required to maintain storage invariants - updating an
@@ -330,17 +337,35 @@ type ListOptions struct {
 	// event containing a ResourceVersion after which the server
 	// continues streaming events.
 	SendInitialEvents *bool
+	// RecordTimestamps requests that the storage layer wrap each emitted watch
+	// object in a WatchEventWithRecordTime carrying its decode timestamp, for dispatch
+	// latency telemetry. This is intended for internal clients only (the watch
+	// cache); external clients cannot set it. The watch cache strips the wrapper
+	// before storing or serializing the object, so it never reaches other watchers.
+	RecordTimestamps bool
+}
+
+// WatchEventWithRecordTime wraps a runtime.Object with the timestamp at which the
+// storage layer decoded the corresponding watch event. It is produced by the
+// storage layer only when ListOptions.RecordTimestamps is set, and is consumed
+// and stripped by the watch cache before the underlying object is stored or
+// serialized. It is never sent to watch clients.
+type WatchEventWithRecordTime interface {
+	runtime.Object
+	// RecordTime returns the decode timestamp of the wrapped event.
+	RecordTime() time.Time
+	// Unwrap returns the underlying object.
+	Unwrap() runtime.Object
 }
 
 // DeleteOptions provides the options that may be provided for storage delete operations.
 type DeleteOptions struct {
-	// IgnoreStoreReadError, if enabled, will ignore store read error
-	// such as transformation or decode failure and go ahead with the
-	// deletion of the object.
+	// ExpectTransformOrDecodeError, if enabled, will return an error if the object can be
+	// transformed and decoded.
 	// NOTE: for normal deletion flow it should always be false, it may be
 	// enabled by the caller only to facilitate unsafe deletion of corrupt
 	// object which otherwise can not be deleted using the normal flow
-	IgnoreStoreReadError bool
+	ExpectTransformOrDecodeError bool
 }
 
 func ValidateListOptions(keyPrefix string, versioner Versioner, opts ListOptions) (withRev int64, continueKey string, err error) {
@@ -420,3 +445,16 @@ func PrepareKey(resourcePrefix, key string, recursive bool) (string, error) {
 	}
 	return key, nil
 }
+
+// ReverseKeyFunc recovers object identity from a resource-relative key
+// produced by the corresponding registry KeyFunc. Backend-specific prefixes
+// are removed before the key is passed to this function.
+// The key identifies a single object, not a collection or root.
+// It starts with "/" and does not end with "/".
+//
+// For namespaced resources, namespace and name are both non-empty. For
+// cluster-scoped resources, namespace is empty and name is non-empty. An error
+// is returned if the key cannot be parsed into a valid object identity.
+// A nil ReverseKeyFunc indicates that identity cannot be derived from the
+// key and callers must fall back to decoding the stored object.
+type ReverseKeyFunc func(key string) (name string, namespace string, err error)

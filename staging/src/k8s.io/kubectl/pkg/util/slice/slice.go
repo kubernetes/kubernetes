@@ -18,36 +18,35 @@ package slice
 
 import "slices"
 
-// SortInts64 sorts []int64 in increasing order
+// SortInts64 sorts []int64 in increasing order.
+//
+// Deprecated: Use slices.Sort instead.
+//
+//go:fix inline
 func SortInts64(a []int64) { slices.Sort(a) }
 
 // Contains checks if a given slice of type T contains the provided item.
 // If a modifier func is provided, it is called with the slice item before the comparation.
+//
+// Deprecated: Use slices.Contains or slices.ContainsFunc instead.
 func Contains[T comparable](slice []T, s T, modifier func(s T) T) bool {
-	for _, item := range slice {
-		if item == s {
-			return true
-		}
-		if modifier != nil && modifier(item) == s {
-			return true
-		}
+	if slices.Contains(slice, s) {
+		return true
+	}
+	if modifier != nil {
+		return slices.ContainsFunc(slice, func(item T) bool { return modifier(item) == s })
 	}
 	return false
 }
 
 // ContainsString checks if a given slice of strings contains the provided string.
 // If a modifier func is provided, it is called with the slice item before the comparation.
-// Deprecated: Use Contains[T] instead
+//
+// Deprecated: Use slices.Contains or slices.ContainsFunc instead.
+//
+//go:fix inline
 func ContainsString(slice []string, s string, modifier func(s string) string) bool {
-	for _, item := range slice {
-		if item == s {
-			return true
-		}
-		if modifier != nil && modifier(item) == s {
-			return true
-		}
-	}
-	return false
+	return Contains(slice, s, modifier)
 }
 
 // ToSet returns a single slice containing the unique values from one or more slices. The order of the items in the

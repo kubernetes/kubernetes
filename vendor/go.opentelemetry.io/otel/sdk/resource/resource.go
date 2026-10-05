@@ -1,7 +1,7 @@
 // Copyright The OpenTelemetry Authors
 // SPDX-License-Identifier: Apache-2.0
 
-package resource // import "go.opentelemetry.io/otel/sdk/resource"
+package resource
 
 import (
 	"context"
@@ -11,6 +11,7 @@ import (
 
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/sdk/internal/attrnorm"
 	"go.opentelemetry.io/otel/sdk/internal/x"
 )
 
@@ -47,6 +48,8 @@ var (
 var ErrSchemaURLConflict = errors.New("conflicting Schema URL")
 
 // New returns a [Resource] built using opts.
+// Duplicate top-level attribute keys and duplicate keys inside map
+// values are resolved using last-value-wins semantics.
 //
 // This may return a partial Resource along with an error containing
 // [ErrPartialResource] if options that provide a [Detector] are used and that
@@ -66,24 +69,28 @@ func New(ctx context.Context, opts ...Option) (*Resource, error) {
 	return r, detect(ctx, r, cfg.detectors)
 }
 
-// NewWithAttributes creates a resource from attrs and associates the resource with a
-// schema URL. If attrs contains duplicate keys, the last value will be used. If attrs
-// contains any invalid items those items will be dropped. The attrs are assumed to be
-// in a schema identified by schemaURL.
+// NewWithAttributes creates a resource from attrs and associates the resource
+// with a schema URL. If attrs contains duplicate top-level attribute keys or
+// duplicate keys inside map values, the last value will be used. If attrs
+// contains any invalid items those items will be dropped. The attrs are assumed
+// to be in a schema identified by schemaURL.
 func NewWithAttributes(schemaURL string, attrs ...attribute.KeyValue) *Resource {
 	resource := NewSchemaless(attrs...)
 	resource.schemaURL = schemaURL
 	return resource
 }
 
-// NewSchemaless creates a resource from attrs. If attrs contains duplicate keys,
-// the last value will be used. If attrs contains any invalid items those items will
-// be dropped. The resource will not be associated with a schema URL. If the schema
+// NewSchemaless creates a resource from attrs. If attrs contains duplicate
+// top-level attribute keys or duplicate keys inside map values, the last
+// value will be used. If attrs contains any invalid items those items will be
+// dropped. The resource will not be associated with a schema URL. If the schema
 // of the attrs is known use NewWithAttributes instead.
 func NewSchemaless(attrs ...attribute.KeyValue) *Resource {
 	if len(attrs) == 0 {
 		return &Resource{}
 	}
+
+	attrs, _ = attrnorm.KeyValues(attrs)
 
 	// Ensure attributes comply with the specification:
 	// https://github.com/open-telemetry/opentelemetry-specification/blob/v1.20.0/specification/common/README.md#attribute
@@ -113,6 +120,9 @@ func (r *Resource) String() string {
 
 // MarshalLog is the marshaling function used by the logging system to represent this Resource.
 func (r *Resource) MarshalLog() any {
+	if r == nil {
+		r = Empty()
+	}
 	return struct {
 		Attributes attribute.Set
 		SchemaURL  string
@@ -232,6 +242,15 @@ func Empty() *Resource {
 // Default returns an instance of Resource with a default
 // "service.name" and OpenTelemetrySDK attributes.
 func Default() *Resource {
+	return DefaultWithContext(context.Background())
+}
+
+// DefaultWithContext returns an instance of Resource with a default
+// "service.name" and OpenTelemetrySDK attributes.
+//
+// If the default resource has already been initialized, the provided ctx
+// is ignored and the cached resource is returned.
+func DefaultWithContext(ctx context.Context) *Resource {
 	defaultResourceOnce.Do(func() {
 		var err error
 		defaultDetectors := []Detector{
@@ -243,7 +262,7 @@ func Default() *Resource {
 			defaultDetectors = append([]Detector{defaultServiceInstanceIDDetector{}}, defaultDetectors...)
 		}
 		defaultResource, err = Detect(
-			context.Background(),
+			ctx,
 			defaultDetectors...,
 		)
 		if err != nil {
@@ -260,8 +279,14 @@ func Default() *Resource {
 // Environment returns an instance of Resource with attributes
 // extracted from the OTEL_RESOURCE_ATTRIBUTES environment variable.
 func Environment() *Resource {
+	return EnvironmentWithContext(context.Background())
+}
+
+// EnvironmentWithContext returns an instance of Resource with attributes
+// extracted from the OTEL_RESOURCE_ATTRIBUTES environment variable.
+func EnvironmentWithContext(ctx context.Context) *Resource {
 	detector := &fromEnv{}
-	resource, err := detector.Detect(context.Background())
+	resource, err := detector.Detect(ctx)
 	if err != nil {
 		otel.Handle(err)
 	}

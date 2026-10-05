@@ -571,7 +571,6 @@ func Test_ProvideWithCoordinates(t *testing.T) {
 	}
 
 	for _, testcase := range testcases {
-		testcase := testcase
 		t.Run(testcase.name, func(t *testing.T) {
 			var buf bytes.Buffer
 			klog.SetOutput(&buf)
@@ -657,7 +656,6 @@ func Test_ProvideParallel(t *testing.T) {
 	}
 
 	for _, testcase := range testcases {
-		testcase := testcase
 		t.Run(testcase.name, func(t *testing.T) {
 			t.Parallel()
 			var wg sync.WaitGroup
@@ -1292,9 +1290,7 @@ func TestGenerateServiceAccountCacheKey_Deterministic(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		tc := tc
 		for _, tc2 := range testCases {
-			tc2 := tc2
 			t.Run(fmt.Sprintf("%+v-%+v", tc, tc2), func(t *testing.T) {
 				serviceAccountCacheKey1, err1 := generateServiceAccountCacheKey(cacheKeyParams{
 					namespace:          tc.serviceAccountNamespace,

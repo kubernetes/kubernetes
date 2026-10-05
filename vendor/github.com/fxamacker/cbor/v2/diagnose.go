@@ -51,11 +51,8 @@ const (
 	maxByteStringEncoding
 )
 
-func (bse ByteStringEncoding) valid() error {
-	if bse >= maxByteStringEncoding {
-		return errors.New("cbor: invalid ByteStringEncoding " + strconv.Itoa(int(bse)))
-	}
-	return nil
+func (bse ByteStringEncoding) valid() bool {
+	return bse < maxByteStringEncoding
 }
 
 // DiagOptions specifies Diag options.
@@ -104,8 +101,8 @@ func (opts DiagOptions) DiagMode() (DiagMode, error) {
 }
 
 func (opts DiagOptions) diagMode() (*diagMode, error) {
-	if err := opts.ByteStringEncoding.valid(); err != nil {
-		return nil, err
+	if !opts.ByteStringEncoding.valid() {
+		return nil, errors.New("cbor: invalid ByteStringEncoding " + strconv.Itoa(int(opts.ByteStringEncoding)))
 	}
 
 	decMode, err := DecOptions{
@@ -360,7 +357,7 @@ func (di *diagnose) item() error { //nolint:gocyclo
 
 	case cborTypeArray:
 		_, _, val := di.d.getHead()
-		count := int(val)
+		count := int(val) //nolint:gosec
 		di.w.WriteByte('[')
 
 		for i := 0; i < count; i++ {
@@ -376,7 +373,7 @@ func (di *diagnose) item() error { //nolint:gocyclo
 
 	case cborTypeMap:
 		_, _, val := di.d.getHead()
-		count := int(val)
+		count := int(val) //nolint:gosec
 		di.w.WriteByte('{')
 
 		for i := 0; i < count; i++ {
@@ -477,8 +474,8 @@ func (di *diagnose) item() error { //nolint:gocyclo
 func (di *diagnose) writeU16(val rune) {
 	di.w.WriteString("\\u")
 	var in [2]byte
-	in[0] = byte(val >> 8)
-	in[1] = byte(val)
+	in[0] = byte(val >> 8) //nolint:gosec
+	in[1] = byte(val)      //nolint:gosec
 	sz := hex.EncodedLen(len(in))
 	di.w.Grow(sz)
 	dst := di.w.Bytes()[di.w.Len() : di.w.Len()+sz]
@@ -608,7 +605,7 @@ func (di *diagnose) encodeTextString(val string, quote byte) error {
 
 		c, size := utf8.DecodeRuneInString(val[i:])
 		switch {
-		case c == utf8.RuneError:
+		case c == utf8.RuneError && size == 1:
 			return &SemanticError{"cbor: invalid UTF-8 string"}
 
 		case c < utf16SurrSelf:
@@ -631,7 +628,7 @@ func (di *diagnose) encodeFloat(ai byte, val uint64) error {
 	f64 := float64(0)
 	switch ai {
 	case additionalInformationAsFloat16:
-		f16 := float16.Frombits(uint16(val))
+		f16 := float16.Frombits(uint16(val)) //nolint:gosec
 		switch {
 		case f16.IsNaN():
 			di.w.WriteString("NaN")
@@ -647,7 +644,7 @@ func (di *diagnose) encodeFloat(ai byte, val uint64) error {
 		}
 
 	case additionalInformationAsFloat32:
-		f32 := math.Float32frombits(uint32(val))
+		f32 := math.Float32frombits(uint32(val)) //nolint:gosec
 		switch {
 		case f32 != f32:
 			di.w.WriteString("NaN")

@@ -19,6 +19,7 @@ package fuzzer
 import (
 	"math"
 
+	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -66,6 +67,21 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 			j.PodReplacementPolicy = &podReplacementPolicy
 			if c.Bool() {
 				c.Fill(j.ManagedBy)
+			}
+			// spec.scheduling has structural invariants the random filler can't know
+			// about: a policy is a union (one of basic or gang), and a gang
+			// minCount must be a positive integer.
+			if j.Scheduling != nil && j.Scheduling.SchedulingPolicy != nil {
+				if c.Bool() {
+					j.Scheduling.SchedulingPolicy = &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{
+						Basic: &schedulingv1alpha3.WorkloadPodGroupBasicSchedulingPolicy{},
+					}
+				} else {
+					minCount := max(c.Int31(), 1)
+					j.Scheduling.SchedulingPolicy = &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{
+						Gang: &schedulingv1alpha3.WorkloadPodGroupGangSchedulingPolicy{MinCount: &minCount},
+					}
+				}
 			}
 		},
 		func(sj *batch.CronJobSpec, c randfill.Continue) {

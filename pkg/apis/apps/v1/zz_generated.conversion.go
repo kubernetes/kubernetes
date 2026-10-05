@@ -25,14 +25,14 @@ import (
 	unsafe "unsafe"
 
 	appsv1 "k8s.io/api/apps/v1"
-	corev1 "k8s.io/api/core/v1"
+	apicorev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	intstr "k8s.io/apimachinery/pkg/util/intstr"
 	apps "k8s.io/kubernetes/pkg/apis/apps"
 	core "k8s.io/kubernetes/pkg/apis/core"
-	apiscorev1 "k8s.io/kubernetes/pkg/apis/core/v1"
+	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
 )
 
 func init() {
@@ -414,11 +414,7 @@ func autoConvert_apps_DaemonSet_To_v1_DaemonSet(in *apps.DaemonSet, out *appsv1.
 }
 
 func autoConvert_v1_DaemonSetCondition_To_apps_DaemonSetCondition(in *appsv1.DaemonSetCondition, out *apps.DaemonSetCondition, s conversion.Scope) error {
-	out.Type = apps.DaemonSetConditionType(in.Type)
-	out.Status = core.ConditionStatus(in.Status)
-	out.LastTransitionTime = in.LastTransitionTime
-	out.Reason = in.Reason
-	out.Message = in.Message
+	*out = *(*apps.DaemonSetCondition)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -428,11 +424,7 @@ func Convert_v1_DaemonSetCondition_To_apps_DaemonSetCondition(in *appsv1.DaemonS
 }
 
 func autoConvert_apps_DaemonSetCondition_To_v1_DaemonSetCondition(in *apps.DaemonSetCondition, out *appsv1.DaemonSetCondition, s conversion.Scope) error {
-	out.Type = appsv1.DaemonSetConditionType(in.Type)
-	out.Status = corev1.ConditionStatus(in.Status)
-	out.LastTransitionTime = in.LastTransitionTime
-	out.Reason = in.Reason
-	out.Message = in.Message
+	*out = *(*appsv1.DaemonSetCondition)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -485,7 +477,7 @@ func Convert_apps_DaemonSetList_To_v1_DaemonSetList(in *apps.DaemonSetList, out 
 
 func autoConvert_v1_DaemonSetSpec_To_apps_DaemonSetSpec(in *appsv1.DaemonSetSpec, out *apps.DaemonSetSpec, s conversion.Scope) error {
 	out.Selector = (*metav1.LabelSelector)(unsafe.Pointer(in.Selector))
-	if err := apiscorev1.Convert_v1_PodTemplateSpec_To_core_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
+	if err := corev1.Convert_v1_PodTemplateSpec_To_core_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
 	if err := Convert_v1_DaemonSetUpdateStrategy_To_apps_DaemonSetUpdateStrategy(&in.UpdateStrategy, &out.UpdateStrategy, s); err != nil {
@@ -503,7 +495,7 @@ func Convert_v1_DaemonSetSpec_To_apps_DaemonSetSpec(in *appsv1.DaemonSetSpec, ou
 
 func autoConvert_apps_DaemonSetSpec_To_v1_DaemonSetSpec(in *apps.DaemonSetSpec, out *appsv1.DaemonSetSpec, s conversion.Scope) error {
 	out.Selector = (*metav1.LabelSelector)(unsafe.Pointer(in.Selector))
-	if err := apiscorev1.Convert_core_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
+	if err := corev1.Convert_core_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
 	if err := Convert_apps_DaemonSetUpdateStrategy_To_v1_DaemonSetUpdateStrategy(&in.UpdateStrategy, &out.UpdateStrategy, s); err != nil {
@@ -516,16 +508,7 @@ func autoConvert_apps_DaemonSetSpec_To_v1_DaemonSetSpec(in *apps.DaemonSetSpec, 
 }
 
 func autoConvert_v1_DaemonSetStatus_To_apps_DaemonSetStatus(in *appsv1.DaemonSetStatus, out *apps.DaemonSetStatus, s conversion.Scope) error {
-	out.CurrentNumberScheduled = in.CurrentNumberScheduled
-	out.NumberMisscheduled = in.NumberMisscheduled
-	out.DesiredNumberScheduled = in.DesiredNumberScheduled
-	out.NumberReady = in.NumberReady
-	out.ObservedGeneration = in.ObservedGeneration
-	out.UpdatedNumberScheduled = in.UpdatedNumberScheduled
-	out.NumberAvailable = in.NumberAvailable
-	out.NumberUnavailable = in.NumberUnavailable
-	out.CollisionCount = (*int32)(unsafe.Pointer(in.CollisionCount))
-	out.Conditions = *(*[]apps.DaemonSetCondition)(unsafe.Pointer(&in.Conditions))
+	*out = *(*apps.DaemonSetStatus)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -535,16 +518,7 @@ func Convert_v1_DaemonSetStatus_To_apps_DaemonSetStatus(in *appsv1.DaemonSetStat
 }
 
 func autoConvert_apps_DaemonSetStatus_To_v1_DaemonSetStatus(in *apps.DaemonSetStatus, out *appsv1.DaemonSetStatus, s conversion.Scope) error {
-	out.CurrentNumberScheduled = in.CurrentNumberScheduled
-	out.NumberMisscheduled = in.NumberMisscheduled
-	out.DesiredNumberScheduled = in.DesiredNumberScheduled
-	out.NumberReady = in.NumberReady
-	out.ObservedGeneration = in.ObservedGeneration
-	out.UpdatedNumberScheduled = in.UpdatedNumberScheduled
-	out.NumberAvailable = in.NumberAvailable
-	out.NumberUnavailable = in.NumberUnavailable
-	out.CollisionCount = (*int32)(unsafe.Pointer(in.CollisionCount))
-	out.Conditions = *(*[]appsv1.DaemonSetCondition)(unsafe.Pointer(&in.Conditions))
+	*out = *(*appsv1.DaemonSetStatus)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -614,12 +588,7 @@ func autoConvert_apps_Deployment_To_v1_Deployment(in *apps.Deployment, out *apps
 }
 
 func autoConvert_v1_DeploymentCondition_To_apps_DeploymentCondition(in *appsv1.DeploymentCondition, out *apps.DeploymentCondition, s conversion.Scope) error {
-	out.Type = apps.DeploymentConditionType(in.Type)
-	out.Status = core.ConditionStatus(in.Status)
-	out.LastUpdateTime = in.LastUpdateTime
-	out.LastTransitionTime = in.LastTransitionTime
-	out.Reason = in.Reason
-	out.Message = in.Message
+	*out = *(*apps.DeploymentCondition)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -629,12 +598,7 @@ func Convert_v1_DeploymentCondition_To_apps_DeploymentCondition(in *appsv1.Deplo
 }
 
 func autoConvert_apps_DeploymentCondition_To_v1_DeploymentCondition(in *apps.DeploymentCondition, out *appsv1.DeploymentCondition, s conversion.Scope) error {
-	out.Type = appsv1.DeploymentConditionType(in.Type)
-	out.Status = corev1.ConditionStatus(in.Status)
-	out.LastUpdateTime = in.LastUpdateTime
-	out.LastTransitionTime = in.LastTransitionTime
-	out.Reason = in.Reason
-	out.Message = in.Message
+	*out = *(*appsv1.DeploymentCondition)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -690,7 +654,7 @@ func autoConvert_v1_DeploymentSpec_To_apps_DeploymentSpec(in *appsv1.DeploymentS
 		return err
 	}
 	out.Selector = (*metav1.LabelSelector)(unsafe.Pointer(in.Selector))
-	if err := apiscorev1.Convert_v1_PodTemplateSpec_To_core_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
+	if err := corev1.Convert_v1_PodTemplateSpec_To_core_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
 	if err := Convert_v1_DeploymentStrategy_To_apps_DeploymentStrategy(&in.Strategy, &out.Strategy, s); err != nil {
@@ -713,7 +677,7 @@ func autoConvert_apps_DeploymentSpec_To_v1_DeploymentSpec(in *apps.DeploymentSpe
 		return err
 	}
 	out.Selector = (*metav1.LabelSelector)(unsafe.Pointer(in.Selector))
-	if err := apiscorev1.Convert_core_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
+	if err := corev1.Convert_core_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
 	if err := Convert_apps_DeploymentStrategy_To_v1_DeploymentStrategy(&in.Strategy, &out.Strategy, s); err != nil {
@@ -728,15 +692,7 @@ func autoConvert_apps_DeploymentSpec_To_v1_DeploymentSpec(in *apps.DeploymentSpe
 }
 
 func autoConvert_v1_DeploymentStatus_To_apps_DeploymentStatus(in *appsv1.DeploymentStatus, out *apps.DeploymentStatus, s conversion.Scope) error {
-	out.ObservedGeneration = in.ObservedGeneration
-	out.Replicas = in.Replicas
-	out.UpdatedReplicas = in.UpdatedReplicas
-	out.ReadyReplicas = in.ReadyReplicas
-	out.AvailableReplicas = in.AvailableReplicas
-	out.UnavailableReplicas = in.UnavailableReplicas
-	out.TerminatingReplicas = (*int32)(unsafe.Pointer(in.TerminatingReplicas))
-	out.Conditions = *(*[]apps.DeploymentCondition)(unsafe.Pointer(&in.Conditions))
-	out.CollisionCount = (*int32)(unsafe.Pointer(in.CollisionCount))
+	*out = *(*apps.DeploymentStatus)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -746,15 +702,7 @@ func Convert_v1_DeploymentStatus_To_apps_DeploymentStatus(in *appsv1.DeploymentS
 }
 
 func autoConvert_apps_DeploymentStatus_To_v1_DeploymentStatus(in *apps.DeploymentStatus, out *appsv1.DeploymentStatus, s conversion.Scope) error {
-	out.ObservedGeneration = in.ObservedGeneration
-	out.Replicas = in.Replicas
-	out.UpdatedReplicas = in.UpdatedReplicas
-	out.ReadyReplicas = in.ReadyReplicas
-	out.AvailableReplicas = in.AvailableReplicas
-	out.UnavailableReplicas = in.UnavailableReplicas
-	out.TerminatingReplicas = (*int32)(unsafe.Pointer(in.TerminatingReplicas))
-	out.Conditions = *(*[]appsv1.DeploymentCondition)(unsafe.Pointer(&in.Conditions))
-	out.CollisionCount = (*int32)(unsafe.Pointer(in.CollisionCount))
+	*out = *(*appsv1.DeploymentStatus)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -834,11 +782,7 @@ func Convert_apps_ReplicaSet_To_v1_ReplicaSet(in *apps.ReplicaSet, out *appsv1.R
 }
 
 func autoConvert_v1_ReplicaSetCondition_To_apps_ReplicaSetCondition(in *appsv1.ReplicaSetCondition, out *apps.ReplicaSetCondition, s conversion.Scope) error {
-	out.Type = apps.ReplicaSetConditionType(in.Type)
-	out.Status = core.ConditionStatus(in.Status)
-	out.LastTransitionTime = in.LastTransitionTime
-	out.Reason = in.Reason
-	out.Message = in.Message
+	*out = *(*apps.ReplicaSetCondition)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -848,11 +792,7 @@ func Convert_v1_ReplicaSetCondition_To_apps_ReplicaSetCondition(in *appsv1.Repli
 }
 
 func autoConvert_apps_ReplicaSetCondition_To_v1_ReplicaSetCondition(in *apps.ReplicaSetCondition, out *appsv1.ReplicaSetCondition, s conversion.Scope) error {
-	out.Type = appsv1.ReplicaSetConditionType(in.Type)
-	out.Status = corev1.ConditionStatus(in.Status)
-	out.LastTransitionTime = in.LastTransitionTime
-	out.Reason = in.Reason
-	out.Message = in.Message
+	*out = *(*appsv1.ReplicaSetCondition)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -909,7 +849,7 @@ func autoConvert_v1_ReplicaSetSpec_To_apps_ReplicaSetSpec(in *appsv1.ReplicaSetS
 	}
 	out.MinReadySeconds = in.MinReadySeconds
 	out.Selector = (*metav1.LabelSelector)(unsafe.Pointer(in.Selector))
-	if err := apiscorev1.Convert_v1_PodTemplateSpec_To_core_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
+	if err := corev1.Convert_v1_PodTemplateSpec_To_core_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
 	return nil
@@ -926,7 +866,7 @@ func autoConvert_apps_ReplicaSetSpec_To_v1_ReplicaSetSpec(in *apps.ReplicaSetSpe
 	}
 	out.MinReadySeconds = in.MinReadySeconds
 	out.Selector = (*metav1.LabelSelector)(unsafe.Pointer(in.Selector))
-	if err := apiscorev1.Convert_core_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
+	if err := corev1.Convert_core_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
 	return nil
@@ -938,13 +878,7 @@ func Convert_apps_ReplicaSetSpec_To_v1_ReplicaSetSpec(in *apps.ReplicaSetSpec, o
 }
 
 func autoConvert_v1_ReplicaSetStatus_To_apps_ReplicaSetStatus(in *appsv1.ReplicaSetStatus, out *apps.ReplicaSetStatus, s conversion.Scope) error {
-	out.Replicas = in.Replicas
-	out.FullyLabeledReplicas = in.FullyLabeledReplicas
-	out.ReadyReplicas = in.ReadyReplicas
-	out.AvailableReplicas = in.AvailableReplicas
-	out.TerminatingReplicas = (*int32)(unsafe.Pointer(in.TerminatingReplicas))
-	out.ObservedGeneration = in.ObservedGeneration
-	out.Conditions = *(*[]apps.ReplicaSetCondition)(unsafe.Pointer(&in.Conditions))
+	*out = *(*apps.ReplicaSetStatus)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -954,13 +888,7 @@ func Convert_v1_ReplicaSetStatus_To_apps_ReplicaSetStatus(in *appsv1.ReplicaSetS
 }
 
 func autoConvert_apps_ReplicaSetStatus_To_v1_ReplicaSetStatus(in *apps.ReplicaSetStatus, out *appsv1.ReplicaSetStatus, s conversion.Scope) error {
-	out.Replicas = in.Replicas
-	out.FullyLabeledReplicas = in.FullyLabeledReplicas
-	out.ReadyReplicas = in.ReadyReplicas
-	out.AvailableReplicas = in.AvailableReplicas
-	out.TerminatingReplicas = (*int32)(unsafe.Pointer(in.TerminatingReplicas))
-	out.ObservedGeneration = in.ObservedGeneration
-	out.Conditions = *(*[]appsv1.ReplicaSetCondition)(unsafe.Pointer(&in.Conditions))
+	*out = *(*appsv1.ReplicaSetStatus)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -1088,11 +1016,7 @@ func Convert_apps_StatefulSet_To_v1_StatefulSet(in *apps.StatefulSet, out *appsv
 }
 
 func autoConvert_v1_StatefulSetCondition_To_apps_StatefulSetCondition(in *appsv1.StatefulSetCondition, out *apps.StatefulSetCondition, s conversion.Scope) error {
-	out.Type = apps.StatefulSetConditionType(in.Type)
-	out.Status = core.ConditionStatus(in.Status)
-	out.LastTransitionTime = in.LastTransitionTime
-	out.Reason = in.Reason
-	out.Message = in.Message
+	*out = *(*apps.StatefulSetCondition)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -1102,11 +1026,7 @@ func Convert_v1_StatefulSetCondition_To_apps_StatefulSetCondition(in *appsv1.Sta
 }
 
 func autoConvert_apps_StatefulSetCondition_To_v1_StatefulSetCondition(in *apps.StatefulSetCondition, out *appsv1.StatefulSetCondition, s conversion.Scope) error {
-	out.Type = appsv1.StatefulSetConditionType(in.Type)
-	out.Status = corev1.ConditionStatus(in.Status)
-	out.LastTransitionTime = in.LastTransitionTime
-	out.Reason = in.Reason
-	out.Message = in.Message
+	*out = *(*appsv1.StatefulSetCondition)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -1158,7 +1078,7 @@ func Convert_apps_StatefulSetList_To_v1_StatefulSetList(in *apps.StatefulSetList
 }
 
 func autoConvert_v1_StatefulSetOrdinals_To_apps_StatefulSetOrdinals(in *appsv1.StatefulSetOrdinals, out *apps.StatefulSetOrdinals, s conversion.Scope) error {
-	out.Start = in.Start
+	*out = *(*apps.StatefulSetOrdinals)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -1168,7 +1088,7 @@ func Convert_v1_StatefulSetOrdinals_To_apps_StatefulSetOrdinals(in *appsv1.State
 }
 
 func autoConvert_apps_StatefulSetOrdinals_To_v1_StatefulSetOrdinals(in *apps.StatefulSetOrdinals, out *appsv1.StatefulSetOrdinals, s conversion.Scope) error {
-	out.Start = in.Start
+	*out = *(*appsv1.StatefulSetOrdinals)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -1178,8 +1098,7 @@ func Convert_apps_StatefulSetOrdinals_To_v1_StatefulSetOrdinals(in *apps.Statefu
 }
 
 func autoConvert_v1_StatefulSetPersistentVolumeClaimRetentionPolicy_To_apps_StatefulSetPersistentVolumeClaimRetentionPolicy(in *appsv1.StatefulSetPersistentVolumeClaimRetentionPolicy, out *apps.StatefulSetPersistentVolumeClaimRetentionPolicy, s conversion.Scope) error {
-	out.WhenDeleted = apps.PersistentVolumeClaimRetentionPolicyType(in.WhenDeleted)
-	out.WhenScaled = apps.PersistentVolumeClaimRetentionPolicyType(in.WhenScaled)
+	*out = *(*apps.StatefulSetPersistentVolumeClaimRetentionPolicy)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -1189,8 +1108,7 @@ func Convert_v1_StatefulSetPersistentVolumeClaimRetentionPolicy_To_apps_Stateful
 }
 
 func autoConvert_apps_StatefulSetPersistentVolumeClaimRetentionPolicy_To_v1_StatefulSetPersistentVolumeClaimRetentionPolicy(in *apps.StatefulSetPersistentVolumeClaimRetentionPolicy, out *appsv1.StatefulSetPersistentVolumeClaimRetentionPolicy, s conversion.Scope) error {
-	out.WhenDeleted = appsv1.PersistentVolumeClaimRetentionPolicyType(in.WhenDeleted)
-	out.WhenScaled = appsv1.PersistentVolumeClaimRetentionPolicyType(in.WhenScaled)
+	*out = *(*appsv1.StatefulSetPersistentVolumeClaimRetentionPolicy)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -1204,7 +1122,7 @@ func autoConvert_v1_StatefulSetSpec_To_apps_StatefulSetSpec(in *appsv1.StatefulS
 		return err
 	}
 	out.Selector = (*metav1.LabelSelector)(unsafe.Pointer(in.Selector))
-	if err := apiscorev1.Convert_v1_PodTemplateSpec_To_core_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
+	if err := corev1.Convert_v1_PodTemplateSpec_To_core_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
 	out.VolumeClaimTemplates = *(*[]core.PersistentVolumeClaim)(unsafe.Pointer(&in.VolumeClaimTemplates))
@@ -1225,10 +1143,10 @@ func autoConvert_apps_StatefulSetSpec_To_v1_StatefulSetSpec(in *apps.StatefulSet
 		return err
 	}
 	out.Selector = (*metav1.LabelSelector)(unsafe.Pointer(in.Selector))
-	if err := apiscorev1.Convert_core_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
+	if err := corev1.Convert_core_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
-	out.VolumeClaimTemplates = *(*[]corev1.PersistentVolumeClaim)(unsafe.Pointer(&in.VolumeClaimTemplates))
+	out.VolumeClaimTemplates = *(*[]apicorev1.PersistentVolumeClaim)(unsafe.Pointer(&in.VolumeClaimTemplates))
 	out.ServiceName = in.ServiceName
 	out.PodManagementPolicy = appsv1.PodManagementPolicyType(in.PodManagementPolicy)
 	if err := Convert_apps_StatefulSetUpdateStrategy_To_v1_StatefulSetUpdateStrategy(&in.UpdateStrategy, &out.UpdateStrategy, s); err != nil {

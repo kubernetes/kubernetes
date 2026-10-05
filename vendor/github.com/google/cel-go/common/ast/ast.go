@@ -16,6 +16,8 @@
 package ast
 
 import (
+	"slices"
+
 	"github.com/google/cel-go/common"
 	"github.com/google/cel-go/common/types"
 	"github.com/google/cel-go/common/types/ref"
@@ -160,6 +162,26 @@ func MaxID(a *AST) int64 {
 	return visitor.maxID + 1
 }
 
+// IDs returns the set of AST node IDs, including macro calls.
+func (a *AST) IDs() map[int64]bool {
+	visitor := make(idVisitor)
+	PostOrderVisit(a.Expr(), visitor)
+	for _, call := range a.SourceInfo().MacroCalls() {
+		PostOrderVisit(call, visitor)
+	}
+	return visitor
+}
+
+// ClearUnusedIDs removes IDs not used in the AST or macro calls from SourceInfo.
+func (a *AST) ClearUnusedIDs() {
+	ids := a.IDs()
+	for id := range a.SourceInfo().OffsetRanges() {
+		if !ids[id] {
+			a.SourceInfo().ClearOffsetRange(id)
+		}
+	}
+}
+
 // Heights computes the heights of all AST expressions and returns a map from expression id to height.
 func Heights(a *AST) map[int64]int {
 	visitor := make(heightVisitor)
@@ -209,6 +231,11 @@ func CopySourceInfo(info *SourceInfo) *SourceInfo {
 	for id, call := range info.macroCalls {
 		callsCopy[id] = defaultFactory.CopyExpr(call)
 	}
+	var extCopy []Extension
+	if len(info.extensions) > 0 {
+		extCopy = make([]Extension, len(info.extensions))
+		copy(extCopy, info.extensions)
+	}
 	return &SourceInfo{
 		syntax:       info.syntax,
 		desc:         info.desc,
@@ -217,6 +244,7 @@ func CopySourceInfo(info *SourceInfo) *SourceInfo {
 		baseCol:      info.baseCol,
 		offsetRanges: rangesCopy,
 		macroCalls:   callsCopy,
+		extensions:   extCopy,
 	}
 }
 
@@ -230,6 +258,26 @@ type SourceInfo struct {
 	baseCol      int32
 	offsetRanges map[int64]OffsetRange
 	macroCalls   map[int64]Expr
+
+	// extensions indicate versioned optional features which affect the execution of one or more CEL component.
+	extensions []Extension
+}
+
+// RenumberIDs performs an in-place update of the expression IDs within the SourceInfo.
+func (s *SourceInfo) RenumberIDs(idGen IDGenerator) {
+	if s == nil {
+		return
+	}
+	oldIDs := []int64{}
+	for id := range s.offsetRanges {
+		oldIDs = append(oldIDs, id)
+	}
+	slices.Sort(oldIDs)
+	newRanges := make(map[int64]OffsetRange)
+	for _, id := range oldIDs {
+		newRanges[idGen(id)] = s.offsetRanges[id]
+	}
+	s.offsetRanges = newRanges
 }
 
 // SyntaxVersion returns the syntax version associated with the text expression.
@@ -365,6 +413,12 @@ func (s *SourceInfo) ComputeOffset(line, col int32) int32 {
 		line = s.baseLine + line
 		col = s.baseCol + col
 	}
+	return s.ComputeOffsetAbsolute(line, col)
+}
+
+// ComputeOffsetAbsolute calculates the 0-based character offset from a 1-based line and 0-based column
+// based on the absolute line and column of the SourceInfo.
+func (s *SourceInfo) ComputeOffsetAbsolute(line, col int32) int32 {
 	if line == 1 {
 		return col
 	}
@@ -373,6 +427,34 @@ func (s *SourceInfo) ComputeOffset(line, col int32) int32 {
 	}
 	offset := s.LineOffsets()[line-2]
 	return offset + col
+}
+
+// Extensions returns the set of extensions present in the source.
+func (s *SourceInfo) Extensions() []Extension {
+	var extensions []Extension
+	if s == nil {
+		return extensions
+	}
+	return s.extensions
+}
+
+// HasExtension returns whether the source info contains the extension which satisfies the minimum version requirement.
+//
+// For an extension to be considered 'present' it must have the same major version as the minVersion and a minor version
+// at least as great as the lowest minor version specified.
+func (s *SourceInfo) HasExtension(id string, minVersion ExtensionVersion) bool {
+	for _, ext := range s.Extensions() {
+		return ext.ID == id && ext.Version.Major == minVersion.Major && ext.Version.Minor >= minVersion.Minor
+	}
+	return false
+}
+
+// AddExtension adds an extension record into the SourceInfo.
+func (s *SourceInfo) AddExtension(ext Extension) {
+	if s == nil {
+		return
+	}
+	s.extensions = append(s.extensions, ext)
 }
 
 // OffsetRange captures the start and stop positions of a section of text in the input expression.
@@ -443,6 +525,53 @@ func (r *ReferenceInfo) Equals(other *ReferenceInfo) bool {
 	}
 	return true
 }
+
+// NewExtension creates an Extension to be recorded on the SourceInfo.
+func NewExtension(id string, version ExtensionVersion, components ...ExtensionComponent) Extension {
+	return Extension{
+		ID:         id,
+		Version:    version,
+		Components: components,
+	}
+}
+
+// Extension represents a versioned, optional feature present in the AST that affects CEL component behavior.
+type Extension struct {
+	// ID indicates the unique name of the extension.
+	ID string
+	// Version indicates the major / minor version.
+	Version ExtensionVersion
+	// Components enumerates the CEL components affected by the feature.
+	Components []ExtensionComponent
+}
+
+// NewExtensionVersion creates a new extension version with a major, minor version.
+func NewExtensionVersion(major, minor int64) ExtensionVersion {
+	return ExtensionVersion{Major: major, Minor: minor}
+}
+
+// ExtensionVersion represents a semantic version with a major and minor number.
+type ExtensionVersion struct {
+	// Major version of the extension.
+	// All versions with the same major number are expected to be compatible with all minor version changes.
+	Major int64
+
+	// Minor version of the extension which indicates that some small non-semantic change has been made to
+	// the extension.
+	Minor int64
+}
+
+// ExtensionComponent indicates which CEL component is affected.
+type ExtensionComponent int
+
+const (
+	// ComponentParser means the feature affects expression parsing.
+	ComponentParser ExtensionComponent = iota + 1
+	// ComponentTypeChecker means the feature affects type-checking.
+	ComponentTypeChecker
+	// ComponentRuntime alters program planning or evaluation of the AST.
+	ComponentRuntime
+)
 
 type maxIDVisitor struct {
 	maxID int64
@@ -532,4 +661,14 @@ func (hv heightVisitor) maxEntryHeight(entries ...EntryExpr) int {
 		}
 	}
 	return max
+}
+
+type idVisitor map[int64]bool
+
+func (v idVisitor) VisitExpr(e Expr) {
+	v[e.ID()] = true
+}
+
+func (v idVisitor) VisitEntryExpr(e EntryExpr) {
+	v[e.ID()] = true
 }

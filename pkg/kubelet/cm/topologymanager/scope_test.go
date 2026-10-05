@@ -17,14 +17,17 @@ limitations under the License.
 package topologymanager
 
 import (
+	"reflect"
+	"testing"
+
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/kubelet/cm/containermap"
-	"reflect"
-	"testing"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func TestGetAffinity(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	tcases := []struct {
 		name          string
 		containerName string
@@ -40,7 +43,7 @@ func TestGetAffinity(t *testing.T) {
 	}
 	for _, tc := range tcases {
 		scope := scope{}
-		actual := scope.GetAffinity(tc.podUID, tc.containerName)
+		actual := scope.GetAffinity(logger, tc.podUID, tc.containerName)
 		if !reflect.DeepEqual(actual, tc.expected) {
 			t.Errorf("Expected Affinity in result to be %v, got %v", tc.expected, actual)
 		}
@@ -83,6 +86,7 @@ func TestAddContainer(t *testing.T) {
 }
 
 func TestRemoveContainer(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	testCases := []struct {
 		name        string
 		containerID string
@@ -110,7 +114,7 @@ func TestRemoveContainer(t *testing.T) {
 		scope.podTopologyHints[string(tc.podUID)][tc.name] = TopologyHint{}
 		len1 = len(scope.podMap)
 		lenHints1 = len(scope.podTopologyHints)
-		err := scope.RemoveContainer(tc.containerID)
+		err := scope.RemoveContainer(logger, tc.containerID)
 		len2 = len(scope.podMap)
 		lenHints2 = len(scope.podTopologyHints)
 		if err != nil {

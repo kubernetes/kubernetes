@@ -46,8 +46,8 @@ type Interface interface {
 	ListAll(ctx context.Context) (map[string][]string, error)
 
 	// List returns a list of the names of the objects of objectType ("chain", "set",
-	// "map" or "counter") in the table. If there are no such objects, this will
-	// return an empty list and no error.
+	// "map", "counter", or "flowtable" in the table. If there are no such objects,
+	// this will return an empty list and no error.
 	List(ctx context.Context, objectType string) ([]string, error)
 
 	// ListRules returns a list of the rules in a chain, in order. If no chain name is
@@ -87,6 +87,9 @@ const (
 	// that you can use the `tx.Destroy()` method to be compatible with destroy
 	// emulation; see the docs for that method for more details.
 	EmulateDestroy Option = "EmulateDestroy"
+
+	// UseNetlink turns on the experimental netlink support for List* commands.
+	UseNetlink Option = "UseNetlink"
 )
 
 type nftContext struct {
@@ -115,6 +118,8 @@ type realNFTables struct {
 
 	exec execer
 	path string
+
+	nl netlink
 }
 
 func optionSet(options []Option, option Option) bool {
@@ -208,6 +213,18 @@ func newInternal(family Family, table string, execer execer, options ...Option) 
 		nft.emulateDestroy = emulateDestroy
 	}
 
+	if optionSet(options, UseNetlink) {
+		// Use netlink directly to avoid the performance overhead
+		// of executing nft list commands for every operation and
+		// avoid parsing nft output.
+		// TODO: Only some commands are implemented.
+		nl, err := newNetlinkAdapter(family, table)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create netlink adapter: %w", err)
+		}
+		nft.nl = nl
+	}
+
 	return nft, nil
 }
 
@@ -232,6 +249,9 @@ func newInternal(family Family, table string, execer execer, options ...Option) 
 //   - EmulateDestroy: adjust the API of `tx.Destroy()` to make it possible to emulate via
 //     `nft add` and `nft delete` on systems that do not have `nft destroy`; see the docs
 //     for `tx.Destroy()` for more details.
+//
+//   - UseNetlink: use the experimental netlink version of the List* methods rather than
+//     using `nft list`.
 func New(family Family, table string, options ...Option) (Interface, error) {
 	return newInternal(family, table, realExec{}, options...)
 }
@@ -383,7 +403,11 @@ func getJSONObjects(listOutput, objectType string) ([]map[string]interface{}, er
 
 // ListAll is part of Interface.
 func (nft *realNFTables) ListAll(ctx context.Context) (map[string][]string, error) {
-	cmd := exec.CommandContext(ctx, nft.path, "--json", "list", "table", string(nft.family), nft.table)
+	if nft.nl != nil {
+		return nft.nl.ListAll(ctx)
+	}
+
+	cmd := exec.CommandContext(ctx, nft.path, "--json", "--terse", "list", "table", string(nft.family), nft.table)
 	out, err := nft.exec.Run(cmd)
 	if err != nil {
 		return nil, fmt.Errorf("failed to run nft: %w", err)
@@ -412,22 +436,42 @@ func (nft *realNFTables) ListAll(ctx context.Context) (map[string][]string, erro
 	return result, nil
 }
 
+// Takes objectType, which can be either singular or plural, and returns the singular
+// form.
+func canonicalObjectType(objectType string) string {
+	// All currently-existing nftables object types have plural forms that are just
+	// the singular form plus 's', and none have singular forms ending in 's'.
+	if objectType[len(objectType)-1] == 's' {
+		objectType = objectType[:len(objectType)-1]
+	}
+	return objectType
+}
+
+var listableTypes = map[string]bool{
+	"chain":     true,
+	"set":       true,
+	"map":       true,
+	"counter":   true,
+	"flowtable": true,
+}
+
 // List is part of Interface.
 func (nft *realNFTables) List(ctx context.Context, objectType string) ([]string, error) {
 	if nft.table == "" {
 		return nil, fmt.Errorf("can't use List() on a knftables.Interface with no associated family/table")
 	}
+	objectType = canonicalObjectType(objectType)
+	if _, ok := listableTypes[objectType]; !ok {
+		return nil, fmt.Errorf("can't List() type %q", objectType)
+	}
 
-	// objectType is allowed to be either singular or plural. All currently-existing
-	// nftables object types have plural forms that are just the singular form plus 's',
-	// and none have singular forms ending in 's'.
-	if objectType[len(objectType)-1] == 's' {
-		objectType = objectType[:len(objectType)-1]
+	if nft.nl != nil {
+		return nft.nl.List(ctx, objectType)
 	}
 
 	// We want to restrict nft to looking only at our table, so we have to do "list table"
 	// rather than any variant of "list <objectType>".
-	cmd := exec.CommandContext(ctx, nft.path, "--json", "list", "table", string(nft.family), nft.table)
+	cmd := exec.CommandContext(ctx, nft.path, "--json", "--terse", "list", "table", string(nft.family), nft.table)
 	out, err := nft.exec.Run(cmd)
 	if err != nil {
 		return nil, fmt.Errorf("failed to run nft: %w", err)
@@ -455,7 +499,7 @@ func (nft *realNFTables) ListRules(ctx context.Context, chain string) ([]*Rule, 
 
 	var cmd *exec.Cmd
 	if chain == "" {
-		cmd = exec.CommandContext(ctx, nft.path, "--json", "list", "table", string(nft.family), nft.table)
+		cmd = exec.CommandContext(ctx, nft.path, "--json", "--terse", "list", "table", string(nft.family), nft.table)
 	} else {
 		cmd = exec.CommandContext(ctx, nft.path, "--json", "list", "chain", string(nft.family), nft.table, chain)
 	}
@@ -476,7 +520,9 @@ func (nft *realNFTables) ListRules(ctx context.Context, chain string) ([]*Rule, 
 			return nil, fmt.Errorf("unexpected JSON output from nft (rule with no chain)")
 		}
 		rule := &Rule{
-			Chain: parentChain,
+			Family: nft.family,
+			Table:  nft.table,
+			Chain:  parentChain,
 		}
 
 		// handle is written as an integer in nft's output, but json.Unmarshal
@@ -500,6 +546,9 @@ func (nft *realNFTables) ListRules(ctx context.Context, chain string) ([]*Rule, 
 func (nft *realNFTables) ListElements(ctx context.Context, objectType, name string) ([]*Element, error) {
 	if nft.table == "" {
 		return nil, fmt.Errorf("can't use ListElements() on a knftables.Interface with no associated family/table")
+	}
+	if objectType != "set" && objectType != "map" {
+		return nil, fmt.Errorf("invalid objectType %q", objectType)
 	}
 
 	cmd := exec.CommandContext(ctx, nft.path, "--json", "list", objectType, string(nft.family), nft.table, name)

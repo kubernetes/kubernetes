@@ -22,6 +22,7 @@ import (
 	"strconv"
 	"strings"
 
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/conversion"
@@ -29,8 +30,36 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
+	resourcehelper "k8s.io/component-helpers/resource"
 	"k8s.io/kubernetes/pkg/apis/core"
 )
+
+// IsPodLevelResourcesSet check if PodLevelResources pod-level resources are set.
+// It returns true if either the Requests or Limits maps are non-empty.
+// Note: keep this in sync with k8s.io/component-helpers/resource.IsPodLevelResourcesSet
+func IsPodLevelResourcesSet(pod *core.Pod) bool {
+	if pod.Spec.Resources == nil {
+		return false
+	}
+
+	if (len(pod.Spec.Resources.Requests) + len(pod.Spec.Resources.Limits)) == 0 {
+		return false
+	}
+
+	for name := range pod.Spec.Resources.Requests {
+		if resourcehelper.IsSupportedPodLevelResource(v1.ResourceName(name)) {
+			return true
+		}
+	}
+
+	for name := range pod.Spec.Resources.Limits {
+		if resourcehelper.IsSupportedPodLevelResource(v1.ResourceName(name)) {
+			return true
+		}
+	}
+
+	return false
+}
 
 // IsHugePageResourceName returns true if the resource name has the huge page
 // resource prefix.
@@ -39,18 +68,25 @@ func IsHugePageResourceName(name core.ResourceName) bool {
 }
 
 // IsHugePageResourceValueDivisible returns true if the resource value of storage is
-// integer multiple of page size.
+// integer multiple of page size. A value outside the int64 range is not.
 func IsHugePageResourceValueDivisible(name core.ResourceName, quantity resource.Quantity) bool {
 	pageSize, err := HugePageSizeFromResourceName(name)
 	if err != nil {
 		return false
 	}
 
-	if pageSize.Sign() <= 0 || pageSize.MilliValue()%int64(1000) != int64(0) {
+	milli, ok := pageSize.AsMilliInt64()
+	if pageSize.Sign() <= 0 || !ok || milli%1000 != 0 {
 		return false
 	}
+	// milli is a positive multiple of 1000, so this is the page size in whole bytes.
+	size := milli / 1000
 
-	return quantity.Value()%pageSize.Value() == 0
+	value, ok := quantity.AsScaledInt64(0)
+	if !ok {
+		return false
+	}
+	return value%size == 0
 }
 
 // IsQuotaHugePageResourceName returns true if the resource name has the quota
@@ -104,6 +140,9 @@ var Semantic = conversion.EqualitiesOrDie(
 	},
 	func(a, b metav1.Time) bool {
 		return a.UTC() == b.UTC()
+	},
+	func(a, b metav1.FieldsV1) bool {
+		return a.Equal(b)
 	},
 	func(a, b labels.Selector) bool {
 		return a.String() == b.String()
@@ -173,6 +212,12 @@ var standardContainerResources = sets.New(
 // for the specified resource
 func IsStandardContainerResourceName(name core.ResourceName) bool {
 	return standardContainerResources.Has(name) || IsHugePageResourceName(name)
+}
+
+// IsNodeAllocatableResourceName returns true if the resource name is valid for DRA NodeAllocatableResources.
+// Currently, only cpu, memory, and hugepages are supported (excluding ephemeral-storage for alpha).
+func IsNodeAllocatableResourceName(name core.ResourceName) bool {
+	return name == core.ResourceCPU || name == core.ResourceMemory || IsHugePageResourceName(name)
 }
 
 // IsExtendedResourceName returns true if:

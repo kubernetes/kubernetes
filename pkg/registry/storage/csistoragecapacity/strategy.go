@@ -22,6 +22,7 @@ import (
 	metav1validation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	storageutil "k8s.io/kubernetes/pkg/api/storage"
@@ -31,13 +32,13 @@ import (
 
 // csiStorageCapacityStrategy implements behavior for CSIStorageCapacity objects
 type csiStorageCapacityStrategy struct {
-	runtime.ObjectTyper
+	rest.DeclarativeValidation
 	names.NameGenerator
 }
 
 // Strategy is the default logic that applies when creating and updating
 // CSIStorageCapacity objects via the REST API.
-var Strategy = csiStorageCapacityStrategy{legacyscheme.Scheme, names.SimpleNameGenerator}
+var Strategy = csiStorageCapacityStrategy{rest.DeclarativeValidation{Scheme: legacyscheme.Scheme}, names.SimpleNameGenerator}
 
 func (csiStorageCapacityStrategy) NamespaceScoped() bool {
 	return true
@@ -65,7 +66,7 @@ func (csiStorageCapacityStrategy) WarningsOnCreate(ctx context.Context, obj runt
 func (csiStorageCapacityStrategy) Canonicalize(obj runtime.Object) {
 }
 
-func (csiStorageCapacityStrategy) AllowCreateOnUpdate() bool {
+func (csiStorageCapacityStrategy) AllowCreateOnUpdate(ctx context.Context) bool {
 	return false
 }
 
@@ -88,7 +89,7 @@ func (csiStorageCapacityStrategy) WarningsOnUpdate(ctx context.Context, obj, old
 	return storageutil.GetWarningsForCSIStorageCapacity(obj.(*storage.CSIStorageCapacity))
 }
 
-func (csiStorageCapacityStrategy) AllowUnconditionalUpdate() bool {
+func (csiStorageCapacityStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {
 	return false
 }
 

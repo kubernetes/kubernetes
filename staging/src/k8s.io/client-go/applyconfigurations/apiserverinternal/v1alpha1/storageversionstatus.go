@@ -24,14 +24,15 @@ package v1alpha1
 // API server instances report the versions they can decode and the version they
 // encode objects to when persisting objects in the backend.
 type StorageVersionStatusApplyConfiguration struct {
-	// The reported versions per API server instance.
+	// storageVersions lists the reported versions per API server instance.
 	StorageVersions []ServerStorageVersionApplyConfiguration `json:"storageVersions,omitempty"`
-	// If all API server instances agree on the same encoding storage version,
-	// then this field is set to that version. Otherwise this field is left empty.
+	// commonEncodingVersion is set to an encoding storage version if all API server
+	// instances share that same version. If they don't share one storage version, this
+	// field is left empty.
 	// API servers should finish updating its storageVersionStatus entry before
 	// serving write operations, so that this field will be in sync with the reality.
 	CommonEncodingVersion *string `json:"commonEncodingVersion,omitempty"`
-	// The latest available observations of the storageVersion's state.
+	// conditions lists the latest available observations of the storageVersion's state.
 	Conditions []StorageVersionConditionApplyConfiguration `json:"conditions,omitempty"`
 }
 

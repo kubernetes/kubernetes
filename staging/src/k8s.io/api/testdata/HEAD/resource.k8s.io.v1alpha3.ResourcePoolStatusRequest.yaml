@@ -1,0 +1,72 @@
+apiVersion: resource.k8s.io/v1alpha3
+kind: ResourcePoolStatusRequest
+metadata:
+  annotations:
+    annotationsKey: annotationsValue
+  creationTimestamp: "2008-01-01T01:01:01Z"
+  deletionGracePeriodSeconds: 10
+  deletionTimestamp: "2009-01-01T01:01:01Z"
+  finalizers:
+  - finalizersValue
+  generateName: generateNameValue
+  generation: 7
+  labels:
+    labelsKey: labelsValue
+  managedFields:
+  - apiVersion: apiVersionValue
+    fieldsType: fieldsTypeValue
+    fieldsV1: {}
+    manager: managerValue
+    operation: operationValue
+    subresource: subresourceValue
+    time: "2004-01-01T01:01:01Z"
+  name: nameValue
+  namespace: namespaceValue
+  ownerReferences:
+  - apiVersion: apiVersionValue
+    blockOwnerDeletion: true
+    controller: true
+    kind: kindValue
+    name: nameValue
+    uid: uidValue
+  resourceVersion: resourceVersionValue
+  selfLink: selfLinkValue
+  uid: uidValue
+spec:
+  defaultPartitionTypeAttribute: defaultPartitionTypeAttributeValue
+  driver: driverValue
+  limit: 3
+  poolName: poolNameValue
+status:
+  conditions:
+  - lastTransitionTime: "2004-01-01T01:01:01Z"
+    message: messageValue
+    observedGeneration: 3
+    reason: reasonValue
+    status: statusValue
+    type: typeValue
+  poolCount: 6
+  pools:
+  - allocatedDevices: 5
+    availableDevices: 6
+    driver: driverValue
+    generation: 9
+    nodeName: nodeNameValue
+    partitionSummary:
+    - allocatable: 3
+      attribute: attributeValue
+      total: 2
+      type: typeValue
+    poolName: poolNameValue
+    resourceSliceCount: 8
+    shareableSummary:
+      capacity:
+      - available: "0"
+        consumed: "0"
+        name: nameValue
+        total: "0"
+      fullyAvailableDevices: 1
+      partiallyAvailableDevices: 2
+    totalDevices: 4
+    unavailableDevices: 7
+    validationError: validationErrorValue

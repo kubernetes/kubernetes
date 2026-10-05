@@ -42,7 +42,7 @@ run_wait_tests() {
     # Post-Condition: deployments exists
     kube::test::get_object_assert "deployments" "{{range .items}}{{.metadata.name}},{{end}}" 'test-1,test-2,'
 
-    # wait with jsonpath will timout for busybox deployment
+    # wait with jsonpath will timeout for busybox deployment
     set +o errexit
     # Command: Wait with jsonpath support fields not exist in the first place
     output_message=$(kubectl wait --for=jsonpath=.status.readyReplicas=1 deploy/test-1 2>&1)
@@ -172,6 +172,114 @@ EOF
 
     # Clean deployment
     kubectl delete deployment test-3
+
+    kube::log::status "Testing kubectl wait with multiple conditions"
+
+    # Test 1: Wait for deployment creation AND available condition together
+    # Create deployment in background
+( sleep 2 && cat <<EOF | kubectl apply -f -
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: test-multiple
+      labels:
+        app: test-multiple
+    spec:
+      replicas: 1
+      selector:
+        matchLabels:
+          app: test-multiple
+      template:
+        metadata:
+          labels:
+            app: test-multiple
+        spec:
+          containers:
+          - name: bb
+            image: busybox
+            command: ["/bin/sh", "-c", "sleep infinity"]
+EOF
+        ) &
+
+    # Command: Wait for deployment to be created AND have replicas spec set
+    output_message=$(kubectl wait --for=create --for=jsonpath=.status.unavailableReplicas=1 deploy -l app=test-multiple --timeout=30s)
+
+    # Post-Condition: Wait was successful
+    kube::test::if_has_string "${output_message}" 'test-multiple condition met'
+
+    # Clean up
+    kubectl delete deployment test-multiple
+
+    # Test 2: Multiple status conditions
+    # Create a deployment that will eventually have replicas available
+    kubectl apply -f - <<EOF
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: multi-condition-test
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: multi-condition-test
+  template:
+    metadata:
+      labels:
+        app: multi-condition-test
+    spec:
+      containers:
+      - name: bb
+        image: busybox
+        command: ["/bin/sh", "-c", "sleep infinity"]
+EOF
+
+    # Wait for both Available AND Progressing conditions
+    output_message=$(kubectl wait deployment/multi-condition-test \
+        --for=jsonpath=.status.unavailableReplicas=1 \
+        --for=condition=Progressing \
+        --timeout=30s )
+
+    # Post-Condition: Both conditions met
+    kube::test::if_has_string "${output_message}" 'multi-condition-test condition met'
+
+    # Clean up
+    kubectl delete deployment multi-condition-test
+
+    # Test 4: One condition fails - should timeout (validates AND logic)
+    kubectl apply -f - <<EOF
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: partial-condition-test
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: partial-test
+  template:
+    metadata:
+      labels:
+        app: partial-test
+    spec:
+      containers:
+      - name: bb
+        image: busybox
+        command: ["/bin/sh", "-c", "sleep infinity"]
+EOF
+
+    set +o errexit
+    # Wait for Available condition AND non-existent replicas count (should timeout)
+    output_message=$(kubectl wait deployment/partial-condition-test \
+        --for=condition=Progressing \
+        --for=jsonpath='{.status.replicas}'=2 \
+        --timeout=10s 2>&1)
+    set -o errexit
+
+    # Post-Condition: Should timeout because second condition not met
+    kube::test::if_has_string "${output_message}" 'timed out waiting for the condition'
+
+    # Clean up
+    kubectl delete deployment partial-condition-test
 
     set +o nounset
     set +o errexit

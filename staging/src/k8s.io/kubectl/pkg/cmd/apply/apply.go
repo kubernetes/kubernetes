@@ -23,7 +23,7 @@ import (
 	"net/http"
 
 	"github.com/spf13/cobra"
-	"sigs.k8s.io/structured-merge-diff/v6/fieldpath"
+	"sigs.k8s.io/structured-merge-diff/v7/fieldpath"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -184,7 +184,7 @@ var ApplySetToolVersion = version.Get().GitVersion
 func NewApplyFlags(streams genericiooptions.IOStreams) *ApplyFlags {
 	return &ApplyFlags{
 		RecordFlags: genericclioptions.NewRecordFlags(),
-		DeleteFlags: cmddelete.NewDeleteFlags("The files that contain the configurations to apply."),
+		DeleteFlags: cmddelete.NewDeleteFlags("The files, directories or URLs that contain the configurations to apply."),
 		PrintFlags:  genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme),
 
 		Overwrite:    true,

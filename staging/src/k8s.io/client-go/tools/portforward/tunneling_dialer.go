@@ -17,6 +17,7 @@ limitations under the License.
 package portforward
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -24,17 +25,29 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/util/httpstream"
-	"k8s.io/apimachinery/pkg/util/httpstream/spdy"
+	httpstreamspdy "k8s.io/apimachinery/pkg/util/httpstream/spdy"
 	constants "k8s.io/apimachinery/pkg/util/portforward"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/transport/websocket"
 	"k8s.io/klog/v2"
+	streamhttp "k8s.io/streaming/pkg/httpstream"
+	streamspdy "k8s.io/streaming/pkg/httpstream/spdy"
 )
 
 const PingPeriod = 10 * time.Second
 
 // tunnelingDialer implements "httpstream.Dial" interface
 type tunnelingDialer struct {
+	logger    klog.Logger
+	url       *url.URL
+	transport http.RoundTripper
+	holder    websocket.ConnectionHolder
+}
+
+// streamingTunnelingDialer implements "k8s.io/streaming/pkg/httpstream.Dialer"
+// for in-tree callers.
+type streamingTunnelingDialer struct {
+	logger    klog.Logger
 	url       *url.URL
 	transport http.RoundTripper
 	holder    websocket.ConnectionHolder
@@ -43,37 +56,69 @@ type tunnelingDialer struct {
 // NewTunnelingDialer creates and returns the tunnelingDialer structure which implemements the "httpstream.Dialer"
 // interface. The dialer can upgrade a websocket request, creating a websocket connection. This function
 // returns an error if one occurs.
+//
+//logcheck:context // NewSPDYOverWebsocketDialerWithLogger should be used instead of NewSPDYOverWebsocketDialer in code which supports contextual logging.
 func NewSPDYOverWebsocketDialer(url *url.URL, config *restclient.Config) (httpstream.Dialer, error) {
+	return NewSPDYOverWebsocketDialerWithLogger(klog.Background(), url, config)
+}
+
+// NewTunnelingDialer creates and returns the tunnelingDialer structure which implemements the "httpstream.Dialer"
+// interface. The dialer can upgrade a websocket request, creating a websocket connection. This function
+// returns an error if one occurs.
+func NewSPDYOverWebsocketDialerWithLogger(logger klog.Logger, url *url.URL, config *restclient.Config) (httpstream.Dialer, error) {
 	transport, holder, err := websocket.RoundTripperFor(config)
 	if err != nil {
 		return nil, err
 	}
 	return &tunnelingDialer{
+		logger:    logger,
 		url:       url,
 		transport: transport,
 		holder:    holder,
 	}, nil
 }
 
-// Dial upgrades to a tunneling streaming connection, returning a SPDY connection
-// containing a WebSockets connection (which implements "net.Conn"). Also
-// returns the protocol negotiated, or an error.
-func (d *tunnelingDialer) Dial(protocols ...string) (httpstream.Connection, string, error) {
-	// There is no passed context, so skip the context when creating request for now.
+// NewSPDYOverWebsocketDialerForStreaming creates a SPDY-over-websocket dialer
+// for in-tree callers that use k8s.io/streaming/pkg/httpstream types.
+//
+//logcheck:context // NewSPDYOverWebsocketDialerForStreamingWithLogger should be used instead of NewSPDYOverWebsocketDialerForStreaming in code which supports contextual logging.
+func NewSPDYOverWebsocketDialerForStreaming(url *url.URL, config *restclient.Config) (streamhttp.Dialer, error) {
+	return NewSPDYOverWebsocketDialerForStreamingWithLogger(klog.Background(), url, config)
+}
+
+// NewSPDYOverWebsocketDialerForStreamingWithLogger creates a SPDY-over-websocket dialer
+// for in-tree callers that use k8s.io/streaming/pkg/httpstream types.
+func NewSPDYOverWebsocketDialerForStreamingWithLogger(logger klog.Logger, url *url.URL, config *restclient.Config) (streamhttp.Dialer, error) {
+	transport, holder, err := websocket.RoundTripperFor(config)
+	if err != nil {
+		return nil, err
+	}
+	return &streamingTunnelingDialer{
+		logger:    logger,
+		url:       url,
+		transport: transport,
+		holder:    holder,
+	}, nil
+}
+
+func negotiateSPDYOverWebsocket(logger klog.Logger, url *url.URL, transport http.RoundTripper, holder websocket.ConnectionHolder, protocols ...string) (*TunnelingConnection, string, error) {
+	// There is no passed context, so use the background context when creating request for now.
+	ctx := klog.NewContext(context.Background(), logger)
+
 	// Websockets requires "GET" method: RFC 6455 Sec. 4.1 (page 17).
-	req, err := http.NewRequest("GET", d.url.String(), nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", url.String(), nil)
 	if err != nil {
 		return nil, "", err
 	}
 	// Add the spdy tunneling prefix to the requested protocols. The tunneling
 	// handler will know how to negotiate these protocols.
-	tunnelingProtocols := []string{}
+	tunnelingProtocols := make([]string, 0, len(protocols))
 	for _, protocol := range protocols {
 		tunnelingProtocol := constants.WebsocketsSPDYTunnelingPrefix + protocol
 		tunnelingProtocols = append(tunnelingProtocols, tunnelingProtocol)
 	}
-	klog.V(4).Infoln("Before WebSocket Upgrade Connection...")
-	conn, err := websocket.Negotiate(d.transport, d.holder, req, tunnelingProtocols...)
+	logger.V(4).Info("Before WebSocket Upgrade Connection...")
+	conn, err := websocket.Negotiate(transport, holder, req, tunnelingProtocols...)
 	if err != nil {
 		return nil, "", err
 	}
@@ -82,12 +127,34 @@ func (d *tunnelingDialer) Dial(protocols ...string) (httpstream.Connection, stri
 	}
 	protocol := conn.Subprotocol()
 	protocol = strings.TrimPrefix(protocol, constants.WebsocketsSPDYTunnelingPrefix)
-	klog.V(4).Infof("negotiated protocol: %s", protocol)
+	logger.V(4).Info("Negotiation complete", "protocol", protocol)
 
-	// Wrap the websocket connection which implements "net.Conn".
-	tConn := NewTunnelingConnection("client", conn)
+	return NewTunnelingConnectionWithLogger(klog.LoggerWithName(logger, "client"), conn), protocol, nil
+}
+
+// Dial upgrades to a tunneling streaming connection, returning a SPDY connection
+// containing a WebSockets connection (which implements "net.Conn"). Also
+// returns the protocol negotiated, or an error.
+func (d *tunnelingDialer) Dial(protocols ...string) (httpstream.Connection, string, error) {
+	tConn, protocol, err := negotiateSPDYOverWebsocket(d.logger, d.url, d.transport, d.holder, protocols...)
+	if err != nil {
+		return nil, "", err
+	}
 	// Create SPDY connection injecting the previously created tunneling connection.
-	spdyConn, err := spdy.NewClientConnectionWithPings(tConn, PingPeriod)
+	spdyConn, err := httpstreamspdy.NewClientConnectionWithPings(tConn, PingPeriod)
+
+	return spdyConn, protocol, err
+}
+
+// Dial upgrades to a tunneling streaming connection for callers using
+// k8s.io/streaming/pkg/httpstream types.
+func (d *streamingTunnelingDialer) Dial(protocols ...string) (streamhttp.Connection, string, error) {
+	tConn, protocol, err := negotiateSPDYOverWebsocket(d.logger, d.url, d.transport, d.holder, protocols...)
+	if err != nil {
+		return nil, "", err
+	}
+	// Create SPDY connection injecting the previously created tunneling connection.
+	spdyConn, err := streamspdy.NewClientConnectionWithPings(tConn, PingPeriod)
 
 	return spdyConn, protocol, err
 }

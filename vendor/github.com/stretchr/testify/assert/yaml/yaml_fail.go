@@ -3,7 +3,7 @@
 // Package yaml is an implementation of YAML functions that always fail.
 //
 // This implementation can be used at build time to replace the default implementation
-// to avoid linking with [gopkg.in/yaml.v3]:
+// to avoid linking with [go.yaml.in/yaml/v3]:
 //
 //	go test -tags testify_yaml_fail
 package yaml

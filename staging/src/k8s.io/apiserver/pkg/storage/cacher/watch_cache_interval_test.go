@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"sort"
 	"sync"
 	"testing"
 
@@ -28,9 +29,11 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/client-go/tools/cache"
-
+	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage/cacher/store"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/tools/cache"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 )
 
 func intervalFromEvents(events []*watchCacheEvent) *watchCacheInterval {
@@ -44,6 +47,10 @@ func intervalFromEvents(events []*watchCacheEvent) *watchCacheInterval {
 	indexValidator := func(_ int) bool { return true }
 
 	return newCacheInterval(startIndex, endIndex, indexer, indexValidator, 0, locker)
+}
+
+func historySource(wci *watchCacheInterval) *historyCacheIntervalSource {
+	return wci.source.(*historyCacheIntervalSource)
 }
 
 func bufferFromEvents(events []*watchCacheEvent) *watchCacheIntervalBuffer {
@@ -201,33 +208,34 @@ func TestFillBuffer(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			events := generateEvents(0, c.numEventsToFill)
 			wci := intervalFromEvents(events)
+			src := historySource(wci)
 
 			for i := 0; i < len(events); i++ {
 				if i%bufferSize == 0 {
-					wci.fillBuffer()
+					src.fillBuffer()
 				}
-				event, ok := wci.buffer.next()
+				event, ok := src.buffer.next()
 				if err := verifyEvent(ok, event, events[i]); err != nil {
 					t.Error(err)
 				}
 				// If we have already received bufferSize number of events,
 				// buffer should be empty and we should receive no event.
 				if i%bufferSize == bufferSize-1 {
-					event, ok := wci.buffer.next()
+					event, ok := src.buffer.next()
 					if err := verifyNoEvent(ok, event); err != nil {
 						t.Error(err)
 					}
 				}
 			}
 			// buffer should be empty and return no event.
-			event, ok := wci.buffer.next()
+			event, ok := src.buffer.next()
 			if err := verifyNoEvent(ok, event); err != nil {
 				t.Error(err)
 			}
 			// Buffer should be empty now, an additional fillBuffer()
 			// should make no difference.
-			wci.fillBuffer()
-			event, ok = wci.buffer.next()
+			src.fillBuffer()
+			event, ok = src.buffer.next()
 			if err := verifyNoEvent(ok, event); err != nil {
 				t.Error(err)
 			}
@@ -294,19 +302,20 @@ func TestCacheIntervalNextFromWatchCache(t *testing.T) {
 				wc.Add(makeTestPod(fmt.Sprintf("pod%d", i), uint64(i)))
 			}
 			indexerFunc := func(i int) *watchCacheEvent {
-				return wc.cache[i%wc.capacity]
+				return wc.history.cache[i%wc.history.capacity]
 			}
 
 			wci := newCacheInterval(
 				c.intervalStartIndex,
-				wc.endIndex,
+				wc.history.endIndex,
 				indexerFunc,
-				wc.isIndexValidLocked,
+				wc.history.isIndexValidLocked,
 				wc.resourceVersion,
 				&wc.RWMutex,
 			)
+			src := historySource(wci)
 
-			numExpectedEvents := wc.endIndex - c.intervalStartIndex
+			numExpectedEvents := wc.history.endIndex - c.intervalStartIndex
 			for i := 0; i < numExpectedEvents; i++ {
 				// Simulate and test interval invalidation iff
 				// the watchCache itself is not empty.
@@ -318,9 +327,9 @@ func TestCacheIntervalNextFromWatchCache(t *testing.T) {
 					// copying over events from the underlying watch cache,
 					// i.e. freshly filling in the interval buffer.
 					if i%bufferSize == 0 && i != c.eventsAddedToWatchcache {
-						originalCacheStartIndex := wc.startIndex
-						wc.startIndex = wci.startIndex + 1
-						event, err := wci.Next()
+						originalCacheStartIndex := wc.history.startIndex
+						wc.history.startIndex = src.startIndex + 1
+						event, err := src.next()
 						if err == nil {
 							t.Errorf("expected non-nil error")
 						}
@@ -328,7 +337,7 @@ func TestCacheIntervalNextFromWatchCache(t *testing.T) {
 							t.Errorf("expected nil event, got %v", *event)
 						}
 						// Restore startIndex.
-						wc.startIndex = originalCacheStartIndex
+						wc.history.startIndex = originalCacheStartIndex
 					}
 				}
 
@@ -338,24 +347,24 @@ func TestCacheIntervalNextFromWatchCache(t *testing.T) {
 				// or when received is equal to the number of expected events.
 				// The latter happens when partial filling occurs and no more
 				// events are left post the partial fill.
-				if wci.buffer.isEmpty() != (i%bufferSize == 0 || i == numExpectedEvents) {
+				if src.buffer.isEmpty() != (i%bufferSize == 0 || i == numExpectedEvents) {
 					t.Error("expected empty interval buffer")
 					return
 				}
 
-				event, err := wci.Next()
+				event, err := src.next()
 				if err != nil {
 					t.Errorf("unexpected error: %v", err)
 					return
 				}
 
-				expectedIndex := (c.intervalStartIndex + i) % wc.capacity
-				expectedEvent := wc.cache[expectedIndex]
+				expectedIndex := (c.intervalStartIndex + i) % wc.history.capacity
+				expectedEvent := wc.history.cache[expectedIndex]
 				if err := verifyEvent(true, event, expectedEvent); err != nil {
 					t.Error(err)
 				}
 			}
-			event, err := wci.Next()
+			event, err := src.next()
 			ok := err != nil
 			if err := verifyNoEvent(ok, event); err != nil {
 				t.Error(err)
@@ -373,7 +382,7 @@ func TestCacheIntervalNextFromStore(t *testing.T) {
 		return labels.Set(pod.Labels), fields.Set{"spec.nodeName": pod.Spec.NodeName}, nil
 	}
 	const numEvents = 50
-	store := cache.NewIndexer(store.ElementKey, store.ElementIndexers(nil))
+	store := store.NewWatchCacheStorage(nil, nil)
 	events := make(map[string]*watchCacheEvent)
 	var rv uint64 = 1 // arbitrary number; rv till which the watch cache has progressed.
 
@@ -391,22 +400,19 @@ func TestCacheIntervalNextFromStore(t *testing.T) {
 			Key:             elem.Key,
 			ResourceVersion: rv,
 		}
-		store.Add(elem)
+		if _, err := store.UpdateStore(watch.Added, elem, rv); err != nil {
+			t.Fatal(err)
+		}
 	}
 
 	wci, err := newCacheIntervalFromStore(rv, store, "", false)
 	if err != nil {
 		t.Fatal(err)
 	}
+	src := wci.source.(*snapshotCacheIntervalSource)
 
 	for i := 0; i < numEvents; i++ {
-		// The interval buffer can never be empty unless
-		// all elements obtained through List() have been
-		// returned.
-		if wci.buffer.isEmpty() && i != numEvents {
-			t.Fatal("expected non-empty interval buffer")
-		}
-		event, err := wci.Next()
+		event, err := src.next()
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -423,8 +429,133 @@ func TestCacheIntervalNextFromStore(t *testing.T) {
 		}
 	}
 
-	// The interval's buffer should now be empty.
-	if !wci.buffer.isEmpty() {
-		t.Error("expected cache interval's buffer to be empty")
+	// All events should have been consumed.
+	event, err := src.next()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if event != nil {
+		t.Errorf("expected nil event after consuming all events, got %v", *event)
+	}
+}
+
+// TestCacheIntervalFromStoreSorted verifies newCacheIntervalFromStore returns
+// events sorted by Key for both indexer backends.
+func TestCacheIntervalFromStoreSorted(t *testing.T) {
+	cases := []struct {
+		name    string
+		indexer *store.WatchCacheStorage
+	}{
+		{"btree", store.NewWatchCacheStorage(nil, nil)},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			const n = 50
+			// Insert in reverse-key order so any code path that returns
+			// items in insertion order trivially fails the sorted check below.
+			for i := n - 1; i >= 0; i-- {
+				key := fmt.Sprintf("pod-%08d", i)
+				elem := makeTestStoreElement(makeTestPod(key, uint64(i)))
+				_, err := tc.indexer.UpdateStore(watch.Added, elem, uint64(i))
+				if err != nil {
+					t.Fatal(err)
+				}
+			}
+
+			wci, err := newCacheIntervalFromStore(n, tc.indexer, "", false)
+			if err != nil {
+				t.Fatal(err)
+			}
+			src := wci.source.(*snapshotCacheIntervalSource)
+
+			got := make([]string, 0, n)
+			for range n {
+				ev, err := src.next()
+				if err != nil {
+					t.Fatal(err)
+				}
+				got = append(got, ev.Key)
+			}
+			if !sort.StringsAreSorted(got) {
+				t.Errorf("events not sorted by key: %v", got)
+			}
+		})
+	}
+}
+
+// TestCacheIntervalSourceSelection verifies that getIntervalFromStoreLocked builds the
+// interval from the lazy snapshot source regardless of whether snapshotting is enabled.
+func TestCacheIntervalSourceSelection(t *testing.T) {
+	cases := []struct {
+		name             string
+		snapshottingOn   bool
+		wantLazySnapshot bool
+	}{
+		{
+			name:             "snapshotting enabled serves from lazy snapshot",
+			snapshottingOn:   true,
+			wantLazySnapshot: true,
+		},
+		{
+			name:             "snapshotting disabled still serves from lazy snapshot",
+			snapshottingOn:   false,
+			wantLazySnapshot: true,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ListFromCacheSnapshot, tc.snapshottingOn)
+			wc := newTestWatchCache(3, DefaultEventFreshDuration, &cache.Indexers{})
+			defer wc.Stop()
+			if err := wc.Add(makeTestPod("pod1", 100)); err != nil {
+				t.Fatal(err)
+			}
+
+			wc.Lock()
+			wci, err := wc.getIntervalFromStoreLocked("", false)
+			wc.Unlock()
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			if tc.wantLazySnapshot {
+				if _, ok := wci.source.(*lazySnapshotCacheIntervalSource); !ok {
+					t.Errorf("expected *lazySnapshotCacheIntervalSource, got %T", wci.source)
+				}
+			} else {
+				if _, ok := wci.source.(*snapshotCacheIntervalSource); !ok {
+					t.Errorf("expected *snapshotCacheIntervalSource, got %T", wci.source)
+				}
+			}
+		})
+	}
+}
+
+type countingSnapshot struct {
+	rangePrefixCalls int
+}
+
+func (s *countingSnapshot) GetByKey(string) (interface{}, bool, error) {
+	return nil, false, nil
+}
+
+func (s *countingSnapshot) OrderedListPrefix(_, _ string) ([]interface{}, error) {
+	return nil, fmt.Errorf("OrderedListPrefix must not be called")
+}
+
+func (s *countingSnapshot) RangePrefix(_, _ string) store.Range {
+	s.rangePrefixCalls++
+	return store.EmptyRange()
+}
+
+func TestLazySnapshotCacheIntervalSourceEmpty(t *testing.T) {
+	snap := &countingSnapshot{}
+	wci := newCacheIntervalFromLazySnapshot(100, snap)
+
+	for event, err := range wci.All() {
+		t.Fatalf("empty snapshot yielded (%v, %v)", event, err)
+	}
+	if snap.rangePrefixCalls != 1 {
+		t.Errorf("expected RangePrefix to be called once, got %d", snap.rangePrefixCalls)
 	}
 }

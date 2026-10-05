@@ -27,7 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
-	v1alpha1 "k8s.io/apiserver/pkg/server/statusz/api/v1alpha1"
+	v1beta1 "k8s.io/apiserver/pkg/server/statusz/api/v1beta1"
 )
 
 // statuszTextSerializer implements runtime.Serializer for text/plain output.
@@ -45,9 +45,9 @@ func (s statuszTextSerializer) Encode(obj runtime.Object, w io.Writer) error {
 	randomIndex := rand.Intn(len(delimiters))
 	delim := html.EscapeString(delimiters[randomIndex])
 
-	statuszObj, ok := obj.(*v1alpha1.Statusz)
+	statuszObj, ok := obj.(*v1beta1.Statusz)
 	if !ok {
-		return fmt.Errorf("expected *v1alpha1.Statusz, got %T", obj)
+		return fmt.Errorf("expected *v1beta1.Statusz, got %T", obj)
 	}
 
 	startTime := html.EscapeString(statuszObj.StartTime.Time.Format(time.UnixDate))

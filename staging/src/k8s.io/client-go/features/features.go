@@ -17,7 +17,7 @@ limitations under the License.
 package features
 
 import (
-	"errors"
+	"context"
 	"sync/atomic"
 
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -127,7 +127,9 @@ func AddVersionedFeaturesToExistingFeatureGates(registry VersionedRegistry) erro
 //	clientgofeaturegate.ReplaceFeatureGates(utilfeature.DefaultMutableFeatureGate)
 func ReplaceFeatureGates(newFeatureGates Gates) {
 	if replaceFeatureGatesWithWarningIndicator(newFeatureGates) {
-		utilruntime.HandleError(errors.New("the default feature gates implementation has already been used and now it's being overwritten. This might lead to unexpected behaviour. Check your initialization order"))
+		// TODO (?): A new API would be needed where callers pass in a context or logger.
+		// Probably not worth it.
+		utilruntime.HandleErrorWithContext(context.TODO(), nil, "The default feature gates implementation has already been used and now it's being overwritten. This might lead to unexpected behaviour. Check your initialization order.")
 	}
 }
 

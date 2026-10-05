@@ -107,7 +107,7 @@ func createHandlerWithConfig(kubeClient kubernetes.Interface, informerFactory in
 	if config == nil {
 		config = &resourcequotaapi.Configuration{}
 	}
-	quotaConfiguration, err := install.NewQuotaConfigurationForAdmission(nil)
+	quotaConfiguration, err := install.NewQuotaConfigurationForAdmission(informerFactory, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -1417,7 +1417,6 @@ func TestAdmitBelowVolumeAttributesClassQuotaLimitWhenPVCScopeUpdated(t *testing
 	}
 
 	for _, testCase := range testCases {
-		testCase := testCase
 		t.Run(testCase.desc, func(t *testing.T) {
 			stopCh := make(chan struct{})
 			defer close(stopCh)

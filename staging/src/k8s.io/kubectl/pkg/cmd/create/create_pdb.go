@@ -196,7 +196,7 @@ func (o *PodDisruptionBudgetOpts) Validate() error {
 	return nil
 }
 
-// Run calls the CreateSubcommandOptions.Run in PodDisruptionBudgetOpts instance
+// Run performs the execution of the 'create poddisruptionbudget' sub command
 func (o *PodDisruptionBudgetOpts) Run() error {
 	podDisruptionBudget, err := o.createPodDisruptionBudgets()
 	if err != nil {

@@ -25,7 +25,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	svmv1beta1 "k8s.io/api/storagemigration/v1beta1"
+	svmv1 "k8s.io/api/storagemigration/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -33,12 +33,13 @@ import (
 	"k8s.io/client-go/discovery"
 	fakediscovery "k8s.io/client-go/discovery/fake"
 	"k8s.io/client-go/informers"
-	svminformers "k8s.io/client-go/informers/storagemigration/v1beta1"
+	svminformers "k8s.io/client-go/informers/storagemigration/v1"
 	"k8s.io/client-go/kubernetes"
 	kubefake "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/metadata"
 	metadatafake "k8s.io/client-go/metadata/fake"
 	kubetesting "k8s.io/client-go/testing"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func TestIsResourceMigratable(t *testing.T) {
@@ -173,15 +174,16 @@ func TestIsResourceMigratable(t *testing.T) {
 
 	for _, tc := range tcs {
 		t.Run(tc.name, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {}))
 			defer server.Close()
 			discoveryClient := fakediscovery.FakeDiscovery{Fake: &kubetesting.Fake{}}
 			discoveryClient.Resources = tc.resources
 			rvController := ResourceVersionController{
-				discoveryClient: &discoveryClient,
+				discoveryClient: discovery.ToDiscoveryInterfaceWithContext(&discoveryClient),
 			}
 
-			isMigratable, err := rvController.isResourceMigratable(tc.resource)
+			isMigratable, err := rvController.isResourceMigratable(tCtx, tc.resource)
 			if err != nil {
 				if !strings.Contains(err.Error(), tc.wantErr) {
 					t.Errorf("Unexpected error: %v, want: %v", err, tc.wantErr)
@@ -199,7 +201,7 @@ func TestRVSync(t *testing.T) {
 	testCases := []struct {
 		name               string
 		key                string
-		svm                *svmv1beta1.StorageVersionMigration
+		svm                *svmv1.StorageVersionMigration
 		discoveryResources *metav1.APIResourceList
 		metadataList       *metav1.List
 		metadataErr        bool
@@ -207,9 +209,19 @@ func TestRVSync(t *testing.T) {
 		expectKubeActions  []kubetesting.Action
 	}{
 		{
+			name: "Migration not active",
+			key:  "inactive-svm",
+			svm:  newSVMWithConditions("inactive-svm", "", []metav1.Condition{}),
+		},
+		{
 			name: "Successful RV acquisition",
 			key:  "test-svm",
-			svm:  newSVM("test-svm", ""),
+			svm: newSVMWithConditions("test-svm", "", []metav1.Condition{
+				{
+					Type:   string(svmv1.MigrationRunning),
+					Status: metav1.ConditionTrue,
+				},
+			}),
 			discoveryResources: &metav1.APIResourceList{
 				GroupVersion: "apps/v1",
 				APIResources: []metav1.APIResource{
@@ -223,9 +235,14 @@ func TestRVSync(t *testing.T) {
 			},
 			expectKubeActions: []kubetesting.Action{
 				kubetesting.NewUpdateAction(
-					svmv1beta1.SchemeGroupVersion.WithResource("storageversionmigrations"),
+					svmv1.SchemeGroupVersion.WithResource("storageversionmigrations"),
 					"",
-					newSVM("test-svm", "12345"),
+					newSVMWithConditions("test-svm", "12345", []metav1.Condition{
+						{
+							Type:   string(svmv1.MigrationRunning),
+							Status: metav1.ConditionTrue,
+						},
+					}),
 				),
 			},
 		},
@@ -235,11 +252,16 @@ func TestRVSync(t *testing.T) {
 			svm:  nil,
 		},
 		{
+			name: "SVM has no CRD condition",
+			key:  "succeeded-svm",
+			svm:  newSVM("succeeded-svm", ""),
+		},
+		{
 			name: "SVM already succeeded",
 			key:  "succeeded-svm",
 			svm: newSVMWithConditions("succeeded-svm", "100", []metav1.Condition{
 				{
-					Type:   string(svmv1beta1.MigrationSucceeded),
+					Type:   string(svmv1.MigrationSucceeded),
 					Status: metav1.ConditionTrue,
 				},
 			}),
@@ -249,7 +271,7 @@ func TestRVSync(t *testing.T) {
 			key:  "failed-svm",
 			svm: newSVMWithConditions("failed-svm", "100", []metav1.Condition{
 				{
-					Type:   string(svmv1beta1.MigrationFailed),
+					Type:   string(svmv1.MigrationFailed),
 					Status: metav1.ConditionTrue,
 				},
 			}),
@@ -257,12 +279,22 @@ func TestRVSync(t *testing.T) {
 		{
 			name: "RV already set",
 			key:  "rv-set-svm",
-			svm:  newSVM("rv-set-svm", "123"),
+			svm: newSVMWithConditions("rv-set-svm", "123", []metav1.Condition{
+				{
+					Type:   string(svmv1.MigrationRunning),
+					Status: metav1.ConditionTrue,
+				},
+			}),
 		},
 		{
 			name: "Resource not migratable",
 			key:  "not-migratable-svm",
-			svm:  newSVM("not-migratable-svm", ""),
+			svm: newSVMWithConditions("not-migratable-svm", "", []metav1.Condition{
+				{
+					Type:   string(svmv1.MigrationRunning),
+					Status: metav1.ConditionTrue,
+				},
+			}),
 			discoveryResources: &metav1.APIResourceList{
 				GroupVersion: "apps/v1",
 				APIResources: []metav1.APIResource{
@@ -271,11 +303,15 @@ func TestRVSync(t *testing.T) {
 			},
 			expectKubeActions: []kubetesting.Action{
 				kubetesting.NewUpdateAction(
-					svmv1beta1.SchemeGroupVersion.WithResource("storageversionmigrations"),
+					svmv1.SchemeGroupVersion.WithResource("storageversionmigrations"),
 					"",
 					newSVMWithConditions("not-migratable-svm", "", []metav1.Condition{
 						{
-							Type:   string(svmv1beta1.MigrationFailed),
+							Type:   string(svmv1.MigrationRunning),
+							Status: metav1.ConditionTrue,
+						},
+						{
+							Type:   string(svmv1.MigrationFailed),
 							Status: metav1.ConditionTrue,
 						},
 					}),
@@ -285,7 +321,12 @@ func TestRVSync(t *testing.T) {
 		{
 			name: "Metadata list error",
 			key:  "metadata-error-svm",
-			svm:  newSVM("metadata-error-svm", ""),
+			svm: newSVMWithConditions("metadata-error-svm", "", []metav1.Condition{
+				{
+					Type:   string(svmv1.MigrationRunning),
+					Status: metav1.ConditionTrue,
+				},
+			}),
 			discoveryResources: &metav1.APIResourceList{
 				GroupVersion: "apps/v1",
 				APIResources: []metav1.APIResource{
@@ -299,7 +340,12 @@ func TestRVSync(t *testing.T) {
 		{
 			name: "Invalid RV returned",
 			key:  "invalid-rv-svm",
-			svm:  newSVM("invalid-rv-svm", ""),
+			svm: newSVMWithConditions("invalid-rv-svm", "", []metav1.Condition{
+				{
+					Type:   string(svmv1.MigrationRunning),
+					Status: metav1.ConditionTrue,
+				},
+			}),
 			discoveryResources: &metav1.APIResourceList{
 				GroupVersion: "apps/v1",
 				APIResources: []metav1.APIResource{
@@ -313,11 +359,15 @@ func TestRVSync(t *testing.T) {
 			},
 			expectKubeActions: []kubetesting.Action{
 				kubetesting.NewUpdateAction(
-					svmv1beta1.SchemeGroupVersion.WithResource("storageversionmigrations"),
+					svmv1.SchemeGroupVersion.WithResource("storageversionmigrations"),
 					"",
 					newSVMWithConditions("invalid-rv-svm", "", []metav1.Condition{
 						{
-							Type:   string(svmv1beta1.MigrationFailed),
+							Type:   string(svmv1.MigrationRunning),
+							Status: metav1.ConditionTrue,
+						},
+						{
+							Type:   string(svmv1.MigrationFailed),
 							Status: metav1.ConditionTrue,
 						},
 					}),
@@ -335,7 +385,7 @@ func TestRVSync(t *testing.T) {
 			}
 			kubeClient := kubefake.NewClientset(initialSVMs...)
 			kubeInformerFactory := informers.NewSharedInformerFactory(kubeClient, 0)
-			svmInformer := kubeInformerFactory.Storagemigration().V1beta1().StorageVersionMigrations()
+			svmInformer := kubeInformerFactory.Storagemigration().V1().StorageVersionMigrations()
 
 			if tc.svm != nil {
 				err := svmInformer.Informer().GetStore().Add(tc.svm)
@@ -350,7 +400,7 @@ func TestRVSync(t *testing.T) {
 
 			// Setup fake metadata client
 			metadatascheme := metadatafake.NewTestScheme()
-			err := svmv1beta1.AddToScheme(metadatascheme)
+			err := svmv1.AddToScheme(metadatascheme)
 			require.NoError(t, err)
 			err = metav1.AddMetaToScheme(metadatascheme)
 			require.NoError(t, err)
@@ -401,8 +451,8 @@ func TestRVSync(t *testing.T) {
 				require.Equal(t, expected.GetVerb(), actual.GetVerb(), "kube action %d: verb mismatch", i)
 				require.Equal(t, expected.GetResource(), actual.GetResource(), "kube action %d: resource mismatch", i)
 
-				actualSvm := actual.(kubetesting.UpdateAction).GetObject().(*svmv1beta1.StorageVersionMigration)
-				expectedSvm := expected.(kubetesting.UpdateAction).GetObject().(*svmv1beta1.StorageVersionMigration)
+				actualSvm := actual.(kubetesting.UpdateAction).GetObject().(*svmv1.StorageVersionMigration)
+				expectedSvm := expected.(kubetesting.UpdateAction).GetObject().(*svmv1.StorageVersionMigration)
 
 				// Check the important parts: ResourceVersion and Conditions
 				require.Equal(t, expectedSvm.Status.ResourceVersion, actualSvm.Status.ResourceVersion, "kube action %d: status.resourceVersion mismatch", i)
@@ -433,6 +483,15 @@ func filterListWatchActions(actions []kubetesting.Action) []kubetesting.Action {
 	return filteredActions
 }
 
+type testRESTMapper struct {
+	meta.RESTMapper
+}
+
+func (m *testRESTMapper) Reset() {
+	//nolint:logcheck // Reset() has a fixed signature from meta.ResettableRESTMapper and cannot accept a context.
+	meta.MaybeResetRESTMapper(m.RESTMapper)
+}
+
 // newTestRVController creates a new ResourceVersionController for testing.
 func newTestRVController(
 	kubeClient kubernetes.Interface,
@@ -445,11 +504,11 @@ func newTestRVController(
 
 	rvController := &ResourceVersionController{
 		kubeClient:      kubeClient,
-		discoveryClient: discoveryClient,
+		discoveryClient: discovery.ToDiscoveryInterfaceWithContext(discoveryClient),
 		metadataClient:  metadataClient,
 		svmListers:      svmInformer.Lister(),
 		svmSynced:       func() bool { return true },
-		mapper:          mapper,
+		mapper:          &testRESTMapper{mapper},
 	}
 	return rvController
 }

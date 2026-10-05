@@ -605,8 +605,6 @@ func init() {
 			decls.Overload(overloads.DurationToDuration, argTypes(types.DurationType), types.DurationType,
 				decls.OverloadExamples(`duration(duration('1s')) // duration('1s')`),
 				decls.UnaryBinding(identity)),
-			decls.Overload(overloads.IntToDuration, argTypes(types.IntType), types.DurationType,
-				decls.UnaryBinding(convertToType(types.DurationType))),
 			decls.Overload(overloads.StringToDuration, argTypes(types.StringType), types.DurationType,
 				decls.OverloadExamples(`duration('1h2m3s') // duration('3723s')`),
 				decls.UnaryBinding(convertToType(types.DurationType)))),

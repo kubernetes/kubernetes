@@ -42,7 +42,7 @@ type Interrupts map[string]Interrupt
 
 // Interrupts creates a new instance from a given Proc instance.
 func (p Proc) Interrupts() (Interrupts, error) {
-	data, err := util.ReadFileNoStat(p.path("interrupts"))
+	data, err := util.ReadFileNoStat(p.fs.proc.Path("interrupts"))
 	if err != nil {
 		return nil, err
 	}

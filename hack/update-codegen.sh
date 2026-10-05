@@ -202,7 +202,7 @@ function codegen::deepcopy() {
         -v "${KUBE_VERBOSE}" \
         --go-header-file "${BOILERPLATE_FILENAME}" \
         --output-file "${output_file}" \
-        --bounding-dirs "k8s.io/kubernetes,k8s.io/api" \
+        --lint-rules=known-tags-only,require-explicit-disablement \
         "${tag_pkgs[@]}" \
         "$@"
 
@@ -326,6 +326,7 @@ function codegen::prerelease() {
         -v "${KUBE_VERBOSE}" \
         --go-header-file "${BOILERPLATE_FILENAME}" \
         --output-file "${output_file}" \
+        --lint-rules=known-tags-only,require-explicit-disablement \
         "${tag_pkgs[@]}" \
         "$@"
 
@@ -390,6 +391,7 @@ function codegen::defaults() {
         -v "${KUBE_VERBOSE}" \
         --go-header-file "${BOILERPLATE_FILENAME}" \
         --output-file "${output_file}" \
+        --lint-rules=known-tags-only,require-explicit-disablement \
         "${tag_pkgs[@]}" \
         "$@"
 
@@ -407,8 +409,8 @@ function codegen::defaults() {
 # The <VALUE> depends on context:
 #     on packages:
 #       *: all exported types are candidates for having validation generated
-#       FIELDNAME: any type with a field of this name is a candidate for
-#                  having validation generated
+#       TypesWithField=NAME: any type with a field of this name is a
+#           candidate for having validation generated
 #     on types:
 #       true:  always generate validation for this type
 #       false: never generate validation for this type
@@ -418,8 +420,11 @@ function codegen::validation() {
         k8s.io/code-generator/cmd/validation-gen
 
     # TODO: Where do we want these output?  It should be somewhere internal..
-    # The result file, in each pkg, of validation generation.
-    local output_file="${GENERATED_FILE_PREFIX}validations.go"
+    # All files emitted by validation-gen (the per-pkg validations file and the
+    # per-Kind coverage test fixtures under test/declarative_validation/) share
+    # this prefix so the cleanup below can glob-remove them in one pass.
+    local output_file_prefix="${GENERATED_FILE_PREFIX}validations."
+    local output_file="${output_file_prefix}go"
 
     # All directories that request any form of validation generation.
     if [[ "${DBG_CODEGEN}" == 1 ]]; then
@@ -434,8 +439,15 @@ function codegen::validation() {
         kube::log::status "DBG: found ${#tag_dirs[@]} +k8s:validation-gen tagged dirs"
     fi
 
+    # The extensions example uses "+k8s:" like everything else, so the
+    # search above finds it -- but this run knows nothing about its formats.
+    local extensions_example="staging/src/k8s.io/code-generator/cmd/validation-gen/examples/extensions"
+
     local tag_pkgs=()
     for dir in "${tag_dirs[@]}"; do
+        if [[ "${dir}" == "${extensions_example}"/* ]]; then
+            continue
+        fi
         tag_pkgs+=("./$dir")
     done
 
@@ -444,7 +456,6 @@ function codegen::validation() {
     # used, but not regenerated, unless they are also listed as a "regular"
     # input on the command-line.
     local readonly_pkgs=(
-        k8s.io/apimachinery/pkg/apis/meta/v1
         k8s.io/apimachinery/pkg/api/resource
         k8s.io/apimachinery/pkg/runtime
         k8s.io/apimachinery/pkg/types
@@ -460,14 +471,42 @@ function codegen::validation() {
         done
     fi
 
-    git_find -z ':(glob)**'/"${output_file}" | xargs -0 rm -f
+    git_find -z ':(glob)**'/"${output_file_prefix}"'*' | xargs -0 rm -f
 
     validation-gen \
         -v "${KUBE_VERBOSE}" \
         --go-header-file "${BOILERPLATE_FILENAME}" \
         --output-file "${output_file}" \
+        --test-output-root "test/declarative_validation" \
+        --test-output-file-prefix "${output_file_prefix}" \
+        --test-allowlist "test/declarative_validation/coverage-allowlist.yaml" \
+        --lint-rules=known-tags-only,require-explicit-disablement \
         $(printf -- " --readonly-pkg %s" "${readonly_pkgs[@]}") \
         "${tag_pkgs[@]}" \
+        "$@"
+
+    # validation-gen's example of a generator with a custom tag prefix
+    # ("+xyz:") is not found by the tag search above, and its output shares
+    # the file prefix removed above, so regenerate it here to keep it in step
+    # with the generator.
+    local custom_prefix_example="staging/src/k8s.io/code-generator/cmd/validation-gen/examples/custom-prefix"
+    kube::log::status "Generating validation code for the custom-prefix example"
+    GOPROXY=off go run "./${custom_prefix_example}" \
+        -v "${KUBE_VERBOSE}" \
+        --go-header-file "${BOILERPLATE_FILENAME}" \
+        --output-file "${output_file}" \
+        "./${custom_prefix_example}/output_tests/..." \
+        "$@"
+
+    # The extensions example, excluded above. This is the stock
+    # generator: --validation-extensions-file is the whole difference.
+    kube::log::status "Generating validation code for the extensions example"
+    validation-gen \
+        -v "${KUBE_VERBOSE}" \
+        --go-header-file "${BOILERPLATE_FILENAME}" \
+        --output-file "${output_file}" \
+        --validation-extensions-file "./${extensions_example}/extensions.yaml" \
+        "./${extensions_example}/output_tests/..." \
         "$@"
 
     if [[ "${DBG_CODEGEN}" == 1 ]]; then
@@ -542,6 +581,7 @@ function codegen::conversions() {
         -v "${KUBE_VERBOSE}" \
         --go-header-file "${BOILERPLATE_FILENAME}" \
         --output-file "${output_file}" \
+        --lint-rules=known-tags-only,require-explicit-disablement \
         $(printf -- " --extra-peer-dirs %s" "${extra_peer_pkgs[@]}") \
         "${tag_pkgs[@]}" \
         "$@"
@@ -597,6 +637,7 @@ function codegen::register() {
         -v "${KUBE_VERBOSE}" \
         --go-header-file "${BOILERPLATE_FILENAME}" \
         --output-file "${output_file}" \
+        --lint-rules=known-tags-only,require-explicit-disablement \
         "${tag_pkgs[@]}" \
         "$@"
 
@@ -929,6 +970,7 @@ function codegen::protobindings() {
         "staging/src/k8s.io/kubelet/pkg/apis/dra"
         "staging/src/k8s.io/kubelet/pkg/apis/deviceplugin"
         "staging/src/k8s.io/kubelet/pkg/apis/podresources"
+        "staging/src/k8s.io/kubelet/pkg/apis/pods"
         "staging/src/k8s.io/kms/apis"
         "staging/src/k8s.io/apiserver/pkg/storage/value/encrypt/envelope/kmsv2"
         "staging/src/k8s.io/kubelet/pkg/apis/pluginregistration"

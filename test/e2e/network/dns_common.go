@@ -128,7 +128,7 @@ func (t *dnsTestCommon) runDig(dnsName, target string) []string {
 	}
 	cmd = append(cmd, dnsName)
 
-	stdout, stderr, err := e2epod.ExecWithOptions(t.f, e2epod.ExecOptions{
+	stdout, stderr, err := e2epod.Exec(t.f.TContext(context.Background()), e2epod.ExecOptions{
 		Command:       cmd,
 		Namespace:     t.f.Namespace.Name,
 		PodName:       t.utilPod.Name,
@@ -522,10 +522,6 @@ func assertFilesContain(ctx context.Context, fileNames []string, fileDir string,
 func validateDNSResults(ctx context.Context, f *framework.Framework, pod *v1.Pod, fileNames []string) {
 	ginkgo.By("submitting the pod to kubernetes")
 	podClient := f.ClientSet.CoreV1().Pods(f.Namespace.Name)
-	ginkgo.DeferCleanup(func(ctx context.Context) error {
-		ginkgo.By("deleting the pod")
-		return podClient.Delete(ctx, pod.Name, *metav1.NewDeleteOptions(0))
-	})
 	if _, err := podClient.Create(ctx, pod, metav1.CreateOptions{}); err != nil {
 		framework.Failf("ginkgo.Failed to create pod %s/%s: %v", pod.Namespace, pod.Name, err)
 	}
@@ -549,10 +545,6 @@ func validateDNSResults(ctx context.Context, f *framework.Framework, pod *v1.Pod
 func validateTargetedProbeOutput(ctx context.Context, f *framework.Framework, pod *v1.Pod, fileNames []string, value string) {
 	ginkgo.By("submitting the pod to kubernetes")
 	podClient := f.ClientSet.CoreV1().Pods(f.Namespace.Name)
-	ginkgo.DeferCleanup(func(ctx context.Context) error {
-		ginkgo.By("deleting the pod")
-		return podClient.Delete(ctx, pod.Name, *metav1.NewDeleteOptions(0))
-	})
 	if _, err := podClient.Create(ctx, pod, metav1.CreateOptions{}); err != nil {
 		framework.Failf("ginkgo.Failed to create pod %s/%s: %v", pod.Namespace, pod.Name, err)
 	}

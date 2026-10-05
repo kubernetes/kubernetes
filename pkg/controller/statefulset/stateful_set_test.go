@@ -719,12 +719,14 @@ func TestOrphanedPodsWithPVCDeletePolicy(t *testing.T) {
 			om.podsIndexer.Add(pod)
 			claims := getPersistentVolumeClaims(set, pod)
 			for _, claim := range claims {
-				om.CreateClaim(&claim)
+				if err := om.CreateClaim(&claim, set); err != nil {
+					t.Errorf("Failed to create claim %s: %v", claim.Name, err)
+				}
 			}
 		}
 
 		for i := range pods {
-			if _, err := om.setPodReadyCondition(set, i, true); err != nil {
+			if _, err := om.setPodReadyCondition(set, i, true, time.Now()); err != nil {
 				t.Errorf("%d: %v", i, err)
 			}
 			if _, err := om.setPodRunning(set, i); err != nil {
@@ -1041,7 +1043,7 @@ func scaleUpStatefulSetControllerBounded(logger klog.Logger, set *apps.StatefulS
 		fakeWorker(ssc)
 		pod = getPodAtOrdinal(pods, ord)
 		prev = *pod
-		if pods, err = om.setPodReadyCondition(set, ord, true); err != nil {
+		if pods, err = om.setPodReadyCondition(set, ord, true, time.Now()); err != nil {
 			return err
 		}
 		pod = getPodAtOrdinal(pods, ord)

@@ -18,10 +18,15 @@ package util
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/component-base/metrics/legacyregistry"
+	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/pkg/volume/util/types"
+	"k8s.io/utils/ptr"
 )
 
 func TestGetFullQualifiedPluginNameForVolume(t *testing.T) {
@@ -87,5 +92,53 @@ func TestGetFullQualifiedPluginNameForVolume(t *testing.T) {
 				t.Errorf("Case name: %s, GetFullQualifiedPluginNameForVolume, pluginName:%s, spec: %v, return:%s, want:%s", test.name, test.pluginName, test.spec, fullPluginName, test.wantFullName)
 			}
 		})
+	}
+}
+
+func TestOperationCompleteHook_StorageOperationMetric_CollectAndCompare(t *testing.T) {
+	StorageOperationMetric.Reset()
+
+	errNil := error(nil)
+	OperationCompleteHook("kubernetes.io/fake-plugin", "mount_volume")(types.CompleteFuncParam{Err: &errNil})
+
+	errFail := fmt.Errorf("test error")
+	OperationCompleteHook("kubernetes.io/fake-plugin", "unmount_volume")(types.CompleteFuncParam{Err: &errFail, Migrated: ptr.To(true)})
+
+	want := `# HELP storage_operation_duration_seconds [BETA] Storage operation duration
+# TYPE storage_operation_duration_seconds histogram
+storage_operation_duration_seconds_count{migrated="false",operation_name="mount_volume",status="success",volume_plugin="kubernetes.io/fake-plugin"} 1
+storage_operation_duration_seconds_count{migrated="true",operation_name="unmount_volume",status="fail-unknown",volume_plugin="kubernetes.io/fake-plugin"} 1
+`
+	if err := testutil.GatherAndCompare(gatherWithoutBuckets(), strings.NewReader(want), "storage_operation_duration_seconds"); err != nil {
+		t.Fatalf("unexpected metrics output: %v", err)
+	}
+}
+
+func TestRecordOperationLatencyMetric_VolumeOperationTotalSeconds_CollectAndCompare(t *testing.T) {
+	storageOperationEndToEndLatencyMetric.Reset()
+	RecordOperationLatencyMetric("kubernetes.io/fake-plugin", "mount_volume", 0.5)
+
+	want := `# HELP volume_operation_total_seconds [BETA] Storage operation end to end duration in seconds
+# TYPE volume_operation_total_seconds histogram
+volume_operation_total_seconds_count{operation_name="mount_volume",plugin_name="kubernetes.io/fake-plugin"} 1
+`
+	if err := testutil.GatherAndCompare(gatherWithoutBuckets(), strings.NewReader(want), "volume_operation_total_seconds"); err != nil {
+		t.Fatalf("unexpected metrics output: %v", err)
+	}
+}
+
+func gatherWithoutBuckets() testutil.GathererFunc {
+	return func() ([]*testutil.MetricFamily, error) {
+		got, err := legacyregistry.DefaultGatherer.Gather()
+		for _, mf := range got {
+			for _, m := range mf.Metric {
+				if m.Histogram == nil {
+					continue
+				}
+				m.Histogram.SampleSum = nil
+				m.Histogram.Bucket = nil
+			}
+		}
+		return got, err
 	}
 }

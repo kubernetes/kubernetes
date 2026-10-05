@@ -152,7 +152,7 @@ func (o *ClusterRoleBindingOptions) Complete(f cmdutil.Factory, cmd *cobra.Comma
 	return nil
 }
 
-// Run calls the CreateSubcommandOptions.Run in ClusterRoleBindingOptions instance
+// Run performs the execution of the 'create clusterrolebinding' sub command
 func (o *ClusterRoleBindingOptions) Run() error {
 	clusterRoleBinding, err := o.createClusterRoleBinding()
 	if err != nil {

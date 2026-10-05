@@ -25,7 +25,7 @@ package v1beta1
 // the related backend services. Incoming requests are first evaluated for a host
 // match, then routed to the backend associated with the matching IngressRuleValue.
 type IngressRuleApplyConfiguration struct {
-	// Host is the fully qualified domain name of a network host, as defined by RFC 3986.
+	// host is the fully qualified domain name of a network host, as defined by RFC 3986.
 	// Note the following deviations from the "host" part of the
 	// URI as defined in RFC 3986:
 	// 1. IPs are not allowed. Currently an IngressRuleValue can only apply to
@@ -53,7 +53,7 @@ type IngressRuleApplyConfiguration struct {
 	// just traffic matching the host to the default backend or all traffic to the
 	// default backend, is left to the controller fulfilling the Ingress. Http is
 	// currently the only supported IngressRuleValue.
-	IngressRuleValueApplyConfiguration `json:",inline"`
+	IngressRuleValueApplyConfiguration `json:""`
 }
 
 // IngressRuleApplyConfiguration constructs a declarative configuration of the IngressRule type for use with

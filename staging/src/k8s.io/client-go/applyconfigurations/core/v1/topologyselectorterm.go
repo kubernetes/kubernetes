@@ -27,6 +27,8 @@ package v1
 // It provides a subset of functionality as NodeSelectorTerm.
 // This is an alpha feature and may change in the future.
 type TopologySelectorTermApplyConfiguration struct {
+	// matchLabelExpressions is a list of topology selector requirements by labels.
+	// Usage: Fields of type []TopologySelectorTerm must be listType=atomic.
 	// A list of topology selector requirements by labels.
 	MatchLabelExpressions []TopologySelectorLabelRequirementApplyConfiguration `json:"matchLabelExpressions,omitempty"`
 }

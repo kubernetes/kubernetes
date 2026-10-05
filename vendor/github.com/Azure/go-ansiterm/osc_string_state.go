@@ -11,21 +11,13 @@ func (oscState oscStringState) Handle(b byte) (s state, e error) {
 		return nextState, err
 	}
 
-	switch {
-	case isOscStringTerminator(b):
+	// There are several control characters and sequences which can
+	// terminate an OSC string. Most of them are handled by the baseState
+	// handler. The ANSI_BEL character is a special case which behaves as a
+	// terminator only for an OSC string.
+	if b == ANSI_BEL {
 		return oscState.parser.ground, nil
 	}
 
 	return oscState, nil
-}
-
-// See below for OSC string terminators for linux
-// http://man7.org/linux/man-pages/man4/console_codes.4.html
-func isOscStringTerminator(b byte) bool {
-
-	if b == ANSI_BEL || b == 0x5C {
-		return true
-	}
-
-	return false
 }

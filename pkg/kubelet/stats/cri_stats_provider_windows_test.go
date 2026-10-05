@@ -22,7 +22,7 @@ import (
 	"time"
 
 	"github.com/Microsoft/hnslib"
-	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
+	cadvisorapi "github.com/google/cadvisor/lib/model"
 	"github.com/stretchr/testify/assert"
 	"k8s.io/apimachinery/pkg/api/resource"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -519,7 +519,7 @@ func Test_criStatsProvider_makeWinContainerStats(t *testing.T) {
 		},
 	}
 
-	inputRootFsInfo := &cadvisorapiv2.FsInfo{}
+	inputRootFsInfo := &cadvisorapi.FsInfo{}
 
 	// Used by the getPodContainerLogStats() call in makeWinContainerStats()
 	inputPodSandboxMetadata := &runtimeapi.PodSandboxMetadata{
@@ -529,7 +529,7 @@ func Test_criStatsProvider_makeWinContainerStats(t *testing.T) {
 	}
 
 	logger, _ := ktesting.NewTestContext(t)
-	got, err := p.makeWinContainerStats(logger, inputStats, inputContainer, inputRootFsInfo, make(map[string]*cadvisorapiv2.FsInfo), inputPodSandboxMetadata)
+	got, err := p.makeWinContainerStats(logger, inputStats, inputContainer, inputRootFsInfo, make(map[string]*cadvisorapi.FsInfo), inputPodSandboxMetadata)
 
 	expected := &statsapi.ContainerStats{
 		Name:      "c0",

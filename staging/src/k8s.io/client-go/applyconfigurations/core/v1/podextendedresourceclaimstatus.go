@@ -25,10 +25,10 @@ package v1
 // resource requests backed by DRA. It stores the generated name for
 // the corresponding special ResourceClaim created by the scheduler.
 type PodExtendedResourceClaimStatusApplyConfiguration struct {
-	// RequestMappings identifies the mapping of <container, extended resource backed by DRA> to  device request
+	// requestMappings identifies the mapping of <container, extended resource backed by DRA> to  device request
 	// in the generated ResourceClaim.
 	RequestMappings []ContainerExtendedResourceRequestApplyConfiguration `json:"requestMappings,omitempty"`
-	// ResourceClaimName is the name of the ResourceClaim that was
+	// resourceClaimName is the name of the ResourceClaim that was
 	// generated for the Pod in the namespace of the Pod.
 	ResourceClaimName *string `json:"resourceClaimName,omitempty"`
 }

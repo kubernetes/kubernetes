@@ -37,7 +37,7 @@ func checkForErrors(methodName string, hr error, resultBuffer *uint16) error {
 	}
 
 	if errorFound {
-		returnError := new(hr, methodName, result)
+		returnError := newHcnError(hr, methodName, result)
 		logrus.Debugf(returnError.Error()) // HCN errors logged for debugging.
 		return returnError
 	}
@@ -52,6 +52,11 @@ const (
 	ERROR_NOT_FOUND                     = ErrorCode(windows.ERROR_NOT_FOUND)
 	HCN_E_PORT_ALREADY_EXISTS ErrorCode = ErrorCode(windows.HCN_E_PORT_ALREADY_EXISTS)
 	HCN_E_NOTIMPL             ErrorCode = ErrorCode(windows.E_NOTIMPL)
+	HCN_E_NETWORK_NOT_FOUND   ErrorCode = ErrorCode(windows.HCN_E_NETWORK_NOT_FOUND)
+	HCN_E_ENDPOINT_NOT_FOUND  ErrorCode = ErrorCode(windows.HCN_E_ENDPOINT_NOT_FOUND)
+	HCN_E_PORT_NOT_FOUND      ErrorCode = ErrorCode(windows.HCN_E_PORT_NOT_FOUND)
+	HCN_E_INVALID_IP          ErrorCode = ErrorCode(windows.HCN_E_INVALID_IP)
+	HCN_E_ADAPTER_NOT_FOUND   ErrorCode = ErrorCode(windows.HCN_E_ADAPTER_NOT_FOUND)
 )
 
 type HcnError struct {
@@ -83,7 +88,27 @@ func IsNotImplemented(err error) bool {
 	return CheckErrorWithCode(err, HCN_E_NOTIMPL)
 }
 
-func new(hr error, title string, rest string) error {
+func IsNetworkNotFoundError(err error) bool {
+	return CheckErrorWithCode(err, HCN_E_NETWORK_NOT_FOUND)
+}
+
+func IsEndpointNotFoundError(err error) bool {
+	return CheckErrorWithCode(err, HCN_E_ENDPOINT_NOT_FOUND)
+}
+
+func IsPortNotFoundError(err error) bool {
+	return CheckErrorWithCode(err, HCN_E_PORT_NOT_FOUND)
+}
+
+func IsInvalidIPError(err error) bool {
+	return CheckErrorWithCode(err, HCN_E_INVALID_IP)
+}
+
+func IsAdapterNotFoundError(err error) bool {
+	return CheckErrorWithCode(err, HCN_E_ADAPTER_NOT_FOUND)
+}
+
+func newHcnError(hr error, title string, rest string) error {
 	err := &HcnError{}
 	hnsError := hns.NewHnsError(hr, title, rest)
 	err.HnsError = hnsError.(*hns.HnsError) //nolint:errorlint

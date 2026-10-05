@@ -204,7 +204,7 @@ var _ = SIGDescribe("MirrorPod", func() {
 	})
 	ginkgo.Context("when recreating a static pod", func() {
 		var ns, podPath, staticPodName, mirrorPodName string
-		f.It("it should launch successfully even if it temporarily failed termination due to volume failing to unmount", f.WithNodeConformance(), f.WithSerial(), func(ctx context.Context) {
+		f.It("it should launch successfully even if it temporarily failed termination due to volume failing to unmount", f.WithNodeConformance(), f.WithSerial(), f.WithSlow(), func(ctx context.Context) {
 			node := getNodeName(ctx, f)
 			ns = f.Namespace.Name
 			c := f.ClientSet
@@ -921,11 +921,6 @@ var _ = SIGDescribe("MirrorPod", framework.WithSerial(), func() {
 			ginkgo.By("restarting the kubelet")
 			restartKubelet := mustStopKubelet(ctx, f)
 			restartKubelet(ctx)
-
-			ginkgo.By("ensuring kubelet is healthy")
-			gomega.Eventually(ctx, func() bool {
-				return kubeletHealthCheck(kubeletHealthCheckURL)
-			}, f.Timeouts.PodStart, f.Timeouts.Poll).Should(gomega.BeTrueBecause("kubelet should be started"))
 
 			// Let the goroutine run for a few more seconds to catch any delayed changes
 			time.Sleep(5 * time.Second)

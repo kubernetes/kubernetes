@@ -19,6 +19,7 @@ package clusterinfo
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"k8s.io/cli-runtime/pkg/genericiooptions"
@@ -80,5 +81,44 @@ func TestSetupOutputWriterFile(t *testing.T) {
 	}
 	if string(data) != output {
 		t.Errorf("expected: %v, saw: %v", output, data)
+	}
+}
+
+func TestSetupOutputWriterPermissions(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("file modes are not enforced on windows")
+	}
+	file := filepath.Join("some-namespace", "some-pod", "logs")
+	extension := ".txt"
+	dir, err := os.MkdirTemp(os.TempDir(), "out")
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	fullPath := filepath.Join(dir, file) + extension
+	defer os.RemoveAll(dir)
+
+	_, _, buf, _ := genericiooptions.NewTestIOStreams()
+	f := cmdtesting.NewTestFactory()
+	defer f.Cleanup()
+
+	writer := setupOutputWriter(dir, buf, file, extension)
+	if writer == buf {
+		t.Errorf("expected: %v, saw: %v", buf, writer)
+	}
+
+	fileInfo, err := os.Stat(fullPath)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if fileInfo.Mode().Perm() != 0600 {
+		t.Errorf("expected file mode: %v, saw: %v", os.FileMode(0600), fileInfo.Mode().Perm())
+	}
+
+	dirInfo, err := os.Stat(filepath.Dir(fullPath))
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if dirInfo.Mode().Perm() != 0700 {
+		t.Errorf("expected directory mode: %v, saw: %v", os.FileMode(0700), dirInfo.Mode().Perm())
 	}
 }

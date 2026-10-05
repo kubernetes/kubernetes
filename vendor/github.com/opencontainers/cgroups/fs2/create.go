@@ -28,7 +28,7 @@ func needAnyControllers(r *cgroups.Resources) (bool, error) {
 		return false, err
 	}
 	avail := make(map[string]struct{})
-	for _, ctr := range strings.Fields(content) {
+	for ctr := range strings.FieldsSeq(content) {
 		avail[ctr] = struct{}{}
 	}
 
@@ -137,8 +137,7 @@ func CreateCgroupPath(path string, c *cgroups.Cgroup) (Err error) {
 		if i < len(elements)-1 {
 			if err := cgroups.WriteFile(current, cgStCtlFile, res); err != nil {
 				// try write one by one
-				allCtrs := strings.Split(res, " ")
-				for _, ctr := range allCtrs {
+				for ctr := range strings.SplitSeq(res, " ") {
 					_ = cgroups.WriteFile(current, cgStCtlFile, ctr)
 				}
 			}

@@ -128,6 +128,16 @@ func NewGZIPDecompressor() Decompressor {
 }
 
 func (d *gzipDecompressor) Do(r io.Reader) ([]byte, error) {
+	return d.doWithMaxSize(r, math.MaxInt64)
+}
+
+// doWithMaxSize behaves like Do but caps the size of the decompressed
+// payload at maxMessageSize+1 bytes. The Decompressor interface does not
+// allow extra parameters, so callers inside the package type-assert to
+// *gzipDecompressor to invoke this method directly. The +1 byte makes it
+// possible for the caller to detect that the limit was exceeded and
+// return ResourceExhausted instead of materializing an unbounded payload.
+func (d *gzipDecompressor) doWithMaxSize(r io.Reader, maxMessageSize int64) ([]byte, error) {
 	var z *gzip.Reader
 	switch maybeZ := d.pool.Get().(type) {
 	case nil:
@@ -148,7 +158,11 @@ func (d *gzipDecompressor) Do(r io.Reader) ([]byte, error) {
 		z.Close()
 		d.pool.Put(z)
 	}()
-	return io.ReadAll(z)
+	var src io.Reader = z
+	if maxMessageSize < math.MaxInt64 {
+		src = io.LimitReader(z, maxMessageSize+1)
+	}
+	return io.ReadAll(src)
 }
 
 func (d *gzipDecompressor) Type() string {
@@ -830,15 +844,15 @@ func compress(in mem.BufferSlice, cp Compressor, compressor encoding.Compressor,
 	if compressor != nil {
 		z, err := compressor.Compress(w)
 		if err != nil {
-			return nil, 0, wrapErr(err)
+			return nil, compressionNone, wrapErr(err)
 		}
 		for _, b := range in {
 			if _, err := z.Write(b.ReadOnlyData()); err != nil {
-				return nil, 0, wrapErr(err)
+				return nil, compressionNone, wrapErr(err)
 			}
 		}
 		if err := z.Close(); err != nil {
-			return nil, 0, wrapErr(err)
+			return nil, compressionNone, wrapErr(err)
 		}
 	} else {
 		// This is obviously really inefficient since it fully materializes the data, but
@@ -848,7 +862,7 @@ func compress(in mem.BufferSlice, cp Compressor, compressor encoding.Compressor,
 		buf := in.MaterializeToBuffer(pool)
 		defer buf.Free()
 		if err := cp.Do(w, buf.ReadOnlyData()); err != nil {
-			return nil, 0, wrapErr(err)
+			return nil, compressionNone, wrapErr(err)
 		}
 	}
 	return out, compressionMade, nil
@@ -961,25 +975,49 @@ func recvAndDecompress(p *parser, s recvCompressor, dc Decompressor, maxReceiveM
 	return out, nil
 }
 
-// decompress processes the given data by decompressing it using either a custom decompressor or a standard compressor.
-// If a custom decompressor is provided, it takes precedence. The function validates that the decompressed data
-// does not exceed the specified maximum size and returns an error if this limit is exceeded.
-// On success, it returns the decompressed data. Otherwise, it returns an error if decompression fails or the data exceeds the size limit.
+// decompress processes the given data by decompressing it using either
+// a custom decompressor or a standard compressor. If a custom decompressor
+// is provided, it takes precedence. The function validates that
+// the decompressed data does not exceed the specified maximum size and returns
+// an error if this limit is exceeded. On success, it returns the decompressed
+// data. Otherwise, it returns an error if decompression fails or the data
+// exceeds the size limit.
 func decompress(compressor encoding.Compressor, d mem.BufferSlice, dc Decompressor, maxReceiveMessageSize int, pool mem.BufferPool) (mem.BufferSlice, error) {
 	if dc != nil {
-		uncompressed, err := dc.Do(d.Reader())
+		r := d.Reader()
+		// For the built-in gzip decompressor, bound the decompressed output
+		// at maxReceiveMessageSize+1 so that a small but highly compressed
+		// payload (a "zip bomb") cannot expand to gigabytes in memory before
+		// the post-decompression size check below has a chance to fire. The
+		// Decompressor interface does not accept an extra size parameter,
+		// so we type-assert to invoke a size-aware helper. Third-party
+		// Decompressor implementations keep the original Do behavior.
+		var uncompressed []byte
+		var err error
+		if gd, ok := dc.(*gzipDecompressor); ok {
+			uncompressed, err = gd.doWithMaxSize(r, int64(maxReceiveMessageSize))
+		} else {
+			uncompressed, err = dc.Do(r)
+		}
 		if err != nil {
+			r.Close() // ensure buffers are reused
 			return nil, status.Errorf(codes.Internal, "grpc: failed to decompress the received message: %v", err)
 		}
 		if len(uncompressed) > maxReceiveMessageSize {
+			r.Close() // ensure buffers are reused
 			return nil, status.Errorf(codes.ResourceExhausted, "grpc: message after decompression larger than max (%d vs. %d)", len(uncompressed), maxReceiveMessageSize)
 		}
 		return mem.BufferSlice{mem.SliceBuffer(uncompressed)}, nil
 	}
 	if compressor != nil {
-		dcReader, err := compressor.Decompress(d.Reader())
+		r := d.Reader()
+		dcReader, err := compressor.Decompress(r)
 		if err != nil {
+			r.Close() // ensure buffers are reused
 			return nil, status.Errorf(codes.Internal, "grpc: failed to decompress the message: %v", err)
+		}
+		if closer, ok := dcReader.(io.Closer); ok {
+			defer closer.Close()
 		}
 
 		// Read at most one byte more than the limit from the decompressor.
@@ -990,11 +1028,13 @@ func decompress(compressor encoding.Compressor, d mem.BufferSlice, dc Decompress
 		}
 		out, err := mem.ReadAll(dcReader, pool)
 		if err != nil {
+			r.Close() // ensure buffers are reused
 			out.Free()
 			return nil, status.Errorf(codes.Internal, "grpc: failed to read decompressed data: %v", err)
 		}
 
 		if out.Len() > maxReceiveMessageSize {
+			r.Close() // ensure buffers are reused
 			out.Free()
 			return nil, status.Errorf(codes.ResourceExhausted, "grpc: received message after decompression larger than max %d", maxReceiveMessageSize)
 		}

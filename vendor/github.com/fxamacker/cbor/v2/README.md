@@ -683,7 +683,7 @@ because RFC 8949 treats CBOR data item with remaining bytes as malformed.
 Other useful functions: 
 - `Diagnose`, `DiagnoseFirst` produce human-readable [Extended Diagnostic Notation](https://www.rfc-editor.org/rfc/rfc8610.html#appendix-G) from CBOR data.
 - `UnmarshalFirst` decodes first CBOR data item and return any remaining bytes.
-- `Wellformed` returns true if the CBOR data item is well-formed.
+- `Wellformed` returns nil error if the CBOR data item is well-formed.
 
 Interfaces identical or comparable to Go `encoding` packages include:  
 `Marshaler`, `Unmarshaler`, `BinaryMarshaler`, and `BinaryUnmarshaler`.
@@ -702,28 +702,29 @@ Default limits may need to be increased for systems handling very large data (e.
 
 ## Status
 
-[v2.9.0](https://github.com/fxamacker/cbor/releases/tag/v2.9.0) (Jul 13, 2025) improved interoperability/transcoding between CBOR & JSON, refactored tests, and improved docs.
-- Add opt-in support for `encoding.TextMarshaler` and `encoding.TextUnmarshaler` to encode and decode from CBOR text string.
-- Add opt-in support for `json.Marshaler` and `json.Unmarshaler` via user-provided transcoding function.
-- Update docs for TimeMode, Tag, RawTag, and add example for Embedded JSON Tag for CBOR.
+v2.9.2 (Sunday, May 3, 2026) refactors and hardens the streaming encoder by adding stricter checks for encoding to CBOR indefinite-length data. This prevents improper use of this library from producing malformed CBOR indefinite-length data that would be rejected by the decoder.
 
-v2.9.0 passed fuzz tests and is production quality.
+This release includes other bugfixes, defensive checks, and added more tests.
 
-The minimum version of Go required to build:
-- v2.8.0 and newer releases require go 1.20+.
-- v2.7.1 and older releases require go 1.17+.
+v2.9.2 passed fuzz tests (billions of executions) and is production quality.
 
-For more details, see [release notes](https://github.com/fxamacker/cbor/releases).
+For more details, see [v2.9.2 release notes](https://github.com/fxamacker/cbor/releases).
 
 ### Prior Releases
 
-[v2.8.0](https://github.com/fxamacker/cbor/releases/tag/v2.8.0) (March 30, 2025) is a small release primarily to add `omitzero` option to struct field tags and fix bugs.   It passed fuzz tests (billions of executions) and is production quality.
+Releases and commits tend to be on Sundays because my work schedule didn't leave time to work on this during weekdays (sometimes consecutive weekends and consecutive Christmas breaks, too).  Monday morning releases were to allow more fuzzing to run overnight before clicking the release button.
 
-[v2.7.0](https://github.com/fxamacker/cbor/releases/tag/v2.7.0) (June 23, 2024) adds features and improvements that help large projects (e.g. Kubernetes) use CBOR as an alternative to JSON and Protocol Buffers. Other improvements include speedups, improved memory use, bug fixes, new serialization options, etc.   It passed fuzz tests (5+ billion executions) and is production quality.
+[v2.9.1](https://github.com/fxamacker/cbor/releases/tag/v2.9.1) (Monday, Mar 30, 2026) includes important bugfixes, defensive checks, improved code quality, and more tests.  Although not public, the fuzzer was also improved by adding more fuzz tests.  It passed fuzz tests (billions of executions) and is production quality.
 
-[v2.6.0](https://github.com/fxamacker/cbor/releases/tag/v2.6.0) (February 2024) adds important new features, optimizations, and bug fixes. It is especially useful to systems that need to convert data between CBOR and JSON.  New options and optimizations improve handling of bignum, integers, maps, and strings.
+[v2.9.0](https://github.com/fxamacker/cbor/releases/tag/v2.9.0) (Sunday, Jul 13, 2025) improved interoperability/transcoding between CBOR & JSON, refactored tests, and improved docs.   It passed fuzz tests (billions of executions) and is production quality.
 
-[v2.5.0](https://github.com/fxamacker/cbor/releases/tag/v2.5.0) was released on Sunday, August 13, 2023 with new features and important bug fixes.  It is fuzz tested and production quality after extended beta [v2.5.0-beta](https://github.com/fxamacker/cbor/releases/tag/v2.5.0-beta) (Dec 2022) -> [v2.5.0](https://github.com/fxamacker/cbor/releases/tag/v2.5.0) (Aug 2023).
+[v2.8.0](https://github.com/fxamacker/cbor/releases/tag/v2.8.0) (Sunday, March 30, 2025) is a small release primarily to add `omitzero` option to struct field tags and fix bugs.   It passed fuzz tests (billions of executions) and is production quality.
+
+[v2.7.0](https://github.com/fxamacker/cbor/releases/tag/v2.7.0) (Monday, June 23, 2024) adds features and improvements that help large projects (e.g. Kubernetes) use CBOR as an alternative to JSON and Protocol Buffers. Other improvements include speedups, improved memory use, bug fixes, new serialization options, etc.   It passed fuzz tests (5+ billion executions) and is production quality.
+
+[v2.6.0](https://github.com/fxamacker/cbor/releases/tag/v2.6.0) (Sunday, Feb 11, 2024) adds important new features, optimizations, and bug fixes. It is especially useful to systems that need to convert data between CBOR and JSON.  New options and optimizations improve handling of bignum, integers, maps, and strings.
+
+[v2.5.0](https://github.com/fxamacker/cbor/releases/tag/v2.5.0) (Sunday, August 13, 2023) adds new features and important bug fixes.  It is fuzz tested and production quality after extended beta [v2.5.0-beta](https://github.com/fxamacker/cbor/releases/tag/v2.5.0-beta) (Dec 2022) -> [v2.5.0](https://github.com/fxamacker/cbor/releases/tag/v2.5.0) (Aug 2023).
 
 __IMPORTANT__:  👉 Before upgrading from v2.4 or older release, please read the notable changes highlighted in the release notes.  v2.5.0 is a large release with bug fixes to error handling for extraneous data in `Unmarshal`, etc. that should be reviewed before upgrading.
 

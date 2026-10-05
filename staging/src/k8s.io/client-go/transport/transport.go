@@ -28,12 +28,15 @@ import (
 	"time"
 
 	utilnet "k8s.io/apimachinery/pkg/util/net"
+	clientgofeaturegate "k8s.io/client-go/features"
+	"k8s.io/client-go/tools/metrics"
 	"k8s.io/klog/v2"
 )
 
 // New returns an http.RoundTripper that will provide the authentication
 // or transport level security defined by the provided Config.
 func New(config *Config) (http.RoundTripper, error) {
+	metrics.EnsureRegistered()
 	// Set transport level security
 	if config.Transport != nil && (config.HasCA() || config.HasCertAuth() || config.HasCertCallback() || config.TLS.Insecure) {
 		return nil, fmt.Errorf("using a custom transport with TLS certificate options or the insecure flag is not allowed")
@@ -211,15 +214,24 @@ func TLSConfigFor(c *Config) (*tls.Config, error) {
 // KeyData, and CAFile fields, or returns an error. If no error is returned, all three fields are
 // either populated or were empty to start.
 func loadTLSFiles(c *Config) error {
+	// Check that we are purely loading CA from file
+	if clientgofeaturegate.FeatureGates().Enabled(clientgofeaturegate.ClientsAllowCARotation) {
+		if len(c.TLS.CAFile) > 0 && len(c.TLS.CAData) == 0 {
+			c.TLS.ReloadCAFiles = true
+		}
+	} else if c.TLS.ReloadCAFiles {
+		return fmt.Errorf("ReloadCAFiles=true requires ClientsAllowCARotation to be enabled")
+	}
+
+	// Check that we are purely loading certs and keys from files
+	if len(c.TLS.CertFile) > 0 && len(c.TLS.CertData) == 0 && len(c.TLS.KeyFile) > 0 && len(c.TLS.KeyData) == 0 {
+		c.TLS.ReloadTLSFiles = true
+	}
+
 	var err error
 	c.TLS.CAData, err = dataFromSliceOrFile(c.TLS.CAData, c.TLS.CAFile)
 	if err != nil {
 		return err
-	}
-
-	// Check that we are purely loading from files
-	if len(c.TLS.CertFile) > 0 && len(c.TLS.CertData) == 0 && len(c.TLS.KeyFile) > 0 && len(c.TLS.KeyData) == 0 {
-		c.TLS.ReloadTLSFiles = true
 	}
 
 	c.TLS.CertData, err = dataFromSliceOrFile(c.TLS.CertData, c.TLS.CertFile)
@@ -254,6 +266,11 @@ func rootCertPool(caData []byte) (*x509.CertPool, error) {
 	// code for a look at the platform specific insanity), so we'll use the fact that RootCAs == nil gives us the system values
 	// It doesn't allow trusting either/or, but hopefully that won't be an issue
 	if len(caData) == 0 {
+		// When the ClientsAllowCARotation feature gate is enabled, it returns an empty but non-nil pool.
+		// This ensures we don't fall back to system roots when a user explicitly points CAFile to a zero-byte file.
+		if clientgofeaturegate.FeatureGates().Enabled(clientgofeaturegate.ClientsAllowCARotation) {
+			return x509.NewCertPool(), nil
+		}
 		return nil, nil
 	}
 

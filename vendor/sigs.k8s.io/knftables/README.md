@@ -39,6 +39,18 @@ a change in how some rules are generated starting in nft 1.0.3
 triggers a crash in nft 0.9.9 and earlier, _even if you aren't looking
 at the table containing that rule_.)
 
+In general, if you are creating a container image containing `nft`, it
+is better to include an older version of `nft` than a newer one,
+because newer versions may create rules, sets, etc., that older ones
+can't understand (and in some cases, newer versions of `nft` may even
+cause older versions to crash). If your container uses an older
+version of `nft` than the host uses, then it's guaranteed to not cause
+problems if the admin runs `nft list ruleset` or the like. (As of
+v0.0.20, knftables should never look at any tables other than the
+one(s) it is managing, so having an older version of `nft` in your
+container than is on the host should not cause any problems for
+knftables.)
+
 ## Usage
 
 Create an `Interface` object to manage operations on a single nftables

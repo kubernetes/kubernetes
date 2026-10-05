@@ -17,11 +17,13 @@ limitations under the License.
 package deviceclass
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/version"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -51,7 +53,7 @@ func TestStrategy(t *testing.T) {
 	if Strategy.NamespaceScoped() {
 		t.Errorf("DeviceClass must not be namespace scoped")
 	}
-	if Strategy.AllowCreateOnUpdate() {
+	if Strategy.AllowCreateOnUpdate(context.Background()) {
 		t.Errorf("DeviceClass should not allow create on update")
 	}
 }
@@ -92,7 +94,9 @@ func TestStrategyCreate(t *testing.T) {
 	for name, tc := range testcases {
 		t.Run(name, func(t *testing.T) {
 			obj := tc.obj.DeepCopy()
-
+			if !tc.draExtendedResource {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.36"))
+			}
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAExtendedResource, tc.draExtendedResource)
 
 			Strategy.PrepareForCreate(ctx, obj)
@@ -172,7 +176,9 @@ func TestStrategyUpdate(t *testing.T) {
 			oldObj := tc.oldObj.DeepCopy()
 			newObj := tc.newObj.DeepCopy()
 			newObj.ResourceVersion = "4"
-
+			if !tc.draExtendedResource {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.36"))
+			}
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAExtendedResource, tc.draExtendedResource)
 
 			Strategy.PrepareForUpdate(ctx, newObj, oldObj)

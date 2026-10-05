@@ -387,7 +387,7 @@ func ConfirmInternalAnnotationUnchanged(r1 *yaml.RNode, r2 *yaml.RNode, exclusio
 		for _, key := range keys {
 			errorString = errorString + key + ", "
 		}
-		return errors.Errorf(errorString[0 : len(errorString)-2])
+		return errors.Errorf("%s", errorString[0:len(errorString)-2])
 	}
 
 	return nil

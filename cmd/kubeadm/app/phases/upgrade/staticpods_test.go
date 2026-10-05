@@ -42,13 +42,13 @@ import (
 	etcdphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/etcd"
 	kubeconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubeconfig"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
-	certstestutil "k8s.io/kubernetes/cmd/kubeadm/app/util/certs"
+	certstestutil "k8s.io/kubernetes/cmd/kubeadm/app/util/certs/testing"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
+	configtestutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config/testing"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 	etcdutil "k8s.io/kubernetes/cmd/kubeadm/app/util/etcd"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
 	pkiutiltesting "k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil/testing"
-	testutil "k8s.io/kubernetes/cmd/kubeadm/test"
 )
 
 const (
@@ -786,7 +786,7 @@ func TestRenewCertsByComponent(t *testing.T) {
 			// Setup up basic requisites
 			tmpDir := t.TempDir()
 
-			cfg := testutil.GetDefaultInternalConfig(t)
+			cfg := configtestutil.GetDefaultInternalConfig(t)
 			cfg.CertificatesDir = tmpDir
 
 			if err := pkiutil.WriteCertAndKey(tmpDir, constants.CACertAndKeyBaseName, caCert, caKey); err != nil {

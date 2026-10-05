@@ -18,6 +18,13 @@ package peerproxy
 
 import (
 	"context"
+	"fmt"
+	"io"
+	"net"
+	"net/http"
+	"net/http/httptest"
+	"os"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -32,7 +39,6 @@ import (
 	"k8s.io/apiserver/pkg/server"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/transport"
 	"k8s.io/client-go/util/cert"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2"
@@ -46,13 +52,6 @@ import (
 
 func TestPeerProxiedRequest(t *testing.T) {
 	ktesting.SetDefaultVerbosity(1)
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
-	defer func() {
-		t.Cleanup(cancel) // register context cancellation last so it is cleaned up before servers
-	}()
-
-	// ensure to stop cert reloading after shutdown
-	transport.DialerStopCh = ctx.Done()
 
 	// enable feature flags
 	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
@@ -109,13 +108,6 @@ func TestPeerProxiedRequest(t *testing.T) {
 
 func TestPeerProxiedRequestToThirdServerAfterFirstDies(t *testing.T) {
 	ktesting.SetDefaultVerbosity(1)
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
-	defer func() {
-		t.Cleanup(cancel) // register context cancellation last so it is cleaned up before servers
-	}()
-
-	// ensure to stop cert reloading after shutdown
-	transport.DialerStopCh = ctx.Done()
 
 	// enable feature flags
 	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
@@ -175,7 +167,7 @@ func TestPeerProxiedRequestToThirdServerAfterFirstDies(t *testing.T) {
 
 	var jobsB *v1.JobList
 	// list jobs using ServerB which it should proxy to ServerC and get back valid response
-	err = wait.PollUntilContextTimeout(ctx, 1*time.Second, 1*time.Minute, false, func(ctx context.Context) (bool, error) {
+	err = wait.PollUntilContextTimeout(t.Context(), 1*time.Second, 1*time.Minute, false, func(ctx context.Context) (bool, error) {
 		select {
 		case <-ctx.Done():
 			return false, ctx.Err()
@@ -199,6 +191,77 @@ func TestPeerProxiedRequestToThirdServerAfterFirstDies(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotEmpty(t, jobsB)
 	assert.Equal(t, job.Name, jobsB.Items[0].Name)
+}
+
+func TestPeerProxy_EgressDialerIsUsed(t *testing.T) {
+	ktesting.SetDefaultVerbosity(1)
+
+	// Start a HTTP CONNECT proxy to act as a fake egress dialer over UDS
+	dialerHit, udsName := runMockEgressProxy(t)
+
+	// Write a temporary egress selector config file pointing to our proxy
+	egressSelectorConfigFile, err := os.CreateTemp("", "egress_selector_configuration.yaml")
+	require.NoError(t, err)
+	defer func() { _ = os.Remove(egressSelectorConfigFile.Name()) }()
+
+	configYAML := fmt.Sprintf(`
+apiVersion: apiserver.k8s.io/v1beta1
+kind: EgressSelectorConfiguration
+egressSelections:
+- name: controlplane
+  connection:
+      proxyProtocol: HTTPConnect
+      transport:
+        uds:
+          udsName: "%s"
+`, udsName)
+	err = os.WriteFile(egressSelectorConfigFile.Name(), []byte(configYAML), 0644)
+	require.NoError(t, err)
+
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.APIServerIdentity:                   true,
+		features.UnknownVersionInteroperabilityProxy: true,
+	})
+
+	etcd := framework.SharedEtcd()
+	proxyCA, err := createProxyCertContent()
+	require.NoError(t, err)
+
+	// Start two apiservers, one with batch/v1 disabled
+	server.SetHostnameFuncForTests("test-server-egress-a")
+	serverA := kastesting.StartTestServerOrDie(t, &kastesting.TestServerInstanceOptions{
+		EnableCertAuth: true,
+		ProxyCA:        &proxyCA},
+		[]string{"--runtime-config=api/all=true", "--egress-selector-config-file=" + egressSelectorConfigFile.Name()}, etcd)
+	t.Cleanup(serverA.TearDownFn)
+
+	server.SetHostnameFuncForTests("test-server-egress-b")
+	serverB := kastesting.StartTestServerOrDie(t, &kastesting.TestServerInstanceOptions{
+		EnableCertAuth: true,
+		ProxyCA:        &proxyCA},
+		[]string{"--runtime-config=api/all=true,batch/v1=false", "--egress-selector-config-file=" + egressSelectorConfigFile.Name()}, etcd)
+	t.Cleanup(serverB.TearDownFn)
+
+	kubeClientSetA, err := kubernetes.NewForConfig(serverA.ClientConfig)
+	require.NoError(t, err)
+	kubeClientSetB, err := kubernetes.NewForConfig(serverB.ClientConfig)
+	require.NoError(t, err)
+
+	// create jobs resource using serverA
+	job := createJobResource()
+	_, err = kubeClientSetA.BatchV1().Jobs("default").Create(context.Background(), job, metav1.CreateOptions{})
+	require.NoError(t, err)
+
+	// List jobs using ServerB (should be proxied to ServerA, hitting our dialer)
+	jobsB, err := kubeClientSetB.BatchV1().Jobs("default").List(context.Background(), metav1.ListOptions{})
+	require.NoError(t, err)
+	assert.NotEmpty(t, jobsB)
+	assert.Equal(t, job.Name, jobsB.Items[0].Name)
+
+	// Assert that our dialer was hit at least once
+	if atomic.LoadInt32(dialerHit) == 0 {
+		t.Errorf("expected egress dialer to be used, but it was not hit")
+	}
 }
 
 func createProxyCertContent() (kastesting.ProxyCA, error) {
@@ -239,4 +302,71 @@ func createJobResource() *v1.Job {
 			},
 		},
 	}
+}
+
+func runMockEgressProxy(t *testing.T) (*int32, string) {
+	t.Helper()
+	udsFile, err := os.CreateTemp("/tmp", "egress-*.sock")
+	require.NoError(t, err)
+	udsName := udsFile.Name()
+	_ = udsFile.Close()
+	_ = os.Remove(udsName) // Must remove so we can bind
+
+	listener, err := net.Listen("unix", udsName)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		_ = listener.Close()
+		_ = os.Remove(udsName)
+	})
+
+	dialerHit := new(int32)
+	proxy := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		atomic.AddInt32(dialerHit, 1)
+
+		// A standard HTTP CONNECT proxy proxies opaque TCP streams.
+		if req.Method == http.MethodConnect {
+			// Actively establish a TCP connection to the destination API server
+			destConn, err := net.DialTimeout("tcp", req.Host, 5*time.Second)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusServiceUnavailable)
+				return
+			}
+
+			// Acknowledge the connection stream has opened successfully
+			w.WriteHeader(http.StatusOK)
+
+			// 'Hijack' the underlying network connection away from Go's
+			// generic HTTP Server so we can use it as a raw TCP proxy socket.
+			hijacker, ok := w.(http.Hijacker)
+			if !ok {
+				http.Error(w, "Hijacking not supported", http.StatusInternalServerError)
+				return
+			}
+			clientConn, _, err := hijacker.Hijack()
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusServiceUnavailable)
+				return
+			}
+
+			// Spin up two concurrent forwarding pipes to pass traffic between
+			// the client and the destination over our UDS socket.
+			go func() {
+				_, _ = io.Copy(destConn, clientConn)
+				_ = destConn.Close()
+				_ = clientConn.Close()
+			}()
+			go func() {
+				_, _ = io.Copy(clientConn, destConn)
+				_ = destConn.Close()
+				_ = clientConn.Close()
+			}()
+		} else {
+			http.Error(w, "this is a proxy", http.StatusBadRequest)
+		}
+	}))
+	proxy.Listener = listener
+	proxy.Start()
+	t.Cleanup(proxy.Close)
+
+	return dialerHit, udsName
 }

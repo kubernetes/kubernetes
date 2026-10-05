@@ -16,11 +16,11 @@ package spec
 
 import (
 	"encoding/json"
+	"encoding/json/jsontext"
+	jsonv2 "encoding/json/v2"
 	"fmt"
 
-	"github.com/go-openapi/swag"
 	"k8s.io/kube-openapi/pkg/internal"
-	jsonv2 "k8s.io/kube-openapi/pkg/internal/third_party/go-json-experiment/json"
 )
 
 // Swagger this is the root document object for the API specification.
@@ -35,57 +35,35 @@ type Swagger struct {
 
 // MarshalJSON marshals this swagger structure to json
 func (s Swagger) MarshalJSON() ([]byte, error) {
-	if internal.UseOptimizedJSONMarshaling {
-		return internal.DeterministicMarshal(s)
-	}
-	b1, err := json.Marshal(s.SwaggerProps)
-	if err != nil {
-		return nil, err
-	}
-	b2, err := json.Marshal(s.VendorExtensible)
-	if err != nil {
-		return nil, err
-	}
-	return swag.ConcatJSON(b1, b2), nil
+	return internal.DeterministicMarshal(s)
 }
 
 // MarshalJSON marshals this swagger structure to json
-func (s Swagger) MarshalNextJSON(opts jsonv2.MarshalOptions, enc *jsonv2.Encoder) error {
+func (s Swagger) MarshalJSONTo(enc *jsontext.Encoder) error {
 	var x struct {
-		Extensions
+		Extensions Extensions `json:",embed"`
 		SwaggerProps
 	}
 	x.Extensions = internal.SanitizeExtensions(s.Extensions)
 	x.SwaggerProps = s.SwaggerProps
-	return opts.MarshalNext(enc, x)
+	return jsonv2.MarshalEncode(enc, x)
 }
 
 // UnmarshalJSON unmarshals a swagger spec from json
 func (s *Swagger) UnmarshalJSON(data []byte) error {
-	if internal.UseOptimizedJSONUnmarshaling {
-		return jsonv2.Unmarshal(data, s)
-	}
-	var sw Swagger
-	if err := json.Unmarshal(data, &sw.SwaggerProps); err != nil {
-		return err
-	}
-	if err := json.Unmarshal(data, &sw.VendorExtensible); err != nil {
-		return err
-	}
-	*s = sw
-	return nil
+	return jsonv2.Unmarshal(data, s)
 }
 
-func (s *Swagger) UnmarshalNextJSON(opts jsonv2.UnmarshalOptions, dec *jsonv2.Decoder) error {
+func (s *Swagger) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	// Note: If you're willing to make breaking changes, it is possible to
 	// optimize this and other usages of this pattern:
 	// https://github.com/kubernetes/kube-openapi/pull/319#discussion_r983165948
 	var x struct {
-		Extensions
+		Extensions Extensions `json:",embed"`
 		SwaggerProps
 	}
 
-	if err := opts.UnmarshalNext(dec, &x); err != nil {
+	if err := jsonv2.UnmarshalDecode(dec, &x); err != nil {
 		return err
 	}
 	s.Extensions = internal.SanitizeExtensions(x.Extensions)
@@ -132,63 +110,37 @@ var jsFalse = []byte("false")
 
 // MarshalJSON convert this object to JSON
 func (s SchemaOrBool) MarshalJSON() ([]byte, error) {
-	if internal.UseOptimizedJSONMarshaling {
-		return internal.DeterministicMarshal(s)
-	}
-	if s.Schema != nil {
-		return json.Marshal(s.Schema)
-	}
-
-	if s.Schema == nil && !s.Allows {
-		return jsFalse, nil
-	}
-	return jsTrue, nil
+	return internal.DeterministicMarshal(s)
 }
 
 // MarshalJSON convert this object to JSON
-func (s SchemaOrBool) MarshalNextJSON(opts jsonv2.MarshalOptions, enc *jsonv2.Encoder) error {
+func (s SchemaOrBool) MarshalJSONTo(enc *jsontext.Encoder) error {
 	if s.Schema != nil {
-		return opts.MarshalNext(enc, s.Schema)
+		return jsonv2.MarshalEncode(enc, s.Schema)
 	}
 
 	if s.Schema == nil && !s.Allows {
-		return enc.WriteToken(jsonv2.False)
+		return enc.WriteToken(jsontext.False)
 	}
-	return enc.WriteToken(jsonv2.True)
+	return enc.WriteToken(jsontext.True)
 }
 
 // UnmarshalJSON converts this bool or schema object from a JSON structure
 func (s *SchemaOrBool) UnmarshalJSON(data []byte) error {
-	if internal.UseOptimizedJSONUnmarshaling {
-		return jsonv2.Unmarshal(data, s)
-	}
-
-	var nw SchemaOrBool
-	if len(data) > 0 && data[0] == '{' {
-		var sch Schema
-		if err := json.Unmarshal(data, &sch); err != nil {
-			return err
-		}
-		nw.Schema = &sch
-		nw.Allows = true
-	} else {
-		json.Unmarshal(data, &nw.Allows)
-	}
-	*s = nw
-	return nil
+	return jsonv2.Unmarshal(data, s)
 }
 
-func (s *SchemaOrBool) UnmarshalNextJSON(opts jsonv2.UnmarshalOptions, dec *jsonv2.Decoder) error {
+func (s *SchemaOrBool) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	switch k := dec.PeekKind(); k {
 	case '{':
-		err := opts.UnmarshalNext(dec, &s.Schema)
+		err := jsonv2.UnmarshalDecode(dec, &s.Schema)
 		if err != nil {
 			return err
 		}
 		s.Allows = true
 		return nil
 	case 't', 'f':
-		err := opts.UnmarshalNext(dec, &s.Allows)
+		err := jsonv2.UnmarshalDecode(dec, &s.Allows)
 		if err != nil {
 			return err
 		}
@@ -206,62 +158,31 @@ type SchemaOrStringArray struct {
 
 // MarshalJSON converts this schema object or array into JSON structure
 func (s SchemaOrStringArray) MarshalJSON() ([]byte, error) {
-	if internal.UseOptimizedJSONMarshaling {
-		return internal.DeterministicMarshal(s)
-	}
-	if len(s.Property) > 0 {
-		return json.Marshal(s.Property)
-	}
-	if s.Schema != nil {
-		return json.Marshal(s.Schema)
-	}
-	return []byte("null"), nil
+	return internal.DeterministicMarshal(s)
 }
 
 // MarshalJSON converts this schema object or array into JSON structure
-func (s SchemaOrStringArray) MarshalNextJSON(opts jsonv2.MarshalOptions, enc *jsonv2.Encoder) error {
+func (s SchemaOrStringArray) MarshalJSONTo(enc *jsontext.Encoder) error {
 	if len(s.Property) > 0 {
-		return opts.MarshalNext(enc, s.Property)
+		return jsonv2.MarshalEncode(enc, s.Property)
 	}
 	if s.Schema != nil {
-		return opts.MarshalNext(enc, s.Schema)
+		return jsonv2.MarshalEncode(enc, s.Schema)
 	}
-	return enc.WriteToken(jsonv2.Null)
+	return enc.WriteToken(jsontext.Null)
 }
 
 // UnmarshalJSON converts this schema object or array from a JSON structure
 func (s *SchemaOrStringArray) UnmarshalJSON(data []byte) error {
-	if internal.UseOptimizedJSONUnmarshaling {
-		return jsonv2.Unmarshal(data, s)
-	}
-
-	var first byte
-	if len(data) > 1 {
-		first = data[0]
-	}
-	var nw SchemaOrStringArray
-	if first == '{' {
-		var sch Schema
-		if err := json.Unmarshal(data, &sch); err != nil {
-			return err
-		}
-		nw.Schema = &sch
-	}
-	if first == '[' {
-		if err := json.Unmarshal(data, &nw.Property); err != nil {
-			return err
-		}
-	}
-	*s = nw
-	return nil
+	return jsonv2.Unmarshal(data, s)
 }
 
-func (s *SchemaOrStringArray) UnmarshalNextJSON(opts jsonv2.UnmarshalOptions, dec *jsonv2.Decoder) error {
+func (s *SchemaOrStringArray) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	switch dec.PeekKind() {
 	case '{':
-		return opts.UnmarshalNext(dec, &s.Schema)
+		return jsonv2.UnmarshalDecode(dec, &s.Schema)
 	case '[':
-		return opts.UnmarshalNext(dec, &s.Property)
+		return jsonv2.UnmarshalDecode(dec, &s.Property)
 	default:
 		_, err := dec.ReadValue()
 		return err
@@ -298,48 +219,17 @@ func (s StringOrArray) Contains(value string) bool {
 
 // UnmarshalJSON unmarshals this string or array object from a JSON array or JSON string
 func (s *StringOrArray) UnmarshalJSON(data []byte) error {
-	if internal.UseOptimizedJSONUnmarshaling {
-		return jsonv2.Unmarshal(data, s)
-	}
-
-	var first byte
-	if len(data) > 1 {
-		first = data[0]
-	}
-
-	if first == '[' {
-		var parsed []string
-		if err := json.Unmarshal(data, &parsed); err != nil {
-			return err
-		}
-		*s = StringOrArray(parsed)
-		return nil
-	}
-
-	var single interface{}
-	if err := json.Unmarshal(data, &single); err != nil {
-		return err
-	}
-	if single == nil {
-		return nil
-	}
-	switch v := single.(type) {
-	case string:
-		*s = StringOrArray([]string{v})
-		return nil
-	default:
-		return fmt.Errorf("only string or array is allowed, not %T", single)
-	}
+	return jsonv2.Unmarshal(data, s)
 }
 
-func (s *StringOrArray) UnmarshalNextJSON(opts jsonv2.UnmarshalOptions, dec *jsonv2.Decoder) error {
+func (s *StringOrArray) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	switch k := dec.PeekKind(); k {
 	case '[':
 		*s = StringOrArray{}
-		return opts.UnmarshalNext(dec, (*[]string)(s))
+		return jsonv2.UnmarshalDecode(dec, (*[]string)(s))
 	case '"':
 		*s = StringOrArray{""}
-		return opts.UnmarshalNext(dec, &(*s)[0])
+		return jsonv2.UnmarshalDecode(dec, &(*s)[0])
 	case 'n':
 		// Throw out null token
 		_, _ = dec.ReadToken()
@@ -382,56 +272,28 @@ func (s *SchemaOrArray) ContainsType(name string) bool {
 
 // MarshalJSON converts this schema object or array into JSON structure
 func (s SchemaOrArray) MarshalJSON() ([]byte, error) {
-	if internal.UseOptimizedJSONMarshaling {
-		return internal.DeterministicMarshal(s)
-	}
-	if s.Schemas != nil {
-		return json.Marshal(s.Schemas)
-	}
-	return json.Marshal(s.Schema)
+	return internal.DeterministicMarshal(s)
 }
 
 // MarshalJSON converts this schema object or array into JSON structure
-func (s SchemaOrArray) MarshalNextJSON(opts jsonv2.MarshalOptions, enc *jsonv2.Encoder) error {
+func (s SchemaOrArray) MarshalJSONTo(enc *jsontext.Encoder) error {
 	if s.Schemas != nil {
-		return opts.MarshalNext(enc, s.Schemas)
+		return jsonv2.MarshalEncode(enc, s.Schemas)
 	}
-	return opts.MarshalNext(enc, s.Schema)
+	return jsonv2.MarshalEncode(enc, s.Schema)
 }
 
 // UnmarshalJSON converts this schema object or array from a JSON structure
 func (s *SchemaOrArray) UnmarshalJSON(data []byte) error {
-	if internal.UseOptimizedJSONUnmarshaling {
-		return jsonv2.Unmarshal(data, s)
-	}
-
-	var nw SchemaOrArray
-	var first byte
-	if len(data) > 1 {
-		first = data[0]
-	}
-	if first == '{' {
-		var sch Schema
-		if err := json.Unmarshal(data, &sch); err != nil {
-			return err
-		}
-		nw.Schema = &sch
-	}
-	if first == '[' {
-		if err := json.Unmarshal(data, &nw.Schemas); err != nil {
-			return err
-		}
-	}
-	*s = nw
-	return nil
+	return jsonv2.Unmarshal(data, s)
 }
 
-func (s *SchemaOrArray) UnmarshalNextJSON(opts jsonv2.UnmarshalOptions, dec *jsonv2.Decoder) error {
+func (s *SchemaOrArray) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	switch dec.PeekKind() {
 	case '{':
-		return opts.UnmarshalNext(dec, &s.Schema)
+		return jsonv2.UnmarshalDecode(dec, &s.Schema)
 	case '[':
-		return opts.UnmarshalNext(dec, &s.Schemas)
+		return jsonv2.UnmarshalDecode(dec, &s.Schemas)
 	default:
 		_, err := dec.ReadValue()
 		return err

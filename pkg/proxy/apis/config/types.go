@@ -217,12 +217,19 @@ type KubeProxyConfiguration struct {
 	// detectLocal contains optional configuration settings related to DetectLocalMode.
 	DetectLocal DetectLocalConfiguration
 
-	// nodePortAddresses is a list of CIDR ranges that contain valid node IPs, or
-	// alternatively, the single string 'primary'. If set to a list of CIDRs,
-	// connections to NodePort services will only be accepted on node IPs in one of
-	// the indicated ranges. If set to 'primary', NodePort services will only be
-	// accepted on the node's primary IPv4 and/or IPv6 address according to the Node
-	// object. If unset, NodePort connections will be accepted on all local IPs.
+	// nodePortAddresses is a list of CIDR ranges and/or keywords that expand to CIDR
+	// ranges. NodePort services are only accessible on node IPs covered by the list.
+	// Supported keywords: 'primary' (the Node object's primary IPv4 and/or IPv6
+	// addresses), 'localhost' (127.0.0.0/8 and ::1/128), and 'all' (0.0.0.0/0 and ::/0).
+	// Any combination of valid keywords and CIDRs may be included in the list.
+	//
+	// Serving NodePorts on loopback IPs is only supported in iptables mode (IPv4
+	// only, see iptables.localhostNodePorts), and, only for TCP, in nftables mode when
+	// the KubeProxyNFTablesLocalhostNodePorts feature gate is enabled and the list
+	// explicitly includes loopback (e.g. 'localhost').
+	//
+	// If unset, this defaults to 'all' in iptables and ipvs mode, and to 'primary' in
+	// nftables mode.
 	NodePortAddresses []string
 
 	// syncPeriod is an interval (e.g. '5s', '1m', '2h22m') indicating how frequently
@@ -299,6 +306,13 @@ func (m *LocalMode) Type() string {
 	return "LocalMode"
 }
 
-// NodePortAddressesPrimary is a special value for NodePortAddresses indicating that it
-// should only use the primary node IPs.
-const NodePortAddressesPrimary string = "primary"
+// NodePortAddresses keywords are symbolic values for NodePortAddresses that are
+// resolved to concrete CIDRs. They may be combined with each other and with literal CIDRs.
+const (
+	// NodePortAddressesPrimary resolves to the primary IPs of the node's IP families.
+	NodePortAddressesPrimary string = "primary"
+	// NodePortAddressesLocalhost resolves to the loopback CIDRs.
+	NodePortAddressesLocalhost string = "localhost"
+	// NodePortAddressesAll resolves to the zero CIDRs.
+	NodePortAddressesAll string = "all"
+)

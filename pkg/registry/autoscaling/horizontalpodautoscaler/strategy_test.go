@@ -22,6 +22,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
@@ -41,6 +42,51 @@ const (
 	oneMinReplicas                      = false
 )
 
+func TestPrepareForGeneration(t *testing.T) {
+	testCases := []struct {
+		name                       string
+		featureGateEnabled         bool
+		expectedGenerationOnCreate int64
+		expectedGenerationOnUpdate int64
+	}{
+		{
+			name:                       "With HPAGeneration enabled",
+			featureGateEnabled:         true,
+			expectedGenerationOnCreate: 1,
+			expectedGenerationOnUpdate: 2,
+		},
+		{
+			name:                       "With HPAGeneration disabled",
+			featureGateEnabled:         false,
+			expectedGenerationOnCreate: 0,
+			expectedGenerationOnUpdate: 0,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.37"))
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HPAGeneration, tc.featureGateEnabled)
+
+			hpa := prepareHPA(oneMinReplicas, withTolerance)
+			Strategy.PrepareForCreate(context.Background(), &hpa)
+
+			if hpa.Generation != tc.expectedGenerationOnCreate {
+				t.Error("Expected generation to be ", tc.expectedGenerationOnCreate, ", got ", hpa.Generation)
+			}
+
+			// Create an updated HPA with a different spec
+			hpaUpdated := hpa.DeepCopy() // prepareHPA(zeroMinReplicas, withoutTolerance)
+			hpaUpdated.Spec.MaxReplicas = 100
+			Strategy.PrepareForUpdate(context.Background(), hpaUpdated, &hpa)
+
+			if hpaUpdated.Generation != tc.expectedGenerationOnUpdate {
+				t.Error("Expected generation to be ", tc.expectedGenerationOnUpdate, ", got ", hpaUpdated.Generation)
+			}
+		})
+	}
+}
+
 func TestPrepareForCreateConfigurableToleranceEnabled(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HPAConfigurableTolerance, true)
 	hpa := prepareHPA(oneMinReplicas, withTolerance)
@@ -52,6 +98,8 @@ func TestPrepareForCreateConfigurableToleranceEnabled(t *testing.T) {
 }
 
 func TestPrepareForCreateConfigurableToleranceDisabled(t *testing.T) {
+	// Set emulated version to 1.36 so that disabling the feature gate is allowed.
+	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.36"))
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HPAConfigurableTolerance, false)
 	hpa := prepareHPA(oneMinReplicas, withTolerance)
 
@@ -73,6 +121,8 @@ func TestPrepareForUpdateConfigurableToleranceEnabled(t *testing.T) {
 }
 
 func TestPrepareForUpdateConfigurableToleranceDisabled(t *testing.T) {
+	// Set emulated version to 1.36 so that disabling the feature gate is allowed.
+	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.36"))
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HPAConfigurableTolerance, false)
 	newHPA := prepareHPA(oneMinReplicas, withTolerance)
 	oldHPA := prepareHPA(oneMinReplicas, withoutTolerance)
@@ -175,7 +225,7 @@ func TestValidationOptionsForHorizontalPodAutoscaler(t *testing.T) {
 			scaleToZeroEnabled:     false,
 			expectMinReplicasLower: 1,
 			expectScaleTargetRefValidationOpts: validation.CrossVersionObjectReferenceValidationOptions{
-				AllowInvalidAPIVersion: false, AllowEmptyAPIGroup: false,
+				AllowInvalidAPIVersion: false, AllowEmptyAPIGroup: false, RequiredCoveredByDeclarative: true,
 			},
 			expectMetricsValidationOpts: validation.CrossVersionObjectReferenceValidationOptions{
 				AllowInvalidAPIVersion: false, AllowEmptyAPIGroup: true,
@@ -188,7 +238,7 @@ func TestValidationOptionsForHorizontalPodAutoscaler(t *testing.T) {
 			scaleToZeroEnabled:     false,
 			expectMinReplicasLower: 1,
 			expectScaleTargetRefValidationOpts: validation.CrossVersionObjectReferenceValidationOptions{
-				AllowInvalidAPIVersion: true, AllowEmptyAPIGroup: false,
+				AllowInvalidAPIVersion: true, AllowEmptyAPIGroup: false, RequiredCoveredByDeclarative: true,
 			},
 			expectMetricsValidationOpts: validation.CrossVersionObjectReferenceValidationOptions{
 				AllowInvalidAPIVersion: false, AllowEmptyAPIGroup: true,
@@ -201,7 +251,7 @@ func TestValidationOptionsForHorizontalPodAutoscaler(t *testing.T) {
 			scaleToZeroEnabled:     false,
 			expectMinReplicasLower: 0,
 			expectScaleTargetRefValidationOpts: validation.CrossVersionObjectReferenceValidationOptions{
-				AllowInvalidAPIVersion: true, AllowEmptyAPIGroup: false,
+				AllowInvalidAPIVersion: true, AllowEmptyAPIGroup: false, RequiredCoveredByDeclarative: true,
 			},
 			expectMetricsValidationOpts: validation.CrossVersionObjectReferenceValidationOptions{
 				AllowInvalidAPIVersion: false, AllowEmptyAPIGroup: true,
@@ -214,7 +264,7 @@ func TestValidationOptionsForHorizontalPodAutoscaler(t *testing.T) {
 			scaleToZeroEnabled:     true,
 			expectMinReplicasLower: 0,
 			expectScaleTargetRefValidationOpts: validation.CrossVersionObjectReferenceValidationOptions{
-				AllowInvalidAPIVersion: false, AllowEmptyAPIGroup: false,
+				AllowInvalidAPIVersion: false, AllowEmptyAPIGroup: false, RequiredCoveredByDeclarative: true,
 			},
 			expectMetricsValidationOpts: validation.CrossVersionObjectReferenceValidationOptions{
 				AllowInvalidAPIVersion: false, AllowEmptyAPIGroup: true,
@@ -228,7 +278,7 @@ func TestValidationOptionsForHorizontalPodAutoscaler(t *testing.T) {
 			scaleToZeroEnabled:     false,
 			expectMinReplicasLower: 1,
 			expectScaleTargetRefValidationOpts: validation.CrossVersionObjectReferenceValidationOptions{
-				AllowInvalidAPIVersion: false, AllowEmptyAPIGroup: true,
+				AllowInvalidAPIVersion: false, AllowEmptyAPIGroup: true, RequiredCoveredByDeclarative: true,
 			},
 			expectMetricsValidationOpts: validation.CrossVersionObjectReferenceValidationOptions{
 				AllowInvalidAPIVersion: false, AllowEmptyAPIGroup: true,
@@ -241,7 +291,7 @@ func TestValidationOptionsForHorizontalPodAutoscaler(t *testing.T) {
 			scaleToZeroEnabled:     false,
 			expectMinReplicasLower: 1,
 			expectScaleTargetRefValidationOpts: validation.CrossVersionObjectReferenceValidationOptions{
-				AllowInvalidAPIVersion: false, AllowEmptyAPIGroup: false,
+				AllowInvalidAPIVersion: false, AllowEmptyAPIGroup: false, RequiredCoveredByDeclarative: true,
 			},
 			expectMetricsValidationOpts: validation.CrossVersionObjectReferenceValidationOptions{
 				AllowInvalidAPIVersion: false, AllowEmptyAPIGroup: true,
@@ -254,7 +304,7 @@ func TestValidationOptionsForHorizontalPodAutoscaler(t *testing.T) {
 			scaleToZeroEnabled:     false,
 			expectMinReplicasLower: 1,
 			expectScaleTargetRefValidationOpts: validation.CrossVersionObjectReferenceValidationOptions{
-				AllowInvalidAPIVersion: true, AllowEmptyAPIGroup: false,
+				AllowInvalidAPIVersion: true, AllowEmptyAPIGroup: false, RequiredCoveredByDeclarative: true,
 			},
 			expectMetricsValidationOpts: validation.CrossVersionObjectReferenceValidationOptions{
 				AllowInvalidAPIVersion: false, AllowEmptyAPIGroup: true,
@@ -267,7 +317,7 @@ func TestValidationOptionsForHorizontalPodAutoscaler(t *testing.T) {
 			scaleToZeroEnabled:     false,
 			expectMinReplicasLower: 1,
 			expectScaleTargetRefValidationOpts: validation.CrossVersionObjectReferenceValidationOptions{
-				AllowInvalidAPIVersion: false, AllowEmptyAPIGroup: true,
+				AllowInvalidAPIVersion: false, AllowEmptyAPIGroup: true, RequiredCoveredByDeclarative: true,
 			},
 			expectMetricsValidationOpts: validation.CrossVersionObjectReferenceValidationOptions{
 				AllowInvalidAPIVersion: false, AllowEmptyAPIGroup: true,
@@ -280,7 +330,7 @@ func TestValidationOptionsForHorizontalPodAutoscaler(t *testing.T) {
 			scaleToZeroEnabled:     false,
 			expectMinReplicasLower: 1,
 			expectScaleTargetRefValidationOpts: validation.CrossVersionObjectReferenceValidationOptions{
-				AllowInvalidAPIVersion: false, AllowEmptyAPIGroup: false,
+				AllowInvalidAPIVersion: false, AllowEmptyAPIGroup: false, RequiredCoveredByDeclarative: true,
 			},
 			expectMetricsValidationOpts: validation.CrossVersionObjectReferenceValidationOptions{
 				AllowInvalidAPIVersion: false, AllowEmptyAPIGroup: true,
@@ -294,7 +344,7 @@ func TestValidationOptionsForHorizontalPodAutoscaler(t *testing.T) {
 			scaleToZeroEnabled:     false,
 			expectMinReplicasLower: 1,
 			expectScaleTargetRefValidationOpts: validation.CrossVersionObjectReferenceValidationOptions{
-				AllowInvalidAPIVersion: false, AllowEmptyAPIGroup: false,
+				AllowInvalidAPIVersion: false, AllowEmptyAPIGroup: false, RequiredCoveredByDeclarative: true,
 			},
 			expectMetricsValidationOpts: validation.CrossVersionObjectReferenceValidationOptions{
 				AllowInvalidAPIVersion: false, AllowEmptyAPIGroup: true,
@@ -307,7 +357,7 @@ func TestValidationOptionsForHorizontalPodAutoscaler(t *testing.T) {
 			scaleToZeroEnabled:     false,
 			expectMinReplicasLower: 1,
 			expectScaleTargetRefValidationOpts: validation.CrossVersionObjectReferenceValidationOptions{
-				AllowInvalidAPIVersion: false, AllowEmptyAPIGroup: false,
+				AllowInvalidAPIVersion: false, AllowEmptyAPIGroup: false, RequiredCoveredByDeclarative: true,
 			},
 			expectMetricsValidationOpts: validation.CrossVersionObjectReferenceValidationOptions{
 				AllowInvalidAPIVersion: false, AllowEmptyAPIGroup: true,
@@ -320,7 +370,7 @@ func TestValidationOptionsForHorizontalPodAutoscaler(t *testing.T) {
 			scaleToZeroEnabled:     false,
 			expectMinReplicasLower: 1,
 			expectScaleTargetRefValidationOpts: validation.CrossVersionObjectReferenceValidationOptions{
-				AllowInvalidAPIVersion: false, AllowEmptyAPIGroup: false,
+				AllowInvalidAPIVersion: false, AllowEmptyAPIGroup: false, RequiredCoveredByDeclarative: true,
 			},
 			expectMetricsValidationOpts: validation.CrossVersionObjectReferenceValidationOptions{
 				AllowInvalidAPIVersion: false, AllowEmptyAPIGroup: true,
@@ -333,7 +383,7 @@ func TestValidationOptionsForHorizontalPodAutoscaler(t *testing.T) {
 			scaleToZeroEnabled:     false,
 			expectMinReplicasLower: 1,
 			expectScaleTargetRefValidationOpts: validation.CrossVersionObjectReferenceValidationOptions{
-				AllowInvalidAPIVersion: true, AllowEmptyAPIGroup: false,
+				AllowInvalidAPIVersion: true, AllowEmptyAPIGroup: false, RequiredCoveredByDeclarative: true,
 			},
 			expectMetricsValidationOpts: validation.CrossVersionObjectReferenceValidationOptions{
 				AllowInvalidAPIVersion: true, AllowEmptyAPIGroup: true,
@@ -346,7 +396,7 @@ func TestValidationOptionsForHorizontalPodAutoscaler(t *testing.T) {
 			scaleToZeroEnabled:     false,
 			expectMinReplicasLower: 1,
 			expectScaleTargetRefValidationOpts: validation.CrossVersionObjectReferenceValidationOptions{
-				AllowInvalidAPIVersion: false, AllowEmptyAPIGroup: false,
+				AllowInvalidAPIVersion: false, AllowEmptyAPIGroup: false, RequiredCoveredByDeclarative: true,
 			},
 			expectMetricsValidationOpts: validation.CrossVersionObjectReferenceValidationOptions{
 				AllowInvalidAPIVersion: false, AllowEmptyAPIGroup: true,
@@ -362,7 +412,7 @@ func TestValidationOptionsForHorizontalPodAutoscaler(t *testing.T) {
 			scaleToZeroEnabled:     false,
 			expectMinReplicasLower: 1,
 			expectScaleTargetRefValidationOpts: validation.CrossVersionObjectReferenceValidationOptions{
-				AllowInvalidAPIVersion: false, AllowEmptyAPIGroup: false,
+				AllowInvalidAPIVersion: false, AllowEmptyAPIGroup: false, RequiredCoveredByDeclarative: true,
 			},
 			expectMetricsValidationOpts: validation.CrossVersionObjectReferenceValidationOptions{
 				AllowInvalidAPIVersion: false, AllowEmptyAPIGroup: true,

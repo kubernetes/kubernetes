@@ -1210,6 +1210,13 @@ func (m *headerMatcher) inspect(t *testing.T, w http.ResponseWriter, ctx context
 				return
 			default:
 			}
+
+			// The timeout filter may have already committed the response
+			// before APF had a chance to attach its headers.
+			if ctx.Err() != nil {
+				t.Logf("Skipping APF header assertion for %s: response committed after timeout", key)
+				return
+			}
 		}
 
 		t.Errorf("expected HTTP header %s to have value %q, but got: %q", key, expected, actual)

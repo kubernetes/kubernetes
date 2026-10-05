@@ -1,7 +1,7 @@
 // Copyright The OpenTelemetry Authors
 // SPDX-License-Identifier: Apache-2.0
 
-package metric // import "go.opentelemetry.io/otel/metric"
+package metric
 
 import (
 	"context"
@@ -24,12 +24,18 @@ type Float64Counter interface {
 	//
 	// Use the WithAttributeSet (or, if performance is not a concern,
 	// the WithAttributes) option to include measurement attributes.
+	//
+	// Implementations of this method need to be safe for a user to call
+	// concurrently.
 	Add(ctx context.Context, incr float64, options ...AddOption)
 
 	// Enabled reports whether the instrument will process measurements for the given context.
 	//
 	// This function can be used in places where measuring an instrument
 	// would result in computationally expensive operations.
+	//
+	// Implementations of this method need to be safe for a user to call
+	// concurrently.
 	Enabled(context.Context) bool
 }
 
@@ -45,6 +51,9 @@ type Float64CounterConfig struct {
 func NewFloat64CounterConfig(opts ...Float64CounterOption) Float64CounterConfig {
 	var config Float64CounterConfig
 	for _, o := range opts {
+		if _, ok := o.(experimentalOption); ok {
+			continue
+		}
 		config = o.applyFloat64Counter(config)
 	}
 	return config
@@ -83,12 +92,18 @@ type Float64UpDownCounter interface {
 	//
 	// Use the WithAttributeSet (or, if performance is not a concern,
 	// the WithAttributes) option to include measurement attributes.
+	//
+	// Implementations of this method need to be safe for a user to call
+	// concurrently.
 	Add(ctx context.Context, incr float64, options ...AddOption)
 
 	// Enabled reports whether the instrument will process measurements for the given context.
 	//
 	// This function can be used in places where measuring an instrument
 	// would result in computationally expensive operations.
+	//
+	// Implementations of this method need to be safe for a user to call
+	// concurrently.
 	Enabled(context.Context) bool
 }
 
@@ -104,6 +119,9 @@ type Float64UpDownCounterConfig struct {
 func NewFloat64UpDownCounterConfig(opts ...Float64UpDownCounterOption) Float64UpDownCounterConfig {
 	var config Float64UpDownCounterConfig
 	for _, o := range opts {
+		if _, ok := o.(experimentalOption); ok {
+			continue
+		}
 		config = o.applyFloat64UpDownCounter(config)
 	}
 	return config
@@ -140,14 +158,22 @@ type Float64Histogram interface {
 
 	// Record adds an additional value to the distribution.
 	//
+	// The incr value is expected to be non-negative.
+	//
 	// Use the WithAttributeSet (or, if performance is not a concern,
 	// the WithAttributes) option to include measurement attributes.
+	//
+	// Implementations of this method need to be safe for a user to call
+	// concurrently.
 	Record(ctx context.Context, incr float64, options ...RecordOption)
 
 	// Enabled reports whether the instrument will process measurements for the given context.
 	//
 	// This function can be used in places where measuring an instrument
 	// would result in computationally expensive operations.
+	//
+	// Implementations of this method need to be safe for a user to call
+	// concurrently.
 	Enabled(context.Context) bool
 }
 
@@ -164,6 +190,9 @@ type Float64HistogramConfig struct {
 func NewFloat64HistogramConfig(opts ...Float64HistogramOption) Float64HistogramConfig {
 	var config Float64HistogramConfig
 	for _, o := range opts {
+		if _, ok := o.(experimentalOption); ok {
+			continue
+		}
 		config = o.applyFloat64Histogram(config)
 	}
 	return config
@@ -206,12 +235,18 @@ type Float64Gauge interface {
 	//
 	// Use the WithAttributeSet (or, if performance is not a concern,
 	// the WithAttributes) option to include measurement attributes.
+	//
+	// Implementations of this method need to be safe for a user to call
+	// concurrently.
 	Record(ctx context.Context, value float64, options ...RecordOption)
 
 	// Enabled reports whether the instrument will process measurements for the given context.
 	//
 	// This function can be used in places where measuring an instrument
 	// would result in computationally expensive operations.
+	//
+	// Implementations of this method need to be safe for a user to call
+	// concurrently.
 	Enabled(context.Context) bool
 }
 
@@ -227,6 +262,9 @@ type Float64GaugeConfig struct {
 func NewFloat64GaugeConfig(opts ...Float64GaugeOption) Float64GaugeConfig {
 	var config Float64GaugeConfig
 	for _, o := range opts {
+		if _, ok := o.(experimentalOption); ok {
+			continue
+		}
 		config = o.applyFloat64Gauge(config)
 	}
 	return config

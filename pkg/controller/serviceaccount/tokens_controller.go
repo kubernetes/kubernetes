@@ -71,7 +71,8 @@ type TokensControllerOptions struct {
 }
 
 // NewTokensController returns a new *TokensController.
-func NewTokensController(logger klog.Logger, serviceAccounts informers.ServiceAccountInformer, secrets informers.SecretInformer, cl clientset.Interface, options TokensControllerOptions) (*TokensController, error) {
+func NewTokensController(ctx context.Context, serviceAccounts informers.ServiceAccountInformer, secrets informers.SecretInformer, cl clientset.Interface, options TokensControllerOptions) (*TokensController, error) {
+	logger := klog.FromContext(ctx)
 	maxRetries := options.MaxRetries
 	if maxRetries == 0 {
 		maxRetries = 10
@@ -84,11 +85,17 @@ func NewTokensController(logger klog.Logger, serviceAccounts informers.ServiceAc
 
 		syncServiceAccountQueue: workqueue.NewTypedRateLimitingQueueWithConfig(
 			workqueue.DefaultTypedControllerRateLimiter[serviceAccountQueueKey](),
-			workqueue.TypedRateLimitingQueueConfig[serviceAccountQueueKey]{Name: "serviceaccount_tokens_service"},
+			workqueue.TypedRateLimitingQueueConfig[serviceAccountQueueKey]{
+				Logger: &logger,
+				Name:   "serviceaccount_tokens_service",
+			},
 		),
 		syncSecretQueue: workqueue.NewTypedRateLimitingQueueWithConfig(
 			workqueue.DefaultTypedControllerRateLimiter[secretQueueKey](),
-			workqueue.TypedRateLimitingQueueConfig[secretQueueKey]{Name: "serviceaccount_tokens_service"},
+			workqueue.TypedRateLimitingQueueConfig[secretQueueKey]{
+				Logger: &logger,
+				Name:   "serviceaccount_tokens_service",
+			},
 		),
 
 		maxRetries: maxRetries,
@@ -96,13 +103,16 @@ func NewTokensController(logger klog.Logger, serviceAccounts informers.ServiceAc
 
 	e.serviceAccounts = serviceAccounts.Lister()
 	e.serviceAccountSynced = serviceAccounts.Informer().HasSynced
-	serviceAccounts.Informer().AddEventHandlerWithResyncPeriod(
+	_, _ = serviceAccounts.Informer().AddEventHandlerWithOptions(
 		cache.ResourceEventHandlerFuncs{
 			AddFunc:    e.queueServiceAccountSync,
 			UpdateFunc: e.queueServiceAccountUpdateSync,
 			DeleteFunc: e.queueServiceAccountSync,
 		},
-		options.ServiceAccountResync,
+		cache.HandlerOptions{
+			Logger:       &logger,
+			ResyncPeriod: &options.ServiceAccountResync,
+		},
 	)
 
 	e.secrets = secrets.Lister()
@@ -323,7 +333,7 @@ func (e *TokensController) syncSecret(ctx context.Context) {
 			}
 		default:
 			// Update token if needed
-			if retriable, err := e.generateTokenIfNeeded(ctx, logger, sa, secret); err != nil {
+			if retriable, err := e.generateTokenIfNeeded(ctx, sa, secret); err != nil {
 				logger.Error(err, "Populating serviceaccount token", "secret", klog.KRef(secretInfo.namespace, secretInfo.name), "serviceAccount", klog.KRef(secretInfo.namespace, secretInfo.saName))
 				retry = retriable
 			}
@@ -379,7 +389,7 @@ func (e *TokensController) secretUpdateNeeded(secret *v1.Secret) (bool, bool, bo
 }
 
 // generateTokenIfNeeded populates the token data for the given Secret if not already set
-func (e *TokensController) generateTokenIfNeeded(ctx context.Context, logger klog.Logger, serviceAccount *v1.ServiceAccount, cachedSecret *v1.Secret) ( /* retry */ bool, error) {
+func (e *TokensController) generateTokenIfNeeded(ctx context.Context, serviceAccount *v1.ServiceAccount, cachedSecret *v1.Secret) ( /* retry */ bool, error) {
 	// Check the cached secret to see if changes are needed
 	if needsCA, needsNamespace, needsToken := e.secretUpdateNeeded(cachedSecret); !needsCA && !needsToken && !needsNamespace {
 		return false, nil
@@ -396,7 +406,7 @@ func (e *TokensController) generateTokenIfNeeded(ctx context.Context, logger klo
 	if liveSecret.ResourceVersion != cachedSecret.ResourceVersion {
 		// our view of the secret is not up to date
 		// we'll get notified of an update event later and get to try again
-		logger.V(2).Info("Secret is not up to date, skipping token population", "secret", klog.KRef(liveSecret.Namespace, liveSecret.Name))
+		klog.FromContext(ctx).V(2).Info("Secret is not up to date, skipping token population", "secret", klog.KRef(liveSecret.Namespace, liveSecret.Name))
 		return false, nil
 	}
 

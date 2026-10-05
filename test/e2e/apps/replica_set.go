@@ -46,7 +46,6 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2ereplicaset "k8s.io/kubernetes/test/e2e/framework/replicaset"
-	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 
@@ -115,9 +114,7 @@ var _ = SIGDescribe("ReplicaSet", func() {
 		testReplicaSetServeImageOrFail(ctx, f, "basic", imageutils.GetE2EImage(imageutils.Agnhost))
 	})
 
-	ginkgo.It("should serve a basic image on each replica with a private image", func(ctx context.Context) {
-		// requires private images
-		e2eskipper.SkipUnlessProviderIs("gce")
+	f.It("should serve a basic image on each replica with a private image", f.WithProvider("gce") /* requires private images */, func(ctx context.Context) {
 		privateimage := imageutils.GetConfig(imageutils.AgnhostPrivate)
 		testReplicaSetServeImageOrFail(ctx, f, "private", privateimage.GetE2EImage())
 	})
@@ -415,11 +412,11 @@ func testRSScaleSubresources(ctx context.Context, f *framework.Framework) {
 	replicas := int32(1)
 	ginkgo.By(fmt.Sprintf("Creating replica set %q that asks for more than the allowed pod quota", rsName))
 	rs := newRS(rsName, replicas, rsPodLabels, AgnhostImageName, AgnhostImage, nil)
-	_, err := c.AppsV1().ReplicaSets(ns).Create(ctx, rs, metav1.CreateOptions{})
+	createdRS, err := c.AppsV1().ReplicaSets(ns).Create(ctx, rs, metav1.CreateOptions{})
 	framework.ExpectNoError(err)
 
 	// Verify that the required pods have come up.
-	err = e2epod.VerifyPodsRunning(ctx, c, ns, podName, labels.SelectorFromSet(map[string]string{"name": podName}), false, replicas)
+	err = e2ereplicaset.WaitForReplicaSetTargetAvailableReplicas(ctx, c, createdRS, replicas)
 	framework.ExpectNoError(err, "error in waiting for pods to come up: %s", err)
 
 	ginkgo.By("getting scale subresource")

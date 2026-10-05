@@ -34,14 +34,17 @@ import (
 // TokenReview attempts to authenticate a token to a known user.
 // Note: TokenReview requests may be cached by the webhook token authenticator
 // plugin in the kube-apiserver.
+// +k8s:supportsSubresource="/status"
 type TokenReview struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 	// metadata is the standard object's metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
+	// +k8s:opaqueType
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// spec holds information about the request being evaluated
+	// +required
 	Spec TokenReviewSpec `json:"spec" protobuf:"bytes,2,opt,name=spec"`
 
 	// status is filled in by the server and indicates whether the token can be authenticated.
@@ -52,7 +55,7 @@ type TokenReview struct {
 // TokenReviewSpec is a description of the token authentication request.
 type TokenReviewSpec struct {
 	// token is the opaque bearer token.
-	// +optional
+	// +required
 	Token string `json:"token,omitempty" protobuf:"bytes,1,opt,name=token"`
 	// audiences is a list of the identifiers that the resource server presented
 	// with the token identifies as. Audience-aware token authenticators will
@@ -127,13 +130,16 @@ func (t ExtraValue) String() string {
 // SelfSubjectReview contains the user information that the kube-apiserver has about the user making this request.
 // When using impersonation, users will receive the user info of the user being impersonated.  If impersonation or
 // request header authentication is used, any extra keys will have their case ignored and returned as lowercase.
+// +k8s:supportsSubresource="/status"
 type SelfSubjectReview struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 	// metadata is the standard object's metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
+	// +k8s:opaqueType
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 	// status is filled in by the server with the user attributes.
+	// +optional
 	Status SelfSubjectReviewStatus `json:"status,omitempty" protobuf:"bytes,2,opt,name=status"`
 }
 

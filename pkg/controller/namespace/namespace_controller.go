@@ -71,20 +71,22 @@ func NewNamespaceController(
 	namespaceInformer coreinformers.NamespaceInformer,
 	resyncPeriod time.Duration,
 	finalizerToken v1.FinalizerName) *NamespaceController {
+	logger := klog.FromContext(ctx)
 
 	// create the controller so we can inject the enqueue function
 	namespaceController := &NamespaceController{
 		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
 			nsControllerRateLimiter(),
 			workqueue.TypedRateLimitingQueueConfig[string]{
-				Name: "namespace",
+				Logger: &logger,
+				Name:   "namespace",
 			},
 		),
 		namespacedResourcesDeleter: deletion.NewNamespacedResourcesDeleter(ctx, kubeClient.CoreV1().Namespaces(), metadataClient, kubeClient.CoreV1(), discoverResourcesFn, finalizerToken),
 	}
 
 	// configure the namespace informer event handlers
-	namespaceInformer.Informer().AddEventHandlerWithResyncPeriod(
+	_, _ = namespaceInformer.Informer().AddEventHandlerWithOptions(
 		cache.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
 				namespace := obj.(*v1.Namespace)
@@ -95,7 +97,7 @@ func NewNamespaceController(
 				namespaceController.enqueueNamespace(ctx, namespace)
 			},
 		},
-		resyncPeriod,
+		cache.HandlerOptions{Logger: &logger, ResyncPeriod: &resyncPeriod},
 	)
 	namespaceController.lister = namespaceInformer.Lister()
 	namespaceController.listerSynced = namespaceInformer.Informer().HasSynced

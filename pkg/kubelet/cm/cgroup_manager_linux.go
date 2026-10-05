@@ -42,6 +42,8 @@ const (
 	systemdSuffix string = ".slice"
 	// Cgroup2MemoryMin is memory.min for cgroup v2
 	Cgroup2MemoryMin string = "memory.min"
+	// Cgroup2MemoryLow is memory.low for cgroup v2
+	Cgroup2MemoryLow string = "memory.low"
 	// Cgroup2MemoryHigh is memory.high for cgroup v2
 	Cgroup2MemoryHigh      string = "memory.high"
 	Cgroup2MaxCpuLimit     string = "max"
@@ -145,6 +147,16 @@ type cgroupCommon struct {
 
 	// useSystemd tells if systemd cgroup manager should be used.
 	useSystemd bool
+
+	// isCgroup2UnifiedModeOverride is used to override the default behavior of isCgroup2UnifiedMode() for testing purposes.
+	isCgroup2UnifiedModeOverride *bool
+}
+
+func (m *cgroupCommon) isCgroup2UnifiedMode() bool {
+	if m.isCgroup2UnifiedModeOverride != nil {
+		return *m.isCgroup2UnifiedModeOverride
+	}
+	return libcontainercgroups.IsCgroup2UnifiedMode()
 }
 
 // Make sure that cgroupV1impl and cgroupV2impl implement the CgroupManager interface
@@ -159,7 +171,7 @@ func NewCgroupManager(logger klog.Logger, cs *CgroupSubsystems, cgroupDriver str
 	return NewCgroupV1Manager(logger, cs, cgroupDriver)
 }
 
-func newCgroupCommon(logger klog.Logger, cs *CgroupSubsystems, cgroupDriver string) cgroupCommon {
+func newCgroupCommon(_ klog.Logger, cs *CgroupSubsystems, cgroupDriver string) cgroupCommon {
 	return cgroupCommon{
 		subsystems: cs,
 		useSystemd: cgroupDriver == "systemd",
@@ -291,7 +303,7 @@ func (m *cgroupCommon) toResources(logger klog.Logger, resourceConfig *ResourceC
 		resources.Memory = *resourceConfig.Memory
 	}
 	if resourceConfig.CPUShares != nil {
-		if libcontainercgroups.IsCgroup2UnifiedMode() {
+		if m.isCgroup2UnifiedMode() {
 			resources.CpuWeight = getCPUWeight(resourceConfig.CPUShares)
 		} else {
 			resources.CpuShares = *resourceConfig.CPUShares
@@ -315,7 +327,7 @@ func (m *cgroupCommon) toResources(logger klog.Logger, resourceConfig *ResourceC
 	// Ideally unified is used for all the resources when running on cgroup v2.
 	// It doesn't make difference for the memory.max limit, but for e.g. the cpu controller
 	// you can specify the correct setting without relying on the conversions performed by the OCI runtime.
-	if resourceConfig.Unified != nil && libcontainercgroups.IsCgroup2UnifiedMode() {
+	if resourceConfig.Unified != nil && m.isCgroup2UnifiedMode() {
 		resources.Unified = make(map[string]string)
 		for k, v := range resourceConfig.Unified {
 			resources.Unified[k] = v
@@ -326,7 +338,7 @@ func (m *cgroupCommon) toResources(logger klog.Logger, resourceConfig *ResourceC
 
 func (m *cgroupCommon) maybeSetHugetlb(logger klog.Logger, resourceConfig *ResourceConfig, resources *libcontainercgroups.Resources) {
 	// Check if hugetlb is supported.
-	if libcontainercgroups.IsCgroup2UnifiedMode() {
+	if m.isCgroup2UnifiedMode() {
 		if !getSupportedUnifiedControllers().Has("hugetlb") {
 			logger.V(6).Info("Optional subsystem not supported: hugetlb")
 			return

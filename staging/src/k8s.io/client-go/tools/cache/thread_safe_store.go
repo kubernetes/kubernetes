@@ -18,6 +18,7 @@ package cache
 
 import (
 	"fmt"
+	"strconv"
 	"sync"
 	"time"
 
@@ -79,6 +80,14 @@ type ThreadSafeStoreWithTransaction interface {
 type ThreadSafeStoreTransaction struct {
 	Transaction
 	Key string
+}
+
+type ThreadSafeStoreOption = func(*threadSafeMap)
+
+func WithThreadSafeStoreMetrics(identifier InformerNameAndResource, metricsProvider InformerMetricsProvider) ThreadSafeStoreOption {
+	return func(c *threadSafeMap) {
+		c.metrics = newStoreMetrics(identifier, metricsProvider)
+	}
 }
 
 // storeIndex implements the indexing functionality for Store interface
@@ -251,6 +260,10 @@ type threadSafeMap struct {
 	// index implements the indexing functionality
 	index *storeIndex
 	rv    string
+
+	// metrics is used to expose metrics about the store
+	// and must be non-nil. If not provided, a noop implementation will be used.
+	metrics *storeMetrics
 }
 
 func (c *threadSafeMap) Transaction(txns ...ThreadSafeStoreTransaction) {
@@ -259,6 +272,7 @@ func (c *threadSafeMap) Transaction(txns ...ThreadSafeStoreTransaction) {
 	}
 	finalObj := txns[len(txns)-1].Object
 	rv, rvErr := rvFromObject(finalObj)
+	rvInt, parseErr := parseRVForMetricsWithTruncation(rv)
 	c.lock.Lock()
 	defer c.lock.Unlock()
 	trace := utiltrace.New("ThreadSafeMap Transaction Process",
@@ -278,6 +292,9 @@ func (c *threadSafeMap) Transaction(txns ...ThreadSafeStoreTransaction) {
 	}
 	if rvErr == nil {
 		c.rv = rv
+		if parseErr == nil {
+			c.metrics.storeResourceVersion.Set(float64(rvInt))
+		}
 	}
 }
 
@@ -291,11 +308,15 @@ func (c *threadSafeMap) addLocked(key string, obj interface{}) {
 
 func (c *threadSafeMap) Update(key string, obj interface{}) {
 	rv, rvErr := rvFromObject(obj)
+	rvInt, parseErr := parseRVForMetricsWithTruncation(rv)
 	c.lock.Lock()
 	defer c.lock.Unlock()
 	c.updateLocked(key, obj)
 	if rvErr == nil {
 		c.rv = rv
+		if parseErr == nil {
+			c.metrics.storeResourceVersion.Set(float64(rvInt))
+		}
 	}
 }
 
@@ -311,15 +332,20 @@ func (c *threadSafeMap) Delete(key string) {
 
 func (c *threadSafeMap) DeleteWithObject(key string, obj interface{}) {
 	var rv string
-	var rvErr error
+	var rvInt int64
+	var rvErr, parseErr error
 	if obj != nil {
 		rv, rvErr = rvFromObject(obj)
+		rvInt, parseErr = parseRVForMetricsWithTruncation(rv)
 	}
 	c.lock.Lock()
 	defer c.lock.Unlock()
 	c.deleteLocked(key)
 	if obj != nil && rvErr == nil {
 		c.rv = rv
+		if parseErr == nil {
+			c.metrics.storeResourceVersion.Set(float64(rvInt))
+		}
 	}
 }
 
@@ -360,10 +386,18 @@ func (c *threadSafeMap) ListKeys() []string {
 }
 
 func (c *threadSafeMap) Replace(items map[string]interface{}, resourceVersion string) {
+	var rvInt int64
+	var parseErr error
+	if resourceVersion != "" {
+		rvInt, parseErr = parseRVForMetricsWithTruncation(resourceVersion)
+	}
 	c.lock.Lock()
 	defer c.lock.Unlock()
 	c.items = items
 	c.rv = resourceVersion
+	if parseErr == nil {
+		c.metrics.storeResourceVersion.Set(float64(rvInt))
+	}
 	// rebuild any index
 	c.index.reset()
 	for key, item := range c.items {
@@ -411,9 +445,17 @@ func (c *threadSafeMap) LastStoreSyncResourceVersion() string {
 
 // Bookmark sets the latest resource version that the store has seen.
 func (c *threadSafeMap) Bookmark(rv string) {
+	var rvInt int64
+	var parseErr error
+	if rv != "" {
+		rvInt, parseErr = parseRVForMetricsWithTruncation(rv)
+	}
 	c.lock.Lock()
 	defer c.lock.Unlock()
 	c.rv = rv
+	if parseErr == nil {
+		c.metrics.storeResourceVersion.Set(float64(rvInt))
+	}
 }
 
 // ByIndex returns a list of the items whose indexed values in the given index include the given indexed value
@@ -480,13 +522,31 @@ func (c *threadSafeMap) Resync() error {
 	return nil
 }
 
-// NewThreadSafeStore creates a new instance of ThreadSafeStore.
-func NewThreadSafeStore(indexers Indexers, indices Indices) ThreadSafeStore {
-	return &threadSafeMap{
+func NewThreadSafeStore(indexers Indexers, indices Indices, opts ...ThreadSafeStoreOption) ThreadSafeStore {
+	store := &threadSafeMap{
 		items: map[string]interface{}{},
 		index: &storeIndex{
 			indexers: indexers,
 			indices:  indices,
 		},
 	}
+	for _, opt := range opts {
+		opt(store)
+	}
+	if store.metrics == nil {
+		store.metrics = newStoreMetrics(InformerNameAndResource{}, noopInformerMetricsProvider{})
+	}
+	return store
+}
+
+func parseRVForMetricsWithTruncation(rv string) (int64, error) {
+	if rv == "" {
+		return 0, nil
+	}
+	// Truncate to last 15 digits to ensure metrics are always less than 2^53-1
+	// and avoid imprecise float64 representation.
+	if len(rv) > 15 {
+		rv = rv[len(rv)-15:]
+	}
+	return strconv.ParseInt(rv, 10, 64)
 }

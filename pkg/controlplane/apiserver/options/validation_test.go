@@ -149,9 +149,7 @@ func TestValidateUnknownVersionInteroperabilityProxy(t *testing.T) {
 				PeerCAFile:           test.peerCAFile,
 				PeerAdvertiseAddress: test.peerAdvertiseAddress,
 			}
-			if test.featureEnabled {
-				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.UnknownVersionInteroperabilityProxy, true)
-			}
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.UnknownVersionInteroperabilityProxy, test.featureEnabled)
 			var errMessageGot string
 			if errs := validateUnknownVersionInteroperabilityProxyFlags(options); len(errs) > 0 {
 				errMessageGot = errs[0].Error()

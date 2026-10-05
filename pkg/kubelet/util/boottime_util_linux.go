@@ -19,7 +19,6 @@ limitations under the License.
 package util
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"strconv"
@@ -33,12 +32,9 @@ import (
 // GetBootTime returns the time at which the machine was started, truncated to the nearest second.
 // It uses /proc/stat first, which is more accurate, and falls back to the less accurate
 // unix.Sysinfo if /proc/stat failed.
-func GetBootTime() (time.Time, error) {
+func GetBootTime(logger klog.Logger) (time.Time, error) {
 	bootTime, err := getBootTimeWithProcStat()
 	if err != nil {
-		// TODO: it needs to be replaced by a proper context in the future
-		ctx := context.TODO()
-		logger := klog.FromContext(ctx)
 		logger.Info("Failed to get boot time from /proc/uptime. Will retry with unix.Sysinfo.", "error", err)
 		return getBootTimeWithSysinfo()
 	}

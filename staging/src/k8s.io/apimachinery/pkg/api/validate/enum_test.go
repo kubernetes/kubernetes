@@ -139,63 +139,73 @@ func TestEnumExclude(t *testing.T) {
 	}
 
 	testCases := []struct {
-		name      string
-		value     TestEnum
-		opts      []string
-		expectErr string
+		name           string
+		value          TestEnum
+		opts           map[string]bool
+		expectInternal bool
+		expectErr      string
 	}{
 		{
 			name:  "no options, A is valid",
 			value: ValueA,
+			opts:  map[string]bool{FeatureA: false, FeatureB: false},
 		},
 		{
 			name:      "no options, B is invalid",
 			value:     ValueB,
+			opts:      map[string]bool{FeatureA: false, FeatureB: false},
 			expectErr: `fld: Unsupported value: "B": supported values: "A", "C"`,
 		},
 		{
 			name:      "no options, D is invalid",
 			value:     ValueD,
+			opts:      map[string]bool{FeatureA: false, FeatureB: false},
 			expectErr: `fld: Unsupported value: "D": supported values: "A", "C"`,
 		},
 		{
 			name:      "FeatureA enabled, A is invalid",
 			value:     ValueA,
-			opts:      []string{FeatureA},
+			opts:      map[string]bool{FeatureA: true, FeatureB: false},
 			expectErr: `fld: Unsupported value: "A": supported values: "C"`,
 		},
 		{
 			name:      "FeatureA enabled, B is invalid",
 			value:     ValueB,
-			opts:      []string{FeatureA},
+			opts:      map[string]bool{FeatureA: true, FeatureB: false},
 			expectErr: `fld: Unsupported value: "B": supported values: "C"`,
 		},
 		{
 			name:  "FeatureB enabled, A is valid",
 			value: ValueA,
-			opts:  []string{FeatureB},
+			opts:  map[string]bool{FeatureA: false, FeatureB: true},
 		},
 		{
 			name:  "FeatureB enabled, B is valid",
 			value: ValueB,
-			opts:  []string{FeatureB},
+			opts:  map[string]bool{FeatureA: false, FeatureB: true},
 		},
 		{
 			name:      "FeatureA and FeatureB enabled, A is invalid",
 			value:     ValueA,
-			opts:      []string{FeatureA, FeatureB},
+			opts:      map[string]bool{FeatureA: true, FeatureB: true},
 			expectErr: `fld: Unsupported value: "A": supported values: "B", "C"`,
 		},
 		{
 			name:  "FeatureA and FeatureB enabled, B is valid",
 			value: ValueB,
-			opts:  []string{FeatureA, FeatureB},
+			opts:  map[string]bool{FeatureA: true, FeatureB: true},
 		},
 		{
 			name:      "FeatureA and FeatureB enabled, D is invalid",
 			value:     ValueD,
-			opts:      []string{FeatureA, FeatureB},
+			opts:      map[string]bool{FeatureA: true, FeatureB: true},
 			expectErr: `fld: Unsupported value: "D": supported values: "B", "C"`,
+		},
+		{
+			name:           "undeclared option is an internal error",
+			value:          ValueB,
+			opts:           map[string]bool{FeatureA: false},
+			expectInternal: true,
 		},
 	}
 
@@ -203,6 +213,13 @@ func TestEnumExclude(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			op := operation.Operation{Type: operation.Create, Options: tc.opts}
 			errs := Enum(context.Background(), op, field.NewPath("fld"), &tc.value, nil, testEnumValues, testEnumExclusions)
+
+			if tc.expectInternal {
+				if len(errs) != 1 || errs[0].Type != field.ErrorTypeInternal {
+					t.Fatalf("expected a single internal error, but got: %v", errs)
+				}
+				return
+			}
 
 			if tc.expectErr == "" {
 				if len(errs) > 0 {

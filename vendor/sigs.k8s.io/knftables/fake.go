@@ -157,6 +157,11 @@ func (fake *Fake) ListAll(_ context.Context) (map[string][]string, error) {
 
 // List is part of Interface.
 func (fake *Fake) List(_ context.Context, objectType string) ([]string, error) {
+	objectType = canonicalObjectType(objectType)
+	if _, ok := listableTypes[objectType]; !ok {
+		return nil, fmt.Errorf("can't List() type %q", objectType)
+	}
+
 	fake.RLock()
 	defer fake.RUnlock()
 	if fake.Table == nil {
@@ -166,29 +171,29 @@ func (fake *Fake) List(_ context.Context, objectType string) ([]string, error) {
 	var result []string
 
 	switch objectType {
-	case "flowtable", "flowtables":
+	case "flowtable":
 		for name := range fake.Table.Flowtables {
 			result = append(result, name)
 		}
-	case "chain", "chains":
+	case "chain":
 		for name := range fake.Table.Chains {
 			result = append(result, name)
 		}
-	case "set", "sets":
+	case "set":
 		for name := range fake.Table.Sets {
 			result = append(result, name)
 		}
-	case "map", "maps":
+	case "map":
 		for name := range fake.Table.Maps {
 			result = append(result, name)
 		}
-	case "counter", "counters":
+	case "counter":
 		for name := range fake.Table.Counters {
 			result = append(result, name)
 		}
 
 	default:
-		return nil, fmt.Errorf("unsupported object type %q", objectType)
+		return nil, fmt.Errorf("internal error: missing List() support for %q", objectType)
 	}
 
 	return result, nil
@@ -220,17 +225,22 @@ func (fake *Fake) ListRules(_ context.Context, chain string) ([]*Rule, error) {
 
 // ListElements is part of Interface
 func (fake *Fake) ListElements(_ context.Context, objectType, name string) ([]*Element, error) {
+	if objectType != "set" && objectType != "map" {
+		return nil, fmt.Errorf("invalid objectType %q", objectType)
+	}
+
 	fake.RLock()
 	defer fake.RUnlock()
 	if fake.Table == nil {
 		return nil, notFoundError("no such %s %q", objectType, name)
 	}
-	if objectType == "set" {
+	switch objectType {
+	case "set":
 		s := fake.Table.Sets[name]
 		if s != nil {
 			return s.Elements, nil
 		}
-	} else if objectType == "map" {
+	case "map":
 		m := fake.Table.Maps[name]
 		if m != nil {
 			return m.Elements, nil

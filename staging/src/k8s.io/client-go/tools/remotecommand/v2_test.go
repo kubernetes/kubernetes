@@ -26,9 +26,9 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/util/httpstream"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog/v2/ktesting"
+	"k8s.io/streaming/pkg/httpstream"
 )
 
 type fakeReader struct {

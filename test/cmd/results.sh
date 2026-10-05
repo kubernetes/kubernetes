@@ -40,7 +40,6 @@ error: unknown command "list" for "kubectl"
 
 Did you mean this?
 	get
-	wait
 EOF
   kube::test::results::diff "${TEMP}/actual_stdout" "${TEMP}/actual_stderr" "$res" "${TEMP}/empty" "${TEMP}/expected_stderr" 1 "kubectl list"
 

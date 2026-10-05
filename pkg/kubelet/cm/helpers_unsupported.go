@@ -23,6 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog/v2"
+	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 )
 
 const (
@@ -48,7 +49,7 @@ func MilliCPUToShares(milliCPU int64) uint64 {
 }
 
 // ResourceConfigForPod takes the input pod and outputs the cgroup resource config.
-func ResourceConfigForPod(pod *v1.Pod, enforceCPULimit bool, cpuPeriod uint64, enforceMemoryQoS bool) *ResourceConfig {
+func ResourceConfigForPod(pod *v1.Pod, enforceCPULimit bool, cpuPeriod uint64, enforceMemoryQoS bool, memoryReservationPolicy kubeletconfig.MemoryReservationPolicy) *ResourceConfig {
 	return nil
 }
 
@@ -78,6 +79,10 @@ func GetKubeletContainer(logger klog.Logger, kubeletCgroups string) (string, err
 
 func CPURequestsFromConfig(podConfig *ResourceConfig) *resource.Quantity {
 	return nil
+}
+
+func CPUSharesEqualAfterV2RoundTrip(allocatedShares, readbackShares uint64) bool {
+	return false
 }
 
 func CPULimitsFromConfig(podConfig *ResourceConfig) *resource.Quantity {

@@ -30,7 +30,7 @@ import (
 
 // ipAddressStrategy implements verification logic for Replication.
 type ipAddressStrategy struct {
-	runtime.ObjectTyper
+	rest.DeclarativeValidation
 	names.NameGenerator
 }
 
@@ -42,7 +42,7 @@ func (noopNameGenerator) GenerateName(base string) string {
 }
 
 // Strategy is the default logic that applies when creating and updating Replication IPAddress objects.
-var Strategy = ipAddressStrategy{legacyscheme.Scheme, noopNameGenerator{}}
+var Strategy = ipAddressStrategy{rest.DeclarativeValidation{Scheme: legacyscheme.Scheme}, noopNameGenerator{}}
 
 // Strategy should implement rest.RESTCreateStrategy
 var _ rest.RESTCreateStrategy = Strategy
@@ -72,8 +72,7 @@ func (ipAddressStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.
 // Validate validates a new IPAddress.
 func (ipAddressStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	ipAddress := obj.(*networking.IPAddress)
-	err := validation.ValidateIPAddress(ipAddress)
-	return err
+	return validation.ValidateIPAddress(ipAddress)
 }
 
 // Canonicalize normalizes the object after validation.
@@ -81,7 +80,7 @@ func (ipAddressStrategy) Canonicalize(obj runtime.Object) {
 }
 
 // AllowCreateOnUpdate is false for IPAddress; this means POST is needed to create one.
-func (ipAddressStrategy) AllowCreateOnUpdate() bool {
+func (ipAddressStrategy) AllowCreateOnUpdate(ctx context.Context) bool {
 	return false
 }
 
@@ -95,7 +94,7 @@ func (ipAddressStrategy) ValidateUpdate(ctx context.Context, new, old runtime.Ob
 }
 
 // AllowUnconditionalUpdate is the default update policy for IPAddress objects.
-func (ipAddressStrategy) AllowUnconditionalUpdate() bool {
+func (ipAddressStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {
 	return true
 }
 

@@ -22,8 +22,8 @@ import (
 	"k8s.io/kubernetes/test/integration/apiserver/cel/authorizerselector"
 )
 
-// TestAuthzSelectorsLibraryEnabled ensures that the authzselectors library feature enablement works properly.
+// TestAuthzSelectorsLibraryEnabled ensures that the authzselectors library works properly.
 // CEL envs and compilers cached per process mean this must be the only test in this package.
 func TestAuthzSelectorsLibraryEnabled(t *testing.T) {
-	authorizerselector.RunAuthzSelectorsLibraryTests(t, true)
+	authorizerselector.RunAuthzSelectorsLibraryTests(t)
 }

@@ -245,13 +245,13 @@ func (c *stringFormatterV2) Fixed(precision int) func(ref.Val) (string, error) {
 			if !ok {
 				return "", fmt.Errorf("type conversion error from '%s' to '%s'", arg.Type(), types.IntType)
 			}
-			return fmt.Sprintf(fmtStr, argInt), nil
+			return fmt.Sprintf(fmtStr, float64(argInt)), nil
 		case types.UintType:
 			argUint, ok := arg.Value().(uint64)
 			if !ok {
 				return "", fmt.Errorf("type conversion error from '%s' to '%s'", arg.Type(), types.UintType)
 			}
-			return fmt.Sprintf(fmtStr, argUint), nil
+			return fmt.Sprintf(fmtStr, float64(argUint)), nil
 		case types.DoubleType:
 			argDbl, ok := arg.Value().(float64)
 			if !ok {
@@ -283,13 +283,13 @@ func (c *stringFormatterV2) Scientific(precision int) func(ref.Val) (string, err
 			if !ok {
 				return "", fmt.Errorf("type conversion error from '%s' to '%s'", arg.Type(), types.IntType)
 			}
-			return fmt.Sprintf(fmtStr, argInt), nil
+			return fmt.Sprintf(fmtStr, float64(argInt)), nil
 		case types.UintType:
 			argUint, ok := arg.Value().(uint64)
 			if !ok {
 				return "", fmt.Errorf("type conversion error from '%s' to '%s'", arg.Type(), types.UintType)
 			}
-			return fmt.Sprintf(fmtStr, argUint), nil
+			return fmt.Sprintf(fmtStr, float64(argUint)), nil
 		case types.DoubleType:
 			argDbl, ok := arg.Value().(float64)
 			if !ok {
@@ -402,7 +402,9 @@ func (c *stringFormatterV2) Octal(arg ref.Val) (string, error) {
 
 // stringFormatValidatorV2 implements the cel.ASTValidator interface allowing for static validation
 // of string.format calls.
-type stringFormatValidatorV2 struct{}
+type stringFormatValidatorV2 struct {
+	maxPrecision int
+}
 
 // Name returns the name of the validator.
 func (stringFormatValidatorV2) Name() string {
@@ -419,7 +421,7 @@ func (stringFormatValidatorV2) Configure(config cel.MutableValidatorConfig) erro
 
 // Validate parses all literal format strings and type checks the format clause against the argument
 // at the corresponding ordinal within the list literal argument to the function, if one is specified.
-func (stringFormatValidatorV2) Validate(env *cel.Env, _ cel.ValidatorConfig, a *ast.AST, iss *cel.Issues) {
+func (v stringFormatValidatorV2) Validate(env *cel.Env, _ cel.ValidatorConfig, a *ast.AST, iss *cel.Issues) {
 	root := ast.NavigateAST(a)
 	formatCallExprs := ast.MatchDescendants(root, matchConstantFormatStringWithListLiteralArgs(a))
 	for _, e := range formatCallExprs {
@@ -431,7 +433,7 @@ func (stringFormatValidatorV2) Validate(env *cel.Env, _ cel.ValidatorConfig, a *
 			ast:  a,
 		}
 		// use a placeholder locale, since locale doesn't affect syntax
-		_, err := parseFormatStringV2(formatStr, formatCheck, formatCheck)
+		_, err := parseFormatStringV2(formatStr, formatCheck, formatCheck, v.maxPrecision)
 		if err != nil {
 			iss.ReportErrorAtID(getErrorExprID(e.ID(), err), "%v", err)
 			continue
@@ -668,7 +670,7 @@ type formatStringInterpolatorV2 interface {
 
 // parseFormatString formats a string according to the string.format syntax, taking the clause implementations
 // from the provided FormatCallback and the args from the given FormatList.
-func parseFormatStringV2(formatStr string, callback formatStringInterpolatorV2, list formatListArgs) (string, error) {
+func parseFormatStringV2(formatStr string, callback formatStringInterpolatorV2, list formatListArgs, maxPrecision int) (string, error) {
 	i := 0
 	argIndex := 0
 	var builtStr strings.Builder
@@ -692,7 +694,7 @@ func parseFormatStringV2(formatStr string, callback formatStringInterpolatorV2, 
 				if int64(argIndex) >= list.Size() {
 					return "", fmt.Errorf("index %d out of range", argIndex)
 				}
-				numRead, val, refErr := parseAndFormatClauseV2(formatStr[i:], argAny, callback, list)
+				numRead, val, refErr := parseAndFormatClauseV2(formatStr[i:], argAny, callback, list, maxPrecision)
 				if refErr != nil {
 					return "", refErr
 				}
@@ -716,9 +718,9 @@ func parseFormatStringV2(formatStr string, callback formatStringInterpolatorV2, 
 
 // parseAndFormatClause parses the format clause at the start of the given string with val, and returns
 // how many characters were consumed and the substituted string form of val, or an error if one occurred.
-func parseAndFormatClauseV2(formatStr string, val ref.Val, callback formatStringInterpolatorV2, list formatListArgs) (int, string, error) {
+func parseAndFormatClauseV2(formatStr string, val ref.Val, callback formatStringInterpolatorV2, list formatListArgs, maxPrecision int) (int, string, error) {
 	i := 1
-	read, formatter, err := parseFormattingClauseV2(formatStr[i:], callback)
+	read, formatter, err := parseFormattingClauseV2(formatStr[i:], callback, maxPrecision)
 	i += read
 	if err != nil {
 		return -1, "", newParseFormatError("could not parse formatting clause", err)
@@ -731,9 +733,9 @@ func parseAndFormatClauseV2(formatStr string, val ref.Val, callback formatString
 	return i, valStr, nil
 }
 
-func parseFormattingClauseV2(formatStr string, callback formatStringInterpolatorV2) (int, clauseImplV2, error) {
+func parseFormattingClauseV2(formatStr string, callback formatStringInterpolatorV2, maxPrecision int) (int, clauseImplV2, error) {
 	i := 0
-	read, precision, err := parsePrecisionV2(formatStr[i:])
+	read, precision, err := parsePrecisionV2(formatStr[i:], maxPrecision)
 	i += read
 	if err != nil {
 		return -1, nil, fmt.Errorf("error while parsing precision: %w", err)
@@ -760,7 +762,7 @@ func parseFormattingClauseV2(formatStr string, callback formatStringInterpolator
 	}
 }
 
-func parsePrecisionV2(formatStr string) (int, int, error) {
+func parsePrecisionV2(formatStr string, maxPrecision int) (int, int, error) {
 	i := 0
 	if formatStr[i] != '.' {
 		return i, defaultPrecision, nil
@@ -783,6 +785,9 @@ func parsePrecisionV2(formatStr string) (int, int, error) {
 	}
 	if precision < 0 {
 		return -1, -1, fmt.Errorf("negative precision: %d", precision)
+	}
+	if maxPrecision > 0 && precision > maxPrecision {
+		return -1, -1, fmt.Errorf("precision %d exceeds maximum allowed precision %d", precision, maxPrecision)
 	}
 	return i, precision, nil
 }

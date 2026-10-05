@@ -47,8 +47,7 @@ type TestAPIServer struct {
 // process. All resources get released automatically when the test
 // completes. If startup fails, the test gets aborted.
 func StartAPITestServer(t *testing.T) TestAPIServer {
-	cfg := etcdserver.NewTestConfig(t)
-	etcdClient := etcdserver.RunEtcd(t, cfg)
+	etcdClient := etcdserver.RunEtcd(t)
 	storageConfig := storagebackend.NewDefaultConfig(path.Join(uuid.New().String(), "registry"), nil)
 	storageConfig.Transport.ServerList = etcdClient.Endpoints()
 

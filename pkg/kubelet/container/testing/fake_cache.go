@@ -32,12 +32,16 @@ func NewFakeCache(runtime container.Runtime) container.Cache {
 	return &fakeCache{runtime: runtime}
 }
 
-func (c *fakeCache) Get(id types.UID) (*container.PodStatus, error) {
-	return c.runtime.GetPodStatus(context.TODO(), id, "", "")
+func (c *fakeCache) Get(ctx context.Context, id types.UID) (*container.PodStatus, error) {
+	pod, err := c.runtime.GetPod(ctx, id)
+	if err != nil {
+		pod = &container.Pod{ID: id}
+	}
+	return c.runtime.GetPodStatus(ctx, pod)
 }
 
-func (c *fakeCache) GetNewerThan(id types.UID, minTime time.Time) (*container.PodStatus, error) {
-	return c.Get(id)
+func (c *fakeCache) GetNewerThan(ctx context.Context, id types.UID, minTime time.Time) (*container.PodStatus, error) {
+	return c.Get(ctx, id)
 }
 
 func (c *fakeCache) Set(id types.UID, status *container.PodStatus, err error, timestamp time.Time) (updated bool) {
@@ -48,4 +52,7 @@ func (c *fakeCache) Delete(id types.UID) {
 }
 
 func (c *fakeCache) UpdateTime(_ time.Time) {
+}
+
+func (c *fakeCache) SetObservedTime(id types.UID, timestamp time.Time) {
 }

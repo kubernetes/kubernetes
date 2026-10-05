@@ -45,6 +45,7 @@ var (
 type Metrics map[string]Samples
 type Samples = model.Samples
 type Sample = model.Sample
+type Time = model.Time
 type Metric = model.Metric
 type LabelValue = model.LabelValue
 type LabelName = model.LabelName
@@ -52,6 +53,13 @@ type SampleHistogram = model.SampleHistogram
 type FloatString = model.FloatString
 type HistogramBuckets = model.HistogramBuckets
 type HistogramBucket = model.HistogramBucket
+
+// GatheredMetrics is a point-in-time snapshot of a Gatherer. Use it to extract
+// multiple metric/label-value combinations without re-gathering the whole
+// registry for every lookup.
+type GatheredMetrics struct {
+	families []*dto.MetricFamily
+}
 
 // Equal returns true if all metrics are the same as the arguments.
 func (m *Metrics) Equal(o Metrics) bool {
@@ -111,6 +119,10 @@ func ParseMetrics(data string, output *Metrics) error {
 func TextToMetricFamilies(in io.Reader) (map[string]*dto.MetricFamily, error) {
 	textParser := expfmt.NewTextParser(model.UTF8Validation)
 	return textParser.TextToMetricFamilies(in)
+}
+
+func MetricFamilyToText(out io.Writer, in *dto.MetricFamily) (written int, err error) {
+	return expfmt.MetricFamilyToText(out, in)
 }
 
 // PrintSample returns formatted representation of metric Sample
@@ -261,17 +273,35 @@ func (vec HistogramVec) Validate() error {
 	return nil
 }
 
+// GatherMetrics collects all metric families from the given gatherer.
+func GatherMetrics(gatherer metrics.Gatherer) (*GatheredMetrics, error) {
+	families, err := gatherer.Gather()
+	if err != nil {
+		return nil, err
+	}
+	return &GatheredMetrics{families: families}, nil
+}
+
+// GetHistogramVec returns the histograms for metricName whose labels match lvMap
+// from the snapshot taken by GatherMetrics().
+func (g *GatheredMetrics) GetHistogramVec(metricName string, lvMap map[string]string) (HistogramVec, error) {
+	return histogramVecFromMetricFamilies(g.families, metricName, lvMap)
+}
+
 // GetHistogramVecFromGatherer collects a metric, that matches the input labelValue map,
 // from a gatherer implementing k8s.io/component-base/metrics.Gatherer interface.
 // Used only for testing purposes where we need to gather metrics directly from a running binary (without metrics endpoint).
 func GetHistogramVecFromGatherer(gatherer metrics.Gatherer, metricName string, lvMap map[string]string) (HistogramVec, error) {
-	var metricFamily *dto.MetricFamily
 	m, err := gatherer.Gather()
 	if err != nil {
 		return nil, err
 	}
 
-	metricFamily = findMetricFamily(m, metricName)
+	return histogramVecFromMetricFamilies(m, metricName, lvMap)
+}
+
+func histogramVecFromMetricFamilies(metricFamilies []*dto.MetricFamily, metricName string, lvMap map[string]string) (HistogramVec, error) {
+	metricFamily := findMetricFamily(metricFamilies, metricName)
 
 	if metricFamily == nil {
 		return nil, fmt.Errorf("metric %q not found", metricName)

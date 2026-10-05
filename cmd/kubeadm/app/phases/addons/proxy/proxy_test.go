@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"context"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -156,7 +157,7 @@ func TestEnsureProxyAddon(t *testing.T) {
 				initConfiguration.ClusterConfiguration.Networking.PodSubnet = "2001:101::/48"
 			}
 
-			err = EnsureProxyAddon(&initConfiguration.ClusterConfiguration, &initConfiguration.LocalAPIEndpoint, client, os.Stdout, false)
+			err = EnsureProxyAddon(&initConfiguration.ClusterConfiguration, &initConfiguration.LocalAPIEndpoint, client, "", os.Stdout, false)
 
 			// Compare actual to expected errors
 			actErr := "No error"
@@ -175,6 +176,42 @@ func TestEnsureProxyAddon(t *testing.T) {
 					actErr)
 			}
 		})
+	}
+}
+
+func TestApplyKubeProxyDaemonSetPatches(t *testing.T) {
+	daemonSetBytes, err := kubeadmutil.ParseTemplate(KubeProxyDaemonSet19, struct{ Image, ProxyConfigMap, ProxyConfigMapKey string }{
+		Image:             "foo",
+		ProxyConfigMap:    "bar",
+		ProxyConfigMapKey: "baz",
+	})
+	if err != nil {
+		t.Fatalf("unexpected ParseTemplate failure: %v", err)
+	}
+
+	tmpDir := t.TempDir()
+	patchFile := filepath.Join(tmpDir, "kubeproxydaemonset+strategic.yaml")
+	patch := `spec:
+  template:
+    spec:
+      hostNetwork: false
+`
+	if err := os.WriteFile(patchFile, []byte(patch), 0600); err != nil {
+		t.Fatalf("failed writing patch file: %v", err)
+	}
+
+	patchedDaemonSetBytes, err := applyKubeProxyDaemonSetPatches(daemonSetBytes, tmpDir, os.Stdout)
+	if err != nil {
+		t.Fatalf("applyKubeProxyDaemonSetPatches returned error: %v", err)
+	}
+
+	kubeproxyDaemonSet := &apps.DaemonSet{}
+	if err := runtime.DecodeInto(clientsetscheme.Codecs.UniversalDecoder(), patchedDaemonSetBytes, kubeproxyDaemonSet); err != nil {
+		t.Fatalf("unable to decode kube-proxy daemonset: %v", err)
+	}
+
+	if kubeproxyDaemonSet.Spec.Template.Spec.HostNetwork {
+		t.Fatal("expected patched kube-proxy daemonset hostNetwork to be false")
 	}
 }
 

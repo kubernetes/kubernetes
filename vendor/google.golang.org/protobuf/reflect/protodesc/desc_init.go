@@ -201,6 +201,7 @@ func (r descsByName) initExtensionDeclarations(xds []*descriptorpb.FieldDescript
 			return nil, err
 		}
 		x.L1.EditionFeatures = mergeEditionFeatures(parent, xd.GetOptions().GetFeatures())
+		x.L2.IsProto3Optional = xd.GetProto3Optional()
 		if opts := xd.GetOptions(); opts != nil {
 			opts = proto.Clone(opts).(*descriptorpb.FieldOptions)
 			x.L2.Options = func() protoreflect.ProtoMessage { return opts }

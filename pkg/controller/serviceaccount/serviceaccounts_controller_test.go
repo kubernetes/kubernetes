@@ -166,13 +166,13 @@ func TestServiceAccountCreation(t *testing.T) {
 			nsInformer := informers.Core().V1().Namespaces()
 
 			var wg sync.WaitGroup
-			defer wg.Wait()
 
-			logger, ctx := ktesting.NewTestContext(t)
-			defer ctx.Cancel("test case terminating")
+			tCtx := ktesting.Init(t)
+			tCtx.Cleanup(wg.Wait)
+			logger := tCtx.Logger()
 
 			controller, err := NewServiceAccountsController(
-				logger,
+				tCtx,
 				saInformer,
 				nsInformer,
 				client,
@@ -200,7 +200,7 @@ func TestServiceAccountCreation(t *testing.T) {
 			stopCh := make(chan struct{})
 			defer close(stopCh)
 			wg.Go(func() {
-				controller.Run(ctx, 1)
+				controller.Run(tCtx, 1)
 			})
 
 			if tc.ExistingNamespace != nil {

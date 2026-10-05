@@ -251,7 +251,7 @@ func (l *Loader) loadPlugin(res *resource.Resource) (resmap.Configurable, error)
 				return nil, errors.Errorf("plugin %s with mount path '%s' is not permitted; "+
 					"mount paths must be relative to the current kustomization directory", res.OrgId(), mount.Src)
 			}
-			if strings.HasPrefix(filepath.Clean(mount.Src), "../") {
+			if strings.HasPrefix(filepath.Clean(mount.Src), "..") {
 				return nil, errors.Errorf("plugin %s with mount path '%s' is not permitted; "+
 					"mount paths must be under the current kustomization directory", res.OrgId(), mount.Src)
 			}

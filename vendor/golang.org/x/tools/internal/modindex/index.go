@@ -10,11 +10,12 @@ import (
 	"encoding/csv"
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -67,6 +68,9 @@ whose types are []byte and interface{}.
 const CurrentVersion int = 0
 
 // Index is returned by [Read].
+//
+// An Index is immutable once constructed: [Read] may return the same
+// Index to multiple callers, so it must not be modified.
 type Index struct {
 	Version    int
 	GOMODCACHE string    // absolute path of Go module cache dir
@@ -107,25 +111,56 @@ var IndexDir string = func() string {
 		var err error
 		dir, err = os.UserCacheDir()
 		// shouldn't happen, but TempDir is better than
-		// creating ./go/imports
+		// creating ./goimports
 		if err != nil {
 			dir = os.TempDir()
 		}
 	}
 	dir = filepath.Join(dir, "goimports")
 	if err := os.MkdirAll(dir, 0777); err != nil {
-		log.Printf("failed to create modcache index dir: %v", err)
+		dir = "" // #75505, people complain about the error message
 	}
 	return dir
 }()
 
+// cache memoizes the most recently read index for each Go module cache
+// directory; see [Read].
+var cache sync.Map // from gomodcache (string) to *cacheEntry
+
+type cacheEntry struct {
+	payloadFile string // the file the index was read from
+	index       *Index
+}
+
+// parseCount counts the number of times [Read] has parsed a payload
+// file, as opposed to returning a memoized index. It is for testing.
+var parseCount atomic.Int64
+
 // Read reads the latest version of the on-disk index
 // for the specified Go module cache directory.
 // If there is no index, it returns a nil Index and an fs.ErrNotExist error.
+//
+// The result is memoized: parsing the payload file, which may be
+// hundreds of megabytes, is far more expensive than the rest of the
+// work done by a typical client such as [golang.org/x/tools/imports.Process],
+// and clients that process many files would otherwise repeat it for
+// each one. Because payload files are immutable--[write] gives each
+// one a fresh random name and only then updates the link file to refer
+// to it--the name of the payload file is a sound cache key, so an index
+// created by another process is picked up as soon as the link file
+// changes. Only the most recent index for each directory is retained,
+// so that a long-running process that repeatedly updates the index does
+// not accumulate stale ones.
+//
+// Consequently the same Index may be returned to multiple callers, and
+// callers must not modify it.
 func Read(gomodcache string) (*Index, error) {
 	gomodcache, err := filepath.Abs(gomodcache)
 	if err != nil {
 		return nil, err
+	}
+	if IndexDir == "" {
+		return nil, os.ErrNotExist
 	}
 
 	// Read the "link" file for the specified gomodcache directory.
@@ -136,13 +171,26 @@ func Read(gomodcache string) (*Index, error) {
 	}
 	payloadFile := filepath.Join(IndexDir, string(content))
 
+	// Is the index from that payload file already in memory?
+	if v, ok := cache.Load(gomodcache); ok {
+		if e := v.(*cacheEntry); e.payloadFile == payloadFile {
+			return e.index, nil
+		}
+	}
+
 	// Read the index out of the payload file.
 	f, err := os.Open(payloadFile)
 	if err != nil {
 		return nil, err
 	}
 	defer f.Close()
-	return readIndexFrom(gomodcache, bufio.NewReader(f))
+	parseCount.Add(1)
+	ix, err := readIndexFrom(gomodcache, bufio.NewReader(f))
+	if err != nil {
+		return nil, err
+	}
+	cache.Store(gomodcache, &cacheEntry{payloadFile, ix})
+	return ix, nil
 }
 
 func readIndexFrom(gomodcache string, r io.Reader) (*Index, error) {
@@ -186,6 +234,9 @@ func readIndexFrom(gomodcache string, r io.Reader) (*Index, error) {
 	)
 	for scan.Scan() {
 		v := scan.Text()
+		if len(v) < 2 {
+			return nil, fmt.Errorf("malformed line: %q, %d entries", v, len(entries))
+		}
 		if v[0] == ':' {
 			if curEntry != nil {
 				entries = append(entries, *curEntry)
@@ -227,6 +278,9 @@ func readIndexFrom(gomodcache string, r io.Reader) (*Index, error) {
 
 // write writes the index file and updates the index directory to refer to it.
 func write(gomodcache string, ix *Index) error {
+	if IndexDir == "" {
+		return os.ErrNotExist
+	}
 	// Write the index into a payload file with a fresh name.
 	f, err := os.CreateTemp(IndexDir, fmt.Sprintf("index-%d-*", CurrentVersion))
 	if err != nil {

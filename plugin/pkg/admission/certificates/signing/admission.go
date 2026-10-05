@@ -45,11 +45,11 @@ func Register(plugins *admission.Plugins) {
 // Plugin holds state for and implements the admission plugin.
 type Plugin struct {
 	*admission.Handler
-	authz authorizer.Authorizer
+	authz authorizer.UnconditionalAuthorizer
 }
 
-// SetAuthorizer sets the authorizer.
-func (p *Plugin) SetAuthorizer(authz authorizer.Authorizer) {
+// SetUnconditionalAuthorizer sets the authorizer.
+func (p *Plugin) SetUnconditionalAuthorizer(authz authorizer.UnconditionalAuthorizer) {
 	p.authz = authz
 }
 
@@ -62,7 +62,7 @@ func (p *Plugin) ValidateInitialization() error {
 }
 
 var _ admission.ValidationInterface = &Plugin{}
-var _ genericadmissioninit.WantsAuthorizer = &Plugin{}
+var _ genericadmissioninit.WantsUnconditionalAuthorizer = &Plugin{}
 
 // NewPlugin creates a new CSR approval admission plugin
 func NewPlugin() *Plugin {

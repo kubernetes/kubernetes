@@ -30,6 +30,23 @@ import (
 	"k8s.io/apimachinery/pkg/util/json"
 )
 
+// isJSONEmptyForOmitempty returns true if the JSON value would be dropped by the
+// kube-openapi v2 JSON encoder's omitempty tag. Unlike omitzero (used for Default),
+// the Example field uses omitempty which considers empty strings, empty slices,
+// and empty maps as empty.
+func isJSONEmptyForOmitempty(j JSON) bool {
+	switch v := j.Object.(type) {
+	case string:
+		return v == ""
+	case []interface{}:
+		return len(v) == 0
+	case map[string]interface{}:
+		return len(v) == 0
+	default:
+		return j.Object == nil
+	}
+}
+
 func TestStructuralKubeOpenAPIRoundtrip(t *testing.T) {
 	f := randfill.New()
 	seed := time.Now().UnixNano()
@@ -64,13 +81,21 @@ func TestStructuralKubeOpenAPIRoundtrip(t *testing.T) {
 		f.Fill(orig)
 
 		// normalize Structural.ValueValidation to zero values if it was nil before
+		// and normalize Example values that are considered empty by omitempty
+		// (the kube-openapi Example field uses omitempty, not omitzero, so
+		// empty strings/slices/maps get dropped during JSON roundtrip)
 		normalizer := Visitor{
 			Structural: func(s *Structural) bool {
+				changed := false
 				if s.ValueValidation == nil {
 					s.ValueValidation = &ValueValidation{}
-					return true
+					changed = true
 				}
-				return false
+				if isJSONEmptyForOmitempty(s.Generic.Example) {
+					s.Generic.Example = JSON{}
+					changed = true
+				}
+				return changed
 			},
 		}
 		normalizer.Visit(orig)

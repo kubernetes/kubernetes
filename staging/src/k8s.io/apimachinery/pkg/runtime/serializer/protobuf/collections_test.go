@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"encoding/base64"
 	"io"
+	"math/rand"
 	"os/exec"
 	"testing"
 
@@ -328,4 +329,35 @@ func (s *countingSizer) DeepCopyObject() runtime.Object {
 
 func (s *countingSizer) GetObjectKind() schema.ObjectKind {
 	return nil
+}
+
+func BenchmarkStreamEncodeProtobufCollections(b *testing.B) {
+	disableFuzzFieldsV1 := func(field *metav1.FieldsV1, c randfill.Continue) {}
+	fuzzMap := func(kvs map[string]interface{}, c randfill.Continue) {
+		kvs[c.String(0)] = c.Bool()
+		kvs[c.String(0)] = c.Uint64()
+		kvs[c.String(0)] = c.String(0)
+	}
+	f := randfill.New().RandSource(rand.NewSource(12345)).Funcs(disableFuzzFieldsV1, fuzzMap)
+	carpList := &testapigroupv1.CarpList{}
+	carpList.Items = make([]testapigroupv1.Carp, 1000)
+	for i := range 1000 {
+		f.Fill(&carpList.Items[i])
+	}
+	carpList.Kind = "CarpList"
+	carpList.APIVersion = "testapigroup.k8s.io/v1"
+	carpList.ResourceVersion = "12345"
+
+	encoder := NewSerializerWithOptions(nil, nil, SerializerOptions{StreamingCollectionsEncoding: true})
+	b.Run("CarpList", func(b *testing.B) {
+		var buf bytes.Buffer
+		b.ReportAllocs()
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			buf.Reset()
+			if err := encoder.Encode(carpList, &buf); err != nil {
+				b.Fatal(err)
+			}
+		}
+	})
 }

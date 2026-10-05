@@ -42,7 +42,7 @@ func (t *HPAUpgradeTest) Setup(ctx context.Context, f *framework.Framework) {
 	t.rc = e2eautoscaling.NewDynamicResourceConsumer(ctx,
 		"res-cons-upgrade",
 		f.Namespace.Name,
-		e2eautoscaling.KindRC,
+		e2eautoscaling.KindReplicaSet,
 		1,   /* replicas */
 		250, /* initCPUTotal */
 		0,

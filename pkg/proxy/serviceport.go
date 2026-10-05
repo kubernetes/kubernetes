@@ -23,8 +23,10 @@ import (
 	"strings"
 
 	v1 "k8s.io/api/core/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
 	apiservice "k8s.io/kubernetes/pkg/api/v1/service"
+	"k8s.io/kubernetes/pkg/features"
 	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
 	netutils "k8s.io/utils/net"
 )
@@ -136,6 +138,10 @@ func (bsvcPortInfo *BaseServicePortInfo) NodePort() int {
 
 // ExternalIPs is part of ServicePort interface.
 func (bsvcPortInfo *BaseServicePortInfo) ExternalIPs() []net.IP {
+	// Only program rules for externalIPs if the feature gate is enabled
+	if !utilfeature.DefaultFeatureGate.Enabled(features.AllowServiceExternalIPs) {
+		return []net.IP{}
+	}
 	return bsvcPortInfo.externalIPs
 }
 

@@ -18,7 +18,6 @@ package framework
 
 import (
 	"context"
-	"fmt"
 
 	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -34,7 +33,7 @@ import (
 func GetDriverNameWithFeatureTags(driver TestDriver) []interface{} {
 	dInfo := driver.GetDriverInfo()
 
-	return append([]interface{}{fmt.Sprintf("[Driver: %s]", dInfo.Name)}, dInfo.TestTags...)
+	return append([]interface{}{framework.WithLabel("Driver: " + dInfo.Name)}, dInfo.TestTags...)
 }
 
 // CreateVolume creates volume for test unless dynamicPV or CSI ephemeral inline volume test

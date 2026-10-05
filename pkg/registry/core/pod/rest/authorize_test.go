@@ -42,7 +42,7 @@ func TestEnsureAuthorizedForVerb(t *testing.T) {
 	tests := []struct {
 		name          string
 		ctx           context.Context
-		authorizer    authorizer.Authorizer
+		authorizer    authorizer.UnconditionalAuthorizer
 		verb          string
 		expectErr     string
 		expectErrType interface{}

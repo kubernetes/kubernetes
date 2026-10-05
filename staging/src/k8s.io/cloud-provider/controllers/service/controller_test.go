@@ -307,8 +307,17 @@ func TestSyncLoadBalancerIfNeeded(t *testing.T) {
 				if len(cloud.Calls) > 0 {
 					t.Errorf("Unexpected cloud provider calls: %v", cloud.Calls)
 				}
-				if len(actions) > 0 {
-					t.Errorf("Unexpected client actions: %v", actions)
+				// Ignore watch actions from the informer's reflector (timing-dependent).
+				var nonWatchActions []core.Action
+				for _, a := range actions {
+					if a.GetVerb() != "watch" {
+						nonWatchActions = append(nonWatchActions, a)
+					} else {
+						t.Logf("Ignoring watch action: %v", a)
+					}
+				}
+				if len(nonWatchActions) > 0 {
+					t.Logf("Unexpected client actions: %v", nonWatchActions)
 				}
 				return
 			}

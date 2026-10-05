@@ -21,6 +21,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	quota "k8s.io/apiserver/pkg/quota/v1"
 	"k8s.io/apiserver/pkg/quota/v1/generic"
+	"k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/client-go/informers"
 	"k8s.io/kubernetes/pkg/apis/authentication"
 	"k8s.io/kubernetes/pkg/apis/authorization"
@@ -28,8 +29,12 @@ import (
 )
 
 // NewQuotaConfigurationForAdmission returns a quota configuration for admission control.
-func NewQuotaConfigurationForAdmission(i informers.SharedInformerFactory) (quota.Configuration, error) {
-	evaluators, err := core.NewEvaluators(nil, i)
+func NewQuotaConfigurationForAdmission(i informers.SharedInformerFactory, apiResourceConfig storage.APIResourceConfigSource) (quota.Configuration, error) {
+	var isEnabled func(schema.GroupVersionResource) bool
+	if apiResourceConfig != nil {
+		isEnabled = apiResourceConfig.ResourceEnabled
+	}
+	evaluators, err := core.NewEvaluators(nil, i, isEnabled)
 	if err != nil {
 		return nil, err
 	}
@@ -38,7 +43,7 @@ func NewQuotaConfigurationForAdmission(i informers.SharedInformerFactory) (quota
 
 // NewQuotaConfigurationForControllers returns a quota configuration for controllers.
 func NewQuotaConfigurationForControllers(f quota.ListerForResourceFunc, i informers.SharedInformerFactory) (quota.Configuration, error) {
-	evaluators, err := core.NewEvaluators(f, i)
+	evaluators, err := core.NewEvaluators(f, i, nil)
 	if err != nil {
 		return nil, err
 	}

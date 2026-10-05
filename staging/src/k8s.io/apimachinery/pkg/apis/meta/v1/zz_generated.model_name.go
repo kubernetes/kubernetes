@@ -202,6 +202,11 @@ func (in ServerAddressByClientCIDR) OpenAPIModelName() string {
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
+func (in ShardInfo) OpenAPIModelName() string {
+	return "io.k8s.apimachinery.pkg.apis.meta.v1.ShardInfo"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
 func (in Status) OpenAPIModelName() string {
 	return "io.k8s.apimachinery.pkg.apis.meta.v1.Status"
 }

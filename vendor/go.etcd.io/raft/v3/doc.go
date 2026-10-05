@@ -93,7 +93,7 @@ your main raft loop.
 3. Apply Snapshot (if any) and CommittedEntries to the state machine.
 If any committed Entry has Type EntryConfChange, call Node.ApplyConfChange()
 to apply it to the node. The configuration change may be cancelled at this point
-by setting the NodeID field to zero before calling ApplyConfChange
+by setting the NodeId field to zero before calling ApplyConfChange
 (but ApplyConfChange must be called one way or the other, and the decision to cancel
 must be based solely on the state machine and not external information such as
 the observed health of the node).
@@ -109,7 +109,7 @@ restart), or you can supply your own disk-backed implementation.
 
 Third, when you receive a message from another node, pass it to Node.Step:
 
-	func recvRaftRPC(ctx context.Context, m raftpb.Message) {
+	func recvRaftRPC(ctx context.Context, m *raftpb.Message) {
 		n.Step(ctx, m)
 	}
 
@@ -132,9 +132,9 @@ The total state machine handling loop will look something like this:
 	    }
 	    for _, entry := range rd.CommittedEntries {
 	      process(entry)
-	      if entry.Type == raftpb.EntryConfChange {
+	      if entry.GetType() == raftpb.EntryConfChange {
 	        var cc raftpb.ConfChange
-	        cc.Unmarshal(entry.Data)
+	        proto.Unmarshal(entry.GetData(), &cc)
 	        s.Node.ApplyConfChange(cc)
 	      }
 	    }
@@ -161,7 +161,7 @@ After config change is committed, some committed entry with type
 raftpb.EntryConfChange will be returned. You must apply it to node through:
 
 	var cc raftpb.ConfChange
-	cc.Unmarshal(data)
+	proto.Unmarshal(data, &cc)
 	n.ApplyConfChange(cc)
 
 Note: An ID represents a unique node in a cluster for all time. A
@@ -206,7 +206,7 @@ will look something like this:
 	    n.Tick()
 	  case rd := <-s.Node.Ready():
 	    for _, m := range rd.Messages {
-	      switch m.To {
+	      switch m.GetTo() {
 	      case raft.LocalAppendThread:
 	        toAppend <- m
 	      case raft.LocalApplyThread:
@@ -229,8 +229,8 @@ application to the local state machine (apply). Those will look something like:
 	  for {
 	    select {
 	    case m := <-toAppend:
-	      saveToStorage(m.State, m.Entries, m.Snapshot)
-	      send(m.Responses)
+	      saveToStorage(m.State, m.GetEntries(), m.GetSnapshot())
+	      send(m.GetResponses())
 	    case <-s.done:
 	      return
 	    }
@@ -244,13 +244,13 @@ application to the local state machine (apply). Those will look something like:
 	    case m := <-toApply:
 	      for _, entry := range m.CommittedEntries {
 	        process(entry)
-	        if entry.Type == raftpb.EntryConfChange {
+	        if entry.GetType() == raftpb.EntryConfChange {
 	          var cc raftpb.ConfChange
-	          cc.Unmarshal(entry.Data)
+	          proto.Unmarshal(entry.GetData(), &cc)
 	          s.Node.ApplyConfChange(cc)
 	        }
 	      }
-	      send(m.Responses)
+	      send(m.GetResponses())
 	    case <-s.done:
 	      return
 	    }

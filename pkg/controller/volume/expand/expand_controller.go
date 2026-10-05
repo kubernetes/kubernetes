@@ -111,7 +111,10 @@ func NewExpandController(
 		pvcsSynced: pvcInformer.Informer().HasSynced,
 		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
 			workqueue.DefaultTypedControllerRateLimiter[string](),
-			workqueue.TypedRateLimitingQueueConfig[string]{Name: "volume_expand"},
+			workqueue.TypedRateLimitingQueueConfig[string]{
+				Logger: new(klog.FromContext(ctx)),
+				Name:   "volume_expand",
+			},
 		),
 		translator:               translator,
 		csiMigratedPluginManager: csiMigratedPluginManager,
@@ -133,7 +136,8 @@ func NewExpandController(
 		expc.recorder,
 		blkutil)
 
-	pvcInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	logger := klog.FromContext(ctx)
+	_, err := pvcInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		AddFunc: expc.enqueuePVC,
 		UpdateFunc: func(old, new interface{}) {
 			oldPVC, ok := old.(*v1.PersistentVolumeClaim)
@@ -157,7 +161,10 @@ func NewExpandController(
 			}
 		},
 		DeleteFunc: expc.enqueuePVC,
-	})
+	}, cache.HandlerOptions{Logger: &logger})
+	if err != nil {
+		return nil, fmt.Errorf("could not add pvc event handler: %w", err)
+	}
 
 	return expc, nil
 }
@@ -322,7 +329,7 @@ func (expc *expandController) expand(logger klog.Logger, pvc *v1.PersistentVolum
 
 // TODO make concurrency configurable (workers argument). previously, nestedpendingoperations spawned unlimited goroutines
 func (expc *expandController) Run(ctx context.Context) {
-	defer runtime.HandleCrash()
+	defer runtime.HandleCrashWithContext(ctx)
 
 	logger := klog.FromContext(ctx)
 	logger.Info("Starting expand controller")

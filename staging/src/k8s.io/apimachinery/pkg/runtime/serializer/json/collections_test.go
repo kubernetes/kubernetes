@@ -19,6 +19,8 @@ package json
 import (
 	"bytes"
 	"fmt"
+	"math/rand"
+	"slices"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -51,6 +53,10 @@ func testCollectionsEncoding(t *testing.T, s *Serializer, streamingEnabled bool)
 		in           runtime.Object
 		cannotStream bool
 		expect       string
+		// allow provides allowed alternate representations.
+		// For the json v1->v2 transition, this is used to tolerate changes
+		// in how malformed input in munged.
+		allow []string
 	}{
 		// Preserving the distinction between integers and floating-point numbers
 		{
@@ -114,6 +120,8 @@ func testCollectionsEncoding(t *testing.T, s *Serializer, streamingEnabled bool)
 				},
 			},
 			expect: "{\"items\":[],\"key\":\"\\ufffd\"}\n",
+			// Go json/v2 emits U+FFFD as raw UTF-8 bytes rather than the \ufffd escape.
+			allow: []string{"{\"items\":[],\"key\":\"\ufffd\"}\n"},
 		},
 		{
 			name: "UnstructuredList items invalid UTF-8 ",
@@ -127,6 +135,8 @@ func testCollectionsEncoding(t *testing.T, s *Serializer, streamingEnabled bool)
 				},
 			},
 			expect: "{\"items\":[{\"key\":\"\\ufffd\"}]}\n",
+			// Go json/v2 emits U+FFFD as raw UTF-8 bytes rather than the \ufffd escape.
+			allow: []string{"{\"items\":[{\"key\":\"\ufffd\"}]}\n"},
 		},
 		// Preserving the distinction between absent, present-but-null, and present-and-empty states for slices and maps
 		{
@@ -577,8 +587,8 @@ func testCollectionsEncoding(t *testing.T, s *Serializer, streamingEnabled bool)
 				t.Fatalf("unexpected error: %v", err)
 			}
 			t.Logf("encoded: %s", buf.String())
-			if diff := cmp.Diff(buf.String(), tc.expect); diff != "" {
-				t.Errorf("not matching:\n%s", diff)
+			if got := buf.String(); got != tc.expect && !slices.Contains(tc.allow, got) {
+				t.Errorf("not matching:\n%s", cmp.Diff(got, tc.expect))
 			}
 			expectStreaming := !tc.cannotStream && streamingEnabled
 			if expectStreaming && buf.writeCount <= 1 {
@@ -592,7 +602,7 @@ func testCollectionsEncoding(t *testing.T, s *Serializer, streamingEnabled bool)
 }
 
 type StructWithFloatsList struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 	Items           []StructWithFloats `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
@@ -602,7 +612,7 @@ func (l *StructWithFloatsList) DeepCopyObject() runtime.Object {
 }
 
 type StructWithFloats struct {
-	metav1.TypeMeta   `json:",inline"`
+	metav1.TypeMeta   `json:""`
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	Int     int
@@ -615,7 +625,7 @@ func (s *StructWithFloats) DeepCopyObject() runtime.Object {
 }
 
 type StructWithDuplicatedTagsList struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 	Items           []StructWithDuplicatedTags `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
@@ -625,7 +635,7 @@ func (l *StructWithDuplicatedTagsList) DeepCopyObject() runtime.Object {
 }
 
 type StructWithDuplicatedTags struct {
-	metav1.TypeMeta   `json:",inline"`
+	metav1.TypeMeta   `json:""`
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	Key1 string `json:"key"`
@@ -637,7 +647,7 @@ func (s *StructWithDuplicatedTags) DeepCopyObject() runtime.Object {
 }
 
 type ListWithMarshalJSONList struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 	Items           []string `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
@@ -651,7 +661,7 @@ func (l *ListWithMarshalJSONList) MarshalJSON() ([]byte, error) {
 }
 
 type StructWithMarshalJSONList struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 	Items           []StructWithMarshalJSON `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
@@ -661,7 +671,7 @@ func (s *StructWithMarshalJSONList) DeepCopyObject() runtime.Object {
 }
 
 type StructWithMarshalJSON struct {
-	metav1.TypeMeta   `json:",inline"`
+	metav1.TypeMeta   `json:""`
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 }
 
@@ -674,7 +684,7 @@ func (l *StructWithMarshalJSON) MarshalJSON() ([]byte, error) {
 }
 
 type StructWithRawBytesList struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 	Items           []StructWithRawBytes `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
@@ -684,7 +694,7 @@ func (s *StructWithRawBytesList) DeepCopyObject() runtime.Object {
 }
 
 type StructWithRawBytes struct {
-	metav1.TypeMeta   `json:",inline"`
+	metav1.TypeMeta   `json:""`
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 	Slice             []byte
 	Array             [3]byte
@@ -695,7 +705,7 @@ func (s *StructWithRawBytes) DeepCopyObject() runtime.Object {
 }
 
 type ListWithAdditionalFields struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 	Items           []testapigroupv1.Carp `json:"items" protobuf:"bytes,2,rep,name=items"`
 	AdditionalField int
@@ -747,7 +757,7 @@ func TestFuzzCollectionsEncoding(t *testing.T) {
 	normalSerializer := NewSerializerWithOptions(DefaultMetaFactory, nil, nil, SerializerOptions{StreamingCollectionsEncoding: false})
 	normalBuffer := &bytes.Buffer{}
 	t.Run("CarpList", func(t *testing.T) {
-		for i := 0; i < 1000; i++ {
+		for range 1000 {
 			list := &testapigroupv1.CarpList{}
 			f.Fill(list)
 			streamingBuffer.Reset()
@@ -770,7 +780,7 @@ func TestFuzzCollectionsEncoding(t *testing.T) {
 		}
 	})
 	t.Run("UnstructuredList", func(t *testing.T) {
-		for i := 0; i < 1000; i++ {
+		for range 1000 {
 			list := &unstructured.UnstructuredList{}
 			f.Fill(list)
 			streamingBuffer.Reset()
@@ -789,6 +799,70 @@ func TestFuzzCollectionsEncoding(t *testing.T) {
 				t.Logf("normal: %s", normalBuffer.String())
 				t.Logf("streaming: %s", streamingBuffer.String())
 				t.Errorf("not matching:\n%s", diff)
+			}
+		}
+	})
+}
+
+func BenchmarkStreamEncodeCollections(b *testing.B) {
+	disableFuzzFieldsV1 := func(field *metav1.FieldsV1, c randfill.Continue) {}
+	fuzzMap := func(kvs map[string]interface{}, c randfill.Continue) {
+		kvs[c.String(0)] = c.Bool()
+		kvs[c.String(0)] = c.Uint64()
+		kvs[c.String(0)] = c.String(0)
+	}
+	f := randfill.New().RandSource(rand.NewSource(12345)).Funcs(disableFuzzFieldsV1, fuzzMap)
+	carpList := &testapigroupv1.CarpList{}
+	carpList.Items = make([]testapigroupv1.Carp, 1000)
+	for i := range 1000 {
+		f.Fill(&carpList.Items[i])
+	}
+	carpList.Kind = "CarpList"
+	carpList.APIVersion = "testapigroup.k8s.io/v1"
+	carpList.ResourceVersion = "12345"
+	unstructuredList := &unstructured.UnstructuredList{}
+	unstructuredList.Object = map[string]interface{}{
+		"kind":       "List",
+		"apiVersion": "v1",
+		"metadata": map[string]interface{}{
+			"resourceVersion": "12345",
+		},
+	}
+	unstructuredList.Items = make([]unstructured.Unstructured, 1000)
+	for i := range 1000 {
+		unstrMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&carpList.Items[i])
+		if err != nil {
+			b.Fatalf("failed to convert carp to unstructured: %v", err)
+		}
+		unstructuredList.Items[i] = unstructured.Unstructured{Object: unstrMap}
+	}
+	b.Run("CarpList", func(b *testing.B) {
+		var buf bytes.Buffer
+		b.ReportAllocs()
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			buf.Reset()
+			ok, err := streamEncodeCollections(carpList, &buf)
+			if err != nil {
+				b.Fatal(err)
+			}
+			if !ok {
+				b.Fatal("not ok")
+			}
+		}
+	})
+	b.Run("UnstructuredList", func(b *testing.B) {
+		var buf bytes.Buffer
+		b.ReportAllocs()
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			buf.Reset()
+			ok, err := streamEncodeCollections(unstructuredList, &buf)
+			if err != nil {
+				b.Fatal(err)
+			}
+			if !ok {
+				b.Fatal("not ok")
 			}
 		}
 	})

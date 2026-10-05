@@ -365,7 +365,7 @@ var _ = common.SIGDescribe("KubeProxy", func() {
 		framework.ExpectNoError(err)
 
 		ginkgo.By("accessing endpoint via localhost nodeports 10 times")
-		for i := 0; i < 10; i++ {
+		for range 10 {
 			if err := wait.PollUntilContextTimeout(ctx, 1*time.Second, 10*time.Second, true, func(_ context.Context) (bool, error) {
 				_, err = e2epodoutput.RunHostCmd(fr.Namespace.Name, hostExecPodName, fmt.Sprintf("curl --silent http://localhost:%d/hostname", svc.Spec.Ports[0].NodePort))
 				if err != nil {

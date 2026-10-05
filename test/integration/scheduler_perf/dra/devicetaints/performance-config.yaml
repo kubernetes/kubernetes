@@ -21,7 +21,6 @@
 # with a claim template that tolerates the taint defined in a DeviceTaintRule.
 - name: DeviceTaintToleration
   featureGates:
-    DynamicResourceAllocation: true
     DRADeviceTaints: true
   workloadTemplate:
   - opcode: createNodes
@@ -31,10 +30,11 @@
   - opcode: createNodes
     nodeTemplatePath: ../templates/node-with-dra-test-driver.yaml
     countParam: $nodesWithDRA
-  - opcode: createResourceDriver
-    driverName: test-driver.cdi.k8s.io
-    nodes: scheduler-perf-dra-*
-    maxClaimsPerNodeParam: $maxClaimsPerNode
+  - opcode: createAny
+    templatePath: ../templates/resourceslice-basic-devices.yaml
+    countParam: $nodesWithDRA
+    templateParams:
+      numDevices: 10
   - opcode: createAny
     templatePath: ../templates/deviceclass.yaml
   - opcode: createAny
@@ -54,8 +54,6 @@
     collectMetrics: true
   workloads:
   - name: fast
-    featureGates:
-      SchedulerQueueingHints: false
     labels: [integration-test, short]
     params:
       # This testcase runs through all code paths without
@@ -64,16 +62,3 @@
       nodesWithoutDRA: 1
       initPods: 0
       measurePods: 10
-      maxClaimsPerNode: 10
-  - name: fast_QueueingHintsEnabled
-    featureGates:
-      SchedulerQueueingHints: true
-    labels: [integration-test, short]
-    params:
-      # This testcase runs through all code paths without
-      # taking too long overall.
-      nodesWithDRA: 1
-      nodesWithoutDRA: 1
-      initPods: 0
-      measurePods: 10
-      maxClaimsPerNode: 10

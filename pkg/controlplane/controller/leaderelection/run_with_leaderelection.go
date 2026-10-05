@@ -50,7 +50,7 @@ func RunWithLeaderElection(ctx context.Context, config *rest.Config, newRunnerFn
 	}
 	identity := hostname + "_" + string(uuid.NewUUID())
 
-	wait.Until(func() {
+	wait.UntilWithContext(ctx, func(ctx context.Context) {
 		callbacks := leaderelection.LeaderCallbacks{
 			OnStartedLeading: func(ctx context.Context) {
 				var err error
@@ -94,5 +94,5 @@ func RunWithLeaderElection(ctx context.Context, config *rest.Config, newRunnerFn
 			return
 		}
 		le.Run(ctx)
-	}, timers.RetryPeriod, ctx.Done())
+	}, timers.RetryPeriod)
 }

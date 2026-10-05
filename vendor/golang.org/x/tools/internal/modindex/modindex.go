@@ -73,7 +73,9 @@ func build(gomodcache string, old *Index) (*Index, bool, error) {
 	// Set the time window.
 	var start time.Time // = dawn of time
 	if old != nil {
-		start = old.ValidAt
+		// -1s to accommodate skew between (fine-grained) time.Now
+		// and (coarse) file system's mtime clock.
+		start = old.ValidAt.Add(-1 * time.Second)
 	}
 	now := time.Now()
 	end := now.Add(24 * time.Hour) // safely in the future

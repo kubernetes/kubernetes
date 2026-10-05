@@ -95,18 +95,19 @@ var (
 		Name:      "proposals_failed_total",
 		Help:      "The total number of failed proposals seen.",
 	})
-	slowReadIndex = prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: "etcd",
-		Subsystem: "server",
-		Name:      "slow_read_indexes_total",
-		Help:      "The total number of pending read indexes not in sync with leader's or timed out read index requests.",
-	})
-	readIndexFailed = prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: "etcd",
-		Subsystem: "server",
-		Name:      "read_indexes_failed_total",
-		Help:      "The total number of failed read indexes seen.",
-	})
+	requestDurationSec = prometheus.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Namespace: "etcd",
+			Subsystem: "server",
+			Name:      "request_duration_seconds",
+			Help:      "Response latency distribution in seconds for each type.",
+
+			// lowest bucket start of upper bound 0.001 sec (1 ms) with factor 2
+			// highest bucket start of 0.001 sec * 2^13 == 8.192 sec
+			Buckets: prometheus.ExponentialBuckets(0.001, 2, 14),
+		},
+		[]string{"type", "success"},
+	)
 	leaseExpired = prometheus.NewCounter(prometheus.CounterOpts{
 		Namespace: "etcd_debugging",
 		Subsystem: "server",
@@ -171,8 +172,7 @@ func init() {
 	prometheus.MustRegister(proposalsApplied)
 	prometheus.MustRegister(proposalsPending)
 	prometheus.MustRegister(proposalsFailed)
-	prometheus.MustRegister(slowReadIndex)
-	prometheus.MustRegister(readIndexFailed)
+	prometheus.MustRegister(requestDurationSec)
 	prometheus.MustRegister(leaseExpired)
 	prometheus.MustRegister(currentVersion)
 	prometheus.MustRegister(currentGoVersion)

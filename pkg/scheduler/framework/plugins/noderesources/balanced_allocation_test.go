@@ -22,6 +22,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	fwk "k8s.io/kube-scheduler/framework"
@@ -29,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/backend/cache"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/dynamicresources"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
@@ -316,13 +318,15 @@ func testNodeResourcesBalancedAllocation(tCtx ktesting.TContext) {
 
 	for _, test := range tests {
 		tCtx.SyncTest(test.name, func(tCtx ktesting.TContext) {
+			if test.draObjects == nil {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(tCtx, utilfeature.DefaultFeatureGate, version.MustParse("1.36"))
+			}
 			featuregatetesting.SetFeatureGateDuringTest(tCtx, utilfeature.DefaultFeatureGate, features.DRAExtendedResource, test.draObjects != nil)
 			snapshot := cache.NewSnapshot(test.existingPods, test.nodes)
 			fh, _ := runtime.NewFramework(tCtx, nil, nil, runtime.WithSnapshotSharedLister(snapshot))
-			defer func() {
-				tCtx.Cancel("test has completed")
+			tCtx.Cleanup(func() {
 				runtime.WaitForShutdown(fh)
-			}()
+			})
 			p, _ := NewBalancedAllocation(tCtx, &test.args, fh, feature.Features{
 				EnableDRAExtendedResource: test.draObjects != nil,
 			})
@@ -359,16 +363,19 @@ func testNodeResourcesBalancedAllocation(tCtx ktesting.TContext) {
 }
 
 func TestBalancedAllocationSignPod(t *testing.T) {
+	testBalancedAllocationSignPod(ktesting.Init(t))
+}
+func testBalancedAllocationSignPod(tCtx ktesting.TContext) {
 	tests := map[string]struct {
-		name                      string
-		pod                       *v1.Pod
-		enableDRAExtendedResource bool
-		expectedFragments         []fwk.SignFragment
-		expectedStatusCode        fwk.Code
+		name                       string
+		pod                        *v1.Pod
+		disableDRAExtendedResource bool
+		expectedFragments          []fwk.SignFragment
+		expectedStatusCode         fwk.Code
 	}{
 		"pod with CPU and memory requests": {
-			pod:                       st.MakePod().Req(cpuAndMemory("1000m", "2000")).Obj(),
-			enableDRAExtendedResource: false,
+			pod:                        st.MakePod().Req(cpuAndMemory("1000m", "2000")).Obj(),
+			disableDRAExtendedResource: true,
 			expectedFragments: []fwk.SignFragment{
 				{Key: fwk.ResourcesSignerName, Value: computePodResourceRequest(
 					st.MakePod().Req(cpuAndMemory("1000m", "2000")).Obj(), ResourceRequestsOptions{})},
@@ -376,8 +383,8 @@ func TestBalancedAllocationSignPod(t *testing.T) {
 			expectedStatusCode: fwk.Success,
 		},
 		"best-effort pod with no requests": {
-			pod:                       st.MakePod().Obj(),
-			enableDRAExtendedResource: false,
+			pod:                        st.MakePod().Obj(),
+			disableDRAExtendedResource: true,
 			expectedFragments: []fwk.SignFragment{
 				{Key: fwk.ResourcesSignerName, Value: computePodResourceRequest(st.MakePod().Obj(), ResourceRequestsOptions{})},
 			},
@@ -387,7 +394,7 @@ func TestBalancedAllocationSignPod(t *testing.T) {
 			pod: st.MakePod().
 				Container("container1").Req(cpuAndMemory("500m", "1000")).
 				Container("container2").Req(cpuAndMemory("1500m", "3000")).Obj(),
-			enableDRAExtendedResource: false,
+			disableDRAExtendedResource: true,
 			expectedFragments: []fwk.SignFragment{
 				{Key: fwk.ResourcesSignerName, Value: computePodResourceRequest(st.MakePod().
 					Container("container1").Req(cpuAndMemory("500m", "1000")).
@@ -396,34 +403,69 @@ func TestBalancedAllocationSignPod(t *testing.T) {
 			expectedStatusCode: fwk.Success,
 		},
 		"DRA extended resource enabled - returns unschedulable": {
-			pod:                       st.MakePod().Req(cpuAndMemory("1000m", "2000")).Obj(),
-			enableDRAExtendedResource: true,
-			expectedFragments:         nil,
-			expectedStatusCode:        fwk.Unschedulable,
+			pod: st.MakePod().Req(
+				map[v1.ResourceName]string{
+					v1.ResourceCPU:                        "1000m",
+					v1.ResourceMemory:                     "2000",
+					v1.ResourceName(extendedResourceName): "1",
+				}).Obj(),
+			disableDRAExtendedResource: false,
+			expectedFragments:          nil,
+			expectedStatusCode:         fwk.Unschedulable,
+		},
+		"DRA extended resource disabled": {
+			pod: st.MakePod().Req(
+				map[v1.ResourceName]string{
+					v1.ResourceCPU:                        "1000m",
+					v1.ResourceMemory:                     "2000",
+					v1.ResourceName(extendedResourceName): "1",
+				}).Obj(),
+			disableDRAExtendedResource: true,
+			expectedFragments: []fwk.SignFragment{
+				{Key: fwk.ResourcesSignerName, Value: computePodResourceRequest(st.MakePod().
+					Container("container1").Req(
+					map[v1.ResourceName]string{
+						v1.ResourceCPU:                        "1000m",
+						v1.ResourceMemory:                     "2000",
+						v1.ResourceName(extendedResourceName): "1",
+					}).Obj(), ResourceRequestsOptions{})},
+			},
+			expectedStatusCode: fwk.Success,
 		},
 	}
 
 	for name, test := range tests {
-		t.Run(name, func(t *testing.T) {
-			_, ctx := ktesting.NewTestContext(t)
+		tCtx.SyncTest(name, func(tCtx ktesting.TContext) {
+			runOpts := []runtime.Option{}
+			var testDRAManager *dynamicresources.DefaultDRAManager
+			if !test.disableDRAExtendedResource {
+				testDRAManager = newTestDRAManager(tCtx, deviceClassWithExtendResourceName)
+				runOpts = append(runOpts, runtime.WithSharedDRAManager(testDRAManager))
+			} else {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(tCtx, utilfeature.DefaultFeatureGate, version.MustParse("1.36"))
+			}
+			fh, _ := runtime.NewFramework(tCtx, nil, nil, runOpts...)
+			tCtx.Cleanup(func() {
+				runtime.WaitForShutdown(fh)
+			})
 
-			p, err := NewBalancedAllocation(ctx, &config.NodeResourcesBalancedAllocationArgs{}, nil, feature.Features{
-				EnableDRAExtendedResource: test.enableDRAExtendedResource,
+			p, err := NewBalancedAllocation(tCtx, &config.NodeResourcesBalancedAllocationArgs{}, fh, feature.Features{
+				EnableDRAExtendedResource: !test.disableDRAExtendedResource,
 			})
 			if err != nil {
-				t.Fatalf("failed to create plugin: %v", err)
+				tCtx.Fatalf("failed to create plugin: %v", err)
 			}
 
 			ba := p.(*BalancedAllocation)
-			fragments, status := ba.SignPod(ctx, test.pod)
+			fragments, status := ba.SignPod(tCtx, test.pod)
 
 			if status.Code() != test.expectedStatusCode {
-				t.Errorf("unexpected status code, want: %v, got: %v, message: %v", test.expectedStatusCode, status.Code(), status.Message())
+				tCtx.Errorf("unexpected status code, want: %v, got: %v, message: %v", test.expectedStatusCode, status.Code(), status.Message())
 			}
 
 			if test.expectedStatusCode == fwk.Success {
 				if diff := cmp.Diff(test.expectedFragments, fragments); diff != "" {
-					t.Errorf("unexpected fragments, diff (-want,+got):\n%s", diff)
+					tCtx.Errorf("unexpected fragments, diff (-want,+got):\n%s", diff)
 				}
 			}
 		})

@@ -29,11 +29,11 @@ import (
 	gwebsocket "github.com/gorilla/websocket"
 
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/util/httpstream"
 	"k8s.io/apimachinery/pkg/util/remotecommand"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/transport/websocket"
 	"k8s.io/klog/v2"
+	"k8s.io/streaming/pkg/httpstream"
 )
 
 // writeDeadline defines the time that a client-side write to the websocket

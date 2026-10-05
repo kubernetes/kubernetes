@@ -29,7 +29,7 @@ var (
 		&k8smetrics.GaugeOpts{
 			Name:           "running_managed_controllers",
 			Help:           "Indicates where instances of a controller are currently running",
-			StabilityLevel: k8smetrics.ALPHA,
+			StabilityLevel: k8smetrics.BETA,
 		},
 		[]string{"name", "manager"},
 	)

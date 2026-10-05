@@ -465,6 +465,7 @@ func TestSensitiveMountOptions(t *testing.T) {
 		options          []string
 		sensitiveOptions []string
 		mountFlags       []string
+		expectedLogStr   string
 	}{
 		{
 			source:           "mySrc",
@@ -473,6 +474,7 @@ func TestSensitiveMountOptions(t *testing.T) {
 			options:          []string{"o1", "o2"},
 			sensitiveOptions: []string{"s1", "s2"},
 			mountFlags:       []string{},
+			expectedLogStr:   " -t myFS -o o1,o2,<masked>,<masked> mySrc myTarget",
 		},
 		{
 			source:           "mySrc",
@@ -481,6 +483,7 @@ func TestSensitiveMountOptions(t *testing.T) {
 			options:          []string{},
 			sensitiveOptions: []string{"s1", "s2"},
 			mountFlags:       []string{},
+			expectedLogStr:   " -t myFS -o <masked>,<masked> mySrc myTarget",
 		},
 		{
 			source:           "mySrc",
@@ -489,6 +492,7 @@ func TestSensitiveMountOptions(t *testing.T) {
 			options:          []string{"o1", "o2"},
 			sensitiveOptions: []string{},
 			mountFlags:       []string{},
+			expectedLogStr:   " -t myFS -o o1,o2 mySrc myTarget",
 		},
 		{
 			source:           "mySrc",
@@ -497,6 +501,7 @@ func TestSensitiveMountOptions(t *testing.T) {
 			options:          []string{"o1", "o2"},
 			sensitiveOptions: []string{"s1", "s2"},
 			mountFlags:       []string{"--no-canonicalize"},
+			expectedLogStr:   "--no-canonicalize -t myFS -o o1,o2,<masked>,<masked> mySrc myTarget",
 		},
 	}
 
@@ -529,6 +534,9 @@ func TestSensitiveMountOptions(t *testing.T) {
 			if strings.Contains(mountArgsLogStr, sensitiveOption) {
 				t.Errorf("Expected sensitiveOption (%q) to not exist in returned mountArgsLogStr (%q), but it does", sensitiveOption, mountArgsLogStr)
 			}
+		}
+		if v.expectedLogStr != "" && mountArgsLogStr != v.expectedLogStr {
+			t.Errorf("Expected mountArgsLogStr to be %q, got %q", v.expectedLogStr, mountArgsLogStr)
 		}
 	}
 }

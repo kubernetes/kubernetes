@@ -21,6 +21,9 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"regexp"
+	"runtime/debug"
+	"strings"
 
 	"github.com/onsi/gomega"
 	"github.com/onsi/gomega/format"
@@ -58,10 +61,71 @@ func (f FailureError) Is(target error) bool {
 //	}
 var ErrFailure error = FailureError{}
 
-func gomegaAssertion(tc *TC, fatal bool, actual interface{}, extra ...interface{}) gomega.Assertion {
-	testingT := gtypes.GomegaTestingT(tc)
+// NewFailure creates a new [FailureError] with msg as its message, recording
+// the current stack backtrace in [FailureError.FullStackTrace] so that
+// [TContext.ExpectNoError] and [TContext.AssertNoError] can log it later,
+// when the error eventually gets turned into a test failure.
+//
+// Use it in helper code which detects a failure and wants to return an error
+// through normal Go error handling instead of failing the test directly:
+//
+//	func doSomething(tCtx ktesting.TContext) error {
+//	    ...
+//	    if !ok {
+//	        return ktesting.NewFailure(fmt.Sprintf("something went wrong: %s", reason))
+//	    }
+//	    return nil
+//	}
+func NewFailure(msg string) FailureError {
+	return FailureError{
+		Msg:            msg,
+		FullStackTrace: captureBacktrace(),
+	}
+}
+
+// runtimeStackFrameRE matches source file paths of stack frames inside the Go
+// runtime or testing packages, Gomega's own internal plumbing, plus ktesting's
+// own source code (but not code in subpackages like the examples). None of
+// those add useful information for diagnosing test failures: the former are
+// internal implementation details, the latter merely point back at the
+// ktesting API call that triggered capturing the backtrace.
+var runtimeStackFrameRE = regexp.MustCompile(`/src/testing/|/src/runtime/|/onsi/gomega/|/test/utils/ktesting/[^/]+\.go:`)
+
+// captureBacktrace returns a pruned stack backtrace pointing at the caller of
+// captureBacktrace, suitable for use as [FailureError.FullStackTrace].
+func captureBacktrace() string {
+	// Skip the frames for runtime/debug.Stack itself and this function.
+	// Any remaining ktesting-internal frames (e.g. Error, Errorf, Fatal,
+	// Fatalf, NewFailure) get filtered out below via runtimeStackFrameRE,
+	// regardless of how deep the call chain to captureBacktrace is.
+	return pruneStack(string(debug.Stack()), 2)
+}
+
+// pruneStack removes the given number of leading frames (as pairs of
+// function name + file:line, in the format produced by [runtime/debug.Stack])
+// plus any frames matched by runtimeStackFrameRE.
+func pruneStack(fullStackTrace string, skip int) string {
+	stack := strings.Split(fullStackTrace, "\n")
+	// Ignore the "goroutine 1 [running]:" header line, if present.
+	if len(stack) > 0 && strings.HasPrefix(stack[0], "goroutine ") {
+		stack = stack[1:]
+	}
+	if len(stack) > 2*skip {
+		stack = stack[2*skip:]
+	}
+	var pruned []string
+	for i := 0; i < len(stack)/2; i++ {
+		if !runtimeStackFrameRE.MatchString(stack[i*2+1]) {
+			pruned = append(pruned, stack[i*2], stack[i*2+1])
+		}
+	}
+	return strings.Join(pruned, "\n")
+}
+
+func gomegaAssertion(tCtx TContext, fatal bool, actual interface{}, extra ...interface{}) gomega.Assertion {
+	testingT := gtypes.GomegaTestingT(tCtx)
 	if !fatal {
-		testingT = assertTestingT{tc}
+		testingT = assertTestingT{tCtx}
 	}
 	return gomega.NewWithT(testingT).Expect(actual, extra...)
 }
@@ -70,7 +134,7 @@ func gomegaAssertion(tc *TC, fatal bool, actual interface{}, extra ...interface{
 // reporting failures) using TContext.Errorf, i.e. testing continues after a
 // failed assertion. The Helper method gets passed through.
 type assertTestingT struct {
-	*TC
+	TContext
 }
 
 var _ gtypes.GomegaTestingT = assertTestingT{}
@@ -104,51 +168,57 @@ func (a assertTestingT) Fatalf(format string, args ...any) {
 //
 //	tCtx.ExpectNoError(somehelper.CreateSomething(tCtx, ...), "creating the first foobar")
 //	tCtx.ExpectNoError(somehelper.CreateSomething(tCtx, ...), "creating the second foobar")
-func (tc *TC) ExpectNoError(err error, explain ...interface{}) {
-	tc.Helper()
-	tc.noError(tc.Fatalf, err, explain...)
+func (tCtx TContext) ExpectNoError(err error, explain ...interface{}) {
+	tCtx.Helper()
+	tCtx.noError(true, err, explain...)
 }
 
 // AssertNoError is a variant of ExpectNoError which reports an unexpected
 // error without aborting the test. It returns true if there was no error.
-func (tc *TC) AssertNoError(err error, explain ...interface{}) bool {
-	tc.Helper()
-	return tc.noError(tc.Errorf, err, explain...)
+func (tCtx TContext) AssertNoError(err error, explain ...interface{}) bool {
+	tCtx.Helper()
+	return tCtx.noError(false, err, explain...)
 }
 
-func (tc *TC) noError(failf func(format string, args ...any), err error, explain ...interface{}) bool {
+func (tCtx TContext) noError(fatal bool, err error, explain ...interface{}) bool {
 	if err == nil {
 		return true
 	}
 
-	tc.Helper()
+	tCtx.Helper()
 	description := buildDescription(explain...)
+
+	fail := tCtx.Errorf
+	if fatal {
+		fail = tCtx.Fatalf
+	}
 
 	if errors.Is(err, ErrFailure) {
 		var failure FailureError
-		if tc.capture == nil && errors.As(err, &failure) {
+		if tCtx.capture == nil && errors.As(err, &failure) {
 			if backtrace := failure.Backtrace(); backtrace != "" {
 				if description != "" {
-					tc.Log(description)
+					tCtx.Logf("%s: failed at:\n%s", description, backtrace)
+				} else {
+					tCtx.Logf("failed at:\n%s", backtrace)
 				}
-				tc.Logf("Failed at:\n%s", backtrace)
 			}
 		}
 		if description != "" {
-			failf("%s: %s", description, err.Error())
+			fail("%s: %s", description, err.Error())
 			return false
 		}
-		failf("%s", err.Error())
+		fail("%s", err.Error())
 		return false
 	}
 
 	if description == "" {
 		description = "Unexpected error"
 	}
-	if tc.capture == nil {
-		tc.Logf("%s:\n%s", description, format.Object(err, 0))
+	if tCtx.capture == nil {
+		tCtx.Logf("%s:\n%s", description, format.Object(err, 0))
 	}
-	failf("%s: %v", description, err.Error())
+	fail("%s: %v", description, err.Error())
 	return false
 }
 
@@ -162,6 +232,30 @@ func buildDescription(explain ...interface{}) string {
 		}
 	}
 	return fmt.Sprintf(explain[0].(string), explain[1:]...)
+}
+
+// Expect wraps [gomega.Expect] such that a failure will be reported via
+// [TContext.Fatal]. As with [gomega.Expect], additional values
+// may get passed. Those values then all must be nil for the assertion
+// to pass. This can be used with functions which return a value
+// plus error. The error gets checked automatically.
+//
+//	myAmazingThing := func(int, error) { ...}
+//	tCtx.Expect(myAmazingThing()).Should(gomega.Equal(1))
+func (tCtx TContext) Expect(actual interface{}, extra ...interface{}) gomega.Assertion {
+	return gomegaAssertion(tCtx, true, actual, extra...)
+}
+
+// Require is an alias for Expect.
+func (tCtx TContext) Require(actual interface{}, extra ...interface{}) gomega.Assertion {
+	return gomegaAssertion(tCtx, true, actual, extra...)
+}
+
+// Assert also wraps [gomega.Expect], but in contrast to Expect = Require,
+// it reports a failure through [TContext.Error]. This makes it possible
+// to test several different assertions.
+func (tCtx TContext) Assert(actual interface{}, extra ...interface{}) gomega.Assertion {
+	return gomegaAssertion(tCtx, false, actual, extra...)
 }
 
 // Eventually wraps [gomega.Eventually]. Supported argument types are:
@@ -233,39 +327,41 @@ func buildDescription(explain ...interface{}) string {
 //	    return value
 //	 }
 //	 tCtx.Eventually(cb).Should(gomega.Equal(42), "should be the answer to everything")
-func (tc *TC) Eventually(arg any) gomega.AsyncAssertion {
-	tc.Helper()
-	return tc.newAsyncAssertion(gomega.NewWithT(tc).Eventually, arg)
+func (tCtx TContext) Eventually(arg any) gomega.AsyncAssertion {
+	tCtx.Helper()
+	return tCtx.newAsyncAssertion(gomega.NewWithT(tCtx).Eventually, arg)
 }
 
 // AssertEventually is a variant of Eventually which merely records a failure
 // without stopping the test.
-func (tc *TC) AssertEventually(arg any) gomega.AsyncAssertion {
-	tc.Helper()
-	return tc.newAsyncAssertion(gomega.NewWithT(assertTestingT{tc}).Eventually, arg)
+func (tCtx TContext) AssertEventually(arg any) gomega.AsyncAssertion {
+	tCtx.Helper()
+	return tCtx.newAsyncAssertion(gomega.NewWithT(assertTestingT{tCtx}).Eventually, arg)
 }
 
 // Consistently wraps [gomega.Consistently] the same way as [Eventually] wraps
 // [gomega.Eventually].
-func (tc *TC) Consistently(arg any) gomega.AsyncAssertion {
-	tc.Helper()
-	return tc.newAsyncAssertion(gomega.NewWithT(tc).Consistently, arg)
+func (tCtx TContext) Consistently(arg any) gomega.AsyncAssertion {
+	tCtx.Helper()
+	return tCtx.newAsyncAssertion(gomega.NewWithT(tCtx).Consistently, arg)
 }
 
 // AssertConsistently is a variant of Consistently which merely records a failure
 // without stopping the test.
-func (tc *TC) AssertConsistently(arg any) gomega.AsyncAssertion {
-	tc.Helper()
-	return tc.newAsyncAssertion(gomega.NewWithT(assertTestingT{tc}).Consistently, arg)
+func (tCtx TContext) AssertConsistently(arg any) gomega.AsyncAssertion {
+	tCtx.Helper()
+	return tCtx.newAsyncAssertion(gomega.NewWithT(assertTestingT{tCtx}).Consistently, arg)
 }
 
-func (tc *TC) newAsyncAssertion(eventuallyOrConsistently func(actualOrCtx any, args ...any) gomega.AsyncAssertion, arg any) gomega.AsyncAssertion {
-	tc.Helper()
+// newAsyncAssertion must be kept identical to the corresponding newAsyncAssertion in
+// the client-go ktesting, minus the support for TContext from that package.
+func (tCtx TContext) newAsyncAssertion(eventuallyOrConsistently func(actualOrCtx any, args ...any) gomega.AsyncAssertion, arg any) gomega.AsyncAssertion {
+	tCtx.Helper()
 	// switch arg := arg.(type) {
 	// case func(tCtx TContext):
 	// 	// Tricky to handle via reflect, so let's cover this directly...
-	// 	return eventuallyOrConsistently(tc, func(g gomega.Gomega, ctx context.Context) (err error) {
-	// 		tCtx := WithContext(tc, ctx)
+	// 	return eventuallyOrConsistently(tCtx, func(g gomega.Gomega, ctx context.Context) (err error) {
+	// 		tCtx := WithContext(tCtx, ctx)
 	// 		tCtx, finalize := WithError(tCtx, &err)
 	// 		defer finalize()
 	// 		arg(tCtx)
@@ -274,12 +370,12 @@ func (tc *TC) newAsyncAssertion(eventuallyOrConsistently func(actualOrCtx any, a
 	v := reflect.ValueOf(arg)
 	if v.Kind() != reflect.Func {
 		// Gomega must deal with it.
-		return eventuallyOrConsistently(tc, arg)
+		return eventuallyOrConsistently(tCtx, arg)
 	}
 	t := v.Type()
 	if t.NumIn() == 0 || t.In(0) != tContextType {
 		// Not a function we can wrap.
-		return eventuallyOrConsistently(tc, arg)
+		return eventuallyOrConsistently(tCtx, arg)
 	}
 	// Build a wrapper function with context instead of TContext as first parameter.
 	// The wrapper then builds that TContext when called and invokes the actual function.
@@ -302,7 +398,7 @@ func (tc *TC) newAsyncAssertion(eventuallyOrConsistently func(actualOrCtx any, a
 	wrapperType := reflect.FuncOf(in, out, t.IsVariadic())
 	wrapper := reflect.MakeFunc(wrapperType, func(args []reflect.Value) (results []reflect.Value) {
 		var err error
-		tCtx, finalize := tc.WithContext(args[0].Interface().(context.Context)).
+		tCtx, finalize := tCtx.WithContext(args[0].Interface().(context.Context)).
 			WithCancel().
 			WithError(&err)
 		args[0] = reflect.ValueOf(tCtx)
@@ -324,8 +420,8 @@ func (tc *TC) newAsyncAssertion(eventuallyOrConsistently func(actualOrCtx any, a
 			// by finalize(), then results is still nil.
 			// We need to fill in null values.
 			if len(results) == 0 && t.NumOut() > 0 {
-				for i := range t.NumOut() {
-					results = append(results, reflect.New(t.Out(i)).Elem())
+				for t := range t.Outs() {
+					results = append(results, reflect.New(t).Elem())
 				}
 			}
 			if addErrResult {
@@ -339,7 +435,7 @@ func (tc *TC) newAsyncAssertion(eventuallyOrConsistently func(actualOrCtx any, a
 		defer finalize() // Must be called directly, otherwise it cannot recover a panic.
 		return v.Call(args)
 	})
-	return eventuallyOrConsistently(tc, wrapper.Interface())
+	return eventuallyOrConsistently(tCtx, wrapper.Interface())
 }
 
 var (

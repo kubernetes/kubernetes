@@ -113,22 +113,24 @@ func newGroup(suite *Suite) *group {
 // initialReportForSpec constructs a new SpecReport right before running the spec.
 func (g *group) initialReportForSpec(spec Spec) types.SpecReport {
 	return types.SpecReport{
-		ContainerHierarchyTexts:             spec.Nodes.WithType(types.NodeTypeContainer).Texts(),
-		ContainerHierarchyLocations:         spec.Nodes.WithType(types.NodeTypeContainer).CodeLocations(),
-		ContainerHierarchyLabels:            spec.Nodes.WithType(types.NodeTypeContainer).Labels(),
-		ContainerHierarchySemVerConstraints: spec.Nodes.WithType(types.NodeTypeContainer).SemVerConstraints(),
-		LeafNodeLocation:                    spec.FirstNodeWithType(types.NodeTypeIt).CodeLocation,
-		LeafNodeType:                        types.NodeTypeIt,
-		LeafNodeText:                        spec.FirstNodeWithType(types.NodeTypeIt).Text,
-		LeafNodeLabels:                      []string(spec.FirstNodeWithType(types.NodeTypeIt).Labels),
-		LeafNodeSemVerConstraints:           []string(spec.FirstNodeWithType(types.NodeTypeIt).SemVerConstraints),
-		ParallelProcess:                     g.suite.config.ParallelProcess,
-		RunningInParallel:                   g.suite.isRunningInParallel(),
-		IsSerial:                            spec.Nodes.HasNodeMarkedSerial(),
-		IsInOrderedContainer:                !spec.Nodes.FirstNodeMarkedOrdered().IsZero(),
-		MaxFlakeAttempts:                    spec.Nodes.GetMaxFlakeAttempts(),
-		MaxMustPassRepeatedly:               spec.Nodes.GetMaxMustPassRepeatedly(),
-		SpecPriority:                        spec.Nodes.GetSpecPriority(),
+		ContainerHierarchyTexts:                      spec.Nodes.WithType(types.NodeTypeContainer).Texts(),
+		ContainerHierarchyLocations:                  spec.Nodes.WithType(types.NodeTypeContainer).CodeLocations(),
+		ContainerHierarchyLabels:                     spec.Nodes.WithType(types.NodeTypeContainer).Labels(),
+		ContainerHierarchySemVerConstraints:          spec.Nodes.WithType(types.NodeTypeContainer).SemVerConstraints(),
+		ContainerHierarchyComponentSemVerConstraints: spec.Nodes.WithType(types.NodeTypeContainer).ComponentSemVerConstraints(),
+		LeafNodeLocation:                             spec.FirstNodeWithType(types.NodeTypeIt).CodeLocation,
+		LeafNodeType:                                 types.NodeTypeIt,
+		LeafNodeText:                                 spec.FirstNodeWithType(types.NodeTypeIt).Text,
+		LeafNodeLabels:                               []string(spec.FirstNodeWithType(types.NodeTypeIt).Labels),
+		LeafNodeSemVerConstraints:                    []string(spec.FirstNodeWithType(types.NodeTypeIt).SemVerConstraints),
+		LeafNodeComponentSemVerConstraints:           map[string][]string(spec.FirstNodeWithType(types.NodeTypeIt).ComponentSemVerConstraints),
+		ParallelProcess:                              g.suite.config.ParallelProcess,
+		RunningInParallel:                            g.suite.isRunningInParallel(),
+		IsSerial:                                     spec.Nodes.HasNodeMarkedSerial(),
+		IsInOrderedContainer:                         !spec.Nodes.FirstNodeMarkedOrdered().IsZero(),
+		MaxFlakeAttempts:                             spec.Nodes.GetMaxFlakeAttempts(),
+		MaxMustPassRepeatedly:                        spec.Nodes.GetMaxMustPassRepeatedly(),
+		SpecPriority:                                 spec.Nodes.GetSpecPriority(),
 	}
 }
 
@@ -152,6 +154,7 @@ func addNodeToReportForNode(report *types.ConstructionNodeReport, node *TreeNode
 	report.ContainerHierarchyLocations = append(report.ContainerHierarchyLocations, node.Node.CodeLocation)
 	report.ContainerHierarchyLabels = append(report.ContainerHierarchyLabels, node.Node.Labels)
 	report.ContainerHierarchySemVerConstraints = append(report.ContainerHierarchySemVerConstraints, node.Node.SemVerConstraints)
+	report.ContainerHierarchyComponentSemVerConstraints = append(report.ContainerHierarchyComponentSemVerConstraints, node.Node.ComponentSemVerConstraints)
 	if node.Node.MarkedSerial {
 		report.IsSerial = true
 	}
@@ -206,6 +209,21 @@ func (g *group) isLastSpecWithPair(specID uint, pair runOncePair) bool {
 		}
 	}
 	return lastSpecID == specID
+}
+
+func (g *group) willRunAnotherAttempt(isFinalAttempt bool) bool {
+	if isFinalAttempt {
+		return false
+	}
+
+	if g.suite.currentSpecReport.MaxMustPassRepeatedly > 0 {
+		return g.suite.currentSpecReport.State.Is(types.SpecStatePassed)
+	}
+	if g.suite.currentSpecReport.MaxFlakeAttempts > 0 {
+		return g.suite.currentSpecReport.State.Is(types.SpecStateFailureStates)
+	}
+
+	return false
 }
 
 func (g *group) attemptSpec(isFinalAttempt bool, spec Spec) bool {
@@ -277,10 +295,11 @@ func (g *group) attemptSpec(isFinalAttempt bool, spec Spec) bool {
 			}
 			// it's our last chance to run if we're the last spec for our oncePair
 			isLastSpecWithPair := g.isLastSpecWithPair(spec.SubjectID(), pair)
+			willRunAnotherAttempt := g.willRunAnotherAttempt(isFinalAttempt)
 
 			switch g.suite.currentSpecReport.State {
 			case types.SpecStatePassed: //this attempt is passing...
-				return isLastSpecWithPair //...we should run-once if we'this is our last chance
+				return isLastSpecWithPair && !willRunAnotherAttempt //...we should run-once if this is our last chance
 			case types.SpecStateSkipped: //the spec was skipped by the user...
 				if isLastSpecWithPair {
 					return true //...we're the last spec, so we should run the AfterNode
@@ -289,7 +308,7 @@ func (g *group) attemptSpec(isFinalAttempt bool, spec Spec) bool {
 					return true //...or, a run-once node at our nesting level was skipped which means this is our last chance to run
 				}
 			case types.SpecStateFailed, types.SpecStatePanicked, types.SpecStateTimedout: // the spec has failed...
-				if isFinalAttempt {
+				if !willRunAnotherAttempt {
 					if g.continueOnFailure {
 						return isLastSpecWithPair || failedInARunOnceBefore //...we're configured to continue on failures - so we should only run if we're the last spec for this pair or if we failed in a runOnceBefore (which means we _are_ the last spec to run)
 					} else {

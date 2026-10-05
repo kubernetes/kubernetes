@@ -21,19 +21,23 @@
 package pickfirst
 
 import (
+	"cmp"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"net"
 	"net/netip"
+	"slices"
 	"sync"
 	"time"
 
 	"google.golang.org/grpc/balancer"
 	"google.golang.org/grpc/balancer/pickfirst/internal"
 	"google.golang.org/grpc/connectivity"
-	expstats "google.golang.org/grpc/experimental/stats"
+	"google.golang.org/grpc/experimental/balancer/weight"
 	"google.golang.org/grpc/grpclog"
+	"google.golang.org/grpc/internal/envconfig"
 	internalgrpclog "google.golang.org/grpc/internal/grpclog"
 	"google.golang.org/grpc/internal/pretty"
 	"google.golang.org/grpc/resolver"
@@ -51,30 +55,7 @@ const Name = "pick_first"
 // attributes to indicate whether the health listener usage is enabled.
 type enableHealthListenerKeyType struct{}
 
-var (
-	logger               = grpclog.Component("pick-first-leaf-lb")
-	disconnectionsMetric = expstats.RegisterInt64Count(expstats.MetricDescriptor{
-		Name:        "grpc.lb.pick_first.disconnections",
-		Description: "EXPERIMENTAL. Number of times the selected subchannel becomes disconnected.",
-		Unit:        "{disconnection}",
-		Labels:      []string{"grpc.target"},
-		Default:     false,
-	})
-	connectionAttemptsSucceededMetric = expstats.RegisterInt64Count(expstats.MetricDescriptor{
-		Name:        "grpc.lb.pick_first.connection_attempts_succeeded",
-		Description: "EXPERIMENTAL. Number of successful connection attempts.",
-		Unit:        "{attempt}",
-		Labels:      []string{"grpc.target"},
-		Default:     false,
-	})
-	connectionAttemptsFailedMetric = expstats.RegisterInt64Count(expstats.MetricDescriptor{
-		Name:        "grpc.lb.pick_first.connection_attempts_failed",
-		Description: "EXPERIMENTAL. Number of failed connection attempts.",
-		Unit:        "{attempt}",
-		Labels:      []string{"grpc.target"},
-		Default:     false,
-	})
-)
+var logger = grpclog.Component("pick-first-leaf-lb")
 
 const (
 	// TODO: change to pick-first when this becomes the default pick_first policy.
@@ -96,11 +77,9 @@ const (
 
 type pickfirstBuilder struct{}
 
-func (pickfirstBuilder) Build(cc balancer.ClientConn, bo balancer.BuildOptions) balancer.Balancer {
+func (pickfirstBuilder) Build(cc balancer.ClientConn, _ balancer.BuildOptions) balancer.Balancer {
 	b := &pickfirstBalancer{
-		cc:              cc,
-		target:          bo.Target.String(),
-		metricsRecorder: cc.MetricsRecorder(),
+		cc: cc,
 
 		subConns:              resolver.NewAddressMapV2[*scData](),
 		state:                 connectivity.Connecting,
@@ -180,10 +159,8 @@ func (b *pickfirstBalancer) newSCData(addr resolver.Address) (*scData, error) {
 type pickfirstBalancer struct {
 	// The following fields are initialized at build time and read-only after
 	// that and therefore do not need to be guarded by a mutex.
-	logger          *internalgrpclog.PrefixLogger
-	cc              balancer.ClientConn
-	target          string
-	metricsRecorder expstats.MetricsRecorder // guaranteed to be non nil
+	logger *internalgrpclog.PrefixLogger
+	cc     balancer.ClientConn
 
 	// The mutex is used to ensure synchronization of updates triggered
 	// from the idle picker and the already serialized resolver,
@@ -258,8 +235,42 @@ func (b *pickfirstBalancer) UpdateClientConnState(state balancer.ClientConnState
 		// will change the order of endpoints but not touch the order of the
 		// addresses within each endpoint. - A61
 		if cfg.ShuffleAddressList {
-			endpoints = append([]resolver.Endpoint{}, endpoints...)
-			internal.RandShuffle(len(endpoints), func(i, j int) { endpoints[i], endpoints[j] = endpoints[j], endpoints[i] })
+			if envconfig.PickFirstWeightedShuffling {
+				type weightedEndpoint struct {
+					endpoint resolver.Endpoint
+					weight   float64
+				}
+
+				// For each endpoint, compute a key as described in A113 and
+				// https://utopia.duth.gr/~pefraimi/research/data/2007EncOfAlg.pdf:
+				var weightedEndpoints []weightedEndpoint
+				for _, endpoint := range endpoints {
+					u := internal.RandFloat64() // Random number in [0.0, 1.0)
+					weight := weightAttribute(endpoint)
+					weightedEndpoints = append(weightedEndpoints, weightedEndpoint{
+						endpoint: endpoint,
+						weight:   math.Pow(u, 1.0/float64(weight)),
+					})
+				}
+				// Sort endpoints by key in descending order and reconstruct the
+				// endpoints slice.
+				slices.SortFunc(weightedEndpoints, func(a, b weightedEndpoint) int {
+					return cmp.Compare(b.weight, a.weight)
+				})
+
+				// Here, and in the "else" block below, we clone the endpoints
+				// slice to avoid mutating the resolver state. Doing the latter
+				// would lead to data races if the caller is accessing the same
+				// slice concurrently.
+				sortedEndpoints := make([]resolver.Endpoint, len(endpoints))
+				for i, we := range weightedEndpoints {
+					sortedEndpoints[i] = we.endpoint
+				}
+				endpoints = sortedEndpoints
+			} else {
+				endpoints = slices.Clone(endpoints)
+				internal.RandShuffle(len(endpoints), func(i, j int) { endpoints[i], endpoints[j] = endpoints[j], endpoints[i] })
+			}
 		}
 
 		// "Flatten the list by concatenating the ordered list of addresses for
@@ -360,14 +371,14 @@ func (b *pickfirstBalancer) startFirstPassLocked() {
 	b.firstPass = true
 	b.numTF = 0
 	// Reset the connection attempt record for existing SubConns.
-	for _, sd := range b.subConns.Values() {
+	for _, sd := range b.subConns.All() {
 		sd.connectionFailedInFirstPass = false
 	}
 	b.requestConnectionLocked()
 }
 
 func (b *pickfirstBalancer) closeSubConnsLocked() {
-	for _, sd := range b.subConns.Values() {
+	for _, sd := range b.subConns.All() {
 		sd.subConn.Shutdown()
 	}
 	b.subConns = resolver.NewAddressMapV2[*scData]()
@@ -467,7 +478,7 @@ func (b *pickfirstBalancer) reconcileSubConnsLocked(newAddrs []resolver.Address)
 		newAddrsMap.Set(addr, true)
 	}
 
-	for _, oldAddr := range b.subConns.Keys() {
+	for oldAddr := range b.subConns.All() {
 		if _, ok := newAddrsMap.Get(oldAddr); ok {
 			continue
 		}
@@ -481,7 +492,7 @@ func (b *pickfirstBalancer) reconcileSubConnsLocked(newAddrs []resolver.Address)
 // becomes ready, which means that all other subConn must be shutdown.
 func (b *pickfirstBalancer) shutdownRemainingLocked(selected *scData) {
 	b.cancelConnectionTimer()
-	for _, sd := range b.subConns.Values() {
+	for _, sd := range b.subConns.All() {
 		if sd.subConn != selected.subConn {
 			sd.subConn.Shutdown()
 		}
@@ -594,14 +605,11 @@ func (b *pickfirstBalancer) updateSubConnState(sd *scData, newState balancer.Sub
 		return
 	}
 
-	// Record a connection attempt when exiting CONNECTING.
 	if newState.ConnectivityState == connectivity.TransientFailure {
 		sd.connectionFailedInFirstPass = true
-		connectionAttemptsFailedMetric.Record(b.metricsRecorder, 1, b.target)
 	}
 
 	if newState.ConnectivityState == connectivity.Ready {
-		connectionAttemptsSucceededMetric.Record(b.metricsRecorder, 1, b.target)
 		b.shutdownRemainingLocked(sd)
 		if !b.addressList.seekTo(sd.addr) {
 			// This should not fail as we should have only one SubConn after
@@ -650,15 +658,6 @@ func (b *pickfirstBalancer) updateSubConnState(sd *scData, newState balancer.Sub
 		// the first address when the picker is used.
 		b.shutdownRemainingLocked(sd)
 		sd.effectiveState = newState.ConnectivityState
-		// READY SubConn interspliced in between CONNECTING and IDLE, need to
-		// account for that.
-		if oldState == connectivity.Connecting {
-			// A known issue (https://github.com/grpc/grpc-go/issues/7862)
-			// causes a race that prevents the READY state change notification.
-			// This works around it.
-			connectionAttemptsSucceededMetric.Record(b.metricsRecorder, 1, b.target)
-		}
-		disconnectionsMetric.Record(b.metricsRecorder, 1, b.target)
 		b.addressList.reset()
 		b.updateBalancerState(balancer.State{
 			ConnectivityState: connectivity.Idle,
@@ -732,7 +731,7 @@ func (b *pickfirstBalancer) endFirstPassIfPossibleLocked(lastErr error) {
 	}
 	// Connect() has been called on all the SubConns. The first pass can be
 	// ended if all the SubConns have reported a failure.
-	for _, sd := range b.subConns.Values() {
+	for _, sd := range b.subConns.All() {
 		if !sd.connectionFailedInFirstPass {
 			return
 		}
@@ -743,7 +742,7 @@ func (b *pickfirstBalancer) endFirstPassIfPossibleLocked(lastErr error) {
 		Picker:            &picker{err: lastErr},
 	})
 	// Start re-connecting all the SubConns that are already in IDLE.
-	for _, sd := range b.subConns.Values() {
+	for _, sd := range b.subConns.All() {
 		if sd.rawConnectivityState == connectivity.Idle {
 			sd.subConn.Connect()
 		}
@@ -905,4 +904,18 @@ func (al *addressList) hasNext() bool {
 func equalAddressIgnoringBalAttributes(a, b *resolver.Address) bool {
 	return a.Addr == b.Addr && a.ServerName == b.ServerName &&
 		a.Attributes.Equal(b.Attributes)
+}
+
+// weightAttribute is a convenience function which returns the value of the
+// weight endpoint Attribute.
+//
+// When used in the xDS context, the weight attribute is guaranteed to be
+// non-zero. But, when used in a non-xDS context, the weight attribute could be
+// unset. A Default of 1 is used in the latter case.
+func weightAttribute(e resolver.Endpoint) uint32 {
+	w := weight.FromEndpoint(e).Weight
+	if w == 0 {
+		return 1
+	}
+	return w
 }

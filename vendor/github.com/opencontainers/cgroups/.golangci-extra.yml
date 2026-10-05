@@ -19,3 +19,11 @@ linters:
         - -QF1008 # https://staticcheck.dev/docs/checks/#QF1008 Omit embedded fields from selector expression.
   exclusions:
     generated: strict
+    rules:
+      # Legacy names we can't change without breaking compatibility.
+      - path: stats.go
+        text: "(type|struct field) (CpuUsage|CpuStats) should be "
+      - path: config_linux.go
+        text: "struct field (CpuShares|CpuQuota|CpuBurst|CpuPeriod|CpuRtRuntime|CpuRtPeriod|CpuWeight) should be "
+      - path: devices/config/device.go
+        text: "struct field (Uid|Gid) should be "

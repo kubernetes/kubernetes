@@ -77,12 +77,17 @@ const (
 type Features struct {
 	// Sorted alphabetically. When adding a new entry, also extend Set and FeaturesAll.
 
-	AdminAccess            bool
-	ConsumableCapacity     bool
-	DeviceBindingAndStatus bool
-	DeviceTaints           bool
-	PartitionableDevices   bool
-	PrioritizedList        bool
+	AdminAccess             bool
+	CompatibilityGroups     bool
+	ConsumableCapacity      bool
+	DerivedAttributes       bool
+	DeviceBindingAndStatus  bool
+	DeviceTaints            bool
+	FractionalCapacityRange bool
+	ListTypeAttributes      bool
+	OptionalNodeOperations  bool
+	PartitionableDevices    bool
+	PrioritizedList         bool
 }
 
 // Set returns all features which are set to true.
@@ -96,11 +101,26 @@ func (f Features) Set() sets.Set[string] {
 	if f.AdminAccess {
 		enabled.Insert("DRAAdminAccess")
 	}
+	if f.CompatibilityGroups {
+		enabled.Insert("DRADeviceCompatibilityGroups")
+	}
 	if f.ConsumableCapacity {
 		enabled.Insert("DRAConsumableCapacity")
 	}
+	if f.DerivedAttributes {
+		enabled.Insert("DRADerivedAttributes")
+	}
 	if f.DeviceTaints {
 		enabled.Insert("DRADeviceTaints")
+	}
+	if f.FractionalCapacityRange {
+		enabled.Insert("DRAFractionalCapacityRange")
+	}
+	if f.ListTypeAttributes {
+		enabled.Insert("DRAListTypeAttributes")
+	}
+	if f.OptionalNodeOperations {
+		enabled.Insert("DRAOptionalNodeOperations")
 	}
 	if f.PartitionableDevices {
 		enabled.Insert("DRAPartitionableDevices")
@@ -115,10 +135,15 @@ func (f Features) Set() sets.Set[string] {
 }
 
 var FeaturesAll = Features{
-	AdminAccess:            true,
-	ConsumableCapacity:     true,
-	DeviceBindingAndStatus: true,
-	DeviceTaints:           true,
-	PartitionableDevices:   true,
-	PrioritizedList:        true,
+	AdminAccess:             true,
+	CompatibilityGroups:     true,
+	ConsumableCapacity:      true,
+	DerivedAttributes:       true,
+	DeviceBindingAndStatus:  true,
+	DeviceTaints:            true,
+	FractionalCapacityRange: true,
+	ListTypeAttributes:      true,
+	OptionalNodeOperations:  true,
+	PartitionableDevices:    true,
+	PrioritizedList:         true,
 }

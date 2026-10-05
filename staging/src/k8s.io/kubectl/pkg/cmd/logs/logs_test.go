@@ -64,6 +64,7 @@ func TestLog(t *testing.T) {
 				}
 
 				o := NewLogsOptions(streams)
+				o.GetPodTimeout = 5 * time.Millisecond
 				o.LogsForObject = mock.mockLogsForObject
 				o.ConsumeRequestFn = mock.mockConsumeRequest
 
@@ -85,6 +86,7 @@ func TestLog(t *testing.T) {
 				}
 
 				o := NewLogsOptions(streams)
+				o.GetPodTimeout = 5 * time.Millisecond
 				o.LogsForObject = mock.mockLogsForObject
 				o.ConsumeRequestFn = mock.mockConsumeRequest
 				o.Prefix = true
@@ -112,6 +114,7 @@ func TestLog(t *testing.T) {
 				}
 
 				o := NewLogsOptions(streams)
+				o.GetPodTimeout = 5 * time.Millisecond
 				o.LogsForObject = mock.mockLogsForObject
 				o.ConsumeRequestFn = mock.mockConsumeRequest
 				o.Prefix = true
@@ -136,6 +139,7 @@ func TestLog(t *testing.T) {
 				}
 
 				o := NewLogsOptions(streams)
+				o.GetPodTimeout = 5 * time.Millisecond
 				o.LogsForObject = mock.mockLogsForObject
 				o.ConsumeRequestFn = mock.mockConsumeRequest
 				o.Prefix = true
@@ -158,6 +162,7 @@ func TestLog(t *testing.T) {
 				}
 
 				o := NewLogsOptions(streams)
+				o.GetPodTimeout = 5 * time.Millisecond
 				o.LogsForObject = mock.mockLogsForObject
 				o.ConsumeRequestFn = mock.mockConsumeRequest
 				o.Prefix = true
@@ -190,6 +195,7 @@ func TestLog(t *testing.T) {
 				}
 
 				o := NewLogsOptions(streams)
+				o.GetPodTimeout = 5 * time.Millisecond
 				o.LogsForObject = mock.mockLogsForObject
 				o.ConsumeRequestFn = mock.mockConsumeRequest
 				return o
@@ -210,23 +216,36 @@ func TestLog(t *testing.T) {
 							Kind:      "Pod",
 							Name:      "some-pod-1",
 							FieldPath: "spec.containers{some-container-1}",
-						}: &responseWrapperMock{data: strings.NewReader("test log content from source 1\n")},
+						}: &statefulResponseWrapperMock{
+							results: []mockResult{
+								{data: strings.NewReader("test log content from source 1\n")},
+							},
+						},
 						{
 							Kind:      "Pod",
 							Name:      "some-pod-2",
 							FieldPath: "spec.containers{some-container-2}",
-						}: &responseWrapperMock{data: strings.NewReader("test log content from source 2\n")},
+						}: &statefulResponseWrapperMock{
+							results: []mockResult{
+								{data: strings.NewReader("test log content from source 2\n")},
+							},
+						},
 						{
 							Kind:      "Pod",
 							Name:      "some-pod-3",
 							FieldPath: "spec.containers{some-container-3}",
-						}: &responseWrapperMock{data: strings.NewReader("test log content from source 3\n")},
+						}: &statefulResponseWrapperMock{
+							results: []mockResult{
+								{data: strings.NewReader("test log content from source 3\n")},
+							},
+						},
 					},
 					wg: wg,
 				}
 				wg.Add(3)
 
 				o := NewLogsOptions(streams)
+				o.GetPodTimeout = 5 * time.Millisecond
 				o.LogsForObject = mock.mockLogsForObject
 				o.ConsumeRequestFn = mock.mockConsumeRequest
 				o.Follow = true
@@ -268,6 +287,7 @@ func TestLog(t *testing.T) {
 				o.LogsForObject = mock.mockLogsForObject
 				o.ConsumeRequestFn = mock.mockConsumeRequest
 				o.MaxFollowConcurrency = 2
+				o.GetPodTimeout = 5 * time.Millisecond
 				o.Follow = true
 				return o
 			},
@@ -277,6 +297,7 @@ func TestLog(t *testing.T) {
 			name: "fail if LogsForObject fails",
 			opts: func(streams genericiooptions.IOStreams) *LogsOptions {
 				o := NewLogsOptions(streams)
+				o.GetPodTimeout = 5 * time.Millisecond
 				o.LogsForObject = func(restClientGetter genericclioptions.RESTClientGetter, object, options runtime.Object, timeout time.Duration, allContainers bool) (map[corev1.ObjectReference]restclient.ResponseWrapper, error) {
 					return nil, errors.New("Error from the LogsForObject")
 				}
@@ -303,6 +324,7 @@ func TestLog(t *testing.T) {
 				}
 
 				o := NewLogsOptions(streams)
+				o.GetPodTimeout = 5 * time.Millisecond
 				o.LogsForObject = mock.mockLogsForObject
 				o.ConsumeRequestFn = func(ctx context.Context, req restclient.ResponseWrapper, out io.Writer) error {
 					return errors.New("Error from the ConsumeRequestFn")
@@ -321,17 +343,29 @@ func TestLog(t *testing.T) {
 							Kind:      "Pod",
 							Name:      "test-pod-1",
 							FieldPath: "spec.containers{test-container-1}",
-						}: &responseWrapperMock{data: strings.NewReader("test log content from source 1\n")},
+						}: &statefulResponseWrapperMock{
+							results: []mockResult{
+								{data: strings.NewReader("test log content from source 1\n")},
+							},
+						},
 						{
 							Kind:      "Pod",
 							Name:      "test-pod-2",
 							FieldPath: "spec.containers{test-container-2}",
-						}: &responseWrapperMock{data: strings.NewReader("test log content from source 2\n")},
+						}: &statefulResponseWrapperMock{
+							results: []mockResult{
+								{data: strings.NewReader("test log content from source 2\n")},
+							},
+						},
 						{
 							Kind:      "Pod",
 							Name:      "test-pod-3",
 							FieldPath: "spec.containers{test-container-3}",
-						}: &responseWrapperMock{data: strings.NewReader("test log content from source 3\n")},
+						}: &statefulResponseWrapperMock{
+							results: []mockResult{
+								{data: strings.NewReader("test log content from source 3\n")},
+							},
+						},
 					},
 					wg: wg,
 				}
@@ -340,6 +374,7 @@ func TestLog(t *testing.T) {
 				o := NewLogsOptions(streams)
 				o.LogsForObject = mock.mockLogsForObject
 				o.ConsumeRequestFn = mock.mockConsumeRequest
+				o.GetPodTimeout = 5 * time.Millisecond
 				o.Follow = true
 				o.Prefix = true
 				return o
@@ -360,17 +395,29 @@ func TestLog(t *testing.T) {
 							Kind:      "Pod",
 							Name:      "test-pod-1",
 							FieldPath: "spec.containers{test-container-1}",
-						}: &responseWrapperMock{},
+						}: &statefulResponseWrapperMock{
+							results: []mockResult{
+								{},
+							},
+						},
 						{
 							Kind:      "Pod",
 							Name:      "test-pod-2",
 							FieldPath: "spec.containers{test-container-2}",
-						}: &responseWrapperMock{},
+						}: &statefulResponseWrapperMock{
+							results: []mockResult{
+								{},
+							},
+						},
 						{
 							Kind:      "Pod",
 							Name:      "test-pod-3",
 							FieldPath: "spec.containers{test-container-3}",
-						}: &responseWrapperMock{},
+						}: &statefulResponseWrapperMock{
+							results: []mockResult{
+								{},
+							},
+						},
 					},
 					wg: wg,
 				}
@@ -382,6 +429,7 @@ func TestLog(t *testing.T) {
 					return errors.New("Error from the ConsumeRequestFn")
 				}
 				o.Follow = true
+				o.GetPodTimeout = 5 * time.Millisecond
 				return o
 			},
 			expectedErr: "Error from the ConsumeRequestFn",
@@ -405,6 +453,7 @@ func TestLog(t *testing.T) {
 					return errors.New("Error from the ConsumeRequestFn")
 				}
 				o.Follow = true
+				o.GetPodTimeout = 5 * time.Millisecond
 				return o
 			},
 			expectedErr: "Error from the ConsumeRequestFn",
@@ -433,6 +482,7 @@ func TestLog(t *testing.T) {
 				}
 
 				o := NewLogsOptions(streams)
+				o.GetPodTimeout = 5 * time.Millisecond
 				o.LogsForObject = mock.mockLogsForObject
 				o.ConsumeRequestFn = mock.mockConsumeRequest
 				o.IgnoreLogErrors = true
@@ -463,6 +513,7 @@ func TestLog(t *testing.T) {
 				}
 
 				o := NewLogsOptions(streams)
+				o.GetPodTimeout = 5 * time.Millisecond
 				o.LogsForObject = mock.mockLogsForObject
 				o.ConsumeRequestFn = mock.mockConsumeRequest
 				return o
@@ -494,6 +545,7 @@ func TestLog(t *testing.T) {
 
 				o := NewLogsOptions(streams)
 				o.LogsForObject = mock.mockLogsForObject
+				o.GetPodTimeout = 5 * time.Millisecond
 				o.ConsumeRequestFn = mock.mockConsumeRequest
 				o.IgnoreLogErrors = true
 				o.Follow = true
@@ -527,9 +579,72 @@ func TestLog(t *testing.T) {
 				o.LogsForObject = mock.mockLogsForObject
 				o.ConsumeRequestFn = mock.mockConsumeRequest
 				o.Follow = true
+				o.GetPodTimeout = 5 * time.Second
 				return o
 			},
 			expectedErr: "error-container",
+		},
+		{
+			name: "follow logs with retry on waiting container",
+			opts: func(streams genericiooptions.IOStreams) *LogsOptions {
+				mock := &logTestMock{
+					logsForObjectRequests: map[corev1.ObjectReference]restclient.ResponseWrapper{
+						{
+							Kind:      "Pod",
+							Name:      "some-pod",
+							FieldPath: "spec.containers{some-container}",
+						}: &statefulResponseWrapperMock{
+							results: []mockResult{
+								{
+									err: apierrors.NewBadRequest("container \"some-container\" in pod \"some-pod\" is waiting to start: ContainerCreating"),
+								},
+								{
+									data: strings.NewReader("test log content\n"),
+								},
+							},
+						},
+					},
+				}
+				o := NewLogsOptions(streams)
+				o.LogsForObject = mock.mockLogsForObject
+				o.ConsumeRequestFn = mock.mockConsumeRequest
+				o.Follow = true
+				o.GetPodTimeout = 5 * time.Second
+				return o
+			},
+			expectedOutSubstrings: []string{
+				"test log content\n",
+			},
+		},
+		{
+			name: "follow logs with retry and timeout",
+			opts: func(streams genericiooptions.IOStreams) *LogsOptions {
+				mock := &logTestMock{
+					logsForObjectRequests: map[corev1.ObjectReference]restclient.ResponseWrapper{
+						{
+							Kind:      "Pod",
+							Name:      "some-pod",
+							FieldPath: "spec.containers{some-container}",
+						}: &statefulResponseWrapperMock{
+							results: []mockResult{
+								{
+									err: apierrors.NewBadRequest("container \"some-container\" in pod \"some-pod\" is waiting to start: ContainerCreating"),
+								},
+								{
+									err: apierrors.NewBadRequest("container \"some-container\" in pod \"some-pod\" is waiting to start: ContainerCreating"),
+								},
+							},
+						},
+					},
+				}
+				o := NewLogsOptions(streams)
+				o.LogsForObject = mock.mockLogsForObject
+				o.ConsumeRequestFn = mock.mockConsumeRequest
+				o.Follow = true
+				o.GetPodTimeout = 1 * time.Millisecond
+				return o
+			},
+			expectedErr: "context deadline exceeded",
 		},
 	}
 	for _, test := range tests {
@@ -538,6 +653,7 @@ func TestLog(t *testing.T) {
 			defer tf.Cleanup()
 
 			streams, _, buf, _ := genericiooptions.NewTestIOStreams()
+			streams.ErrOut = &threadSafeWriter{writer: streams.ErrOut}
 
 			opts := test.opts(streams)
 			opts.Namespace = "test"
@@ -967,4 +1083,44 @@ func (l *logTestMock) mockLogsForObject(restClientGetter genericclioptions.RESTC
 	default:
 		return nil, fmt.Errorf("cannot get the logs from %T", object)
 	}
+}
+
+type mockResult struct {
+	err  error
+	data io.Reader
+}
+
+type statefulResponseWrapperMock struct {
+	lock    sync.Mutex
+	calls   int
+	results []mockResult
+}
+
+func (r *statefulResponseWrapperMock) DoRaw(context.Context) ([]byte, error) {
+	return nil, nil
+}
+
+func (r *statefulResponseWrapperMock) Stream(context.Context) (io.ReadCloser, error) {
+	r.lock.Lock()
+	defer r.lock.Unlock()
+	if r.calls >= len(r.results) {
+		return nil, fmt.Errorf("unexpected call %d", r.calls)
+	}
+	res := r.results[r.calls]
+	r.calls++
+	if res.err != nil {
+		return nil, res.err
+	}
+	return io.NopCloser(res.data), nil
+}
+
+type threadSafeWriter struct {
+	mu     sync.Mutex
+	writer io.Writer
+}
+
+func (tsw *threadSafeWriter) Write(p []byte) (n int, err error) {
+	tsw.mu.Lock()
+	defer tsw.mu.Unlock()
+	return tsw.writer.Write(p)
 }

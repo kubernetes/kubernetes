@@ -21,16 +21,16 @@ import (
 	"net/http"
 
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
+	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
-	semconv "go.opentelemetry.io/otel/semconv/v1.17.0"
 	oteltrace "go.opentelemetry.io/otel/trace"
 	noopoteltrace "go.opentelemetry.io/otel/trace/noop"
 
 	"k8s.io/client-go/transport"
-	"k8s.io/component-base/tracing/api/v1"
+	v1 "k8s.io/component-base/tracing/api/v1"
 )
 
 // TracerProvider is an OpenTelemetry TracerProvider which can be shut down
@@ -101,7 +101,7 @@ func WithTracing(handler http.Handler, tp oteltrace.TracerProvider, spanName str
 		// Add the http.target attribute to the otelhttp span
 		// Workaround for https://github.com/open-telemetry/opentelemetry-go-contrib/issues/3743
 		if r.URL != nil {
-			oteltrace.SpanFromContext(r.Context()).SetAttributes(semconv.HTTPTarget(r.URL.RequestURI()))
+			oteltrace.SpanFromContext(r.Context()).SetAttributes(attribute.Key("http.target").String(r.URL.RequestURI()))
 		}
 		handler.ServeHTTP(w, r)
 	})

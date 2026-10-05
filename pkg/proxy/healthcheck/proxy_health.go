@@ -203,7 +203,8 @@ func (hs *ProxyHealthServer) Run(ctx context.Context) error {
 	serveMux.Handle("/livez", livezHandler{hs: hs})
 	server := hs.httpFactory.New(serveMux)
 
-	listener, err := hs.listener.Listen(ctx, hs.addr)
+	// using MultiListen to support both IPv4 and IPv6 addresses.
+	listener, err := hs.listener.Listen(ctx, "tcp", hs.addr)
 	if err != nil {
 		return fmt.Errorf("failed to start proxy healthz on %s: %w", hs.addr, err)
 	}

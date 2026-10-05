@@ -12,6 +12,10 @@ import (
 	"golang.org/x/text/language"
 )
 
+// A Message holds a collection of translations for the same phrase that may
+// vary based on the values of substitution arguments.
+type Message = catmsg.Message
+
 // TODO:
 // Dictionary returns a Dictionary that returns the first Message, using the
 // given language tag, that matches:
@@ -38,7 +42,7 @@ func (b *Builder) lookup(tag language.Tag, key string) (data string, ok bool) {
 }
 
 func (c *Builder) set(tag language.Tag, key string, s *store, msg ...Message) error {
-	data, err := catmsg.Compile(tag, &dict{&c.macros, tag}, firstInSequence(msg))
+	data, err := catmsg.Compile(tag, &dict{&c.macros, tag}, catmsg.FirstOf(msg))
 
 	s.mutex.Lock()
 	defer s.mutex.Unlock()

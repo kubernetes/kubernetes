@@ -28,7 +28,6 @@ import (
 	"github.com/onsi/gomega"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
-	apiextensionsfeatures "k8s.io/apiextensions-apiserver/pkg/features"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -41,7 +40,7 @@ import (
 	"k8s.io/kubernetes/test/utils/crd"
 )
 
-var _ = SIGDescribe("CRDValidationRatcheting [Privileged:ClusterAdmin]", framework.WithFeatureGate(apiextensionsfeatures.CRDValidationRatcheting), func() {
+var _ = SIGDescribe("CRDValidationRatcheting [Privileged:ClusterAdmin]", func() {
 	f := framework.NewDefaultFramework("crd-validation-ratcheting")
 	var apiExtensionClient *clientset.Clientset
 	var dynamicClient dynamic.Interface

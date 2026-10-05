@@ -10,6 +10,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"math"
 
 	"google.golang.org/protobuf/encoding/protowire"
 	"google.golang.org/protobuf/internal/errors"
@@ -117,7 +118,13 @@ func (o UnmarshalOptions) UnmarshalFrom(r Reader, m proto.Message) error {
 	if maxSize == 0 {
 		maxSize = defaultMaxSize
 	}
-	if maxSize != -1 && size > uint64(maxSize) {
+	if maxSize == -1 {
+		// No limit specified: Just check that size fits into an integer,
+		// otherwise the make([]byte, size) call below will panic.
+		if size > math.MaxInt {
+			return errors.Wrap(&SizeTooLargeError{Size: size, MaxSize: math.MaxInt}, "")
+		}
+	} else if size > uint64(maxSize) {
 		return errors.Wrap(&SizeTooLargeError{Size: size, MaxSize: uint64(maxSize)}, "")
 	}
 

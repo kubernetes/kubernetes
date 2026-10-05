@@ -75,7 +75,6 @@ var _ = SIGDescribe("StaticPod", framework.WithSerial(), func() {
 			})
 
 			var initCtrID string
-			var startTime *metav1.Time
 			mirrorPodName := fmt.Sprintf("%s-%s", staticPod.Name, framework.TestContext.NodeName)
 			ginkgo.By("wait for the mirror pod to be updated")
 			gomega.Eventually(ctx, func(g gomega.Gomega) {
@@ -85,9 +84,10 @@ var _ = SIGDescribe("StaticPod", framework.WithSerial(), func() {
 				cstatus := pod.Status.InitContainerStatuses[0]
 				// Wait until the init container is terminated.
 				g.Expect(cstatus.State.Terminated).NotTo(gomega.BeNil())
+				g.Expect(cstatus.State.Terminated.Reason).To(gomega.Equal("Completed"))
+				g.Expect(cstatus.State.Terminated.ExitCode).To(gomega.BeZero())
 				g.Expect(cstatus.State.Terminated.ContainerID).NotTo(gomega.BeEmpty())
 				initCtrID = cstatus.ContainerID
-				startTime = pod.Status.StartTime
 			}, 2*time.Minute, 5*time.Second).Should(gomega.Succeed())
 
 			ginkgo.By("remove init container")
@@ -96,14 +96,10 @@ var _ = SIGDescribe("StaticPod", framework.WithSerial(), func() {
 			ginkgo.By("restart kubelet")
 			startKubelet := mustStopKubelet(ctx, f)
 			startKubelet(ctx)
-			gomega.Eventually(ctx, func() bool {
-				return kubeletHealthCheck(kubeletHealthCheckURL)
-			}, f.Timeouts.PodStart, f.Timeouts.Poll).Should(gomega.BeTrueBecause("kubelet should be started"))
 
 			ginkgo.By("wait for the mirror pod to be updated")
 			gomega.Eventually(ctx, func(g gomega.Gomega) {
 				pod, err := f.ClientSet.CoreV1().Pods(staticPod.Namespace).Get(ctx, mirrorPodName, metav1.GetOptions{})
-				g.Expect(pod.Status.StartTime).NotTo(gomega.Equal(startTime))
 				g.Expect(err).Should(gomega.Succeed())
 				g.Expect(pod.Status.InitContainerStatuses).To(gomega.HaveLen(1))
 				cstatus := pod.Status.InitContainerStatuses[0]
@@ -111,6 +107,7 @@ var _ = SIGDescribe("StaticPod", framework.WithSerial(), func() {
 				g.Expect(cstatus.State.Terminated).NotTo(gomega.BeNil())
 				g.Expect(cstatus.State.Terminated.Reason).To(gomega.Equal("Completed"))
 				g.Expect(cstatus.State.Terminated.ExitCode).To(gomega.BeZero())
+				g.Expect(cstatus.State.Terminated.Message).To(gomega.ContainSubstring("Unable to get init container status"))
 			}, 2*time.Minute, 5*time.Second).Should(gomega.Succeed())
 		})
 	})
@@ -151,7 +148,6 @@ var _ = SIGDescribe("StaticPod", framework.WithSerial(), func() {
 			})
 
 			var sidecarCtrID string
-			var startTime *metav1.Time
 			mirrorPodName := fmt.Sprintf("%s-%s", staticPod.Name, framework.TestContext.NodeName)
 			ginkgo.By("wait for the mirror pod to be updated")
 			gomega.Eventually(ctx, func(g gomega.Gomega) {
@@ -162,7 +158,6 @@ var _ = SIGDescribe("StaticPod", framework.WithSerial(), func() {
 				// Wait until the sidecar container starts running.
 				g.Expect(cstatus.State.Running).NotTo(gomega.BeNil())
 				sidecarCtrID = cstatus.ContainerID
-				startTime = pod.Status.StartTime
 			}, 2*time.Minute, 5*time.Second).Should(gomega.Succeed())
 
 			// Stop kubelet first not to restart the sidecar container.
@@ -174,19 +169,16 @@ var _ = SIGDescribe("StaticPod", framework.WithSerial(), func() {
 
 			ginkgo.By("start kubelet")
 			startKubelet(ctx)
-			gomega.Eventually(ctx, func() bool {
-				return kubeletHealthCheck(kubeletHealthCheckURL)
-			}, f.Timeouts.PodStart, f.Timeouts.Poll).Should(gomega.BeTrueBecause("kubelet should be started"))
 
 			ginkgo.By("wait for the mirror pod to be updated")
 			gomega.Eventually(ctx, func(g gomega.Gomega) {
 				pod, err := f.ClientSet.CoreV1().Pods(staticPod.Namespace).Get(ctx, mirrorPodName, metav1.GetOptions{})
-				g.Expect(pod.Status.StartTime).NotTo(gomega.Equal(startTime))
 				g.Expect(err).Should(gomega.Succeed())
 				g.Expect(pod.Status.InitContainerStatuses).To(gomega.HaveLen(1))
 				cstatus := pod.Status.InitContainerStatuses[0]
 				// Sidecar container should be restarted and running.
 				g.Expect(cstatus.State.Running).NotTo(gomega.BeNil())
+				g.Expect(cstatus.ContainerID).NotTo(gomega.Equal(sidecarCtrID))
 			}, 2*time.Minute, 5*time.Second).Should(gomega.Succeed())
 		})
 	})
@@ -210,7 +202,7 @@ func createStaticPodFromPod(dir string, pod *v1.Pod) (string, error) {
 }
 
 func removeInitContainer(ctx context.Context, ctrID string) {
-	cricli, _, err := getCRIClient()
+	cricli, _, err := getCRIClient(ctx)
 	framework.ExpectNoError(err)
 	splitID := strings.Split(ctrID, "://")
 	gomega.Expect(splitID).To(gomega.HaveLen(2))

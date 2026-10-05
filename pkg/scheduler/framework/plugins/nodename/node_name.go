@@ -21,16 +21,16 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 )
 
 // NodeName is a plugin that checks if a pod spec node name matches the current node.
-type NodeName struct {
-	enableSchedulingQueueHint bool
-}
+type NodeName struct{}
 
+var _ fwk.PreFilterPlugin = &NodeName{}
 var _ fwk.FilterPlugin = &NodeName{}
 var _ fwk.EnqueueExtensions = &NodeName{}
 var _ fwk.SignPlugin = &NodeName{}
@@ -46,20 +46,10 @@ const (
 // EventsToRegister returns the possible events that may make a Pod
 // failed by this plugin schedulable.
 func (pl *NodeName) EventsToRegister(_ context.Context) ([]fwk.ClusterEventWithHint, error) {
-	// A note about UpdateNodeTaint/UpdateNodeLabel event:
-	// Ideally, it's supposed to register only Add because any Node update event will never change the result from this plugin.
-	// But, we may miss Node/Add event due to preCheck, and we decided to register UpdateNodeTaint | UpdateNodeLabel for all plugins registering Node/Add.
-	// See: https://github.com/kubernetes/kubernetes/issues/109437
-	nodeActionType := fwk.Add | fwk.UpdateNodeTaint | fwk.UpdateNodeLabel
-	if pl.enableSchedulingQueueHint {
-		// preCheck is not used when QHint is enabled, and hence Update event isn't necessary.
-		nodeActionType = fwk.Add
-	}
-
 	return []fwk.ClusterEventWithHint{
 		// We don't need the QueueingHintFn here because the scheduling of Pods will be always retried with backoff when this Event happens.
 		// (the same as Queue)
-		{Event: fwk.ClusterEvent{Resource: fwk.Node, ActionType: nodeActionType}},
+		{Event: fwk.ClusterEvent{Resource: fwk.Node, ActionType: fwk.Add}},
 	}, nil
 }
 
@@ -73,6 +63,23 @@ func (pl *NodeName) SignPod(ctx context.Context, pod *v1.Pod) ([]fwk.SignFragmen
 	return []fwk.SignFragment{
 		{Key: fwk.NodeNameSignerName, Value: pod.Spec.NodeName},
 	}, nil
+}
+
+// PreFilter invoked at the prefilter extension point.
+func (pl *NodeName) PreFilter(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodes []fwk.NodeInfo) (*fwk.PreFilterResult, *fwk.Status) {
+	if pod.Spec.NodeName != "" {
+		// Pod already has a target node specified in spec.nodeName (e.g. assigned pod with deferred resize or static node assignment).
+		// We restrict evaluation to that node - other nodes will be considered as UnschedulableAndUnresolvable and therefore won't be a target of preemption.
+		return &fwk.PreFilterResult{
+			NodeNames: sets.New(pod.Spec.NodeName),
+		}, nil
+	}
+	return nil, nil
+}
+
+// PreFilterExtensions returns prefilter extensions, which is nil for this plugin.
+func (pl *NodeName) PreFilterExtensions() fwk.PreFilterExtensions {
+	return nil
 }
 
 // Filter invoked at the filter extension point.
@@ -90,8 +97,6 @@ func Fits(pod *v1.Pod, nodeInfo fwk.NodeInfo) bool {
 }
 
 // New initializes a new plugin and returns it.
-func New(_ context.Context, _ runtime.Object, _ fwk.Handle, fts feature.Features) (fwk.Plugin, error) {
-	return &NodeName{
-		enableSchedulingQueueHint: fts.EnableSchedulingQueueHint,
-	}, nil
+func New(_ context.Context, _ runtime.Object, _ fwk.Handle, _ feature.Features) (fwk.Plugin, error) {
+	return &NodeName{}, nil
 }

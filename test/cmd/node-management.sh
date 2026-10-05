@@ -193,6 +193,10 @@ run_cluster_management_tests() {
    kube::test::if_has_string "${output_message}" '"Response" verb="GET" url=".*/v1/nodes?labelSelector=test%3Dlabel&limit=500" status="200 OK"'
    kube::test::if_has_string "${output_message}" '"Response" verb="GET" url=".*/v1/pods?fieldSelector=spec.nodeName%3D127.0.0.1&limit=500" status="200 OK"'
 
+   ### kubectl drain with --disable-eviction --dry-run=server completes successfully
+   kubectl drain "127.0.0.1" --force --disable-eviction --dry-run=server
+   kube::test::get_object_assert "pods" "{{range .items}}{{.metadata.name}},{{end}}" 'test-pod-1,test-pod-2,'
+
   ### kubectl cordon command fails when no arguments are passed
   # Pre-condition: node exists
   response=$(! kubectl cordon 2>&1)

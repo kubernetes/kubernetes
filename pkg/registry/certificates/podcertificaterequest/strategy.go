@@ -16,11 +16,13 @@ limitations under the License.
 
 // Package podcertificaterequest provides Registry interface and its RESTStorage
 // implementation for storing PodCertificateRequest objects.
-package podcertificaterequest // import "k8s.io/kubernetes/pkg/registry/certificates/podcertificaterequest"
+package podcertificaterequest
 
 import (
 	"context"
 	"fmt"
+
+	"sigs.k8s.io/structured-merge-diff/v7/fieldpath"
 
 	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -36,12 +38,11 @@ import (
 	certvalidation "k8s.io/kubernetes/pkg/apis/certificates/validation"
 	"k8s.io/kubernetes/pkg/certauthorization"
 	"k8s.io/utils/clock"
-	"sigs.k8s.io/structured-merge-diff/v6/fieldpath"
 )
 
 // strategy implements behavior for PodCertificateRequests.
 type Strategy struct {
-	runtime.ObjectTyper
+	rest.DeclarativeValidation
 	names.NameGenerator
 }
 
@@ -51,8 +52,8 @@ var _ rest.RESTDeleteStrategy = (*Strategy)(nil)
 
 func NewStrategy() *Strategy {
 	return &Strategy{
-		ObjectTyper:   legacyscheme.Scheme,
-		NameGenerator: names.SimpleNameGenerator,
+		DeclarativeValidation: rest.DeclarativeValidation{Scheme: legacyscheme.Scheme},
+		NameGenerator:         names.SimpleNameGenerator,
 	}
 }
 
@@ -76,7 +77,7 @@ func (s *Strategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []s
 
 func (s *Strategy) Canonicalize(obj runtime.Object) {}
 
-func (s *Strategy) AllowCreateOnUpdate() bool {
+func (s *Strategy) AllowCreateOnUpdate(ctx context.Context) bool {
 	return false
 }
 
@@ -96,18 +97,32 @@ func (s *Strategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object
 	return nil
 }
 
-func (s *Strategy) AllowUnconditionalUpdate() bool {
+func (s *Strategy) AllowUnconditionalUpdate(ctx context.Context) bool {
 	return false
+}
+
+// GetResetFields returns the set of fields that get reset by the strategy
+// and should not be modified by the user.
+func (s *Strategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
+	fields := map[fieldpath.APIVersion]*fieldpath.Set{
+		"certificates.k8s.io/v1": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("status"),
+		),
+		"certificates.k8s.io/v1beta1": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("status"),
+		),
+	}
+	return fields
 }
 
 // StatusStrategy is the strategy for the status subresource.
 type StatusStrategy struct {
 	*Strategy
-	authorizer authorizer.Authorizer
+	authorizer authorizer.UnconditionalAuthorizer
 	clock      clock.PassiveClock
 }
 
-func NewStatusStrategy(strategy *Strategy, authorizer authorizer.Authorizer, clock clock.PassiveClock) *StatusStrategy {
+func NewStatusStrategy(strategy *Strategy, authorizer authorizer.UnconditionalAuthorizer, clock clock.PassiveClock) *StatusStrategy {
 	return &StatusStrategy{
 		Strategy:   strategy,
 		authorizer: authorizer,
@@ -120,6 +135,11 @@ func NewStatusStrategy(strategy *Strategy, authorizer authorizer.Authorizer, clo
 func (s *StatusStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
 	fields := map[fieldpath.APIVersion]*fieldpath.Set{
 		"certificates.k8s.io/v1beta1": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("metadata"),
+			fieldpath.MakePathOrDie("spec"),
+		),
+		"certificates.k8s.io/v1": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("metadata"),
 			fieldpath.MakePathOrDie("spec"),
 		),
 	}

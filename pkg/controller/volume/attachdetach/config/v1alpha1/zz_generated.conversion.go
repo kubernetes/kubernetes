@@ -22,6 +22,8 @@ limitations under the License.
 package v1alpha1
 
 import (
+	unsafe "unsafe"
+
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
@@ -74,8 +76,7 @@ func autoConvert_config_AttachDetachControllerConfiguration_To_v1alpha1_AttachDe
 }
 
 func autoConvert_v1alpha1_GroupResource_To_v1_GroupResource(in *configv1alpha1.GroupResource, out *v1.GroupResource, s conversion.Scope) error {
-	out.Group = in.Group
-	out.Resource = in.Resource
+	*out = *(*v1.GroupResource)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -85,8 +86,7 @@ func Convert_v1alpha1_GroupResource_To_v1_GroupResource(in *configv1alpha1.Group
 }
 
 func autoConvert_v1_GroupResource_To_v1alpha1_GroupResource(in *v1.GroupResource, out *configv1alpha1.GroupResource, s conversion.Scope) error {
-	out.Group = in.Group
-	out.Resource = in.Resource
+	*out = *(*configv1alpha1.GroupResource)(unsafe.Pointer(in))
 	return nil
 }
 

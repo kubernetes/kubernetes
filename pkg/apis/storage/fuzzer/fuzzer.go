@@ -100,6 +100,10 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 				obj.Spec.SELinuxMount = new(bool)
 				*(obj.Spec.SELinuxMount) = false
 			}
+			if obj.Spec.PreventPodSchedulingIfMissing == nil {
+				obj.Spec.PreventPodSchedulingIfMissing = new(bool)
+				*(obj.Spec.PreventPodSchedulingIfMissing) = false
+			}
 		},
 	}
 }

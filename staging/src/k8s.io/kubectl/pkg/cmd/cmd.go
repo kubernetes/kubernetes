@@ -275,7 +275,7 @@ func NewKubectlCommand(o KubectlOptions) *cobra.Command {
 		{
 			Message: "Deploy Commands:",
 			Commands: []*cobra.Command{
-				rollout.NewCmdRollout(f, o.IOStreams),
+				rollout.NewCmdRollout("kubectl", f, o.IOStreams),
 				scale.NewCmdScale(f, o.IOStreams),
 				autoscale.NewCmdAutoscale(f, o.IOStreams),
 			},

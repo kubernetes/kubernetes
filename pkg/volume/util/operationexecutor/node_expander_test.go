@@ -34,6 +34,7 @@ import (
 
 type fakeActualStateOfWorld struct {
 	volumesWithFinalExpansionErrors sets.Set[v1.UniqueVolumeName]
+	attemptedMounts                 map[volumetypes.UniquePodName]sets.Set[v1.UniqueVolumeName]
 	sync.RWMutex
 }
 
@@ -42,6 +43,7 @@ var _ ActualStateOfWorldMounterUpdater = &fakeActualStateOfWorld{}
 func newFakeActualStateOfWorld() *fakeActualStateOfWorld {
 	return &fakeActualStateOfWorld{
 		volumesWithFinalExpansionErrors: sets.New[v1.UniqueVolumeName](),
+		attemptedMounts:                 make(map[volumetypes.UniquePodName]sets.Set[v1.UniqueVolumeName]),
 	}
 }
 
@@ -368,4 +370,27 @@ func (f *fakeActualStateOfWorld) RemoveVolumeFromFailedWithFinalErrors(volumeNam
 	f.Lock()
 	defer f.Unlock()
 	f.volumesWithFinalExpansionErrors.Delete(volumeName)
+}
+
+// MarkVolumeAsMountAttempted implements ActualStateOfWorldMounterUpdater.
+func (f *fakeActualStateOfWorld) MarkVolumeAsMountAttempted(podName volumetypes.UniquePodName, volumeName v1.UniqueVolumeName) {
+	f.Lock()
+	defer f.Unlock()
+	volumes, ok := f.attemptedMounts[podName]
+	if !ok {
+		volumes = sets.New[v1.UniqueVolumeName]()
+		f.attemptedMounts[podName] = volumes
+	}
+	volumes.Insert(volumeName)
+}
+
+// IsVolumeMountAttempted implements ActualStateOfWorldMounterUpdater.
+func (f *fakeActualStateOfWorld) IsVolumeMountAttempted(podName volumetypes.UniquePodName, volumeName v1.UniqueVolumeName) bool {
+	f.RLock()
+	defer f.RUnlock()
+	volumes, ok := f.attemptedMounts[podName]
+	if !ok {
+		return false
+	}
+	return volumes.Has(volumeName)
 }

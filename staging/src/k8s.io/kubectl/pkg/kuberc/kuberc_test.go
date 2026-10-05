@@ -806,7 +806,6 @@ func TestApplyOverride(t *testing.T) {
 				},
 			},
 		},
-
 		{
 			name: "alias command override",
 			nestedCmds: []fakeCmds[string]{
@@ -2978,8 +2977,8 @@ users:
 			return &config.Preference{
 				CredentialPluginPolicy: config.CredentialPluginPolicy("Allowlist"),
 				CredentialPluginAllowlist: []config.AllowlistEntry{
-					{Name: "bar"},
-					{Name: "baz"},
+					{Command: "bar"},
+					{Command: "baz"},
 				},
 			}, nil
 		}
@@ -2992,8 +2991,8 @@ users:
 		require.NotNil(t, cfg, "rest config")
 		require.NotNil(t, cfg.ExecProvider, "exec config")
 		require.Equal(t, clientcmdapi.PolicyType("Allowlist"), cfg.ExecProvider.PluginPolicy.PolicyType)
-		require.Equal(t, "bar", cfg.ExecProvider.PluginPolicy.Allowlist[0].Name)
-		require.Equal(t, "baz", cfg.ExecProvider.PluginPolicy.Allowlist[1].Name)
+		require.Equal(t, "bar", cfg.ExecProvider.PluginPolicy.Allowlist[0].Command)
+		require.Equal(t, "baz", cfg.ExecProvider.PluginPolicy.Allowlist[1].Command)
 	})
 
 	type pluginPolicyTest struct {
@@ -3028,7 +3027,7 @@ kind: Preference
 apiVersion: kubectl.config.k8s.io/v1beta1
 credentialPluginPolicy: "foo"
 credentialPluginAllowlist:
-- name: "bar"
+- command: "bar"
 `,
 		},
 		{
@@ -3057,8 +3056,8 @@ credentialPluginAllowlist: []
 kind: Preference
 apiVersion: kubectl.config.k8s.io/v1beta1
 credentialPluginAllowlist:
-- name: "bar"
-- name: "baz"
+- command: "bar"
+- command: "baz"
 `,
 		},
 		{
@@ -3069,8 +3068,8 @@ kind: Preference
 apiVersion: kubectl.config.k8s.io/v1beta1
 credentialPluginPolicy: "AllowAll"
 credentialPluginAllowlist: []clientcmdapi.AllowlistEntry{
-- name: "bar"
-- name: "baz"
+- command: "bar"
+- command: "baz"
 `,
 		},
 		{
@@ -3081,8 +3080,8 @@ kind: Preference
 apiVersion: kubectl.config.k8s.io/v1beta1
 credentialPluginPolicy: "DenyAll"
 credentialPluginAllowlist:
-- name: "bar"
-- name: "baz"
+- command: "bar"
+- command: "baz"
 `,
 		},
 		{
@@ -3103,8 +3102,8 @@ kind: Preference
 apiVersion: kubectl.config.k8s.io/v1beta1
 credentialPluginPolicy: "Allowlist"
 credentialPluginAllowlist:
-- name: "foo"
-- name: ""
+- command: "foo"
+- command: ""
 `,
 		},
 		{
@@ -3114,7 +3113,39 @@ credentialPluginAllowlist:
 kind: Preference
 credentialPluginPolicy: "Allowlist"
 credentialPluginAllowlist:
+- command: "foo"
+`,
+		},
+		{
+			name:      "allowlist-policy-name-converts-to-command",
+			shouldErr: false,
+			kuberc: `apiVersion: kubectl.config.k8s.io/v1beta1
+kind: Preference
+credentialPluginPolicy: "Allowlist"
+credentialPluginAllowlist:
 - name: "foo"
+`,
+		},
+		{
+			name:      "allowlist-policy-with-both-name-and-command-having-different-values",
+			shouldErr: true,
+			kuberc: `apiVersion: kubectl.config.k8s.io/v1beta1
+kind: Preference
+credentialPluginPolicy: "Allowlist"
+credentialPluginAllowlist:
+- name: "foo"
+  command: "bar"
+`,
+		},
+		{
+			name:      "allowlist-policy-with-both-name-and-command-having-the-same-value",
+			shouldErr: false,
+			kuberc: `apiVersion: kubectl.config.k8s.io/v1beta1
+kind: Preference
+credentialPluginPolicy: "Allowlist"
+credentialPluginAllowlist:
+- name: "foo"
+  command: "foo"
 `,
 		},
 		{
@@ -3168,5 +3199,66 @@ credentialPluginPolicy: ""
 				require.NoError(t, err)
 			}
 		})
+	}
+}
+
+func TestApplyOverrideDoesNotMatchSameLeafCommand(t *testing.T) {
+	rootCmd := &cobra.Command{Use: "root"}
+
+	configCmd := &cobra.Command{Use: "config"}
+	configViewCmd := &cobra.Command{Use: "view"}
+	configViewCmd.Flags().String("output", "default", "")
+	configCmd.AddCommand(configViewCmd)
+
+	kubercCmd := &cobra.Command{Use: "kuberc"}
+	kubercViewCmd := &cobra.Command{Use: "view"}
+	kubercViewCmd.Flags().String("output", "default", "")
+	kubercCmd.AddCommand(kubercViewCmd)
+
+	rootCmd.AddCommand(configCmd, kubercCmd)
+
+	opts := genericclioptions.NewConfigFlags(false)
+	prefHandler := NewPreferences()
+	prefHandler.AddFlags(rootCmd.PersistentFlags())
+
+	pref := prefHandler.(*Preferences)
+	pref.getPreferencesFunc = func(kuberc string, errOut io.Writer) (*config.Preference, error) {
+		return &config.Preference{
+			TypeMeta: metav1.TypeMeta{
+				Kind:       "Preference",
+				APIVersion: "kubectl.config.k8s.io/v1alpha1",
+			},
+			Defaults: []config.CommandDefaults{
+				{
+					Command: "config view",
+					Options: []config.CommandOptionDefault{
+						{
+							Name:    "output",
+							Default: "json",
+						},
+					},
+				},
+			},
+		}, nil
+	}
+
+	errWriter := &bytes.Buffer{}
+	args := []string{"root", "kuberc", "view"}
+
+	_, err := pref.Apply(rootCmd, opts, args, errWriter)
+	if err != nil {
+		t.Fatalf("unexpected error %v", err)
+	}
+	if errWriter.String() != "" {
+		t.Fatalf("unexpected error message %s", errWriter.String())
+	}
+
+	actualCmd, _, err := rootCmd.Find(args[1:])
+	if err != nil {
+		t.Fatalf("unable to find command: %v", err)
+	}
+
+	if got := actualCmd.Flag("output").Value.String(); got != "default" {
+		t.Fatalf("unexpected output flag value: got %q, want %q", got, "default")
 	}
 }

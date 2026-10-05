@@ -699,7 +699,11 @@ func fetchInitConfigurationFromJoinConfiguration(cfg *kubeadmapi.JoinConfigurati
 	tlsBootstrapCfg.Clusters = map[string]*clientcmdapi.Cluster{
 		initConfiguration.ClusterName: clusterinfo,
 	}
-	tlsBootstrapCfg.Contexts[tlsBootstrapCfg.CurrentContext].Cluster = initConfiguration.ClusterName
+	currentContext, ok := tlsBootstrapCfg.Contexts[tlsBootstrapCfg.CurrentContext]
+	if !ok || currentContext == nil {
+		return nil, errors.Errorf("the TLS bootstrap kubeconfig is malformed: %q set as current-context, but not found in context list", tlsBootstrapCfg.CurrentContext)
+	}
+	currentContext.Cluster = initConfiguration.ClusterName
 
 	// injects into the kubeadm configuration the information about the joining node
 	initConfiguration.NodeRegistration = cfg.NodeRegistration
@@ -715,7 +719,7 @@ func fetchInitConfiguration(client clientset.Interface) (*kubeadmapi.InitConfigu
 	getNodeRegistration := false
 	getAPIEndpoint := false
 	getComponentConfigs := true
-	initConfiguration, err := configutil.FetchInitConfigurationFromCluster(client, nil, "preflight", getNodeRegistration, getAPIEndpoint, getComponentConfigs)
+	initConfiguration, err := configutil.FetchInitConfigurationFromCluster(client, nil, "preflight", getNodeRegistration, getAPIEndpoint, getComponentConfigs, false)
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to fetch the kubeadm-config ConfigMap")
 	}

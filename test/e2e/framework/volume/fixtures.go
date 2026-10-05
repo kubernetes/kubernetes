@@ -274,6 +274,21 @@ func WaitForVolumeAttachmentCreated(ctx context.Context, attachmentName string, 
 	return nil
 }
 
+// WaitForVolumeAttached waits for the VolumeAttachment with the passed in attachmentName to become attached.
+func WaitForVolumeAttached(ctx context.Context, attachmentName string, cs clientset.Interface, timeout time.Duration) error {
+	waitErr := wait.PollUntilContextTimeout(ctx, framework.Poll, timeout, true, func(ctx context.Context) (bool, error) {
+		va, err := cs.StorageV1().VolumeAttachments().Get(ctx, attachmentName, metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+		return va.Status.Attached, nil
+	})
+	if waitErr != nil {
+		return fmt.Errorf("error waiting for volume attachment %v to become attached: %w", attachmentName, waitErr)
+	}
+	return nil
+}
+
 // WaitForVolumeAttachmentTerminated waits for the VolumeAttachment with the passed in attachmentName to be terminated.
 func WaitForVolumeAttachmentTerminated(ctx context.Context, attachmentName string, cs clientset.Interface, timeout time.Duration) error {
 	waitErr := wait.PollUntilContextTimeout(ctx, 10*time.Second, timeout, true, func(ctx context.Context) (bool, error) {
@@ -302,7 +317,7 @@ func startVolumeServer(ctx context.Context, client clientset.Interface, config T
 	portCount := len(config.ServerPorts)
 	serverPodPorts := make([]v1.ContainerPort, portCount)
 
-	for i := 0; i < portCount; i++ {
+	for i := range portCount {
 		portName := fmt.Sprintf("%s-%d", config.Prefix, i)
 
 		serverPodPorts[i] = v1.ContainerPort{

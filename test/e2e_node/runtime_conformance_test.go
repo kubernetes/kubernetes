@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -100,9 +101,23 @@ var _ = SIGDescribe("Container Runtime Conformance Test", func() {
 
 					err := os.WriteFile(configFile, []byte(auth), 0644)
 					framework.ExpectNoError(err)
-					ginkgo.DeferCleanup(func() {
-						framework.ExpectNoError(os.Remove(configFile))
-						framework.ExpectNoError(os.RemoveAll(filepath.Join(services.KubeletRootDirectory, "image_manager")))
+					ginkgo.DeferCleanup(func(ctx context.Context) {
+						imageManagerDir := filepath.Join(services.KubeletRootDirectory, "image_manager")
+
+						// restart the kubelet
+						withStoppedKubelet(ctx, f, false, func() {
+							framework.ExpectNoError(os.Remove(configFile))
+							framework.ExpectNoError(os.RemoveAll(imageManagerDir))
+						})
+						framework.ExpectNoError(wait.PollUntilContextTimeout(ctx, 5*time.Second, 2*time.Minute, true, func(_ context.Context) (bool, error) {
+							if _, err := os.Stat(imageManagerDir); err != nil {
+								f.Logf("waiting for %q to appear: %v", imageManagerDir, err)
+								return false, nil
+							}
+							return true, nil
+						}),
+							"directory %q never reappeared", imageManagerDir,
+						)
 					})
 
 					// checkContainerStatus checks whether the container status matches expectation.

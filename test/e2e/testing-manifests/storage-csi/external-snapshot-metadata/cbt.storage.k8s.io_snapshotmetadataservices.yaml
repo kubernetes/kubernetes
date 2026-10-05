@@ -17,7 +17,7 @@ spec:
     singular: snapshotmetadataservice
   scope: Cluster
   versions:
-  - name: v1alpha1
+  - name: v1beta1
     schema:
       openAPIV3Schema:
         description: |-

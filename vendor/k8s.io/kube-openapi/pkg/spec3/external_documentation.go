@@ -17,11 +17,10 @@ limitations under the License.
 package spec3
 
 import (
-	"encoding/json"
+	"encoding/json/jsontext"
+	jsonv2 "encoding/json/v2"
 
-	"github.com/go-openapi/swag"
 	"k8s.io/kube-openapi/pkg/internal"
-	jsonv2 "k8s.io/kube-openapi/pkg/internal/third_party/go-json-experiment/json"
 	"k8s.io/kube-openapi/pkg/validation/spec"
 )
 
@@ -39,49 +38,29 @@ type ExternalDocumentationProps struct {
 
 // MarshalJSON is a custom marshal function that knows how to encode Responses as JSON
 func (e *ExternalDocumentation) MarshalJSON() ([]byte, error) {
-	if internal.UseOptimizedJSONMarshalingV3 {
-		return internal.DeterministicMarshal(e)
-	}
-	b1, err := json.Marshal(e.ExternalDocumentationProps)
-	if err != nil {
-		return nil, err
-	}
-	b2, err := json.Marshal(e.VendorExtensible)
-	if err != nil {
-		return nil, err
-	}
-	return swag.ConcatJSON(b1, b2), nil
+	return internal.DeterministicMarshal(e)
 }
 
-func (e *ExternalDocumentation) MarshalNextJSON(opts jsonv2.MarshalOptions, enc *jsonv2.Encoder) error {
+func (e *ExternalDocumentation) MarshalJSONTo(enc *jsontext.Encoder) error {
 	var x struct {
-		ExternalDocumentationProps `json:",inline"`
-		spec.Extensions
+		ExternalDocumentationProps `json:",embed"`
+		Extensions                 spec.Extensions `json:",embed"`
 	}
 	x.Extensions = internal.SanitizeExtensions(e.Extensions)
 	x.ExternalDocumentationProps = e.ExternalDocumentationProps
-	return opts.MarshalNext(enc, x)
+	return jsonv2.MarshalEncode(enc, x)
 }
 
 func (e *ExternalDocumentation) UnmarshalJSON(data []byte) error {
-	if internal.UseOptimizedJSONUnmarshalingV3 {
-		return jsonv2.Unmarshal(data, e)
-	}
-	if err := json.Unmarshal(data, &e.ExternalDocumentationProps); err != nil {
-		return err
-	}
-	if err := json.Unmarshal(data, &e.VendorExtensible); err != nil {
-		return err
-	}
-	return nil
+	return jsonv2.Unmarshal(data, e)
 }
 
-func (e *ExternalDocumentation) UnmarshalNextJSON(opts jsonv2.UnmarshalOptions, dec *jsonv2.Decoder) error {
+func (e *ExternalDocumentation) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	var x struct {
-		spec.Extensions
+		Extensions spec.Extensions `json:",embed"`
 		ExternalDocumentationProps
 	}
-	if err := opts.UnmarshalNext(dec, &x); err != nil {
+	if err := jsonv2.UnmarshalDecode(dec, &x); err != nil {
 		return err
 	}
 	e.Extensions = internal.SanitizeExtensions(x.Extensions)

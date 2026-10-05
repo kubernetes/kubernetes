@@ -463,7 +463,7 @@ func TestWatchEventSizes(t *testing.T) {
 			close(timeoutCh)
 			<-doneCh
 
-			expected := fmt.Sprintf(`# HELP apiserver_watch_events_sizes [ALPHA] Watch event size distribution in bytes
+			expected := fmt.Sprintf(`# HELP apiserver_watch_events_sizes [BETA] Watch event size distribution in bytes
 # TYPE apiserver_watch_events_sizes histogram
 apiserver_watch_events_sizes_bucket{group="group",resource="resource",version="version",le="1024"} 2
 apiserver_watch_events_sizes_bucket{group="group",resource="resource",version="version",le="2048"} 2
@@ -477,7 +477,7 @@ apiserver_watch_events_sizes_bucket{group="group",resource="resource",version="v
 apiserver_watch_events_sizes_sum{group="group",resource="resource",version="version"} %d
 apiserver_watch_events_sizes_count{group="group",resource="resource",version="version"} 2
 
-# HELP apiserver_watch_events_total [ALPHA] Number of events sent in watch clients
+# HELP apiserver_watch_events_total [BETA] Number of events sent in watch clients
 # TYPE apiserver_watch_events_total counter
 apiserver_watch_events_total{group="group",resource="resource",version="version"} 2
 `, tc.wantSize)

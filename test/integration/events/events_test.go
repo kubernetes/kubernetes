@@ -94,6 +94,18 @@ func TestEventCompatibility(t *testing.T) {
 		return true, nil
 	})
 	if err != nil {
+		v1Events, _ := client.EventsV1().Events("").List(context.TODO(), metav1.ListOptions{})
+		if v1Events != nil {
+			for _, e := range v1Events.Items {
+				t.Logf("events.k8s.io/v1: name=%s reason=%s action=%s reportingController=%s", e.Name, e.Reason, e.Action, e.ReportingController)
+			}
+		}
+		coreEvents, _ := client.CoreV1().Events("").List(context.TODO(), metav1.ListOptions{})
+		if coreEvents != nil {
+			for _, e := range coreEvents.Items {
+				t.Logf("core/v1: name=%s reason=%s source.component=%s", e.Name, e.Reason, e.Source.Component)
+			}
+		}
 		t.Fatalf("unexpected err: %v", err)
 	}
 }

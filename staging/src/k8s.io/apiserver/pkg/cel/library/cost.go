@@ -101,7 +101,7 @@ func (l *CostEstimator) CallCost(function, overloadId string, args []ref.Val, re
 			cost := selectorCostEstimate(checker.SizeEstimate{Min: selectorLength, Max: selectorLength})
 			return &cost.Max
 		}
-	case "isSorted", "sum", "max", "min", "indexOf", "lastIndexOf":
+	case "isSorted", "sum", "max", "min", "indexOf", "lastIndexOf", "includes":
 		var cost uint64
 		if len(args) > 0 {
 			cost += traversalCost(args[0]) // these O(n) operations all cost roughly the cost of a single traversal
@@ -161,7 +161,7 @@ func (l *CostEstimator) CallCost(function, overloadId string, args []ref.Val, re
 			cost := uint64(math.Ceil(float64(actualSize(args[0])) * 2 * common.StringTraversalCostFactor))
 			return &cost
 		}
-	case "masked", "prefixLength", "family", "isUnspecified", "isLoopback", "isLinkLocalMulticast", "isLinkLocalUnicast", "isGlobalUnicast":
+	case "masked", "isMask", "prefixLength", "family", "isUnspecified", "isLoopback", "isLinkLocalMulticast", "isLinkLocalUnicast", "isGlobalUnicast":
 		// IP and CIDR accessors are nominal cost.
 		cost := uint64(1)
 		return &cost
@@ -287,7 +287,7 @@ func (l *CostEstimator) EstimateCallCost(function, overloadId string, target *ch
 		if len(args) == 1 {
 			return &checker.CallEstimate{CostEstimate: selectorCostEstimate(l.sizeEstimate(args[0]))}
 		}
-	case "isSorted", "sum", "max", "min", "indexOf", "lastIndexOf":
+	case "isSorted", "sum", "max", "min", "indexOf", "lastIndexOf", "includes":
 		if target != nil {
 			// Charge 1 cost for comparing each element in the list
 			elCost := checker.CostEstimate{Min: 1, Max: 1}
@@ -300,7 +300,12 @@ func (l *CostEstimator) EstimateCallCost(function, overloadId string, target *ch
 					elCost = elCost.Add(sz.MultiplyByCostFactor(common.StringTraversalCostFactor))
 				}
 				return &checker.CallEstimate{CostEstimate: l.sizeEstimate(*target).MultiplyByCost(elCost)}
-			} else { // the target is a string, which is supported by indexOf and lastIndexOf
+			} else if function == "includes" {
+				// Since target can be a list under DynType, the worst case is a list comparison of size n,
+				// where each comparison costs 1.
+				return &checker.CallEstimate{CostEstimate: l.sizeEstimate(*target).MultiplyByCost(elCost)}
+			} else {
+				// the target is a string, which is supported by indexOf and lastIndexOf
 				return &checker.CallEstimate{CostEstimate: l.sizeEstimate(*target).MultiplyByCostFactor(common.StringTraversalCostFactor)}
 			}
 		}
@@ -442,7 +447,7 @@ func (l *CostEstimator) EstimateCallCost(function, overloadId string, target *ch
 			// So we double the cost of parsing the string.
 			return &checker.CallEstimate{CostEstimate: sz.MultiplyByCostFactor(2 * common.StringTraversalCostFactor)}
 		}
-	case "masked", "prefixLength", "family", "isUnspecified", "isLoopback", "isLinkLocalMulticast", "isLinkLocalUnicast", "isGlobalUnicast":
+	case "masked", "isMask", "prefixLength", "family", "isUnspecified", "isLoopback", "isLinkLocalMulticast", "isLinkLocalUnicast", "isGlobalUnicast":
 		// IP and CIDR accessors are nominal cost.
 		return &checker.CallEstimate{CostEstimate: checker.CostEstimate{Min: 1, Max: 1}}
 	case "containsIP":
@@ -498,7 +503,17 @@ func (l *CostEstimator) EstimateCallCost(function, overloadId string, target *ch
 	case "sign", "asInteger", "isInteger", "asApproximateFloat", "isGreaterThan", "isLessThan", "compareTo", "add", "sub", "major", "minor", "patch":
 		return &checker.CallEstimate{CostEstimate: checker.CostEstimate{Min: 1, Max: 1}}
 	case "getScheme", "getHostname", "getHost", "getPort", "getEscapedPath", "getQuery":
-		// url accessors
+		// URL accessors return values derived from components of the URL.
+		// Propagate the target's size estimate so downstream string operations
+		// (e.g. matches()) see a bounded input instead of an unbounded result.
+		// getEscapedPath may expand bytes via percent-encoding, so account for up to 3x expansion (%XX).
+		if target != nil {
+			sz := l.sizeEstimate(*target)
+			if function == "getEscapedPath" {
+				sz = sz.Multiply(checker.SizeEstimate{Min: 1, Max: 3})
+			}
+			return &checker.CallEstimate{CostEstimate: checker.CostEstimate{Min: 1, Max: 1}, ResultSize: &sz}
+		}
 		return &checker.CallEstimate{CostEstimate: checker.CostEstimate{Min: 1, Max: 1}}
 	case "_==_":
 		if len(args) == 2 {

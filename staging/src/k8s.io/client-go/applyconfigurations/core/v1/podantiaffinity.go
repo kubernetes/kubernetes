@@ -23,7 +23,7 @@ package v1
 //
 // Pod anti affinity is a group of inter pod anti affinity scheduling rules.
 type PodAntiAffinityApplyConfiguration struct {
-	// If the anti-affinity requirements specified by this field are not met at
+	// requiredDuringSchedulingIgnoredDuringExecution specifies that if the anti-affinity requirements specified by this field are not met at
 	// scheduling time, the pod will not be scheduled onto the node.
 	// If the anti-affinity requirements specified by this field cease to be met
 	// at some point during pod execution (e.g. due to a pod label update), the
@@ -31,7 +31,7 @@ type PodAntiAffinityApplyConfiguration struct {
 	// When there are multiple elements, the lists of nodes corresponding to each
 	// podAffinityTerm are intersected, i.e. all terms must be satisfied.
 	RequiredDuringSchedulingIgnoredDuringExecution []PodAffinityTermApplyConfiguration `json:"requiredDuringSchedulingIgnoredDuringExecution,omitempty"`
-	// The scheduler will prefer to schedule pods to nodes that satisfy
+	// preferredDuringSchedulingIgnoredDuringExecution specifies that the scheduler will prefer to schedule pods to nodes that satisfy
 	// the anti-affinity expressions specified by this field, but it may choose
 	// a node that violates one or more of the expressions. The node that is
 	// most preferred is the one with the greatest sum of weights, i.e.

@@ -17,12 +17,12 @@ limitations under the License.
 package nodeports
 
 import (
+	"context"
 	"strconv"
 	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/stretchr/testify/require"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2/ktesting"
@@ -220,7 +220,7 @@ func TestPreFilterDisabled(t *testing.T) {
 	}
 }
 
-func Test_isSchedulableAfterPodDeleted(t *testing.T) {
+func Test_isSchedulableAfterAssignedPodDeleted(t *testing.T) {
 	podWithHostPort := st.MakePod().HostPort(8080)
 
 	testcases := map[string]struct {
@@ -262,15 +262,21 @@ func Test_isSchedulableAfterPodDeleted(t *testing.T) {
 			logger, ctx := ktesting.NewTestContext(t)
 			p, err := New(ctx, nil, nil, feature.Features{})
 			if err != nil {
-				t.Fatalf("Creating plugin: %v", err)
+				t.Fatalf("creating plugin: %v", err)
 			}
-			actualHint, err := p.(*NodePorts).isSchedulableAfterPodDeleted(logger, tc.pod, tc.oldObj, nil)
+			actualHint, err := p.(*NodePorts).isSchedulableAfterAssignedPodDeleted(logger, tc.pod, tc.oldObj, nil)
 			if tc.expectedErr {
-				require.Error(t, err)
+				if err == nil {
+					t.Fatalf("expected error, got nil")
+				}
 				return
 			}
-			require.NoError(t, err)
-			require.Equal(t, tc.expectedHint, actualHint)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if diff := cmp.Diff(tc.expectedHint, actualHint); diff != "" {
+				t.Errorf("unexpected hint (-want, +got):\n%s", diff)
+			}
 		})
 	}
 }
@@ -336,5 +342,22 @@ func TestFits(t *testing.T) {
 				t.Errorf("expected %t; got %t", test.expect, !test.expect)
 			}
 		})
+	}
+}
+
+func TestNodePorts_DeferredResizeSkipped(t *testing.T) {
+	ctx := context.Background()
+	pod := st.MakePod().Name("p").UID("p").Condition(v1.PodResizePending, v1.ConditionTrue, v1.PodReasonDeferred).Obj()
+	nodeInfo := framework.NewNodeInfo()
+	nodeInfo.SetNode(st.MakeNode().Name("node1").Obj())
+
+	pl := &NodePorts{enableInPlacePodVerticalScalingSchedulerPreemption: true}
+
+	if preRes, preStatus := pl.PreFilter(ctx, nil, pod, nil); preStatus.Code() != fwk.Skip || preRes != nil {
+		t.Errorf("PreFilter: got (res: %v, status: %v), want (nil, Skip)", preRes, preStatus.Code())
+	}
+
+	if filterStatus := pl.Filter(ctx, nil, pod, nodeInfo); filterStatus.Code() != fwk.Success {
+		t.Errorf("Filter: got status %v, want Success (nil)", filterStatus.Code())
 	}
 }

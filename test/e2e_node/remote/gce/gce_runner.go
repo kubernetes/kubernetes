@@ -17,10 +17,10 @@ limitations under the License.
 package gce
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
-	"flag"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -69,17 +69,17 @@ func (e *envs) Set(value string) error {
 // nodeEnvs is the node envs from the flag `node-env`.
 var nodeEnvs = make(envs)
 
-var project = flag.String("project", "", "gce project the hosts live in (gce)")
-var zone = flag.String("zone", "", "gce zone that the hosts live in (gce)")
-var instanceMetadata = flag.String("instance-metadata", "", "key/value metadata for instances separated by '=' or '<', 'k=v' means the key is 'k' and the value is 'v'; 'k<p' means the key is 'k' and the value is extracted from the local path 'p', e.g. k1=v1,k2<p2  (gce)")
-var imageProject = flag.String("image-project", "", "gce project the hosts live in  (gce)")
-var instanceType = flag.String("instance-type", "e2-medium", "GCP Machine type to use for test")
-var preemptibleInstances = flag.Bool("preemptible-instances", false, "If true, gce instances will be configured to be preemptible  (gce)")
-var network = flag.String("network", "", "Specifies the network that the VM instance are a part of")
-var subnet = flag.String("subnet", "", "Specifies the subnet that the VM instance are a part of")
+var project = remote.CommandLine.String("project", "", "gce project the hosts live in (gce)")
+var zone = remote.CommandLine.String("zone", "", "gce zone that the hosts live in (gce)")
+var instanceMetadata = remote.CommandLine.String("instance-metadata", "", "key/value metadata for instances separated by '=' or '<', 'k=v' means the key is 'k' and the value is 'v'; 'k<p' means the key is 'k' and the value is extracted from the local path 'p', e.g. k1=v1,k2<p2  (gce)")
+var imageProject = remote.CommandLine.String("image-project", "", "gce project the hosts live in  (gce)")
+var instanceType = remote.CommandLine.String("instance-type", "e2-medium", "GCP Machine type to use for test")
+var preemptibleInstances = remote.CommandLine.Bool("preemptible-instances", false, "If true, gce instances will be configured to be preemptible  (gce)")
+var network = remote.CommandLine.String("network", "", "Specifies the network that the VM instance are a part of")
+var subnet = remote.CommandLine.String("subnet", "", "Specifies the subnet that the VM instance are a part of")
 
 func init() {
-	flag.Var(&nodeEnvs, "node-env", "An environment variable passed to instance as metadata, e.g. when '--node-env=PATH=/usr/bin' is specified, there will be an extra instance metadata 'PATH=/usr/bin'.")
+	remote.CommandLine.Var(&nodeEnvs, "node-env", "An environment variable passed to instance as metadata, e.g. when '--node-env=PATH=/usr/bin' is specified, there will be an extra instance metadata 'PATH=/usr/bin'.")
 }
 
 type GCERunner struct {
@@ -88,7 +88,9 @@ type GCERunner struct {
 }
 
 const (
-	defaultGCEMachine = "e2-standard-2"
+	defaultGCEMachine            = "e2-standard-2"
+	gceInstanceReadyPollInterval = 20 * time.Second
+	gceInstanceReadyTimeout      = 10 * time.Minute
 )
 
 func NewGCERunner(cfg remote.Config) remote.Runner {
@@ -176,6 +178,8 @@ type GCEImageConfig struct {
 type GCEImage struct {
 	Image      string `json:"image,omitempty"`
 	ImageRegex string `json:"image_regex,omitempty"`
+	// ImageExcludeRegex drops dynamically selected images whose names match it; ignored when Image is set.
+	ImageExcludeRegex string `json:"image_exclude_regex,omitempty"`
 	// ImageFamily is the image family to use. The latest image from the image family will be used, e.g cos-81-lts.
 	ImageFamily     string    `json:"image_family,omitempty"`
 	ImageDesc       string    `json:"image_description,omitempty"`
@@ -186,26 +190,86 @@ type GCEImage struct {
 	Resources       Resources `json:"resources,omitempty"`
 }
 
-// Returns an image name based on regex and given GCE project.
-func (g *GCERunner) getGCEImage(imageRegex, imageFamily string, project string) (string, error) {
-	data, err := runGCPCommandNoProject("compute", "images", "list",
-		"--format=json", "--project="+project)
+// gceImageLister runs the gcloud image listing; a var so tests can replace it.
+var gceImageLister = runGCPCommandNoProject
+
+// imageSelector is the compiled form of a config's image filters.
+type imageSelector struct {
+	include *regexp.Regexp
+	exclude *regexp.Regexp
+	family  string
+}
+
+// compileImageSelector compiles the include and exclude filters before the
+// listing, so a bad config regex fails without first paying for the gcloud call.
+func compileImageSelector(imageRegex, imageExcludeRegex, imageFamily string) (imageSelector, error) {
+	s := imageSelector{family: imageFamily}
+	var err error
+	if imageRegex != "" {
+		if s.include, err = regexp.Compile(imageRegex); err != nil {
+			return imageSelector{}, fmt.Errorf("failed to compile image_regex %q: %w", imageRegex, err)
+		}
+	}
+	if imageExcludeRegex != "" {
+		if s.exclude, err = regexp.Compile(imageExcludeRegex); err != nil {
+			return imageSelector{}, fmt.Errorf("failed to compile image_exclude_regex %q: %w", imageExcludeRegex, err)
+		}
+	}
+	return s, nil
+}
+
+// getGCEImage returns the newest image matching imageRegex and imageFamily in
+// project, dropping names that match imageExcludeRegex.
+func (g *GCERunner) getGCEImage(imageRegex, imageExcludeRegex, imageFamily string, project string) (string, error) {
+	selector, err := compileImageSelector(imageRegex, imageExcludeRegex, imageFamily)
+	if err != nil {
+		return "", err
+	}
+	data, err := gceImageLister(gceImageListArgs(project, imageFamily)...)
 	if err != nil {
 		return "", fmt.Errorf("failed to list images in project %q: %w", project, err)
 	}
 	var images []gceImage
-	err = json.Unmarshal(data, &images)
-	if err != nil {
+	if err := json.Unmarshal(data, &images); err != nil {
 		return "", fmt.Errorf("failed to parse images: %w", err)
 	}
+	return pickNewestImage(images, selector, project)
+}
 
+// gceImageListArgs returns the gcloud arguments to list candidate images.
+func gceImageListArgs(project, imageFamily string) []string {
+	// Print only the fields pickNewestImage reads, so the runner buffers less.
+	args := []string{"compute", "images", "list", "--format=json(name,family,creationTimestamp)", "--project=" + project}
+	if imageFamily != "" {
+		// Narrow to the family so gcloud does not return the whole project.
+		// For large projects that can take a long time and consume significant
+		// amounts of RAM. It was the reason why the memory requirements of
+		// jobs using Ubuntu had to be raised (https://github.com/kubernetes/kubernetes/issues/141434).
+		args = append(args, "--filter=family="+imageFamily)
+	}
+	return args
+}
+
+// regexpString returns re's pattern for logging, or "" when re is nil.
+func regexpString(re *regexp.Regexp) string {
+	if re == nil {
+		return ""
+	}
+	return re.String()
+}
+
+// pickNewestImage returns the name of the newest image the selector accepts.
+func pickNewestImage(images []gceImage, selector imageSelector, project string) (string, error) {
 	imageObjs := []imageObj{}
-	imageRe := regexp.MustCompile(imageRegex)
 	for _, instance := range images {
-		if imageRegex != "" && !imageRe.MatchString(instance.Name) {
+		if selector.include != nil && !selector.include.MatchString(instance.Name) {
 			continue
 		}
-		if imageFamily != "" && instance.Family != imageFamily {
+		if selector.exclude != nil && selector.exclude.MatchString(instance.Name) {
+			continue
+		}
+		// gcloud's --filter=family is not guaranteed exact, so match here too.
+		if selector.family != "" && instance.Family != selector.family {
 			continue
 		}
 		creationTime, err := time.Parse(time.RFC3339, instance.CreationTimestamp)
@@ -222,10 +286,18 @@ func (g *GCERunner) getGCEImage(imageRegex, imageFamily string, project string) 
 	// Pick the latest image after sorting.
 	sort.Sort(byCreationTime(imageObjs))
 	if len(imageObjs) > 0 {
-		klog.V(4).Infof("found images %+v based on regex %q and family %q in project %q", imageObjs, imageRegex, imageFamily, project)
+		klog.V(4).Infof("found images %+v based on regex %q, exclude regex %q and family %q in project %q", imageObjs, regexpString(selector.include), regexpString(selector.exclude), selector.family, project)
 		return imageObjs[0].name, nil
 	}
-	return "", fmt.Errorf("found zero images based on regex %q and family %q in project %q", imageRegex, imageFamily, project)
+	return "", fmt.Errorf("found zero images based on regex %q, exclude regex %q and family %q in project %q", regexpString(selector.include), regexpString(selector.exclude), selector.family, project)
+}
+
+// validateImageSelector rejects an image_exclude_regex with no positive selector to refine.
+func validateImageSelector(shortName string, c GCEImage) error {
+	if c.Image == "" && c.ImageExcludeRegex != "" && c.ImageRegex == "" && c.ImageFamily == "" {
+		return fmt.Errorf("invalid config for %q: image_exclude_regex requires image_regex or image_family", shortName)
+	}
+	return nil
 }
 
 func (g *GCERunner) prepareGceImages() (*internalGCEImageConfig, error) {
@@ -253,12 +325,15 @@ func (g *GCERunner) prepareGceImages() (*internalGCEImageConfig, error) {
 		}
 
 		for shortName, imageConfig := range externalImageConfig.Images {
+			if err := validateImageSelector(shortName, imageConfig); err != nil {
+				return nil, err
+			}
 			var image string
 			if (imageConfig.ImageRegex != "" || imageConfig.ImageFamily != "") && imageConfig.Image == "" {
-				image, err = g.getGCEImage(imageConfig.ImageRegex, imageConfig.ImageFamily, imageConfig.Project)
+				image, err = g.getGCEImage(imageConfig.ImageRegex, imageConfig.ImageExcludeRegex, imageConfig.ImageFamily, imageConfig.Project)
 				if err != nil {
-					return nil, fmt.Errorf("Could not retrieve a image based on image regex %q and family %q: %v",
-						imageConfig.ImageRegex, imageConfig.ImageFamily, err)
+					return nil, fmt.Errorf("could not retrieve an image based on image regex %q, exclude regex %q, and family %q: %w",
+						imageConfig.ImageRegex, imageConfig.ImageExcludeRegex, imageConfig.ImageFamily, err)
 				}
 			} else {
 				image = imageConfig.Image
@@ -572,44 +647,28 @@ func (g *GCERunner) createGCEInstance(imageConfig *internalGCEImage) (string, er
 		}
 	}
 
-	instanceRunning := false
-	var instance *gceInstance
-	for i := 0; i < 30 && !instanceRunning; i++ {
-		if i > 0 {
-			time.Sleep(time.Second * 20)
-		}
-
-		instance, err := getGCEInstance(name)
-		if err != nil {
-			continue
-		}
-		if !strings.EqualFold(instance.Status, "RUNNING") {
-			_ = fmt.Errorf("instance %s not in state RUNNING, was %s", name, instance.Status)
-			continue
-		}
-		externalIP := g.getExternalIP(instance)
-		if len(externalIP) > 0 {
-			remote.AddHostnameIP(name, externalIP)
-		}
-
-		var output string
-		output, err = remote.SSH(name, "sh", "-c",
-			"'systemctl list-units  --type=service  --state=running | grep -e containerd -e crio'")
-		if err != nil {
-			_ = fmt.Errorf("instance %s not running containerd/crio daemon - Command failed: %s", name, output)
-			continue
-		}
-		if !strings.Contains(output, "containerd.service") &&
-			!strings.Contains(output, "crio.service") {
-			_ = fmt.Errorf("instance %s not running containerd/crio daemon: %s", name, output)
-			continue
-		}
-		instanceRunning = true
+	waitForReady := func() (*gceInstance, error) {
+		return waitForGCEInstanceReady(
+			context.Background(),
+			name,
+			gceInstanceReadyPollInterval,
+			gceInstanceReadyTimeout,
+			getGCEInstanceContext,
+			func(ctx context.Context, instance *gceInstance) error {
+				externalIP := g.getExternalIP(instance)
+				if len(externalIP) > 0 {
+					remote.AddHostnameIP(name, externalIP)
+				}
+				return probeGCEInstanceRuntime(ctx, instance, remote.SSHContext)
+			},
+		)
 	}
-	// If instance didn't reach running state in time, return with error now.
+
+	instance, err := waitForReady()
 	if err != nil {
 		return name, err
 	}
+	needsReadinessRecheck := false
 	// Instance reached running state in time, make sure that cloud-init is complete
 	if g.isCloudInitUsed(imageConfig.metadata) {
 		cloudInitFinished := false
@@ -625,6 +684,10 @@ func (g *GCERunner) createGCEInstance(imageConfig *internalGCEImage) (string, er
 			}
 			cloudInitFinished = true
 		}
+		if err != nil {
+			return name, err
+		}
+		needsReadinessRecheck = true
 	}
 
 	// apply additional kernel arguments to the instance
@@ -633,9 +696,94 @@ func (g *GCERunner) createGCEInstance(imageConfig *internalGCEImage) (string, er
 		if err := g.updateKernelArguments(instance, imageConfig.image, imageConfig.kernelArguments); err != nil {
 			return name, err
 		}
+		needsReadinessRecheck = true
+	}
+	// Cloud-init or a kernel-argument reboot can change readiness, so recheck.
+	if needsReadinessRecheck {
+		if _, err := waitForReady(); err != nil {
+			return name, err
+		}
 	}
 
-	return name, err
+	return name, nil
+}
+
+func waitForGCEInstanceReady(
+	ctx context.Context,
+	name string,
+	pollInterval, pollTimeout time.Duration,
+	describe func(context.Context, string) (*gceInstance, error),
+	probeRuntime func(context.Context, *gceInstance) error,
+) (*gceInstance, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, fmt.Errorf("wait for instance %q readiness: %w", name, err)
+	}
+
+	var lastErr error
+	var readyInstance *gceInstance
+	pollErr := wait.PollUntilContextTimeout(ctx, pollInterval, pollTimeout, true, func(ctx context.Context) (bool, error) {
+		// Describe and probe failures can be transient during boot. Keep the last
+		// observation so the terminal error identifies the stage that stalled.
+		if err := ctx.Err(); err != nil {
+			return false, err
+		}
+		instance, err := describe(ctx, name)
+		if err != nil {
+			// A call cut off by the deadline saw nothing; keep the earlier observation.
+			if ctxErr := ctx.Err(); ctxErr != nil {
+				return false, ctxErr
+			}
+			lastErr = fmt.Errorf("describe instance %q: %w", name, err)
+			return false, nil
+		}
+		if !strings.EqualFold(instance.Status, "RUNNING") {
+			lastErr = fmt.Errorf("instance %q not RUNNING, status=%q", name, instance.Status)
+			return false, nil
+		}
+		if err := ctx.Err(); err != nil {
+			return false, err
+		}
+		if err := probeRuntime(ctx, instance); err != nil {
+			if ctxErr := ctx.Err(); ctxErr != nil {
+				return false, ctxErr
+			}
+			lastErr = fmt.Errorf("probe runtime on instance %q: %w", name, err)
+			return false, nil
+		}
+		// A completed, successful probe supersedes failures from earlier attempts.
+		lastErr = nil
+		if err := ctx.Err(); err != nil {
+			return false, err
+		}
+
+		readyInstance = instance
+		return true, nil
+	})
+	if pollErr != nil {
+		if lastErr == nil {
+			return nil, fmt.Errorf("instance %q did not become ready: %w", name, pollErr)
+		}
+		return nil, fmt.Errorf("instance %q did not become ready: %w; last observation: %w", name, pollErr, lastErr)
+	}
+	return readyInstance, nil
+}
+
+func probeGCEInstanceRuntime(ctx context.Context, instance *gceInstance, ssh func(context.Context, string, ...string) (string, error)) error {
+	output, err := ssh(ctx, instance.Name, "systemctl", "list-units", "--type=service", "--state=running", "--no-legend", "--plain", "containerd.service", "crio.service")
+	if err != nil {
+		return fmt.Errorf("runtime service probe on instance %q failed: %w; output: %q", instance.Name, err, output)
+	}
+	for line := range strings.SplitSeq(output, "\n") {
+		fields := strings.Fields(line)
+		if len(fields) == 0 {
+			continue
+		}
+		// --plain drops the status bullet, so the unit name is the first field.
+		if unit := fields[0]; unit == "containerd.service" || unit == "crio.service" {
+			return nil
+		}
+	}
+	return fmt.Errorf("instance %q is not running containerd or CRI-O; output: %q", instance.Name, output)
 }
 
 func (g *GCERunner) isCloudInitUsed(metadata *gceMetadata) bool {

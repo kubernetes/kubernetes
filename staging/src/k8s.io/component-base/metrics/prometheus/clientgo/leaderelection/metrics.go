@@ -17,6 +17,8 @@ limitations under the License.
 package leaderelection
 
 import (
+	"sync"
+
 	"k8s.io/client-go/tools/leaderelection"
 	k8smetrics "k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
@@ -38,15 +40,30 @@ var (
 	}, []string{"name"})
 )
 
+var registerOnce sync.Once
+
+// init only installs the provider with leaderelection. The actual metric
+// registration with legacyregistry is deferred until the first factory
+// method is called (which happens at runtime when the first leader election
+// manager is constructed).
 func init() {
-	legacyregistry.MustRegister(leaderGauge)
-	legacyregistry.MustRegister(leaderSlowpathCounter)
 	leaderelection.SetProvider(prometheusMetricsProvider{})
 }
 
 type prometheusMetricsProvider struct{}
 
+// register registers leaderelection metrics with the legacy registry. It is
+// invoked from the provider factory method via registerOnce so that the
+// registration (and thus Create()) happens at runtime.
+func register() {
+	registerOnce.Do(func() {
+		legacyregistry.MustRegister(leaderGauge)
+		legacyregistry.MustRegister(leaderSlowpathCounter)
+	})
+}
+
 func (prometheusMetricsProvider) NewLeaderMetric() leaderelection.LeaderMetric {
+	register()
 	return &leaderAdapter{gauge: leaderGauge, counter: leaderSlowpathCounter}
 }
 

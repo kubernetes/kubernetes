@@ -19,6 +19,8 @@ package statefulset
 import (
 	"context"
 
+	"sigs.k8s.io/structured-merge-diff/v7/fieldpath"
+
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -31,17 +33,16 @@ import (
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/apps/validation"
 	"k8s.io/kubernetes/pkg/features"
-	"sigs.k8s.io/structured-merge-diff/v6/fieldpath"
 )
 
 // statefulSetStrategy implements verification logic for Replication StatefulSets.
 type statefulSetStrategy struct {
-	runtime.ObjectTyper
+	rest.DeclarativeValidation
 	names.NameGenerator
 }
 
 // Strategy is the default logic that applies when creating and updating Replication StatefulSet objects.
-var Strategy = statefulSetStrategy{legacyscheme.Scheme, names.SimpleNameGenerator}
+var Strategy = statefulSetStrategy{rest.DeclarativeValidation{Scheme: legacyscheme.Scheme}, names.SimpleNameGenerator}
 
 // Make sure we correctly implement the interface.
 var _ = rest.GarbageCollectionDeleteStrategy(Strategy)
@@ -129,7 +130,11 @@ func dropStatefulSetDisabledFields(newSS *apps.StatefulSet, oldSS *apps.Stateful
 func (statefulSetStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	statefulSet := obj.(*apps.StatefulSet)
 	opts := pod.GetValidationOptionsFromPodTemplate(&statefulSet.Spec.Template, nil)
-	return validation.ValidateStatefulSet(statefulSet, opts)
+	setOpts := validation.StatefulSetValidationOptions{
+		AllowInvalidServiceName:          false, // require valid serviceNames in new StatefulSets
+		AllowStatefulSetRecreateStrategy: utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetRecreateStrategy),
+	}
+	return validation.ValidateStatefulSet(statefulSet, setOpts, opts)
 }
 
 // WarningsOnCreate returns warnings for the creation of the given object.
@@ -151,7 +156,7 @@ func (statefulSetStrategy) Canonicalize(obj runtime.Object) {
 }
 
 // AllowCreateOnUpdate is false for StatefulSet; this means POST is needed to create one.
-func (statefulSetStrategy) AllowCreateOnUpdate() bool {
+func (statefulSetStrategy) AllowCreateOnUpdate(ctx context.Context) bool {
 	return false
 }
 
@@ -160,8 +165,13 @@ func (statefulSetStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.
 	newStatefulSet := obj.(*apps.StatefulSet)
 	oldStatefulSet := old.(*apps.StatefulSet)
 
+	setOpts := validation.StatefulSetValidationOptions{
+		AllowInvalidServiceName:          true, // serviceName is immutable, tolerate existing invalid names on update
+		SkipValidateVolumeClaimTemplates: true, // volumeClaimTemplates are immutable, tolerate previously persisted invalid values on update
+		AllowStatefulSetRecreateStrategy: utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetRecreateStrategy) || oldStatefulSet.Spec.UpdateStrategy.Type == apps.RecreateStatefulSetStrategyType,
+	}
 	opts := pod.GetValidationOptionsFromPodTemplate(&newStatefulSet.Spec.Template, &oldStatefulSet.Spec.Template)
-	return validation.ValidateStatefulSetUpdate(newStatefulSet, oldStatefulSet, opts)
+	return validation.ValidateStatefulSetUpdate(newStatefulSet, oldStatefulSet, setOpts, opts)
 }
 
 // WarningsOnUpdate returns warnings for the given update.
@@ -183,7 +193,7 @@ func (statefulSetStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtim
 }
 
 // AllowUnconditionalUpdate is the default update policy for StatefulSet objects.
-func (statefulSetStrategy) AllowUnconditionalUpdate() bool {
+func (statefulSetStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {
 	return true
 }
 

@@ -1,0 +1,23 @@
+apiVersion: custom.metrics.k8s.io/v1beta2
+describedObject:
+  apiVersion: apiVersionValue
+  fieldPath: fieldPathValue
+  kind: kindValue
+  name: nameValue
+  namespace: namespaceValue
+  resourceVersion: resourceVersionValue
+  uid: uidValue
+kind: MetricValue
+metric:
+  name: nameValue
+  selector:
+    matchExpressions:
+    - key: keyValue
+      operator: operatorValue
+      values:
+      - valuesValue
+    matchLabels:
+      matchLabelsKey: matchLabelsValue
+timestamp: "2003-01-01T01:01:01Z"
+value: "0"
+windowSeconds: 4

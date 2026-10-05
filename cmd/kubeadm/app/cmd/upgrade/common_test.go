@@ -18,6 +18,7 @@ package upgrade
 
 import (
 	"bytes"
+	_ "embed"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -32,25 +33,8 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/output"
 )
 
-const testConfigToken = `apiVersion: v1
-clusters:
-- cluster:
-    certificate-authority-data:
-    server: localhost:8000
-  name: prod
-contexts:
-- context:
-    cluster: prod
-    namespace: default
-    user: default-service-account
-  name: default
-current-context: default
-kind: Config
-users:
-- name: kubernetes-admin
-  user:
-    client-certificate-data:
-`
+//go:embed testdata/config-token.yaml
+var testConfigToken string
 
 func TestEnforceRequirements(t *testing.T) {
 	tmpDir := t.TempDir()
@@ -66,7 +50,6 @@ func TestEnforceRequirements(t *testing.T) {
 	tcases := []struct {
 		name               string
 		newK8sVersion      string
-		dryRun             bool
 		flags              applyPlanFlags
 		expectedErr        string
 		expectedErrNonRoot string
@@ -97,7 +80,7 @@ func TestEnforceRequirements(t *testing.T) {
 	}
 	for _, tt := range tcases {
 		t.Run(tt.name, func(t *testing.T) {
-			_, _, _, _, err := enforceRequirements(&pflag.FlagSet{}, &tt.flags, nil, tt.dryRun, false, &output.TextPrinter{})
+			_, _, _, _, err := enforceRequirements(&pflag.FlagSet{}, &tt.flags, nil, &output.TextPrinter{})
 			if err == nil && len(tt.expectedErr) != 0 {
 				t.Error("Expected error, but got success")
 			}

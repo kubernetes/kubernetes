@@ -1,18 +1,16 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 
+approvers:
+  - sig-cloud-provider-leads
+  - bowei
+  - MrHohn
+  - thockin
 reviewers:
   - bowei
   - MrHohn
   - thockin
-  - andrewsykim
-  - cheftako
-approvers:
-  - bowei
-  - MrHohn
-  - thockin
-  - andrewsykim
-  - cheftako
 emeritus_approvers:
   - matchstick
+  - andrewsykim
 labels:
   - sig/network

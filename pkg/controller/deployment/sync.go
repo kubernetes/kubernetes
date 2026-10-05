@@ -279,7 +279,7 @@ func (dc *DeploymentController) getNewReplicaSet(ctx context.Context, d *apps.De
 			// these reasons as well. Related issue: https://github.com/kubernetes/kubernetes/issues/18568
 			_, _ = dc.client.AppsV1().Deployments(d.Namespace).UpdateStatus(ctx, d, metav1.UpdateOptions{})
 		}
-		dc.eventRecorder.Eventf(d, v1.EventTypeWarning, deploymentutil.FailedRSCreateReason, msg)
+		dc.eventRecorder.Eventf(d, v1.EventTypeWarning, deploymentutil.FailedRSCreateReason, "%s", msg)
 		return nil, err
 	}
 	if !alreadyExists && newReplicasCount > 0 {
@@ -390,7 +390,6 @@ func (dc *DeploymentController) scale(ctx context.Context, deployment *apps.Depl
 				}
 			}
 
-			// TODO: Use transactions when we have them.
 			if _, _, err := dc.scaleReplicaSet(ctx, rs, nameToSize[rs.Name], deployment, true); err != nil {
 				// Return as soon as we fail, the deployment is requeued
 				return err

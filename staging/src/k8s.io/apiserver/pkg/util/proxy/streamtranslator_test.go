@@ -38,8 +38,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/httpstream"
-	"k8s.io/apimachinery/pkg/util/httpstream/spdy"
 	rcconstants "k8s.io/apimachinery/pkg/util/remotecommand"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/util/proxy/metrics"
@@ -48,6 +46,8 @@ import (
 	"k8s.io/client-go/transport"
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/metrics/testutil"
+	"k8s.io/streaming/pkg/httpstream"
+	"k8s.io/streaming/pkg/httpstream/spdy"
 )
 
 // TestStreamTranslator_LoopbackStdinToStdout returns random data sent on the client's
@@ -971,20 +971,11 @@ func v4WriteStatusFunc(stream io.Writer) func(status *apierrors.StatusError) err
 	}
 }
 
-func fakeTransport() (*http.Transport, error) {
+func fakeTransport() (http.RoundTripper, error) {
 	cfg := &transport.Config{
 		TLS: transport.TLSConfig{
 			Insecure: true,
-			CAFile:   "",
 		},
 	}
-	rt, err := transport.New(cfg)
-	if err != nil {
-		return nil, err
-	}
-	t, ok := rt.(*http.Transport)
-	if !ok {
-		return nil, fmt.Errorf("unknown transport type: %T", rt)
-	}
-	return t, nil
+	return transport.New(cfg)
 }

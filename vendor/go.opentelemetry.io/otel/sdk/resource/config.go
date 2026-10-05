@@ -1,7 +1,7 @@
 // Copyright The OpenTelemetry Authors
 // SPDX-License-Identifier: Apache-2.0
 
-package resource // import "go.opentelemetry.io/otel/sdk/resource"
+package resource
 
 import (
 	"context"
@@ -23,7 +23,9 @@ type Option interface {
 	apply(config) config
 }
 
-// WithAttributes adds attributes to the configured Resource.
+// WithAttributes adds attributes to the configured Resource. Duplicate
+// top-level attribute keys and duplicate keys inside map values are
+// resolved using last-value-wins semantics.
 func WithAttributes(attributes ...attribute.KeyValue) Option {
 	return WithDetectors(detectAttributes{attributes})
 }
@@ -192,4 +194,12 @@ func WithContainer() Option {
 // Please use the ECS resource detector instead (https://pkg.go.dev/go.opentelemetry.io/contrib/detectors/aws/ecs).
 func WithContainerID() Option {
 	return WithDetectors(cgroupContainerIDDetector{})
+}
+
+// WithService adds all the Service attributes to the configured Resource.
+func WithService() Option {
+	return WithDetectors(
+		defaultServiceInstanceIDDetector{},
+		defaultServiceNameDetector{},
+	)
 }

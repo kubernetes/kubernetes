@@ -141,7 +141,167 @@ func TestUpdateValue(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			op := operation.Operation{Type: tt.op}
+			errs := UpdateValue(context.TODO(), op, field.NewPath("test"), &tt.value, &tt.oldValue, func(a, b string) bool { return a == b }, tt.constraints...)
+			if len(errs) != tt.wantErrs {
+				t.Errorf("UpdateValue() returned %d errors, want %d: %v", len(errs), tt.wantErrs, errs)
+			}
+			for i, msg := range tt.wantMsgs {
+				if i >= len(errs) {
+					t.Errorf("Expected error message %q not found", msg)
+					continue
+				}
+				if errs[i].Detail != msg {
+					t.Errorf("UpdateValue() error message = %q, want %q", errs[i].Detail, msg)
+				}
+			}
+		})
+	}
+}
+
+func TestUpdateValueByCompare(t *testing.T) {
+	tests := []struct {
+		name        string
+		op          operation.Type
+		value       string
+		oldValue    string
+		constraints []UpdateConstraint
+		wantErrs    int
+		wantMsgs    []string
+	}{
+		{
+			name:        "NoSet - unset to set transition (forbidden)",
+			op:          operation.Update,
+			value:       "value",
+			oldValue:    "",
+			constraints: []UpdateConstraint{NoSet},
+			wantErrs:    1,
+			wantMsgs:    []string{"field cannot be set once created"},
+		},
+		{
+			name:        "NoUnset - set to unset transition (forbidden)",
+			op:          operation.Update,
+			value:       "",
+			oldValue:    "value",
+			constraints: []UpdateConstraint{NoUnset},
+			wantErrs:    1,
+			wantMsgs:    []string{"field cannot be cleared once set"},
+		},
+		{
+			name:        "NoModify - set to different value (forbidden)",
+			op:          operation.Update,
+			value:       "value2",
+			oldValue:    "value1",
+			constraints: []UpdateConstraint{NoModify},
+			wantErrs:    1,
+			wantMsgs:    []string{"field cannot be modified once set"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			op := operation.Operation{Type: tt.op}
 			errs := UpdateValueByCompare(context.TODO(), op, field.NewPath("test"), &tt.value, &tt.oldValue, tt.constraints...)
+			if len(errs) != tt.wantErrs {
+				t.Errorf("UpdateValueByCompare() returned %d errors, want %d: %v", len(errs), tt.wantErrs, errs)
+			}
+			for i, msg := range tt.wantMsgs {
+				if i >= len(errs) {
+					t.Errorf("Expected error message %q not found", msg)
+					continue
+				}
+				if errs[i].Detail != msg {
+					t.Errorf("UpdateValueByCompare() error message = %q, want %q", errs[i].Detail, msg)
+				}
+			}
+		})
+	}
+}
+
+func TestUpdateValue_CustomMatchFunc(t *testing.T) {
+	type NonComparableStruct struct {
+		Name string
+		Tags []string
+	}
+
+	// customEquiv ignores Tags, so a value with only Tags set counts as unset.
+	customEquiv := func(a, b NonComparableStruct) bool {
+		return a.Name == b.Name
+	}
+
+	tests := []struct {
+		name        string
+		op          operation.Type
+		value       NonComparableStruct
+		oldValue    NonComparableStruct
+		constraints []UpdateConstraint
+		wantErrs    int
+		wantMsgs    []string
+	}{
+		{
+			name:        "NoSet - unset to set (forbidden)",
+			op:          operation.Update,
+			value:       NonComparableStruct{Name: "foo", Tags: []string{"a"}},
+			oldValue:    NonComparableStruct{},
+			constraints: []UpdateConstraint{NoSet},
+			wantErrs:    1,
+			wantMsgs:    []string{"field cannot be set once created"},
+		},
+		{
+			name:        "NoSet - Tags-only value is unset per equiv (allowed)",
+			op:          operation.Update,
+			value:       NonComparableStruct{Tags: []string{"a"}},
+			oldValue:    NonComparableStruct{},
+			constraints: []UpdateConstraint{NoSet},
+			wantErrs:    0,
+		},
+		{
+			name:        "NoUnset - set to unset (forbidden)",
+			op:          operation.Update,
+			value:       NonComparableStruct{},
+			oldValue:    NonComparableStruct{Name: "foo", Tags: []string{"a"}},
+			constraints: []UpdateConstraint{NoUnset},
+			wantErrs:    1,
+			wantMsgs:    []string{"field cannot be cleared once set"},
+		},
+		{
+			name:        "NoModify - zero to non-zero transition (allowed)",
+			op:          operation.Update,
+			value:       NonComparableStruct{Name: "foo", Tags: []string{"a"}},
+			oldValue:    NonComparableStruct{},
+			constraints: []UpdateConstraint{NoModify},
+			wantErrs:    0,
+		},
+		{
+			name:        "NoModify - non-zero to zero transition (allowed)",
+			op:          operation.Update,
+			value:       NonComparableStruct{},
+			oldValue:    NonComparableStruct{Name: "foo", Tags: []string{"a"}},
+			constraints: []UpdateConstraint{NoModify},
+			wantErrs:    0,
+		},
+		{
+			name:        "NoModify - non-zero to non-zero transition (forbidden)",
+			op:          operation.Update,
+			value:       NonComparableStruct{Name: "foo", Tags: []string{"b"}},
+			oldValue:    NonComparableStruct{Name: "foo", Tags: []string{"a"}},
+			constraints: []UpdateConstraint{NoModify},
+			wantErrs:    1,
+			wantMsgs:    []string{"field cannot be modified once set"},
+		},
+		{
+			name:        "NoModify - both values unset per equiv (allowed)",
+			op:          operation.Update,
+			value:       NonComparableStruct{Tags: []string{"b"}},
+			oldValue:    NonComparableStruct{Tags: []string{"a"}},
+			constraints: []UpdateConstraint{NoModify},
+			wantErrs:    0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			op := operation.Operation{Type: tt.op}
+			errs := UpdateValue(context.TODO(), op, field.NewPath("test"), &tt.value, &tt.oldValue, customEquiv, tt.constraints...)
 			if len(errs) != tt.wantErrs {
 				t.Errorf("UpdateValue() returned %d errors, want %d: %v", len(errs), tt.wantErrs, errs)
 			}
@@ -427,4 +587,359 @@ func TestUpdateStruct(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestValSliceUpdate(t *testing.T) {
+	type keyed struct {
+		Name  string
+		Value string
+	}
+	keyMatch := func(a, b *keyed) bool { return a.Name == b.Name }
+
+	tests := []struct {
+		name        string
+		op          operation.Type
+		value       []string
+		oldValue    []string
+		match       MatchFunc[*string]
+		constraints []UpdateConstraint
+		wantDetails []string
+	}{
+		{
+			name:        "create operation - no validation",
+			op:          operation.Create,
+			value:       []string{"a"},
+			oldValue:    nil,
+			constraints: []UpdateConstraint{NoSet, NoUnset, NoAddItem, NoRemoveItem},
+			match:       DirectEqual[string],
+		},
+		{
+			name:        "NoSet nil to non-empty (forbidden)",
+			op:          operation.Update,
+			value:       []string{"a"},
+			oldValue:    nil,
+			constraints: []UpdateConstraint{NoSet},
+			wantDetails: []string{"field cannot be set once created"},
+		},
+		{
+			name:        "NoSet empty to non-empty (forbidden)",
+			op:          operation.Update,
+			value:       []string{"a"},
+			oldValue:    []string{},
+			constraints: []UpdateConstraint{NoSet},
+			wantDetails: []string{"field cannot be set once created"},
+		},
+		{
+			name:        "NoSet non-empty to non-empty (allowed)",
+			op:          operation.Update,
+			value:       []string{"a", "b"},
+			oldValue:    []string{"a"},
+			constraints: []UpdateConstraint{NoSet},
+		},
+		{
+			name:        "NoUnset non-empty to nil (forbidden)",
+			op:          operation.Update,
+			value:       nil,
+			oldValue:    []string{"a"},
+			constraints: []UpdateConstraint{NoUnset},
+			wantDetails: []string{"field cannot be cleared once set"},
+		},
+		{
+			name:        "NoUnset non-empty to empty (forbidden)",
+			op:          operation.Update,
+			value:       []string{},
+			oldValue:    []string{"a"},
+			constraints: []UpdateConstraint{NoUnset},
+			wantDetails: []string{"field cannot be cleared once set"},
+		},
+		{
+			name:        "NoAddItem direct-equal item added",
+			op:          operation.Update,
+			value:       []string{"a", "b", "c"},
+			oldValue:    []string{"a", "c"},
+			match:       DirectEqual[string],
+			constraints: []UpdateConstraint{NoAddItem},
+			wantDetails: []string{"item may not be added"},
+		},
+		{
+			name:        "NoAddItem direct-equal reorder allowed",
+			op:          operation.Update,
+			value:       []string{"c", "a", "b"},
+			oldValue:    []string{"a", "b", "c"},
+			match:       DirectEqual[string],
+			constraints: []UpdateConstraint{NoAddItem},
+		},
+		{
+			name:        "NoRemoveItem direct-equal item removed",
+			op:          operation.Update,
+			value:       []string{"a"},
+			oldValue:    []string{"a", "b"},
+			match:       DirectEqual[string],
+			constraints: []UpdateConstraint{NoRemoveItem},
+			wantDetails: []string{"item may not be removed"},
+		},
+		{
+			name:        "NoAddItem + NoRemoveItem frozen shape (allowed)",
+			op:          operation.Update,
+			value:       []string{"a", "b"},
+			oldValue:    []string{"b", "a"},
+			match:       DirectEqual[string],
+			constraints: []UpdateConstraint{NoAddItem, NoRemoveItem},
+		},
+		{
+			name:        "NoAddItem + NoRemoveItem one added one removed",
+			op:          operation.Update,
+			value:       []string{"a", "c"},
+			oldValue:    []string{"a", "b"},
+			match:       DirectEqual[string],
+			constraints: []UpdateConstraint{NoAddItem, NoRemoveItem},
+			wantDetails: []string{
+				"item may not be added",
+				"item may not be removed",
+			},
+		},
+		{
+			name:        "NoAddItem + NoRemoveItem combined with NoUnset",
+			op:          operation.Update,
+			value:       nil,
+			oldValue:    []string{"a"},
+			match:       DirectEqual[string],
+			constraints: []UpdateConstraint{NoUnset, NoAddItem, NoRemoveItem},
+			wantDetails: []string{
+				"field cannot be cleared once set",
+				"item may not be removed",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			op := operation.Operation{Type: tt.op}
+			errs := ValSliceUpdate(context.TODO(), op, field.NewPath("test"), tt.value, tt.oldValue, tt.match, tt.constraints...)
+			if len(errs) != len(tt.wantDetails) {
+				t.Fatalf("ValSliceUpdate() returned %d errors, want %d: %v", len(errs), len(tt.wantDetails), errs)
+			}
+			for i, want := range tt.wantDetails {
+				if errs[i].Detail != want {
+					t.Errorf("ValSliceUpdate() error[%d] = %q, want %q", i, errs[i].Detail, want)
+				}
+				if errs[i].Origin != "update" {
+					t.Errorf("ValSliceUpdate() error[%d] origin = %q, want %q", i, errs[i].Origin, "update")
+				}
+			}
+		})
+	}
+
+	// Keyed-match case: matching by the Name field only. Modifying the Value
+	// of a keyed item should not trigger either NoAddItem or NoRemoveItem
+	// (that check belongs to eachVal + NoModify).
+	t.Run("NoAddItem+NoRemoveItem keyed match allows item modification", func(t *testing.T) {
+		op := operation.Operation{Type: operation.Update}
+		newList := []keyed{{Name: "alpha", Value: "v2"}, {Name: "beta", Value: "v1"}}
+		oldList := []keyed{{Name: "alpha", Value: "v1"}, {Name: "beta", Value: "v1"}}
+		errs := ValSliceUpdate(context.TODO(), op, field.NewPath("test"), newList, oldList, keyMatch, NoAddItem, NoRemoveItem)
+		if len(errs) != 0 {
+			t.Errorf("expected no errors for keyed-match item modification, got %v", errs)
+		}
+	})
+
+	t.Run("NoAddItem+NoRemoveItem keyed match reports add and remove by key", func(t *testing.T) {
+		op := operation.Operation{Type: operation.Update}
+		newList := []keyed{{Name: "alpha"}, {Name: "gamma"}}
+		oldList := []keyed{{Name: "alpha"}, {Name: "beta"}}
+		errs := ValSliceUpdate(context.TODO(), op, field.NewPath("test"), newList, oldList, keyMatch, NoAddItem, NoRemoveItem)
+		if len(errs) != 2 {
+			t.Fatalf("expected 2 errors, got %d: %v", len(errs), errs)
+		}
+	})
+
+	t.Run("NoAddItem without match returns internal error", func(t *testing.T) {
+		op := operation.Operation{Type: operation.Update}
+		errs := ValSliceUpdate[string](context.TODO(), op, field.NewPath("test"), []string{"a"}, nil, nil, NoAddItem)
+		if len(errs) != 1 || errs[0].Type != field.ErrorTypeInternal {
+			t.Errorf("expected single InternalError, got %v", errs)
+		}
+	})
+}
+
+func TestUpdateMap(t *testing.T) {
+	tests := []struct {
+		name        string
+		op          operation.Type
+		value       map[string]string
+		oldValue    map[string]string
+		constraints []UpdateConstraint
+		wantDetails []string
+	}{
+		{
+			name:        "create operation - no validation",
+			op:          operation.Create,
+			value:       map[string]string{"a": "1"},
+			oldValue:    nil,
+			constraints: []UpdateConstraint{NoSet, NoUnset, NoAddItem, NoRemoveItem},
+		},
+		{
+			name:        "NoSet nil to non-empty (forbidden)",
+			op:          operation.Update,
+			value:       map[string]string{"a": "1"},
+			oldValue:    nil,
+			constraints: []UpdateConstraint{NoSet},
+			wantDetails: []string{"field cannot be set once created"},
+		},
+		{
+			name:        "NoUnset non-empty to empty (forbidden)",
+			op:          operation.Update,
+			value:       map[string]string{},
+			oldValue:    map[string]string{"a": "1"},
+			constraints: []UpdateConstraint{NoUnset},
+			wantDetails: []string{"field cannot be cleared once set"},
+		},
+		{
+			name:        "NoAddItem key added",
+			op:          operation.Update,
+			value:       map[string]string{"a": "1", "b": "2"},
+			oldValue:    map[string]string{"a": "1"},
+			constraints: []UpdateConstraint{NoAddItem},
+			wantDetails: []string{"item may not be added"},
+		},
+		{
+			name:        "NoAddItem value-only change allowed",
+			op:          operation.Update,
+			value:       map[string]string{"a": "2"},
+			oldValue:    map[string]string{"a": "1"},
+			constraints: []UpdateConstraint{NoAddItem},
+		},
+		{
+			name:        "NoRemoveItem key removed",
+			op:          operation.Update,
+			value:       map[string]string{"a": "1"},
+			oldValue:    map[string]string{"a": "1", "b": "2"},
+			constraints: []UpdateConstraint{NoRemoveItem},
+			wantDetails: []string{"item may not be removed"},
+		},
+		{
+			name:        "NoAddItem + NoRemoveItem stable keys allowed",
+			op:          operation.Update,
+			value:       map[string]string{"a": "1", "b": "22"},
+			oldValue:    map[string]string{"a": "11", "b": "2"},
+			constraints: []UpdateConstraint{NoAddItem, NoRemoveItem},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			op := operation.Operation{Type: tt.op}
+			errs := UpdateMap(context.TODO(), op, field.NewPath("test"), tt.value, tt.oldValue, tt.constraints...)
+			if len(errs) != len(tt.wantDetails) {
+				t.Fatalf("UpdateMap() returned %d errors, want %d: %v", len(errs), len(tt.wantDetails), errs)
+			}
+			for i, want := range tt.wantDetails {
+				if errs[i].Detail != want {
+					t.Errorf("UpdateMap() error[%d] = %q, want %q", i, errs[i].Detail, want)
+				}
+				if errs[i].Origin != "update" {
+					t.Errorf("UpdateMap() error[%d] origin = %q, want %q", i, errs[i].Origin, "update")
+				}
+			}
+		})
+	}
+}
+
+func TestPtrSliceUpdate(t *testing.T) {
+	type keyed struct {
+		Name  string
+		Value string
+	}
+	keyMatch := func(a, b *keyed) bool { return a.Name == b.Name }
+
+	tests := []struct {
+		name        string
+		op          operation.Type
+		value       []*string
+		oldValue    []*string
+		match       MatchFunc[*string]
+		constraints []UpdateConstraint
+		wantDetails []string
+	}{
+		{
+			name:        "create operation - no validation",
+			op:          operation.Create,
+			value:       []*string{new("a")},
+			oldValue:    nil,
+			constraints: []UpdateConstraint{NoSet, NoUnset, NoAddItem, NoRemoveItem},
+			match:       DirectEqual[string],
+		},
+		{
+			name:        "NoSet nil to non-empty (forbidden)",
+			op:          operation.Update,
+			value:       []*string{new("a")},
+			oldValue:    nil,
+			constraints: []UpdateConstraint{NoSet},
+			wantDetails: []string{"field cannot be set once created"},
+		},
+		{
+			name:        "NoAddItem direct-equal item added",
+			op:          operation.Update,
+			value:       []*string{new("a"), new("b"), new("c")},
+			oldValue:    []*string{new("a"), new("c")},
+			match:       DirectEqual[string],
+			constraints: []UpdateConstraint{NoAddItem},
+			wantDetails: []string{"item may not be added"},
+		},
+		{
+			name:        "NoRemoveItem direct-equal item removed",
+			op:          operation.Update,
+			value:       []*string{new("a")},
+			oldValue:    []*string{new("a"), new("b")},
+			match:       DirectEqual[string],
+			constraints: []UpdateConstraint{NoRemoveItem},
+			wantDetails: []string{"item may not be removed"},
+		},
+		{
+			name:        "nil element in value (ignored)",
+			op:          operation.Update,
+			value:       []*string{new("a"), nil, new("c")},
+			oldValue:    []*string{new("a"), new("c")},
+			match:       DirectEqual[string],
+			constraints: []UpdateConstraint{NoAddItem},
+			// Expect 0 errors because nil is ignored and non-nil elements match old values.
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			op := operation.Operation{Type: tt.op}
+			errs := PtrSliceUpdate(context.TODO(), op, field.NewPath("test"), tt.value, tt.oldValue, tt.match, tt.constraints...)
+
+			if len(errs) != len(tt.wantDetails) {
+				t.Fatalf("PtrSliceUpdate() returned %d errors, want %d: %v", len(errs), len(tt.wantDetails), errs)
+			}
+			for i, want := range tt.wantDetails {
+				if errs[i].Detail != want {
+					t.Errorf("PtrSliceUpdate() error[%d] = %q, want %q", i, errs[i].Detail, want)
+				}
+				if errs[i].Origin != "update" {
+					t.Errorf("PtrSliceUpdate() error[%d] origin = %q, want %q", i, errs[i].Origin, "update")
+				}
+			}
+		})
+	}
+
+	t.Run("NoAddItem+NoRemoveItem keyed match allows item modification", func(t *testing.T) {
+		op := operation.Operation{Type: operation.Update}
+		newList := []*keyed{{Name: "alpha", Value: "v2"}, {Name: "beta", Value: "v1"}}
+		oldList := []*keyed{{Name: "alpha", Value: "v1"}, {Name: "beta", Value: "v1"}}
+		errs := PtrSliceUpdate(context.TODO(), op, field.NewPath("test"), newList, oldList, keyMatch, NoAddItem, NoRemoveItem)
+		if len(errs) != 0 {
+			t.Errorf("expected no errors for keyed-match item modification, got %v", errs)
+		}
+	})
+
+	t.Run("NoAddItem without match returns internal error", func(t *testing.T) {
+		op := operation.Operation{Type: operation.Update}
+		errs := PtrSliceUpdate[string](context.TODO(), op, field.NewPath("test"), []*string{new("a")}, nil, nil, NoAddItem)
+		if len(errs) != 1 || errs[0].Type != field.ErrorTypeInternal {
+			t.Errorf("expected single InternalError, got %v", errs)
+		}
+	})
 }

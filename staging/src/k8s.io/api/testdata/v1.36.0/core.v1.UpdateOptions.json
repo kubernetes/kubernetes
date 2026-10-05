@@ -1,0 +1,9 @@
+{
+  "kind": "UpdateOptions",
+  "apiVersion": "v1",
+  "dryRun": [
+    "dryRunValue"
+  ],
+  "fieldManager": "fieldManagerValue",
+  "fieldValidation": "fieldValidationValue"
+}

@@ -19,6 +19,7 @@ package server
 import (
 	"context"
 	"crypto/sha256"
+	"crypto/tls"
 	"encoding/base32"
 	"fmt"
 	"net"
@@ -365,6 +366,13 @@ type SecureServingInfo struct {
 	// Values are from tls package constants (https://golang.org/pkg/crypto/tls/#pkg-constants).
 	CipherSuites []uint16
 
+	// CurvePreferences optionally specifies the set of allowed key exchange mechanisms for the server.
+	// The order of the list is ignored, and key exchange mechanisms
+	// are chosen by Go from this list using an internal preference order.
+	// If empty, the default Go curves will be used.
+	// Values are from the Go crypto/tls CurveID constants (https://golang.org/pkg/crypto/tls/#CurveID).
+	CurvePreferences []tls.CurveID
+
 	// HTTP2MaxStreamsPerConnection is the limit that the api server imposes on each client.
 	// A value of zero means to use the default provided by golang's HTTP/2 support.
 	HTTP2MaxStreamsPerConnection int
@@ -500,9 +508,9 @@ func DefaultOpenAPIConfig(getDefinitions openapicommon.GetOpenAPIDefinitions, de
 				Description: "Default Response.",
 			},
 		},
-		GetOperationIDAndTags: apiopenapi.GetOperationIDAndTags,
-		GetDefinitionName:     defNamer.GetDefinitionName,
-		GetDefinitions:        getDefinitions,
+		GetOperationIDAndTagsFromRoute: apiopenapi.GetOperationIDAndTagsFromRoute,
+		GetDefinitionName:              defNamer.GetDefinitionName,
+		GetDefinitions:                 getDefinitions,
 	}
 }
 
@@ -520,9 +528,9 @@ func DefaultOpenAPIV3Config(getDefinitions openapicommon.GetOpenAPIDefinitions, 
 				Description: "Default Response.",
 			},
 		},
-		GetOperationIDAndTags: apiopenapi.GetOperationIDAndTags,
-		GetDefinitionName:     defNamer.GetDefinitionName,
-		GetDefinitions:        getDefinitions,
+		GetOperationIDAndTagsFromRoute: apiopenapi.GetOperationIDAndTagsFromRoute,
+		GetDefinitionName:              defNamer.GetDefinitionName,
+		GetDefinitions:                 getDefinitions,
 	}
 	defaultConfig.Definitions = getDefinitions(func(name string) spec.Ref {
 		defName, _ := defaultConfig.GetDefinitionName(name)
@@ -1061,9 +1069,7 @@ func DefaultBuildHandlerChain(apiHandler http.Handler, c *Config) http.Handler {
 
 	// WithTracing comes after authentication so we can allow authenticated
 	// clients to influence sampling.
-	if c.FeatureGate.Enabled(genericfeatures.APIServerTracing) {
-		handler = genericapifilters.WithTracing(handler, c.TracerProvider)
-	}
+	handler = genericapifilters.WithTracing(handler, c.TracerProvider)
 	failedHandler = filterlatency.TrackCompleted(failedHandler)
 	handler = filterlatency.TrackCompleted(handler)
 	handler = genericapifilters.WithAuthentication(handler, c.Authentication.Authenticator, failedHandler, c.Authentication.APIAudiences, c.Authentication.RequestHeaderConfig)

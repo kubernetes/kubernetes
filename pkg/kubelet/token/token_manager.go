@@ -49,7 +49,7 @@ func NewManager(c clientset.Interface) *Manager {
 	once := &sync.Once{}
 	tokenRequestsSupported := func() bool {
 		once.Do(func() {
-			resources, err := c.Discovery().ServerResourcesForGroupVersion("v1")
+			resources, err := c.Discovery().ServerResourcesForGroupVersionWithContext(context.TODO(), ("v1"))
 			if err != nil {
 				return
 			}

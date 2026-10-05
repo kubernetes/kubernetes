@@ -125,8 +125,7 @@ func makePrivateKeySignerFromFile(key string) (ssh.Signer, error) {
 // NodeSSHHosts returns SSH-able host names for all schedulable nodes.
 // If it can't find any external IPs, it falls back to
 // looking for internal IPs. If it can't find an internal IP for every node it
-// returns an error, though it still returns all hosts that it found in that
-// case.
+// returns an error.
 func NodeSSHHosts(ctx context.Context, c clientset.Interface) ([]string, error) {
 	nodelist := waitListSchedulableNodesOrDie(ctx, c)
 
@@ -136,10 +135,9 @@ func NodeSSHHosts(ctx context.Context, c clientset.Interface) ([]string, error) 
 		framework.Logf("No external IP address on nodes, falling back to internal IPs")
 		hosts = nodeAddresses(nodelist, v1.NodeInternalIP)
 	}
-
-	// Error if neither External nor Internal IPs weren't available for all nodes.
 	if len(hosts) != len(nodelist.Items) {
-		return hosts, fmt.Errorf(
+		// Something is wrong; all schedulable nodes should have at least one IP.
+		return nil, fmt.Errorf(
 			"only found %d IPs on nodes, but found %d nodes. Nodelist: %v",
 			len(hosts), len(nodelist.Items), nodelist)
 	}

@@ -22,20 +22,24 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/apiserver/pkg/features"
+	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage/names"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/admissionregistration"
 	"k8s.io/kubernetes/pkg/apis/admissionregistration/validation"
+	"k8s.io/kubernetes/pkg/kubeapiserver/admission/exclusion"
 )
 
 // mutatingWebhookConfigurationStrategy implements verification logic for mutatingWebhookConfiguration.
 type mutatingWebhookConfigurationStrategy struct {
-	runtime.ObjectTyper
+	rest.DeclarativeValidation
 	names.NameGenerator
 }
 
 // Strategy is the default logic that applies when creating and updating mutatingWebhookConfiguration objects.
-var Strategy = mutatingWebhookConfigurationStrategy{legacyscheme.Scheme, names.SimpleNameGenerator}
+var Strategy = mutatingWebhookConfigurationStrategy{rest.DeclarativeValidation{Scheme: legacyscheme.Scheme}, names.SimpleNameGenerator}
 
 // NamespaceScoped returns false because MutatingWebhookConfiguration is cluster-scoped resource.
 func (mutatingWebhookConfigurationStrategy) NamespaceScoped() bool {
@@ -50,7 +54,15 @@ func (mutatingWebhookConfigurationStrategy) PrepareForCreate(ctx context.Context
 
 // WarningsOnCreate returns warnings for the creation of the given object.
 func (mutatingWebhookConfigurationStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
-	return nil
+	ic := obj.(*admissionregistration.MutatingWebhookConfiguration)
+	var warnings []string
+	if !utilfeature.DefaultFeatureGate.Enabled(features.ManifestBasedAdmissionControlConfig) {
+		warnings = append(warnings, validation.WarningsForStaticSuffix(ic.Name)...)
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.ExcludeAdmissionWebhookVirtualResources) {
+		warnings = append(warnings, validation.WarningsForMutatingWebhookRules(ic.Webhooks, exclusion.Excluded())...)
+	}
+	return warnings
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
@@ -69,7 +81,11 @@ func (mutatingWebhookConfigurationStrategy) PrepareForUpdate(ctx context.Context
 // Validate validates a new mutatingWebhookConfiguration.
 func (mutatingWebhookConfigurationStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	ic := obj.(*admissionregistration.MutatingWebhookConfiguration)
-	return validation.ValidateMutatingWebhookConfiguration(ic)
+	errs := validation.ValidateMutatingWebhookConfiguration(ic)
+	if utilfeature.DefaultFeatureGate.Enabled(features.ManifestBasedAdmissionControlConfig) {
+		errs = append(errs, validation.ValidateStaticSuffix(ic.Name, field.NewPath("metadata", "name"))...)
+	}
+	return errs
 }
 
 // Canonicalize normalizes the object after validation.
@@ -77,22 +93,31 @@ func (mutatingWebhookConfigurationStrategy) Canonicalize(obj runtime.Object) {
 }
 
 // AllowCreateOnUpdate is false for mutatingWebhookConfiguration; this means you may not create one with a PUT request.
-func (mutatingWebhookConfigurationStrategy) AllowCreateOnUpdate() bool {
+func (mutatingWebhookConfigurationStrategy) AllowCreateOnUpdate(ctx context.Context) bool {
 	return false
 }
 
 // ValidateUpdate is the default update validation for an end user.
 func (mutatingWebhookConfigurationStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
-	return validation.ValidateMutatingWebhookConfigurationUpdate(obj.(*admissionregistration.MutatingWebhookConfiguration), old.(*admissionregistration.MutatingWebhookConfiguration))
+	newIC := obj.(*admissionregistration.MutatingWebhookConfiguration)
+	oldIC := old.(*admissionregistration.MutatingWebhookConfiguration)
+	errs := validation.ValidateMutatingWebhookConfigurationUpdate(newIC, oldIC)
+	return errs
 }
 
 // WarningsOnUpdate returns warnings for the given update.
 func (mutatingWebhookConfigurationStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
-	return nil
+	newIC := obj.(*admissionregistration.MutatingWebhookConfiguration)
+	var warnings []string
+	warnings = append(warnings, validation.WarningsForStaticSuffix(newIC.Name)...)
+	if utilfeature.DefaultFeatureGate.Enabled(features.ExcludeAdmissionWebhookVirtualResources) {
+		warnings = append(warnings, validation.WarningsForMutatingWebhookRules(newIC.Webhooks, exclusion.Excluded())...)
+	}
+	return warnings
 }
 
 // AllowUnconditionalUpdate is the default update policy for mutatingWebhookConfiguration objects. Status update should
 // only be allowed if version match.
-func (mutatingWebhookConfigurationStrategy) AllowUnconditionalUpdate() bool {
+func (mutatingWebhookConfigurationStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {
 	return false
 }

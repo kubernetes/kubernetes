@@ -4,8 +4,6 @@
 
 package antlr
 
-import "sync"
-
 // ATNInvalidAltNumber is used to represent an ALT number that has yet to be calculated or
 // which is invalid for a particular struct such as [*antlr.BaseRuleContext]
 var ATNInvalidAltNumber int
@@ -56,9 +54,9 @@ type ATN struct {
 	//
 	states []ATNState
 
-	mu      sync.Mutex
-	stateMu sync.RWMutex
-	edgeMu  sync.RWMutex
+	mu      Mutex
+	stateMu RWMutex
+	edgeMu  RWMutex
 }
 
 // NewATN returns a new ATN struct representing the given grammarType and is used

@@ -26,6 +26,9 @@ var (
 	// option to configure a shared buffer pool for a grpc.Server.
 	BufferPool any // func (grpc.SharedBufferPool) grpc.ServerOption
 
+	// SetDefaultBufferPool updates the default buffer pool.
+	SetDefaultBufferPool any // func(mem.BufferPool)
+
 	// AcceptCompressors is implemented by the grpc package and returns
 	// a call option that restricts the grpc-accept-encoding header for a call.
 	AcceptCompressors any // func(...string) grpc.CallOption

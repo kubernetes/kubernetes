@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // Package x documents experimental features for [go.opentelemetry.io/otel/sdk].
-package x // import "go.opentelemetry.io/otel/sdk/internal/x"
+package x
 
 import "strings"
 
@@ -35,5 +35,20 @@ var Observability = newFeature(
 			return v, true
 		}
 		return "", false
+	},
+)
+
+// PerSeriesStartTimestamps is an experimental feature flag that determines if the SDK
+// uses the new Start Timestamps specification.
+//
+// To enable this feature set the OTEL_GO_X_PER_SERIES_START_TIMESTAMPS environment variable
+// to the case-insensitive string value of "true".
+var PerSeriesStartTimestamps = newFeature(
+	[]string{"PER_SERIES_START_TIMESTAMPS"},
+	func(v string) (bool, bool) {
+		if strings.EqualFold(v, "true") {
+			return true, true
+		}
+		return false, false
 	},
 )

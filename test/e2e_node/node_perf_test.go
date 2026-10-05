@@ -180,7 +180,7 @@ var _ = SIGDescribe("Node Performance Testing", framework.WithSerial(), framewor
 		ginkgo.BeforeEach(func() {
 			wl = workloads.NodePerfWorkloads[2]
 		})
-		ginkgo.It("TensorFlow workload", func(ctx context.Context) {
+		ginkgo.It("PyTorch workload", func(ctx context.Context) {
 			ginkgo.DeferCleanup(cleanup)
 			runWorkload(ctx)
 		})

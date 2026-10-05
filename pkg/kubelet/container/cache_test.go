@@ -20,10 +20,12 @@ import (
 	"fmt"
 	"strconv"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func newTestCache() *cache {
@@ -61,6 +63,7 @@ func TestGetIfNewerThanWhenPodExists(t *testing.T) {
 	cases := []struct {
 		cacheTime time.Time
 		modified  time.Time
+		observed  time.Time
 		expected  bool
 	}{
 		{
@@ -130,6 +133,7 @@ func TestGetPodNewerThanWhenPodDoesNotExist(t *testing.T) {
 }
 
 func TestCacheSetAndGet(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	cache := NewCache()
 	cases := []struct {
 		numContainers int
@@ -144,34 +148,36 @@ func TestCacheSetAndGet(t *testing.T) {
 		cache.Set(podID, status, c.error, time.Time{})
 		// Read back the status and error stored in cache and make sure they
 		// match the original ones.
-		actualStatus, actualErr := cache.Get(podID)
+		actualStatus, actualErr := cache.Get(tCtx, podID)
 		assert.Equal(t, status, actualStatus, "test[%d]", i)
 		assert.Equal(t, c.error, actualErr, "test[%d]", i)
 	}
 }
 
 func TestCacheGetPodDoesNotExist(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	cache := NewCache()
 	podID, status := getTestPodIDAndStatus(0)
 	// If the pod does not exist in cache, cache should return an status
 	// object with id filled.
-	actualStatus, actualErr := cache.Get(podID)
+	actualStatus, actualErr := cache.Get(tCtx, podID)
 	assert.Equal(t, status, actualStatus)
 	assert.NoError(t, actualErr)
 }
 
 func TestDelete(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	cache := &cache{pods: map[types.UID]*data{}}
 	// Write a new pod status into the cache.
 	podID, status := getTestPodIDAndStatus(3)
 	cache.Set(podID, status, nil, time.Time{})
-	actualStatus, actualErr := cache.Get(podID)
+	actualStatus, actualErr := cache.Get(tCtx, podID)
 	assert.Equal(t, status, actualStatus)
 	assert.NoError(t, actualErr)
 	// Delete the pod from cache, and verify that we get an empty status.
 	cache.Delete(podID)
 	expectedStatus := &PodStatus{ID: podID}
-	actualStatus, actualErr = cache.Get(podID)
+	actualStatus, actualErr = cache.Get(tCtx, podID)
 	assert.Equal(t, expectedStatus, actualStatus)
 	assert.NoError(t, actualErr)
 }
@@ -207,4 +213,112 @@ func TestRegisterNotification(t *testing.T) {
 	cache.UpdateTime(cacheTime.Add(time.Second * 2))
 	// The advance of cache timestamp should've triggered the notification.
 	verifyNotification(t, ch, true)
+}
+
+func TestGetNewerThan(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	podID := types.UID("test-pod")
+	status := &PodStatus{ID: podID}
+
+	cases := []struct {
+		name      string
+		podExists bool
+
+		action func(*cache, time.Time)
+	}{
+		{
+			name:      "UnblockBySet",
+			podExists: true,
+			action:    func(c *cache, timestamp time.Time) { c.Set(podID, status, nil, timestamp) },
+		},
+		{
+			name:      "UnblockBySetObservedTime",
+			podExists: true,
+			action:    func(c *cache, timestamp time.Time) { c.SetObservedTime(podID, timestamp) },
+		},
+		{
+			name:      "UnblockByUpdateTimeExists",
+			podExists: true,
+			action:    func(c *cache, timestamp time.Time) { c.UpdateTime(timestamp) },
+		},
+		{
+			name:      "Missing:UnblockBySet",
+			podExists: false,
+			action:    func(c *cache, timestamp time.Time) { c.Set(podID, status, nil, timestamp) },
+		},
+		{
+			name:      "Missing:UnblockByUpdateTime",
+			podExists: false,
+			action:    func(c *cache, timestamp time.Time) { c.UpdateTime(timestamp) },
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			synctest.Test(t, func(t *testing.T) {
+				initial := time.Now()
+				minTime := initial.Add(10 * time.Second)
+
+				c := newTestCache()
+				c.UpdateTime(initial)
+
+				if tc.podExists {
+					c.Set(podID, status, nil, initial)
+					c.SetObservedTime(podID, initial)
+				}
+
+				// First call to GetNewerThan - should block initially.
+				resCh := make(chan *PodStatus, 1)
+				go func() {
+					s, err := c.GetNewerThan(tCtx, podID, minTime)
+					assert.NoError(t, err)
+					resCh <- s
+				}()
+
+				requireBlocked(t, resCh, "Initial")
+
+				// Should still be blocked if the action is before minTime.
+				tc.action(c, minTime.Add(-time.Second))
+				requireBlocked(t, resCh, "Before minTime")
+
+				// Should be unblocked if the action is after minTime.
+				tc.action(c, minTime.Add(time.Second))
+				r := requireUnblocked(t, resCh, "After minTime")
+				assert.Equal(t, podID, r.ID)
+
+				// Verify a subsequent call returns immediately.
+				resCh2 := make(chan *PodStatus, 1)
+				go func() {
+					s, err := c.GetNewerThan(tCtx, podID, minTime)
+					assert.NoError(t, err)
+					resCh2 <- s
+				}()
+				r = requireUnblocked(t, resCh2, "Already unblocked")
+				assert.Equal(t, podID, r.ID)
+			})
+		})
+	}
+}
+
+func requireBlocked[T any](t *testing.T, ch <-chan T, msg string) {
+	t.Helper()
+	synctest.Wait()
+	select {
+	case r := <-ch:
+		t.Fatalf("%s: receive should have blocked, but got: %v", msg, r)
+	default:
+		// OK.
+	}
+}
+
+func requireUnblocked[T any](t *testing.T, ch <-chan T, msg string) (received T) {
+	t.Helper()
+	synctest.Wait()
+	select {
+	case r := <-ch:
+		return r
+	default:
+		t.Fatalf("%s: receive should not have been blocked", msg)
+		return
+	}
 }

@@ -26,10 +26,15 @@ import (
 // RESTCreateUpdateStrategy is a union of RESTUpdateStrategy and RESTCreateStrategy,
 // and it defines the minimum validation, accepted input, and name generation
 // behavior to create and update an object that follows Kubernetes API conventions.
+//
+// The context that is passed to these methods can be used to retrieve
+// information about the request with request.RequestInfoFrom(ctx) and
+// to return different responses depending on the APIVersion in the
+// request.
 type RESTCreateUpdateStrategy interface {
 	RESTCreateStrategy
 	// AllowCreateOnUpdate returns true if the object can be created by a PUT.
-	AllowCreateOnUpdate() bool
+	AllowCreateOnUpdate(ctx context.Context) bool
 	// PrepareForUpdate is invoked on update before validation to normalize
 	// the object.  For example: remove fields that are not to be persisted,
 	// sort order-insensitive list fields, etc.  This should not remove fields
@@ -62,7 +67,7 @@ type RESTCreateUpdateStrategy interface {
 	// AllowUnconditionalUpdate returns true if the object can be updated
 	// unconditionally (irrespective of the latest resource version), when
 	// there is no resource version specified in the object.
-	AllowUnconditionalUpdate() bool
+	AllowUnconditionalUpdate(ctx context.Context) bool
 }
 
 // Ensure that RESTCreateUpdateStrategy extends RESTCreateStrategy

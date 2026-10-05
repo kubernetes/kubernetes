@@ -1,3 +1,7 @@
+# Pod template for extended resource tests.
+# Pods cycle through .classes device classes (example.com/gpu-0 through example.com/gpu-24 for .classes == 25).
+# The class can be explicit or implicit depending on .class.
+# When .classes is 1, all requests use the same class because "X modulo 1" is always zero.
 apiVersion: v1
 kind: Pod
 metadata:
@@ -8,6 +12,6 @@ spec:
     name: pause
     resources:
       requests:
-        example.com/gpu-{{.Index}}: 1
+        {{.class}}-{{Mod .Index .classes}}: 1
       limits:
-        example.com/gpu-{{.Index}}: 1
+        {{.class}}-{{Mod .Index .classes}}: 1

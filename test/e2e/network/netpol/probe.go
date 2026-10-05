@@ -88,7 +88,7 @@ func ProbePodToPodConnectivity(prober Prober, allPods []TestPod, dnsDomain strin
 	}
 	close(jobs)
 
-	for i := 0; i < size; i++ {
+	for range size {
 		result := <-results
 		job := result.Job
 		if result.Err != nil {

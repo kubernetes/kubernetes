@@ -57,6 +57,11 @@ func GetWarningsForService(service, oldService *api.Service) []string {
 		warnings = append(warnings, utilvalidation.GetWarningsForIP(field.NewPath("spec").Child("externalIPs").Index(i), externalIP)...)
 	}
 
+	// Warn about using externalIPs
+	if len(service.Spec.ExternalIPs) > 0 && !isHeadlessService(service) && service.Spec.Type != api.ServiceTypeExternalName { //nolint:staticcheck // SA1019 testing deprecated field
+		warnings = append(warnings, "spec.externalIPs is deprecated and may no longer be implemented in some clusters")
+	}
+
 	if len(service.Spec.LoadBalancerIP) > 0 {
 		warnings = append(warnings, utilvalidation.GetWarningsForIP(field.NewPath("spec").Child("loadBalancerIP"), service.Spec.LoadBalancerIP)...)
 	}

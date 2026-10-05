@@ -2,9 +2,11 @@ apiVersion: v1
 kind: Node
 metadata:
   # The name is relevant for selecting whether the driver has resources for this node.
-  generateName: scheduler-perf-dra-
-  # The label is used by the node selector in ResourceSlices to scope devices to nodes
-  # that have DRA enabled.
+  # It's deterministic and can be matched with per-node ResourceSlices.
+  name: scheduler-perf-dra-{{.Index}}
+  # The label can used by the node selector in ResourceSlices to scope devices to nodes
+  # that have DRA enabled. Only use this for workloads which simulate network-attached
+  # devices, it wouldn't be realistic for node-local devices.
   labels:
     node-with-dra: "true"
 spec: {}

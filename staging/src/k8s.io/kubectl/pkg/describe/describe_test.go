@@ -41,6 +41,7 @@ import (
 	networkingv1beta1 "k8s.io/api/networking/v1beta1"
 	policyv1 "k8s.io/api/policy/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	resourcev1 "k8s.io/api/resource/v1"
 	schedulingv1 "k8s.io/api/scheduling/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -620,47 +621,36 @@ func TestDescribePodRuntimeClass(t *testing.T) {
 	}
 }
 
-func TestDescribePodWorkloadReference(t *testing.T) {
+func TestDescribePodSchedulingGroup(t *testing.T) {
 	testCases := []struct {
-		name     string
-		pod      *corev1.Pod
-		expected string
+		name       string
+		pod        *corev1.Pod
+		expected   string
+		unexpected string
 	}{
 		{
-			name: "test1",
+			name: "pod with a scheduling group",
 			pod: &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "bar",
 				},
 				Spec: corev1.PodSpec{
-					WorkloadRef: &corev1.WorkloadReference{
-						Name:     "workload",
-						PodGroup: "pg",
+					SchedulingGroup: &corev1.PodSchedulingGroup{
+						PodGroupName: new("pg"),
 					},
 				},
 			},
-			expected: `WorkloadRef:
-  Name:      workload
-  PodGroup:  pg`,
+			expected: "SchedulingGroup:\n  PodGroupName:  pg",
 		},
 		{
-			name: "test2",
+			name: "pod without a scheduling group",
 			pod: &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "bar",
 				},
-				Spec: corev1.PodSpec{
-					WorkloadRef: &corev1.WorkloadReference{
-						Name:               "workload",
-						PodGroup:           "pg",
-						PodGroupReplicaKey: "pg1",
-					},
-				},
+				Spec: corev1.PodSpec{},
 			},
-			expected: `WorkloadRef:
-  Name:                workload
-  PodGroup:            pg
-  PodGroupReplicaKey:  pg1`,
+			unexpected: "SchedulingGroup:",
 		},
 	}
 	for _, tc := range testCases {
@@ -672,8 +662,11 @@ func TestDescribePodWorkloadReference(t *testing.T) {
 			if err != nil {
 				t.Errorf("Unexpected error: %v", err)
 			}
-			if !strings.Contains(out, tc.expected) {
+			if len(tc.expected) > 0 && !strings.Contains(out, tc.expected) {
 				t.Errorf("Expected to find %q in output: %q", tc.expected, out)
+			}
+			if len(tc.unexpected) > 0 && strings.Contains(out, tc.unexpected) {
+				t.Errorf("Unexpected to find %q in output: %q", tc.unexpected, out)
 			}
 		})
 	}
@@ -1382,6 +1375,7 @@ func TestDescribeService(t *testing.T) {
 
 func TestPodDescribeResultsSorted(t *testing.T) {
 	// Arrange
+	pod := &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: "foo", Name: "bar"}}
 	fake := fake.NewClientset(
 		&corev1.EventList{
 			Items: []corev1.Event{
@@ -1414,7 +1408,7 @@ func TestPodDescribeResultsSorted(t *testing.T) {
 				},
 			},
 		},
-		&corev1.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: "foo", Name: "bar"}},
+		pod,
 	)
 	c := &describeClient{T: t, Namespace: "foo", Interface: fake}
 	d := PodDescriber{c}
@@ -1502,10 +1496,10 @@ func TestDescribeResources(t *testing.T) {
 			describeResources(testCase.resources, writer, LEVEL_1)
 			output := out.String()
 			gotElements := make(map[string]int)
-			for key, val := range testCase.expectedElements {
+			for key := range testCase.expectedElements {
 				count := strings.Count(output, key)
 				if count == 0 {
-					t.Errorf("expected to find %q in output: %q", val, output)
+					t.Errorf("expected to find %q in output: %q", key, output)
 					continue
 				}
 				gotElements[key] = count
@@ -1581,6 +1575,81 @@ func TestDescribeContainerPorts(t *testing.T) {
 			result := describeContainerHostPorts(tc.ports)
 			if result != tc.expectedHost {
 				t.Errorf("describeContainerHostPorts: expected %q, got %q", tc.expectedHost, result)
+			}
+		})
+	}
+}
+
+func TestFormatEndpointSlices(t *testing.T) {
+	endpoint := func(addr string, ready bool) discoveryv1.Endpoint {
+		return discoveryv1.Endpoint{
+			Addresses:  []string{addr},
+			Conditions: discoveryv1.EndpointConditions{Ready: new(ready)},
+		}
+	}
+	ports := []discoveryv1.EndpointPort{{Name: new("http"), Port: new(int32(80))}}
+
+	testCases := []struct {
+		name           string
+		endpointSlices []discoveryv1.EndpointSlice
+		expected       string
+	}{
+		{
+			name:     "no endpoint slices",
+			expected: "<none>",
+		},
+		{
+			name: "three ready endpoints",
+			endpointSlices: []discoveryv1.EndpointSlice{{
+				Ports:     ports,
+				Endpoints: []discoveryv1.Endpoint{endpoint("10.0.0.1", true), endpoint("10.0.0.2", true), endpoint("10.0.0.3", true)},
+			}},
+			expected: "10.0.0.1:80,10.0.0.2:80,10.0.0.3:80",
+		},
+		{
+			name: "three ready endpoints followed by a not ready endpoint",
+			endpointSlices: []discoveryv1.EndpointSlice{{
+				Ports:     ports,
+				Endpoints: []discoveryv1.Endpoint{endpoint("10.0.0.1", true), endpoint("10.0.0.2", true), endpoint("10.0.0.3", true), endpoint("10.0.0.4", false)},
+			}},
+			expected: "10.0.0.1:80,10.0.0.2:80,10.0.0.3:80",
+		},
+		{
+			name: "four ready endpoints",
+			endpointSlices: []discoveryv1.EndpointSlice{{
+				Ports:     ports,
+				Endpoints: []discoveryv1.Endpoint{endpoint("10.0.0.1", true), endpoint("10.0.0.2", true), endpoint("10.0.0.3", true), endpoint("10.0.0.4", true)},
+			}},
+			expected: "10.0.0.1:80,10.0.0.2:80,10.0.0.3:80 + 1 more...",
+		},
+		{
+			name: "not ready endpoints are skipped when counting more",
+			endpointSlices: []discoveryv1.EndpointSlice{{
+				Ports:     ports,
+				Endpoints: []discoveryv1.Endpoint{endpoint("10.0.0.1", false), endpoint("10.0.0.2", true), endpoint("10.0.0.3", true), endpoint("10.0.0.4", true), endpoint("10.0.0.5", false), endpoint("10.0.0.6", true)},
+			}},
+			expected: "10.0.0.2:80,10.0.0.3:80,10.0.0.4:80 + 1 more...",
+		},
+		{
+			name: "headless service with three ready endpoints followed by not ready endpoints",
+			endpointSlices: []discoveryv1.EndpointSlice{{
+				Endpoints: []discoveryv1.Endpoint{endpoint("10.0.0.1", true), endpoint("10.0.0.2", true), endpoint("10.0.0.3", true), endpoint("10.0.0.4", false), endpoint("10.0.0.5", false)},
+			}},
+			expected: "10.0.0.1,10.0.0.2,10.0.0.3",
+		},
+		{
+			name: "headless service with more ready endpoints than shown",
+			endpointSlices: []discoveryv1.EndpointSlice{{
+				Endpoints: []discoveryv1.Endpoint{endpoint("10.0.0.1", true), endpoint("10.0.0.2", true), endpoint("10.0.0.3", true), endpoint("10.0.0.4", false), endpoint("10.0.0.5", true)},
+			}},
+			expected: "10.0.0.1,10.0.0.2,10.0.0.3 + 1 more...",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := formatEndpointSlices(tc.endpointSlices, nil); got != tc.expected {
+				t.Errorf("expected %q, got %q", tc.expected, got)
 			}
 		})
 	}
@@ -2818,61 +2887,63 @@ func TestGetPodsForPVC(t *testing.T) {
 func TestDescribeDeployment(t *testing.T) {
 	labels := map[string]string{"k8s-app": "bar"}
 	testCases := []struct {
-		name    string
-		objects []runtime.Object
-		expects []string
+		name       string
+		deployment runtime.Object
+		objects    []runtime.Object
+		expects    []string
 	}{
 		{
 			name: "deployment with two mounted volumes",
-			objects: []runtime.Object{
-				&appsv1.Deployment{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:              "bar",
-						Namespace:         "foo",
-						Labels:            labels,
-						UID:               "00000000-0000-0000-0000-000000000001",
-						CreationTimestamp: metav1.NewTime(time.Date(2021, time.Month(1), 1, 0, 0, 0, 0, time.UTC)),
+			deployment: &appsv1.Deployment{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "bar",
+					Namespace:         "foo",
+					Labels:            labels,
+					UID:               "00000000-0000-0000-0000-000000000001",
+					CreationTimestamp: metav1.NewTime(time.Date(2021, time.Month(1), 1, 0, 0, 0, 0, time.UTC)),
+				},
+				Spec: appsv1.DeploymentSpec{
+					Replicas: ptr.To[int32](1),
+					Selector: &metav1.LabelSelector{
+						MatchLabels: labels,
 					},
-					Spec: appsv1.DeploymentSpec{
-						Replicas: ptr.To[int32](1),
-						Selector: &metav1.LabelSelector{
-							MatchLabels: labels,
+					Template: corev1.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "bar",
+							Namespace: "foo",
+							Labels:    labels,
 						},
-						Template: corev1.PodTemplateSpec{
-							ObjectMeta: metav1.ObjectMeta{
-								Name:      "bar",
-								Namespace: "foo",
-								Labels:    labels,
-							},
-							Spec: corev1.PodSpec{
-								Containers: []corev1.Container{
-									{
-										Image: "mytest-image:latest",
-										VolumeMounts: []corev1.VolumeMount{
-											{
-												Name:      "vol-foo",
-												MountPath: "/tmp/vol-foo",
-											}, {
-												Name:      "vol-bar",
-												MountPath: "/tmp/vol-bar",
-											},
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Image: "mytest-image:latest",
+									VolumeMounts: []corev1.VolumeMount{
+										{
+											Name:      "vol-foo",
+											MountPath: "/tmp/vol-foo",
+										}, {
+											Name:      "vol-bar",
+											MountPath: "/tmp/vol-bar",
 										},
 									},
 								},
-								Volumes: []corev1.Volume{
-									{
-										Name:         "vol-foo",
-										VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}},
-									},
-									{
-										Name:         "vol-bar",
-										VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}},
-									},
+							},
+							Volumes: []corev1.Volume{
+								{
+									Name:         "vol-foo",
+									VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}},
+								},
+								{
+									Name:         "vol-bar",
+									VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}},
 								},
 							},
 						},
 					},
-				}, &appsv1.ReplicaSet{
+				},
+			},
+			objects: []runtime.Object{
+				&appsv1.ReplicaSet{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "bar-001",
 						Namespace: "foo",
@@ -2947,61 +3018,62 @@ func TestDescribeDeployment(t *testing.T) {
 		},
 		{
 			name: "deployment during the process of rolling out",
-			objects: []runtime.Object{
-				&appsv1.Deployment{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:              "bar",
-						Namespace:         "foo",
-						Labels:            labels,
-						UID:               "00000000-0000-0000-0000-000000000001",
-						CreationTimestamp: metav1.NewTime(time.Date(2021, time.Month(1), 1, 0, 0, 0, 0, time.UTC)),
+			deployment: &appsv1.Deployment{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "bar",
+					Namespace:         "foo",
+					Labels:            labels,
+					UID:               "00000000-0000-0000-0000-000000000001",
+					CreationTimestamp: metav1.NewTime(time.Date(2021, time.Month(1), 1, 0, 0, 0, 0, time.UTC)),
+				},
+				Spec: appsv1.DeploymentSpec{
+					Replicas: ptr.To[int32](2),
+					Selector: &metav1.LabelSelector{
+						MatchLabels: labels,
 					},
-					Spec: appsv1.DeploymentSpec{
-						Replicas: ptr.To[int32](2),
-						Selector: &metav1.LabelSelector{
-							MatchLabels: labels,
+					Template: corev1.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "bar",
+							Namespace: "foo",
+							Labels:    labels,
 						},
-						Template: corev1.PodTemplateSpec{
-							ObjectMeta: metav1.ObjectMeta{
-								Name:      "bar",
-								Namespace: "foo",
-								Labels:    labels,
-							},
-							Spec: corev1.PodSpec{
-								Containers: []corev1.Container{
-									{
-										Image: "mytest-image:v2.0",
-										VolumeMounts: []corev1.VolumeMount{
-											{
-												Name:      "vol-foo",
-												MountPath: "/tmp/vol-foo",
-											}, {
-												Name:      "vol-bar",
-												MountPath: "/tmp/vol-bar",
-											},
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Image: "mytest-image:v2.0",
+									VolumeMounts: []corev1.VolumeMount{
+										{
+											Name:      "vol-foo",
+											MountPath: "/tmp/vol-foo",
+										}, {
+											Name:      "vol-bar",
+											MountPath: "/tmp/vol-bar",
 										},
 									},
 								},
-								Volumes: []corev1.Volume{
-									{
-										Name:         "vol-foo",
-										VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}},
-									},
-									{
-										Name:         "vol-bar",
-										VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}},
-									},
+							},
+							Volumes: []corev1.Volume{
+								{
+									Name:         "vol-foo",
+									VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}},
+								},
+								{
+									Name:         "vol-bar",
+									VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}},
 								},
 							},
 						},
 					},
-					Status: appsv1.DeploymentStatus{
-						Replicas:            3,
-						UpdatedReplicas:     1,
-						AvailableReplicas:   2,
-						UnavailableReplicas: 1,
-					},
-				}, &appsv1.ReplicaSet{
+				},
+				Status: appsv1.DeploymentStatus{
+					Replicas:            3,
+					UpdatedReplicas:     1,
+					AvailableReplicas:   2,
+					UnavailableReplicas: 1,
+				},
+			},
+			objects: []runtime.Object{
+				&appsv1.ReplicaSet{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "bar-001",
 						Namespace: "foo",
@@ -3207,61 +3279,62 @@ func TestDescribeDeployment(t *testing.T) {
 		},
 		{
 			name: "deployment after successful rollout",
-			objects: []runtime.Object{
-				&appsv1.Deployment{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:              "bar",
-						Namespace:         "foo",
-						Labels:            labels,
-						UID:               "00000000-0000-0000-0000-000000000001",
-						CreationTimestamp: metav1.NewTime(time.Date(2021, time.Month(1), 1, 0, 0, 0, 0, time.UTC)),
+			deployment: &appsv1.Deployment{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "bar",
+					Namespace:         "foo",
+					Labels:            labels,
+					UID:               "00000000-0000-0000-0000-000000000001",
+					CreationTimestamp: metav1.NewTime(time.Date(2021, time.Month(1), 1, 0, 0, 0, 0, time.UTC)),
+				},
+				Spec: appsv1.DeploymentSpec{
+					Replicas: ptr.To[int32](2),
+					Selector: &metav1.LabelSelector{
+						MatchLabels: labels,
 					},
-					Spec: appsv1.DeploymentSpec{
-						Replicas: ptr.To[int32](2),
-						Selector: &metav1.LabelSelector{
-							MatchLabels: labels,
+					Template: corev1.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "bar",
+							Namespace: "foo",
+							Labels:    labels,
 						},
-						Template: corev1.PodTemplateSpec{
-							ObjectMeta: metav1.ObjectMeta{
-								Name:      "bar",
-								Namespace: "foo",
-								Labels:    labels,
-							},
-							Spec: corev1.PodSpec{
-								Containers: []corev1.Container{
-									{
-										Image: "mytest-image:v2.0",
-										VolumeMounts: []corev1.VolumeMount{
-											{
-												Name:      "vol-foo",
-												MountPath: "/tmp/vol-foo",
-											}, {
-												Name:      "vol-bar",
-												MountPath: "/tmp/vol-bar",
-											},
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Image: "mytest-image:v2.0",
+									VolumeMounts: []corev1.VolumeMount{
+										{
+											Name:      "vol-foo",
+											MountPath: "/tmp/vol-foo",
+										}, {
+											Name:      "vol-bar",
+											MountPath: "/tmp/vol-bar",
 										},
 									},
 								},
-								Volumes: []corev1.Volume{
-									{
-										Name:         "vol-foo",
-										VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}},
-									},
-									{
-										Name:         "vol-bar",
-										VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}},
-									},
+							},
+							Volumes: []corev1.Volume{
+								{
+									Name:         "vol-foo",
+									VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}},
+								},
+								{
+									Name:         "vol-bar",
+									VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}},
 								},
 							},
 						},
 					},
-					Status: appsv1.DeploymentStatus{
-						Replicas:            2,
-						UpdatedReplicas:     2,
-						AvailableReplicas:   2,
-						UnavailableReplicas: 0,
-					},
-				}, &appsv1.ReplicaSet{
+				},
+				Status: appsv1.DeploymentStatus{
+					Replicas:            2,
+					UpdatedReplicas:     2,
+					AvailableReplicas:   2,
+					UnavailableReplicas: 0,
+				},
+			},
+			objects: []runtime.Object{
+				&appsv1.ReplicaSet{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "bar-001",
 						Namespace: "foo",
@@ -3504,7 +3577,8 @@ func TestDescribeDeployment(t *testing.T) {
 	}
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			fakeClient := fake.NewClientset(testCase.objects...)
+			objs := append([]runtime.Object{testCase.deployment}, testCase.objects...)
+			fakeClient := fake.NewClientset(objs...)
 			d := DeploymentDescriber{fakeClient}
 			out, err := d.Describe("foo", "bar", DescriberSettings{ShowEvents: true})
 			if err != nil {
@@ -6327,20 +6401,21 @@ func TestDescribeNode(t *testing.T) {
 		getHugePageResourceList("1Gi", "0"),
 	)
 
-	fake := fake.NewClientset(
-		&corev1.Node{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "bar",
-				UID:  "uid",
-			},
-			Spec: corev1.NodeSpec{
-				Unschedulable: true,
-			},
-			Status: corev1.NodeStatus{
-				Capacity:    nodeCapacity,
-				Allocatable: nodeAllocatable,
-			},
+	node := &corev1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "bar",
+			UID:  "uid",
 		},
+		Spec: corev1.NodeSpec{
+			Unschedulable: true,
+		},
+		Status: corev1.NodeStatus{
+			Capacity:    nodeCapacity,
+			Allocatable: nodeAllocatable,
+		},
+	}
+	fake := fake.NewClientset(
+		node,
 		&coordinationv1.Lease{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "bar",
@@ -6461,20 +6536,21 @@ func TestDescribeNodeWithSidecar(t *testing.T) {
 	)
 
 	restartPolicy := corev1.ContainerRestartPolicyAlways
-	fake := fake.NewClientset(
-		&corev1.Node{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "bar",
-				UID:  "uid",
-			},
-			Spec: corev1.NodeSpec{
-				Unschedulable: true,
-			},
-			Status: corev1.NodeStatus{
-				Capacity:    nodeCapacity,
-				Allocatable: nodeAllocatable,
-			},
+	node := &corev1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "bar",
+			UID:  "uid",
 		},
+		Spec: corev1.NodeSpec{
+			Unschedulable: true,
+		},
+		Status: corev1.NodeStatus{
+			Capacity:    nodeCapacity,
+			Allocatable: nodeAllocatable,
+		},
+	}
+	fake := fake.NewClientset(
+		node,
 		&coordinationv1.Lease{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "bar",
@@ -6597,6 +6673,335 @@ func TestDescribeNodeWithSidecar(t *testing.T) {
 		}
 	}
 }
+
+func TestDescribeNodeWithPodLevelResources(t *testing.T) {
+	holderIdentity := "holder"
+	nodeCapacity := getResourceList("8", "24Gi")
+	nodeAllocatable := getResourceList("4", "12Gi")
+
+	node := &corev1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "bar",
+			UID:  "uid",
+		},
+		Spec: corev1.NodeSpec{
+			Unschedulable: false,
+		},
+		Status: corev1.NodeStatus{
+			Capacity:    nodeCapacity,
+			Allocatable: nodeAllocatable,
+		},
+	}
+	fake := fake.NewClientset(
+		node,
+		&coordinationv1.Lease{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "bar",
+				Namespace: corev1.NamespaceNodeLease,
+			},
+			Spec: coordinationv1.LeaseSpec{
+				HolderIdentity: &holderIdentity,
+				AcquireTime:    &metav1.MicroTime{Time: time.Now().Add(-time.Hour)},
+				RenewTime:      &metav1.MicroTime{Time: time.Now()},
+			},
+		},
+		&corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "pod-with-pod-level-resources",
+				Namespace: "foo",
+			},
+			TypeMeta: metav1.TypeMeta{
+				Kind: "Pod",
+			},
+			Spec: corev1.PodSpec{
+				// Pod-level resources
+				Resources: &corev1.ResourceRequirements{
+					Requests: getResourceList("2", "4Gi"),
+					Limits:   getResourceList("4", "8Gi"),
+				},
+				Containers: []corev1.Container{
+					{
+						Name:  "container-1",
+						Image: "image:latest",
+					},
+					{
+						Name:  "container-2",
+						Image: "image:latest",
+					},
+				},
+			},
+			Status: corev1.PodStatus{
+				Phase: corev1.PodRunning,
+			},
+		},
+	)
+	c := &describeClient{T: t, Namespace: "foo", Interface: fake}
+	d := NodeDescriber{c}
+	out, err := d.Describe("foo", "bar", DescriberSettings{ShowEvents: true})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	// Verify that describeNodeResource works correctly with pod-level resources
+	// Pod-level resources: requests cpu=2, memory=4Gi; limits cpu=4, memory=8Gi
+	// Node allocatable: cpu=4, memory=12Gi
+	// Expected: cpu requests 2 (50%), cpu limits 4 (100%), memory requests 4Gi (33%), memory limits 8Gi (66%)
+	expectedOut := []string{
+		"pod-with-pod-level-resources",
+		// Verify per-pod row shows correct computed values for pod-level resources
+		"pod-with-pod-level-resources    2 (50%)       4 (100%)    4Gi (33%)        8Gi (66%)",
+		// Verify the allocated resources totals correctly account for pod-level resources
+		`Allocated resources:
+  (Total limits may be over 100 percent, i.e., overcommitted.)
+  Resource           Requests   Limits
+  --------           --------   ------
+  cpu                2 (50%)    4 (100%)
+  memory             4Gi (33%)  8Gi (66%)
+  ephemeral-storage  0 (0%)     0 (0%)`,
+	}
+	for _, expected := range expectedOut {
+		if !strings.Contains(out, expected) {
+			t.Errorf("expected to find %q in output: %q", expected, out)
+		}
+	}
+}
+
+func TestDescribeNodeResource(t *testing.T) {
+	newPod := func(requests, limits corev1.ResourceList, status *corev1.ResourceRequirements) corev1.Pod {
+		pod := corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{Name: "pod-1", Namespace: "foo"},
+			Spec: corev1.PodSpec{
+				Containers: []corev1.Container{{
+					Name:      "container-1",
+					Resources: corev1.ResourceRequirements{Requests: requests, Limits: limits},
+				}},
+			},
+		}
+		if status != nil {
+			pod.Status = corev1.PodStatus{
+				Phase:             corev1.PodRunning,
+				ContainerStatuses: []corev1.ContainerStatus{{Name: "container-1", Resources: status}},
+			}
+		}
+		return pod
+	}
+
+	tests := []struct {
+		name     string
+		node     *corev1.Node
+		pods     []corev1.Pod
+		expected []string
+	}{
+		{
+			name: "node with allocatable resources",
+			node: &corev1.Node{
+				ObjectMeta: metav1.ObjectMeta{Name: "bar"},
+				Status:     corev1.NodeStatus{Allocatable: getResourceList("1", "1Gi")},
+			},
+			pods: []corev1.Pod{newPod(getResourceList("250m", "256Mi"), getResourceList("500m", "512Mi"), nil)},
+			expected: []string{
+				"foo\tpod-1\t\t250m (25%)\t500m (50%)\t256Mi (25%)\t512Mi (50%)\t",
+				"cpu\t250m (25%)\t500m (50%)\n",
+				"memory\t256Mi (25%)\t512Mi (50%)\n",
+			},
+		},
+		{
+			// A node that has not reported capacity or allocatable yet, for
+			// example one registered by hand or whose kubelet has not posted
+			// its status. Percentages must be 0 instead of a division by zero.
+			name: "node without allocatable resources",
+			node: &corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "bar"}},
+			pods: []corev1.Pod{newPod(getResourceList("100m", "100Mi"), getResourceList("200m", "200Mi"), nil)},
+			expected: []string{
+				"foo\tpod-1\t\t100m (0%)\t200m (0%)\t100Mi (0%)\t200Mi (0%)\t",
+				"cpu\t100m (0%)\t200m (0%)\n",
+				"memory\t100Mi (0%)\t200Mi (0%)\n",
+			},
+		},
+		{
+			// A pod in the middle of an in-place resize: the spec still asks
+			// for 100m but the container status already reports 500m. The
+			// per-pod row and the "Allocated resources" totals must agree.
+			name: "pod being resized in place",
+			node: &corev1.Node{
+				ObjectMeta: metav1.ObjectMeta{Name: "bar"},
+				Status:     corev1.NodeStatus{Allocatable: getResourceList("1", "1Gi")},
+			},
+			pods: []corev1.Pod{newPod(getResourceList("100m", ""), getResourceList("100m", ""), &corev1.ResourceRequirements{
+				Requests: getResourceList("500m", ""),
+				Limits:   getResourceList("500m", ""),
+			})},
+			expected: []string{
+				"foo\tpod-1\t\t500m (50%)\t500m (50%)\t0 (0%)\t0 (0%)\t",
+				"cpu\t500m (50%)\t500m (50%)\n",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			buf := &bytes.Buffer{}
+			describeNodeResource(&corev1.PodList{Items: tt.pods}, tt.node, NewPrefixWriter(buf))
+			out := buf.String()
+			for _, expected := range tt.expected {
+				if !strings.Contains(out, expected) {
+					t.Errorf("expected to find %q in output:\n%s", expected, out)
+				}
+			}
+		})
+	}
+}
+
+func TestDescribeNodeWithResourceSlice(t *testing.T) {
+	nodeCapacity := mergeResourceLists(
+		getHugePageResourceList("2Mi", "4Gi"),
+		getResourceList("8", "24Gi"),
+		getHugePageResourceList("1Gi", "0"),
+	)
+	nodeAllocatable := mergeResourceLists(
+		getHugePageResourceList("2Mi", "2Gi"),
+		getResourceList("4", "12Gi"),
+		getHugePageResourceList("1Gi", "0"),
+	)
+
+	fake := fake.NewClientset(
+		&corev1.Node{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "bar",
+				UID:  "uid",
+			},
+			Spec: corev1.NodeSpec{
+				Unschedulable: true,
+			},
+			Status: corev1.NodeStatus{
+				Capacity:    nodeCapacity,
+				Allocatable: nodeAllocatable,
+			},
+		},
+		&resourcev1.ResourceSlice{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "slice-1",
+			},
+			Spec: resourcev1.ResourceSliceSpec{
+				NodeName: ptr.To("bar"),
+				Driver:   "nvidia.com/gpu",
+				Pool: resourcev1.ResourcePool{
+					Name: "gpu-pool",
+				},
+				Devices: []resourcev1.Device{
+					{Name: "gpu-0"},
+					{Name: "gpu-1"},
+				},
+			},
+		},
+		&resourcev1.ResourceSlice{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "slice-2",
+			},
+			Spec: resourcev1.ResourceSliceSpec{
+				NodeName: ptr.To("bar"),
+				Driver:   "nvidia.com/gpu",
+				Pool: resourcev1.ResourcePool{
+					Name: "gpu-pool",
+				},
+				Devices: []resourcev1.Device{
+					{Name: "gpu-2"},
+					{Name: "gpu-3"},
+				},
+			},
+		},
+	)
+	c := &describeClient{T: t, Namespace: "foo", Interface: fake}
+	d := NodeDescriber{c}
+	out, err := d.Describe("foo", "bar", DescriberSettings{ShowEvents: true})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	// Verify node-exclusive resource slices are shown aggregated by pool
+	expectedOut := []string{
+		"Unschedulable",
+		"true",
+		"Node-Local ResourceSlices:",
+		"Driver",
+		"Pool",
+		"Slices",
+		"Devices",
+		"nvidia.com/gpu",
+		"gpu-pool",
+	}
+	for _, expected := range expectedOut {
+		if !strings.Contains(out, expected) {
+			t.Errorf("expected to find %q in output: %q", expected, out)
+		}
+	}
+}
+
+func TestDescribeNodeWithResourceSliceCapping(t *testing.T) {
+	// Create a node with more than 10 pools to test capping
+	node := &corev1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "bar",
+			UID:  "uid",
+		},
+	}
+
+	objects := []runtime.Object{node}
+
+	// Create 12 different driver/pool combinations
+	for i := range 12 {
+		objects = append(objects, &resourcev1.ResourceSlice{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: fmt.Sprintf("slice-%d", i),
+			},
+			Spec: resourcev1.ResourceSliceSpec{
+				NodeName: ptr.To("bar"),
+				Driver:   fmt.Sprintf("driver-%d.example.com", i),
+				Pool: resourcev1.ResourcePool{
+					Name: fmt.Sprintf("pool-%d", i),
+				},
+				Devices: []resourcev1.Device{
+					{Name: "device-0"},
+				},
+			},
+		})
+	}
+
+	fake := fake.NewClientset(objects...)
+	c := &describeClient{T: t, Namespace: "foo", Interface: fake}
+	d := NodeDescriber{c}
+	out, err := d.Describe("foo", "bar", DescriberSettings{ShowEvents: true})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	// Should show capping message
+	if !strings.Contains(out, "...and 2 more pools") {
+		t.Errorf("expected capping message in output: %q", out)
+	}
+}
+
+func TestDescribeNodeWithNoResourceSlices(t *testing.T) {
+	fake := fake.NewClientset(
+		&corev1.Node{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "bar",
+				UID:  "uid",
+			},
+		},
+	)
+	c := &describeClient{T: t, Namespace: "foo", Interface: fake}
+	d := NodeDescriber{c}
+	out, err := d.Describe("foo", "bar", DescriberSettings{ShowEvents: true})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	// Should NOT show ResourceSlices section when there are none
+	if strings.Contains(out, "Node-Local ResourceSlices") {
+		t.Errorf("did not expect ResourceSlices section when there are no slices: %q", out)
+	}
+}
 func TestDescribeStatefulSet(t *testing.T) {
 	var partition int32 = 2672
 	var replicas int32 = 1
@@ -6606,14 +7011,25 @@ func TestDescribeStatefulSet(t *testing.T) {
 			Namespace: "foo",
 		},
 		Spec: appsv1.StatefulSetSpec{
-			Replicas: &replicas,
-			Selector: &metav1.LabelSelector{},
+			PodManagementPolicy: appsv1.ParallelPodManagement,
+			Replicas:            &replicas,
+			Selector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{"app": "mytest"},
+			},
 			Template: corev1.PodTemplateSpec{
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
-						{Image: "mytest-image:latest"},
+						{
+							Name:  "mytest",
+							Image: "mytest-image:latest",
+						},
 					},
 				},
+			},
+			ServiceName: "test-service",
+			PersistentVolumeClaimRetentionPolicy: &appsv1.StatefulSetPersistentVolumeClaimRetentionPolicy{
+				WhenDeleted: appsv1.DeletePersistentVolumeClaimRetentionPolicyType,
+				WhenScaled:  appsv1.RetainPersistentVolumeClaimRetentionPolicyType,
 			},
 			UpdateStrategy: appsv1.StatefulSetUpdateStrategy{
 				Type: appsv1.RollingUpdateStatefulSetStrategyType,
@@ -6630,7 +7046,18 @@ func TestDescribeStatefulSet(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 	expectedOutputs := []string{
-		"bar", "foo", "Containers:", "mytest-image:latest", "Update Strategy", "RollingUpdate", "Partition", "2672",
+		"Name:                   bar",
+		"Namespace:              foo",
+		"CreationTimestamp:      Mon, 01 Jan 0001 00:00:00 +0000",
+		"Selector:               app=mytest",
+		"Service Name:           test-service",
+		"Pod Management Policy:  Parallel",
+		"Replicas:               1 desired | 0 total",
+		"Update Strategy:        RollingUpdate",
+		"  Partition:            2672",
+		"Persistent Volume Claim Retention Policy:",
+		"  WhenDeleted:  Delete",
+		"  WhenScaled:   Retain",
 	}
 	for _, o := range expectedOutputs {
 		if !strings.Contains(out, o) {
@@ -6943,28 +7370,29 @@ Events:       <none>` + "\n",
 
 func TestControllerRef(t *testing.T) {
 	var replicas int32 = 1
-	f := fake.NewClientset(
-		&corev1.ReplicationController{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "bar",
-				Namespace: "foo",
-				UID:       "123456",
-			},
-			TypeMeta: metav1.TypeMeta{
-				Kind: "ReplicationController",
-			},
-			Spec: corev1.ReplicationControllerSpec{
-				Replicas: &replicas,
-				Selector: map[string]string{"abc": "xyz"},
-				Template: &corev1.PodTemplateSpec{
-					Spec: corev1.PodSpec{
-						Containers: []corev1.Container{
-							{Image: "mytest-image:latest"},
-						},
+	replicationController := &corev1.ReplicationController{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "bar",
+			Namespace: "foo",
+			UID:       "123456",
+		},
+		TypeMeta: metav1.TypeMeta{
+			Kind: "ReplicationController",
+		},
+		Spec: corev1.ReplicationControllerSpec{
+			Replicas: &replicas,
+			Selector: map[string]string{"abc": "xyz"},
+			Template: &corev1.PodTemplateSpec{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{Image: "mytest-image:latest"},
 					},
 				},
 			},
 		},
+	}
+	f := fake.NewClientset(
+		replicationController,
 		&corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:            "barpod",
@@ -7274,6 +7702,7 @@ func TestDescribeCronJob(t *testing.T) {
 					Schedule:                   "*/5 * * * *",
 					ConcurrencyPolicy:          batchv1.ForbidConcurrent,
 					Suspend:                    ptr.To(false),
+					TimeZone:                   ptr.To("America/New_York"),
 					SuccessfulJobsHistoryLimit: ptr.To[int32](3),
 					FailedJobsHistoryLimit:     ptr.To[int32](1),
 					StartingDeadlineSeconds:    ptr.To[int64](200),
@@ -7296,6 +7725,7 @@ func TestDescribeCronJob(t *testing.T) {
 				"Schedule:                      */5 * * * *",
 				"Concurrency Policy:            Forbid",
 				"Suspend:                       False",
+				"Time Zone:                     America/New_York",
 				"Starting Deadline Seconds:     200",
 				"Successful Job History Limit:  3",
 				"Failed Job History Limit:      1",

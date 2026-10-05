@@ -597,7 +597,7 @@ func (m *resWrangler) appendReplaceOrMerge(res *resource.Resource) error {
 
 		default:
 			return fmt.Errorf(
-				"id %#v exists; behavior must be merge or replace", id)
+				"id %#v exists; can not use behavior: '%s', behavior must be merge or replace", id, res.Behavior())
 		}
 		i, err := m.Replace(res)
 		if err != nil {

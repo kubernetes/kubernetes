@@ -20,6 +20,8 @@ import (
 	"context"
 	"errors"
 
+	"sigs.k8s.io/structured-merge-diff/v7/fieldpath"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/testapigroup"
 	"k8s.io/apimachinery/pkg/fields"
@@ -27,16 +29,16 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/registry/generic"
+	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
 	v1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"sigs.k8s.io/structured-merge-diff/v6/fieldpath"
 )
 
 // carpStrategy implements behavior for Carp objects
 type carpStrategy struct {
-	runtime.ObjectTyper
+	rest.DeclarativeValidation
 	names.NameGenerator
 	nsClient v1.NamespaceInterface
 }
@@ -44,7 +46,7 @@ type carpStrategy struct {
 // NewStrategy is the default logic that applies when creating and updating Carp objects.
 func NewStrategy(nsClient v1.NamespaceInterface) *carpStrategy {
 	return &carpStrategy{
-		legacyscheme.Scheme,
+		rest.DeclarativeValidation{Scheme: legacyscheme.Scheme},
 		names.SimpleNameGenerator,
 		nsClient,
 	}
@@ -84,7 +86,7 @@ func (*carpStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) [
 func (*carpStrategy) Canonicalize(obj runtime.Object) {
 }
 
-func (*carpStrategy) AllowCreateOnUpdate() bool {
+func (*carpStrategy) AllowCreateOnUpdate(ctx context.Context) bool {
 	return false
 }
 
@@ -102,7 +104,7 @@ func (*carpStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Obje
 	return nil
 }
 
-func (*carpStrategy) AllowUnconditionalUpdate() bool {
+func (*carpStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {
 	return true
 }
 

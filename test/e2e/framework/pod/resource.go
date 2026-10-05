@@ -242,31 +242,6 @@ func DumpAllPodInfoForNamespace(ctx context.Context, c clientset.Interface, name
 	logPodLogs(ctx, c, namespace, pods.Items, reportDir)
 }
 
-// FilterNonRestartablePods filters out pods that will never get recreated if
-// deleted after termination.
-func FilterNonRestartablePods(pods []*v1.Pod) []*v1.Pod {
-	var results []*v1.Pod
-	for _, p := range pods {
-		if isNotRestartAlwaysMirrorPod(p) {
-			// Mirror pods with restart policy == Never will not get
-			// recreated if they are deleted after the pods have
-			// terminated. For now, we discount such pods.
-			// https://github.com/kubernetes/kubernetes/issues/34003
-			continue
-		}
-		results = append(results, p)
-	}
-	return results
-}
-
-func isNotRestartAlwaysMirrorPod(p *v1.Pod) bool {
-	// Check if the pod is a mirror pod
-	if _, ok := p.Annotations[v1.MirrorPodAnnotationKey]; !ok {
-		return false
-	}
-	return p.Spec.RestartPolicy != v1.RestartPolicyAlways
-}
-
 // NewAgnhostPod returns a pod that uses the agnhost image. The image's binary supports various subcommands
 // that behave the same, no matter the underlying OS. If no args are given, it defaults to the pause subcommand.
 // For more information about agnhost subcommands, see: https://github.com/kubernetes/kubernetes/tree/master/test/images/agnhost#agnhost

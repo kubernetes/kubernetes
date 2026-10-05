@@ -17,7 +17,11 @@ rules:
   verbs: ["get"]
 - apiGroups: ["resource.k8s.io"]
   resources: ["resourceclaims/status"]
-  verbs: ["update"]
+  verbs: ["patch", "update"]
+- apiGroups: ["resource.k8s.io"]
+  resources: ["resourceclaims/driver"]
+  verbs: ["associated-node:patch", "associated-node:update"]
+  resourceNames: ["dra-kubelet-plugin-driver-name"]
 - apiGroups: [""]
   resources: ["nodes"]
   verbs: ["get"]
@@ -67,7 +71,7 @@ spec:
   validations:
   - expression: variables.userNodeName != ""
     message: >-
-      no node association found for user, this user must run in a pod on a node and ServiceAccountTokenPodNodeInfo must be enabled
+      no node association found for user, this user must run in a pod on a node
   - expression: variables.userNodeName == variables.objectNodeName
     messageExpression: >-
       "this user running on node '"+variables.userNodeName+"' may not modify " +

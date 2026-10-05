@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"go.uber.org/zap"
+	"google.golang.org/protobuf/proto"
 
 	"go.etcd.io/etcd/client/pkg/v3/logutil"
 	"go.etcd.io/etcd/pkg/v3/contention"
@@ -67,8 +68,8 @@ func init() {
 // raft storage concurrently; the application must read
 // notifyc before assuming the raft messages are stable.
 type toApply struct {
-	entries  []raftpb.Entry
-	snapshot raftpb.Snapshot
+	entries  []*raftpb.Entry
+	snapshot *raftpb.Snapshot
 	// notifyc synchronizes etcd server applies with the raft node
 	notifyc chan struct{}
 	// raftAdvancedC notifies EtcdServer.apply that
@@ -86,7 +87,7 @@ type raftNode struct {
 	raftNodeConfig
 
 	// a chan to send/receive snapshot
-	msgSnapC chan raftpb.Message
+	msgSnapC chan *raftpb.Message
 
 	// a chan to send out apply
 	applyc chan toApply
@@ -141,7 +142,7 @@ func newRaftNode(cfg raftNodeConfig) *raftNode {
 		// expect to send a heartbeat within 2 heartbeat intervals.
 		td:         contention.NewTimeoutDetector(2 * cfg.heartbeat),
 		readStateC: make(chan raft.ReadState, 1),
-		msgSnapC:   make(chan raftpb.Message, maxInFlightMsgSnap),
+		msgSnapC:   make(chan *raftpb.Message, maxInFlightMsgSnap),
 		applyc:     make(chan toApply),
 		stopped:    make(chan struct{}),
 		done:       make(chan struct{}),
@@ -214,12 +215,13 @@ func (r *raftNode) start(rh *raftReadyHandler) {
 						return
 					}
 				}
-
+				committedEntries := rd.CommittedEntries
 				notifyc := make(chan struct{}, 1)
 				raftAdvancedC := make(chan struct{}, 1)
+				raftSnap := proto.Clone(rd.Snapshot).(*raftpb.Snapshot)
 				ap := toApply{
-					entries:       rd.CommittedEntries,
-					snapshot:      rd.Snapshot,
+					entries:       committedEntries,
+					snapshot:      proto.Clone(rd.Snapshot).(*raftpb.Snapshot),
 					notifyc:       notifyc,
 					raftAdvancedC: raftAdvancedC,
 				}
@@ -242,9 +244,9 @@ func (r *raftNode) start(rh *raftReadyHandler) {
 
 				// Must save the snapshot file and WAL snapshot entry before saving any other entries or hardstate to
 				// ensure that recovery after a snapshot restore is possible.
-				if !raft.IsEmptySnap(rd.Snapshot) {
+				if !raft.IsEmptySnap(raftSnap) {
 					// gofail: var raftBeforeSaveSnap struct{}
-					if err := r.storage.SaveSnap(rd.Snapshot); err != nil {
+					if err := r.storage.SaveSnap(raftSnap); err != nil {
 						r.lg.Fatal("failed to save Raft snapshot", zap.Error(err))
 					}
 					// gofail: var raftAfterSaveSnap struct{}
@@ -255,11 +257,11 @@ func (r *raftNode) start(rh *raftReadyHandler) {
 					r.lg.Fatal("failed to save Raft hard state and entries", zap.Error(err))
 				}
 				if !raft.IsEmptyHardState(rd.HardState) {
-					proposalsCommitted.Set(float64(rd.HardState.Commit))
+					proposalsCommitted.Set(float64(rd.HardState.GetCommit()))
 				}
 				// gofail: var raftAfterSave struct{}
 
-				if !raft.IsEmptySnap(rd.Snapshot) {
+				if !raft.IsEmptySnap(raftSnap) {
 					// Force WAL to fsync its hard state before Release() releases
 					// old data from the WAL. Otherwise could get an error like:
 					// panic: tocommit(107) is out of range [lastIndex(84)]. Was the raft log corrupted, truncated, or lost?
@@ -272,11 +274,11 @@ func (r *raftNode) start(rh *raftReadyHandler) {
 					notifyc <- struct{}{}
 
 					// gofail: var raftBeforeApplySnap struct{}
-					r.raftStorage.ApplySnapshot(rd.Snapshot)
-					r.lg.Info("applied incoming Raft snapshot", zap.Uint64("snapshot-index", rd.Snapshot.Metadata.Index))
+					r.raftStorage.ApplySnapshot(raftSnap)
+					r.lg.Info("applied incoming Raft snapshot", zap.Uint64("snapshot-index", raftSnap.Metadata.GetIndex()))
 					// gofail: var raftAfterApplySnap struct{}
 
-					if err := r.storage.Release(rd.Snapshot); err != nil {
+					if err := r.storage.Release(raftSnap); err != nil {
 						r.lg.Fatal("failed to release Raft wal", zap.Error(err))
 					}
 					// gofail: var raftAfterWALRelease struct{}
@@ -286,7 +288,7 @@ func (r *raftNode) start(rh *raftReadyHandler) {
 
 				confChanged := false
 				for _, ent := range rd.CommittedEntries {
-					if ent.Type == raftpb.EntryConfChange {
+					if ent.GetType() == raftpb.EntryConfChange {
 						confChanged = true
 						break
 					}
@@ -342,51 +344,51 @@ func (r *raftNode) start(rh *raftReadyHandler) {
 func updateCommittedIndex(ap *toApply, rh *raftReadyHandler) {
 	var ci uint64
 	if len(ap.entries) != 0 {
-		ci = ap.entries[len(ap.entries)-1].Index
+		ci = ap.entries[len(ap.entries)-1].GetIndex()
 	}
-	if ap.snapshot.Metadata.Index > ci {
-		ci = ap.snapshot.Metadata.Index
+	if ap.snapshot != nil && ap.snapshot.Metadata.GetIndex() > ci {
+		ci = ap.snapshot.Metadata.GetIndex()
 	}
 	if ci != 0 {
 		rh.updateCommittedIndex(ci)
 	}
 }
 
-func (r *raftNode) processMessages(ms []raftpb.Message) []raftpb.Message {
+func (r *raftNode) processMessages(ms []*raftpb.Message) []*raftpb.Message {
 	sentAppResp := false
+	var messages []*raftpb.Message
 	for i := len(ms) - 1; i >= 0; i-- {
-		if r.isIDRemoved(ms[i].To) {
-			ms[i].To = 0
+		m := ms[i]
+		if r.isIDRemoved(m.GetTo()) {
 			continue
 		}
 
-		if ms[i].Type == raftpb.MsgAppResp {
+		if m.GetType() == raftpb.MsgAppResp {
 			if sentAppResp {
-				ms[i].To = 0
-			} else {
-				sentAppResp = true
+				continue
 			}
+			sentAppResp = true
 		}
 
-		if ms[i].Type == raftpb.MsgSnap {
+		if m.GetType() == raftpb.MsgSnap {
 			// There are two separate data store: the store for v2, and the KV for v3.
 			// The msgSnap only contains the most recent snapshot of store without KV.
 			// So we need to redirect the msgSnap to etcd server main loop for merging in the
 			// current store snapshot and KV snapshot.
 			select {
-			case r.msgSnapC <- ms[i]:
+			case r.msgSnapC <- m:
 			default:
 				// drop msgSnap if the inflight chan if full.
 			}
-			ms[i].To = 0
+			continue
 		}
-		if ms[i].Type == raftpb.MsgHeartbeat {
-			ok, exceed := r.td.Observe(ms[i].To)
+		if m.GetType() == raftpb.MsgHeartbeat {
+			ok, exceed := r.td.Observe(m.GetTo())
 			if !ok {
 				// TODO: limit request rate.
 				r.lg.Warn(
 					"leader failed to send out heartbeat on time; took too long, leader is overloaded likely from slow disk",
-					zap.String("to", fmt.Sprintf("%x", ms[i].To)),
+					zap.String("to", fmt.Sprintf("%x", m.GetTo())),
 					zap.Duration("heartbeat-interval", r.heartbeat),
 					zap.Duration("expected-duration", 2*r.heartbeat),
 					zap.Duration("exceeded-duration", exceed),
@@ -394,8 +396,9 @@ func (r *raftNode) processMessages(ms []raftpb.Message) []raftpb.Message {
 				heartbeatSendFailures.Inc()
 			}
 		}
+		messages = append(messages, m)
 	}
-	return ms
+	return messages
 }
 
 func (r *raftNode) apply() chan toApply {
@@ -443,4 +446,8 @@ func (r *raftNode) advanceTicks(ticks int) {
 	for i := 0; i < ticks; i++ {
 		r.tick()
 	}
+}
+
+func (r *raftNode) ReadState() <-chan raft.ReadState {
+	return r.readStateC
 }

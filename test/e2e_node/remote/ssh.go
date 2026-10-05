@@ -17,21 +17,22 @@ limitations under the License.
 package remote
 
 import (
-	"flag"
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
 	"os/user"
 	"strings"
 	"sync"
+	"time"
 
 	"k8s.io/klog/v2"
 )
 
-var sshOptions = flag.String("ssh-options", "", "Commandline options passed to ssh.")
-var sshEnv = flag.String("ssh-env", "", "Use predefined ssh options for environment.  Options: gce")
-var sshKey = flag.String("ssh-key", "", "Path to ssh private key.")
-var sshUser = flag.String("ssh-user", "", "Use predefined user for ssh.")
+var sshOptions = CommandLine.String("ssh-options", "", "Commandline options passed to ssh.")
+var sshEnv = CommandLine.String("ssh-env", "", "Use predefined ssh options for environment.  Options: gce")
+var sshKey = CommandLine.String("ssh-key", "", "Path to ssh private key.")
+var sshUser = CommandLine.String("ssh-user", "", "Use predefined user for ssh.")
 
 var sshOptionsMap map[string]string
 var sshDefaultKeyMap map[string]string
@@ -118,7 +119,15 @@ func getSSHCommand(sep string, args ...string) string {
 // SSH executes ssh command with runSSHCommand as root. The `sudo` makes sure that all commands
 // are executed by root, so that there won't be permission mismatch between different commands.
 func SSH(host string, cmd ...string) (string, error) {
-	return runSSHCommand(host, "ssh", append([]string{GetHostnameOrIP(host), "--", "sudo"}, cmd...)...)
+	return SSHContext(context.Background(), host, cmd...)
+}
+
+// CommandWaitDelay bounds how long a canceled call waits for pipes that a descendant, such as a ProxyCommand, keeps open.
+const CommandWaitDelay = time.Second
+
+// SSHContext lets provisioning deadlines stop an SSH process that no longer responds.
+func SSHContext(ctx context.Context, host string, cmd ...string) (string, error) {
+	return runSSHCommandContext(ctx, host, "ssh", append([]string{GetHostnameOrIP(host), "--", "sudo"}, cmd...)...)
 }
 
 // SSHNoSudo executes ssh command with runSSHCommand as normal user. Sometimes we need this,
@@ -129,6 +138,10 @@ func SSHNoSudo(host string, cmd ...string) (string, error) {
 
 // runSSHCommand executes the ssh or scp command, adding the flag provided --ssh-options
 func runSSHCommand(host, cmd string, args ...string) (string, error) {
+	return runSSHCommandContext(context.Background(), host, cmd, args...)
+}
+
+func runSSHCommandContext(ctx context.Context, host, cmd string, args ...string) (string, error) {
 	if key, err := getPrivateSSHKey(host); len(key) != 0 {
 		if err != nil {
 			klog.Errorf("private SSH key (%s) not found. Check if the SSH key is configured properly:, err: %v", key, err)
@@ -144,7 +157,12 @@ func runSSHCommand(host, cmd string, args ...string) (string, error) {
 		args = append(strings.Split(*sshOptions, " "), args...)
 	}
 	klog.Infof("Running the command %s, with args: %v", cmd, args)
-	output, err := exec.Command(cmd, args...).CombinedOutput()
+	command := exec.CommandContext(ctx, cmd, args...)
+	// WaitDelay also fails a normal exit that leaves the pipes open, so only cancelable calls get it.
+	if ctx.Done() != nil {
+		command.WaitDelay = CommandWaitDelay
+	}
+	output, err := command.CombinedOutput()
 	if err != nil {
 		klog.Errorf("failed to run SSH command: out: %s, err: %v", output, err)
 		return string(output), fmt.Errorf("command [%s %s] failed with error: %w", cmd, strings.Join(args, " "), err)

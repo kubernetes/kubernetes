@@ -31,6 +31,7 @@ import (
 	"k8s.io/klog/v2"
 	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
+	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 )
 
 const (
@@ -57,6 +58,10 @@ type podContainerManagerImpl struct {
 	cpuCFSQuotaPeriod uint64
 	// podContainerManager is the ContainerManager running on the machine
 	podContainerManager ContainerManager
+	// memoryReservationPolicy controls memory reservation protection behavior
+	memoryReservationPolicy kubeletconfig.MemoryReservationPolicy
+	// memoryThrottlingFactor is used to compute pod-level memory.high
+	memoryThrottlingFactor *float64
 }
 
 // Make sure that podContainerManagerImpl implements the PodContainerManager interface
@@ -76,7 +81,7 @@ func (m *podContainerManagerImpl) EnsureExists(logger klog.Logger, pod *v1.Pod) 
 	alreadyExists := m.Exists(pod)
 	if !alreadyExists {
 		enforceCPULimits := m.enforceCPULimits
-		if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.DisableCPUQuotaWithExclusiveCPUs) && m.podContainerManager.PodHasExclusiveCPUs(pod) {
+		if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.DisableCPUQuotaWithExclusiveCPUs) && m.podContainerManager.PodHasExclusiveCPUs(logger, pod) {
 			logger.V(2).Info("Disabled CFS quota", "pod", klog.KObj(pod))
 			enforceCPULimits = false
 		}
@@ -89,12 +94,13 @@ func (m *podContainerManagerImpl) EnsureExists(logger klog.Logger, pod *v1.Pod) 
 		podContainerName, _ := m.GetPodContainerName(pod)
 		containerConfig := &CgroupConfig{
 			Name:               podContainerName,
-			ResourceParameters: ResourceConfigForPod(pod, enforceCPULimits, m.cpuCFSQuotaPeriod, enforceMemoryQoS),
+			ResourceParameters: ResourceConfigForPod(pod, enforceCPULimits, m.cpuCFSQuotaPeriod, enforceMemoryQoS, m.memoryReservationPolicy),
 		}
 		if m.podPidsLimit > 0 {
 			containerConfig.ResourceParameters.PidsLimit = &m.podPidsLimit
 		}
 		if enforceMemoryQoS {
+			m.applyPodLevelMemoryHigh(pod, containerConfig.ResourceParameters)
 			logger.V(4).Info("MemoryQoS config for pod", "pod", klog.KObj(pod), "unified", containerConfig.ResourceParameters.Unified)
 		}
 		if err := m.cgroupManager.Create(logger, containerConfig); err != nil {
@@ -103,6 +109,15 @@ func (m *podContainerManagerImpl) EnsureExists(logger klog.Logger, pod *v1.Pod) 
 
 	}
 	return nil
+}
+
+// applyPodLevelMemoryHigh sets memory.high on the pod cgroup.
+// The kernel enforces memory.high hierarchically (try_charge_memcg walks ancestors),
+// so this throttles all containers in the pod without per-container memory.high.
+func (m *podContainerManagerImpl) applyPodLevelMemoryHigh(pod *v1.Pod, rc *ResourceConfig) {
+	if m.memoryThrottlingFactor != nil {
+		ApplyPodLevelMemoryHigh(pod, rc, *m.memoryThrottlingFactor)
+	}
 }
 
 // GetPodContainerName returns the CgroupName identifier, and its literal cgroupfs form on the host.
@@ -253,10 +268,7 @@ func (m *podContainerManagerImpl) IsPodCgroup(cgroupfs string) (bool, types.UID)
 
 // GetAllPodsFromCgroups scans through all the subsystems of pod cgroups
 // Get list of pods whose cgroup still exist on the cgroup mounts
-func (m *podContainerManagerImpl) GetAllPodsFromCgroups() (map[types.UID]CgroupName, error) {
-	// Use klog.TODO() because we currently do not have a proper logger to pass in.
-	// Replace this with an appropriate logger when refactoring this function to accept a logger parameter.
-	logger := klog.TODO()
+func (m *podContainerManagerImpl) GetAllPodsFromCgroups(logger klog.Logger) (map[types.UID]CgroupName, error) {
 	// Map for storing all the found pods on the disk
 	foundPods := make(map[types.UID]CgroupName)
 	qosContainersList := [3]CgroupName{m.qosContainersInfo.BestEffort, m.qosContainersInfo.Burstable, m.qosContainersInfo.Guaranteed}
@@ -345,11 +357,11 @@ func (m *podContainerManagerNoop) ReduceCPULimits(_ klog.Logger, _ CgroupName) e
 	return nil
 }
 
-func (m *podContainerManagerNoop) GetAllPodsFromCgroups() (map[types.UID]CgroupName, error) {
+func (m *podContainerManagerNoop) GetAllPodsFromCgroups(_ klog.Logger) (map[types.UID]CgroupName, error) {
 	return nil, nil
 }
 
-func (m *podContainerManagerNoop) IsPodCgroup(cgroupfs string) (bool, types.UID) {
+func (m *podContainerManagerNoop) IsPodCgroup(_ string) (bool, types.UID) {
 	return false, types.UID("")
 }
 

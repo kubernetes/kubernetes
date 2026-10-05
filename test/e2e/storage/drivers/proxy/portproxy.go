@@ -29,13 +29,13 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/httpstream"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/portforward"
 	"k8s.io/client-go/transport/spdy"
 	"k8s.io/klog/v2"
+	"k8s.io/streaming/pkg/httpstream"
 )
 
 // Maximum number of forwarded connections. In practice we don't
@@ -99,7 +99,7 @@ func Listen(ctx context.Context, clientset kubernetes.Interface, restConfig *res
 	if err != nil {
 		return nil, fmt.Errorf("create round tripper: %w", err)
 	}
-	dialer := spdy.NewDialer(upgrader, &http.Client{Transport: transport}, "POST", req.URL())
+	dialer := spdy.NewDialerForStreaming(upgrader, &http.Client{Transport: transport}, "POST", req.URL())
 
 	prefix := fmt.Sprintf("port forwarding for %s", addr)
 	ctx, cancel := context.WithCancel(ctx)

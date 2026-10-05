@@ -34,7 +34,7 @@ import (
 	clienttesting "k8s.io/client-go/testing"
 	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/controller/volume/protectionutil"
+	"k8s.io/kubernetes/pkg/controller/util/protectionutil"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/utils/dump"
 )
@@ -292,8 +292,8 @@ func TestVACProtectionController(t *testing.T) {
 		}
 
 		// Create the controller
-		logger, _ := ktesting.NewTestContext(t)
-		ctrl, err := NewVACProtectionController(logger, client, pvcInformer, pvInformer, vacInformer)
+		logger, ctx := ktesting.NewTestContext(t)
+		ctrl, err := NewVACProtectionController(ctx, client, pvcInformer, pvInformer, vacInformer)
 		require.NoError(t, err, "failed to create controller")
 
 		// Start the test by simulating an event

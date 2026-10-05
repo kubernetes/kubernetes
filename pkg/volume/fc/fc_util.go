@@ -18,7 +18,6 @@ package fc
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -48,7 +47,19 @@ const (
 )
 
 func (handler *osIOHandler) ReadDir(dirname string) ([]os.FileInfo, error) {
-	return ioutil.ReadDir(dirname)
+	entries, err := os.ReadDir(dirname)
+	if err != nil {
+		return nil, err
+	}
+	infos := make([]os.FileInfo, 0, len(entries))
+	for _, entry := range entries {
+		info, err := entry.Info()
+		if err != nil {
+			return nil, err
+		}
+		infos = append(infos, info)
+	}
+	return infos, nil
 }
 func (handler *osIOHandler) Lstat(name string) (os.FileInfo, error) {
 	return os.Lstat(name)
@@ -57,7 +68,7 @@ func (handler *osIOHandler) EvalSymlinks(path string) (string, error) {
 	return filepath.EvalSymlinks(path)
 }
 func (handler *osIOHandler) WriteFile(filename string, data []byte, perm os.FileMode) error {
-	return ioutil.WriteFile(filename, data, perm)
+	return os.WriteFile(filename, data, perm)
 }
 
 // given a wwn and lun, find the device and associated devicemapper parent
@@ -347,7 +358,7 @@ func (util *fcUtil) DetachBlockFCDisk(c fcDiskUnmapper, mapPath, devicePath stri
 	if strings.Contains(volumeInfo, "-lun-") {
 		searchPath = byPath
 	}
-	fis, err := ioutil.ReadDir(searchPath)
+	fis, err := os.ReadDir(searchPath)
 	if err != nil {
 		return err
 	}
@@ -412,7 +423,7 @@ func checkPathExists(path string) (bool, error) {
 	if pathExists, pathErr := mount.PathExists(path); pathErr != nil {
 		return pathExists, fmt.Errorf("error checking if path exists: %w", pathErr)
 	} else if !pathExists {
-		klog.Warningf("Warning: Unmap skipped because path does not exist: %v", path)
+		klog.Warningf("Unmap skipped because path does not exist: %v", path)
 		return pathExists, nil
 	}
 	return true, nil

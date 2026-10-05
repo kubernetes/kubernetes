@@ -27,6 +27,7 @@ import (
 	"time"
 
 	authv1 "k8s.io/api/authentication/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -51,8 +52,10 @@ import (
 	kubeadmruntime "k8s.io/kubernetes/cmd/kubeadm/app/util/runtime"
 )
 
-// FetchInitConfigurationFromCluster fetches configuration from a ConfigMap in the cluster
-func FetchInitConfigurationFromCluster(client clientset.Interface, printer output.Printer, logPrefix string, getNodeRegistration, getAPIEndpoint, getComponentConfigs bool) (*kubeadmapi.InitConfiguration, error) {
+// FetchInitConfigurationFromCluster fetches configuration from a ConfigMap in the cluster.
+// If shortConfigMapGet is true, a short retry is used when fetching the kubeadm-config ConfigMap,
+// which is suitable for callers like "kubeadm reset" that don't need a long retry.
+func FetchInitConfigurationFromCluster(client clientset.Interface, printer output.Printer, logPrefix string, getNodeRegistration, getAPIEndpoint, getComponentConfigs, shortConfigMapGet bool) (*kubeadmapi.InitConfiguration, error) {
 	if printer == nil {
 		printer = &output.TextPrinter{}
 	}
@@ -61,14 +64,16 @@ func FetchInitConfigurationFromCluster(client clientset.Interface, printer outpu
 	_, _ = printer.Printf("[%s] Use 'kubeadm init phase upload-config kubeadm --config your-config-file' to re-upload it.\n", logPrefix)
 
 	// Fetch the actual config from cluster
-	cfg, err := getInitConfigurationFromCluster(constants.KubernetesDir, client, getNodeRegistration, getAPIEndpoint, getComponentConfigs)
+	cfg, err := getInitConfigurationFromCluster(constants.KubernetesDir, constants.KubeletRunDirectory, client, getNodeRegistration, getAPIEndpoint, getComponentConfigs, shortConfigMapGet)
 	if err != nil {
 		return nil, err
 	}
 
-	// Apply dynamic defaults
-	// NB. skip CRI detection here because it won't be used at all and will be overridden later
-	if err := SetInitDynamicDefaults(cfg, true); err != nil {
+	// Apply dynamic defaults.
+	// NB. skip CRI detection here because it won't be used at all and will be overridden later.
+	// NB. skip LocalAPIEndpoint defaulting when the caller did not request the endpoint (e.g. a
+	// worker join).
+	if err := SetInitDynamicDefaults(cfg, true, !getAPIEndpoint); err != nil {
 		return nil, err
 	}
 
@@ -76,9 +81,31 @@ func FetchInitConfigurationFromCluster(client clientset.Interface, printer outpu
 }
 
 // getInitConfigurationFromCluster is separate only for testing purposes, don't call it directly, use FetchInitConfigurationFromCluster instead
-func getInitConfigurationFromCluster(kubeconfigDir string, client clientset.Interface, getNodeRegistration, getAPIEndpoint, getComponentConfigs bool) (*kubeadmapi.InitConfiguration, error) {
+func getInitConfigurationFromCluster(kubeconfigDir string, kubeletRunDir string, client clientset.Interface, getNodeRegistration, getAPIEndpoint, getComponentConfigs, shortConfigMapGet bool) (*kubeadmapi.InitConfiguration, error) {
 	// Also, the config map really should be KubeadmConfigConfigMap...
-	configMap, err := apiclient.GetConfigMapWithShortRetry(client, metav1.NamespaceSystem, constants.KubeadmConfigConfigMap)
+	var configMap *v1.ConfigMap
+	var err error
+	if shortConfigMapGet {
+		configMap, err = apiclient.GetConfigMapWithShortRetry(client, metav1.NamespaceSystem, constants.KubeadmConfigConfigMap)
+	} else {
+		var lastErr error
+		err = wait.PollUntilContextTimeout(context.Background(),
+			constants.KubernetesAPICallRetryInterval,
+			kubeadmapi.GetActiveTimeouts().KubernetesAPICall.Duration,
+			true, func(_ context.Context) (bool, error) {
+				var err error
+				configMap, err = client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(
+					context.Background(), constants.KubeadmConfigConfigMap, metav1.GetOptions{})
+				if err == nil {
+					return true, nil
+				}
+				lastErr = err
+				return false, nil
+			})
+		if err != nil {
+			err = lastErr
+		}
+	}
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get config map")
 	}
@@ -114,9 +141,7 @@ func getInitConfigurationFromCluster(kubeconfigDir string, client clientset.Inte
 	}
 
 	if getNodeRegistration {
-		// gets the nodeRegistration for the current from the node object
-		kubeconfigFile := filepath.Join(kubeconfigDir, constants.KubeletKubeConfigFileName)
-		if err := GetNodeRegistration(kubeconfigFile, client, &initcfg.NodeRegistration); err != nil {
+		if err := GetNodeRegistration(kubeconfigDir, kubeletRunDir, client, &initcfg.NodeRegistration); err != nil {
 			return nil, errors.Wrap(err, "failed to get node registration")
 		}
 	}
@@ -163,9 +188,9 @@ func GetNodeName(kubeconfigFile string) (string, error) {
 }
 
 // GetNodeRegistration returns the nodeRegistration for the current node
-func GetNodeRegistration(kubeconfigFile string, client clientset.Interface, nodeRegistration *kubeadmapi.NodeRegistrationOptions) error {
+func GetNodeRegistration(kubeconfigDir, kubeletRunDir string, client clientset.Interface, nodeRegistration *kubeadmapi.NodeRegistrationOptions) error {
 	// gets the name of the current node
-	nodeName, err := GetNodeName(kubeconfigFile)
+	nodeName, err := GetNodeName(filepath.Join(kubeconfigDir, constants.KubeletKubeConfigFileName))
 	if err != nil {
 		return err
 	}
@@ -176,26 +201,26 @@ func GetNodeRegistration(kubeconfigFile string, client clientset.Interface, node
 		return errors.Wrap(err, "failed to get corresponding node")
 	}
 
-	criSocket, ok := node.Annotations[constants.AnnotationKubeadmCRISocket]
-	if !ok {
-		configFilePath := filepath.Join(constants.KubeletRunDirectory, constants.KubeletInstanceConfigurationFileName)
-		_, err := os.Stat(configFilePath)
-		if os.IsNotExist(err) {
-			klog.Warningf("node %q lacks annotation %q and kubelet config file %q; attempting auto-detection", nodeName, constants.AnnotationKubeadmCRISocket, configFilePath)
-			criSocket, err = kubeadmruntime.DetectCRISocket()
-			if err != nil {
-				klog.Warningf("auto-detection of CRI socket failed for node %q: %v; falling back to default %q", nodeName, err, constants.DefaultCRISocket)
-				criSocket = constants.DefaultCRISocket
-			}
-		} else if err != nil {
-			return err
-		} else {
-			kubeletConfig, err := readKubeletConfig(constants.KubeletRunDirectory, constants.KubeletInstanceConfigurationFileName)
-			if err != nil {
-				return errors.Wrapf(err, "could not read kubelet instance configuration on node %q", nodeName)
-			}
-			criSocket = kubeletConfig.ContainerRuntimeEndpoint
+	var criSocket string
+	configFilePath := filepath.Join(kubeletRunDir, constants.KubeletInstanceConfigurationFileName)
+	_, err = os.Stat(configFilePath)
+	if os.IsNotExist(err) {
+		klog.Warningf("Node %q lacks a kubelet instance config file %q; attempting auto-detection",
+			nodeName, configFilePath)
+		criSocket, err = kubeadmruntime.DetectCRISocket()
+		if err != nil {
+			klog.Warningf("Auto-detection of CRI socket failed for node %q: %v; falling back to default %q",
+				nodeName, err, constants.DefaultCRISocket)
+			criSocket = constants.DefaultCRISocket
 		}
+	} else if err != nil {
+		return err
+	} else {
+		kubeletConfig, err := readKubeletConfig(kubeletRunDir, constants.KubeletInstanceConfigurationFileName)
+		if err != nil {
+			return errors.Wrapf(err, "could not read kubelet instance configuration on node %q", nodeName)
+		}
+		criSocket = kubeletConfig.ContainerRuntimeEndpoint
 	}
 
 	// returns the nodeRegistration attributes

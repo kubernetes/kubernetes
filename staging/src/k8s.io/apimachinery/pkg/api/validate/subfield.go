@@ -31,7 +31,13 @@ type GetFieldFunc[Tstruct any, Tfield any] func(*Tstruct) Tfield
 // the value of the subfield is the same as the previous value, as per the
 // equiv function, then no validation is performed.
 //
+// The equiv function can be called with nil arguments in the case of nilable
+// fields.
+//
 // The fldPath passed to the validator includes the subfield name.
+//
+// A nil struct is not an error: this relocates a validation, it does not
+// assert that the path exists.
 func Subfield[Tstruct any, Tfield any](
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	newStruct, oldStruct *Tstruct,
@@ -39,6 +45,9 @@ func Subfield[Tstruct any, Tfield any](
 	equiv MatchFunc[Tfield],
 	validator ValidateFunc[Tfield],
 ) field.ErrorList {
+	if newStruct == nil {
+		return nil
+	}
 	var errs field.ErrorList
 	newVal := getField(newStruct)
 	var oldVal Tfield

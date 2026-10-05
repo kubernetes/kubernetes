@@ -1,0 +1,214 @@
+/*
+Copyright The Kubernetes Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package dra
+
+import (
+	"fmt"
+	"time"
+
+	"github.com/onsi/gomega"
+	v1 "k8s.io/api/core/v1"
+	schedulingapi "k8s.io/api/scheduling/v1beta1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	st "k8s.io/kubernetes/pkg/scheduler/testing"
+	"k8s.io/kubernetes/test/utils/client-go/ktesting"
+)
+
+func testPodGroup(tCtx ktesting.TContext) {
+	tCtx.Parallel()
+
+	podGroupName := "podgroup"
+	tests := map[string]struct {
+		numPods  int
+		podGroup *schedulingapi.PodGroup
+	}{
+		"gang-2-pods-mincount-2": {
+			numPods: 2,
+			podGroup: &schedulingapi.PodGroup{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: podGroupName,
+				},
+				Spec: schedulingapi.PodGroupSpec{
+					SchedulingPolicy: schedulingapi.PodGroupSchedulingPolicy{
+						Gang: &schedulingapi.GangSchedulingPolicy{
+							MinCount: 2,
+						},
+					},
+				},
+			},
+		},
+		"gang-20-pods-mincount-20": {
+			numPods: 20,
+			podGroup: &schedulingapi.PodGroup{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: podGroupName,
+				},
+				Spec: schedulingapi.PodGroupSpec{
+					SchedulingPolicy: schedulingapi.PodGroupSchedulingPolicy{
+						Gang: &schedulingapi.GangSchedulingPolicy{
+							MinCount: 20,
+						},
+					},
+				},
+			},
+		},
+		"gang-5-pods-mincount-2": {
+			numPods: 5,
+			podGroup: &schedulingapi.PodGroup{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: podGroupName,
+				},
+				Spec: schedulingapi.PodGroupSpec{
+					SchedulingPolicy: schedulingapi.PodGroupSchedulingPolicy{
+						Gang: &schedulingapi.GangSchedulingPolicy{
+							MinCount: 2,
+						},
+					},
+				},
+			},
+		},
+		"basic-2-pods": {
+			numPods: 2,
+			podGroup: &schedulingapi.PodGroup{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: podGroupName,
+				},
+				Spec: schedulingapi.PodGroupSpec{
+					SchedulingPolicy: schedulingapi.PodGroupSchedulingPolicy{
+						Basic: &schedulingapi.BasicSchedulingPolicy{},
+					},
+				},
+			},
+		},
+		"basic-20-pods": {
+			numPods: 20,
+			podGroup: &schedulingapi.PodGroup{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: podGroupName,
+				},
+				Spec: schedulingapi.PodGroupSpec{
+					SchedulingPolicy: schedulingapi.PodGroupSchedulingPolicy{
+						Basic: &schedulingapi.BasicSchedulingPolicy{},
+					},
+				},
+			},
+		},
+	}
+
+	for name, test := range tests {
+		tCtx.Run(name, func(tCtx ktesting.TContext) {
+			tCtx.Parallel()
+
+			namespace := createTestNamespace(tCtx, nil)
+			startScheduler(tCtx)
+
+			class, driverName := createTestClass(tCtx, namespace)
+			slice := st.MakeResourceSlice("worker-0", driverName).Devices("device-0")
+			createSlice(tCtx, slice.Obj())
+
+			claim := createClaim(tCtx, namespace, "", class, claim)
+
+			podGroup, err := tCtx.Client().SchedulingV1beta1().PodGroups(namespace).Create(tCtx, test.podGroup, metav1.CreateOptions{})
+			tCtx.ExpectNoError(err, "create PodGroup")
+			schedGroup := &v1.PodSchedulingGroup{
+				PodGroupName: &podGroup.Name,
+			}
+
+			pods := make([]*v1.Pod, test.numPods)
+			for i := range pods {
+				pod := podWithClaimName.DeepCopy()
+				pod.Spec.SchedulingGroup = schedGroup
+				pods[i] = createPod(tCtx, namespace, fmt.Sprintf("-%d", i), pod, claim)
+			}
+
+			waitForClaimAllocatedToDevice(tCtx, namespace, claim.Name, schedulingTimeout)
+			// The PodScheduled condition checked by [waitForPodScheduled] could
+			// converge to either a True or False status due to a race
+			// condition, but Pods should still ultimately be scheduled:
+			// https://github.com/kubernetes/kubernetes/issues/139417#issuecomment-4651436886
+			tCtx.Eventually(func(tCtx ktesting.TContext) ([]v1.Pod, error) {
+				var groupPods []v1.Pod
+				pods, err := tCtx.Client().CoreV1().Pods(namespace).List(tCtx, metav1.ListOptions{})
+				if err != nil {
+					return nil, err
+				}
+				for _, pod := range pods.Items {
+					if pod.Spec.SchedulingGroup == nil ||
+						pod.Spec.SchedulingGroup.PodGroupName == nil ||
+						*pod.Spec.SchedulingGroup.PodGroupName != podGroupName {
+						continue
+					}
+					groupPods = append(groupPods, pod)
+				}
+				return groupPods, err
+			}).WithTimeout(60*time.Second).Should(
+				gomega.HaveEach(
+					gomega.HaveField("Spec.NodeName",
+						gomega.Not(gomega.BeEmpty()),
+					),
+				),
+				"Pods should have been scheduled.",
+			)
+		})
+	}
+
+	tCtx.Run("incompatible-node-selectors", func(tCtx ktesting.TContext) {
+		tCtx.Parallel()
+
+		namespace := createTestNamespace(tCtx, nil)
+		startScheduler(tCtx)
+
+		class, driverName := createTestClass(tCtx, namespace)
+
+		slice0 := st.MakeResourceSlice("worker-0", driverName).Devices("device-0")
+		createSlice(tCtx, slice0.Obj())
+
+		claimObj := createClaim(tCtx, namespace, "", class, claim)
+
+		podGroup := &schedulingapi.PodGroup{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: podGroupName,
+			},
+			Spec: schedulingapi.PodGroupSpec{
+				SchedulingPolicy: schedulingapi.PodGroupSchedulingPolicy{
+					Gang: &schedulingapi.GangSchedulingPolicy{
+						MinCount: 2,
+					},
+				},
+			},
+		}
+		podGroup, err := tCtx.Client().SchedulingV1beta1().PodGroups(namespace).Create(tCtx, podGroup, metav1.CreateOptions{})
+		tCtx.ExpectNoError(err, "create PodGroup")
+
+		schedGroup := &v1.PodSchedulingGroup{
+			PodGroupName: &podGroup.Name,
+		}
+
+		pod0 := podWithClaimName.DeepCopy()
+		pod0.Spec.SchedulingGroup = schedGroup
+		pod0.Spec.NodeSelector = map[string]string{"kubernetes.io/hostname": "worker-0"}
+		pod0 = createPod(tCtx, namespace, "-0", pod0, claimObj)
+
+		pod1 := podWithClaimName.DeepCopy()
+		pod1.Spec.SchedulingGroup = schedGroup
+		pod1.Spec.NodeSelector = map[string]string{"kubernetes.io/hostname": "worker-1"}
+		pod1 = createPod(tCtx, namespace, "-1", pod1, claimObj)
+
+		expectPodUnschedulable(tCtx, pod0, "parent pod group is unschedulable: minCount (2) cannot be satisfied")
+		expectPodUnschedulable(tCtx, pod1, "1 resourceclaim not available on the node")
+	})
+}

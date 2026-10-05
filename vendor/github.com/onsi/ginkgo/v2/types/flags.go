@@ -212,6 +212,24 @@ func (f GinkgoFlagSet) IsZero() bool {
 	return f.flagSet == nil
 }
 
+func (f GinkgoFlagSet) Completion(arg string) map[string]string {
+	if f.IsZero() {
+		return nil
+	}
+	prefix := strings.TrimLeft(arg, "-")
+	dash := arg[:len(arg)-len(prefix)]
+	if len(dash) < 1 || len(dash) > 3 {
+		return nil
+	}
+	result := make(map[string]string, len(f.flags))
+	for _, flag := range f.flags {
+		if flag.Name != "" && strings.HasPrefix(flag.Name, prefix) {
+			result[dash+flag.Name] = flag.Usage
+		}
+	}
+	return result
+}
+
 func (f GinkgoFlagSet) WasSet(name string) bool {
 	found := false
 	f.flagSet.Visit(func(f *flag.Flag) {

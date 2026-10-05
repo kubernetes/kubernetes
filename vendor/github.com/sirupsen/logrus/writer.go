@@ -30,7 +30,7 @@ func (entry *Entry) Writer() *io.PipeWriter {
 func (entry *Entry) WriterLevel(level Level) *io.PipeWriter {
 	reader, writer := io.Pipe()
 
-	var printFunc func(args ...interface{})
+	printFunc := entry.Print
 
 	// Determine which log function to use based on the specified log level
 	switch level {
@@ -48,8 +48,6 @@ func (entry *Entry) WriterLevel(level Level) *io.PipeWriter {
 		printFunc = entry.Fatal
 	case PanicLevel:
 		printFunc = entry.Panic
-	default:
-		printFunc = entry.Print
 	}
 
 	// Start a new goroutine to scan the input and write it to the logger using the specified print function.
@@ -63,7 +61,7 @@ func (entry *Entry) WriterLevel(level Level) *io.PipeWriter {
 }
 
 // writerScanner scans the input from the reader and writes it to the logger
-func (entry *Entry) writerScanner(reader *io.PipeReader, printFunc func(args ...interface{})) {
+func (entry *Entry) writerScanner(reader *io.PipeReader, printFunc func(args ...any)) {
 	scanner := bufio.NewScanner(reader)
 
 	// Set the buffer size to the maximum token size to avoid buffer overflows

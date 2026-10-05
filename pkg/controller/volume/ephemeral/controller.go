@@ -91,7 +91,10 @@ func NewController(
 		pvcsSynced: pvcInformer.Informer().HasSynced,
 		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
 			workqueue.DefaultTypedControllerRateLimiter[string](),
-			workqueue.TypedRateLimitingQueueConfig[string]{Name: "ephemeral_volume"},
+			workqueue.TypedRateLimitingQueueConfig[string]{
+				Logger: new(klog.FromContext(ctx)),
+				Name:   "ephemeral_volume",
+			},
 		),
 	}
 
@@ -102,17 +105,24 @@ func NewController(
 	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kubeClient.CoreV1().Events("")})
 	ec.recorder = eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "ephemeral_volume"})
 
-	podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	logger := klog.FromContext(ctx)
+	_, err := podInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		AddFunc: ec.enqueuePod,
 		// The pod spec is immutable. Therefore the controller can ignore pod updates
 		// because there cannot be any changes that have to be copied into the generated
 		// PVC.
 		// Deletion of the PVC is handled through the owner reference and garbage collection.
 		// Therefore pod deletions also can be ignored.
-	})
-	pvcInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	}, cache.HandlerOptions{Logger: &logger})
+	if err != nil {
+		return nil, fmt.Errorf("could not add pod event handler: %w", err)
+	}
+	_, err = pvcInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		DeleteFunc: ec.onPVCDelete,
-	})
+	}, cache.HandlerOptions{Logger: &logger})
+	if err != nil {
+		return nil, fmt.Errorf("could not add pvc event handler: %w", err)
+	}
 	if err := common.AddPodPVCIndexerIfNotPresent(ec.podIndexer); err != nil {
 		return nil, fmt.Errorf("could not initialize ephemeral volume controller: %w", err)
 	}
@@ -168,7 +178,7 @@ func (ec *ephemeralController) onPVCDelete(obj interface{}) {
 }
 
 func (ec *ephemeralController) Run(ctx context.Context, workers int) {
-	defer runtime.HandleCrash()
+	defer runtime.HandleCrashWithContext(ctx)
 
 	logger := klog.FromContext(ctx)
 	logger.Info("Starting ephemeral volume controller")

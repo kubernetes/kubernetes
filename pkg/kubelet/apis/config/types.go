@@ -76,6 +76,30 @@ const (
 	PodTopologyManagerScope = "pod"
 )
 
+// CertificateKeyAlgorithmType defines the type of key algorithm used for certificate signing requests.
+type CertificateKeyAlgorithmType string
+
+const (
+	// CertificateKeyAlgorithmECDSAP256 defines the ECDSA key algorithm type with curve P256.
+	CertificateKeyAlgorithmECDSAP256 CertificateKeyAlgorithmType = "ECDSA-P256"
+	// CertificateKeyAlgorithmECDSAP384 defines the ECDSA key algorithm type with curve P384.
+	CertificateKeyAlgorithmECDSAP384 CertificateKeyAlgorithmType = "ECDSA-P384"
+	// CertificateKeyAlgorithmRSA2048 defines the RSA key algorithm type with key size 2048 bits.
+	CertificateKeyAlgorithmRSA2048 CertificateKeyAlgorithmType = "RSA-2048"
+	// CertificateKeyAlgorithmRSA3072 defines the RSA key algorithm type with key size 3072 bits.
+	CertificateKeyAlgorithmRSA3072 CertificateKeyAlgorithmType = "RSA-3072"
+	// CertificateKeyAlgorithmRSA4096 defines the RSA key algorithm type with key size 4096 bits.
+	CertificateKeyAlgorithmRSA4096 CertificateKeyAlgorithmType = "RSA-4096"
+	// CertificateKeyAlgorithmMLDSA44 defines the ML-DSA-44 key algorithm variant.
+	CertificateKeyAlgorithmMLDSA44 CertificateKeyAlgorithmType = "ML-DSA-44"
+	// CertificateKeyAlgorithmMLDSA65 defines the ML-DSA-65 key algorithm variant.
+	CertificateKeyAlgorithmMLDSA65 CertificateKeyAlgorithmType = "ML-DSA-65"
+	// CertificateKeyAlgorithmMLDSA87 defines the ML-DSA-87 key algorithm variant.
+	CertificateKeyAlgorithmMLDSA87 CertificateKeyAlgorithmType = "ML-DSA-87"
+	// CertificateKeyAlgorithmDefault is the default key algorithm (ECDSA P-256).
+	CertificateKeyAlgorithmDefault = CertificateKeyAlgorithmECDSAP256
+)
+
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // KubeletConfiguration contains the configuration for the Kubelet
@@ -131,6 +155,14 @@ type KubeletConfiguration struct {
 	// Note that TLS 1.3 ciphersuites are not configurable.
 	// Values are from tls package constants (https://golang.org/pkg/crypto/tls/#pkg-constants).
 	TLSCipherSuites []string
+	// TLSCurvePreferences is the set of allowed key exchange mechanisms for the server,
+	// specified as numeric Go crypto/tls CurveID values.
+	// The supported values depend on the Go version used.
+	// See https://pkg.go.dev/crypto/tls#CurveID for values supported for each Go version.
+	// The order of the list is ignored, and key exchange mechanisms are
+	// chosen by Go from this list using an internal preference order.
+	// If empty, the default Go curves will be used.
+	TLSCurvePreferences []int32
 	// TLSMinVersion is the minimum TLS version supported.
 	// Values are from tls package constants (https://golang.org/pkg/crypto/tls/#pkg-constants).
 	TLSMinVersion string
@@ -144,6 +176,29 @@ type KubeletConfiguration struct {
 	// certificate signing requests. The RotateKubeletServerCertificate feature
 	// must be enabled.
 	ServerTLSBootstrap bool
+	// clientCertificateKeyAlgorithm specifies the key algorithm to use when generating
+	// client certificate signing requests during certificate rotation.
+	// This field only takes effect when rotateCertificates is true. It controls keys
+	// generated for initial and renewal CSRs; it does not alter supplied static
+	// credentials.
+	// Note: ML-DSA algorithms require TLS 1.3 and peers that support the selected
+	// signature algorithm. Go rejects ML-DSA certificates under TLS 1.2.
+	// Valid values are: "ECDSA-P256", "ECDSA-P384", "RSA-2048", "RSA-3072", "RSA-4096",
+	// "ML-DSA-44", "ML-DSA-65", "ML-DSA-87".
+	// When nil, defaults to "ECDSA-P256".
+	ClientCertificateKeyAlgorithm *CertificateKeyAlgorithmType
+	// serverCertificateKeyAlgorithm specifies the key algorithm to use when generating
+	// server certificate signing requests during certificate rotation.
+	// This field only takes effect when serverTLSBootstrap is true. It is not used
+	// for self-signed serving certificates.
+	// Changing this value does not immediately replace an existing certificate;
+	// the new algorithm takes effect at the next certificate renewal.
+	// Note: ML-DSA algorithms require TLS 1.3 and peers that support the selected
+	// signature algorithm. Go rejects ML-DSA certificates under TLS 1.2.
+	// Valid values are: "ECDSA-P256", "ECDSA-P384", "RSA-2048", "RSA-3072", "RSA-4096",
+	// "ML-DSA-44", "ML-DSA-65", "ML-DSA-87".
+	// When nil, defaults to "ECDSA-P256".
+	ServerCertificateKeyAlgorithm *CertificateKeyAlgorithmType
 	// authentication specifies how requests to the Kubelet's server are authenticated
 	Authentication KubeletAuthentication
 	// authorization specifies how requests to the Kubelet's server are authorized
@@ -206,14 +261,14 @@ type KubeletConfiguration struct {
 	// Deprecated: no longer has any effect.
 	StreamingConnectionIdleTimeout metav1.Duration
 	// nodeStatusUpdateFrequency is the frequency that kubelet computes node
-	// status. If node lease feature is not enabled, it is also the frequency that
-	// kubelet posts node status to master. In that case, be cautious when
-	// changing the constant, it must work with nodeMonitorGracePeriod in nodecontroller.
+	// status and checks if an update to the API server is necessary. Status
+	// is posted to the API server either when it changes or when
+	// nodeStatusReportFrequency has elapsed since the last report.
 	NodeStatusUpdateFrequency metav1.Duration
 	// nodeStatusReportFrequency is the frequency that kubelet posts node
-	// status to master if node status does not change. Kubelet will ignore this
-	// frequency and post node status immediately if any change is detected. It is
-	// only used when node lease feature is enabled.
+	// status to the API server if node status does not change. Kubelet will
+	// ignore this frequency and post node status immediately if any change
+	// is detected.
 	NodeStatusReportFrequency metav1.Duration
 	// nodeLeaseDurationSeconds is the duration the Kubelet will set on its corresponding Lease.
 	NodeLeaseDurationSeconds int32
@@ -398,6 +453,12 @@ type KubeletConfiguration struct {
 	// For example: "`kernel.msg*,net.ipv4.route.min_pmtu`"
 	// +optional
 	AllowedUnsafeSysctls []string
+	// DefaultPodSysctls is a set of default sysctls that will be applied to all pods.
+	// It can be overridden by sysctls set in pod spec.securityContext.sysctls.
+	// Support namespaced groups: `kernel.shm*`, `kernel.msg*`, `kernel.sem`, `fs.mqueue.*`, `net.*`, `kernel.domainname`, and `user.*`.
+	// For example: {"net.ipv4.ip_forward": "1", "kernel.shmall": "1048576"}
+	// +optional
+	DefaultPodSysctls map[string]string
 	// kernelMemcgNotification if enabled, the kubelet will integrate with the kernel memcg
 	// notification to determine if memory eviction thresholds are crossed rather than polling.
 	KernelMemcgNotification bool
@@ -443,7 +504,6 @@ type KubeletConfiguration struct {
 	// EnableSystemLogHandler has to be enabled in addition for this feature to work.
 	// Enabling this feature has security implications. The recommendation is to enable it on a need basis for debugging
 	// purposes and disabling otherwise.
-	// +featureGate=NodeLogQuery
 	// +optional
 	EnableSystemLogQuery bool
 	// ShutdownGracePeriod specifies the total duration that the node should delay the shutdown and total grace period for pod termination during a node shutdown.
@@ -489,12 +549,22 @@ type KubeletConfiguration struct {
 	// MemoryThrottlingFactor specifies the factor multiplied by the memory limit or node allocatable memory
 	// when setting the cgroupv2 memory.high value to enforce MemoryQoS.
 	// Decreasing this factor will set lower high limit for container cgroups and put heavier reclaim pressure
-	// while increasing will put less reclaim pressure.
+	// while increasing will put less reclaim pressure. If nil, memory.high is not set.
 	// See https://kep.k8s.io/2570 for more details.
-	// Default: 0.9
+	// Default: nil
 	// +featureGate=MemoryQoS
 	// +optional
 	MemoryThrottlingFactor *float64
+	// MemoryReservationPolicy controls how the kubelet applies cgroup v2 memory protection.
+	// "None" (default): The kubelet does not set memory.min for containers and pods,
+	// ensuring no hard memory is locked by the kernel.
+	// "TieredReservation": The kubelet sets cgroup v2 memory.min for Guaranteed pods and memory.low for Burstable pods based on memory requests.
+	// Guaranteed memory is never reclaimed by the kernel; Burstable memory is preferentially retained but may be reclaimed under extreme pressure.
+	// See https://kep.k8s.io/2570 for more details.
+	// Default: None
+	// +featureGate=MemoryQoS
+	// +optional
+	MemoryReservationPolicy MemoryReservationPolicy
 	// registerWithTaints are an array of taints to add to a node object when
 	// the kubelet registers itself. This only takes effect when registerNode
 	// is true and upon the initial registration of the node.
@@ -546,6 +616,18 @@ type KubeletConfiguration struct {
 	// +featureGate=UserNamespacesSupport
 	// +optional
 	UserNamespaces *UserNamespaces
+}
+
+// ValidCertificateKeyAlgorithms contains all supported key algorithm types.
+var ValidCertificateKeyAlgorithms = []CertificateKeyAlgorithmType{
+	CertificateKeyAlgorithmECDSAP256,
+	CertificateKeyAlgorithmECDSAP384,
+	CertificateKeyAlgorithmRSA2048,
+	CertificateKeyAlgorithmRSA3072,
+	CertificateKeyAlgorithmRSA4096,
+	CertificateKeyAlgorithmMLDSA44,
+	CertificateKeyAlgorithmMLDSA65,
+	CertificateKeyAlgorithmMLDSA87,
 }
 
 // KubeletAuthorizationMode denotes the authorization mode for the kubelet
@@ -842,6 +924,18 @@ const (
 	// AlwaysVerify requires credential verification for accessing any image on the
 	// node irregardless how it was pulled
 	AlwaysVerify ImagePullCredentialsVerificationPolicy = "AlwaysVerify"
+)
+
+// MemoryReservationPolicy defines how the kubelet applies cgroup v2 memory protection.
+type MemoryReservationPolicy string
+
+const (
+	// NoneMemoryReservationPolicy disables memory.min protection for containers and pods.
+	// This is the default to maintain node stability by preventing "locked" memory.
+	NoneMemoryReservationPolicy MemoryReservationPolicy = "None"
+	// TieredReservationMemoryReservationPolicy enables tiered memory protection:
+	// memory.min for Guaranteed pods, memory.low for Burstable pods.
+	TieredReservationMemoryReservationPolicy MemoryReservationPolicy = "TieredReservation"
 )
 
 // ImagePullIntent is a record of the kubelet attempting to pull an image.

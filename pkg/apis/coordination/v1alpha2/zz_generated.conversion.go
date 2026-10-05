@@ -24,9 +24,7 @@ package v1alpha2
 import (
 	unsafe "unsafe"
 
-	coordinationv1 "k8s.io/api/coordination/v1"
 	coordinationv1alpha2 "k8s.io/api/coordination/v1alpha2"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	coordination "k8s.io/kubernetes/pkg/apis/coordination"
@@ -121,12 +119,7 @@ func Convert_coordination_LeaseCandidateList_To_v1alpha2_LeaseCandidateList(in *
 }
 
 func autoConvert_v1alpha2_LeaseCandidateSpec_To_coordination_LeaseCandidateSpec(in *coordinationv1alpha2.LeaseCandidateSpec, out *coordination.LeaseCandidateSpec, s conversion.Scope) error {
-	out.LeaseName = in.LeaseName
-	out.PingTime = (*v1.MicroTime)(unsafe.Pointer(in.PingTime))
-	out.RenewTime = (*v1.MicroTime)(unsafe.Pointer(in.RenewTime))
-	out.BinaryVersion = in.BinaryVersion
-	out.EmulationVersion = in.EmulationVersion
-	out.Strategy = coordination.CoordinatedLeaseStrategy(in.Strategy)
+	*out = *(*coordination.LeaseCandidateSpec)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -136,12 +129,7 @@ func Convert_v1alpha2_LeaseCandidateSpec_To_coordination_LeaseCandidateSpec(in *
 }
 
 func autoConvert_coordination_LeaseCandidateSpec_To_v1alpha2_LeaseCandidateSpec(in *coordination.LeaseCandidateSpec, out *coordinationv1alpha2.LeaseCandidateSpec, s conversion.Scope) error {
-	out.LeaseName = in.LeaseName
-	out.PingTime = (*v1.MicroTime)(unsafe.Pointer(in.PingTime))
-	out.RenewTime = (*v1.MicroTime)(unsafe.Pointer(in.RenewTime))
-	out.BinaryVersion = in.BinaryVersion
-	out.EmulationVersion = in.EmulationVersion
-	out.Strategy = coordinationv1.CoordinatedLeaseStrategy(in.Strategy)
+	*out = *(*coordinationv1alpha2.LeaseCandidateSpec)(unsafe.Pointer(in))
 	return nil
 }
 

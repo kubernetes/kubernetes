@@ -35,6 +35,9 @@ func Test(t *testing.T) {
 		field.Required(field.NewPath("intPtrField"), ""),
 		field.Required(field.NewPath("boolField"), ""),
 		field.Required(field.NewPath("boolPtrField"), ""),
+		field.Required(field.NewPath("structPtrField"), ""),
+		field.Required(field.NewPath("sliceField"), ""),
+		field.Required(field.NewPath("mapField"), ""),
 	})
 
 	st.Value(&Struct{
@@ -44,5 +47,8 @@ func Test(t *testing.T) {
 		IntPtrField:    ptr.To(0),
 		BoolField:      true,
 		BoolPtrField:   ptr.To(false),
+		StructPtrField: &Submarker{Name: "x"},
+		SliceField:     []string{"foo"},
+		MapField:       map[string]string{"k": "v"},
 	}).ExpectValid()
 }

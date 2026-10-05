@@ -43,6 +43,7 @@ type CronJobInterface interface {
 	// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
 	UpdateStatus(ctx context.Context, cronJob *batchv1beta1.CronJob, opts v1.UpdateOptions) (*batchv1beta1.CronJob, error)
 	Delete(ctx context.Context, name string, opts v1.DeleteOptions) error
+	DeleteWithResult(ctx context.Context, name string, opts v1.DeleteOptions) (v1.APIResult, error)
 	DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error
 	Get(ctx context.Context, name string, opts v1.GetOptions) (*batchv1beta1.CronJob, error)
 	List(ctx context.Context, opts v1.ListOptions) (*batchv1beta1.CronJobList, error)

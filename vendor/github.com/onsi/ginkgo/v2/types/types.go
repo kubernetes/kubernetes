@@ -38,6 +38,10 @@ type ConstructionNodeReport struct {
 	// all Describe/Context/When containers in this spec's hierarchy
 	ContainerHierarchySemVerConstraints [][]string
 
+	// ContainerHierarchyComponentSemVerConstraints is a slice containing the component-specific semVerConstraints of
+	// all Describe/Context/When containers in this spec's hierarchy
+	ContainerHierarchyComponentSemVerConstraints []map[string][]string
+
 	// IsSerial captures whether the any container has the Serial decorator
 	IsSerial bool
 
@@ -84,6 +88,9 @@ type Report struct {
 
 	//SuiteSemVerConstraints captures any semVerConstraints attached to the suite by the DSL's RunSpecs() function
 	SuiteSemVerConstraints []string
+
+	//SuiteComponentSemVerConstraints captures any component-specific semVerConstraints attached to the suite by the DSL's RunSpecs() function
+	SuiteComponentSemVerConstraints map[string][]string
 
 	//SuiteSucceeded captures the success or failure status of the test run
 	//If true, the test run is considered successful.
@@ -188,14 +195,19 @@ type SpecReport struct {
 	// all Describe/Context/When containers in this spec's hierarchy
 	ContainerHierarchySemVerConstraints [][]string
 
+	// ContainerHierarchyComponentSemVerConstraints is a slice containing the component-specific semVerConstraints of
+	// all Describe/Context/When containers in this spec's hierarchy
+	ContainerHierarchyComponentSemVerConstraints []map[string][]string
+
 	// LeafNodeType, LeafNodeLocation, LeafNodeLabels, LeafNodeSemVerConstraints and LeafNodeText capture the NodeType, CodeLocation, and text
 	// of the Ginkgo node being tested (typically an NodeTypeIt node, though this can also be
 	// one of the NodeTypesForSuiteLevelNodes node types)
-	LeafNodeType              NodeType
-	LeafNodeLocation          CodeLocation
-	LeafNodeLabels            []string
-	LeafNodeSemVerConstraints []string
-	LeafNodeText              string
+	LeafNodeType                       NodeType
+	LeafNodeLocation                   CodeLocation
+	LeafNodeLabels                     []string
+	LeafNodeSemVerConstraints          []string
+	LeafNodeComponentSemVerConstraints map[string][]string
+	LeafNodeText                       string
 
 	// Captures the Spec Priority
 	SpecPriority int
@@ -261,52 +273,54 @@ type SpecReport struct {
 func (report SpecReport) MarshalJSON() ([]byte, error) {
 	//All this to avoid emitting an empty Failure struct in the JSON
 	out := struct {
-		ContainerHierarchyTexts             []string
-		ContainerHierarchyLocations         []CodeLocation
-		ContainerHierarchyLabels            [][]string
-		ContainerHierarchySemVerConstraints [][]string
-		LeafNodeType                        NodeType
-		LeafNodeLocation                    CodeLocation
-		LeafNodeLabels                      []string
-		LeafNodeSemVerConstraints           []string
-		LeafNodeText                        string
-		State                               SpecState
-		StartTime                           time.Time
-		EndTime                             time.Time
-		RunTime                             time.Duration
-		ParallelProcess                     int
-		Failure                             *Failure `json:",omitempty"`
-		NumAttempts                         int
-		MaxFlakeAttempts                    int
-		MaxMustPassRepeatedly               int
-		CapturedGinkgoWriterOutput          string              `json:",omitempty"`
-		CapturedStdOutErr                   string              `json:",omitempty"`
-		ReportEntries                       ReportEntries       `json:",omitempty"`
-		ProgressReports                     []ProgressReport    `json:",omitempty"`
-		AdditionalFailures                  []AdditionalFailure `json:",omitempty"`
-		SpecEvents                          SpecEvents          `json:",omitempty"`
+		ContainerHierarchyTexts                      []string
+		ContainerHierarchyLocations                  []CodeLocation
+		ContainerHierarchyLabels                     [][]string
+		ContainerHierarchySemVerConstraints          [][]string
+		ContainerHierarchyComponentSemVerConstraints []map[string][]string
+		LeafNodeType                                 NodeType
+		LeafNodeLocation                             CodeLocation
+		LeafNodeLabels                               []string
+		LeafNodeSemVerConstraints                    []string
+		LeafNodeText                                 string
+		State                                        SpecState
+		StartTime                                    time.Time
+		EndTime                                      time.Time
+		RunTime                                      time.Duration
+		ParallelProcess                              int
+		Failure                                      *Failure `json:",omitempty"`
+		NumAttempts                                  int
+		MaxFlakeAttempts                             int
+		MaxMustPassRepeatedly                        int
+		CapturedGinkgoWriterOutput                   string              `json:",omitempty"`
+		CapturedStdOutErr                            string              `json:",omitempty"`
+		ReportEntries                                ReportEntries       `json:",omitempty"`
+		ProgressReports                              []ProgressReport    `json:",omitempty"`
+		AdditionalFailures                           []AdditionalFailure `json:",omitempty"`
+		SpecEvents                                   SpecEvents          `json:",omitempty"`
 	}{
-		ContainerHierarchyTexts:             report.ContainerHierarchyTexts,
-		ContainerHierarchyLocations:         report.ContainerHierarchyLocations,
-		ContainerHierarchyLabels:            report.ContainerHierarchyLabels,
-		ContainerHierarchySemVerConstraints: report.ContainerHierarchySemVerConstraints,
-		LeafNodeType:                        report.LeafNodeType,
-		LeafNodeLocation:                    report.LeafNodeLocation,
-		LeafNodeLabels:                      report.LeafNodeLabels,
-		LeafNodeSemVerConstraints:           report.LeafNodeSemVerConstraints,
-		LeafNodeText:                        report.LeafNodeText,
-		State:                               report.State,
-		StartTime:                           report.StartTime,
-		EndTime:                             report.EndTime,
-		RunTime:                             report.RunTime,
-		ParallelProcess:                     report.ParallelProcess,
-		Failure:                             nil,
-		ReportEntries:                       nil,
-		NumAttempts:                         report.NumAttempts,
-		MaxFlakeAttempts:                    report.MaxFlakeAttempts,
-		MaxMustPassRepeatedly:               report.MaxMustPassRepeatedly,
-		CapturedGinkgoWriterOutput:          report.CapturedGinkgoWriterOutput,
-		CapturedStdOutErr:                   report.CapturedStdOutErr,
+		ContainerHierarchyTexts:                      report.ContainerHierarchyTexts,
+		ContainerHierarchyLocations:                  report.ContainerHierarchyLocations,
+		ContainerHierarchyLabels:                     report.ContainerHierarchyLabels,
+		ContainerHierarchySemVerConstraints:          report.ContainerHierarchySemVerConstraints,
+		ContainerHierarchyComponentSemVerConstraints: report.ContainerHierarchyComponentSemVerConstraints,
+		LeafNodeType:                                 report.LeafNodeType,
+		LeafNodeLocation:                             report.LeafNodeLocation,
+		LeafNodeLabels:                               report.LeafNodeLabels,
+		LeafNodeSemVerConstraints:                    report.LeafNodeSemVerConstraints,
+		LeafNodeText:                                 report.LeafNodeText,
+		State:                                        report.State,
+		StartTime:                                    report.StartTime,
+		EndTime:                                      report.EndTime,
+		RunTime:                                      report.RunTime,
+		ParallelProcess:                              report.ParallelProcess,
+		Failure:                                      nil,
+		ReportEntries:                                nil,
+		NumAttempts:                                  report.NumAttempts,
+		MaxFlakeAttempts:                             report.MaxFlakeAttempts,
+		MaxMustPassRepeatedly:                        report.MaxMustPassRepeatedly,
+		CapturedGinkgoWriterOutput:                   report.CapturedGinkgoWriterOutput,
+		CapturedStdOutErr:                            report.CapturedStdOutErr,
 	}
 
 	if !report.Failure.IsZero() {
@@ -404,6 +418,34 @@ func (report SpecReport) SemVerConstraints() []string {
 	return out
 }
 
+// ComponentSemVerConstraints returns a deduped map of all the spec's component-specific SemVerConstraints.
+func (report SpecReport) ComponentSemVerConstraints() map[string][]string {
+	out := map[string][]string{}
+	seen := map[string]bool{}
+	for _, compSemVerConstraints := range report.ContainerHierarchyComponentSemVerConstraints {
+		for component := range compSemVerConstraints {
+			if !seen[component] {
+				seen[component] = true
+				out[component] = compSemVerConstraints[component]
+			} else {
+				out[component] = append(out[component], compSemVerConstraints[component]...)
+				out[component] = slices.Compact(out[component])
+			}
+		}
+	}
+	for component := range report.LeafNodeComponentSemVerConstraints {
+		if !seen[component] {
+			seen[component] = true
+			out[component] = report.LeafNodeComponentSemVerConstraints[component]
+		} else {
+			out[component] = append(out[component], report.LeafNodeComponentSemVerConstraints[component]...)
+			out[component] = slices.Compact(out[component])
+		}
+	}
+
+	return out
+}
+
 // MatchesLabelFilter returns true if the spec satisfies the passed in label filter query
 func (report SpecReport) MatchesLabelFilter(query string) (bool, error) {
 	filter, err := ParseLabelFilter(query)
@@ -419,7 +461,22 @@ func (report SpecReport) MatchesSemVerFilter(version string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	return filter(report.SemVerConstraints()), nil
+
+	semVerConstraints := report.SemVerConstraints()
+	if len(semVerConstraints) != 0 && filter("", report.SemVerConstraints()) == false {
+		return false, nil
+	}
+
+	componentSemVerConstraints := report.ComponentSemVerConstraints()
+	if len(componentSemVerConstraints) != 0 {
+		for component, constraints := range componentSemVerConstraints {
+			if filter(component, constraints) == false {
+				return false, nil
+			}
+		}
+	}
+
+	return true, nil
 }
 
 // FileName() returns the name of the file containing the spec

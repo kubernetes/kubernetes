@@ -20,14 +20,18 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 	"reflect"
+	goruntime "runtime"
 	"strconv"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	kubetypes "k8s.io/apimachinery/pkg/types"
@@ -44,6 +48,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	"k8s.io/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/pkg/volume/emptydir"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/hostutil"
@@ -106,7 +111,6 @@ func TestGetMountedVolumesForPodAndGetVolumesInUse(t *testing.T) {
 			manager := newTestVolumeManager(t, tmpDir, podManager, kubeClient, node)
 
 			tCtx := ktesting.Init(t)
-			defer tCtx.Cancel("test has completed")
 			sourcesReady := config.NewSourcesReady(func(_ sets.Set[string]) bool { return true })
 			go manager.Run(tCtx, sourcesReady)
 
@@ -233,7 +237,6 @@ func TestWaitForAttachAndMountError(t *testing.T) {
 	manager := newTestVolumeManager(t, tmpDir, podManager, kubeClient, nil)
 
 	tCtx := ktesting.Init(t)
-	defer tCtx.Cancel("test has completed")
 	sourcesReady := config.NewSourcesReady(func(_ sets.Set[string]) bool { return true })
 	go manager.Run(tCtx, sourcesReady)
 
@@ -319,15 +322,16 @@ func TestWaitForAttachAndMountVolumeAttachLimitExceededError(t *testing.T) {
 		hostutil.NewFakeHostUtil(nil),
 		"",
 		&record.FakeRecorder{},
-		volumetest.NewBlockVolumePathHandler())
+		volumetest.NewBlockVolumePathHandler(),
+		nil,
+		0)
 
 	tCtx := ktesting.Init(t)
-	t.Cleanup(func() { tCtx.Cancel("test has completed") })
 	sourcesReady := config.NewSourcesReady(func(_ sets.Set[string]) bool { return true })
 	go manager.Run(tCtx, sourcesReady)
 	podManager.SetPods([]*v1.Pod{pod})
 
-	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+	ctx, cancel := context.WithTimeout(tCtx, 1*time.Second)
 	defer cancel()
 	err = manager.WaitForAttachAndMount(ctx, pod)
 
@@ -359,7 +363,6 @@ func TestInitialPendingVolumesForPodAndGetVolumesInUse(t *testing.T) {
 
 	manager := newTestVolumeManager(t, tmpDir, podManager, kubeClient, node)
 
-	defer tCtx.Cancel("test has completed")
 	sourcesReady := config.NewSourcesReady(func(_ sets.Set[string]) bool { return true })
 	go manager.Run(tCtx, sourcesReady)
 
@@ -450,7 +453,6 @@ func TestGetExtraSupplementalGroupsForPod(t *testing.T) {
 		manager := newTestVolumeManager(t, tmpDir, podManager, kubeClient, node)
 
 		tCtx := ktesting.Init(t)
-		defer tCtx.Cancel("test has completed")
 		sourcesReady := config.NewSourcesReady(func(_ sets.Set[string]) bool { return true })
 		go manager.Run(tCtx, sourcesReady)
 
@@ -527,7 +529,9 @@ func newTestVolumeManager(t *testing.T, tmpDir string, podManager kubepod.Manage
 		hostutil.NewFakeHostUtil(nil),
 		"",
 		fakeRecorder,
-		fakePathHandler)
+		fakePathHandler,
+		nil,
+		0)
 
 	return vm
 }
@@ -741,7 +745,7 @@ func TestWaitForAllPodsUnmount(t *testing.T) {
 
 				for _, pod := range pods {
 					go func() {
-						err := manager.WaitForAttachAndMount(context.Background(), pod)
+						err := manager.WaitForAttachAndMount(ctx, pod)
 						resultChan <- attachResult{
 							podName: pod.Name,
 							err:     err,
@@ -890,4 +894,171 @@ func createMultiplePodsWithVolumes(numPods int, pvMode v1.PersistentVolumeMode) 
 	}
 
 	return node, pods, pvs, claims
+}
+
+func TestVolumeManager_ResizeEphemeralVolume(t *testing.T) {
+	if goruntime.GOOS != "linux" {
+		t.Skip("in-place resize of memory-backed volumes is only supported on Linux")
+	}
+	quantity200Mi := resource.MustParse("200Mi")
+
+	tests := []struct {
+		name              string
+		volumes           []v1.Volume
+		isMounted         bool
+		newSize           *resource.Quantity
+		expectedErrSubstr string
+		expectedMountOpts []string
+	}{
+		{
+			name: "resizable memory volume - not yet mounted (deferral path)",
+			volumes: []v1.Volume{
+				{
+					Name: "vol1",
+					VolumeSource: v1.VolumeSource{
+						EmptyDir: &v1.EmptyDirVolumeSource{
+							Medium: v1.StorageMediumMemory,
+						},
+					},
+				},
+			},
+			isMounted:         false,
+			newSize:           &quantity200Mi,
+			expectedErrSubstr: "is not yet mounted; deferring resize",
+		},
+		{
+			name: "resizable memory volume - already mounted (success path)",
+			volumes: []v1.Volume{
+				{
+					Name: "vol1",
+					VolumeSource: v1.VolumeSource{
+						EmptyDir: &v1.EmptyDirVolumeSource{
+							Medium: v1.StorageMediumMemory,
+						},
+					},
+				},
+			},
+			isMounted:         true,
+			newSize:           &quantity200Mi,
+			expectedErrSubstr: "",
+			expectedMountOpts: []string{"remount", "size=209715200"},
+		},
+		{
+			name: "non-resizable disk-backed emptyDir volume (error path)",
+			volumes: []v1.Volume{
+				{
+					Name: "vol1",
+					VolumeSource: v1.VolumeSource{
+						EmptyDir: &v1.EmptyDirVolumeSource{
+							Medium: v1.StorageMediumDefault,
+						},
+					},
+				},
+			},
+			isMounted:         false,
+			newSize:           &quantity200Mi,
+			expectedErrSubstr: "only memory-backed emptyDir volumes support direct resize",
+		},
+		{
+			name: "non-resizable non-emptyDir volume (error path)",
+			volumes: []v1.Volume{
+				{
+					Name: "vol1",
+					VolumeSource: v1.VolumeSource{
+						HostPath: &v1.HostPathVolumeSource{
+							Path: "/tmp",
+						},
+					},
+				},
+			},
+			isMounted:         false,
+			newSize:           &quantity200Mi,
+			expectedErrSubstr: "does not support direct resizing",
+		},
+		{
+			name:              "volume not found in pod spec (error path)",
+			volumes:           []v1.Volume{},
+			isMounted:         false,
+			newSize:           &quantity200Mi,
+			expectedErrSubstr: "volume vol1 not found in pod test-pod",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tmpDir := t.TempDir()
+
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-pod",
+					UID:  "12345",
+				},
+				Spec: v1.PodSpec{
+					Volumes: tt.volumes,
+				},
+			}
+
+			plugMgr := &volume.VolumePluginMgr{}
+			fakeVolumeHost := volumetest.NewFakeKubeletVolumeHost(t, tmpDir, nil, nil)
+			err := plugMgr.InitPlugins(emptydir.ProbeVolumePlugins(), nil, fakeVolumeHost)
+			require.NoError(t, err)
+
+			physicalMounter := fakeVolumeHost.GetMounter().(*mount.FakeMounter)
+			volPath := filepath.Join(tmpDir, "pods/12345/volumes/kubernetes.io~empty-dir/vol1")
+
+			if tt.isMounted {
+				physicalMounter.MountPoints = []mount.MountPoint{
+					{
+						Path: volPath,
+						Opts: []string{"size=104857600"}, // 100Mi
+					},
+				}
+				err := os.MkdirAll(volPath, 0750)
+				require.NoError(t, err)
+			} else {
+				os.RemoveAll(volPath) //nolint:errcheck
+			}
+
+			podManager := kubepod.NewBasicPodManager()
+			podManager.SetPods([]*v1.Pod{pod})
+
+			manager := NewVolumeManager(
+				true,
+				testHostname,
+				podManager,
+				&fakePodStateProvider{},
+				nil,
+				plugMgr,
+				physicalMounter,
+				hostutil.NewFakeHostUtil(nil),
+				"",
+				&record.FakeRecorder{},
+				volumetest.NewBlockVolumePathHandler(),
+				nil,
+				0)
+
+			// Test ResizeEphemeralVolume
+			err = manager.ResizeEphemeralVolume(pod, "vol1", tt.newSize)
+			if tt.expectedErrSubstr != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.expectedErrSubstr)
+				return
+			}
+			require.NoError(t, err)
+
+			// Check current mount points options for the success path
+			var targetMp *mount.MountPoint
+			for i := len(physicalMounter.MountPoints) - 1; i >= 0; i-- {
+				if physicalMounter.MountPoints[i].Path == volPath {
+					targetMp = &physicalMounter.MountPoints[i]
+					break
+				}
+			}
+			require.NotNil(t, targetMp)
+			for _, expectedOpt := range tt.expectedMountOpts {
+				assert.Contains(t, targetMp.Opts, expectedOpt)
+			}
+
+		})
+	}
 }

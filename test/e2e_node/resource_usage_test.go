@@ -83,8 +83,7 @@ var _ = SIGDescribe("Resource-usage", framework.WithSerial(), framework.WithSlow
 			},
 		}
 
-		for _, testArg := range rTests {
-			itArg := testArg
+		for _, itArg := range rTests {
 			desc := fmt.Sprintf("resource tracking for %d pods per node", itArg.podsNr)
 			ginkgo.It(desc, func(ctx context.Context) {
 				testInfo := getTestNodeInfo(f, itArg.getTestName(), desc)
@@ -114,15 +113,14 @@ var _ = SIGDescribe("Resource-usage", framework.WithSerial(), framework.WithSlow
 		}
 
 		for _, testArg := range rTests {
-			itArg := testArg
-			desc := fmt.Sprintf("resource tracking for %d pods per node [Benchmark]", itArg.podsNr)
+			desc := fmt.Sprintf("resource tracking for %d pods per node [Benchmark]", testArg.podsNr)
 			ginkgo.It(desc, func(ctx context.Context) {
-				testInfo := getTestNodeInfo(f, itArg.getTestName(), desc)
+				testInfo := getTestNodeInfo(f, testArg.getTestName(), desc)
 
-				runResourceUsageTest(ctx, f, rc, itArg)
+				runResourceUsageTest(ctx, f, rc, testArg)
 
 				// Log and verify resource usage
-				logAndVerifyResource(ctx, f, rc, itArg.cpuLimits, itArg.memLimits, testInfo, false)
+				logAndVerifyResource(ctx, f, rc, testArg.cpuLimits, testArg.memLimits, testInfo, false)
 			})
 		}
 	})

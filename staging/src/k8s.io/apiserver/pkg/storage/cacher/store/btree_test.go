@@ -1,0 +1,164 @@
+/*
+Copyright 2024 The Kubernetes Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package store
+
+import (
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"k8s.io/apimachinery/pkg/watch"
+)
+
+func TestStoreListOrdered(t *testing.T) {
+	store := NewWatchCacheStorage(nil, nil)
+	prev, err := store.UpdateStore(watch.Added, testStorageElement("foo3", "bar3", 1), 1)
+	require.NoError(t, err)
+	assert.Nil(t, prev)
+	prev, err = store.UpdateStore(watch.Added, testStorageElement("foo1", "bar2", 2), 2)
+	require.NoError(t, err)
+	assert.Nil(t, prev)
+	prev, err = store.UpdateStore(watch.Added, testStorageElement("foo2", "bar1", 3), 3)
+	require.NoError(t, err)
+	assert.Nil(t, prev)
+	assert.Equal(t, []interface{}{
+		testStorageElement("foo1", "bar2", 2),
+		testStorageElement("foo2", "bar1", 3),
+		testStorageElement("foo3", "bar3", 1),
+	}, store.List())
+}
+
+func TestStoreListPrefix(t *testing.T) {
+	store := NewWatchCacheStorage(nil, nil)
+	prev, err := store.UpdateStore(watch.Added, testStorageElement("foo3", "bar3", 1), 1)
+	require.NoError(t, err)
+	assert.Nil(t, prev)
+	prev, err = store.UpdateStore(watch.Added, testStorageElement("foo1", "bar2", 2), 2)
+	require.NoError(t, err)
+	assert.Nil(t, prev)
+	prev, err = store.UpdateStore(watch.Added, testStorageElement("foo2", "bar1", 3), 3)
+	require.NoError(t, err)
+	assert.Nil(t, prev)
+	prev, err = store.UpdateStore(watch.Added, testStorageElement("bar", "baz", 4), 4)
+	require.NoError(t, err)
+	assert.Nil(t, prev)
+
+	items, err := store.OrderedListPrefix("foo", "")
+	require.NoError(t, err)
+	assert.Equal(t, []interface{}{
+		testStorageElement("foo1", "bar2", 2),
+		testStorageElement("foo2", "bar1", 3),
+		testStorageElement("foo3", "bar3", 1),
+	}, items)
+
+	items, err = store.OrderedListPrefix("foo2", "")
+	require.NoError(t, err)
+	assert.Equal(t, []interface{}{
+		testStorageElement("foo2", "bar1", 3),
+	}, items)
+
+	items, err = store.OrderedListPrefix("foo", "foo1\x00")
+	require.NoError(t, err)
+	assert.Equal(t, []interface{}{
+		testStorageElement("foo2", "bar1", 3),
+		testStorageElement("foo3", "bar3", 1),
+	}, items)
+
+	items, err = store.OrderedListPrefix("foo", "foo2\x00")
+	require.NoError(t, err)
+	assert.Equal(t, []interface{}{
+		testStorageElement("foo3", "bar3", 1),
+	}, items)
+
+	items, err = store.OrderedListPrefix("bar", "")
+	require.NoError(t, err)
+	assert.Equal(t, []interface{}{
+		testStorageElement("bar", "baz", 4),
+	}, items)
+}
+
+func TestStoreSnapshotter(t *testing.T) {
+	cache := newSnapshotter()
+	cache.Add(10, fakeSnapshot{rv: 10})
+	cache.Add(20, fakeSnapshot{rv: 20})
+	cache.Add(30, fakeSnapshot{rv: 30})
+	cache.Add(40, fakeSnapshot{rv: 40})
+	assert.Equal(t, 4, cache.Len())
+
+	t.Log("No snapshot from before first RV")
+	_, found := cache.GetLessOrEqual(9)
+	assert.False(t, found)
+
+	t.Log("Get snapshot from first RV")
+	snapshot, found := cache.GetLessOrEqual(10)
+	assert.True(t, found)
+	assert.Equal(t, 10, snapshot.(fakeSnapshot).rv)
+
+	t.Log("Get first snapshot by larger RV")
+	snapshot, found = cache.GetLessOrEqual(11)
+	assert.True(t, found)
+	assert.Equal(t, 10, snapshot.(fakeSnapshot).rv)
+
+	t.Log("Get second snapshot by larger RV")
+	snapshot, found = cache.GetLessOrEqual(22)
+	assert.True(t, found)
+	assert.Equal(t, 20, snapshot.(fakeSnapshot).rv)
+
+	t.Log("Get third snapshot for future revision")
+	snapshot, found = cache.GetLessOrEqual(100)
+	assert.True(t, found)
+	assert.Equal(t, 40, snapshot.(fakeSnapshot).rv)
+
+	t.Log("Remove snapshot less than 30")
+	cache.RemoveLess(30)
+
+	assert.Equal(t, 2, cache.Len())
+	_, found = cache.GetLessOrEqual(10)
+	assert.False(t, found)
+
+	_, found = cache.GetLessOrEqual(20)
+	assert.False(t, found)
+
+	snapshot, found = cache.GetLessOrEqual(30)
+	assert.True(t, found)
+	assert.Equal(t, 30, snapshot.(fakeSnapshot).rv)
+
+	t.Log("Remove removing all RVs")
+	cache.Reset()
+	assert.Equal(t, 0, cache.Len())
+	_, found = cache.GetLessOrEqual(30)
+	assert.False(t, found)
+	_, found = cache.GetLessOrEqual(40)
+	assert.False(t, found)
+}
+
+type fakeSnapshot struct {
+	rv int
+}
+
+func (f fakeSnapshot) GetByKey(key string) (item interface{}, exists bool, err error) {
+	return nil, false, nil
+}
+
+func (f fakeSnapshot) OrderedListPrefix(prefixKey, continueKey string) ([]interface{}, error) {
+	return nil, nil
+}
+
+func (f fakeSnapshot) RangePrefix(prefixKey, continueKey string) Range {
+	return nil
+}

@@ -18,12 +18,36 @@ package etcd3
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.etcd.io/etcd/api/v3/mvccpb"
 )
+
+func TestStatsCachePrefix(t *testing.T) {
+	for _, prefix := range []string{"", "/", "/registry", "/registry/", "/custom/backend"} {
+		t.Run(prefix, func(t *testing.T) {
+			storageKey := strings.TrimSuffix(prefix, "/") + "/pods/ns/pod"
+			for _, key := range []string{storageKey, "/pods/ns/pod", "pods/ns/pod"} {
+				t.Run(key, func(t *testing.T) {
+					estimator := newResourceSizeEstimator(prefix, func(context.Context) ([]string, error) {
+						return []string{key}, nil
+					})
+					t.Cleanup(estimator.Close)
+					estimator.UpdateKey(&mvccpb.KeyValue{Key: []byte(storageKey), Value: []byte("abc"), ModRevision: 1})
+
+					// Both full etcd keys and resource-relative cacher keys must retain the entry.
+					stats, err := estimator.Stats(t.Context())
+					require.NoError(t, err)
+					assert.Equal(t, int64(1), stats.ObjectCount)
+					assert.Equal(t, int64(3), stats.EstimatedAverageObjectSizeBytes)
+				})
+			}
+		})
+	}
+}
 
 func TestStatsCache(t *testing.T) {
 	ctx := t.Context()

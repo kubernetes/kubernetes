@@ -32,8 +32,12 @@ func ZaprOutputMappingDirect() map[string]string {
 `: `{"caller":"test/output.go:<LINE>","msg":"helper","v":0,"akey":"avalue"}
 `,
 
-		`I output.go:<LINE>] "test" akey="avalue" akey="avalue2"
-`: `{"caller":"test/output.go:<LINE>","msg":"test","v":0,"akey":"avalue","akey":"avalue2"}
+		`I output.go:<LINE>] "test-arguments" akey="avalue2"
+`: `{"caller":"test/output.go:<LINE>","msg":"test-arguments","v":0,"akey":"avalue","akey":"avalue2"}
+`,
+
+		`I output.go:<LINE>] "test-with-values" akey="avalue2"
+`: `{"caller":"test/output.go:<LINE>","msg":"test-with-values","akey":"avalue","v":0,"akey":"avalue2"}
 `,
 
 		`I output.go:<LINE>] "test" logger="hello.world" akey="avalue"
@@ -259,6 +263,26 @@ I output.go:<LINE>] "odd WithValues" keyWithoutValue="(MISSING)"
 		`I output.go:<LINE>] "cycle" list="<internal error: json: unsupported value: encountered a cycle via *test.myList>"
 `: `{"caller":"test/output.go:<LINE>","msg":"cycle","v":0,"listError":"json: unsupported value: encountered a cycle via *test.myList"}
 `,
+
+		`I output.go:<LINE>] "duplicates" trace="101112131415161718191a1b1c1d1e1f" span="0102030405060708"
+I output.go:<LINE>] "duplicates" trace="101112131415161718191a1b1c1d1e1f" span="1112131415161718"
+I output.go:<LINE>] "duplicates" trace="101112131415161718191a1b1c1d1e1f" span="0102030405060708"
+I output.go:<LINE>] "duplicates" trace="101112131415161718191a1b1c1d1e1f" span="2122232425262728"
+`: `{"caller":"test/output.go:<LINE>","msg":"duplicates","trace":"101112131415161718191a1b1c1d1e1f","span":"0102030405060708","v":0}
+{"caller":"test/output.go:<LINE>","msg":"duplicates","trace":"101112131415161718191a1b1c1d1e1f","span":"0102030405060708","trace":"101112131415161718191a1b1c1d1e1f","span":"1112131415161718","v":0}
+{"caller":"test/output.go:<LINE>","msg":"duplicates","trace":"101112131415161718191a1b1c1d1e1f","span":"0102030405060708","v":0}
+{"caller":"test/output.go:<LINE>","msg":"duplicates","trace":"101112131415161718191a1b1c1d1e1f","span":"0102030405060708","trace":"101112131415161718191a1b1c1d1e1f","span":"2122232425262728","v":0}
+`,
+
+		`I output.go:<LINE>] "duplicates" trace="101112131415161718191a1b1c1d1e1f" span="0102030405060708" a=1
+I output.go:<LINE>] "duplicates" trace="101112131415161718191a1b1c1d1e1f" a=1 b=2 span="1112131415161718"
+I output.go:<LINE>] "duplicates" trace="101112131415161718191a1b1c1d1e1f" span="0102030405060708" a=1
+I output.go:<LINE>] "duplicates" trace="101112131415161718191a1b1c1d1e1f" a=1 c=3 span="2122232425262728" d=4
+`: `{"caller":"test/output.go:<LINE>","msg":"duplicates","trace":"101112131415161718191a1b1c1d1e1f","span":"0102030405060708","a":1,"v":0}
+{"caller":"test/output.go:<LINE>","msg":"duplicates","trace":"101112131415161718191a1b1c1d1e1f","span":"0102030405060708","a":1,"b":2,"trace":"101112131415161718191a1b1c1d1e1f","span":"1112131415161718","v":0}
+{"caller":"test/output.go:<LINE>","msg":"duplicates","trace":"101112131415161718191a1b1c1d1e1f","span":"0102030405060708","a":1,"v":0}
+{"caller":"test/output.go:<LINE>","msg":"duplicates","trace":"101112131415161718191a1b1c1d1e1f","span":"0102030405060708","a":1,"c":3,"trace":"101112131415161718191a1b1c1d1e1f","span":"2122232425262728","d":4,"v":0}
+`,
 	}
 }
 
@@ -275,8 +299,6 @@ I output.go:<LINE>] "odd WithValues" keyWithoutValue="(MISSING)"
 //   - Output does that without emitting the warning that we get
 //     from zapr.
 //   - zap drops keys with missing values, here we get "(MISSING)".
-//   - zap does not de-duplicate key/value pairs, here klog does that
-//     for it.
 func ZaprOutputMappingIndirect() map[string]string {
 	mapping := ZaprOutputMappingDirect()
 
@@ -311,12 +333,16 @@ I output.go:<LINE>] "odd WithValues" keyWithoutValue="(MISSING)"
 `: `{"caller":"test/output.go:<LINE>","msg":"test","v":0,"akey9":"avalue9","akey8":"avalue8","akey1":"avalue1","akey5":"avalue5","akey4":"avalue4"}
 `,
 
-		`I output.go:<LINE>] "test" akey="avalue2"
-`: `{"caller":"test/output.go:<LINE>","msg":"test","v":0,"akey":"avalue2"}
+		`I output.go:<LINE>] "test-arguments" akey="avalue2"
+`: `{"caller":"test/output.go:<LINE>","msg":"test-arguments","v":0,"akey":"avalue","akey":"avalue2"}
+`,
+
+		`I output.go:<LINE>] "test-with-values" akey="avalue2"
+`: `{"caller":"test/output.go:<LINE>","msg":"test-with-values","v":0,"akey":"avalue","akey":"avalue2"}
 `,
 
 		`I output.go:<LINE>] "test" X="y" duration="1m0s" A="b"
-`: `{"caller":"test/output.go:<LINE>","msg":"test","v":0,"X":"y","duration":"1m0s","A":"b"}
+`: `{"caller":"test/output.go:<LINE>","msg":"test","v":0,"duration":"1h0m0s","X":"y","duration":"1m0s","A":"b"}
 `,
 
 		`I output.go:<LINE>] "test" firstKey=1
@@ -345,6 +371,26 @@ I output.go:<LINE>] "test" firstKey=1 secondKey=3
 		// discards these messages.
 		`I output.go:<LINE>] "v=11: you see me because of -vmodule output=11"
 `: ``,
+
+		`I output.go:<LINE>] "duplicates" trace="101112131415161718191a1b1c1d1e1f" span="0102030405060708"
+I output.go:<LINE>] "duplicates" trace="101112131415161718191a1b1c1d1e1f" span="1112131415161718"
+I output.go:<LINE>] "duplicates" trace="101112131415161718191a1b1c1d1e1f" span="0102030405060708"
+I output.go:<LINE>] "duplicates" trace="101112131415161718191a1b1c1d1e1f" span="2122232425262728"
+`: `{"caller":"test/output.go:<LINE>","msg":"duplicates","v":0,"trace":"101112131415161718191a1b1c1d1e1f","span":"0102030405060708"}
+{"caller":"test/output.go:<LINE>","msg":"duplicates","v":0,"trace":"101112131415161718191a1b1c1d1e1f","span":"0102030405060708","trace":"101112131415161718191a1b1c1d1e1f","span":"1112131415161718"}
+{"caller":"test/output.go:<LINE>","msg":"duplicates","v":0,"trace":"101112131415161718191a1b1c1d1e1f","span":"0102030405060708"}
+{"caller":"test/output.go:<LINE>","msg":"duplicates","v":0,"trace":"101112131415161718191a1b1c1d1e1f","span":"0102030405060708","trace":"101112131415161718191a1b1c1d1e1f","span":"2122232425262728"}
+`,
+
+		`I output.go:<LINE>] "duplicates" trace="101112131415161718191a1b1c1d1e1f" span="0102030405060708" a=1
+I output.go:<LINE>] "duplicates" trace="101112131415161718191a1b1c1d1e1f" a=1 b=2 span="1112131415161718"
+I output.go:<LINE>] "duplicates" trace="101112131415161718191a1b1c1d1e1f" span="0102030405060708" a=1
+I output.go:<LINE>] "duplicates" trace="101112131415161718191a1b1c1d1e1f" a=1 c=3 span="2122232425262728" d=4
+`: `{"caller":"test/output.go:<LINE>","msg":"duplicates","v":0,"trace":"101112131415161718191a1b1c1d1e1f","span":"0102030405060708","a":1}
+{"caller":"test/output.go:<LINE>","msg":"duplicates","v":0,"trace":"101112131415161718191a1b1c1d1e1f","span":"0102030405060708","a":1,"b":2,"trace":"101112131415161718191a1b1c1d1e1f","span":"1112131415161718"}
+{"caller":"test/output.go:<LINE>","msg":"duplicates","v":0,"trace":"101112131415161718191a1b1c1d1e1f","span":"0102030405060708","a":1}
+{"caller":"test/output.go:<LINE>","msg":"duplicates","v":0,"trace":"101112131415161718191a1b1c1d1e1f","span":"0102030405060708","a":1,"c":3,"trace":"101112131415161718191a1b1c1d1e1f","span":"2122232425262728","d":4}
+`,
 	} {
 		mapping[key] = value
 	}

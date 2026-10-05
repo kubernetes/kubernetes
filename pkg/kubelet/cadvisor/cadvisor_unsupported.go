@@ -22,8 +22,8 @@ import (
 	"context"
 	"errors"
 
-	cadvisorapi "github.com/google/cadvisor/info/v1"
-	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
+	cadvisorapi "github.com/google/cadvisor/lib/model"
+	"k8s.io/klog/v2"
 )
 
 type cadvisorUnsupported struct {
@@ -32,7 +32,7 @@ type cadvisorUnsupported struct {
 var _ Interface = new(cadvisorUnsupported)
 
 // New creates a new cAdvisor Interface for unsupported systems.
-func New(imageFsInfoProvider ImageFsInfoProvider, rootPath string, cgroupsRoots []string, usingLegacyStats, localStorageCapacityIsolation bool) (Interface, error) {
+func New(_ klog.Logger, imageFsInfoProvider ImageFsInfoProvider, rootPath string, cgroupsRoots []string, usingLegacyStats, localStorageCapacityIsolation, disableContainerDiscovery bool) (Interface, error) {
 	return &cadvisorUnsupported{}, nil
 }
 
@@ -42,15 +42,15 @@ func (cu *cadvisorUnsupported) Start() error {
 	return errUnsupported
 }
 
-func (cu *cadvisorUnsupported) ContainerInfoV2(name string, options cadvisorapiv2.RequestOptions) (map[string]cadvisorapiv2.ContainerInfo, error) {
+func (cu *cadvisorUnsupported) ContainerInfoV2(name string, options cadvisorapi.RequestOptions) (map[string]cadvisorapi.ContainerInfo, error) {
 	return nil, errUnsupported
 }
 
-func (cu *cadvisorUnsupported) GetRequestedContainersInfo(containerName string, options cadvisorapiv2.RequestOptions) (map[string]*cadvisorapi.ContainerInfo, error) {
+func (cu *cadvisorUnsupported) GetRequestedContainersInfo(containerName string, options cadvisorapi.RequestOptions) (map[string]*cadvisorapi.ContainerInfo, error) {
 	return nil, errUnsupported
 }
 
-func (cu *cadvisorUnsupported) MachineInfo() (*cadvisorapi.MachineInfo, error) {
+func (cu *cadvisorUnsupported) MachineInfo(logger klog.Logger) (*cadvisorapi.MachineInfo, error) {
 	return nil, errUnsupported
 }
 
@@ -58,18 +58,22 @@ func (cu *cadvisorUnsupported) VersionInfo() (*cadvisorapi.VersionInfo, error) {
 	return nil, errUnsupported
 }
 
-func (cu *cadvisorUnsupported) ImagesFsInfo(context.Context) (cadvisorapiv2.FsInfo, error) {
-	return cadvisorapiv2.FsInfo{}, errUnsupported
+func (cu *cadvisorUnsupported) ImagesFsInfo(context.Context) (cadvisorapi.FsInfo, error) {
+	return cadvisorapi.FsInfo{}, errUnsupported
 }
 
-func (cu *cadvisorUnsupported) RootFsInfo() (cadvisorapiv2.FsInfo, error) {
-	return cadvisorapiv2.FsInfo{}, errUnsupported
+func (cu *cadvisorUnsupported) RootFsInfo() (cadvisorapi.FsInfo, error) {
+	return cadvisorapi.FsInfo{}, errUnsupported
 }
 
-func (cu *cadvisorUnsupported) ContainerFsInfo(context.Context) (cadvisorapiv2.FsInfo, error) {
-	return cadvisorapiv2.FsInfo{}, errUnsupported
+func (cu *cadvisorUnsupported) ContainerFsInfo(context.Context) (cadvisorapi.FsInfo, error) {
+	return cadvisorapi.FsInfo{}, errUnsupported
 }
 
-func (cu *cadvisorUnsupported) GetDirFsInfo(path string) (cadvisorapiv2.FsInfo, error) {
-	return cadvisorapiv2.FsInfo{}, nil
+func (cu *cadvisorUnsupported) GetDirFsInfo(path string) (cadvisorapi.FsInfo, error) {
+	return cadvisorapi.FsInfo{}, nil
+}
+
+func IsPsiEnabled(_ klog.Logger) bool {
+	return false
 }

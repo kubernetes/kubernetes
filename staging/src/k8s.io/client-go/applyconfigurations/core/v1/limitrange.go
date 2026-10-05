@@ -32,11 +32,11 @@ import (
 //
 // LimitRange sets resource usage limits for each kind of resource in a Namespace.
 type LimitRangeApplyConfiguration struct {
-	metav1.TypeMetaApplyConfiguration `json:",inline"`
-	// Standard object's metadata.
+	metav1.TypeMetaApplyConfiguration `json:""`
+	// metadata is the standard object's metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	// Spec defines the limits enforced.
+	// spec defines the limits enforced.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
 	Spec *LimitRangeSpecApplyConfiguration `json:"spec,omitempty"`
 }

@@ -17,6 +17,7 @@ limitations under the License.
 package experimental
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"slices"
@@ -57,37 +58,35 @@ func NodeMatches(node *v1.Node, nodeNameToMatch string, allNodesMatch bool, node
 // Both is recorded in the result.
 func GatherPools(ctx context.Context, slicesForNode []*resourceapi.ResourceSlice, node *v1.Node, features Features, allSlices []*resourceapi.ResourceSlice) ([]*Pool, error) {
 	pools := make(map[PoolID][]*draapi.ResourceSlice)
-	var slicesWithBindingConditions []*resourceapi.ResourceSlice
 
 	for _, slice := range slicesForNode {
 		if !features.PartitionableDevices && (slice.Spec.PerDeviceNodeSelection != nil || len(slice.Spec.SharedCounters) > 0) {
 			continue
 		}
 
-		// Always include slices with SharedCounters since they are needed to use a pool
-		// regardless of their node selector.
-		if len(slice.Spec.SharedCounters) > 0 {
-			if err := addSlice(pools, slice); err != nil {
-				return nil, fmt.Errorf("failed to add node slice %s: %w", slice.Name, err)
-			}
-		} else if nodeName, allNodes := ptr.Deref(slice.Spec.NodeName, ""), ptr.Deref(slice.Spec.AllNodes, false); nodeName != "" || allNodes || slice.Spec.NodeSelector != nil {
+		// While the DRADeviceCompatibilityGroups feature is disabled, this
+		// allocator cannot validate co-allocation against compatibility
+		// groups, so slices with devices which declare them get ignored.
+		// This makes the pool incomplete (checked below), which prevents
+		// allocating the pool's other devices, too.
+		if !features.CompatibilityGroups && sliceUsesCompatibilityGroups(slice) {
+			klog.FromContext(ctx).V(5).Info("Ignoring resource slice because it uses compatibility groups while the DRADeviceCompatibilityGroups feature is disabled; its pool will be treated as incomplete", "resourceslice", klog.KObj(slice))
+			continue
+		}
+
+		// Determine if the slice is relevant for the node.
+		relevant := false
+		// Slices containing SharedCounters might be excluded here if they do not target the current node.
+		// This is safe: if a device on this node references a shared counter from an excluded slice,
+		// the initial isComplete check below will fail due to the missing slice. Consequently,
+		// checkSlicesInPool will be called to fetch all slices in the pool, ensuring that the required
+		// shared counter slice is collected and included during pool construction.
+		if nodeName, allNodes := ptr.Deref(slice.Spec.NodeName, ""), ptr.Deref(slice.Spec.AllNodes, false); nodeName != "" || allNodes || slice.Spec.NodeSelector != nil {
 			match, err := NodeMatches(node, nodeName, allNodes, slice.Spec.NodeSelector)
 			if err != nil {
 				return nil, fmt.Errorf("failed to perform node selection for slice %s: %w", slice.Name, err)
 			}
-			if match {
-				if hasBindingConditions(slice) {
-					// If there is a Device in the ResourceSlice that contains BindingConditions,
-					// the ResourceSlice should be sorted to be after the ResourceSlice without BindingConditions
-					// because then the allocation is going to prefer the simpler devices without
-					// binding conditions.
-					slicesWithBindingConditions = append(slicesWithBindingConditions, slice)
-					continue
-				}
-				if err := addSlice(pools, slice); err != nil {
-					return nil, fmt.Errorf("failed to add node slice %s: %w", slice.Name, err)
-				}
-			}
+			relevant = match
 		} else if ptr.Deref(slice.Spec.PerDeviceNodeSelection, false) {
 			for _, device := range slice.Spec.Devices {
 				match, err := NodeMatches(node, ptr.Deref(device.NodeName, ""), ptr.Deref(device.AllNodes, false), device.NodeSelector)
@@ -96,15 +95,7 @@ func GatherPools(ctx context.Context, slicesForNode []*resourceapi.ResourceSlice
 						device.String(), slice.Name, err)
 				}
 				if match {
-					if hasBindingConditions(slice) {
-						// If there is a Device in the ResourceSlice that contains BindingConditions,
-						// the ResourceSlice should be sorted to be after the ResourceSlice without BindingConditions.
-						slicesWithBindingConditions = append(slicesWithBindingConditions, slice)
-						break
-					}
-					if err := addSlice(pools, slice); err != nil {
-						return nil, fmt.Errorf("failed to add node slice %s: %w", slice.Name, err)
-					}
+					relevant = true
 					break
 				}
 			}
@@ -119,11 +110,10 @@ func GatherPools(ctx context.Context, slicesForNode []*resourceapi.ResourceSlice
 			continue
 		}
 
-	}
-
-	for _, slice := range slicesWithBindingConditions {
-		if err := addSlice(pools, slice); err != nil {
-			return nil, fmt.Errorf("failed to add node slice %s: %w", slice.Name, err)
+		if relevant {
+			if err := addSlice(pools, slice); err != nil {
+				return nil, fmt.Errorf("failed to add node slice %s: %w", slice.Name, err)
+			}
 		}
 	}
 
@@ -164,6 +154,13 @@ func GatherPools(ctx context.Context, slicesForNode []*resourceapi.ResourceSlice
 			// Let's ignore the old device information by ignoring the pool.
 			continue
 		}
+		if !features.CompatibilityGroups {
+			// Stay consistent with the filtering above: ignored slices must
+			// not count towards pool completeness, otherwise a pool could be
+			// considered complete even though its devices with compatibility
+			// groups are not visible to the allocator.
+			allSlicesForPool = slicesWithoutCompatibilityGroups(allSlicesForPool)
+		}
 		// Use the more complete number of slices to check for "incomplete pool".
 		//
 		// The slices that we return to the caller still don't represent the whole
@@ -192,11 +189,33 @@ func GatherPools(ctx context.Context, slicesForNode []*resourceapi.ResourceSlice
 		}
 		result = append(result, pool)
 	}
+
+	// Sort pools by ID to ensure a deterministic allocation order.
+	// Because the allocator uses a first-fit search, this allows driver authors
+	// to influence prioritization through their naming conventions.
+	sortPoolsByID(result)
+	sortPoolsByID(resultWithBindingConditions)
+
 	if len(resultWithBindingConditions) != 0 {
 		result = append(result, resultWithBindingConditions...)
 	}
 
 	return result, nil
+}
+
+func sortSlicesByName(slicesToSort []*draapi.ResourceSlice) {
+	slices.SortFunc(slicesToSort, func(a, b *draapi.ResourceSlice) int {
+		return cmp.Compare(a.Name, b.Name)
+	})
+}
+
+func sortPoolsByID(pools []*Pool) {
+	slices.SortFunc(pools, func(a, b *Pool) int {
+		if cmp := cmp.Compare(a.PoolID.Driver.String(), b.PoolID.Driver.String()); cmp != 0 {
+			return cmp
+		}
+		return cmp.Compare(a.PoolID.Pool.String(), b.PoolID.Pool.String())
+	})
 }
 
 func addSlice(pools map[PoolID][]*draapi.ResourceSlice, s *resourceapi.ResourceSlice) error {
@@ -231,19 +250,47 @@ func addSlice(pools map[PoolID][]*draapi.ResourceSlice, s *resourceapi.ResourceS
 }
 
 func buildPool(id PoolID, slices []*draapi.ResourceSlice, features Features, allSlicesForPool []*resourceapi.ResourceSlice) (*Pool, error) {
+	// Sort slices by name to ensure a deterministic allocation order.
+	// Because the allocator uses a first-fit search, this allows driver authors
+	// to influence prioritization through their naming conventions.
+	sortSlicesByName(slices)
+
 	var deviceSlices []*draapi.ResourceSlice
 	var counterSetSlices []*draapi.ResourceSlice
-	if features.PartitionableDevices {
+	var slicesNotTargetingNode []*draapi.ResourceSlice
+
+	for _, slice := range slices {
+		if features.PartitionableDevices && len(slice.Spec.SharedCounters) > 0 {
+			counterSetSlices = append(counterSetSlices, slice)
+		} else {
+			deviceSlices = append(deviceSlices, slice)
+		}
+	}
+
+	// Process and convert any slices that were excluded because they didn't target the current node.
+	if len(slices) < len(allSlicesForPool) {
+		// We only want to convert the slices we haven't already converted, so make it easy to
+		// look up the names of converted slices.
+		slicesTargetingNodeNames := sets.New[string]()
 		for _, slice := range slices {
-			if len(slice.Spec.SharedCounters) > 0 {
-				counterSetSlices = append(counterSetSlices, slice)
+			slicesTargetingNodeNames.Insert(slice.Name)
+		}
+		for _, slice := range allSlicesForPool {
+			if slicesTargetingNodeNames.Has(slice.Name) {
+				continue
+			}
+			var convertedSlice draapi.ResourceSlice
+			if err := draapi.Convert_v1_ResourceSlice_To_api_ResourceSlice(slice, &convertedSlice, nil); err != nil {
+				return nil, fmt.Errorf("convert ResourceSlice: %w", err)
+			}
+			if features.PartitionableDevices && len(convertedSlice.Spec.SharedCounters) > 0 {
+				counterSetSlices = append(counterSetSlices, &convertedSlice)
 			} else {
-				deviceSlices = append(deviceSlices, slice)
+				slicesNotTargetingNode = append(slicesNotTargetingNode, &convertedSlice)
 			}
 		}
-	} else {
-		deviceSlices = slices
 	}
+
 	if err := validateDeviceNames(deviceSlices); err != nil {
 		return &Pool{
 			PoolID:        id,
@@ -251,6 +298,7 @@ func buildPool(id PoolID, slices []*draapi.ResourceSlice, features Features, all
 			InvalidReason: err.Error(),
 		}, nil
 	}
+
 	// If the partitionable devices feature is not enabled, we don't need to
 	// validate counter sets and consumed counters, so we are done.
 	if !features.PartitionableDevices {
@@ -269,49 +317,16 @@ func buildPool(id PoolID, slices []*draapi.ResourceSlice, features Features, all
 		}, nil
 	}
 
-	if err := validateDeviceCounterConsumption(counterSets, slices); err != nil {
+	// Validate device counter consumption for devices targeting the node.
+	if err := validateDeviceCounterConsumption(counterSets, deviceSlices); err != nil {
 		return &Pool{
 			PoolID:        id,
 			IsInvalid:     true,
 			InvalidReason: err.Error(),
 		}, nil
 	}
-	// If we have already seen all slices (both with counter sets and devices),
-	// we don't need to do any more validation.
-	if allSlicesForPool == nil || len(slices) == len(allSlicesForPool) {
-		return &Pool{
-			PoolID:                    id,
-			DeviceSlicesTargetingNode: deviceSlices,
-			CounterSets:               counterSets,
-		}, nil
-	}
 
-	// If we have slices that were discarded earlier because they didn't target the current node
-	// we need to check them now. They might include devices that consume counters in the pool and
-	// the allocator needs to know about them to correctly determine available counters.
-	//
-	// We only want to convert the slices we haven't already converted, so make it easy to
-	// look up the names of converted slices.
-	slicesTargetingNodeNames := sets.New[string]()
-	for _, slice := range slices {
-		slicesTargetingNodeNames.Insert(slice.Name)
-	}
-	var slicesNotTargetingNode []*draapi.ResourceSlice
-	for _, slice := range allSlicesForPool {
-		if slicesTargetingNodeNames.Has(slice.Name) {
-			continue
-		}
-		var convertedSlice draapi.ResourceSlice
-		if err := draapi.Convert_v1_ResourceSlice_To_api_ResourceSlice(slice, &convertedSlice, nil); err != nil {
-			return nil, fmt.Errorf("convert ResourceSlice: %w", err)
-		}
-		slicesNotTargetingNode = append(slicesNotTargetingNode, &convertedSlice)
-	}
-	// We need to make sure the devices here are correctly consuming counters and counter
-	// sets. Otherwise the allocator might make incorrect decisions.
-	// We don't validate the device names here. It might be that we should do that, but
-	// this is consistent with existing behavior where we don't validate slices that
-	// we don't allocate from.
+	// Validate device counter consumption for devices not targeting the node.
 	if err := validateDeviceCounterConsumption(counterSets, slicesNotTargetingNode); err != nil {
 		return &Pool{
 			PoolID:        id,
@@ -319,6 +334,7 @@ func buildPool(id PoolID, slices []*draapi.ResourceSlice, features Features, all
 			InvalidReason: err.Error(),
 		}, nil
 	}
+
 	return &Pool{
 		PoolID:                       id,
 		DeviceSlicesTargetingNode:    deviceSlices,
@@ -378,15 +394,6 @@ func validateDeviceCounterConsumption(counterSets map[draapi.UniqueString]*draap
 	return nil
 }
 
-func hasBindingConditions(slice *resourceapi.ResourceSlice) bool {
-	for _, device := range slice.Spec.Devices {
-		if device.BindingConditions != nil {
-			return true
-		}
-	}
-	return false
-}
-
 func poolHasBindingConditions(pool Pool) bool {
 	for _, slice := range pool.DeviceSlicesTargetingNode {
 		for _, device := range slice.Spec.Devices {
@@ -405,7 +412,11 @@ func poolHasBindingConditions(pool Pool) bool {
 // - current generation is obsolete -> no further checking
 // - all slices with the generation in the pool
 //
-// Future TODO: detect inconsistent ResourceSliceCount, also in poolIsInvalid.
+// Not checked: consistency of a pool generation's ResourceSliceCount, meaning
+// slices that disagree on the declared count or outnumber it. The count still
+// decides completeness. The extra cross-slice check was considered in
+// https://github.com/kubernetes/kubernetes/pull/141118 and left out to keep the
+// allocation path cheap. Drivers must publish consistent counts.
 func checkSlicesInPool(slices []*resourceapi.ResourceSlice, poolID PoolID, generation int64) (bool, []*resourceapi.ResourceSlice) {
 	// A cached index by pool ID would make this more efficient.
 	// It may be needed long-term to support features which always have to consider all slices.
@@ -524,50 +535,4 @@ func (p *poolsLogger) addDevicesInSlices(devices []string, poolID PoolID, slices
 		}
 	}
 	return devices
-}
-
-// logPools returns a handle for the value in a structured log call which
-// includes varying amounts of information about the allocated devices, depending on
-// the verbosity of the logger.
-func logAllocatedDevices(logger klog.Logger, allocatedDevices sets.Set[DeviceID]) any {
-	// We need to check verbosity here because our caller's source code
-	// location may be relevant (-vmodule !).
-	helper, logger := logger.WithCallStackHelper()
-	helper()
-
-	// We always produce the same output at V <= 5. 6 adds all IDs.
-	verbosity := 5
-	for i := 7; i > verbosity; i-- {
-		if loggerV := logger.V(i); loggerV.Enabled() {
-			verbosity = i
-			break
-		}
-	}
-
-	return &allocatedDevicesLogger{verbosity, allocatedDevices}
-}
-
-type allocatedDevicesLogger struct {
-	verbosity int
-	devices   sets.Set[DeviceID]
-}
-
-var _ logr.Marshaler = &allocatedDevicesLogger{}
-
-func (a *allocatedDevicesLogger) MarshalLog() any {
-	info := map[string]any{"count": len(a.devices)}
-	if a.verbosity >= 6 {
-		ids := make([]string, 0, len(a.devices))
-		for id := range a.devices {
-			if a.verbosity == 6 && len(ids) >= maxDevicesLevel6 {
-				ids = append(ids, "...")
-				break
-			}
-			ids = append(ids, id.String())
-		}
-		slices.Sort(ids)
-		info["devices"] = ids
-
-	}
-	return info
 }

@@ -29,6 +29,7 @@ import (
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/utils/ptr"
 )
 
@@ -589,7 +590,9 @@ func TestGeneratePodReadyToStartContainersCondition(t *testing.T) {
 			pod:    &v1.Pod{},
 			status: &kubecontainer.PodStatus{},
 			expected: v1.PodCondition{
-				Status: v1.ConditionFalse,
+				Status:  v1.ConditionFalse,
+				Reason:  kubetypes.PodSandboxNotReadyReason,
+				Message: kubetypes.PodSandboxNotReadyMsgNoPodSandbox,
 			},
 		},
 		"Pod sandbox status not ready": {
@@ -603,7 +606,65 @@ func TestGeneratePodReadyToStartContainersCondition(t *testing.T) {
 				},
 			},
 			expected: v1.PodCondition{
-				Status: v1.ConditionFalse,
+				Status:  v1.ConditionFalse,
+				Reason:  kubetypes.PodSandboxNotReadyReason,
+				Message: kubetypes.PodSandboxNotReadyMsgSandboxNotReady,
+			},
+		},
+		"Pod with multiple ready sandboxes": {
+			pod: &v1.Pod{},
+			status: &kubecontainer.PodStatus{
+				SandboxStatuses: []*runtimeapi.PodSandboxStatus{
+					{
+						Network: &runtimeapi.PodSandboxNetworkStatus{
+							Ip: "10.0.0.10",
+						},
+						Metadata: &runtimeapi.PodSandboxMetadata{Attempt: uint32(1)},
+						State:    runtimeapi.PodSandboxState_SANDBOX_READY,
+					},
+					{
+						Network: &runtimeapi.PodSandboxNetworkStatus{
+							Ip: "10.0.0.11",
+						},
+						Metadata: &runtimeapi.PodSandboxMetadata{Attempt: uint32(0)},
+						State:    runtimeapi.PodSandboxState_SANDBOX_READY,
+					},
+				},
+			},
+			expected: v1.PodCondition{
+				Status:  v1.ConditionFalse,
+				Reason:  kubetypes.PodSandboxNotReadyReason,
+				Message: kubetypes.PodSandboxNotReadyMsgMultipleSandboxes,
+			},
+		},
+		"Pod sandbox status ready but network namespace mode changed": {
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					HostNetwork: true,
+				},
+			},
+			status: &kubecontainer.PodStatus{
+				SandboxStatuses: []*runtimeapi.PodSandboxStatus{
+					{
+						Network: &runtimeapi.PodSandboxNetworkStatus{
+							Ip: "10.0.0.10",
+						},
+						Metadata: &runtimeapi.PodSandboxMetadata{Attempt: uint32(0)},
+						State:    runtimeapi.PodSandboxState_SANDBOX_READY,
+						Linux: &runtimeapi.LinuxPodSandboxStatus{
+							Namespaces: &runtimeapi.Namespace{
+								Options: &runtimeapi.NamespaceOption{
+									Network: runtimeapi.NamespaceMode_POD,
+								},
+							},
+						},
+					},
+				},
+			},
+			expected: v1.PodCondition{
+				Status:  v1.ConditionFalse,
+				Reason:  kubetypes.PodSandboxNotReadyReason,
+				Message: kubetypes.PodSandboxNotReadyMsgNetworkNamespaceMode,
 			},
 		},
 		"Pod sandbox status ready but no IP configured": {
@@ -620,7 +681,9 @@ func TestGeneratePodReadyToStartContainersCondition(t *testing.T) {
 				},
 			},
 			expected: v1.PodCondition{
-				Status: v1.ConditionFalse,
+				Status:  v1.ConditionFalse,
+				Reason:  kubetypes.PodSandboxNotReadyReason,
+				Message: kubetypes.PodSandboxNotReadyMsgNoIPAddress,
 			},
 		},
 		"Pod sandbox status ready and IP configured": {
@@ -646,6 +709,8 @@ func TestGeneratePodReadyToStartContainersCondition(t *testing.T) {
 			condition := GeneratePodReadyToStartContainersCondition(test.pod, &v1.PodStatus{}, test.status)
 			require.Equal(t, test.expected.Type, condition.Type)
 			require.Equal(t, test.expected.Status, condition.Status)
+			require.Equal(t, test.expected.Reason, condition.Reason)
+			require.Equal(t, test.expected.Message, condition.Message)
 		})
 	}
 }

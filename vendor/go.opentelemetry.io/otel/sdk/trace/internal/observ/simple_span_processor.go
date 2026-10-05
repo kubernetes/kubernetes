@@ -1,38 +1,25 @@
 // Copyright The OpenTelemetry Authors
 // SPDX-License-Identifier: Apache-2.0
 
-package observ // import "go.opentelemetry.io/otel/sdk/trace/internal/observ"
+package observ
 
 import (
 	"context"
 	"fmt"
-	"sync"
 
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
 	"go.opentelemetry.io/otel/sdk"
 	"go.opentelemetry.io/otel/sdk/internal/x"
-	semconv "go.opentelemetry.io/otel/semconv/v1.39.0"
-	"go.opentelemetry.io/otel/semconv/v1.39.0/otelconv"
+	semconv "go.opentelemetry.io/otel/semconv/v1.43.0"
+	"go.opentelemetry.io/otel/semconv/v1.43.0/otelconv"
 )
-
-var measureAttrsPool = sync.Pool{
-	New: func() any {
-		// "component.name" + "component.type" + "error.type"
-		const n = 1 + 1 + 1
-		s := make([]attribute.KeyValue, 0, n)
-		// Return a pointer to a slice instead of a slice itself
-		// to avoid allocations on every call.
-		return &s
-	},
-}
 
 // SSP is the instrumentation for an OTel SDK SimpleSpanProcessor.
 type SSP struct {
 	spansProcessedCounter metric.Int64Counter
 	addOpts               []metric.AddOption
-	attrs                 []attribute.KeyValue
 }
 
 // SSPComponentName returns the component name attribute for a
@@ -70,28 +57,12 @@ func NewSSP(id int64) (*SSP, error) {
 	return &SSP{
 		spansProcessedCounter: spansProcessedCounter.Inst(),
 		addOpts:               addOpts,
-		attrs:                 attrs,
 	}, err
 }
 
-// SpanProcessed records that a span has been processed by the SimpleSpanProcessor.
-// If err is non-nil, it records the processing error as an attribute.
-func (ssp *SSP) SpanProcessed(ctx context.Context, err error) {
-	ssp.spansProcessedCounter.Add(ctx, 1, ssp.addOption(err)...)
-}
-
-func (ssp *SSP) addOption(err error) []metric.AddOption {
-	if err == nil {
-		return ssp.addOpts
-	}
-	attrs := measureAttrsPool.Get().(*[]attribute.KeyValue)
-	defer func() {
-		*attrs = (*attrs)[:0] // reset the slice for reuse
-		measureAttrsPool.Put(attrs)
-	}()
-	*attrs = append(*attrs, ssp.attrs...)
-	*attrs = append(*attrs, semconv.ErrorType(err))
-	// Do not inefficiently make a copy of attrs by using
-	// WithAttributes instead of WithAttributeSet.
-	return []metric.AddOption{metric.WithAttributeSet(attribute.NewSet(*attrs...))}
+// SpanProcessed records that a span has been submitted to the exporter by the
+// SimpleSpanProcessor. Per the semantic conventions, this count is recorded at
+// submission time and MUST NOT be affected by the export outcome.
+func (ssp *SSP) SpanProcessed(ctx context.Context) {
+	ssp.spansProcessedCounter.Add(ctx, 1, ssp.addOpts...)
 }

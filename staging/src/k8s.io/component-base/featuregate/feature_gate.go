@@ -34,7 +34,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/naming"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/version"
-	featuremetrics "k8s.io/component-base/metrics/prometheus/feature"
 	baseversion "k8s.io/component-base/version"
 	"k8s.io/klog/v2"
 )
@@ -174,8 +173,9 @@ type MutableFeatureGate interface {
 	Add(features map[Feature]FeatureSpec) error
 	// GetAll returns a copy of the map of known feature names to feature specs.
 	GetAll() map[Feature]FeatureSpec
-	// AddMetrics adds feature enablement metrics
-	AddMetrics()
+	// AddMetrics records every known feature's stage and enablement through record,
+	// usually k8s.io/component-base/metrics/prometheus/feature.RecordFeatureInfo.
+	AddMetrics(record func(ctx context.Context, name, stage string, enabled bool))
 	// OverrideDefault sets a local override for the registered default value of a named
 	// feature. If the feature has not been previously registered (e.g. by a call to Add), has a
 	// locked default, or if the gate has already registered itself with a FlagSet, a non-nil
@@ -887,7 +887,7 @@ func (f *featureGate) SetEmulationVersionAndMinCompatibilityVersionWithLogger(lo
 		newVal := featureEnabled(feature, enabled, known, emulationVersion, minCompatibilityVersion)
 		oldVal := featureEnabled(feature, f.enabled.Load().(map[Feature]bool), known, f.EmulationVersion(), f.MinCompatibilityVersion())
 		if newVal != oldVal {
-			logger.Info("Warning: SetEmulationVersionAndMinCompatibilityVersion will change already queried feature", "featureGate", feature, "oldValue", oldVal, newVal)
+			logger.Info("Warning: SetEmulationVersionAndMinCompatibilityVersion will change already queried feature", "featureGate", feature, "oldValue", oldVal, "newValue", newVal)
 		}
 	}
 
@@ -998,9 +998,9 @@ func (f *featureGate) AddFlag(fs *pflag.FlagSet) {
 		"Options are:\n"+strings.Join(known, "\n"))
 }
 
-func (f *featureGate) AddMetrics() {
+func (f *featureGate) AddMetrics(record func(ctx context.Context, name, stage string, enabled bool)) {
 	for feature, featureSpec := range f.GetAll() {
-		featuremetrics.RecordFeatureInfo(context.Background(), string(feature), string(featureSpec.PreRelease), f.Enabled(feature))
+		record(context.Background(), string(feature), string(featureSpec.PreRelease), f.Enabled(feature))
 	}
 }
 

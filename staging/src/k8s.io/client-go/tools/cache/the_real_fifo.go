@@ -72,7 +72,7 @@ type RealFIFOOptions struct {
 	Identifier InformerNameAndResource
 
 	// MetricsProvider is used to create metrics for the FIFO.
-	MetricsProvider FIFOMetricsProvider
+	MetricsProvider InformerMetricsProvider
 
 	// EmitDeltaTypeBookmark is used to specify whether the RealFIFO will emit
 	// bookmark deltas or not. This can only be set if AtomicEvents is true.
@@ -448,7 +448,7 @@ func (f *RealFIFO) Pop(process PopProcessFunc) (interface{}, error) {
 	return Deltas{item}, err
 }
 
-// whileProcessing_locked calls the `process` function.
+// whileProcessing_locked calls the `process` function and records processing latency.
 // The lock must be held before calling `whileProcessing_locked`, and is held when `whileProcessing_locked` returns.
 // whileProcessing_locked releases the lock during the call to `process` if f.unlockWhileProcessing is true and the f.items queue is not too long.
 func (f *RealFIFO) whileProcessing_locked(process func() error) error {
@@ -459,7 +459,10 @@ func (f *RealFIFO) whileProcessing_locked(process func() error) error {
 		f.lock.Unlock()
 		defer f.lock.Lock()
 	}
-	return process()
+	startTime := time.Now()
+	err := process()
+	f.metrics.processingLatency.Observe(time.Since(startTime).Seconds())
+	return err
 }
 
 // batchable stores the delta types that can be batched
@@ -776,7 +779,7 @@ func (f *RealFIFO) Resync() error {
 
 		retErr := f.addToItems_locked(Sync, true, knownObj)
 		if retErr != nil {
-			return fmt.Errorf("couldn't queue object: %w", err)
+			return fmt.Errorf("couldn't queue object: %w", retErr)
 		}
 	}
 

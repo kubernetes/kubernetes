@@ -28,7 +28,7 @@ import (
 //
 // CapacityRequirements defines the capacity requirements for a specific device request.
 type CapacityRequirementsApplyConfiguration struct {
-	// Requests represent individual device resource requests for distinct resources,
+	// requests represent individual device resource requests for distinct resources,
 	// all of which must be provided by the device.
 	//
 	// This value is used as an additional filtering condition against the available capacity on the device.

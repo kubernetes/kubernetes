@@ -74,6 +74,7 @@ type Env struct {
 	declarations        *Scopes
 	aggLitElemType      aggregateLiteralElementType
 	filteredOverloadIDs map[string]struct{}
+	jsonFieldNames      bool
 }
 
 // NewEnv returns a new *Env with the given parameters.
@@ -104,6 +105,7 @@ func NewEnv(container *containers.Container, provider types.Provider, opts ...Op
 		declarations:        declarations,
 		aggLitElemType:      aggLitElemType,
 		filteredOverloadIDs: filteredOverloadIDs,
+		jsonFieldNames:      envOptions.jsonFieldNames,
 	}, nil
 }
 
@@ -129,45 +131,111 @@ func (e *Env) AddFunctions(declarations ...*decls.FunctionDecl) error {
 	return formatError(errMsgs)
 }
 
-// LookupIdent returns a Decl proto for typeName as an identifier in the Env.
-// Returns nil if no such identifier is found in the Env.
-func (e *Env) LookupIdent(name string) *decls.VariableDecl {
+// newAttrResolution creates a new attribute resolution value.
+func newAttrResolution(ident *decls.VariableDecl, requiresDisambiguation bool) *attributeResolution {
+	return &attributeResolution{
+		VariableDecl:           ident,
+		requiresDisambiguation: requiresDisambiguation,
+	}
+}
+
+// attributeResolution wraps an existing variable and denotes whether disambiguation is needed
+// during variable resolution.
+type attributeResolution struct {
+	*decls.VariableDecl
+
+	// requiresDisambiguation indicates the variable name should be dot-prefixed.
+	requiresDisambiguation bool
+}
+
+// resolveSimpleIdent determines the resolved attribute for a single identifier.
+func (e *Env) resolveSimpleIdent(name string) *attributeResolution {
+	local := e.lookupLocalIdent(name)
+	if local != nil && !strings.HasPrefix(name, ".") {
+		return newAttrResolution(local, false)
+	}
 	for _, candidate := range e.container.ResolveCandidateNames(name) {
-		if ident := e.declarations.FindIdent(candidate); ident != nil {
-			return ident
-		}
-
-		// Next try to import the name as a reference to a message type. If found,
-		// the declaration is added to the outest (global) scope of the
-		// environment, so next time we can access it faster.
-		if t, found := e.provider.FindStructType(candidate); found {
-			decl := decls.NewVariable(candidate, t)
-			e.declarations.AddIdent(decl)
-			return decl
-		}
-
-		if i, found := e.provider.FindIdent(candidate); found {
-			if t, ok := i.(*types.Type); ok {
-				decl := decls.NewVariable(candidate, types.NewTypeTypeWithParam(t))
-				e.declarations.AddIdent(decl)
-				return decl
-			}
-		}
-
-		// Next try to import this as an enum value by splitting the name in a type prefix and
-		// the enum inside.
-		if enumValue := e.provider.EnumValue(candidate); enumValue.Type() != types.ErrType {
-			decl := decls.NewConstant(candidate, types.IntType, enumValue)
-			e.declarations.AddIdent(decl)
-			return decl
+		if ident := e.lookupGlobalIdent(candidate); ident != nil {
+			return newAttrResolution(ident, local != nil)
 		}
 	}
 	return nil
 }
 
-// LookupFunction returns a Decl proto for typeName as a function in env.
+// resolveQualifiedIdent determines the resolved attribute for a qualified identifier.
+func (e *Env) resolveQualifiedIdent(qualifiers ...string) *attributeResolution {
+	if len(qualifiers) == 1 {
+		return e.resolveSimpleIdent(qualifiers[0])
+	}
+	local := e.lookupLocalIdent(qualifiers[0])
+	if local != nil && !strings.HasPrefix(qualifiers[0], ".") {
+		// this should resolve through a field selection rather than a qualified identifier
+		return nil
+	}
+	// The qualifiers are concatenated together to indicate the qualified name to search
+	// for as a global identifier. Since select expressions are resolved from leaf to root
+	// if the fully concatenated string doesn't match a global identifier, indicate that
+	// no variable was found to continue the traversal up to the next simpler name.
+	varName := strings.Join(qualifiers, ".")
+	for _, candidate := range e.container.ResolveCandidateNames(varName) {
+		if ident := e.lookupGlobalIdent(candidate); ident != nil {
+			return newAttrResolution(ident, local != nil)
+		}
+	}
+	return nil
+}
+
+// resolveTypeIdent returns a Decl proto for typeName as an identifier in the Env.
+// Returns nil if no such identifier is found in the Env.
+func (e *Env) resolveTypeIdent(name string) *decls.VariableDecl {
+	for _, candidate := range e.container.ResolveCandidateNames(name) {
+		// Try to import the name as a reference to a message type.
+		if i, found := e.provider.FindIdent(candidate); found {
+			if t, ok := i.(*types.Type); ok {
+				return decls.NewVariable(candidate, types.NewTypeTypeWithParam(t))
+			}
+		}
+		// Next, try to find the struct type.
+		if t, found := e.provider.FindStructType(candidate); found {
+			return decls.NewVariable(candidate, t)
+		}
+	}
+	return nil
+}
+
+// lookupLocalIdent finds the variable candidate in a local scope, returning nil if
+// the candidate variable name is not a local variable.
+func (e *Env) lookupLocalIdent(candidate string) *decls.VariableDecl {
+	return e.declarations.FindLocalIdent(candidate)
+}
+
+// lookupGlobalIdent finds a candidate variable name in the root scope, returning
+// nil if the identifier is not in the global scope.
+func (e *Env) lookupGlobalIdent(candidate string) *decls.VariableDecl {
+	// Try to resolve the global identifier first.
+	if ident := e.declarations.FindGlobalIdent(candidate); ident != nil {
+		return ident
+	}
+	// Next try to import the name as a reference to a message type.
+	if i, found := e.provider.FindIdent(candidate); found {
+		if t, ok := i.(*types.Type); ok {
+			return decls.NewVariable(candidate, types.NewTypeTypeWithParam(t))
+		}
+	}
+	if t, found := e.provider.FindStructType(candidate); found {
+		return decls.NewVariable(candidate, t)
+	}
+	// Next try to import this as an enum value by splitting the name in a type prefix and
+	// the enum inside.
+	if enumValue := e.provider.EnumValue(candidate); enumValue.Type() != types.ErrType {
+		return decls.NewConstant(candidate, types.IntType, enumValue)
+	}
+	return nil
+}
+
+// lookupFunction returns a Decl proto for typeName as a function in env.
 // Returns nil if no such function is found in env.
-func (e *Env) LookupFunction(name string) *decls.FunctionDecl {
+func (e *Env) lookupFunction(name string) *decls.FunctionDecl {
 	for _, candidate := range e.container.ResolveCandidateNames(name) {
 		if fn := e.declarations.FindFunction(candidate); fn != nil {
 			return fn
@@ -207,12 +275,31 @@ func (e *Env) setFunction(fn *decls.FunctionDecl) []errorMsg {
 	return errMsgs
 }
 
+func maybeMergeConstant(a *decls.VariableDecl, b *decls.VariableDecl) (*decls.VariableDecl, errorMsg) {
+	if b.Value() != nil {
+		if a.Value() == nil {
+			return b, ""
+		}
+		eq, ok := a.Value().Equal(b.Value()).Value().(bool)
+		if ok && eq {
+			return a, ""
+		}
+		return nil, constantConflictError(b.Name())
+	}
+	return a, ""
+}
+
 // addIdent adds the Decl to the declarations in the Env.
 // Returns a non-empty errorMsg if the identifier is already declared in the scope.
 func (e *Env) addIdent(decl *decls.VariableDecl) errorMsg {
 	current := e.declarations.FindIdentInScope(decl.Name())
 	if current != nil {
 		if current.DeclarationIsEquivalent(decl) {
+			decl, errMsg := maybeMergeConstant(current, decl)
+			if errMsg != "" {
+				return errMsg
+			}
+			e.declarations.AddIdent(decl)
 			return ""
 		}
 		return overlappingIdentifierError(decl.Name())
@@ -258,6 +345,10 @@ func (e *Env) exitScope() *Env {
 // errorMsg is a type alias meant to represent error-based return values which
 // may be accumulated into an error at a later point in execution.
 type errorMsg string
+
+func constantConflictError(name string) errorMsg {
+	return errorMsg(fmt.Sprintf("conflicting constant definitions for name '%s'", name))
+}
 
 func overlappingIdentifierError(name string) errorMsg {
 	return errorMsg(fmt.Sprintf("overlapping identifier for name '%s'", name))

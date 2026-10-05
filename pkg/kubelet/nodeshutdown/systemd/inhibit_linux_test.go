@@ -101,6 +101,10 @@ func (f *fakeSystemDBus) AddMatchSignal(options ...dbus.MatchOption) error {
 	return nil
 }
 
+func (f *fakeSystemDBus) Close() error {
+	return nil
+}
+
 func TestCurrentInhibitDelay(t *testing.T) {
 	thirtySeconds := time.Duration(30) * time.Second
 
@@ -161,7 +165,6 @@ func TestMonitorShutdown(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		tc := tc
 		t.Run(tc.desc, func(t *testing.T) {
 			fakeSystemBus := &fakeSystemDBus{}
 			bus := DBusCon{

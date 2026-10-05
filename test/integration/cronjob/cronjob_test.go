@@ -52,7 +52,7 @@ func setup(ctx context.Context, t *testing.T) (kubeapiservertesting.TearDownFunc
 	if err != nil {
 		t.Fatalf("Error creating CronJob controller: %v", err)
 	}
-	jc, err := job.NewController(ctx, informerSet.Core().V1().Pods(), informerSet.Batch().V1().Jobs(), clientSet)
+	jc, err := job.NewController(ctx, clientSet, informerSet.Core().V1().Pods(), informerSet.Batch().V1().Jobs(), nil, nil)
 	if err != nil {
 		t.Fatalf("Error creating Job controller: %v", err)
 	}
@@ -151,10 +151,7 @@ func TestCronJobLaunchesPodAndCleansUp(t *testing.T) {
 	tCtx := ktesting.Init(t)
 
 	closeFn, cjc, jc, informerSet, clientSet := setup(tCtx, t)
-	defer closeFn()
-
-	// When shutting down, cancel must be called before closeFn.
-	defer tCtx.Cancel("test has completed")
+	tCtx.Cleanup(closeFn)
 
 	cronJobName := "foo"
 	namespaceName := "simple-cronjob-test"

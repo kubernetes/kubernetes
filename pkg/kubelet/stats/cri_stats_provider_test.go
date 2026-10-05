@@ -25,9 +25,8 @@ import (
 	"testing"
 	"time"
 
-	cadvisorfs "github.com/google/cadvisor/fs"
-	cadvisorapiv1 "github.com/google/cadvisor/info/v1"
-	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
+	cadvisorfs "github.com/google/cadvisor/lib/fs"
+	cadvisorapi "github.com/google/cadvisor/lib/model"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
@@ -164,7 +163,7 @@ func TestCRIListPodStats(t *testing.T) {
 		fakeImageService   = critest.NewFakeImageService()
 	)
 
-	infos := map[string]cadvisorapiv2.ContainerInfo{
+	infos := map[string]cadvisorapi.ContainerInfo{
 		"/":                           getTestContainerInfo(seedRoot, "", "", ""),
 		"/kubelet":                    getTestContainerInfo(seedKubelet, "", "", ""),
 		"/system":                     getTestContainerInfo(seedMisc, "", "", ""),
@@ -181,8 +180,8 @@ func TestCRIListPodStats(t *testing.T) {
 		sandbox3Cgroup:                getTestContainerInfo(seedSandbox3, "", "", ""),
 	}
 
-	options := cadvisorapiv2.RequestOptions{
-		IdType:    cadvisorapiv2.TypeName,
+	options := cadvisorapi.RequestOptions{
+		IdType:    cadvisorapi.TypeName,
 		Count:     2,
 		Recursive: true,
 	}
@@ -190,7 +189,7 @@ func TestCRIListPodStats(t *testing.T) {
 	mockCadvisor.EXPECT().ContainerInfoV2("/", options).Return(infos, nil)
 	mockCadvisor.EXPECT().RootFsInfo().Return(rootFsInfo, nil)
 	mockCadvisor.EXPECT().GetDirFsInfo(imageFsMountpoint).Return(imageFsInfo, nil)
-	mockCadvisor.EXPECT().GetDirFsInfo(unknownMountpoint).Return(cadvisorapiv2.FsInfo{}, cadvisorfs.ErrNoSuchDevice)
+	mockCadvisor.EXPECT().GetDirFsInfo(unknownMountpoint).Return(cadvisorapi.FsInfo{}, cadvisorfs.ErrNoSuchDevice)
 
 	fakeRuntimeService.SetFakeSandboxes([]*critest.FakePodSandbox{
 		sandbox0, sandbox1, sandbox2, sandbox3, sandbox4, sandbox5,
@@ -244,6 +243,7 @@ func TestCRIListPodStats(t *testing.T) {
 		fakeRuntimeService,
 		fakeImageService,
 		NewFakeHostStatsProviderWithData(fakeStats, fakeOS),
+		false,
 		false,
 		fakeContainerStatsProvider{},
 	)
@@ -396,7 +396,7 @@ func TestListPodStatsStrictlyFromCRI(t *testing.T) {
 		fakeRuntimeService = critest.NewFakeRuntimeService()
 		fakeImageService   = critest.NewFakeImageService()
 	)
-	infos := map[string]cadvisorapiv2.ContainerInfo{
+	infos := map[string]cadvisorapi.ContainerInfo{
 		"/":                           getTestContainerInfo(seedRoot, "", "", ""),
 		"/kubelet":                    getTestContainerInfo(seedKubelet, "", "", ""),
 		"/system":                     getTestContainerInfo(seedMisc, "", "", ""),
@@ -420,15 +420,15 @@ func TestListPodStatsStrictlyFromCRI(t *testing.T) {
 		prf1: getPodSandboxStatsStrictlyFromCRI(seedSandbox1, sandbox1),
 	}
 
-	options := cadvisorapiv2.RequestOptions{
-		IdType:    cadvisorapiv2.TypeName,
+	options := cadvisorapi.RequestOptions{
+		IdType:    cadvisorapi.TypeName,
 		Count:     2,
 		Recursive: true,
 	}
 	mockCadvisor.EXPECT().ContainerInfoV2("/", options).Return(infos, nil)
 	mockCadvisor.EXPECT().RootFsInfo().Return(rootFsInfo, nil)
 	mockCadvisor.EXPECT().GetDirFsInfo(imageFsMountpoint).Return(imageFsInfo, nil)
-	mockCadvisor.EXPECT().GetDirFsInfo(unknownMountpoint).Return(cadvisorapiv2.FsInfo{}, cadvisorfs.ErrNoSuchDevice)
+	mockCadvisor.EXPECT().GetDirFsInfo(unknownMountpoint).Return(cadvisorapi.FsInfo{}, cadvisorfs.ErrNoSuchDevice)
 	fakeRuntimeService.SetFakeSandboxes([]*critest.FakePodSandbox{
 		sandbox0, sandbox1,
 	})
@@ -480,6 +480,7 @@ func TestListPodStatsStrictlyFromCRI(t *testing.T) {
 		fakeImageService,
 		NewFakeHostStatsProviderWithData(fakeStats, fakeOS),
 		true,
+		false,
 		fakeContainerStatsProvider{},
 	)
 
@@ -608,7 +609,7 @@ func TestCRIListPodCPUAndMemoryStats(t *testing.T) {
 		fakeRuntimeService = critest.NewFakeRuntimeService()
 	)
 
-	infos := map[string]cadvisorapiv2.ContainerInfo{
+	infos := map[string]cadvisorapi.ContainerInfo{
 		"/":                           getTestContainerInfo(seedRoot, "", "", ""),
 		"/kubelet":                    getTestContainerInfo(seedKubelet, "", "", ""),
 		"/system":                     getTestContainerInfo(seedMisc, "", "", ""),
@@ -625,8 +626,8 @@ func TestCRIListPodCPUAndMemoryStats(t *testing.T) {
 		sandbox3Cgroup:                getTestContainerInfo(seedSandbox3, "", "", ""),
 	}
 
-	options := cadvisorapiv2.RequestOptions{
-		IdType:    cadvisorapiv2.TypeName,
+	options := cadvisorapi.RequestOptions{
+		IdType:    cadvisorapi.TypeName,
 		Count:     2,
 		Recursive: true,
 	}
@@ -658,6 +659,7 @@ func TestCRIListPodCPUAndMemoryStats(t *testing.T) {
 		nil,
 		NewFakeHostStatsProvider(&kubecontainertest.FakeOS{}),
 		false,
+		false,
 		fakeContainerStatsProvider{},
 	)
 
@@ -688,6 +690,7 @@ func TestCRIListPodCPUAndMemoryStats(t *testing.T) {
 	c0 := containerStatsMap[cName0]
 	assert.Equal(container0.CreatedAt, c0.StartTime.UnixNano())
 	checkCRICPUAndMemoryStats(assert, c0, infos[container0.ContainerStatus.Id].Stats[0])
+	checkSwapStats(t, cName0, seedContainer0, infos[container0.ContainerStatus.Id], c0.Swap)
 	assert.Nil(c0.Rootfs)
 	assert.Nil(c0.Logs)
 	assert.Nil(c0.Accelerators)
@@ -696,6 +699,7 @@ func TestCRIListPodCPUAndMemoryStats(t *testing.T) {
 	c1 := containerStatsMap[cName1]
 	assert.Equal(container1.CreatedAt, c1.StartTime.UnixNano())
 	checkCRICPUAndMemoryStats(assert, c1, infos[container1.ContainerStatus.Id].Stats[0])
+	checkSwapStats(t, cName1, seedContainer1, infos[container1.ContainerStatus.Id], c1.Swap)
 	assert.Nil(c1.Rootfs)
 	assert.Nil(c1.Logs)
 	assert.Nil(c1.Accelerators)
@@ -715,6 +719,7 @@ func TestCRIListPodCPUAndMemoryStats(t *testing.T) {
 	assert.Equal(cName2, c2.Name)
 	assert.Equal(container2.CreatedAt, c2.StartTime.UnixNano())
 	checkCRICPUAndMemoryStats(assert, c2, infos[container2.ContainerStatus.Id].Stats[0])
+	checkSwapStats(t, cName2, seedContainer2, infos[container2.ContainerStatus.Id], c2.Swap)
 	assert.Nil(c2.Rootfs)
 	assert.Nil(c2.Logs)
 	assert.Nil(c2.Accelerators)
@@ -734,6 +739,7 @@ func TestCRIListPodCPUAndMemoryStats(t *testing.T) {
 	assert.Equal(cName3, c3.Name)
 	assert.Equal(container4.CreatedAt, c3.StartTime.UnixNano())
 	checkCRICPUAndMemoryStats(assert, c3, infos[container4.ContainerStatus.Id].Stats[0])
+	checkSwapStats(t, cName3, seedContainer3, infos[container4.ContainerStatus.Id], c3.Swap)
 	assert.Nil(c2.Rootfs)
 	assert.Nil(c2.Logs)
 	assert.Nil(c2.Accelerators)
@@ -808,6 +814,7 @@ func TestCRIPodCPUAndMemoryStats(t *testing.T) {
 		fakeRuntimeService,
 		nil,
 		NewFakeHostStatsProvider(&kubecontainertest.FakeOS{}),
+		false,
 		false,
 		fakeContainerStatsProvider,
 	)
@@ -892,6 +899,7 @@ func TestCRIImagesFsStats(t *testing.T) {
 		fakeRuntimeService,
 		fakeImageService,
 		NewFakeHostStatsProvider(&kubecontainertest.FakeOS{}),
+		false,
 		false,
 		fakeContainerStatsProvider{},
 	)
@@ -1154,7 +1162,7 @@ func makeFakeVolumeStats(volumeNames []string) []statsapi.VolumeStats {
 	return volumes
 }
 
-func checkCRICPUAndMemoryStats(assert *assert.Assertions, actual statsapi.ContainerStats, cs *cadvisorapiv2.ContainerStats) {
+func checkCRICPUAndMemoryStats(assert *assert.Assertions, actual statsapi.ContainerStats, cs *cadvisorapi.ContainerStats) {
 	assert.Equal(cs.Timestamp.UnixNano(), actual.CPU.Time.UnixNano())
 	assert.Equal(cs.Cpu.Usage.Total, *actual.CPU.UsageCoreNanoSeconds)
 	assert.Equal(cs.CpuInst.Usage.Total, *actual.CPU.UsageNanoCores)
@@ -1171,7 +1179,7 @@ func checkCRICPUAndMemoryStats(assert *assert.Assertions, actual statsapi.Contai
 	}
 }
 
-func checkCRIIOStats(assert *assert.Assertions, actual statsapi.ContainerStats, cs *cadvisorapiv2.ContainerStats) {
+func checkCRIIOStats(assert *assert.Assertions, actual statsapi.ContainerStats, cs *cadvisorapi.ContainerStats) {
 	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletPSI) {
 		checkCRIPSIStats(assert, &cs.DiskIo.PSI, actual.IO.PSI)
 	}
@@ -1196,7 +1204,7 @@ func checkCRIIOStatsForStrictlyFromCRI(assert *assert.Assertions, actual statsap
 	}
 }
 
-func checkCRIRootfsStats(assert *assert.Assertions, actual statsapi.ContainerStats, cs *runtimeapi.ContainerStats, imageFsInfo *cadvisorapiv2.FsInfo) {
+func checkCRIRootfsStats(assert *assert.Assertions, actual statsapi.ContainerStats, cs *runtimeapi.ContainerStats, imageFsInfo *cadvisorapi.FsInfo) {
 	assert.Equal(cs.WritableLayer.Timestamp, actual.Rootfs.Time.UnixNano())
 	if imageFsInfo != nil {
 		assert.Equal(imageFsInfo.Available, *actual.Rootfs.AvailableBytes)
@@ -1213,7 +1221,7 @@ func checkCRIRootfsStats(assert *assert.Assertions, actual statsapi.ContainerSta
 	assert.Equal(cs.WritableLayer.InodesUsed.Value, *actual.Rootfs.InodesUsed)
 }
 
-func checkCRILogsStats(assert *assert.Assertions, actual statsapi.ContainerStats, rootFsInfo *cadvisorapiv2.FsInfo, logStats *volume.Metrics) {
+func checkCRILogsStats(assert *assert.Assertions, actual statsapi.ContainerStats, rootFsInfo *cadvisorapi.FsInfo, logStats *volume.Metrics) {
 	assert.Equal(rootFsInfo.Timestamp, actual.Logs.Time.Time)
 	assert.Equal(rootFsInfo.Available, *actual.Logs.AvailableBytes)
 	assert.Equal(rootFsInfo.Capacity, *actual.Logs.CapacityBytes)
@@ -1254,14 +1262,14 @@ func checkEphemeralStorageStats(assert *assert.Assertions,
 	assert.Equal(int(inodesUsed), int(*actual.EphemeralStorage.InodesUsed))
 }
 
-func checkCRINetworkStats(assert *assert.Assertions, actual *statsapi.NetworkStats, expected *cadvisorapiv2.NetworkStats) {
+func checkCRINetworkStats(assert *assert.Assertions, actual *statsapi.NetworkStats, expected *cadvisorapi.NetworkStats) {
 	assert.Equal(expected.Interfaces[0].RxBytes, *actual.RxBytes)
 	assert.Equal(expected.Interfaces[0].RxErrors, *actual.RxErrors)
 	assert.Equal(expected.Interfaces[0].TxBytes, *actual.TxBytes)
 	assert.Equal(expected.Interfaces[0].TxErrors, *actual.TxErrors)
 }
 
-func checkCRIPodCPUAndMemoryStats(assert *assert.Assertions, actual statsapi.PodStats, cs *cadvisorapiv2.ContainerStats) {
+func checkCRIPodCPUAndMemoryStats(assert *assert.Assertions, actual statsapi.PodStats, cs *cadvisorapi.ContainerStats) {
 	if runtime.GOOS != "linux" {
 		return
 	}
@@ -1281,7 +1289,7 @@ func checkCRIPodCPUAndMemoryStats(assert *assert.Assertions, actual statsapi.Pod
 	}
 }
 
-func checkCRIPodIOStats(assert *assert.Assertions, actual statsapi.PodStats, cs *cadvisorapiv2.ContainerStats) {
+func checkCRIPodIOStats(assert *assert.Assertions, actual statsapi.PodStats, cs *cadvisorapi.ContainerStats) {
 	if runtime.GOOS != "linux" {
 		return
 	}
@@ -1290,14 +1298,14 @@ func checkCRIPodIOStats(assert *assert.Assertions, actual statsapi.PodStats, cs 
 	}
 }
 
-func checkCRIPSIStats(assert *assert.Assertions, want *cadvisorapiv1.PSIStats, got *statsapi.PSIStats) {
+func checkCRIPSIStats(assert *assert.Assertions, want *cadvisorapi.PSIStats, got *statsapi.PSIStats) {
 	assert.NotNil(want)
 	assert.NotNil(got)
 	checkCRIPSIData(assert, want.Full, got.Full)
 	checkCRIPSIData(assert, want.Some, got.Some)
 }
 
-func checkCRIPSIData(assert *assert.Assertions, want cadvisorapiv1.PSIData, got statsapi.PSIData) {
+func checkCRIPSIData(assert *assert.Assertions, want cadvisorapi.PSIData, got statsapi.PSIData) {
 	assert.Equal(want.Total, got.Total)
 	assert.InDelta(want.Avg10, got.Avg10, 0.01)
 	assert.InDelta(want.Avg60, got.Avg60, 0.01)
@@ -1318,7 +1326,7 @@ func checkCRIPSIDataStrictlyFromCRI(assert *assert.Assertions, want, got statsap
 	assert.InDelta(want.Avg300, got.Avg300, 0.01)
 }
 
-func checkCRIPodSwapStats(assert *assert.Assertions, actual statsapi.PodStats, cs *cadvisorapiv2.ContainerStats) {
+func checkCRIPodSwapStats(assert *assert.Assertions, actual statsapi.PodStats, cs *cadvisorapi.ContainerStats) {
 	if runtime.GOOS != "linux" {
 		return
 	}

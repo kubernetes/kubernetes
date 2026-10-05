@@ -38,14 +38,11 @@ import (
 	apiextensions "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema/cel/model"
-	apiextensionsfeatures "k8s.io/apiextensions-apiserver/pkg/features"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	celconfig "k8s.io/apiserver/pkg/apis/cel"
 	"k8s.io/apiserver/pkg/cel/common"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/warning"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 )
 
 // TestValidationExpressions tests CEL integration with custom resource values and OpenAPIv3.
@@ -2196,7 +2193,6 @@ func TestValidationExpressions(t *testing.T) {
 	}
 
 	for i := range tests {
-		i := i
 		t.Run(tests[i].name, func(t *testing.T) {
 			t.Parallel()
 			tt := tests[i]
@@ -2918,7 +2914,6 @@ func TestValidationExpressionsAtSchemaLevels(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			ctx := context.TODO()
@@ -4484,7 +4479,6 @@ func TestRatcheting(t *testing.T) {
 
 // Runs transition rule cases with OptionalOldSelf set to true on the schema
 func TestOptionalOldSelf(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, apiextensionsfeatures.CRDValidationRatcheting, true)
 
 	tests := []struct {
 		name   string
@@ -4593,7 +4587,6 @@ func TestOptionalOldSelf(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		tp := true
 		for i := range tt.schema.XValidations {
 			tt.schema.XValidations[i].OptionalOldSelf = &tp
@@ -4639,7 +4632,6 @@ func TestOptionalOldSelf(t *testing.T) {
 // Shows that type(oldSelf) == null_type works for all supported OpenAPI types
 // both when oldSelf is null and when it is not null
 func TestOptionalOldSelfCheckForNull(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, apiextensionsfeatures.CRDValidationRatcheting, true)
 
 	tests := []struct {
 		name   string
@@ -4749,7 +4741,6 @@ func TestOptionalOldSelfCheckForNull(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		tp := true
 		for i := range tt.schema.XValidations {
 			tt.schema.XValidations[i].OptionalOldSelf = &tp
@@ -4781,7 +4772,6 @@ func TestOptionalOldSelfCheckForNull(t *testing.T) {
 
 // Show that we cant just use oldSelf as if it was unwrapped
 func TestOptionalOldSelfIsOptionalType(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, apiextensionsfeatures.CRDValidationRatcheting, true)
 
 	cases := []struct {
 		name   string

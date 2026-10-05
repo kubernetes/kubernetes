@@ -111,7 +111,8 @@ func NewDeploymentController(ctx context.Context, dInformer appsinformers.Deploy
 		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
 			workqueue.DefaultTypedControllerRateLimiter[string](),
 			workqueue.TypedRateLimitingQueueConfig[string]{
-				Name: "deployment",
+				Logger: &logger,
+				Name:   "deployment",
 			},
 		),
 	}
@@ -120,7 +121,7 @@ func NewDeploymentController(ctx context.Context, dInformer appsinformers.Deploy
 		Recorder:   dc.eventRecorder,
 	}
 
-	dInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	_, _ = dInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			dc.addDeployment(logger, obj)
 		},
@@ -131,8 +132,8 @@ func NewDeploymentController(ctx context.Context, dInformer appsinformers.Deploy
 		DeleteFunc: func(obj interface{}) {
 			dc.deleteDeployment(logger, obj)
 		},
-	})
-	rsInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	}, cache.HandlerOptions{Logger: &logger})
+	_, _ = rsInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			dc.addReplicaSet(logger, obj)
 		},
@@ -142,12 +143,12 @@ func NewDeploymentController(ctx context.Context, dInformer appsinformers.Deploy
 		DeleteFunc: func(obj interface{}) {
 			dc.deleteReplicaSet(logger, obj)
 		},
-	})
-	podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	}, cache.HandlerOptions{Logger: &logger})
+	_, _ = podInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		DeleteFunc: func(obj interface{}) {
 			dc.deletePod(logger, obj)
 		},
-	})
+	}, cache.HandlerOptions{Logger: &logger})
 
 	dc.syncHandler = dc.syncDeployment
 	dc.enqueueDeployment = dc.enqueue
@@ -169,7 +170,7 @@ func NewDeploymentController(ctx context.Context, dInformer appsinformers.Deploy
 
 // Run begins watching and syncing.
 func (dc *DeploymentController) Run(ctx context.Context, workers int) {
-	defer utilruntime.HandleCrash()
+	defer utilruntime.HandleCrashWithContext(ctx)
 
 	// Start events processing pipeline.
 	dc.eventBroadcaster.StartStructuredLogging(3)
@@ -392,22 +393,7 @@ func (dc *DeploymentController) deletePod(logger klog.Logger, obj interface{}) {
 	}
 	logger.V(4).Info("Pod deleted", "pod", klog.KObj(pod))
 	if d.Spec.Strategy.Type == apps.RecreateDeploymentStrategyType {
-		// Sync if this Deployment now has no more Pods.
-		rsList, err := util.ListReplicaSets(d, util.RsListFromClient(dc.client.AppsV1()))
-		if err != nil {
-			return
-		}
-		podMap, err := dc.getPodMapForDeployment(d, rsList)
-		if err != nil {
-			return
-		}
-		numPods := 0
-		for _, podList := range podMap {
-			numPods += len(podList)
-		}
-		if numPods == 0 {
-			dc.enqueueDeployment(d)
-		}
+		dc.enqueueDeployment(d)
 	}
 }
 
@@ -610,7 +596,6 @@ func (dc *DeploymentController) syncDeployment(ctx context.Context, key string) 
 	}
 
 	// Deep-copy otherwise we are mutating our cache.
-	// TODO: Deep-copy only when needed.
 	d := deployment.DeepCopy()
 
 	everything := metav1.LabelSelector{}
@@ -626,15 +611,6 @@ func (dc *DeploymentController) syncDeployment(ctx context.Context, key string) 
 	// List ReplicaSets owned by this Deployment, while reconciling ControllerRef
 	// through adoption/orphaning.
 	rsList, err := dc.getReplicaSetsForDeployment(ctx, d)
-	if err != nil {
-		return err
-	}
-	// List all Pods owned by this Deployment, grouped by their ReplicaSet.
-	// Current uses of the podMap are:
-	//
-	// * check if a Pod is labeled correctly with the pod-template-hash label.
-	// * check that no old Pods are running in the middle of Recreate Deployments.
-	podMap, err := dc.getPodMapForDeployment(d, rsList)
 	if err != nil {
 		return err
 	}
@@ -671,6 +647,12 @@ func (dc *DeploymentController) syncDeployment(ctx context.Context, key string) 
 
 	switch d.Spec.Strategy.Type {
 	case apps.RecreateDeploymentStrategyType:
+		// List all Pods owned by this Deployment, grouped by their ReplicaSet, to
+		// check that no old Pods are running in the middle of a Recreate rollout.
+		podMap, err := dc.getPodMapForDeployment(d, rsList)
+		if err != nil {
+			return err
+		}
 		return dc.rolloutRecreate(ctx, d, rsList, podMap)
 	case apps.RollingUpdateDeploymentStrategyType:
 		return dc.rolloutRolling(ctx, d, rsList)

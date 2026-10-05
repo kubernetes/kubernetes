@@ -62,6 +62,22 @@ func TestQuantityProtoMarshal(t *testing.T) {
 	}
 }
 
+func TestQuantitySizeDoesNotMutateReceiver(t *testing.T) {
+	// Size() (like String()) must not mutate the Quantity it measures/encodes.
+	// Protobuf encoding recomputing the canonical string twice (once in Size(),
+	// once in MarshalToSizedBuffer()) is the accepted cost of that guarantee.
+	q := decQuantity(1000, 6, DecimalSI) // canonicalizes to "1G", built without a cached string
+	if len(q.s) != 0 {
+		t.Fatalf("test precondition failed: expected no cached string, got %q", q.s)
+	}
+	if n := q.Size(); n <= 0 {
+		t.Fatalf("Size() = %d, expected a positive value", n)
+	}
+	if len(q.s) != 0 {
+		t.Errorf("Size() unexpectedly mutated q.s to %q", q.s)
+	}
+}
+
 func TestQuantityProtoUnmarshal(t *testing.T) {
 	// Test when d is nil
 	table := []struct {

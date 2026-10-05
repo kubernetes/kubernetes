@@ -30,14 +30,6 @@ type intReader struct {
 	path string
 }
 
-func (r *intReader) int64() int64 {
-	i, err := binary.ReadVarint(r.Reader)
-	if err != nil {
-		errorf("import %q: read varint error: %v", r.path, err)
-	}
-	return i
-}
-
 func (r *intReader) uint64() uint64 {
 	i, err := binary.ReadUvarint(r.Reader)
 	if err != nil {
@@ -48,13 +40,14 @@ func (r *intReader) uint64() uint64 {
 
 // Keep this in sync with constants in iexport.go.
 const (
-	iexportVersionGo1_11   = 0
-	iexportVersionPosCol   = 1
-	iexportVersionGo1_18   = 2
-	iexportVersionGenerics = 2
-	iexportVersion         = iexportVersionGenerics
+	iexportVersionGo1_11         = 0
+	iexportVersionPosCol         = 1
+	iexportVersionGo1_18         = 2
+	iexportVersionGenerics       = 2
+	iexportVersionGenericMethods = 3
+	iexportVersion               = iexportVersionGenericMethods
 
-	iexportVersionCurrent = 2
+	iexportVersionCurrent = 3
 )
 
 type ident struct {
@@ -100,12 +93,12 @@ const (
 // and returns 0 and a reference to the package.
 // If the export data version is not recognized or the format is otherwise
 // compromised, an error is returned.
-func IImportData(fset *token.FileSet, imports map[string]*types.Package, data []byte, path string) (int, *types.Package, error) {
+func IImportData(fset *token.FileSet, imports map[string]*types.Package, data []byte, path string) (*types.Package, error) {
 	pkgs, err := iimportCommon(fset, GetPackagesFromMap(imports), data, false, path, false, nil)
 	if err != nil {
-		return 0, nil, err
+		return nil, err
 	}
-	return 0, pkgs[0], nil
+	return pkgs[0], nil
 }
 
 // IImportBundle imports a set of packages from the serialized package bundle.
@@ -179,9 +172,9 @@ func iimportCommon(fset *token.FileSet, getPackages GetPackagesFunc, data []byte
 
 	version = int64(r.uint64())
 	switch version {
-	case iexportVersionGo1_18, iexportVersionPosCol, iexportVersionGo1_11:
+	case iexportVersionGenericMethods, iexportVersionGo1_18, iexportVersionPosCol, iexportVersionGo1_11:
 	default:
-		if version > iexportVersionGo1_18 {
+		if version > iexportVersionGenericMethods {
 			errorf("unstable iexport format version %d, just rebuild compiler and std library", version)
 		} else {
 			errorf("unknown iexport format version %d", version)
@@ -210,7 +203,6 @@ func iimportCommon(fset *token.FileSet, getPackages GetPackagesFunc, data []byte
 	p := iimporter{
 		version: int(version),
 		ipath:   path,
-		aliases: aliases.Enabled(),
 		shallow: shallow,
 		reportf: reportf,
 
@@ -370,7 +362,6 @@ type iimporter struct {
 	version int
 	ipath   string
 
-	aliases bool
 	shallow bool
 	reportf ReportFunc // if non-nil, used to report bugs
 
@@ -576,7 +567,7 @@ func (r *importReader) obj(pkg *types.Package, name string) {
 			tparams = r.tparamList()
 		}
 		typ := r.typ()
-		obj := aliases.NewAlias(r.p.aliases, pos, pkg, name, typ, tparams)
+		obj := aliases.New(pos, pkg, name, typ, tparams)
 		markBlack(obj) // workaround for golang/go#69912
 		r.declare(obj)
 
@@ -616,6 +607,10 @@ func (r *importReader) obj(pkg *types.Package, name string) {
 			for n := r.uint64(); n > 0; n-- {
 				mpos := r.pos()
 				mname := r.ident()
+				var tpars []*types.TypeParam
+				if r.p.version >= iexportVersionGenericMethods && r.bool() {
+					tpars = r.tparamList()
+				}
 				recv := r.param(pkg)
 
 				// If the receiver has any targs, set those as the
@@ -630,8 +625,7 @@ func (r *importReader) obj(pkg *types.Package, name string) {
 						rparams[i] = types.Unalias(targs.At(i)).(*types.TypeParam)
 					}
 				}
-				msig := r.signature(pkg, recv, rparams, nil)
-
+				msig := r.signature(pkg, recv, rparams, tpars)
 				named.AddMethod(types.NewFunc(mpos, pkg, mname, msig))
 			}
 		}

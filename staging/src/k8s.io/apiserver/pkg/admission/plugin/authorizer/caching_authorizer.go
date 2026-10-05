@@ -34,15 +34,18 @@ type authzResult struct {
 	err        error
 }
 
+// For now, secondary authorization checks in admission only support unconditional authorization
+var _ = authorizer.UnconditionalAuthorizer(&cachingAuthorizer{})
+
 type cachingAuthorizer struct {
-	authorizer authorizer.Authorizer
+	authorizer authorizer.UnconditionalAuthorizer
 	decisions  map[string]authzResult
 }
 
 // NewCachingAuthorizer returns an authorizer that caches decisions for the duration
 // of the authorizers use.  Intended to be used for short-lived operations such as
 // the handling of a request in the admission chain, and then discarded.
-func NewCachingAuthorizer(in authorizer.Authorizer) authorizer.Authorizer {
+func NewCachingAuthorizer(in authorizer.UnconditionalAuthorizer) authorizer.UnconditionalAuthorizer {
 	return &cachingAuthorizer{
 		authorizer: in,
 		decisions:  make(map[string]authzResult),

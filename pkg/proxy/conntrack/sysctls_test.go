@@ -30,13 +30,14 @@ import (
 	"github.com/google/go-cmp/cmp"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	proxyconfigapi "k8s.io/kubernetes/pkg/proxy/apis/config"
+	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
 	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/ptr"
 )
 
 func TestGetConntrackMax(t *testing.T) {
 	ncores := runtime.NumCPU()
+	const maxLimit = 1048576
 	testCases := []struct {
 		min        int32
 		maxPerCore int32
@@ -49,7 +50,7 @@ func TestGetConntrackMax(t *testing.T) {
 		{
 			maxPerCore: 67890, // use this if Max is 0
 			min:        1,     // avoid 0 default
-			expected:   67890 * ncores,
+			expected:   min(67890*ncores, maxLimit),
 		},
 		{
 			maxPerCore: 1, // ensure that Min is considered
@@ -64,12 +65,12 @@ func TestGetConntrackMax(t *testing.T) {
 	}
 
 	for i, tc := range testCases {
-		cfg := proxyconfigapi.KubeProxyConntrackConfiguration{
+		cfg := kubeproxyconfig.KubeProxyConntrackConfiguration{
 			Min:        ptr.To(tc.min),
 			MaxPerCore: ptr.To(tc.maxPerCore),
 		}
 		_, ctx := ktesting.NewTestContext(t)
-		x, e := getConntrackMax(ctx, &cfg)
+		x, e := getConntrackMax(ctx, &cfg, ncores)
 		if e != nil {
 			if tc.err == "" {
 				t.Errorf("[%d] unexpected error: %v", i, e)
@@ -83,13 +84,18 @@ func TestGetConntrackMax(t *testing.T) {
 }
 
 type fakeConntracker struct {
+	max      int
+	hashsize int
+	err      error
+
 	called []string
-	err    error
 }
 
-// SetMax value is calculated based on the number of CPUs by getConntrackMax()
+func (fc *fakeConntracker) GetMax(ctx context.Context) (int, error) {
+	return fc.max, fc.err
+}
 func (fc *fakeConntracker) SetMax(ctx context.Context, max int) error {
-	fc.called = append(fc.called, "SetMax")
+	fc.called = append(fc.called, fmt.Sprintf("SetMax(%d)", max))
 	return fc.err
 }
 func (fc *fakeConntracker) SetTCPEstablishedTimeout(ctx context.Context, seconds int) error {
@@ -112,108 +118,165 @@ func (fc *fakeConntracker) SetUDPStreamTimeout(ctx context.Context, seconds int)
 	fc.called = append(fc.called, fmt.Sprintf("SetUDPStreamTimeout(%d)", seconds))
 	return fc.err
 }
+func (fc *fakeConntracker) GetHashsize(ctx context.Context) (int, error) {
+	return fc.hashsize, fc.err
+}
+func (fc *fakeConntracker) SetHashsize(ctx context.Context, value int) error {
+	fc.called = append(fc.called, fmt.Sprintf("SetHashsize(%d)", value))
+	return fc.err
+}
+func (fc *fakeConntracker) DetectNumCPU() int {
+	return 8
+}
 
 func TestSetupConntrack(t *testing.T) {
 	_, ctx := ktesting.NewTestContext(t)
 	tests := []struct {
 		name         string
-		config       proxyconfigapi.KubeProxyConntrackConfiguration
-		expect       []string
+		config       kubeproxyconfig.KubeProxyConntrackConfiguration
+		max          int
+		hashsize     int
 		conntrackErr error
+		expect       []string
 		wantErr      bool
 	}{
 		{
 			name:   "do nothing if conntrack config is empty",
-			config: proxyconfigapi.KubeProxyConntrackConfiguration{},
+			config: kubeproxyconfig.KubeProxyConntrackConfiguration{},
 			expect: nil,
 		},
 		{
-			name: "SetMax is called if conntrack.maxPerCore is specified",
-			config: proxyconfigapi.KubeProxyConntrackConfiguration{
+			name: "SetMax is called if conntrack.maxPerCore is specified and sysctl is unset",
+			config: kubeproxyconfig.KubeProxyConntrackConfiguration{
 				MaxPerCore: ptr.To(int32(12)),
 			},
-			expect: []string{"SetMax"},
+			expect: []string{"SetMax(96)", "SetHashsize(24)"},
+		},
+		{
+			name: "SetMax is not called if sysctl value is already correct",
+			config: kubeproxyconfig.KubeProxyConntrackConfiguration{
+				MaxPerCore: ptr.To(int32(12)),
+			},
+			max:      96,
+			hashsize: 24,
+			expect:   nil,
+		},
+		{
+			name: "SetMax is not called if sysctl value is higher than wanted",
+			config: kubeproxyconfig.KubeProxyConntrackConfiguration{
+				MaxPerCore: ptr.To(int32(12)),
+			},
+			max:      192,
+			hashsize: 48,
+			expect:   nil,
+		},
+		{
+			name: "SetMax is called if sysctl value is too low",
+			config: kubeproxyconfig.KubeProxyConntrackConfiguration{
+				MaxPerCore: ptr.To(int32(12)),
+			},
+			max:      48,
+			hashsize: 12,
+			expect:   []string{"SetMax(96)", "SetHashsize(24)"},
 		},
 		{
 			name: "SetMax is not called if conntrack.maxPerCore is 0",
-			config: proxyconfigapi.KubeProxyConntrackConfiguration{
+			config: kubeproxyconfig.KubeProxyConntrackConfiguration{
 				MaxPerCore: ptr.To(int32(0)),
 			},
 			expect: nil,
 		},
 		{
+			name: "SetHashsize is called if max is correct but hashsize isn't",
+			config: kubeproxyconfig.KubeProxyConntrackConfiguration{
+				MaxPerCore: ptr.To(int32(12)),
+			},
+			max:      96,
+			hashsize: 0,
+			expect:   []string{"SetHashsize(24)"},
+		},
+		{
+			name: "SetHashsize is not called if max is wrong but hashsize is correct",
+			config: kubeproxyconfig.KubeProxyConntrackConfiguration{
+				MaxPerCore: ptr.To(int32(12)),
+			},
+			max:      48,
+			hashsize: 24,
+			expect:   []string{"SetMax(96)"},
+		},
+		{
 			name: "SetTCPEstablishedTimeout is called if conntrack.tcpEstablishedTimeout is specified",
-			config: proxyconfigapi.KubeProxyConntrackConfiguration{
+			config: kubeproxyconfig.KubeProxyConntrackConfiguration{
 				TCPEstablishedTimeout: &metav1.Duration{Duration: 5 * time.Second},
 			},
 			expect: []string{"SetTCPEstablishedTimeout(5)"},
 		},
 		{
 			name: "SetTCPEstablishedTimeout is not called if conntrack.tcpEstablishedTimeout is 0",
-			config: proxyconfigapi.KubeProxyConntrackConfiguration{
+			config: kubeproxyconfig.KubeProxyConntrackConfiguration{
 				TCPEstablishedTimeout: &metav1.Duration{Duration: 0 * time.Second},
 			},
 			expect: nil,
 		},
 		{
 			name: "SetTCPCloseWaitTimeout is called if conntrack.tcpCloseWaitTimeout is specified",
-			config: proxyconfigapi.KubeProxyConntrackConfiguration{
+			config: kubeproxyconfig.KubeProxyConntrackConfiguration{
 				TCPCloseWaitTimeout: &metav1.Duration{Duration: 5 * time.Second},
 			},
 			expect: []string{"SetTCPCloseWaitTimeout(5)"},
 		},
 		{
 			name: "SetTCPCloseWaitTimeout is not called if conntrack.tcpCloseWaitTimeout is 0",
-			config: proxyconfigapi.KubeProxyConntrackConfiguration{
+			config: kubeproxyconfig.KubeProxyConntrackConfiguration{
 				TCPCloseWaitTimeout: &metav1.Duration{Duration: 0 * time.Second},
 			},
 			expect: nil,
 		},
 		{
 			name: "SetTCPBeLiberal is called if conntrack.tcpBeLiberal is true",
-			config: proxyconfigapi.KubeProxyConntrackConfiguration{
+			config: kubeproxyconfig.KubeProxyConntrackConfiguration{
 				TCPBeLiberal: true,
 			},
 			expect: []string{"SetTCPBeLiberal(1)"},
 		},
 		{
 			name: "SetTCPBeLiberal is not called if conntrack.tcpBeLiberal is false",
-			config: proxyconfigapi.KubeProxyConntrackConfiguration{
+			config: kubeproxyconfig.KubeProxyConntrackConfiguration{
 				TCPBeLiberal: false,
 			},
 			expect: nil,
 		},
 		{
 			name: "SetUDPTimeout is called if conntrack.udpTimeout is specified",
-			config: proxyconfigapi.KubeProxyConntrackConfiguration{
+			config: kubeproxyconfig.KubeProxyConntrackConfiguration{
 				UDPTimeout: metav1.Duration{Duration: 5 * time.Second},
 			},
 			expect: []string{"SetUDPTimeout(5)"},
 		},
 		{
 			name: "SetUDPTimeout is called if conntrack.udpTimeout is zero",
-			config: proxyconfigapi.KubeProxyConntrackConfiguration{
+			config: kubeproxyconfig.KubeProxyConntrackConfiguration{
 				UDPTimeout: metav1.Duration{Duration: 0 * time.Second},
 			},
 			expect: nil,
 		},
 		{
 			name: "SetUDPStreamTimeout is called if conntrack.udpStreamTimeout is specified",
-			config: proxyconfigapi.KubeProxyConntrackConfiguration{
+			config: kubeproxyconfig.KubeProxyConntrackConfiguration{
 				UDPStreamTimeout: metav1.Duration{Duration: 5 * time.Second},
 			},
 			expect: []string{"SetUDPStreamTimeout(5)"},
 		},
 		{
 			name: "SetUDPStreamTimeout is called if conntrack.udpStreamTimeout is zero",
-			config: proxyconfigapi.KubeProxyConntrackConfiguration{
+			config: kubeproxyconfig.KubeProxyConntrackConfiguration{
 				UDPStreamTimeout: metav1.Duration{Duration: 0 * time.Second},
 			},
 			expect: nil,
 		},
 		{
 			name: "an error is returned if conntrack.SetTCPEstablishedTimeout fails",
-			config: proxyconfigapi.KubeProxyConntrackConfiguration{
+			config: kubeproxyconfig.KubeProxyConntrackConfiguration{
 				TCPEstablishedTimeout: &metav1.Duration{Duration: 5 * time.Second},
 			},
 			expect:       []string{"SetTCPEstablishedTimeout(5)"},
@@ -224,7 +287,7 @@ func TestSetupConntrack(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			fc := &fakeConntracker{err: test.conntrackErr}
+			fc := &fakeConntracker{max: test.max, hashsize: test.hashsize, err: test.conntrackErr}
 			err := setSysctls(ctx, fc, &test.config)
 			if test.wantErr && err == nil {
 				t.Errorf("Test %q: Expected error, got nil", test.name)
@@ -236,5 +299,28 @@ func TestSetupConntrack(t *testing.T) {
 				t.Errorf("Test %q: Expected conntrack calls: %v, got: %v", test.name, test.expect, fc.called)
 			}
 		})
+	}
+}
+
+func TestGetConntrackMax_Capped(t *testing.T) {
+	// Simulate 512 cores
+	numCPU := 512
+
+	maxPerCore := int32(32768)
+	cfg := kubeproxyconfig.KubeProxyConntrackConfiguration{
+		MaxPerCore: ptr.To(maxPerCore),
+		Min:        ptr.To(int32(0)),
+	}
+
+	_, ctx := ktesting.NewTestContext(t)
+	val, err := getConntrackMax(ctx, &cfg, numCPU)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	// 512 * 32768 = 16,777,216. Cap is 1,048,576
+	expected := 1048576
+	if val != expected {
+		t.Errorf("Expected capped value %d, got %d", expected, val)
 	}
 }

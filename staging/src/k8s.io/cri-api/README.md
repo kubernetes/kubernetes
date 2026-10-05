@@ -57,6 +57,29 @@ is a readonly mirror repository, all development is done at [kubernetes/kubernet
 
 Here is the change history of the Container Runtime Interface protocol. The change history is maintained manually:
 
+### v1.36
+
+`git diff v1.35.0 v1.36.0 -- staging/src/k8s.io/cri-api/pkg/apis/runtime/v1/api.proto`
+
+- [[KEP-5825] cri-api: Add streaming RPCs for CRI list operations](https://github.com/kubernetes/kubernetes/pull/136987)
+  - Added streaming alternatives to list methods to avoid gRPC message size limits: `StreamPodSandboxes`, `StreamContainers`, `StreamContainerStats`, `StreamPodSandboxStats`, `StreamPodSandboxMetrics`, and `StreamImages`.
+  - Added corresponding request and response types for the new streaming methods.
+
+- [Stricter image reference meaning](https://github.com/kubernetes/kubernetes/pull/137217)
+  - Clarified that `PullImageResponse.image_ref` MUST match `Image.id`, `Container.image_id`, and `ContainerStatus.image_id`.
+
+- [[KEP-5365] Implement Image Volume with Digest](https://github.com/kubernetes/kubernetes/pull/132807)
+  - Added `image_ref` field to the type `ImageSpec`.
+
+- [Update OCI image volume type description to remove "noexec" attribute](https://github.com/kubernetes/kubernetes/pull/135775)
+  - Updated comment on the `Mount` type.
+
+- [Add alpha-2 stage implementation for UserNamespacesHostNetworkSupport](https://github.com/kubernetes/kubernetes/pull/135828)
+  - Added `user_namespaces_host_network` field to the type `RuntimeFeatures`.
+
+- [Clarify RemoveImage CRI API call](https://github.com/kubernetes/kubernetes/pull/135710)
+  - Added comments to `RemoveImage` and `ImageFsInfo` explaining behavior when an image is referenced by multiple tags.
+
 ### v1.35
 
 `git diff v1.34.0 1.35.0 -- staging/src/k8s.io/cri-api/pkg/apis/runtime/v1/api.proto`

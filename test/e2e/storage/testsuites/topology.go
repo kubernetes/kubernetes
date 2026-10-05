@@ -79,17 +79,18 @@ func (t *topologyTestSuite) GetTestSuiteInfo() storageframework.TestSuiteInfo {
 	return t.tsInfo
 }
 
-func (t *topologyTestSuite) SkipUnsupportedTests(driver storageframework.TestDriver, pattern storageframework.TestPattern) {
+func (t *topologyTestSuite) SkipUnsupportedTests(driver storageframework.TestDriver, pattern storageframework.TestPattern) string {
 	dInfo := driver.GetDriverInfo()
 	var ok bool
 	_, ok = driver.(storageframework.DynamicPVTestDriver)
 	if !ok {
-		e2eskipper.Skipf("Driver %s doesn't support %v -- skipping", dInfo.Name, pattern.VolType)
+		return fmt.Sprintf("Driver %s doesn't support %v", dInfo.Name, pattern.VolType)
 	}
 
 	if !dInfo.Capabilities[storageframework.CapTopology] {
-		e2eskipper.Skipf("Driver %q does not support topology - skipping", dInfo.Name)
+		return fmt.Sprintf("Driver %q does not support topology", dInfo.Name)
 	}
+	return ""
 }
 
 func (t *topologyTestSuite) DefineTests(driver storageframework.TestDriver, pattern storageframework.TestPattern) {
@@ -282,7 +283,7 @@ func (t *topologyTestSuite) setAllowedTopologies(sc *storagev1.StorageClass, top
 	allowedTopologies := []topology{}
 	sc.AllowedTopologies = []v1.TopologySelectorTerm{}
 
-	for i := 0; i < len(topos); i++ {
+	for i := range topos {
 		if i != excludedIndex {
 			exprs := []v1.TopologySelectorLabelRequirement{}
 			for k, v := range topos[i] {

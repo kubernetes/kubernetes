@@ -23,6 +23,7 @@ package nodelifecycle
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -35,6 +36,8 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -49,13 +52,13 @@ import (
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
+	consistencyutil "k8s.io/client-go/util/consistency"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/client-go/util/workqueue"
 	nodetopology "k8s.io/component-helpers/node/topology"
 	kubeletapis "k8s.io/kubelet/pkg/apis"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/nodelifecycle/scheduler"
-	"k8s.io/kubernetes/pkg/controller/tainteviction"
 	controllerutil "k8s.io/kubernetes/pkg/controller/util/node"
 	"k8s.io/kubernetes/pkg/features"
 	taintutils "k8s.io/kubernetes/pkg/util/taints"
@@ -111,6 +114,8 @@ var (
 		v1.TaintNodeDiskPressure:       v1.NodeDiskPressure,
 		v1.TaintNodePIDPressure:        v1.NodePIDPressure,
 	}
+
+	leaseResource = coordv1.SchemeGroupVersion.WithResource("leases").GroupResource()
 )
 
 // ZoneState is the state of a given zone.
@@ -131,11 +136,6 @@ const (
 	podUpdateWorkerSize = 4
 	// nodeUpdateWorkerSize defines the size of workers for node update or/and pod update.
 	nodeUpdateWorkerSize = 8
-
-	// taintEvictionController is defined here in order to prevent imports of
-	// k8s.io/kubernetes/cmd/kube-controller-manager/names which would result in validation errors.
-	// This constant will be removed upon graduation of the SeparateTaintEvictionController feature.
-	taintEvictionController = "taint-eviction-controller"
 )
 
 // labelReconcileInfo lists Node labels to reconcile, and how to reconcile them.
@@ -209,6 +209,12 @@ func (n *nodeHealthMap) set(name string, data *nodeHealthData) {
 	n.nodeHealths[name] = data
 }
 
+func (n *nodeHealthMap) delete(name string) {
+	n.lock.Lock()
+	defer n.lock.Unlock()
+	delete(n.nodeHealths, name)
+}
+
 type podUpdateItem struct {
 	namespace string
 	name      string
@@ -216,8 +222,6 @@ type podUpdateItem struct {
 
 // Controller is the controller that manages node's life cycle.
 type Controller struct {
-	taintManager *tainteviction.Controller
-
 	podLister         corelisters.PodLister
 	podInformerSynced cache.InformerSynced
 	kubeClient        clientset.Interface
@@ -248,8 +252,10 @@ type Controller struct {
 
 	leaseLister         coordlisters.LeaseLister
 	leaseInformerSynced cache.InformerSynced
-	nodeLister          corelisters.NodeLister
-	nodeInformerSynced  cache.InformerSynced
+
+	consistencyStore   consistencyutil.ConsistencyStore
+	nodeLister         corelisters.NodeLister
+	nodeInformerSynced cache.InformerSynced
 
 	getPodsAssignedToNode func(nodeName string) ([]*v1.Pod, error)
 
@@ -349,7 +355,8 @@ func NewNodeLifecycleController(
 		podUpdateQueue: workqueue.NewTypedRateLimitingQueueWithConfig(
 			workqueue.DefaultTypedControllerRateLimiter[podUpdateItem](),
 			workqueue.TypedRateLimitingQueueConfig[podUpdateItem]{
-				Name: "node_lifecycle_controller_pods",
+				Logger: new(klog.FromContext(ctx)),
+				Name:   "node_lifecycle_controller_pods",
 			},
 		),
 	}
@@ -358,7 +365,7 @@ func NewNodeLifecycleController(
 	nc.enterFullDisruptionFunc = nc.HealthyQPSFunc
 	nc.computeZoneStateFunc = nc.ComputeZoneState
 
-	podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	_, _ = podInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			pod := obj.(*v1.Pod)
 			nc.podUpdated(nil, pod)
@@ -368,7 +375,7 @@ func NewNodeLifecycleController(
 			newPod := obj.(*v1.Pod)
 			nc.podUpdated(prevPod, newPod)
 		},
-	})
+	}, cache.HandlerOptions{Logger: &logger})
 	nc.podInformerSynced = podInformer.Informer().HasSynced
 	controller.AddPodNodeNameIndexer(podInformer.Informer())
 	podIndexer := podInformer.Informer().GetIndexer()
@@ -390,17 +397,8 @@ func NewNodeLifecycleController(
 	nc.podLister = podInformer.Lister()
 	nc.nodeLister = nodeInformer.Lister()
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.SeparateTaintEvictionController) {
-		logger.Info("Running TaintEvictionController as part of NodeLifecyleController")
-		tm, err := tainteviction.New(ctx, kubeClient, podInformer, nodeInformer, taintEvictionController)
-		if err != nil {
-			return nil, err
-		}
-		nc.taintManager = tm
-	}
-
 	logger.Info("Controller will reconcile labels")
-	nodeInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	_, _ = nodeInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		AddFunc: controllerutil.CreateAddNodeHandler(func(node *v1.Node) error {
 			nc.nodeUpdateQueue.Add(node.Name)
 			return nil
@@ -413,7 +411,7 @@ func NewNodeLifecycleController(
 			nc.nodesToRetry.Delete(node.Name)
 			return nil
 		}),
-	})
+	}, cache.HandlerOptions{Logger: &logger})
 
 	nc.leaseLister = leaseInformer.Lister()
 	nc.leaseInformerSynced = leaseInformer.Informer().HasSynced
@@ -422,6 +420,14 @@ func NewNodeLifecycleController(
 
 	nc.daemonSetStore = daemonSetInformer.Lister()
 	nc.daemonSetInformerSynced = daemonSetInformer.Informer().HasSynced
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.NodeControllerLeaseCircuitBreaker) {
+		nc.consistencyStore = consistencyutil.NewConsistencyStore(map[schema.GroupResource]consistencyutil.LastSyncRVGetter{
+			leaseResource: leaseInformer.Informer().GetStore(),
+		})
+	} else {
+		nc.consistencyStore = consistencyutil.NewNoopConsistencyStore()
+	}
 
 	return nc, nil
 }
@@ -453,13 +459,6 @@ func (nc *Controller) Run(ctx context.Context) {
 
 	if !cache.WaitForNamedCacheSyncWithContext(ctx, nc.leaseInformerSynced, nc.nodeInformerSynced, nc.podInformerSynced, nc.daemonSetInformerSynced) {
 		return
-	}
-
-	if !utilfeature.DefaultFeatureGate.Enabled(features.SeparateTaintEvictionController) {
-		logger.Info("Starting", "controller", taintEvictionController)
-		wg.Go(func() {
-			nc.taintManager.Run(ctx)
-		})
 	}
 
 	// Start workers to reconcile labels and/or update NoSchedule taint for nodes.
@@ -645,6 +644,15 @@ func (nc *Controller) doNoExecuteTaintingPass(ctx context.Context) {
 	}
 }
 
+// shortCircuitError is a marker type to signal the polling loop in monitorNodeHealth should return early with error
+type shortCircuitError struct {
+	error
+}
+
+func (n shortCircuitError) Unwrap() error {
+	return n.error
+}
+
 // monitorNodeHealth verifies node health are constantly updated by kubelet, and if not, post "NodeReady==ConditionUnknown".
 // This function will
 //   - add nodes which are not ready or not reachable for a long period of time to a rate-limited
@@ -679,6 +687,7 @@ func (nc *Controller) monitorNodeHealth(ctx context.Context) error {
 		logger.V(1).Info("Controller observed a Node deletion", "node", klog.KRef("", deleted[i].Name))
 		controllerutil.RecordNodeEvent(ctx, nc.recorder, deleted[i].Name, string(deleted[i].UID), v1.EventTypeNormal, "RemovingNode", fmt.Sprintf("Removing Node %v from Controller", deleted[i].Name))
 		delete(nc.knownNodeSet, deleted[i].Name)
+		nc.nodeHealthMap.delete(deleted[i].Name)
 	}
 
 	var zoneToNodeConditionsLock sync.Mutex
@@ -698,6 +707,12 @@ func (nc *Controller) monitorNodeHealth(ctx context.Context) error {
 			_, observedReadyCondition, currentReadyCondition, err = nc.tryUpdateNodeHealth(ctx, node)
 			if err == nil {
 				return true, nil
+			}
+			// If the error is due to a short circuit, don't retry.
+			if utilfeature.DefaultFeatureGate.Enabled(features.NodeControllerLeaseCircuitBreaker) {
+				if err, ok := errors.AsType[shortCircuitError](err); ok {
+					return false, err.error
+				}
 			}
 			name := node.Name
 			node, err = nc.kubeClient.CoreV1().Nodes().Get(ctx, name, metav1.GetOptions{})
@@ -816,6 +831,16 @@ func (nc *Controller) tryUpdateNodeHealth(ctx context.Context, node *v1.Node) (t
 		nc.nodeHealthMap.set(node.Name, nodeHealth)
 	}()
 
+	if utilfeature.DefaultFeatureGate.Enabled(features.NodeControllerLeaseCircuitBreaker) {
+		// This is a controller-wide consistency check, if the lease cache is stale, then we cannot
+		// trust any node leases until the cache has caught back up.
+		err := nc.consistencyStore.EnsureReady(types.NamespacedName{})
+		// Skip processing this node in this cycle if the node controller cache is not ready yet.
+		if err != nil {
+			return 0, v1.NodeCondition{}, nil, shortCircuitError{err}
+		}
+	}
+
 	var gracePeriod time.Duration
 	var observedReadyCondition v1.NodeCondition
 	_, currentReadyCondition := controllerutil.GetNodeCondition(&node.Status, v1.NodeReady)
@@ -919,6 +944,35 @@ func (nc *Controller) tryUpdateNodeHealth(ctx context.Context, node *v1.Node) (t
 	}
 
 	if nc.now().After(nodeHealth.probeTimestamp.Add(gracePeriod)) {
+		if utilfeature.DefaultFeatureGate.Enabled(features.NodeControllerLeaseCircuitBreaker) {
+			var nodeHealthLeaseRV string
+			if nodeHealth.lease != nil {
+				nodeHealthLeaseRV = nodeHealth.lease.ResourceVersion
+			}
+			// The lease instance in the informer cache indicates it is expired.
+			// Double-check the live lease is actually expired in case our informer cache is stale.
+			liveLease, err := nc.kubeClient.CoordinationV1().Leases(v1.NamespaceNodeLease).Get(ctx, node.Name, metav1.GetOptions{})
+			if err == nil {
+				if liveLease.ResourceVersion != nodeHealthLeaseRV {
+					nc.consistencyStore.WroteAt(
+						// This is a controller wide consistency check, if the lease cache is stale
+						// we need to wait for the cache to catch up before processing any nodes.
+						types.NamespacedName{},
+						"", // No specific UID for generic name
+						leaseResource,
+						liveLease.ResourceVersion,
+					)
+					return 0, v1.NodeCondition{}, nil, shortCircuitError{&consistencyutil.ConsistencyError{
+						ReadRV:        nodeHealthLeaseRV,
+						WroteRV:       liveLease.ResourceVersion,
+						GroupResource: leaseResource,
+					}}
+				}
+			} else if !apierrors.IsNotFound(err) {
+				return 0, v1.NodeCondition{}, nil, shortCircuitError{fmt.Errorf("error looking up lease to verify node %s: %w", node.Name, err)}
+			}
+		}
+
 		// NodeReady condition or lease was last set longer ago than gracePeriod, so
 		// update it to Unknown (regardless of its current value) in the master.
 

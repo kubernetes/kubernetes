@@ -23,7 +23,7 @@ package v1beta1
 //
 // PriorityLevelConfigurationReference contains information that points to the "request-priority" being used.
 type PriorityLevelConfigurationReferenceApplyConfiguration struct {
-	// `name` is the name of the priority level configuration being referenced
+	// name is the name of the priority level configuration being referenced
 	// Required.
 	Name *string `json:"name,omitempty"`
 }

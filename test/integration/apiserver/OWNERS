@@ -3,3 +3,5 @@ approvers:
   - alexzielenski
   - jefftree
   - jpbetz
+labels:
+  - sig/api-machinery

@@ -41,7 +41,6 @@ import (
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
-	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/storage/testsuites"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 	admissionapi "k8s.io/pod-security-admission/api"
@@ -237,11 +236,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 				},
 			}
 
-			for i, t := range tests {
-				// Beware of closure, use local variables instead of those from
-				// outer scope
-				test := t
-
+			for i, test := range tests {
 				if !framework.ProviderIs(test.CloudProviders...) {
 					framework.Logf("Skipping %q: cloud providers is not %v", test.Name, test.CloudProviders)
 					continue
@@ -335,9 +330,8 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 		})
 	})
 
-	ginkgo.Describe("DynamicProvisioner Default", func() {
+	f.Describe("DynamicProvisioner Default", f.WithProvider("openstack", "gce", "aws", "vsphere", "azure"), func() {
 		f.It("should create and delete default persistent volumes", f.WithSlow(), func(ctx context.Context) {
-			e2eskipper.SkipUnlessProviderIs("openstack", "gce", "aws", "vsphere", "azure")
 			e2epv.SkipIfNoDefaultStorageClass(ctx, c)
 
 			ginkgo.By("creating a claim with no annotation")
@@ -361,7 +355,6 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 
 		// Modifying the default storage class can be disruptive to other tests that depend on it
 		f.It("should be disabled by changing the default annotation", f.WithSerial(), f.WithDisruptive(), func(ctx context.Context) {
-			e2eskipper.SkipUnlessProviderIs("openstack", "gce", "aws", "vsphere", "azure")
 			e2epv.SkipIfNoDefaultStorageClass(ctx, c)
 
 			scName, scErr := e2epv.GetDefaultStorageClassName(ctx, c)
@@ -398,7 +391,6 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 
 		// Modifying the default storage class can be disruptive to other tests that depend on it
 		f.It("should be disabled by removing the default annotation", f.WithSerial(), f.WithDisruptive(), func(ctx context.Context) {
-			e2eskipper.SkipUnlessProviderIs("openstack", "gce", "aws", "vsphere", "azure")
 			e2epv.SkipIfNoDefaultStorageClass(ctx, c)
 
 			scName, scErr := e2epv.GetDefaultStorageClassName(ctx, c)
@@ -437,8 +429,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 	})
 
 	ginkgo.Describe("Invalid AWS KMS key", func() {
-		ginkgo.It("should report an error and create no PV", func(ctx context.Context) {
-			e2eskipper.SkipUnlessProviderIs("aws")
+		f.It("should report an error and create no PV", f.WithProvider("aws"), func(ctx context.Context) {
 			test := testsuites.StorageClassTest{
 				Client:      c,
 				Name:        "AWS EBS with invalid KMS key",

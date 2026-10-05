@@ -40,6 +40,7 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
+	"k8s.io/kubernetes/pkg/kubelet/certificate/keyalgorithm"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	netutils "k8s.io/utils/net"
 )
@@ -72,23 +73,26 @@ func newGetTemplateFn(nodeName types.NodeName, getAddresses func() []v1.NodeAddr
 
 // NewKubeletServerCertificateManager creates a certificate manager for the kubelet when retrieving a server certificate
 // or returns an error.
-func NewKubeletServerCertificateManager(kubeClient clientset.Interface, kubeCfg *kubeletconfig.KubeletConfiguration, nodeName types.NodeName, getAddresses func() []v1.NodeAddress, certDirectory string) (certificate.Manager, error) {
+func NewKubeletServerCertificateManager(logger klog.Logger, kubeClient clientset.Interface, kubeCfg *kubeletconfig.KubeletConfiguration, nodeName types.NodeName, getAddresses func() []v1.NodeAddress, certDirectory string) (certificate.Manager, error) {
+	logger = logger.WithName("serverCertificateManager")
 	var clientsetFn certificate.ClientsetFunc
 	if kubeClient != nil {
 		clientsetFn = func(current *tls.Certificate) (clientset.Interface, error) {
 			return kubeClient, nil
 		}
 	}
-	certificateStore, err := certificate.NewFileStore(
+	certificateStore, err := certificate.NewFileStoreWithLogger(
+		logger,
 		"kubelet-server",
 		certDirectory,
 		certDirectory,
 		kubeCfg.TLSCertFile,
-		kubeCfg.TLSPrivateKeyFile)
+		kubeCfg.TLSPrivateKeyFile,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize server certificate store: %v", err)
 	}
-	var certificateRenewFailure = compbasemetrics.NewCounter(
+	certificateRenewFailure := compbasemetrics.NewCounter(
 		&compbasemetrics.CounterOpts{
 			Subsystem:      metrics.KubeletSubsystem,
 			Name:           "server_expiration_renew_errors",
@@ -122,7 +126,7 @@ func NewKubeletServerCertificateManager(kubeClient clientset.Interface, kubeCfg 
 
 	getTemplate := newGetTemplateFn(nodeName, getAddresses)
 
-	m, err := certificate.NewManager(&certificate.Config{
+	config := certificate.Config{
 		ClientsetFn:             clientsetFn,
 		GetTemplate:             getTemplate,
 		SignerName:              certificates.KubeletServingSignerName,
@@ -130,7 +134,9 @@ func NewKubeletServerCertificateManager(kubeClient clientset.Interface, kubeCfg 
 		CertificateStore:        certificateStore,
 		CertificateRotation:     certificateRotationAge,
 		CertificateRenewFailure: certificateRenewFailure,
-	})
+	}
+	config.GenerateKey = keyalgorithm.KeyGeneratorFunc(kubeCfg.ServerCertificateKeyAlgorithm)
+	m, err := certificate.NewManager(&config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize server certificate manager: %v", err)
 	}
@@ -197,6 +203,7 @@ func addressesToHostnamesAndIPs(addresses []v1.NodeAddress) (dnsNames []string, 
 // client that can be used to sign new certificates (or rotate). If a CSR
 // client is set later, it may begin rotating/renewing the client cert.
 func NewKubeletClientCertificateManager(
+	logger klog.Logger,
 	certDirectory string,
 	nodeName types.NodeName,
 	bootstrapCertData []byte,
@@ -204,18 +211,22 @@ func NewKubeletClientCertificateManager(
 	certFile string,
 	keyFile string,
 	clientsetFn certificate.ClientsetFunc,
+	keyAlgorithm *kubeletconfig.CertificateKeyAlgorithmType,
 ) (certificate.Manager, error) {
+	logger = logger.WithName("clientCertificateManager")
 
-	certificateStore, err := certificate.NewFileStore(
+	certificateStore, err := certificate.NewFileStoreWithLogger(
+		logger,
 		"kubelet-client",
 		certDirectory,
 		certDirectory,
 		certFile,
-		keyFile)
+		keyFile,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize client certificate store: %v", err)
 	}
-	var certificateRenewFailure = compbasemetrics.NewCounter(
+	certificateRenewFailure := compbasemetrics.NewCounter(
 		&compbasemetrics.CounterOpts{
 			Namespace:      metrics.KubeletSubsystem,
 			Subsystem:      "certificate_manager",
@@ -226,7 +237,7 @@ func NewKubeletClientCertificateManager(
 	)
 	legacyregistry.Register(certificateRenewFailure)
 
-	m, err := certificate.NewManager(&certificate.Config{
+	config := certificate.Config{
 		ClientsetFn: clientsetFn,
 		Template: &x509.CertificateRequest{
 			Subject: pkix.Name{
@@ -245,7 +256,9 @@ func NewKubeletClientCertificateManager(
 
 		CertificateStore:        certificateStore,
 		CertificateRenewFailure: certificateRenewFailure,
-	})
+	}
+	config.GenerateKey = keyalgorithm.KeyGeneratorFunc(keyAlgorithm)
+	m, err := certificate.NewManager(&config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize client certificate manager: %v", err)
 	}

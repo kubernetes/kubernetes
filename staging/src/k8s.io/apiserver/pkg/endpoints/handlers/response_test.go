@@ -22,10 +22,13 @@ import (
 	"io"
 	"net/http"
 	"reflect"
+	"slices"
 	"testing"
 	"time"
 
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -163,7 +166,7 @@ func TestCacheableObject(t *testing.T) {
 			internalEncoder := &mockEncoder{}
 			watchEncoder := newWatchEmbeddedEncoder(
 				request.WithRequestInfo(context.TODO(), &request.RequestInfo{}),
-				internalEncoder, test.target, test.opts,
+				internalEncoder, test.target, test.opts, nil,
 				&RequestScope{
 					Namer:          &mockNamer{},
 					TableConvertor: tableConvertor,
@@ -178,6 +181,153 @@ func TestCacheableObject(t *testing.T) {
 				t.Errorf("unexpected result: %#v, expected: %#v", a, e)
 			}
 		})
+	}
+}
+
+// identityConvertor stands in for the CRD convertor, which returns
+// unstructured objects as they are.
+type identityConvertor struct{}
+
+func (identityConvertor) Convert(in, out, context interface{}) error { return nil }
+func (identityConvertor) ConvertToVersion(in runtime.Object, gv runtime.GroupVersioner) (runtime.Object, error) {
+	return in, nil
+}
+func (identityConvertor) ConvertFieldLabel(gvk schema.GroupVersionKind, label, value string) (string, string, error) {
+	return label, value, nil
+}
+
+func hasAnyManagedFields(obj runtime.Object) bool {
+	if table, ok := obj.(*metav1.Table); ok {
+		for i := range table.Rows {
+			if row := table.Rows[i].Object.Object; row != nil && hasAnyManagedFields(row) {
+				return true
+			}
+		}
+		return false
+	}
+	if meta.IsListType(obj) {
+		found := false
+		_ = meta.EachListItem(obj, func(item runtime.Object) error {
+			found = found || hasAnyManagedFields(item)
+			return nil
+		})
+		return found
+	}
+	acc, err := meta.Accessor(obj)
+	return err == nil && len(acc.GetManagedFields()) > 0
+}
+
+func TestDropManagedFieldsTransform(t *testing.T) {
+	pomGVK := metav1.SchemeGroupVersion.WithKind("PartialObjectMetadata")
+	pomListGVK := metav1.SchemeGroupVersion.WithKind("PartialObjectMetadataList")
+	tableGVK := metav1.SchemeGroupVersion.WithKind("Table")
+
+	pod := newPodWithManagedFields("a")
+	cachedPods := newPodListWithManagedFields(2)
+	cachedWidget := &unstructured.Unstructured{Object: map[string]interface{}{
+		"apiVersion": "example.com/v1",
+		"kind":       "Widget",
+		"metadata": map[string]interface{}{
+			"name":          "w",
+			"managedFields": []interface{}{map[string]interface{}{"manager": "m"}},
+		},
+	}}
+	// The cacher copies cached objects into a fresh list for each request.
+	object := func() runtime.Object { return pod }
+	pods := func() runtime.Object { return &examplev1.PodList{Items: slices.Clone(cachedPods.Items)} }
+	widgets := func() runtime.Object {
+		return &unstructured.UnstructuredList{Items: []unstructured.Unstructured{*cachedWidget}}
+	}
+
+	testCases := []struct {
+		desc   string
+		object func() runtime.Object
+		target *schema.GroupVersionKind
+		opts   *metav1.TableOptions
+	}{
+		{
+			desc:   "object",
+			object: object,
+		},
+		{
+			desc:   "as PartialObjectMetadata",
+			object: object,
+			target: &pomGVK,
+		},
+		{
+			desc:   "as PartialObjectMetadataList",
+			object: pods,
+			target: &pomListGVK,
+		},
+		{
+			desc:   "as Table includeObject=Metadata",
+			object: pods,
+			target: &tableGVK,
+			opts:   &metav1.TableOptions{IncludeObject: metav1.IncludeMetadata},
+		},
+		{
+			desc:   "unstructured as Table includeObject=Object",
+			object: widgets,
+			target: &tableGVK,
+			opts:   &metav1.TableOptions{IncludeObject: metav1.IncludeObject},
+		},
+	}
+
+	drop := []string{"metadata.managedFields"}
+	ctx := request.WithRequestInfo(context.TODO(), &request.RequestInfo{})
+	scope := &RequestScope{
+		Namer:          &mockNamer{},
+		Kind:           examplev1.SchemeGroupVersion.WithKind("Pod"),
+		Convertor:      identityConvertor{},
+		TableConvertor: rest.NewDefaultTableConvertor(examplev1.Resource("pods")),
+	}
+	for _, tc := range testCases {
+		t.Run(tc.desc, func(t *testing.T) {
+			full, err := doTransformObject(ctx, tc.object(), tc.opts, tc.target, nil, scope)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !hasAnyManagedFields(full) {
+				t.Fatal("managedFields missing without drop; the case would pass vacuously")
+			}
+			stripped, err := doTransformObject(ctx, tc.object(), tc.opts, tc.target, drop, scope)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if hasAnyManagedFields(stripped) {
+				t.Errorf("managedFields present in %T", stripped)
+			}
+			for _, cached := range []runtime.Object{pod, cachedPods, cachedWidget} {
+				if !hasAnyManagedFields(cached) {
+					t.Errorf("cached %T was mutated", cached)
+				}
+			}
+		})
+	}
+}
+
+func TestWatchEmbeddedEncoderDrop(t *testing.T) {
+	drop := []string{"metadata.managedFields"}
+	encoder := &mockEncoder{}
+	if err := newWatchEmbeddedEncoder(context.TODO(), encoder, nil, nil, drop, nil).Encode(newPodWithManagedFields("a"), nil); err != nil {
+		t.Fatal(err)
+	}
+	if len(encoder.obj.(*examplev1.Pod).ManagedFields) != 0 {
+		t.Error("managedFields present in the encoded object")
+	}
+
+	tableGVK := metav1.SchemeGroupVersion.WithKind("Table")
+	identifier := func(target *schema.GroupVersionKind, drop []string) runtime.Identifier {
+		return newWatchEmbeddedEncoder(context.TODO(), encoder, target, nil, drop, nil).Identifier()
+	}
+	if got := identifier(nil, nil); got != encoder.Identifier() {
+		t.Errorf("identifier without transformation should be the encoder's, got %s", got)
+	}
+	if identifier(nil, drop) == identifier(nil, nil) {
+		t.Error("drop must yield a distinct identifier")
+	}
+	if identifier(&tableGVK, drop) == identifier(&tableGVK, nil) {
+		t.Error("drop must yield a distinct identifier for Table")
 	}
 }
 

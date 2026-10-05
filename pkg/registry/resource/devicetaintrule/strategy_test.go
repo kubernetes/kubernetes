@@ -17,14 +17,23 @@ limitations under the License.
 package devicetaintrule
 
 import (
+	"context"
 	"testing"
+	"testing/synctest"
+	"time"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
 
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/kubernetes/pkg/apis/resource"
 )
+
+// synctestEpoch is when the clock inside a synctest bubble starts (part of the
+// package API, but not defined there in Go).
+var synctestEpoch = &metav1.Time{Time: time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC)}
 
 var obj = &resource.DeviceTaintRule{
 	ObjectMeta: metav1.ObjectMeta{
@@ -33,8 +42,9 @@ var obj = &resource.DeviceTaintRule{
 	},
 	Spec: resource.DeviceTaintRuleSpec{
 		Taint: resource.DeviceTaint{
-			Key:    "example.com/tainted",
-			Effect: resource.DeviceTaintEffectNoExecute,
+			Key:       "example.com/tainted",
+			Effect:    resource.DeviceTaintEffectNoExecute,
+			TimeAdded: synctestEpoch,
 		},
 	},
 }
@@ -46,8 +56,9 @@ var objWithStatus = &resource.DeviceTaintRule{
 	},
 	Spec: resource.DeviceTaintRuleSpec{
 		Taint: resource.DeviceTaint{
-			Key:    "example.com/tainted",
-			Effect: resource.DeviceTaintEffectNoExecute,
+			Key:       "example.com/tainted",
+			Effect:    resource.DeviceTaintEffectNoExecute,
+			TimeAdded: synctestEpoch,
 		},
 	},
 	Status: resource.DeviceTaintRuleStatus{
@@ -68,8 +79,23 @@ func TestDeviceTaintRuleStrategy(t *testing.T) {
 	if Strategy.NamespaceScoped() {
 		t.Errorf("DeviceTaintRule must not be namespace scoped")
 	}
-	if Strategy.AllowCreateOnUpdate() {
+	if Strategy.AllowCreateOnUpdate(context.Background()) {
 		t.Errorf("DeviceTaintRule should not allow create on update")
+	}
+	if Strategy.AllowUnconditionalUpdate(context.Background()) {
+		t.Errorf("DeviceTaintRule should not allow update without ResourceVersion when the APIVersion is unknown")
+	}
+	if Strategy.AllowUnconditionalUpdate(genericapirequest.WithRequestInfo(context.Background(), &genericapirequest.RequestInfo{APIVersion: "v1"})) {
+		t.Errorf("DeviceTaintRule should not allow update without ResourceVersion when the APIVersion is v1")
+	}
+	if Strategy.AllowUnconditionalUpdate(genericapirequest.WithRequestInfo(context.Background(), &genericapirequest.RequestInfo{APIVersion: "no-such-versison"})) {
+		t.Errorf("DeviceTaintRule should not allow update without ResourceVersion when the APIVersion is something unknown")
+	}
+	if !Strategy.AllowUnconditionalUpdate(genericapirequest.WithRequestInfo(context.Background(), &genericapirequest.RequestInfo{APIVersion: "v1beta2"})) {
+		t.Errorf("DeviceTaintRule should allow update without ResourceVersion when the APIVersion is v1beta2")
+	}
+	if !Strategy.AllowUnconditionalUpdate(genericapirequest.WithRequestInfo(context.Background(), &genericapirequest.RequestInfo{APIVersion: "v1alpha3"})) {
+		t.Errorf("DeviceTaintRule should allow update without ResourceVersion when the APIVersion is v1alpha2")
 	}
 }
 
@@ -132,6 +158,11 @@ func TestDeviceTaintRuleStrategyCreate(t *testing.T) {
 func TestDeviceTaintRuleStrategyUpdate(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
 
+	// The update happens some time after the epoch.
+	updateDelay := 10 * time.Second
+	updateTime := &metav1.Time{Time: synctestEpoch.Add(updateDelay)}
+	oldTime := &metav1.Time{Time: synctestEpoch.Add(updateDelay / 2)}
+
 	testcases := map[string]struct {
 		oldObj                *resource.DeviceTaintRule
 		newObj                *resource.DeviceTaintRule
@@ -157,7 +188,7 @@ func TestDeviceTaintRuleStrategyUpdate(t *testing.T) {
 			newObj:    objWithStatus,
 			expectObj: obj,
 		},
-		"bump-generation": {
+		"change-effect": {
 			oldObj: obj,
 			newObj: func() *resource.DeviceTaintRule {
 				obj := obj.DeepCopy()
@@ -167,6 +198,51 @@ func TestDeviceTaintRuleStrategyUpdate(t *testing.T) {
 			expectObj: func() *resource.DeviceTaintRule {
 				obj := obj.DeepCopy()
 				obj.Spec.Taint.Effect = resource.DeviceTaintEffectNone
+				// Automatically bumped.
+				obj.Spec.Taint.TimeAdded = updateTime
+				obj.Generation++
+				return obj
+			}(),
+		},
+		"change-key": {
+			oldObj: obj,
+			newObj: func() *resource.DeviceTaintRule {
+				obj := obj.DeepCopy()
+				obj.Spec.Taint.Key += "-other"
+				return obj
+			}(),
+			expectObj: func() *resource.DeviceTaintRule {
+				obj := obj.DeepCopy()
+				obj.Spec.Taint.Key += "-other"
+				obj.Generation++
+				return obj
+			}(),
+		},
+		"change-value": {
+			oldObj: obj,
+			newObj: func() *resource.DeviceTaintRule {
+				obj := obj.DeepCopy()
+				obj.Spec.Taint.Value = "value"
+				return obj
+			}(),
+			expectObj: func() *resource.DeviceTaintRule {
+				obj := obj.DeepCopy()
+				obj.Spec.Taint.Value = "value"
+				obj.Generation++
+				return obj
+			}(),
+		},
+		"change-time-added": {
+			oldObj: obj,
+			newObj: func() *resource.DeviceTaintRule {
+				obj := obj.DeepCopy()
+				obj.Spec.Taint.TimeAdded = oldTime
+				return obj
+			}(),
+			expectObj: func() *resource.DeviceTaintRule {
+				obj := obj.DeepCopy()
+				// Stored as requested.
+				obj.Spec.Taint.TimeAdded = oldTime
 				obj.Generation++
 				return obj
 			}(),
@@ -175,28 +251,34 @@ func TestDeviceTaintRuleStrategyUpdate(t *testing.T) {
 
 	for name, tc := range testcases {
 		t.Run(name, func(t *testing.T) {
-			oldObj := tc.oldObj.DeepCopy()
-			newObj := tc.newObj.DeepCopy()
-			newObj.ResourceVersion = "4"
+			synctest.Test(t, func(t *testing.T) {
+				oldObj := tc.oldObj.DeepCopy()
+				newObj := tc.newObj.DeepCopy()
+				newObj.ResourceVersion = "4"
 
-			Strategy.PrepareForUpdate(ctx, newObj, oldObj)
-			if errs := Strategy.ValidateUpdate(ctx, newObj, oldObj); len(errs) != 0 {
-				if tc.expectValidationError == "" {
-					t.Fatalf("unexpected error(s): %v", errs)
+				time.Sleep(updateDelay)
+
+				Strategy.PrepareForUpdate(ctx, newObj, oldObj)
+				if errs := Strategy.ValidateUpdate(ctx, newObj, oldObj); len(errs) != 0 {
+					if tc.expectValidationError == "" {
+						t.Fatalf("unexpected error(s): %v", errs)
+					}
+					assert.ErrorContains(t, errs[0], tc.expectValidationError, "the error message should have contained the expected error message")
+					return
 				}
-				assert.ErrorContains(t, errs[0], tc.expectValidationError, "the error message should have contained the expected error message")
-				return
-			}
-			if tc.expectValidationError != "" {
-				t.Fatal("expected validation error(s), got none")
-			}
-			if warnings := Strategy.WarningsOnUpdate(ctx, newObj, oldObj); len(warnings) != 0 {
-				t.Fatalf("unexpected warnings: %q", warnings)
-			}
-			Strategy.Canonicalize(newObj)
-			expectObj := tc.expectObj.DeepCopy()
-			expectObj.ResourceVersion = "4"
-			assert.Equal(t, expectObj, newObj)
+				if tc.expectValidationError != "" {
+					t.Fatal("expected validation error(s), got none")
+				}
+				if warnings := Strategy.WarningsOnUpdate(ctx, newObj, oldObj); len(warnings) != 0 {
+					t.Fatalf("unexpected warnings: %q", warnings)
+				}
+				Strategy.Canonicalize(newObj)
+				expectObj := tc.expectObj.DeepCopy()
+				expectObj.ResourceVersion = "4"
+				if !apiequality.Semantic.DeepEqual(expectObj, newObj) {
+					t.Error(cmp.Diff(expectObj, newObj))
+				}
+			})
 		})
 	}
 }
@@ -271,6 +353,59 @@ func TestStatusStrategyUpdate(t *testing.T) {
 			expectObj := tc.expectObj.DeepCopy()
 			expectObj.ResourceVersion = "4"
 			assert.Equal(t, expectObj, newObj)
+		})
+	}
+}
+
+// TestDeviceTaintRuleEmptySelectorWarning covers
+// https://github.com/kubernetes/kubernetes/issues/141422: an empty but
+// non-nil deviceSelector matches every device from every driver, which is
+// easy to trigger by mistake and has no other signal at apply time.
+func TestDeviceTaintRuleEmptySelectorWarning(t *testing.T) {
+	ctx := genericapirequest.NewDefaultContext()
+	driver := "example.com"
+
+	testcases := map[string]struct {
+		selector      *resource.DeviceTaintSelector
+		expectWarning bool
+	}{
+		"nil-selector-matches-nothing": {
+			selector:      nil,
+			expectWarning: false,
+		},
+		"empty-selector-matches-everything": {
+			selector:      &resource.DeviceTaintSelector{},
+			expectWarning: true,
+		},
+		"selector-with-driver-is-scoped": {
+			selector:      &resource.DeviceTaintSelector{Driver: &driver},
+			expectWarning: false,
+		},
+	}
+
+	for name, tc := range testcases {
+		t.Run(name, func(t *testing.T) {
+			ruleObj := obj.DeepCopy()
+			ruleObj.Spec.DeviceSelector = tc.selector
+
+			createWarnings := Strategy.WarningsOnCreate(ctx, ruleObj)
+			updateWarnings := Strategy.WarningsOnUpdate(ctx, ruleObj, ruleObj)
+
+			if tc.expectWarning {
+				if len(createWarnings) == 0 {
+					t.Error("expected a warning from WarningsOnCreate, got none")
+				}
+				if len(updateWarnings) == 0 {
+					t.Error("expected a warning from WarningsOnUpdate, got none")
+				}
+			} else {
+				if len(createWarnings) != 0 {
+					t.Errorf("unexpected warnings from WarningsOnCreate: %q", createWarnings)
+				}
+				if len(updateWarnings) != 0 {
+					t.Errorf("unexpected warnings from WarningsOnUpdate: %q", updateWarnings)
+				}
+			}
 		})
 	}
 }

@@ -30,6 +30,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 
 	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -40,6 +41,7 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	clientscheme "k8s.io/client-go/kubernetes/scheme"
 	restclient "k8s.io/client-go/rest"
+	clienttesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
 	utiltesting "k8s.io/client-go/util/testing"
 	endptspkg "k8s.io/kubernetes/pkg/api/v1/endpoints"
@@ -1105,6 +1107,7 @@ func TestSyncEndpointsItems(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			ResourceVersion: "",
 			Name:            "foo",
+			Namespace:       ns,
 			Labels: map[string]string{
 				LabelManagedBy:       ControllerName,
 				v1.IsHeadlessService: "",
@@ -1162,6 +1165,7 @@ func TestSyncEndpointsItemsWithLabels(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			ResourceVersion: "",
 			Name:            "foo",
+			Namespace:       ns,
 			Labels:          serviceLabels,
 		},
 		Subsets: endptspkg.SortSubsets(expectedSubsets),
@@ -1501,7 +1505,8 @@ func TestSyncEndpointsHeadlessWithoutPort(t *testing.T) {
 	endpointsHandler.ValidateRequestCount(t, 1)
 	data := runtime.EncodeOrDie(clientscheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), &v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "foo",
+			Name:      "foo",
+			Namespace: ns,
 			Labels: map[string]string{
 				LabelManagedBy:       ControllerName,
 				v1.IsHeadlessService: "",
@@ -3222,5 +3227,129 @@ func TestSyncEndpointsAddDeletePorts(t *testing.T) {
 	expectEndpoints.Subsets = expectEndpoints.Subsets[:1]
 	if diff := cmp.Diff(expectEndpoints, endpoints); diff != "" {
 		t.Fatalf("incorrect endpoints after deleting first port:\n%s", diff)
+	}
+}
+
+func TestPodToEndpointAddressForServiceEmptyIPFamilies(t *testing.T) {
+	testCases := []struct {
+		name       string
+		clusterIP  string
+		podIPs     []v1.PodIP
+		podIP      string
+		wantErr    bool
+		wantFamily v1.IPFamily
+	}{
+		{
+			name:       "headful IPv4, IPv4 pod",
+			clusterIP:  "10.0.0.1",
+			podIPs:     []v1.PodIP{{IP: "10.244.0.1"}},
+			wantFamily: v1.IPv4Protocol,
+		},
+		{
+			name:       "headful IPv6, IPv6 pod",
+			clusterIP:  "fd00::1",
+			podIPs:     []v1.PodIP{{IP: "fd00::10"}},
+			wantFamily: v1.IPv6Protocol,
+		},
+		{
+			name:      "headful IPv4, no matching pod IP",
+			clusterIP: "10.0.0.1",
+			podIPs:    []v1.PodIP{{IP: "fd00::10"}},
+			wantErr:   true,
+		},
+		{
+			name:       "headless, IPv4 pod",
+			clusterIP:  v1.ClusterIPNone,
+			podIPs:     []v1.PodIP{{IP: "10.244.0.1"}},
+			podIP:      "10.244.0.1",
+			wantFamily: v1.IPv4Protocol,
+		},
+		{
+			name:       "headless, IPv6 pod",
+			clusterIP:  v1.ClusterIPNone,
+			podIPs:     []v1.PodIP{{IP: "fd00::10"}},
+			podIP:      "fd00::10",
+			wantFamily: v1.IPv6Protocol,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			svc := &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
+				Spec: v1.ServiceSpec{
+					// Intentionally leave IPFamilies empty.
+					ClusterIP: tc.clusterIP,
+				},
+			}
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo-pod", Namespace: "bar", UID: "uid-1"},
+				Spec:       v1.PodSpec{NodeName: "node-1"},
+				Status:     v1.PodStatus{PodIP: tc.podIP, PodIPs: tc.podIPs},
+			}
+
+			addr, err := podToEndpointAddressForService(svc, pod)
+			if tc.wantErr {
+				if err == nil {
+					t.Fatalf("expected error but got addr=%v", addr)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if addr == nil {
+				t.Fatal("expected an address but got nil")
+			}
+			isV6 := utilnet.IsIPv6String(addr.IP)
+			wantV6 := tc.wantFamily == v1.IPv6Protocol
+			if isV6 != wantV6 {
+				t.Errorf("got IP %q (IPv6=%v), want family %v", addr.IP, isV6, tc.wantFamily)
+			}
+		})
+	}
+}
+
+// TestSyncServiceFailedCreateEndpointsEventHasNamespace verifies that when
+// syncService fails to create a brand new Endpoints object, the resulting
+// FailedToCreateEndpoint event carries the service's namespace on
+// involvedObject, not just in the message text.
+func TestSyncServiceFailedCreateEndpointsEventHasNamespace(t *testing.T) {
+	ns := "target-ns"
+	tCtx := ktesting.Init(t)
+	client, controller := newFakeController(tCtx, 0*time.Second)
+
+	controller.serviceStore.Add(&v1.Service{
+		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: ns},
+		Spec: v1.ServiceSpec{
+			Selector: map[string]string{"foo": "bar"},
+			Ports:    []v1.ServicePort{{Port: 80}},
+		},
+	})
+
+	client.PrependReactor("create", "endpoints", func(action clienttesting.Action) (bool, runtime.Object, error) {
+		return true, nil, apierrors.NewAlreadyExists(schema.GroupResource{Resource: "endpoints"}, "foo")
+	})
+
+	gotEvents := make(chan *v1.Event, 1)
+	watcher := controller.eventBroadcaster.StartEventWatcher(func(e *v1.Event) {
+		if e.Reason == "FailedToCreateEndpoint" {
+			gotEvents <- e
+		}
+	})
+	defer watcher.Stop()
+
+	if err := controller.syncService(tCtx, ns+"/foo"); err == nil {
+		t.Fatal("expected syncService to return the AlreadyExists error")
+	}
+
+	var gotEvent *v1.Event
+	select {
+	case gotEvent = <-gotEvents:
+	case <-time.After(5 * time.Second):
+		t.Fatal("timed out waiting for a FailedToCreateEndpoint event to be recorded")
+	}
+	if gotEvent.InvolvedObject.Namespace != ns {
+		t.Errorf("event involvedObject.namespace = %q, want %q", gotEvent.InvolvedObject.Namespace, ns)
 	}
 }

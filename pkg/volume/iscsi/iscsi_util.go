@@ -20,7 +20,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -373,7 +372,7 @@ func (util *ISCSIUtil) AttachDisk(b iscsiDiskMounter) (string, error) {
 				_, err = execWithLog(b, "iscsiadm", "-m", "node", "-p", tp, "-T", b.Iqn, "-o", "update", "-n", "node.startup", "-v", "manual")
 				if err != nil {
 					// don't fail if we can't set startup mode, but log warning so there is a clue
-					klog.Warningf("Warning: Failed to set iSCSI login mode to manual. Error: %v", err)
+					klog.Warningf("Failed to set iSCSI login mode to manual: %v", err)
 				}
 
 				// Rebuild the host map after logging in
@@ -482,6 +481,17 @@ func (util *ISCSIUtil) AttachDisk(b iscsiDiskMounter) (string, error) {
 	return devicePath, nil
 }
 
+func validateISCSIPluginPath(path, pluginDir string) error {
+	if !mount.PathWithinBase(path, pluginDir) {
+		return fmt.Errorf(
+			"iscsi: resolved path %q escapes plugin directory %q",
+			path,
+			pluginDir,
+		)
+	}
+	return nil
+}
+
 // persistISCSI saves iSCSI volume configuration for DetachDisk into global
 // mount / map directory.
 func (util *ISCSIUtil) persistISCSI(b iscsiDiskMounter) error {
@@ -493,8 +503,19 @@ func (util *ISCSIUtil) persistISCSI(b iscsiDiskMounter) error {
 		globalPDPath = b.manager.MakeGlobalPDName(*b.iscsiDisk)
 	}
 
+	var pluginDir string
+	if b.volumeMode == v1.PersistentVolumeBlock {
+		pluginDir = b.iscsiDisk.plugin.host.GetVolumeDevicePluginDir(iscsiPluginName)
+	} else {
+		pluginDir = b.iscsiDisk.plugin.host.GetPluginDir(iscsiPluginName)
+	}
+
+	if err := validateISCSIPluginPath(globalPDPath, pluginDir); err != nil {
+		return err
+	}
+
 	if err := os.MkdirAll(globalPDPath, 0750); err != nil {
-		klog.Errorf("iscsi: failed to mkdir %s, error", globalPDPath)
+		klog.Errorf("iscsi: failed to mkdir %s: %v", globalPDPath, err)
 		return err
 	}
 
@@ -564,7 +585,7 @@ func deleteDevices(c iscsiDiskUnmounter) error {
 	for mpathDevice := range mpathDevices {
 		_, err = c.exec.Command("multipath", "-f", mpathDevice).CombinedOutput()
 		if err != nil {
-			klog.Warningf("Warning: Failed to flush multipath device map: %s\nError: %v", mpathDevice, err)
+			klog.Warningf("Failed to flush multipath device map: %s: %v", mpathDevice, err)
 			// Fall through -- keep deleting the block devices
 		}
 		klog.V(4).Infof("Flushed multipath device: %s", mpathDevice)
@@ -572,7 +593,7 @@ func deleteDevices(c iscsiDiskUnmounter) error {
 	for _, deviceName := range deviceNames {
 		err = deleteDevice(deviceName)
 		if err != nil {
-			klog.Warningf("Warning: Failed to delete block device: %s\nError: %v", deviceName, err)
+			klog.Warningf("Failed to delete block device: %s: %v", deviceName, err)
 			// Fall through -- keep deleting other block devices
 		}
 	}
@@ -584,7 +605,7 @@ func (util *ISCSIUtil) DetachDisk(c iscsiDiskUnmounter, mntPath string) error {
 	if pathExists, pathErr := mount.PathExists(mntPath); pathErr != nil {
 		return fmt.Errorf("error checking if path exists: %w", pathErr)
 	} else if !pathExists {
-		klog.Warningf("Warning: Unmount skipped because path does not exist: %v", mntPath)
+		klog.Warningf("Unmount skipped because path does not exist: %v", mntPath)
 		return nil
 	}
 
@@ -660,7 +681,7 @@ func (util *ISCSIUtil) DetachBlockISCSIDisk(c iscsiDiskUnmapper, mapPath string)
 	if pathExists, pathErr := mount.PathExists(mapPath); pathErr != nil {
 		return fmt.Errorf("error checking if path exists: %w", pathErr)
 	} else if !pathExists {
-		klog.Warningf("Warning: Unmap skipped because path does not exist: %v", mapPath)
+		klog.Warningf("Unmap skipped because path does not exist: %v", mapPath)
 		return nil
 	}
 	// If we arrive here, device is no longer used, see if need to logout the target
@@ -702,8 +723,19 @@ func (util *ISCSIUtil) DetachBlockISCSIDisk(c iscsiDiskUnmapper, mapPath string)
 
 	devicePath := getDevByPath(portals[0], iqn, lun)
 	klog.V(5).Infof("iscsi: devicePath: %s", devicePath)
-	if _, err = os.Stat(devicePath); err != nil {
-		return fmt.Errorf("failed to validate devicePath: %s", devicePath)
+	if _, err := os.Stat(devicePath); err != nil {
+		if !os.IsNotExist(err) {
+			// The path exists but cannot be accessed (permissions, corrupted
+			// filesystem, ...): surface it instead of continuing.
+			return fmt.Errorf("failed to access devicePath %s: %w", devicePath, err)
+		}
+		// The by-path link may already be gone if the iSCSI session was lost
+		// before teardown ran. The remaining steps handle a missing session
+		// (detachISCSIDisk ignores ISCSI_ERR_NO_OBJS_FOUND and
+		// ISCSI_ERR_SESS_NOT_FOUND, and isSessionBusy counts plugin
+		// directories rather than devices), so continue instead of failing
+		// detach permanently and stranding the volume in volumesInUse.
+		klog.V(4).Infof("iscsi: devicePath %s already gone, continuing to detach", devicePath)
 	}
 
 	// Lock the target while we determine if we can safely log out or not
@@ -927,7 +959,7 @@ func isSessionBusy(host volume.VolumeHost, portal, iqn string) bool {
 func getVolCount(dir, portal, iqn string) (int, error) {
 	// For FileSystem volumes, the topmost dirs are named after the ifaces, e.g., iface-default or iface-127.0.0.1:3260:pv0.
 	// For Block volumes, the default topmost dir is volumeDevices.
-	contents, err := ioutil.ReadDir(dir)
+	contents, err := os.ReadDir(dir)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return 0, nil
@@ -943,7 +975,7 @@ func getVolCount(dir, portal, iqn string) (int, error) {
 			continue
 		}
 
-		mounts, err := ioutil.ReadDir(filepath.Join(dir, c.Name()))
+		mounts, err := os.ReadDir(filepath.Join(dir, c.Name()))
 		if err != nil {
 			return 0, err
 		}

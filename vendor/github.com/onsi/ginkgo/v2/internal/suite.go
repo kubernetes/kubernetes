@@ -108,13 +108,13 @@ func (suite *Suite) BuildTree() error {
 	return nil
 }
 
-func (suite *Suite) Run(description string, suiteLabels Labels, suiteSemVerConstraints SemVerConstraints, suiteAroundNodes types.AroundNodes, suitePath string, failer *Failer, reporter reporters.Reporter, writer WriterInterface, outputInterceptor OutputInterceptor, interruptHandler interrupt_handler.InterruptHandlerInterface, client parallel_support.Client, progressSignalRegistrar ProgressSignalRegistrar, suiteConfig types.SuiteConfig) (bool, bool) {
+func (suite *Suite) Run(description string, suiteLabels Labels, suiteSemVerConstraints SemVerConstraints, suiteComponentSemVerConstraints ComponentSemVerConstraints, suiteAroundNodes types.AroundNodes, suitePath string, failer *Failer, reporter reporters.Reporter, writer WriterInterface, outputInterceptor OutputInterceptor, interruptHandler interrupt_handler.InterruptHandlerInterface, client parallel_support.Client, progressSignalRegistrar ProgressSignalRegistrar, suiteConfig types.SuiteConfig) (bool, bool) {
 	if suite.phase != PhaseBuildTree {
 		panic("cannot run before building the tree = call suite.BuildTree() first")
 	}
 	ApplyNestedFocusPolicyToTree(suite.tree)
 	specs := GenerateSpecsFromTreeRoot(suite.tree)
-	specs, hasProgrammaticFocus := ApplyFocusToSpecs(specs, description, suiteLabels, suiteSemVerConstraints, suiteConfig)
+	specs, hasProgrammaticFocus := ApplyFocusToSpecs(specs, description, suiteLabels, suiteSemVerConstraints, suiteComponentSemVerConstraints, suiteConfig)
 	specs = ComputeAroundNodes(specs)
 
 	suite.phase = PhaseRun
@@ -133,7 +133,7 @@ func (suite *Suite) Run(description string, suiteLabels Labels, suiteSemVerConst
 
 	cancelProgressHandler := progressSignalRegistrar(suite.handleProgressSignal)
 
-	success := suite.runSpecs(description, suiteLabels, suiteSemVerConstraints, suitePath, hasProgrammaticFocus, specs)
+	success := suite.runSpecs(description, suiteLabels, suiteSemVerConstraints, suiteComponentSemVerConstraints, suitePath, hasProgrammaticFocus, specs)
 
 	cancelProgressHandler()
 
@@ -456,16 +456,17 @@ func (suite *Suite) processCurrentSpecReport() {
 	}
 }
 
-func (suite *Suite) runSpecs(description string, suiteLabels Labels, suiteSemVerConstraints SemVerConstraints, suitePath string, hasProgrammaticFocus bool, specs Specs) bool {
+func (suite *Suite) runSpecs(description string, suiteLabels Labels, suiteSemVerConstraints SemVerConstraints, suiteComponentSemVerConstraints ComponentSemVerConstraints, suitePath string, hasProgrammaticFocus bool, specs Specs) bool {
 	numSpecsThatWillBeRun := specs.CountWithoutSkip()
 
 	suite.report = types.Report{
-		SuitePath:                 suitePath,
-		SuiteDescription:          description,
-		SuiteLabels:               suiteLabels,
-		SuiteSemVerConstraints:    suiteSemVerConstraints,
-		SuiteConfig:               suite.config,
-		SuiteHasProgrammaticFocus: hasProgrammaticFocus,
+		SuitePath:                       suitePath,
+		SuiteDescription:                description,
+		SuiteLabels:                     suiteLabels,
+		SuiteSemVerConstraints:          suiteSemVerConstraints,
+		SuiteComponentSemVerConstraints: suiteComponentSemVerConstraints,
+		SuiteConfig:                     suite.config,
+		SuiteHasProgrammaticFocus:       hasProgrammaticFocus,
 		PreRunStats: types.PreRunStats{
 			TotalSpecs:       len(specs),
 			SpecsThatWillRun: numSpecsThatWillBeRun,
@@ -995,6 +996,7 @@ func (suite *Suite) runNode(node Node, specDeadline time.Time, text string) (typ
 			} else {
 				failure.Message, failure.Location, failure.ForwardedPanic, failure.TimelineLocation = failureFromRun.Message, failureFromRun.Location, failureFromRun.ForwardedPanic, failureFromRun.TimelineLocation
 				suite.reporter.EmitFailure(outcomeFromRun, failure)
+				suite.pauseOnFailureIfRequested(node)
 				return outcomeFromRun, failure
 			}
 		case <-gracePeriodChannel:
@@ -1042,7 +1044,7 @@ func (suite *Suite) runNode(node Node, specDeadline time.Time, text string) (typ
 			}
 
 			progressReport = progressReport.WithoutOtherGoroutines()
-			sc.cancel(fmt.Errorf(interruptStatus.Message()))
+			sc.cancel(fmt.Errorf("%s", interruptStatus.Message()))
 
 			if interruptStatus.Level == interrupt_handler.InterruptLevelBailOut {
 				if interruptStatus.ShouldIncludeProgressReport() {
@@ -1075,6 +1077,42 @@ func (suite *Suite) runNode(node Node, specDeadline time.Time, text string) (typ
 				progressPoller.Reset(pollProgressInterval)
 			}
 		}
+	}
+}
+
+// pauseOnFailureIfRequested pauses the suite at the moment a failure is identified,
+// when the user has set --sleep-on-failure.  This hooks directly into runNode's failure
+// path so the pause happens immediately at the point of failure - before any teardown
+// or cleanup runs - leaving the system live for inspection.
+//
+// We only pause for failures in setup and subject nodes (It, Before*, BeforeSuite...),
+// i.e. nodes that run before teardown.  Pausing on a failure in a teardown/cleanup or
+// reporting node would be pointless (the system is already being torn down) and could
+// interfere with interrupt handling, so those are skipped.
+//
+// The pause is interruptible: pressing ^C (or any interrupt) ends the pause early and
+// the suite proceeds to run cleanup as usual.  It is a no-op if the feature is disabled.
+func (suite *Suite) pauseOnFailureIfRequested(node Node) {
+	if suite.config.SleepOnFailure <= 0 {
+		return
+	}
+	// only pause before teardown - skip teardown/cleanup/reporting nodes
+	if node.NodeType.Is(types.NodeTypesAllowedDuringCleanupInterrupt | types.NodeTypesAllowedDuringReportInterrupt) {
+		return
+	}
+
+	duration := suite.config.SleepOnFailure
+	report := suite.generateProgressReport(false)
+	report.Message = fmt.Sprintf("{{bold}}{{orange}}Paused on failure for up to %s.{{/}}\nThe spec failed and Ginkgo has paused before running any teardown so you can inspect the live system.\nPress {{bold}}^C{{/}} to end the pause and proceed to cleanup.", duration)
+	suite.emitProgressReport(report)
+
+	timer := time.NewTimer(duration)
+	defer timer.Stop()
+	// wait for the pause to elapse, or for the user to interrupt - in which case we end
+	// the pause early and let runNode return so cleanup can proceed
+	select {
+	case <-timer.C:
+	case <-suite.interruptHandler.Status().Channel:
 	}
 }
 

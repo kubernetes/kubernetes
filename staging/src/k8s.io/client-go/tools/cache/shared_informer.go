@@ -28,6 +28,7 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -35,6 +36,7 @@ import (
 	"k8s.io/utils/buffer"
 	"k8s.io/utils/clock"
 	"k8s.io/utils/ptr"
+	utiltrace "k8s.io/utils/trace"
 
 	"k8s.io/klog/v2"
 
@@ -176,6 +178,15 @@ type SharedInformer interface {
 	// RemoveEventHandler removes a formerly added event handler given by
 	// its registration handle.
 	// This function is guaranteed to be idempotent, and thread-safe.
+	//
+	// Note: RemoveEventHandler is asynchronous. It stops queueing new events
+	// but does not wait for already-queued events to finish executing.
+	// Goroutines processing the remaining events may still be running and
+	// invoking callbacks after this function returns.
+	//
+	// If the caller needs to wait for all handlers to finish executing (for
+	// example, to safely close channels or release resources used by the handler),
+	// they should use [ShutDownEventHandler].
 	RemoveEventHandler(handle ResourceEventHandlerRegistration) error
 	// GetStore returns the informer's local cache as a Store.
 	GetStore() Store
@@ -286,6 +297,118 @@ type SharedIndexInformer interface {
 	GetIndexer() Indexer
 }
 
+// TypedSharedIndexInformer adds type-safe variants for non-type-safe methods
+// in SharedIndexInformer. No type casts are needed when using those variants.
+type TypedSharedIndexInformer[T Object] interface {
+	SharedIndexInformer
+
+	// AddTypedEventHandler is a type-safe replacement for
+	// SharedIndexInformer.AddEventHandlerWithOptions
+	// and SharedIndexInformer.AddEventHandler.
+	//
+	// Without options, it uses the same defaults as AddEventHandler
+	// or AddEventHandlerWithOptions with empty HandlerOptions.
+	// Passing one instance corresponds to AddEventHandlerWithOptions.
+	// Passing more than one is invalid and returns an error.
+	AddTypedEventHandler(handler TypedResourceEventHandler[T], options ...HandlerOptions) (ResourceEventHandlerRegistration, error)
+	AddTypedIndexers(indexers TypedIndexers[T]) error
+	GetTypedIndexer() TypedIndexer[T]
+}
+
+func NewTypedSharedIndexInformer[T Object](informer SharedIndexInformer) TypedSharedIndexInformer[T] {
+	return &typedSharedIndexInformer[T]{SharedIndexInformer: informer}
+}
+
+type typedSharedIndexInformer[T Object] struct {
+	SharedIndexInformer
+}
+
+func (s typedSharedIndexInformer[T]) AddTypedEventHandler(handler TypedResourceEventHandler[T], options ...HandlerOptions) (ResourceEventHandlerRegistration, error) {
+	var o HandlerOptions
+	switch len(options) {
+	case 0:
+	case 1:
+		o = options[0]
+	default:
+		return nil, fmt.Errorf("at most one HandlerOptions may be passed, got %d", len(options))
+	}
+	return s.AddEventHandlerWithOptions(&typedResourceEventHandler[T]{handler}, o)
+}
+
+func (s typedSharedIndexInformer[T]) AddTypedIndexers(indexers TypedIndexers[T]) error {
+	return s.AddIndexers(TypedIndexersToIndexers(indexers))
+}
+
+func (s typedSharedIndexInformer[T]) GetTypedIndexer() TypedIndexer[T] {
+	return &typedIndexer[T]{s.GetIndexer()}
+}
+
+// typedResourceEventHandler implements the untyped ResourceEventHandler interface
+// by invoking the methods of a TypedResourceEventHandler instance.
+type typedResourceEventHandler[T Object] struct {
+	handler TypedResourceEventHandler[T]
+}
+
+var _ ResourceEventHandler = &typedResourceEventHandler[*metav1.ObjectMeta]{}
+
+func (h *typedResourceEventHandler[T]) OnAdd(obj any, isInitialList bool) {
+	h.handler.OnAdd(obj.(T), isInitialList)
+}
+
+func (h *typedResourceEventHandler[T]) OnUpdate(oldObj, newObj any) {
+	h.handler.OnUpdate(oldObj.(T), newObj.(T))
+}
+
+func (h *typedResourceEventHandler[T]) OnDelete(obj any) {
+	if tomb, ok := obj.(DeletedFinalStateUnknown); ok {
+		if tomb.Obj == nil {
+			h.handler.OnDelete(DeletedObject[T]{FinalStateUnknown: &tomb})
+			return
+		}
+		h.handler.OnDelete(DeletedObject[T]{OptionalObj: tomb.Obj.(T), FinalStateUnknown: &tomb})
+		return
+	}
+	h.handler.OnDelete(DeletedObject[T]{OptionalObj: obj.(T)})
+}
+
+type typedIndexer[T any] struct {
+	Indexer
+}
+
+func (i typedIndexer[T]) TypedIndex(indexName string, obj T) ([]T, error) {
+	untyped, err := i.Index(indexName, obj)
+	if err != nil {
+		return nil, err
+	}
+	typed := make([]T, len(untyped))
+	for i, obj := range untyped {
+		typed[i] = obj.(T)
+	}
+	return typed, nil
+}
+
+func (i typedIndexer[T]) ByTypedIndex(indexName, indexedValue string) ([]T, error) {
+	untyped, err := i.ByIndex(indexName, indexedValue)
+	if err != nil {
+		return nil, err
+	}
+	typed := make([]T, len(untyped))
+	for i, obj := range untyped {
+		typed[i] = obj.(T)
+	}
+	return typed, nil
+}
+
+func (i typedIndexer[T]) AddTypedIndexers(newIndexers TypedIndexers[T]) error {
+	untyped := make(Indexers, len(newIndexers))
+	for i, indexer := range newIndexers {
+		untyped[i] = func(obj any) ([]string, error) {
+			return indexer(obj.(T))
+		}
+	}
+	return i.AddIndexers(untyped)
+}
+
 // NewSharedInformer creates a new instance for the ListerWatcher. See NewSharedIndexInformerWithOptions for full details.
 func NewSharedInformer(lw ListerWatcher, exampleObject runtime.Object, defaultEventHandlerResyncPeriod time.Duration) SharedInformer {
 	return NewSharedIndexInformer(lw, exampleObject, defaultEventHandlerResyncPeriod, Indexers{})
@@ -322,7 +445,7 @@ func NewSharedIndexInformerWithOptions(lw ListerWatcher, exampleObject runtime.O
 	processor.listenersRCond = sync.NewCond(processor.listenersLock.RLocker())
 
 	return &sharedIndexInformer{
-		indexer:                         NewIndexer(DeletionHandlingMetaNamespaceKeyFunc, options.Indexers),
+		indexer:                         NewIndexer(DeletionHandlingMetaNamespaceKeyFunc, options.Indexers, WithStoreMetrics(options.Identifier, options.InformerMetricsProvider)),
 		processor:                       processor,
 		synced:                          make(chan struct{}),
 		listerWatcher:                   lw,
@@ -333,7 +456,7 @@ func NewSharedIndexInformerWithOptions(lw ListerWatcher, exampleObject runtime.O
 		clock:                           realClock,
 		cacheMutationDetector:           NewCacheMutationDetector(fmt.Sprintf("%T", exampleObject)),
 		identifier:                      options.Identifier,
-		fifoMetricsProvider:             options.FIFOMetricsProvider,
+		informerMetricsProvider:         options.InformerMetricsProvider,
 		keyFunc:                         DeletionHandlingMetaNamespaceKeyFunc,
 	}
 }
@@ -355,9 +478,9 @@ type SharedIndexInformerOptions struct {
 	// If not set, metrics will not be published.
 	Identifier InformerNameAndResource
 
-	// FIFOMetricsProvider is the metrics provider for the FIFO queue.
+	// InformerMetricsProvider is the metrics provider for the FIFO queue.
 	// If not set, metrics will be no-ops.
-	FIFOMetricsProvider FIFOMetricsProvider
+	InformerMetricsProvider InformerMetricsProvider
 }
 
 // InformerSynced is a function that can be used to determine if an informer has synced.  This is useful for determining if caches have synced.
@@ -629,8 +752,8 @@ type sharedIndexInformer struct {
 	// identifier is used to identify this informer for metrics and logging purposes.
 	identifier InformerNameAndResource
 
-	// fifoMetricsProvider is the metrics provider for the FIFO queue.
-	fifoMetricsProvider FIFOMetricsProvider
+	// informerMetricsProvider is the metrics provider for the FIFO queue.
+	informerMetricsProvider InformerMetricsProvider
 
 	// keyFunc is called when processing deltas by the underlying process function.
 	keyFunc KeyFunc
@@ -728,7 +851,7 @@ func (s *sharedIndexInformer) RunWithContext(ctx context.Context) {
 		s.startedLock.Lock()
 		defer s.startedLock.Unlock()
 
-		logger, fifo := newQueueFIFO(logger, s.objectType, s.indexer, s.transform, s.identifier, s.fifoMetricsProvider)
+		logger, fifo := newQueueFIFO(logger, s.objectType, s.indexer, s.transform, s.identifier, s.informerMetricsProvider)
 
 		cfg := &Config{
 			Queue:             fifo,
@@ -907,7 +1030,8 @@ func (s *sharedIndexInformer) AddEventHandlerWithOptions(handler ResourceEventHa
 	listener := newProcessListener(logger, handler, resyncPeriod, determineResyncPeriod(logger, resyncPeriod, s.resyncCheckPeriod), s.clock.Now(), initialBufferSize, s.HasSyncedChecker())
 
 	if !s.started {
-		return s.processor.addListener(listener), nil
+		handle, _ := s.processor.addListener(listener)
+		return handle, nil
 	}
 
 	// in order to safely join, we have to
@@ -918,7 +1042,7 @@ func (s *sharedIndexInformer) AddEventHandlerWithOptions(handler ResourceEventHa
 	s.blockDeltas.Lock()
 	defer s.blockDeltas.Unlock()
 
-	handle := s.processor.addListener(listener)
+	handle, started := s.processor.addListener(listener)
 	for _, item := range s.indexer.List() {
 		// Note that we enqueue these notifications with the lock held
 		// and before returning the handle. That means there is never a
@@ -932,7 +1056,9 @@ func (s *sharedIndexInformer) AddEventHandlerWithOptions(handler ResourceEventHa
 	}
 
 	// Initial list is added, now we can allow the listener to detect that "upstream has synced".
-	s.processor.wg.Start(listener.watchSynced)
+	if started {
+		s.processor.wg.Start(listener.watchSynced)
+	}
 
 	return handle, nil
 }
@@ -1010,6 +1136,24 @@ func (s *sharedIndexInformer) RemoveEventHandler(handle ResourceEventHandlerRegi
 	return s.processor.removeListener(handle)
 }
 
+// ShutDownEventHandler removes the event handler and blocks until it has fully
+// stopped processing events.
+//
+// Like RemoveEventHandler, it is idempotent and thread-safe. However, it MUST NOT
+// be called from within the event handler's own callbacks, as that will result
+// in a deadlock.
+func ShutDownEventHandler(informer SharedInformer, handle ResourceEventHandlerRegistration) error {
+	if err := informer.RemoveEventHandler(handle); err != nil {
+		return err
+	}
+	if s, ok := handle.(interface{ ShutdownChan() <-chan struct{} }); ok {
+		<-s.ShutdownChan()
+	} else {
+		return fmt.Errorf("handle does not support ShutdownChan()")
+	}
+	return nil
+}
+
 // sharedProcessor has a collection of processorListener and can
 // distribute a notification object to its listeners.  There are two
 // kinds of distribute operations.  The sync distributions go to a
@@ -1043,7 +1187,7 @@ func (p *sharedProcessor) getListener(registration ResourceEventHandlerRegistrat
 	return nil
 }
 
-func (p *sharedProcessor) addListener(listener *processorListener) ResourceEventHandlerRegistration {
+func (p *sharedProcessor) addListener(listener *processorListener) (ResourceEventHandlerRegistration, bool) {
 	p.listenersLock.Lock()
 	defer p.listenersLock.Unlock()
 
@@ -1060,7 +1204,7 @@ func (p *sharedProcessor) addListener(listener *processorListener) ResourceEvent
 		p.wg.Start(listener.pop)
 	}
 
-	return listener
+	return listener, p.listenersStarted
 }
 
 func (p *sharedProcessor) removeListener(handle ResourceEventHandlerRegistration) error {
@@ -1082,6 +1226,8 @@ func (p *sharedProcessor) removeListener(handle ResourceEventHandlerRegistration
 
 	if p.listenersStarted {
 		close(listener.addCh)
+	} else {
+		close(listener.runFinished)
 	}
 
 	return nil
@@ -1205,12 +1351,14 @@ func (p *sharedProcessor) resyncCheckPeriodChanged(logger klog.Logger, resyncChe
 // processorListener also keeps track of the adjusted requested resync
 // period of the listener.
 type processorListener struct {
-	logger klog.Logger
-	nextCh chan interface{}
-	addCh  chan interface{}
-	done   chan struct{}
+	logger      klog.Logger
+	nextCh      chan interface{}
+	addCh       chan interface{}
+	done        chan struct{}
+	runFinished chan struct{}
 
-	handler ResourceEventHandler
+	handler     ResourceEventHandler
+	handlerName string
 
 	syncTracker       *synctrack.SingleFileTracker
 	upstreamHasSynced DoneChecker
@@ -1221,6 +1369,9 @@ type processorListener struct {
 	// TODO: This is no worse than before, since reflectors were backed by unbounded DeltaFIFOs, but
 	// we should try to do something better.
 	pendingNotifications buffer.RingGrowing
+	// pendingNotificationsLength tracks pendingNotifications size and is only mutated by pop().
+	// run() reads this to decide when to enable expensive time tracing.
+	pendingNotificationsLength atomic.Int64
 
 	// requestedResyncPeriod is how frequently the listener wants a
 	// full resync from the shared informer, but modified by two
@@ -1257,15 +1408,22 @@ func (p *processorListener) HasSyncedChecker() DoneChecker {
 	return p.syncTracker
 }
 
+func (p *processorListener) ShutdownChan() <-chan struct{} {
+	return p.runFinished
+}
+
 func newProcessListener(logger klog.Logger, handler ResourceEventHandler, requestedResyncPeriod, resyncPeriod time.Duration, now time.Time, bufferSize int, hasSynced DoneChecker) *processorListener {
+	handlerName := nameForHandler(handler)
 	ret := &processorListener{
 		logger:                logger,
 		nextCh:                make(chan interface{}),
 		addCh:                 make(chan interface{}),
 		done:                  make(chan struct{}),
+		runFinished:           make(chan struct{}),
 		upstreamHasSynced:     hasSynced,
 		handler:               handler,
-		syncTracker:           synctrack.NewSingleFileTracker(fmt.Sprintf("%s + event handler %s", hasSynced.Name(), nameForHandler(handler))),
+		handlerName:           handlerName,
+		syncTracker:           synctrack.NewSingleFileTracker(fmt.Sprintf("%s + event handler %s", hasSynced.Name(), handlerName)),
 		pendingNotifications:  *buffer.NewRingGrowing(bufferSize),
 		requestedResyncPeriod: requestedResyncPeriod,
 		resyncPeriod:          resyncPeriod,
@@ -1296,7 +1454,9 @@ func (p *processorListener) pop() {
 			// Notification dispatched
 			var ok bool
 			notification, ok = p.pendingNotifications.ReadOne()
-			if !ok { // Nothing to pop
+			if ok {
+				p.pendingNotificationsLength.Add(-1)
+			} else { // Nothing to pop
 				nextCh = nil // Disable this select case
 			}
 		case notificationToAdd, ok := <-p.addCh:
@@ -1309,12 +1469,14 @@ func (p *processorListener) pop() {
 				nextCh = p.nextCh
 			} else { // There is already a notification waiting to be dispatched
 				p.pendingNotifications.WriteOne(notificationToAdd)
+				p.pendingNotificationsLength.Add(1)
 			}
 		}
 	}
 }
 
 func (p *processorListener) run() {
+	defer close(p.runFinished)
 	// this call blocks until the channel is closed.  When a panic happens during the notification
 	// we will catch it, **the offending item will be skipped!**, and after a short delay (one second)
 	// the next notification will be attempted. This is usually better than the alternative of never
@@ -1331,6 +1493,14 @@ func (p *processorListener) run() {
 			// Gets reset below, but only if we get that far.
 			sleepAfterCrash = true
 			defer utilruntime.HandleCrashWithLogger(p.logger)
+			pendingNotifications := p.pendingNotificationsLength.Load()
+			if pendingNotifications > initialBufferSize {
+				trace := utiltrace.New("processorListener handler",
+					utiltrace.Field{Key: "handler", Value: p.handlerName},
+					utiltrace.Field{Key: "pendingNotifications", Value: pendingNotifications},
+				)
+				defer trace.LogIfLong(100 * time.Millisecond)
+			}
 
 			switch notification := next.(type) {
 			case updateNotification:

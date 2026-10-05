@@ -24,7 +24,6 @@ package v1alpha1
 import (
 	unsafe "unsafe"
 
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	componentbaseconfigv1alpha1 "k8s.io/component-base/config/v1alpha1"
@@ -210,13 +209,7 @@ func autoConvert_config_KubeProxyConfiguration_To_v1alpha1_KubeProxyConfiguratio
 }
 
 func autoConvert_v1alpha1_KubeProxyConntrackConfiguration_To_config_KubeProxyConntrackConfiguration(in *configv1alpha1.KubeProxyConntrackConfiguration, out *config.KubeProxyConntrackConfiguration, s conversion.Scope) error {
-	out.MaxPerCore = (*int32)(unsafe.Pointer(in.MaxPerCore))
-	out.Min = (*int32)(unsafe.Pointer(in.Min))
-	out.TCPEstablishedTimeout = (*v1.Duration)(unsafe.Pointer(in.TCPEstablishedTimeout))
-	out.TCPCloseWaitTimeout = (*v1.Duration)(unsafe.Pointer(in.TCPCloseWaitTimeout))
-	out.TCPBeLiberal = in.TCPBeLiberal
-	out.UDPTimeout = in.UDPTimeout
-	out.UDPStreamTimeout = in.UDPStreamTimeout
+	*out = *(*config.KubeProxyConntrackConfiguration)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -226,13 +219,7 @@ func Convert_v1alpha1_KubeProxyConntrackConfiguration_To_config_KubeProxyConntra
 }
 
 func autoConvert_config_KubeProxyConntrackConfiguration_To_v1alpha1_KubeProxyConntrackConfiguration(in *config.KubeProxyConntrackConfiguration, out *configv1alpha1.KubeProxyConntrackConfiguration, s conversion.Scope) error {
-	out.MaxPerCore = (*int32)(unsafe.Pointer(in.MaxPerCore))
-	out.Min = (*int32)(unsafe.Pointer(in.Min))
-	out.TCPEstablishedTimeout = (*v1.Duration)(unsafe.Pointer(in.TCPEstablishedTimeout))
-	out.TCPCloseWaitTimeout = (*v1.Duration)(unsafe.Pointer(in.TCPCloseWaitTimeout))
-	out.TCPBeLiberal = in.TCPBeLiberal
-	out.UDPTimeout = in.UDPTimeout
-	out.UDPStreamTimeout = in.UDPStreamTimeout
+	*out = *(*configv1alpha1.KubeProxyConntrackConfiguration)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -307,11 +294,7 @@ func Convert_config_KubeProxyNFTablesConfiguration_To_v1alpha1_KubeProxyNFTables
 }
 
 func autoConvert_v1alpha1_KubeProxyWinkernelConfiguration_To_config_KubeProxyWinkernelConfiguration(in *configv1alpha1.KubeProxyWinkernelConfiguration, out *config.KubeProxyWinkernelConfiguration, s conversion.Scope) error {
-	out.NetworkName = in.NetworkName
-	out.SourceVip = in.SourceVip
-	out.EnableDSR = in.EnableDSR
-	out.RootHnsEndpointName = in.RootHnsEndpointName
-	out.ForwardHealthCheckVip = in.ForwardHealthCheckVip
+	*out = *(*config.KubeProxyWinkernelConfiguration)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -321,11 +304,7 @@ func Convert_v1alpha1_KubeProxyWinkernelConfiguration_To_config_KubeProxyWinkern
 }
 
 func autoConvert_config_KubeProxyWinkernelConfiguration_To_v1alpha1_KubeProxyWinkernelConfiguration(in *config.KubeProxyWinkernelConfiguration, out *configv1alpha1.KubeProxyWinkernelConfiguration, s conversion.Scope) error {
-	out.NetworkName = in.NetworkName
-	out.SourceVip = in.SourceVip
-	out.EnableDSR = in.EnableDSR
-	out.RootHnsEndpointName = in.RootHnsEndpointName
-	out.ForwardHealthCheckVip = in.ForwardHealthCheckVip
+	*out = *(*configv1alpha1.KubeProxyWinkernelConfiguration)(unsafe.Pointer(in))
 	return nil
 }
 

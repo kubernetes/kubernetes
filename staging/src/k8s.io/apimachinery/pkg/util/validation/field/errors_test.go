@@ -200,6 +200,45 @@ func TestErrorListMarkDeclarative(t *testing.T) {
 	}
 }
 
+func TestErrorMarkFromImperative(t *testing.T) {
+	// Test for single Error
+	err := Invalid(NewPath("field"), "value", "detail")
+	if err.FromImperative {
+		t.Errorf("New error should not be from imperative by default")
+	}
+
+	// Mark as FromImperative
+	err.MarkFromImperative() //nolint:errcheck // The "error" here is not an unexpected error from the function.
+	if !err.FromImperative {
+		t.Errorf("Error should be from imperative after marking")
+	}
+}
+
+func TestErrorListMarkFromImperative(t *testing.T) {
+	// Test for ErrorList
+	list := ErrorList{
+		Invalid(NewPath("field1"), "value1", "detail1"),
+		Invalid(NewPath("field2"), "value2", "detail2"),
+	}
+
+	// Verify none are from imperative by default
+	for i, err := range list {
+		if err.FromImperative {
+			t.Errorf("Error %d should not be from imperative by default", i)
+		}
+	}
+
+	// Mark list as from imperative
+	list.MarkFromImperative()
+
+	// Verify all errors in the list are now from imperative
+	for i, err := range list {
+		if !err.FromImperative {
+			t.Errorf("Error %d should be from imperative after marking the list", i)
+		}
+	}
+}
+
 func TestErrorListExtractCoveredByDeclarative(t *testing.T) {
 	testCases := []struct {
 		list         ErrorList

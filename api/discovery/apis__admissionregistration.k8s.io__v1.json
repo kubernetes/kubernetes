@@ -7,6 +7,46 @@
       "categories": [
         "api-extensions"
       ],
+      "kind": "MutatingAdmissionPolicy",
+      "name": "mutatingadmissionpolicies",
+      "namespaced": false,
+      "singularName": "mutatingadmissionpolicy",
+      "storageVersionHash": "mHCkTKpUTrE=",
+      "verbs": [
+        "create",
+        "delete",
+        "deletecollection",
+        "get",
+        "list",
+        "patch",
+        "update",
+        "watch"
+      ]
+    },
+    {
+      "categories": [
+        "api-extensions"
+      ],
+      "kind": "MutatingAdmissionPolicyBinding",
+      "name": "mutatingadmissionpolicybindings",
+      "namespaced": false,
+      "singularName": "mutatingadmissionpolicybinding",
+      "storageVersionHash": "ZKgZT1uTmZ0=",
+      "verbs": [
+        "create",
+        "delete",
+        "deletecollection",
+        "get",
+        "list",
+        "patch",
+        "update",
+        "watch"
+      ]
+    },
+    {
+      "categories": [
+        "api-extensions"
+      ],
       "kind": "MutatingWebhookConfiguration",
       "name": "mutatingwebhookconfigurations",
       "namespaced": false,

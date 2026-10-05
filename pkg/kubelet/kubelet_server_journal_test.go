@@ -18,7 +18,8 @@ package kubelet
 
 import (
 	"bytes"
-	"context"
+	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -31,8 +32,51 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/stretchr/testify/assert"
+	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/ptr"
 )
+
+func TestJournalServerMethodRestriction(t *testing.T) {
+	tests := []struct {
+		name           string
+		method         string
+		expectedStatus int
+		expectedAllow  string
+	}{
+		{
+			name:           "GET is allowed by method gate",
+			method:         http.MethodGet,
+			expectedStatus: http.StatusBadRequest,
+		},
+		{
+			name:           "POST is allowed by method gate",
+			method:         http.MethodPost,
+			expectedStatus: http.StatusBadRequest,
+		},
+		{
+			name:           "PUT is rejected",
+			method:         http.MethodPut,
+			expectedStatus: http.StatusMethodNotAllowed,
+			expectedAllow:  "GET, POST",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// invalid sinceTime forces an early validation error (400), so we only
+			// validate method gating and avoid invoking external log commands.
+			req := httptest.NewRequest(tt.method, "/logs?sinceTime=invalid", nil)
+			recorder := httptest.NewRecorder()
+
+			journal.ServeHTTP(recorder, req)
+
+			assert.Equal(t, tt.expectedStatus, recorder.Code)
+			if tt.expectedAllow != "" {
+				assert.Equal(t, tt.expectedAllow, recorder.Header().Get("Allow"))
+			}
+		})
+	}
+}
 
 func Test_getLoggingCmd(t *testing.T) {
 	var emptyCmdEnv []string
@@ -258,7 +302,7 @@ func Test_nodeLogQuery_validate(t *testing.T) {
 }
 
 func Test_heuristicsCopyFileLogs(t *testing.T) {
-	ctx := context.TODO()
+	tCtx := ktesting.Init(t)
 	buf := &bytes.Buffer{}
 
 	dir, err := os.MkdirTemp("", "logs")
@@ -268,14 +312,14 @@ func Test_heuristicsCopyFileLogs(t *testing.T) {
 	defer func() { _ = os.RemoveAll(dir) }()
 
 	// Check missing logs
-	heuristicsCopyFileLogs(ctx, buf, dir, "service.log")
+	heuristicsCopyFileLogs(tCtx, buf, dir, "service.log")
 	if !strings.Contains(buf.String(), "log not found for service.log") {
 		t.Fail()
 	}
 	buf.Reset()
 
 	// Check missing service logs
-	heuristicsCopyFileLogs(ctx, buf, dir, "service")
+	heuristicsCopyFileLogs(tCtx, buf, dir, "service")
 	if !strings.Contains(buf.String(), "log not found for service") {
 		t.Fail()
 	}
@@ -285,14 +329,14 @@ func Test_heuristicsCopyFileLogs(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, "service.log"), []byte("valid logs"), 0o444); err != nil {
 		t.Fatal(err)
 	}
-	heuristicsCopyFileLogs(ctx, buf, dir, "service.log")
+	heuristicsCopyFileLogs(tCtx, buf, dir, "service.log")
 	if buf.String() != "valid logs" {
 		t.Fail()
 	}
 	buf.Reset()
 
 	// Check service logs
-	heuristicsCopyFileLogs(ctx, buf, dir, "service")
+	heuristicsCopyFileLogs(tCtx, buf, dir, "service")
 	if buf.String() != "valid logs" {
 		t.Fail()
 	}
@@ -302,7 +346,7 @@ func Test_heuristicsCopyFileLogs(t *testing.T) {
 	if err := os.Mkdir(filepath.Join(dir, "service"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	heuristicsCopyFileLogs(ctx, buf, dir, "service")
+	heuristicsCopyFileLogs(tCtx, buf, dir, "service")
 	if buf.String() != "valid logs" {
 		t.Fail()
 	}
@@ -312,7 +356,7 @@ func Test_heuristicsCopyFileLogs(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, "service", "service.log"), []byte("error"), 0o444); err != nil {
 		t.Fatal(err)
 	}
-	heuristicsCopyFileLogs(ctx, buf, dir, "service")
+	heuristicsCopyFileLogs(tCtx, buf, dir, "service")
 	if buf.String() != "valid logs" {
 		t.Fail()
 	}

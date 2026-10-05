@@ -73,7 +73,9 @@ func (p localPath) StripSlashes() localPath {
 }
 
 func isRelative(base, target localPath) bool {
-	relative, err := filepath.Rel(base.String(), target.String())
+	baseNormalized := strings.ReplaceAll(stripTrailingSlash(base.String()), `\`, "/")
+	targetNormalized := strings.ReplaceAll(stripTrailingSlash(target.String()), `\`, "/")
+	relative, err := filepath.Rel(baseNormalized, targetNormalized)
 	if err != nil {
 		return false
 	}
@@ -141,11 +143,18 @@ func stripLeadingSlash(file string) string {
 // stripPathShortcuts removes any leading or trailing "../" from a given path
 func stripPathShortcuts(p string) string {
 	newPath := p
-	trimmed := strings.TrimPrefix(newPath, "../")
+	trimmedPosix := strings.TrimPrefix(newPath, "../")
 
-	for trimmed != newPath {
-		newPath = trimmed
-		trimmed = strings.TrimPrefix(newPath, "../")
+	for trimmedPosix != newPath {
+		newPath = trimmedPosix
+		trimmedPosix = strings.TrimPrefix(newPath, "../")
+	}
+
+	trimmedWindows := strings.TrimPrefix(newPath, `..\`)
+
+	for trimmedWindows != newPath {
+		newPath = trimmedWindows
+		trimmedWindows = strings.TrimPrefix(newPath, `..\`)
 	}
 
 	// trim leftover {".", ".."}
@@ -153,7 +162,7 @@ func stripPathShortcuts(p string) string {
 		newPath = ""
 	}
 
-	if len(newPath) > 0 && string(newPath[0]) == "/" {
+	if len(newPath) > 0 && (string(newPath[0]) == "/" || string(newPath[0]) == `\`) {
 		return newPath[1:]
 	}
 

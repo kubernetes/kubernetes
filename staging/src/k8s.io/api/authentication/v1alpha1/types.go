@@ -26,17 +26,23 @@ import (
 // +genclient:onlyVerbs=create
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:prerelease-lifecycle-gen:introduced=1.26
+// +k8s:prerelease-lifecycle-gen:deprecated=1.29
+// +k8s:prerelease-lifecycle-gen:removed=1.32
+// +k8s:prerelease-lifecycle-gen:replacement=authentication.k8s.io,v1,SelfSubjectReview
 
 // SelfSubjectReview contains the user information that the kube-apiserver has about the user making this request.
 // When using impersonation, users will receive the user info of the user being impersonated.  If impersonation or
 // request header authentication is used, any extra keys will have their case ignored and returned as lowercase.
+// +k8s:supportsSubresource="/status"
 type SelfSubjectReview struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 	// metadata is the standard object's metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
+	// +k8s:opaqueType
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 	// status is filled in by the server with the user attributes.
+	// +optional
 	Status SelfSubjectReviewStatus `json:"status,omitempty" protobuf:"bytes,2,opt,name=status"`
 }
 

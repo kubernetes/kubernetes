@@ -1,22 +1,23 @@
 // Copyright The OpenTelemetry Authors
 // SPDX-License-Identifier: Apache-2.0
 
-package otelgrpc // import "go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
+package otelgrpc
 
 import (
 	"context"
-	"sync/atomic"
+	"strconv"
 	"time"
 
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/metric"
-	semconv "go.opentelemetry.io/otel/semconv/v1.39.0"
-	"go.opentelemetry.io/otel/semconv/v1.39.0/rpcconv"
+	oldrpcconv "go.opentelemetry.io/otel/semconv/v1.37.0/rpcconv" //nolint:depguard // Use of v1.37.0 is required for backward compatibility stability opt-in.
+	semconv "go.opentelemetry.io/otel/semconv/v1.43.0"
+	"go.opentelemetry.io/otel/semconv/v1.43.0/rpcconv"
 	"go.opentelemetry.io/otel/trace"
+
 	grpc_codes "google.golang.org/grpc/codes"
-	"google.golang.org/grpc/peer"
 	"google.golang.org/grpc/stats"
 	"google.golang.org/grpc/status"
 
@@ -25,12 +26,14 @@ import (
 
 type gRPCContextKey struct{}
 
+// dialTargetContextKey carries the dial target seeded by client interceptors
+// so the stats handler can use the hostname for server.address instead of the
+// post-DNS IP from RemoteAddr.
+type dialTargetContextKey struct{}
+
 type gRPCContext struct {
-	inMessages    int64
-	outMessages   int64
-	metricAttrs   []attribute.KeyValue
-	metricAttrSet attribute.Set
-	record        bool
+	metricAttrs []attribute.KeyValue
+	record      bool
 }
 
 type serverHandler struct {
@@ -38,14 +41,17 @@ type serverHandler struct {
 
 	tracer trace.Tracer
 
-	duration rpcconv.ServerCallDuration
-	inSize   int64Hist
-	outSize  int64Hist
+	duration    rpcconv.ServerCallDuration
+	oldDuration oldrpcconv.ServerDuration
 }
 
 // NewServerHandler creates a stats.Handler for a gRPC server.
 func NewServerHandler(opts ...Option) stats.Handler {
 	c := newConfig(opts)
+	if c.SpanKind == trace.SpanKindUnspecified {
+		c.SpanKind = trace.SpanKindServer
+	}
+
 	h := &serverHandler{config: c}
 
 	h.tracer = c.TracerProvider.Tracer(
@@ -60,19 +66,26 @@ func NewServerHandler(opts ...Option) stats.Handler {
 	)
 
 	var err error
-	h.duration, err = rpcconv.NewServerCallDuration(meter)
-	if err != nil {
-		otel.Handle(err)
+	if c.semconvMode == semconvModeOld || c.semconvMode == semconvModeDup {
+		oldDur, err := oldrpcconv.NewServerDuration(meter)
+		if err != nil {
+			otel.Handle(err)
+		} else {
+			h.oldDuration = oldDur
+		}
 	}
 
-	h.inSize, err = rpcconv.NewServerRequestSize(meter)
-	if err != nil {
-		otel.Handle(err)
-	}
-
-	h.outSize, err = rpcconv.NewServerResponseSize(meter)
-	if err != nil {
-		otel.Handle(err)
+	if c.semconvMode == semconvModeNew || c.semconvMode == semconvModeDup {
+		h.duration, err = rpcconv.NewServerCallDuration(
+			meter,
+			metric.WithExplicitBucketBoundaries(
+				0.005, 0.01, 0.025, 0.05, 0.075, 0.1,
+				0.25, 0.5, 0.75, 1, 2.5, 5, 7.5, 10,
+			),
+		)
+		if err != nil {
+			otel.Handle(err)
+		}
 	}
 
 	return h
@@ -91,8 +104,23 @@ func (*serverHandler) HandleConn(context.Context, stats.ConnStats) {
 func (h *serverHandler) TagRPC(ctx context.Context, info *stats.RPCTagInfo) context.Context {
 	ctx = extract(ctx, h.Propagators)
 
-	name, attrs := internal.ParseFullMethod(info.FullMethodName)
-	attrs = append(attrs, semconv.RPCSystemNameGRPC)
+	var name string
+	var attrs []attribute.KeyValue
+
+	switch h.semconvMode {
+	case semconvModeOld:
+		name, attrs = internal.ParseFullMethodOld(info.FullMethodName)
+	case semconvModeDup:
+		var attrsNew, attrsOld []attribute.KeyValue
+		name, attrsNew = internal.ParseFullMethod(info.FullMethodName)
+		_, attrsOld = internal.ParseFullMethodOld(info.FullMethodName)
+		// Combine both. We append New last so its rpc.method (fully qualified) wins when deduplicated.
+		attrs = append(append([]attribute.KeyValue{}, attrsOld...), attrsNew...)
+		attrs = append(attrs, semconv.RPCSystemNameGRPC) // New convention
+	default: // semconvModeNew
+		name, attrs = internal.ParseFullMethod(info.FullMethodName)
+		attrs = append(attrs, semconv.RPCSystemNameGRPC)
+	}
 
 	record := true
 	if h.Filter != nil {
@@ -104,7 +132,7 @@ func (h *serverHandler) TagRPC(ctx context.Context, info *stats.RPCTagInfo) cont
 		spanAttributes := make([]attribute.KeyValue, 0, len(attrs)+len(h.SpanAttributes))
 		spanAttributes = append(append(spanAttributes, attrs...), h.SpanAttributes...)
 		opts := []trace.SpanStartOption{
-			trace.WithSpanKind(trace.SpanKindServer),
+			trace.WithSpanKind(h.SpanKind),
 			trace.WithAttributes(spanAttributes...),
 		}
 		if h.PublicEndpoint || (h.PublicEndpointFn != nil && h.PublicEndpointFn(ctx, info)) {
@@ -131,19 +159,24 @@ func (h *serverHandler) TagRPC(ctx context.Context, info *stats.RPCTagInfo) cont
 		gctx.metricAttrs = append(gctx.metricAttrs, extraAttrs...)
 	}
 
-	gctx.metricAttrSet = attribute.NewSet(gctx.metricAttrs...)
-
 	return context.WithValue(ctx, gRPCContextKey{}, &gctx)
 }
 
 // HandleRPC processes the RPC stats.
 func (h *serverHandler) HandleRPC(ctx context.Context, rs stats.RPCStats) {
+	var dur metric.Float64Histogram
+	if h.semconvMode == semconvModeNew || h.semconvMode == semconvModeDup {
+		dur = h.duration.Inst()
+	}
+	var oldDur metric.Float64Histogram
+	if h.semconvMode == semconvModeOld || h.semconvMode == semconvModeDup {
+		oldDur = h.oldDuration.Inst()
+	}
 	h.handleRPC(
 		ctx,
 		rs,
-		h.duration.Inst(),
-		h.inSize,
-		h.outSize,
+		dur,
+		oldDur,
 		serverStatus,
 	)
 }
@@ -153,14 +186,17 @@ type clientHandler struct {
 
 	tracer trace.Tracer
 
-	duration rpcconv.ClientCallDuration
-	inSize   int64Hist
-	outSize  int64Hist
+	duration    rpcconv.ClientCallDuration
+	oldDuration oldrpcconv.ClientDuration
 }
 
 // NewClientHandler creates a stats.Handler for a gRPC client.
 func NewClientHandler(opts ...Option) stats.Handler {
 	c := newConfig(opts)
+	if c.SpanKind == trace.SpanKindUnspecified {
+		c.SpanKind = trace.SpanKindClient
+	}
+
 	h := &clientHandler{config: c}
 
 	h.tracer = c.TracerProvider.Tracer(
@@ -175,19 +211,26 @@ func NewClientHandler(opts ...Option) stats.Handler {
 	)
 
 	var err error
-	h.duration, err = rpcconv.NewClientCallDuration(meter)
-	if err != nil {
-		otel.Handle(err)
+	if c.semconvMode == semconvModeOld || c.semconvMode == semconvModeDup {
+		oldDur, err := oldrpcconv.NewClientDuration(meter)
+		if err != nil {
+			otel.Handle(err)
+		} else {
+			h.oldDuration = oldDur
+		}
 	}
 
-	h.inSize, err = rpcconv.NewClientResponseSize(meter)
-	if err != nil {
-		otel.Handle(err)
-	}
-
-	h.outSize, err = rpcconv.NewClientRequestSize(meter)
-	if err != nil {
-		otel.Handle(err)
+	if c.semconvMode == semconvModeNew || c.semconvMode == semconvModeDup {
+		h.duration, err = rpcconv.NewClientCallDuration(
+			meter,
+			metric.WithExplicitBucketBoundaries(
+				0.005, 0.01, 0.025, 0.05, 0.075, 0.1,
+				0.25, 0.5, 0.75, 1, 2.5, 5, 7.5, 10,
+			),
+		)
+		if err != nil {
+			otel.Handle(err)
+		}
 	}
 
 	return h
@@ -195,8 +238,23 @@ func NewClientHandler(opts ...Option) stats.Handler {
 
 // TagRPC can attach some information to the given context.
 func (h *clientHandler) TagRPC(ctx context.Context, info *stats.RPCTagInfo) context.Context {
-	name, attrs := internal.ParseFullMethod(info.FullMethodName)
-	attrs = append(attrs, semconv.RPCSystemNameGRPC)
+	var name string
+	var attrs []attribute.KeyValue
+
+	switch h.semconvMode {
+	case semconvModeOld:
+		name, attrs = internal.ParseFullMethodOld(info.FullMethodName)
+	case semconvModeDup:
+		var attrsNew, attrsOld []attribute.KeyValue
+		name, attrsNew = internal.ParseFullMethod(info.FullMethodName)
+		_, attrsOld = internal.ParseFullMethodOld(info.FullMethodName)
+		// Combine both. We append New last so its rpc.method (fully qualified) wins when deduplicated.
+		attrs = append(append([]attribute.KeyValue{}, attrsOld...), attrsNew...)
+		attrs = append(attrs, semconv.RPCSystemNameGRPC) // New convention
+	default: // semconvModeNew
+		name, attrs = internal.ParseFullMethod(info.FullMethodName)
+		attrs = append(attrs, semconv.RPCSystemNameGRPC)
+	}
 
 	record := true
 	if h.Filter != nil {
@@ -210,7 +268,7 @@ func (h *clientHandler) TagRPC(ctx context.Context, info *stats.RPCTagInfo) cont
 		ctx, _ = h.tracer.Start(
 			ctx,
 			name,
-			trace.WithSpanKind(trace.SpanKindClient),
+			trace.WithSpanKind(h.SpanKind),
 			trace.WithAttributes(spanAttributes...),
 		)
 	}
@@ -225,19 +283,24 @@ func (h *clientHandler) TagRPC(ctx context.Context, info *stats.RPCTagInfo) cont
 		gctx.metricAttrs = append(gctx.metricAttrs, extraAttrs...)
 	}
 
-	gctx.metricAttrSet = attribute.NewSet(gctx.metricAttrs...)
-
 	return inject(context.WithValue(ctx, gRPCContextKey{}, &gctx), h.Propagators)
 }
 
 // HandleRPC processes the RPC stats.
 func (h *clientHandler) HandleRPC(ctx context.Context, rs stats.RPCStats) {
+	var dur metric.Float64Histogram
+	if h.semconvMode == semconvModeNew || h.semconvMode == semconvModeDup {
+		dur = h.duration.Inst()
+	}
+	var oldDur metric.Float64Histogram
+	if h.semconvMode == semconvModeOld || h.semconvMode == semconvModeDup {
+		oldDur = h.oldDuration.Inst()
+	}
 	h.handleRPC(
 		ctx,
 		rs,
-		h.duration.Inst(),
-		h.inSize,
-		h.outSize,
+		dur,
+		oldDur,
 		func(s *status.Status) (codes.Code, string) {
 			return codes.Error, s.Message()
 		},
@@ -254,15 +317,11 @@ func (*clientHandler) HandleConn(context.Context, stats.ConnStats) {
 	// no-op
 }
 
-type int64Hist interface {
-	RecordSet(context.Context, int64, attribute.Set)
-}
-
-func (c *config) handleRPC(
+func (*config) handleRPC(
 	ctx context.Context,
 	rs stats.RPCStats,
 	duration metric.Float64Histogram,
-	inSize, outSize int64Hist,
+	oldDuration metric.Float64Histogram,
 	recordStatus func(*status.Status) (codes.Code, string),
 ) {
 	gctx, _ := ctx.Value(gRPCContextKey{}).(*gRPCContext)
@@ -271,47 +330,46 @@ func (c *config) handleRPC(
 	}
 
 	span := trace.SpanFromContext(ctx)
-	var messageId int64
 
 	switch rs := rs.(type) {
 	case *stats.Begin:
-	case *stats.InPayload:
-		if gctx != nil {
-			messageId = atomic.AddInt64(&gctx.inMessages, 1)
-			inSize.RecordSet(ctx, int64(rs.Length), gctx.metricAttrSet)
+		// Set server.address early from the dial target when available (upcoming
+		// interceptors will seed this). Covers both success and failure paths since Begin
+		// fires on every RPC regardless of outcome.
+		if rs.Client {
+			if target, ok := ctx.Value(dialTargetContextKey{}).(string); ok && target != "" {
+				attrs := serverAddrAttrsFromCanonicalTarget(target)
+				if span.IsRecording() {
+					span.SetAttributes(attrs...)
+				}
+				if gctx != nil {
+					gctx.metricAttrs = append(gctx.metricAttrs, attrs...)
+				}
+			}
 		}
-
-		if c.ReceivedEvent && span.IsRecording() {
-			span.AddEvent("message",
-				trace.WithAttributes(
-					semconv.RPCMessageTypeReceived,
-					semconv.RPCMessageIDKey.Int64(messageId),
-					semconv.RPCMessageCompressedSizeKey.Int(rs.CompressedLength),
-					semconv.RPCMessageUncompressedSizeKey.Int(rs.Length),
-				),
-			)
+	case *stats.InPayload:
+	case *stats.InHeader:
+		if !rs.Client && rs.LocalAddr != nil {
+			if span.IsRecording() {
+				span.SetAttributes(serverAddrAttrs(rs.LocalAddr.String())...)
+			}
+			// TODO: add server.address and server.port to metrics once the API supports opt-in attributes.
 		}
 	case *stats.OutPayload:
-		if gctx != nil {
-			messageId = atomic.AddInt64(&gctx.outMessages, 1)
-			outSize.RecordSet(ctx, int64(rs.Length), gctx.metricAttrSet)
-		}
-
-		if c.SentEvent && span.IsRecording() {
-			span.AddEvent("message",
-				trace.WithAttributes(
-					semconv.RPCMessageTypeSent,
-					semconv.RPCMessageIDKey.Int64(messageId),
-					semconv.RPCMessageCompressedSizeKey.Int(rs.CompressedLength),
-					semconv.RPCMessageUncompressedSizeKey.Int(rs.Length),
-				),
-			)
-		}
 	case *stats.OutTrailer:
 	case *stats.OutHeader:
-		if span.IsRecording() {
-			if p, ok := peer.FromContext(ctx); ok {
-				span.SetAttributes(serverAddrAttrs(p.Addr.String())...)
+		// Only use the resolved IP from RemoteAddr when no dial target was seeded
+		// (i.e. NewClientHandler callers without interceptors). When dialTargetContextKey
+		// is present, Begin already set server.address to the hostname.
+		if rs.Client && rs.RemoteAddr != nil && (span.IsRecording() || gctx != nil) {
+			if target, ok := ctx.Value(dialTargetContextKey{}).(string); !ok || target == "" {
+				attrs := serverAddrAttrs(rs.RemoteAddr.String())
+				if span.IsRecording() {
+					span.SetAttributes(attrs...)
+				}
+				if gctx != nil {
+					gctx.metricAttrs = append(gctx.metricAttrs, attrs...)
+				}
 			}
 		}
 	case *stats.End:
@@ -320,9 +378,9 @@ func (c *config) handleRPC(
 		var s *status.Status
 		if rs.Error != nil {
 			s, _ = status.FromError(rs.Error)
-			rpcStatusAttr = semconv.RPCResponseStatusCode(s.Code().String())
+			rpcStatusAttr = semconv.RPCResponseStatusCode(canonicalString(s.Code()))
 		} else {
-			rpcStatusAttr = semconv.RPCResponseStatusCode(grpc_codes.OK.String())
+			rpcStatusAttr = semconv.RPCResponseStatusCode(canonicalString(grpc_codes.OK))
 		}
 		if span.IsRecording() {
 			if s != nil {
@@ -333,24 +391,99 @@ func (c *config) handleRPC(
 			span.End()
 		}
 
-		var metricAttrs []attribute.KeyValue
-		if gctx != nil {
-			// Don't use gctx.metricAttrSet here, because it requires passing
-			// multiple RecordOptions, which would call metric.mergeSets and
-			// allocate a new set for each Record call.
-			metricAttrs = make([]attribute.KeyValue, 0, len(gctx.metricAttrs)+1)
-			metricAttrs = append(metricAttrs, gctx.metricAttrs...)
+		var durationEnabled bool
+		var oldDurationEnabled bool
+
+		if duration != nil {
+			durationEnabled = duration.Enabled(ctx)
 		}
-		metricAttrs = append(metricAttrs, rpcStatusAttr)
-		// Allocate vararg slice once.
-		recordOpts := []metric.RecordOption{metric.WithAttributeSet(attribute.NewSet(metricAttrs...))}
+		if oldDuration != nil {
+			oldDurationEnabled = oldDuration.Enabled(ctx)
+		}
 
-		// Use floating point division here for higher precision (instead of Millisecond method).
-		// Measure right before calling Record() to capture as much elapsed time as possible.
-		elapsedTime := float64(rs.EndTime.Sub(rs.BeginTime)) / float64(time.Millisecond)
+		if durationEnabled || oldDurationEnabled {
+			var metricAttrs []attribute.KeyValue
+			if gctx != nil {
+				// Don't use gctx.metricAttrSet here, because it requires passing
+				// multiple RecordOptions, which would call metric.mergeSets and
+				// allocate a new set for each Record call.
+				metricAttrs = make([]attribute.KeyValue, 0, len(gctx.metricAttrs)+2)
+				metricAttrs = append(metricAttrs, gctx.metricAttrs...)
+			}
+			metricAttrs = append(metricAttrs, rpcStatusAttr)
 
-		duration.Record(ctx, elapsedTime, recordOpts...)
+			// error.type is Conditionally Required on the stable rpc.*.call.duration
+			// metrics when the RPC failed, and SHOULD be set to the returned status
+			// code. The failure classification is role-specific: clients treat every
+			// non-OK status as an error, while servers only classify Unknown,
+			// DeadlineExceeded, Unimplemented, Internal, Unavailable and DataLoss
+			// as errors. Use recordStatus so the client and server rules are applied
+			// independently (e.g. a client cancellation is not a server error).
+			// The legacy v1.37 rpc.*.duration conventions did not define error.type,
+			// so the compatibility instruments keep the unmodified attribute set.
+			// Build each record option only in its enabled branch: single-mode
+			// configurations (rpc, rpc/old) must not allocate the other set, and
+			// error.type is only appended after the legacy instruments recorded.
+
+			// Use floating point division here for higher precision (instead of Millisecond method).
+			// Measure right before calling Record() to capture as much elapsed time as possible.
+			elapsedTime := float64(rs.EndTime.Sub(rs.BeginTime)) / float64(time.Second)
+
+			if oldDurationEnabled {
+				oldDuration.Record(ctx, elapsedTime*1000.0, metric.WithAttributeSet(attribute.NewSet(metricAttrs...)))
+			}
+			if durationEnabled {
+				if s != nil {
+					if c, _ := recordStatus(s); c == codes.Error {
+						metricAttrs = append(metricAttrs, semconv.ErrorTypeKey.String(canonicalString(s.Code())))
+					}
+				}
+				duration.Record(ctx, elapsedTime, metric.WithAttributeSet(attribute.NewSet(metricAttrs...)))
+			}
+		}
+
 	default:
 		return
+	}
+}
+
+func canonicalString(code grpc_codes.Code) string {
+	switch code {
+	case grpc_codes.OK:
+		return "OK"
+	case grpc_codes.Canceled:
+		return "CANCELLED"
+	case grpc_codes.Unknown:
+		return "UNKNOWN"
+	case grpc_codes.InvalidArgument:
+		return "INVALID_ARGUMENT"
+	case grpc_codes.DeadlineExceeded:
+		return "DEADLINE_EXCEEDED"
+	case grpc_codes.NotFound:
+		return "NOT_FOUND"
+	case grpc_codes.AlreadyExists:
+		return "ALREADY_EXISTS"
+	case grpc_codes.PermissionDenied:
+		return "PERMISSION_DENIED"
+	case grpc_codes.ResourceExhausted:
+		return "RESOURCE_EXHAUSTED"
+	case grpc_codes.FailedPrecondition:
+		return "FAILED_PRECONDITION"
+	case grpc_codes.Aborted:
+		return "ABORTED"
+	case grpc_codes.OutOfRange:
+		return "OUT_OF_RANGE"
+	case grpc_codes.Unimplemented:
+		return "UNIMPLEMENTED"
+	case grpc_codes.Internal:
+		return "INTERNAL"
+	case grpc_codes.Unavailable:
+		return "UNAVAILABLE"
+	case grpc_codes.DataLoss:
+		return "DATA_LOSS"
+	case grpc_codes.Unauthenticated:
+		return "UNAUTHENTICATED"
+	default:
+		return "CODE(" + strconv.FormatInt(int64(code), 10) + ")"
 	}
 }

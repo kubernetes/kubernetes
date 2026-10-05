@@ -19,6 +19,8 @@ package daemonset
 import (
 	"context"
 
+	"sigs.k8s.io/structured-merge-diff/v7/fieldpath"
+
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1validation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -29,17 +31,16 @@ import (
 	"k8s.io/kubernetes/pkg/api/pod"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/apps/validation"
-	"sigs.k8s.io/structured-merge-diff/v6/fieldpath"
 )
 
 // daemonSetStrategy implements verification logic for daemon sets.
 type daemonSetStrategy struct {
-	runtime.ObjectTyper
+	rest.DeclarativeValidation
 	names.NameGenerator
 }
 
 // Strategy is the default logic that applies when creating and updating DaemonSet objects.
-var Strategy = daemonSetStrategy{legacyscheme.Scheme, names.SimpleNameGenerator}
+var Strategy = daemonSetStrategy{rest.DeclarativeValidation{Scheme: legacyscheme.Scheme}, names.SimpleNameGenerator}
 
 // Make sure we correctly implement the interface.
 var _ = rest.GarbageCollectionDeleteStrategy(Strategy)
@@ -132,7 +133,7 @@ func (daemonSetStrategy) Canonicalize(obj runtime.Object) {
 
 // AllowCreateOnUpdate is false for daemon set; this means a POST is
 // needed to create one
-func (daemonSetStrategy) AllowCreateOnUpdate() bool {
+func (daemonSetStrategy) AllowCreateOnUpdate(ctx context.Context) bool {
 	return false
 }
 
@@ -159,7 +160,7 @@ func (daemonSetStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.
 }
 
 // AllowUnconditionalUpdate is the default update policy for daemon set objects.
-func (daemonSetStrategy) AllowUnconditionalUpdate() bool {
+func (daemonSetStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {
 	return true
 }
 

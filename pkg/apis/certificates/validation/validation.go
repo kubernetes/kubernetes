@@ -22,13 +22,13 @@ import (
 	"crypto/ecdsa"
 	"crypto/ed25519"
 	"crypto/elliptic"
+	"crypto/mldsa"
 	"crypto/rsa"
 	"crypto/sha256"
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
 	"net/mail"
-	"strconv"
 	"strings"
 	"time"
 
@@ -40,9 +40,11 @@ import (
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utilcert "k8s.io/client-go/util/cert"
 	"k8s.io/kubernetes/pkg/apis/certificates"
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/utils/clock"
 )
 
@@ -88,18 +90,25 @@ type certificateValidationOptions struct {
 	allowUnknownUsages bool
 	// allow duplicate usages values
 	allowDuplicateUsages bool
+	// allow ML-DSA signed requests
+	allowMLDSASignedRequests bool
 }
 
 // validateCSR validates the signature and formatting of a base64-wrapped,
 // PEM-encoded PKCS#10 certificate signing request. If this is invalid, we must
 // not accept the CSR for further processing.
-func validateCSR(obj *certificates.CertificateSigningRequest) error {
+func validateCSR(obj *certificates.CertificateSigningRequest) (*x509.CertificateRequest, error) {
 	csr, err := certificates.ParseCSR(obj.Spec.Request)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	// check that the signature is valid
-	return csr.CheckSignature()
+	err = csr.CheckSignature()
+	if err != nil {
+		return nil, err
+	}
+
+	return csr, nil
 }
 
 func validateCertificate(pemData []byte) error {
@@ -176,6 +185,21 @@ var (
 		string(certificates.UsageMicrosoftSGC),
 		string(certificates.UsageNetscapeSGC),
 	)
+
+	mldsaDisallowedUsages = sets.NewString(
+		string(certificates.UsageKeyEncipherment),
+		string(certificates.UsageKeyAgreement),
+		string(certificates.UsageDataEncipherment),
+		string(certificates.UsageEncipherOnly),
+		string(certificates.UsageDecipherOnly),
+	)
+
+	mldsaAtLeastOneOfUsages = sets.NewString(
+		string(certificates.UsageDigitalSignature),
+		string(certificates.UsageContentCommitment),
+		string(certificates.UsageCertSign),
+		string(certificates.UsageCRLSign),
+	)
 )
 
 func validateCertificateSigningRequest(csr *certificates.CertificateSigningRequest, opts certificateValidationOptions) field.ErrorList {
@@ -183,17 +207,17 @@ func validateCertificateSigningRequest(csr *certificates.CertificateSigningReque
 	allErrs := apivalidation.ValidateObjectMeta(&csr.ObjectMeta, isNamespaced, ValidateCertificateRequestName, field.NewPath("metadata"))
 
 	specPath := field.NewPath("spec")
-	err := validateCSR(csr)
+	certReq, err := validateCSR(csr)
 	if err != nil {
 		allErrs = append(allErrs, field.Invalid(specPath.Child("request"), csr.Spec.Request, fmt.Sprintf("%v", err)))
 	}
 	if len(csr.Spec.Usages) == 0 {
-		allErrs = append(allErrs, field.Required(specPath.Child("usages"), ""))
+		allErrs = append(allErrs, field.Required(specPath.Child("usages"), "").MarkCoveredByDeclarative())
 	}
 	if !opts.allowUnknownUsages {
 		for i, usage := range csr.Spec.Usages {
 			if !allValidUsages.Has(string(usage)) {
-				allErrs = append(allErrs, field.NotSupported(specPath.Child("usages").Index(i), usage, allValidUsages.List()))
+				allErrs = append(allErrs, field.NotSupported(specPath.Child("usages").Index(i), usage, allValidUsages.List()).MarkCoveredByDeclarative())
 			}
 		}
 	}
@@ -206,6 +230,40 @@ func validateCertificateSigningRequest(csr *certificates.CertificateSigningReque
 			seen[usage] = true
 		}
 	}
+
+	// As documented by https://www.rfc-editor.org/rfc/rfc9881.html#name-key-usage-bits
+	// ML-DSA certificates must contain at least one of the usages:
+	//     - digitalSignature
+	//     - nonRepudiation (also known as contentCommitment)
+	//     - keyCertSign
+	//     - cRLSign
+	// and must not contain any of the usages:
+	//     - keyEncipherment
+	//     - dataEncipherment
+	//     - keyAgreement
+	//     - encipherOnly
+	//     - decipherOnly
+	if certReq != nil && certReq.PublicKeyAlgorithm == x509.MLDSA {
+		if opts.allowMLDSASignedRequests {
+			hasAtLeastOneRequired := false
+			for i, usage := range csr.Spec.Usages {
+				if mldsaDisallowedUsages.Has(string(usage)) {
+					allErrs = append(allErrs, field.Invalid(specPath.Child("usages").Index(i), usage, fmt.Sprintf("When using ML-DSA keys, the usages %v are not allowed", mldsaDisallowedUsages.List())))
+				}
+
+				if !hasAtLeastOneRequired && mldsaAtLeastOneOfUsages.Has(string(usage)) {
+					hasAtLeastOneRequired = true
+				}
+			}
+
+			if !hasAtLeastOneRequired {
+				allErrs = append(allErrs, field.Invalid(specPath.Child("usages"), csr.Spec.Usages, fmt.Sprintf("When using ML-DSA keys, at least one of %v usages are required", mldsaAtLeastOneOfUsages.List())))
+			}
+		} else {
+			allErrs = append(allErrs, field.Invalid(specPath.Child("request"), csr.Spec.Request, "ML-DSA keys cannot be used for requests"))
+		}
+	}
+
 	if !opts.allowLegacySignerName && csr.Spec.SignerName == certificates.LegacyUnknownSignerName {
 		allErrs = append(allErrs, field.Invalid(specPath.Child("signerName"), csr.Spec.SignerName, "the legacy signerName is not allowed via this API version"))
 	} else {
@@ -278,20 +336,24 @@ func validateConditions(fldPath *field.Path, csr *certificates.CertificateSignin
 }
 
 func ValidateCertificateSigningRequestUpdate(newCSR, oldCSR *certificates.CertificateSigningRequest) field.ErrorList {
-	opts := getValidationOptions(newCSR, oldCSR)
-	return validateCertificateSigningRequestUpdate(newCSR, oldCSR, opts)
+	allErrs := apivalidation.ValidateObjectMetaUpdate(&newCSR.ObjectMeta, &oldCSR.ObjectMeta, field.NewPath("metadata"))
+	allErrs = append(allErrs, apivalidation.ValidateImmutableField(&newCSR.Spec, &oldCSR.Spec, field.NewPath("spec")).WithOrigin("immutable").MarkCoveredByDeclarative()...)
+	allErrs = append(allErrs, apivalidation.ValidateImmutableField(&newCSR.Status, &oldCSR.Status, field.NewPath("status"))...)
+	return allErrs
 }
 
 func ValidateCertificateSigningRequestStatusUpdate(newCSR, oldCSR *certificates.CertificateSigningRequest) field.ErrorList {
+	allErrs := apivalidation.ValidateImmutableField(&newCSR.Spec, &oldCSR.Spec, field.NewPath("spec")).WithOrigin("immutable").MarkCoveredByDeclarative()
 	opts := getValidationOptions(newCSR, oldCSR)
 	opts.allowSettingCertificate = true
-	return validateCertificateSigningRequestUpdate(newCSR, oldCSR, opts)
+	return append(allErrs, validateCertificateSigningRequestUpdate(newCSR, oldCSR, opts)...)
 }
 
 func ValidateCertificateSigningRequestApprovalUpdate(newCSR, oldCSR *certificates.CertificateSigningRequest) field.ErrorList {
+	allErrs := apivalidation.ValidateImmutableField(&newCSR.Spec, &oldCSR.Spec, field.NewPath("spec")).WithOrigin("immutable").MarkCoveredByDeclarative()
 	opts := getValidationOptions(newCSR, oldCSR)
 	opts.allowSettingApprovalConditions = true
-	return validateCertificateSigningRequestUpdate(newCSR, oldCSR, opts)
+	return append(allErrs, validateCertificateSigningRequestUpdate(newCSR, oldCSR, opts)...)
 }
 
 func validateCertificateSigningRequestUpdate(newCSR, oldCSR *certificates.CertificateSigningRequest, opts certificateValidationOptions) field.ErrorList {
@@ -360,6 +422,7 @@ func getValidationOptions(newCSR, oldCSR *certificates.CertificateSigningRequest
 		allowArbitraryCertificate:    allowArbitraryCertificate(newCSR, oldCSR),
 		allowDuplicateUsages:         allowDuplicateUsages(oldCSR),
 		allowUnknownUsages:           allowUnknownUsages(oldCSR),
+		allowMLDSASignedRequests:     allowMLDSASignedRequests(oldCSR),
 	}
 }
 
@@ -474,6 +537,25 @@ func hasDuplicateUsage(usages []certificates.KeyUsage) bool {
 	return false
 }
 
+func allowMLDSASignedRequests(oldCSR *certificates.CertificateSigningRequest) bool {
+	if utilfeature.DefaultFeatureGate.Enabled(features.CertificateSigningRequestMLDSA) {
+		return true
+	}
+
+	if oldCSR != nil {
+		cr, err := certificates.ParseCSR(oldCSR.Spec.Request)
+		if err != nil {
+			return false
+		}
+
+		if cr.PublicKeyAlgorithm == x509.MLDSA {
+			return true
+		}
+	}
+
+	return false
+}
+
 type ValidateClusterTrustBundleOptions struct {
 	SuppressBundleParsing bool
 }
@@ -512,7 +594,7 @@ func ValidateClusterTrustBundleUpdate(newBundle, oldBundle *certificates.Cluster
 	var allErrors field.ErrorList
 	allErrors = append(allErrors, ValidateClusterTrustBundle(newBundle, opts)...)
 	allErrors = append(allErrors, apivalidation.ValidateObjectMetaUpdate(&newBundle.ObjectMeta, &oldBundle.ObjectMeta, field.NewPath("metadata"))...)
-	allErrors = append(allErrors, apivalidation.ValidateImmutableField(newBundle.Spec.SignerName, oldBundle.Spec.SignerName, field.NewPath("spec", "signerName"))...)
+	allErrors = append(allErrors, apivalidation.ValidateImmutableField(newBundle.Spec.SignerName, oldBundle.Spec.SignerName, field.NewPath("spec", "signerName")).WithOrigin("immutable").MarkAlpha().MarkCoveredByDeclarative()...)
 	return allErrors
 }
 
@@ -752,8 +834,14 @@ func validateStubPKCS10Request(req *certificates.PodCertificateRequest) field.Er
 			allErrors = append(allErrors, field.Invalid(pkcs10ReqPath, fmt.Sprintf("%d-bit modulus", pkcs10Pub.Size()*8), "RSA keys must have modulus size 3072 or 4096"))
 			return allErrors
 		}
+	case *mldsa.PublicKey:
+		keyParam := pkcs10Pub.Parameters().String()
+		if keyParam != mldsa.MLDSA44().String() && keyParam != mldsa.MLDSA65().String() && keyParam != mldsa.MLDSA87().String() {
+			allErrors = append(allErrors, field.Invalid(pkcs10ReqPath, fmt.Sprintf("key parameters %q", keyParam), fmt.Sprintf("ML-DSA keys must have key parameters of %s, %s, or %s", mldsa.MLDSA44().String(), mldsa.MLDSA65().String(), mldsa.MLDSA87().String())))
+			return allErrors
+		}
 	default:
-		allErrors = append(allErrors, field.Invalid(pkcs10ReqPath, field.OmitValueType{}, "unknown public key type; supported types are Ed25519, ECDSA, and RSA"))
+		allErrors = append(allErrors, field.Invalid(pkcs10ReqPath, field.OmitValueType{}, "unknown public key type; supported types are Ed25519, ECDSA, RSA, and ML-DSA"))
 		return allErrors
 	}
 
@@ -825,13 +913,13 @@ func ValidatePodCertificateRequestStatusUpdate(newReq, oldReq *certificates.PodC
 		case certificates.PodCertificateRequestConditionTypeIssued, certificates.PodCertificateRequestConditionTypeDenied, certificates.PodCertificateRequestConditionTypeFailed:
 			numKnownConditions++
 			if numKnownConditions > 1 {
-				allErrors = append(allErrors, field.Invalid(field.NewPath("status", "conditions", formatIndex(i), "type"), cond.Type, `There may be at most one condition with type "Issued", "Denied", or "Failed"`))
+				allErrors = append(allErrors, field.Invalid(field.NewPath("status", "conditions").Index(i).Child("type"), cond.Type, `There may be at most one condition with type "Issued", "Denied", or "Failed"`))
 			}
 			if cond.Status != metav1.ConditionTrue {
-				allErrors = append(allErrors, field.NotSupported(field.NewPath("status", "conditions", formatIndex(i), "status"), cond.Status, []metav1.ConditionStatus{metav1.ConditionTrue}))
+				allErrors = append(allErrors, field.NotSupported(field.NewPath("status", "conditions").Index(i).Child("status"), cond.Status, []metav1.ConditionStatus{metav1.ConditionTrue}))
 			}
 		default:
-			allErrors = append(allErrors, field.NotSupported(field.NewPath("status", "conditions", formatIndex(i), "type"), cond.Type, []string{certificates.PodCertificateRequestConditionTypeIssued, certificates.PodCertificateRequestConditionTypeDenied, certificates.PodCertificateRequestConditionTypeFailed}))
+			allErrors = append(allErrors, field.NotSupported(field.NewPath("status", "conditions").Index(i).Child("type"), cond.Type, []string{certificates.PodCertificateRequestConditionTypeIssued, certificates.PodCertificateRequestConditionTypeDenied, certificates.PodCertificateRequestConditionTypeFailed}))
 		}
 	}
 
@@ -931,6 +1019,11 @@ func ValidatePodCertificateRequestStatusUpdate(newReq, oldReq *certificates.PodC
 				return allErrors
 			}
 		case *ecdsa.PublicKey:
+			if !wantPK.Equal(leafCert.PublicKey) {
+				allErrors = append(allErrors, field.Invalid(certChainPath, newReq.Status.CertificateChain, "leaf certificate was not issued to the requested public key"))
+				return allErrors
+			}
+		case *mldsa.PublicKey:
 			if !wantPK.Equal(leafCert.PublicKey) {
 				allErrors = append(allErrors, field.Invalid(certChainPath, newReq.Status.CertificateChain, "leaf certificate was not issued to the requested public key"))
 				return allErrors
@@ -1046,10 +1139,6 @@ func pcrIsFailed(pcr *certificates.PodCertificateRequest) bool {
 		}
 	}
 	return false
-}
-
-func formatIndex(i int) string {
-	return "[" + strconv.Itoa(i) + "]"
 }
 
 // Similar to apivalidation.ValidateImmutableField but we can supply our own detail string.

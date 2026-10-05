@@ -202,12 +202,9 @@ func TestPodLogsKubeletClientCertReload(t *testing.T) {
 	t.Cleanup(cancel)
 
 	origCertCallbackRefreshDuration := transport.CertCallbackRefreshDuration
-	origDialerStopCh := transport.DialerStopCh
 	transport.CertCallbackRefreshDuration = time.Second // make client cert reloading fast
-	transport.DialerStopCh = ctx.Done()
 	t.Cleanup(func() {
 		transport.CertCallbackRefreshDuration = origCertCallbackRefreshDuration
-		transport.DialerStopCh = origDialerStopCh
 	})
 
 	// create a CA to sign the API server's kubelet client cert
@@ -356,7 +353,7 @@ func generateClientCert(t *testing.T) testCerts {
 		NotBefore:    caCert.NotBefore,
 		SerialNumber: serial,
 		NotAfter:     time.Now().Add(time.Hour).UTC(),
-		KeyUsage:     x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
+		KeyUsage:     x509.KeyUsageDigitalSignature,
 		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
 	}
 	clientCertDERBytes, err := x509.CreateCertificate(rand.Reader, &certTmpl, caCert, clientCertKey.Public(), caPrivateKey)

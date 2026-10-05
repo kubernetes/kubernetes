@@ -91,7 +91,7 @@ func (t Timestamp) ConvertToNative(typeDesc reflect.Type) (any, error) {
 	case anyValueType:
 		// Pack the underlying time as a tpb.Timestamp into an Any value.
 		return anypb.New(tpb.New(t.Time))
-	case jsonValueType:
+	case JSONValueType:
 		// CEL follows the proto3 to JSON conversion which formats as an RFC 3339 encoded JSON
 		// string.
 		v := t.ConvertToType(StringType)
@@ -301,6 +301,9 @@ func timeZone(tz ref.Val, visitor timestampVisitor) timestampVisitor {
 		min, err := strconv.Atoi(string(val[ind+1:]))
 		if err != nil {
 			return WrapErr(err)
+		}
+		if min < 0 || min > 59 {
+			return WrapErr(fmt.Errorf("timezone offset minutes out of range [0, 59]: %s", val))
 		}
 		var offset int
 		if string(val[0]) == "-" {

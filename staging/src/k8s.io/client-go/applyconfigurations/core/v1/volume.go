@@ -30,7 +30,7 @@ type VolumeApplyConfiguration struct {
 	// volumeSource represents the location and type of the mounted volume.
 	// If not specified, the Volume is implied to be an EmptyDir.
 	// This implied behavior is deprecated and will be removed in a future version.
-	VolumeSourceApplyConfiguration `json:",inline"`
+	VolumeSourceApplyConfiguration `json:""`
 }
 
 // VolumeApplyConfiguration constructs a declarative configuration of the Volume type for use with

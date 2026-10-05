@@ -1,0 +1,5 @@
+# Disable inheritance as this package contains API-facing validation and requires API approval
+options:
+  no_parent_owners: true
+approvers:
+  - api-approvers

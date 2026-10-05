@@ -15,7 +15,11 @@
 // Package functions defines the standard builtin functions supported by the interpreter
 package functions
 
-import "github.com/google/cel-go/common/types/ref"
+import (
+	"context"
+
+	"github.com/google/cel-go/common/types/ref"
+)
 
 // Overload defines a named overload of a function, indicating an operand trait
 // which must be present on the first argument to the overload as well as one
@@ -41,9 +45,11 @@ type Overload struct {
 	// Binary defines the overload with a BinaryOp implementation. May be nil.
 	Binary BinaryOp
 
-	// Function defines the overload with a FunctionOp implementation. May be
-	// nil.
+	// Function defines the overload with a FunctionOp implementation. May be nil.
 	Function FunctionOp
+
+	// Async defines the overload with an AsyncOp implementation. May be nil.
+	Async AsyncOp
 
 	// NonStrict specifies whether the Overload will tolerate arguments that
 	// are types.Err or types.Unknown.
@@ -51,11 +57,25 @@ type Overload struct {
 }
 
 // UnaryOp is a function that takes a single value and produces an output.
-type UnaryOp func(value ref.Val) ref.Val
+type UnaryOp func(ref.Val) ref.Val
 
 // BinaryOp is a function that takes two values and produces an output.
-type BinaryOp func(lhs ref.Val, rhs ref.Val) ref.Val
+type BinaryOp func(ref.Val, ref.Val) ref.Val
 
 // FunctionOp is a function with accepts zero or more arguments and produces
 // a value or error as a result.
-type FunctionOp func(values ...ref.Val) ref.Val
+type FunctionOp func(...ref.Val) ref.Val
+
+// AsyncOp is a function that accepts zero or more arguments and produces
+// a value or error asynchronously via a channel.
+//
+// AsyncOp is an internal interface intended for use by CEL to manage goroutines and
+// channels associated with async calls. For public API usage, use BlockingAsyncOp.
+// Implementers should listen for context cancellation on the provided context for
+// resource cleanup.
+type AsyncOp func(context.Context, ...ref.Val) <-chan ref.Val
+
+// BlockingAsyncOp is a function that accepts zero or more arguments and blocks until
+// the result is available. When used with AsyncBinding, the framework runs the function
+// in its own goroutine and manages channel lifecycle internally.
+type BlockingAsyncOp func(context.Context, ...ref.Val) ref.Val

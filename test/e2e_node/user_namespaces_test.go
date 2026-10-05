@@ -23,26 +23,28 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"os/exec"
 	"os/user"
+	"path/filepath"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
-	kubefeatures "k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
+	kubeletconfigpaths "k8s.io/kubernetes/pkg/kubelet/kubeletconfig"
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
-	e2eoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
+	"k8s.io/kubernetes/test/e2e_node/services"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
+	"k8s.io/utils/ptr"
 )
 
 var (
@@ -52,59 +54,7 @@ var (
 	getsubuidsBinary            = "getsubids"
 )
 
-var _ = SIGDescribe("UserNamespaces", "[LinuxOnly]", feature.UserNamespacesSupport, framework.WithSerial(), func() {
-	f := framework.NewDefaultFramework("user-namespace-off-test")
-	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
-	f.Context("when UserNamespacesSupport=false in the kubelet", func() {
-		// Turn off UserNamespacesSupport for this test
-		// TODO: once the UserNamespacesSupport feature is removed, this test should be removed too
-		tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
-			if initialConfig.FeatureGates == nil {
-				initialConfig.FeatureGates = make(map[string]bool)
-			}
-			initialConfig.FeatureGates[string(kubefeatures.UserNamespacesSupport)] = false
-			initialConfig.FeatureGates[string(kubefeatures.ProcMountType)] = false
-		})
-		f.It("will fail to create a hostUsers=false pod", func(ctx context.Context) {
-			if on, ok := serviceFeatureGates[string(kubefeatures.UserNamespacesSupport)]; !ok || !on {
-				e2eskipper.Skipf("services do not have user namespaces on")
-			}
-			falseVar := false
-			podClient := e2epod.NewPodClient(f)
-			pod, err := podClient.PodInterface.Create(ctx, &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "userns-pod"},
-				Spec: v1.PodSpec{
-					Containers: []v1.Container{
-						{
-							Name:    "test-container-1",
-							Image:   imageutils.GetE2EImage(imageutils.BusyBox),
-							Command: []string{"/bin/sleep"},
-							Args:    []string{"10000"},
-						},
-					},
-					HostUsers: &falseVar,
-				},
-			}, metav1.CreateOptions{})
-			framework.ExpectNoError(err)
-
-			// Pod should stay in pending
-			// Events would be a better way to tell this, as we could actually read the event,
-			// but history proves events aren't reliable enough to base a test on.
-			gomega.Consistently(ctx, func() error {
-				p, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(ctx, pod.Name, metav1.GetOptions{})
-				if err != nil {
-					return err
-				}
-				if p.Status.Phase != v1.PodPending {
-					return fmt.Errorf("Pod phase isn't pending")
-				}
-				return nil
-			}, 30*time.Second, 5*time.Second).ShouldNot(gomega.HaveOccurred())
-		})
-	})
-})
-
-var _ = SIGDescribe("user namespaces kubeconfig tests", "[LinuxOnly]", feature.UserNamespacesSupport, framework.WithFeatureGate(kubefeatures.UserNamespacesSupport), framework.WithSerial(), func() {
+var _ = SIGDescribe("user namespaces kubeconfig tests", "[LinuxOnly]", feature.UserNamespacesSupport, framework.WithSerial(), func() {
 	f := framework.NewDefaultFramework("userns-kubeconfig")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	f.Context("test config using userNamespaces.idsPerPod", func() {
@@ -144,8 +94,36 @@ var _ = SIGDescribe("user namespaces kubeconfig tests", "[LinuxOnly]", feature.U
 					RestartPolicy: v1.RestartPolicyNever,
 				},
 			}
-			expected := []string{strconv.FormatInt(customIDsPerPod, 10)}
-			e2eoutput.TestContainerOutput(ctx, f, "idsPerPod is configured correctly", pod, 0, expected)
+			podClient := e2epod.NewPodClient(f)
+			createdPod := podClient.Create(ctx, pod)
+			ginkgo.DeferCleanup(func(ctx context.Context) {
+				ginkgo.By("delete the pod")
+				podClient.DeleteSync(ctx, createdPod.Name, metav1.DeleteOptions{GracePeriodSeconds: ptr.To(int64(0))}, f.Timeouts.PodDelete)
+				// DeleteSync waits until the pod is deleted from the API server.
+				// But we need the pod dir to removed from the node before we
+				// continue. The pod dir is not deleted with the pod, but left for
+				// the periodic run of the cleanup function to delete it later. So,
+				// let's wait until the dir is removed.
+				// The reason we need to wait for the dir to be removed is because
+				// tempSetCurrentKubeletConfig's AfterEach will restart the kubelet
+				// with the original idsPerPod. If the pod directory is still on
+				// disk, the kubelet will fail to start as the new kubelet config
+				// can't be honored if we have pods on disk with another config.
+				podDir := filepath.Join(services.KubeletRootDirectory, kubeletconfigpaths.DefaultKubeletPodsDirName, string(createdPod.UID))
+				gomega.Eventually(ctx, func() bool {
+					_, err := os.Stat(podDir)
+					return os.IsNotExist(err)
+				}).WithTimeout(f.Timeouts.PodDelete).Should(gomega.BeTrueBecause("pod directory %s must be removed - kubelet can't restart", podDir))
+			})
+
+			err := e2epod.WaitForPodSuccessInNamespaceTimeout(ctx, f.ClientSet, createdPod.Name, f.Namespace.Name, f.Timeouts.PodStart)
+			framework.ExpectNoError(err)
+
+			logs, err := e2epod.GetPodLogs(ctx, f.ClientSet, f.Namespace.Name, createdPod.Name, "container")
+			framework.ExpectNoError(err)
+			expected := strconv.FormatInt(customIDsPerPod, 10)
+			gomega.Expect(logs).To(gomega.ContainSubstring(expected))
+
 		})
 	})
 })

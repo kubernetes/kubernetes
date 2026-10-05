@@ -44,18 +44,25 @@ var _ = utils.SIGDescribe("CSI Mock VolumeLimitScaling scheduling", framework.Wi
 
 	f.Context("VolumeLimitScaling scheduling", func() {
 		tests := []struct {
-			name              string
-			csiDriverPresent  bool
-			expectSchedulable bool
+			name                          string
+			csiDriverPresent              bool
+			preventPodSchedulingIfMissing *bool
+			expectSchedulable             bool
 		}{
 			{
-				name:              "blocks scheduling when driver not installed and CSIDriver is present",
-				csiDriverPresent:  true,
-				expectSchedulable: false,
+				name:                          "blocks scheduling when driver not installed and CSIDriver opts in",
+				csiDriverPresent:              true,
+				preventPodSchedulingIfMissing: new(true),
+				expectSchedulable:             false,
 			},
 			{
 				name:              "allows scheduling when driver not installed and CSIDriver object is not present",
 				csiDriverPresent:  false,
+				expectSchedulable: true,
+			},
+			{
+				name:              "allows scheduling when driver not installed and CSIDriver does not opt in",
+				csiDriverPresent:  true,
 				expectSchedulable: true,
 			},
 		}
@@ -68,7 +75,9 @@ var _ = utils.SIGDescribe("CSI Mock VolumeLimitScaling scheduling", framework.Wi
 				fakeDriver := fmt.Sprintf("csi-mock-uninstalled-%s", f.Namespace.Name)
 				csiDriver := &storagev1.CSIDriver{
 					ObjectMeta: metav1.ObjectMeta{Name: fakeDriver},
-					Spec:       storagev1.CSIDriverSpec{},
+					Spec: storagev1.CSIDriverSpec{
+						PreventPodSchedulingIfMissing: tc.preventPodSchedulingIfMissing,
+					},
 				}
 
 				if tc.csiDriverPresent {
@@ -138,7 +147,7 @@ var _ = utils.SIGDescribe("CSI Mock VolumeLimitScaling scheduling", framework.Wi
 			}
 
 			// Compose It with feature tags
-			args := []interface{}{tc.name, testFunc}
+			args := []any{tc.name, testFunc}
 			framework.It(args...)
 		}
 	})

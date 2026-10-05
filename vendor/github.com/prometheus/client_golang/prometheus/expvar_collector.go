@@ -47,14 +47,14 @@ func (e *expvarCollector) Collect(ch chan<- Metric) {
 		if expVar == nil {
 			continue
 		}
-		var v interface{}
+		var v any
 		labels := make([]string, len(desc.variableLabels.names))
 		if err := json.Unmarshal([]byte(expVar.String()), &v); err != nil {
 			ch <- NewInvalidMetric(desc, err)
 			continue
 		}
-		var processValue func(v interface{}, i int)
-		processValue = func(v interface{}, i int) {
+		var processValue func(v any, i int)
+		processValue = func(v any, i int) {
 			if i >= len(labels) {
 				copiedLabels := append(make([]string, 0, len(labels)), labels...)
 				switch v := v.(type) {
@@ -72,7 +72,7 @@ func (e *expvarCollector) Collect(ch chan<- Metric) {
 				ch <- m
 				return
 			}
-			vm, ok := v.(map[string]interface{})
+			vm, ok := v.(map[string]any)
 			if !ok {
 				return
 			}
