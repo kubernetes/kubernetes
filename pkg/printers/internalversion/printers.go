@@ -3164,7 +3164,9 @@ func printPriorityLevelConfiguration(obj *flowcontrol.PriorityLevelConfiguration
 	handSize := interface{}("<none>")
 	queueLengthLimit := interface{}("<none>")
 	if obj.Spec.Limited != nil {
-		ncs = obj.Spec.Limited.NominalConcurrencyShares
+		if obj.Spec.Limited.NominalConcurrencyShares != nil {
+			ncs = *obj.Spec.Limited.NominalConcurrencyShares
+		}
 		if qc := obj.Spec.Limited.LimitResponse.Queuing; qc != nil {
 			queues = qc.Queues
 			handSize = qc.HandSize

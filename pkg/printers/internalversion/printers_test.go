@@ -6976,7 +6976,7 @@ func TestPrintPriorityLevelConfiguration(t *testing.T) {
 				Spec: flowcontrol.PriorityLevelConfigurationSpec{
 					Type: flowcontrol.PriorityLevelEnablementLimited,
 					Limited: &flowcontrol.LimitedPriorityLevelConfiguration{
-						NominalConcurrencyShares: 47,
+						NominalConcurrencyShares: ptr.To[int32](47),
 						LimitResponse: flowcontrol.LimitResponse{
 							Type: flowcontrol.LimitResponseTypeReject,
 						},
@@ -6995,7 +6995,7 @@ func TestPrintPriorityLevelConfiguration(t *testing.T) {
 				Spec: flowcontrol.PriorityLevelConfigurationSpec{
 					Type: flowcontrol.PriorityLevelEnablementLimited,
 					Limited: &flowcontrol.LimitedPriorityLevelConfiguration{
-						NominalConcurrencyShares: 42,
+						NominalConcurrencyShares: ptr.To[int32](42),
 						LimitResponse: flowcontrol.LimitResponse{
 							Type: flowcontrol.LimitResponseTypeQueue,
 							Queuing: &flowcontrol.QueuingConfiguration{

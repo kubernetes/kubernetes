@@ -227,7 +227,6 @@ func TestMemoryIdenticalConversion(t *testing.T) {
 		"MutatingWebhookConfiguration.admissionregistration.k8s.io",
 		"Node",
 		"PodCertificateRequest.certificates.k8s.io",
-		"PriorityLevelConfiguration.flowcontrol.apiserver.k8s.io",
 		"ReplicaSet.apps",
 		"Secret",
 		"StatefulSet.apps",
