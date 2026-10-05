@@ -115,6 +115,23 @@ var (
 	}
 
 	watchRequestDistribution = WatchDistribution{
+		Scope: []ChoiceWeight[KeyScope]{
+			{Choice: ScopeCluster, Weight: 40},
+			{Choice: ScopeNamespace, Weight: 30},
+			{Choice: ScopeObject, Weight: 30},
+		},
+		FieldSelector: []ChoiceWeight[WatchFieldSelector]{
+			{Choice: FieldEverything, Weight: 25},
+			{Choice: FieldByName, Weight: 15},
+			{Choice: FieldByNamespace, Weight: 15},
+			{Choice: FieldByNode, Weight: 20},
+			{Choice: FieldByEmptyNode, Weight: 15},
+			{Choice: FieldCombined, Weight: 10},
+		},
+		LabelSelector: []ChoiceWeight[WatchLabelSelector]{
+			{Choice: LabelEverything, Weight: 60},
+			{Choice: LabelByApp, Weight: 40},
+		},
 		SendInitialEvents: []ChoiceWeight[bool]{
 			{Choice: false, Weight: 70},
 			{Choice: true, Weight: 30},
