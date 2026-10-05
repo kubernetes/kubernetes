@@ -19,9 +19,9 @@ package util
 import (
 	"bytes"
 	"crypto/x509"
-	"html/template" //nolint:depguard
 	"strings"
 
+	"k8s.io/cli-runtime/third_party/forked/golang/text/template"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcertutil "k8s.io/client-go/util/cert"
 
@@ -92,10 +92,10 @@ func getJoinCommand(kubeConfigFile, token, key string, controlPlane, skipTokenPr
 	}
 
 	if skipTokenPrint {
-		ctx["Token"] = template.HTML("<value withheld>")
+		ctx["Token"] = "<value withheld>"
 	}
 	if skipCertificateKeyPrint {
-		ctx["CertificateKey"] = template.HTML("<value withheld>")
+		ctx["CertificateKey"] = "<value withheld>"
 	}
 
 	var out bytes.Buffer

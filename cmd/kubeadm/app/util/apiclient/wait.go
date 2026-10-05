@@ -25,7 +25,6 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
-	"text/template"
 	"time"
 
 	"github.com/lithammer/dedent"
@@ -35,6 +34,7 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	netutil "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/cli-runtime/third_party/forked/golang/text/template"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
 

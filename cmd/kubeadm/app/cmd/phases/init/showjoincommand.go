@@ -18,10 +18,10 @@ package phases
 
 import (
 	"io"
-	"text/template"
 
 	"github.com/lithammer/dedent"
 
+	"k8s.io/cli-runtime/third_party/forked/golang/text/template"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
