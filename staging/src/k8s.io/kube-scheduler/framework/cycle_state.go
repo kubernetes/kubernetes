@@ -162,17 +162,10 @@ type PodGroupCycleState interface {
 	// GetParentPlacementCycleState returns PlacementCycleState of the parent composite pod group.
 	// If there is no parent, returns nil.
 	GetParentPlacementCycleState() PlacementCycleState
-	// GetPlacementCycleStateForName returns the PlacementCycleState associated with the
-	// given placement name, or nil if none is registered. A PlacementGeneratePlugin can
-	// attach per-placement data to a placement it generates and read it back in a later
-	// phase of the same plugin (Filter, Score, etc.) for the corresponding placement.
-	GetPlacementCycleStateForName(placementName string) PlacementCycleState
-	// SetPlacementCycleStateForName registers the PlacementCycleState for the given
-	// placement name. A PlacementGeneratePlugin should call this with the name of a
-	// placement it returns to carry per-placement data into the scheduling cycle.
-	// Each plugin must use its own state keys to avoid clobbering other plugins' data.
-	SetPlacementCycleStateForName(placementName string, state PlacementCycleState)
-	// DeletePlacementCycleStateForName removes the PlacementCycleState for the given
-	// placement name. This is used by the framework during placement merging.
-	DeletePlacementCycleStateForName(placementName string)
+	// PlacementState returns the PlacementCycleState for the given placement.
+	// If no state exists for the placement, the method initializes and returns a new one.
+	// If placement is nil, the method returns nil.
+	// A PlacementGeneratePlugin can write per-placement data to this state during
+	// GeneratePlacements and read it from PlacementCycleState in later phases.
+	PlacementState(placement *Placement) PlacementCycleState
 }

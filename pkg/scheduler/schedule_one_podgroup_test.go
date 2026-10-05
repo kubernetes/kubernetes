@@ -3488,7 +3488,10 @@ type placementStateData struct {
 
 func (d *placementStateData) Clone() fwk.StateData { return d }
 
-var placementStateKey fwk.StateKey = "placementStateTracker"
+var (
+	placementStateKey fwk.StateKey = "placementStateTracker"
+	placementSeedKey  fwk.StateKey = "placementSeedTracker"
+)
 
 var _ fwk.FilterPlugin = &placementStateTracker{}
 var _ fwk.PlacementGeneratePlugin = &placementStateTracker{}
@@ -3500,6 +3503,13 @@ func (p *placementStateTracker) Filter(ctx context.Context, state fwk.CycleState
 	placementState := state.GetPlacementCycleState()
 	if placementState == nil {
 		return fwk.NewStatus(fwk.Error, "PlacementCycleState is nil during Filter")
+	}
+	seedData, err := placementState.Read(placementSeedKey)
+	if err != nil {
+		return fwk.NewStatus(fwk.Error, fmt.Sprintf("failed to read seeded PlacementCycleState in Filter: %v", err))
+	}
+	if seedData.(*placementStateData).value == "" {
+		return fwk.NewStatus(fwk.Error, "empty seeded PlacementCycleState in Filter")
 	}
 
 	// Write the node name as a marker so ScorePlacement can verify
@@ -3535,10 +3545,13 @@ func (p *placementStateTracker) GeneratePlacements(ctx context.Context, state fw
 
 	resultPlacements := make([]*fwk.Placement, 0, len(p.generatePlacementsResult))
 	for placementName, nodeNames := range p.generatePlacementsResult {
-		placement := &fwk.Placement{Name: placementName}
+		placement := &fwk.Placement{
+			Name: placementName,
+		}
 		for _, nodeName := range nodeNames {
 			placement.Nodes = append(placement.Nodes, parentNodes[nodeName])
 		}
+		state.PlacementState(placement).Write(placementSeedKey, &placementStateData{value: placementName})
 		resultPlacements = append(resultPlacements, placement)
 	}
 	return &fwk.GeneratePlacementsResult{Placements: resultPlacements}, nil
@@ -3727,6 +3740,9 @@ func (p *multiLevelPlacementStateTracker) Filter(ctx context.Context, state fwk.
 
 func (p *multiLevelPlacementStateTracker) PlacementFeasible(ctx context.Context, state fwk.PlacementCycleState, podGroup fwk.PodGroupInfo, args fwk.PlacementProgress) *fwk.Status {
 	if args.Scheduled == 0 {
+		if _, err := state.Read(placementSeedKey); err != nil {
+			return fwk.AsStatus(fmt.Errorf("failed to read seeded placement state for %s: %w", podGroup.GetKey(), err))
+		}
 		if podGroup.GetPodGroup() != nil {
 			trajectory := []string{}
 			if err := collectHierarchyFromPodGroupCycleState(state.GetPodGroupCycleState(), &trajectory); err != nil {
@@ -3758,6 +3774,11 @@ func (p *multiLevelPlacementStateTracker) PlacementScoreExtensions() fwk.Placeme
 }
 
 func (p *multiLevelPlacementStateTracker) GeneratePlacements(ctx context.Context, state fwk.PodGroupCycleState, podGroup fwk.PodGroupInfo, parentPlacement *fwk.Placement) (*fwk.GeneratePlacementsResult, *fwk.Status) {
+	if parentState := state.GetParentPlacementCycleState(); parentState != nil {
+		if _, err := parentState.Read(placementSeedKey); err != nil {
+			return nil, fwk.AsStatus(fmt.Errorf("failed to read parent seeded placement state for %s: %w", podGroup.GetKey(), err))
+		}
+	}
 	if podGroup.GetPodGroup() != nil {
 		trajectory := []string{}
 		if err := collectHierarchyFromPlacementCycleState(state.GetParentPlacementCycleState(), &trajectory); err != nil {
@@ -3768,7 +3789,12 @@ func (p *multiLevelPlacementStateTracker) GeneratePlacements(ctx context.Context
 	state.Write(hierarchyKey, &hierarchyData{id: podGroup.GetKey().String()})
 	placements := []*fwk.Placement{}
 	for _, placementName := range p.generatePlacementsResult[podGroup.GetKey()] {
-		placements = append(placements, &fwk.Placement{Name: placementName, Nodes: parentPlacement.Nodes})
+		pl := &fwk.Placement{
+			Name:  placementName,
+			Nodes: parentPlacement.Nodes,
+		}
+		state.PlacementState(pl).Write(placementSeedKey, &hierarchyData{id: placementName})
+		placements = append(placements, pl)
 	}
 	return &fwk.GeneratePlacementsResult{Placements: placements}, nil
 }

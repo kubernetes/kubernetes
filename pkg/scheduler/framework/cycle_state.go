@@ -51,13 +51,13 @@ type CycleState struct {
 	// If set to nil, it means this pod is not being scheduled within a placement context.
 	// This field can only be non-nil when GenericWorkload feature flag is enabled.
 	placementCycleState fwk.PlacementCycleState
-	// placementCycleStatesByName holds per-placement state keyed by placement name. It is
-	// populated by PlacementGeneratePlugins (via SetPlacementCycleStateForName) during
-	// placement generation, combined by the framework when merging placements, and consumed
-	// to seed the per-placement CycleState before each placement is simulated.
-	// Only ever populated on a PodGroup-level CycleState.
-	placementCycleStatesByName map[string]fwk.PlacementCycleState
-	// placementStatesMu guards placementCycleStatesByName.
+	// placementStates holds per-placement state keyed by Placement pointer.
+	// PlacementGeneratePlugins populate it via PlacementState during placement generation.
+	// The framework merges entries across plugins and copies the state for a placement
+	// into the per-placement CycleState before placement evaluation.
+	// Only populated on a PodGroup-level CycleState.
+	placementStates map[*fwk.Placement]*CycleState
+	// placementStatesMu guards placementStates.
 	placementStatesMu sync.Mutex
 }
 
@@ -141,99 +141,104 @@ func (c *CycleState) SetPlacementCycleState(placementCycleState fwk.PlacementCyc
 	c.placementCycleState = placementCycleState
 }
 
-// GetPlacementCycleStateForName returns the PlacementCycleState registered under the given
-// placement name, or nil if none is registered.
-func (c *CycleState) GetPlacementCycleStateForName(placementName string) fwk.PlacementCycleState {
-	c.placementStatesMu.Lock()
-	defer c.placementStatesMu.Unlock()
-	return c.placementCycleStatesByName[placementName]
-}
-
-// SetPlacementCycleStateForName registers the PlacementCycleState for the given placement name.
-func (c *CycleState) SetPlacementCycleStateForName(placementName string, state fwk.PlacementCycleState) {
-	c.placementStatesMu.Lock()
-	defer c.placementStatesMu.Unlock()
-	if c.placementCycleStatesByName == nil {
-		c.placementCycleStatesByName = make(map[string]fwk.PlacementCycleState)
+// PlacementState returns the PlacementCycleState for the given placement.
+// If no state exists for the placement, the method initializes and returns a new one.
+// If placement is nil, the method returns nil.
+func (c *CycleState) PlacementState(placement *fwk.Placement) fwk.PlacementCycleState {
+	if c == nil || placement == nil {
+		return nil
 	}
-	c.placementCycleStatesByName[placementName] = state
-}
-
-// DeletePlacementCycleStateForName removes the PlacementCycleState for the given placement name.
-func (c *CycleState) DeletePlacementCycleStateForName(placementName string) {
 	c.placementStatesMu.Lock()
 	defer c.placementStatesMu.Unlock()
-	delete(c.placementCycleStatesByName, placementName)
+	if c.placementStates == nil {
+		c.placementStates = make(map[*fwk.Placement]*CycleState)
+	}
+	ps := c.placementStates[placement]
+	if ps == nil {
+		ps = NewCycleState()
+		c.placementStates[placement] = ps
+	}
+	return ps
 }
 
-// CopyPlacementDataInto clones every StateData entry stored in this state and writes it
-// into dst. It is used by the framework to seed a per-placement CycleState from the named
-// placement state produced during placement generation.
-func (c *CycleState) CopyPlacementDataInto(dst *CycleState) {
-	if c == nil || dst == nil {
+// DeletePlacementStates removes the PlacementCycleState entries for the given placements.
+// The framework calls this method after merging placements to remove intermediate parent states.
+func (c *CycleState) DeletePlacementStates(placements ...*fwk.Placement) {
+	if c == nil {
 		return
 	}
-	c.storage.Range(func(k, v interface{}) bool {
+	c.placementStatesMu.Lock()
+	defer c.placementStatesMu.Unlock()
+	if len(c.placementStates) == 0 {
+		return
+	}
+	for _, p := range placements {
+		delete(c.placementStates, p)
+	}
+}
+
+// CopyPlacementDataInto clones every StateData entry registered for placement and writes
+// it into dst. The scheduler calls this method to seed a per-placement CycleState before
+// placement evaluation.
+func (c *CycleState) CopyPlacementDataInto(placement *fwk.Placement, dst *CycleState) {
+	if c == nil || placement == nil || dst == nil {
+		return
+	}
+	c.placementStatesMu.Lock()
+	src := c.placementStates[placement]
+	c.placementStatesMu.Unlock()
+	if src == nil {
+		return
+	}
+	src.storage.Range(func(k, v interface{}) bool {
 		dst.storage.Store(k, v.(fwk.StateData).Clone())
 		return true
 	})
 }
 
-// MergePlacementStatesInto combines the placement states registered under srcNames into a
-// single PlacementCycleState registered under dstName. Each StateData entry is cloned so the
-// merged placement does not share mutable state with the source placements (which may be
-// reused across other merged placements). If none of the sources hold any state, dstName is
-// left unregistered, since a missing entry seeds the same as an empty one. It returns an error
-// if two source states write the same StateKey, which signals that plugins are not using
-// disjoint keys as required.
-func (c *CycleState) MergePlacementStatesInto(dstName string, srcNames ...string) error {
+// MergePlacementStatesInto combines the placement states for srcs into a single
+// PlacementCycleState for dst. The method clones each StateData entry so the merged
+// placement does not share mutable state with the source placements. If no source
+// holds state, the method leaves dst unregistered and allocates nothing on the heap.
+// If two source states contain the same StateKey, the method returns an error.
+func (c *CycleState) MergePlacementStatesInto(dst *fwk.Placement, srcs ...*fwk.Placement) error {
+	if c == nil || dst == nil {
+		return nil
+	}
 	c.placementStatesMu.Lock()
 	defer c.placementStatesMu.Unlock()
+	if len(c.placementStates) == 0 {
+		return nil
+	}
 
-	merged := NewCycleState()
-	empty := true
-	for _, name := range srcNames {
-		src, ok := c.placementCycleStatesByName[name].(*CycleState)
-		if !ok || src == nil {
+	var merged *CycleState
+	for _, srcPlacement := range srcs {
+		src := c.placementStates[srcPlacement]
+		if src == nil {
 			continue
 		}
 		var conflict *fwk.StateKey
 		src.storage.Range(func(k, v interface{}) bool {
 			key := k.(fwk.StateKey)
+			if merged == nil {
+				merged = NewCycleState()
+			}
 			if _, loaded := merged.storage.LoadOrStore(key, v.(fwk.StateData).Clone()); loaded {
 				keyCopy := key
 				conflict = &keyCopy
 				return false
 			}
-			empty = false
 			return true
 		})
 		if conflict != nil {
-			return fmt.Errorf("conflicting placement cycle state key %q while merging placements %v into %q", *conflict, srcNames, dstName)
+			return fmt.Errorf("conflicting placement cycle state key %q while merging into placement %q", *conflict, dst.Name)
 		}
 	}
-	// Nothing to carry over: leave the name unregistered. A missing entry seeds the same as an
-	// empty one, so skip the allocation rather than register an empty state per merged placement.
-	if empty {
+	if merged == nil {
 		return nil
 	}
-	if c.placementCycleStatesByName == nil {
-		c.placementCycleStatesByName = make(map[string]fwk.PlacementCycleState)
-	}
-	c.placementCycleStatesByName[dstName] = merged
+	c.placementStates[dst] = merged
 	return nil
-}
-
-// clonePlacementCycleState returns a deep copy of the placement-scoped StateData held by
-// state, or returns state unchanged if it is not backed by a *CycleState.
-func clonePlacementCycleState(state fwk.PlacementCycleState) fwk.PlacementCycleState {
-	cs, ok := state.(*CycleState)
-	if !ok || cs == nil {
-		return state
-	}
-	dup := NewCycleState()
-	cs.CopyPlacementDataInto(dup)
-	return dup
 }
 
 func (c *CycleState) SetSkipAllPostFilterPlugins(flag bool) {
@@ -266,12 +271,20 @@ func (c *CycleState) Clone() fwk.CycleState {
 	copy.placementCycleState = c.placementCycleState
 	copy.skipAllPostFilterPlugins = c.skipAllPostFilterPlugins
 
-	// Deep copy the named placement states so the clone does not share mutable StateData.
+	// Deep copy the per-placement states so the clone does not share mutable StateData.
 	c.placementStatesMu.Lock()
-	if c.placementCycleStatesByName != nil {
-		copy.placementCycleStatesByName = make(map[string]fwk.PlacementCycleState, len(c.placementCycleStatesByName))
-		for name, st := range c.placementCycleStatesByName {
-			copy.placementCycleStatesByName[name] = clonePlacementCycleState(st)
+	if len(c.placementStates) > 0 {
+		copy.placementStates = make(map[*fwk.Placement]*CycleState, len(c.placementStates))
+		for p, st := range c.placementStates {
+			if st == nil {
+				continue
+			}
+			dup := NewCycleState()
+			st.storage.Range(func(k, v interface{}) bool {
+				dup.storage.Store(k, v.(fwk.StateData).Clone())
+				return true
+			})
+			copy.placementStates[p] = dup
 		}
 	}
 	c.placementStatesMu.Unlock()
