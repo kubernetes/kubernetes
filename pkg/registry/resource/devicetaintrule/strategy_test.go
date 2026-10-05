@@ -385,9 +385,9 @@ func TestDeviceTaintRuleEmptySelectorWarning(t *testing.T) {
 			selector:      &resource.DeviceTaintSelector{All: new(true)},
 			expectWarning: false,
 		},
-		"all-false-does-not-suppress-warning": {
+		"all-false-is-rejected-by-validation-not-warned": {
 			selector:      &resource.DeviceTaintSelector{All: new(false)},
-			expectWarning: true,
+			expectWarning: false,
 		},
 	}
 

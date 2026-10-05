@@ -86,14 +86,15 @@ func (*deviceTaintRuleStrategy) WarningsOnCreate(ctx context.Context, obj runtim
 }
 
 // warningsForDeviceTaintRule returns a warning when spec.deviceSelector is
-// present but empty (driver, pool, device, and all unset). Such a selector
-// matches every device from every driver in the cluster, which is easy to
-// trigger by mistake. See https://github.com/kubernetes/kubernetes/issues/141422.
-// No warning is returned when all is explicitly set to true: that is now the
-// intentional way to select every device.
+// present but empty (no field set). Such a selector matches every device from
+// every driver in the cluster, which is easy to trigger by mistake.
+// See https://github.com/kubernetes/kubernetes/issues/141422.
+// A selector with all set is not empty: all: true is the intentional way to
+// select every device and all: false is rejected by validation.
 func warningsForDeviceTaintRule(rule *resource.DeviceTaintRule) []string {
 	sel := rule.Spec.DeviceSelector
-	if sel != nil && sel.Driver == nil && sel.Pool == nil && sel.Device == nil && (sel.All == nil || !*sel.All) {
+	var emptySel resource.DeviceTaintSelector
+	if sel != nil && *sel == emptySel {
 		return []string{
 			field.NewPath("spec", "deviceSelector").String() +
 				": an empty selector matches every device from every driver in the cluster; set `all: true` to make this explicit and silence this warning",

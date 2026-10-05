@@ -1105,6 +1105,19 @@ type DeviceTaintSelector struct {
 	// +optional
 	Device *string `json:"device,omitempty" protobuf:"bytes,4,opt,name=device"`
 
+	// Selectors contains the same selection criteria as a ResourceClaim.
+	// Currently, CEL expressions are supported. All of these selectors
+	// must be satisfied.
+	//
+	// +optional
+	// +listType=atomic
+	//
+	// Tombstoned since 1.35 because it turned out that supporting this in all cases
+	// would depend on copying the device attributes into the ResourceClaim allocation
+	// result. Without that the eviction controller cannot evaluate these CEL expressions.
+	//
+	// Selectors []DeviceSelector `json:"selectors,omitempty" protobuf:"bytes,5,rep,name=selectors"`
+
 	// all explicitly selects every device from every driver in the
 	// cluster when set to true. It must not be combined with driver, pool,
 	// or device: those must all be unset when all is true.
@@ -1121,19 +1134,6 @@ type DeviceTaintSelector struct {
 	// +k8s:alpha(since: "1.38")=+k8s:dependentForbidden("pool")
 	// +k8s:alpha(since: "1.38")=+k8s:dependentForbidden("device")
 	All *bool `json:"all,omitempty" protobuf:"varint,6,opt,name=all"`
-
-	// Selectors contains the same selection criteria as a ResourceClaim.
-	// Currently, CEL expressions are supported. All of these selectors
-	// must be satisfied.
-	//
-	// +optional
-	// +listType=atomic
-	//
-	// Tombstoned since 1.35 because it turned out that supporting this in all cases
-	// would depend on copying the device attributes into the ResourceClaim allocation
-	// result. Without that the eviction controller cannot evaluate these CEL expressions.
-	//
-	// Selectors []DeviceSelector `json:"selectors,omitempty" protobuf:"bytes,5,rep,name=selectors"`
 }
 
 // DeviceTaintRuleStatus provides information about an on-going pod eviction.
