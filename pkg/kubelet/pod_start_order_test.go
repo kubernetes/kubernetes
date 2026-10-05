@@ -27,9 +27,11 @@ import (
 	"github.com/stretchr/testify/require"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/tools/record"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
@@ -37,6 +39,8 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/allocation"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
+	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
+	"k8s.io/kubernetes/pkg/kubelet/preemption"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/ptr"
@@ -344,6 +348,132 @@ func TestSortPodAdditionsAccountedRuntimePod(t *testing.T) {
 				wantUIDs = []types.UID{"high", "old"}
 			}
 			assert.Equal(t, wantUIDs, startOrderUIDs(pods))
+		})
+	}
+}
+
+type startOrderAdmitHandler struct {
+	uids []types.UID
+}
+
+func (h *startOrderAdmitHandler) Admit(_ context.Context, attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
+	h.uids = append(h.uids, attrs.Pod.UID)
+	return lifecycle.PodAdmitResult{Admit: true}
+}
+
+func TestHandlePodAdditionsStartOrder(t *testing.T) {
+	for _, test := range []struct {
+		name        string
+		enabled     bool
+		oldPriority int32
+		newPriority int32
+		runtimeUID  types.UID
+		wantUIDs    []types.UID
+	}{
+		{name: "disabled retains creation order", oldPriority: 10, newPriority: 100, wantUIDs: []types.UID{"older", "younger"}},
+		{name: "cold pods use priority", enabled: true, oldPriority: 10, newPriority: 100, wantUIDs: []types.UID{"younger", "older"}},
+		{name: "runtime pod is admitted first", enabled: true, oldPriority: 10, newPriority: 100, runtimeUID: "older", wantUIDs: []types.UID{"older", "younger"}},
+		{name: "younger runtime pod precedes older pending pod", enabled: true, oldPriority: 100, newPriority: 10, runtimeUID: "younger", wantUIDs: []types.UID{"younger", "older"}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodStartingOrderByPriority, test.enabled)
+			tk := newTestKubeletExcludeAdmitHandlers(t, false, false)
+			defer tk.Cleanup()
+			kl := tk.kubelet
+			kl.podWorkers.(*fakePodWorkers).syncPodFn = func(context.Context, kubetypes.SyncPodType, *v1.Pod, *v1.Pod, *kubecontainer.PodStatus) (bool, func(), error) {
+				return false, nil, nil
+			}
+			handler := &startOrderAdmitHandler{}
+			kl.allocationManager.AddPodAdmitHandlers(lifecycle.PodAdmitHandlers{handler})
+			older := podForStartOrder("older", 1, test.oldPriority)
+			younger := podForStartOrder("younger", 2, test.newPriority)
+			if test.runtimeUID != "" {
+				tk.fakeRuntime.AllPodList = []*containertest.FakePod{{Pod: runtimePodForStartOrder(test.runtimeUID, kubecontainer.ContainerStateRunning)}}
+			}
+
+			kl.HandlePodAdditions(ktesting.Init(t), []*v1.Pod{younger, older})
+
+			assert.Equal(t, test.wantUIDs, handler.uids)
+		})
+	}
+}
+
+func TestHandlePodAdditionsStartOrderResourceCompetition(t *testing.T) {
+	for _, test := range []struct {
+		name         string
+		enabled      bool
+		running      bool
+		critical     bool
+		wantAdmitted types.UID
+		wantEvicted  []types.UID
+	}{
+		{name: "disabled cold pods retain old admission", wantAdmitted: "old-low"},
+		{name: "enabled cold pods admit high priority", enabled: true, wantAdmitted: "new-high"},
+		{name: "disabled preserves existing pod", running: true, wantAdmitted: "old-low"},
+		{name: "enabled preserves existing ordinary pod", enabled: true, running: true, wantAdmitted: "old-low"},
+		{name: "disabled permits existing critical preemption", running: true, critical: true, wantAdmitted: "new-high", wantEvicted: []types.UID{"old-low"}},
+		{name: "enabled permits existing critical preemption", enabled: true, running: true, critical: true, wantAdmitted: "new-high", wantEvicted: []types.UID{"old-low"}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodStartingOrderByPriority, test.enabled)
+			tCtx := ktesting.Init(t)
+			logger := klog.FromContext(tCtx)
+			tk := newTestKubeletExcludeAdmitHandlers(t, false, false)
+			defer tk.Cleanup()
+			kl := tk.kubelet
+			kl.nodeLister = testNodeLister{nodes: []*v1.Node{{
+				ObjectMeta: metav1.ObjectMeta{Name: string(kl.nodeName)},
+				Status: v1.NodeStatus{Allocatable: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("4"),
+					v1.ResourceMemory: resource.MustParse("1Gi"),
+					v1.ResourcePods:   resource.MustParse("10"),
+				}},
+			}}}
+			oldLow := podForStartOrder("old-low", 1, 10)
+			newHigh := podForStartOrder("new-high", 2, 100)
+			oldLow.Spec.NodeName = string(kl.nodeName)
+			newHigh.Spec.NodeName = string(kl.nodeName)
+			oldLow.Spec.Containers[0].Resources.Requests = v1.ResourceList{v1.ResourceCPU: resource.MustParse("3")}
+			newHigh.Spec.Containers[0].Resources.Requests = v1.ResourceList{v1.ResourceCPU: resource.MustParse("2")}
+			if test.critical {
+				newHigh.Spec.Priority = ptr.To[int32](scheduling.SystemCriticalPriority)
+			}
+			if test.running {
+				tk.fakeRuntime.AllPodList = []*containertest.FakePod{{Pod: runtimePodForStartOrder(oldLow.UID, kubecontainer.ContainerStateRunning)}}
+			}
+			kl.podWorkers.(*fakePodWorkers).syncPodFn = func(_ context.Context, _ kubetypes.SyncPodType, pod, _ *v1.Pod, _ *kubecontainer.PodStatus) (bool, func(), error) {
+				kl.statusManager.SetPodStatus(logger, pod, v1.PodStatus{Phase: v1.PodPending})
+				return false, nil, nil
+			}
+			var evicted []types.UID
+			criticalHandler := preemption.NewCriticalPodAdmissionHandler(kl.GetActivePods,
+				func(pod *v1.Pod, _ bool, _ *int64, updateStatus func(*v1.PodStatus)) error {
+					evicted = append(evicted, pod.UID)
+					status := v1.PodStatus{}
+					updateStatus(&status)
+					kl.statusManager.SetPodStatus(logger, pod, status)
+					return nil
+				}, record.NewFakeRecorder(10))
+			predicateHandler := lifecycle.NewPredicateAdmitHandler(kl.GetCachedNode, criticalHandler, kl.containerManager.UpdatePluginResources)
+			kl.allocationManager.AddPodAdmitHandlers(lifecycle.PodAdmitHandlers{predicateHandler})
+
+			kl.HandlePodAdditions(tCtx, []*v1.Pod{newHigh, oldLow})
+
+			assert.Equal(t, test.wantEvicted, evicted)
+			for _, pod := range []*v1.Pod{oldLow, newHigh} {
+				status, ok := kl.statusManager.GetPodStatus(pod.UID)
+				require.True(t, ok, "pod %s must have an admission result", pod.UID)
+				if pod.UID == test.wantAdmitted {
+					assert.Equal(t, v1.PodPending, status.Phase)
+				} else {
+					assert.Equal(t, v1.PodFailed, status.Phase)
+					if test.critical {
+						assert.Equal(t, "Preempting", status.Reason)
+					} else {
+						assert.Equal(t, "OutOfcpu", status.Reason)
+					}
+				}
+			}
 		})
 	}
 }
