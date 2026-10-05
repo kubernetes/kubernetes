@@ -1343,8 +1343,11 @@ func (e *Store) Delete(ctx context.Context, name string, deleteValidation rest.V
 			if err != nil {
 				return out, false, apierrors.NewInternalError(err)
 			}
-			resourceVersion := accessor.GetResourceVersion()
-			preconditions.ResourceVersion = &resourceVersion
+			// When the update was short-circuited with errDeleteNow, nothing was
+			// written and out is empty, so keep the caller's precondition.
+			if resourceVersion := accessor.GetResourceVersion(); resourceVersion != "" {
+				preconditions.ResourceVersion = &resourceVersion
+			}
 		}
 	}
 

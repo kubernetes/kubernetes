@@ -1727,6 +1727,46 @@ func TestStoreGracefulDeleteWithResourceVersion(t *testing.T) {
 	}
 }
 
+// TestStoreDeleteWithResourceVersionPreconditionAndGCFinalizer tests that a delete
+// carrying a resourceVersion precondition succeeds when the object's only finalizer
+// is a garbage collection finalizer which the delete itself removes.
+func TestStoreDeleteWithResourceVersionPreconditionAndGCFinalizer(t *testing.T) {
+	testContext := genericapirequest.WithNamespace(genericapirequest.NewContext(), "test")
+	destroyFunc, registry := NewTestGenericStoreRegistry(t)
+	defer destroyFunc()
+	registry.EnableGarbageCollection = true
+
+	pod := &example.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "foo", Finalizers: []string{metav1.FinalizerDeleteDependents}},
+		Spec:       example.PodSpec{NodeName: "machine"},
+	}
+	created, err := registry.Create(testContext, pod, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	accessor, err := meta.Accessor(created)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resourceVersion := accessor.GetResourceVersion()
+
+	background := metav1.DeletePropagationBackground
+	options := metav1.NewDeleteOptions(0)
+	options.PropagationPolicy = &background
+	options.Preconditions = &metav1.Preconditions{ResourceVersion: &resourceVersion}
+
+	_, wasDeleted, err := registry.Delete(testContext, pod.Name, rest.ValidateAllObjectFunc, options)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	if !wasDeleted {
+		t.Errorf("expected pod %s to be deleted immediately", pod.Name)
+	}
+	if _, err := registry.Get(testContext, pod.Name, &metav1.GetOptions{}); !errors.IsNotFound(err) {
+		t.Errorf("expected NotFound, got: %v", err)
+	}
+}
+
 // TestGracefulStoreCanDeleteIfExistingGracePeriodZero tests recovery from
 // race condition where the graceful delete is unable to complete
 // in prior operation, but the pod remains with deletion timestamp
