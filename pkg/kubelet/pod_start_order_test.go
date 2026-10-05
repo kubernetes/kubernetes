@@ -18,19 +18,23 @@ package kubelet
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/kubelet/allocation"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
@@ -199,4 +203,229 @@ func TestSortPodAdditionsUsesUID(t *testing.T) {
 	tk.kubelet.sortPodAdditions(ktesting.Init(t), pods)
 
 	assert.Equal(t, []types.UID{"old-incarnation", "highest", "replacement"}, startOrderUIDs(pods))
+}
+
+func TestSortPodAdditionsCanceledObservation(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodStartingOrderByPriority, true)
+	tk := newTestKubelet(t, false)
+	defer tk.Cleanup()
+	ctx, cancel := context.WithCancel(ktesting.Init(t))
+	defer cancel()
+	runtime := containertest.NewMockRuntime(t)
+	runtime.EXPECT().GetPods(mock.Anything, true).Run(func(queryCtx context.Context, _ bool) {
+		cancel()
+		<-queryCtx.Done()
+	}).Return(nil, nil).Once()
+	tk.kubelet.containerRuntime = runtime
+	pods := []*v1.Pod{podForStartOrder("high", 2, 100), podForStartOrder("old", 1, 10)}
+
+	tk.kubelet.sortPodAdditions(ctx, pods)
+
+	assert.Equal(t, []types.UID{"old", "high"}, startOrderUIDs(pods))
+}
+
+func TestSortPodAdditionsSkipsRuntime(t *testing.T) {
+	for _, test := range []struct {
+		name    string
+		enabled bool
+		mutate  func(*Kubelet, []*v1.Pod)
+		count   int
+	}{
+		{name: "gate disabled", count: 3},
+		{name: "empty batch", enabled: true},
+		{name: "one pod", enabled: true, count: 1},
+		{name: "static pod", enabled: true, count: 3, mutate: func(_ *Kubelet, pods []*v1.Pod) {
+			pods[0].Annotations[kubetypes.ConfigSourceAnnotationKey] = kubetypes.FileSource
+		}},
+		{name: "HTTP static pod", enabled: true, count: 3, mutate: func(_ *Kubelet, pods []*v1.Pod) {
+			pods[0].Annotations[kubetypes.ConfigSourceAnnotationKey] = kubetypes.HTTPSource
+		}},
+		{name: "mirror pod", enabled: true, count: 3, mutate: func(_ *Kubelet, pods []*v1.Pod) {
+			pods[0].Annotations[kubetypes.ConfigMirrorAnnotationKey] = "mirror"
+		}},
+		{name: "deleting pod", enabled: true, count: 3, mutate: func(_ *Kubelet, pods []*v1.Pod) {
+			pods[0].DeletionTimestamp = ptr.To(metav1.NewTime(time.Unix(5, 0)))
+		}},
+		{name: "failed pod", enabled: true, count: 3, mutate: func(_ *Kubelet, pods []*v1.Pod) {
+			pods[0].Status.Phase = v1.PodFailed
+		}},
+		{name: "succeeded pod", enabled: true, count: 3, mutate: func(_ *Kubelet, pods []*v1.Pod) {
+			pods[0].Status.Phase = v1.PodSucceeded
+		}},
+		{name: "worker termination requested", enabled: true, count: 3, mutate: func(kl *Kubelet, pods []*v1.Pod) {
+			kl.podWorkers.(*fakePodWorkers).terminationRequested = map[types.UID]bool{pods[0].UID: true}
+		}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodStartingOrderByPriority, test.enabled)
+			tk := newTestKubelet(t, false)
+			defer tk.Cleanup()
+			runtime := containertest.NewMockRuntime(t)
+			tk.kubelet.containerRuntime = runtime
+			pods := []*v1.Pod{podForStartOrder("b", 2, 20), podForStartOrder("a", 2, 10), podForStartOrder("old", 1, 0)}[:test.count]
+			if test.mutate != nil {
+				test.mutate(tk.kubelet, pods)
+			}
+
+			tk.kubelet.sortPodAdditions(ktesting.Init(t), pods)
+
+			wantUIDs := []types.UID{}
+			switch test.count {
+			case 1:
+				wantUIDs = []types.UID{"b"}
+			case 3:
+				wantUIDs = []types.UID{"old", "a", "b"}
+			}
+			assert.Equal(t, wantUIDs, startOrderUIDs(pods))
+			runtime.AssertNotCalled(t, "GetPods", mock.Anything, mock.Anything)
+		})
+	}
+}
+
+func TestSortPodAdditionsRuntimeFallback(t *testing.T) {
+	for _, test := range []struct {
+		name    string
+		runtime []*kubecontainer.Pod
+		err     error
+	}{
+		{name: "query fails", err: errors.New("runtime unavailable")},
+		{name: "query times out", err: context.DeadlineExceeded},
+		{name: "unknown container state", runtime: []*kubecontainer.Pod{runtimePodForStartOrder("old", kubecontainer.ContainerStateUnknown)}},
+		{name: "invalid container state", runtime: []*kubecontainer.Pod{runtimePodForStartOrder("old", kubecontainer.State("invalid"))}},
+		{name: "unknown sandbox state", runtime: []*kubecontainer.Pod{{ID: "old", Sandboxes: []*kubecontainer.Container{{State: kubecontainer.ContainerStateUnknown}}}}},
+		{name: "invalid sandbox state", runtime: []*kubecontainer.Pod{{ID: "old", Sandboxes: []*kubecontainer.Container{{State: kubecontainer.ContainerStateCreated}}}}},
+		{name: "empty runtime UID", runtime: []*kubecontainer.Pod{runtimePodForStartOrder("", kubecontainer.ContainerStateRunning)}},
+		{name: "duplicate runtime UID", runtime: []*kubecontainer.Pod{runtimePodForStartOrder("old", kubecontainer.ContainerStateRunning), runtimePodForStartOrder("old", kubecontainer.ContainerStateExited)}},
+		{name: "nil runtime pod", runtime: []*kubecontainer.Pod{nil}},
+		{name: "nil container", runtime: []*kubecontainer.Pod{{ID: "old", Containers: []*kubecontainer.Container{nil}}}},
+		{name: "nil sandbox", runtime: []*kubecontainer.Pod{{ID: "old", Sandboxes: []*kubecontainer.Container{nil}}}},
+		{name: "runtime pod without container or sandbox", runtime: []*kubecontainer.Pod{{ID: "old"}}},
+		{name: "running and unknown containers", runtime: []*kubecontainer.Pod{runtimePodForStartOrder("old", kubecontainer.ContainerStateRunning, kubecontainer.ContainerStateUnknown)}},
+		{name: "unaccounted running pod outside batch", runtime: []*kubecontainer.Pod{runtimePodForStartOrder("outside", kubecontainer.ContainerStateRunning)}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodStartingOrderByPriority, true)
+			tk := newTestKubelet(t, false)
+			defer tk.Cleanup()
+			runtime := containertest.NewMockRuntime(t)
+			runtime.EXPECT().GetPods(mock.Anything, true).Return(test.runtime, test.err).Once()
+			tk.kubelet.containerRuntime = runtime
+			pods := []*v1.Pod{podForStartOrder("high", 2, 100), podForStartOrder("old", 1, 10), podForStartOrder("newest", 3, 1000)}
+
+			tk.kubelet.sortPodAdditions(ktesting.Init(t), pods)
+
+			assert.Equal(t, []types.UID{"old", "high", "newest"}, startOrderUIDs(pods))
+		})
+	}
+}
+
+func TestSortPodAdditionsAccountedRuntimePod(t *testing.T) {
+	for _, accounted := range []bool{false, true} {
+		t.Run(map[bool]string{false: "unallocated", true: "allocated"}[accounted], func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodStartingOrderByPriority, true)
+			tCtx := ktesting.Init(t)
+			tk := newTestKubelet(t, false)
+			defer tk.Cleanup()
+			kl := tk.kubelet
+			outside := podForStartOrder("outside", 0, 1)
+			kl.podManager.AddPod(outside)
+			if accounted {
+				require.NoError(t, kl.allocationManager.SetAllocatedResources(klog.FromContext(tCtx), outside))
+			}
+			runtime := containertest.NewMockRuntime(t)
+			runtime.EXPECT().GetPods(mock.Anything, true).Return([]*kubecontainer.Pod{runtimePodForStartOrder(outside.UID, kubecontainer.ContainerStateRunning)}, nil).Once()
+			kl.containerRuntime = runtime
+			pods := []*v1.Pod{podForStartOrder("high", 2, 100), podForStartOrder("old", 1, 10)}
+
+			kl.sortPodAdditions(tCtx, pods)
+
+			wantUIDs := []types.UID{"old", "high"}
+			if accounted {
+				wantUIDs = []types.UID{"high", "old"}
+			}
+			assert.Equal(t, wantUIDs, startOrderUIDs(pods))
+		})
+	}
+}
+
+type startOrderAllocationSnapshot struct {
+	allocation.Manager
+	pods  []*v1.Pod
+	calls int
+}
+
+func (m *startOrderAllocationSnapshot) GetAllocatedPods() []*v1.Pod {
+	m.calls++
+	return m.pods
+}
+
+func TestSortPodAdditionsReadsAllocationWhenNeeded(t *testing.T) {
+	for _, test := range []struct {
+		name      string
+		runtime   []*kubecontainer.Pod
+		allocated []*v1.Pod
+		wantUIDs  []types.UID
+		wantCalls int
+	}{
+		{name: "cold batch does not read allocations", wantUIDs: []types.UID{"high", "old"}},
+		{
+			name:     "active batch pod does not read allocations",
+			runtime:  []*kubecontainer.Pod{runtimePodForStartOrder("old", kubecontainer.ContainerStateRunning)},
+			wantUIDs: []types.UID{"old", "high"},
+		},
+		{
+			name:     "outside exited pod does not read allocations",
+			runtime:  []*kubecontainer.Pod{runtimePodForStartOrder("outside", kubecontainer.ContainerStateExited)},
+			wantUIDs: []types.UID{"high", "old"},
+		},
+		{
+			name: "multiple accounted outside pods use one snapshot",
+			runtime: []*kubecontainer.Pod{
+				runtimePodForStartOrder("outside-a", kubecontainer.ContainerStateRunning),
+				runtimePodForStartOrder("outside-b", kubecontainer.ContainerStateCreated),
+			},
+			allocated: []*v1.Pod{podForStartOrder("outside-a", 0, 1), podForStartOrder("outside-b", 0, 1)},
+			wantUIDs:  []types.UID{"high", "old"},
+			wantCalls: 1,
+		},
+		{
+			name: "active batch pod does not bypass outside accounting",
+			runtime: []*kubecontainer.Pod{
+				runtimePodForStartOrder("high", kubecontainer.ContainerStateRunning),
+				runtimePodForStartOrder("outside", kubecontainer.ContainerStateRunning),
+			},
+			wantUIDs:  []types.UID{"old", "high"},
+			wantCalls: 1,
+		},
+		{
+			name: "partially accounted outside pods still cause fallback",
+			runtime: []*kubecontainer.Pod{
+				runtimePodForStartOrder("outside-a", kubecontainer.ContainerStateRunning),
+				runtimePodForStartOrder("outside-b", kubecontainer.ContainerStateRunning),
+			},
+			allocated: []*v1.Pod{podForStartOrder("outside-a", 0, 1)},
+			wantUIDs:  []types.UID{"old", "high"},
+			wantCalls: 1,
+		},
+		{
+			name:      "unaccounted outside pod still causes fallback",
+			runtime:   []*kubecontainer.Pod{runtimePodForStartOrder("outside", kubecontainer.ContainerStateRunning)},
+			wantUIDs:  []types.UID{"old", "high"},
+			wantCalls: 1,
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodStartingOrderByPriority, true)
+			runtime := containertest.NewMockRuntime(t)
+			runtime.EXPECT().GetPods(mock.Anything, true).Return(test.runtime, nil).Once()
+			manager := &startOrderAllocationSnapshot{pods: test.allocated}
+			kl := &Kubelet{containerRuntime: runtime, podWorkers: &fakePodWorkers{}, allocationManager: manager}
+			pods := []*v1.Pod{podForStartOrder("high", 2, 100), podForStartOrder("old", 1, 10)}
+
+			kl.sortPodAdditions(ktesting.Init(t), pods)
+
+			assert.Equal(t, test.wantUIDs, startOrderUIDs(pods))
+			assert.Equal(t, test.wantCalls, manager.calls)
+		})
+	}
 }
