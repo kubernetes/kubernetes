@@ -310,7 +310,7 @@ var _ = utils.SIGDescribe("CSI Mock volume snapshot", func() {
 				}
 				ginkgo.DeferCleanup(m.cleanup)
 
-				metricsGrabber, err := e2emetrics.NewMetricsGrabber(ctx, m.config.Framework.ClientSet, nil, f.ClientConfig(), false, false, false, false, false, true)
+				metricsGrabber, err := e2emetrics.NewMetricsGrabber(ctx, m.config.Framework.ClientSet, f.ClientConfig(), false, false, false, false, false, true)
 				if err != nil {
 					framework.Failf("Error creating metrics grabber : %v", err)
 				}

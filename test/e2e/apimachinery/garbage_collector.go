@@ -261,7 +261,7 @@ func verifyRemainingObjects(ctx context.Context, f *framework.Framework, objects
 func gatherMetrics(ctx context.Context, f *framework.Framework) {
 	ginkgo.By("Gathering metrics")
 	var summary framework.TestDataSummary
-	grabber, err := e2emetrics.NewMetricsGrabber(ctx, f.ClientSet, f.KubemarkExternalClusterClientSet, f.ClientConfig(), false, false, true, false, false, false)
+	grabber, err := e2emetrics.NewMetricsGrabber(ctx, f.ClientSet, f.ClientConfig(), false, false, true, false, false, false)
 	if err != nil {
 		framework.Logf("Failed to create MetricsGrabber. Skipping metrics gathering.")
 	} else {
