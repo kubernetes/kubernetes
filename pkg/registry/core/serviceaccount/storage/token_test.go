@@ -151,7 +151,7 @@ func TestCreate_Token_WithExpiryCap(t *testing.T) {
 					Namespace: serviceAccount.Namespace,
 				},
 				Spec: authenticationapi.TokenRequestSpec{
-					ExpirationSeconds: 3607,
+					ExpirationSeconds: new(int64(3607)),
 					BoundObjectRef: &authenticationapi.BoundObjectReference{
 						Name:       pod.Name,
 						Kind:       "Pod",
@@ -267,7 +267,7 @@ func TestTokenRequest_ServiceAccountUIDValidation(t *testing.T) {
 				},
 				Spec: authenticationapi.TokenRequestSpec{
 					Audiences:         aud,
-					ExpirationSeconds: 3600, // 1 hour
+					ExpirationSeconds: new(int64(3600)), // 1 hour
 				},
 			}
 
@@ -587,7 +587,7 @@ func TestTokenRESTCreateWebhookAuthenticationFlow(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{Name: "test-sa", Namespace: "test-ns"},
 		Spec: authenticationapi.TokenRequestSpec{
 			Audiences:         []string{"https://webhook.example.com"},
-			ExpirationSeconds: 3600,
+			ExpirationSeconds: new(int64(3600)),
 			BoundObjectRef: &authenticationapi.BoundObjectReference{
 				Kind:       "ValidatingWebhookConfiguration",
 				APIVersion: "admissionregistration.k8s.io/v1",
@@ -823,7 +823,7 @@ func TestTokenRESTCreateWebhookExpirationCap(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "test-sa", Namespace: "test-ns"},
 				Spec: authenticationapi.TokenRequestSpec{
 					Audiences:         []string{"https://webhook.example.com"},
-					ExpirationSeconds: tc.requestExp,
+					ExpirationSeconds: &tc.requestExp,
 					BoundObjectRef: &authenticationapi.BoundObjectReference{
 						Kind:       "ValidatingWebhookConfiguration",
 						APIVersion: "admissionregistration.k8s.io/v1",
@@ -841,8 +841,8 @@ func TestTokenRESTCreateWebhookExpirationCap(t *testing.T) {
 			}
 
 			tokenReq := result.(*authenticationapi.TokenRequest)
-			if tokenReq.Spec.ExpirationSeconds != tc.wantExpCapped {
-				t.Errorf("expected ExpirationSeconds %d, got %d", tc.wantExpCapped, tokenReq.Spec.ExpirationSeconds)
+			if *tokenReq.Spec.ExpirationSeconds != tc.wantExpCapped {
+				t.Errorf("expected ExpirationSeconds %d, got %d", tc.wantExpCapped, *tokenReq.Spec.ExpirationSeconds)
 			}
 		})
 	}
@@ -858,7 +858,7 @@ func TestTokenRESTCreateWebhookDeletionTimestamp(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{Name: "test-sa", Namespace: "test-ns"},
 			Spec: authenticationapi.TokenRequestSpec{
 				Audiences:         []string{"https://webhook.example.com"},
-				ExpirationSeconds: 600,
+				ExpirationSeconds: new(int64(600)),
 				BoundObjectRef: &authenticationapi.BoundObjectReference{
 					Kind:       "ValidatingWebhookConfiguration",
 					APIVersion: "admissionregistration.k8s.io/v1",

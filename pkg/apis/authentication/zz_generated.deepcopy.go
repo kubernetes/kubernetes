@@ -161,6 +161,11 @@ func (in *TokenRequestSpec) DeepCopyInto(out *TokenRequestSpec) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
+	if in.ExpirationSeconds != nil {
+		in, out := &in.ExpirationSeconds, &out.ExpirationSeconds
+		*out = new(int64)
+		**out = **in
+	}
 	if in.BoundObjectRef != nil {
 		in, out := &in.BoundObjectRef, &out.BoundObjectRef
 		*out = new(BoundObjectReference)
