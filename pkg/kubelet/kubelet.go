@@ -135,7 +135,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/util"
 	"k8s.io/kubernetes/pkg/kubelet/util/manager"
 	"k8s.io/kubernetes/pkg/kubelet/util/queue"
-	"k8s.io/kubernetes/pkg/kubelet/util/sliceutils"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager"
 	"k8s.io/kubernetes/pkg/kubelet/watchdog"
 	httpprobe "k8s.io/kubernetes/pkg/probe/http"
@@ -2896,7 +2895,7 @@ func handleProbeSync(ctx context.Context, kl *Kubelet, update proberesults.Updat
 func (kl *Kubelet) HandlePodAdditions(ctx context.Context, pods []*v1.Pod) {
 	start := kl.clock.Now()
 	logger := klog.FromContext(ctx)
-	sort.Sort(sliceutils.PodsByCreationTime(pods))
+	kl.sortPodAdditions(ctx, pods)
 	var pendingResizes []types.UID
 	for _, pod := range pods {
 		// Always add the pod to the pod manager. Kubelet relies on the pod
