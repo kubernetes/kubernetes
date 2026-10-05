@@ -942,6 +942,84 @@ func readTestCases() []testStep {
 			CorrectResponse: Response{Err: invalidRVErr},
 			InvalidResponses: []Response{
 				{Object: withLabel(pod4, "17", "version", "v2")},
+				{Object: nil, Err: apierrors.NewBadRequest(fmt.Sprintf("invalid resource version: %v", invalidRVErr))},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name: "Get pod4 with ResourceVersion=16 returns pod4 at RV>=16",
+			Request: Request{
+				Op:  OpGet,
+				Key: pod4Key,
+				Get: GetRequest{Options: storage.GetOptions{ResourceVersion: "16"}},
+			},
+			CorrectResponse: Response{
+				Object: withLabel(pod4, "16", "version", "v1"),
+			},
+			InvalidResponses: []Response{
+				{Object: withRV(pod4, "14")},
+				{Object: withLabel(pod4, "19", "version", "v2")},
+				{Object: &example.Pod{}},
+				{Object: nil, Err: storage.NewKeyNotFoundError(pod4Key, 0)},
+				{Object: nil, Err: storage.NewKeyNotFoundError(pod4Key, 18)},
+				{Object: nil, Err: storage.NewTooLargeResourceVersionError(16, 18, 0)},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name: "Get pod4 with ResourceVersion=0 and ignoreNotFound=true returns pod4 or empty pod",
+			Request: Request{
+				Op:  OpGet,
+				Key: pod4Key,
+				Get: GetRequest{Options: storage.GetOptions{ResourceVersion: "0", IgnoreNotFound: true}},
+			},
+			CorrectResponse: Response{
+				Object: withRV(pod4, "14"),
+			},
+			InvalidResponses: []Response{
+				{Object: withLabel(pod4, "19", "version", "v2")},
+				{Object: withRV(pod1, "2")},
+				{Object: nil, Err: storage.NewKeyNotFoundError(pod4Key, 0)},
+				{Object: nil, Err: storage.NewKeyNotFoundError(pod4Key, 18)},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name: "Get deleted pod5 with ResourceVersion=18 returns KeyNotFoundError",
+			Request: Request{
+				Op:  OpGet,
+				Key: pod5Key,
+				Get: GetRequest{Options: storage.GetOptions{ResourceVersion: "18"}},
+			},
+			CorrectResponse: Response{
+				Object: nil,
+				Err:    storage.NewKeyNotFoundError(pod5Key, 18),
+			},
+			InvalidResponses: []Response{
+				{Object: withRV(pod5, "15")},
+				{Object: &example.Pod{}},
+				{Object: nil, Err: storage.NewKeyNotFoundError(pod5Key, 0)},
+				{Object: nil, Err: storage.NewKeyNotFoundError(pod5Key, 15)},
+				{Object: nil, Err: storage.NewKeyNotFoundError(pod5Key, 17)},
+				{Object: nil, Err: storage.NewKeyNotFoundError(pod5Key, 19)},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name: "Get pod4 with future ResourceVersion=99 returns TooLargeResourceVersionError",
+			Request: Request{
+				Op:  OpGet,
+				Key: pod4Key,
+				Get: GetRequest{Options: storage.GetOptions{ResourceVersion: "99"}},
+			},
+			CorrectResponse: Response{
+				Object: nil,
+				Err:    storage.NewTooLargeResourceVersionError(99, 18, 0),
+			},
+			InvalidResponses: []Response{
+				{Object: withLabel(pod4, "17", "version", "v2")},
+				{Object: nil, Err: storage.NewKeyNotFoundError(pod4Key, 0)},
+				{Object: nil, Err: storage.NewKeyNotFoundError(pod4Key, 18)},
 				{Object: nil, Err: nil},
 			},
 		},

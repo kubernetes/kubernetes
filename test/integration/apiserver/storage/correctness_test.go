@@ -62,6 +62,15 @@ var (
 				{Choice: false, Weight: 50},
 				{Choice: true, Weight: 50},
 			},
+			ResourceVersion: []ChoiceWeight[RVType]{
+				{Choice: RVEmpty, Weight: 30},
+				{Choice: RVZero, Weight: 15},
+				{Choice: RVOne, Weight: 10},
+				{Choice: RVCached, Weight: 15},
+				{Choice: RVCurrent, Weight: 10},
+				{Choice: RVPast, Weight: 10},
+				{Choice: RVFuture, Weight: 10},
+			},
 		},
 		List: ListDistribution{
 			Scope: []ChoiceWeight[KeyScope]{

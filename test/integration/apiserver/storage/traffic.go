@@ -66,7 +66,8 @@ type RequestDistribution struct {
 }
 
 type GetDistribution struct {
-	IgnoreNotFound []ChoiceWeight[bool]
+	IgnoreNotFound  []ChoiceWeight[bool]
+	ResourceVersion []ChoiceWeight[RVType]
 }
 
 type ListDistribution struct {
@@ -163,7 +164,7 @@ func RunUnaryTraffic(ctx context.Context, store storage.Interface, cfg UnaryConf
 					return
 				default:
 				}
-				request := randomRequest(keys, cfg.RequestDistribution, cachedObj)
+				request := randomRequest(ctx, store, keys, cfg.RequestDistribution, cachedObj)
 				if request == nil {
 					continue
 				}
@@ -227,7 +228,7 @@ func RunWatchTraffic(ctx context.Context, store storage.Interface, cfg WatchConf
 	return watches
 }
 
-func randomRequest(keys []types.NamespacedName, dist RequestDistribution, cached runtime.Object) *correctness.Request {
+func randomRequest(ctx context.Context, store storage.Interface, keys []types.NamespacedName, dist RequestDistribution, cached runtime.Object) *correctness.Request {
 	key := keys[rand.Intn(len(keys))]
 
 	switch selectedOp := PickRandom(dist.Op); selectedOp {
@@ -254,11 +255,18 @@ func randomRequest(keys []types.NamespacedName, dist RequestDistribution, cached
 			},
 		}
 	case correctness.OpGet:
+		rv, ok := pickResourceVersion(ctx, store, dist.Get.ResourceVersion, cached)
+		if !ok {
+			return nil
+		}
 		return &correctness.Request{
 			Op:  correctness.OpGet,
 			Key: storageKey(key),
 			Get: correctness.GetRequest{
-				Options: storage.GetOptions{IgnoreNotFound: PickRandom(dist.Get.IgnoreNotFound)},
+				Options: storage.GetOptions{
+					IgnoreNotFound:  PickRandom(dist.Get.IgnoreNotFound),
+					ResourceVersion: rv,
+				},
 			},
 		}
 	case correctness.OpList:
@@ -274,26 +282,16 @@ func randomRequest(keys []types.NamespacedName, dist RequestDistribution, cached
 		default:
 			panic(fmt.Sprintf("%v: unknown list scope", scope))
 		}
-		switch rvType := PickRandom(dist.List.ResourceVersion); rvType {
-		case RVEmpty:
-		case RVZero:
-			opts.ResourceVersion = "0"
+		rv, ok := pickResourceVersion(ctx, store, dist.List.ResourceVersion, cached)
+		if !ok {
+			return nil
+		}
+		opts.ResourceVersion = rv
+		if rv != "" {
 			opts.ResourceVersionMatch = PickRandom(dist.List.ResourceVersionMatch)
-			if opts.ResourceVersionMatch == metav1.ResourceVersionMatchExact {
+			if rv == "0" && opts.ResourceVersionMatch == metav1.ResourceVersionMatchExact {
 				return nil
 			}
-		case RVCached:
-			if cached == nil {
-				return nil
-			}
-			accessor, err := meta.Accessor(cached)
-			if err != nil {
-				panic(err)
-			}
-			opts.ResourceVersion = accessor.GetResourceVersion()
-			opts.ResourceVersionMatch = PickRandom(dist.List.ResourceVersionMatch)
-		default:
-			panic(fmt.Sprintf("%v: unknown list RVType", rvType))
 		}
 		return &correctness.Request{
 			Op:   correctness.OpList,
@@ -336,6 +334,34 @@ func randomRequest(keys []types.NamespacedName, dist RequestDistribution, cached
 		}
 	default:
 		panic(fmt.Sprintf("%v: unknown operation", selectedOp))
+	}
+}
+
+func pickResourceVersion(ctx context.Context, store storage.Interface, dist []ChoiceWeight[RVType], cached runtime.Object) (string, bool) {
+	switch rvType := PickRandom(dist); rvType {
+	case RVEmpty:
+		return "", true
+	case RVZero:
+		return "0", true
+	case RVOne:
+		return "1", true
+	case RVCached:
+		if cached == nil {
+			return "", false
+		}
+		accessor, err := meta.Accessor(cached)
+		if err != nil {
+			panic(err)
+		}
+		return accessor.GetResourceVersion(), true
+	case RVCurrent:
+		return relativeRV(ctx, store, 0), true
+	case RVPast:
+		return relativeRV(ctx, store, -int64(1+rand.Intn(10))), true
+	case RVFuture:
+		return relativeRV(ctx, store, int64(1+rand.Intn(10))), true
+	default:
+		panic(fmt.Sprintf("%v: unknown RVType", rvType))
 	}
 }
 
@@ -403,7 +429,7 @@ func runTraffic(ctx context.Context, store storage.Interface, request *correctne
 		panic(fmt.Sprintf("%v: unknown operation", request.Op))
 	}
 	if err != nil {
-		if _, ok := errors.AsType[*storage.StorageError](err); ok {
+		if _, ok := errors.AsType[*storage.StorageError](err); ok || storage.IsTooLargeResourceVersion(err) {
 			return correctness.Response{
 				Err: err,
 			}
