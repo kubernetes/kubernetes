@@ -32,6 +32,7 @@ import (
 	"k8s.io/dynamic-resource-allocation/structured"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
+	"k8s.io/kubernetes/pkg/scheduler/framework"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 )
 
@@ -55,6 +56,7 @@ type resourceAllocationScorer struct {
 	enablePodLevelResources                       bool
 	enableDRAExtendedResource                     bool
 	enableInPlacePodLevelResourcesVerticalScaling bool
+	enableDRANodeAllocatableResources             bool
 	// used to decide whether to use Requested or NonZeroRequested for
 	// cpu and memory.
 	useRequested bool
@@ -239,7 +241,8 @@ func (r *resourceAllocationScorer) calculatePodResourceRequest(pod *v1.Pod, reso
 		UseStatusResources: r.enableInPlacePodVerticalScaling,
 		InPlacePodLevelResourcesVerticalScalingEnabled: r.enableInPlacePodLevelResourcesVerticalScaling,
 		// SkipPodLevelResources is set to false when PodLevelResources feature is enabled.
-		SkipPodLevelResources: !r.enablePodLevelResources,
+		SkipPodLevelResources:            !r.enablePodLevelResources,
+		UseExtraNodeAllocatableResources: r.enableDRANodeAllocatableResources,
 	}
 
 	if !r.useRequested {
@@ -264,6 +267,27 @@ func (r *resourceAllocationScorer) calculatePodResourceRequestList(pod *v1.Pod, 
 		podRequests[i] = r.calculatePodResourceRequest(pod, v1.ResourceName(resources[i].Name))
 	}
 	return podRequests
+}
+
+// calculatePodRequestWithExtraNodeAllocatable returns the requests of pod on nodeName.
+// It adds the extra node allocatable resources that other plugins record in cycle state
+// during Filter. PreScore cannot add them, because it computes podRequests once for all
+// nodes and these resources can differ per node.
+func (r *resourceAllocationScorer) calculatePodRequestWithExtraNodeAllocatable(cycleState fwk.CycleState, pod *v1.Pod, nodeName string, podRequests []int64) []int64 {
+	if !r.enableDRANodeAllocatableResources {
+		return podRequests
+	}
+	state := framework.GetExtraNodeAllocatableResourcesState(cycleState)
+	if state == nil {
+		return podRequests
+	}
+	extraResources := state.Get(nodeName)
+	if len(extraResources) == 0 {
+		return podRequests
+	}
+	podCopy := *pod
+	podCopy.Status.ExtraNodeAllocatableResources = extraResources
+	return r.calculatePodResourceRequestList(&podCopy, r.resources)
 }
 
 func (r *resourceAllocationScorer) isBestEffortPod(podRequests []int64) bool {
@@ -511,7 +535,7 @@ func (r *resourceAllocationScorer) scorePlacement(
 	// Calculate requests for the pod group pods scheduled for this placement
 	for _, assignment := range podGroupAssignments.ProposedAssignments {
 		pod := assignment.GetPod()
-		podRequests := r.calculatePodResourceRequestList(pod, r.resources)
+		podRequests := r.calculatePodRequestWithExtraNodeAllocatable(assignment.GetCycleState(), pod, assignment.GetNodeName(), r.calculatePodResourceRequestList(pod, r.resources))
 		for i := range len(r.resources) {
 			requested[i] += podRequests[i]
 		}

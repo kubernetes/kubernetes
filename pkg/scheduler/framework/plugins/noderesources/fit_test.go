@@ -2466,8 +2466,9 @@ func testFitSignPod(tCtx ktesting.TContext) {
 }
 
 type podAssignment struct {
-	podInfo  *framework.PodInfo
-	nodeName string
+	podInfo    *framework.PodInfo
+	nodeName   string
+	cycleState fwk.CycleState
 }
 
 func (pa *podAssignment) GetPod() *v1.Pod {
@@ -2479,7 +2480,7 @@ func (pa *podAssignment) GetNodeName() string {
 }
 
 func (pa *podAssignment) GetCycleState() fwk.CycleState {
-	return nil
+	return pa.cycleState
 }
 
 func (pa *podAssignment) GetPodInfo() fwk.PodInfo {
@@ -2493,14 +2494,15 @@ func TestScorePlacement_Resources(t *testing.T) {
 	})
 
 	testCases := []struct {
-		name                string
-		nodes               []*v1.Node
-		placementNodeNames  []string
-		podGroupPods        []*v1.Pod
-		podGroupAssignments map[types.UID]string
-		preExistingPods     []*v1.Pod
-		resourceSpec        []config.ResourceSpec
-		expectedScore       int64
+		name                          string
+		nodes                         []*v1.Node
+		placementNodeNames            []string
+		podGroupPods                  []*v1.Pod
+		podGroupAssignments           map[types.UID]string
+		preExistingPods               []*v1.Pod
+		resourceSpec                  []config.ResourceSpec
+		extraNodeAllocatableResources map[types.UID][]v1.ExtraNodeAllocatableResource
+		expectedScore                 int64
 	}{
 		{
 			name: "Computes score based on total requests",
@@ -2681,6 +2683,33 @@ func TestScorePlacement_Resources(t *testing.T) {
 			// Score: MaxScore * (0.3 + 0.2) / 2 = 25
 			expectedScore: 25,
 		},
+		{
+			name: "Adds the extra node allocatable resources recorded for the proposed nodes",
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Capacity(cpuAndMemory("5000m", "5000")).Obj(),
+				st.MakeNode().Name("node2").Capacity(cpuAndMemory("5000m", "5000")).Obj(),
+			},
+			placementNodeNames: []string{"node1", "node2"},
+			podGroupPods: []*v1.Pod{
+				st.MakePod().UID("foo").Req(cpuAndMemory("1000m", "0")).Obj(),
+				st.MakePod().UID("bar").Req(cpuAndMemory("2000m", "2000")).Obj(),
+			},
+			podGroupAssignments: map[types.UID]string{
+				"foo": "node1",
+				"bar": "node2",
+			},
+			extraNodeAllocatableResources: map[types.UID][]v1.ExtraNodeAllocatableResource{
+				"foo": makeExtraNodeAllocatableResources("claim1", "2"),
+			},
+			resourceSpec: []config.ResourceSpec{
+				{Name: "cpu", Weight: 1},
+				{Name: "memory", Weight: 1},
+			},
+			// CPU: (1000m + 2000m DRA + 2000m) / (5000m + 5000m) = 0.5
+			// Memory: (0 + 2000) / (5000 + 5000) = 0.2
+			// Score: MaxScore * (0.5 + 0.2) / 2 = 35
+			expectedScore: 35,
+		},
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -2691,7 +2720,7 @@ func TestScorePlacement_Resources(t *testing.T) {
 			scoringStrategy.Resources = tc.resourceSpec
 			plugin, err := NewFit(tCtx, &config.NodeResourcesFitArgs{
 				ScoringStrategy: scoringStrategy,
-			}, fh, plfeature.Features{EnableTopologyAwareWorkloadScheduling: true})
+			}, fh, plfeature.Features{EnableTopologyAwareWorkloadScheduling: true, EnableDRANodeAllocatableResources: true})
 
 			if err != nil {
 				t.Fatal(err)
@@ -2710,8 +2739,9 @@ func TestScorePlacement_Resources(t *testing.T) {
 				if nodeName, ok := tc.podGroupAssignments[pod.UID]; ok {
 					podInfo, _ := framework.NewPodInfo(pod)
 					proposedAssignments = append(proposedAssignments, &podAssignment{
-						podInfo:  podInfo,
-						nodeName: nodeName,
+						podInfo:    podInfo,
+						nodeName:   nodeName,
+						cycleState: newNodeAllocatableCycleState(map[string][]v1.ExtraNodeAllocatableResource{nodeName: tc.extraNodeAllocatableResources[pod.UID]}),
 					})
 				}
 			}
@@ -3388,6 +3418,136 @@ func TestFitFilterWithExtraNodeAllocatableResources(t *testing.T) {
 			gotStatus := p.(fwk.FilterPlugin).Filter(tCtx, cycleState, pod, test.nodeInfo)
 			if diff := cmp.Diff(test.wantStatus, gotStatus); diff != "" {
 				tCtx.Errorf("status does not match (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}
+func TestFitScoreWithExtraNodeAllocatableResources(t *testing.T) {
+	testCtx := ktesting.Init(t)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRANodeAllocatableResources, true)
+	nodeName := "node-1"
+	claim := v1.ExtraNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "claim1"}
+	mapped := func(source v1.ExtraNodeAllocatableReference) []v1.ExtraNodeAllocatableResource {
+		return []v1.ExtraNodeAllocatableResource{{
+			Source:     source,
+			Containers: []string{"c1"},
+			Mapping:    []v1.NodeAllocatableMappedResources{{Name: v1.ResourceCPU, Quantity: new(resource.MustParse("2"))}},
+		}}
+	}
+	requests := map[v1.ResourceName]string{v1.ResourceCPU: "1", v1.ResourceMemory: "1000"}
+	existingPod := func(entries []v1.ExtraNodeAllocatableResource) *v1.Pod {
+		pod := st.MakePod().UID("existing").Name("existing").Namespace("test-ns").Node(nodeName).Req(requests).Obj()
+		pod.Status.ExtraNodeAllocatableResources = entries
+		return pod
+	}
+	pod := st.MakePod().UID("new").Name("new").Namespace("test-ns").Req(requests).Obj()
+
+	tests := []struct {
+		name                              string
+		strategy                          config.ScoringStrategyType
+		existingPods                      []*v1.Pod
+		enableDRANodeAllocatableResources bool
+		extraResources                    map[string][]v1.ExtraNodeAllocatableResource
+		runPreScore                       bool
+		wantScore                         int64
+	}{
+		{
+			// CPU: (8 - 1) / 8 = 87. Memory: 90.
+			name:                              "no entries",
+			strategy:                          config.LeastAllocated,
+			enableDRANodeAllocatableResources: true,
+			runPreScore:                       true,
+			wantScore:                         88,
+		},
+		{
+			// CPU: (8 - 1 - 2) / 8 = 62. Memory: 90.
+			name:                              "entries are added to the pod requests",
+			strategy:                          config.LeastAllocated,
+			enableDRANodeAllocatableResources: true,
+			extraResources: map[string][]v1.ExtraNodeAllocatableResource{
+				nodeName: makeExtraNodeAllocatableResources("claim1", "2"),
+			},
+			runPreScore: true,
+			wantScore:   76,
+		},
+		{
+			// CPU: (1 + 2) / 8 = 37. Memory: 10.
+			name:                              "entries are added to the pod requests with MostAllocated",
+			strategy:                          config.MostAllocated,
+			enableDRANodeAllocatableResources: true,
+			extraResources: map[string][]v1.ExtraNodeAllocatableResource{
+				nodeName: makeExtraNodeAllocatableResources("claim1", "2"),
+			},
+			runPreScore: true,
+			wantScore:   23,
+		},
+		{
+			name:                              "entries are added to the pod requests if PreScore not called",
+			strategy:                          config.LeastAllocated,
+			enableDRANodeAllocatableResources: true,
+			extraResources: map[string][]v1.ExtraNodeAllocatableResource{
+				nodeName: makeExtraNodeAllocatableResources("claim1", "2"),
+			},
+			wantScore: 76,
+		},
+		{
+			name:                              "entries for another node are ignored",
+			strategy:                          config.LeastAllocated,
+			enableDRANodeAllocatableResources: true,
+			extraResources: map[string][]v1.ExtraNodeAllocatableResource{
+				"other-node": makeExtraNodeAllocatableResources("claim1", "2"),
+			},
+			runPreScore: true,
+			wantScore:   88,
+		},
+		{
+			name:                              "feature disabled",
+			strategy:                          config.LeastAllocated,
+			enableDRANodeAllocatableResources: false,
+			extraResources: map[string][]v1.ExtraNodeAllocatableResource{
+				nodeName: makeExtraNodeAllocatableResources("claim1", "2"),
+			},
+			runPreScore: true,
+			wantScore:   88,
+		},
+		{
+			// Node: 1 + 2 (claim1, accounted to the existing pod) = 3. CPU: (8 - 3 - 1 - 2) / 8 = 25. Memory: 80.
+			name:                              "claim is accounted to every pod",
+			strategy:                          config.LeastAllocated,
+			existingPods:                      []*v1.Pod{existingPod(mapped(claim))},
+			enableDRANodeAllocatableResources: true,
+			extraResources:                    map[string][]v1.ExtraNodeAllocatableResource{nodeName: mapped(claim)},
+			runPreScore:                       true,
+			wantScore:                         52,
+		},
+	}
+
+	for _, test := range tests {
+		testCtx.Run(test.name, func(tCtx ktesting.TContext) {
+			node := st.MakeNode().Name(nodeName).Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "8", v1.ResourceMemory: "10000"}).Obj()
+			nodeInfo := framework.NewNodeInfo(test.existingPods...)
+			nodeInfo.SetNode(node)
+
+			p, err := NewFit(tCtx, &config.NodeResourcesFitArgs{
+				ScoringStrategy: &config.ScoringStrategy{Type: test.strategy, Resources: defaultScoringStrategy.Resources},
+			}, nil, plfeature.Features{
+				EnableDRANodeAllocatableResources: test.enableDRANodeAllocatableResources,
+			})
+			tCtx.ExpectNoError(err, "create fit plugin")
+
+			cycleState := newNodeAllocatableCycleState(test.extraResources)
+			if test.runPreScore {
+				if status := p.(fwk.PreScorePlugin).PreScore(tCtx, cycleState, pod, []fwk.NodeInfo{nodeInfo}); !status.IsSuccess() {
+					tCtx.Fatalf("prescore failed with status: %v", status)
+				}
+			}
+
+			gotScore, status := p.(fwk.ScorePlugin).Score(tCtx, cycleState, pod, nodeInfo)
+			if !status.IsSuccess() {
+				tCtx.Fatalf("score failed with status: %v", status)
+			}
+			if diff := cmp.Diff(test.wantScore, gotScore); diff != "" {
+				tCtx.Errorf("score does not match (-want,+got):\n%s", diff)
 			}
 		})
 	}

@@ -220,6 +220,7 @@ func NewFit(_ context.Context, plArgs runtime.Object, h fwk.Handle, fts feature.
 	if err != nil {
 		return nil, err
 	}
+	scorer.enableDRANodeAllocatableResources = fts.EnableDRANodeAllocatableResources
 	if fts.EnableDRAExtendedResource {
 		scorer.enableDRAExtendedResource = true
 		scorer.draManager = h.SharedDRAManager()
@@ -257,6 +258,7 @@ func NewFit(_ context.Context, plArgs runtime.Object, h fwk.Handle, fts feature.
 		if err != nil {
 			return nil, err
 		}
+		placementScorer.enableDRANodeAllocatableResources = fts.EnableDRANodeAllocatableResources
 		pl.placementScorer = placementScorer
 	}
 
@@ -689,7 +691,8 @@ func (f *Fit) Score(ctx context.Context, state fwk.CycleState, pod *v1.Pod, node
 		}
 	}
 
-	return f.score(ctx, pod, nodeInfo, s.podRequests, s.draPreScoreState)
+	podRequests := f.calculatePodRequestWithExtraNodeAllocatable(state, pod, nodeInfo.Node().Name, s.podRequests)
+	return f.score(ctx, pod, nodeInfo, podRequests, s.draPreScoreState)
 }
 
 // PlacementScoreExtensions is not used by this plugin.
