@@ -114,10 +114,9 @@ type Framework struct {
 	// test multiple times in parallel.
 	UniqueName string
 
-	clientConfig                     *rest.Config
-	restMapper                       *restmapper.DeferredDiscoveryRESTMapper
-	ClientSet                        clientset.Interface
-	KubemarkExternalClusterClientSet clientset.Interface
+	clientConfig *rest.Config
+	restMapper   *restmapper.DeferredDiscoveryRESTMapper
+	ClientSet    clientset.Interface
 
 	DynamicClient dynamic.Interface
 
