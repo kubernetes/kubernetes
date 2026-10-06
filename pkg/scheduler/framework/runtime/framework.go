@@ -1127,10 +1127,13 @@ func (f *frameworkImpl) RunFilterPlugins(
 		logger = klog.LoggerWithName(logger, "Filter")
 	}
 
-	runOnlyNodeLocal := state.ShouldRunOnlyNodeLocalFilterPlugins()
+	executionMode := state.GetFilterPluginExecutionMode()
 	for _, pl := range f.filterPlugins {
-		if runOnlyNodeLocal {
-			if c, ok := pl.(fwk.NodeLocalFilterPlugin); !ok || !c.IsNodeLocal() {
+		if executionMode != fwk.FilterPluginModeAll {
+			c, ok := pl.(fwk.NodeLocalFilterPlugin)
+			isNodeLocal := ok && c.IsNodeLocal()
+			if (executionMode == fwk.FilterPluginModeNodeLocalOnly && !isNodeLocal) ||
+				(executionMode == fwk.FilterPluginModeNonNodeLocalOnly && isNodeLocal) {
 				continue
 			}
 		}

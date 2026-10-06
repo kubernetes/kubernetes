@@ -1989,7 +1989,7 @@ func TestPodGroupEvaluator_ReprieveNodeLocalFilters(t *testing.T) {
 		t.Fatalf("expected success status, got %v", status)
 	}
 
-	wantNodeLocalEvals := map[string]int{"node1": 1, "node2": 1, "node3": 2}
+	wantNodeLocalEvals := map[string]int{"node3": 1}
 	if diff := cmp.Diff(wantNodeLocalEvals, nodeLocalPlugin.evalCountByNode); diff != "" {
 		t.Errorf("unexpected nodeLocalPlugin evalCountByNode (-want +got):\n%s", diff)
 	}

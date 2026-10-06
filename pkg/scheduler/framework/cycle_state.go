@@ -38,8 +38,8 @@ type CycleState struct {
 	skipPreBindPlugins sets.Set[string]
 	// skipAllPostFilterPlugins indicates whether to skip all plugins in the PostFilter extension point.
 	skipAllPostFilterPlugins bool
-	// runOnlyNodeLocalFilterPlugins indicates whether only node-local Filter plugins should run in the Filter extension point.
-	runOnlyNodeLocalFilterPlugins bool
+	// filterPluginExecutionMode specifies which subset of Filter plugins should run in the Filter extension point.
+	filterPluginExecutionMode fwk.FilterPluginExecutionMode
 	// GetParallelPreBindPlugins returns plugins that can be run in parallel with other plugins
 	// in the PreBind extension point.
 	parallelPreBindPlugins sets.Set[string]
@@ -142,18 +142,18 @@ func (c *CycleState) ShouldSkipAllPostFilterPlugins() bool {
 	return c.skipAllPostFilterPlugins
 }
 
-func (c *CycleState) SetRunOnlyNodeLocalFilterPlugins(flag bool) {
+func (c *CycleState) SetFilterPluginExecutionMode(mode fwk.FilterPluginExecutionMode) {
 	if c == nil {
 		return
 	}
-	c.runOnlyNodeLocalFilterPlugins = flag
+	c.filterPluginExecutionMode = mode
 }
 
-func (c *CycleState) ShouldRunOnlyNodeLocalFilterPlugins() bool {
+func (c *CycleState) GetFilterPluginExecutionMode() fwk.FilterPluginExecutionMode {
 	if c == nil {
-		return false
+		return fwk.FilterPluginModeAll
 	}
-	return c.runOnlyNodeLocalFilterPlugins
+	return c.filterPluginExecutionMode
 }
 
 // Clone creates a copy of CycleState and returns its pointer. Clone returns
@@ -177,7 +177,7 @@ func (c *CycleState) Clone() fwk.CycleState {
 	copy.podGroupCycleState = c.podGroupCycleState
 	copy.placementCycleState = c.placementCycleState
 	copy.skipAllPostFilterPlugins = c.skipAllPostFilterPlugins
-	copy.runOnlyNodeLocalFilterPlugins = c.runOnlyNodeLocalFilterPlugins
+	copy.filterPluginExecutionMode = c.filterPluginExecutionMode
 
 	return copy
 }

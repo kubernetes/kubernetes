@@ -5743,10 +5743,10 @@ func TestRunNodeLocalFilterPlugins(t *testing.T) {
 	nodeInfo := framework.NewNodeInfo()
 	nodeInfo.SetNode(&v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node1"}})
 
-	// 1. RunFilterPlugins with SetRunOnlyNodeLocalFilterPlugins(true) runs only plugins with IsNodeLocal() == true;
+	// 1. RunFilterPlugins with FilterPluginModeNodeLocalOnly runs only plugins with IsNodeLocal() == true;
 	// plugins not implementing NodeLocalFilterPlugin default to cross-node (IsNodeLocal() == false).
 	state := framework.NewCycleState()
-	state.SetRunOnlyNodeLocalFilterPlugins(true)
+	state.SetFilterPluginExecutionMode(fwk.FilterPluginModeNodeLocalOnly)
 	status := f.RunFilterPlugins(ctx, state, pod, nodeInfo)
 	if !status.IsSuccess() {
 		t.Fatalf("expected success, got %v", status)
@@ -5771,9 +5771,9 @@ func TestRunNodeLocalFilterPlugins(t *testing.T) {
 		t.Errorf("expected nodeLocalPl to be skipped, got %d", nodeLocalPl.evalCount)
 	}
 
-	// 3. Setting SetRunOnlyNodeLocalFilterPlugins(false) runs all filter plugins
+	// 3. Setting FilterPluginModeAll (default) runs all filter plugins
 	stateAll := framework.NewCycleState()
-	stateAll.SetRunOnlyNodeLocalFilterPlugins(false)
+	stateAll.SetFilterPluginExecutionMode(fwk.FilterPluginModeAll)
 	status = f.RunFilterPlugins(ctx, stateAll, pod, nodeInfo)
 	if !status.IsSuccess() {
 		t.Fatalf("expected success when running all filter plugins, got %v", status)
@@ -5786,5 +5786,22 @@ func TestRunNodeLocalFilterPlugins(t *testing.T) {
 	}
 	if crossNodePl.evalCount != 1 {
 		t.Errorf("expected crossNodePl evalCount=1, got %d", crossNodePl.evalCount)
+	}
+
+	// 4. Setting FilterPluginModeNonNodeLocalOnly skips plugins with IsNodeLocal() == true
+	stateSkipLocal := framework.NewCycleState()
+	stateSkipLocal.SetFilterPluginExecutionMode(fwk.FilterPluginModeNonNodeLocalOnly)
+	status = f.RunFilterPlugins(ctx, stateSkipLocal, pod, nodeInfo)
+	if !status.IsSuccess() {
+		t.Fatalf("expected success when skipping node-local filter plugins, got %v", status)
+	}
+	if defaultPl.evalCount != 2 {
+		t.Errorf("expected defaultPl evalCount=2, got %d", defaultPl.evalCount)
+	}
+	if nodeLocalPl.evalCount != 2 {
+		t.Errorf("expected nodeLocalPl to be skipped (evalCount=2), got %d", nodeLocalPl.evalCount)
+	}
+	if crossNodePl.evalCount != 2 {
+		t.Errorf("expected crossNodePl evalCount=2, got %d", crossNodePl.evalCount)
 	}
 }

@@ -213,17 +213,53 @@ func (ev *PodGroupEvaluator) selectVictimsOnDomain(
 	// reprieveVictim tries to reprieve a victim as a single unit.
 	// If reprieveFilter allows reprieving the victim, it adds all victim's pods back to snapshot
 	// and to CycleStates of preemptor pods.
-	// In Phase 1, it runs node-local FilterPlugins (those implementing NodeLocalFilterPlugin
-	// with IsNodeLocal() == true) on the nodes directly affected by the victim to fail fast.
-	// In Phase 2, if Phase 1 succeeds, it goes through preemptor's proposed assignments in
-	// scheduling-cycle order and runs all FilterPlugins for a given preemptor pod on its proposed node.
-	// If all FilterPlugins succeed, it notifies reprieveFilter and returns true.
-	// Preemptor pods are evaluated in the same order as in the scheduling cycle.
-	// This logic uses the CycleState returned for each of the preemptor pods from the
-	// scheduling algorithm called on a cluster without victims.
-	// This means that the CycleState for the Nth preemptor pod was created with:
-	// - all previous preemptor pods assumed and reserved
-	// - no knowledge of upcoming preemptor pods
+	//
+	// Preemptor pods are evaluated against the CycleState returned for each preemptor pod from the
+	// scheduling algorithm called on a cluster without victims. This means the CycleState for the
+	// m-th preemptor pod was created with:
+	// - all previous preemptor pods (0 .. m-1) assumed and reserved
+	// - no knowledge of upcoming preemptor pods (m+1 .. P-1)
+	//
+	// Evaluation is split into two phases:
+	// - Phase 1 runs only node-local Filter plugins (those implementing NodeLocalFilterPlugin with
+	//   IsNodeLocal() == true) on the nodes directly affected by the victim (assignmentsByNode[nodeName])
+	//   to fail fast when a victim causes a node-local conflict (e.g. CPU/memory/ports).
+	// - Phase 2 replays all preemptor assignments in the original scheduling-cycle order (0 .. P-1),
+	//   skipping node-local Filter plugins and running only cross-node Filter plugins.
+	//
+	// Why evaluating affected nodes out of global order in Phase 1 and skipping node-local filters
+	// in Phase 2 is safe and preserves sequential scheduling invariants:
+	//  1. Zero cross-node state in node-local Filter plugins:
+	//     By the contract of NodeLocalFilterPlugin, a node-local Filter plugin evaluating an
+	//     assignment a_m on target node N depends solely on (a_m.Pod, a_m.CycleState's node-local
+	//     PreFilter state, NodeInfo(N)). Assuming or reserving a preemptor pod a_j assigned to a
+	//     different node N' != N only mutates NodeInfo(N') and cross-node plugin state; it never
+	//     modifies NodeInfo(N) or a_m's node-local PreFilter state.
+	//  2. Intra-node relative ordering is preserved:
+	//     assignmentsByNode[N] is constructed by iterating through ProposedAssignments in the exact
+	//     scheduling-cycle order (0 .. P-1). If multiple preemptor pods a_{i_1}, a_{i_2}, ..., a_{i_k}
+	//     (i_1 < i_2 < ... < i_k) are assigned to the same node N, assignmentsByNode[N] preserves
+	//     that exact subsequence order. Because Phase 1 adds each a_{i_r} to NodeInfo(N) and runs
+	//     Reserve before evaluating a_{i_{r+1}}, at step r in Phase 1 NodeInfo(N) contains:
+	//       BasePods(N) U VictimPods(N) U {a_{i_1}, ..., a_{i_{r-1}}}
+	//     which is bit-for-bit identical to the NodeInfo(N) state at step i_r during a full
+	//     0 .. P-1 replay (since all intermediate pods a_j not in assignmentsByNode[N] target
+	//     other nodes N' != N).
+	//  3. Redundancy of node-local Filter plugins in Phase 2:
+	//     - For every affected node N in affectedNodes: Phase 1 has already verified that all
+	//       node-local Filter plugins succeed for every assignment in assignmentsByNode[N] against
+	//       the exact NodeInfo(N) state they would observe in Phase 2.
+	//     - For every unaffected node N not in affectedNodes: VictimPods(N) is empty, so adding
+	//       victim v did not modify NodeInfo(N). During Phase 2's 0 .. P-1 replay, at step i_r
+	//       NodeInfo(N) contains BasePods(N) U {a_{i_1}, ..., a_{i_{r-1}}}, which is the exact
+	//       same NodeInfo(N) and node-local CycleState that already passed all node-local Filter
+	//       plugins when podGroupSchedulingFunc produced validAssignment (plus any previously
+	//       reprieved victims on N, which were already validated when those victims were reprieved).
+	//  4. Cross-node sequential invariants in Phase 2:
+	//     Phase 2 still iterates over all preemptorAssignments in the exact 0 .. P-1 order,
+	//     adding each pod to mutableLister and running ReservePluginsReserve before evaluating
+	//     subsequent pods, so all cross-node Filter plugins observe the exact sequential
+	//     cluster-wide state transitions.
 	reprieveVictim := func(v fwk.PreemptionVictim, preemptorAssignments []fwk.ProposedAssignment) (fits bool, err error) {
 		ok, err := reprieveFilter.ShouldAttemptReprieval(ctx, v)
 		if err != nil {
@@ -249,7 +285,7 @@ func (ev *PodGroupEvaluator) selectVictimsOnDomain(
 			}
 		}()
 
-		evaluateAssignments := func(assignments []fwk.ProposedAssignment, runOnlyNodeLocal bool) (ok bool, evalErr error) {
+		evaluateAssignments := func(assignments []fwk.ProposedAssignment, mode fwk.FilterPluginExecutionMode) (ok bool, evalErr error) {
 			cleanupFns := []func() error{}
 			defer func() {
 				for i := len(cleanupFns) - 1; i >= 0; i-- {
@@ -266,9 +302,9 @@ func (ev *PodGroupEvaluator) selectVictimsOnDomain(
 				}
 
 				cs := assignment.GetCycleState()
-				cs.SetRunOnlyNodeLocalFilterPlugins(runOnlyNodeLocal)
+				cs.SetFilterPluginExecutionMode(mode)
 				s := ev.Handle.RunFilterPluginsWithNominatedPods(ctx, cs, assignment.GetPod(), nodeInfo)
-				cs.SetRunOnlyNodeLocalFilterPlugins(false)
+				cs.SetFilterPluginExecutionMode(fwk.FilterPluginModeAll)
 				if !s.IsSuccess() {
 					return false, nil
 				}
@@ -292,16 +328,16 @@ func (ev *PodGroupEvaluator) selectVictimsOnDomain(
 			affectedNodes.Insert(pi.GetPod().Spec.NodeName)
 		}
 
-		// Phase 1: Fast-fail on nodes directly affected by the victim using node-local Filter plugins.
+		// Phase 1: Fast-fail on nodes directly affected by the victim using only node-local Filter plugins.
 		for nodeName := range affectedNodes {
-			if fits, err = evaluateAssignments(assignmentsByNode[nodeName], true); err != nil || !fits {
+			if fits, err = evaluateAssignments(assignmentsByNode[nodeName], fwk.FilterPluginModeNodeLocalOnly); err != nil || !fits {
 				return fits, err
 			}
 		}
 
-		// Phase 2: Replay all assignments in scheduling-cycle order running all Filter plugins.
-		if fits, err := evaluateAssignments(preemptorAssignments, false); err != nil || !fits {
-			return, fits, err
+		// Phase 2: Replay all assignments in scheduling-cycle order running only non-node-local (cross-node) Filter plugins.
+		if fits, err = evaluateAssignments(preemptorAssignments, fwk.FilterPluginModeNonNodeLocalOnly); err != nil || !fits {
+			return fits, err
 		}
 		if err = reprieveFilter.OnVictimReprieved(ctx, v); err != nil {
 			return false, err
