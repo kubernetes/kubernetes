@@ -105,33 +105,18 @@ func (s *Model) Equal(other *Model) bool {
 // Step applies an operation to the sequential state machine. change is the
 // write the operation made, or nil if the operation didn't write.
 func (s *Model) Step(input Request, output Response) (ok bool, next *Model, change *Change) {
-	if input.Op == OpGet {
-		if _, err := s.checkGet(input.Key, input.Get.Options); err != nil {
-			return reflect.DeepEqual(Response{Err: err}, output), s, nil
-		}
-		consistency := GetReadConsistency(input.Get.Options)
-		if consistency != ConsistencyConsistent {
-			return s.validateGetRV(input.Key, input.Get.Options, output), s, nil
-		}
-	}
-	if input.Op == OpList {
-		if err := s.checkList(input.Key, input.List.Options); err != nil {
-			return reflect.DeepEqual(Response{Err: err}, output), s, nil
-		}
-		consistency, err := ListReadConsistency(input.List.Options)
-		if err != nil {
+	expected, next, change := s.execute(input)
+	switch input.Op {
+	case OpGet:
+		return s.validateGet(input.Get.Options, expected, output), s, nil
+	case OpList:
+		return s.validateList(input.List.Options, expected, output), s, nil
+	default:
+		if !reflect.DeepEqual(expected, output) {
 			return false, s, nil
 		}
-		if consistency != ConsistencyConsistent {
-			// Model only validates consistent reads, for stale reads we just validate RV and contents are validated later during replay.
-			return s.validateListRV(input.List.Options, output), s, nil
-		}
+		return true, next, change
 	}
-	expected, next, change := s.execute(input)
-	if !reflect.DeepEqual(expected, output) {
-		return false, s, nil
-	}
-	return true, next, change
 }
 
 // execute returns the response storage gives for input served from this
@@ -159,115 +144,83 @@ func (s *Model) execute(input Request) (Response, *Model, *Change) {
 	}
 }
 
-func (s *Model) checkGet(key string, opts storage.GetOptions) (uint64, error) {
-	if err := checkKey(key, false); err != nil {
-		return 0, err
-	}
-	rv, err := s.Versioner.ParseResourceVersion(opts.ResourceVersion)
-	if err != nil {
-		return 0, err
-	}
-	return rv, nil
-}
-
-func (s *Model) validateGetRV(key string, opts storage.GetOptions, output Response) bool {
-	reqRV, err := s.Versioner.ParseResourceVersion(opts.ResourceVersion)
-	if err != nil {
-		return false
-	}
-	if output.Err != nil {
-		if storage.IsTooLargeResourceVersion(output.Err) {
-			return output.Object == nil && reqRV > s.ResourceVersion
+func (s *Model) validateGet(opts storage.GetOptions, expected, output Response) bool {
+	if expected.Err != nil {
+		switch {
+		case storage.IsTooLargeResourceVersion(expected.Err):
+			return output.Object == nil && storage.IsTooLargeResourceVersion(output.Err)
+		case storage.IsNotFound(expected.Err):
+		default:
+			return reflect.DeepEqual(expected, output)
 		}
-		if storageErr, ok := output.Err.(*storage.StorageError); ok && storageErr.Code == storage.ErrCodeKeyNotFound {
-			errRV := uint64(storageErr.ResourceVersion)
-			// Cacher returns NotFound errors without the underlying etcd prefix.
-			return !opts.IgnoreNotFound && storageErr.ResourceVersion > 0 && errRV >= reqRV && errRV <= s.ResourceVersion &&
-				(reflect.DeepEqual(output, Response{Err: storage.NewKeyNotFoundError(s.Prefix+key, storageErr.ResourceVersion)}) ||
-					reflect.DeepEqual(output, Response{Err: storage.NewKeyNotFoundError(key, storageErr.ResourceVersion)}))
+	}
+	if output.Err != nil && output.Object != nil {
+		return false
+	}
+	reqRV, _ := s.Versioner.ParseResourceVersion(opts.ResourceVersion)
+	switch GetReadConsistency(opts) {
+	case ConsistencyConsistent:
+		return reflect.DeepEqual(expected, output)
+	case ConsistencyNotOlderThan:
+		// Model only validates consistent reads, for stale reads we just validate RV and contents are validated later during replay.
+		if storage.IsNotFound(output.Err) {
+			outputErr := output.Err.(*storage.StorageError)
+			respRV := uint64(outputErr.ResourceVersion)
+			return respRV > 0 && respRV >= reqRV && respRV <= s.ResourceVersion
 		}
+		if output.Err != nil || output.Object == nil {
+			return false
+		}
+		respRV, err := s.Versioner.ObjectResourceVersion(output.Object)
+		return err == nil && respRV <= s.ResourceVersion
+	default:
 		return false
 	}
-	if output.Object == nil || reqRV > s.ResourceVersion {
-		return false
-	}
-	respRV, err := s.Versioner.ObjectResourceVersion(output.Object)
-	if err != nil {
-		return false
-	}
-	if respRV == 0 {
-		return opts.IgnoreNotFound && reflect.DeepEqual(output.Object, s.NewFunc())
-	}
-	return respRV <= s.ResourceVersion
 }
 
-// checkList returns the error storage returns for an invalid list and panics
-// on lists the model doesn't support.
-func (s *Model) checkList(key string, opts storage.ListOptions) error {
-	if err := checkKey(key, opts.Recursive); err != nil {
-		return err
+func (s *Model) validateList(opts storage.ListOptions, expected, output Response) bool {
+	if expected.Err != nil {
+		switch {
+		case storage.IsTooLargeResourceVersion(expected.Err):
+			return output.Object == nil && storage.IsTooLargeResourceVersion(output.Err)
+		default:
+			return reflect.DeepEqual(expected, output)
+		}
 	}
-	if _, _, err := storage.ValidateListOptions("", s.Versioner, opts); err != nil {
-		return err
-	}
-	if opts.Predicate.Label == nil || opts.Predicate.Field == nil {
-		// etcd3 and the cacher call methods on both selectors.
-		panic("nil label or field selector is not supported, use storage.Everything to match everything")
-	}
-	if opts.Predicate.Limit != 0 || opts.Predicate.Continue != "" {
-		panic("pagination (limit, continue) is not supported")
-	}
-	if !opts.Predicate.Empty() && opts.Predicate.GetAttrs == nil {
-		panic("selectors without GetAttrs are not supported")
-	}
-	if opts.RecordTimestamps {
-		panic("recordTimestamps is not supported, it wraps objects in storage-internal types")
-	}
-	return nil
-}
-
-func (s *Model) validateListRV(opts storage.ListOptions, output Response) bool {
 	consistency, err := ListReadConsistency(opts)
 	if err != nil {
 		return false
 	}
-	if consistency == ConsistencyConsistent {
-		return true
-	}
-	reqRV, err := s.Versioner.ParseResourceVersion(opts.ResourceVersion)
-	if err != nil {
-		return false
-	}
-	if output.Err != nil {
-		// RV from future must return error
-		if storage.IsTooLargeResourceVersion(output.Err) {
-			return output.Object == nil && reqRV > s.ResourceVersion
-		}
-		return false
-	}
-	if output.Object == nil {
-		return false
-	}
-	accessor, err := meta.ListAccessor(output.Object)
-	if err != nil {
-		return false
-	}
-	respRV, err := s.Versioner.ParseResourceVersion(accessor.GetResourceVersion())
-	if err != nil || respRV == 0 {
-		return false
-	}
-	// RV from future that didn't return error is invalid.
-	if respRV > s.ResourceVersion {
-		return false
-	}
+	reqRV, _ := s.Versioner.ParseResourceVersion(opts.ResourceVersion)
 	switch consistency {
+	case ConsistencyConsistent:
+		return reflect.DeepEqual(expected, output)
 	case ConsistencyExact:
-		return reqRV > 0 && respRV == reqRV
+		// Model only validates consistent reads, for stale reads we just validate RV and contents are validated later during replay.
+		respRV, ok := s.listResponseRV(output)
+		return ok && respRV == reqRV
 	case ConsistencyNotOlderThan:
-		return respRV >= reqRV
+		// Model only validates consistent reads, for stale reads we just validate RV and contents are validated later during replay.
+		respRV, ok := s.listResponseRV(output)
+		return ok && respRV >= reqRV && respRV <= s.ResourceVersion
 	default:
 		return false
 	}
+}
+
+func (s *Model) listResponseRV(output Response) (uint64, bool) {
+	if output.Err != nil || output.Object == nil {
+		return 0, false
+	}
+	accessor, err := meta.ListAccessor(output.Object)
+	if err != nil {
+		return 0, false
+	}
+	respRV, err := s.Versioner.ParseResourceVersion(accessor.GetResourceVersion())
+	if err != nil || respRV == 0 {
+		return 0, false
+	}
+	return respRV, true
 }
 
 func (s *Model) update(ctx context.Context, key string, ignoreNotFound bool, preconditions *storage.Preconditions, tryUpdate storage.UpdateFunc, cachedExistingObject runtime.Object) (Response, *Change) {
@@ -356,14 +309,15 @@ func (s *Model) create(key string, obj runtime.Object) (Response, *Change) {
 }
 
 func (s *Model) get(key string, opts storage.GetOptions) Response {
-	rv, err := s.checkGet(key, opts)
+	if err := checkKey(key, false); err != nil {
+		return Response{Err: err}
+	}
+	rv, err := s.Versioner.ParseResourceVersion(opts.ResourceVersion)
 	if err != nil {
 		return Response{Err: err}
 	}
-	if consistency := GetReadConsistency(opts); consistency != ConsistencyConsistent {
-		if rv > s.ResourceVersion {
-			return Response{Err: storage.NewTooLargeResourceVersionError(rv, s.ResourceVersion, 0)}
-		}
+	if rv > s.ResourceVersion {
+		return Response{Err: storage.NewTooLargeResourceVersionError(rv, s.ResourceVersion, 0)}
 	}
 	stored, exists := s.Items[key]
 	if !exists {
@@ -376,8 +330,31 @@ func (s *Model) get(key string, opts storage.GetOptions) Response {
 }
 
 func (s *Model) list(key string, opts storage.ListOptions) Response {
-	if err := s.checkList(key, opts); err != nil {
+	if err := checkKey(key, opts.Recursive); err != nil {
 		return Response{Err: err}
+	}
+	if _, _, err := storage.ValidateListOptions("", s.Versioner, opts); err != nil {
+		return Response{Err: err}
+	}
+	if opts.Predicate.Label == nil || opts.Predicate.Field == nil {
+		// etcd3 and the cacher call methods on both selectors.
+		panic("nil label or field selector is not supported, use storage.Everything to match everything")
+	}
+	if opts.Predicate.Limit != 0 || opts.Predicate.Continue != "" {
+		panic("pagination (limit, continue) is not supported")
+	}
+	if !opts.Predicate.Empty() && opts.Predicate.GetAttrs == nil {
+		panic("selectors without GetAttrs are not supported")
+	}
+	if opts.RecordTimestamps {
+		panic("recordTimestamps is not supported, it wraps objects in storage-internal types")
+	}
+	rv, err := s.Versioner.ParseResourceVersion(opts.ResourceVersion)
+	if err != nil {
+		return Response{Err: err}
+	}
+	if rv > s.ResourceVersion {
+		return Response{Err: storage.NewTooLargeResourceVersionError(rv, s.ResourceVersion, 0)}
 	}
 	items, err := s.listItems(key, opts)
 	if err != nil {
