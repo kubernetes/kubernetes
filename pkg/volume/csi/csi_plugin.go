@@ -189,7 +189,7 @@ func updateCSIDriver(pluginName string) error {
 	return nil
 }
 
-func (p *csiPlugin) VerifyExhaustedResource(spec *volume.Spec) bool {
+func (p *csiPlugin) VerifyExhaustedResource(logger klog.Logger, spec *volume.Spec) bool {
 	if spec == nil || spec.PersistentVolume == nil || spec.PersistentVolume.Spec.CSI == nil {
 		klog.ErrorS(nil, "Invalid volume spec for CSI")
 		return false
@@ -197,7 +197,7 @@ func (p *csiPlugin) VerifyExhaustedResource(spec *volume.Spec) bool {
 
 	pluginName := spec.PersistentVolume.Spec.CSI.Driver
 
-	driver, err := p.getCSIDriver(pluginName)
+	driver, err := p.getCSIDriver(logger, pluginName)
 	if err != nil {
 		klog.ErrorS(err, "Failed to retrieve CSIDriver", "pluginName", pluginName)
 		return false
@@ -352,13 +352,15 @@ func (p *csiPlugin) Init(host volume.VolumeHost) error {
 
 	// This function prevents Kubelet from posting Ready status until CSINode
 	// is both installed and initialized
-	if err := initializeCSINode(host, p.csiDriverInformer); err != nil {
+	// Use context.TODO() because we currently do not have a proper context to pass in.
+	// This should be replaced with an appropriate context when refactoring this function to accept a context parameter.
+	if err := initializeCSINode(context.TODO(), host, p.csiDriverInformer); err != nil {
 		return errors.New(log("failed to initialize CSINode: %v", err))
 	}
 	return nil
 }
 
-func initializeCSINode(host volume.VolumeHost, csiDriverInformer cache.SharedIndexInformer) error {
+func initializeCSINode(ctx context.Context, host volume.VolumeHost, csiDriverInformer cache.SharedIndexInformer) error {
 	kvh, ok := host.(volume.KubeletVolumeHost)
 	if !ok {
 		klog.V(4).Info("Cast from VolumeHost to KubeletVolumeHost failed. Skipping CSINode initialization, not running on kubelet")
@@ -378,7 +380,7 @@ func initializeCSINode(host volume.VolumeHost, csiDriverInformer cache.SharedInd
 
 		// First wait indefinitely to talk to Kube APIServer
 		nodeName := host.GetNodeName()
-		err := waitForAPIServerForever(kubeClient, nodeName)
+		err := waitForAPIServerForever(ctx, kubeClient, nodeName)
 		if err != nil {
 			klog.Fatalf("Failed to initialize CSINode while waiting for API server to report ok: %v", err)
 		}
@@ -454,7 +456,7 @@ func (p *csiPlugin) CanSupport(spec *volume.Spec) bool {
 		(spec.Volume != nil && spec.Volume.CSI != nil)
 }
 
-func (p *csiPlugin) RequiresRemount(spec *volume.Spec) bool {
+func (p *csiPlugin) RequiresRemount(logger klog.Logger, spec *volume.Spec) bool {
 	if p.csiDriverLister == nil {
 		return false
 	}
@@ -463,7 +465,7 @@ func (p *csiPlugin) RequiresRemount(spec *volume.Spec) bool {
 		klog.V(5).Info(log("Failed to mark %q as republish required, err: %v", spec.Name(), err))
 		return false
 	}
-	csiDriver, err := p.getCSIDriver(driverName)
+	csiDriver, err := p.getCSIDriver(logger, driverName)
 	if err != nil {
 		klog.V(5).Info(log("Failed to mark %q as republish required, err: %v", spec.Name(), err))
 		return false
@@ -634,13 +636,13 @@ func (p *csiPlugin) SupportsMountOption() bool {
 	return true
 }
 
-func (p *csiPlugin) SupportsSELinuxContextMount(spec *volume.Spec) (bool, error) {
+func (p *csiPlugin) SupportsSELinuxContextMount(logger klog.Logger, spec *volume.Spec) (bool, error) {
 	if utilfeature.DefaultFeatureGate.Enabled(features.SELinuxMountReadWriteOncePod) {
 		driver, err := GetCSIDriverName(spec)
 		if err != nil {
 			return false, err
 		}
-		csiDriver, err := p.getCSIDriver(driver)
+		csiDriver, err := p.getCSIDriver(logger, driver)
 		if err != nil {
 			if apierrors.IsNotFound(err) {
 				return false, nil
@@ -672,7 +674,7 @@ func (p *csiPlugin) NewDetacher() (volume.Detacher, error) {
 	return p.newAttacherDetacher()
 }
 
-func (p *csiPlugin) CanAttach(spec *volume.Spec) (bool, error) {
+func (p *csiPlugin) CanAttach(logger klog.Logger, spec *volume.Spec) (bool, error) {
 	volumeLifecycleMode, err := p.getVolumeLifecycleMode(spec)
 	if err != nil {
 		return false, err
@@ -690,7 +692,7 @@ func (p *csiPlugin) CanAttach(spec *volume.Spec) (bool, error) {
 
 	driverName := pvSrc.Driver
 
-	skipAttach, err := p.skipAttach(driverName)
+	skipAttach, err := p.skipAttach(logger, driverName)
 	if err != nil {
 		return false, err
 	}
@@ -855,8 +857,8 @@ func (p *csiPlugin) ConstructBlockVolumeSpec(podUID types.UID, specVolName, mapP
 
 // skipAttach looks up CSIDriver object associated with driver name
 // to determine if driver requires attachment volume operation
-func (p *csiPlugin) skipAttach(driver string) (bool, error) {
-	csiDriver, err := p.getCSIDriver(driver)
+func (p *csiPlugin) skipAttach(logger klog.Logger, driver string) (bool, error) {
+	csiDriver, err := p.getCSIDriver(logger, driver)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			// Don't skip attach if CSIDriver does not exist
@@ -870,10 +872,10 @@ func (p *csiPlugin) skipAttach(driver string) (bool, error) {
 	return false, nil
 }
 
-func (p *csiPlugin) getCSIDriver(driver string) (*storage.CSIDriver, error) {
+func (p *csiPlugin) getCSIDriver(logger klog.Logger, driver string) (*storage.CSIDriver, error) {
 	kletHost, ok := p.host.(volume.KubeletVolumeHost)
 	if ok {
-		if err := kletHost.WaitForCacheSync(); err != nil {
+		if err := kletHost.WaitForCacheSync(logger); err != nil {
 			return nil, err
 		}
 	}
@@ -903,8 +905,9 @@ func (p *csiPlugin) getVolumeLifecycleMode(spec *volume.Spec) (storage.VolumeLif
 	return storage.VolumeLifecyclePersistent, nil
 }
 
-func (p *csiPlugin) getPublishContext(client clientset.Interface, handle, driver, nodeName string) (map[string]string, error) {
-	skip, err := p.skipAttach(driver)
+func (p *csiPlugin) getPublishContext(ctx context.Context, client clientset.Interface, handle, driver, nodeName string) (map[string]string, error) {
+	logger := klog.FromContext(ctx)
+	skip, err := p.skipAttach(logger, driver)
 	if err != nil {
 		return nil, err
 	}
@@ -915,7 +918,7 @@ func (p *csiPlugin) getPublishContext(client clientset.Interface, handle, driver
 	attachID := getAttachmentName(handle, driver, nodeName)
 
 	// search for attachment by VolumeAttachment.Spec.Source.PersistentVolumeName
-	attachment, err := client.StorageV1().VolumeAttachments().Get(context.TODO(), attachID, meta.GetOptions{})
+	attachment, err := client.StorageV1().VolumeAttachments().Get(ctx, attachID, meta.GetOptions{})
 	if err != nil {
 		return nil, err // This err already has enough context ("VolumeAttachment xyz not found")
 	}
@@ -941,8 +944,8 @@ func (p *csiPlugin) newAttacherDetacher() (*csiAttacher, error) {
 }
 
 // podInfoEnabled  check CSIDriver enabled pod info flag
-func (p *csiPlugin) podInfoEnabled(driverName string) (bool, error) {
-	csiDriver, err := p.getCSIDriver(driverName)
+func (p *csiPlugin) podInfoEnabled(logger klog.Logger, driverName string) (bool, error) {
+	csiDriver, err := p.getCSIDriver(logger, driverName)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			klog.V(4).Info(log("CSIDriver %q not found, not adding pod information", driverName))
@@ -971,7 +974,7 @@ func unregisterDriver(driverName string) error {
 
 // waitForAPIServerForever waits forever to get a CSINode instance as a proxy
 // for a healthy APIServer
-func waitForAPIServerForever(client clientset.Interface, nodeName types.NodeName) error {
+func waitForAPIServerForever(ctx context.Context, client clientset.Interface, nodeName types.NodeName) error {
 	var lastErr error
 	// Served object is discarded so no risk to have stale object with benefit to
 	// reduce the load on APIServer and etcd.
@@ -982,7 +985,7 @@ func waitForAPIServerForever(client clientset.Interface, nodeName types.NodeName
 		// and 2) it has enough permissions. Kubelet may have restricted permissions
 		// when it's bootstrapping TLS.
 		// https://kubernetes.io/docs/reference/access-authn-authz/kubelet-tls-bootstrapping/
-		_, lastErr = client.StorageV1().CSINodes().Get(context.TODO(), string(nodeName), opts)
+		_, lastErr = client.StorageV1().CSINodes().Get(ctx, string(nodeName), opts)
 		if lastErr == nil || apierrors.IsNotFound(lastErr) {
 			// API server contacted
 			return true, nil

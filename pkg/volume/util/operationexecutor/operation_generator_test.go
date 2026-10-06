@@ -29,6 +29,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/test/utils/ktesting"
 
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
@@ -515,6 +516,8 @@ func TestCheckForRecoveryFromExpansion(t *testing.T) {
 func TestGenerateMountVolumeFunc_AttemptTrackingRespectsFeatureGate(t *testing.T) {
 	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.33"))
 
+	tCtx := ktesting.Init(t)
+
 	tests := []struct {
 		name                  string
 		featureGateEnabled    bool
@@ -550,7 +553,7 @@ func TestGenerateMountVolumeFunc_AttemptTrackingRespectsFeatureGate(t *testing.T
 				Pod:        pod,
 			}
 
-			ops := og.GenerateMountVolumeFunc(time.Second, volumeToMount, asow, false)
+			ops := og.GenerateMountVolumeFunc(tCtx, time.Second, volumeToMount, asow, false)
 			eventErr, detailedErr := ops.Run()
 			if eventErr != nil || detailedErr != nil {
 				t.Fatalf("GenerateMountVolumeFunc returned unexpected errors: event=%v detailed=%v", eventErr, detailedErr)
@@ -565,6 +568,8 @@ func TestGenerateMountVolumeFunc_AttemptTrackingRespectsFeatureGate(t *testing.T
 
 func TestGenerateMapVolumeFunc_AttemptTrackingRespectsFeatureGate(t *testing.T) {
 	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.33"))
+
+	tCtx := ktesting.Init(t)
 
 	tests := []struct {
 		name                  string
@@ -606,7 +611,7 @@ func TestGenerateMapVolumeFunc_AttemptTrackingRespectsFeatureGate(t *testing.T) 
 				Pod:        pod,
 			}
 
-			ops, err := og.GenerateMapVolumeFunc(time.Second, volumeToMount, asow)
+			ops, err := og.GenerateMapVolumeFunc(tCtx, time.Second, volumeToMount, asow)
 			if err != nil {
 				t.Fatalf("GenerateMapVolumeFunc returned unexpected error: %v", err)
 			}

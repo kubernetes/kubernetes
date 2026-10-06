@@ -17,6 +17,7 @@ limitations under the License.
 package testing
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -291,7 +292,7 @@ func (plugin *FakeVolumePlugin) CanSupport(spec *volume.Spec) bool {
 	return true
 }
 
-func (plugin *FakeVolumePlugin) RequiresRemount(spec *volume.Spec) bool {
+func (plugin *FakeVolumePlugin) RequiresRemount(logger klog.Logger, spec *volume.Spec) bool {
 	return plugin.SupportsRemount
 }
 
@@ -299,7 +300,7 @@ func (plugin *FakeVolumePlugin) SupportsMountOption() bool {
 	return true
 }
 
-func (plugin *FakeVolumePlugin) SupportsSELinuxContextMount(spec *volume.Spec) (bool, error) {
+func (plugin *FakeVolumePlugin) SupportsSELinuxContextMount(logger klog.Logger, spec *volume.Spec) (bool, error) {
 	return plugin.SupportsSELinux, nil
 }
 
@@ -444,11 +445,11 @@ func (plugin *FakeVolumePlugin) GetNewDetacherCallCount() int {
 	return plugin.NewDetacherCallCount
 }
 
-func (plugin *FakeVolumePlugin) CanAttach(spec *volume.Spec) (bool, error) {
+func (plugin *FakeVolumePlugin) CanAttach(logger klog.Logger, pec *volume.Spec) (bool, error) {
 	return !plugin.NonAttachable, nil
 }
 
-func (plugin *FakeVolumePlugin) VerifyExhaustedResource(spec *volume.Spec) bool {
+func (plugin *FakeVolumePlugin) VerifyExhaustedResource(_ klog.Logger, _ *volume.Spec) bool {
 	return plugin.VerifyExhaustedEnabled
 }
 
@@ -577,12 +578,12 @@ func (f *FakeBasicVolumePlugin) NewUnmounter(volName string, podUID types.UID) (
 	return f.Plugin.NewUnmounter(volName, podUID)
 }
 
-func (f *FakeBasicVolumePlugin) RequiresRemount(spec *volume.Spec) bool {
-	return f.Plugin.RequiresRemount(spec)
+func (f *FakeBasicVolumePlugin) RequiresRemount(logger klog.Logger, spec *volume.Spec) bool {
+	return f.Plugin.RequiresRemount(logger, spec)
 }
 
-func (f *FakeBasicVolumePlugin) SupportsSELinuxContextMount(spec *volume.Spec) (bool, error) {
-	return f.Plugin.SupportsSELinuxContextMount(spec)
+func (f *FakeBasicVolumePlugin) SupportsSELinuxContextMount(logger klog.Logger, spec *volume.Spec) (bool, error) {
+	return f.Plugin.SupportsSELinuxContextMount(logger, spec)
 }
 
 func (f *FakeBasicVolumePlugin) SupportsMountOption() bool {
@@ -628,11 +629,11 @@ func (f *FakeAttachableVolumePlugin) NewDetacher() (volume.Detacher, error) {
 	return f.Plugin.NewDetacher()
 }
 
-func (f *FakeAttachableVolumePlugin) CanAttach(spec *volume.Spec) (bool, error) {
+func (f *FakeAttachableVolumePlugin) CanAttach(logger klog.Logger, spec *volume.Spec) (bool, error) {
 	return true, nil
 }
 
-func (f *FakeAttachableVolumePlugin) VerifyExhaustedResource(spec *volume.Spec) bool {
+func (f *FakeAttachableVolumePlugin) VerifyExhaustedResource(_ klog.Logger, _ *volume.Spec) bool {
 	return false
 }
 
@@ -658,7 +659,7 @@ func (plugin *FakeFileVolumePlugin) CanSupport(spec *volume.Spec) bool {
 	return true
 }
 
-func (plugin *FakeFileVolumePlugin) RequiresRemount(spec *volume.Spec) bool {
+func (plugin *FakeFileVolumePlugin) RequiresRemount(logger klog.Logger, spec *volume.Spec) bool {
 	return false
 }
 
@@ -666,7 +667,7 @@ func (plugin *FakeFileVolumePlugin) SupportsMountOption() bool {
 	return false
 }
 
-func (plugin *FakeFileVolumePlugin) SupportsSELinuxContextMount(spec *volume.Spec) (bool, error) {
+func (plugin *FakeFileVolumePlugin) SupportsSELinuxContextMount(logger klog.Logger, spec *volume.Spec) (bool, error) {
 	return false, nil
 }
 
@@ -744,10 +745,10 @@ func (_ *FakeVolume) GetAttributes() volume.Attributes {
 	}
 }
 
-func (fv *FakeVolume) SetUp(mounterArgs volume.MounterArgs) error {
+func (fv *FakeVolume) SetUp(ctx context.Context, mounterArgs volume.MounterArgs) error {
 	fv.Lock()
 	defer fv.Unlock()
-	err := fv.setupInternal(mounterArgs)
+	err := fv.setupInternal(ctx, mounterArgs)
 	fv.SetUpCallCount++
 	if fv.SetUpHook != nil {
 		return fv.SetUpHook(fv.Plugin, mounterArgs)
@@ -755,7 +756,7 @@ func (fv *FakeVolume) SetUp(mounterArgs volume.MounterArgs) error {
 	return err
 }
 
-func (fv *FakeVolume) setupInternal(mounterArgs volume.MounterArgs) error {
+func (fv *FakeVolume) setupInternal(ctx context.Context, mounterArgs volume.MounterArgs) error {
 	if fv.VolName == TimeoutOnSetupVolumeName {
 		fv.VolumeMountState[fv.VolName] = volumeMountUncertain
 		return volumetypes.NewUncertainProgressError("time out on setup")
@@ -794,7 +795,7 @@ func (fv *FakeVolume) setupInternal(mounterArgs volume.MounterArgs) error {
 	}
 
 	fv.VolumeMountState[fv.VolName] = volumeNotMounted
-	return fv.SetUpAt(fv.getPath(), mounterArgs)
+	return fv.SetUpAt(ctx, fv.getPath(), mounterArgs)
 }
 
 func (fv *FakeVolume) GetSetUpCallCount() int {
@@ -803,7 +804,7 @@ func (fv *FakeVolume) GetSetUpCallCount() int {
 	return fv.SetUpCallCount
 }
 
-func (fv *FakeVolume) SetUpAt(dir string, mounterArgs volume.MounterArgs) error {
+func (fv *FakeVolume) SetUpAt(ctx context.Context, dir string, mounterArgs volume.MounterArgs) error {
 	return os.MkdirAll(dir, 0750)
 }
 
@@ -835,7 +836,7 @@ func (fv *FakeVolume) TearDownAt(dir string) error {
 }
 
 // Block volume support
-func (fv *FakeVolume) SetUpDevice() (string, error) {
+func (fv *FakeVolume) SetUpDevice(logger klog.Logger) (string, error) {
 	fv.Lock()
 	defer fv.Unlock()
 	if fv.VolName == TimeoutOnMountDeviceVolumeName {
@@ -959,7 +960,7 @@ func (fv *FakeVolume) GetUnmapPodDeviceCallCount() int {
 }
 
 // Block volume support
-func (fv *FakeVolume) MapPodDevice() (string, error) {
+func (fv *FakeVolume) MapPodDevice(logger klog.Logger) (string, error) {
 	fv.Lock()
 	defer fv.Unlock()
 
@@ -1116,7 +1117,7 @@ func (fv *FakeVolume) mountDeviceInternal(spec *volume.Spec, devicePath string, 
 	return nil
 }
 
-func (fv *FakeVolume) MountDevice(spec *volume.Spec, devicePath string, deviceMountPath string, _ volume.DeviceMounterArgs) error {
+func (fv *FakeVolume) MountDevice(logger klog.Logger, spec *volume.Spec, devicePath string, deviceMountPath string, _ volume.DeviceMounterArgs) error {
 	return fv.mountDeviceInternal(spec, devicePath, deviceMountPath)
 }
 
@@ -1155,7 +1156,7 @@ func (fv *FakeVolume) Detach(volumeName string, nodeName types.NodeName) error {
 	return nil
 }
 
-func (fv *FakeVolume) VolumesAreAttached(spec []*volume.Spec, nodeName types.NodeName) (map[*volume.Spec]bool, error) {
+func (fv *FakeVolume) VolumesAreAttached(_ klog.Logger, _ []*volume.Spec, _ types.NodeName) (map[*volume.Spec]bool, error) {
 	fv.Lock()
 	defer fv.Unlock()
 	return nil, nil

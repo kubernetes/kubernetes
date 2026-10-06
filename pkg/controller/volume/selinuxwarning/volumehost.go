@@ -17,6 +17,7 @@ limitations under the License.
 package selinuxwarning
 
 import (
+	"context"
 	"fmt"
 
 	authenticationv1 "k8s.io/api/authentication/v1"
@@ -63,7 +64,7 @@ func (c *Controller) GetKubeClient() clientset.Interface {
 	return c.kubeClient
 }
 
-func (c *Controller) NewWrapperMounter(volName string, spec volume.Spec, pod *v1.Pod) (volume.Mounter, error) {
+func (c *Controller) NewWrapperMounter(logger klog.Logger, volName string, spec volume.Spec, pod *v1.Pod) (volume.Mounter, error) {
 	return nil, fmt.Errorf("NewWrapperMounter not supported by SELinux controller VolumeHost implementation")
 }
 
@@ -75,22 +76,22 @@ func (c *Controller) GetMounter() mount.Interface {
 	return nil
 }
 
-func (c *Controller) GetNodeAllocatable() (v1.ResourceList, error) {
+func (c *Controller) GetNodeAllocatable(_ context.Context) (v1.ResourceList, error) {
 	return v1.ResourceList{}, nil
 }
 
-func (c *Controller) GetAttachedVolumesFromNodeStatus() (map[v1.UniqueVolumeName]string, error) {
+func (c *Controller) GetAttachedVolumesFromNodeStatus(_ context.Context) (map[v1.UniqueVolumeName]string, error) {
 	return map[v1.UniqueVolumeName]string{}, nil
 }
 
-func (c *Controller) GetSecretFunc() func(namespace, name string) (*v1.Secret, error) {
-	return func(_, _ string) (*v1.Secret, error) {
+func (c *Controller) GetSecretFunc() func(ctx context.Context, namespace, name string) (*v1.Secret, error) {
+	return func(_ context.Context, _, _ string) (*v1.Secret, error) {
 		return nil, fmt.Errorf("GetSecret unsupported in SELinux controller")
 	}
 }
 
-func (c *Controller) GetConfigMapFunc() func(namespace, name string) (*v1.ConfigMap, error) {
-	return func(_, _ string) (*v1.ConfigMap, error) {
+func (c *Controller) GetConfigMapFunc() func(ctx context.Context, namespace, name string) (*v1.ConfigMap, error) {
+	return func(_ context.Context, _, _ string) (*v1.ConfigMap, error) {
 		return nil, fmt.Errorf("GetConfigMap unsupported in SELinux controller")
 	}
 }
@@ -108,7 +109,7 @@ func (c *Controller) DeleteServiceAccountTokenFunc() func(types.UID) {
 	}
 }
 
-func (c *Controller) GetNodeLabels() (map[string]string, error) {
+func (c *Controller) GetNodeLabels(_ context.Context) (map[string]string, error) {
 	return nil, fmt.Errorf("GetNodeLabels() unsupported in SELinux controller")
 }
 

@@ -33,6 +33,7 @@ import (
 	"k8s.io/client-go/informers"
 	fakeclient "k8s.io/client-go/kubernetes/fake"
 	utiltesting "k8s.io/client-go/util/testing"
+	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 )
@@ -41,6 +42,7 @@ import (
 // based on operations from the volume manager/reconciler/operation executor
 func TestCSI_VolumeAll(t *testing.T) {
 	defaultFSGroupPolicy := storage.ReadWriteOnceWithFSTypeFSGroupPolicy
+	logger, tCtx := ktesting.NewTestContext(t)
 
 	tests := []struct {
 		name                 string
@@ -276,7 +278,7 @@ func TestCSI_VolumeAll(t *testing.T) {
 			// *************** Attach/Mount volume resources ****************//
 			// attach volume
 			t.Log("csiTest.VolumeAll Attaching volume...")
-			attachPlug, err := attachDetachPlugMgr.FindAttachablePluginBySpec(volSpec)
+			attachPlug, err := attachDetachPlugMgr.FindAttachablePluginBySpec(logger, volSpec)
 			if err != nil {
 				if !test.findPluginShouldFail {
 					t.Fatalf("csiTest.VolumeAll PluginManager.FindAttachablePluginBySpec failed: %v", err)
@@ -375,7 +377,7 @@ func TestCSI_VolumeAll(t *testing.T) {
 				if err != nil {
 					t.Fatalf("csiTest.VolumeAll deviceMounter.GetdeviceMountPath failed %s", err)
 				}
-				if err := csiDevMounter.MountDevice(volSpec, devicePath, devMountPath, volume.DeviceMounterArgs{}); err != nil {
+				if err := csiDevMounter.MountDevice(logger, volSpec, devicePath, devMountPath, volume.DeviceMounterArgs{}); err != nil {
 					t.Fatalf("csiTest.VolumeAll deviceMounter.MountDevice failed: %v", err)
 				}
 				t.Log("csiTest.VolumeAll device mounted at path:", devMountPath)
@@ -412,7 +414,7 @@ func TestCSI_VolumeAll(t *testing.T) {
 			csiMounter.csiClient = csiClient
 			var mounterArgs volume.MounterArgs
 			mounterArgs.FsGroup = fsGroup
-			err = csiMounter.SetUp(mounterArgs)
+			err = csiMounter.SetUp(tCtx, mounterArgs)
 			if test.isInline && (test.driverSpec == nil || !containsVolumeMode(test.driverSpec.VolumeLifecycleModes, storage.VolumeLifecycleEphemeral)) {
 				// This *must* fail because a CSIDriver.Spec.VolumeLifecycleModes entry "ephemeral"
 				// is required.
@@ -548,7 +550,7 @@ func TestCSI_VolumeAll(t *testing.T) {
 
 			// detach volume
 			t.Log("csiTest.VolumeAll Detaching volume...")
-			attachPlug, err = attachDetachPlugMgr.FindAttachablePluginBySpec(volSpec)
+			attachPlug, err = attachDetachPlugMgr.FindAttachablePluginBySpec(logger, volSpec)
 			if err != nil {
 				t.Fatalf("csiTest.VolumeAll PluginManager.FindAttachablePluginBySpec failed: %v", err)
 			}
