@@ -65,7 +65,7 @@ type MetaAllocator struct {
 	// Multiple ServiceCIDR can contain the same network prefix
 	// so we need to store the references from each allocators to
 	// the corresponding ServiceCIDRs
-	mu         sync.Mutex
+	mu         sync.RWMutex
 	allocators map[string]*item
 
 	ipFamily api.IPFamily
@@ -303,8 +303,8 @@ func (c *MetaAllocator) syncAllocators() error {
 // contain references to the IP addresses hence does not matter what allocators have
 // the IP. Release operations need to work with ANY allocator independent of its state.
 func (c *MetaAllocator) getAllocator(ip net.IP, ready bool) (*Allocator, error) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
+	c.mu.RLock()
+	defer c.mu.RUnlock()
 	address := servicecidr.IPToAddr(ip)
 	// use the first allocator that contains the address
 	for cidr, item := range c.allocators {
@@ -345,8 +345,9 @@ func (c *MetaAllocator) Allocate(ip net.IP) error {
 }
 
 func (c *MetaAllocator) AllocateNextService(service *api.Service) (net.IP, error) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
+	// We only read from c.allocators.
+	c.mu.RLock()
+	defer c.mu.RUnlock()
 	// TODO(aojea) add strategy to return a random allocator but
 	// taking into consideration the number of addresses of each allocator.
 	// Per example, if we have allocator A and B with 256 and 1024 possible
@@ -436,8 +437,8 @@ func (c *MetaAllocator) Used() int {
 
 // for testing
 func (c *MetaAllocator) Free() int {
-	c.mu.Lock()
-	defer c.mu.Unlock()
+	c.mu.RLock()
+	defer c.mu.RUnlock()
 
 	size := 0
 	prefixes := []netip.Prefix{}
@@ -474,8 +475,8 @@ func (c *MetaAllocator) EnableMetrics() {
 
 // DryRun returns a random allocator
 func (c *MetaAllocator) DryRun() Interface {
-	c.mu.Lock()
-	defer c.mu.Unlock()
+	c.mu.RLock()
+	defer c.mu.RUnlock()
 	for _, item := range c.allocators {
 		return item.allocator.DryRun()
 	}
