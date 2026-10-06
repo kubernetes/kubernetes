@@ -26,7 +26,6 @@ import (
 	"strings"
 
 	"k8s.io/apimachinery/pkg/api/meta"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/storage"
@@ -106,18 +105,27 @@ func (s *Model) Equal(other *Model) bool {
 // Step applies an operation to the sequential state machine. change is the
 // write the operation made, or nil if the operation didn't write.
 func (s *Model) Step(input Request, output Response) (ok bool, next *Model, change *Change) {
-	if input.Op == OpGet && input.Get.Options.ResourceVersion != "" {
-		if err := s.checkGet(input.Key, input.Get.Options); err != nil {
+	if input.Op == OpGet {
+		if _, err := s.checkGet(input.Key, input.Get.Options); err != nil {
 			return reflect.DeepEqual(Response{Err: err}, output), s, nil
 		}
-		return s.validateGetRV(input.Key, input.Get.Options, output), s, nil
+		consistency := GetReadConsistency(input.Get.Options)
+		if consistency != ConsistencyConsistent {
+			return s.validateGetRV(input.Key, input.Get.Options, output), s, nil
+		}
 	}
-	if input.Op == OpList && input.List.Options.ResourceVersion != "" {
+	if input.Op == OpList {
 		if err := s.checkList(input.Key, input.List.Options); err != nil {
 			return reflect.DeepEqual(Response{Err: err}, output), s, nil
 		}
-		// Model only validates consistent reads, for stale reads we just validate RV and contents are validated later during replay.
-		return s.validateListRV(input.List.Options, output), s, nil
+		consistency, err := ListReadConsistency(input.List.Options)
+		if err != nil {
+			return false, s, nil
+		}
+		if consistency != ConsistencyConsistent {
+			// Model only validates consistent reads, for stale reads we just validate RV and contents are validated later during replay.
+			return s.validateListRV(input.List.Options, output), s, nil
+		}
 	}
 	expected, next, change := s.execute(input)
 	if !reflect.DeepEqual(expected, output) {
@@ -139,16 +147,6 @@ func (s *Model) execute(input Request) (Response, *Model, *Change) {
 		resp, change := next.delete(context.Background(), input.Key, input.Delete.Preconditions, nil)
 		return resp, next, change
 	case OpGet:
-		if err := s.checkGet(input.Key, input.Get.Options); err != nil {
-			return Response{Err: err}, s, nil
-		}
-		if input.Get.Options.ResourceVersion != "" {
-			// checkGet already rejected unparsable RVs.
-			rv, _ := s.Versioner.ParseResourceVersion(input.Get.Options.ResourceVersion)
-			if rv > s.ResourceVersion {
-				return Response{Err: storage.NewTooLargeResourceVersionError(rv, s.ResourceVersion, 0)}, s, nil
-			}
-		}
 		return s.get(input.Key, input.Get.Options), s, nil
 	case OpList:
 		return s.list(input.Key, input.List.Options), s, nil
@@ -161,14 +159,15 @@ func (s *Model) execute(input Request) (Response, *Model, *Change) {
 	}
 }
 
-func (s *Model) checkGet(key string, opts storage.GetOptions) error {
+func (s *Model) checkGet(key string, opts storage.GetOptions) (uint64, error) {
 	if err := checkKey(key, false); err != nil {
-		return err
+		return 0, err
 	}
-	if _, err := s.Versioner.ParseResourceVersion(opts.ResourceVersion); err != nil {
-		return err
+	rv, err := s.Versioner.ParseResourceVersion(opts.ResourceVersion)
+	if err != nil {
+		return 0, err
 	}
-	return nil
+	return rv, nil
 }
 
 func (s *Model) validateGetRV(key string, opts storage.GetOptions, output Response) bool {
@@ -228,7 +227,11 @@ func (s *Model) checkList(key string, opts storage.ListOptions) error {
 }
 
 func (s *Model) validateListRV(opts storage.ListOptions, output Response) bool {
-	if opts.ResourceVersion == "" {
+	consistency, err := ListReadConsistency(opts)
+	if err != nil {
+		return false
+	}
+	if consistency == ConsistencyConsistent {
 		return true
 	}
 	reqRV, err := s.Versioner.ParseResourceVersion(opts.ResourceVersion)
@@ -257,16 +260,10 @@ func (s *Model) validateListRV(opts storage.ListOptions, output Response) bool {
 	if respRV > s.ResourceVersion {
 		return false
 	}
-	switch opts.ResourceVersionMatch {
-	case metav1.ResourceVersionMatchExact:
+	switch consistency {
+	case ConsistencyExact:
 		return reqRV > 0 && respRV == reqRV
-	case metav1.ResourceVersionMatchNotOlderThan:
-		return respRV >= reqRV
-	case "":
-		// Legacy exact match
-		if opts.Recursive && opts.Predicate.Limit > 0 && reqRV > 0 {
-			return respRV == reqRV
-		}
+	case ConsistencyNotOlderThan:
 		return respRV >= reqRV
 	default:
 		return false
@@ -359,6 +356,15 @@ func (s *Model) create(key string, obj runtime.Object) (Response, *Change) {
 }
 
 func (s *Model) get(key string, opts storage.GetOptions) Response {
+	rv, err := s.checkGet(key, opts)
+	if err != nil {
+		return Response{Err: err}
+	}
+	if consistency := GetReadConsistency(opts); consistency != ConsistencyConsistent {
+		if rv > s.ResourceVersion {
+			return Response{Err: storage.NewTooLargeResourceVersionError(rv, s.ResourceVersion, 0)}
+		}
+	}
 	stored, exists := s.Items[key]
 	if !exists {
 		if opts.IgnoreNotFound {
