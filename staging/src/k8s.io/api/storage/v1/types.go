@@ -701,6 +701,8 @@ type StorageHealthCondition struct {
 	// reason is a brief CamelCase machine-parseable reason.
 	// Maximum permitted length of a reason is 256 characters.
 	// +required
+	// +k8s:alpha(since: "1.38")=+k8s:required
+	// +k8s:alpha(since: "1.38")=+k8s:maxBytes=256
 	Reason string `json:"reason" protobuf:"bytes,2,opt,name=reason"`
 	// message is a human-readable description.
 	// +optional
