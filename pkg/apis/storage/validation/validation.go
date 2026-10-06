@@ -372,7 +372,7 @@ func validateCSINodeSpec(spec *storage.CSINodeSpec, fldPath *field.Path) field.E
 func validateCSINodeDriverRegistrations(registrations []storage.CSINodeDriverRegistration, drivers []storage.CSINodeDriver, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
-	driverNodeIDs := map[string]string{}
+	driverNodeIDs := make(map[string]string, len(drivers))
 	for _, driver := range drivers {
 		driverNodeIDs[driver.Name] = driver.NodeID
 	}
