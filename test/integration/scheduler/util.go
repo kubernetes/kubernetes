@@ -18,6 +18,7 @@ package scheduler
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -25,8 +26,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	clientset "k8s.io/client-go/kubernetes"
 	configv1 "k8s.io/kube-scheduler/config/v1"
 	fwk "k8s.io/kube-scheduler/framework"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler"
 	schedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	configtesting "k8s.io/kubernetes/pkg/scheduler/apis/config/testing"
@@ -38,6 +42,43 @@ import (
 	"k8s.io/kubernetes/test/utils/client-go/ktesting"
 	"k8s.io/utils/ptr"
 )
+
+// createPausePod creates a pause pod, optionally wrapping it in a basic PodGroup when scheduleAsPodGroup is true.
+func createPausePod(cs clientset.Interface, p *v1.Pod, scheduleAsPodGroup bool) (*v1.Pod, error) {
+	if scheduleAsPodGroup {
+		pg := st.MakePodGroup().Namespace(p.Namespace).BasicPolicy().Obj()
+		pg.GenerateName = p.Name + "-"
+		createdPG, err := cs.SchedulingV1beta1().PodGroups(p.Namespace).Create(context.TODO(), pg, metav1.CreateOptions{})
+		if err != nil {
+			return nil, fmt.Errorf("failed to create PodGroup for pod %s/%s: %w", p.Namespace, p.Name, err)
+		}
+		p = p.DeepCopy()
+		p.Spec.SchedulingGroup = &v1.PodSchedulingGroup{
+			PodGroupName: &createdPG.Name,
+		}
+	}
+	return testutils.CreatePausePod(cs, p)
+}
+
+// createPausePodWithResource creates a pause pod with the given resource requests, optionally wrapping it in a basic PodGroup.
+func createPausePodWithResource(cs clientset.Interface, podName, nsName string, res *v1.ResourceList, scheduleAsPodGroup bool) (*v1.Pod, error) {
+	var conf testutils.PausePodConfig
+	if res == nil {
+		conf = testutils.PausePodConfig{
+			Name:      podName,
+			Namespace: nsName,
+		}
+	} else {
+		conf = testutils.PausePodConfig{
+			Name:      podName,
+			Namespace: nsName,
+			Resources: &v1.ResourceRequirements{
+				Requests: *res,
+			},
+		}
+	}
+	return createPausePod(cs, testutils.InitPausePod(&conf), scheduleAsPodGroup)
+}
 
 // The returned shutdown func will delete created resources and scheduler, resources should be those
 // that will affect the scheduling result, like nodes, pods, etc.. Namespaces should not be
@@ -70,6 +111,12 @@ func InitTestSchedulerForFrameworkTest(t *testing.T, testCtx *testutils.TestCont
 		err = testCtx.ClientSet.CoreV1().Pods(testCtx.NS.Name).DeleteCollection(testCtx.SchedulerCtx, *metav1.NewDeleteOptions(0), metav1.ListOptions{})
 		if err != nil {
 			t.Errorf("error while deleting pod: %v", err)
+		}
+		if utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload) {
+			err = testCtx.ClientSet.SchedulingV1beta1().PodGroups(testCtx.NS.Name).DeleteCollection(testCtx.SchedulerCtx, *metav1.NewDeleteOptions(0), metav1.ListOptions{})
+			if err != nil {
+				t.Errorf("error while deleting podgroups: %v", err)
+			}
 		}
 		// Wait for all pods to be deleted, or will failed to create same name pods
 		// required in other test cases.
