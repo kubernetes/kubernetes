@@ -2186,6 +2186,10 @@
     lockToDefault: false
     preRelease: Alpha
     version: "1.32"
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.38"
 - name: WindowsGracefulNodeShutdown
   versionedSpecs:
   - default: false
