@@ -133,6 +133,9 @@ func (pp *PermitPlugin) Reset() {
 }
 
 func TestReScheduling(t *testing.T) {
+	// Enable GenericWorkload before starting the shared API server so it registers
+	// the PodGroup API needed by the scheduleAsPodGroup subtests.
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GenericWorkload, true)
 	testContext := testutils.InitTestAPIServer(t, "permit-plugin", nil)
 	tests := []struct {
 		name   string
@@ -143,8 +146,9 @@ func TestReScheduling(t *testing.T) {
 		wantFirstSchedulingError bool
 
 		// wantScheduled/wantError means the final expected scheduling result.
-		wantScheduled bool
-		wantError     bool
+		wantScheduled          bool
+		wantError              bool
+		skipScheduleAsPodGroup bool
 	}{
 		{
 			name:   "Rescheduling pod rejected by Permit Plugin",
@@ -154,6 +158,9 @@ func TestReScheduling(t *testing.T) {
 				return err
 			},
 			wantScheduled: true,
+			// TODO(#143568): If PodGroup scheduling succeeds, Pods rejected by per-pod Permit plugins, are still requeued immediately.
+			// To check whether to enable this case for PodGroups after revisiting the behavior.
+			skipScheduleAsPodGroup: true,
 		},
 		{
 			name:   "Rescheduling pod rejected by Permit Plugin with unrelated event",
@@ -164,6 +171,9 @@ func TestReScheduling(t *testing.T) {
 				return err
 			},
 			wantScheduled: false,
+			// TODO(#143568): If PodGroup scheduling succeeds, Pods rejected by per-pod Permit plugins are still requeued immediately.
+			// To check whether to enable this case for PodGroups after revisiting the behavior.
+			skipScheduleAsPodGroup: true,
 		},
 		{
 			name:   "Rescheduling pod failed by Permit Plugin",
@@ -206,59 +216,65 @@ func TestReScheduling(t *testing.T) {
 		},
 	}
 
-	for _, asyncAPICallsEnabled := range []bool{true, false} {
-		for _, test := range tests {
-			t.Run(fmt.Sprintf("%s (Async API calls enabled: %v)", test.name, asyncAPICallsEnabled), func(t *testing.T) {
-				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerAsyncAPICalls, asyncAPICallsEnabled)
-
-				// Create a plugin registry for testing. Register only a permit plugin.
-				registry, prof := InitRegistryAndConfig(t, nil, test.plugin)
-				t.Cleanup(test.plugin.Reset)
-
-				testCtx, teardown := InitTestSchedulerForFrameworkTest(t, testContext, 2, true,
-					scheduler.WithProfiles(prof),
-					scheduler.WithFrameworkOutOfTreeRegistry(registry))
-				defer teardown()
-
-				pod, err := testutils.CreatePausePod(testCtx.ClientSet,
-					testutils.InitPausePod(&testutils.PausePodConfig{Name: "test-pod", Namespace: testCtx.NS.Name}))
-				if err != nil {
-					t.Errorf("Error while creating a test pod: %v", err)
+	// Test scheduling scenarios treating the pod as individual or part of a pod group if applicable.
+	for _, scheduleAsPodGroup := range []bool{false, true} {
+		for _, asyncAPICallsEnabled := range []bool{true, false} {
+			for _, test := range tests {
+				if scheduleAsPodGroup && test.skipScheduleAsPodGroup {
+					continue
 				}
+				t.Run(fmt.Sprintf("%s (Async API calls enabled: %v, Schedule as PodGroup: %v)", test.name, asyncAPICallsEnabled, scheduleAsPodGroup), func(t *testing.T) {
+					featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerAsyncAPICalls, asyncAPICallsEnabled)
 
-				// The first time for scheduling, pod is error or unschedulable, controlled by wantFirstSchedulingError
-				if test.wantFirstSchedulingError {
-					if err = wait.PollUntilContextTimeout(testCtx.Ctx, 10*time.Millisecond, 30*time.Second, false,
-						PodSchedulingError(testCtx.ClientSet, pod.Namespace, pod.Name)); err != nil {
-						t.Errorf("Expected a scheduling error, but got: %v", err)
-					}
-				} else {
-					if err = WaitForPodUnschedulable(testCtx.Ctx, testCtx.ClientSet, pod); err != nil {
-						t.Errorf("Didn't expect the pod to be scheduled. error: %v", err)
-					}
-				}
+					// Create a plugin registry for testing. Register only a permit plugin.
+					registry, prof := InitRegistryAndConfig(t, nil, test.plugin)
+					t.Cleanup(test.plugin.Reset)
 
-				if test.action != nil {
-					if err = test.action(); err != nil {
-						t.Errorf("Perform action() error: %v", err)
-					}
-				}
+					testCtx, teardown := InitTestSchedulerForFrameworkTest(t, testContext, 2, true,
+						scheduler.WithProfiles(prof),
+						scheduler.WithFrameworkOutOfTreeRegistry(registry))
+					defer teardown()
 
-				if test.wantScheduled {
-					if err = WaitForPodToSchedule(testCtx.Ctx, testCtx.ClientSet, pod); err != nil {
-						t.Errorf("Didn't expect the pod to be unschedulable. error: %v", err)
+					pod, err := createPausePod(testCtx.ClientSet,
+						testutils.InitPausePod(&testutils.PausePodConfig{Name: "test-pod", Namespace: testCtx.NS.Name}), scheduleAsPodGroup)
+					if err != nil {
+						t.Fatalf("Error while creating a test pod: %v", err)
 					}
-				} else if test.wantError {
-					if err = wait.PollUntilContextTimeout(testCtx.Ctx, 10*time.Millisecond, 30*time.Second, false,
-						PodSchedulingError(testCtx.ClientSet, pod.Namespace, pod.Name)); err != nil {
-						t.Errorf("Expected a scheduling error, but got: %v", err)
+
+					// The first time for scheduling, pod is error or unschedulable, controlled by wantFirstSchedulingError
+					if test.wantFirstSchedulingError {
+						if err = wait.PollUntilContextTimeout(testCtx.Ctx, 10*time.Millisecond, 30*time.Second, false,
+							PodSchedulingError(testCtx.ClientSet, pod.Namespace, pod.Name)); err != nil {
+							t.Errorf("Expected a scheduling error, but got: %v", err)
+						}
+					} else {
+						if err = WaitForPodUnschedulable(testCtx.Ctx, testCtx.ClientSet, pod); err != nil {
+							t.Errorf("Didn't expect the pod to be scheduled. error: %v", err)
+						}
 					}
-				} else {
-					if err = WaitForPodUnschedulable(testCtx.Ctx, testCtx.ClientSet, pod); err != nil {
-						t.Errorf("Didn't expect the pod to be scheduled. error: %v", err)
+
+					if test.action != nil {
+						if err = test.action(); err != nil {
+							t.Errorf("Perform action() error: %v", err)
+						}
 					}
-				}
-			})
+
+					if test.wantScheduled {
+						if err = WaitForPodToSchedule(testCtx.Ctx, testCtx.ClientSet, pod); err != nil {
+							t.Errorf("Didn't expect the pod to be unschedulable. error: %v", err)
+						}
+					} else if test.wantError {
+						if err = wait.PollUntilContextTimeout(testCtx.Ctx, 10*time.Millisecond, 30*time.Second, false,
+							PodSchedulingError(testCtx.ClientSet, pod.Namespace, pod.Name)); err != nil {
+							t.Errorf("Expected a scheduling error, but got: %v", err)
+						}
+					} else {
+						if err = WaitForPodUnschedulable(testCtx.Ctx, testCtx.ClientSet, pod); err != nil {
+							t.Errorf("Didn't expect the pod to be scheduled. error: %v", err)
+						}
+					}
+				})
+			}
 		}
 	}
 }
