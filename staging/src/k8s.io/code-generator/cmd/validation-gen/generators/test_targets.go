@@ -444,7 +444,9 @@ func collectRules(node *typeNode) fieldRules {
 func recordRules(rules fieldRules, basePath string, fg validators.FunctionGen, suffix string) {
 	if len(fg.Emits) > 0 {
 		for _, e := range fg.Emits {
-			path := basePath + suffix + e.PathFragment
+			// The root fldPath is nil, so a ".name" fragment on an empty
+			// basePath must not add a leading ".".
+			path := strings.TrimPrefix(basePath+suffix+e.PathFragment, ".")
 			rules[path] = append(rules[path], rule{
 				ErrorType: string(e.Type),
 				Origin:    e.Origin,
