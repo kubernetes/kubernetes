@@ -35,7 +35,6 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
-	"golang.org/x/net/http2"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -462,7 +461,7 @@ func TestErrConnKilledHTTP2(t *testing.T) {
 	}
 	ts.TLS = &tls.Config{
 		Certificates: []tls.Certificate{tsCert},
-		NextProtos:   []string{http2.NextProtoTLS},
+		NextProtos:   []string{"h2"},
 	}
 	ts.StartTLS()
 	defer ts.Close()
@@ -480,12 +479,16 @@ func TestErrConnKilledHTTP2(t *testing.T) {
 	clientCACertPool.AppendCertsFromPEM(tsCrt)
 	clientTLSConfig := &tls.Config{
 		RootCAs:    clientCACertPool,
-		NextProtos: []string{http2.NextProtoTLS},
+		NextProtos: []string{"h2"},
 	}
 	tr := &panicOnNonReuseTransport{}
 	client := &http.Client{}
-	tr.Transport = &http2.Transport{
+	// HTTP/2 only, as the x/net Transport was.
+	protocols := new(http.Protocols)
+	protocols.SetHTTP2(true)
+	tr.Transport = &http.Transport{
 		TLSClientConfig: clientTLSConfig,
+		Protocols:       protocols,
 	}
 	client.Transport = tr
 
