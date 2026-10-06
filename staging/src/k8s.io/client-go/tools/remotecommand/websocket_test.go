@@ -22,10 +22,12 @@ import (
 	"crypto/rand"
 	"crypto/tls"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"math"
 	mrand "math/rand"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -1130,6 +1132,85 @@ func TestLateStreamCreation(t *testing.T) {
 		t.Fatal("expected error adding stream after closeAllStreamReaders")
 	}
 }
+
+func TestWebSocketClient_InitialReadDeadlineError(t *testing.T) {
+	expectedErr := errors.New("initial read deadline failed")
+	for _, tc := range []struct {
+		name    string
+		options StreamOptions
+	}{
+		{name: "error stream only"},
+		{name: "stdout and stderr", options: StreamOptions{Stdout: io.Discard, Stderr: io.Discard}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			upgrader := gwebsocket.Upgrader{Subprotocols: []string{remotecommand.StreamProtocolV5Name}}
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+				conn, err := upgrader.Upgrade(w, req, nil)
+				if err != nil {
+					t.Errorf("unable to upgrade connection: %v", err)
+					return
+				}
+				defer conn.Close()
+				// Wait until the client closes the connection after its read deadline fails.
+				_, _, _ = conn.ReadMessage()
+			}))
+			defer server.Close()
+
+			transport := &readDeadlineErrorTransport{err: expectedErr}
+			exec := &wsStreamExecutor{
+				transport:         transport,
+				upgrader:          transport,
+				method:            http.MethodGet,
+				url:               server.URL,
+				protocols:         []string{remotecommand.StreamProtocolV5Name},
+				heartbeatPeriod:   pingPeriod,
+				heartbeatDeadline: pingReadDeadline,
+			}
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			err := exec.StreamWithContext(ctx, tc.options)
+			require.ErrorContains(t, err, expectedErr.Error())
+		})
+	}
+}
+
+// readDeadlineErrorTransport lets the WebSocket handshake succeed while failing
+// the initial read deadline used by the streaming connection.
+type readDeadlineErrorTransport struct {
+	err  error
+	conn *gwebsocket.Conn
+}
+
+func (rt *readDeadlineErrorTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	dialer := gwebsocket.Dialer{
+		NetDialContext: func(ctx context.Context, network, address string) (net.Conn, error) {
+			conn, err := (&net.Dialer{}).DialContext(ctx, network, address)
+			if err != nil {
+				return nil, err
+			}
+			return &readDeadlineErrorConn{Conn: conn, err: rt.err}, nil
+		},
+		Subprotocols: req.Header[wsstream.WebSocketProtocolHeader],
+	}
+	location := *req.URL
+	location.Scheme = "ws"
+	conn, resp, err := dialer.DialContext(req.Context(), location.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+	rt.conn = conn
+	return resp, nil
+}
+
+func (rt *readDeadlineErrorTransport) Connection() *gwebsocket.Conn { return rt.conn }
+func (rt *readDeadlineErrorTransport) DataBufferSize() int          { return 32 * 1024 }
+
+type readDeadlineErrorConn struct {
+	net.Conn
+	err error
+}
+
+func (c *readDeadlineErrorConn) SetReadDeadline(time.Time) error { return c.err }
 
 func TestWebSocketClient_StreamsAndExpectedErrors(t *testing.T) {
 	logger, _ := ktesting.NewTestContext(t)
