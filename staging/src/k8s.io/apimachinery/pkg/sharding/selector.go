@@ -18,6 +18,7 @@ package sharding
 
 import (
 	"fmt"
+	"math/bits"
 	"strings"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -134,4 +135,32 @@ func NewSelector(reqs ...ShardRangeRequirement) Selector {
 	return &shardSelector{
 		requirements: reqs,
 	}
+}
+
+// NewShardRangeSelector constructs a Selector for shardIndex in [0, totalShards)
+// by partitioning the 64-bit hash space [0x0000000000000000, 0x10000000000000000).
+// Supported keys are "object.metadata.uid" and "object.metadata.namespace".
+func NewShardRangeSelector(key string, shardIndex, totalShards int) (Selector, error) {
+	switch key {
+	case "object.metadata.uid", "object.metadata.namespace":
+	default:
+		return nil, fmt.Errorf("unsupported shard key %q; supported: object.metadata.uid, object.metadata.namespace", key)
+	}
+	if totalShards <= 0 {
+		return nil, fmt.Errorf("totalShards must be positive, got %d", totalShards)
+	}
+	if shardIndex < 0 || shardIndex >= totalShards {
+		return nil, fmt.Errorf("shardIndex %d out of range [0, %d)", shardIndex, totalShards)
+	}
+	start, _ := bits.Div64(uint64(shardIndex), 0, uint64(totalShards))
+	end := "0x10000000000000000"
+	if shardIndex+1 < totalShards {
+		endVal, _ := bits.Div64(uint64(shardIndex+1), 0, uint64(totalShards))
+		end = fmt.Sprintf("0x%016x", endVal)
+	}
+	return NewSelector(ShardRangeRequirement{
+		Key:   key,
+		Start: fmt.Sprintf("0x%016x", start),
+		End:   end,
+	}), nil
 }

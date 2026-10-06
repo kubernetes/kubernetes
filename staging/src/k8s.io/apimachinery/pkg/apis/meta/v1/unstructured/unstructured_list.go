@@ -26,6 +26,7 @@ import (
 
 var _ runtime.Unstructured = &UnstructuredList{}
 var _ metav1.ListInterface = &UnstructuredList{}
+var _ metav1.ShardedListInterface = &UnstructuredList{}
 
 // UnstructuredList allows lists that do not have Golang structs
 // registered to be manipulated generically. This can be used to deal
@@ -194,6 +195,29 @@ func (u *UnstructuredList) SetRemainingItemCount(c *int64) {
 		RemoveNestedField(u.Object, "metadata", "remainingItemCount")
 	} else {
 		u.setNestedField(*c, "metadata", "remainingItemCount")
+	}
+}
+
+func (u *UnstructuredList) GetShardInfo() *metav1.ShardInfo {
+	if u.Object == nil {
+		return nil
+	}
+	shardInfo, ok, err := NestedMap(u.Object, "metadata", "shardInfo")
+	if !ok || err != nil {
+		return nil
+	}
+	return &metav1.ShardInfo{
+		Selector: getNestedString(shardInfo, "selector"),
+	}
+}
+
+func (u *UnstructuredList) SetShardInfo(s *metav1.ShardInfo) {
+	if s == nil {
+		RemoveNestedField(u.Object, "metadata", "shardInfo")
+	} else {
+		u.setNestedField(map[string]interface{}{
+			"selector": s.Selector,
+		}, "metadata", "shardInfo")
 	}
 }
 
