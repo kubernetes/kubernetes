@@ -64,7 +64,12 @@ type Interface interface {
 	Routes() (Routes, bool)
 	// ProviderName returns the cloud provider ID.
 	ProviderName() string
-	// HasClusterID returns true if a ClusterID is required and set
+	// HasClusterID returns true if the cluster has a ClusterID set. The
+	// cloud-controller-manager checks this during cloud initialization at startup
+	// and exits on false unless the deprecated --allow-untagged-cloud flag is set.
+	// The framework only reads this boolean and never reads the ID itself, so how a
+	// provider stores and verifies it (for example, that instances carry the cluster
+	// tag) is up to the provider.
 	HasClusterID() bool
 }
 
