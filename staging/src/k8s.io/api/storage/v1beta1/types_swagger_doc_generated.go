@@ -91,7 +91,7 @@ func (CSINodeDriver) SwaggerDoc() map[string]string {
 
 var map_CSINodeDriverRegistration = map[string]string{
 	"":       "CSINodeDriverRegistration holds the node ID of a CSI driver whose topology and volume attachment limit are reported by the CSI controller.",
-	"name":   "name is the name of the CSI driver. This MUST be the same name returned by the CSI GetPluginName() call for that driver.",
+	"name":   "name is the name of the CSI driver. This MUST be the same name returned by the CSI GetPluginInfo() call for that driver.",
 	"nodeID": "nodeID is the ID of the node from the driver's point of view, as returned by the driver's NodeGetInfo call.",
 }
 
