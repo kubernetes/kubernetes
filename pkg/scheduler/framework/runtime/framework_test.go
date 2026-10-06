@@ -5805,3 +5805,110 @@ func TestRunNodeLocalFilterPlugins(t *testing.T) {
 		t.Errorf("expected crossNodePl evalCount=2, got %d", crossNodePl.evalCount)
 	}
 }
+
+type fakePreFilterWithExtensionsPlugin struct {
+	name          string
+	withExt       bool
+	preFilterCode fwk.Code
+	addPodCalls   int
+	rmPodCalls    int
+}
+
+func (p *fakePreFilterWithExtensionsPlugin) Name() string { return p.name }
+func (p *fakePreFilterWithExtensionsPlugin) PreFilter(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodes []fwk.NodeInfo) (*fwk.PreFilterResult, *fwk.Status) {
+	return nil, fwk.NewStatus(p.preFilterCode)
+}
+func (p *fakePreFilterWithExtensionsPlugin) PreFilterExtensions() fwk.PreFilterExtensions {
+	if !p.withExt {
+		return nil
+	}
+	return p
+}
+func (p *fakePreFilterWithExtensionsPlugin) AddPod(ctx context.Context, state fwk.CycleState, podToSchedule *v1.Pod, podInfoToAdd fwk.PodInfo, nodeInfo fwk.NodeInfo) *fwk.Status {
+	p.addPodCalls++
+	return nil
+}
+func (p *fakePreFilterWithExtensionsPlugin) RemovePod(ctx context.Context, state fwk.CycleState, podToSchedule *v1.Pod, podInfoToRemove fwk.PodInfo, nodeInfo fwk.NodeInfo) *fwk.Status {
+	p.rmPodCalls++
+	return nil
+}
+
+func TestSkipAllPreFilterExtensions(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	noExtPl := &fakePreFilterWithExtensionsPlugin{name: "NoExtPreFilter", withExt: false, preFilterCode: fwk.Success}
+	extPl := &fakePreFilterWithExtensionsPlugin{name: "ExtPreFilter", withExt: true, preFilterCode: fwk.Skip}
+
+	reg := Registry{
+		queueSortPlugin: newQueueSortPlugin,
+		bindPlugin:      newBindPlugin,
+		noExtPl.Name(): func(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
+			return noExtPl, nil
+		},
+		extPl.Name(): func(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
+			return extPl, nil
+		},
+	}
+
+	cfgPls := &config.Plugins{}
+	cfgPls.PreFilter.Enabled = append(
+		cfgPls.PreFilter.Enabled,
+		config.Plugin{Name: noExtPl.Name()},
+		config.Plugin{Name: extPl.Name()},
+	)
+	profile := config.KubeSchedulerProfile{
+		SchedulerName: "test-skip-prefilter-ext-profile",
+		Plugins:       cfgPls,
+	}
+
+	f, err := newFrameworkWithQueueSortAndBind(ctx, reg, profile, WithSnapshotSharedLister(cache.NewEmptySnapshot()))
+	if err != nil {
+		t.Fatalf("failed to create framework: %v", err)
+	}
+	defer func() { _ = f.Close() }()
+
+	nodeInfo := framework.NewNodeInfo()
+	nodeInfo.SetNode(&v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node1"}})
+	pi, _ := framework.NewPodInfo(pod)
+
+	// 1. When all PreFilter plugins with PreFilterExtensions() != nil return Skip,
+	// ShouldSkipAllPreFilterExtensions() is true.
+	stateSkip := framework.NewCycleState()
+	if _, status, _ := f.RunPreFilterPlugins(ctx, stateSkip, pod); !status.IsSuccess() {
+		t.Fatalf("unexpected PreFilter status: %v", status)
+	}
+	if !stateSkip.ShouldSkipAllPreFilterExtensions() {
+		t.Errorf("expected ShouldSkipAllPreFilterExtensions() to be true when all PreFilterExtensions plugins returned Skip")
+	}
+	if status := f.RunPreFilterExtensionAddPod(ctx, stateSkip, pod, pi, nodeInfo); !status.IsSuccess() {
+		t.Fatalf("unexpected AddPod status: %v", status)
+	}
+	if status := f.RunPreFilterExtensionRemovePod(ctx, stateSkip, pod, pi, nodeInfo); !status.IsSuccess() {
+		t.Fatalf("unexpected RemovePod status: %v", status)
+	}
+	if extPl.addPodCalls != 0 || extPl.rmPodCalls != 0 {
+		t.Errorf("expected 0 AddPod/RemovePod calls when skipped, got add=%d rm=%d", extPl.addPodCalls, extPl.rmPodCalls)
+	}
+
+	// 2. When a PreFilter plugin with PreFilterExtensions() != nil returns Success,
+	// ShouldSkipAllPreFilterExtensions() is false and AddPod/RemovePod are invoked.
+	extPl.preFilterCode = fwk.Success
+	stateActive := framework.NewCycleState()
+	if _, status, _ := f.RunPreFilterPlugins(ctx, stateActive, pod); !status.IsSuccess() {
+		t.Fatalf("unexpected PreFilter status: %v", status)
+	}
+	if stateActive.ShouldSkipAllPreFilterExtensions() {
+		t.Errorf("expected ShouldSkipAllPreFilterExtensions() to be false when an active PreFilterExtensions plugin exists")
+	}
+	if status := f.RunPreFilterExtensionAddPod(ctx, stateActive, pod, pi, nodeInfo); !status.IsSuccess() {
+		t.Fatalf("unexpected AddPod status: %v", status)
+	}
+	if status := f.RunPreFilterExtensionRemovePod(ctx, stateActive, pod, pi, nodeInfo); !status.IsSuccess() {
+		t.Fatalf("unexpected RemovePod status: %v", status)
+	}
+	if extPl.addPodCalls != 1 || extPl.rmPodCalls != 1 {
+		t.Errorf("expected 1 AddPod and 1 RemovePod call, got add=%d rm=%d", extPl.addPodCalls, extPl.rmPodCalls)
+	}
+}

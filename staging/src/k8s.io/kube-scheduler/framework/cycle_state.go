@@ -99,6 +99,14 @@ type CycleState interface {
 	// which Filter plugins are executed in the Filter extension point.
 	// This function is mostly for the scheduling framework runtime, plugins usually don't have to use it.
 	SetFilterPluginExecutionMode(mode FilterPluginExecutionMode)
+	// ShouldSkipAllPreFilterExtensions returns whether all PreFilterExtensions plugins should be skipped
+	// in RunPreFilterExtensionAddPod and RunPreFilterExtensionRemovePod.
+	// This function is mostly for the scheduling framework runtime, plugins usually don't have to use it.
+	ShouldSkipAllPreFilterExtensions() bool
+	// SetSkipAllPreFilterExtensions sets whether all PreFilterExtensions plugins should be skipped
+	// in RunPreFilterExtensionAddPod and RunPreFilterExtensionRemovePod.
+	// This function is mostly for the scheduling framework runtime, plugins usually don't have to use it.
+	SetSkipAllPreFilterExtensions(flag bool)
 
 	// Read retrieves data with the given "key" from CycleState. If the key is not
 	// present, ErrNotFound is returned.

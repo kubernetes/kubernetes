@@ -121,10 +121,9 @@ func (ev *PodGroupEvaluator) selectVictimsOnDomain(
 
 	mutableLister := ev.Handle.MutableSnapshotSharedLister()
 
-	// removePods removes all victims from the snapshot.
-	// This is called before the podGroupSchedulingFunc so it does not have
-	// to update any cycle states as podGroupSchedulingFunc creates empty CycleStates
-	// and fills them by running PreFilter plugins for preemptor pods.
+	// removePods removes all victims from the snapshot without updating CycleStates.
+	// This is used both before podGroupSchedulingFunc (when CycleStates do not exist yet)
+	// and when rolling back a victim rejected in Phase 1 (before PreFilterExtensions run).
 	removePods := func(v fwk.PreemptionVictim) error {
 		for _, pi := range v.Pods() {
 			if err := mutableLister.RemovePod(logger, pi.GetPod(), pi.GetPod().Spec.NodeName); err != nil {
@@ -134,20 +133,32 @@ func (ev *PodGroupEvaluator) selectVictimsOnDomain(
 		return nil
 	}
 
-	// addVictimPodsWithPreFilter simulates adding back victim's pods to the snapshot
-	// and calls PreFilterExtensionAddPod() for all preemptor pods's proposed valid assignments.
-	// The node passed to the RunPreFilterExtensionAddPod will have the victim pod
-	// added.
-	addVictimPodsWithPreFilter := func(v fwk.PreemptionVictim, preemptorAssignments []fwk.ProposedAssignment) error {
+	// addPods adds all of a victim's pods back to the snapshot without running PreFilterExtensions.
+	// This is sufficient for Phase 1 because node-local Filter plugins do not implement
+	// PreFilterExtensions and observe existing pods on a node solely via NodeInfo.
+	addPods := func(v fwk.PreemptionVictim) error {
+		for _, pi := range v.Pods() {
+			if err := mutableLister.AddPod(pi, pi.GetPod().Spec.NodeName); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+
+	// addVictimPreFilterExtensions calls PreFilterExtensionAddPod() for all preemptor assignments
+	// that have active PreFilterExtensions.
+	// It must be called after addPods(v) so that the NodeInfo passed to RunPreFilterExtensionAddPod
+	// already has the victim pod added.
+	addVictimPreFilterExtensions := func(v fwk.PreemptionVictim, preFilterAssignments []fwk.ProposedAssignment) error {
+		if len(preFilterAssignments) == 0 {
+			return nil
+		}
 		for _, pi := range v.Pods() {
 			nodeInfo, err := mutableLister.NodeInfos().Get(pi.GetPod().Spec.NodeName)
 			if err != nil {
 				return err
 			}
-			if err := mutableLister.AddPod(pi, pi.GetPod().Spec.NodeName); err != nil {
-				return err
-			}
-			for _, assignment := range preemptorAssignments {
+			for _, assignment := range preFilterAssignments {
 				status := ev.Handle.RunPreFilterExtensionAddPod(ctx, assignment.GetCycleState(), assignment.GetPod(), pi, nodeInfo)
 				if !status.IsSuccess() {
 					return status.AsError()
@@ -157,11 +168,11 @@ func (ev *PodGroupEvaluator) selectVictimsOnDomain(
 		return nil
 	}
 
-	// removeVictimPodsWithPreFilter removes all victims from the snapshot
-	// and calls PreFilterExtensionRemovePod(victim) for all preemptor pods.
-	// The node passed to the RunPreFilterExtensionRemovePod will have the victim pod
-	// removed.
-	removeVictimPodsWithPreFilter := func(v fwk.PreemptionVictim, preemptorAssignments []fwk.ProposedAssignment) error {
+	// removeVictimPodsWithPreFilter removes all of a victim's pods from the snapshot
+	// and calls PreFilterExtensionRemovePod(victim) for all preemptor assignments that
+	// have active PreFilterExtensions.
+	// The node passed to RunPreFilterExtensionRemovePod will have the victim pod removed.
+	removeVictimPodsWithPreFilter := func(v fwk.PreemptionVictim, preFilterAssignments []fwk.ProposedAssignment) error {
 		for _, pi := range v.Pods() {
 			nodeInfo, err := mutableLister.NodeInfos().Get(pi.GetPod().Spec.NodeName)
 			if err != nil {
@@ -170,7 +181,7 @@ func (ev *PodGroupEvaluator) selectVictimsOnDomain(
 			if err := mutableLister.RemovePod(logger, pi.GetPod(), pi.GetPod().Spec.NodeName); err != nil {
 				return err
 			}
-			for _, assignment := range preemptorAssignments {
+			for _, assignment := range preFilterAssignments {
 				status := ev.Handle.RunPreFilterExtensionRemovePod(ctx, assignment.GetCycleState(), assignment.GetPod(), pi, nodeInfo)
 				if !status.IsSuccess() {
 					return status.AsError()
@@ -195,6 +206,7 @@ func (ev *PodGroupEvaluator) selectVictimsOnDomain(
 	numViolatingVictim := 0
 
 	validAssignment := make([]fwk.ProposedAssignment, 0, len(podGroupAssignments.ProposedAssignments))
+	preFilterAssignments := make([]fwk.ProposedAssignment, 0, len(podGroupAssignments.ProposedAssignments))
 	assignmentsByNode := make(map[string][]fwk.ProposedAssignment)
 
 	// Prepare podInfos for each of the assigned preemptor pods
@@ -203,6 +215,9 @@ func (ev *PodGroupEvaluator) selectVictimsOnDomain(
 		if nodeName != "" {
 			validAssignment = append(validAssignment, assignment)
 			assignmentsByNode[nodeName] = append(assignmentsByNode[nodeName], assignment)
+			if !assignment.GetCycleState().ShouldSkipAllPreFilterExtensions() {
+				preFilterAssignments = append(preFilterAssignments, assignment)
+			}
 		}
 	}
 
@@ -221,11 +236,14 @@ func (ev *PodGroupEvaluator) selectVictimsOnDomain(
 	// - no knowledge of upcoming preemptor pods (m+1 .. P-1)
 	//
 	// Evaluation is split into two phases:
-	// - Phase 1 runs only node-local Filter plugins (those implementing NodeLocalFilterPlugin with
+	// - Phase 1 adds the victim's pods to mutableLister (without running PreFilterExtensions) and
+	//   runs only node-local Filter plugins (those implementing NodeLocalFilterPlugin with
 	//   IsNodeLocal() == true) on the nodes directly affected by the victim (assignmentsByNode[nodeName])
 	//   to fail fast when a victim causes a node-local conflict (e.g. CPU/memory/ports).
-	// - Phase 2 replays all preemptor assignments in the original scheduling-cycle order (0 .. P-1),
-	//   skipping node-local Filter plugins and running only cross-node Filter plugins.
+	// - Phase 2 runs PreFilterExtensionAddPod for assignments with active PreFilterExtensions
+	//   (preFilterAssignments) and then replays all preemptor assignments in the original
+	//   scheduling-cycle order (0 .. P-1), skipping node-local Filter plugins and running only
+	//   cross-node Filter plugins.
 	//
 	// Why evaluating affected nodes out of global order in Phase 1 and skipping node-local filters
 	// in Phase 2 is safe and preserves sequential scheduling invariants:
@@ -260,6 +278,39 @@ func (ev *PodGroupEvaluator) selectVictimsOnDomain(
 	//     adding each pod to mutableLister and running ReservePluginsReserve before evaluating
 	//     subsequent pods, so all cross-node Filter plugins observe the exact sequential
 	//     cluster-wide state transitions.
+	//
+	// Why deferring PreFilterExtensions to Phase 2 and restricting them to preFilterAssignments is safe:
+	//  1. Node-local Filter plugins do not use PreFilterExtensions:
+	//     By the contract of NodeLocalFilterPlugin, node-local Filter plugins never implement
+	//     PreFilterExtensions (PreFilterExtensions() == nil), because their PreFilter state in
+	//     CycleState depends strictly on the incoming preemptor pod itself (e.g. resource requests,
+	//     container ports, node affinity terms, volume claims) and is invariant to adding or
+	//     removing existing pods in the cluster. Instead, node-local Filter plugins observe the
+	//     victim's pods on target node N exclusively through NodeInfo(N), which is updated by
+	//     addPods(v) before Phase 1.
+	//  2. Fast rollback on Phase 1 rejection without CycleState churn:
+	//     If Phase 1 rejects the victim (!fits), no cross-node Filter plugin is evaluated for this
+	//     victim. Because addVictimPreFilterExtensions has not been called yet, rolling back the
+	//     victim only requires removePods(v) on mutableLister, completely avoiding O(P)
+	//     RunPreFilterExtensionAddPod and RunPreFilterExtensionRemovePod calls per rejected victim.
+	//  3. Exact NodeInfo and CycleState state at Phase 2 entry:
+	//     When Phase 1 succeeds, evaluateAssignments has already cleaned up all temporary preemptor
+	//     assumptions on affectedNodes while the victim's pods remain in mutableLister. Calling
+	//     addVictimPreFilterExtensions immediately before Phase 2 therefore passes a NodeInfo that
+	//     already contains the victim's pods (satisfying the RunPreFilterExtensionAddPod contract)
+	//     and updates CycleState before any cross-node Filter plugin runs in Phase 2.
+	//  4. Skipping assignments with ShouldSkipAllPreFilterExtensions() == true:
+	//     During RunPreFilterPlugins, any PreFilterPlugin that returns Skip is recorded in
+	//     CycleState.GetSkipFilterPlugins() and does not initialize plugin state in CycleState.
+	//     Both RunPreFilterExtensionAddPod and RunPreFilterExtensionRemovePod already skip every
+	//     plugin pl where pl.PreFilterExtensions() == nil || state.GetSkipFilterPlugins().Has(pl.Name()).
+	//     ShouldSkipAllPreFilterExtensions() is set to true by RunPreFilterPlugins if and only if
+	//     every configured PreFilterPlugin with non-nil PreFilterExtensions() returned Skip. Because
+	//     GetSkipFilterPlugins() is not mutated after RunPreFilterPlugins completes, invoking
+	//     RunPreFilterExtensionAddPod or RunPreFilterExtensionRemovePod on an assignment with
+	//     ShouldSkipAllPreFilterExtensions() == true is guaranteed to be a no-op for every victim pod.
+	//     Pre-filtering validAssignment into preFilterAssignments once before the victim loop avoids
+	//     O(V * P) no-op calls while preserving the exact set of PreFilterExtensions invocations.
 	reprieveVictim := func(v fwk.PreemptionVictim, preemptorAssignments []fwk.ProposedAssignment) (fits bool, err error) {
 		ok, err := reprieveFilter.ShouldAttemptReprieval(ctx, v)
 		if err != nil {
@@ -268,12 +319,19 @@ func (ev *PodGroupEvaluator) selectVictimsOnDomain(
 		if !ok {
 			return false, nil
 		}
-		if err = addVictimPodsWithPreFilter(v, preemptorAssignments); err != nil {
+		if err = addPods(v); err != nil {
 			return false, err
 		}
+		preFilterAdded := false
 		defer func() {
 			if !fits {
-				if rmErr := removeVictimPodsWithPreFilter(v, preemptorAssignments); rmErr != nil {
+				var rmErr error
+				if preFilterAdded {
+					rmErr = removeVictimPodsWithPreFilter(v, preFilterAssignments)
+				} else {
+					rmErr = removePods(v)
+				}
+				if rmErr != nil {
 					err = errors.Join(err, rmErr)
 				}
 				if err != nil {
@@ -335,7 +393,12 @@ func (ev *PodGroupEvaluator) selectVictimsOnDomain(
 			}
 		}
 
-		// Phase 2: Replay all assignments in scheduling-cycle order running only non-node-local (cross-node) Filter plugins.
+		// Phase 2: Update PreFilterExtensions for assignments that require them, then replay all
+		// assignments in scheduling-cycle order running only non-node-local (cross-node) Filter plugins.
+		if err = addVictimPreFilterExtensions(v, preFilterAssignments); err != nil {
+			return false, err
+		}
+		preFilterAdded = true
 		if fits, err = evaluateAssignments(preemptorAssignments, fwk.FilterPluginModeNonNodeLocalOnly); err != nil || !fits {
 			return fits, err
 		}
