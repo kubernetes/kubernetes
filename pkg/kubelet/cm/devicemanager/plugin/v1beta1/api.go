@@ -37,6 +37,7 @@ type ClientHandler interface {
 }
 
 // TODO: evaluate whether we need these error definitions.
+// See https://github.com/kubernetes/kubernetes/issues/115481 for tracking.
 const (
 	// errFailedToDialDevicePlugin is the error raised when the device plugin could not be
 	// reached on the registered socket
