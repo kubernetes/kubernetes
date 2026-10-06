@@ -31,6 +31,8 @@ type KustomizeVisitor struct {
 	dirPath string
 	// File system containing dirPath.
 	fSys filesys.FileSystem
+	// Enables the Helm chart inflator generator.
+	enableHelm bool
 	// Holds result of kustomize build, retained for tests.
 	yml []byte
 }
@@ -39,6 +41,10 @@ type KustomizeVisitor struct {
 func (v *KustomizeVisitor) Visit(fn VisitorFunc) error {
 	kOpts := krusty.MakeDefaultOptions()
 	kOpts.Reorder = krusty.ReorderOptionLegacy
+	if v.enableHelm {
+		kOpts.PluginConfig.HelmConfig.Enabled = true
+		kOpts.PluginConfig.HelmConfig.Command = "helm"
+	}
 	k := krusty.MakeKustomizer(kOpts)
 	m, err := k.Run(v.fSys, v.dirPath)
 	if err != nil {

@@ -187,10 +187,11 @@ func NewDeleteCommandFlags(usage string) *DeleteFlags {
 	filenames := []string{}
 	recursive := false
 	kustomize := ""
+	enableHelm := false
 
 	return &DeleteFlags{
 		// Not using helpers.go since it provides function to add '-k' for FileNameOptions, but not FileNameFlags
-		FileNameFlags: &genericclioptions.FileNameFlags{Usage: usage, Filenames: &filenames, Kustomize: &kustomize, Recursive: &recursive},
+		FileNameFlags: &genericclioptions.FileNameFlags{Usage: usage, Filenames: &filenames, Kustomize: &kustomize, Recursive: &recursive, EnableHelm: &enableHelm},
 		LabelSelector: &labelSelector,
 		FieldSelector: &fieldSelector,
 
@@ -222,9 +223,10 @@ func NewDeleteFlags(usage string) *DeleteFlags {
 	filenames := []string{}
 	kustomize := ""
 	recursive := false
+	enableHelm := false
 
 	return &DeleteFlags{
-		FileNameFlags: &genericclioptions.FileNameFlags{Usage: usage, Filenames: &filenames, Kustomize: &kustomize, Recursive: &recursive},
+		FileNameFlags: &genericclioptions.FileNameFlags{Usage: usage, Filenames: &filenames, Kustomize: &kustomize, Recursive: &recursive, EnableHelm: &enableHelm},
 
 		CascadingStrategy: &cascadingStrategy,
 		GracePeriod:       &gracePeriod,

@@ -429,11 +429,12 @@ func writeTestFile(t *testing.T, path string, contents string) {
 
 func TestFilenameOptionsValidate(t *testing.T) {
 	testcases := []struct {
-		filenames []string
-		kustomize string
-		recursive bool
-		errExp    bool
-		msgExp    string
+		filenames  []string
+		kustomize  string
+		recursive  bool
+		enableHelm bool
+		errExp     bool
+		msgExp     string
 	}{
 		{
 			filenames: []string{"file"},
@@ -446,6 +447,17 @@ func TestFilenameOptionsValidate(t *testing.T) {
 			recursive: true,
 			errExp:    true,
 			msgExp:    "the -k flag can't be used with -f or -R",
+		},
+		{
+			filenames:  []string{"file"},
+			enableHelm: true,
+			errExp:     true,
+			msgExp:     "the --enable-helm flag can only be used with -k",
+		},
+		{
+			kustomize:  "dir",
+			enableHelm: true,
+			errExp:     false,
 		},
 		{
 			filenames: []string{"file"},
@@ -463,9 +475,10 @@ func TestFilenameOptionsValidate(t *testing.T) {
 	}
 	for _, testcase := range testcases {
 		o := &FilenameOptions{
-			Kustomize: testcase.kustomize,
-			Filenames: testcase.filenames,
-			Recursive: testcase.recursive,
+			Kustomize:  testcase.kustomize,
+			Filenames:  testcase.filenames,
+			Recursive:  testcase.recursive,
+			EnableHelm: testcase.enableHelm,
 		}
 		errs := o.validate()
 		if testcase.errExp {

@@ -17,6 +17,7 @@ limitations under the License.
 package resource
 
 import (
+	"strings"
 	"testing"
 
 	"k8s.io/utils/dump"
@@ -156,5 +157,53 @@ func TestKustomizeVisitor(t *testing.T) {
 	}
 	if string(kv.yml) != expectedContent {
 		t.Fatalf("expected:\n%s\nbut got:\n%s", expectedContent, string(kv.yml))
+	}
+}
+
+const helmChartsKustomization = `
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+helmCharts:
+- name: demo
+  releaseName: demo
+`
+
+func TestKustomizeVisitorEnableHelm(t *testing.T) {
+	// The chart does not exist, so the build fails in both cases. With helm
+	// disabled, kustomize rejects the helmCharts field while configuring the
+	// generator. With helm enabled, configuration succeeds and the build fails
+	// later, when kustomize looks for the chart.
+	testcases := []struct {
+		name       string
+		enableHelm bool
+		errMsg     string
+	}{
+		{name: "helm disabled", enableHelm: false, errMsg: "must specify --enable-helm"},
+		{name: "helm enabled", enableHelm: true, errMsg: "no repo specified for pull"},
+	}
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			fSys := filesys.MakeFsInMemory()
+			if err := fSys.WriteFile(
+				konfig.DefaultKustomizationFileName(),
+				[]byte(helmChartsKustomization)); err != nil {
+				t.Fatal(err)
+			}
+			b := newDefaultBuilder()
+			kv := KustomizeVisitor{
+				mapper:     b.mapper,
+				dirPath:    ".",
+				schema:     b.schema,
+				fSys:       fSys,
+				enableHelm: tc.enableHelm,
+			}
+			err := kv.Visit((&testVisitor{}).Handle)
+			if err == nil {
+				t.Fatal("expected an error, got nil")
+			}
+			if !strings.Contains(err.Error(), tc.errMsg) {
+				t.Fatalf("expected error containing %q, got: %v", tc.errMsg, err)
+			}
+		})
 	}
 }
