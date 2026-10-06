@@ -20,6 +20,8 @@ import (
 	"math"
 	"math/big"
 	"testing"
+
+	inf "gopkg.in/inf.v0"
 )
 
 // pow10Big returns 10^n as a *big.Int.
@@ -65,8 +67,8 @@ func TestScaledValueSaturationAndRounding(t *testing.T) {
 	for _, tc := range []struct {
 		name     string
 		unscaled *big.Int
-		scale    int64
-		newScale int64
+		scale    inf.Scale
+		newScale inf.Scale
 		want     int64
 		wantOK   bool
 	}{
@@ -94,7 +96,7 @@ func TestScaledValueSaturationAndRounding(t *testing.T) {
 		{"scale-down extreme neg rounds to minus one", big.NewInt(-7), 2000000000, 0, -1, true},
 		{"scale-down extreme zero", big.NewInt(0), 2000000000, 0, 0, true},
 	} {
-		got, ok := scaledValue(tc.unscaled, tc.scale, tc.newScale)
+		got, ok := scaledValue(tc.unscaled, widenInfScale(tc.scale), widenInfScale(tc.newScale))
 		if got != tc.want || ok != tc.wantOK {
 			t.Errorf("%s: scaledValue = (%d, %t), want (%d, %t)", tc.name, got, ok, tc.want, tc.wantOK)
 		}

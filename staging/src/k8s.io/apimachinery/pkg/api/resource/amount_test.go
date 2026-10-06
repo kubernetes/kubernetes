@@ -282,3 +282,44 @@ func TestScaleInfScale(t *testing.T) {
 		})
 	}
 }
+
+func TestWidenInfScale(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		in   inf.Scale
+		want widenedScale
+	}{
+		{"positive flips sign", 3, -3},
+		{"negative flips sign", -3, 3},
+		{"zero", 0, 0},
+		{"MinInt32 flips sign", math.MinInt32, -math.MinInt32},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := widenInfScale(tc.in); got != tc.want {
+				t.Errorf("widenInfScale(%d) = %d, want %d", tc.in, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestNarrowScale(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		in       widenedScale
+		want     Scale
+		wantFits bool
+	}{
+		{"zero", 0, 0, true},
+		{"MaxInt32", math.MaxInt32, math.MaxInt32, true},
+		{"MinInt32", math.MinInt32, math.MinInt32, true},
+		{"MaxInt32+1 wraps", math.MaxInt32 + 1, math.MinInt32, false},
+		{"MinInt32-1 wraps", math.MinInt32 - 1, math.MaxInt32, false},
+		{"2^32 wraps to zero", 1 << 32, 0, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got, fits := narrowScale(tc.in); got != tc.want || fits != tc.wantFits {
+				t.Errorf("narrowScale(%d) = (%d, %t), want (%d, %t)", tc.in, got, fits, tc.want, tc.wantFits)
+			}
+		})
+	}
+}
