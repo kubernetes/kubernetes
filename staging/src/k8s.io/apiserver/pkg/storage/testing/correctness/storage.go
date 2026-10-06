@@ -63,9 +63,13 @@ func (s *ModelStorage) Delete(ctx context.Context, key string, out runtime.Objec
 		panic("not implemented")
 	}
 	return s.execute(Request{
-		Op:     OpDelete,
-		Key:    key,
-		Delete: DeleteRequest{Preconditions: preconditions},
+		Op:  OpDelete,
+		Key: key,
+		Delete: DeleteRequest{
+			Preconditions:        preconditions,
+			ValidateDeletion:     validateDeletion,
+			CachedExistingObject: cachedExistingObject,
+		},
 	}, out)
 }
 

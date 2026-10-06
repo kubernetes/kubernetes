@@ -64,7 +64,9 @@ type ListRequest struct {
 
 // DeleteRequest contains parameters specific to Delete operations.
 type DeleteRequest struct {
-	Preconditions *storage.Preconditions
+	Preconditions        *storage.Preconditions
+	ValidateDeletion     storage.ValidateObjectFunc
+	CachedExistingObject runtime.Object
 }
 
 // UpdateRequest contains parameters specific to Update / GuaranteedUpdate operations.

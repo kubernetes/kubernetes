@@ -624,11 +624,83 @@ func correctnessTestSteps() []testStep {
 			},
 		},
 		{
-			Name: "24. Delete pod3 returns success RV=13",
+			Name: "24. Delete pod3 where ValidateDeletion returns user error returns error",
 			Request: Request{
-				Op:     OpDelete,
-				Key:    pod3Key,
-				Delete: DeleteRequest{},
+				Op:  OpDelete,
+				Key: pod3Key,
+				Delete: DeleteRequest{
+					ValidateDeletion: func(ctx context.Context, obj runtime.Object) error {
+						return errCustom
+					},
+				},
+			},
+			CorrectResponse: Response{
+				Object: nil,
+				Err:    errCustom,
+			},
+			InvalidResponses: []Response{
+				{Object: withRV(pod3v7, "12")},
+				{Object: withRV(pod3v7, "13")},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name: "25. Delete pod3 with CachedExistingObject and failing ValidateDeletion returns user error",
+			Request: Request{
+				Op:  OpDelete,
+				Key: pod3Key,
+				Delete: DeleteRequest{
+					CachedExistingObject: withRV(pod3v6, "11"),
+					ValidateDeletion: func(ctx context.Context, obj runtime.Object) error {
+						return errCustom
+					},
+				},
+			},
+			CorrectResponse: Response{
+				Object: nil,
+				Err:    errCustom,
+			},
+			InvalidResponses: []Response{
+				{Object: withRV(pod3v7, "12")},
+				{Object: withRV(pod3v7, "13")},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name: "26. Delete pod3 with stale CachedExistingObject where only suggestion passes Preconditions returns invalid obj error",
+			Request: Request{
+				Op:  OpDelete,
+				Key: pod3Key,
+				Delete: DeleteRequest{
+					Preconditions:        &storage.Preconditions{ResourceVersion: &pod3RV10},
+					CachedExistingObject: withRV(pod3v5, "10"),
+				},
+			},
+			CorrectResponse: Response{
+				Object: nil,
+				Err:    (&storage.Preconditions{ResourceVersion: &pod3RV10}).Check(pod3Key, withRV(pod3v7, "12")),
+			},
+			InvalidResponses: []Response{
+				{Object: withRV(pod3v7, "12")},
+				{Object: withRV(pod3v7, "13")},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name: "27. Delete pod3 with stale CachedExistingObject where ValidateDeletion fails on stale RV retries and returns success RV=13",
+			Request: Request{
+				Op:  OpDelete,
+				Key: pod3Key,
+				Delete: DeleteRequest{
+					CachedExistingObject: withRV(pod3v5, "10"),
+					ValidateDeletion: func(ctx context.Context, obj runtime.Object) error {
+						pod := obj.(*example.Pod)
+						if pod.ResourceVersion != "12" {
+							return fmt.Errorf("expected ResourceVersion 12, got %s", pod.ResourceVersion)
+						}
+						return nil
+					},
+				},
 			},
 			CorrectResponse: Response{
 				Object: withRV(pod3v7, "13"),
@@ -644,7 +716,7 @@ func correctnessTestSteps() []testStep {
 			},
 		},
 		{
-			Name: "25. Create pod4 returns success RV=14",
+			Name: "28. Create pod4 returns success RV=14",
 			Request: Request{
 				Op:  OpCreate,
 				Key: pod4Key,
@@ -666,7 +738,7 @@ func correctnessTestSteps() []testStep {
 			},
 		},
 		{
-			Name: "26. Create pod5 in ns10 returns success RV=15",
+			Name: "29. Create pod5 in ns10 returns success RV=15",
 			Request: Request{
 				Op:  OpCreate,
 				Key: pod5Key,
@@ -688,7 +760,7 @@ func correctnessTestSteps() []testStep {
 			},
 		},
 		{
-			Name: "27. Update existing pod4 with ignoreNotFound=true validating ResponseMeta has pod4 RV, not store RV, returns success RV=16",
+			Name: "30. Update existing pod4 with ignoreNotFound=true validating ResponseMeta has pod4 RV, not store RV, returns success RV=16",
 			Request: Request{
 				Op:  OpUpdate,
 				Key: pod4Key,
@@ -719,7 +791,7 @@ func correctnessTestSteps() []testStep {
 			},
 		},
 		{
-			Name: "28. Update pod4 with CachedExistingObject and failing UpdateFunc returns user error",
+			Name: "31. Update pod4 with CachedExistingObject and failing UpdateFunc returns user error",
 			Request: Request{
 				Op:  OpUpdate,
 				Key: pod4Key,
@@ -741,7 +813,7 @@ func correctnessTestSteps() []testStep {
 			},
 		},
 		{
-			Name: "29. Update pod4 with stale CachedExistingObject where UpdateFunc fails on stale RV retries and returns success RV=17",
+			Name: "32. Update pod4 with stale CachedExistingObject where UpdateFunc fails on stale RV retries and returns success RV=17",
 			Request: Request{
 				Op:  OpUpdate,
 				Key: pod4Key,
@@ -771,11 +843,14 @@ func correctnessTestSteps() []testStep {
 			},
 		},
 		{
-			Name: "30. Delete pod5 with matching ResourceVersion precondition returns success RV=18",
+			Name: "33. Delete pod5 with CachedExistingObject and matching ResourceVersion precondition returns success RV=18",
 			Request: Request{
-				Op:     OpDelete,
-				Key:    pod5Key,
-				Delete: DeleteRequest{Preconditions: &storage.Preconditions{ResourceVersion: &pod5RV15}},
+				Op:  OpDelete,
+				Key: pod5Key,
+				Delete: DeleteRequest{
+					Preconditions:        &storage.Preconditions{ResourceVersion: &pod5RV15},
+					CachedExistingObject: withRV(pod5, "15"),
+				},
 			},
 			CorrectResponse: Response{
 				Object: withRV(pod5, "18"),
@@ -793,7 +868,26 @@ func correctnessTestSteps() []testStep {
 			},
 		},
 		{
-			Name: "31. Create pod1 with ResourceVersion set returns ErrResourceVersionSetOnCreate",
+			Name: "34. Delete deleted pod5 with stale CachedExistingObject returns NotFound",
+			Request: Request{
+				Op:  OpDelete,
+				Key: pod5Key,
+				Delete: DeleteRequest{
+					CachedExistingObject: withRV(pod5, "15"),
+				},
+			},
+			CorrectResponse: Response{
+				Object: nil,
+				Err:    storage.NewKeyNotFoundError(pod5Key, 18),
+			},
+			InvalidResponses: []Response{
+				{Object: withRV(pod5, "18")},
+				{Object: withRV(pod5, "19")},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name: "35. Create pod1 with ResourceVersion set returns ErrResourceVersionSetOnCreate",
 			Request: Request{
 				Op:     OpCreate,
 				Key:    pod1Key,
@@ -806,7 +900,7 @@ func correctnessTestSteps() []testStep {
 			},
 		},
 		{
-			Name: "32. Create with empty key returns empty key error",
+			Name: "36. Create with empty key returns empty key error",
 			Request: Request{
 				Op:     OpCreate,
 				Key:    "",
@@ -819,7 +913,7 @@ func correctnessTestSteps() []testStep {
 			},
 		},
 		{
-			Name: "33. Update with key containing . returns invalid key error",
+			Name: "37. Update with key containing . returns invalid key error",
 			Request: Request{
 				Op:  OpUpdate,
 				Key: "/pods/./ns1/pod4",
@@ -834,7 +928,7 @@ func correctnessTestSteps() []testStep {
 			},
 		},
 		{
-			Name: "34. Delete with key / returns empty key error",
+			Name: "38. Delete with key / returns empty key error",
 			Request: Request{
 				Op:  OpDelete,
 				Key: "/",
@@ -1589,7 +1683,11 @@ func RunTestCorrectness(ctx context.Context, t *testing.T, store storage.Interfa
 		case OpCreate:
 			err = store.Create(ctx, step.Request.Key, step.Request.Create.Object, out, 0)
 		case OpDelete:
-			err = store.Delete(ctx, step.Request.Key, out, step.Request.Delete.Preconditions, storage.ValidateAllObjectFunc, nil, storage.DeleteOptions{})
+			validateDeletion := step.Request.Delete.ValidateDeletion
+			if validateDeletion == nil {
+				validateDeletion = storage.ValidateAllObjectFunc
+			}
+			err = store.Delete(ctx, step.Request.Key, out, step.Request.Delete.Preconditions, validateDeletion, step.Request.Delete.CachedExistingObject, storage.DeleteOptions{})
 		case OpUpdate:
 			err = store.GuaranteedUpdate(ctx, step.Request.Key, out, step.Request.Update.IgnoreNotFound, step.Request.Update.Preconditions, step.Request.Update.UpdateFunc, step.Request.Update.CachedExistingObject)
 		default:

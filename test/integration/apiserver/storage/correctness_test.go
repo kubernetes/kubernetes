@@ -56,6 +56,14 @@ var (
 					{Choice: true, Weight: 25},
 				},
 			},
+			CachedObject: []ChoiceWeight[bool]{
+				{Choice: false, Weight: 75},
+				{Choice: true, Weight: 25},
+			},
+			ValidateDeletion: []ChoiceWeight[bool]{
+				{Choice: false, Weight: 75},
+				{Choice: true, Weight: 25},
+			},
 		},
 		Get: GetDistribution{
 			IgnoreNotFound: []ChoiceWeight[bool]{
