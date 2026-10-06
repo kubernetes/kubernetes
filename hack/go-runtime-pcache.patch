@@ -1,0 +1,145 @@
+--- a/src/runtime/mgcwork.go
++++ b/src/runtime/mgcwork.go
+@@ -103,6 +103,13 @@
+ 	// Invariant: Both wbuf1 and wbuf2 are nil or neither are.
+ 	wbuf1, wbuf2 *workbuf
+ 
++	// stackBufs caches empty workbufs for stack scanning
++	// (stackScanState), so scanning a goroutine that has stack
++	// objects or stack-to-stack pointers does not pop and push
++	// the global work.empty list.
++	stackBufs  [4]*workbuf
++	nStackBufs int
++
+ 	// spanq is a queue of spans to process.
+ 	//
+ 	// Only used if goexperiment.GreenTeaGC.
+@@ -303,6 +310,11 @@
+ //
+ //go:nowritebarrierrec
+ func (w *gcWork) dispose() {
++	for w.nStackBufs > 0 {
++		w.nStackBufs--
++		putempty(w.stackBufs[w.nStackBufs])
++		w.stackBufs[w.nStackBufs] = nil
++	}
+ 	if wbuf := w.wbuf1; wbuf != nil {
+ 		if wbuf.nobj == 0 {
+ 			putempty(wbuf)
+@@ -559,3 +571,31 @@
+ 	unlock(&work.wbufSpans.lock)
+ 	return more
+ }
++
++// getStackBuf returns an empty workbuf for stack scanning, preferring
++// the per-P cache over the global work.empty list.
++//
++//go:nowritebarrier
++func (w *gcWork) getStackBuf() *workbuf {
++	if w.nStackBufs > 0 {
++		w.nStackBufs--
++		b := w.stackBufs[w.nStackBufs]
++		w.stackBufs[w.nStackBufs] = nil
++		return b
++	}
++	return getempty()
++}
++
++// putStackBuf returns an empty stack-scan workbuf to the per-P cache,
++// spilling to the global work.empty list when the cache is full.
++//
++//go:nowritebarrier
++func (w *gcWork) putStackBuf(b *workbuf) {
++	b.checkempty()
++	if w.nStackBufs < len(w.stackBufs) {
++		w.stackBufs[w.nStackBufs] = b
++		w.nStackBufs++
++		return
++	}
++	putempty(b)
++}
+--- a/src/runtime/mgcstack.go
++++ b/src/runtime/mgcstack.go
+@@ -195,6 +195,9 @@
+ 	// root of binary tree for fast object lookup by address
+ 	// Initialized by buildIndex.
+ 	root *stackObject
++
++	// gcw supplies cached empty workbufs for the buffers above.
++	gcw *gcWork
+ }
+ 
+ // Add p as a potential pointer to a stack object.
+@@ -210,7 +213,7 @@
+ 	buf := *head
+ 	if buf == nil {
+ 		// Initial setup.
+-		buf = (*stackWorkBuf)(unsafe.Pointer(getempty()))
++		buf = (*stackWorkBuf)(unsafe.Pointer(s.gcw.getStackBuf()))
+ 		buf.nobj = 0
+ 		buf.next = nil
+ 		*head = buf
+@@ -219,7 +222,7 @@
+ 			buf = s.freeBuf
+ 			s.freeBuf = nil
+ 		} else {
+-			buf = (*stackWorkBuf)(unsafe.Pointer(getempty()))
++			buf = (*stackWorkBuf)(unsafe.Pointer(s.gcw.getStackBuf()))
+ 		}
+ 		buf.nobj = 0
+ 		buf.next = *head
+@@ -244,7 +247,7 @@
+ 		if buf.nobj == 0 {
+ 			if s.freeBuf != nil {
+ 				// Free old freeBuf.
+-				putempty((*workbuf)(unsafe.Pointer(s.freeBuf)))
++				s.gcw.putStackBuf((*workbuf)(unsafe.Pointer(s.freeBuf)))
+ 			}
+ 			// Move buf to the freeBuf.
+ 			s.freeBuf = buf
+@@ -260,7 +263,7 @@
+ 	}
+ 	// No more data in either list.
+ 	if s.freeBuf != nil {
+-		putempty((*workbuf)(unsafe.Pointer(s.freeBuf)))
++		s.gcw.putStackBuf((*workbuf)(unsafe.Pointer(s.freeBuf)))
+ 		s.freeBuf = nil
+ 	}
+ 	return 0, false
+@@ -271,7 +274,7 @@
+ 	x := s.tail
+ 	if x == nil {
+ 		// initial setup
+-		x = (*stackObjectBuf)(unsafe.Pointer(getempty()))
++		x = (*stackObjectBuf)(unsafe.Pointer(s.gcw.getStackBuf()))
+ 		x.next = nil
+ 		s.head = x
+ 		s.tail = x
+@@ -281,7 +284,7 @@
+ 	}
+ 	if x.nobj == len(x.obj) {
+ 		// full buffer - allocate a new buffer, add to end of linked list
+-		y := (*stackObjectBuf)(unsafe.Pointer(getempty()))
++		y := (*stackObjectBuf)(unsafe.Pointer(s.gcw.getStackBuf()))
+ 		y.next = nil
+ 		x.next = y
+ 		s.tail = y
+--- a/src/runtime/mgcmark.go
++++ b/src/runtime/mgcmark.go
+@@ -951,6 +951,7 @@
+ 
+ 	var state stackScanState
+ 	state.stack = gp.stack
++	state.gcw = gcw
+ 
+ 	if stackTraceDebug {
+ 		println("stack trace goroutine", gp.goid)
+@@ -1060,7 +1061,7 @@
+ 			}
+ 		}
+ 		x.nobj = 0
+-		putempty((*workbuf)(unsafe.Pointer(x)))
++		gcw.putStackBuf((*workbuf)(unsafe.Pointer(x)))
+ 	}
+ 	if state.buf != nil || state.cbuf != nil || state.freeBuf != nil {
+ 		throw("remaining pointer buffers")

@@ -624,6 +624,53 @@ kube::golang::setup_env() {
   # This may try to download our specific Go version.  Do it last so it uses
   # the above-configured environment.
   kube::golang::internal::verify_go_version
+  kube::golang::setup_runtime_overlay
+}
+
+kube::golang::setup_runtime_overlay() {
+  local patch_file="${KUBE_ROOT}/hack/go-runtime-pcache.patch"
+  if [[ ! -f "${patch_file}" ]]; then
+    return 0
+  fi
+
+  local goroot
+  goroot="$(go env GOROOT)"
+  if [[ -n "${GOMODCACHE:-}" && "${goroot}" == "${GOMODCACHE}"* ]]; then
+    rm -f "${KUBE_GOPATH}/goroot"
+    ln -s "${goroot}" "${KUBE_GOPATH}/goroot"
+    goroot="${KUBE_GOPATH}/goroot"
+    export GOROOT="${goroot}"
+    export PATH="${goroot}/bin:${PATH}"
+  fi
+
+  local overlay_dir="${KUBE_GOPATH}/runtime-overlay"
+  local overlay_json="${KUBE_GOPATH}/go-runtime-overlay.json"
+
+  if [[ -f "${overlay_json}" && -f "${overlay_dir}/src/runtime/mgcwork.go" ]]; then
+    export KUBE_GO_RUNTIME_OVERLAY="${overlay_json}"
+    return 0
+  fi
+
+  rm -rf "${overlay_dir}"
+  mkdir -p "${overlay_dir}/src/runtime"
+  cp "${goroot}/src/runtime/mgcwork.go" \
+     "${goroot}/src/runtime/mgcstack.go" \
+     "${goroot}/src/runtime/mgcmark.go" \
+     "${overlay_dir}/src/runtime/"
+  chmod u+w "${overlay_dir}/src/runtime/"*.go
+
+  (cd "${overlay_dir}" && patch -p1 --silent < "${patch_file}")
+
+  cat <<EOF > "${overlay_json}"
+{
+  "Replace": {
+    "${goroot}/src/runtime/mgcwork.go": "${overlay_dir}/src/runtime/mgcwork.go",
+    "${goroot}/src/runtime/mgcstack.go": "${overlay_dir}/src/runtime/mgcstack.go",
+    "${goroot}/src/runtime/mgcmark.go": "${overlay_dir}/src/runtime/mgcmark.go"
+  }
+}
+EOF
+  export KUBE_GO_RUNTIME_OVERLAY="${overlay_json}"
 }
 
 # kube::golang::hack_tools_gotoolchain outputs the value to use for $GOTOOLCHAIN,
@@ -930,6 +977,9 @@ kube::golang::build_binaries() {
   local goflags goldflags gogcflags gotags
 
   goflags=()
+  if [[ -n "${KUBE_GO_RUNTIME_OVERLAY:-}" ]]; then
+    goflags+=("-overlay=${KUBE_GO_RUNTIME_OVERLAY}")
+  fi
   gogcflags="${GOGCFLAGS:-}"
   goldflags="all=$(kube::version::ldflags) ${GOLDFLAGS:-}"
 
