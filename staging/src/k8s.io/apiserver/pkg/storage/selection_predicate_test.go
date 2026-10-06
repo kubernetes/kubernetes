@@ -238,21 +238,31 @@ func TestSelectionPredicateMatchesShardOnly(t *testing.T) {
 	}
 	testCases := map[string]struct {
 		enableShardedListAndWatch bool
+		label                     labels.Selector
 		shardSelector             sharding.Selector
 		expectMatch               bool
 	}{
 		"in shard, gate on": {
 			enableShardedListAndWatch: true,
+			label:                     labels.Everything(),
 			shardSelector:             shardSelectorMatchingEverything(),
 			expectMatch:               true,
 		},
 		"out of shard, gate on": {
 			enableShardedListAndWatch: true,
+			label:                     labels.Everything(),
+			shardSelector:             shardSelectorExcludingUID(uid),
+			expectMatch:               false,
+		},
+		"out of shard with label selector, gate on": {
+			enableShardedListAndWatch: true,
+			label:                     labels.SelectorFromSet(labels.Set{"app": "web"}),
 			shardSelector:             shardSelectorExcludingUID(uid),
 			expectMatch:               false,
 		},
 		"out of shard, gate off": {
 			enableShardedListAndWatch: false,
+			label:                     labels.Everything(),
 			shardSelector:             shardSelectorExcludingUID(uid),
 			expectMatch:               true,
 		},
@@ -261,11 +271,11 @@ func TestSelectionPredicateMatchesShardOnly(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ShardedListAndWatch, tc.enableShardedListAndWatch)
 			sp := &SelectionPredicate{
-				Label:         labels.Everything(),
+				Label:         tc.label,
 				Field:         fields.Everything(),
 				ShardSelector: tc.shardSelector,
 				GetAttrs: func(runtime.Object) (labels.Set, fields.Set, error) {
-					t.Error("GetAttrs must not be called for empty label/field selectors")
+					t.Error("GetAttrs must not be called when label/field selectors are empty or shard does not match")
 					return nil, nil, errors.New("GetAttrs must not be called")
 				},
 			}

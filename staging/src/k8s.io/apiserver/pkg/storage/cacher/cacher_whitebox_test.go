@@ -3507,3 +3507,47 @@ func TestGetListWithShardedListAndWatch(t *testing.T) {
 		})
 	}
 }
+
+func BenchmarkShardedWatchFilter(b *testing.B) {
+	featuregatetesting.SetFeatureGateDuringTest(b, utilfeature.DefaultFeatureGate, features.ShardedListAndWatch, true)
+	const (
+		totalShards = 16
+		numEvents   = 500
+	)
+	pods := shardTestPods(numEvents)
+	keys := make([]string, numEvents)
+	fSets := make([]fields.Set, numEvents)
+	for i := range pods {
+		keys[i] = "/pods/default/" + pods[i].Name
+		fSets[i] = fields.Set{"metadata.name": pods[i].Name, "metadata.namespace": pods[i].Namespace}
+	}
+	gr := schema.GroupResource{Resource: "pods"}
+	filters := make([]filterWithAttrsFunc, totalShards)
+	for i := range totalShards {
+		start := fmt.Sprintf("0x%016x", uint64(i)<<60)
+		end := "0x10000000000000000"
+		if i+1 < totalShards {
+			end = fmt.Sprintf("0x%016x", uint64(i+1)<<60)
+		}
+		sel := sharding.NewSelector(sharding.ShardRangeRequirement{
+			Key:   "object.metadata.uid",
+			Start: start,
+			End:   end,
+		})
+		filters[i] = filterWithAttrsAndPrefixFunction("/pods/", storage.SelectionPredicate{
+			Label:         labels.Everything(),
+			Field:         fields.Everything(),
+			ShardSelector: sel,
+			GetAttrs:      storage.DefaultNamespaceScopedAttr,
+		}, gr)
+	}
+	b.ReportAllocs()
+	b.ResetTimer()
+	for b.Loop() {
+		for i := range pods {
+			for s := range filters {
+				filters[s](keys[i], labels.Set{}, fSets[i], &pods[i])
+			}
+		}
+	}
+}
