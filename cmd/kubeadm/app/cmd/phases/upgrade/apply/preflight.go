@@ -86,9 +86,10 @@ func runPreflight(c workflow.RunData) error {
 	}
 
 	// Check if feature gate flags used in the cluster are consistent with the set of features currently supported by kubeadm.
+	// This is a preflight check that warns users about deprecated feature gates before the upgrade proceeds.
 	if msg := features.CheckDeprecatedFlags(&features.InitFeatureGates, initCfg.FeatureGates); len(msg) > 0 {
 		for _, m := range msg {
-			_, _ = printer.Printf("[upgrade/preflight] %s\n", m)
+			_, _ = printer.Printf("[upgrade/preflight] WARNING: %s\n", m)
 		}
 	}
 

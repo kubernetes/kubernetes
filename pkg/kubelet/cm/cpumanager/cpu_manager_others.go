@@ -30,6 +30,7 @@ func (m *manager) updateContainerCPUSet(ctx context.Context, containerID string,
 	// helpers_linux.go similar to what exists for pods.
 	// It would be better to pass the full container resources here instead of
 	// this patch-like partial resources.
+	// See https://github.com/kubernetes/kubernetes/issues/115488 for tracking.
 
 	return m.containerRuntime.UpdateContainerResources(
 		ctx,

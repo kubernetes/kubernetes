@@ -82,7 +82,8 @@ func (c *client) Connect(ctx context.Context) error {
 func (c *client) Run(ctx context.Context) {
 	logger := klog.FromContext(ctx)
 	// FIXME: passing real context to ListAndWatch results in
-	// failing TestDevicePluginReRegistration with "context cancelled" error
+	// failing TestDevicePluginReRegistration with "context cancelled" error.
+	// See https://github.com/kubernetes/kubernetes/issues/115472 for tracking.
 	stream, err := c.client.ListAndWatch(context.TODO(), &api.Empty{})
 	if err != nil {
 		logger.Error(err, "ListAndWatch ended unexpectedly for device plugin", "resource", c.resource)
