@@ -81,7 +81,8 @@ func (r *Replay) Validate(req Request, resp Response) error {
 
 func (r *Replay) validateGet(req Request, resp Response) error {
 	opts := req.Get.Options
-	if opts.ResourceVersion == "" {
+	consistency := GetReadConsistency(opts)
+	if consistency == ConsistencyConsistent {
 		return nil
 	}
 	reqRV, err := r.versioner.ParseResourceVersion(opts.ResourceVersion)
@@ -103,7 +104,14 @@ func (r *Replay) validateGet(req Request, resp Response) error {
 }
 
 func (r *Replay) validateList(req Request, resp Response) error {
-	if req.List.Options.ResourceVersion == "" || resp.Err != nil {
+	if resp.Err != nil {
+		return nil
+	}
+	consistency, err := ListReadConsistency(req.List.Options)
+	if err != nil {
+		return err
+	}
+	if consistency == ConsistencyConsistent {
 		return nil
 	}
 	if resp.Object == nil {
