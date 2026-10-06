@@ -963,18 +963,6 @@ func (sched *Scheduler) podGroupSchedulingPlacementAlgorithm(ctx context.Context
 	var anyResult *podGroupAlgorithmResult
 	successfulResults := make(map[*fwk.Placement]*podGroupAlgorithmResult)
 
-	numPlacementsToFind := 1
-	if schedFwk.HasPlacementScorePlugins() {
-		numPlacementsToFind = sched.numFeasiblePlacementsToFind(schedFwk.PercentageOfPlacementsToScore(), placements)
-	}
-
-	// Only a subset of placements will be evaluated, so shuffle to avoid favoring the order
-	// returned by the PlacementGenerate plugin. Clone the slice to avoid mutating plugin data.
-	if sched.shufflePlacements != nil && numPlacementsToFind < len(placements) {
-		placements = slices.Clone(placements)
-		sched.shufflePlacements(placements)
-	}
-
 	parentPlacement := sched.nodeInfoSnapshot.GetPlacement()
 	defer func() {
 		sched.nodeInfoSnapshot.ForgetPlacement()
@@ -1023,6 +1011,8 @@ func (sched *Scheduler) podGroupSchedulingPlacementAlgorithm(ctx context.Context
 
 	// Only evaluate the remaining placements when the nominated one wasn't feasible.
 	if !nominatedFeasible {
+		var numPlacementsToFind int
+		placements, numPlacementsToFind = sched.placementsToEvaluate(schedFwk, placements)
 		for _, placement := range placements {
 			if placement == nominated {
 				continue
@@ -1087,7 +1077,7 @@ func (sched *Scheduler) podGroupSchedulingPlacementAlgorithm(ctx context.Context
 // compositePodGroupSchedulingPlacementAlgorithm tries several different combinations for scheduling the child pod groups and selects the best one.
 // First it runs placement generator plugins to create a list of placements.
 // Placement is a set of nodes that will be considered when scheduling a pod group.
-// Then for each placement it tries to schedule the pod group through podGroupSchedulingDefaultAlgorithm.
+// Then it evaluates candidate placements through compositePodGroupSchedulingDefaultAlgorithm up to the feasible-placement limit.
 // Finally, it runs placement scorer plugins to select the best placement.
 func (sched *Scheduler) compositePodGroupSchedulingPlacementAlgorithm(ctx context.Context, schedFwk framework.Framework, podGroupCycleState *framework.CycleState, root *framework.QueuedPodGroupInfo, podGroupInfo *framework.PodGroupInfo, results map[fwk.EntityKey]*podGroupAlgorithmResult) (finalResult *podGroupAlgorithmResult, revertFns revertFns) {
 	defer func() {
@@ -1114,6 +1104,8 @@ func (sched *Scheduler) compositePodGroupSchedulingPlacementAlgorithm(ctx contex
 
 	var anyResultSubtree map[fwk.EntityKey]*podGroupAlgorithmResult
 	successfulResults := make(map[*fwk.Placement]map[fwk.EntityKey]*podGroupAlgorithmResult)
+
+	placements, numPlacementsToFind := sched.placementsToEvaluate(schedFwk, placements)
 
 	parentPlacement := sched.nodeInfoSnapshot.GetPlacement()
 	defer func() {
@@ -1154,6 +1146,10 @@ func (sched *Scheduler) compositePodGroupSchedulingPlacementAlgorithm(ctx contex
 
 		if result.status.IsSuccess() {
 			successfulResults[placement] = subtreeResult
+		}
+
+		if len(successfulResults) >= numPlacementsToFind {
+			break
 		}
 	}
 
@@ -1199,6 +1195,23 @@ func randShufflePlacements(placements []*fwk.Placement) {
 	rand.Shuffle(len(placements), func(i, j int) {
 		placements[i], placements[j] = placements[j], placements[i]
 	})
+}
+
+// placementsToEvaluate returns the placements in evaluation order and the number of feasible
+// placements to find before the search stops.
+func (sched *Scheduler) placementsToEvaluate(schedFwk framework.Framework, placements []*fwk.Placement) ([]*fwk.Placement, int) {
+	numPlacementsToFind := 1
+	if schedFwk.HasPlacementScorePlugins() {
+		numPlacementsToFind = sched.numFeasiblePlacementsToFind(schedFwk.PercentageOfPlacementsToScore(), placements)
+	}
+
+	// Only a subset of placements will be evaluated, so shuffle to avoid favoring the order
+	// returned by the PlacementGenerate plugin. Clone the slice to avoid mutating plugin data.
+	if sched.shufflePlacements != nil && numPlacementsToFind < len(placements) {
+		placements = slices.Clone(placements)
+		sched.shufflePlacements(placements)
+	}
+	return placements, numPlacementsToFind
 }
 
 // numFeasiblePlacementsToFind returns the number of feasible placements that once found, the scheduler stops

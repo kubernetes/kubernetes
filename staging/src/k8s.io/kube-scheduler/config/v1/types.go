@@ -68,15 +68,19 @@ type KubeSchedulerConfiguration struct {
 	// nodes will be scored. It is overridden by profile level PercentageOfNodesToScore.
 	PercentageOfNodesToScore *int32 `json:"percentageOfNodesToScore,omitempty"`
 
-	// PercentageOfPlacementsToScore is the percentage of generated placements that once found
-	// feasible for running a PodGroup, the scheduler stops its search for more feasible placements.
-	// This is an alpha field and requires the TopologyAwareWorkloadScheduling
-	// feature gate to be enabled.
-	// Scheduler always tries to find at least "minFeasiblePlacementsToFind" feasible placements.
+	// PercentageOfPlacementsToScore is the percentage of generated placements that the scheduler
+	// tries to find feasible for a PodGroup or CompositePodGroup before it stops searching and
+	// scores them. Valid values are from 0 to 100.
+	// The scheduler always tries to find at least one feasible placement.
 	// Example: if 500 placements are generated and the value is 30, the scheduler stops after
-	// finding 150 feasible placements. When the value is 0, the default percentage decreases
-	// from 100% to 10% as the summed node count across generated placements grows from 0 to 5000,
-	// with a 5% floor. It is overridden by profile level PercentageOfPlacementsToScore.
+	// finding 150 feasible placements.
+	// When unset or 0, the scheduler calculates an adaptive percentage based on the sum of node
+	// counts across all generated placements. If placements overlap, a node present in multiple
+	// placements is counted once per placement. The adaptive percentage decreases linearly from
+	// 100% at 0 summed nodes to 10% at 5000 summed nodes, and continues decreasing for larger
+	// sums down to a minimum of 5%.
+	// It is overridden by profile level PercentageOfPlacementsToScore.
+	// This field is only available when the TopologyAwareWorkloadScheduling feature gate is enabled.
 	// +featureGate=TopologyAwareWorkloadScheduling
 	// +optional
 	PercentageOfPlacementsToScore *int32 `json:"percentageOfPlacementsToScore,omitempty"`
@@ -166,16 +170,20 @@ type KubeSchedulerProfile struct {
 	// global PercentageOfNodesToScore will be used.
 	PercentageOfNodesToScore *int32 `json:"percentageOfNodesToScore,omitempty"`
 
-	// PercentageOfPlacementsToScore is the percentage of generated placements that once found
-	// feasible for running a PodGroup, the scheduler stops its search for more feasible placements.
-	// This is an alpha field and requires the TopologyAwareWorkloadScheduling
-	// feature gate to be enabled.
-	// Scheduler always tries to find at least "minFeasiblePlacementsToFind" feasible placements.
+	// PercentageOfPlacementsToScore is the percentage of generated placements that the scheduler
+	// tries to find feasible for a PodGroup or CompositePodGroup before it stops searching and
+	// scores them. Valid values are from 0 to 100.
+	// The scheduler always tries to find at least one feasible placement.
 	// Example: if 500 placements are generated and the value is 30, the scheduler stops after
-	// finding 150 feasible placements. When the value is 0, the default percentage decreases
-	// from 100% to 10% as the summed node count across generated placements grows from 0 to 5000,
-	// with a 5% floor. It overrides global PercentageOfPlacementsToScore. If empty, the global
+	// finding 150 feasible placements.
+	// When the value is 0, the scheduler calculates an adaptive percentage based on the sum of node
+	// counts across all generated placements. If placements overlap, a node present in multiple
+	// placements is counted once per placement. The adaptive percentage decreases linearly from
+	// 100% at 0 summed nodes to 10% at 5000 summed nodes, and continues decreasing for larger
+	// sums down to a minimum of 5%.
+	// It overrides global PercentageOfPlacementsToScore. If empty, the global
 	// PercentageOfPlacementsToScore is used.
+	// This field is only available when the TopologyAwareWorkloadScheduling feature gate is enabled.
 	// +featureGate=TopologyAwareWorkloadScheduling
 	// +optional
 	PercentageOfPlacementsToScore *int32 `json:"percentageOfPlacementsToScore,omitempty"`

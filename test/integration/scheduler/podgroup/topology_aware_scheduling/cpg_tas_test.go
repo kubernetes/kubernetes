@@ -2008,16 +2008,200 @@ func TestCPGTopologyAwareSchedulingWorkloadAwarePreemption(t *testing.T) {
 	}
 }
 
-func runCPGTestScenario(t *testing.T, tt scenario) {
+func TestCPGTopologyAwareSchedulingWithPlacementLimit(t *testing.T) {
+	tests := []scenario{
+		{
+			name: "parent CPG co-locates children on a single rack despite a restrictive placement limit",
+			steps: []stepsframework.Step{
+				{
+					Name: "Create nodes in multiple racks, each rack able to fit the whole hierarchy",
+					CreateNodes: []*v1.Node{
+						makeNode("node1-z1-r1", "rack-1", "zone-1"),
+						makeNode("node2-z1-r1", "rack-1", "zone-1"),
+						makeNode("node3-z1-r2", "rack-2", "zone-1"),
+						makeNode("node4-z1-r2", "rack-2", "zone-1"),
+						makeNode("node5-z2-r3", "rack-3", "zone-2"),
+						makeNode("node6-z2-r3", "rack-3", "zone-2"),
+					},
+				},
+				{
+					Name:                    "Create the root CompositePodGroup object (Gang with minGroupCount=2, TopologyKey=rack)",
+					CreateCompositePodGroup: makeGangCompositePodGroup("cpg-root", "", "rack", 2),
+				},
+				{
+					Name:           "Create child PodGroup pg1 (Gang with minCount=2, without topology constraints, Parent=cpg-root)",
+					CreatePodGroup: makeGangPodGroupWithParent("pg1", "cpg-root", "", 2),
+				},
+				{
+					Name:           "Create child PodGroup pg2 (Gang with minCount=2, without topology constraints, Parent=cpg-root)",
+					CreatePodGroup: makeGangPodGroupWithParent("pg2", "cpg-root", "", 2),
+				},
+				{
+					Name: "Create all pods belonging to pg1 and pg2, each pod requiring 1 CPU",
+					CreatePods: []*v1.Pod{
+						makePod("p1", "pg1"),
+						makePod("p2", "pg1"),
+						makePod("p3", "pg2"),
+						makePod("p4", "pg2"),
+					},
+				},
+				{
+					Name:                 "Verify all pods in the composite group are scheduled",
+					WaitForPodsScheduled: []string{"p1", "p2", "p3", "p4"},
+				},
+				{
+					Name: "Verify all pods across both children landed on a single rack despite the limit",
+					VerifyAssignedInOneDomain: &stepsframework.VerifyAssignedInOneDomain{
+						Pods:        []string{"p1", "p2", "p3", "p4"},
+						TopologyKey: "rack",
+					},
+				},
+			},
+		},
+		{
+			name: "restrictive placement limit still finds the only feasible rack for a CPG",
+			steps: []stepsframework.Step{
+				{
+					Name: "Create nodes in multiple racks; only rack-1 can fit the whole hierarchy",
+					CreateNodes: []*v1.Node{
+						makeNode("node1-z1-r1", "rack-1", "zone-1"),
+						makeNode("node2-z1-r1", "rack-1", "zone-1"),
+						makeNode("node3-z1-r1", "rack-1", "zone-1"),
+						makeNode("node4-z1-r2", "rack-2", "zone-1"),
+						makeNode("node5-z1-r2", "rack-2", "zone-1"),
+						makeNode("node6-z2-r3", "rack-3", "zone-2"),
+					},
+				},
+				{
+					Name: "Block rack-2 so it can no longer fit the whole hierarchy",
+					CreatePods: []*v1.Pod{
+						makeAssignedPod("existing1", "node4-z1-r2", "2"),
+					},
+				},
+				{
+					Name:                    "Create the root CompositePodGroup object (Gang with minGroupCount=2, TopologyKey=rack)",
+					CreateCompositePodGroup: makeGangCompositePodGroup("cpg-root", "", "rack", 2),
+				},
+				{
+					Name:           "Create child PodGroup pg1 (Gang with minCount=2, without topology constraints, Parent=cpg-root)",
+					CreatePodGroup: makeGangPodGroupWithParent("pg1", "cpg-root", "", 2),
+				},
+				{
+					Name:           "Create child PodGroup pg2 (Gang with minCount=1, without topology constraints, Parent=cpg-root)",
+					CreatePodGroup: makeGangPodGroupWithParent("pg2", "cpg-root", "", 1),
+				},
+				{
+					Name: "Create all pods belonging to pg1 and pg2, each pod requiring 1 CPU",
+					CreatePods: []*v1.Pod{
+						makePod("p1", "pg1"),
+						makePod("p2", "pg1"),
+						makePod("p3", "pg2"),
+					},
+				},
+				{
+					Name:                 "Verify all pods in the composite group are scheduled",
+					WaitForPodsScheduled: []string{"p1", "p2", "p3"},
+				},
+				{
+					Name: "Verify all pods landed on the only feasible rack",
+					VerifyAssignments: &stepsframework.VerifyAssignments{
+						Pods:  []string{"p1", "p2", "p3"},
+						Nodes: sets.New("node1-z1-r1", "node2-z1-r1", "node3-z1-r1"),
+					},
+				},
+			},
+		},
+		{
+			name: "restrictive placement limit applies at each level of a CPG hierarchy (root=zone, leaf=rack)",
+			steps: []stepsframework.Step{
+				{
+					Name: "Create nodes across zones and racks",
+					CreateNodes: []*v1.Node{
+						makeNode("node1-z1-r1", "rack-1", "zone-1"),
+						makeNode("node2-z1-r1", "rack-1", "zone-1"),
+						makeNode("node3-z1-r2", "rack-2", "zone-1"),
+						makeNode("node4-z1-r2", "rack-2", "zone-1"),
+						makeNode("node5-z2-r3", "rack-3", "zone-2"),
+						makeNode("node6-z2-r3", "rack-3", "zone-2"),
+					},
+				},
+				{
+					Name: "Block zone-2 so it can no longer fit the whole hierarchy",
+					CreatePods: []*v1.Pod{
+						makeAssignedPod("existing1", "node6-z2-r3", "2"),
+					},
+				},
+				{
+					Name:                    "Create the root CompositePodGroup object (Gang with minGroupCount=2, TopologyKey=zone)",
+					CreateCompositePodGroup: makeGangCompositePodGroup("cpg-root", "", "zone", 2),
+				},
+				{
+					Name:           "Create child PodGroup pg1 (Gang with minCount=2, TopologyKey=rack, Parent=cpg-root)",
+					CreatePodGroup: makeGangPodGroupWithParent("pg1", "cpg-root", "rack", 2),
+				},
+				{
+					Name:           "Create child PodGroup pg2 (Gang with minCount=2, TopologyKey=rack, Parent=cpg-root)",
+					CreatePodGroup: makeGangPodGroupWithParent("pg2", "cpg-root", "rack", 2),
+				},
+				{
+					Name: "Create all pods belonging to pg1 and pg2, each pod requiring 1 CPU",
+					CreatePods: []*v1.Pod{
+						makePod("p1", "pg1"),
+						makePod("p2", "pg1"),
+						makePod("p3", "pg2"),
+						makePod("p4", "pg2"),
+					},
+				},
+				{
+					Name:                 "Verify all pods in the composite group are scheduled",
+					WaitForPodsScheduled: []string{"p1", "p2", "p3", "p4"},
+				},
+				{
+					Name: "Verify all pods landed on the only feasible zone",
+					VerifyAssignments: &stepsframework.VerifyAssignments{
+						Pods:  []string{"p1", "p2", "p3", "p4"},
+						Nodes: sets.New("node1-z1-r1", "node2-z1-r1", "node3-z1-r2", "node4-z1-r2"),
+					},
+				},
+				{
+					Name: "Verify pg1 landed on a single rack",
+					VerifyAssignedInOneDomain: &stepsframework.VerifyAssignedInOneDomain{
+						Pods:        []string{"p1", "p2"},
+						TopologyKey: "rack",
+					},
+				},
+				{
+					Name: "Verify pg2 landed on a single rack",
+					VerifyAssignedInOneDomain: &stepsframework.VerifyAssignedInOneDomain{
+						Pods:        []string{"p3", "p4"},
+						TopologyKey: "rack",
+					},
+				},
+			},
+		},
+	}
+
+	// A low percentage forces the scheduler to score only a subset of the generated placements.
+	percentageLimit := int32(1)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			runCPGTestScenario(t, tt, scheduler.WithPercentageOfPlacementsToScore(new(percentageLimit)))
+		})
+	}
+}
+
+func runCPGTestScenario(t *testing.T, tt scenario, opts ...scheduler.Option) {
 	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 		features.CompositePodGroup:               true,
 		features.GenericWorkload:                 true,
 		features.TopologyAwareWorkloadScheduling: true,
 	})
 
-	testCtx := testutils.InitTestSchedulerWithNS(t, "cpg-tas",
+	opts = append([]scheduler.Option{
 		scheduler.WithPodMaxBackoffSeconds(0),
-		scheduler.WithPodInitialBackoffSeconds(0))
+		scheduler.WithPodInitialBackoffSeconds(0),
+	}, opts...)
+	testCtx := testutils.InitTestSchedulerWithNS(t, "cpg-tas", opts...)
 	ns := testCtx.NS.Name
 
 	if err := stepsframework.RunSteps(testCtx, t, ns, tt.steps); err != nil {
