@@ -23,6 +23,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/apiserver/pkg/storage/cacher/consistency"
 )
 
 func TestStoreListOrdered(t *testing.T) {
@@ -95,15 +96,38 @@ func TestStoreListPrefix(t *testing.T) {
 }
 
 func TestStoreSnapshotter(t *testing.T) {
+	prevPanic := consistency.PanicOnCacheInconsistency
+	consistency.PanicOnCacheInconsistency = true
+	t.Cleanup(func() {
+		consistency.PanicOnCacheInconsistency = prevPanic
+	})
+
 	cache := newSnapshotter(true)
+	_, found := cache.GetLessOrEqual(10)
+	assert.False(t, found)
+
 	cache.Add(&btreeStore{resourceVersion: 10})
 	cache.Add(&btreeStore{resourceVersion: 20})
 	cache.Add(&btreeStore{resourceVersion: 30})
 	cache.Add(&btreeStore{resourceVersion: 40})
 	assert.Equal(t, 4, cache.Len())
 
+	t.Log("Added snapshot need to have strictly increasing RV")
+	assert.Panics(t, func() {
+		cache.Add(&btreeStore{resourceVersion: 40})
+	})
+	assert.Panics(t, func() {
+		cache.Add(&btreeStore{resourceVersion: 35})
+	})
+	t.Log("Bookmarks can have non-decreasing RV")
+	cache.UpdateResourceVersion(40)
+	assert.Panics(t, func() {
+		cache.UpdateResourceVersion(39)
+	})
+	cache.UpdateResourceVersion(45)
+
 	t.Log("No snapshot from before first RV")
-	_, found := cache.GetLessOrEqual(9)
+	_, found = cache.GetLessOrEqual(9)
 	assert.False(t, found)
 
 	t.Log("Get snapshot from first RV")
@@ -122,6 +146,10 @@ func TestStoreSnapshotter(t *testing.T) {
 	assert.Equal(t, uint64(20), snapshot.ResourceVersion())
 
 	t.Log("Get third snapshot for future revision")
+	assert.Panics(t, func() {
+		cache.GetLessOrEqual(100)
+	})
+	cache.UpdateResourceVersion(100)
 	snapshot, found = cache.GetLessOrEqual(100)
 	assert.True(t, found)
 	assert.Equal(t, uint64(40), snapshot.ResourceVersion())

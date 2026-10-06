@@ -17,6 +17,10 @@ limitations under the License.
 package store
 
 import (
+	"fmt"
+
+	"k8s.io/apiserver/pkg/storage/cacher/consistency"
+	"k8s.io/klog/v2"
 	"k8s.io/utils/third_party/forked/golang/btree"
 )
 
@@ -83,10 +87,15 @@ func (s *snapshotter) reset() {
 }
 
 func (s *snapshotter) GetLessOrEqual(rv uint64) (*btreeStore, bool) {
-	if !s.enabled {
+	if !s.enabled || s.resourceVersion == 0 {
 		return nil, false
 	}
-	// TODO: if rv > s.resourceVersion return error to separate too old from future RV.
+	if rv > s.resourceVersion {
+		if consistency.PanicOnCacheInconsistency {
+			panic(fmt.Sprintf("snapshotter (on %d) got future resourceVersion (%d) that it doesn't properly handle as it depends on caller ensuring consistency", s.resourceVersion, rv))
+		}
+		klog.ErrorS(nil, "Snapshotter got future resourceVersion that it doesn't properly handle as it depends on caller ensuring consistency", "requestResourceVersion", rv, "currentResourceVersion", s.resourceVersion)
+	}
 	var result *btreeStore
 	s.snapshots.DescendLessOrEqual(&btreeStore{resourceVersion: rv}, func(snap *btreeStore) bool {
 		result = snap
@@ -110,8 +119,13 @@ func (s *snapshotter) Add(snapshot *btreeStore) {
 	if !s.enabled {
 		return
 	}
+	if snapshot.resourceVersion <= s.resourceVersion {
+		if consistency.PanicOnCacheInconsistency {
+			panic(fmt.Sprintf("snapshot resourceVersion (%d) must be greater than current resourceVersion (%d)", snapshot.resourceVersion, s.resourceVersion))
+		}
+		klog.ErrorS(nil, "Snapshot resourceVersion must be greater than current resourceVersion", "snapshotResourceVersion", snapshot.resourceVersion, "currentResourceVersion", s.resourceVersion)
+	}
 	s.snapshots.ReplaceOrInsert(snapshot)
-	// TODO: We should validate that RV is only increasing, instead of just taking max.
 	s.resourceVersion = max(s.resourceVersion, snapshot.resourceVersion)
 }
 
@@ -119,7 +133,12 @@ func (s *snapshotter) UpdateResourceVersion(rv uint64) {
 	if !s.enabled {
 		return
 	}
-	// TODO: We should validate that RV is only increasing, instead of just taking max.
+	if rv < s.resourceVersion {
+		if consistency.PanicOnCacheInconsistency {
+			panic(fmt.Sprintf("updated resourceVersion (%d) must be greater than or equal to current resourceVersion (%d)", rv, s.resourceVersion))
+		}
+		klog.ErrorS(nil, "Updated resourceVersion must be greater than or equal to current resourceVersion", "updatedResourceVersion", rv, "currentResourceVersion", s.resourceVersion)
+	}
 	s.resourceVersion = max(s.resourceVersion, rv)
 }
 
