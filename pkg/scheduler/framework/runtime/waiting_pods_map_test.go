@@ -116,7 +116,7 @@ func TestWaitingPodConcurrentStop(t *testing.T) {
 	const callers = 8
 	start := make(chan struct{})
 	results := make(chan bool, callers)
-	for i := 0; i < callers; i++ {
+	for i := range callers {
 		go func(i int) {
 			<-start
 			if i%2 == 0 {
@@ -129,7 +129,7 @@ func TestWaitingPodConcurrentStop(t *testing.T) {
 	close(start)
 
 	succeeded := 0
-	for i := range callers {
+	for range callers {
 		if <-results {
 			succeeded++
 		}
