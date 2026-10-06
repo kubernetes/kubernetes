@@ -657,8 +657,8 @@ function kube::util::ensure-cfssl {
     echo "Unable to successfully run 'cfssl' from ${PATH}; downloading instead..."
     local host_os; host_os=$(kube::util::host_os)
     local host_arch; host_arch=$(kube::util::host_arch)
-    local cfssl_response; cfssl_response=$(curl --retry 10 --write-out "%{response_code}" -fL -o cfssl "https://github.com/cloudflare/cfssl/releases/download/v1.7.0/cfssl_1.7.0_${host_os}_${host_arch}")
-    local cfssljson_response; cfssljson_response=$(curl --retry 10 --write-out "%{response_code}" -fL -o cfssljson "https://github.com/cloudflare/cfssl/releases/download/v1.7.0/cfssljson_1.7.0_${host_os}_${host_arch}")
+    local cfssl_response; cfssl_response=$(curl --retry 10 --write-out "%{response_code}" -fL -o cfssl "https://github.com/cloudflare/cfssl/releases/download/v1.7.1/cfssl_1.7.1_${host_os}_${host_arch}")
+    local cfssljson_response; cfssljson_response=$(curl --retry 10 --write-out "%{response_code}" -fL -o cfssljson "https://github.com/cloudflare/cfssl/releases/download/v1.7.1/cfssljson_1.7.1_${host_os}_${host_arch}")
 
     if [[ "$cfssl_response" == "404" || "$cfssljson_response" == "404" ]]; then
       echo "cfssl download unavailable for $host_os/$host_arch and cfssl does not appear to be installed."
