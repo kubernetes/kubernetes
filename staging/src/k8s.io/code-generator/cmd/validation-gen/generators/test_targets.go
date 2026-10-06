@@ -403,7 +403,13 @@ func collectRules(node *typeNode) fieldRules {
 		record(path, n.typeKeyIterations.Functions) // keys validate at parent path
 
 		for _, fld := range n.fields {
-			walkChild(fld, joinPath(path, fld.jsonName), false, false)
+			name := fld.jsonName
+			if name == "" && path == "" {
+				// In a root type, the generated code names an embedded
+				// field after its type.
+				name = fld.name
+			}
+			walkChild(fld, joinPath(path, name), false, false)
 		}
 		if n.elem != nil && !skipElem {
 			walkChild(n.elem, joinPath(path, "[*]"), false, false)
