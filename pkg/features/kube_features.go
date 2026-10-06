@@ -340,6 +340,20 @@ const (
 	// owner: @pohly
 	// kep: http://kep.k8s.io/4381
 	//
+	// Controls whether the deprecated resource.k8s.io/v1beta1 API is
+	// installed. It used to be installed unconditionally but has never
+	// been used by a default Kubernetes configuration. It is now
+	// disabled by default and planned for removal in 1.39. In the
+	// unlikely situation that a cluster still has objects stored using
+	// the v1beta1 format, decoding them will fail unless this feature
+	// gate gets enabled. To upgrade such a cluster, migrate the objects
+	// to a new version (see https://kubernetes.io/docs/tasks/manage-kubernetes-objects/storage-version-migration/)
+	// before the upgrade.
+	DRAResourceV1beta1API featuregate.Feature = "DRAResourceV1beta1API"
+
+	// owner: @pohly
+	// kep: http://kep.k8s.io/4381
+	//
 	// Enables aborting the per-node Filter operation in the scheduler after
 	// a certain time (10 seconds by default, configurable in the DynamicResources
 	// scheduler plugin configuration).
@@ -1481,6 +1495,11 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.36"), Default: false, PreRelease: featuregate.Alpha},
 	},
 
+	DRAResourceV1beta1API: {
+		{Version: version.MustParse("1.0"), Default: true, PreRelease: featuregate.Beta},
+		{Version: version.MustParse("1.38"), Default: false, PreRelease: featuregate.Deprecated}, // remove in 1.39
+	},
+
 	DRASchedulerFilterTimeout: {
 		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.Beta},
 	},
@@ -2484,6 +2503,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	DRAResourceClaimGranularStatusAuthorization: {DRAResourceClaimDeviceStatus},
 
 	DRAResourcePoolStatus: {},
+
+	DRAResourceV1beta1API: {},
 
 	DRASchedulerFilterTimeout: {},
 

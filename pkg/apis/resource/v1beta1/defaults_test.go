@@ -17,6 +17,7 @@ limitations under the License.
 package v1beta1_test
 
 import (
+	"os"
 	"reflect"
 	"testing"
 	"time"
@@ -26,12 +27,30 @@ import (
 	v1beta1 "k8s.io/api/resource/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/utils/ptr"
 
 	// ensure types are installed
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	_ "k8s.io/kubernetes/pkg/apis/resource/install"
 )
+
+// TestMain enables the deprecated v1beta1 API so this package can keep
+// testing it, then finalizes the scheme before any test runs.
+func TestMain(m *testing.M) {
+	// Work around hack/verify-test-featuregates.sh: we cannot use
+	// featuregatetesting.SetFeatureGateDuringTest here (no testing.T instance).
+	// Repeating this in each test doesn't make sense just to satisfy
+	// that somewhat simplistic verify script.
+	utilruntime.Must(utilfeature.DefaultFeatureGate.(interface{ SetFromMap(map[string]bool) error }).SetFromMap(map[string]bool{
+		string(features.DRAResourceV1beta1API): true,
+	}))
+	utilruntime.Must(legacyscheme.Scheme.Init(klog.Background()))
+	os.Exit(m.Run())
+}
 
 func TestSetDefaultAllocationMode(t *testing.T) {
 	claim := &v1beta1.ResourceClaim{

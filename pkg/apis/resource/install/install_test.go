@@ -25,8 +25,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	internal "k8s.io/kubernetes/pkg/apis/resource"
+	"k8s.io/kubernetes/pkg/apis/resource/v1beta1"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 func TestResourceVersioner(t *testing.T) {
@@ -71,5 +76,31 @@ func TestUnversioned(t *testing.T) {
 		if unversioned, ok := legacyscheme.Scheme.IsUnversioned(obj); !unversioned || !ok {
 			t.Errorf("%v is expected to be unversioned", reflect.TypeOf(obj))
 		}
+	}
+}
+
+func TestV1beta1FeatureGate(t *testing.T) {
+	gvk := v1beta1.SchemeGroupVersion.WithKind("ResourceClaim")
+
+	for name, tc := range map[string]struct {
+		enabled       bool
+		wantInstalled bool
+	}{
+		"disabled-by-default": {enabled: false, wantInstalled: false},
+		"enabled":             {enabled: true, wantInstalled: true},
+	} {
+		t.Run(name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAResourceV1beta1API, tc.enabled)
+
+			scheme := runtime.NewScheme()
+			Install(scheme)
+			if err := scheme.Init(klog.Background()); err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			if got := scheme.Recognizes(gvk); got != tc.wantInstalled {
+				t.Errorf("Scheme.Recognizes(%v) = %v, want %v", gvk, got, tc.wantInstalled)
+			}
+		})
 	}
 }

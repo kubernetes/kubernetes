@@ -72,6 +72,20 @@ func (c *Converter) WithConversions(fns ConversionFuncs) *Converter {
 	return &copied
 }
 
+// Clone returns an independent copy: mutating one does not affect the
+// other.
+func (c *Converter) Clone() *Converter {
+	ignored := make(map[typePair]struct{}, len(c.ignoredUntypedConversions))
+	for k, v := range c.ignoredUntypedConversions {
+		ignored[k] = v
+	}
+	return &Converter{
+		conversionFuncs:           c.conversionFuncs.Merge(NewConversionFuncs()),
+		generatedConversionFuncs:  c.generatedConversionFuncs.Merge(NewConversionFuncs()),
+		ignoredUntypedConversions: ignored,
+	}
+}
+
 // DefaultMeta returns meta for a given type.
 func (c *Converter) DefaultMeta(t reflect.Type) *Meta {
 	return &Meta{}
