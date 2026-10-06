@@ -405,8 +405,8 @@ func (c *watchCache) waitUntilFreshAndGetList(ctx context.Context, key string, o
 	return listResp{ResourceVersion: readResourceVersion, Range: store.SingleElementRange(elem)}, "", nil
 }
 
-// WaitUntilFreshAndList returns list of pointers to `storeElement` objects along
-// with their ResourceVersion and the name of the index, if any, that was used.
+// WaitUntilFreshAndGetKeys waits until the cache is fresh enough for the given
+// resource version and returns all keys from the latest snapshot.
 func (w *watchCache) WaitUntilFreshAndGetKeys(ctx context.Context, resourceVersion uint64) ([]string, error) {
 	span := tracing.SpanFromContext(ctx)
 	consistentReadSupported := delegator.ConsistentReadSupported()
