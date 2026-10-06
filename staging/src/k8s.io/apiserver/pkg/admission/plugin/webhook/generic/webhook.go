@@ -293,9 +293,9 @@ func (a *Webhook) ValidateInitialization() error {
 	return nil
 }
 
-// ShouldCallHook returns invocation details if the webhook should be called, nil if the webhook should not be called,
-// or an error if an error was encountered during evaluation.
-func (a *Webhook) ShouldCallHook(ctx context.Context, h webhook.WebhookAccessor, attr admission.Attributes, o admission.ObjectInterfaces, v VersionedAttributeAccessor) (*WebhookInvocation, *apierrors.StatusError) {
+// matchHook returns invocation details if h's selectors and rules (but not its matchConditions)
+// select attr, nil if they do not, or an error if they could not be evaluated.
+func (a *Webhook) matchHook(h webhook.WebhookAccessor, attr admission.Attributes, o admission.ObjectInterfaces) (*WebhookInvocation, *apierrors.StatusError) {
 	matches, matchNsErr := a.namespaceMatcher.MatchNamespaceSelector(h, attr)
 	// Should not return an error here for webhooks which do not apply to the request, even if err is an unexpected scenario.
 	if !matches && matchNsErr == nil {
@@ -360,6 +360,16 @@ func (a *Webhook) ShouldCallHook(ctx context.Context, h webhook.WebhookAccessor,
 	}
 	if matchObjErr != nil {
 		return nil, matchObjErr
+	}
+	return invocation, nil
+}
+
+// ShouldCallHook returns invocation details if the webhook should be called, nil if the webhook should not be called,
+// or an error if an error was encountered during evaluation.
+func (a *Webhook) ShouldCallHook(ctx context.Context, h webhook.WebhookAccessor, attr admission.Attributes, o admission.ObjectInterfaces, v VersionedAttributeAccessor) (*WebhookInvocation, *apierrors.StatusError) {
+	invocation, err := a.matchHook(h, attr, o)
+	if err != nil || invocation == nil {
+		return nil, err
 	}
 	matchConditions := h.GetMatchConditions()
 	if len(matchConditions) > 0 {
