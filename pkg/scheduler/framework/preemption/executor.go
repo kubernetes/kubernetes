@@ -109,18 +109,27 @@ func NewExecutor(fh fwk.Handle, fts feature.Features) *Executor {
 		eventMessage := fmt.Sprintf("Preempted by %s %v on node %v", preemptor.Type(), preemptor.UID(), c.Name())
 		// If the victim is a WaitingPod, try to preempt it without a delete call (victim will go back to backoff queue).
 		// Otherwise we should delete the victim.
+		var podInPreBind fwk.PodInPreBind
 		if waitingPod := e.fh.GetWaitingPod(victim.UID); waitingPod != nil {
 			if waitingPod.Preempt(pluginName, "preempted") {
 				logger.V(2).Info("Preemptor preempted a waiting pod", "preemptorType", preemptor.Type(), "preemptor", klog.KObj(preemptor), "waitingPod", klog.KObj(victim), "node", c.Name())
 				preemptedInMemory = true
 			}
-		} else if podInPreBind := e.fh.GetPodInPreBind(victim.UID); podInPreBind != nil {
+		} else if podInPreBind = e.fh.GetPodInPreBind(victim.UID); podInPreBind != nil {
 			// If the victim is in the preBind cancel the binding process.
 			if podInPreBind.CancelPod(fmt.Sprintf("preempted by %s", pluginName)) {
 				logger.V(2).Info("Preemptor rejected a pod in preBind", "preemptorType", preemptor.Type(), "preemptor", klog.KObj(preemptor), "podInPreBind", klog.KObj(victim), "node", c.Name())
 				preemptedInMemory = true
 			} else {
 				logger.V(5).Info("Failed to reject a pod in preBind, falling back to deletion via api call", "preemptor", klog.KObj(preemptor), "podInPreBind", klog.KObj(victim), "node", c.Name())
+			}
+		}
+		if !preemptedInMemory && podInPreBind == nil {
+			// If another component already rejected and forgot the assumed victim, the pod is unscheduled in the informer cache.
+			// Skip the API deletion call and return false so the caller activates the preemptor.
+			if apiPod, err := e.podLister.Pods(victim.Namespace).Get(victim.Name); err == nil && apiPod.Spec.NodeName == "" {
+				logger.V(2).Info("Skipped API deletion for unscheduled victim that is no longer assumed in memory", "preemptor", klog.KObj(preemptor), "victim", klog.KObj(victim), "node", c.Name())
+				return false, nil
 			}
 		}
 		if !preemptedInMemory {

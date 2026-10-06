@@ -1440,14 +1440,17 @@ func TestPreemptPod(t *testing.T) {
 	victimPod := st.MakePod().Name("v").UID("v").Priority(midPriority).Obj()
 
 	tests := []struct {
-		name                         string
-		addVictimToPrebind           bool
-		addVictimToWaiting           bool
-		notFoundOnPatch              bool
-		notFoundOnDelete             bool
-		expectCancel                 bool
-		wantWillProduceDeletionEvent bool
-		expectedActions              []string
+		name                             string
+		addVictimToPrebind               bool
+		markPreboundBeforePreempt        bool
+		addVictimToWaiting               bool
+		rejectWaitingVictimBeforePreempt bool
+		syncUnscheduledVictimInInformer  bool
+		notFoundOnPatch                  bool
+		notFoundOnDelete                 bool
+		expectCancel                     bool
+		wantWillProduceDeletionEvent     bool
+		expectedActions                  []string
 	}{
 		{
 			name:                         "victim is in preBind, context should be cancelled",
@@ -1478,6 +1481,29 @@ func TestPreemptPod(t *testing.T) {
 			notFoundOnDelete:             true,
 			wantWillProduceDeletionEvent: false,
 			expectedActions:              []string{"patch", "delete"},
+		},
+		{
+			name:                            "Trigger C: victim was rejected and forgotten before PreemptPod, unscheduled pod in informer store is not deleted",
+			syncUnscheduledVictimInInformer: true,
+			wantWillProduceDeletionEvent:    false,
+			expectedActions:                 []string{},
+		},
+		{
+			name:                             "Trigger C: waiting victim was already rejected before PreemptPod, unscheduled pod in informer store is not deleted",
+			addVictimToWaiting:               true,
+			rejectWaitingVictimBeforePreempt: true,
+			syncUnscheduledVictimInInformer:  true,
+			wantWillProduceDeletionEvent:     false,
+			expectedActions:                  []string{},
+		},
+		{
+			name:                            "victim finished preBind (MarkPrebound) and is binding, falls back to deletion via api call",
+			addVictimToPrebind:              true,
+			markPreboundBeforePreempt:       true,
+			syncUnscheduledVictimInInformer: true,
+			expectCancel:                    false,
+			wantWillProduceDeletionEvent:    true,
+			expectedActions:                 []string{"patch", "delete"},
 		},
 	}
 
@@ -1510,6 +1536,11 @@ func TestPreemptPod(t *testing.T) {
 					})
 				}
 				informerFactory := informers.NewSharedInformerFactory(cs, 0)
+				if tt.syncUnscheduledVictimInInformer {
+					if err := informerFactory.Core().V1().Pods().Informer().GetIndexer().Add(victimCopy); err != nil {
+						t.Fatal(err)
+					}
+				}
 				eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: cs.EventsV1()})
 				logger, ctx := ktesting.NewTestContext(t)
 
@@ -1532,6 +1563,9 @@ func TestPreemptPod(t *testing.T) {
 				if tt.addVictimToPrebind {
 					victimCtx, cancel = context.WithCancelCause(context.Background())
 					schedFramework.AddPodInPreBind(victimCopy.UID, cancel)
+					if tt.markPreboundBeforePreempt {
+						schedFramework.GetPodInPreBind(victimCopy.UID).MarkPrebound()
+					}
 				}
 				if tt.addVictimToWaiting {
 					pluginsWaitTime, status := schedFramework.RunPermitPlugins(ctx, framework.NewCycleState(), victimCopy, "fake-node")
@@ -1539,6 +1573,9 @@ func TestPreemptPod(t *testing.T) {
 						t.Fatalf("Failed to add a pod to waiting list")
 					}
 					schedFramework.AddWaitingPod(victimCopy, pluginsWaitTime)
+					if tt.rejectWaitingVictimBeforePreempt {
+						schedFramework.GetWaitingPod(victimCopy.UID).Reject(waitingPermitPluginName, "concurrent rejection")
+					}
 				}
 				pe := NewExecutor(schedFramework, feature.Features{})
 
@@ -1550,7 +1587,9 @@ func TestPreemptPod(t *testing.T) {
 					preemptor = &podExecutorPreemptor{Pod: preemptorPod}
 				}
 
-				willProduceDeletionEvent, err := pe.PreemptPod(ctx, &candidate{name: "fake-node"}, preemptor, victimCopy, "test-plugin")
+				assumedVictim := victimCopy.DeepCopy()
+				assumedVictim.Spec.NodeName = "fake-node"
+				willProduceDeletionEvent, err := pe.PreemptPod(ctx, &candidate{name: "fake-node"}, preemptor, assumedVictim, "test-plugin")
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -1594,17 +1633,22 @@ func TestPrepareCandidateAsyncActivatesPreemptorAfterLastVictimInMemoryPreemptio
 	gracePeriodVictim := st.MakePod().Name("grace-v").UID("grace-v").Priority(midPriority).Node("node1").TerminationGracePeriodSeconds(gracePeriodSec).Obj()
 	notFoundPatchVictim := st.MakePod().Name("not-found-patch-v").UID("not-found-patch-v").Priority(midPriority).Node("node1").Obj()
 	notFoundDeleteVictim := st.MakePod().Name("not-found-delete-v").UID("not-found-delete-v").Priority(midPriority).Node("node1").Obj()
+	forgottenVictim := st.MakePod().Name("forgotten-v").UID("forgotten-v").Priority(midPriority).Node("node1").Obj()
 
 	tests := []struct {
-		name                        string
-		victimPods                  []*v1.Pod
-		inMemoryVictim              *v1.Pod
-		addVictimToPrebind          bool
-		addVictimToPrebindOnPreempt bool
-		addVictimToWaiting          bool
-		preemptorGenericPodGroup    *fwk.GenericPodGroup
-		preemptorPods               []*v1.Pod
-		wantPreemptorActivate       bool
+		name                             string
+		victimPods                       []*v1.Pod
+		inMemoryVictim                   *v1.Pod
+		unscheduledVictimInInformer      *v1.Pod
+		addVictimToPrebind               bool
+		addVictimToPrebindOnPreempt      bool
+		removePreBindVictimBeforePreempt bool
+		addVictimToWaiting               bool
+		rejectWaitingVictimBeforePreempt bool
+		removeWaitingVictimBeforePreempt bool
+		preemptorGenericPodGroup         *fwk.GenericPodGroup
+		preemptorPods                    []*v1.Pod
+		wantPreemptorActivate            bool
 	}{
 		{
 			name:                  "last waiting pod",
@@ -1707,6 +1751,79 @@ func TestPrepareCandidateAsyncActivatesPreemptorAfterLastVictimInMemoryPreemptio
 			wantPreemptorActivate:    true,
 		},
 		{
+			name:                             "Trigger C: last waiting pod concurrently rejected and forgotten before PreemptPod for pod",
+			victimPods:                       []*v1.Pod{forgottenVictim.DeepCopy()},
+			inMemoryVictim:                   forgottenVictim.DeepCopy(),
+			unscheduledVictimInInformer:      st.MakePod().Name("forgotten-v").UID("forgotten-v").Priority(midPriority).Obj(),
+			addVictimToWaiting:               true,
+			rejectWaitingVictimBeforePreempt: true,
+			removeWaitingVictimBeforePreempt: true,
+			wantPreemptorActivate:            true,
+		},
+		{
+			name:                             "Trigger C: last waiting pod concurrently rejected (still in waitingPodsMap) before PreemptPod for pod",
+			victimPods:                       []*v1.Pod{forgottenVictim.DeepCopy()},
+			inMemoryVictim:                   forgottenVictim.DeepCopy(),
+			unscheduledVictimInInformer:      st.MakePod().Name("forgotten-v").UID("forgotten-v").Priority(midPriority).Obj(),
+			addVictimToWaiting:               true,
+			rejectWaitingVictimBeforePreempt: true,
+			wantPreemptorActivate:            true,
+		},
+		{
+			name:                             "Trigger C: last preBind pod concurrently cancelled and forgotten before PreemptPod for pod",
+			victimPods:                       []*v1.Pod{forgottenVictim.DeepCopy()},
+			inMemoryVictim:                   forgottenVictim.DeepCopy(),
+			unscheduledVictimInInformer:      st.MakePod().Name("forgotten-v").UID("forgotten-v").Priority(midPriority).Obj(),
+			addVictimToPrebind:               true,
+			removePreBindVictimBeforePreempt: true,
+			wantPreemptorActivate:            true,
+		},
+		{
+			name:                             "Trigger C: last concurrently forgotten victim after API-deleted victim",
+			victimPods:                       []*v1.Pod{apiVictim.DeepCopy(), forgottenVictim.DeepCopy()},
+			inMemoryVictim:                   forgottenVictim.DeepCopy(),
+			unscheduledVictimInInformer:      st.MakePod().Name("forgotten-v").UID("forgotten-v").Priority(midPriority).Obj(),
+			addVictimToWaiting:               true,
+			rejectWaitingVictimBeforePreempt: true,
+			removeWaitingVictimBeforePreempt: true,
+			wantPreemptorActivate:            true,
+		},
+		{
+			name:                             "Trigger C: last waiting pod concurrently rejected and forgotten before PreemptPod for pod group",
+			victimPods:                       []*v1.Pod{forgottenVictim.DeepCopy()},
+			inMemoryVictim:                   forgottenVictim.DeepCopy(),
+			unscheduledVictimInInformer:      st.MakePod().Name("forgotten-v").UID("forgotten-v").Priority(midPriority).Obj(),
+			addVictimToWaiting:               true,
+			rejectWaitingVictimBeforePreempt: true,
+			removeWaitingVictimBeforePreempt: true,
+			preemptorGenericPodGroup:         fwk.NewGenericPodGroup(preemptorPodGroup),
+			preemptorPods:                    []*v1.Pod{preemptorPod.DeepCopy(), secondPreemptorPod.DeepCopy()},
+			wantPreemptorActivate:            true,
+		},
+		{
+			name:                             "Trigger C: last preBind pod concurrently cancelled and forgotten before PreemptPod for pod group",
+			victimPods:                       []*v1.Pod{forgottenVictim.DeepCopy()},
+			inMemoryVictim:                   forgottenVictim.DeepCopy(),
+			unscheduledVictimInInformer:      st.MakePod().Name("forgotten-v").UID("forgotten-v").Priority(midPriority).Obj(),
+			addVictimToPrebind:               true,
+			removePreBindVictimBeforePreempt: true,
+			preemptorGenericPodGroup:         fwk.NewGenericPodGroup(preemptorPodGroup),
+			preemptorPods:                    []*v1.Pod{preemptorPod.DeepCopy(), secondPreemptorPod.DeepCopy()},
+			wantPreemptorActivate:            true,
+		},
+		{
+			name:                             "Trigger C: last waiting pod concurrently rejected and forgotten before PreemptPod for composite pod group",
+			victimPods:                       []*v1.Pod{forgottenVictim.DeepCopy()},
+			inMemoryVictim:                   forgottenVictim.DeepCopy(),
+			unscheduledVictimInInformer:      st.MakePod().Name("forgotten-v").UID("forgotten-v").Priority(midPriority).Obj(),
+			addVictimToWaiting:               true,
+			rejectWaitingVictimBeforePreempt: true,
+			removeWaitingVictimBeforePreempt: true,
+			preemptorGenericPodGroup:         fwk.NewGenericCompositePodGroup(preemptorCompositePodGroup),
+			preemptorPods:                    []*v1.Pod{preemptorPod.DeepCopy(), secondPreemptorPod.DeepCopy()},
+			wantPreemptorActivate:            true,
+		},
+		{
 			name:                  "R3: bound victim with non-zero termination grace period for pod",
 			victimPods:            []*v1.Pod{gracePeriodVictim.DeepCopy()},
 			wantPreemptorActivate: false,
@@ -1733,6 +1850,15 @@ func TestPrepareCandidateAsyncActivatesPreemptorAfterLastVictimInMemoryPreemptio
 		{
 			name:       "non-last NotFound pod followed by bound API-deleted victim",
 			victimPods: []*v1.Pod{notFoundDeleteVictim.DeepCopy(), apiVictim.DeepCopy()},
+		},
+		{
+			name:                             "non-last forgotten pod followed by bound API-deleted victim",
+			victimPods:                       []*v1.Pod{forgottenVictim.DeepCopy(), apiVictim.DeepCopy()},
+			inMemoryVictim:                   forgottenVictim.DeepCopy(),
+			unscheduledVictimInInformer:      st.MakePod().Name("forgotten-v").UID("forgotten-v").Priority(midPriority).Obj(),
+			addVictimToWaiting:               true,
+			rejectWaitingVictimBeforePreempt: true,
+			removeWaitingVictimBeforePreempt: true,
 		},
 	}
 
@@ -1770,7 +1896,11 @@ func TestPrepareCandidateAsyncActivatesPreemptorAfterLastVictimInMemoryPreemptio
 			}
 			podsForSnapshot := make([]*v1.Pod, 0, len(tt.victimPods))
 			for _, pod := range tt.victimPods {
-				objects = append(objects, pod)
+				if tt.unscheduledVictimInInformer != nil && pod.UID == tt.unscheduledVictimInInformer.UID {
+					objects = append(objects, tt.unscheduledVictimInInformer.DeepCopy())
+				} else {
+					objects = append(objects, pod)
+				}
 				podsForSnapshot = append(podsForSnapshot, pod)
 			}
 			cs := clientsetfake.NewClientset(objects...)
@@ -1787,6 +1917,11 @@ func TestPrepareCandidateAsyncActivatesPreemptorAfterLastVictimInMemoryPreemptio
 				return false, nil, nil
 			})
 			informerFactory := informers.NewSharedInformerFactory(cs, 0)
+			if tt.unscheduledVictimInInformer != nil {
+				if err := informerFactory.Core().V1().Pods().Informer().GetIndexer().Add(tt.unscheduledVictimInInformer.DeepCopy()); err != nil {
+					t.Fatal(err)
+				}
+			}
 			eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: cs.EventsV1()})
 
 			schedFwk, err := tf.NewFramework(
@@ -1811,6 +1946,10 @@ func TestPrepareCandidateAsyncActivatesPreemptorAfterLastVictimInMemoryPreemptio
 			if tt.addVictimToPrebind {
 				victimCtx, cancelVictim = context.WithCancelCause(context.Background())
 				schedFwk.AddPodInPreBind(tt.inMemoryVictim.UID, cancelVictim)
+				if tt.removePreBindVictimBeforePreempt {
+					schedFwk.GetPodInPreBind(tt.inMemoryVictim.UID).CancelPod("concurrent prebind failure")
+					schedFwk.RemovePodInPreBind(tt.inMemoryVictim.UID)
+				}
 			}
 			if tt.addVictimToWaiting {
 				pluginsWaitTime, status := schedFwk.RunPermitPlugins(ctx, framework.NewCycleState(), tt.inMemoryVictim, "node1")
@@ -1818,6 +1957,12 @@ func TestPrepareCandidateAsyncActivatesPreemptorAfterLastVictimInMemoryPreemptio
 					t.Fatalf("Failed to add a pod to waiting list")
 				}
 				schedFwk.AddWaitingPod(tt.inMemoryVictim, pluginsWaitTime)
+				if tt.rejectWaitingVictimBeforePreempt {
+					schedFwk.GetWaitingPod(tt.inMemoryVictim.UID).Reject(waitingPermitPluginName, "concurrent permit rejection")
+				}
+				if tt.removeWaitingVictimBeforePreempt {
+					schedFwk.WaitOnPermit(ctx, tt.inMemoryVictim)
+				}
 			}
 
 			executor := NewExecutor(schedFwk, feature.Features{EnableAsyncPreemption: true})
@@ -1880,6 +2025,11 @@ func TestPrepareCandidateAsyncActivatesPreemptorAfterLastVictimInMemoryPreemptio
 			}
 			if (tt.addVictimToPrebind || tt.addVictimToPrebindOnPreempt) && (victimCtx == nil || victimCtx.Err() == nil) {
 				t.Fatalf("Expected preBind victim context to be cancelled")
+			}
+			if tt.unscheduledVictimInInformer != nil {
+				if _, err := cs.CoreV1().Pods(tt.unscheduledVictimInInformer.Namespace).Get(ctx, tt.unscheduledVictimInInformer.Name, metav1.GetOptions{}); err != nil {
+					t.Fatalf("Expected unscheduled victim pod %q not to be deleted from apiserver, got err: %v", tt.unscheduledVictimInInformer.Name, err)
+				}
 			}
 		})
 	}
