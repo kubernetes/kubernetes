@@ -17,6 +17,7 @@ limitations under the License.
 package validators
 
 import (
+	"reflect"
 	"strings"
 	"testing"
 
@@ -26,6 +27,7 @@ import (
 
 func TestParseNumericLimit(t *testing.T) {
 	duration := &types.Type{Name: durationType, Kind: types.Alias, Underlying: types.Int64}
+	quantity := &types.Type{Name: quantityType, Kind: types.Struct}
 	cases := []struct {
 		name    string
 		typ     *types.Type
@@ -48,6 +50,16 @@ func TestParseNumericLimit(t *testing.T) {
 		tag:     codetags.Tag{Value: "1", ValueType: codetags.ValueTypeString},
 		wantErr: "missing unit",
 	}, {
+		name: "valid quantity",
+		typ:  quantity,
+		tag:  codetags.Tag{Name: "minimum", Value: "1Gi", ValueType: codetags.ValueTypeString},
+		want: Function("minimum", DefaultFlags, resourceMustParse, "1Gi"),
+	}, {
+		name:    "invalid quantity",
+		typ:     quantity,
+		tag:     codetags.Tag{Value: "1GB", ValueType: codetags.ValueTypeString},
+		wantErr: "failed to parse tag payload",
+	}, {
 		name: "valid integer",
 		typ:  types.Int64,
 		tag:  codetags.Tag{Value: "1", ValueType: codetags.ValueTypeInt},
@@ -67,7 +79,7 @@ func TestParseNumericLimit(t *testing.T) {
 			if err != nil && !strings.Contains(err.Error(), tc.wantErr) {
 				t.Errorf("got error %v, want %q", err, tc.wantErr)
 			}
-			if got != tc.want {
+			if !reflect.DeepEqual(got, tc.want) {
 				t.Errorf("got %v (%T), want %v (%T)", got, got, tc.want, tc.want)
 			}
 		})
