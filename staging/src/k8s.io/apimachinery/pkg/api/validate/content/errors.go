@@ -25,13 +25,13 @@ import (
 
 // MinError returns a string explanation of a "must be greater than or equal"
 // validation failure.
-func MinError[T constraints.Integer](min T) string {
+func MinError[T constraints.Integer | ~string](min T) string {
 	return fmt.Sprintf("must be greater than or equal to %v", min)
 }
 
 // MaxError returns a string explanation of a "must be less than or equal"
 // validation failure.
-func MaxError[T constraints.Integer](max T) string {
+func MaxError[T constraints.Integer | ~string](max T) string {
 	return fmt.Sprintf("must be less than or equal to %v", max)
 }
 
