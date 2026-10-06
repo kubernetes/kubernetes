@@ -105,7 +105,7 @@ func (w *testWatchCache) getCacheIntervalForEvents(resourceVersion uint64, opts 
 	w.RLock()
 	defer w.RUnlock()
 
-	return w.getAllEventsSinceLocked(resourceVersion, "", opts)
+	return w.getAllEventsSinceLocked(context.Background(), resourceVersion, "", opts)
 }
 
 // newTestWatchCache just adds a fake clock.
@@ -441,9 +441,8 @@ func TestMarker(t *testing.T) {
 	}
 }
 
-func TestWaitUntilFreshAndGetList(t *testing.T) {
-	ctx := context.Background()
-	store := newTestWatchCache(3, DefaultEventFreshDuration, &cache.Indexers{
+func testIndexers() *cache.Indexers {
+	return &cache.Indexers{
 		"l:label": func(obj interface{}) ([]string, error) {
 			pod, ok := obj.(*v1.Pod)
 			if !ok {
@@ -461,7 +460,12 @@ func TestWaitUntilFreshAndGetList(t *testing.T) {
 			}
 			return []string{pod.Spec.NodeName}, nil
 		},
-	})
+	}
+}
+
+func TestWaitUntilFreshAndGetList(t *testing.T) {
+	ctx := context.Background()
+	store := newTestWatchCache(3, DefaultEventFreshDuration, testIndexers())
 	defer store.Stop()
 	// In background, update the store.
 	go func() {
@@ -484,9 +488,11 @@ func TestWaitUntilFreshAndGetList(t *testing.T) {
 	if indexUsed != "" {
 		t.Errorf("Used index %q but expected none to be used", indexUsed)
 	}
+	verifyInitialWatchCandidates(t, store, "/prefix/", storage.Everything, "", []string{"/prefix/ns/pod1", "/prefix/ns/pod2", "/prefix/ns/pod3"})
+	verifyInitialWatchCandidates(t, store, "/prefix/other/", storage.Everything, "", nil)
 
 	// list by label index.
-	resp, indexUsed, err = store.WaitUntilFreshAndGetList(ctx, "/prefix/", storage.ListOptions{ResourceVersion: "5", Recursive: true, Predicate: storage.SelectionPredicate{
+	labelPred := storage.SelectionPredicate{
 		Label: labels.SelectorFromSet(map[string]string{
 			"label": "value1",
 		}),
@@ -494,7 +500,8 @@ func TestWaitUntilFreshAndGetList(t *testing.T) {
 			"spec.nodeName": "node2",
 		}),
 		IndexLabels: []string{"label"},
-	}})
+	}
+	resp, indexUsed, err = store.WaitUntilFreshAndGetList(ctx, "/prefix/", storage.ListOptions{ResourceVersion: "5", Recursive: true, Predicate: labelPred})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -507,9 +514,10 @@ func TestWaitUntilFreshAndGetList(t *testing.T) {
 	if indexUsed != "l:label" {
 		t.Errorf("Used index %q but expected %q", indexUsed, "l:label")
 	}
+	verifyInitialWatchCandidates(t, store, "/prefix/", labelPred, "l:label", []string{"/prefix/ns/pod1", "/prefix/ns/pod2"})
 
 	// list with spec.nodeName index.
-	resp, indexUsed, err = store.WaitUntilFreshAndGetList(ctx, "/prefix/", storage.ListOptions{ResourceVersion: "5", Recursive: true, Predicate: storage.SelectionPredicate{
+	nodePred := storage.SelectionPredicate{
 		Label: labels.SelectorFromSet(map[string]string{
 			"not-exist-label": "whatever",
 		}),
@@ -517,7 +525,8 @@ func TestWaitUntilFreshAndGetList(t *testing.T) {
 			"spec.nodeName": "node2",
 		}),
 		IndexFields: []string{"spec.nodeName"},
-	}})
+	}
+	resp, indexUsed, err = store.WaitUntilFreshAndGetList(ctx, "/prefix/", storage.ListOptions{ResourceVersion: "5", Recursive: true, Predicate: nodePred})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -530,15 +539,17 @@ func TestWaitUntilFreshAndGetList(t *testing.T) {
 	if indexUsed != "f:spec.nodeName" {
 		t.Errorf("Used index %q but expected %q", indexUsed, "f:spec.nodeName")
 	}
+	verifyInitialWatchCandidates(t, store, "/prefix/", nodePred, "f:spec.nodeName", []string{"/prefix/ns/pod3"})
 
 	// list with index not exists.
-	resp, indexUsed, err = store.WaitUntilFreshAndGetList(ctx, "/prefix/", storage.ListOptions{ResourceVersion: "5", Recursive: true, Predicate: storage.SelectionPredicate{
+	missingIndexPred := storage.SelectionPredicate{
 		Label: labels.SelectorFromSet(map[string]string{
 			"not-exist-label": "whatever",
 		}),
 		Field:       fields.Everything(),
 		IndexLabels: []string{"label"},
-	}})
+	}
+	resp, indexUsed, err = store.WaitUntilFreshAndGetList(ctx, "/prefix/", storage.ListOptions{ResourceVersion: "5", Recursive: true, Predicate: missingIndexPred})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -550,6 +561,29 @@ func TestWaitUntilFreshAndGetList(t *testing.T) {
 	}
 	if indexUsed != "" {
 		t.Errorf("Used index %q but expected none to be used", indexUsed)
+	}
+	verifyInitialWatchCandidates(t, store, "/prefix/", missingIndexPred, "", []string{"/prefix/ns/pod1", "/prefix/ns/pod2", "/prefix/ns/pod3"})
+}
+
+func verifyInitialWatchCandidates(t *testing.T, store *testWatchCache, key string, pred storage.SelectionPredicate, expectedIndex string, expectedKeys []string) {
+	t.Helper()
+	store.RLock()
+	interval, indexUsed, err := store.getIntervalFromStoreLocked(context.Background(), key, storage.ListOptions{
+		Recursive: true,
+		Predicate: pred,
+	})
+	store.RUnlock()
+	require.NoError(t, err)
+	if indexUsed != expectedIndex {
+		t.Errorf("Used index %q but expected %q", indexUsed, expectedIndex)
+	}
+	var gotKeys []string
+	for ev, err := range interval.All() {
+		require.NoError(t, err)
+		gotKeys = append(gotKeys, ev.Key)
+	}
+	if !apiequality.Semantic.DeepEqual(gotKeys, expectedKeys) {
+		t.Errorf("unexpected initial watch candidate keys: %v, expected: %v", gotKeys, expectedKeys)
 	}
 }
 
