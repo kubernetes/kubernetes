@@ -24,6 +24,7 @@ package maximum
 import (
 	"time"
 
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/code-generator/cmd/validation-gen/testscheme"
 )
 
@@ -60,6 +61,9 @@ type Struct struct {
 
 	// +k8s:maximum="500ns"
 	DurationField time.Duration `json:"durationField"`
+
+	// +k8s:maximum="1Gi"
+	QuantityField resource.Quantity `json:"quantityField"`
 
 	TypedefField    IntType  `json:"typedefField"`
 	TypedefPtrField *IntType `json:"typedefPtrField"`

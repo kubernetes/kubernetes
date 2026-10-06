@@ -20,6 +20,7 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/utils/ptr"
 )
@@ -40,6 +41,7 @@ func Test(t *testing.T) {
 		Uint64Field:     2,
 		UintPtrField:    ptr.To(uint(2)),
 		DurationField:   500*time.Nanosecond + 1,
+		QuantityField:   resource.MustParse("1025Mi"),
 		TypedefField:    IntType(2),
 		TypedefPtrField: ptr.To(IntType(2)),
 	}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField().ByDetailSubstring(), field.ErrorList{
@@ -54,6 +56,7 @@ func Test(t *testing.T) {
 		field.Invalid(field.NewPath("uint32Field"), nil, ""),
 		field.Invalid(field.NewPath("uint64Field"), nil, ""),
 		field.Invalid(field.NewPath("durationField"), nil, ""),
+		field.Invalid(field.NewPath("quantityField"), nil, ""),
 		field.Invalid(field.NewPath("typedefField"), nil, ""),
 		field.Invalid(field.NewPath("typedefPtrField"), nil, ""),
 	})
@@ -70,6 +73,7 @@ func Test(t *testing.T) {
 		Uint64Field:     2,
 		UintPtrField:    ptr.To(uint(2)),
 		DurationField:   500*time.Nanosecond + 1,
+		QuantityField:   resource.MustParse("1025Mi"),
 		TypedefField:    IntType(2),
 		TypedefPtrField: ptr.To(IntType(2)),
 	}).OldValue(&Struct{
@@ -84,6 +88,7 @@ func Test(t *testing.T) {
 		Uint64Field:     2,
 		UintPtrField:    ptr.To(uint(2)),
 		DurationField:   500*time.Nanosecond + 1,
+		QuantityField:   resource.MustParse("1025Mi"),
 		TypedefField:    IntType(2),
 		TypedefPtrField: ptr.To(IntType(2)),
 	}).ExpectValid()
@@ -100,6 +105,7 @@ func Test(t *testing.T) {
 		Uint64Field:     1,
 		UintPtrField:    ptr.To(uint(1)),
 		DurationField:   500 * time.Nanosecond,
+		QuantityField:   resource.MustParse("1Gi"),
 		TypedefField:    IntType(1),
 		TypedefPtrField: ptr.To(IntType(1)),
 	}).ExpectValid()
