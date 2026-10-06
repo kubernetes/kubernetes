@@ -71,6 +71,7 @@ import (
 	fakeremote "k8s.io/cri-client/pkg/fake"
 	"k8s.io/klog/v2"
 	"k8s.io/ktesting"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/allocation"
 	"k8s.io/kubernetes/pkg/kubelet/allocation/state"
@@ -3164,6 +3165,152 @@ func TestSyncTerminatingPodKillPod(t *testing.T) {
 
 	// Check pod status stored in the status map.
 	checkPodStatus(t, kl, pod, v1.PodFailed)
+}
+
+// A pod the kubelet failed (an eviction) whose container handles SIGTERM and
+// exits 0 must stay Failed with the eviction reason, even though the exit
+// codes alone would compute Succeeded.
+func TestSyncTerminatingPodKeepsFailedStatusAfterCleanExit(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
+	kl := testKubelet.kubelet
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:       "12345678",
+			Name:      "bar",
+			Namespace: "foo",
+		},
+		Spec: v1.PodSpec{
+			RestartPolicy: v1.RestartPolicyNever,
+			Containers:    []v1.Container{{Name: "bar"}},
+		},
+	}
+	kl.podManager.SetPods([]*v1.Pod{pod})
+	// The container is running when termination starts, and the runtime
+	// reports it exited 0 once it has been killed.
+	running := &kubecontainer.PodStatus{
+		ID:        pod.UID,
+		Name:      pod.Name,
+		Namespace: pod.Namespace,
+		ContainerStatuses: []*kubecontainer.Status{{
+			Name:  "bar",
+			State: kubecontainer.ContainerStateRunning,
+		}},
+	}
+	testKubelet.fakeRuntime.PodList = []*containertest.FakePod{{Pod: &kubecontainer.Pod{
+		ID:         pod.UID,
+		Name:       pod.Name,
+		Namespace:  pod.Namespace,
+		Containers: []*kubecontainer.Container{{Name: "bar"}},
+	}}}
+	testKubelet.fakeRuntime.PodStatus = kubecontainer.PodStatus{
+		ID:        pod.UID,
+		Name:      pod.Name,
+		Namespace: pod.Namespace,
+		ContainerStatuses: []*kubecontainer.Status{{
+			Name:     "bar",
+			State:    kubecontainer.ContainerStateExited,
+			ExitCode: 0,
+		}},
+	}
+	gracePeriodOverride := int64(0)
+	const message = "Pod ephemeral local storage usage exceeds the total limit of containers 1Gi."
+	applied := 0
+	err := kl.SyncTerminatingPod(tCtx, pod, running, &gracePeriodOverride, func(podStatus *v1.PodStatus) {
+		applied++
+		podStatus.Phase = v1.PodFailed
+		podStatus.Reason = "Evicted"
+		podStatus.Message = message
+	})
+	require.NoError(t, err)
+	// The override is applied to the status generated before the kill and
+	// again to the one generated after the containers stopped.
+	assert.Equal(t, 2, applied)
+
+	status, found := kl.statusManager.GetPodStatus(pod.UID)
+	require.True(t, found, "Status of pod %q is not found in the status map", pod.UID)
+	assert.Equal(t, v1.PodFailed, status.Phase)
+	assert.Equal(t, "Evicted", status.Reason)
+	assert.Equal(t, message, status.Message)
+	require.Len(t, status.ContainerStatuses, 1)
+	require.NotNil(t, status.ContainerStatuses[0].State.Terminated)
+	assert.Equal(t, int32(0), status.ContainerStatuses[0].State.Terminated.ExitCode)
+	for _, conditionType := range []v1.PodConditionType{v1.PodReady, v1.ContainersReady} {
+		_, condition := podutil.GetPodCondition(&status, conditionType)
+		require.NotNil(t, condition, "condition %s is missing", conditionType)
+		assert.Equal(t, v1.ConditionFalse, condition.Status)
+		assert.Equal(t, "PodFailed", condition.Reason)
+	}
+}
+
+// The three-way phase merge must never move a pod from Failed to Succeeded:
+// a Failed phase recorded by the kubelet wins over a Succeeded phase
+// recomputed from container exit codes. Succeeded to Failed is still allowed
+// here, in the kubelet's cached status; a terminal phase already published to
+// the API server stays protected by the illegal-transition check that follows.
+func TestGenerateAPIPodStatusKeepsFailedPhase(t *testing.T) {
+	logger, tCtx := ktesting.NewTestContext(t)
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
+	kl := testKubelet.kubelet
+	pod := podWithUIDNameNs("12345678", "foo", "new")
+	pod.Spec = v1.PodSpec{
+		RestartPolicy: v1.RestartPolicyNever,
+		Containers:    []v1.Container{{Name: "bar"}},
+	}
+	kl.podManager.SetPods([]*v1.Pod{pod})
+
+	exited := func(exitCode int) *kubecontainer.PodStatus {
+		return &kubecontainer.PodStatus{
+			ID:        pod.UID,
+			Name:      pod.Name,
+			Namespace: pod.Namespace,
+			ContainerStatuses: []*kubecontainer.Status{{
+				Name:     "bar",
+				State:    kubecontainer.ContainerStateExited,
+				ExitCode: exitCode,
+			}},
+		}
+	}
+	tests := []struct {
+		name            string
+		cached          v1.PodStatus
+		podStatus       *kubecontainer.PodStatus
+		expectedPhase   v1.PodPhase
+		expectedReason  string
+		expectedMessage string
+	}{
+		{
+			name:            "failed is kept over a clean exit",
+			cached:          v1.PodStatus{Phase: v1.PodFailed, Reason: "Evicted", Message: "over the limit"},
+			podStatus:       exited(0),
+			expectedPhase:   v1.PodFailed,
+			expectedReason:  "Evicted",
+			expectedMessage: "over the limit",
+		},
+		{
+			name:          "succeeded may become failed",
+			cached:        v1.PodStatus{Phase: v1.PodSucceeded},
+			podStatus:     exited(1),
+			expectedPhase: v1.PodFailed,
+		},
+		{
+			name:          "succeeded is kept over a clean exit",
+			cached:        v1.PodStatus{Phase: v1.PodSucceeded},
+			podStatus:     exited(0),
+			expectedPhase: v1.PodSucceeded,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			kl.statusManager.SetPodStatus(logger, pod, test.cached)
+			status := kl.generateAPIPodStatus(tCtx, pod, test.podStatus, true)
+			assert.Equal(t, test.expectedPhase, status.Phase)
+			assert.Equal(t, test.expectedReason, status.Reason)
+			assert.Equal(t, test.expectedMessage, status.Message)
+		})
+	}
 }
 
 func TestPullErrorReportsMissingSecrets(t *testing.T) {
