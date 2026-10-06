@@ -23,6 +23,7 @@ import (
 	"path"
 	"strings"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/stretchr/testify/require"
@@ -34,6 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/client-go/kubernetes/fake"
+	"k8s.io/dynamic-resource-allocation/resourceslice"
 	drahealthv1 "k8s.io/kubelet/pkg/apis/dra-health/v1"
 )
 
@@ -102,6 +104,82 @@ func TestStartWithoutDRAAPI(t *testing.T) {
 		NodeV1beta1(false),
 	)
 	require.ErrorContains(t, err, "no supported DRA gRPC API")
+}
+
+// republishPlugin reacts to an error by publishing again once the test
+// releases it, like a driver that fixes its pools in HandleError.
+type republishPlugin struct {
+	stubPlugin
+	helper    *Helper
+	entered   chan struct{}
+	release   chan struct{}
+	published chan error
+}
+
+func (p *republishPlugin) HandleError(ctx context.Context, err error, msg string) {
+	close(p.entered)
+	<-p.release
+	// Fail instead of deadlocking if the shutdown holds d.mutex.
+	if !p.helper.mutex.TryLock() {
+		p.published <- errors.New("shutdown holds d.mutex while it waits for HandleError")
+		return
+	}
+	p.helper.mutex.Unlock()
+	p.published <- p.helper.PublishResources(ctx, resourceslice.DriverResources{
+		Pools: map[string]resourceslice.Pool{"pool": {Slices: []resourceslice.Slice{{}}}},
+	})
+}
+
+// TestStopWhileHandleErrorPublishes ensures that Stop does not deadlock
+// when HandleError calls PublishResources while the helper stops.
+func TestStopWhileHandleErrorPublishes(t *testing.T) {
+	synctest.Test(t, testStopWhileHandleErrorPublishes)
+}
+
+func testStopWhileHandleErrorPublishes(t *testing.T) {
+	plugin := &republishPlugin{
+		entered:   make(chan struct{}),
+		release:   make(chan struct{}),
+		published: make(chan error, 1),
+	}
+	helper, err := Start(t.Context(), plugin,
+		DriverName("test-driver"),
+		NodeName("node"),
+		NodeUID("node-uid"),
+		KubeClient(fake.NewClientset()),
+		RegistrationService(false),
+		DRAService(false),
+		ReconcilePoolWithName("pool"),
+	)
+	require.NoError(t, err)
+	plugin.helper = helper
+
+	// The worker reports the other pool through HandleError.
+	require.NoError(t, helper.PublishResources(t.Context(), resourceslice.DriverResources{
+		Pools: map[string]resourceslice.Pool{"other-pool": {Slices: []resourceslice.Slice{{}}}},
+	}))
+	synctest.Wait()
+	select {
+	case <-plugin.entered:
+	default:
+		t.Fatal("HandleError was not called")
+	}
+
+	stopped := make(chan struct{})
+	go func() {
+		defer close(stopped)
+		helper.Stop()
+	}()
+	// Let the shutdown run until it waits for the worker in HandleError.
+	synctest.Wait()
+	select {
+	case <-stopped:
+		t.Error("Stop returned before HandleError")
+	default:
+	}
+	close(plugin.release)
+	<-stopped
+	require.NoError(t, <-plugin.published)
 }
 
 func TestRollingUpdatePluginSocketPathLength(t *testing.T) {

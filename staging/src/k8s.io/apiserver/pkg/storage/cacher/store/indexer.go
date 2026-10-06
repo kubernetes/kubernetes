@@ -38,28 +38,30 @@ func newIndexer(indexers cache.Indexers) indexer {
 }
 
 type indexer struct {
-	indices  map[string]map[string]map[string]*Element
-	indexers cache.Indexers
+	indices         map[string]map[string]map[string]*Element
+	indexers        cache.Indexers
+	resourceVersion uint64
 }
 
-func (i *indexer) ByIndex(indexName, indexValue string) ([]interface{}, error) {
+func (i *indexer) ByIndex(indexName, indexValue string) (list []interface{}, resourceVersion uint64, err error) {
 	indexFunc := i.indexers[indexName]
 	if indexFunc == nil {
-		return nil, fmt.Errorf("index with name %s does not exist", indexName)
+		return nil, 0, fmt.Errorf("index with name %s does not exist", indexName)
 	}
 	index := i.indices[indexName]
 	set := index[indexValue]
-	list := make([]interface{}, 0, len(set))
+	list = make([]interface{}, 0, len(set))
 	for _, obj := range set {
 		list = append(list, obj)
 	}
-	return list, nil
+	return list, i.resourceVersion, nil
 }
 
-func (i *indexer) Replace(objs []*Element) error {
+func (i *indexer) Replace(objs []*Element, resourceVersion uint64) error {
 	i.indices = map[string]map[string]map[string]*Element{}
+	i.resourceVersion = resourceVersion
 	for _, storeElem := range objs {
-		err := i.updateElem(storeElem.Key, nil, storeElem)
+		err := i.updateElem(storeElem.Key, nil, storeElem, resourceVersion)
 		if err != nil {
 			return err
 		}
@@ -67,7 +69,8 @@ func (i *indexer) Replace(objs []*Element) error {
 	return nil
 }
 
-func (i *indexer) updateElem(key string, oldObj, newObj *Element) (err error) {
+func (i *indexer) updateElem(key string, oldObj, newObj *Element, resourceVersion uint64) (err error) {
+	i.resourceVersion = resourceVersion
 	var oldIndexValues, indexValues []string
 	for name, indexFunc := range i.indexers {
 		if oldObj != nil {

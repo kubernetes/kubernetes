@@ -26,7 +26,7 @@ import (
 )
 
 func TestStoreListOrdered(t *testing.T) {
-	store := NewWatchCacheStorage(nil, nil)
+	store := NewWatchCacheStorage(nil)
 	prev, err := store.UpdateStore(watch.Added, testStorageElement("foo3", "bar3", 1), 1)
 	require.NoError(t, err)
 	assert.Nil(t, prev)
@@ -36,15 +36,17 @@ func TestStoreListOrdered(t *testing.T) {
 	prev, err = store.UpdateStore(watch.Added, testStorageElement("foo2", "bar1", 3), 3)
 	require.NoError(t, err)
 	assert.Nil(t, prev)
+	items, err := store.LatestSnapshot().OrderedListPrefix("", "")
+	require.NoError(t, err)
 	assert.Equal(t, []interface{}{
 		testStorageElement("foo1", "bar2", 2),
 		testStorageElement("foo2", "bar1", 3),
 		testStorageElement("foo3", "bar3", 1),
-	}, store.List())
+	}, items)
 }
 
 func TestStoreListPrefix(t *testing.T) {
-	store := NewWatchCacheStorage(nil, nil)
+	store := NewWatchCacheStorage(nil)
 	prev, err := store.UpdateStore(watch.Added, testStorageElement("foo3", "bar3", 1), 1)
 	require.NoError(t, err)
 	assert.Nil(t, prev)
@@ -58,7 +60,7 @@ func TestStoreListPrefix(t *testing.T) {
 	require.NoError(t, err)
 	assert.Nil(t, prev)
 
-	items, err := store.OrderedListPrefix("foo", "")
+	items, err := store.LatestSnapshot().OrderedListPrefix("foo", "")
 	require.NoError(t, err)
 	assert.Equal(t, []interface{}{
 		testStorageElement("foo1", "bar2", 2),
@@ -66,26 +68,26 @@ func TestStoreListPrefix(t *testing.T) {
 		testStorageElement("foo3", "bar3", 1),
 	}, items)
 
-	items, err = store.OrderedListPrefix("foo2", "")
+	items, err = store.LatestSnapshot().OrderedListPrefix("foo2", "")
 	require.NoError(t, err)
 	assert.Equal(t, []interface{}{
 		testStorageElement("foo2", "bar1", 3),
 	}, items)
 
-	items, err = store.OrderedListPrefix("foo", "foo1\x00")
+	items, err = store.LatestSnapshot().OrderedListPrefix("foo", "foo1\x00")
 	require.NoError(t, err)
 	assert.Equal(t, []interface{}{
 		testStorageElement("foo2", "bar1", 3),
 		testStorageElement("foo3", "bar3", 1),
 	}, items)
 
-	items, err = store.OrderedListPrefix("foo", "foo2\x00")
+	items, err = store.LatestSnapshot().OrderedListPrefix("foo", "foo2\x00")
 	require.NoError(t, err)
 	assert.Equal(t, []interface{}{
 		testStorageElement("foo3", "bar3", 1),
 	}, items)
 
-	items, err = store.OrderedListPrefix("bar", "")
+	items, err = store.LatestSnapshot().OrderedListPrefix("bar", "")
 	require.NoError(t, err)
 	assert.Equal(t, []interface{}{
 		testStorageElement("bar", "baz", 4),
@@ -93,11 +95,11 @@ func TestStoreListPrefix(t *testing.T) {
 }
 
 func TestStoreSnapshotter(t *testing.T) {
-	cache := newSnapshotter()
-	cache.Add(10, fakeSnapshot{rv: 10})
-	cache.Add(20, fakeSnapshot{rv: 20})
-	cache.Add(30, fakeSnapshot{rv: 30})
-	cache.Add(40, fakeSnapshot{rv: 40})
+	cache := newSnapshotter(true)
+	cache.Add(&btreeStore{resourceVersion: 10})
+	cache.Add(&btreeStore{resourceVersion: 20})
+	cache.Add(&btreeStore{resourceVersion: 30})
+	cache.Add(&btreeStore{resourceVersion: 40})
 	assert.Equal(t, 4, cache.Len())
 
 	t.Log("No snapshot from before first RV")
@@ -107,22 +109,22 @@ func TestStoreSnapshotter(t *testing.T) {
 	t.Log("Get snapshot from first RV")
 	snapshot, found := cache.GetLessOrEqual(10)
 	assert.True(t, found)
-	assert.Equal(t, 10, snapshot.(fakeSnapshot).rv)
+	assert.Equal(t, uint64(10), snapshot.ResourceVersion())
 
 	t.Log("Get first snapshot by larger RV")
 	snapshot, found = cache.GetLessOrEqual(11)
 	assert.True(t, found)
-	assert.Equal(t, 10, snapshot.(fakeSnapshot).rv)
+	assert.Equal(t, uint64(10), snapshot.ResourceVersion())
 
 	t.Log("Get second snapshot by larger RV")
 	snapshot, found = cache.GetLessOrEqual(22)
 	assert.True(t, found)
-	assert.Equal(t, 20, snapshot.(fakeSnapshot).rv)
+	assert.Equal(t, uint64(20), snapshot.ResourceVersion())
 
 	t.Log("Get third snapshot for future revision")
 	snapshot, found = cache.GetLessOrEqual(100)
 	assert.True(t, found)
-	assert.Equal(t, 40, snapshot.(fakeSnapshot).rv)
+	assert.Equal(t, uint64(40), snapshot.ResourceVersion())
 
 	t.Log("Remove snapshot less than 30")
 	cache.RemoveLess(30)
@@ -136,29 +138,46 @@ func TestStoreSnapshotter(t *testing.T) {
 
 	snapshot, found = cache.GetLessOrEqual(30)
 	assert.True(t, found)
-	assert.Equal(t, 30, snapshot.(fakeSnapshot).rv)
+	assert.Equal(t, uint64(30), snapshot.ResourceVersion())
 
-	t.Log("Remove removing all RVs")
-	cache.Reset()
-	assert.Equal(t, 0, cache.Len())
+	t.Log("Replace resets old RVs and adds the new snapshot")
+	cache.Replace(&btreeStore{resourceVersion: 200})
+	assert.Equal(t, 1, cache.Len())
 	_, found = cache.GetLessOrEqual(30)
 	assert.False(t, found)
 	_, found = cache.GetLessOrEqual(40)
 	assert.False(t, found)
-}
+	_, found = cache.GetLessOrEqual(100)
+	assert.False(t, found)
+	snapshot, found = cache.GetLessOrEqual(200)
+	assert.True(t, found)
+	assert.Equal(t, uint64(200), snapshot.ResourceVersion())
 
-type fakeSnapshot struct {
-	rv int
-}
+	t.Log("Disabling snapshotter clears all RVs and ignores updates")
+	cache.SetEnabled(false)
+	assert.False(t, cache.Enabled())
+	assert.Equal(t, 0, cache.Len())
+	_, found = cache.GetLessOrEqual(200)
+	assert.False(t, found)
+	cache.Add(&btreeStore{resourceVersion: 300})
+	cache.UpdateResourceVersion(400)
+	assert.Equal(t, 0, cache.Len())
+	_, found = cache.GetLessOrEqual(300)
+	assert.False(t, found)
 
-func (f fakeSnapshot) GetByKey(key string) (item interface{}, exists bool, err error) {
-	return nil, false, nil
-}
+	t.Log("Enabling snapshotter clears all RVs")
+	cache.SetEnabled(true)
+	assert.True(t, cache.Enabled())
+	assert.Equal(t, 0, cache.Len())
+	_, found = cache.GetLessOrEqual(300)
+	assert.False(t, found)
+	_, found = cache.GetLessOrEqual(400)
+	assert.False(t, found)
 
-func (f fakeSnapshot) OrderedListPrefix(prefixKey, continueKey string) ([]interface{}, error) {
-	return nil, nil
-}
-
-func (f fakeSnapshot) RangePrefix(prefixKey, continueKey string) Range {
-	return nil
+	cache.Add(&btreeStore{resourceVersion: 500})
+	assert.Equal(t, 1, cache.Len())
+	cache.SetEnabled(true)
+	assert.Equal(t, 0, cache.Len())
+	_, found = cache.GetLessOrEqual(500)
+	assert.False(t, found)
 }

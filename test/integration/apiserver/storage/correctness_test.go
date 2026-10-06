@@ -62,12 +62,33 @@ var (
 				{Choice: false, Weight: 50},
 				{Choice: true, Weight: 50},
 			},
+			ResourceVersion: []ChoiceWeight[RVType]{
+				{Choice: RVEmpty, Weight: 30},
+				{Choice: RVZero, Weight: 15},
+				{Choice: RVOne, Weight: 10},
+				{Choice: RVCached, Weight: 15},
+				{Choice: RVCurrent, Weight: 10},
+				{Choice: RVPast, Weight: 10},
+				{Choice: RVFuture, Weight: 10},
+			},
 		},
 		List: ListDistribution{
 			Scope: []ChoiceWeight[KeyScope]{
 				{Choice: ScopeCluster, Weight: 50},
 				{Choice: ScopeNamespace, Weight: 25},
 				{Choice: ScopeObject, Weight: 25},
+			},
+			FieldSelector: []ChoiceWeight[FieldSelector]{
+				{Choice: FieldEverything, Weight: 25},
+				{Choice: FieldByName, Weight: 15},
+				{Choice: FieldByNamespace, Weight: 15},
+				{Choice: FieldByNode, Weight: 20},
+				{Choice: FieldByEmptyNode, Weight: 15},
+				{Choice: FieldCombined, Weight: 10},
+			},
+			LabelSelector: []ChoiceWeight[LabelSelector]{
+				{Choice: LabelEverything, Weight: 60},
+				{Choice: LabelByApp, Weight: 40},
 			},
 			ResourceVersion: []ChoiceWeight[RVType]{
 				{Choice: RVEmpty, Weight: 50},
@@ -115,6 +136,23 @@ var (
 	}
 
 	watchRequestDistribution = WatchDistribution{
+		Scope: []ChoiceWeight[KeyScope]{
+			{Choice: ScopeCluster, Weight: 40},
+			{Choice: ScopeNamespace, Weight: 30},
+			{Choice: ScopeObject, Weight: 30},
+		},
+		FieldSelector: []ChoiceWeight[FieldSelector]{
+			{Choice: FieldEverything, Weight: 25},
+			{Choice: FieldByName, Weight: 15},
+			{Choice: FieldByNamespace, Weight: 15},
+			{Choice: FieldByNode, Weight: 20},
+			{Choice: FieldByEmptyNode, Weight: 15},
+			{Choice: FieldCombined, Weight: 10},
+		},
+		LabelSelector: []ChoiceWeight[LabelSelector]{
+			{Choice: LabelEverything, Weight: 60},
+			{Choice: LabelByApp, Weight: 40},
+		},
 		SendInitialEvents: []ChoiceWeight[bool]{
 			{Choice: false, Weight: 70},
 			{Choice: true, Weight: 30},

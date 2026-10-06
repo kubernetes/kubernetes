@@ -132,6 +132,9 @@ func (r Request) Describe(output Response) string {
 		}
 		return fmt.Sprintf("%s(%s) -> Deleted", r.Op, r.Key)
 	case OpGet:
+		if r.Get.Options.ResourceVersion != "" {
+			return fmt.Sprintf("%s(%s, RV=%s) -> RV: %s, UID: %s", r.Op, r.Key, r.Get.Options.ResourceVersion, accessor.GetResourceVersion(), accessor.GetUID())
+		}
 		return fmt.Sprintf("%s(%s) -> RV: %s, UID: %s", r.Op, r.Key, accessor.GetResourceVersion(), accessor.GetUID())
 	case OpUpdate:
 		return fmt.Sprintf("%s(%s) -> RV: %s, UID: %s", r.Op, r.Key, accessor.GetResourceVersion(), accessor.GetUID())

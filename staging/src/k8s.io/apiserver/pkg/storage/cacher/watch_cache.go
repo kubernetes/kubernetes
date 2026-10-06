@@ -155,7 +155,7 @@ func newWatchCache(
 		resourceVersion: 0,
 		config:          config,
 		history:         newWatchCacheHistory(config, eventFreshDuration),
-		storage:         store.NewWatchCacheStorage(config.keyFunc, indexers),
+		storage:         store.NewWatchCacheStorage(indexers),
 	}
 	wc.cond = sync.NewCond(wc.RLocker())
 	wc.config.indexValidator = wc.history.isIndexValidLocked
@@ -303,6 +303,7 @@ func (w *watchCache) UpdateResourceVersion(resourceVersion string) {
 	func() {
 		w.Lock()
 		defer w.Unlock()
+		w.storage.UpdateResourceVersion(rv)
 		w.resourceVersion = rv
 		w.cond.Broadcast()
 	}()
@@ -417,7 +418,13 @@ func (w *watchCache) WaitUntilFreshAndGetKeys(ctx context.Context, resourceVersi
 		return nil, err
 	}
 	span.AddEvent("watchCache fresh enough")
-	keys := w.storage.ListKeys()
+	var keys []string
+	for elem, err := range w.storage.LatestSnapshot().RangePrefix("", "").All() {
+		if err != nil {
+			return nil, err
+		}
+		keys = append(keys, elem.Key)
+	}
 	span.AddEvent("ListKeys success")
 	return keys, nil
 }
@@ -551,7 +558,7 @@ func (w *watchCache) WaitUntilFreshAndGet(ctx context.Context, resourceVersion u
 		return nil, false, 0, err
 	}
 	span.AddEvent("watchCache fresh enough")
-	value, exists, err := w.storage.GetByKey(key)
+	value, exists, err := w.storage.LatestSnapshot().GetByKey(key)
 	if err != nil {
 		span.AddEvent("GetByKey failed", attribute.String("error", err.Error()))
 		return nil, false, 0, err
@@ -675,5 +682,5 @@ func (w *watchCache) getIntervalFromStoreLocked(key string, matchesSingle bool) 
 	if !matchesSingle {
 		return newCacheIntervalFromLazySnapshot(w.resourceVersion, w.storage.LatestSnapshot()), nil
 	}
-	return newCacheIntervalFromStore(w.resourceVersion, w.storage, key, matchesSingle)
+	return newCacheIntervalFromStore(w.resourceVersion, w.storage.LatestSnapshot(), key, matchesSingle)
 }

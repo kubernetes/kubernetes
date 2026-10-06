@@ -382,7 +382,7 @@ func TestCacheIntervalNextFromStore(t *testing.T) {
 		return labels.Set(pod.Labels), fields.Set{"spec.nodeName": pod.Spec.NodeName}, nil
 	}
 	const numEvents = 50
-	store := store.NewWatchCacheStorage(nil, nil)
+	store := store.NewWatchCacheStorage(nil)
 	events := make(map[string]*watchCacheEvent)
 	var rv uint64 = 1 // arbitrary number; rv till which the watch cache has progressed.
 
@@ -405,7 +405,7 @@ func TestCacheIntervalNextFromStore(t *testing.T) {
 		}
 	}
 
-	wci, err := newCacheIntervalFromStore(rv, store, "", false)
+	wci, err := newCacheIntervalFromStore(rv, store.LatestSnapshot(), "", false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -446,7 +446,7 @@ func TestCacheIntervalFromStoreSorted(t *testing.T) {
 		name    string
 		indexer *store.WatchCacheStorage
 	}{
-		{"btree", store.NewWatchCacheStorage(nil, nil)},
+		{"btree", store.NewWatchCacheStorage(nil)},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -462,7 +462,7 @@ func TestCacheIntervalFromStoreSorted(t *testing.T) {
 				}
 			}
 
-			wci, err := newCacheIntervalFromStore(n, tc.indexer, "", false)
+			wci, err := newCacheIntervalFromStore(n, tc.indexer.LatestSnapshot(), "", false)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -546,6 +546,10 @@ func (s *countingSnapshot) OrderedListPrefix(_, _ string) ([]interface{}, error)
 func (s *countingSnapshot) RangePrefix(_, _ string) store.Range {
 	s.rangePrefixCalls++
 	return store.EmptyRange()
+}
+
+func (s *countingSnapshot) ResourceVersion() uint64 {
+	return 0
 }
 
 func TestLazySnapshotCacheIntervalSourceEmpty(t *testing.T) {

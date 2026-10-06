@@ -644,15 +644,6 @@ function kube::util::ensure-cfssl {
     return 0
   fi
 
-  host_arch=$(kube::util::host_arch)
-
-  if [[ "${host_arch}" != "amd64" ]]; then
-    echo "Cannot download cfssl on non-amd64 hosts and cfssl does not appear to be installed."
-    echo "Please install cfssl and cfssljson and verify they are in \$PATH."
-    echo "Hint: export PATH=\$PATH:\$GOPATH/bin; go install github.com/cloudflare/cfssl/cmd/...@latest"
-    exit 1
-  fi
-
   # Create a temp dir for cfssl if no directory was given
   local cfssldir=${1:-}
   if [[ -z "${cfssldir}" ]]; then
@@ -664,21 +655,17 @@ function kube::util::ensure-cfssl {
   pushd "${cfssldir}" > /dev/null || return 1
 
     echo "Unable to successfully run 'cfssl' from ${PATH}; downloading instead..."
-    kernel=$(uname -s)
-    case "${kernel}" in
-      Linux)
-        curl --retry 10 -L -o cfssl https://github.com/cloudflare/cfssl/releases/download/v1.7.0/cfssl_1.7.0_linux_amd64
-        curl --retry 10 -L -o cfssljson https://github.com/cloudflare/cfssl/releases/download/v1.7.0/cfssljson_1.7.0_linux_amd64
-        ;;
-      Darwin)
-        curl --retry 10 -L -o cfssl https://github.com/cloudflare/cfssl/releases/download/v1.7.0/cfssl_1.7.0_darwin_amd64
-        curl --retry 10 -L -o cfssljson https://github.com/cloudflare/cfssl/releases/download/v1.7.0/cfssljson_1.7.0_darwin_amd64
-        ;;
-      *)
-        echo "Unknown, unsupported platform: ${kernel}." >&2
-        echo "Supported platforms: Linux, Darwin." >&2
-        exit 2
-    esac
+    local host_os; host_os=$(kube::util::host_os)
+    local host_arch; host_arch=$(kube::util::host_arch)
+    local cfssl_response; cfssl_response=$(curl --retry 10 --write-out "%{response_code}" -fL -o cfssl "https://github.com/cloudflare/cfssl/releases/download/v1.7.0/cfssl_1.7.0_${host_os}_${host_arch}")
+    local cfssljson_response; cfssljson_response=$(curl --retry 10 --write-out "%{response_code}" -fL -o cfssljson "https://github.com/cloudflare/cfssl/releases/download/v1.7.0/cfssljson_1.7.0_${host_os}_${host_arch}")
+
+    if [[ "$cfssl_response" == "404" || "$cfssljson_response" == "404" ]]; then
+      echo "cfssl download unavailable for $host_os/$host_arch and cfssl does not appear to be installed."
+      echo "Please install cfssl and cfssljson and verify they are in \$PATH."
+      echo "Hint: export PATH=\$PATH:\$GOPATH/bin; go install github.com/cloudflare/cfssl/cmd/...@latest"
+      exit 1
+    fi
 
     chmod +x cfssl || true
     chmod +x cfssljson || true

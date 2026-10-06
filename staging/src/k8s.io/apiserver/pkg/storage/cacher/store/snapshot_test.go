@@ -45,7 +45,7 @@ func TestSnapshotListPrefix(t *testing.T) {
 		{
 			name: "Indexer",
 			newSnapshot: func(t *testing.T) Snapshot {
-				indexer := NewWatchCacheStorage(nil, nil)
+				indexer := NewWatchCacheStorage(nil)
 				for i, elem := range elements {
 					prev, err := indexer.UpdateStore(watch.Added, elem, uint64(i+1))
 					require.NoError(t, err)
@@ -58,8 +58,8 @@ func TestSnapshotListPrefix(t *testing.T) {
 			name: "btreeStore",
 			newSnapshot: func(t *testing.T) Snapshot {
 				store := newBtreeStore(btreeDegree)
-				for _, elem := range elements {
-					store.addOrUpdateElem(elem)
+				for i, elem := range elements {
+					store.addOrUpdateElem(elem, uint64(i+1))
 				}
 				return &store
 			},
