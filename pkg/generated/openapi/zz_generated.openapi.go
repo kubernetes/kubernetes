@@ -59503,7 +59503,7 @@ func schema_k8sio_api_storage_v1_CSINodeDriverRegistration(ref common.ReferenceC
 				Properties: map[string]spec.Schema{
 					"name": {
 						SchemaProps: spec.SchemaProps{
-							Description: "name is the name of the CSI driver. This MUST be the same name returned by the CSI GetPluginName() call for that driver.",
+							Description: "name is the name of the CSI driver. This MUST be the same name returned by the CSI GetPluginInfo() call for that driver.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -61271,7 +61271,7 @@ func schema_k8sio_api_storage_v1beta1_CSINodeDriverRegistration(ref common.Refer
 				Properties: map[string]spec.Schema{
 					"name": {
 						SchemaProps: spec.SchemaProps{
-							Description: "name is the name of the CSI driver. This MUST be the same name returned by the CSI GetPluginName() call for that driver.",
+							Description: "name is the name of the CSI driver. This MUST be the same name returned by the CSI GetPluginInfo() call for that driver.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",

@@ -650,7 +650,7 @@ type VolumeNodeResources struct {
 // volume attachment limit are reported by the CSI controller.
 type CSINodeDriverRegistration struct {
 	// name is the name of the CSI driver. This MUST be the same name returned by
-	// the CSI GetPluginName() call for that driver.
+	// the CSI GetPluginInfo() call for that driver.
 	Name string
 
 	// nodeID is the ID of the node from the driver's point of view, as returned

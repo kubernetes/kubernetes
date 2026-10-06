@@ -710,7 +710,7 @@ type VolumeNodeResources struct {
 // volume attachment limit are reported by the CSI controller.
 type CSINodeDriverRegistration struct {
 	// name is the name of the CSI driver. This MUST be the same name returned by
-	// the CSI GetPluginName() call for that driver.
+	// the CSI GetPluginInfo() call for that driver.
 	// +required
 	// +k8s:alpha(since: "1.38")=+k8s:required
 	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`

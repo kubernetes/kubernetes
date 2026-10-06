@@ -22720,7 +22720,7 @@
       "description": "CSINodeDriverRegistration holds the node ID of a CSI driver whose topology and volume attachment limit are reported by the CSI controller.",
       "properties": {
         "name": {
-          "description": "name is the name of the CSI driver. This MUST be the same name returned by the CSI GetPluginName() call for that driver.",
+          "description": "name is the name of the CSI driver. This MUST be the same name returned by the CSI GetPluginInfo() call for that driver.",
           "type": "string"
         },
         "nodeID": {
