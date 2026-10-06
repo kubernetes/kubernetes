@@ -264,8 +264,8 @@ const (
 	// A value of 0 means adaptive, meaning the scheduler figures out a proper default.
 	DefaultPercentageOfNodesToScore = 0
 
-	// DefaultPercentageOfPlacementsToScore defines the percentage of placements of all placements
-	// that once found feasible, the scheduler stops looking for more placements.
+	// DefaultPercentageOfPlacementsToScore is the default percentage of generated placements that
+	// the scheduler tries to find feasible before it stops searching.
 	// A value of 0 means adaptive, meaning the scheduler figures out a proper default.
 	DefaultPercentageOfPlacementsToScore = 0
 
