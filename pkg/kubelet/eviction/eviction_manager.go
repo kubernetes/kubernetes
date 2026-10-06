@@ -444,7 +444,7 @@ func (m *managerImpl) synchronize(ctx context.Context, diskInfoProvider DiskInfo
 			Reason:             v1.PodReasonTerminationByKubelet,
 			Message:            message,
 		}
-		if m.evictPod(logger, pod, gracePeriodOverride, message, annotations, condition) {
+		if m.evictPod(logger, pod, gracePeriodOverride, message, annotations, condition, v1.PodReasonNodePressure) {
 			metrics.Evictions.WithLabelValues(string(thresholdToReclaim.Signal)).Inc()
 			return []*v1.Pod{pod}, nil
 		}
@@ -556,7 +556,7 @@ func (m *managerImpl) emptyDirLimitEviction(logger klog.Logger, podStats statsap
 			used := podVolumeUsed[pod.Spec.Volumes[i].Name]
 			if used != nil && size != nil && size.Sign() == 1 && used.Cmp(*size) > 0 {
 				// the emptyDir usage exceeds the size limit, evict the pod
-				if m.evictPod(logger, pod, immediateEvictionGracePeriodSeconds, fmt.Sprintf(emptyDirMessageFmt, pod.Spec.Volumes[i].Name, size.String()), nil, nil) {
+				if m.evictPod(logger, pod, immediateEvictionGracePeriodSeconds, fmt.Sprintf(emptyDirMessageFmt, pod.Spec.Volumes[i].Name, size.String()), nil, nil, v1.PodReasonEmptyDirSizeLimitExceeded) {
 					metrics.Evictions.WithLabelValues(signalEmptyDirFsLimit).Inc()
 					return true
 				}
@@ -584,7 +584,7 @@ func (m *managerImpl) podEphemeralStorageLimitEviction(logger klog.Logger, podSt
 	if podEphemeralStorageTotalUsage.Cmp(podEphemeralStorageLimit) > 0 {
 		// the total usage of pod exceeds the total size limit of containers, evict the pod
 		message := fmt.Sprintf(podEphemeralStorageMessageFmt, podEphemeralStorageLimit.String())
-		if m.evictPod(logger, pod, immediateEvictionGracePeriodSeconds, message, nil, nil) {
+		if m.evictPod(logger, pod, immediateEvictionGracePeriodSeconds, message, nil, nil, v1.PodReasonEphemeralStorageLimitExceeded) {
 			metrics.Evictions.WithLabelValues(signalEphemeralPodFsLimit).Inc()
 			return true
 		}
@@ -623,7 +623,7 @@ func (m *managerImpl) containerEphemeralStorageLimitEviction(logger klog.Logger,
 
 		if ephemeralStorageThreshold, ok := thresholdsMap[containerStat.Name]; ok {
 			if ephemeralStorageThreshold.Cmp(*containerUsed) < 0 {
-				if m.evictPod(logger, pod, immediateEvictionGracePeriodSeconds, fmt.Sprintf(containerEphemeralStorageMessageFmt, containerStat.Name, ephemeralStorageThreshold.String()), nil, nil) {
+				if m.evictPod(logger, pod, immediateEvictionGracePeriodSeconds, fmt.Sprintf(containerEphemeralStorageMessageFmt, containerStat.Name, ephemeralStorageThreshold.String()), nil, nil, v1.PodReasonEphemeralStorageLimitExceeded) {
 					metrics.Evictions.WithLabelValues(signalEphemeralContainerFsLimit).Inc()
 					return true
 				}
@@ -634,7 +634,11 @@ func (m *managerImpl) containerEphemeralStorageLimitEviction(logger klog.Logger,
 	return false
 }
 
-func (m *managerImpl) evictPod(logger klog.Logger, pod *v1.Pod, gracePeriodOverride int64, evictMsg string, annotations map[string]string, condition *v1.PodCondition) bool {
+// evictPod kills the pod with the eviction status. evictionTargetReason is the
+// EvictionTarget condition reason for the cause of this eviction; the
+// condition is attached only while the KubeletEvictionTargetCondition gate is
+// enabled.
+func (m *managerImpl) evictPod(logger klog.Logger, pod *v1.Pod, gracePeriodOverride int64, evictMsg string, annotations map[string]string, condition *v1.PodCondition, evictionTargetReason string) bool {
 	// If the pod is marked as critical and static, and support for critical pod annotations is enabled,
 	// do not evict such pods. Static pods are not re-admitted after evictions.
 	// https://github.com/kubernetes/kubernetes/issues/40573 has more details.
@@ -654,6 +658,19 @@ func (m *managerImpl) evictPod(logger klog.Logger, pod *v1.Pod, gracePeriodOverr
 		if condition != nil {
 			condition.ObservedGeneration = podutil.CalculatePodConditionObservedGeneration(status, pod.Generation, v1.DisruptionTarget)
 			podutil.UpdatePodCondition(status, condition)
+		}
+		if utilfeature.DefaultFeatureGate.Enabled(features.KubeletEvictionTargetCondition) {
+			// The decision is final once made, so an existing True condition
+			// keeps its original reason, message and transition time.
+			if _, existing := podutil.GetPodCondition(status, v1.EvictionTarget); existing == nil || existing.Status != v1.ConditionTrue {
+				podutil.UpdatePodCondition(status, &v1.PodCondition{
+					Type:               v1.EvictionTarget,
+					ObservedGeneration: podutil.CalculatePodConditionObservedGeneration(status, pod.Generation, v1.EvictionTarget),
+					Status:             v1.ConditionTrue,
+					Reason:             evictionTargetReason,
+					Message:            evictMsg,
+				})
+			}
 		}
 	})
 	if err != nil {

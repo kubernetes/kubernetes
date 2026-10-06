@@ -60,6 +60,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/envvars"
+	"k8s.io/kubernetes/pkg/kubelet/eviction"
 	"k8s.io/kubernetes/pkg/kubelet/images"
 	"k8s.io/kubernetes/pkg/kubelet/kuberuntime"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
@@ -1921,6 +1922,21 @@ func (kl *Kubelet) determinePodResizeStatus(allocatedPod *v1.Pod, podIsTerminal 
 	return resizeStatus
 }
 
+// evictionTargetCondition returns the EvictionTarget condition the kubelet
+// keeps reporting for the pod: the cached one, which may not have reached the
+// API server yet, or else the one already persisted on the API object. The
+// cache is only consulted while the gate is enabled, so with the gate off a
+// persisted condition is preserved as it is and nothing new is published.
+func evictionTargetCondition(cached *v1.PodStatus, pod *v1.Pod) *v1.PodCondition {
+	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletEvictionTargetCondition) {
+		if _, condition := podutil.GetPodCondition(cached, v1.EvictionTarget); condition != nil {
+			return condition
+		}
+	}
+	_, condition := podutil.GetPodCondition(&pod.Status, v1.EvictionTarget)
+	return condition
+}
+
 // generateAPIPodStatus creates the final API pod status for a pod, given the
 // internal pod status. This method should only be called from within sync*Pod methods.
 func (kl *Kubelet) generateAPIPodStatus(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus, podIsTerminal bool) v1.PodStatus {
@@ -1936,6 +1952,23 @@ func (kl *Kubelet) generateAPIPodStatus(ctx context.Context, pod *v1.Pod, podSta
 	allStatus := append(append([]v1.ContainerStatus{}, s.ContainerStatuses...), s.InitContainerStatuses...)
 	s.Phase = getPhase(logger, pod, allStatus, podIsTerminal, kubecontainer.HasAnyActiveRegularContainerStarted(&pod.Spec, podStatus))
 	logger.V(4).Info("Got phase for pod", "pod", klog.KObj(pod), "oldPhase", oldPodStatus.Phase, "phase", s.Phase)
+
+	// A committed eviction is reported as Failed regardless of how the
+	// containers end, including after a kubelet restart in which the
+	// eviction manager's status callback is lost but the condition it
+	// published survives on the API object. This only reconstructs the
+	// status; it does not restore the eviction's worker state or grace
+	// period, and a decision that never reached the API server is lost.
+	// A terminal phase already published on the API object is never changed,
+	// so it is left for the merge below to carry over with its reason and
+	// message.
+	evictionTarget := evictionTargetCondition(&oldPodStatus, pod)
+	committedEviction := utilfeature.DefaultFeatureGate.Enabled(features.KubeletEvictionTargetCondition) &&
+		evictionTarget != nil && evictionTarget.Status == v1.ConditionTrue
+	if committedEviction && s.Phase != v1.PodFailed && pod.Status.Phase != v1.PodSucceeded {
+		logger.V(4).Info("Pod has a committed eviction, reporting the Failed phase", "pod", klog.KObj(pod), "computedPhase", s.Phase)
+		s.Phase = v1.PodFailed
+	}
 
 	// Perform a three-way merge between the statuses from the status manager,
 	// runtime, and generated status to ensure terminal status is correctly set.
@@ -1982,6 +2015,15 @@ func (kl *Kubelet) generateAPIPodStatus(ctx context.Context, pod *v1.Pod, podSta
 		}
 	}
 
+	// A reconstructed eviction carries the eviction reason and the message
+	// recorded on the condition. An existing reason is left alone: it was
+	// either carried over from the cached eviction status or set by a
+	// handler above.
+	if committedEviction && s.Phase == v1.PodFailed && s.Reason == "" {
+		s.Reason = eviction.Reason
+		s.Message = evictionTarget.Message
+	}
+
 	kl.probeManager.UpdatePodStatus(ctx, pod, s)
 
 	// update the allocated resources status
@@ -1994,6 +2036,14 @@ func (kl *Kubelet) generateAPIPodStatus(ctx context.Context, pod *v1.Pod, podSta
 	for _, c := range pod.Status.Conditions {
 		if !kubetypes.PodConditionByKubelet(c.Type) {
 			s.Conditions = append(s.Conditions, c)
+		}
+	}
+	// EvictionTarget is set once by the eviction manager and never regenerated
+	// from container state, so carry the committed condition forward as is,
+	// including a cached one that has not reached the API server yet.
+	if evictionTarget != nil {
+		if _, existing := podutil.GetPodConditionFromList(s.Conditions, v1.EvictionTarget); existing == nil {
+			s.Conditions = utilpod.ReplaceOrAppendPodCondition(s.Conditions, evictionTarget)
 		}
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {

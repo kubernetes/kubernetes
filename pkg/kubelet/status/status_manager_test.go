@@ -57,6 +57,7 @@ import (
 	statustest "k8s.io/kubernetes/pkg/kubelet/status/testing"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util"
+	statusutil "k8s.io/kubernetes/pkg/util/pod"
 	"k8s.io/utils/ptr"
 )
 
@@ -3503,4 +3504,238 @@ func TestPodDeferredResizeDurationSeconds(t *testing.T) {
 			require.Equal(t, uint64(tc.expectedCount), count)
 		})
 	}
+}
+
+// EvictionTarget is published on the next status update even while the pod
+// still has running containers and its terminal phase is withheld, unlike
+// DisruptionTarget, which waits for the terminal transition.
+func TestMergePodStatus_EvictionTargetPublishedBeforeTerminal(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KubeletEvictionTargetCondition, true)
+	evictionTarget := v1.PodCondition{Type: v1.EvictionTarget, Status: v1.ConditionTrue, Reason: v1.PodReasonEmptyDirSizeLimitExceeded, Message: "over the limit"}
+	disruptionTarget := v1.PodCondition{Type: v1.DisruptionTarget, Status: v1.ConditionTrue, Reason: v1.PodReasonTerminationByKubelet}
+	newStatus := getPodStatus()
+	newStatus.Phase = v1.PodFailed
+	newStatus.Conditions = append(newStatus.Conditions, evictionTarget, disruptionTarget)
+
+	merged := mergePodStatus(&v1.Pod{}, getPodStatus(), newStatus, true /* couldHaveRunningContainers */)
+	assert.Equal(t, v1.PodRunning, merged.Phase, "terminal phase must still be withheld")
+	_, got := podutil.GetPodCondition(&merged, v1.EvictionTarget)
+	require.NotNil(t, got, "EvictionTarget must be published before the terminal phase")
+	assert.Equal(t, evictionTarget.Status, got.Status)
+	assert.Equal(t, evictionTarget.Reason, got.Reason)
+	assert.Equal(t, evictionTarget.Message, got.Message)
+	_, disruption := podutil.GetPodCondition(&merged, v1.DisruptionTarget)
+	assert.Nil(t, disruption, "DisruptionTarget stays withheld until the terminal phase")
+
+	merged = mergePodStatus(&v1.Pod{}, getPodStatus(), newStatus, false /* couldHaveRunningContainers */)
+	assert.Equal(t, v1.PodFailed, merged.Phase)
+	_, got = podutil.GetPodCondition(&merged, v1.EvictionTarget)
+	require.NotNil(t, got)
+	_, disruption = podutil.GetPodCondition(&merged, v1.DisruptionTarget)
+	assert.NotNil(t, disruption)
+}
+
+// The transition time of a committed eviction is kept across status updates.
+func TestUpdateLastTransitionTime_EvictionTargetIsStable(t *testing.T) {
+	decidedAt := metav1.NewTime(time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC))
+	oldStatus := v1.PodStatus{Conditions: []v1.PodCondition{{Type: v1.EvictionTarget, Status: v1.ConditionTrue, LastTransitionTime: decidedAt}}}
+	status := v1.PodStatus{Conditions: []v1.PodCondition{{Type: v1.EvictionTarget, Status: v1.ConditionTrue}}}
+	updateLastTransitionTime(&status, &oldStatus, v1.EvictionTarget)
+	assert.Equal(t, decidedAt, status.Conditions[0].LastTransitionTime)
+}
+
+func committedEvictionTargetCondition() v1.PodCondition {
+	return v1.PodCondition{
+		Type:               v1.EvictionTarget,
+		Status:             v1.ConditionTrue,
+		Reason:             v1.PodReasonNodePressure,
+		Message:            "The node was low on resource: memory.",
+		LastTransitionTime: metav1.NewTime(time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)),
+		ObservedGeneration: 3,
+	}
+}
+
+// A committed eviction decision that only exists in the status manager cache
+// survives a later status update that was built without it.
+func TestSetPodStatus_EvictionTargetSurvivesCacheReplacement(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KubeletEvictionTargetCondition, true)
+	logger, _ := ktesting.NewTestContext(t)
+	syncer := newTestManager(&fake.Clientset{})
+	pod := getTestPod()
+
+	decided := getPodStatus()
+	decided.Conditions = append(decided.Conditions, committedEvictionTargetCondition())
+	syncer.SetPodStatus(logger, pod, decided)
+	cached, ok := syncer.GetPodStatus(pod.UID)
+	require.True(t, ok)
+	_, recorded := podutil.GetPodCondition(&cached, v1.EvictionTarget)
+	require.NotNil(t, recorded)
+
+	syncer.SetPodStatus(logger, pod, getRandomPodStatus())
+	cached, ok = syncer.GetPodStatus(pod.UID)
+	require.True(t, ok)
+	_, got := podutil.GetPodCondition(&cached, v1.EvictionTarget)
+	require.NotNil(t, got, "a cache-only EvictionTarget must not be dropped by a status that omits it")
+	assert.Equal(t, *recorded, *got)
+}
+
+// A stale status snapshot taken before the eviction decision and written back
+// afterwards, as an asynchronous condition update does, keeps the decision.
+func TestSetPodStatus_StaleSnapshotKeepsEvictionTarget(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KubeletEvictionTargetCondition, true)
+	logger, _ := ktesting.NewTestContext(t)
+	syncer := newTestManager(&fake.Clientset{})
+	pod := getTestPod()
+
+	syncer.SetPodStatus(logger, pod, getPodStatus())
+	snapshot, ok := syncer.GetPodStatus(pod.UID)
+	require.True(t, ok)
+
+	decided := getPodStatus()
+	decided.Conditions = append(decided.Conditions, committedEvictionTargetCondition())
+	syncer.SetPodStatus(logger, pod, decided)
+	cached, ok := syncer.GetPodStatus(pod.UID)
+	require.True(t, ok)
+	_, recorded := podutil.GetPodCondition(&cached, v1.EvictionTarget)
+	require.NotNil(t, recorded)
+
+	stale := snapshot.DeepCopy()
+	stale.Conditions = statusutil.ReplaceOrAppendPodCondition(stale.Conditions, &v1.PodCondition{Type: v1.PodReadyToStartContainers, Status: v1.ConditionTrue})
+	syncer.SetPodStatus(logger, pod, *stale)
+	cached, ok = syncer.GetPodStatus(pod.UID)
+	require.True(t, ok)
+	_, got := podutil.GetPodCondition(&cached, v1.EvictionTarget)
+	require.NotNil(t, got, "a stale snapshot must not drop a committed EvictionTarget")
+	assert.Equal(t, *recorded, *got)
+	_, ready := podutil.GetPodCondition(&cached, v1.PodReadyToStartContainers)
+	require.NotNil(t, ready)
+	assert.Equal(t, v1.ConditionTrue, ready.Status)
+}
+
+// A committed eviction decision persisted on the API object, as after a
+// kubelet restart, survives the first status update that replaces the cache.
+func TestSetPodStatus_PersistedEvictionTargetSurvivesCacheReplacement(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KubeletEvictionTargetCondition, true)
+	logger, _ := ktesting.NewTestContext(t)
+	syncer := newTestManager(&fake.Clientset{})
+	pod := getTestPod()
+	persisted := committedEvictionTargetCondition()
+	pod.Status = getPodStatus()
+	pod.Status.Conditions = append(pod.Status.Conditions, persisted)
+
+	syncer.SetPodStatus(logger, pod, getRandomPodStatus())
+	cached, ok := syncer.GetPodStatus(pod.UID)
+	require.True(t, ok)
+	_, got := podutil.GetPodCondition(&cached, v1.EvictionTarget)
+	require.NotNil(t, got, "a persisted EvictionTarget must not be dropped by a status that omits it")
+	assert.Equal(t, persisted, *got)
+}
+
+// A committed eviction decision already published on the API object is kept
+// when merging a new status that omits it, including when the API object is
+// fresher than the status being merged.
+func TestMergePodStatus_KeepsPublishedEvictionTarget(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KubeletEvictionTargetCondition, true)
+	published := committedEvictionTargetCondition()
+	oldStatus := getPodStatus()
+	oldStatus.Conditions = append(oldStatus.Conditions, published)
+
+	merged := mergePodStatus(&v1.Pod{}, oldStatus, getPodStatus(), true /* couldHaveRunningContainers */)
+	_, got := podutil.GetPodCondition(&merged, v1.EvictionTarget)
+	require.NotNil(t, got, "a published EvictionTarget must be kept")
+	assert.Equal(t, published, *got)
+}
+
+// With the gate off the kubelet neither carries the condition into its cache
+// nor regenerates it, and a persisted condition is preserved from the API
+// object as a condition not owned by the kubelet.
+func TestEvictionTargetPreservation_GateOff(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KubeletEvictionTargetCondition, false)
+	logger, _ := ktesting.NewTestContext(t)
+	syncer := newTestManager(&fake.Clientset{})
+	pod := getTestPod()
+	persisted := committedEvictionTargetCondition()
+	pod.Status = getPodStatus()
+	pod.Status.Conditions = append(pod.Status.Conditions, persisted)
+
+	syncer.SetPodStatus(logger, pod, getRandomPodStatus())
+	cached, ok := syncer.GetPodStatus(pod.UID)
+	require.True(t, ok)
+	_, inCache := podutil.GetPodCondition(&cached, v1.EvictionTarget)
+	assert.Nil(t, inCache, "the condition is not kubelet-owned with the gate off")
+
+	merged := mergePodStatus(pod, pod.Status, cached, true /* couldHaveRunningContainers */)
+	_, got := podutil.GetPodCondition(&merged, v1.EvictionTarget)
+	require.NotNil(t, got, "a persisted EvictionTarget must be preserved with the gate off")
+	assert.Equal(t, persisted, *got)
+}
+
+// A persisted condition carried into a status update while the cache still
+// holds an older status without it keeps its recorded transition time, reason
+// and message instead of being stamped as a new decision.
+func TestSetPodStatus_PersistedEvictionTargetKeepsTransitionTime(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KubeletEvictionTargetCondition, true)
+	logger, _ := ktesting.NewTestContext(t)
+	syncer := newTestManager(&fake.Clientset{})
+	pod := getTestPod()
+	pod.Status = getPodStatus()
+	syncer.SetPodStatus(logger, pod, getPodStatus())
+
+	persisted := committedEvictionTargetCondition()
+	pod.Status.Conditions = append(pod.Status.Conditions, persisted)
+	incoming := getPodStatus()
+	incoming.Conditions = append(incoming.Conditions, persisted)
+	syncer.SetPodStatus(logger, pod, incoming)
+
+	cached, ok := syncer.GetPodStatus(pod.UID)
+	require.True(t, ok)
+	_, got := podutil.GetPodCondition(&cached, v1.EvictionTarget)
+	require.NotNil(t, got)
+	assert.Equal(t, persisted, *got, "the persisted decision must not be restamped")
+}
+
+// An incoming EvictionTarget=True with different metadata does not rewrite a
+// decision already recorded in the cache or on the API object.
+func TestEvictionTarget_RecordedDecisionWinsOverIncoming(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KubeletEvictionTargetCondition, true)
+	recorded := committedEvictionTargetCondition()
+	later := v1.PodCondition{
+		Type:               v1.EvictionTarget,
+		Status:             v1.ConditionTrue,
+		Reason:             v1.PodReasonEmptyDirSizeLimitExceeded,
+		Message:            "a later decision",
+		LastTransitionTime: metav1.NewTime(time.Date(2026, 6, 7, 8, 9, 10, 0, time.UTC)),
+		ObservedGeneration: 4,
+	}
+	withCondition := func(c v1.PodCondition) v1.PodStatus {
+		status := getPodStatus()
+		status.Conditions = append(status.Conditions, c)
+		return status
+	}
+
+	t.Run("updateStatusInternal", func(t *testing.T) {
+		logger, _ := ktesting.NewTestContext(t)
+		syncer := newTestManager(&fake.Clientset{})
+		pod := getTestPod()
+		syncer.SetPodStatus(logger, pod, withCondition(recorded))
+		cached, ok := syncer.GetPodStatus(pod.UID)
+		require.True(t, ok)
+		_, inCache := podutil.GetPodCondition(&cached, v1.EvictionTarget)
+		require.NotNil(t, inCache)
+		assert.Equal(t, recorded.Reason, inCache.Reason)
+
+		syncer.SetPodStatus(logger, pod, withCondition(later))
+		cached, ok = syncer.GetPodStatus(pod.UID)
+		require.True(t, ok)
+		_, got := podutil.GetPodCondition(&cached, v1.EvictionTarget)
+		require.NotNil(t, got)
+		assert.Equal(t, *inCache, *got, "the recorded decision must win over the incoming one")
+	})
+
+	t.Run("mergePodStatus", func(t *testing.T) {
+		merged := mergePodStatus(&v1.Pod{}, withCondition(recorded), withCondition(later), true /* couldHaveRunningContainers */)
+		_, got := podutil.GetPodCondition(&merged, v1.EvictionTarget)
+		require.NotNil(t, got)
+		assert.Equal(t, recorded, *got, "the published decision must win over the incoming one")
+	})
 }

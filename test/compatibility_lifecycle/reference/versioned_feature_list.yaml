@@ -993,6 +993,12 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.35"
+- name: KubeletEvictionTargetCondition
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.38"
 - name: KubeletFineGrainedAuthz
   versionedSpecs:
   - default: false

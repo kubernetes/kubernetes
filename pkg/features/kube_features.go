@@ -610,6 +610,13 @@ const (
 	// access for different tenants.
 	KubeletEnsureSecretPulledImages featuregate.Feature = "KubeletEnsureSecretPulledImages"
 
+	// owner: @amrmahdi
+	//
+	// Publishes the EvictionTarget pod condition when the kubelet's eviction
+	// manager commits to evicting a pod, and reconstructs the Failed phase
+	// with the eviction reason from a persisted condition after a restart.
+	KubeletEvictionTargetCondition featuregate.Feature = "KubeletEvictionTargetCondition"
+
 	// owner: @vinayakankugoyal
 	// kep: http://kep.k8s.io/2862
 	//
@@ -1686,6 +1693,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.35"), Default: true, PreRelease: featuregate.Beta},
 	},
 
+	KubeletEvictionTargetCondition: {
+		{Version: version.MustParse("1.38"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
 	KubeletFineGrainedAuthz: {
 		{Version: version.MustParse("1.32"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.33"), Default: true, PreRelease: featuregate.Beta},
@@ -2570,6 +2581,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	KubeletCrashLoopBackOffMax: {},
 
 	KubeletEnsureSecretPulledImages: {},
+
+	KubeletEvictionTargetCondition: {},
 
 	KubeletFineGrainedAuthz: {},
 

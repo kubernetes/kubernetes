@@ -3862,6 +3862,12 @@ const (
 	PodResizeInProgress PodConditionType = "PodResizeInProgress"
 	// AllContainersRestarting indicates that all containers of the pod is being restarted.
 	AllContainersRestarting PodConditionType = "AllContainersRestarting"
+	// EvictionTarget indicates that the kubelet has committed to evicting the
+	// pod to reclaim node resources or because the pod exceeded its own storage
+	// limit. The decision is final for this pod; the pod's containers may still
+	// be running while it is terminated. It does not mean the termination has
+	// completed: that is reported by the Failed phase with reason Evicted.
+	EvictionTarget PodConditionType = "EvictionTarget"
 )
 
 // These are reasons for a pod's transition to a condition.
@@ -3885,6 +3891,18 @@ const (
 	// PodReasonPreemptionByScheduler reason in DisruptionTarget pod condition indicates that the
 	// disruption was initiated by scheduler's preemption.
 	PodReasonPreemptionByScheduler = "PreemptionByScheduler"
+
+	// PodReasonNodePressure reason in EvictionTarget pod condition indicates that the kubelet is
+	// evicting the pod to relieve node resource pressure.
+	PodReasonNodePressure = "NodePressure"
+
+	// PodReasonEphemeralStorageLimitExceeded reason in EvictionTarget pod condition indicates that
+	// the pod, or one of its containers, exceeded its ephemeral-storage limit.
+	PodReasonEphemeralStorageLimitExceeded = "EphemeralStorageLimitExceeded"
+
+	// PodReasonEmptyDirSizeLimitExceeded reason in EvictionTarget pod condition indicates that one
+	// of the pod's emptyDir volumes exceeded its sizeLimit.
+	PodReasonEmptyDirSizeLimitExceeded = "EmptyDirSizeLimitExceeded"
 
 	// PodReasonDeferred reason in PodResizePending pod condition indicates the proposed resize is feasible in
 	// theory (it fits on this node) but is not possible right now.

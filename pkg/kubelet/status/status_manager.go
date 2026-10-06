@@ -975,6 +975,15 @@ func (m *manager) updateStatusInternal(logger klog.Logger, pod *v1.Pod, status v
 	// Set AllContainersRestarting.LastTransitionTime
 	updateLastTransitionTime(&status, &oldStatus, v1.AllContainersRestarting)
 
+	// A committed eviction decision recorded in the cache or on the API object
+	// wins over whatever the incoming status carries, so it survives statuses
+	// built without it (an admission rejection, a stale snapshot written back
+	// asynchronously) and keeps its original reason, message and transition
+	// time. Only a genuinely new decision is stamped with a transition time.
+	if !preserveEvictionTargetCondition(&status, &oldStatus, &pod.Status) {
+		updateLastTransitionTime(&status, &oldStatus, v1.EvictionTarget)
+	}
+
 	// ensure that the start time does not change across updates.
 	if oldStatus.StartTime != nil && !oldStatus.StartTime.IsZero() {
 		status.StartTime = oldStatus.StartTime.DeepCopy()
@@ -1446,6 +1455,38 @@ func normalizeStatus(pod *v1.Pod, status *v1.PodStatus) *v1.PodStatus {
 	return status
 }
 
+// committedEvictionTarget returns the EvictionTarget condition of status when
+// it records a committed eviction decision, and nil otherwise.
+func committedEvictionTarget(status *v1.PodStatus) *v1.PodCondition {
+	_, condition := podutil.GetPodCondition(status, v1.EvictionTarget)
+	if condition == nil || condition.Status != v1.ConditionTrue {
+		return nil
+	}
+	return condition
+}
+
+// preserveEvictionTargetCondition copies a committed EvictionTarget condition
+// from the first of sources that records one into status, replacing any
+// EvictionTarget condition status carries. The recorded condition is copied
+// unchanged, including its reason, message, LastTransitionTime and
+// ObservedGeneration, because the decision it records is final and an
+// incoming condition must not rewrite it. It reports whether a recorded
+// condition was found. It does nothing when the KubeletEvictionTargetCondition
+// feature gate is disabled: the condition is then not owned by the kubelet and
+// is preserved from the API object like any other foreign condition.
+func preserveEvictionTargetCondition(status *v1.PodStatus, sources ...*v1.PodStatus) bool {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.KubeletEvictionTargetCondition) {
+		return false
+	}
+	for _, source := range sources {
+		if condition := committedEvictionTarget(source); condition != nil {
+			status.Conditions = statusutil.ReplaceOrAppendPodCondition(status.Conditions, condition)
+			return true
+		}
+	}
+	return false
+}
+
 // mergePodStatus merges oldPodStatus and newPodStatus to preserve where pod conditions
 // not owned by kubelet and to ensure terminal phase transition only happens after all
 // running containers have terminated. This method does not modify the old status.
@@ -1484,6 +1525,11 @@ func mergePodStatus(pod *v1.Pod, oldPodStatus, newPodStatus v1.PodStatus, couldH
 		}
 	}
 	newPodStatus.Conditions = podConditions
+
+	// A committed eviction decision already published on the API object wins
+	// over the new status, whether that was built without it or carries
+	// different metadata for it.
+	preserveEvictionTargetCondition(&newPodStatus, &oldPodStatus)
 
 	// ResourceClaimStatuses is not owned and not modified by kubelet.
 	newPodStatus.ResourceClaimStatuses = oldPodStatus.ResourceClaimStatuses

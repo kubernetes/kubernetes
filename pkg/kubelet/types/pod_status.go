@@ -49,6 +49,14 @@ func PodConditionByKubelet(conditionType v1.PodConditionType) bool {
 			return true
 		}
 	}
+	// EvictionTarget is kubelet-owned only while the gate is enabled. With the
+	// gate off the kubelet neither sets nor regenerates it, so treating it as
+	// not owned preserves a condition an earlier kubelet already published.
+	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletEvictionTargetCondition) {
+		if conditionType == v1.EvictionTarget {
+			return true
+		}
+	}
 	return false
 }
 
