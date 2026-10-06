@@ -31,7 +31,8 @@ const serverShutdownSignalKey serverShutdownSignalKeyType = iota
 // the request handler logic has access to signals rlated to
 // the server shutdown events
 type ServerShutdownSignal interface {
-	// Signaled when the apiserver is not receiving any new request
+	// Signaled when active watch request(s) should start returning,
+	// the apiserver is not receiving any new request by then
 	ShuttingDown() <-chan struct{}
 }
 

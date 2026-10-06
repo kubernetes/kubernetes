@@ -522,6 +522,9 @@ func (s preparedGenericAPIServer) Run(stopCh <-chan struct{}) error {
 // |           |                      |                                        |                  |
 // |           |         (NonLongRunningRequestWaitGroup::Wait)   (WatchRequestWaitGroup::Wait)   |
 // |           |                      |                                        |                  |
+// |           |                      |                                   (on entry)              |
+// |           |                      |      WatchTerminationStarted (watchTerminationStartedCh)  |
+// |           |                      |                                        |                  |
 // |           |                      |------------------|---------------------|                  |
 // |           |                                         |                                        |
 // |           |                         InFlightRequestsDrained (drainedCh)                      |
@@ -674,8 +677,15 @@ func (s preparedGenericAPIServer) RunWithContext(ctx context.Context) error {
 
 	// wait for all in-flight watches to finish
 	activeWatchesDrainedCh := make(chan struct{})
+	watchTerminationStartedCh := s.lifecycleSignals.WatchTerminationStarted
+	go func() {
+		<-watchTerminationStartedCh.Signaled()
+		klog.V(1).InfoS("[graceful-termination] shutdown event", "name", watchTerminationStartedCh.Name())
+	}()
 	go func() {
 		defer close(activeWatchesDrainedCh)
+		// in case we return before the rate limiter factory signals it
+		defer watchTerminationStartedCh.Signal()
 
 		<-notAcceptingNewRequestCh.Signaled()
 		if s.ShutdownWatchTerminationGracePeriod <= time.Duration(0) {
@@ -697,6 +707,10 @@ func (s preparedGenericAPIServer) RunWithContext(ctx context.Context) error {
 			}
 
 			ctx, cancel := context.WithTimeout(context.Background(), grace)
+
+			// every Done that follows is rate limited, see RateLimiterFactoryFunc
+			watchTerminationStartedCh.Signal()
+
 			// We don't expect more than one token to be consumed
 			// in a single Wait call, so setting burst to 1.
 			return rate.NewLimiter(rate.Limit(qps), 1), ctx, cancel
