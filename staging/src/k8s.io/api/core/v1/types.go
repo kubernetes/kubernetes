@@ -8438,7 +8438,6 @@ type Secret struct {
 	// It is provided as a write-only input field for convenience.
 	// All keys and values are merged into the data field on write, overwriting any existing values.
 	// The stringData field is never output when reading from the API.
-	// +k8s:conversion-gen=false
 	// +optional
 	StringData map[string]string `json:"stringData,omitempty" protobuf:"bytes,4,rep,name=stringData"`
 

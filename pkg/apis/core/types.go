@@ -5726,6 +5726,10 @@ type EndpointsList struct {
 
 // NodeSpec describes the attributes that a node is created with.
 type NodeSpec struct {
+	// PodCIDR represents the pod IP range assigned to the node.
+	// +optional
+	PodCIDR string
+
 	// PodCIDRs represents the IP ranges assigned to the node for usage by Pods on that node. It may
 	// contain AT MOST one value for each of IPv4 and IPv6.
 	// Note: assigning IP ranges to nodes might need to be revisited when we support migratable IPs.
@@ -6911,6 +6915,13 @@ type Secret struct {
 	// data value here.
 	// +optional
 	Data map[string][]byte `datapolicy:"password,security-key,token"`
+
+	// StringData allows specifying non-binary secret data in string form.
+	// It is provided as a write-only input field for convenience.
+	// All keys and values are merged into the data field on write, overwriting any existing values.
+	// The stringData field is never output when reading from the API.
+	// +optional
+	StringData map[string]string `datapolicy:"password,security-key,token"`
 
 	// Used to facilitate programmatic handling of secret data.
 	// More info: https://kubernetes.io/docs/concepts/configuration/secret/#secret-types
