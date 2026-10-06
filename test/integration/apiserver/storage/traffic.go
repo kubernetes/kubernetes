@@ -62,22 +62,22 @@ const (
 	RVFuture  RVType = "Future"
 )
 
-type WatchFieldSelector string
+type FieldSelector string
 
 const (
-	FieldEverything  WatchFieldSelector = "Everything"
-	FieldByName      WatchFieldSelector = "ByName"
-	FieldByNamespace WatchFieldSelector = "ByNamespace"
-	FieldByNode      WatchFieldSelector = "ByNode"
-	FieldByEmptyNode WatchFieldSelector = "ByEmptyNode"
-	FieldCombined    WatchFieldSelector = "Combined"
+	FieldEverything  FieldSelector = "Everything"
+	FieldByName      FieldSelector = "ByName"
+	FieldByNamespace FieldSelector = "ByNamespace"
+	FieldByNode      FieldSelector = "ByNode"
+	FieldByEmptyNode FieldSelector = "ByEmptyNode"
+	FieldCombined    FieldSelector = "Combined"
 )
 
-type WatchLabelSelector string
+type LabelSelector string
 
 const (
-	LabelEverything WatchLabelSelector = "Everything"
-	LabelByApp      WatchLabelSelector = "ByApp"
+	LabelEverything LabelSelector = "Everything"
+	LabelByApp      LabelSelector = "ByApp"
 )
 
 var (
@@ -104,6 +104,8 @@ type GetDistribution struct {
 
 type ListDistribution struct {
 	Scope                []ChoiceWeight[KeyScope]
+	FieldSelector        []ChoiceWeight[FieldSelector]
+	LabelSelector        []ChoiceWeight[LabelSelector]
 	ResourceVersion      []ChoiceWeight[RVType]
 	ResourceVersionMatch []ChoiceWeight[metav1.ResourceVersionMatch]
 }
@@ -126,8 +128,8 @@ type PreconditionsDistribution struct {
 
 type WatchDistribution struct {
 	Scope             []ChoiceWeight[KeyScope]
-	FieldSelector     []ChoiceWeight[WatchFieldSelector]
-	LabelSelector     []ChoiceWeight[WatchLabelSelector]
+	FieldSelector     []ChoiceWeight[FieldSelector]
+	LabelSelector     []ChoiceWeight[LabelSelector]
 	SendInitialEvents []ChoiceWeight[bool]
 	ResourceVersion   []ChoiceWeight[RVType]
 }
@@ -305,7 +307,9 @@ func randomRequest(ctx context.Context, store storage.Interface, keys []types.Na
 			},
 		}
 	case correctness.OpList:
-		opts := storage.ListOptions{Predicate: storage.Everything}
+		opts := storage.ListOptions{
+			Predicate: pickPredicate(dist.List.FieldSelector, dist.List.LabelSelector),
+		}
 		var listKey string
 		switch scope := PickRandom(dist.List.Scope); scope {
 		case ScopeCluster:
@@ -511,8 +515,6 @@ func randomWatchRequest(ctx context.Context, store storage.Interface, distributi
 
 	ns := watchNamespaces[rand.Intn(len(watchNamespaces))]
 	name := watchPodNames[rand.Intn(len(watchPodNames))]
-	node := nonEmptyNodes[rand.Intn(len(nonEmptyNodes))]
-	app := nonEmptyApps[rand.Intn(len(nonEmptyApps))]
 
 	watchKey := "/pods/"
 	recursive := true
@@ -529,10 +531,33 @@ func randomWatchRequest(ctx context.Context, store storage.Interface, distributi
 		}
 	}
 
+	pred := pickPredicate(distribution.FieldSelector, distribution.LabelSelector)
+
+	opts := storage.ListOptions{ResourceVersion: rv, Predicate: pred, Recursive: recursive}
+	switch {
+	case watchList:
+		opts.Predicate.AllowWatchBookmarks = true
+		opts.SendInitialEvents = new(true)
+		opts.ResourceVersionMatch = metav1.ResourceVersionMatchNotOlderThan
+	case rv == "" || rv == "0":
+		// Otherwise storage starts with synthetic ADDED events for existing
+		// objects. API validation requires the match with sendInitialEvents.
+		opts.SendInitialEvents = new(false)
+		opts.ResourceVersionMatch = metav1.ResourceVersionMatchNotOlderThan
+	}
+	return correctness.WatchRequest{Key: watchKey, Options: opts}
+}
+
+func pickPredicate(fieldDist []ChoiceWeight[FieldSelector], labelDist []ChoiceWeight[LabelSelector]) storage.SelectionPredicate {
+	ns := watchNamespaces[rand.Intn(len(watchNamespaces))]
+	name := watchPodNames[rand.Intn(len(watchPodNames))]
+	node := nonEmptyNodes[rand.Intn(len(nonEmptyNodes))]
+	app := nonEmptyApps[rand.Intn(len(nonEmptyApps))]
+
 	fieldSel := fields.Everything()
 	var indexFields []string
-	if len(distribution.FieldSelector) > 0 {
-		switch fs := PickRandom(distribution.FieldSelector); fs {
+	if len(fieldDist) > 0 {
+		switch fs := PickRandom(fieldDist); fs {
 		case FieldEverything:
 			fieldSel = fields.Everything()
 		case FieldByName:
@@ -552,42 +577,28 @@ func randomWatchRequest(ctx context.Context, store storage.Interface, distributi
 			)
 			indexFields = []string{"spec.nodeName"}
 		default:
-			panic(fmt.Sprintf("%v: unknown watch field selector", fs))
+			panic(fmt.Sprintf("%v: unknown field selector", fs))
 		}
 	}
 
 	labelSel := labels.Everything()
-	if len(distribution.LabelSelector) > 0 {
-		switch ls := PickRandom(distribution.LabelSelector); ls {
+	if len(labelDist) > 0 {
+		switch ls := PickRandom(labelDist); ls {
 		case LabelEverything:
 			labelSel = labels.Everything()
 		case LabelByApp:
 			labelSel = labels.SelectorFromSet(labels.Set{"app": app})
 		default:
-			panic(fmt.Sprintf("%v: unknown watch label selector", ls))
+			panic(fmt.Sprintf("%v: unknown label selector", ls))
 		}
 	}
 
-	pred := storage.SelectionPredicate{
+	return storage.SelectionPredicate{
 		Label:       labelSel,
 		Field:       fieldSel,
 		GetAttrs:    registrypod.GetAttrs,
 		IndexFields: indexFields,
 	}
-
-	opts := storage.ListOptions{ResourceVersion: rv, Predicate: pred, Recursive: recursive}
-	switch {
-	case watchList:
-		opts.Predicate.AllowWatchBookmarks = true
-		opts.SendInitialEvents = new(true)
-		opts.ResourceVersionMatch = metav1.ResourceVersionMatchNotOlderThan
-	case rv == "" || rv == "0":
-		// Otherwise storage starts with synthetic ADDED events for existing
-		// objects. API validation requires the match with sendInitialEvents.
-		opts.SendInitialEvents = new(false)
-		opts.ResourceVersionMatch = metav1.ResourceVersionMatchNotOlderThan
-	}
-	return correctness.WatchRequest{Key: watchKey, Options: opts}
 }
 
 func relativeRV(ctx context.Context, store storage.Interface, offset int64) string {

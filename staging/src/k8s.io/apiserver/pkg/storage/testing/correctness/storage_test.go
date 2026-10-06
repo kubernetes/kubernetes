@@ -43,6 +43,10 @@ func TestStorageGetListRecursivePrefix(t *testing.T) {
 	storagetesting.RunTestGetListRecursivePrefix(t.Context(), t, newTestStorage())
 }
 
+func TestStorageNamespaceScopedList(t *testing.T) {
+	storagetesting.RunTestNamespaceScopedList(t.Context(), t, newTestStorage())
+}
+
 func TestStorageCreateWithKeyExist(t *testing.T) {
 	storagetesting.RunTestCreateWithKeyExist(t.Context(), t, newTestStorage())
 }

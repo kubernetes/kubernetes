@@ -78,6 +78,18 @@ var (
 				{Choice: ScopeNamespace, Weight: 25},
 				{Choice: ScopeObject, Weight: 25},
 			},
+			FieldSelector: []ChoiceWeight[FieldSelector]{
+				{Choice: FieldEverything, Weight: 25},
+				{Choice: FieldByName, Weight: 15},
+				{Choice: FieldByNamespace, Weight: 15},
+				{Choice: FieldByNode, Weight: 20},
+				{Choice: FieldByEmptyNode, Weight: 15},
+				{Choice: FieldCombined, Weight: 10},
+			},
+			LabelSelector: []ChoiceWeight[LabelSelector]{
+				{Choice: LabelEverything, Weight: 60},
+				{Choice: LabelByApp, Weight: 40},
+			},
 			ResourceVersion: []ChoiceWeight[RVType]{
 				{Choice: RVEmpty, Weight: 50},
 				{Choice: RVZero, Weight: 20},
@@ -129,7 +141,7 @@ var (
 			{Choice: ScopeNamespace, Weight: 30},
 			{Choice: ScopeObject, Weight: 30},
 		},
-		FieldSelector: []ChoiceWeight[WatchFieldSelector]{
+		FieldSelector: []ChoiceWeight[FieldSelector]{
 			{Choice: FieldEverything, Weight: 25},
 			{Choice: FieldByName, Weight: 15},
 			{Choice: FieldByNamespace, Weight: 15},
@@ -137,7 +149,7 @@ var (
 			{Choice: FieldByEmptyNode, Weight: 15},
 			{Choice: FieldCombined, Weight: 10},
 		},
-		LabelSelector: []ChoiceWeight[WatchLabelSelector]{
+		LabelSelector: []ChoiceWeight[LabelSelector]{
 			{Choice: LabelEverything, Weight: 60},
 			{Choice: LabelByApp, Weight: 40},
 		},
