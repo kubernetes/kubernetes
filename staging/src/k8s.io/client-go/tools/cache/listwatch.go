@@ -19,9 +19,12 @@ package cache
 import (
 	"context"
 
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/sharding"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/util/watchlist"
@@ -309,4 +312,97 @@ func (lw *ListWatch) WatchWithContext(ctx context.Context, options metav1.ListOp
 		return lw.WatchFuncWithContext(ctx, options)
 	}
 	return lw.WatchFunc(options)
+}
+
+type shardedListWatch struct {
+	rawLW    ListerWatcher
+	lw       ListerWatcherWithContext
+	selector sharding.Selector
+}
+
+var (
+	_ ListerWatcher            = &shardedListWatch{}
+	_ ListerWatcherWithContext = &shardedListWatch{}
+)
+
+// NewShardedListWatch wraps a ListerWatcher to attach selector to outgoing
+// LIST and WATCH requests and transparently fall back to client-side filtering
+// via selector.Matches when the server omits ListMeta.ShardInfo (e.g. when the
+// ShardedListAndWatch feature gate is disabled on kube-apiserver).
+func NewShardedListWatch(lw ListerWatcher, selector sharding.Selector) ListerWatcher {
+	if selector == nil || selector.Empty() {
+		return lw
+	}
+	return &shardedListWatch{
+		rawLW:    lw,
+		lw:       ToListerWatcherWithContext(lw),
+		selector: selector,
+	}
+}
+
+func (s *shardedListWatch) List(options metav1.ListOptions) (runtime.Object, error) {
+	return s.ListWithContext(context.Background(), options)
+}
+
+func (s *shardedListWatch) ListWithContext(ctx context.Context, options metav1.ListOptions) (runtime.Object, error) {
+	options.ShardSelector = s.selector.String()
+	list, err := s.lw.ListWithContext(ctx, options)
+	if err != nil {
+		return nil, err
+	}
+	metaObj, err := meta.ListAccessor(list)
+	if err != nil {
+		return nil, err
+	}
+	if shardedList, ok := metaObj.(metav1.ShardedListInterface); ok {
+		if info := shardedList.GetShardInfo(); info != nil && info.Selector == options.ShardSelector {
+			return list, nil
+		}
+	}
+	items, err := meta.ExtractList(list)
+	if err != nil {
+		return nil, err
+	}
+	filtered := make([]runtime.Object, 0, len(items))
+	for _, item := range items {
+		matched, err := s.selector.Matches(item)
+		if err != nil {
+			return nil, err
+		}
+		if matched {
+			filtered = append(filtered, item)
+		}
+	}
+	metaObj.SetRemainingItemCount(nil)
+	if err := meta.SetList(list, filtered); err != nil {
+		return nil, err
+	}
+	return list, nil
+}
+
+func (s *shardedListWatch) Watch(options metav1.ListOptions) (watch.Interface, error) {
+	return s.WatchWithContext(context.Background(), options)
+}
+
+func (s *shardedListWatch) WatchWithContext(ctx context.Context, options metav1.ListOptions) (watch.Interface, error) {
+	options.ShardSelector = s.selector.String()
+	w, err := s.lw.WatchWithContext(ctx, options)
+	if err != nil {
+		return nil, err
+	}
+	return watch.Filter(w, func(in watch.Event) (watch.Event, bool) {
+		if in.Type == watch.Bookmark || in.Type == watch.Error {
+			return in, true
+		}
+		matched, err := s.selector.Matches(in.Object)
+		if err != nil {
+			utilruntime.HandleErrorWithContext(ctx, err, "Unable to match watch event against shard selector")
+			return in, false
+		}
+		return in, matched
+	}), nil
+}
+
+func (s *shardedListWatch) IsWatchListSemanticsUnSupported() bool {
+	return watchlist.DoesClientNotSupportWatchListSemantics(s.rawLW)
 }
