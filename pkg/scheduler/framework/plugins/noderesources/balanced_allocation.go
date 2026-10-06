@@ -166,7 +166,8 @@ func (ba *BalancedAllocation) Score(ctx context.Context, state fwk.CycleState, p
 	// Detail: score = (1 - std) * MaxNodeScore, where std is calculated by the root square of Σ((fraction(i)-mean)^2)/len(resources)
 	// The algorithm is partly inspired by:
 	// "Wei Huang et al. An Energy Efficient Virtual Machine Placement Algorithm with Balanced Resource Utilization"
-	return ba.score(ctx, pod, nodeInfo, s.podRequests, s.draPreScoreState)
+	podRequests := ba.calculatePodRequestWithAdditionalNodeAllocatable(state, pod, nodeInfo, s.podRequests)
+	return ba.score(ctx, pod, nodeInfo, podRequests, s.draPreScoreState)
 }
 
 // ScoreExtensions of the Score plugin.
@@ -196,7 +197,8 @@ func NewBalancedAllocation(_ context.Context, baArgs runtime.Object, h fwk.Handl
 			useRequested:                    true,
 			resources:                       args.Resources,
 			enableInPlacePodLevelResourcesVerticalScaling: fts.EnableInPlacePodLevelResourcesVerticalScaling,
-			draManager: h.SharedDRAManager(),
+			enableDRANodeAllocatableResources:             fts.EnableDRANodeAllocatableResources,
+			draManager:                                    h.SharedDRAManager(),
 		},
 	}, nil
 }

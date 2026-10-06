@@ -3474,6 +3474,150 @@ func TestFitFilterNodeReservations(t *testing.T) {
 	}
 }
 
+func TestFitScoreWithAdditionalNodeAllocatableResources(t *testing.T) {
+	testCtx := ktesting.Init(t)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRANodeAllocatableResources, true)
+	nodeName := "node-1"
+	pool := v1.AdditionalNodeAllocatableReference{APIGroup: "example.com", Kind: "Pool", Name: "pool1"}
+	otherPool := v1.AdditionalNodeAllocatableReference{APIGroup: "example.com", Kind: "Pool", Name: "pool2"}
+	claim := v1.AdditionalNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "claim1"}
+	mapped := func(source v1.AdditionalNodeAllocatableReference) []v1.AdditionalNodeAllocatableResource {
+		return []v1.AdditionalNodeAllocatableResource{{
+			Source:     source,
+			Containers: []string{"c1"},
+			Mapping:    []v1.NodeAllocatableMappedResources{{Name: v1.ResourceCPU, Quantity: ptr.To(resource.MustParse("2"))}},
+		}}
+	}
+	requests := map[v1.ResourceName]string{v1.ResourceCPU: "1", v1.ResourceMemory: "1000"}
+	existingPod := func(entries []v1.AdditionalNodeAllocatableResource) *v1.Pod {
+		pod := st.MakePod().UID("existing").Name("existing").Namespace("test-ns").Node(nodeName).Req(requests).Obj()
+		pod.Status.AdditionalNodeAllocatableResources = entries
+		return pod
+	}
+	pod := st.MakePod().UID("new").Name("new").Namespace("test-ns").Req(requests).Obj()
+
+	tests := []struct {
+		name                              string
+		strategy                          config.ScoringStrategyType
+		existingPods                      []*v1.Pod
+		enableDRANodeAllocatableResources bool
+		additionalResources               map[string][]v1.AdditionalNodeAllocatableResource
+		runPreScore                       bool
+		wantScore                         int64
+	}{
+		{
+			// CPU: (8 - 1) / 8 = 87. Memory: 90.
+			name:                              "no entries",
+			strategy:                          config.LeastAllocated,
+			enableDRANodeAllocatableResources: true,
+			runPreScore:                       true,
+			wantScore:                         88,
+		},
+		{
+			// CPU: (8 - 1 - 2) / 8 = 62. Memory: 90.
+			name:                              "entries are added to the pod requests",
+			strategy:                          config.LeastAllocated,
+			enableDRANodeAllocatableResources: true,
+			additionalResources: map[string][]v1.AdditionalNodeAllocatableResource{
+				nodeName: makeAdditionalNodeAllocatableResources("claim1", "2"),
+			},
+			runPreScore: true,
+			wantScore:   76,
+		},
+		{
+			// CPU: (1 + 2) / 8 = 37. Memory: 10.
+			name:                              "entries are added to the pod requests with MostAllocated",
+			strategy:                          config.MostAllocated,
+			enableDRANodeAllocatableResources: true,
+			additionalResources: map[string][]v1.AdditionalNodeAllocatableResource{
+				nodeName: makeAdditionalNodeAllocatableResources("claim1", "2"),
+			},
+			runPreScore: true,
+			wantScore:   23,
+		},
+		{
+			name:                              "entries are added to the pod requests if PreScore not called",
+			strategy:                          config.LeastAllocated,
+			enableDRANodeAllocatableResources: true,
+			additionalResources: map[string][]v1.AdditionalNodeAllocatableResource{
+				nodeName: makeAdditionalNodeAllocatableResources("claim1", "2"),
+			},
+			wantScore: 76,
+		},
+		{
+			name:                              "entries for another node are ignored",
+			strategy:                          config.LeastAllocated,
+			enableDRANodeAllocatableResources: true,
+			additionalResources: map[string][]v1.AdditionalNodeAllocatableResource{
+				"other-node": makeAdditionalNodeAllocatableResources("claim1", "2"),
+			},
+			runPreScore: true,
+			wantScore:   88,
+		},
+		{
+			name:                              "feature disabled",
+			strategy:                          config.LeastAllocated,
+			enableDRANodeAllocatableResources: false,
+			additionalResources: map[string][]v1.AdditionalNodeAllocatableResource{
+				nodeName: makeAdditionalNodeAllocatableResources("claim1", "2"),
+			},
+			runPreScore: true,
+			wantScore:   88,
+		},
+		{
+			// Node: 1 (existing) + 2 (pool1 reservation) = 3. Pod: 1, pool2 is not accounted to it.
+			// CPU: (8 - 3 - 1) / 8 = 50. Memory: 80.
+			name:                              "node reservations are not added to the pod requests",
+			strategy:                          config.LeastAllocated,
+			existingPods:                      []*v1.Pod{existingPod(mapped(pool))},
+			enableDRANodeAllocatableResources: true,
+			additionalResources:               map[string][]v1.AdditionalNodeAllocatableResource{nodeName: mapped(otherPool)},
+			runPreScore:                       true,
+			wantScore:                         65,
+		},
+		{
+			// Node: 1 + 2 (claim1, accounted to the existing pod) = 3. CPU: (8 - 3 - 1 - 2) / 8 = 25. Memory: 80.
+			name:                              "claim is accounted to every pod",
+			strategy:                          config.LeastAllocated,
+			existingPods:                      []*v1.Pod{existingPod(mapped(claim))},
+			enableDRANodeAllocatableResources: true,
+			additionalResources:               map[string][]v1.AdditionalNodeAllocatableResource{nodeName: mapped(claim)},
+			runPreScore:                       true,
+			wantScore:                         52,
+		},
+	}
+
+	for _, test := range tests {
+		testCtx.Run(test.name, func(tCtx ktesting.TContext) {
+			node := st.MakeNode().Name(nodeName).Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "8", v1.ResourceMemory: "10000"}).Obj()
+			nodeInfo := framework.NewNodeInfo(test.existingPods...)
+			nodeInfo.SetNode(node)
+
+			p, err := NewFit(tCtx, &config.NodeResourcesFitArgs{
+				ScoringStrategy: &config.ScoringStrategy{Type: test.strategy, Resources: defaultScoringStrategy.Resources},
+			}, nil, plfeature.Features{
+				EnableDRANodeAllocatableResources: test.enableDRANodeAllocatableResources,
+			})
+			tCtx.ExpectNoError(err, "create fit plugin")
+
+			cycleState := newNodeAllocatableCycleState(test.additionalResources)
+			if test.runPreScore {
+				if status := p.(fwk.PreScorePlugin).PreScore(tCtx, cycleState, pod, []fwk.NodeInfo{nodeInfo}); !status.IsSuccess() {
+					tCtx.Fatalf("prescore failed with status: %v", status)
+				}
+			}
+
+			gotScore, status := p.(fwk.ScorePlugin).Score(tCtx, cycleState, pod, nodeInfo)
+			if !status.IsSuccess() {
+				tCtx.Fatalf("score failed with status: %v", status)
+			}
+			if diff := cmp.Diff(test.wantScore, gotScore); diff != "" {
+				tCtx.Errorf("score does not match (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}
+
 func TestFitPreBindAndUnreserveWithAdditionalNodeAllocatableResources(t *testing.T) {
 	testCtx := ktesting.Init(t)
 	nodeName := "node-1"
