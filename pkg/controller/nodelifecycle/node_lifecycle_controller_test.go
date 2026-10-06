@@ -41,7 +41,9 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	testcore "k8s.io/client-go/testing"
+	"k8s.io/client-go/util/flowcontrol"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	nodetopology "k8s.io/component-helpers/node/topology"
 	kubeletapis "k8s.io/kubelet/pkg/apis"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/nodelifecycle/scheduler"
@@ -2312,6 +2314,13 @@ func TestMonitorNodeHealthRemovesDeletedNodeHealth(t *testing.T) {
 					CreationTimestamp: fakeNow,
 				},
 			},
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "node2",
+					CreationTimestamp: fakeNow,
+					Labels:            map[string]string{v1.LabelTopologyZone: "zone2"},
+				},
+			},
 		},
 		Clientset: fake.NewSimpleClientset(&v1.PodList{}),
 	}
@@ -2335,10 +2344,32 @@ func TestMonitorNodeHealthRemovesDeletedNodeHealth(t *testing.T) {
 	if err := nodeController.monitorNodeHealth(tCtx); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	for _, name := range []string{"node0", "node1"} {
+	for _, name := range []string{"node0", "node1", "node2"} {
 		if nodeController.nodeHealthMap.getDeepCopy(name) == nil {
 			t.Fatalf("expected node health of %s to be recorded", name)
 		}
+	}
+
+	pendingQueue := scheduler.NewRateLimitedTimedQueue(flowcontrol.NewFakeAlwaysRateLimiter())
+	nodeController.zoneNoExecuteTainter[nodetopology.GetZoneKey(fakeNodeHandler.Existing[1])] = pendingQueue
+	if !pendingQueue.Add("node1", "uid1") {
+		t.Fatal("expected node1 to be queued")
+	}
+	processedQueue := scheduler.NewRateLimitedTimedQueue(flowcontrol.NewFakeAlwaysRateLimiter())
+	nodeController.zoneNoExecuteTainter[nodetopology.GetZoneKey(fakeNodeHandler.Existing[2])] = processedQueue
+	if !processedQueue.Add("node2", "uid2") {
+		t.Fatal("expected node2 to be queued")
+	}
+	processed := false
+	processedQueue.Try(tCtx.Logger(), func(value scheduler.TimedValue) (bool, time.Duration) {
+		processed = true
+		return true, 0
+	})
+	if !processed {
+		t.Fatal("expected node2 to be processed")
+	}
+	if processedQueue.Add("node2", "duplicate") {
+		t.Fatal("expected processed node2 to remain in the deduplication set")
 	}
 
 	fakeNodeHandler.Existing = fakeNodeHandler.Existing[:1]
@@ -2353,6 +2384,19 @@ func TestMonitorNodeHealthRemovesDeletedNodeHealth(t *testing.T) {
 	}
 	if nodeController.nodeHealthMap.getDeepCopy("node1") != nil {
 		t.Errorf("expected node health of deleted node1 to be removed")
+	}
+	if nodeController.nodeHealthMap.getDeepCopy("node2") != nil {
+		t.Errorf("expected node health of deleted node2 to be removed")
+	}
+	pendingQueue.Try(tCtx.Logger(), func(value scheduler.TimedValue) (bool, time.Duration) {
+		t.Errorf("deleted node %s remains in the pending taint queue", value.Value)
+		return false, time.Hour
+	})
+	if !pendingQueue.Add("node1", "new-uid1") {
+		t.Error("expected deleted node1 to be removed from the pending taint queue")
+	}
+	if !processedQueue.Add("node2", "new-uid2") {
+		t.Error("expected deleted node2 to be removed from the processed taint queue")
 	}
 }
 

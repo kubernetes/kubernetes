@@ -688,6 +688,11 @@ func (nc *Controller) monitorNodeHealth(ctx context.Context) error {
 		controllerutil.RecordNodeEvent(ctx, nc.recorder, deleted[i].Name, string(deleted[i].UID), v1.EventTypeNormal, "RemovingNode", fmt.Sprintf("Removing Node %v from Controller", deleted[i].Name))
 		delete(nc.knownNodeSet, deleted[i].Name)
 		nc.nodeHealthMap.delete(deleted[i].Name)
+		nc.evictorLock.Lock()
+		for _, tainter := range nc.zoneNoExecuteTainter {
+			tainter.Remove(deleted[i].Name)
+		}
+		nc.evictorLock.Unlock()
 	}
 
 	var zoneToNodeConditionsLock sync.Mutex
