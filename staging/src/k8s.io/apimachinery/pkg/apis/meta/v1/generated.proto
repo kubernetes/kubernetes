@@ -558,7 +558,7 @@ message ListMeta {
   // Clients should not cache sharded list responses as a full representation
   // of the collection.
   //
-  // This is an alpha field and requires enabling the ShardedListAndWatch feature gate.
+  // This is a beta field and is enabled by default via the ShardedListAndWatch feature gate.
   // +featureGate=ShardedListAndWatch
   // +optional
   optional ShardInfo shardInfo = 5;
@@ -700,7 +700,7 @@ message ListOptions {
   //     shard 2: shardRange(object.metadata.uid, '0x8000000000000000', '0xc000000000000000')
   //     shard 3: shardRange(object.metadata.uid, '0xc000000000000000', '0x10000000000000000')
   //
-  // This is an alpha field and requires enabling the ShardedListAndWatch feature gate.
+  // This is a beta field and is enabled by default via the ShardedListAndWatch feature gate.
   // +featureGate=ShardedListAndWatch
   // +optional
   optional string shardSelector = 15;

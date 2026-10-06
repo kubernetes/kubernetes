@@ -99,7 +99,7 @@ type ListMeta struct {
 	// Clients should not cache sharded list responses as a full representation
 	// of the collection.
 	//
-	// This is an alpha field and requires enabling the ShardedListAndWatch feature gate.
+	// This is a beta field and is enabled by default via the ShardedListAndWatch feature gate.
 	// +featureGate=ShardedListAndWatch
 	// +optional
 	ShardInfo *ShardInfo `json:"shardInfo,omitempty" protobuf:"bytes,5,opt,name=shardInfo"`
@@ -493,7 +493,7 @@ type ListOptions struct {
 	//     shard 2: shardRange(object.metadata.uid, '0x8000000000000000', '0xc000000000000000')
 	//     shard 3: shardRange(object.metadata.uid, '0xc000000000000000', '0x10000000000000000')
 	//
-	// This is an alpha field and requires enabling the ShardedListAndWatch feature gate.
+	// This is a beta field and is enabled by default via the ShardedListAndWatch feature gate.
 	// +featureGate=ShardedListAndWatch
 	// +optional
 	ShardSelector string `json:"shardSelector,omitempty" protobuf:"bytes,15,opt,name=shardSelector"`
