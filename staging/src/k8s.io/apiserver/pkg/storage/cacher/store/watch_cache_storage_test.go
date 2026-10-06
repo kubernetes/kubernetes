@@ -37,7 +37,7 @@ func TestWatchCacheStorageMarkConsistent(t *testing.T) {
 	indexers := &cache.Indexers{}
 	s := NewWatchCacheStorage(indexers)
 
-	assert.True(t, s.snapshottingEnabled)
+	assert.True(t, s.SnapshottingEnabled())
 
 	t.Log("New cache collects snapshots")
 	elem1 := &Element{Key: "foo", Object: &mockObject{key: "foo", val: "100"}}
@@ -51,7 +51,7 @@ func TestWatchCacheStorageMarkConsistent(t *testing.T) {
 	t.Log("Inconsistent cache clears old snapshots")
 	s.MarkConsistent(false)
 	assert.Equal(t, 0, s.snapshots.Len())
-	assert.False(t, s.snapshottingEnabled)
+	assert.False(t, s.SnapshottingEnabled())
 	_, err = s.GetExactSnapshotLocked(100)
 	require.Error(t, err)
 
@@ -141,6 +141,7 @@ func TestWatchCacheStorageMatchExactResourceVersionFallback(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
+	assert.Equal(t, uint64(20), snap.ResourceVersion())
 	val, ok, err := snap.GetByKey("foo")
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
@@ -170,6 +171,7 @@ func TestWatchCacheStorageMatchExactResourceVersionFallback(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
+	assert.Equal(t, uint64(30), snap30.ResourceVersion())
 	val, ok, err = snap30.GetByKey("foo")
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
@@ -195,7 +197,7 @@ func TestWatchCacheStorageSnapshots(t *testing.T) {
 	indexers := &cache.Indexers{}
 	s := NewWatchCacheStorage(indexers)
 
-	assert.True(t, s.snapshottingEnabled, "Expected snapshotting to be enabled when feature gate is active")
+	assert.True(t, s.SnapshottingEnabled(), "Expected snapshotting to be enabled when feature gate is active")
 
 	_, err := s.GetExactSnapshotLocked(100)
 	require.Error(t, err, "Expected empty cache to not include any snapshots")
@@ -222,7 +224,17 @@ func TestWatchCacheStorageSnapshots(t *testing.T) {
 
 	snap100, err := s.GetExactSnapshotLocked(100)
 	require.NoError(t, err)
+	assert.Equal(t, uint64(100), snap100.ResourceVersion())
 	elements, err := snap100.OrderedListPrefix("", "")
+	require.NoError(t, err)
+	assert.Len(t, elements, 1)
+	assert.Equal(t, &mockObject{key: "foo", val: "100"}, elements[0].(*Element).Object)
+
+	t.Log("Test cache on intermediate rev 150 between mutations")
+	snap150, err := s.GetExactSnapshotLocked(150)
+	require.NoError(t, err)
+	assert.Equal(t, uint64(100), snap150.ResourceVersion())
+	elements, err = snap150.OrderedListPrefix("", "")
 	require.NoError(t, err)
 	assert.Len(t, elements, 1)
 	assert.Equal(t, &mockObject{key: "foo", val: "100"}, elements[0].(*Element).Object)
@@ -235,6 +247,7 @@ func TestWatchCacheStorageSnapshots(t *testing.T) {
 	t.Log("Test cache on rev 200")
 	snap200, err := s.GetExactSnapshotLocked(200)
 	require.NoError(t, err)
+	assert.Equal(t, uint64(200), snap200.ResourceVersion())
 	elements, err = snap200.OrderedListPrefix("", "")
 	require.NoError(t, err)
 	assert.Len(t, elements, 1)
@@ -243,6 +256,7 @@ func TestWatchCacheStorageSnapshots(t *testing.T) {
 	t.Log("Test cache on rev 300")
 	snap300, err := s.GetExactSnapshotLocked(300)
 	require.NoError(t, err)
+	assert.Equal(t, uint64(300), snap300.ResourceVersion())
 	elements, err = snap300.OrderedListPrefix("", "")
 	require.NoError(t, err)
 	assert.Empty(t, elements)
@@ -255,6 +269,7 @@ func TestWatchCacheStorageSnapshots(t *testing.T) {
 
 	snap400, err := s.GetExactSnapshotLocked(400)
 	require.NoError(t, err)
+	assert.Equal(t, uint64(400), snap400.ResourceVersion())
 	elements, err = snap400.OrderedListPrefix("", "")
 	require.NoError(t, err)
 	assert.Len(t, elements, 1)
@@ -273,6 +288,7 @@ func TestWatchCacheStorageSnapshots(t *testing.T) {
 
 	snap500, err := s.GetExactSnapshotLocked(500)
 	require.NoError(t, err)
+	assert.Equal(t, uint64(500), snap500.ResourceVersion())
 	elements, err = snap500.OrderedListPrefix("", "")
 	require.NoError(t, err)
 	assert.Len(t, elements, 1)
@@ -286,6 +302,7 @@ func TestWatchCacheStorageSnapshots(t *testing.T) {
 
 	snap600, err := s.GetExactSnapshotLocked(600)
 	require.NoError(t, err)
+	assert.Equal(t, uint64(600), snap600.ResourceVersion())
 	elements, err = snap600.OrderedListPrefix("", "")
 	require.NoError(t, err)
 	assert.Len(t, elements, 1)
@@ -308,6 +325,7 @@ func TestWatchCacheStorageSnapshots(t *testing.T) {
 	t.Log("Test cache on rev 700")
 	snap700, err := s.GetExactSnapshotLocked(700)
 	require.NoError(t, err)
+	assert.Equal(t, uint64(700), snap700.ResourceVersion())
 	elements, err = snap700.OrderedListPrefix("", "")
 	require.NoError(t, err)
 	assert.Len(t, elements, 1)

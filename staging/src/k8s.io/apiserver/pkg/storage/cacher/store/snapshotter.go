@@ -53,44 +53,80 @@ import (
 // However, this solution is more complex and is deferred for future implementation.
 //
 // TODO: Rewrite to use a cyclic buffer
-func newSnapshotter() snapshotter {
+func newSnapshotter(enabled bool) snapshotter {
 	return snapshotter{
-		snapshots: btree.New(btreeDegree, func(a, b rvSnapshot) bool {
+		snapshots: btree.New(btreeDegree, func(a, b *btreeStore) bool {
 			return a.resourceVersion < b.resourceVersion
 		}),
+		enabled: enabled,
 	}
 }
 
 type snapshotter struct {
-	snapshots *btree.BTree[rvSnapshot]
-}
-
-type rvSnapshot struct {
+	snapshots       *btree.BTree[*btreeStore]
 	resourceVersion uint64
-	snapshot        Snapshot
+	enabled         bool
 }
 
-func (s *snapshotter) Reset() {
+func (s *snapshotter) Enabled() bool {
+	return s.enabled
+}
+
+func (s *snapshotter) SetEnabled(enabled bool) {
+	s.enabled = enabled
+	s.reset()
+}
+
+func (s *snapshotter) reset() {
 	s.snapshots.Clear(false)
+	s.resourceVersion = 0
 }
 
-func (s *snapshotter) GetLessOrEqual(rv uint64) (Snapshot, bool) {
-	var result *rvSnapshot
-	s.snapshots.DescendLessOrEqual(rvSnapshot{resourceVersion: rv}, func(rvs rvSnapshot) bool {
-		result = &rvs
+func (s *snapshotter) GetLessOrEqual(rv uint64) (*btreeStore, bool) {
+	if !s.enabled {
+		return nil, false
+	}
+	// TODO: if rv > s.resourceVersion return error to separate too old from future RV.
+	var result *btreeStore
+	s.snapshots.DescendLessOrEqual(&btreeStore{resourceVersion: rv}, func(snap *btreeStore) bool {
+		result = snap
 		return false
 	})
 	if result == nil {
 		return nil, false
 	}
-	return result.snapshot, true
+	return result, true
 }
 
-func (s *snapshotter) Add(rv uint64, snapshot Snapshot) {
-	s.snapshots.ReplaceOrInsert(rvSnapshot{resourceVersion: rv, snapshot: snapshot})
+func (s *snapshotter) Replace(snapshot *btreeStore) {
+	if !s.enabled {
+		return
+	}
+	s.reset()
+	s.Add(snapshot)
+}
+
+func (s *snapshotter) Add(snapshot *btreeStore) {
+	if !s.enabled {
+		return
+	}
+	s.snapshots.ReplaceOrInsert(snapshot)
+	// TODO: We should validate that RV is only increasing, instead of just taking max.
+	s.resourceVersion = max(s.resourceVersion, snapshot.resourceVersion)
+}
+
+func (s *snapshotter) UpdateResourceVersion(rv uint64) {
+	if !s.enabled {
+		return
+	}
+	// TODO: We should validate that RV is only increasing, instead of just taking max.
+	s.resourceVersion = max(s.resourceVersion, rv)
 }
 
 func (s *snapshotter) RemoveLess(rv uint64) {
+	if !s.enabled {
+		return
+	}
 	for s.snapshots.Len() > 0 {
 		oldest, ok := s.snapshots.Min()
 		if !ok {
