@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"path"
 	"reflect"
 	"strconv"
@@ -49,6 +50,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/apis/example"
 	examplev1 "k8s.io/apiserver/pkg/apis/example/v1"
+	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
@@ -2735,6 +2737,46 @@ func TestStoreWatch(t *testing.T) {
 					}
 				}
 				wi.Stop()
+			}
+		})
+	}
+}
+
+func TestStoreWatchInvalidResourceVersion(t *testing.T) {
+	for _, cacheEnabled := range []bool{false, true} {
+		t.Run(fmt.Sprintf("cacheEnabled=%t", cacheEnabled), func(t *testing.T) {
+			destroyFunc, registry := newTestGenericStoreRegistry(t, scheme, cacheEnabled)
+			defer destroyFunc()
+
+			ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), "test")
+			for _, tc := range []struct {
+				name          string
+				fieldSelector fields.Selector
+			}{
+				{name: "collection", fieldSelector: fields.Everything()},
+				{name: "single", fieldSelector: fields.OneTermEqualSelector("metadata.name", "foo")},
+			} {
+				t.Run(tc.name, func(t *testing.T) {
+					watcher, err := registry.Watch(ctx, &metainternalversion.ListOptions{
+						ResourceVersion: "invalid",
+						FieldSelector:   tc.fieldSelector,
+					})
+					if watcher != nil {
+						watcher.Stop()
+						t.Fatal("expected no watcher for an invalid resource version")
+					}
+					status := responsewriters.ErrorToAPIStatus(err)
+					if status.Code != http.StatusUnprocessableEntity || status.Reason != metav1.StatusReasonInvalid {
+						t.Fatalf("expected 422 Invalid, got %#v", status)
+					}
+					if status.Details == nil || len(status.Details.Causes) != 1 {
+						t.Fatalf("expected one validation cause, got %#v", status.Details)
+					}
+					cause := status.Details.Causes[0]
+					if cause.Field != "resourceVersion" || cause.Type != metav1.CauseTypeFieldValueInvalid {
+						t.Errorf("expected invalid resourceVersion cause, got %#v", cause)
+					}
+				})
 			}
 		})
 	}
