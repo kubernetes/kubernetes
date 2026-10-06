@@ -26,6 +26,8 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
@@ -1271,6 +1273,150 @@ func readTestCases() []testStep {
 			CorrectResponse: Response{Err: fmt.Errorf("unknown ResourceVersionMatch value: %v", "Newest")},
 			InvalidResponses: []Response{
 				{Object: newTestPodList("18", withLabel(pod4, "17", "version", "v2"))},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name: "List pods with matching label selector",
+			Request: Request{
+				Op:  OpList,
+				Key: "/pods/",
+				List: ListRequest{Options: storage.ListOptions{
+					Recursive: true,
+					Predicate: storage.SelectionPredicate{
+						Label:    labels.SelectorFromSet(labels.Set{"version": "v2"}),
+						Field:    fields.Everything(),
+						GetAttrs: storage.DefaultNamespaceScopedAttr,
+					},
+				}},
+			},
+			CorrectResponse: Response{
+				Object: newTestPodList("18", withLabel(pod4, "17", "version", "v2")),
+			},
+			InvalidResponses: []Response{
+				{Object: newTestPodList("18")},
+				{Object: newTestPodList("17", withLabel(pod4, "17", "version", "v2"))},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name: "List pods with non-matching label selector",
+			Request: Request{
+				Op:  OpList,
+				Key: "/pods/",
+				List: ListRequest{Options: storage.ListOptions{
+					Recursive: true,
+					Predicate: storage.SelectionPredicate{
+						Label:    labels.SelectorFromSet(labels.Set{"version": "v1"}),
+						Field:    fields.Everything(),
+						GetAttrs: storage.DefaultNamespaceScopedAttr,
+					},
+				}},
+			},
+			CorrectResponse: Response{
+				Object: newTestPodList("18"),
+			},
+			InvalidResponses: []Response{
+				{Object: newTestPodList("18", withLabel(pod4, "17", "version", "v2"))},
+				{Object: newTestPodList("18", withLabel(pod4, "16", "version", "v1"))},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name: "List pods with matching field selector",
+			Request: Request{
+				Op:  OpList,
+				Key: "/pods/",
+				List: ListRequest{Options: storage.ListOptions{
+					Recursive: true,
+					Predicate: storage.SelectionPredicate{
+						Label:    labels.Everything(),
+						Field:    fields.OneTermEqualSelector("metadata.name", "pod4"),
+						GetAttrs: storage.DefaultNamespaceScopedAttr,
+					},
+				}},
+			},
+			CorrectResponse: Response{
+				Object: newTestPodList("18", withLabel(pod4, "17", "version", "v2")),
+			},
+			InvalidResponses: []Response{
+				{Object: newTestPodList("18")},
+				{Object: newTestPodList("17", withLabel(pod4, "17", "version", "v2"))},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name: "List pods with non-matching field selector",
+			Request: Request{
+				Op:  OpList,
+				Key: "/pods/",
+				List: ListRequest{Options: storage.ListOptions{
+					Recursive: true,
+					Predicate: storage.SelectionPredicate{
+						Label:    labels.Everything(),
+						Field:    fields.OneTermEqualSelector("metadata.name", "pod5"),
+						GetAttrs: storage.DefaultNamespaceScopedAttr,
+					},
+				}},
+			},
+			CorrectResponse: Response{
+				Object: newTestPodList("18"),
+			},
+			InvalidResponses: []Response{
+				{Object: newTestPodList("18", withLabel(pod4, "17", "version", "v2"))},
+				{Object: newTestPodList("18", withRV(pod5, "15"))},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name: "List pods with Exact ResourceVersion=16 and label selector",
+			Request: Request{
+				Op:  OpList,
+				Key: "/pods/",
+				List: ListRequest{Options: storage.ListOptions{
+					ResourceVersion:      "16",
+					ResourceVersionMatch: metav1.ResourceVersionMatchExact,
+					Recursive:            true,
+					Predicate: storage.SelectionPredicate{
+						Label:    labels.SelectorFromSet(labels.Set{"version": "v1"}),
+						Field:    fields.Everything(),
+						GetAttrs: storage.DefaultNamespaceScopedAttr,
+					},
+				}},
+			},
+			CorrectResponse: Response{
+				Object: newTestPodList("16", withLabel(pod4, "16", "version", "v1")),
+			},
+			InvalidResponses: []Response{
+				{Object: newTestPodList("16", withLabel(pod4, "16", "version", "v1"), withRV(pod5, "15"))},
+				{Object: newTestPodList("16")},
+				{Object: newTestPodList("18")},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name: "List pods with Exact ResourceVersion=16 and field selector",
+			Request: Request{
+				Op:  OpList,
+				Key: "/pods/",
+				List: ListRequest{Options: storage.ListOptions{
+					ResourceVersion:      "16",
+					ResourceVersionMatch: metav1.ResourceVersionMatchExact,
+					Recursive:            true,
+					Predicate: storage.SelectionPredicate{
+						Label:    labels.Everything(),
+						Field:    fields.OneTermEqualSelector("metadata.namespace", "ns10"),
+						GetAttrs: storage.DefaultNamespaceScopedAttr,
+					},
+				}},
+			},
+			CorrectResponse: Response{
+				Object: newTestPodList("16", withRV(pod5, "15")),
+			},
+			InvalidResponses: []Response{
+				{Object: newTestPodList("16", withLabel(pod4, "16", "version", "v1"), withRV(pod5, "15"))},
+				{Object: newTestPodList("16")},
+				{Object: newTestPodList("18")},
 				{Object: nil, Err: nil},
 			},
 		},
