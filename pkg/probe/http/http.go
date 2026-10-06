@@ -31,6 +31,10 @@ import (
 )
 
 const (
+	// maxRespBodyLength caps how much of the body is read. The body is only logged; the result
+	// depends on the status code. Once this many bytes arrive, reading stops without waiting for
+	// the rest, so a response that sends 200 and then stalls only fails the probe if it stalls
+	// before this many bytes.
 	maxRespBodyLength = 10 * 1 << 10 // 10KB
 )
 
