@@ -231,6 +231,8 @@ func (sched *Scheduler) prepareForBindingCycle(
 		}
 
 		return assumedPodInfo, runPermitStatus
+	} else {
+		schedFramework.AddPodInPreBind(assumedPod.UID, nil)
 	}
 
 	// At the end of a successful scheduling cycle, pop and move up Pods if needed.
@@ -370,11 +372,10 @@ func (sched *Scheduler) bindingCycle(
 	sched.SchedulingQueue.Done(assumedPod.UID)
 
 	// If we are going to run prebind plugins we put the pod in binding map to optimize preemption.
+	var podInPreBindCancel context.CancelCauseFunc
+	ctx, podInPreBindCancel = context.WithCancelCause(ctx)
+	defer podInPreBindCancel(nil)
 	if preFlightStatus.IsSuccess() {
-		var podInPreBindCancel context.CancelCauseFunc
-		ctx, podInPreBindCancel = context.WithCancelCause(ctx)
-		defer podInPreBindCancel(nil)
-		defer schedFramework.RemovePodInPreBind(assumedPod.UID)
 		schedFramework.AddPodInPreBind(assumedPod.UID, podInPreBindCancel)
 	}
 	// Run "prebind" plugins.
@@ -386,6 +387,9 @@ func (sched *Scheduler) bindingCycle(
 	bindingPod := schedFramework.GetPodInPreBind(assumedPod.UID)
 	if bindingPod != nil && !bindingPod.MarkPrebound() {
 		err := context.Cause(ctx)
+		if err == nil {
+			err = errors.New("pod was preempted before binding")
+		}
 		return fwk.AsStatus(err)
 	}
 
@@ -393,6 +397,7 @@ func (sched *Scheduler) bindingCycle(
 	if status := sched.bind(ctx, schedFramework, assumedPod, scheduleResult.SuggestedHost, state); !status.IsSuccess() {
 		return status
 	}
+	schedFramework.RemovePodInPreBind(assumedPod.UID)
 
 	// Calculating nodeResourceString can be heavy. Avoid it if klog verbosity is below 2.
 	logger.V(2).Info("Successfully bound pod to node", "pod", klog.KObj(assumedPod), "node", scheduleResult.SuggestedHost, "evaluatedNodes", scheduleResult.EvaluatedNodes, "feasibleNodes", scheduleResult.FeasibleNodes)

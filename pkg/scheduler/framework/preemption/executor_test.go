@@ -1442,7 +1442,9 @@ func TestPreemptPod(t *testing.T) {
 	tests := []struct {
 		name                         string
 		addVictimToPrebind           bool
+		cancelVictimInPrebind        bool
 		addVictimToWaiting           bool
+		rejectWaitingVictim          bool
 		notFoundOnPatch              bool
 		notFoundOnDelete             bool
 		expectCancel                 bool
@@ -1457,8 +1459,23 @@ func TestPreemptPod(t *testing.T) {
 			expectedActions:              []string{},
 		},
 		{
+			name:                         "Trigger C: victim in preBind was already cancelled, returns false without API delete",
+			addVictimToPrebind:           true,
+			cancelVictimInPrebind:        true,
+			expectCancel:                 true,
+			wantWillProduceDeletionEvent: false,
+			expectedActions:              []string{},
+		},
+		{
 			name:                         "victim is in waiting pods, it should be rejected (no calls to apiserver)",
 			addVictimToWaiting:           true,
+			wantWillProduceDeletionEvent: false,
+			expectedActions:              []string{},
+		},
+		{
+			name:                         "Trigger C: waiting victim was already rejected in memory, returns false without API delete",
+			addVictimToWaiting:           true,
+			rejectWaitingVictim:          true,
 			wantWillProduceDeletionEvent: false,
 			expectedActions:              []string{},
 		},
@@ -1532,6 +1549,9 @@ func TestPreemptPod(t *testing.T) {
 				if tt.addVictimToPrebind {
 					victimCtx, cancel = context.WithCancelCause(context.Background())
 					schedFramework.AddPodInPreBind(victimCopy.UID, cancel)
+					if tt.cancelVictimInPrebind {
+						schedFramework.GetPodInPreBind(victimCopy.UID).CancelPod("already cancelled")
+					}
 				}
 				if tt.addVictimToWaiting {
 					pluginsWaitTime, status := schedFramework.RunPermitPlugins(ctx, framework.NewCycleState(), victimCopy, "fake-node")
@@ -1539,6 +1559,9 @@ func TestPreemptPod(t *testing.T) {
 						t.Fatalf("Failed to add a pod to waiting list")
 					}
 					schedFramework.AddWaitingPod(victimCopy, pluginsWaitTime)
+					if tt.rejectWaitingVictim {
+						schedFramework.GetWaitingPod(victimCopy.UID).Reject(waitingPermitPluginName, "rejected")
+					}
 				}
 				pe := NewExecutor(schedFramework, feature.Features{})
 
@@ -1602,6 +1625,7 @@ func TestPrepareCandidateAsyncActivatesPreemptorAfterLastVictimInMemoryPreemptio
 		addVictimToPrebind          bool
 		addVictimToPrebindOnPreempt bool
 		addVictimToWaiting          bool
+		rejectWaitingVictim         bool
 		preemptorGenericPodGroup    *fwk.GenericPodGroup
 		preemptorPods               []*v1.Pod
 		wantPreemptorActivate       bool
@@ -1611,6 +1635,14 @@ func TestPrepareCandidateAsyncActivatesPreemptorAfterLastVictimInMemoryPreemptio
 			victimPods:            []*v1.Pod{waitingVictim},
 			inMemoryVictim:        waitingVictim,
 			addVictimToWaiting:    true,
+			wantPreemptorActivate: true,
+		},
+		{
+			name:                  "Trigger C: last waiting pod already rejected before PreemptPod",
+			victimPods:            []*v1.Pod{waitingVictim.DeepCopy()},
+			inMemoryVictim:        waitingVictim.DeepCopy(),
+			addVictimToWaiting:    true,
+			rejectWaitingVictim:   true,
 			wantPreemptorActivate: true,
 		},
 		{
@@ -1818,6 +1850,9 @@ func TestPrepareCandidateAsyncActivatesPreemptorAfterLastVictimInMemoryPreemptio
 					t.Fatalf("Failed to add a pod to waiting list")
 				}
 				schedFwk.AddWaitingPod(tt.inMemoryVictim, pluginsWaitTime)
+				if tt.rejectWaitingVictim {
+					schedFwk.GetWaitingPod(tt.inMemoryVictim.UID).Reject(waitingPermitPluginName, "rejected")
+				}
 			}
 
 			executor := NewExecutor(schedFwk, feature.Features{EnableAsyncPreemption: true})

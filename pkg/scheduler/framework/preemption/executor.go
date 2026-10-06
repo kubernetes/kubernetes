@@ -114,13 +114,16 @@ func NewExecutor(fh fwk.Handle, fts feature.Features) *Executor {
 				logger.V(2).Info("Preemptor preempted a waiting pod", "preemptorType", preemptor.Type(), "preemptor", klog.KObj(preemptor), "waitingPod", klog.KObj(victim), "node", c.Name())
 				preemptedInMemory = true
 			}
-		} else if podInPreBind := e.fh.GetPodInPreBind(victim.UID); podInPreBind != nil {
-			// If the victim is in the preBind cancel the binding process.
-			if podInPreBind.CancelPod(fmt.Sprintf("preempted by %s", pluginName)) {
-				logger.V(2).Info("Preemptor rejected a pod in preBind", "preemptorType", preemptor.Type(), "preemptor", klog.KObj(preemptor), "podInPreBind", klog.KObj(victim), "node", c.Name())
-				preemptedInMemory = true
-			} else {
-				logger.V(5).Info("Failed to reject a pod in preBind, falling back to deletion via api call", "preemptor", klog.KObj(preemptor), "podInPreBind", klog.KObj(victim), "node", c.Name())
+		}
+		if !preemptedInMemory {
+			if podInPreBind := e.fh.GetPodInPreBind(victim.UID); podInPreBind != nil {
+				// If the victim is in the binding cycle or was already rejected in memory, cancel the binding process.
+				if podInPreBind.CancelPod(fmt.Sprintf("preempted by %s", pluginName)) {
+					logger.V(2).Info("Preemptor rejected a pod in preBind", "preemptorType", preemptor.Type(), "preemptor", klog.KObj(preemptor), "podInPreBind", klog.KObj(victim), "node", c.Name())
+					preemptedInMemory = true
+				} else {
+					logger.V(5).Info("Failed to reject a pod in preBind, falling back to deletion via api call", "preemptor", klog.KObj(preemptor), "podInPreBind", klog.KObj(victim), "node", c.Name())
+				}
 			}
 		}
 		if !preemptedInMemory {

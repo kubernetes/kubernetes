@@ -2227,6 +2227,7 @@ func (f *frameworkImpl) runPlacementFeasiblePlugin(ctx context.Context, pl fwk.P
 func (f *frameworkImpl) AddWaitingPod(pod *v1.Pod, pluginsWaitTime map[string]time.Duration) {
 	waitingPod := newWaitingPod(pod, pluginsWaitTime)
 	f.waitingPods.add(waitingPod)
+	f.podsInPreBind.add(pod.UID, nil)
 }
 
 // RunPlacementGeneratePlugins runs the set of configured PlacementGeneratePlugins and returns the generated placements.
