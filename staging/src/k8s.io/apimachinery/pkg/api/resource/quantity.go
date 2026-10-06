@@ -711,20 +711,27 @@ func (q *Quantity) AsScale(scale Scale) (CanonicalValue, bool) {
 // This function is unsafe to call concurrently with method calls from other
 // goroutines (even to read-only methods).
 func (q *Quantity) RoundUp(scale Scale) bool {
+	// avoid clearing the string value if we have already calculated it
+	if q.widenedScale() >= widenScale(scale) {
+		return true
+	}
+	q.s = cachedString{}
 	if q.d.Dec != nil {
-		q.s = cachedString{}
 		d, exact := q.d.AsScale(scale)
 		q.d = d
 		return exact
 	}
-	// avoid clearing the string value if we have already calculated it
-	if q.i.scale >= scale {
-		return true
-	}
-	q.s = cachedString{}
 	i, exact := q.i.AsScale(scale)
 	q.i = i
 	return exact
+}
+
+// widenedScale returns the base-10 scale exponent as a widenedScale.
+func (q *Quantity) widenedScale() widenedScale {
+	if q.d.Dec != nil {
+		return q.d.widenedScale()
+	}
+	return q.i.widenedScale()
 }
 
 // Add adds the provide y quantity to the current value. If the current value is zero,
