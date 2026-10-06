@@ -204,18 +204,32 @@ linters:
           deny:
             - pkg: "k8s.io/utils/pointer"
               desc: "k8s.io/utils/pointer shall no longer be used, please use k8s.io/utils/ptr."
-        go-cmp:
+        test-only-dependencies:
           files:
+            # Apply deny list to all files except for _test.go files.
             - $all
             - "!$test"
+            # Some normal packages are meant to be used only in tests and thus
+            # are also exempt.
             - "!**/test/**"
             - "!**/testing/**"
+            - "!**/ktesting/**"
             - "!**/apitesting/**"
           deny:
             - pkg: "github.com/google/go-cmp/cmp"
               desc: "cmp is allowed only in test files"
             - pkg: "html/template"
               desc: "template is allowed only in test files as it disables dead code elimination"
+            - pkg: "k8s.io/ktesting"
+              desc: "ktesting is allowed only in test files"
+            - pkg: "k8s.io/client-go/ktesting"
+              desc: "ktesting is allowed only in test files"
+            # Normal packages exempted above also must not be used in production code.
+            # depguard wants a prefix here, so we would need to list packages explicitly
+            # instead of using wildcards as above.
+            #
+            # This only covers one level of indirection, though.
+            # A better solution might be transitive deny (https://github.com/OpenPeeDeeP/depguard/issues/68).
     forbidigo:
       analyze-types: true
       forbid:
