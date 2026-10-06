@@ -377,7 +377,7 @@ func validateCSINodeDriverRegistrations(registrations []storage.CSINodeDriverReg
 		driverNodeIDs[driver.Name] = driver.NodeID
 	}
 
-	registrationNames := sets.New[string]()
+	registrationNames := make(sets.Set[string], len(registrations))
 	for i, registration := range registrations {
 		idxPath := fldPath.Index(i)
 		allErrs = append(allErrs, apivalidation.ValidateCSIDriverName(registration.Name, idxPath.Child("name"), apivalidation.RequiredCovered)...)
