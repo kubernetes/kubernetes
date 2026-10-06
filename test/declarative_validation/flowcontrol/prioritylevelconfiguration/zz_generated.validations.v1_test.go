@@ -71,9 +71,11 @@ func init() {
 			},
 			"spec.limited": {
 				{ErrorType: "FieldValueForbidden"},
+				{ErrorType: "FieldValueRequired"},
 			},
 			"spec.limited.limitResponse.queuing": {
 				{ErrorType: "FieldValueForbidden"},
+				{ErrorType: "FieldValueRequired"},
 			},
 			"spec.limited.limitResponse.type": {
 				{ErrorType: "FieldValueRequired"},

@@ -468,6 +468,14 @@ func recordRules(rules fieldRules, basePath string, fg validators.FunctionGen, s
 			for _, child := range a.Functions {
 				recordRules(rules, basePath, child, suffix+a.PathFragment)
 			}
+		case validators.SliceLiteral:
+			recordRules(rules, basePath, validators.FunctionGen{Args: a.Elements}, suffix)
+		case validators.StructLiteral:
+			var values []any
+			for _, f := range a.Fields {
+				values = append(values, f.Value)
+			}
+			recordRules(rules, basePath, validators.FunctionGen{Args: values}, suffix)
 		}
 	}
 }
