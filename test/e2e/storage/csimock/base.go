@@ -247,7 +247,7 @@ func (m *mockDriverSetup) cleanup(ctx context.Context) {
 				errs = append(errs, err)
 			}
 			if claim.Spec.VolumeName != "" {
-				errs = append(errs, e2epv.WaitForPersistentVolumeDeleted(ctx, cs, claim.Spec.VolumeName, framework.Poll, 2*time.Minute))
+				errs = append(errs, e2epv.WaitForPersistentVolumeDeleted(ctx, cs, claim.Spec.VolumeName, framework.Poll, m.f.Timeouts.PVDelete))
 			}
 		}
 	}
