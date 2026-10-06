@@ -20,6 +20,7 @@ import (
 	"context"
 	"io"
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -181,6 +182,37 @@ func TestDryRunRoundTripperActions(t *testing.T) {
 				t.Errorf("action differs (-want,+got):\n%s", diff)
 			}
 		})
+	}
+}
+
+func TestDryRunRoundTripperListFilter(t *testing.T) {
+	pod := func(name string) corev1.Pod {
+		return corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: metav1.NamespaceSystem, Labels: map[string]string{"component": name}}}
+	}
+	d := NewDryRun().WithDefaultMarshalFunction().WithWriter(io.Discard)
+	d.PrependReactor(&clienttesting.SimpleReactor{
+		Verb:     "list",
+		Resource: "pods",
+		Reaction: func(clienttesting.Action) (bool, runtime.Object, error) {
+			return true, &corev1.PodList{Items: []corev1.Pod{pod("kube-apiserver"), pod("etcd")}}, nil
+		},
+	})
+	for _, tc := range []struct{ selector, want string }{
+		{"", "kube-apiserver,etcd"},
+		{"component=kube-apiserver", "kube-apiserver"},
+		{"component=none", ""},
+	} {
+		list, err := d.FakeClient().CoreV1().Pods(metav1.NamespaceSystem).List(context.Background(), metav1.ListOptions{LabelSelector: tc.selector})
+		if err != nil {
+			t.Fatalf("%q: unexpected error: %v", tc.selector, err)
+		}
+		var names []string
+		for _, p := range list.Items {
+			names = append(names, p.Name)
+		}
+		if got := strings.Join(names, ","); got != tc.want {
+			t.Errorf("%q: got %q, want %q", tc.selector, got, tc.want)
+		}
 	}
 }
 

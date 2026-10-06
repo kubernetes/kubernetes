@@ -91,6 +91,11 @@ func (rt *dryRunRoundTripper) RoundTrip(req *http.Request) (*http.Response, erro
 	if err != nil {
 		return errorResponse(req, err), nil
 	}
+	if list, ok := action.(testing.ListAction); ok && obj != nil {
+		if err := filterByLabels(obj, list.GetListRestrictions().Labels); err != nil {
+			return errorResponse(req, err), nil
+		}
+	}
 	if obj == nil {
 		obj = &metav1.Status{Status: metav1.StatusSuccess, Code: http.StatusOK}
 	}
@@ -178,6 +183,24 @@ func parseResourcePath(path string) (gvr schema.GroupVersionResource, namespace,
 		return gvr, namespace, name, subresource, true
 	}
 	return gvr, "", "", "", false
+}
+
+// filterByLabels drops the list items sel does not match, as the typed fake clients did.
+func filterByLabels(obj runtime.Object, sel labels.Selector) error {
+	if sel == nil || sel.Empty() {
+		return nil
+	}
+	items, err := meta.ExtractList(obj)
+	if err != nil {
+		return err
+	}
+	kept := items[:0]
+	for _, item := range items {
+		if m, err := meta.Accessor(item); err == nil && sel.Matches(labels.Set(m.GetLabels())) {
+			kept = append(kept, item)
+		}
+	}
+	return meta.SetList(obj, kept)
 }
 
 // decodeBody decodes a request body into the typed object the reactors expect.
