@@ -19,7 +19,6 @@ package utils
 import (
 	"context"
 	"fmt"
-	"testing"
 	"time"
 
 	apps "k8s.io/api/apps/v1"
@@ -54,7 +53,7 @@ func UpdateReplicaSetWithRetries(c clientset.Interface, namespace, name string, 
 }
 
 // Verify .Status.Replicas is equal to .Spec.Replicas
-func WaitRSStable(t *testing.T, clientSet clientset.Interface, rs *apps.ReplicaSet, pollInterval, pollTimeout time.Duration) error {
+func WaitRSStable(t TB, clientSet clientset.Interface, rs *apps.ReplicaSet, pollInterval, pollTimeout time.Duration) error {
 	desiredGeneration := rs.Generation
 	if err := wait.PollImmediate(pollInterval, pollTimeout, func() (bool, error) {
 		newRS, err := clientSet.AppsV1().ReplicaSets(rs.Namespace).Get(context.TODO(), rs.Name, metav1.GetOptions{})

@@ -41,6 +41,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubeapiserver"
 	registrypod "k8s.io/kubernetes/pkg/registry/core/pod"
 	"k8s.io/kubernetes/test/integration/framework"
+	testutils "k8s.io/kubernetes/test/utils"
 )
 
 func cacheKeyFunc(obj runtime.Object) (string, error) {
@@ -54,7 +55,7 @@ func cacheKeyFunc(obj runtime.Object) (string, error) {
 	return "/pods/" + pod.Namespace + "/" + pod.Name, nil
 }
 
-func newEtcdStorageForResource(t *testing.T, etcdConfig *storagebackend.Config, resource schema.GroupResource) *storagebackend.ConfigForResource {
+func newEtcdStorageForResource(t testutils.TB, etcdConfig *storagebackend.Config, resource schema.GroupResource) *storagebackend.ConfigForResource {
 	t.Helper()
 
 	completedConfig := kubeapiserver.NewStorageFactoryConfig().Complete(options.NewEtcdOptions(etcdConfig))

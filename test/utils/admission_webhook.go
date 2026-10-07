@@ -24,7 +24,6 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"testing"
 
 	"k8s.io/api/admission/v1beta1"
 )
@@ -52,7 +51,7 @@ func NewAdmissionWebhookServer(handler http.Handler) (string, func(), error) {
 
 // AdmissionWebhookHandler creates a HandlerFunc that decodes/encodes AdmissionReview and performs
 // given admit function
-func AdmissionWebhookHandler(t *testing.T, admit func(*v1beta1.AdmissionReview) error) http.HandlerFunc {
+func AdmissionWebhookHandler(t TB, admit func(*v1beta1.AdmissionReview) error) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		defer r.Body.Close()
 		data, err := io.ReadAll(r.Body)

@@ -37,6 +37,24 @@ import (
 	storagetesting "k8s.io/apiserver/pkg/storage/testing"
 )
 
+// T is the subset of testing.T or ktesting.TContext needed by this package.
+type T interface {
+	Cleanup(func())
+	Error(args ...any)
+	Errorf(format string, args ...any)
+	Fail()
+	FailNow()
+	Failed() bool
+	Fatal(args ...any)
+	Helper()
+	Logf(format string, args ...any)
+	Name() string
+	TempDir() string
+}
+
+// This tells the vet printf checker that methods in the interface must be checked.
+var _ T = &testing.T{}
+
 // getAvailablePort returns a TCP port that is available for binding.
 func getAvailablePorts(count int) ([]int, error) {
 	ports := []int{}
@@ -59,7 +77,7 @@ func getAvailablePorts(count int) ([]int, error) {
 //   - uses free ports for client and peer listeners
 //   - cleans up the data directory on test termination
 //   - silences server logs other than errors
-func newTestConfig(t testing.TB) *embed.Config {
+func newTestConfig(t T) *embed.Config {
 	cfg := embed.NewConfig()
 
 	cfg.UnsafeNoFsync = true
@@ -88,7 +106,7 @@ var autoPortLock sync.Mutex
 // RunEtcd starts an embedded etcd server with a test configuration run through
 // any provided configuration tweak functions, and returns a client connected to the server.
 // The server is terminated when the test ends.
-func RunEtcd(t testing.TB, tweakConfig ...func(cfg *embed.Config)) *kubernetes.Client {
+func RunEtcd(t T, tweakConfig ...func(cfg *embed.Config)) *kubernetes.Client {
 	t.Helper()
 
 	// lock until we successfully start the server on the ports we chose

@@ -19,7 +19,6 @@ package podgroup
 import (
 	"context"
 	"fmt"
-	"testing"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -35,6 +34,7 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/scheduler/backend/queue"
 	testutils "k8s.io/kubernetes/test/integration/util"
+	utiltesting "k8s.io/kubernetes/test/utils"
 )
 
 type WaitForAnyPodsScheduled struct {
@@ -786,7 +786,7 @@ func runScheduleOne(testCtx *testutils.TestContext) {
 // RunSteps executes steps in the given order. It executes only first encountered operation in step.
 // If there is no operation in the step, it will return an error.
 // If there is an error in any step, it will stop and return the error.
-func RunSteps(testCtx *testutils.TestContext, t *testing.T, ns string, steps []Step) error {
+func RunSteps(testCtx *testutils.TestContext, t utiltesting.TB, ns string, steps []Step) error {
 	for i, step := range steps {
 		if step.Name == "" {
 			return fmt.Errorf("step name cannot be empty")

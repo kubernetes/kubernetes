@@ -1,5 +1,5 @@
 /*
-Copyright 2018 The Kubernetes Authors.
+Copyright The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,35 +14,25 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package fake
+package utils
 
-type T interface {
+import "testing"
+
+// TB is the subset of testing.T and testing.TB that is needed by helpers in
+// test/utils and test/integration/framework.
+type TB interface {
+	Cleanup(func())
+	Error(args ...any)
+	Errorf(format string, args ...any)
+	FailNow()
+	Fatal(args ...any)
+	Fatalf(format string, args ...any)
 	Helper()
-	Error(...any)
+	Log(args ...any)
+	Logf(format string, args ...any)
+	Name() string
+	TempDir() string
 }
 
-func NewCloser(t T) *Closer {
-	return &Closer{
-		t: t,
-	}
-}
-
-type Closer struct {
-	wasCalled bool
-	t         T
-}
-
-func (c *Closer) Close() error {
-	c.wasCalled = true
-	return nil
-}
-
-func (c *Closer) Check() *Closer {
-	c.t.Helper()
-
-	if !c.wasCalled {
-		c.t.Error("expected closer to have been called")
-	}
-
-	return c
-}
+// This tells the vet printf checker that methods in the interface must be checked.
+var _ TB = &testing.T{}

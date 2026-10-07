@@ -43,6 +43,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/podautoscaler"
 	metricsclient "k8s.io/kubernetes/pkg/controller/podautoscaler/metrics"
 	"k8s.io/kubernetes/test/integration/framework"
+	testutils "k8s.io/kubernetes/test/utils"
 	emapi "k8s.io/metrics/pkg/apis/external_metrics/v1beta1"
 	metricsclientset "k8s.io/metrics/pkg/client/clientset/versioned"
 	emfake "k8s.io/metrics/pkg/client/external_metrics/fake"
@@ -72,7 +73,7 @@ type testClients struct {
 //
 // Creates an external metrics server to connect to, and returns a pointer to the
 // metric value it's serving.
-func createClients(t *testing.T, config *restclient.Config) (testClients, *atomic.Value) {
+func createClients(t testutils.TB, config *restclient.Config) (testClients, *atomic.Value) {
 	apiServer := clientset.NewForConfigOrDie(config)
 	metrics := metricsclientset.NewForConfigOrDie(config)
 	externalMetrics, externalMetricValue := setupFakeExternalMetrics()
@@ -95,7 +96,7 @@ func createClients(t *testing.T, config *restclient.Config) (testClients, *atomi
 	}, externalMetricValue
 }
 
-func createTestNamespace(t *testing.T, c *clientset.Clientset) *corev1.Namespace {
+func createTestNamespace(t testutils.TB, c *clientset.Clientset) *corev1.Namespace {
 	ns := framework.CreateNamespaceOrDie(c, "podautoscaler", t)
 	t.Cleanup(func() {
 		framework.DeleteNamespaceOrDie(c, ns, t)

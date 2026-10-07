@@ -18,7 +18,6 @@ package apiserver
 
 import (
 	"path"
-	"testing"
 
 	"github.com/google/uuid"
 
@@ -29,7 +28,9 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/util/cert"
+	"k8s.io/ktesting"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
+	testutils "k8s.io/kubernetes/test/utils"
 	"k8s.io/kubernetes/test/utils/kubeconfig"
 )
 
@@ -46,7 +47,7 @@ type TestAPIServer struct {
 // StartAPIServer runs etcd and apiserver in the background in the same
 // process. All resources get released automatically when the test
 // completes. If startup fails, the test gets aborted.
-func StartAPITestServer(t *testing.T) TestAPIServer {
+func StartAPITestServer(t ktesting.TB) TestAPIServer {
 	etcdClient := etcdserver.RunEtcd(t)
 	storageConfig := storagebackend.NewDefaultConfig(path.Join(uuid.New().String(), "registry"), nil)
 	storageConfig.Transport.ServerList = etcdClient.Endpoints()
@@ -64,7 +65,7 @@ func StartAPITestServer(t *testing.T) TestAPIServer {
 	}
 }
 
-func writeKubeConfigForWardleServerToKASConnection(t *testing.T, kubeClientConfig *rest.Config) string {
+func writeKubeConfigForWardleServerToKASConnection(t testutils.TB, kubeClientConfig *rest.Config) string {
 	// write a kubeconfig out for starting other API servers with delegated auth.  remember, no in-cluster config
 	// the loopback client config uses a loopback cert with different SNI.  We need to use the "real"
 	// cert, so we'll hope we aren't hacked during a unit test and instead load it from the server we started.
