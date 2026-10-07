@@ -1266,6 +1266,44 @@ func TestReplicaCalcObjectMetric(t *testing.T) {
 			expectedUsage:    50000,
 		},
 		{
+			name: "does not scale down above target when pods are unready",
+			fixture: calcScenario{
+				currentReplicas: 10,
+				podReadiness: []v1.ConditionStatus{
+					v1.ConditionTrue, v1.ConditionFalse, v1.ConditionFalse, v1.ConditionFalse, v1.ConditionFalse,
+					v1.ConditionFalse, v1.ConditionFalse, v1.ConditionFalse, v1.ConditionFalse, v1.ConditionFalse,
+				},
+				metric: objectMetric(200),
+			},
+			targetUsage:      100,
+			expectedReplicas: 10,
+			expectedUsage:    200,
+		},
+		{
+			name: "does not scale down above target when all pods are unready",
+			fixture: calcScenario{
+				currentReplicas: 10,
+				podReadiness: []v1.ConditionStatus{
+					v1.ConditionFalse, v1.ConditionFalse, v1.ConditionFalse, v1.ConditionFalse, v1.ConditionFalse,
+					v1.ConditionFalse, v1.ConditionFalse, v1.ConditionFalse, v1.ConditionFalse, v1.ConditionFalse,
+				},
+				metric: objectMetric(200),
+			},
+			targetUsage:      100,
+			expectedReplicas: 10,
+			expectedUsage:    200,
+		},
+		{
+			name: "all pods ready still scales up above target",
+			fixture: calcScenario{
+				currentReplicas: 10,
+				metric:          objectMetric(200),
+			},
+			targetUsage:      100,
+			expectedReplicas: 20,
+			expectedUsage:    200,
+		},
+		{
 			name: "scale down",
 			fixture: calcScenario{
 				currentReplicas: 5,
@@ -1432,15 +1470,75 @@ func TestReplicaCalcExternalMetric(t *testing.T) {
 
 	cases := []metricCase{
 		{
-			name: "scale down: ignores unready pods (would otherwise scale up)",
+			name: "does not scale down above target when pods are unready",
 			fixture: calcScenario{
 				currentReplicas: 3,
 				podReadiness:    []v1.ConditionStatus{v1.ConditionFalse, v1.ConditionTrue, v1.ConditionFalse},
 				metric:          externalMetric(8600),
 			},
 			targetUsage:      4400,
-			expectedReplicas: 2, // Would be 6 if we didn't ignore unready pods.
+			expectedReplicas: 3,
 			expectedUsage:    8600,
+		},
+		{
+			name: "does not scale down above target when all pods are unready",
+			fixture: calcScenario{
+				currentReplicas: 3,
+				podReadiness:    []v1.ConditionStatus{v1.ConditionFalse, v1.ConditionFalse, v1.ConditionFalse},
+				metric:          externalMetric(8600),
+			},
+			targetUsage:      4400,
+			expectedReplicas: 3,
+			expectedUsage:    8600,
+		},
+		{
+			name: "does not scale up below target when ready pods exceed current replicas",
+			fixture: calcScenario{
+				currentReplicas: 3,
+				podPhase:        []v1.PodPhase{v1.PodRunning, v1.PodRunning, v1.PodRunning, v1.PodRunning, v1.PodRunning},
+				metric:          externalMetric(8000),
+			},
+			targetUsage:      10000,
+			expectedReplicas: 3,
+			expectedUsage:    8000,
+		},
+		{
+			name: "issue 142753: one ready pod holds current replicas above target",
+			fixture: calcScenario{
+				currentReplicas: 10,
+				podReadiness: []v1.ConditionStatus{
+					v1.ConditionTrue, v1.ConditionFalse, v1.ConditionFalse, v1.ConditionFalse, v1.ConditionFalse,
+					v1.ConditionFalse, v1.ConditionFalse, v1.ConditionFalse, v1.ConditionFalse, v1.ConditionFalse,
+				},
+				metric: externalMetric(200),
+			},
+			targetUsage:      100,
+			expectedReplicas: 10,
+			expectedUsage:    200,
+		},
+		{
+			name: "issue 142753: five ready pods hold current replicas above target",
+			fixture: calcScenario{
+				currentReplicas: 10,
+				podReadiness: []v1.ConditionStatus{
+					v1.ConditionTrue, v1.ConditionTrue, v1.ConditionTrue, v1.ConditionTrue, v1.ConditionTrue,
+					v1.ConditionFalse, v1.ConditionFalse, v1.ConditionFalse, v1.ConditionFalse, v1.ConditionFalse,
+				},
+				metric: externalMetric(200),
+			},
+			targetUsage:      100,
+			expectedReplicas: 10,
+			expectedUsage:    200,
+		},
+		{
+			name: "issue 142753: all pods ready still scales up above target",
+			fixture: calcScenario{
+				currentReplicas: 10,
+				metric:          externalMetric(200),
+			},
+			targetUsage:      100,
+			expectedReplicas: 20,
+			expectedUsage:    200,
 		},
 		{
 			name: "scale down",
@@ -1461,6 +1559,16 @@ func TestReplicaCalcExternalMetric(t *testing.T) {
 			targetUsage:      8888,
 			expectedReplicas: 3,
 			expectedUsage:    8600,
+		},
+		{
+			name: "exactly at target",
+			fixture: calcScenario{
+				currentReplicas: 3,
+				metric:          externalMetric(10000),
+			},
+			targetUsage:      10000,
+			expectedReplicas: 3,
+			expectedUsage:    10000,
 		},
 		{
 			name:       "outside configurable 1% tolerance",

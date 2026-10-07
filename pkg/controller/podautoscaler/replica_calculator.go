@@ -291,6 +291,11 @@ func (c *ReplicaCalculator) getUsageRatioReplicaCount(currentReplicas int32, usa
 			return 0, time.Time{}, fmt.Errorf("unable to calculate ready pods: %s", err)
 		}
 		replicaCount = ceilToInt32(usageRatio * float64(readyPodCount))
+		if (usageRatio < 1.0 && replicaCount > currentReplicas) ||
+			(usageRatio > 1.0 && replicaCount < currentReplicas) {
+			// Readiness should not change the direction indicated by the metric.
+			return currentReplicas, timestamp, nil
+		}
 	} else {
 		// Scale to zero or n pods depending on usageRatio
 		replicaCount = ceilToInt32(usageRatio)
