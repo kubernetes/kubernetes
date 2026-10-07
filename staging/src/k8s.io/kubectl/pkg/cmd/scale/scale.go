@@ -30,7 +30,6 @@ import (
 	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/cli-runtime/pkg/resource"
-	"k8s.io/client-go/kubernetes"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/scale"
 	"k8s.io/kubectl/pkg/util/completion"
@@ -95,8 +94,6 @@ func NewScaleFlags(streams genericiooptions.IOStreams) *ScaleFlags {
 
 type ScaleOptions struct {
 	FilenameOptions resource.FilenameOptions
-	RecordFlags     *genericclioptions.RecordFlags
-	PrintFlags      *genericclioptions.PrintFlags
 	PrintObj        printers.ResourcePrinterFunc
 
 	Selector        string
@@ -111,11 +108,8 @@ type ScaleOptions struct {
 	namespace                    string
 	enforceNamespace             bool
 	args                         []string
-	shortOutput                  bool
-	clientSet                    kubernetes.Interface
 	scaler                       scale.Scaler
 	unstructuredClientForMapping func(mapping *meta.RESTMapping) (resource.RESTClient, error)
-	parent                       string
 	dryRunStrategy               cmdutil.DryRunStrategy
 
 	genericiooptions.IOStreams
@@ -145,11 +139,6 @@ func (flags *ScaleFlags) ToOptions(f cmdutil.Factory, cmd *cobra.Command, args [
 		return nil, err
 	}
 
-	clientSet, err := f.KubernetesClientSet()
-	if err != nil {
-		return nil, err
-	}
-
 	scaler, err := scaler(f)
 	if err != nil {
 		return nil, err
@@ -157,8 +146,6 @@ func (flags *ScaleFlags) ToOptions(f cmdutil.Factory, cmd *cobra.Command, args [
 
 	o := &ScaleOptions{
 		FilenameOptions: flags.FilenameOptions,
-		RecordFlags:     flags.RecordFlags,
-		PrintFlags:      flags.PrintFlags,
 		PrintObj:        printer.PrintObj,
 
 		Selector:        flags.Selector,
@@ -173,11 +160,8 @@ func (flags *ScaleFlags) ToOptions(f cmdutil.Factory, cmd *cobra.Command, args [
 		namespace:                    namespace,
 		enforceNamespace:             enforceNamespace,
 		args:                         args,
-		shortOutput:                  cmdutil.GetFlagString(cmd, "output") == "name",
-		clientSet:                    clientSet,
 		scaler:                       scaler,
 		unstructuredClientForMapping: f.UnstructuredClientForMapping,
-		parent:                       cmd.Parent().Name(),
 		dryRunStrategy:               dryRunStrategy,
 
 		IOStreams: flags.IOStreams,
