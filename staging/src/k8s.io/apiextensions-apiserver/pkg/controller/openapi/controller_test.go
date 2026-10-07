@@ -24,10 +24,10 @@ import (
 	"testing"
 	"time"
 
-	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
-	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
-	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/fake"
-	"k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions"
+	v1 "k8s.io/apiextensions-api/pkg/apis/apiextensions/v1"
+	"k8s.io/apiextensions-api/pkg/client/clientset/clientset"
+	"k8s.io/apiextensions-api/pkg/client/clientset/clientset/fake"
+	"k8s.io/apiextensions-api/pkg/client/informers/externalversions"
 	"k8s.io/kube-openapi/pkg/cached"
 	"k8s.io/kube-openapi/pkg/handler"
 

@@ -21,9 +21,11 @@ import (
 	"reflect"
 	"testing"
 
+	apiextensionsv1 "k8s.io/apiextensions-api/pkg/apis/apiextensions/v1"
+	apiextensionsv1beta1 "k8s.io/apiextensions-api/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
-	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
-	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	apiextensionsv1conversion "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	apiextensionsv1beta1conversion "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	structuralschema "k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -186,7 +188,7 @@ func TestStatusStrategyValidateUpdate(t *testing.T) {
 	}
 	t.Logf("crd v1 details: %v", crdV1)
 	crd := &apiextensions.CustomResourceDefinition{}
-	if err = apiextensionsv1.Convert_v1_CustomResourceDefinition_To_apiextensions_CustomResourceDefinition(crdV1, crd, nil); err != nil {
+	if err = apiextensionsv1conversion.Convert_v1_CustomResourceDefinition_To_apiextensions_CustomResourceDefinition(crdV1, crd, nil); err != nil {
 		t.Fatalf("unexpected convert error: %v", err)
 	}
 	t.Logf("crd details: %v", crd)
@@ -305,7 +307,7 @@ func TestStatusStrategyValidateUpdateForLegacyV1beta1(t *testing.T) {
 	}
 	t.Logf("crd details: %v", crdV1beta1)
 	crd := &apiextensions.CustomResourceDefinition{}
-	if err = apiextensionsv1beta1.Convert_v1beta1_CustomResourceDefinition_To_apiextensions_CustomResourceDefinition(crdV1beta1, crd, nil); err != nil {
+	if err = apiextensionsv1beta1conversion.Convert_v1beta1_CustomResourceDefinition_To_apiextensions_CustomResourceDefinition(crdV1beta1, crd, nil); err != nil {
 		t.Fatalf("unexpected convert error: %v", err)
 	}
 	t.Logf("crd details: %v", crd)

@@ -30,7 +30,7 @@ import (
 
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	svmv1 "k8s.io/api/storagemigration/v1"
-	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	apiextensionsv1 "k8s.io/apiextensions-api/pkg/apis/apiextensions/v1"
 	extensionfeatures "k8s.io/apiextensions-apiserver/pkg/features"
 	crdintegration "k8s.io/apiextensions-apiserver/test/integration"
 	metaconditions "k8s.io/apimachinery/pkg/api/meta"
