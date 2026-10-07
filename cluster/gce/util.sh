@@ -142,6 +142,8 @@ PREEXISTING_NETWORK_MODE=""
 KUBE_PROMPT_FOR_UPDATE=${KUBE_PROMPT_FOR_UPDATE:-"n"}
 # How long (in seconds) to wait for cluster initialization.
 KUBE_CLUSTER_INITIALIZATION_TIMEOUT=${KUBE_CLUSTER_INITIALIZATION_TIMEOUT:-300}
+# Regions to choose from when neither KUBE_GCE_ZONE nor KUBE_GCE_REGION is set.
+KUBE_GCE_DEFAULT_REGIONS=(us-central1 us-east1 us-east2 europe-west1)
 
 function join_csv() {
   local IFS=','; echo "$*";
@@ -200,12 +202,81 @@ function detect-project() {
     echo "'gcloud config set project <PROJECT>'" >&2
     exit 1
   fi
+  detect-zone-in-region
   if [[ -z "${PROJECT_REPORTED-}" ]]; then
     echo "Project: ${PROJECT}" >&2
     echo "Network Project: ${NETWORK_PROJECT}" >&2
     echo "Zone: ${ZONE}" >&2
     PROJECT_REPORTED=true
   fi
+}
+
+# Prints the UP zones of the given regions, one per line.
+#
+# Assumed vars:
+#   PROJECT
+function list-region-zones() {
+  local regions_re
+  regions_re=$(IFS='|'; echo "$*")
+  gcloud compute zones list \
+    --project "${PROJECT}" \
+    --filter "name ~ '^(${regions_re})-[a-z]+$' AND status=UP" \
+    --format 'value(name)' \
+    --sort-by name
+}
+
+# When KUBE_GCE_ZONE is unset, sets REGION and ZONE to where the master instance
+# or disk already is. Otherwise uses REGION if set, or a region from
+# KUBE_GCE_DEFAULT_REGIONS, and the first zone in it.
+#
+# Assumed vars:
+#   PROJECT
+#   MASTER_NAME
+#   KUBE_GCE_DEFAULT_REGIONS
+# Vars set:
+#   REGION
+#   ZONE
+function detect-zone-in-region() {
+  if [[ -n "${ZONE:-}" ]]; then
+    return
+  fi
+
+  local -a regions=("${KUBE_GCE_DEFAULT_REGIONS[@]}")
+  if [[ -n "${REGION:-}" ]]; then
+    regions=("${REGION}")
+  fi
+
+  local zones
+  zones=$(list-region-zones "${regions[@]}")
+  if [[ -z "${zones}" ]]; then
+    echo "${color_red:-}Could not find any zones in regions ${regions[*]} for project ${PROJECT}${color_norm:-}" >&2
+    exit 1
+  fi
+  # Deliberately split on whitespace
+  # shellcheck disable=SC2086
+  local -r zones_csv=$(join_csv ${zones})
+
+  local zone
+  zone=$(gcloud compute instances list --project "${PROJECT}" --zones "${zones_csv}" \
+    --filter "name=${MASTER_NAME}" --format 'value(zone.basename())' --limit 1 2>/dev/null || true)
+  if [[ -z "${zone}" ]]; then
+    zone=$(gcloud compute disks list --project "${PROJECT}" --zones "${zones_csv}" \
+      --filter "name=${MASTER_NAME}-pd" --format 'value(zone.basename())' --limit 1 2>/dev/null || true)
+  fi
+
+  if [[ -z "${zone}" ]]; then
+    # Only regions with UP zones are candidates.
+    local -a available
+    read -r -a available <<< "$(echo "${zones}" | sed 's/-[a-z]*$//' | sort -u | tr '\n' ' ')"
+    # Hash MASTER_NAME so separate kube-up/kube-down/log-dump runs agree on the region.
+    local hash
+    hash=$(cksum <<< "${MASTER_NAME}" | cut -d' ' -f1)
+    local -r region="${available[hash % ${#available[@]}]}"
+    zone=$(echo "${zones}" | grep -m1 "^${region}-")
+  fi
+
+  ZONE="${zone}"
+  REGION="${zone%-*}"
 }
 
 # Use gsutil to get the md5 hash for a particular tar
@@ -2868,13 +2939,20 @@ function create-master() {
       --allow tcp:8132 &
   fi
 
+  local zone_fallback=false
+  if [[ -z "${KUBE_GCE_ZONE:-}" ]]; then
+    zone_fallback=true
+  fi
+
   # We have to make sure the disk is created before creating the master VM, so
-  # run this in the foreground.
-  gcloud compute disks create "${MASTER_NAME}-pd" \
-    --project "${PROJECT}" \
-    --zone "${ZONE}" \
-    --type "${MASTER_DISK_TYPE}" \
-    --size "${MASTER_DISK_SIZE}"
+  # run this in the foreground. With zone fallback the disk is created per zone.
+  if [[ "${zone_fallback}" != "true" ]]; then
+    gcloud compute disks create "${MASTER_NAME}-pd" \
+      --project "${PROJECT}" \
+      --zone "${ZONE}" \
+      --type "${MASTER_DISK_TYPE}" \
+      --size "${MASTER_DISK_SIZE}"
+  fi
 
   # Create rule for accessing and securing etcd servers.
   if ! gcloud compute firewall-rules --project "${NETWORK_PROJECT}" describe "${MASTER_NAME}-etcd" &>/dev/null; then
@@ -2918,7 +2996,10 @@ function create-master() {
   create-etcd-certs "${MASTER_NAME}"
   create-etcd-apiserver-certs "etcd-${MASTER_NAME}" "${MASTER_NAME}"
 
-  if [[ "$(get-num-nodes)" -ge "50" ]]; then
+  if [[ "${zone_fallback}" == "true" ]]; then
+    # Must run in the foreground so the chosen ZONE is visible to node creation.
+    create-master-in-region "${MASTER_RESERVED_IP}" "${MASTER_INTERNAL_IP}" || exit 1
+  elif [[ "$(get-num-nodes)" -ge "50" ]]; then
     # We block on master creation for large clusters to avoid doing too much
     # unnecessary work in case master start-up fails (like creation of nodes).
     create-master-instance "${MASTER_RESERVED_IP}" "${MASTER_INTERNAL_IP}"
@@ -2926,6 +3007,64 @@ function create-master() {
     create-master-instance "${MASTER_RESERVED_IP}" "${MASTER_INTERNAL_IP}" &
   fi
 
+}
+
+# Tries each zone of REGION in turn: creates the master disk, then makes two
+# attempts to create the master instance. Sets ZONE to the first zone that succeeds.
+#
+# Assumed vars:
+#   PROJECT
+#   REGION
+#   MASTER_NAME
+#   MASTER_DISK_TYPE
+#   MASTER_DISK_SIZE
+# Vars set:
+#   ZONE
+#
+# $1: master reserved IP
+# $2: master internal IP (may be empty)
+function create-master-in-region() {
+  local -r address="${1}"
+  local -r internal_address="${2:-}"
+
+  local zones
+  zones=$(list-region-zones "${REGION}")
+  if [[ -z "${zones}" ]]; then
+    echo "${color_red}Could not find any zones in region ${REGION}${color_norm}" >&2
+    return 1
+  fi
+
+  local zone
+  for zone in ${zones}; do
+    ZONE="${zone}"
+    echo "Attempting to create master in zone ${ZONE}" >&2
+    # Both embed ZONE, so regenerate them for the zone being tried.
+    write-cluster-location
+    create-autoscaler-config
+
+    if ! gcloud compute disks create "${MASTER_NAME}-pd" \
+        --project "${PROJECT}" \
+        --zone "${ZONE}" \
+        --type "${MASTER_DISK_TYPE}" \
+        --size "${MASTER_DISK_SIZE}"; then
+      echo -e "${color_yellow}Failed to create master disk in zone ${ZONE}, trying next zone.${color_norm}" >&2
+      continue
+    fi
+
+    if MASTER_CREATE_ATTEMPTS_PER_ZONE=2 create-master-instance "${address}" "${internal_address}"; then
+      echo "Created master in zone ${ZONE}" >&2
+      return 0
+    fi
+
+    echo -e "${color_yellow}Failed to create master in zone ${ZONE}, trying next zone.${color_norm}" >&2
+    gcloud compute disks delete "${MASTER_NAME}-pd" \
+      --project "${PROJECT}" \
+      --zone "${ZONE}" \
+      --quiet || true
+  done
+
+  echo -e "${color_red}Failed to create master in any zone of region ${REGION}.${color_norm}" >&2
+  return 1
 }
 
 # Adds master replica to etcd cluster.
