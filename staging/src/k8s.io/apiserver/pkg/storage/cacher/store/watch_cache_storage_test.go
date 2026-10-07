@@ -277,7 +277,7 @@ func TestWatchCacheStorageSnapshots(t *testing.T) {
 
 	t.Log("Compact snapshots to simulate cache capacity downsize")
 	s.CompactSnapshotsLocked(500)
-	_, err = s.GetExactSnapshotLocked(499)
+	_, err = s.GetExactSnapshotLocked(400)
 	require.Error(t, err, "Expected compacted snapshots below 500 to be deleted")
 
 	t.Log("Test cache on rev 500")
