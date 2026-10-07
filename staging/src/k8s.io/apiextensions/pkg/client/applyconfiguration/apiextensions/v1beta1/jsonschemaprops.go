@@ -19,7 +19,7 @@ limitations under the License.
 package v1beta1
 
 import (
-	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	apiextensionsv1beta1 "k8s.io/apiextensions/pkg/apis/apiextensions/v1beta1"
 )
 
 // JSONSchemaPropsApplyConfiguration represents a declarative configuration of the JSONSchemaProps type for use

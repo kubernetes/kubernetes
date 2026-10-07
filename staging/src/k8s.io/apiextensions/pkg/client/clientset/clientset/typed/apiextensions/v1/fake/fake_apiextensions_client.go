@@ -19,7 +19,7 @@ limitations under the License.
 package fake
 
 import (
-	v1 "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1"
+	v1 "k8s.io/apiextensions/pkg/client/clientset/clientset/typed/apiextensions/v1"
 	rest "k8s.io/client-go/rest"
 	testing "k8s.io/client-go/testing"
 )

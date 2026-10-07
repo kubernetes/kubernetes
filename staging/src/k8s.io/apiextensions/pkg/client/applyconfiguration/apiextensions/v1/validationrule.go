@@ -19,7 +19,7 @@ limitations under the License.
 package v1
 
 import (
-	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	apiextensionsv1 "k8s.io/apiextensions/pkg/apis/apiextensions/v1"
 )
 
 // ValidationRuleApplyConfiguration represents a declarative configuration of the ValidationRule type for use

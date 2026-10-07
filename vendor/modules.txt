@@ -1031,6 +1031,8 @@ gopkg.in/inf.v0
 gopkg.in/natefinch/lumberjack.v2
 # k8s.io/api v0.0.0 => ./staging/src/k8s.io/api
 ## explicit; go 1.27.0
+# k8s.io/apiextensions v0.0.0 => ./staging/src/k8s.io/apiextensions
+## explicit; go 1.27.0
 # k8s.io/apiextensions-apiserver v0.0.0 => ./staging/src/k8s.io/apiextensions-apiserver
 ## explicit; go 1.27.0
 # k8s.io/apimachinery v0.0.0 => ./staging/src/k8s.io/apimachinery

@@ -84,6 +84,7 @@ require (
 	gopkg.in/evanphx/json-patch.v4 v4.13.0
 	gopkg.in/inf.v0 v0.9.1
 	k8s.io/api v0.0.0
+	k8s.io/apiextensions v0.0.0
 	k8s.io/apiextensions-apiserver v0.0.0
 	k8s.io/apimachinery v0.0.0
 	k8s.io/apiserver v0.0.0
@@ -216,6 +217,7 @@ require (
 
 replace (
 	k8s.io/api => ./staging/src/k8s.io/api
+	k8s.io/apiextensions => ./staging/src/k8s.io/apiextensions
 	k8s.io/apiextensions-apiserver => ./staging/src/k8s.io/apiextensions-apiserver
 	k8s.io/apimachinery => ./staging/src/k8s.io/apimachinery
 	k8s.io/apiserver => ./staging/src/k8s.io/apiserver

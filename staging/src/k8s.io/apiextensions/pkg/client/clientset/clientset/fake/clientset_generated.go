@@ -19,12 +19,12 @@ limitations under the License.
 package fake
 
 import (
-	applyconfiguration "k8s.io/apiextensions-apiserver/pkg/client/applyconfiguration"
-	clientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
-	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1"
-	fakeapiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1/fake"
-	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1beta1"
-	fakeapiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1beta1/fake"
+	applyconfiguration "k8s.io/apiextensions/pkg/client/applyconfiguration"
+	clientset "k8s.io/apiextensions/pkg/client/clientset/clientset"
+	apiextensionsv1 "k8s.io/apiextensions/pkg/client/clientset/clientset/typed/apiextensions/v1"
+	fakeapiextensionsv1 "k8s.io/apiextensions/pkg/client/clientset/clientset/typed/apiextensions/v1/fake"
+	apiextensionsv1beta1 "k8s.io/apiextensions/pkg/client/clientset/clientset/typed/apiextensions/v1beta1"
+	fakeapiextensionsv1beta1 "k8s.io/apiextensions/pkg/client/clientset/clientset/typed/apiextensions/v1beta1/fake"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"

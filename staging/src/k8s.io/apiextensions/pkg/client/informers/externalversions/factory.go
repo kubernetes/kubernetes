@@ -24,9 +24,9 @@ import (
 	sync "sync"
 	time "time"
 
-	clientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
-	apiextensions "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions/apiextensions"
-	internalinterfaces "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions/internalinterfaces"
+	clientset "k8s.io/apiextensions/pkg/client/clientset/clientset"
+	apiextensions "k8s.io/apiextensions/pkg/client/informers/externalversions/apiextensions"
+	internalinterfaces "k8s.io/apiextensions/pkg/client/informers/externalversions/internalinterfaces"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
