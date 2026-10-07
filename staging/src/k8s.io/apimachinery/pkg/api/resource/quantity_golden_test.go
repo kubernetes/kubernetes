@@ -307,7 +307,7 @@ func quantitySerializationCases() []serializationCase {
 // serialization goes through CanonicalizeBytes instead of the q.s fast path.
 func (tc serializationCase) cleared() Quantity {
 	q := tc.load()
-	q.s = ""
+	q.s = cachedString{}
 	return q
 }
 

@@ -453,8 +453,8 @@ func TestQuantityParse(t *testing.T) {
 			t.Errorf("%v: unexpected error: %v", item.input, err)
 			continue
 		}
-		if got.s == "" {
-			t.Errorf("%v: cached string was not set by ParseQuantity as it should have been", item.input)
+		if !got.s.validFor(got.Format) {
+			t.Errorf("%v: cached string was not set by ParseQuantity for its Format %q as it should have been: %+v", item.input, got.Format, got.s)
 		}
 		gotString := got.String()
 		if gotString != item.expectString {
@@ -757,7 +757,7 @@ func TestQuantityRoundUp(t *testing.T) {
 					// populate the string cache before rounding
 					got.CacheString()
 				} else {
-					got.s = ""
+					got.s = cachedString{}
 				}
 				cachedString := got.s
 				if ok := got.RoundUp(item.scale); ok != item.ok {
@@ -790,7 +790,7 @@ func TestQuantityRoundUp(t *testing.T) {
 						t.Errorf("%s(%d,%t,%t): unexpected int64 scale: %d vs %d", item.in, item.scale, asDec, cached, got.i.scale, want)
 					}
 					if parsedScale >= item.scale && got.s != cachedString {
-						t.Errorf("%s(%d,%t,%t): RoundUp left the value unchanged but changed the cached string from %q to %q", item.in, item.scale, asDec, cached, cachedString, got.s)
+						t.Errorf("%s(%d,%t,%t): RoundUp left the value unchanged but changed the cached string from %+v to %+v", item.in, item.scale, asDec, cached, cachedString, got.s)
 					}
 				}
 			}
@@ -1159,15 +1159,12 @@ func TestQuantityRoundUpKnownGaps(t *testing.T) {
 			decGot: &outcome{ok: true, value: "1024", str: "1Ki"},
 			want:   outcome{ok: true, value: "1024", str: "+1Ki"},
 		},
-		// TODO: Should be "2147483648" on the int64 route
 		{
-			name:     "2Gi then Format = DecimalSI, RoundUp(Milli)",
-			in:       func() Quantity { q := MustParse("2Gi"); q.Format = DecimalSI; return q },
-			scale:    Milli,
-			int64Got: &outcome{ok: true, value: "2147483648", str: "2Gi"},
-			want:     outcome{ok: true, value: "2147483648", str: "2147483648"},
+			name:  "2Gi then Format = DecimalSI, RoundUp(Milli)",
+			in:    func() Quantity { q := MustParse("2Gi"); q.Format = DecimalSI; return q },
+			scale: Milli,
+			want:  outcome{ok: true, value: "2147483648", str: "2147483648"},
 		},
-		// TODO: Should be "1Ki" on the int64 route
 		{
 			name: "1024 CacheString then Format = BinarySI, RoundUp(Milli)",
 			in: func() Quantity {
@@ -1176,9 +1173,8 @@ func TestQuantityRoundUpKnownGaps(t *testing.T) {
 				q.Format = BinarySI
 				return q
 			},
-			scale:    Milli,
-			int64Got: &outcome{ok: true, value: "1024", str: "1024"},
-			want:     outcome{ok: true, value: "1024", str: "1Ki"},
+			scale: Milli,
+			want:  outcome{ok: true, value: "1024", str: "1Ki"},
 		},
 		// TODO: Should be 1000 on the inf.Dec route
 		{
@@ -1233,6 +1229,37 @@ func TestQuantityRoundUpKnownGaps(t *testing.T) {
 				check("inf.Dec route", q, tc.decGot)
 			}
 		})
+	}
+}
+
+func TestQuantityCachedStringRecordsFormat(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		in     func() Quantity
+		str    string
+		format Format
+	}{
+		{"parsed zero", func() Quantity { return MustParse("0") }, "0", DecimalSI},
+		{"parsed as typed", func() Quantity { return MustParse("+2Gi") }, "+2Gi", BinarySI},
+		{"parsed and reformatted", func() Quantity { return MustParse("1024Mi") }, "1Gi", BinarySI},
+		{"CacheString", func() Quantity { q := *NewQuantity(2000, DecimalSI); q.CacheString(); return q }, "2k", DecimalSI},
+		// CacheString replaces a string written for another Format.
+		{"CacheString after assigning Format", func() Quantity {
+			q := MustParse("2k")
+			q.Format = DecimalExponent
+			q.CacheString()
+			return q
+		}, "2e3", DecimalExponent},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got, want := tc.in().s, newCachedString(tc.str, tc.format); got != want {
+				t.Errorf("cached string = %+v, want %+v", got, want)
+			}
+		})
+	}
+	// How the string was cached does not show up in reflect.DeepEqual.
+	if a, b := MustParse("1Gi"), MustParse("1024Mi"); !reflect.DeepEqual(a, b) {
+		t.Errorf("MustParse(%q) and MustParse(%q) are not reflect.DeepEqual: %+v vs %+v", "1Gi", "1024Mi", a, b)
 	}
 }
 
@@ -1354,7 +1381,7 @@ type quantityState struct {
 	dec      *inf.Dec
 	unscaled string
 	scale    inf.Scale
-	s        string
+	s        cachedString
 	format   Format
 }
 
@@ -1800,8 +1827,8 @@ func TestQuantityString(t *testing.T) {
 		if err != nil {
 			t.Errorf("%#v: unexpected error: %v", item.expect, err)
 		}
-		if len(q.s) == 0 || q.s != item.expect {
-			t.Errorf("%#v: did not copy canonical string on parse: %s", item.expect, q.s)
+		if len(q.s.str) == 0 || q.s.str != item.expect {
+			t.Errorf("%#v: did not copy canonical string on parse: %s", item.expect, q.s.str)
 		}
 		if len(item.alternate) == 0 {
 			continue
@@ -1813,8 +1840,8 @@ func TestQuantityString(t *testing.T) {
 		}
 		// ParseQuantity always canonicalizes and caches the string form itself now,
 		// since String() no longer mutates the receiver.
-		if len(q.s) == 0 || q.s != item.expect {
-			t.Errorf("%#v: did not set canonical string on parse: %s", item.expect, q.s)
+		if len(q.s.str) == 0 || q.s.str != item.expect {
+			t.Errorf("%#v: did not set canonical string on parse: %s", item.expect, q.s.str)
 		}
 		if q.String() != item.expect {
 			t.Errorf("%#v: unexpected alternate canonical: %v", item.expect, q.String())
@@ -1887,14 +1914,14 @@ func TestBinarySIZeroExponentString(t *testing.T) {
 
 func TestQuantityCacheString(t *testing.T) {
 	q := decQuantity(1000, 6, DecimalSI) // canonicalizes to "1G", built without a cached string
-	if len(q.s) != 0 {
-		t.Fatalf("expected no cached string yet, got %q", q.s)
+	if len(q.s.str) != 0 {
+		t.Fatalf("expected no cached string yet, got %q", q.s.str)
 	}
 	if s := q.CacheString(); s != "1G" {
 		t.Errorf("CacheString() = %q, expected %q", s, "1G")
 	}
-	if q.s != "1G" {
-		t.Errorf("CacheString() did not populate q.s, got %q", q.s)
+	if q.s.str != "1G" {
+		t.Errorf("CacheString() did not populate q.s, got %q", q.s.str)
 	}
 	// calling again with an already-populated cache must return the cached value unchanged
 	if s := q.CacheString(); s != "1G" {
@@ -3558,36 +3585,43 @@ func TestQuantityAsInt64AfterRoundTrip(t *testing.T) {
 				t.Fatalf("ParseQuantity(%q): %v", seed.in.String(), err)
 			}
 			wantValue, wantOK := ref.AsInt64()
-			for _, cachedAs := range []Format{"", DecimalSI, BinarySI} {
+			// cachedAs is the Format CacheString runs with. nil skips CacheString.
+			for _, cachedAs := range []*Format{nil, new(DecimalSI), new(BinarySI)} {
 				for _, format := range asInt64Formats {
 					for _, toDec := range []bool{false, true} {
 						for _, roundUp := range []bool{false, true} {
 							for _, codec := range codecs {
 								q := seed.in.DeepCopy()
-								// spelling is the Format, and spelledFromDec the form, that the
-								// encoded string comes from.
-								spelling, spelledFromDec := format, toDec
-								if cachedAs != "" {
-									q.Format = cachedAs
+
+								if cachedAs != nil {
+									q.Format = *cachedAs
 									q.CacheString()
-									spelling, spelledFromDec = cachedAs, false
 								}
 								q.Format = format
+
+								// spelledFromDec is whether the encoded string is written from
+								// the inf.Dec form.
+								spelledFromDec := false
 								if toDec {
+									// If we didn't call CacheString(), or changing format invalidated the cache, the codec writes a string generated from the inf.Dec form.
+									// Otherwise, the codec writes the CacheString() generated before calling ToDec().
+									if cachedAs == nil || *cachedAs != format {
+										spelledFromDec = true
+									}
 									q.ToDec()
 								}
 								if roundUp {
 									// A RoundUp that changes nothing keeps the cached string on
 									// the int64 form but clears it on the inf.Dec form.
 									if q.d.Dec != nil || q.i.scale < Nano {
-										spelling, spelledFromDec = format, q.d.Dec != nil
+										spelledFromDec = q.d.Dec != nil
 									}
 									q.RoundUp(Nano)
 								}
 
 								desc := fmt.Sprintf("Format %q, ToDec %t, RoundUp(Nano) %t, %s", format, toDec, roundUp, codec.name)
-								if cachedAs != "" {
-									desc = fmt.Sprintf("cached as %s, then %s", cachedAs, desc)
+								if cachedAs != nil {
+									desc = fmt.Sprintf("cached as %s, then %s", *cachedAs, desc)
 								}
 								decoded, err := codec.roundTrip(q)
 								if err != nil {
@@ -3595,9 +3629,9 @@ func TestQuantityAsInt64AfterRoundTrip(t *testing.T) {
 									continue
 								}
 								// TODO: Should be (wantValue, wantOK)
-								gap := spelling == BinarySI && seed.binarySpellingIsInfDec
+								gap := format == BinarySI && seed.binarySpellingIsInfDec
 								// TODO: Should be (wantValue, wantOK) but changing is API breaking
-								gap = gap || (spelling == BinarySI && spelledFromDec && seed.in.CmpInt64(math.MinInt64) == 0)
+								gap = gap || (format == BinarySI && spelledFromDec && seed.in.CmpInt64(math.MinInt64) == 0)
 								value, ok := decoded.AsInt64()
 								switch {
 								case gap && value == wantValue && ok == wantOK:
@@ -3903,7 +3937,7 @@ func BenchmarkQuantityString(b *testing.B) {
 	for _, q := range benchmarkQuantities() {
 		b.Run(q.String(), func(b *testing.B) {
 			for b.Loop() {
-				q.s = ""
+				q.s = cachedString{}
 				if len(q.String()) == 0 {
 					b.Fatal(q)
 				}
@@ -3917,7 +3951,7 @@ func BenchmarkQuantityStringBinarySI(b *testing.B) {
 		q.Format = BinarySI
 		b.Run(q.String(), func(b *testing.B) {
 			for b.Loop() {
-				q.s = ""
+				q.s = cachedString{}
 				if len(q.String()) == 0 {
 					b.Fatal(q)
 				}
@@ -3930,7 +3964,7 @@ func BenchmarkQuantityMarshalJSON(b *testing.B) {
 	for _, q := range benchmarkQuantities() {
 		b.Run(q.String(), func(b *testing.B) {
 			for b.Loop() {
-				q.s = ""
+				q.s = cachedString{}
 				if _, err := q.MarshalJSON(); err != nil {
 					b.Fatal(err)
 				}
