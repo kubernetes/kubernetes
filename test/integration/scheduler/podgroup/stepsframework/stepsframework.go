@@ -286,10 +286,23 @@ func createPods(testCtx *testutils.TestContext, ns string, pods []*v1.Pod, prese
 	for _, pod := range pods {
 		p := pod.DeepCopy()
 		p.Namespace = ns
-		if _, err := cs.CoreV1().Pods(ns).Create(testCtx.Ctx, p, metav1.CreateOptions{}); err != nil {
+		actualPod, err := cs.CoreV1().Pods(ns).Create(testCtx.Ctx, p, metav1.CreateOptions{})
+		if err != nil {
 			return fmt.Errorf("failed to create pod %s: %w", p.Name, err)
 		}
-		if preserveOrder {
+		if p.Spec.NodeName != "" {
+			// Assigned pods bypass the scheduling queue and must be reflected in the cache
+			// so the scheduler accounts for their resource consumption on the node.
+			err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, wait.ForeverTestTimeout, false,
+				func(_ context.Context) (bool, error) {
+					_, err := testCtx.Scheduler.Cache.GetPod(actualPod)
+					return err == nil, nil
+				},
+			)
+			if err != nil {
+				return fmt.Errorf("failed to wait for pod %s to be in the scheduler cache: %w", p.Name, err)
+			}
+		} else if preserveOrder {
 			podSchedulingAttemptedFn := podSchedulingAttempted(cs, ns, p.Name)
 			err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 10*time.Second, false, func(ctx context.Context) (bool, error) {
 				_, ok := testCtx.Scheduler.SchedulingQueue.GetPod(ctx, p.Name, p.Namespace, p.Spec.SchedulingGroup)

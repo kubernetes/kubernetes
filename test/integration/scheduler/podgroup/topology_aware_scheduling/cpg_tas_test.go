@@ -1305,6 +1305,13 @@ func TestCPGTopologyAwareSchedulingWorkloadAwarePreemption(t *testing.T) {
 					WaitForPodsScheduled: []string{"p1", "p2", "p3", "p4"},
 				},
 				{
+					Name: "Verify assignments are in zone-1 matching cpg-level topology constraints",
+					VerifyAssignments: &stepsframework.VerifyAssignments{
+						Pods:  []string{"p1", "p2", "p3", "p4"},
+						Nodes: sets.New("node1-z1-r1", "node2-z1-r2"),
+					},
+				},
+				{
 					Name: "Verify pg1 assignments are in the same rack",
 					VerifyAssignedInOneDomain: &stepsframework.VerifyAssignedInOneDomain{
 						Pods:        []string{"p1", "p2"},
@@ -1336,6 +1343,13 @@ func TestCPGTopologyAwareSchedulingWorkloadAwarePreemption(t *testing.T) {
 				{
 					Name:               "Verify low-priority pods in rack-3 are removed via preemption",
 					WaitForPodsRemoved: []string{"low-z1-r3"},
+				},
+				{
+					Name: "Verify pg3 assignments are on node3-z1-r3 after preemption",
+					VerifyAssignments: &stepsframework.VerifyAssignments{
+						Pods:  []string{"p5", "p6"},
+						Nodes: sets.New("node3-z1-r3"),
+					},
 				},
 				{
 					Name: "Verify pg3 assignments are in the same rack",
