@@ -187,11 +187,10 @@ func (s *Model) validateList(opts storage.ListOptions, expected, output Response
 			return reflect.DeepEqual(expected, output)
 		}
 	}
-	consistency, err := ListReadConsistency(opts)
+	consistency, reqRV, _, err := ListReadConsistency("", s.Versioner, opts)
 	if err != nil {
 		return false
 	}
-	reqRV, _ := s.Versioner.ParseResourceVersion(opts.ResourceVersion)
 	switch consistency {
 	case ConsistencyConsistent:
 		return reflect.DeepEqual(expected, output)
@@ -333,7 +332,8 @@ func (s *Model) list(key string, opts storage.ListOptions) Response {
 	if err := checkKey(key, opts.Recursive); err != nil {
 		return Response{Err: err}
 	}
-	if _, _, err := storage.ValidateListOptions("", s.Versioner, opts); err != nil {
+	_, rv, _, err := ListReadConsistency("", s.Versioner, opts)
+	if err != nil {
 		return Response{Err: err}
 	}
 	if opts.Predicate.Label == nil || opts.Predicate.Field == nil {
@@ -348,10 +348,6 @@ func (s *Model) list(key string, opts storage.ListOptions) Response {
 	}
 	if opts.RecordTimestamps {
 		panic("recordTimestamps is not supported, it wraps objects in storage-internal types")
-	}
-	rv, err := s.Versioner.ParseResourceVersion(opts.ResourceVersion)
-	if err != nil {
-		return Response{Err: err}
 	}
 	if rv > s.ResourceVersion {
 		return Response{Err: storage.NewTooLargeResourceVersionError(rv, s.ResourceVersion, 0)}

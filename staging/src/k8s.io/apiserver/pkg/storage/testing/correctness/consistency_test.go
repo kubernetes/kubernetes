@@ -56,15 +56,17 @@ func TestListReadConsistency(t *testing.T) {
 		continueToken   string
 		limit           int64
 		wantConsistency ReadConsistency
+		wantRV          uint64
+		wantContinueKey string
 		wantErr         bool
 	}{
 		// ResourceVersion = unset ("")
-		{rv: "", match: "", continueToken: "", limit: 0, wantConsistency: ConsistencyConsistent},
-		{rv: "", match: "", continueToken: "", limit: 10, wantConsistency: ConsistencyConsistent},
-		{rv: "", match: "", continueToken: continueTokenRV, limit: 0, wantConsistency: ConsistencyExact},
-		{rv: "", match: "", continueToken: continueTokenRV, limit: 10, wantConsistency: ConsistencyExact},
-		{rv: "", match: "", continueToken: continueTokenConsistent, limit: 0, wantConsistency: ConsistencyConsistent},
-		{rv: "", match: "", continueToken: continueTokenConsistent, limit: 10, wantConsistency: ConsistencyConsistent},
+		{rv: "", match: "", continueToken: "", limit: 0, wantConsistency: ConsistencyConsistent, wantRV: 0},
+		{rv: "", match: "", continueToken: "", limit: 10, wantConsistency: ConsistencyConsistent, wantRV: 0},
+		{rv: "", match: "", continueToken: continueTokenRV, limit: 0, wantConsistency: ConsistencyExact, wantRV: 100, wantContinueKey: "/pods/ns/p1"},
+		{rv: "", match: "", continueToken: continueTokenRV, limit: 10, wantConsistency: ConsistencyExact, wantRV: 100, wantContinueKey: "/pods/ns/p1"},
+		{rv: "", match: "", continueToken: continueTokenConsistent, limit: 0, wantConsistency: ConsistencyConsistent, wantRV: 0, wantContinueKey: "/pods/ns/p1"},
+		{rv: "", match: "", continueToken: continueTokenConsistent, limit: 10, wantConsistency: ConsistencyConsistent, wantRV: 0, wantContinueKey: "/pods/ns/p1"},
 		{rv: "", match: metav1.ResourceVersionMatchExact, continueToken: "", limit: 0, wantErr: true},
 		{rv: "", match: metav1.ResourceVersionMatchExact, continueToken: "", limit: 10, wantErr: true},
 		{rv: "", match: metav1.ResourceVersionMatchExact, continueToken: continueTokenRV, limit: 0, wantErr: true},
@@ -75,43 +77,44 @@ func TestListReadConsistency(t *testing.T) {
 		{rv: "", match: metav1.ResourceVersionMatchNotOlderThan, continueToken: continueTokenRV, limit: 10, wantErr: true},
 
 		// ResourceVersion = "0"
-		{rv: "0", match: "", continueToken: "", limit: 0, wantConsistency: ConsistencyNotOlderThan},
-		{rv: "0", match: "", continueToken: "", limit: 10, wantConsistency: ConsistencyNotOlderThan},
+		{rv: "0", match: "", continueToken: "", limit: 0, wantConsistency: ConsistencyNotOlderThan, wantRV: 0},
+		{rv: "0", match: "", continueToken: "", limit: 10, wantConsistency: ConsistencyNotOlderThan, wantRV: 0},
 		// Note: KEP-2340 table says "Quorum read request" for (rv="0", match="", continue=token),
 		// but storage.ValidateListOptions and watchCache.waitUntilFreshAndList actually use the
 		// RV encoded in the continue token (Exact if continueRV > 0, Consistent if continueRV < 0).
-		{rv: "0", match: "", continueToken: continueTokenRV, limit: 0, wantConsistency: ConsistencyExact},
-		{rv: "0", match: "", continueToken: continueTokenRV, limit: 10, wantConsistency: ConsistencyExact},
-		{rv: "0", match: "", continueToken: continueTokenConsistent, limit: 0, wantConsistency: ConsistencyConsistent},
-		{rv: "0", match: "", continueToken: continueTokenConsistent, limit: 10, wantConsistency: ConsistencyConsistent},
+		{rv: "0", match: "", continueToken: continueTokenRV, limit: 0, wantConsistency: ConsistencyExact, wantRV: 100, wantContinueKey: "/pods/ns/p1"},
+		{rv: "0", match: "", continueToken: continueTokenRV, limit: 10, wantConsistency: ConsistencyExact, wantRV: 100, wantContinueKey: "/pods/ns/p1"},
+		{rv: "0", match: "", continueToken: continueTokenConsistent, limit: 0, wantConsistency: ConsistencyConsistent, wantRV: 0, wantContinueKey: "/pods/ns/p1"},
+		{rv: "0", match: "", continueToken: continueTokenConsistent, limit: 10, wantConsistency: ConsistencyConsistent, wantRV: 0, wantContinueKey: "/pods/ns/p1"},
 		{rv: "0", match: metav1.ResourceVersionMatchExact, continueToken: "", limit: 0, wantErr: true},
 		{rv: "0", match: metav1.ResourceVersionMatchExact, continueToken: "", limit: 10, wantErr: true},
 		{rv: "0", match: metav1.ResourceVersionMatchExact, continueToken: continueTokenRV, limit: 0, wantErr: true},
 		{rv: "0", match: metav1.ResourceVersionMatchExact, continueToken: continueTokenRV, limit: 10, wantErr: true},
-		{rv: "0", match: metav1.ResourceVersionMatchNotOlderThan, continueToken: "", limit: 0, wantConsistency: ConsistencyNotOlderThan},
-		{rv: "0", match: metav1.ResourceVersionMatchNotOlderThan, continueToken: "", limit: 10, wantConsistency: ConsistencyNotOlderThan},
+		{rv: "0", match: metav1.ResourceVersionMatchNotOlderThan, continueToken: "", limit: 0, wantConsistency: ConsistencyNotOlderThan, wantRV: 0},
+		{rv: "0", match: metav1.ResourceVersionMatchNotOlderThan, continueToken: "", limit: 10, wantConsistency: ConsistencyNotOlderThan, wantRV: 0},
 		// Note: KEP-2340 table says "Read request from RV encoded in token" for (rv="0", match="NotOlderThan", continue=token),
 		// but validation.ValidateListOptions forbids setting resourceVersionMatch when continue is provided.
 		{rv: "0", match: metav1.ResourceVersionMatchNotOlderThan, continueToken: continueTokenRV, limit: 0, wantErr: true},
 		{rv: "0", match: metav1.ResourceVersionMatchNotOlderThan, continueToken: continueTokenRV, limit: 10, wantErr: true},
 
 		// ResourceVersion = "100"
-		{rv: "100", match: "", continueToken: "", limit: 0, wantConsistency: ConsistencyNotOlderThan},
-		{rv: "100", match: "", continueToken: "", limit: 10, wantConsistency: ConsistencyExact},
+		{rv: "100", match: "", continueToken: "", limit: 0, wantConsistency: ConsistencyNotOlderThan, wantRV: 100},
+		{rv: "100", match: "", continueToken: "", limit: 10, wantConsistency: ConsistencyExact, wantRV: 100},
 		// Note: KEP-2340 table says "Read request from RV encoded in token" for (rv=RV, match="", continue=token),
 		// but storage.ValidateListOptions rejects specifying a non-zero resourceVersion when continue is provided.
 		{rv: "100", match: "", continueToken: continueTokenRV, limit: 0, wantErr: true},
 		{rv: "100", match: "", continueToken: continueTokenRV, limit: 10, wantErr: true},
-		{rv: "100", match: metav1.ResourceVersionMatchExact, continueToken: "", limit: 0, wantConsistency: ConsistencyExact},
-		{rv: "100", match: metav1.ResourceVersionMatchExact, continueToken: "", limit: 10, wantConsistency: ConsistencyExact},
+		{rv: "100", match: metav1.ResourceVersionMatchExact, continueToken: "", limit: 0, wantConsistency: ConsistencyExact, wantRV: 100},
+		{rv: "100", match: metav1.ResourceVersionMatchExact, continueToken: "", limit: 10, wantConsistency: ConsistencyExact, wantRV: 100},
 		{rv: "100", match: metav1.ResourceVersionMatchExact, continueToken: continueTokenRV, limit: 0, wantErr: true},
 		{rv: "100", match: metav1.ResourceVersionMatchExact, continueToken: continueTokenRV, limit: 10, wantErr: true},
-		{rv: "100", match: metav1.ResourceVersionMatchNotOlderThan, continueToken: "", limit: 0, wantConsistency: ConsistencyNotOlderThan},
-		{rv: "100", match: metav1.ResourceVersionMatchNotOlderThan, continueToken: "", limit: 10, wantConsistency: ConsistencyNotOlderThan},
+		{rv: "100", match: metav1.ResourceVersionMatchNotOlderThan, continueToken: "", limit: 0, wantConsistency: ConsistencyNotOlderThan, wantRV: 100},
+		{rv: "100", match: metav1.ResourceVersionMatchNotOlderThan, continueToken: "", limit: 10, wantConsistency: ConsistencyNotOlderThan, wantRV: 100},
 		{rv: "100", match: metav1.ResourceVersionMatchNotOlderThan, continueToken: continueTokenRV, limit: 0, wantErr: true},
 		{rv: "100", match: metav1.ResourceVersionMatchNotOlderThan, continueToken: continueTokenRV, limit: 10, wantErr: true},
 	}
 
+	versioner := storage.APIObjectVersioner{}
 	for i := range testCases {
 		tc := &testCases[i]
 		name := fmt.Sprintf("rv=%q/match=%q/continue=%v/limit=%d", tc.rv, tc.match, tc.continueToken != "", tc.limit)
@@ -125,13 +128,15 @@ func TestListReadConsistency(t *testing.T) {
 					Limit:    tc.limit,
 				},
 			}
-			got, err := ListReadConsistency(opts)
+			gotConsistency, gotRV, gotContinueKey, err := ListReadConsistency("/pods/", versioner, opts)
 			if tc.wantErr {
 				require.Error(t, err)
 				return
 			}
 			require.NoError(t, err)
-			require.Equal(t, tc.wantConsistency, got)
+			require.Equal(t, tc.wantConsistency, gotConsistency)
+			require.Equal(t, tc.wantRV, gotRV)
+			require.Equal(t, tc.wantContinueKey, gotContinueKey)
 		})
 	}
 }
