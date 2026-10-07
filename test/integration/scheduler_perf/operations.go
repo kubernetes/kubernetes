@@ -681,6 +681,10 @@ type createPodGroups struct {
 	Count int
 	// CountParam is the name of the parameter that determines the count.
 	CountParam string
+	// Template parameter for multiplying CountParam. It is used when total number of podgroups
+	// is defined by number of podgroups per set of composite podgroups for multiple sets of composite podgroups.
+	// Optional.
+	CountMultiplierParam string
 }
 
 func (cpg *createPodGroups) isValid(allowParameterization bool) error {
@@ -710,6 +714,13 @@ func (cpg createPodGroups) patchParams(w *Workload) (realOp, error) {
 			return nil, err
 		}
 		cpg.Count = count
+		if cpg.CountMultiplierParam != "" {
+			multiplier, err := w.Params.get(cpg.CountMultiplierParam[1:])
+			if err != nil {
+				return nil, err
+			}
+			cpg.Count *= multiplier
+		}
 	}
 	if len(cpg.TemplateParams) > 0 {
 		var err error
@@ -719,6 +730,111 @@ func (cpg createPodGroups) patchParams(w *Workload) (realOp, error) {
 		}
 	}
 	return &cpg, cpg.isValid(false)
+}
+
+// createCompositePodGroups defines an op where CompositePodGroups get created from a YAML template
+// then waits for them to be visible in the scheduler's informer cache.
+type createCompositePodGroups struct {
+	// Must match createCompositePodGroupsOpcode.
+	Opcode operationCode
+	// Namespace the objects should be created in.
+	Namespace string
+	// Path to spec file describing the CompositePodGroup to create.
+	TemplatePath string
+	// Params to be passed to the template.
+	TemplateParams map[string]any
+	// RootCount determines how many root CompositePodGroups get created. This is also equivalent to the number of trees to be created.
+	RootCount int
+	// RootCountParam is the name of the parameter that determines RootCount.
+	RootCountParam string
+	// Depth determines the depth of the CompositePodGroups hierarchy.
+	// The first level is always the root CompositePodGroup level.
+	// The last level is always tht leaf PodGroup level.
+	// The levels in-between are all CompositePodGroups levels.
+	// The minimum depth is 2, and the maximum depth is 4.
+	Depth int
+	// ChildrenCompositePodGroupsPerCPG is the number of child CompositePodGroups per parent.
+	// It must be set if and only if depth > 2.
+	ChildrenCompositePodGroupsPerCPG int
+	// ChildrenCompositePodGroupsPerCPGParam is the name of the parameter that determines ChildrenCompositePodGroupsPerCPG.
+	ChildrenCompositePodGroupsPerCPGParam string
+	// ChildrenPodGroupsPerCPG is the number of child PodGroups per parent.
+	ChildrenPodGroupsPerCPG int
+	// ChildrenPodGroupsPerCPGParam is the name of the parameter that determines ChildrenPodGroupsPerCPG.
+	ChildrenPodGroupsPerCPGParam string
+}
+
+func (ccpg *createCompositePodGroups) isValid(allowParameterization bool) error {
+	if ccpg.TemplatePath == "" {
+		return fmt.Errorf("templatePath must be set")
+	}
+	if ccpg.Namespace == "" {
+		return fmt.Errorf("namespace must be set")
+	}
+	if !isValidCount(allowParameterization, ccpg.RootCount, ccpg.RootCountParam) {
+		return fmt.Errorf("invalid RootCount=%d / RootCountParam=%q", ccpg.RootCount, ccpg.RootCountParam)
+	}
+	if !allowParameterization && ccpg.RootCount < 1 {
+		return fmt.Errorf("rootCount must be greater than 0, got %d", ccpg.RootCount)
+	}
+	if ccpg.Depth < 2 || ccpg.Depth > 4 {
+		return fmt.Errorf("depth must be between 2 and 4, got %d", ccpg.Depth)
+	}
+	if ccpg.Depth == 2 {
+		if ccpg.ChildrenCompositePodGroupsPerCPG != 0 || ccpg.ChildrenCompositePodGroupsPerCPGParam != "" {
+			return fmt.Errorf("childrenCompositePodGroupsPerCPG / childrenCompositePodGroupsPerCPGParam cannot be set when depth is 2")
+		}
+	} else {
+		if !isValidCount(allowParameterization, ccpg.ChildrenCompositePodGroupsPerCPG, ccpg.ChildrenCompositePodGroupsPerCPGParam) {
+			return fmt.Errorf("invalid ChildrenCompositePodGroupsPerCPG=%d / ChildrenCompositePodGroupsPerCPGParam=%q when Depth=%d", ccpg.ChildrenCompositePodGroupsPerCPG, ccpg.ChildrenCompositePodGroupsPerCPGParam, ccpg.Depth)
+		}
+		if !allowParameterization && ccpg.ChildrenCompositePodGroupsPerCPG < 1 {
+			return fmt.Errorf("childrenCompositePodGroupsPerCPG must be greater than 0 when depth > 2, got %d", ccpg.ChildrenCompositePodGroupsPerCPG)
+		}
+	}
+	if !isValidCount(allowParameterization, ccpg.ChildrenPodGroupsPerCPG, ccpg.ChildrenPodGroupsPerCPGParam) {
+		return fmt.Errorf("invalid ChildrenPodGroupsPerCPG=%d / ChildrenPodGroupsPerCPGParam=%q", ccpg.ChildrenPodGroupsPerCPG, ccpg.ChildrenPodGroupsPerCPGParam)
+	}
+	if !allowParameterization && ccpg.ChildrenPodGroupsPerCPG < 1 {
+		return fmt.Errorf("childrenPodGroupsPerCPG must be greater than 0, got %d", ccpg.ChildrenPodGroupsPerCPG)
+	}
+	return nil
+}
+
+func (ccpg *createCompositePodGroups) collectsMetrics() bool {
+	return false
+}
+
+func (ccpg createCompositePodGroups) patchParams(w *Workload) (realOp, error) {
+	if ccpg.RootCountParam != "" {
+		rootCount, err := w.Params.get(ccpg.RootCountParam[1:])
+		if err != nil {
+			return nil, err
+		}
+		ccpg.RootCount = rootCount
+	}
+	if ccpg.ChildrenCompositePodGroupsPerCPGParam != "" {
+		childrenPerCPG, err := w.Params.get(ccpg.ChildrenCompositePodGroupsPerCPGParam[1:])
+		if err != nil {
+			return nil, err
+		}
+		ccpg.ChildrenCompositePodGroupsPerCPG = childrenPerCPG
+	}
+	if ccpg.ChildrenPodGroupsPerCPGParam != "" {
+		childrenPodGroupsPerCPG, err := w.Params.get(ccpg.ChildrenPodGroupsPerCPGParam[1:])
+		if err != nil {
+			return nil, err
+		}
+		ccpg.ChildrenPodGroupsPerCPG = childrenPodGroupsPerCPG
+	}
+	if len(ccpg.TemplateParams) > 0 {
+		var err error
+		ccpg.TemplateParams, err = resolveTemplateParams(ccpg.TemplateParams, w)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return &ccpg, ccpg.isValid(false)
 }
 
 // startCollectingMetricsOp defines an op that starts metrics collectors.
