@@ -35,8 +35,9 @@ import (
 	"k8s.io/utils/ptr"
 
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
-	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	apiextensionsv1conversion "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/validation"
+	apiextensionsv1 "k8s.io/apiextensions/pkg/apis/apiextensions/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -701,7 +702,7 @@ func convertJSONSchemaProps(in []byte, out *spec.Schema) error {
 		return err
 	}
 	internal := apiextensions.JSONSchemaProps{}
-	if err := apiextensionsv1.Convert_v1_JSONSchemaProps_To_apiextensions_JSONSchemaProps(&external, &internal, nil); err != nil {
+	if err := apiextensionsv1conversion.Convert_v1_JSONSchemaProps_To_apiextensions_JSONSchemaProps(&external, &internal, nil); err != nil {
 		return err
 	}
 	kubeOut := spec.Schema{}

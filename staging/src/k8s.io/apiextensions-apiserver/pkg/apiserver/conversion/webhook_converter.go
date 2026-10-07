@@ -25,8 +25,8 @@ import (
 
 	"go.opentelemetry.io/otel/attribute"
 
-	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
-	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	v1 "k8s.io/apiextensions/pkg/apis/apiextensions/v1"
+	"k8s.io/apiextensions/pkg/apis/apiextensions/v1beta1"
 	apivalidation "k8s.io/apimachinery/pkg/api/validation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"

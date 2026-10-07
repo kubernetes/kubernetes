@@ -25,9 +25,10 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
-	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	apiextensionsv1conversion "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema/cel"
+	apiextensionsv1 "k8s.io/apiextensions/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	celconfig "k8s.io/apiserver/pkg/apis/cel"
@@ -51,7 +52,7 @@ func FieldValidators(t *testing.T, crd *apiextensionsv1.CustomResourceDefinition
 	ret := map[string]map[string]CELValidateFunc{}
 	for _, v := range crd.Spec.Versions {
 		var internalSchema apiextensions.JSONSchemaProps
-		err := apiextensionsv1.Convert_v1_JSONSchemaProps_To_apiextensions_JSONSchemaProps(v.Schema.OpenAPIV3Schema, &internalSchema, nil)
+		err := apiextensionsv1conversion.Convert_v1_JSONSchemaProps_To_apiextensions_JSONSchemaProps(v.Schema.OpenAPIV3Schema, &internalSchema, nil)
 		require.NoError(t, err, "failed to convert JSONSchemaProps for version %s: %v", v.Name, err)
 		structuralSchema, err := schema.NewStructural(&internalSchema)
 		require.NoError(t, err, "failed to create StructuralSchema for version %s: %v", v.Name, err)
@@ -77,7 +78,7 @@ func VersionValidatorsFromFile(t *testing.T, crdFilePath string) map[string]CELV
 	ret := map[string]CELValidateFunc{}
 	for _, v := range crd.Spec.Versions {
 		var internalSchema apiextensions.JSONSchemaProps
-		err := apiextensionsv1.Convert_v1_JSONSchemaProps_To_apiextensions_JSONSchemaProps(v.Schema.OpenAPIV3Schema, &internalSchema, nil)
+		err := apiextensionsv1conversion.Convert_v1_JSONSchemaProps_To_apiextensions_JSONSchemaProps(v.Schema.OpenAPIV3Schema, &internalSchema, nil)
 		require.NoError(t, err, "failed to convert JSONSchemaProps for version %s: %v", v.Name, err)
 		structuralSchema, err := schema.NewStructural(&internalSchema)
 		require.NoError(t, err, "failed to create StructuralSchema for version %s: %v", v.Name, err)
