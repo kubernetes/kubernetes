@@ -26,6 +26,7 @@ import (
 
 var jsTrue = []byte("true")
 var jsFalse = []byte("false")
+var nullLiteral = []byte(`null`)
 
 // The CBOR parsing related constants and functions below are not exported so they can be
 // easily removed at a future date when the CBOR library provides equivalent functionality.
