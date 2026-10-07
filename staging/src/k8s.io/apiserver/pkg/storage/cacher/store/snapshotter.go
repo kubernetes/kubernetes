@@ -73,6 +73,9 @@ func (s *snapshotter) Enabled() bool {
 }
 
 func (s *snapshotter) SetEnabled(enabled bool) {
+	if s.enabled == enabled {
+		return
+	}
 	s.enabled = enabled
 	s.reset()
 }

@@ -45,8 +45,19 @@ func TestWatchCacheStorageMarkConsistent(t *testing.T) {
 	require.NoError(t, err)
 	assert.Nil(t, prev)
 	assert.Equal(t, 1, s.snapshots.Len())
-	_, err = s.GetExactSnapshotLocked(100)
+	snapshot, err := s.GetExactSnapshotLocked(100)
 	require.NoError(t, err)
+
+	t.Log("Repeated successful consistency checks preserve snapshots")
+	for range 2 {
+		s.MarkConsistent(true)
+		assert.True(t, s.SnapshottingEnabled())
+		assert.Equal(t, 1, s.snapshots.Len())
+		assert.True(t, s.CanServeExactRV(100))
+		got, err := s.GetExactSnapshotLocked(100)
+		require.NoError(t, err)
+		assert.Same(t, snapshot, got)
+	}
 
 	t.Log("Inconsistent cache clears old snapshots")
 	s.MarkConsistent(false)
@@ -69,6 +80,12 @@ func TestWatchCacheStorageMarkConsistent(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, elem1, prev)
 	assert.Equal(t, 1, s.snapshots.Len())
+	_, err = s.GetExactSnapshotLocked(300)
+	require.NoError(t, err)
+
+	s.MarkConsistent(true)
+	assert.Equal(t, 1, s.snapshots.Len())
+	assert.True(t, s.CanServeExactRV(300))
 	_, err = s.GetExactSnapshotLocked(300)
 	require.NoError(t, err)
 }

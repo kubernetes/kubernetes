@@ -157,6 +157,7 @@ func TestStoreSnapshotter(t *testing.T) {
 	cache.SetEnabled(false)
 	assert.False(t, cache.Enabled())
 	assert.Equal(t, 0, cache.Len())
+	assert.Equal(t, uint64(0), cache.resourceVersion)
 	_, found = cache.GetLessOrEqual(200)
 	assert.False(t, found)
 	cache.Add(&btreeStore{resourceVersion: 300})
@@ -169,6 +170,7 @@ func TestStoreSnapshotter(t *testing.T) {
 	cache.SetEnabled(true)
 	assert.True(t, cache.Enabled())
 	assert.Equal(t, 0, cache.Len())
+	assert.Equal(t, uint64(0), cache.resourceVersion)
 	_, found = cache.GetLessOrEqual(300)
 	assert.False(t, found)
 	_, found = cache.GetLessOrEqual(400)
@@ -176,8 +178,14 @@ func TestStoreSnapshotter(t *testing.T) {
 
 	cache.Add(&btreeStore{resourceVersion: 500})
 	assert.Equal(t, 1, cache.Len())
+	cache.UpdateResourceVersion(600)
+
+	t.Log("Keeping snapshotter enabled preserves snapshots and the latest RV")
 	cache.SetEnabled(true)
-	assert.Equal(t, 0, cache.Len())
-	_, found = cache.GetLessOrEqual(500)
-	assert.False(t, found)
+	assert.True(t, cache.Enabled())
+	assert.Equal(t, 1, cache.Len())
+	assert.Equal(t, uint64(600), cache.resourceVersion)
+	snapshot, found = cache.GetLessOrEqual(500)
+	require.True(t, found)
+	assert.Equal(t, uint64(500), snapshot.ResourceVersion())
 }
