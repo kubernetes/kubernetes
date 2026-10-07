@@ -18,6 +18,7 @@ package scheduler
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"sort"
 	"strconv"
@@ -31,10 +32,12 @@ import (
 	v1 "k8s.io/api/core/v1"
 	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
 	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -2549,8 +2552,12 @@ func TestUpdatePodGroupCondition(t *testing.T) {
 	tests := []struct {
 		name             string
 		existingPodGroup *schedulingv1beta1.PodGroup
+		cachedPodGroup   *schedulingv1beta1.PodGroup
 		condition        *metav1.Condition
 		expectCondition  *metav1.Condition
+		// expectNoClientActions verifies that the cache-side no-op fast path
+		// does not make an API request.
+		expectNoClientActions bool
 		// expectLastTransitionTimeUnchanged, when true, verifies that LastTransitionTime
 		// is preserved from the existing condition.
 		expectLastTransitionTimeUnchanged bool
@@ -2586,6 +2593,37 @@ func TestUpdatePodGroupCondition(t *testing.T) {
 				Reason:  schedulingapi.PodGroupReasonUnschedulable,
 				Message: "0/3 nodes are available: insufficient cpu",
 			},
+		},
+		{
+			name: "unchanged Unschedulable condition does not call API",
+			existingPodGroup: &schedulingv1beta1.PodGroup{
+				ObjectMeta: metav1.ObjectMeta{Name: "pg-unchanged-unschedulable", Namespace: "ns1"},
+				Status: schedulingv1beta1.PodGroupStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:               schedulingapi.PodGroupInitiallyScheduled,
+							Status:             metav1.ConditionFalse,
+							Reason:             schedulingapi.PodGroupReasonUnschedulable,
+							Message:            "not enough resources",
+							LastTransitionTime: now,
+						},
+					},
+				},
+			},
+			condition: &metav1.Condition{
+				Type:    schedulingapi.PodGroupInitiallyScheduled,
+				Status:  metav1.ConditionFalse,
+				Reason:  schedulingapi.PodGroupReasonUnschedulable,
+				Message: "not enough resources",
+			},
+			expectCondition: &metav1.Condition{
+				Type:    schedulingapi.PodGroupInitiallyScheduled,
+				Status:  metav1.ConditionFalse,
+				Reason:  schedulingapi.PodGroupReasonUnschedulable,
+				Message: "not enough resources",
+			},
+			expectNoClientActions:             true,
+			expectLastTransitionTimeUnchanged: true,
 		},
 		{
 			name:             "set Scheduled condition to False with SchedulerError reason",
@@ -2693,6 +2731,37 @@ func TestUpdatePodGroupCondition(t *testing.T) {
 					},
 				},
 			},
+			condition: &metav1.Condition{
+				Type:    schedulingapi.PodGroupInitiallyScheduled,
+				Status:  metav1.ConditionFalse,
+				Reason:  schedulingapi.PodGroupReasonUnschedulable,
+				Message: "extra pods could not be placed",
+			},
+			expectCondition: &metav1.Condition{
+				Type:    schedulingapi.PodGroupInitiallyScheduled,
+				Status:  metav1.ConditionTrue,
+				Reason:  schedulingapi.PodGroupReasonScheduled,
+				Message: "All pods scheduled",
+			},
+			expectLastTransitionTimeUnchanged: true,
+		},
+		{
+			name: "stale cache does not regress Scheduled",
+			existingPodGroup: &schedulingv1beta1.PodGroup{
+				ObjectMeta: metav1.ObjectMeta{Name: "pg-stale-cache", Namespace: "ns1"},
+				Status: schedulingv1beta1.PodGroupStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:               schedulingapi.PodGroupInitiallyScheduled,
+							Status:             metav1.ConditionTrue,
+							Reason:             schedulingapi.PodGroupReasonScheduled,
+							Message:            "All pods scheduled",
+							LastTransitionTime: now,
+						},
+					},
+				},
+			},
+			cachedPodGroup: st.MakePodGroup().Name("pg-stale-cache").Namespace("ns1").Obj(),
 			condition: &metav1.Condition{
 				Type:    schedulingapi.PodGroupInitiallyScheduled,
 				Status:  metav1.ConditionFalse,
@@ -2852,14 +2921,18 @@ func TestUpdatePodGroupCondition(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			_, ctx := ktesting.NewTestContext(t)
 
-			var objects []runtime.Object
-			if tt.existingPodGroup != nil {
-				objects = append(objects, tt.existingPodGroup)
+			// The cache holds the same version as the API server unless the case sets an older one.
+			livePodGroup := tt.existingPodGroup.DeepCopy()
+			livePodGroup.ResourceVersion = "2"
+			cachedPodGroup := livePodGroup
+			if tt.cachedPodGroup != nil {
+				cachedPodGroup = tt.cachedPodGroup.DeepCopy()
+				cachedPodGroup.ResourceVersion = "1"
 			}
-			client := clientsetfake.NewClientset(objects...)
+			client := clientsetfake.NewClientset(livePodGroup)
+			enforceStatusPatchPrecondition(client, podGroupsResource, nil)
 			cache := internalcache.New(ctx, nil, true, true)
-			gpg := fwk.NewGenericPodGroup(tt.existingPodGroup)
-			cache.AddGenericPodGroup(gpg)
+			cache.AddGenericPodGroup(fwk.NewGenericPodGroup(cachedPodGroup))
 
 			informerFactory := informers.NewSharedInformerFactory(client, 0)
 			informerFactory.Start(ctx.Done())
@@ -2872,9 +2945,15 @@ func TestUpdatePodGroupCondition(t *testing.T) {
 			}
 
 			podGroupInfo := &framework.QueuedPodGroupInfo{
-				PodGroupInfo: &framework.PodGroupInfo{GenericPodGroup: gpg},
+				PodGroupInfo: &framework.PodGroupInfo{GenericPodGroup: fwk.NewGenericPodGroup(tt.existingPodGroup)},
 			}
 			sched.updatePodGroupCondition(ctx, podGroupInfo.PodGroupInfo, tt.condition)
+			if tt.expectNoClientActions && len(client.Actions()) != 0 {
+				t.Errorf("Expected no client actions, got %v", client.Actions())
+			}
+			if updates := countClientVerb(client.Actions(), "update"); updates != 0 {
+				t.Errorf("Expected status to be patched rather than updated, got %d update requests", updates)
+			}
 
 			updatedPodGroup, err := client.SchedulingV1beta1().PodGroups(tt.existingPodGroup.Namespace).Get(ctx, tt.existingPodGroup.Name, metav1.GetOptions{})
 			if err != nil {
@@ -2888,6 +2967,213 @@ func TestUpdatePodGroupCondition(t *testing.T) {
 
 			if tt.expectLastTransitionTimeUnchanged && !cond.LastTransitionTime.Equal(&existingLTT) {
 				t.Errorf("Expected LastTransitionTime to be preserved as %v, got %v", existingLTT, cond.LastTransitionTime)
+			}
+		})
+	}
+}
+
+var (
+	podGroupsResource          = schedulingv1beta1.SchemeGroupVersion.WithResource("podgroups")
+	compositePodGroupsResource = schedulingv1alpha3.SchemeGroupVersion.WithResource("compositepodgroups")
+)
+
+// enforceStatusPatchPrecondition makes status patches of the given resource fail with a Conflict
+// when they carry a resourceVersion other than the stored object's, as the API server does. The
+// fake clientset's object tracker does not check resource versions on its own. Only the check is
+// modeled: unlike the API server, a successful patch does not bump the stored resourceVersion.
+// onPatch, if set, runs before the check with the index of the patch, for example to simulate a
+// concurrent write. It returns the patches that were sent.
+func enforceStatusPatchPrecondition(client *clientsetfake.Clientset, gvr schema.GroupVersionResource, onPatch func(i int)) *[]string {
+	var patches []string
+	client.PrependReactor("patch", gvr.Resource, func(action clienttesting.Action) (bool, runtime.Object, error) {
+		patchAction := action.(clienttesting.PatchAction)
+		if patchAction.GetSubresource() != "status" {
+			return false, nil, nil
+		}
+		patches = append(patches, string(patchAction.GetPatch()))
+		if onPatch != nil {
+			onPatch(len(patches) - 1)
+		}
+		var patch struct {
+			Metadata struct {
+				ResourceVersion string `json:"resourceVersion"`
+			} `json:"metadata"`
+		}
+		if err := json.Unmarshal(patchAction.GetPatch(), &patch); err != nil {
+			return true, nil, err
+		}
+		if patch.Metadata.ResourceVersion == "" {
+			return false, nil, nil
+		}
+		// Use the tracker directly: calling the clientset from a reactor deadlocks.
+		stored, err := client.Tracker().Get(gvr, patchAction.GetNamespace(), patchAction.GetName())
+		if err != nil {
+			return true, nil, err
+		}
+		storedMeta, err := apimeta.Accessor(stored)
+		if err != nil {
+			return true, nil, err
+		}
+		if storedMeta.GetResourceVersion() != patch.Metadata.ResourceVersion {
+			return true, nil, apierrors.NewConflict(gvr.GroupResource(), patchAction.GetName(), fmt.Errorf("the object has been modified"))
+		}
+		return false, nil, nil
+	})
+	return &patches
+}
+
+func countClientVerb(actions []clienttesting.Action, verb string) int {
+	count := 0
+	for _, action := range actions {
+		if action.GetVerb() == verb {
+			count++
+		}
+	}
+	return count
+}
+
+// versionedPodGroup returns PodGroup ns/pg with the given UID, resourceVersion and conditions.
+func versionedPodGroup(uid types.UID, resourceVersion string, conditions ...metav1.Condition) *schedulingv1beta1.PodGroup {
+	pg := st.MakePodGroup().Name("pg").Namespace("ns").UID(uid).Conditions(conditions...).Obj()
+	pg.ResourceVersion = resourceVersion
+	return pg
+}
+
+// TestUpdatePodGroupConditionConflict covers non-True condition writes whose resourceVersion
+// precondition fails because the PodGroup changed after the scheduler cache last saw it.
+func TestUpdatePodGroupConditionConflict(t *testing.T) {
+	scheduled := metav1.Condition{
+		Type:               schedulingapi.PodGroupInitiallyScheduled,
+		Status:             metav1.ConditionTrue,
+		Reason:             schedulingapi.PodGroupReasonScheduled,
+		Message:            "All pods scheduled",
+		LastTransitionTime: metav1.Now().Rfc3339Copy(),
+	}
+	disruptionTarget := metav1.Condition{
+		Type:               schedulingapi.DisruptionTarget,
+		Status:             metav1.ConditionTrue,
+		Reason:             schedulingapi.PodGroupReasonPreemptionByScheduler,
+		LastTransitionTime: metav1.Now().Rfc3339Copy(),
+	}
+	unschedulable := metav1.Condition{
+		Type:    schedulingapi.PodGroupInitiallyScheduled,
+		Status:  metav1.ConditionFalse,
+		Reason:  schedulingapi.PodGroupReasonUnschedulable,
+		Message: "extra pods could not be placed",
+	}
+
+	tests := []struct {
+		name string
+		// cached is the PodGroup in the scheduler cache, and the one the cycle scheduled.
+		cached *schedulingv1beta1.PodGroup
+		// live is the PodGroup in the API server. Nil means it was deleted.
+		live *schedulingv1beta1.PodGroup
+		// concurrentWrite, if set, replaces the live PodGroup right before the first patch.
+		concurrentWrite  *schedulingv1beta1.PodGroup
+		expectPatches    int
+		expectGets       int
+		expectConditions []metav1.Condition
+	}{
+		{
+			name:             "Scheduled written right before the patch is not regressed",
+			cached:           versionedPodGroup("pg", "1"),
+			live:             versionedPodGroup("pg", "1"),
+			concurrentWrite:  versionedPodGroup("pg", "2", scheduled),
+			expectPatches:    1,
+			expectGets:       1,
+			expectConditions: []metav1.Condition{scheduled},
+		},
+		{
+			name:             "conflict from an unrelated write is retried and keeps that write",
+			cached:           versionedPodGroup("pg", "1"),
+			live:             versionedPodGroup("pg", "1"),
+			concurrentWrite:  versionedPodGroup("pg", "2", disruptionTarget),
+			expectPatches:    2,
+			expectGets:       1,
+			expectConditions: []metav1.Condition{disruptionTarget, unschedulable},
+		},
+		{
+			name:          "recreated PodGroup is not written",
+			cached:        versionedPodGroup("old", "1"),
+			live:          versionedPodGroup("new", "2"),
+			expectPatches: 1,
+			expectGets:    1,
+		},
+		{
+			name:          "deleted PodGroup is not retried",
+			cached:        versionedPodGroup("pg", "1"),
+			expectPatches: 1,
+			expectGets:    0,
+		},
+		{
+			name:          "deleted PodGroup cached without resourceVersion is not written",
+			cached:        versionedPodGroup("pg", ""),
+			expectPatches: 0,
+			expectGets:    1,
+		},
+		{
+			name:             "cached PodGroup without resourceVersion is checked against the live object",
+			cached:           versionedPodGroup("pg", ""),
+			live:             versionedPodGroup("pg", "2", scheduled),
+			expectPatches:    0,
+			expectGets:       1,
+			expectConditions: []metav1.Condition{scheduled},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+
+			var objects []runtime.Object
+			if tt.live != nil {
+				objects = append(objects, tt.live)
+			}
+			client := clientsetfake.NewClientset(objects...)
+			patches := enforceStatusPatchPrecondition(client, podGroupsResource, func(i int) {
+				if i == 0 && tt.concurrentWrite != nil {
+					if err := client.Tracker().Update(podGroupsResource, tt.concurrentWrite.DeepCopy(), tt.concurrentWrite.Namespace); err != nil {
+						t.Errorf("Failed to simulate a concurrent write: %v", err)
+					}
+				}
+			})
+			cache := internalcache.New(ctx, nil, true, true)
+			cache.AddGenericPodGroup(fwk.NewGenericPodGroup(tt.cached))
+			sched := &Scheduler{client: client, Cache: cache}
+
+			condition := unschedulable
+			sched.updatePodGroupCondition(ctx, &framework.PodGroupInfo{GenericPodGroup: fwk.NewGenericPodGroup(tt.cached)}, &condition)
+
+			if condition.ObservedGeneration != 0 {
+				t.Errorf("Expected the caller's condition not to be modified, got ObservedGeneration %d", condition.ObservedGeneration)
+			}
+			if got := len(*patches); got != tt.expectPatches {
+				t.Errorf("Expected %d status patches, got %d: %v", tt.expectPatches, got, *patches)
+			}
+			for _, patch := range *patches {
+				if !strings.Contains(patch, `"resourceVersion"`) {
+					t.Errorf("Expected status patch to be pinned to a resourceVersion, got %s", patch)
+				}
+			}
+			if got := countClientVerb(client.Actions(), "get"); got != tt.expectGets {
+				t.Errorf("Expected %d get requests, got %d", tt.expectGets, got)
+			}
+
+			podGroups, err := client.SchedulingV1beta1().PodGroups(tt.cached.Namespace).List(ctx, metav1.ListOptions{})
+			if err != nil {
+				t.Fatalf("Failed to list PodGroups: %v", err)
+			}
+			if tt.live == nil {
+				if len(podGroups.Items) != 0 {
+					t.Errorf("Expected no PodGroups, got %v", podGroups.Items)
+				}
+				return
+			}
+			if len(podGroups.Items) != 1 {
+				t.Fatalf("Expected 1 PodGroup, got %d", len(podGroups.Items))
+			}
+			if diff := cmp.Diff(tt.expectConditions, podGroups.Items[0].Status.Conditions, cmpopts.EquateEmpty(), cmpopts.IgnoreFields(metav1.Condition{}, "LastTransitionTime")); diff != "" {
+				t.Errorf("Unexpected PodGroup conditions (-want +got):\n%s", diff)
 			}
 		})
 	}
@@ -5391,7 +5677,8 @@ func TestScheduleOnePodGroup_SchedulerNameMismatchUpdatesStatus(t *testing.T) {
 	p2 := st.MakePod().Namespace("default").Name("p2").UID("p2").PodGroupName("pg").SchedulerName("sched2").Obj()
 	qInfo1 := &framework.QueuedPodInfo{PodInfo: &framework.PodInfo{Pod: p1}}
 	qInfo2 := &framework.QueuedPodInfo{PodInfo: &framework.PodInfo{Pod: p2}}
-	testPodGroup := st.MakePodGroup().Name("pg").Namespace("default").Obj()
+	// The UID matches the snapshotted PodGroup below, as it does for objects from the same informer.
+	testPodGroup := st.MakePodGroup().Name("pg").Namespace("default").UID("pg").Obj()
 	gpg := fwk.NewGenericPodGroup(testPodGroup)
 	podGroupInfo := newQueuedPodGroupInfo(&framework.PodGroupInfo{GenericPodGroup: gpg}, qInfo1, qInfo2)
 	_, ctx := ktesting.NewTestContext(t)
@@ -8205,10 +8492,16 @@ func TestUpdateCompositePodGroupCondition(t *testing.T) {
 	now := metav1.Now().Rfc3339Copy()
 
 	tests := []struct {
-		name                              string
-		existingPodGroup                  *schedulingv1alpha3.CompositePodGroup
-		condition                         *metav1.Condition
-		expectCondition                   *metav1.Condition
+		name             string
+		existingPodGroup *schedulingv1alpha3.CompositePodGroup
+		cachedPodGroup   *schedulingv1alpha3.CompositePodGroup
+		condition        *metav1.Condition
+		expectCondition  *metav1.Condition
+		// expectNoClientActions verifies that the cache-side no-op fast path
+		// does not make an API request.
+		expectNoClientActions bool
+		// expectLastTransitionTimeUnchanged, when true, verifies that LastTransitionTime
+		// is preserved from the existing condition.
 		expectLastTransitionTimeUnchanged bool
 	}{
 		{
@@ -8242,6 +8535,32 @@ func TestUpdateCompositePodGroupCondition(t *testing.T) {
 				Reason:  schedulingapi.CompositePodGroupReasonUnschedulable,
 				Message: "0/3 nodes are available: insufficient cpu",
 			},
+		},
+		{
+			name: "unchanged Unschedulable condition does not call API",
+			existingPodGroup: st.MakeCompositePodGroup().Name("cpg-unchanged-unschedulable").Namespace("ns1").Conditions(
+				metav1.Condition{
+					Type:               schedulingapi.CompositePodGroupInitiallyScheduled,
+					Status:             metav1.ConditionFalse,
+					Reason:             schedulingapi.CompositePodGroupReasonUnschedulable,
+					Message:            "not enough resources",
+					LastTransitionTime: now,
+				},
+			).Obj(),
+			condition: &metav1.Condition{
+				Type:    schedulingapi.CompositePodGroupInitiallyScheduled,
+				Status:  metav1.ConditionFalse,
+				Reason:  schedulingapi.CompositePodGroupReasonUnschedulable,
+				Message: "not enough resources",
+			},
+			expectCondition: &metav1.Condition{
+				Type:    schedulingapi.CompositePodGroupInitiallyScheduled,
+				Status:  metav1.ConditionFalse,
+				Reason:  schedulingapi.CompositePodGroupReasonUnschedulable,
+				Message: "not enough resources",
+			},
+			expectNoClientActions:             true,
+			expectLastTransitionTimeUnchanged: true,
 		},
 		{
 			name:             "set Scheduled condition to False with SchedulerError reason",
@@ -8334,6 +8653,32 @@ func TestUpdateCompositePodGroupCondition(t *testing.T) {
 					LastTransitionTime: now,
 				},
 			).Obj(),
+			condition: &metav1.Condition{
+				Type:    schedulingapi.CompositePodGroupInitiallyScheduled,
+				Status:  metav1.ConditionFalse,
+				Reason:  schedulingapi.CompositePodGroupReasonUnschedulable,
+				Message: "extra pods could not be placed",
+			},
+			expectCondition: &metav1.Condition{
+				Type:    schedulingapi.CompositePodGroupInitiallyScheduled,
+				Status:  metav1.ConditionTrue,
+				Reason:  schedulingapi.CompositePodGroupReasonScheduled,
+				Message: "All pods scheduled",
+			},
+			expectLastTransitionTimeUnchanged: true,
+		},
+		{
+			name: "stale cache does not regress Scheduled",
+			existingPodGroup: st.MakeCompositePodGroup().Name("cpg-stale-cache").Namespace("ns1").Conditions(
+				metav1.Condition{
+					Type:               schedulingapi.CompositePodGroupInitiallyScheduled,
+					Status:             metav1.ConditionTrue,
+					Reason:             schedulingapi.CompositePodGroupReasonScheduled,
+					Message:            "All pods scheduled",
+					LastTransitionTime: now,
+				},
+			).Obj(),
+			cachedPodGroup: st.MakeCompositePodGroup().Name("cpg-stale-cache").Namespace("ns1").Obj(),
 			condition: &metav1.Condition{
 				Type:    schedulingapi.CompositePodGroupInitiallyScheduled,
 				Status:  metav1.ConditionFalse,
@@ -8471,15 +8816,18 @@ func TestUpdateCompositePodGroupCondition(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			_, ctx := ktesting.NewTestContext(t)
 
-			var objects []runtime.Object
-			if tt.existingPodGroup != nil {
-				objects = append(objects, tt.existingPodGroup)
+			// The cache holds the same version as the API server unless the case sets an older one.
+			livePodGroup := tt.existingPodGroup.DeepCopy()
+			livePodGroup.ResourceVersion = "2"
+			cachedPodGroup := livePodGroup
+			if tt.cachedPodGroup != nil {
+				cachedPodGroup = tt.cachedPodGroup.DeepCopy()
+				cachedPodGroup.ResourceVersion = "1"
 			}
-			client := clientsetfake.NewClientset(objects...)
+			client := clientsetfake.NewClientset(livePodGroup)
+			enforceStatusPatchPrecondition(client, compositePodGroupsResource, nil)
 			cache := internalcache.New(ctx, nil, true, true)
-			if tt.existingPodGroup != nil {
-				cache.AddGenericPodGroup(fwk.NewGenericCompositePodGroup(tt.existingPodGroup))
-			}
+			cache.AddGenericPodGroup(fwk.NewGenericCompositePodGroup(cachedPodGroup))
 			informerFactory := informers.NewSharedInformerFactory(client, 0)
 			informerFactory.Start(ctx.Done())
 			informerFactory.WaitForCacheSync(ctx.Done())
@@ -8496,6 +8844,12 @@ func TestUpdateCompositePodGroupCondition(t *testing.T) {
 				},
 			}
 			sched.updateCompositePodGroupCondition(ctx, podGroupInfo.PodGroupInfo, tt.condition)
+			if tt.expectNoClientActions && len(client.Actions()) != 0 {
+				t.Errorf("Expected no client actions, got %v", client.Actions())
+			}
+			if updates := countClientVerb(client.Actions(), "update"); updates != 0 {
+				t.Errorf("Expected status to be patched rather than updated, got %d update requests", updates)
+			}
 
 			updatedPodGroup, err := client.SchedulingV1alpha3().CompositePodGroups(tt.existingPodGroup.Namespace).Get(ctx, tt.existingPodGroup.Name, metav1.GetOptions{})
 			if err != nil {
@@ -8509,6 +8863,150 @@ func TestUpdateCompositePodGroupCondition(t *testing.T) {
 
 			if tt.expectLastTransitionTimeUnchanged && !cond.LastTransitionTime.Equal(&existingLTT) {
 				t.Errorf("Expected LastTransitionTime to be preserved as %v, got %v", existingLTT, cond.LastTransitionTime)
+			}
+		})
+	}
+}
+
+// versionedCompositePodGroup returns CompositePodGroup ns/cpg with the given UID, resourceVersion and conditions.
+func versionedCompositePodGroup(uid, resourceVersion string, conditions ...metav1.Condition) *schedulingv1alpha3.CompositePodGroup {
+	cpg := st.MakeCompositePodGroup().Name("cpg").Namespace("ns").UID(uid).Conditions(conditions...).Obj()
+	cpg.ResourceVersion = resourceVersion
+	return cpg
+}
+
+// TestUpdateCompositePodGroupConditionConflict covers non-True condition writes whose resourceVersion
+// precondition fails because the CompositePodGroup changed after the scheduler cache last saw it.
+func TestUpdateCompositePodGroupConditionConflict(t *testing.T) {
+	scheduled := metav1.Condition{
+		Type:               schedulingapi.CompositePodGroupInitiallyScheduled,
+		Status:             metav1.ConditionTrue,
+		Reason:             schedulingapi.CompositePodGroupReasonScheduled,
+		Message:            "All child pods have been scheduled",
+		LastTransitionTime: metav1.Now().Rfc3339Copy(),
+	}
+	disruptionTarget := metav1.Condition{
+		Type:               schedulingapi.DisruptionTarget,
+		Status:             metav1.ConditionTrue,
+		Reason:             schedulingapi.PodGroupReasonPreemptionByScheduler,
+		LastTransitionTime: metav1.Now().Rfc3339Copy(),
+	}
+	unschedulable := metav1.Condition{
+		Type:    schedulingapi.CompositePodGroupInitiallyScheduled,
+		Status:  metav1.ConditionFalse,
+		Reason:  schedulingapi.CompositePodGroupReasonUnschedulable,
+		Message: "no pods were schedulable",
+	}
+
+	tests := []struct {
+		name string
+		// cached is the CompositePodGroup in the scheduler cache, and the one the cycle scheduled.
+		cached *schedulingv1alpha3.CompositePodGroup
+		// live is the CompositePodGroup in the API server. Nil means it was deleted.
+		live *schedulingv1alpha3.CompositePodGroup
+		// concurrentWrite, if set, replaces the live CompositePodGroup right before the first patch.
+		concurrentWrite  *schedulingv1alpha3.CompositePodGroup
+		expectPatches    int
+		expectGets       int
+		expectConditions []metav1.Condition
+	}{
+		{
+			name:             "Scheduled written right before the patch is not regressed",
+			cached:           versionedCompositePodGroup("cpg", "1"),
+			live:             versionedCompositePodGroup("cpg", "1"),
+			concurrentWrite:  versionedCompositePodGroup("cpg", "2", scheduled),
+			expectPatches:    1,
+			expectGets:       1,
+			expectConditions: []metav1.Condition{scheduled},
+		},
+		{
+			name:             "conflict from an unrelated write is retried and keeps that write",
+			cached:           versionedCompositePodGroup("cpg", "1"),
+			live:             versionedCompositePodGroup("cpg", "1"),
+			concurrentWrite:  versionedCompositePodGroup("cpg", "2", disruptionTarget),
+			expectPatches:    2,
+			expectGets:       1,
+			expectConditions: []metav1.Condition{disruptionTarget, unschedulable},
+		},
+		{
+			name:          "recreated CompositePodGroup is not written",
+			cached:        versionedCompositePodGroup("old", "1"),
+			live:          versionedCompositePodGroup("new", "2"),
+			expectPatches: 1,
+			expectGets:    1,
+		},
+		{
+			name:          "deleted CompositePodGroup is not retried",
+			cached:        versionedCompositePodGroup("cpg", "1"),
+			expectPatches: 1,
+			expectGets:    0,
+		},
+		{
+			name:          "deleted CompositePodGroup cached without resourceVersion is not written",
+			cached:        versionedCompositePodGroup("cpg", ""),
+			expectPatches: 0,
+			expectGets:    1,
+		},
+		{
+			name:             "cached CompositePodGroup without resourceVersion is checked against the live object",
+			cached:           versionedCompositePodGroup("cpg", ""),
+			live:             versionedCompositePodGroup("cpg", "2", scheduled),
+			expectPatches:    0,
+			expectGets:       1,
+			expectConditions: []metav1.Condition{scheduled},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+
+			var objects []runtime.Object
+			if tt.live != nil {
+				objects = append(objects, tt.live)
+			}
+			client := clientsetfake.NewClientset(objects...)
+			patches := enforceStatusPatchPrecondition(client, compositePodGroupsResource, func(i int) {
+				if i == 0 && tt.concurrentWrite != nil {
+					if err := client.Tracker().Update(compositePodGroupsResource, tt.concurrentWrite.DeepCopy(), tt.concurrentWrite.Namespace); err != nil {
+						t.Errorf("Failed to simulate a concurrent write: %v", err)
+					}
+				}
+			})
+			cache := internalcache.New(ctx, nil, true, true)
+			cache.AddGenericPodGroup(fwk.NewGenericCompositePodGroup(tt.cached))
+			sched := &Scheduler{client: client, Cache: cache}
+
+			condition := unschedulable
+			sched.updateCompositePodGroupCondition(ctx, &framework.PodGroupInfo{GenericPodGroup: fwk.NewGenericCompositePodGroup(tt.cached)}, &condition)
+
+			if got := len(*patches); got != tt.expectPatches {
+				t.Errorf("Expected %d status patches, got %d: %v", tt.expectPatches, got, *patches)
+			}
+			for _, patch := range *patches {
+				if !strings.Contains(patch, `"resourceVersion"`) {
+					t.Errorf("Expected status patch to be pinned to a resourceVersion, got %s", patch)
+				}
+			}
+			if got := countClientVerb(client.Actions(), "get"); got != tt.expectGets {
+				t.Errorf("Expected %d get requests, got %d", tt.expectGets, got)
+			}
+
+			compositePodGroups, err := client.SchedulingV1alpha3().CompositePodGroups(tt.cached.Namespace).List(ctx, metav1.ListOptions{})
+			if err != nil {
+				t.Fatalf("Failed to list CompositePodGroups: %v", err)
+			}
+			if tt.live == nil {
+				if len(compositePodGroups.Items) != 0 {
+					t.Errorf("Expected no CompositePodGroups, got %v", compositePodGroups.Items)
+				}
+				return
+			}
+			if len(compositePodGroups.Items) != 1 {
+				t.Fatalf("Expected 1 CompositePodGroup, got %d", len(compositePodGroups.Items))
+			}
+			if diff := cmp.Diff(tt.expectConditions, compositePodGroups.Items[0].Status.Conditions, cmpopts.EquateEmpty(), cmpopts.IgnoreFields(metav1.Condition{}, "LastTransitionTime")); diff != "" {
+				t.Errorf("Unexpected CompositePodGroup conditions (-want +got):\n%s", diff)
 			}
 		})
 	}

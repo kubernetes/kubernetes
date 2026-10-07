@@ -167,26 +167,9 @@ func PatchPodGroupStatus(ctx context.Context, cs kubernetes.Interface, name stri
 		return nil
 	}
 
-	if oldStatus == nil {
-		oldStatus = &schedulingv1beta1.PodGroupStatus{}
-	}
-
-	oldData, err := json.Marshal(schedulingv1beta1.PodGroup{Status: *oldStatus})
-	if err != nil {
+	patchBytes, err := podGroupStatusPatch(name, namespace, "", oldStatus, newStatus)
+	if err != nil || patchBytes == nil {
 		return err
-	}
-
-	newData, err := json.Marshal(schedulingv1beta1.PodGroup{Status: *newStatus})
-	if err != nil {
-		return err
-	}
-	patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, &schedulingv1beta1.PodGroup{})
-	if err != nil {
-		return fmt.Errorf("failed to create merge patch for podgroup %q/%q: %w", namespace, name, err)
-	}
-
-	if string(patchBytes) == "{}" {
-		return nil
 	}
 
 	patchFn := func() error {
@@ -195,6 +178,71 @@ func PatchPodGroupStatus(ctx context.Context, cs kubernetes.Interface, name stri
 	}
 
 	return retry.OnError(retry.DefaultBackoff, RetriableWithConflict, patchFn)
+}
+
+// PatchPodGroupStatusWithPrecondition is like PatchPodGroupStatus, but pins the patch to
+// <resourceVersion>: the API server rejects it with a Conflict if the PodGroup changed since then.
+// It makes a single request and does not retry, because after a conflict the caller has to
+// recompute the patch from a fresh object. An empty resourceVersion leaves the patch unpinned;
+// objects read from the API server always carry one.
+func PatchPodGroupStatusWithPrecondition(ctx context.Context, cs kubernetes.Interface, name string,
+	namespace string, resourceVersion string, oldStatus *schedulingv1beta1.PodGroupStatus,
+	newStatus *schedulingv1beta1.PodGroupStatus) error {
+	if newStatus == nil {
+		return nil
+	}
+	patchBytes, err := podGroupStatusPatch(name, namespace, resourceVersion, oldStatus, newStatus)
+	if err != nil || patchBytes == nil {
+		return err
+	}
+	_, err = cs.SchedulingV1beta1().PodGroups(namespace).Patch(ctx, name, types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{}, "status")
+	return err
+}
+
+func podGroupStatusPatch(name, namespace, resourceVersion string, oldStatus, newStatus *schedulingv1beta1.PodGroupStatus) ([]byte, error) {
+	if oldStatus == nil {
+		oldStatus = &schedulingv1beta1.PodGroupStatus{}
+	}
+	patchBytes, err := createStatusPatch(schedulingv1beta1.PodGroup{Status: *oldStatus}, schedulingv1beta1.PodGroup{Status: *newStatus}, &schedulingv1beta1.PodGroup{}, resourceVersion)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create merge patch for podgroup %q/%q: %w", namespace, name, err)
+	}
+	return patchBytes, nil
+}
+
+// createStatusPatch returns the strategic merge patch from oldObj to newObj, or nil when they
+// don't differ. A non-empty resourceVersion is added as an optimistic-concurrency precondition.
+func createStatusPatch(oldObj, newObj, dataStruct any, resourceVersion string) ([]byte, error) {
+	oldData, err := json.Marshal(oldObj)
+	if err != nil {
+		return nil, err
+	}
+	newData, err := json.Marshal(newObj)
+	if err != nil {
+		return nil, err
+	}
+	patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, dataStruct)
+	if err != nil {
+		return nil, err
+	}
+	if string(patchBytes) == "{}" {
+		return nil, nil
+	}
+	if resourceVersion == "" {
+		return patchBytes, nil
+	}
+	// The objects only carry status, so the patch has no metadata of its own to preserve.
+	// json.RawMessage keeps the computed status bytes as they are.
+	patch := map[string]json.RawMessage{}
+	if err := json.Unmarshal(patchBytes, &patch); err != nil {
+		return nil, err
+	}
+	metadata, err := json.Marshal(metav1.ObjectMeta{ResourceVersion: resourceVersion})
+	if err != nil {
+		return nil, err
+	}
+	patch["metadata"] = metadata
+	return json.Marshal(patch)
 }
 
 // PatchCompositePodGroupStatus calculates the delta bytes change from <old.Status> to <newStatus>,
@@ -206,26 +254,9 @@ func PatchCompositePodGroupStatus(ctx context.Context, cs kubernetes.Interface, 
 		return nil
 	}
 
-	if oldStatus == nil {
-		oldStatus = &schedulingv1alpha3.CompositePodGroupStatus{}
-	}
-
-	oldData, err := json.Marshal(schedulingv1alpha3.CompositePodGroup{Status: *oldStatus})
-	if err != nil {
+	patchBytes, err := compositePodGroupStatusPatch(name, namespace, "", oldStatus, newStatus)
+	if err != nil || patchBytes == nil {
 		return err
-	}
-
-	newData, err := json.Marshal(schedulingv1alpha3.CompositePodGroup{Status: *newStatus})
-	if err != nil {
-		return err
-	}
-	patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, &schedulingv1alpha3.CompositePodGroup{})
-	if err != nil {
-		return fmt.Errorf("failed to create merge patch for composite podgroup %q/%q: %w", namespace, name, err)
-	}
-
-	if string(patchBytes) == "{}" {
-		return nil
 	}
 
 	patchFn := func() error {
@@ -234,6 +265,36 @@ func PatchCompositePodGroupStatus(ctx context.Context, cs kubernetes.Interface, 
 	}
 
 	return retry.OnError(retry.DefaultBackoff, RetriableWithConflict, patchFn)
+}
+
+// PatchCompositePodGroupStatusWithPrecondition is like PatchCompositePodGroupStatus, but pins the
+// patch to <resourceVersion>: the API server rejects it with a Conflict if the CompositePodGroup
+// changed since then. It makes a single request and does not retry, because after a conflict the
+// caller has to recompute the patch from a fresh object. An empty resourceVersion leaves the patch
+// unpinned; objects read from the API server always carry one.
+func PatchCompositePodGroupStatusWithPrecondition(ctx context.Context, cs kubernetes.Interface, name string,
+	namespace string, resourceVersion string, oldStatus *schedulingv1alpha3.CompositePodGroupStatus,
+	newStatus *schedulingv1alpha3.CompositePodGroupStatus) error {
+	if newStatus == nil {
+		return nil
+	}
+	patchBytes, err := compositePodGroupStatusPatch(name, namespace, resourceVersion, oldStatus, newStatus)
+	if err != nil || patchBytes == nil {
+		return err
+	}
+	_, err = cs.SchedulingV1alpha3().CompositePodGroups(namespace).Patch(ctx, name, types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{}, "status")
+	return err
+}
+
+func compositePodGroupStatusPatch(name, namespace, resourceVersion string, oldStatus, newStatus *schedulingv1alpha3.CompositePodGroupStatus) ([]byte, error) {
+	if oldStatus == nil {
+		oldStatus = &schedulingv1alpha3.CompositePodGroupStatus{}
+	}
+	patchBytes, err := createStatusPatch(schedulingv1alpha3.CompositePodGroup{Status: *oldStatus}, schedulingv1alpha3.CompositePodGroup{Status: *newStatus}, &schedulingv1alpha3.CompositePodGroup{}, resourceVersion)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create merge patch for composite podgroup %q/%q: %w", namespace, name, err)
+	}
+	return patchBytes, nil
 }
 
 // DeletePod deletes the given <pod> from API server

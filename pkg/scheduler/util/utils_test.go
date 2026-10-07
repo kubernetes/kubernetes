@@ -18,8 +18,10 @@ package util
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"syscall"
 	"testing"
 	"time"
@@ -696,6 +698,115 @@ func TestPatchPodGroupStatus(t *testing.T) {
 			if diff := cmp.Diff(wantStatus, retrievedPG.Status); diff != "" {
 				t.Errorf("unexpected podgroup status (-want,+got):\n%s", diff)
 			}
+		})
+	}
+}
+
+func TestPatchStatusWithPrecondition(t *testing.T) {
+	condition := metav1.Condition{
+		Type:               schedulingapi.PodGroupInitiallyScheduled,
+		Status:             metav1.ConditionFalse,
+		Reason:             schedulingapi.PodGroupReasonUnschedulable,
+		Message:            "not enough capacity for the gang",
+		LastTransitionTime: metav1.Now().Rfc3339Copy(),
+	}
+	tests := []struct {
+		name string
+		// patch sends a status patch adding condition, or nothing when unchanged is set.
+		patch func(ctx context.Context, cs *clientsetfake.Clientset, resourceVersion string, unchanged bool) error
+		// resource is the resource whose status the patch is sent to.
+		resource string
+	}{
+		{
+			name:     "PodGroup",
+			resource: "podgroups",
+			patch: func(ctx context.Context, cs *clientsetfake.Clientset, resourceVersion string, unchanged bool) error {
+				oldStatus := &schedulingv1beta1.PodGroupStatus{}
+				if unchanged {
+					oldStatus.Conditions = []metav1.Condition{condition}
+				}
+				newStatus := &schedulingv1beta1.PodGroupStatus{Conditions: []metav1.Condition{condition}}
+				return PatchPodGroupStatusWithPrecondition(ctx, cs, "pg", "ns", resourceVersion, oldStatus, newStatus)
+			},
+		},
+		{
+			name:     "CompositePodGroup",
+			resource: "compositepodgroups",
+			patch: func(ctx context.Context, cs *clientsetfake.Clientset, resourceVersion string, unchanged bool) error {
+				oldStatus := &schedulingv1alpha3.CompositePodGroupStatus{}
+				if unchanged {
+					oldStatus.Conditions = []metav1.Condition{condition}
+				}
+				newStatus := &schedulingv1alpha3.CompositePodGroupStatus{Conditions: []metav1.Condition{condition}}
+				return PatchCompositePodGroupStatusWithPrecondition(ctx, cs, "pg", "ns", resourceVersion, oldStatus, newStatus)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// recordPatches makes every status patch return returnErr and records its body.
+			recordPatches := func(returnErr error) (*clientsetfake.Clientset, *[]string) {
+				client := clientsetfake.NewClientset()
+				var patches []string
+				client.PrependReactor("patch", tt.resource, func(action clienttesting.Action) (bool, runtime.Object, error) {
+					patches = append(patches, string(action.(clienttesting.PatchAction).GetPatch()))
+					return true, nil, returnErr
+				})
+				return client, &patches
+			}
+
+			t.Run("patch is pinned to the resourceVersion", func(t *testing.T) {
+				_, ctx := ktesting.NewTestContext(t)
+				client, patches := recordPatches(nil)
+				if err := tt.patch(ctx, client, "42", false); err != nil {
+					t.Fatalf("Unexpected error: %v", err)
+				}
+				if len(*patches) != 1 {
+					t.Fatalf("Expected 1 patch, got %d", len(*patches))
+				}
+				var got map[string]any
+				if err := json.Unmarshal([]byte((*patches)[0]), &got); err != nil {
+					t.Fatalf("Failed to decode patch: %v", err)
+				}
+				if diff := cmp.Diff(map[string]any{"resourceVersion": "42"}, got["metadata"]); diff != "" {
+					t.Errorf("Unexpected patch metadata (-want +got):\n%s", diff)
+				}
+				if _, ok := got["status"]; !ok {
+					t.Errorf("Expected patch to contain the status change, got %s", (*patches)[0])
+				}
+			})
+			t.Run("empty resourceVersion leaves the patch unpinned", func(t *testing.T) {
+				_, ctx := ktesting.NewTestContext(t)
+				client, patches := recordPatches(nil)
+				if err := tt.patch(ctx, client, "", false); err != nil {
+					t.Fatalf("Unexpected error: %v", err)
+				}
+				if len(*patches) != 1 || strings.Contains((*patches)[0], "metadata") {
+					t.Errorf("Expected 1 patch without metadata, got %v", *patches)
+				}
+			})
+			t.Run("unchanged status sends no request", func(t *testing.T) {
+				_, ctx := ktesting.NewTestContext(t)
+				client, patches := recordPatches(nil)
+				if err := tt.patch(ctx, client, "42", true); err != nil {
+					t.Fatalf("Unexpected error: %v", err)
+				}
+				if len(*patches) != 0 {
+					t.Errorf("Expected no patches, got %v", *patches)
+				}
+			})
+			t.Run("conflict is returned without retrying", func(t *testing.T) {
+				_, ctx := ktesting.NewTestContext(t)
+				conflict := apierrors.NewConflict(schema.GroupResource{Group: "scheduling.k8s.io", Resource: tt.resource}, "pg", errors.New("the object has been modified"))
+				client, patches := recordPatches(conflict)
+				if err := tt.patch(ctx, client, "42", false); !apierrors.IsConflict(err) {
+					t.Errorf("Expected a Conflict error, got %v", err)
+				}
+				if len(*patches) != 1 {
+					t.Errorf("Expected exactly 1 patch, got %d", len(*patches))
+				}
+			})
 		})
 	}
 }
