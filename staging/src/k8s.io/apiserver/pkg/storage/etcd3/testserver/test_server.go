@@ -53,6 +53,8 @@ type T interface {
 }
 
 // This tells the vet printf checker that methods in the interface must be checked.
+//
+//nolint:forbidigo
 var _ T = &testing.T{}
 
 // getAvailablePort returns a TCP port that is available for binding.

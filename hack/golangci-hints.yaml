@@ -80,6 +80,19 @@ linters:
         text: should not use Add, use AddVersioned instead
         path: _test.go$
 
+      # Tests can and have to use testing.T.
+      #
+      # Test helper packages like ktesting are also exempt:
+      # this is rather broad because there are several normal
+      # packages which implement tests via t.Run. We need to
+      # be careful here to not exclude the top-level test directory
+      # because test helper code should not depend on testing.T
+      # unnecessarily (limits usability).
+      - linters:
+          - forbidigo
+        text: should not depend on the testing package
+        path: /([^/]*testing|[^/]*test|test[^/]*)/|test/declarative_validation/|_test.go$
+
       # The Kubernetes naming convention for conversion functions uses underscores
       # and intentionally deviates from normal Go conventions to make those function
       # names more readable. Same for SetDefaults_* and ValidateCustom_*.
@@ -557,6 +570,11 @@ linters:
           pkg: ^github\.com/onsi/ginkgo/v2$
           msg: usage is restricted to code under control of SIG Testing
           # Exceptions are listed above under rules.
+        - pattern: \.(T|TB)$
+          pkg: ^testing$
+          msg: Production code should not depend on the testing package. Helper packages should be more flexible and support other implementations like ktesting.TContext. Replace with a locally-defined interface or some pre-defined one like test/utils.TB or ktesting.TB. Choose based on the context and which dependencies are acceptable.
+          # Exceptions are listed above under rules.
+          # testing.B is not checked because there are some (rare) valid usages and it's less common anyway, so we don't need to enforce anything.
         - pattern: ^gomega\.BeTrue$
           pkg: ^github.com/onsi/gomega$
           msg: "it does not produce a good failure message - use BeTrueBecause with an explicit printf-style failure message instead, or plain Go: if ... { ginkgo.Fail(...) }"

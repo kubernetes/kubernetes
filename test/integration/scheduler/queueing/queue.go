@@ -2570,7 +2570,7 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 
 // TestCoreResourceEnqueue verify Pods failed by in-tree default plugins can be
 // moved properly upon their registered events.
-func RunTestCoreResourceEnqueue(t *testing.T, tt *CoreResourceEnqueueTestCase) {
+func RunTestCoreResourceEnqueue(t *testing.T, tt *CoreResourceEnqueueTestCase) { //nolint:forbidigo // calls ndftesting.NewMockFeature/ktesting.NewTestContext, which require *testing.T
 	t.Helper()
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
 	if tt.EnableDRAExtendedResource {

@@ -917,7 +917,7 @@ func RunBenchmarkPerfScheduling(b *testing.B, configFile string, topicName strin
 }
 
 // RunIntegrationPerfScheduling runs the scheduler performance integration tests.
-func RunIntegrationPerfScheduling(t *testing.T, configFile string, options ...SchedulerPerfOption) {
+func RunIntegrationPerfScheduling(t *testing.T, configFile string, options ...SchedulerPerfOption) { //nolint:forbidigo // calls t.Run, which requires *testing.T
 	opts := &schedulerPerfOptions{}
 	for _, option := range options {
 		option(opts)
@@ -937,9 +937,9 @@ func RunIntegrationPerfScheduling(t *testing.T, configFile string, options ...Sc
 	testcaseLabelSelectors := strings.Split(TestSchedulingLabelFilter, ",")
 
 	for _, tc := range testCases {
-		t.Run(tc.Name, func(t *testing.T) {
+		t.Run(tc.Name, func(t *testing.T) { //nolint:forbidigo // t.Run requires *testing.T
 			for _, w := range tc.Workloads {
-				t.Run(w.Name, func(t *testing.T) {
+				t.Run(w.Name, func(t *testing.T) { //nolint:forbidigo // t.Run requires *testing.T
 					if !enabled(testcaseLabelSelectors, append(tc.Labels, w.Labels...)...) {
 						t.Skipf("disabled by label filter %q", TestSchedulingLabelFilter)
 					}
