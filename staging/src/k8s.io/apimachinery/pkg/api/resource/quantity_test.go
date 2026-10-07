@@ -677,14 +677,14 @@ func TestQuantityRoundUp(t *testing.T) {
 		ok       bool
 		decScale inf.Scale // expected scale of the inf.Dec value after RoundUp
 	}{
-		{"9.01", -3, decQuantity(901, -2, DecimalSI), true, 3}, // TODO: Should keep inf.Dec scale 2 like the int64 route
+		{"9.01", -3, decQuantity(901, -2, DecimalSI), true, 2},
 		{"9.01", -2, decQuantity(901, -2, DecimalSI), true, 2},
 		{"9.01", -1, decQuantity(91, -1, DecimalSI), false, 1},
 		{"9.01", 0, decQuantity(10, 0, DecimalSI), false, 0},
 		{"9.01", 1, decQuantity(10, 0, DecimalSI), false, -1},
 		{"9.01", 2, decQuantity(100, 0, DecimalSI), false, -2},
 
-		{"-9.01", -3, decQuantity(-901, -2, DecimalSI), true, 3}, // TODO: Should keep inf.Dec scale 2 like the int64 route
+		{"-9.01", -3, decQuantity(-901, -2, DecimalSI), true, 2},
 		{"-9.01", -2, decQuantity(-901, -2, DecimalSI), true, 2},
 		{"-9.01", -1, decQuantity(-91, -1, DecimalSI), false, 1},
 		{"-9.01", 0, decQuantity(-10, 0, DecimalSI), false, 0},
@@ -717,28 +717,28 @@ func TestQuantityRoundUp(t *testing.T) {
 		{"1.230", -2, decQuantity(123, -2, DecimalSI), true, 2},
 
 		// no-op cases
-		{"0", -3, decQuantity(0, 0, DecimalSI), true, 3},                                // TODO: Should keep inf.Dec scale 0 like the int64 route
-		{"5", -9, decQuantity(5, 0, DecimalSI), true, 9},                                // TODO: Should keep inf.Dec scale 0 like the int64 route
-		{"5", -6, decQuantity(5, 0, DecimalSI), true, 6},                                // TODO: Should keep inf.Dec scale 0 like the int64 route
-		{"5", -3, decQuantity(5, 0, DecimalSI), true, 3},                                // TODO: Should keep inf.Dec scale 0 like the int64 route
-		{"-5", -3, decQuantity(-5, 0, DecimalSI), true, 3},                              // TODO: Should keep inf.Dec scale 0 like the int64 route
-		{"50k", -3, decQuantity(50, 3, DecimalSI), true, 3},                             // TODO: Should keep inf.Dec scale -3 like the int64 route
-		{"50k", 0, decQuantity(50, 3, DecimalSI), true, 0},                              // TODO: Should keep inf.Dec scale -3 like the int64 route
-		{"2Gi", -3, decQuantity(2147483648, 0, BinarySI), true, 3},                      // TODO: Should keep inf.Dec scale 0 like the int64 route
-		{"9223372036854775807", -3, decQuantity(math.MaxInt64, 0, DecimalSI), true, 3},  // TODO: Should keep inf.Dec scale 0 like the int64 route
-		{"-9223372036854775808", -9, decQuantity(math.MinInt64, 0, DecimalSI), true, 9}, // TODO: Should keep inf.Dec scale 0 like the int64 route
+		{"0", -3, decQuantity(0, 0, DecimalSI), true, 0},
+		{"5", -9, decQuantity(5, 0, DecimalSI), true, 0},
+		{"5", -6, decQuantity(5, 0, DecimalSI), true, 0},
+		{"5", -3, decQuantity(5, 0, DecimalSI), true, 0},
+		{"-5", -3, decQuantity(-5, 0, DecimalSI), true, 0},
+		{"50k", -3, decQuantity(50, 3, DecimalSI), true, -3},
+		{"50k", 0, decQuantity(50, 3, DecimalSI), true, -3},
+		{"2Gi", -3, decQuantity(2147483648, 0, BinarySI), true, 0},
+		{"9223372036854775807", -3, decQuantity(math.MaxInt64, 0, DecimalSI), true, 0},
+		{"-9223372036854775808", -9, decQuantity(math.MinInt64, 0, DecimalSI), true, 0},
 		{"1000m", -3, decQuantity(1000, -3, DecimalSI), true, 3},
-		{"1000m", -9, decQuantity(1000, -3, DecimalSI), true, 9}, // TODO: Should keep inf.Dec scale 3 like the int64 route
-		{"1.5", -3, decQuantity(15, -1, DecimalSI), true, 3},     // TODO: Should keep inf.Dec scale 1 like the int64 route
-		{"0", -9, decQuantity(0, 0, DecimalSI), true, 9},         // TODO: Should keep inf.Dec scale 0 like the int64 route
-		{"50k", -9, decQuantity(50, 3, DecimalSI), true, 9},      // TODO: Should keep inf.Dec scale -3 like the int64 route
-		{"100E", -3, decQuantity(100, 18, DecimalSI), true, 3},   // TODO: Should keep inf.Dec scale -18 like the int64 route
+		{"1000m", -9, decQuantity(1000, -3, DecimalSI), true, 3},
+		{"1.5", -3, decQuantity(15, -1, DecimalSI), true, 1},
+		{"0", -9, decQuantity(0, 0, DecimalSI), true, 0},
+		{"50k", -9, decQuantity(50, 3, DecimalSI), true, -3},
+		{"100E", -3, decQuantity(100, 18, DecimalSI), true, -18},
 		{"5", 0, decQuantity(5, 0, DecimalSI), true, 0},
 		{"50k", 3, decQuantity(50, 3, DecimalSI), true, -3},
 		{"50k", 4, decQuantity(5, 4, DecimalSI), true, -4},
-		{"1.5", -9, decQuantity(15, -1, DecimalSI), true, 9},   // TODO: Should keep inf.Dec scale 1 like the int64 route
-		{"0.000", -9, decQuantity(0, 0, DecimalSI), true, 9},   // TODO: Should keep inf.Dec scale 3 like the int64 route
-		{"5", -1000, decQuantity(5, 0, DecimalSI), true, 1000}, // TODO: Should keep inf.Dec scale 0 like the int64 route
+		{"1.5", -9, decQuantity(15, -1, DecimalSI), true, 1},
+		{"0.000", -9, decQuantity(0, 0, DecimalSI), true, 3},
+		{"5", -1000, decQuantity(5, 0, DecimalSI), true, 0},
 	}
 
 	for _, asDec := range []bool{false, true} {
@@ -965,45 +965,35 @@ func TestQuantityRoundUpKnownGaps(t *testing.T) {
 		skipDec bool
 		want    outcome
 	}{
-		// TODO: Should be (5, true) on the inf.Dec route
 		{
-			name:   "5 RoundUp(MinInt32)",
-			in:     func() Quantity { return *NewQuantity(5, DecimalSI) },
-			scale:  math.MinInt32,
-			decGot: &outcome{panics: true},
-			want:   outcome{ok: true, value: "5"},
+			name:  "5 RoundUp(MinInt32)",
+			in:    func() Quantity { return *NewQuantity(5, DecimalSI) },
+			scale: math.MinInt32,
+			want:  outcome{ok: true, value: "5"},
 		},
-		// TODO: Should be (0, true) on the inf.Dec route
 		{
-			name:   "0 RoundUp(MinInt32)",
-			in:     func() Quantity { return *NewQuantity(0, DecimalSI) },
-			scale:  math.MinInt32,
-			decGot: &outcome{panics: true},
-			want:   outcome{ok: true, value: "0"},
+			name:  "0 RoundUp(MinInt32)",
+			in:    func() Quantity { return *NewQuantity(0, DecimalSI) },
+			scale: math.MinInt32,
+			want:  outcome{ok: true, value: "0"},
 		},
-		// TODO: Should be (5*10^MaxInt32, true) on the inf.Dec route
 		{
-			name:   "5*10^MaxInt32 RoundUp(MinInt32)",
-			in:     func() Quantity { return *NewScaledQuantity(5, math.MaxInt32) },
-			scale:  math.MinInt32,
-			decGot: &outcome{ok: false, value: "1", exponent: -math.MinInt32},
-			want:   outcome{ok: true, value: "5", exponent: math.MaxInt32},
+			name:  "5*10^MaxInt32 RoundUp(MinInt32)",
+			in:    func() Quantity { return *NewScaledQuantity(5, math.MaxInt32) },
+			scale: math.MinInt32,
+			want:  outcome{ok: true, value: "5", exponent: math.MaxInt32},
 		},
-		// TODO: Should be (5*10^(MinInt32+1), true) on the inf.Dec route
 		{
-			name:   "5*10^(MinInt32+1) RoundUp(MinInt32)",
-			in:     func() Quantity { return *NewScaledQuantity(5, math.MinInt32+1) },
-			scale:  math.MinInt32,
-			decGot: &outcome{ok: true, value: "5", exponent: -math.MinInt32 + 1},
-			want:   outcome{ok: true, value: "5", exponent: math.MinInt32 + 1},
+			name:  "5*10^(MinInt32+1) RoundUp(MinInt32)",
+			in:    func() Quantity { return *NewScaledQuantity(5, math.MinInt32+1) },
+			scale: math.MinInt32,
+			want:  outcome{ok: true, value: "5", exponent: math.MinInt32 + 1},
 		},
-		// TODO: Should be (-7*10^(MinInt32+2), true) on the inf.Dec route
 		{
-			name:   "-7*10^(MinInt32+2) RoundUp(MinInt32)",
-			in:     func() Quantity { return *NewScaledQuantity(-7, math.MinInt32+2) },
-			scale:  math.MinInt32,
-			decGot: &outcome{ok: true, value: "-7", exponent: -math.MinInt32 + 2},
-			want:   outcome{ok: true, value: "-7", exponent: math.MinInt32 + 2},
+			name:  "-7*10^(MinInt32+2) RoundUp(MinInt32)",
+			in:    func() Quantity { return *NewScaledQuantity(-7, math.MinInt32+2) },
+			scale: math.MinInt32,
+			want:  outcome{ok: true, value: "-7", exponent: math.MinInt32 + 2},
 		},
 		// TODO: Should be (1*10^MaxInt32, false)
 		{
@@ -1078,21 +1068,22 @@ func TestQuantityRoundUpKnownGaps(t *testing.T) {
 			want:     outcome{ok: false, value: "1", exponent: 2},
 		},
 		// TODO: Should be (1, false) on both routes
+		// TODO: int64 route: int64Amount.AsScale overflows computing 0-MinInt32.
+		// TODO: inf.Dec route: ToDec overflows negating MinInt32, so RoundUp gets
+		// 5*10^2147483648.
 		{
 			name:     "5*10^MinInt32 RoundUp(0)",
 			in:       func() Quantity { return *NewScaledQuantity(5, math.MinInt32) },
 			scale:    0,
 			int64Got: &outcome{ok: true, value: "5"},
-			decGot:   &outcome{panics: true},
+			decGot:   &outcome{ok: true, value: "5", exponent: -math.MinInt32}, // -math.MinInt32 == +2147483648
 			want:     outcome{ok: false, value: "1"},
 		},
-		// TODO: Should be (5*10^MaxInt32, true) on the inf.Dec route
 		{
-			name:   "5*10^MaxInt32 RoundUp(MinInt32+1)",
-			in:     func() Quantity { return *NewScaledQuantity(5, math.MaxInt32) },
-			scale:  math.MinInt32 + 1,
-			decGot: &outcome{ok: false, value: "1", exponent: -math.MaxInt32},
-			want:   outcome{ok: true, value: "5", exponent: math.MaxInt32},
+			name:  "5*10^MaxInt32 RoundUp(MinInt32+1)",
+			in:    func() Quantity { return *NewScaledQuantity(5, math.MaxInt32) },
+			scale: math.MinInt32 + 1,
+			want:  outcome{ok: true, value: "5", exponent: math.MaxInt32},
 		},
 		// TODO: Should be (1*10^MaxInt32, false) on both routes
 		{
@@ -1111,53 +1102,41 @@ func TestQuantityRoundUpKnownGaps(t *testing.T) {
 			decGot: &outcome{ok: true, value: "5", exponent: math.MaxInt32 + 3},
 			want:   outcome{ok: false, value: "1", exponent: math.MaxInt32 - 1},
 		},
-		// TODO: Should be (5*10^-MinInt32, true) on the inf.Dec route
 		{
-			name:   "inf.Dec 5*10^-MinInt32 RoundUp(MinInt32+1)",
-			in:     func() Quantity { return *NewDecimalQuantity(*inf.NewDec(5, math.MinInt32), DecimalSI) },
-			scale:  math.MinInt32 + 1,
-			decGot: &outcome{ok: false, value: "1", exponent: -math.MaxInt32},
-			want:   outcome{ok: true, value: "5", exponent: -math.MinInt32},
+			name:  "inf.Dec 5*10^-MinInt32 RoundUp(MinInt32+1)",
+			in:    func() Quantity { return *NewDecimalQuantity(*inf.NewDec(5, math.MinInt32), DecimalSI) },
+			scale: math.MinInt32 + 1,
+			want:  outcome{ok: true, value: "5", exponent: -math.MinInt32},
 		},
-		// TODO: Should be (5*10^-MinInt32, true) on the inf.Dec route
 		{
-			name:   "inf.Dec 5*10^-MinInt32 RoundUp(0)",
-			in:     func() Quantity { return *NewDecimalQuantity(*inf.NewDec(5, math.MinInt32), DecimalSI) },
-			scale:  0,
-			decGot: &outcome{panics: true},
-			want:   outcome{ok: true, value: "5", exponent: -math.MinInt32},
+			name:  "inf.Dec 5*10^-MinInt32 RoundUp(0)",
+			in:    func() Quantity { return *NewDecimalQuantity(*inf.NewDec(5, math.MinInt32), DecimalSI) },
+			scale: 0,
+			want:  outcome{ok: true, value: "5", exponent: -math.MinInt32},
 		},
-		// TODO: Should be "+1" like the int64 route
 		{
-			name:   "+1 RoundUp(0)",
-			in:     func() Quantity { return MustParse("+1") },
-			scale:  0,
-			decGot: &outcome{ok: true, value: "1", str: "1"},
-			want:   outcome{ok: true, value: "1", str: "+1"},
+			name:  "+1 RoundUp(0)",
+			in:    func() Quantity { return MustParse("+1") },
+			scale: 0,
+			want:  outcome{ok: true, value: "1", str: "+1"},
 		},
-		// TODO: Should be "+1500m" like the int64 route
 		{
-			name:   "+1500m RoundUp(Milli)",
-			in:     func() Quantity { return MustParse("+1500m") },
-			scale:  Milli,
-			decGot: &outcome{ok: true, value: "15", exponent: -1, str: "1500m"},
-			want:   outcome{ok: true, value: "15", exponent: -1, str: "+1500m"},
+			name:  "+1500m RoundUp(Milli)",
+			in:    func() Quantity { return MustParse("+1500m") },
+			scale: Milli,
+			want:  outcome{ok: true, value: "15", exponent: -1, str: "+1500m"},
 		},
-		// TODO: Should be "5e0" like the int64 route
 		{
-			name:   "5e0 RoundUp(0)",
-			in:     func() Quantity { return MustParse("5e0") },
-			scale:  0,
-			decGot: &outcome{ok: true, value: "5", str: "5"},
-			want:   outcome{ok: true, value: "5", str: "5e0"},
+			name:  "5e0 RoundUp(0)",
+			in:    func() Quantity { return MustParse("5e0") },
+			scale: 0,
+			want:  outcome{ok: true, value: "5", str: "5e0"},
 		},
-		// TODO: Should be "+1Ki" like the int64 route
 		{
-			name:   "+1Ki RoundUp(Milli)",
-			in:     func() Quantity { return MustParse("+1Ki") },
-			scale:  Milli,
-			decGot: &outcome{ok: true, value: "1024", str: "1Ki"},
-			want:   outcome{ok: true, value: "1024", str: "+1Ki"},
+			name:  "+1Ki RoundUp(Milli)",
+			in:    func() Quantity { return MustParse("+1Ki") },
+			scale: Milli,
+			want:  outcome{ok: true, value: "1024", str: "+1Ki"},
 		},
 		{
 			name:  "2Gi then Format = DecimalSI, RoundUp(Milli)",
@@ -1176,29 +1155,34 @@ func TestQuantityRoundUpKnownGaps(t *testing.T) {
 			scale: Milli,
 			want:  outcome{ok: true, value: "1024", str: "1Ki"},
 		},
-		// TODO: Should be 1000 on the inf.Dec route
 		{
-			name:   "1k RoundUp(Nano) then AsApproximateFloat64",
-			in:     func() Quantity { return MustParse("1k") },
-			scale:  Nano,
-			decGot: &outcome{ok: true, value: "1", exponent: 3, float: "1000.0000000000001"},
-			want:   outcome{ok: true, value: "1", exponent: 3, float: "1000"},
+			name: "2k then Format = DecimalExponent, CacheString, RoundUp(Milli)",
+			in: func() Quantity {
+				q := MustParse("2k")
+				q.Format = DecimalExponent
+				q.CacheString()
+				return q
+			},
+			scale: Milli,
+			want:  outcome{ok: true, value: "2", exponent: 3, str: "2e3"},
 		},
-		// TODO: Should be 5 on the inf.Dec route
 		{
-			name:   "5 RoundUp(-310) then AsApproximateFloat64",
-			in:     func() Quantity { return *NewQuantity(5, DecimalSI) },
-			scale:  -310,
-			decGot: &outcome{ok: true, value: "5", float: "+Inf"},
-			want:   outcome{ok: true, value: "5", float: "5"},
+			name:  "1k RoundUp(Nano) then AsApproximateFloat64",
+			in:    func() Quantity { return MustParse("1k") },
+			scale: Nano,
+			want:  outcome{ok: true, value: "1", exponent: 3, float: "1000"},
 		},
-		// TODO: Should be 5 on the inf.Dec route
 		{
-			name:   "5 RoundUp(-330) then AsApproximateFloat64",
-			in:     func() Quantity { return *NewQuantity(5, DecimalSI) },
-			scale:  -330,
-			decGot: &outcome{ok: true, value: "5", float: "NaN"},
-			want:   outcome{ok: true, value: "5", float: "5"},
+			name:  "5 RoundUp(-310) then AsApproximateFloat64",
+			in:    func() Quantity { return *NewQuantity(5, DecimalSI) },
+			scale: -310,
+			want:  outcome{ok: true, value: "5", float: "5"},
+		},
+		{
+			name:  "5 RoundUp(-330) then AsApproximateFloat64",
+			in:    func() Quantity { return *NewQuantity(5, DecimalSI) },
+			scale: -330,
+			want:  outcome{ok: true, value: "5", float: "5"},
 		},
 	}
 
@@ -1260,6 +1244,39 @@ func TestQuantityCachedStringRecordsFormat(t *testing.T) {
 	// How the string was cached does not show up in reflect.DeepEqual.
 	if a, b := MustParse("1Gi"), MustParse("1024Mi"); !reflect.DeepEqual(a, b) {
 		t.Errorf("MustParse(%q) and MustParse(%q) are not reflect.DeepEqual: %+v vs %+v", "1Gi", "1024Mi", a, b)
+	}
+}
+
+func TestQuantityRoundUpKeepsCachedString(t *testing.T) {
+	// A RoundUp that changes nothing leaves the cached string alone, even across
+	// ToDec or after Format is assigned. The readers check whether it is valid.
+	for _, tc := range []struct {
+		name string
+		in   func() Quantity
+		kept bool
+	}{
+		{"5 CacheString then ToDec", func() Quantity {
+			q := *NewQuantity(5, DecimalSI)
+			q.CacheString()
+			q.ToDec()
+			return q
+		}, true},
+		{"0Ki then Format = DecimalSI", func() Quantity { q := MustParse("0Ki"); q.Format = DecimalSI; return q }, true},
+		{"500m CacheString as BinarySI then Format = DecimalSI", func() Quantity {
+			q := *NewMilliQuantity(500, BinarySI)
+			q.CacheString()
+			q.Format = DecimalSI
+			return q
+		}, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			q := tc.in()
+			cached := q.s
+			q.RoundUp(Nano)
+			if kept := q.s == cached; kept != tc.kept {
+				t.Errorf("RoundUp(Nano) left the cached string as %+v (was %+v), want kept=%t", q.s, cached, tc.kept)
+			}
+		})
 	}
 }
 
@@ -3459,7 +3476,7 @@ func TestQuantityAsInt64KnownGaps(t *testing.T) {
 			int64Route: func() Quantity { q := *NewScaledQuantity(5, math.MinInt32); q.RoundUp(0); return q },
 			decRoute:   func() Quantity { q := *NewScaledQuantity(5, math.MinInt32); q.ToDec(); q.RoundUp(0); return q },
 			int64Got:   outcome{value: 5, ok: true},
-			decGot:     outcome{panics: true},
+			decGot:     outcome{value: 0, ok: false},
 			want:       &outcome{value: 1, ok: true},
 		},
 		// TODO: Should be (100, true)
@@ -3611,11 +3628,8 @@ func TestQuantityAsInt64AfterRoundTrip(t *testing.T) {
 									q.ToDec()
 								}
 								if roundUp {
-									// A RoundUp that changes nothing keeps the cached string on
-									// the int64 form but clears it on the inf.Dec form.
-									if q.d.Dec != nil || q.i.scale < Nano {
-										spelledFromDec = q.d.Dec != nil
-									}
+									// RoundUp(Nano) changes none of the seeds, so it keeps the cached
+									// string.
 									q.RoundUp(Nano)
 								}
 
