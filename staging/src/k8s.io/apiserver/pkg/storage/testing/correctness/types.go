@@ -38,13 +38,14 @@ type Operation struct {
 
 // Request represents an input invocation to the storage interface.
 type Request struct {
-	Op     OpType
-	Key    string
-	Create CreateRequest
-	Get    GetRequest
-	List   ListRequest
-	Delete DeleteRequest
-	Update UpdateRequest
+	Op      OpType
+	Key     string
+	Create  CreateRequest
+	Get     GetRequest
+	List    ListRequest
+	Delete  DeleteRequest
+	Update  UpdateRequest
+	Compact CompactRequest
 }
 
 // CreateRequest contains parameters specific to Create operations.
@@ -75,6 +76,11 @@ type UpdateRequest struct {
 	CachedExistingObject runtime.Object
 }
 
+// CompactRequest contains parameters specific to Compact operations.
+type CompactRequest struct {
+	ResourceVersion string
+}
+
 // Describe formats the operation for debugging and visualization.
 func (r Request) Describe(output Response) string {
 	if output.Err != nil {
@@ -103,6 +109,9 @@ func (r Request) Describe(output Response) string {
 		default:
 			return fmt.Sprintf("%s(%s) -> %v", r.Op, r.Key, output.Err)
 		}
+	}
+	if r.Op == OpCompact {
+		return fmt.Sprintf("%s(RV=%s) -> OK", r.Op, r.Compact.ResourceVersion)
 	}
 	if r.Op == OpList {
 		accessor, err := meta.ListAccessor(output.Object)
@@ -147,11 +156,12 @@ func (r Request) Describe(output Response) string {
 type OpType string
 
 const (
-	OpCreate OpType = "Create"
-	OpDelete OpType = "Delete"
-	OpGet    OpType = "Get"
-	OpList   OpType = "List"
-	OpUpdate OpType = "Update"
+	OpCreate  OpType = "Create"
+	OpDelete  OpType = "Delete"
+	OpGet     OpType = "Get"
+	OpList    OpType = "List"
+	OpUpdate  OpType = "Update"
+	OpCompact OpType = "Compact"
 )
 
 // Response represents the output/result from the storage interface invocation.
