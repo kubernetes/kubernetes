@@ -6139,6 +6139,33 @@ func Test_generateAPIPodStatusForInPlaceVPAEnabled(t *testing.T) {
 	}
 }
 
+func TestGenerateAPIPodStatusOmitsInsecureImplicitConditionsForWindowsPods(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodImplicitRootWarnings, true)
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{UID: "windows-pod", Name: "foo0", Namespace: "bar0"},
+		Spec: v1.PodSpec{
+			OS:         &v1.PodOS{Name: v1.Windows},
+			Containers: []v1.Container{{Name: "ctr0"}},
+		},
+	}
+	criStatus := &kubecontainer.PodStatus{
+		ContainerStatuses: []*kubecontainer.Status{{Name: "ctr0"}},
+	}
+
+	logger, tCtx := ktesting.NewTestContext(t)
+	testKubelet := newTestKubelet(t, false)
+	defer testKubelet.Cleanup()
+	kl := testKubelet.kubelet
+
+	kl.statusManager.SetPodStatus(logger, pod, pod.Status)
+	actual := kl.generateAPIPodStatus(tCtx, pod, criStatus, false)
+	for _, c := range actual.Conditions {
+		if c.Type == v1.InsecureImplicitUserID || c.Type == v1.InsecureImplicitGroupID {
+			t.Fatalf("unexpected condition on Windows pod: %v", c)
+		}
+	}
+}
+
 func findContainerStatusByName(status v1.PodStatus, name string) *v1.ContainerStatus {
 	for i, c := range status.InitContainerStatuses {
 		if c.Name == name {
