@@ -18,6 +18,7 @@ package serviceaccount
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 	"strings"
 	"testing"
@@ -29,11 +30,14 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apiserver/pkg/admission"
 	admissiontesting "k8s.io/apiserver/pkg/admission/testing"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	v1defaults "k8s.io/kubernetes/pkg/apis/core/v1"
 	"k8s.io/kubernetes/pkg/controller"
+	"k8s.io/kubernetes/pkg/features"
 	kubelet "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/utils/ptr"
 )
@@ -162,82 +166,104 @@ func TestRejectsMirrorPodWithServiceAccountTokenVolumeProjections(t *testing.T) 
 func TestAssignsDefaultServiceAccountAndBoundTokenWithNoSecretTokens(t *testing.T) {
 	ns := "myns"
 
-	admit := NewServiceAccount()
-	informerFactory := informers.NewSharedInformerFactory(nil, controller.NoResyncPeriodFunc())
-	admit.SetExternalKubeInformerFactory(informerFactory)
-	admit.MountServiceAccountToken = true
-
-	// Add the default service account for the ns into the cache
-	informerFactory.Core().V1().ServiceAccounts().Informer().GetStore().Add(&corev1.ServiceAccount{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      DefaultServiceAccountName,
-			Namespace: ns,
-		},
-	})
-
-	v1PodIn := &corev1.Pod{
-		Spec: corev1.PodSpec{
-			Containers: []corev1.Container{{}},
-		},
-	}
-	v1defaults.SetObjectDefaults_Pod(v1PodIn)
-	pod := &api.Pod{}
-	if err := v1defaults.Convert_v1_Pod_To_core_Pod(v1PodIn, pod, nil); err != nil {
-		t.Fatal(err)
-	}
-	attrs := admission.NewAttributesRecord(pod, nil, api.Kind("Pod").WithVersion("version"), ns, "myname", api.Resource("pods").WithVersion("version"), "", admission.Create, &metav1.CreateOptions{}, false, nil)
-	err := admissiontesting.WithReinvocationTesting(t, admit).Admit(context.TODO(), attrs, nil)
-	if err != nil {
-		t.Fatalf("Expected success, got: %v", err)
-	}
-
-	expectedVolumes := []api.Volume{{
+	expectedConfigMapVolumes := []api.Volume{{
 		Name: "cleared",
-		VolumeSource: api.VolumeSource{
-			Projected: &api.ProjectedVolumeSource{
-				Sources: []api.VolumeProjection{
-					{ServiceAccountToken: &api.ServiceAccountTokenProjection{ExpirationSeconds: ptr.To[int64](3607), Path: "token"}},
-					{ConfigMap: &api.ConfigMapProjection{LocalObjectReference: api.LocalObjectReference{Name: "kube-root-ca.crt"}, Items: []api.KeyToPath{{Key: "ca.crt", Path: "ca.crt"}}}},
-					{DownwardAPI: &api.DownwardAPIProjection{Items: []api.DownwardAPIVolumeFile{{Path: "namespace", FieldRef: &api.ObjectFieldSelector{APIVersion: "v1", FieldPath: "metadata.namespace"}}}}},
-				},
-				DefaultMode: ptr.To[int32](0644),
+		Projected: &api.ProjectedVolumeSource{
+			Sources: []api.VolumeProjection{
+				{ServiceAccountToken: &api.ServiceAccountTokenProjection{ExpirationSeconds: ptr.To[int64](3607), Path: "token"}},
+				{ConfigMap: &api.ConfigMapProjection{LocalObjectReference: api.LocalObjectReference{Name: "kube-root-ca.crt"}, Items: []api.KeyToPath{{Key: "ca.crt", Path: "ca.crt"}}}},
+				{DownwardAPI: &api.DownwardAPIProjection{Items: []api.DownwardAPIVolumeFile{{Path: "namespace", FieldRef: &api.ObjectFieldSelector{APIVersion: "v1", FieldPath: "metadata.namespace"}}}}},
 			},
+			DefaultMode: ptr.To[int32](0644),
 		},
 	}}
-	expectedVolumeMounts := []api.VolumeMount{{
-		Name:      "cleared",
-		ReadOnly:  true,
-		MountPath: "/var/run/secrets/kubernetes.io/serviceaccount",
+	expectedVolumesClusterTrustBundle := []api.Volume{{
+		Name: "cleared",
+		Projected: &api.ProjectedVolumeSource{
+			Sources: []api.VolumeProjection{
+				{ServiceAccountToken: &api.ServiceAccountTokenProjection{ExpirationSeconds: ptr.To[int64](3607), Path: "token"}},
+				{ClusterTrustBundle: &api.ClusterTrustBundleProjection{SignerName: new("kubernetes.io/kube-apiserver-serving"), LabelSelector: &metav1.LabelSelector{}, Path: "ca.crt"}},
+				{DownwardAPI: &api.DownwardAPIProjection{Items: []api.DownwardAPIVolumeFile{{Path: "namespace", FieldRef: &api.ObjectFieldSelector{APIVersion: "v1", FieldPath: "metadata.namespace"}}}}},
+			},
+			DefaultMode: ptr.To[int32](0644),
+		},
 	}}
 
-	// clear generated volume names
-	for i := range pod.Spec.Volumes {
-		if len(pod.Spec.Volumes[i].Name) > 0 {
-			pod.Spec.Volumes[i].Name = "cleared"
+	for _, ctbTrustEnabled := range []bool{false, true} {
+		expectedVolumes := expectedConfigMapVolumes
+		if ctbTrustEnabled {
+			expectedVolumes = expectedVolumesClusterTrustBundle
 		}
-	}
-	for i := range pod.Spec.Containers[0].VolumeMounts {
-		if len(pod.Spec.Containers[0].VolumeMounts[i].Name) > 0 {
-			pod.Spec.Containers[0].VolumeMounts[i].Name = "cleared"
-		}
-	}
 
-	if !reflect.DeepEqual(expectedVolumes, pod.Spec.Volumes) {
-		t.Errorf("unexpected volumes: %s", cmp.Diff(expectedVolumes, pod.Spec.Volumes))
-	}
-	if !reflect.DeepEqual(expectedVolumeMounts, pod.Spec.Containers[0].VolumeMounts) {
-		t.Errorf("unexpected volumes: %s", cmp.Diff(expectedVolumeMounts, pod.Spec.Containers[0].VolumeMounts))
-	}
+		t.Run(fmt.Sprintf("KubeAPIServerWorkloadsTrust=%t", ctbTrustEnabled), func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KubeAPIServerWorkloadsTrust, ctbTrustEnabled)
 
-	// ensure result converted to v1 matches defaulted object
-	v1PodOut := &corev1.Pod{}
-	if err := v1defaults.Convert_core_Pod_To_v1_Pod(pod, v1PodOut, nil); err != nil {
-		t.Fatal(err)
-	}
-	v1PodOutDefaulted := v1PodOut.DeepCopy()
-	v1defaults.SetObjectDefaults_Pod(v1PodOutDefaulted)
-	if !reflect.DeepEqual(v1PodOut, v1PodOutDefaulted) {
-		t.Error(cmp.Diff(v1PodOut, v1PodOutDefaulted))
+			admit := NewServiceAccount()
+			informerFactory := informers.NewSharedInformerFactory(nil, controller.NoResyncPeriodFunc())
+			admit.SetExternalKubeInformerFactory(informerFactory)
+			admit.MountServiceAccountToken = true
+
+			// Add the default service account for the ns into the cache
+			err := informerFactory.Core().V1().ServiceAccounts().Informer().GetStore().Add(&corev1.ServiceAccount{
+				Name:      DefaultServiceAccountName,
+				Namespace: ns,
+			})
+			if err != nil {
+				t.Fatalf("failed to add ServiceAccount to the informer's store: %v", err)
+			}
+
+			v1PodIn := &corev1.Pod{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{{}},
+				},
+			}
+			v1defaults.SetObjectDefaults_Pod(v1PodIn)
+			pod := &api.Pod{}
+			if err := v1defaults.Convert_v1_Pod_To_core_Pod(v1PodIn, pod, nil); err != nil {
+				t.Fatal(err)
+			}
+			attrs := admission.NewAttributesRecord(pod, nil, api.Kind("Pod").WithVersion("version"), ns, "myname", api.Resource("pods").WithVersion("version"), "", admission.Create, &metav1.CreateOptions{}, false, nil)
+			err = admissiontesting.WithReinvocationTesting(t, admit).Admit(context.TODO(), attrs, nil)
+			if err != nil {
+				t.Fatalf("Expected success, got: %v", err)
+			}
+
+			expectedVolumeMounts := []api.VolumeMount{{
+				Name:      "cleared",
+				ReadOnly:  true,
+				MountPath: "/var/run/secrets/kubernetes.io/serviceaccount",
+			}}
+
+			// clear generated volume names
+			for i := range pod.Spec.Volumes {
+				if len(pod.Spec.Volumes[i].Name) > 0 {
+					pod.Spec.Volumes[i].Name = "cleared"
+				}
+			}
+			for i := range pod.Spec.Containers[0].VolumeMounts {
+				if len(pod.Spec.Containers[0].VolumeMounts[i].Name) > 0 {
+					pod.Spec.Containers[0].VolumeMounts[i].Name = "cleared"
+				}
+			}
+
+			if !reflect.DeepEqual(expectedVolumes, pod.Spec.Volumes) {
+				t.Errorf("unexpected volumes: %s", cmp.Diff(expectedVolumes, pod.Spec.Volumes))
+			}
+			if !reflect.DeepEqual(expectedVolumeMounts, pod.Spec.Containers[0].VolumeMounts) {
+				t.Errorf("unexpected volumes: %s", cmp.Diff(expectedVolumeMounts, pod.Spec.Containers[0].VolumeMounts))
+			}
+
+			// ensure result converted to v1 matches defaulted object
+			v1PodOut := &corev1.Pod{}
+			if err := v1defaults.Convert_core_Pod_To_v1_Pod(pod, v1PodOut, nil); err != nil {
+				t.Fatal(err)
+			}
+			v1PodOutDefaulted := v1PodOut.DeepCopy()
+			v1defaults.SetObjectDefaults_Pod(v1PodOutDefaulted)
+			if !reflect.DeepEqual(v1PodOut, v1PodOutDefaulted) {
+				t.Error(cmp.Diff(v1PodOut, v1PodOutDefaulted))
+			}
+		})
 	}
 }
 
@@ -288,6 +314,12 @@ func TestDeniesInvalidServiceAccount(t *testing.T) {
 }
 
 func TestAutomountsAPIToken(t *testing.T) {
+	for _, ctbTrustEnabled := range []bool{false, true} {
+		t.Run(fmt.Sprintf("KubeAPIServerWorkloadsTrust=%t", ctbTrustEnabled), func(t *testing.T) { testAutomountsAPIToken(t, ctbTrustEnabled) })
+	}
+}
+func testAutomountsAPIToken(t *testing.T, ctbTrustEnabled bool) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KubeAPIServerWorkloadsTrust, ctbTrustEnabled)
 
 	admit := NewServiceAccount()
 	informerFactory := informers.NewSharedInformerFactory(nil, controller.NoResyncPeriodFunc())
