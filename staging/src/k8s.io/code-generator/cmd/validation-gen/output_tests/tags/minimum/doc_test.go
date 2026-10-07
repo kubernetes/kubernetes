@@ -20,6 +20,7 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/utils/ptr"
 )
@@ -33,6 +34,7 @@ func TestBasicStruct(t *testing.T) {
 		IntPtrField:      ptr.To(0),
 		UintPtrField:     ptr.To(uint(0)),
 		DurationPtrField: ptr.To(time.Duration(0)),
+		QuantityPtrField: ptr.To(resource.MustParse("0")),
 		TypedefPtrField:  ptr.To(IntType(0)),
 	}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField().ByDetailSubstring().ByOrigin(), field.ErrorList{
 		field.Invalid(field.NewPath("intField"), nil, "").WithOrigin("minimum"),
@@ -47,6 +49,8 @@ func TestBasicStruct(t *testing.T) {
 		field.Invalid(field.NewPath("uint64Field"), nil, "").WithOrigin("minimum"),
 		field.Invalid(field.NewPath("durationField"), nil, "").WithOrigin("minimum"),
 		field.Invalid(field.NewPath("durationPtrField"), nil, "").WithOrigin("minimum"),
+		field.Invalid(field.NewPath("quantityField"), nil, "").WithOrigin("minimum"),
+		field.Invalid(field.NewPath("quantityPtrField"), nil, "").WithOrigin("minimum"),
 		field.Invalid(field.NewPath("typedefField"), nil, "").WithOrigin("minimum"),
 		field.Invalid(field.NewPath("typedefPtrField"), nil, "").WithOrigin("minimum"),
 	})
@@ -71,6 +75,8 @@ func TestBasicStruct(t *testing.T) {
 		Int64Field:       -1,
 		DurationField:    time.Second - 1,
 		DurationPtrField: ptr.To(100*time.Millisecond - 1),
+		QuantityField:    resource.MustParse("-1"),
+		QuantityPtrField: ptr.To(resource.MustParse("1023Mi")),
 		TypedefField:     IntType(-1),
 		TypedefPtrField:  ptr.To(IntType(-1)),
 	}).OldValue(&BasicStruct{
@@ -81,6 +87,7 @@ func TestBasicStruct(t *testing.T) {
 		Int64Field:       0,
 		DurationField:    0,
 		DurationPtrField: ptr.To(time.Duration(0)),
+		QuantityPtrField: ptr.To(resource.MustParse("0")),
 		TypedefField:     IntType(0),
 		TypedefPtrField:  ptr.To(IntType(0)),
 	}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField().ByDetailSubstring().ByOrigin(), field.ErrorList{
@@ -91,6 +98,8 @@ func TestBasicStruct(t *testing.T) {
 		field.Invalid(field.NewPath("int64Field"), nil, "").WithOrigin("minimum"),
 		field.Invalid(field.NewPath("durationField"), nil, "").WithOrigin("minimum"),
 		field.Invalid(field.NewPath("durationPtrField"), nil, "").WithOrigin("minimum"),
+		field.Invalid(field.NewPath("quantityField"), nil, "").WithOrigin("minimum"),
+		field.Invalid(field.NewPath("quantityPtrField"), nil, "").WithOrigin("minimum"),
 		field.Invalid(field.NewPath("typedefField"), nil, "").WithOrigin("minimum"),
 		field.Invalid(field.NewPath("typedefPtrField"), nil, "").WithOrigin("minimum"),
 	})
@@ -109,6 +118,8 @@ func TestBasicStruct(t *testing.T) {
 		UintPtrField:     ptr.To(uint(1)),
 		DurationField:    time.Second,
 		DurationPtrField: ptr.To(100 * time.Millisecond),
+		QuantityField:    resource.MustParse("1"),
+		QuantityPtrField: ptr.To(resource.MustParse("1Gi")),
 		TypedefField:     IntType(1),
 		TypedefPtrField:  ptr.To(IntType(1)),
 	}).ExpectValid()
