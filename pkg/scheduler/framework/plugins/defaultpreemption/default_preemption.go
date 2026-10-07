@@ -582,11 +582,6 @@ func (pl *DefaultPreemption) PreScore(ctx context.Context, cycleState fwk.CycleS
 			evals[i] = nodeVictimEval{nodeName: nodeName}
 			return
 		}
-		fits, err := pl.fitsWithAllSurvivingVictims(ctx, cycleState, pod, nodeInfo, surviving)
-		if err == nil && fits {
-			evals[i] = nodeVictimEval{nodeName: nodeName}
-			return
-		}
 		victims, numPDBViolations, err := pl.computeDeltaVictimsOnNode(ctx, cycleState, pod, nodeInfo, surviving)
 		if err != nil {
 			mu.Lock()
@@ -692,14 +687,10 @@ func (pl *DefaultPreemption) Reserve(ctx context.Context, state fwk.CycleState, 
 		if len(surviving) > 0 {
 			if nodeInfo, err := pl.fh.SnapshotSharedLister().NodeInfos().Get(nodeName); err == nil {
 				// AssumeAndReserveInSnapshot has already assumed pod onto nodeInfo before calling Reserve;
-				// clone nodeInfo and remove pod so fitsWithAllSurvivingVictims / computeDeltaVictimsOnNode
-				// do not double-count pod.
+				// clone nodeInfo and remove pod so computeDeltaVictimsOnNode does not double-count pod.
 				nodeInfoClone := nodeInfo.Snapshot()
 				_ = nodeInfoClone.RemovePod(klog.FromContext(ctx), pod)
-				fits, err := pl.fitsWithAllSurvivingVictims(ctx, state, pod, nodeInfoClone, surviving)
-				if err == nil && !fits {
-					victims, _, _ = pl.computeDeltaVictimsOnNode(ctx, state, pod, nodeInfoClone, surviving)
-				}
+				victims, _, _ = pl.computeDeltaVictimsOnNode(ctx, state, pod, nodeInfoClone, surviving)
 			}
 		}
 		s = &preemptionScoreState{}
@@ -732,45 +723,16 @@ func (pl *DefaultPreemption) Unreserve(ctx context.Context, state fwk.CycleState
 	}
 }
 
-func (pl *DefaultPreemption) getTargetNodeInfo(nodeName string, nameToNode map[string]fwk.NodeInfo) (fwk.NodeInfo, error) {
-	if ni, ok := nameToNode[nodeName]; ok {
-		return ni, nil
+func (pl *DefaultPreemption) getTargetNodeInfo(v fwk.PreemptionVictim, nodeName, mainNodeName string, mainNodeClone fwk.NodeInfo) (fwk.NodeInfo, error) {
+	if nodeName == mainNodeName {
+		return mainNodeClone, nil
 	}
-	ni, err := pl.fh.SnapshotSharedLister().NodeInfos().Get(nodeName)
-	if err != nil {
-		return nil, err
-	}
-	cloned := ni.Snapshot()
-	nameToNode[nodeName] = cloned
-	return cloned, nil
-}
-
-func (pl *DefaultPreemption) fitsWithAllSurvivingVictims(
-	ctx context.Context,
-	cycleState fwk.CycleState,
-	preemptor *v1.Pod,
-	nodeInfo fwk.NodeInfo,
-	surviving []fwk.PreemptionVictim,
-) (bool, error) {
-	mainNodeName := nodeInfo.Node().Name
-	nodeInfoClone := nodeInfo.Snapshot()
-	stateClone := cycleState.Clone()
-	nameToNode := map[string]fwk.NodeInfo{mainNodeName: nodeInfoClone}
-	for _, v := range surviving {
-		for _, pi := range v.Pods() {
-			targetNodeInfo, err := pl.getTargetNodeInfo(pi.GetPod().Spec.NodeName, nameToNode)
-			if err != nil {
-				return false, err
-			}
-			targetNodeInfo.AddPodInfo(pi)
-			status := pl.fh.RunPreFilterExtensionAddPod(ctx, stateClone, preemptor, pi, targetNodeInfo)
-			if !status.IsSuccess() {
-				return false, status.AsError()
-			}
+	if dv, ok := v.(*preemption.DomainVictim); ok {
+		if ni, ok := dv.AffectedNodes()[nodeName]; ok {
+			return ni, nil
 		}
 	}
-	status := pl.fh.RunFilterPluginsWithNominatedPods(ctx, stateClone, preemptor, nodeInfoClone)
-	return status.IsSuccess(), nil
+	return pl.fh.SnapshotSharedLister().NodeInfos().Get(nodeName)
 }
 
 func (pl *DefaultPreemption) computeDeltaVictimsOnNode(
@@ -784,15 +746,20 @@ func (pl *DefaultPreemption) computeDeltaVictimsOnNode(
 	mainNodeName := nodeInfo.Node().Name
 	nodeInfoClone := nodeInfo.Snapshot()
 	stateClone := cycleState.Clone()
-	nameToNode := map[string]fwk.NodeInfo{mainNodeName: nodeInfoClone}
+	// Follow the same NodeInfo-mutation contract as SelectVictimsOnNode: only mainNodeName's
+	// NodeInfo is cloned and mutated. Remote nodes affected by a multi-node PodGroup victim
+	// are passed unmutated to PreFilterExtension AddPod/RemovePod hooks to update CycleState.
 
 	addVictim := func(v fwk.PreemptionVictim) error {
 		for _, pi := range v.Pods() {
-			targetNodeInfo, err := pl.getTargetNodeInfo(pi.GetPod().Spec.NodeName, nameToNode)
+			podNodeName := pi.GetPod().Spec.NodeName
+			targetNodeInfo, err := pl.getTargetNodeInfo(v, podNodeName, mainNodeName, nodeInfoClone)
 			if err != nil {
 				return err
 			}
-			targetNodeInfo.AddPodInfo(pi)
+			if podNodeName == mainNodeName {
+				nodeInfoClone.AddPodInfo(pi)
+			}
 			status := pl.fh.RunPreFilterExtensionAddPod(ctx, stateClone, preemptor, pi, targetNodeInfo)
 			if !status.IsSuccess() {
 				return status.AsError()
@@ -803,12 +770,15 @@ func (pl *DefaultPreemption) computeDeltaVictimsOnNode(
 
 	removeVictim := func(v fwk.PreemptionVictim) error {
 		for _, pi := range v.Pods() {
-			targetNodeInfo, err := pl.getTargetNodeInfo(pi.GetPod().Spec.NodeName, nameToNode)
+			podNodeName := pi.GetPod().Spec.NodeName
+			targetNodeInfo, err := pl.getTargetNodeInfo(v, podNodeName, mainNodeName, nodeInfoClone)
 			if err != nil {
 				return err
 			}
-			if err := targetNodeInfo.RemovePod(logger, pi.GetPod()); err != nil {
-				return err
+			if podNodeName == mainNodeName {
+				if err := nodeInfoClone.RemovePod(logger, pi.GetPod()); err != nil {
+					return err
+				}
 			}
 			status := pl.fh.RunPreFilterExtensionRemovePod(ctx, stateClone, preemptor, pi, targetNodeInfo)
 			if !status.IsSuccess() {
@@ -841,15 +811,19 @@ func (pl *DefaultPreemption) computeDeltaVictimsOnNode(
 
 	var deltaVictims []fwk.PreemptionVictim
 	numPDBViolations := 0
+	remainingVictims := len(violatingVictims) + len(nonViolatingVictims)
 
 	reprieve := func(v fwk.PreemptionVictim) (bool, error) {
+		remainingVictims--
 		if err := addVictim(v); err != nil {
 			return false, err
 		}
 		status := pl.fh.RunFilterPluginsWithNominatedPods(ctx, stateClone, preemptor, nodeInfoClone)
 		if !status.IsSuccess() {
-			if err := removeVictim(v); err != nil {
-				return false, err
+			if remainingVictims > 0 {
+				if err := removeVictim(v); err != nil {
+					return false, err
+				}
 			}
 			deltaVictims = append(deltaVictims, v)
 			return false, nil
@@ -877,4 +851,3 @@ func (pl *DefaultPreemption) computeDeltaVictimsOnNode(
 	}
 	return deltaVictims, numPDBViolations, nil
 }
-
