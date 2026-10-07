@@ -711,6 +711,9 @@ type StorageHealthCondition struct {
 	Status StorageHealthStatusType `json:"status" protobuf:"bytes,1,opt,name=status,casttype=StorageHealthStatusType"`
 	// reason is a brief CamelCase machine-parseable reason.
 	// +required
+	// +k8s:alpha(since: "1.38")=+k8s:required
+	// +k8s:alpha(since: "1.38")=+k8s:maxBytes=256
+	// +k8s:alpha(since: "1.38")=+k8s:format=k8s-condition-reason
 	// Maximum permitted length of a reason is 256 characters.
 	Reason string `json:"reason" protobuf:"bytes,2,opt,name=reason"`
 	// message is a human-readable description.
@@ -738,6 +741,7 @@ type StorageHealth struct {
 	// At most 16 conditions may be reported.
 	// +optional
 	// +listType=atomic
+	// +k8s:alpha(since: "1.38")=+k8s:optional
 	HealthConditions []StorageHealthCondition `json:"healthConditions,omitempty" protobuf:"bytes,2,rep,name=healthConditions"`
 }
 

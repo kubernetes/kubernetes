@@ -1000,7 +1000,7 @@ func TestConditionReason(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			value := tc.input
-			gotErrs := validateConditionReasonMessage(ctx, operation.Operation{}, fldPath, &value, nil)
+			gotErrs := ConditionReason(ctx, operation.Operation{}, fldPath, &value, nil)
 			matcher.Test(t, tc.wantErrs, gotErrs)
 		})
 	}
