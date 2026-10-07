@@ -947,8 +947,9 @@ kube::golang::build_binaries() {
       grpcnotrace=",grpcnotrace"
   fi
 
-  # Extract tags if any specified in GOFLAGS
-  gotags="selinux,notest${grpcnotrace},$(echo "${GOFLAGS:-}" | sed -ne 's|.*-tags=\([^-]*\).*|\1|p')"
+  # Extract tags if any specified in GOFLAGS. kubectl never enables kustomize Go
+  # plugins; the std plugin package plus cgo makes the linker keep every method.
+  gotags="selinux,notest,kustomize_disable_go_plugin_support${grpcnotrace},$(echo "${GOFLAGS:-}" | sed -ne 's|.*-tags=\([^-]*\).*|\1|p')"
 
   local -a targets=()
   local arg
