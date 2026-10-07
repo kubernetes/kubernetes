@@ -724,6 +724,76 @@ func TestGarbageCollectNotEnoughFreed(t *testing.T) {
 	}
 }
 
+func imageIDsOf(images []container.Image) []string {
+	ids := make([]string, 0, len(images))
+	for _, image := range images {
+		ids = append(ids, image.ID)
+	}
+	return ids
+}
+
+// Post-GC hooks prune state for images missing from remainingImages, so in-use,
+// pinned and not-yet-evaluated images must all be reported.
+func TestPostGCHooksReceiveAllRemainingImages(t *testing.T) {
+	for name, gc := range map[string]func(context.Context, *realImageGCManager) error{
+		"GarbageCollect": func(ctx context.Context, im *realImageGCManager) error {
+			return im.GarbageCollect(ctx, time.Now())
+		},
+		"DeleteUnusedImages": func(ctx context.Context, im *realImageGCManager) error {
+			return im.DeleteUnusedImages(ctx)
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			ctx := ktesting.Init(t)
+			mockStatsProvider := statstest.NewMockProvider(t)
+			manager, fakeRuntime := newRealImageGCManager(ImageGCPolicy{
+				HighThresholdPercent: 90,
+				LowThresholdPercent:  80,
+			}, mockStatsProvider)
+
+			var hookCalls int
+			var remainingImages []string
+			manager.postGCHooks = []PostImageGCHook{
+				func(_ context.Context, remaining []string, _ time.Time) {
+					hookCalls++
+					remainingImages = remaining
+				},
+			}
+
+			// 95% usage; freeing either unused image is enough to stop GC early,
+			// so the other one is never evaluated.
+			imageFs := &statsapi.FsStats{
+				AvailableBytes: ptr.To(uint64(50)),
+				CapacityBytes:  ptr.To(uint64(1000)),
+			}
+			mockStatsProvider.EXPECT().ImageFsStats(mock.Anything).Return(imageFs, imageFs, nil).Maybe()
+
+			pinnedImage := makeImage(3, 100)
+			pinnedImage.Pinned = true
+			fakeRuntime.ImageList = []container.Image{
+				makeImage(0, 100),
+				makeImage(1, 600),
+				makeImage(2, 600),
+				pinnedImage,
+			}
+			fakeRuntime.AllPodList = []*containertest.FakePod{
+				{Pod: &container.Pod{
+					Containers: []*container.Container{
+						makeContainer(0),
+					},
+				}},
+			}
+
+			require.NoError(t, gc(ctx, manager))
+			require.Equal(t, 1, hookCalls)
+
+			assert.Contains(t, remainingImages, imageID(0), "in-use image must be reported as remaining")
+			assert.Contains(t, remainingImages, imageID(3), "pinned image must be reported as remaining")
+			assert.ElementsMatch(t, imageIDsOf(fakeRuntime.ImageList), remainingImages)
+		})
+	}
+}
+
 func TestGarbageCollectImageNotOldEnough(t *testing.T) {
 	ctx := ktesting.Init(t)
 	policy := ImageGCPolicy{
@@ -771,7 +841,7 @@ func TestGarbageCollectImageNotOldEnough(t *testing.T) {
 func getImagesAndFreeSpace(ctx context.Context, t *testing.T, assert *assert.Assertions, im *realImageGCManager, fakeRuntime *containertest.FakeRuntime, spaceToFree, expectedSpaceFreed int64, imagesLen int, freeTime time.Time) {
 	images, err := im.imagesInEvictionOrder(ctx, freeTime)
 	require.NoError(t, err)
-	_, spaceFreed, err := im.freeSpace(ctx, spaceToFree, freeTime, images)
+	spaceFreed, err := im.freeSpace(ctx, spaceToFree, freeTime, images)
 	require.NoError(t, err)
 	assert.EqualValues(expectedSpaceFreed, spaceFreed)
 	assert.Len(fakeRuntime.ImageList, imagesLen)

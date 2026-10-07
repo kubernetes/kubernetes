@@ -393,13 +393,13 @@ func (im *realImageGCManager) GarbageCollect(ctx context.Context, beganGC time.T
 	if usagePercent >= im.policy.HighThresholdPercent {
 		amountToFree := capacity*int64(100-im.policy.LowThresholdPercent)/100 - available
 		logger.Info("Disk usage on image filesystem is over the high threshold, trying to free bytes down to the low threshold", "usage", usagePercent, "highThreshold", im.policy.HighThresholdPercent, "amountToFree", amountToFree, "lowThreshold", im.policy.LowThresholdPercent)
-		remainingImages, freed, err := im.freeSpace(ctx, amountToFree, freeTime, images)
+		freed, err := im.freeSpace(ctx, amountToFree, freeTime, images)
 		if err != nil {
 			// Failed to delete images, eg due to a read-only filesystem.
 			return err
 		}
 
-		im.runPostGCHooks(ctx, remainingImages, freeTime)
+		im.runPostGCHooks(ctx, im.remainingImages(), freeTime)
 
 		if freed < amountToFree {
 			// This usually means the disk is full for reasons other than container
@@ -415,6 +415,21 @@ func (im *realImageGCManager) GarbageCollect(ctx context.Context, beganGC time.T
 	}
 
 	return nil
+}
+
+// remainingImages returns the IDs of all images still known after a GC pass.
+// This must include in-use and pinned images, not just the eviction candidates
+// that survived: post-GC hooks treat anything missing from the list as gone.
+func (im *realImageGCManager) remainingImages() []string {
+	im.imageRecordsLock.Lock()
+	defer im.imageRecordsLock.Unlock()
+
+	// The same image can be tracked once per runtime handler.
+	imageIDs := sets.New[string]()
+	for imageKey := range im.imageRecords {
+		imageIDs.Insert(getImageIDFromTuple(imageKey))
+	}
+	return sets.List(imageIDs)
 }
 
 func (im *realImageGCManager) runPostGCHooks(ctx context.Context, remainingImages []string, gcStartTime time.Time) {
@@ -465,32 +480,30 @@ func (im *realImageGCManager) DeleteUnusedImages(ctx context.Context) error {
 		return err
 	}
 
-	remainingImages, _, err := im.freeSpace(ctx, math.MaxInt64, freeTime, images)
+	_, err = im.freeSpace(ctx, math.MaxInt64, freeTime, images)
 	if err != nil {
 		return err
 	}
 
-	im.runPostGCHooks(ctx, remainingImages, freeTime)
+	im.runPostGCHooks(ctx, im.remainingImages(), freeTime)
 	return nil
 }
 
 // Tries to free bytesToFree worth of images on the disk.
 //
-// Returns the images that are still available after the cleanup, the number of bytes freed
-// and an error if any occurred. The number of bytes freed is always returned.
+// Returns the number of bytes freed and an error if any occurred. The number
+// of bytes freed is always returned.
 // Note that error may be nil and the number of bytes free may be less
 // than bytesToFree.
-func (im *realImageGCManager) freeSpace(ctx context.Context, bytesToFree int64, freeTime time.Time, images []evictionInfo) ([]string, int64, error) {
+func (im *realImageGCManager) freeSpace(ctx context.Context, bytesToFree int64, freeTime time.Time, images []evictionInfo) (int64, error) {
 	// Delete unused images until we've freed up enough space.
 	var deletionErrors []error
 	logger := klog.FromContext(ctx)
 	spaceFreed := int64(0)
-	var imagesLeft []string
 	for _, image := range images {
 		logger.V(5).Info("Evaluating image ID for possible garbage collection based on disk usage", "imageID", image.id, "runtimeHandler", image.runtimeHandlerUsedToPullImage)
 		// Images that are currently in used were given a newer lastUsed.
 		if image.lastUsed.Equal(freeTime) || image.lastUsed.After(freeTime) {
-			imagesLeft = append(imagesLeft, image.id)
 			logger.V(5).Info("Image ID was used too recently, not eligible for garbage collection", "imageID", image.id, "lastUsed", image.lastUsed, "freeTime", freeTime)
 			continue
 		}
@@ -498,14 +511,12 @@ func (im *realImageGCManager) freeSpace(ctx context.Context, bytesToFree int64, 
 		// Avoid garbage collect the image if the image is not old enough.
 		// In such a case, the image may have just been pulled down, and will be used by a container right away.
 		if freeTime.Sub(image.firstDetected) < im.policy.MinAge {
-			imagesLeft = append(imagesLeft, image.id)
 			logger.V(5).Info("Image ID's age is less than the policy's minAge, not eligible for garbage collection", "imageID", image.id, "age", freeTime.Sub(image.firstDetected), "minAge", im.policy.MinAge)
 			continue
 		}
 
 		if err := im.freeImage(ctx, image, ImageGarbageCollectedTotalReasonSpace); err != nil {
 			deletionErrors = append(deletionErrors, err)
-			imagesLeft = append(imagesLeft, image.id)
 			continue
 		}
 		spaceFreed += image.size
@@ -516,9 +527,9 @@ func (im *realImageGCManager) freeSpace(ctx context.Context, bytesToFree int64, 
 	}
 
 	if len(deletionErrors) > 0 {
-		return nil, spaceFreed, fmt.Errorf("wanted to free %d bytes, but freed %d bytes space with errors in image deletion: %w", bytesToFree, spaceFreed, errors.NewAggregate(deletionErrors))
+		return spaceFreed, fmt.Errorf("wanted to free %d bytes, but freed %d bytes space with errors in image deletion: %w", bytesToFree, spaceFreed, errors.NewAggregate(deletionErrors))
 	}
-	return imagesLeft, spaceFreed, nil
+	return spaceFreed, nil
 }
 
 func (im *realImageGCManager) freeImage(ctx context.Context, image evictionInfo, reason string) error {
