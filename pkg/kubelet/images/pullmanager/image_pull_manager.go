@@ -349,6 +349,7 @@ func (f *PullManager) PruneUnknownRecords(ctx context.Context, imageList []strin
 			continue
 		}
 
+		logger.V(4).Info("Removing ImagePulledRecord for an image no longer present on the node", "imageRef", imageRecord.ImageRef, "lastUpdatedTime", imageRecord.LastUpdatedTime)
 		if err := f.recordsAccessor.DeleteImagePulledRecord(logger, imageRecord.ImageRef); err != nil {
 			logger.Error(err, "failed to remove an ImagePulledRecord", "imageRef", imageRecord.ImageRef)
 		}
