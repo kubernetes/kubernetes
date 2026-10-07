@@ -79,6 +79,14 @@ func TestStoragePreconditionalDeleteWithOnlySuggestionPass(t *testing.T) {
 	storagetesting.RunTestPreconditionalDeleteWithOnlySuggestionPass(t.Context(), t, newTestStorage())
 }
 
+func TestStorageValidateDeletionWithSuggestion(t *testing.T) {
+	storagetesting.RunTestValidateDeletionWithSuggestion(t.Context(), t, newTestStorage())
+}
+
+func TestStorageValidateDeletionWithOnlySuggestionValid(t *testing.T) {
+	storagetesting.RunTestValidateDeletionWithOnlySuggestionValid(t.Context(), t, newTestStorage())
+}
+
 func TestStorageGuaranteedUpdateWithSuggestionAndConflict(t *testing.T) {
 	storagetesting.RunTestGuaranteedUpdateWithSuggestionAndConflict(t.Context(), t, newTestStorage())
 }

@@ -96,6 +96,8 @@ var (
 	nonEmptyNodes   = []string{"node-1", "node-2"}
 	appLabels       = []string{"", "app-a", "app-b"}
 	nonEmptyApps    = []string{"app-a", "app-b"}
+
+	errDeleteRejected = errors.New("delete rejected by validateDeletion")
 )
 
 type RequestDistribution struct {
@@ -127,7 +129,9 @@ type UpdateDistribution struct {
 }
 
 type DeleteDistribution struct {
-	Preconditions PreconditionsDistribution
+	Preconditions    PreconditionsDistribution
+	CachedObject     []ChoiceWeight[bool]
+	ValidateDeletion []ChoiceWeight[bool]
 }
 
 type PreconditionsDistribution struct {
@@ -301,11 +305,31 @@ func randomRequest(ctx context.Context, store storage.Interface, keys []types.Na
 		if !ok {
 			return nil
 		}
+		useCached := PickRandom(dist.Delete.CachedObject)
+		if useCached && cached == nil {
+			return nil
+		}
+		var cachedExisting runtime.Object
+		if useCached {
+			cachedExisting = cached.DeepCopyObject()
+		}
+		var validateDeletion storage.ValidateObjectFunc
+		if PickRandom(dist.Delete.ValidateDeletion) {
+			rejectedNode := nodeNames[rand.Intn(len(nodeNames))]
+			validateDeletion = func(ctx context.Context, obj runtime.Object) error {
+				if obj.(*api.Pod).Spec.NodeName == rejectedNode {
+					return errDeleteRejected
+				}
+				return nil
+			}
+		}
 		return &correctness.Request{
 			Op:  correctness.OpDelete,
 			Key: storageKey(key),
 			Delete: correctness.DeleteRequest{
-				Preconditions: preconditions,
+				Preconditions:        preconditions,
+				ValidateDeletion:     validateDeletion,
+				CachedExistingObject: cachedExisting,
 			},
 		}
 	case correctness.OpGet:
@@ -481,7 +505,11 @@ func runTraffic(ctx context.Context, store storage.Interface, request *correctne
 	case correctness.OpCreate:
 		err = store.Create(ctx, key, request.Create.Object, out, 0)
 	case correctness.OpDelete:
-		err = store.Delete(ctx, key, out, request.Delete.Preconditions, storage.ValidateAllObjectFunc, nil, storage.DeleteOptions{})
+		validateDeletion := request.Delete.ValidateDeletion
+		if validateDeletion == nil {
+			validateDeletion = storage.ValidateAllObjectFunc
+		}
+		err = store.Delete(ctx, key, out, request.Delete.Preconditions, validateDeletion, request.Delete.CachedExistingObject, storage.DeleteOptions{})
 	case correctness.OpGet:
 		err = store.Get(ctx, key, request.Get.Options, out)
 	case correctness.OpList:
@@ -493,7 +521,7 @@ func runTraffic(ctx context.Context, store storage.Interface, request *correctne
 		panic(fmt.Sprintf("%v: unknown operation", request.Op))
 	}
 	if err != nil {
-		if _, ok := errors.AsType[*storage.StorageError](err); ok || storage.IsTooLargeResourceVersion(err) {
+		if _, ok := errors.AsType[*storage.StorageError](err); ok || storage.IsTooLargeResourceVersion(err) || errors.Is(err, errDeleteRejected) {
 			return correctness.Response{
 				Err: err,
 			}

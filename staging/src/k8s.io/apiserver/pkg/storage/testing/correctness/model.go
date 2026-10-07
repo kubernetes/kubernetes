@@ -129,7 +129,7 @@ func (s *Model) execute(input Request) (Response, *Model, *Change) {
 		return resp, next, change
 	case OpDelete:
 		next := s.Clone()
-		resp, change := next.delete(context.Background(), input.Key, input.Delete.Preconditions, nil)
+		resp, change := next.delete(context.Background(), input.Key, input.Delete.Preconditions, input.Delete.ValidateDeletion)
 		return resp, next, change
 	case OpGet:
 		return s.get(input.Key, input.Get.Options), s, nil
@@ -425,7 +425,7 @@ func (s *Model) delete(ctx context.Context, key string, preconditions *storage.P
 		return Response{Object: nil, Err: err}, nil
 	}
 	if validateDeletion != nil && stored != nil {
-		if err := validateDeletion(ctx, stored); err != nil {
+		if err := validateDeletion(ctx, stored.DeepCopyObject()); err != nil {
 			return Response{Object: nil, Err: err}, nil
 		}
 	}
