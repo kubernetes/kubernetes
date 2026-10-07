@@ -309,13 +309,13 @@ func validateStorageHealthCondition(condition storage.StorageHealthCondition, fl
 		allErrs = append(allErrs, field.NotSupported(fldPath.Child("status"), condition.Status, sets.List(validStorageHealthStatusTypes)))
 	}
 	if len(condition.Reason) == 0 {
-		allErrs = append(allErrs, field.Required(fldPath.Child("reason"), ""))
+		allErrs = append(allErrs, field.Required(fldPath.Child("reason"), "").MarkCoveredByDeclarative())
 	} else {
 		for _, msg := range metav1validation.IsValidConditionReason(condition.Reason) {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("reason"), condition.Reason, msg))
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("reason"), condition.Reason, msg).WithOrigin("format=k8s-condition-reason").MarkCoveredByDeclarative())
 		}
 		if len(condition.Reason) > 256 {
-			allErrs = append(allErrs, field.TooLong(fldPath.Child("reason"), condition.Reason, 256))
+			allErrs = append(allErrs, field.TooLong(fldPath.Child("reason"), condition.Reason, 256).WithOrigin("maxBytes").MarkCoveredByDeclarative())
 		}
 	}
 	if len(condition.Message) > 1024 {
