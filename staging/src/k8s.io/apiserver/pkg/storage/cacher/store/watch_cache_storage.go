@@ -23,7 +23,6 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage/cacher/key"
@@ -66,8 +65,7 @@ func (w *WatchCacheStorage) SnapshottingEnabled() bool {
 func (w *WatchCacheStorage) CanServeExactRV(rv uint64) bool {
 	w.lock.RLock()
 	defer w.lock.RUnlock()
-	_, canServe := w.snapshots.GetLessOrEqual(rv)
-	return canServe
+	return w.snapshots.HasSnapshot(rv)
 }
 
 func (w *WatchCacheStorage) UpdateListResourceVersion(rv uint64) {
@@ -230,9 +228,9 @@ func (w *WatchCacheStorage) Replace(toReplace []*Element, version uint64) error 
 func (w *WatchCacheStorage) GetExactSnapshotLocked(resourceVersion uint64) (Snapshot, error) {
 	w.lock.RLock()
 	defer w.lock.RUnlock()
-	snap, ok := w.snapshots.GetLessOrEqual(resourceVersion)
-	if !ok {
-		return nil, errors.NewResourceExpired(fmt.Sprintf("too old resource version: %d", resourceVersion))
+	snap, err := w.snapshots.GetSnapshot(resourceVersion)
+	if err != nil {
+		return nil, err
 	}
 	return snap, nil
 }
