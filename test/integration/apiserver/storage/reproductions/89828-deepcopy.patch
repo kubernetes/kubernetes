@@ -1,0 +1,17 @@
+diff --git a/staging/src/k8s.io/apiserver/pkg/storage/cacher/delegator.go b/staging/src/k8s.io/apiserver/pkg/storage/cacher/delegator.go
+index 3e12f481a9c..41d893c7e01 100644
+--- a/staging/src/k8s.io/apiserver/pkg/storage/cacher/delegator.go
++++ b/staging/src/k8s.io/apiserver/pkg/storage/cacher/delegator.go
+@@ -84,9 +84,9 @@ func (c *CacheDelegator) Delete(ctx context.Context, key string, out runtime.Obj
+ 	if elem, exists, err := c.cacher.watchCache.storage.LatestSnapshot().GetByKey(key); err != nil {
+ 		klog.Errorf("GetByKey returned error: %v", err)
+ 	} else if exists {
+-		// DeepCopy the object since we modify resource version when serializing the
+-		// current object.
+-		currObj := elem.(*store.Element).Object.DeepCopyObject()
++		// BUG REVERT: no DeepCopy, so PrepareObjectForStorage mutates the live
++		// object still held by the watch cache.
++		currObj := elem.(*store.Element).Object
+ 		return c.storage.Delete(ctx, key, out, preconditions, validateDeletion, currObj, opts)
+ 	}
+ 	// If we couldn't get the object, fallback to no-suggestion.
