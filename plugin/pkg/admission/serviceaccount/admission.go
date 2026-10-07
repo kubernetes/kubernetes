@@ -32,11 +32,13 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 	genericadmissioninitializer "k8s.io/apiserver/pkg/admission/initializer"
 	"k8s.io/apiserver/pkg/storage/names"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	corev1listers "k8s.io/client-go/listers/core/v1"
 	podutil "k8s.io/kubernetes/pkg/api/pod"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/serviceaccount"
 	"k8s.io/utils/ptr"
 )
@@ -55,6 +57,10 @@ const (
 	// DefaultAPITokenMountPath is the path that ServiceAccountToken secrets are automounted to.
 	// The token file would then be accessible at /var/run/secrets/kubernetes.io/serviceaccount
 	DefaultAPITokenMountPath = "/var/run/secrets/kubernetes.io/serviceaccount"
+
+	// KubeAPIServerServingSigner is the signer that is used for distribution of the
+	// kube-apiserver serving trust
+	KubeAPIServerServingSigner = "kubernetes.io/kube-apiserver-serving"
 
 	// PluginName is the name of this admission plugin
 	PluginName = "ServiceAccount"
@@ -485,6 +491,29 @@ func (s *Plugin) mountServiceAccountToken(serviceAccount *corev1.ServiceAccount,
 
 // TokenVolumeSource returns the projected volume source for service account token.
 func TokenVolumeSource() *api.ProjectedVolumeSource {
+	kubeAPIServerTrustProjection := api.VolumeProjection{
+		ConfigMap: &api.ConfigMapProjection{
+			LocalObjectReference: api.LocalObjectReference{
+				Name: "kube-root-ca.crt",
+			},
+			Items: []api.KeyToPath{
+				{
+					Key:  "ca.crt",
+					Path: "ca.crt",
+				},
+			},
+		},
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.KubeAPIServerWorkloadsTrust) {
+		kubeAPIServerTrustProjection = api.VolumeProjection{
+			ClusterTrustBundle: &api.ClusterTrustBundleProjection{
+				SignerName:    new(KubeAPIServerServingSigner),
+				LabelSelector: &metav1.LabelSelector{},
+				Path:          "ca.crt",
+			},
+		}
+	}
+
 	return &api.ProjectedVolumeSource{
 		// explicitly set default value, see #104464
 		DefaultMode: ptr.To[int32](corev1.ProjectedVolumeSourceDefaultMode),
@@ -495,19 +524,7 @@ func TokenVolumeSource() *api.ProjectedVolumeSource {
 					ExpirationSeconds: ptr.To[int64](serviceaccount.WarnOnlyBoundTokenExpirationSeconds),
 				},
 			},
-			{
-				ConfigMap: &api.ConfigMapProjection{
-					LocalObjectReference: api.LocalObjectReference{
-						Name: "kube-root-ca.crt",
-					},
-					Items: []api.KeyToPath{
-						{
-							Key:  "ca.crt",
-							Path: "ca.crt",
-						},
-					},
-				},
-			},
+			kubeAPIServerTrustProjection,
 			{
 				DownwardAPI: &api.DownwardAPIProjection{
 					Items: []api.DownwardAPIVolumeFile{
