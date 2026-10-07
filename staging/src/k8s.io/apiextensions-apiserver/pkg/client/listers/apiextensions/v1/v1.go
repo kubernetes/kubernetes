@@ -14,8 +14,20 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package v1beta1 contains deprecated aliases of
-// k8s.io/apiextensions/pkg/client/clientset/clientset/typed/apiextensions/v1beta1.
-//
-// Deprecated: use k8s.io/apiextensions/pkg/client/clientset/clientset/typed/apiextensions/v1beta1 directly.
-package v1beta1
+package v1
+
+import (
+	v1 "k8s.io/apiextensions/pkg/client/listers/apiextensions/v1"
+	"k8s.io/client-go/tools/cache"
+)
+
+//go:fix inline
+type CustomResourceDefinitionLister = v1.CustomResourceDefinitionLister
+
+//go:fix inline
+type CustomResourceDefinitionListerExpansion = v1.CustomResourceDefinitionListerExpansion
+
+//go:fix inline
+func NewCustomResourceDefinitionLister(indexer cache.Indexer) v1.CustomResourceDefinitionLister {
+	return v1.NewCustomResourceDefinitionLister(indexer)
+}

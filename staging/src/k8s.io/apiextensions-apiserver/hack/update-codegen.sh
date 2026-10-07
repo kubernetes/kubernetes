@@ -25,6 +25,16 @@ source "${CODEGEN_PKG}/kube_codegen.sh"
 
 THIS_PKG="k8s.io/apiextensions-apiserver"
 
+# The external API types and their clients live in the k8s.io/apiextensions
+# staging module; their OpenAPI definitions and conversions live here.
+TYPES_ROOT="${SCRIPT_ROOT}/../apiextensions"
+TYPES_PKG="k8s.io/apiextensions"
+
+kube::codegen::gen_helpers \
+    --boilerplate "${SCRIPT_ROOT}/hack/boilerplate.go.txt" \
+    --lint-rules known-tags-only,require-explicit-disablement \
+    "${TYPES_ROOT}/pkg"
+
 kube::codegen::gen_helpers \
     --boilerplate "${SCRIPT_ROOT}/hack/boilerplate.go.txt" \
     --lint-rules known-tags-only,require-explicit-disablement \
@@ -39,6 +49,8 @@ fi
 
 kube::codegen::gen_openapi \
     --extra-pkgs k8s.io/api/autoscaling/v1 `# needed for Scale type` \
+    --extra-pkgs "${TYPES_PKG}/pkg/apis/apiextensions/v1" \
+    --extra-pkgs "${TYPES_PKG}/pkg/apis/apiextensions/v1beta1" \
     --output-dir "${SCRIPT_ROOT}/pkg/generated/openapi" \
     --output-pkg "${THIS_PKG}/pkg/generated/openapi" \
     --report-filename "${report_filename:-"/dev/null"}" \
@@ -51,10 +63,10 @@ kube::codegen::gen_client \
     --with-watch \
     --with-applyconfig \
     --applyconfig-openapi-schema <(go run k8s.io/apiextensions-apiserver/pkg/generated/openapi/cmd/models-schema) \
-    --output-dir "${SCRIPT_ROOT}/pkg/client" \
-    --output-pkg "${THIS_PKG}/pkg/client" \
+    --output-dir "${TYPES_ROOT}/pkg/client" \
+    --output-pkg "${TYPES_PKG}/pkg/client" \
     --versioned-name "clientset" \
     --boilerplate "${SCRIPT_ROOT}/hack/boilerplate.go.txt" \
     --prefers-protobuf \
     --lint-rules known-tags-only,require-explicit-disablement \
-    "${SCRIPT_ROOT}/pkg/apis"
+    "${TYPES_ROOT}/pkg/apis"

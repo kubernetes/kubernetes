@@ -14,8 +14,21 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package v1beta1 contains deprecated aliases of
-// k8s.io/apiextensions/pkg/client/clientset/clientset/typed/apiextensions/v1beta1.
-//
-// Deprecated: use k8s.io/apiextensions/pkg/client/clientset/clientset/typed/apiextensions/v1beta1 directly.
-package v1beta1
+package applyconfiguration
+
+import (
+	applyconfiguration "k8s.io/apiextensions/pkg/client/applyconfiguration"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/managedfields"
+)
+
+//go:fix inline
+func ForKind(kind schema.GroupVersionKind) interface{} {
+	return applyconfiguration.ForKind(kind)
+}
+
+//go:fix inline
+func NewTypeConverter(scheme *runtime.Scheme) managedfields.TypeConverter {
+	return applyconfiguration.NewTypeConverter(scheme)
+}

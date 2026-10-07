@@ -14,8 +14,17 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package v1beta1 contains deprecated aliases of
-// k8s.io/apiextensions/pkg/client/clientset/clientset/typed/apiextensions/v1beta1.
-//
-// Deprecated: use k8s.io/apiextensions/pkg/client/clientset/clientset/typed/apiextensions/v1beta1 directly.
-package v1beta1
+package apiextensions
+
+import (
+	apiextensions "k8s.io/apiextensions/pkg/client/informers/externalversions/apiextensions"
+	"k8s.io/apiextensions/pkg/client/informers/externalversions/internalinterfaces"
+)
+
+//go:fix inline
+type Interface = apiextensions.Interface
+
+//go:fix inline
+func New(f internalinterfaces.SharedInformerFactory, namespace string, tweakListOptions internalinterfaces.TweakListOptionsFunc) apiextensions.Interface {
+	return apiextensions.New(f, namespace, tweakListOptions)
+}

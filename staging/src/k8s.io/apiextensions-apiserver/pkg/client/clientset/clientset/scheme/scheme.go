@@ -14,8 +14,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package v1beta1 contains deprecated aliases of
-// k8s.io/apiextensions/pkg/client/clientset/clientset/typed/apiextensions/v1beta1.
-//
-// Deprecated: use k8s.io/apiextensions/pkg/client/clientset/clientset/typed/apiextensions/v1beta1 directly.
-package v1beta1
+package scheme
+
+import (
+	scheme "k8s.io/apiextensions/pkg/client/clientset/clientset/scheme"
+)
+
+var (
+	AddToScheme    = scheme.AddToScheme
+	Codecs         = scheme.Codecs
+	ParameterCodec = scheme.ParameterCodec
+	Scheme         = scheme.Scheme
+)

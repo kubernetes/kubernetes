@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 // Package v1beta1 contains deprecated aliases of
-// k8s.io/apiextensions/pkg/client/clientset/clientset/typed/apiextensions/v1beta1.
+// k8s.io/apiextensions/pkg/client/listers/apiextensions/v1beta1.
 //
-// Deprecated: use k8s.io/apiextensions/pkg/client/clientset/clientset/typed/apiextensions/v1beta1 directly.
+// Deprecated: use k8s.io/apiextensions/pkg/client/listers/apiextensions/v1beta1 directly.
 package v1beta1

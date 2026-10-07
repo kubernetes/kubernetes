@@ -14,8 +14,26 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package v1beta1 contains deprecated aliases of
-// k8s.io/apiextensions/pkg/client/clientset/clientset/typed/apiextensions/v1beta1.
-//
-// Deprecated: use k8s.io/apiextensions/pkg/client/clientset/clientset/typed/apiextensions/v1beta1 directly.
-package v1beta1
+package fake
+
+import (
+	fake "k8s.io/apiextensions/pkg/client/clientset/clientset/fake"
+	"k8s.io/apimachinery/pkg/runtime"
+)
+
+//go:fix inline
+type Clientset = fake.Clientset
+
+var (
+	AddToScheme = fake.AddToScheme
+)
+
+//go:fix inline
+func NewClientset(objects ...runtime.Object) *fake.Clientset {
+	return fake.NewClientset(objects...)
+}
+
+//go:fix inline
+func NewSimpleClientset(objects ...runtime.Object) *fake.Clientset {
+	return fake.NewSimpleClientset(objects...)
+}
