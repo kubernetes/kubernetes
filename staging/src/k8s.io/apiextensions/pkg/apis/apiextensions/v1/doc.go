@@ -14,10 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// +k8s:conversion-gen=k8s.io/apiextensions-apiserver/pkg/apis/apiextensions
-// +k8s:conversion-gen-external-types=k8s.io/apiextensions/pkg/apis/apiextensions/v1
+// +k8s:deepcopy-gen=package
+// +k8s:protobuf-gen=package
+// +k8s:defaulter-gen=TypeMeta
+// +k8s:openapi-gen=true
+// +k8s:prerelease-lifecycle-gen=true
+// +k8s:openapi-model-package=io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1
 
-// Package v1 contains the conversions between the internal apiextensions types
-// and k8s.io/apiextensions/pkg/apis/apiextensions/v1, and deprecated aliases
-// of the identifiers that package had when the types moved there.
+// +groupName=apiextensions.k8s.io
+
+// Package v1 is the v1 version of the API.
 package v1

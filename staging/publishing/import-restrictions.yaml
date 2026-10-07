@@ -175,9 +175,17 @@
   - k8s.io/utils/net
   - k8s.io/klog
 
+- baseImportPath: "./staging/src/k8s.io/apiextensions"
+  allowedImports:
+  - k8s.io/apiextensions
+  - k8s.io/apimachinery
+  - k8s.io/client-go
+  - k8s.io/utils
+
 - baseImportPath: "./staging/src/k8s.io/apiextensions-apiserver"
   allowedImports:
   - k8s.io/api
+  - k8s.io/apiextensions
   - k8s.io/apiextensions-apiserver
   - k8s.io/apimachinery
   - k8s.io/apiserver

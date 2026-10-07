@@ -1,5 +1,5 @@
 /*
-Copyright 2019 The Kubernetes Authors.
+Copyright The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,10 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// +k8s:conversion-gen=k8s.io/apiextensions-apiserver/pkg/apis/apiextensions
-// +k8s:conversion-gen-external-types=k8s.io/apiextensions/pkg/apis/apiextensions/v1
-
-// Package v1 contains the conversions between the internal apiextensions types
-// and k8s.io/apiextensions/pkg/apis/apiextensions/v1, and deprecated aliases
-// of the identifiers that package had when the types moved there.
-package v1
+// Package apiextensions is the root of the k8s.io/apiextensions module, which
+// contains the apiextensions.k8s.io API types and their generated clients.
+package apiextensions
