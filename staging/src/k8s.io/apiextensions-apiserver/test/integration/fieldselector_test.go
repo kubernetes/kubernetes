@@ -29,8 +29,8 @@ import (
 	openapi_v2 "github.com/google/gnostic-models/openapiv2"
 	"sigs.k8s.io/yaml"
 
-	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
-	clientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
+	apiextensionsv1 "k8s.io/apiextensions-api/pkg/apis/apiextensions/v1"
+	clientset "k8s.io/apiextensions-api/pkg/client/clientset/clientset"
 	"k8s.io/apiextensions-apiserver/test/integration/conversion"
 	"k8s.io/apiextensions-apiserver/test/integration/fixtures"
 	"k8s.io/apimachinery/pkg/api/meta"
