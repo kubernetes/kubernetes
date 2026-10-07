@@ -107,7 +107,7 @@ func (r *Replay) validateList(req Request, resp Response) error {
 	if resp.Err != nil {
 		return nil
 	}
-	consistency, err := ListReadConsistency(req.List.Options)
+	consistency, _, _, err := ListReadConsistency("", r.versioner, req.List.Options)
 	if err != nil {
 		return err
 	}
