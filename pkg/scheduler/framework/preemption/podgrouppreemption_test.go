@@ -92,12 +92,16 @@ func (m *mockFilterPlugin) Name() string {
 	return "mockFilterPlugin"
 }
 
+func (m *mockFilterPlugin) IsNodeLocal() bool {
+	return true
+}
+
 type nodeCapacity struct {
 	nodeName string
 	capacity int
 }
 
-var _ fwk.FilterPlugin = &mockFilterPlugin{}
+var _ fwk.NodeLocalFilterPlugin = &mockFilterPlugin{}
 
 func makePodGroupPreemptor(pg *schedulingv1beta1.PodGroup, pods []*v1.Pod) fwk.PodGroupInfo {
 	return makePodGroupPreemptorWithPreemptionPolicy(pg, pods, v1.PreemptLowerPriority)
@@ -1881,17 +1885,20 @@ func TestPodGroupPreemptionEvaluationDurationMetric(t *testing.T) {
 }
 
 type trackingFilter struct {
-	name            string
-	isNodeLocal     bool
-	failOnVictimPod string
-	evalCountByNode map[string]int
-	addPodByPod     map[string]int
-	rmPodByPod      map[string]int
+	name                 string
+	isNodeLocal          bool
+	failOnVictimPod      string
+	evalCountByNode      map[string]int
+	addPodByPod          map[string]int
+	rmPodByPod           map[string]int
+	reserveCountByNode   map[string]int
+	unreserveCountByNode map[string]int
 }
 
 var _ fwk.NodeLocalFilterPlugin = &trackingFilter{}
 var _ fwk.PreFilterPlugin = &trackingFilter{}
 var _ fwk.PreFilterExtensions = &trackingFilter{}
+var _ fwk.ReservePlugin = &trackingFilter{}
 
 func (f *trackingFilter) Name() string      { return f.name }
 func (f *trackingFilter) IsNodeLocal() bool { return f.isNodeLocal }
@@ -1927,16 +1934,29 @@ func (f *trackingFilter) Filter(_ context.Context, _ fwk.CycleState, _ *v1.Pod, 
 	}
 	return fwk.NewStatus(fwk.Success)
 }
+func (f *trackingFilter) Reserve(_ context.Context, _ fwk.CycleState, _ *v1.Pod, nodeName string) *fwk.Status {
+	if f.reserveCountByNode != nil {
+		f.reserveCountByNode[nodeName]++
+	}
+	return fwk.NewStatus(fwk.Success)
+}
+func (f *trackingFilter) Unreserve(_ context.Context, _ fwk.CycleState, _ *v1.Pod, nodeName string) {
+	if f.unreserveCountByNode != nil {
+		f.unreserveCountByNode[nodeName]++
+	}
+}
 
 func TestPodGroupEvaluator_ReprieveNodeLocalFilters(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GenericWorkload, true)
 	logger, ctx := ktesting.NewTestContext(t)
 
 	nodeLocalPlugin := &trackingFilter{
-		name:            "TrackingNodeLocalFilter",
-		isNodeLocal:     true,
-		failOnVictimPod: "v1",
-		evalCountByNode: make(map[string]int),
+		name:                 "TrackingNodeLocalFilter",
+		isNodeLocal:          true,
+		failOnVictimPod:      "v1",
+		evalCountByNode:      make(map[string]int),
+		reserveCountByNode:   make(map[string]int),
+		unreserveCountByNode: make(map[string]int),
 	}
 	crossNodePlugin := &trackingFilter{
 		name:            "TrackingCrossNodeFilter",
@@ -1975,9 +1995,9 @@ func TestPodGroupEvaluator_ReprieveNodeLocalFilters(t *testing.T) {
 	registeredPlugins := []tf.RegisterPluginFunc{
 		tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
 		tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
-		tf.RegisterFilterPlugin(nodeLocalPlugin.Name(), func(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
+		tf.RegisterPluginAsExtensions(nodeLocalPlugin.Name(), func(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
 			return nodeLocalPlugin, nil
-		}),
+		}, "Filter", "Reserve"),
 		tf.RegisterPluginAsExtensions(crossNodePlugin.Name(), func(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
 			return crossNodePlugin, nil
 		}, "PreFilter", "Filter"),
@@ -2046,6 +2066,15 @@ func TestPodGroupEvaluator_ReprieveNodeLocalFilters(t *testing.T) {
 	wantNodeLocalEvals := map[string]int{"node1": 1, "node2": 1, "node3": 1}
 	if diff := cmp.Diff(wantNodeLocalEvals, nodeLocalPlugin.evalCountByNode); diff != "" {
 		t.Errorf("unexpected nodeLocalPlugin evalCountByNode (-want +got):\n%s", diff)
+	}
+	// Reserve and Unreserve are executed ONLY in Phase 1 (for v2 on node2 and v3 on node3; v1 fails Filter on node1),
+	// and skipped completely in Phase 2.
+	wantReserveCalls := map[string]int{"node2": 1, "node3": 1}
+	if diff := cmp.Diff(wantReserveCalls, nodeLocalPlugin.reserveCountByNode); diff != "" {
+		t.Errorf("unexpected nodeLocalPlugin reserveCountByNode (-want +got):\n%s", diff)
+	}
+	if diff := cmp.Diff(wantReserveCalls, nodeLocalPlugin.unreserveCountByNode); diff != "" {
+		t.Errorf("unexpected nodeLocalPlugin unreserveCountByNode (-want +got):\n%s", diff)
 	}
 	// v1 fails in Phase 1 (0 cross-node evals).
 	// v3 passes Phase 1 and Phase 2 (1 eval on node1, node2, node3).

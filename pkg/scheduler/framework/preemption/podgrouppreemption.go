@@ -273,11 +273,43 @@ func (ev *PodGroupEvaluator) selectVictimsOnDomain(
 	//       same NodeInfo(N) and node-local CycleState that already passed all node-local Filter
 	//       plugins when podGroupSchedulingFunc produced validAssignment (plus any previously
 	//       reprieved victims on N, which were already validated when those victims were reprieved).
-	//  4. Cross-node sequential invariants in Phase 2:
+	//  4. Cross-node sequential invariants in Phase 2 without snapshot/Reserve mutations:
 	//     Phase 2 still iterates over all preemptorAssignments in the exact 0 .. P-1 order,
-	//     adding each pod to mutableLister and running ReservePluginsReserve before evaluating
-	//     subsequent pods, so all cross-node Filter plugins observe the exact sequential
-	//     cluster-wide state transitions.
+	//     evaluating non-node-local Filter plugins against each assignment's saved CycleState,
+	//     without re-executing mutableLister.AddPod or RunReservePluginsReserve (or their
+	//     Unreserve/RemovePod cleanups). Skipping mutableLister.AddPod and Reserve in Phase 2
+	//     is safe because:
+	//     - Cross-node state is already captured in CycleState:
+	//       When podGroupSchedulingFunc scheduled preemptor pods 0 .. P-1 on the victim-free
+	//       cluster, each assignment a_m was evaluated with all earlier preemptor pods 0 .. m-1
+	//       already assumed in mutableLister and reserved. Thus, a_m.GetCycleState() already
+	//       encodes the exact cross-node PreFilter state for BasePods U {a_0, ..., a_{m-1}}
+	//       (and excludes {a_{m+1}, ..., a_{P-1}}), while addVictimPreFilterExtensions updates
+	//       that state with the reprieved victims and current victim v.
+	//     - Filter plugins never read cross-node state from mutableLister during Filter():
+	//       mutableLister.AddPod(a_j, N') mutates NodeInfo(N') and snapshot-wide indexes
+	//       (havePodsWithAffinityNodeInfoList, havePodsWithRequiredAntiAffinityNodeInfoList,
+	//       usedPVCRefCounts, podGroupStates). Those snapshot-wide indexes are only read during
+	//       PreFilter (or PodGroupPostFilter), never during Filter(). During Filter(ctx, cs, pod,
+	//       nodeInfo), plugins only inspect (cs, pod, nodeInfo), so adding a_j to NodeInfo(N')
+	//       cannot be observed when evaluating any assignment on N != N'.
+	//     - Same-node checks in non-node-local Filter plugins do not require re-adding a_j to NodeInfo(N):
+	//       Of the non-node-local Filter plugins (PodTopologySpread, DynamicResources,
+	//       VolumeRestrictions, InterPodAffinity), PodTopologySpread.Filter and
+	//       DynamicResources.Filter never inspect nodeInfo.GetPods() or nodeInfo.GetRequested().
+	//       VolumeRestrictions.Filter (satisfyVolumeConflicts) and InterPodAffinity.Filter
+	//       (host-scoped anti-affinity checks) only perform pairwise conflict checks between a_m
+	//       and pods in nodeInfo(N).GetPods(): pairwise compatibility between a_m and earlier
+	//       preemptor pods a_j (j < m) on N was already verified by podGroupSchedulingFunc, and
+	//       pairwise compatibility with victim pods on N is verified because addPods(v) (and any
+	//       previously reprieved victims) are already present in nodeInfo(N).
+	//     - Reserve plugins do not affect non-node-local Filter evaluation in Phase 2:
+	//       The only Reserve plugins are VolumeBinding and DynamicResources. VolumeBinding is a
+	//       node-local Filter plugin (IsNodeLocal() == true) whose Filter only runs in Phase 1
+	//       (where Reserve/Unreserve are still executed) and is skipped in Phase 2.
+	//       DynamicResources.Filter uses the allocator and pending claim state already captured
+	//       in each assignment's CycleState during podGroupSchedulingFunc and does not depend on
+	//       victim pods in mutableLister.
 	//
 	// Why deferring PreFilterExtensions to Phase 2 and restricting them to preFilterAssignments is safe:
 	//  1. Node-local Filter plugins do not use PreFilterExtensions:
@@ -366,17 +398,19 @@ func (ev *PodGroupEvaluator) selectVictimsOnDomain(
 				if !s.IsSuccess() {
 					return false, nil
 				}
-				// Simulate assuming a preemptor pod and reserving stateful plugins resources.
-				// We do not need to add the preemptor pod to the cycle state of upcoming preemptor pods.
-				// This is because the cycle state was created with them already assumed.
-				if err = mutableLister.AddPod(assignment.GetPodInfo(), nodeName); err != nil {
-					return false, err
+				if mode != fwk.FilterPluginModeNonNodeLocalOnly {
+					// Simulate assuming a preemptor pod and reserving stateful plugins resources.
+					// We do not need to add the preemptor pod to the cycle state of upcoming preemptor pods.
+					// This is because the cycle state was created with them already assumed.
+					if err = mutableLister.AddPod(assignment.GetPodInfo(), nodeName); err != nil {
+						return false, err
+					}
+					ev.Handle.RunReservePluginsReserve(ctx, cs, assignment.GetPod(), nodeName)
+					cleanupFns = append(cleanupFns, func() error {
+						ev.Handle.RunReservePluginsUnreserve(ctx, cs, assignment.GetPod(), nodeName)
+						return mutableLister.RemovePod(logger, assignment.GetPod(), nodeName)
+					})
 				}
-				ev.Handle.RunReservePluginsReserve(ctx, cs, assignment.GetPod(), nodeName)
-				cleanupFns = append(cleanupFns, func() error {
-					ev.Handle.RunReservePluginsUnreserve(ctx, cs, assignment.GetPod(), nodeName)
-					return mutableLister.RemovePod(logger, assignment.GetPod(), nodeName)
-				})
 			}
 			return true, nil
 		}
