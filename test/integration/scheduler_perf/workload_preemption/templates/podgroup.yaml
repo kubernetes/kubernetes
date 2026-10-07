@@ -5,7 +5,11 @@ metadata:
 spec:
   priority: {{if .priority}}{{AddInt 0 .priority}}{{else}}10000{{end}}
   disruptionMode:
+  {{- if and .disruptionMode (eq .disruptionMode "All")}}
     all: {}
+  {{- else}}
+    single: {}
+  {{- end}}
   schedulingPolicy:
     gang:
       minCount: {{.podsPerGroup}}

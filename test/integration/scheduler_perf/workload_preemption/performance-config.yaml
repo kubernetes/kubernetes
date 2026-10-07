@@ -394,6 +394,7 @@
     templateParams:
       podsPerGroup: $trainingPodsPerGroup
       priority: 10000
+      disruptionMode: $disruptionMode
   - opcode: createPods
     countParam: $trainingGroups
     countMultiplierParam: $trainingPodsPerGroup
@@ -412,6 +413,7 @@
     templateParams:
       podsPerGroup: $largeBatchPodsPerGroup
       priority: 100
+      disruptionMode: $disruptionMode
   - opcode: createPods
     countParam: $largeBatchGroups
     countMultiplierParam: $largeBatchPodsPerGroup
@@ -430,6 +432,7 @@
     templateParams:
       podsPerGroup: $smallBatchPodsPerGroup
       priority: 100
+      disruptionMode: $disruptionMode
   - opcode: createPods
     countParam: $smallBatchGroups
     countMultiplierParam: $smallBatchPodsPerGroup
@@ -448,6 +451,7 @@
     templateParams:
       podsPerGroup: $heroPodsPerGroup
       priority: 1000000
+      disruptionMode: $disruptionMode
   - opcode: createPods
     collectMetrics: true
     countParam: $heroGroups
@@ -472,6 +476,7 @@
       smallBatchPodsPerGroup: 1
       heroGroups: 1
       heroPodsPerGroup: 5
+      disruptionMode: All
   - name: 100Nodes_Hero50Pods_60PctOccupied
     labels: [performance]
     params:
@@ -484,6 +489,7 @@
       smallBatchPodsPerGroup: 5
       heroGroups: 1
       heroPodsPerGroup: 50
+      disruptionMode: All
   - name: 1000Nodes_Hero500Pods_60PctOccupied
     labels: [performance]
     params:
@@ -496,6 +502,7 @@
       smallBatchPodsPerGroup: 50
       heroGroups: 1
       heroPodsPerGroup: 500
+      disruptionMode: All
   - name: 4900Nodes_Hero2450Pods_60PctOccupied
     labels: [performance]
     params:
@@ -508,4 +515,19 @@
       smallBatchPodsPerGroup: 50
       heroGroups: 1
       heroPodsPerGroup: 2450
+      disruptionMode: All
+  - name: 4900Nodes_Hero2450Pods_60PctOccupied_SingleDisruptionMode
+    labels: [performance]
+    params:
+      initNodes: 4900
+      trainingGroups: 3
+      trainingPodsPerGroup: 490
+      largeBatchGroups: 3
+      largeBatchPodsPerGroup: 250
+      smallBatchGroups: 14
+      smallBatchPodsPerGroup: 50
+      heroGroups: 1
+      heroPodsPerGroup: 2450
+      disruptionMode: Single
+
 
