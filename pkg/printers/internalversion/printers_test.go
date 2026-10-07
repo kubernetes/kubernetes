@@ -5170,7 +5170,7 @@ func TestPrintStatefulSet(t *testing.T) {
 					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
 				},
 				Spec: apps.StatefulSetSpec{
-					Replicas: 5,
+					Replicas: new(int32(5)),
 					Template: api.PodTemplateSpec{
 						Spec: api.PodSpec{
 							Containers: []api.Container{
@@ -5203,7 +5203,7 @@ func TestPrintStatefulSet(t *testing.T) {
 					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
 				},
 				Spec: apps.StatefulSetSpec{
-					Replicas: 5,
+					Replicas: new(int32(5)),
 					Template: api.PodTemplateSpec{
 						Spec: api.PodSpec{
 							Containers: []api.Container{

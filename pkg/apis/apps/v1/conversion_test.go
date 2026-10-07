@@ -31,7 +31,7 @@ import (
 )
 
 func TestV12StatefulSetSpecConversion(t *testing.T) {
-	replicas := ptr.To(int32(2))
+	replicas := new(int32(2))
 	selector := &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}}
 	appsv1Template := v1.PodTemplateSpec{
 		ObjectMeta: metav1.ObjectMeta{Name: "foo"},
@@ -53,7 +53,7 @@ func TestV12StatefulSetSpecConversion(t *testing.T) {
 	}{
 		"StatefulSetSpec Conversion 1": {
 			stsSpec1: &apps.StatefulSetSpec{
-				Replicas: *replicas,
+				Replicas: replicas,
 				Template: apiTemplate,
 			},
 			stsSepc2: &appsv1.StatefulSetSpec{
@@ -63,7 +63,7 @@ func TestV12StatefulSetSpecConversion(t *testing.T) {
 		},
 		"StatefulSetSpec Conversion 2": {
 			stsSpec1: &apps.StatefulSetSpec{
-				Replicas:            *replicas,
+				Replicas:            replicas,
 				Selector:            selector,
 				Template:            apiTemplate,
 				ServiceName:         "foo",
@@ -102,10 +102,8 @@ func TestV12StatefulSetSpecConversion(t *testing.T) {
 }
 
 func TestV1StatefulSetStatusConversion(t *testing.T) {
-	observedGeneration := new(int64)
-	*observedGeneration = 2
-	collisionCount := new(int32)
-	*collisionCount = 1
+	observedGeneration := int64(2)
+	collisionCount := new(int32(1))
 	testcases := map[string]struct {
 		stsStatus1 *apps.StatefulSetStatus
 		stsStatus2 *appsv1.StatefulSetStatus
@@ -127,7 +125,7 @@ func TestV1StatefulSetStatusConversion(t *testing.T) {
 				UpdatedReplicas:    int32(3),
 				CurrentRevision:    "12345",
 				UpdateRevision:     "23456",
-				ObservedGeneration: *observedGeneration,
+				ObservedGeneration: observedGeneration,
 			},
 		},
 		"StatefulSetStatus Conversion 2": {
@@ -142,7 +140,7 @@ func TestV1StatefulSetStatusConversion(t *testing.T) {
 				CollisionCount:     collisionCount,
 			},
 			stsStatus2: &appsv1.StatefulSetStatus{
-				ObservedGeneration: *observedGeneration,
+				ObservedGeneration: observedGeneration,
 				Replicas:           int32(3),
 				ReadyReplicas:      int32(1),
 				CurrentReplicas:    int32(3),
@@ -177,11 +175,11 @@ func TestV1StatefulSetStatusConversion(t *testing.T) {
 }
 
 func TestV1StatefulSetUpdateStrategyConversion(t *testing.T) {
-	partition := ptr.To(int32(2))
+	partition := new(int32(2))
 	appsv1rollingUpdate := new(appsv1.RollingUpdateStatefulSetStrategy)
 	appsv1rollingUpdate.Partition = partition
 	appsrollingUpdate := new(apps.RollingUpdateStatefulSetStrategy)
-	appsrollingUpdate.Partition = *partition
+	appsrollingUpdate.Partition = partition
 	testcases := map[string]struct {
 		stsUpdateStrategy1 *apps.StatefulSetUpdateStrategy
 		stsUpdateStrategy2 *appsv1.StatefulSetUpdateStrategy

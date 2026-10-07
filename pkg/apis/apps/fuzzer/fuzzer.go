@@ -42,9 +42,6 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 			if len(s.Labels) == 0 {
 				s.Labels = s.Spec.Template.Labels
 			}
-			if s.Status.ObservedGeneration == nil {
-				s.Status.ObservedGeneration = new(int64)
-			}
 			if s.Status.CollisionCount == nil {
 				s.Status.CollisionCount = new(int32)
 			}
@@ -52,6 +49,9 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 		func(s *apps.StatefulSetSpec, c randfill.Continue) {
 			c.FillNoCustom(s)
 
+			if s.Replicas == nil {
+				s.Replicas = new(int32(1))
+			}
 			if s.Selector == nil {
 				s.Selector = &metav1.LabelSelector{MatchLabels: s.Template.Labels}
 			}
@@ -89,8 +89,13 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 				s.RollingUpdate = nil
 			}
 
-			if s.RollingUpdate != nil && s.RollingUpdate.MaxUnavailable == nil {
-				s.RollingUpdate.MaxUnavailable = new(intstr.FromInt32(1))
+			if s.RollingUpdate != nil {
+				if s.RollingUpdate.Partition == nil {
+					s.RollingUpdate.Partition = new(int32(0))
+				}
+				if s.RollingUpdate.MaxUnavailable == nil {
+					s.RollingUpdate.MaxUnavailable = new(intstr.FromInt32(1))
+				}
 			}
 		},
 		func(j *apps.Deployment, c randfill.Continue) {

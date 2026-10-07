@@ -176,7 +176,9 @@ func ValidateStatefulSetSpec(spec *apps.StatefulSetSpec, fldPath *field.Path, op
 		allErrs = append(allErrs, validateVolumeClaimTemplates(spec.VolumeClaimTemplates, fldPath.Child("volumeClaimTemplates"))...)
 	}
 
-	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(spec.Replicas), fldPath.Child("replicas"))...)
+	if spec.Replicas != nil {
+		allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(*spec.Replicas), fldPath.Child("replicas"))...)
+	}
 	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(spec.MinReadySeconds), fldPath.Child("minReadySeconds"))...)
 	if spec.Ordinals != nil {
 		replicaStartOrdinal := spec.Ordinals.Start
@@ -276,9 +278,7 @@ func ValidateStatefulSetStatus(status *apps.StatefulSetStatus, fieldPath *field.
 	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.CurrentReplicas), fieldPath.Child("currentReplicas"))...)
 	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.UpdatedReplicas), fieldPath.Child("updatedReplicas"))...)
 	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.AvailableReplicas), fieldPath.Child("availableReplicas"))...)
-	if status.ObservedGeneration != nil {
-		allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(*status.ObservedGeneration), fieldPath.Child("observedGeneration"))...)
-	}
+	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(status.ObservedGeneration, fieldPath.Child("observedGeneration"))...)
 	if status.CollisionCount != nil {
 		allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(*status.CollisionCount), fieldPath.Child("collisionCount"))...)
 	}
@@ -495,10 +495,12 @@ func ValidateRollingUpdateDaemonSet(rollingUpdate *apps.RollingUpdateDaemonSet, 
 func validateRollingUpdateStatefulSet(rollingUpdate *apps.RollingUpdateStatefulSetStrategy, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 	fldPathMaxUn := fldPath.Child("maxUnavailable")
-	allErrs = append(allErrs,
-		apivalidation.ValidateNonnegativeField(
-			int64(rollingUpdate.Partition),
-			fldPath.Child("partition"))...)
+	if rollingUpdate.Partition != nil {
+		allErrs = append(allErrs,
+			apivalidation.ValidateNonnegativeField(
+				int64(*rollingUpdate.Partition),
+				fldPath.Child("partition"))...)
+	}
 	if rollingUpdate.MaxUnavailable != nil {
 		allErrs = append(allErrs, ValidatePositiveIntOrPercent(*rollingUpdate.MaxUnavailable, fldPathMaxUn)...)
 		if getIntOrPercentValue(*rollingUpdate.MaxUnavailable) == 0 {

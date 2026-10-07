@@ -283,7 +283,7 @@ func mkValidStatefulSet(tweaks ...func(obj *apps.StatefulSet)) apps.StatefulSet 
 			Namespace: metav1.NamespaceDefault,
 		},
 		Spec: apps.StatefulSetSpec{
-			Replicas:            1,
+			Replicas:            new(int32(1)),
 			ServiceName:         "valid-service",
 			PodManagementPolicy: apps.OrderedReadyPodManagement,
 			Selector: &metav1.LabelSelector{

@@ -106,7 +106,7 @@ func tweakPodManagementPolicy(policy apps.PodManagementPolicyType) statefulSetTw
 
 func tweakReplicas(replicas int32) statefulSetTweak {
 	return func(ss *apps.StatefulSet) {
-		ss.Spec.Replicas = replicas
+		ss.Spec.Replicas = new(replicas)
 	}
 }
 
@@ -161,7 +161,7 @@ func tweakRollingUpdatePartition(partition int32) statefulSetTweak {
 		if ss.Spec.UpdateStrategy.RollingUpdate == nil {
 			ss.Spec.UpdateStrategy.RollingUpdate = &apps.RollingUpdateStatefulSetStrategy{}
 		}
-		ss.Spec.UpdateStrategy.RollingUpdate.Partition = partition
+		ss.Spec.UpdateStrategy.RollingUpdate.Partition = new(partition)
 	}
 }
 
@@ -170,7 +170,7 @@ func tweakMaxUnavailable(mu intstr.IntOrString) statefulSetTweak {
 		if ss.Spec.UpdateStrategy.RollingUpdate == nil {
 			ss.Spec.UpdateStrategy.RollingUpdate = &apps.RollingUpdateStatefulSetStrategy{}
 		}
-		ss.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable = ptr.To(mu)
+		ss.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable = new(mu)
 	}
 }
 
@@ -880,7 +880,7 @@ func generateStatefulSetSpec(minSeconds int32) *apps.StatefulSetSpec {
 		PodManagementPolicy: "OrderedReady",
 		Selector:            &metav1.LabelSelector{MatchLabels: labels},
 		Template:            podTemplate.Template,
-		Replicas:            3,
+		Replicas:            new(int32(3)),
 		UpdateStrategy:      apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
 		MinReadySeconds:     minSeconds,
 	}
@@ -934,7 +934,7 @@ func TestValidateStatefulSetStatus(t *testing.T) {
 		currentReplicas    int32
 		updatedReplicas    int32
 		availableReplicas  int32
-		observedGeneration *int64
+		observedGeneration int64
 		collisionCount     *int32
 		expectedErr        bool
 	}{{
@@ -978,7 +978,7 @@ func TestValidateStatefulSetStatus(t *testing.T) {
 		readyReplicas:      3,
 		currentReplicas:    2,
 		updatedReplicas:    1,
-		observedGeneration: &observedGenerationMinusOne,
+		observedGeneration: observedGenerationMinusOne,
 		expectedErr:        true,
 	}, {
 		name:            "invalid collisionCount",

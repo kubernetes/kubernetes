@@ -229,7 +229,6 @@ func TestMemoryIdenticalConversion(t *testing.T) {
 		"PodCertificateRequest.certificates.k8s.io",
 		"PriorityLevelConfiguration.flowcontrol.apiserver.k8s.io",
 		"Secret",
-		"StatefulSet.apps",
 		"ValidatingWebhookConfiguration.admissionregistration.k8s.io",
 
 		// Legacy unserved groups/types that share internal hub types with newer groups:

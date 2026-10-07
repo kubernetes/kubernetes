@@ -23,6 +23,15 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
+const (
+	ControllerRevisionHashLabelKey = "controller-revision-hash"
+	StatefulSetRevisionLabel       = ControllerRevisionHashLabelKey
+	DeprecatedRollbackTo           = "deprecated.deployment.rollback.to"
+	DeprecatedTemplateGeneration   = "deprecated.daemonset.template.generation"
+	StatefulSetPodNameLabel        = "statefulset.kubernetes.io/pod-name"
+	PodIndexLabel                  = "apps.kubernetes.io/pod-index"
+)
+
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // StatefulSet represents a set of pods with consistent identities.
@@ -107,7 +116,8 @@ type RollingUpdateStatefulSetStrategy struct {
 	// for updates. During a rolling update, all pods from ordinal Replicas-1 to
 	// Partition are updated. All pods from ordinal Partition-1 to 0 remain untouched.
 	// This is helpful in being able to do a canary based deployment. The default value is 0.
-	Partition int32
+	// +optional
+	Partition *int32
 	// The maximum number of pods that can be unavailable during the update.
 	// Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%).
 	// Absolute number is calculated from percentage by rounding down. This can not be 0.
@@ -178,7 +188,7 @@ type StatefulSetSpec struct {
 	// If unspecified, defaults to 1.
 	// TODO: Consider a rename of this field.
 	// +optional
-	Replicas int32
+	Replicas *int32
 
 	// Selector is a label query over pods that should match the replica count.
 	// If empty, defaulted to labels on the pod template.
@@ -262,7 +272,7 @@ type StatefulSetStatus struct {
 	// observedGeneration is the most recent generation observed for this StatefulSet. It corresponds to the
 	// StatefulSet's generation, which is updated on mutation by the API Server.
 	// +optional
-	ObservedGeneration *int64
+	ObservedGeneration int64
 
 	// replicas is the number of Pods created by the StatefulSet controller.
 	Replicas int32
