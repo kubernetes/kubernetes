@@ -65,12 +65,12 @@ import (
 	featuremetrics "k8s.io/component-base/metrics/prometheus/feature"
 	zpagesfeatures "k8s.io/component-base/zpages/features"
 	"k8s.io/klog/v2"
+	"k8s.io/ktesting"
 	"k8s.io/kube-aggregator/pkg/apiserver"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	"k8s.io/kubernetes/test/e2e/invariants/metrics"
 	testutil "k8s.io/kubernetes/test/utils"
-	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func init() {

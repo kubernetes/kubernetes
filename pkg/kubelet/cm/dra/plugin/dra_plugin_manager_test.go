@@ -23,9 +23,9 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"k8s.io/ktesting"
 	drahealthv1 "k8s.io/kubelet/pkg/apis/dra-health/v1"
 	drahealthv1alpha1 "k8s.io/kubelet/pkg/apis/dra-health/v1alpha1"
-	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func TestPickHealthService(t *testing.T) {

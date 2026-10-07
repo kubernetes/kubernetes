@@ -38,7 +38,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
-	"k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/ktesting"
 
 	apitest "k8s.io/cri-api/pkg/apis/testing"
 	kubelettypes "k8s.io/kubelet/pkg/types"

@@ -27,10 +27,10 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/ktesting"
 	"k8s.io/kubernetes/pkg/features"
 	cm "k8s.io/kubernetes/pkg/kubelet/cm"
 	cmtesting "k8s.io/kubernetes/pkg/kubelet/cm/testing"
-	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func TestConvertToAPIPodLevelResourcesStatus(t *testing.T) {

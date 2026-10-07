@@ -46,9 +46,9 @@ import (
 	"k8s.io/component-base/metrics/legacyregistry"
 	resourceclaimmetrics "k8s.io/dynamic-resource-allocation/resourceclaim/metrics"
 	"k8s.io/klog/v2"
+	"k8s.io/ktesting"
 	"k8s.io/kubernetes/pkg/controller"
 	controllermetrics "k8s.io/kubernetes/pkg/controller/resourceclaim/metrics"
-	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 var (

@@ -44,6 +44,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	utiltesting "k8s.io/client-go/util/testing"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/ktesting"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
@@ -53,7 +54,6 @@ import (
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/hostutil"
 	"k8s.io/kubernetes/pkg/volume/util/types"
-	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/mount-utils"
 )
 

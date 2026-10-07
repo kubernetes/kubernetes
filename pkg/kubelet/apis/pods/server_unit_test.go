@@ -46,6 +46,7 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	compmetrics "k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/testutil"
+	"k8s.io/ktesting"
 	podsv1alpha1 "k8s.io/kubelet/pkg/apis/pods/v1alpha1"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	corefuzzer "k8s.io/kubernetes/pkg/apis/core/fuzzer"
@@ -55,7 +56,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	kubepodtest "k8s.io/kubernetes/pkg/kubelet/pod/testing"
 	statustest "k8s.io/kubernetes/pkg/kubelet/status/testing"
-	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func TestStartEventLoop(t *testing.T) {
