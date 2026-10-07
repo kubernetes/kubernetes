@@ -24,8 +24,10 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
 	clientset "k8s.io/client-go/kubernetes"
 
+	"github.com/onsi/gomega"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes/scheme"
 	typedv1 "k8s.io/client-go/kubernetes/typed/core/v1"
@@ -73,41 +75,28 @@ func TestEventCompatibility(t *testing.T) {
 	newRecorder := newBroadcaster.NewRecorder(scheme.Scheme, "k8s.io/kube-scheduler")
 	newBroadcaster.StartRecordingToSink(stopCh)
 	newRecorder.Eventf(regarding, related, v1.EventTypeNormal, "memoryPressure", "killed", "memory pressure")
-	err = wait.PollImmediate(100*time.Millisecond, 20*time.Second, func() (done bool, err error) {
-		v1Events, err := client.EventsV1().Events("").List(context.TODO(), metav1.ListOptions{})
-		if err != nil {
-			return false, err
-		}
 
-		if len(v1Events.Items) != 2 {
-			return false, nil
-		}
+	// Select only events regarding the test pod. Internal controllers (e.g. the
+	// ipallocator-repair-controller emitting ClusterIPNotAllocated for the
+	// kubernetes service) emit unrelated events during apiserver startup that
+	// would otherwise race the assertion.
+	v1Selector := fields.SelectorFromSet(fields.Set{
+		"regarding.name": testPod.Name,
+		"regarding.uid":  string(testPod.UID),
+	}).String()
+	coreSelector := fields.SelectorFromSet(fields.Set{
+		"involvedObject.name": testPod.Name,
+		"involvedObject.uid":  string(testPod.UID),
+	}).String()
+	gomega.NewWithT(t).Eventually(func(g gomega.Gomega) {
+		v1Events, err := client.EventsV1().Events(testPod.Namespace).List(context.TODO(), metav1.ListOptions{FieldSelector: v1Selector})
+		g.Expect(err).NotTo(gomega.HaveOccurred())
+		g.Expect(v1Events.Items).To(gomega.HaveLen(2))
 
-		events, err := client.CoreV1().Events("").List(context.TODO(), metav1.ListOptions{})
-		if err != nil {
-			return false, err
-		}
-
-		if len(events.Items) != 2 {
-			return false, nil
-		}
-		return true, nil
-	})
-	if err != nil {
-		v1Events, _ := client.EventsV1().Events("").List(context.TODO(), metav1.ListOptions{})
-		if v1Events != nil {
-			for _, e := range v1Events.Items {
-				t.Logf("events.k8s.io/v1: name=%s reason=%s action=%s reportingController=%s", e.Name, e.Reason, e.Action, e.ReportingController)
-			}
-		}
-		coreEvents, _ := client.CoreV1().Events("").List(context.TODO(), metav1.ListOptions{})
-		if coreEvents != nil {
-			for _, e := range coreEvents.Items {
-				t.Logf("core/v1: name=%s reason=%s source.component=%s", e.Name, e.Reason, e.Source.Component)
-			}
-		}
-		t.Fatalf("unexpected err: %v", err)
-	}
+		coreEvents, err := client.CoreV1().Events(testPod.Namespace).List(context.TODO(), metav1.ListOptions{FieldSelector: coreSelector})
+		g.Expect(err).NotTo(gomega.HaveOccurred())
+		g.Expect(coreEvents.Items).To(gomega.HaveLen(2))
+	}).WithPolling(100 * time.Millisecond).WithTimeout(20 * time.Second).Should(gomega.Succeed())
 }
 
 func TestEventSeries(t *testing.T) {
