@@ -473,9 +473,11 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 // aggregated discovery document and calling the generic PrepareRun.
 func (s *APIAggregator) PrepareRun() (preparedAPIAggregator, error) {
 	// add post start hook before generic PrepareRun in order to be before /healthz installation
+	var openAPIRunOnce sync.Once
+	var openAPIStopCh <-chan struct{}
 	if s.openAPIConfig != nil {
 		s.GenericAPIServer.AddPostStartHookOrDie("apiservice-openapi-controller", func(context genericapiserver.PostStartHookContext) error {
-			go s.openAPIAggregationController.Run(context.Done())
+			openAPIStopCh = context.Done()
 			return nil
 		})
 	}
@@ -492,12 +494,22 @@ func (s *APIAggregator) PrepareRun() (preparedAPIAggregator, error) {
 	// delay OpenAPI setup until the delegate had a chance to setup their OpenAPI handlers
 	if s.openAPIConfig != nil {
 		specDownloader := openapiaggregator.NewDownloader()
+		lazyHandler := &lazyPathHandler{
+			delegate: s.GenericAPIServer.Handler.NonGoRestfulMux,
+			trigger: func() {
+				openAPIRunOnce.Do(func() {
+					if openAPIStopCh != nil {
+						go s.openAPIAggregationController.Run(openAPIStopCh)
+					}
+				})
+			},
+		}
 		openAPIAggregator, err := openapiaggregator.BuildAndRegisterAggregator(
 			&specDownloader,
 			s.GenericAPIServer.NextDelegate(),
 			s.GenericAPIServer.Handler.GoRestfulContainer.RegisteredWebServices(),
 			s.openAPIConfig,
-			s.GenericAPIServer.Handler.NonGoRestfulMux)
+			lazyHandler)
 		if err != nil {
 			return preparedAPIAggregator{}, err
 		}
@@ -658,4 +670,18 @@ func DefaultAPIResourceConfigSource() *serverstorage.ResourceConfig {
 	)
 
 	return ret
+}
+
+type lazyPathHandler struct {
+	delegate openapicommon.PathHandler
+	trigger  func()
+}
+
+func (l *lazyPathHandler) Handle(path string, handler http.Handler) {
+	l.delegate.Handle(path, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if l.trigger != nil {
+			l.trigger()
+		}
+		handler.ServeHTTP(w, r)
+	}))
 }

@@ -86,12 +86,11 @@ type specAggregator struct {
 	downloader *Downloader
 }
 
-func buildAndRegisterSpecAggregatorForLocalServices(downloader *Downloader, aggregatorSpec *spec.Swagger, delegationHandlers []http.Handler, pathHandler common.PathHandler) *specAggregator {
+func buildAndRegisterSpecAggregatorForLocalServices(downloader *Downloader, cachedAggregatorSpec cached.Value[*spec.Swagger], delegationHandlers []http.Handler, pathHandler common.PathHandler) *specAggregator {
 	s := &specAggregator{
 		downloader:            downloader,
 		specsByAPIServiceName: map[string]*openAPISpecInfo{},
 	}
-	cachedAggregatorSpec := cached.Static(aggregatorSpec, "never-changes")
 	s.addLocalSpec(fmt.Sprintf(localDelegateChainNamePattern, 0), cachedAggregatorSpec)
 	for i, handler := range delegationHandlers {
 		name := fmt.Sprintf(localDelegateChainNamePattern, i+1)
@@ -127,11 +126,14 @@ func (i instrumentedPathHandler) Handle(path string, h http.Handler) {
 func BuildAndRegisterAggregator(downloader *Downloader, delegationTarget server.DelegationTarget, webServices []*restful.WebService,
 	config *common.Config, pathHandler common.PathHandler) (SpecAggregator, error) {
 
-	aggregatorOpenAPISpec, err := builder.BuildOpenAPISpecFromRoutes(restfuladapter.AdaptWebServices(webServices), config)
-	if err != nil {
-		return nil, err
-	}
-	aggregatorOpenAPISpec.Definitions = handler.PruneDefaults(aggregatorOpenAPISpec.Definitions)
+	cachedAggregatorSpec := cached.Once(cached.Func[*spec.Swagger](func() (*spec.Swagger, string, error) {
+		aggregatorOpenAPISpec, err := builder.BuildOpenAPISpecFromRoutes(restfuladapter.AdaptWebServices(webServices), config)
+		if err != nil {
+			return nil, "", err
+		}
+		aggregatorOpenAPISpec.Definitions = handler.PruneDefaults(aggregatorOpenAPISpec.Definitions)
+		return aggregatorOpenAPISpec, "never-changes", nil
+	}))
 
 	var delegationHandlers []http.Handler
 
@@ -148,7 +150,7 @@ func BuildAndRegisterAggregator(downloader *Downloader, delegationTarget server.
 		}
 		delegationHandlers = append(delegationHandlers, handler)
 	}
-	s := buildAndRegisterSpecAggregatorForLocalServices(downloader, aggregatorOpenAPISpec, delegationHandlers, pathHandler)
+	s := buildAndRegisterSpecAggregatorForLocalServices(downloader, cachedAggregatorSpec, delegationHandlers, pathHandler)
 	return s, nil
 }
 
