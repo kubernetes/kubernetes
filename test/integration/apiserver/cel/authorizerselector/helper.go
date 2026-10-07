@@ -33,6 +33,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	apiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/test/integration/framework"
+	testutils "k8s.io/kubernetes/test/utils"
 	"k8s.io/utils/ptr"
 )
 
@@ -234,7 +235,7 @@ func RunAuthzSelectorsLibraryTests(t *testing.T) {
 	}
 }
 
-func getCauses(t *testing.T, err error) sets.Set[string] {
+func getCauses(t testutils.TB, err error) sets.Set[string] {
 	t.Helper()
 	status, ok := err.(apierrors.APIStatus)
 	if !ok {

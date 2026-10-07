@@ -36,6 +36,7 @@ import (
 	apiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/test/integration/etcd"
 	"k8s.io/kubernetes/test/integration/framework"
+	testutils "k8s.io/kubernetes/test/utils"
 )
 
 type DefinitionTestFunc func(t *testing.T, setup Definition)
@@ -195,7 +196,7 @@ func matchesException(gvr schema.GroupVersionResource, exceptions sets.Set[strin
 
 // TestObj is a generic test helper that creates an Unstructured object from a creation stub
 // and explicitly sets the status from a separate JSON payload.
-func TestObj(t *testing.T, stub, status string, gvk schema.GroupVersionKind) *unstructured.Unstructured {
+func TestObj(t testutils.TB, stub, status string, gvk schema.GroupVersionKind) *unstructured.Unstructured {
 	t.Helper()
 	obj := &unstructured.Unstructured{}
 	if err := json.Unmarshal([]byte(stub), &obj.Object); err != nil {

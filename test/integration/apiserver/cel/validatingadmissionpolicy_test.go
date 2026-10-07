@@ -2458,7 +2458,7 @@ func Test_ValidateSecondaryAuthorization(t *testing.T) {
 		rbac             *rbacv1.PolicyRule
 		expression       string
 		allowed          bool
-		extraAccountFn   func(t *testing.T, adminClient *clientset.Clientset, clientConfig *rest.Config, rules []rbacv1.PolicyRule) *clientset.Clientset
+		extraAccountFn   func(t utils.TB, adminClient *clientset.Clientset, clientConfig *rest.Config, rules []rbacv1.PolicyRule) *clientset.Clientset
 		extraAccountRbac *rbacv1.PolicyRule
 	}{
 		{
@@ -2507,7 +2507,7 @@ func Test_ValidateSecondaryAuthorization(t *testing.T) {
 
 	for i, testcase := range testcases {
 		t.Run(testcase.name, func(t *testing.T) {
-			clients := map[string]func(t *testing.T, adminClient *clientset.Clientset, clientConfig *rest.Config, rules []rbacv1.PolicyRule) *clientset.Clientset{
+			clients := map[string]func(t utils.TB, adminClient *clientset.Clientset, clientConfig *rest.Config, rules []rbacv1.PolicyRule) *clientset.Clientset{
 				"user":           secondaryAuthorizationUserClient,
 				"serviceaccount": secondaryAuthorizationServiceAccountClient,
 			}
@@ -2890,7 +2890,7 @@ contexts:
 	}
 }
 
-func secondaryAuthorizationUserClient(t *testing.T, adminClient *clientset.Clientset, clientConfig *rest.Config, rules []rbacv1.PolicyRule) *clientset.Clientset {
+func secondaryAuthorizationUserClient(t utils.TB, adminClient *clientset.Clientset, clientConfig *rest.Config, rules []rbacv1.PolicyRule) *clientset.Clientset {
 	clientConfig = rest.CopyConfig(clientConfig)
 	clientConfig.Impersonate = rest.ImpersonationConfig{
 		UserName: "alice",
@@ -2904,7 +2904,7 @@ func secondaryAuthorizationUserClient(t *testing.T, adminClient *clientset.Clien
 	return client
 }
 
-func secondaryAuthorizationServiceAccountClient(t *testing.T, adminClient *clientset.Clientset, clientConfig *rest.Config, rules []rbacv1.PolicyRule) *clientset.Clientset {
+func secondaryAuthorizationServiceAccountClient(t utils.TB, adminClient *clientset.Clientset, clientConfig *rest.Config, rules []rbacv1.PolicyRule) *clientset.Clientset {
 	return authutil.ServiceAccountClient("default", "test-service-acct")(t, adminClient, clientConfig, rules)
 }
 

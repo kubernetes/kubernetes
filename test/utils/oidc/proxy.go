@@ -21,16 +21,16 @@ import (
 	"net"
 	"net/http"
 	"sync/atomic"
-	"testing"
 
 	utilnet "k8s.io/apimachinery/pkg/util/net"
+	testutils "k8s.io/kubernetes/test/utils"
 )
 
 // NewHTTPConnectProxyHandler returns an http.Handler that implements an HTTP CONNECT proxy.
 // When a CONNECT request is received, it dials the target, hijacks the client connection,
 // and bidirectionally copies data between them. The called flag is set to true when a
 // non-ready request is received.
-func NewHTTPConnectProxyHandler(t testing.TB, called *atomic.Bool) http.Handler {
+func NewHTTPConnectProxyHandler(t testutils.TB, called *atomic.Bool) http.Handler {
 	t.Helper()
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

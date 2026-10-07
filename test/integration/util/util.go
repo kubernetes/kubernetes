@@ -23,7 +23,6 @@ import (
 	"fmt"
 	"net/http"
 	"sync/atomic"
-	"testing"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -76,6 +75,7 @@ import (
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	taintutils "k8s.io/kubernetes/pkg/util/taints"
 	"k8s.io/kubernetes/test/integration/framework"
+	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
@@ -142,7 +142,7 @@ func StartSchedulerWithDone(tCtx ktesting.TContext, cfg *kubeschedulerconfig.Kub
 
 // CreateResourceClaimController creates a ResourceClaim controller and returns a blocking run function.
 // The caller is responsible for the management of the goroutine where that method is invoked.
-func CreateResourceClaimController(ctx context.Context, tb ktesting.TB, clientSet clientset.Interface, informerFactory informers.SharedInformerFactory) func() {
+func CreateResourceClaimController(ctx context.Context, tb testutils.TB, clientSet clientset.Interface, informerFactory informers.SharedInformerFactory) func() {
 	podInformer := informerFactory.Core().V1().Pods()
 	podGroupInformer := informerFactory.Scheduling().V1beta1().PodGroups()
 	claimInformer := informerFactory.Resource().V1().ResourceClaims()
@@ -204,7 +204,7 @@ func StartFakePVController(ctx context.Context, clientSet clientset.Interface, i
 // CreateGCController creates a garbage controller and returns a run function
 // for it. The informer factory needs to be started before invoking that
 // function.
-func CreateGCController(ctx context.Context, tb ktesting.TB, restConfig restclient.Config, informerSet informers.SharedInformerFactory) func() {
+func CreateGCController(ctx context.Context, tb testutils.TB, restConfig restclient.Config, informerSet informers.SharedInformerFactory) func() {
 	restclient.AddUserAgent(&restConfig, "gc-controller")
 	clientSet := clientset.NewForConfigOrDie(&restConfig)
 	metadataClient, err := metadata.NewForConfig(&restConfig)
@@ -242,7 +242,7 @@ func CreateGCController(ctx context.Context, tb ktesting.TB, restConfig restclie
 // CreateNamespaceController creates a namespace controller and returns a run
 // function for it. The informer factory needs to be started before invoking
 // that function.
-func CreateNamespaceController(ctx context.Context, tb ktesting.TB, restConfig restclient.Config, informerSet informers.SharedInformerFactory) func() {
+func CreateNamespaceController(ctx context.Context, tb testutils.TB, restConfig restclient.Config, informerSet informers.SharedInformerFactory) func() {
 	restclient.AddUserAgent(&restConfig, "namespace-controller")
 	clientSet := clientset.NewForConfigOrDie(&restConfig)
 	metadataClient, err := metadata.NewForConfig(&restConfig)
@@ -315,7 +315,7 @@ func (r roundTripWrapper) RoundTrip(req *http.Request) (*http.Response, error) {
 var _ http.RoundTripper = roundTripWrapper{}
 
 // CleanupNodes cleans all nodes which were created during integration test
-func CleanupNodes(cs clientset.Interface, t *testing.T) {
+func CleanupNodes(cs clientset.Interface, t testutils.TB) {
 	err := cs.CoreV1().Nodes().DeleteCollection(context.TODO(), *metav1.NewDeleteOptions(0), metav1.ListOptions{})
 	if err != nil {
 		t.Errorf("error while deleting all nodes: %v", err)
@@ -371,7 +371,7 @@ func CleanupTest(tCtx ktesting.TContext, testCtx *TestContext) {
 	testCtx.CloseFn()
 }
 
-func RemovePodFinalizersInNamespace(ctx context.Context, cs clientset.Interface, t *testing.T, ns string) {
+func RemovePodFinalizersInNamespace(ctx context.Context, cs clientset.Interface, t testutils.TB, ns string) {
 	t.Helper()
 	pods, err := cs.CoreV1().Pods(ns).List(ctx, metav1.ListOptions{})
 	if err != nil {
@@ -381,7 +381,7 @@ func RemovePodFinalizersInNamespace(ctx context.Context, cs clientset.Interface,
 }
 
 // RemovePodFinalizers removes pod finalizers for the pods
-func RemovePodFinalizers(ctx context.Context, cs clientset.Interface, t *testing.T, pods ...v1.Pod) {
+func RemovePodFinalizers(ctx context.Context, cs clientset.Interface, t testutils.TB, pods ...v1.Pod) {
 	t.Helper()
 	for _, p := range pods {
 		pod, err := cs.CoreV1().Pods(p.Namespace).Get(ctx, p.Name, metav1.GetOptions{})
@@ -404,7 +404,7 @@ func RemovePodFinalizers(ctx context.Context, cs clientset.Interface, t *testing
 }
 
 // CleanupPods deletes the given pods and waits for them to be actually deleted.
-func CleanupPods(ctx context.Context, cs clientset.Interface, t *testing.T, pods []*v1.Pod) {
+func CleanupPods(ctx context.Context, cs clientset.Interface, t testutils.TB, pods []*v1.Pod) {
 	for _, p := range pods {
 		err := cs.CoreV1().Pods(p.Namespace).Delete(ctx, p.Name, *metav1.NewDeleteOptions(0))
 		if err != nil && !apierrors.IsNotFound(err) {
@@ -521,7 +521,7 @@ func UpdateNodeStatus(cs clientset.Interface, node *v1.Node) error {
 // configuration.
 // It registers cleanup functions to t.Cleanup(), they will be called when the test completes,
 // no need to do this again.
-func InitTestAPIServer(t *testing.T, nsPrefix string, admission admission.Interface) *TestContext {
+func InitTestAPIServer(t ktesting.TB, nsPrefix string, admission admission.Interface) *TestContext {
 	tCtx := ktesting.Init(t)
 	// We need to intercept context cancellation, otherwise
 	// CleanupTest cannot succeed. CleanupTest calls
@@ -603,7 +603,7 @@ func InitTestAPIServer(t *testing.T, nsPrefix string, admission admission.Interf
 // parent but gets a fresh namespace. Only the namespace is deleted on t.Cleanup;
 // the API server lifecycle is managed by the caller. This is useful when
 // multiple subtests share one API server to avoid the per-subtest startup cost.
-func WithNewNamespace(t *testing.T, parent *TestContext, nsPrefix string) *TestContext {
+func WithNewNamespace(t testutils.TB, parent *TestContext, nsPrefix string) *TestContext {
 	t.Helper()
 	child := &TestContext{
 		ClientSet:  parent.ClientSet,
@@ -619,7 +619,7 @@ func WithNewNamespace(t *testing.T, parent *TestContext, nsPrefix string) *TestC
 }
 
 // WaitForSchedulerCacheCleanup waits for cleanup of scheduler's cache to complete
-func WaitForSchedulerCacheCleanup(ctx context.Context, sched *scheduler.Scheduler, t *testing.T) {
+func WaitForSchedulerCacheCleanup(ctx context.Context, sched *scheduler.Scheduler, t testutils.TB) {
 	schedulerCacheIsEmpty := func(context.Context) (bool, error) {
 		dump := sched.Cache.Dump()
 
@@ -634,7 +634,7 @@ func WaitForSchedulerCacheCleanup(ctx context.Context, sched *scheduler.Schedule
 // InitTestScheduler initializes a test environment and creates a scheduler with default
 // configuration.
 func InitTestScheduler(
-	t *testing.T,
+	t testutils.TB,
 	testCtx *TestContext,
 ) *TestContext {
 	// Pod preemption is enabled by default scheduler configuration.
@@ -644,7 +644,7 @@ func InitTestScheduler(
 // InitTestSchedulerWithOptions initializes a test environment and creates a scheduler with default
 // configuration and other options.
 func InitTestSchedulerWithOptions(
-	t *testing.T,
+	t testutils.TB,
 	testCtx *TestContext,
 	resyncPeriod time.Duration,
 	opts ...scheduler.Option,
@@ -725,7 +725,7 @@ func PodScheduled(c clientset.Interface, podNamespace, podName string) wait.Cond
 
 // InitDisruptionController initializes and runs a Disruption Controller to properly
 // update PodDisuptionBudget objects.
-func InitDisruptionController(t *testing.T, testCtx *TestContext) *disruption.DisruptionController {
+func InitDisruptionController(t testutils.TB, testCtx *TestContext) *disruption.DisruptionController {
 	informers := informers.NewSharedInformerFactory(testCtx.ClientSet, 12*time.Hour)
 
 	discoveryClient := cacheddiscovery.NewMemCacheClient(testCtx.ClientSet.Discovery())
@@ -759,7 +759,7 @@ func InitDisruptionController(t *testing.T, testCtx *TestContext) *disruption.Di
 
 // InitTestSchedulerWithNS initializes a test environment and creates API server and scheduler with default
 // configuration.
-func InitTestSchedulerWithNS(t *testing.T, nsPrefix string, opts ...scheduler.Option) *TestContext {
+func InitTestSchedulerWithNS(t ktesting.TB, nsPrefix string, opts ...scheduler.Option) *TestContext {
 	testCtx := InitTestSchedulerWithOptions(t, InitTestAPIServer(t, nsPrefix, nil), 0, opts...)
 	SyncSchedulerInformerFactory(testCtx)
 	go testCtx.Scheduler.Run(testCtx.SchedulerCtx)
@@ -768,7 +768,7 @@ func InitTestSchedulerWithNS(t *testing.T, nsPrefix string, opts ...scheduler.Op
 
 // InitTestDisablePreemption initializes a test environment and creates API server and scheduler with default
 // configuration but with pod preemption disabled.
-func InitTestDisablePreemption(t *testing.T, nsPrefix string) *TestContext {
+func InitTestDisablePreemption(t ktesting.TB, nsPrefix string) *TestContext {
 	cfg := configtesting.V1ToInternalWithDefaults(t, kubeschedulerconfigv1.KubeSchedulerConfiguration{
 		Profiles: []kubeschedulerconfigv1.KubeSchedulerProfile{{
 			SchedulerName: new(v1.DefaultSchedulerName),
@@ -792,7 +792,7 @@ func InitTestDisablePreemption(t *testing.T, nsPrefix string) *TestContext {
 
 // WaitForReflection waits till the passFunc confirms that the object it expects
 // to see is in the store. Used to observe reflected events.
-func WaitForReflection(ctx context.Context, t *testing.T, nodeLister corelisters.NodeLister, key string,
+func WaitForReflection(ctx context.Context, t testutils.TB, nodeLister corelisters.NodeLister, key string,
 	passFunc func(n interface{}) bool) error {
 	var nodes []*v1.Node
 	err := wait.PollUntilContextTimeout(ctx, time.Millisecond*100, wait.ForeverTestTimeout, false, func(context.Context) (bool, error) {
@@ -1237,7 +1237,7 @@ func timeout(ctx context.Context, d time.Duration, f func()) error {
 
 // NextEntityOrDie returns the next entity (either Pod or PodGroup) in the scheduler queue.
 // The operation needs to be completed within 5 seconds; otherwise the test gets aborted.
-func NextEntityOrDie(t *testing.T, testCtx *TestContext) schedulerframework.QueuedEntityInfo {
+func NextEntityOrDie(t testutils.TB, testCtx *TestContext) schedulerframework.QueuedEntityInfo {
 	t.Helper()
 
 	var entity schedulerframework.QueuedEntityInfo

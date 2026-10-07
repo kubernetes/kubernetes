@@ -4,6 +4,20 @@ Go API changes are typically not included in the Kubernetes release notes, so
 noteworthy Go API changes *may* be documented here. This is currently not
 *required*, so consult the git history to see all changes.
 
+### More flexible util/testing.CloseAndRemove
+
+Callers are no longer restricted to passing exactly a testing.T instance.
+Existing calls still work, only usage of CloseAndRemove as a function pointer
+has to be adapted.
+
+Note that `CloseAndRemove(&testing.T{})` is broken, also without this change:
+the test crashes in case of a problem. The new `FatalToError(&err)` can be used to
+capture problems in an error. E2E tests can use `GinkgoTB()`.
+
+```
+- ./util/testing.CloseAndRemove: changed from func(*testing.T, ...*os.File) to func(TB, ...*os.File)
+```
+
 ### Dynamic shared informer factory: add StartWithContext
 
 The same change was made earlier for the type informer factory:

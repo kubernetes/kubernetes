@@ -22,7 +22,6 @@ import (
 	"fmt"
 	"strings"
 	"sync"
-	"testing"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -52,6 +51,7 @@ import (
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	testutils "k8s.io/kubernetes/test/integration/util"
+	utiltesting "k8s.io/kubernetes/test/utils"
 )
 
 const (
@@ -164,7 +164,7 @@ type AsyncPreemptionStepRunnerConfig struct {
 }
 
 // RunAsyncPreemptionSteps runs the async preemption test steps in order.
-func RunAsyncPreemptionSteps(testCtx *testutils.TestContext, t *testing.T, steps []Step, config AsyncPreemptionStepRunnerConfig) {
+func RunAsyncPreemptionSteps(testCtx *testutils.TestContext, t ktesting.TB, steps []Step, config AsyncPreemptionStepRunnerConfig) {
 	for _, step := range steps {
 		t.Logf("Running scenario: %s", step.Name)
 		switch {
@@ -209,7 +209,7 @@ type AsyncPreemptionTestConfig struct {
 
 // InitTestForAsyncPreemption initializes the test environment for async preemption tests.
 // It enables required feature gates, creates required plugins and returns test context, preemption plugin and client set.
-func InitTestForAsyncPreemption(t *testing.T, config AsyncPreemptionTestConfig) (*testutils.TestContext, *defaultpreemption.DefaultPreemption, kubernetes.Interface) {
+func InitTestForAsyncPreemption(t ktesting.TB, config AsyncPreemptionTestConfig) (*testutils.TestContext, *defaultpreemption.DefaultPreemption, kubernetes.Interface) {
 	featuresOverrides := featuregatetesting.FeatureOverrides{
 		features.SchedulerAsyncAPICalls:   true,
 		features.SchedulerAsyncPreemption: true,
@@ -360,7 +360,7 @@ func registerDelayedPreemptionPlugin(registry *frameworkruntime.Registry, preemp
 	return delayedPreemptionPluginName, func() *defaultpreemption.DefaultPreemption { return preemptionPlugin }, err
 }
 
-func waitForPodsDeleted(testCtx *testutils.TestContext, t *testing.T, podIndexes []int, createdPods []*v1.Pod, cs kubernetes.Interface) {
+func waitForPodsDeleted(testCtx *testutils.TestContext, t utiltesting.TB, podIndexes []int, createdPods []*v1.Pod, cs kubernetes.Interface) {
 	for _, podIndex := range podIndexes {
 		podName := createdPods[podIndex].Name
 		if err := wait.PollUntilContextTimeout(testCtx.Ctx, 50*time.Millisecond, wait.ForeverTestTimeout, false, testutils.PodDeleted(testCtx.Ctx, cs, testCtx.NS.Name, podName)); err != nil {
@@ -369,7 +369,7 @@ func waitForPodsDeleted(testCtx *testutils.TestContext, t *testing.T, podIndexes
 	}
 }
 
-func verifyPodInUnschedulable(testCtx *testutils.TestContext, t *testing.T, podName string) {
+func verifyPodInUnschedulable(testCtx *testutils.TestContext, t utiltesting.TB, podName string) {
 	if err := wait.PollUntilContextTimeout(testCtx.Ctx, 50*time.Millisecond, 200*time.Millisecond, false, func(ctx context.Context) (bool, error) {
 		if !PodInUnschedulablePodPool(t, testCtx.Scheduler.SchedulingQueue, podName) {
 			return false, fmt.Errorf("expected the pod %s to remain in the unschedulable queue after the scheduling attempt", podName)
@@ -383,7 +383,7 @@ func verifyPodInUnschedulable(testCtx *testutils.TestContext, t *testing.T, podN
 	}
 }
 
-func podRunningPreemption(testCtx *testutils.TestContext, t *testing.T, createdPods []*v1.Pod, podIndex *int, preemptionPlugin *defaultpreemption.DefaultPreemption) {
+func podRunningPreemption(testCtx *testutils.TestContext, t utiltesting.TB, createdPods []*v1.Pod, podIndex *int, preemptionPlugin *defaultpreemption.DefaultPreemption) {
 	if err := wait.PollUntilContextTimeout(testCtx.Ctx, time.Millisecond*200, wait.ForeverTestTimeout, false, func(ctx context.Context) (bool, error) {
 		pod := createdPods[*podIndex]
 		if pod.Spec.SchedulingGroup != nil && pod.Spec.SchedulingGroup.PodGroupName != nil {
@@ -398,7 +398,7 @@ func podRunningPreemption(testCtx *testutils.TestContext, t *testing.T, createdP
 	}
 }
 
-func podGatedInQueue(testCtx *testutils.TestContext, t *testing.T, podName string, logger klog.Logger) {
+func podGatedInQueue(testCtx *testutils.TestContext, t utiltesting.TB, podName string, logger klog.Logger) {
 	pod := unschedulablePod(t, testCtx.Scheduler.SchedulingQueue, podName)
 	if pod == nil {
 		t.Fatalf("Expected the pod %s to be in the queue", podName)
@@ -423,7 +423,7 @@ func podGatedInQueue(testCtx *testutils.TestContext, t *testing.T, podName strin
 	}
 }
 
-func completePreemption(t *testing.T, preemptorName string, preemptionDoneChannels *sync.Map) {
+func completePreemption(t utiltesting.TB, preemptorName string, preemptionDoneChannels *sync.Map) {
 	ch, ok := preemptionDoneChannels.Load(preemptorName)
 	if !ok {
 		t.Fatalf("The preemptor Pod %q is not running preemption", preemptorName)
@@ -432,7 +432,7 @@ func completePreemption(t *testing.T, preemptorName string, preemptionDoneChanne
 	preemptionDoneChannels.Delete(preemptorName)
 }
 
-func activatePod(testCtx *testutils.TestContext, t *testing.T, podName string, logger klog.Logger) {
+func activatePod(testCtx *testutils.TestContext, t utiltesting.TB, podName string, logger klog.Logger) {
 	pod := unschedulablePod(t, testCtx.Scheduler.SchedulingQueue, podName)
 	if pod == nil {
 		t.Fatalf("Expected the pod %s to be in unschedulable queue before activation phase", podName)
@@ -441,7 +441,7 @@ func activatePod(testCtx *testutils.TestContext, t *testing.T, podName string, l
 	testCtx.Scheduler.SchedulingQueue.Activate(logger, m)
 }
 
-func schedulePod(testCtx *testutils.TestContext, t *testing.T, schedulePodStep *SchedulePod, cs kubernetes.Interface, preemptionDoneChannels *sync.Map) {
+func schedulePod(testCtx *testutils.TestContext, t utiltesting.TB, schedulePodStep *SchedulePod, cs kubernetes.Interface, preemptionDoneChannels *sync.Map) {
 	lastFailure := ""
 	if err := wait.PollUntilContextTimeout(testCtx.Ctx, time.Millisecond*200, wait.ForeverTestTimeout, false, func(ctx context.Context) (bool, error) {
 		if len(testCtx.Scheduler.SchedulingQueue.PodsInActiveQ()) == 0 {
@@ -484,7 +484,7 @@ func schedulePod(testCtx *testutils.TestContext, t *testing.T, schedulePodStep *
 	}
 }
 
-func schedulePodGroup(testCtx *testutils.TestContext, t *testing.T, schedulePodGroupStep *SchedulePodGroup, cs kubernetes.Interface, preemptionDoneChannels *sync.Map) {
+func schedulePodGroup(testCtx *testutils.TestContext, t utiltesting.TB, schedulePodGroupStep *SchedulePodGroup, cs kubernetes.Interface, preemptionDoneChannels *sync.Map) {
 	lastFailure := ""
 	if err := wait.PollUntilContextTimeout(testCtx.Ctx, time.Millisecond*200, wait.ForeverTestTimeout, false, func(ctx context.Context) (bool, error) {
 		if len(testCtx.Scheduler.SchedulingQueue.PodsInActiveQ()) == 0 {
@@ -558,7 +558,7 @@ func schedulePodGroup(testCtx *testutils.TestContext, t *testing.T, schedulePodG
 	}
 }
 
-func createPod(testCtx *testutils.TestContext, t *testing.T, createPodStep *CreatePod, cs kubernetes.Interface, createdPods *[]*v1.Pod) {
+func createPod(testCtx *testutils.TestContext, t utiltesting.TB, createPodStep *CreatePod, cs kubernetes.Interface, createdPods *[]*v1.Pod) {
 	if createPodStep.Count == nil {
 		createPodStep.Count = new(1)
 	}
@@ -572,7 +572,7 @@ func createPod(testCtx *testutils.TestContext, t *testing.T, createPodStep *Crea
 	}
 }
 
-func createPodGroup(testCtx *testutils.TestContext, t *testing.T, cs kubernetes.Interface, createPodGroupStep *CreatePodGroup) {
+func createPodGroup(testCtx *testutils.TestContext, t utiltesting.TB, cs kubernetes.Interface, createPodGroupStep *CreatePodGroup) {
 	_, err := cs.SchedulingV1beta1().PodGroups(testCtx.NS.Name).Create(testCtx.Ctx, createPodGroupStep.PodGroup, metav1.CreateOptions{})
 	if err != nil && !apierrors.IsAlreadyExists(err) {
 		t.Fatalf("Failed to create a PodGroup %q: %v", createPodGroupStep.PodGroup.Name, err)
@@ -591,7 +591,7 @@ func createPodGroup(testCtx *testutils.TestContext, t *testing.T, cs kubernetes.
 	}
 }
 
-func nodeCreation(testCtx *testutils.TestContext, t *testing.T, nodeName string, cs kubernetes.Interface) {
+func nodeCreation(testCtx *testutils.TestContext, t ktesting.TB, nodeName string, cs kubernetes.Interface) {
 	newNode := st.MakeNode().Name(nodeName).Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Obj()
 	if _, err := cs.CoreV1().Nodes().Create(testCtx.Ctx, newNode, metav1.CreateOptions{}); err != nil {
 		t.Fatalf("Failed to create an initial Node %q: %v", newNode.Name, err)
@@ -604,7 +604,7 @@ func nodeCreation(testCtx *testutils.TestContext, t *testing.T, nodeName string,
 }
 
 // PodInUnschedulablePodPool checks if the given Pod is in the unschedulable pod pool.
-func PodInUnschedulablePodPool(t *testing.T, queue queue.SchedulingQueue, podName string) bool {
+func PodInUnschedulablePodPool(t utiltesting.TB, queue queue.SchedulingQueue, podName string) bool {
 	t.Helper()
 	// First, look for the pod in the activeQ.
 	for _, pod := range queue.PodsInActiveQ() {
@@ -623,7 +623,7 @@ func PodInUnschedulablePodPool(t *testing.T, queue queue.SchedulingQueue, podNam
 	return false
 }
 
-func podInQueue(t *testing.T, queue queue.SchedulingQueue, podName string) bool {
+func podInQueue(t utiltesting.TB, queue queue.SchedulingQueue, podName string) bool {
 	t.Helper()
 	pendingPods, _ := queue.PendingPods()
 	for _, pod := range pendingPods {
@@ -636,7 +636,7 @@ func podInQueue(t *testing.T, queue queue.SchedulingQueue, podName string) bool 
 }
 
 // unschedulablePod checks if the given Pod is in the unschedulable queue and returns it.
-func unschedulablePod(t *testing.T, queue queue.SchedulingQueue, podName string) *v1.Pod {
+func unschedulablePod(t utiltesting.TB, queue queue.SchedulingQueue, podName string) *v1.Pod {
 	t.Helper()
 	unschedPods := queue.UnschedulablePods()
 	for _, pod := range unschedPods {

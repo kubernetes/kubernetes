@@ -19,9 +19,9 @@ package framework
 import (
 	"flag"
 	"io"
-	"testing"
 
 	"k8s.io/klog/v2"
+	testutils "k8s.io/kubernetes/test/utils"
 )
 
 // RedirectKlog modifies the global klog logger so that it writes via the given
@@ -29,7 +29,7 @@ import (
 //
 // The returned cleanup function restores the previous state. Beware that it is
 // not thread-safe, all goroutines which call klog must have been stopped.
-func RedirectKlog(tb testing.TB, output io.Writer) func() {
+func RedirectKlog(tb testutils.TB, output io.Writer) func() {
 	expectNoError := func(err error) {
 		if err != nil {
 			tb.Fatalf("unexpected error: %v", err)
@@ -61,12 +61,12 @@ func RedirectKlog(tb testing.TB, output io.Writer) func() {
 // as helper. Therefore the code here doesn't do it either and thus shows up
 // as call site in the testing output. To avoid that, contextual logging
 // and ktesting have to be used.
-func NewTBWriter(tb testing.TB) io.Writer {
+func NewTBWriter(tb testutils.TB) io.Writer {
 	return testingWriter{TB: tb}
 }
 
 type testingWriter struct {
-	testing.TB
+	testutils.TB
 }
 
 func (tw testingWriter) Write(data []byte) (int, error) {

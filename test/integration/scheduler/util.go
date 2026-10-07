@@ -18,7 +18,6 @@ package scheduler
 
 import (
 	"context"
-	"testing"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -36,6 +35,7 @@ import (
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	testutils "k8s.io/kubernetes/test/integration/util"
+	utiltesting "k8s.io/kubernetes/test/utils"
 	"k8s.io/utils/ptr"
 )
 
@@ -46,7 +46,7 @@ import (
 // This should only be called when you want to kill the scheduler alone, away from apiserver.
 // For example, in scheduler integration tests, recreating apiserver is performance consuming,
 // then shutdown the scheduler and recreate it between each test case is a better approach.
-func InitTestSchedulerForFrameworkTest(t *testing.T, testCtx *testutils.TestContext, nodeCount int, runScheduler bool, opts ...scheduler.Option) (*testutils.TestContext, testutils.ShutdownFunc) {
+func InitTestSchedulerForFrameworkTest(t ktesting.TB, testCtx *testutils.TestContext, nodeCount int, runScheduler bool, opts ...scheduler.Option) (*testutils.TestContext, testutils.ShutdownFunc) {
 	tCtx := ktesting.Init(t)
 	testCtx = testutils.InitTestSchedulerWithOptions(t, testCtx, 0, opts...)
 	testutils.SyncSchedulerInformerFactory(testCtx)
@@ -93,7 +93,7 @@ func NewPlugin(plugin fwk.Plugin) frameworkruntime.PluginFactory {
 }
 
 // InitRegistryAndConfig returns registry and plugins config based on give plugins.
-func InitRegistryAndConfig(t *testing.T, factory func(plugin fwk.Plugin) frameworkruntime.PluginFactory, plugins ...fwk.Plugin) (frameworkruntime.Registry, schedulerconfig.KubeSchedulerProfile) {
+func InitRegistryAndConfig(t utiltesting.TB, factory func(plugin fwk.Plugin) frameworkruntime.PluginFactory, plugins ...fwk.Plugin) (frameworkruntime.Registry, schedulerconfig.KubeSchedulerProfile) {
 	if len(plugins) == 0 {
 		return frameworkruntime.Registry{}, schedulerconfig.KubeSchedulerProfile{}
 	}
