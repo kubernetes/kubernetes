@@ -1436,6 +1436,11 @@ func watchTestCases() []watchTestCase {
 		pred.AllowWatchBookmarks = false
 		return storage.ListOptions{ResourceVersion: rv, ResourceVersionMatch: match, Predicate: pred, Recursive: true, SendInitialEvents: new(false)}
 	}
+	watchWithBookmarks := func(rv string, match metav1.ResourceVersionMatch) storage.ListOptions {
+		opts := watch(rv, match)
+		opts.Predicate.AllowWatchBookmarks = true
+		return opts
+	}
 	watchList := func(rv string) storage.ListOptions {
 		pred := storage.Everything
 		pred.AllowWatchBookmarks = true
@@ -1447,6 +1452,10 @@ func watchTestCases() []watchTestCase {
 			Request: WatchRequest{Key: "/pods/", Options: watch("", "")},
 		},
 		{
+			Name:    "Watch everything with AllowWatchBookmarks",
+			Request: WatchRequest{Key: "/pods/", Options: watchWithBookmarks("", "")},
+		},
+		{
 			Name:    "Watch everything with NotOlderThan",
 			Request: WatchRequest{Key: "/pods/", Options: watch("", metav1.ResourceVersionMatchNotOlderThan)},
 		},
@@ -1455,12 +1464,20 @@ func watchTestCases() []watchTestCase {
 			Request: WatchRequest{Key: "/pods/", Options: watch("0", "")},
 		},
 		{
+			Name:    "Watch everything with ResourceVersion=0 and AllowWatchBookmarks",
+			Request: WatchRequest{Key: "/pods/", Options: watchWithBookmarks("0", "")},
+		},
+		{
 			Name:    "Watch everything with ResourceVersion=0 and NotOlderThan",
 			Request: WatchRequest{Key: "/pods/", Options: watch("0", metav1.ResourceVersionMatchNotOlderThan)},
 		},
 		{
 			Name:    "Watch everything with ResourceVersion=1",
 			Request: WatchRequest{Key: "/pods/", Options: watch("1", "")},
+		},
+		{
+			Name:    "Watch everything with ResourceVersion=1 and AllowWatchBookmarks",
+			Request: WatchRequest{Key: "/pods/", Options: watchWithBookmarks("1", "")},
 		},
 		{
 			Name:    "Watch everything with ResourceVersion=1 and Exact",
@@ -1473,6 +1490,10 @@ func watchTestCases() []watchTestCase {
 		{
 			Name:    "Watch everything with ResourceVersion=8",
 			Request: WatchRequest{Key: "/pods/", Options: watch("8", "")},
+		},
+		{
+			Name:    "Watch everything with ResourceVersion=8 and AllowWatchBookmarks",
+			Request: WatchRequest{Key: "/pods/", Options: watchWithBookmarks("8", "")},
 		},
 		{
 			Name:    "Watch everything with ResourceVersion=8 and Exact",
