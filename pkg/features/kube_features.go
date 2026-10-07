@@ -568,6 +568,15 @@ const (
 	// Enables the fast path for inter-pod affinity calculations when the topology key is kubernetes.io/hostname.
 	InterPodAffinityHostnameFastPath featuregate.Feature = "InterPodAffinityHostnameFastPath"
 
+	// owner: @stlaz
+	// kep: https://kep.k8s.io/6283
+	//
+	// Makes the kube-apiserver use the ClusterTrustBundles with signer 'kubernetes.io/kube-apiserver-serving'
+	// when injecting the kube-apiserver serving certificate trust to workloads.
+	// This is injected instead of the 'kube-root-ca.crt' configMap into automounted ServiceAccount
+	// volumes.
+	KubeAPIServerWorkloadsTrust featuregate.Feature = "KubeAPIServerWorkloadsTrust"
+
 	// owner: @adrianmoisey @danwinship
 	// kep: https://kep.k8s.io/5495
 	//
@@ -1661,6 +1670,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.37"), Default: false, PreRelease: featuregate.Alpha},
 	},
 
+	KubeAPIServerWorkloadsTrust: {
+		{Version: version.MustParse("1.38"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
 	KubeProxyIPVS: {
 		{Version: version.MustParse("1.0"), Default: true, PreRelease: featuregate.GA},
 		{Version: version.MustParse("1.37"), Default: true, PreRelease: featuregate.Deprecated},
@@ -2567,6 +2580,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	InPlacePodVerticalScalingSchedulerPreemption: {InPlacePodVerticalScaling},
 
 	InterPodAffinityHostnameFastPath: {},
+
+	KubeAPIServerWorkloadsTrust: {ClusterTrustBundle, ClusterTrustBundleProjection},
 
 	KubeProxyIPVS: {},
 
