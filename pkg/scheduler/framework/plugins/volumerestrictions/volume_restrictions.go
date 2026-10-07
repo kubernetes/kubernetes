@@ -26,9 +26,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/component-helpers/resource"
+	volumehelpers "k8s.io/component-helpers/storage/volume"
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
-	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
@@ -267,7 +267,7 @@ func (pl *VolumeRestrictions) readWriteOncePodPVCsForPod(ctx context.Context, po
 			return nil, err
 		}
 
-		if !v1helper.ContainsAccessMode(pvc.Spec.AccessModes, v1.ReadWriteOncePod) {
+		if !volumehelpers.ContainsAccessMode(pvc.Spec.AccessModes, v1.ReadWriteOncePod) {
 			continue
 		}
 		pvcs.Insert(pvc.Name)

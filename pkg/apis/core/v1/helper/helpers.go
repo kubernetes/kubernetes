@@ -18,15 +18,17 @@ package helper
 
 import (
 	"fmt"
-	"k8s.io/klog/v2"
 	"strings"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/selection"
-	"k8s.io/apimachinery/pkg/util/validation"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	topologhelper "k8s.io/component-helpers/node/topology"
+	resourcehelper "k8s.io/component-helpers/resource"
+	volumehelper "k8s.io/component-helpers/storage/volume"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
 	"k8s.io/kubernetes/pkg/features"
 )
@@ -37,35 +39,26 @@ import (
 // to avoid confusion with the convention in quota
 // 3. it satisfies the rules in IsQualifiedName() after converted into quota resource name
 func IsExtendedResourceName(name v1.ResourceName) bool {
-	if IsNativeResource(name) || strings.HasPrefix(string(name), v1.DefaultResourceRequestsPrefix) {
-		return false
-	}
-	// Ensure it satisfies the rules in IsQualifiedName() after converted into quota resource name
-	nameForQuota := fmt.Sprintf("%s%s", v1.DefaultResourceRequestsPrefix, string(name))
-	if errs := validation.IsQualifiedName(nameForQuota); len(errs) != 0 {
-		return false
-	}
-	return true
+	return resourcehelper.IsExtendedResourceName(name)
 }
 
 // IsPrefixedNativeResource returns true if the resource name is in the
 // *kubernetes.io/ namespace.
 func IsPrefixedNativeResource(name v1.ResourceName) bool {
-	return strings.Contains(string(name), v1.ResourceDefaultNamespacePrefix)
+	return resourcehelper.IsPrefixedNativeResource(name)
 }
 
 // IsNativeResource returns true if the resource name is in the
 // *kubernetes.io/ namespace. Partially-qualified (unprefixed) names are
 // implicitly in the kubernetes.io/ namespace.
 func IsNativeResource(name v1.ResourceName) bool {
-	return !strings.Contains(string(name), "/") ||
-		IsPrefixedNativeResource(name)
+	return resourcehelper.IsNativeResource(name)
 }
 
 // IsHugePageResourceName returns true if the resource name has the huge page
 // resource prefix.
 func IsHugePageResourceName(name v1.ResourceName) bool {
-	return strings.HasPrefix(string(name), v1.ResourceHugePagesPrefix)
+	return resourcehelper.IsHugePageResourceName(name)
 }
 
 // HugePageResourceName returns a ResourceName with the canonical hugepage
@@ -134,7 +127,7 @@ func IsOvercommitAllowed(name v1.ResourceName) bool {
 
 // IsAttachableVolumeResourceName returns true when the resource name is prefixed in attachable volume
 func IsAttachableVolumeResourceName(name v1.ResourceName) bool {
-	return strings.HasPrefix(string(name), v1.ResourceAttachableVolumesPrefix)
+	return resourcehelper.IsAttachableVolumeResourceName(name)
 }
 
 // IsServiceIPSet aims to check if the service's ClusterIP is set or not
@@ -195,12 +188,7 @@ func removeDuplicateAccessModes(modes []v1.PersistentVolumeAccessMode) []v1.Pers
 }
 
 func ContainsAccessMode(modes []v1.PersistentVolumeAccessMode, mode v1.PersistentVolumeAccessMode) bool {
-	for _, m := range modes {
-		if m == mode {
-			return true
-		}
-	}
-	return false
+	return volumehelper.ContainsAccessMode(modes, mode)
 }
 
 // NodeSelectorRequirementKeysExistInNodeSelectorTerms checks if a NodeSelectorTerm with key is already specified in terms
@@ -239,26 +227,7 @@ func TopologySelectorRequirementsAsSelector(tsm []v1.TopologySelectorLabelRequir
 // MatchTopologySelectorTerms checks whether given labels match topology selector terms in ORed;
 // nil or empty term matches no objects; while empty term list matches all objects.
 func MatchTopologySelectorTerms(topologySelectorTerms []v1.TopologySelectorTerm, lbls labels.Set) bool {
-	if len(topologySelectorTerms) == 0 {
-		// empty term list matches all objects
-		return true
-	}
-
-	for _, req := range topologySelectorTerms {
-		// nil or empty term selects no objects
-		if len(req.MatchLabelExpressions) == 0 {
-			continue
-		}
-
-		labelSelector, err := TopologySelectorRequirementsAsSelector(req.MatchLabelExpressions)
-		if err != nil || !labelSelector.Matches(lbls) {
-			continue
-		}
-
-		return true
-	}
-
-	return false
+	return topologhelper.MatchTopologySelectorTerms(topologySelectorTerms, lbls)
 }
 
 // AddOrUpdateTolerationInPodSpec tries to add a toleration to the toleration list in PodSpec.
