@@ -3030,6 +3030,10 @@
             "x-kubernetes-patch-merge-key": "name",
             "x-kubernetes-patch-strategy": "merge"
           },
+          "defaultNetwork": {
+            "description": "defaultNetwork selects the pod's default network. \"Pod\" gives the pod its own network namespace attached to the default pod network, \"Host\" runs the pod in the host network namespace (equivalent to hostNetwork: true and kept in sync with it), and \"None\" gives the pod an isolated network namespace with only a loopback interface, not attached to the default pod network and with no automatic network plumbing. Defaults to \"Pod\", or to \"Host\" when hostNetwork is true; setting \"Host\" sets hostNetwork to true. \"None\" may not be combined with hostNetwork: true. When \"None\" is selected, dnsPolicy defaults to \"None\" and enableServiceLinks defaults to false (both may be overridden), and features that require networking (such as hostPorts and network-based probes and lifecycle handlers) are forbidden. This field is immutable.",
+            "type": "string"
+          },
           "dnsConfig": {
             "allOf": [
               {

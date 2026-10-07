@@ -1434,6 +1434,12 @@
     lockToDefault: false
     preRelease: GA
     version: "1.37"
+- name: PodDefaultNetwork
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.38"
 - name: PodDeletionCost
   versionedSpecs:
   - default: false
