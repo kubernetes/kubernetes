@@ -370,6 +370,9 @@ func GenerateAllContainersRestartingCondition(pod *v1.Pod, podStatus *kubecontai
 
 // findContainersMissingUserInfo returns names of containers the runtime hasn't reported user info for yet.
 func findContainersMissingUserInfo(pod *v1.Pod, containerStatuses []v1.ContainerStatus) []string {
+	if pod.Spec.HostUsers != nil && !*pod.Spec.HostUsers {
+		return nil
+	}
 	var names []string
 	podutil.VisitContainers(&pod.Spec, podutil.AllContainers, func(container *v1.Container, _ podutil.ContainerType) bool {
 		status, ok := podutil.GetContainerStatus(containerStatuses, container.Name)
@@ -386,6 +389,9 @@ func findRootContainers(pod *v1.Pod, containerStatuses []v1.ContainerStatus,
 	isIDInsecure func(status v1.ContainerStatus) bool,
 	effectiveRequestedID func(pod *v1.Pod, container *v1.Container) (*int64, bool),
 	explicit bool) []string {
+	if pod.Spec.HostUsers != nil && !*pod.Spec.HostUsers {
+		return nil
+	}
 	var names []string
 	podutil.VisitContainers(&pod.Spec, podutil.AllContainers, func(container *v1.Container, _ podutil.ContainerType) bool {
 		status, ok := podutil.GetContainerStatus(containerStatuses, container.Name)
@@ -413,11 +419,6 @@ func GenerateInsecureImplicitUserIDCondition(pod *v1.Pod, oldPodStatus *v1.PodSt
 		ObservedGeneration: podutil.CalculatePodConditionObservedGeneration(oldPodStatus, pod.Generation, conditionType),
 	}
 
-	if pod.Spec.HostUsers != nil && !*pod.Spec.HostUsers {
-		cond.Status = v1.ConditionFalse
-		return cond
-	}
-
 	insecureContainerNames := findRootContainers(pod, containerStatuses,
 		func(status v1.ContainerStatus) bool { return status.User.Linux.UID == 0 },
 		securitycontext.DetermineEffectiveRunAsUser, false)
@@ -442,6 +443,9 @@ func GenerateInsecureImplicitUserIDCondition(pod *v1.Pod, oldPodStatus *v1.PodSt
 // findInsecureSupplementalGroupsContainers returns names of containers whose resolved
 // supplemental groups include GID 0, split by explicit vs. implicit.
 func findInsecureSupplementalGroupsContainers(pod *v1.Pod, containerStatuses []v1.ContainerStatus, explicit bool) []string {
+	if pod.Spec.HostUsers != nil && !*pod.Spec.HostUsers {
+		return nil
+	}
 	podRequestsGID0AsSupplementalGroup := false
 	if sc := pod.Spec.SecurityContext; sc != nil {
 		if sc.FSGroup != nil && *sc.FSGroup == 0 {
@@ -482,11 +486,6 @@ func GenerateInsecureImplicitGroupIDCondition(pod *v1.Pod, oldPodStatus *v1.PodS
 		ObservedGeneration: podutil.CalculatePodConditionObservedGeneration(oldPodStatus, pod.Generation, conditionType),
 	}
 
-	if pod.Spec.HostUsers != nil && !*pod.Spec.HostUsers {
-		cond.Status = v1.ConditionFalse
-		return cond
-	}
-
 	containersWithInsecurePrimaryGID := findRootContainers(pod, containerStatuses,
 		func(status v1.ContainerStatus) bool { return status.User.Linux.GID == 0 },
 		securitycontext.DetermineEffectiveRunAsGroup, false)
@@ -518,9 +517,6 @@ func GenerateInsecureImplicitGroupIDCondition(pod *v1.Pod, oldPodStatus *v1.PodS
 
 // IsPodExplicitlyInsecureUserID reports whether a container explicitly requests UID 0.
 func IsPodExplicitlyInsecureUserID(pod *v1.Pod, containerStatuses []v1.ContainerStatus) bool {
-	if pod.Spec.HostUsers != nil && !*pod.Spec.HostUsers {
-		return false
-	}
 	return len(findRootContainers(pod, containerStatuses,
 		func(status v1.ContainerStatus) bool { return status.User.Linux.UID == 0 },
 		securitycontext.DetermineEffectiveRunAsUser, true)) > 0
@@ -528,9 +524,6 @@ func IsPodExplicitlyInsecureUserID(pod *v1.Pod, containerStatuses []v1.Container
 
 // IsPodExplicitlyInsecureGroupID reports whether a container explicitly requests GID 0.
 func IsPodExplicitlyInsecureGroupID(pod *v1.Pod, containerStatuses []v1.ContainerStatus) bool {
-	if pod.Spec.HostUsers != nil && !*pod.Spec.HostUsers {
-		return false
-	}
 	return len(findRootContainers(pod, containerStatuses,
 		func(status v1.ContainerStatus) bool { return status.User.Linux.GID == 0 },
 		securitycontext.DetermineEffectiveRunAsGroup, true)) > 0
@@ -539,9 +532,6 @@ func IsPodExplicitlyInsecureGroupID(pod *v1.Pod, containerStatuses []v1.Containe
 // IsPodImplicitlyInsecurePrimaryGroupID reports whether a container's primary GID is
 // implicitly 0, ignoring supplemental groups.
 func IsPodImplicitlyInsecurePrimaryGroupID(pod *v1.Pod, containerStatuses []v1.ContainerStatus) bool {
-	if pod.Spec.HostUsers != nil && !*pod.Spec.HostUsers {
-		return false
-	}
 	return len(findRootContainers(pod, containerStatuses,
 		func(status v1.ContainerStatus) bool { return status.User.Linux.GID == 0 },
 		securitycontext.DetermineEffectiveRunAsGroup, false)) > 0
@@ -550,17 +540,11 @@ func IsPodImplicitlyInsecurePrimaryGroupID(pod *v1.Pod, containerStatuses []v1.C
 // IsPodImplicitlyInsecureSupplementalGroups reports whether a container implicitly has
 // GID 0 as a supplemental group.
 func IsPodImplicitlyInsecureSupplementalGroups(pod *v1.Pod, containerStatuses []v1.ContainerStatus) bool {
-	if pod.Spec.HostUsers != nil && !*pod.Spec.HostUsers {
-		return false
-	}
 	return len(findInsecureSupplementalGroupsContainers(pod, containerStatuses, false)) > 0
 }
 
 // IsPodExplicitlyInsecureSupplementalGroups reports whether a pod explicitly requests
 // GID 0 as a supplemental group.
 func IsPodExplicitlyInsecureSupplementalGroups(pod *v1.Pod, containerStatuses []v1.ContainerStatus) bool {
-	if pod.Spec.HostUsers != nil && !*pod.Spec.HostUsers {
-		return false
-	}
 	return len(findInsecureSupplementalGroupsContainers(pod, containerStatuses, true)) > 0
 }
