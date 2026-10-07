@@ -871,7 +871,11 @@ type ReplicaSetList struct {
 // a Template set.
 type ReplicaSetSpec struct {
 	// Replicas is the number of desired replicas.
-	Replicas int32
+	// This is a pointer to distinguish between explicit zero and unspecified.
+	// Defaults to 1.
+	// More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicaset
+	// +optional
+	Replicas *int32
 
 	// Minimum number of seconds for which a newly created pod should be ready
 	// without any of its container crashing, for it to be considered available.

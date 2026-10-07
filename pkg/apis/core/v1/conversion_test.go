@@ -504,7 +504,7 @@ func TestReplicaSetConversion(t *testing.T) {
 				Labels:    map[string]string{"foo": "bar", "bar": "foo"}, // labels have to be defined everywhere not to trigger RC defaulting
 			},
 			Spec: apps.ReplicaSetSpec{
-				Replicas:        1,
+				Replicas:        new(int32(1)),
 				MinReadySeconds: 32,
 				Selector: &metav1.LabelSelector{
 					MatchLabels: map[string]string{"foo": "bar", "bar": "foo"},

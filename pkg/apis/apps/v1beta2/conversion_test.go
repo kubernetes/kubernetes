@@ -576,8 +576,7 @@ func TestV1beta2RollingUpdateDeploymentConversion(t *testing.T) {
 }
 
 func TestV1beta2ReplicaSetSpecConversion(t *testing.T) {
-	replicas := new(int32)
-	*replicas = 2
+	replicas := new(int32(2))
 	matchExpressions := []metav1.LabelSelectorRequirement{
 		{Key: "foo", Operator: metav1.LabelSelectorOpIn, Values: []string{"foo"}},
 	}
@@ -590,7 +589,7 @@ func TestV1beta2ReplicaSetSpecConversion(t *testing.T) {
 	}{
 		"ReplicaSetSpec Conversion 1": {
 			replicaset1: &apps.ReplicaSetSpec{
-				Replicas:        *replicas,
+				Replicas:        replicas,
 				MinReadySeconds: 2,
 				Template: api.PodTemplateSpec{
 					Spec: api.PodSpec{
@@ -610,7 +609,7 @@ func TestV1beta2ReplicaSetSpecConversion(t *testing.T) {
 		},
 		"ReplicaSetSpec Conversion 2": {
 			replicaset1: &apps.ReplicaSetSpec{
-				Replicas: *replicas,
+				Replicas: replicas,
 				Selector: selector,
 				Template: api.PodTemplateSpec{
 					Spec: api.PodSpec{

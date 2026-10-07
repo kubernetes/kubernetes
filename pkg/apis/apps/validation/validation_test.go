@@ -3421,7 +3421,7 @@ func TestValidateReplicaSetStatusUpdate(t *testing.T) {
 		update: apps.ReplicaSet{
 			ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 			Spec: apps.ReplicaSetSpec{
-				Replicas: 3,
+				Replicas: new(int32(3)),
 				Selector: &metav1.LabelSelector{MatchLabels: validLabels},
 				Template: validPodTemplate.Template,
 			},
@@ -3453,7 +3453,7 @@ func TestValidateReplicaSetStatusUpdate(t *testing.T) {
 			update: apps.ReplicaSet{
 				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 				Spec: apps.ReplicaSetSpec{
-					Replicas: 2,
+					Replicas: new(int32(2)),
 					Selector: &metav1.LabelSelector{MatchLabels: validLabels},
 					Template: validPodTemplate.Template,
 				},
@@ -3517,7 +3517,7 @@ func TestValidateReplicaSetUpdate(t *testing.T) {
 			update: apps.ReplicaSet{
 				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 				Spec: apps.ReplicaSetSpec{
-					Replicas: 3,
+					Replicas: new(int32(3)),
 					Selector: &metav1.LabelSelector{MatchLabels: validLabels},
 					Template: validPodTemplate.Template,
 				},
@@ -3534,7 +3534,7 @@ func TestValidateReplicaSetUpdate(t *testing.T) {
 			update: apps.ReplicaSet{
 				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 				Spec: apps.ReplicaSetSpec{
-					Replicas: 3,
+					Replicas: new(int32(3)),
 					Selector: &metav1.LabelSelector{MatchLabels: validLabels},
 					Template: readWriteVolumePodTemplate.Template,
 				},
@@ -3571,7 +3571,7 @@ func TestValidateReplicaSetUpdate(t *testing.T) {
 			update: apps.ReplicaSet{
 				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 				Spec: apps.ReplicaSetSpec{
-					Replicas: 2,
+					Replicas: new(int32(2)),
 					Selector: &metav1.LabelSelector{MatchLabels: invalidLabels},
 					Template: validPodTemplate.Template,
 				},
@@ -3589,7 +3589,7 @@ func TestValidateReplicaSetUpdate(t *testing.T) {
 			update: apps.ReplicaSet{
 				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 				Spec: apps.ReplicaSetSpec{
-					Replicas: 2,
+					Replicas: new(int32(2)),
 					Selector: &metav1.LabelSelector{MatchLabels: validLabels},
 					Template: invalidPodTemplate.Template,
 				},
@@ -3607,7 +3607,7 @@ func TestValidateReplicaSetUpdate(t *testing.T) {
 			update: apps.ReplicaSet{
 				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 				Spec: apps.ReplicaSetSpec{
-					Replicas: -1,
+					Replicas: new(int32(-1)),
 					Selector: &metav1.LabelSelector{MatchLabels: validLabels},
 					Template: validPodTemplate.Template,
 				},
@@ -3701,7 +3701,7 @@ func TestValidateReplicaSet(t *testing.T) {
 	}, {
 		ObjectMeta: metav1.ObjectMeta{Name: "abc-123", Namespace: metav1.NamespaceDefault},
 		Spec: apps.ReplicaSetSpec{
-			Replicas: 1,
+			Replicas: new(int32(1)),
 			Selector: &metav1.LabelSelector{MatchLabels: validLabels},
 			Template: readWriteVolumePodTemplate.Template,
 		},
@@ -3750,7 +3750,7 @@ func TestValidateReplicaSet(t *testing.T) {
 		"read-write persistent disk with > 1 pod": {
 			ObjectMeta: metav1.ObjectMeta{Name: "abc"},
 			Spec: apps.ReplicaSetSpec{
-				Replicas: 2,
+				Replicas: new(int32(2)),
 				Selector: &metav1.LabelSelector{MatchLabels: validLabels},
 				Template: readWriteVolumePodTemplate.Template,
 			},
@@ -3758,7 +3758,7 @@ func TestValidateReplicaSet(t *testing.T) {
 		"negative_replicas": {
 			ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 			Spec: apps.ReplicaSetSpec{
-				Replicas: -1,
+				Replicas: new(int32(-1)),
 				Selector: &metav1.LabelSelector{MatchLabels: validLabels},
 			},
 		},

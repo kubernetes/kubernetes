@@ -834,17 +834,7 @@ func Convert_apps_ReplicaSetCondition_To_v1beta2_ReplicaSetCondition(in *apps.Re
 
 func autoConvert_v1beta2_ReplicaSetList_To_apps_ReplicaSetList(in *appsv1beta2.ReplicaSetList, out *apps.ReplicaSetList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	if in.Items != nil {
-		in, out := &in.Items, &out.Items
-		*out = make([]apps.ReplicaSet, len(*in))
-		for i := range *in {
-			if err := Convert_v1beta2_ReplicaSet_To_apps_ReplicaSet(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.Items = nil
-	}
+	out.Items = *(*[]apps.ReplicaSet)(unsafe.Pointer(&in.Items))
 	return nil
 }
 
@@ -855,17 +845,7 @@ func Convert_v1beta2_ReplicaSetList_To_apps_ReplicaSetList(in *appsv1beta2.Repli
 
 func autoConvert_apps_ReplicaSetList_To_v1beta2_ReplicaSetList(in *apps.ReplicaSetList, out *appsv1beta2.ReplicaSetList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	if in.Items != nil {
-		in, out := &in.Items, &out.Items
-		*out = make([]appsv1beta2.ReplicaSet, len(*in))
-		for i := range *in {
-			if err := Convert_apps_ReplicaSet_To_v1beta2_ReplicaSet(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.Items = nil
-	}
+	out.Items = *(*[]appsv1beta2.ReplicaSet)(unsafe.Pointer(&in.Items))
 	return nil
 }
 
@@ -875,14 +855,7 @@ func Convert_apps_ReplicaSetList_To_v1beta2_ReplicaSetList(in *apps.ReplicaSetLi
 }
 
 func autoConvert_v1beta2_ReplicaSetSpec_To_apps_ReplicaSetSpec(in *appsv1beta2.ReplicaSetSpec, out *apps.ReplicaSetSpec, s conversion.Scope) error {
-	if err := v1.Convert_Pointer_int32_To_int32(&in.Replicas, &out.Replicas, s); err != nil {
-		return err
-	}
-	out.MinReadySeconds = in.MinReadySeconds
-	out.Selector = (*v1.LabelSelector)(unsafe.Pointer(in.Selector))
-	if err := corev1.Convert_v1_PodTemplateSpec_To_core_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
-		return err
-	}
+	*out = *(*apps.ReplicaSetSpec)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -892,14 +865,7 @@ func Convert_v1beta2_ReplicaSetSpec_To_apps_ReplicaSetSpec(in *appsv1beta2.Repli
 }
 
 func autoConvert_apps_ReplicaSetSpec_To_v1beta2_ReplicaSetSpec(in *apps.ReplicaSetSpec, out *appsv1beta2.ReplicaSetSpec, s conversion.Scope) error {
-	if err := v1.Convert_int32_To_Pointer_int32(&in.Replicas, &out.Replicas, s); err != nil {
-		return err
-	}
-	out.MinReadySeconds = in.MinReadySeconds
-	out.Selector = (*v1.LabelSelector)(unsafe.Pointer(in.Selector))
-	if err := corev1.Convert_core_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
-		return err
-	}
+	*out = *(*appsv1beta2.ReplicaSetSpec)(unsafe.Pointer(in))
 	return nil
 }
 

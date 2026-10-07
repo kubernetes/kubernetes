@@ -228,7 +228,6 @@ func TestMemoryIdenticalConversion(t *testing.T) {
 		"Node",
 		"PodCertificateRequest.certificates.k8s.io",
 		"PriorityLevelConfiguration.flowcontrol.apiserver.k8s.io",
-		"ReplicaSet.apps",
 		"Secret",
 		"StatefulSet.apps",
 		"ValidatingWebhookConfiguration.admissionregistration.k8s.io",
@@ -238,7 +237,6 @@ func TestMemoryIdenticalConversion(t *testing.T) {
 		"Deployment.extensions",
 		"Ingress.extensions",
 		"NetworkPolicy.extensions",
-		"ReplicaSet.extensions",
 		"Scale.apps",
 		"Scale.extensions",
 

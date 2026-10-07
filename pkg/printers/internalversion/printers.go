@@ -1259,7 +1259,7 @@ func printReplicaSet(obj *apps.ReplicaSet, options printers.GenerateOptions) ([]
 		Object: runtime.RawExtension{Object: obj},
 	}
 
-	desiredReplicas := obj.Spec.Replicas
+	desiredReplicas := ptr.Deref(obj.Spec.Replicas, 0)
 	currentReplicas := obj.Status.Replicas
 	readyReplicas := obj.Status.ReadyReplicas
 

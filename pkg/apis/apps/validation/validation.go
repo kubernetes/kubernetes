@@ -32,6 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/apps"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
+	"k8s.io/utils/ptr"
 )
 
 // StatefulSetValidationOptions is a struct that can be passed to ValidateStatefulSetSpec to record the validate options
@@ -802,7 +803,9 @@ func ValidateReplicaSetStatus(status apps.ReplicaSetStatus, fldPath *field.Path)
 func ValidateReplicaSetSpec(spec, oldSpec *apps.ReplicaSetSpec, fldPath *field.Path, opts apivalidation.PodValidationOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
 
-	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(spec.Replicas), fldPath.Child("replicas"))...)
+	if spec.Replicas != nil {
+		allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(*spec.Replicas), fldPath.Child("replicas"))...)
+	}
 	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(spec.MinReadySeconds), fldPath.Child("minReadySeconds"))...)
 
 	if spec.Selector == nil {
@@ -819,7 +822,7 @@ func ValidateReplicaSetSpec(spec, oldSpec *apps.ReplicaSetSpec, fldPath *field.P
 	if err != nil {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("selector"), spec.Selector, "invalid label selector"))
 	} else {
-		allErrs = append(allErrs, ValidatePodTemplateSpecForReplicaSet(&spec.Template, selector, spec.Replicas, fldPath.Child("template"), opts)...)
+		allErrs = append(allErrs, ValidatePodTemplateSpecForReplicaSet(&spec.Template, selector, ptr.Deref(spec.Replicas, 0), fldPath.Child("template"), opts)...)
 	}
 	return allErrs
 }

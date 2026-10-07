@@ -113,7 +113,9 @@ func Convert_v1_ReplicationController_To_apps_ReplicaSet(in *v1.ReplicationContr
 }
 
 func Convert_v1_ReplicationControllerSpec_To_apps_ReplicaSetSpec(in *v1.ReplicationControllerSpec, out *apps.ReplicaSetSpec, s conversion.Scope) error {
-	out.Replicas = *in.Replicas
+	if in.Replicas != nil {
+		out.Replicas = new(*in.Replicas)
+	}
 	out.MinReadySeconds = in.MinReadySeconds
 	if in.Selector != nil {
 		out.Selector = new(metav1.LabelSelector)
@@ -164,8 +166,9 @@ func Convert_apps_ReplicaSet_To_v1_ReplicationController(in *apps.ReplicaSet, ou
 }
 
 func Convert_apps_ReplicaSetSpec_To_v1_ReplicationControllerSpec(in *apps.ReplicaSetSpec, out *v1.ReplicationControllerSpec, s conversion.Scope) error {
-	out.Replicas = new(int32)
-	*out.Replicas = in.Replicas
+	if in.Replicas != nil {
+		out.Replicas = new(*in.Replicas)
+	}
 	out.MinReadySeconds = in.MinReadySeconds
 	var invalidErr error
 	if in.Selector != nil {

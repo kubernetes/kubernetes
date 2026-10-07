@@ -168,6 +168,9 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 			c.FillNoCustom(j)
 
 			// match defaulter
+			if j.Spec.Replicas == nil {
+				j.Spec.Replicas = new(int32(1))
+			}
 			if j.Spec.Selector == nil {
 				j.Spec.Selector = &metav1.LabelSelector{MatchLabels: j.Spec.Template.Labels}
 			}
