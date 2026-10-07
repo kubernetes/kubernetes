@@ -2228,6 +2228,13 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 					return false, nil, fmt.Errorf("failed to update the state of pod-level resources for the pod %v : %w", pod.UID, err)
 				}
 			}
+			// Apply the limits on every sync, not only when the pod cgroup is
+			// created. The cgroup may predate the gate, or an earlier write may
+			// have failed.
+			if err := pcm.EnsureWritableCgroupLimits(pod); err != nil {
+				kl.recorder.WithLogger(logger).Eventf(pod, v1.EventTypeWarning, events.FailedToCreatePodContainer, "unable to apply pod cgroup descendant and depth limits: %v", err)
+				return false, nil, fmt.Errorf("failed to apply cgroup descendant and depth limits for pod %v: %w", pod.UID, err)
+			}
 		}
 	}
 

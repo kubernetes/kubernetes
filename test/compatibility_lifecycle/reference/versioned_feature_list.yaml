@@ -118,6 +118,12 @@
     preRelease: Beta
     version: "1.38"
     minCompatibilityVersion: "1.38"
+- name: CgroupOptions
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.38"
 - name: ChangeContainerStatusOnKubeletRestart
   versionedSpecs:
   - default: true
