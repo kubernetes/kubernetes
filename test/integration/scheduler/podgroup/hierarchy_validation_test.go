@@ -70,9 +70,9 @@ func TestHierarchyValidation(t *testing.T) {
 					CreatePods: makeTestPods("pg1", "1"),
 				},
 				{
-					Name: "Verify groups have Invalid condition",
-					WaitForGroupsInvalid: &stepsframework.Groups{
-						CompositePodGroups: []string{"cpg-root"},
+					Name: "Verify groups have error condition",
+					WaitForGroupsError: &stepsframework.Groups{
+						CompositePodGroups: []string{"cpg-root", "cpg1", "cpg2", "cpg3"},
 						PodGroups:          []string{"pg1"},
 					},
 				},
@@ -110,9 +110,9 @@ func TestHierarchyValidation(t *testing.T) {
 					CreatePods: makeTestPods("pg1", "1"),
 				},
 				{
-					Name: "Verify groups have Invalid condition",
-					WaitForGroupsInvalid: &stepsframework.Groups{
-						CompositePodGroups: []string{"cpg-root"},
+					Name: "Verify groups have error condition",
+					WaitForGroupsError: &stepsframework.Groups{
+						CompositePodGroups: []string{"cpg-root", "cpg1", "cpg2", "cpg3"},
 						PodGroups:          []string{"pg1"},
 					},
 				},
@@ -138,8 +138,8 @@ func TestHierarchyValidation(t *testing.T) {
 					CreatePods: makeTestPods("pg1", "1"),
 				},
 				{
-					Name: "Verify groups have Invalid condition",
-					WaitForGroupsInvalid: &stepsframework.Groups{
+					Name: "Verify groups have error condition",
+					WaitForGroupsError: &stepsframework.Groups{
 						CompositePodGroups: []string{"cpg-root"},
 						PodGroups:          []string{"pg1"},
 					},
@@ -166,8 +166,8 @@ func TestHierarchyValidation(t *testing.T) {
 					CreatePods: makeTestPods("pg1", "1"),
 				},
 				{
-					Name: "Verify groups have Invalid condition",
-					WaitForGroupsInvalid: &stepsframework.Groups{
+					Name: "Verify groups have error condition",
+					WaitForGroupsError: &stepsframework.Groups{
 						CompositePodGroups: []string{"cpg-root"},
 						PodGroups:          []string{"pg1"},
 					},
@@ -194,8 +194,8 @@ func TestHierarchyValidation(t *testing.T) {
 					CreatePods: makeTestPods("pg1", "1"),
 				},
 				{
-					Name: "Verify groups have Invalid condition",
-					WaitForGroupsInvalid: &stepsframework.Groups{
+					Name: "Verify groups have error condition",
+					WaitForGroupsError: &stepsframework.Groups{
 						CompositePodGroups: []string{"cpg-root"},
 						PodGroups:          []string{"pg1"},
 					},

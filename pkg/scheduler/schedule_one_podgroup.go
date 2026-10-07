@@ -68,7 +68,7 @@ func (sched *Scheduler) scheduleOnePodGroup(ctx context.Context, podGroupInfo *f
 		sched.handlePodGroupFailureBeforeScheduling(ctx, podGroupInfo, err)
 		return
 	}
-	if err := sched.validatePodGroup(podGroupInfo); err != nil {
+	if err := sched.validatePodGroupHierarchy(podGroupInfo); err != nil {
 		sched.handlePodGroupFailureBeforeScheduling(ctx, podGroupInfo, err)
 		return
 	}
@@ -187,7 +187,7 @@ func (sched *Scheduler) updatePodGroupConditionWithError(ctx context.Context, pg
 	}
 }
 
-// validatePodGroup ensures that:
+// validatePodGroupHierarchy ensures that:
 // - the hierarchy does not exceed WorkloadMaxTreeDepth (and has no CompositePodGroup at depth WorkloadMaxTreeDepth),
 // - all groups in the hierarchy reference the same Workload as the root group,
 // - no gang parent group has a basic child group,
@@ -195,7 +195,7 @@ func (sched *Scheduler) updatePodGroupConditionWithError(ctx context.Context, pg
 // - all Pods in a group hierarchy have matching scheduler name,
 // - all entities in a group hierarchy have the same priority as the root group,
 // - all entities in a group hierarchy have the same preemption policy.
-func (sched *Scheduler) validatePodGroup(rootInfo *framework.QueuedPodGroupInfo) error {
+func (sched *Scheduler) validatePodGroupHierarchy(rootInfo *framework.QueuedPodGroupInfo) error {
 	rootPriority := rootInfo.GetPriority()
 	rootWorkloadName := rootInfo.GetWorkloadName()
 
@@ -214,7 +214,7 @@ func (sched *Scheduler) validatePodGroup(rootInfo *framework.QueuedPodGroupInfo)
 		break
 	}
 
-	validatePodGroup := func(pgi, parent *framework.PodGroupInfo) error {
+	validateChildPodGroup := func(pgi, parent *framework.PodGroupInfo) error {
 		if parent == nil {
 			// It's a root, so we can skip the checks against itself.
 			return nil
@@ -277,7 +277,7 @@ func (sched *Scheduler) validatePodGroup(rootInfo *framework.QueuedPodGroupInfo)
 		return nil
 	}
 
-	if err := sched.validatePodGroupHierarchy(rootInfo.PodGroupInfo, nil /* parent */, 1 /* depth */, validatePodGroup, validatePod); err != nil {
+	if err := sched.validatePodGroupSubtree(rootInfo.PodGroupInfo, nil /* parent */, 1 /* depth */, validateChildPodGroup, validatePod); err != nil {
 		return err
 	}
 
@@ -288,29 +288,28 @@ func (sched *Scheduler) validatePodGroup(rootInfo *framework.QueuedPodGroupInfo)
 	return nil
 }
 
-// validatePodGroupHierarchy recursively validates that all entities in the hierarchy
+// validatePodGroupSubtree recursively validates that all entities in the hierarchy
 // (composite pod groups, pod groups, and both unscheduled and scheduled pods)
 // conform to the group-wide constraints.
-func (sched *Scheduler) validatePodGroupHierarchy(
+func (sched *Scheduler) validatePodGroupSubtree(
 	podGroupInfo, parent *framework.PodGroupInfo,
 	depth int,
-	validatePodGroup func(pgi, parent *framework.PodGroupInfo) error,
+	validateChildPodGroup func(pgi, parent *framework.PodGroupInfo) error,
 	validatePod func(pod *v1.Pod) error,
 ) error {
 	// CompositePodGroup nodes cannot be at depth WorkloadMaxTreeDepth as they have to contain a PodGroup as a child,
 	// breaking the depth constraint.
-	if depth > schedulingv1alpha3.WorkloadMaxTreeDepth ||
-		(podGroupInfo.GetType() == fwk.CompositePodGroupKeyType && depth == schedulingv1alpha3.WorkloadMaxTreeDepth) {
+	if podGroupInfo.GetType() == fwk.CompositePodGroupKeyType && depth == schedulingv1alpha3.WorkloadMaxTreeDepth {
 		return newValidationErrorf("hierarchy depth exceeds maximum allowed depth %d at %q", schedulingv1alpha3.WorkloadMaxTreeDepth, podGroupInfo.GetKey())
 	}
 
-	if err := validatePodGroup(podGroupInfo, parent); err != nil {
+	if err := validateChildPodGroup(podGroupInfo, parent); err != nil {
 		return err
 	}
 
 	if podGroupInfo.GetType() == fwk.CompositePodGroupKeyType {
 		for _, child := range podGroupInfo.GetChildGroups() {
-			if err := sched.validatePodGroupHierarchy(child, podGroupInfo, depth+1, validatePodGroup, validatePod); err != nil {
+			if err := sched.validatePodGroupSubtree(child, podGroupInfo, depth+1, validateChildPodGroup, validatePod); err != nil {
 				return err
 			}
 		}
@@ -335,7 +334,7 @@ func (sched *Scheduler) validatePodGroupHierarchy(
 }
 
 // frameworkForPodGroup obtains the concrete scheduler framework for the entire pod group.
-// Assumes [Scheduler.validatePodGroup] has been called before.
+// Assumes [Scheduler.validatePodGroupHierarchy] has been called before.
 func (sched *Scheduler) frameworkForPodGroup(podGroupInfo *framework.QueuedPodGroupInfo) framework.Framework {
 	for pInfo := range podGroupInfo.ForEachPodInfo() {
 		return sched.Profiles[pInfo.Pod.Spec.SchedulerName]

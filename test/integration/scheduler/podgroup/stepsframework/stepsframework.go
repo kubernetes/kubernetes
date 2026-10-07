@@ -180,8 +180,8 @@ type Step struct {
 	WaitForGroupsScheduled *Groups
 	// WaitForGroupsUnschedulable is used to wait for PodGroups and CompositePodGroups to have Unschedulable condition.
 	WaitForGroupsUnschedulable *Groups
-	// WaitForGroupsInvalid is used to wait for PodGroups and CompositePodGroups to have Invalid condition.
-	WaitForGroupsInvalid *Groups
+	// WaitForGroupsError is used to wait for PodGroups and CompositePodGroups to have PodGroupError or CompositePodGroupError condition reason.
+	WaitForGroupsError *Groups
 	// VerifyAssignments is use to verify that the pods are assigned to the correct nodes.
 	VerifyAssignments *VerifyAssignments
 	// VerifyAssignedInOneDomain is use to verify that the pods are assigned to nodes in the same domain.
@@ -236,7 +236,7 @@ func podGroupHasScheduledCondition(cs kubernetes.Interface, ns, name string, sta
 		}
 		for _, c := range pg.Status.Conditions {
 			if c.Type == schedulingapi.PodGroupInitiallyScheduled &&
-				c.Status == status && (reason == "" || c.Reason == reason) {
+				c.Status == status && c.Reason == reason {
 				return true, nil
 			}
 		}
@@ -255,7 +255,7 @@ func compositePodGroupHasScheduledCondition(cs kubernetes.Interface, ns, name st
 		}
 		for _, c := range cpg.Status.Conditions {
 			if c.Type == schedulingv1alpha3.CompositePodGroupInitiallyScheduled &&
-				c.Status == status && (reason == "" || c.Reason == reason) {
+				c.Status == status && c.Reason == reason {
 				return true, nil
 			}
 		}
@@ -678,7 +678,7 @@ func waitForPodGroupsUnschedulable(testCtx *testutils.TestContext, ns string, pg
 	return nil
 }
 
-func waitForPodGroupsInvalid(testCtx *testutils.TestContext, ns string, pgNames []string) error {
+func waitForPodGroupsError(testCtx *testutils.TestContext, ns string, pgNames []string) error {
 	cs := testCtx.ClientSet
 	for _, pgName := range pgNames {
 		err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, wait.ForeverTestTimeout, false,
@@ -717,7 +717,7 @@ func waitForCompositePodGroupsUnschedulable(testCtx *testutils.TestContext, ns s
 	return nil
 }
 
-func waitForCompositePodGroupsInvalid(testCtx *testutils.TestContext, ns string, cpgNames []string) error {
+func waitForCompositePodGroupsError(testCtx *testutils.TestContext, ns string, cpgNames []string) error {
 	cs := testCtx.ClientSet
 	for _, cpgName := range cpgNames {
 		err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, wait.ForeverTestTimeout, false,
@@ -744,11 +744,11 @@ func waitForGroupsUnschedulable(testCtx *testutils.TestContext, ns string, group
 	return waitForPodGroupsUnschedulable(testCtx, ns, groups.PodGroups)
 }
 
-func waitForGroupsInvalid(testCtx *testutils.TestContext, ns string, groups *Groups) error {
-	if err := waitForCompositePodGroupsInvalid(testCtx, ns, groups.CompositePodGroups); err != nil {
+func waitForGroupsError(testCtx *testutils.TestContext, ns string, groups *Groups) error {
+	if err := waitForCompositePodGroupsError(testCtx, ns, groups.CompositePodGroups); err != nil {
 		return err
 	}
-	return waitForPodGroupsInvalid(testCtx, ns, groups.PodGroups)
+	return waitForPodGroupsError(testCtx, ns, groups.PodGroups)
 }
 
 func verifyAssignments(testCtx *testutils.TestContext, ns string, verify *VerifyAssignments) error {
@@ -875,8 +875,8 @@ func RunSteps(testCtx *testutils.TestContext, t *testing.T, ns string, steps []S
 			err = waitForGroupsScheduled(testCtx, ns, step.WaitForGroupsScheduled)
 		case step.WaitForGroupsUnschedulable != nil:
 			err = waitForGroupsUnschedulable(testCtx, ns, step.WaitForGroupsUnschedulable)
-		case step.WaitForGroupsInvalid != nil:
-			err = waitForGroupsInvalid(testCtx, ns, step.WaitForGroupsInvalid)
+		case step.WaitForGroupsError != nil:
+			err = waitForGroupsError(testCtx, ns, step.WaitForGroupsError)
 		case step.VerifyAssignments != nil:
 			err = verifyAssignments(testCtx, ns, step.VerifyAssignments)
 		case step.VerifyAssignedInOneDomain != nil:

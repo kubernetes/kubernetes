@@ -891,13 +891,13 @@ func TestValidatePodGroup(t *testing.T) {
 				genericWorkloadEnabled:          true,
 				podGroupPreemptionPolicyEnabled: tt.enablePodGroupPreemptionPolicy,
 			}
-			err := sched.validatePodGroup(podGroupInfo)
+			err := sched.validatePodGroupHierarchy(podGroupInfo)
 			gotErr := ""
 			if err != nil {
 				gotErr = err.Error()
 			}
 			if gotErr != tt.wantErr {
-				t.Errorf("Unexpected error from validatePodGroup, want: %q, got: %q", tt.wantErr, gotErr)
+				t.Errorf("Unexpected error from validatePodGroupHierarchy, want: %q, got: %q", tt.wantErr, gotErr)
 			}
 		})
 	}
@@ -6738,6 +6738,9 @@ func buildHierarchicalQueuedPodGroupInfo(
 
 	var buildTree func(cpg *schedulingv1alpha3.CompositePodGroup) *framework.PodGroupInfo
 	buildTree = func(cpg *schedulingv1alpha3.CompositePodGroup) *framework.PodGroupInfo {
+		if cpg.Spec.WorkloadRef == nil {
+			cpg.Spec.WorkloadRef = &schedulingv1alpha3.WorkloadReference{}
+		}
 		info := &framework.PodGroupInfo{GenericPodGroup: fwk.NewGenericCompositePodGroup(cpg)}
 		for _, childCPG := range cpgChildren[cpg.Name] {
 			info.Children = append(info.Children, buildTree(childCPG))

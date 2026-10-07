@@ -197,7 +197,7 @@ func (fe *podGroupFitError) Error() string {
 }
 
 // validationError wraps a runtime pod group validation failure so that
-// status updates can report the Invalid condition reason.
+// status updates can report the PodGroupError or CompositePodGroupError condition reason.
 type validationError struct {
 	err error
 }

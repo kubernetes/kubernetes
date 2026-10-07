@@ -906,13 +906,13 @@ func (gpg *GenericPodGroup) GetParentKey() (EntityKey, bool) {
 
 // GetWorkloadName returns the workload name referenced by the wrapped object.
 func (gpg *GenericPodGroup) GetWorkloadName() string {
-	if gpg.PodGroup != nil && gpg.PodGroup.Spec.WorkloadRef != nil {
-		return gpg.PodGroup.Spec.WorkloadRef.WorkloadName
+	if gpg.PodGroup != nil {
+		if ref := gpg.PodGroup.Spec.WorkloadRef; ref != nil {
+			return ref.WorkloadName
+		}
+		return ""
 	}
-	if gpg.CompositePodGroup != nil && gpg.CompositePodGroup.Spec.WorkloadRef != nil {
-		return gpg.CompositePodGroup.Spec.WorkloadRef.WorkloadName
-	}
-	return ""
+	return gpg.CompositePodGroup.Spec.WorkloadRef.WorkloadName
 }
 
 // IsGang returns true if the wrapped object has a Gang scheduling policy.

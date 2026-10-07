@@ -354,3 +354,240 @@ func TestGenericPodGroup_HasDisruptionModeAll(t *testing.T) {
 		})
 	}
 }
+
+func TestGenericPodGroup_HasDisruptionModeSingle(t *testing.T) {
+	tests := []struct {
+		name string
+		gpg  *GenericPodGroup
+		want bool
+	}{
+		{
+			name: "PodGroup with nil DisruptionMode",
+			gpg:  NewGenericPodGroup(&schedulingv1beta1.PodGroup{}),
+			want: false,
+		},
+		{
+			name: "PodGroup with Single DisruptionMode",
+			gpg: NewGenericPodGroup(&schedulingv1beta1.PodGroup{
+				Spec: schedulingv1beta1.PodGroupSpec{
+					DisruptionMode: &schedulingv1beta1.DisruptionMode{
+						Single: &schedulingv1beta1.SingleDisruptionMode{},
+					},
+				},
+			}),
+			want: true,
+		},
+		{
+			name: "PodGroup with All DisruptionMode",
+			gpg: NewGenericPodGroup(&schedulingv1beta1.PodGroup{
+				Spec: schedulingv1beta1.PodGroupSpec{
+					DisruptionMode: &schedulingv1beta1.DisruptionMode{
+						All: &schedulingv1beta1.AllDisruptionMode{},
+					},
+				},
+			}),
+			want: false,
+		},
+		{
+			name: "CompositePodGroup with nil DisruptionMode",
+			gpg:  NewGenericCompositePodGroup(&schedulingv1alpha3.CompositePodGroup{}),
+			want: false,
+		},
+		{
+			name: "CompositePodGroup with Single DisruptionMode",
+			gpg: NewGenericCompositePodGroup(&schedulingv1alpha3.CompositePodGroup{
+				Spec: schedulingv1alpha3.CompositePodGroupSpec{
+					DisruptionMode: &schedulingv1alpha3.CompositeDisruptionMode{
+						Single: &schedulingv1alpha3.SingleCompositeDisruptionMode{},
+					},
+				},
+			}),
+			want: true,
+		},
+		{
+			name: "CompositePodGroup with All DisruptionMode",
+			gpg: NewGenericCompositePodGroup(&schedulingv1alpha3.CompositePodGroup{
+				Spec: schedulingv1alpha3.CompositePodGroupSpec{
+					DisruptionMode: &schedulingv1alpha3.CompositeDisruptionMode{
+						All: &schedulingv1alpha3.AllCompositeDisruptionMode{},
+					},
+				},
+			}),
+			want: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.gpg.HasDisruptionModeSingle(); got != tt.want {
+				t.Errorf("HasDisruptionModeSingle() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestGenericPodGroup_GetWorkloadName(t *testing.T) {
+	tests := []struct {
+		name string
+		gpg  *GenericPodGroup
+		want string
+	}{
+		{
+			name: "PodGroup with nil WorkloadRef",
+			gpg:  NewGenericPodGroup(&schedulingv1beta1.PodGroup{}),
+			want: "",
+		},
+		{
+			name: "PodGroup with WorkloadRef",
+			gpg: NewGenericPodGroup(&schedulingv1beta1.PodGroup{
+				Spec: schedulingv1beta1.PodGroupSpec{
+					WorkloadRef: &schedulingv1beta1.WorkloadReference{
+						WorkloadName: "wl-pg",
+					},
+				},
+			}),
+			want: "wl-pg",
+		},
+		{
+			name: "CompositePodGroup with WorkloadRef",
+			gpg: NewGenericCompositePodGroup(&schedulingv1alpha3.CompositePodGroup{
+				Spec: schedulingv1alpha3.CompositePodGroupSpec{
+					WorkloadRef: &schedulingv1alpha3.WorkloadReference{
+						WorkloadName: "wl-cpg",
+					},
+				},
+			}),
+			want: "wl-cpg",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.gpg.GetWorkloadName(); got != tt.want {
+				t.Errorf("GetWorkloadName() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestGenericPodGroup_IsGang(t *testing.T) {
+	tests := []struct {
+		name string
+		gpg  *GenericPodGroup
+		want bool
+	}{
+		{
+			name: "PodGroup with Basic SchedulingPolicy",
+			gpg: NewGenericPodGroup(&schedulingv1beta1.PodGroup{
+				Spec: schedulingv1beta1.PodGroupSpec{
+					SchedulingPolicy: schedulingv1beta1.PodGroupSchedulingPolicy{
+						Basic: &schedulingv1beta1.BasicSchedulingPolicy{},
+					},
+				},
+			}),
+			want: false,
+		},
+		{
+			name: "PodGroup with Gang SchedulingPolicy",
+			gpg: NewGenericPodGroup(&schedulingv1beta1.PodGroup{
+				Spec: schedulingv1beta1.PodGroupSpec{
+					SchedulingPolicy: schedulingv1beta1.PodGroupSchedulingPolicy{
+						Gang: &schedulingv1beta1.GangSchedulingPolicy{MinCount: 2},
+					},
+				},
+			}),
+			want: true,
+		},
+		{
+			name: "CompositePodGroup with Basic SchedulingPolicy",
+			gpg: NewGenericCompositePodGroup(&schedulingv1alpha3.CompositePodGroup{
+				Spec: schedulingv1alpha3.CompositePodGroupSpec{
+					SchedulingPolicy: schedulingv1alpha3.CompositePodGroupSchedulingPolicy{
+						Basic: &schedulingv1alpha3.CompositeBasicSchedulingPolicy{},
+					},
+				},
+			}),
+			want: false,
+		},
+		{
+			name: "CompositePodGroup with Gang SchedulingPolicy",
+			gpg: NewGenericCompositePodGroup(&schedulingv1alpha3.CompositePodGroup{
+				Spec: schedulingv1alpha3.CompositePodGroupSpec{
+					SchedulingPolicy: schedulingv1alpha3.CompositePodGroupSchedulingPolicy{
+						Gang: &schedulingv1alpha3.CompositeGangSchedulingPolicy{MinGroupCount: 2},
+					},
+				},
+			}),
+			want: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.gpg.IsGang(); got != tt.want {
+				t.Errorf("IsGang() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestGenericPodGroup_IsBasic(t *testing.T) {
+	tests := []struct {
+		name string
+		gpg  *GenericPodGroup
+		want bool
+	}{
+		{
+			name: "PodGroup with Basic SchedulingPolicy",
+			gpg: NewGenericPodGroup(&schedulingv1beta1.PodGroup{
+				Spec: schedulingv1beta1.PodGroupSpec{
+					SchedulingPolicy: schedulingv1beta1.PodGroupSchedulingPolicy{
+						Basic: &schedulingv1beta1.BasicSchedulingPolicy{},
+					},
+				},
+			}),
+			want: true,
+		},
+		{
+			name: "PodGroup with Gang SchedulingPolicy",
+			gpg: NewGenericPodGroup(&schedulingv1beta1.PodGroup{
+				Spec: schedulingv1beta1.PodGroupSpec{
+					SchedulingPolicy: schedulingv1beta1.PodGroupSchedulingPolicy{
+						Gang: &schedulingv1beta1.GangSchedulingPolicy{MinCount: 2},
+					},
+				},
+			}),
+			want: false,
+		},
+		{
+			name: "CompositePodGroup with Basic SchedulingPolicy",
+			gpg: NewGenericCompositePodGroup(&schedulingv1alpha3.CompositePodGroup{
+				Spec: schedulingv1alpha3.CompositePodGroupSpec{
+					SchedulingPolicy: schedulingv1alpha3.CompositePodGroupSchedulingPolicy{
+						Basic: &schedulingv1alpha3.CompositeBasicSchedulingPolicy{},
+					},
+				},
+			}),
+			want: true,
+		},
+		{
+			name: "CompositePodGroup with Gang SchedulingPolicy",
+			gpg: NewGenericCompositePodGroup(&schedulingv1alpha3.CompositePodGroup{
+				Spec: schedulingv1alpha3.CompositePodGroupSpec{
+					SchedulingPolicy: schedulingv1alpha3.CompositePodGroupSchedulingPolicy{
+						Gang: &schedulingv1alpha3.CompositeGangSchedulingPolicy{MinGroupCount: 2},
+					},
+				},
+			}),
+			want: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.gpg.IsBasic(); got != tt.want {
+				t.Errorf("IsBasic() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
