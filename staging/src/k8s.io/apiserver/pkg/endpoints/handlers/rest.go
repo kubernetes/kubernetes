@@ -17,6 +17,7 @@ limitations under the License.
 package handlers
 
 import (
+	"bytes"
 	"context"
 	"encoding/hex"
 	"fmt"
@@ -24,6 +25,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
 	"time"
 
 	grpccodes "google.golang.org/grpc/codes"
@@ -369,23 +371,43 @@ func summarizeData(data []byte, maxLength int) string {
 	}
 }
 
+const maxReadBufCap = 64 * 1024
+
+var readBufPool = sync.Pool{
+	New: func() any {
+		return bytes.NewBuffer(make([]byte, 0, 4096))
+	},
+}
+
 func limitedReadBody(req *http.Request, limit int64) ([]byte, error) {
 	defer req.Body.Close()
+
+	b := readBufPool.Get().(*bytes.Buffer)
+	b.Reset()
+	defer func() {
+		if b.Cap() <= maxReadBufCap {
+			b.Reset()
+			readBufPool.Put(b)
+		}
+	}()
+
 	if limit <= 0 {
-		return io.ReadAll(req.Body)
+		if _, err := b.ReadFrom(req.Body); err != nil {
+			return nil, err
+		}
+		return bytes.Clone(b.Bytes()), nil
 	}
 	lr := &io.LimitedReader{
 		R: req.Body,
 		N: limit + 1,
 	}
-	data, err := io.ReadAll(lr)
-	if err != nil {
+	if _, err := b.ReadFrom(lr); err != nil {
 		return nil, err
 	}
 	if lr.N <= 0 {
 		return nil, errors.NewRequestEntityTooLargeError(fmt.Sprintf("limit is %d", limit))
 	}
-	return data, nil
+	return bytes.Clone(b.Bytes()), nil
 }
 
 func limitedReadBodyWithRecordMetric(ctx context.Context, req *http.Request, limit int64, groupResource schema.GroupResource, verb requestmetrics.RequestBodyVerb) ([]byte, error) {
