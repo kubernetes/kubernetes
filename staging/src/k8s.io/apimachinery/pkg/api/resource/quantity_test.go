@@ -44,12 +44,12 @@ var (
 
 func dec(i int64, exponent int) infDecAmount {
 	// See the below test-- scale is the negative of an exponent.
-	return infDecAmount{inf.NewDec(i, inf.Scale(-exponent))}
+	return infDecAmount{Dec: inf.NewDec(i, inf.Scale(-exponent))}
 }
 
 func bigDec(i *big.Int, exponent int) infDecAmount {
 	// See the below test-- scale is the negative of an exponent.
-	return infDecAmount{inf.NewDecBig(i, inf.Scale(-exponent))}
+	return infDecAmount{Dec: inf.NewDecBig(i, inf.Scale(-exponent))}
 }
 
 func decQuantity(i int64, exponent int, format Format) Quantity {
@@ -232,8 +232,8 @@ func TestQuantityCmp(t *testing.T) {
 		{dec(-10, 0).Dec, nil, -1},
 	}
 	for _, testCase := range table2 {
-		q1 := Quantity{d: infDecAmount{testCase.x}, Format: DecimalSI}
-		q2 := Quantity{d: infDecAmount{testCase.y}, Format: DecimalSI}
+		q1 := Quantity{d: infDecAmount{Dec: testCase.x}, Format: DecimalSI}
+		q2 := Quantity{d: infDecAmount{Dec: testCase.y}, Format: DecimalSI}
 		if result := q1.Cmp(q2); result != testCase.expect {
 			t.Errorf("X: %v, Y: %v, Expected: %v, Actual: %v", testCase.x, testCase.y, testCase.expect, result)
 		}
@@ -469,8 +469,7 @@ func TestQuantityParse(t *testing.T) {
 				t.Errorf("%v: unexpected error: %v", item.input, err)
 				continue
 			}
-			// TODO(#141166): uncomment with the inf.Dec parity check below.
-			// wantValue, wantOK := got.AsInt64()
+			wantValue, wantOK := got.AsInt64()
 			if asDec {
 				got.ToDec()
 			}
@@ -483,12 +482,8 @@ func TestQuantityParse(t *testing.T) {
 			}
 
 			if asDec {
-				// TODO(#141166): AsInt64 on the inf.Dec form should match the int64 form.
-				// if i, ok := got.AsInt64(); i != wantValue || ok != wantOK {
-				// 	t.Errorf("%v: AsInt64() on the inf.Dec form = (%d, %t), want (%d, %t)", item.input, i, ok, wantValue, wantOK)
-				// }
-				if i, ok := got.AsInt64(); i != 0 || ok {
-					t.Errorf("%v: expected inf.Dec to return false for AsInt64: %d", item.input, i)
+				if i, ok := got.AsInt64(); i != wantValue || ok != wantOK {
+					t.Errorf("%v: AsInt64() on the inf.Dec form = (%d, %t), want (%d, %t)", item.input, i, ok, wantValue, wantOK)
 				}
 				continue
 			}
@@ -1871,7 +1866,7 @@ func TestQuantityString(t *testing.T) {
 			continue
 		}
 		q := item.in
-		q.d = infDecAmount{desired.Neg(q.AsDec())}
+		q.d = infDecAmount{Dec: desired.Neg(q.AsDec())}
 		if e, a := "-"+item.expect, q.String(); e != a {
 			t.Errorf("%#v: expected %v, got %v", item.in, e, a)
 		}
@@ -2101,12 +2096,12 @@ func TestQuantityDeepCopy(t *testing.T) {
 	}
 	// Test when i is {0,0}
 	for _, testCase := range table {
-		q := Quantity{d: infDecAmount{testCase}, Format: DecimalSI}
+		q := Quantity{d: infDecAmount{Dec: testCase}, Format: DecimalSI}
 		result := q.DeepCopy()
 		if q.d.Cmp(result.AsDec()) != 0 {
 			t.Errorf("Expected: %v, Actual: %v", q.String(), result.String())
 		}
-		result = Quantity{d: infDecAmount{dec(2, 0).Dec}, Format: DecimalSI}
+		result = Quantity{d: infDecAmount{Dec: dec(2, 0).Dec}, Format: DecimalSI}
 		if q.d.Cmp(result.AsDec()) == 0 {
 			t.Errorf("Modifying result has affected q")
 		}
@@ -2914,10 +2909,6 @@ func TestQuantityAsInt64(t *testing.T) {
 		t.Run(item.name, func(t *testing.T) {
 			in := item.in.DeepCopy()
 			want, wantOK := item.value, item.ok
-			if in.d.Dec != nil {
-				// TODO(#141166): drop once AsInt64 on inf.Dec matches the int64 form.
-				want, wantOK = 0, false
-			}
 			if value, ok := in.AsInt64(); value != want || ok != wantOK {
 				t.Errorf("AsInt64() = (%d, %t), want (%d, %t)", value, ok, want, wantOK)
 			}
@@ -2936,10 +2927,8 @@ func TestQuantityAsInt64(t *testing.T) {
 			} {
 				promoted := item.in.DeepCopy()
 				promote.fn(&promoted)
-				// TODO(#141166): want (item.decValue, item.decOK) once AsInt64 on
-				// inf.Dec matches the int64 form.
-				if value, ok := promoted.AsInt64(); value != 0 || ok {
-					t.Errorf("after %s(): AsInt64() = (%d, %t), want (0, false)", promote.name, value, ok)
+				if value, ok := promoted.AsInt64(); value != item.decValue || ok != item.decOK {
+					t.Errorf("after %s(): AsInt64() = (%d, %t), want (%d, %t)", promote.name, value, ok, item.decValue, item.decOK)
 				}
 			}
 
@@ -3077,9 +3066,7 @@ func TestQuantityAsInt64Stability(t *testing.T) {
 				op.fn(&q)
 				want, wantOK := item.value, item.ok
 				if q.d.Dec != nil {
-					// TODO(#141166): want (item.decValue, item.decOK) once AsInt64 on
-					// inf.Dec matches the int64 form.
-					want, wantOK = 0, false
+					want, wantOK = item.decValue, item.decOK
 				}
 				if value, ok := q.AsInt64(); value != want || ok != wantOK {
 					t.Errorf("after %s: AsInt64() = (%d, %t), want (%d, %t)", op.name, value, ok, want, wantOK)
@@ -3144,11 +3131,11 @@ func TestQuantityRoundUpAsInt64(t *testing.T) {
 		{"0.99999999999999999Ki", 0, 0, false, 0, false},
 		{"1.0000000001", 0, 0, false, 0, false},
 		{"-1.0000000001", 0, 0, false, 0, false},
-		// TODO(#141166): (math.MaxInt64, false) once the binarySI parse cap is removed.
+		// TODO(#141166): (math.MaxInt64, false) for 8Ei and (math.MinInt64, true) for -8Ei once the binarySI parse cap is removed.
 		{"8Ei", -3, 0, false, 0, false},
 		{"8Ei", 0, 0, false, 0, false},
 		{"8Ei", 3, 0, false, 0, false},
-		{"-8Ei", 0, 0, false, 0, false}, // TODO: Should be (math.MinInt64, true) once the binarySI parse cap is removed
+		{"-8Ei", 0, 0, false, 0, false},
 	}
 
 	for _, item := range table {
@@ -3160,10 +3147,6 @@ func TestQuantityRoundUpAsInt64(t *testing.T) {
 				want, wantOK = item.decValue, item.decOK
 			}
 			got.RoundUp(item.scale)
-			if got.d.Dec != nil {
-				// TODO(#141166): drop once AsInt64 on inf.Dec matches the int64 form.
-				want, wantOK = 0, false
-			}
 			if value, ok := got.AsInt64(); value != want || ok != wantOK {
 				t.Errorf("%s RoundUp(%d) asDec=%t: AsInt64() = (%d, %t), want (%d, %t)", item.in, item.scale, asDec, value, ok, want, wantOK)
 			}
@@ -3196,11 +3179,44 @@ func TestQuantityAsInt64ToDecParity(t *testing.T) {
 		// inf.Dec form before the operation.
 		xDec, yDec bool
 	}
+	// droppedZero reports whether int64 Add or Sub of x and y drops a zero
+	// operand's fractional digits, keeping only the other operand's scale, and
+	// whether that zero was in inf.Dec form.
+	droppedZero := func(r route) (dropped, zeroDec bool) {
+		switch {
+		case r.y.value == 0:
+			return r.y.scale < 0 && r.x.scale >= 0, r.yDec
+		case r.x.value == 0:
+			return r.x.scale < 0 && r.y.scale >= 0, r.xDec
+		}
+		return false, false
+	}
 	// knownGap returns the result AsInt64 gives today at the end of r when it
 	// differs from want, the result for the int64 form.
 	knownGap := func(r route, got *Quantity, want result) (result, bool) {
-		// TODO: Should be the int64 form's result
-		if got.d.Dec != nil && want != (result{}) {
+		switch {
+		case r.op == "" && r.x.scale == math.MinInt32:
+			// TODO: Should be the int64 form's result
+			switch {
+			case r.x.value == 0:
+				return result{0, true}, true
+			case r.x.value > 0:
+				return result{math.MaxInt64, false}, true
+			default:
+				return result{math.MinInt64, false}, true
+			}
+		case r.op == "Add" || r.op == "Sub":
+			dropped, zeroDec := droppedZero(r)
+			switch {
+			case dropped && zeroDec:
+				// TODO: Should be the int64 form's result but changing is API breaking
+				return result{}, true
+			case dropped && (r.xDec || r.yDec):
+				// TODO: Should be the int64 form's result
+				return result{}, true
+			}
+		case r.op == "Mul" && r.xDec && r.mul == 0 && r.x.value != 0 && r.x.scale < 0:
+			// TODO: Should be the int64 form's result
 			return result{}, true
 		}
 		return result{}, false
@@ -3428,13 +3444,40 @@ func TestQuantityAsInt64KnownGaps(t *testing.T) {
 			int64Got: outcome{value: 1, ok: true},
 			decGot:   outcome{},
 		},
-		// TODO: Should be (5, true) on the inf.Dec route
+		// TODO: Should be (0, false) on the inf.Dec route
 		{
-			name:       "parsed 0.0 + 5 and 0.0Ki + 5",
-			int64Route: func() Quantity { q := MustParse("0.0"); q.Add(MustParse("5")); return q },
-			decRoute:   func() Quantity { q := MustParse("0.0Ki"); q.Add(MustParse("5")); return q },
-			int64Got:   outcome{value: 5, ok: true},
-			decGot:     outcome{},
+			name: "1*10^MinInt32 in inf.Dec form + 1*10^MinInt32",
+			int64Route: func() Quantity {
+				q := *NewScaledQuantity(1, math.MinInt32)
+				q.Add(*NewScaledQuantity(1, math.MinInt32))
+				return q
+			},
+			decRoute: func() Quantity {
+				q := *NewScaledQuantity(1, math.MinInt32)
+				q.ToDec()
+				q.Add(*NewScaledQuantity(1, math.MinInt32))
+				return q
+			},
+			int64Got: outcome{value: 0, ok: false},
+			decGot:   outcome{value: math.MaxInt64, ok: false},
+		},
+		// TODO: Should be (0, false)
+		{
+			name:     "MaxInt64*10^MinInt32 Mul(2) promotes on overflow",
+			decRoute: func() Quantity { q := *NewScaledQuantity(math.MaxInt64, math.MinInt32); q.Mul(2); return q },
+			decGot:   outcome{value: math.MaxInt64, ok: false},
+			want:     &outcome{value: 0, ok: false},
+		},
+		// TODO: Should be (0, false)
+		{
+			name: "MaxInt64*10^MinInt32 + itself promotes on overflow",
+			decRoute: func() Quantity {
+				q := *NewScaledQuantity(math.MaxInt64, math.MinInt32)
+				q.Add(*NewScaledQuantity(math.MaxInt64, math.MinInt32))
+				return q
+			},
+			decGot: outcome{value: math.MaxInt64, ok: false},
+			want:   &outcome{value: 0, ok: false},
 		},
 		// TODO: Should be (1, true) on the inf.Dec route
 		{
@@ -3476,7 +3519,7 @@ func TestQuantityAsInt64KnownGaps(t *testing.T) {
 			int64Route: func() Quantity { q := *NewScaledQuantity(5, math.MinInt32); q.RoundUp(0); return q },
 			decRoute:   func() Quantity { q := *NewScaledQuantity(5, math.MinInt32); q.ToDec(); q.RoundUp(0); return q },
 			int64Got:   outcome{value: 5, ok: true},
-			decGot:     outcome{value: 0, ok: false},
+			decGot:     outcome{value: math.MaxInt64, ok: false},
 			want:       &outcome{value: 1, ok: true},
 		},
 		// TODO: Should be (100, true)
@@ -3564,9 +3607,6 @@ func TestQuantityAsInt64AfterRoundTrip(t *testing.T) {
 	seeds := []struct {
 		name string
 		in   Quantity
-		// binarySpellingIsInfDec is true when ParseQuantity reads the BinarySI
-		// spelling of the value into inf.Dec form.
-		binarySpellingIsInfDec bool
 	}{
 		{name: "zero", in: *NewQuantity(0, DecimalSI)},
 		{name: "zero at milli scale", in: *NewMilliQuantity(0, DecimalSI)},
@@ -3579,13 +3619,13 @@ func TestQuantityAsInt64AfterRoundTrip(t *testing.T) {
 		{name: "1536Mi", in: *NewQuantity(1536<<20, DecimalSI)},
 		{name: "5Gi", in: *NewQuantity(5<<30, DecimalSI)},
 		{name: "99999Gi", in: *NewQuantity(99999<<30, DecimalSI)},
-		{name: "100000Gi", in: *NewQuantity(100000<<30, DecimalSI), binarySpellingIsInfDec: true},
+		{name: "100000Gi", in: *NewQuantity(100000<<30, DecimalSI)},
 		{name: "99Ti", in: *NewQuantity(99<<40, DecimalSI)},
-		{name: "100Ti", in: *NewQuantity(100<<40, DecimalSI), binarySpellingIsInfDec: true},
-		{name: "1Pi", in: *NewQuantity(1<<50, DecimalSI), binarySpellingIsInfDec: true},
-		{name: "-1Pi", in: *NewQuantity(-(1 << 50), DecimalSI), binarySpellingIsInfDec: true},
-		{name: "4Ei", in: *NewQuantity(1<<62, DecimalSI), binarySpellingIsInfDec: true},
-		{name: "1E", in: *NewScaledQuantity(1, 18), binarySpellingIsInfDec: true},
+		{name: "100Ti", in: *NewQuantity(100<<40, DecimalSI)},
+		{name: "1Pi", in: *NewQuantity(1<<50, DecimalSI)},
+		{name: "-1Pi", in: *NewQuantity(-(1 << 50), DecimalSI)},
+		{name: "4Ei", in: *NewQuantity(1<<62, DecimalSI)},
+		{name: "1E", in: *NewScaledQuantity(1, 18)},
 		{name: "max int64", in: *NewQuantity(math.MaxInt64, DecimalSI)},
 		{name: "min int64", in: *NewQuantity(math.MinInt64, DecimalSI)},
 		{name: "min int64 + 1", in: *NewQuantity(math.MinInt64+1, DecimalSI)},
@@ -3642,10 +3682,8 @@ func TestQuantityAsInt64AfterRoundTrip(t *testing.T) {
 									t.Errorf("%s: %v", desc, err)
 									continue
 								}
-								// TODO: Should be (wantValue, wantOK)
-								gap := format == BinarySI && seed.binarySpellingIsInfDec
 								// TODO: Should be (wantValue, wantOK) but changing is API breaking
-								gap = gap || (format == BinarySI && spelledFromDec && seed.in.CmpInt64(math.MinInt64) == 0)
+								gap := format == BinarySI && spelledFromDec && seed.in.CmpInt64(math.MinInt64) == 0
 								value, ok := decoded.AsInt64()
 								switch {
 								case gap && value == wantValue && ok == wantOK:
@@ -4231,7 +4269,7 @@ func TestParseQuantity(t *testing.T) {
 		if !ok {
 			t.Fatalf("invalid dec: %s", s)
 		}
-		return &infDecAmount{d}
+		return &infDecAmount{Dec: d}
 	}
 
 	tests := []struct {
