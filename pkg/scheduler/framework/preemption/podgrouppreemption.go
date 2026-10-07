@@ -277,11 +277,26 @@ func (ev *PodGroupEvaluator) selectVictimsOnDomain(
 	//       same NodeInfo(N) and node-local CycleState that already passed all node-local Filter
 	//       plugins when podGroupSchedulingFunc produced validAssignment (plus any previously
 	//       reprieved victims on N, which were already validated when those victims were reprieved).
-	//  4. Cross-node sequential invariants in Phase 2:
-	//     Phase 2 still iterates over all preemptorAssignments in the exact 0 .. P-1 order,
-	//     adding each pod to mutableLister and running ReservePluginsReserve before evaluating
-	//     subsequent pods, so all cross-node Filter plugins observe the exact sequential
-	//     cluster-wide state transitions.
+	//  4. Cross-node sequential invariants in Phase 2 with minimal snapshot mutations:
+	//     Phase 2 iterates over all preemptorAssignments in the exact 0 .. P-1 order,
+	//     evaluating non-node-local Filter plugins against each assignment's saved CycleState.
+	//     In both Phase 1 and Phase 2, mutableLister.AddPod (and its RemovePod cleanup) is
+	//     skipped whenever an assignment is the last (or only) preemptor pod on its node:
+	//     - Last pod on a node never needs AddPod:
+	//       Filter plugins only inspect (cs, pod, nodeInfo(N)); snapshot-wide indexes on
+	//       mutableLister are only read during PreFilter, never during Filter(). Once the last
+	//       preemptor assignment on node N has been evaluated by Filter(), no subsequent Filter()
+	//       call in the pass inspects nodeInfo(N).
+	//     - Earlier pods on a multi-preemptor node are added to nodeInfo(N):
+	//       Whenever multiple preemptor pods are assigned to the same node N, adding earlier
+	//       preemptor pods on N ensures any subsequent preemptor pod on N observes all earlier
+	//       co-located preemptors in nodeInfo(N) in both Phase 1 and Phase 2.
+	//     - Reserve plugins in Phase 1 and Phase 2 are filtered by FilterPluginExecutionMode and SkipFilterPlugins:
+	//       RunReservePluginsReserve and RunReservePluginsUnreserve skip plugins that do not implement
+	//       FilterPlugin, that returned Skip in PreFilter, or that do not match the active
+	//       FilterPluginExecutionMode. Thus, node-local Reserve+Filter plugins only run in Phase 1
+	//       when active for the pod, and non-node-local Reserve+Filter plugins (such as VolumeBinding,
+	//       DynamicResources, or custom Reserve+Filter plugins) only run in Phase 2 when active for the pod.
 	//
 	// Why deferring PreFilterExtensions to Phase 2 and restricting them to preFilterAssignments is safe:
 	//  1. Node-local Filter plugins do not use PreFilterExtensions:
@@ -347,12 +362,25 @@ func (ev *PodGroupEvaluator) selectVictimsOnDomain(
 			}
 		}()
 
+		shouldAddPodToNodeInfo := func(assignment fwk.ProposedAssignment, nodeName string) bool {
+			nodeAssignments := assignmentsByNode[nodeName]
+			return nodeAssignments[len(nodeAssignments)-1] != assignment
+		}
+
 		evaluateAssignments := func(assignments []fwk.ProposedAssignment, mode fwk.FilterPluginExecutionMode) (ok bool, evalErr error) {
-			cleanupFns := []func() error{}
+			reservedCount := 0
 			defer func() {
-				for i := len(cleanupFns) - 1; i >= 0; i-- {
-					if cleanupErr := cleanupFns[i](); cleanupErr != nil {
-						evalErr = errors.Join(evalErr, cleanupErr)
+				for i := reservedCount - 1; i >= 0; i-- {
+					assignment := assignments[i]
+					nodeName := assignment.GetNodeName()
+					cs := assignment.GetCycleState()
+					cs.SetFilterPluginExecutionMode(mode)
+					ev.Handle.RunReservePluginsUnreserve(ctx, cs, assignment.GetPod(), nodeName)
+					cs.SetFilterPluginExecutionMode(fwk.FilterPluginModeAll)
+					if shouldAddPodToNodeInfo(assignment, nodeName) {
+						if cleanupErr := mutableLister.RemovePod(logger, assignment.GetPod(), nodeName); cleanupErr != nil {
+							evalErr = errors.Join(evalErr, cleanupErr)
+						}
 					}
 				}
 			}()
@@ -373,14 +401,15 @@ func (ev *PodGroupEvaluator) selectVictimsOnDomain(
 				// Simulate assuming a preemptor pod and reserving stateful plugins resources.
 				// We do not need to add the preemptor pod to the cycle state of upcoming preemptor pods.
 				// This is because the cycle state was created with them already assumed.
-				if err = mutableLister.AddPod(assignment.GetPodInfo(), nodeName); err != nil {
-					return false, err
+				if shouldAddPodToNodeInfo(assignment, nodeName) {
+					if err = mutableLister.AddPod(assignment.GetPodInfo(), nodeName); err != nil {
+						return false, err
+					}
 				}
+				cs.SetFilterPluginExecutionMode(mode)
 				ev.Handle.RunReservePluginsReserve(ctx, cs, assignment.GetPod(), nodeName)
-				cleanupFns = append(cleanupFns, func() error {
-					ev.Handle.RunReservePluginsUnreserve(ctx, cs, assignment.GetPod(), nodeName)
-					return mutableLister.RemovePod(logger, assignment.GetPod(), nodeName)
-				})
+				cs.SetFilterPluginExecutionMode(fwk.FilterPluginModeAll)
+				reservedCount++
 			}
 			return true, nil
 		}

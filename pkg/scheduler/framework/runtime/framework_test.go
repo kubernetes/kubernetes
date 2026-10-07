@@ -6412,3 +6412,144 @@ func TestSkipAllPreFilterExtensions(t *testing.T) {
 		t.Errorf("expected AddPod/RemovePod to be skipped in NodeLocalOnly mode, got add=%d rm=%d", extPl.addPodCalls, extPl.rmPodCalls)
 	}
 }
+
+type fakeReservePluginWithMode struct {
+	name         string
+	isFilter     bool
+	isNodeLocal  bool
+	reserveCalls int
+	unresCalls   int
+}
+
+func (p *fakeReservePluginWithMode) Name() string { return p.name }
+func (p *fakeReservePluginWithMode) Reserve(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) *fwk.Status {
+	p.reserveCalls++
+	return nil
+}
+func (p *fakeReservePluginWithMode) Unreserve(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) {
+	p.unresCalls++
+}
+
+type fakeFilterReservePlugin struct {
+	fakeReservePluginWithMode
+}
+
+func (p *fakeFilterReservePlugin) Filter(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) *fwk.Status {
+	return nil
+}
+func (p *fakeFilterReservePlugin) IsNodeLocal() bool { return p.isNodeLocal }
+
+func TestReservePluginsSkipAndExecutionMode(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	nodeLocalPl := &fakeFilterReservePlugin{fakeReservePluginWithMode: fakeReservePluginWithMode{name: "NodeLocalReserve", isFilter: true, isNodeLocal: true}}
+	nonNodeLocalPl := &fakeFilterReservePlugin{fakeReservePluginWithMode: fakeReservePluginWithMode{name: "NonNodeLocalReserve", isFilter: true, isNodeLocal: false}}
+	reserveOnlyPl := &fakeReservePluginWithMode{name: "ReserveOnly", isFilter: false}
+
+	reg := Registry{
+		queueSortPlugin: newQueueSortPlugin,
+		bindPlugin:      newBindPlugin,
+		nodeLocalPl.Name(): func(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
+			return nodeLocalPl, nil
+		},
+		nonNodeLocalPl.Name(): func(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
+			return nonNodeLocalPl, nil
+		},
+		reserveOnlyPl.Name(): func(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
+			return reserveOnlyPl, nil
+		},
+	}
+
+	cfgPls := &config.Plugins{}
+	cfgPls.Reserve.Enabled = append(
+		cfgPls.Reserve.Enabled,
+		config.Plugin{Name: nodeLocalPl.Name()},
+		config.Plugin{Name: nonNodeLocalPl.Name()},
+		config.Plugin{Name: reserveOnlyPl.Name()},
+	)
+	profile := config.KubeSchedulerProfile{
+		SchedulerName: "test-reserve-mode-profile",
+		Plugins:       cfgPls,
+	}
+
+	f, err := newFrameworkWithQueueSortAndBind(ctx, reg, profile, WithSnapshotSharedLister(cache.NewEmptySnapshot()))
+	if err != nil {
+		t.Fatalf("failed to create framework: %v", err)
+	}
+	defer func() { _ = f.Close() }()
+
+	resetCounts := func() {
+		nodeLocalPl.reserveCalls, nodeLocalPl.unresCalls = 0, 0
+		nonNodeLocalPl.reserveCalls, nonNodeLocalPl.unresCalls = 0, 0
+		reserveOnlyPl.reserveCalls, reserveOnlyPl.unresCalls = 0, 0
+	}
+
+	// 1. FilterPluginModeAll runs all Reserve plugins, even if a plugin is in SkipFilterPlugins.
+	resetCounts()
+	cs := framework.NewCycleState()
+	cs.SetSkipFilterPlugins(sets.New(nodeLocalPl.Name()))
+	if status := f.RunReservePluginsReserve(ctx, cs, pod, "node1"); !status.IsSuccess() {
+		t.Fatalf("unexpected Reserve status: %v", status)
+	}
+	f.RunReservePluginsUnreserve(ctx, cs, pod, "node1")
+	if nodeLocalPl.reserveCalls != 1 || nodeLocalPl.unresCalls != 1 {
+		t.Errorf("expected plugin in SkipFilterPlugins to still run Reserve/Unreserve, got reserve=%d unreserve=%d", nodeLocalPl.reserveCalls, nodeLocalPl.unresCalls)
+	}
+	if nonNodeLocalPl.reserveCalls != 1 || nonNodeLocalPl.unresCalls != 1 {
+		t.Errorf("expected non-node-local plugin to have 1 call, got reserve=%d unreserve=%d", nonNodeLocalPl.reserveCalls, nonNodeLocalPl.unresCalls)
+	}
+	if reserveOnlyPl.reserveCalls != 1 || reserveOnlyPl.unresCalls != 1 {
+		t.Errorf("expected reserve-only plugin to have 1 call in FilterPluginModeAll, got reserve=%d unreserve=%d", reserveOnlyPl.reserveCalls, reserveOnlyPl.unresCalls)
+	}
+
+	// 2. FilterPluginModeNodeLocalOnly runs only node-local Filter+Reserve plugins.
+	resetCounts()
+	cs = framework.NewCycleState()
+	cs.SetFilterPluginExecutionMode(fwk.FilterPluginModeNodeLocalOnly)
+	if status := f.RunReservePluginsReserve(ctx, cs, pod, "node1"); !status.IsSuccess() {
+		t.Fatalf("unexpected Reserve status: %v", status)
+	}
+	f.RunReservePluginsUnreserve(ctx, cs, pod, "node1")
+	if nodeLocalPl.reserveCalls != 1 || nodeLocalPl.unresCalls != 1 {
+		t.Errorf("expected node-local plugin to have 1 call in NodeLocalOnly mode, got reserve=%d unreserve=%d", nodeLocalPl.reserveCalls, nodeLocalPl.unresCalls)
+	}
+	if nonNodeLocalPl.reserveCalls != 0 || nonNodeLocalPl.unresCalls != 0 {
+		t.Errorf("expected non-node-local plugin to have 0 calls in NodeLocalOnly mode, got reserve=%d unreserve=%d", nonNodeLocalPl.reserveCalls, nonNodeLocalPl.unresCalls)
+	}
+	if reserveOnlyPl.reserveCalls != 0 || reserveOnlyPl.unresCalls != 0 {
+		t.Errorf("expected reserve-only plugin to have 0 calls in NodeLocalOnly mode, got reserve=%d unreserve=%d", reserveOnlyPl.reserveCalls, reserveOnlyPl.unresCalls)
+	}
+
+	// 3. FilterPluginModeNonNodeLocalOnly runs non-skipped non-node-local Filter+Reserve plugins.
+	resetCounts()
+	cs = framework.NewCycleState()
+	cs.SetFilterPluginExecutionMode(fwk.FilterPluginModeNonNodeLocalOnly)
+	if status := f.RunReservePluginsReserve(ctx, cs, pod, "node1"); !status.IsSuccess() {
+		t.Fatalf("unexpected Reserve status: %v", status)
+	}
+	f.RunReservePluginsUnreserve(ctx, cs, pod, "node1")
+	if nodeLocalPl.reserveCalls != 0 || nodeLocalPl.unresCalls != 0 {
+		t.Errorf("expected node-local plugin to have 0 calls in NonNodeLocalOnly mode, got reserve=%d unreserve=%d", nodeLocalPl.reserveCalls, nodeLocalPl.unresCalls)
+	}
+	if nonNodeLocalPl.reserveCalls != 1 || nonNodeLocalPl.unresCalls != 1 {
+		t.Errorf("expected non-node-local plugin to have 1 call in NonNodeLocalOnly mode, got reserve=%d unreserve=%d", nonNodeLocalPl.reserveCalls, nonNodeLocalPl.unresCalls)
+	}
+	if reserveOnlyPl.reserveCalls != 0 || reserveOnlyPl.unresCalls != 0 {
+		t.Errorf("expected reserve-only plugin to have 0 calls in NonNodeLocalOnly mode, got reserve=%d unreserve=%d", reserveOnlyPl.reserveCalls, reserveOnlyPl.unresCalls)
+	}
+
+	// 4. FilterPluginModeNonNodeLocalOnly skips non-node-local Filter+Reserve plugins that are in SkipFilterPlugins.
+	resetCounts()
+	cs = framework.NewCycleState()
+	cs.SetFilterPluginExecutionMode(fwk.FilterPluginModeNonNodeLocalOnly)
+	cs.SetSkipFilterPlugins(sets.New(nonNodeLocalPl.Name()))
+	if status := f.RunReservePluginsReserve(ctx, cs, pod, "node1"); !status.IsSuccess() {
+		t.Fatalf("unexpected Reserve status: %v", status)
+	}
+	f.RunReservePluginsUnreserve(ctx, cs, pod, "node1")
+	if nonNodeLocalPl.reserveCalls != 0 || nonNodeLocalPl.unresCalls != 0 {
+		t.Errorf("expected skipped non-node-local plugin to have 0 calls in NonNodeLocalOnly mode, got reserve=%d unreserve=%d", nonNodeLocalPl.reserveCalls, nonNodeLocalPl.unresCalls)
+	}
+}

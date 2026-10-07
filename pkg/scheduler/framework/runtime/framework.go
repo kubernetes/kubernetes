@@ -2143,10 +2143,33 @@ func (f *frameworkImpl) runPostBindPlugin(ctx context.Context, pl fwk.PostBindPl
 // continue running the remaining ones and returns the error. In such a case,
 // the pod will not be scheduled and the caller will be expected to call
 // RunReservePluginsUnreserve.
+func shouldRunReservePlugin(pl fwk.ReservePlugin, state fwk.CycleState) bool {
+	executionMode := state.GetFilterPluginExecutionMode()
+	if executionMode == fwk.FilterPluginModeAll {
+		return true
+	}
+	if _, ok := pl.(fwk.FilterPlugin); !ok {
+		return false
+	}
+	if state.GetSkipFilterPlugins().Has(pl.Name()) {
+		return false
+	}
+	c, ok := pl.(fwk.NodeLocalFilterPlugin)
+	isNodeLocal := ok && c.IsNodeLocal()
+	return (executionMode == fwk.FilterPluginModeNodeLocalOnly && isNodeLocal) ||
+		(executionMode == fwk.FilterPluginModeNonNodeLocalOnly && !isNodeLocal)
+}
+
 func (f *frameworkImpl) RunReservePluginsReserve(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) (status *fwk.Status) {
-	startTime := time.Now()
+	var startTime time.Time
+	recordMetrics := state.GetFilterPluginExecutionMode() == fwk.FilterPluginModeAll
+	if recordMetrics {
+		startTime = time.Now()
+	}
 	defer func() {
-		metrics.FrameworkExtensionPointDuration.WithLabelValues(metrics.Reserve, status.Code().String(), f.profileName).Observe(metrics.SinceInSeconds(startTime))
+		if recordMetrics {
+			metrics.FrameworkExtensionPointDuration.WithLabelValues(metrics.Reserve, status.Code().String(), f.profileName).Observe(metrics.SinceInSeconds(startTime))
+		}
 	}()
 	logger := klog.FromContext(ctx)
 	verboseLogs := logger.V(4).Enabled()
@@ -2155,6 +2178,13 @@ func (f *frameworkImpl) RunReservePluginsReserve(ctx context.Context, state fwk.
 		logger = klog.LoggerWithValues(logger, "node", klog.ObjectRef{Name: nodeName})
 	}
 	for _, pl := range f.reservePlugins {
+		if !shouldRunReservePlugin(pl, state) {
+			continue
+		}
+		if !recordMetrics {
+			recordMetrics = true
+			startTime = time.Now()
+		}
 		ctx := ctx
 		if verboseLogs {
 			logger := klog.LoggerWithName(logger, pl.Name())
@@ -2188,9 +2218,15 @@ func (f *frameworkImpl) runReservePluginReserve(ctx context.Context, pl fwk.Rese
 // RunReservePluginsUnreserve runs the Unreserve method in the set of
 // configured reserve plugins.
 func (f *frameworkImpl) RunReservePluginsUnreserve(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) {
-	startTime := time.Now()
+	var startTime time.Time
+	recordMetrics := state.GetFilterPluginExecutionMode() == fwk.FilterPluginModeAll
+	if recordMetrics {
+		startTime = time.Now()
+	}
 	defer func() {
-		metrics.FrameworkExtensionPointDuration.WithLabelValues(metrics.Unreserve, fwk.Success.String(), f.profileName).Observe(metrics.SinceInSeconds(startTime))
+		if recordMetrics {
+			metrics.FrameworkExtensionPointDuration.WithLabelValues(metrics.Unreserve, fwk.Success.String(), f.profileName).Observe(metrics.SinceInSeconds(startTime))
+		}
 	}()
 	// Execute the Unreserve operation of each reserve plugin in the
 	// *reverse* order in which the Reserve operation was executed.
@@ -2202,6 +2238,13 @@ func (f *frameworkImpl) RunReservePluginsUnreserve(ctx context.Context, state fw
 	}
 	for i := len(f.reservePlugins) - 1; i >= 0; i-- {
 		pl := f.reservePlugins[i]
+		if !shouldRunReservePlugin(pl, state) {
+			continue
+		}
+		if !recordMetrics {
+			recordMetrics = true
+			startTime = time.Now()
+		}
 		ctx := ctx
 		if verboseLogs {
 			logger := klog.LoggerWithName(logger, pl.Name())
