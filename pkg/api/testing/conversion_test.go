@@ -220,7 +220,6 @@ func TestMemoryIdenticalConversion(t *testing.T) {
 	exempt := sets.New[string](
 		// Remaining APIs to migrate to memory-identical internal types:
 		"AdmissionReview.admission.k8s.io",
-		"DaemonSet.apps",
 		"Deployment.apps",
 		"Event.events.k8s.io",
 		"HorizontalPodAutoscaler.autoscaling",

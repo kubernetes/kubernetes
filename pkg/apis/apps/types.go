@@ -668,7 +668,7 @@ type RollingUpdateDaemonSet struct {
 	// 70% of original number of DaemonSet pods are available at all times during
 	// the update.
 	// +optional
-	MaxUnavailable intstr.IntOrString
+	MaxUnavailable *intstr.IntOrString
 
 	// The maximum number of nodes with an existing available DaemonSet pod that
 	// can have an updated DaemonSet pod during during an update.
@@ -689,7 +689,7 @@ type RollingUpdateDaemonSet struct {
 	// so resource intensive daemonsets should take into account that they may
 	// cause evictions during disruption.
 	// +optional
-	MaxSurge intstr.IntOrString
+	MaxSurge *intstr.IntOrString
 }
 
 // DaemonSetSpec is the specification of a daemon set.
@@ -719,12 +719,6 @@ type DaemonSetSpec struct {
 	// is ready).
 	// +optional
 	MinReadySeconds int32
-
-	// DEPRECATED.
-	// A sequence number representing a specific generation of the template.
-	// Populated by the system. It can be set only during the creation.
-	// +optional
-	TemplateGeneration int64
 
 	// The number of old history to retain to allow rollback.
 	// This is a pointer to distinguish between explicit zero and not specified.

@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"strconv"
 
-	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	unversionedvalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
@@ -382,19 +381,6 @@ func ValidateDaemonSetUpdate(ds, oldDS *apps.DaemonSet, opts apivalidation.PodVa
 func ValidateDaemonSetSpecUpdate(newSpec, oldSpec *apps.DaemonSetSpec, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
-	// TemplateGeneration shouldn't be decremented
-	if newSpec.TemplateGeneration < oldSpec.TemplateGeneration {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("templateGeneration"), newSpec.TemplateGeneration, "must not be decremented"))
-	}
-
-	// TemplateGeneration should be increased when and only when template is changed
-	templateUpdated := !apiequality.Semantic.DeepEqual(newSpec.Template, oldSpec.Template)
-	if newSpec.TemplateGeneration == oldSpec.TemplateGeneration && templateUpdated {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("templateGeneration"), newSpec.TemplateGeneration, "must be incremented upon template update"))
-	} else if newSpec.TemplateGeneration > oldSpec.TemplateGeneration && !templateUpdated {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("templateGeneration"), newSpec.TemplateGeneration, "must not be incremented without template update"))
-	}
-
 	// Spec.Selector is immutable
 	allErrs = append(allErrs, apivalidation.ValidateImmutableField(newSpec.Selector, oldSpec.Selector, field.NewPath("spec").Child("selector"))...)
 
@@ -456,7 +442,6 @@ func ValidateDaemonSetSpec(spec *apps.DaemonSetSpec, fldPath *field.Path, opts a
 		allErrs = append(allErrs, field.Forbidden(fldPath.Child("template", "spec", "activeDeadlineSeconds"), "activeDeadlineSeconds in DaemonSet is not Supported"))
 	}
 	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(spec.MinReadySeconds), fldPath.Child("minReadySeconds"))...)
-	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(spec.TemplateGeneration), fldPath.Child("templateGeneration"))...)
 
 	allErrs = append(allErrs, ValidateDaemonSetUpdateStrategy(&spec.UpdateStrategy, fldPath.Child("updateStrategy"))...)
 	if spec.RevisionHistoryLimit != nil {
@@ -470,20 +455,23 @@ func ValidateDaemonSetSpec(spec *apps.DaemonSetSpec, fldPath *field.Path, opts a
 func ValidateRollingUpdateDaemonSet(rollingUpdate *apps.RollingUpdateDaemonSet, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 
+	maxUnavailable := ptr.Deref(rollingUpdate.MaxUnavailable, intstr.IntOrString{})
+	maxSurge := ptr.Deref(rollingUpdate.MaxSurge, intstr.IntOrString{})
+
 	// Validate both fields are positive ints or have a percentage value
-	allErrs = append(allErrs, ValidatePositiveIntOrPercent(rollingUpdate.MaxUnavailable, fldPath.Child("maxUnavailable"))...)
-	allErrs = append(allErrs, ValidatePositiveIntOrPercent(rollingUpdate.MaxSurge, fldPath.Child("maxSurge"))...)
+	allErrs = append(allErrs, ValidatePositiveIntOrPercent(maxUnavailable, fldPath.Child("maxUnavailable"))...)
+	allErrs = append(allErrs, ValidatePositiveIntOrPercent(maxSurge, fldPath.Child("maxSurge"))...)
 
 	// Validate that MaxUnavailable and MaxSurge are not more than 100%.
-	allErrs = append(allErrs, IsNotMoreThan100Percent(rollingUpdate.MaxUnavailable, fldPath.Child("maxUnavailable"))...)
-	allErrs = append(allErrs, IsNotMoreThan100Percent(rollingUpdate.MaxSurge, fldPath.Child("maxSurge"))...)
+	allErrs = append(allErrs, IsNotMoreThan100Percent(maxUnavailable, fldPath.Child("maxUnavailable"))...)
+	allErrs = append(allErrs, IsNotMoreThan100Percent(maxSurge, fldPath.Child("maxSurge"))...)
 
 	// Validate exactly one of MaxSurge or MaxUnavailable is non-zero
-	hasUnavailable := getIntOrPercentValue(rollingUpdate.MaxUnavailable) != 0
-	hasSurge := getIntOrPercentValue(rollingUpdate.MaxSurge) != 0
+	hasUnavailable := getIntOrPercentValue(maxUnavailable) != 0
+	hasSurge := getIntOrPercentValue(maxSurge) != 0
 	switch {
 	case hasUnavailable && hasSurge:
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("maxSurge"), rollingUpdate.MaxSurge, "may not be set when maxUnavailable is non-zero"))
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("maxSurge"), maxSurge, "may not be set when maxUnavailable is non-zero"))
 	case !hasUnavailable && !hasSurge:
 		allErrs = append(allErrs, field.Required(fldPath.Child("maxUnavailable"), "cannot be 0 when maxSurge is 0"))
 	}

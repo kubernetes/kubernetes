@@ -135,43 +135,6 @@ func Convert_apps_Deployment_To_v1beta2_Deployment(in *apps.Deployment, out *app
 	return nil
 }
 
-func Convert_apps_DaemonSet_To_v1beta2_DaemonSet(in *apps.DaemonSet, out *appsv1beta2.DaemonSet, s conversion.Scope) error {
-	if err := autoConvert_apps_DaemonSet_To_v1beta2_DaemonSet(in, out, s); err != nil {
-		return err
-	}
-
-	out.Annotations = deepCopyStringMap(out.Annotations)
-	out.Annotations[appsv1beta2.DeprecatedTemplateGeneration] = strconv.FormatInt(in.Spec.TemplateGeneration, 10)
-	return nil
-}
-
-// Convert_apps_DaemonSetSpec_To_v1beta2_DaemonSetSpec is defined here, because public
-// conversion is not auto-generated due to existing warnings.
-func Convert_apps_DaemonSetSpec_To_v1beta2_DaemonSetSpec(in *apps.DaemonSetSpec, out *appsv1beta2.DaemonSetSpec, s conversion.Scope) error {
-	if err := autoConvert_apps_DaemonSetSpec_To_v1beta2_DaemonSetSpec(in, out, s); err != nil {
-		return err
-	}
-	return nil
-}
-
-func Convert_v1beta2_DaemonSet_To_apps_DaemonSet(in *appsv1beta2.DaemonSet, out *apps.DaemonSet, s conversion.Scope) error {
-	if err := autoConvert_v1beta2_DaemonSet_To_apps_DaemonSet(in, out, s); err != nil {
-		return err
-	}
-
-	if value, ok := in.Annotations[appsv1beta2.DeprecatedTemplateGeneration]; ok {
-		if value64, err := strconv.ParseInt(value, 10, 64); err != nil {
-			return err
-		} else {
-			out.Spec.TemplateGeneration = value64
-			out.Annotations = deepCopyStringMap(out.Annotations)
-			delete(out.Annotations, appsv1beta2.DeprecatedTemplateGeneration)
-		}
-	}
-
-	return nil
-}
-
 func deepCopyStringMap(m map[string]string) map[string]string {
 	ret := make(map[string]string, len(m))
 	for k, v := range m {

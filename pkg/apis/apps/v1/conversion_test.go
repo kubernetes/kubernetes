@@ -230,7 +230,7 @@ func TestV1RollingUpdateDaemonSetConversion(t *testing.T) {
 		rollingUpdateDs2 *appsv1.RollingUpdateDaemonSet
 	}{
 		"RollingUpdateDaemonSet Conversion 2": {
-			rollingUpdateDs1: &apps.RollingUpdateDaemonSet{MaxUnavailable: intorstr, MaxSurge: maxSurge},
+			rollingUpdateDs1: &apps.RollingUpdateDaemonSet{MaxUnavailable: &intorstr, MaxSurge: &maxSurge},
 			rollingUpdateDs2: &appsv1.RollingUpdateDaemonSet{MaxUnavailable: &intorstr, MaxSurge: &maxSurge},
 		},
 	}
