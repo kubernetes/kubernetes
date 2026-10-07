@@ -2057,7 +2057,13 @@ func (kl *Kubelet) generateAPIPodStatus(ctx context.Context, pod *v1.Pod, podSta
 		ObservedGeneration: podutil.CalculatePodConditionObservedGeneration(&oldPodStatus, pod.Generation, v1.PodScheduled),
 		Status:             v1.ConditionTrue,
 	})
-	if utilfeature.DefaultFeatureGate.Enabled(features.PodImplicitRootWarnings) {
+	// Note: Windows containers have no numeric UID/GID concept (name/SID-based via runAsUserName,
+	// see https://kubernetes.io/docs/tasks/configure-pod-container/configure-runasusername/), so
+	// InsecureImplicitUserID/GroupID conditions are omitted for Windows pods, and require the
+	// runtime to support reporting the container's actual UID/GID/supplemental groups.
+	rtFeatures := kl.runtimeState.runtimeFeatures()
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodImplicitRootWarnings) && runtime.GOOS != "windows" &&
+		rtFeatures != nil && rtFeatures.SupplementalGroupsPolicy {
 		allContainerStatuses = append(allContainerStatuses, s.EphemeralContainerStatuses...)
 		insecureImplicitUserIDCondition := status.GenerateInsecureImplicitUserIDCondition(pod, &oldPodStatus, allContainerStatuses)
 		insecureImplicitGroupIDCondition := status.GenerateInsecureImplicitGroupIDCondition(pod, &oldPodStatus, allContainerStatuses)

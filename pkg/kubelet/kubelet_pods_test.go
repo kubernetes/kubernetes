@@ -10332,17 +10332,34 @@ func TestEmitInsecureIDEvent(t *testing.T) {
 	}
 }
 
-func TestGenerateAPIPodStatusSuppressesInsecureIDEventForTerminalPods(t *testing.T) {
+func TestGenerateAPIPodStatusInsecureImplicitConditionsAndEvents(t *testing.T) {
 	if goruntime.GOOS == "windows" {
 		t.Skip("InsecureImplicitUserID/InsecureImplicitGroupID conditions are not generated on Windows")
 	}
-	for _, podState := range []PodWorkerState{SyncPod, TerminatingPod, TerminatedPod} {
-		t.Run(podState.String(), func(t *testing.T) {
+	supported := &kubecontainer.RuntimeFeatures{SupplementalGroupsPolicy: true}
+	unsupported := &kubecontainer.RuntimeFeatures{SupplementalGroupsPolicy: false}
+
+	tests := []struct {
+		name                    string
+		podState                PodWorkerState
+		rtFeatures              *kubecontainer.RuntimeFeatures
+		expectConditionsOmitted bool
+		expectEvent             bool
+	}{
+		{name: "sync emits event", podState: SyncPod, rtFeatures: supported, expectEvent: true},
+		{name: "terminating suppresses event", podState: TerminatingPod, rtFeatures: supported, expectEvent: false},
+		{name: "terminated suppresses event", podState: TerminatedPod, rtFeatures: supported, expectEvent: false},
+		{name: "nil runtime features omits conditions", podState: SyncPod, rtFeatures: nil, expectConditionsOmitted: true},
+		{name: "SupplementalGroupsPolicy unsupported omits conditions", podState: SyncPod, rtFeatures: unsupported, expectConditionsOmitted: true},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodImplicitRootWarnings, true)
 			tCtx := ktesting.Init(t)
 			testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 			defer testKubelet.Cleanup()
 			kl := testKubelet.kubelet
+			kl.runtimeState.setRuntimeFeatures(tc.rtFeatures)
 			fakeRecorder := record.NewFakeRecorder(10)
 			kl.insecureIDEventRecorder = fakeRecorder
 
@@ -10359,7 +10376,7 @@ func TestGenerateAPIPodStatusSuppressesInsecureIDEventForTerminalPods(t *testing
 				}},
 			}
 
-			status := kl.generateAPIPodStatus(tCtx, pod, criStatus, podState)
+			status := kl.generateAPIPodStatus(tCtx, pod, criStatus, tc.podState)
 
 			var userIDCondition *v1.PodCondition
 			for i := range status.Conditions {
@@ -10368,18 +10385,22 @@ func TestGenerateAPIPodStatusSuppressesInsecureIDEventForTerminalPods(t *testing
 					break
 				}
 			}
-			if userIDCondition == nil || userIDCondition.Status != v1.ConditionTrue {
+			if tc.expectConditionsOmitted {
+				if userIDCondition != nil {
+					t.Fatalf("expected InsecureImplicitUserID condition to be omitted, got %#v", userIDCondition)
+				}
+			} else if userIDCondition == nil || userIDCondition.Status != v1.ConditionTrue {
 				t.Fatalf("expected InsecureImplicitUserID condition to be true, got %#v", userIDCondition)
 			}
 
 			select {
 			case got := <-fakeRecorder.Events:
-				if podState != SyncPod {
-					t.Fatalf("expected no event for podState %s, got %q", podState, got)
+				if !tc.expectEvent {
+					t.Fatalf("expected no event, got %q", got)
 				}
 			default:
-				if podState == SyncPod {
-					t.Fatalf("expected an event for podState %s, got none", podState)
+				if tc.expectEvent {
+					t.Fatalf("expected an event, got none")
 				}
 			}
 		})
