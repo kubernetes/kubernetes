@@ -37,7 +37,7 @@ import (
 	"k8s.io/utils/ptr"
 )
 
-func RunAuthzSelectorsLibraryTests(t *testing.T) {
+func RunAuthzSelectorsLibraryTests(t *testing.T) { //nolint:forbidigo // calls t.Run, which requires *testing.T
 	// Start the server
 	args := []string{
 		fmt.Sprintf("--runtime-config=%s=true", resourceapi.SchemeGroupVersion), // For ResourceClaim test case below.
@@ -201,7 +201,7 @@ func RunAuthzSelectorsLibraryTests(t *testing.T) {
 		},
 	}
 	for _, tc := range testcases {
-		t.Run(tc.name, func(t *testing.T) {
+		t.Run(tc.name, func(t *testing.T) { //nolint:forbidigo // t.Run requires *testing.T
 			err := tc.createObject()
 
 			switch {

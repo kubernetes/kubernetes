@@ -35,4 +35,6 @@ type TB interface {
 }
 
 // This tells the vet printf checker that methods in the interface must be checked.
+//
+//nolint:forbidigo
 var _ TB = &testing.T{}
