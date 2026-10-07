@@ -56,3 +56,27 @@ func LabelerFromContext(ctx context.Context) (*Labeler, bool) {
 	}
 	return l, ok
 }
+
+// clientLabelerContextKey is a separate context key for the client-side Labeler.
+// This prevents server-side Labeler attributes (e.g., http.route) from leaking
+// into client-side metrics when a server handler propagates its request context
+// into an outbound HTTP client request.
+const clientLabelerContextKey labelerContextKeyType = 1
+
+// ContextWithClientLabeler returns a new context with the provided Labeler instance
+// for use with client-side HTTP instrumentation (otelhttp.Transport).
+// Attributes added to this labeler will be attached to client-side metrics.
+func ContextWithClientLabeler(parent context.Context, l *Labeler) context.Context {
+	return context.WithValue(parent, clientLabelerContextKey, l)
+}
+
+// ClientLabelerFromContext retrieves a Labeler instance from the provided context
+// for use with client-side HTTP instrumentation. If no Labeler was found, a new,
+// empty Labeler is returned and the second return value is false.
+func ClientLabelerFromContext(ctx context.Context) (*Labeler, bool) {
+	l, ok := ctx.Value(clientLabelerContextKey).(*Labeler)
+	if !ok {
+		l = &Labeler{}
+	}
+	return l, ok
+}
