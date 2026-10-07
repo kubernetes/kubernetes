@@ -160,6 +160,19 @@ func checkMemoryIdentical(path string, a, b reflect.Value) []string {
 		if !a.IsNil() && a.UnsafePointer() != b.UnsafePointer() {
 			return []string{fmt.Sprintf("%s: nilable type (%s) was copied", path, a.Kind())}
 		}
+		switch a.Kind() {
+		case reflect.Pointer:
+			if !a.IsNil() {
+				diffs = append(diffs, checkMemoryIdentical(path, a.Elem(), b.Elem())...)
+			}
+		case reflect.Slice:
+			if a.Len() > 0 {
+				diffs = append(diffs, checkMemoryIdentical(path, a.Index(0), b.Index(0))...)
+			}
+		case reflect.Map:
+			diffs = append(diffs, checkMemoryIdentical(path+"[key]", reflect.Zero(a.Type().Key()), reflect.Zero(b.Type().Key()))...)
+			diffs = append(diffs, checkMemoryIdentical(path+"[val]", reflect.Zero(a.Type().Elem()), reflect.Zero(b.Type().Elem()))...)
+		}
 	case reflect.Interface:
 		if a.IsNil() != b.IsNil() {
 			return []string{fmt.Sprintf("%s: nil interface mismatch: %v vs %v", path, a.IsNil(), b.IsNil())}
