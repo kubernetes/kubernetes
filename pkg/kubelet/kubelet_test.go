@@ -3242,6 +3242,67 @@ func TestSyncTerminatingPodKeepsFailedStatusAfterCleanExit(t *testing.T) {
 		assert.Equal(t, v1.ConditionFalse, condition.Status)
 		assert.Equal(t, "PodFailed", condition.Reason)
 	}
+
+	// SyncTerminatedPod regenerates the status from the stopped containers
+	// without the caller's override. The API object is still nonterminal
+	// here, so only the merge with the cached status keeps the failure.
+	stoppedPodStatus := testKubelet.fakeRuntime.PodStatus
+	status = kl.generateAPIPodStatus(tCtx, pod, &stoppedPodStatus, true)
+	assert.Equal(t, v1.PodFailed, status.Phase)
+	assert.Equal(t, "Evicted", status.Reason)
+	assert.Equal(t, message, status.Message)
+}
+
+// The node shutdown manager's status callback only sets Failed when the
+// status is not already Succeeded. After a clean exit the status generated
+// once the containers stopped computes Succeeded, so the callback applied to
+// it alone would leave Succeeded; the failure must come from the override
+// applied before the kill, which the phase merge then preserves.
+func TestSyncTerminatingPodShutdownCallbackAfterCleanExit(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
+	kl := testKubelet.kubelet
+	pod := podWithUIDNameNs("12345678", "bar", "foo")
+	pod.Spec = v1.PodSpec{
+		RestartPolicy: v1.RestartPolicyNever,
+		Containers:    []v1.Container{{Name: "bar"}},
+	}
+	kl.podManager.SetPods([]*v1.Pod{pod})
+	running := &kubecontainer.PodStatus{
+		ID:                pod.UID,
+		Name:              pod.Name,
+		Namespace:         pod.Namespace,
+		ContainerStatuses: []*kubecontainer.Status{{Name: "bar", State: kubecontainer.ContainerStateRunning}},
+	}
+	testKubelet.fakeRuntime.PodList = []*containertest.FakePod{{Pod: &kubecontainer.Pod{
+		ID:         pod.UID,
+		Name:       pod.Name,
+		Namespace:  pod.Namespace,
+		Containers: []*kubecontainer.Container{{Name: "bar"}},
+	}}}
+	testKubelet.fakeRuntime.PodStatus = kubecontainer.PodStatus{
+		ID:                pod.UID,
+		Name:              pod.Name,
+		Namespace:         pod.Namespace,
+		ContainerStatuses: []*kubecontainer.Status{{Name: "bar", State: kubecontainer.ContainerStateExited, ExitCode: 0}},
+	}
+	gracePeriodOverride := int64(0)
+	const message = "Pod was terminated in response to imminent node shutdown."
+	err := kl.SyncTerminatingPod(tCtx, pod, running, &gracePeriodOverride, func(podStatus *v1.PodStatus) {
+		if podStatus.Phase != v1.PodSucceeded {
+			podStatus.Phase = v1.PodFailed
+		}
+		podStatus.Reason = "Terminated"
+		podStatus.Message = message
+	})
+	require.NoError(t, err)
+
+	status, found := kl.statusManager.GetPodStatus(pod.UID)
+	require.True(t, found, "Status of pod %q is not found in the status map", pod.UID)
+	assert.Equal(t, v1.PodFailed, status.Phase)
+	assert.Equal(t, "Terminated", status.Reason)
+	assert.Equal(t, message, status.Message)
 }
 
 // The three-way phase merge must never move a pod from Failed to Succeeded:
@@ -3273,6 +3334,14 @@ func TestGenerateAPIPodStatusKeepsFailedPhase(t *testing.T) {
 			}},
 		}
 	}
+	runningContainer := func() *kubecontainer.PodStatus {
+		return &kubecontainer.PodStatus{
+			ID:                pod.UID,
+			Name:              pod.Name,
+			Namespace:         pod.Namespace,
+			ContainerStatuses: []*kubecontainer.Status{{Name: "bar", State: kubecontainer.ContainerStateRunning}},
+		}
+	}
 	tests := []struct {
 		name            string
 		cached          v1.PodStatus
@@ -3299,6 +3368,12 @@ func TestGenerateAPIPodStatusKeepsFailedPhase(t *testing.T) {
 			name:          "succeeded is kept over a clean exit",
 			cached:        v1.PodStatus{Phase: v1.PodSucceeded},
 			podStatus:     exited(0),
+			expectedPhase: v1.PodSucceeded,
+		},
+		{
+			name:          "succeeded is kept over a running container",
+			cached:        v1.PodStatus{Phase: v1.PodSucceeded},
+			podStatus:     runningContainer(),
 			expectedPhase: v1.PodSucceeded,
 		},
 	}

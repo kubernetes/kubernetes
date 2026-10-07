@@ -443,6 +443,15 @@ var _ = SIGDescribe("LocalStorageCapacityIsolationEviction", framework.WithSlow(
 				evictionPriority: 0, // The restartable init container (sidecar) stays under its limit, so the pod should not be evicted.
 				pod:              diskConsumingSidecarPod("sidecar-container-disk-below-sizelimit", useUnderLimit, v1.ResourceRequirements{Limits: containerLimit}),
 			},
+			{
+				evictionPriority: 1, // This pod should be evicted for its emptyDir usage violation even though its container handles SIGTERM by exiting 0.
+				pod: diskConsumingCleanExitPod("emptydir-disk-sizelimit-clean-exit", useOverLimit, &v1.VolumeSource{
+					EmptyDir: &v1.EmptyDirVolumeSource{SizeLimit: &sizeLimit},
+				}),
+				wantEvictionAfterCleanExit: &cleanExitEviction{
+					message: fmt.Sprintf("Usage of EmptyDir volume %q exceeds the limit %q", volumeName, sizeLimit.String()),
+				},
+			},
 		})
 	})
 })
@@ -753,6 +762,17 @@ type podEvictSpec struct {
 
 	// Can be used in order to alter pod using runtime data
 	prePodCreationModificationFunc func(ctx context.Context, pod *v1.Pod)
+
+	// When set, the pod's container is expected to handle SIGTERM by exiting
+	// 0 and the published status is expected to still report the eviction.
+	wantEvictionAfterCleanExit *cleanExitEviction
+}
+
+// cleanExitEviction describes the status expected on the API object for a
+// pod that was evicted while its container exited 0.
+type cleanExitEviction struct {
+	// message is expected to be contained in the pod's status message.
+	message string
 }
 
 // runEvictionTest sets up a testing environment given the provided pods, and checks a few things:
@@ -836,6 +856,9 @@ func runEvictionTest(f *framework.Framework, pressureTimeout time.Duration, expe
 
 			ginkgo.By("checking for the expected pod conditions for evicted pods")
 			verifyPodConditions(ctx, f, testSpecs)
+
+			ginkgo.By("checking the published status of evicted pods whose container exited 0")
+			verifyEvictionAfterCleanExit(ctx, f, testSpecs)
 
 			// We observe pressure from the API server.  The eviction manager observes pressure from the kubelet internal stats.
 			// This means the eviction manager will observe pressure before we will, creating a delay between when the eviction manager
@@ -1019,6 +1042,55 @@ func verifyPodConditions(ctx context.Context, f *framework.Framework, testSpecs 
 			}
 		}
 	}
+}
+
+// verifyEvictionAfterCleanExit checks that a pod whose container handled
+// SIGTERM by exiting 0 is published as Failed with the eviction reason and
+// message, and that the container's exit code 0 is reported. It polls until
+// the complete status is present, because an older status snapshot can be
+// published once the containers stop, before the one carrying the container's
+// terminated state.
+func verifyEvictionAfterCleanExit(ctx context.Context, f *framework.Framework, testSpecs []podEvictSpec) {
+	for _, spec := range testSpecs {
+		if spec.wantEvictionAfterCleanExit == nil {
+			continue
+		}
+		var lastStatus v1.PodStatus
+		gomega.Eventually(ctx, func(ctx context.Context) error {
+			pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(ctx, spec.pod.Name, metav1.GetOptions{})
+			if err != nil {
+				return fmt.Errorf("failed to get pod %q: %w", spec.pod.Name, err)
+			}
+			lastStatus = pod.Status
+			return checkEvictionAfterCleanExit(&pod.Status, spec.wantEvictionAfterCleanExit.message)
+		}, postTestConditionMonitoringPeriod, evictionPollInterval).Should(gomega.Succeed(),
+			"pod %s did not publish the expected eviction status after a clean exit, last status: %#v", spec.pod.Name, lastStatus)
+	}
+}
+
+// checkEvictionAfterCleanExit reports why status is not yet the complete
+// status expected for a pod evicted while its container exited 0.
+func checkEvictionAfterCleanExit(status *v1.PodStatus, message string) error {
+	if status.Phase != v1.PodFailed {
+		return fmt.Errorf("phase is %q, want %q", status.Phase, v1.PodFailed)
+	}
+	if status.Reason != eviction.Reason {
+		return fmt.Errorf("reason is %q, want %q", status.Reason, eviction.Reason)
+	}
+	if !strings.Contains(status.Message, message) {
+		return fmt.Errorf("message %q does not contain %q", status.Message, message)
+	}
+	if len(status.ContainerStatuses) != 1 {
+		return fmt.Errorf("got %d container statuses, want 1", len(status.ContainerStatuses))
+	}
+	terminated := status.ContainerStatuses[0].State.Terminated
+	if terminated == nil {
+		return fmt.Errorf("container %q is not terminated", status.ContainerStatuses[0].Name)
+	}
+	if terminated.ExitCode != 0 {
+		return fmt.Errorf("container %q exited %d, want 0", status.ContainerStatuses[0].Name, terminated.ExitCode)
+	}
+	return nil
 }
 
 func verifyEvictionEvents(ctx context.Context, f *framework.Framework, testSpecs []podEvictSpec, expectedStarvedResource v1.ResourceName) {
@@ -1286,6 +1358,21 @@ func diskConsumingPod(name string, diskConsumedMB int, volumeSource *v1.VolumeSo
 	}
 	// Each iteration writes 1 Mb, so do diskConsumedMB iterations.
 	return podWithCommand(volumeSource, resources, diskConsumedMB, name, fmt.Sprintf("dd if=/dev/urandom of=%s${i} bs=1048576 count=1 2>/dev/null; sleep .1;", filepath.Join(path, "file")), true)
+}
+
+// diskConsumingCleanExitPod returns a pod that writes diskConsumedMB MB to
+// the given volume and then idles with PID 1 waiting on a background sleep,
+// so that the SIGTERM sent by an eviction is handled within the grace period
+// and the container exits 0.
+func diskConsumingCleanExitPod(name string, diskConsumedMB int, volumeSource *v1.VolumeSource) *v1.Pod {
+	pod := diskConsumingPod(name, diskConsumedMB, volumeSource, v1.ResourceRequirements{})
+	path := filepath.Join(volumeMountPath, "file")
+	pod.Spec.Containers[0].Command = []string{
+		"sh",
+		"-c",
+		fmt.Sprintf("trap 'exit 0' TERM; i=0; while [ $i -lt %d ]; do dd if=/dev/urandom of=%s${i} bs=1048576 count=1 2>/dev/null; sleep .1; i=$(($i+1)); done; while true; do sleep 5 & wait $!; done", diskConsumedMB, path),
+	}
+	return pod
 }
 
 // diskConsumingSidecarPod returns a pod whose restartable init container (sidecar)
