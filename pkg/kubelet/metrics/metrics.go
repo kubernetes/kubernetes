@@ -146,9 +146,15 @@ const (
 	MemoryManagerPinningErrorsTotalKey   = "memory_manager_pinning_errors_total"
 
 	// Metrics to track the Topology manager behavior
-	TopologyManagerAdmissionRequestsTotalKey = "topology_manager_admission_requests_total"
-	TopologyManagerAdmissionErrorsTotalKey   = "topology_manager_admission_errors_total"
-	TopologyManagerAdmissionDurationKey      = "topology_manager_admission_duration_ms"
+	TopologyManagerAdmissionRequestsTotalKey  = "topology_manager_admission_requests_total"
+	TopologyManagerAdmissionErrorsTotalKey    = "topology_manager_admission_errors_total"
+	TopologyManagerAdmissionDurationKey       = "topology_manager_admission_duration_ms"
+	TopologyManagerNUMAScoreSelectionTotalKey = "topology_manager_numa_score_selection_total"
+
+	// TopologyManagerNUMAAllocationStrategyLabelKey carries the value of the
+	// numa-allocation-strategy topology manager policy option which was in
+	// effect for the selection being counted.
+	TopologyManagerNUMAAllocationStrategyLabelKey = "numa_allocation_strategy"
 
 	// Metrics to track orphan pod cleanup
 	orphanPodCleanedVolumesKey       = "orphan_pod_cleaned_volumes"
@@ -1041,6 +1047,22 @@ var (
 		},
 	)
 
+	// TopologyManagerNUMAScoreSelectionTotal tracks how often the
+	// numa-allocation-strategy policy option changed the outcome of a NUMA node
+	// selection. A rising counter is what tells an operator that the option is
+	// not merely configured but actually steering placement; a counter which
+	// stays at zero means every selection so far was already settled before the
+	// strategy got a say, not that the option is broken.
+	TopologyManagerNUMAScoreSelectionTotal = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           TopologyManagerNUMAScoreSelectionTotalKey,
+			Help:           "The number of NUMA node selections in which the numa-allocation-strategy policy option changed the outcome, that is the selected hint differs from the one the narrowest/closest tiebreak would have picked. Counted once per hint merge: once per admitted container under the container scope, once per admitted pod under the pod scope.",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{TopologyManagerNUMAAllocationStrategyLabelKey},
+	)
+
 	// OrphanPodCleanedVolumes is number of orphaned Pods that times that removeOrphanedPodVolumeDirs was called during the last sweep.
 	OrphanPodCleanedVolumes = metrics.NewGauge(
 		&metrics.GaugeOpts{
@@ -1526,6 +1548,7 @@ func Register() {
 		legacyregistry.MustRegister(TopologyManagerAdmissionRequestsTotal)
 		legacyregistry.MustRegister(TopologyManagerAdmissionErrorsTotal)
 		legacyregistry.MustRegister(TopologyManagerAdmissionDuration)
+		legacyregistry.MustRegister(TopologyManagerNUMAScoreSelectionTotal)
 		legacyregistry.MustRegister(OrphanPodCleanedVolumes)
 		legacyregistry.MustRegister(OrphanPodCleanedVolumesErrors)
 
