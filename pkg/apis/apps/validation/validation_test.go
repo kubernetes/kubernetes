@@ -2592,8 +2592,8 @@ func validDeployment(tweaks ...func(d *apps.Deployment)) *apps.Deployment {
 			Strategy: apps.DeploymentStrategy{
 				Type: apps.RollingUpdateDeploymentStrategyType,
 				RollingUpdate: &apps.RollingUpdateDeployment{
-					MaxSurge:       intstr.FromInt32(1),
-					MaxUnavailable: intstr.FromInt32(1),
+					MaxSurge:       new(intstr.FromInt32(1)),
+					MaxUnavailable: new(intstr.FromInt32(1)),
 				},
 			},
 			Template: api.PodTemplateSpec{
@@ -2605,9 +2605,6 @@ func validDeployment(tweaks ...func(d *apps.Deployment)) *apps.Deployment {
 					},
 				},
 				Spec: podtest.MakePodSpec(),
-			},
-			RollbackTo: &apps.RollbackConfig{
-				Revision: 1,
 			},
 		},
 	}
@@ -2674,7 +2671,7 @@ func TestValidateDeployment(t *testing.T) {
 	invalidMaxSurgeDeployment.Spec.Strategy = apps.DeploymentStrategy{
 		Type: apps.RollingUpdateDeploymentStrategyType,
 		RollingUpdate: &apps.RollingUpdateDeployment{
-			MaxSurge: intstr.FromString("20Percent"),
+			MaxSurge: new(intstr.FromString("20Percent")),
 		},
 	}
 	errorCases["a valid percent string must be"] = invalidMaxSurgeDeployment
@@ -2684,8 +2681,8 @@ func TestValidateDeployment(t *testing.T) {
 	invalidRollingUpdateDeployment.Spec.Strategy = apps.DeploymentStrategy{
 		Type: apps.RollingUpdateDeploymentStrategyType,
 		RollingUpdate: &apps.RollingUpdateDeployment{
-			MaxSurge:       intstr.FromString("0%"),
-			MaxUnavailable: intstr.FromInt32(0),
+			MaxSurge:       new(intstr.FromString("0%")),
+			MaxUnavailable: new(intstr.FromInt32(0)),
 		},
 	}
 	errorCases["may not be 0 when `maxSurge` is 0"] = invalidRollingUpdateDeployment
@@ -2695,15 +2692,10 @@ func TestValidateDeployment(t *testing.T) {
 	invalidMaxUnavailableDeployment.Spec.Strategy = apps.DeploymentStrategy{
 		Type: apps.RollingUpdateDeploymentStrategyType,
 		RollingUpdate: &apps.RollingUpdateDeployment{
-			MaxUnavailable: intstr.FromString("110%"),
+			MaxUnavailable: new(intstr.FromString("110%")),
 		},
 	}
 	errorCases["must not be greater than 100%"] = invalidMaxUnavailableDeployment
-
-	// Rollback.Revision must be non-negative
-	invalidRollbackRevisionDeployment := validDeployment()
-	invalidRollbackRevisionDeployment.Spec.RollbackTo.Revision = -3
-	errorCases["must be greater than or equal to 0"] = invalidRollbackRevisionDeployment
 
 	// ProgressDeadlineSeconds should be greater than MinReadySeconds
 	invalidProgressDeadlineDeployment := validDeployment()
@@ -3000,7 +2992,7 @@ func TestValidateDeploymentUpdate(t *testing.T) {
 			update: apps.Deployment{
 				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 				Spec: apps.DeploymentSpec{
-					Replicas: 1,
+					Replicas: new(int32(1)),
 					Selector: &metav1.LabelSelector{MatchLabels: validLabels},
 					Template: readWriteVolumePodTemplate.Template,
 					Strategy: apps.DeploymentStrategy{Type: apps.RecreateDeploymentStrategyType},
@@ -3019,7 +3011,7 @@ func TestValidateDeploymentUpdate(t *testing.T) {
 			update: apps.Deployment{
 				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 				Spec: apps.DeploymentSpec{
-					Replicas: 2,
+					Replicas: new(int32(2)),
 					Selector: &metav1.LabelSelector{MatchLabels: validLabels},
 					Template: readWriteVolumePodTemplate.Template,
 					Strategy: apps.DeploymentStrategy{Type: apps.RecreateDeploymentStrategyType},
@@ -3057,7 +3049,7 @@ func TestValidateDeploymentUpdate(t *testing.T) {
 				update: apps.Deployment{
 					ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 					Spec: apps.DeploymentSpec{
-						Replicas: 2,
+						Replicas: new(int32(2)),
 						Selector: &metav1.LabelSelector{MatchLabels: invalidLabels},
 						Template: validPodTemplate.Template,
 						Strategy: apps.DeploymentStrategy{Type: apps.RecreateDeploymentStrategyType},
@@ -3077,7 +3069,7 @@ func TestValidateDeploymentUpdate(t *testing.T) {
 				update: apps.Deployment{
 					ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 					Spec: apps.DeploymentSpec{
-						Replicas: 2,
+						Replicas: new(int32(2)),
 						Selector: &metav1.LabelSelector{MatchLabels: validLabels},
 						Template: invalidPodTemplate.Template,
 						Strategy: apps.DeploymentStrategy{Type: apps.RecreateDeploymentStrategyType},
@@ -3097,7 +3089,7 @@ func TestValidateDeploymentUpdate(t *testing.T) {
 				update: apps.Deployment{
 					ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 					Spec: apps.DeploymentSpec{
-						Replicas: -1,
+						Replicas: new(int32(-1)),
 						Selector: &metav1.LabelSelector{MatchLabels: validLabels},
 						Template: readWriteVolumePodTemplate.Template,
 						Strategy: apps.DeploymentStrategy{Type: apps.RecreateDeploymentStrategyType},
@@ -3146,6 +3138,10 @@ func TestValidateDeploymentRollback(t *testing.T) {
 	invalidNoName := validDeploymentRollback()
 	invalidNoName.Name = ""
 	errorCases["name: Required value"] = invalidNoName
+
+	invalidRevision := validDeploymentRollback()
+	invalidRevision.RollbackTo.Revision = -3
+	errorCases["must be greater than or equal to 0"] = invalidRevision
 
 	for k, v := range errorCases {
 		errs := ValidateDeploymentRollback(v)

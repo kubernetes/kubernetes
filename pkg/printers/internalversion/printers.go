@@ -2500,7 +2500,7 @@ func printDeployment(obj *apps.Deployment, options printers.GenerateOptions) ([]
 	row := metav1.TableRow{
 		Object: runtime.RawExtension{Object: obj},
 	}
-	desiredReplicas := obj.Spec.Replicas
+	desiredReplicas := ptr.Deref(obj.Spec.Replicas, 0)
 	updatedReplicas := obj.Status.UpdatedReplicas
 	readyReplicas := obj.Status.ReadyReplicas
 	availableReplicas := obj.Status.AvailableReplicas

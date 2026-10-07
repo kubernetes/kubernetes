@@ -398,8 +398,10 @@ type Deployment struct {
 
 // DeploymentSpec specifies the state of a Deployment.
 type DeploymentSpec struct {
-	// Number of desired pods.
-	Replicas int32
+	// Number of desired pods. This is a pointer to distinguish between explicit
+	// zero and not specified. Defaults to 1.
+	// +optional
+	Replicas *int32
 
 	// Label selector for pods. Existing ReplicaSets whose pods are
 	// selected by this will be the ones affected by this deployment.
@@ -431,11 +433,6 @@ type DeploymentSpec struct {
 	// deployment controller.
 	// +optional
 	Paused bool
-
-	// DEPRECATED.
-	// The config this deployment is rolling back to. Will be cleared after rollback is done.
-	// +optional
-	RollbackTo *RollbackConfig
 
 	// The maximum time in seconds for a deployment to make progress before it
 	// is considered to be failed. The deployment controller will continue to
@@ -517,7 +514,7 @@ type RollingUpdateDeployment struct {
 	// that at least 70% of original number of pods are available at all times
 	// during the update.
 	// +optional
-	MaxUnavailable intstr.IntOrString
+	MaxUnavailable *intstr.IntOrString
 
 	// The maximum number of pods that can be scheduled above the original number of
 	// pods.
@@ -530,7 +527,7 @@ type RollingUpdateDeployment struct {
 	// new RC can be scaled up further, ensuring that total number of pods running
 	// at any time during the update is at most 130% of original pods.
 	// +optional
-	MaxSurge intstr.IntOrString
+	MaxSurge *intstr.IntOrString
 }
 
 // DeploymentStatus holds information about the observed status of a deployment.

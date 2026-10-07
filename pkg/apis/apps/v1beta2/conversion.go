@@ -18,14 +18,12 @@ package v1beta2
 
 import (
 	"fmt"
-	"strconv"
 
 	appsv1beta2 "k8s.io/api/apps/v1beta2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/kubernetes/pkg/apis/apps"
 	autoscaling "k8s.io/kubernetes/pkg/apis/autoscaling"
 )
 
@@ -81,64 +79,4 @@ func Convert_v1beta2_ScaleStatus_To_autoscaling_ScaleStatus(in *appsv1beta2.Scal
 		out.Selector = ""
 	}
 	return nil
-}
-
-// Convert_apps_DeploymentSpec_To_v1beta2_DeploymentSpec is defined here, because public
-// conversion is not auto-generated due to existing warnings.
-func Convert_apps_DeploymentSpec_To_v1beta2_DeploymentSpec(in *apps.DeploymentSpec, out *appsv1beta2.DeploymentSpec, s conversion.Scope) error {
-	if err := autoConvert_apps_DeploymentSpec_To_v1beta2_DeploymentSpec(in, out, s); err != nil {
-		return err
-	}
-	return nil
-}
-
-func Convert_v1beta2_Deployment_To_apps_Deployment(in *appsv1beta2.Deployment, out *apps.Deployment, s conversion.Scope) error {
-	if err := autoConvert_v1beta2_Deployment_To_apps_Deployment(in, out, s); err != nil {
-		return err
-	}
-
-	// Copy annotation to deprecated rollbackTo field for roundtrip
-	// TODO: remove this conversion after we delete extensions/v1beta1 and apps/v1beta1 Deployment
-	if revision := in.Annotations[appsv1beta2.DeprecatedRollbackTo]; revision != "" {
-		if revision64, err := strconv.ParseInt(revision, 10, 64); err != nil {
-			return fmt.Errorf("failed to parse annotation[%s]=%s as int64: %v", appsv1beta2.DeprecatedRollbackTo, revision, err)
-		} else {
-			out.Spec.RollbackTo = new(apps.RollbackConfig)
-			out.Spec.RollbackTo.Revision = revision64
-		}
-		out.Annotations = deepCopyStringMap(out.Annotations)
-		delete(out.Annotations, appsv1beta2.DeprecatedRollbackTo)
-	} else {
-		out.Spec.RollbackTo = nil
-	}
-
-	return nil
-}
-
-func Convert_apps_Deployment_To_v1beta2_Deployment(in *apps.Deployment, out *appsv1beta2.Deployment, s conversion.Scope) error {
-	if err := autoConvert_apps_Deployment_To_v1beta2_Deployment(in, out, s); err != nil {
-		return err
-	}
-
-	out.Annotations = deepCopyStringMap(out.Annotations) // deep copy because we modify annotations below
-	// Copy deprecated rollbackTo field to annotation for roundtrip
-	// TODO: remove this conversion after we delete extensions/v1beta1 and apps/v1beta1 Deployment
-	if in.Spec.RollbackTo != nil {
-		if out.Annotations == nil {
-			out.Annotations = make(map[string]string)
-		}
-		out.Annotations[appsv1beta2.DeprecatedRollbackTo] = strconv.FormatInt(in.Spec.RollbackTo.Revision, 10)
-	} else {
-		delete(out.Annotations, appsv1beta2.DeprecatedRollbackTo)
-	}
-
-	return nil
-}
-
-func deepCopyStringMap(m map[string]string) map[string]string {
-	ret := make(map[string]string, len(m))
-	for k, v := range m {
-		ret[k] = v
-	}
-	return ret
 }

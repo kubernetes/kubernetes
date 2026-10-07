@@ -20,7 +20,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"reflect"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -43,6 +43,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
+	"k8s.io/utils/ptr"
 )
 
 const defaultReplicas = 100
@@ -71,8 +72,8 @@ func validNewDeployment() *apps.Deployment {
 			Strategy: apps.DeploymentStrategy{
 				Type: apps.RollingUpdateDeploymentStrategyType,
 				RollingUpdate: &apps.RollingUpdateDeployment{
-					MaxSurge:       intstr.FromInt32(1),
-					MaxUnavailable: intstr.FromInt32(1),
+					MaxSurge:       new(intstr.FromInt32(1)),
+					MaxUnavailable: new(intstr.FromInt32(1)),
 				},
 			},
 			Template: api.PodTemplateSpec{
@@ -81,7 +82,7 @@ func validNewDeployment() *apps.Deployment {
 				},
 				Spec: podtest.MakePodSpec(),
 			},
-			Replicas: 7,
+			Replicas: new(int32(7)),
 		},
 		Status: apps.DeploymentStatus{
 			Replicas: 5,
@@ -219,7 +220,7 @@ func TestScaleGet(t *testing.T) {
 			CreationTimestamp: deployment.CreationTimestamp,
 		},
 		Spec: autoscaling.ScaleSpec{
-			Replicas: validDeployment.Spec.Replicas,
+			Replicas: *validDeployment.Spec.Replicas,
 		},
 		Status: autoscaling.ScaleStatus{
 			Replicas: validDeployment.Status.Replicas,
@@ -264,7 +265,7 @@ func TestScaleUpdate(t *testing.T) {
 	}
 	scale := obj.(*autoscaling.Scale)
 	if scale.Spec.Replicas != replicas {
-		t.Errorf("wrong replicas count expected: %d got: %d", replicas, deployment.Spec.Replicas)
+		t.Errorf("wrong replicas count expected: %d got: %d", replicas, ptr.Deref(deployment.Spec.Replicas, 0))
 	}
 
 	update.ResourceVersion = deployment.ResourceVersion
@@ -288,7 +289,7 @@ func TestStatusUpdate(t *testing.T) {
 	update := apps.Deployment{
 		ObjectMeta: validDeployment.ObjectMeta,
 		Spec: apps.DeploymentSpec{
-			Replicas: defaultReplicas,
+			Replicas: new(int32(defaultReplicas)),
 		},
 		Status: apps.DeploymentStatus{
 			Replicas: defaultReplicas,
@@ -304,8 +305,8 @@ func TestStatusUpdate(t *testing.T) {
 	}
 
 	deployment := obj.(*apps.Deployment)
-	if deployment.Spec.Replicas != 7 {
-		t.Errorf("we expected .spec.replicas to not be updated but it was updated to %v", deployment.Spec.Replicas)
+	if ptr.Deref(deployment.Spec.Replicas, 0) != 7 {
+		t.Errorf("we expected .spec.replicas to not be updated but it was updated to %v", ptr.Deref(deployment.Spec.Replicas, 0))
 	}
 	if deployment.Status.Replicas != defaultReplicas {
 		t.Errorf("we expected .status.replicas to be updated to %d but it was %v", defaultReplicas, deployment.Status.Replicas)
@@ -368,8 +369,8 @@ func TestEtcdCreateDeploymentRollback(t *testing.T) {
 			d, err := storage.Deployment.Get(ctx, deployment.ObjectMeta.Name, &metav1.GetOptions{})
 			if err != nil {
 				t.Errorf("%s: unexpected error: %v", k, err)
-			} else if !reflect.DeepEqual(*d.(*apps.Deployment).Spec.RollbackTo, test.rollback.RollbackTo) {
-				t.Errorf("%s: expected: %v, got: %v", k, *d.(*apps.Deployment).Spec.RollbackTo, test.rollback.RollbackTo)
+			} else if d.(*apps.Deployment).Annotations[apps.DeprecatedRollbackTo] != strconv.FormatInt(test.rollback.RollbackTo.Revision, 10) {
+				t.Errorf("%s: expected: %v, got: %v", k, test.rollback.RollbackTo.Revision, d.(*apps.Deployment).Annotations[apps.DeprecatedRollbackTo])
 			}
 		}
 	}

@@ -579,14 +579,16 @@ func IsNotMoreThan100Percent(intOrStringValue intstr.IntOrString, fldPath *field
 // ValidateRollingUpdateDeployment validates a given RollingUpdateDeployment.
 func ValidateRollingUpdateDeployment(rollingUpdate *apps.RollingUpdateDeployment, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	allErrs = append(allErrs, ValidatePositiveIntOrPercent(rollingUpdate.MaxUnavailable, fldPath.Child("maxUnavailable"))...)
-	allErrs = append(allErrs, ValidatePositiveIntOrPercent(rollingUpdate.MaxSurge, fldPath.Child("maxSurge"))...)
-	if getIntOrPercentValue(rollingUpdate.MaxUnavailable) == 0 && getIntOrPercentValue(rollingUpdate.MaxSurge) == 0 {
+	maxUnavailable := ptr.Deref(rollingUpdate.MaxUnavailable, intstr.IntOrString{})
+	maxSurge := ptr.Deref(rollingUpdate.MaxSurge, intstr.IntOrString{})
+	allErrs = append(allErrs, ValidatePositiveIntOrPercent(maxUnavailable, fldPath.Child("maxUnavailable"))...)
+	allErrs = append(allErrs, ValidatePositiveIntOrPercent(maxSurge, fldPath.Child("maxSurge"))...)
+	if getIntOrPercentValue(maxUnavailable) == 0 && getIntOrPercentValue(maxSurge) == 0 {
 		// Both MaxSurge and MaxUnavailable cannot be zero.
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("maxUnavailable"), rollingUpdate.MaxUnavailable, "may not be 0 when `maxSurge` is 0"))
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("maxUnavailable"), maxUnavailable, "may not be 0 when `maxSurge` is 0"))
 	}
 	// Validate that MaxUnavailable is not more than 100%.
-	allErrs = append(allErrs, IsNotMoreThan100Percent(rollingUpdate.MaxUnavailable, fldPath.Child("maxUnavailable"))...)
+	allErrs = append(allErrs, IsNotMoreThan100Percent(maxUnavailable, fldPath.Child("maxUnavailable"))...)
 	return allErrs
 }
 
@@ -623,7 +625,9 @@ func ValidateRollback(rollback *apps.RollbackConfig, fldPath *field.Path) field.
 // ValidateDeploymentSpec validates given deployment spec.
 func ValidateDeploymentSpec(spec, oldSpec *apps.DeploymentSpec, fldPath *field.Path, opts apivalidation.PodValidationOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
-	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(spec.Replicas), fldPath.Child("replicas"))...)
+	if spec.Replicas != nil {
+		allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(*spec.Replicas), fldPath.Child("replicas"))...)
+	}
 
 	if spec.Selector == nil {
 		allErrs = append(allErrs, field.Required(fldPath.Child("selector"), ""))
@@ -639,7 +643,7 @@ func ValidateDeploymentSpec(spec, oldSpec *apps.DeploymentSpec, fldPath *field.P
 	if err != nil {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("selector"), spec.Selector, "invalid label selector"))
 	} else {
-		allErrs = append(allErrs, ValidatePodTemplateSpecForReplicaSet(&spec.Template, selector, spec.Replicas, fldPath.Child("template"), opts)...)
+		allErrs = append(allErrs, ValidatePodTemplateSpecForReplicaSet(&spec.Template, selector, ptr.Deref(spec.Replicas, 0), fldPath.Child("template"), opts)...)
 	}
 
 	allErrs = append(allErrs, ValidateDeploymentStrategy(&spec.Strategy, fldPath.Child("strategy"))...)
@@ -647,9 +651,6 @@ func ValidateDeploymentSpec(spec, oldSpec *apps.DeploymentSpec, fldPath *field.P
 	if spec.RevisionHistoryLimit != nil {
 		// zero is a valid RevisionHistoryLimit
 		allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(*spec.RevisionHistoryLimit), fldPath.Child("revisionHistoryLimit"))...)
-	}
-	if spec.RollbackTo != nil {
-		allErrs = append(allErrs, ValidateRollback(spec.RollbackTo, fldPath.Child("rollback"))...)
 	}
 	if spec.ProgressDeadlineSeconds != nil {
 		allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(*spec.ProgressDeadlineSeconds), fldPath.Child("progressDeadlineSeconds"))...)

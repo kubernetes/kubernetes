@@ -109,9 +109,16 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 			if len(j.Labels) == 0 {
 				j.Labels = j.Spec.Template.Labels
 			}
+			if j.Annotations == nil {
+				j.Annotations = make(map[string]string)
+			}
+			j.Annotations[apps.DeprecatedRollbackTo] = strconv.FormatInt(c.Int63(), 10)
 		},
 		func(j *apps.DeploymentSpec, c randfill.Continue) {
 			c.FillNoCustom(j) // fuzz self without calling this function again
+			if j.Replicas == nil {
+				j.Replicas = new(int32(1))
+			}
 			rhl := int32(c.Rand.Int31())
 			pds := int32(c.Rand.Int31())
 			j.RevisionHistoryLimit = &rhl
@@ -127,10 +134,11 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 			} else {
 				rollingUpdate := apps.RollingUpdateDeployment{}
 				if c.Bool() {
-					rollingUpdate.MaxUnavailable = intstr.FromInt32(c.Rand.Int31())
-					rollingUpdate.MaxSurge = intstr.FromInt32(c.Rand.Int31())
+					rollingUpdate.MaxUnavailable = new(intstr.FromInt32(c.Rand.Int31()))
+					rollingUpdate.MaxSurge = new(intstr.FromInt32(c.Rand.Int31()))
 				} else {
-					rollingUpdate.MaxSurge = intstr.FromString(fmt.Sprintf("%d%%", c.Rand.Int31()))
+					rollingUpdate.MaxUnavailable = new(intstr.FromString(fmt.Sprintf("%d%%", c.Rand.Int31())))
+					rollingUpdate.MaxSurge = new(intstr.FromString(fmt.Sprintf("%d%%", c.Rand.Int31())))
 				}
 				j.RollingUpdate = &rollingUpdate
 			}
@@ -161,8 +169,7 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 			if j.Type != apps.RollingUpdateDaemonSetStrategyType {
 				j.RollingUpdate = nil
 			} else {
-				rollingUpdate := apps.DaemonSetUpdateStrategy{}.RollingUpdate
-				rollingUpdate = &apps.RollingUpdateDaemonSet{}
+				rollingUpdate := &apps.RollingUpdateDaemonSet{}
 				if c.Bool() {
 					rollingUpdate.MaxUnavailable = new(intstr.FromInt32(c.Rand.Int31()))
 					rollingUpdate.MaxSurge = new(intstr.FromInt32(c.Rand.Int31()))

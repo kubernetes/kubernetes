@@ -18,6 +18,7 @@ package v1beta1
 
 import (
 	"fmt"
+	"maps"
 	"strconv"
 
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
@@ -215,6 +216,51 @@ func Convert_networking_IngressSpec_To_v1beta1_IngressSpec(in *networking.Ingres
 	return nil
 }
 
+// Convert_v1beta1_DeploymentSpec_To_apps_DeploymentSpec is defined here, because public
+// conversion is not auto-generated due to existing warnings.
+func Convert_v1beta1_DeploymentSpec_To_apps_DeploymentSpec(in *extensionsv1beta1.DeploymentSpec, out *apps.DeploymentSpec, s conversion.Scope) error {
+	return autoConvert_v1beta1_DeploymentSpec_To_apps_DeploymentSpec(in, out, s)
+}
+
+func Convert_v1beta1_Deployment_To_apps_Deployment(in *extensionsv1beta1.Deployment, out *apps.Deployment, s conversion.Scope) error {
+	if err := autoConvert_v1beta1_Deployment_To_apps_Deployment(in, out, s); err != nil {
+		return err
+	}
+
+	if in.Spec.RollbackTo != nil {
+		out.Annotations = deepCopyStringMap(out.Annotations)
+		out.Annotations[apps.DeprecatedRollbackTo] = strconv.FormatInt(in.Spec.RollbackTo.Revision, 10)
+	} else if out.Annotations != nil {
+		if _, ok := out.Annotations[apps.DeprecatedRollbackTo]; ok {
+			out.Annotations = deepCopyStringMap(out.Annotations)
+			delete(out.Annotations, apps.DeprecatedRollbackTo)
+		}
+	}
+
+	return nil
+}
+
+func Convert_apps_Deployment_To_v1beta1_Deployment(in *apps.Deployment, out *extensionsv1beta1.Deployment, s conversion.Scope) error {
+	if err := autoConvert_apps_Deployment_To_v1beta1_Deployment(in, out, s); err != nil {
+		return err
+	}
+
+	if revision := in.Annotations[apps.DeprecatedRollbackTo]; revision != "" {
+		if revision64, err := strconv.ParseInt(revision, 10, 64); err != nil {
+			return fmt.Errorf("failed to parse annotation[%s]=%s as int64: %w", apps.DeprecatedRollbackTo, revision, err)
+		} else {
+			out.Spec.RollbackTo = new(extensionsv1beta1.RollbackConfig)
+			out.Spec.RollbackTo.Revision = revision64
+		}
+		out.Annotations = deepCopyStringMap(out.Annotations)
+		delete(out.Annotations, apps.DeprecatedRollbackTo)
+	} else {
+		out.Spec.RollbackTo = nil
+	}
+
+	return nil
+}
+
 // Convert_v1beta1_DaemonSetSpec_To_apps_DaemonSetSpec is defined here, because public
 // conversion is not auto-generated due to existing warnings.
 func Convert_v1beta1_DaemonSetSpec_To_apps_DaemonSetSpec(in *extensionsv1beta1.DaemonSetSpec, out *apps.DaemonSetSpec, s conversion.Scope) error {
@@ -249,8 +295,6 @@ func Convert_apps_DaemonSet_To_v1beta1_DaemonSet(in *apps.DaemonSet, out *extens
 
 func deepCopyStringMap(m map[string]string) map[string]string {
 	ret := make(map[string]string, len(m))
-	for k, v := range m {
-		ret[k] = v
-	}
+	maps.Copy(ret, m)
 	return ret
 }

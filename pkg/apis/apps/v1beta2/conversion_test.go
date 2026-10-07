@@ -26,7 +26,6 @@ import (
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/utils/ptr"
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -259,18 +258,18 @@ func TestV1beta2StatefulSetStatusConversion(t *testing.T) {
 }
 
 func TestV1beta2DeploymentConversion(t *testing.T) {
-	replica := ptr.To(int32(2))
-	rollbackTo := new(apps.RollbackConfig)
-	rollbackTo.Revision = int64(2)
+	replica := new(int32(2))
 	testcases := map[string]struct {
 		deployment1 *apps.Deployment
 		deployment2 *v1beta2.Deployment
 	}{
 		"Deployment Conversion 1": {
 			deployment1: &apps.Deployment{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{apps.DeprecatedRollbackTo: "2"},
+				},
 				Spec: apps.DeploymentSpec{
-					Replicas:   *replica,
-					RollbackTo: rollbackTo,
+					Replicas: replica,
 					Template: api.PodTemplateSpec{
 						Spec: api.PodSpec{
 							SecurityContext: new(api.PodSecurityContext),
@@ -295,7 +294,7 @@ func TestV1beta2DeploymentConversion(t *testing.T) {
 		"Deployment Conversion 2": {
 			deployment1: &apps.Deployment{
 				Spec: apps.DeploymentSpec{
-					Replicas: *replica,
+					Replicas: replica,
 					Template: api.PodTemplateSpec{
 						Spec: api.PodSpec{
 							SecurityContext: new(api.PodSecurityContext),
@@ -389,9 +388,9 @@ func TestV1beta2ScaleStatusConversion(t *testing.T) {
 }
 
 func TestV1beta2DeploymentSpecConversion(t *testing.T) {
-	replica := ptr.To(int32(2))
-	revisionHistoryLimit := ptr.To(int32(2))
-	progressDeadlineSeconds := ptr.To(int32(2))
+	replica := new(int32(2))
+	revisionHistoryLimit := new(int32(2))
+	progressDeadlineSeconds := new(int32(2))
 
 	testcases := map[string]struct {
 		deploymentSpec1 *apps.DeploymentSpec
@@ -399,7 +398,7 @@ func TestV1beta2DeploymentSpecConversion(t *testing.T) {
 	}{
 		"DeploymentSpec Conversion 1": {
 			deploymentSpec1: &apps.DeploymentSpec{
-				Replicas: *replica,
+				Replicas: replica,
 				Template: api.PodTemplateSpec{
 					Spec: api.PodSpec{
 						SecurityContext: new(api.PodSecurityContext),
@@ -417,7 +416,7 @@ func TestV1beta2DeploymentSpecConversion(t *testing.T) {
 		},
 		"DeploymentSpec Conversion 2": {
 			deploymentSpec1: &apps.DeploymentSpec{
-				Replicas:             *replica,
+				Replicas:             replica,
 				RevisionHistoryLimit: revisionHistoryLimit,
 				MinReadySeconds:      2,
 				Paused:               true,
@@ -441,7 +440,7 @@ func TestV1beta2DeploymentSpecConversion(t *testing.T) {
 		},
 		"DeploymentSpec Conversion 3": {
 			deploymentSpec1: &apps.DeploymentSpec{
-				Replicas:                *replica,
+				Replicas:                replica,
 				ProgressDeadlineSeconds: progressDeadlineSeconds,
 				Template: api.PodTemplateSpec{
 					Spec: api.PodSpec{
@@ -489,7 +488,7 @@ func TestV1beta2DeploymentSpecConversion(t *testing.T) {
 func TestV1beta2DeploymentStrategyConversion(t *testing.T) {
 	maxUnavailable := intstr.FromInt32(2)
 	maxSurge := intstr.FromInt32(2)
-	extensionsRollingUpdate := apps.RollingUpdateDeployment{MaxUnavailable: maxUnavailable, MaxSurge: maxSurge}
+	extensionsRollingUpdate := apps.RollingUpdateDeployment{MaxUnavailable: &maxUnavailable, MaxSurge: &maxSurge}
 	v1beta2RollingUpdate := v1beta2.RollingUpdateDeployment{MaxUnavailable: &maxUnavailable, MaxSurge: &maxSurge}
 	testcases := map[string]struct {
 		deploymentStrategy1 *apps.DeploymentStrategy
@@ -527,7 +526,6 @@ func TestV1beta2DeploymentStrategyConversion(t *testing.T) {
 }
 
 func TestV1beta2RollingUpdateDeploymentConversion(t *testing.T) {
-	nilIntStr := intstr.IntOrString{}
 	maxUnavailable := intstr.FromInt32(2)
 	maxSurge := intstr.FromInt32(2)
 	testcases := map[string]struct {
@@ -536,18 +534,18 @@ func TestV1beta2RollingUpdateDeploymentConversion(t *testing.T) {
 	}{
 		"RollingUpdateDeployment Conversion 1": {
 			rollingUpdateDeployment1: &apps.RollingUpdateDeployment{},
-			rollingUpdateDeployment2: &v1beta2.RollingUpdateDeployment{MaxUnavailable: &nilIntStr, MaxSurge: &nilIntStr},
+			rollingUpdateDeployment2: &v1beta2.RollingUpdateDeployment{},
 		},
 		"RollingUpdateDeployment Conversion 2": {
-			rollingUpdateDeployment1: &apps.RollingUpdateDeployment{MaxUnavailable: maxUnavailable},
-			rollingUpdateDeployment2: &v1beta2.RollingUpdateDeployment{MaxUnavailable: &maxUnavailable, MaxSurge: &nilIntStr},
+			rollingUpdateDeployment1: &apps.RollingUpdateDeployment{MaxUnavailable: &maxUnavailable},
+			rollingUpdateDeployment2: &v1beta2.RollingUpdateDeployment{MaxUnavailable: &maxUnavailable},
 		},
 		"RollingUpdateDeployment Conversion 3": {
-			rollingUpdateDeployment1: &apps.RollingUpdateDeployment{MaxSurge: maxSurge},
-			rollingUpdateDeployment2: &v1beta2.RollingUpdateDeployment{MaxSurge: &maxSurge, MaxUnavailable: &nilIntStr},
+			rollingUpdateDeployment1: &apps.RollingUpdateDeployment{MaxSurge: &maxSurge},
+			rollingUpdateDeployment2: &v1beta2.RollingUpdateDeployment{MaxSurge: &maxSurge},
 		},
 		"RollingUpdateDeployment Conversion 4": {
-			rollingUpdateDeployment1: &apps.RollingUpdateDeployment{MaxUnavailable: maxUnavailable, MaxSurge: maxSurge},
+			rollingUpdateDeployment1: &apps.RollingUpdateDeployment{MaxUnavailable: &maxUnavailable, MaxSurge: &maxSurge},
 			rollingUpdateDeployment2: &v1beta2.RollingUpdateDeployment{MaxUnavailable: &maxUnavailable, MaxSurge: &maxSurge},
 		},
 	}

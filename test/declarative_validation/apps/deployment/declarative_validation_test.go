@@ -48,12 +48,13 @@ func mkDeployment(tweaks ...func(*apps.Deployment)) *apps.Deployment {
 	deploy := &apps.Deployment{
 		ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 		Spec: apps.DeploymentSpec{
+			Replicas: new(int32(1)),
 			Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"name": "abc"}},
 			Strategy: apps.DeploymentStrategy{
 				Type: apps.RollingUpdateDeploymentStrategyType,
 				RollingUpdate: &apps.RollingUpdateDeployment{
-					MaxSurge:       intstr.FromInt32(1),
-					MaxUnavailable: intstr.FromInt32(1),
+					MaxSurge:       new(intstr.FromInt32(1)),
+					MaxUnavailable: new(intstr.FromInt32(1)),
 				},
 			},
 			Template: api.PodTemplateSpec{
