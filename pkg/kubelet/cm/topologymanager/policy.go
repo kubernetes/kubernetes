@@ -17,7 +17,9 @@ limitations under the License.
 package topologymanager
 
 import (
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
+	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
 )
 
@@ -38,10 +40,68 @@ func IsAlignmentGuaranteed(p Policy) bool {
 	return p.Name() == PolicySingleNumaNode
 }
 
+// aggregateHintScores reduces the scores of the hints in a permutation to the
+// single score carried by the merged hint, as the weighted average
+//
+//	sum(weight[r] * score[r]) / sum(weight[r])
+//
+// over the contributors which reported a score. Contributors with no affinity,
+// or an unscored (zero) Score, take no part in it.
+//
+// resourceNames is parallel to the permutation: resourceNames[i] names the
+// resource permutation[i] came from, which is what the weight lookup is keyed
+// on. A resource the weights do not name carries defaultNUMAScoreWeight, so nil
+// or empty weights reduce the formula to the equal-weight average sum/count.
+// A resource named with a weight of 0 is dropped from the average entirely.
+//
+// Dividing by the total applicable weight keeps the result in the same [1,100]
+// range as the individual scores, and makes the weights self-normalizing: only
+// the ratios between them matter, so "cpu=30,memory=10" behaves exactly like
+// "cpu=3,memory=1".
+//
+// The second return value is false when nothing contributed, that is when the
+// total applicable weight is 0. The merged hint is then left unscored and hint
+// selection falls back to the structural comparison alone.
+func aggregateHintScores(permutation []TopologyHint, resourceNames []string, weights map[string]int) (int64, bool) {
+	var weightedSum int64
+	var totalWeight int64
+	for i, hint := range permutation {
+		if hint.NUMANodeAffinity == nil || hint.Score <= 0 {
+			continue
+		}
+
+		weight := defaultNUMAScoreWeight
+		// Guard the index rather than trusting the parallelism: a caller which
+		// supplies fewer names than hints leaves the excess contributors
+		// unnamed, and an unnamed contributor sits at the default weight. That
+		// is the same treatment a named-but-unweighted resource gets, and it
+		// keeps a mismatch out of the pod admission path.
+		if i < len(resourceNames) {
+			if w, ok := weights[resourceNames[i]]; ok {
+				weight = w
+			}
+		}
+		if weight == 0 {
+			continue
+		}
+
+		weightedSum += hint.Score * int64(weight)
+		totalWeight += int64(weight)
+	}
+	if totalWeight == 0 {
+		return 0, false
+	}
+	return weightedSum / totalWeight, true
+}
+
 // Merge a TopologyHints permutation to a single hint by performing a bitwise-AND
 // of their affinity masks. The hint shall be preferred if all hits in the permutation
 // are preferred.
-func mergePermutation(defaultAffinity bitmask.BitMask, permutation []TopologyHint) TopologyHint {
+//
+// resourceNames and weights are only consulted to aggregate the scores; see
+// aggregateHintScores for the correspondence they are required to have with the
+// permutation.
+func mergePermutation(logger klog.Logger, defaultAffinity bitmask.BitMask, permutation []TopologyHint, resourceNames []string, weights map[string]int) TopologyHint {
 	// Get the NUMANodeAffinity from each hint in the permutation and see if any
 	// of them encode unpreferred allocations.
 	preferred := true
@@ -63,21 +123,36 @@ func mergePermutation(defaultAffinity bitmask.BitMask, permutation []TopologyHin
 
 	// Merge the affinities using a bitwise-and operation.
 	mergedAffinity := bitmask.And(defaultAffinity, numaAffinities...)
+
+	score, hasScores := aggregateHintScores(permutation, resourceNames, weights)
+	if hasScores {
+		logger.V(4).Info("Merged hint includes aggregated score", "score", score)
+	}
+
 	// Build a mergedHint from the merged affinity mask, setting preferred as
 	// appropriate based on the logic above.
-	return TopologyHint{mergedAffinity, preferred}
+	return TopologyHint{NUMANodeAffinity: mergedAffinity, Preferred: preferred, Score: score}
 }
 
-func filterProvidersHints(logger klog.Logger, providersHints []map[string][]TopologyHint) [][]TopologyHint {
+// filterProvidersHints flattens the per-provider hint maps into a list of hint
+// lists, one per resource, and returns the resource names alongside it.
+//
+// The two returned slices are parallel: allProviderHints[i] holds the hints for
+// resourceNames[i]. A provider which expressed no preference at all has no
+// resource to name, so it contributes an empty name. Callers rely on this
+// correspondence to attribute a hint back to the resource it came from.
+func filterProvidersHints(logger klog.Logger, providersHints []map[string][]TopologyHint) ([][]TopologyHint, []string) {
 	// Loop through all hint providers and save an accumulated list of the
 	// hints returned by each hint provider. If no hints are provided, assume
 	// that provider has no preference for topology-aware allocation.
 	var allProviderHints [][]TopologyHint
+	var resourceNames []string
 	for _, hints := range providersHints {
 		// If hints is nil, insert a single, preferred any-numa hint into allProviderHints.
 		if len(hints) == 0 {
 			logger.Info("Hint Provider has no preference for NUMA affinity with any resource")
-			allProviderHints = append(allProviderHints, []TopologyHint{{nil, true}})
+			allProviderHints = append(allProviderHints, []TopologyHint{{NUMANodeAffinity: nil, Preferred: true}})
+			resourceNames = append(resourceNames, "")
 			continue
 		}
 
@@ -85,20 +160,23 @@ func filterProvidersHints(logger klog.Logger, providersHints []map[string][]Topo
 		for resource := range hints {
 			if hints[resource] == nil {
 				logger.Info("Hint Provider has no preference for NUMA affinity with resource", "resource", resource)
-				allProviderHints = append(allProviderHints, []TopologyHint{{nil, true}})
+				allProviderHints = append(allProviderHints, []TopologyHint{{NUMANodeAffinity: nil, Preferred: true}})
+				resourceNames = append(resourceNames, resource)
 				continue
 			}
 
 			if len(hints[resource]) == 0 {
 				logger.Info("Hint Provider has no possible NUMA affinities for resource", "resource", resource)
-				allProviderHints = append(allProviderHints, []TopologyHint{{nil, false}})
+				allProviderHints = append(allProviderHints, []TopologyHint{{NUMANodeAffinity: nil, Preferred: false}})
+				resourceNames = append(resourceNames, resource)
 				continue
 			}
 
 			allProviderHints = append(allProviderHints, hints[resource])
+			resourceNames = append(resourceNames, resource)
 		}
 	}
-	return allProviderHints
+	return allProviderHints, resourceNames
 }
 
 func narrowestHint(hints []TopologyHint) *TopologyHint {
@@ -137,6 +215,16 @@ func maxOfMinAffinityCounts(filteredHints [][]TopologyHint) int {
 type HintMerger struct {
 	NUMAInfo *NUMAInfo
 	Hints    [][]TopologyHint
+	// ResourceNames is parallel to Hints: ResourceNames[i] names the resource
+	// whose hints are in Hints[i]. Since a permutation takes its i-th element
+	// from Hints[i], this also names the resource each hint in a permutation
+	// belongs to.
+	ResourceNames []string
+	// ScoreWeights maps a resource name to the weight its score carries when
+	// the scores of a permutation are aggregated. It is nil unless the user
+	// asked for weights; every resource then sits at the default weight and
+	// the aggregation is the equal-weight average.
+	ScoreWeights map[string]int
 	// Set bestNonPreferredAffinityCount to help decide which affinity mask is
 	// preferred amongst all non-preferred hints. We calculate this value as
 	// the maximum of the minimum affinity counts supplied for any given hint
@@ -147,16 +235,79 @@ type HintMerger struct {
 	CompareNUMAAffinityMasks      func(candidate *TopologyHint, current *TopologyHint) (best *TopologyHint)
 }
 
-func NewHintMerger(numaInfo *NUMAInfo, hints [][]TopologyHint, policyName string, opts PolicyOptions) HintMerger {
+// compareHintScores returns the hint preferred by the given NUMA allocation
+// strategy, or nil if the strategy expresses no preference between the two
+// hints. Callers are expected to fall back to the structural comparison in
+// that case.
+func compareHintScores(strategy string, current, candidate *TopologyHint) *TopologyHint {
+	// A Score of 0 means unscored: no provider reported a utilization signal
+	// for the hint. Scored hints sit in [1,100], so reading 0 as a value would
+	// rate an unscored hint as a completely empty NUMA node and hand it every
+	// least-allocated comparison. Leave those to the structural comparison.
+	if current.Score == 0 || candidate.Score == 0 {
+		return nil
+	}
+
+	if current.Score == candidate.Score {
+		return nil
+	}
+
+	switch strategy {
+	case NUMAAllocationStrategyMostAllocated:
+		// Packing: the NUMA nodes which are already the busiest score the
+		// highest, so the higher score wins.
+		if candidate.Score > current.Score {
+			return candidate
+		}
+		return current
+	case NUMAAllocationStrategyLeastAllocated:
+		// Spreading: the NUMA nodes which are the emptiest score the lowest,
+		// so the lower score wins.
+		if candidate.Score < current.Score {
+			return candidate
+		}
+		return current
+	}
+
+	return nil
+}
+
+func NewHintMerger(numaInfo *NUMAInfo, hints [][]TopologyHint, resourceNames []string, policyName string, opts PolicyOptions) HintMerger {
+	preferClosest := (policyName != PolicySingleNumaNode) && opts.PreferClosestNUMA
+
+	// The allocation strategy and the score weights are alpha-level policy
+	// options. NewPolicyOptions already refuses them while the alpha options are
+	// disabled; check the gate here as well so PolicyOptions values built by
+	// other means cannot turn the feature on behind the gate's back.
+	allocationStrategy := NUMAAllocationStrategyNone
+	var scoreWeights map[string]int
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.TopologyManagerPolicyAlphaOptions) {
+		if opts.NUMAAllocationStrategy != "" {
+			allocationStrategy = opts.NUMAAllocationStrategy
+		}
+		scoreWeights = opts.NUMAScoreWeights
+	}
+
 	compareNumaAffinityMasks := func(current, candidate *TopologyHint) *TopologyHint {
 		// If current and candidate bitmasks are the same, prefer current hint.
 		if candidate.NUMANodeAffinity.IsEqual(current.NUMANodeAffinity) {
 			return current
 		}
 
+		// The structural comparison below comes first: the allocation strategy
+		// only gets to decide between masks which Narrowest, respectively
+		// Closest, considers equally good and would otherwise separate with an
+		// arbitrary fallback.
+		if allocationStrategy != NUMAAllocationStrategyNone &&
+			numaInfo.equallyFit(current.NUMANodeAffinity, candidate.NUMANodeAffinity, preferClosest) {
+			if best := compareHintScores(allocationStrategy, current, candidate); best != nil {
+				return best
+			}
+		}
+
 		// Otherwise compare the hints, based on the policy options provided
 		var best bitmask.BitMask
-		if (policyName != PolicySingleNumaNode) && opts.PreferClosestNUMA {
+		if preferClosest {
 			best = numaInfo.Closest(current.NUMANodeAffinity, candidate.NUMANodeAffinity)
 		} else {
 			best = numaInfo.Narrowest(current.NUMANodeAffinity, candidate.NUMANodeAffinity)
@@ -170,6 +321,8 @@ func NewHintMerger(numaInfo *NUMAInfo, hints [][]TopologyHint, policyName string
 	merger := HintMerger{
 		NUMAInfo:                      numaInfo,
 		Hints:                         hints,
+		ResourceNames:                 resourceNames,
+		ScoreWeights:                  scoreWeights,
 		BestNonPreferredAffinityCount: maxOfMinAffinityCounts(hints),
 		CompareNUMAAffinityMasks:      compareNumaAffinityMasks,
 	}
@@ -300,14 +453,18 @@ func (m HintMerger) compare(current *TopologyHint, candidate *TopologyHint) *Top
 
 }
 
-func (m HintMerger) Merge() TopologyHint {
+func (m HintMerger) Merge(logger klog.Logger) TopologyHint {
 	defaultAffinity := m.NUMAInfo.DefaultAffinityMask()
 
 	var bestHint *TopologyHint
 	iterateAllProviderTopologyHints(m.Hints, func(permutation []TopologyHint) {
 		// Get the NUMANodeAffinity from each hint in the permutation and see if any
 		// of them encode unpreferred allocations.
-		mergedHint := mergePermutation(defaultAffinity, permutation)
+		//
+		// permutation[i] is drawn from m.Hints[i], which holds the hints for
+		// m.ResourceNames[i], so the permutation and the resource names line up
+		// and the aggregation can weight each hint by the resource it came from.
+		mergedHint := mergePermutation(logger, defaultAffinity, permutation, m.ResourceNames, m.ScoreWeights)
 
 		// Compare the current bestHint with the candidate mergedHint and
 		// update bestHint if appropriate.
@@ -315,7 +472,7 @@ func (m HintMerger) Merge() TopologyHint {
 	})
 
 	if bestHint == nil {
-		bestHint = &TopologyHint{defaultAffinity, false}
+		bestHint = &TopologyHint{NUMANodeAffinity: defaultAffinity, Preferred: false}
 	}
 
 	return *bestHint

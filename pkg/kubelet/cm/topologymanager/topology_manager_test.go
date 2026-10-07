@@ -19,6 +19,7 @@ package topologymanager
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"runtime"
 	"strings"
 	"testing"
@@ -171,6 +172,259 @@ func TestNewManager(t *testing.T) {
 			if policyName != tc.expectedPolicy {
 				t.Errorf("Unexpected policy name. Have: %q wants %q", policyName, tc.expectedPolicy)
 			}
+		}
+	}
+}
+
+// policyOptionsOf returns the PolicyOptions a policy was built with.
+func policyOptionsOf(t *testing.T, policy Policy) PolicyOptions {
+	t.Helper()
+	switch p := policy.(type) {
+	case *bestEffortPolicy:
+		return p.opts
+	case *restrictedPolicy:
+		return p.opts
+	case *singleNumaNodePolicy:
+		return p.opts
+	default:
+		t.Fatalf("policy %q has an unexpected type %T", policy.Name(), policy)
+		return PolicyOptions{}
+	}
+}
+
+// TestNewManagerPolicyOptionPropagation checks that the policy option map
+// reaches the policy the manager builds, for every policy and every scope.
+// The container manager hands NodeConfig.TopologyManagerPolicyOptions to
+// NewManager verbatim on both Linux and Windows, so NewPolicyOptions is the
+// only place the map is decoded: whatever lands in PolicyOptions here is what
+// hint selection sees.
+func TestNewManagerPolicyOptionPropagation(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+
+	tcases := []struct {
+		description     string
+		policyOptions   map[string]string
+		expectedOptions PolicyOptions
+	}{
+		{
+			description: "no policy options",
+			expectedOptions: PolicyOptions{
+				MaxAllowableNUMANodes:  defaultMaxAllowableNUMANodes,
+				NUMAAllocationStrategy: NUMAAllocationStrategyNone,
+			},
+		},
+		{
+			description: "numa-allocation-strategy set to most-allocated",
+			policyOptions: map[string]string{
+				NUMAAllocationStrategy: NUMAAllocationStrategyMostAllocated,
+			},
+			expectedOptions: PolicyOptions{
+				MaxAllowableNUMANodes:  defaultMaxAllowableNUMANodes,
+				NUMAAllocationStrategy: NUMAAllocationStrategyMostAllocated,
+			},
+		},
+		{
+			description: "numa-allocation-strategy set to least-allocated",
+			policyOptions: map[string]string{
+				NUMAAllocationStrategy: NUMAAllocationStrategyLeastAllocated,
+			},
+			expectedOptions: PolicyOptions{
+				MaxAllowableNUMANodes:  defaultMaxAllowableNUMANodes,
+				NUMAAllocationStrategy: NUMAAllocationStrategyLeastAllocated,
+			},
+		},
+		{
+			description: "numa-allocation-strategy set to none",
+			policyOptions: map[string]string{
+				NUMAAllocationStrategy: NUMAAllocationStrategyNone,
+			},
+			expectedOptions: PolicyOptions{
+				MaxAllowableNUMANodes:  defaultMaxAllowableNUMANodes,
+				NUMAAllocationStrategy: NUMAAllocationStrategyNone,
+			},
+		},
+		{
+			description: "numa-allocation-strategy alongside another option",
+			policyOptions: map[string]string{
+				NUMAAllocationStrategy: NUMAAllocationStrategyMostAllocated,
+				MaxAllowableNUMANodes:  "9",
+			},
+			expectedOptions: PolicyOptions{
+				MaxAllowableNUMANodes:  9,
+				NUMAAllocationStrategy: NUMAAllocationStrategyMostAllocated,
+			},
+		},
+		{
+			description: "numa-score-weights reaches the policy parsed",
+			policyOptions: map[string]string{
+				NUMAScoreWeights: "cpu=3,memory=1,nvidia.com/gpu=6",
+			},
+			expectedOptions: PolicyOptions{
+				MaxAllowableNUMANodes:  defaultMaxAllowableNUMANodes,
+				NUMAAllocationStrategy: NUMAAllocationStrategyNone,
+				NUMAScoreWeights:       map[string]int{"cpu": 3, "memory": 1, "nvidia.com/gpu": 6},
+			},
+		},
+		{
+			description: "numa-score-weights alongside numa-allocation-strategy",
+			policyOptions: map[string]string{
+				NUMAAllocationStrategy: NUMAAllocationStrategyLeastAllocated,
+				NUMAScoreWeights:       "intel.com/sriov-nic=10,cpu=0,memory=0",
+			},
+			expectedOptions: PolicyOptions{
+				MaxAllowableNUMANodes:  defaultMaxAllowableNUMANodes,
+				NUMAAllocationStrategy: NUMAAllocationStrategyLeastAllocated,
+				NUMAScoreWeights:       map[string]int{"intel.com/sriov-nic": 10, "cpu": 0, "memory": 0},
+			},
+		},
+	}
+
+	for _, policyName := range []string{PolicyBestEffort, PolicyRestricted, PolicySingleNumaNode} {
+		for _, scopeName := range []string{ContainerTopologyScope, PodTopologyScope} {
+			for _, tc := range tcases {
+				t.Run(fmt.Sprintf("%s/%s/%s", policyName, scopeName, tc.description), func(t *testing.T) {
+					featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TopologyManagerPolicyAlphaOptions, true)
+
+					mngr, err := NewManager(logger, nil, policyName, scopeName, tc.policyOptions)
+					if err != nil {
+						t.Fatalf("unexpected error: %v", err)
+					}
+
+					opts := policyOptionsOf(t, mngr.GetPolicy())
+					if !reflect.DeepEqual(opts, tc.expectedOptions) {
+						t.Errorf("Unexpected policy options. Have: %v wants %v", opts, tc.expectedOptions)
+					}
+				})
+			}
+		}
+	}
+}
+
+// TestNewManagerInvalidNUMAAllocationStrategy checks that a bad
+// numa-allocation-strategy value aborts manager creation. NewContainerManager
+// propagates that error, so kubelet startup fails rather than silently running
+// with the option ignored.
+func TestNewManagerInvalidNUMAAllocationStrategy(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+
+	tcases := []struct {
+		description       string
+		alphaOptionsGate  bool
+		policyOptions     map[string]string
+		expectedErrSubstr string
+	}{
+		{
+			description:      "unknown numa-allocation-strategy value",
+			alphaOptionsGate: true,
+			policyOptions: map[string]string{
+				NUMAAllocationStrategy: "most-allocated-ish",
+			},
+			expectedErrSubstr: `bad value for option "numa-allocation-strategy"`,
+		},
+		{
+			description:      "numa-allocation-strategy value differing only in case",
+			alphaOptionsGate: true,
+			policyOptions: map[string]string{
+				NUMAAllocationStrategy: "Most-Allocated",
+			},
+			expectedErrSubstr: `bad value for option "numa-allocation-strategy"`,
+		},
+		{
+			description:      "numa-allocation-strategy without the alpha options gate",
+			alphaOptionsGate: false,
+			policyOptions: map[string]string{
+				NUMAAllocationStrategy: NUMAAllocationStrategyMostAllocated,
+			},
+			expectedErrSubstr: `topology manager policy alpha-level options not enabled`,
+		},
+	}
+
+	for _, policyName := range []string{PolicyBestEffort, PolicyRestricted, PolicySingleNumaNode} {
+		for _, tc := range tcases {
+			t.Run(fmt.Sprintf("%s/%s", policyName, tc.description), func(t *testing.T) {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TopologyManagerPolicyAlphaOptions, tc.alphaOptionsGate)
+
+				_, err := NewManager(logger, nil, policyName, ContainerTopologyScope, tc.policyOptions)
+				if err == nil {
+					t.Fatalf("expected an error containing %q, got none", tc.expectedErrSubstr)
+				}
+				if !strings.Contains(err.Error(), tc.expectedErrSubstr) {
+					t.Errorf("Unexpected error message. Have: %s wants a message containing %s", err.Error(), tc.expectedErrSubstr)
+				}
+			})
+		}
+	}
+}
+
+// TestNewManagerInvalidNUMAScoreWeights checks that a bad numa-score-weights
+// value aborts manager creation, for the same reason as the
+// numa-allocation-strategy equivalent above: NewContainerManager propagates
+// the error, so kubelet startup fails rather than silently running with the
+// weights ignored.
+func TestNewManagerInvalidNUMAScoreWeights(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+
+	tcases := []struct {
+		description       string
+		alphaOptionsGate  bool
+		policyOptions     map[string]string
+		expectedErrSubstr string
+	}{
+		{
+			description:      "numa-score-weights entry without a separator",
+			alphaOptionsGate: true,
+			policyOptions: map[string]string{
+				NUMAScoreWeights: "cpu:3",
+			},
+			expectedErrSubstr: `bad value for option "numa-score-weights"`,
+		},
+		{
+			description:      "numa-score-weights with a fractional weight",
+			alphaOptionsGate: true,
+			policyOptions: map[string]string{
+				NUMAScoreWeights: "cpu=3.5",
+			},
+			expectedErrSubstr: `bad value for option "numa-score-weights"`,
+		},
+		{
+			description:      "numa-score-weights with a negative weight",
+			alphaOptionsGate: true,
+			policyOptions: map[string]string{
+				NUMAScoreWeights: "cpu=-5",
+			},
+			expectedErrSubstr: "must be in range [0, 100]",
+		},
+		{
+			description:      "numa-score-weights above the accepted range",
+			alphaOptionsGate: true,
+			policyOptions: map[string]string{
+				NUMAScoreWeights: "cpu=101",
+			},
+			expectedErrSubstr: "must be in range [0, 100]",
+		},
+		{
+			description:      "numa-score-weights without the alpha options gate",
+			alphaOptionsGate: false,
+			policyOptions: map[string]string{
+				NUMAScoreWeights: "cpu=3,memory=1",
+			},
+			expectedErrSubstr: `topology manager policy alpha-level options not enabled`,
+		},
+	}
+
+	for _, policyName := range []string{PolicyBestEffort, PolicyRestricted, PolicySingleNumaNode} {
+		for _, tc := range tcases {
+			t.Run(fmt.Sprintf("%s/%s", policyName, tc.description), func(t *testing.T) {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TopologyManagerPolicyAlphaOptions, tc.alphaOptionsGate)
+
+				_, err := NewManager(logger, nil, policyName, ContainerTopologyScope, tc.policyOptions)
+				if err == nil {
+					t.Fatalf("expected an error containing %q, got none", tc.expectedErrSubstr)
+				}
+				if !strings.Contains(err.Error(), tc.expectedErrSubstr) {
+					t.Errorf("Unexpected error message. Have: %s wants a message containing %s", err.Error(), tc.expectedErrSubstr)
+				}
+			})
 		}
 	}
 }
