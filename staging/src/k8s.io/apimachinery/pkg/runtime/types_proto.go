@@ -216,3 +216,128 @@ func (m *Unknown) NestedMarshalTo(data []byte, b ProtobufMarshaller, size uint64
 	data[i] = typeMetaTag
 	return msgSize - i, nil
 }
+
+// UnmarshalRawZeroCopy unmarshals an Unknown message from data without allocating and copying
+// the nested Raw payload slice. The resulting m.Raw slice aliases data when non-empty; callers
+// must not retain m.Raw beyond the lifetime of data without cloning it.
+func (m *Unknown) UnmarshalRawZeroCopy(data []byte) error {
+	offset := 0
+	for offset < len(data) {
+		fieldStart := offset
+		wire, nextOffset, err := consumeVarint(data, offset)
+		if err != nil {
+			return err
+		}
+		offset = nextOffset
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: Unknown: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: Unknown: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field TypeMeta", wireType)
+			}
+			val, end, err := consumeBytes(data, offset)
+			if err != nil {
+				return err
+			}
+			if err := m.TypeMeta.Unmarshal(val); err != nil {
+				return err
+			}
+			offset = end
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Raw", wireType)
+			}
+			val, end, err := consumeBytes(data, offset)
+			if err != nil {
+				return err
+			}
+			if len(val) == 0 {
+				m.Raw = []byte{}
+			} else {
+				m.Raw = val
+			}
+			offset = end
+		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ContentEncoding", wireType)
+			}
+			val, end, err := consumeBytes(data, offset)
+			if err != nil {
+				return err
+			}
+			m.ContentEncoding = string(val)
+			offset = end
+		case 4:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ContentType", wireType)
+			}
+			val, end, err := consumeBytes(data, offset)
+			if err != nil {
+				return err
+			}
+			m.ContentType = string(val)
+			offset = end
+		default:
+			skipped, err := skipGenerated(data[fieldStart:])
+			if err != nil {
+				return err
+			}
+			if skipped < 0 || (fieldStart+skipped) < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if (fieldStart + skipped) > len(data) {
+				return io.ErrUnexpectedEOF
+			}
+			offset = fieldStart + skipped
+		}
+	}
+
+	if offset > len(data) {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+
+func consumeVarint(data []byte, offset int) (uint64, int, error) {
+	var v uint64
+	for shift := uint(0); ; shift += 7 {
+		if shift >= 64 {
+			return 0, 0, ErrIntOverflowGenerated
+		}
+		if offset >= len(data) {
+			return 0, 0, io.ErrUnexpectedEOF
+		}
+		b := data[offset]
+		offset++
+		v |= uint64(b&0x7F) << shift
+		if b < 0x80 {
+			return v, offset, nil
+		}
+	}
+}
+
+func consumeBytes(data []byte, offset int) ([]byte, int, error) {
+	rawLen, nextOffset, err := consumeVarint(data, offset)
+	if err != nil {
+		return nil, 0, err
+	}
+	length := int(rawLen)
+	if length < 0 || uint64(length) != rawLen {
+		return nil, 0, ErrInvalidLengthGenerated
+	}
+	end := nextOffset + length
+	if end < 0 {
+		return nil, 0, ErrInvalidLengthGenerated
+	}
+	if end > len(data) {
+		return nil, 0, io.ErrUnexpectedEOF
+	}
+	return data[nextOffset:end:end], end, nil
+}
