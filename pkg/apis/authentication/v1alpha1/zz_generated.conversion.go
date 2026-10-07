@@ -22,11 +22,12 @@ limitations under the License.
 package v1alpha1
 
 import (
+	unsafe "unsafe"
+
 	authenticationv1alpha1 "k8s.io/api/authentication/v1alpha1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	authentication "k8s.io/kubernetes/pkg/apis/authentication"
-	v1 "k8s.io/kubernetes/pkg/apis/authentication/v1"
 )
 
 func init() {
@@ -86,9 +87,7 @@ func Convert_authentication_SelfSubjectReview_To_v1alpha1_SelfSubjectReview(in *
 }
 
 func autoConvert_v1alpha1_SelfSubjectReviewStatus_To_authentication_SelfSubjectReviewStatus(in *authenticationv1alpha1.SelfSubjectReviewStatus, out *authentication.SelfSubjectReviewStatus, s conversion.Scope) error {
-	if err := v1.Convert_v1_UserInfo_To_authentication_UserInfo(&in.UserInfo, &out.UserInfo, s); err != nil {
-		return err
-	}
+	*out = *(*authentication.SelfSubjectReviewStatus)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -98,9 +97,7 @@ func Convert_v1alpha1_SelfSubjectReviewStatus_To_authentication_SelfSubjectRevie
 }
 
 func autoConvert_authentication_SelfSubjectReviewStatus_To_v1alpha1_SelfSubjectReviewStatus(in *authentication.SelfSubjectReviewStatus, out *authenticationv1alpha1.SelfSubjectReviewStatus, s conversion.Scope) error {
-	if err := v1.Convert_authentication_UserInfo_To_v1_UserInfo(&in.UserInfo, &out.UserInfo, s); err != nil {
-		return err
-	}
+	*out = *(*authenticationv1alpha1.SelfSubjectReviewStatus)(unsafe.Pointer(in))
 	return nil
 }
 
