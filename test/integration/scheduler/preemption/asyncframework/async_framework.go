@@ -52,6 +52,7 @@ import (
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	testutils "k8s.io/kubernetes/test/integration/util"
 	"k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/utils/ptr"
 )
 
 const (
@@ -239,6 +240,10 @@ func InitTestForAsyncPreemption(t *testing.T, config AsyncPreemptionTestConfig) 
 		t.Fatalf("Error registering a queueSkipFilterPlugin plugin: %v", err)
 	}
 
+	var delayedPreemptionWeight *int32
+	if config.EnableGenericWorkload {
+		delayedPreemptionWeight = ptr.To[int32](1000)
+	}
 	cfg := configtesting.V1ToInternalWithDefaults(t, configv1.KubeSchedulerConfiguration{
 		Profiles: []configv1.KubeSchedulerProfile{{
 			SchedulerName: new(v1.DefaultSchedulerName),
@@ -246,7 +251,7 @@ func InitTestForAsyncPreemption(t *testing.T, config AsyncPreemptionTestConfig) 
 				MultiPoint: configv1.PluginSet{
 					Enabled: []configv1.Plugin{
 						{Name: blockingBindPluginName},
-						{Name: delayedPreemptionPluginName},
+						{Name: delayedPreemptionPluginName, Weight: delayedPreemptionWeight},
 						{Name: reservingPluginName},
 						{Name: queueSkipFilterPluginName},
 					},
@@ -339,6 +344,7 @@ func registerDelayedPreemptionPlugin(registry *frameworkruntime.Registry, preemp
 		if !ok {
 			return nil, fmt.Errorf("unexpected plugin type %T", p)
 		}
+		preemptionPlugin.SetName(delayedPreemptionPluginName)
 
 		exec, ok := preemptionPlugin.Executor.(*preemption.Executor)
 		if !ok {
