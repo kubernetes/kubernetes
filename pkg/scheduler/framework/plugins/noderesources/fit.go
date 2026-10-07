@@ -18,12 +18,16 @@ package noderesources
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/component-helpers/resource"
@@ -48,6 +52,8 @@ var _ fwk.PreScorePlugin = &Fit{}
 var _ fwk.ScorePlugin = &Fit{}
 var _ fwk.SignPlugin = &Fit{}
 var _ fwk.PlacementScorePlugin = &Fit{}
+var _ fwk.ReservePlugin = &Fit{}
+var _ fwk.PreBindPlugin = &Fit{}
 
 const (
 	// Name is the name of the plugin used in the plugin registry and configurations.
@@ -98,6 +104,7 @@ type Fit struct {
 	enableDRAExtendedResource                          bool
 	enableInPlacePodLevelResourcesVerticalScaling      bool
 	enableInPlacePodVerticalScalingSchedulerPreemption bool
+	enableDRANodeAllocatableResources                  bool
 	handle                                             fwk.Handle
 	*resourceAllocationScorer
 	placementScorer *resourceAllocationScorer
@@ -220,6 +227,7 @@ func NewFit(_ context.Context, plArgs runtime.Object, h fwk.Handle, fts feature.
 	if err != nil {
 		return nil, err
 	}
+	scorer.enableDRANodeAllocatableResources = fts.EnableDRANodeAllocatableResources
 	if fts.EnableDRAExtendedResource {
 		scorer.enableDRAExtendedResource = true
 		scorer.draManager = h.SharedDRAManager()
@@ -243,6 +251,8 @@ func NewFit(_ context.Context, plArgs runtime.Object, h fwk.Handle, fts feature.
 		enableInPlacePodLevelResourcesVerticalScaling: fts.EnableInPlacePodLevelResourcesVerticalScaling,
 
 		enableInPlacePodVerticalScalingSchedulerPreemption: fts.EnableInPlacePodVerticalScalingSchedulerPreemption,
+
+		enableDRANodeAllocatableResources: fts.EnableDRANodeAllocatableResources,
 
 		resourceAllocationScorer: scorer,
 	}
@@ -324,11 +334,30 @@ func computePodResourceRequest(pod *v1.Pod, opts ResourceRequestsOptions) *preFi
 	// pod hasn't scheduled yet so we don't need to worry about InPlacePodVerticalScalingEnabled
 	reqs := resource.PodRequests(pod, resource.PodResourcesOptions{
 		// SkipPodLevelResources is set to false when PodLevelResources feature is enabled.
-		SkipPodLevelResources:                    !opts.EnablePodLevelResources,
-		UseDRANodeAllocatableResourceClaimStatus: opts.EnableDRANodeAllocatableResources,
+		SkipPodLevelResources:                 !opts.EnablePodLevelResources,
+		UseAdditionalNodeAllocatableResources: opts.EnableDRANodeAllocatableResources,
 	})
 	result := &preFilterState{}
 	result.SetMaxResource(reqs)
+	return result
+}
+
+// computePodResourceRequestForNode is computePodResourceRequest plus the node
+// reservations that pod would be the first on nodeInfo to hold. Reservations
+// the node already holds are part of its Requested and are not counted again.
+func computePodResourceRequestForNode(pod *v1.Pod, nodeInfo fwk.NodeInfo, opts ResourceRequestsOptions) *preFilterState {
+	result := computePodResourceRequest(pod, opts)
+	if !opts.EnableDRANodeAllocatableResources {
+		return result
+	}
+	// Deduplicate the requests that are not directly accounted to this pod. The node
+	// counts each such source once, so add it only if no existing pod on the node
+	// references it.
+	for _, res := range pod.Status.AdditionalNodeAllocatableResources {
+		if !resource.IsAccountedToPod(res.Source) && !nodeInfo.HasNodeAllocatableReservation(pod.Namespace, res.Source) {
+			result.Add(framework.NodeReservationRequests(res))
+		}
+	}
 	return result
 }
 
@@ -659,6 +688,7 @@ func (f *Fit) Filter(ctx context.Context, cycleState fwk.CycleState, pod *v1.Pod
 	if err != nil {
 		return fwk.AsStatus(err)
 	}
+	s = f.recomputePodResourceRequestForNode(cycleState, pod, nodeInfo, s)
 
 	var draManager fwk.SharedDRAManager
 	if f.enableDRAExtendedResource {
@@ -691,6 +721,30 @@ func (f *Fit) Filter(ctx context.Context, cycleState fwk.CycleState, pod *v1.Pod
 	return nil
 }
 
+// recomputePodResourceRequestForNode recomputes the pod request including the node
+// allocatable resources that other plugins recorded for nodeInfo during Filter.
+// This recomputation is necessary because the other plugins' resource footprint
+// is not known during PreFilter.
+func (f *Fit) recomputePodResourceRequestForNode(cycleState fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo, s *preFilterState) *preFilterState {
+	if !f.enableDRANodeAllocatableResources {
+		return s
+	}
+	state := framework.GetAdditionalNodeAllocatableResourcesState(cycleState)
+	if state == nil {
+		return s
+	}
+	additionalResources := state.Get(nodeInfo.Node().Name)
+	if len(additionalResources) == 0 {
+		return s
+	}
+	podCopy := *pod
+	podCopy.Status.AdditionalNodeAllocatableResources = additionalResources
+	return computePodResourceRequestForNode(&podCopy, nodeInfo, ResourceRequestsOptions{
+		EnablePodLevelResources:           f.enablePodLevelResources,
+		EnableDRANodeAllocatableResources: true,
+	})
+}
+
 // InsufficientResource describes what kind of resource limit is hit and caused the pod to not fit the node.
 type InsufficientResource struct {
 	ResourceName v1.ResourceName
@@ -707,7 +761,7 @@ type InsufficientResource struct {
 
 // Fits checks if node have enough resources to host the pod.
 func Fits(pod *v1.Pod, nodeInfo fwk.NodeInfo, draManager fwk.SharedDRAManager, opts ResourceRequestsOptions) []InsufficientResource {
-	return fitsRequest(computePodResourceRequest(pod, opts), nodeInfo, nil, nil, draManager, opts, pod)
+	return fitsRequest(computePodResourceRequestForNode(pod, nodeInfo, opts), nodeInfo, nil, nil, draManager, opts, pod)
 }
 
 func fitsRequest(podRequest *preFilterState, nodeInfo fwk.NodeInfo, ignoredExtendedResources, ignoredResourceGroups sets.Set[string], draManager fwk.SharedDRAManager, opts ResourceRequestsOptions, pod *v1.Pod) []InsufficientResource {
@@ -864,7 +918,8 @@ func (f *Fit) Score(ctx context.Context, state fwk.CycleState, pod *v1.Pod, node
 		}
 	}
 
-	return f.score(ctx, pod, nodeInfo, s.podRequests, s.draPreScoreState)
+	podRequests := f.calculatePodRequestWithAdditionalNodeAllocatable(state, pod, nodeInfo, s.podRequests)
+	return f.score(ctx, pod, nodeInfo, podRequests, s.draPreScoreState)
 }
 
 // PlacementScoreExtensions is not used by this plugin.
@@ -875,4 +930,103 @@ func (f *Fit) PlacementScoreExtensions() fwk.PlacementScoreExtensions {
 // ScorePlacement scores capacity ratio on all nodes in the placement including all assigned pod group pods' resource requests.
 func (f *Fit) ScorePlacement(ctx context.Context, state fwk.PlacementCycleState, podGroup fwk.PodGroupInfo, placement *fwk.PodGroupAssignments) (int64, *fwk.Status) {
 	return f.placementScorer.scorePlacement(ctx, podGroup, placement)
+}
+
+// Reserve is a no-op. It exists so that Unreserve gets called.
+func (f *Fit) Reserve(ctx context.Context, cs fwk.CycleState, pod *v1.Pod, nodeName string) *fwk.Status {
+	return nil
+}
+
+// Unreserve clears pod.status.additionalNodeAllocatableResources if PreBind
+// may have persisted it.
+func (f *Fit) Unreserve(ctx context.Context, cs fwk.CycleState, pod *v1.Pod, nodeName string) {
+	if !f.enableDRANodeAllocatableResources {
+		return
+	}
+	state := framework.GetAdditionalNodeAllocatableResourcesState(cs)
+	if state == nil || !state.Has(nodeName) {
+		return
+	}
+	f.clearAdditionalNodeAllocatableResources(ctx, pod)
+}
+
+// PreBindPreFlight skips PreBind unless some plugin recorded additional node
+// allocatable resources for the node.
+func (f *Fit) PreBindPreFlight(ctx context.Context, cs fwk.CycleState, pod *v1.Pod, nodeName string) (*fwk.PreBindPreFlightResult, *fwk.Status) {
+	// In the default order, run before DynamicResources creates or reserves claims, so that a
+	// failed status patch stops PreBind before any claim is touched.
+	result := &fwk.PreBindPreFlightResult{AllowParallel: false}
+	if !f.enableDRANodeAllocatableResources {
+		return result, fwk.NewStatus(fwk.Skip)
+	}
+	state := framework.GetAdditionalNodeAllocatableResourcesState(cs)
+	if state == nil || !state.Has(nodeName) {
+		return result, fwk.NewStatus(fwk.Skip)
+	}
+	return result, nil
+}
+
+// PreBind persists the additional node allocatable resources recorded for the
+// node in pod.status.additionalNodeAllocatableResources.
+func (f *Fit) PreBind(ctx context.Context, cs fwk.CycleState, pod *v1.Pod, nodeName string) *fwk.Status {
+	if !f.enableDRANodeAllocatableResources {
+		return nil
+	}
+	state := framework.GetAdditionalNodeAllocatableResourcesState(cs)
+	if state == nil {
+		return nil
+	}
+	return f.patchAdditionalNodeAllocatableResources(ctx, pod, state.Get(nodeName))
+}
+
+func (f *Fit) patchAdditionalNodeAllocatableResources(ctx context.Context, pod *v1.Pod, additionalResources []v1.AdditionalNodeAllocatableResource) *fwk.Status {
+	if len(additionalResources) == 0 {
+		return nil
+	}
+	logger := klog.FromContext(ctx)
+
+	// The incoming 'pod' is from the scheduler cache and would have AdditionalNodeAllocatableResources
+	// pre-populated in the assume phase without persisting to the API server.
+	// schedutil.PatchPodStatus skips patching if the old and new status are identical.
+	// To ensure the status is persisted to the API server we clear it in the baseStatus, forcing a patch.
+	baseStatus := pod.Status
+	if !apiequality.Semantic.DeepEqual(baseStatus.AdditionalNodeAllocatableResources, additionalResources) {
+		logger.V(5).Info("AdditionalNodeAllocatableResources difference: assumed pod status does not match calculated status", "pod", klog.KObj(pod))
+		return fwk.AsStatus(errors.New("assumed pod status does not match calculated status to be patched"))
+	}
+
+	baseStatus.AdditionalNodeAllocatableResources = nil
+
+	targetStatus := pod.Status
+
+	targetStatus.AdditionalNodeAllocatableResources = additionalResources
+	if err := schedutil.PatchPodStatus(ctx, f.handle.ClientSet(), pod.Name, pod.Namespace, &baseStatus, &targetStatus); err != nil {
+		return fwk.AsStatus(fmt.Errorf("updating pod %s/%s AdditionalNodeAllocatableResources: %w", pod.Namespace, pod.Name, err))
+	}
+	logger.V(5).Info("Patched pod status with AdditionalNodeAllocatableResources", "pod", klog.KObj(pod), "status", targetStatus.AdditionalNodeAllocatableResources)
+
+	return nil
+}
+
+func (f *Fit) clearAdditionalNodeAllocatableResources(ctx context.Context, pod *v1.Pod) {
+	if len(pod.Status.AdditionalNodeAllocatableResources) == 0 {
+		return
+	}
+
+	logger := klog.FromContext(ctx)
+	logger.V(5).Info("Clearing AdditionalNodeAllocatableResources on Unreserve", "pod", klog.KObj(pod))
+
+	// An explicit empty list distinguishes an intentional clear from an old
+	// client omitting a field that it does not know about. PatchPodStatus cannot
+	// preserve that distinction because the field has an omitempty JSON tag.
+	//
+	// The uid is included as a precondition so the patch cannot silently apply
+	// to a different pod object if this one got deleted and recreated with the
+	// same name in the meantime.
+	patch := fmt.Appendf(nil, `{"metadata":{"uid":%q},"status":{"additionalNodeAllocatableResources":[]}}`, pod.UID)
+	if _, err := f.handle.ClientSet().CoreV1().Pods(pod.Namespace).Patch(ctx, pod.Name, types.MergePatchType, patch, metav1.PatchOptions{}, "status"); err != nil {
+		logger.Error(err, "Failed to clear AdditionalNodeAllocatableResources on Unreserve", "pod", klog.KObj(pod))
+	} else {
+		logger.V(5).Info("Cleared AdditionalNodeAllocatableResources", "pod", klog.KObj(pod))
+	}
 }

@@ -5793,9 +5793,9 @@ func Test_generateAPIPodStatus(t *testing.T) {
 					},
 				},
 				Status: v1.PodStatus{
-					NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+					AdditionalNodeAllocatableResources: []v1.AdditionalNodeAllocatableResource{
 						{
-							ResourceClaimName: "dra-claim",
+							Source: v1.AdditionalNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "dra-claim"},
 							Mapping: []v1.NodeAllocatableMappedResources{
 								{
 									Name:     v1.ResourceCPU,

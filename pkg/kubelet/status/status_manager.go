@@ -231,7 +231,7 @@ func NewManager(kubeClient clientset.Interface, podManager PodManager, podDeleti
 // isPodStatusByKubeletEqual returns true if the given pod statuses are equal, ignoring
 // fields not managed by the kubelet (including non-kubelet-owned pod conditions,
 // ResourceClaimStatuses, ExtendedResourceClaimStatus, and
-// NodeAllocatableResourceClaimStatuses). Statuses are assumed to be
+// AdditionalNodeAllocatableResources). Statuses are assumed to be
 // normalized before calling this function.
 func isPodStatusByKubeletEqual(oldStatus, status *v1.PodStatus) bool {
 	oldCopy := oldStatus.DeepCopy()
@@ -264,8 +264,8 @@ func isPodStatusByKubeletEqual(oldStatus, status *v1.PodStatus) bool {
 	oldCopy.ResourceClaimStatuses = status.ResourceClaimStatuses
 	// ExtendedResourceClaimStatus is not owned and not modified by kubelet.
 	oldCopy.ExtendedResourceClaimStatus = status.ExtendedResourceClaimStatus
-	// NodeAllocatableResourceClaimStatuses is not owned and not modified by kubelet.
-	oldCopy.NodeAllocatableResourceClaimStatuses = status.NodeAllocatableResourceClaimStatuses
+	// AdditionalNodeAllocatableResources is not owned and not modified by kubelet.
+	oldCopy.AdditionalNodeAllocatableResources = status.AdditionalNodeAllocatableResources
 
 	return apiequality.Semantic.DeepEqual(oldCopy, status)
 }
@@ -1489,8 +1489,8 @@ func mergePodStatus(pod *v1.Pod, oldPodStatus, newPodStatus v1.PodStatus, couldH
 	newPodStatus.ResourceClaimStatuses = oldPodStatus.ResourceClaimStatuses
 	// ExtendedResourceClaimStatus is not owned and not modified by kubelet.
 	newPodStatus.ExtendedResourceClaimStatus = oldPodStatus.ExtendedResourceClaimStatus
-	// NodeAllocatableResourceClaimStatuses is not owned and not modified by kubelet.
-	newPodStatus.NodeAllocatableResourceClaimStatuses = oldPodStatus.NodeAllocatableResourceClaimStatuses
+	// AdditionalNodeAllocatableResources is not owned and not modified by kubelet.
+	newPodStatus.AdditionalNodeAllocatableResources = oldPodStatus.AdditionalNodeAllocatableResources
 
 	// Delay transitioning a pod to a terminal status unless the pod is actually terminal.
 	// The Kubelet should never transition a pod to terminal status that could have running

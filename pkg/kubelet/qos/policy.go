@@ -147,24 +147,24 @@ func getEffectiveContainerMemoryRequest(pod *v1.Pod, container *v1.Container) in
 	}
 
 	var draMemoryShare int64
-	for _, claimStatus := range pod.Status.NodeAllocatableResourceClaimStatuses {
+	for _, res := range pod.Status.AdditionalNodeAllocatableResources {
 		// Check if this container references the claim
-		if !slices.Contains(claimStatus.Containers, container.Name) {
+		if !slices.Contains(res.Containers, container.Name) {
 			continue
 		}
 
-		numRefs := int64(len(claimStatus.Containers))
+		numRefs := int64(len(res.Containers))
 
 		// Add Mapping memory resources share. Since mapping resources represent a fixed allocation
 		// shared by all referencing containers in the pod, we divide it equally.
-		for _, mapping := range claimStatus.Mapping {
+		for _, mapping := range res.Mapping {
 			if mapping.Name == v1.ResourceMemory && mapping.Quantity != nil {
 				draMemoryShare += mapping.Quantity.Value() / numRefs
 			}
 		}
 
 		// Add Overhead memory resources share.
-		for _, overhead := range claimStatus.Overhead {
+		for _, overhead := range res.Overhead {
 			if overhead.Name == v1.ResourceMemory {
 				// PerPod overhead is applied once per pod. We split it equally among the
 				// referencing containers.

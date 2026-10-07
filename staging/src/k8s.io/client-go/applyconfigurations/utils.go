@@ -616,6 +616,10 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationscoordinationv1beta1.LeaseSpecApplyConfiguration{}
 
 		// Group=core, Version=v1
+	case corev1.SchemeGroupVersion.WithKind("AdditionalNodeAllocatableReference"):
+		return &applyconfigurationscorev1.AdditionalNodeAllocatableReferenceApplyConfiguration{}
+	case corev1.SchemeGroupVersion.WithKind("AdditionalNodeAllocatableResource"):
+		return &applyconfigurationscorev1.AdditionalNodeAllocatableResourceApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("Affinity"):
 		return &applyconfigurationscorev1.AffinityApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("AppArmorProfile"):
@@ -812,8 +816,6 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationscorev1.NodeAllocatableMappedResourcesApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("NodeAllocatableOverheadResources"):
 		return &applyconfigurationscorev1.NodeAllocatableOverheadResourcesApplyConfiguration{}
-	case corev1.SchemeGroupVersion.WithKind("NodeAllocatableResourceClaimStatus"):
-		return &applyconfigurationscorev1.NodeAllocatableResourceClaimStatusApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("NodeCondition"):
 		return &applyconfigurationscorev1.NodeConditionApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("NodeConfigSource"):

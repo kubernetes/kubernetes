@@ -55,6 +55,7 @@ import (
 	utilsysctl "k8s.io/component-helpers/node/util/sysctl"
 	resourcehelper "k8s.io/component-helpers/resource"
 	schedulinghelper "k8s.io/component-helpers/scheduling/corev1"
+	"k8s.io/dynamic-resource-allocation/resourceclaim"
 	kubeletapis "k8s.io/kubelet/pkg/apis"
 	"k8s.io/kubernetes/pkg/apis/certificates"
 
@@ -65,6 +66,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/core/helper/qos"
 	podshelper "k8s.io/kubernetes/pkg/apis/core/pods"
 	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
+	resourceapi "k8s.io/kubernetes/pkg/apis/resource"
 
 	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/features"
@@ -6229,7 +6231,7 @@ func ValidatePodStatusUpdate(newPod, oldPod *core.Pod, opts PodValidationOptions
 	allErrs = append(allErrs, ValidateEphemeralContainerStateTransition(newPod.Status.EphemeralContainerStatuses, oldPod.Status.EphemeralContainerStatuses, fldPath.Child("ephemeralContainerStatuses"))...)
 	allErrs = append(allErrs, validatePodResourceClaimStatuses(newPod.Status.ResourceClaimStatuses, newPod.Spec.ResourceClaims, fldPath.Child("resourceClaimStatuses"))...)
 	allErrs = append(allErrs, validatePodExtendedResourceClaimStatus(newPod.Status.ExtendedResourceClaimStatus, &newPod.Spec, fldPath.Child("extendedResourceClaimStatus"))...)
-	allErrs = append(allErrs, validateNodeAllocatableResourceClaimStatus(newPod.Status, &newPod.Spec, fldPath.Child("nodeAllocatableResourceClaimStatuses"))...)
+	allErrs = append(allErrs, validateAdditionalNodeAllocatableResources(newPod.Name, newPod.Status, &newPod.Spec, fldPath.Child("additionalNodeAllocatableResources"))...)
 
 	if len(newPod.Status.VolumeHealth) > 0 {
 		allErrs = append(allErrs, validatePodVolumeHealth(newPod.Status.VolumeHealth, &newPod.Spec, fldPath.Child("volumeHealth"))...)
@@ -6323,59 +6325,100 @@ func validatePodResourceClaimStatuses(statuses []core.PodResourceClaimStatus, po
 	return allErrs
 }
 
-// validateNodeAllocatableResourceClaimStatus validates NodeAllocatableResourceClaimStatuses in a pod status
-func validateNodeAllocatableResourceClaimStatus(podStatus core.PodStatus, podSpec *core.PodSpec, fldPath *field.Path) field.ErrorList {
+// validateAdditionalNodeAllocatableResources validates AdditionalNodeAllocatableResources in a pod status
+func validateAdditionalNodeAllocatableResources(podName string, podStatus core.PodStatus, podSpec *core.PodSpec, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
-	if len(podStatus.NodeAllocatableResourceClaimStatuses) == 0 {
+	if len(podStatus.AdditionalNodeAllocatableResources) == 0 {
 		return allErrs
 	}
 
-	for i, nodeAllocatableStatus := range podStatus.NodeAllocatableResourceClaimStatuses {
-		statusFldPath := fldPath.Index(i)
-		if nodeAllocatableStatus.ResourceClaimName == "" {
-			continue
-		}
+	// Declarative validation cannot dedupe on a struct key.
+	seenSources := sets.New[core.AdditionalNodeAllocatableReference]()
+	for i, res := range podStatus.AdditionalNodeAllocatableResources {
+		idxPath := fldPath.Index(i)
+		sourceFldPath := idxPath.Child("source")
+		source := res.Source
 
-		// First check the podSpec to see if the ResourceClaim is directly referenced.
-		// If not, check the podStatus to see if the ResourceClaim was generated from a template.
-		found := false
-		for _, claimRef := range podSpec.ResourceClaims {
-			if (claimRef.ResourceClaimName != nil) && (*claimRef.ResourceClaimName == nodeAllocatableStatus.ResourceClaimName) {
-				found = true
-				break
+		if source.Name != "" {
+			if seenSources.Has(source) {
+				allErrs = append(allErrs, field.Duplicate(sourceFldPath, source))
+			} else {
+				seenSources.Insert(source)
 			}
 		}
-		if !found {
-			for _, claimRef := range podStatus.ResourceClaimStatuses {
-				if (claimRef.ResourceClaimName != nil) && (*claimRef.ResourceClaimName == nodeAllocatableStatus.ResourceClaimName) {
-					found = true
-					break
-				}
-			}
-		}
-		// Extended resources backed by DRA are satisfied by a scheduler-created
-		// ResourceClaim that is not referenced in podSpec.ResourceClaims nor in
-		// podStatus.ResourceClaimStatuses. Its name is recorded in
-		// podStatus.ExtendedResourceClaimStatus instead.
-		if !found && podStatus.ExtendedResourceClaimStatus != nil &&
-			podStatus.ExtendedResourceClaimStatus.ResourceClaimName == nodeAllocatableStatus.ResourceClaimName {
-			found = true
-		}
 
-		if !found {
-			allErrs = append(allErrs, field.Invalid(statusFldPath.Child("resourceClaimName"), nodeAllocatableStatus.ResourceClaimName, "no mapping found in pod reference"))
-		}
+		allErrs = append(allErrs, validateAdditionalNodeAllocatableSource(source, podName, podStatus, podSpec, sourceFldPath)...)
 
-		if len(nodeAllocatableStatus.Mapping) > 0 {
-			allErrs = append(allErrs, validateNodeAllocatableMappedResources(nodeAllocatableStatus.Mapping, statusFldPath.Child("mapping"))...)
+		if len(res.Mapping) > 0 {
+			allErrs = append(allErrs, validateNodeAllocatableMappedResources(res.Mapping, idxPath.Child("mapping"))...)
 		}
-		if len(nodeAllocatableStatus.Overhead) > 0 {
-			allErrs = append(allErrs, validateNodeAllocatableOverheadResources(nodeAllocatableStatus.Overhead, statusFldPath.Child("overhead"))...)
+		if len(res.Overhead) > 0 {
+			allErrs = append(allErrs, validateNodeAllocatableOverheadResources(res.Overhead, idxPath.Child("overhead"))...)
 		}
 	}
 
 	return allErrs
+}
+
+// validateAdditionalNodeAllocatableSource validates the source type and reference.
+func validateAdditionalNodeAllocatableSource(source core.AdditionalNodeAllocatableReference, podName string, podStatus core.PodStatus, podSpec *core.PodSpec, fldPath *field.Path) field.ErrorList {
+	// Required by declarative validation.
+	if source.Kind == "" || source.Name == "" {
+		return nil
+	}
+
+	// We currently only support ResourceClaims. Extend these sets when introducing support for new groups and kinds.
+	supportedAPIGroups := sets.New(resourceapi.GroupName)
+	supportedKinds := sets.New("ResourceClaim")
+
+	allErrs := field.ErrorList{}
+	if !supportedAPIGroups.Has(source.APIGroup) {
+		allErrs = append(allErrs, field.NotSupported(fldPath.Child("apiGroup"), source.APIGroup, sets.List(supportedAPIGroups)))
+	}
+	if !supportedKinds.Has(source.Kind) {
+		allErrs = append(allErrs, field.NotSupported(fldPath.Child("kind"), source.Kind, sets.List(supportedKinds)))
+	}
+	if len(allErrs) > 0 {
+		return allErrs
+	}
+
+	return validateAdditionalNodeAllocatableResourceClaim(source.Name, podName, podStatus, podSpec, fldPath.Child("name"))
+}
+
+// validateAdditionalNodeAllocatableResourceClaim validates that the pod references the claim.
+func validateAdditionalNodeAllocatableResourceClaim(claimName, podName string, podStatus core.PodStatus, podSpec *core.PodSpec, fldPath *field.Path) field.ErrorList {
+	// First check the podSpec to see if the ResourceClaim is directly referenced.
+	// If not, check the podStatus to see if the ResourceClaim was generated from a template.
+	for _, claimRef := range podSpec.ResourceClaims {
+		if claimRef.ResourceClaimName != nil && *claimRef.ResourceClaimName == claimName {
+			return nil
+		}
+	}
+	for _, claimRef := range podStatus.ResourceClaimStatuses {
+		if claimRef.ResourceClaimName != nil && *claimRef.ResourceClaimName == claimName {
+			return nil
+		}
+	}
+	// Extended resources backed by DRA are satisfied by a scheduler-created ResourceClaim that is not referenced in podSpec.ResourceClaims nor in
+	// podStatus.ResourceClaimStatuses. Its name is recorded in podStatus.ExtendedResourceClaimStatus instead.
+	if podStatus.ExtendedResourceClaimStatus != nil && podStatus.ExtendedResourceClaimStatus.ResourceClaimName == claimName {
+		return nil
+	}
+	// Depending on the scheduler plugin order, AdditionalNodeAllocatableResources
+	// may be patched before podStatus.ExtendedResourceClaimStatus, so there is
+	// no name to compare against yet. Don't return an error in that case. The
+	// status update that sets ExtendedResourceClaimStatus runs this validation
+	// again, and the check above then requires the two names to match.
+	// Until then, only accept names generated from the base the scheduler uses
+	// for the extended resource claim of a pod that requests extended resources,
+	// so the name cannot point at an arbitrary claim.
+	if podStatus.ExtendedResourceClaimStatus == nil &&
+		helper.PodRequestsExtendedResources(podSpec) &&
+		resourceclaim.IsExtendedResourceClaimNameForPod(podName, claimName) {
+		return nil
+	}
+	return field.ErrorList{field.Invalid(fldPath, claimName, "no mapping found in pod reference")}
 }
 
 // validateNodeAllocatableMappedResources validates a list of mapped node allocatable resources
@@ -6764,7 +6807,7 @@ func validatePodLevelResourcesResize(newPod, oldPod *core.Pod, podSpecToMutate *
 		allErrs = append(allErrs, errs)
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.DRANodeAllocatableResources) && len(newPod.Status.NodeAllocatableResourceClaimStatuses) > 0 {
+	if utilfeature.DefaultFeatureGate.Enabled(features.DRANodeAllocatableResources) && len(newPod.Status.AdditionalNodeAllocatableResources) > 0 {
 		v1Pod := &v1.Pod{}
 		if err := corev1.Convert_core_Pod_To_v1_Pod(newPod, v1Pod, nil); err != nil {
 			allErrs = append(allErrs, field.InternalError(specPath, fmt.Errorf("failed to convert pod for DRA validation: %w", err)))
@@ -6852,8 +6895,8 @@ func validatePodLevelResourcesCoverDRA(pod *v1.Pod) (bool, string) {
 
 	if pod.Spec.Resources.Requests != nil {
 		opts := resourcehelper.PodResourcesOptions{
-			SkipPodLevelResources:                    true,
-			UseDRANodeAllocatableResourceClaimStatus: true,
+			SkipPodLevelResources:                 true,
+			UseAdditionalNodeAllocatableResources: true,
 		}
 		requestWithoutPodLevel := resourcehelper.AggregateContainerRequests(pod, opts)
 
@@ -6873,8 +6916,8 @@ func validatePodLevelResourcesCoverDRA(pod *v1.Pod) (bool, string) {
 
 	if pod.Spec.Resources.Limits != nil {
 		opts := resourcehelper.PodResourcesOptions{
-			SkipPodLevelResources:                    true,
-			UseDRANodeAllocatableResourceClaimStatus: true,
+			SkipPodLevelResources:                 true,
+			UseAdditionalNodeAllocatableResources: true,
 		}
 		limitsWithoutPodLevel := resourcehelper.AggregateContainerLimits(pod, opts)
 

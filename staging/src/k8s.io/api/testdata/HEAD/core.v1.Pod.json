@@ -2208,9 +2208,26 @@
         }
       ]
     },
-    "nodeAllocatableResourceClaimStatuses": [
+    "volumeHealth": [
       {
-        "resourceClaimName": "resourceClaimNameValue",
+        "name": "nameValue",
+        "healthConditions": [
+          {
+            "status": "statusValue",
+            "reason": "reasonValue",
+            "message": "messageValue"
+          }
+        ],
+        "lastTransitionTime": "2003-01-01T01:01:01Z"
+      }
+    ],
+    "additionalNodeAllocatableResources": [
+      {
+        "source": {
+          "apiGroup": "apiGroupValue",
+          "kind": "kindValue",
+          "name": "nameValue"
+        },
         "containers": [
           "containersValue"
         ],
@@ -2227,19 +2244,6 @@
             "perContainer": "0"
           }
         ]
-      }
-    ],
-    "volumeHealth": [
-      {
-        "name": "nameValue",
-        "healthConditions": [
-          {
-            "status": "statusValue",
-            "reason": "reasonValue",
-            "message": "messageValue"
-          }
-        ],
-        "lastTransitionTime": "2003-01-01T01:01:01Z"
       }
     ]
   }

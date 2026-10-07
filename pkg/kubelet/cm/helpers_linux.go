@@ -183,9 +183,9 @@ func ResourceConfigForPod(allocatedPod *v1.Pod, enforceCPULimits bool, cpuPeriod
 	// sum requests and limits.
 	reqs := resourcehelper.PodRequests(allocatedPod, resourcehelper.PodResourcesOptions{
 		// SkipPodLevelResources is set to false when PodLevelResources feature is enabled.
-		SkipPodLevelResources:                    !podLevelResourcesEnabled,
-		UseStatusResources:                       false,
-		UseDRANodeAllocatableResourceClaimStatus: draNodeAllocatableEnabled,
+		SkipPodLevelResources:                 !podLevelResourcesEnabled,
+		UseStatusResources:                    false,
+		UseAdditionalNodeAllocatableResources: draNodeAllocatableEnabled,
 	})
 	// track if limits were applied for each resource.
 	memoryLimitsDeclared := true
@@ -193,8 +193,8 @@ func ResourceConfigForPod(allocatedPod *v1.Pod, enforceCPULimits bool, cpuPeriod
 
 	limits := resourcehelper.PodLimits(allocatedPod, resourcehelper.PodResourcesOptions{
 		// SkipPodLevelResources is set to false when PodLevelResources feature is enabled.
-		SkipPodLevelResources:                    !podLevelResourcesEnabled,
-		UseDRANodeAllocatableResourceClaimStatus: draNodeAllocatableEnabled,
+		SkipPodLevelResources:                 !podLevelResourcesEnabled,
+		UseAdditionalNodeAllocatableResources: draNodeAllocatableEnabled,
 	})
 
 	for c := range podutil.ContainerIter(&allocatedPod.Spec, podutil.InitContainers|podutil.Containers) {

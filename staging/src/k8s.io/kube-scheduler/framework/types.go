@@ -314,6 +314,10 @@ type NodeInfo interface {
 	// GetPVCRefCounts returns a mapping of PVC names to the number of pods on the node using it.
 	// Keys are in the format "namespace/name".
 	GetPVCRefCounts() map[string]int
+	// HasNodeAllocatableReservation reports whether the node holds the reservation for
+	// additional node allocatable resources. Its entries are not accounted to any pod, and at least one pod on
+	// the node references it in status.additionalNodeAllocatableResources.
+	HasNodeAllocatableReservation(namespace string, source v1.AdditionalNodeAllocatableReference) bool
 	// Whenever NodeInfo changes, generation is bumped.
 	// This is used to avoid cloning it if the object didn't change.
 	GetGeneration() int64

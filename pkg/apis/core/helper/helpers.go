@@ -23,6 +23,7 @@ import (
 	"strings"
 
 	v1 "k8s.io/api/core/v1"
+	resourcev1 "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/conversion"
@@ -235,6 +236,35 @@ func IsExtendedResourceName(name core.ResourceName) bool {
 		return false
 	}
 	return true
+}
+
+// PodRequestsExtendedResources returns true if any container or init container
+// requests a non-zero quantity of an extended resource. This includes the
+// implicit DRA extended resource names, which IsExtendedResourceName rejects
+// because they are in the kubernetes.io namespace.
+func PodRequestsExtendedResources(spec *core.PodSpec) bool {
+	requestsExtended := func(container *core.Container) bool {
+		for name, quantity := range container.Resources.Requests {
+			if quantity.IsZero() {
+				continue
+			}
+			if IsExtendedResourceName(name) || strings.HasPrefix(string(name), resourcev1.ResourceDeviceClassPrefix) {
+				return true
+			}
+		}
+		return false
+	}
+	for i := range spec.InitContainers {
+		if requestsExtended(&spec.InitContainers[i]) {
+			return true
+		}
+	}
+	for i := range spec.Containers {
+		if requestsExtended(&spec.Containers[i]) {
+			return true
+		}
+	}
+	return false
 }
 
 // IsNativeResource returns true if the resource name is in the

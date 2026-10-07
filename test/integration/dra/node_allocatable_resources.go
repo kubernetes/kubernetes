@@ -112,25 +112,29 @@ func expectPodUnschedulable(tCtx ktesting.TContext, pod *v1.Pod, reason string) 
 	}))))
 }
 
-func verifyPodNodeAllocatableStatus(tCtx ktesting.TContext, namespace, podName string, expectedStatus []v1.NodeAllocatableResourceClaimStatus) {
+func verifyPodAdditionalNodeAllocatableResources(tCtx ktesting.TContext, namespace, podName string, expectedStatus []v1.AdditionalNodeAllocatableResource) {
 	tCtx.Helper()
 	var statusMatchers []gtypes.GomegaMatcher
 	for _, expected := range expectedStatus {
 		statusMatchers = append(statusMatchers, gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
-			"ResourceClaimName": gomega.ContainSubstring(expected.ResourceClaimName),
-			"Containers":        gomega.Equal(expected.Containers),
-			"Mapping":           gomega.Equal(expected.Mapping),
-			"Overhead":          gomega.Equal(expected.Overhead),
+			"Source": gstruct.MatchAllFields(gstruct.Fields{
+				"APIGroup": gomega.Equal(expected.Source.APIGroup),
+				"Kind":     gomega.Equal(expected.Source.Kind),
+				"Name":     gomega.ContainSubstring(expected.Source.Name),
+			}),
+			"Containers": gomega.Equal(expected.Containers),
+			"Mapping":    gomega.Equal(expected.Mapping),
+			"Overhead":   gomega.Equal(expected.Overhead),
 		}))
 	}
-	tCtx.Eventually(func(tCtx ktesting.TContext) []v1.NodeAllocatableResourceClaimStatus {
+	tCtx.Eventually(func(tCtx ktesting.TContext) []v1.AdditionalNodeAllocatableResource {
 		pod, err := tCtx.Client().CoreV1().Pods(namespace).Get(tCtx, podName, metav1.GetOptions{})
 		if err != nil {
 			tCtx.Logf("Error getting pod: %v", err)
 			return nil
 		}
-		return pod.Status.NodeAllocatableResourceClaimStatuses
-	}).WithTimeout(30*time.Second).WithPolling(200*time.Millisecond).Should(gomega.ConsistOf(statusMatchers), "pod node allocatable resource claim status")
+		return pod.Status.AdditionalNodeAllocatableResources
+	}).WithTimeout(30*time.Second).WithPolling(200*time.Millisecond).Should(gomega.ConsistOf(statusMatchers), "pod additional node allocatable resources")
 }
 
 func createPodWithNodeAllocatableClaim(tCtx ktesting.TContext, env *testEnv, claimName, podName string, numContainers int) (*v1.Pod, *resourceapi.ResourceClaim) {
@@ -222,15 +226,15 @@ func testNodeAllocatableResourcesConsumablePool(tCtx ktesting.TContext) {
 		"node allocatable claim allocation",
 	)
 
-	expectedStatus := []v1.NodeAllocatableResourceClaimStatus{{
-		ResourceClaimName: claim.Name,
-		Containers:        []string{"my-container-1", "my-container-2"},
+	expectedStatus := []v1.AdditionalNodeAllocatableResource{{
+		Source:     v1.AdditionalNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: claim.Name},
+		Containers: []string{"my-container-1", "my-container-2"},
 		Mapping: []v1.NodeAllocatableMappedResources{
 			{Name: v1.ResourceCPU, Quantity: new(resource.MustParse(nodeCPUCapacity))},
 			{Name: v1.ResourceMemory, Quantity: new(resource.MustParse(nodeMemoryCapacity))},
 		},
 	}}
-	verifyPodNodeAllocatableStatus(tCtx, env.namespace, pod.Name, expectedStatus)
+	verifyPodAdditionalNodeAllocatableResources(tCtx, env.namespace, pod.Name, expectedStatus)
 
 	anotherPod := st.MakePod().Name("another-pod").Namespace(env.namespace).Obj()
 	anotherPod.Spec.NodeSelector = map[string]string{"kubernetes.io/hostname": env.nodeName}
@@ -296,14 +300,14 @@ func testNodeAllocatableResourcesIndividualDevices(tCtx ktesting.TContext) {
 		"node allocatable claim allocation",
 	)
 
-	expectedStatus := []v1.NodeAllocatableResourceClaimStatus{{
-		ResourceClaimName: claim.Name,
-		Containers:        []string{"my-container-1", "my-container-2"},
+	expectedStatus := []v1.AdditionalNodeAllocatableResource{{
+		Source:     v1.AdditionalNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: claim.Name},
+		Containers: []string{"my-container-1", "my-container-2"},
 		Mapping: []v1.NodeAllocatableMappedResources{
 			{Name: v1.ResourceCPU, Quantity: new(numCPUsPerDevice)},
 		},
 	}}
-	verifyPodNodeAllocatableStatus(tCtx, env.namespace, pod.Name, expectedStatus)
+	verifyPodAdditionalNodeAllocatableResources(tCtx, env.namespace, pod.Name, expectedStatus)
 }
 
 func testNodeAllocatableResourceClaimSharing(tCtx ktesting.TContext) {
@@ -625,15 +629,15 @@ func testNodeAllocatableResourcesWithClaimTemplate(tCtx ktesting.TContext) {
 
 	waitForPodScheduled(tCtx, env.namespace, pod.Name)
 
-	expectedStatus := []v1.NodeAllocatableResourceClaimStatus{{
-		ResourceClaimName: podName, // The genereate claim based on template contains pod name
-		Containers:        []string{"c1"},
+	expectedStatus := []v1.AdditionalNodeAllocatableResource{{
+		Source:     v1.AdditionalNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: podName}, // The genereate claim based on template contains pod name
+		Containers: []string{"c1"},
 		Mapping: []v1.NodeAllocatableMappedResources{
 			{Name: v1.ResourceCPU, Quantity: new(resource.MustParse("10"))},
 			{Name: v1.ResourceMemory, Quantity: new(resource.MustParse("100"))},
 		},
 	}}
-	verifyPodNodeAllocatableStatus(tCtx, env.namespace, pod.Name, expectedStatus)
+	verifyPodAdditionalNodeAllocatableResources(tCtx, env.namespace, pod.Name, expectedStatus)
 }
 
 func testNodeAllocatableUnreferencedClaimInPod(tCtx ktesting.TContext) {
@@ -682,15 +686,15 @@ func testNodeAllocatableUnreferencedClaimInPod(tCtx ktesting.TContext) {
 	// and that the pod status correctly lists the allocated claim with an empty container list.
 	waitForPodScheduled(tCtx, env.namespace, pod.Name)
 
-	expectedStatus := []v1.NodeAllocatableResourceClaimStatus{{
-		ResourceClaimName: claimName,
-		Containers:        nil,
+	expectedStatus := []v1.AdditionalNodeAllocatableResource{{
+		Source:     v1.AdditionalNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: claimName},
+		Containers: nil,
 		Mapping: []v1.NodeAllocatableMappedResources{{
 			Name:     v1.ResourceCPU,
 			Quantity: new(resource.MustParse(nodeCPUCapacity)),
 		}},
 	}}
-	verifyPodNodeAllocatableStatus(tCtx, env.namespace, pod.Name, expectedStatus)
+	verifyPodAdditionalNodeAllocatableResources(tCtx, env.namespace, pod.Name, expectedStatus)
 }
 
 func testNodeAllocatableResourcesWithOverheadPerPod(tCtx ktesting.TContext) {
@@ -741,9 +745,9 @@ func testNodeAllocatableResourcesWithOverheadPerPod(tCtx ktesting.TContext) {
 		"node allocatable claim allocation",
 	)
 
-	expectedStatus := []v1.NodeAllocatableResourceClaimStatus{{
-		ResourceClaimName: claimName,
-		Containers:        []string{"my-container-1", "my-container-2"},
+	expectedStatus := []v1.AdditionalNodeAllocatableResource{{
+		Source:     v1.AdditionalNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: claimName},
+		Containers: []string{"my-container-1", "my-container-2"},
 		Overhead: []v1.NodeAllocatableOverheadResources{
 			{
 				Name:   v1.ResourceMemory,
@@ -751,7 +755,7 @@ func testNodeAllocatableResourcesWithOverheadPerPod(tCtx ktesting.TContext) {
 			},
 		},
 	}}
-	verifyPodNodeAllocatableStatus(tCtx, env.namespace, pod.Name, expectedStatus)
+	verifyPodAdditionalNodeAllocatableResources(tCtx, env.namespace, pod.Name, expectedStatus)
 }
 
 func testNodeAllocatableResourcesWithOverheadPerContainer(tCtx ktesting.TContext) {
@@ -802,9 +806,9 @@ func testNodeAllocatableResourcesWithOverheadPerContainer(tCtx ktesting.TContext
 		"node allocatable claim allocation",
 	)
 
-	expectedStatus := []v1.NodeAllocatableResourceClaimStatus{{
-		ResourceClaimName: claimName,
-		Containers:        []string{"my-container-1", "my-container-2"},
+	expectedStatus := []v1.AdditionalNodeAllocatableResource{{
+		Source:     v1.AdditionalNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: claimName},
+		Containers: []string{"my-container-1", "my-container-2"},
 		Overhead: []v1.NodeAllocatableOverheadResources{
 			{
 				Name:         v1.ResourceMemory,
@@ -812,7 +816,7 @@ func testNodeAllocatableResourcesWithOverheadPerContainer(tCtx ktesting.TContext
 			},
 		},
 	}}
-	verifyPodNodeAllocatableStatus(tCtx, env.namespace, pod.Name, expectedStatus)
+	verifyPodAdditionalNodeAllocatableResources(tCtx, env.namespace, pod.Name, expectedStatus)
 }
 
 func testNodeAllocatableResourcesWithOverheadBoth(tCtx ktesting.TContext) {
@@ -864,9 +868,9 @@ func testNodeAllocatableResourcesWithOverheadBoth(tCtx ktesting.TContext) {
 		"node allocatable claim allocation",
 	)
 
-	expectedStatus := []v1.NodeAllocatableResourceClaimStatus{{
-		ResourceClaimName: claimName,
-		Containers:        []string{"my-container-1", "my-container-2"},
+	expectedStatus := []v1.AdditionalNodeAllocatableResource{{
+		Source:     v1.AdditionalNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: claimName},
+		Containers: []string{"my-container-1", "my-container-2"},
 		Overhead: []v1.NodeAllocatableOverheadResources{
 			{
 				Name:         v1.ResourceMemory,
@@ -875,7 +879,7 @@ func testNodeAllocatableResourcesWithOverheadBoth(tCtx ktesting.TContext) {
 			},
 		},
 	}}
-	verifyPodNodeAllocatableStatus(tCtx, env.namespace, pod.Name, expectedStatus)
+	verifyPodAdditionalNodeAllocatableResources(tCtx, env.namespace, pod.Name, expectedStatus)
 }
 
 func testNodeAllocatableResourcesWithOverheadInsufficient(tCtx ktesting.TContext) {
@@ -912,8 +916,8 @@ func testNodeAllocatableResourcesWithOverheadInsufficient(tCtx ktesting.TContext
 // intersection of two features: an extended resource backed by DRA (the
 // scheduler creates the ResourceClaim during PreBind) and a device that
 // contributes node allocatable resources. Before the fix, PreBind left the
-// in-memory placeholder claim name "<extended-resources>" in the node
-// allocatable claim status and the API server rejected the pod status patch, so
+// in-memory placeholder claim name "<extended-resources>" in
+// AdditionalNodeAllocatableResources and the API server rejected the pod status patch, so
 // the pod never got scheduled.
 func testNodeAllocatableExtendedResource(tCtx ktesting.TContext) {
 	tCtx.Parallel()
@@ -947,7 +951,7 @@ func testNodeAllocatableExtendedResource(tCtx ktesting.TContext) {
 	// pod stays unschedulable because the pod status patch fails validation.
 	waitForPodScheduled(tCtx, env.namespace, pod.Name)
 
-	// The node allocatable status must reference the real extended-resource
+	// AdditionalNodeAllocatableResources must reference the real extended-resource
 	// claim name (recorded in ExtendedResourceClaimStatus), never the in-memory
 	// placeholder "<extended-resources>".
 	tCtx.Eventually(func(tCtx ktesting.TContext) error {
@@ -959,16 +963,16 @@ func testNodeAllocatableExtendedResource(tCtx ktesting.TContext) {
 			return fmt.Errorf("pod has no ExtendedResourceClaimStatus yet")
 		}
 		realClaimName := p.Status.ExtendedResourceClaimStatus.ResourceClaimName
-		if len(p.Status.NodeAllocatableResourceClaimStatuses) == 0 {
-			return fmt.Errorf("pod has no NodeAllocatableResourceClaimStatuses yet")
+		if len(p.Status.AdditionalNodeAllocatableResources) == 0 {
+			return fmt.Errorf("pod has no AdditionalNodeAllocatableResources yet")
 		}
-		for _, s := range p.Status.NodeAllocatableResourceClaimStatuses {
-			if s.ResourceClaimName != realClaimName {
-				return fmt.Errorf("node allocatable status references claim name %q, want real extended resource claim name %q", s.ResourceClaimName, realClaimName)
+		for _, s := range p.Status.AdditionalNodeAllocatableResources {
+			if s.Source.Name != realClaimName {
+				return fmt.Errorf("additionalNodeAllocatableResources references claim name %q, want real extended resource claim name %q", s.Source.Name, realClaimName)
 			}
 		}
 		return nil
-	}).WithTimeout(30*time.Second).WithPolling(200*time.Millisecond).Should(gomega.Succeed(), "node allocatable status should reference the real extended resource claim name")
+	}).WithTimeout(30*time.Second).WithPolling(200*time.Millisecond).Should(gomega.Succeed(), "additionalNodeAllocatableResources should reference the real extended resource claim name")
 }
 
 func testNodeAllocatableResourceClaimSharingOverhead(tCtx ktesting.TContext) {

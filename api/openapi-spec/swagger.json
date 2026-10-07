@@ -6172,6 +6172,76 @@
       ],
       "type": "object"
     },
+    "io.k8s.api.core.v1.AdditionalNodeAllocatableReference": {
+      "description": "AdditionalNodeAllocatableReference identifies the source object in the pod's namespace contributing additional node allocatable resources to a pod.",
+      "properties": {
+        "apiGroup": {
+          "description": "apiGroup is the group for the resource being referenced. It is empty for the core API. Currently, only \"resource.k8s.io\" is supported.",
+          "type": "string"
+        },
+        "kind": {
+          "description": "kind is the type of resource being referenced. Currently, only \"ResourceClaim\" is supported.",
+          "type": "string"
+        },
+        "name": {
+          "description": "name is the name of the source object in the pod's namespace (e.g., name of the resource claim).",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "name"
+      ],
+      "type": "object",
+      "x-kubernetes-map-type": "atomic"
+    },
+    "io.k8s.api.core.v1.AdditionalNodeAllocatableResource": {
+      "description": "AdditionalNodeAllocatableResource describes the status of node allocatable resources allocated outside of direct spec requests.",
+      "properties": {
+        "containers": {
+          "description": "containers lists the names of all containers in this pod that reference the source.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array",
+          "x-kubernetes-list-type": "set"
+        },
+        "mapping": {
+          "description": "mapping contains fixed node allocatable resource quantities allocated once per source. When source.kind is ResourceClaim, this contains allocations through devices mapped in the device spec's `nodeAllocatableResources[...].mapping` field. This is used by kubelet for pod level and container-level cgroup enforcement.",
+          "items": {
+            "$ref": "#/definitions/io.k8s.api.core.v1.NodeAllocatableMappedResources"
+          },
+          "type": "array",
+          "x-kubernetes-list-map-keys": [
+            "name"
+          ],
+          "x-kubernetes-list-type": "map",
+          "x-kubernetes-patch-merge-key": "name",
+          "x-kubernetes-patch-strategy": "merge"
+        },
+        "overhead": {
+          "description": "overhead contains variable node allocatable resource overheads incurred per pod (PerPod) and per referencing container (PerContainer) when using the source. When source.kind is ResourceClaim, this contains allocations through devices mapped in the device spec's `nodeAllocatableResources[...].overhead` field. This is used by kubelet for pod level and container-level cgroup enforcement.",
+          "items": {
+            "$ref": "#/definitions/io.k8s.api.core.v1.NodeAllocatableOverheadResources"
+          },
+          "type": "array",
+          "x-kubernetes-list-map-keys": [
+            "name"
+          ],
+          "x-kubernetes-list-type": "map",
+          "x-kubernetes-patch-merge-key": "name",
+          "x-kubernetes-patch-strategy": "merge"
+        },
+        "source": {
+          "$ref": "#/definitions/io.k8s.api.core.v1.AdditionalNodeAllocatableReference",
+          "description": "source identifies the object in the pod's namespace that this resource contribution originates from (e.g., a ResourceClaim)."
+        }
+      },
+      "required": [
+        "source"
+      ],
+      "type": "object"
+    },
     "io.k8s.api.core.v1.Affinity": {
       "description": "Affinity is a group of affinity scheduling rules.",
       "properties": {
@@ -9142,7 +9212,7 @@
         },
         "quantity": {
           "$ref": "#/definitions/io.k8s.apimachinery.pkg.api.resource.Quantity",
-          "description": "quantity is the total node allocatable resource capacity allocated for the claim. This claim's allocated devices is shared by all the containers referencing the claim. Kubelet adds this value to both requests and limits at the pod-level cgroup, and to limits at the container-level cgroup for each container referencing the claim."
+          "description": "quantity is the total node allocatable resource capacity allocated for the source. This source's allocated devices are shared by all the containers referencing the source. Kubelet adds this value to both requests and limits at the pod-level cgroup, and to limits at the container-level cgroup for each container referencing the source."
         }
       },
       "required": [
@@ -9160,7 +9230,7 @@
         },
         "perContainer": {
           "$ref": "#/definitions/io.k8s.apimachinery.pkg.api.resource.Quantity",
-          "description": "perContainer is the variable overhead quantity applied for each container referencing the claim. The container references are recorded in `nodeAllocatableResourceClaimStatuses.containers`. The total overhead quantity allocated for the claim is computed as: Quantity = PerPod + (PerContainer * NumReferences) Kubelet accounts for this overhead in cgroups: - Pod-level cgroup (requests and limits): Kubelet adds PerPod + (PerContainer * NumReferences). - Container-level cgroup (limits only): Kubelet adds PerPod + PerContainer for each referencing container. This allows any single container to access the pod-level overhead, while the parent cgroup caps the total usage to account for PerPod exactly once. At least one of PerPod or PerContainer must be specified. Specifying neither is an invalid configuration."
+          "description": "perContainer is the variable overhead quantity applied for each container referencing the claim. The container references are recorded in `additionalNodeAllocatableResources.containers`. The total overhead quantity allocated for the claim is computed as: Quantity = PerPod + (PerContainer * NumReferences) Kubelet accounts for this overhead in cgroups: - Pod-level cgroup (requests and limits): Kubelet adds PerPod + (PerContainer * NumReferences). - Container-level cgroup (limits only): Kubelet adds PerPod + PerContainer for each referencing container. This allows any single container to access the pod-level overhead, while the parent cgroup caps the total usage to account for PerPod exactly once. At least one of PerPod or PerContainer must be specified. Specifying neither is an invalid configuration."
         },
         "perPod": {
           "$ref": "#/definitions/io.k8s.apimachinery.pkg.api.resource.Quantity",
@@ -9169,53 +9239,6 @@
       },
       "required": [
         "name"
-      ],
-      "type": "object"
-    },
-    "io.k8s.api.core.v1.NodeAllocatableResourceClaimStatus": {
-      "description": "NodeAllocatableResourceClaimStatus describes the status of node allocatable resources allocated via DRA.",
-      "properties": {
-        "containers": {
-          "description": "containers lists the names of all containers in this pod that reference the claim.",
-          "items": {
-            "type": "string"
-          },
-          "type": "array",
-          "x-kubernetes-list-type": "set"
-        },
-        "mapping": {
-          "description": "mapping contains allocations through devices mapped in the device spec's `nodeAllocatableResources[...].mapping` field. This is used by kubelet for pod level and container-level cgroup enforcement.",
-          "items": {
-            "$ref": "#/definitions/io.k8s.api.core.v1.NodeAllocatableMappedResources"
-          },
-          "type": "array",
-          "x-kubernetes-list-map-keys": [
-            "name"
-          ],
-          "x-kubernetes-list-type": "map",
-          "x-kubernetes-patch-merge-key": "name",
-          "x-kubernetes-patch-strategy": "merge"
-        },
-        "overhead": {
-          "description": "overhead contains allocations through devices mapped in the device spec's `nodeAllocatableResources[...].overhead` field. This is used by kubelet for pod level and container-level cgroup enforcement.",
-          "items": {
-            "$ref": "#/definitions/io.k8s.api.core.v1.NodeAllocatableOverheadResources"
-          },
-          "type": "array",
-          "x-kubernetes-list-map-keys": [
-            "name"
-          ],
-          "x-kubernetes-list-type": "map",
-          "x-kubernetes-patch-merge-key": "name",
-          "x-kubernetes-patch-strategy": "merge"
-        },
-        "resourceClaimName": {
-          "description": "resourceClaimName is the resource claim referenced by the pod that resulted in this node allocatable resource allocation.",
-          "type": "string"
-        }
-      },
-      "required": [
-        "resourceClaimName"
       ],
       "type": "object"
     },
@@ -11007,6 +11030,14 @@
     "io.k8s.api.core.v1.PodStatus": {
       "description": "PodStatus represents information about the status of a pod. Status may trail the actual state of a system, especially if the node that hosts the pod cannot contact the control plane.",
       "properties": {
+        "additionalNodeAllocatableResources": {
+          "description": "additionalNodeAllocatableResources contains the status of node allocatable resources that were allocated for this pod outside of direct spec requests (e.g., through DRA claims). This includes resources currently reported in v1.Node `status.allocatable` that are not extended resources (see https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#extended-resources). Examples include \"cpu\", \"memory\", \"ephemeral-storage\", and hugepages.",
+          "items": {
+            "$ref": "#/definitions/io.k8s.api.core.v1.AdditionalNodeAllocatableResource"
+          },
+          "type": "array",
+          "x-kubernetes-list-type": "atomic"
+        },
         "allocatedResources": {
           "additionalProperties": {
             "$ref": "#/definitions/io.k8s.apimachinery.pkg.api.resource.Quantity"
@@ -11072,19 +11103,6 @@
         "message": {
           "description": "A human readable message indicating details about why the pod is in this condition.",
           "type": "string"
-        },
-        "nodeAllocatableResourceClaimStatuses": {
-          "description": "NodeAllocatableResourceClaimStatuses contains the status of node-allocatable resources that were allocated for this pod through DRA claims. This includes resources currently reported in v1.Node `status.allocatable` that are not extended resources (see https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#extended-resources). Examples include \"cpu\", \"memory\", \"ephemeral-storage\", and hugepages.",
-          "items": {
-            "$ref": "#/definitions/io.k8s.api.core.v1.NodeAllocatableResourceClaimStatus"
-          },
-          "type": "array",
-          "x-kubernetes-list-map-keys": [
-            "resourceClaimName"
-          ],
-          "x-kubernetes-list-type": "map",
-          "x-kubernetes-patch-merge-key": "resourceClaimName",
-          "x-kubernetes-patch-strategy": "merge"
         },
         "nominatedNodeName": {
           "description": "nominatedNodeName is set only when this pod preempts other pods on the node, but it cannot be scheduled right away as preemption victims receive their graceful termination periods. This field does not guarantee that the pod will be scheduled on this node. Scheduler may decide to place the pod elsewhere if other nodes become available sooner. Scheduler may also decide to give the resources on this node to a higher priority pod that is created after preemption. As a result, this field may be different than PodSpec.nodeName when the pod is scheduled.",

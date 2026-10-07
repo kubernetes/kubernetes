@@ -39,6 +39,29 @@ func (AWSElasticBlockStoreVolumeSource) SwaggerDoc() map[string]string {
 	return map_AWSElasticBlockStoreVolumeSource
 }
 
+var map_AdditionalNodeAllocatableReference = map[string]string{
+	"":         "AdditionalNodeAllocatableReference identifies the source object in the pod's namespace contributing additional node allocatable resources to a pod.",
+	"apiGroup": "apiGroup is the group for the resource being referenced. It is empty for the core API. Currently, only \"resource.k8s.io\" is supported.",
+	"kind":     "kind is the type of resource being referenced. Currently, only \"ResourceClaim\" is supported.",
+	"name":     "name is the name of the source object in the pod's namespace (e.g., name of the resource claim).",
+}
+
+func (AdditionalNodeAllocatableReference) SwaggerDoc() map[string]string {
+	return map_AdditionalNodeAllocatableReference
+}
+
+var map_AdditionalNodeAllocatableResource = map[string]string{
+	"":           "AdditionalNodeAllocatableResource describes the status of node allocatable resources allocated outside of direct spec requests.",
+	"source":     "source identifies the object in the pod's namespace that this resource contribution originates from (e.g., a ResourceClaim).",
+	"containers": "containers lists the names of all containers in this pod that reference the source.",
+	"mapping":    "mapping contains fixed node allocatable resource quantities allocated once per source. When source.kind is ResourceClaim, this contains allocations through devices mapped in the device spec's `nodeAllocatableResources[...].mapping` field. This is used by kubelet for pod level and container-level cgroup enforcement.",
+	"overhead":   "overhead contains variable node allocatable resource overheads incurred per pod (PerPod) and per referencing container (PerContainer) when using the source. When source.kind is ResourceClaim, this contains allocations through devices mapped in the device spec's `nodeAllocatableResources[...].overhead` field. This is used by kubelet for pod level and container-level cgroup enforcement.",
+}
+
+func (AdditionalNodeAllocatableResource) SwaggerDoc() map[string]string {
+	return map_AdditionalNodeAllocatableResource
+}
+
 var map_Affinity = map[string]string{
 	"":                "Affinity is a group of affinity scheduling rules.",
 	"nodeAffinity":    "nodeAffinity describes node affinity scheduling rules for the pod.",
@@ -1255,7 +1278,7 @@ func (NodeAffinity) SwaggerDoc() map[string]string {
 var map_NodeAllocatableMappedResources = map[string]string{
 	"":         "NodeAllocatableMappedResources describes mapped node allocatable resource allocations.",
 	"name":     "name is the name of the resource (e.g., cpu, memory).",
-	"quantity": "quantity is the total node allocatable resource capacity allocated for the claim. This claim's allocated devices is shared by all the containers referencing the claim. Kubelet adds this value to both requests and limits at the pod-level cgroup, and to limits at the container-level cgroup for each container referencing the claim.",
+	"quantity": "quantity is the total node allocatable resource capacity allocated for the source. This source's allocated devices are shared by all the containers referencing the source. Kubelet adds this value to both requests and limits at the pod-level cgroup, and to limits at the container-level cgroup for each container referencing the source.",
 }
 
 func (NodeAllocatableMappedResources) SwaggerDoc() map[string]string {
@@ -1266,23 +1289,11 @@ var map_NodeAllocatableOverheadResources = map[string]string{
 	"":             "NodeAllocatableOverheadResources describes auxiliary overhead resource allocations.",
 	"name":         "name is the name of the resource (e.g., cpu, memory).",
 	"perPod":       "perPod is the flat overhead quantity allocated per pod. Adding to each container limit allows individual containers to utilize the overhead, while the parent pod-level cgroup limit caps the total usage at the pod boundary where the overhead is accounted for exactly once. At least one of PerPod or PerContainer must be specified. Specifying neither is an invalid configuration.",
-	"perContainer": "perContainer is the variable overhead quantity applied for each container referencing the claim. The container references are recorded in `nodeAllocatableResourceClaimStatuses.containers`. The total overhead quantity allocated for the claim is computed as: Quantity = PerPod + (PerContainer * NumReferences) Kubelet accounts for this overhead in cgroups: - Pod-level cgroup (requests and limits): Kubelet adds PerPod + (PerContainer * NumReferences). - Container-level cgroup (limits only): Kubelet adds PerPod + PerContainer for each referencing container. This allows any single container to access the pod-level overhead, while the parent cgroup caps the total usage to account for PerPod exactly once. At least one of PerPod or PerContainer must be specified. Specifying neither is an invalid configuration.",
+	"perContainer": "perContainer is the variable overhead quantity applied for each container referencing the claim. The container references are recorded in `additionalNodeAllocatableResources.containers`. The total overhead quantity allocated for the claim is computed as: Quantity = PerPod + (PerContainer * NumReferences) Kubelet accounts for this overhead in cgroups: - Pod-level cgroup (requests and limits): Kubelet adds PerPod + (PerContainer * NumReferences). - Container-level cgroup (limits only): Kubelet adds PerPod + PerContainer for each referencing container. This allows any single container to access the pod-level overhead, while the parent cgroup caps the total usage to account for PerPod exactly once. At least one of PerPod or PerContainer must be specified. Specifying neither is an invalid configuration.",
 }
 
 func (NodeAllocatableOverheadResources) SwaggerDoc() map[string]string {
 	return map_NodeAllocatableOverheadResources
-}
-
-var map_NodeAllocatableResourceClaimStatus = map[string]string{
-	"":                  "NodeAllocatableResourceClaimStatus describes the status of node allocatable resources allocated via DRA.",
-	"resourceClaimName": "resourceClaimName is the resource claim referenced by the pod that resulted in this node allocatable resource allocation.",
-	"containers":        "containers lists the names of all containers in this pod that reference the claim.",
-	"mapping":           "mapping contains allocations through devices mapped in the device spec's `nodeAllocatableResources[...].mapping` field. This is used by kubelet for pod level and container-level cgroup enforcement.",
-	"overhead":          "overhead contains allocations through devices mapped in the device spec's `nodeAllocatableResources[...].overhead` field. This is used by kubelet for pod level and container-level cgroup enforcement.",
-}
-
-func (NodeAllocatableResourceClaimStatus) SwaggerDoc() map[string]string {
-	return map_NodeAllocatableResourceClaimStatus
 }
 
 var map_NodeCondition = map[string]string{
@@ -2015,29 +2026,29 @@ func (PodSpec) SwaggerDoc() map[string]string {
 }
 
 var map_PodStatus = map[string]string{
-	"":                                     "PodStatus represents information about the status of a pod. Status may trail the actual state of a system, especially if the node that hosts the pod cannot contact the control plane.",
-	"observedGeneration":                   "If set, this represents the .metadata.generation that the pod status was set based upon. The PodObservedGenerationTracking feature gate must be enabled to use this field.",
-	"phase":                                "The phase of a Pod is a simple, high-level summary of where the Pod is in its lifecycle. The conditions array, the reason and message fields, and the individual container status arrays contain more detail about the pod's status. There are five possible phase values:\n\nPending: The pod has been accepted by the Kubernetes system, but one or more of the container images has not been created. This includes time before being scheduled as well as time spent downloading images over the network, which could take a while. Running: The pod has been bound to a node, and all of the containers have been created. At least one container is still running, or is in the process of starting or restarting. Succeeded: All containers in the pod have terminated in success, and will not be restarted. Failed: All containers in the pod have terminated, and at least one container has terminated in failure. The container either exited with non-zero status or was terminated by the system. Unknown: For some reason the state of the pod could not be obtained, typically due to an error in communicating with the host of the pod.\n\nMore info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#pod-phase",
-	"conditions":                           "Current service state of pod. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#pod-conditions",
-	"message":                              "A human readable message indicating details about why the pod is in this condition.",
-	"reason":                               "A brief CamelCase message indicating details about why the pod is in this state. e.g. 'Evicted'",
-	"nominatedNodeName":                    "nominatedNodeName is set only when this pod preempts other pods on the node, but it cannot be scheduled right away as preemption victims receive their graceful termination periods. This field does not guarantee that the pod will be scheduled on this node. Scheduler may decide to place the pod elsewhere if other nodes become available sooner. Scheduler may also decide to give the resources on this node to a higher priority pod that is created after preemption. As a result, this field may be different than PodSpec.nodeName when the pod is scheduled.",
-	"hostIP":                               "hostIP holds the IP address of the host to which the pod is assigned. Empty if the pod has not started yet. A pod can be assigned to a node that has a problem in kubelet which in turns mean that HostIP will not be updated even if there is a node is assigned to pod",
-	"hostIPs":                              "hostIPs holds the IP addresses allocated to the host. If this field is specified, the first entry must match the hostIP field. This list is empty if the pod has not started yet. A pod can be assigned to a node that has a problem in kubelet which in turns means that HostIPs will not be updated even if there is a node is assigned to this pod.",
-	"podIP":                                "podIP address allocated to the pod. Routable at least within the cluster. Empty if not yet allocated.",
-	"podIPs":                               "podIPs holds the IP addresses allocated to the pod. If this field is specified, the 0th entry must match the podIP field. Pods may be allocated at most 1 value for each of IPv4 and IPv6. This list is empty if no IPs have been allocated yet.",
-	"startTime":                            "RFC 3339 date and time at which the object was acknowledged by the Kubelet. This is before the Kubelet pulled the container image(s) for the pod.",
-	"initContainerStatuses":                "Statuses of init containers in this pod. The most recent successful non-restartable init container will have ready = true, the most recently started container will have startTime set. Each init container in the pod should have at most one status in this list, and all statuses should be for containers in the pod. However this is not enforced. If a status for a non-existent container is present in the list, or the list has duplicate names, the behavior of various Kubernetes components is not defined and those statuses might be ignored. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#pod-and-container-status",
-	"containerStatuses":                    "Statuses of containers in this pod. Each container in the pod should have at most one status in this list, and all statuses should be for containers in the pod. However this is not enforced. If a status for a non-existent container is present in the list, or the list has duplicate names, the behavior of various Kubernetes components is not defined and those statuses might be ignored. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#pod-and-container-status",
-	"qosClass":                             "The Quality of Service (QOS) classification assigned to the pod based on resource requirements See PodQOSClass type for available QOS classes More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-qos/#quality-of-service-classes",
-	"ephemeralContainerStatuses":           "Statuses for any ephemeral containers that have run in this pod. Each ephemeral container in the pod should have at most one status in this list, and all statuses should be for containers in the pod. However this is not enforced. If a status for a non-existent container is present in the list, or the list has duplicate names, the behavior of various Kubernetes components is not defined and those statuses might be ignored. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#pod-and-container-status",
-	"resize":                               "Status of resources resize desired for pod's containers. It is empty if no resources resize is pending. Any changes to container resources will automatically set this to \"Proposed\" Deprecated: Resize status is moved to two pod conditions PodResizePending and PodResizeInProgress. PodResizePending will track states where the spec has been resized, but the Kubelet has not yet allocated the resources. PodResizeInProgress will track in-progress resizes, and should be present whenever allocated resources != acknowledged resources.",
-	"resourceClaimStatuses":                "Status of resource claims.",
-	"extendedResourceClaimStatus":          "Status of extended resource claim backed by DRA.",
-	"allocatedResources":                   "AllocatedResources is the total requests allocated for this pod by the node. If pod-level requests are not set, this will be the total requests aggregated across containers in the pod.",
-	"resources":                            "Resources represents the compute resource requests and limits that have been applied at the pod level if pod-level requests or limits are set in PodSpec.Resources",
-	"nodeAllocatableResourceClaimStatuses": "NodeAllocatableResourceClaimStatuses contains the status of node-allocatable resources that were allocated for this pod through DRA claims. This includes resources currently reported in v1.Node `status.allocatable` that are not extended resources (see https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#extended-resources). Examples include \"cpu\", \"memory\", \"ephemeral-storage\", and hugepages.",
-	"volumeHealth":                         "volumeHealth contains node-reported health for each volume the pod is using. Populated by the kubelet on the pod's node.",
+	"":                                   "PodStatus represents information about the status of a pod. Status may trail the actual state of a system, especially if the node that hosts the pod cannot contact the control plane.",
+	"observedGeneration":                 "If set, this represents the .metadata.generation that the pod status was set based upon. The PodObservedGenerationTracking feature gate must be enabled to use this field.",
+	"phase":                              "The phase of a Pod is a simple, high-level summary of where the Pod is in its lifecycle. The conditions array, the reason and message fields, and the individual container status arrays contain more detail about the pod's status. There are five possible phase values:\n\nPending: The pod has been accepted by the Kubernetes system, but one or more of the container images has not been created. This includes time before being scheduled as well as time spent downloading images over the network, which could take a while. Running: The pod has been bound to a node, and all of the containers have been created. At least one container is still running, or is in the process of starting or restarting. Succeeded: All containers in the pod have terminated in success, and will not be restarted. Failed: All containers in the pod have terminated, and at least one container has terminated in failure. The container either exited with non-zero status or was terminated by the system. Unknown: For some reason the state of the pod could not be obtained, typically due to an error in communicating with the host of the pod.\n\nMore info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#pod-phase",
+	"conditions":                         "Current service state of pod. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#pod-conditions",
+	"message":                            "A human readable message indicating details about why the pod is in this condition.",
+	"reason":                             "A brief CamelCase message indicating details about why the pod is in this state. e.g. 'Evicted'",
+	"nominatedNodeName":                  "nominatedNodeName is set only when this pod preempts other pods on the node, but it cannot be scheduled right away as preemption victims receive their graceful termination periods. This field does not guarantee that the pod will be scheduled on this node. Scheduler may decide to place the pod elsewhere if other nodes become available sooner. Scheduler may also decide to give the resources on this node to a higher priority pod that is created after preemption. As a result, this field may be different than PodSpec.nodeName when the pod is scheduled.",
+	"hostIP":                             "hostIP holds the IP address of the host to which the pod is assigned. Empty if the pod has not started yet. A pod can be assigned to a node that has a problem in kubelet which in turns mean that HostIP will not be updated even if there is a node is assigned to pod",
+	"hostIPs":                            "hostIPs holds the IP addresses allocated to the host. If this field is specified, the first entry must match the hostIP field. This list is empty if the pod has not started yet. A pod can be assigned to a node that has a problem in kubelet which in turns means that HostIPs will not be updated even if there is a node is assigned to this pod.",
+	"podIP":                              "podIP address allocated to the pod. Routable at least within the cluster. Empty if not yet allocated.",
+	"podIPs":                             "podIPs holds the IP addresses allocated to the pod. If this field is specified, the 0th entry must match the podIP field. Pods may be allocated at most 1 value for each of IPv4 and IPv6. This list is empty if no IPs have been allocated yet.",
+	"startTime":                          "RFC 3339 date and time at which the object was acknowledged by the Kubelet. This is before the Kubelet pulled the container image(s) for the pod.",
+	"initContainerStatuses":              "Statuses of init containers in this pod. The most recent successful non-restartable init container will have ready = true, the most recently started container will have startTime set. Each init container in the pod should have at most one status in this list, and all statuses should be for containers in the pod. However this is not enforced. If a status for a non-existent container is present in the list, or the list has duplicate names, the behavior of various Kubernetes components is not defined and those statuses might be ignored. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#pod-and-container-status",
+	"containerStatuses":                  "Statuses of containers in this pod. Each container in the pod should have at most one status in this list, and all statuses should be for containers in the pod. However this is not enforced. If a status for a non-existent container is present in the list, or the list has duplicate names, the behavior of various Kubernetes components is not defined and those statuses might be ignored. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#pod-and-container-status",
+	"qosClass":                           "The Quality of Service (QOS) classification assigned to the pod based on resource requirements See PodQOSClass type for available QOS classes More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-qos/#quality-of-service-classes",
+	"ephemeralContainerStatuses":         "Statuses for any ephemeral containers that have run in this pod. Each ephemeral container in the pod should have at most one status in this list, and all statuses should be for containers in the pod. However this is not enforced. If a status for a non-existent container is present in the list, or the list has duplicate names, the behavior of various Kubernetes components is not defined and those statuses might be ignored. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#pod-and-container-status",
+	"resize":                             "Status of resources resize desired for pod's containers. It is empty if no resources resize is pending. Any changes to container resources will automatically set this to \"Proposed\" Deprecated: Resize status is moved to two pod conditions PodResizePending and PodResizeInProgress. PodResizePending will track states where the spec has been resized, but the Kubelet has not yet allocated the resources. PodResizeInProgress will track in-progress resizes, and should be present whenever allocated resources != acknowledged resources.",
+	"resourceClaimStatuses":              "Status of resource claims.",
+	"extendedResourceClaimStatus":        "Status of extended resource claim backed by DRA.",
+	"allocatedResources":                 "AllocatedResources is the total requests allocated for this pod by the node. If pod-level requests are not set, this will be the total requests aggregated across containers in the pod.",
+	"resources":                          "Resources represents the compute resource requests and limits that have been applied at the pod level if pod-level requests or limits are set in PodSpec.Resources",
+	"volumeHealth":                       "volumeHealth contains node-reported health for each volume the pod is using. Populated by the kubelet on the pod's node.",
+	"additionalNodeAllocatableResources": "additionalNodeAllocatableResources contains the status of node allocatable resources that were allocated for this pod outside of direct spec requests (e.g., through DRA claims). This includes resources currently reported in v1.Node `status.allocatable` that are not extended resources (see https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#extended-resources). Examples include \"cpu\", \"memory\", \"ephemeral-storage\", and hugepages.",
 }
 
 func (PodStatus) SwaggerDoc() map[string]string {

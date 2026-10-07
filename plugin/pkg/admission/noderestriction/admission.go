@@ -368,8 +368,8 @@ func (p *Plugin) admitPodStatus(nodeName string, a admission.Attributes) error {
 		if !extendedResourceClaimStatusEqual(oldPod.Status.ExtendedResourceClaimStatus, newPod.Status.ExtendedResourceClaimStatus) {
 			return admission.NewForbidden(a, fmt.Errorf("node %q cannot update extended resource claim status", nodeName))
 		}
-		if !nodeAllocatableResourceClaimStatusesEqual(oldPod.Status.NodeAllocatableResourceClaimStatuses, newPod.Status.NodeAllocatableResourceClaimStatuses) {
-			return admission.NewForbidden(a, fmt.Errorf("node %q cannot update node allocatable resource claim statuses", nodeName))
+		if !additionalNodeAllocatableResourcesEqual(oldPod.Status.AdditionalNodeAllocatableResources, newPod.Status.AdditionalNodeAllocatableResources) {
+			return admission.NewForbidden(a, fmt.Errorf("node %q cannot update additional node allocatable resources", nodeName))
 		}
 		return nil
 
@@ -417,24 +417,24 @@ func extendedResourceClaimStatusEqual(statusA, statusB *api.PodExtendedResourceC
 	return slices.Equal(statusA.RequestMappings, statusB.RequestMappings)
 }
 
-func nodeAllocatableResourceClaimStatusesEqual(statusA, statusB []api.NodeAllocatableResourceClaimStatus) bool {
-	if len(statusA) != len(statusB) {
+func additionalNodeAllocatableResourcesEqual(resourcesA, resourcesB []api.AdditionalNodeAllocatableResource) bool {
+	if len(resourcesA) != len(resourcesB) {
 		return false
 	}
-	// In most cases, status entries only get added once and not modified.
+	// In most cases, entries only get added once and not modified.
 	// But this cannot be guaranteed, so for the sake of correctness in all
 	// cases this code here has to check.
-	for i := range statusA {
-		if statusA[i].ResourceClaimName != statusB[i].ResourceClaimName {
+	for i := range resourcesA {
+		if resourcesA[i].Source != resourcesB[i].Source {
 			return false
 		}
-		if !slices.Equal(statusA[i].Containers, statusB[i].Containers) {
+		if !slices.Equal(resourcesA[i].Containers, resourcesB[i].Containers) {
 			return false
 		}
-		if !nodeAllocatableMappedResourcesEqual(statusA[i].Mapping, statusB[i].Mapping) {
+		if !nodeAllocatableMappedResourcesEqual(resourcesA[i].Mapping, resourcesB[i].Mapping) {
 			return false
 		}
-		if !nodeAllocatableOverheadResourcesEqual(statusA[i].Overhead, statusB[i].Overhead) {
+		if !nodeAllocatableOverheadResourcesEqual(resourcesA[i].Overhead, resourcesB[i].Overhead) {
 			return false
 		}
 	}

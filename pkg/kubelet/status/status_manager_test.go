@@ -530,10 +530,10 @@ func TestStatusEquality(t *testing.T) {
 	}
 	oldPodStatus.ResourceClaimStatuses = []v1.PodResourceClaimStatus{claimStatusA}
 	oldPodStatus.ExtendedResourceClaimStatus = extendedClaimStatusA
-	oldPodStatus.NodeAllocatableResourceClaimStatuses = []v1.NodeAllocatableResourceClaimStatus{
+	oldPodStatus.AdditionalNodeAllocatableResources = []v1.AdditionalNodeAllocatableResource{
 		{
-			ResourceClaimName: "my-claim",
-			Containers:        []string{"ctr0"},
+			Source:     v1.AdditionalNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "my-claim"},
+			Containers: []string{"ctr0"},
 			Mapping: []v1.NodeAllocatableMappedResources{{
 				Name:     v1.ResourceMemory,
 				Quantity: new(resource.MustParse("100Mi")),
@@ -580,7 +580,7 @@ func TestIsPodStatusByKubeletEqualFutureProof(t *testing.T) {
 	kubeletIgnoredFields := sets.NewString(
 		"ResourceClaimStatuses",
 		"ExtendedResourceClaimStatus",
-		"NodeAllocatableResourceClaimStatuses",
+		"AdditionalNodeAllocatableResources",
 	)
 
 	// Get all fields in v1.PodStatus.
@@ -625,14 +625,14 @@ func TestIsPodStatusByKubeletEqualFutureProof(t *testing.T) {
 			t.Error("ExtendedResourceClaimStatus: change should be ignored but was detected")
 		}
 
-		// Test NodeAllocatableResourceClaimStatuses
+		// Test AdditionalNodeAllocatableResources
 		modified = base.DeepCopy()
-		modified.NodeAllocatableResourceClaimStatuses = []v1.NodeAllocatableResourceClaimStatus{{
-			ResourceClaimName: "test-node-claim",
-			Containers:        []string{"ctr0"},
+		modified.AdditionalNodeAllocatableResources = []v1.AdditionalNodeAllocatableResource{{
+			Source:     v1.AdditionalNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "test-node-claim"},
+			Containers: []string{"ctr0"},
 		}}
 		if !isPodStatusByKubeletEqual(base, modified) {
-			t.Error("NodeAllocatableResourceClaimStatuses: change should be ignored but was detected")
+			t.Error("AdditionalNodeAllocatableResources: change should be ignored but was detected")
 		}
 	})
 

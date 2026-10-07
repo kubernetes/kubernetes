@@ -4925,17 +4925,6 @@ type PodStatus struct {
 	// +optional
 	Resources *ResourceRequirements
 
-	// NodeAllocatableResourceClaimStatuses contains the status of node-allocatable resources
-	// that were allocated for this pod through DRA claims. This includes resources currently
-	// reported in v1.Node `status.allocatable` that are not extended resources
-	// (see https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#extended-resources).
-	// Examples include "cpu", "memory", "ephemeral-storage", and hugepages.
-	// +featureGate=DRANodeAllocatableResources
-	// +optional
-	// +listType=map
-	// +listMapKey=resourceClaimName
-	NodeAllocatableResourceClaimStatuses []NodeAllocatableResourceClaimStatus
-
 	// volumeHealth contains node-reported health for each volume the pod is using.
 	// Populated by the kubelet on the pod's node.
 	// +featureGate=CSIVolumeHealth
@@ -4943,6 +4932,17 @@ type PodStatus struct {
 	// +listType=map
 	// +listMapKey=name
 	VolumeHealth []PodVolumeHealth
+
+	// AdditionalNodeAllocatableResources contains the status of node allocatable resources
+	// that were allocated for this pod outside of direct spec requests (e.g., through DRA claims).
+	// This includes resources currently
+	// reported in v1.Node `status.allocatable` that are not extended resources
+	// (see https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#extended-resources).
+	// Examples include "cpu", "memory", "ephemeral-storage", and hugepages.
+	// +featureGate=DRANodeAllocatableResources
+	// +optional
+	// +listType=atomic
+	AdditionalNodeAllocatableResources []AdditionalNodeAllocatableResource
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -7522,27 +7522,50 @@ type ImageVolumeSource struct {
 	PullPolicy PullPolicy
 }
 
-// NodeAllocatableResourceClaimStatus describes the status of node allocatable resources allocated via DRA.
-type NodeAllocatableResourceClaimStatus struct {
-	// ResourceClaimName is the resource claim referenced by the pod that resulted in this node allocatable resource allocation.
+// AdditionalNodeAllocatableResource describes the status of
+// node allocatable resources allocated outside of direct spec requests.
+type AdditionalNodeAllocatableResource struct {
+	// Source identifies the object in the pod's namespace that this resource
+	// contribution originates from (e.g., a ResourceClaim).
 	// +required
-	ResourceClaimName string
-	// Containers lists the names of all containers in this pod that reference the claim.
+	Source AdditionalNodeAllocatableReference
+	// Containers lists the names of all containers in this pod that reference the source.
 	// +optional
 	// +listType=set
 	Containers []string
-	// Mapping contains allocations through devices mapped in `device.nodeAllocatableResources.mapping`.
+	// Mapping contains fixed node allocatable resource quantities allocated once per source.
+	// When source.kind is ResourceClaim, this contains allocations through devices mapped in `device.nodeAllocatableResources.mapping`.
 	// This is used by kubelet for pod level and container level cgroup enforcement.
 	// +optional
 	// +listType=map
 	// +listMapKey=name
 	Mapping []NodeAllocatableMappedResources
-	// Overhead contains allocations through devices mapped in `device.nodeAllocatableResources.overhead`.
+	// Overhead contains variable node allocatable resource overheads incurred per pod (PerPod) and
+	// per referencing container (PerContainer) when using the source.
+	// When source.kind is ResourceClaim, this contains allocations through devices mapped in `device.nodeAllocatableResources.overhead`.
 	// This is used by kubelet for pod level and container level cgroup enforcement.
 	// +optional
 	// +listType=map
 	// +listMapKey=name
 	Overhead []NodeAllocatableOverheadResources
+}
+
+// AdditionalNodeAllocatableReference identifies the source object in the pod's namespace
+// contributing additional node allocatable resources to a pod.
+type AdditionalNodeAllocatableReference struct {
+	// APIGroup is the group for the resource being referenced. It is
+	// empty for the core API.
+	// Currently, only "resource.k8s.io" is supported.
+	// +optional
+	APIGroup string
+	// Kind is the type of resource being referenced.
+	// Currently, only "ResourceClaim" is supported.
+	// +required
+	Kind string
+	// Name is the name of the source object in the pod's namespace
+	// (e.g., name of the resource claim).
+	// +required
+	Name string
 }
 
 // NodeAllocatableMappedResources describes mapped node allocatable resource allocations.
@@ -7568,7 +7591,7 @@ type NodeAllocatableOverheadResources struct {
 	// +optional
 	PerPod *resource.Quantity
 	// PerContainer is the variable overhead quantity applied for each container referencing the claim.
-	// The container references are recorded in `nodeAllocatableResourceClaimStatuses.containers`.
+	// The container references are recorded in `additionalNodeAllocatableResources.containers`.
 	// The total overhead quantity allocated for the claim is computed as:
 	// Quantity = PerPod + (PerContainer * NumReferences)
 	// Kubelet accounts for this overhead in cgroups:

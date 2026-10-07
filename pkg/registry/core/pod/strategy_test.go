@@ -5401,15 +5401,15 @@ func TestStatusPrepareForUpdate(t *testing.T) {
 			},
 		},
 		{
-			description: "preserve old NodeAllocatableResourceClaimStatuses when misbehaving client clears them on terminating pod",
+			description: "preserve old AdditionalNodeAllocatableResources when misbehaving client clears them on terminating pod",
 			features: map[featuregate.Feature]bool{
 				features.DRANodeAllocatableResources: true,
 			},
 			oldPod: &api.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "pod", DeletionTimestamp: &metav1.Time{}},
 				Status: api.PodStatus{
-					NodeAllocatableResourceClaimStatuses: []api.NodeAllocatableResourceClaimStatus{
-						{ResourceClaimName: "pod-node-claim"},
+					AdditionalNodeAllocatableResources: []api.AdditionalNodeAllocatableResource{
+						{Source: api.AdditionalNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "pod-node-claim"}},
 					},
 				},
 			},
@@ -5420,22 +5420,22 @@ func TestStatusPrepareForUpdate(t *testing.T) {
 			expected: &api.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
 				Status: api.PodStatus{
-					NodeAllocatableResourceClaimStatuses: []api.NodeAllocatableResourceClaimStatus{
-						{ResourceClaimName: "pod-node-claim"},
+					AdditionalNodeAllocatableResources: []api.AdditionalNodeAllocatableResource{
+						{Source: api.AdditionalNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "pod-node-claim"}},
 					},
 				},
 			},
 		},
 		{
-			description: "preserve old NodeAllocatableResourceClaimStatuses when omitted on non-terminating pod",
+			description: "preserve old AdditionalNodeAllocatableResources when omitted on non-terminating pod",
 			features: map[featuregate.Feature]bool{
 				features.DRANodeAllocatableResources: true,
 			},
 			oldPod: &api.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
 				Status: api.PodStatus{
-					NodeAllocatableResourceClaimStatuses: []api.NodeAllocatableResourceClaimStatus{
-						{ResourceClaimName: "pod-node-claim"},
+					AdditionalNodeAllocatableResources: []api.AdditionalNodeAllocatableResource{
+						{Source: api.AdditionalNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "pod-node-claim"}},
 					},
 				},
 			},
@@ -5446,35 +5446,35 @@ func TestStatusPrepareForUpdate(t *testing.T) {
 			expected: &api.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
 				Status: api.PodStatus{
-					NodeAllocatableResourceClaimStatuses: []api.NodeAllocatableResourceClaimStatus{
-						{ResourceClaimName: "pod-node-claim"},
+					AdditionalNodeAllocatableResources: []api.AdditionalNodeAllocatableResource{
+						{Source: api.AdditionalNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "pod-node-claim"}},
 					},
 				},
 			},
 		},
 		{
-			description: "allow explicit empty-slice removal of NodeAllocatableResourceClaimStatuses on non-terminating pod",
+			description: "allow explicit empty-slice removal of AdditionalNodeAllocatableResources on non-terminating pod",
 			features: map[featuregate.Feature]bool{
 				features.DRANodeAllocatableResources: true,
 			},
 			oldPod: &api.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
 				Status: api.PodStatus{
-					NodeAllocatableResourceClaimStatuses: []api.NodeAllocatableResourceClaimStatus{
-						{ResourceClaimName: "pod-node-claim"},
+					AdditionalNodeAllocatableResources: []api.AdditionalNodeAllocatableResource{
+						{Source: api.AdditionalNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "pod-node-claim"}},
 					},
 				},
 			},
 			newPod: &api.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
 				Status: api.PodStatus{
-					NodeAllocatableResourceClaimStatuses: []api.NodeAllocatableResourceClaimStatus{},
+					AdditionalNodeAllocatableResources: []api.AdditionalNodeAllocatableResource{},
 				},
 			},
 			expected: &api.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
 				Status: api.PodStatus{
-					NodeAllocatableResourceClaimStatuses: []api.NodeAllocatableResourceClaimStatus{},
+					AdditionalNodeAllocatableResources: []api.AdditionalNodeAllocatableResource{},
 				},
 			},
 		},

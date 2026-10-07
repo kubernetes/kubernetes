@@ -479,3 +479,52 @@ func TestHasInvalidLabelValueInNodeSelectorTerms(t *testing.T) {
 		})
 	}
 }
+
+func TestPodRequestsExtendedResources(t *testing.T) {
+	requests := func(name core.ResourceName, quantity string) core.ResourceRequirements {
+		return core.ResourceRequirements{Requests: core.ResourceList{name: resource.MustParse(quantity)}}
+	}
+	tests := []struct {
+		name string
+		spec core.PodSpec
+		want bool
+	}{
+		{
+			name: "no requests",
+			spec: core.PodSpec{Containers: []core.Container{{Name: "c1"}}},
+		},
+		{
+			name: "native resources only",
+			spec: core.PodSpec{Containers: []core.Container{{Name: "c1", Resources: requests(core.ResourceCPU, "1")}}},
+		},
+		{
+			name: "zero extended resource request",
+			spec: core.PodSpec{Containers: []core.Container{{Name: "c1", Resources: requests("example.com/gpu", "0")}}},
+		},
+		{
+			name: "explicit extended resource",
+			spec: core.PodSpec{Containers: []core.Container{{Name: "c1", Resources: requests("example.com/gpu", "1")}}},
+			want: true,
+		},
+		{
+			name: "implicit DRA extended resource",
+			spec: core.PodSpec{Containers: []core.Container{{Name: "c1", Resources: requests("deviceclass.resource.kubernetes.io/gpu-class", "1")}}},
+			want: true,
+		},
+		{
+			name: "extended resource in init container",
+			spec: core.PodSpec{
+				InitContainers: []core.Container{{Name: "init1", Resources: requests("example.com/gpu", "1")}},
+				Containers:     []core.Container{{Name: "c1"}},
+			},
+			want: true,
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := PodRequestsExtendedResources(&tc.spec); got != tc.want {
+				t.Errorf("PodRequestsExtendedResources() = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}

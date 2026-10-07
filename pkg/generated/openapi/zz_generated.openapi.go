@@ -473,6 +473,8 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		coordinationv1beta1.LeaseList{}.OpenAPIModelName():                                                              schema_k8sio_api_coordination_v1beta1_LeaseList(ref),
 		coordinationv1beta1.LeaseSpec{}.OpenAPIModelName():                                                              schema_k8sio_api_coordination_v1beta1_LeaseSpec(ref),
 		corev1.AWSElasticBlockStoreVolumeSource{}.OpenAPIModelName():                                                    schema_k8sio_api_core_v1_AWSElasticBlockStoreVolumeSource(ref),
+		corev1.AdditionalNodeAllocatableReference{}.OpenAPIModelName():                                                  schema_k8sio_api_core_v1_AdditionalNodeAllocatableReference(ref),
+		corev1.AdditionalNodeAllocatableResource{}.OpenAPIModelName():                                                   schema_k8sio_api_core_v1_AdditionalNodeAllocatableResource(ref),
 		corev1.Affinity{}.OpenAPIModelName():                                                                            schema_k8sio_api_core_v1_Affinity(ref),
 		corev1.AppArmorProfile{}.OpenAPIModelName():                                                                     schema_k8sio_api_core_v1_AppArmorProfile(ref),
 		corev1.AttachedVolume{}.OpenAPIModelName():                                                                      schema_k8sio_api_core_v1_AttachedVolume(ref),
@@ -579,7 +581,6 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		corev1.NodeAffinity{}.OpenAPIModelName():                                                                        schema_k8sio_api_core_v1_NodeAffinity(ref),
 		corev1.NodeAllocatableMappedResources{}.OpenAPIModelName():                                                      schema_k8sio_api_core_v1_NodeAllocatableMappedResources(ref),
 		corev1.NodeAllocatableOverheadResources{}.OpenAPIModelName():                                                    schema_k8sio_api_core_v1_NodeAllocatableOverheadResources(ref),
-		corev1.NodeAllocatableResourceClaimStatus{}.OpenAPIModelName():                                                  schema_k8sio_api_core_v1_NodeAllocatableResourceClaimStatus(ref),
 		corev1.NodeCondition{}.OpenAPIModelName():                                                                       schema_k8sio_api_core_v1_NodeCondition(ref),
 		corev1.NodeConfigSource{}.OpenAPIModelName():                                                                    schema_k8sio_api_core_v1_NodeConfigSource(ref),
 		corev1.NodeConfigStatus{}.OpenAPIModelName():                                                                    schema_k8sio_api_core_v1_NodeConfigStatus(ref),
@@ -19507,6 +19508,136 @@ func schema_k8sio_api_core_v1_AWSElasticBlockStoreVolumeSource(ref common.Refere
 	}
 }
 
+func schema_k8sio_api_core_v1_AdditionalNodeAllocatableReference(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "AdditionalNodeAllocatableReference identifies the source object in the pod's namespace contributing additional node allocatable resources to a pod.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"apiGroup": {
+						SchemaProps: spec.SchemaProps{
+							Description: "apiGroup is the group for the resource being referenced. It is empty for the core API. Currently, only \"resource.k8s.io\" is supported.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"kind": {
+						SchemaProps: spec.SchemaProps{
+							Description: "kind is the type of resource being referenced. Currently, only \"ResourceClaim\" is supported.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"name": {
+						SchemaProps: spec.SchemaProps{
+							Description: "name is the name of the source object in the pod's namespace (e.g., name of the resource claim).",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"kind", "name"},
+			},
+			VendorExtensible: spec.VendorExtensible{
+				Extensions: spec.Extensions{
+					"x-kubernetes-map-type": "atomic",
+				},
+			},
+		},
+	}
+}
+
+func schema_k8sio_api_core_v1_AdditionalNodeAllocatableResource(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "AdditionalNodeAllocatableResource describes the status of node allocatable resources allocated outside of direct spec requests.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"source": {
+						SchemaProps: spec.SchemaProps{
+							Description: "source identifies the object in the pod's namespace that this resource contribution originates from (e.g., a ResourceClaim).",
+							Default:     map[string]interface{}{},
+							Ref:         ref(corev1.AdditionalNodeAllocatableReference{}.OpenAPIModelName()),
+						},
+					},
+					"containers": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "set",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "containers lists the names of all containers in this pod that reference the source.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Type:   []string{"string"},
+										Format: "",
+									},
+								},
+							},
+						},
+					},
+					"mapping": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-map-keys": []interface{}{
+									"name",
+								},
+								"x-kubernetes-list-type":       "map",
+								"x-kubernetes-patch-merge-key": "name",
+								"x-kubernetes-patch-strategy":  "merge",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "mapping contains fixed node allocatable resource quantities allocated once per source. When source.kind is ResourceClaim, this contains allocations through devices mapped in the device spec's `nodeAllocatableResources[...].mapping` field. This is used by kubelet for pod level and container-level cgroup enforcement.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref(corev1.NodeAllocatableMappedResources{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
+					"overhead": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-map-keys": []interface{}{
+									"name",
+								},
+								"x-kubernetes-list-type":       "map",
+								"x-kubernetes-patch-merge-key": "name",
+								"x-kubernetes-patch-strategy":  "merge",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "overhead contains variable node allocatable resource overheads incurred per pod (PerPod) and per referencing container (PerContainer) when using the source. When source.kind is ResourceClaim, this contains allocations through devices mapped in the device spec's `nodeAllocatableResources[...].overhead` field. This is used by kubelet for pod level and container-level cgroup enforcement.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref(corev1.NodeAllocatableOverheadResources{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"source"},
+			},
+		},
+		Dependencies: []string{
+			corev1.AdditionalNodeAllocatableReference{}.OpenAPIModelName(), corev1.NodeAllocatableMappedResources{}.OpenAPIModelName(), corev1.NodeAllocatableOverheadResources{}.OpenAPIModelName()},
+	}
+}
+
 func schema_k8sio_api_core_v1_Affinity(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
@@ -25185,7 +25316,7 @@ func schema_k8sio_api_core_v1_NodeAllocatableMappedResources(ref common.Referenc
 					},
 					"quantity": {
 						SchemaProps: spec.SchemaProps{
-							Description: "quantity is the total node allocatable resource capacity allocated for the claim. This claim's allocated devices is shared by all the containers referencing the claim. Kubelet adds this value to both requests and limits at the pod-level cgroup, and to limits at the container-level cgroup for each container referencing the claim.",
+							Description: "quantity is the total node allocatable resource capacity allocated for the source. This source's allocated devices are shared by all the containers referencing the source. Kubelet adds this value to both requests and limits at the pod-level cgroup, and to limits at the container-level cgroup for each container referencing the source.",
 							Ref:         ref(resource.Quantity{}.OpenAPIModelName()),
 						},
 					},
@@ -25221,7 +25352,7 @@ func schema_k8sio_api_core_v1_NodeAllocatableOverheadResources(ref common.Refere
 					},
 					"perContainer": {
 						SchemaProps: spec.SchemaProps{
-							Description: "perContainer is the variable overhead quantity applied for each container referencing the claim. The container references are recorded in `nodeAllocatableResourceClaimStatuses.containers`. The total overhead quantity allocated for the claim is computed as: Quantity = PerPod + (PerContainer * NumReferences) Kubelet accounts for this overhead in cgroups: - Pod-level cgroup (requests and limits): Kubelet adds PerPod + (PerContainer * NumReferences). - Container-level cgroup (limits only): Kubelet adds PerPod + PerContainer for each referencing container. This allows any single container to access the pod-level overhead, while the parent cgroup caps the total usage to account for PerPod exactly once. At least one of PerPod or PerContainer must be specified. Specifying neither is an invalid configuration.",
+							Description: "perContainer is the variable overhead quantity applied for each container referencing the claim. The container references are recorded in `additionalNodeAllocatableResources.containers`. The total overhead quantity allocated for the claim is computed as: Quantity = PerPod + (PerContainer * NumReferences) Kubelet accounts for this overhead in cgroups: - Pod-level cgroup (requests and limits): Kubelet adds PerPod + (PerContainer * NumReferences). - Container-level cgroup (limits only): Kubelet adds PerPod + PerContainer for each referencing container. This allows any single container to access the pod-level overhead, while the parent cgroup caps the total usage to account for PerPod exactly once. At least one of PerPod or PerContainer must be specified. Specifying neither is an invalid configuration.",
 							Ref:         ref(resource.Quantity{}.OpenAPIModelName()),
 						},
 					},
@@ -25231,95 +25362,6 @@ func schema_k8sio_api_core_v1_NodeAllocatableOverheadResources(ref common.Refere
 		},
 		Dependencies: []string{
 			resource.Quantity{}.OpenAPIModelName()},
-	}
-}
-
-func schema_k8sio_api_core_v1_NodeAllocatableResourceClaimStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
-	return common.OpenAPIDefinition{
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "NodeAllocatableResourceClaimStatus describes the status of node allocatable resources allocated via DRA.",
-				Type:        []string{"object"},
-				Properties: map[string]spec.Schema{
-					"resourceClaimName": {
-						SchemaProps: spec.SchemaProps{
-							Description: "resourceClaimName is the resource claim referenced by the pod that resulted in this node allocatable resource allocation.",
-							Default:     "",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"containers": {
-						VendorExtensible: spec.VendorExtensible{
-							Extensions: spec.Extensions{
-								"x-kubernetes-list-type": "set",
-							},
-						},
-						SchemaProps: spec.SchemaProps{
-							Description: "containers lists the names of all containers in this pod that reference the claim.",
-							Type:        []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Type:   []string{"string"},
-										Format: "",
-									},
-								},
-							},
-						},
-					},
-					"mapping": {
-						VendorExtensible: spec.VendorExtensible{
-							Extensions: spec.Extensions{
-								"x-kubernetes-list-map-keys": []interface{}{
-									"name",
-								},
-								"x-kubernetes-list-type":       "map",
-								"x-kubernetes-patch-merge-key": "name",
-								"x-kubernetes-patch-strategy":  "merge",
-							},
-						},
-						SchemaProps: spec.SchemaProps{
-							Description: "mapping contains allocations through devices mapped in the device spec's `nodeAllocatableResources[...].mapping` field. This is used by kubelet for pod level and container-level cgroup enforcement.",
-							Type:        []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Ref: ref(corev1.NodeAllocatableMappedResources{}.OpenAPIModelName()),
-									},
-								},
-							},
-						},
-					},
-					"overhead": {
-						VendorExtensible: spec.VendorExtensible{
-							Extensions: spec.Extensions{
-								"x-kubernetes-list-map-keys": []interface{}{
-									"name",
-								},
-								"x-kubernetes-list-type":       "map",
-								"x-kubernetes-patch-merge-key": "name",
-								"x-kubernetes-patch-strategy":  "merge",
-							},
-						},
-						SchemaProps: spec.SchemaProps{
-							Description: "overhead contains allocations through devices mapped in the device spec's `nodeAllocatableResources[...].overhead` field. This is used by kubelet for pod level and container-level cgroup enforcement.",
-							Type:        []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Ref: ref(corev1.NodeAllocatableOverheadResources{}.OpenAPIModelName()),
-									},
-								},
-							},
-						},
-					},
-				},
-				Required: []string{"resourceClaimName"},
-			},
-		},
-		Dependencies: []string{
-			corev1.NodeAllocatableMappedResources{}.OpenAPIModelName(), corev1.NodeAllocatableOverheadResources{}.OpenAPIModelName()},
 	}
 }
 
@@ -29341,29 +29383,6 @@ func schema_k8sio_api_core_v1_PodStatus(ref common.ReferenceCallback) common.Ope
 							Ref:         ref(corev1.ResourceRequirements{}.OpenAPIModelName()),
 						},
 					},
-					"nodeAllocatableResourceClaimStatuses": {
-						VendorExtensible: spec.VendorExtensible{
-							Extensions: spec.Extensions{
-								"x-kubernetes-list-map-keys": []interface{}{
-									"resourceClaimName",
-								},
-								"x-kubernetes-list-type":       "map",
-								"x-kubernetes-patch-merge-key": "resourceClaimName",
-								"x-kubernetes-patch-strategy":  "merge",
-							},
-						},
-						SchemaProps: spec.SchemaProps{
-							Description: "NodeAllocatableResourceClaimStatuses contains the status of node-allocatable resources that were allocated for this pod through DRA claims. This includes resources currently reported in v1.Node `status.allocatable` that are not extended resources (see https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#extended-resources). Examples include \"cpu\", \"memory\", \"ephemeral-storage\", and hugepages.",
-							Type:        []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Ref: ref(corev1.NodeAllocatableResourceClaimStatus{}.OpenAPIModelName()),
-									},
-								},
-							},
-						},
-					},
 					"volumeHealth": {
 						VendorExtensible: spec.VendorExtensible{
 							Extensions: spec.Extensions{
@@ -29385,11 +29404,29 @@ func schema_k8sio_api_core_v1_PodStatus(ref common.ReferenceCallback) common.Ope
 							},
 						},
 					},
+					"additionalNodeAllocatableResources": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "additionalNodeAllocatableResources contains the status of node allocatable resources that were allocated for this pod outside of direct spec requests (e.g., through DRA claims). This includes resources currently reported in v1.Node `status.allocatable` that are not extended resources (see https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#extended-resources). Examples include \"cpu\", \"memory\", \"ephemeral-storage\", and hugepages.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref(corev1.AdditionalNodeAllocatableResource{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
 				},
 			},
 		},
 		Dependencies: []string{
-			corev1.ContainerStatus{}.OpenAPIModelName(), corev1.HostIP{}.OpenAPIModelName(), corev1.NodeAllocatableResourceClaimStatus{}.OpenAPIModelName(), corev1.PodCondition{}.OpenAPIModelName(), corev1.PodExtendedResourceClaimStatus{}.OpenAPIModelName(), corev1.PodIP{}.OpenAPIModelName(), corev1.PodResourceClaimStatus{}.OpenAPIModelName(), corev1.PodVolumeHealth{}.OpenAPIModelName(), corev1.ResourceRequirements{}.OpenAPIModelName(), resource.Quantity{}.OpenAPIModelName(), metav1.Time{}.OpenAPIModelName()},
+			corev1.AdditionalNodeAllocatableResource{}.OpenAPIModelName(), corev1.ContainerStatus{}.OpenAPIModelName(), corev1.HostIP{}.OpenAPIModelName(), corev1.PodCondition{}.OpenAPIModelName(), corev1.PodExtendedResourceClaimStatus{}.OpenAPIModelName(), corev1.PodIP{}.OpenAPIModelName(), corev1.PodResourceClaimStatus{}.OpenAPIModelName(), corev1.PodVolumeHealth{}.OpenAPIModelName(), corev1.ResourceRequirements{}.OpenAPIModelName(), resource.Quantity{}.OpenAPIModelName(), metav1.Time{}.OpenAPIModelName()},
 	}
 }
 

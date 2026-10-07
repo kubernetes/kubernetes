@@ -42,6 +42,7 @@ import (
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/kubernetes/test/utils/ktesting/initoption"
+	"k8s.io/utils/ptr"
 )
 
 var nodeInfoCmpOpts = []cmp.Option{
@@ -2259,15 +2260,15 @@ var (
 
 func TestPodInfoCalculateResources(t *testing.T) {
 	testCases := []struct {
-		name                                 string
-		containers                           []v1.Container
-		podResources                         *v1.ResourceRequirements
-		podLevelResourcesEnabled             bool
-		nodeAllocatableResourcesDRAEnabled   bool
-		nodeAllocatableResourceClaimStatuses []v1.NodeAllocatableResourceClaimStatus
-		expectedResource                     fwk.PodResource
-		initContainers                       []v1.Container
-		overhead                             *v1.ResourceList
+		name                               string
+		containers                         []v1.Container
+		podResources                       *v1.ResourceRequirements
+		podLevelResourcesEnabled           bool
+		nodeAllocatableResourcesDRAEnabled bool
+		additionalNodeAllocatableResources []v1.AdditionalNodeAllocatableResource
+		expectedResource                   fwk.PodResource
+		initContainers                     []v1.Container
+		overhead                           *v1.ResourceList
 	}{
 		{
 			name:       "requestless container",
@@ -2512,9 +2513,9 @@ func TestPodInfoCalculateResources(t *testing.T) {
 					},
 				},
 			},
-			nodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+			additionalNodeAllocatableResources: []v1.AdditionalNodeAllocatableResource{
 				{
-					ResourceClaimName: "node-allocatable-claim",
+					Source: v1.AdditionalNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "node-allocatable-claim"},
 					Mapping: []v1.NodeAllocatableMappedResources{
 						{Name: v1.ResourceCPU, Quantity: new(cpu100m)},
 						{Name: v1.ResourceMemory, Quantity: new(mem200M)},
@@ -2548,9 +2549,9 @@ func TestPodInfoCalculateResources(t *testing.T) {
 					},
 				},
 			},
-			nodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+			additionalNodeAllocatableResources: []v1.AdditionalNodeAllocatableResource{
 				{
-					ResourceClaimName: "node-allocatable-claim",
+					Source: v1.AdditionalNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "node-allocatable-claim"},
 					Mapping: []v1.NodeAllocatableMappedResources{
 						{Name: v1.ResourceCPU, Quantity: new(cpu100m)},
 						{Name: v1.ResourceMemory, Quantity: new(mem200M)},
@@ -2587,16 +2588,16 @@ func TestPodInfoCalculateResources(t *testing.T) {
 					},
 				},
 			},
-			nodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+			additionalNodeAllocatableResources: []v1.AdditionalNodeAllocatableResource{
 				{
-					ResourceClaimName: "node-allocatable-claim-1",
+					Source: v1.AdditionalNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "node-allocatable-claim-1"},
 					Mapping: []v1.NodeAllocatableMappedResources{
 						{Name: v1.ResourceCPU, Quantity: new(cpu100m)},
 						{Name: v1.ResourceMemory, Quantity: new(mem200M)},
 					},
 				},
 				{
-					ResourceClaimName: "node-allocatable-claim-2",
+					Source: v1.AdditionalNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "node-allocatable-claim-2"},
 					Mapping: []v1.NodeAllocatableMappedResources{
 						{Name: v1.ResourceCPU, Quantity: new(cpu100m)},
 					},
@@ -2629,9 +2630,9 @@ func TestPodInfoCalculateResources(t *testing.T) {
 					},
 				},
 			},
-			nodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+			additionalNodeAllocatableResources: []v1.AdditionalNodeAllocatableResource{
 				{
-					ResourceClaimName: "node-allocatable-claim-1",
+					Source: v1.AdditionalNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "node-allocatable-claim-1"},
 					Mapping: []v1.NodeAllocatableMappedResources{
 						{Name: v1.ResourceCPU, Quantity: new(cpu1000m)},
 						{Name: v1.ResourceMemory, Quantity: new(mem200M)},
@@ -2680,9 +2681,9 @@ func TestPodInfoCalculateResources(t *testing.T) {
 					},
 				},
 			},
-			nodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+			additionalNodeAllocatableResources: []v1.AdditionalNodeAllocatableResource{
 				{
-					ResourceClaimName: "node-allocatable-claim-1",
+					Source: v1.AdditionalNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "node-allocatable-claim-1"},
 					Mapping: []v1.NodeAllocatableMappedResources{
 						{Name: v1.ResourceCPU, Quantity: new(cpu100m)},
 						{Name: v1.ResourceMemory, Quantity: new(mem200M)},
@@ -2723,9 +2724,9 @@ func TestPodInfoCalculateResources(t *testing.T) {
 					v1.ResourceMemory: mem800M,
 				},
 			},
-			nodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+			additionalNodeAllocatableResources: []v1.AdditionalNodeAllocatableResource{
 				{
-					ResourceClaimName: "node-allocatable-claim-1",
+					Source: v1.AdditionalNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "node-allocatable-claim-1"},
 					Mapping: []v1.NodeAllocatableMappedResources{
 						{Name: v1.ResourceCPU, Quantity: new(cpu100m)},
 						{Name: v1.ResourceMemory, Quantity: new(mem200M)},
@@ -2759,9 +2760,9 @@ func TestPodInfoCalculateResources(t *testing.T) {
 					},
 				},
 			},
-			nodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+			additionalNodeAllocatableResources: []v1.AdditionalNodeAllocatableResource{
 				{
-					ResourceClaimName: "node-allocatable-claim-1",
+					Source: v1.AdditionalNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "node-allocatable-claim-1"},
 					Mapping: []v1.NodeAllocatableMappedResources{
 						{Name: v1.ResourceCPU, Quantity: new(cpu100m)},
 						{Name: v1.ResourceMemory, Quantity: new(mem200M)},
@@ -2801,10 +2802,10 @@ func TestPodInfoCalculateResources(t *testing.T) {
 					},
 				},
 			},
-			nodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+			additionalNodeAllocatableResources: []v1.AdditionalNodeAllocatableResource{
 				{
-					ResourceClaimName: "node-allocatable-claim",
-					Containers:        []string{"c1"},
+					Source:     v1.AdditionalNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "node-allocatable-claim"},
+					Containers: []string{"c1"},
 					Overhead: []v1.NodeAllocatableOverheadResources{
 						{
 							Name:         v1.ResourceCPU,
@@ -2847,10 +2848,10 @@ func TestPodInfoCalculateResources(t *testing.T) {
 					},
 				},
 			},
-			nodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+			additionalNodeAllocatableResources: []v1.AdditionalNodeAllocatableResource{
 				{
-					ResourceClaimName: "node-allocatable-claim",
-					Containers:        []string{"c1"},
+					Source:     v1.AdditionalNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "node-allocatable-claim"},
+					Containers: []string{"c1"},
 					Mapping: []v1.NodeAllocatableMappedResources{
 						{
 							Name:     v1.ResourceCPU,
@@ -2903,7 +2904,7 @@ func TestPodInfoCalculateResources(t *testing.T) {
 				Pod: &v1.Pod{
 					Spec: podSpec,
 					Status: v1.PodStatus{
-						NodeAllocatableResourceClaimStatuses: tc.nodeAllocatableResourceClaimStatuses,
+						AdditionalNodeAllocatableResources: tc.additionalNodeAllocatableResources,
 					},
 				},
 			}
@@ -5060,4 +5061,106 @@ func newQueuedPodGroupInfoForTest(root *PodGroupInfo, pods ...*v1.Pod) *QueuedPo
 		pgqi.AddPod(&QueuedPodInfo{PodInfo: &PodInfo{Pod: pod}})
 	}
 	return pgqi
+}
+
+// TestNodeInfoNodeReservations shows that NodeInfo holds a node reservation
+// from the first pod that references its source until the last one leaves,
+// while a ResourceClaim is accounted to each pod.
+func TestNodeInfoNodeReservations(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRANodeAllocatableResources, true)
+
+	pool := v1.AdditionalNodeAllocatableReference{APIGroup: "example.com", Kind: "Pool", Name: "pool1"}
+	claim := v1.AdditionalNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "claim1"}
+	makePod := func(uid string, source v1.AdditionalNodeAllocatableReference) *v1.Pod {
+		pod := st.MakePod().UID(uid).Namespace("ns").Name(uid).Node("node").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj()
+		pod.Status.AdditionalNodeAllocatableResources = []v1.AdditionalNodeAllocatableResource{{
+			Source:     source,
+			Containers: []string{"c1"},
+			Mapping:    []v1.NodeAllocatableMappedResources{{Name: v1.ResourceCPU, Quantity: ptr.To(resource.MustParse("2"))}},
+		}}
+		return pod
+	}
+	podA, podB := makePod("a", pool), makePod("b", pool)
+	podC := makePod("c", claim)
+
+	ni := NewNodeInfo()
+	steps := []struct {
+		name             string
+		apply            func()
+		wantMilliCPU     int64
+		wantReservations map[NodeAllocatableReservationKey]int
+	}{
+		{
+			name:             "first pod holds the reservation",
+			apply:            func() { ni.AddPod(podA) },
+			wantMilliCPU:     1000 + 2000,
+			wantReservations: map[NodeAllocatableReservationKey]int{{Namespace: "ns", Source: pool}: 1},
+		},
+		{
+			name:             "second pod adds only its spec",
+			apply:            func() { ni.AddPod(podB) },
+			wantMilliCPU:     3000 + 1000,
+			wantReservations: map[NodeAllocatableReservationKey]int{{Namespace: "ns", Source: pool}: 2},
+		},
+		{
+			name:             "claim is accounted to its pod",
+			apply:            func() { ni.AddPod(podC) },
+			wantMilliCPU:     4000 + 1000 + 2000,
+			wantReservations: map[NodeAllocatableReservationKey]int{{Namespace: "ns", Source: pool}: 2},
+		},
+		{
+			name:             "removing one pod keeps the reservation",
+			apply:            func() { _ = ni.RemovePod(klog.Background(), podA) },
+			wantMilliCPU:     7000 - 1000,
+			wantReservations: map[NodeAllocatableReservationKey]int{{Namespace: "ns", Source: pool}: 1},
+		},
+		{
+			name:         "removing the last pod releases the reservation",
+			apply:        func() { _ = ni.RemovePod(klog.Background(), podB) },
+			wantMilliCPU: 6000 - 1000 - 2000,
+		},
+		{
+			name:         "removing the claim pod",
+			apply:        func() { _ = ni.RemovePod(klog.Background(), podC) },
+			wantMilliCPU: 0,
+		},
+	}
+	for _, step := range steps {
+		step.apply()
+		if got := ni.Requested.MilliCPU; got != step.wantMilliCPU {
+			t.Errorf("%s: Requested.MilliCPU = %d, want %d", step.name, got, step.wantMilliCPU)
+		}
+		var gotReservations map[NodeAllocatableReservationKey]int
+		for key, reservation := range ni.NodeReservations {
+			if gotReservations == nil {
+				gotReservations = map[NodeAllocatableReservationKey]int{}
+			}
+			gotReservations[key] = reservation.RefCount
+		}
+		if diff := cmp.Diff(step.wantReservations, gotReservations); diff != "" {
+			t.Errorf("%s: reservations do not match (-want,+got):\n%s", step.name, diff)
+		}
+		if len(step.wantReservations) == 0 && ni.NodeReservations != nil {
+			t.Errorf("%s: NodeReservations should be nil when empty, got %v", step.name, ni.NodeReservations)
+		}
+		for _, source := range []v1.AdditionalNodeAllocatableReference{pool, claim} {
+			_, want := step.wantReservations[NodeAllocatableReservationKey{Namespace: "ns", Source: source}]
+			if got := ni.HasNodeAllocatableReservation("ns", source); got != want {
+				t.Errorf("%s: HasNodeReservation(%s) = %t, want %t", step.name, source.Name, got, want)
+			}
+		}
+	}
+
+	// A snapshot must not share reservation state with the original.
+	ni.AddPod(podA)
+	snapshot := ni.SnapshotConcrete()
+	if err := ni.RemovePod(klog.Background(), podA); err != nil {
+		t.Fatal(err)
+	}
+	if got := snapshot.Requested.MilliCPU; got != 3000 {
+		t.Errorf("snapshot Requested.MilliCPU = %d after removing the pod from the original, want 3000", got)
+	}
+	if !snapshot.HasNodeAllocatableReservation("ns", pool) {
+		t.Errorf("snapshot lost the reservation for %s", pool.Name)
+	}
 }

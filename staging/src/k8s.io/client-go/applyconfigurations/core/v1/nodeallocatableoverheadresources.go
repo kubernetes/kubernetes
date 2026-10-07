@@ -35,7 +35,7 @@ type NodeAllocatableOverheadResourcesApplyConfiguration struct {
 	// At least one of PerPod or PerContainer must be specified. Specifying neither is an invalid configuration.
 	PerPod *resource.Quantity `json:"perPod,omitempty"`
 	// perContainer is the variable overhead quantity applied for each container referencing the claim.
-	// The container references are recorded in `nodeAllocatableResourceClaimStatuses.containers`.
+	// The container references are recorded in `additionalNodeAllocatableResources.containers`.
 	// The total overhead quantity allocated for the claim is computed as:
 	// Quantity = PerPod + (PerContainer * NumReferences)
 	// Kubelet accounts for this overhead in cgroups:

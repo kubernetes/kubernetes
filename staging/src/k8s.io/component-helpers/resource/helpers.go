@@ -60,8 +60,9 @@ type PodResourcesOptions struct {
 	SkipPodLevelResources bool
 	// SkipContainerLevelResources
 	SkipContainerLevelResources bool
-	// Use node allocatable resource claim information from pod status to compute the effective pod resource request.
-	UseDRANodeAllocatableResourceClaimStatus bool
+	// Use AdditionalNodeAllocatableResources from pod status to compute the effective pod resource request.
+	// Only entries accounted to the pod are used, see IsAccountedToPod.
+	UseAdditionalNodeAllocatableResources bool
 }
 
 var supportedPodLevelResources = sets.New(v1.ResourceCPU, v1.ResourceMemory)
@@ -297,11 +298,11 @@ func AggregateContainerRequests(pod *v1.Pod, opts PodResourcesOptions) v1.Resour
 	reqs := reuseOrClearResourceList(opts.Reuse)
 	if !opts.UseStatusResources {
 		addResourceList(reqs, aggregateContainerResourcesByFn(pod, opts, containerSpecRequests))
-		addDRANodeAllocatableClaimResources(reqs, pod, opts)
+		addAdditionalNodeAllocatableResources(reqs, pod, opts)
 	} else {
 		isResizeInfeasible := IsPodResizeInfeasible(pod)
 		specReqs := aggregateContainerResourcesByFn(pod, opts, containerSpecRequests)
-		addDRANodeAllocatableClaimResources(specReqs, pod, opts)
+		addAdditionalNodeAllocatableResources(specReqs, pod, opts)
 		var allocatedReqs, actuatedReqs v1.ResourceList
 		// When pod-level status maps are populated, they already contain the aggregate values across all containers.
 		// When unpopulated (e.g., at creation time or when feature gates are disabled), we fall back to container status aggregation.
@@ -317,7 +318,7 @@ func AggregateContainerRequests(pod *v1.Pod, opts PodResourcesOptions) v1.Resour
 			// DRA allocations are added to allocatedReqs here because Kubelet does not include DRA in pod.Status.ContainerStatuses[].AllocatedResources. Adding them prevents under-reporting.
 			// This is a temporary fallback until InPlacePodLevelResourcesVerticalScaling is Beta/GA on all nodes and pod-level status fields which natively include DRA are always available.
 			allocatedReqs = aggregateContainerResourcesByFn(pod, opts, containerAllocatedRequests)
-			addDRANodeAllocatableClaimResources(allocatedReqs, pod, opts)
+			addAdditionalNodeAllocatableResources(allocatedReqs, pod, opts)
 			actuatedReqs = aggregateContainerResourcesByFn(pod, opts, containerActuatedRequests)
 		}
 
@@ -497,12 +498,12 @@ func reuseOrClearResourceList(reuse v1.ResourceList) v1.ResourceList {
 // GetContainerDRAAllocations returns the sum of all DRA resource allocations assigned to a container.
 func GetContainerDRAAllocations(pod *v1.Pod, containerName string) v1.ResourceList {
 	draAllocations := make(v1.ResourceList)
-	for _, claimStatus := range pod.Status.NodeAllocatableResourceClaimStatuses {
-		if !slices.Contains(claimStatus.Containers, containerName) {
+	for _, res := range pod.Status.AdditionalNodeAllocatableResources {
+		if !slices.Contains(res.Containers, containerName) || !IsAccountedToPod(res.Source) {
 			continue
 		}
 		// Add Mapping resources
-		for _, mapping := range claimStatus.Mapping {
+		for _, mapping := range res.Mapping {
 			if mapping.Quantity != nil {
 				q := draAllocations[mapping.Name]
 				q.Add(*mapping.Quantity)
@@ -511,7 +512,7 @@ func GetContainerDRAAllocations(pod *v1.Pod, containerName string) v1.ResourceLi
 		}
 
 		// Add Overhead resources
-		for _, overhead := range claimStatus.Overhead {
+		for _, overhead := range res.Overhead {
 			var quantity resource.Quantity
 			if overhead.PerPod != nil {
 				quantity.Add(*overhead.PerPod)
@@ -529,7 +530,7 @@ func GetContainerDRAAllocations(pod *v1.Pod, containerName string) v1.ResourceLi
 
 func addDRANodeAllocatableLimits(specLimits v1.ResourceList, pod *v1.Pod, opts PodResourcesOptions) v1.ResourceList {
 	draResources := v1.ResourceList{}
-	addDRANodeAllocatableClaimResources(draResources, pod, opts)
+	addAdditionalNodeAllocatableResources(draResources, pod, opts)
 	for name, quantity := range draResources {
 		val, declared := specLimits[name]
 		// Only add DRA values if limits are explicitly declared in the spec. kubelet skips setting limits (unlimited) if not defined in spec.
@@ -543,26 +544,35 @@ func addDRANodeAllocatableLimits(specLimits v1.ResourceList, pod *v1.Pod, opts P
 	return specLimits
 }
 
-func addDRANodeAllocatableClaimResources(resources v1.ResourceList, pod *v1.Pod, opts PodResourcesOptions) {
-	if opts.UseDRANodeAllocatableResourceClaimStatus && len(pod.Status.NodeAllocatableResourceClaimStatuses) > 0 {
-		for _, claimStatus := range pod.Status.NodeAllocatableResourceClaimStatuses {
+// IsAccountedToPod reports whether the entries of source are part of the
+// requests of each pod that references it and applies to pod's cgroup calculations.
+func IsAccountedToPod(source v1.AdditionalNodeAllocatableReference) bool {
+	return source.APIGroup == "resource.k8s.io" && source.Kind == "ResourceClaim"
+}
+
+func addAdditionalNodeAllocatableResources(resources v1.ResourceList, pod *v1.Pod, opts PodResourcesOptions) {
+	if opts.UseAdditionalNodeAllocatableResources && len(pod.Status.AdditionalNodeAllocatableResources) > 0 {
+		for _, res := range pod.Status.AdditionalNodeAllocatableResources {
+			if !IsAccountedToPod(res.Source) {
+				continue
+			}
 			// TODO(pravk03): Handle claim references by init containers and peak resource calculation based on that.
 			// Currently, any DRA allocation is always added into the pod footprint.
-			for _, mapping := range claimStatus.Mapping {
+			for _, mapping := range res.Mapping {
 				if mapping.Quantity != nil {
 					q := resources[mapping.Name]
 					q.Add(*mapping.Quantity)
 					resources[mapping.Name] = q
 				}
 			}
-			for _, overhead := range claimStatus.Overhead {
+			for _, overhead := range res.Overhead {
 				var quantity resource.Quantity
 				if overhead.PerPod != nil {
 					quantity.Add(*overhead.PerPod)
 				}
-				if overhead.PerContainer != nil && len(claimStatus.Containers) > 0 {
+				if overhead.PerContainer != nil && len(res.Containers) > 0 {
 					varOverhead := overhead.PerContainer.DeepCopy()
-					varOverhead.Mul(int64(len(claimStatus.Containers)))
+					varOverhead.Mul(int64(len(res.Containers)))
 					quantity.Add(varOverhead)
 				}
 				q := resources[overhead.Name]

@@ -2124,7 +2124,7 @@ func TestPodRequestsAndLimitsWithDRA(t *testing.T) {
 					},
 				},
 			},
-			options: PodResourcesOptions{UseDRANodeAllocatableResourceClaimStatus: true},
+			options: PodResourcesOptions{UseAdditionalNodeAllocatableResources: true},
 			expectedRequests: v1.ResourceList{
 				v1.ResourceCPU:    resource.MustParse("100m"),
 				v1.ResourceMemory: resource.MustParse("1Gi"),
@@ -2166,10 +2166,10 @@ func TestPodRequestsAndLimitsWithDRA(t *testing.T) {
 					},
 				},
 				Status: v1.PodStatus{
-					NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+					AdditionalNodeAllocatableResources: []v1.AdditionalNodeAllocatableResource{
 						{
-							ResourceClaimName: "node-allocatable-claim-1",
-							Containers:        []string{"c1"},
+							Source:     v1.AdditionalNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "node-allocatable-claim-1"},
+							Containers: []string{"c1"},
 							Mapping: []v1.NodeAllocatableMappedResources{
 								{Name: v1.ResourceCPU, Quantity: new(resource.MustParse("50m"))},
 								{Name: hugePageResource1Gi, Quantity: new(resource.MustParse("1"))},
@@ -2178,7 +2178,7 @@ func TestPodRequestsAndLimitsWithDRA(t *testing.T) {
 					},
 				},
 			},
-			options: PodResourcesOptions{UseDRANodeAllocatableResourceClaimStatus: true},
+			options: PodResourcesOptions{UseAdditionalNodeAllocatableResources: true},
 			expectedRequests: v1.ResourceList{
 				v1.ResourceCPU:      resource.MustParse("150m"), // 100m + 50m
 				v1.ResourceMemory:   resource.MustParse("1Gi"),
@@ -2221,17 +2221,17 @@ func TestPodRequestsAndLimitsWithDRA(t *testing.T) {
 					},
 				},
 				Status: v1.PodStatus{
-					NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+					AdditionalNodeAllocatableResources: []v1.AdditionalNodeAllocatableResource{
 						{
-							ResourceClaimName: "node-allocatable-claim-1",
-							Containers:        []string{"c1"},
+							Source:     v1.AdditionalNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "node-allocatable-claim-1"},
+							Containers: []string{"c1"},
 							Mapping: []v1.NodeAllocatableMappedResources{
 								{Name: v1.ResourceCPU, Quantity: new(resource.MustParse("50m"))},
 							},
 						},
 						{
-							ResourceClaimName: "node-allocatable-claim-2",
-							Containers:        []string{"c1"},
+							Source:     v1.AdditionalNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "node-allocatable-claim-2"},
+							Containers: []string{"c1"},
 							Mapping: []v1.NodeAllocatableMappedResources{
 								{Name: v1.ResourceCPU, Quantity: new(resource.MustParse("25m"))},
 								{Name: v1.ResourceMemory, Quantity: new(resource.MustParse("512Mi"))},
@@ -2240,7 +2240,7 @@ func TestPodRequestsAndLimitsWithDRA(t *testing.T) {
 					},
 				},
 			},
-			options: PodResourcesOptions{UseDRANodeAllocatableResourceClaimStatus: true},
+			options: PodResourcesOptions{UseAdditionalNodeAllocatableResources: true},
 			expectedRequests: v1.ResourceList{
 				v1.ResourceCPU:    resource.MustParse("175m"),  // 100m + 50m + 25m
 				v1.ResourceMemory: resource.MustParse("1.5Gi"), // 1Gi + 512Mi
@@ -2280,10 +2280,10 @@ func TestPodRequestsAndLimitsWithDRA(t *testing.T) {
 					},
 				},
 				Status: v1.PodStatus{
-					NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+					AdditionalNodeAllocatableResources: []v1.AdditionalNodeAllocatableResource{
 						{
-							ResourceClaimName: "node-allocatable-claim-1",
-							Containers:        []string{"c1", "c2"},
+							Source:     v1.AdditionalNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "node-allocatable-claim-1"},
+							Containers: []string{"c1", "c2"},
 							Mapping: []v1.NodeAllocatableMappedResources{
 								{Name: v1.ResourceCPU, Quantity: new(resource.MustParse("50m"))},
 							},
@@ -2291,7 +2291,7 @@ func TestPodRequestsAndLimitsWithDRA(t *testing.T) {
 					},
 				},
 			},
-			options: PodResourcesOptions{UseDRANodeAllocatableResourceClaimStatus: true},
+			options: PodResourcesOptions{UseAdditionalNodeAllocatableResources: true},
 			expectedRequests: v1.ResourceList{
 				v1.ResourceCPU: resource.MustParse("350m"), // 100m + 200m + 50m (claim counted once)
 			},
@@ -2342,18 +2342,18 @@ func TestPodRequestsAndLimitsWithDRA(t *testing.T) {
 					},
 				},
 				Status: v1.PodStatus{
-					NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+					AdditionalNodeAllocatableResources: []v1.AdditionalNodeAllocatableResource{
 						{
-							ResourceClaimName: "node-allocatable-claim-1",
-							Containers:        []string{"c1"},
+							Source:     v1.AdditionalNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "node-allocatable-claim-1"},
+							Containers: []string{"c1"},
 							Mapping: []v1.NodeAllocatableMappedResources{
 								{Name: v1.ResourceCPU, Quantity: new(resource.MustParse("50m"))},
 								{Name: hugePageResource1Gi, Quantity: new(resource.MustParse("1"))},
 							},
 						},
 						{
-							ResourceClaimName: "node-allocatable-claim-2",
-							Containers:        []string{"c2"},
+							Source:     v1.AdditionalNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "node-allocatable-claim-2"},
+							Containers: []string{"c2"},
 							Mapping: []v1.NodeAllocatableMappedResources{
 								{Name: v1.ResourceCPU, Quantity: new(resource.MustParse("25m"))},
 								{Name: v1.ResourceMemory, Quantity: new(resource.MustParse("512Mi"))},
@@ -2363,7 +2363,7 @@ func TestPodRequestsAndLimitsWithDRA(t *testing.T) {
 					},
 				},
 			},
-			options: PodResourcesOptions{UseDRANodeAllocatableResourceClaimStatus: true},
+			options: PodResourcesOptions{UseAdditionalNodeAllocatableResources: true},
 			expectedRequests: v1.ResourceList{
 				v1.ResourceCPU:      resource.MustParse("375m"),  // 100m + 200m + 50m + 25m
 				v1.ResourceMemory:   resource.MustParse("1.5Gi"), // 1Gi + 1Gi + 1Gi + 512Mi
@@ -2401,10 +2401,10 @@ func TestPodRequestsAndLimitsWithDRA(t *testing.T) {
 					},
 				},
 				Status: v1.PodStatus{
-					NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+					AdditionalNodeAllocatableResources: []v1.AdditionalNodeAllocatableResource{
 						{
-							ResourceClaimName: "node-allocatable-claim",
-							Containers:        []string{"ic1"},
+							Source:     v1.AdditionalNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "node-allocatable-claim"},
+							Containers: []string{"ic1"},
 							Mapping: []v1.NodeAllocatableMappedResources{
 								{Name: v1.ResourceCPU, Quantity: new(resource.MustParse("25m"))},
 							},
@@ -2412,13 +2412,13 @@ func TestPodRequestsAndLimitsWithDRA(t *testing.T) {
 					},
 				},
 			},
-			options: PodResourcesOptions{UseDRANodeAllocatableResourceClaimStatus: true},
+			options: PodResourcesOptions{UseAdditionalNodeAllocatableResources: true},
 			expectedRequests: v1.ResourceList{
 				v1.ResourceCPU: resource.MustParse("125m"), // max(100m, 50m) + 25m
 			},
 		},
 		{
-			description: "UseDRANodeAllocatableResourceClaimStatus flag disabled",
+			description: "UseAdditionalNodeAllocatableResources flag disabled",
 			pod: &v1.Pod{
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{
@@ -2445,10 +2445,10 @@ func TestPodRequestsAndLimitsWithDRA(t *testing.T) {
 					},
 				},
 				Status: v1.PodStatus{
-					NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+					AdditionalNodeAllocatableResources: []v1.AdditionalNodeAllocatableResource{
 						{
-							ResourceClaimName: "node-allocatable-claim",
-							Containers:        []string{"c1"},
+							Source:     v1.AdditionalNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "node-allocatable-claim"},
+							Containers: []string{"c1"},
 							Mapping: []v1.NodeAllocatableMappedResources{
 								{Name: v1.ResourceCPU, Quantity: new(resource.MustParse("50m"))},
 							},
@@ -2456,7 +2456,7 @@ func TestPodRequestsAndLimitsWithDRA(t *testing.T) {
 					},
 				},
 			},
-			options: PodResourcesOptions{UseDRANodeAllocatableResourceClaimStatus: false},
+			options: PodResourcesOptions{UseAdditionalNodeAllocatableResources: false},
 			expectedRequests: v1.ResourceList{
 				v1.ResourceCPU: resource.MustParse("100m"),
 			},
@@ -2493,10 +2493,10 @@ func TestPodRequestsAndLimitsWithDRA(t *testing.T) {
 					},
 				},
 				Status: v1.PodStatus{
-					NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+					AdditionalNodeAllocatableResources: []v1.AdditionalNodeAllocatableResource{
 						{
-							ResourceClaimName: "node-allocatable-claim",
-							Containers:        []string{"c1"},
+							Source:     v1.AdditionalNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "node-allocatable-claim"},
+							Containers: []string{"c1"},
 							Mapping: []v1.NodeAllocatableMappedResources{
 								{Name: v1.ResourceCPU, Quantity: new(resource.MustParse("3"))},
 							},
@@ -2504,7 +2504,7 @@ func TestPodRequestsAndLimitsWithDRA(t *testing.T) {
 					},
 				},
 			},
-			options: PodResourcesOptions{UseDRANodeAllocatableResourceClaimStatus: true, SkipPodLevelResources: false},
+			options: PodResourcesOptions{UseAdditionalNodeAllocatableResources: true, SkipPodLevelResources: false},
 			expectedRequests: v1.ResourceList{
 				v1.ResourceCPU:    resource.MustParse("2"),   // Pod level resource should not be overridden by claim request (3)
 				v1.ResourceMemory: resource.MustParse("1Gi"), // Container level resource should be included
@@ -2546,10 +2546,10 @@ func TestPodRequestsAndLimitsWithDRA(t *testing.T) {
 					},
 				},
 				Status: v1.PodStatus{
-					NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+					AdditionalNodeAllocatableResources: []v1.AdditionalNodeAllocatableResource{
 						{
-							ResourceClaimName: "node-allocatable-claim",
-							Containers:        []string{"c1", "c2"},
+							Source:     v1.AdditionalNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "node-allocatable-claim"},
+							Containers: []string{"c1", "c2"},
 							Overhead: []v1.NodeAllocatableOverheadResources{
 								{
 									Name:         v1.ResourceMemory,
@@ -2561,7 +2561,7 @@ func TestPodRequestsAndLimitsWithDRA(t *testing.T) {
 					},
 				},
 			},
-			options: PodResourcesOptions{UseDRANodeAllocatableResourceClaimStatus: true},
+			options: PodResourcesOptions{UseAdditionalNodeAllocatableResources: true},
 			expectedRequests: v1.ResourceList{
 				v1.ResourceCPU:    resource.MustParse("200m"),
 				v1.ResourceMemory: resource.MustParse("4072Mi"), // 1Gi (c1) + 1Gi (c2) + 1Gi (flat pod overhead) + 2 * 500Mi (container overhead) = 4072Mi
@@ -2612,10 +2612,10 @@ func TestPodRequestsAndLimitsWithDRA(t *testing.T) {
 					},
 				},
 				Status: v1.PodStatus{
-					NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+					AdditionalNodeAllocatableResources: []v1.AdditionalNodeAllocatableResource{
 						{
-							ResourceClaimName: "node-allocatable-claim-1",
-							Containers:        []string{"c1", "c2"},
+							Source:     v1.AdditionalNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "node-allocatable-claim-1"},
+							Containers: []string{"c1", "c2"},
 							Mapping: []v1.NodeAllocatableMappedResources{
 								{
 									Name:     v1.ResourceMemory,
@@ -2633,7 +2633,7 @@ func TestPodRequestsAndLimitsWithDRA(t *testing.T) {
 					},
 				},
 			},
-			options: PodResourcesOptions{UseDRANodeAllocatableResourceClaimStatus: true},
+			options: PodResourcesOptions{UseAdditionalNodeAllocatableResources: true},
 			expectedRequests: v1.ResourceList{
 				v1.ResourceMemory: resource.MustParse("6120Mi"),
 			},
@@ -2660,10 +2660,10 @@ func TestPodRequestsAndLimitsWithDRA(t *testing.T) {
 					},
 				},
 				Status: v1.PodStatus{
-					NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+					AdditionalNodeAllocatableResources: []v1.AdditionalNodeAllocatableResource{
 						{
-							ResourceClaimName: "node-allocatable-claim",
-							Containers:        []string{"c1"},
+							Source:     v1.AdditionalNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "node-allocatable-claim"},
+							Containers: []string{"c1"},
 							Overhead: []v1.NodeAllocatableOverheadResources{
 								{
 									Name:   v1.ResourceMemory,
@@ -2674,7 +2674,7 @@ func TestPodRequestsAndLimitsWithDRA(t *testing.T) {
 					},
 				},
 			},
-			options: PodResourcesOptions{UseDRANodeAllocatableResourceClaimStatus: true},
+			options: PodResourcesOptions{UseAdditionalNodeAllocatableResources: true},
 			expectedRequests: v1.ResourceList{
 				v1.ResourceMemory: resource.MustParse("2Gi"), // 1Gi (c1) + 1Gi (flat pod overhead) = 2Gi
 			},
@@ -2701,10 +2701,10 @@ func TestPodRequestsAndLimitsWithDRA(t *testing.T) {
 					},
 				},
 				Status: v1.PodStatus{
-					NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+					AdditionalNodeAllocatableResources: []v1.AdditionalNodeAllocatableResource{
 						{
-							ResourceClaimName: "node-allocatable-claim",
-							Containers:        []string{"c1"},
+							Source:     v1.AdditionalNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "node-allocatable-claim"},
+							Containers: []string{"c1"},
 							Overhead: []v1.NodeAllocatableOverheadResources{
 								{
 									Name:         v1.ResourceMemory,
@@ -2715,7 +2715,7 @@ func TestPodRequestsAndLimitsWithDRA(t *testing.T) {
 					},
 				},
 			},
-			options: PodResourcesOptions{UseDRANodeAllocatableResourceClaimStatus: true},
+			options: PodResourcesOptions{UseAdditionalNodeAllocatableResources: true},
 			expectedRequests: v1.ResourceList{
 				v1.ResourceMemory: resource.MustParse("1524Mi"), // 1Gi (c1) + 500Mi (container overhead) = 1524Mi
 			},
@@ -2742,10 +2742,10 @@ func TestPodRequestsAndLimitsWithDRA(t *testing.T) {
 					},
 				},
 				Status: v1.PodStatus{
-					NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+					AdditionalNodeAllocatableResources: []v1.AdditionalNodeAllocatableResource{
 						{
-							ResourceClaimName: "unref-direct-claim",
-							Containers:        []string{},
+							Source:     v1.AdditionalNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "unref-direct-claim"},
+							Containers: []string{},
 							Mapping: []v1.NodeAllocatableMappedResources{
 								{
 									Name:     v1.ResourceMemory,
@@ -2756,7 +2756,7 @@ func TestPodRequestsAndLimitsWithDRA(t *testing.T) {
 					},
 				},
 			},
-			options: PodResourcesOptions{UseDRANodeAllocatableResourceClaimStatus: true},
+			options: PodResourcesOptions{UseAdditionalNodeAllocatableResources: true},
 			expectedRequests: v1.ResourceList{
 				v1.ResourceMemory: resource.MustParse("3Gi"), // 1Gi (c1) + 2Gi (unreferenced mapping) = 3Gi
 			},
@@ -2783,10 +2783,10 @@ func TestPodRequestsAndLimitsWithDRA(t *testing.T) {
 					},
 				},
 				Status: v1.PodStatus{
-					NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+					AdditionalNodeAllocatableResources: []v1.AdditionalNodeAllocatableResource{
 						{
-							ResourceClaimName: "unref-overhead-claim",
-							Containers:        []string{},
+							Source:     v1.AdditionalNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "unref-overhead-claim"},
+							Containers: []string{},
 							Overhead: []v1.NodeAllocatableOverheadResources{
 								{
 									Name:         v1.ResourceMemory,
@@ -2798,7 +2798,7 @@ func TestPodRequestsAndLimitsWithDRA(t *testing.T) {
 					},
 				},
 			},
-			options: PodResourcesOptions{UseDRANodeAllocatableResourceClaimStatus: true},
+			options: PodResourcesOptions{UseAdditionalNodeAllocatableResources: true},
 			expectedRequests: v1.ResourceList{
 				v1.ResourceMemory: resource.MustParse("2Gi"), // 1Gi (c1) + 1Gi (PerPod) + 0 * 500Mi (PerContainer) = 2Gi
 			},
@@ -2825,10 +2825,10 @@ func TestPodRequestsAndLimitsWithDRA(t *testing.T) {
 					},
 				},
 				Status: v1.PodStatus{
-					NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+					AdditionalNodeAllocatableResources: []v1.AdditionalNodeAllocatableResource{
 						{
-							ResourceClaimName: "unref-overhead-percontainer-claim",
-							Containers:        []string{},
+							Source:     v1.AdditionalNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "unref-overhead-percontainer-claim"},
+							Containers: []string{},
 							Overhead: []v1.NodeAllocatableOverheadResources{
 								{
 									Name:         v1.ResourceMemory,
@@ -2839,7 +2839,7 @@ func TestPodRequestsAndLimitsWithDRA(t *testing.T) {
 					},
 				},
 			},
-			options: PodResourcesOptions{UseDRANodeAllocatableResourceClaimStatus: true},
+			options: PodResourcesOptions{UseAdditionalNodeAllocatableResources: true},
 			expectedRequests: v1.ResourceList{
 				v1.ResourceMemory: resource.MustParse("1Gi"), // 1Gi (c1) + 0 * 500Mi = 1Gi
 			},
@@ -2899,10 +2899,10 @@ func TestPodRequestsAndLimitsWithDRA(t *testing.T) {
 						Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("6Gi")},
 					},
 					AllocatedResources: v1.ResourceList{v1.ResourceMemory: resource.MustParse("5Gi")},
-					NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+					AdditionalNodeAllocatableResources: []v1.AdditionalNodeAllocatableResource{
 						{
-							ResourceClaimName: "shared-mem-claim",
-							Containers:        []string{"c1", "c2"},
+							Source:     v1.AdditionalNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "shared-mem-claim"},
+							Containers: []string{"c1", "c2"},
 							Overhead: []v1.NodeAllocatableOverheadResources{
 								{Name: v1.ResourceMemory, PerContainer: new(resource.MustParse("1Gi"))},
 							},
@@ -2911,7 +2911,7 @@ func TestPodRequestsAndLimitsWithDRA(t *testing.T) {
 				},
 			},
 			options: PodResourcesOptions{
-				UseDRANodeAllocatableResourceClaimStatus:       true,
+				UseAdditionalNodeAllocatableResources:          true,
 				UseStatusResources:                             true,
 				InPlacePodLevelResourcesVerticalScalingEnabled: true,
 			},
@@ -2980,17 +2980,17 @@ func TestPodRequestsAndLimitsWithDRA(t *testing.T) {
 						Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("3"), v1.ResourceMemory: resource.MustParse("5Gi")}, // CPU pod level spec = 3; Mem spec + DRA = 5Gi
 					},
 					AllocatedResources: v1.ResourceList{v1.ResourceCPU: resource.MustParse("3"), v1.ResourceMemory: resource.MustParse("5Gi")},
-					NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+					AdditionalNodeAllocatableResources: []v1.AdditionalNodeAllocatableResource{
 						{
-							ResourceClaimName: "shared-cpu-claim",
-							Containers:        []string{"c1", "c2"},
+							Source:     v1.AdditionalNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "shared-cpu-claim"},
+							Containers: []string{"c1", "c2"},
 							Mapping: []v1.NodeAllocatableMappedResources{
 								{Name: v1.ResourceCPU, Quantity: new(resource.MustParse("1"))},
 							},
 						},
 						{
-							ResourceClaimName: "shared-mem-claim",
-							Containers:        []string{"c1", "c2"},
+							Source:     v1.AdditionalNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "shared-mem-claim"},
+							Containers: []string{"c1", "c2"},
 							Overhead: []v1.NodeAllocatableOverheadResources{
 								{Name: v1.ResourceMemory, PerContainer: new(resource.MustParse("1Gi"))},
 							},
@@ -2999,7 +2999,7 @@ func TestPodRequestsAndLimitsWithDRA(t *testing.T) {
 				},
 			},
 			options: PodResourcesOptions{
-				UseDRANodeAllocatableResourceClaimStatus:       true,
+				UseAdditionalNodeAllocatableResources:          true,
 				UseStatusResources:                             true,
 				InPlacePodLevelResourcesVerticalScalingEnabled: true,
 			},
@@ -3070,17 +3070,17 @@ func TestPodRequestsAndLimitsWithDRA(t *testing.T) {
 						Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("3"), v1.ResourceMemory: resource.MustParse("5Gi")},
 					},
 					AllocatedResources: v1.ResourceList{v1.ResourceCPU: resource.MustParse("3"), v1.ResourceMemory: resource.MustParse("5Gi")},
-					NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+					AdditionalNodeAllocatableResources: []v1.AdditionalNodeAllocatableResource{
 						{
-							ResourceClaimName: "shared-cpu-claim",
-							Containers:        []string{"c1", "c2"},
+							Source:     v1.AdditionalNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "shared-cpu-claim"},
+							Containers: []string{"c1", "c2"},
 							Mapping: []v1.NodeAllocatableMappedResources{
 								{Name: v1.ResourceCPU, Quantity: new(resource.MustParse("1"))},
 							},
 						},
 						{
-							ResourceClaimName: "shared-mem-claim",
-							Containers:        []string{"c1", "c2"},
+							Source:     v1.AdditionalNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "shared-mem-claim"},
+							Containers: []string{"c1", "c2"},
 							Overhead: []v1.NodeAllocatableOverheadResources{
 								{Name: v1.ResourceMemory, PerContainer: new(resource.MustParse("1Gi"))},
 							},
@@ -3089,7 +3089,7 @@ func TestPodRequestsAndLimitsWithDRA(t *testing.T) {
 				},
 			},
 			options: PodResourcesOptions{
-				UseDRANodeAllocatableResourceClaimStatus:       true,
+				UseAdditionalNodeAllocatableResources:          true,
 				UseStatusResources:                             true,
 				InPlacePodLevelResourcesVerticalScalingEnabled: true,
 			},
@@ -3156,17 +3156,17 @@ func TestPodRequestsAndLimitsWithDRA(t *testing.T) {
 					Resources: &v1.ResourceRequirements{
 						Limits: v1.ResourceList{v1.ResourceCPU: resource.MustParse("3"), v1.ResourceMemory: resource.MustParse("5Gi")},
 					},
-					NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+					AdditionalNodeAllocatableResources: []v1.AdditionalNodeAllocatableResource{
 						{
-							ResourceClaimName: "shared-cpu-claim",
-							Containers:        []string{"c1", "c2"},
+							Source:     v1.AdditionalNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "shared-cpu-claim"},
+							Containers: []string{"c1", "c2"},
 							Mapping: []v1.NodeAllocatableMappedResources{
 								{Name: v1.ResourceCPU, Quantity: new(resource.MustParse("1"))},
 							},
 						},
 						{
-							ResourceClaimName: "shared-mem-claim",
-							Containers:        []string{"c1", "c2"},
+							Source:     v1.AdditionalNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "shared-mem-claim"},
+							Containers: []string{"c1", "c2"},
 							Overhead: []v1.NodeAllocatableOverheadResources{
 								{Name: v1.ResourceMemory, PerContainer: new(resource.MustParse("1Gi"))},
 							},
@@ -3175,7 +3175,7 @@ func TestPodRequestsAndLimitsWithDRA(t *testing.T) {
 				},
 			},
 			options: PodResourcesOptions{
-				UseDRANodeAllocatableResourceClaimStatus:       true,
+				UseAdditionalNodeAllocatableResources:          true,
 				UseStatusResources:                             true,
 				InPlacePodLevelResourcesVerticalScalingEnabled: true,
 			},
@@ -3242,17 +3242,17 @@ func TestPodRequestsAndLimitsWithDRA(t *testing.T) {
 					Resources: &v1.ResourceRequirements{
 						Limits: v1.ResourceList{v1.ResourceCPU: resource.MustParse("3"), v1.ResourceMemory: resource.MustParse("5Gi")}, // old CPU allocated status = 3
 					},
-					NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+					AdditionalNodeAllocatableResources: []v1.AdditionalNodeAllocatableResource{
 						{
-							ResourceClaimName: "shared-cpu-claim",
-							Containers:        []string{"c1", "c2"},
+							Source:     v1.AdditionalNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "shared-cpu-claim"},
+							Containers: []string{"c1", "c2"},
 							Mapping: []v1.NodeAllocatableMappedResources{
 								{Name: v1.ResourceCPU, Quantity: new(resource.MustParse("1"))},
 							},
 						},
 						{
-							ResourceClaimName: "shared-mem-claim",
-							Containers:        []string{"c1", "c2"},
+							Source:     v1.AdditionalNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "shared-mem-claim"},
+							Containers: []string{"c1", "c2"},
 							Overhead: []v1.NodeAllocatableOverheadResources{
 								{Name: v1.ResourceMemory, PerContainer: new(resource.MustParse("1Gi"))},
 							},
@@ -3261,7 +3261,7 @@ func TestPodRequestsAndLimitsWithDRA(t *testing.T) {
 				},
 			},
 			options: PodResourcesOptions{
-				UseDRANodeAllocatableResourceClaimStatus:       true,
+				UseAdditionalNodeAllocatableResources:          true,
 				UseStatusResources:                             true,
 				InPlacePodLevelResourcesVerticalScalingEnabled: true,
 			},
@@ -3316,10 +3316,10 @@ func TestPodRequestsAndLimitsWithDRA(t *testing.T) {
 							},
 						},
 					},
-					NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+					AdditionalNodeAllocatableResources: []v1.AdditionalNodeAllocatableResource{
 						{
-							ResourceClaimName: "shared-mem-claim",
-							Containers:        []string{"c1", "c2"},
+							Source:     v1.AdditionalNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "shared-mem-claim"},
+							Containers: []string{"c1", "c2"},
 							Overhead: []v1.NodeAllocatableOverheadResources{
 								{Name: v1.ResourceMemory, PerContainer: new(resource.MustParse("1Gi"))},
 							},
@@ -3328,7 +3328,7 @@ func TestPodRequestsAndLimitsWithDRA(t *testing.T) {
 				},
 			},
 			options: PodResourcesOptions{
-				UseDRANodeAllocatableResourceClaimStatus:       true,
+				UseAdditionalNodeAllocatableResources:          true,
 				UseStatusResources:                             true,
 				InPlacePodLevelResourcesVerticalScalingEnabled: false, // container level resize!
 			},
@@ -3384,10 +3384,10 @@ func TestPodRequestsAndLimitsWithDRA(t *testing.T) {
 							AllocatedResources: v1.ResourceList{v1.ResourceMemory: resource.MustParse("2Gi")},
 						},
 					},
-					NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+					AdditionalNodeAllocatableResources: []v1.AdditionalNodeAllocatableResource{
 						{
-							ResourceClaimName: "shared-mem-claim",
-							Containers:        []string{"c1", "c2"},
+							Source:     v1.AdditionalNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "shared-mem-claim"},
+							Containers: []string{"c1", "c2"},
 							Overhead: []v1.NodeAllocatableOverheadResources{
 								{Name: v1.ResourceMemory, PerContainer: new(resource.MustParse("1Gi"))},
 							},
@@ -3396,7 +3396,7 @@ func TestPodRequestsAndLimitsWithDRA(t *testing.T) {
 				},
 			},
 			options: PodResourcesOptions{
-				UseDRANodeAllocatableResourceClaimStatus:       true,
+				UseAdditionalNodeAllocatableResources:          true,
 				UseStatusResources:                             true,
 				InPlacePodLevelResourcesVerticalScalingEnabled: false, // container level resize!
 			},
@@ -3430,10 +3430,10 @@ func TestPodRequestsAndLimitsWithDRA(t *testing.T) {
 					},
 				},
 				Status: v1.PodStatus{
-					NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+					AdditionalNodeAllocatableResources: []v1.AdditionalNodeAllocatableResource{
 						{
-							ResourceClaimName: "node-allocatable-claim-1",
-							Containers:        []string{"c1"},
+							Source:     v1.AdditionalNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "node-allocatable-claim-1"},
+							Containers: []string{"c1"},
 							Mapping: []v1.NodeAllocatableMappedResources{
 								{Name: v1.ResourceCPU, Quantity: new(resource.MustParse("50m"))},
 								{Name: v1.ResourceMemory, Quantity: new(resource.MustParse("512Mi"))},
@@ -3442,7 +3442,7 @@ func TestPodRequestsAndLimitsWithDRA(t *testing.T) {
 					},
 				},
 			},
-			options: PodResourcesOptions{UseDRANodeAllocatableResourceClaimStatus: true},
+			options: PodResourcesOptions{UseAdditionalNodeAllocatableResources: true},
 			expectedRequests: v1.ResourceList{
 				v1.ResourceCPU:    resource.MustParse("150m"),   // 100m + 50m DRA
 				v1.ResourceMemory: resource.MustParse("1536Mi"), // 1Gi + 512Mi DRA
@@ -3474,10 +3474,10 @@ func TestPodRequestsAndLimitsWithDRA(t *testing.T) {
 					},
 				},
 				Status: v1.PodStatus{
-					NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+					AdditionalNodeAllocatableResources: []v1.AdditionalNodeAllocatableResource{
 						{
-							ResourceClaimName: "node-allocatable-claim-1",
-							Containers:        []string{"c1"},
+							Source:     v1.AdditionalNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "node-allocatable-claim-1"},
+							Containers: []string{"c1"},
 							Mapping: []v1.NodeAllocatableMappedResources{
 								{Name: hugePageResource1Gi, Quantity: new(resource.MustParse("1"))},
 							},
@@ -3485,7 +3485,7 @@ func TestPodRequestsAndLimitsWithDRA(t *testing.T) {
 					},
 				},
 			},
-			options: PodResourcesOptions{UseDRANodeAllocatableResourceClaimStatus: true},
+			options: PodResourcesOptions{UseAdditionalNodeAllocatableResources: true},
 			expectedRequests: v1.ResourceList{
 				v1.ResourceCPU:      resource.MustParse("100m"),
 				hugePageResource1Gi: resource.MustParse("1"),
@@ -4034,10 +4034,10 @@ func TestPodResourceLimitsWithSharedDRAClaims(t *testing.T) {
 					},
 				},
 			},
-			NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+			AdditionalNodeAllocatableResources: []v1.AdditionalNodeAllocatableResource{
 				{
-					ResourceClaimName: "shared-claim",
-					Containers:        []string{"c1", "c2"},
+					Source:     v1.AdditionalNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "shared-claim"},
+					Containers: []string{"c1", "c2"},
 					Overhead: []v1.NodeAllocatableOverheadResources{
 						{
 							Name:         v1.ResourceMemory,
@@ -4054,8 +4054,8 @@ func TestPodResourceLimitsWithSharedDRAClaims(t *testing.T) {
 	// Unique DRA overhead = 2 containers * 3Gi = 6Gi.
 	// Expected limits = 4Gi + 6Gi = 10Gi.
 	limitsNoStatus := PodLimits(testPod, PodResourcesOptions{
-		UseDRANodeAllocatableResourceClaimStatus: true,
-		UseStatusResources:                       false,
+		UseAdditionalNodeAllocatableResources: true,
+		UseStatusResources:                    false,
 	})
 	expectedNoStatus := v1.ResourceList{
 		v1.ResourceMemory: resource.MustParse("10Gi"),
@@ -4074,7 +4074,7 @@ func TestPodResourceLimitsWithSharedDRAClaims(t *testing.T) {
 		},
 	}
 	limitsWithStatus := PodLimits(testPodWithStatus, PodResourcesOptions{
-		UseDRANodeAllocatableResourceClaimStatus:       true,
+		UseAdditionalNodeAllocatableResources:          true,
 		UseStatusResources:                             true,
 		InPlacePodLevelResourcesVerticalScalingEnabled: true,
 	})
@@ -4099,7 +4099,7 @@ func TestPodResourceLimitsWithSharedDRAClaims(t *testing.T) {
 		},
 	}
 	limitsResize := PodLimits(testPodResize, PodResourcesOptions{
-		UseDRANodeAllocatableResourceClaimStatus:       true,
+		UseAdditionalNodeAllocatableResources:          true,
 		UseStatusResources:                             true,
 		InPlacePodLevelResourcesVerticalScalingEnabled: true,
 	})
@@ -4146,10 +4146,10 @@ func TestPodResourceRequestsWithSharedDRAClaims(t *testing.T) {
 			},
 		},
 		Status: v1.PodStatus{
-			NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+			AdditionalNodeAllocatableResources: []v1.AdditionalNodeAllocatableResource{
 				{
-					ResourceClaimName: "shared-claim",
-					Containers:        []string{"c1", "c2"},
+					Source:     v1.AdditionalNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "shared-claim"},
+					Containers: []string{"c1", "c2"},
 					Overhead: []v1.NodeAllocatableOverheadResources{
 						{
 							Name:         v1.ResourceMemory,
@@ -4166,8 +4166,8 @@ func TestPodResourceRequestsWithSharedDRAClaims(t *testing.T) {
 	// Unique DRA overhead = 2 containers * 3Gi = 6Gi.
 	// Expected requests = 4Gi + 6Gi = 10Gi.
 	requestsNoStatus := PodRequests(testPod, PodResourcesOptions{
-		UseDRANodeAllocatableResourceClaimStatus: true,
-		UseStatusResources:                       false,
+		UseAdditionalNodeAllocatableResources: true,
+		UseStatusResources:                    false,
 	})
 	expectedNoStatus := v1.ResourceList{
 		v1.ResourceMemory: resource.MustParse("10Gi"),
@@ -4189,7 +4189,7 @@ func TestPodResourceRequestsWithSharedDRAClaims(t *testing.T) {
 		v1.ResourceMemory: resource.MustParse("10Gi"),
 	}
 	requestsWithStatus := PodRequests(testPodWithStatus, PodResourcesOptions{
-		UseDRANodeAllocatableResourceClaimStatus:       true,
+		UseAdditionalNodeAllocatableResources:          true,
 		UseStatusResources:                             true,
 		InPlacePodLevelResourcesVerticalScalingEnabled: true,
 	})
@@ -4217,7 +4217,7 @@ func TestPodResourceRequestsWithSharedDRAClaims(t *testing.T) {
 		v1.ResourceMemory: resource.MustParse("10Gi"),
 	}
 	requestsResize := PodRequests(testPodResize, PodResourcesOptions{
-		UseDRANodeAllocatableResourceClaimStatus:       true,
+		UseAdditionalNodeAllocatableResources:          true,
 		UseStatusResources:                             true,
 		InPlacePodLevelResourcesVerticalScalingEnabled: true,
 	})
@@ -4280,10 +4280,10 @@ func TestGetContainerDRAAllocations(t *testing.T) {
 			containerName: "c1",
 			pod: &v1.Pod{
 				Status: v1.PodStatus{
-					NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+					AdditionalNodeAllocatableResources: []v1.AdditionalNodeAllocatableResource{
 						{
-							ResourceClaimName: "unreferenced-claim",
-							Containers:        []string{"c2"},
+							Source:     v1.AdditionalNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "unreferenced-claim"},
+							Containers: []string{"c2"},
 							Mapping: []v1.NodeAllocatableMappedResources{
 								{
 									Name:     v1.ResourceCPU,
@@ -4301,10 +4301,10 @@ func TestGetContainerDRAAllocations(t *testing.T) {
 			containerName: "c1",
 			pod: &v1.Pod{
 				Status: v1.PodStatus{
-					NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+					AdditionalNodeAllocatableResources: []v1.AdditionalNodeAllocatableResource{
 						{
-							ResourceClaimName: "direct-claim",
-							Containers:        []string{"c1"},
+							Source:     v1.AdditionalNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "direct-claim"},
+							Containers: []string{"c1"},
 							Mapping: []v1.NodeAllocatableMappedResources{
 								{
 									Name:     v1.ResourceCPU,
@@ -4324,10 +4324,10 @@ func TestGetContainerDRAAllocations(t *testing.T) {
 			containerName: "c1",
 			pod: &v1.Pod{
 				Status: v1.PodStatus{
-					NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+					AdditionalNodeAllocatableResources: []v1.AdditionalNodeAllocatableResource{
 						{
-							ResourceClaimName: "overhead-pod",
-							Containers:        []string{"c1"},
+							Source:     v1.AdditionalNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "overhead-pod"},
+							Containers: []string{"c1"},
 							Overhead: []v1.NodeAllocatableOverheadResources{
 								{
 									Name:   v1.ResourceMemory,
@@ -4347,10 +4347,10 @@ func TestGetContainerDRAAllocations(t *testing.T) {
 			containerName: "c1",
 			pod: &v1.Pod{
 				Status: v1.PodStatus{
-					NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+					AdditionalNodeAllocatableResources: []v1.AdditionalNodeAllocatableResource{
 						{
-							ResourceClaimName: "overhead-container",
-							Containers:        []string{"c1"},
+							Source:     v1.AdditionalNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "overhead-container"},
+							Containers: []string{"c1"},
 							Overhead: []v1.NodeAllocatableOverheadResources{
 								{
 									Name:         v1.ResourceMemory,
@@ -4370,10 +4370,10 @@ func TestGetContainerDRAAllocations(t *testing.T) {
 			containerName: "c1",
 			pod: &v1.Pod{
 				Status: v1.PodStatus{
-					NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+					AdditionalNodeAllocatableResources: []v1.AdditionalNodeAllocatableResource{
 						{
-							ResourceClaimName: "overhead-both",
-							Containers:        []string{"c1"},
+							Source:     v1.AdditionalNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "overhead-both"},
+							Containers: []string{"c1"},
 							Overhead: []v1.NodeAllocatableOverheadResources{
 								{
 									Name:         v1.ResourceMemory,
@@ -4394,10 +4394,10 @@ func TestGetContainerDRAAllocations(t *testing.T) {
 			containerName: "c1",
 			pod: &v1.Pod{
 				Status: v1.PodStatus{
-					NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+					AdditionalNodeAllocatableResources: []v1.AdditionalNodeAllocatableResource{
 						{
-							ResourceClaimName: "combined-claim",
-							Containers:        []string{"c1"},
+							Source:     v1.AdditionalNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "combined-claim"},
+							Containers: []string{"c1"},
 							Mapping: []v1.NodeAllocatableMappedResources{
 								{
 									Name:     v1.ResourceCPU,
@@ -4424,10 +4424,10 @@ func TestGetContainerDRAAllocations(t *testing.T) {
 			containerName: "c1",
 			pod: &v1.Pod{
 				Status: v1.PodStatus{
-					NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+					AdditionalNodeAllocatableResources: []v1.AdditionalNodeAllocatableResource{
 						{
-							ResourceClaimName: "claim-1",
-							Containers:        []string{"c1"},
+							Source:     v1.AdditionalNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "claim-1"},
+							Containers: []string{"c1"},
 							Mapping: []v1.NodeAllocatableMappedResources{
 								{
 									Name:     v1.ResourceCPU,
@@ -4436,8 +4436,8 @@ func TestGetContainerDRAAllocations(t *testing.T) {
 							},
 						},
 						{
-							ResourceClaimName: "claim-2",
-							Containers:        []string{"c1"},
+							Source:     v1.AdditionalNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "claim-2"},
+							Containers: []string{"c1"},
 							Overhead: []v1.NodeAllocatableOverheadResources{
 								{
 									Name:   v1.ResourceMemory,
@@ -4458,10 +4458,10 @@ func TestGetContainerDRAAllocations(t *testing.T) {
 			containerName: "c1",
 			pod: &v1.Pod{
 				Status: v1.PodStatus{
-					NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+					AdditionalNodeAllocatableResources: []v1.AdditionalNodeAllocatableResource{
 						{
-							ResourceClaimName: "claim-1",
-							Containers:        []string{"c1"},
+							Source:     v1.AdditionalNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "claim-1"},
+							Containers: []string{"c1"},
 							Mapping: []v1.NodeAllocatableMappedResources{
 								{
 									Name:     v1.ResourceCPU,
@@ -4470,8 +4470,8 @@ func TestGetContainerDRAAllocations(t *testing.T) {
 							},
 						},
 						{
-							ResourceClaimName: "claim-2",
-							Containers:        []string{"c1"},
+							Source:     v1.AdditionalNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "claim-2"},
+							Containers: []string{"c1"},
 							Mapping: []v1.NodeAllocatableMappedResources{
 								{
 									Name:     v1.ResourceCPU,
