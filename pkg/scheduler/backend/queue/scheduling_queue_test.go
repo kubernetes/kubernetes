@@ -11724,3 +11724,54 @@ func TestPreQueueingHint_MultiProfileNarrowing(t *testing.T) {
 		t.Errorf("expected 0 pods in unschedulable, got %d", got)
 	}
 }
+
+func TestGatedPodEventOfInterestForPreviouslyRejectedPlugin(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+
+	const (
+		gatingPlugin = "preEnqueuePlugin"
+		failedPlugin = "fooPlugin"
+	)
+
+	queueingHintMap := makeEmptyQueueingHintMapPerProfile()
+	queueingHintMap[""][nodeAdd] = []*QueueingHintFunction{
+		{
+			PluginName:     failedPlugin,
+			QueueingHintFn: queueHintReturnQueue,
+		},
+	}
+
+	q := NewTestQueue(
+		ctx,
+		newDefaultQueueSort(),
+		WithQueueingHintMapPerProfile(queueingHintMap),
+	)
+
+	podInfo := &framework.QueuedPodInfo{
+		PodInfo: mustNewPodInfo(
+			st.MakePod().
+				Name("gated-pod").
+				Namespace("ns").
+				UID("gated-pod").
+				Obj(),
+		),
+		QueueingParams: framework.QueueingParams{
+			UnschedulablePlugins: sets.New(gatingPlugin, failedPlugin),
+			PendingPlugins:       sets.New(failedPlugin),
+			GatingPlugin:         gatingPlugin,
+			GatingPluginEvents: []fwk.ClusterEvent{
+				framework.EventAssignedPodAdd,
+			},
+		},
+	}
+
+	entity := framework.QueuedEntityInfo(podInfo)
+
+	if !q.isEventOfInterestForEntity(entity, nodeAdd) {
+		t.Fatalf("expected nodeAdd event to be of interest for gated pod because %q rejected it", failedPlugin)
+	}
+
+	if q.isEventOfInterestForEntity(entity, framework.EventAssignedPodAdd) {
+		t.Fatalf("expected AssignedPodAdd to not be of interest to failed plugin")
+	}
+}
