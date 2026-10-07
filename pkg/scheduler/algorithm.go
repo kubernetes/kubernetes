@@ -35,6 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/parallelize"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/dynamicresources"
+	"k8s.io/kubernetes/pkg/scheduler/framework/preemption"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	utiltrace "k8s.io/utils/trace"
 )
@@ -133,8 +134,12 @@ func NewSchedulingAlgorithm(snapshot *internalcache.Snapshot, cache internalcach
 // opportunisticBatchingEnabled reports whether opportunistic batching can run. It needs both the
 // feature gate and a cycle provider: batch state is keyed by scheduling cycle, so
 // without a real counter the batch cannot tell consecutive cycles apart.
-func (a *SchedulingAlgorithm) opportunisticBatchingEnabled() bool {
-	return a.cycleProvider != nil && utilfeature.DefaultFeatureGate.Enabled(features.OpportunisticBatching)
+// Opportunistic batching is also bypassed during Workload-Aware Preemption simulations
+// because victim condemnation dynamically updates node scores after each pod reservation.
+func (a *SchedulingAlgorithm) opportunisticBatchingEnabled(ctx context.Context) bool {
+	return a.cycleProvider != nil &&
+		utilfeature.DefaultFeatureGate.Enabled(features.OpportunisticBatching) &&
+		preemption.PodGroupPreemptionStateFromContext(ctx) == nil
 }
 
 // SchedulePod runs PreFilter, Filter, filter extenders and Score, and returns the
@@ -167,7 +172,7 @@ func (a *SchedulingAlgorithm) SchedulePod(ctx context.Context, schedFramework fr
 	// When only one node after predicate, just use it.
 	if len(feasibleNodes) == 1 {
 		node := feasibleNodes[0].Node().Name
-		if a.opportunisticBatchingEnabled() {
+		if a.opportunisticBatchingEnabled(ctx) {
 			schedFramework.StoreScheduleResults(ctx, podInfo.PodSignature, nodeHint, node, nil, a.cycleProvider())
 		}
 		return ScheduleResult{
@@ -186,7 +191,7 @@ func (a *SchedulingAlgorithm) SchedulePod(ctx context.Context, schedFramework fr
 	node := sortedPrioritizedNodes.Pop().Name
 	trace.Step("Prioritizing done")
 
-	if a.opportunisticBatchingEnabled() {
+	if a.opportunisticBatchingEnabled(ctx) {
 		schedFramework.StoreScheduleResults(ctx, podInfo.PodSignature, nodeHint, node, sortedPrioritizedNodes, a.cycleProvider())
 	}
 
@@ -336,7 +341,7 @@ func (a *SchedulingAlgorithm) findNodesThatFitPod(ctx context.Context, schedFram
 	}
 
 	var nodeHint string
-	if a.opportunisticBatchingEnabled() {
+	if a.opportunisticBatchingEnabled(ctx) {
 		// We get the node hint even if we have a nominated name for simplicity, but we could potentially avoid it
 		// in this scenario in the future.
 		nodeHint = schedFramework.GetNodeHint(ctx, pod, podInfo.PodSignature, state, a.cycleProvider())
