@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes/fake"
+	"k8s.io/client-go/tools/record"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -483,6 +484,25 @@ func TestFailureThreshold(t *testing.T) {
 	}
 }
 
+func TestFailureThresholdEvents(t *testing.T) {
+	logger, ctx := ktesting.NewTestContext(t)
+	m := newTestManager()
+	fakeRecorder := record.NewFakeRecorder(10)
+	m.prober.recorder = fakeRecorder
+
+	w := newTestWorker(m, liveness, v1.Probe{SuccessThreshold: 1, FailureThreshold: 2})
+	m.statusManager.SetPodStatus(logger, w.pod, getTestRunningStatus())
+	m.prober.exec = fakeExecProber{probe.Failure, nil}
+
+	expectContinue(t, w, w.doProbe(ctx), "first failure")
+	expectResult(t, w, results.Success, "first failure below threshold")
+	expectEvent(t, fakeRecorder, "Warning Unhealthy Liveness probe failed (failure threshold not reached: 1/2): ")
+
+	expectContinue(t, w, w.doProbe(ctx), "second failure")
+	expectResult(t, w, results.Failure, "second failure reaches threshold")
+	expectEvent(t, fakeRecorder, "Warning Unhealthy Liveness probe failed (failure threshold reached: 2/2): ")
+}
+
 func TestSuccessThreshold(t *testing.T) {
 	logger, ctx := ktesting.NewTestContext(t)
 	m := newTestManager()
@@ -658,6 +678,18 @@ func expectResult(t *testing.T, w *worker, expectedResult results.Result, msg st
 func expectContinue(t *testing.T, w *worker, c bool, msg string) {
 	if !c {
 		t.Errorf("[%s - %s] Expected to continue, but did not", w.probeType, msg)
+	}
+}
+
+func expectEvent(t *testing.T, recorder *record.FakeRecorder, expected string) {
+	t.Helper()
+	select {
+	case event := <-recorder.Events:
+		if event != expected {
+			t.Errorf("Expected event %q, got %q", expected, event)
+		}
+	default:
+		t.Errorf("Expected event %q, got none", expected)
 	}
 }
 
