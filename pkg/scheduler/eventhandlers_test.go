@@ -186,7 +186,7 @@ func TestEventHandlers_MoveToActiveOnNominatedNodeUpdate(t *testing.T) {
 				}
 				poppedPod := entity.(*framework.QueuedPodInfo)
 				poppedPod.UnschedulablePlugins = sets.New("fooPlugin1")
-				if err := queue.AddUnschedulablePodIfNotPresent(logger, poppedPod, queue.SchedulingCycle()); err != nil {
+				if err := queue.AddUnschedulablePodIfNotPresent(ctx, poppedPod, queue.SchedulingCycle()); err != nil {
 					t.Errorf("Unexpected error from AddUnschedulablePodIfNotPresent: %v", err)
 				}
 			}
@@ -776,7 +776,7 @@ func TestAddPod_MoveUnschedulablePodsWithGenericWorkload(t *testing.T) {
 				if _, err := sched.SchedulingQueue.Pop(logger); err != nil {
 					t.Fatalf("Pop failed: %v", err)
 				}
-				if err := sched.SchedulingQueue.AddUnschedulablePodIfNotPresent(logger, pInfo, sched.SchedulingQueue.SchedulingCycle()); err != nil {
+				if err := sched.SchedulingQueue.AddUnschedulablePodIfNotPresent(ctx, pInfo, sched.SchedulingQueue.SchedulingCycle()); err != nil {
 					t.Fatalf("Unexpected error from AddUnschedulablePodIfNotPresent: %v", err)
 				}
 			}
@@ -1523,7 +1523,7 @@ func TestAddCompositePodGroup(t *testing.T) {
 				poppedPod := poppedEntity.(*framework.QueuedPodInfo)
 				poppedPod.QueueingParams.Timestamp = time.Now().Add(-10 * time.Minute)
 				poppedPod.QueueingParams.UnschedulablePlugins = sets.New("fake-plugin")
-				if err := queue.AddUnschedulablePodIfNotPresent(logger, poppedPod, queue.SchedulingCycle()); err != nil {
+				if err := queue.AddUnschedulablePodIfNotPresent(ctx, poppedPod, queue.SchedulingCycle()); err != nil {
 					t.Fatalf("Failed to add unschedulable pod: %v", err)
 				}
 			}
@@ -1684,7 +1684,7 @@ func TestUpdateCompositePodGroup(t *testing.T) {
 				poppedPod := poppedEntity.(*framework.QueuedPodInfo)
 				poppedPod.QueueingParams.Timestamp = time.Now().Add(-10 * time.Minute)
 				poppedPod.QueueingParams.UnschedulablePlugins = sets.New("fake-plugin")
-				if err := queue.AddUnschedulablePodIfNotPresent(logger, poppedPod, queue.SchedulingCycle()); err != nil {
+				if err := queue.AddUnschedulablePodIfNotPresent(ctx, poppedPod, queue.SchedulingCycle()); err != nil {
 					t.Fatalf("Failed to add unschedulable pod: %v", err)
 				}
 			}
@@ -1818,7 +1818,7 @@ func TestDeleteCompositePodGroup(t *testing.T) {
 				poppedPod := poppedEntity.(*framework.QueuedPodInfo)
 				poppedPod.QueueingParams.Timestamp = time.Now().Add(-10 * time.Minute)
 				poppedPod.QueueingParams.UnschedulablePlugins = sets.New("fake-plugin")
-				if err := queue.AddUnschedulablePodIfNotPresent(logger, poppedPod, queue.SchedulingCycle()); err != nil {
+				if err := queue.AddUnschedulablePodIfNotPresent(ctx, poppedPod, queue.SchedulingCycle()); err != nil {
 					t.Fatalf("Failed to add unschedulable pod: %v", err)
 				}
 			}
