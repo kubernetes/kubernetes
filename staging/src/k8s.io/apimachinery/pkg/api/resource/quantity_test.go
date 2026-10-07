@@ -1938,6 +1938,29 @@ func TestQuantityStringBelowNano(t *testing.T) {
 	}
 }
 
+func TestQuantityStringDecMinInt32Scale(t *testing.T) {
+	// An inf.Scale of math.MinInt32 is one past the Scale range. Narrowing its
+	// exponent wraps, and the value still prints exactly unless trailing zeros
+	// push the exponent past int32.
+	for _, tc := range []struct {
+		unscaled int64
+		format   Format
+		expect   string
+	}{
+		{1, DecimalExponent, "100e2147483646"},
+		{7, DecimalSI, "700e2147483646"},
+		{10, DecimalExponent, "1000e2147483646"},
+		// TODO(#141166): Must print the exact value, 10e2147483649. The exponent
+		// overflows int32 and wraps negative.
+		{100, DecimalExponent, "1e-2147483646"},
+	} {
+		q := NewDecimalQuantity(*inf.NewDec(tc.unscaled, math.MinInt32), tc.format)
+		if got := q.String(); got != tc.expect {
+			t.Errorf("%d * 10^2147483648 as %s: String() = %q, want %q", tc.unscaled, tc.format, got, tc.expect)
+		}
+	}
+}
+
 func TestQuantityParseEmit(t *testing.T) {
 	table := []struct {
 		in     string
