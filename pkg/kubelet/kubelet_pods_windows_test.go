@@ -24,11 +24,41 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/ktesting"
+	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/volume/util/hostutil"
 	"k8s.io/kubernetes/pkg/volume/util/subpath"
 )
+
+func TestGenerateAPIPodStatusOmitsInsecureImplicitConditionsForWindowsPods(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodImplicitRootWarnings, true)
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{UID: "windows-pod", Name: "foo0", Namespace: "bar0"},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{{Name: "ctr0"}},
+		},
+	}
+	criStatus := &kubecontainer.PodStatus{
+		ContainerStatuses: []*kubecontainer.Status{{Name: "ctr0"}},
+	}
+
+	logger, tCtx := ktesting.NewTestContext(t)
+	testKubelet := newTestKubelet(t, false)
+	defer testKubelet.Cleanup()
+	kl := testKubelet.kubelet
+
+	kl.statusManager.SetPodStatus(logger, pod, pod.Status)
+	actual := kl.generateAPIPodStatus(tCtx, pod, criStatus, false)
+	for _, c := range actual.Conditions {
+		if c.Type == v1.InsecureImplicitUserID || c.Type == v1.InsecureImplicitGroupID {
+			t.Fatalf("unexpected condition on Windows pod: %v", c)
+		}
+	}
+}
 
 func TestMakeMountsWindows(t *testing.T) {
 	logger, _ := ktesting.NewTestContext(t)
