@@ -61,6 +61,7 @@ import (
 	zpagesfeatures "k8s.io/component-base/zpages/features"
 	"k8s.io/klog/v2"
 	openapibuilder3 "k8s.io/kube-openapi/pkg/builder3"
+	"k8s.io/kube-openapi/pkg/cached"
 	openapicommon "k8s.io/kube-openapi/pkg/common"
 	"k8s.io/kube-openapi/pkg/handler"
 	"k8s.io/kube-openapi/pkg/handler3"
@@ -186,8 +187,10 @@ type GenericAPIServer struct {
 	OpenAPIV3VersionedService *handler3.OpenAPIService
 
 	// StaticOpenAPISpec is the spec derived from the restful container endpoints.
-	// It is set during PrepareRun.
-	StaticOpenAPISpec *spec.Swagger
+	// It is set during PrepareRun. The spec is built on the first Get, or during
+	// PrepareRun itself unless the OpenAPIV2LazyBuild feature gate is enabled;
+	// the result, including a build error, is kept for the life of the server.
+	StaticOpenAPISpec cached.Value[*spec.Swagger]
 
 	// PostStartHooks are each called after the server has started listening, in a separate go func for each
 	// with no guarantee of ordering between them.  The map key is a name used for error reporting.
@@ -448,6 +451,15 @@ func (s *GenericAPIServer) PrepareRun() preparedGenericAPIServer {
 		s.OpenAPIVersionedService, s.StaticOpenAPISpec = routes.OpenAPI{
 			Config: s.openAPIConfig,
 		}.InstallV2(s.Handler.GoRestfulContainer, s.Handler.NonGoRestfulMux)
+		if !utilfeature.DefaultFeatureGate.Enabled(features.OpenAPIV2LazyBuild) {
+			// Build the spec now, so that a broken spec fails startup as it
+			// always has. With the gate enabled the first request builds it
+			// instead and nothing is retained for an endpoint that is never
+			// requested.
+			if _, _, err := s.StaticOpenAPISpec.Get(); err != nil {
+				klog.Fatalf("Failed to build open api spec for root: %v", err)
+			}
+		}
 	}
 
 	if s.openAPIV3Config != nil && !s.skipOpenAPIInstallation {
