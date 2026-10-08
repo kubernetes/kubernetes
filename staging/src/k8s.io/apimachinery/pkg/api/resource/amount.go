@@ -380,33 +380,58 @@ func (a int64Amount) widenedScale() widenedScale {
 	return widenScale(a.scale)
 }
 
-// AsCanonicalBytes accepts a buffer to write the base-10 string value of this field to, and returns
-// either that buffer or a larger buffer and the current exponent of the value. The value is adjusted
-// until the exponent is a multiple of 3 - i.e. 1.1e5 would return "110", 3.
+// floorToSIExponent returns the largest multiple of 3 that is less than or
+// equal to w. fits is false when that multiple is outside the Scale range.
+func floorToSIExponent(w widenedScale) (exponent Scale, fits bool) {
+	switch w % 3 {
+	case 1, -2:
+		return narrowScale(w - 1)
+	case 2, -1:
+		return narrowScale(w - 2)
+	default: // case 0
+		return narrowScale(w)
+	}
+}
+
+// AsCanonicalBytes accepts a buffer to write the base-10 string value of this
+// field to, and returns either that buffer or a larger buffer and the current
+// exponent of the value. The value is adjusted down until the exponent is a multiple
+// of 3 to align with SI units. For example, 1.1e5 returns ("110", 3).
+// math.MinInt32 and math.MinInt32+1 are returned as is because no lower
+// multiple of 3 fits in an int32.
 func (a int64Amount) AsCanonicalBytes(out []byte) (result []byte, exponent int32) {
 	mantissa := a.value
-	exponent = int32(a.scale)
 
 	amount, times := removeInt64Factors(mantissa, 10)
-	exponent += int32(times)
-
-	// make sure exponent is a multiple of 3
-	var ok bool
-	switch exponent % 3 {
-	case 1, -2:
-		amount, ok = int64MultiplyScale10(amount)
-		if !ok {
+	e := a.widenedScale() + widenedScale(times)
+	c, fits := floorToSIExponent(e)
+	if !fits {
+		if e > 0 {
 			return infDecAmount{a.AsDec()}.AsCanonicalBytes(out)
 		}
-		exponent = exponent - 1
-	case 2, -1:
-		amount, ok = int64MultiplyScale100(amount)
-		if !ok {
-			return infDecAmount{a.AsDec()}.AsCanonicalBytes(out)
+		// 'times' is always positive, and the `e > 0` case above handles positive overflow,
+		// so this means we could not round down to SI exponent without negative overflow, so keep e as-is
+		c, _ = narrowScale(e)
+	} else {
+		// If the rounded-down exponent fits,
+		// add the zeros that c no longer covers to the mantissa
+		var ok bool
+		switch e % 3 {
+		case 0:
+			// noop
+		case 1, -2:
+			amount, ok = int64MultiplyScale10(amount)
+			if !ok {
+				return infDecAmount{a.AsDec()}.AsCanonicalBytes(out)
+			}
+		case 2, -1:
+			amount, ok = int64MultiplyScale100(amount)
+			if !ok {
+				return infDecAmount{a.AsDec()}.AsCanonicalBytes(out)
+			}
 		}
-		exponent = exponent - 2
 	}
-	return strconv.AppendInt(out, amount, 10), exponent
+	return strconv.AppendInt(out, amount, 10), int32(c)
 }
 
 // AsCanonicalBase1024Bytes accepts a buffer to write the base-1024 string value of this field to, and returns
@@ -440,26 +465,33 @@ func (a infDecAmount) widenedScale() widenedScale {
 	return widenInfScale(a.Dec.Scale())
 }
 
-// AsCanonicalBytes accepts a buffer to write the base-10 string value of this field to, and returns
-// either that buffer or a larger buffer and the current exponent of the value. The value is adjusted
-// until the exponent is a multiple of 3 - i.e. 1.1e5 would return "110", 3.
+// AsCanonicalBytes accepts a buffer to write the base-10 string value of this
+// field to, and returns either that buffer or a larger buffer and the current
+// exponent of the value. The value is adjusted until the exponent is a multiple
+// of 3 to align with SI units. For example, 1.1e5 returns ("110", 3).
+// math.MinInt32 and math.MinInt32+1 are returned as is because no lower
+// multiple of 3 fits in an int32.
 func (a infDecAmount) AsCanonicalBytes(out []byte) (result []byte, exponent int32) {
 	mantissa := a.Dec.UnscaledBig()
-	// An inf.Scale of math.MinInt32 does not fit, and wraps.
-	scale, _ := narrowScale(a.widenedScale())
-	exponent = int32(scale)
 	amount := big.NewInt(0).Set(mantissa)
 	// move all factors of 10 into the exponent for easy reasoning
 	amount, times := removeBigIntFactors(amount, bigTen)
-	exponent += times
-
-	// make sure exponent is a multiple of 3
-	for exponent%3 != 0 {
-		amount.Mul(amount, bigTen)
-		exponent--
+	e := a.widenedScale() + widenedScale(times)
+	c, fits := floorToSIExponent(e)
+	if !fits {
+		if e > 0 {
+			c = math.MaxInt32 - 1 // largest multiple of 3 in int32 is math.MaxInt32-1
+		} else {
+			c, _ = narrowScale(e) // no multiple of 3 below e fits, so keep e
+		}
 	}
 
-	return append(out, amount.String()...), exponent
+	// add the zeros that c no longer covers to the mantissa
+	if c := widenScale(c); e > c {
+		amount.Mul(amount, new(big.Int).Exp(bigTen, big.NewInt(int64(e-c)), nil))
+	}
+
+	return append(out, amount.String()...), int32(c)
 }
 
 // AsCanonicalBase1024Bytes accepts a buffer to write the base-1024 string value of this field to, and returns
