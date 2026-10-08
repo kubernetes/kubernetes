@@ -245,6 +245,88 @@ foo	12m (x3 over 20m)	Normal	ScalingReplicaSet	Deployment/bar	Scaled up replica 
 60s (x3 over 20m)	test^[	test^[	Deployment/bar^[	^[
 `,
 		},
+		{
+			// tabwriter ends a row at a break character, so a value that spans
+			// several lines would be printed as extra lines that belong to no
+			// event. Cut the value there, the way the table printer behind
+			// "kubectl get events" already does.
+			printer: EventPrinter{
+				NoHeaders:     false,
+				AllNamespaces: false,
+			},
+			obj: &corev1.EventList{
+				Items: []corev1.Event{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "bar-000",
+							Namespace: "foo",
+						},
+						InvolvedObject: corev1.ObjectReference{
+							APIVersion: "apps/v1",
+							Kind:       "Deployment",
+							Name:       "bar",
+							Namespace:  "foo",
+						},
+						Type:                corev1.EventTypeWarning,
+						Reason:              "Failed",
+						Message:             "failed to pull image\nError response from daemon: manifest unknown",
+						ReportingController: "kubelet",
+						EventTime:           metav1.NewMicroTime(time.Now().Add(-20 * time.Minute)),
+						Series: &corev1.EventSeries{
+							Count:            3,
+							LastObservedTime: metav1.NewMicroTime(time.Now().Add(-1 * time.Minute)),
+						},
+					},
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "bar-001",
+							Namespace: "foo",
+						},
+						InvolvedObject: corev1.ObjectReference{
+							APIVersion: "apps/v1",
+							Kind:       "Deployment",
+							Name:       "bar",
+							Namespace:  "foo",
+						},
+						Type:                corev1.EventTypeWarning,
+						Reason:              "Failed",
+						Message:             "visible\rOVERWRITTEN",
+						ReportingController: "kubelet",
+						EventTime:           metav1.NewMicroTime(time.Now().Add(-20 * time.Minute)),
+						Series: &corev1.EventSeries{
+							Count:            3,
+							LastObservedTime: metav1.NewMicroTime(time.Now().Add(-1 * time.Minute)),
+						},
+					},
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "bar-002",
+							Namespace: "foo",
+						},
+						InvolvedObject: corev1.ObjectReference{
+							APIVersion: "apps/v1",
+							Kind:       "Deployment",
+							Name:       "bar",
+							Namespace:  "foo",
+						},
+						Type:                corev1.EventTypeWarning,
+						Reason:              "Failed",
+						Message:             "page-one\fpage-two",
+						ReportingController: "kubelet",
+						EventTime:           metav1.NewMicroTime(time.Now().Add(-20 * time.Minute)),
+						Series: &corev1.EventSeries{
+							Count:            3,
+							LastObservedTime: metav1.NewMicroTime(time.Now().Add(-1 * time.Minute)),
+						},
+					},
+				},
+			},
+			expected: `LAST SEEN	TYPE	REASON	OBJECT	MESSAGE
+60s (x3 over 20m)	Warning	Failed	Deployment/bar	failed to pull image...
+60s (x3 over 20m)	Warning	Failed	Deployment/bar	visible...
+60s (x3 over 20m)	Warning	Failed	Deployment/bar	page-one...
+`,
+		},
 	}
 
 	for _, test := range tests {
