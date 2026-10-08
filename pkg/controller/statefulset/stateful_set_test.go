@@ -570,7 +570,9 @@ func TestGetPodsForStatefulSetAdopt(t *testing.T) {
 	om.podsIndexer.Add(pod2)
 	om.podsIndexer.Add(pod3)
 	om.podsIndexer.Add(pod4)
-	om.podsIndexer.Add(pod5)
+	if err := om.podsIndexer.Add(pod5); err != nil {
+		t.Fatalf("Failed to add pod %s to indexer: %v", pod5.Name, err)
+	}
 	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
 	if err != nil {
 		t.Fatal(err)
@@ -656,7 +658,9 @@ func TestGetPodsForStatefulSetRelease(t *testing.T) {
 	om.podsIndexer.Add(pod2)
 	om.podsIndexer.Add(pod3)
 	om.podsIndexer.Add(pod4)
-	om.podsIndexer.Add(pod5)
+	if err := om.podsIndexer.Add(pod5); err != nil {
+		t.Fatalf("Failed to add pod %s to indexer: %v", pod5.Name, err)
+	}
 	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
 	if err != nil {
 		t.Fatal(err)
