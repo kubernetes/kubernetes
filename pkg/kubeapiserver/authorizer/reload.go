@@ -201,17 +201,9 @@ func (r *reloadableAuthorizerResolver) newForConfig(authzConfig *authzconfig.Aut
 			}
 
 			webhookMetrics := kubeapiserverWebhookMetrics{WebhookMetrics: webhookmetrics.NewWebhookMetrics(), MatcherMetrics: authorizationcel.NewMatcherMetrics()}
-			var matcher webhook.Matcher
-			celMatcher, fieldErrs := apiservervalidation.ValidateAndCompileMatchConditions(r.compiler, configuredAuthorizer.Webhook.MatchConditions)
-			if err := fieldErrs.ToAggregate(); err != nil {
+			matcher, err := apiservervalidation.NewWebhookMatcher(r.compiler, configuredAuthorizer.Webhook.MatchConditions, configuredAuthorizer.Name, webhookMetrics)
+			if err != nil {
 				return nil, nil, err
-			}
-			// Leave the interface nil when there are no match conditions; a nil *CELMatcher inside it would not be nil.
-			if celMatcher != nil {
-				celMatcher.AuthorizerType = "Webhook"
-				celMatcher.AuthorizerName = configuredAuthorizer.Name
-				celMatcher.Metrics = webhookMetrics
-				matcher = celMatcher
 			}
 			webhookAuthorizer, err := webhook.New(sarClientConfig,
 				configuredAuthorizer.Webhook.SubjectAccessReviewVersion,
