@@ -785,6 +785,12 @@ const (
 	// The recommendation is to enable it on a need basis for debugging purposes and disabling otherwise.
 	NodeLogQuery featuregate.Feature = "NodeLogQuery"
 
+	// owner: @QiWang19 @sohankunkerkar
+	// kep: https://kep.k8s.io/2570
+	//
+	// Enables Soft and Hard node memory reservation policies.
+	NodeMemoryReservationPolicy featuregate.Feature = "NodeMemoryReservationPolicy"
+
 	// owner: @sanposhiho, @wojtek-t
 	// kep: https://kep.k8s.io/5278
 	//
@@ -1778,6 +1784,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.36"), Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.39, locked to default in 1.36
 	},
 
+	NodeMemoryReservationPolicy: {
+		{Version: version.MustParse("1.38"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
 	NominatedNodeNameForExpectation: {
 		{Version: version.MustParse("1.34"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.35"), Default: true, PreRelease: featuregate.Beta},
@@ -2569,6 +2579,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	NodeLifecycleConditions: {},
 
 	NodeLogQuery: {},
+
+	NodeMemoryReservationPolicy: {},
 
 	NominatedNodeNameForExpectation: {},
 
