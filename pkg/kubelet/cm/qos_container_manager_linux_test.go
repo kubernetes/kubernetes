@@ -407,7 +407,10 @@ func TestQoSContainerCgroup(t *testing.T) {
 			m.setMemoryQoS(logger, qosConfigs)
 
 			assert.Equal(t, tc.expectedGuaranteed, qosConfigs[v1.PodQOSGuaranteed].ResourceParameters.Unified[Cgroup2MemoryMin])
+			assert.Equal(t, tc.expectedBurstable, qosConfigs[v1.PodQOSGuaranteed].ResourceParameters.Unified[Cgroup2MemoryLow])
 			assert.Equal(t, tc.expectedBurstable, qosConfigs[v1.PodQOSBurstable].ResourceParameters.Unified[Cgroup2MemoryLow])
+			assert.NotContains(t, qosConfigs[v1.PodQOSBurstable].ResourceParameters.Unified, Cgroup2MemoryMin)
+			assert.Empty(t, qosConfigs[v1.PodQOSBestEffort].ResourceParameters.Unified)
 		})
 	}
 }
@@ -449,6 +452,42 @@ func TestQoSContainerCgroupWithMemoryReservationPolicyNone(t *testing.T) {
 
 	assert.Equal(t, "0", qosConfigs[v1.PodQOSGuaranteed].ResourceParameters.Unified[Cgroup2MemoryMin])
 	assert.Equal(t, "0", qosConfigs[v1.PodQOSBurstable].ResourceParameters.Unified[Cgroup2MemoryLow])
+}
+
+func TestQoSContainerCgroupWithSoftAndHardReservation(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	bestEffortPod := &v1.Pod{Spec: v1.PodSpec{
+		Containers: []v1.Container{{Name: "foo"}},
+		Overhead:   v1.ResourceList{v1.ResourceMemory: resource.MustParse("128Mi")},
+	}}
+	pods := append(activeTestPods(), bestEffortPod)
+	for _, tc := range []struct {
+		policy   kubeletconfig.MemoryReservationPolicy
+		rootMin  string
+		rootLow  string
+		burstMin string
+		burstLow string
+	}{
+		{policy: "Soft", rootMin: "0", rootLow: "536870912", burstMin: "0", burstLow: "402653184"},
+		{policy: "Hard", rootMin: "536870912", rootLow: "0", burstMin: "402653184", burstLow: "0"},
+	} {
+		t.Run(string(tc.policy), func(t *testing.T) {
+			m := &qosContainerManagerImpl{memoryReservationPolicy: tc.policy, activePods: func() []*v1.Pod { return pods }}
+			configs := map[v1.PodQOSClass]*CgroupConfig{
+				v1.PodQOSGuaranteed: {ResourceParameters: &ResourceConfig{}},
+				v1.PodQOSBurstable:  {ResourceParameters: &ResourceConfig{}},
+				v1.PodQOSBestEffort: {ResourceParameters: &ResourceConfig{}},
+			}
+			m.setMemoryQoS(logger, configs)
+			root := configs[v1.PodQOSGuaranteed].ResourceParameters.Unified
+			burst := configs[v1.PodQOSBurstable].ResourceParameters.Unified
+			assert.Equal(t, tc.rootMin, root[Cgroup2MemoryMin])
+			assert.Equal(t, tc.rootLow, root[Cgroup2MemoryLow])
+			assert.Equal(t, tc.burstMin, burst[Cgroup2MemoryMin])
+			assert.Equal(t, tc.burstLow, burst[Cgroup2MemoryLow])
+			assert.Empty(t, configs[v1.PodQOSBestEffort].ResourceParameters.Unified)
+		})
+	}
 }
 
 // fakeCgroupManager is used because Start() requires a functional

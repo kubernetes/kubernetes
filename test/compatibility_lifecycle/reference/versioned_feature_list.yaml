@@ -1342,6 +1342,12 @@
     lockToDefault: true
     preRelease: GA
     version: "1.36"
+- name: NodeMemoryReservationPolicy
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.38"
 - name: NodeSwap
   versionedSpecs:
   - default: false
