@@ -28,6 +28,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -734,3 +735,58 @@ func gatherWithoutBuckets(gatherer compbasemetrics.Gatherer) testutil.GathererFu
 		return got, err
 	}
 }
+
+func TestGetShallowCopyObject(t *testing.T) {
+	t.Run("typed struct", func(t *testing.T) {
+		orig := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:   "pod-1",
+				Labels: map[string]string{"app": "test"},
+			},
+		}
+		copied := getShallowCopyObject(orig).(*v1.Pod)
+		if copied == orig {
+			t.Fatalf("expected new struct pointer, got same pointer")
+		}
+		copied.GetObjectKind().SetGroupVersionKind(v1.SchemeGroupVersion.WithKind("Pod"))
+		if orig.APIVersion != "" || orig.Kind != "" {
+			t.Errorf("expected original TypeMeta to remain empty, got %v", orig.TypeMeta)
+		}
+		if reflect.ValueOf(copied.Labels).Pointer() != reflect.ValueOf(orig.Labels).Pointer() {
+			t.Errorf("expected shallow copy to share nested map")
+		}
+	})
+
+	t.Run("unstructured", func(t *testing.T) {
+		nested := map[string]interface{}{"key": "val"}
+		orig := &unstructured.Unstructured{
+			Object: map[string]interface{}{
+				"apiVersion": "v1",
+				"kind":       "Pod",
+				"spec":       nested,
+			},
+		}
+		copied := getShallowCopyObject(orig).(*unstructured.Unstructured)
+		if copied == orig {
+			t.Fatalf("expected new Unstructured pointer, got same pointer")
+		}
+		copied.SetGroupVersionKind(schema.GroupVersionKind{Group: "example.com", Version: "v2", Kind: "Custom"})
+		if orig.GetAPIVersion() != "v1" || orig.GetKind() != "Pod" {
+			t.Errorf("expected original GVK to remain v1/Pod, got %s/%s", orig.GetAPIVersion(), orig.GetKind())
+		}
+		if reflect.ValueOf(copied.Object["spec"]).Pointer() != reflect.ValueOf(orig.Object["spec"]).Pointer() {
+			t.Errorf("expected shallow copy to share nested spec map")
+		}
+	})
+
+	t.Run("cachingObject", func(t *testing.T) {
+		co, err := newCachingObject(&v1.Pod{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := getShallowCopyObject(co); got != co {
+			t.Errorf("expected same cachingObject pointer, got %#v", got)
+		}
+	})
+}
+
