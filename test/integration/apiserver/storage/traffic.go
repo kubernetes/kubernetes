@@ -50,6 +50,14 @@ const (
 	ScopeObject    KeyScope = "Object"
 )
 
+type KeyTarget string
+
+const (
+	KeyExisting          KeyTarget = "Existing"
+	KeyNonExistingNS     KeyTarget = "NonExistingNamespace"
+	KeyNonExistingObject KeyTarget = "NonExistingObject"
+)
+
 type RVType string
 
 const (
@@ -90,12 +98,10 @@ const (
 )
 
 var (
-	watchNamespaces = []string{"ns-1", "ns-2"}
-	watchPodNames   = []string{"pod-1", "pod-2"}
-	nodeNames       = []string{"", "node-1", "node-2"}
-	nonEmptyNodes   = []string{"node-1", "node-2"}
-	appLabels       = []string{"", "app-a", "app-b"}
-	nonEmptyApps    = []string{"app-a", "app-b"}
+	nodeNames     = []string{"", "node-1", "node-2"}
+	nonEmptyNodes = []string{"node-1", "node-2"}
+	appLabels     = []string{"", "app-a", "app-b"}
+	nonEmptyApps  = []string{"app-a", "app-b"}
 
 	errDeleteRejected = errors.New("delete rejected by validateDeletion")
 )
@@ -140,6 +146,7 @@ type PreconditionsDistribution struct {
 }
 
 type WatchDistribution struct {
+	KeyTarget           []ChoiceWeight[KeyTarget]
 	Scope               []ChoiceWeight[KeyScope]
 	FieldSelector       []ChoiceWeight[FieldSelector]
 	LabelSelector       []ChoiceWeight[LabelSelector]
@@ -152,8 +159,6 @@ type WatchDistribution struct {
 type UnaryConfig struct {
 	Concurrency         int
 	MaxOperations       int
-	Namespaces          int
-	Objects             int
 	RequestDistribution RequestDistribution
 }
 
@@ -166,33 +171,29 @@ type WatchConfig struct {
 	RequestDistribution WatchDistribution
 }
 
-func generateKeys(cfg UnaryConfig) []types.NamespacedName {
-	numNamespaces := cfg.Namespaces
-	if numNamespaces <= 0 {
-		numNamespaces = 1
+func pickKeyTarget(key types.NamespacedName, dist []ChoiceWeight[KeyTarget]) types.NamespacedName {
+	if len(dist) == 0 {
+		return key
 	}
-	keys := make([]types.NamespacedName, 0, cfg.Objects)
-	for i := 0; i < cfg.Objects; i++ {
-		ns := fmt.Sprintf("ns-%d", (i%numNamespaces)+1)
-		name := fmt.Sprintf("pod-%d", (i/numNamespaces)+1)
-		keys = append(keys, types.NamespacedName{
-			Namespace: ns,
-			Name:      name,
-		})
+	switch target := PickRandom(dist); target {
+	case KeyExisting:
+		return key
+	case KeyNonExistingNS:
+		return types.NamespacedName{Namespace: "ns-nonexistent", Name: key.Name}
+	case KeyNonExistingObject:
+		return types.NamespacedName{Namespace: key.Namespace, Name: "pod-nonexistent"}
+	default:
+		panic(fmt.Sprintf("%v: unknown key target", target))
 	}
-	return keys
 }
 
 // RunUnaryTraffic drives concurrent storage operations and records all invocations.
-func RunUnaryTraffic(ctx context.Context, store storage.Interface, cfg UnaryConfig) ([]correctness.Operation, error) {
+func RunUnaryTraffic(ctx context.Context, store storage.Interface, objects []types.NamespacedName, cfg UnaryConfig) ([]correctness.Operation, error) {
 	if cfg.Concurrency <= 0 {
 		return nil, fmt.Errorf("concurrency must be positive")
 	}
-	if cfg.Objects <= 0 {
-		return nil, fmt.Errorf("objects must be positive")
-	}
-	if cfg.Namespaces <= 0 {
-		return nil, fmt.Errorf("namespaces must be positive")
+	if len(objects) == 0 {
+		return nil, fmt.Errorf("objects must be non-empty")
 	}
 	if len(cfg.RequestDistribution.Op) == 0 {
 		return nil, fmt.Errorf("operations must be non-empty")
@@ -201,7 +202,6 @@ func RunUnaryTraffic(ctx context.Context, store storage.Interface, cfg UnaryConf
 		return nil, fmt.Errorf("MaxOperations must be positive")
 	}
 
-	keys := generateKeys(cfg)
 	var requestCounter atomic.Int64
 	var mu sync.Mutex
 	var operations []correctness.Operation
@@ -218,7 +218,7 @@ func RunUnaryTraffic(ctx context.Context, store storage.Interface, cfg UnaryConf
 					return
 				default:
 				}
-				request := randomRequest(ctx, store, keys, cfg.RequestDistribution, cachedObj)
+				request := randomRequest(ctx, store, objects, cfg.RequestDistribution, cachedObj)
 				if request == nil {
 					continue
 				}
@@ -255,7 +255,7 @@ func RunUnaryTraffic(ctx context.Context, store storage.Interface, cfg UnaryConf
 // RunWatchTraffic keeps cfg.Concurrency watches open until stop is closed and
 // records what each of them received. Watches still open at that point run to
 // their own deadline, so the events they already collected are not discarded.
-func RunWatchTraffic(ctx context.Context, store storage.Interface, cfg WatchConfig, stop <-chan struct{}) []correctness.WatchOperation {
+func RunWatchTraffic(ctx context.Context, store storage.Interface, objects []types.NamespacedName, cfg WatchConfig, stop <-chan struct{}) []correctness.WatchOperation {
 	var mu sync.Mutex
 	var watches []correctness.WatchOperation
 	var wg sync.WaitGroup
@@ -269,7 +269,7 @@ func RunWatchTraffic(ctx context.Context, store storage.Interface, cfg WatchConf
 					return
 				default:
 				}
-				request := randomWatchRequest(ctx, store, cfg.RequestDistribution)
+				request := randomWatchRequest(ctx, store, objects, cfg.RequestDistribution)
 				mode := WatcherFast
 				if len(cfg.RequestDistribution.WatcherBehavior) > 0 {
 					mode = PickRandom(cfg.RequestDistribution.WatcherBehavior)
@@ -349,7 +349,7 @@ func randomRequest(ctx context.Context, store storage.Interface, keys []types.Na
 		}
 	case correctness.OpList:
 		opts := storage.ListOptions{
-			Predicate: pickPredicate(dist.List.FieldSelector, dist.List.LabelSelector),
+			Predicate: pickPredicate(key, dist.List.FieldSelector, dist.List.LabelSelector),
 		}
 		var listKey string
 		switch scope := PickRandom(dist.List.Scope); scope {
@@ -534,7 +534,7 @@ func runTraffic(ctx context.Context, store storage.Interface, request *correctne
 	return response
 }
 
-func randomWatchRequest(ctx context.Context, store storage.Interface, distribution WatchDistribution) correctness.WatchRequest {
+func randomWatchRequest(ctx context.Context, store storage.Interface, keys []types.NamespacedName, distribution WatchDistribution) correctness.WatchRequest {
 	var rv string
 	watchList := PickRandom(distribution.SendInitialEvents)
 	selected := PickRandom(distribution.ResourceVersion)
@@ -558,8 +558,7 @@ func randomWatchRequest(ctx context.Context, store storage.Interface, distributi
 		panic(fmt.Sprintf("%v: unknown watch request type", selected))
 	}
 
-	ns := watchNamespaces[rand.Intn(len(watchNamespaces))]
-	name := watchPodNames[rand.Intn(len(watchPodNames))]
+	key := pickKeyTarget(keys[rand.Intn(len(keys))], distribution.KeyTarget)
 
 	watchKey := "/pods/"
 	recursive := true
@@ -568,15 +567,15 @@ func randomWatchRequest(ctx context.Context, store storage.Interface, distributi
 		case ScopeCluster:
 			watchKey, recursive = "/pods/", true
 		case ScopeNamespace:
-			watchKey, recursive = "/pods/"+ns, true
+			watchKey, recursive = "/pods/"+key.Namespace, true
 		case ScopeObject:
-			watchKey, recursive = "/pods/"+ns+"/"+name, false
+			watchKey, recursive = storageKey(key), false
 		default:
 			panic(fmt.Sprintf("%v: unknown watch scope", scope))
 		}
 	}
 
-	pred := pickPredicate(distribution.FieldSelector, distribution.LabelSelector)
+	pred := pickPredicate(key, distribution.FieldSelector, distribution.LabelSelector)
 	if len(distribution.AllowWatchBookmarks) > 0 {
 		pred.AllowWatchBookmarks = PickRandom(distribution.AllowWatchBookmarks)
 	}
@@ -596,9 +595,7 @@ func randomWatchRequest(ctx context.Context, store storage.Interface, distributi
 	return correctness.WatchRequest{Key: watchKey, Options: opts}
 }
 
-func pickPredicate(fieldDist []ChoiceWeight[FieldSelector], labelDist []ChoiceWeight[LabelSelector]) storage.SelectionPredicate {
-	ns := watchNamespaces[rand.Intn(len(watchNamespaces))]
-	name := watchPodNames[rand.Intn(len(watchPodNames))]
+func pickPredicate(key types.NamespacedName, fieldDist []ChoiceWeight[FieldSelector], labelDist []ChoiceWeight[LabelSelector]) storage.SelectionPredicate {
 	node := nonEmptyNodes[rand.Intn(len(nonEmptyNodes))]
 	app := nonEmptyApps[rand.Intn(len(nonEmptyApps))]
 
@@ -609,9 +606,9 @@ func pickPredicate(fieldDist []ChoiceWeight[FieldSelector], labelDist []ChoiceWe
 		case FieldEverything:
 			fieldSel = fields.Everything()
 		case FieldByName:
-			fieldSel = fields.OneTermEqualSelector("metadata.name", name)
+			fieldSel = fields.OneTermEqualSelector("metadata.name", key.Name)
 		case FieldByNamespace:
-			fieldSel = fields.OneTermEqualSelector("metadata.namespace", ns)
+			fieldSel = fields.OneTermEqualSelector("metadata.namespace", key.Namespace)
 		case FieldByNode:
 			fieldSel = fields.OneTermEqualSelector("spec.nodeName", node)
 			indexFields = []string{"spec.nodeName"}
@@ -620,7 +617,7 @@ func pickPredicate(fieldDist []ChoiceWeight[FieldSelector], labelDist []ChoiceWe
 			indexFields = []string{"spec.nodeName"}
 		case FieldCombined:
 			fieldSel = fields.AndSelectors(
-				fields.OneTermEqualSelector("metadata.namespace", ns),
+				fields.OneTermEqualSelector("metadata.namespace", key.Namespace),
 				fields.OneTermEqualSelector("spec.nodeName", node),
 			)
 			indexFields = []string{"spec.nodeName"}

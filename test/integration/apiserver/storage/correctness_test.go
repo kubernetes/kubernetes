@@ -29,6 +29,7 @@ import (
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/storage"
@@ -137,13 +138,16 @@ var (
 
 	unaryCfg = UnaryConfig{
 		Concurrency:         8,
-		Namespaces:          2,
-		Objects:             4,
 		MaxOperations:       10000,
 		RequestDistribution: requestDistribution,
 	}
 
 	watchRequestDistribution = WatchDistribution{
+		KeyTarget: []ChoiceWeight[KeyTarget]{
+			{Choice: KeyExisting, Weight: 80},
+			{Choice: KeyNonExistingNS, Weight: 10},
+			{Choice: KeyNonExistingObject, Weight: 10},
+		},
 		Scope: []ChoiceWeight[KeyScope]{
 			{Choice: ScopeCluster, Weight: 40},
 			{Choice: ScopeNamespace, Weight: 30},
@@ -225,16 +229,23 @@ func testCorrectness(t *testing.T, store storage.Interface, storagePrefix string
 	initialState, err := correctness.NewModelFromStorage(storagePrefix, list, func() runtime.Object { return &api.Pod{} }, func() runtime.Object { return &api.PodList{} }, cacheKeyFunc, versioner)
 	require.NoError(t, err)
 
+	objects := []types.NamespacedName{
+		{Namespace: "ns-1", Name: "pod-1"},
+		{Namespace: "ns-1", Name: "pod-11"},
+		{Namespace: "ns-2", Name: "pod-2"},
+		{Namespace: "ns-11", Name: "pod-1"},
+	}
+
 	stopWatches := make(chan struct{})
 	var operations []correctness.Operation
 	var watches []correctness.WatchOperation
 	var wg sync.WaitGroup
 	wg.Go(func() {
-		operations, err = RunUnaryTraffic(ctx, store, unaryCfg)
+		operations, err = RunUnaryTraffic(ctx, store, objects, unaryCfg)
 		close(stopWatches)
 	})
 	wg.Go(func() {
-		watches = RunWatchTraffic(ctx, store, watchCfg, stopWatches)
+		watches = RunWatchTraffic(ctx, store, objects, watchCfg, stopWatches)
 	})
 	wg.Wait()
 	require.NoError(t, err)
