@@ -1,10 +1,6 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 
-approvers:
-  - cjcullen
-  - mikedanese
-reviewers:
-  - cjcullen
-  - mikedanese
 emeritus_approvers:
+  - cjcullen
+  - mikedanese
   - q-lee
