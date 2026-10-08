@@ -242,6 +242,14 @@ func TestMemoryIdenticalConversion(t *testing.T) {
 		"Scale.apps",
 		"Scale.extensions",
 
+		// These types are not considered memory-identical right now by conversion-gen, although they are,
+		// as we need to define Convert_v1_ConditionsAwareDecision_To_authorization_ConditionsAwareDecision (and vice versa)
+		// function to make ConditionsAwareDecision possible to vendor.
+		// TODO: Remove this when https://github.com/kubernetes/kubernetes/issues/142345 is fixed
+		"SubjectAccessReview.authorization.k8s.io",
+		"SelfSubjectAccessReview.authorization.k8s.io",
+		"LocalSubjectAccessReview.authorization.k8s.io",
+
 		// Generic meta-list type (metainternalversion.List vs metav1.List):
 		"List",
 	)

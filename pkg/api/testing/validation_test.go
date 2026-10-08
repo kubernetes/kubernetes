@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	authorizationvalidation "k8s.io/kubernetes/pkg/apis/authorization/validation"
 	nodevalidation "k8s.io/kubernetes/pkg/apis/node/validation"
 	resourcevalidation "k8s.io/kubernetes/pkg/apis/resource/validation"
 )
@@ -83,6 +84,10 @@ func TestVersionedValidationByFuzzing(t *testing.T) {
 				allRules := append([]field.NormalizationRule{}, resourcevalidation.ResourceNormalizationRules...)
 				allRules = append(allRules, nodevalidation.NodeNormalizationRules...)
 				opts = append(opts, WithNormalizationRules(allRules...), WithFuzzer(f))
+
+				// TODO: accumulate omitted fields and and set opts
+				allOmittedPaths := authorizationvalidation.OmittedFieldPaths()
+				opts = append(opts, WithOmittedFieldPaths(allOmittedPaths))
 
 				if subresource != "" {
 					opts = append(opts, WithSubResources(subresource))

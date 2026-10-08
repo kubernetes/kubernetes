@@ -78,6 +78,15 @@ func TestCreateIgnoresPostedStatus(t *testing.T) {
 			ResourceAttributes: &authorizationapi.ResourceAttributes{
 				Namespace: "myns", Verb: "get", Resource: "pods",
 			},
+			AuthorizationOptions: &authorizationapi.AuthorizationOptions{
+				HandledDecisionTypes: []authorizationapi.ConditionsAwareDecisionType{
+					authorizationapi.ConditionsAwareDecisionTypeAllow,
+					authorizationapi.ConditionsAwareDecisionTypeDeny,
+					authorizationapi.ConditionsAwareDecisionTypeNoOpinion,
+					authorizationapi.ConditionsAwareDecisionTypeConditionsMap,
+					authorizationapi.ConditionsAwareDecisionTypeUnion,
+				},
+			},
 		},
 		// Mutually exclusive, so validating this status would reject the request.
 		Status: authorizationapi.SubjectAccessReviewStatus{
@@ -97,5 +106,8 @@ func TestCreateIgnoresPostedStatus(t *testing.T) {
 	want := authorizationapi.SubjectAccessReviewStatus{Allowed: true, Reason: "myreason"}
 	if !reflect.DeepEqual(got.Status, want) {
 		t.Errorf("expected status\n%#v\ngot\n%#v", want, got.Status)
+	}
+	if got.Spec.AuthorizationOptions != nil {
+		t.Errorf("expected the conditions opt-in to be cleared while the feature gate is off, got %#v", got.Spec.AuthorizationOptions)
 	}
 }
