@@ -52,7 +52,7 @@ func powerShellLinkQuery(t *testing.T) func(string) (powerShellLinkInfo, error) 
 		defer cancel()
 		// Query the same properties as the previous implementation. JSON/UTF-8
 		// preserves arrays and Unicode instead of depending on console encoding.
-		cmd := exec.CommandContext(ctx, powershell, "-NoProfile", "-NonInteractive", "-Command", "$ErrorActionPreference = 'Stop'; [Console]::OutputEncoding = New-Object System.Text.UTF8Encoding; $item = Get-Item -Force -LiteralPath $env:linkpath; @{LinkType = [string]$item.LinkType; Targets = @($item.Target)} | ConvertTo-Json -Compress")
+		cmd := exec.CommandContext(ctx, powershell, "-NoProfile", "-NonInteractive", "-Command", "$ErrorActionPreference = 'Stop'; [Console]::OutputEncoding = New-Object System.Text.UTF8Encoding; $item = Get-Item -Force -LiteralPath $env:linkpath; if ($null -eq $item) { throw 'Get-Item returned no item' }; @{LinkType = [string]$item.LinkType; Targets = @($item.Target | Where-Object { $null -ne $_ })} | ConvertTo-Json -Compress")
 		cmd.Env = append(os.Environ(), "linkpath="+path)
 		output, err := cmd.CombinedOutput()
 		if err != nil {
@@ -240,6 +240,145 @@ func TestNativeLinkQueriesMatchPowerShell(t *testing.T) {
 				if (psErr != nil) != (nativeErr != nil) || (psErr == nil && !strings.EqualFold(got, want)) {
 					t.Fatalf("resolve %q: native=%q, %v; PowerShell=%q, %v", input, got, nativeErr, want, psErr)
 				}
+			}
+		})
+	}
+}
+
+// Set these roots to the same writable test share, accessed through UNC and a
+// mapped drive in the test process's logon session. Ordinary unit tests must
+// not depend on SMB credentials, a server, or administrator-only share setup.
+func TestNativeSMBMatchesPowerShell(t *testing.T) {
+	uncRoot := os.Getenv("KUBE_SUBPATH_SMB_UNC_ROOT")
+	driveRoot := os.Getenv("KUBE_SUBPATH_SMB_DRIVE_ROOT")
+	if uncRoot == "" && driveRoot == "" {
+		t.Skip("set KUBE_SUBPATH_SMB_UNC_ROOT and KUBE_SUBPATH_SMB_DRIVE_ROOT to run the SMB integration test")
+	}
+	if !strings.HasPrefix(uncRoot, `\\`) || len(filepath.VolumeName(driveRoot)) != 2 || !filepath.IsAbs(driveRoot) {
+		t.Fatal("SMB roots must be a UNC share and an absolute mapped-drive path")
+	}
+	query := powerShellLinkQuery(t)
+	volume, err := os.MkdirTemp(driveRoot, "kube-subpath-smb-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := os.RemoveAll(volume); err != nil {
+			t.Errorf("remove SMB fixture: %v", err)
+		}
+	})
+	dir := filepath.Join(volume, "config [literal] ż")
+	if err := os.Mkdir(dir, 0700); err != nil {
+		t.Fatal(err)
+	}
+	file := filepath.Join(dir, "file.cfg")
+	if err := os.WriteFile(file, []byte("fixture"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"directory", "file", "missing"} {
+		t.Run(name, func(t *testing.T) {
+			path := dir
+			if name == "file" {
+				path = file
+			} else if name == "missing" {
+				path = filepath.Join(dir, "missing")
+			}
+			relative, err := filepath.Rel(driveRoot, path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, input := range []string{path, filepath.Join(uncRoot, relative)} {
+				info, psErr := query(input)
+				kind, nativeErr := nativeLinkType(input)
+				if name == "missing" {
+					if psErr == nil || !os.IsNotExist(nativeErr) {
+						t.Fatalf("%q: PowerShell error=%v; native error=%v", input, psErr, nativeErr)
+					}
+				} else if psErr != nil || nativeErr != nil || kind != windowsNotLink || info.LinkType != "" || len(info.Targets) != 0 {
+					t.Fatalf("%q: PowerShell=%+v, %v; native kind=%v, %v", input, info, psErr, kind, nativeErr)
+				}
+			}
+			// Direct UNC paths are guarded by evalSymlink; compare traversal on
+			// the mapped drive, where the previous implementation also ran it.
+			want, psErr := powerShellEvalSymlink(path, query)
+			got, nativeErr := evalSymlink(path)
+			if (psErr != nil) != (nativeErr != nil) || (psErr == nil && !strings.EqualFold(got, want)) {
+				t.Fatalf("resolve %q: native=%q, %v; PowerShell=%q, %v", path, got, nativeErr, want, psErr)
+			}
+		})
+	}
+	t.Run("prepare and release", func(t *testing.T) {
+		newPath, cleanup, err := (&subpath{}).PrepareSafeSubpath(Subpath{VolumePath: volume, Path: file})
+		if cleanup == nil {
+			t.Fatal("missing cleanup action")
+		}
+		defer func() {
+			if cleanup != nil {
+				cleanup()
+			}
+		}()
+		if err != nil || newPath != file {
+			t.Fatalf("prepare SMB file: path=%q error=%v", newPath, err)
+		}
+		if err := os.Rename(file, file+".renamed"); err == nil {
+			t.Fatal("SMB file was renamed while its subpath handle was retained")
+		}
+		cleanup()
+		// Do not call cleanup twice: handles may be reused after being closed.
+		cleanup = nil
+		if err := os.Rename(file, file+".renamed"); err != nil {
+			t.Fatalf("SMB cleanup did not release the handle: %v", err)
+		}
+	})
+	for _, directory := range []bool{false, true} {
+		name := "UNC file target"
+		if directory {
+			name = "UNC directory target"
+		}
+		t.Run(name, func(t *testing.T) {
+			target := filepath.Join(uncRoot, filepath.Base(volume), filepath.Base(dir))
+			flags := uint32(windows.SYMBOLIC_LINK_FLAG_DIRECTORY)
+			if !directory {
+				target = filepath.Join(target, "file.cfg.renamed")
+				flags = 0
+			}
+			link := filepath.Join(t.TempDir(), "unc-link")
+			linkp, err := windows.UTF16PtrFromString(link)
+			if err != nil {
+				t.Fatal(err)
+			}
+			targetp, err := windows.UTF16PtrFromString(target)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := windows.CreateSymbolicLink(linkp, targetp, flags); err != nil {
+				t.Fatal(err)
+			}
+			info, err := query(link)
+			// Windows PowerShell can expose the stripped NT namespace form
+			// UNC\server\share, whereas Readlink returns \\server\share.
+			if len(info.Targets) == 1 && strings.HasPrefix(info.Targets[0], `UNC\`) {
+				info.Targets[0] = `\\` + strings.TrimPrefix(info.Targets[0], `UNC\`)
+			}
+			if err != nil || info.LinkType != "SymbolicLink" || len(info.Targets) != 1 || !strings.EqualFold(info.Targets[0], target) {
+				t.Fatalf("UNC target property: PowerShell=%+v, %v", info, err)
+			}
+			kind, nativeErr := nativeLinkType(link)
+			readTarget, readErr := os.Readlink(link)
+			if nativeErr != nil || kind != windowsSymbolicLink || readErr != nil || !strings.EqualFold(readTarget, target) {
+				t.Fatalf("native UNC link query: kind=%v, %v; target=%q, %v", kind, nativeErr, readTarget, readErr)
+			}
+			got, nativeErr := evalSymlink(link)
+			want, psErr := powerShellEvalSymlink(link, query)
+			if nativeErr != nil || psErr != nil || got != link || want != link {
+				t.Fatalf("UNC target followed: native=%q, %v; PowerShell=%q, %v", got, nativeErr, want, psErr)
+			}
+			_, cleanup, err := (&subpath{}).PrepareSafeSubpath(Subpath{VolumePath: filepath.Dir(link), Path: link})
+			if cleanup != nil {
+				cleanup()
+			}
+			if err == nil {
+				t.Fatal("PrepareSafeSubpath accepted a symlink to an SMB target")
 			}
 		})
 	}
