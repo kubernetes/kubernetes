@@ -18,8 +18,8 @@ package util
 
 import (
 	"bytes"
-	"text/template"
 
+	"k8s.io/cli-runtime/third_party/forked/golang/text/template"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 )
 

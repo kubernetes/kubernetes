@@ -19,9 +19,9 @@ package v2
 import (
 	"fmt"
 	"io"
-	"text/template"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/cli-runtime/third_party/forked/golang/text/template"
 )
 
 type Generator interface {

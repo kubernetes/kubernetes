@@ -19,10 +19,10 @@ package phases
 import (
 	"bytes"
 	"fmt"
-	"text/template"
 
 	"github.com/lithammer/dedent"
 
+	"k8s.io/cli-runtime/third_party/forked/golang/text/template"
 	"k8s.io/klog/v2"
 	utilsexec "k8s.io/utils/exec"
 

@@ -22,10 +22,10 @@ import (
 	"fmt"
 	"io"
 	"reflect"
-	"text/template"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/json"
+	"k8s.io/cli-runtime/third_party/forked/golang/text/template"
 )
 
 // GoTemplatePrinter is an implementation of ResourcePrinter which formats data with a Go Template.
