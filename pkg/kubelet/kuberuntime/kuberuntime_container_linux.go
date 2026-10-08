@@ -195,13 +195,22 @@ func (m *kubeGenericRuntimeManager) generateLinuxContainerResources(ctx context.
 		memoryRequestSpec := container.Resources.Requests.Memory().Value()
 		memoryRequest := memoryRequestSpec + extraNodeAllocatableRequests.Memory().Value()
 		memoryLimitSpec := container.Resources.Limits.Memory().Value()
-		if memoryRequest != 0 && m.memoryReservationPolicy == kubeletconfiginternal.TieredReservationMemoryReservationPolicy {
-			// Guaranteed pods get memory.min (hard protection).
-			// Burstable pods get memory.low (soft protection).
-			if kubeapiqos.GetPodQOS(pod) == v1.PodQOSGuaranteed {
+		qosClass := kubeapiqos.GetPodQOS(pod)
+		// DRA overhead can make requests positive even for containers in BestEffort pods.
+		// Preserve the existing TieredReservation behavior for compatibility.
+		if memoryRequest != 0 && m.memoryReservationPolicy.EnforcesMemoryProtection() &&
+			(qosClass != v1.PodQOSBestEffort || m.memoryReservationPolicy == kubeletconfiginternal.TieredReservationMemoryReservationPolicy) {
+			switch m.memoryReservationPolicy {
+			case kubeletconfiginternal.HardMemoryReservationPolicy:
 				unified[cm.Cgroup2MemoryMin] = strconv.FormatInt(memoryRequest, 10)
-			} else {
+			case kubeletconfiginternal.SoftMemoryReservationPolicy:
 				unified[cm.Cgroup2MemoryLow] = strconv.FormatInt(memoryRequest, 10)
+			case kubeletconfiginternal.TieredReservationMemoryReservationPolicy:
+				if qosClass == v1.PodQOSGuaranteed {
+					unified[cm.Cgroup2MemoryMin] = strconv.FormatInt(memoryRequest, 10)
+				} else {
+					unified[cm.Cgroup2MemoryLow] = strconv.FormatInt(memoryRequest, 10)
+				}
 			}
 		} else {
 			unified[cm.Cgroup2MemoryMin] = "0"

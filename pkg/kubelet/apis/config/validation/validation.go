@@ -398,8 +398,16 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration, featur
 	}
 	switch kc.MemoryReservationPolicy {
 	case kubeletconfig.NoneMemoryReservationPolicy, kubeletconfig.TieredReservationMemoryReservationPolicy:
+	case kubeletconfig.SoftMemoryReservationPolicy, kubeletconfig.HardMemoryReservationPolicy:
+		if !localFeatureGate.Enabled(features.NodeMemoryReservationPolicy) {
+			allErrors = append(allErrors, fmt.Errorf("invalid configuration: memoryReservationPolicy %q requires NodeMemoryReservationPolicy feature gate to be enabled", kc.MemoryReservationPolicy))
+		}
 	default:
-		allErrors = append(allErrors, fmt.Errorf("invalid configuration: option %q specified for memoryReservationPolicy. Valid options are %q or %q", kc.MemoryReservationPolicy, kubeletconfig.NoneMemoryReservationPolicy, kubeletconfig.TieredReservationMemoryReservationPolicy))
+		if localFeatureGate.Enabled(features.NodeMemoryReservationPolicy) {
+			allErrors = append(allErrors, fmt.Errorf("invalid configuration: %q specified for memoryReservationPolicy. Valid options are %q, %q, %q or %q", kc.MemoryReservationPolicy, kubeletconfig.NoneMemoryReservationPolicy, kubeletconfig.TieredReservationMemoryReservationPolicy, kubeletconfig.SoftMemoryReservationPolicy, kubeletconfig.HardMemoryReservationPolicy))
+		} else {
+			allErrors = append(allErrors, fmt.Errorf("invalid configuration: %q specified for memoryReservationPolicy. Valid options are %q or %q", kc.MemoryReservationPolicy, kubeletconfig.NoneMemoryReservationPolicy, kubeletconfig.TieredReservationMemoryReservationPolicy))
+		}
 	}
 
 	if kc.ContainerRuntimeEndpoint == "" {

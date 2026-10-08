@@ -1167,8 +1167,10 @@ func TestResourceConfigForPodWithEnforceMemoryQoS(t *testing.T) {
 		expected         *ResourceConfig
 		enforceCPULimits bool
 		quotaPeriod      uint64 // in microseconds
+		policy           kubeletconfig.MemoryReservationPolicy
 	}{
 		"besteffort": {
+			policy: kubeletconfig.TieredReservationMemoryReservationPolicy,
 			pod: &v1.Pod{
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{
@@ -1183,6 +1185,7 @@ func TestResourceConfigForPodWithEnforceMemoryQoS(t *testing.T) {
 			expected:         &ResourceConfig{CPUShares: &minShares},
 		},
 		"burstable-no-limits": {
+			policy: kubeletconfig.TieredReservationMemoryReservationPolicy,
 			pod: &v1.Pod{
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{
@@ -1197,6 +1200,7 @@ func TestResourceConfigForPodWithEnforceMemoryQoS(t *testing.T) {
 			expected:         &ResourceConfig{CPUShares: &burstableShares, Unified: map[string]string{"memory.low": "104857600"}},
 		},
 		"burstable-with-limits": {
+			policy: kubeletconfig.TieredReservationMemoryReservationPolicy,
 			pod: &v1.Pod{
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{
@@ -1211,6 +1215,7 @@ func TestResourceConfigForPodWithEnforceMemoryQoS(t *testing.T) {
 			expected:         &ResourceConfig{CPUShares: &burstableShares, CPUQuota: &burstableQuota, CPUPeriod: &defaultQuotaPeriod, Memory: &burstableMemory, Unified: map[string]string{"memory.low": "104857600"}},
 		},
 		"burstable-with-limits-no-cpu-enforcement": {
+			policy: kubeletconfig.TieredReservationMemoryReservationPolicy,
 			pod: &v1.Pod{
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{
@@ -1225,6 +1230,7 @@ func TestResourceConfigForPodWithEnforceMemoryQoS(t *testing.T) {
 			expected:         &ResourceConfig{CPUShares: &burstableShares, CPUQuota: &cpuNoLimit, CPUPeriod: &defaultQuotaPeriod, Memory: &burstableMemory, Unified: map[string]string{"memory.low": "104857600"}},
 		},
 		"burstable-partial-limits": {
+			policy: kubeletconfig.TieredReservationMemoryReservationPolicy,
 			pod: &v1.Pod{
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{
@@ -1242,6 +1248,7 @@ func TestResourceConfigForPodWithEnforceMemoryQoS(t *testing.T) {
 			expected:         &ResourceConfig{CPUShares: &burstablePartialShares, Unified: map[string]string{"memory.low": "209715200"}},
 		},
 		"burstable-with-limits-with-tuned-quota": {
+			policy: kubeletconfig.TieredReservationMemoryReservationPolicy,
 			pod: &v1.Pod{
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{
@@ -1256,6 +1263,7 @@ func TestResourceConfigForPodWithEnforceMemoryQoS(t *testing.T) {
 			expected:         &ResourceConfig{CPUShares: &burstableShares, CPUQuota: &burstableQuota, CPUPeriod: &tunedQuotaPeriod, Memory: &burstableMemory, Unified: map[string]string{"memory.low": "104857600"}},
 		},
 		"burstable-with-limits-no-cpu-enforcement-with-tuned-quota": {
+			policy: kubeletconfig.TieredReservationMemoryReservationPolicy,
 			pod: &v1.Pod{
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{
@@ -1270,6 +1278,7 @@ func TestResourceConfigForPodWithEnforceMemoryQoS(t *testing.T) {
 			expected:         &ResourceConfig{CPUShares: &burstableShares, CPUQuota: &cpuNoLimit, CPUPeriod: &tunedQuotaPeriod, Memory: &burstableMemory, Unified: map[string]string{"memory.low": "104857600"}},
 		},
 		"burstable-partial-limits-with-tuned-quota": {
+			policy: kubeletconfig.TieredReservationMemoryReservationPolicy,
 			pod: &v1.Pod{
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{
@@ -1287,6 +1296,7 @@ func TestResourceConfigForPodWithEnforceMemoryQoS(t *testing.T) {
 			expected:         &ResourceConfig{CPUShares: &burstablePartialShares, Unified: map[string]string{"memory.low": "209715200"}},
 		},
 		"guaranteed": {
+			policy: kubeletconfig.TieredReservationMemoryReservationPolicy,
 			pod: &v1.Pod{
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{
@@ -1301,6 +1311,7 @@ func TestResourceConfigForPodWithEnforceMemoryQoS(t *testing.T) {
 			expected:         &ResourceConfig{CPUShares: &guaranteedShares, CPUQuota: &guaranteedQuota, CPUPeriod: &defaultQuotaPeriod, Memory: &guaranteedMemory, Unified: map[string]string{"memory.min": "104857600"}},
 		},
 		"guaranteed-no-cpu-enforcement": {
+			policy: kubeletconfig.TieredReservationMemoryReservationPolicy,
 			pod: &v1.Pod{
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{
@@ -1315,6 +1326,7 @@ func TestResourceConfigForPodWithEnforceMemoryQoS(t *testing.T) {
 			expected:         &ResourceConfig{CPUShares: &guaranteedShares, CPUQuota: &cpuNoLimit, CPUPeriod: &defaultQuotaPeriod, Memory: &guaranteedMemory, Unified: map[string]string{"memory.min": "104857600"}},
 		},
 		"guaranteed-with-tuned-quota": {
+			policy: kubeletconfig.TieredReservationMemoryReservationPolicy,
 			pod: &v1.Pod{
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{
@@ -1329,6 +1341,7 @@ func TestResourceConfigForPodWithEnforceMemoryQoS(t *testing.T) {
 			expected:         &ResourceConfig{CPUShares: &guaranteedShares, CPUQuota: &guaranteedTunedQuota, CPUPeriod: &tunedQuotaPeriod, Memory: &guaranteedMemory, Unified: map[string]string{"memory.min": "104857600"}},
 		},
 		"guaranteed-no-cpu-enforcement-with-tuned-quota": {
+			policy: kubeletconfig.TieredReservationMemoryReservationPolicy,
 			pod: &v1.Pod{
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{
@@ -1342,14 +1355,66 @@ func TestResourceConfigForPodWithEnforceMemoryQoS(t *testing.T) {
 			quotaPeriod:      tunedQuotaPeriod,
 			expected:         &ResourceConfig{CPUShares: &guaranteedShares, CPUQuota: &cpuNoLimit, CPUPeriod: &tunedQuotaPeriod, Memory: &guaranteedMemory, Unified: map[string]string{"memory.min": "104857600"}},
 		},
+		"soft-besteffort": {
+			pod:      &v1.Pod{Spec: v1.PodSpec{Containers: []v1.Container{{}}}},
+			expected: &ResourceConfig{},
+			policy:   kubeletconfig.SoftMemoryReservationPolicy,
+		},
+		"hard-besteffort": {
+			pod:      &v1.Pod{Spec: v1.PodSpec{Containers: []v1.Container{{}}}},
+			expected: &ResourceConfig{},
+			policy:   kubeletconfig.HardMemoryReservationPolicy,
+		},
+		"soft-besteffort-with-overhead": {
+			pod: &v1.Pod{Spec: v1.PodSpec{
+				Containers: []v1.Container{{}},
+				Overhead:   v1.ResourceList{v1.ResourceMemory: resource.MustParse("32Mi")},
+			}},
+			expected: &ResourceConfig{},
+			policy:   kubeletconfig.SoftMemoryReservationPolicy,
+		},
+		"hard-besteffort-with-overhead": {
+			pod: &v1.Pod{Spec: v1.PodSpec{
+				Containers: []v1.Container{{}},
+				Overhead:   v1.ResourceList{v1.ResourceMemory: resource.MustParse("32Mi")},
+			}},
+			expected: &ResourceConfig{},
+			policy:   kubeletconfig.HardMemoryReservationPolicy,
+		},
+		"tiered-besteffort-with-overhead": {
+			pod: &v1.Pod{Spec: v1.PodSpec{
+				Containers: []v1.Container{{}},
+				Overhead:   v1.ResourceList{v1.ResourceMemory: resource.MustParse("32Mi")},
+			}},
+			expected: &ResourceConfig{Unified: map[string]string{Cgroup2MemoryLow: "33554432"}},
+			policy:   kubeletconfig.TieredReservationMemoryReservationPolicy,
+		},
+		"soft-burstable": {
+			pod:      &v1.Pod{Spec: v1.PodSpec{Containers: []v1.Container{{Resources: getResourceRequirements(getResourceList("100m", "100Mi"), getResourceList("200m", "200Mi"))}}}},
+			expected: &ResourceConfig{Unified: map[string]string{Cgroup2MemoryLow: "104857600"}},
+			policy:   kubeletconfig.SoftMemoryReservationPolicy,
+		},
+		"hard-burstable": {
+			pod:      &v1.Pod{Spec: v1.PodSpec{Containers: []v1.Container{{Resources: getResourceRequirements(getResourceList("100m", "100Mi"), getResourceList("200m", "200Mi"))}}}},
+			expected: &ResourceConfig{Unified: map[string]string{Cgroup2MemoryMin: "104857600"}},
+			policy:   kubeletconfig.HardMemoryReservationPolicy,
+		},
+		"soft-guaranteed": {
+			pod:      &v1.Pod{Spec: v1.PodSpec{Containers: []v1.Container{{Resources: getResourceRequirements(getResourceList("100m", "100Mi"), getResourceList("100m", "100Mi"))}}}},
+			expected: &ResourceConfig{Unified: map[string]string{Cgroup2MemoryLow: "104857600"}},
+			policy:   kubeletconfig.SoftMemoryReservationPolicy,
+		},
+		"hard-guaranteed": {
+			pod:      &v1.Pod{Spec: v1.PodSpec{Containers: []v1.Container{{Resources: getResourceRequirements(getResourceList("100m", "100Mi"), getResourceList("100m", "100Mi"))}}}},
+			expected: &ResourceConfig{Unified: map[string]string{Cgroup2MemoryMin: "104857600"}},
+			policy:   kubeletconfig.HardMemoryReservationPolicy,
+		},
 	}
 
 	for testName, testCase := range testCases {
-
-		actual := ResourceConfigForPod(testCase.pod, testCase.enforceCPULimits, testCase.quotaPeriod, true, kubeletconfig.TieredReservationMemoryReservationPolicy)
-
+		actual := ResourceConfigForPod(testCase.pod, testCase.enforceCPULimits, testCase.quotaPeriod, true, testCase.policy)
 		if !reflect.DeepEqual(actual.Unified, testCase.expected.Unified) {
-			t.Errorf("unexpected result, test: %v, unified not as expected", testName)
+			t.Errorf("unexpected result, test: %v, expected unified %v, got %v", testName, testCase.expected.Unified, actual.Unified)
 		}
 	}
 }

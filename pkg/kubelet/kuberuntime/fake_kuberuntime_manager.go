@@ -34,6 +34,7 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/credentialprovider"
 	"k8s.io/kubernetes/pkg/kubelet/allocation/state"
+	kubeletconfiginternal "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/images"
@@ -99,24 +100,25 @@ func (f *fakePodPullingTimeRecorder) RecordImageFinishedPulling(podUID types.UID
 func newFakeKubeRuntimeManager(ctx context.Context, runtimeService internalapi.RuntimeService, imageService internalapi.ImageManagerService, machineInfo *cadvisorapi.MachineInfo, osInterface kubecontainer.OSInterface, runtimeHelper kubecontainer.RuntimeHelper, tracer trace.Tracer, recorder *record.FakeRecorder) (*kubeGenericRuntimeManager, error) {
 	logger := klog.FromContext(ctx)
 	kubeRuntimeManager := &kubeGenericRuntimeManager{
-		recorder:           recorder,
-		cpuCFSQuota:        false,
-		cpuCFSQuotaPeriod:  metav1.Duration{Duration: time.Millisecond * 100},
-		livenessManager:    proberesults.NewManager(),
-		startupManager:     proberesults.NewManager(),
-		probeLifecycle:     kubecontainer.NoopContainerProbeLifecycle{},
-		machineInfo:        machineInfo,
-		osInterface:        osInterface,
-		containerManager:   cm.NewFakeContainerManager(logger),
-		runtimeHelper:      runtimeHelper,
-		runtimeService:     runtimeService,
-		imageService:       imageService,
-		seccompProfileRoot: fakeSeccompProfileRoot,
-		internalLifecycle:  cm.NewFakeInternalContainerLifecycle(),
-		logReduction:       logreduction.NewLogReduction(identicalErrorDelay),
-		logManager:         logs.NewStubContainerLogManager(),
-		podLogsDirectory:   fakePodLogsDirectory,
-		actuatedState:      state.NewStateMemory(logger, nil, KeepOnlyResourceValues),
+		recorder:                recorder,
+		cpuCFSQuota:             false,
+		cpuCFSQuotaPeriod:       metav1.Duration{Duration: time.Millisecond * 100},
+		livenessManager:         proberesults.NewManager(),
+		startupManager:          proberesults.NewManager(),
+		probeLifecycle:          kubecontainer.NoopContainerProbeLifecycle{},
+		machineInfo:             machineInfo,
+		osInterface:             osInterface,
+		containerManager:        cm.NewFakeContainerManager(logger),
+		runtimeHelper:           runtimeHelper,
+		runtimeService:          runtimeService,
+		imageService:            imageService,
+		seccompProfileRoot:      fakeSeccompProfileRoot,
+		internalLifecycle:       cm.NewFakeInternalContainerLifecycle(),
+		logReduction:            logreduction.NewLogReduction(identicalErrorDelay),
+		logManager:              logs.NewStubContainerLogManager(),
+		podLogsDirectory:        fakePodLogsDirectory,
+		actuatedState:           state.NewStateMemory(logger, nil, KeepOnlyResourceValues),
+		memoryReservationPolicy: kubeletconfiginternal.NoneMemoryReservationPolicy,
 	}
 
 	// Initialize swap controller availability check (always false for tests)

@@ -16,6 +16,11 @@ limitations under the License.
 
 package config
 
+// EnforcesMemoryProtection reports whether the policy enables cgroup v2 memory protection.
+func (p MemoryReservationPolicy) EnforcesMemoryProtection() bool {
+	return p != NoneMemoryReservationPolicy
+}
+
 // KubeletConfigurationPathRefs returns pointers to all of the KubeletConfiguration fields that contain filepaths.
 // You might use this, for example, to resolve all relative paths against some common root before
 // passing the configuration to the application. This method must be kept up to date as new fields are added.

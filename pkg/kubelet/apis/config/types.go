@@ -565,9 +565,29 @@ type KubeletConfiguration struct {
 	// "None" (default): The kubelet does not set memory.min for containers and pods,
 	// ensuring no hard memory is locked by the kernel.
 	// "TieredReservation": The kubelet sets cgroup v2 memory.min for Guaranteed pods and memory.low for Burstable pods based on memory requests.
-	// Guaranteed memory is never reclaimed by the kernel; Burstable memory is preferentially retained but may be reclaimed under extreme pressure.
+	// Guaranteed memory is never reclaimed by the kernel, and Burstable memory is
+	// preferentially retained but may be reclaimed under extreme pressure.
+	// "Soft": The kubelet sets memory.low for Guaranteed and Burstable pods and containers based on memory requests. Requested memory is preferentially retained but may be reclaimed under extreme pressure.
+	// "Hard": The kubelet sets memory.min for Guaranteed and Burstable pods and containers based on memory requests. Requested memory is never reclaimed by the kernel.
+	// Soft and Hard require the NodeMemoryReservationPolicy feature gate.
+	// When reservation is enabled, unused QoS-root protection can also reduce reclaim of
+	// BestEffort page cache because cgroup v2 memory protection is hierarchical.
 	// See https://kep.k8s.io/2570 for more details.
 	// Default: None
+	// Recreate affected pods when enabling protection or switching between
+	// TieredReservation, Soft, and Hard.
+	// When switching from Soft to TieredReservation, existing Guaranteed pods retain
+	// memory.low until recreated. They share the kubepods root's soft protection
+	// with the Burstable QoS cgroup, which can reduce effective protection for Burstable pods.
+	// Disabling protection clears QoS cgroup protection at kubelet startup,
+	// but existing pod and container values may remain.
+	//
+	// Before downgrading to a kubelet version that does not support Soft or Hard,
+	// set memoryReservationPolicy to TieredReservation or None and remove
+	// NodeMemoryReservationPolicy from the kubelet configuration and --feature-gates
+	// flags, even if set to false.
+	// For Hard, restart the current kubelet and verify that the Burstable QoS
+	// cgroup's memory.min is zero before downgrading.
 	// +featureGate=MemoryQoS
 	// +optional
 	MemoryReservationPolicy MemoryReservationPolicy
@@ -942,6 +962,10 @@ const (
 	// TieredReservationMemoryReservationPolicy enables tiered memory protection:
 	// memory.min for Guaranteed pods, memory.low for Burstable pods.
 	TieredReservationMemoryReservationPolicy MemoryReservationPolicy = "TieredReservation"
+	// SoftMemoryReservationPolicy protects memory requests of Guaranteed and Burstable pods with memory.low.
+	SoftMemoryReservationPolicy MemoryReservationPolicy = "Soft"
+	// HardMemoryReservationPolicy protects memory requests of Guaranteed and Burstable pods with memory.min.
+	HardMemoryReservationPolicy MemoryReservationPolicy = "Hard"
 )
 
 // ImagePullIntent is a record of the kubelet attempting to pull an image.

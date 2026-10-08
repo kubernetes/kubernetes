@@ -25,6 +25,27 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
+func TestMemoryReservationPolicyEnforcesMemoryProtection(t *testing.T) {
+	tests := []struct {
+		name   string
+		policy MemoryReservationPolicy
+		want   bool
+	}{
+		{name: "none", policy: NoneMemoryReservationPolicy, want: false},
+		{name: "tiered reservation", policy: TieredReservationMemoryReservationPolicy, want: true},
+		{name: "soft", policy: SoftMemoryReservationPolicy, want: true},
+		{name: "hard", policy: HardMemoryReservationPolicy, want: true},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if got := test.policy.EnforcesMemoryProtection(); got != test.want {
+				t.Errorf("EnforcesMemoryProtection() = %t, want %t", got, test.want)
+			}
+		})
+	}
+}
+
 func TestKubeletConfigurationPathFields(t *testing.T) {
 	// ensure the intersection of kubeletConfigurationPathFieldPaths and KubeletConfigurationNonPathFields is empty
 	if i := kubeletConfigurationPathFieldPaths.Intersection(kubeletConfigurationNonPathFieldPaths); len(i) > 0 {
