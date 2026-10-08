@@ -113,9 +113,6 @@ message AllocationResult {
   // allocationTimestamp stores the time when the resources were allocated.
   // This field is not guaranteed to be set, in which case that time is unknown.
   //
-  // This is a beta field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus
-  // feature gate.
-  //
   // +optional
   // +featureGate=DRADeviceBindingConditions,DRAResourceClaimDeviceStatus
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.Time allocationTimestamp = 5;
@@ -210,9 +207,6 @@ message BasicDevice {
   // If set to true, the scheduler will set the ResourceClaim.Status.Allocation.NodeSelector
   // to match the node where the allocation was made.
   //
-  // This is a beta field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus
-  // feature gates.
-  //
   // +optional
   // +featureGate=DRADeviceBindingConditions,DRAResourceClaimDeviceStatus
   optional bool bindsToNode = 8;
@@ -225,9 +219,6 @@ message BasicDevice {
   // The maximum number of binding conditions is 4.
   //
   // The conditions must be a valid condition type string.
-  //
-  // This is a beta field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus
-  // feature gates.
   //
   // +optional
   // +listType=atomic
@@ -243,9 +234,6 @@ message BasicDevice {
   // The maximum number of binding failure conditions is 4.
   //
   // The conditions must be a valid condition type string.
-  //
-  // This is a beta field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus
-  // feature gates.
   //
   // +optional
   // +listType=atomic
@@ -1280,9 +1268,6 @@ message DeviceRequestAllocationResult {
   // bindingConditions contains a copy of the BindingConditions
   // from the corresponding ResourceSlice at the time of allocation.
   //
-  // This is a beta field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus
-  // feature gates.
-  //
   // +optional
   // +listType=atomic
   // +featureGate=DRADeviceBindingConditions,DRAResourceClaimDeviceStatus
@@ -1292,9 +1277,6 @@ message DeviceRequestAllocationResult {
 
   // bindingFailureConditions contains a copy of the BindingFailureConditions
   // from the corresponding ResourceSlice at the time of allocation.
-  //
-  // This is a beta field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus
-  // feature gates.
   //
   // +optional
   // +listType=atomic
