@@ -23,7 +23,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/fsnotify/fsnotify"
 	"github.com/spf13/pflag"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -43,14 +42,13 @@ import (
 	kubeproxyconfigv1alpha1 "k8s.io/kubernetes/pkg/proxy/apis/config/v1alpha1"
 	"k8s.io/kubernetes/pkg/proxy/apis/config/validation"
 	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
-	"k8s.io/kubernetes/pkg/util/filesystem"
 	utilflag "k8s.io/kubernetes/pkg/util/flag"
 	"k8s.io/utils/ptr"
 )
 
 // Options contains everything necessary to create and run a proxy server.
 type Options struct {
-	// ConfigFile is the location of the proxy server's configuration file.
+	// ConfigFile is the configuration file loaded once at startup.
 	ConfigFile string
 	// WriteConfigTo is the path where the default configuration will be written.
 	WriteConfigTo string
@@ -60,12 +58,6 @@ type Options struct {
 	InitAndExit bool
 	// config is the proxy server's configuration object.
 	config *kubeproxyconfig.KubeProxyConfiguration
-	// watcher is used to watch on the update change of ConfigFile
-	watcher filesystem.FSWatcher
-	// proxyServer is the interface to run the proxy server
-	proxyServer proxyRun
-	// errCh is the channel that errors will be sent
-	errCh chan error
 	// flagz is the Reader interface to get flags for the flagz page.
 	flagz flagz.Reader
 
@@ -99,7 +91,7 @@ type Options struct {
 func (o *Options) AddFlags(fs *pflag.FlagSet) {
 	o.addOSFlags(fs)
 
-	fs.StringVar(&o.ConfigFile, "config", o.ConfigFile, "The path to the configuration file.")
+	fs.StringVar(&o.ConfigFile, "config", o.ConfigFile, "The path to the configuration file. Changes take effect after restarting kube-proxy. For a DaemonSet, roll out a new ConfigMap reference to apply changes incrementally.")
 	fs.StringVar(&o.WriteConfigTo, "write-config-to", o.WriteConfigTo, "If set, write the default configuration values to this file and exit.")
 
 	fs.BoolVar(&o.CleanupAndExit, "cleanup", o.CleanupAndExit, "If true cleanup iptables and ipvs rules and exit.")
@@ -197,7 +189,6 @@ func NewOptions() *Options {
 		config:      newKubeProxyConfiguration(),
 		healthzPort: ports.ProxyHealthzPort,
 		metricsPort: ports.ProxyStatusPort,
-		errCh:       make(chan error),
 		logger:      klog.FromContext(context.Background()),
 	}
 }
@@ -224,10 +215,6 @@ func (o *Options) Complete(fs *pflag.FlagSet) error {
 		// when it contains no logging settings).
 		_ = copyLogsFromFlags(fs, &c.Logging)
 		o.config = c
-
-		if err := o.initWatcher(); err != nil {
-			return err
-		}
 	} else {
 		o.processV1Alpha1Flags(fs)
 	}
@@ -291,34 +278,6 @@ func copyLogsFromFlags(from *pflag.FlagSet, to *logsapi.LoggingConfiguration) er
 	return err
 }
 
-// Creates a new filesystem watcher and adds watches for the config file.
-func (o *Options) initWatcher() error {
-	fswatcher := filesystem.NewFsnotifyWatcher()
-	err := fswatcher.Init(o.eventHandler, o.errorHandler)
-	if err != nil {
-		return err
-	}
-	err = fswatcher.AddWatch(o.ConfigFile)
-	if err != nil {
-		return err
-	}
-	o.watcher = fswatcher
-	return nil
-}
-
-func (o *Options) eventHandler(ent fsnotify.Event) {
-	if ent.Has(fsnotify.Write) || ent.Has(fsnotify.Rename) {
-		// error out when ConfigFile is updated
-		o.errCh <- fmt.Errorf("content of the proxy server's configuration file was updated")
-		return
-	}
-	o.errCh <- nil
-}
-
-func (o *Options) errorHandler(err error) {
-	o.errCh <- err
-}
-
 // processHostnameOverrideFlag processes hostname-override flag
 func (o *Options) processHostnameOverrideFlag() error {
 	// Check if hostname-override flag is set and use value since configFile always overrides
@@ -363,7 +322,6 @@ func (o *Options) Validate() error {
 
 // Run runs the specified ProxyServer.
 func (o *Options) Run(ctx context.Context) error {
-	defer close(o.errCh)
 	if len(o.WriteConfigTo) > 0 {
 		return o.writeConfigFile()
 	}
@@ -383,29 +341,7 @@ func (o *Options) Run(ctx context.Context) error {
 		return nil
 	}
 
-	o.proxyServer = proxyServer
-	return o.runLoop(ctx)
-}
-
-// runLoop will watch on the update change of the proxy server's configuration file.
-// Return an error when updated
-func (o *Options) runLoop(ctx context.Context) error {
-	if o.watcher != nil {
-		o.watcher.Run(ctx)
-	}
-
-	// run the proxy in goroutine
-	go func() {
-		err := o.proxyServer.Run(ctx)
-		o.errCh <- err
-	}()
-
-	for {
-		err := <-o.errCh
-		if err != nil {
-			return err
-		}
-	}
+	return proxyServer.Run(ctx)
 }
 
 func (o *Options) writeConfigFile() (err error) {
