@@ -167,6 +167,14 @@ func TestInt64AsCanonicalString(t *testing.T) {
 		{100, 1, "1", 3},
 		{100, -1, "10", 0},
 		{10800, -10, "1080", -9},
+		{10, math.MaxInt32, "100", math.MaxInt32 - 1},
+		{1000, math.MaxInt32, "10000", math.MaxInt32 - 1},
+		{math.MaxInt64, math.MaxInt32, "92233720368547758070", math.MaxInt32 - 1},
+		{1000, math.MinInt32, "10", math.MinInt32 + 2},
+		// No multiple of 3 fits at or below these exponents.
+		{1, math.MinInt32 + 1, "1", math.MinInt32 + 1},
+		{10, math.MinInt32, "1", math.MinInt32 + 1},
+		{1, math.MinInt32, "1", math.MinInt32},
 	} {
 		r, exp := int64Amount{value: test.value, scale: test.scale}.AsCanonicalBytes(nil)
 		if string(r) != test.result {

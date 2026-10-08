@@ -271,6 +271,65 @@ func cmpDec(x, y *inf.Dec) int {
 	return x.Cmp(y)
 }
 
+// maxAddDigits is how many significant digits addDec keeps. Every sum of
+// quantities between 1n and the int64 range needs at most 29.
+const maxAddDigits = 64
+
+// maxAddCoefficient is 10^maxAddDigits, the smallest coefficient with more
+// than maxAddDigits digits. Treat as read only.
+var maxAddCoefficient = new(big.Int).Exp(bigTen, big.NewInt(maxAddDigits), nil)
+
+// addDec returns x + y, or x - y when sub is true, rounded away from zero to
+// maxAddDigits significant digits when the exact result has more.
+func addDec(x, y *inf.Dec, sub bool) *inf.Dec {
+	z := new(inf.Dec)
+	switch {
+	case y.Sign() == 0:
+		z.Set(x)
+	case x.Sign() == 0 && sub:
+		z.Neg(y)
+	case x.Sign() == 0:
+		z.Set(y)
+	case sub:
+		z.Sub(addend(x, y), addend(y, x))
+	default:
+		z.Add(addend(x, y), addend(y, x))
+	}
+	return roundAddDigits(z)
+}
+
+// addend returns small, or a stand-in for it in small + large. When all of
+// small lies below both large's last digit and the last digit addDec keeps,
+// only small's sign can change the rounded sum. The stand-in is then one unit
+// of that sign just below both.
+func addend(small, large *inf.Dec) *inf.Dec {
+	_, smallHi := decimalExponentBounds(small.UnscaledBig().BitLen(), widenInfScale(small.Scale()))
+	largeLo, _ := decimalExponentBounds(large.UnscaledBig().BitLen(), widenInfScale(large.Scale()))
+	below := min(widenInfScale(large.Scale()), largeLo-maxAddDigits)
+	if smallHi > below {
+		return small
+	}
+	// smallHi <= below keeps below-1 inside the Scale range.
+	scale, _ := narrowScale(below - 1)
+	return inf.NewDec(int64(small.Sign()), scale.infScale())
+}
+
+// roundAddDigits rounds z away from zero to maxAddDigits significant digits.
+// A z that would need a scale above the Scale range to round stays exact.
+func roundAddDigits(z *inf.Dec) *inf.Dec {
+	unscaled := z.UnscaledBig()
+	if unscaled.CmpAbs(maxAddCoefficient) < 0 {
+		return z
+	}
+	digits := len(new(big.Int).Abs(unscaled).String())
+	scale, fits := narrowScale(widenInfScale(z.Scale()) + widenedScale(digits-maxAddDigits))
+	if !fits {
+		return z
+	}
+	rounded, _ := infDecAmount{z}.AsScale(scale)
+	return rounded.Dec
+}
+
 // Add adds two int64Amounts together, matching scales. It will return false and not mutate
 // a if overflow or underflow would result.
 func (a *int64Amount) Add(b int64Amount) bool {
@@ -288,7 +347,12 @@ func (a *int64Amount) Add(b int64Amount) bool {
 		}
 		a.value = c
 	case a.scale > b.scale:
-		c, ok := positiveScaleInt64(a.value, a.scale-b.scale)
+		// Widen first: the delta of two int32 scales can need 33 bits.
+		up, fits := narrowScale(a.widenedScale() - b.widenedScale())
+		if !fits {
+			return false
+		}
+		c, ok := positiveScaleInt64(a.value, up)
 		if !ok {
 			return false
 		}
@@ -299,7 +363,12 @@ func (a *int64Amount) Add(b int64Amount) bool {
 		a.scale = b.scale
 		a.value = c
 	default:
-		c, ok := positiveScaleInt64(b.value, b.scale-a.scale)
+		// Widen first: the delta of two int32 scales can need 33 bits.
+		up, fits := narrowScale(b.widenedScale() - a.widenedScale())
+		if !fits {
+			return false
+		}
+		c, ok := positiveScaleInt64(b.value, up)
 		if !ok {
 			return false
 		}
@@ -371,7 +440,11 @@ func (a int64Amount) AsScale(scale Scale) (int64Amount, bool) {
 	if a.scale >= scale {
 		return a, true
 	}
-	result, exact := negativeScaleInt64(a.value, scale-a.scale)
+	down, fits := narrowScale(widenScale(scale) - a.widenedScale())
+	if !fits { // The scale drop overflows int32
+		down = log10MaxInt64 // Use the largest possible (19 digit) scale drop
+	}
+	result, exact := negativeScaleInt64(a.value, down)
 	return int64Amount{value: result, scale: scale}, exact
 }
 
@@ -380,33 +453,46 @@ func (a int64Amount) widenedScale() widenedScale {
 	return widenScale(a.scale)
 }
 
-// AsCanonicalBytes accepts a buffer to write the base-10 string value of this field to, and returns
-// either that buffer or a larger buffer and the current exponent of the value. The value is adjusted
-// until the exponent is a multiple of 3 - i.e. 1.1e5 would return "110", 3.
+// floorToSIExponent returns the largest multiple of 3 that is less than or
+// equal to w. fits is false when that multiple is outside the Scale range.
+func floorToSIExponent(w widenedScale) (exponent Scale, fits bool) {
+	return narrowScale(w - (w%3+3)%3)
+}
+
+// AsCanonicalBytes accepts a buffer to write the base-10 string value of this
+// field to, and returns either that buffer or a larger buffer and the current
+// exponent of the value. The value is adjusted until the exponent is a multiple
+// of 3 to align with SI units. For example, 1.1e5 returns ("110", 3).
+// math.MinInt32 and math.MinInt32+1 are returned as is because no lower
+// multiple of 3 fits in an int32.
 func (a int64Amount) AsCanonicalBytes(out []byte) (result []byte, exponent int32) {
 	mantissa := a.value
-	exponent = int32(a.scale)
 
 	amount, times := removeInt64Factors(mantissa, 10)
-	exponent += int32(times)
+	e := a.widenedScale() + widenedScale(times)
+	c, fits := floorToSIExponent(e)
+	if !fits {
+		if e > 0 {
+			return infDecAmount{a.AsDec()}.AsCanonicalBytes(out)
+		}
+		c, _ = narrowScale(e) // no multiple of 3 below e fits, so keep e
+	}
 
-	// make sure exponent is a multiple of 3
+	// add the zeros that c no longer covers to the mantissa
 	var ok bool
-	switch exponent % 3 {
-	case 1, -2:
+	switch e - widenScale(c) {
+	case 1:
 		amount, ok = int64MultiplyScale10(amount)
 		if !ok {
 			return infDecAmount{a.AsDec()}.AsCanonicalBytes(out)
 		}
-		exponent = exponent - 1
-	case 2, -1:
+	case 2:
 		amount, ok = int64MultiplyScale100(amount)
 		if !ok {
 			return infDecAmount{a.AsDec()}.AsCanonicalBytes(out)
 		}
-		exponent = exponent - 2
 	}
-	return strconv.AppendInt(out, amount, 10), exponent
+	return strconv.AppendInt(out, amount, 10), int32(c)
 }
 
 // AsCanonicalBase1024Bytes accepts a buffer to write the base-1024 string value of this field to, and returns
@@ -430,6 +516,27 @@ type infDecAmount struct {
 // AsScale adjusts this amount to set a minimum scale, rounding up, and returns true iff no precision
 // was lost. (1.1e5).AsScale(5) would return 1.1e5, but (1.1e5).AsScale(6) would return 1e6.
 func (a infDecAmount) AsScale(scale Scale) (infDecAmount, bool) {
+	// Short-circuit if the scale is not being reduced. This also guarantees the below
+	// infScale calls are safe.
+	if a.widenedScale() >= widenScale(scale) {
+		return infDecAmount{new(inf.Dec).Set(a.Dec)}, true
+	}
+
+	sign := a.Dec.Sign()
+
+	// Short-circuit if the value is zero, since we can skip the rounding.
+	if sign == 0 {
+		return infDecAmount{inf.NewDec(0, scale.infScale())}, true
+	}
+
+	// Short-circuit if we can cheaply determine that the value is less than one unit of scale.
+	_, hi := decimalExponentBounds(a.Dec.UnscaledBig().BitLen(), a.widenedScale())
+	if hi <= widenScale(scale) {
+		// The value is less than one unit of the desired scale, so to implement
+		// AsScale, we round away from zero 1 or -1.
+		return infDecAmount{inf.NewDec(int64(sign), scale.infScale())}, false
+	}
+
 	tmp := &inf.Dec{}
 	tmp.Round(a.Dec, scale.infScale(), inf.RoundUp)
 	return infDecAmount{tmp}, tmp.Cmp(a.Dec) == 0
@@ -440,26 +547,33 @@ func (a infDecAmount) widenedScale() widenedScale {
 	return widenInfScale(a.Dec.Scale())
 }
 
-// AsCanonicalBytes accepts a buffer to write the base-10 string value of this field to, and returns
-// either that buffer or a larger buffer and the current exponent of the value. The value is adjusted
-// until the exponent is a multiple of 3 - i.e. 1.1e5 would return "110", 3.
+// AsCanonicalBytes accepts a buffer to write the base-10 string value of this
+// field to, and returns either that buffer or a larger buffer and the current
+// exponent of the value. The value is adjusted until the exponent is a multiple
+// of 3 to align with SI units. For example, 1.1e5 returns ("110", 3).
+// math.MinInt32 and math.MinInt32+1 are returned as is because no lower
+// multiple of 3 fits in an int32.
 func (a infDecAmount) AsCanonicalBytes(out []byte) (result []byte, exponent int32) {
 	mantissa := a.Dec.UnscaledBig()
-	// An inf.Scale of math.MinInt32 does not fit, and wraps.
-	scale, _ := narrowScale(a.widenedScale())
-	exponent = int32(scale)
 	amount := big.NewInt(0).Set(mantissa)
 	// move all factors of 10 into the exponent for easy reasoning
 	amount, times := removeBigIntFactors(amount, bigTen)
-	exponent += times
-
-	// make sure exponent is a multiple of 3
-	for exponent%3 != 0 {
-		amount.Mul(amount, bigTen)
-		exponent--
+	e := a.widenedScale() + widenedScale(times)
+	c, fits := floorToSIExponent(e)
+	if !fits {
+		if e > 0 {
+			c = math.MaxInt32 - 1 // largest multiple of 3 in int32 is math.MaxInt32-1
+		} else {
+			c, _ = narrowScale(e) // no multiple of 3 below e fits, so keep e
+		}
 	}
 
-	return append(out, amount.String()...), exponent
+	// add the zeros that c no longer covers to the mantissa
+	if shift := e - widenScale(c); shift > 0 {
+		amount.Mul(amount, new(big.Int).Exp(bigTen, big.NewInt(int64(shift)), nil))
+	}
+
+	return append(out, amount.String()...), int32(c)
 }
 
 // AsCanonicalBase1024Bytes accepts a buffer to write the base-1024 string value of this field to, and returns

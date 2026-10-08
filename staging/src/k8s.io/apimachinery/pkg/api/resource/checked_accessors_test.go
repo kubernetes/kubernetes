@@ -122,9 +122,15 @@ func TestQuantityAsScaledInt64Boundaries(t *testing.T) {
 		{"milli neg overflow saturates", NewScaledQuantity(mostNegative, 0), Milli, mostNegative, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			got, ok := tc.q.AsScaledInt64(tc.scale)
-			if got != tc.want || ok != tc.wantOK {
-				t.Errorf("AsScaledInt64(%d) = (%d, %t), want (%d, %t)", tc.scale, got, ok, tc.want, tc.wantOK)
+			for _, asDec := range []bool{false, true} {
+				q := tc.q.DeepCopy()
+				if asDec {
+					q.ToDec()
+				}
+				got, ok := q.AsScaledInt64(tc.scale)
+				if got != tc.want || ok != tc.wantOK {
+					t.Errorf("asDec=%t: AsScaledInt64(%d) = (%d, %t), want (%d, %t)", asDec, tc.scale, got, ok, tc.want, tc.wantOK)
+				}
 			}
 		})
 	}
@@ -133,14 +139,28 @@ func TestQuantityAsScaledInt64Boundaries(t *testing.T) {
 // TestQuantityValueSaturates pins the headline case: NewScaledQuantity(mostPositive, 1).Value()
 // returns the rail rather than a wrapped -10.
 func TestQuantityValueSaturates(t *testing.T) {
-	if got := NewScaledQuantity(mostPositive, 1).Value(); got != mostPositive {
-		t.Errorf("NewScaledQuantity(mostPositive, 1).Value() = %d, want %d", got, int64(mostPositive))
-	}
-	if got := NewScaledQuantity(mostNegative, 1).Value(); got != mostNegative {
-		t.Errorf("NewScaledQuantity(mostNegative, 1).Value() = %d, want %d", got, int64(mostNegative))
-	}
-	if got := NewScaledQuantity(mostPositive, 0).MilliValue(); got != mostPositive {
-		t.Errorf("NewScaledQuantity(mostPositive, 0).MilliValue() = %d, want %d", got, int64(mostPositive))
+	for _, asDec := range []bool{false, true} {
+		q := NewScaledQuantity(mostPositive, 1)
+		if asDec {
+			q.ToDec()
+		}
+		if got := q.Value(); got != mostPositive {
+			t.Errorf("asDec=%t: NewScaledQuantity(mostPositive, 1).Value() = %d, want %d", asDec, got, int64(mostPositive))
+		}
+		q = NewScaledQuantity(mostNegative, 1)
+		if asDec {
+			q.ToDec()
+		}
+		if got := q.Value(); got != mostNegative {
+			t.Errorf("asDec=%t: NewScaledQuantity(mostNegative, 1).Value() = %d, want %d", asDec, got, int64(mostNegative))
+		}
+		q = NewScaledQuantity(mostPositive, 0)
+		if asDec {
+			q.ToDec()
+		}
+		if got := q.MilliValue(); got != mostPositive {
+			t.Errorf("asDec=%t: NewScaledQuantity(mostPositive, 0).MilliValue() = %d, want %d", asDec, got, int64(mostPositive))
+		}
 	}
 }
 
@@ -251,27 +271,45 @@ func FuzzQuantityScaledInt64BackendsAgree(f *testing.F) {
 // range, and the int32 endpoints themselves.
 func TestQuantityAsScaledInt64ExtremeScales(t *testing.T) {
 	for _, tc := range []struct {
-		name   string
-		value  int64
-		scale  Scale
-		target Scale
-		want   int64
-		wantOK bool
+		name      string
+		value     int64
+		scale     Scale
+		target    Scale
+		want      int64
+		wantOK    bool
+		decWant   int64
+		decWantOK bool
 	}{
-		{"neg-source-pos-target-rounds-up", 7, Scale(-2000000000), Scale(2000000000), 1, true},
-		{"neg-source-pos-target-negative", -7, Scale(-2000000000), Scale(2000000000), -1, true},
-		{"pos-source-neg-target-saturates", 7, Scale(2000000000), Scale(-2000000000), mostPositive, false},
-		{"neg-source-neg-target-saturates", -7, Scale(2000000000), Scale(-2000000000), mostNegative, false},
-		{"minint32-target-saturates", 7, 0, Scale(math.MinInt32), mostPositive, false},
-		{"maxint32-target-rounds-up", 7, 0, Scale(math.MaxInt32), 1, true},
-		{"minint32-source-rounds-up", 1, Scale(math.MinInt32), 0, 1, true},
-		{"zero-value-any-scale", 0, Scale(math.MinInt32), Scale(math.MaxInt32), 0, true},
+		{"neg-source-pos-target-rounds-up", 7, Scale(-2000000000), Scale(2000000000), 1, true, 1, true},
+		{"neg-source-pos-target-negative", -7, Scale(-2000000000), Scale(2000000000), -1, true, -1, true},
+		{"pos-source-neg-target-saturates", 7, Scale(2000000000), Scale(-2000000000), mostPositive, false, mostPositive, false},
+		{"neg-source-neg-target-saturates", -7, Scale(2000000000), Scale(-2000000000), mostNegative, false, mostNegative, false},
+		{"minint32-target-saturates", 7, 0, Scale(math.MinInt32), mostPositive, false, mostPositive, false},
+		{"maxint32-target-rounds-up", 7, 0, Scale(math.MaxInt32), 1, true, 1, true},
+		{"minint32-source-rounds-up", 1, Scale(math.MinInt32), 0, 1, true, 1, true},
+		{"minint32-source-negative-rounds-up", -1, Scale(math.MinInt32), 0, -1, true, -1, true},
+		{"minint32-source-exact-at-minint32-plus-1", 10, Scale(math.MinInt32), Scale(math.MinInt32 + 1), 1, true, 1, true},
+		// NewScaledQuantity rounds 1*10^MinInt32 up to 1*10^(MinInt32+1), which is 10 at scale MinInt32.
+		{"minint32-source-at-minint32-target", 1, Scale(math.MinInt32), Scale(math.MinInt32), 10, true, 10, true},
+		{"minint32-source-at-maxint32-target", 1, Scale(math.MinInt32), Scale(math.MaxInt32), 1, true, 1, true},
+		{"zero-value-any-scale", 0, Scale(math.MinInt32), Scale(math.MaxInt32), 0, true, 0, true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			got, ok := NewScaledQuantity(tc.value, tc.scale).AsScaledInt64(tc.target)
+			q := NewScaledQuantity(tc.value, tc.scale)
+			got, ok := q.AsScaledInt64(tc.target)
 			if got != tc.want || ok != tc.wantOK {
 				t.Errorf("value=%d scale=%d target=%d: got (%d,%t), want (%d,%t)",
 					tc.value, tc.scale, tc.target, got, ok, tc.want, tc.wantOK)
+			}
+			q.ToDec()
+			decGot, decOK := q.AsScaledInt64(tc.target)
+			if decGot != tc.decWant || decOK != tc.decWantOK {
+				hint := ""
+				if decGot == tc.want && decOK == tc.wantOK {
+					hint = "; this matches the int64 route, so update decWant/decWantOK and delete the row's TODO"
+				}
+				t.Errorf("value=%d scale=%d target=%d on the inf.Dec route: got (%d,%t), want (%d,%t)%s",
+					tc.value, tc.scale, tc.target, decGot, decOK, tc.decWant, tc.decWantOK, hint)
 			}
 		})
 	}

@@ -737,6 +737,9 @@ func (q *Quantity) widenedScale() widenedScale {
 // Add adds the provide y quantity to the current value. If the current value is zero,
 // the format of the quantity will be updated to the format of y.
 //
+// The sum is exact when it has at most 38 significant digits. Otherwise it is
+// rounded away from zero to 38 significant digits.
+//
 // This function is unsafe to call concurrently with method calls from other
 // goroutines (even to read-only methods).
 func (q *Quantity) Add(y Quantity) {
@@ -752,11 +755,14 @@ func (q *Quantity) Add(y Quantity) {
 		q.Format = y.Format
 	}
 	q.ToDec()
-	q.d.Dec = new(inf.Dec).Add(q.d.Dec, y.internalReadOnlyDec())
+	q.d.Dec = addDec(q.d.Dec, y.internalReadOnlyDec(), false)
 }
 
 // Sub subtracts the provided quantity from the current value in place. If the current
 // value is zero, the format of the quantity will be updated to the format of y.
+//
+// The difference is exact when it has at most 38 significant digits. Otherwise
+// it is rounded away from zero to 38 significant digits.
 //
 // This function is unsafe to call concurrently with method calls from other
 // goroutines (even to read-only methods).
@@ -777,7 +783,7 @@ func (q *Quantity) Sub(y Quantity) {
 		return
 	}
 	q.ToDec()
-	q.d.Dec = new(inf.Dec).Sub(q.d.Dec, y.internalReadOnlyDec())
+	q.d.Dec = addDec(q.d.Dec, y.internalReadOnlyDec(), true)
 }
 
 // Mul multiplies the provided y to the current value.
@@ -1005,11 +1011,13 @@ func NewMilliQuantity(value int64, format Format) *Quantity {
 
 // NewScaledQuantity returns a new Quantity representing the given
 // value * 10^scale in DecimalSI format.
+//
+// A scale of math.MinInt32, which inf.Dec cannot represent, is rounded away
+// from zero to math.MinInt32+1.
 func NewScaledQuantity(value int64, scale Scale) *Quantity {
-	return &Quantity{
-		i:      int64Amount{value: value, scale: scale},
-		Format: DecimalSI,
-	}
+	q := &Quantity{Format: DecimalSI}
+	q.SetScaled(value, scale) // Calls into AsScale to round away from zero and keep the value in the range supported by inf.Dec.
+	return q
 }
 
 // Value returns the value of q rounded to an integer, away from zero. It
@@ -1071,12 +1079,17 @@ func (q *Quantity) SetMilli(value int64) {
 
 // SetScaled sets q's value to be value * 10^scale
 //
+// A scale of math.MinInt32, which inf.Dec cannot represent, is rounded away
+// from zero to math.MinInt32+1.
+//
 // This function is unsafe to call concurrently with method calls from other
 // goroutines (even to read-only methods).
 func (q *Quantity) SetScaled(value int64, scale Scale) {
 	q.s = cachedString{}
 	q.d.Dec = nil
-	q.i = int64Amount{value: value, scale: scale}
+
+	// Use AsScale to round away from zero and keep the value in the range supported by inf.Dec.
+	q.i, _ = int64Amount{value: value, scale: scale}.AsScale(math.MinInt32 + 1)
 }
 
 // QuantityValue makes it possible to use a Quantity as value for a command
