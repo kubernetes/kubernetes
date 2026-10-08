@@ -261,7 +261,7 @@ func NewFit(_ context.Context, plArgs runtime.Object, h fwk.Handle, fts feature.
 }
 
 // InsufficientResource, ResourceRequestsOptions and Fits live in plugins/helper
-// so the kubelet's admission check does not need this plugin's DRA imports.
+// so the kubelet can use them without this plugin's DRA imports.
 type InsufficientResource = helper.InsufficientResource
 
 // ResourceRequestsOptions contains feature gate flags for resource request computation.
@@ -273,7 +273,7 @@ func Fits(pod *v1.Pod, nodeInfo fwk.NodeInfo, draManager fwk.SharedDRAManager, o
 }
 
 func computePodResourceRequest(pod *v1.Pod, opts ResourceRequestsOptions) *preFilterState {
-	return &preFilterState{Resource: *helper.ComputePodResourceRequest(pod, opts)}
+	return &preFilterState{Resource: helper.ComputePodResourceRequest(pod, opts)}
 }
 
 // PreFilter invoked at the prefilter extension point.

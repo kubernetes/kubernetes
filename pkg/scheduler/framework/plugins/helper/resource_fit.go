@@ -87,14 +87,14 @@ func ShouldDelegateResourceToDRA(rName v1.ResourceName, nodeInfo fwk.NodeInfo, d
 //	    Memory: 1G
 //
 // Result: CPU: 3, Memory: 3G
-func ComputePodResourceRequest(pod *v1.Pod, opts ResourceRequestsOptions) *framework.Resource {
+func ComputePodResourceRequest(pod *v1.Pod, opts ResourceRequestsOptions) framework.Resource {
 	// pod hasn't scheduled yet so we don't need to worry about InPlacePodVerticalScalingEnabled
 	reqs := resource.PodRequests(pod, resource.PodResourcesOptions{
 		// SkipPodLevelResources is set to false when PodLevelResources feature is enabled.
 		SkipPodLevelResources:                    !opts.EnablePodLevelResources,
 		UseDRANodeAllocatableResourceClaimStatus: opts.EnableDRANodeAllocatableResources,
 	})
-	result := &framework.Resource{}
+	var result framework.Resource
 	result.SetMaxResource(reqs)
 	return result
 }
@@ -115,9 +115,12 @@ type InsufficientResource struct {
 
 // Fits checks if node have enough resources to host the pod.
 func Fits(pod *v1.Pod, nodeInfo fwk.NodeInfo, draManager fwk.SharedDRAManager, opts ResourceRequestsOptions) []InsufficientResource {
-	return FitsRequest(ComputePodResourceRequest(pod, opts), nodeInfo, nil, nil, draManager, opts, pod)
+	req := ComputePodResourceRequest(pod, opts)
+	return FitsRequest(&req, nodeInfo, nil, nil, draManager, opts, pod)
 }
 
+// FitsRequest checks if the node has enough resources for an already computed pod
+// request, skipping the ignored extended resources and the resources DRA provides.
 func FitsRequest(podRequest *framework.Resource, nodeInfo fwk.NodeInfo, ignoredExtendedResources, ignoredResourceGroups sets.Set[string], draManager fwk.SharedDRAManager, opts ResourceRequestsOptions, pod *v1.Pod) []InsufficientResource {
 	insufficientResources := make([]InsufficientResource, 0, 4)
 

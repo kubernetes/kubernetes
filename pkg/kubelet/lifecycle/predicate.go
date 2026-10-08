@@ -25,13 +25,16 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/featuregate"
 	"k8s.io/component-helpers/scheduling/corev1"
+	corev1nodeaffinity "k8s.io/component-helpers/scheduling/corev1/nodeaffinity"
 	"k8s.io/klog/v2"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/types"
 	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework"
-	"k8s.io/kubernetes/pkg/scheduler/framework/admission"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/helper"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeaffinity"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodename"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeports"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/tainttoleration"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 	"k8s.io/utils/ptr"
@@ -430,19 +433,27 @@ func (e *PredicateFailureError) GetReason() string {
 
 // generalFilter checks a group of filterings that the kubelet cares about.
 func generalFilter(logger klog.Logger, pod *v1.Pod, nodeInfo *schedulerframework.NodeInfo) []PredicateFailureReason {
-	admissionResults := admission.Check(pod, nodeInfo, true)
 	var reasons []PredicateFailureReason
-	for _, r := range admissionResults {
-		if r.InsufficientResource != nil {
-			reasons = append(reasons, &InsufficientResourceError{
-				ResourceName: r.InsufficientResource.ResourceName,
-				Requested:    r.InsufficientResource.Requested,
-				Used:         r.InsufficientResource.Used,
-				Capacity:     r.InsufficientResource.Capacity,
-			})
-		} else {
-			reasons = append(reasons, &PredicateFailureError{r.Name, r.Reason})
-		}
+	for _, r := range helper.Fits(pod, nodeInfo, nil, helper.ResourceRequestsOptions{
+		EnablePodLevelResources:           utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources),
+		EnableDRAExtendedResource:         utilfeature.DefaultFeatureGate.Enabled(features.DRAExtendedResource),
+		EnableDRANodeAllocatableResources: utilfeature.DefaultFeatureGate.Enabled(features.DRANodeAllocatableResources),
+	}) {
+		reasons = append(reasons, &InsufficientResourceError{
+			ResourceName: r.ResourceName,
+			Requested:    r.Requested,
+			Used:         r.Used,
+			Capacity:     r.Capacity,
+		})
+	}
+	if matches, _ := corev1nodeaffinity.GetRequiredNodeAffinity(pod).Match(nodeInfo.Node()); !matches {
+		reasons = append(reasons, &PredicateFailureError{nodeaffinity.Name, nodeaffinity.ErrReasonPod})
+	}
+	if !nodename.Fits(pod, nodeInfo) {
+		reasons = append(reasons, &PredicateFailureError{nodename.Name, nodename.ErrReason})
+	}
+	if !nodeports.Fits(pod, nodeInfo) {
+		reasons = append(reasons, &PredicateFailureError{nodeports.Name, nodeports.ErrReason})
 	}
 
 	// Check taint/toleration except for static pods
