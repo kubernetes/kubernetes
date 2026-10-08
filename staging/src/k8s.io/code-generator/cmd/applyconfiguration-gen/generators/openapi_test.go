@@ -34,21 +34,26 @@ func TestNewTypeModels(t *testing.T) {
 	}
 
 	cases := []struct {
-		name     string
-		comments []string
-		want     string
-		wantErr  bool
+		name         string
+		comments     []string
+		typeComments []string
+		want         string
+		wantErr      bool
 	}{
 		{name: "derived from Go package path", want: "com.example.widgets.v1.Widget"},
 		{name: "model package tag", comments: []string{"+k8s:openapi-model-package=io.example.widgets.v1"}, want: "io.example.widgets.v1.Widget"},
+		{name: "type model package tag", typeComments: []string{"+k8s:openapi-model-package=io.example.widgets.v1"}, want: "io.example.widgets.v1.Widget"},
+		{name: "type model package overrides package", comments: []string{"+k8s:openapi-model-package=io.example.widgets.v1"}, typeComments: []string{"+k8s:openapi-model-package=com.example.widgets.v1"}, want: "com.example.widgets.v1.Widget"},
+		{name: "empty model package uses Go package path", comments: []string{"+k8s:openapi-model-package="}, want: "com.example.widgets.v1.Widget"},
 		{name: "no definition", comments: []string{"+k8s:openapi-model-package=io.example.other.v1"}, wantErr: true},
+		{name: "type definition missing", comments: []string{"+k8s:openapi-model-package=io.example.widgets.v1"}, typeComments: []string{"+k8s:openapi-model-package=io.example.other.v1"}, wantErr: true},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			widget := &types.Type{
 				Name:         types.Name{Package: "example.com/widgets/v1", Name: "Widget"},
 				Kind:         types.Struct,
-				CommentLines: []string{"+genclient"},
+				CommentLines: append([]string{"+genclient"}, tc.typeComments...),
 			}
 			pkg := &types.Package{
 				Path:     "example.com/widgets/v1",
