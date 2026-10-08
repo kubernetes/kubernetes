@@ -42,7 +42,7 @@ import (
 //   - `Add`: Adds a new snapshot.
 //     Complexity: O(log n).
 //     Executed for each watch event observed by the cache.
-//   - `HasSnapshot`: Checks whether the requested RV is not older than the oldest stored snapshot.
+//   - `OldestResourceVersion`: Returns the RV of the oldest stored snapshot.
 //     Complexity: O(log n).
 //     Executed before watch cache synchronization for each LIST request with match=Exact or continuation.
 //   - `GetSnapshot`: Retrieves the snapshot with the greatest RV less than or equal to the requested RV.
@@ -92,14 +92,19 @@ func (s *snapshotter) reset() {
 }
 
 func (s *snapshotter) HasSnapshot(rv uint64) bool {
+	oldest, ok := s.OldestResourceVersion()
+	return ok && rv >= oldest
+}
+
+func (s *snapshotter) OldestResourceVersion() (uint64, bool) {
 	if !s.enabled {
-		return false
+		return 0, false
 	}
 	oldest, ok := s.snapshots.Min()
 	if !ok {
-		return false
+		return 0, false
 	}
-	return rv >= oldest.resourceVersion
+	return oldest.resourceVersion, true
 }
 
 func (s *snapshotter) GetSnapshot(rv uint64) (*btreeStore, error) {
