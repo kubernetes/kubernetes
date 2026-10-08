@@ -26,13 +26,11 @@ import (
 
 var _ checkpointmanager.Checkpoint = &Checkpoint{}
 
-type PodResourceCheckpointInfo struct {
-	Entries PodResourceInfoMap `json:"entries,omitempty"`
-}
-
 // Checkpoint represents a structure to store pod resource allocation checkpoint data
 type Checkpoint struct {
-	// Data is a serialized PodResourceAllocationInfo
+	// Version is the checkpoint format version. It is empty for legacy V1 checkpoints.
+	Version string `json:"version,omitempty"`
+	// Data is the serialized payload: a PodResourceCheckpointInfo for V1, a CheckpointData for V2.
 	Data string `json:"data"`
 	// Checksum is a checksum of Data
 	Checksum checksum.Checksum `json:"checksum"`
