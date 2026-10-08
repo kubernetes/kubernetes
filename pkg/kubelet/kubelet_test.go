@@ -2837,6 +2837,9 @@ func TestHandlePodAdditionsStaleNoExecuteTaint(t *testing.T) {
 		expectedPhase v1.PodPhase
 		// expectedReason is only checked when expectedPhase is PodFailed.
 		expectedReason string
+		// wantRejectionMetric is the expected kubelet_admission_rejections_total text;
+		// empty means the counter must not have been incremented.
+		wantRejectionMetric string
 	}{
 		{
 			name:          "stale taint cleared by synchronous fetch",
@@ -2856,6 +2859,11 @@ func TestHandlePodAdditionsStaleNoExecuteTaint(t *testing.T) {
 			freshTaints:    []v1.Taint{staleTaint},
 			expectedPhase:  v1.PodFailed,
 			expectedReason: tainttoleration.Name,
+			wantRejectionMetric: `
+                # HELP kubelet_admission_rejections_total [ALPHA] Cumulative number pod admission rejections by the Kubelet.
+                # TYPE kubelet_admission_rejections_total counter
+                kubelet_admission_rejections_total{reason="TaintToleration"} 1
+            `,
 		},
 		{
 			// The registration NoExecute taint is removed, a NoSchedule taint stays,
@@ -2903,8 +2911,15 @@ func TestHandlePodAdditionsStaleNoExecuteTaint(t *testing.T) {
 				pods = append(pods, makePod(fmt.Sprintf("uid-%d", i), fmt.Sprintf("pod-%d", i), nodeName))
 			}
 
+			// The admission rejection counter lives in the global registry.
+			metrics.Register()
+			metrics.AdmissionRejectionsTotal.Reset()
+
 			kl.HandlePodAdditions(tCtx, pods)
 
+			if err := testutil.GatherAndCompare(metrics.GetGather(), strings.NewReader(test.wantRejectionMetric), "kubelet_admission_rejections_total"); err != nil {
+				t.Errorf("unexpected admission rejection metrics: %v", err)
+			}
 			for _, pod := range pods {
 				checkPodStatus(t, kl, pod, test.expectedPhase)
 				if test.expectedPhase == v1.PodFailed {
@@ -4148,12 +4163,12 @@ func TestRecordAdmissionRejection(t *testing.T) {
             `,
 		},
 		{
-			name:   "node(s) had taints that the pod didn't tolerate",
-			reason: tainttoleration.ErrReasonNotMatch,
+			name:   "TaintToleration",
+			reason: tainttoleration.Name,
 			wants: `
                 # HELP kubelet_admission_rejections_total [ALPHA] Cumulative number pod admission rejections by the Kubelet.
                 # TYPE kubelet_admission_rejections_total counter
-                kubelet_admission_rejections_total{reason="node(s) had taints that the pod didn't tolerate"} 1
+                kubelet_admission_rejections_total{reason="TaintToleration"} 1
             `,
 		},
 		{
