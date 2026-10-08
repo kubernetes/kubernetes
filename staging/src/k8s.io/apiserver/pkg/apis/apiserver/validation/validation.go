@@ -741,10 +741,20 @@ func ValidateWebhookConfiguration(compiler authorizationcel.Compiler, fldPath *f
 	return allErrs
 }
 
-// ValidateAndCompileMatchConditions validates a given webhook's matchConditions.
-// This is exported for use in authz package.
-func ValidateAndCompileMatchConditions(compiler authorizationcel.Compiler, matchConditions []api.WebhookMatchCondition) (*authorizationcel.CELMatcher, field.ErrorList) {
-	return compileMatchConditions(compiler, matchConditions, nil)
+// NewWebhookMatcher compiles matchConditions into the matcher a webhook authorizer
+// evaluates for each request. With no conditions it matches every request.
+func NewWebhookMatcher(compiler authorizationcel.Compiler, matchConditions []api.WebhookMatchCondition, authorizerName string, metrics authorizationcel.MatcherMetrics) (*authorizationcel.CELMatcher, error) {
+	matcher, errs := compileMatchConditions(compiler, matchConditions, nil)
+	if err := errs.ToAggregate(); err != nil {
+		return nil, err
+	}
+	if matcher == nil {
+		matcher = &authorizationcel.CELMatcher{}
+	}
+	matcher.AuthorizerType = "Webhook"
+	matcher.AuthorizerName = authorizerName
+	matcher.Metrics = metrics
+	return matcher, nil
 }
 
 func compileMatchConditions(compiler authorizationcel.Compiler, matchConditions []api.WebhookMatchCondition, fldPath *field.Path) (*authorizationcel.CELMatcher, field.ErrorList) {

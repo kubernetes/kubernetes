@@ -2485,7 +2485,7 @@ func TestValidateAuthorizationConfiguration(t *testing.T) {
 	}
 }
 
-func TestValidateAndCompileMatchConditions(t *testing.T) {
+func TestNewWebhookMatcher(t *testing.T) {
 	testCases := []struct {
 		name            string
 		matchConditions []api.WebhookMatchCondition
@@ -2551,13 +2551,16 @@ func TestValidateAndCompileMatchConditions(t *testing.T) {
 
 	for _, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
-			celMatcher, errList := ValidateAndCompileMatchConditions(authorizationcel.NewDefaultCompiler(), tt.matchConditions)
-			if len(tt.expectedErr) == 0 && len(tt.matchConditions) > 0 && len(errList) == 0 && celMatcher == nil {
-				t.Errorf("celMatcher should not be nil when there are matchCondition and no error returned")
+			matcher, err := NewWebhookMatcher(authorizationcel.NewDefaultCompiler(), tt.matchConditions, "wh", authorizationcel.NoopMatcherMetrics{})
+			got := ""
+			if err != nil {
+				got = err.Error()
 			}
-			got := errList.ToAggregate()
-			if d := cmp.Diff(tt.expectedErr, errString(got)); d != "" {
-				t.Fatalf("ValidateAndCompileMatchConditions validation mismatch (-want +got):\n%s", d)
+			if d := cmp.Diff(tt.expectedErr, got); d != "" {
+				t.Fatalf("NewWebhookMatcher error mismatch (-want +got):\n%s", d)
+			}
+			if err == nil && (matcher == nil || matcher.AuthorizerName != "wh" || len(matcher.CompilationResults) != len(tt.matchConditions)) {
+				t.Errorf("unexpected matcher %+v", matcher)
 			}
 		})
 	}

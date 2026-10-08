@@ -43,6 +43,9 @@ type CELMatcher struct {
 
 // eval evaluates the given SubjectAccessReview against all cel matchCondition expression
 func (c *CELMatcher) Eval(ctx context.Context, r *authorizationv1.SubjectAccessReview) (bool, error) {
+	if len(c.CompilationResults) == 0 {
+		return true, nil
+	}
 	var evalErrors []error
 
 	metrics := c.Metrics

@@ -364,16 +364,9 @@ func newV1Authorizer(callbackURL string, clientCert, clientKey, ca []byte, cache
 	if err != nil {
 		return nil, fmt.Errorf("error building sar client: %v", err)
 	}
-	var matcher Matcher
-	celMatcher, fieldErrs := apiservervalidation.ValidateAndCompileMatchConditions(compiler, expressions)
-	if err := fieldErrs.ToAggregate(); err != nil {
+	matcher, err := apiservervalidation.NewWebhookMatcher(compiler, expressions, authzName, metrics)
+	if err != nil {
 		return nil, err
-	}
-	if celMatcher != nil {
-		celMatcher.AuthorizerType = "Webhook"
-		celMatcher.AuthorizerName = authzName
-		celMatcher.Metrics = metrics
-		matcher = celMatcher
 	}
 	return newWithBackoff(sarClient, cacheTime, cacheTime, testRetryBackoff, authorizer.DecisionNoOpinion, matcher, metrics, authzName)
 }
