@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/storage"
+	"k8s.io/apiserver/pkg/storage/cacher/consistency"
 	"k8s.io/apiserver/pkg/storage/cacher/delegator"
 	"k8s.io/apiserver/pkg/storage/cacher/metrics"
 	"k8s.io/apiserver/pkg/storage/cacher/progress"
@@ -418,8 +419,10 @@ func (w *watchCache) WaitUntilFreshAndGetKeys(ctx context.Context, resourceVersi
 		return nil, err
 	}
 	span.AddEvent("watchCache fresh enough")
+	snap := w.storage.LatestSnapshot()
+	w.checkSnapshotResourceVersion(snap, w.resourceVersion)
 	var keys []string
-	for elem, err := range w.storage.LatestSnapshot().RangePrefix("", "").All() {
+	for elem, err := range snap.RangePrefix("", "").All() {
 		if err != nil {
 			return nil, err
 		}
@@ -491,6 +494,7 @@ func (w *watchCache) waitAndGetExactSnapshot(ctx context.Context, resourceVersio
 		return nil, err
 	}
 	span.AddEvent("GetExactSnapshotLocked success")
+	w.checkSnapshotResourceVersion(store, resourceVersion)
 	return store, nil
 }
 
@@ -531,13 +535,25 @@ func (w *watchCache) waitAndGetLatestSnapshot(ctx context.Context, minResourceVe
 		snap, err := w.storage.GetByIndexSnapshot(matchValue.IndexName, matchValue.Value)
 		if err == nil {
 			span.AddEvent("GetByIndexSnapshot success", attribute.String("index", matchValue.IndexName))
+			w.checkSnapshotResourceVersion(snap, w.resourceVersion)
 			return snap, w.resourceVersion, matchValue.IndexName, nil
 		}
 		span.AddEvent("GetByIndexSnapshot fail", attribute.String("index", matchValue.IndexName), attribute.String("error", err.Error()))
 	}
 	snap = w.storage.LatestSnapshot()
 	span.AddEvent("LatestSnapshot success")
+	w.checkSnapshotResourceVersion(snap, w.resourceVersion)
 	return snap, w.resourceVersion, "", nil
+}
+
+func (w *watchCache) checkSnapshotResourceVersion(snap store.Snapshot, expectedRV uint64) {
+	if snap.ResourceVersion() == expectedRV {
+		return
+	}
+	klog.ErrorS(nil, "Watch cache snapshot resourceVersion mismatch", "group", w.config.groupResource.Group, "resource", w.config.groupResource.Resource, "snapshotResourceVersion", snap.ResourceVersion(), "expectedResourceVersion", expectedRV)
+	if consistency.PanicOnCacheInconsistency {
+		panic(fmt.Sprintf("Watch cache snapshot resourceVersion mismatch, group: %q, resource: %q, snapshotResourceVersion: %d, expectedResourceVersion: %d", w.config.groupResource.Group, w.config.groupResource.Resource, snap.ResourceVersion(), expectedRV))
+	}
 }
 
 func (w *watchCache) notFresh(resourceVersion uint64) bool {
@@ -558,7 +574,9 @@ func (w *watchCache) WaitUntilFreshAndGet(ctx context.Context, resourceVersion u
 		return nil, false, 0, err
 	}
 	span.AddEvent("watchCache fresh enough")
-	value, exists, err := w.storage.LatestSnapshot().GetByKey(key)
+	snap := w.storage.LatestSnapshot()
+	w.checkSnapshotResourceVersion(snap, w.resourceVersion)
+	value, exists, err := snap.GetByKey(key)
 	if err != nil {
 		span.AddEvent("GetByKey failed", attribute.String("error", err.Error()))
 		return nil, false, 0, err
@@ -677,10 +695,12 @@ func (w *watchCache) getAllEventsSinceLocked(resourceVersion uint64, key string,
 // that covers the entire storage state.
 // This function assumes to be called under the watchCache lock.
 func (w *watchCache) getIntervalFromStoreLocked(key string, matchesSingle bool) (*watchCacheInterval, error) {
+	snap := w.storage.LatestSnapshot()
+	w.checkSnapshotResourceVersion(snap, w.resourceVersion)
 	// When not matching a single key, an immutable snapshot lets us
 	// defer the O(N) interval build off the watchCache lock.
 	if !matchesSingle {
-		return newCacheIntervalFromLazySnapshot(w.resourceVersion, w.storage.LatestSnapshot()), nil
+		return newCacheIntervalFromLazySnapshot(w.resourceVersion, snap), nil
 	}
-	return newCacheIntervalFromStore(w.resourceVersion, w.storage.LatestSnapshot(), key, matchesSingle)
+	return newCacheIntervalFromStore(w.resourceVersion, snap, key, matchesSingle)
 }
