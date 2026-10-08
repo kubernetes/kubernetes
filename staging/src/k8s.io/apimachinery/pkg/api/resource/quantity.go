@@ -695,8 +695,15 @@ func (q *Quantity) Sign() int {
 	return q.i.Sign()
 }
 
-// AsScale returns the current value, rounded up to the provided scale, and returns
-// false if the scale resulted in a loss of precision.
+// AsScale returns the current value, rounded away from zero to set a minimum
+// scale, and returns false if the scale resulted in a loss of precision.
+//
+// For example:
+//   - (1.1e5).AsScale(3) returns 1.1e5, true
+//   - (1.1e5).AsScale(4) returns 1.1e5, true
+//   - (1.1e5).AsScale(5) returns 2e5, false
+//   - (1.1e5).AsScale(6) returns 1e6, false
+//   - (-1.1e5).AsScale(5) returns -2e5, false
 func (q *Quantity) AsScale(scale Scale) (CanonicalValue, bool) {
 	if q.d.Dec != nil {
 		return q.d.AsScale(scale)
