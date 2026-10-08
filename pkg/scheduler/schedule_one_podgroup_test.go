@@ -5172,7 +5172,8 @@ func TestScheduleOnePodGroup_PodGroupNotFound(t *testing.T) {
 	}
 
 	cache := internalcache.New(ctx, nil, true, false /* CompositePodGroup */)
-	queue := internalqueue.NewSchedulingQueue(nil, informerFactory)
+	queue := internalqueue.NewPriorityQueue(nil, informerFactory)
+	internalqueue.MarkInFlightForTest(queue, podGroupInfo)
 
 	informerFactory.Start(ctx.Done())
 	informerFactory.WaitForCacheSync(ctx.Done())
@@ -7901,7 +7902,8 @@ func TestPodGroupCycle_PodStatusConditions(t *testing.T) {
 					client := clientsetfake.NewClientset(objs...)
 
 					informerFactory := informers.NewSharedInformerFactory(client, 0)
-					queue := internalqueue.NewSchedulingQueue(nil, informerFactory)
+					queue := internalqueue.NewPriorityQueue(nil, informerFactory)
+					internalqueue.MarkInFlightForTest(queue, tt.podGroupInfo)
 					snapshot := internalcache.NewEmptySnapshot()
 
 					placementFeasiblePlugin := &fakePlacementFeasiblePlugin{
