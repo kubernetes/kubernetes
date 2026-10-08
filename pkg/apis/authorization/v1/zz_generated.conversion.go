@@ -37,6 +37,46 @@ func init() {
 // RegisterConversions adds conversion functions to the given scheme.
 // Public to allow building arbitrary schemes.
 func RegisterConversions(s *runtime.Scheme) error {
+	if err := s.AddGeneratedConversionFunc((*authorizationv1.AuthorizationOptions)(nil), (*authorization.AuthorizationOptions)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_AuthorizationOptions_To_authorization_AuthorizationOptions(a.(*authorizationv1.AuthorizationOptions), b.(*authorization.AuthorizationOptions), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*authorization.AuthorizationOptions)(nil), (*authorizationv1.AuthorizationOptions)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_authorization_AuthorizationOptions_To_v1_AuthorizationOptions(a.(*authorization.AuthorizationOptions), b.(*authorizationv1.AuthorizationOptions), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*authorizationv1.Condition)(nil), (*authorization.Condition)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_Condition_To_authorization_Condition(a.(*authorizationv1.Condition), b.(*authorization.Condition), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*authorization.Condition)(nil), (*authorizationv1.Condition)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_authorization_Condition_To_v1_Condition(a.(*authorization.Condition), b.(*authorizationv1.Condition), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*authorizationv1.ConditionsAwareDecision)(nil), (*authorization.ConditionsAwareDecision)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_ConditionsAwareDecision_To_authorization_ConditionsAwareDecision(a.(*authorizationv1.ConditionsAwareDecision), b.(*authorization.ConditionsAwareDecision), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*authorization.ConditionsAwareDecision)(nil), (*authorizationv1.ConditionsAwareDecision)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_authorization_ConditionsAwareDecision_To_v1_ConditionsAwareDecision(a.(*authorization.ConditionsAwareDecision), b.(*authorizationv1.ConditionsAwareDecision), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*authorizationv1.ConditionsMap)(nil), (*authorization.ConditionsMap)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_ConditionsMap_To_authorization_ConditionsMap(a.(*authorizationv1.ConditionsMap), b.(*authorization.ConditionsMap), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*authorization.ConditionsMap)(nil), (*authorizationv1.ConditionsMap)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_authorization_ConditionsMap_To_v1_ConditionsMap(a.(*authorization.ConditionsMap), b.(*authorizationv1.ConditionsMap), scope)
+	}); err != nil {
+		return err
+	}
 	if err := s.AddGeneratedConversionFunc((*authorizationv1.FieldSelectorAttributes)(nil), (*authorization.FieldSelectorAttributes)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_v1_FieldSelectorAttributes_To_authorization_FieldSelectorAttributes(a.(*authorizationv1.FieldSelectorAttributes), b.(*authorization.FieldSelectorAttributes), scope)
 	}); err != nil {
@@ -64,6 +104,16 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}
 	if err := s.AddGeneratedConversionFunc((*authorization.LocalSubjectAccessReview)(nil), (*authorizationv1.LocalSubjectAccessReview)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_authorization_LocalSubjectAccessReview_To_v1_LocalSubjectAccessReview(a.(*authorization.LocalSubjectAccessReview), b.(*authorizationv1.LocalSubjectAccessReview), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*authorizationv1.NamedConditionsAwareDecision)(nil), (*authorization.NamedConditionsAwareDecision)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_NamedConditionsAwareDecision_To_authorization_NamedConditionsAwareDecision(a.(*authorizationv1.NamedConditionsAwareDecision), b.(*authorization.NamedConditionsAwareDecision), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*authorization.NamedConditionsAwareDecision)(nil), (*authorizationv1.NamedConditionsAwareDecision)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_authorization_NamedConditionsAwareDecision_To_v1_NamedConditionsAwareDecision(a.(*authorization.NamedConditionsAwareDecision), b.(*authorizationv1.NamedConditionsAwareDecision), scope)
 	}); err != nil {
 		return err
 	}
@@ -187,7 +237,97 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
+	if err := s.AddGeneratedConversionFunc((*authorizationv1.UnconditionalDecision)(nil), (*authorization.UnconditionalDecision)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_UnconditionalDecision_To_authorization_UnconditionalDecision(a.(*authorizationv1.UnconditionalDecision), b.(*authorization.UnconditionalDecision), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*authorization.UnconditionalDecision)(nil), (*authorizationv1.UnconditionalDecision)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_authorization_UnconditionalDecision_To_v1_UnconditionalDecision(a.(*authorization.UnconditionalDecision), b.(*authorizationv1.UnconditionalDecision), scope)
+	}); err != nil {
+		return err
+	}
 	return nil
+}
+
+func autoConvert_v1_AuthorizationOptions_To_authorization_AuthorizationOptions(in *authorizationv1.AuthorizationOptions, out *authorization.AuthorizationOptions, s conversion.Scope) error {
+	*out = *(*authorization.AuthorizationOptions)(unsafe.Pointer(in))
+	return nil
+}
+
+// Convert_v1_AuthorizationOptions_To_authorization_AuthorizationOptions is an autogenerated conversion function.
+func Convert_v1_AuthorizationOptions_To_authorization_AuthorizationOptions(in *authorizationv1.AuthorizationOptions, out *authorization.AuthorizationOptions, s conversion.Scope) error {
+	return autoConvert_v1_AuthorizationOptions_To_authorization_AuthorizationOptions(in, out, s)
+}
+
+func autoConvert_authorization_AuthorizationOptions_To_v1_AuthorizationOptions(in *authorization.AuthorizationOptions, out *authorizationv1.AuthorizationOptions, s conversion.Scope) error {
+	*out = *(*authorizationv1.AuthorizationOptions)(unsafe.Pointer(in))
+	return nil
+}
+
+// Convert_authorization_AuthorizationOptions_To_v1_AuthorizationOptions is an autogenerated conversion function.
+func Convert_authorization_AuthorizationOptions_To_v1_AuthorizationOptions(in *authorization.AuthorizationOptions, out *authorizationv1.AuthorizationOptions, s conversion.Scope) error {
+	return autoConvert_authorization_AuthorizationOptions_To_v1_AuthorizationOptions(in, out, s)
+}
+
+func autoConvert_v1_Condition_To_authorization_Condition(in *authorizationv1.Condition, out *authorization.Condition, s conversion.Scope) error {
+	*out = *(*authorization.Condition)(unsafe.Pointer(in))
+	return nil
+}
+
+// Convert_v1_Condition_To_authorization_Condition is an autogenerated conversion function.
+func Convert_v1_Condition_To_authorization_Condition(in *authorizationv1.Condition, out *authorization.Condition, s conversion.Scope) error {
+	return autoConvert_v1_Condition_To_authorization_Condition(in, out, s)
+}
+
+func autoConvert_authorization_Condition_To_v1_Condition(in *authorization.Condition, out *authorizationv1.Condition, s conversion.Scope) error {
+	*out = *(*authorizationv1.Condition)(unsafe.Pointer(in))
+	return nil
+}
+
+// Convert_authorization_Condition_To_v1_Condition is an autogenerated conversion function.
+func Convert_authorization_Condition_To_v1_Condition(in *authorization.Condition, out *authorizationv1.Condition, s conversion.Scope) error {
+	return autoConvert_authorization_Condition_To_v1_Condition(in, out, s)
+}
+
+func autoConvert_v1_ConditionsAwareDecision_To_authorization_ConditionsAwareDecision(in *authorizationv1.ConditionsAwareDecision, out *authorization.ConditionsAwareDecision, s conversion.Scope) error {
+	*out = *(*authorization.ConditionsAwareDecision)(unsafe.Pointer(in))
+	return nil
+}
+
+// Convert_v1_ConditionsAwareDecision_To_authorization_ConditionsAwareDecision is an autogenerated conversion function.
+func Convert_v1_ConditionsAwareDecision_To_authorization_ConditionsAwareDecision(in *authorizationv1.ConditionsAwareDecision, out *authorization.ConditionsAwareDecision, s conversion.Scope) error {
+	return autoConvert_v1_ConditionsAwareDecision_To_authorization_ConditionsAwareDecision(in, out, s)
+}
+
+func autoConvert_authorization_ConditionsAwareDecision_To_v1_ConditionsAwareDecision(in *authorization.ConditionsAwareDecision, out *authorizationv1.ConditionsAwareDecision, s conversion.Scope) error {
+	*out = *(*authorizationv1.ConditionsAwareDecision)(unsafe.Pointer(in))
+	return nil
+}
+
+// Convert_authorization_ConditionsAwareDecision_To_v1_ConditionsAwareDecision is an autogenerated conversion function.
+func Convert_authorization_ConditionsAwareDecision_To_v1_ConditionsAwareDecision(in *authorization.ConditionsAwareDecision, out *authorizationv1.ConditionsAwareDecision, s conversion.Scope) error {
+	return autoConvert_authorization_ConditionsAwareDecision_To_v1_ConditionsAwareDecision(in, out, s)
+}
+
+func autoConvert_v1_ConditionsMap_To_authorization_ConditionsMap(in *authorizationv1.ConditionsMap, out *authorization.ConditionsMap, s conversion.Scope) error {
+	*out = *(*authorization.ConditionsMap)(unsafe.Pointer(in))
+	return nil
+}
+
+// Convert_v1_ConditionsMap_To_authorization_ConditionsMap is an autogenerated conversion function.
+func Convert_v1_ConditionsMap_To_authorization_ConditionsMap(in *authorizationv1.ConditionsMap, out *authorization.ConditionsMap, s conversion.Scope) error {
+	return autoConvert_v1_ConditionsMap_To_authorization_ConditionsMap(in, out, s)
+}
+
+func autoConvert_authorization_ConditionsMap_To_v1_ConditionsMap(in *authorization.ConditionsMap, out *authorizationv1.ConditionsMap, s conversion.Scope) error {
+	*out = *(*authorizationv1.ConditionsMap)(unsafe.Pointer(in))
+	return nil
+}
+
+// Convert_authorization_ConditionsMap_To_v1_ConditionsMap is an autogenerated conversion function.
+func Convert_authorization_ConditionsMap_To_v1_ConditionsMap(in *authorization.ConditionsMap, out *authorizationv1.ConditionsMap, s conversion.Scope) error {
+	return autoConvert_authorization_ConditionsMap_To_v1_ConditionsMap(in, out, s)
 }
 
 func autoConvert_v1_FieldSelectorAttributes_To_authorization_FieldSelectorAttributes(in *authorizationv1.FieldSelectorAttributes, out *authorization.FieldSelectorAttributes, s conversion.Scope) error {
@@ -260,6 +400,26 @@ func autoConvert_authorization_LocalSubjectAccessReview_To_v1_LocalSubjectAccess
 // Convert_authorization_LocalSubjectAccessReview_To_v1_LocalSubjectAccessReview is an autogenerated conversion function.
 func Convert_authorization_LocalSubjectAccessReview_To_v1_LocalSubjectAccessReview(in *authorization.LocalSubjectAccessReview, out *authorizationv1.LocalSubjectAccessReview, s conversion.Scope) error {
 	return autoConvert_authorization_LocalSubjectAccessReview_To_v1_LocalSubjectAccessReview(in, out, s)
+}
+
+func autoConvert_v1_NamedConditionsAwareDecision_To_authorization_NamedConditionsAwareDecision(in *authorizationv1.NamedConditionsAwareDecision, out *authorization.NamedConditionsAwareDecision, s conversion.Scope) error {
+	*out = *(*authorization.NamedConditionsAwareDecision)(unsafe.Pointer(in))
+	return nil
+}
+
+// Convert_v1_NamedConditionsAwareDecision_To_authorization_NamedConditionsAwareDecision is an autogenerated conversion function.
+func Convert_v1_NamedConditionsAwareDecision_To_authorization_NamedConditionsAwareDecision(in *authorizationv1.NamedConditionsAwareDecision, out *authorization.NamedConditionsAwareDecision, s conversion.Scope) error {
+	return autoConvert_v1_NamedConditionsAwareDecision_To_authorization_NamedConditionsAwareDecision(in, out, s)
+}
+
+func autoConvert_authorization_NamedConditionsAwareDecision_To_v1_NamedConditionsAwareDecision(in *authorization.NamedConditionsAwareDecision, out *authorizationv1.NamedConditionsAwareDecision, s conversion.Scope) error {
+	*out = *(*authorizationv1.NamedConditionsAwareDecision)(unsafe.Pointer(in))
+	return nil
+}
+
+// Convert_authorization_NamedConditionsAwareDecision_To_v1_NamedConditionsAwareDecision is an autogenerated conversion function.
+func Convert_authorization_NamedConditionsAwareDecision_To_v1_NamedConditionsAwareDecision(in *authorization.NamedConditionsAwareDecision, out *authorizationv1.NamedConditionsAwareDecision, s conversion.Scope) error {
+	return autoConvert_authorization_NamedConditionsAwareDecision_To_v1_NamedConditionsAwareDecision(in, out, s)
 }
 
 func autoConvert_v1_NonResourceAttributes_To_authorization_NonResourceAttributes(in *authorizationv1.NonResourceAttributes, out *authorization.NonResourceAttributes, s conversion.Scope) error {
@@ -536,4 +696,24 @@ func autoConvert_authorization_SubjectRulesReviewStatus_To_v1_SubjectRulesReview
 // Convert_authorization_SubjectRulesReviewStatus_To_v1_SubjectRulesReviewStatus is an autogenerated conversion function.
 func Convert_authorization_SubjectRulesReviewStatus_To_v1_SubjectRulesReviewStatus(in *authorization.SubjectRulesReviewStatus, out *authorizationv1.SubjectRulesReviewStatus, s conversion.Scope) error {
 	return autoConvert_authorization_SubjectRulesReviewStatus_To_v1_SubjectRulesReviewStatus(in, out, s)
+}
+
+func autoConvert_v1_UnconditionalDecision_To_authorization_UnconditionalDecision(in *authorizationv1.UnconditionalDecision, out *authorization.UnconditionalDecision, s conversion.Scope) error {
+	*out = *(*authorization.UnconditionalDecision)(unsafe.Pointer(in))
+	return nil
+}
+
+// Convert_v1_UnconditionalDecision_To_authorization_UnconditionalDecision is an autogenerated conversion function.
+func Convert_v1_UnconditionalDecision_To_authorization_UnconditionalDecision(in *authorizationv1.UnconditionalDecision, out *authorization.UnconditionalDecision, s conversion.Scope) error {
+	return autoConvert_v1_UnconditionalDecision_To_authorization_UnconditionalDecision(in, out, s)
+}
+
+func autoConvert_authorization_UnconditionalDecision_To_v1_UnconditionalDecision(in *authorization.UnconditionalDecision, out *authorizationv1.UnconditionalDecision, s conversion.Scope) error {
+	*out = *(*authorizationv1.UnconditionalDecision)(unsafe.Pointer(in))
+	return nil
+}
+
+// Convert_authorization_UnconditionalDecision_To_v1_UnconditionalDecision is an autogenerated conversion function.
+func Convert_authorization_UnconditionalDecision_To_v1_UnconditionalDecision(in *authorization.UnconditionalDecision, out *authorizationv1.UnconditionalDecision, s conversion.Scope) error {
+	return autoConvert_authorization_UnconditionalDecision_To_v1_UnconditionalDecision(in, out, s)
 }
