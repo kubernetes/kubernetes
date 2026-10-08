@@ -698,19 +698,19 @@ func Test_InFlightPods(t *testing.T) {
 				{callback: func(t *testing.T, q *PriorityQueue) { poppedPod2 = popPod(t, logger, q, pod2) }},
 				{eventHappens: &framework.EventAssignedPodAdd},
 				{callback: func(t *testing.T, q *PriorityQueue) {
-					logger, _ := ktesting.NewTestContext(t)
+					_, ctx := ktesting.NewTestContext(t)
 					// This pod will be requeued to backoffQ immediately because no plugin is registered as unschedulable plugin,
 					// which means the pod encountered an unexpected error (e.g., a network error).
-					err := q.AddUnschedulablePodIfNotPresent(logger, poppedPod, q.SchedulingCycle())
+					err := q.AddUnschedulablePodIfNotPresent(ctx, poppedPod, q.SchedulingCycle())
 					if err != nil {
 						t.Fatalf("unexpected error from AddUnschedulablePodIfNotPresent: %v", err)
 					}
 				}},
 				{callback: func(t *testing.T, q *PriorityQueue) {
-					logger, _ := ktesting.NewTestContext(t)
+					_, ctx := ktesting.NewTestContext(t)
 					poppedPod2.UnschedulablePlugins = sets.New("fooPlugin2", "fooPlugin3")
 					poppedPod2.PendingPlugins = sets.New("fooPlugin1")
-					err := q.AddUnschedulablePodIfNotPresent(logger, poppedPod2, q.SchedulingCycle())
+					err := q.AddUnschedulablePodIfNotPresent(ctx, poppedPod2, q.SchedulingCycle())
 					if err != nil {
 						t.Fatalf("unexpected error from AddUnschedulablePodIfNotPresent: %v", err)
 					}
@@ -749,11 +749,11 @@ func Test_InFlightPods(t *testing.T) {
 			actions: []action{
 				{callback: func(t *testing.T, q *PriorityQueue) { poppedPod = popPod(t, logger, q, pod1) }},
 				{callback: func(t *testing.T, q *PriorityQueue) {
-					logger, _ := ktesting.NewTestContext(t)
+					_, ctx := ktesting.NewTestContext(t)
 					// Unschedulable due to PendingPlugins.
 					poppedPod.PendingPlugins = sets.New("fooPlugin1")
 					poppedPod.UnschedulablePlugins = sets.New("fooPlugin2")
-					if err := q.AddUnschedulablePodIfNotPresent(logger, poppedPod, q.SchedulingCycle()); err != nil {
+					if err := q.AddUnschedulablePodIfNotPresent(ctx, poppedPod, q.SchedulingCycle()); err != nil {
 						t.Errorf("Unexpected error from AddUnschedulablePodIfNotPresent: %v", err)
 					}
 				}},
@@ -770,9 +770,9 @@ func Test_InFlightPods(t *testing.T) {
 					}
 				}},
 				{callback: func(t *testing.T, q *PriorityQueue) {
-					logger, _ := ktesting.NewTestContext(t)
+					_, ctx := ktesting.NewTestContext(t)
 					// Failed (i.e. no UnschedulablePlugins). Should go to backoff.
-					if err := q.AddUnschedulablePodIfNotPresent(logger, poppedPod, q.SchedulingCycle()); err != nil {
+					if err := q.AddUnschedulablePodIfNotPresent(ctx, poppedPod, q.SchedulingCycle()); err != nil {
 						t.Errorf("Unexpected error from AddUnschedulablePodIfNotPresent: %v", err)
 					}
 				}},
@@ -1127,7 +1127,7 @@ func Test_InFlightPods(t *testing.T) {
 					case action.eventHappens != nil:
 						q.MoveAllToActiveOrBackoffQueue(logger, *action.eventHappens, nil, nil, nil)
 					case action.podEnqueued != nil:
-						err := q.AddUnschedulablePodIfNotPresent(logger, action.podEnqueued, q.SchedulingCycle())
+						err := q.AddUnschedulablePodIfNotPresent(ctx, action.podEnqueued, q.SchedulingCycle())
 						if err != nil {
 							t.Fatalf("unexpected error from AddUnschedulablePodIfNotPresent: %v", err)
 						}
@@ -1264,7 +1264,7 @@ func TestPop(t *testing.T) {
 	poppedPod := popPod(t, logger, q, pod)
 	// We put register the plugin to PendingPlugins so that it's interpreted as queueImmediately and skip backoff.
 	poppedPod.PendingPlugins = sets.New("fooPlugin1")
-	if err := q.AddUnschedulablePodIfNotPresent(logger, poppedPod, q.SchedulingCycle()); err != nil {
+	if err := q.AddUnschedulablePodIfNotPresent(ctx, poppedPod, q.SchedulingCycle()); err != nil {
 		t.Errorf("Unexpected error from AddUnschedulablePodIfNotPresent: %v", err)
 	}
 
@@ -1296,7 +1296,7 @@ func TestPriorityQueue_AddUnschedulablePodIfNotPresent(t *testing.T) {
 	}
 
 	q.Add(ctx, highPriNominatedPodInfo.Pod)
-	err := q.AddUnschedulablePodIfNotPresent(logger, newQueuedPodInfoForLookup(unschedulablePodInfo.Pod, "plugin"), q.SchedulingCycle())
+	err := q.AddUnschedulablePodIfNotPresent(ctx, newQueuedPodInfoForLookup(unschedulablePodInfo.Pod, "plugin"), q.SchedulingCycle())
 	if err != nil {
 		t.Fatalf("unexpected error from AddUnschedulablePodIfNotPresent: %v", err)
 	}
@@ -1364,7 +1364,7 @@ func TestPriorityQueue_AddUnschedulablePodIfNotPresent_Backoff(t *testing.T) {
 			},
 		}
 
-		err := q.AddUnschedulablePodIfNotPresent(logger, newQueuedPodInfoForLookup(unschedulablePod, "plugin"), oldCycle)
+		err := q.AddUnschedulablePodIfNotPresent(ctx, newQueuedPodInfoForLookup(unschedulablePod, "plugin"), oldCycle)
 		if err != nil {
 			t.Fatalf("unexpected error from AddUnschedulablePodIfNotPresent: %v", err)
 		}
@@ -1773,7 +1773,7 @@ func TestPriorityQueue_UpdateWhenInflight(t *testing.T) {
 	// test-pod got rejected by fakePlugin,
 	// but the update event that it just got may change this scheduling result,
 	// and hence we should put this pod to activeQ/backoffQ.
-	err := q.AddUnschedulablePodIfNotPresent(logger, newQueuedPodInfoForLookup(updatedPod, "fakePlugin"), q.SchedulingCycle())
+	err := q.AddUnschedulablePodIfNotPresent(ctx, newQueuedPodInfoForLookup(updatedPod, "fakePlugin"), q.SchedulingCycle())
 	if err != nil {
 		t.Fatalf("unexpected error from AddUnschedulablePodIfNotPresent: %v", err)
 	}
@@ -2458,7 +2458,7 @@ func BenchmarkMoveAllToActiveOrBackoffQueue(b *testing.B) {
 							// Random case.
 							podInfo = q.newQueuedPodInfo(ctx, p, plugins[j%len(plugins)])
 						}
-						err := q.AddUnschedulablePodIfNotPresent(logger, podInfo, q.SchedulingCycle())
+						err := q.AddUnschedulablePodIfNotPresent(ctx, podInfo, q.SchedulingCycle())
 						if err != nil {
 							b.Fatalf("unexpected error from AddUnschedulablePodIfNotPresent: %v", err)
 						}
@@ -2626,7 +2626,7 @@ func TestPriorityQueue_MoveAllToActiveOrBackoffQueueWithQueueingHint(t *testing.
 					t.Errorf("Unexpected pod after Pop (-want, +got):\n%s", diff)
 				}
 				// add to unsched pod pool
-				err := q.AddUnschedulablePodIfNotPresent(logger, test.podInfo, q.SchedulingCycle())
+				err := q.AddUnschedulablePodIfNotPresent(ctx, test.podInfo, q.SchedulingCycle())
 				if err != nil {
 					t.Fatalf("unexpected error from AddUnschedulablePodIfNotPresent: %v", err)
 				}
@@ -2687,11 +2687,11 @@ func TestPriorityQueue_MoveAllToActiveOrBackoffQueue(t *testing.T) {
 		t.Errorf("Unexpected pod after Pop (-want, +got):\n%s", diff)
 	}
 	expectInFlightPods(t, q, unschedulablePodInfo.Pod.UID, highPriorityPodInfo.Pod.UID)
-	err := q.AddUnschedulablePodIfNotPresent(logger, q.newQueuedPodInfo(ctx, unschedulablePodInfo.Pod, "fooPlugin"), q.SchedulingCycle())
+	err := q.AddUnschedulablePodIfNotPresent(ctx, q.newQueuedPodInfo(ctx, unschedulablePodInfo.Pod, "fooPlugin"), q.SchedulingCycle())
 	if err != nil {
 		t.Fatalf("unexpected error from AddUnschedulablePodIfNotPresent: %v", err)
 	}
-	err = q.AddUnschedulablePodIfNotPresent(logger, q.newQueuedPodInfo(ctx, highPriorityPodInfo.Pod, "fooPlugin"), q.SchedulingCycle())
+	err = q.AddUnschedulablePodIfNotPresent(ctx, q.newQueuedPodInfo(ctx, highPriorityPodInfo.Pod, "fooPlugin"), q.SchedulingCycle())
 	if err != nil {
 		t.Fatalf("unexpected error from AddUnschedulablePodIfNotPresent: %v", err)
 	}
@@ -2708,7 +2708,7 @@ func TestPriorityQueue_MoveAllToActiveOrBackoffQueue(t *testing.T) {
 	// This Pod will go to backoffQ because no failure plugin is associated with it.
 	hpp1PodInfo := q.newQueuedPodInfo(ctx, hpp1)
 	hpp1PodInfo.UnschedulableCount++
-	err = q.AddUnschedulablePodIfNotPresent(logger, hpp1PodInfo, q.SchedulingCycle())
+	err = q.AddUnschedulablePodIfNotPresent(ctx, hpp1PodInfo, q.SchedulingCycle())
 	if err != nil {
 		t.Fatalf("unexpected error from AddUnschedulablePodIfNotPresent: %v", err)
 	}
@@ -2723,7 +2723,7 @@ func TestPriorityQueue_MoveAllToActiveOrBackoffQueue(t *testing.T) {
 	}
 	expectInFlightPods(t, q, hpp2.UID)
 	// This Pod will go to the unschedulable Pod pool.
-	err = q.AddUnschedulablePodIfNotPresent(logger, q.newQueuedPodInfo(ctx, hpp2, "barPlugin"), q.SchedulingCycle())
+	err = q.AddUnschedulablePodIfNotPresent(ctx, q.newQueuedPodInfo(ctx, hpp2, "barPlugin"), q.SchedulingCycle())
 	if err != nil {
 		t.Fatalf("unexpected error from AddUnschedulablePodIfNotPresent: %v", err)
 	}
@@ -2777,17 +2777,17 @@ func TestPriorityQueue_MoveAllToActiveOrBackoffQueue(t *testing.T) {
 	highPriorityQueuedPodInfo := q.newQueuedPodInfo(ctx, highPriorityPodInfo.Pod, "fooPlugin")
 	hpp1QueuedPodInfo := q.newQueuedPodInfo(ctx, hpp1)
 	expectInFlightPods(t, q, medPriorityPodInfo.Pod.UID, unschedulablePodInfo.Pod.UID, highPriorityPodInfo.Pod.UID, hpp1.UID)
-	err = q.AddUnschedulablePodIfNotPresent(logger, unschedulableQueuedPodInfo, q.SchedulingCycle())
+	err = q.AddUnschedulablePodIfNotPresent(ctx, unschedulableQueuedPodInfo, q.SchedulingCycle())
 	if err != nil {
 		t.Fatalf("unexpected error from AddUnschedulablePodIfNotPresent: %v", err)
 	}
 	expectInFlightPods(t, q, medPriorityPodInfo.Pod.UID, highPriorityPodInfo.Pod.UID, hpp1.UID)
-	err = q.AddUnschedulablePodIfNotPresent(logger, highPriorityQueuedPodInfo, q.SchedulingCycle())
+	err = q.AddUnschedulablePodIfNotPresent(ctx, highPriorityQueuedPodInfo, q.SchedulingCycle())
 	if err != nil {
 		t.Fatalf("unexpected error from AddUnschedulablePodIfNotPresent: %v", err)
 	}
 	expectInFlightPods(t, q, medPriorityPodInfo.Pod.UID, hpp1.UID)
-	err = q.AddUnschedulablePodIfNotPresent(logger, hpp1QueuedPodInfo, q.SchedulingCycle())
+	err = q.AddUnschedulablePodIfNotPresent(ctx, hpp1QueuedPodInfo, q.SchedulingCycle())
 	if err != nil {
 		t.Fatalf("unexpected error from AddUnschedulablePodIfNotPresent: %v", err)
 	}
@@ -3066,11 +3066,11 @@ func TestPriorityQueue_PendingPods(t *testing.T) {
 		t.Errorf("Unexpected pod after Pop (-want, +got):\n%s", diff)
 	}
 	q.Add(ctx, medPriorityPodInfo.Pod)
-	err := q.AddUnschedulablePodIfNotPresent(logger, q.newQueuedPodInfo(ctx, unschedulablePodInfo.Pod, "plugin"), q.SchedulingCycle())
+	err := q.AddUnschedulablePodIfNotPresent(ctx, q.newQueuedPodInfo(ctx, unschedulablePodInfo.Pod, "plugin"), q.SchedulingCycle())
 	if err != nil {
 		t.Fatalf("unexpected error from AddUnschedulablePodIfNotPresent: %v", err)
 	}
-	err = q.AddUnschedulablePodIfNotPresent(logger, q.newQueuedPodInfo(ctx, highPriorityPodInfo.Pod, "plugin"), q.SchedulingCycle())
+	err = q.AddUnschedulablePodIfNotPresent(ctx, q.newQueuedPodInfo(ctx, highPriorityPodInfo.Pod, "plugin"), q.SchedulingCycle())
 	if err != nil {
 		t.Fatalf("unexpected error from AddUnschedulablePodIfNotPresent: %v", err)
 	}
@@ -3257,7 +3257,7 @@ func TestRecentlyTriedPodsGoBack(t *testing.T) {
 	})
 	p1.UnschedulablePlugins = sets.New("plugin")
 	// Put in the unschedulable queue.
-	err = q.AddUnschedulablePodIfNotPresent(logger, p1, q.SchedulingCycle())
+	err = q.AddUnschedulablePodIfNotPresent(ctx, p1, q.SchedulingCycle())
 	if err != nil {
 		t.Fatalf("unexpected error from AddUnschedulablePodIfNotPresent: %v", err)
 	}
@@ -3310,7 +3310,7 @@ func TestPodFailedSchedulingMultipleTimesDoesNotBlockNewerPod(t *testing.T) {
 		t.Errorf("Unexpected pod after Pop (-want, +got):\n%s", diff)
 	}
 	// Put in the unschedulable queue
-	err := q.AddUnschedulablePodIfNotPresent(logger, newQueuedPodInfoForLookup(unschedulablePod, "plugin"), q.SchedulingCycle())
+	err := q.AddUnschedulablePodIfNotPresent(ctx, newQueuedPodInfoForLookup(unschedulablePod, "plugin"), q.SchedulingCycle())
 	if err != nil {
 		t.Fatalf("unexpected error from AddUnschedulablePodIfNotPresent: %v", err)
 	}
@@ -3344,7 +3344,7 @@ func TestPodFailedSchedulingMultipleTimesDoesNotBlockNewerPod(t *testing.T) {
 	})
 
 	// And then, put unschedulable pod to the unschedulable queue
-	err = q.AddUnschedulablePodIfNotPresent(logger, newQueuedPodInfoForLookup(unschedulablePod, "plugin"), q.SchedulingCycle())
+	err = q.AddUnschedulablePodIfNotPresent(ctx, newQueuedPodInfoForLookup(unschedulablePod, "plugin"), q.SchedulingCycle())
 	if err != nil {
 		t.Fatalf("unexpected error from AddUnschedulablePodIfNotPresent: %v", err)
 	}
@@ -3396,7 +3396,7 @@ func TestHighPriorityBackoff(t *testing.T) {
 		Message: "fake scheduling failure",
 	})
 	// Put in the unschedulable queue.
-	err = q.AddUnschedulablePodIfNotPresent(logger, newQueuedPodInfoForLookup(p.Pod, "fooPlugin"), q.SchedulingCycle())
+	err = q.AddUnschedulablePodIfNotPresent(ctx, newQueuedPodInfoForLookup(p.Pod, "fooPlugin"), q.SchedulingCycle())
 	if err != nil {
 		t.Fatalf("unexpected error from AddUnschedulablePodIfNotPresent: %v", err)
 	}
@@ -3460,11 +3460,11 @@ func TestHighPriorityFlushUnschedulableEntitiesLeftover(t *testing.T) {
 	} else if diff := cmp.Diff(midPod, p.(*framework.QueuedPodInfo).Pod); diff != "" {
 		t.Errorf("Unexpected pod after Pop (-want, +got):\n%s", diff)
 	}
-	err := q.AddUnschedulablePodIfNotPresent(logger, q.newQueuedPodInfo(ctx, highPod, "fakePlugin"), q.SchedulingCycle())
+	err := q.AddUnschedulablePodIfNotPresent(ctx, q.newQueuedPodInfo(ctx, highPod, "fakePlugin"), q.SchedulingCycle())
 	if err != nil {
 		t.Fatalf("unexpected error from AddUnschedulablePodIfNotPresent: %v", err)
 	}
-	err = q.AddUnschedulablePodIfNotPresent(logger, q.newQueuedPodInfo(ctx, midPod, "fakePlugin"), q.SchedulingCycle())
+	err = q.AddUnschedulablePodIfNotPresent(ctx, q.newQueuedPodInfo(ctx, midPod, "fakePlugin"), q.SchedulingCycle())
 	if err != nil {
 		t.Fatalf("unexpected error from AddUnschedulablePodIfNotPresent: %v", err)
 	}
@@ -3509,7 +3509,7 @@ func TestFlushUnschedulableEntitiesLeftoverSetsFlag(t *testing.T) {
 	}
 
 	// Add pod to unschedulableEntities (simulating failed scheduling)
-	err = q.AddUnschedulablePodIfNotPresent(logger, q.newQueuedPodInfo(ctx, pod, "fakePlugin"), q.SchedulingCycle())
+	err = q.AddUnschedulablePodIfNotPresent(ctx, q.newQueuedPodInfo(ctx, pod, "fakePlugin"), q.SchedulingCycle())
 	if err != nil {
 		t.Fatalf("Unexpected error from AddUnschedulablePodIfNotPresent: %v", err)
 	}
@@ -3529,7 +3529,7 @@ func TestFlushUnschedulableEntitiesLeftoverSetsFlag(t *testing.T) {
 	}
 
 	// Simulate pod failing to schedule again and returning to queue
-	err = q.AddUnschedulablePodIfNotPresent(logger, q.newQueuedPodInfo(ctx, pInfo.Pod, "fakePlugin"), q.SchedulingCycle())
+	err = q.AddUnschedulablePodIfNotPresent(ctx, q.newQueuedPodInfo(ctx, pInfo.Pod, "fakePlugin"), q.SchedulingCycle())
 	if err != nil {
 		t.Fatalf("Unexpected error from AddUnschedulablePodIfNotPresent: %v", err)
 	}
@@ -3646,7 +3646,7 @@ func TestFlushUnschedulablePodsLeftoverSetsFlag_GatedPod(t *testing.T) {
 				delete(pod.Labels, allowedLabel)
 			}
 
-			err = q.AddUnschedulablePodIfNotPresent(logger, podInfo, q.SchedulingCycle())
+			err = q.AddUnschedulablePodIfNotPresent(ctx, podInfo, q.SchedulingCycle())
 			if err != nil {
 				t.Fatalf("Failed to add pod to unschedulable: %v", err)
 			}
@@ -4111,7 +4111,7 @@ var (
 		// Simulate plugins that are waiting for some events.
 		p.UnschedulablePlugins = unschedulablePlugins
 		p.PendingPlugins = pendingPlugins
-		if err := queue.AddUnschedulablePodIfNotPresent(logger, p, 1); err != nil {
+		if err := queue.AddUnschedulablePodIfNotPresent(tCtx, p, 1); err != nil {
 			tCtx.Fatalf("Unexpected error during AddUnschedulablePodIfNotPresent: %v", err)
 		}
 	}
@@ -4129,7 +4129,7 @@ var (
 		// needs to increment it to make it backoff
 		p.UnschedulableCount++
 		// When there is no known unschedulable plugin, pods always go to the backoff queue.
-		if err := queue.AddUnschedulablePodIfNotPresent(logger, p, 1); err != nil {
+		if err := queue.AddUnschedulablePodIfNotPresent(tCtx, p, 1); err != nil {
 			tCtx.Fatalf("Unexpected error during AddUnschedulablePodIfNotPresent: %v", err)
 		}
 	}
@@ -4857,7 +4857,7 @@ func TestPerPodSchedulingMetrics(t *testing.T) {
 				}
 
 				pInfo.UnschedulablePlugins = sets.New("plugin")
-				err = queue.AddUnschedulablePodIfNotPresent(logger, pInfo, 1)
+				err = queue.AddUnschedulablePodIfNotPresent(ctx, pInfo, 1)
 				if err != nil {
 					t.Fatalf("Failed to add unschedulable pod %v", err)
 				}
@@ -4881,7 +4881,7 @@ func TestPerPodSchedulingMetrics(t *testing.T) {
 				}
 
 				pInfo.UnschedulablePlugins = sets.New("plugin")
-				err = queue.AddUnschedulablePodIfNotPresent(logger, pInfo, 1)
+				err = queue.AddUnschedulablePodIfNotPresent(ctx, pInfo, 1)
 				if err != nil {
 					t.Fatalf("Failed to add unschedulable pod %v", err)
 				}
@@ -5169,7 +5169,7 @@ func TestIncomingEntitiesMetrics(t *testing.T) {
 				}
 				pod := entity.(*framework.QueuedPodInfo)
 				pod.UnschedulablePlugins = sets.New(unschedulablePlugin)
-				if err := queue.AddUnschedulablePodIfNotPresent(logger, pod, 1); err != nil {
+				if err := queue.AddUnschedulablePodIfNotPresent(tCtx, pod, 1); err != nil {
 					tCtx.Fatalf("Unexpected error adding unschedulable pod: %v", err)
 				}
 			},
@@ -5411,7 +5411,7 @@ func TestQueuedEntitiesMetrics(t *testing.T) {
 				}
 				pod := entity.(*framework.QueuedPodInfo)
 				pod.UnschedulablePlugins = sets.New(unschedulablePlugin)
-				if err := queue.AddUnschedulablePodIfNotPresent(logger, pod, 1); err != nil {
+				if err := queue.AddUnschedulablePodIfNotPresent(tCtx, pod, 1); err != nil {
 					tCtx.Fatalf("Unexpected error adding unschedulable pod: %v", err)
 				}
 			},
@@ -5447,7 +5447,7 @@ func TestQueuedEntitiesMetrics(t *testing.T) {
 				}
 				pod := entity.(*framework.QueuedPodInfo)
 				pod.UnschedulablePlugins = sets.New(unschedulablePlugin)
-				if err := queue.AddUnschedulablePodIfNotPresent(logger, pod, 1); err != nil {
+				if err := queue.AddUnschedulablePodIfNotPresent(tCtx, pod, 1); err != nil {
 					tCtx.Fatalf("Unexpected error adding unschedulable pod: %v", err)
 				}
 
@@ -5469,7 +5469,7 @@ func TestQueuedEntitiesMetrics(t *testing.T) {
 				}
 				pod := entity.(*framework.QueuedPodInfo)
 				pod.UnschedulablePlugins = sets.New(unschedulablePlugin)
-				if err := queue.AddUnschedulablePodIfNotPresent(logger, pod, 1); err != nil {
+				if err := queue.AddUnschedulablePodIfNotPresent(tCtx, pod, 1); err != nil {
 					tCtx.Fatalf("Unexpected error adding unschedulable pod: %v", err)
 				}
 
@@ -5726,7 +5726,7 @@ func TestBackOffFlow(t *testing.T) {
 					t.Errorf("got attempts %d, want %d", podInfo.GetAttempts(), i+1)
 				}
 				podInfo.GetUnschedulablePlugins().Insert("unsched-plugin")
-				err = q.AddUnschedulablePodIfNotPresent(logger, podInfo, int64(i))
+				err = q.AddUnschedulablePodIfNotPresent(ctx, podInfo, int64(i))
 				if err != nil {
 					t.Fatalf("unexpected error from AddUnschedulablePodIfNotPresent: %v", err)
 				}
@@ -5844,7 +5844,7 @@ func TestMoveAllToActiveOrBackoffQueue_PreEnqueueChecks(t *testing.T) {
 					t.Errorf("Unexpected pod after Pop (-want, +got):\n%s", diff)
 				}
 				podInfo.UnschedulablePlugins = sets.New("plugin")
-				err := q.AddUnschedulablePodIfNotPresent(logger, podInfo, q.activeQ.schedulingCycle())
+				err := q.AddUnschedulablePodIfNotPresent(ctx, podInfo, q.activeQ.schedulingCycle())
 				if err != nil {
 					t.Fatalf("unexpected error from AddUnschedulablePodIfNotPresent: %v", err)
 				}
@@ -6937,9 +6937,12 @@ func TestPriorityQueue_UpdateRecomputesSignature(t *testing.T) {
 	pod2 := pod1.DeepCopy()
 	pod2.Labels["key"] = "value2"
 
+	var inFlightPodInfo *framework.QueuedPodInfo
+
 	tests := []struct {
-		name        string
-		prepareFunc func(tCtx ktesting.TContext, q *PriorityQueue)
+		name            string
+		prepareFunc     func(tCtx ktesting.TContext, q *PriorityQueue)
+		afterUpdateFunc func(tCtx ktesting.TContext, q *PriorityQueue)
 	}{
 		{
 			name: "pod in activeQ",
@@ -6965,6 +6968,25 @@ func TestPriorityQueue_UpdateRecomputesSignature(t *testing.T) {
 			name:        "pod not in any queue",
 			prepareFunc: nil,
 		},
+		{
+			name: "in-flight pod returned via AddUnschedulablePodIfNotPresent",
+			prepareFunc: func(tCtx ktesting.TContext, q *PriorityQueue) {
+				q.Add(tCtx, pod1)
+				entity, err := q.Pop(klog.FromContext(tCtx))
+				if err != nil {
+					tCtx.Fatalf("Pop failed: %v", err)
+				}
+				inFlightPodInfo = entity.(*framework.QueuedPodInfo)
+			},
+			afterUpdateFunc: func(tCtx ktesting.TContext, q *PriorityQueue) {
+				// Simulate handleSchedulingFailure: PodInfo is refreshed from the informer
+				// cache before calling AddUnschedulablePodIfNotPresent.
+				inFlightPodInfo.PodInfo, _ = framework.NewPodInfo(pod2)
+				if err := q.AddUnschedulablePodIfNotPresent(tCtx, inFlightPodInfo, q.SchedulingCycle()); err != nil {
+					tCtx.Fatalf("AddUnschedulablePodIfNotPresent failed: %v", err)
+				}
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -6978,6 +7000,10 @@ func TestPriorityQueue_UpdateRecomputesSignature(t *testing.T) {
 
 			// Update pod with different label
 			q.Update(tCtx, pod1, pod2)
+
+			if tt.afterUpdateFunc != nil {
+				tt.afterUpdateFunc(tCtx, q)
+			}
 
 			// Check signature was recomputed
 			pInfo, exists := q.GetPod(tCtx, pod2.Name, pod2.Namespace, nil)
@@ -8575,7 +8601,7 @@ func TestAddUnschedulablePodIfNotPresentPodGroupMember(t *testing.T) {
 			// Add unschedulable pods
 			for _, pInfo := range tt.podsToAdd {
 				pInfoCloned := pInfo.DeepCopy()
-				if err := q.AddUnschedulablePodIfNotPresent(logger, pInfoCloned, q.SchedulingCycle()); err != nil {
+				if err := q.AddUnschedulablePodIfNotPresent(ctx, pInfoCloned, q.SchedulingCycle()); err != nil {
 					t.Errorf("Failed to add unschedulable pods %s: %v", pInfoCloned.Pod.Name, err)
 				}
 			}
@@ -10426,7 +10452,7 @@ func TestPriorityQueue_PreQueueingHint(t *testing.T) {
 				}
 				pInfo := entity.(*framework.QueuedPodInfo)
 				pInfo.UnschedulablePlugins = sets.New[string]("foo", "bar")
-				if err := q.AddUnschedulablePodIfNotPresent(logger, pInfo, q.SchedulingCycle()); err != nil {
+				if err := q.AddUnschedulablePodIfNotPresent(ctx, pInfo, q.SchedulingCycle()); err != nil {
 					t.Fatalf("AddUnschedulablePodIfNotPresent failed: %v", err)
 				}
 			}
@@ -10494,7 +10520,7 @@ func TestPreQueueingHint_FlushRescue(t *testing.T) {
 		}
 		pInfo := entity.(*framework.QueuedPodInfo)
 		pInfo.UnschedulablePlugins = sets.New[string]("fakePlugin")
-		if err := q.AddUnschedulablePodIfNotPresent(logger, pInfo, q.SchedulingCycle()); err != nil {
+		if err := q.AddUnschedulablePodIfNotPresent(ctx, pInfo, q.SchedulingCycle()); err != nil {
 			t.Fatalf("AddUnschedulablePodIfNotPresent failed: %v", err)
 		}
 	}
@@ -10585,7 +10611,7 @@ func TestPreQueueingHint_Metrics(t *testing.T) {
 	entity, _ := q.Pop(logger)
 	pInfo := entity.(*framework.QueuedPodInfo)
 	pInfo.UnschedulablePlugins = sets.New[string]("testPlugin")
-	if err := q.AddUnschedulablePodIfNotPresent(logger, pInfo, q.SchedulingCycle()); err != nil {
+	if err := q.AddUnschedulablePodIfNotPresent(ctx, pInfo, q.SchedulingCycle()); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -10747,7 +10773,7 @@ func TestPreQueueingHint_ErrorFallback(t *testing.T) {
 		}
 		pInfo := entity.(*framework.QueuedPodInfo)
 		pInfo.UnschedulablePlugins = sets.New[string]("fakePlugin")
-		if err := q.AddUnschedulablePodIfNotPresent(logger, pInfo, q.SchedulingCycle()); err != nil {
+		if err := q.AddUnschedulablePodIfNotPresent(ctx, pInfo, q.SchedulingCycle()); err != nil {
 			t.Fatalf("AddUnschedulablePodIfNotPresent failed: %v", err)
 		}
 	}
@@ -10801,7 +10827,7 @@ func TestPreQueueingHint_CPGDisablesNarrowing(t *testing.T) {
 		}
 		pInfo := entity.(*framework.QueuedPodInfo)
 		pInfo.UnschedulablePlugins = sets.New[string]("testPlugin")
-		if err := q.AddUnschedulablePodIfNotPresent(logger, pInfo, q.SchedulingCycle()); err != nil {
+		if err := q.AddUnschedulablePodIfNotPresent(ctx, pInfo, q.SchedulingCycle()); err != nil {
 			t.Fatalf("AddUnschedulablePodIfNotPresent failed: %v", err)
 		}
 	}
@@ -10852,7 +10878,7 @@ func TestPreQueueingHint_WildcardSkipsNarrowing(t *testing.T) {
 		}
 		pInfo := entity.(*framework.QueuedPodInfo)
 		pInfo.UnschedulablePlugins = sets.New[string]("testPlugin")
-		if err := q.AddUnschedulablePodIfNotPresent(logger, pInfo, q.SchedulingCycle()); err != nil {
+		if err := q.AddUnschedulablePodIfNotPresent(ctx, pInfo, q.SchedulingCycle()); err != nil {
 			t.Fatalf("AddUnschedulablePodIfNotPresent failed: %v", err)
 		}
 	}
@@ -10912,7 +10938,7 @@ func TestPreQueueingHint_PerPluginNarrowing(t *testing.T) {
 		}
 		pInfo := entity.(*framework.QueuedPodInfo)
 		pInfo.UnschedulablePlugins = sets.New[string]("pluginA", "pluginB")
-		if err := q.AddUnschedulablePodIfNotPresent(logger, pInfo, q.SchedulingCycle()); err != nil {
+		if err := q.AddUnschedulablePodIfNotPresent(ctx, pInfo, q.SchedulingCycle()); err != nil {
 			t.Fatalf("AddUnschedulablePodIfNotPresent failed: %v", err)
 		}
 	}
