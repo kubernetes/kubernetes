@@ -51,7 +51,7 @@ type Controller struct {
 
 	queue workqueue.TypedRateLimitingInterface[string]
 
-	staticSpec *spec.Swagger
+	staticSpecSource cached.Value[*spec.Swagger]
 
 	openAPIService *handler.OpenAPIService
 
@@ -130,15 +130,18 @@ func NewController(crdInformer informers.CustomResourceDefinitionInformer) *Cont
 	return c
 }
 
-// Run sets openAPIAggregationManager and starts workers
-func (c *Controller) Run(staticSpec *spec.Swagger, openAPIService *handler.OpenAPIService, stopCh <-chan struct{}) {
+// Run sets openAPIAggregationManager and starts workers. staticSpecSource is
+// the base spec that CRD specs are merged into; it may build the spec on first
+// use, as the generic apiserver's does when the OpenAPIV2LazyBuild feature gate
+// is enabled, and an error from it makes the merged spec unavailable (503).
+func (c *Controller) Run(staticSpecSource cached.Value[*spec.Swagger], openAPIService *handler.OpenAPIService, stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	defer c.queue.ShutDown()
 	defer klog.Infof("Shutting down OpenAPI controller")
 
 	klog.Infof("Starting OpenAPI controller")
 
-	c.staticSpec = staticSpec
+	c.staticSpecSource = staticSpecSource
 	c.openAPIService = openAPIService
 
 	if !cache.WaitForCacheSync(stopCh, c.crdsSynced) {
@@ -251,7 +254,11 @@ func (c *Controller) updateSpecLocked() {
 				localCRDSpec = append(localCRDSpec, results[k].Value)
 			}
 		}
-		mergedSpec, err := builder.MergeSpecs(c.staticSpec, localCRDSpec...)
+		staticSpec, _, err := c.staticSpecSource.Get()
+		if err != nil {
+			return nil, "", fmt.Errorf("failed to get base spec: %w", err)
+		}
+		mergedSpec, err := builder.MergeSpecs(staticSpec, localCRDSpec...)
 		if err != nil {
 			return nil, "", fmt.Errorf("failed to merge specs: %v", err)
 		}

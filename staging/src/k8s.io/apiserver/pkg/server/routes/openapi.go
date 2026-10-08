@@ -25,6 +25,7 @@ import (
 	"k8s.io/apiserver/pkg/server/mux"
 	builder2 "k8s.io/kube-openapi/pkg/builder"
 	"k8s.io/kube-openapi/pkg/builder3"
+	"k8s.io/kube-openapi/pkg/cached"
 	"k8s.io/kube-openapi/pkg/common"
 	"k8s.io/kube-openapi/pkg/common/restfuladapter"
 	"k8s.io/kube-openapi/pkg/handler"
@@ -39,17 +40,25 @@ type OpenAPI struct {
 	V3Config *common.OpenAPIV3Config
 }
 
-// Install adds the SwaggerUI webservice to the given mux.
-func (oa OpenAPI) InstallV2(c *restful.Container, mux *mux.PathRecorderMux) (*handler.OpenAPIService, *spec.Swagger) {
-	spec, err := builder2.BuildOpenAPISpecFromRoutes(restfuladapter.AdaptWebServices(c.RegisteredWebServices()), oa.Config)
-	if err != nil {
-		klog.Fatalf("Failed to build open api spec for root: %v", err)
-	}
-	spec.Definitions = handler.PruneDefaults(spec.Definitions)
-	openAPIVersionedService := handler.NewOpenAPIService(spec)
+// InstallV2 adds the /openapi/v2 endpoint to the given mux without building
+// the spec. The returned source builds it on its first Get, which is the first
+// request to the endpoint unless a caller gets it earlier. The result is kept,
+// including an error: the build depends only on the registered routes and the
+// config, so a broken spec is reported once and the endpoint then serves 503.
+func (oa OpenAPI) InstallV2(c *restful.Container, mux *mux.PathRecorderMux) (*handler.OpenAPIService, cached.Value[*spec.Swagger]) {
+	source := cached.Once(cached.Func(func() (*spec.Swagger, string, error) {
+		spec, err := builder2.BuildOpenAPISpecFromRoutes(restfuladapter.AdaptWebServices(c.RegisteredWebServices()), oa.Config)
+		if err != nil {
+			klog.Errorf("Failed to build OpenAPI v2 spec: %v", err)
+			return nil, "", err
+		}
+		spec.Definitions = handler.PruneDefaults(spec.Definitions)
+		return spec, "openapi-v2-static", nil
+	}))
+	openAPIVersionedService := handler.NewOpenAPIServiceLazy(source)
 	openAPIVersionedService.RegisterOpenAPIVersionedService("/openapi/v2", mux)
 
-	return openAPIVersionedService, spec
+	return openAPIVersionedService, source
 }
 
 // InstallV3 adds the static group/versions defined in the RegisteredWebServices to the OpenAPI v3 spec.
