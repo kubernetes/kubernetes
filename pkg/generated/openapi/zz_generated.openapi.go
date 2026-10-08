@@ -22,6 +22,7 @@ limitations under the License.
 package openapi
 
 import (
+	admissionv1 "k8s.io/api/admission/v1"
 	v1 "k8s.io/api/admissionregistration/v1"
 	v1alpha1 "k8s.io/api/admissionregistration/v1alpha1"
 	v1beta1 "k8s.io/api/admissionregistration/v1beta1"
@@ -34,6 +35,7 @@ import (
 	authenticationv1alpha1 "k8s.io/api/authentication/v1alpha1"
 	authenticationv1beta1 "k8s.io/api/authentication/v1beta1"
 	authorizationv1 "k8s.io/api/authorization/v1"
+	authorizationv1alpha1 "k8s.io/api/authorization/v1alpha1"
 	authorizationv1beta1 "k8s.io/api/authorization/v1beta1"
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	autoscalingv2 "k8s.io/api/autoscaling/v2"
@@ -358,6 +360,9 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		authorizationv1.SubjectAccessReviewStatus{}.OpenAPIModelName():                                                  schema_k8sio_api_authorization_v1_SubjectAccessReviewStatus(ref),
 		authorizationv1.SubjectRulesReviewStatus{}.OpenAPIModelName():                                                   schema_k8sio_api_authorization_v1_SubjectRulesReviewStatus(ref),
 		authorizationv1.UnconditionalDecision{}.OpenAPIModelName():                                                      schema_k8sio_api_authorization_v1_UnconditionalDecision(ref),
+		authorizationv1alpha1.AuthorizationConditionsRequest{}.OpenAPIModelName():                                       schema_k8sio_api_authorization_v1alpha1_AuthorizationConditionsRequest(ref),
+		authorizationv1alpha1.AuthorizationConditionsResponse{}.OpenAPIModelName():                                      schema_k8sio_api_authorization_v1alpha1_AuthorizationConditionsResponse(ref),
+		authorizationv1alpha1.AuthorizationConditionsReview{}.OpenAPIModelName():                                        schema_k8sio_api_authorization_v1alpha1_AuthorizationConditionsReview(ref),
 		authorizationv1beta1.LocalSubjectAccessReview{}.OpenAPIModelName():                                              schema_k8sio_api_authorization_v1beta1_LocalSubjectAccessReview(ref),
 		authorizationv1beta1.NonResourceAttributes{}.OpenAPIModelName():                                                 schema_k8sio_api_authorization_v1beta1_NonResourceAttributes(ref),
 		authorizationv1beta1.NonResourceRule{}.OpenAPIModelName():                                                       schema_k8sio_api_authorization_v1beta1_NonResourceRule(ref),
@@ -13783,6 +13788,114 @@ func schema_k8sio_api_authorization_v1_UnconditionalDecision(ref common.Referenc
 				},
 			},
 		},
+	}
+}
+
+func schema_k8sio_api_authorization_v1alpha1_AuthorizationConditionsRequest(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "AuthorizationConditionsRequest describes the authorization conditions request.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"decision": {
+						SchemaProps: spec.SchemaProps{
+							Description: "decision contains the conditional decision the authorizer authored at authorization time.",
+							Default:     map[string]interface{}{},
+							Ref:         ref(authorizationv1.ConditionsAwareDecision{}.OpenAPIModelName()),
+						},
+					},
+					"admissionRequest": {
+						SchemaProps: spec.SchemaProps{
+							Description: "admissionRequest may contain additional information for evaluating the conditions.",
+							Ref:         ref(admissionv1.AdmissionRequest{}.OpenAPIModelName()),
+						},
+					},
+				},
+				Required: []string{"decision", "admissionRequest"},
+			},
+		},
+		Dependencies: []string{
+			admissionv1.AdmissionRequest{}.OpenAPIModelName(), authorizationv1.ConditionsAwareDecision{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_authorization_v1alpha1_AuthorizationConditionsResponse(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "AuthorizationConditionsResponse describes an authorization conditions response.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"uid": {
+						SchemaProps: spec.SchemaProps{
+							Description: "uid is an identifier for the individual request/response. This must be copied over from request.admissionRequest.uid of the corresponding AuthorizationConditionsReview. It is possible that the same request content (except uid) is sent to the authorizer multiple times.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"decision": {
+						SchemaProps: spec.SchemaProps{
+							Description: "decision contains the authorizer's decision after seeing the data. Currently, this must return an unconditional decision, that is, one of {Allow, Deny, NoOpinion}.",
+							Default:     map[string]interface{}{},
+							Ref:         ref(authorizationv1.ConditionsAwareDecision{}.OpenAPIModelName()),
+						},
+					},
+				},
+				Required: []string{"uid", "decision"},
+			},
+		},
+		Dependencies: []string{
+			authorizationv1.ConditionsAwareDecision{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_authorization_v1alpha1_AuthorizationConditionsReview(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "AuthorizationConditionsReview describes a request to evaluate authorization conditions.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"kind": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"apiVersion": {
+						SchemaProps: spec.SchemaProps{
+							Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Description: "metadata is the standard list metadata. In AuthorizationConditionsReview, it must be an empty struct. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+							Default:     map[string]interface{}{},
+							Ref:         ref(metav1.ObjectMeta{}.OpenAPIModelName()),
+						},
+					},
+					"request": {
+						SchemaProps: spec.SchemaProps{
+							Description: "request describes the attributes for the authorization conditions request.",
+							Ref:         ref(authorizationv1alpha1.AuthorizationConditionsRequest{}.OpenAPIModelName()),
+						},
+					},
+					"response": {
+						SchemaProps: spec.SchemaProps{
+							Description: "response describes the attributes for the authorization conditions response.",
+							Ref:         ref(authorizationv1alpha1.AuthorizationConditionsResponse{}.OpenAPIModelName()),
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			authorizationv1alpha1.AuthorizationConditionsRequest{}.OpenAPIModelName(), authorizationv1alpha1.AuthorizationConditionsResponse{}.OpenAPIModelName(), metav1.ObjectMeta{}.OpenAPIModelName()},
 	}
 }
 
