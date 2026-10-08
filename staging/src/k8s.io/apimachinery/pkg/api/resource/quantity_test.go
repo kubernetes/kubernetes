@@ -1124,22 +1124,20 @@ func TestQuantityRoundUpKnownGaps(t *testing.T) {
 			skipDec:  true,
 			want:     outcome{ok: false, value: "-1", exponent: 3},
 		},
-		// TODO: Should be (10, false) on both routes
+		// TODO: Should be (10, false) on the int64 route
 		{
 			name:     "1*10^-MaxInt32 RoundUp(1)",
 			in:       func() Quantity { return *NewScaledQuantity(1, -math.MaxInt32) },
 			scale:    1,
 			int64Got: &outcome{ok: true, value: "1", exponent: 1},
-			decGot:   &outcome{panics: true},
 			want:     outcome{ok: false, value: "1", exponent: 1},
 		},
-		// TODO: Should be (100, false) on both routes
+		// TODO: Should be (100, false) on the int64 route
 		{
 			name:     "5*10^(MinInt32+2) RoundUp(2)",
 			in:       func() Quantity { return *NewScaledQuantity(5, math.MinInt32+2) },
 			scale:    2,
 			int64Got: &outcome{ok: true, value: "5", exponent: 2},
-			decGot:   &outcome{panics: true},
 			want:     outcome{ok: false, value: "1", exponent: 2},
 		},
 		// TODO: Should be (1, false) on both routes
@@ -1160,22 +1158,19 @@ func TestQuantityRoundUpKnownGaps(t *testing.T) {
 			scale: math.MinInt32 + 1,
 			want:  outcome{ok: true, value: "5", exponent: math.MaxInt32},
 		},
-		// TODO: Should be (1*10^MaxInt32, false) on both routes
+		// TODO: Should be (1*10^MaxInt32, false) on the int64 route
 		{
 			name:     "5*10^(MinInt32+1) RoundUp(MaxInt32)",
 			in:       func() Quantity { return *NewScaledQuantity(5, math.MinInt32+1) },
 			scale:    math.MaxInt32,
 			int64Got: &outcome{ok: true, value: "5", exponent: math.MaxInt32},
-			decGot:   &outcome{ok: true, value: "5", exponent: math.MaxInt32 + 2},
 			want:     outcome{ok: false, value: "1", exponent: math.MaxInt32},
 		},
-		// TODO: Should be (1*10^(MaxInt32-1), false) on the inf.Dec route
 		{
-			name:   "inf.Dec 5*10^-(MaxInt32-1) RoundUp(MaxInt32-1)",
-			in:     func() Quantity { return *NewDecimalQuantity(*inf.NewDec(5, math.MaxInt32-1), DecimalSI) },
-			scale:  math.MaxInt32 - 1,
-			decGot: &outcome{ok: true, value: "5", exponent: math.MaxInt32 + 3},
-			want:   outcome{ok: false, value: "1", exponent: math.MaxInt32 - 1},
+			name:  "inf.Dec 5*10^-(MaxInt32-1) RoundUp(MaxInt32-1)",
+			in:    func() Quantity { return *NewDecimalQuantity(*inf.NewDec(5, math.MaxInt32-1), DecimalSI) },
+			scale: math.MaxInt32 - 1,
+			want:  outcome{ok: false, value: "1", exponent: math.MaxInt32 - 1},
 		},
 		{
 			name:  "inf.Dec 5*10^-MinInt32 RoundUp(MinInt32+1)",
@@ -1371,6 +1366,11 @@ func TestQuantityAsScale(t *testing.T) {
 		{intQuantity(1, math.MinInt32+1, DecimalSI), math.MinInt32, intQuantity(1, math.MinInt32+1, DecimalSI), true},
 		{intQuantity(1, math.MaxInt32, DecimalSI), math.MinInt32, intQuantity(1, math.MaxInt32, DecimalSI), true},
 		{*NewDecimalQuantity(*inf.NewDec(5, math.MinInt32), DecimalSI), math.MinInt32, *NewDecimalQuantity(*inf.NewDec(5, math.MinInt32), DecimalSI), true},
+		{intQuantity(5, 0, DecimalSI), math.MinInt32 + 1, intQuantity(5, 0, DecimalSI), true},
+		{intQuantity(5, 0, DecimalSI), math.MaxInt32, intQuantity(1, math.MaxInt32, DecimalSI), false},
+		{intQuantity(5, math.MinInt32+1, DecimalSI), 0, intQuantity(1, 0, DecimalSI), false},
+		{intQuantity(-5, math.MinInt32+1, DecimalSI), 0, intQuantity(-1, 0, DecimalSI), false},
+		{intQuantity(0, math.MinInt32+1, DecimalSI), 0, intQuantity(0, 0, DecimalSI), true},
 	} {
 		format := func(d *inf.Dec) string { return fmt.Sprintf("%v*10^%d", d.UnscaledBig(), -int64(d.Scale())) }
 		want := tc.want.AsDec()

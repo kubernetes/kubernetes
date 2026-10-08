@@ -443,9 +443,27 @@ type infDecAmount struct {
 // AsScale adjusts this amount to set a minimum scale, rounding up, and returns true iff no precision
 // was lost. (1.1e5).AsScale(5) would return 1.1e5, but (1.1e5).AsScale(6) would return 1e6.
 func (a infDecAmount) AsScale(scale Scale) (infDecAmount, bool) {
-	if !scale.canInfScale() {
+	// Short-circuit if the scale is not being reduced. This also guarantees the below
+	// infScale calls are safe.
+	if a.widenedScale() >= widenScale(scale) {
 		return infDecAmount{new(inf.Dec).Set(a.Dec)}, true
 	}
+
+	sign := a.Dec.Sign()
+
+	// Short-circuit if the value is zero, since we can skip the rounding.
+	if sign == 0 {
+		return infDecAmount{inf.NewDec(0, scale.infScale())}, true
+	}
+
+	// Short-circuit if we can cheaply determine that the value is less than one unit of scale.
+	_, hi := decimalExponentBounds(a.Dec.UnscaledBig().BitLen(), a.widenedScale())
+	if hi <= widenScale(scale) {
+		// The value is less than one unit of the desired scale, so to implement
+		// AsScale, we round away from zero 1 or -1.
+		return infDecAmount{inf.NewDec(int64(sign), scale.infScale())}, false
+	}
+
 	tmp := &inf.Dec{}
 	tmp.Round(a.Dec, scale.infScale(), inf.RoundUp)
 	return infDecAmount{tmp}, tmp.Cmp(a.Dec) == 0
