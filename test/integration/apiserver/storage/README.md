@@ -16,13 +16,13 @@ reproduce them. A bug counts as reproducible once its fix has been reverted and
 | ------------------------------- | ------ | --------- | ------------- | ------------ | -------------------- |
 | `GuaranteedUpdate` bases the update on a stale cached suggestion [#35415] | Oct 2016 | cacher, etcd3 | Maintainer | Yes | `./test/integration/apiserver/storage/reproduce.sh 35415` |
 | `GuaranteedUpdate` rewrites the live cached object in place [#35415] | Oct 2016 | cacher | Maintainer | Yes | `./test/integration/apiserver/storage/reproduce.sh 35415-deepcopy` |
-| Conflict on a stale suggestion is returned instead of retried against live data [#43152] | Mar 2017 | etcd3 | Maintainer | No, `tryUpdate` never fails | `./test/integration/apiserver/storage/reproduce.sh 43152` |
+| Conflict on a stale suggestion is returned instead of retried against live data [#43152] | Mar 2017 | etcd3 | Maintainer | Yes | `./test/integration/apiserver/storage/reproduce.sh 43152` |
 | `GuaranteedUpdate` skips the write when the stored data is not canonical [#48394] | Jul 2017 | etcd3 | Maintainer | Yes | `./test/integration/apiserver/storage/reproduce.sh 48394` |
 | Watch events out of order when watching from RV=0 [#49745] | Jul 2017 | cacher | User | No, `streamInterval` advances `resourceVersion` | `./test/integration/apiserver/storage/reproduce.sh 49745` |
 | Patch of a custom resource fails against a stale cached suggestion [#54780] | Oct 2017 | etcd3 | User | Yes | `./test/integration/apiserver/storage/reproduce.sh 54780` |
 | Delete notifications carry old ResourceVersion [#58545] | Jan 2018 | cacher | User | Yes | `./test/integration/apiserver/storage/reproduce.sh 58545` |
 | Re-watching from a DELETE event's RV replays events [#63356] | May 2018 | cacher | User | Yes | `./test/integration/apiserver/storage/reproduce.sh 58545` |
-| `validateDeletion` not re-run against live data after failing on a stale suggestion [#77619] | May 2019 | etcd3 | Maintainer | No, `validateDeletion` never fails | `./test/integration/apiserver/storage/reproduce.sh 77619` |
+| `validateDeletion` not re-run against live data after failing on a stale suggestion [#77619] | May 2019 | etcd3 | Maintainer | Yes | `./test/integration/apiserver/storage/reproduce.sh 77619` |
 | Decoding an unstructured object from etcd loses the expected in-memory version [#78713] | Jun 2019 | etcd3 | Maintainer | No, unstructured objects are not covered | |
 | Preconditioned `GuaranteedUpdate` on a stale suggestion returns a spurious conflict [#82303] | Sep 2019 | cacher | Maintainer | Yes | `./test/integration/apiserver/storage/reproduce.sh 82303` |
 | Preconditioned delete on a stale suggestion returns a spurious conflict [#89828] | Apr 2020 | cacher | Maintainer | Yes | `./test/integration/apiserver/storage/reproduce.sh 89828-precondition` |
