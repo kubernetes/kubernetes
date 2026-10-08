@@ -7,6 +7,9 @@ import (
 
 const ListTypeIDLTag = "listType"
 
+// K8sListTypeIDLTag is the declarative validation spelling of ListTypeIDLTag.
+const K8sListTypeIDLTag = "k8s:listType"
+
 // ListTypeMissing implements APIRule interface.
 // A list type is required for inlined list.
 type ListTypeMissing struct{}
@@ -25,7 +28,8 @@ func (l *ListTypeMissing) Validate(t *types.Type) ([]string, error) {
 	switch t.Kind {
 	case types.Struct:
 		for _, m := range t.Members {
-			hasListType := gengo.ExtractCommentTags("+", m.CommentLines)[ListTypeIDLTag] != nil
+			tags := gengo.ExtractCommentTags("+", m.CommentLines)
+			hasListType := tags[ListTypeIDLTag] != nil || tags[K8sListTypeIDLTag] != nil
 
 			if m.Name == "Items" && m.Type.Kind == types.Slice && hasNamedMember(t, "ListMeta") {
 				if hasListType {

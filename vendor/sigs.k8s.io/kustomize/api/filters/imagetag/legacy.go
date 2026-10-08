@@ -4,7 +4,8 @@
 package imagetag
 
 import (
-	"sigs.k8s.io/kustomize/api/internal/utils"
+	"slices"
+
 	"sigs.k8s.io/kustomize/api/types"
 	"sigs.k8s.io/kustomize/kyaml/errors"
 	"sigs.k8s.io/kustomize/kyaml/kio"
@@ -76,7 +77,7 @@ func (f findFieldsFilter) walk(node *yaml.RNode) error {
 				return err
 			}
 			key := n.Key.YNode().Value
-			if utils.StringSliceContains(f.fields, key) {
+			if slices.Contains(f.fields, key) {
 				return f.fieldCallback(n.Value)
 			}
 			return nil

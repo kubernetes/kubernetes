@@ -8,7 +8,7 @@ godebug default=go1.27
 
 require (
 	github.com/go-logr/logr v1.4.4
-	github.com/google/gnostic-models v0.7.0
+	github.com/google/gnostic-models v0.7.1
 	github.com/google/go-cmp v0.7.0
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/websocket v1.5.4-0.20250319132907-e064f32e3674
@@ -28,7 +28,7 @@ require (
 	k8s.io/apimachinery v0.0.0
 	k8s.io/klog/v2 v2.140.0
 	k8s.io/ktesting v0.0.0
-	k8s.io/kube-openapi v0.0.0-20260929181212-2cfbdf149b9a
+	k8s.io/kube-openapi v0.0.0-20261001230523-97fa35140926
 	k8s.io/streaming v0.0.0
 	k8s.io/utils v0.0.0-20260626114624-be93311217bd
 	sigs.k8s.io/json v0.0.0-20250730193827-2d320260d730
