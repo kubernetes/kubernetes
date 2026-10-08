@@ -137,7 +137,7 @@ process_content () {
 # use modules, and use module info rather than the vendor dir for computing dependencies
 kube::golang::setup_env
 export GOWORK=off
-export GOFLAGS=-mod=mod
+export GOFLAGS=-mod=readonly
 
 # Check bash version
 if (( BASH_VERSINFO[0] < 4 )); then

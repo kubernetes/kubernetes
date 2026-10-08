@@ -40,7 +40,7 @@ kube::util::require-jq
 # Set the Go environment, otherwise we get "can't compute 'all' using the
 # vendor directory".
 export GOWORK=off
-export GOFLAGS=-mod=mod
+export GOFLAGS=-mod=readonly
 
 # let us log all errors before we exit
 rc=0
