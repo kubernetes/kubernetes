@@ -5133,6 +5133,7 @@ func TestDoPodResizeAction(t *testing.T) {
 
 			updateInfo := containerToUpdateInfo{
 				container:                 &pod.Spec.Containers[0],
+				containerType:             podutil.Containers,
 				kubeContainerID:           kps.ContainerStatuses[0].ID,
 				desiredContainerResources: tc.desiredResources,
 				currentContainerResources: &tc.currentResources,
@@ -5319,7 +5320,7 @@ func TestComputeVolumeResizeAction(t *testing.T) {
 			}
 
 			if tc.actuatedLimit != nil {
-				err := m.actuatedState.SetEmptyDirVolumeLimit(pod.UID, "mem-vol", tc.actuatedLimit)
+				err := m.actuatedState.SetEmptyDirVolumeLimit(pod.UID, "mem-vol", &v1.EmptyDirVolumeSource{Medium: tc.volMedium, SizeLimit: tc.actuatedLimit})
 				require.NoError(t, err)
 			}
 
@@ -5445,8 +5446,14 @@ func TestDoPodResizeAction_Volumes(t *testing.T) {
 			}
 
 			// Pre-seed initial state for both volumes so we can observe state changes
-			require.NoError(t, m.actuatedState.SetEmptyDirVolumeLimit(pod.UID, "down-vol", resource.NewQuantity(300, resource.BinarySI)))
-			require.NoError(t, m.actuatedState.SetEmptyDirVolumeLimit(pod.UID, "up-vol", resource.NewQuantity(50, resource.BinarySI)))
+			require.NoError(t, m.actuatedState.SetEmptyDirVolumeLimit(pod.UID, "down-vol", &v1.EmptyDirVolumeSource{
+				Medium:    v1.StorageMediumMemory,
+				SizeLimit: resource.NewQuantity(300, resource.BinarySI),
+			}))
+			require.NoError(t, m.actuatedState.SetEmptyDirVolumeLimit(pod.UID, "up-vol", &v1.EmptyDirVolumeSource{
+				Medium:    v1.StorageMediumMemory,
+				SizeLimit: resource.NewQuantity(50, resource.BinarySI),
+			}))
 
 			helper := &mockVolumeResizeRuntimeHelper{
 				resizeErr: tc.injectResizeError,
@@ -5585,7 +5592,10 @@ func TestIsPodResizeInProgress_Volumes(t *testing.T) {
 			}
 
 			if tc.statusLimit != nil {
-				err := m.actuatedState.SetEmptyDirVolumeLimit(pod.UID, "mem-vol", tc.statusLimit)
+				err := m.actuatedState.SetEmptyDirVolumeLimit(pod.UID, "mem-vol", &v1.EmptyDirVolumeSource{
+					Medium:    v1.StorageMediumMemory,
+					SizeLimit: tc.statusLimit,
+				})
 				require.NoError(t, err)
 			}
 
@@ -5815,6 +5825,7 @@ func TestValidatePodResizeAction(t *testing.T) {
 
 			updateInfo := containerToUpdateInfo{
 				container:                 &pod.Spec.Containers[0],
+				containerType:             podutil.Containers,
 				kubeContainerID:           kps.ContainerStatuses[0].ID,
 				desiredContainerResources: tc.desiredResources,
 				currentContainerResources: &tc.currentResources,

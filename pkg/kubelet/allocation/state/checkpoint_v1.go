@@ -21,9 +21,13 @@ import (
 	"slices"
 
 	v1 "k8s.io/api/core/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 // TODO: Remove this file in v1.39 when the V1 checkpoint format is no longer supported.
@@ -47,33 +51,6 @@ type PodResourceInfoMap map[types.UID]PodResourceInfo
 // PodResourceCheckpointInfo is the V1 checkpoint payload, stored as JSON in Checkpoint.Data.
 type PodResourceCheckpointInfo struct {
 	Entries PodResourceInfoMap `json:"entries,omitempty"`
-}
-
-// Clone returns a copy of PodResourceInfoMap
-func (pr PodResourceInfoMap) Clone() PodResourceInfoMap {
-	prCopy := make(PodResourceInfoMap)
-	for podUID, podInfo := range pr {
-		newPodInfo := PodResourceInfo{
-			ContainerResources: make(map[string]v1.ResourceRequirements),
-			PodLevelResources:  podInfo.PodLevelResources.DeepCopy(),
-		}
-		for containerName, containerInfo := range podInfo.ContainerResources {
-			newPodInfo.ContainerResources[containerName] = *containerInfo.DeepCopy()
-		}
-		if podInfo.EmptyDirVolumeLimits != nil {
-			newPodInfo.EmptyDirVolumeLimits = make(map[string]*resource.Quantity)
-			for volumeName, volumeLimit := range podInfo.EmptyDirVolumeLimits {
-				if volumeLimit == nil {
-					newPodInfo.EmptyDirVolumeLimits[volumeName] = nil
-				} else {
-					vl := volumeLimit.DeepCopy()
-					newPodInfo.EmptyDirVolumeLimits[volumeName] = &vl
-				}
-			}
-		}
-		prCopy[podUID] = newPodInfo
-	}
-	return prCopy
 }
 
 // migrateV1ToV2 converts the JSON payload of a V1 checkpoint into a PodList.
@@ -186,4 +163,93 @@ func podListToV1Entries(podList *v1.PodList) PodResourceInfoMap {
 		entries[pod.UID] = info
 	}
 	return entries
+}
+
+// IsMigratedFromV1 returns whether the stored pod was rebuilt from a V1 checkpoint. Those only
+// recorded resources, so the pod has no name, until it is replaced by a complete one when it is
+// added again.
+func IsMigratedFromV1(stored *v1.Pod) bool {
+	return stored.Name == ""
+}
+
+// UpdatePodFromV1 overlays the resources of a pod migrated from a V1 checkpoint onto pod.
+func UpdatePodFromV1(pod *v1.Pod, stored *v1.Pod) (*v1.Pod, bool) {
+	if pod == nil {
+		return pod, false
+	}
+
+	updated := false
+	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling) {
+		pod, updated = updatePodLevelResourcesFromV1(pod, stored)
+	}
+	pod, updated = updateContainerResourcesFromV1(pod, stored, updated)
+	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingMemoryBackedVolumes) {
+		pod, updated = updateEmptyDirVolumeLimitsFromV1(pod, stored, updated)
+	}
+
+	return pod, updated
+}
+
+func updateContainerResourcesFromV1(pod *v1.Pod, stored *v1.Pod, alreadyUpdated bool) (*v1.Pod, bool) {
+	updated := alreadyUpdated
+	containerAlloc := func(c v1.Container) (v1.ResourceRequirements, bool) {
+		for ac := range podutil.ContainerIter(&stored.Spec, podutil.AllContainers) {
+			if ac.Name == c.Name && !apiequality.Semantic.DeepEqual(c.Resources, ac.Resources) {
+				// Stored resources differ from pod spec, retrieve them.
+				if !updated {
+					// If this is the first update to be performed, copy the pod.
+					pod = pod.DeepCopy()
+					updated = true
+				}
+				return ac.Resources, true
+			}
+		}
+		return v1.ResourceRequirements{}, false
+	}
+
+	for i, c := range pod.Spec.Containers {
+		if cAlloc, found := containerAlloc(c); found {
+			pod.Spec.Containers[i].Resources = cAlloc
+		}
+	}
+	for i, c := range pod.Spec.InitContainers {
+		if cAlloc, found := containerAlloc(c); found {
+			pod.Spec.InitContainers[i].Resources = cAlloc
+		}
+	}
+	return pod, updated
+}
+
+func updatePodLevelResourcesFromV1(pod *v1.Pod, stored *v1.Pod) (*v1.Pod, bool) {
+	pAlloc := stored.Spec.Resources
+	if !apiequality.Semantic.DeepEqual(pod.Spec.Resources, pAlloc) {
+		pod = pod.DeepCopy()
+		pod.Spec.Resources = pAlloc.DeepCopy()
+		return pod, true
+	}
+	return pod, false
+}
+
+func updateEmptyDirVolumeLimitsFromV1(pod *v1.Pod, stored *v1.Pod, alreadyUpdated bool) (*v1.Pod, bool) {
+	updated := alreadyUpdated
+	for i, vol := range pod.Spec.Volumes {
+		if vol.EmptyDir == nil || vol.EmptyDir.Medium != v1.StorageMediumMemory || vol.EmptyDir.SizeLimit == nil || vol.EmptyDir.SizeLimit.IsZero() {
+			continue
+		}
+		for _, storedVol := range stored.Spec.Volumes {
+			if storedVol.Name != vol.Name || storedVol.EmptyDir == nil || storedVol.EmptyDir.SizeLimit == nil {
+				continue
+			}
+			if alloc := storedVol.EmptyDir.SizeLimit; alloc.Cmp(*vol.EmptyDir.SizeLimit) != 0 {
+				if !updated {
+					pod = pod.DeepCopy()
+					updated = true
+				}
+				allocCopy := *alloc
+				pod.Spec.Volumes[i].EmptyDir.SizeLimit = &allocCopy
+			}
+			break
+		}
+	}
+	return pod, updated
 }
