@@ -19,6 +19,8 @@ package store
 import (
 	"fmt"
 
+	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/cacher/consistency"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/third_party/forked/golang/btree"
@@ -40,9 +42,12 @@ import (
 //   - `Add`: Adds a new snapshot.
 //     Complexity: O(log n).
 //     Executed for each watch event observed by the cache.
-//   - `GetLessOrEqual`: Retrieves the snapshot with the greatest RV less than or equal to the requested RV.
+//   - `HasSnapshot`: Checks whether the requested RV is not older than the oldest stored snapshot.
 //     Complexity: O(log n).
-//     Executed for each LIST request with match=Exact or continuation.
+//     Executed before watch cache synchronization for each LIST request with match=Exact or continuation.
+//   - `GetSnapshot`: Retrieves the snapshot with the greatest RV less than or equal to the requested RV.
+//     Complexity: O(log n).
+//     Executed after watch cache synchronization for each LIST request with match=Exact or continuation.
 //   - `RemoveLess`: Cleans up snapshots outside the watch history window.
 //     Complexity: O(k log n), k - number of snapshots to remove, usually only one if watch capacity was not reduced.
 //     Executed per watch event observed when the cache is full.
@@ -86,15 +91,27 @@ func (s *snapshotter) reset() {
 	s.resourceVersion = 0
 }
 
-func (s *snapshotter) GetLessOrEqual(rv uint64) (*btreeStore, bool) {
+func (s *snapshotter) HasSnapshot(rv uint64) bool {
+	if !s.enabled {
+		return false
+	}
+	oldest, ok := s.snapshots.Min()
+	if !ok {
+		return false
+	}
+	return rv >= oldest.resourceVersion
+}
+
+func (s *snapshotter) GetSnapshot(rv uint64) (*btreeStore, error) {
 	if !s.enabled || s.resourceVersion == 0 {
-		return nil, false
+		return nil, errors.NewResourceExpired(fmt.Sprintf("too old resource version: %d", rv))
 	}
 	if rv > s.resourceVersion {
 		if consistency.PanicOnCacheInconsistency {
 			panic(fmt.Sprintf("snapshotter (on %d) got future resourceVersion (%d) that it doesn't properly handle as it depends on caller ensuring consistency", s.resourceVersion, rv))
 		}
 		klog.ErrorS(nil, "Snapshotter got future resourceVersion that it doesn't properly handle as it depends on caller ensuring consistency", "requestResourceVersion", rv, "currentResourceVersion", s.resourceVersion)
+		return nil, storage.NewTooLargeResourceVersionError(rv, s.resourceVersion, 0)
 	}
 	var result *btreeStore
 	s.snapshots.DescendLessOrEqual(&btreeStore{resourceVersion: rv}, func(snap *btreeStore) bool {
@@ -102,9 +119,9 @@ func (s *snapshotter) GetLessOrEqual(rv uint64) (*btreeStore, bool) {
 		return false
 	})
 	if result == nil {
-		return nil, false
+		return nil, errors.NewResourceExpired(fmt.Sprintf("too old resource version: %d", rv))
 	}
-	return result, true
+	return result, nil
 }
 
 func (s *snapshotter) Replace(snapshot *btreeStore) {
