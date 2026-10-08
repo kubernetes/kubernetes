@@ -18,6 +18,7 @@ package generators
 
 import (
 	"fmt"
+	"slices"
 	"sort"
 	"strings"
 
@@ -146,6 +147,22 @@ func sortedMapKeys(m map[string][]string) []string {
 	return keys
 }
 
+// resolveTagAliases treats the "k8s:" list tags as aliases of the unprefixed
+// ones, which win where both are present. +k8s:listMapKey is only used on map
+// lists.
+func resolveTagAliases(tagValues map[string][]string) {
+	if _, ok := tagValues["listType"]; !ok {
+		if values, ok := tagValues["k8s:listType"]; ok {
+			tagValues["listType"] = values
+		}
+	}
+	if _, ok := tagValues["listMapKey"]; !ok && slices.Equal(tagValues["listType"], []string{"map"}) {
+		if values, ok := tagValues["k8s:listMapKey"]; ok {
+			tagValues["listMapKey"] = values
+		}
+	}
+}
+
 // Parses comments to return openapi extensions. Returns a list of
 // extensions which parsed correctly, as well as a list of the
 // parse errors. Validating extensions is performed separately.
@@ -173,6 +190,7 @@ func parseExtensions(comments []string) ([]extension, []error) {
 	}
 	// Next, generate extensions from "idlTags" (e.g. +listType)
 	tagValues := gengo.ExtractCommentTags("+", comments)
+	resolveTagAliases(tagValues)
 	for _, idlTag := range sortedMapKeys(tagValues) {
 		xAttrs, exists := tagToExtension[idlTag]
 		if !exists {

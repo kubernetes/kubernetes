@@ -9,6 +9,7 @@ import (
 	"log"
 	"os"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -190,7 +191,7 @@ func SyncMapNodesOrder(from, to *RNode) {
 	}
 
 	for _, fieldName := range fromFieldNames {
-		if !sliceutil.Contains(toFieldNames, fieldName) {
+		if !slices.Contains(toFieldNames, fieldName) {
 			continue
 		}
 		// append the common nodes in the order defined in 'from' node
@@ -554,7 +555,7 @@ func (rn *RNode) getMapFromMeta(fName string, fields ...string) map[string]strin
 		// fName is found in metadata; create the map from its content
 		expectedSize := len(fields)
 		if expectedSize == 0 {
-			expectedSize = len(fNameValue.Content) / 2 //nolint: gomnd
+			expectedSize = len(fNameValue.Content) / 2
 		}
 		result = make(map[string]string, expectedSize)
 
@@ -1065,7 +1066,7 @@ func deAnchor(yn *yaml.Node) (res *yaml.Node, err error) {
 		}
 		return yn, nil
 	default:
-		return nil, fmt.Errorf("cannot deAnchor kind %q", yn.Kind)
+		return nil, fmt.Errorf("cannot deAnchor kind %d", yn.Kind)
 	}
 }
 
