@@ -435,9 +435,41 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 			enableTopologyAwareScheduling: true,
 		},
 		"cpg disruption mode all": {
+			input:                         mkValidWorkload(setCPGDisruptionModeAll(0), setNestedPGDisruptionModeAll(0, 0)),
+			enableCompositePodGroup:       true,
+			enableTopologyAwareScheduling: true,
+		},
+		"cpg disruption mode all with child pg disruption mode single": {
+			input:                         mkValidWorkload(setCPGDisruptionModeAll(0), setNestedPGDisruptionModeSingle(0, 0)),
+			enableCompositePodGroup:       true,
+			enableTopologyAwareScheduling: true,
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "compositePodGroupTemplates").Index(0).Child("podGroupTemplates").Index(0).Child("disruptionMode"), nil, "cannot have single disruption mode when parent compositePodGroupTemplate has all disruption mode").MarkFromImperative(),
+			},
+		},
+		"cpg disruption mode all with child pg disruption mode unset": {
 			input:                         mkValidWorkload(setCPGDisruptionModeAll(0)),
 			enableCompositePodGroup:       true,
 			enableTopologyAwareScheduling: true,
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "compositePodGroupTemplates").Index(0).Child("podGroupTemplates").Index(0).Child("disruptionMode"), nil, "cannot have single disruption mode when parent compositePodGroupTemplate has all disruption mode").MarkFromImperative(),
+			},
+		},
+		"cpg disruption mode all with child cpg disruption mode single": {
+			input:                         mkValidWorkload(addNestedCompositePodGroupTemplate(0, "sub"), setCPGDisruptionModeAll(0), setNestedPGDisruptionModeAll(0, 0), setNestedCPGDisruptionModeSingle(0, 0)),
+			enableCompositePodGroup:       true,
+			enableTopologyAwareScheduling: true,
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "compositePodGroupTemplates").Index(0).Child("compositePodGroupTemplates").Index(0).Child("disruptionMode"), nil, "cannot have single disruption mode when parent compositePodGroupTemplate has all disruption mode").MarkFromImperative(),
+			},
+		},
+		"cpg disruption mode all with child cpg disruption mode unset": {
+			input:                         mkValidWorkload(addNestedCompositePodGroupTemplate(0, "sub"), setCPGDisruptionModeAll(0), setNestedPGDisruptionModeAll(0, 0)),
+			enableCompositePodGroup:       true,
+			enableTopologyAwareScheduling: true,
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "compositePodGroupTemplates").Index(0).Child("compositePodGroupTemplates").Index(0).Child("disruptionMode"), nil, "cannot have single disruption mode when parent compositePodGroupTemplate has all disruption mode").MarkFromImperative(),
+			},
 		},
 		"cpg disruption mode with neither single nor all": {
 			input:                         mkValidWorkload(setCPGDisruptionModeNeither(0)),
@@ -450,6 +482,22 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 			enableCompositePodGroup:       true,
 			enableTopologyAwareScheduling: true,
 			expectedErrs:                  field.ErrorList{field.Invalid(field.NewPath("spec", "compositePodGroupTemplates").Index(0).Child("disruptionMode"), nil, "").WithOrigin("union")},
+		},
+		"cpg gang policy with child pg basic policy": {
+			input:                         mkValidWorkload(setNestedPGBasicPolicy(0, 0)),
+			enableCompositePodGroup:       true,
+			enableTopologyAwareScheduling: true,
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "compositePodGroupTemplates").Index(0).Child("podGroupTemplates").Index(0).Child("schedulingPolicy"), nil, "cannot have basic scheduling policy when parent compositePodGroupTemplate has gang scheduling policy").MarkFromImperative(),
+			},
+		},
+		"cpg gang policy with child cpg basic policy": {
+			input:                         mkValidWorkload(addNestedCompositePodGroupTemplate(0, "sub"), setNestedCPGBasicPolicy(0, 0)),
+			enableCompositePodGroup:       true,
+			enableTopologyAwareScheduling: true,
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "compositePodGroupTemplates").Index(0).Child("compositePodGroupTemplates").Index(0).Child("schedulingPolicy"), nil, "cannot have basic scheduling policy when parent compositePodGroupTemplate has gang scheduling policy").MarkFromImperative(),
+			},
 		},
 		"cpg policy missing gang": {
 			input:                         mkValidWorkload(setCPGPolicyEmpty(0)),
@@ -1221,6 +1269,7 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 			enableTopologyAwareScheduling: true,
 			expectedErrs: field.ErrorList{
 				field.Invalid(field.NewPath("spec", "compositePodGroupTemplates").Index(0).Child("disruptionMode"), nil, "field is immutable").WithOrigin("immutable"),
+				field.Invalid(field.NewPath("spec", "compositePodGroupTemplates").Index(0).Child("podGroupTemplates").Index(0).Child("disruptionMode"), nil, "cannot have single disruption mode when parent compositePodGroupTemplate has all disruption mode").MarkFromImperative(),
 			},
 		},
 		"invalid update immutable nested pg disruptionMode": {
@@ -1387,11 +1436,12 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 			expectedErrs: field.ErrorList{
 				field.Invalid(field.NewPath("spec", "compositePodGroupTemplates").Index(0).Child("podGroupTemplates").Index(0).Child("schedulingPolicy", "basic"), nil, "field is immutable").WithOrigin("immutable"),
 				field.Invalid(field.NewPath("spec", "compositePodGroupTemplates").Index(0).Child("podGroupTemplates").Index(0).Child("schedulingPolicy", "gang"), nil, "field cannot be cleared once set").WithOrigin("update"),
+				field.Invalid(field.NewPath("spec", "compositePodGroupTemplates").Index(0).Child("podGroupTemplates").Index(0).Child("schedulingPolicy"), nil, "cannot have basic scheduling policy when parent compositePodGroupTemplate has gang scheduling policy").MarkFromImperative(),
 			},
 		},
 		"invalid update nested pg from basic to gang policy": {
-			oldObj:                        mkValidWorkload(setResourceVersion("1"), addCompositePodGroupTemplate(), setNestedPGBasicPolicy(0, 0)),
-			updateObj:                     mkValidWorkload(setResourceVersion("1"), addCompositePodGroupTemplate(), setNestedPGMinCount(0, 0, 1)),
+			oldObj:                        mkValidWorkload(setResourceVersion("1"), setCPGBasicPolicy(0), setNestedPGBasicPolicy(0, 0)),
+			updateObj:                     mkValidWorkload(setResourceVersion("1"), setCPGBasicPolicy(0), setNestedPGMinCount(0, 0, 1)),
 			enableCompositePodGroup:       true,
 			enableTopologyAwareScheduling: true,
 			expectedErrs: field.ErrorList{
@@ -1410,8 +1460,8 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 			},
 		},
 		"invalid update nested pg from basic with neither basic nor gang": {
-			oldObj:                        mkValidWorkload(setResourceVersion("1"), addCompositePodGroupTemplate(), setNestedPGBasicPolicy(0, 0)),
-			updateObj:                     mkValidWorkload(setResourceVersion("1"), addCompositePodGroupTemplate(), clearNestedPGPolicy(0, 0)),
+			oldObj:                        mkValidWorkload(setResourceVersion("1"), setCPGBasicPolicy(0), setNestedPGBasicPolicy(0, 0)),
+			updateObj:                     mkValidWorkload(setResourceVersion("1"), setCPGBasicPolicy(0), clearNestedPGPolicy(0, 0)),
 			enableCompositePodGroup:       true,
 			enableTopologyAwareScheduling: true,
 			expectedErrs: field.ErrorList{
@@ -1430,8 +1480,8 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 			},
 		},
 		"invalid update nested pg basic policy with both basic and gang": {
-			oldObj:                        mkValidWorkload(setResourceVersion("1"), addCompositePodGroupTemplate(), setNestedPGBasicPolicy(0, 0)),
-			updateObj:                     mkValidWorkload(setResourceVersion("1"), addCompositePodGroupTemplate(), setNestedPGPolicyBoth(0, 0)),
+			oldObj:                        mkValidWorkload(setResourceVersion("1"), setCPGBasicPolicy(0), setNestedPGBasicPolicy(0, 0)),
+			updateObj:                     mkValidWorkload(setResourceVersion("1"), setCPGBasicPolicy(0), setNestedPGPolicyBoth(0, 0)),
 			enableCompositePodGroup:       true,
 			enableTopologyAwareScheduling: true,
 			expectedErrs: field.ErrorList{
@@ -1471,11 +1521,12 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 			expectedErrs: field.ErrorList{
 				field.Invalid(field.NewPath("spec", "compositePodGroupTemplates").Index(0).Child("compositePodGroupTemplates").Index(0).Child("schedulingPolicy", "basic"), nil, "field is immutable").WithOrigin("immutable"),
 				field.Invalid(field.NewPath("spec", "compositePodGroupTemplates").Index(0).Child("compositePodGroupTemplates").Index(0).Child("schedulingPolicy", "gang"), nil, "field cannot be cleared once set").WithOrigin("update"),
+				field.Invalid(field.NewPath("spec", "compositePodGroupTemplates").Index(0).Child("compositePodGroupTemplates").Index(0).Child("schedulingPolicy"), nil, "cannot have basic scheduling policy when parent compositePodGroupTemplate has gang scheduling policy").MarkFromImperative(),
 			},
 		},
 		"nested cpg invalid update from basic to gang policy": {
-			oldObj:                        mkValidWorkload(setResourceVersion("1"), addNestedCompositePodGroupTemplate(0, "sub"), setNestedCPGBasicPolicy(0, 0)),
-			updateObj:                     mkValidWorkload(setResourceVersion("1"), addNestedCompositePodGroupTemplate(0, "sub"), setNestedCPGGangPolicy(0, 0)),
+			oldObj:                        mkValidWorkload(setResourceVersion("1"), setCPGBasicPolicy(0), addNestedCompositePodGroupTemplate(0, "sub"), setNestedCPGBasicPolicy(0, 0)),
+			updateObj:                     mkValidWorkload(setResourceVersion("1"), setCPGBasicPolicy(0), addNestedCompositePodGroupTemplate(0, "sub"), setNestedCPGGangPolicy(0, 0)),
 			enableCompositePodGroup:       true,
 			enableTopologyAwareScheduling: true,
 			expectedErrs: field.ErrorList{
@@ -1494,8 +1545,8 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 			},
 		},
 		"nested cpg invalid update from basic with neither basic nor gang": {
-			oldObj:                        mkValidWorkload(setResourceVersion("1"), addNestedCompositePodGroupTemplate(0, "sub"), setNestedCPGBasicPolicy(0, 0)),
-			updateObj:                     mkValidWorkload(setResourceVersion("1"), addNestedCompositePodGroupTemplate(0, "sub"), clearNestedCPGPolicy(0, 0)),
+			oldObj:                        mkValidWorkload(setResourceVersion("1"), setCPGBasicPolicy(0), addNestedCompositePodGroupTemplate(0, "sub"), setNestedCPGBasicPolicy(0, 0)),
+			updateObj:                     mkValidWorkload(setResourceVersion("1"), setCPGBasicPolicy(0), addNestedCompositePodGroupTemplate(0, "sub"), clearNestedCPGPolicy(0, 0)),
 			enableCompositePodGroup:       true,
 			enableTopologyAwareScheduling: true,
 			expectedErrs: field.ErrorList{
@@ -1514,8 +1565,8 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 			},
 		},
 		"nested cpg invalid update basic policy with both basic and gang": {
-			oldObj:                        mkValidWorkload(setResourceVersion("1"), addNestedCompositePodGroupTemplate(0, "sub"), setNestedCPGBasicPolicy(0, 0)),
-			updateObj:                     mkValidWorkload(setResourceVersion("1"), addNestedCompositePodGroupTemplate(0, "sub"), setNestedCPGPolicyBoth(0, 0)),
+			oldObj:                        mkValidWorkload(setResourceVersion("1"), setCPGBasicPolicy(0), addNestedCompositePodGroupTemplate(0, "sub"), setNestedCPGBasicPolicy(0, 0)),
+			updateObj:                     mkValidWorkload(setResourceVersion("1"), setCPGBasicPolicy(0), addNestedCompositePodGroupTemplate(0, "sub"), setNestedCPGPolicyBoth(0, 0)),
 			enableCompositePodGroup:       true,
 			enableTopologyAwareScheduling: true,
 			expectedErrs: field.ErrorList{
@@ -1932,7 +1983,7 @@ func setNestedManyCompositePodGroupTemplates(idx, n int) func(obj *scheduling.Wo
 				},
 				PodGroupTemplates: []scheduling.PodGroupTemplate{{
 					Name:             fmt.Sprintf("sub-%d-leaf", i),
-					SchedulingPolicy: scheduling.PodGroupSchedulingPolicy{Basic: &scheduling.BasicSchedulingPolicy{}},
+					SchedulingPolicy: scheduling.PodGroupSchedulingPolicy{Gang: &scheduling.GangSchedulingPolicy{MinCount: 1}},
 				}},
 			}
 		}
@@ -1953,7 +2004,7 @@ func addNestedCompositePodGroupTemplate(idx int, names ...string) func(obj *sche
 					PodGroupTemplates: []scheduling.PodGroupTemplate{{
 						Name: fmt.Sprintf("%s-leaf-%d", name, len(obj.Spec.CompositePodGroupTemplates[idx].CompositePodGroupTemplates)),
 						SchedulingPolicy: scheduling.PodGroupSchedulingPolicy{
-							Basic: &scheduling.BasicSchedulingPolicy{},
+							Gang: &scheduling.GangSchedulingPolicy{MinCount: 1},
 						},
 					}},
 				},
@@ -2079,6 +2130,14 @@ func setNestedCPGPolicyBoth(cidx, nestedCidx int) func(obj *scheduling.Workload)
 		obj.Spec.CompositePodGroupTemplates[cidx].CompositePodGroupTemplates[nestedCidx].SchedulingPolicy = scheduling.CompositePodGroupSchedulingPolicy{
 			Basic: &scheduling.CompositeBasicSchedulingPolicy{},
 			Gang:  &scheduling.CompositeGangSchedulingPolicy{MinGroupCount: 2},
+		}
+	}
+}
+
+func setNestedCPGDisruptionModeSingle(cidx, nestedCidx int) func(obj *scheduling.Workload) {
+	return func(obj *scheduling.Workload) {
+		obj.Spec.CompositePodGroupTemplates[cidx].CompositePodGroupTemplates[nestedCidx].DisruptionMode = &scheduling.CompositeDisruptionMode{
+			Single: &scheduling.SingleCompositeDisruptionMode{},
 		}
 	}
 }
