@@ -121,7 +121,10 @@ func (s *snapshotter) GetSnapshot(rv uint64) (*btreeStore, error) {
 	if result == nil {
 		return nil, errors.NewResourceExpired(fmt.Sprintf("too old resource version: %d", rv))
 	}
-	return result, nil
+	return &btreeStore{
+		tree:            result.tree,
+		resourceVersion: rv,
+	}, nil
 }
 
 func (s *snapshotter) Replace(snapshot *btreeStore) {

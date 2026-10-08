@@ -109,10 +109,14 @@ func TestStoreSnapshotter(t *testing.T) {
 	_, err := cache.GetSnapshot(10)
 	assert.True(t, errors.IsResourceExpired(err))
 
-	cache.Add(&btreeStore{resourceVersion: 10})
-	cache.Add(&btreeStore{resourceVersion: 20})
-	cache.Add(&btreeStore{resourceVersion: 30})
-	cache.Add(&btreeStore{resourceVersion: 40})
+	snap10 := &btreeStore{tree: newBtreeStore(btreeDegree).tree, resourceVersion: 10}
+	snap20 := &btreeStore{tree: newBtreeStore(btreeDegree).tree, resourceVersion: 20}
+	snap30 := &btreeStore{tree: newBtreeStore(btreeDegree).tree, resourceVersion: 30}
+	snap40 := &btreeStore{tree: newBtreeStore(btreeDegree).tree, resourceVersion: 40}
+	cache.Add(snap10)
+	cache.Add(snap20)
+	cache.Add(snap30)
+	cache.Add(snap40)
 	assert.Equal(t, 4, cache.Len())
 
 	t.Log("Added snapshot need to have strictly increasing RV")
@@ -139,18 +143,21 @@ func TestStoreSnapshotter(t *testing.T) {
 	snapshot, err := cache.GetSnapshot(10)
 	require.NoError(t, err)
 	assert.Equal(t, uint64(10), snapshot.ResourceVersion())
+	assert.Same(t, snap10.tree, snapshot.tree)
 
 	t.Log("Get first snapshot by larger RV")
 	assert.True(t, cache.HasSnapshot(11))
 	snapshot, err = cache.GetSnapshot(11)
 	require.NoError(t, err)
-	assert.Equal(t, uint64(10), snapshot.ResourceVersion())
+	assert.Equal(t, uint64(11), snapshot.ResourceVersion())
+	assert.Same(t, snap10.tree, snapshot.tree)
 
 	t.Log("Get second snapshot by larger RV")
 	assert.True(t, cache.HasSnapshot(22))
 	snapshot, err = cache.GetSnapshot(22)
 	require.NoError(t, err)
-	assert.Equal(t, uint64(20), snapshot.ResourceVersion())
+	assert.Equal(t, uint64(22), snapshot.ResourceVersion())
+	assert.Same(t, snap20.tree, snapshot.tree)
 
 	t.Log("Get third snapshot for future revision")
 	assert.True(t, cache.HasSnapshot(100))
@@ -164,7 +171,8 @@ func TestStoreSnapshotter(t *testing.T) {
 	cache.UpdateResourceVersion(100)
 	snapshot, err = cache.GetSnapshot(100)
 	require.NoError(t, err)
-	assert.Equal(t, uint64(40), snapshot.ResourceVersion())
+	assert.Equal(t, uint64(100), snapshot.ResourceVersion())
+	assert.Same(t, snap40.tree, snapshot.tree)
 
 	t.Log("Remove snapshot less than 30")
 	cache.RemoveLess(30)
@@ -182,6 +190,7 @@ func TestStoreSnapshotter(t *testing.T) {
 	snapshot, err = cache.GetSnapshot(30)
 	require.NoError(t, err)
 	assert.Equal(t, uint64(30), snapshot.ResourceVersion())
+	assert.Same(t, snap30.tree, snapshot.tree)
 
 	t.Log("Replace resets old RVs and adds the new snapshot")
 	cache.Replace(&btreeStore{resourceVersion: 200})

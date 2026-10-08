@@ -240,7 +240,7 @@ func TestWatchCacheStorageSnapshots(t *testing.T) {
 	t.Log("Test cache on intermediate rev 150 between mutations")
 	snap150, err := s.GetExactSnapshotLocked(150)
 	require.NoError(t, err)
-	assert.Equal(t, uint64(100), snap150.ResourceVersion())
+	assert.Equal(t, uint64(150), snap150.ResourceVersion())
 	elements, err = snap150.OrderedListPrefix("", "")
 	require.NoError(t, err)
 	assert.Len(t, elements, 1)
