@@ -21,16 +21,21 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog/v2/ktesting"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager/checksum"
 )
@@ -298,4 +303,187 @@ func Test_stateCheckpoint_currentFormatIsNotRewritten(t *testing.T) {
 	actual, err := os.ReadFile(checkpointPath)
 	require.NoError(t, err)
 	require.Equal(t, blob, actual, "a checkpoint in the current format should not be rewritten on startup")
+}
+
+// blockingCheckpointManager holds every write of a checkpoint until release is called, as a slow disk
+// would, so that a test can use the state while a write is in progress.
+type blockingCheckpointManager struct {
+	checkpointmanager.CheckpointManager // Only CreateCheckpoint is called.
+
+	// started receives a value when a write begins, if nothing is waiting on the previous one.
+	started  chan struct{}
+	released chan struct{}
+	release  func()
+
+	mux     sync.Mutex
+	written []*Checkpoint
+}
+
+func newBlockingCheckpointManager() *blockingCheckpointManager {
+	released := make(chan struct{})
+	return &blockingCheckpointManager{
+		started:  make(chan struct{}, 1),
+		released: released,
+		release:  sync.OnceFunc(func() { close(released) }),
+	}
+}
+
+func (m *blockingCheckpointManager) CreateCheckpoint(_ string, checkpoint checkpointmanager.Checkpoint) error {
+	select {
+	case m.started <- struct{}{}:
+	default:
+	}
+	<-m.released
+
+	m.mux.Lock()
+	defer m.mux.Unlock()
+	m.written = append(m.written, checkpoint.(*Checkpoint))
+	return nil
+}
+
+func (m *blockingCheckpointManager) lastWritten() *Checkpoint {
+	m.mux.Lock()
+	defer m.mux.Unlock()
+	return m.written[len(m.written)-1]
+}
+
+func Test_stateCheckpoint_slowWriteDoesNotBlockReaders(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	fake := newBlockingCheckpointManager()
+	sc := &stateCheckpoint{
+		cache:             newStateMemory(logger, PodMap{}),
+		checkpointManager: fake,
+		checkpointName:    testCheckpoint,
+	}
+
+	var wg sync.WaitGroup
+	t.Cleanup(func() {
+		// Don't leave anything stuck behind the write if the test failed.
+		fake.release()
+		wg.Wait()
+	})
+
+	const pods = 8
+	podUID := func(i int) types.UID { return types.UID(fmt.Sprintf("pod%d", i)) }
+	setPodErrs := make(chan error, pods)
+	setPod := func(i int) {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			setPodErrs <- sc.SetPod(logger, newTestPod(podUID(i), "1", true, true))
+		}()
+	}
+
+	// The first write is stuck on the disk.
+	setPod(0)
+	select {
+	case <-fake.started:
+	case <-time.After(wait.ForeverTestTimeout):
+		t.Fatal("the checkpoint was never written")
+	}
+
+	// The other updates still reach the cache, and everything in it can be read, while that write is stuck.
+	for i := 1; i < pods; i++ {
+		setPod(i)
+	}
+	readersDone := make(chan struct{})
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		defer close(readersDone)
+		assert.Eventually(t, func() bool { return len(sc.GetPodUIDs()) == pods }, wait.ForeverTestTimeout, time.Millisecond)
+		for i := range pods {
+			uid := podUID(i)
+			assert.True(t, sc.HasPod(uid), "pod %s", uid)
+			_, ok := sc.GetPod(uid)
+			assert.True(t, ok, "pod %s", uid)
+			_, ok = sc.GetContainerResources(uid, "container1")
+			assert.True(t, ok, "pod %s", uid)
+			_, ok = sc.GetPodLevelResources(uid)
+			assert.True(t, ok, "pod %s", uid)
+			_, ok = sc.GetEmptyDirVolumeLimit(uid, "volume1")
+			assert.True(t, ok, "pod %s", uid)
+		}
+	}()
+	select {
+	case <-readersDone:
+	case <-time.After(wait.ForeverTestTimeout):
+		t.Fatal("the state could not be read while the checkpoint was being written")
+	}
+
+	// A write reads the state once its turn comes, so it also has what the cache got while it waited,
+	// even though the update that added it has not written anything.
+	require.NoError(t, sc.cache.SetPod(logger, newTestPod("late", "1", true, true)))
+
+	// Once the disk catches up, the updates complete, and the last write has all of them.
+	fake.release()
+	wg.Wait()
+	close(setPodErrs)
+	for err := range setPodErrs {
+		require.NoError(t, err)
+	}
+
+	podList, _, err := fake.lastWritten().GetPodList()
+	require.NoError(t, err)
+	expectedUIDs := []types.UID{"late"}
+	for i := range pods {
+		expectedUIDs = append(expectedUIDs, podUID(i))
+	}
+	var writtenUIDs []types.UID
+	for _, pod := range podList.Items {
+		writtenUIDs = append(writtenUIDs, pod.UID)
+	}
+	require.ElementsMatch(t, expectedUIDs, writtenUIDs, "the last write should have every update")
+}
+
+func Test_stateCheckpoint_concurrentUpdates(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	testDir := getTestDir(t)
+	sc, err := NewStateCheckpoint(logger, testDir, testCheckpoint)
+	require.NoError(t, err)
+
+	const pods, updates = 8, 20
+	stop := make(chan struct{})
+	var writers, readers sync.WaitGroup
+	for i := range pods {
+		podUID := types.UID(fmt.Sprintf("pod%d", i))
+		writers.Add(1)
+		go func() {
+			defer writers.Done()
+			for j := range updates {
+				requests := v1.ResourceList{v1.ResourceCPU: *resource.NewMilliQuantity(int64(j+1), resource.DecimalSI)}
+				assert.NoError(t, sc.SetContainerResources(logger, podUID, "container1", podutil.Containers, v1.ResourceRequirements{Requests: requests}))
+				assert.NoError(t, sc.SetPodLevelResources(logger, podUID, &v1.ResourceRequirements{Requests: requests}))
+				limit := resource.MustParse(fmt.Sprintf("%dMi", j+1))
+				assert.NoError(t, sc.SetEmptyDirVolumeLimit(podUID, "volume1", &limit))
+			}
+		}()
+		readers.Add(1)
+		go func() {
+			defer readers.Done()
+			for {
+				select {
+				case <-stop:
+					return
+				default:
+				}
+				sc.GetPodUIDs()
+				sc.HasPod(podUID)
+				sc.GetPod(podUID)
+				sc.GetContainerResources(podUID, "container1")
+				sc.GetPodLevelResources(podUID)
+				sc.GetEmptyDirVolumeLimit(podUID, "volume1")
+			}
+		}()
+	}
+	writers.Wait()
+	close(stop)
+	readers.Wait()
+
+	// Whichever write came last, the checkpoint has the final state.
+	restored, err := NewStateCheckpoint(logger, testDir, testCheckpoint)
+	require.NoError(t, err)
+	expected, actual := getPodMap(sc), getPodMap(restored)
+	require.Len(t, expected, pods)
+	verifyPodResourceAllocation(t, &expected, &actual, "the checkpoint does not have the latest state")
 }

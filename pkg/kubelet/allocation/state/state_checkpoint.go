@@ -35,7 +35,10 @@ import (
 var _ State = &stateCheckpoint{}
 
 type stateCheckpoint struct {
-	mux               sync.RWMutex
+	// mux serializes the writes of the checkpoint and guards lastChecksum. It is not held while
+	// the cache is read or updated, since the cache has its own lock. That way a slow write to
+	// the disk does not block the readers.
+	mux               sync.Mutex
 	cache             *stateMemory
 	checkpointManager checkpointmanager.CheckpointManager
 	checkpointName    string
@@ -101,8 +104,13 @@ func restoreState(logger klog.Logger, checkpointManager checkpointmanager.Checkp
 	return pods, checkpoint.Checksum, migrated, nil
 }
 
-// saves state to a checkpoint, caller is responsible for locking
+// saves state to a checkpoint. Calls are serialized, and the state is read once it is the call's
+// turn to write, so the checkpoint always ends up with the latest state.
 func (sc *stateCheckpoint) storeState(logger klog.Logger) error {
+	sc.mux.Lock()
+	defer sc.mux.Unlock()
+
+	// The cache is not locked while the pods are encoded, since it never modifies a stored pod.
 	podList := sc.cache.toPodList()
 
 	checkpoint, err := NewCheckpointV2(podList)
@@ -124,50 +132,36 @@ func (sc *stateCheckpoint) storeState(logger klog.Logger) error {
 
 // GetContainerResources returns current resources information to a pod's container
 func (sc *stateCheckpoint) GetContainerResources(podUID types.UID, containerName string) (v1.ResourceRequirements, bool) {
-	sc.mux.RLock()
-	defer sc.mux.RUnlock()
 	return sc.cache.GetContainerResources(podUID, containerName)
 }
 
 // GetPodLevelResources returns current resources information at pod-level
 func (sc *stateCheckpoint) GetPodLevelResources(podUID types.UID) (*v1.ResourceRequirements, bool) {
-	sc.mux.RLock()
-	defer sc.mux.RUnlock()
 	return sc.cache.GetPodLevelResources(podUID)
 }
 
 // GetEmptyDirVolumeLimit returns current resources information for emptyDir volume
 func (sc *stateCheckpoint) GetEmptyDirVolumeLimit(podUID types.UID, volumeName string) (*resource.Quantity, bool) {
-	sc.mux.RLock()
-	defer sc.mux.RUnlock()
 	return sc.cache.GetEmptyDirVolumeLimit(podUID, volumeName)
 }
 
 // GetPodUIDs returns the UIDs of the pods with resource information
 func (sc *stateCheckpoint) GetPodUIDs() []types.UID {
-	sc.mux.RLock()
-	defer sc.mux.RUnlock()
 	return sc.cache.GetPodUIDs()
 }
 
 // GetPod returns current pod resource information
 func (sc *stateCheckpoint) GetPod(podUID types.UID) (*v1.Pod, bool) {
-	sc.mux.RLock()
-	defer sc.mux.RUnlock()
 	return sc.cache.GetPod(podUID)
 }
 
 // HasPod returns whether there is resource information for the pod
 func (sc *stateCheckpoint) HasPod(podUID types.UID) bool {
-	sc.mux.RLock()
-	defer sc.mux.RUnlock()
 	return sc.cache.HasPod(podUID)
 }
 
 // SetContainerResources sets resources information for a pod's container
 func (sc *stateCheckpoint) SetContainerResources(logger klog.Logger, podUID types.UID, containerName string, containerType podutil.ContainerType, resources v1.ResourceRequirements) error {
-	sc.mux.Lock()
-	defer sc.mux.Unlock()
 	err := sc.cache.SetContainerResources(logger, podUID, containerName, containerType, resources)
 	if err != nil {
 		return err
@@ -177,8 +171,6 @@ func (sc *stateCheckpoint) SetContainerResources(logger klog.Logger, podUID type
 
 // SetPodLevelResources sets resources information for a pod's resources at pod-level.
 func (sc *stateCheckpoint) SetPodLevelResources(logger klog.Logger, podUID types.UID, resInfo *v1.ResourceRequirements) error {
-	sc.mux.Lock()
-	defer sc.mux.Unlock()
 	err := sc.cache.SetPodLevelResources(logger, podUID, resInfo)
 	if err != nil {
 		return err
@@ -189,8 +181,6 @@ func (sc *stateCheckpoint) SetPodLevelResources(logger klog.Logger, podUID types
 // SetEmptyDirVolumeLimit sets the size limit for a pod's emptyDir volume.
 func (sc *stateCheckpoint) SetEmptyDirVolumeLimit(podUID types.UID, volumeName string, limit *resource.Quantity) error {
 	logger := klog.TODO()
-	sc.mux.Lock()
-	defer sc.mux.Unlock()
 	err := sc.cache.SetEmptyDirVolumeLimit(podUID, volumeName, limit)
 	if err != nil {
 		return err
@@ -200,8 +190,6 @@ func (sc *stateCheckpoint) SetEmptyDirVolumeLimit(podUID types.UID, volumeName s
 
 // SetPod sets pod allocation information
 func (sc *stateCheckpoint) SetPod(logger klog.Logger, pod *v1.Pod) error {
-	sc.mux.Lock()
-	defer sc.mux.Unlock()
 	err := sc.cache.SetPod(logger, pod)
 	if err != nil {
 		return err
@@ -211,8 +199,6 @@ func (sc *stateCheckpoint) SetPod(logger klog.Logger, pod *v1.Pod) error {
 
 // Delete deletes resource information for specified pod
 func (sc *stateCheckpoint) RemovePod(logger klog.Logger, podUID types.UID) error {
-	sc.mux.Lock()
-	defer sc.mux.Unlock()
 	// Skip writing the checkpoint for pod deletion, since there is no side effect to
 	// keeping a deleted pod. Deleted pods will eventually be cleaned up by RemoveOrphanedPods.
 	// The deletion will be stored the next time a non-delete update is made.
