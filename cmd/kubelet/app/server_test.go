@@ -128,6 +128,84 @@ func TestParseResourceListCPUOverflowsMicro(t *testing.T) {
 	require.Equal(t, 1, q.Cmp(resource.MustParse("9223372036854775808u")))
 }
 
+func TestParseResourceListHugepages(t *testing.T) {
+	validCases := []struct {
+		name     string
+		input    map[string]string
+		expected v1.ResourceList
+	}{
+		{
+			name:  "2Mi hugepages",
+			input: map[string]string{"hugepages-2Mi": "512Mi"},
+			expected: v1.ResourceList{
+				v1.ResourceName("hugepages-2Mi"): resource.MustParse("512Mi"),
+			},
+		},
+		{
+			name:  "1Gi hugepages",
+			input: map[string]string{"hugepages-1Gi": "2Gi"},
+			expected: v1.ResourceList{
+				v1.ResourceName("hugepages-1Gi"): resource.MustParse("2Gi"),
+			},
+		},
+		{
+			name:  "mixed resources including hugepages",
+			input: map[string]string{"cpu": "200m", "memory": "100Mi", "hugepages-2Mi": "512Mi"},
+			expected: v1.ResourceList{
+				v1.ResourceCPU:                   resource.MustParse("200m"),
+				v1.ResourceMemory:                resource.MustParse("100Mi"),
+				v1.ResourceName("hugepages-2Mi"): resource.MustParse("512Mi"),
+			},
+		},
+		{
+			name:  "zero hugepages",
+			input: map[string]string{"hugepages-2Mi": "0"},
+			expected: v1.ResourceList{
+				v1.ResourceName("hugepages-2Mi"): resource.MustParse("0"),
+			},
+		},
+	}
+	for _, tc := range validCases {
+		t.Run(tc.name, func(t *testing.T) {
+			rl, err := parseResourceList(tc.input)
+			require.NoError(t, err)
+			for k, expected := range tc.expected {
+				actual, ok := rl[k]
+				require.True(t, ok, "expected resource %q not found", k)
+				require.Equal(t, 0, expected.Cmp(actual), "resource %q: expected %s, got %s", k, expected.String(), actual.String())
+			}
+		})
+	}
+
+	errorCases := []struct {
+		name  string
+		input map[string]string
+	}{
+		{
+			name:  "hugepage value not divisible by page size",
+			input: map[string]string{"hugepages-2Mi": "3Mi"},
+		},
+		{
+			name:  "negative hugepage value",
+			input: map[string]string{"hugepages-2Mi": "-4Mi"},
+		},
+		{
+			name:  "invalid hugepage quantity",
+			input: map[string]string{"hugepages-2Mi": "abc"},
+		},
+		{
+			name:  "invalid hugepage resource name",
+			input: map[string]string{"hugepages-foo": "4Mi"},
+		},
+	}
+	for _, tc := range errorCases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := parseResourceList(tc.input)
+			require.Error(t, err, "expected error for input %v", tc.input)
+		})
+	}
+}
+
 func TestMergeKubeletConfigurations(t *testing.T) {
 	testCases := []struct {
 		kubeletConfig           *kubeletconfiginternal.KubeletConfiguration
