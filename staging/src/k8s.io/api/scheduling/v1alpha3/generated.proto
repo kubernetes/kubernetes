@@ -236,7 +236,7 @@ message CompositePodGroupSpec {
   // +optional
   // +k8s:optional
   // +k8s:immutable
-  // +k8s:maximum=1000000000 # HighestUserDefinablePriority
+  // +k8s:maximum=2000001000 # SystemCriticalPriority + 1000 (system-node-critical)
   optional int32 priority = 7;
 
   // preemptionPolicy is the Policy for preempting pods/podgroups with lower priority.
@@ -345,7 +345,7 @@ message CompositePodGroupTemplate {
   //
   // +optional
   // +k8s:optional
-  // +k8s:maximum=1000000000 # HighestUserDefinablePriority
+  // +k8s:maximum=2000001000 # SystemCriticalPriority + 1000 (system-node-critical)
   // +k8s:immutable
   optional int32 priority = 6;
 
@@ -685,7 +685,7 @@ message PodGroupSpec {
   // +optional
   // +k8s:optional
   // +k8s:immutable
-  // +k8s:maximum=1000000000 # HighestUserDefinablePriority
+  // +k8s:maximum=2000001000 # SystemCriticalPriority + 1000 (system-node-critical)
   optional int32 priority = 8;
 
   // preemptionPolicy is the Policy for preempting pods/podgroups with lower priority.
@@ -827,7 +827,7 @@ message PodGroupTemplate {
   //
   // +optional
   // +k8s:optional
-  // +k8s:maximum=1000000000 # HighestUserDefinablePriority
+  // +k8s:maximum=2000001000 # SystemCriticalPriority + 1000 (system-node-critical)
   // +k8s:immutable
   optional int32 priority = 7;
 

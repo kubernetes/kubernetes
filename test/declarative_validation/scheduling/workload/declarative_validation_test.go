@@ -224,8 +224,17 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 		"valid negative priority": {
 			input: mkValidWorkload(setPriority(0, -2147483648)),
 		},
-		"too high priority": {
+		"valid priority above user-defined maximum": {
 			input: mkValidWorkload(setPriority(0, scheduling.HighestUserDefinablePriority+1)),
+		},
+		"valid system-cluster-critical priority": {
+			input: mkValidWorkload(setPriority(0, scheduling.SystemCriticalPriority)),
+		},
+		"valid system-node-critical priority": {
+			input: mkValidWorkload(setPriority(0, scheduling.SystemCriticalPriority+1000)),
+		},
+		"too high priority": {
+			input: mkValidWorkload(setPriority(0, scheduling.SystemCriticalPriority+1001)),
 			expectedErrs: field.ErrorList{
 				field.Invalid(field.NewPath("spec", "podGroupTemplates").Index(0).Child("priority"), nil, "").WithOrigin("maximum"),
 			},
@@ -522,8 +531,23 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 				field.Invalid(field.NewPath("spec"), nil, "detected multiple priority configurations").MarkFromImperative(),
 			},
 		},
-		"nested pg invalid priority max": {
+		"nested pg valid priority above user-defined maximum": {
 			input:                         mkValidWorkload(setCPGPriority(0, scheduling.HighestUserDefinablePriority+1), setNestedPGPriority(0, 0, scheduling.HighestUserDefinablePriority+1)),
+			enableTopologyAwareScheduling: true,
+			enableCompositePodGroup:       true,
+		},
+		"nested pg valid system-cluster-critical priority": {
+			input:                         mkValidWorkload(setCPGPriority(0, scheduling.SystemCriticalPriority), setNestedPGPriority(0, 0, scheduling.SystemCriticalPriority)),
+			enableTopologyAwareScheduling: true,
+			enableCompositePodGroup:       true,
+		},
+		"nested pg valid system-node-critical priority": {
+			input:                         mkValidWorkload(setCPGPriority(0, scheduling.SystemCriticalPriority+1000), setNestedPGPriority(0, 0, scheduling.SystemCriticalPriority+1000)),
+			enableTopologyAwareScheduling: true,
+			enableCompositePodGroup:       true,
+		},
+		"nested pg invalid priority max": {
+			input:                         mkValidWorkload(setCPGPriority(0, scheduling.SystemCriticalPriority+1001), setNestedPGPriority(0, 0, scheduling.SystemCriticalPriority+1001)),
 			enableTopologyAwareScheduling: true,
 			enableCompositePodGroup:       true,
 			expectedErrs: field.ErrorList{

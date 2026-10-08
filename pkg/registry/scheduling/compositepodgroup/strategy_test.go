@@ -208,10 +208,22 @@ func TestStrategyCreate(t *testing.T) {
 				return cpg
 			}(),
 		},
+		"system-node-critical priority": {
+			obj: func() *scheduling.CompositePodGroup {
+				cpg := cpg.DeepCopy()
+				cpg.Spec.Priority = new(int32(scheduling.SystemCriticalPriority + 1000))
+				return cpg
+			}(),
+			expectObj: func() *scheduling.CompositePodGroup {
+				cpg := cpg.DeepCopy()
+				cpg.Spec.Priority = new(int32(scheduling.SystemCriticalPriority + 1000))
+				return cpg
+			}(),
+		},
 		"too high priority": {
 			obj: func() *scheduling.CompositePodGroup {
 				cpg := cpg.DeepCopy()
-				cpg.Spec.Priority = new(int32(scheduling.HighestUserDefinablePriority + 1))
+				cpg.Spec.Priority = new(int32(scheduling.SystemCriticalPriority + 1001))
 				return cpg
 			}(),
 			expectValidationError: maximumError,
