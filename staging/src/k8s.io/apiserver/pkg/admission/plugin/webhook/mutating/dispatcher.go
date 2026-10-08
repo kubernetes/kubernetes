@@ -68,6 +68,7 @@ const (
 type mutatingDispatcher struct {
 	cm     *webhookutil.ClientManager
 	plugin *Plugin
+	// tokenAccessor // cached client corev1serviceaccount client
 }
 
 func newMutatingDispatcher(p *Plugin) func(cm *webhookutil.ClientManager) generic.Dispatcher {
@@ -279,7 +280,12 @@ func (a *mutatingDispatcher) callAttrMutatingHook(ctx context.Context, h *admiss
 		defer cancel()
 	}
 
-	r := client.Post().Body(request)
+	// // start with just requesting tokens, then implement cache
+	// webhookAuthenticationToken, ok := cache.Check(key)
+	// if !ok {
+	//     webhookAuthenticationToken =
+	// }
+	r := client.Post().Body(request) /*.SetHeader("Authentication", "bearer <token>")*/
 
 	// if the context has a deadline, set it as a parameter to inform the backend
 	if deadline, hasDeadline := ctx.Deadline(); hasDeadline {
