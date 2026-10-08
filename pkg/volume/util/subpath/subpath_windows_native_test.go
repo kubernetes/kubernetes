@@ -149,7 +149,7 @@ func TestEvalSymlinkNative(t *testing.T) {
 	}
 }
 
-func TestHardLinkTargetsMatchPowerShell(t *testing.T) {
+func TestNativeHardLinkTargets(t *testing.T) {
 	root := t.TempDir()
 	file := filepath.Join(root, "file.cfg")
 	if err := os.WriteFile(file, []byte("fixture"), 0600); err != nil {
@@ -166,15 +166,14 @@ func TestHardLinkTargetsMatchPowerShell(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		cmd := exec.Command("powershell", "/c", "$ErrorActionPreference = 'Stop'; (Get-Item -Force -LiteralPath $env:linkpath).Target")
-		cmd.Env = append(os.Environ(), "linkpath="+path)
-		output, err := cmd.CombinedOutput()
-		if err != nil {
-			t.Fatalf("PowerShell characterization: %v: %s", err, output)
+		var expected []string
+		for _, other := range []string{"file.cfg", "alias1.cfg", "alias2.cfg"} {
+			if other != name {
+				expected = append(expected, filepath.Join(root, other))
+			}
 		}
-		expected := strings.FieldsFunc(strings.TrimSpace(string(output)), func(r rune) bool { return r == '\r' || r == '\n' })
 		if len(targets) != len(expected) {
-			t.Fatalf("%q: targets=%q PowerShell=%q", path, targets, expected)
+			t.Fatalf("%q: targets=%q want=%q", path, targets, expected)
 		}
 		for _, target := range targets {
 			found := false
@@ -182,7 +181,7 @@ func TestHardLinkTargetsMatchPowerShell(t *testing.T) {
 				found = found || strings.EqualFold(target, want)
 			}
 			if !found {
-				t.Fatalf("native target %q not in PowerShell targets %q", target, expected)
+				t.Fatalf("native target %q not in expected targets %q", target, expected)
 			}
 		}
 		resolved, err := evalSymlink(path)
