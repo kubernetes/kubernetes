@@ -54,7 +54,7 @@ require (
 	k8s.io/component-base v0.0.0
 	k8s.io/klog/v2 v2.140.0
 	k8s.io/kms v0.0.0
-	k8s.io/kube-openapi v0.0.0-20261001230523-97fa35140926
+	k8s.io/kube-openapi v0.0.0-20261007072838-e2e80c32a35f
 	k8s.io/streaming v0.0.0
 	k8s.io/utils v0.0.0-20260626114624-be93311217bd
 	sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.37.0
@@ -66,7 +66,6 @@ require (
 
 require (
 	cel.dev/expr v0.25.2 // indirect
-	github.com/NYTimes/gziphandler v1.1.1 // indirect
 	github.com/antlr4-go/antlr/v4 v4.13.1 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cenkalti/backoff/v5 v5.0.3 // indirect

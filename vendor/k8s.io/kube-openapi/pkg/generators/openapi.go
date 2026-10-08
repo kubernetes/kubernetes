@@ -65,18 +65,30 @@ var tempPatchTags = [...]string{
 }
 
 func getOpenAPITagValue(comments []string) []string {
-	return gengo.ExtractCommentTags("+", comments)[tagName]
+	tags, err := gengo.ExtractFunctionStyleCommentTags("+", []string{tagName}, comments)
+	if err != nil {
+		klog.Fatalf("invalid %s tag: %v", tagName, err)
+	}
+	var values []string
+	for _, tag := range tags[tagName] {
+		values = append(values, tag.Value)
+	}
+	return values
 }
 
 func getSingleTagsValue(comments []string, tag string) (string, error) {
-	tags, ok := gengo.ExtractCommentTags("+", comments)[tag]
+	extracted, err := gengo.ExtractFunctionStyleCommentTags("+", []string{tag}, comments)
+	if err != nil {
+		return "", err
+	}
+	tags, ok := extracted[tag]
 	if !ok || len(tags) == 0 {
 		return "", nil
 	}
 	if len(tags) > 1 {
 		return "", fmt.Errorf("multiple values are not allowed for tag %s", tag)
 	}
-	return tags[0], nil
+	return tags[0].Value, nil
 }
 
 func hasOpenAPITagValue(comments []string, value string) bool {
@@ -98,7 +110,10 @@ func hasOpenAPITagValue(comments []string, value string) bool {
 // the same requiredness (e.g. both +optional and +k8s:optional). That is not a
 // conflict, and it does not change the generated schema.
 func isOptional(m *types.Member) (bool, error) {
-	commentTags := gengo.ExtractCommentTags("+", m.CommentLines)
+	commentTags, err := gengo.ExtractFunctionStyleCommentTags("+", []string{tagOptional, tagK8sOptional, tagRequired, tagK8sRequired}, m.CommentLines)
+	if err != nil {
+		return false, err
+	}
 	hasOptionalCommentTag := commentTags[tagOptional] != nil ||
 		commentTags[tagK8sOptional] != nil
 	hasRequiredCommentTag := commentTags[tagRequired] != nil ||

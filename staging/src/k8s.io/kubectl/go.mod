@@ -37,7 +37,7 @@ require (
 	k8s.io/component-base v0.0.0
 	k8s.io/component-helpers v0.0.0
 	k8s.io/klog/v2 v2.140.0
-	k8s.io/kube-openapi v0.0.0-20261001230523-97fa35140926
+	k8s.io/kube-openapi v0.0.0-20261007072838-e2e80c32a35f
 	k8s.io/metrics v0.0.0
 	k8s.io/streaming v0.0.0
 	k8s.io/utils v0.0.0-20260626114624-be93311217bd
@@ -54,7 +54,6 @@ require (
 	github.com/Masterminds/semver/v3 v3.4.0 // indirect
 	github.com/blang/semver/v4 v4.0.0 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
-	github.com/emicklei/go-restful/v3 v3.13.0 // indirect
 	github.com/fxamacker/cbor/v2 v2.9.4 // indirect
 	github.com/go-errors/errors v1.5.1 // indirect
 	github.com/go-logr/logr v1.4.4 // indirect

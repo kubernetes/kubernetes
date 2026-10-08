@@ -40,9 +40,6 @@ github.com/Microsoft/hnslib/internal/hns
 github.com/Microsoft/hnslib/internal/interop
 github.com/Microsoft/hnslib/internal/regstate
 github.com/Microsoft/hnslib/internal/runhcs
-# github.com/NYTimes/gziphandler v1.1.1
-## explicit; go 1.11
-github.com/NYTimes/gziphandler
 # github.com/anishathalye/porcupine v1.3.0
 ## explicit; go 1.16
 github.com/anishathalye/porcupine
@@ -1105,7 +1102,7 @@ k8s.io/klog/v2/textlogger
 ## explicit; go 1.27.0
 # k8s.io/kube-controller-manager v0.0.0 => ./staging/src/k8s.io/kube-controller-manager
 ## explicit; go 1.27.0
-# k8s.io/kube-openapi v0.0.0-20261001230523-97fa35140926
+# k8s.io/kube-openapi v0.0.0-20261007072838-e2e80c32a35f
 ## explicit; go 1.27.0
 k8s.io/kube-openapi/cmd/openapi-gen
 k8s.io/kube-openapi/cmd/openapi-gen/args
@@ -1122,6 +1119,7 @@ k8s.io/kube-openapi/pkg/handler
 k8s.io/kube-openapi/pkg/handler3
 k8s.io/kube-openapi/pkg/internal
 k8s.io/kube-openapi/pkg/internal/third_party/govalidator
+k8s.io/kube-openapi/pkg/internal/third_party/gziphandler
 k8s.io/kube-openapi/pkg/openapiconv
 k8s.io/kube-openapi/pkg/schemaconv
 k8s.io/kube-openapi/pkg/schemamutation
