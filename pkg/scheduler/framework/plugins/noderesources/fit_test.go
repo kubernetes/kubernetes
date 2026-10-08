@@ -41,6 +41,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/dynamicresources"
 	plfeature "k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/helper"
 	plugintesting "k8s.io/kubernetes/pkg/scheduler/framework/plugins/testing"
 	"k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
@@ -740,7 +741,7 @@ func testEnoughRequests(tCtx ktesting.TContext) {
 
 			opts := ResourceRequestsOptions{EnablePodLevelResources: test.podLevelResourcesEnabled, EnableDRAExtendedResource: test.draExtendedResourceEnabled}
 			state := computePodResourceRequest(test.pod, opts)
-			gotInsufficientResources := fitsRequest(state, test.nodeInfo, p.(*Fit).ignoredResources, p.(*Fit).ignoredResourceGroups, testDRAManager, opts, test.pod)
+			gotInsufficientResources := helper.FitsRequest(&state.Resource, test.nodeInfo, p.(*Fit).ignoredResources, p.(*Fit).ignoredResourceGroups, testDRAManager, opts, test.pod)
 			if diff := cmp.Diff(test.wantInsufficientResources, gotInsufficientResources); diff != "" {
 				tCtx.Errorf("insufficient resources do not match (-want,+got):\n%s", diff)
 			}
