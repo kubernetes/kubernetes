@@ -9,6 +9,9 @@
             "type": "string"
           }
         },
+        "required": [
+          "expression"
+        ],
         "type": "object"
       },
       "io.k8s.api.admissionregistration.v1beta1.JSONPatch": {
@@ -19,6 +22,9 @@
             "type": "string"
           }
         },
+        "required": [
+          "expression"
+        ],
         "type": "object"
       },
       "io.k8s.api.admissionregistration.v1beta1.MatchCondition": {
@@ -114,6 +120,9 @@
             "description": "spec defines the desired behavior of the MutatingAdmissionPolicy."
           }
         },
+        "required": [
+          "spec"
+        ],
         "type": "object",
         "x-kubernetes-group-version-kind": [
           {
@@ -153,6 +162,9 @@
             "description": "spec defines the desired behavior of the MutatingAdmissionPolicyBinding."
           }
         },
+        "required": [
+          "spec"
+        ],
         "type": "object",
         "x-kubernetes-group-version-kind": [
           {
@@ -226,6 +238,9 @@
             "type": "string"
           }
         },
+        "required": [
+          "policyName"
+        ],
         "type": "object"
       },
       "io.k8s.api.admissionregistration.v1beta1.MutatingAdmissionPolicyList": {
@@ -325,6 +340,11 @@
             "x-kubernetes-list-type": "atomic"
           }
         },
+        "required": [
+          "matchConstraints",
+          "mutations",
+          "reinvocationPolicy"
+        ],
         "type": "object"
       },
       "io.k8s.api.admissionregistration.v1beta1.Mutation": {
@@ -405,6 +425,12 @@
             "type": "string"
           }
         },
+        "required": [
+          "operations",
+          "apiGroups",
+          "apiVersions",
+          "resources"
+        ],
         "type": "object",
         "x-kubernetes-map-type": "atomic"
       },
@@ -420,6 +446,10 @@
             "type": "string"
           }
         },
+        "required": [
+          "apiVersion",
+          "kind"
+        ],
         "type": "object",
         "x-kubernetes-map-type": "atomic"
       },

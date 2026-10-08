@@ -9,6 +9,9 @@
             "type": "string"
           }
         },
+        "required": [
+          "expression"
+        ],
         "type": "object"
       },
       "io.k8s.api.admissionregistration.v1.AuditAnnotation": {
@@ -59,6 +62,9 @@
             "type": "string"
           }
         },
+        "required": [
+          "expression"
+        ],
         "type": "object"
       },
       "io.k8s.api.admissionregistration.v1.MatchCondition": {
@@ -154,6 +160,9 @@
             "description": "spec defines the desired behavior of the MutatingAdmissionPolicy."
           }
         },
+        "required": [
+          "spec"
+        ],
         "type": "object",
         "x-kubernetes-group-version-kind": [
           {
@@ -193,6 +202,9 @@
             "description": "spec defines the desired behavior of the MutatingAdmissionPolicyBinding."
           }
         },
+        "required": [
+          "spec"
+        ],
         "type": "object",
         "x-kubernetes-group-version-kind": [
           {
@@ -266,6 +278,9 @@
             "type": "string"
           }
         },
+        "required": [
+          "policyName"
+        ],
         "type": "object"
       },
       "io.k8s.api.admissionregistration.v1.MutatingAdmissionPolicyList": {
@@ -365,6 +380,11 @@
             "x-kubernetes-list-type": "atomic"
           }
         },
+        "required": [
+          "matchConstraints",
+          "mutations",
+          "reinvocationPolicy"
+        ],
         "type": "object"
       },
       "io.k8s.api.admissionregistration.v1.MutatingWebhook": {
@@ -620,6 +640,12 @@
             "type": "string"
           }
         },
+        "required": [
+          "operations",
+          "apiGroups",
+          "apiVersions",
+          "resources"
+        ],
         "type": "object",
         "x-kubernetes-map-type": "atomic"
       },
@@ -635,6 +661,10 @@
             "type": "string"
           }
         },
+        "required": [
+          "apiVersion",
+          "kind"
+        ],
         "type": "object",
         "x-kubernetes-map-type": "atomic"
       },
@@ -708,6 +738,12 @@
             "type": "string"
           }
         },
+        "required": [
+          "operations",
+          "apiGroups",
+          "apiVersions",
+          "resources"
+        ],
         "type": "object"
       },
       "io.k8s.api.admissionregistration.v1.ServiceReference": {
@@ -792,6 +828,9 @@
             "description": "status represents the current status of the ValidatingAdmissionPolicy, including warnings that are useful to determine if the policy behaves in the expected way. Populated by the system. Read-only."
           }
         },
+        "required": [
+          "spec"
+        ],
         "type": "object",
         "x-kubernetes-group-version-kind": [
           {
@@ -1027,6 +1066,9 @@
             "x-kubernetes-patch-strategy": "merge"
           }
         },
+        "required": [
+          "matchConstraints"
+        ],
         "type": "object"
       },
       "io.k8s.api.admissionregistration.v1.ValidatingAdmissionPolicyStatus": {
