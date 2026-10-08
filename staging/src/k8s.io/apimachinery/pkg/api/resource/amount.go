@@ -443,6 +443,9 @@ type infDecAmount struct {
 // AsScale adjusts this amount to set a minimum scale, rounding up, and returns true iff no precision
 // was lost. (1.1e5).AsScale(5) would return 1.1e5, but (1.1e5).AsScale(6) would return 1e6.
 func (a infDecAmount) AsScale(scale Scale) (infDecAmount, bool) {
+	if !scale.canInfScale() {
+		return infDecAmount{new(inf.Dec).Set(a.Dec)}, true
+	}
 	tmp := &inf.Dec{}
 	tmp.Round(a.Dec, scale.infScale(), inf.RoundUp)
 	return infDecAmount{tmp}, tmp.Cmp(a.Dec) == 0
