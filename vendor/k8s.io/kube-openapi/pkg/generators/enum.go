@@ -25,6 +25,7 @@ import (
 	"k8s.io/gengo/v2"
 	"k8s.io/gengo/v2/generator"
 	"k8s.io/gengo/v2/types"
+	"k8s.io/klog/v2"
 )
 
 const tagEnumType = "enum"
@@ -178,7 +179,10 @@ func isEnumType(stringType *types.Type, t *types.Type) bool {
 }
 
 func hasEnumTag(t *types.Type) bool {
-	tags := gengo.ExtractCommentTags("+", t.CommentLines)
+	tags, err := gengo.ExtractFunctionStyleCommentTags("+", []string{tagEnumType, tagK8sEnumType}, t.CommentLines)
+	if err != nil {
+		klog.Fatalf("Type %v: invalid enum tag: %v", t.Name, err)
+	}
 	return tags[tagEnumType] != nil || tags[tagK8sEnumType] != nil
 }
 
