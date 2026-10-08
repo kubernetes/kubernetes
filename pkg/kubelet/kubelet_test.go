@@ -51,6 +51,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilversion "k8s.io/apimachinery/pkg/util/version"
@@ -2798,6 +2799,126 @@ func TestHandlePodAdditionsInvokesPodAdmitHandlers(t *testing.T) {
 	// Check pod status stored in the status map.
 	checkPodStatus(t, kl, podToReject, v1.PodFailed)
 	checkPodStatus(t, kl, podToAdmit, v1.PodPending)
+}
+
+// TestHandlePodAdditionsStaleNoExecuteTaint verifies that when the informer-backed
+// node carries a NoExecute taint the pod does not tolerate, the predicate admit
+// handler re-fetches the node synchronously before rejecting the pod, and that
+// the refreshed node is cached for subsequent pods in the same batch.
+func TestHandlePodAdditionsStaleNoExecuteTaint(t *testing.T) {
+	staleTaint := v1.Taint{Key: "node.example.com/not-ready", Value: "true", Effect: v1.TaintEffectNoExecute}
+	allocatable := v1.ResourceList{
+		v1.ResourcePods: *resource.NewQuantity(110, resource.DecimalSI),
+	}
+	makeNode := func(name, rv string, taints []v1.Taint) *v1.Node {
+		return &v1.Node{
+			ObjectMeta: metav1.ObjectMeta{Name: name, ResourceVersion: rv},
+			Spec:       v1.NodeSpec{Taints: taints},
+			Status:     v1.NodeStatus{Allocatable: allocatable},
+		}
+	}
+	makePod := func(uid, name, nodeName string) *v1.Pod {
+		return &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				UID:       types.UID(uid),
+				Name:      name,
+				Namespace: "foo",
+			},
+			Spec: v1.PodSpec{NodeName: nodeName},
+		}
+	}
+
+	tests := []struct {
+		name     string
+		podCount int
+		// staleTaints are what the informer still reports. nil means just staleTaint.
+		staleTaints   []v1.Taint
+		freshTaints   []v1.Taint
+		expectedPhase v1.PodPhase
+		// expectedReason is only checked when expectedPhase is PodFailed.
+		expectedReason string
+	}{
+		{
+			name:          "stale taint cleared by synchronous fetch",
+			podCount:      1,
+			freshTaints:   nil,
+			expectedPhase: v1.PodPending,
+		},
+		{
+			name:          "second pod in the same batch reuses the refreshed cache",
+			podCount:      2,
+			freshTaints:   nil,
+			expectedPhase: v1.PodPending,
+		},
+		{
+			name:           "taint still present on fresh node",
+			podCount:       1,
+			freshTaints:    []v1.Taint{staleTaint},
+			expectedPhase:  v1.PodFailed,
+			expectedReason: tainttoleration.Name,
+		},
+		{
+			// The registration NoExecute taint is removed, a NoSchedule taint stays,
+			// and the kubelet's informer still lists both when the bound pod arrives.
+			name:     "registration NoExecute taint removed while a NoSchedule taint remains",
+			podCount: 1,
+			staleTaints: []v1.Taint{
+				{Key: "app", Value: "batch", Effect: v1.TaintEffectNoSchedule},
+				{Key: "karpenter.sh/unregistered", Effect: v1.TaintEffectNoExecute},
+			},
+			freshTaints: []v1.Taint{
+				{Key: "app", Value: "batch", Effect: v1.TaintEffectNoSchedule},
+			},
+			expectedPhase: v1.PodPending,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
+			testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+			defer testKubelet.Cleanup()
+			kl := testKubelet.kubelet
+			nodeName := string(kl.nodeName)
+
+			// The informer still reports the stale NoExecute taint.
+			staleTaints := test.staleTaints
+			if staleTaints == nil {
+				staleTaints = []v1.Taint{staleTaint}
+			}
+			kl.nodeLister = testNodeLister{nodes: []*v1.Node{makeNode(nodeName, "1", staleTaints)}}
+			kl.cachedNode = nil
+
+			// Without a reactor the generated fake Get returns an empty node with no
+			// taints, which would let the negative case pass for the wrong reason.
+			freshNode := makeNode(nodeName, "2", test.freshTaints)
+			getCount := 0
+			testKubelet.fakeKubeClient.PrependReactor("get", "nodes", func(action core.Action) (bool, runtime.Object, error) {
+				getCount++
+				return true, freshNode.DeepCopy(), nil
+			})
+
+			pods := make([]*v1.Pod, 0, test.podCount)
+			for i := 0; i < test.podCount; i++ {
+				pods = append(pods, makePod(fmt.Sprintf("uid-%d", i), fmt.Sprintf("pod-%d", i), nodeName))
+			}
+
+			kl.HandlePodAdditions(tCtx, pods)
+
+			for _, pod := range pods {
+				checkPodStatus(t, kl, pod, test.expectedPhase)
+				if test.expectedPhase == v1.PodFailed {
+					podStatus, _ := kl.statusManager.GetPodStatus(pod.UID)
+					assert.Equal(t, test.expectedReason, podStatus.Reason, "unexpected rejection reason for pod %q", pod.Name)
+				}
+			}
+			// Every row triggers exactly one synchronous fetch: the first pod's stale
+			// taint forces it, and later pods are served from the refreshed cache.
+			assert.Equal(t, 1, getCount, "unexpected number of synchronous node fetches")
+			require.NotNil(t, kl.cachedNode, "synchronous fetch should populate the node cache")
+			assert.Equal(t, "2", kl.cachedNode.ResourceVersion, "node cache should hold the synchronously fetched node")
+		})
+	}
 }
 
 // Test verifies that HandlePodAdditions only tracks pod certificates for pods

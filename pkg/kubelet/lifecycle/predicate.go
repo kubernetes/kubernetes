@@ -252,13 +252,14 @@ func (w *predicateAdmitHandler) generalFilter(ctx context.Context, pod *v1.Pod, 
 
 	reasons := generalFilter(logger, pod, nodeInfo)
 	for _, r := range reasons {
-		if r.GetReason() != nodeaffinity.ErrReasonPod {
+		if r.GetReason() != nodeaffinity.ErrReasonPod && r.GetReason() != tainttoleration.ErrReasonNotMatch {
 			return reasons
 		}
 	}
 	if len(reasons) > 0 {
-		// If the only reason for failure is the node affinity labels, fetch the node synchronously
-		// and try again.
+		// If the only reasons for failure are node affinity labels and/or NoExecute taints, fetch the
+		// node synchronously and try again. Both are node spec attributes that other controllers change
+		// after the scheduler has already evaluated them, so the informer cache may be stale.
 
 		node, err := w.getNodeAnyWayFunc(ctx, false)
 		if err != nil {
