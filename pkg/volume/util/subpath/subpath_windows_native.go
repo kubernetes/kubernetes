@@ -95,6 +95,12 @@ func hardLinkTargets(path string) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
+	// Enumeration returns long names even when the input uses an 8.3 alias.
+	// Compare names in the same form so the input is not its own target.
+	absolute, err = longPathName(absolute)
+	if err != nil {
+		return nil, err
+	}
 	p, err := windows.UTF16PtrFromString(absolute)
 	if err != nil {
 		return nil, err
@@ -129,10 +135,31 @@ func hardLinkTargets(path string) ([]string, error) {
 	return targets, nil
 }
 
+func longPathName(path string) (string, error) {
+	p, err := windows.UTF16PtrFromString(path)
+	if err != nil {
+		return "", err
+	}
+	buffer := make([]uint16, MaxPathLength+1)
+	n, err := windows.GetLongPathName(p, &buffer[0], uint32(len(buffer)))
+	if err == nil && n >= uint32(len(buffer)) {
+		err = windows.ERROR_INSUFFICIENT_BUFFER
+	}
+	if err != nil {
+		return "", &os.PathError{Op: "long path name", Path: path, Err: err}
+	}
+	return windows.UTF16ToString(buffer[:n]), nil
+}
+
 // Called while the caller retains the file's lockPath handle. A hardlink with
 // a name outside the volume must not turn native resolution into a bypass of
 // the subPath containment check.
 func checkHardLinkTargets(path, volumePath string) error {
+	// Otherwise a valid long-name alias appears outside an 8.3 volume path.
+	volumePath, err := longPathName(volumePath)
+	if err != nil {
+		return err
+	}
 	targets, err := hardLinkTargets(path)
 	if err != nil {
 		return err

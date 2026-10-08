@@ -151,6 +151,11 @@ func TestEvalSymlinkNative(t *testing.T) {
 
 func TestNativeHardLinkTargets(t *testing.T) {
 	root := t.TempDir()
+	// TempDir may inherit a short-name TEMP path from the Windows account.
+	root, err := filepath.EvalSymlinks(root)
+	if err != nil {
+		t.Fatal(err)
+	}
 	file := filepath.Join(root, "file.cfg")
 	if err := os.WriteFile(file, []byte("fixture"), 0600); err != nil {
 		t.Fatal(err)
@@ -188,6 +193,59 @@ func TestNativeHardLinkTargets(t *testing.T) {
 		if err != nil || !strings.EqualFold(resolved, path) {
 			t.Fatalf("hardlink names must not cause redirect recursion: %q %v", resolved, err)
 		}
+	}
+}
+
+func TestNativeHardLinkShortPaths(t *testing.T) {
+	root, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	volume := filepath.Join(root, "long-volume-directory")
+	if err := os.Mkdir(volume, 0700); err != nil {
+		t.Fatal(err)
+	}
+	file := filepath.Join(volume, "file.cfg")
+	if err := os.WriteFile(file, []byte("fixture"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	alias := filepath.Join(volume, "alias.cfg")
+	if err := os.Link(file, alias); err != nil {
+		t.Fatal(err)
+	}
+	shortName := func(path string) string {
+		t.Helper()
+		p, err := windows.UTF16PtrFromString(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		buffer := make([]uint16, MaxPathLength+1)
+		n, err := windows.GetShortPathName(p, &buffer[0], uint32(len(buffer)))
+		if err != nil || n >= uint32(len(buffer)) {
+			t.Fatalf("short path %q: length=%d error=%v", path, n, err)
+		}
+		return windows.UTF16ToString(buffer[:n])
+	}
+	shortVolume, shortFile := shortName(volume), shortName(file)
+	if strings.EqualFold(shortVolume, volume) {
+		t.Skip("test filesystem does not provide 8.3 names")
+	}
+	targets, err := hardLinkTargets(shortFile)
+	if err != nil || len(targets) != 1 || !strings.EqualFold(targets[0], alias) {
+		t.Fatalf("short-name input must exclude itself: targets=%q error=%v; want %q", targets, err, alias)
+	}
+	handles, err := lockAndCheckSubPath(shortVolume, shortFile)
+	unlockPath(handles)
+	if err != nil {
+		t.Fatalf("alias inside short-name volume rejected: %v", err)
+	}
+	if err := os.Link(file, filepath.Join(root, "outside.cfg")); err != nil {
+		t.Fatal(err)
+	}
+	handles, err = lockAndCheckSubPath(shortVolume, shortFile)
+	unlockPath(handles)
+	if err == nil {
+		t.Fatal("alias outside short-name volume accepted")
 	}
 }
 
