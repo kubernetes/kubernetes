@@ -363,6 +363,36 @@ func createObject(t *testing.T, ctx context.Context, store storage.Interface) st
 	return out.ResourceVersion
 }
 
+func TestCompactPastLastWrite(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ListFromCacheSnapshot, true)
+	ctx, cacher, server, terminate := testSetupWithEtcdServer(t)
+	t.Cleanup(terminate)
+	recorder := server.V3Client.Kubernetes.(*storagetesting.KubernetesRecorder)
+
+	createObject(t, ctx, cacher)
+	resourceVersionPastLastWrite := fmt.Sprint(increaseRVFunc(server.V3Client.Client)(ctx, t))
+	list := storage.ListOptions{
+		Predicate:            storage.Everything,
+		ResourceVersionMatch: metav1.ResourceVersionMatchExact,
+		ResourceVersion:      resourceVersionPastLastWrite,
+		Recursive:            true,
+	}
+
+	t.Log("Before compaction, list skips etcd")
+	etcdRequests := etcdListRequests(t, ctx, cacher, recorder, list)
+	if len(etcdRequests) != 0 {
+		t.Errorf("Expected no requests to etcd, got: %+v", etcdRequests)
+	}
+
+	t.Log("Compaction keeps the listed resourceVersion, same list hits etcd")
+	compactStore(cacher, server.V3Client.Client)(ctx, t, resourceVersionPastLastWrite)
+	etcdRequests = etcdListRequests(t, ctx, cacher, recorder, list)
+	// TODO: Expect no requests to etcd, nothing was written since the cache served this list.
+	if len(etcdRequests) != 1 {
+		t.Errorf("Expected request to etcd, got: %+v", etcdRequests)
+	}
+}
+
 func etcdListRequests(t *testing.T, ctx context.Context, store storage.Interface, recorder *storagetesting.KubernetesRecorder, opts storage.ListOptions) []storagetesting.RecordedList {
 	key := rand.String(10)
 	listCtx := context.WithValue(ctx, storagetesting.RecorderContextKey, key)
