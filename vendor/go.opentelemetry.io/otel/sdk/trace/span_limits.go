@@ -10,6 +10,10 @@ const (
 	// attribute value length, unlimited.
 	DefaultAttributeValueLengthLimit = -1
 
+	// DefaultAttributeValueDepthLimit is the default maximum allowed depth for
+	// nested attribute values.
+	DefaultAttributeValueDepthLimit = 64
+
 	// DefaultAttributeCountLimit is the default maximum number of attributes
 	// a span can have.
 	DefaultAttributeCountLimit = 128
@@ -42,6 +46,20 @@ type SpanLimits struct {
 	//
 	// Setting this to a negative value means no limit is applied.
 	AttributeValueLengthLimit int
+
+	// AttributeValueDepthLimit is the maximum allowed depth for an attribute
+	// value. Depth starts at one for the top-level value and increments when
+	// descending into an array element or map value. An array or map beyond this
+	// depth is replaced by an empty value.
+	//
+	// This limit applies to span, event, link, and instrumentation scope
+	// attributes processed by a TracerProvider. It does not apply to Resource
+	// attributes.
+	//
+	// Setting this to zero means the default limit is used.
+	//
+	// Setting this to a negative value means no limit is applied.
+	AttributeValueDepthLimit int
 
 	// AttributeCountLimit is the maximum allowed span attribute count. Any
 	// attribute added to a span once this limit is reached will be dropped.
@@ -88,11 +106,14 @@ type SpanLimits struct {
 	AttributePerLinkCountLimit int
 }
 
-// NewSpanLimits returns a SpanLimits with all limits set to the value their
-// corresponding environment variable holds, or the default if unset.
+// NewSpanLimits returns a SpanLimits with all limits set to their default.
+// Limits with a corresponding environment variable are set from the
+// environment when the variable is defined.
 //
 // • AttributeValueLengthLimit: OTEL_SPAN_ATTRIBUTE_VALUE_LENGTH_LIMIT
 // (default: unlimited)
+//
+// • AttributeValueDepthLimit: default 64 (no environment variable)
 //
 // • AttributeCountLimit: OTEL_SPAN_ATTRIBUTE_COUNT_LIMIT (default: 128)
 //
@@ -107,6 +128,7 @@ type SpanLimits struct {
 func NewSpanLimits() SpanLimits {
 	return SpanLimits{
 		AttributeValueLengthLimit:   env.SpanAttributeValueLength(DefaultAttributeValueLengthLimit),
+		AttributeValueDepthLimit:    DefaultAttributeValueDepthLimit,
 		AttributeCountLimit:         env.SpanAttributeCount(DefaultAttributeCountLimit),
 		EventCountLimit:             env.SpanEventCount(DefaultEventCountLimit),
 		LinkCountLimit:              env.SpanLinkCount(DefaultLinkCountLimit),

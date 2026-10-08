@@ -6,5 +6,5 @@ package sdk
 
 // Version is the current release version of the OpenTelemetry SDK in use.
 func Version() string {
-	return "1.46.0"
+	return "1.47.0"
 }

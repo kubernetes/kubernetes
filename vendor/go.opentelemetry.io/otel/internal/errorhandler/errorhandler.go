@@ -21,6 +21,9 @@ type ErrorHandler interface {
 	Handle(error)
 }
 
+// ErrDelegator is an ErrorHandler that forwards errors to a delegate
+// ErrorHandler set with setDelegate. Before a delegate is set, it logs
+// errors to STDERR.
 type ErrDelegator struct {
 	delegate atomic.Pointer[ErrorHandler]
 }
@@ -28,6 +31,8 @@ type ErrDelegator struct {
 // Compile-time check that delegator implements ErrorHandler.
 var _ ErrorHandler = (*ErrDelegator)(nil)
 
+// Handle handles err by forwarding it to the configured delegate, or
+// logging it to STDERR if no delegate is set.
 func (d *ErrDelegator) Handle(err error) {
 	if eh := d.delegate.Load(); eh != nil {
 		(*eh).Handle(err)
