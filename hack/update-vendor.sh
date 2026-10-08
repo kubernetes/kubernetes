@@ -31,8 +31,9 @@ kube::golang::setup_env
 export GOWORK=off
 # Explicitly opt into go modules
 export GO111MODULE=on
-# Explicitly set GOFLAGS to ignore vendor, since GOFLAGS=-mod=vendor breaks dependency resolution while rebuilding vendor
-export GOFLAGS=-mod=mod
+# Read module information from go.mod files, not the vendor directory. readonly, not mod: `go list -m all` in
+# mod mode records go.sum lines that `go mod tidy` does not want, so tidy and list would fight over go.sum.
+export GOFLAGS=-mod=readonly
 # Ensure sort order doesn't depend on locale
 export LANG=C
 export LC_ALL=C
