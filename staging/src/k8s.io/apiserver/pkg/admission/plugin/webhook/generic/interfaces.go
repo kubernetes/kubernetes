@@ -22,6 +22,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook"
+	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 )
 
 type VersionedAttributeAccessor interface {
@@ -49,5 +50,5 @@ type Dispatcher interface {
 	// call a hook, either because the rules of the hook does not match, or
 	// the namespaceSelector or the objectSelector of the hook does not
 	// match. A non-nil error means the request is rejected.
-	Dispatch(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces, hooks []webhook.WebhookAccessor) error
+	Dispatch(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces, client corev1.ServiceAccountInterface, hooks []webhook.WebhookAccessor) error
 }

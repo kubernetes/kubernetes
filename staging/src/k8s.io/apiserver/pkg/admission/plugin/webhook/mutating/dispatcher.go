@@ -26,6 +26,7 @@ import (
 
 	"go.opentelemetry.io/otel/attribute"
 	jsonpatch "gopkg.in/evanphx/json-patch.v4"
+	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 
 	admissionv1 "k8s.io/api/admission/v1"
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
@@ -66,9 +67,9 @@ const (
 )
 
 type mutatingDispatcher struct {
-	cm     *webhookutil.ClientManager
-	plugin *Plugin
-	// tokenAccessor // cached client corev1serviceaccount client
+	cm            *webhookutil.ClientManager
+	plugin        *Plugin
+	tokenAccessor corev1.ServiceAccountInterface
 }
 
 func newMutatingDispatcher(p *Plugin) func(cm *webhookutil.ClientManager) generic.Dispatcher {
@@ -103,7 +104,7 @@ func (v *versionedAttributeAccessor) VersionedAttribute(gvk schema.GroupVersionK
 
 var _ generic.Dispatcher = &mutatingDispatcher{}
 
-func (a *mutatingDispatcher) Dispatch(ctx context.Context, attr admission.Attributes, o admission.ObjectInterfaces, hooks []webhook.WebhookAccessor) error {
+func (a *mutatingDispatcher) Dispatch(ctx context.Context, attr admission.Attributes, o admission.ObjectInterfaces, saclient corev1.ServiceAccountInterface, hooks []webhook.WebhookAccessor) error {
 	reinvokeCtx := attr.GetReinvocationContext()
 	var webhookReinvokeCtx *webhookReinvokeContext
 	if v := reinvokeCtx.Value(PluginName); v != nil {
@@ -112,6 +113,8 @@ func (a *mutatingDispatcher) Dispatch(ctx context.Context, attr admission.Attrib
 		webhookReinvokeCtx = &webhookReinvokeContext{}
 		reinvokeCtx.SetValue(PluginName, webhookReinvokeCtx)
 	}
+
+	// a.tokenAccessor.CreateToken()
 
 	if reinvokeCtx.IsReinvoke() && webhookReinvokeCtx.IsOutputChangedSinceLastWebhookInvocation(attr.GetObject()) {
 		// If the object has changed, we know the in-tree plugin re-invocations have mutated the object,
