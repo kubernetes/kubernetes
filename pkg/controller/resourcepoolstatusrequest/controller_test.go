@@ -511,19 +511,12 @@ func TestSyncRequest(t *testing.T) {
 	}
 }
 
-func TestSyncRequestRequeuesIncompletePool(t *testing.T) {
+func TestIncompletePoolEventuallyGetsTerminalStatus(t *testing.T) {
 	_, ctx := ktesting.NewTestContext(t)
 
-	request := &resourcev1alpha3.ResourcePoolStatusRequest{
-		ObjectMeta: metav1.ObjectMeta{Name: "test-request"},
-		Spec: resourcev1alpha3.ResourcePoolStatusRequestSpec{
-			Driver: "test.example.com",
-		},
-	}
-
+	request := makeRequest("test.example.com")
 	fakeClient := fake.NewClientset(request)
 	informerFactory := informers.NewSharedInformerFactory(fakeClient, 0)
-
 	controller, err := NewController(ctx, fakeClient,
 		informerFactory.Resource().V1alpha3().ResourcePoolStatusRequests(),
 		informerFactory.Resource().V1().ResourceSlices(),
@@ -534,45 +527,127 @@ func TestSyncRequestRequeuesIncompletePool(t *testing.T) {
 		t.Fatalf("Failed to create controller: %v", err)
 	}
 
-	// Add request to informer
-	err = informerFactory.Resource().V1alpha3().ResourcePoolStatusRequests().Informer().GetStore().Add(request)
-	if err != nil {
+	if err := informerFactory.Resource().V1alpha3().ResourcePoolStatusRequests().Informer().GetStore().Add(request); err != nil {
 		t.Fatalf("Failed to add request to informer: %v", err)
 	}
-
-	// Add an incomplete pool (expects 3 slices, only 1 published)
-	slice := makeSliceWithExpectedCount("slice-1", "test.example.com", "pool-1", "node-1", 4, 1, 3)
-	err = informerFactory.Resource().V1().ResourceSlices().Informer().GetStore().Add(slice)
-	if err != nil {
-		t.Fatalf("Failed to add slice to informer: %v", err)
+	if err := informerFactory.Resource().V1().ResourceSlices().Informer().GetStore().Add(
+		makeSliceWithExpectedCount("slice-1", "test.example.com", "pool-1", "node-1", 4, 1, 4),
+	); err != nil {
+		t.Fatalf("Failed to add incomplete slice to informer: %v", err)
 	}
 
-	// syncRequest should always return an error for incomplete pools,
-	// letting processNextWorkItem handle retry counting and drop logic.
-	err = controller.syncRequest(ctx, "test-request")
-	if err == nil {
-		t.Fatal("Expected syncRequest to return error for incomplete pool requeue, got nil")
-	}
+	controller.workqueue.Add(request.Name)
 
-	// Verify no status update was made
-	for _, action := range fakeClient.Actions() {
-		if action.GetVerb() == "update" && action.GetSubresource() == "status" {
-			t.Error("Should not update status when requeueing for incomplete pools")
+	// Process up to maxRetries + 1 (the initial attempt + maxRetries retries)
+	for i := 0; i <= maxRetries; i++ {
+		if !controller.processNextWorkItem(ctx) {
+			t.Fatal("worker stopped unexpectedly")
 		}
 	}
 
-	// Even after retries are exhausted, syncRequest still returns an error;
-	// it is processNextWorkItem that decides to drop the key.
-	for range maxRetries {
-		controller.workqueue.AddRateLimited("test-request")
-		key, _ := controller.workqueue.Get()
-		controller.workqueue.Done(key)
+	// At this point, the retry budget is exhausted and partial status should be written.
+	updated, err := fakeClient.ResourceV1alpha3().ResourcePoolStatusRequests().Get(ctx, request.Name, metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("Failed to get request: %v", err)
+	}
+	if updated.Status == nil {
+		t.Fatal("expected request status to be set after retry exhaustion")
+	}
+	if len(updated.Status.Pools) != 1 {
+		t.Fatalf("expected 1 pool, got %d", len(updated.Status.Pools))
+	}
+	if updated.Status.Pools[0].ValidationError == nil {
+		t.Fatal("expected ValidationError to be set")
+	}
+	if !strings.Contains(*updated.Status.Pools[0].ValidationError, "is incomplete") {
+		t.Fatalf("expected ValidationError to mention incomplete pool, got %s", *updated.Status.Pools[0].ValidationError)
 	}
 
-	fakeClient.ClearActions()
-	err = controller.syncRequest(ctx, "test-request")
-	if err == nil {
-		t.Fatal("Expected syncRequest to still return error for incomplete pools after retries exhausted")
+	// The request should no longer be in the queue
+	if controller.workqueue.Len() > 0 {
+		t.Fatal("expected workqueue to be empty after retry exhaustion")
+	}
+}
+
+func TestIncompletePoolCompletesSuccessfully(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+
+	request := makeRequest("test.example.com")
+	fakeClient := fake.NewClientset(request)
+	informerFactory := informers.NewSharedInformerFactory(fakeClient, 0)
+	controller, err := NewController(ctx, fakeClient,
+		informerFactory.Resource().V1alpha3().ResourcePoolStatusRequests(),
+		informerFactory.Resource().V1().ResourceSlices(),
+		informerFactory.Resource().V1().ResourceClaims(),
+		informerFactory.Resource().V1().DeviceTaintRules(),
+	)
+	if err != nil {
+		t.Fatalf("Failed to create controller: %v", err)
+	}
+
+	if err := informerFactory.Resource().V1alpha3().ResourcePoolStatusRequests().Informer().GetStore().Add(request); err != nil {
+		t.Fatalf("Failed to add request to informer: %v", err)
+	}
+
+	// Add 1 out of 2 expected slices
+	if err := informerFactory.Resource().V1().ResourceSlices().Informer().GetStore().Add(
+		makeSliceWithExpectedCount("slice-1", "test.example.com", "pool-1", "node-1", 4, 1, 2),
+	); err != nil {
+		t.Fatalf("Failed to add incomplete slice to informer: %v", err)
+	}
+
+	controller.workqueue.Add(request.Name)
+
+	// Process the initial request (it should requeue because it's incomplete)
+	if !controller.processNextWorkItem(ctx) {
+		t.Fatal("worker stopped unexpectedly")
+	}
+
+	// Verify it was requeued and status is still nil
+	updated, err := fakeClient.ResourceV1alpha3().ResourcePoolStatusRequests().Get(ctx, request.Name, metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("Failed to get request: %v", err)
+	}
+	if updated.Status != nil {
+		t.Fatal("expected request status to remain nil while incomplete and retrying")
+	}
+	if controller.workqueue.NumRequeues(request.Name) != 1 {
+		t.Fatalf("expected request to be requeued, NumRequeues = %d", controller.workqueue.NumRequeues(request.Name))
+	}
+
+	// Now add the missing slice to complete the pool
+	if err := informerFactory.Resource().V1().ResourceSlices().Informer().GetStore().Add(
+		makeSliceWithExpectedCount("slice-2", "test.example.com", "pool-1", "node-1", 4, 1, 2),
+	); err != nil {
+		t.Fatalf("Failed to add completed slice to informer: %v", err)
+	}
+
+	// Process the requeued item
+	if !controller.processNextWorkItem(ctx) {
+		t.Fatal("worker stopped unexpectedly")
+	}
+
+	// Status should now be written and complete
+	updated, err = fakeClient.ResourceV1alpha3().ResourcePoolStatusRequests().Get(ctx, request.Name, metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("Failed to get request: %v", err)
+	}
+	if updated.Status == nil {
+		t.Fatal("expected request status to be set after pool became complete")
+	}
+	if len(updated.Status.Pools) != 1 {
+		t.Fatalf("expected 1 pool, got %d", len(updated.Status.Pools))
+	}
+	if updated.Status.Pools[0].ValidationError != nil {
+		t.Fatalf("expected ValidationError to be nil, got %v", *updated.Status.Pools[0].ValidationError)
+	}
+	if updated.Status.Pools[0].TotalDevices == nil || *updated.Status.Pools[0].TotalDevices != 8 {
+		t.Fatalf("expected TotalDevices to be 8, got %v", updated.Status.Pools[0].TotalDevices)
+	}
+
+	// The request should no longer be in the queue
+	if controller.workqueue.Len() > 0 {
+		t.Fatal("expected workqueue to be empty after successful processing")
 	}
 }
 
