@@ -170,18 +170,7 @@ func (w *predicateAdmitHandler) Admit(ctx context.Context, attrs *PodAdmitAttrib
 		}
 	}
 
-	// Remove the requests of the extended resources that are missing in the
-	// node info. This is required to support cluster-level resources, which
-	// are extended resources unknown to nodes, and also extended resources
-	// backed by DRA.
-	//
-	// Caveat: If a pod was manually bound to a node (e.g., static pod) where a
-	// node-level extended resource it requires is not found, then kubelet will
-	// not fail admission while it should. This issue will be addressed with
-	// the Resource Class API in the future.
-	podWithoutMissingExtendedResources := removeMissingExtendedResources(admitPod, nodeInfo)
-
-	reasons := w.generalFilter(ctx, podWithoutMissingExtendedResources, nodeInfo)
+	reasons := w.generalFilter(ctx, attrs, nodeInfo)
 	fit := len(reasons) == 0
 	if !fit {
 		reasons, err = w.admissionFailureHandler.HandleAdmissionFailure(ctx, admitPod, reasons, attrs.Operation)
@@ -246,9 +235,21 @@ func (w *predicateAdmitHandler) Admit(ctx context.Context, attrs *PodAdmitAttrib
 	}
 }
 
-// generalFilter checks a group of filterings that the kubelet cares about.
-func (w *predicateAdmitHandler) generalFilter(ctx context.Context, pod *v1.Pod, nodeInfo *schedulerframework.NodeInfo) []PredicateFailureReason {
+// generalFilter checks a group of filterings that the kubelet cares about. The caller must
+// already have applied pluginResourceUpdateFunc to nodeInfo; the retry path re-applies it.
+func (w *predicateAdmitHandler) generalFilter(ctx context.Context, attrs *PodAdmitAttributes, nodeInfo *schedulerframework.NodeInfo) []PredicateFailureReason {
 	logger := klog.FromContext(ctx)
+
+	// Remove the requests of the extended resources that are missing in the
+	// node info. This is required to support cluster-level resources, which
+	// are extended resources unknown to nodes, and also extended resources
+	// backed by DRA.
+	//
+	// Caveat: If a pod was manually bound to a node (e.g., static pod) where a
+	// node-level extended resource it requires is not found, then kubelet will
+	// not fail admission while it should. This issue will be addressed with
+	// the Resource Class API in the future.
+	pod := removeMissingExtendedResources(attrs.Pod, nodeInfo)
 
 	reasons := generalFilter(logger, pod, nodeInfo)
 	for _, r := range reasons {
@@ -267,6 +268,17 @@ func (w *predicateAdmitHandler) generalFilter(ctx context.Context, pod *v1.Pod, 
 			return reasons
 		}
 		nodeInfo.SetNode(node)
+		// SetNode rebuilt Allocatable from the fresh node, which discards the device plugin
+		// adjustments applied before the first pass. Re-apply them so a pod that already holds
+		// devices is not rejected on the retry; the device manager only raises allocatable.
+		if err := w.pluginResourceUpdateFunc(nodeInfo, attrs); err != nil {
+			logger.Error(err, "Failed to update plugin resources after synchronously fetching node info", "pod", klog.KObj(attrs.Pod))
+			return reasons
+		}
+		// The fresh node may know a different set of extended resources, so strip again. This
+		// must follow the plugin update, as in Admit: the device manager can add a resource the
+		// fresh node does not list, and that request has to be checked rather than stripped.
+		pod = removeMissingExtendedResources(attrs.Pod, nodeInfo)
 		reasons = generalFilter(logger, pod, nodeInfo)
 	}
 
