@@ -271,6 +271,65 @@ func cmpDec(x, y *inf.Dec) int {
 	return x.Cmp(y)
 }
 
+// maxAddDigits is how many significant digits addDec keeps. Every sum of
+// quantities between 1n and the int64 range needs at most 29.
+const maxAddDigits = 64
+
+// maxAddCoefficient is 10^maxAddDigits, the smallest coefficient with more
+// than maxAddDigits digits. Treat as read only.
+var maxAddCoefficient = new(big.Int).Exp(bigTen, big.NewInt(maxAddDigits), nil)
+
+// addDec returns x + y, or x - y when sub is true, rounded away from zero to
+// maxAddDigits significant digits when the exact result has more.
+func addDec(x, y *inf.Dec, sub bool) *inf.Dec {
+	z := new(inf.Dec)
+	switch {
+	case y.Sign() == 0:
+		z.Set(x)
+	case x.Sign() == 0 && sub:
+		z.Neg(y)
+	case x.Sign() == 0:
+		z.Set(y)
+	case sub:
+		z.Sub(addend(x, y), addend(y, x))
+	default:
+		z.Add(addend(x, y), addend(y, x))
+	}
+	return roundAddDigits(z)
+}
+
+// addend returns small, or a stand-in for it in small + large. When all of
+// small lies below both large's last digit and the last digit addDec keeps,
+// only small's sign can change the rounded sum. The stand-in is then one unit
+// of that sign just below both.
+func addend(small, large *inf.Dec) *inf.Dec {
+	_, smallHi := decimalExponentBounds(small.UnscaledBig().BitLen(), widenInfScale(small.Scale()))
+	largeLo, _ := decimalExponentBounds(large.UnscaledBig().BitLen(), widenInfScale(large.Scale()))
+	below := min(widenInfScale(large.Scale()), largeLo-maxAddDigits)
+	if smallHi > below {
+		return small
+	}
+	// smallHi <= below keeps below-1 inside the Scale range.
+	scale, _ := narrowScale(below - 1)
+	return inf.NewDec(int64(small.Sign()), scale.infScale())
+}
+
+// roundAddDigits rounds z away from zero to maxAddDigits significant digits.
+// A z that would need a scale above the Scale range to round stays exact.
+func roundAddDigits(z *inf.Dec) *inf.Dec {
+	unscaled := z.UnscaledBig()
+	if unscaled.CmpAbs(maxAddCoefficient) < 0 {
+		return z
+	}
+	digits := len(new(big.Int).Abs(unscaled).String())
+	scale, fits := narrowScale(widenInfScale(z.Scale()) + widenedScale(digits-maxAddDigits))
+	if !fits {
+		return z
+	}
+	rounded, _ := infDecAmount{z}.AsScale(scale)
+	return rounded.Dec
+}
+
 // Add adds two int64Amounts together, matching scales. It will return false and not mutate
 // a if overflow or underflow would result.
 func (a *int64Amount) Add(b int64Amount) bool {
@@ -288,7 +347,12 @@ func (a *int64Amount) Add(b int64Amount) bool {
 		}
 		a.value = c
 	case a.scale > b.scale:
-		c, ok := positiveScaleInt64(a.value, a.scale-b.scale)
+		// Widen first: the delta of two int32 scales can need 33 bits.
+		up, fits := narrowScale(a.widenedScale() - b.widenedScale())
+		if !fits {
+			return false
+		}
+		c, ok := positiveScaleInt64(a.value, up)
 		if !ok {
 			return false
 		}
@@ -299,7 +363,12 @@ func (a *int64Amount) Add(b int64Amount) bool {
 		a.scale = b.scale
 		a.value = c
 	default:
-		c, ok := positiveScaleInt64(b.value, b.scale-a.scale)
+		// Widen first: the delta of two int32 scales can need 33 bits.
+		up, fits := narrowScale(b.widenedScale() - a.widenedScale())
+		if !fits {
+			return false
+		}
+		c, ok := positiveScaleInt64(b.value, up)
 		if !ok {
 			return false
 		}
@@ -371,7 +440,11 @@ func (a int64Amount) AsScale(scale Scale) (int64Amount, bool) {
 	if a.scale >= scale {
 		return a, true
 	}
-	result, exact := negativeScaleInt64(a.value, scale-a.scale)
+	down, fits := narrowScale(widenScale(scale) - a.widenedScale())
+	if !fits { // The scale drop overflows int32
+		down = log10MaxInt64 // Use the largest possible (19 digit) scale drop
+	}
+	result, exact := negativeScaleInt64(a.value, down)
 	return int64Amount{value: result, scale: scale}, exact
 }
 
