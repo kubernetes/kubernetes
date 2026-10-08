@@ -37,7 +37,7 @@ reproduce them. A bug counts as reproducible once its fix has been reverted and
 | Consistent list from the watch cache ignores `resourceVersion=0` [#123676] | Mar 2024 | cacher | Maintainer | No, consistent read satisfies `NotOlderThan 0` | `./test/integration/apiserver/storage/reproduce.sh 123676` |
 | Watch of a single namespace missing all events [#125133] | May 2024 | cacher | User | Yes | `./test/integration/apiserver/storage/reproduce.sh 125133` |
 | Bookmark RV not synced to list RV [#125244] | May 2024 | cacher | CI flake | No, bookmarks are only requested on WatchList | `./test/integration/apiserver/storage/reproduce.sh 125244` |
-| Recursive list from the watch cache returns items outside the key prefix [#125584] | Jun 2024 | cacher | Maintainer | No, test namespaces do not share a string prefix | `./test/integration/apiserver/storage/reproduce.sh 125584` |
+| Recursive list from the watch cache returns items outside the key prefix [#125584] | Jun 2024 | cacher | Maintainer | Yes | `./test/integration/apiserver/storage/reproduce.sh 125584` |
 | `sendInitialEvents` returns non-ADDED events before initial BOOKMARK [#134831] | Oct 2025 | cacher | User | Yes | `./test/integration/apiserver/storage/reproduce.sh 134831` |
 | WatchList on an unrecognized (too large) RV hangs instead of erroring [#135452] | Nov 2025 | cacher, etcd3 | User | Yes | `./test/integration/apiserver/storage/reproduce.sh 135452` |
 | `Delete` and `GuaranteedUpdate` on a non-existent key return `ResourceVersion=0` on `KeyNotFoundError` [#138724] | May 2026 | cacher, etcd3 | Maintainer | Yes | `./test/integration/apiserver/storage/reproduce.sh 138724` |
