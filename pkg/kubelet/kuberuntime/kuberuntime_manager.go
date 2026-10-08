@@ -834,13 +834,48 @@ func (m *kubeGenericRuntimeManager) InitializeActuatedPod(logger klog.Logger, al
 	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
 		return
 	}
-	if _, ok := m.actuatedState.GetPodResourceInfo(allocatedPod.UID); ok {
+	if m.actuatedState.HasPod(allocatedPod.UID) {
 		return
 	}
-	info := allocation.ResourceInfoForPod(allocatedPod)
-	if err := m.actuatedState.SetPodResourceInfo(logger, allocatedPod.UID, info); err != nil {
+	actuatedPod := keepOnlyResourceValues(allocatedPod)
+	if err := m.actuatedState.SetPod(logger, actuatedPod); err != nil {
 		logger.Error(err, "Failed to initialize actuated pod resource info checkpoint", "pod", klog.KObj(allocatedPod))
 	}
+}
+
+// keepOnlyResourceValues returns a pod with only the resizable resources of allocatedPod, because
+// those are all the actuated state holds. They are shared with allocatedPod, not copied: SetPod
+// copies what it stores.
+func keepOnlyResourceValues(allocatedPod *v1.Pod) *v1.Pod {
+	actuatedPod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{UID: allocatedPod.UID, Name: allocatedPod.Name, Namespace: allocatedPod.Namespace},
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling) && allocatedPod.Spec.Resources != nil {
+		actuatedPod.Spec.Resources = allocatedPod.Spec.Resources
+	}
+	for container, containerType := range podutil.ContainerIter(&allocatedPod.Spec, podutil.InitContainers|podutil.Containers) {
+		if !allocation.IsResizableContainer(container, containerType) {
+			continue
+		}
+		actuated := v1.Container{Name: container.Name, Resources: container.Resources}
+		if containerType == podutil.InitContainers {
+			actuatedPod.Spec.InitContainers = append(actuatedPod.Spec.InitContainers, actuated)
+		} else {
+			actuatedPod.Spec.Containers = append(actuatedPod.Spec.Containers, actuated)
+		}
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingMemoryBackedVolumes) {
+		for _, vol := range allocatedPod.Spec.Volumes {
+			if !allocation.VolHasMemoryBackedEmptyDirSizeLimit(&vol) {
+				continue
+			}
+			actuatedPod.Spec.Volumes = append(actuatedPod.Spec.Volumes, v1.Volume{
+				Name:         vol.Name,
+				VolumeSource: v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{SizeLimit: vol.EmptyDir.SizeLimit}},
+			})
+		}
+	}
+	return actuatedPod
 }
 
 func (m *kubeGenericRuntimeManager) getActuatedEmptyDirVolumeLimit(logger klog.Logger, pod *v1.Pod, volName string) *resource.Quantity {
@@ -2289,7 +2324,7 @@ func (m *kubeGenericRuntimeManager) GetContainerStatus(ctx context.Context, podU
 func (m *kubeGenericRuntimeManager) GarbageCollect(ctx context.Context, gcPolicy kubecontainer.GCPolicy, allSourcesReady bool, evictNonDeletedPods bool) error {
 	logger := klog.FromContext(ctx)
 	// Remove terminated pods from the actuated state.
-	for uid := range m.actuatedState.GetPodResourceInfoMap() {
+	for _, uid := range m.actuatedState.GetPodUIDs() {
 		if m.podStateProvider.ShouldPodContentBeRemoved(uid) {
 			if err := m.actuatedState.RemovePod(logger, uid); err != nil {
 				// No need to act on the error beyond logging it here.

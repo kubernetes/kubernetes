@@ -5133,6 +5133,7 @@ func TestDoPodResizeAction(t *testing.T) {
 
 			updateInfo := containerToUpdateInfo{
 				container:                 &pod.Spec.Containers[0],
+				containerType:             podutil.Containers,
 				kubeContainerID:           kps.ContainerStatuses[0].ID,
 				desiredContainerResources: tc.desiredResources,
 				currentContainerResources: &tc.currentResources,
@@ -5815,6 +5816,7 @@ func TestValidatePodResizeAction(t *testing.T) {
 
 			updateInfo := containerToUpdateInfo{
 				container:                 &pod.Spec.Containers[0],
+				containerType:             podutil.Containers,
 				kubeContainerID:           kps.ContainerStatuses[0].ID,
 				desiredContainerResources: tc.desiredResources,
 				currentContainerResources: &tc.currentResources,

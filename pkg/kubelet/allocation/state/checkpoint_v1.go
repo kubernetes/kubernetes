@@ -47,33 +47,6 @@ type PodResourceCheckpointInfo struct {
 	Entries PodResourceInfoMap `json:"entries,omitempty"`
 }
 
-// Clone returns a copy of PodResourceInfoMap
-func (pr PodResourceInfoMap) Clone() PodResourceInfoMap {
-	prCopy := make(PodResourceInfoMap)
-	for podUID, podInfo := range pr {
-		newPodInfo := PodResourceInfo{
-			ContainerResources: make(map[string]v1.ResourceRequirements),
-			PodLevelResources:  podInfo.PodLevelResources.DeepCopy(),
-		}
-		for containerName, containerInfo := range podInfo.ContainerResources {
-			newPodInfo.ContainerResources[containerName] = *containerInfo.DeepCopy()
-		}
-		if podInfo.EmptyDirVolumeLimits != nil {
-			newPodInfo.EmptyDirVolumeLimits = make(map[string]*resource.Quantity)
-			for volumeName, volumeLimit := range podInfo.EmptyDirVolumeLimits {
-				if volumeLimit == nil {
-					newPodInfo.EmptyDirVolumeLimits[volumeName] = nil
-				} else {
-					vl := volumeLimit.DeepCopy()
-					newPodInfo.EmptyDirVolumeLimits[volumeName] = &vl
-				}
-			}
-		}
-		prCopy[podUID] = newPodInfo
-	}
-	return prCopy
-}
-
 // migrateV1ToV2 converts the JSON payload of a V1 checkpoint into a PodList.
 //
 // V1 did not record container types, so every container ends up in Spec.Containers, and nothing but
