@@ -1034,7 +1034,7 @@ func (m *kubeGenericRuntimeManager) doPodResizeAction(ctx context.Context, pod *
 				if err := m.runtimeHelper.ResizeEphemeralVolume(pod, vol.Name, desiredSize); err != nil {
 					return fmt.Errorf("failed to resize volume %s: %w", vol.Name, err)
 				}
-				if err := m.actuatedState.SetEmptyDirVolumeLimit(pod.UID, vol.Name, desiredSize); err != nil {
+				if err := m.actuatedState.SetEmptyDirVolumeLimit(logger, pod.UID, vol.Name, desiredSize); err != nil {
 					return fmt.Errorf("failed to update actuated emptyDir volume limit checkpoint for %s: %w", vol.Name, err)
 				}
 			}
@@ -1273,7 +1273,7 @@ func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *
 	logger := klog.FromContext(ctx)
 	logger.V(5).Info("Syncing Pod", "pod", klog.KObj(pod))
 
-	createPodSandbox, attempt, sandboxID, _ := runtimeutil.PodSandboxChanged(pod, podStatus)
+	createPodSandbox, attempt, sandboxID, _ := runtimeutil.PodSandboxChanged(logger, pod, podStatus)
 	changes := podActions{
 		KillPod:           createPodSandbox,
 		CreateSandbox:     createPodSandbox,

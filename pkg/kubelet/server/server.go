@@ -539,7 +539,7 @@ func (s *Server) InstallAuthNotRequiredHandlers(ctx context.Context) {
 	r := compbasemetrics.NewKubeRegistry()
 	r.RawMustRegister(metrics.NewPrometheusMachineCollector(prometheusHostAdapter{s.host}, includedMetrics))
 	if utilfeature.DefaultFeatureGate.Enabled(features.PodAndContainerStatsFromCRI) {
-		r.CustomRegister(collectors.NewCRIMetricsCollector(context.TODO(), s.host.ListPodSandboxMetrics, s.host.ListMetricDescriptors))
+		r.CustomRegister(collectors.NewCRIMetricsCollector(ctx, s.host.ListPodSandboxMetrics, s.host.ListMetricDescriptors))
 		servermetrics.SetMetricsProvider(servermetrics.CRIMetricsProvider)
 	} else {
 		cadvisorOpts := cadvisorapi.RequestOptions{

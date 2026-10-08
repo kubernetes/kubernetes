@@ -145,8 +145,7 @@ func (s *stateMemory) SetPodLevelResources(logger klog.Logger, podUID types.UID,
 	return nil
 }
 
-func (s *stateMemory) SetEmptyDirVolumeLimit(podUID types.UID, volumeName string, limit *resource.Quantity) error {
-	logger := klog.TODO()
+func (s *stateMemory) SetEmptyDirVolumeLimit(logger klog.Logger, podUID types.UID, volumeName string, limit *resource.Quantity) error {
 	s.Lock()
 	defer s.Unlock()
 

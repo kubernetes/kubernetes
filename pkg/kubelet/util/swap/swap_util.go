@@ -125,15 +125,11 @@ func isSwapOnAccordingToProcSwaps(logger klog.Logger, procSwapsContent []byte) b
 // IsSwapOn detects whether swap in enabled on the system by inspecting
 // /proc/swaps. If the file does not exist, an os.NotFound error will be returned.
 // If running on windows, swap is assumed to always be false.
-func IsSwapOn() (bool, error) {
+func IsSwapOn(logger klog.Logger) (bool, error) {
 	isSwapOnHelper := func() (bool, error) {
 		if sysruntime.GOOS == "windows" {
 			return false, nil
 		}
-
-		// TODO: it needs to be replaced by a proper context in the future
-		ctx := context.TODO()
-		logger := klog.FromContext(ctx)
 
 		const swapFilePath = "/proc/swaps"
 		procSwapsContent, err := os.ReadFile(swapFilePath)

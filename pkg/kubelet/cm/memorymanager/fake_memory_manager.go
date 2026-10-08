@@ -99,8 +99,8 @@ func (m *fakeManager) GetMemory(logger klog.Logger, podUID, containerName string
 }
 
 // GetPodMemory returns the memory allocated by a pod from NUMA nodes
-func (m *fakeManager) GetPodMemory(podUID string) []state.Block {
-	logger := klog.LoggerWithValues(klog.TODO(), "podUID", podUID)
+func (m *fakeManager) GetPodMemory(logger klog.Logger, podUID string) []state.Block {
+	logger = klog.LoggerWithValues(logger, "podUID", podUID)
 	logger.Info("Get Pod Memory")
 	return []state.Block{}
 }

@@ -80,7 +80,7 @@ type writer interface {
 	SetContainerResources(logger klog.Logger, podUID types.UID, containerName string, resources v1.ResourceRequirements) error
 	SetPodResourceInfo(logger klog.Logger, podUID types.UID, resourceInfo PodResourceInfo) error
 	SetPodLevelResources(logger klog.Logger, podUID types.UID, alloc *v1.ResourceRequirements) error
-	SetEmptyDirVolumeLimit(podUID types.UID, volumeName string, limit *resource.Quantity) error
+	SetEmptyDirVolumeLimit(logger klog.Logger, podUID types.UID, volumeName string, limit *resource.Quantity) error
 	RemovePod(logger klog.Logger, podUID types.UID) error
 	// RemoveOrphanedPods removes the stored state for any pods not included in the set of remaining pods.
 	RemoveOrphanedPods(remainingPods sets.Set[types.UID])
