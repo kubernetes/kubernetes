@@ -463,14 +463,31 @@ func ParseQuantity(str string) (Quantity, error) {
 	// if you want some resources, you should get some resources, even if you asked for way too small
 	// of an amount.  Arguably, this should be inf.RoundHalfUp (normal rounding), but that would have
 	// the side effect of rounding values < .5n to zero.
+	int64tainted := false
 	if v, ok := amount.Unscaled(); v != int64(0) || !ok {
-		amount.Round(amount, Nano.infScale(), inf.RoundUp)
+		if amount.Scale() <= Nano.infScale() { // // At most 9 digits (nano precision) after the decimal point? Trailing zeros count.
+			amount.Round(amount, Nano.infScale(), inf.RoundUp) // Pad with zeros to the nano scale. No precision is lost.
+		} else if amount.Round(amount, Nano.infScale(), inf.RoundExact) == nil {
+			// Dec.Round returned nil, which means the value is not representable in nano scale,
+			// so we round it and loose precision.
+			amount.Round(amount, Nano.infScale(), inf.RoundUp)
+			int64tainted = true
+		}
+	}
+
+	// A whole BinarySI value, such as 1.5Gi, keeps no fractional digits, so
+	// AsInt64 returns its value as it does for the int64 form.
+	if format == BinarySI && amount.Scale() > 0 {
+		if whole := new(inf.Dec).Round(amount, 0, inf.RoundExact); whole != nil {
+			amount.Set(whole)
+		}
 	}
 
 	// The max is just a simple cap.
 	// TODO: this prevents accumulating quantities greater than int64, for instance quota across a cluster
 	if format == BinarySI && amount.Cmp(maxAllowed.Dec) > 0 {
 		amount.Set(maxAllowed.Dec)
+		int64tainted = true
 	}
 
 	if format == BinarySI && amount.Cmp(decOne) < 0 && amount.Cmp(decZero) > 0 {
@@ -481,7 +498,7 @@ func ParseQuantity(str string) (Quantity, error) {
 		amount.Neg(amount)
 	}
 
-	q := Quantity{d: infDecAmount{amount}, Format: format}
+	q := Quantity{d: infDecAmount{Dec: amount, int64tainted: int64tainted}, Format: format}
 	q.CacheString()
 	return q, nil
 }
@@ -628,13 +645,26 @@ func (q *Quantity) AsFloat64Slow() float64 {
 	return result
 }
 
-// AsInt64 returns a representation of the current value as an int64 if a fast conversion
-// is possible. If false is returned, callers must use the inf.Dec form of this quantity.
+// AsInt64 returns the value as an int64 when the quantity is stored without
+// fractional digits and the value fits in an int64.
+//
+// A quantity stored with fractional digits returns false even when its value is
+// whole, such as 1000m. Otherwise a value outside the int64 range returns false
+// and saturates to math.MinInt64 or math.MaxInt64. To get the value rounded to a
+// whole number use Value or ScaledValue. To get the exact value use AsDec.
 func (q *Quantity) AsInt64() (int64, bool) {
-	if q.d.Dec != nil {
+	if q.d.Dec == nil {
+		return q.i.AsInt64()
+	}
+	// If the Dec value is tainted for int64 use (for example, rounded during ParseQuantity or parsed from sub-integer units like millis), return false
+	if q.d.int64tainted {
 		return 0, false
 	}
-	return q.i.AsInt64()
+	if q.d.Dec.Scale() > 0 {
+		// has a fractional part that cannot be represented as an int64
+		return 0, false
+	}
+	return q.AsScaledInt64(0)
 }
 
 // ToDec promotes the quantity in place to use an inf.Dec representation and returns itself.
@@ -753,6 +783,7 @@ func (q *Quantity) Add(y Quantity) {
 	}
 	q.ToDec()
 	q.d.Dec = new(inf.Dec).Add(q.d.Dec, y.internalReadOnlyDec())
+	q.d.int64tainted = q.d.int64tainted || y.d.int64tainted
 }
 
 // Sub subtracts the provided quantity from the current value in place. If the current
@@ -778,6 +809,7 @@ func (q *Quantity) Sub(y Quantity) {
 	}
 	q.ToDec()
 	q.d.Dec = new(inf.Dec).Sub(q.d.Dec, y.internalReadOnlyDec())
+	q.d.int64tainted = q.d.int64tainted || y.d.int64tainted
 }
 
 // Mul multiplies the provided y to the current value.
@@ -978,7 +1010,7 @@ func (q *Quantity) UnmarshalCBOR(value []byte) error {
 func NewDecimalQuantity(b inf.Dec, format Format) *Quantity {
 	return &Quantity{
 		// b is a shallow copy and shares the big.Int.abs slice from the original, so we make a defensive copy.
-		d:      infDecAmount{new(inf.Dec).Set(&b)},
+		d:      infDecAmount{Dec: new(inf.Dec).Set(&b)},
 		Format: format,
 	}
 }
@@ -1075,7 +1107,7 @@ func (q *Quantity) SetMilli(value int64) {
 // goroutines (even to read-only methods).
 func (q *Quantity) SetScaled(value int64, scale Scale) {
 	q.s = cachedString{}
-	q.d.Dec = nil
+	q.d = infDecAmount{}
 	q.i = int64Amount{value: value, scale: scale}
 }
 
