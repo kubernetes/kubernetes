@@ -110,7 +110,7 @@ type ShouldResyncFunc func() bool
 type ProcessFunc func(obj interface{}, isInInitialList bool) error
 
 // ProcessBatchFunc processes multiple objects in batch.
-// The deltas must not contain multiple entries for the same object.
+// The deltas are ordered from oldest to newest and may contain multiple entries for the same object.
 type ProcessBatchFunc func(deltas []Delta, isInInitialList bool) error
 
 // `*controller` implements Controller
@@ -887,8 +887,14 @@ func processDeltas(
 // atomically in a single transaction and corresponding handler callbacks are
 // executed afterward. Otherwise, each Delta is processed individually.
 //
-// Returns an error if any Delta or transaction fails. For TransactionError,
-// only successful operations trigger callbacks.
+// The batch may contain multiple Deltas for the same object. Each of them
+// triggers its own callback, which receives the object as of the previous Delta
+// as the old object. Since callbacks run after the whole transaction, the Store
+// may already reflect later Deltas of the batch when a callback reads it.
+//
+// Returns an error if any Delta or transaction fails. If the key of any object
+// cannot be computed, nothing is applied. For TransactionError, only successful
+// operations trigger callbacks.
 func processDeltasInBatch(
 	logger klog.Logger,
 	handler ResourceEventHandler,
@@ -913,20 +919,23 @@ func processDeltasInBatch(
 		}
 		return nil
 	}
+	// inBatch holds the newest object of every key seen so far in the batch, or nil if it was
+	// deleted. The store only changes after the loop, so it cannot provide the old object of a
+	// key that repeats within the batch.
 	inBatch := make(map[string]interface{}, len(deltas))
 	for _, d := range deltas {
 		obj := d.Object
 		key, err := keyFunc(obj)
+		if err != nil {
+			return KeyError{obj, err}
+		}
 		switch d.Type {
 		case Sync, Replaced, Added, Updated:
-			var old interface{}
-			if err == nil {
-				var seen bool
-				if old, seen = inBatch[key]; !seen {
-					old, _, _ = clientState.GetByKey(key)
-				}
-				inBatch[key] = obj
+			old, seen := inBatch[key]
+			if !seen {
+				old, _, _ = clientState.GetByKey(key)
 			}
+			inBatch[key] = obj
 			if old != nil {
 				txn := Transaction{
 					Type:   TransactionTypeUpdate,
@@ -947,9 +956,7 @@ func processDeltasInBatch(
 				})
 			}
 		case Deleted:
-			if err == nil {
-				inBatch[key] = nil
-			}
+			inBatch[key] = nil
 			txn := Transaction{
 				Type:   TransactionTypeDelete,
 				Object: obj,
