@@ -10820,7 +10820,7 @@ func TestPreQueueingHint_CompositePodGroupLookup(t *testing.T) {
 	}
 	otherPInfo := otherEntity.(*framework.QueuedPodInfo)
 	otherPInfo.UnschedulablePlugins = sets.New[string]("testPlugin")
-	if err := q.AddUnschedulablePodIfNotPresent(logger, otherPInfo, q.SchedulingCycle()); err != nil {
+	if err := q.AddUnschedulablePodIfNotPresent(ctx, otherPInfo, q.SchedulingCycle()); err != nil {
 		t.Fatalf("AddUnschedulablePodIfNotPresent failed: %v", err)
 	}
 
