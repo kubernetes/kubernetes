@@ -26,7 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	acappsv1 "k8s.io/client-go/applyconfigurations/apps/v1"
-	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/ktesting"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/features"
@@ -52,17 +52,16 @@ import (
 //  4. The metric value is decreased to 800 (a 20% decrease), which should not
 //     trigger a scale-down.
 func TestHPAWithTolerance(t *testing.T) {
-	ctx := t.Context()
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HPAConfigurableTolerance, true)
 
 	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
 	t.Cleanup(server.TearDownFn)
-	clients, metricValue := createClients(t, server.ClientConfig)
-	startHPAControllerAndWaitForCaches(t, clients)
+	tCtx := ktesting.Init(t).WithRESTConfig(server.ClientConfig)
+	clients, metricValue := createClients(tCtx)
+	startHPAControllerAndWaitForCaches(tCtx, clients)
 
-	cs := clients.apiServer
-	ns := createTestNamespace(t, cs)
-	deployment := createDeployment(t, cs, ns.Name, 35)
+	ns := createTestNamespace(tCtx)
+	deployment := createDeployment(tCtx, ns.Name, 35)
 
 	metricValue.Store(resource.MustParse("3500"))
 
@@ -87,7 +86,7 @@ func TestHPAWithTolerance(t *testing.T) {
 			Tolerance: new(resource.MustParse("0.5")),
 		},
 	}
-	createHPA(t, cs, deployment, metricSpec, withHPAMinMaxReplicas(1, 1000), withHPABehavior(behavior))
+	createHPA(tCtx, deployment, metricSpec, withHPAMinMaxReplicas(1, 1000), withHPABehavior(behavior))
 
 	testcases := []struct {
 		name       string
@@ -121,16 +120,16 @@ func TestHPAWithTolerance(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			metricValue.Store(tc.metric)
 			if tc.expected != nil {
-				if err := waitForDeploymentCondition(ctx, cs, deployment, tc.expected); err != nil {
+				if err := waitForDeploymentCondition(tCtx, deployment, tc.expected); err != nil {
 					t.Fatalf("Deployment did not reach the expected number of replicas: %v", err)
 				}
 			}
 			if tc.unexpected != nil {
-				if err := waitForDeploymentCondition(ctx, cs, deployment, tc.unexpected); err == nil {
+				if err := waitForDeploymentCondition(tCtx, deployment, tc.unexpected); err == nil {
 					t.Fatal("Deployment reached an unexpected number of replicas")
 				}
 			}
-			simulatePodsScheduled(t, cs, deployment)
+			simulatePodsScheduled(tCtx, deployment)
 		})
 	}
 }
@@ -138,19 +137,19 @@ func TestHPAWithTolerance(t *testing.T) {
 // simulatePodsScheduled sets the `status.replicas` field of a deployment to
 // the same value as `spec.replicas`, pretending that the deployment Pods were
 // actually scheduled.
-func simulatePodsScheduled(t *testing.T, cs *kubernetes.Clientset, d *appsv1.Deployment) {
-	t.Helper()
-	ud, err := cs.AppsV1().Deployments(d.Namespace).Get(t.Context(), d.Name, metav1.GetOptions{})
+func simulatePodsScheduled(tCtx ktesting.TContext, d *appsv1.Deployment) {
+	tCtx.Helper()
+	ud, err := tCtx.Client().AppsV1().Deployments(d.Namespace).Get(tCtx, d.Name, metav1.GetOptions{})
 	if err != nil {
-		t.Fatalf("Cannot retrieve deployment: %v", err)
+		tCtx.Fatalf("Cannot retrieve deployment: %v", err)
 	}
 	replicas := *ud.Spec.Replicas
 	statusCfg := acappsv1.Deployment(d.Name, d.Namespace).
 		WithStatus(acappsv1.DeploymentStatus().
 			WithReplicas(replicas))
 	opts := metav1.ApplyOptions{FieldManager: "podautoscaler-test"}
-	if _, err = cs.AppsV1().Deployments(d.Namespace).ApplyStatus(t.Context(), statusCfg, opts); err != nil {
-		t.Fatalf("Cannot set deployment status: %v", err)
+	if _, err = tCtx.Client().AppsV1().Deployments(d.Namespace).ApplyStatus(tCtx, statusCfg, opts); err != nil {
+		tCtx.Fatalf("Cannot set deployment status: %v", err)
 	}
 
 	// Wait to ensure HPA controller takes the update into account
