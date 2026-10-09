@@ -26,7 +26,9 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 
 	v1 "k8s.io/api/admissionregistration/v1"
+	authenticationv1 "k8s.io/api/authentication/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/admission"
@@ -87,6 +89,7 @@ var _ generic.Dispatcher = &validatingDispatcher{}
 
 func (d *validatingDispatcher) Dispatch(ctx context.Context, attr admission.Attributes, o admission.ObjectInterfaces, hooks []webhook.WebhookAccessor) error {
 	var relevantHooks []*generic.WebhookInvocation
+	var relevantAccessors []webhook.WebhookAccessor
 	// Construct all the versions we need to call our webhooks
 	versionedAttrAccessor := &versionedAttributeAccessor{
 		versionedAttrs:   map[schema.GroupVersionKind]*admission.VersionedAttributes{},
@@ -103,6 +106,7 @@ func (d *validatingDispatcher) Dispatch(ctx context.Context, attr admission.Attr
 		}
 
 		relevantHooks = append(relevantHooks, invocation)
+		relevantAccessors = append(relevantAccessors, hook)
 		// VersionedAttr result will be cached and reused later during parallel webhook calls
 		_, err := versionedAttrAccessor.VersionedAttribute(invocation.Kind)
 		if err != nil {
@@ -127,7 +131,8 @@ func (d *validatingDispatcher) Dispatch(ctx context.Context, attr admission.Attr
 	errCh := make(chan error, 2*len(relevantHooks)) // double the length to handle extra errors for panics in the gofunc
 	wg.Add(len(relevantHooks))
 	for i := range relevantHooks {
-		go func(invocation *generic.WebhookInvocation, idx int) {
+		i := i
+		go func(invocation *generic.WebhookInvocation, accessor webhook.WebhookAccessor, idx int) {
 			ignoreClientCallFailures := false
 			hookName := "unknown"
 			versionedAttr := versionedAttrAccessor.versionedAttrs[invocation.Kind]
@@ -161,6 +166,12 @@ func (d *validatingDispatcher) Dispatch(ctx context.Context, attr admission.Attr
 				},
 			)
 
+			token, err := d.getWebhookAuthenticationToken(ctx, accessor)
+			if err != nil {
+				utilruntime.HandleError(fmt.Errorf("validating webhook dispatch could not get webhook authentication token: %w", err))
+				return
+			}
+
 			hook, ok := invocation.Webhook.GetValidatingWebhook()
 			if !ok {
 				utilruntime.HandleError(fmt.Errorf("validating webhook dispatch requires v1.ValidatingWebhook, but got %T", hook))
@@ -169,7 +180,7 @@ func (d *validatingDispatcher) Dispatch(ctx context.Context, attr admission.Attr
 			hookName = hook.Name
 			ignoreClientCallFailures = hook.FailurePolicy != nil && *hook.FailurePolicy == v1.Ignore
 			t := time.Now()
-			err := d.callHook(ctx, hook, invocation, versionedAttr)
+			err = d.callHook(ctx, hook, invocation, versionedAttr, token)
 			rejected := false
 			if err != nil {
 				switch err := err.(type) {
@@ -224,7 +235,7 @@ func (d *validatingDispatcher) Dispatch(ctx context.Context, attr admission.Attr
 			}
 			klog.Warningf("rejected by webhook %q: %#v", hook.Name, err)
 			errCh <- err
-		}(relevantHooks[i], i)
+		}(relevantHooks[i], relevantAccessors[i], i)
 	}
 	wg.Wait()
 	close(errCh)
@@ -245,7 +256,31 @@ func (d *validatingDispatcher) Dispatch(ctx context.Context, attr admission.Attr
 	return errs[0]
 }
 
-func (d *validatingDispatcher) callHook(ctx context.Context, h *v1.ValidatingWebhook, invocation *generic.WebhookInvocation, attr *admission.VersionedAttributes) error {
+func (a *validatingDispatcher) getWebhookAuthenticationToken(ctx context.Context, hook webhook.WebhookAccessor) (string, error) {
+	cl := hook.GetKubeClient()
+	tokenRequest, err := cl.CoreV1().ServiceAccounts("kube-system").CreateToken(ctx, "webhook-auth", &authenticationv1.TokenRequest{
+		Spec: authenticationv1.TokenRequestSpec{
+			Audiences:         []string{"foo"},
+			ExpirationSeconds: nil,
+			BoundObjectRef: &authenticationv1.BoundObjectReference{
+				Kind: "ValidatingWebhookConfiguration",
+				Name: hook.GetConfigurationName(),
+				UID:  hook.GetConfigurationUID(),
+			},
+			Attestations: map[string]authenticationv1.AttestationValue{
+				authenticationv1.AttestationAdmissionReviewAPIGroups: {"*"},
+			},
+		},
+	}, metav1.CreateOptions{})
+
+	if err != nil {
+		return "", err
+	}
+
+	return tokenRequest.Status.Token, nil
+}
+
+func (d *validatingDispatcher) callHook(ctx context.Context, h *v1.ValidatingWebhook, invocation *generic.WebhookInvocation, attr *admission.VersionedAttributes, token string) error {
 	if attr.Attributes.IsDryRun() {
 		if h.SideEffects == nil {
 			return &webhookutil.ErrCallingWebhook{WebhookName: h.Name, Reason: fmt.Errorf("Webhook SideEffects is nil"), Status: apierrors.NewBadRequest("Webhook SideEffects is nil")}
@@ -280,7 +315,7 @@ func (d *validatingDispatcher) callHook(ctx context.Context, h *v1.ValidatingWeb
 		defer cancel()
 	}
 
-	r := client.Post().Body(request)
+	r := client.Post().Body(request).SetHeader("Authentication", fmt.Sprintf("bearer %s", token))
 
 	// if the context has a deadline, set it as a parameter to inform the backend
 	if deadline, hasDeadline := ctx.Deadline(); hasDeadline {
