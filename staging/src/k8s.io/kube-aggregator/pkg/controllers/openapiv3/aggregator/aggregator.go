@@ -267,6 +267,8 @@ func (s *specProxier) handleDiscovery(w http.ResponseWriter, r *http.Request) {
 	http.ServeContent(w, r, "/openapi/v3", time.Now(), bytes.NewReader(j))
 }
 
+// getGroupVersionHandler keeps the selected handler reachable even if its APIService is removed.
+// It does not snapshot the handler's internal state; the handler manages its own updates.
 func (s *specProxier) getGroupVersionHandler(targetGV string) http.Handler {
 	s.rwMutex.RLock()
 	defer s.rwMutex.RUnlock()
