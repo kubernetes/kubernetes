@@ -10483,9 +10483,6 @@ func TestPriorityQueue_PreQueueingHint(t *testing.T) {
 	}
 }
 
-// TestPreQueueingHint_FlushRescue verifies that pods missed by a buggy PreQueueingHintFn
-// (not included in the narrowed set) are eventually rescued by periodic flush
-// after podMaxInUnschedulablePodsDuration expires.
 // TestPreQueueingHint_Metrics verifies that the PreQueueingHintEvaluations metric
 // is incremented with the correct labels when PreQueueingHintFn is invoked.
 func TestPreQueueingHint_Metrics(t *testing.T) {
