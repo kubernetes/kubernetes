@@ -38,8 +38,16 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 )
 
-// Name of the plugin used in the plugin registry and configurations.
-const Name = names.DefaultPreemption
+const (
+	// Name of the plugin used in the plugin registry and configurations.
+	Name = names.DefaultPreemption
+
+	// preScoreStateKey is the key in CycleState to DefaultPreemption pre-computed data for Scoring.
+	preScoreStateKey = "PreScore" + Name
+
+	// reserveStateKey is the key in CycleState to DefaultPreemption data recorded in Reserve.
+	reserveStateKey = "Reserve" + Name
+)
 
 // IsEligiblePodFunc is a function which may be assigned to the DefaultPreemption plugin.
 // This may implement rules/filtering around preemption eligibility, which is in addition to
@@ -98,6 +106,11 @@ type DefaultPreemption struct {
 
 var _ fwk.PostFilterPlugin = &DefaultPreemption{}
 var _ fwk.PreEnqueuePlugin = &DefaultPreemption{}
+var _ fwk.PodGroupPostFilterPlugin = &DefaultPreemption{}
+var _ fwk.PreScorePlugin = &DefaultPreemption{}
+var _ fwk.ScorePlugin = &DefaultPreemption{}
+var _ fwk.ReservePlugin = &DefaultPreemption{}
+var _ fwk.SignPlugin = &DefaultPreemption{}
 
 // Name returns name of the plugin. It is used in logs, etc.
 func (pl *DefaultPreemption) Name() string {
@@ -507,4 +520,193 @@ func (pl *DefaultPreemption) PodGroupPostFilter(ctx context.Context, state fwk.P
 		return res, fwk.NewStatus(status.Code(), "pod group preemption: "+msg)
 	}
 	return res, status
+}
+
+// TODO: Replace with the final PodGroupPreemptionState retrieval mechanism once wired up with PodGroupPostFilter.
+const podGroupPreemptionStateKey fwk.StateKey = "PodGroupPreemptionState"
+
+type podGroupPreemptionStateHolder struct {
+	state *preemption.PodGroupPreemptionState
+}
+
+func (h *podGroupPreemptionStateHolder) Clone() fwk.StateData {
+	return h
+}
+
+func getPodGroupPreemptionState(state fwk.CycleState) *preemption.PodGroupPreemptionState {
+	if state == nil {
+		return nil
+	}
+	c, err := state.Read(podGroupPreemptionStateKey)
+	if err != nil {
+		return nil
+	}
+	if h, ok := c.(*podGroupPreemptionStateHolder); ok {
+		return h.state
+	}
+	return nil
+}
+
+type preemptionScoreState struct {
+	nodeScores   map[string]int64
+	deltaVictims map[string][]fwk.PreemptionVictim
+}
+
+func (s *preemptionScoreState) Clone() fwk.StateData {
+	return s
+}
+
+type reserveState struct {
+	condemnedByPod []fwk.PreemptionVictim
+}
+
+func (s *reserveState) Clone() fwk.StateData {
+	return s
+}
+
+// PreScore evaluates candidate nodes during Workload-Aware Preemption scheduling cycles.
+// It prioritizes nodes that require zero new preemptions (either naturally free capacity
+// or space freed up by already-condemned victims) and ranks remaining nodes by victim cost.
+func (pl *DefaultPreemption) PreScore(ctx context.Context, cycleState fwk.CycleState, pod *v1.Pod, nodes []fwk.NodeInfo) *fwk.Status {
+	preemptionState := getPodGroupPreemptionState(cycleState)
+	if preemptionState == nil || len(nodes) == 0 {
+		return fwk.NewStatus(fwk.Skip)
+	}
+
+	type nodeVictimEval struct {
+		nodeName string
+		victims  []fwk.PreemptionVictim
+	}
+	evals := make([]nodeVictimEval, len(nodes))
+	for i, nodeInfo := range nodes {
+		nodeName := nodeInfo.Node().Name
+		evals[i] = nodeVictimEval{
+			nodeName: nodeName,
+			victims:  pl.computeDeltaVictimsOnNode(nodeName, preemptionState),
+		}
+	}
+
+	sort.Slice(evals, func(i, j int) bool {
+		return preemption.CompareVictimSets(evals[i].victims, evals[j].victims) < 0
+	})
+
+	// Count distinct non-empty victim ranks so we can space non-empty victim scores across [0, 80]
+	// while keeping zero-preemption nodes at MaxScore (100). A gap of at least 20 points between
+	// zero-preemption (100) and preemption-required (<= 80) ensures standard score plugins cannot
+	// cause unnecessary preemptions.
+	numNonEmptyRanks := 0
+	for i := range evals {
+		if len(evals[i].victims) == 0 {
+			continue
+		}
+		if numNonEmptyRanks == 0 || preemption.CompareVictimSets(evals[i-1].victims, evals[i].victims) != 0 {
+			numNonEmptyRanks++
+		}
+	}
+
+	step := max(int64(1), int64(80)/int64(max(1, numNonEmptyRanks)))
+	nodeScores := make(map[string]int64, len(nodes))
+	deltaVictims := make(map[string][]fwk.PreemptionVictim, len(nodes))
+
+	nonEmptyRank := 0
+	for i := range evals {
+		if len(evals[i].victims) == 0 {
+			nodeScores[evals[i].nodeName] = fwk.MaxScore
+			continue
+		}
+		if nonEmptyRank == 0 || preemption.CompareVictimSets(evals[i-1].victims, evals[i].victims) != 0 {
+			nonEmptyRank++
+		}
+		score := max(fwk.MinScore, int64(80)-int64(nonEmptyRank-1)*step)
+		nodeScores[evals[i].nodeName] = score
+		deltaVictims[evals[i].nodeName] = evals[i].victims
+	}
+
+	cycleState.Write(preScoreStateKey, &preemptionScoreState{
+		nodeScores:   nodeScores,
+		deltaVictims: deltaVictims,
+	})
+	return nil
+}
+
+// Score returns the preemption score computed during PreScore.
+func (pl *DefaultPreemption) Score(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) (int64, *fwk.Status) {
+	c, err := state.Read(preScoreStateKey)
+	if err != nil {
+		return 0, nil
+	}
+	s, ok := c.(*preemptionScoreState)
+	if !ok {
+		return 0, nil
+	}
+	return s.nodeScores[nodeInfo.Node().Name], nil
+}
+
+// ScoreExtensions returns nil as PreScore already normalizes scores into [MinScore, MaxScore].
+func (pl *DefaultPreemption) ScoreExtensions() fwk.ScoreExtensions {
+	return nil
+}
+
+// SignPod returns an empty list of signature fragments with a nil (Success) status,
+// as DefaultPreemption does not depend on any per-pod attributes for node scoring.
+func (pl *DefaultPreemption) SignPod(ctx context.Context, pod *v1.Pod) ([]fwk.SignFragment, *fwk.Status) {
+	return nil, nil
+}
+
+func (pl *DefaultPreemption) getVictimsOnNode(state fwk.CycleState, nodeName string, preemptionState *preemption.PodGroupPreemptionState) []fwk.PreemptionVictim {
+	if c, err := state.Read(preScoreStateKey); err == nil {
+		if s, ok := c.(*preemptionScoreState); ok {
+			return s.deltaVictims[nodeName]
+		}
+	}
+	// PreScore is skipped when len(feasibleNodes) == 1 or when an opportunistic batch hint is used.
+	return pl.computeDeltaVictimsOnNode(nodeName, preemptionState)
+}
+
+// Reserve records newly condemned victims when a pod in a PodGroup is tentatively assumed on nodeName.
+func (pl *DefaultPreemption) Reserve(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) *fwk.Status {
+	preemptionState := getPodGroupPreemptionState(state)
+	if preemptionState == nil {
+		return nil
+	}
+	if victims := pl.getVictimsOnNode(state, nodeName, preemptionState); len(victims) > 0 {
+		state.Write(reserveStateKey, &reserveState{condemnedByPod: victims})
+		preemptionState.AddCondemned(victims)
+	}
+	return nil
+}
+
+// Unreserve rolls back condemned victims recorded by Reserve if the pod assumption is reverted.
+func (pl *DefaultPreemption) Unreserve(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) {
+	preemptionState := getPodGroupPreemptionState(state)
+	if preemptionState == nil {
+		return
+	}
+	c, err := state.Read(reserveStateKey)
+	if err != nil {
+		return
+	}
+	s, ok := c.(*reserveState)
+	if !ok {
+		return
+	}
+	if len(s.condemnedByPod) > 0 {
+		preemptionState.RemoveCondemned(s.condemnedByPod)
+		s.condemnedByPod = nil
+	}
+}
+
+// computeDeltaVictimsOnNode returns the surviving victims on nodeName that would be
+// newly condemned if a preemptor pod is placed on it, sorted from most to least important.
+func (pl *DefaultPreemption) computeDeltaVictimsOnNode(nodeName string, preemptionState *preemption.PodGroupPreemptionState) []fwk.PreemptionVictim {
+	victims := preemptionState.SurvivingVictimsOnNode(nodeName)
+	sort.SliceStable(victims, func(i, j int) bool {
+		vi1, ok1 := victims[i].(preemption.Victim)
+		vi2, ok2 := victims[j].(preemption.Victim)
+		if ok1 && ok2 {
+			return pl.MoreImportantVictim(vi1, vi2)
+		}
+		return false
+	})
+	return victims
 }
