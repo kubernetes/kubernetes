@@ -646,7 +646,7 @@ func ValidateCSIStorageCapacityUpdate(capacity, oldCapacity *storage.CSIStorageC
 		allErrs = append(allErrs, field.Invalid(field.NewPath("nodeTopology"), capacity.NodeTopology, "field is immutable"))
 	}
 	if capacity.StorageClassName != oldCapacity.StorageClassName {
-		allErrs = append(allErrs, field.Invalid(field.NewPath("storageClassName"), capacity.StorageClassName, "field is immutable"))
+		allErrs = append(allErrs, field.Invalid(field.NewPath("storageClassName"), capacity.StorageClassName, "field is immutable").MarkCoveredByDeclarative().WithOrigin("immutable"))
 	}
 
 	return allErrs

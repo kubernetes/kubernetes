@@ -19,6 +19,7 @@ package csistoragecapacity
 import (
 	"testing"
 
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
@@ -91,6 +92,47 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 		Verb:              "update",
 	}), metav1.NamespaceDefault)
 
+	testCases := map[string]struct {
+		oldObj       storage.CSIStorageCapacity
+		updateObj    storage.CSIStorageCapacity
+		expectedErrs field.ErrorList
+	}{
+		"unchanged storageClassName": {
+			oldObj:    mkCSIStorageCapacity(),
+			updateObj: mkCSIStorageCapacity(),
+		},
+		"mutable field changed, storageClassName unchanged": {
+			oldObj: mkCSIStorageCapacity(),
+			updateObj: mkCSIStorageCapacity(func(obj *storage.CSIStorageCapacity) {
+				obj.Capacity = resource.NewQuantity(1024, resource.BinarySI)
+			}),
+		},
+		"storageClassName changed": {
+			oldObj: mkCSIStorageCapacity(),
+			updateObj: mkCSIStorageCapacity(func(obj *storage.CSIStorageCapacity) {
+				obj.StorageClassName = "bar"
+			}),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("storageClassName"), nil, "").WithOrigin("immutable").MarkAlpha(),
+			},
+		},
+		"storageClassName cleared": {
+			oldObj: mkCSIStorageCapacity(),
+			updateObj: mkCSIStorageCapacity(func(obj *storage.CSIStorageCapacity) {
+				obj.StorageClassName = ""
+			}),
+			expectedErrs: field.ErrorList{
+				field.Required(field.NewPath("storageClassName"), "").MarkAlpha(),
+				field.Invalid(field.NewPath("storageClassName"), nil, "").WithOrigin("immutable").MarkAlpha(),
+			},
+		},
+	}
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			apitesting.VerifyUpdateValidationEquivalence(t, ctx, &tc.updateObj, &tc.oldObj, registry.Strategy, tc.expectedErrs)
+		})
+	}
+
 	updateObj := mkCSIStorageCapacity()
 	meta.RunObjectMetaUpdateTestCases(t, ctx, &updateObj, registry.Strategy, meta.WithStringentFinalizerValidation())
 }
@@ -98,8 +140,9 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 func mkCSIStorageCapacity(tweaks ...func(capacity *storage.CSIStorageCapacity)) storage.CSIStorageCapacity {
 	capacity := storage.CSIStorageCapacity{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "valid-obj",
-			Namespace: metav1.NamespaceDefault,
+			Name:            "valid-obj",
+			Namespace:       metav1.NamespaceDefault,
+			ResourceVersion: "1",
 		},
 		StorageClassName: "foo",
 	}
