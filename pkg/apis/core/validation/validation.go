@@ -6619,7 +6619,7 @@ func ValidatePodResize(newPod, oldPod *core.Pod, opts PodValidationOptions) fiel
 	// Ensure that only CPU and memory resources are mutable for regular containers.
 	var newContainers []core.Container
 	for ix, container := range newPodSpecCopy.Containers {
-		dropCPUMemoryResourcesFromContainer(&container, &oldPod.Spec.Containers[ix])
+		dropCPUMemoryResourcesFromContainer(&container, &oldPod.Spec.Containers[ix], opts)
 		if !apiequality.Semantic.DeepEqual(container, oldPod.Spec.Containers[ix]) {
 			// This likely means that the user has made changes to resources other than CPU and memory for regular container.
 			errs := field.Forbidden(specPath, "only cpu and memory resources are mutable")
@@ -6637,7 +6637,7 @@ func ValidatePodResize(newPod, oldPod *core.Pod, opts PodValidationOptions) fiel
 		modifiedContainer := !apiequality.Semantic.DeepEqual(container, oldPod.Spec.InitContainers[ix])
 
 		if canResize {
-			dropCPUMemoryResourcesFromContainer(&container, &oldPod.Spec.InitContainers[ix])
+			dropCPUMemoryResourcesFromContainer(&container, &oldPod.Spec.InitContainers[ix], opts)
 			if !apiequality.Semantic.DeepEqual(container, oldPod.Spec.InitContainers[ix]) {
 				// This likely means that the user has made changes to resources other than CPU and memory for sidecar container.
 				errs := field.Forbidden(specPath.Child("initContainers").Index(ix), "only cpu and memory resources for init or sidecar containers are mutable")
@@ -6775,7 +6775,7 @@ func validatePodLevelResourcesResize(newPod, oldPod *core.Pod, podSpecToMutate *
 
 	}
 
-	podSpecToMutate.Resources = dropCPUMemoryResourceRequirementsUpdates(podSpecToMutate.Resources, oldPod.Spec.Resources)
+	podSpecToMutate.Resources = dropCPUMemoryResourceRequirementsUpdates(podSpecToMutate.Resources, oldPod.Spec.Resources, opts)
 
 	if !apiequality.Semantic.DeepEqual(podSpecToMutate.Resources, oldPod.Spec.Resources) {
 		// This likely means that the user has made changes to pod-level resources other
@@ -6800,7 +6800,16 @@ func validatePodLevelResourcesResize(newPod, oldPod *core.Pod, podSpecToMutate *
 	return allErrs
 }
 
-func dropCPUMemoryUpdates(resourceList, oldResourceList core.ResourceList) core.ResourceList {
+// resizableResources returns the set of resource names whose values may change
+// on a resize. swap (KEP-5359) joins cpu and memory when the gate is enabled.
+func resizableResources(opts PodValidationOptions) []core.ResourceName {
+	if opts.AllowWorkloadControlledSwap {
+		return []core.ResourceName{core.ResourceCPU, core.ResourceMemory, core.ResourceSwap}
+	}
+	return []core.ResourceName{core.ResourceCPU, core.ResourceMemory}
+}
+
+func dropCPUMemoryUpdates(resourceList, oldResourceList core.ResourceList, opts PodValidationOptions) core.ResourceList {
 	var mungedResourceList core.ResourceList
 	if resourceList == nil {
 		if oldResourceList == nil {
@@ -6810,13 +6819,11 @@ func dropCPUMemoryUpdates(resourceList, oldResourceList core.ResourceList) core.
 	} else {
 		mungedResourceList = resourceList.DeepCopy()
 	}
-	delete(mungedResourceList, core.ResourceCPU)
-	delete(mungedResourceList, core.ResourceMemory)
-	if cpu, found := oldResourceList[core.ResourceCPU]; found {
-		mungedResourceList[core.ResourceCPU] = cpu
-	}
-	if mem, found := oldResourceList[core.ResourceMemory]; found {
-		mungedResourceList[core.ResourceMemory] = mem
+	for _, name := range resizableResources(opts) {
+		delete(mungedResourceList, name)
+		if old, found := oldResourceList[name]; found {
+			mungedResourceList[name] = old
+		}
 	}
 	return mungedResourceList
 }
@@ -6824,9 +6831,9 @@ func dropCPUMemoryUpdates(resourceList, oldResourceList core.ResourceList) core.
 // dropCPUMemoryResourcesFromContainer deletes the cpu and memory resources from the
 // container, and copies them from the old pod container resources if present.
 // TODO(ndixita): refactor to reuse dropCPUMemoryResourceRequirementsUpdates
-func dropCPUMemoryResourcesFromContainer(container *core.Container, oldPodSpecContainer *core.Container) {
-	lim := dropCPUMemoryUpdates(container.Resources.Limits, oldPodSpecContainer.Resources.Limits)
-	req := dropCPUMemoryUpdates(container.Resources.Requests, oldPodSpecContainer.Resources.Requests)
+func dropCPUMemoryResourcesFromContainer(container *core.Container, oldPodSpecContainer *core.Container, opts PodValidationOptions) {
+	lim := dropCPUMemoryUpdates(container.Resources.Limits, oldPodSpecContainer.Resources.Limits, opts)
+	req := dropCPUMemoryUpdates(container.Resources.Requests, oldPodSpecContainer.Resources.Requests, opts)
 	// Resource claims are immutable during pod resize and the original configuration must be preserved.
 	container.Resources = core.ResourceRequirements{Limits: lim, Requests: req, Claims: container.Resources.Claims}
 }
@@ -6834,7 +6841,7 @@ func dropCPUMemoryResourcesFromContainer(container *core.Container, oldPodSpecCo
 // dropCPUMemoryResourceRequirementsUpdates deletes the cpu and memory resources
 // from the `resources` field, and copies them from old Pod spec's resources field
 // if present.
-func dropCPUMemoryResourceRequirementsUpdates(resources *core.ResourceRequirements, oldPodResources *core.ResourceRequirements) *core.ResourceRequirements {
+func dropCPUMemoryResourceRequirementsUpdates(resources *core.ResourceRequirements, oldPodResources *core.ResourceRequirements, opts PodValidationOptions) *core.ResourceRequirements {
 	if resources == nil {
 		return resources
 	}
@@ -6848,8 +6855,8 @@ func dropCPUMemoryResourceRequirementsUpdates(resources *core.ResourceRequiremen
 		oldLims = oldPodResources.Limits // +k8s:verify-mutation:reason=clone'
 	}
 
-	resources.Requests = dropCPUMemoryUpdates(resources.Requests, oldReqs)
-	resources.Limits = dropCPUMemoryUpdates(resources.Limits, oldLims)
+	resources.Requests = dropCPUMemoryUpdates(resources.Requests, oldReqs, opts)
+	resources.Limits = dropCPUMemoryUpdates(resources.Limits, oldLims, opts)
 
 	// Set the entire Resources block to nil if two conditions are met:
 	// 1. The old PodSpec Resources lacked any Resources

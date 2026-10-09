@@ -2319,6 +2319,19 @@ func (kl *Kubelet) convertToAPIPodLevelResourcesStatus(logger klog.Logger, alloc
 		preserveOldResourcesValue(v1.ResourceMemory, oldPodStatus.Resources.Limits, resources.Limits)
 	}
 
+	// KEP-5359: pod-level swap limit, read back from the pod cgroup's
+	// memory.swap.max when the pod declared one.
+	if _, declared := resources.Limits[v1.ResourceSwap]; declared && utilfeature.DefaultFeatureGate.Enabled(features.WorkloadControlledSwap) {
+		if swapConfig, err := pcm.GetPodCgroupConfig(allocatedPod, v1.ResourceSwap); err != nil {
+			logger.V(4).Info("failed to read swap cgroup config for the pod", "podName", allocatedPod.Name, "err", err)
+			preserveOldResourcesValue(v1.ResourceSwap, oldPodStatus.Resources.Limits, resources.Limits)
+		} else if swapLimit, ok := cm.SwapLimitFromConfig(swapConfig); ok {
+			resources.Limits[v1.ResourceSwap] = *apiresource.NewQuantity(swapLimit, apiresource.BinarySI)
+		} else {
+			preserveOldResourcesValue(v1.ResourceSwap, oldPodStatus.Resources.Limits, resources.Limits)
+		}
+	}
+
 	return resources
 }
 
@@ -2519,6 +2532,16 @@ func (kl *Kubelet) convertToAPIContainerStatuses(ctx context.Context, pod *v1.Po
 				resources.Limits[v1.ResourceMemory] = cStatus.Resources.MemoryLimit.DeepCopy()
 			} else {
 				preserveOldResourcesValue(v1.ResourceMemory, oldStatus.Resources.Limits, resources.Limits)
+			}
+			// KEP-5359: report the actuated swap limit only for containers that
+			// declared one. Kubelet-derived values (pod-level inheritance,
+			// LimitedSwap) stay out of status until the API shape is settled.
+			if _, declared := resources.Limits[v1.ResourceSwap]; declared && utilfeature.DefaultFeatureGate.Enabled(features.WorkloadControlledSwap) {
+				if cStatus.Resources != nil && cStatus.Resources.SwapLimit != nil {
+					resources.Limits[v1.ResourceSwap] = cStatus.Resources.SwapLimit.DeepCopy()
+				} else {
+					preserveOldResourcesValue(v1.ResourceSwap, oldStatus.Resources.Limits, resources.Limits)
+				}
 			}
 		}
 
