@@ -4048,42 +4048,76 @@ func TestUnrollWildCardResource_WithGenericWorkload(t *testing.T) {
 	}
 }
 
-func TestPodGroupInfoGetChildrenSorting(t *testing.T) {
-	now := time.Now()
-	pgInfo := func(name, namespace string, creationTime time.Time) *PodGroupInfo {
-		return &PodGroupInfo{
-			GenericPodGroup: fwk.NewGenericPodGroup(&schedulingv1beta1.PodGroup{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:              name,
-					Namespace:         namespace,
-					CreationTimestamp: metav1.NewTime(creationTime),
-				},
-			}),
-		}
+func TestPodGroupInfo_SortChildren(t *testing.T) {
+	now := metav1.Now()
+
+	parentCPG := fwk.NewGenericCompositePodGroup(st.MakeCompositePodGroup().Name("parent-cpg").CreationTimestamp(now).Obj())
+	leafPG := fwk.NewGenericPodGroup(st.MakePodGroup().Name("leaf-pg").CreationTimestamp(now).Obj())
+
+	// Children with different timestamps.
+	pgInfo1 := newPodGroupInfoForTest(st.MakePodGroup().Name("pg1").CreationTimestamp(now).Obj())
+	pgInfo2 := newPodGroupInfoForTest(st.MakePodGroup().Name("pg2").CreationTimestamp(metav1.NewTime(now.Add(time.Minute))).Obj())
+	pgInfo3 := newPodGroupInfoForTest(st.MakePodGroup().Name("pg3").CreationTimestamp(metav1.NewTime(now.Add(-time.Minute))).Obj())
+	// Children with same timestamp, but different names.
+	pgInfo4 := newPodGroupInfoForTest(st.MakePodGroup().Name("pg4").CreationTimestamp(now).Obj())
+	pgInfo5 := newPodGroupInfoForTest(st.MakePodGroup().Name("pg5").CreationTimestamp(now).Obj())
+	// Children with same timestamp, and same name, but different entity types.
+	pgInfo6 := newPodGroupInfoForTest(st.MakePodGroup().Name("same").CreationTimestamp(now).Obj())
+	pgInfo7 := newCompositePodGroupInfoForTest(st.MakeCompositePodGroup().Name("same").CreationTimestamp(now).Obj())
+
+	tests := []struct {
+		name                string
+		parent              *fwk.GenericPodGroup
+		children            []*PodGroupInfo
+		wantOrderedChildren []*PodGroupInfo
+	}{
+		{
+			name:                "composite pod group with nil children is a no-op",
+			parent:              parentCPG,
+			wantOrderedChildren: nil,
+		},
+		{
+			name:                "composite pod group with empty children is a no-op",
+			parent:              parentCPG,
+			children:            []*PodGroupInfo{},
+			wantOrderedChildren: []*PodGroupInfo{},
+		},
+		{
+			name:                "podgroup is a no-op because it has no children",
+			parent:              leafPG,
+			wantOrderedChildren: nil,
+		},
+		{
+			name:                "composite pod group children sorted by timestamp",
+			parent:              parentCPG,
+			children:            []*PodGroupInfo{pgInfo1, pgInfo2, pgInfo3},
+			wantOrderedChildren: []*PodGroupInfo{pgInfo3, pgInfo1, pgInfo2},
+		},
+		{
+			name:                "composite pod group children sorted by name as a tie-breaker",
+			parent:              parentCPG,
+			children:            []*PodGroupInfo{pgInfo5, pgInfo4},
+			wantOrderedChildren: []*PodGroupInfo{pgInfo4, pgInfo5},
+		},
+		{
+			name:                "composite pod group children sorted by entity type as a tie-breaker",
+			parent:              parentCPG,
+			children:            []*PodGroupInfo{pgInfo6, pgInfo7},
+			wantOrderedChildren: []*PodGroupInfo{pgInfo7, pgInfo6},
+		},
 	}
 
-	pgInfo1 := pgInfo("pg1", "default", now)
-	pgInfo2 := pgInfo("pg2", "default", now.Add(time.Minute))
-	pgInfo3 := pgInfo("pg3", "default", now.Add(-time.Minute))
-	// pgInfo4 has same timestamp as pgInfo1 but is listed as the last one.
-	// We verify sorting stability by checking that pg1 is still before pg4.
-	pgInfo4 := pgInfo("pg4", "default", now)
-
-	pgi := &PodGroupInfo{
-		GenericPodGroup: fwk.NewGenericCompositePodGroup(&schedulingv1alpha3.CompositePodGroup{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "parent-cpg",
-				Namespace: "default",
-			},
-		}),
-		Children: []*PodGroupInfo{pgInfo1, pgInfo2, pgInfo3, pgInfo4},
-	}
-
-	expectedOrder := []*PodGroupInfo{pgInfo3, pgInfo1, pgInfo4, pgInfo2}
-	gotOrder := pgi.GetChildGroups()
-
-	if diff := cmp.Diff(expectedOrder, gotOrder); diff != "" {
-		t.Errorf("GetChildGroups() returned diff (-want +got):\n%s", diff)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			pgi := &PodGroupInfo{
+				GenericPodGroup: tt.parent,
+				Children:        tt.children,
+			}
+			pgi.SortChildren()
+			if diff := cmp.Diff(tt.wantOrderedChildren, pgi.Children); diff != "" {
+				t.Errorf("SortChildren() resulted in unexpected children order (-want +got):\n%s", diff)
+			}
+		})
 	}
 }
 
@@ -4187,11 +4221,11 @@ func TestQueuedPodGroupInfo_AddCompositePodGroup(t *testing.T) {
 				if len(qpgi.PodGroupInfo.Children) != 2 {
 					t.Fatalf("Expected 2 children under root CPG, got %d", len(qpgi.PodGroupInfo.Children))
 				}
-				if qpgi.PodGroupInfo.Children[0].GetType() != fwk.PodGroupKeyType || qpgi.PodGroupInfo.Children[0].GetName() != "shared-name" {
-					t.Errorf("First child should be PG shared-name")
+				if qpgi.PodGroupInfo.Children[0].GetType() != fwk.CompositePodGroupKeyType || qpgi.PodGroupInfo.Children[0].GetName() != "shared-name" {
+					t.Errorf("First child should be CPG shared-name")
 				}
-				if qpgi.PodGroupInfo.Children[1].GetType() != fwk.CompositePodGroupKeyType || qpgi.PodGroupInfo.Children[1].GetName() != "shared-name" {
-					t.Errorf("Second child should be CPG shared-name")
+				if qpgi.PodGroupInfo.Children[1].GetType() != fwk.PodGroupKeyType || qpgi.PodGroupInfo.Children[1].GetName() != "shared-name" {
+					t.Errorf("Second child should be PG shared-name")
 				}
 			},
 		},
@@ -4214,6 +4248,11 @@ func TestQueuedPodGroupInfo_UpdateCompositePodGroup(t *testing.T) {
 	cpgChild := st.MakeCompositePodGroup().Name("cpg-child").Namespace("ns1").ParentCompositePodGroup("cpg-root").Obj()
 	cpgChildUpdated := st.MakeCompositePodGroup().Name("cpg-child").Namespace("ns1").ParentCompositePodGroup("cpg-root").Obj()
 	cpgChildUpdated.Annotations = map[string]string{"updated": "true"}
+
+	now := metav1.Now()
+	cpgChild1 := st.MakeCompositePodGroup().Name("cpg-first").UID("cpg-first-uid1").Namespace("ns1").ParentCompositePodGroup("cpg-root").CreationTimestamp(now).Obj()
+	cpgChild2 := st.MakeCompositePodGroup().Name("cpg-second").UID("cpg-second-uid1").Namespace("ns1").ParentCompositePodGroup("cpg-root").CreationTimestamp(now).Obj()
+	cpgChild1Recreated := st.MakeCompositePodGroup().Name("cpg-first").UID("cpg-first-uid2").Namespace("ns1").ParentCompositePodGroup("cpg-root").CreationTimestamp(metav1.NewTime(now.Add(time.Minute))).Obj()
 
 	tests := []struct {
 		name      string
@@ -4266,6 +4305,25 @@ func TestQueuedPodGroupInfo_UpdateCompositePodGroup(t *testing.T) {
 				}
 				if qpgi.PodGroupInfo.Children[1].GetType() != fwk.CompositePodGroupKeyType || qpgi.PodGroupInfo.Children[1].CompositePodGroup.Annotations["updated"] != "true" {
 					t.Errorf("Child CPG not updated correctly")
+				}
+			},
+		},
+		{
+			name: "Recreate child CPG through update changes its timestamp and disrupts children order",
+			qpgi: &QueuedPodGroupInfo{
+				PodGroupInfo: newCompositePodGroupInfoForTest(cpgRoot,
+					newCompositePodGroupInfoForTest(cpgChild1),
+					newCompositePodGroupInfoForTest(cpgChild2),
+				),
+			},
+			updateCPG: cpgChild1Recreated,
+			verify: func(t *testing.T, qpgi *QueuedPodGroupInfo) {
+				wantOrder := []*PodGroupInfo{
+					newCompositePodGroupInfoForTest(cpgChild2),
+					newCompositePodGroupInfoForTest(cpgChild1Recreated),
+				}
+				if diff := cmp.Diff(wantOrder, qpgi.PodGroupInfo.Children); diff != "" {
+					t.Errorf("Unexpected children order after update (-want, +got):\n%s", diff)
 				}
 			},
 		},
@@ -4503,6 +4561,11 @@ func TestQueuedPodGroupInfo_UpdatePodGroup(t *testing.T) {
 	pgStandalone := st.MakePodGroup().Name("pg-standalone").Namespace("ns1").MinCount(1).Obj()
 	pgStandaloneUpdated := st.MakePodGroup().Name("pg-standalone").Namespace("ns1").MinCount(3).Obj()
 
+	now := metav1.Now()
+	pgChild1 := st.MakePodGroup().Name("pg-first").UID("pg-first-uid1").Namespace("ns1").ParentCompositePodGroup("cpg-root").CreationTimestamp(now).Obj()
+	pgChild2 := st.MakePodGroup().Name("pg-second").UID("pg-second-uid1").Namespace("ns1").ParentCompositePodGroup("cpg-root").CreationTimestamp(now).Obj()
+	pgChild1Recreated := st.MakePodGroup().Name("pg-first").UID("pg-first-uid2").Namespace("ns1").ParentCompositePodGroup("cpg-root").CreationTimestamp(metav1.NewTime(now.Add(time.Minute))).Obj()
+
 	tests := []struct {
 		name     string
 		qpgi     *QueuedPodGroupInfo
@@ -4562,6 +4625,25 @@ func TestQueuedPodGroupInfo_UpdatePodGroup(t *testing.T) {
 				}
 				if qpgi.PodGroupInfo.Children[1].GetType() != fwk.PodGroupKeyType || qpgi.PodGroupInfo.Children[1].PodGroup.Spec.SchedulingPolicy.Gang.MinCount != 10 {
 					t.Errorf("PG node was not updated correctly")
+				}
+			},
+		},
+		{
+			name: "Recreate child PG through update changes its timestamp and disrupts children order",
+			qpgi: &QueuedPodGroupInfo{
+				PodGroupInfo: newCompositePodGroupInfoForTest(cpgRoot,
+					newPodGroupInfoForTest(pgChild1),
+					newPodGroupInfoForTest(pgChild2),
+				),
+			},
+			updatePG: pgChild1Recreated,
+			verify: func(t *testing.T, qpgi *QueuedPodGroupInfo) {
+				wantOrder := []*PodGroupInfo{
+					newPodGroupInfoForTest(pgChild2),
+					newPodGroupInfoForTest(pgChild1Recreated),
+				}
+				if diff := cmp.Diff(wantOrder, qpgi.PodGroupInfo.Children); diff != "" {
+					t.Errorf("Unexpected children order after update (-want, +got):\n%s", diff)
 				}
 			},
 		},
