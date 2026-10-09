@@ -596,6 +596,42 @@ func TestSetBytesBad(t *testing.T) {
 	}()
 }
 
+func TestSetPointerField(t *testing.T) {
+	for _, field := range []string{"exec", "auth-provider"} {
+		t.Run(field, func(t *testing.T) {
+			startingConfig := newRedFederalCowHammerConfig()
+
+			test := configCommandTest{
+				args:           []string{"set", "users.red-user." + field, "x"},
+				startingConfig: startingConfig,
+				expectedConfig: startingConfig,
+			}
+
+			func() {
+				defer func() {
+					// Restore cmdutil behavior.
+					cmdutil.DefaultBehaviorOnFatal()
+				}()
+
+				// Check exit code.
+				failed := false
+				cmdutil.BehaviorOnFatal(func(e string, code int) {
+					failed = true
+					if code != 1 {
+						t.Errorf("The exit code is %d, expected 1", code)
+					}
+					test.checkOutput(e, []string{"can't set " + field + " to a value"}, t)
+				})
+
+				test.run(t)
+				if !failed {
+					t.Errorf("expected setting %s to fail", field)
+				}
+			}()
+		})
+	}
+}
+
 func TestSetBytes(t *testing.T) {
 	clusterInfoWithCAData := clientcmdapi.NewCluster()
 	clusterInfoWithCAData.CertificateAuthorityData = []byte("cadata")
