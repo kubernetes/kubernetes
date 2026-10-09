@@ -135,7 +135,7 @@ func (dc *DeploymentController) reconcileOldReplicaSets(ctx context.Context, all
 	// and cause timeout. See https://github.com/kubernetes/kubernetes/issues/16737
 	oldRSs, cleanupCount, err := dc.cleanupUnhealthyReplicas(ctx, oldRSs, deployment, maxScaledDown)
 	if err != nil {
-		return false, nil
+		return false, err
 	}
 	logger.V(4).Info("Cleaned up unhealthy replicas from old RSes", "count", cleanupCount)
 
@@ -143,7 +143,7 @@ func (dc *DeploymentController) reconcileOldReplicaSets(ctx context.Context, all
 	allRSs = append(oldRSs, newRS)
 	scaledDownCount, err := dc.scaleDownOldReplicaSetsForRollingUpdate(ctx, allRSs, oldRSs, deployment)
 	if err != nil {
-		return false, nil
+		return false, err
 	}
 	logger.V(4).Info("Scaled down old RSes", "deployment", klog.KObj(deployment), "count", scaledDownCount)
 
