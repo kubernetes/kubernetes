@@ -33,6 +33,7 @@ import (
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/cacher"
 	"k8s.io/apiserver/pkg/storage/testing/correctness"
+	"k8s.io/ktesting"
 	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
@@ -211,20 +212,20 @@ var (
 func TestCorrectness(t *testing.T) {
 	storages := []struct {
 		name                   string
-		setupStorage           func(t *testing.T) (storage.Interface, string)
-		validateFaultInjection func(t *testing.T, ops []correctness.Operation, watches []correctness.WatchOperation)
+		setupStorage           func(tCtx ktesting.TContext) (storage.Interface, string)
+		validateFaultInjection func(tCtx ktesting.TContext, ops []correctness.Operation, watches []correctness.WatchOperation)
 	}{
 		{
 			name: "etcd3",
-			setupStorage: func(t *testing.T) (storage.Interface, string) {
-				return setupStore(t)
+			setupStorage: func(tCtx ktesting.TContext) (storage.Interface, string) {
+				return setupStore(tCtx)
 			},
 		},
 		{
 			name: "cacher",
-			setupStorage: func(t *testing.T) (storage.Interface, string) {
-				store, prefix := setupStore(t)
-				return setupCacher(t, store), prefix
+			setupStorage: func(tCtx ktesting.TContext) (storage.Interface, string) {
+				store, prefix := setupStore(tCtx)
+				return setupCacher(tCtx, store), prefix
 			},
 		},
 		{
@@ -234,11 +235,11 @@ func TestCorrectness(t *testing.T) {
 			// - CacheDelegator fallback to etcd on Get and bounded unfiltered GetList when !cacher.Ready()
 			// - Cacher 429 TooManyRequests rejection on non-delegated GetList and Watch when !cacher.Ready()
 			name: "cacher with watch-breaking etcd",
-			setupStorage: func(t *testing.T) (storage.Interface, string) {
-				store, prefix := setupStore(t)
-				return setupCacher(t, &watchBreakingStore{Interface: store, expireAfter: 200 * time.Millisecond}), prefix
+			setupStorage: func(tCtx ktesting.TContext) (storage.Interface, string) {
+				store, prefix := setupStore(tCtx)
+				return setupCacher(tCtx, &watchBreakingStore{Interface: store, expireAfter: 200 * time.Millisecond}), prefix
 			},
-			validateFaultInjection: func(t *testing.T, ops []correctness.Operation, watches []correctness.WatchOperation) {
+			validateFaultInjection: func(tCtx ktesting.TContext, ops []correctness.Operation, watches []correctness.WatchOperation) {
 				require.True(t, hasUnreadyListError(ops), "expected cacher.GetList to reject requests with 429 TooManyRequests while unready")
 				require.True(t, hasWatchTooManyRequestsError(watches), "expected cacher.Watch to reject watches with 429 TooManyRequests while unready")
 			},
@@ -250,11 +251,11 @@ func TestCorrectness(t *testing.T) {
 			// - Cacher.GetList (non-consistent RVCached) and Cacher.Get returning TooLargeResourceVersionError
 			// - Cacher.Watch (SendInitialEvents=true) timing out in waitUntilWatchCacheFreshAndForceAllEvents and returning errWatcher
 			name: "cacher with watch-delaying etcd",
-			setupStorage: func(t *testing.T) (storage.Interface, string) {
-				store, prefix := setupStore(t)
-				return setupCacher(t, &watchDelayingStore{Interface: store, delay: 3600 * time.Millisecond}), prefix
+			setupStorage: func(tCtx ktesting.TContext) (storage.Interface, string) {
+				store, prefix := setupStore(tCtx)
+				return setupCacher(tCtx, &watchDelayingStore{Interface: store, delay: 3600 * time.Millisecond}), prefix
 			},
-			validateFaultInjection: func(t *testing.T, ops []correctness.Operation, watches []correctness.WatchOperation) {
+			validateFaultInjection: func(tCtx ktesting.TContext, ops []correctness.Operation, watches []correctness.WatchOperation) {
 				require.True(t, hasConsistentListFallback(ops) || hasUnaryTimeoutError(ops),
 					"expected >3s watch delay to trigger consistent List fallback to etcd or unary TooLargeResourceVersionError")
 				require.True(t, hasWatchEventReason(watches, metav1.StatusReasonTimeout),
@@ -267,11 +268,11 @@ func TestCorrectness(t *testing.T) {
 			// - Dropped progress bookmarks preventing watchCache.resourceVersion from advancing during an idle window (>3s),
 			//   causing waitUntilFreshLocked timeouts on GetList (falling back to etcd on consistent reads) and WatchList
 			name: "cacher with bookmark-dropping etcd",
-			setupStorage: func(t *testing.T) (storage.Interface, string) {
-				store, prefix := setupStore(t)
-				return setupCacher(t, &bookmarkDroppingStore{Interface: store, stallDuration: 4700 * time.Millisecond}), prefix
+			setupStorage: func(tCtx ktesting.TContext) (storage.Interface, string) {
+				store, prefix := setupStore(tCtx)
+				return setupCacher(tCtx, &bookmarkDroppingStore{Interface: store, stallDuration: 4700 * time.Millisecond}), prefix
 			},
-			validateFaultInjection: func(t *testing.T, ops []correctness.Operation, watches []correctness.WatchOperation) {
+			validateFaultInjection: func(tCtx ktesting.TContext, ops []correctness.Operation, watches []correctness.WatchOperation) {
 				require.True(t, hasConsistentListFallback(ops) || hasUnaryTimeoutError(ops),
 					"expected dropped progress bookmarks during >3s idle window to trigger consistent List fallback to etcd or unary TooLargeResourceVersionError")
 				require.True(t, hasWatchEventReason(watches, metav1.StatusReasonTimeout),
@@ -283,16 +284,16 @@ func TestCorrectness(t *testing.T) {
 			// - watchCacheHistory dynamic capacity resize (grow and shrink), event eviction, and B-tree snapshot compaction
 			// - watchCacheHistory.GetIntervalLocked returning 410 ResourceExpired when a watch requests an evicted RV
 			name: "cacher_small_history",
-			setupStorage: func(t *testing.T) (storage.Interface, string) {
+			setupStorage: func(tCtx ktesting.TContext) (storage.Interface, string) {
 				origFreshDuration := cacher.DefaultEventFreshDuration
 				cacher.DefaultEventFreshDuration = 50 * time.Millisecond
 				t.Cleanup(func() {
 					cacher.DefaultEventFreshDuration = origFreshDuration
 				})
-				store, prefix := setupStore(t)
-				return setupCacher(t, store), prefix
+				store, prefix := setupStore(tCtx)
+				return setupCacher(tCtx, store), prefix
 			},
-			validateFaultInjection: func(t *testing.T, _ []correctness.Operation, watches []correctness.WatchOperation) {
+			validateFaultInjection: func(tCtx ktesting.TContext, _ []correctness.Operation, watches []correctness.WatchOperation) {
 				require.True(t, hasWatchEventReason(watches, metav1.StatusReasonExpired),
 					"expected small history window to expire old watch resource versions with StatusReasonExpired")
 			},
@@ -300,10 +301,11 @@ func TestCorrectness(t *testing.T) {
 	}
 	for _, s := range storages {
 		t.Run(s.name, func(t *testing.T) {
-			store, storagePrefix := s.setupStorage(t)
+			tCtx := ktesting.Init(t)
+			store, storagePrefix := s.setupStorage(tCtx)
 			ops, watches := testCorrectness(t, store, storagePrefix)
 			if s.validateFaultInjection != nil {
-				s.validateFaultInjection(t, ops, watches)
+				s.validateFaultInjection(tCtx, ops, watches)
 			}
 		})
 	}
