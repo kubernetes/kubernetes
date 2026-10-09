@@ -415,21 +415,12 @@ func (g *Graph) AddPod(pod *corev1.Pod) {
 		}
 	}
 
-	for _, podResourceClaim := range pod.Spec.ResourceClaims {
-		claimName, _, err := resourceclaim.Name(pod, &podResourceClaim)
-		// Do we have a valid claim name? If yes, add an edge that grants
-		// kubelet access to that claim. An error indicates that a claim
-		// still needs to be created, nil that intentionally no claim
-		// was created and never will be because it isn't needed.
-		if err == nil && claimName != nil {
-			claimVertex := g.getOrCreateVertexLocked(resourceClaimVertexType, pod.Namespace, *claimName)
-			// Edge adds must be handled by addEdgeLocked instead of direct g.graph.SetEdge calls.
-			g.addEdgeLocked(claimVertex, podVertex, nodeVertex)
-		}
-	}
-
-	if pod.Status.ExtendedResourceClaimStatus != nil && len(pod.Status.ExtendedResourceClaimStatus.ResourceClaimName) > 0 {
-		claimVertex := g.getOrCreateVertexLocked(resourceClaimVertexType, pod.Namespace, pod.Status.ExtendedResourceClaimStatus.ResourceClaimName)
+	// Grant kubelet access to all ResourceClaims referenced by or created for
+	// the pod (including extended resource claims). Claims that still need to
+	// be created or intentionally were not created because they are not needed
+	// are skipped by PodClaims.
+	for claimName := range resourceclaim.PodClaims(pod) {
+		claimVertex := g.getOrCreateVertexLocked(resourceClaimVertexType, pod.Namespace, claimName)
 		// Edge adds must be handled by addEdgeLocked instead of direct g.graph.SetEdge calls.
 		g.addEdgeLocked(claimVertex, podVertex, nodeVertex)
 	}
