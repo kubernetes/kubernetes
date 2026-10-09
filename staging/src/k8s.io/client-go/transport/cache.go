@@ -18,6 +18,7 @@ package transport
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"net"
 	"net/http"
@@ -139,24 +140,7 @@ func (c *tlsTransportCache) get(config *Config) (http.RoundTripper, error) {
 		go dynamicCertDialer.run(ctx.Done())
 	}
 
-	proxy := http.ProxyFromEnvironment
-	if config.Proxy != nil {
-		proxy = config.Proxy
-	}
-
-	httpTransport := utilnet.SetTransportDefaults(&http.Transport{
-		Proxy:               proxy,
-		TLSHandshakeTimeout: 10 * time.Second,
-		TLSClientConfig:     tlsConfig,
-		MaxIdleConnsPerHost: idleConnsPerHost,
-		DialContext:         dial,
-		DisableCompression:  config.DisableCompression,
-	})
-	var transport http.RoundTripper = httpTransport
-
-	if config.TLS.ReloadCAFiles && tlsConfig != nil && tlsConfig.RootCAs != nil && len(config.TLS.CAFile) > 0 {
-		transport = newAtomicTransportHolder(config.TLS.CAFile, config.TLS.CAData, httpTransport)
-	}
+	transport := newTransport(config, tlsConfig, dial)
 
 	if !canCache && cancel == nil {
 		return transport, nil // uncacheable config with no cert rotation - nothing to GC
@@ -202,6 +186,29 @@ func (c *tlsTransportCache) get(config *Config) (http.RoundTripper, error) {
 	}
 
 	return transportWithGC, nil
+}
+
+// newTransport returns a new, uncached http.RoundTripper for config that uses
+// tlsConfig and dial.
+func newTransport(config *Config, tlsConfig *tls.Config, dial func(ctx context.Context, network, address string) (net.Conn, error)) http.RoundTripper {
+	proxy := http.ProxyFromEnvironment
+	if config.Proxy != nil {
+		proxy = config.Proxy
+	}
+
+	httpTransport := utilnet.SetTransportDefaults(&http.Transport{
+		Proxy:               proxy,
+		TLSHandshakeTimeout: 10 * time.Second,
+		TLSClientConfig:     tlsConfig,
+		MaxIdleConnsPerHost: idleConnsPerHost,
+		DialContext:         dial,
+		DisableCompression:  config.DisableCompression,
+	})
+
+	if config.TLS.ReloadCAFiles && tlsConfig != nil && tlsConfig.RootCAs != nil && len(config.TLS.CAFile) > 0 {
+		return newAtomicTransportHolder(config.TLS.CAFile, config.TLS.CAData, httpTransport)
+	}
+	return httpTransport
 }
 
 func (c *tlsTransportCache) getLocked(key tlsCacheKey) (http.RoundTripper, bool) {
