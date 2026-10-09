@@ -23,6 +23,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -194,6 +195,17 @@ func (p *podEvaluator) Handles(a admission.Attributes) bool {
 		return op == admission.Create
 	case "resize":
 		return op == admission.Update
+	case "status":
+		if op == admission.Update {
+			pod, err1 := toExternalPodOrError(a.GetObject())
+			oldPod, err2 := toExternalPodOrError(a.GetOldObject())
+			if err1 != nil || err2 != nil {
+				return false
+			}
+			return len(pod.Status.ExtraNodeAllocatableResources) > 0 &&
+				!apiequality.Semantic.DeepEqual(oldPod.Status.ExtraNodeAllocatableResources, pod.Status.ExtraNodeAllocatableResources)
+		}
+		return false
 	default:
 		return false
 	}
@@ -402,6 +414,8 @@ func PodUsageFunc(obj runtime.Object, clock clock.Clock) (corev1.ResourceList, e
 		UseStatusResources: feature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling),
 		// SkipPodLevelResources is set to false when PodLevelResources feature is enabled.
 		SkipPodLevelResources: !feature.DefaultFeatureGate.Enabled(features.PodLevelResources),
+		// Not gated, so pods that carry the field stay charged when the feature is disabled.
+		UseExtraNodeAllocatableResources: true,
 	}
 	requests := resourcehelper.PodRequests(pod, opts)
 	limits := resourcehelper.PodLimits(pod, opts)

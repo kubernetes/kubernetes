@@ -32,13 +32,16 @@ import (
 	genericadmissioninitializer "k8s.io/apiserver/pkg/admission/initializer"
 	"k8s.io/apiserver/pkg/admission/plugin/resourcequota"
 	resourcequotaapi "k8s.io/apiserver/pkg/admission/plugin/resourcequota/apis/resourcequota"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	testcore "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	controlplaneadmission "k8s.io/kubernetes/pkg/controlplane/apiserver/admission"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/quota/v1/install"
 )
 
@@ -2734,5 +2737,241 @@ func TestAdmitAllowDecreaseUsageWithoutCoveringQuota(t *testing.T) {
 
 	if err != nil {
 		t.Errorf("Expected no error for decreasing a limited resource without quota, got %v", err)
+	}
+}
+
+func TestAdmitPodStatusExtraNodeAllocatableResources(t *testing.T) {
+	testCases := []struct {
+		name                     string
+		podLevelResourcesEnabled bool
+		oldPod                   *api.Pod
+		newPod                   *api.Pod
+		expectError              string
+		expectQuotaUpdate        bool
+		expectedUsed             corev1.ResourceList
+	}{
+		{
+			name: "admits status update with extraNodeAllocatableResources within quota and charges delta",
+			oldPod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "dra-pod", Namespace: "test", ResourceVersion: "1"},
+				Spec: api.PodSpec{
+					Containers: []api.Container{{
+						Name:      "c1",
+						Resources: getResourceRequirements(getResourceList("100m", "1Gi"), getResourceList("", "")),
+					}},
+				},
+			},
+			newPod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "dra-pod", Namespace: "test", ResourceVersion: "1"},
+				Spec: api.PodSpec{
+					Containers: []api.Container{{
+						Name:      "c1",
+						Resources: getResourceRequirements(getResourceList("100m", "1Gi"), getResourceList("", "")),
+					}},
+				},
+				Status: api.PodStatus{
+					ExtraNodeAllocatableResources: []api.ExtraNodeAllocatableResource{{
+						Source:     api.ExtraNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "claim-1"},
+						Containers: []string{"c1"},
+						Mapping: []api.NodeAllocatableMappedResources{
+							{Name: api.ResourceCPU, Quantity: new(resource.MustParse("1"))},
+							{Name: api.ResourceMemory, Quantity: new(resource.MustParse("10Gi"))},
+						},
+					}},
+				},
+			},
+			expectQuotaUpdate: true,
+			expectedUsed: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("2"),
+				corev1.ResourceMemory: resource.MustParse("60Gi"),
+				corev1.ResourcePods:   resource.MustParse("3"),
+			},
+		},
+		{
+			name: "rejects status update when extraNodeAllocatableResources delta exceeds hard quota",
+			oldPod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "dra-pod", Namespace: "test", ResourceVersion: "1"},
+				Spec: api.PodSpec{
+					Containers: []api.Container{{
+						Name:      "c1",
+						Resources: getResourceRequirements(getResourceList("100m", "1Gi"), getResourceList("", "")),
+					}},
+				},
+			},
+			newPod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "dra-pod", Namespace: "test", ResourceVersion: "1"},
+				Spec: api.PodSpec{
+					Containers: []api.Container{{
+						Name:      "c1",
+						Resources: getResourceRequirements(getResourceList("100m", "1Gi"), getResourceList("", "")),
+					}},
+				},
+				Status: api.PodStatus{
+					ExtraNodeAllocatableResources: []api.ExtraNodeAllocatableResource{{
+						Source:     api.ExtraNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "claim-1"},
+						Containers: []string{"c1"},
+						Mapping: []api.NodeAllocatableMappedResources{
+							{Name: api.ResourceCPU, Quantity: new(resource.MustParse("3"))},
+						},
+					}},
+				},
+			},
+			expectError: "exceeded quota",
+		},
+		{
+			name:                     "pod-level resources covering DRA resource produces zero delta on status update",
+			podLevelResourcesEnabled: true,
+			oldPod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "dra-plr-pod", Namespace: "test", ResourceVersion: "1"},
+				Spec: api.PodSpec{
+					Resources: &api.ResourceRequirements{
+						Requests: getResourceList("2", "10Gi"),
+					},
+					Containers: []api.Container{{Name: "c1"}},
+				},
+			},
+			newPod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "dra-plr-pod", Namespace: "test", ResourceVersion: "1"},
+				Spec: api.PodSpec{
+					Resources: &api.ResourceRequirements{
+						Requests: getResourceList("2", "10Gi"),
+					},
+					Containers: []api.Container{{Name: "c1"}},
+				},
+				Status: api.PodStatus{
+					ExtraNodeAllocatableResources: []api.ExtraNodeAllocatableResource{{
+						Source:     api.ExtraNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "claim-1"},
+						Containers: []string{"c1"},
+						Mapping: []api.NodeAllocatableMappedResources{
+							{Name: api.ResourceCPU, Quantity: new(resource.MustParse("1"))},
+							{Name: api.ResourceMemory, Quantity: new(resource.MustParse("5Gi"))},
+						},
+					}},
+				},
+			},
+			expectQuotaUpdate: false,
+		},
+		{
+			name: "ignores status update when extraNodeAllocatableResources is unchanged",
+			oldPod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "dra-pod", Namespace: "test", ResourceVersion: "1"},
+				Spec: api.PodSpec{
+					Containers: []api.Container{{
+						Name:      "c1",
+						Resources: getResourceRequirements(getResourceList("100m", "1Gi"), getResourceList("", "")),
+					}},
+				},
+				Status: api.PodStatus{
+					Phase: api.PodPending,
+				},
+			},
+			newPod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "dra-pod", Namespace: "test", ResourceVersion: "1"},
+				Spec: api.PodSpec{
+					Containers: []api.Container{{
+						Name:      "c1",
+						Resources: getResourceRequirements(getResourceList("100m", "1Gi"), getResourceList("", "")),
+					}},
+				},
+				Status: api.PodStatus{
+					Phase: api.PodRunning,
+				},
+			},
+			expectQuotaUpdate: false,
+		},
+		{
+			// The pod does not specify the cpu and memory requests that the quota requires.
+			name: "admits status update clearing extraNodeAllocatableResources without evaluating quota",
+			oldPod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "dra-pod", Namespace: "test", ResourceVersion: "1"},
+				Spec: api.PodSpec{
+					Containers: []api.Container{{Name: "c1"}},
+				},
+				Status: api.PodStatus{
+					ExtraNodeAllocatableResources: []api.ExtraNodeAllocatableResource{{
+						Source:     api.ExtraNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "claim-1"},
+						Containers: []string{"c1"},
+						Mapping: []api.NodeAllocatableMappedResources{
+							{Name: api.ResourceCPU, Quantity: new(resource.MustParse("1"))},
+						},
+					}},
+				},
+			},
+			newPod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "dra-pod", Namespace: "test", ResourceVersion: "1"},
+				Spec: api.PodSpec{
+					Containers: []api.Container{{Name: "c1"}},
+				},
+				Status: api.PodStatus{
+					ExtraNodeAllocatableResources: []api.ExtraNodeAllocatableResource{},
+				},
+			},
+			expectQuotaUpdate: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRANodeAllocatableResources, true)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, tc.podLevelResourcesEnabled)
+
+			resourceQuota := &corev1.ResourceQuota{
+				ObjectMeta: metav1.ObjectMeta{Name: "quota", Namespace: "test", ResourceVersion: "124"},
+				Status: corev1.ResourceQuotaStatus{
+					Hard: corev1.ResourceList{
+						corev1.ResourceCPU:    resource.MustParse("3"),
+						corev1.ResourceMemory: resource.MustParse("100Gi"),
+						corev1.ResourcePods:   resource.MustParse("5"),
+					},
+					Used: corev1.ResourceList{
+						corev1.ResourceCPU:    resource.MustParse("1"),
+						corev1.ResourceMemory: resource.MustParse("50Gi"),
+						corev1.ResourcePods:   resource.MustParse("3"),
+					},
+				},
+			}
+			stopCh := make(chan struct{})
+			defer close(stopCh)
+
+			kubeClient := fake.NewSimpleClientset(resourceQuota)
+			informerFactory := informers.NewSharedInformerFactory(kubeClient, 0)
+
+			handler, err := createHandler(kubeClient, informerFactory, stopCh)
+			if err != nil {
+				t.Fatalf("Error occurred while creating admission plugin: %v", err)
+			}
+
+			if err := informerFactory.Core().V1().ResourceQuotas().Informer().GetIndexer().Add(resourceQuota); err != nil {
+				t.Fatal(err)
+			}
+			err = handler.Validate(context.TODO(), admission.NewAttributesRecord(tc.newPod, tc.oldPod, api.Kind("Pod").WithVersion("version"), tc.newPod.Namespace, tc.newPod.Name, corev1.Resource("pods").WithVersion("version"), "status", admission.Update, &metav1.UpdateOptions{}, false, nil), nil)
+			if tc.expectError != "" {
+				if err == nil || !strings.Contains(err.Error(), tc.expectError) {
+					t.Fatalf("Expected error containing %q, got: %v", tc.expectError, err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("Unexpected error: %v", err)
+			}
+
+			decimatedActions := removeListWatch(kubeClient.Actions())
+			if !tc.expectQuotaUpdate {
+				if len(decimatedActions) != 0 {
+					t.Fatalf("Expected no quota update actions, got: %v", decimatedActions)
+				}
+				return
+			}
+			if len(decimatedActions) == 0 {
+				t.Fatalf("Expected quota status update action, got none")
+			}
+			usage := decimatedActions[len(decimatedActions)-1].(testcore.UpdateAction).GetObject().(*corev1.ResourceQuota)
+			for k, v := range tc.expectedUsed {
+				actual := usage.Status.Used[k]
+				if actual.String() != v.String() {
+					t.Errorf("Usage Used: Key: %v, Expected: %v, Actual: %v", k, v.String(), actual.String())
+				}
+			}
+		})
 	}
 }

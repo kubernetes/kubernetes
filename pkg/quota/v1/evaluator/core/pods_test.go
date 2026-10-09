@@ -650,8 +650,81 @@ func TestPodEvaluatorUsage(t *testing.T) {
 				generic.ObjectCountQuotaResourceNameFor(schema.GroupResource{Resource: "pods"}): resource.MustParse("1"),
 			},
 		},
+		"extra node allocatable resources mapping and overhead": {
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					Containers: []api.Container{{
+						Name: "c1",
+						Resources: api.ResourceRequirements{
+							Requests: api.ResourceList{
+								api.ResourceCPU:    resource.MustParse("100m"),
+								api.ResourceMemory: resource.MustParse("100Mi"),
+							},
+						},
+					}},
+				},
+				Status: api.PodStatus{
+					ExtraNodeAllocatableResources: []api.ExtraNodeAllocatableResource{{
+						Source:     api.ExtraNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "claim-1"},
+						Containers: []string{"c1"},
+						Mapping: []api.NodeAllocatableMappedResources{
+							{Name: api.ResourceCPU, Quantity: new(resource.MustParse("500m"))},
+							{Name: api.ResourceMemory, Quantity: new(resource.MustParse("200Mi"))},
+							{Name: api.ResourceName(api.ResourceHugePagesPrefix + "2Mi"), Quantity: new(resource.MustParse("64Mi"))},
+						},
+						Overhead: []api.NodeAllocatableOverheadResources{
+							{
+								Name:         api.ResourceCPU,
+								PerPod:       new(resource.MustParse("200m")),
+								PerContainer: new(resource.MustParse("50m")),
+							},
+						},
+					}},
+				},
+			},
+			usage: corev1.ResourceList{
+				corev1.ResourceCPU:            resource.MustParse("850m"),
+				corev1.ResourceRequestsCPU:    resource.MustParse("850m"),
+				corev1.ResourceMemory:         resource.MustParse("300Mi"),
+				corev1.ResourceRequestsMemory: resource.MustParse("300Mi"),
+				corev1.ResourceName(corev1.ResourceHugePagesPrefix + "2Mi"):         resource.MustParse("64Mi"),
+				corev1.ResourceName(corev1.ResourceRequestsHugePagesPrefix + "2Mi"): resource.MustParse("64Mi"),
+				corev1.ResourcePods: resource.MustParse("1"),
+				generic.ObjectCountQuotaResourceNameFor(schema.GroupResource{Resource: "pods"}): resource.MustParse("1"),
+			},
+		},
+		"pod-level resources override extra node allocatable resources for covered resource": {
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					Resources: &api.ResourceRequirements{
+						Requests: api.ResourceList{api.ResourceCPU: resource.MustParse("2")},
+					},
+					Containers: []api.Container{{
+						Name: "c1",
+					}},
+				},
+				Status: api.PodStatus{
+					ExtraNodeAllocatableResources: []api.ExtraNodeAllocatableResource{{
+						Source:     api.ExtraNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "claim-1"},
+						Containers: []string{"c1"},
+						Mapping: []api.NodeAllocatableMappedResources{
+							{Name: api.ResourceCPU, Quantity: new(resource.MustParse("500m"))},
+							{Name: api.ResourceMemory, Quantity: new(resource.MustParse("200Mi"))},
+						},
+					}},
+				},
+			},
+			podLevelResourcesEnabled: true,
+			usage: corev1.ResourceList{
+				corev1.ResourceCPU:            resource.MustParse("2"),
+				corev1.ResourceRequestsCPU:    resource.MustParse("2"),
+				corev1.ResourceMemory:         resource.MustParse("200Mi"),
+				corev1.ResourceRequestsMemory: resource.MustParse("200Mi"),
+				corev1.ResourcePods:           resource.MustParse("1"),
+				generic.ObjectCountQuotaResourceNameFor(schema.GroupResource{Resource: "pods"}): resource.MustParse("1"),
+			},
+		},
 	}
-	t.Parallel()
 	for testName, testCase := range testCases {
 		t.Run(testName, func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, testCase.podLevelResourcesEnabled)
@@ -1283,9 +1356,10 @@ func TestPodEvaluatorHandles(t *testing.T) {
 	fakeClock := testingclock.NewFakeClock(time.Now())
 	evaluator := NewPodEvaluator(nil, fakeClock)
 	testCases := []struct {
-		name  string
-		attrs admission.Attributes
-		want  bool
+		name                                string
+		attrs                               admission.Attributes
+		draNodeAllocatableResourcesDisabled bool
+		want                                bool
 	}{
 		{
 			name:  "create",
@@ -1337,9 +1411,93 @@ func TestPodEvaluatorHandles(t *testing.T) {
 			attrs: admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{Group: "core", Version: "v1", Kind: "Pod"}, "", "", schema.GroupVersionResource{Group: "core", Version: "v1", Resource: "pods"}, "resize", admission.Update, nil, false, nil),
 			want:  true,
 		},
+		{
+			name: "update-status-extraNodeAllocatableResources-added",
+			attrs: admission.NewAttributesRecord(
+				&corev1.Pod{Status: corev1.PodStatus{ExtraNodeAllocatableResources: []corev1.ExtraNodeAllocatableResource{{Containers: []string{"c1"}, Mapping: []corev1.NodeAllocatableMappedResources{{Name: corev1.ResourceCPU, Quantity: new(resource.MustParse("1"))}}}}}},
+				&corev1.Pod{},
+				schema.GroupVersionKind{Group: "core", Version: "v1", Kind: "Pod"}, "", "", schema.GroupVersionResource{Group: "core", Version: "v1", Resource: "pods"}, "status", admission.Update, nil, false, nil,
+			),
+			want: true,
+		},
+		{
+			// With the gate off, the apiserver keeps the field only on pods that already carry it.
+			name: "update-status-extraNodeAllocatableResources-modified-feature-gate-disabled",
+			attrs: admission.NewAttributesRecord(
+				&corev1.Pod{Status: corev1.PodStatus{ExtraNodeAllocatableResources: []corev1.ExtraNodeAllocatableResource{{Containers: []string{"c1"}, Mapping: []corev1.NodeAllocatableMappedResources{{Name: corev1.ResourceCPU, Quantity: new(resource.MustParse("2"))}}}}}},
+				&corev1.Pod{Status: corev1.PodStatus{ExtraNodeAllocatableResources: []corev1.ExtraNodeAllocatableResource{{Containers: []string{"c1"}, Mapping: []corev1.NodeAllocatableMappedResources{{Name: corev1.ResourceCPU, Quantity: new(resource.MustParse("1"))}}}}}},
+				schema.GroupVersionKind{Group: "core", Version: "v1", Kind: "Pod"}, "", "", schema.GroupVersionResource{Group: "core", Version: "v1", Resource: "pods"}, "status", admission.Update, nil, false, nil,
+			),
+			draNodeAllocatableResourcesDisabled: true,
+			want:                                true,
+		},
+		{
+			name: "update-status-extraNodeAllocatableResources-modified",
+			attrs: admission.NewAttributesRecord(
+				&corev1.Pod{Status: corev1.PodStatus{ExtraNodeAllocatableResources: []corev1.ExtraNodeAllocatableResource{{Containers: []string{"c1"}, Mapping: []corev1.NodeAllocatableMappedResources{{Name: corev1.ResourceCPU, Quantity: new(resource.MustParse("2"))}}}}}},
+				&corev1.Pod{Status: corev1.PodStatus{ExtraNodeAllocatableResources: []corev1.ExtraNodeAllocatableResource{{Containers: []string{"c1"}, Mapping: []corev1.NodeAllocatableMappedResources{{Name: corev1.ResourceCPU, Quantity: new(resource.MustParse("1"))}}}}}},
+				schema.GroupVersionKind{Group: "core", Version: "v1", Kind: "Pod"}, "", "", schema.GroupVersionResource{Group: "core", Version: "v1", Resource: "pods"}, "status", admission.Update, nil, false, nil,
+			),
+			want: true,
+		},
+		{
+			name: "update-status-extraNodeAllocatableResources-unchanged",
+			attrs: admission.NewAttributesRecord(
+				&corev1.Pod{Status: corev1.PodStatus{Phase: corev1.PodRunning, ExtraNodeAllocatableResources: []corev1.ExtraNodeAllocatableResource{{Containers: []string{"c1"}, Mapping: []corev1.NodeAllocatableMappedResources{{Name: corev1.ResourceCPU, Quantity: new(resource.MustParse("1"))}}}}}},
+				&corev1.Pod{Status: corev1.PodStatus{Phase: corev1.PodPending, ExtraNodeAllocatableResources: []corev1.ExtraNodeAllocatableResource{{Containers: []string{"c1"}, Mapping: []corev1.NodeAllocatableMappedResources{{Name: corev1.ResourceCPU, Quantity: new(resource.MustParse("1"))}}}}}},
+				schema.GroupVersionKind{Group: "core", Version: "v1", Kind: "Pod"}, "", "", schema.GroupVersionResource{Group: "core", Version: "v1", Resource: "pods"}, "status", admission.Update, nil, false, nil,
+			),
+			want: false,
+		},
+		{
+			name: "update-status-extraNodeAllocatableResources-cleared",
+			attrs: admission.NewAttributesRecord(
+				&corev1.Pod{Status: corev1.PodStatus{ExtraNodeAllocatableResources: []corev1.ExtraNodeAllocatableResource{}}},
+				&corev1.Pod{Status: corev1.PodStatus{ExtraNodeAllocatableResources: []corev1.ExtraNodeAllocatableResource{{Containers: []string{"c1"}, Mapping: []corev1.NodeAllocatableMappedResources{{Name: corev1.ResourceCPU, Quantity: new(resource.MustParse("1"))}}}}}},
+				schema.GroupVersionKind{Group: "core", Version: "v1", Kind: "Pod"}, "", "", schema.GroupVersionResource{Group: "core", Version: "v1", Resource: "pods"}, "status", admission.Update, nil, false, nil,
+			),
+			want: false,
+		},
+		{
+			name: "update-status-without-extraNodeAllocatableResources",
+			attrs: admission.NewAttributesRecord(
+				&corev1.Pod{Status: corev1.PodStatus{Phase: corev1.PodRunning}},
+				&corev1.Pod{Status: corev1.PodStatus{Phase: corev1.PodPending}},
+				schema.GroupVersionKind{Group: "core", Version: "v1", Kind: "Pod"}, "", "", schema.GroupVersionResource{Group: "core", Version: "v1", Resource: "pods"}, "status", admission.Update, nil, false, nil,
+			),
+			want: false,
+		},
+		{
+			name: "create-status-with-extraNodeAllocatableResources",
+			attrs: admission.NewAttributesRecord(
+				&corev1.Pod{Status: corev1.PodStatus{ExtraNodeAllocatableResources: []corev1.ExtraNodeAllocatableResource{{Containers: []string{"c1"}, Mapping: []corev1.NodeAllocatableMappedResources{{Name: corev1.ResourceCPU, Quantity: new(resource.MustParse("1"))}}}}}},
+				nil,
+				schema.GroupVersionKind{Group: "core", Version: "v1", Kind: "Pod"}, "", "", schema.GroupVersionResource{Group: "core", Version: "v1", Resource: "pods"}, "status", admission.Create, nil, false, nil,
+			),
+			want: false,
+		},
+		{
+			name: "update-status-internal-pod-extraNodeAllocatableResources-added",
+			attrs: admission.NewAttributesRecord(
+				&api.Pod{Status: api.PodStatus{ExtraNodeAllocatableResources: []api.ExtraNodeAllocatableResource{{Containers: []string{"c1"}, Mapping: []api.NodeAllocatableMappedResources{{Name: api.ResourceCPU, Quantity: new(resource.MustParse("1"))}}}}}},
+				&api.Pod{},
+				schema.GroupVersionKind{Group: "core", Version: "v1", Kind: "Pod"}, "", "", schema.GroupVersionResource{Group: "core", Version: "v1", Resource: "pods"}, "status", admission.Update, nil, false, nil,
+			),
+			want: true,
+		},
+		{
+			name: "update-status-internal-pod-extraNodeAllocatableResources-unchanged",
+			attrs: admission.NewAttributesRecord(
+				&api.Pod{Status: api.PodStatus{Phase: api.PodRunning, ExtraNodeAllocatableResources: []api.ExtraNodeAllocatableResource{{Containers: []string{"c1"}, Mapping: []api.NodeAllocatableMappedResources{{Name: api.ResourceCPU, Quantity: new(resource.MustParse("1"))}}}}}},
+				&api.Pod{Status: api.PodStatus{Phase: api.PodPending, ExtraNodeAllocatableResources: []api.ExtraNodeAllocatableResource{{Containers: []string{"c1"}, Mapping: []api.NodeAllocatableMappedResources{{Name: api.ResourceCPU, Quantity: new(resource.MustParse("1"))}}}}}},
+				schema.GroupVersionKind{Group: "core", Version: "v1", Kind: "Pod"}, "", "", schema.GroupVersionResource{Group: "core", Version: "v1", Resource: "pods"}, "status", admission.Update, nil, false, nil,
+			),
+			want: false,
+		},
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRANodeAllocatableResources, !tc.draNodeAllocatableResourcesDisabled)
 			actual := evaluator.Handles(tc.attrs)
 
 			if tc.want != actual {
