@@ -12,7 +12,7 @@ github.com/go-openapi/swag/conv v0.29.2/go.mod h1:AZS0YigTNf8qNtD6WqJz/N4RUNmpr7
 github.com/go-openapi/swag/jsonutils v0.29.2/go.mod h1:ONTdNvj3Y+IXRzfa17E+Rgt2ns/qiSOYjIo2K7v2yDs=
 github.com/go-openapi/swag/pools v0.29.2/go.mod h1:V3lhxVT4qDYRqc2MRSSbLsTYIYV/2HlHafhyEkmzLIc=
 github.com/go-openapi/swag/typeutils v0.29.2/go.mod h1:7+GDG+uz9Ke+eVt4rClZg7wklSDp8hT/mKNh/pC26TE=
-github.com/google/gnostic-models v0.7.0/go.mod h1:whL5G0m6dmc5cPxKc5bdKdEN3UjI7OUGxBlw57miDrQ=
+github.com/google/gnostic-models v0.7.1/go.mod h1:whL5G0m6dmc5cPxKc5bdKdEN3UjI7OUGxBlw57miDrQ=
 github.com/google/go-cmp v0.7.0 h1:wk8382ETsv4JYUZwIsn6YpYiWiBsYLSJiTsyBybVuN8=
 github.com/google/go-cmp v0.7.0/go.mod h1:pXiqmnSA92OHEEa9HXL2W4E7lf9JzCmGVUdgjX3N/iU=
 github.com/google/uuid v1.6.0/go.mod h1:TIyPZe4MgqvfeYDBFedMoGGpEw/LqOeaOT+nhxU+yHo=
@@ -48,7 +48,7 @@ gopkg.in/inf.v0 v0.9.1 h1:73M5CoZyi3ZLMOyDlQh031Cx6N9NDJ2Vvfl76EDAgDc=
 gopkg.in/inf.v0 v0.9.1/go.mod h1:cWUDdTG/fYaXco+Dcufb5Vnc6Gp2YChqWtbxRZE0mXw=
 k8s.io/klog/v2 v2.140.0 h1:Tf+J3AH7xnUzZyVVXhTgGhEKnFqye14aadWv7bzXdzc=
 k8s.io/klog/v2 v2.140.0/go.mod h1:o+/RWfJ6PwpnFn7OyAG3QnO47BFsymfEfrz6XyYSSp0=
-k8s.io/kube-openapi v0.0.0-20260929181212-2cfbdf149b9a/go.mod h1:sn0em1NYapwHuGbKnEJW8Fr3M4GmqFtIWgvQebBHkPA=
+k8s.io/kube-openapi v0.0.0-20261007072838-e2e80c32a35f/go.mod h1:ijAJHxCK/9OftZdcKwI5BHyIeRUeoKe1ldIyM4JHMts=
 k8s.io/utils v0.0.0-20260626114624-be93311217bd h1:Ea7fgQ5we8Y9T0OX5o0dAHzQOBRI07D/dEYRaB9ZZEs=
 k8s.io/utils v0.0.0-20260626114624-be93311217bd/go.mod h1:xDxuJ0whA3d0I4mf/C4ppKHxXynQ+fxnkmQH0vTHnuk=
 sigs.k8s.io/json v0.0.0-20250730193827-2d320260d730 h1:IpInykpT6ceI+QxKBbEflcR5EXP7sU1kvOlxwZh5txg=

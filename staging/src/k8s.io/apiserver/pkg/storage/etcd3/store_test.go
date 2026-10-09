@@ -1660,9 +1660,9 @@ func TestPrefixStats(t *testing.T) {
 }
 
 func TestCorrectness(t *testing.T) {
-	ctx, store, _ := testSetup(t)
+	ctx, store, client := testSetup(t)
 	correctness.RunTestCorrectness(ctx, t, store, "", func(obj runtime.Object) (string, error) {
 		pod := obj.(*example.Pod)
 		return computePodKey(pod), nil
-	})
+	}, compactStorage(store, client.Client))
 }

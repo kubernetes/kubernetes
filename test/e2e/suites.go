@@ -54,8 +54,8 @@ func gatherTestSuiteMetrics(ctx context.Context) error {
 		return fmt.Errorf("error creating client: %w", err)
 	}
 
-	// Grab metrics for apiserver, scheduler, controller-manager, kubelet (for non-kubemark case) and cluster autoscaler (optionally).
-	grabber, err := e2emetrics.NewMetricsGrabber(ctx, c, nil, config, !framework.ProviderIs("kubemark"), true, true, true, framework.TestContext.IncludeClusterAutoscalerMetrics, false)
+	// Grab metrics for apiserver, scheduler, controller-manager, kubelet and cluster autoscaler (optionally).
+	grabber, err := e2emetrics.NewMetricsGrabber(ctx, c, config, true, true, true, true, framework.TestContext.IncludeClusterAutoscalerMetrics, false)
 	if err != nil {
 		return fmt.Errorf("failed to create MetricsGrabber: %w", err)
 	}

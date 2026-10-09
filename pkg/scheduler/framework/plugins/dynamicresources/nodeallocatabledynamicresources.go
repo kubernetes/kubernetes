@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	resourcehelper "k8s.io/component-helpers/resource"
 	"k8s.io/component-helpers/scheduling/corev1/nodeaffinity"
+	draapi "k8s.io/dynamic-resource-allocation/api"
 	"k8s.io/dynamic-resource-allocation/resourceclaim"
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
@@ -216,7 +217,7 @@ func addDeviceMapping(
 		if result.ConsumedCapacity == nil {
 			return fmt.Errorf("claim %s/%s, device %s: ConsumedCapacity is nil, but Capacity key '%s' is set in NodeAllocatableResources for resource %s", key.Namespace, key.Name, result.Device, capacityKey, resourceName)
 		}
-		if consumed, exists := result.ConsumedCapacity[capacityKey]; exists {
+		if consumed, exists := draapi.LookupByQualifiedName(result.ConsumedCapacity, capacityKey, result.Driver); exists {
 			// If !exists - the capacityKey is not in ConsumedCapacity, this mapping is not relevant for this allocation
 			consumedQuantity := consumed.DeepCopy()
 			quantityOne := resource.MustParse("1")

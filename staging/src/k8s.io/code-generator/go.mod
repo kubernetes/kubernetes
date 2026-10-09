@@ -8,7 +8,7 @@ godebug default=go1.27
 
 require (
 	github.com/gogo/protobuf v1.3.2
-	github.com/google/gnostic-models v0.7.0
+	github.com/google/gnostic-models v0.7.1
 	github.com/google/go-cmp v0.7.0
 	github.com/spf13/pflag v1.0.10
 	go.yaml.in/yaml/v2 v2.4.4
@@ -16,7 +16,7 @@ require (
 	k8s.io/apimachinery v0.0.0
 	k8s.io/gengo/v2 v2.0.0-20260408192533-25e2208e0dc3
 	k8s.io/klog/v2 v2.140.0
-	k8s.io/kube-openapi v0.0.0-20260929181212-2cfbdf149b9a
+	k8s.io/kube-openapi v0.0.0-20261007072838-e2e80c32a35f
 	k8s.io/utils v0.0.0-20260626114624-be93311217bd
 	sigs.k8s.io/randfill v1.0.0
 	sigs.k8s.io/yaml v1.6.0
@@ -24,7 +24,6 @@ require (
 
 require (
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
-	github.com/emicklei/go-restful/v3 v3.13.0 // indirect
 	github.com/fxamacker/cbor/v2 v2.9.4 // indirect
 	github.com/go-logr/logr v1.4.4 // indirect
 	github.com/go-openapi/jsonpointer v1.0.2 // indirect

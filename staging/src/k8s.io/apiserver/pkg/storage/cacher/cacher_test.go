@@ -852,7 +852,7 @@ func BenchmarkStoreStats(b *testing.B) {
 }
 
 func TestCorrectness(t *testing.T) {
-	ctx, cacher, terminate := testSetup(t)
+	ctx, cacher, server, terminate := testSetupWithEtcdServer(t)
 	t.Cleanup(terminate)
-	correctness.RunTestCorrectness(ctx, t, cacher, etcd3testing.PathPrefix(), cacher.cacher.watchCache.config.keyFunc)
+	correctness.RunTestCorrectness(ctx, t, cacher, etcd3testing.PathPrefix(), cacher.cacher.watchCache.config.keyFunc, compactStore(cacher, server.V3Client.Client))
 }

@@ -10,13 +10,12 @@ require (
 	k8s.io/api v0.0.0
 	k8s.io/apimachinery v0.0.0
 	k8s.io/client-go v0.0.0
-	k8s.io/kube-openapi v0.0.0-20260929181212-2cfbdf149b9a
+	k8s.io/kube-openapi v0.0.0-20261007072838-e2e80c32a35f
 	sigs.k8s.io/structured-merge-diff/v7 v7.0.0
 )
 
 require (
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
-	github.com/emicklei/go-restful/v3 v3.13.0 // indirect
 	github.com/fxamacker/cbor/v2 v2.9.4 // indirect
 	github.com/go-logr/logr v1.4.4 // indirect
 	github.com/go-openapi/jsonpointer v1.0.2 // indirect
@@ -25,7 +24,7 @@ require (
 	github.com/go-openapi/swag/jsonutils v0.29.2 // indirect
 	github.com/go-openapi/swag/pools v0.29.2 // indirect
 	github.com/go-openapi/swag/typeutils v0.29.2 // indirect
-	github.com/google/gnostic-models v0.7.0 // indirect
+	github.com/google/gnostic-models v0.7.1 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect

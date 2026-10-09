@@ -14244,7 +14244,6 @@ func schema_k8sio_api_autoscaling_v1_ContainerResourceMetricStatus(ref common.Re
 						},
 					},
 				},
-				Required: []string{"name", "currentAverageValue", "container"},
 			},
 		},
 		Dependencies: []string{
@@ -14370,7 +14369,6 @@ func schema_k8sio_api_autoscaling_v1_ExternalMetricStatus(ref common.ReferenceCa
 						},
 					},
 				},
-				Required: []string{"metricName", "currentValue"},
 			},
 		},
 		Dependencies: []string{
@@ -14446,7 +14444,7 @@ func schema_k8sio_api_autoscaling_v1_HorizontalPodAutoscalerCondition(ref common
 					},
 					"status": {
 						SchemaProps: spec.SchemaProps{
-							Description: "status is the status of the condition (True, False, Unknown)",
+							Description: "status is the status of the condition, one of True, False, Unknown.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -14480,7 +14478,6 @@ func schema_k8sio_api_autoscaling_v1_HorizontalPodAutoscalerCondition(ref common
 						},
 					},
 				},
-				Required: []string{"type", "status"},
 			},
 		},
 		Dependencies: []string{
@@ -14627,7 +14624,6 @@ func schema_k8sio_api_autoscaling_v1_HorizontalPodAutoscalerStatus(ref common.Re
 						},
 					},
 				},
-				Required: []string{"currentReplicas", "desiredReplicas"},
 			},
 		},
 		Dependencies: []string{
@@ -14699,7 +14695,7 @@ func schema_k8sio_api_autoscaling_v1_MetricStatus(ref common.ReferenceCallback) 
 				Properties: map[string]spec.Schema{
 					"type": {
 						SchemaProps: spec.SchemaProps{
-							Description: "type is the type of metric source.  It will be one of \"ContainerResource\", \"External\", \"Object\", \"Pods\" or \"Resource\", each corresponds to a matching field in the object.\n\nPossible enum values:\n - `\"ContainerResource\"` is a resource metric known to Kubernetes, as specified in requests and limits, describing a single container in each pod in the current scale target (e.g. CPU or memory). Such metrics are built in to Kubernetes, and have special scaling options on top of those available to normal per-pod metrics (the \"pods\" source).\n - `\"External\"` is a global metric that is not associated with any Kubernetes object. It allows autoscaling based on information coming from components running outside of cluster (for example length of queue in cloud messaging service, or QPS from loadbalancer running outside of cluster).\n - `\"Object\"` is a metric describing a kubernetes object (for example, hits-per-second on an Ingress object).\n - `\"Pods\"` is a metric describing each pod in the current scale target (for example, transactions-processed-per-second). The values will be averaged together before being compared to the target value.\n - `\"Resource\"` is a resource metric known to Kubernetes, as specified in requests and limits, describing each pod in the current scale target (e.g. CPU or memory). Such metrics are built in to Kubernetes, and have special scaling options on top of those available to normal per-pod metrics (the \"pods\" source).",
+							Description: "type is the type of metric source.  It should be one of \"ContainerResource\", \"External\", \"Object\", \"Pods\" or \"Resource\", each corresponds to a matching field in the object.\n\nPossible enum values:\n - `\"ContainerResource\"` is a resource metric known to Kubernetes, as specified in requests and limits, describing a single container in each pod in the current scale target (e.g. CPU or memory). Such metrics are built in to Kubernetes, and have special scaling options on top of those available to normal per-pod metrics (the \"pods\" source).\n - `\"External\"` is a global metric that is not associated with any Kubernetes object. It allows autoscaling based on information coming from components running outside of cluster (for example length of queue in cloud messaging service, or QPS from loadbalancer running outside of cluster).\n - `\"Object\"` is a metric describing a kubernetes object (for example, hits-per-second on an Ingress object).\n - `\"Pods\"` is a metric describing each pod in the current scale target (for example, transactions-processed-per-second). The values will be averaged together before being compared to the target value.\n - `\"Resource\"` is a resource metric known to Kubernetes, as specified in requests and limits, describing each pod in the current scale target (e.g. CPU or memory). Such metrics are built in to Kubernetes, and have special scaling options on top of those available to normal per-pod metrics (the \"pods\" source).",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -14737,7 +14733,6 @@ func schema_k8sio_api_autoscaling_v1_MetricStatus(ref common.ReferenceCallback) 
 						},
 					},
 				},
-				Required: []string{"type"},
 			},
 		},
 		Dependencies: []string{
@@ -14786,7 +14781,7 @@ func schema_k8sio_api_autoscaling_v1_ObjectMetricSource(ref common.ReferenceCall
 						},
 					},
 				},
-				Required: []string{"target", "metricName", "targetValue"},
+				Required: []string{"target", "metricName"},
 			},
 		},
 		Dependencies: []string{
@@ -14835,7 +14830,6 @@ func schema_k8sio_api_autoscaling_v1_ObjectMetricStatus(ref common.ReferenceCall
 						},
 					},
 				},
-				Required: []string{"target", "metricName", "currentValue"},
 			},
 		},
 		Dependencies: []string{
@@ -14907,7 +14901,6 @@ func schema_k8sio_api_autoscaling_v1_PodsMetricStatus(ref common.ReferenceCallba
 						},
 					},
 				},
-				Required: []string{"metricName", "currentAverageValue"},
 			},
 		},
 		Dependencies: []string{
@@ -14981,7 +14974,6 @@ func schema_k8sio_api_autoscaling_v1_ResourceMetricStatus(ref common.ReferenceCa
 						},
 					},
 				},
-				Required: []string{"name", "currentAverageValue"},
 			},
 		},
 		Dependencies: []string{
@@ -15159,7 +15151,6 @@ func schema_k8sio_api_autoscaling_v2_ContainerResourceMetricStatus(ref common.Re
 						},
 					},
 				},
-				Required: []string{"name", "current", "container"},
 			},
 		},
 		Dependencies: []string{
@@ -15256,7 +15247,6 @@ func schema_k8sio_api_autoscaling_v2_ExternalMetricStatus(ref common.ReferenceCa
 						},
 					},
 				},
-				Required: []string{"metric", "current"},
 			},
 		},
 		Dependencies: []string{
@@ -15450,7 +15440,7 @@ func schema_k8sio_api_autoscaling_v2_HorizontalPodAutoscalerCondition(ref common
 					},
 					"status": {
 						SchemaProps: spec.SchemaProps{
-							Description: "status is the status of the condition (True, False, Unknown)",
+							Description: "status is the status of the condition, should be one of True, False, Unknown",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -15484,7 +15474,6 @@ func schema_k8sio_api_autoscaling_v2_HorizontalPodAutoscalerCondition(ref common
 						},
 					},
 				},
-				Required: []string{"type", "status"},
 			},
 		},
 		Dependencies: []string{
@@ -15681,7 +15670,6 @@ func schema_k8sio_api_autoscaling_v2_HorizontalPodAutoscalerStatus(ref common.Re
 						},
 					},
 				},
-				Required: []string{"desiredReplicas"},
 			},
 		},
 		Dependencies: []string{
@@ -15819,7 +15807,6 @@ func schema_k8sio_api_autoscaling_v2_MetricStatus(ref common.ReferenceCallback) 
 						},
 					},
 				},
-				Required: []string{"type"},
 			},
 		},
 		Dependencies: []string{
@@ -15970,7 +15957,6 @@ func schema_k8sio_api_autoscaling_v2_ObjectMetricStatus(ref common.ReferenceCall
 						},
 					},
 				},
-				Required: []string{"metric", "current", "describedObject"},
 			},
 		},
 		Dependencies: []string{
@@ -16030,7 +16016,6 @@ func schema_k8sio_api_autoscaling_v2_PodsMetricStatus(ref common.ReferenceCallba
 						},
 					},
 				},
-				Required: []string{"metric", "current"},
 			},
 		},
 		Dependencies: []string{
@@ -16092,7 +16077,6 @@ func schema_k8sio_api_autoscaling_v2_ResourceMetricStatus(ref common.ReferenceCa
 						},
 					},
 				},
-				Required: []string{"name", "current"},
 			},
 		},
 		Dependencies: []string{
@@ -47871,7 +47855,7 @@ func schema_k8sio_api_resource_v1_CapacityRequirements(ref common.ReferenceCallb
 				Properties: map[string]spec.Schema{
 					"requests": {
 						SchemaProps: spec.SchemaProps{
-							Description: "requests represent individual device resource requests for distinct resources, all of which must be provided by the device.\n\nThis value is used as an additional filtering condition against the available capacity on the device. This is semantically equivalent to a CEL selector with `device.capacity[<domain>].<name>.compareTo(quantity(<request quantity>)) >= 0`. For example, device.capacity['test-driver.cdi.k8s.io'].counters.compareTo(quantity('2')) >= 0.\n\nWhen a requestPolicy is defined, the requested amount is adjusted upward to the nearest valid value based on the policy. If the requested amount cannot be adjusted to a valid value—because it exceeds what the requestPolicy allows— the device is considered ineligible for allocation.\n\nFor any capacity that is not explicitly requested: - If no requestPolicy is set, the default consumed capacity is equal to the full device capacity\n  (i.e., the whole device is claimed).\n- If a requestPolicy is set, the default consumed capacity is determined according to that policy.\n\nIf the device allows multiple allocation, the aggregated amount across all requests must not exceed the capacity value. The consumed capacity, which may be adjusted based on the requestPolicy if defined, is recorded in the resource claim’s status.devices[*].consumedCapacity field.",
+							Description: "requests represent individual device resource requests for distinct resources, all of which must be provided by the device.\n\nThis value is used as an additional filtering condition against the available capacity on the device. This is semantically equivalent to a CEL selector with `device.capacity[<domain>].<name>.compareTo(quantity(<request quantity>)) >= 0`. For example, device.capacity['test-driver.cdi.k8s.io'].counters.compareTo(quantity('2')) >= 0.\n\nThe domain prefix can be omitted, in which case it defaults to the driver of the device under evaluation. For example, \"bandwidth: 1Gi\" is equivalent to \"<driver>/bandwidth: 1Gi\" for a device published by driver \"<driver>\", regardless of which other, differently-domained \"bandwidth\" capacities that device might also have. To request one of those, the domain must be given explicitly, for example \"example.com/bandwidth\". Requesting the same driver capacity with and without the driver name as domain, for example \"bandwidth: 1Gi\" and \"<driver>/bandwidth: 2Gi\", is ambiguous and causes scheduling to fail with an error. For the sake of consistency there's no exception for such a conflict where the value is the same - that is still an error.\n\nWhen a requestPolicy is defined, the requested amount is adjusted upward to the nearest valid value based on the policy. If the requested amount cannot be adjusted to a valid value—because it exceeds what the requestPolicy allows— the device is considered ineligible for allocation.\n\nFor any capacity that is not explicitly requested: - If no requestPolicy is set, the default consumed capacity is equal to the full device capacity\n  (i.e., the whole device is claimed).\n- If a requestPolicy is set, the default consumed capacity is determined according to that policy.\n\nIf the device allows multiple allocation, the aggregated amount across all requests must not exceed the capacity value. The consumed capacity, which may be adjusted based on the requestPolicy if defined, is recorded in the resource claim’s status.devices[*].consumedCapacity field.",
 							Type:        []string{"object"},
 							AdditionalProperties: &spec.SchemaOrBool{
 								Allows: true,
@@ -48965,7 +48949,7 @@ func schema_k8sio_api_resource_v1_DeviceRequestAllocationResult(ref common.Refer
 					},
 					"consumedCapacity": {
 						SchemaProps: spec.SchemaProps{
-							Description: "consumedCapacity tracks the amount of capacity consumed per device as part of the claim request. The consumed amount may differ from the requested amount: it is rounded up to the nearest valid value based on the device’s requestPolicy if applicable (i.e., may not be less than the requested amount).\n\nThe total consumed capacity for each device must not exceed the DeviceCapacity's Value.\n\nThis field is populated only for devices that allow multiple allocations. All capacity entries are included, even if the consumed amount is zero.",
+							Description: "consumedCapacity tracks the amount of capacity consumed per device as part of the claim request. The consumed amount may differ from the requested amount: it is rounded up to the nearest valid value based on the device’s requestPolicy if applicable (i.e., may not be less than the requested amount).\n\nThe total consumed capacity for each device must not exceed the DeviceCapacity's Value.\n\nThis field is populated only for devices that allow multiple allocations. All capacity entries are included, even if the consumed amount is zero. The domain prefix in the capacity name may be omitted if it is the same as the driver name.",
 							Type:        []string{"object"},
 							AdditionalProperties: &spec.SchemaOrBool{
 								Allows: true,
@@ -49594,7 +49578,7 @@ func schema_k8sio_api_resource_v1_NodeAllocatableMapping(ref common.ReferenceCal
 				Properties: map[string]spec.Schema{
 					"capacityKey": {
 						SchemaProps: spec.SchemaProps{
-							Description: "capacityKey references a capacity name defined as a key in the `spec.devices[*].capacity` map. When this field is set, the value associated with this key in the `status.allocation.devices.results[*].consumedCapacity` map (for a specific claim allocation) determines the base quantity for the node allocatable resource. `capacityMultiplier` must also be set and is multiplied with the base quantity. For example, if `spec.devices[*].capacity` has an entry \"dra.example.com/memory\": \"128Gi\", and this field is set to \"dra.example.com/memory\", then for a claim allocation that consumes { \"dra.example.com/memory\": \"4Gi\" } the base quantity for the node allocatable resource mapping will be \"4Gi\". The final node allocatable resource amount is `consumedCapacity[capacityKey]` * `capacityMultiplier`.",
+							Description: "capacityKey references a capacity name defined as a key in the `spec.devices[*].capacity` map. When this field is set, the value associated with this key in the `status.allocation.devices.results[*].consumedCapacity` map (for a specific claim allocation) determines the base quantity for the node allocatable resource. `capacityMultiplier` must also be set and is multiplied with the base quantity.\n\nFor example, if `spec.devices[*].capacity` has an entry \"dra.example.com/memory\": \"128Gi\", and this field is set to \"dra.example.com/memory\", then for a claim allocation that consumes { \"dra.example.com/memory\": \"4Gi\" } the base quantity for the node allocatable resource mapping will be \"4Gi\". The final node allocatable resource amount is `consumedCapacity[capacityKey]` * `capacityMultiplier`.\n\nIn this example, \"dra.example.com/memory\" is a fictional standardized capacity name. For driver-specific capacities the driver name can be omitted. As defined for consumedCapacity, the capacity consumption may be recorded there with or without the driver name.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -51443,7 +51427,7 @@ func schema_k8sio_api_resource_v1beta1_CapacityRequirements(ref common.Reference
 				Properties: map[string]spec.Schema{
 					"requests": {
 						SchemaProps: spec.SchemaProps{
-							Description: "requests represent individual device resource requests for distinct resources, all of which must be provided by the device.\n\nThis value is used as an additional filtering condition against the available capacity on the device. This is semantically equivalent to a CEL selector with `device.capacity[<domain>].<name>.compareTo(quantity(<request quantity>)) >= 0`. For example, device.capacity['test-driver.cdi.k8s.io'].counters.compareTo(quantity('2')) >= 0.\n\nWhen a requestPolicy is defined, the requested amount is adjusted upward to the nearest valid value based on the policy. If the requested amount cannot be adjusted to a valid value—because it exceeds what the requestPolicy allows— the device is considered ineligible for allocation.\n\nFor any capacity that is not explicitly requested: - If no requestPolicy is set, the default consumed capacity is equal to the full device capacity\n  (i.e., the whole device is claimed).\n- If a requestPolicy is set, the default consumed capacity is determined according to that policy.\n\nIf the device allows multiple allocation, the aggregated amount across all requests must not exceed the capacity value. The consumed capacity, which may be adjusted based on the requestPolicy if defined, is recorded in the resource claim’s status.devices[*].consumedCapacity field.",
+							Description: "requests represent individual device resource requests for distinct resources, all of which must be provided by the device.\n\nThis value is used as an additional filtering condition against the available capacity on the device. This is semantically equivalent to a CEL selector with `device.capacity[<domain>].<name>.compareTo(quantity(<request quantity>)) >= 0`. For example, device.capacity['test-driver.cdi.k8s.io'].counters.compareTo(quantity('2')) >= 0.\n\nThe domain prefix can be omitted, in which case it defaults to the driver of the device under evaluation. For example, \"bandwidth: 1Gi\" is equivalent to \"<driver>/bandwidth: 1Gi\" for a device published by driver \"<driver>\", regardless of which other, differently-domained \"bandwidth\" capacities that device might also have. To request one of those, the domain must be given explicitly, for example \"example.com/bandwidth\". Requesting the same driver capacity with and without the driver name as domain, for example \"bandwidth: 1Gi\" and \"<driver>/bandwidth: 2Gi\", is ambiguous and causes scheduling to fail with an error. For the sake of consistency there's no exception for such a conflict where the value is the same - that is still an error.\n\nWhen a requestPolicy is defined, the requested amount is adjusted upward to the nearest valid value based on the policy. If the requested amount cannot be adjusted to a valid value—because it exceeds what the requestPolicy allows— the device is considered ineligible for allocation.\n\nFor any capacity that is not explicitly requested: - If no requestPolicy is set, the default consumed capacity is equal to the full device capacity\n  (i.e., the whole device is claimed).\n- If a requestPolicy is set, the default consumed capacity is determined according to that policy.\n\nIf the device allows multiple allocation, the aggregated amount across all requests must not exceed the capacity value. The consumed capacity, which may be adjusted based on the requestPolicy if defined, is recorded in the resource claim’s status.devices[*].consumedCapacity field.",
 							Type:        []string{"object"},
 							AdditionalProperties: &spec.SchemaOrBool{
 								Allows: true,
@@ -52477,7 +52461,7 @@ func schema_k8sio_api_resource_v1beta1_DeviceRequestAllocationResult(ref common.
 					},
 					"consumedCapacity": {
 						SchemaProps: spec.SchemaProps{
-							Description: "consumedCapacity tracks the amount of capacity consumed per device as part of the claim request. The consumed amount may differ from the requested amount: it is rounded up to the nearest valid value based on the device’s requestPolicy if applicable (i.e., may not be less than the requested amount).\n\nThe total consumed capacity for each device must not exceed the DeviceCapacity's Value.\n\nThis field is populated only for devices that allow multiple allocations. All capacity entries are included, even if the consumed amount is zero.",
+							Description: "consumedCapacity tracks the amount of capacity consumed per device as part of the claim request. The consumed amount may differ from the requested amount: it is rounded up to the nearest valid value based on the device’s requestPolicy if applicable (i.e., may not be less than the requested amount).\n\nThe total consumed capacity for each device must not exceed the DeviceCapacity's Value.\n\nThis field is populated only for devices that allow multiple allocations. All capacity entries are included, even if the consumed amount is zero. The domain prefix in the capacity name may be omitted if it is the same as the driver name.",
 							Type:        []string{"object"},
 							AdditionalProperties: &spec.SchemaOrBool{
 								Allows: true,
@@ -52798,7 +52782,7 @@ func schema_k8sio_api_resource_v1beta1_NodeAllocatableMapping(ref common.Referen
 				Properties: map[string]spec.Schema{
 					"capacityKey": {
 						SchemaProps: spec.SchemaProps{
-							Description: "capacityKey references a capacity name defined as a key in the `spec.devices[*].capacity` map. When this field is set, the value associated with this key in the `status.allocation.devices.results[*].consumedCapacity` map (for a specific claim allocation) determines the base quantity for the node allocatable resource. `capacityMultiplier` must also be set and is multiplied with the base quantity. For example, if `spec.devices[*].capacity` has an entry \"dra.example.com/memory\": \"128Gi\", and this field is set to \"dra.example.com/memory\", then for a claim allocation that consumes { \"dra.example.com/memory\": \"4Gi\" } the base quantity for the node allocatable resource mapping will be \"4Gi\". The final node allocatable resource amount is `consumedCapacity[capacityKey]` * `capacityMultiplier`.",
+							Description: "capacityKey references a capacity name defined as a key in the `spec.devices[*].capacity` map. When this field is set, the value associated with this key in the `status.allocation.devices.results[*].consumedCapacity` map (for a specific claim allocation) determines the base quantity for the node allocatable resource. `capacityMultiplier` must also be set and is multiplied with the base quantity.\n\nFor example, if `spec.devices[*].capacity` has an entry \"dra.example.com/memory\": \"128Gi\", and this field is set to \"dra.example.com/memory\", then for a claim allocation that consumes { \"dra.example.com/memory\": \"4Gi\" } the base quantity for the node allocatable resource mapping will be \"4Gi\". The final node allocatable resource amount is `consumedCapacity[capacityKey]` * `capacityMultiplier`.\n\nIn this example, \"dra.example.com/memory\" is a fictional standardized capacity name. For driver-specific capacities the driver name can be omitted. As defined for consumedCapacity, the capacity consumption may be recorded there with or without the driver name.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -53741,7 +53725,7 @@ func schema_k8sio_api_resource_v1beta2_CapacityRequirements(ref common.Reference
 				Properties: map[string]spec.Schema{
 					"requests": {
 						SchemaProps: spec.SchemaProps{
-							Description: "requests represent individual device resource requests for distinct resources, all of which must be provided by the device.\n\nThis value is used as an additional filtering condition against the available capacity on the device. This is semantically equivalent to a CEL selector with `device.capacity[<domain>].<name>.compareTo(quantity(<request quantity>)) >= 0`. For example, device.capacity['test-driver.cdi.k8s.io'].counters.compareTo(quantity('2')) >= 0.\n\nWhen a requestPolicy is defined, the requested amount is adjusted upward to the nearest valid value based on the policy. If the requested amount cannot be adjusted to a valid value—because it exceeds what the requestPolicy allows— the device is considered ineligible for allocation.\n\nFor any capacity that is not explicitly requested: - If no requestPolicy is set, the default consumed capacity is equal to the full device capacity\n  (i.e., the whole device is claimed).\n- If a requestPolicy is set, the default consumed capacity is determined according to that policy.\n\nIf the device allows multiple allocation, the aggregated amount across all requests must not exceed the capacity value. The consumed capacity, which may be adjusted based on the requestPolicy if defined, is recorded in the resource claim’s status.devices[*].consumedCapacity field.",
+							Description: "requests represent individual device resource requests for distinct resources, all of which must be provided by the device.\n\nThis value is used as an additional filtering condition against the available capacity on the device. This is semantically equivalent to a CEL selector with `device.capacity[<domain>].<name>.compareTo(quantity(<request quantity>)) >= 0`. For example, device.capacity['test-driver.cdi.k8s.io'].counters.compareTo(quantity('2')) >= 0.\n\nThe domain prefix can be omitted, in which case it defaults to the driver of the device under evaluation. For example, \"bandwidth: 1Gi\" is equivalent to \"<driver>/bandwidth: 1Gi\" for a device published by driver \"<driver>\", regardless of which other, differently-domained \"bandwidth\" capacities that device might also have. To request one of those, the domain must be given explicitly, for example \"example.com/bandwidth\". Requesting the same driver capacity with and without the driver name as domain, for example \"bandwidth: 1Gi\" and \"<driver>/bandwidth: 2Gi\", is ambiguous and causes scheduling to fail with an error. For the sake of consistency there's no exception for such a conflict where the value is the same - that is still an error.\n\nWhen a requestPolicy is defined, the requested amount is adjusted upward to the nearest valid value based on the policy. If the requested amount cannot be adjusted to a valid value—because it exceeds what the requestPolicy allows— the device is considered ineligible for allocation.\n\nFor any capacity that is not explicitly requested: - If no requestPolicy is set, the default consumed capacity is equal to the full device capacity\n  (i.e., the whole device is claimed).\n- If a requestPolicy is set, the default consumed capacity is determined according to that policy.\n\nIf the device allows multiple allocation, the aggregated amount across all requests must not exceed the capacity value. The consumed capacity, which may be adjusted based on the requestPolicy if defined, is recorded in the resource claim’s status.devices[*].consumedCapacity field.",
 							Type:        []string{"object"},
 							AdditionalProperties: &spec.SchemaOrBool{
 								Allows: true,
@@ -54835,7 +54819,7 @@ func schema_k8sio_api_resource_v1beta2_DeviceRequestAllocationResult(ref common.
 					},
 					"consumedCapacity": {
 						SchemaProps: spec.SchemaProps{
-							Description: "consumedCapacity tracks the amount of capacity consumed per device as part of the claim request. The consumed amount may differ from the requested amount: it is rounded up to the nearest valid value based on the device’s requestPolicy if applicable (i.e., may not be less than the requested amount).\n\nThe total consumed capacity for each device must not exceed the DeviceCapacity's Value.\n\nThis field is populated only for devices that allow multiple allocations. All capacity entries are included, even if the consumed amount is zero.",
+							Description: "consumedCapacity tracks the amount of capacity consumed per device as part of the claim request. The consumed amount may differ from the requested amount: it is rounded up to the nearest valid value based on the device’s requestPolicy if applicable (i.e., may not be less than the requested amount).\n\nThe total consumed capacity for each device must not exceed the DeviceCapacity's Value.\n\nThis field is populated only for devices that allow multiple allocations. All capacity entries are included, even if the consumed amount is zero. The domain prefix in the capacity name may be omitted if it is the same as the driver name.",
 							Type:        []string{"object"},
 							AdditionalProperties: &spec.SchemaOrBool{
 								Allows: true,
@@ -55464,7 +55448,7 @@ func schema_k8sio_api_resource_v1beta2_NodeAllocatableMapping(ref common.Referen
 				Properties: map[string]spec.Schema{
 					"capacityKey": {
 						SchemaProps: spec.SchemaProps{
-							Description: "capacityKey references a capacity name defined as a key in the `spec.devices[*].capacity` map. When this field is set, the value associated with this key in the `status.allocation.devices.results[*].consumedCapacity` map (for a specific claim allocation) determines the base quantity for the node allocatable resource. `capacityMultiplier` must also be set and is multiplied with the base quantity. For example, if `spec.devices[*].capacity` has an entry \"dra.example.com/memory\": \"128Gi\", and this field is set to \"dra.example.com/memory\", then for a claim allocation that consumes { \"dra.example.com/memory\": \"4Gi\" } the base quantity for the node allocatable resource mapping will be \"4Gi\". The final node allocatable resource amount is `consumedCapacity[capacityKey]` * `capacityMultiplier`.",
+							Description: "capacityKey references a capacity name defined as a key in the `spec.devices[*].capacity` map. When this field is set, the value associated with this key in the `status.allocation.devices.results[*].consumedCapacity` map (for a specific claim allocation) determines the base quantity for the node allocatable resource. `capacityMultiplier` must also be set and is multiplied with the base quantity.\n\nFor example, if `spec.devices[*].capacity` has an entry \"dra.example.com/memory\": \"128Gi\", and this field is set to \"dra.example.com/memory\", then for a claim allocation that consumes { \"dra.example.com/memory\": \"4Gi\" } the base quantity for the node allocatable resource mapping will be \"4Gi\". The final node allocatable resource amount is `consumedCapacity[capacityKey]` * `capacityMultiplier`.\n\nIn this example, \"dra.example.com/memory\" is a fictional standardized capacity name. For driver-specific capacities the driver name can be omitted. As defined for consumedCapacity, the capacity consumption may be recorded there with or without the driver name.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -73549,6 +73533,13 @@ func schema_k8sio_kube_scheduler_config_v1_KubeSchedulerConfiguration(ref common
 							Format:      "int32",
 						},
 					},
+					"percentageOfPlacementsToScore": {
+						SchemaProps: spec.SchemaProps{
+							Description: "PercentageOfPlacementsToScore is the percentage of generated placements that the scheduler tries to find feasible for a PodGroup or CompositePodGroup before it stops searching and scores them. Valid values are from 0 to 100. The scheduler always tries to find at least one feasible placement. Example: if 500 placements are generated and the value is 30, the scheduler stops after finding 150 feasible placements. When unset or 0, the scheduler calculates an adaptive percentage based on the sum of node counts across all generated placements. If placements overlap, a node present in multiple placements is counted once per placement. The adaptive percentage decreases linearly from 100% at 0 summed nodes to 10% at 5000 summed nodes, and continues decreasing for larger sums down to a minimum of 5%. It is overridden by profile level PercentageOfPlacementsToScore. This field is only available when the TopologyAwareWorkloadScheduling feature gate is enabled.",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
 					"podInitialBackoffSeconds": {
 						SchemaProps: spec.SchemaProps{
 							Description: "PodInitialBackoffSeconds is the initial backoff for unschedulable pods. If specified, it must be greater than 0. If this value is null, the default value (1s) will be used.",
@@ -73635,6 +73626,13 @@ func schema_k8sio_kube_scheduler_config_v1_KubeSchedulerProfile(ref common.Refer
 					"percentageOfNodesToScore": {
 						SchemaProps: spec.SchemaProps{
 							Description: "PercentageOfNodesToScore is the percentage of all nodes that once found feasible for running a pod, the scheduler stops its search for more feasible nodes in the cluster. This helps improve scheduler's performance. Scheduler always tries to find at least \"minFeasibleNodesToFind\" feasible nodes no matter what the value of this flag is. Example: if the cluster size is 500 nodes and the value of this flag is 30, then scheduler stops finding further feasible nodes once it finds 150 feasible ones. When the value is 0, default percentage (5%--50% based on the size of the cluster) of the nodes will be scored. It will override global PercentageOfNodesToScore. If it is empty, global PercentageOfNodesToScore will be used.",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+					"percentageOfPlacementsToScore": {
+						SchemaProps: spec.SchemaProps{
+							Description: "PercentageOfPlacementsToScore is the percentage of generated placements that the scheduler tries to find feasible for a PodGroup or CompositePodGroup before it stops searching and scores them. Valid values are from 0 to 100. The scheduler always tries to find at least one feasible placement. Example: if 500 placements are generated and the value is 30, the scheduler stops after finding 150 feasible placements. When the value is 0, the scheduler calculates an adaptive percentage based on the sum of node counts across all generated placements. If placements overlap, a node present in multiple placements is counted once per placement. The adaptive percentage decreases linearly from 100% at 0 summed nodes to 10% at 5000 summed nodes, and continues decreasing for larger sums down to a minimum of 5%. It overrides global PercentageOfPlacementsToScore. If empty, the global PercentageOfPlacementsToScore is used. This field is only available when the TopologyAwareWorkloadScheduling feature gate is enabled.",
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},

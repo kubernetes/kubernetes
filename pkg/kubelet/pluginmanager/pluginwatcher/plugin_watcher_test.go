@@ -28,9 +28,9 @@ import (
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog/v2"
+	"k8s.io/ktesting"
 	registerapi "k8s.io/kubelet/pkg/apis/pluginregistration/v1"
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager/cache"
-	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 var (

@@ -1,0 +1,39 @@
+diff --git a/staging/src/k8s.io/apiserver/pkg/storage/etcd3/store.go b/staging/src/k8s.io/apiserver/pkg/storage/etcd3/store.go
+index 0cb165fb4ec..71f92c8104a 100644
+--- a/staging/src/k8s.io/apiserver/pkg/storage/etcd3/store.go
++++ b/staging/src/k8s.io/apiserver/pkg/storage/etcd3/store.go
+@@ -544,30 +544,9 @@ func (s *store) GuaranteedUpdate(
+ 		}
+ 
+ 		ret, ttl, err := s.updateState(origState, tryUpdate)
+ 		if err != nil {
+-			// If our data is already up to date, return the error
+-			if origStateIsCurrent {
+-				return err
+-			}
+-
+-			// It's possible we were working with stale data
+-			// Remember the revision of the potentially stale data and the resulting update error
+-			cachedRev := origState.rev
+-			cachedUpdateErr := err
+-
+-			// Actually fetch
+-			origState, err = getCurrentState()
+-			if err != nil {
+-				return err
+-			}
+-			origStateIsCurrent = true
+-
+-			// it turns out our cached data was not stale, return the error
+-			if cachedRev == origState.rev {
+-				return cachedUpdateErr
+-			}
+-
+-			// Retry
+-			continue
++			// BUG REVERT (#43152): return tryUpdate error on a stale cached suggestion
++			// immediately instead of refetching live state from etcd and retrying.
++			return err
+ 		}
+ 
+ 		span.AddEvent("About to Encode")

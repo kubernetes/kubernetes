@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	admissionapi "k8s.io/pod-security-admission/api"
 
+	"k8s.io/client-go/ktesting"
 	"k8s.io/dynamic-resource-allocation/resourceslice"
 	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 	"k8s.io/kubernetes/pkg/features"
@@ -42,7 +43,6 @@ import (
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
-	"k8s.io/kubernetes/test/utils/client-go/ktesting"
 )
 
 type draContainerInfo struct {

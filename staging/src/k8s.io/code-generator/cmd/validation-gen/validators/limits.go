@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"time"
 
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/code-generator/cmd/validation-gen/util"
@@ -419,7 +420,10 @@ func (minimumTagValidator) ValidScopes() sets.Set[Scope] {
 	return minimumTagValidScopes
 }
 
-var minimumValidator = types.Name{Package: libValidationPkg, Name: "Minimum"}
+var (
+	minimumValidator         = types.Name{Package: libValidationPkg, Name: "Minimum"}
+	minimumQuantityValidator = types.Name{Package: libValidationPkg, Name: "MinimumQuantity"}
+)
 
 func (minimumTagValidator) GetValidations(context Context, tag codetags.Tag) (Validations, error) {
 	var result Validations
@@ -427,7 +431,11 @@ func (minimumTagValidator) GetValidations(context Context, tag codetags.Tag) (Va
 	if err != nil {
 		return result, err
 	}
-	result.AddFunction(Function(minimumTagName, DefaultFlags, minimumValidator, limit).
+	validator := minimumValidator
+	if util.NonPointer(context.Type).Name == quantityType {
+		validator = minimumQuantityValidator
+	}
+	result.AddFunction(Function(minimumTagName, DefaultFlags, validator, limit).
 		WithEmits(Emission{field.ErrorTypeInvalid, "minimum", ""}))
 	return result, nil
 }
@@ -444,6 +452,9 @@ func (mtv minimumTagValidator) Docs() TagDoc {
 		}, {
 			Description: `"<duration>"`,
 			Docs:        "This time.Duration field must be greater than or equal to X, a Go duration string.",
+		}, {
+			Description: `"<quantity>"`,
+			Docs:        "This resource.Quantity field must be greater than or equal to X, a quantity string.",
 		}},
 		PayloadsType:     codetags.ValueTypeRaw,
 		PayloadsRequired: true,
@@ -464,7 +475,10 @@ func (maximumTagValidator) ValidScopes() sets.Set[Scope] {
 	return maximumTagValidScopes
 }
 
-var maximumValidator = types.Name{Package: libValidationPkg, Name: "Maximum"}
+var (
+	maximumValidator         = types.Name{Package: libValidationPkg, Name: "Maximum"}
+	maximumQuantityValidator = types.Name{Package: libValidationPkg, Name: "MaximumQuantity"}
+)
 
 func (maximumTagValidator) GetValidations(context Context, tag codetags.Tag) (Validations, error) {
 	var result Validations
@@ -472,7 +486,11 @@ func (maximumTagValidator) GetValidations(context Context, tag codetags.Tag) (Va
 	if err != nil {
 		return result, err
 	}
-	result.AddFunction(Function(maximumTagName, DefaultFlags, maximumValidator, limit).
+	validator := maximumValidator
+	if util.NonPointer(context.Type).Name == quantityType {
+		validator = maximumQuantityValidator
+	}
+	result.AddFunction(Function(maximumTagName, DefaultFlags, validator, limit).
 		WithEmits(Emission{field.ErrorTypeInvalid, "maximum", ""}))
 	return result, nil
 }
@@ -489,13 +507,20 @@ func (mtv maximumTagValidator) Docs() TagDoc {
 		}, {
 			Description: `"<duration>"`,
 			Docs:        "This time.Duration field must be less than or equal to X, a Go duration string.",
+		}, {
+			Description: `"<quantity>"`,
+			Docs:        "This resource.Quantity field must be less than or equal to X, a quantity string.",
 		}},
 		PayloadsType:     codetags.ValueTypeRaw,
 		PayloadsRequired: true,
 	}
 }
 
-var durationType = types.Name{Package: "time", Name: "Duration"}
+var (
+	durationType      = types.Name{Package: "time", Name: "Duration"}
+	quantityType      = types.Name{Package: "k8s.io/apimachinery/pkg/api/resource", Name: "Quantity"}
+	resourceMustParse = types.Name{Package: "k8s.io/apimachinery/pkg/api/resource", Name: "MustParse"}
+)
 
 // parseNumericLimit parses a minimum or maximum payload for the field's type.
 func parseNumericLimit(context Context, tag codetags.Tag) (any, error) {
@@ -513,6 +538,11 @@ func parseNumericLimit(context Context, tag codetags.Tag) (any, error) {
 			return nil, fmt.Errorf("failed to parse tag payload: %w", err)
 		}
 		return int64(d), nil
+	case util.NonPointer(context.Type).Name == quantityType:
+		if _, err := resource.ParseQuantity(tag.Value); err != nil {
+			return nil, fmt.Errorf("failed to parse tag payload: %w", err)
+		}
+		return Function(tag.Name, DefaultFlags, resourceMustParse, tag.Value), nil
 	case types.IsInteger(t):
 		if tag.ValueType != codetags.ValueTypeInt {
 			return nil, fmt.Errorf("type mismatch: field is an integer, but payload is of type %s", tag.ValueType)
@@ -532,7 +562,7 @@ func parseNumericLimit(context Context, tag codetags.Tag) (any, error) {
 		}
 		return limit, nil
 	default:
-		return nil, fmt.Errorf("can only be used on integer types (%s)", rootTypeString(context.Type, t))
+		return nil, fmt.Errorf("can only be used on integer and resource.Quantity types (%s)", rootTypeString(context.Type, t))
 	}
 }
 

@@ -33,12 +33,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/ktesting"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	cgotesting "k8s.io/client-go/testing"
 	drapb "k8s.io/kubelet/pkg/apis/dra/v1beta1"
 	timedworkers "k8s.io/kubernetes/pkg/controller/tainteviction"
-	"k8s.io/kubernetes/test/utils/client-go/ktesting"
 	"k8s.io/utils/ptr"
 )
 

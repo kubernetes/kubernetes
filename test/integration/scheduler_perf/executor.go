@@ -47,6 +47,7 @@ import (
 	"k8s.io/client-go/dynamic"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	schedulinginformers "k8s.io/client-go/informers/scheduling/v1beta1"
+	"k8s.io/client-go/ktesting"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/restmapper"
 	"k8s.io/client-go/tools/cache"
@@ -54,7 +55,6 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 	testutils "k8s.io/kubernetes/test/utils"
-	"k8s.io/kubernetes/test/utils/client-go/ktesting"
 	"sigs.k8s.io/yaml"
 )
 

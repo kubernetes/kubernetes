@@ -31,13 +31,13 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	resourcehelper "k8s.io/component-helpers/resource"
 	"k8s.io/klog/v2"
+	"k8s.io/ktesting"
 	pkgfeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm/containermap"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/state"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/topology"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
-	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/cpuset"
 )
 

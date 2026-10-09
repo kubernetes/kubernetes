@@ -38,11 +38,9 @@ func SplitHostPort(hostport string) (host string, port int) {
 			host = hostport[1:addrEnd]
 			return host, port
 		}
-	} else {
-		if i := strings.LastIndexByte(hostport, ':'); i < 0 {
-			host = hostport
-			return host, port
-		}
+	} else if !strings.Contains(hostport, ":") {
+		host = hostport
+		return host, port
 	}
 
 	host, pStr, err := net.SplitHostPort(hostport)

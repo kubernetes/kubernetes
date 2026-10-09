@@ -40,8 +40,8 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/rest"
+	"k8s.io/ktesting"
 	"k8s.io/kubernetes/test/e2e/storage/podlogs"
-	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 type containerLogs struct {

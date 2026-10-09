@@ -1,0 +1,16 @@
+diff --git a/staging/src/k8s.io/apiserver/pkg/storage/cacher/watch_cache.go b/staging/src/k8s.io/apiserver/pkg/storage/cacher/watch_cache.go
+index 06ae150447c..9128ab44102 100644
+--- a/staging/src/k8s.io/apiserver/pkg/storage/cacher/watch_cache.go
++++ b/staging/src/k8s.io/apiserver/pkg/storage/cacher/watch_cache.go
+@@ -458,9 +458,8 @@ func (w *watchCache) waitUntilFreshAndList(ctx context.Context, key string, opts
+ 		if opts.Predicate.Limit > 0 && len(opts.ResourceVersion) > 0 && opts.ResourceVersion != "0" {
+ 			return w.waitAndListExactRV(ctx, key, "", listRV)
+ 		}
+-		if opts.ResourceVersion == "" {
+-			return w.waitAndListConsistent(ctx, key, "", opts.Predicate.MatcherIndex(ctx))
+-		}
++		// BUG INJECTION (GetList analog of stale-get): serve consistent GetList(RV="")
++		// from the current watch cache state without fetching the latest RV from etcd.
+ 	}
+ 	return w.waitAndListLatestRV(ctx, listRV, key, "", opts.Predicate.MatcherIndex(ctx))
+ }

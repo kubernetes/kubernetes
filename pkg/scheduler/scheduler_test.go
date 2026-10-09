@@ -50,6 +50,7 @@ import (
 	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
+	utiltesting "k8s.io/ktesting"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/features"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
@@ -71,7 +72,6 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/profile"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	tf "k8s.io/kubernetes/pkg/scheduler/testing/framework"
-	utiltesting "k8s.io/kubernetes/test/utils/ktesting"
 	testingclock "k8s.io/utils/clock/testing"
 	"k8s.io/utils/ptr"
 )
@@ -465,6 +465,51 @@ func TestWithPercentageOfNodesToScore(t *testing.T) {
 			}
 			if sched.algorithm.percentageOfNodesToScore != tt.wantedPercentageOfNodesToScore {
 				t.Errorf("scheduler.percentageOfNodesToScore = %v, want %v", sched.algorithm.percentageOfNodesToScore, tt.wantedPercentageOfNodesToScore)
+			}
+		})
+	}
+}
+
+// TestWithPercentageOfPlacementsToScore tests scheduler's PercentageOfPlacementsToScore is set correctly.
+func TestWithPercentageOfPlacementsToScore(t *testing.T) {
+	tests := []struct {
+		name                                string
+		percentageOfPlacementsToScoreConfig *int32
+		wantedPercentageOfPlacementsToScore int32
+	}{
+		{
+			name:                                "percentageOfPlacementsScore is nil",
+			percentageOfPlacementsToScoreConfig: nil,
+			wantedPercentageOfPlacementsToScore: schedulerapi.DefaultPercentageOfPlacementsToScore,
+		},
+		{
+			name:                                "percentageOfPlacementsScore is not nil",
+			percentageOfPlacementsToScoreConfig: ptr.To[int32](10),
+			wantedPercentageOfPlacementsToScore: 10,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			client := fake.NewClientset()
+			informerFactory := informers.NewSharedInformerFactory(client, 0)
+			eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: client.EventsV1()})
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+			sched, err := New(
+				ctx,
+				client,
+				informerFactory,
+				nil,
+				profile.NewRecorderFactory(eventBroadcaster),
+				WithPercentageOfPlacementsToScore(tt.percentageOfPlacementsToScoreConfig),
+			)
+			if err != nil {
+				t.Fatalf("Failed to create scheduler: %v", err)
+			}
+			if sched.percentageOfPlacementsToScore != tt.wantedPercentageOfPlacementsToScore {
+				t.Errorf("scheduler.percentageOfPlacementsToScore = %v, want %v", sched.percentageOfPlacementsToScore, tt.wantedPercentageOfPlacementsToScore)
 			}
 		})
 	}

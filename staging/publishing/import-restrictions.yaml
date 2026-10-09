@@ -81,6 +81,7 @@
   - k8s.io/client-go
   - k8s.io/klog
   - k8s.io/kube-openapi
+  - k8s.io/ktesting
   - k8s.io/streaming
   - k8s.io/utils
 
@@ -241,6 +242,15 @@
   - k8s.io/component-base
   - k8s.io/kubelet
   - k8s.io/utils
+
+- baseImportPath: "./staging/src/k8s.io/ktesting"
+  allowedImports:
+  - k8s.io/klog
+  - k8s.io/ktesting
+  - sigs.k8s.io/yaml
+  - github.com/go-logr
+  - github.com/onsi/gomega
+  - go.uber.org/goleak
 
 - baseImportPath: "./staging/src/k8s.io/cluster-bootstrap"
   allowedImports:

@@ -6,12 +6,12 @@ package krusty
 import (
 	"fmt"
 	"log"
+	"slices"
 
 	"sigs.k8s.io/kustomize/api/internal/builtins"
 	fLdr "sigs.k8s.io/kustomize/api/internal/loader"
 	pLdr "sigs.k8s.io/kustomize/api/internal/plugins/loader"
 	"sigs.k8s.io/kustomize/api/internal/target"
-	"sigs.k8s.io/kustomize/api/internal/utils"
 	"sigs.k8s.io/kustomize/api/konfig"
 	"sigs.k8s.io/kustomize/api/provenance"
 	"sigs.k8s.io/kustomize/api/provider"
@@ -95,7 +95,7 @@ func (b *Kustomizer) Run(
 	if err != nil {
 		return nil, err
 	}
-	if b.options.AddManagedbyLabel || utils.StringSliceContains(kt.Kustomization().BuildMetadata, types.ManagedByLabelOption) {
+	if b.options.AddManagedbyLabel || slices.Contains(kt.Kustomization().BuildMetadata, types.ManagedByLabelOption) {
 		t := builtins.LabelTransformerPlugin{
 			Labels: map[string]string{
 				konfig.ManagedbyLabelKey: fmt.Sprintf("kustomize-%s", provenance.GetProvenance().Semver()),
@@ -111,13 +111,13 @@ func (b *Kustomizer) Run(
 		}
 	}
 	m.RemoveBuildAnnotations()
-	if !utils.StringSliceContains(kt.Kustomization().BuildMetadata, types.OriginAnnotations) {
+	if !slices.Contains(kt.Kustomization().BuildMetadata, types.OriginAnnotations) {
 		err = m.RemoveOriginAnnotations()
 		if err != nil {
 			return nil, errors.WrapPrefixf(err, "failed to clean up origin tracking annotations")
 		}
 	}
-	if !utils.StringSliceContains(kt.Kustomization().BuildMetadata, types.TransformerAnnotations) {
+	if !slices.Contains(kt.Kustomization().BuildMetadata, types.TransformerAnnotations) {
 		err = m.RemoveTransformerAnnotations()
 		if err != nil {
 			return nil, errors.WrapPrefixf(err, "failed to clean up transformer annotations")

@@ -28,8 +28,8 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
+	"k8s.io/ktesting"
 	"k8s.io/kubernetes/pkg/kubelet/winstats"
-	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func TestApplyPlatformSpecificContainerConfig(t *testing.T) {

@@ -37,12 +37,14 @@ import (
 	"k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
+	"k8s.io/client-go/ktesting"
 	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-base/logs"
 	logsapi "k8s.io/component-base/logs/api/v1"
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/klog/v2"
+	"k8s.io/ktesting/initoption"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
@@ -53,8 +55,6 @@ import (
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	"k8s.io/kubernetes/test/integration/framework"
-	"k8s.io/kubernetes/test/utils/client-go/ktesting"
-	"k8s.io/kubernetes/test/utils/ktesting/initoption"
 	"sigs.k8s.io/yaml"
 )
 

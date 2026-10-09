@@ -30,12 +30,12 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/ktesting"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager/checksum"
 	"k8s.io/kubernetes/pkg/kubelet/cm/containermap"
 	testutil "k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/state/testing"
-	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/cpuset"
 )
 

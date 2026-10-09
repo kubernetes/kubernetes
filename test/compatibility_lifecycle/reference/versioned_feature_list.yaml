@@ -1115,6 +1115,10 @@
     lockToDefault: false
     preRelease: Alpha
     version: "1.37"
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.38"
 - name: ListFromCacheSnapshot
   versionedSpecs:
   - default: false
@@ -2182,6 +2186,10 @@
     lockToDefault: false
     preRelease: Alpha
     version: "1.32"
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.38"
 - name: WindowsGracefulNodeShutdown
   versionedSpecs:
   - default: false

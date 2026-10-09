@@ -28,6 +28,7 @@ import (
 	utilversion "k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/ktesting"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/types"
@@ -36,7 +37,6 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodename"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeports"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/tainttoleration"
-	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/ptr"
 )
 
@@ -638,6 +638,37 @@ func TestGeneralPredicates(t *testing.T) {
 			}}
 			reasons := w.generalFilter(tCtx, test.pod, test.nodeInfo)
 			if diff := cmp.Diff(test.reasons, reasons); diff != "" {
+				t.Errorf("unexpected failure reasons (-want, +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestGeneralPredicatesDRANodeAllocatableResources(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	// The claim maps 8 CPUs to the pod on top of its 1 CPU request; the node has 8.
+	pod := newResourcePod(v1.ResourceList{v1.ResourceCPU: *resource.NewMilliQuantity(1000, resource.DecimalSI)})
+	pod.Status.NodeAllocatableResourceClaimStatuses = []v1.NodeAllocatableResourceClaimStatus{{
+		ResourceClaimName: "claim",
+		Mapping:           []v1.NodeAllocatableMappedResources{{Name: v1.ResourceCPU, Quantity: ptr.To(resource.MustParse("8"))}},
+	}}
+	node := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{Name: "machine1"},
+		Status:     v1.NodeStatus{Capacity: makeResources(8000, 20, 32, 0, 0, 0), Allocatable: makeAllocatableResources(8000, 20, 32, 0, 0, 0)},
+	}
+	for _, tt := range []struct {
+		name    string
+		enabled bool
+		want    []PredicateFailureReason
+	}{
+		{name: "gate disabled"},
+		{name: "gate enabled", enabled: true, want: []PredicateFailureReason{&InsufficientResourceError{ResourceName: v1.ResourceCPU, Requested: 9000, Capacity: 8000}}},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{features.DRANodeAllocatableResources: tt.enabled})
+			nodeInfo := schedulerframework.NewNodeInfo()
+			nodeInfo.SetNode(node)
+			if diff := cmp.Diff(tt.want, generalFilter(tCtx.Logger(), pod, nodeInfo)); diff != "" {
 				t.Errorf("unexpected failure reasons (-want, +got):\n%s", diff)
 			}
 		})

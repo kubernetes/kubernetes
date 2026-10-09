@@ -42,12 +42,12 @@ import (
 	"k8s.io/client-go/discovery"
 	cacheddiscovery "k8s.io/client-go/discovery/cached/memory"
 	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/ktesting"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/restmapper"
 	scaleclient "k8s.io/client-go/scale"
-	"k8s.io/kubernetes/test/utils/client-go/ktesting"
 	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/go-logr/logr"
@@ -114,10 +114,9 @@ type Framework struct {
 	// test multiple times in parallel.
 	UniqueName string
 
-	clientConfig                     *rest.Config
-	restMapper                       *restmapper.DeferredDiscoveryRESTMapper
-	ClientSet                        clientset.Interface
-	KubemarkExternalClusterClientSet clientset.Interface
+	clientConfig *rest.Config
+	restMapper   *restmapper.DeferredDiscoveryRESTMapper
+	ClientSet    clientset.Interface
 
 	DynamicClient dynamic.Interface
 

@@ -30,6 +30,8 @@ type Tracer struct {
 	started metric.Int64Counter
 }
 
+// NewTracer creates new instrumentation for a Tracer.
+// It returns an empty, disabled Tracer if observability is not enabled.
 func NewTracer() (Tracer, error) {
 	if !x.Observability.Enabled() {
 		return Tracer{}, nil
@@ -52,8 +54,11 @@ func NewTracer() (Tracer, error) {
 	return Tracer{enabled: true, live: l.Inst(), started: s.Inst()}, err
 }
 
+// Enabled returns whether observability is enabled for t.
 func (t Tracer) Enabled() bool { return t.enabled }
 
+// SpanStarted records the start of span, which was created with psc as its
+// parent span context.
 func (t Tracer) SpanStarted(ctx context.Context, psc trace.SpanContext, span trace.Span) {
 	if !t.started.Enabled(ctx) {
 		return
@@ -84,10 +89,12 @@ func (t Tracer) SpanStarted(ctx context.Context, psc trace.SpanContext, span tra
 	t.started.Add(ctx, 1, opts...)
 }
 
+// SpanLive records span as a live span.
 func (t Tracer) SpanLive(ctx context.Context, span trace.Span) {
 	t.spanLive(ctx, 1, span)
 }
 
+// SpanEnded records span as no longer being live.
 func (t Tracer) SpanEnded(ctx context.Context, span trace.Span) {
 	t.spanLive(ctx, -1, span)
 }

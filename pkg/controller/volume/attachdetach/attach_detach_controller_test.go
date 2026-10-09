@@ -33,13 +33,13 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	kcache "k8s.io/client-go/tools/cache"
+	"k8s.io/ktesting"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/cache"
 	controllervolumetesting "k8s.io/kubernetes/pkg/controller/volume/attachdetach/testing"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/csi"
 	"k8s.io/kubernetes/pkg/volume/util"
-	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 const (

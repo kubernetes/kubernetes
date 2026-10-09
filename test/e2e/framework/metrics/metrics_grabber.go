@@ -70,7 +70,6 @@ type Collection struct {
 // Grabber provides functions which grab metrics from components
 type Grabber struct {
 	client                             clientset.Interface
-	externalClient                     clientset.Interface
 	config                             *rest.Config
 	grabFromAPIServer                  bool
 	grabFromControllerManager          bool
@@ -94,7 +93,7 @@ type Grabber struct {
 // Collecting metrics data is an optional debug feature. Not all clusters will
 // support it. If disabled for a component, the corresponding Grab function
 // will immediately return an error derived from MetricsGrabbingDisabledError.
-func NewMetricsGrabber(ctx context.Context, c clientset.Interface, ec clientset.Interface, config *rest.Config, kubelets bool, scheduler bool, controllers bool, apiServer bool, clusterAutoscaler bool, snapshotController bool) (*Grabber, error) {
+func NewMetricsGrabber(ctx context.Context, c clientset.Interface, config *rest.Config, kubelets bool, scheduler bool, controllers bool, apiServer bool, clusterAutoscaler bool, snapshotController bool) (*Grabber, error) {
 	kubeScheduler := ""
 	kubeControllerManager := ""
 	snapshotControllerManager := ""
@@ -128,13 +127,9 @@ func NewMetricsGrabber(ctx context.Context, c clientset.Interface, ec clientset.
 			break
 		}
 	}
-	if clusterAutoscaler && ec == nil {
-		klog.Warningf("Did not receive an external client interface. Grabbing metrics from ClusterAutoscaler is disabled.")
-	}
 
 	return &Grabber{
 		client:                     c,
-		externalClient:             ec,
 		config:                     config,
 		grabFromAPIServer:          apiServer,
 		grabFromControllerManager:  checkPodDebugHandlers(ctx, c, controllers, "kube-controller-manager", kubeControllerManager),
@@ -309,19 +304,10 @@ func (g *Grabber) GrabFromScheduler(ctx context.Context) (SchedulerMetrics, erro
 
 // GrabFromClusterAutoscaler returns metrics from cluster autoscaler
 func (g *Grabber) GrabFromClusterAutoscaler(ctx context.Context) (ClusterAutoscalerMetrics, error) {
-	if !g.HasControlPlanePods() && g.externalClient == nil {
+	if !g.HasControlPlanePods() {
 		return ClusterAutoscalerMetrics{}, fmt.Errorf("ClusterAutoscaler: %w", MetricsGrabbingDisabledError)
 	}
-	var client clientset.Interface
-	var namespace string
-	if g.externalClient != nil {
-		client = g.externalClient
-		namespace = "kubemark"
-	} else {
-		client = g.client
-		namespace = metav1.NamespaceSystem
-	}
-	output, err := g.getMetricsFromPod(ctx, client, "cluster-autoscaler", namespace, 8085)
+	output, err := g.getMetricsFromPod(ctx, g.client, "cluster-autoscaler", metav1.NamespaceSystem, 8085)
 	if err != nil {
 		return ClusterAutoscalerMetrics{}, err
 	}

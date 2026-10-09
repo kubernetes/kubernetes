@@ -20,15 +20,37 @@ import (
 	"fmt"
 	"math"
 	"reflect"
+	"sort"
 	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	promclient "github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
 	"k8s.io/component-base/metrics"
 	"k8s.io/utils/ptr"
 )
+
+// samples2NativeHistogram builds a native histogram (sparse, exponentially
+// sized buckets, see https://www.kubernetes.dev/resources/keps/5808/)
+// out of samples using the real prometheus client, to get realistic bucket
+// spans/deltas instead of hand-crafting them.
+func samples2NativeHistogram(samples []float64) Histogram {
+	h := promclient.NewHistogram(promclient.HistogramOpts{
+		Name:                        "test_histogram",
+		Help:                        "test",
+		NativeHistogramBucketFactor: 1.1,
+	})
+	for _, sample := range samples {
+		h.Observe(sample)
+	}
+	var metric dto.Metric
+	if err := h.(promclient.Metric).Write(&metric); err != nil {
+		panic(err)
+	}
+	return Histogram{metric.GetHistogram()}
+}
 
 func samples2Histogram(samples []float64, upperBounds []float64) Histogram {
 	histogram := dto.Histogram{
@@ -689,6 +711,95 @@ func TestGetCounterValuesFromGatherer(t *testing.T) {
 
 			if diff := cmp.Diff(tt.wantCounterValues, counterValues); diff != "" {
 				t.Errorf("Got unexpected HistogramVec (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestHistogram_Quantile_NativeHistogram(t *testing.T) {
+	tests := map[string]struct {
+		samples []float64
+	}{
+		"uniform-distribution": {
+			samples: func() []float64 {
+				var s []float64
+				for i := range 1000 {
+					s = append(s, 0.000123+float64(i)*0.0000001)
+				}
+				return s
+			}(),
+		},
+		"single-value": {
+			samples: []float64{0.0005, 0.0005, 0.0005, 0.0005},
+		},
+		"wide-range": {
+			samples: []float64{0.00001, 0.0001, 0.001, 0.01, 0.1, 1, 10},
+		},
+	}
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			hist := samples2NativeHistogram(tt.samples)
+			if len(hist.GetPositiveSpan()) == 0 {
+				t.Fatalf("expected native histogram data (PositiveSpan), got none")
+			}
+
+			sorted := append([]float64(nil), tt.samples...)
+			sort.Float64s(sorted)
+			min, max := sorted[0], sorted[len(sorted)-1]
+
+			for _, q := range []float64{0.5, 0.9, 0.99} {
+				got := hist.Quantile(q)
+				// Native histograms give an approximation, but it must stay
+				// within the range of the observed samples.
+				if got < min*0.9 || got > max*1.1 {
+					t.Errorf("Quantile(%v) = %v, want value within [%v, %v]", q, got, min, max)
+				}
+			}
+
+			p50 := hist.Quantile(0.5)
+			p90 := hist.Quantile(0.9)
+			p99 := hist.Quantile(0.99)
+			if len(tt.samples) > 1 && min != max && (p50 == p90 || p90 == p99) {
+				t.Errorf("percentiles did not differentiate samples: p50=%v p90=%v p99=%v", p50, p90, p99)
+			}
+		})
+	}
+}
+
+func TestHistogramVec_Quantile_NativeHistogram(t *testing.T) {
+	tests := map[string]struct {
+		samples [][]float64
+	}{
+		"duplicated-histograms": {
+			samples: [][]float64{
+				{0.0001, 0.0002, 0.0003, 0.0004},
+				{0.0001, 0.0002, 0.0003, 0.0004},
+			},
+		},
+		"different-ranges": {
+			samples: [][]float64{
+				{0.00001, 0.00002, 0.00003},
+				{1, 2, 3},
+			},
+		},
+	}
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			var vec HistogramVec
+			var all []float64
+			for _, samples := range tt.samples {
+				hist := samples2NativeHistogram(samples)
+				vec = append(vec, &hist)
+				all = append(all, samples...)
+			}
+			sort.Float64s(all)
+			min, max := all[0], all[len(all)-1]
+
+			for _, q := range []float64{0.5, 0.9, 0.99} {
+				got := vec.Quantile(q)
+				if got < min*0.9 || got > max*1.1 {
+					t.Errorf("Quantile(%v) = %v, want value within [%v, %v]", q, got, min, max)
+				}
 			}
 		})
 	}

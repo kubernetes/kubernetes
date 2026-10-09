@@ -125,6 +125,7 @@ func TestWatchCacheStorageMatchExactResourceVersionFallback(t *testing.T) {
 	s := NewWatchCacheStorage(indexers)
 
 	t.Log("Initially no snapshots exist, should return ResourceExpired error")
+	assert.False(t, s.CanServeExactRV(20))
 	_, err := s.GetExactSnapshotLocked(20)
 	if !errors.IsResourceExpired(err) {
 		t.Fatalf("Expected ResourceExpired error, got: %v", err)
@@ -137,6 +138,9 @@ func TestWatchCacheStorageMatchExactResourceVersionFallback(t *testing.T) {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 
+	assert.False(t, s.CanServeExactRV(19))
+	assert.True(t, s.CanServeExactRV(20))
+	assert.True(t, s.CanServeExactRV(25))
 	snap, err := s.GetExactSnapshotLocked(20)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
@@ -161,12 +165,15 @@ func TestWatchCacheStorageMatchExactResourceVersionFallback(t *testing.T) {
 	s.Compact(30)
 
 	t.Log("Get snapshot at RV 20 should now return ResourceExpired error")
+	assert.False(t, s.CanServeExactRV(20))
 	_, err = s.GetExactSnapshotLocked(20)
 	if !errors.IsResourceExpired(err) {
 		t.Fatalf("Expected ResourceExpired error, got: %v", err)
 	}
 
 	t.Log("Get snapshot at RV 30 should succeed since it was not compacted")
+	assert.True(t, s.CanServeExactRV(30))
+	assert.True(t, s.CanServeExactRV(40))
 	snap30, err := s.GetExactSnapshotLocked(30)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
@@ -233,7 +240,7 @@ func TestWatchCacheStorageSnapshots(t *testing.T) {
 	t.Log("Test cache on intermediate rev 150 between mutations")
 	snap150, err := s.GetExactSnapshotLocked(150)
 	require.NoError(t, err)
-	assert.Equal(t, uint64(100), snap150.ResourceVersion())
+	assert.Equal(t, uint64(150), snap150.ResourceVersion())
 	elements, err = snap150.OrderedListPrefix("", "")
 	require.NoError(t, err)
 	assert.Len(t, elements, 1)
@@ -277,7 +284,7 @@ func TestWatchCacheStorageSnapshots(t *testing.T) {
 
 	t.Log("Compact snapshots to simulate cache capacity downsize")
 	s.CompactSnapshotsLocked(500)
-	_, err = s.GetExactSnapshotLocked(499)
+	_, err = s.GetExactSnapshotLocked(400)
 	require.Error(t, err, "Expected compacted snapshots below 500 to be deleted")
 
 	t.Log("Test cache on rev 500")

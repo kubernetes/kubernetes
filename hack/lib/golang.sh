@@ -277,7 +277,6 @@ readonly KUBE_TEST_BINARIES=("${KUBE_TEST_TARGETS[@]##*/}")
 readonly KUBE_TEST_BINARIES_WIN=("${KUBE_TEST_BINARIES[@]/%/.exe}")
 readonly KUBE_TEST_PORTABLE=(
   test/e2e/testing-manifests
-  test/kubemark
   hack/e2e-internal
   hack/get-build.sh
   hack/ginkgo-e2e.sh
@@ -289,7 +288,6 @@ readonly KUBE_TEST_PORTABLE=(
 # These binaries will be distributed in the kubernetes-test tarball.
 kube::golang::server_test_targets() {
   local targets=(
-    cmd/kubemark
     ginkgo
   )
 
@@ -332,7 +330,6 @@ readonly KUBE_STATIC_BINARIES=(
   kubectl
   kubectl-convert
   kubelet
-  kubemark
   mounter
 )
 
@@ -950,8 +947,9 @@ kube::golang::build_binaries() {
       grpcnotrace=",grpcnotrace"
   fi
 
-  # Extract tags if any specified in GOFLAGS
-  gotags="selinux,notest${grpcnotrace},$(echo "${GOFLAGS:-}" | sed -ne 's|.*-tags=\([^-]*\).*|\1|p')"
+  # Extract tags if any specified in GOFLAGS. kubectl never enables kustomize Go
+  # plugins; the std plugin package plus cgo makes the linker keep every method.
+  gotags="selinux,notest,kustomize_disable_go_plugin_support${grpcnotrace},$(echo "${GOFLAGS:-}" | sed -ne 's|.*-tags=\([^-]*\).*|\1|p')"
 
   local -a targets=()
   local arg

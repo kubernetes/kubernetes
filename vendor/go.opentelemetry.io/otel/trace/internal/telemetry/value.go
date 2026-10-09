@@ -327,7 +327,7 @@ func (v Value) String() string {
 		// Try to handle this as gracefully as possible.
 		//
 		// Don't panic here. The goal here is to have developers find this
-		// first if a slog.Kind is is not handled. It is
+		// first if a slog.Kind is not handled. It is
 		// preferable to have user's open issue asking why their attributes
 		// have a "unhandled: " prefix than say that their code is panicking.
 		return fmt.Sprintf("<unhandled telemetry.ValueKind: %s>", v.Kind())

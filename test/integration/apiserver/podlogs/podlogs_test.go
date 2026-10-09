@@ -49,9 +49,9 @@ import (
 	"k8s.io/client-go/transport"
 	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/client-go/util/keyutil"
+	"k8s.io/ktesting"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	"k8s.io/kubernetes/test/integration/framework"
-	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func TestInsecurePodLogs(t *testing.T) {

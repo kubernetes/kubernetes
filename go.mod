@@ -33,7 +33,7 @@ require (
 	github.com/godbus/dbus/v5 v5.2.2
 	github.com/google/cadvisor/lib v0.60.6
 	github.com/google/cel-go v0.29.2
-	github.com/google/gnostic-models v0.7.0
+	github.com/google/gnostic-models v0.7.1
 	github.com/google/go-cmp v0.7.0
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/websocket v1.5.4-0.20250319132907-e064f32e3674
@@ -58,13 +58,13 @@ require (
 	go.etcd.io/etcd/api/v3 v3.7.2
 	go.etcd.io/etcd/client/pkg/v3 v3.7.2
 	go.etcd.io/etcd/client/v3 v3.7.2
-	go.opentelemetry.io/contrib/instrumentation/github.com/emicklei/go-restful/otelrestful v0.71.0
-	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.71.0
-	go.opentelemetry.io/otel v1.46.0
+	go.opentelemetry.io/contrib/instrumentation/github.com/emicklei/go-restful/otelrestful v0.72.0
+	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.72.0
+	go.opentelemetry.io/otel v1.47.0
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.45.0
-	go.opentelemetry.io/otel/metric v1.46.0
-	go.opentelemetry.io/otel/sdk v1.46.0
-	go.opentelemetry.io/otel/trace v1.46.0
+	go.opentelemetry.io/otel/metric v1.47.0
+	go.opentelemetry.io/otel/sdk v1.47.0
+	go.opentelemetry.io/otel/trace v1.47.0
 	go.opentelemetry.io/proto/otlp v1.11.0
 	go.uber.org/goleak v1.3.0
 	go.uber.org/zap v1.27.1
@@ -78,7 +78,7 @@ require (
 	golang.org/x/text v0.42.0
 	golang.org/x/time v0.16.0
 	golang.org/x/tools v0.50.0
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20260825221802-da73d73af1c5
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20260928230214-8a89bd6388cc
 	google.golang.org/grpc v1.84.0
 	google.golang.org/protobuf v1.36.12
 	gopkg.in/evanphx/json-patch.v4 v4.13.0
@@ -104,9 +104,10 @@ require (
 	k8s.io/externaljwt v0.0.0
 	k8s.io/klog/v2 v2.140.0
 	k8s.io/kms v0.0.0
+	k8s.io/ktesting v0.0.0
 	k8s.io/kube-aggregator v0.0.0
 	k8s.io/kube-controller-manager v0.0.0
-	k8s.io/kube-openapi v0.0.0-20260929181212-2cfbdf149b9a
+	k8s.io/kube-openapi v0.0.0-20261007072838-e2e80c32a35f
 	k8s.io/kube-proxy v0.0.0
 	k8s.io/kube-scheduler v0.0.0
 	k8s.io/kubectl v0.0.0
@@ -132,7 +133,6 @@ require (
 	github.com/Azure/go-ansiterm v0.0.0-20250102033503-faa5f7b0171c // indirect
 	github.com/MakeNowJust/heredoc v1.0.0 // indirect
 	github.com/Masterminds/semver/v3 v3.4.0 // indirect
-	github.com/NYTimes/gziphandler v1.1.1 // indirect
 	github.com/antlr4-go/antlr/v4 v4.13.1 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cenkalti/backoff/v5 v5.0.3 // indirect
@@ -149,7 +149,7 @@ require (
 	github.com/fatih/camelcase v1.0.0 // indirect
 	github.com/felixge/httpsnoop v1.1.0 // indirect
 	github.com/fxamacker/cbor/v2 v2.9.4 // indirect
-	github.com/go-errors/errors v1.4.2 // indirect
+	github.com/go-errors/errors v1.5.1 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-logr/zapr v1.3.0 // indirect
 	github.com/go-openapi/jsonpointer v1.0.2 // indirect
@@ -198,8 +198,9 @@ require (
 	go.etcd.io/etcd/server/v3 v3.7.2 // indirect
 	go.etcd.io/raft/v3 v3.7.0 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
-	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.71.0 // indirect
-	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.46.0 // indirect
+	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.72.0 // indirect
+	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.47.0 // indirect
+	go.opentelemetry.io/otel/log v1.47.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.yaml.in/yaml/v3 v3.0.5 // indirect
 	golang.org/x/exp v0.0.0-20260908205506-85c1c2202aba // indirect
@@ -208,9 +209,9 @@ require (
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
 	k8s.io/gengo/v2 v2.0.0-20260408192533-25e2208e0dc3 // indirect
 	sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.37.0 // indirect
-	sigs.k8s.io/kustomize/api v0.21.1 // indirect
-	sigs.k8s.io/kustomize/kustomize/v5 v5.8.1 // indirect
-	sigs.k8s.io/kustomize/kyaml v0.21.1 // indirect
+	sigs.k8s.io/kustomize/api v0.21.3 // indirect
+	sigs.k8s.io/kustomize/kustomize/v5 v5.8.3 // indirect
+	sigs.k8s.io/kustomize/kyaml v0.21.3 // indirect
 )
 
 replace (
@@ -234,6 +235,7 @@ replace (
 	k8s.io/endpointslice => ./staging/src/k8s.io/endpointslice
 	k8s.io/externaljwt => ./staging/src/k8s.io/externaljwt
 	k8s.io/kms => ./staging/src/k8s.io/kms
+	k8s.io/ktesting => ./staging/src/k8s.io/ktesting
 	k8s.io/kube-aggregator => ./staging/src/k8s.io/kube-aggregator
 	k8s.io/kube-controller-manager => ./staging/src/k8s.io/kube-controller-manager
 	k8s.io/kube-proxy => ./staging/src/k8s.io/kube-proxy

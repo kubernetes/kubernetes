@@ -34,9 +34,9 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/klog/v2"
+	"k8s.io/ktesting"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/securitycontext"
-	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 const (

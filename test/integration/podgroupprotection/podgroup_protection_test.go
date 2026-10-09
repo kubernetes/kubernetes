@@ -35,12 +35,12 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/ktesting"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/controller/scheduling/podgroupprotection"
 	"k8s.io/kubernetes/pkg/features"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	"k8s.io/kubernetes/test/integration/framework"
-	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 type objectKind string

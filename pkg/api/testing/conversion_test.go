@@ -231,7 +231,6 @@ func TestMemoryIdenticalConversion(t *testing.T) {
 		"ReplicaSet.apps",
 		"Secret",
 		"StatefulSet.apps",
-		"TokenRequest.authentication.k8s.io",
 		"ValidatingWebhookConfiguration.admissionregistration.k8s.io",
 
 		// Legacy unserved groups/types that share internal hub types with newer groups:

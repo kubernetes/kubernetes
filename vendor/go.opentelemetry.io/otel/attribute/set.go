@@ -409,6 +409,21 @@ func computeDataReflect(kvs []KeyValue) any {
 	return at.Interface()
 }
 
+// String returns a string representation of the Set using the
+// [OpenTelemetry Attribute Collection representation for non-OTLP protocols]
+// rules.
+//
+// The Set is encoded as a JSON object. A nil or empty Set is encoded as an
+// empty JSON object.
+//
+// [OpenTelemetry Attribute Collection representation for non-OTLP protocols]: https://opentelemetry.io/docs/specs/otel/common/#attribute-collection-representation-for-non-otlp
+func (l *Set) String() string {
+	if l == nil || l.hash == 0 {
+		return "{}"
+	}
+	return formatMapValue(l.data)
+}
+
 // MarshalJSON returns the JSON encoding of the Set.
 func (l *Set) MarshalJSON() ([]byte, error) {
 	return json.Marshal(l.data)

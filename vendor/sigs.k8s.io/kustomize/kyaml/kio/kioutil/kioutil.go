@@ -6,6 +6,7 @@ package kioutil
 import (
 	"fmt"
 	"path"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -338,7 +339,7 @@ func SortNodes(nodes []*yaml.RNode) error {
 func CopyInternalAnnotations(src *yaml.RNode, dst *yaml.RNode, exclusions ...AnnotationKey) error {
 	srcAnnotations := GetInternalAnnotations(src)
 	for k, v := range srcAnnotations {
-		if stringSliceContains(exclusions, k) {
+		if slices.Contains(exclusions, k) {
 			continue
 		}
 		if err := dst.PipeE(yaml.SetAnnotation(k, v)); err != nil {
@@ -359,7 +360,7 @@ func ConfirmInternalAnnotationUnchanged(r1 *yaml.RNode, r2 *yaml.RNode, exclusio
 	diffAnnos := make(map[string]bool)
 
 	for k, v1 := range r1Annotations {
-		if stringSliceContains(exclusions, k) {
+		if slices.Contains(exclusions, k) {
 			continue
 		}
 		if v2, ok := r2Annotations[k]; !ok || v1 != v2 {
@@ -368,7 +369,7 @@ func ConfirmInternalAnnotationUnchanged(r1 *yaml.RNode, r2 *yaml.RNode, exclusio
 	}
 
 	for k, v2 := range r2Annotations {
-		if stringSliceContains(exclusions, k) {
+		if slices.Contains(exclusions, k) {
 			continue
 		}
 		if v1, ok := r1Annotations[k]; !ok || v2 != v1 {
@@ -407,14 +408,4 @@ func GetInternalAnnotations(rn *yaml.RNode) map[string]string {
 		}
 	}
 	return result
-}
-
-// stringSliceContains returns true if the slice has the string.
-func stringSliceContains(slice []string, str string) bool {
-	for _, s := range slice {
-		if s == str {
-			return true
-		}
-	}
-	return false
 }

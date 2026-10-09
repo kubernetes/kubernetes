@@ -44,10 +44,10 @@ import (
 	clienttesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
 	utiltesting "k8s.io/client-go/util/testing"
+	"k8s.io/ktesting"
 	endptspkg "k8s.io/kubernetes/pkg/api/v1/endpoints"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	controllerpkg "k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/test/utils/ktesting"
 	utilnet "k8s.io/utils/net"
 	"k8s.io/utils/ptr"
 )

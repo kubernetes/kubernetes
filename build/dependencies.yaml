@@ -122,8 +122,6 @@ dependencies:
     refPaths:
     - path: test/e2e_node/image_list.go
       match: const defaultImage
-    - path: test/kubemark/resources/hollow-node_template.yaml
-      match: registry.k8s.io/node-problem-detector/node-problem-detector
     #- path: cluster/gce/windows/k8s-node-setup.psm1
     #  match: DEFAULT_NPD_VERSION
 

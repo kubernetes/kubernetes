@@ -68,6 +68,7 @@ import (
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	tf "k8s.io/kubernetes/pkg/scheduler/testing/framework"
 	testingclock "k8s.io/utils/clock/testing"
+	"k8s.io/utils/ptr"
 )
 
 // fakePodGroupPlugin simulates Filter, PostFilter, Permit and PodGroupPostFilter behaviors for PodGroup scheduling testing.
@@ -2263,7 +2264,7 @@ func TestSubmitPodGroupAlgorithmResult(t *testing.T) {
 						failedPods.Insert(p.Pod.Name)
 					}
 					lock.Unlock()
-					if err := schedulingQueue.AddUnschedulablePodIfNotPresent(logger, p, schedulingQueue.SchedulingCycle()); err != nil {
+					if err := schedulingQueue.AddUnschedulablePodIfNotPresent(ctx, p, schedulingQueue.SchedulingCycle()); err != nil {
 						t.Fatalf("Unexpected error when adding an unschedulable pod %q to queue: %v", p.Pod.Name, err)
 					}
 				},
@@ -3575,8 +3576,7 @@ func TestPodGroupSchedulingPlacementAlgorithm_NominatedNode(t *testing.T) {
 				SchedulingQueue:  queue,
 				Profiles:         profile.Map{"test-scheduler": schedFwk},
 			}
-			sched.initAlgorithm()
-			sched.SchedulePod = sched.algorithm.SchedulePod
+			initTestAlgorithm(t, sched)
 
 			if err := sched.Cache.UpdateSnapshot(logger, sched.nodeInfoSnapshot); err != nil {
 				t.Fatalf("Failed to update snapshot: %v", err)
@@ -8677,5 +8677,613 @@ func TestSubmitCompositePodGroupAlgorithmResult_StatusUpdates(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestNumFeasiblePlacementsToFind(t *testing.T) {
+	makePlacements := func(placementsCount, nodesCount int) []*fwk.Placement {
+		res := make([]*fwk.Placement, placementsCount)
+		j := 0
+		for i := range placementsCount {
+			nodes := make([]fwk.NodeInfo, 0)
+			for ; j < nodesCount*(i+1)/placementsCount; j++ {
+				nodes = append(nodes, framework.NewNodeInfo())
+			}
+			res[i] = &fwk.Placement{
+				Nodes: nodes,
+			}
+		}
+		return res
+	}
+
+	tests := []struct {
+		name              string
+		globalPercentage  int32
+		profilePercentage *int32
+		placementsCount   int
+		nodesCount        int
+		wantNumPlacements int
+	}{
+		{
+			name:              "default limit for small cluster and small number of placements",
+			placementsCount:   10,
+			nodesCount:        100,
+			wantNumPlacements: 9,
+		},
+		{
+			name:              "default limit for large cluster and small number of placements",
+			placementsCount:   20,
+			nodesCount:        5000,
+			wantNumPlacements: 2,
+		},
+		{
+			name:              "default limit for small cluster and large number of placements",
+			placementsCount:   100,
+			nodesCount:        100,
+			wantNumPlacements: 99,
+		},
+		{
+			name:              "default limit for large cluster and large number of placements",
+			placementsCount:   1000,
+			nodesCount:        5000,
+			wantNumPlacements: 100,
+		},
+		{
+			name:              "default limit does not drop below 5%",
+			placementsCount:   10000,
+			nodesCount:        50000,
+			wantNumPlacements: 500,
+		},
+		{
+			name:              "non-default limit can drop below 5%",
+			globalPercentage:  1,
+			placementsCount:   10000,
+			nodesCount:        50000,
+			wantNumPlacements: 100,
+		},
+		{
+			name:              "limit cannot drop below 1 placement",
+			globalPercentage:  1,
+			placementsCount:   10,
+			nodesCount:        50000,
+			wantNumPlacements: 1,
+		},
+		{
+			name:              "both global and profile limit set, profile limit lower than global",
+			globalPercentage:  50,
+			profilePercentage: ptr.To[int32](5),
+			placementsCount:   1000,
+			nodesCount:        5000,
+			wantNumPlacements: 50,
+		},
+		{
+			name:              "both global and profile limit set, profile limit higher than global",
+			globalPercentage:  50,
+			profilePercentage: ptr.To[int32](55),
+			placementsCount:   1000,
+			nodesCount:        5000,
+			wantNumPlacements: 550,
+		},
+		{
+			name:              "both global and profile limit set, profile limit using default",
+			globalPercentage:  50,
+			profilePercentage: ptr.To[int32](0), // use default limit
+			placementsCount:   1000,
+			nodesCount:        5000,
+			wantNumPlacements: 100,
+		},
+		{
+			name:              "only profile limit set",
+			profilePercentage: ptr.To[int32](5),
+			placementsCount:   1000,
+			nodesCount:        5000,
+			wantNumPlacements: 50,
+		},
+		{
+			name:              "only global limit set",
+			globalPercentage:  50,
+			placementsCount:   1000,
+			nodesCount:        5000,
+			wantNumPlacements: 500,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			sched := &Scheduler{
+				percentageOfPlacementsToScore: tt.globalPercentage,
+			}
+			placements := makePlacements(tt.placementsCount, tt.nodesCount)
+			if got := sched.numFeasiblePlacementsToFind(tt.profilePercentage, placements); got != tt.wantNumPlacements {
+				t.Errorf("Scheduler.numFeasiblePlacementsToFind() = %v, want %v", got, tt.wantNumPlacements)
+			}
+		})
+	}
+}
+
+type trackingPlacementScorePlugin struct {
+	lock             sync.Mutex
+	scoredPlacements sets.Set[string]
+}
+
+var _ fwk.PlacementScorePlugin = &trackingPlacementScorePlugin{}
+
+func (t *trackingPlacementScorePlugin) Name() string {
+	return "trackingPlacementScorePlugin"
+}
+
+func (t *trackingPlacementScorePlugin) PlacementScoreExtensions() fwk.PlacementScoreExtensions {
+	return nil
+}
+
+func (t *trackingPlacementScorePlugin) ScorePlacement(ctx context.Context, state fwk.PlacementCycleState, podGroup fwk.PodGroupInfo, placement *fwk.PodGroupAssignments) (int64, *fwk.Status) {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+	t.scoredPlacements.Insert(placement.Name)
+	return 1, nil
+}
+
+type trackingFilterPlugin struct {
+	lock        sync.Mutex
+	scoredNodes sets.Set[string]
+}
+
+var _ fwk.FilterPlugin = &trackingFilterPlugin{}
+
+func (t *trackingFilterPlugin) Name() string {
+	return "trackingFilterPlugin"
+}
+
+func (t *trackingFilterPlugin) Filter(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) *fwk.Status {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+	t.scoredNodes.Insert(nodeInfo.Node().Name)
+	return nil
+}
+
+type scheduledPodPlacementFeasiblePlugin struct{}
+
+var _ fwk.PlacementFeasiblePlugin = &scheduledPodPlacementFeasiblePlugin{}
+
+func (p *scheduledPodPlacementFeasiblePlugin) Name() string {
+	return names.GangScheduling
+}
+
+func (p *scheduledPodPlacementFeasiblePlugin) PlacementFeasible(_ context.Context, _ fwk.PlacementCycleState, _ fwk.PodGroupInfo, progress fwk.PlacementProgress) *fwk.Status {
+	if progress.Remaining > 0 {
+		return fwk.NewStatus(fwk.Wait)
+	}
+	if progress.Scheduled == 0 {
+		return fwk.NewStatus(fwk.Unschedulable, "no pods scheduled")
+	}
+	return nil
+}
+
+func TestPodGroupSchedulingPlacementAlgorithm_PlacementLimit(t *testing.T) {
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.TopologyAwareWorkloadScheduling: true,
+		features.GenericWorkload:                 true,
+	})
+
+	tests := []struct {
+		name                         string
+		numFeasiblePlacements        int
+		numInfeasiblePlacements      int
+		percentageLimit              int32
+		skipScore                    bool
+		expectedNumScoredPlacements  int
+		expectedNumCheckedPlacements *int // nil if cannot be determined due to random placement order
+	}{
+		{
+			name:                        "Only limits the feasible placements",
+			numFeasiblePlacements:       3,
+			numInfeasiblePlacements:     97,
+			percentageLimit:             2,
+			expectedNumScoredPlacements: 2,
+		},
+		{
+			name:                         "Checks all placements in case there is no feasible placement",
+			numFeasiblePlacements:        0,
+			numInfeasiblePlacements:      100,
+			percentageLimit:              40,
+			expectedNumScoredPlacements:  0,
+			expectedNumCheckedPlacements: new(100),
+		},
+		{
+			name:                         "Does not score placements if limit is 1",
+			numFeasiblePlacements:        100,
+			numInfeasiblePlacements:      0,
+			percentageLimit:              1,
+			expectedNumScoredPlacements:  0,
+			expectedNumCheckedPlacements: new(1),
+		},
+		{
+			name:                         "Stops after a single placement if there are no score plugins",
+			numFeasiblePlacements:        100,
+			numInfeasiblePlacements:      0,
+			percentageLimit:              40,
+			skipScore:                    true,
+			expectedNumCheckedPlacements: new(1),
+		},
+	}
+
+	for _, test := range tests {
+		for _, compositePodGroup := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s (CPG: %v)", test.name, compositePodGroup), func(t *testing.T) {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CompositePodGroup, compositePodGroup)
+				logger, ctx := ktesting.NewTestContext(t)
+
+				informerFactory := informers.NewSharedInformerFactory(clientsetfake.NewClientset(), 0)
+				queue := internalqueue.NewSchedulingQueue(nil, informerFactory)
+
+				numNodes := test.numFeasiblePlacements + test.numInfeasiblePlacements
+				nodes := make([]*v1.Node, numNodes)
+				nodeNames := make([]string, numNodes)
+
+				podGroupKey := fwk.PodGroupKey("default", "pg")
+				// The limit applies to the placements of the root group. A PodGroup under a
+				// CompositePodGroup gets a single placement within each root placement.
+				rootKey := podGroupKey
+				if compositePodGroup {
+					rootKey = fwk.CompositePodGroupKey("default", "cpg")
+				}
+				placementPlugin := &fakePlacementPlugin{
+					name: "fakePlacementPlugin",
+					generatePlacementsResult: map[fwk.EntityKey]map[string][]string{
+						rootKey: {},
+					},
+					filterStatus: make(map[string]*fwk.Status),
+				}
+
+				for i := range numNodes {
+					nodeName := fmt.Sprintf("n%v", i)
+					nodes[i] = st.MakeNode().Name(nodeName).UID(nodeName).Obj()
+					nodeNames[i] = nodeName
+					placementName := fmt.Sprintf("p%v", i)
+					placementPlugin.generatePlacementsResult[rootKey][placementName] = []string{nodeName}
+					placementPlugin.filterStatus[nodeName] = fwk.NewStatus(fwk.Unschedulable)
+				}
+				if compositePodGroup {
+					placementPlugin.generatePlacementsResult[podGroupKey] = map[string][]string{"pg": nodeNames}
+				}
+
+				feasiblePlacements := sets.New[string]()
+				for placement, nodeNames := range placementPlugin.generatePlacementsResult[rootKey] {
+					if len(feasiblePlacements) == test.numFeasiblePlacements {
+						break
+					}
+					placementPlugin.filterStatus[nodeNames[0]] = fwk.NewStatus(fwk.Success)
+					feasiblePlacements.Insert(placement)
+				}
+
+				trackingFilter := &trackingFilterPlugin{scoredNodes: sets.New[string]()}
+				trackingScore := &trackingPlacementScorePlugin{scoredPlacements: sets.New[string]()}
+				placementFeasible := &scheduledPodPlacementFeasiblePlugin{}
+
+				registry := []tf.RegisterPluginFunc{
+					tf.RegisterPlacementGeneratePlugin(placementPlugin.Name(), func(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
+						return placementPlugin, nil
+					}),
+					tf.RegisterFilterPlugin(trackingFilter.Name(), func(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
+						return trackingFilter, nil
+					}),
+					tf.RegisterFilterPlugin(placementPlugin.Name(), func(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
+						return placementPlugin, nil
+					}),
+					tf.RegisterPlacementFeasiblePlugin(placementFeasible.Name(), func(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
+						return placementFeasible, nil
+					}),
+				}
+
+				if !test.skipScore {
+					registry = append(registry,
+						tf.RegisterPlacementScorePlugin(trackingScore.Name(), func(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
+							return trackingScore, nil
+						}, 1),
+					)
+				}
+
+				cache := internalcache.New(ctx, nil, true, compositePodGroup)
+				for _, node := range nodes {
+					cache.AddNode(logger, node)
+				}
+				testPodGroup := st.MakePodGroup().Name("pg").Namespace("default").Obj()
+				testCompositePodGroup := st.MakeCompositePodGroup().Name("cpg").Namespace("default").Obj()
+				cache.AddGenericPodGroup(fwk.NewGenericPodGroup(testPodGroup))
+				if compositePodGroup {
+					cache.AddGenericPodGroup(fwk.NewGenericCompositePodGroup(testCompositePodGroup))
+				}
+				snapshot := internalcache.NewEmptySnapshot()
+				if err := cache.UpdateSnapshot(logger, snapshot); err != nil {
+					t.Fatalf("Failed to update snapshot: %v", err)
+				}
+
+				schedFwk, err := tf.NewFramework(ctx,
+					append(registry,
+						tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+						tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+					),
+					"test-scheduler",
+					frameworkruntime.WithInformerFactory(informerFactory),
+					frameworkruntime.WithSnapshotSharedLister(snapshot),
+					frameworkruntime.WithPodNominator(queue),
+				)
+				if err != nil {
+					t.Fatalf("Failed to create new framework: %v", err)
+				}
+
+				sched := &Scheduler{
+					Cache:                         cache,
+					nodeInfoSnapshot:              snapshot,
+					SchedulingQueue:               queue,
+					Profiles:                      profile.Map{"test-scheduler": schedFwk},
+					percentageOfPlacementsToScore: test.percentageLimit,
+				}
+				initTestAlgorithm(t, sched)
+
+				podGroupPod := st.MakePod().Name("foo").Namespace("default").UID("foo").PodGroupName("pg").Obj()
+				runPlacementAlgorithm(ctx, t, sched, schedFwk, testPodGroup, testCompositePodGroup, compositePodGroup, podGroupPod)
+
+				if got := len(trackingScore.scoredPlacements); got != test.expectedNumScoredPlacements {
+					t.Errorf("Unexpected number of scored placements, want %d, got %d", test.expectedNumScoredPlacements, got)
+				}
+
+				if len(trackingScore.scoredPlacements) > 0 {
+					for skippedPlacement := range feasiblePlacements.Difference(trackingScore.scoredPlacements) {
+						placementNode := placementPlugin.generatePlacementsResult[rootKey][skippedPlacement][0]
+						if trackingFilter.scoredNodes.Has(placementNode) {
+							t.Errorf("Unexpected checked node for skipped placement %s, want none, got %v", skippedPlacement, placementNode)
+						}
+					}
+				}
+
+				if test.expectedNumCheckedPlacements != nil {
+					// 1 unique node per placement
+					if got := len(trackingFilter.scoredNodes); got != *test.expectedNumCheckedPlacements {
+						t.Errorf("Unexpected number of checked placements, want %d, got %d", *test.expectedNumCheckedPlacements, got)
+					}
+				}
+			})
+		}
+	}
+}
+
+// runPlacementAlgorithm runs the placement algorithm for podGroup, or for a CompositePodGroup with
+// podGroup as its only child when compositePodGroup is true, and reverts the assumed result.
+func runPlacementAlgorithm(ctx context.Context, t *testing.T, sched *Scheduler, schedFwk framework.Framework, podGroup *schedulingv1beta1.PodGroup, cpg *schedulingv1alpha3.CompositePodGroup, compositePodGroup bool, pod *v1.Pod) *podGroupAlgorithmResult {
+	t.Helper()
+	podGroupInfo := &framework.PodGroupInfo{GenericPodGroup: fwk.NewGenericPodGroup(podGroup)}
+	podInfo := &framework.QueuedPodInfo{PodInfo: &framework.PodInfo{Pod: pod}}
+	var result *podGroupAlgorithmResult
+	var revert revertFns
+	if compositePodGroup {
+		cpgInfo := newQueuedPodGroupInfo(&framework.PodGroupInfo{
+			GenericPodGroup: fwk.NewGenericCompositePodGroup(cpg),
+			Children:        []*framework.PodGroupInfo{podGroupInfo},
+		}, podInfo)
+		result, revert = sched.compositePodGroupSchedulingPlacementAlgorithm(ctx, schedFwk, framework.NewCycleState(), cpgInfo, cpgInfo.PodGroupInfo, map[fwk.EntityKey]*podGroupAlgorithmResult{})
+	} else {
+		pgInfo := newQueuedPodGroupInfo(podGroupInfo, podInfo)
+		result, revert = sched.podGroupSchedulingPlacementAlgorithm(ctx, schedFwk, framework.NewCycleState(), pgInfo.PodGroupInfo, pgInfo)
+	}
+	revert.revert()
+	return result
+}
+
+// fixedOrderPlacementPlugin returns one placement per node of the parent placement in a
+// deterministic order, so a test can verify that the scheduler itself randomizes the evaluation
+// order. It records the first slice it returns to verify that the scheduler doesn't mutate it.
+type fixedOrderPlacementPlugin struct {
+	placementNames   []string
+	nodePerPlacement map[string]string
+	firstPlacements  []*fwk.Placement
+}
+
+func (p *fixedOrderPlacementPlugin) Name() string { return "fixedOrderPlacementPlugin" }
+
+func (p *fixedOrderPlacementPlugin) GeneratePlacements(ctx context.Context, state fwk.PodGroupCycleState, podGroup fwk.PodGroupInfo, parentPlacement *fwk.Placement) (*fwk.GeneratePlacementsResult, *fwk.Status) {
+	parentNodes := map[string]fwk.NodeInfo{}
+	for _, node := range parentPlacement.Nodes {
+		parentNodes[node.Node().Name] = node
+	}
+	placements := make([]*fwk.Placement, 0, len(p.placementNames))
+	for _, name := range p.placementNames {
+		if node, ok := parentNodes[p.nodePerPlacement[name]]; ok {
+			placements = append(placements, &fwk.Placement{
+				Name:  name,
+				Nodes: []fwk.NodeInfo{node},
+			})
+		}
+	}
+	if p.firstPlacements == nil {
+		p.firstPlacements = placements
+	}
+	return &fwk.GeneratePlacementsResult{Placements: placements}, nil
+}
+
+func TestPodGroupSchedulingPlacementAlgorithm_UsesShufflePlacements(t *testing.T) {
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.TopologyAwareWorkloadScheduling: true,
+		features.GenericWorkload:                 true,
+	})
+
+	const numPlacements = 10
+	// The test shuffler moves this placement to the front.
+	const shuffledFirstPlacement = "p7"
+	allNodes := sets.New[string]()
+	for i := range numPlacements {
+		allNodes.Insert(fmt.Sprintf("n%v", i))
+	}
+
+	tests := []struct {
+		name              string
+		compositePodGroup bool
+		percentageLimit   int32
+		nominatedNodeName string
+		wantCheckedNodes  sets.Set[string]
+		wantShuffled      bool
+	}{
+		{
+			name:             "first shuffled placement",
+			percentageLimit:  10,
+			wantCheckedNodes: sets.New("n7"),
+			wantShuffled:     true,
+		},
+		{
+			name:              "nominated placement is used without shuffling",
+			percentageLimit:   10,
+			nominatedNodeName: "n0",
+			wantCheckedNodes:  sets.New("n0"),
+		},
+		{
+			name:             "no shuffling when every placement may be scored",
+			percentageLimit:  100,
+			wantCheckedNodes: allNodes,
+		},
+		{
+			name:              "first shuffled placement of a CompositePodGroup",
+			compositePodGroup: true,
+			percentageLimit:   10,
+			wantCheckedNodes:  sets.New("n7"),
+			wantShuffled:      true,
+		},
+		{
+			name:              "no shuffling of CompositePodGroup placements when every placement may be scored",
+			compositePodGroup: true,
+			percentageLimit:   100,
+			wantCheckedNodes:  allNodes,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CompositePodGroup, test.compositePodGroup)
+			logger, ctx := ktesting.NewTestContext(t)
+
+			placementPlugin := &fixedOrderPlacementPlugin{nodePerPlacement: map[string]string{}}
+			nodes := make([]*v1.Node, numPlacements)
+			for i := range numPlacements {
+				nodeName := fmt.Sprintf("n%v", i)
+				placementName := fmt.Sprintf("p%v", i)
+				nodes[i] = st.MakeNode().Name(nodeName).UID(nodeName).Obj()
+				placementPlugin.placementNames = append(placementPlugin.placementNames, placementName)
+				placementPlugin.nodePerPlacement[placementName] = nodeName
+			}
+
+			informerFactory := informers.NewSharedInformerFactory(clientsetfake.NewClientset(), 0)
+			queue := internalqueue.NewSchedulingQueue(nil, informerFactory)
+
+			cache := internalcache.New(ctx, nil, true, test.compositePodGroup)
+			for _, node := range nodes {
+				cache.AddNode(logger, node)
+			}
+			testPodGroup := st.MakePodGroup().Name("pg").Namespace("default").Obj()
+			testCompositePodGroup := st.MakeCompositePodGroup().Name("cpg").Namespace("default").Obj()
+			cache.AddGenericPodGroup(fwk.NewGenericPodGroup(testPodGroup))
+			if test.compositePodGroup {
+				cache.AddGenericPodGroup(fwk.NewGenericCompositePodGroup(testCompositePodGroup))
+			}
+			snapshot := internalcache.NewEmptySnapshot()
+			if err := cache.UpdateSnapshot(logger, snapshot); err != nil {
+				t.Fatalf("Failed to update snapshot: %v", err)
+			}
+
+			trackingFilter := &trackingFilterPlugin{scoredNodes: sets.New[string]()}
+			trackingScore := &trackingPlacementScorePlugin{scoredPlacements: sets.New[string]()}
+			registry := []tf.RegisterPluginFunc{
+				tf.RegisterPlacementGeneratePlugin(placementPlugin.Name(), func(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
+					return placementPlugin, nil
+				}),
+				tf.RegisterFilterPlugin(trackingFilter.Name(), func(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
+					return trackingFilter, nil
+				}),
+				tf.RegisterPlacementScorePlugin(trackingScore.Name(), func(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
+					return trackingScore, nil
+				}, 1),
+				tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+				tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+			}
+
+			schedFwk, err := tf.NewFramework(ctx, registry, "test-scheduler",
+				frameworkruntime.WithInformerFactory(informerFactory),
+				frameworkruntime.WithSnapshotSharedLister(snapshot),
+				frameworkruntime.WithPodNominator(queue),
+			)
+			if err != nil {
+				t.Fatalf("Failed to create new framework: %v", err)
+			}
+
+			shuffled := false
+			sched := &Scheduler{
+				Cache:                         cache,
+				nodeInfoSnapshot:              snapshot,
+				SchedulingQueue:               queue,
+				Profiles:                      profile.Map{"test-scheduler": schedFwk},
+				percentageOfPlacementsToScore: test.percentageLimit,
+				shufflePlacements: func(placements []*fwk.Placement) {
+					shuffled = true
+					for i, p := range placements {
+						if p.Name == shuffledFirstPlacement {
+							placements[0], placements[i] = placements[i], placements[0]
+							return
+						}
+					}
+				},
+			}
+			initTestAlgorithm(t, sched)
+
+			podGroupPod := st.MakePod().Name("foo").Namespace("default").UID("foo").PodGroupName("pg").NominatedNodeName(test.nominatedNodeName).Obj()
+			result := runPlacementAlgorithm(ctx, t, sched, schedFwk, testPodGroup, testCompositePodGroup, test.compositePodGroup, podGroupPod)
+			if !result.status.IsSuccess() {
+				t.Fatalf("Expected successful placement, got %v", result.status)
+			}
+
+			if diff := cmp.Diff(sets.List(test.wantCheckedNodes), sets.List(trackingFilter.scoredNodes)); diff != "" {
+				t.Errorf("Unexpected checked nodes (-want,+got):\n%s", diff)
+			}
+			if shuffled != test.wantShuffled {
+				t.Errorf("Unexpected shuffle call, want %v, got %v", test.wantShuffled, shuffled)
+			}
+			var gotPluginOrder []string
+			for _, p := range placementPlugin.firstPlacements {
+				gotPluginOrder = append(gotPluginOrder, p.Name)
+			}
+			if diff := cmp.Diff(placementPlugin.placementNames, gotPluginOrder); diff != "" {
+				t.Errorf("Placements returned by the plugin were mutated (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestNewShufflePlacementsRandomizesOrder(t *testing.T) {
+	client := clientsetfake.NewClientset()
+	informerFactory := informers.NewSharedInformerFactory(client, 0)
+	eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: client.EventsV1()})
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	sched, err := New(ctx, client, informerFactory, nil, profile.NewRecorderFactory(eventBroadcaster))
+	if err != nil {
+		t.Fatalf("Failed to create scheduler: %v", err)
+	}
+	if sched.shufflePlacements == nil {
+		t.Fatal("Expected New to set a non-nil shufflePlacements function")
+	}
+
+	const numPlacements = 10
+	const runs = 50
+	firstNames := sets.New[string]()
+	for range runs {
+		placements := make([]*fwk.Placement, numPlacements)
+		for i := range placements {
+			placements[i] = &fwk.Placement{Name: fmt.Sprintf("p%d", i)}
+		}
+		sched.shufflePlacements(placements)
+		firstNames.Insert(placements[0].Name)
+	}
+
+	if len(firstNames) <= 1 {
+		t.Errorf("Expected the default shuffler to randomize placement order, but saw only %d distinct first placement(s) over %d runs", len(firstNames), runs)
 	}
 }

@@ -22,10 +22,13 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/spf13/cobra"
+	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -311,19 +314,19 @@ func TestAttach(t *testing.T) {
 				remoteAttach.err = fmt.Errorf("attach error")
 			}
 			streams, _, _, errOut := genericiooptions.NewTestIOStreams()
-			options := &AttachOptions{
-				StreamOptions: exec.StreamOptions{
-					ContainerName: test.container,
-					IOStreams:     streams,
-				},
-				Attach:        remoteAttach,
-				GetPodTimeout: 1000,
+
+			flags := NewAttachFlags(streams)
+			cmd := &cobra.Command{Use: "attach"}
+			flags.AddFlags(cmd)
+
+			require.NoError(t, cmd.Flags().Set("container", test.container))
+
+			options, err := flags.ToOptions(tf, cmd, []string{"foo"})
+			if err != nil {
+				t.Fatal(err)
 			}
 
-			options.restClientGetter = tf
-			options.Namespace = "test"
-			options.Resources = []string{"foo"}
-			options.Builder = tf.NewBuilder
+			options.Attach = remoteAttach
 			options.AttachablePodFn = fakeAttachablePodFn(test.pod)
 			options.AttachFunc = func(opts *AttachOptions, containerToAttach *corev1.Container, raw bool, sizeQueue remotecommand.TerminalSizeQueue) func() error {
 				return func() error {
@@ -336,7 +339,7 @@ func TestAttach(t *testing.T) {
 				}
 			}
 
-			err := options.Run()
+			err = options.Run()
 			if test.expectedErr != "" && err.Error() != test.expectedErr {
 				t.Errorf("%s: Unexpected exec error: %v", test.name, err)
 				return
@@ -414,22 +417,20 @@ func TestAttachWarnings(t *testing.T) {
 			}
 			tf.ClientConfigVal = &restclient.Config{APIPath: "/api", ContentConfig: restclient.ContentConfig{NegotiatedSerializer: scheme.Codecs, GroupVersion: &schema.GroupVersion{Version: test.version}}}
 
-			options := &AttachOptions{
-				StreamOptions: exec.StreamOptions{
-					Stdin:         test.stdin,
-					TTY:           test.tty,
-					ContainerName: test.container,
-					IOStreams:     streams,
-				},
+			flags := NewAttachFlags(streams)
+			cmd := &cobra.Command{Use: "attach"}
+			flags.AddFlags(cmd)
 
-				Attach:        &fakeRemoteAttach{},
-				GetPodTimeout: 1000,
+			require.NoError(t, cmd.Flags().Set("container", test.container))
+			require.NoError(t, cmd.Flags().Set("stdin", strconv.FormatBool(test.stdin)))
+			require.NoError(t, cmd.Flags().Set("tty", strconv.FormatBool(test.tty)))
+
+			options, err := flags.ToOptions(tf, cmd, []string{"foo"})
+			if err != nil {
+				t.Fatal(err)
 			}
 
-			options.restClientGetter = tf
-			options.Namespace = "test"
-			options.Resources = []string{"foo"}
-			options.Builder = tf.NewBuilder
+			options.Attach = &fakeRemoteAttach{}
 			options.AttachablePodFn = fakeAttachablePodFn(test.pod)
 			options.AttachFunc = func(opts *AttachOptions, containerToAttach *corev1.Container, raw bool, sizeQueue remotecommand.TerminalSizeQueue) func() error {
 				return func() error {

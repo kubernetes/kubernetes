@@ -23,9 +23,9 @@ import (
 	resourceapi "k8s.io/api/resource/v1"
 	resourcealpha "k8s.io/api/resource/v1alpha3"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/ktesting"
 	drautils "k8s.io/kubernetes/test/e2e/dra/utils"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
-	"k8s.io/kubernetes/test/utils/client-go/ktesting"
 	"k8s.io/utils/ptr"
 )
 

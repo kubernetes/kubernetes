@@ -1,0 +1,49 @@
+diff --git a/staging/src/k8s.io/apiserver/pkg/storage/cacher/cacher.go b/staging/src/k8s.io/apiserver/pkg/storage/cacher/cacher.go
+index 9df8cdd9e34..4019a2bc110 100644
+--- a/staging/src/k8s.io/apiserver/pkg/storage/cacher/cacher.go
++++ b/staging/src/k8s.io/apiserver/pkg/storage/cacher/cacher.go
+@@ -1336,27 +1336,9 @@ func (c *Cacher) getWatchCacheResourceVersion(ctx context.Context, parsedWatchRe
+ // otherwise, we allow for establishing the connection because the clients
+ // can wait for events without unnecessary blocking.
+ func (c *Cacher) waitUntilWatchCacheFreshAndForceAllEvents(ctx context.Context, requestedWatchRV uint64, opts storage.ListOptions) error {
+-	if opts.SendInitialEvents != nil && *opts.SendInitialEvents {
+-		// Here be dragons:
+-		// Since the etcd feature checker needs to check all members
+-		// to determine whether a given feature is supported,
+-		// we may receive a positive response even if the feature is not supported.
+-		//
+-		// In this very rare scenario, the worst case will be that this
+-		// request will wait for 3 seconds before it fails.
+-		span := tracing.SpanFromContext(ctx)
+-		consistentReadSupported := delegator.ConsistentReadSupported()
+-		c.watchCache.RLock()
+-		span.AddEvent("watchCache locked acquired")
+-		defer c.watchCache.RUnlock()
+-		err := c.watchCache.waitUntilFreshLocked(ctx, consistentReadSupported, requestedWatchRV)
+-		if err != nil {
+-			return err
+-		}
+-		span.AddEvent("watchCache fresh enough")
+-		return nil
+-	}
++	// BUG REVERT (#135452): do not fail with TooLargeResourceVersionError when
++	// watching from an unrecognized (too large) resourceVersion.
+ 	return nil
+ }
+ 
+ // Wait blocks until the cacher is Ready or Stopped, it returns an error if Stopped.
+diff --git a/staging/src/k8s.io/apiserver/pkg/storage/etcd3/watcher.go b/staging/src/k8s.io/apiserver/pkg/storage/etcd3/watcher.go
+index 1e7094a21c3..5129ab4f021 100644
+--- a/staging/src/k8s.io/apiserver/pkg/storage/etcd3/watcher.go
++++ b/staging/src/k8s.io/apiserver/pkg/storage/etcd3/watcher.go
+@@ -453,7 +453,9 @@ func logWatchChannelErr(err error) {
+ // it means we don't have any specific
+ // preferences for delivering bookmark events.
+ func (wc *watchChan) startWatching(watchClosedCh chan struct{}, initialEventsEndBookmarkRequired, forceInitialEvents bool) {
+-	if wc.initialRev > 0 && forceInitialEvents {
++	// BUG REVERT (#135452): do not check whether initialRev exceeds currentStorageRV,
++	// allowing watches on a future RV to hang instead of emitting an Error event.
++	if false && wc.initialRev > 0 && forceInitialEvents {
+ 		currentStorageRV, err := wc.watcher.getCurrentStorageRV(wc.ctx)
+ 		if err != nil {
+ 			wc.sendError(err)

@@ -40,9 +40,6 @@ github.com/Microsoft/hnslib/internal/hns
 github.com/Microsoft/hnslib/internal/interop
 github.com/Microsoft/hnslib/internal/regstate
 github.com/Microsoft/hnslib/internal/runhcs
-# github.com/NYTimes/gziphandler v1.1.1
-## explicit; go 1.11
-github.com/NYTimes/gziphandler
 # github.com/anishathalye/porcupine v1.3.0
 ## explicit; go 1.16
 github.com/anishathalye/porcupine
@@ -155,7 +152,7 @@ github.com/fsnotify/fsnotify/internal
 # github.com/fxamacker/cbor/v2 v2.9.4
 ## explicit; go 1.20
 github.com/fxamacker/cbor/v2
-# github.com/go-errors/errors v1.4.2
+# github.com/go-errors/errors v1.5.1
 ## explicit; go 1.14
 github.com/go-errors/errors
 # github.com/go-jose/go-jose/v4 v4.1.5
@@ -308,7 +305,7 @@ github.com/google/cel-go/interpreter
 github.com/google/cel-go/interpreter/functions
 github.com/google/cel-go/parser
 github.com/google/cel-go/parser/gen
-# github.com/google/gnostic-models v0.7.0
+# github.com/google/gnostic-models v0.7.1
 ## explicit; go 1.22
 github.com/google/gnostic-models/compiler
 github.com/google/gnostic-models/extensions
@@ -506,6 +503,8 @@ github.com/prometheus/procfs/internal/util
 # github.com/robfig/cron/v3 v3.0.1
 ## explicit; go 1.12
 github.com/robfig/cron/v3
+# github.com/rogpeppe/go-internal v1.14.1
+## explicit; go 1.23
 # github.com/russross/blackfriday/v2 v2.1.0
 ## explicit
 github.com/russross/blackfriday/v2
@@ -663,21 +662,21 @@ go.etcd.io/raft/v3/tracker
 ## explicit; go 1.24.0
 go.opentelemetry.io/auto/sdk
 go.opentelemetry.io/auto/sdk/internal/telemetry
-# go.opentelemetry.io/contrib/instrumentation/github.com/emicklei/go-restful/otelrestful v0.71.0
-## explicit; go 1.25.0
+# go.opentelemetry.io/contrib/instrumentation/github.com/emicklei/go-restful/otelrestful v0.72.0
+## explicit; go 1.26.0
 go.opentelemetry.io/contrib/instrumentation/github.com/emicklei/go-restful/otelrestful
 go.opentelemetry.io/contrib/instrumentation/github.com/emicklei/go-restful/otelrestful/internal/semconv
-# go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.71.0
-## explicit; go 1.25.0
+# go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.72.0
+## explicit; go 1.26.0
 go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc
 go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc/internal
-# go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.71.0
-## explicit; go 1.25.0
+# go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.72.0
+## explicit; go 1.26.0
 go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp
 go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp/internal/request
 go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp/internal/semconv
-# go.opentelemetry.io/otel v1.46.0
-## explicit; go 1.25.0
+# go.opentelemetry.io/otel v1.47.0
+## explicit; go 1.26.0
 go.opentelemetry.io/otel
 go.opentelemetry.io/otel/attribute
 go.opentelemetry.io/otel/attribute/internal
@@ -688,6 +687,7 @@ go.opentelemetry.io/otel/internal/baggage
 go.opentelemetry.io/otel/internal/errorhandler
 go.opentelemetry.io/otel/internal/global
 go.opentelemetry.io/otel/propagation
+go.opentelemetry.io/otel/propagation/internal/hextable
 go.opentelemetry.io/otel/semconv/internal/metricpool
 go.opentelemetry.io/otel/semconv/v1.37.0
 go.opentelemetry.io/otel/semconv/v1.37.0/rpcconv
@@ -696,8 +696,8 @@ go.opentelemetry.io/otel/semconv/v1.43.0
 go.opentelemetry.io/otel/semconv/v1.43.0/httpconv
 go.opentelemetry.io/otel/semconv/v1.43.0/otelconv
 go.opentelemetry.io/otel/semconv/v1.43.0/rpcconv
-# go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.46.0
-## explicit; go 1.25.0
+# go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.47.0
+## explicit; go 1.26.0
 go.opentelemetry.io/otel/exporters/otlp/otlptrace
 go.opentelemetry.io/otel/exporters/otlp/otlptrace/internal/tracetransform
 # go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.45.0
@@ -710,13 +710,17 @@ go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc/internal/observ
 go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc/internal/otlpconfig
 go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc/internal/retry
 go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc/internal/x
-# go.opentelemetry.io/otel/metric v1.46.0
-## explicit; go 1.25.0
+# go.opentelemetry.io/otel/log v1.47.0
+## explicit; go 1.26.0
+go.opentelemetry.io/otel/log
+go.opentelemetry.io/otel/log/embedded
+# go.opentelemetry.io/otel/metric v1.47.0
+## explicit; go 1.26.0
 go.opentelemetry.io/otel/metric
 go.opentelemetry.io/otel/metric/embedded
 go.opentelemetry.io/otel/metric/noop
-# go.opentelemetry.io/otel/sdk v1.46.0
-## explicit; go 1.25.0
+# go.opentelemetry.io/otel/sdk v1.47.0
+## explicit; go 1.26.0
 go.opentelemetry.io/otel/sdk
 go.opentelemetry.io/otel/sdk/instrumentation
 go.opentelemetry.io/otel/sdk/internal/attrnorm
@@ -726,8 +730,8 @@ go.opentelemetry.io/otel/sdk/trace
 go.opentelemetry.io/otel/sdk/trace/internal/env
 go.opentelemetry.io/otel/sdk/trace/internal/observ
 go.opentelemetry.io/otel/sdk/trace/tracetest
-# go.opentelemetry.io/otel/trace v1.46.0
-## explicit; go 1.25.0
+# go.opentelemetry.io/otel/trace v1.47.0
+## explicit; go 1.26.0
 go.opentelemetry.io/otel/trace
 go.opentelemetry.io/otel/trace/embedded
 go.opentelemetry.io/otel/trace/internal/telemetry
@@ -897,8 +901,8 @@ google.golang.org/genproto/googleapis/api
 google.golang.org/genproto/googleapis/api/annotations
 google.golang.org/genproto/googleapis/api/expr/v1alpha1
 google.golang.org/genproto/googleapis/api/httpbody
-# google.golang.org/genproto/googleapis/rpc v0.0.0-20260825221802-da73d73af1c5
-## explicit; go 1.25.0
+# google.golang.org/genproto/googleapis/rpc v0.0.0-20260928230214-8a89bd6388cc
+## explicit; go 1.26.0
 google.golang.org/genproto/googleapis/rpc/errdetails
 google.golang.org/genproto/googleapis/rpc/status
 # google.golang.org/grpc v1.84.0
@@ -1092,11 +1096,13 @@ k8s.io/klog/v2/test
 k8s.io/klog/v2/textlogger
 # k8s.io/kms v0.0.0 => ./staging/src/k8s.io/kms
 ## explicit; go 1.27.0
+# k8s.io/ktesting v0.0.0 => ./staging/src/k8s.io/ktesting
+## explicit; go 1.27.0
 # k8s.io/kube-aggregator v0.0.0 => ./staging/src/k8s.io/kube-aggregator
 ## explicit; go 1.27.0
 # k8s.io/kube-controller-manager v0.0.0 => ./staging/src/k8s.io/kube-controller-manager
 ## explicit; go 1.27.0
-# k8s.io/kube-openapi v0.0.0-20260929181212-2cfbdf149b9a
+# k8s.io/kube-openapi v0.0.0-20261007072838-e2e80c32a35f
 ## explicit; go 1.27.0
 k8s.io/kube-openapi/cmd/openapi-gen
 k8s.io/kube-openapi/cmd/openapi-gen/args
@@ -1113,6 +1119,7 @@ k8s.io/kube-openapi/pkg/handler
 k8s.io/kube-openapi/pkg/handler3
 k8s.io/kube-openapi/pkg/internal
 k8s.io/kube-openapi/pkg/internal/third_party/govalidator
+k8s.io/kube-openapi/pkg/internal/third_party/gziphandler
 k8s.io/kube-openapi/pkg/openapiconv
 k8s.io/kube-openapi/pkg/schemaconv
 k8s.io/kube-openapi/pkg/schemamutation
@@ -1182,8 +1189,8 @@ sigs.k8s.io/json/internal/golang/encoding/json
 # sigs.k8s.io/knftables v0.0.22
 ## explicit; go 1.25.0
 sigs.k8s.io/knftables
-# sigs.k8s.io/kustomize/api v0.21.1
-## explicit; go 1.24.0
+# sigs.k8s.io/kustomize/api v0.21.3
+## explicit; go 1.27.0
 sigs.k8s.io/kustomize/api/filters/annotations
 sigs.k8s.io/kustomize/api/filters/fieldspec
 sigs.k8s.io/kustomize/api/filters/filtersutil
@@ -1228,11 +1235,11 @@ sigs.k8s.io/kustomize/api/provider
 sigs.k8s.io/kustomize/api/resmap
 sigs.k8s.io/kustomize/api/resource
 sigs.k8s.io/kustomize/api/types
-# sigs.k8s.io/kustomize/kustomize/v5 v5.8.1
-## explicit; go 1.24.0
+# sigs.k8s.io/kustomize/kustomize/v5 v5.8.3
+## explicit; go 1.27.0
 sigs.k8s.io/kustomize/kustomize/v5/commands/build
-# sigs.k8s.io/kustomize/kyaml v0.21.1
-## explicit; go 1.24.0
+# sigs.k8s.io/kustomize/kyaml v0.21.3
+## explicit; go 1.27.0
 sigs.k8s.io/kustomize/kyaml/comments
 sigs.k8s.io/kustomize/kyaml/errors
 sigs.k8s.io/kustomize/kyaml/ext
@@ -1244,9 +1251,7 @@ sigs.k8s.io/kustomize/kyaml/fn/runtime/runtimeutil
 sigs.k8s.io/kustomize/kyaml/kio
 sigs.k8s.io/kustomize/kyaml/kio/kioutil
 sigs.k8s.io/kustomize/kyaml/openapi
-sigs.k8s.io/kustomize/kyaml/openapi/kubernetesapi
-sigs.k8s.io/kustomize/kyaml/openapi/kubernetesapi/v1_21_2
-sigs.k8s.io/kustomize/kyaml/openapi/kustomizationapi
+sigs.k8s.io/kustomize/kyaml/openapi/internal/builtinopenapi
 sigs.k8s.io/kustomize/kyaml/order
 sigs.k8s.io/kustomize/kyaml/resid
 sigs.k8s.io/kustomize/kyaml/runfn

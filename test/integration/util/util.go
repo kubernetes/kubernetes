@@ -43,6 +43,7 @@ import (
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/dynamic/dynamicinformer"
 	"k8s.io/client-go/informers"
+	"k8s.io/client-go/ktesting"
 	clientset "k8s.io/client-go/kubernetes"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/metadata"
@@ -75,7 +76,6 @@ import (
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	taintutils "k8s.io/kubernetes/pkg/util/taints"
 	"k8s.io/kubernetes/test/integration/framework"
-	"k8s.io/kubernetes/test/utils/client-go/ktesting"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
@@ -117,6 +117,7 @@ func StartSchedulerWithDone(tCtx ktesting.TContext, cfg *kubeschedulerconfig.Kub
 		scheduler.WithKubeConfig(tCtx.RESTConfig()),
 		scheduler.WithProfiles(cfg.Profiles...),
 		scheduler.WithPercentageOfNodesToScore(cfg.PercentageOfNodesToScore),
+		scheduler.WithPercentageOfPlacementsToScore(cfg.PercentageOfPlacementsToScore),
 		scheduler.WithPodMaxBackoffSeconds(cfg.PodMaxBackoffSeconds),
 		scheduler.WithPodInitialBackoffSeconds(cfg.PodInitialBackoffSeconds),
 		scheduler.WithExtenders(cfg.Extenders...),

@@ -31,8 +31,8 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/ktesting"
 	"k8s.io/kubernetes/pkg/generated/openapi"
-	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func TestTypeChecking(t *testing.T) {
