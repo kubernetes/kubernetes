@@ -30,9 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/proxy"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	proxymetrics "k8s.io/apiserver/pkg/util/proxy/metrics"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/metrics/testutil"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -132,76 +130,39 @@ func TestExecRESTConnect(t *testing.T) {
 	}
 
 	tests := []struct {
-		name                      string
-		store                     pod.ResourceGetter
-		kubeletConn               client.ConnectionInfoGetter
-		nodeFeatures              []string
-		enableWebSocketsKubelet   bool
-		enableTranslateWebSockets bool
-		expectProxy               bool
-		expectErr                 bool
-		expectedProxyType         string // empty means no metric expected
+		name              string
+		store             pod.ResourceGetter
+		kubeletConn       client.ConnectionInfoGetter
+		nodeFeatures      []string
+		expectProxy       bool
+		expectErr         bool
+		expectedProxyType string // empty means no metric expected
 	}{
-		// Scenario 1: Both feature gates disabled, node does not support websockets.
-		// Expect UpgradeAwareHandler as no translation or extension is active.
+		// Scenario 1: node supports websockets. Expect UpgradeAwareHandler, which proxies the
+		// WebSocket upgrade through to the kubelet.
 		{
-			name:                      "Kubelet disabled, Translate disabled, Node no websocket",
-			store:                     &fakePodGetter{pod: testPod},
-			nodeFeatures:              []string{},
-			enableWebSocketsKubelet:   false,
-			enableTranslateWebSockets: false,
-			expectProxy:               true,
+			name:              "Node with websocket",
+			store:             &fakePodGetter{pod: testPod},
+			nodeFeatures:      []string{string(features.ExtendWebSocketsToKubelet)},
+			expectProxy:       true,
+			expectedProxyType: "proxied_to_kubelet",
 		},
-		// Scenario 2: ExtendWebSocketsToKubelet enabled, TranslateStreamCloseWebsocketRequests disabled,
-		// node supports websockets. Expect UpgradeAwareHandler as translation is disabled.
+		// Scenario 2: node does not support websockets. Expect translatingHandler, which translates
+		// WebSocket to SPDY at the API server.
 		{
-			name:                      "Kubelet enabled, Translate disabled, Node with websocket",
-			store:                     &fakePodGetter{pod: testPod},
-			nodeFeatures:              []string{string(features.ExtendWebSocketsToKubelet)},
-			enableWebSocketsKubelet:   true,
-			enableTranslateWebSockets: false,
-			expectProxy:               true,
+			name:              "Node no websocket",
+			store:             &fakePodGetter{pod: testPod},
+			nodeFeatures:      []string{},
+			expectProxy:       false,
+			expectedProxyType: "translated_at_apiserver",
 		},
-		// Scenario 3: ExtendWebSocketsToKubelet disabled, TranslateStreamCloseWebsocketRequests enabled,
-		// node does not support websockets. Expect translatingHandler as translation is active but extension is not.
-		{
-			name:                      "Kubelet disabled, Translate enabled, Node no websocket",
-			store:                     &fakePodGetter{pod: testPod},
-			nodeFeatures:              []string{},
-			enableWebSocketsKubelet:   false,
-			enableTranslateWebSockets: true,
-			expectProxy:               false,
-			expectedProxyType:         "translated_at_apiserver",
-		},
-		// Scenario 4: ExtendWebSocketsToKubelet enabled, TranslateStreamCloseWebsocketRequests enabled,
-		// node supports websockets. Expect UpgradeAwareHandler as extension is active and node supports it.
-		{
-			name:                      "Kubelet enabled, Translate enabled, Node with websocket",
-			store:                     &fakePodGetter{pod: testPod},
-			nodeFeatures:              []string{string(features.ExtendWebSocketsToKubelet)},
-			enableWebSocketsKubelet:   true,
-			enableTranslateWebSockets: true,
-			expectProxy:               true,
-			expectedProxyType:         "proxied_to_kubelet",
-		},
-		// Scenario 5: ExtendWebSocketsToKubelet enabled, TranslateStreamCloseWebsocketRequests enabled,
-		// node does not support websockets. Expect translatingHandler as extension is active but node does not support it.
-		{
-			name:                      "Kubelet enabled, Translate enabled, Node no websocket",
-			store:                     &fakePodGetter{pod: testPod},
-			nodeFeatures:              []string{},
-			enableWebSocketsKubelet:   true,
-			enableTranslateWebSockets: true,
-			expectProxy:               false,
-			expectedProxyType:         "translated_at_apiserver",
-		},
-		// Scenario 6: Pod getter returns error; Connect must propagate it.
+		// Scenario 3: Pod getter returns error; Connect must propagate it.
 		{
 			name:      "pod getter error",
 			store:     &fakePodGetter{err: fmt.Errorf("pod not found")},
 			expectErr: true,
 		},
-		// Scenario 7: ConnectionInfo getter returns error; Connect must propagate it.
+		// Scenario 4: ConnectionInfo getter returns error; Connect must propagate it.
 		{
 			name:        "connection info getter error",
 			store:       &fakePodGetter{pod: testPod},
@@ -214,8 +175,6 @@ func TestExecRESTConnect(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			proxymetrics.ResetForTest()
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExtendWebSocketsToKubelet, tt.enableWebSocketsKubelet)
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TranslateStreamCloseWebsocketRequests, tt.enableTranslateWebSockets)
 
 			info := &genericapirequest.RequestInfo{Verb: "create", Name: "test-pod", Namespace: "default"}
 			ctx := genericapirequest.WithRequestInfo(context.Background(), info)
@@ -281,76 +240,39 @@ func TestAttachRESTConnect(t *testing.T) {
 	}
 
 	tests := []struct {
-		name                      string
-		store                     pod.ResourceGetter
-		kubeletConn               client.ConnectionInfoGetter
-		nodeFeatures              []string
-		enableWebSocketsKubelet   bool
-		enableTranslateWebSockets bool
-		expectProxy               bool
-		expectErr                 bool
-		expectedProxyType         string // empty means no metric expected
+		name              string
+		store             pod.ResourceGetter
+		kubeletConn       client.ConnectionInfoGetter
+		nodeFeatures      []string
+		expectProxy       bool
+		expectErr         bool
+		expectedProxyType string // empty means no metric expected
 	}{
-		// Scenario 1: Both feature gates disabled, node does not support websockets.
-		// Expect UpgradeAwareHandler as no translation or extension is active.
+		// Scenario 1: node supports websockets. Expect UpgradeAwareHandler, which proxies the
+		// WebSocket upgrade through to the kubelet.
 		{
-			name:                      "Kubelet disabled, Translate disabled, Node no websocket",
-			store:                     &fakePodGetter{pod: testPod},
-			nodeFeatures:              []string{},
-			enableWebSocketsKubelet:   false,
-			enableTranslateWebSockets: false,
-			expectProxy:               true,
+			name:              "Node with websocket",
+			store:             &fakePodGetter{pod: testPod},
+			nodeFeatures:      []string{string(features.ExtendWebSocketsToKubelet)},
+			expectProxy:       true,
+			expectedProxyType: "proxied_to_kubelet",
 		},
-		// Scenario 2: ExtendWebSocketsToKubelet enabled, TranslateStreamCloseWebsocketRequests disabled,
-		// node supports websockets. Expect UpgradeAwareHandler as translation is disabled.
+		// Scenario 2: node does not support websockets. Expect translatingHandler, which translates
+		// WebSocket to SPDY at the API server.
 		{
-			name:                      "Kubelet enabled, Translate disabled, Node with websocket",
-			store:                     &fakePodGetter{pod: testPod},
-			nodeFeatures:              []string{string(features.ExtendWebSocketsToKubelet)},
-			enableWebSocketsKubelet:   true,
-			enableTranslateWebSockets: false,
-			expectProxy:               true,
+			name:              "Node no websocket",
+			store:             &fakePodGetter{pod: testPod},
+			nodeFeatures:      []string{},
+			expectProxy:       false,
+			expectedProxyType: "translated_at_apiserver",
 		},
-		// Scenario 3: ExtendWebSocketsToKubelet disabled, TranslateStreamCloseWebsocketRequests enabled,
-		// node does not support websockets. Expect translatingHandler as translation is active but extension is not.
-		{
-			name:                      "Kubelet disabled, Translate enabled, Node no websocket",
-			store:                     &fakePodGetter{pod: testPod},
-			nodeFeatures:              []string{},
-			enableWebSocketsKubelet:   false,
-			enableTranslateWebSockets: true,
-			expectProxy:               false,
-			expectedProxyType:         "translated_at_apiserver",
-		},
-		// Scenario 4: ExtendWebSocketsToKubelet enabled, TranslateStreamCloseWebsocketRequests enabled,
-		// node supports websockets. Expect UpgradeAwareHandler as extension is active and node supports it.
-		{
-			name:                      "Kubelet enabled, Translate enabled, Node with websocket",
-			store:                     &fakePodGetter{pod: testPod},
-			nodeFeatures:              []string{string(features.ExtendWebSocketsToKubelet)},
-			enableWebSocketsKubelet:   true,
-			enableTranslateWebSockets: true,
-			expectProxy:               true,
-			expectedProxyType:         "proxied_to_kubelet",
-		},
-		// Scenario 5: ExtendWebSocketsToKubelet enabled, TranslateStreamCloseWebsocketRequests enabled,
-		// node does not support websockets. Expect translatingHandler as extension is active but node does not support it.
-		{
-			name:                      "Kubelet enabled, Translate enabled, Node no websocket",
-			store:                     &fakePodGetter{pod: testPod},
-			nodeFeatures:              []string{},
-			enableWebSocketsKubelet:   true,
-			enableTranslateWebSockets: true,
-			expectProxy:               false,
-			expectedProxyType:         "translated_at_apiserver",
-		},
-		// Scenario 6: Pod getter returns error; Connect must propagate it.
+		// Scenario 3: Pod getter returns error; Connect must propagate it.
 		{
 			name:      "pod getter error",
 			store:     &fakePodGetter{err: fmt.Errorf("pod not found")},
 			expectErr: true,
 		},
-		// Scenario 7: ConnectionInfo getter returns error; Connect must propagate it.
+		// Scenario 4: ConnectionInfo getter returns error; Connect must propagate it.
 		{
 			name:        "connection info getter error",
 			store:       &fakePodGetter{pod: testPod},
@@ -363,8 +285,6 @@ func TestAttachRESTConnect(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			proxymetrics.ResetForTest()
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExtendWebSocketsToKubelet, tt.enableWebSocketsKubelet)
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TranslateStreamCloseWebsocketRequests, tt.enableTranslateWebSockets)
 
 			info := &genericapirequest.RequestInfo{Verb: "create", Name: "test-pod", Namespace: "default"}
 			ctx := genericapirequest.WithRequestInfo(context.Background(), info)
@@ -430,76 +350,39 @@ func TestPortForwardRESTConnect(t *testing.T) {
 	}
 
 	tests := []struct {
-		name                    string
-		store                   pod.ResourceGetter
-		kubeletConn             client.ConnectionInfoGetter
-		nodeFeatures            []string
-		enableWebSocketsKubelet bool
-		enablePortForward       bool
-		expectProxy             bool
-		expectErr               bool
-		expectedProxyType       string // empty means no metric expected
+		name              string
+		store             pod.ResourceGetter
+		kubeletConn       client.ConnectionInfoGetter
+		nodeFeatures      []string
+		expectProxy       bool
+		expectErr         bool
+		expectedProxyType string // empty means no metric expected
 	}{
-		// Scenario 1: Both feature gates disabled, node does not support websockets.
-		// Expect UpgradeAwareHandler as no tunneling or extension is active.
+		// Scenario 1: node supports websockets. Expect UpgradeAwareHandler, which proxies the
+		// WebSocket upgrade through to the kubelet.
 		{
-			name:                    "Kubelet disabled, PortForward disabled, Node no websocket",
-			store:                   &fakePodGetter{pod: testPod},
-			nodeFeatures:            []string{},
-			enableWebSocketsKubelet: false,
-			enablePortForward:       false,
-			expectProxy:             true,
+			name:              "Node with websocket",
+			store:             &fakePodGetter{pod: testPod},
+			nodeFeatures:      []string{string(features.ExtendWebSocketsToKubelet)},
+			expectProxy:       true,
+			expectedProxyType: "proxied_to_kubelet",
 		},
-		// Scenario 2: ExtendWebSocketsToKubelet enabled, PortForwardWebsockets disabled,
-		// node supports websockets. Expect UpgradeAwareHandler as tunneling is disabled.
+		// Scenario 2: node does not support websockets. Expect translatingHandler, which tunnels
+		// WebSocket to SPDY at the API server.
 		{
-			name:                    "Kubelet enabled, PortForward disabled, Node with websocket",
-			store:                   &fakePodGetter{pod: testPod},
-			nodeFeatures:            []string{string(features.ExtendWebSocketsToKubelet)},
-			enableWebSocketsKubelet: true,
-			enablePortForward:       false,
-			expectProxy:             true,
+			name:              "Node no websocket",
+			store:             &fakePodGetter{pod: testPod},
+			nodeFeatures:      []string{},
+			expectProxy:       false,
+			expectedProxyType: "translated_at_apiserver",
 		},
-		// Scenario 3: ExtendWebSocketsToKubelet disabled, PortForwardWebsockets enabled,
-		// node does not support websockets. Expect translatingHandler as tunneling is active but extension is not.
-		{
-			name:                    "Kubelet disabled, PortForward enabled, Node no websocket",
-			store:                   &fakePodGetter{pod: testPod},
-			nodeFeatures:            []string{},
-			enableWebSocketsKubelet: false,
-			enablePortForward:       true,
-			expectProxy:             false,
-			expectedProxyType:       "translated_at_apiserver",
-		},
-		// Scenario 4: ExtendWebSocketsToKubelet enabled, PortForwardWebsockets enabled,
-		// node supports websockets. Expect UpgradeAwareHandler as extension is active and node supports it.
-		{
-			name:                    "Kubelet enabled, PortForward enabled, Node with websocket",
-			store:                   &fakePodGetter{pod: testPod},
-			nodeFeatures:            []string{string(features.ExtendWebSocketsToKubelet)},
-			enableWebSocketsKubelet: true,
-			enablePortForward:       true,
-			expectProxy:             true,
-			expectedProxyType:       "proxied_to_kubelet",
-		},
-		// Scenario 5: ExtendWebSocketsToKubelet enabled, PortForwardWebsockets enabled,
-		// node does not support websockets. Expect translatingHandler as extension is active but node does not support it.
-		{
-			name:                    "Kubelet enabled, PortForward enabled, Node no websocket",
-			store:                   &fakePodGetter{pod: testPod},
-			nodeFeatures:            []string{},
-			enableWebSocketsKubelet: true,
-			enablePortForward:       true,
-			expectProxy:             false,
-			expectedProxyType:       "translated_at_apiserver",
-		},
-		// Scenario 6: Pod getter returns error; Connect must propagate it.
+		// Scenario 3: Pod getter returns error; Connect must propagate it.
 		{
 			name:      "pod getter error",
 			store:     &fakePodGetter{err: fmt.Errorf("pod not found")},
 			expectErr: true,
 		},
-		// Scenario 7: ConnectionInfo getter returns error; Connect must propagate it.
+		// Scenario 4: ConnectionInfo getter returns error; Connect must propagate it.
 		{
 			name:        "connection info getter error",
 			store:       &fakePodGetter{pod: testPod},
@@ -512,8 +395,6 @@ func TestPortForwardRESTConnect(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			proxymetrics.ResetForTest()
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExtendWebSocketsToKubelet, tt.enableWebSocketsKubelet)
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PortForwardWebsockets, tt.enablePortForward)
 
 			info := &genericapirequest.RequestInfo{Verb: "create", Name: "test-pod", Namespace: "default"}
 			ctx := genericapirequest.WithRequestInfo(context.Background(), info)
