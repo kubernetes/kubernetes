@@ -17,6 +17,7 @@ limitations under the License.
 package csistoragecapacity
 
 import (
+	"strings"
 	"testing"
 
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -68,6 +69,82 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 			}),
 			expectedErrs: field.ErrorList{
 				field.Required(field.NewPath("storageClassName"), "").MarkAlpha(),
+			},
+		},
+		"storageClassName label format": {
+			input: mkCSIStorageCapacity(func(obj *storage.CSIStorageCapacity) {
+				obj.StorageClassName = "this-is-a-label"
+			}),
+		},
+		"storageClassName subdomain format": {
+			input: mkCSIStorageCapacity(func(obj *storage.CSIStorageCapacity) {
+				obj.StorageClassName = "this.is.a.subdomain"
+			}),
+		},
+		"storageClassName invalid label format": {
+			input: mkCSIStorageCapacity(func(obj *storage.CSIStorageCapacity) {
+				obj.StorageClassName = "-this-is-not-a-label"
+			}),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("storageClassName"), nil, "").WithOrigin("format=k8s-long-name").MarkAlpha(),
+			},
+		},
+		"storageClassName invalid subdomain format": {
+			input: mkCSIStorageCapacity(func(obj *storage.CSIStorageCapacity) {
+				obj.StorageClassName = ".this.is.not.a.subdomain"
+			}),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("storageClassName"), nil, "").WithOrigin("format=k8s-long-name").MarkAlpha(),
+			},
+		},
+		"storageClassName label format with trailing dash": {
+			input: mkCSIStorageCapacity(func(obj *storage.CSIStorageCapacity) {
+				obj.StorageClassName = "this-is-a-label-"
+			}),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("storageClassName"), nil, "").WithOrigin("format=k8s-long-name").MarkAlpha(),
+			},
+		},
+		"storageClassName subdomain format with trailing dash": {
+			input: mkCSIStorageCapacity(func(obj *storage.CSIStorageCapacity) {
+				obj.StorageClassName = "this.is.a.subdomain-"
+			}),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("storageClassName"), nil, "").WithOrigin("format=k8s-long-name").MarkAlpha(),
+			},
+		},
+		"storageClassName uppercase": {
+			input: mkCSIStorageCapacity(func(obj *storage.CSIStorageCapacity) {
+				obj.StorageClassName = "Foo"
+			}),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("storageClassName"), nil, "").WithOrigin("format=k8s-long-name").MarkAlpha(),
+			},
+		},
+		"storageClassName long label format": {
+			input: mkCSIStorageCapacity(func(obj *storage.CSIStorageCapacity) {
+				obj.StorageClassName = strings.Repeat("x", 253)
+			}),
+		},
+		"storageClassName long subdomain format": {
+			input: mkCSIStorageCapacity(func(obj *storage.CSIStorageCapacity) {
+				obj.StorageClassName = strings.Repeat("x.", 126) + "x"
+			}),
+		},
+		"storageClassName too long label format": {
+			input: mkCSIStorageCapacity(func(obj *storage.CSIStorageCapacity) {
+				obj.StorageClassName = strings.Repeat("x", 254)
+			}),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("storageClassName"), nil, "").WithOrigin("format=k8s-long-name").MarkAlpha(),
+			},
+		},
+		"storageClassName too long subdomain format": {
+			input: mkCSIStorageCapacity(func(obj *storage.CSIStorageCapacity) {
+				obj.StorageClassName = strings.Repeat("x.", 126) + "xx"
+			}),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("storageClassName"), nil, "").WithOrigin("format=k8s-long-name").MarkAlpha(),
 			},
 		},
 	}

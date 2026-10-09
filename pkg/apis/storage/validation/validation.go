@@ -627,7 +627,7 @@ func ValidateCSIStorageCapacity(capacity *storage.CSIStorageCapacity, opts CSISt
 		allErrs = append(allErrs, field.Required(field.NewPath("storageClassName"), "").MarkCoveredByDeclarative())
 	} else {
 		for _, msg := range apivalidation.ValidateClassName(capacity.StorageClassName, false) {
-			allErrs = append(allErrs, field.Invalid(field.NewPath("storageClassName"), capacity.StorageClassName, msg))
+			allErrs = append(allErrs, field.Invalid(field.NewPath("storageClassName"), capacity.StorageClassName, msg).WithOrigin("format=k8s-long-name").MarkCoveredByDeclarative())
 		}
 	}
 	if capacity.Capacity != nil {

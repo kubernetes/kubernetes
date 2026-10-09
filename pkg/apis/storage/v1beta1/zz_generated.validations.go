@@ -395,6 +395,9 @@ func Validate_CSIStorageCapacity(
 			if earlyReturn {
 				return // do not proceed
 			}
+			if e := validate.LongName(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
+				errs = append(errs, e...)
+			}
 			return
 		}
 		oldVal := safe.Field(oldObj,
