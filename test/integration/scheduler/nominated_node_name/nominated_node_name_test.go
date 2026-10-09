@@ -748,23 +748,26 @@ func TestPodGroupPreemptionAndNominatedNodeNameScenarios(t *testing.T) {
 	// All test cases run on the same node.
 	node := st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "3", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj()
 	for _, asyncPreemptionEnabled := range []bool{true, false} {
-		for _, nnnForExpectationEnabled := range []bool{true, false} {
-			for _, clearNNNAfterBindingEnabled := range []bool{true, false} {
-				for _, test := range tests {
-					t.Run(fmt.Sprintf("%s (AsyncPreemption: %v, NominatedNodeName for expectation: %v, Clearing NNN: %v)", test.name, asyncPreemptionEnabled, nnnForExpectationEnabled, clearNNNAfterBindingEnabled), func(t *testing.T) {
-						featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-							features.GenericWorkload:                       true,
-							features.TopologyAwareWorkloadScheduling:       true,
-							features.PodGroupPreemptionPolicy:              true,
-							features.CompositePodGroup:                     true,
-							features.NominatedNodeNameForExpectation:       nnnForExpectationEnabled,
-							features.ClearingNominatedNodeNameAfterBinding: clearNNNAfterBindingEnabled,
-							features.SchedulerAsyncPreemption:              asyncPreemptionEnabled,
+		for _, asyncAPICallsEnabled := range []bool{true, false} {
+			for _, nnnForExpectationEnabled := range []bool{true, false} {
+				for _, clearNNNAfterBindingEnabled := range []bool{true, false} {
+					for _, test := range tests {
+						t.Run(fmt.Sprintf("%s (AsyncPreemption: %v, AsyncAPICalls: %v, NNN for expectation: %v, Clearing NNN: %v)", test.name, asyncPreemptionEnabled, asyncAPICallsEnabled, nnnForExpectationEnabled, clearNNNAfterBindingEnabled), func(t *testing.T) {
+							featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+								features.GenericWorkload:                       true,
+								features.TopologyAwareWorkloadScheduling:       true,
+								features.PodGroupPreemptionPolicy:              true,
+								features.CompositePodGroup:                     true,
+								features.NominatedNodeNameForExpectation:       nnnForExpectationEnabled,
+								features.ClearingNominatedNodeNameAfterBinding: clearNNNAfterBindingEnabled,
+								features.SchedulerAsyncPreemption:              asyncPreemptionEnabled,
+								features.SchedulerAsyncAPICalls:                asyncAPICallsEnabled,
+							})
+							// Set PodMaxBackoff to 1 second to turn on backoff and allow apiCacher to get information about
+							// pod NNN. Without this we might have a race between starting binding and update of apiCacher.
+							runScenarios(t, test.scenarios, node, 1 /* enable backoff */)
 						})
-						// Set PodMaxBackoff to 1 second to turn on backoff and allow apiCacher to get information about
-						// pod NNN. Without this we might have a race between starting binding and update of apiCacher.
-						runScenarios(t, test.scenarios, node, 1 /* enable backoff */)
-					})
+					}
 				}
 			}
 		}
