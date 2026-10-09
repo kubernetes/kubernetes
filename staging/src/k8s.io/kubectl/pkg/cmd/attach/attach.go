@@ -251,21 +251,17 @@ func createExecutor(url *url.URL, config *restclient.Config) (remotecommand.Exec
 	if err != nil {
 		return nil, err
 	}
-	// Fallback executor is default, unless feature flag is explicitly disabled.
-	if !cmdutil.RemoteCommandWebsockets.IsDisabled() {
-		// WebSocketExecutor must be "GET" method as described in RFC 6455 Sec. 4.1 (page 17).
-		websocketExec, err := remotecommand.NewWebSocketExecutor(config, "GET", url.String())
-		if err != nil {
-			return nil, err
-		}
-		exec, err = remotecommand.NewFallbackExecutor(websocketExec, exec, func(err error) bool {
-			return httpstream.IsUpgradeFailure(err) || httpstream.IsHTTPSProxyError(err)
-		})
-		if err != nil {
-			return nil, err
-		}
+	// WebSockets is always attempted first, falling back to SPDY; the
+	// environment variable that used to disable it has no effect.
+	cmdutil.RemoteCommandWebsockets.WarnIfSet()
+	// WebSocketExecutor must be "GET" method as described in RFC 6455 Sec. 4.1 (page 17).
+	websocketExec, err := remotecommand.NewWebSocketExecutor(config, "GET", url.String())
+	if err != nil {
+		return nil, err
 	}
-	return exec, nil
+	return remotecommand.NewFallbackExecutor(websocketExec, exec, func(err error) bool {
+		return httpstream.IsUpgradeFailure(err) || httpstream.IsHTTPSProxyError(err)
+	})
 }
 
 // Validate checks that the provided attach options are specified.

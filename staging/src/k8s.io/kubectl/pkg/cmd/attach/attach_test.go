@@ -594,13 +594,13 @@ func TestCreateExecutor(t *testing.T) {
 	if _, isFallback := executor.(*remotecommand.FallbackExecutor); !isFallback {
 		t.Errorf("expected fallback executor, got %#v", executor)
 	}
-	// Finally, check explicit disabling does NOT create the fallback executor.
+	// Finally, check the deprecated disable value is ignored: still the fallback executor.
 	t.Setenv(string(cmdutil.RemoteCommandWebsockets), "false")
 	executor, err = createExecutor(url, config)
 	if err != nil {
 		t.Fatalf("unable to create executor: %v", err)
 	}
-	if _, isFallback := executor.(*remotecommand.FallbackExecutor); isFallback {
+	if _, isFallback := executor.(*remotecommand.FallbackExecutor); !isFallback {
 		t.Errorf("expected fallback executor, got %#v", executor)
 	}
 }

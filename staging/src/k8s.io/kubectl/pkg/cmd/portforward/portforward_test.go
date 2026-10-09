@@ -1028,13 +1028,13 @@ func TestCreateDialer(t *testing.T) {
 	if _, isFallback := dialer.(*portforward.StreamingFallbackDialer); !isFallback {
 		t.Errorf("expected fallback dialer, got %#v", dialer)
 	}
-	// Finally, check explicit disabling does NOT create the fallback dialer.
+	// Finally, check the deprecated disable value is ignored: still the fallback dialer.
 	t.Setenv(string(cmdutil.PortForwardWebsockets), "false")
 	dialer, err = createDialer("GET", url, opts)
 	if err != nil {
 		t.Fatalf("unable to create dialer: %v", err)
 	}
-	if _, isFallback := dialer.(*portforward.StreamingFallbackDialer); isFallback {
+	if _, isFallback := dialer.(*portforward.StreamingFallbackDialer); !isFallback {
 		t.Errorf("expected fallback dialer, got %#v", dialer)
 	}
 }
