@@ -20,7 +20,9 @@ import (
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	storage "k8s.io/kubernetes/pkg/apis/storage"
 	registry "k8s.io/kubernetes/pkg/registry/storage/csistoragecapacity"
 	"k8s.io/kubernetes/test/declarative_validation/meta"
@@ -51,6 +53,28 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 		IsResourceRequest: true,
 		Verb:              "create",
 	}), metav1.NamespaceDefault)
+
+	testCases := map[string]struct {
+		input        storage.CSIStorageCapacity
+		expectedErrs field.ErrorList
+	}{
+		"valid": {
+			input: mkCSIStorageCapacity(),
+		},
+		"storageClassName missing": {
+			input: mkCSIStorageCapacity(func(obj *storage.CSIStorageCapacity) {
+				obj.StorageClassName = ""
+			}),
+			expectedErrs: field.ErrorList{
+				field.Required(field.NewPath("storageClassName"), "").MarkAlpha(),
+			},
+		},
+	}
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			apitesting.VerifyValidationEquivalence(t, ctx, &tc.input, registry.Strategy, tc.expectedErrs)
+		})
+	}
 
 	obj := mkCSIStorageCapacity()
 	meta.RunObjectMetaTestCases(t, ctx, &obj, registry.Strategy, meta.WithStringentFinalizerValidation())
