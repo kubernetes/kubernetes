@@ -25,7 +25,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/sharding"
-	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 )
@@ -174,11 +173,6 @@ func (s *SelectionPredicate) MatcherIndex(ctx context.Context) []MatchValue {
 	for _, field := range s.IndexFields {
 		if value, ok := s.Field.RequiresExactMatch(field); ok {
 			result = append(result, MatchValue{IndexName: FieldIndex(field), Value: value})
-		} else if field == "metadata.namespace" {
-			// list pods in the namespace. i.e. /api/v1/namespaces/default/pods
-			if namespace, isNamespaceScope := isNamespaceScopedRequest(ctx); isNamespaceScope {
-				result = append(result, MatchValue{IndexName: FieldIndex(field), Value: namespace})
-			}
 		}
 	}
 	for _, label := range s.IndexLabels {
@@ -211,14 +205,6 @@ func (s *SelectionPredicate) SetShardInfoOnList(listObj runtime.Object) {
 			setter.SetShardInfo(&metav1.ShardInfo{Selector: s.ShardSelector.String()})
 		}
 	}
-}
-
-func isNamespaceScopedRequest(ctx context.Context) (string, bool) {
-	re, _ := request.RequestInfoFrom(ctx)
-	if re == nil || len(re.Namespace) == 0 {
-		return "", false
-	}
-	return re.Namespace, true
 }
 
 // LabelIndex add prefix for label index.
