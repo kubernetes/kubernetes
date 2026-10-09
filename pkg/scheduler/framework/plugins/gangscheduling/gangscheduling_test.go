@@ -1239,7 +1239,7 @@ func TestPlacementFeasible(t *testing.T) {
 		childrenCount         int
 		unscheduledPods       []*v1.Pod
 		podStatuses           []fwk.Code
-		expectedStatuses      []fwk.Code
+		wantCodes             []fwk.Code
 		initialScheduledCount int
 	}{
 		{
@@ -1248,7 +1248,7 @@ func TestPlacementFeasible(t *testing.T) {
 			childrenCount:         2,
 			unscheduledPods:       []*v1.Pod{st.MakePod().Name("p1").Obj(), st.MakePod().Name("p2").Obj()},
 			podStatuses:           []fwk.Code{fwk.Success, fwk.Success},
-			expectedStatuses:      []fwk.Code{fwk.Wait, fwk.Success},
+			wantCodes:             []fwk.Code{fwk.Wait, fwk.Success},
 			initialScheduledCount: 0,
 		},
 		{
@@ -1257,7 +1257,7 @@ func TestPlacementFeasible(t *testing.T) {
 			childrenCount:         3,
 			unscheduledPods:       []*v1.Pod{st.MakePod().Name("p1").Obj(), st.MakePod().Name("p2").Obj(), st.MakePod().Name("p3").Obj()},
 			podStatuses:           []fwk.Code{fwk.Unschedulable},
-			expectedStatuses:      []fwk.Code{fwk.Unschedulable},
+			wantCodes:             []fwk.Code{fwk.Unschedulable},
 			initialScheduledCount: 0,
 		},
 		{
@@ -1266,7 +1266,7 @@ func TestPlacementFeasible(t *testing.T) {
 			childrenCount:         2,
 			unscheduledPods:       []*v1.Pod{st.MakePod().Name("p1").Obj(), st.MakePod().Name("p2").Obj()},
 			podStatuses:           []fwk.Code{fwk.Success, fwk.Unschedulable},
-			expectedStatuses:      []fwk.Code{fwk.Wait, fwk.Unschedulable},
+			wantCodes:             []fwk.Code{fwk.Wait, fwk.Unschedulable},
 			initialScheduledCount: 0,
 		},
 		{
@@ -1275,7 +1275,7 @@ func TestPlacementFeasible(t *testing.T) {
 			childrenCount:         1,
 			unscheduledPods:       []*v1.Pod{st.MakePod().Name("p1").Obj()},
 			podStatuses:           []fwk.Code{fwk.Unschedulable},
-			expectedStatuses:      []fwk.Code{fwk.Unschedulable},
+			wantCodes:             []fwk.Code{fwk.Unschedulable},
 			initialScheduledCount: 0,
 		},
 		{
@@ -1284,7 +1284,7 @@ func TestPlacementFeasible(t *testing.T) {
 			childrenCount:         1,
 			unscheduledPods:       []*v1.Pod{st.MakePod().Name("p1").Obj()},
 			podStatuses:           []fwk.Code{fwk.Success},
-			expectedStatuses:      []fwk.Code{fwk.Success},
+			wantCodes:             []fwk.Code{fwk.Success},
 			initialScheduledCount: 0,
 		},
 		{
@@ -1293,7 +1293,7 @@ func TestPlacementFeasible(t *testing.T) {
 			childrenCount:         1,
 			unscheduledPods:       []*v1.Pod{st.MakePod().Name("p1").Obj()},
 			podStatuses:           []fwk.Code{fwk.Unschedulable},
-			expectedStatuses:      []fwk.Code{fwk.Success},
+			wantCodes:             []fwk.Code{fwk.Success},
 			initialScheduledCount: 1,
 		},
 		{
@@ -1302,7 +1302,7 @@ func TestPlacementFeasible(t *testing.T) {
 			childrenCount:         3,
 			unscheduledPods:       []*v1.Pod{st.MakePod().Name("p1").Obj(), st.MakePod().Name("p2").Obj(), st.MakePod().Name("p3").Obj()},
 			podStatuses:           []fwk.Code{fwk.Success, fwk.Success, fwk.Success},
-			expectedStatuses:      []fwk.Code{fwk.Wait, fwk.Success, fwk.Success},
+			wantCodes:             []fwk.Code{fwk.Wait, fwk.Success, fwk.Success},
 			initialScheduledCount: 0,
 		},
 		{
@@ -1311,7 +1311,7 @@ func TestPlacementFeasible(t *testing.T) {
 			childrenCount:         3,
 			unscheduledPods:       []*v1.Pod{st.MakePod().Name("p1").Obj(), st.MakePod().Name("p2").Obj(), st.MakePod().Name("p3").Obj()},
 			podStatuses:           []fwk.Code{fwk.Unschedulable, fwk.Success, fwk.Success},
-			expectedStatuses:      []fwk.Code{fwk.Wait, fwk.Wait, fwk.Success},
+			wantCodes:             []fwk.Code{fwk.Wait, fwk.Wait, fwk.Success},
 			initialScheduledCount: 0,
 		},
 		{
@@ -1320,7 +1320,7 @@ func TestPlacementFeasible(t *testing.T) {
 			childrenCount:         3,
 			unscheduledPods:       []*v1.Pod{st.MakePod().Name("p1").Obj(), st.MakePod().Name("p2").Obj(), st.MakePod().Name("p3").Obj()},
 			podStatuses:           []fwk.Code{fwk.Unschedulable, fwk.Unschedulable},
-			expectedStatuses:      []fwk.Code{fwk.Wait, fwk.Unschedulable},
+			wantCodes:             []fwk.Code{fwk.Wait, fwk.Unschedulable},
 			initialScheduledCount: 0,
 		},
 		{
@@ -1329,7 +1329,7 @@ func TestPlacementFeasible(t *testing.T) {
 			childrenCount:         2,
 			unscheduledPods:       []*v1.Pod{st.MakePod().Name("p1").Obj(), st.MakePod().Name("p2").Obj()},
 			podStatuses:           []fwk.Code{fwk.Success, fwk.Success},
-			expectedStatuses:      []fwk.Code{fwk.Wait, fwk.Success},
+			wantCodes:             []fwk.Code{fwk.Wait, fwk.Success},
 			initialScheduledCount: 1,
 		},
 		{
@@ -1338,7 +1338,7 @@ func TestPlacementFeasible(t *testing.T) {
 			childrenCount:         1,
 			unscheduledPods:       []*v1.Pod{st.MakePod().Name("p1").Obj()},
 			podStatuses:           []fwk.Code{fwk.Unschedulable},
-			expectedStatuses:      []fwk.Code{fwk.Success},
+			wantCodes:             []fwk.Code{fwk.Success},
 			initialScheduledCount: 2,
 		},
 		{
@@ -1347,7 +1347,7 @@ func TestPlacementFeasible(t *testing.T) {
 			childrenCount:         2,
 			unscheduledPods:       []*v1.Pod{st.MakePod().Name("p1").Obj(), st.MakePod().Name("p2").Obj()},
 			podStatuses:           []fwk.Code{fwk.Unschedulable},
-			expectedStatuses:      []fwk.Code{fwk.Unschedulable},
+			wantCodes:             []fwk.Code{fwk.Unschedulable},
 			initialScheduledCount: 1,
 		},
 		{
@@ -1356,7 +1356,7 @@ func TestPlacementFeasible(t *testing.T) {
 			childrenCount:         2,
 			unscheduledPods:       []*v1.Pod{st.MakePod().Name("p1").Obj(), st.MakePod().Name("p2").Obj()},
 			podStatuses:           []fwk.Code{fwk.Success},
-			expectedStatuses:      []fwk.Code{fwk.Unschedulable},
+			wantCodes:             []fwk.Code{fwk.Unschedulable},
 			initialScheduledCount: 1,
 		},
 	}
@@ -1386,23 +1386,23 @@ func TestPlacementFeasible(t *testing.T) {
 					var objs []runtime.Object
 
 					if isCPG {
-						cpg := st.MakeCompositePodGroup().Namespace(namespace).Name(pgName).Obj()
+						cpg := st.MakeCompositePodGroup().Namespace(namespace).Name(pgName)
 						if tc.minCount > 0 {
-							cpg.Spec.SchedulingPolicy.Gang = &schedulingv1alpha3.CompositeGangSchedulingPolicy{MinGroupCount: tc.minCount}
+							cpg.MinGroupCount(tc.minCount)
 						} else {
-							cpg.Spec.SchedulingPolicy.Basic = &schedulingv1alpha3.CompositeBasicSchedulingPolicy{}
+							cpg.BasicPolicy()
 						}
-						pgInfo.GenericPodGroup = fwk.NewGenericCompositePodGroup(cpg)
-						objs = append(objs, cpg)
+						pgInfo.GenericPodGroup = fwk.NewGenericCompositePodGroup(cpg.Obj())
+						objs = append(objs, cpg.Obj())
 					} else {
-						pg := st.MakePodGroup().Namespace(namespace).Name(pgName).ParentCompositePodGroup("cpg-root").Obj()
+						pg := st.MakePodGroup().Namespace(namespace).Name(pgName).ParentCompositePodGroup("cpg-root")
 						if tc.minCount > 0 {
-							pg.Spec.SchedulingPolicy.Gang = &schedulingv1beta1.GangSchedulingPolicy{MinCount: tc.minCount}
+							pg.MinCount(tc.minCount)
 						} else {
-							pg.Spec.SchedulingPolicy.Basic = &schedulingv1beta1.BasicSchedulingPolicy{}
+							pg.BasicPolicy()
 						}
-						pgInfo.GenericPodGroup = fwk.NewGenericPodGroup(pg)
-						objs = append(objs, pg)
+						pgInfo.GenericPodGroup = fwk.NewGenericPodGroup(pg.Obj())
+						objs = append(objs, pg.Obj())
 					}
 
 					informerFactory := informers.NewSharedInformerFactory(fake.NewClientset(objs...), 0)
@@ -1448,8 +1448,8 @@ func TestPlacementFeasible(t *testing.T) {
 						}
 						gotStatus := pl.PlacementFeasible(ctx, cycleState, pgInfo, args)
 
-						if gotCode := gotStatus.Code(); gotCode != tc.expectedStatuses[i] {
-							t.Errorf("Step %d: expected status %v, got %v", i, tc.expectedStatuses[i], gotCode)
+						if gotCode := gotStatus.Code(); gotCode != tc.wantCodes[i] {
+							t.Errorf("Step %d: expected status code %v, got %v", i, tc.wantCodes[i], gotCode)
 						}
 					}
 				})

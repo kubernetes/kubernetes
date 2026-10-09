@@ -609,7 +609,7 @@ func completePodGroupAlgorithmResult(ctx context.Context, queuedPodInfos []*fram
 // It ensures that every pod in every subgroup has a fully populated status and that failure statuses
 // are propagated down the tree before finalizing the cycle.
 func completeCompositePodGroupAlgorithmResult(ctx context.Context, rootPodGroupInfo *framework.QueuedPodGroupInfo, rootCycleState *framework.CycleState, pgResults map[fwk.EntityKey]*podGroupAlgorithmResult) map[fwk.EntityKey]*podGroupAlgorithmResult {
-	completeCompositePodGroupAlgorithmResultMap(ctx, rootPodGroupInfo.PodGroupInfo, pgResults, &podGroupAlgorithmResult{})
+	completeCompositePodGroupAlgorithmResultMap(rootPodGroupInfo.PodGroupInfo, pgResults, nil)
 	for pgKey, queuedPodInfos := range rootPodGroupInfo.ForEachGroupAndPodInfos() {
 		pgResult := pgResults[pgKey]
 		// Ensure podResults has an entry for each pod in the pod group with a status.
@@ -618,33 +618,62 @@ func completeCompositePodGroupAlgorithmResult(ctx context.Context, rootPodGroupI
 	return pgResults
 }
 
-// completeCompositePodGroupAlgorithmResultMap propagates scheduling failures from parents to children.
-// This is necessary because child pod groups cannot be committed or bound if their parent composite
-// pod group fails to meet its scheduling requirements.
-func completeCompositePodGroupAlgorithmResultMap(ctx context.Context, podGroupInfo *framework.PodGroupInfo, pgResults map[fwk.EntityKey]*podGroupAlgorithmResult, parentResult *podGroupAlgorithmResult) {
+// completeCompositePodGroupAlgorithmResultMap propagates scheduling failures down the hierarchy.
+// If an ancestor composite pod group fails to meet its requirements, any child groups
+// that were schedulable on their own must be marked unschedulable with context identifying
+// the failed ancestor. Subgroups that were skipped or not evaluated are populated with the
+// failed ancestor's status. Subgroups that failed directly on their own retain their original
+// specific failure reasons.
+func completeCompositePodGroupAlgorithmResultMap(
+	podGroupInfo *framework.PodGroupInfo,
+	pgResults map[fwk.EntityKey]*podGroupAlgorithmResult,
+	failedAncestor *podGroupAlgorithmResult,
+) {
 	key := podGroupInfo.GetKey()
-	result, ok := pgResults[key]
-	if !ok {
-		// In case the pod group wasn't processed, create the result and set its status to parent.
+	result, exists := pgResults[key]
+	wasSuccess := exists && result.status.IsSuccess()
+	hadError := exists && result.status.IsError()
+
+	if !exists {
 		result = &podGroupAlgorithmResult{
 			podGroupInfo: podGroupInfo,
-			status:       parentResult.status.Clone(),
 		}
 		pgResults[key] = result
-	} else if !parentResult.status.IsSuccess() && result.status.IsSuccess() {
-		// When a parent composite pod group fails, any child that previously succeeded during its own evaluation
-		// must be invalidated with the parent's failure status to prevent its pods from proceeding to binding.
-		// Preserve the old result, but just overwrite the status.
-		result.status = parentResult.status.Clone()
-	} else if parentResult.status.IsError() && !result.status.IsError() {
-		// In case of an error, overwrite the status with an error.
-		result.status = parentResult.status.Clone()
 	}
+
+	ancestorHadError := failedAncestor != nil && failedAncestor.status.IsError()
+	if failedAncestor != nil && (!exists || wasSuccess || (ancestorHadError && !hadError)) {
+		// We have to consider three cases for forwarding ancestor's status:
+		// 1. If the group was not processed.
+		// 2. If the group was initially successfully scheduled.
+		// 3. If the ancestor had fatal error while the group did not.
+		result.status = buildAncestorFailureStatus(failedAncestor)
+	} else if exists && !wasSuccess {
+		// Propagate the nearest failed ancestor; succeeded groups pass through upstream failures.
+		failedAncestor = result
+	}
+
 	if podGroupInfo.CompositePodGroup != nil {
 		for _, child := range podGroupInfo.GetChildGroups() {
-			completeCompositePodGroupAlgorithmResultMap(ctx, child, pgResults, result)
+			completeCompositePodGroupAlgorithmResultMap(child, pgResults, failedAncestor)
 		}
 	}
+}
+
+// buildAncestorFailureStatus constructs a failure status for a pod group whose ancestor failed.
+func buildAncestorFailureStatus(
+	failedAncestor *podGroupAlgorithmResult,
+) *fwk.Status {
+	ancestorName := failedAncestor.podGroupInfo.GetName()
+	if failedAncestor.status.IsError() {
+		return fwk.AsStatus(fmt.Errorf("ancestor composite pod group %q has an error: %w", ancestorName, failedAncestor.status.AsError()))
+	}
+
+	prefix := fmt.Sprintf("ancestor composite pod group %q is unschedulable: ", ancestorName)
+	msg := prefix + failedAncestor.status.Message()
+	fitError := newPodGroupFitError(fwk.NewStatus(fwk.Unschedulable, msg))
+	fitError.addPluginStatus(failedAncestor.status)
+	return fwk.NewStatus(fwk.Unschedulable).WithError(fitError)
 }
 
 // applyPodGroupPostFilterResult updates the final scheduling results of the pod group hierarchy
@@ -1500,7 +1529,7 @@ func (sched *Scheduler) compositePodGroupSchedulingDefaultAlgorithm(ctx context.
 		if childResult.status.IsError() {
 			return &podGroupAlgorithmResult{
 				podGroupInfo:        podGroupInfo,
-				status:              fwk.AsStatus(fmt.Errorf("composite pod group evaluation failed due to child error: %w", childResult.status.AsError())),
+				status:              fwk.AsStatus(fmt.Errorf("composite pod group %q evaluation failed due to child %q error: %w", podGroupInfo.GetName(), childPGInfo.GetName(), childResult.status.AsError())),
 				placementCycleState: placementCycleState,
 			}, revertFns
 		}

@@ -389,35 +389,20 @@ func (pl *GangScheduling) isPGReady(snapshot fwk.PodGroupManager, namespace, pgN
 // The function will only return success once the gang's MinCount is satisfied or if the pod group is not using gang scheduling policy.
 // In case there are not enough remaining pods to satisfy the gang's MinCount, it returns Unschedulable which will terminate the pod group scheduling cycle early.
 func (pl *GangScheduling) PlacementFeasible(ctx context.Context, placementCycleState fwk.PlacementCycleState, podGroupInfo fwk.PodGroupInfo, args fwk.PlacementProgress) *fwk.Status {
-	minCount := getMinCount(podGroupInfo)
+	minCount := podGroupInfo.GetMinCount()
 	remaining := args.Remaining
 	scheduled := args.Scheduled
 
 	if remaining+scheduled < minCount {
 		// minCount can't be satisfied because there are not enough remaining pods.
-		return fwk.NewStatus(fwk.Unschedulable, fmt.Sprintf("minCount (%d) cannot be satisfied: %d scheduled, %d remaining", minCount, scheduled, remaining))
+		return fwk.NewStatus(fwk.Unschedulable, fmt.Sprintf("scheduling policy's minimum threshold (%d) cannot be satisfied: %d scheduled, %d remaining", minCount, scheduled, remaining))
 	}
 
 	if scheduled < minCount {
 		// minCount might be satisfied once more remaining pods are evaluated.
-		return fwk.NewStatus(fwk.Wait, fmt.Sprintf("minCount (%d) is not yet satisfied: %d scheduled, %d remaining", minCount, scheduled, remaining))
+		return fwk.NewStatus(fwk.Wait, fmt.Sprintf("scheduling policy's minimum threshold (%d) is not yet satisfied: %d scheduled, %d remaining", minCount, scheduled, remaining))
 	}
 
 	// minCount is satisfied.
 	return nil
-}
-
-// getMinCount returns the min count for a pod group or a composite pod group. For basic groups it returns 1.
-func getMinCount(podGroupInfo fwk.PodGroupInfo) int {
-	if podGroupInfo.GetType() == fwk.CompositePodGroupKeyType {
-		if podGroupInfo.GetCompositePodGroup().Spec.SchedulingPolicy.Gang == nil {
-			return 1
-		}
-		return int(podGroupInfo.GetCompositePodGroup().Spec.SchedulingPolicy.Gang.MinGroupCount)
-	}
-	pg := podGroupInfo.GetPodGroup()
-	if pg.Spec.SchedulingPolicy.Gang == nil {
-		return 1
-	}
-	return int(pg.Spec.SchedulingPolicy.Gang.MinCount)
 }
