@@ -369,7 +369,34 @@ func Validate_CSIStorageCapacity(
 		errs = append(errs, fn(fldPath.Child("metadata"), &obj.ObjectMeta, oldVal, oldObj != nil)...)
 	}
 
-	// field storagev1beta1.CSIStorageCapacity.NodeTopology has no validation
+	{ // field storagev1beta1.CSIStorageCapacity.NodeTopology
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *v1.LabelSelector,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if validate.SemanticDeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *storagev1beta1.CSIStorageCapacity) *v1.LabelSelector {
+				return oldObj.NodeTopology
+			})
+		errs = append(errs, fn(fldPath.Child("nodeTopology"), obj.NodeTopology, oldVal, oldObj != nil)...)
+	}
+
 	// field storagev1beta1.CSIStorageCapacity.StorageClassName has no validation
 	// field storagev1beta1.CSIStorageCapacity.Capacity has no validation
 	// field storagev1beta1.CSIStorageCapacity.MaximumVolumeSize has no validation
