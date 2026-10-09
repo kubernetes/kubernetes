@@ -611,7 +611,9 @@ func CheckRequest(quotas []corev1.ResourceQuota, a admission.Attributes, evaluat
 		requestedUsage := quota.Mask(deltaUsage, hardResources)
 		newUsage := quota.Add(resourceQuota.Status.Used, requestedUsage)
 
-		if a.GetSubresource() != "status" {
+		// Status updates generally reflect observed state  and do not enforce hard limits, except pods/status where scheduler patches
+		// extraNodeAllocatableResources and relies on quota admission to reject over-quota allocations.
+		if a.GetSubresource() != "status" || a.GetResource().GroupResource() == corev1.Resource("pods") {
 			maskedNewUsage := quota.Mask(newUsage, quota.ResourceNames(requestedUsage))
 
 			if allowed, exceeded := quota.LessThanOrEqual(maskedNewUsage, resourceQuota.Status.Hard); !allowed {
