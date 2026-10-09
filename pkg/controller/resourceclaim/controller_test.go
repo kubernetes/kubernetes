@@ -1345,6 +1345,95 @@ func testClaimExists(tCtx ktesting.TContext) {
 	}
 }
 
+// TestClaimExistsAfterDelete checks that a claim which was written by the
+// controller and then deleted is not found once the informer has seen the
+// delete. The mutation cache must not keep serving it until the TTL expires.
+func TestClaimExistsAfterDelete(t *testing.T) { testClaimExistsAfterDelete(ktesting.Init(t)) }
+func testClaimExistsAfterDelete(tCtx ktesting.TContext) {
+	fakeKubeClient := createTestClient()
+	informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, controller.NoResyncPeriodFunc())
+	claimInformer := informerFactory.Resource().V1().ResourceClaims()
+	ec, err := newControllerWithFeatures(tCtx.Logger(), fakeKubeClient,
+		informerFactory.Core().V1().Pods(),
+		informerFactory.Scheduling().V1beta1().PodGroups(),
+		claimInformer,
+		informerFactory.Resource().V1().ResourceClaimTemplates(),
+		controllerFeatures{})
+	tCtx.ExpectNoError(err, "creating controller")
+
+	informerFactory.StartWithContext(tCtx)
+	defer func() {
+		tCtx.Cancel("stopping informers")
+		informerFactory.Shutdown()
+	}()
+	informerFactory.WaitForCacheSyncWithContext(tCtx)
+
+	// Same sequence as in createClaim: create, then record the result.
+	claim, err := fakeKubeClient.ResourceV1().ResourceClaims(testNamespace).Create(tCtx, templatedTestClaim, metav1.CreateOptions{})
+	tCtx.ExpectNoError(err, "creating claim")
+	ec.claimCache.Mutation(claim)
+	waitForClaimInInformer(tCtx, claimInformer.Lister(), claim, true)
+
+	tCtx.ExpectNoError(fakeKubeClient.ResourceV1().ResourceClaims(testNamespace).Delete(tCtx, claim.Name, metav1.DeleteOptions{}), "deleting claim")
+	waitForClaimInInformer(tCtx, claimInformer.Lister(), claim, false)
+
+	alwaysOwned := func(*resourceapi.ResourceClaim) bool { return true }
+	exists, err := ec.claimExists(tCtx, testNamespace, claim.Name, alwaysOwned)
+	tCtx.ExpectNoError(err, "checking claim")
+	assert.False(tCtx, exists, "deleted claim should not be found")
+}
+
+// TestSyncRecreatesDeletedClaim checks that a generated claim which gets
+// deleted while the pod still needs it is created again on the next sync.
+func TestSyncRecreatesDeletedClaim(t *testing.T) { testSyncRecreatesDeletedClaim(ktesting.Init(t)) }
+func testSyncRecreatesDeletedClaim(tCtx ktesting.TContext) {
+	fakeKubeClient := createTestClient(testPodWithResource, template)
+	informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, controller.NoResyncPeriodFunc())
+	claimInformer := informerFactory.Resource().V1().ResourceClaims()
+	ec, err := newControllerWithFeatures(tCtx.Logger(), fakeKubeClient,
+		informerFactory.Core().V1().Pods(),
+		informerFactory.Scheduling().V1beta1().PodGroups(),
+		claimInformer,
+		informerFactory.Resource().V1().ResourceClaimTemplates(),
+		controllerFeatures{})
+	tCtx.ExpectNoError(err, "creating controller")
+
+	informerFactory.StartWithContext(tCtx)
+	defer func() {
+		tCtx.Cancel("stopping informers")
+		informerFactory.Shutdown()
+	}()
+	informerFactory.WaitForCacheSyncWithContext(tCtx)
+
+	tCtx.ExpectNoError(ec.syncHandler(tCtx, podKey(testPodWithResource)), "first sync")
+	claims, err := fakeKubeClient.ResourceV1().ResourceClaims(testNamespace).List(tCtx, metav1.ListOptions{})
+	tCtx.ExpectNoError(err, "listing claims")
+	if len(claims.Items) != 1 {
+		tCtx.Fatalf("expected one generated claim after the first sync, got %d", len(claims.Items))
+	}
+	claim := &claims.Items[0]
+	waitForClaimInInformer(tCtx, claimInformer.Lister(), claim, true)
+
+	tCtx.ExpectNoError(fakeKubeClient.ResourceV1().ResourceClaims(testNamespace).Delete(tCtx, claim.Name, metav1.DeleteOptions{}), "deleting claim")
+	waitForClaimInInformer(tCtx, claimInformer.Lister(), claim, false)
+
+	tCtx.ExpectNoError(ec.syncHandler(tCtx, podKey(testPodWithResource)), "second sync")
+	claims, err = fakeKubeClient.ResourceV1().ResourceClaims(testNamespace).List(tCtx, metav1.ListOptions{})
+	tCtx.ExpectNoError(err, "listing claims")
+	assert.Len(tCtx, claims.Items, 1, "deleted claim should have been re-created")
+}
+
+func waitForClaimInInformer(tCtx ktesting.TContext, lister resourcelisters.ResourceClaimLister, claim *resourceapi.ResourceClaim, wantExists bool) {
+	tCtx.Helper()
+	tCtx.Eventually(func(tCtx ktesting.TContext) bool {
+		_, err := lister.ResourceClaims(claim.Namespace).Get(claim.Name)
+		if err != nil && !apierrors.IsNotFound(err) {
+			tCtx.ExpectNoError(err, "getting claim from informer")
+		}
+		return err == nil
+	}).Should(gomega.Equal(wantExists), "claim %s in informer", klog.KObj(claim))
+}
+
 func TestEventHandlers(t *testing.T) { testEventHandlers(ktesting.Init(t)) }
 func testEventHandlers(tCtx ktesting.TContext) {
 	type object interface {

@@ -746,6 +746,17 @@ func (ec *Controller) enqueueResourceClaim(logger klog.Logger, oldObj, newObj an
 	if claim == nil {
 		claim = oldClaim
 	}
+
+	// The mutation cache returns objects that the informer does not have
+	// (IncludeAdds). It has to learn about informer events before any
+	// sync runs, otherwise it keeps returning a deleted claim until the
+	// TTL expires and the controller does not re-create it.
+	if deleted {
+		ec.claimCache.OnDelete(claim)
+	} else {
+		ec.claimCache.OnAddOrUpdate(claim)
+	}
+
 	if !deleted {
 		// When starting up, we have to check all claims to find those with
 		// stale pods in ReservedFor. During an update, a pod might get added
@@ -1398,9 +1409,9 @@ func (ec *Controller) claimExists(ctx context.Context, namespace, claimName stri
 	key := cache.NewObjectName(namespace, claimName)
 
 	// This may incorrectly return a claim from the mutation cache that
-	// was already deleted again on the apiserver. The sync logic for the
-	// mutation cache (checking after TTL for created
-	// claims, reacting to informer events) will detect that eventually.
+	// was already deleted again on the apiserver. Once the informer
+	// observes the delete, enqueueResourceClaim removes it from the
+	// mutation cache.
 	claim, exists, err := ec.claimCache.GetByKey(key.String())
 	if err != nil && !apierrors.IsNotFound(err) {
 		return false, err
