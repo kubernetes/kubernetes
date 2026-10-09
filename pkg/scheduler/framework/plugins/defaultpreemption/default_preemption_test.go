@@ -4212,7 +4212,7 @@ type mockPodGroupEvaluator struct {
 	status *fwk.Status
 }
 
-func (m *mockPodGroupEvaluator) Preempt(ctx context.Context, pgInfo fwk.PodGroupInfo, podGroupSchedulingFunc fwk.PodGroupSchedulingFunc) (*fwk.PodGroupPostFilterResult, *fwk.Status) {
+func (m *mockPodGroupEvaluator) Preempt(ctx context.Context, state fwk.PodGroupCycleState, pgInfo fwk.PodGroupInfo, podGroupSchedulingFunc fwk.PodGroupSchedulingFunc) (*fwk.PodGroupPostFilterResult, *fwk.Status) {
 	return nil, m.status
 }
 
@@ -4690,6 +4690,296 @@ func TestDefaultPreemption_PodGroupPostFilter_CustomPreemptionManager(t *testing
 
 			if diff := cmp.Diff(expectedAssignments, actualAssignments); diff != "" {
 				t.Fatalf("Unexpected assignments (-want, +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+type testPreemptionVictim struct {
+	preemption.Victim
+	pdbViolations int
+}
+
+func (v *testPreemptionVictim) NumPDBViolations() int {
+	return v.pdbViolations
+}
+
+func TestDefaultPreemption_PodGroupPreemptionScoring(t *testing.T) {
+	type victimSpec struct {
+		pods          []*v1.Pod
+		priority      int32
+		keyType       fwk.EntityKeyType
+		pdbViolations int
+	}
+
+	preemptor1 := st.MakePod().Name("preemptor-1").UID("preemptor-1").Priority(100).Obj()
+	preemptor2 := st.MakePod().Name("preemptor-2").UID("preemptor-2").Priority(100).Obj()
+
+	tests := []struct {
+		name                       string
+		nodeNames                  []string
+		victims                    []victimSpec
+		withoutPreemptionState     bool
+		expectedPreScoreCode       fwk.Code
+		expectedInitialScores      map[string]int64
+		reserveNode                string
+		expectedScoresAfterReserve map[string]int64
+	}{
+		{
+			name:                   "normal scheduling cycle without PodGroupPreemptionState returns Skip",
+			nodeNames:              []string{"node-1", "node-2"},
+			withoutPreemptionState: true,
+			expectedPreScoreCode:   fwk.Skip,
+		},
+		{
+			name:      "all candidate nodes have zero victims (numNonEmptyRanks == 0)",
+			nodeNames: []string{"node-1", "node-2", "node-3"},
+			expectedInitialScores: map[string]int64{
+				"node-1": fwk.MaxScore,
+				"node-2": fwk.MaxScore,
+				"node-3": fwk.MaxScore,
+			},
+		},
+		{
+			name:      "tied victim sets (CompareVictimSets == 0) receive identical scores",
+			nodeNames: []string{"node-tie-1", "node-tie-2", "node-high"},
+			victims: []victimSpec{
+				{
+					pods:     []*v1.Pod{st.MakePod().Name("victim-tie-1").UID("victim-tie-1").Node("node-tie-1").Priority(10).Obj()},
+					priority: 10,
+					keyType:  fwk.PodKeyType,
+				},
+				{
+					pods:     []*v1.Pod{st.MakePod().Name("victim-tie-2").UID("victim-tie-2").Node("node-tie-2").Priority(10).Obj()},
+					priority: 10,
+					keyType:  fwk.PodKeyType,
+				},
+				{
+					pods:     []*v1.Pod{st.MakePod().Name("victim-high").UID("victim-high").Node("node-high").Priority(20).Obj()},
+					priority: 20,
+					keyType:  fwk.PodKeyType,
+				},
+			},
+			expectedInitialScores: map[string]int64{
+				"node-tie-1": 80,
+				"node-tie-2": 80,
+				"node-high":  0,
+			},
+		},
+		{
+			name:      "multiple victims on a single node sorted by MoreImportantVictim",
+			nodeNames: []string{"node-multi", "node-mid"},
+			victims: []victimSpec{
+				// Listed before victim-low so iterating potentialVictims backward visits victim-low first;
+				// NewPodGroupPreemptionState must sort node-multi's victims by MoreImportantVictim (prio 20 before prio 5)
+				// so node-multi is recognized as more costly than node-mid (prio 15).
+				{
+					pods:     []*v1.Pod{st.MakePod().Name("victim-high").UID("victim-high").Node("node-multi").Priority(20).Obj()},
+					priority: 20,
+					keyType:  fwk.PodKeyType,
+				},
+				{
+					pods:     []*v1.Pod{st.MakePod().Name("victim-low").UID("victim-low").Node("node-multi").Priority(5).Obj()},
+					priority: 5,
+					keyType:  fwk.PodKeyType,
+				},
+				{
+					pods:     []*v1.Pod{st.MakePod().Name("victim-mid").UID("victim-mid").Node("node-mid").Priority(15).Obj()},
+					priority: 15,
+					keyType:  fwk.PodKeyType,
+				},
+			},
+			expectedInitialScores: map[string]int64{
+				"node-mid":   80,
+				"node-multi": 0,
+			},
+		},
+		{
+			name:      "free node, standalone pod, multi-node PodGroup, and higher-priority pod with Reserve and Unreserve",
+			nodeNames: []string{"node-free", "node-pod", "node-pg-1", "node-pg-2", "node-high"},
+			victims: []victimSpec{
+				{
+					pods:     []*v1.Pod{st.MakePod().Name("victim-pod").UID("victim-pod").Node("node-pod").Priority(10).Obj()},
+					priority: 10,
+					keyType:  fwk.PodKeyType,
+				},
+				{
+					pods: []*v1.Pod{
+						st.MakePod().Name("victim-pg-1").UID("victim-pg-1").Node("node-pg-1").Priority(10).PodGroupName("pg-victim").Obj(),
+						st.MakePod().Name("victim-pg-2").UID("victim-pg-2").Node("node-pg-2").Priority(10).PodGroupName("pg-victim").Obj(),
+					},
+					priority: 10,
+					keyType:  fwk.PodGroupKeyType,
+				},
+				{
+					pods:     []*v1.Pod{st.MakePod().Name("victim-high").UID("victim-high").Node("node-high").Priority(20).Obj()},
+					priority: 20,
+					keyType:  fwk.PodKeyType,
+				},
+			},
+			expectedInitialScores: map[string]int64{
+				"node-free": fwk.MaxScore,
+				"node-pod":  80,
+				"node-pg-1": 40,
+				"node-pg-2": 40,
+				"node-high": 0,
+			},
+			reserveNode: "node-pg-1",
+			expectedScoresAfterReserve: map[string]int64{
+				"node-free": fwk.MaxScore,
+				"node-pod":  80,
+				"node-pg-1": fwk.MaxScore,
+				"node-pg-2": fwk.MaxScore,
+				"node-high": 0,
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			logger, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+
+			nodes := make([]*v1.Node, 0, len(tt.nodeNames))
+			for _, name := range tt.nodeNames {
+				nodes = append(nodes, st.MakeNode().Name(name).Obj())
+			}
+
+			registeredPlugins := []tf.RegisterPluginFunc{
+				tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+				tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+			}
+
+			fts := feature.Features{EnableGenericWorkload: true}
+			snapshot := internalcache.NewSnapshot(nil, nodes)
+			client := clientsetfake.NewClientset()
+			informerFactory := informers.NewSharedInformerFactory(client, 0)
+			f, err := tf.NewFramework(ctx, registeredPlugins, "",
+				frameworkruntime.WithClientSet(client),
+				frameworkruntime.WithSnapshotSharedLister(snapshot),
+				frameworkruntime.WithMutableSnapshotLister(snapshot),
+				frameworkruntime.WithInformerFactory(informerFactory),
+				frameworkruntime.WithLogger(logger),
+				frameworkruntime.WithPodGroupManager(internalcache.New(ctx, nil, true, false)),
+				frameworkruntime.WithPodNominator(internalqueue.NewSchedulingQueue(nil, informerFactory)),
+				frameworkruntime.WithPreemptionManager(func(fh fwk.Handle) fwk.PreemptionManager {
+					return preemption.NewPreemptionManager(fh, fts)
+				}),
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			pl, err := New(ctx, getDefaultDefaultPreemptionArgs(), f, fts)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			nodeInfos := make([]fwk.NodeInfo, 0, len(nodes))
+			for _, n := range nodes {
+				ni, err := snapshot.NodeInfos().Get(n.Name)
+				if err != nil {
+					t.Fatal(err)
+				}
+				nodeInfos = append(nodeInfos, ni)
+			}
+
+			if tt.withoutPreemptionState {
+				normalState := framework.NewCycleState()
+				if status := pl.PreScore(ctx, normalState, preemptor1, nodeInfos); status.Code() != tt.expectedPreScoreCode {
+					t.Fatalf("expected PreScore status code %v, got %v", tt.expectedPreScoreCode, status.Code())
+				}
+				return
+			}
+
+			var allVictims []fwk.PreemptionVictim
+			for _, entry := range tt.victims {
+				podInfos := make([]fwk.PodInfo, 0, len(entry.pods))
+				for _, p := range entry.pods {
+					pi, err := framework.NewPodInfo(p)
+					if err != nil {
+						t.Fatal(err)
+					}
+					podInfos = append(podInfos, pi)
+				}
+				v, err := preemption.NewVictim(podInfos, entry.priority, entry.keyType)
+				if err != nil {
+					t.Fatal(err)
+				}
+				allVictims = append(allVictims, &testPreemptionVictim{
+					Victim:        v,
+					pdbViolations: entry.pdbViolations,
+				})
+			}
+
+			preemptState := preemption.NewPodGroupPreemptionState(allVictims)
+			pgState := framework.NewCycleState()
+			preemptState.WriteToPodGroupCycleState(pgState)
+			newCycleStateWithPreemption := func() fwk.CycleState {
+				s := framework.NewCycleState()
+				s.SetPodGroupCycleState(pgState)
+				return s
+			}
+
+			scoreAllNodes := func(state fwk.CycleState, pod *v1.Pod) map[string]int64 {
+				if status := pl.PreScore(ctx, state, pod, nodeInfos); status.Code() != tt.expectedPreScoreCode {
+					t.Fatalf("PreScore status code = %v, want %v", status.Code(), tt.expectedPreScoreCode)
+				}
+				scores := make(map[string]int64, len(nodeInfos))
+				for _, ni := range nodeInfos {
+					score, status := pl.Score(ctx, state, pod, ni)
+					if !status.IsSuccess() {
+						t.Fatalf("Score failed for node %s: %v", ni.Node().Name, status)
+					}
+					scores[ni.Node().Name] = score
+				}
+				return scores
+			}
+
+			state1 := newCycleStateWithPreemption()
+			gotInitialScores := scoreAllNodes(state1, preemptor1)
+			if diff := cmp.Diff(tt.expectedInitialScores, gotInitialScores); diff != "" {
+				t.Errorf("Initial scores mismatch (-want, +got):\n%s", diff)
+			}
+
+			if tt.reserveNode == "" {
+				return
+			}
+
+			if status := pl.Reserve(ctx, state1, preemptor1, tt.reserveNode); !status.IsSuccess() {
+				t.Fatalf("Reserve failed: %v", status)
+			}
+
+			state2 := newCycleStateWithPreemption()
+			gotAfterReserve := scoreAllNodes(state2, preemptor2)
+			if diff := cmp.Diff(tt.expectedScoresAfterReserve, gotAfterReserve); diff != "" {
+				t.Errorf("Scores after Reserve mismatch (-want, +got):\n%s", diff)
+			}
+
+			pl.Unreserve(ctx, state1, preemptor1, tt.reserveNode)
+			state3 := newCycleStateWithPreemption()
+			gotAfterUnreserve := scoreAllNodes(state3, preemptor2)
+			if diff := cmp.Diff(tt.expectedInitialScores, gotAfterUnreserve); diff != "" {
+				t.Errorf("Scores after Unreserve mismatch (-want, +got):\n%s", diff)
+			}
+
+			// Verify Reserve and Unreserve when PreScore was skipped (e.g., single feasible node or batch hint).
+			stateNoPreScore := newCycleStateWithPreemption()
+			if status := pl.Reserve(ctx, stateNoPreScore, preemptor1, tt.reserveNode); !status.IsSuccess() {
+				t.Fatalf("Reserve without PreScore failed: %v", status)
+			}
+			state4 := newCycleStateWithPreemption()
+			gotAfterNoPreScoreReserve := scoreAllNodes(state4, preemptor2)
+			if diff := cmp.Diff(tt.expectedScoresAfterReserve, gotAfterNoPreScoreReserve); diff != "" {
+				t.Errorf("Scores after Reserve without PreScore mismatch (-want, +got):\n%s", diff)
+			}
+
+			pl.Unreserve(ctx, stateNoPreScore, preemptor1, tt.reserveNode)
+			state5 := newCycleStateWithPreemption()
+			gotAfterNoPreScoreUnreserve := scoreAllNodes(state5, preemptor2)
+			if diff := cmp.Diff(tt.expectedInitialScores, gotAfterNoPreScoreUnreserve); diff != "" {
+				t.Errorf("Scores after Unreserve without PreScore mismatch (-want, +got):\n%s", diff)
 			}
 		})
 	}
