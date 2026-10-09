@@ -382,8 +382,6 @@ const (
 	// owner: @carlory
 	// kep: https://kep.k8s.io/4033
 	//
-	// Deprecated: v1.38
-	//
 	// Require runtimes to implement RuntimeConfig instead of falling back to the
 	// cgroup driver in the kubelet configuration. Disable temporarily to allow
 	// the runtime to be upgraded after a kubelet upgrade.

@@ -52,6 +52,11 @@ var _ = SIGDescribe("Cgroup Driver From CRI", feature.CriProxy, framework.WithSe
 	ginkgo.It("should allow temporary recovery when the runtime does not implement RuntimeConfig", func(ctx context.Context) {
 		originalConfig, err := getCurrentKubeletConfig(ctx)
 		framework.ExpectNoError(err)
+		cgroupDriver := originalConfig.CgroupDriver
+		// configz reports the driver obtained from CRI, which cannot be supplied as configuration.
+		if disabled, set := originalConfig.FeatureGates[string(features.DisableCgroupDriverFallback)]; !set || disabled {
+			originalConfig.CgroupDriver = ""
+		}
 		ginkgo.DeferCleanup(func(ctx context.Context) {
 			framework.ExpectNoError(resetCRIProxyInjector(e2eCriProxy))
 			framework.ExpectNoError(e2enodekubelet.WriteKubeletConfigFile(originalConfig))
@@ -62,6 +67,7 @@ var _ = SIGDescribe("Cgroup Driver From CRI", feature.CriProxy, framework.WithSe
 		config := originalConfig.DeepCopy()
 		// Exercise the default even when the suite overrides this gate.
 		delete(config.FeatureGates, string(features.DisableCgroupDriverFallback))
+		config.CgroupDriver = ""
 		updateKubeletConfig(ctx, f, config, false)
 
 		var runtimeConfigCalls atomic.Int64
@@ -85,6 +91,7 @@ var _ = SIGDescribe("Cgroup Driver From CRI", feature.CriProxy, framework.WithSe
 			config.FeatureGates = map[string]bool{}
 		}
 		config.FeatureGates[string(features.DisableCgroupDriverFallback)] = false
+		config.CgroupDriver = cgroupDriver
 		// The unhealthy kubelet cannot serve configz or use the usual config update helper.
 		framework.ExpectNoError(e2enodekubelet.WriteKubeletConfigFile(config))
 		restartKubelet(ctx, false)

@@ -56,6 +56,12 @@ func TestGetCgroupDriverFromCRI(t *testing.T) {
 			expectedError:    "DisableCgroupDriverFallback=false",
 		},
 		{
+			name:           "unsupported runtime uses the default driver when fallback is enabled after defaulting",
+			allowFallback:  true,
+			runtimeError:   status.Error(codes.Unimplemented, "RuntimeConfig is not implemented"),
+			expectedDriver: "cgroupfs",
+		},
+		{
 			name:             "unsupported runtime can fall back to systemd",
 			allowFallback:    true,
 			configuredDriver: "systemd",
