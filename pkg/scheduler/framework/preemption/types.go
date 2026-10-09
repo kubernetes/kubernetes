@@ -317,7 +317,7 @@ type candidate struct {
 	// name returns the target domain(for pod group)/node name where the preemptor gets nominated to run.
 	name string
 	// numPodGroupDisruptions returns the number of preemption units that affect pod groups.
-	// A single preemption unit can be all pods in a pod group (for DisruptionMode=all) or a single pod (for DisruptionMode=single).
+	// A single preemption unit can be all pods in a pod group or composite pod group hierarchy (for DisruptionMode=all) or a single pod (for DisruptionMode=single).
 	numPodGroupDisruptions int
 }
 

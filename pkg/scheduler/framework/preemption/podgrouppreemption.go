@@ -51,7 +51,7 @@ func NewPodGroupEvaluator(fh fwk.Handle) *PodGroupEvaluator {
 func (ev *PodGroupEvaluator) evaluate(ctx context.Context, preemptorType fwk.EntityKeyType, potentialVictims []fwk.PreemptionVictim, podGroupSchedulingFunc fwk.PodGroupSchedulingFunc) (res *selectVictimsResult, status *fwk.Status) {
 	startTime := time.Now()
 	defer func() {
-		metrics.PreemptionEvaluationDuration.WithLabelValues(string(preemptorType), status.Code().String()).Observe(metrics.SinceInSeconds(startTime))
+		metrics.PreemptionEvaluationDuration.WithLabelValues(metrics.EntityTypeToLabel(preemptorType), status.Code().String()).Observe(metrics.SinceInSeconds(startTime))
 	}()
 
 	return ev.selectVictimsOnDomain(ctx, potentialVictims, podGroupSchedulingFunc)

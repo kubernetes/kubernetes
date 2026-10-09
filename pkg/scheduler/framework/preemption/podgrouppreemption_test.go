@@ -1800,25 +1800,25 @@ func TestPodGroupPreemptionEvaluationDurationMetric(t *testing.T) {
 		{
 			name:             "podgroup scheduling success",
 			isCPG:            false,
-			wantPreemptor:    "podgroup",
+			wantPreemptor:    metrics.PodGroup,
 			evaluationStatus: fwk.NewStatus(fwk.Success),
 		},
 		{
 			name:             "compositepodgroup scheduling success",
 			isCPG:            true,
-			wantPreemptor:    "compositepodgroup",
+			wantPreemptor:    metrics.CompositePodGroup,
 			evaluationStatus: fwk.NewStatus(fwk.Success),
 		},
 		{
 			name:             "podgroup scheduling error",
 			isCPG:            false,
-			wantPreemptor:    "podgroup",
+			wantPreemptor:    metrics.PodGroup,
 			evaluationStatus: fwk.NewStatus(fwk.Error, "failed to schedule"),
 		},
 		{
 			name:             "compositepodgroup scheduling error",
 			isCPG:            true,
-			wantPreemptor:    "compositepodgroup",
+			wantPreemptor:    metrics.CompositePodGroup,
 			evaluationStatus: fwk.NewStatus(fwk.Error, "failed to schedule"),
 		},
 	}

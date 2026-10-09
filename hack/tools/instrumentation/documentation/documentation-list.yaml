@@ -6812,8 +6812,8 @@
 - name: preemption_workload_disruptions
   subsystem: scheduler
   help: Number of workload preemption units being preempted. A single preemption unit
-    can be all pods in a pod group (in case of DisruptionMode=all), or a single pod
-    (in case of DisruptionMode=single).
+    can be all pods in a pod group or composite pod group hierarchy (in case of DisruptionMode=all),
+    or a single pod (in case of DisruptionMode=single).
   type: Histogram
   stabilityLevel: ALPHA
   labels:
@@ -6943,8 +6943,8 @@
     endpoint: /metrics
 - name: workload_preemption_attempts_total
   subsystem: scheduler
-  help: Total preemption attempts initiated by workload (including pod groups and
-    composite pod groups) in the cluster till now.
+  help: Total preemption attempts initiated by workload (including either pod groups
+    or composite pod groups) in the cluster till now.
   type: Counter
   stabilityLevel: ALPHA
   labels:
@@ -6956,7 +6956,7 @@
 - name: workload_preemption_victims
   subsystem: scheduler
   help: Number of pod preemption victims caused by workload preemption (including
-    pod groups and composite pod groups).
+    either pod groups or composite pod groups).
   type: Histogram
   stabilityLevel: ALPHA
   labels:
