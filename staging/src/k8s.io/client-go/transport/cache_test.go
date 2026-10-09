@@ -20,8 +20,11 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"fmt"
+	"io"
 	"net"
 	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"os"
 	"reflect"
@@ -32,6 +35,7 @@ import (
 	"time"
 	"weak"
 
+	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientgofeaturegate "k8s.io/client-go/features"
 	clientfeaturestesting "k8s.io/client-go/features/testing"
@@ -43,12 +47,13 @@ func TestTLSConfigKey(t *testing.T) {
 	clientfeaturestesting.SetFeatureDuringTest(t, clientgofeaturegate.ClientsAllowCARotation, true)
 	// Make sure config fields that don't affect the tls config don't affect the cache key
 	identicalConfigurations := map[string]*Config{
-		"empty":          {},
-		"basic":          {Username: "bob", Password: "password"},
-		"bearer":         {BearerToken: "token"},
-		"user agent":     {UserAgent: "useragent"},
-		"transport":      {Transport: http.DefaultTransport},
-		"wrap transport": {WrapTransport: func(http.RoundTripper) http.RoundTripper { return nil }},
+		"empty":                {},
+		"basic":                {Username: "bob", Password: "password"},
+		"bearer":               {BearerToken: "token"},
+		"user agent":           {UserAgent: "useragent"},
+		"transport":            {Transport: http.DefaultTransport},
+		"wrap transport":       {WrapTransport: func(http.RoundTripper) http.RoundTripper { return nil }},
+		"connection pool of 1": {MinConnectionPoolSize: 1},
 	}
 	for nameA, valueA := range identicalConfigurations {
 		for nameB, valueB := range identicalConfigurations {
@@ -88,6 +93,8 @@ func TestTLSConfigKey(t *testing.T) {
 	uniqueConfigurations := map[string]*Config{
 		"proxy":                         {Proxy: func(request *http.Request) (*url.URL, error) { return nil, nil }},
 		"no tls":                        {},
+		"connection pool of 2":          {MinConnectionPoolSize: 2},
+		"connection pool of 3":          {MinConnectionPoolSize: 3},
 		"dialer":                        {DialHolder: &DialHolder{Dial: dialer.DialContext}},
 		"dialer2":                       {DialHolder: &DialHolder{Dial: func(ctx context.Context, network, address string) (net.Conn, error) { return nil, nil }}},
 		"insecure":                      {TLS: TLSConfig{Insecure: true}},
@@ -996,4 +1003,223 @@ func installFakeMetrics(t *testing.T) (*recordingCreateCalls, *recordingCacheGCC
 		metrics.TransportCacheEntries = origEntries
 	})
 	return createCalls, gcCalls, rotationGCCalls, cacheEntries
+}
+
+// TestConnectionPoolIsCached verifies that a connection pool is cached like any
+// other transport, so that constructing clients repeatedly reuses the pool
+// instead of creating new transports and connections.
+func TestConnectionPoolIsCached(t *testing.T) {
+	for name, config := range map[string]*Config{
+		"tls":    {MinConnectionPoolSize: 3, TLS: TLSConfig{ServerName: "pool-test"}},
+		"no tls": {MinConnectionPoolSize: 3},
+	} {
+		t.Run(name, func(t *testing.T) {
+			createCalls, _, _, _ := installFakeMetrics(t)
+			cache := newTLSCache()
+
+			rt1, err := cache.get(config)
+			if err != nil {
+				t.Fatal(err)
+			}
+			rt2, err := cache.get(config)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if rt1 != rt2 {
+				t.Error("expected the same transport (cache hit)")
+			}
+			if calls := createCalls.reset(); !reflect.DeepEqual(calls, []string{"miss", "hit"}) {
+				t.Errorf("expected [miss hit], got %v", calls)
+			}
+			requireCacheLen(t, cache, 1)
+
+			pool := unwrapConnectionPool(t, rt1)
+			if len(pool.members) != 3 {
+				t.Fatalf("expected 3 members, got %d", len(pool.members))
+			}
+			seen := map[http.RoundTripper]bool{}
+			for i, m := range pool.members {
+				if _, ok := m.rt.(*http.Transport); !ok {
+					t.Errorf("member %d: expected *http.Transport, got %T", i, m.rt)
+				}
+				if seen[m.rt] {
+					t.Errorf("member %d: expected a separate transport", i)
+				}
+				seen[m.rt] = true
+			}
+		})
+	}
+}
+
+// TestConnectionPoolFeatureGateDisabled verifies that with the
+// ClientsAllowConnectionPool feature disabled, MinConnectionPoolSize is ignored:
+// the config gets the same transport as the same config without a pool.
+func TestConnectionPoolFeatureGateDisabled(t *testing.T) {
+	clientfeaturestesting.SetFeatureDuringTest(t, clientgofeaturegate.ClientsAllowConnectionPool, false)
+
+	for name, tc := range map[string]struct{ pooled, plain *Config }{
+		"tls": {
+			pooled: &Config{MinConnectionPoolSize: 3, TLS: TLSConfig{ServerName: "pool-test"}},
+			plain:  &Config{TLS: TLSConfig{ServerName: "pool-test"}},
+		},
+		"no tls": {
+			pooled: &Config{MinConnectionPoolSize: 3},
+			plain:  &Config{},
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			cache := newTLSCache()
+			pooled, err := cache.get(tc.pooled)
+			if err != nil {
+				t.Fatal(err)
+			}
+			plain, err := cache.get(tc.plain)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if pooled != plain {
+				t.Errorf("expected the same transport as without a connection pool, got %T and %T", pooled, plain)
+			}
+		})
+	}
+}
+
+// TestConnectionPoolCertRotationLeak verifies that a connection pool starts a
+// single cert rotation goroutine, shared by all members, and that it is
+// stopped when the pool is garbage collected.
+func TestConnectionPoolCertRotationLeak(t *testing.T) {
+	clientfeaturestesting.SetFeatureDuringTest(t, clientgofeaturegate.ClientsAllowTLSCacheGC, true)
+	_, gcCalls, rotationGCCalls, _ := installFakeMetrics(t)
+
+	certFile := writeCAFile(t, []byte(certData))
+	keyFile := writeCAFile(t, []byte(keyData))
+
+	cache := newTLSCache()
+
+	baseline := runtime.NumGoroutine()
+
+	rt, err := cache.get(&Config{
+		MinConnectionPoolSize: 3,
+		TLS: TLSConfig{
+			CertFile:   certFile,
+			KeyFile:    keyFile,
+			ServerName: "pool-cert-rotation-test",
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	requireCacheLen(t, cache, 1)
+
+	runtime.KeepAlive(rt)
+
+	gcCalls.reset()
+	pollCacheSizeWithGC(t, cache, 0)
+
+	err = wait.PollUntilContextTimeout(t.Context(), 10*time.Millisecond, 10*time.Second, true, func(_ context.Context) (bool, error) {
+		runtime.GC()
+		return runtime.NumGoroutine() <= baseline, nil
+	})
+	if err != nil {
+		t.Errorf("goroutine leak: cert rotation goroutine was not stopped for connection pool (baseline=%d current=%d)", baseline, runtime.NumGoroutine())
+	}
+
+	if n := rotationGCCalls.count.Load(); n != 1 {
+		t.Errorf("expected TransportCertRotationGCCalls=1, got %d", n)
+	}
+	if calls := gcCalls.reset(); len(calls) != 1 || calls[0] != "deleted" {
+		t.Errorf("expected [deleted], got %v", calls)
+	}
+}
+
+// TestConnectionPoolConnections verifies that a connection pool of size N
+// opens N connections to the server, and that constructing the client again
+// for the same config reuses them.
+func TestConnectionPoolConnections(t *testing.T) {
+	t.Setenv("DISABLE_HTTP2", "")
+
+	var mu sync.Mutex
+	var conns map[string]bool
+	server := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.ProtoMajor != 2 {
+			t.Errorf("expected HTTP/2, got %s", r.Proto)
+		}
+		mu.Lock()
+		defer mu.Unlock()
+		conns[r.RemoteAddr] = true
+	}))
+	server.EnableHTTP2 = true
+	server.StartTLS()
+	defer server.Close()
+
+	for _, tc := range []struct {
+		poolSize  int
+		wantConns int
+	}{
+		{poolSize: 0, wantConns: 1},
+		{poolSize: 1, wantConns: 1},
+		{poolSize: 4, wantConns: 4},
+	} {
+		t.Run(fmt.Sprintf("pool size %d", tc.poolSize), func(t *testing.T) {
+			mu.Lock()
+			conns = map[string]bool{}
+			mu.Unlock()
+
+			cache := newTLSCache()
+			config := &Config{MinConnectionPoolSize: tc.poolSize, TLS: TLSConfig{Insecure: true}}
+
+			// Construct the client a few times, like callers that rebuild their
+			// clients, and send concurrent requests with each of them.
+			var rts []http.RoundTripper
+			for range 3 {
+				rt, err := cache.get(config)
+				if err != nil {
+					t.Fatal(err)
+				}
+				rts = append(rts, rt)
+
+				client := &http.Client{Transport: rt}
+				var wg sync.WaitGroup
+				for range 32 {
+					wg.Go(func() {
+						resp, err := client.Get(server.URL)
+						if err != nil {
+							t.Error(err)
+							return
+						}
+						_, _ = io.Copy(io.Discard, resp.Body)
+						_ = resp.Body.Close()
+					})
+				}
+				wg.Wait()
+			}
+			for _, rt := range rts {
+				if rt != rts[0] {
+					t.Error("expected the same transport for the same config")
+				}
+			}
+			utilnet.CloseIdleConnectionsFor(rts[0])
+
+			mu.Lock()
+			defer mu.Unlock()
+			if len(conns) != tc.wantConns {
+				t.Errorf("expected %d connections, got %d: %v", tc.wantConns, len(conns), conns)
+			}
+		})
+	}
+}
+
+func unwrapConnectionPool(t *testing.T, rt http.RoundTripper) *connectionPool {
+	t.Helper()
+	for {
+		switch v := rt.(type) {
+		case *connectionPool:
+			return v
+		case utilnet.RoundTripperWrapper:
+			rt = v.WrappedRoundTripper()
+		default:
+			t.Fatalf("expected a connection pool, got %T", rt)
+			return nil
+		}
+	}
 }

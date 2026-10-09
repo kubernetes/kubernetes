@@ -55,6 +55,14 @@ const (
 	// "application/json" or "application/apply-patch+yaml", respectively.
 	ClientsAllowCBOR Feature = "ClientsAllowCBOR"
 
+	// owner: @mborsz
+	// beta: v1.38
+	//
+	// If enabled, rest.Config.MinConnectionPoolSize and transport.Config.MinConnectionPoolSize
+	// greater than 1 make clients spread requests across a pool of independent transports.
+	// Disabling it restores a single shared transport per config.
+	ClientsAllowConnectionPool Feature = "ClientsAllowConnectionPool"
+
 	// owner: @enj
 	// beta: v1.36
 	//
@@ -117,6 +125,9 @@ var defaultVersionedKubernetesFeatureGates = map[Feature]VersionedSpecs{
 	},
 	ClientsAllowCBOR: {
 		{Version: version.MustParse("1.32"), Default: false, PreRelease: Alpha},
+	},
+	ClientsAllowConnectionPool: {
+		{Version: version.MustParse("1.38"), Default: true, PreRelease: Beta},
 	},
 	ClientsAllowTLSCacheGC: {
 		{Version: version.MustParse("1.36"), Default: true, PreRelease: Beta},

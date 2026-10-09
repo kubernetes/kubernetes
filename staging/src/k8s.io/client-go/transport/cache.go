@@ -65,6 +65,8 @@ type tlsCacheKey struct {
 	serverName         string
 	nextProtos         string
 	disableCompression bool
+	// minConnectionPoolSize is 0 unless a connection pool is used, see connectionPoolSize.
+	minConnectionPoolSize int
 	// these functions are wrapped to allow them to be used as map keys
 	getCert *GetCertHolder
 	dial    *DialHolder
@@ -75,8 +77,8 @@ func (t tlsCacheKey) String() string {
 	if len(t.keyData) > 0 {
 		keyText = "<redacted>"
 	}
-	return fmt.Sprintf("insecure:%v, caData:%#v, caFile:%s, certData:%#v, keyData:%s, serverName:%s, disableCompression:%t, getCert:%p, dial:%p",
-		t.insecure, t.caData, t.caFile, t.certData, keyText, t.serverName, t.disableCompression, t.getCert, t.dial)
+	return fmt.Sprintf("insecure:%v, caData:%#v, caFile:%s, certData:%#v, keyData:%s, serverName:%s, disableCompression:%t, minConnectionPoolSize:%d, getCert:%p, dial:%p",
+		t.insecure, t.caData, t.caFile, t.certData, keyText, t.serverName, t.disableCompression, t.minConnectionPoolSize, t.getCert, t.dial)
 }
 
 func (c *tlsTransportCache) get(config *Config) (http.RoundTripper, error) {
@@ -111,7 +113,7 @@ func (c *tlsTransportCache) get(config *Config) (http.RoundTripper, error) {
 		return nil, err
 	}
 	// The options didn't require a custom TLS config
-	if tlsConfig == nil && config.DialHolder == nil && config.Proxy == nil {
+	if tlsConfig == nil && config.DialHolder == nil && config.Proxy == nil && connectionPoolSize(config) == 0 {
 		return http.DefaultTransport, nil
 	}
 
@@ -141,6 +143,16 @@ func (c *tlsTransportCache) get(config *Config) (http.RoundTripper, error) {
 	}
 
 	transport := newTransport(config, tlsConfig, dial)
+	if n := connectionPoolSize(config); n > 0 {
+		// Every member is a separate http.Transport with its own connections.
+		// They share dial, and so the cert rotation above, but each gets its
+		// own copy of tlsConfig, because net/http modifies it on first use.
+		members := []http.RoundTripper{transport}
+		for len(members) < n {
+			members = append(members, newTransport(config, tlsConfig.Clone(), dial))
+		}
+		transport = newConnectionPool(members)
+	}
 
 	if !canCache && cancel == nil {
 		return transport, nil // uncacheable config with no cert rotation - nothing to GC
@@ -256,6 +268,16 @@ func (v *trackedTransport) WrappedRoundTripper() http.RoundTripper {
 	return v.rt
 }
 
+// connectionPoolSize returns the number of transports to pool for c, or 0 if c
+// does not ask for a connection pool or the ClientsAllowConnectionPool feature
+// is disabled. All configs without a pool get 0, so they share cache entries.
+func connectionPoolSize(c *Config) int {
+	if c.MinConnectionPoolSize <= 1 || !clientgofeaturegate.FeatureGates().Enabled(clientgofeaturegate.ClientsAllowConnectionPool) {
+		return 0
+	}
+	return c.MinConnectionPoolSize
+}
+
 // tlsConfigKey returns a unique key for tls.Config objects returned from TLSConfigFor
 func tlsConfigKey(c *Config) (tlsCacheKey, bool, error) {
 	// Make sure ca/key/cert content is loaded
@@ -276,6 +298,8 @@ func tlsConfigKey(c *Config) (tlsCacheKey, bool, error) {
 		getCert:            c.TLS.GetCertHolder,
 		dial:               c.DialHolder,
 	}
+
+	k.minConnectionPoolSize = connectionPoolSize(c)
 
 	if c.TLS.ReloadTLSFiles {
 		k.certFile = c.TLS.CertFile

@@ -52,6 +52,15 @@ type Config struct {
 	// server.
 	DisableCompression bool
 
+	// MinConnectionPoolSize, if greater than 1, spreads requests to the server
+	// across at least this many independent transports, each with its own
+	// connections, preferring the one with fewer requests in flight. More
+	// connections may be opened, for example when a connection reaches the
+	// server's limit of concurrent HTTP/2 streams. Values <= 1 keep the default
+	// of a single shared transport. Ignored if Transport is set or if the
+	// ClientsAllowConnectionPool feature gate is disabled.
+	MinConnectionPoolSize int
+
 	// Transport may be used for custom HTTP behavior. This attribute may
 	// not be specified with the TLS client certificate options. Use
 	// WrapTransport for most client level operations.
