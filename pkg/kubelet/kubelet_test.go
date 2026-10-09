@@ -4994,6 +4994,7 @@ func TestHandlePodUpdates_VolumeResize(t *testing.T) {
 	}
 
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScalingMemoryBackedVolumes, true)
 	tCtx := ktesting.Init(t)
 
 	logger := klog.FromContext(tCtx)
@@ -5002,15 +5003,16 @@ func TestHandlePodUpdates_VolumeResize(t *testing.T) {
 	quantity200Mi := resource.MustParse("200Mi")
 
 	tests := []struct {
-		name                         string
-		enableMemoryVolumeResizeGate bool
-		initialVolumes               []v1.Volume
-		resizedVolumes               []v1.Volume
-		expectResizeAction           bool
+		name           string
+		initialVolumes []v1.Volume
+		resizedVolumes []v1.Volume
+		// Limits are gated on allocation, and an immutable one is treated as gated too. This test never
+		// allocates the resize, so a limit that changes is not the allocated one, and the change is
+		// pending.
+		allocatedDiffersFromDesired bool
 	}{
 		{
-			name:                         "feature gate disabled: memory volume size limit changed",
-			enableMemoryVolumeResizeGate: false,
+			name: "memory volume size limit increased",
 			initialVolumes: []v1.Volume{
 				{
 					Name: "vol-1",
@@ -5033,38 +5035,10 @@ func TestHandlePodUpdates_VolumeResize(t *testing.T) {
 					},
 				},
 			},
-			expectResizeAction: false,
+			allocatedDiffersFromDesired: true,
 		},
 		{
-			name:                         "feature gate enabled: memory volume size limit increased",
-			enableMemoryVolumeResizeGate: true,
-			initialVolumes: []v1.Volume{
-				{
-					Name: "vol-1",
-					VolumeSource: v1.VolumeSource{
-						EmptyDir: &v1.EmptyDirVolumeSource{
-							Medium:    v1.StorageMediumMemory,
-							SizeLimit: &quantity100Mi,
-						},
-					},
-				},
-			},
-			resizedVolumes: []v1.Volume{
-				{
-					Name: "vol-1",
-					VolumeSource: v1.VolumeSource{
-						EmptyDir: &v1.EmptyDirVolumeSource{
-							Medium:    v1.StorageMediumMemory,
-							SizeLimit: &quantity200Mi,
-						},
-					},
-				},
-			},
-			expectResizeAction: true,
-		},
-		{
-			name:                         "feature gate enabled: memory volume size limit decreased",
-			enableMemoryVolumeResizeGate: true,
+			name: "memory volume size limit decreased",
 			initialVolumes: []v1.Volume{
 				{
 					Name: "vol-1",
@@ -5087,11 +5061,10 @@ func TestHandlePodUpdates_VolumeResize(t *testing.T) {
 					},
 				},
 			},
-			expectResizeAction: true,
+			allocatedDiffersFromDesired: true,
 		},
 		{
-			name:                         "feature gate enabled: memory volume size limit unchanged",
-			enableMemoryVolumeResizeGate: true,
+			name: "memory volume size limit unchanged",
 			initialVolumes: []v1.Volume{
 				{
 					Name: "vol-1",
@@ -5114,11 +5087,10 @@ func TestHandlePodUpdates_VolumeResize(t *testing.T) {
 					},
 				},
 			},
-			expectResizeAction: false,
+			allocatedDiffersFromDesired: false,
 		},
 		{
-			name:                         "feature gate enabled: non-memory backed emptyDir volume limit changed",
-			enableMemoryVolumeResizeGate: true,
+			name: "non-memory backed emptyDir volume limit changed",
 			initialVolumes: []v1.Volume{
 				{
 					Name: "vol-1",
@@ -5141,18 +5113,16 @@ func TestHandlePodUpdates_VolumeResize(t *testing.T) {
 					},
 				},
 			},
-			expectResizeAction: false,
+			allocatedDiffersFromDesired: true,
 		},
 		{
-			name:                         "feature gate enabled: pod with no volumes",
-			enableMemoryVolumeResizeGate: true,
-			initialVolumes:               nil,
-			resizedVolumes:               nil,
-			expectResizeAction:           false,
+			name:                        "pod with no volumes",
+			initialVolumes:              nil,
+			resizedVolumes:              nil,
+			allocatedDiffersFromDesired: false,
 		},
 		{
-			name:                         "feature gate enabled: disk-backed emptyDir volume limit changed (implicit default medium)",
-			enableMemoryVolumeResizeGate: true,
+			name: "disk-backed emptyDir volume limit changed (implicit default medium)",
 			initialVolumes: []v1.Volume{
 				{
 					Name: "vol-1",
@@ -5173,11 +5143,13 @@ func TestHandlePodUpdates_VolumeResize(t *testing.T) {
 					},
 				},
 			},
-			expectResizeAction: false,
+			// The api server would reject this resize request in validation so in practice
+			// this test case wouldn't happen. This test verifies that UpdatePodFromAllocation
+			// treats immutable fields the same as 'gated on allocation' fields.
+			allocatedDiffersFromDesired: true,
 		},
 		{
-			name:                         "feature gate enabled: multiple volumes, one memory-backed limit changed",
-			enableMemoryVolumeResizeGate: true,
+			name: "multiple volumes, one memory-backed limit changed",
 			initialVolumes: []v1.Volume{
 				{
 					Name: "vol-1",
@@ -5216,14 +5188,12 @@ func TestHandlePodUpdates_VolumeResize(t *testing.T) {
 					},
 				},
 			},
-			expectResizeAction: true,
+			allocatedDiffersFromDesired: true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScalingMemoryBackedVolumes, tt.enableMemoryVolumeResizeGate)
-
 			testPod := &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "test-pod",
@@ -5245,10 +5215,10 @@ func TestHandlePodUpdates_VolumeResize(t *testing.T) {
 			kubelet.HandlePodUpdates(tCtx, []*v1.Pod{resizedPod})
 
 			allocatedPod, wasUpdated := kubelet.allocationManager.UpdatePodFromAllocation(resizedPod.DeepCopy())
-			assert.Equal(t, tt.expectResizeAction, wasUpdated)
-			assert.Equal(t, tt.expectResizeAction, kubelet.allocationManager.HasPendingResizes())
+			assert.Equal(t, tt.allocatedDiffersFromDesired, wasUpdated)
+			assert.Equal(t, tt.allocatedDiffersFromDesired, kubelet.allocationManager.HasPendingResizes())
 
-			if tt.expectResizeAction {
+			if tt.allocatedDiffersFromDesired {
 				// Reverted back to the initial (old) limit!
 				assert.Equal(t, initialPod.Spec.Volumes[0].EmptyDir.SizeLimit.Value(), allocatedPod.Spec.Volumes[0].EmptyDir.SizeLimit.Value())
 			} else if len(resizedPod.Spec.Volumes) > 0 && resizedPod.Spec.Volumes[0].EmptyDir != nil && resizedPod.Spec.Volumes[0].EmptyDir.SizeLimit != nil {

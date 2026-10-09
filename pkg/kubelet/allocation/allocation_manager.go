@@ -67,9 +67,9 @@ type Manager interface {
 	// GetPodLevelResourceAllocation returns the AllocatedResources value for the container
 	GetPodLevelResourceAllocation(podUID types.UID) (*v1.ResourceRequirements, bool)
 
-	// UpdatePodFromAllocation overwrites the pod spec with the allocation.
-	// This function does a deep copy only if updates are needed.
-	// Returns the updated (or original) pod, and whether there was an allocation stored.
+	// UpdatePodFromAllocation returns the pod as it is allocated, and whether a change to a
+	// field that is gated on allocation is pending. A deep copy of the pod is only returned if an allocation is pending;
+	// otherwise, the pod is returned as-is.
 	UpdatePodFromAllocation(pod *v1.Pod) (*v1.Pod, bool)
 
 	// SetAllocatedResources checkpoints the allocation for a pod.
@@ -417,12 +417,26 @@ func (m *manager) GetPodLevelResourceAllocation(podUID types.UID) (*v1.ResourceR
 	return m.allocated.GetPodLevelResources(podUID)
 }
 
-// UpdatePodFromAllocation overwrites the pod spec with the allocation.
-// This function does a deep copy only if updates are needed.
+// UpdatePodFromAllocation returns the pod as it is allocated, and whether a change to a
+// field that is gated on allocation is pending. A deep copy of the pod is only returned if an allocation is pending;
+// otherwise, the pod is returned as-is.
+//
+// Pod spec fields are either:
+//   - passthrough: they take effect as soon as they change in the pod, e.g. tolerations.
+//   - gated on allocation: they take their allocated value, so that a change only takes effect once it is
+//     allocated (admitted and checkpointed) as a whole. Today the only gated fields that can change
+//     are resources.
+//   - immutable fields: they are classified as 'gated on allocation' too, since which value they take then does
+//     not matter, and this requires fewer changes as we make more fields mutable over time.
+//
+// The allocated pod is the stored pod, with only the passthrough fields copied from the pod, so a
+// change is pending when it differs from the pod. A new PodSpec or Container field has to be
+// classified in TestUpdatePodFromAllocationFieldClassification, which makes it explicit which of the
+// two it is.
+//
+// Pods migrated from a V1 checkpoint only have their resources until they are added again, so for
+// them those resources are overlaid onto the pod instead, and only a change to them can be pending.
 func (m *manager) UpdatePodFromAllocation(pod *v1.Pod) (*v1.Pod, bool) {
-	// TODO: Consider keeping the allocated pod up to date with the changes that are not
-	// gated on allocation, so that its stored pod spec can be used as-is instead of overlaying
-	// just the allocated resources onto the pod.
 	if pod == nil {
 		return pod, false
 	}
@@ -432,9 +446,59 @@ func (m *manager) UpdatePodFromAllocation(pod *v1.Pod) (*v1.Pod, bool) {
 		return pod, false
 	}
 
-	return updatePodFromAllocation(pod, allocated)
+	// TODO: Remove when the V1 checkpoint format is no longer supported (see migrateV1ToV2).
+	if isMigratedFromV1(allocated) {
+		return updatePodFromAllocation(pod, allocated)
+	}
+
+	result := *pod
+	result.Spec = allocated.Spec
+	copyPassthroughFields(&result.Spec, &pod.Spec)
+	// The passthrough fields have the same value in both specs by now, so only a gated field can
+	// make them differ.
+	pending := !apiequality.Semantic.DeepEqual(&pod.Spec, &result.Spec)
+	if !pending {
+		return pod, false
+	}
+	// The metadata, the status and the passthrough fields are still shared with the pod here. Copying
+	// the whole result keeps it private however many passthrough fields are added.
+	return result.DeepCopy(), true
 }
 
+// isMigratedFromV1 returns whether the allocated pod was rebuilt from a V1 checkpoint. Those only
+// recorded resources, so the pod has no name, until it is replaced by a complete one when it is
+// added again.
+func isMigratedFromV1(allocated *v1.Pod) bool {
+	return allocated.Name == ""
+}
+
+// copyPassthroughFields sets the fields of spec that take effect as soon as they change in the pod
+// to their values in desired.
+func copyPassthroughFields(spec, desired *v1.PodSpec) {
+	spec.ActiveDeadlineSeconds = desired.ActiveDeadlineSeconds
+	spec.Tolerations = desired.Tolerations
+	spec.TerminationGracePeriodSeconds = desired.TerminationGracePeriodSeconds
+	spec.EphemeralContainers = desired.EphemeralContainers
+	// TODO: The image becomes gated with dynamic containers, at which point we
+	// should stop copying the image here.
+	copyImages(spec.Containers, desired.Containers)
+	copyImages(spec.InitContainers, desired.InitContainers)
+}
+
+// copyImages sets the image of each container to the one of the container with the same name in desired.
+func copyImages(containers, desired []v1.Container) {
+	for i := range containers {
+		for j := range desired {
+			if desired[j].Name == containers[i].Name {
+				containers[i].Image = desired[j].Image
+				break
+			}
+		}
+	}
+}
+
+// updatePodFromAllocation overlays the allocated resources onto the pod. It is only used for pods
+// migrated from a V1 checkpoint, which have nothing else (see isMigratedFromV1).
 func updatePodFromAllocation(pod *v1.Pod, allocated *v1.Pod) (*v1.Pod, bool) {
 	if pod == nil {
 		return pod, false
@@ -574,14 +638,19 @@ func (m *manager) RemoveOrphanedPods(remainingPods sets.Set[types.UID]) {
 
 func (m *manager) handlePodResourcesResize(ctx context.Context, pod *v1.Pod) (bool, error) {
 	logger := klog.FromContext(ctx)
-	_, updated := m.UpdatePodFromAllocation(pod)
+	allocatedPod, updated := m.UpdatePodFromAllocation(pod)
 	if !updated {
 		// Desired resources == allocated resources. Pod allocation does not need to be updated.
 		m.statusManager.ClearPodResizePendingCondition(pod.UID, metrics.DeferredResizeResolutionReverted)
 		return false, nil
 	}
 
-	// Desired resources != allocated resources. Can we update the allocation to the desired resources?
+	resizeRequested := isResizeRequested(pod, allocatedPod)
+	if !resizeRequested {
+		m.statusManager.ClearPodResizePendingCondition(pod.UID, metrics.DeferredResizeResolutionReverted)
+	}
+
+	// Desired pod != allocated pod. Can we update the allocation to the desired pod?
 	fit, reason, message := m.canAdmitPod(ctx, m.getAllocatedPods(m.getActivePods()), pod, lifecycle.ResizeOperation)
 	if fit {
 		// Update pod resource allocation checkpoint
@@ -590,17 +659,19 @@ func (m *manager) handlePodResourcesResize(ctx context.Context, pod *v1.Pod) (bo
 		}
 		m.statusManager.ClearPodResizePendingCondition(pod.UID, metrics.DeferredResizeResolutionAccepted)
 
-		// Clear any errors that may have been surfaced from a previous resize and update the
-		// generation of the resize in-progress condition.
-		m.statusManager.ClearPodResizeInProgressCondition(pod.UID)
-		m.statusManager.SetPodResizeInProgressCondition(pod.UID, "", "", pod.Generation)
+		if resizeRequested {
+			// Clear any errors that may have been surfaced from a previous resize and update the
+			// generation of the resize in-progress condition.
+			m.statusManager.ClearPodResizeInProgressCondition(pod.UID)
+			m.statusManager.SetPodResizeInProgressCondition(pod.UID, "", "", pod.Generation)
 
-		msg := events.PodResizeStartedMsg(logger, pod, pod.Generation)
-		m.recorder.WithLogger(logger).Eventf(pod, v1.EventTypeNormal, events.ResizeStarted, "%s", msg)
+			msg := events.PodResizeStartedMsg(logger, pod, pod.Generation)
+			m.recorder.WithLogger(logger).Eventf(pod, v1.EventTypeNormal, events.ResizeStarted, "%s", msg)
+		}
 		return true, nil
 	}
 
-	if reason != "" {
+	if reason != "" && resizeRequested {
 		if m.statusManager.SetPodResizePendingCondition(pod.UID, reason, message, pod.Generation) {
 			eventType := events.ResizeDeferred
 			if reason == v1.PodReasonInfeasible {
@@ -612,6 +683,37 @@ func (m *manager) handlePodResourcesResize(ctx context.Context, pod *v1.Pod) (bo
 	}
 
 	return false, nil
+}
+
+// isResizeRequested returns whether the desired pod asks for a change to the resources of its
+// containers, to its pod-level resources, or to the size limit of one of its memory-backed emptyDir
+// volumes. Any other field that is gated on allocation can differ too, but that is not a resize.
+func isResizeRequested(desired, allocated *v1.Pod) bool {
+	// TODO: Adjust this function when dynamic containers is implemented, to check for added/removed containers
+	// that will also cause a resize.
+	if !apiequality.Semantic.DeepEqual(desired.Spec.Resources, allocated.Spec.Resources) {
+		return true
+	}
+	for c := range podutil.ContainerIter(&desired.Spec, podutil.InitContainers|podutil.Containers) {
+		for ac := range podutil.ContainerIter(&allocated.Spec, podutil.AllContainers) {
+			if ac.Name == c.Name && !apiequality.Semantic.DeepEqual(c.Resources, ac.Resources) {
+				return true
+			}
+		}
+	}
+	for _, vol := range desired.Spec.Volumes {
+		for _, allocVol := range allocated.Spec.Volumes {
+			if allocVol.Name != vol.Name {
+				continue
+			}
+			hasLimit, hasAllocLimit := VolHasMemoryBackedEmptyDirSizeLimit(&vol), VolHasMemoryBackedEmptyDirSizeLimit(&allocVol)
+			if hasLimit != hasAllocLimit || (hasLimit && vol.EmptyDir.SizeLimit.Cmp(*allocVol.EmptyDir.SizeLimit) != 0) {
+				return true
+			}
+			break
+		}
+	}
+	return false
 }
 
 // canAdmitPod determines if a pod can be admitted, and gives a reason if it
