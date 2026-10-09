@@ -436,7 +436,7 @@ function kube::util::test_client_certificate_authentication_enabled {
     | "${OPENSSL_BIN}" s_client -connect "127.0.0.1:${SECURE_API_PORT}" 2> /dev/null \
     | grep -A3 'Acceptable client certificate CA names')
 
-  if [[ "${output}" != *"/CN=127.0.0.1"* ]] && [[ "${output}" != *"CN = 127.0.0.1"* ]]; then
+  if [[ "${output}" != *"CN=127.0.0.1"* ]] && [[ "${output}" != *"CN = 127.0.0.1"* ]]; then
     echo "API server not configured for client certificate authentication"
     echo "Output of from acceptable client certificate check: ${output}"
     exit 1
