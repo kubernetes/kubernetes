@@ -60,6 +60,9 @@ type InterPodAffinity struct {
 	filteringExistingMemo           *nodememo.MemoLRU[string, *existingCountsEntry]
 	filteringIncomingMemo           *nodememo.MemoLRU[string, *incomingCountsEntry]
 	filteringHostScopedAffinityMemo *nodememo.MemoLRU[string, *hostScopedAffinityEntry]
+
+	// Memo of the cluster wide walk PreScore does, one entry per pod shape. See scoring_memo.go.
+	scoringMemo *nodememo.MemoLRU[string, *scoringEntry]
 }
 
 // filteringMemoReady reports whether New built the memos. A plugin assembled by hand - which is what
@@ -68,6 +71,12 @@ func (pl *InterPodAffinity) filteringMemoReady() bool {
 	return pl.filteringExistingMemo != nil &&
 		pl.filteringIncomingMemo != nil &&
 		pl.filteringHostScopedAffinityMemo != nil
+}
+
+// scoringMemoReady reports whether New built the scoring memo, for the same reason
+// filteringMemoReady exists.
+func (pl *InterPodAffinity) scoringMemoReady() bool {
+	return pl.scoringMemo != nil
 }
 
 // Name returns name of the plugin. It is used in logs, etc.
@@ -135,6 +144,7 @@ func New(_ context.Context, plArgs runtime.Object, h fwk.Handle, fts feature.Fea
 		filteringExistingMemo:                              nodememo.NewMemoLRU[string, *existingCountsEntry](nodememo.DefaultLRUSize),
 		filteringIncomingMemo:                              nodememo.NewMemoLRU[string, *incomingCountsEntry](nodememo.DefaultLRUSize),
 		filteringHostScopedAffinityMemo:                    nodememo.NewMemoLRU[string, *hostScopedAffinityEntry](nodememo.DefaultLRUSize),
+		scoringMemo:                                        nodememo.NewMemoLRU[string, *scoringEntry](nodememo.DefaultLRUSize),
 	}
 
 	return pl, nil
