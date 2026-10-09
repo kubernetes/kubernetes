@@ -186,6 +186,11 @@ func (tCtx TContext) WithTimeout(timeout time.Duration, timeoutCause string) TCo
 	return TContext{tCtx.TContext.WithTimeout(timeout, timeoutCause)}
 }
 
+// See [ktesting.WithDeadline].
+func (tCtx TContext) WithDeadline(deadline time.Time, timeoutCause string) TContext {
+	return TContext{tCtx.TContext.WithDeadline(deadline, timeoutCause)}
+}
+
 // See [ktesting.WithLogger].
 func (tCtx TContext) WithLogger(logger klog.Logger) TContext {
 	return TContext{tCtx.TContext.WithLogger(logger)}

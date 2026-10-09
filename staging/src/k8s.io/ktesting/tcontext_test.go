@@ -238,3 +238,25 @@ func TestWithContext(t *testing.T) {
 	tCtx.Expect(newCtx.Err()).To(gomega.MatchError(context.DeadlineExceeded))
 	tCtx.Expect(newCtx.Value("foo")).To(gomega.Equal("bar"))
 }
+
+func TestWithDeadline(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		tCtx := ktesting.Init(t)
+		tCtx = tCtx.WithDeadline(time.Now().Add(time.Second), "deadline test")
+		time.Sleep(2 * time.Second)
+		synctest.Wait()
+		tCtx.Expect(context.Cause(tCtx)).To(gomega.MatchError(context.DeadlineExceeded), "cause")
+		tCtx.Expect(tCtx.Err()).To(gomega.MatchError(context.DeadlineExceeded), "err")
+	})
+}
+
+func TestWithTimeout(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		tCtx := ktesting.Init(t)
+		tCtx = tCtx.WithTimeout(time.Second, "timeout test")
+		time.Sleep(2 * time.Second)
+		synctest.Wait()
+		tCtx.Expect(context.Cause(tCtx)).To(gomega.MatchError(context.DeadlineExceeded), "cause")
+		tCtx.Expect(tCtx.Err()).To(gomega.MatchError(context.DeadlineExceeded), "err")
+	})
+}

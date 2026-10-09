@@ -106,6 +106,7 @@ limitations under the License.
 //   - [TContext.WithCancel]
 //   - [TContext.WithoutCancel]
 //   - [TContext.WithTimeout]
+//   - [TContext.WithDeadline]
 //
 // In contrast to [context.WithCancel], [TContext.WithCancel] does not return a separate
 // cancel function. Instead, [TContext.Cancel] can be used to cancel the new TContext
