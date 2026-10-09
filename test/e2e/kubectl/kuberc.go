@@ -28,11 +28,10 @@ import (
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
-	"k8s.io/kubectl/pkg/config/v1beta1"
-
 	"sigs.k8s.io/yaml"
 
 	v1 "k8s.io/api/core/v1"
+	configv1 "k8s.io/kubectl/pkg/config/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -40,7 +39,7 @@ import (
 )
 
 var kuberc = `
-apiVersion: kubectl.config.k8s.io/v1beta1
+apiVersion: kubectl.config.k8s.io/v1
 kind: Preference
 aliases:
 - name: getn
@@ -172,7 +171,7 @@ var _ = SIGDescribe("kubectl kuberc", func() {
 			tmpDir, err = os.MkdirTemp("", "test-kuberc-cmd")
 			framework.ExpectNoError(err)
 			kubercFile = filepath.Join(tmpDir, "kuberc.yaml")
-			minimalKuberc := `apiVersion: kubectl.config.k8s.io/v1beta1
+			minimalKuberc := `apiVersion: kubectl.config.k8s.io/v1
 kind: Preference
 `
 			framework.ExpectNoError(os.WriteFile(kubercFile, []byte(minimalKuberc), os.FileMode(0644)))
@@ -191,13 +190,13 @@ kind: Preference
 
 			ginkgo.By("viewing the kuberc file and parsing as Preference")
 			output := e2ekubectl.RunKubectlOrDie(ns, "kuberc", "view", fmt.Sprintf("--kuberc=%s", kubercFile))
-			var pref v1beta1.Preference
+			var pref configv1.Preference
 			err := yaml.Unmarshal([]byte(output), &pref)
 			framework.ExpectNoError(err, "failed to unmarshal kuberc view output")
 
 			ginkgo.By("verifying structure")
-			if pref.APIVersion != "kubectl.config.k8s.io/v1beta1" {
-				framework.Failf("expected apiVersion kubectl.config.k8s.io/v1beta1, got: %s", pref.APIVersion)
+			if pref.APIVersion != "kubectl.config.k8s.io/v1" {
+				framework.Failf("expected apiVersion kubectl.config.k8s.io/v1, got: %s", pref.APIVersion)
 			}
 			if pref.Kind != "Preference" {
 				framework.Failf("expected kind Preference, got: %s", pref.Kind)
