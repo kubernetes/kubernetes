@@ -2295,9 +2295,9 @@ func (c *cockroachDBTester) name() string {
 	return "CockroachDB"
 }
 
-func (c *cockroachDBTester) cockroachDBExec(cmd, ns, podName string) string {
+func (c *cockroachDBTester) cockroachDBExec(cmd, ns, podName string) (string, error) {
 	cmd = fmt.Sprintf("/cockroach/cockroach sql --insecure --host %s.cockroachdb -e \"%v\"", podName, cmd)
-	return e2ekubectl.RunKubectlOrDie(ns, "exec", podName, "--", "/bin/sh", "-c", cmd)
+	return e2ekubectl.RunKubectl(ns, "exec", podName, "--", "/bin/sh", "-c", cmd)
 }
 
 func (c *cockroachDBTester) deploy(ctx context.Context, ns string) *appsv1.StatefulSet {
@@ -2311,7 +2311,9 @@ func (c *cockroachDBTester) deploy(ctx context.Context, ns string) *appsv1.State
 		"CREATE DATABASE IF NOT EXISTS foo;",
 		"CREATE TABLE IF NOT EXISTS foo.bar (k STRING PRIMARY KEY, v STRING);",
 	} {
-		framework.Logf("%s", c.cockroachDBExec(cmd, ns, fmt.Sprintf("%v-0", c.ss.Name)))
+		out, err := c.cockroachDBExec(cmd, ns, fmt.Sprintf("%v-0", c.ss.Name))
+		framework.ExpectNoError(err)
+		framework.Logf("%s", out)
 	}
 	return c.ss
 }
@@ -2320,12 +2322,23 @@ func (c *cockroachDBTester) write(statefulPodIndex int, kv map[string]string) {
 	name := fmt.Sprintf("%v-%d", c.ss.Name, statefulPodIndex)
 	for k, v := range kv {
 		cmd := fmt.Sprintf("UPSERT INTO foo.bar VALUES ('%v', '%v');", k, v)
-		framework.Logf("%s", c.cockroachDBExec(cmd, c.ss.Namespace, name))
+		out, err := c.cockroachDBExec(cmd, c.ss.Namespace, name)
+		framework.ExpectNoError(err)
+		framework.Logf("%s", out)
 	}
 }
 func (c *cockroachDBTester) read(statefulPodIndex int, key string) string {
 	name := fmt.Sprintf("%v-%d", c.ss.Name, statefulPodIndex)
-	return lastLine(c.cockroachDBExec(fmt.Sprintf("SELECT v FROM foo.bar WHERE k='%v';", key), c.ss.Namespace, name))
+	// Right after a pod is recreated, its headless Service record can still be a
+	// cached negative DNS answer and the node may not serve SQL yet. Return an
+	// empty value so the caller's poll retries instead of failing on the first
+	// exec error.
+	out, err := c.cockroachDBExec(fmt.Sprintf("SELECT v FROM foo.bar WHERE k='%v';", key), c.ss.Namespace, name)
+	if err != nil {
+		framework.Logf("Reading from %s failed, will retry: %v", name, err)
+		return ""
+	}
+	return lastLine(out)
 }
 
 func lastLine(out string) string {
