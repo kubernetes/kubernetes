@@ -722,6 +722,22 @@ func TestApplyPodLevelResourceDefaults(t *testing.T) {
 			wantLimits:   getResourceList("200m", "256Mi"),
 		},
 		{
+			name:                "zero container limit is not defaulted to a pod-level limit",
+			plrEnabled:          true,
+			plrFixUpdateEnabled: true,
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						newContainer("c1", getResourceList("100m", "128Mi"), getResourceList("200m", "256Mi")),
+						newContainer("c2", getResourceList("0", "64Mi"), getResourceList("0", "128Mi")),
+					},
+					Resources: &api.ResourceRequirements{Requests: getResourceList("100m", "192Mi")},
+				},
+			},
+			wantRequests: getResourceList("100m", "192Mi"),
+			wantLimits:   getResourceList("", "384Mi"),
+		},
+		{
 			name:                "pod requests defaulted from container requests when limits set",
 			plrEnabled:          true,
 			plrFixUpdateEnabled: true,
