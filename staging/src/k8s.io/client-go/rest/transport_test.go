@@ -124,6 +124,15 @@ uml0obOEy+ON91k+SWTJ3ggmF/U=
 				},
 			},
 		},
+		{
+			name: "with connection pool",
+			config: &Config{
+				Host:                  "localhost:8080",
+				Username:              "gopher",
+				Password:              "g0ph3r",
+				MinConnectionPoolSize: 3,
+			},
+		},
 	}
 	var wg sync.WaitGroup
 
@@ -145,4 +154,15 @@ uml0obOEy+ON91k+SWTJ3ggmF/U=
 		}()
 	}
 	wg.Wait()
+}
+
+func TestTransportConfigMinConnectionPoolSize(t *testing.T) {
+	config := &Config{Host: "localhost:8080", MinConnectionPoolSize: 3}
+	transportConfig, err := config.TransportConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if transportConfig.MinConnectionPoolSize != 3 {
+		t.Errorf("expected MinConnectionPoolSize 3, got %d", transportConfig.MinConnectionPoolSize)
+	}
 }
