@@ -1472,61 +1472,61 @@ const (
 // Table is a tabular representation of a set of API resources. The server transforms the
 // object into a set of preferred columns for quickly reviewing the objects.
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-// +protobuf=false
+// +protobuf=true
 type Table struct {
 	TypeMeta `json:""`
 	// Standard list metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
 	// +optional
-	ListMeta `json:"metadata,omitempty"`
+	ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// columnDefinitions describes each column in the returned items array. The number of cells per row
 	// will always match the number of column definitions.
 	// +listType=atomic
-	ColumnDefinitions []TableColumnDefinition `json:"columnDefinitions"`
+	ColumnDefinitions []TableColumnDefinition `json:"columnDefinitions" protobuf:"bytes,2,rep,name=columnDefinitions"`
 	// rows is the list of items in the table.
 	// +listType=atomic
-	Rows []TableRow `json:"rows"`
+	Rows []TableRow `json:"rows" protobuf:"bytes,3,rep,name=rows"`
 }
 
 // TableColumnDefinition contains information about a column returned in the Table.
-// +protobuf=false
+// +protobuf=true
 type TableColumnDefinition struct {
 	// name is a human readable name for the column.
-	Name string `json:"name"`
+	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
 	// type is an OpenAPI type definition for this column, such as number, integer, string, or
 	// array.
 	// See https://github.com/OAI/OpenAPI-Specification/blob/master/versions/2.0.md#data-types for more.
-	Type string `json:"type"`
+	Type string `json:"type" protobuf:"bytes,2,opt,name=type"`
 	// format is an optional OpenAPI type modifier for this column. A format modifies the type and
 	// imposes additional rules, like date or time formatting for a string. The 'name' format is applied
 	// to the primary identifier column which has type 'string' to assist in clients identifying column
 	// is the resource name.
 	// See https://github.com/OAI/OpenAPI-Specification/blob/master/versions/2.0.md#data-types for more.
-	Format string `json:"format"`
+	Format string `json:"format" protobuf:"bytes,3,opt,name=format"`
 	// description is a human readable description of this column.
-	Description string `json:"description"`
+	Description string `json:"description" protobuf:"bytes,4,opt,name=description"`
 	// priority is an integer defining the relative importance of this column compared to others. Lower
 	// numbers are considered higher priority. Columns that may be omitted in limited space scenarios
 	// should be given a higher priority.
-	Priority int32 `json:"priority"`
+	Priority int32 `json:"priority" protobuf:"varint,5,opt,name=priority"`
 }
 
 // TableRow is an individual row in a table.
-// +protobuf=false
+// +protobuf=true
 type TableRow struct {
 	// cells will be as wide as the column definitions array and may contain strings, numbers (float64 or
 	// int64), booleans, simple maps, lists, or null. See the type field of the column definition for a
 	// more detailed description.
 	// +listType=atomic
-	Cells []interface{} `json:"cells"`
+	Cells []interface{} `json:"cells" protobuf:"bytes,1,rep,name=cells"`
 	// conditions describe additional status of a row that are relevant for a human user. These conditions
 	// apply to the row, not to the object, and will be specific to table output. The only defined
 	// condition type is 'Completed', for a row that indicates a resource that has run to completion and
 	// can be given less visual priority.
 	// +optional
 	// +listType=atomic
-	Conditions []TableRowCondition `json:"conditions,omitempty"`
+	Conditions []TableRowCondition `json:"conditions,omitempty" protobuf:"bytes,2,rep,name=conditions"`
 	// This field contains the requested additional information about each object based on the includeObject
 	// policy when requesting the Table. If "None", this field is empty, if "Object" this will be the
 	// default serialization of the object for the current API version, and if "Metadata" (the default) will
@@ -1534,25 +1534,25 @@ type TableRow struct {
 	// The media type of the object will always match the enclosing list - if this as a JSON table, these
 	// will be JSON encoded objects.
 	// +optional
-	Object runtime.RawExtension `json:"object,omitempty"`
+	Object runtime.RawExtension `json:"object,omitempty" protobuf:"bytes,3,opt,name=object"`
 }
 
 // TableRowCondition allows a row to be marked with additional information.
-// +protobuf=false
+// +protobuf=true
 type TableRowCondition struct {
 	// Type of row condition. The only defined value is 'Completed' indicating that the
 	// object this row represents has reached a completed state and may be given less visual
 	// priority than other rows. Clients are not required to honor any conditions but should
 	// be consistent where possible about handling the conditions.
-	Type RowConditionType `json:"type"`
+	Type RowConditionType `json:"type" protobuf:"bytes,1,opt,name=type,casttype=RowConditionType"`
 	// Status of the condition, one of True, False, Unknown.
-	Status ConditionStatus `json:"status"`
+	Status ConditionStatus `json:"status" protobuf:"bytes,2,opt,name=status,casttype=ConditionStatus"`
 	// (brief) machine readable reason for the condition's last transition.
 	// +optional
-	Reason string `json:"reason,omitempty"`
+	Reason string `json:"reason,omitempty" protobuf:"bytes,3,opt,name=reason"`
 	// Human readable message indicating details about last transition.
 	// +optional
-	Message string `json:"message,omitempty"`
+	Message string `json:"message,omitempty" protobuf:"bytes,4,opt,name=message"`
 }
 
 type RowConditionType string

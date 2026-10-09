@@ -101,6 +101,11 @@ type typeNameSet map[types.Name]*protobufPackage
 // assignGoTypeToProtoPackage looks for Go and Protobuf types that are referenced by a type in
 // a package. It will not recurse into protobuf types.
 func assignGoTypeToProtoPackage(p *protobufPackage, t *types.Type, local, global typeNameSet, optional map[types.Name]struct{}) {
+	// Interfaces map to google.protobuf.Any, but merely declaring one must not
+	// import any.proto; ProtoTypeFor adds the import once a field uses it.
+	if isInterface(t) {
+		return
+	}
 	newT, isProto := isFundamentalProtoType(t)
 	if isProto {
 		t = newT
