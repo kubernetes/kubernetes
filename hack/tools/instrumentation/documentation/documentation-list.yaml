@@ -1788,17 +1788,6 @@
   componentEndpoints:
   - component: kube-apiserver
     endpoint: /metrics
-- name: apiserver_resource_size_estimate_bytes
-  help: Estimated size of stored objects in database. Estimate is based on sum of
-    last observed sizes of serialized objects.
-  type: Custom
-  stabilityLevel: ALPHA
-  labels:
-  - group
-  - resource
-  componentEndpoints:
-  - component: kube-apiserver
-    endpoint: /metrics
 - name: selfrequest_total
   subsystem: apiserver
   help: Counter of apiserver self-requests broken out for each verb, API resource
@@ -7540,6 +7529,17 @@
   - 10
   - 15
   - 30
+  componentEndpoints:
+  - component: kube-apiserver
+    endpoint: /metrics
+- name: apiserver_resource_size_estimate_bytes
+  help: Estimated size of stored objects in database. Estimate is based on sum of
+    last observed sizes of serialized objects.
+  type: Custom
+  stabilityLevel: BETA
+  labels:
+  - group
+  - resource
   componentEndpoints:
   - component: kube-apiserver
     endpoint: /metrics
