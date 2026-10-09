@@ -33,6 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodememo"
 	"k8s.io/kubernetes/pkg/scheduler/util"
 )
 
@@ -70,6 +71,18 @@ type PodTopologySpread struct {
 	enableMatchLabelKeysInPodTopologySpread            bool
 	enableTaintTolerationComparisonOperators           bool
 	enableInPlacePodVerticalScalingSchedulerPreemption bool
+
+	// Memo of the cluster wide walk PreScore does, one entry per pod shape. See scoring_memo.go. It
+	// hangs off the plugin rather than the package because a profile owns its own PodTopologySpread
+	// instance, and what a node contributes depends on instance level configuration - the default
+	// constraints and the inclusion policy gates.
+	scoringMemo *nodememo.MemoLRU[string, *spreadEntry]
+}
+
+// scoringMemoReady reports whether New built the memo. A plugin assembled by hand - which is what the
+// tests that drive one extension point directly do - has none, and takes the full computation.
+func (pl *PodTopologySpread) scoringMemoReady() bool {
+	return pl.scoringMemo != nil
 }
 
 var _ fwk.PreFilterPlugin = &PodTopologySpread{}
@@ -122,6 +135,7 @@ func New(_ context.Context, plArgs runtime.Object, h fwk.Handle, fts feature.Fea
 		enableMatchLabelKeysInPodTopologySpread:            fts.EnableMatchLabelKeysInPodTopologySpread,
 		enableTaintTolerationComparisonOperators:           fts.EnableTaintTolerationComparisonOperators,
 		enableInPlacePodVerticalScalingSchedulerPreemption: fts.EnableInPlacePodVerticalScalingSchedulerPreemption,
+		scoringMemo: nodememo.NewMemoLRU[string, *spreadEntry](nodememo.DefaultLRUSize),
 	}
 	if args.DefaultingType == config.SystemDefaulting {
 		pl.defaultConstraints = systemDefaultConstraints
