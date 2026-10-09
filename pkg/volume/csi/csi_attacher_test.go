@@ -39,6 +39,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	fakeclient "k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
+	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/volume"
 	fakecsi "k8s.io/kubernetes/pkg/volume/csi/fake"
 	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
@@ -329,6 +330,7 @@ func TestAttacherAttachWithInline(t *testing.T) {
 }
 
 func TestAttacherWithCSIDriver(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	tests := []struct {
 		name                   string
 		driver                 string
@@ -374,7 +376,7 @@ func TestAttacherWithCSIDriver(t *testing.T) {
 			csiAttacher := getCsiAttacherFromVolumeAttacher(attacher, test.watchTimeout)
 			spec := volume.NewSpecFromPersistentVolume(makeTestPV("test-pv", 10, test.driver, "test-vol"), false)
 
-			pluginCanAttach, err := plug.CanAttach(spec)
+			pluginCanAttach, err := plug.CanAttach(logger, spec)
 			if err != nil {
 				t.Fatalf("attacher.CanAttach failed: %s", err)
 			}
@@ -416,6 +418,7 @@ func TestAttacherWaitForVolumeAttachmentWithCSIDriver(t *testing.T) {
 	// In order to detect if the volume plugin would skip WaitForAttach for non-attachable drivers,
 	// we do not instantiate any VolumeAttachment. So if the plugin does not skip attach,  WaitForVolumeAttachment
 	// will return an error that volume attachment was not found.
+	logger, _ := ktesting.NewTestContext(t)
 	tests := []struct {
 		name         string
 		driver       string
@@ -467,7 +470,7 @@ func TestAttacherWaitForVolumeAttachmentWithCSIDriver(t *testing.T) {
 			csiAttacher := getCsiAttacherFromVolumeAttacher(attacher, test.watchTimeout)
 			spec := volume.NewSpecFromPersistentVolume(makeTestPV("test-pv", 10, test.driver, "test-vol"), false)
 
-			pluginCanAttach, err := plug.CanAttach(spec)
+			pluginCanAttach, err := plug.CanAttach(logger, spec)
 			if err != nil {
 				t.Fatalf("plugin.CanAttach test failed: %s", err)
 			}

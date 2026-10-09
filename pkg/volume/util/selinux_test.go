@@ -28,10 +28,12 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetesting "k8s.io/kubernetes/pkg/volume/testing"
+	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/ptr"
 )
 
 func TestGetMountSELinuxLabel(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	pvRWOP := &v1.PersistentVolume{
 		Spec: v1.PersistentVolumeSpec{
 			AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOncePod},
@@ -320,7 +322,7 @@ func TestGetMountSELinuxLabel(t *testing.T) {
 			plugin.SupportsSELinux = tt.pluginSupportsSELinux
 
 			// Act
-			info, err := GetMountSELinuxLabel(tt.volume, tt.seLinuxOptions, tt.podSecurityContext, pluginMgr, seLinuxTranslator)
+			info, err := GetMountSELinuxLabel(logger, tt.volume, tt.seLinuxOptions, tt.podSecurityContext, pluginMgr, seLinuxTranslator)
 
 			// Assert
 			if err != nil {

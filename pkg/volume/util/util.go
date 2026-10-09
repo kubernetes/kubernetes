@@ -706,7 +706,7 @@ func VolumeHealthConditionSetsEqual(a, b []v1.VolumeHealthCondition) bool {
 // The difference is that it bypass the CanAttach() check for CSI plugin, i.e. it assumes all CSI plugin supports detach.
 // The intention here is that a CSI plugin volume can end up in an Uncertain state,  so that a detach
 // operation will help it to detach no matter it actually has the ability to attach/detach.
-func FindDetachablePluginBySpec(spec *volume.Spec, pm *volume.VolumePluginMgr) (volume.AttachableVolumePlugin, error) {
+func FindDetachablePluginBySpec(logger klog.Logger, spec *volume.Spec, pm *volume.VolumePluginMgr) (volume.AttachableVolumePlugin, error) {
 	volumePlugin, err := pm.FindPluginBySpec(spec)
 	if err != nil {
 		return nil, err
@@ -715,7 +715,7 @@ func FindDetachablePluginBySpec(spec *volume.Spec, pm *volume.VolumePluginMgr) (
 		if attachableVolumePlugin.GetPluginName() == "kubernetes.io/csi" {
 			return attachableVolumePlugin, nil
 		}
-		if canAttach, err := attachableVolumePlugin.CanAttach(spec); err != nil {
+		if canAttach, err := attachableVolumePlugin.CanAttach(logger, spec); err != nil {
 			return nil, err
 		} else if canAttach {
 			return attachableVolumePlugin, nil

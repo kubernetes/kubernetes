@@ -85,7 +85,7 @@ func (plugin *localVolumePlugin) CanSupport(spec *volume.Spec) bool {
 	return (spec.PersistentVolume != nil && spec.PersistentVolume.Spec.Local != nil)
 }
 
-func (plugin *localVolumePlugin) RequiresRemount(spec *volume.Spec) bool {
+func (plugin *localVolumePlugin) RequiresRemount(logger klog.Logger, spec *volume.Spec) bool {
 	return false
 }
 
@@ -93,7 +93,7 @@ func (plugin *localVolumePlugin) SupportsMountOption() bool {
 	return true
 }
 
-func (plugin *localVolumePlugin) SupportsSELinuxContextMount(spec *volume.Spec) (bool, error) {
+func (plugin *localVolumePlugin) SupportsSELinuxContextMount(logger klog.Logger, spec *volume.Spec) (bool, error) {
 	return false, nil
 }
 

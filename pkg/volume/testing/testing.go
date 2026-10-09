@@ -291,7 +291,7 @@ func (plugin *FakeVolumePlugin) CanSupport(spec *volume.Spec) bool {
 	return true
 }
 
-func (plugin *FakeVolumePlugin) RequiresRemount(spec *volume.Spec) bool {
+func (plugin *FakeVolumePlugin) RequiresRemount(logger klog.Logger, spec *volume.Spec) bool {
 	return plugin.SupportsRemount
 }
 
@@ -299,7 +299,7 @@ func (plugin *FakeVolumePlugin) SupportsMountOption() bool {
 	return true
 }
 
-func (plugin *FakeVolumePlugin) SupportsSELinuxContextMount(spec *volume.Spec) (bool, error) {
+func (plugin *FakeVolumePlugin) SupportsSELinuxContextMount(logger klog.Logger, spec *volume.Spec) (bool, error) {
 	return plugin.SupportsSELinux, nil
 }
 
@@ -444,11 +444,11 @@ func (plugin *FakeVolumePlugin) GetNewDetacherCallCount() int {
 	return plugin.NewDetacherCallCount
 }
 
-func (plugin *FakeVolumePlugin) CanAttach(spec *volume.Spec) (bool, error) {
+func (plugin *FakeVolumePlugin) CanAttach(logger klog.Logger, spec *volume.Spec) (bool, error) {
 	return !plugin.NonAttachable, nil
 }
 
-func (plugin *FakeVolumePlugin) VerifyExhaustedResource(spec *volume.Spec) bool {
+func (plugin *FakeVolumePlugin) VerifyExhaustedResource(logger klog.Logger, spec *volume.Spec) bool {
 	return plugin.VerifyExhaustedEnabled
 }
 
@@ -577,12 +577,12 @@ func (f *FakeBasicVolumePlugin) NewUnmounter(volName string, podUID types.UID) (
 	return f.Plugin.NewUnmounter(volName, podUID)
 }
 
-func (f *FakeBasicVolumePlugin) RequiresRemount(spec *volume.Spec) bool {
-	return f.Plugin.RequiresRemount(spec)
+func (f *FakeBasicVolumePlugin) RequiresRemount(logger klog.Logger, spec *volume.Spec) bool {
+	return f.Plugin.RequiresRemount(logger, spec)
 }
 
-func (f *FakeBasicVolumePlugin) SupportsSELinuxContextMount(spec *volume.Spec) (bool, error) {
-	return f.Plugin.SupportsSELinuxContextMount(spec)
+func (f *FakeBasicVolumePlugin) SupportsSELinuxContextMount(logger klog.Logger, spec *volume.Spec) (bool, error) {
+	return f.Plugin.SupportsSELinuxContextMount(logger, spec)
 }
 
 func (f *FakeBasicVolumePlugin) SupportsMountOption() bool {
@@ -628,11 +628,11 @@ func (f *FakeAttachableVolumePlugin) NewDetacher() (volume.Detacher, error) {
 	return f.Plugin.NewDetacher()
 }
 
-func (f *FakeAttachableVolumePlugin) CanAttach(spec *volume.Spec) (bool, error) {
+func (f *FakeAttachableVolumePlugin) CanAttach(logger klog.Logger, spec *volume.Spec) (bool, error) {
 	return true, nil
 }
 
-func (f *FakeAttachableVolumePlugin) VerifyExhaustedResource(spec *volume.Spec) bool {
+func (f *FakeAttachableVolumePlugin) VerifyExhaustedResource(logger klog.Logger, spec *volume.Spec) bool {
 	return false
 }
 
@@ -658,7 +658,7 @@ func (plugin *FakeFileVolumePlugin) CanSupport(spec *volume.Spec) bool {
 	return true
 }
 
-func (plugin *FakeFileVolumePlugin) RequiresRemount(spec *volume.Spec) bool {
+func (plugin *FakeFileVolumePlugin) RequiresRemount(logger klog.Logger, spec *volume.Spec) bool {
 	return false
 }
 
@@ -666,7 +666,7 @@ func (plugin *FakeFileVolumePlugin) SupportsMountOption() bool {
 	return false
 }
 
-func (plugin *FakeFileVolumePlugin) SupportsSELinuxContextMount(spec *volume.Spec) (bool, error) {
+func (plugin *FakeFileVolumePlugin) SupportsSELinuxContextMount(logger klog.Logger, spec *volume.Spec) (bool, error) {
 	return false, nil
 }
 

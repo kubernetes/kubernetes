@@ -75,7 +75,7 @@ func (attacher *fcAttacher) VolumesAreAttached(specs []*volume.Spec, nodeName ty
 	return volumesAttachedCheck, nil
 }
 
-func (plugin *fcPlugin) VerifyExhaustedResource(spec *volume.Spec) bool {
+func (plugin *fcPlugin) VerifyExhaustedResource(logger klog.Logger, spec *volume.Spec) bool {
 	return false
 }
 
@@ -205,7 +205,7 @@ func (detacher *fcDetacher) UnmountDevice(deviceMountPath string) error {
 	return nil
 }
 
-func (plugin *fcPlugin) CanAttach(spec *volume.Spec) (bool, error) {
+func (plugin *fcPlugin) CanAttach(logger klog.Logger, spec *volume.Spec) (bool, error) {
 	return true, nil
 }
 

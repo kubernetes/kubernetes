@@ -467,7 +467,7 @@ func (c *Controller) syncPod(ctx context.Context, pod *v1.Pod) error {
 			logger.V(4).Info("skipping not found volume", "pod", klog.KObj(pod), "volume", mount)
 			continue
 		}
-		mountInfo, err := volumeutil.GetMountSELinuxLabel(spec, opts, pod.Spec.SecurityContext, c.vpm, c.seLinuxTranslator)
+		mountInfo, err := volumeutil.GetMountSELinuxLabel(logger, spec, opts, pod.Spec.SecurityContext, c.vpm, c.seLinuxTranslator)
 		if err != nil {
 			errors.Is(err, &volumeutil.MultipleSELinuxLabelsError{})
 			if volumeutil.IsMultipleSELinuxLabelsError(err) {
