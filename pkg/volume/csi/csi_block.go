@@ -211,6 +211,8 @@ func (m *csiBlockMapper) publishVolumeForBlock(
 	csiSource *v1.CSIPersistentVolumeSource,
 	attachment *storage.VolumeAttachment,
 ) (string, error) {
+	logger := klog.FromContext(ctx)
+
 	klog.V(4).Info(log("blockMapper.publishVolumeForBlock called"))
 
 	publishVolumeInfo := map[string]string{}
@@ -220,7 +222,7 @@ func (m *csiBlockMapper) publishVolumeForBlock(
 
 	// Inject pod information into volume_attributes
 	volAttribs := csiSource.VolumeAttributes
-	podInfoEnabled, err := m.plugin.podInfoEnabled(string(m.driverName))
+	podInfoEnabled, err := m.plugin.podInfoEnabled(logger, string(m.driverName))
 	if err != nil {
 		return "", volumetypes.NewTransientOperationFailure(log("blockMapper.publishVolumeForBlock failed to assemble volume attributes: %v", err))
 	}
@@ -291,7 +293,9 @@ func (m *csiBlockMapper) SetUpDevice() (string, error) {
 	}
 
 	driverName := csiSource.Driver
-	skip, err := m.plugin.skipAttach(driverName)
+	// Use klog.TODO() because we currently do not have a proper logger to pass in.
+	// Replace this with an appropriate logger when refactoring this function to accept a logger parameter.
+	skip, err := m.plugin.skipAttach(klog.TODO(), driverName)
 	if err != nil {
 		return "", errors.New(log("blockMapper.SetupDevice failed to check CSIDriver for %s: %v", driverName, err))
 	}
@@ -353,7 +357,9 @@ func (m *csiBlockMapper) MapPodDevice() (string, error) {
 	}
 
 	driverName := csiSource.Driver
-	skip, err := m.plugin.skipAttach(driverName)
+	// Use klog.TODO() because we currently do not have a proper logger to pass in.
+	// Replace this with an appropriate logger when refactoring this function to accept a logger parameter.
+	skip, err := m.plugin.skipAttach(klog.TODO(), driverName)
 	if err != nil {
 		return "", errors.New(log("blockMapper.MapPodDevice failed to check CSIDriver for %s: %v", driverName, err))
 	}

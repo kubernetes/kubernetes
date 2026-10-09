@@ -54,7 +54,7 @@ func (plugin *iscsiPlugin) NewAttacher() (volume.Attacher, error) {
 	}, nil
 }
 
-func (plugin *iscsiPlugin) VerifyExhaustedResource(spec *volume.Spec) bool {
+func (plugin *iscsiPlugin) VerifyExhaustedResource(logger klog.Logger, spec *volume.Spec) bool {
 	return false
 }
 
@@ -193,7 +193,7 @@ func (detacher *iscsiDetacher) UnmountDevice(deviceMountPath string) error {
 	return nil
 }
 
-func (plugin *iscsiPlugin) CanAttach(spec *volume.Spec) (bool, error) {
+func (plugin *iscsiPlugin) CanAttach(logger klog.Logger, spec *volume.Spec) (bool, error) {
 	return true, nil
 }
 

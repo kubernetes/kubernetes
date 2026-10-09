@@ -100,7 +100,7 @@ func (plugin *hostPathPlugin) CanSupport(spec *volume.Spec) bool {
 		(spec.Volume != nil && spec.Volume.HostPath != nil)
 }
 
-func (plugin *hostPathPlugin) RequiresRemount(spec *volume.Spec) bool {
+func (plugin *hostPathPlugin) RequiresRemount(logger klog.Logger, spec *volume.Spec) bool {
 	return false
 }
 
@@ -108,7 +108,7 @@ func (plugin *hostPathPlugin) SupportsMountOption() bool {
 	return false
 }
 
-func (plugin *hostPathPlugin) SupportsSELinuxContextMount(spec *volume.Spec) (bool, error) {
+func (plugin *hostPathPlugin) SupportsSELinuxContextMount(logger klog.Logger, spec *volume.Spec) (bool, error) {
 	return false, nil
 }
 

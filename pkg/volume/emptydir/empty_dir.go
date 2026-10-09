@@ -107,7 +107,7 @@ func (plugin *emptyDirPlugin) CanSupport(spec *volume.Spec) bool {
 	return spec.Volume != nil && spec.Volume.EmptyDir != nil
 }
 
-func (plugin *emptyDirPlugin) RequiresRemount(spec *volume.Spec) bool {
+func (plugin *emptyDirPlugin) RequiresRemount(logger klog.Logger, spec *volume.Spec) bool {
 	// The kuberuntime_manager is responsible for resizing memory-backed emptyDir volumes,
 	// so we never remount them from within the volume plugin.
 	return false
@@ -117,7 +117,7 @@ func (plugin *emptyDirPlugin) SupportsMountOption() bool {
 	return false
 }
 
-func (plugin *emptyDirPlugin) SupportsSELinuxContextMount(spec *volume.Spec) (bool, error) {
+func (plugin *emptyDirPlugin) SupportsSELinuxContextMount(logger klog.Logger, spec *volume.Spec) (bool, error) {
 	return false, nil
 }
 

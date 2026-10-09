@@ -80,7 +80,7 @@ func (plugin *downwardAPIPlugin) CanSupport(spec *volume.Spec) bool {
 	return spec.Volume != nil && spec.Volume.DownwardAPI != nil
 }
 
-func (plugin *downwardAPIPlugin) RequiresRemount(spec *volume.Spec) bool {
+func (plugin *downwardAPIPlugin) RequiresRemount(logger klog.Logger, spec *volume.Spec) bool {
 	return true
 }
 
@@ -88,7 +88,7 @@ func (plugin *downwardAPIPlugin) SupportsMountOption() bool {
 	return false
 }
 
-func (plugin *downwardAPIPlugin) SupportsSELinuxContextMount(spec *volume.Spec) (bool, error) {
+func (plugin *downwardAPIPlugin) SupportsSELinuxContextMount(logger klog.Logger, spec *volume.Spec) (bool, error) {
 	return false, nil
 }
 

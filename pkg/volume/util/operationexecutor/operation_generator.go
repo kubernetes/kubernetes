@@ -355,7 +355,7 @@ func (og *operationGenerator) GenerateDetachVolumeFunc(
 	var err error
 
 	if volumeToDetach.VolumeSpec != nil {
-		attachableVolumePlugin, err = util.FindDetachablePluginBySpec(volumeToDetach.VolumeSpec, og.volumePluginMgr)
+		attachableVolumePlugin, err = util.FindDetachablePluginBySpec(logger, volumeToDetach.VolumeSpec, og.volumePluginMgr)
 		if err != nil || attachableVolumePlugin == nil {
 			return volumetypes.GeneratedOperations{}, volumeToDetach.GenerateErrorDetailed("DetachVolume.findDetachablePluginBySpec failed", err)
 		}
