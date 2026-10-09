@@ -17,12 +17,16 @@ limitations under the License.
 package preemption
 
 import (
+	"errors"
+	"fmt"
 	"slices"
 	"sync"
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	fwk "k8s.io/kube-scheduler/framework"
 )
+
+const podGroupPreemptionStateKey fwk.StateKey = "PodGroupPreemptionState"
 
 // PodGroupPreemptionState tracks dynamic victim eviction state across sequential
 // pod scheduling attempts within a single PodGroup preemption evaluation.
@@ -35,6 +39,47 @@ type PodGroupPreemptionState struct {
 
 	// condemned tracks the set of PreemptionVictims that assumed preemptor pods require to be evicted.
 	condemned sets.Set[fwk.PreemptionVictim]
+}
+
+// Clone implements fwk.StateData.
+func (s *PodGroupPreemptionState) Clone() fwk.StateData {
+	return s
+}
+
+// WriteToPodGroupCycleState stores PodGroupPreemptionState in PodGroupCycleState.
+func (s *PodGroupPreemptionState) WriteToPodGroupCycleState(state fwk.PodGroupCycleState) {
+	if state == nil {
+		return
+	}
+	state.Write(podGroupPreemptionStateKey, s)
+}
+
+// GetPodGroupPreemptionState retrieves PodGroupPreemptionState from a pod's CycleState
+// by walking up its PodGroupCycleState / PlacementCycleState hierarchy to the root PodGroupCycleState.
+// Returns (nil, nil) if not in a PodGroup preemption cycle.
+func GetPodGroupPreemptionState(state fwk.CycleState) (*PodGroupPreemptionState, error) {
+	if state == nil {
+		return nil, nil
+	}
+	for pgState := state.GetPodGroupCycleState(); pgState != nil; {
+		c, err := pgState.Read(podGroupPreemptionStateKey)
+		if err == nil {
+			s, ok := c.(*PodGroupPreemptionState)
+			if !ok {
+				return nil, fmt.Errorf("%+v convert to preemption.PodGroupPreemptionState error", c)
+			}
+			return s, nil
+		}
+		if !errors.Is(err, fwk.ErrNotFound) {
+			return nil, fmt.Errorf("error reading %q from podGroupCycleState: %w", podGroupPreemptionStateKey, err)
+		}
+		parentPlacement := pgState.GetParentPlacementCycleState()
+		if parentPlacement == nil {
+			break
+		}
+		pgState = parentPlacement.GetPodGroupCycleState()
+	}
+	return nil, nil
 }
 
 // NewPodGroupPreemptionState initializes dynamic victim tracking state for a PodGroup preemption cycle.

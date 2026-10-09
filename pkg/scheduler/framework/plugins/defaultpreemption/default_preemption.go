@@ -71,7 +71,7 @@ type IsEligiblePodFunc func(nodeInfo fwk.NodeInfo, victim preemption.Victim, pre
 type MoreImportantVictimFunc func(victim1, victim2 preemption.Victim) bool
 
 type podGroupEvaluator interface {
-	Preempt(ctx context.Context, pgInfo fwk.PodGroupInfo, podGroupSchedulingFunc fwk.PodGroupSchedulingFunc) (*fwk.PodGroupPostFilterResult, *fwk.Status)
+	Preempt(ctx context.Context, state fwk.PodGroupCycleState, pgInfo fwk.PodGroupInfo, podGroupSchedulingFunc fwk.PodGroupSchedulingFunc) (*fwk.PodGroupPostFilterResult, *fwk.Status)
 }
 
 // DefaultPreemption is a PostFilter plugin implements the preemption logic.
@@ -514,37 +514,12 @@ func (pl *DefaultPreemption) PodGroupPostFilter(ctx context.Context, state fwk.P
 		}
 	}()
 
-	res, status := pl.podGroupEvaluator.Preempt(ctx, pgInfo, pgSchedulingFunc)
+	res, status := pl.podGroupEvaluator.Preempt(ctx, state, pgInfo, pgSchedulingFunc)
 	msg := status.Message()
 	if len(msg) > 0 {
 		return res, fwk.NewStatus(status.Code(), "pod group preemption: "+msg)
 	}
 	return res, status
-}
-
-// TODO: Replace with the final PodGroupPreemptionState retrieval mechanism once wired up with PodGroupPostFilter.
-const podGroupPreemptionStateKey fwk.StateKey = "PodGroupPreemptionState"
-
-type podGroupPreemptionStateHolder struct {
-	state *preemption.PodGroupPreemptionState
-}
-
-func (h *podGroupPreemptionStateHolder) Clone() fwk.StateData {
-	return h
-}
-
-func getPodGroupPreemptionState(state fwk.CycleState) *preemption.PodGroupPreemptionState {
-	if state == nil {
-		return nil
-	}
-	c, err := state.Read(podGroupPreemptionStateKey)
-	if err != nil {
-		return nil
-	}
-	if h, ok := c.(*podGroupPreemptionStateHolder); ok {
-		return h.state
-	}
-	return nil
 }
 
 type preemptionScoreState struct {
@@ -568,7 +543,10 @@ func (s *reserveState) Clone() fwk.StateData {
 // It prioritizes nodes that require zero new preemptions (either naturally free capacity
 // or space freed up by already-condemned victims) and ranks remaining nodes by victim cost.
 func (pl *DefaultPreemption) PreScore(ctx context.Context, cycleState fwk.CycleState, pod *v1.Pod, nodes []fwk.NodeInfo) *fwk.Status {
-	preemptionState := getPodGroupPreemptionState(cycleState)
+	preemptionState, err := preemption.GetPodGroupPreemptionState(cycleState)
+	if err != nil {
+		return fwk.AsStatus(err)
+	}
 	if preemptionState == nil || len(nodes) == 0 {
 		return fwk.NewStatus(fwk.Skip)
 	}
@@ -665,7 +643,10 @@ func (pl *DefaultPreemption) getVictimsOnNode(state fwk.CycleState, nodeName str
 
 // Reserve records newly condemned victims when a pod in a PodGroup is tentatively assumed on nodeName.
 func (pl *DefaultPreemption) Reserve(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) *fwk.Status {
-	preemptionState := getPodGroupPreemptionState(state)
+	preemptionState, err := preemption.GetPodGroupPreemptionState(state)
+	if err != nil {
+		return fwk.AsStatus(err)
+	}
 	if preemptionState == nil {
 		return nil
 	}
@@ -678,7 +659,11 @@ func (pl *DefaultPreemption) Reserve(ctx context.Context, state fwk.CycleState, 
 
 // Unreserve rolls back condemned victims recorded by Reserve if the pod assumption is reverted.
 func (pl *DefaultPreemption) Unreserve(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) {
-	preemptionState := getPodGroupPreemptionState(state)
+	preemptionState, err := preemption.GetPodGroupPreemptionState(state)
+	if err != nil {
+		klog.FromContext(ctx).Error(err, "Failed to read PodGroupPreemptionState from cycleState")
+		return
+	}
 	if preemptionState == nil {
 		return
 	}

@@ -4256,7 +4256,7 @@ type mockPodGroupEvaluator struct {
 	status *fwk.Status
 }
 
-func (m *mockPodGroupEvaluator) Preempt(ctx context.Context, pgInfo fwk.PodGroupInfo, podGroupSchedulingFunc fwk.PodGroupSchedulingFunc) (*fwk.PodGroupPostFilterResult, *fwk.Status) {
+func (m *mockPodGroupEvaluator) Preempt(ctx context.Context, state fwk.PodGroupCycleState, pgInfo fwk.PodGroupInfo, podGroupSchedulingFunc fwk.PodGroupSchedulingFunc) (*fwk.PodGroupPostFilterResult, *fwk.Status) {
 	return nil, m.status
 }
 
@@ -4841,9 +4841,11 @@ func TestDefaultPreemption_PodGroupPreemptionScoring(t *testing.T) {
 	}
 
 	preemptState := preemption.NewPodGroupPreemptionState(allVictims)
+	pgState := framework.NewCycleState()
+	preemptState.WriteToPodGroupCycleState(pgState)
 	newCycleStateWithPreemption := func() fwk.CycleState {
 		s := framework.NewCycleState()
-		s.Write(podGroupPreemptionStateKey, &podGroupPreemptionStateHolder{state: preemptState})
+		s.SetPodGroupCycleState(pgState)
 		return s
 	}
 

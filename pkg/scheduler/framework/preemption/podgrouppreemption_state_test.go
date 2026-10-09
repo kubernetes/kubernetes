@@ -81,4 +81,25 @@ func TestPodGroupPreemptionState(t *testing.T) {
 	if got := len(state.SurvivingVictimsOnNode("node2")); got != 1 {
 		t.Fatalf("expected 1 surviving victim on node2 after rollback, got %d", got)
 	}
+
+	// Verify GetPodGroupPreemptionState traverses nested CompositePodGroup -> Placement -> ChildPodGroup -> Pod hierarchy.
+	rootPGState := framework.NewCycleState()
+	state.WriteToPodGroupCycleState(rootPGState)
+
+	placementState := framework.NewCycleState()
+	placementState.SetPodGroupCycleState(rootPGState)
+
+	childPGState := framework.NewCycleState()
+	childPGState.SetPlacementCycleState(placementState)
+
+	podState := framework.NewCycleState()
+	podState.SetPodGroupCycleState(childPGState)
+
+	got, err := GetPodGroupPreemptionState(podState)
+	if err != nil {
+		t.Fatalf("unexpected error from GetPodGroupPreemptionState: %v", err)
+	}
+	if got != state {
+		t.Fatalf("expected GetPodGroupPreemptionState to traverse hierarchy and return root state, got %v", got)
+	}
 }

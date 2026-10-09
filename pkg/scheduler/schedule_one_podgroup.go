@@ -426,7 +426,7 @@ func (sched *Scheduler) podGroupCycle(ctx context.Context, schedFwk framework.Fr
 	// Run pod group post filter plugins if scheduling failed. If any of the plugins is successful,
 	// we need to put the pods from pod group back into the scheduling queue.
 	if rootStatus.Code() == fwk.Unschedulable {
-		pgSchedulingFunc := sched.buildPodGroupSchedulingFunc(schedFwk, rootPodGroupInfo)
+		pgSchedulingFunc := sched.buildPodGroupSchedulingFunc(schedFwk, podGroupCycleState, rootPodGroupInfo)
 		pgPostFilterResult, status := schedFwk.RunPodGroupPostFilterPlugins(ctx, podGroupCycleState, rootPodGroupInfo.PodGroupInfo, pgSchedulingFunc)
 		applyPodGroupPostFilterResult(completePGResults, pgPostFilterResult, status)
 	}
@@ -436,9 +436,9 @@ func (sched *Scheduler) podGroupCycle(ctx context.Context, schedFwk framework.Fr
 
 // buildPodGroupSchedulingFunc returns a PodGroupSchedulingFunc that evaluates the root pod group
 // hierarchy and collects proposed assignments from successful leaf pod groups in tree-walk order.
-func (sched *Scheduler) buildPodGroupSchedulingFunc(schedFwk framework.Framework, rootPodGroupInfo *framework.QueuedPodGroupInfo) fwk.PodGroupSchedulingFunc {
+func (sched *Scheduler) buildPodGroupSchedulingFunc(schedFwk framework.Framework, podGroupCycleState *framework.CycleState, rootPodGroupInfo *framework.QueuedPodGroupInfo) fwk.PodGroupSchedulingFunc {
 	return func(ctx context.Context) (*fwk.PodGroupAssignments, *fwk.Status) {
-		results := sched.runRootSchedulingAlgorithm(ctx, schedFwk, framework.NewCycleState(), rootPodGroupInfo)
+		results := sched.runRootSchedulingAlgorithm(ctx, schedFwk, podGroupCycleState.Clone().(*framework.CycleState), rootPodGroupInfo)
 		rootResult := results[rootPodGroupInfo.PodGroupInfo.GetKey()]
 		if !rootResult.status.IsSuccess() {
 			return nil, rootResult.status
