@@ -132,7 +132,6 @@ func (pl *PodTopologySpread) PreScore(
 		return fwk.NewStatus(fwk.Skip)
 	}
 
-	logger := klog.FromContext(ctx)
 	state := &preScoreState{
 		IgnoredNodes: sets.New[string](),
 	}
@@ -152,45 +151,125 @@ func (pl *PodTopologySpread) PreScore(
 
 	// Ignore parsing errors for backwards compatibility.
 	requiredNodeAffinity := nodeaffinity.GetRequiredNodeAffinity(pod)
-	processAllNode := func(n int) {
-		nodeInfo := allNodes[n]
-		node := nodeInfo.Node()
 
-		if !pl.enableNodeInclusionPolicyInPodTopologySpread {
-			// `node` should satisfy incoming pod's NodeSelector/NodeAffinity
-			if match, _ := requiredNodeAffinity.Match(node); !match {
-				return
-			}
-		}
-
-		// All topologyKeys need to be present in `node`
-		if requireAllTopologies && !nodeLabelsMatchSpreadConstraints(node.Labels, state.Constraints) {
-			return
-		}
-
-		for i, c := range state.Constraints {
-			if pl.enableNodeInclusionPolicyInPodTopologySpread &&
-				!c.matchNodeInclusionPolicies(logger, pod, node, requiredNodeAffinity,
-					pl.enableTaintTolerationComparisonOperators) {
-				continue
-			}
-
-			value := node.Labels[c.TopologyKey]
-			// If current topology pair is not associated with any candidate node,
-			// continue to avoid unnecessary calculation.
-			// Per-node counts are also skipped, as they are done during Score.
-			tpCount := state.TopologyValueToPodCounts[i][value]
-			if tpCount == nil {
-				continue
-			}
-			count := countPodsMatchSelector(nodeInfo.GetPods(), c.Selector, pod.Namespace)
-			atomic.AddInt64(tpCount, int64(count))
-		}
+	// The counts either come from a memo validated by node generation, or from a full computation over
+	// this cycle's snapshot. Both are synchronous and both read the snapshot Score is about to read, so
+	// the counts can never be behind the events that woke this pod.
+	if !cycleState.IsPodGroupSchedulingCycle() && pl.scoringMemoReady() {
+		pl.addTopologyCountsByMemo(ctx, pod, state, allNodes, requireAllTopologies, requiredNodeAffinity)
+	} else {
+		pl.addTopologyCountsFull(ctx, pod, state, allNodes, requireAllTopologies, requiredNodeAffinity)
 	}
-	pl.parallelizer.Until(ctx, len(allNodes), processAllNode, pl.Name())
 
 	cycleState.Write(preScoreStateKey, state)
 	return nil
+}
+
+// addTopologyCountsFull is the community computation: every node of the snapshot in parallel, each one
+// adding its own counts straight into the state. It is what PreScore falls back to when the memo cannot
+// be used, and what the memo in scoring_memo.go has to agree with - the two share countNodePods, so
+// they cannot drift in what they count.
+func (pl *PodTopologySpread) addTopologyCountsFull(ctx context.Context, pod *v1.Pod,
+	state *preScoreState, allNodes []fwk.NodeInfo, requireAllTopologies bool,
+	requiredNodeAffinity nodeaffinity.RequiredNodeAffinity) {
+
+	in := &spreadInputs{
+		logger:               klog.FromContext(ctx),
+		pod:                  pod,
+		constraints:          state.Constraints,
+		requireAllTopologies: requireAllTopologies,
+		requiredNodeAffinity: requiredNodeAffinity,
+		// If current topology pair is not associated with any candidate node, its count is of no use.
+		// Asking before counting is what keeps countPodsMatchSelector off a node whose domain no
+		// filtered node is in, which on a cluster with a narrow node selector is most of them.
+		wanted: func(i int, topologyValue string) bool {
+			return state.TopologyValueToPodCounts[i][topologyValue] != nil
+		},
+	}
+	processAllNode := func(n int) {
+		for _, c := range pl.countNodePods(allNodes[n], in) {
+			atomic.AddInt64(state.TopologyValueToPodCounts[c.index][c.value], int64(c.count))
+		}
+	}
+	pl.parallelizer.Until(ctx, len(allNodes), processAllNode, pl.Name())
+}
+
+// spreadCount is one constraint's contribution of one node: how many of the node's pods the
+// constraint's selector matched, in the node's domain of that constraint's topology key.
+type spreadCount struct {
+	// index into preScoreState.Constraints, which is what the state's per cycle maps are indexed by
+	index int
+	value string
+	count int
+}
+
+// nodeSpreadCounts is what one node contributes: at most one entry per constraint, because a node is in
+// exactly one domain of a topology key. It stays nil for a node that contributes nothing, which on a
+// large cluster is most of them, so a pass over such a cluster allocates nothing per node.
+type nodeSpreadCounts []spreadCount
+
+// spreadInputs is everything countNodePods reads besides the node itself. All of it is fixed for one
+// PreScore call, and bundling it keeps the per node signature down to the node.
+type spreadInputs struct {
+	logger               klog.Logger
+	pod                  *v1.Pod
+	constraints          []topologySpreadConstraint
+	requireAllTopologies bool
+	requiredNodeAffinity nodeaffinity.RequiredNodeAffinity
+	// wanted reports whether a count for this constraint in this topology value can be used at all. It
+	// is consulted before the counting, because countPodsMatchSelector walks every pod of the node and
+	// both callers have domains they can never use. The full computation cannot use a topology value
+	// initPreScoreState did not seed from this cycle's filtered nodes. The memo cannot use a hostname
+	// scoped constraint at all - initPreScoreState never seeds one, because Score counts a node's own
+	// pods itself - and it has to stay independent of the filtered nodes, which is what lets one entry
+	// serve every cycle of a pod shape instead of one per set of nodes that happened to pass Filter.
+	wanted func(constraintIndex int, topologyValue string) bool
+}
+
+// countNodePods is the per node body of PreScore: for every soft constraint, how many of the node's
+// pods its selector matches, in the node's domain of that constraint's topology key. The full
+// computation and the memo both call it, so the two cannot drift in what they count - only the
+// traversal is incremental.
+func (pl *PodTopologySpread) countNodePods(nodeInfo fwk.NodeInfo, in *spreadInputs) nodeSpreadCounts {
+	node := nodeInfo.Node()
+
+	if !pl.enableNodeInclusionPolicyInPodTopologySpread {
+		// `node` should satisfy incoming pod's NodeSelector/NodeAffinity
+		if match, _ := in.requiredNodeAffinity.Match(node); !match {
+			return nil
+		}
+	}
+
+	// All topologyKeys need to be present in `node`
+	if in.requireAllTopologies && !nodeLabelsMatchSpreadConstraints(node.Labels, in.constraints) {
+		return nil
+	}
+
+	var counts nodeSpreadCounts
+	for i, c := range in.constraints {
+		if pl.enableNodeInclusionPolicyInPodTopologySpread &&
+			!c.matchNodeInclusionPolicies(in.logger, in.pod, node, in.requiredNodeAffinity,
+				pl.enableTaintTolerationComparisonOperators) {
+			continue
+		}
+
+		value := node.Labels[c.TopologyKey]
+		if !in.wanted(i, value) {
+			continue
+		}
+		count := countPodsMatchSelector(nodeInfo.GetPods(), c.Selector, in.pod.Namespace)
+		if count == 0 {
+			// Zero is what a seeded slot already holds, so there is nothing to add - and nothing for a
+			// memo to store, since keeping it would make a node that contributes nothing look like one
+			// that does, which is what the watermark rule decides from.
+			continue
+		}
+		if counts == nil {
+			counts = make(nodeSpreadCounts, 0, len(in.constraints))
+		}
+		counts = append(counts, spreadCount{index: i, value: value, count: count})
+	}
+	return counts
 }
 
 // Score invoked at the Score extension point.
