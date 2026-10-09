@@ -155,7 +155,7 @@ func (cm *ClientManager) hookClientConfig(cc ClientConfig) (*rest.Config, error)
 		if len(cfg.TLSClientConfig.CAData) > 0 {
 			cfg.TLSClientConfig.CAData = append(cfg.TLSClientConfig.CAData, '\n')
 		}
-		cfg.TLSClientConfig.CAData = append(cfg.TLSClientConfig.CAData, cc.CABundle...)
+		cfg.TLSClientConfig.CAData = append(cfg.TLSClientConfig.CAData, cc.CABundle.CurrentCABundleContent()...) // FIXME: this uses static content
 
 		cfg.ContentConfig.NegotiatedSerializer = cm.negotiatedSerializer
 		cfg.ContentConfig.ContentType = runtime.ContentTypeJSON

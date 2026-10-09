@@ -30,6 +30,7 @@ import (
 	"k8s.io/apiserver/pkg/admission/plugin/webhook"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/generic"
 	"k8s.io/client-go/informers"
+	"k8s.io/client-go/kubernetes"
 	admissionregistrationlisters "k8s.io/client-go/listers/admissionregistration/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/cache/synctrack"
@@ -54,12 +55,14 @@ type validatingWebhookConfigurationManager struct {
 
 var _ generic.Source = &validatingWebhookConfigurationManager{}
 
-func NewValidatingWebhookConfigurationManager(f informers.SharedInformerFactory, excludedWebhookResources sets.Set[schema.GroupResource]) generic.Source {
+func NewValidatingWebhookConfigurationManager(f informers.SharedInformerFactory, excludedWebhookResources sets.Set[schema.GroupResource], kubeClient kubernetes.Interface) generic.Source {
 	informer := f.Admissionregistration().V1().ValidatingWebhookConfigurations()
 	manager := &validatingWebhookConfigurationManager{
-		lister:                          informer.Lister(),
-		createValidatingWebhookAccessor: webhook.NewValidatingWebhookAccessor,
-		excludedWebhookResources:        excludedWebhookResources,
+		lister: informer.Lister(),
+		createValidatingWebhookAccessor: func(uid, configurationName string, h *v1.ValidatingWebhook) webhook.WebhookAccessor {
+			return webhook.NewValidatingWebhookAccessor(uid, configurationName, h, kubeClient)
+		},
+		excludedWebhookResources: excludedWebhookResources,
 	}
 	manager.lazy.Evaluate = manager.getConfiguration
 

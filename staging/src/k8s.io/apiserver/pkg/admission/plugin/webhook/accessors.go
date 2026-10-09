@@ -28,8 +28,11 @@ import (
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/predicates/namespace"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/predicates/object"
 	"k8s.io/apiserver/pkg/cel/environment"
+	"k8s.io/apiserver/pkg/server/dynamiccertificates"
 	webhookutil "k8s.io/apiserver/pkg/util/webhook"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	"k8s.io/klog/v2"
 )
 
 // WebhookAccessor provides a common interface to both mutating and validating webhook types.
@@ -87,11 +90,13 @@ type WebhookAccessor interface {
 
 	// GetType returns the type of the accessor (validate or admit)
 	GetType() string
+
+	GetKubeClient() kubernetes.Interface
 }
 
 // NewMutatingWebhookAccessor creates an accessor for a MutatingWebhook.
-func NewMutatingWebhookAccessor(uid, configurationName string, configurationUID types.UID, h *v1.MutatingWebhook) WebhookAccessor {
-	return &mutatingWebhookAccessor{uid: uid, configurationName: configurationName, configurationUID: configurationUID, MutatingWebhook: h}
+func NewMutatingWebhookAccessor(uid, configurationName string, configurationUID types.UID, h *v1.MutatingWebhook, kubeClient kubernetes.Interface) WebhookAccessor {
+	return &mutatingWebhookAccessor{uid: uid, configurationName: configurationName, configurationUID: configurationUID, MutatingWebhook: h, kubeClient: kubeClient}
 }
 
 type mutatingWebhookAccessor struct {
@@ -114,6 +119,8 @@ type mutatingWebhookAccessor struct {
 
 	compileMatcher  sync.Once
 	compiledMatcher matchconditions.Matcher
+
+	kubeClient kubernetes.Interface
 }
 
 func (m *mutatingWebhookAccessor) GetUID() string {
@@ -226,9 +233,13 @@ func (m *mutatingWebhookAccessor) GetValidatingWebhook() (*v1.ValidatingWebhook,
 	return nil, false
 }
 
+func (m *mutatingWebhookAccessor) GetKubeClient() kubernetes.Interface {
+	return m.kubeClient
+}
+
 // NewValidatingWebhookAccessor creates an accessor for a ValidatingWebhook.
-func NewValidatingWebhookAccessor(uid, configurationName string, configurationUID types.UID, h *v1.ValidatingWebhook) WebhookAccessor {
-	return &validatingWebhookAccessor{uid: uid, configurationName: configurationName, ValidatingWebhook: h}
+func NewValidatingWebhookAccessor(uid, configurationName string, configurationUID types.UID, h *v1.ValidatingWebhook, kubeClient kubernetes.Interface) WebhookAccessor {
+	return &validatingWebhookAccessor{uid: uid, configurationName: configurationName, configurationUID: configurationUID, ValidatingWebhook: h, kubeClient: kubeClient}
 }
 
 type validatingWebhookAccessor struct {
@@ -251,6 +262,8 @@ type validatingWebhookAccessor struct {
 
 	compileMatcher  sync.Once
 	compiledMatcher matchconditions.Matcher
+
+	kubeClient kubernetes.Interface
 }
 
 func (v *validatingWebhookAccessor) GetUID() string {
@@ -363,27 +376,45 @@ func (v *validatingWebhookAccessor) GetValidatingWebhook() (*v1.ValidatingWebhoo
 	return v.ValidatingWebhook, true
 }
 
+func (v *validatingWebhookAccessor) GetKubeClient() kubernetes.Interface {
+	return v.kubeClient
+}
+
 // hookClientConfigForWebhook construct a webhookutil.ClientConfig using a WebhookAccessor to access
-// v1beta1.MutatingWebhook and v1beta1.ValidatingWebhook API objects.  webhookutil.ClientConfig is used
+// MutatingWebhook and ValidatingWebhook API objects. webhookutil.ClientConfig is used
 // to create a HookClient and the purpose of the config struct is to share that with other packages
 // that need to create a HookClient.
 func hookClientConfigForWebhook(w WebhookAccessor) webhookutil.ClientConfig {
-	ret := webhookutil.ClientConfig{Name: w.GetName(), CABundle: w.GetClientConfig().CABundle}
-	if w.GetClientConfig().URL != nil {
-		ret.URL = *w.GetClientConfig().URL
+	whClientConfig := w.GetClientConfig()
+
+	ret := webhookutil.ClientConfig{Name: w.GetName()} // FIXME: here
+
+	var err error
+	if caBundle := whClientConfig.CABundle; caBundle != nil {
+		ret.CABundle, err = dynamiccertificates.NewStaticCAContent(w.GetName()+"_trust", caBundle) // FIXME: gotta return error now!
+	} else if ctbSelector := whClientConfig.ClusterTrustBundle; ctbSelector != nil {
+		ret.CABundle, err = dynamiccertificates.NewDynamicCAContentFromClusterTrustBundles(w.GetKubeClient(), w.GetName()+"_trust", *ctbSelector.SignerName)
 	}
-	if w.GetClientConfig().Service != nil {
+	if err != nil {
+		klog.Error(err)
+		// FIXME: return
+	}
+
+	if whClientConfig.URL != nil {
+		ret.URL = *whClientConfig.URL
+	}
+	if whClientConfig.Service != nil {
 		ret.Service = &webhookutil.ClientConfigService{
-			Name:      w.GetClientConfig().Service.Name,
-			Namespace: w.GetClientConfig().Service.Namespace,
+			Name:      whClientConfig.Service.Name,
+			Namespace: whClientConfig.Service.Namespace,
 		}
-		if w.GetClientConfig().Service.Port != nil {
-			ret.Service.Port = *w.GetClientConfig().Service.Port
+		if whClientConfig.Service.Port != nil {
+			ret.Service.Port = *whClientConfig.Service.Port
 		} else {
 			ret.Service.Port = 443
 		}
-		if w.GetClientConfig().Service.Path != nil {
-			ret.Service.Path = *w.GetClientConfig().Service.Path
+		if whClientConfig.Service.Path != nil {
+			ret.Service.Path = *whClientConfig.Service.Path
 		}
 	}
 	return ret
