@@ -38,7 +38,6 @@ import (
 	endpointsrequest "k8s.io/apiserver/pkg/endpoints/request"
 	webhookutil "k8s.io/apiserver/pkg/util/webhook"
 	"k8s.io/apiserver/pkg/warning"
-	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/component-base/tracing"
 	"k8s.io/klog/v2"
 )
@@ -86,7 +85,7 @@ func (v *versionedAttributeAccessor) VersionedAttribute(gvk schema.GroupVersionK
 
 var _ generic.Dispatcher = &validatingDispatcher{}
 
-func (d *validatingDispatcher) Dispatch(ctx context.Context, attr admission.Attributes, o admission.ObjectInterfaces, saclient corev1.ServiceAccountInterface, hooks []webhook.WebhookAccessor) error {
+func (d *validatingDispatcher) Dispatch(ctx context.Context, attr admission.Attributes, o admission.ObjectInterfaces, hooks []webhook.WebhookAccessor) error {
 	var relevantHooks []*generic.WebhookInvocation
 	// Construct all the versions we need to call our webhooks
 	versionedAttrAccessor := &versionedAttributeAccessor{

@@ -419,8 +419,6 @@ func (a *Webhook) Dispatch(ctx context.Context, attr admission.Attributes, o adm
 		return nil
 	}
 
-	cl := a.namespaceMatcher.Client.CoreV1().ServiceAccounts("kube-system")
-
 	if a.isExcludedFromAPIHooks(attr) {
 		// Admission config resources are excluded from API-based webhooks to prevent circular
 		// dependencies. However, static (manifest-based) webhooks are safe to evaluate since
@@ -430,7 +428,7 @@ func (a *Webhook) Dispatch(ctx context.Context, attr admission.Attributes, o adm
 				return admission.NewForbidden(attr, fmt.Errorf("not yet ready to handle request"))
 			}
 			hooks := a.staticSource.Webhooks()
-			return a.dispatcher.Dispatch(ctx, attr, o, cl, hooks)
+			return a.dispatcher.Dispatch(ctx, attr, o, hooks)
 		}
 		return nil
 	}
@@ -439,5 +437,5 @@ func (a *Webhook) Dispatch(ctx context.Context, attr admission.Attributes, o adm
 	}
 
 	hooks := a.hookSource.Webhooks()
-	return a.dispatcher.Dispatch(ctx, attr, o, cl, hooks)
+	return a.dispatcher.Dispatch(ctx, attr, o, hooks)
 }

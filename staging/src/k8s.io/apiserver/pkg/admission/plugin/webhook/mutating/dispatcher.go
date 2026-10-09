@@ -26,12 +26,13 @@ import (
 
 	"go.opentelemetry.io/otel/attribute"
 	jsonpatch "gopkg.in/evanphx/json-patch.v4"
-	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 
 	admissionv1 "k8s.io/api/admission/v1"
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
+	authenticationv1 "k8s.io/api/authentication/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -104,7 +105,7 @@ func (v *versionedAttributeAccessor) VersionedAttribute(gvk schema.GroupVersionK
 
 var _ generic.Dispatcher = &mutatingDispatcher{}
 
-func (a *mutatingDispatcher) Dispatch(ctx context.Context, attr admission.Attributes, o admission.ObjectInterfaces, saclient corev1.ServiceAccountInterface, hooks []webhook.WebhookAccessor) error {
+func (a *mutatingDispatcher) Dispatch(ctx context.Context, attr admission.Attributes, o admission.ObjectInterfaces, hooks []webhook.WebhookAccessor) error {
 	reinvokeCtx := attr.GetReinvocationContext()
 	var webhookReinvokeCtx *webhookReinvokeContext
 	if v := reinvokeCtx.Value(PluginName); v != nil {
@@ -142,6 +143,11 @@ func (a *mutatingDispatcher) Dispatch(ctx context.Context, attr admission.Attrib
 			continue
 		}
 
+		token, err := a.getWebhookAuthenticationToken(ctx, hook)
+		if err != nil {
+			return err
+		}
+
 		hook, ok := invocation.Webhook.GetMutatingWebhook()
 		if !ok {
 			return fmt.Errorf("mutating webhook dispatch requires v1.MutatingWebhook, but got %T", hook)
@@ -167,7 +173,7 @@ func (a *mutatingDispatcher) Dispatch(ctx context.Context, attr admission.Attrib
 		}
 
 		annotator := newWebhookAnnotator(versionedAttr, round, i, hook.Name, invocation.Webhook.GetConfigurationName())
-		changed, err := a.callAttrMutatingHook(ctx, hook, invocation, versionedAttr, annotator, o, round, i)
+		changed, err := a.callAttrMutatingHook(ctx, hook, invocation, versionedAttr, annotator, o, round, i, token)
 		ignoreClientCallFailures := hook.FailurePolicy != nil && *hook.FailurePolicy == admissionregistrationv1.Ignore
 		rejected := false
 		if err != nil {
@@ -243,9 +249,33 @@ func (a *mutatingDispatcher) Dispatch(ctx context.Context, attr admission.Attrib
 	return nil
 }
 
+func (*mutatingDispatcher) getWebhookAuthenticationToken(ctx context.Context, hook webhook.WebhookAccessor) (string, error) {
+	cl := hook.GetKubeClient()
+
+	tokenRequest, err := cl.CoreV1().ServiceAccounts("kube-system").CreateToken(ctx, "webhook-auth", &authenticationv1.TokenRequest{
+		Spec: authenticationv1.TokenRequestSpec{
+			Audiences:         []string{"foo"},
+			ExpirationSeconds: nil,
+			BoundObjectRef: &authenticationv1.BoundObjectReference{
+				Kind: "MutatingWebhookConfiguration",
+				Name: hook.GetConfigurationName(),
+				UID:  hook.GetConfigurationUID(),
+			},
+			Attestations: map[string]authenticationv1.AttestationValue{
+				authenticationv1.AttestationAdmissionReviewAPIGroups: {"*"},
+			},
+		},
+	}, v1.CreateOptions{})
+	if err != nil {
+		return "", err
+	}
+
+	return tokenRequest.Status.Token, nil
+}
+
 // note that callAttrMutatingHook updates attr
 
-func (a *mutatingDispatcher) callAttrMutatingHook(ctx context.Context, h *admissionregistrationv1.MutatingWebhook, invocation *generic.WebhookInvocation, attr *admission.VersionedAttributes, annotator *webhookAnnotator, o admission.ObjectInterfaces, round, idx int) (bool, error) {
+func (a *mutatingDispatcher) callAttrMutatingHook(ctx context.Context, h *admissionregistrationv1.MutatingWebhook, invocation *generic.WebhookInvocation, attr *admission.VersionedAttributes, annotator *webhookAnnotator, o admission.ObjectInterfaces, round, idx int, token string) (bool, error) {
 	configurationName := invocation.Webhook.GetConfigurationName()
 	changed := false
 	defer func() { annotator.addMutationAnnotation(changed) }()
@@ -283,12 +313,7 @@ func (a *mutatingDispatcher) callAttrMutatingHook(ctx context.Context, h *admiss
 		defer cancel()
 	}
 
-	// // start with just requesting tokens, then implement cache
-	// webhookAuthenticationToken, ok := cache.Check(key)
-	// if !ok {
-	//     webhookAuthenticationToken =
-	// }
-	r := client.Post().Body(request) /*.SetHeader("Authentication", "bearer <token>")*/
+	r := client.Post().Body(request).SetHeader("Authentication", fmt.Sprintf("bearer %s", token))
 
 	// if the context has a deadline, set it as a parameter to inform the backend
 	if deadline, hasDeadline := ctx.Deadline(); hasDeadline {
