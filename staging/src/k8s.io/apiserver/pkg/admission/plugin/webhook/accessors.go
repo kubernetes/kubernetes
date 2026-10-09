@@ -43,7 +43,7 @@ type WebhookAccessor interface {
 	GetUID() string
 
 	// GetConfigurationUID gets the UID of the webhook configuration that owns this webhook.
-	GetConfigurationUID() string
+	GetConfigurationUID() types.UID
 
 	// GetConfigurationName gets the name of the webhook configuration that owns this webhook.
 	GetConfigurationName() string

@@ -148,7 +148,8 @@ func (m *mutatingWebhookConfigurationManager) getMutatingWebhookConfigurations(c
 			n := c.Webhooks[i].Name
 			uid := fmt.Sprintf("%s/%s/%d", c.Name, n, names[n])
 			names[n]++
-			configurationAccessor := m.createMutatingWebhookAccessor(uid, c.Name, &c.Webhooks[i])
+			u := c.UID
+			configurationAccessor := m.createMutatingWebhookAccessor(uid, c.Name, u, &c.Webhooks[i])
 			configurationAccessors = append(configurationAccessors, configurationAccessor)
 		}
 		accessors = append(accessors, configurationAccessors...)

@@ -145,7 +145,8 @@ func (v *validatingWebhookConfigurationManager) getValidatingWebhookConfiguratio
 			n := c.Webhooks[i].Name
 			uid := fmt.Sprintf("%s/%s/%d", c.Name, n, names[n])
 			names[n]++
-			configurationAccessor := v.createValidatingWebhookAccessor(uid, c.Name, &c.Webhooks[i])
+			u := c.UID
+			configurationAccessor := v.createValidatingWebhookAccessor(uid, c.Name, u, &c.Webhooks[i])
 			configurationAccessors = append(configurationAccessors, configurationAccessor)
 		}
 		accessors = append(accessors, configurationAccessors...)
