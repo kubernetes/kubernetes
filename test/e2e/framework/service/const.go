@@ -44,9 +44,13 @@ const (
 	// not respond after creation.
 	LoadBalancerLagTimeoutDefault = 2 * time.Minute
 
+	// LoadBalancerLagTimeoutLarge is the maximum time a newly created load balancer
+	// is allowed to not respond. Turnup can take several minutes on some providers.
+	LoadBalancerLagTimeoutLarge = 10 * time.Minute
+
 	// LoadBalancerLagTimeoutAWS is the delay between ELB creation and serving traffic
 	// on AWS. A few minutes is typical, so use 10m.
-	LoadBalancerLagTimeoutAWS = 10 * time.Minute
+	LoadBalancerLagTimeoutAWS = LoadBalancerLagTimeoutLarge
 
 	// LoadBalancerCreateTimeoutDefault is the default time to wait for a load balancer to be created/modified.
 	// TODO: once support ticket 21807001 is resolved, reduce this timeout back to something reasonable
