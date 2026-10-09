@@ -18,7 +18,7 @@ package procfs
 import (
 	"os"
 
-	"github.com/prometheus/procfs/internal/util"
+	"github.com/prometheus/procfs/internal/parsers"
 )
 
 // KernelRandom contains information about to the kernel's random number generator.
@@ -48,7 +48,7 @@ func (fs FS) KernelRandom() (KernelRandom, error) {
 		"write_wakeup_threshold":  &random.WriteWakeupThreshold,
 		"read_wakeup_threshold":   &random.ReadWakeupThreshold,
 	} {
-		val, err := util.ReadUintFromFile(fs.proc.Path("sys", "kernel", "random", file))
+		val, err := parsers.ReadUintFromFile(fs.proc.Path("sys", "kernel", "random", file))
 		if os.IsNotExist(err) {
 			continue
 		}
