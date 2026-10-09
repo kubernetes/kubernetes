@@ -1416,40 +1416,69 @@ func TestPrepareResourcesAfterRestartIsIdempotent(t *testing.T) {
 	require.NoError(t, err)
 	defer draServerInfo.teardownFn()
 
-	firstManager, err := NewManager(logger, fakeKubeClient, stateDir)
-	require.NoError(t, err)
-	firstManager.initDRAPluginManager(tCtx, getFakeNode, time.Second)
-	plg := firstManager.GetWatcherHandler()
-	require.NoError(t, plg.RegisterPlugin(tCtx, driverName, draServerInfo.socketName, []string{drapb.DRAPluginService}, nil))
+	startManager := func() *Manager {
+		t.Helper()
+		m, err := NewManager(logger, fakeKubeClient, stateDir)
+		require.NoError(t, err)
+		m.initDRAPluginManager(tCtx, getFakeNode, time.Second)
+		require.NoError(t, m.GetWatcherHandler().RegisterPlugin(
+			tCtx, driverName, draServerInfo.socketName, []string{drapb.DRAPluginService}, nil))
+		return m
+	}
 
+	firstManager := startManager()
 	require.NoError(t, firstManager.PrepareResources(tCtx, pod))
+	require.Equal(t, uint32(1), draServerInfo.server.prepareResourceCalls.Load(),
+		"first prepare should call NodePrepareResources once")
 
 	claimInfo, exists := firstManager.cache.get(claim.Name, namespace)
 	require.True(t, exists)
 	require.Len(t, claimInfo.DriverState[driverName].Devices, 1, "one device after first prepare")
 
-	// Simulate a kubelet restart: build a second Manager on the same state
-	// directory. It restores ClaimInfo from the checkpoint, always with
-	// prepared=false, so PrepareResources will call NodePrepareResources again.
+	// Stop the first Manager so the second one below can take over the same
+	// state directory, as a restarted kubelet would.
 	firstManager.Stop()
 
-	secondManager, err := NewManager(logger, fakeKubeClient, stateDir)
-	require.NoError(t, err)
-	defer secondManager.Stop()
-	secondManager.initDRAPluginManager(tCtx, getFakeNode, time.Second)
-	plg = secondManager.GetWatcherHandler()
-	require.NoError(t, plg.RegisterPlugin(tCtx, driverName, draServerInfo.socketName, []string{drapb.DRAPluginService}, nil))
+	// After the restart the driver reports a different CDI device ID. If
+	// re-prepare replaced the restored devices with the response, the cache
+	// holds only the new ID; if it appended, both IDs would be present; if it
+	// skipped NodePrepareResources, only the old ID would remain.
+	restartedCDIID := cdiID + "-restarted"
+	restartedResp := genPrepareResourcesResponse(claim.UID)
+	restartedResp.Claims[string(claim.UID)].Devices[0].CdiDeviceIds = []string{restartedCDIID}
+	draServerInfo.server.prepareResourcesResponse = restartedResp
+
+	// The second Manager restores ClaimInfo from the checkpoint, always with
+	// prepared=false, so PrepareResources calls NodePrepareResources again.
+	secondManager := startManager()
 
 	restoredClaimInfo, exists := secondManager.cache.get(claim.Name, namespace)
 	require.True(t, exists, "claim info should be restored from checkpoint")
 	assert.False(t, restoredClaimInfo.prepared, "restored claim info is never marked prepared")
 
 	require.NoError(t, secondManager.PrepareResources(tCtx, pod))
+	require.Equal(t, uint32(2), draServerInfo.server.prepareResourceCalls.Load(),
+		"re-prepare after restart must call NodePrepareResources again")
 
 	claimInfo, exists = secondManager.cache.get(claim.Name, namespace)
 	require.True(t, exists)
-	assert.Len(t, claimInfo.DriverState[driverName].Devices, 1,
-		"device list must stay at one entry after restart + re-prepare, not double")
+	devices := claimInfo.DriverState[driverName].Devices
+	require.Len(t, devices, 1, "device list must stay at one entry after restart + re-prepare, not double")
+	assert.Equal(t, []string{restartedCDIID}, devices[0].CDIDeviceIDs,
+		"re-prepare must replace the checkpoint-restored device with the driver's new response")
+
+	// The original bug grew the checkpoint, not just the in-memory cache, so
+	// restart once more and check what was actually persisted.
+	secondManager.Stop()
+	thirdManager := startManager()
+	defer thirdManager.Stop()
+
+	persistedClaimInfo, exists := thirdManager.cache.get(claim.Name, namespace)
+	require.True(t, exists, "claim info should be restored from checkpoint")
+	persisted := persistedClaimInfo.DriverState[driverName].Devices
+	require.Len(t, persisted, 1, "checkpoint must hold one device after restart + re-prepare, not two")
+	assert.Equal(t, []string{restartedCDIID}, persisted[0].CDIDeviceIDs,
+		"checkpoint must hold the device from the re-prepare response")
 }
 
 // TestPrepareResourcesWithUnpreparingClaim is a regression test for the race
