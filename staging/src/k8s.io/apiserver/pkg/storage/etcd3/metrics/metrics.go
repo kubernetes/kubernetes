@@ -94,7 +94,7 @@ var (
 		"Estimated size of stored objects in database. Estimate is based on sum of last observed sizes of serialized objects.",
 		[]string{"group", "resource"},
 		nil,
-		compbasemetrics.ALPHA,
+		compbasemetrics.BETA,
 		"",
 	)
 	resourceSizeEstimate = newTimestampedResourceGaugeCollector(resourceSizeEstimateDesc, clock.RealClock{})
