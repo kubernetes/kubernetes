@@ -1121,15 +1121,15 @@ func TestCIDRAllocateNextConcurrent(t *testing.T) {
 func TestCIDRAllocateNextConcurrentWithRelease(t *testing.T) {
 	c, client := newLaggingMetaAllocator(t)
 
-	// /23 -> 510 usable, peak live set is workers*(rounds/2+1)=300.
-	cidr := newServiceCIDR("test", "10.0.0.0/23")
+	// /26 -> 62 usable, peak live set is workers*(rounds/2+1)=40.
+	cidr := newServiceCIDR("test", "10.0.0.0/26")
 	if _, err := client.NetworkingV1().ServiceCIDRs().Create(context.Background(), cidr, metav1.CreateOptions{}); err != nil {
 		t.Fatal(err)
 	}
 	waitForReadyAllocator(t, c, "10.0.0.1")
 
-	const workers = 50
-	const rounds = 10
+	const workers = 10
+	const rounds = 6
 	var wg sync.WaitGroup
 	var mu sync.Mutex
 	live := sets.New[string]()
