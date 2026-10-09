@@ -27,6 +27,7 @@ import (
 	"testing"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 	"github.com/stretchr/testify/require"
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -3260,5 +3261,66 @@ func TestApplyOverrideDoesNotMatchSameLeafCommand(t *testing.T) {
 
 	if got := actualCmd.Flag("output").Value.String(); got != "default" {
 		t.Fatalf("unexpected output flag value: got %q, want %q", got, "default")
+	}
+}
+
+func TestSearchInArgs(t *testing.T) {
+	flags := pflag.NewFlagSet("test", pflag.ContinueOnError)
+	flags.BoolP("interactive", "i", false, "")
+	flags.BoolP("recursive", "R", false, "")
+	flags.StringP("namespace", "n", "", "")
+	flags.StringP("output", "o", "", "")
+
+	tests := []struct {
+		name      string
+		flagName  string
+		shorthand string
+		args      []string
+		expected  bool
+	}{
+		{
+			name:      "combined shorthands",
+			flagName:  "interactive",
+			shorthand: "i",
+			args:      []string{"delete", "pod", "foo", "-Ri"},
+			expected:  true,
+		},
+		{
+			name:      "value of another shorthand containing the letter",
+			flagName:  "interactive",
+			shorthand: "i",
+			args:      []string{"delete", "pod", "foo", "-nmonitoring"},
+			expected:  false,
+		},
+		{
+			name:      "value of another shorthand after a bool shorthand",
+			flagName:  "interactive",
+			shorthand: "i",
+			args:      []string{"delete", "pod", "foo", "-Rnmonitoring"},
+			expected:  false,
+		},
+		{
+			name:      "value-taking shorthand with attached value",
+			flagName:  "output",
+			shorthand: "o",
+			args:      []string{"get", "pods", "-ojson"},
+			expected:  true,
+		},
+		{
+			name:      "shorthand after double dash is positional",
+			flagName:  "namespace",
+			shorthand: "n",
+			args:      []string{"exec", "mypod", "--", "grep", "-n", "pattern"},
+			expected:  false,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			actual := searchInArgs(test.flagName, test.shorthand, flags, test.args)
+			if actual != test.expected {
+				t.Errorf("searchInArgs(%q, %q, %v) = %t, want %t", test.flagName, test.shorthand, test.args, actual, test.expected)
+			}
+		})
 	}
 }
