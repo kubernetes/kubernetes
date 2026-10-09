@@ -11094,7 +11094,7 @@ func TestPreQueueingHint_NonNarrowingPluginEvaluatesAllPods(t *testing.T) {
 		}
 		pInfo := entity.(*framework.QueuedPodInfo)
 		pInfo.UnschedulablePlugins = sets.New[string]("narrowingPlugin", "nonNarrowingPlugin")
-		if err := q.AddUnschedulablePodIfNotPresent(logger, pInfo, q.SchedulingCycle()); err != nil {
+		if err := q.AddUnschedulablePodIfNotPresent(ctx, pInfo, q.SchedulingCycle()); err != nil {
 			t.Fatalf("AddUnschedulablePodIfNotPresent failed: %v", err)
 		}
 	}
@@ -11238,7 +11238,7 @@ func TestPreQueueingHint_AllPodsAndErrorPreserveNarrowing(t *testing.T) {
 				}
 				pInfo := entity.(*framework.QueuedPodInfo)
 				pInfo.UnschedulablePlugins = sets.New[string]("narrowingPlugin", "pluginB")
-				if err := q.AddUnschedulablePodIfNotPresent(logger, pInfo, q.SchedulingCycle()); err != nil {
+				if err := q.AddUnschedulablePodIfNotPresent(ctx, pInfo, q.SchedulingCycle()); err != nil {
 					t.Fatalf("AddUnschedulablePodIfNotPresent failed: %v", err)
 				}
 			}
@@ -11305,7 +11305,7 @@ func TestPreQueueingHint_MultiProfileNarrowing(t *testing.T) {
 		}
 		pInfo := entity.(*framework.QueuedPodInfo)
 		pInfo.UnschedulablePlugins = sets.New[string]("plugin")
-		if err := q.AddUnschedulablePodIfNotPresent(logger, pInfo, q.SchedulingCycle()); err != nil {
+		if err := q.AddUnschedulablePodIfNotPresent(ctx, pInfo, q.SchedulingCycle()); err != nil {
 			t.Fatalf("AddUnschedulablePodIfNotPresent failed: %v", err)
 		}
 	}
