@@ -135,7 +135,7 @@ func BenchmarkRealFIFOBatchingAndBackpressure(b *testing.B) {
 
 	// Populate the store so concurrent indexer.List() calls hold RLock for a
 	// realistic duration, creating RWMutex contention per Transaction call.
-	for i := 0; i < totalStorePods; i++ {
+	for i := range totalStorePods {
 		pod := &v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace:       fmt.Sprintf("ns-%d", i%50),
@@ -150,8 +150,8 @@ func BenchmarkRealFIFOBatchingAndBackpressure(b *testing.B) {
 
 	// Create two versions per active pod so every update modifies an existing store item.
 	pods := make([][2]*v1.Pod, activePods)
-	for i := 0; i < activePods; i++ {
-		for v := 0; v < 2; v++ {
+	for i := range activePods {
+		for v := range 2 {
 			pods[i][v] = &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace:       fmt.Sprintf("ns-%d", i%50),
@@ -166,7 +166,7 @@ func BenchmarkRealFIFOBatchingAndBackpressure(b *testing.B) {
 	// lock contention that PopBatch + TransactionStore.Transaction is designed to amortize.
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	for r := 0; r < 4; r++ {
+	for range 4 {
 		go func() {
 			for ctx.Err() == nil {
 				_ = indexer.List()
@@ -193,7 +193,7 @@ func BenchmarkRealFIFOBatchingAndBackpressure(b *testing.B) {
 	b.ResetTimer()
 
 	for processedEvents < int64(b.N) {
-		for i := 0; i < burstSize; i++ {
+		for i := range burstSize {
 			_ = fifo.Update(pods[i%activePods][(i/activePods)%2])
 		}
 
@@ -226,4 +226,3 @@ func BenchmarkRealFIFOBatchingAndBackpressure(b *testing.B) {
 		b.ReportMetric(float64(processedEvents)/float64(processedBatches), "batch_size_mean")
 	}
 }
-
