@@ -18,17 +18,17 @@ package cel
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	g "github.com/onsi/gomega"
 	resourceapi "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apiserver/pkg/cel/environment"
-	"k8s.io/klog/v2/ktesting"
+	"k8s.io/ktesting"
 	"k8s.io/utils/ptr"
 )
 
@@ -659,62 +659,40 @@ device.attributes["dra.example.com"]["version"].isGreaterThan(semver("0.0.1"))
 	},
 }
 
-func TestCEL(t *testing.T) {
+func TestCEL(t *testing.T) { testCEL(ktesting.Init(t)) }
+func testCEL(tCtx ktesting.TContext) {
 	for name, scenario := range testcases {
-		run := func(t *testing.T, features Features, envType environment.Type) {
-			_, ctx := ktesting.NewTestContext(t)
+		run := func(tCtx ktesting.TContext, features Features, envType environment.Type) {
 			result := GetCompiler(features).CompileCELExpression(scenario.expression, Options{EnvType: &envType})
-			if scenario.expectCompileError != "" && result.Error == nil {
-				t.Fatalf("FAILURE: expected compile error %q, got none", scenario.expectCompileError)
-			}
-			if result.Error != nil {
-				if scenario.expectCompileError == "" {
-					t.Fatalf("FAILURE: unexpected compile error: %v", result.Error)
-				}
-				if !strings.Contains(result.Error.Error(), scenario.expectCompileError) {
-					t.Fatalf("FAILURE: expected compile error to contain %q, but got instead: %v", scenario.expectCompileError, result.Error)
-				}
+			if scenario.expectCompileError != "" {
+				tCtx.Require(result.Error).To(g.MatchError(g.ContainSubstring(scenario.expectCompileError)), "expected compile error")
 				return
 			}
-			if scenario.expectCompileError != "" {
-				t.Fatalf("FAILURE: expected compile error %q, got none", scenario.expectCompileError)
-			}
-			if expect, actual := scenario.expectCost, result.MaxCost; expect != actual {
-				t.Errorf("ERROR: expected CEL cost %d, got %d instead (%.0f%% of limit %d)", expect, actual, float64(actual)*100.0/float64(resourceapi.CELSelectorExpressionMaxCost), resourceapi.CELSelectorExpressionMaxCost)
-			}
+			tCtx.Require(result.Error).To(g.Succeed(), "unexpected compile error")
 
-			match, details, err := result.DeviceMatches(ctx, Device{
+			tCtx.Assert(result.MaxCost).To(g.Equal(scenario.expectCost), "expected CEL cost (%.0f%% of limit %d)", float64(result.MaxCost)*100.0/float64(resourceapi.CELSelectorExpressionMaxCost), resourceapi.CELSelectorExpressionMaxCost)
+
+			match, details, err := result.DeviceMatches(tCtx, Device{
 				AllowMultipleAllocations: scenario.allowMultipleAllocations, Attributes: scenario.attributes, Capacity: scenario.capacity, Driver: scenario.driver,
 			})
 			// details.ActualCost can be called for nil details, no need to check.
 			actualCost := ptr.Deref(details.ActualCost(), 0)
 			if scenario.expectCost > 0 {
-				t.Logf("actual cost %d, %d%% of worst-case estimate %d", actualCost, actualCost*100/scenario.expectCost, scenario.expectCost)
+				tCtx.Logf("actual cost %d, %d%% of worst-case estimate %d", actualCost, actualCost*100/scenario.expectCost, scenario.expectCost)
 			} else {
-				t.Logf("actual cost %d, expected zero costs", actualCost)
+				tCtx.Logf("actual cost %d, expected zero costs", actualCost)
 			}
-			if actualCost > result.MaxCost {
-				t.Errorf("ERROR: cost estimate %d underestimated the evaluation cost of %d", result.MaxCost, actualCost)
-			}
+			tCtx.Assert(actualCost).To(g.BeNumerically("<=", result.MaxCost), "cost estimate %d underestimated the evaluation cost of %d", result.MaxCost, actualCost)
 
-			if err != nil {
-				if scenario.expectMatchError == "" {
-					t.Fatalf("FAILURE: unexpected evaluation error: %v", err)
-				}
-				if !strings.Contains(err.Error(), scenario.expectMatchError) {
-					t.Fatalf("FAILURE: expected evaluation error to contain %q, but got instead: %v", scenario.expectMatchError, err)
-				}
+			if scenario.expectMatchError != "" {
+				tCtx.Require(err).To(g.MatchError(g.ContainSubstring(scenario.expectMatchError)), "expected evaluation error")
 				return
 			}
-			if scenario.expectMatchError != "" {
-				t.Fatalf("FAILURE: expected match error %q, got none", scenario.expectMatchError)
-			}
-			if match != scenario.expectMatch {
-				t.Fatalf("FAILURE: expected result %v, got %v", scenario.expectMatch, match)
-			}
+			tCtx.Require(err).To(g.Succeed(), "unexpected evaluation error")
+			tCtx.Require(match).To(g.Equal(scenario.expectMatch), "expected result")
 		}
 
-		t.Run(name, func(t *testing.T) {
+		tCtx.Run(name, func(tCtx ktesting.TContext) {
 			stateListType := []bool{true, false}
 			stateConsumable := []bool{true, false}
 			if scenario.features != nil {
@@ -728,12 +706,12 @@ func TestCEL(t *testing.T) {
 
 			var features Features
 			for _, features.EnableListTypeAttributes = range stateListType {
-				t.Run(fmt.Sprintf("list-type-attributes=%v", features.EnableListTypeAttributes), func(t *testing.T) {
+				tCtx.Run(fmt.Sprintf("list-type-attributes=%v", features.EnableListTypeAttributes), func(tCtx ktesting.TContext) {
 					for _, features.EnableConsumableCapacity = range stateConsumable {
-						t.Run(fmt.Sprintf("consumable-capacity=%v", features.EnableConsumableCapacity), func(t *testing.T) {
+						tCtx.Run(fmt.Sprintf("consumable-capacity=%v", features.EnableConsumableCapacity), func(tCtx ktesting.TContext) {
 							for _, envType := range envTypes {
-								t.Run(string(envType), func(t *testing.T) {
-									run(t, features, envType)
+								tCtx.Run(string(envType), func(tCtx ktesting.TContext) {
+									run(tCtx, features, envType)
 								})
 							}
 						})
@@ -744,29 +722,22 @@ func TestCEL(t *testing.T) {
 	}
 }
 
-func TestInterrupt(t *testing.T) {
+func TestInterrupt(t *testing.T) { testInterrupt(ktesting.Init(t)) }
+func testInterrupt(tCtx ktesting.TContext) {
 	for _, name := range []string{"timeout", "deadline", "cancel"} {
-		t.Run(name, func(t *testing.T) {
-			_, ctx := ktesting.NewTestContext(t)
+		tCtx.Run(name, func(tCtx ktesting.TContext) {
 			// Adapted from https://github.com/kubernetes/kubernetes/blob/e0859f91b7d269bb7e2f43e23d202ccccaf34c0c/staging/src/k8s.io/apiextensions-apiserver/pkg/apiserver/schema/cel/validation_test.go#L3006
 			expression := `device.attributes["dra.example.com"].map(key, device.attributes["dra.example.com"][key] * 20).filter(e, e > 50).exists(e, e == 60)`
 			result := GetCompiler(Features{}).CompileCELExpression(expression, Options{})
-			if result.Error != nil {
-				t.Fatalf("unexpected compile error: %v", result.Error)
-			}
+			tCtx.Require(result.Error).To(g.Succeed(), "unexpected compile error")
 			switch name {
 			case "timeout":
-				c, cancel := context.WithTimeout(ctx, time.Nanosecond)
-				defer cancel()
-				ctx = c
+				tCtx = tCtx.WithTimeout(time.Nanosecond, "timeout test")
 			case "deadline":
-				c, cancel := context.WithDeadline(ctx, time.Now())
-				defer cancel()
-				ctx = c
+				tCtx = tCtx.WithDeadline(time.Now(), "deadline test")
 			case "cancel":
-				c, cancel := context.WithCancel(ctx)
-				cancel()
-				ctx = c
+				tCtx = tCtx.WithCancel()
+				tCtx.Cancel("cancel test")
 			}
 			device := Device{
 				Attributes: make(map[resourceapi.QualifiedName]resourceapi.DeviceAttribute),
@@ -776,15 +747,11 @@ func TestInterrupt(t *testing.T) {
 					IntValue: ptr.To(i),
 				}
 			}
-			_, _, err := result.DeviceMatches(ctx, device)
-			if ctx.Err() != nil {
-				if !errors.Is(err, ctx.Err()) {
-					t.Fatalf("expected %v, got error: %v", ctx.Err(), err)
-				}
+			_, _, err := result.DeviceMatches(tCtx, device)
+			if tCtx.Err() != nil {
+				tCtx.Require(err).To(g.MatchError(tCtx.Err()))
 			} else {
-				if err != nil {
-					t.Fatalf("expected no error, got %v", err)
-				}
+				tCtx.Require(err).To(g.Succeed(), "expected no error")
 			}
 		})
 	}
@@ -797,7 +764,7 @@ func BenchmarkDeviceMatches(b *testing.B) {
 		}
 
 		run := func(b *testing.B, features Features, envType environment.Type) {
-			_, ctx := ktesting.NewTestContext(b)
+			tCtx := ktesting.Init(b)
 			result := GetCompiler(features).CompileCELExpression(scenario.expression, Options{EnvType: &envType})
 			if result.Error != nil {
 				b.Fatalf("unexpected compile error: %s", result.Error.Error())
@@ -809,7 +776,7 @@ func BenchmarkDeviceMatches(b *testing.B) {
 				// here also includes additional preparations
 				// in result.DeviceMatches and thus cannot be
 				// used.
-				match, _, err := result.DeviceMatches(ctx, Device{
+				match, _, err := result.DeviceMatches(tCtx, Device{
 					AllowMultipleAllocations: scenario.allowMultipleAllocations, Attributes: scenario.attributes, Capacity: scenario.capacity, Driver: scenario.driver,
 				})
 				if err != nil {
