@@ -518,16 +518,6 @@ func (f *RealFIFO) PopBatch(processBatch ProcessBatchFunc, processSingle PopProc
 			// close the batch when an unbatchable delta is encountered
 			break
 		}
-		_, err := f.keyOf(item)
-		if err != nil {
-			// close the batch here if error happens
-			// TODO: log the error when RealFIFOOptions supports passing klog instance like deprecated DeltaFIFO
-			// still pop the broken item out of queue to be compatible with the non-batch behavior it should be safe
-			// when 1st element is broken, however for Nth broken element, there's possible risk that broken item
-			// still can be processed and broke the uniqueness of the batch unexpectedly.
-			moveDeltaToProcessList(i)
-			break
-		}
 		moveDeltaToProcessList(i)
 	}
 	f.items = f.items[len(deltas):]
