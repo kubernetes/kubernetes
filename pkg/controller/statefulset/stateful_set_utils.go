@@ -129,6 +129,7 @@ func getPersistentVolumeClaimName(set *apps.StatefulSet, claim *v1.PersistentVol
 }
 
 // isMemberOf tests if pod is a member of set.
+// StatefulSet controller should not treat Pods like "sts-01" as its members, so we place the name check here.
 func isMemberOf(set *apps.StatefulSet, pod *v1.Pod) bool {
 	parent, ordinal := getParentNameAndOrdinal(pod)
 	return ordinal >= 0 &&
