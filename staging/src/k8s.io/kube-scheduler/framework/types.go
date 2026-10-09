@@ -904,6 +904,33 @@ func (gpg *GenericPodGroup) GetParentKey() (EntityKey, bool) {
 	return CompositePodGroupKey(gpg.GetNamespace(), *parentName), true
 }
 
+// GetWorkloadName returns the workload name referenced by the wrapped object.
+func (gpg *GenericPodGroup) GetWorkloadName() string {
+	if gpg.PodGroup != nil && gpg.PodGroup.Spec.WorkloadRef != nil {
+		return gpg.PodGroup.Spec.WorkloadRef.WorkloadName
+	}
+	if gpg.CompositePodGroup != nil && gpg.CompositePodGroup.Spec.WorkloadRef != nil {
+		return gpg.CompositePodGroup.Spec.WorkloadRef.WorkloadName
+	}
+	return ""
+}
+
+// IsGang returns true if the wrapped object has a Gang scheduling policy.
+func (gpg *GenericPodGroup) IsGang() bool {
+	if gpg.PodGroup != nil {
+		return gpg.PodGroup.Spec.SchedulingPolicy.Gang != nil
+	}
+	return gpg.CompositePodGroup.Spec.SchedulingPolicy.Gang != nil
+}
+
+// IsBasic returns true if the wrapped object has a Basic scheduling policy.
+func (gpg *GenericPodGroup) IsBasic() bool {
+	if gpg.PodGroup != nil {
+		return gpg.PodGroup.Spec.SchedulingPolicy.Basic != nil
+	}
+	return gpg.CompositePodGroup.Spec.SchedulingPolicy.Basic != nil
+}
+
 // GetPriority returns the priority of the wrapped object.
 func (gpg *GenericPodGroup) GetPriority() int32 {
 	if gpg.PodGroup != nil {
@@ -935,11 +962,16 @@ func (gpg *GenericPodGroup) GetPreemptionPolicy() v1.PreemptionPolicy {
 
 // HasDisruptionModeAll returns true if the wrapped object has disruption mode All.
 func (gpg *GenericPodGroup) HasDisruptionModeAll() bool {
-	if pg := gpg.PodGroup; pg != nil && pg.Spec.DisruptionMode != nil && pg.Spec.DisruptionMode.All != nil {
-		return true
+	if gpg.PodGroup != nil {
+		return gpg.PodGroup.Spec.DisruptionMode != nil && gpg.PodGroup.Spec.DisruptionMode.All != nil
 	}
-	if cpg := gpg.CompositePodGroup; cpg != nil && cpg.Spec.DisruptionMode != nil && cpg.Spec.DisruptionMode.All != nil {
-		return true
+	return gpg.CompositePodGroup.Spec.DisruptionMode != nil && gpg.CompositePodGroup.Spec.DisruptionMode.All != nil
+}
+
+// HasDisruptionModeSingle returns true if the wrapped object has disruption mode Single.
+func (gpg *GenericPodGroup) HasDisruptionModeSingle() bool {
+	if gpg.PodGroup != nil {
+		return gpg.PodGroup.Spec.DisruptionMode != nil && gpg.PodGroup.Spec.DisruptionMode.Single != nil
 	}
-	return false
+	return gpg.CompositePodGroup.Spec.DisruptionMode != nil && gpg.CompositePodGroup.Spec.DisruptionMode.Single != nil
 }
