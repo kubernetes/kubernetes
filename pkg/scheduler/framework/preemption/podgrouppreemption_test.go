@@ -1699,7 +1699,7 @@ func TestPodGroupEvaluator_Preempt_Victims(t *testing.T) {
 			if err := pl.Handle.MutableSnapshotSharedLister().StartMutations(); err != nil {
 				t.Fatalf("Unexpected error: %v", err)
 			}
-			res, gotStatus := pl.Preempt(ctx, tt.preemptor, mockSchedulingFunc)
+			res, gotStatus := pl.Preempt(ctx, framework.NewCycleState(), tt.preemptor, mockSchedulingFunc)
 			if !gotStatus.IsSuccess() {
 				t.Logf("SelectVictimsOnDomain failed: %v", gotStatus.Message())
 			}
@@ -1800,7 +1800,7 @@ func TestPodGroupEvaluator_Preempt_NominatedNodes(t *testing.T) {
 	if err := pl.Handle.MutableSnapshotSharedLister().StartMutations(); err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
-	result, gotStatus := pl.Preempt(ctx, preemptorPGInfo, mockSchedulingFunc)
+	result, gotStatus := pl.Preempt(ctx, framework.NewCycleState(), preemptorPGInfo, mockSchedulingFunc)
 	if err := pl.Handle.MutableSnapshotSharedLister().EndMutations(); err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -1997,7 +1997,7 @@ func TestPodGroupEvaluator_Preempt(t *testing.T) {
 				UnscheduledPods: tt.preemptorPods,
 			}
 
-			gotResult, gotStatus := pl.Preempt(ctx, pgInfo, mockSchedulingFunc)
+			gotResult, gotStatus := pl.Preempt(ctx, framework.NewCycleState(), pgInfo, mockSchedulingFunc)
 			if gotStatus.Code() != tt.expectedStatus.Code() || gotStatus.Message() != tt.expectedStatus.Message() {
 				t.Errorf("Status mismatch. Want status code %v with message %q, Got code %v with message %q",
 					tt.expectedStatus.Code(), tt.expectedStatus.Message(), gotStatus.Code(), gotStatus.Message())
@@ -2142,7 +2142,7 @@ func TestPodGroupPreemptionEvaluationDurationMetric(t *testing.T) {
 			if err := pl.Handle.MutableSnapshotSharedLister().StartMutations(); err != nil {
 				t.Fatalf("Unexpected error: %v", err)
 			}
-			pl.Preempt(ctx, preemptorPGInfo, mockSchedulingFunc)
+			pl.Preempt(ctx, framework.NewCycleState(), preemptorPGInfo, mockSchedulingFunc)
 			if err := pl.Handle.MutableSnapshotSharedLister().EndMutations(); err != nil {
 				t.Errorf("Unexpected error: %v", err)
 			}
