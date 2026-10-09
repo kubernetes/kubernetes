@@ -25,7 +25,6 @@ import (
 	resourceapi "k8s.io/api/resource/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/dynamic-resource-allocation/cel"
-	"k8s.io/utils/ptr"
 )
 
 // fakeClassLister implements DeviceClassLister over a fixed map.
@@ -78,7 +77,7 @@ func makeConstraintFixture() (fakeClassLister, *v1.Node, []*resourceapi.Resource
 				ResourceSliceCount: 1,
 				Generation:         1,
 			},
-			NodeName: ptr.To("node-1"),
+			NodeName: new("node-1"),
 			Devices:  []resourceapi.Device{{Name: "device-1"}},
 		},
 	}
