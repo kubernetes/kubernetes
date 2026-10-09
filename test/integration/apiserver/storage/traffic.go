@@ -126,6 +126,7 @@ type ListDistribution struct {
 	LabelSelector        []ChoiceWeight[LabelSelector]
 	ResourceVersion      []ChoiceWeight[RVType]
 	ResourceVersionMatch []ChoiceWeight[metav1.ResourceVersionMatch]
+	Limit                []ChoiceWeight[int64]
 }
 
 type UpdateDistribution struct {
@@ -374,6 +375,9 @@ func randomRequest(ctx context.Context, store storage.Interface, keys []types.Na
 			if rv == "0" && opts.ResourceVersionMatch == metav1.ResourceVersionMatchExact {
 				return nil
 			}
+		}
+		if len(dist.List.Limit) > 0 && rv != "0" {
+			opts.Predicate.Limit = PickRandom(dist.List.Limit)
 		}
 		return &correctness.Request{
 			Op:   correctness.OpList,
