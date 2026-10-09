@@ -1416,10 +1416,7 @@ func testRollingUpdateDeploymentWithLocalTrafficLoadBalancer(ctx context.Context
 	svcPort := int(service.Spec.Ports[0].Port)
 
 	framework.Logf("Hitting the replica set's pods through the service's load balancer")
-	timeout := e2eservice.LoadBalancerLagTimeoutDefault
-	if framework.ProviderIs("aws") {
-		timeout = e2eservice.LoadBalancerLagTimeoutAWS
-	}
+	timeout := e2eservice.GetServiceLoadBalancerPropagationTimeout(ctx, c)
 	e2eservice.TestReachableHTTP(ctx, lbNameOrAddress, svcPort, timeout)
 
 	expectedNodes, err := jig.GetEndpointNodeNames(ctx)
