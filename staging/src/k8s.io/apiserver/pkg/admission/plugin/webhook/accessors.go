@@ -22,6 +22,7 @@ import (
 	v1 "k8s.io/api/admissionregistration/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apiserver/pkg/admission/plugin/cel"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/matchconditions"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/predicates/namespace"
@@ -40,6 +41,9 @@ type WebhookAccessor interface {
 
 	// GetUID gets a string that uniquely identifies the webhook.
 	GetUID() string
+
+	// GetConfigurationUID gets the UID of the webhook configuration that owns this webhook.
+	GetConfigurationUID() string
 
 	// GetConfigurationName gets the name of the webhook configuration that owns this webhook.
 	GetConfigurationName() string
@@ -86,14 +90,15 @@ type WebhookAccessor interface {
 }
 
 // NewMutatingWebhookAccessor creates an accessor for a MutatingWebhook.
-func NewMutatingWebhookAccessor(uid, configurationName string, h *v1.MutatingWebhook) WebhookAccessor {
-	return &mutatingWebhookAccessor{uid: uid, configurationName: configurationName, MutatingWebhook: h}
+func NewMutatingWebhookAccessor(uid, configurationName string, configurationUID types.UID, h *v1.MutatingWebhook) WebhookAccessor {
+	return &mutatingWebhookAccessor{uid: uid, configurationName: configurationName, configurationUID: configurationUID, MutatingWebhook: h}
 }
 
 type mutatingWebhookAccessor struct {
 	*v1.MutatingWebhook
 	uid               string
 	configurationName string
+	configurationUID  types.UID
 
 	initObjectSelector sync.Once
 	objectSelector     labels.Selector
@@ -117,6 +122,10 @@ func (m *mutatingWebhookAccessor) GetUID() string {
 
 func (m *mutatingWebhookAccessor) GetConfigurationName() string {
 	return m.configurationName
+}
+
+func (m *mutatingWebhookAccessor) GetConfigurationUID() types.UID {
+	return m.configurationUID
 }
 
 func (m *mutatingWebhookAccessor) GetRESTClient(clientManager *webhookutil.ClientManager) (*rest.RESTClient, error) {
@@ -218,7 +227,7 @@ func (m *mutatingWebhookAccessor) GetValidatingWebhook() (*v1.ValidatingWebhook,
 }
 
 // NewValidatingWebhookAccessor creates an accessor for a ValidatingWebhook.
-func NewValidatingWebhookAccessor(uid, configurationName string, h *v1.ValidatingWebhook) WebhookAccessor {
+func NewValidatingWebhookAccessor(uid, configurationName string, configurationUID types.UID, h *v1.ValidatingWebhook) WebhookAccessor {
 	return &validatingWebhookAccessor{uid: uid, configurationName: configurationName, ValidatingWebhook: h}
 }
 
@@ -226,6 +235,7 @@ type validatingWebhookAccessor struct {
 	*v1.ValidatingWebhook
 	uid               string
 	configurationName string
+	configurationUID  types.UID
 
 	initObjectSelector sync.Once
 	objectSelector     labels.Selector
@@ -249,6 +259,10 @@ func (v *validatingWebhookAccessor) GetUID() string {
 
 func (v *validatingWebhookAccessor) GetConfigurationName() string {
 	return v.configurationName
+}
+
+func (v *validatingWebhookAccessor) GetConfigurationUID() types.UID {
+	return v.configurationUID
 }
 
 func (v *validatingWebhookAccessor) GetRESTClient(clientManager *webhookutil.ClientManager) (*rest.RESTClient, error) {

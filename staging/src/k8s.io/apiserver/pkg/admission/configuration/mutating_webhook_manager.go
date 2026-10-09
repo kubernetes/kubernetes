@@ -24,6 +24,7 @@ import (
 	v1 "k8s.io/api/admissionregistration/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook"
@@ -36,7 +37,7 @@ import (
 )
 
 // Type for test injection.
-type mutatingWebhookAccessorCreator func(uid string, configurationName string, h *v1.MutatingWebhook) webhook.WebhookAccessor
+type mutatingWebhookAccessorCreator func(uid string, configurationName string, configurationUID types.UID, h *v1.MutatingWebhook) webhook.WebhookAccessor
 
 // mutatingWebhookConfigurationManager collects the mutating webhook objects so that they can be called.
 type mutatingWebhookConfigurationManager struct {

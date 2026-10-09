@@ -67,9 +67,9 @@ const (
 )
 
 type mutatingDispatcher struct {
-	cm            *webhookutil.ClientManager
-	plugin        *Plugin
-	tokenAccessor corev1.ServiceAccountInterface
+	cm     *webhookutil.ClientManager
+	plugin *Plugin
+	// tokenAccessor corev1.ServiceAccountInterface
 }
 
 func newMutatingDispatcher(p *Plugin) func(cm *webhookutil.ClientManager) generic.Dispatcher {
