@@ -533,6 +533,7 @@ linters:
             - "!**/testing/**"
             - "!**/ktesting/**"
             - "!**/apitesting/**"
+            - "!**/allocatortesting/**"
           deny:
             - pkg: "github.com/google/go-cmp/cmp"
               desc: "cmp is allowed only in test files"

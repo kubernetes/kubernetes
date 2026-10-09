@@ -26,6 +26,7 @@ import (
 	"testing"
 	"time"
 
+	g "github.com/onsi/gomega"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
@@ -36,8 +37,7 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
-	"k8s.io/klog/v2/ktesting"
-	_ "k8s.io/klog/v2/ktesting/init"
+	"k8s.io/ktesting"
 	"k8s.io/utils/ptr"
 )
 
@@ -108,15 +108,15 @@ func applyEventPair(tCtx *testContext, event any) {
 		switch {
 		case pair[0] != nil && pair[1] != nil:
 			err := store.Update(pair[1])
-			require.NoError(tCtx, err)
+			tCtx.ExpectNoError(err)
 			tCtx.resourceSliceUpdate(tCtx.Context)(pair[0], pair[1])
 		case pair[0] != nil:
 			err := store.Delete(pair[0])
-			require.NoError(tCtx, err)
+			tCtx.ExpectNoError(err)
 			tCtx.resourceSliceDelete(tCtx.Context)(resourceinformers.DeletedResourceSlice{OptionalObj: pair[0]})
 		default:
 			err := store.Add(pair[1])
-			require.NoError(tCtx, err)
+			tCtx.ExpectNoError(err)
 			tCtx.resourceSliceAdd(tCtx.Context)(pair[1])
 		}
 	case [2]*resourceapi.DeviceTaintRule:
@@ -124,49 +124,45 @@ func applyEventPair(tCtx *testContext, event any) {
 		switch {
 		case pair[0] != nil && pair[1] != nil:
 			err := store.Update(pair[1])
-			require.NoError(tCtx, err)
+			tCtx.ExpectNoError(err)
 			tCtx.deviceTaintUpdate(tCtx.Context)(pair[0], pair[1])
 		case pair[0] != nil:
 			err := store.Delete(pair[0])
-			require.NoError(tCtx, err)
+			tCtx.ExpectNoError(err)
 			tCtx.deviceTaintDelete(tCtx.Context)(resourceinformers.DeletedDeviceTaintRule{OptionalObj: pair[0]})
 		default:
 			err := store.Add(pair[1])
-			require.NoError(tCtx, err)
+			tCtx.ExpectNoError(err)
 			tCtx.deviceTaintAdd(tCtx.Context)(pair[1])
 		}
 	case removeRule:
 		name := string(pair)
 		store := tCtx.deviceTaints.GetStore()
 		obj, exists, err := store.GetByKey(name)
-		require.NoError(tCtx, err)
+		tCtx.ExpectNoError(err)
 		if !exists {
 			tCtx.Fatalf("cannot delete %s, not found", name)
 		}
 		err = store.Delete(obj)
-		require.NoError(tCtx, err)
+		tCtx.ExpectNoError(err)
 		// Let's pretend we don't have it...
 		tCtx.deviceTaintDelete(tCtx.Context)(resourceinformers.DeletedDeviceTaintRule{FinalStateUnknown: &cache.DeletedFinalStateUnknown{Key: name}})
 	}
 }
 
 type testContext struct {
-	*testing.T
-	context.Context
+	ktesting.TContext
 	*Tracker
 	*fake.Clientset
 }
 
-func (t *testContext) withLoggerName(name string) *testContext {
-	logger := klog.FromContext(t.Context)
-	logger = klog.LoggerWithName(logger, name)
-	t = &testContext{
-		T:         t.T,
-		Context:   klog.NewContext(t.Context, logger),
-		Tracker:   t.Tracker,
-		Clientset: t.Clientset,
+func (tCtx *testContext) withLoggerName(name string) *testContext {
+	logger := klog.LoggerWithName(tCtx.Logger(), name)
+	return &testContext{
+		TContext:  tCtx.WithLogger(logger),
+		Tracker:   tCtx.Tracker,
+		Clientset: tCtx.Clientset,
 	}
-	return t
 }
 
 var (
@@ -318,6 +314,10 @@ var (
 )
 
 func TestListPatchedResourceSlices(t *testing.T) {
+	testListPatchedResourceSlices(ktesting.Init(t))
+}
+
+func testListPatchedResourceSlices(tCtx ktesting.TContext) {
 	type test struct {
 		// events contains pairs of old and new objects which will
 		// be passed to event handler methods.
@@ -339,7 +339,7 @@ func TestListPatchedResourceSlices(t *testing.T) {
 		// permutation: the order in which the events are defined.
 		expectedHandlerEvents []handlerEvent
 		expectEvents          func(t *assert.CollectT, events *v1.EventList)
-		expectUnhandledErrors func(t *testing.T, errs []error)
+		expectUnhandledErrors func(tCtx ktesting.TContext, errs []error)
 	}
 	tests := map[string]test{
 		"add-slices-no-patches": {
@@ -586,9 +586,7 @@ func TestListPatchedResourceSlices(t *testing.T) {
 		},
 	}
 
-	setup := func(t *testing.T) *testContext {
-		_, ctx := ktesting.NewTestContext(t)
-
+	setup := func(tCtx ktesting.TContext) *testContext {
 		kubeClient := fake.NewSimpleClientset()
 		informerFactory := informers.NewSharedInformerFactoryWithOptions(kubeClient, 10*time.Minute)
 
@@ -598,12 +596,11 @@ func TestListPatchedResourceSlices(t *testing.T) {
 			TaintInformer:          informerFactory.Resource().V1().DeviceTaintRules(),
 			KubeClient:             kubeClient,
 		}
-		tracker, err := newTracker(ctx, opts)
-		require.NoError(t, err)
+		tracker, err := newTracker(tCtx, opts)
+		tCtx.ExpectNoError(err)
 
 		return &testContext{
-			T:         t,
-			Context:   ctx,
+			TContext:  tCtx,
 			Tracker:   tracker,
 			Clientset: kubeClient,
 		}
@@ -640,26 +637,26 @@ func TestListPatchedResourceSlices(t *testing.T) {
 		runInputEvents(tCtx, test.events, permutation)
 
 		if !isPermutated {
-			assert.Equal(tCtx, test.expectedHandlerEvents, handlerEvents)
+			tCtx.Assert(handlerEvents).To(g.Equal(test.expectedHandlerEvents))
 		}
 
 		expectUnhandledErrors := test.expectUnhandledErrors
 		if expectUnhandledErrors == nil {
-			expectUnhandledErrors = func(t *testing.T, errs []error) {
-				assert.Empty(t, errs)
+			expectUnhandledErrors = func(tCtx ktesting.TContext, errs []error) {
+				tCtx.Assert(errs).To(g.BeEmpty())
 			}
 		}
-		expectUnhandledErrors(tCtx.T, unhandledErrors)
+		expectUnhandledErrors(tCtx.TContext, unhandledErrors)
 
 		// Check ResourceSlices
 		patchedResourceSlices, err := tCtx.ListPatchedResourceSlices()
-		require.NoError(tCtx, err, "list patched resource slices")
+		tCtx.ExpectNoError(err, "list patched resource slices")
 		sortResourceSlicesFunc := func(s1, s2 *resourceapi.ResourceSlice) int {
 			return stdcmp.Compare(s1.Name, s2.Name)
 		}
 		slices.SortFunc(test.expectedPatchedSlices, sortResourceSlicesFunc)
 		slices.SortFunc(patchedResourceSlices, sortResourceSlicesFunc)
-		assert.Equal(tCtx, test.expectedPatchedSlices, patchedResourceSlices)
+		tCtx.Assert(patchedResourceSlices).To(g.Equal(test.expectedPatchedSlices))
 		expectEvents := test.expectEvents
 		if expectEvents == nil {
 			expectEvents = func(t *assert.CollectT, events *v1.EventList) {
@@ -671,7 +668,7 @@ func TestListPatchedResourceSlices(t *testing.T) {
 		assert.EventuallyWithT(
 			tCtx,
 			func(t *assert.CollectT) {
-				events, err := tCtx.CoreV1().Events("").List(tCtx.Context, metav1.ListOptions{})
+				events, err := tCtx.CoreV1().Events("").List(tCtx, metav1.ListOptions{})
 				require.NoError(t, err, "list events")
 				expectEvents(t, events)
 			},
@@ -682,7 +679,7 @@ func TestListPatchedResourceSlices(t *testing.T) {
 	}
 
 	for name, tc := range tests {
-		t.Run(name, func(t *testing.T) {
+		tCtx.Run(name, func(tCtx ktesting.TContext) {
 			// flatten does one level of flattening of events, counting all events.
 			// It also returns a slice of pairs of indices representing ranges which were
 			// flattened (= came from the second level) and which therefore must
@@ -709,7 +706,7 @@ func TestListPatchedResourceSlices(t *testing.T) {
 				for i := 0; i < numEvents; i++ {
 					permutation = append(permutation, i)
 				}
-				tContext := setup(t)
+				tContext := setup(tCtx)
 				testHandlers(tContext, tc, permutation)
 				return
 			}
@@ -720,8 +717,8 @@ func TestListPatchedResourceSlices(t *testing.T) {
 				if depth >= numEvents {
 					// Define a sub-test which runs the current permutation of events.
 					name := strings.Trim(fmt.Sprintf("%v", permutation), "[]")
-					t.Run(name, func(t *testing.T) {
-						tContext := setup(t)
+					tCtx.Run(name, func(tCtx ktesting.TContext) {
+						tContext := setup(tCtx)
 						// No need to clone the slice, we don't run in parallel.
 						testHandlers(tContext, tc, permutation)
 					})
@@ -758,6 +755,7 @@ func TestListPatchedResourceSlices(t *testing.T) {
 }
 
 func BenchmarkEventHandlers(b *testing.B) {
+	tCtx := ktesting.Init(b)
 	now := time.Now()
 	benchmarks := map[string]struct {
 		resourceSlices []*resourceapi.ResourceSlice
@@ -1006,7 +1004,7 @@ func BenchmarkEventHandlers(b *testing.B) {
 			KubeClient:             kubeClient,
 		}
 		tracker, err := newTracker(ctx, opts)
-		require.NoError(b, err)
+		tCtx.ExpectNoError(err)
 		tracker.handleError = func(_ context.Context, err error, _ string, _ ...any) {
 			b.Error("unexpected unhandled error:", err)
 		}
@@ -1014,24 +1012,25 @@ func BenchmarkEventHandlers(b *testing.B) {
 	}
 
 	for name, benchmark := range benchmarks {
-		b.Run(name, func(b *testing.B) {
-			logger, ctx := ktesting.NewTestContext(b)
-			ctx = klog.NewContext(ctx, logger.V(2))
-			tracker := newBenchTracker(ctx)
+		tCtx.Run(name, func(tCtx ktesting.TContext) {
+			logger := tCtx.Logger().V(2)
+			tCtx = tCtx.WithLogger(logger)
+			tracker := newBenchTracker(tCtx)
 
 			for _, slice := range benchmark.resourceSlices {
 				err := tracker.resourceSlices.GetIndexer().Add(slice)
-				require.NoError(b, err)
+				tCtx.ExpectNoError(err)
 			}
 
 			for _, taintRule := range benchmark.taintRules {
 				err := tracker.deviceTaints.GetIndexer().Add(taintRule)
-				require.NoError(b, err)
+				tCtx.ExpectNoError(err)
 			}
 
+			b := tCtx.TB().(*testing.B)
 			b.ResetTimer()
 			for i := range b.N {
-				benchmark.loop(ctx, b, tracker, benchmark.resourceSlices, benchmark.taintRules, i)
+				benchmark.loop(tCtx, b, tracker, benchmark.resourceSlices, benchmark.taintRules, i)
 			}
 		})
 	}

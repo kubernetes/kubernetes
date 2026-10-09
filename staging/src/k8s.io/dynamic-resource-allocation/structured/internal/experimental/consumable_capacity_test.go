@@ -20,10 +20,11 @@ import (
 	"math"
 	"testing"
 
-	. "github.com/onsi/gomega"
+	g "github.com/onsi/gomega"
 	resourceapi "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	draapi "k8s.io/dynamic-resource-allocation/api"
+	"k8s.io/ktesting"
 )
 
 const (
@@ -78,35 +79,34 @@ func deviceConsumedCapacity(deviceID DeviceID) DeviceConsumedCapacity {
 	return DeviceConsumedCapacity{DeviceID: deviceID, ConsumedCapacity: capacity}
 }
 
-func TestConsumableCapacity(t *testing.T) {
+func TestConsumableCapacity(t *testing.T) { testConsumableCapacity(ktesting.Init(t)) }
+func testConsumableCapacity(tCtx ktesting.TContext) {
 
-	t.Run("add-sub-allocating-consumed-capacity", func(t *testing.T) {
-		g := NewWithT(t)
+	tCtx.Run("add-sub-allocating-consumed-capacity", func(tCtx ktesting.TContext) {
 		allocatedCapacity := NewConsumedCapacity()
-		g.Expect(allocatedCapacity.Empty()).To(BeTrueBecause("allocated capacity should start from zero"))
+		tCtx.Require(allocatedCapacity.Empty()).To(g.BeTrueBecause("allocated capacity should start from zero"))
 		oneAllocated := ConsumedCapacity{
 			fullyQualifiedName(driverA, capacity0): &one,
 		}
 		allocatedCapacity.Add(oneAllocated)
-		g.Expect(allocatedCapacity.Empty()).To(BeFalseBecause("capacity is added"))
+		tCtx.Require(allocatedCapacity.Empty()).To(g.BeFalseBecause("capacity is added"))
 		allocatedCapacity.Sub(oneAllocated)
-		g.Expect(allocatedCapacity.Empty()).To(BeTrueBecause("capacity is subtracted to zero"))
+		tCtx.Require(allocatedCapacity.Empty()).To(g.BeTrueBecause("capacity is subtracted to zero"))
 	})
 
-	t.Run("insert-remove-allocating-consumed-capacity-collection", func(t *testing.T) {
-		g := NewWithT(t)
+	tCtx.Run("insert-remove-allocating-consumed-capacity-collection", func(tCtx ktesting.TContext) {
 		deviceID := MakeDeviceID(driverA, pool1, device1)
 		aggregatedCapacity := NewConsumedCapacityCollection()
 		aggregatedCapacity.Insert(deviceConsumedCapacity(deviceID))
 		aggregatedCapacity.Insert(deviceConsumedCapacity(deviceID))
 		allocatedCapacity, found := aggregatedCapacity[deviceID]
-		g.Expect(found).To(BeTrueBecause("expected deviceID to be found"))
-		g.Expect(allocatedCapacity[fullyQualifiedName(driverA, capacity0)].Cmp(two)).To(BeZero())
+		tCtx.Require(found).To(g.BeTrueBecause("expected deviceID to be found"))
+		tCtx.Require(allocatedCapacity[fullyQualifiedName(driverA, capacity0)].Cmp(two)).To(g.BeZero())
 		aggregatedCapacity.Remove(deviceConsumedCapacity(deviceID))
-		g.Expect(allocatedCapacity[fullyQualifiedName(driverA, capacity0)].Cmp(one)).To(BeZero())
+		tCtx.Require(allocatedCapacity[fullyQualifiedName(driverA, capacity0)].Cmp(one)).To(g.BeZero())
 	})
 
-	t.Run("get-consumed-capacity-from-request", func(t *testing.T) {
+	tCtx.Run("get-consumed-capacity-from-request", func(tCtx ktesting.TContext) {
 		requestedCapacity := map[draapi.FullyQualifiedName]resource.Quantity{
 			draapi.MakeFullyQualifiedName(capacity0, driverA): one,
 			draapi.MakeFullyQualifiedName("dummy", driverA):   one,
@@ -138,34 +138,32 @@ func TestConsumableCapacity(t *testing.T) {
 				Driver: draapi.MakeUniqueString(driverA),
 			},
 		}
-		g := NewWithT(t)
 		consumedCapacity, err := getConsumedCapacityFromRequest(requestedCapacity, device, false)
-		g.Expect(err).NotTo(HaveOccurred())
-		g.Expect(consumedCapacity).To(HaveLen(3))
+		tCtx.Require(err).NotTo(g.HaveOccurred())
+		tCtx.Require(consumedCapacity).To(g.HaveLen(3))
 		for name, val := range consumedCapacity {
-			g.Expect(name.Domain).To(Equal(driverA), "domain should be omitted since it equals the driver")
-			g.Expect(name.Identifier).Should(BeElementOf([]string{capacity0, capacity1, "dummy"}))
-			g.Expect(val.Cmp(one)).To(BeZero())
+			tCtx.Require(name.Domain).To(g.Equal(driverA), "domain should be omitted since it equals the driver")
+			tCtx.Require(name.Identifier).Should(g.BeElementOf([]string{capacity0, capacity1, "dummy"}))
+			tCtx.Require(val.Cmp(one)).To(g.BeZero())
 		}
 	})
 
-	t.Run("violate-capacity-sharing", testViolateCapacityRequestPolicy)
+	tCtx.Run("violate-capacity-sharing", testViolateCapacityRequestPolicy)
 
-	t.Run("calculate-consumed-capacity", testCalculateConsumedCapacity)
+	tCtx.Run("calculate-consumed-capacity", testCalculateConsumedCapacity)
 
-	t.Run("safe-milli-value", testSafeMilliValue)
+	tCtx.Run("safe-milli-value", testSafeMilliValue)
 
-	t.Run("use-milli", testUseMilli)
+	tCtx.Run("use-milli", testUseMilli)
 
-	t.Run("cmp-request-over-capacity-fatal-beats-soft", testCmpRequestOverCapacityFatalBeatsSoft)
+	tCtx.Run("cmp-request-over-capacity-fatal-beats-soft", testCmpRequestOverCapacityFatalBeatsSoft)
 }
 
 // testCmpRequestOverCapacityFatalBeatsSoft pins that a representability error takes
 // precedence over a soft policy or capacity mismatch on the same device. The allocator
 // enforces that precedence by resolving representability for all capacities before it
 // runs the soft checks, so the outcome does not depend on Go's unspecified map order.
-func testCmpRequestOverCapacityFatalBeatsSoft(t *testing.T) {
-	g := NewWithT(t)
+func testCmpRequestOverCapacityFatalBeatsSoft(tCtx ktesting.TContext) {
 	capacity := map[resourceapi.QualifiedName]resourceapi.DeviceCapacity{
 		capacity0: {Value: one}, // no policy; the request of 2 over-fills the value of 1 (soft)
 		capacity1: {
@@ -193,12 +191,12 @@ func testCmpRequestOverCapacityFatalBeatsSoft(t *testing.T) {
 	// order-dependent regression very likely to surface rather than to rely on one order.
 	for range 64 {
 		_, ok, err := cmpRequestOverCapacity(NewConsumedCapacity(), request, device, NewConsumedCapacity(), false)
-		g.Expect(ok).To(BeFalseBecause("an unrepresentable request must not be considered satisfiable"))
-		g.Expect(err).To(MatchError(errCapacityRequestNotRepresentable), "a representability error must take precedence over the soft over-capacity mismatch")
+		tCtx.Require(ok).To(g.BeFalseBecause("an unrepresentable request must not be considered satisfiable"))
+		tCtx.Require(err).To(g.MatchError(errCapacityRequestNotRepresentable), "a representability error must take precedence over the soft over-capacity mismatch")
 	}
 }
 
-func testSafeMilliValue(t *testing.T) {
+func testSafeMilliValue(tCtx ktesting.TContext) {
 	testcases := map[string]struct {
 		q           resource.Quantity
 		expectMilli int64
@@ -218,20 +216,19 @@ func testSafeMilliValue(t *testing.T) {
 		},
 	}
 	for name, tc := range testcases {
-		t.Run(name, func(t *testing.T) {
-			g := NewWithT(t)
+		tCtx.Run(name, func(tCtx ktesting.TContext) {
 			got, err := safeMilliValue(tc.q)
 			if tc.expectErr {
-				g.Expect(err).To(HaveOccurred())
+				tCtx.Require(err).To(g.HaveOccurred())
 			} else {
-				g.Expect(err).NotTo(HaveOccurred())
-				g.Expect(got).To(Equal(tc.expectMilli))
+				tCtx.Require(err).NotTo(g.HaveOccurred())
+				tCtx.Require(got).To(g.Equal(tc.expectMilli))
 			}
 		})
 	}
 }
 
-func testUseMilli(t *testing.T) {
+func testUseMilli(tCtx ktesting.TContext) {
 	testcases := map[string]struct {
 		validRange              resourceapi.CapacityRequestPolicyRange
 		fractionalCapacityRange bool
@@ -276,15 +273,14 @@ func testUseMilli(t *testing.T) {
 		},
 	}
 	for name, tc := range testcases {
-		t.Run(name, func(t *testing.T) {
-			g := NewWithT(t)
+		tCtx.Run(name, func(tCtx ktesting.TContext) {
 			got := useMilli(&tc.validRange, tc.fractionalCapacityRange)
-			g.Expect(got).To(Equal(tc.expectUseMilli))
+			tCtx.Require(got).To(g.Equal(tc.expectUseMilli))
 		})
 	}
 }
 
-func testViolateCapacityRequestPolicy(t *testing.T) {
+func testViolateCapacityRequestPolicy(tCtx ktesting.TContext) {
 	testcases := map[string]struct {
 		requestedVal            resource.Quantity
 		requestPolicy           *resourceapi.CapacityRequestPolicy
@@ -368,15 +364,14 @@ func testViolateCapacityRequestPolicy(t *testing.T) {
 		},
 	}
 	for name, tc := range testcases {
-		t.Run(name, func(t *testing.T) {
-			g := NewWithT(t)
+		tCtx.Run(name, func(tCtx ktesting.TContext) {
 			violate := violatesPolicy(tc.requestedVal, tc.requestPolicy, tc.fractionalCapacityRange)
-			g.Expect(violate).To(BeEquivalentTo(tc.expectResult))
+			tCtx.Require(violate).To(g.BeEquivalentTo(tc.expectResult))
 		})
 	}
 }
 
-func testCalculateConsumedCapacity(t *testing.T) {
+func testCalculateConsumedCapacity(tCtx ktesting.TContext) {
 	testcases := map[string]struct {
 		requestedVal            *resource.Quantity
 		capacityValue           resource.Quantity
@@ -617,21 +612,20 @@ func testCalculateConsumedCapacity(t *testing.T) {
 		},
 	}
 	for name, tc := range testcases {
-		t.Run(name, func(t *testing.T) {
-			g := NewWithT(t)
+		tCtx.Run(name, func(tCtx ktesting.TContext) {
 			capacity := resourceapi.DeviceCapacity{
 				Value:         tc.capacityValue,
 				RequestPolicy: tc.requestPolicy,
 			}
 			consumedCapacity, err := calculateConsumedCapacity(tc.requestedVal, capacity, tc.fractionalCapacityRange)
 			if tc.expectErr {
-				g.Expect(err).To(MatchError(errCapacityRequestNotRepresentable))
+				tCtx.Require(err).To(g.MatchError(errCapacityRequestNotRepresentable))
 				if tc.expectErrMessage != "" {
-					g.Expect(err).To(MatchError(ContainSubstring(tc.expectErrMessage)))
+					tCtx.Require(err).To(g.MatchError(g.ContainSubstring(tc.expectErrMessage)))
 				}
 			} else {
-				g.Expect(err).NotTo(HaveOccurred())
-				g.Expect(consumedCapacity.Cmp(tc.expectResult)).To(BeZero())
+				tCtx.Require(err).NotTo(g.HaveOccurred())
+				tCtx.Require(consumedCapacity.Cmp(tc.expectResult)).To(g.BeZero())
 			}
 		})
 	}
