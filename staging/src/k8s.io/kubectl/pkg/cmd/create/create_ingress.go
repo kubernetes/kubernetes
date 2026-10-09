@@ -227,7 +227,7 @@ func (o *CreateIngressOptions) Validate() error {
 
 	for _, annotation := range o.Annotations {
 		an := strings.SplitN(annotation, "=", 2)
-		if len(an) != 2 || an[0] == "" {
+		if len(an) != 2 || an[0] == "" || an[1] == "" {
 			return fmt.Errorf("annotation %s is invalid and should be in format key=[value]", annotation)
 		}
 	}

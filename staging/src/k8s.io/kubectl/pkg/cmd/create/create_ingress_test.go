@@ -69,7 +69,7 @@ func TestCreateIngressValidation(t *testing.T) {
 			defaultbackend: "xpto:4444",
 			annotations: []string{
 				"key1=value1",
-				"key2=",
+				"key2=value2",
 			},
 			expected: "",
 		},
@@ -79,6 +79,13 @@ func TestCreateIngressValidation(t *testing.T) {
 				"=value",
 			},
 			expected: "annotation =value is invalid and should be in format key=[value]",
+		},
+		"empty annotation value": {
+			defaultbackend: "xpto:4444",
+			annotations: []string{
+				"key=",
+			},
+			expected: "annotation key= is invalid and should be in format key=[value]",
 		},
 		"multiple conformant rules": {
 			rules: []string{
