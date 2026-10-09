@@ -373,6 +373,62 @@ func TestComputePodQOS(t *testing.T) {
 			podLevelResourcesEnabled: true,
 			podLevelResourcesFixKubeletQOSClassEnabled: true,
 		},
+		{
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "best-effort-with-swap-limits"},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "best-effort-with-swap",
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceSwap: resource.MustParse("1Gi"),
+								},
+							},
+						},
+					},
+					Resources: &v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							v1.ResourceSwap: resource.MustParse("2Gi"),
+						},
+					},
+				},
+			},
+			expected:                 v1.PodQOSBestEffort,
+			podLevelResourcesEnabled: true,
+			podLevelResourcesFixKubeletQOSClassEnabled: true,
+		},
+		{
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "guaranteed-with-swap-limits-only"},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "guaranteed-with-swap",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU:    resource.MustParse("100m"),
+									v1.ResourceMemory: resource.MustParse("100Mi"),
+								},
+								Limits: v1.ResourceList{
+									v1.ResourceCPU:    resource.MustParse("100m"),
+									v1.ResourceMemory: resource.MustParse("100Mi"),
+									v1.ResourceSwap:   resource.MustParse("1Gi"),
+								},
+							},
+						},
+					},
+					Resources: &v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							v1.ResourceSwap: resource.MustParse("1Gi"),
+						},
+					},
+				},
+			},
+			expected:                 v1.PodQOSGuaranteed,
+			podLevelResourcesEnabled: true,
+			podLevelResourcesFixKubeletQOSClassEnabled: true,
+		},
 	}
 	tests = append(tests, explicitPLRTests...)
 
