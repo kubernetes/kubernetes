@@ -1064,7 +1064,7 @@ func TestRealFIFO_PopMultipleDeltaInBatch(t *testing.T) {
 			},
 		},
 		{
-			name: "split due to non-unique#1: update single item for multiple items should have separate batch",
+			name: "non-split due to non-unique#1: update single item for multiple items should be bundled after initial list",
 			initialItems: []testFifoObject{
 				obj1,
 			},
@@ -1075,8 +1075,7 @@ func TestRealFIFO_PopMultipleDeltaInBatch(t *testing.T) {
 			batchSize: unlimitedBatchSize,
 			expectedBatches: [][]Delta{
 				{{Replaced, obj1}},
-				{{Updated, obj1}},
-				{{Updated, obj1}},
+				{{Updated, obj1}, {Updated, obj1}},
 			},
 		},
 		{
@@ -1268,8 +1267,7 @@ func TestRealFIFO_PopBrokenItemsInBatch(t *testing.T) {
 				sucessObj1, sucessObj2, failObj3, failObj4,
 			},
 			expectedBatches: [][]Delta{
-				{{testDeltaType, sucessObj1}, {testDeltaType, sucessObj2}, {testDeltaType, failObj3}},
-				{{testDeltaType, failObj4}},
+				{{testDeltaType, sucessObj1}, {testDeltaType, sucessObj2}, {testDeltaType, failObj3}, {testDeltaType, failObj4}},
 			},
 		},
 		{
@@ -1278,8 +1276,7 @@ func TestRealFIFO_PopBrokenItemsInBatch(t *testing.T) {
 				failObj3, sucessObj1, failObj4,
 			},
 			expectedBatches: [][]Delta{
-				{{testDeltaType, failObj3}},
-				{{testDeltaType, sucessObj1}, {testDeltaType, failObj4}},
+				{{testDeltaType, failObj3}, {testDeltaType, sucessObj1}, {testDeltaType, failObj4}},
 			},
 		},
 	}

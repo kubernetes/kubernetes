@@ -499,14 +499,12 @@ func (f *RealFIFO) PopBatch(processBatch ProcessBatchFunc, processSingle PopProc
 	}
 
 	isInInitialList := !f.hasSynced_locked()
-	unique := sets.NewString()
 	deltas := make([]Delta, 0, min(len(f.items), f.batchSize))
 	moveDeltaToProcessList := func(i int) {
 		deltas = append(deltas, f.items[i])
 		// The underlying array still exists and references this object, so the object will not be garbage collected unless we zero the reference.
 		f.items[i] = Delta{}
 	}
-	// only bundle unique items into a batch
 	for i := 0; i < f.batchSize && i < len(f.items); i++ {
 		if f.initialPopulationCount > 0 && i >= f.initialPopulationCount {
 			break
@@ -520,21 +518,6 @@ func (f *RealFIFO) PopBatch(processBatch ProcessBatchFunc, processSingle PopProc
 			// close the batch when an unbatchable delta is encountered
 			break
 		}
-		id, err := f.keyOf(item)
-		if err != nil {
-			// close the batch here if error happens
-			// TODO: log the error when RealFIFOOptions supports passing klog instance like deprecated DeltaFIFO
-			// still pop the broken item out of queue to be compatible with the non-batch behavior it should be safe
-			// when 1st element is broken, however for Nth broken element, there's possible risk that broken item
-			// still can be processed and broke the uniqueness of the batch unexpectedly.
-			moveDeltaToProcessList(i)
-			break
-		}
-		if unique.Has(id) {
-			// close the batch if a duplicate item is encountered
-			break
-		}
-		unique.Insert(id)
 		moveDeltaToProcessList(i)
 	}
 	f.items = f.items[len(deltas):]

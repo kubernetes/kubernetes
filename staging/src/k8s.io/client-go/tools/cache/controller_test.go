@@ -1006,6 +1006,144 @@ func (m *mockTxnStore) Transaction(txns ...Transaction) *TransactionError {
 	return nil
 }
 
+func TestProcessDeltasInBatchRepeatedKeys(t *testing.T) {
+	mkCM := func(name, rv string) *v1.ConfigMap {
+		return &v1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Namespace: "ns", Name: name, ResourceVersion: rv}}
+	}
+	a1, a2, a3 := mkCM("a", "1"), mkCM("a", "2"), mkCM("a", "3")
+	b1, b2 := mkCM("b", "1"), mkCM("b", "2")
+
+	testCases := []struct {
+		name           string
+		initialObjects []interface{}
+		deltas         []Delta
+		expectedEvents []string
+		expectedStore  []string
+	}{
+		{
+			name:           "multiple updates of a new object",
+			deltas:         []Delta{{Added, a1}, {Updated, a2}, {Updated, a3}},
+			expectedEvents: []string{"add a/1", "update a/1 -> a/2", "update a/2 -> a/3"},
+			expectedStore:  []string{"a/3"},
+		},
+		{
+			name:           "multiple updates of a stored object",
+			initialObjects: []interface{}{a1},
+			deltas:         []Delta{{Updated, a2}, {Updated, a3}},
+			expectedEvents: []string{"update a/1 -> a/2", "update a/2 -> a/3"},
+			expectedStore:  []string{"a/3"},
+		},
+		{
+			name:           "add then delete",
+			deltas:         []Delta{{Added, a1}, {Deleted, a1}},
+			expectedEvents: []string{"add a/1", "delete a/1"},
+		},
+		{
+			name:           "delete then add",
+			initialObjects: []interface{}{a1},
+			deltas:         []Delta{{Deleted, a1}, {Added, a2}},
+			expectedEvents: []string{"delete a/1", "add a/2"},
+			expectedStore:  []string{"a/2"},
+		},
+		{
+			name:           "tombstone delete then add and update",
+			initialObjects: []interface{}{a1},
+			deltas:         []Delta{{Deleted, DeletedFinalStateUnknown{Key: "ns/a", Obj: a1}}, {Added, a2}, {Updated, a3}},
+			expectedEvents: []string{"delete tombstone a/1", "add a/2", "update a/2 -> a/3"},
+			expectedStore:  []string{"a/3"},
+		},
+		{
+			name:           "interleaved objects",
+			initialObjects: []interface{}{b1},
+			deltas:         []Delta{{Added, a1}, {Updated, b2}, {Updated, a2}, {Deleted, b2}, {Sync, a2}},
+			expectedEvents: []string{"add a/1", "update b/1 -> b/2", "update a/1 -> a/2", "delete b/2", "update a/2 -> a/2"},
+			expectedStore:  []string{"a/2"},
+		},
+	}
+
+	describe := func(obj interface{}) string {
+		prefix := ""
+		if tombstone, ok := obj.(DeletedFinalStateUnknown); ok {
+			prefix, obj = "tombstone ", tombstone.Obj
+		}
+		cm := obj.(*v1.ConfigMap)
+		return prefix + cm.Name + "/" + cm.ResourceVersion
+	}
+	recorder := func(events *[]string) ResourceEventHandler {
+		return ResourceEventHandlerFuncs{
+			AddFunc: func(obj interface{}) {
+				*events = append(*events, "add "+describe(obj))
+			},
+			UpdateFunc: func(oldObj, newObj interface{}) {
+				*events = append(*events, "update "+describe(oldObj)+" -> "+describe(newObj))
+			},
+			DeleteFunc: func(obj interface{}) {
+				*events = append(*events, "delete "+describe(obj))
+			},
+		}
+	}
+	newStore := func(t *testing.T, objs []interface{}) Store {
+		store := NewStore(DeletionHandlingMetaNamespaceKeyFunc)
+		require.NoError(t, store.Replace(objs, ""))
+		return store
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			logger, _ := ktesting.NewTestContext(t)
+
+			var batchEvents []string
+			batchStore := newStore(t, tc.initialObjects)
+			err := processDeltasInBatch(logger, recorder(&batchEvents), batchStore, tc.deltas, false, DeletionHandlingMetaNamespaceKeyFunc)
+			require.NoError(t, err)
+
+			var individualEvents []string
+			individualStore := newStore(t, tc.initialObjects)
+			for _, d := range tc.deltas {
+				err := processDeltas(logger, recorder(&individualEvents), individualStore, Deltas{d}, false, DeletionHandlingMetaNamespaceKeyFunc)
+				require.NoError(t, err)
+			}
+
+			var storeContents []string
+			for _, obj := range batchStore.List() {
+				storeContents = append(storeContents, describe(obj))
+			}
+
+			assert.Equal(t, tc.expectedEvents, batchEvents)
+			assert.Equal(t, individualEvents, batchEvents)
+			assert.ElementsMatch(t, tc.expectedStore, storeContents)
+		})
+	}
+}
+
+func TestProcessDeltasInBatchKeyError(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	mkCM := func(name string) *v1.ConfigMap {
+		return &v1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Namespace: "ns", Name: name}}
+	}
+	ok1, broken, ok2 := mkCM("ok1"), mkCM("broken"), mkCM("ok2")
+	keyFunc := func(obj interface{}) (string, error) {
+		if obj == broken {
+			return "", errors.New("test key func error")
+		}
+		return DeletionHandlingMetaNamespaceKeyFunc(obj)
+	}
+
+	store := NewStore(DeletionHandlingMetaNamespaceKeyFunc)
+	callbacks := 0
+	handler := ResourceEventHandlerFuncs{
+		AddFunc: func(interface{}) { callbacks++ },
+	}
+
+	err := processDeltasInBatch(logger, handler, store, []Delta{{Added, ok1}, {Added, broken}, {Added, ok2}}, false, keyFunc)
+
+	var keyErr KeyError
+	require.ErrorAs(t, err, &keyErr)
+	assert.Equal(t, broken, keyErr.Obj)
+	assert.Equal(t, 0, callbacks)
+	assert.Empty(t, store.List())
+}
+
 func TestReplaceEvents(t *testing.T) {
 	_, ctx := ktesting.NewTestContext(t)
 	ctx, cancel := context.WithCancel(ctx)
