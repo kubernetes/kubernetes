@@ -18,7 +18,9 @@ package allocation
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"reflect"
 	goruntime "runtime"
 	"strings"
 	"testing"
@@ -42,6 +44,8 @@ import (
 	"k8s.io/ktesting"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/allocation/state"
+	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
+	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager/checksum"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/memorymanager"
@@ -167,121 +171,102 @@ func TestUpdatePodFromAllocation(t *testing.T) {
 		v1.ResourceMemory: *resource.NewQuantity(200, resource.DecimalSI),
 	}
 
+	withPassthroughChanges := func(p *v1.Pod) *v1.Pod {
+		p = p.DeepCopy()
+		p.Spec.ActiveDeadlineSeconds = ptr.To[int64](60)
+		p.Spec.Tolerations = []v1.Toleration{{Key: "key", Operator: v1.TolerationOpExists}}
+		p.Spec.TerminationGracePeriodSeconds = ptr.To[int64](10)
+		p.Spec.EphemeralContainers = []v1.EphemeralContainer{{EphemeralContainerCommon: v1.EphemeralContainerCommon{Name: "debugger"}}}
+		// Every container, since copying the image of the first one only would go unnoticed otherwise.
+		for i := range p.Spec.Containers {
+			p.Spec.Containers[i].Image = "new"
+		}
+		for i := range p.Spec.InitContainers {
+			p.Spec.InitContainers[i].Image = "new"
+		}
+		return p
+	}
+
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeDeclaredFeatures, true)
 
 	tests := []struct {
 		name                         string
 		pod                          *v1.Pod
-		allocated                    state.PodResourceInfo
+		allocated                    *v1.Pod
 		expectPod                    *v1.Pod
 		expectUpdate                 bool
 		inPlacePodLevelResizeEnabled bool
 	}{{
-		name: "steady state",
-		pod:  pod,
-		allocated: state.PodResourceInfo{
-			ContainerResources: map[string]v1.ResourceRequirements{
-				"c1":                  *pod.Spec.Containers[0].Resources.DeepCopy(),
-				"c2":                  *pod.Spec.Containers[1].Resources.DeepCopy(),
-				"c1-restartable-init": *pod.Spec.InitContainers[0].Resources.DeepCopy(),
-				"c1-init":             *pod.Spec.InitContainers[1].Resources.DeepCopy(),
-			},
-		},
+		name:         "steady state",
+		pod:          pod,
+		allocated:    pod,
 		expectUpdate: false,
 	}, {
 		name:         "no allocations",
 		pod:          pod,
-		allocated:    state.PodResourceInfo{},
 		expectUpdate: false,
 	}, {
+		// A pod migrated from a V1 checkpoint has no name, and only the containers that were checkpointed.
 		name: "missing container allocation",
 		pod:  pod,
-		allocated: state.PodResourceInfo{
-			ContainerResources: map[string]v1.ResourceRequirements{
-				"c2": *pod.Spec.Containers[1].Resources.DeepCopy(),
+		allocated: &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{UID: pod.UID},
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{pod.Spec.Containers[1]},
 			},
 		},
 		expectUpdate: false,
 	}, {
-		name: "resized container",
-		pod:  pod,
-		allocated: state.PodResourceInfo{
-			ContainerResources: map[string]v1.ResourceRequirements{
-				"c1":                  *resizedPod.Spec.Containers[0].Resources.DeepCopy(),
-				"c2":                  *resizedPod.Spec.Containers[1].Resources.DeepCopy(),
-				"c1-restartable-init": *resizedPod.Spec.InitContainers[0].Resources.DeepCopy(),
-				"c1-init":             *resizedPod.Spec.InitContainers[1].Resources.DeepCopy(),
-			},
-		},
+		name:         "resized container",
+		pod:          pod,
+		allocated:    resizedPod,
 		expectUpdate: true,
 		expectPod:    resizedPod,
 	}, {
-		name: "resized pod-level allocation",
-		pod:  pod,
-		allocated: state.PodResourceInfo{
-			ContainerResources: map[string]v1.ResourceRequirements{
-				"c1":                  *resizedPod.Spec.Containers[0].Resources.DeepCopy(),
-				"c2":                  *resizedPod.Spec.Containers[1].Resources.DeepCopy(),
-				"c1-restartable-init": *resizedPod.Spec.InitContainers[0].Resources.DeepCopy(),
-				"c1-init":             *resizedPod.Spec.InitContainers[1].Resources.DeepCopy(),
-			},
-			PodLevelResources: resizedPodWithPodLevelResources.Spec.Resources.DeepCopy(),
-		},
+		name:         "changed passthrough fields",
+		pod:          withPassthroughChanges(pod),
+		allocated:    pod,
+		expectUpdate: false,
+		expectPod:    withPassthroughChanges(pod),
+	}, {
+		name:         "changed passthrough fields and resized container",
+		pod:          withPassthroughChanges(pod),
+		allocated:    resizedPod,
+		expectUpdate: true,
+		expectPod:    withPassthroughChanges(resizedPod),
+	}, {
+		name:                         "resized pod-level allocation",
+		pod:                          pod,
+		allocated:                    resizedPodWithPodLevelResources,
 		expectUpdate:                 true,
 		expectPod:                    resizedPodWithPodLevelResources,
 		inPlacePodLevelResizeEnabled: true,
 	}, {
-		name: "resized pod-level resources and allocation",
-		pod:  podWithPodLevelResources,
-		allocated: state.PodResourceInfo{
-			ContainerResources: map[string]v1.ResourceRequirements{
-				"c1":                  *resizedPod.Spec.Containers[0].Resources.DeepCopy(),
-				"c2":                  *resizedPod.Spec.Containers[1].Resources.DeepCopy(),
-				"c1-restartable-init": *resizedPod.Spec.InitContainers[0].Resources.DeepCopy(),
-				"c1-init":             *resizedPod.Spec.InitContainers[1].Resources.DeepCopy(),
-			},
-			PodLevelResources: resizedPodWithPodLevelResources.Spec.Resources.DeepCopy(),
-		},
+		name:                         "resized pod-level resources and allocation",
+		pod:                          podWithPodLevelResources,
+		allocated:                    resizedPodWithPodLevelResources,
 		expectUpdate:                 true,
 		expectPod:                    resizedPodWithPodLevelResources,
 		inPlacePodLevelResizeEnabled: true,
 	}, {
-		name: "resized pod-level resources and no container resources",
-		pod:  podWithoutContainerResources,
-		allocated: state.PodResourceInfo{
-			ContainerResources: map[string]v1.ResourceRequirements{
-				"c1":                  *resizedPod.Spec.Containers[0].Resources.DeepCopy(),
-				"c2":                  *resizedPod.Spec.Containers[1].Resources.DeepCopy(),
-				"c1-restartable-init": *resizedPod.Spec.InitContainers[0].Resources.DeepCopy(),
-				"c1-init":             *resizedPod.Spec.InitContainers[1].Resources.DeepCopy(),
-			},
-			PodLevelResources: resizedPodWithPodLevelResources.Spec.Resources.DeepCopy(),
-		},
+		name:                         "resized pod-level resources and no container resources",
+		pod:                          podWithoutContainerResources,
+		allocated:                    resizedPodWithPodLevelResources,
 		expectUpdate:                 true,
 		expectPod:                    resizedPodWithPodLevelResources,
 		inPlacePodLevelResizeEnabled: true,
 	}, {
-		name: "pod-level resources with overhead, checkpoint matches spec (no overhead stored)",
-		pod:  podWithPodLevelResourcesAndOverhead,
-		allocated: state.PodResourceInfo{
-			PodLevelResources: podWithPodLevelResourcesAndOverhead.Spec.Resources.DeepCopy(),
-		},
+		name:                         "pod-level resources with overhead, allocation matches spec",
+		pod:                          podWithPodLevelResourcesAndOverhead,
+		allocated:                    podWithPodLevelResourcesAndOverhead,
 		expectUpdate:                 false,
 		inPlacePodLevelResizeEnabled: true,
 	}, {
-		name: "resized pod-level resources with feature gate disabled",
-		pod:  podWithPodLevelResources,
-		allocated: state.PodResourceInfo{
-			ContainerResources: map[string]v1.ResourceRequirements{
-				"c1":                  *pod.Spec.Containers[0].Resources.DeepCopy(),
-				"c2":                  *pod.Spec.Containers[1].Resources.DeepCopy(),
-				"c1-restartable-init": *pod.Spec.InitContainers[0].Resources.DeepCopy(),
-				"c1-init":             *pod.Spec.InitContainers[1].Resources.DeepCopy(),
-			},
-			PodLevelResources: resizedPod.Spec.Resources.DeepCopy(),
-		},
-		expectUpdate:                 false,
-		expectPod:                    podWithPodLevelResources,
+		name:                         "resized pod-level resources with feature gate disabled",
+		pod:                          podWithPodLevelResources,
+		allocated:                    pod,
+		expectUpdate:                 true,
+		expectPod:                    pod,
 		inPlacePodLevelResizeEnabled: false,
 	}}
 
@@ -291,18 +276,520 @@ func TestUpdatePodFromAllocation(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodLevelResourcesVerticalScaling, test.inPlacePodLevelResizeEnabled)
 			allocationManager := makeAllocationManager(t, &containertest.FakeRuntime{}, nil, nil)
 			pod := test.pod.DeepCopy()
-			allocationManager.(*manager).allocated.SetPodResourceInfo(logger, pod.UID, test.allocated)
+			if test.allocated != nil {
+				require.NoError(t, allocationManager.(*manager).allocated.SetPod(logger, test.allocated))
+			}
 			allocatedPod, updated := allocationManager.UpdatePodFromAllocation(pod)
 
 			if test.expectUpdate {
 				assert.True(t, updated, "updated")
 				assert.Equal(t, test.expectPod, allocatedPod)
 				assert.NotEqual(t, pod, allocatedPod)
+				assert.NotSame(t, pod, allocatedPod, "when an update is pending, the result is a copy")
 			} else {
 				assert.False(t, updated, "updated")
-				assert.Same(t, pod, allocatedPod)
+				expectPod := test.expectPod
+				if expectPod == nil {
+					expectPod = pod
+				}
+				assert.Equal(t, expectPod, allocatedPod)
+				assert.Same(t, pod, allocatedPod, "when no update is pending, the pod is returned as-is")
 			}
 		})
+	}
+}
+
+// TestUpdatePodFromAllocationReturnsCopy checks that when an update is pending, the caller can modify
+// the result without changing the pod or the stored pod, whichever way the result is built.
+func TestUpdatePodFromAllocationReturnsCopy(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodLevelResourcesVerticalScaling, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScalingMemoryBackedVolumes, true)
+
+	cpu := func(quantity string) v1.ResourceRequirements {
+		return v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse(quantity)}}
+	}
+
+	// newPod has something of each kind that a shallow copy of it would share with it: metadata,
+	// status, passthrough fields, resources and a volume.
+	newPod := func() *v1.Pod {
+		pod := &v1.Pod{}
+		pod.UID, pod.Name, pod.Namespace = "uid", "test", "default"
+		pod.Labels = map[string]string{"label": "value"}
+		pod.Annotations = map[string]string{"annotation": "value"}
+		pod.Status.Conditions = []v1.PodCondition{{Type: v1.PodReady, Reason: "reason"}}
+		pod.Spec.ActiveDeadlineSeconds = ptr.To[int64](60)
+		pod.Spec.TerminationGracePeriodSeconds = ptr.To[int64](30)
+		pod.Spec.Tolerations = []v1.Toleration{{Key: "key", Operator: v1.TolerationOpExists}}
+		pod.Spec.EphemeralContainers = []v1.EphemeralContainer{{EphemeralContainerCommon: v1.EphemeralContainerCommon{Name: "debugger"}}}
+		pod.Spec.Containers = []v1.Container{{Name: "c", Image: "image", Resources: cpu("1")}}
+		pod.Spec.Resources = ptr.To(cpu("2"))
+		pod.Spec.Volumes = []v1.Volume{{Name: "memory"}}
+		pod.Spec.Volumes[0].EmptyDir = &v1.EmptyDirVolumeSource{Medium: v1.StorageMediumMemory, SizeLimit: ptr.To(resource.MustParse("64Mi"))}
+		return pod
+	}
+
+	// v1Pod is a pod migrated from a V1 checkpoint: it has no name, and only the resources of
+	// newPod, except for the one of its container.
+	v1Pod := func(containerCPU string) *v1.Pod {
+		pod := &v1.Pod{}
+		pod.UID = "uid"
+		pod.Spec.Containers = []v1.Container{{Name: "c", Resources: cpu(containerCPU)}}
+		pod.Spec.Resources = ptr.To(cpu("2"))
+		pod.Spec.Volumes = []v1.Volume{{Name: "memory"}}
+		pod.Spec.Volumes[0].EmptyDir = &v1.EmptyDirVolumeSource{SizeLimit: ptr.To(resource.MustParse("64Mi"))}
+		return pod
+	}
+
+	// mutate writes in place to everything in the pod that a shallow copy would share.
+	mutate := func(pod *v1.Pod) {
+		pod.Labels["label"] = "changed"
+		pod.Annotations["annotation"] = "changed"
+		pod.Status.Conditions[0].Reason = "changed"
+		*pod.Spec.ActiveDeadlineSeconds = 1
+		*pod.Spec.TerminationGracePeriodSeconds = 1
+		pod.Spec.Tolerations[0].Key = "changed"
+		pod.Spec.EphemeralContainers[0].Name = "changed"
+		pod.Spec.Containers[0].Image = "changed"
+		pod.Spec.Containers[0].Resources.Requests[v1.ResourceCPU] = resource.MustParse("9")
+		pod.Spec.Resources.Requests[v1.ResourceCPU] = resource.MustParse("9")
+		pod.Spec.Volumes[0].EmptyDir.SizeLimit.Add(resource.MustParse("1Mi"))
+	}
+
+	resized := newPod()
+	resized.Spec.Containers[0].Resources = cpu("500m")
+
+	tests := []struct {
+		name   string
+		stored *v1.Pod
+	}{
+		{"resize pending", resized},
+		{"migrated from V1, resize pending", v1Pod("500m")},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			logger, _ := ktesting.NewTestContext(t)
+			m := &manager{allocated: state.NewStateMemory(logger, nil)}
+			if test.stored != nil {
+				require.NoError(t, m.allocated.SetPod(logger, test.stored))
+			}
+			pod := newPod()
+			// copyImages writes into the containers that come from the stored pod, which only shows if the
+			// image differs from the stored one.
+			pod.Spec.Containers[0].Image = "new"
+			podBefore := pod.DeepCopy()
+			// The snapshot is copied again: if GetPod returned the stored pod itself, the snapshot would
+			// change along with it and the comparison below could not fail.
+			stored, _ := m.allocated.GetPod(pod.UID)
+			storedBefore := stored.DeepCopy()
+
+			allocatedPod, updated := m.UpdatePodFromAllocation(pod)
+			assert.True(t, updated, "updated")
+			unmodified := allocatedPod.DeepCopy()
+
+			mutate(allocatedPod)
+
+			assert.Equal(t, podBefore, pod, "the pod")
+			storedAfter, _ := m.allocated.GetPod(pod.UID)
+			assert.Equal(t, storedBefore, storedAfter, "the stored pod")
+			again, _ := m.UpdatePodFromAllocation(pod)
+			assert.Equal(t, unmodified, again, "the next result")
+		})
+	}
+}
+
+// TestUpdatePodFromAllocationFieldClassification makes it explicit how each field of a pod spec and
+// of a container is allocated. A field that is added to the API fails it until it is classified
+// here and, if it is passthrough, copied in copyPassthroughFields.
+func TestUpdatePodFromAllocationFieldClassification(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodLevelResourcesVerticalScaling, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScalingMemoryBackedVolumes, true)
+
+	type category string
+	const (
+		// A passthrough field takes effect as soon as it changes in the pod.
+		passthrough category = "passthrough"
+		// A gated field has its allocated value, so that a change only takes effect once it is
+		// allocated as a whole. A field that cannot change is gated too, since its allocated value
+		// is the one it has in the pod anyway.
+		gated category = "gated"
+	)
+
+	// Of the gated fields, only the resources of the pod and of its containers can change, and the
+	// size limit of a memory-backed emptyDir volume.
+	podSpecFields := map[category][]string{
+		passthrough: {"ActiveDeadlineSeconds", "EphemeralContainers", "TerminationGracePeriodSeconds", "Tolerations"},
+		gated: {
+			"Volumes", "InitContainers", "Containers", "RestartPolicy", "DNSPolicy", "NodeSelector",
+			"ServiceAccountName", "DeprecatedServiceAccount", "AutomountServiceAccountToken", "NodeName",
+			"HostNetwork", "HostPID", "HostIPC", "ShareProcessNamespace", "SecurityContext",
+			"ImagePullSecrets", "Hostname", "Subdomain", "Affinity", "SchedulerName", "HostAliases",
+			"PriorityClassName", "Priority", "DNSConfig", "ReadinessGates", "RuntimeClassName",
+			"EnableServiceLinks", "PreemptionPolicy", "Overhead", "TopologySpreadConstraints",
+			"SetHostnameAsFQDN", "OS", "HostUsers", "SchedulingGates", "ResourceClaims", "Resources",
+			"HostnameOverride", "SchedulingGroup", "EvictionResponders",
+		},
+	}
+	containerFields := map[category][]string{
+		passthrough: {"Image"},
+		gated: {
+			"Name", "Command", "Args", "WorkingDir", "Ports", "EnvFrom", "Env", "Resources",
+			"ResizePolicy", "RestartPolicy", "RestartPolicyRules", "VolumeMounts", "VolumeDevices",
+			"LivenessProbe", "ReadinessProbe", "StartupProbe", "Lifecycle", "TerminationMessagePath",
+			"TerminationMessagePolicy", "ImagePullPolicy", "SecurityContext", "Stdin", "StdinOnce", "TTY",
+		},
+	}
+
+	// classify returns the category of each field of typ, and fails if a field has no category or
+	// more than one, or if a category names a field that does not exist.
+	classify := func(t *testing.T, typ reflect.Type, fields map[category][]string) map[string]category {
+		t.Helper()
+		categories := map[string]category{}
+		for cat, names := range fields {
+			for _, name := range names {
+				if previous, found := categories[name]; found {
+					t.Errorf("%s.%s is both %s and %s", typ.Name(), name, previous, cat)
+				}
+				categories[name] = cat
+			}
+		}
+		for i := 0; i < typ.NumField(); i++ {
+			if name := typ.Field(i).Name; categories[name] == "" {
+				t.Errorf("%s.%s has no category: it is passthrough, and has to be copied in copyPassthroughFields, if a change to it has to take effect before it is allocated, and gated otherwise", typ.Name(), name)
+			}
+		}
+		for name := range categories {
+			if _, found := typ.FieldByName(name); !found {
+				t.Errorf("%s.%s does not exist anymore", typ.Name(), name)
+			}
+		}
+		return categories
+	}
+
+	// setNonZero sets v, and everything in it that it can, to a value that is not the zero value.
+	var setNonZero func(v reflect.Value)
+	setNonZero = func(v reflect.Value) {
+		if !v.CanSet() {
+			return
+		}
+		switch v.Kind() {
+		case reflect.Pointer:
+			v.Set(reflect.New(v.Type().Elem()))
+			setNonZero(v.Elem())
+		case reflect.Slice:
+			v.Set(reflect.MakeSlice(v.Type(), 1, 1))
+			setNonZero(v.Index(0))
+		case reflect.Map:
+			v.Set(reflect.MakeMap(v.Type()))
+			key, value := reflect.New(v.Type().Key()).Elem(), reflect.New(v.Type().Elem()).Elem()
+			setNonZero(key)
+			setNonZero(value)
+			v.SetMapIndex(key, value)
+		case reflect.Struct:
+			if v.Type() == reflect.TypeOf(resource.Quantity{}) {
+				v.Set(reflect.ValueOf(resource.MustParse("1")))
+				return
+			}
+			for i := 0; i < v.NumField(); i++ {
+				setNonZero(v.Field(i))
+			}
+		case reflect.String:
+			v.SetString("x")
+		case reflect.Bool:
+			v.SetBool(true)
+		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+			v.SetInt(1)
+		}
+	}
+
+	// allocate returns the pod as it is allocated when stored is its allocated pod, and whether a
+	// change to a gated field is pending.
+	allocate := func(t *testing.T, stored, pod *v1.Pod) (*v1.Pod, bool) {
+		t.Helper()
+		logger, _ := ktesting.NewTestContext(t)
+		m := &manager{allocated: state.NewStateMemory(logger, nil)}
+		require.NoError(t, m.allocated.SetPod(logger, stored))
+
+		before := pod.DeepCopy()
+		allocated, updated := m.UpdatePodFromAllocation(pod)
+		assert.Equal(t, before, pod, "the pod must not be modified")
+		return allocated, updated
+	}
+
+	// assertTaken checks that a field of the allocated pod has the value that its category says.
+	assertTaken := func(t *testing.T, cat category, allocated, stored, pod reflect.Value) {
+		t.Helper()
+		want, from := stored, "allocated pod"
+		if cat == passthrough {
+			want, from = pod, "pod"
+		}
+		assert.Equal(t, want.Interface(), allocated.Interface(), "a %s field has its value in the %s", cat, from)
+	}
+
+	// For each field, the pod has a value that its allocated pod does not.
+	newStoredPod := func() *v1.Pod {
+		return &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: "uid", Name: "test", Namespace: "default"}}
+	}
+
+	podSpecCategories := classify(t, reflect.TypeOf(v1.PodSpec{}), podSpecFields)
+	for _, name := range sets.List(sets.KeySet(podSpecCategories)) {
+		t.Run("PodSpec."+name, func(t *testing.T) {
+			field := func(p *v1.Pod) reflect.Value { return reflect.ValueOf(&p.Spec).Elem().FieldByName(name) }
+			stored := newStoredPod()
+			pod := stored.DeepCopy()
+			setNonZero(field(pod))
+			require.False(t, field(pod).IsZero(), "setNonZero has to be extended to set a %s", field(pod).Type())
+
+			allocated, updated := allocate(t, stored, pod)
+			assertTaken(t, podSpecCategories[name], field(allocated), field(stored), field(pod))
+			// A change to a gated field is pending, since it only takes effect once it is allocated.
+			// One to a passthrough field is not, since it takes effect right away.
+			assert.Equal(t, podSpecCategories[name] == gated, updated, "updated")
+		})
+	}
+
+	containerCategories := classify(t, reflect.TypeOf(v1.Container{}), containerFields)
+	for _, name := range sets.List(sets.KeySet(containerCategories)) {
+		for _, list := range []string{"Containers", "InitContainers"} {
+			t.Run(list+"."+name, func(t *testing.T) {
+				containers := func(p *v1.Pod) *[]v1.Container {
+					if list == "InitContainers" {
+						return &p.Spec.InitContainers
+					}
+					return &p.Spec.Containers
+				}
+				field := func(p *v1.Pod) reflect.Value {
+					return reflect.ValueOf(&(*containers(p))[0]).Elem().FieldByName(name)
+				}
+				stored := newStoredPod()
+				*containers(stored) = []v1.Container{{Name: "c"}}
+				pod := stored.DeepCopy()
+				setNonZero(field(pod))
+				require.False(t, field(pod).IsZero(), "setNonZero has to be extended to set a %s", field(pod).Type())
+
+				allocated, updated := allocate(t, stored, pod)
+				assertTaken(t, containerCategories[name], field(allocated), field(stored), field(pod))
+				assert.Equal(t, containerCategories[name] == gated, updated, "updated")
+			})
+		}
+	}
+}
+
+// TestUpdatePodFromAllocationMigratedFromV1 follows a pod that is only known from a V1 checkpoint,
+// which only has resources, until it is added again and stored as a whole.
+//
+// TODO: Remove when the V1 checkpoint format is no longer supported.
+func TestUpdatePodFromAllocationMigratedFromV1(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodLevelResourcesVerticalScaling, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScalingMemoryBackedVolumes, true)
+	logger, ctx := ktesting.NewTestContext(t)
+
+	cpu := func(quantity string) v1.ResourceList {
+		return v1.ResourceList{v1.ResourceCPU: resource.MustParse(quantity)}
+	}
+
+	// A V1 checkpoint has no entry for the init container, since V1 skipped containers that cannot be resized.
+	v1Data, err := json.Marshal(state.PodResourceCheckpointInfo{Entries: state.PodResourceInfoMap{
+		"uid1": {
+			ContainerResources:   map[string]v1.ResourceRequirements{"c1": {Requests: cpu("1")}},
+			PodLevelResources:    &v1.ResourceRequirements{Requests: cpu("3")},
+			EmptyDirVolumeLimits: map[string]*resource.Quantity{"mem-vol": ptr.To(resource.MustParse("64Mi"))},
+		},
+	}})
+	require.NoError(t, err)
+	v1Checkpoint := &state.Checkpoint{Data: string(v1Data)}
+	v1Checkpoint.Checksum = checksum.New(v1Checkpoint.Data)
+
+	stateDir := t.TempDir()
+	checkpointManager, err := checkpointmanager.NewCheckpointManager(stateDir)
+	require.NoError(t, err)
+	require.NoError(t, checkpointManager.CreateCheckpoint(allocatedPodsStateFile, v1Checkpoint))
+	allocated, err := state.NewStateCheckpoint(logger, stateDir, allocatedPodsStateFile)
+	require.NoError(t, err)
+	m := &manager{allocated: allocated}
+
+	// All of its resources have been resized since they were allocated.
+	desired := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{UID: "uid1", Name: "pod1", Namespace: "ns1"},
+		Spec: v1.PodSpec{
+			NodeName:    "node1",
+			Tolerations: []v1.Toleration{{Key: "key", Operator: v1.TolerationOpExists}},
+			InitContainers: []v1.Container{{
+				Name:      "init",
+				Image:     "i0",
+				Resources: v1.ResourceRequirements{Requests: cpu("100m")},
+			}},
+			Containers: []v1.Container{{
+				Name:      "c1",
+				Image:     "i1",
+				Resources: v1.ResourceRequirements{Requests: cpu("2")},
+			}},
+			Resources: &v1.ResourceRequirements{Requests: cpu("4")},
+			Volumes: []v1.Volume{{
+				Name: "mem-vol",
+				VolumeSource: v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{
+					Medium:    v1.StorageMediumMemory,
+					SizeLimit: ptr.To(resource.MustParse("128Mi")),
+				}},
+			}},
+		},
+	}
+	assertAllocatedResources := func(t *testing.T, pod *v1.Pod) {
+		t.Helper()
+		assert.Equal(t, "1", pod.Spec.Containers[0].Resources.Requests.Cpu().String(), "container")
+		assert.Equal(t, "3", pod.Spec.Resources.Requests.Cpu().String(), "pod")
+		assert.Equal(t, "64Mi", pod.Spec.Volumes[0].EmptyDir.SizeLimit.String(), "emptyDir")
+	}
+
+	migrated, found := m.allocated.GetPod("uid1")
+	require.True(t, found)
+	assert.True(t, isMigratedFromV1(migrated))
+
+	// The resources are overlaid onto the pod, which has everything else, including the resources
+	// that the checkpoint does not have.
+	allocatedPod, updated := m.UpdatePodFromAllocation(desired)
+	assert.True(t, updated, "updated")
+	assertAllocatedResources(t, allocatedPod)
+	assert.Equal(t, "100m", allocatedPod.Spec.InitContainers[0].Resources.Requests.Cpu().String(), "init container")
+	assert.Equal(t, desired.Spec.NodeName, allocatedPod.Spec.NodeName)
+	assert.Equal(t, "i1", allocatedPod.Spec.Containers[0].Image)
+	assert.Equal(t, "2", desired.Spec.Containers[0].Resources.Requests.Cpu().String(), "the pod must not be modified")
+
+	// Adding the pod stores it as a whole, with the resources it had been allocated.
+	admitted, reason, message := m.AddPod(ctx, nil, desired)
+	require.True(t, admitted, "%s: %s", reason, message)
+	stored, found := m.allocated.GetPod("uid1")
+	require.True(t, found)
+	assert.False(t, isMigratedFromV1(stored))
+	assertAllocatedResources(t, stored)
+	assert.Equal(t, "i1", stored.Spec.Containers[0].Image)
+
+	// From then on the allocated pod is built from the stored pod. A gated field can only be told
+	// apart from a passthrough one by changing the former, which does not happen to a real pod.
+	changed := desired.DeepCopy()
+	changed.Spec.NodeName = "node2"
+	changed.Spec.Tolerations = nil
+	allocatedPod, updated = m.UpdatePodFromAllocation(changed)
+	assert.True(t, updated, "updated")
+	assertAllocatedResources(t, allocatedPod)
+	assert.Equal(t, "node1", allocatedPod.Spec.NodeName, "gated")
+	assert.Empty(t, allocatedPod.Spec.Tolerations, "passthrough")
+}
+
+// TestUpdatePodFromAllocationPending checks which changes to a pod are pending: the ones to a gated
+// field. For a pod that is stored as a whole, that is any of them, whichever the feature gates. A pod
+// migrated from a V1 checkpoint goes through the overlay instead, which only compares the resources
+// that the feature gates enable.
+//
+// It also checks which of the pending changes are resizes, since only those get the resize events and
+// conditions. That does not depend on the feature gates either: the admit handlers reject a resize
+// that is not allowed.
+//
+// TODO: Remove the checks of the overlay, when the V1 checkpoint format is no longer supported.
+func TestUpdatePodFromAllocationPending(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
+
+	cpu := func(quantity string) v1.ResourceRequirements {
+		return v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse(quantity)}}
+	}
+	emptyDir := func(name string, medium v1.StorageMedium, limit string) v1.Volume {
+		source := &v1.EmptyDirVolumeSource{Medium: medium}
+		if limit != "" {
+			source.SizeLimit = ptr.To(resource.MustParse(limit))
+		}
+		return v1.Volume{Name: name, VolumeSource: v1.VolumeSource{EmptyDir: source}}
+	}
+	restartAlways := v1.ContainerRestartPolicyAlways
+	newPod := func() *v1.Pod {
+		return &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{UID: "uid", Name: "test", Namespace: "default"},
+			Spec: v1.PodSpec{
+				InitContainers: []v1.Container{
+					{Name: "init", Resources: cpu("100m")},
+					{Name: "sidecar", RestartPolicy: &restartAlways, Resources: cpu("200m")},
+				},
+				Containers: []v1.Container{{Name: "c", Resources: cpu("300m")}},
+				Resources:  ptr.To(cpu("1")),
+				Volumes: []v1.Volume{
+					emptyDir("memory", v1.StorageMediumMemory, "64Mi"),
+					emptyDir("disk", v1.StorageMediumDefault, "64Mi"),
+					emptyDir("unlimited", v1.StorageMediumMemory, ""),
+				},
+			},
+		}
+	}
+
+	always := func(podLevelGate, memoryBackedGate bool) bool { return true }
+	never := func(podLevelGate, memoryBackedGate bool) bool { return false }
+	withPodLevelGate := func(podLevelGate, memoryBackedGate bool) bool { return podLevelGate }
+	withMemoryBackedGate := func(podLevelGate, memoryBackedGate bool) bool { return memoryBackedGate }
+
+	tests := []struct {
+		name string
+		// change makes the pod differ from its allocated pod.
+		change func(pod, allocated *v1.Pod)
+		// overlayPending returns whether the overlay finds the change pending, given the state of the
+		// feature gates.
+		overlayPending func(podLevelGate, memoryBackedGate bool) bool
+		// pending is whether the change is pending for a pod that is stored as a whole, whichever the
+		// feature gates.
+		pending bool
+		// resize is whether the change is a resize of a container, of the pod or of a memory-backed
+		// volume, whichever the feature gates.
+		resize bool
+	}{
+		{"no change", func(pod, allocated *v1.Pod) {}, never, false, false},
+		{"container resources", func(pod, allocated *v1.Pod) { pod.Spec.Containers[0].Resources = cpu("400m") }, always, true, true},
+		{"init container resources", func(pod, allocated *v1.Pod) { pod.Spec.InitContainers[0].Resources = cpu("400m") }, always, true, true},
+		{"sidecar resources", func(pod, allocated *v1.Pod) { pod.Spec.InitContainers[1].Resources = cpu("400m") }, always, true, true},
+		{"container missing from the allocated pod", func(pod, allocated *v1.Pod) { allocated.Spec.Containers = nil }, never, true, false},
+		{"pod-level resources", func(pod, allocated *v1.Pod) { pod.Spec.Resources = ptr.To(cpu("2")) }, withPodLevelGate, true, true},
+		{"pod-level resources removed", func(pod, allocated *v1.Pod) { pod.Spec.Resources = nil }, withPodLevelGate, true, true},
+		{"memory-backed emptyDir limit", func(pod, allocated *v1.Pod) {
+			pod.Spec.Volumes[0].EmptyDir.SizeLimit = ptr.To(resource.MustParse("128Mi"))
+		}, withMemoryBackedGate, true, true},
+		{"memory-backed emptyDir limit in another unit", func(pod, allocated *v1.Pod) {
+			pod.Spec.Volumes[0].EmptyDir.SizeLimit = ptr.To(resource.MustParse("65536Ki"))
+		}, never, false, false},
+		{"disk-backed emptyDir limit", func(pod, allocated *v1.Pod) {
+			pod.Spec.Volumes[1].EmptyDir.SizeLimit = ptr.To(resource.MustParse("128Mi"))
+		}, never, true, false},
+		{"emptyDir limit removed", func(pod, allocated *v1.Pod) { pod.Spec.Volumes[0].EmptyDir.SizeLimit = nil }, never, true, true},
+		{"emptyDir limit added", func(pod, allocated *v1.Pod) {
+			pod.Spec.Volumes[2].EmptyDir.SizeLimit = ptr.To(resource.MustParse("64Mi"))
+		}, never, true, true},
+		{"pod field that is not a resource", func(pod, allocated *v1.Pod) { pod.Spec.HostUsers = ptr.To(false) }, never, true, false},
+		{"container field that is not a resource", func(pod, allocated *v1.Pod) { pod.Spec.Containers[0].Command = []string{"new"} }, never, true, false},
+		{"passthrough fields", func(pod, allocated *v1.Pod) {
+			pod.Spec.Tolerations = []v1.Toleration{{Key: "key", Operator: v1.TolerationOpExists}}
+			pod.Spec.Containers[0].Image = "new"
+		}, never, false, false},
+	}
+
+	for _, test := range tests {
+		for _, podLevelGate := range []bool{false, true} {
+			for _, memoryBackedGate := range []bool{false, true} {
+				t.Run(fmt.Sprintf("%s/podLevelGate=%t/memoryBackedGate=%t", test.name, podLevelGate, memoryBackedGate), func(t *testing.T) {
+					featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodLevelResourcesVerticalScaling, podLevelGate)
+					featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScalingMemoryBackedVolumes, memoryBackedGate)
+					pod, allocated := newPod(), newPod()
+					test.change(pod, allocated)
+
+					_, overlayPending := updatePodFromAllocation(pod, allocated)
+					assert.Equal(t, test.overlayPending(podLevelGate, memoryBackedGate), overlayPending, "overlay")
+
+					logger, _ := ktesting.NewTestContext(t)
+					m := &manager{allocated: state.NewStateMemory(logger, nil)}
+					require.NoError(t, m.allocated.SetPod(logger, allocated))
+					allocatedPod, pending := m.UpdatePodFromAllocation(pod)
+					assert.Equal(t, test.pending, pending, "pending")
+					assert.Equal(t, test.resize, isResizeRequested(pod, allocatedPod), "resize")
+				})
+			}
+		}
 	}
 }
 
@@ -835,14 +1322,13 @@ func TestRetryPendingResizes(t *testing.T) {
 						assert.Empty(t, updatedPod.Spec.Resources.Requests, "updated pod spec pod requests should be empty")
 					}
 
-					alloc, found := allocationManager.(*manager).allocated.GetPodResourceInfo(newPod.UID)
+					alloc, found := allocationManager.(*manager).allocated.GetPodLevelResources(newPod.UID)
 					if tt.expectedAllocatedPodReqs != nil {
 						require.True(t, found, "pod allocation")
-						if alloc.PodLevelResources == nil {
-							assert.Equal(t, tt.expectedAllocatedPodReqs, alloc.PodLevelResources.Requests, "stored pod request allocation")
-						}
+						require.NotNil(t, alloc)
+						assert.Equal(t, tt.expectedAllocatedPodReqs, alloc.Requests, "stored pod request allocation")
 					} else {
-						require.False(t, found, "pod allocation should not be found")
+						require.Nil(t, alloc, "pod allocation should not be found")
 					}
 				}
 
@@ -1658,6 +2144,133 @@ func TestRetryPendingResizesMultipleConditions(t *testing.T) {
 			} else {
 				require.Empty(t, fakeRecorder.Events)
 			}
+		})
+	}
+}
+
+// TestRetryPendingResizesNonResourceChange checks that a pending change that is not a resize goes
+// through the admit handlers like any other, but that the resize events and conditions are only
+// emitted for a change to resources.
+func TestRetryPendingResizesNonResourceChange(t *testing.T) {
+	if goruntime.GOOS == "windows" {
+		t.Skip("InPlacePodVerticalScaling is not currently supported for Windows")
+	}
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
+
+	cpu := func(quantity string) v1.ResourceRequirements {
+		return v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse(quantity)}}
+	}
+	// A field that is gated on allocation and is not a resource, like one that the pod has but that an
+	// older version did not checkpoint.
+	changeOtherField := func(pod *v1.Pod) { pod.Spec.HostUsers = ptr.To(false) }
+
+	tests := []struct {
+		name string
+		// deferred is whether the pod has a deferred resize before the retry.
+		deferred bool
+		// change makes the pod differ from its allocated pod.
+		change func(pod *v1.Pod)
+		// reject makes an admit handler reject the pod.
+		reject             bool
+		expectedConditions []*v1.PodCondition
+		expectedEvent      string
+		// expectAllocated is whether the change is allocated after the retry.
+		expectAllocated bool
+	}{
+		{
+			name:            "other field",
+			change:          changeOtherField,
+			expectAllocated: true,
+		},
+		{
+			name:            "other field, while a deferred resize is reverted",
+			deferred:        true,
+			change:          changeOtherField,
+			expectAllocated: true,
+		},
+		{
+			name:   "other field, rejected by an admit handler",
+			change: changeOtherField,
+			reject: true,
+		},
+		{
+			name:     "other field, rejected by an admit handler, while a deferred resize is reverted",
+			deferred: true,
+			change:   changeOtherField,
+			reject:   true,
+		},
+		{
+			name: "other field and resources",
+			change: func(pod *v1.Pod) {
+				changeOtherField(pod)
+				pod.Spec.Containers[0].Resources = cpu("1")
+			},
+			expectedConditions: []*v1.PodCondition{{
+				Type:               v1.PodResizeInProgress,
+				Status:             "True",
+				ObservedGeneration: 1,
+			}},
+			expectedEvent:   `Normal ResizeStarted Pod resize started: {"containers":[{"name":"c1","resources":{"requests":{"cpu":"1"}}}],"generation":1}`,
+			expectAllocated: true,
+		},
+		{
+			name: "other field and resources, rejected by an admit handler",
+			change: func(pod *v1.Pod) {
+				changeOtherField(pod)
+				pod.Spec.Containers[0].Resources = cpu("1")
+			},
+			reject: true,
+			expectedConditions: []*v1.PodCondition{{
+				Type:               v1.PodResizePending,
+				Status:             "True",
+				Reason:             v1.PodReasonDeferred,
+				Message:            "rejected by the test",
+				ObservedGeneration: 1,
+			}},
+			expectedEvent: `Warning ResizeDeferred Pod resize Rejected: {"containers":[{"name":"c1","resources":{"requests":{"cpu":"1"}}}],"generation":1,"error":"rejected by the test"}`,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			logger, tCtx := ktesting.NewTestContext(t)
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{UID: "1111", Name: "pod", Namespace: "ns", Generation: 1},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{Name: "c1", Image: "i1", Resources: cpu("500m")}},
+				},
+			}
+			allocatedPod := pod.DeepCopy()
+			tc.change(pod)
+
+			allocationManager := makeAllocationManager(t, &containertest.FakeRuntime{}, []*v1.Pod{pod}, nil)
+			require.NoError(t, allocationManager.SetAllocatedResources(logger, allocatedPod))
+			if tc.reject {
+				allocationManager.AddPodAdmitHandlers(lifecycle.PodAdmitHandlers{&testPodAdmitHandler{
+					admitFunc: func(*lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
+						return lifecycle.PodAdmitResult{Admit: false, Reason: "Rejected", Message: "rejected by the test"}
+					},
+				}})
+			}
+			statusManager := allocationManager.(*manager).statusManager
+			if tc.deferred {
+				statusManager.SetPodResizePendingCondition(pod.UID, v1.PodReasonDeferred, "deferred by the test", pod.Generation)
+			}
+
+			allocationManager.PushPendingResize(logger, pod.UID)
+			allocationManager.RetryPendingResizes(tCtx, TriggerReasonPodUpdated)
+
+			verifyResizeConditions(t, tc.expectedConditions, statusManager.GetPodResizeConditions(pod.UID))
+			fakeRecorder := allocationManager.(*manager).recorder.(*record.FakeRecorder)
+			if tc.expectedEvent != "" {
+				require.Len(t, fakeRecorder.Events, 1)
+				require.Equal(t, tc.expectedEvent, <-fakeRecorder.Events)
+			} else {
+				require.Empty(t, fakeRecorder.Events)
+			}
+
+			_, pending := allocationManager.UpdatePodFromAllocation(pod)
+			assert.Equal(t, !tc.expectAllocated, pending, "pending")
 		})
 	}
 }
@@ -2689,7 +3302,9 @@ func TestAllocationManager_EmptyDirVolumeLimits_AddPod(t *testing.T) {
 					},
 				},
 			},
-			expectedAllocated: false,
+			// The whole spec is stored. The gate only controls whether the limit is applied.
+			expectedAllocated: true,
+			expectedLimit:     resource.NewQuantity(1024*1024*128, resource.BinarySI),
 		},
 		{
 			name:               "admit volume with medium Default (not Memory) when gate is enabled",
@@ -2725,7 +3340,8 @@ func TestAllocationManager_EmptyDirVolumeLimits_AddPod(t *testing.T) {
 					},
 				},
 			},
-			expectedAllocated: false,
+			expectedAllocated: true,
+			expectedLimit:     resource.NewQuantity(1024*1024*128, resource.BinarySI),
 		},
 		{
 			name:               "admit memory-backed volume with nil size limit when gate is enabled",
@@ -2849,7 +3465,7 @@ func TestAllocationManager_EmptyDirVolumeLimits_UpdatePodFromAllocation(t *testi
 			expectedLimit:   resource.NewQuantity(1024*1024*128, resource.BinarySI),
 		},
 		{
-			name:               "don't apply checkpoint limit to spec mismatch when gate is disabled",
+			name:               "spec mismatch with checkpoint limit is pending when gate is disabled",
 			featureGateEnabled: false,
 			pod: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
@@ -2883,8 +3499,8 @@ func TestAllocationManager_EmptyDirVolumeLimits_UpdatePodFromAllocation(t *testi
 				},
 			},
 			checkpointLimit: resource.NewQuantity(1024*1024*128, resource.BinarySI),
-			expectedUpdated: false,
-			expectedLimit:   resource.NewQuantity(1024*1024*64, resource.BinarySI),
+			expectedUpdated: true,
+			expectedLimit:   resource.NewQuantity(1024*1024*128, resource.BinarySI),
 		},
 		{
 			name:               "spec already matches checkpoint limits when gate is enabled",
@@ -2966,22 +3582,27 @@ func TestAllocationManager_EmptyDirVolumeLimits_UpdatePodFromAllocation(t *testi
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			logger, _ := ktesting.NewTestContext(t)
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScalingMemoryBackedVolumes, test.featureGateEnabled)
 
 			allocationManager := makeAllocationManager(t, &containertest.FakeRuntime{}, []*v1.Pod{test.pod}, nil)
 
-			// Pre-populate the local cache with the checkpoint limit
-			err := allocationManager.(*manager).allocated.SetEmptyDirVolumeLimit(test.pod.UID, "mem-vol", test.checkpointLimit)
-			require.NoError(t, err)
+			// Pre-populate the local cache with the pod as it was allocated, with the checkpoint limit
+			stored := test.pod.DeepCopy()
+			for i := range stored.Spec.Volumes {
+				if vol := &stored.Spec.Volumes[i]; vol.Name == "mem-vol" {
+					vol.EmptyDir.SizeLimit = test.checkpointLimit
+				}
+			}
+			require.NoError(t, allocationManager.(*manager).allocated.SetPod(logger, stored))
 
 			// Actuate UpdatePodFromAllocation and check outcomes
 			allocatedPod, updated := allocationManager.UpdatePodFromAllocation(test.pod)
 			require.Equal(t, test.expectedUpdated, updated)
-
 			if test.expectedUpdated {
-				assert.NotSame(t, test.pod, allocatedPod)
+				assert.NotSame(t, test.pod, allocatedPod, "when an update is pending, the result is a copy")
 			} else {
-				assert.Same(t, test.pod, allocatedPod)
+				assert.Same(t, test.pod, allocatedPod, "when no update is pending, the pod is returned as-is")
 			}
 
 			if len(allocatedPod.Spec.Volumes) > 0 {
@@ -3169,7 +3790,7 @@ func TestAllocationManager_EmptyDirVolumeLimits_RetryPendingResizes(t *testing.T
 			},
 		},
 		{
-			name:          "resize request ignored when gate is disabled",
+			name:          "resize request is infeasible when gate is disabled",
 			isGateEnabled: false,
 			pod: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
@@ -3235,9 +3856,17 @@ func TestAllocationManager_EmptyDirVolumeLimits_RetryPendingResizes(t *testing.T
 					},
 				},
 			},
-			expectResizeAllocated:    false,
-			expectedAllocatedLimit:   nil,
-			expectedResizeConditions: nil,
+			expectResizeAllocated:  false,
+			expectedAllocatedLimit: resource.NewQuantity(1024*1024*128, resource.BinarySI), // Stays at 128Mi
+			expectedResizeConditions: []*v1.PodCondition{
+				{
+					Type:               v1.PodResizePending,
+					Status:             "True",
+					Reason:             "Infeasible",
+					Message:            "Memory-backed emptyDir volume resize is disabled",
+					ObservedGeneration: 2,
+				},
+			},
 		},
 		{
 			name:          "no-op resize request (target limit same as current allocation)",

@@ -587,6 +587,8 @@ type containerToKillInfo struct {
 type containerToUpdateInfo struct {
 	// The spec of the container.
 	container *v1.Container
+	// Type of the container.
+	containerType podutil.ContainerType
 	// ID of the runtime container that needs resource update
 	kubeContainerID kubecontainer.ContainerID
 	// Desired resources for the running container
@@ -726,8 +728,10 @@ func (m *kubeGenericRuntimeManager) computePodResizeAction(ctx context.Context, 
 	}
 
 	var container v1.Container
+	containerType := podutil.Containers
 	if initContainer {
 		container = pod.Spec.InitContainers[containerIdx]
+		containerType = podutil.InitContainers
 	} else {
 		container = pod.Spec.Containers[containerIdx]
 	}
@@ -776,6 +780,7 @@ func (m *kubeGenericRuntimeManager) computePodResizeAction(ctx context.Context, 
 	markContainerForUpdate := func(rName v1.ResourceName, desiredValue, currentValue int64) {
 		cUpdateInfo := containerToUpdateInfo{
 			container:                 &container,
+			containerType:             containerType,
 			kubeContainerID:           kubeContainerStatus.ID,
 			desiredContainerResources: desiredResources,
 			currentContainerResources: &currentResources,
@@ -829,13 +834,48 @@ func (m *kubeGenericRuntimeManager) InitializeActuatedPod(logger klog.Logger, al
 	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
 		return
 	}
-	if _, ok := m.actuatedState.GetPodResourceInfo(allocatedPod.UID); ok {
+	if m.actuatedState.HasPod(allocatedPod.UID) {
 		return
 	}
-	info := allocation.ResourceInfoForPod(allocatedPod)
-	if err := m.actuatedState.SetPodResourceInfo(logger, allocatedPod.UID, info); err != nil {
+	actuatedPod := keepOnlyResourceValues(allocatedPod)
+	if err := m.actuatedState.SetPod(logger, actuatedPod); err != nil {
 		logger.Error(err, "Failed to initialize actuated pod resource info checkpoint", "pod", klog.KObj(allocatedPod))
 	}
+}
+
+// keepOnlyResourceValues returns a pod with only the resizable resources of allocatedPod, because
+// those are all the actuated state holds. They are shared with allocatedPod, not copied: SetPod
+// copies what it stores.
+func keepOnlyResourceValues(allocatedPod *v1.Pod) *v1.Pod {
+	actuatedPod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{UID: allocatedPod.UID, Name: allocatedPod.Name, Namespace: allocatedPod.Namespace},
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling) && allocatedPod.Spec.Resources != nil {
+		actuatedPod.Spec.Resources = allocatedPod.Spec.Resources
+	}
+	for container, containerType := range podutil.ContainerIter(&allocatedPod.Spec, podutil.InitContainers|podutil.Containers) {
+		if !allocation.IsResizableContainer(container, containerType) {
+			continue
+		}
+		actuated := v1.Container{Name: container.Name, Resources: container.Resources}
+		if containerType == podutil.InitContainers {
+			actuatedPod.Spec.InitContainers = append(actuatedPod.Spec.InitContainers, actuated)
+		} else {
+			actuatedPod.Spec.Containers = append(actuatedPod.Spec.Containers, actuated)
+		}
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingMemoryBackedVolumes) {
+		for _, vol := range allocatedPod.Spec.Volumes {
+			if !allocation.VolHasMemoryBackedEmptyDirSizeLimit(&vol) {
+				continue
+			}
+			actuatedPod.Spec.Volumes = append(actuatedPod.Spec.Volumes, v1.Volume{
+				Name:         vol.Name,
+				VolumeSource: v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{SizeLimit: vol.EmptyDir.SizeLimit}},
+			})
+		}
+	}
+	return actuatedPod
 }
 
 func (m *kubeGenericRuntimeManager) getActuatedEmptyDirVolumeLimit(logger klog.Logger, pod *v1.Pod, volName string) *resource.Quantity {
@@ -1245,7 +1285,7 @@ func (m *kubeGenericRuntimeManager) updatePodContainerResources(ctx context.Cont
 				v1.ResourceMemory: *resource.NewQuantity(cInfo.currentContainerResources.memoryRequest, resource.BinarySI),
 			}
 		}
-		if err := m.updateContainerResources(ctx, pod, container, cInfo.kubeContainerID); err != nil {
+		if err := m.updateContainerResources(ctx, pod, container, cInfo.kubeContainerID, cInfo.containerType); err != nil {
 			// Log error and abort as container updates need to succeed in the order determined by computePodResizeAction.
 			// The recovery path is for SyncPod to keep retrying at later times until it succeeds.
 			logger.Error(err, "updateContainerResources failed", "container", container.Name, "cID", cInfo.kubeContainerID,
@@ -1914,7 +1954,7 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 
 		container := &pod.Spec.InitContainers[idx]
 		// Start the next init container.
-		if err := start(ctx, "init container", metrics.InitContainer, containerStartSpec(container)); err != nil {
+		if err := start(ctx, "init container", metrics.InitContainer, initContainerStartSpec(container)); err != nil {
 			if podutil.IsRestartableInitContainer(container) {
 				logger.V(4).Info("Failed to start the restartable init container for the pod, skipping", "initContainerName", container.Name, "pod", klog.KObj(pod))
 				continue
@@ -2284,7 +2324,7 @@ func (m *kubeGenericRuntimeManager) GetContainerStatus(ctx context.Context, podU
 func (m *kubeGenericRuntimeManager) GarbageCollect(ctx context.Context, gcPolicy kubecontainer.GCPolicy, allSourcesReady bool, evictNonDeletedPods bool) error {
 	logger := klog.FromContext(ctx)
 	// Remove terminated pods from the actuated state.
-	for uid := range m.actuatedState.GetPodResourceInfoMap() {
+	for _, uid := range m.actuatedState.GetPodUIDs() {
 		if m.podStateProvider.ShouldPodContentBeRemoved(uid) {
 			if err := m.actuatedState.RemovePod(logger, uid); err != nil {
 				// No need to act on the error beyond logging it here.

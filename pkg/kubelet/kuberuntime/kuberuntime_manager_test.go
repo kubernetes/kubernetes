@@ -2161,6 +2161,7 @@ func TestComputePodActionsWithInitContainers(t *testing.T) {
 				ContainersToUpdate: map[v1.ResourceName][]containerToUpdateInfo{
 					v1.ResourceMemory: {
 						{
+							containerType:   podutil.InitContainers,
 							kubeContainerID: baseStatus.ContainerStatuses[0].ID,
 							desiredContainerResources: resourceRequirements{
 								memoryRequest: memory800Mi.Value(),
@@ -2174,6 +2175,7 @@ func TestComputePodActionsWithInitContainers(t *testing.T) {
 					},
 					v1.ResourceCPU: {
 						{
+							containerType:   podutil.InitContainers,
 							kubeContainerID: baseStatus.ContainerStatuses[0].ID,
 							desiredContainerResources: resourceRequirements{
 								memoryRequest: memory800Mi.Value(),
@@ -3139,7 +3141,7 @@ func TestComputePodActionsForPodResize(t *testing.T) {
 	setupActuatedResources := func(pod *v1.Pod, container *v1.Container, actuatedResources v1.ResourceRequirements) {
 		actuatedContainer := container.DeepCopy()
 		actuatedContainer.Resources = actuatedResources
-		require.NoError(t, m.actuatedState.SetContainerResources(logger, pod.UID, actuatedContainer.Name, actuatedContainer.Resources))
+		require.NoError(t, m.actuatedState.SetContainerResources(logger, pod.UID, actuatedContainer.Name, podutil.Containers, actuatedContainer.Resources))
 	}
 
 	setupActuatedPodResources := func(pod *v1.Pod, actuatedPodResources *v1.ResourceRequirements) {
@@ -3250,6 +3252,7 @@ func TestComputePodActionsForPodResize(t *testing.T) {
 						v1.ResourceMemory: {
 							{
 								container:       &pod.Spec.Containers[1],
+								containerType:   podutil.Containers,
 								kubeContainerID: kcs.ID,
 								desiredContainerResources: resourceRequirements{
 									memoryLimit: mem100M.Value(),
@@ -3264,6 +3267,7 @@ func TestComputePodActionsForPodResize(t *testing.T) {
 						v1.ResourceCPU: {
 							{
 								container:       &pod.Spec.Containers[1],
+								containerType:   podutil.Containers,
 								kubeContainerID: kcs.ID,
 								desiredContainerResources: resourceRequirements{
 									memoryLimit: mem100M.Value(),
@@ -3322,6 +3326,7 @@ func TestComputePodActionsForPodResize(t *testing.T) {
 						v1.ResourceMemory: {
 							{
 								container:       &pod.Spec.Containers[1],
+								containerType:   podutil.Containers,
 								kubeContainerID: kcs.ID,
 								desiredContainerResources: resourceRequirements{
 									memoryLimit: mem200M.Value(),
@@ -3336,6 +3341,7 @@ func TestComputePodActionsForPodResize(t *testing.T) {
 						v1.ResourceCPU: {
 							{
 								container:       &pod.Spec.Containers[1],
+								containerType:   podutil.Containers,
 								kubeContainerID: kcs.ID,
 								desiredContainerResources: resourceRequirements{
 									memoryLimit: mem200M.Value(),
@@ -3398,6 +3404,7 @@ func TestComputePodActionsForPodResize(t *testing.T) {
 						v1.ResourceMemory: {
 							{
 								container:       &pod.Spec.Containers[1],
+								containerType:   podutil.Containers,
 								kubeContainerID: kcs.ID,
 								desiredContainerResources: resourceRequirements{
 									memoryLimit: mem600M.Value(),
@@ -3412,6 +3419,7 @@ func TestComputePodActionsForPodResize(t *testing.T) {
 						v1.ResourceCPU: {
 							{
 								container:       &pod.Spec.Containers[1],
+								containerType:   podutil.Containers,
 								kubeContainerID: kcs.ID,
 								desiredContainerResources: resourceRequirements{
 									memoryLimit: mem600M.Value(),
@@ -3510,6 +3518,7 @@ func TestComputePodActionsForPodResize(t *testing.T) {
 						v1.ResourceMemory: {
 							{
 								container:       &pod.Spec.Containers[1],
+								containerType:   podutil.Containers,
 								kubeContainerID: kcs.ID,
 								desiredContainerResources: resourceRequirements{
 									memoryLimit: mem100M.Value(),
@@ -3524,6 +3533,7 @@ func TestComputePodActionsForPodResize(t *testing.T) {
 						v1.ResourceCPU: {
 							{
 								container:       &pod.Spec.Containers[1],
+								containerType:   podutil.Containers,
 								kubeContainerID: kcs.ID,
 								desiredContainerResources: resourceRequirements{
 									memoryLimit: mem100M.Value(),
@@ -3563,6 +3573,7 @@ func TestComputePodActionsForPodResize(t *testing.T) {
 						v1.ResourceCPU: {
 							{
 								container:       &pod.Spec.Containers[1],
+								containerType:   podutil.Containers,
 								kubeContainerID: kcs.ID,
 								desiredContainerResources: resourceRequirements{
 									memoryLimit: mem100M.Value(),
@@ -3602,6 +3613,7 @@ func TestComputePodActionsForPodResize(t *testing.T) {
 						v1.ResourceMemory: {
 							{
 								container:       &pod.Spec.Containers[2],
+								containerType:   podutil.Containers,
 								kubeContainerID: kcs.ID,
 								desiredContainerResources: resourceRequirements{
 									memoryLimit: mem200M.Value(),
@@ -3648,6 +3660,7 @@ func TestComputePodActionsForPodResize(t *testing.T) {
 						v1.ResourceCPU: {
 							{
 								container:       &pod.Spec.Containers[0],
+								containerType:   podutil.Containers,
 								kubeContainerID: kcs1.ID,
 								desiredContainerResources: resourceRequirements{
 									memoryLimit: mem100M.Value(),
@@ -3657,6 +3670,7 @@ func TestComputePodActionsForPodResize(t *testing.T) {
 							},
 							{
 								container:       &pod.Spec.Containers[2],
+								containerType:   podutil.Containers,
 								kubeContainerID: kcs3.ID,
 								desiredContainerResources: resourceRequirements{
 									memoryLimit: mem100M.Value(),
@@ -3668,6 +3682,7 @@ func TestComputePodActionsForPodResize(t *testing.T) {
 						v1.ResourceMemory: {
 							{
 								container:       &pod.Spec.Containers[0],
+								containerType:   podutil.Containers,
 								kubeContainerID: kcs1.ID,
 								desiredContainerResources: resourceRequirements{
 									memoryLimit: mem100M.Value(),
@@ -3677,6 +3692,7 @@ func TestComputePodActionsForPodResize(t *testing.T) {
 							},
 							{
 								container:       &pod.Spec.Containers[1],
+								containerType:   podutil.Containers,
 								kubeContainerID: kcs2.ID,
 								desiredContainerResources: resourceRequirements{
 									memoryLimit: mem100M.Value(),
@@ -3688,6 +3704,7 @@ func TestComputePodActionsForPodResize(t *testing.T) {
 							},
 							{
 								container:       &pod.Spec.Containers[2],
+								containerType:   podutil.Containers,
 								kubeContainerID: kcs3.ID,
 								desiredContainerResources: resourceRequirements{
 									memoryLimit: mem100M.Value(),
@@ -3827,6 +3844,7 @@ func TestComputePodActionsForPodResize(t *testing.T) {
 						v1.ResourceMemory: {
 							{
 								container:       &pod.Spec.Containers[1],
+								containerType:   podutil.Containers,
 								kubeContainerID: kcs.ID,
 								desiredContainerResources: resourceRequirements{
 									memoryLimit: mem200M.Value(),
@@ -3867,6 +3885,7 @@ func TestComputePodActionsForPodResize(t *testing.T) {
 						v1.ResourceCPU: {
 							{
 								container:       &pod.Spec.Containers[2],
+								containerType:   podutil.Containers,
 								kubeContainerID: kcs.ID,
 								desiredContainerResources: resourceRequirements{
 									memoryLimit: mem100M.Value(),
@@ -3953,6 +3972,7 @@ func TestComputePodActionsForPodResize(t *testing.T) {
 						v1.ResourceMemory: {
 							{
 								container:       &pod.Spec.Containers[2],
+								containerType:   podutil.Containers,
 								kubeContainerID: kcs.ID,
 								desiredContainerResources: resourceRequirements{
 									memoryLimit:   mem200M.Value(),
@@ -4283,7 +4303,7 @@ func TestUpdatePodContainerResources(t *testing.T) {
 	} {
 		for _, allSideCarCtrs := range []bool{false, true} {
 			var containersToUpdate []containerToUpdateInfo
-			containerToUpdateInfo := func(container *v1.Container, idx int) containerToUpdateInfo {
+			containerToUpdateInfo := func(container *v1.Container, idx int, cType podutil.ContainerType) containerToUpdateInfo {
 				var cid kubecontainer.ContainerID
 				for id, c := range fakeRuntime.Containers {
 					if c.Metadata.Name == container.Name {
@@ -4293,6 +4313,7 @@ func TestUpdatePodContainerResources(t *testing.T) {
 				}
 				return containerToUpdateInfo{
 					container:       container,
+					containerType:   cType,
 					kubeContainerID: cid,
 					desiredContainerResources: resourceRequirements{
 						memoryLimit:   tc.apiSpecResources[idx].Limits.Memory().Value(),
@@ -4314,7 +4335,7 @@ func TestUpdatePodContainerResources(t *testing.T) {
 					// default resize policy when pod resize feature is enabled
 					pod.Spec.InitContainers[idx].Resources = tc.apiSpecResources[idx]
 					pod.Status.ContainerStatuses[idx].Resources = &tc.apiStatusResources[idx]
-					cinfo := containerToUpdateInfo(&pod.Spec.InitContainers[idx], idx)
+					cinfo := containerToUpdateInfo(&pod.Spec.InitContainers[idx], idx, podutil.InitContainers)
 					containersToUpdate = append(containersToUpdate, cinfo)
 				}
 			} else {
@@ -4322,7 +4343,7 @@ func TestUpdatePodContainerResources(t *testing.T) {
 					// default resize policy when pod resize feature is enabled
 					pod.Spec.Containers[idx].Resources = tc.apiSpecResources[idx]
 					pod.Status.ContainerStatuses[idx].Resources = &tc.apiStatusResources[idx]
-					cinfo := containerToUpdateInfo(&pod.Spec.Containers[idx], idx)
+					cinfo := containerToUpdateInfo(&pod.Spec.Containers[idx], idx, podutil.Containers)
 					containersToUpdate = append(containersToUpdate, cinfo)
 				}
 			}
@@ -5112,6 +5133,7 @@ func TestDoPodResizeAction(t *testing.T) {
 
 			updateInfo := containerToUpdateInfo{
 				container:                 &pod.Spec.Containers[0],
+				containerType:             podutil.Containers,
 				kubeContainerID:           kps.ContainerStatuses[0].ID,
 				desiredContainerResources: tc.desiredResources,
 				currentContainerResources: &tc.currentResources,
@@ -5794,6 +5816,7 @@ func TestValidatePodResizeAction(t *testing.T) {
 
 			updateInfo := containerToUpdateInfo{
 				container:                 &pod.Spec.Containers[0],
+				containerType:             podutil.Containers,
 				kubeContainerID:           kps.ContainerStatuses[0].ID,
 				desiredContainerResources: tc.desiredResources,
 				currentContainerResources: &tc.currentResources,
@@ -6313,7 +6336,7 @@ func TestIsPodResizeInProgress(t *testing.T) {
 				if c.actuated != nil {
 					actuatedContainer := container.DeepCopy()
 					actuatedContainer.Resources = mkRequirements(*c.actuated)
-					require.NoError(t, m.actuatedState.SetContainerResources(logger, pod.UID, actuatedContainer.Name, actuatedContainer.Resources))
+					require.NoError(t, m.actuatedState.SetContainerResources(logger, pod.UID, actuatedContainer.Name, podutil.Containers, actuatedContainer.Resources))
 
 					fetched, found := m.actuatedState.GetContainerResources(pod.UID, container.Name)
 					require.True(t, found)
