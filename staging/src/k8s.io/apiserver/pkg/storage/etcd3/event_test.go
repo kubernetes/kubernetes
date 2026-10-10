@@ -61,7 +61,7 @@ func TestParseEvent(t *testing.T) {
 		{
 			name: "unsuccessful delete",
 			etcdEvent: &clientv3.Event{
-				Type:   mvccpb.DELETE,
+				Type:   mvccpb.Event_DELETE,
 				PrevKv: nil,
 				Kv: &mvccpb.KeyValue{
 					Key:            []byte("key"),
@@ -76,7 +76,7 @@ func TestParseEvent(t *testing.T) {
 		{
 			name: "delete without previous value",
 			etcdEvent: &clientv3.Event{
-				Type:   mvccpb.DELETE,
+				Type:   mvccpb.Event_DELETE,
 				PrevKv: nil,
 				Kv: &mvccpb.KeyValue{
 					Key:            []byte("key"),
@@ -99,7 +99,7 @@ func TestParseEvent(t *testing.T) {
 		{
 			name: "successful delete",
 			etcdEvent: &clientv3.Event{
-				Type: mvccpb.DELETE,
+				Type: mvccpb.Event_DELETE,
 				PrevKv: &mvccpb.KeyValue{
 					Key:            []byte("key"),
 					CreateRevision: 1,
@@ -124,6 +124,28 @@ func TestParseEvent(t *testing.T) {
 			expectPrevKV: true,
 			expectedErr:  "",
 		},
+		{
+			name: "update ignoring previous value",
+			etcdEvent: &clientv3.Event{
+				Type:   mvccpb.Event_PUT,
+				Kv:     &mvccpb.KeyValue{Key: []byte("key"), CreateRevision: 1, ModRevision: 2, Value: []byte("current")},
+				PrevKv: &mvccpb.KeyValue{Value: []byte("previous")},
+			},
+			expectedEvent: &event{
+				key: "key", value: []byte("current"), rev: 2,
+			},
+		},
+		{
+			name: "delete ignoring previous value",
+			etcdEvent: &clientv3.Event{
+				Type:   mvccpb.Event_DELETE,
+				Kv:     &mvccpb.KeyValue{Key: []byte("key"), CreateRevision: 1, ModRevision: 2},
+				PrevKv: &mvccpb.KeyValue{Value: []byte("previous")},
+			},
+			expectedEvent: &event{
+				key: "key", rev: 2, isDeleted: true,
+			},
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			actualEvent, err := parseEvent(tc.etcdEvent, tc.expectPrevKV)
@@ -135,21 +157,6 @@ func TestParseEvent(t *testing.T) {
 				actualEvent.recordTime = time.Time{}
 				assert.Equal(t, tc.expectedEvent, actualEvent)
 			}
-		})
-	}
-}
-
-func TestParseEventIgnoresPrevKV(t *testing.T) {
-	for _, eventType := range []mvccpb.Event_EventType{mvccpb.PUT, mvccpb.DELETE} {
-		t.Run(eventType.String(), func(t *testing.T) {
-			e := &clientv3.Event{
-				Type:   eventType,
-				Kv:     &mvccpb.KeyValue{Key: []byte("key"), CreateRevision: 1, ModRevision: 2},
-				PrevKv: &mvccpb.KeyValue{Value: []byte("previous")},
-			}
-			parsed, err := parseEvent(e, false)
-			require.NoError(t, err)
-			require.Nil(t, parsed.prevValue)
 		})
 	}
 }

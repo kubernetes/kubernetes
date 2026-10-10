@@ -468,7 +468,7 @@ func TestWatch(t *testing.T) {
 			t.Run("Watch", func(t *testing.T) {
 				ctx, cacher, terminate := testSetup(t)
 				t.Cleanup(terminate)
-				storagetesting.RunTestWatch(ctx, t, cacher)
+				storagetesting.RunTestWatch(ctx, t, cacher, true)
 			})
 			t.Run("WatchFromZero", func(t *testing.T) {
 				ctx, cacher, server, terminate := testSetupWithEtcdServer(t)
@@ -579,14 +579,14 @@ func withDefaults(options *setupOptions) {
 
 	options.resourcePrefix = prefix
 	options.keyFunc = func(obj runtime.Object) (string, error) { return storage.NamespaceKeyFunc(prefix, obj) }
-	options.reverseKeyFunc = reverseKeyFunc(prefix, true)
+	options.reverseKeyFunc = storagetesting.PodReverseKeyFunc(prefix, true)
 	options.clock = clock.RealClock{}
 	options.codec = examplev1ProtoCodec
 	options.transformer = identity.NewEncryptCheckTransformer()
 }
 
 func withClusterScopedKeyFunc(options *setupOptions) {
-	options.reverseKeyFunc = reverseKeyFunc(options.resourcePrefix, false)
+	options.reverseKeyFunc = storagetesting.PodReverseKeyFunc(options.resourcePrefix, false)
 	options.keyFunc = func(obj runtime.Object) (string, error) {
 		return storage.NoNamespaceKeyFunc(options.resourcePrefix, obj)
 	}

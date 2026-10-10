@@ -18,8 +18,9 @@ package cacher
 
 import (
 	"context"
-	"fmt"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -37,40 +38,44 @@ import (
 	cachertesting "k8s.io/apiserver/pkg/storage/cacher/testing"
 )
 
-func TestListerWatcherWatchWithoutPrevKV(t *testing.T) {
-	for _, enabled := range []bool{false, true} {
-		t.Run(fmt.Sprintf("enabled=%t", enabled), func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchFromStorageWithoutPrevKV, enabled)
+func TestListerWatcherWatchOptions(t *testing.T) {
+	for _, tc := range []struct {
+		name               string
+		options            metav1.ListOptions
+		watchWithoutPrevKV bool
+		expectedOptions    storage.ListOptions
+	}{
+		{
+			name:            "resource version, without previous values disabled",
+			options:         metav1.ListOptions{ResourceVersion: "100"},
+			expectedOptions: storage.ListOptions{ResourceVersion: "100"},
+		},
+		{
+			name:               "without previous values enabled",
+			options:            metav1.ListOptions{ResourceVersion: "100"},
+			watchWithoutPrevKV: true,
+			expectedOptions:    storage.ListOptions{ResourceVersion: "100", WatchWithoutPrevKV: true},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchFromStorageWithoutPrevKV, tc.watchWithoutPrevKV)
 			var capturedOpts storage.ListOptions
 			backingStorage := &cachertesting.MockStorage{WatchFn: func(_ context.Context, _ string, opts storage.ListOptions) (watch.Interface, error) {
 				capturedOpts = opts
 				return watch.NewEmptyWatch(), nil
 			}}
 			lw := NewListerWatcher(backingStorage, "/pods/", newPodList, nil)
-			w, err := cache.ToListerWatcherWithContext(lw).WatchWithContext(context.Background(), metav1.ListOptions{ResourceVersion: "100"})
-			if err != nil {
-				t.Fatal(err)
-			}
+			w, err := cache.ToListerWatcherWithContext(lw).WatchWithContext(context.Background(), tc.options)
+			require.NoError(t, err)
 			defer w.Stop()
-			if capturedOpts.WatchWithoutPrevKV != enabled {
-				t.Fatalf("WatchWithoutPrevKV = %t, want %t", capturedOpts.WatchWithoutPrevKV, enabled)
-			}
-			if !capturedOpts.Predicate.Empty() || !capturedOpts.RecordTimestamps || capturedOpts.ResourceVersion != "100" {
-				t.Fatalf("unexpected watch options: %+v", capturedOpts)
-			}
+			expectedOpts := tc.expectedOptions
+			expectedOpts.Predicate.Label = storage.Everything.Label
+			expectedOpts.Predicate.Field = storage.Everything.Field
+			expectedOpts.Recursive = true
+			expectedOpts.ProgressNotify = true
+			expectedOpts.RecordTimestamps = true
+			require.Equal(t, expectedOpts, capturedOpts)
 		})
-	}
-}
-
-func TestCacherRejectsWatchWithoutPrevKV(t *testing.T) {
-	cacher := &Cacher{}
-	w, err := cacher.Watch(context.Background(), "/pods/", storage.ListOptions{WatchWithoutPrevKV: true})
-	if err == nil {
-		w.Stop()
-		t.Fatal("expected watchWithoutPrevKV to be rejected by the cacher")
-	}
-	if err.Error() != "watchWithoutPrevKV is not supported by the cacher" {
-		t.Fatalf("unexpected error: %v", err)
 	}
 }
 
