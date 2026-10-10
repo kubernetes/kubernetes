@@ -155,10 +155,12 @@ func (m *defaultQueueMetrics[T]) sinceInSeconds(start time.Time) float64 {
 
 type retryMetrics interface {
 	retry()
+	delayedCount(count int)
 }
 
 type defaultRetryMetrics struct {
 	retries CounterMetric
+	delayed SettableGaugeMetric
 }
 
 func (m *defaultRetryMetrics) retry() {
@@ -167,6 +169,14 @@ func (m *defaultRetryMetrics) retry() {
 	}
 
 	m.retries.Inc()
+}
+
+func (m *defaultRetryMetrics) delayedCount(count int) {
+	if m == nil {
+		return
+	}
+
+	m.delayed.Set(float64(count))
 }
 
 // MetricsProvider generates various metrics used by the queue.
@@ -180,33 +190,43 @@ type MetricsProvider interface {
 	NewRetriesMetric(name string) CounterMetric
 }
 
+// DelayedMetricsProvider is an optional extension of MetricsProvider,
+// reporting the number of items currently waiting for their delay to expire.
+type DelayedMetricsProvider interface {
+	NewDelayedMetric(name string) SettableGaugeMetric
+}
+
 type noopMetricsProvider struct{}
 
-func (_ noopMetricsProvider) NewDepthMetric(name string) GaugeMetric {
+func (noopMetricsProvider) NewDepthMetric(name string) GaugeMetric {
 	return noopMetric{}
 }
 
-func (_ noopMetricsProvider) NewAddsMetric(name string) CounterMetric {
+func (noopMetricsProvider) NewAddsMetric(name string) CounterMetric {
 	return noopMetric{}
 }
 
-func (_ noopMetricsProvider) NewLatencyMetric(name string) HistogramMetric {
+func (noopMetricsProvider) NewLatencyMetric(name string) HistogramMetric {
 	return noopMetric{}
 }
 
-func (_ noopMetricsProvider) NewWorkDurationMetric(name string) HistogramMetric {
+func (noopMetricsProvider) NewWorkDurationMetric(name string) HistogramMetric {
 	return noopMetric{}
 }
 
-func (_ noopMetricsProvider) NewUnfinishedWorkSecondsMetric(name string) SettableGaugeMetric {
+func (noopMetricsProvider) NewUnfinishedWorkSecondsMetric(name string) SettableGaugeMetric {
 	return noopMetric{}
 }
 
-func (_ noopMetricsProvider) NewLongestRunningProcessorSecondsMetric(name string) SettableGaugeMetric {
+func (noopMetricsProvider) NewLongestRunningProcessorSecondsMetric(name string) SettableGaugeMetric {
 	return noopMetric{}
 }
 
-func (_ noopMetricsProvider) NewRetriesMetric(name string) CounterMetric {
+func (noopMetricsProvider) NewRetriesMetric(name string) CounterMetric {
+	return noopMetric{}
+}
+
+func (noopMetricsProvider) NewDelayedMetric(name string) SettableGaugeMetric {
 	return noopMetric{}
 }
 
@@ -241,9 +261,14 @@ func newRetryMetrics(name string, provider MetricsProvider) retryMetrics {
 		provider = globalMetricsProvider
 	}
 
-	return &defaultRetryMetrics{
+	ret = &defaultRetryMetrics{
 		retries: provider.NewRetriesMetric(name),
+		delayed: noopMetric{},
 	}
+	if delayedProvider, ok := provider.(DelayedMetricsProvider); ok {
+		ret.delayed = delayedProvider.NewDelayedMetric(name)
+	}
+	return ret
 }
 
 // SetProvider sets the metrics provider for all subsequently created work
