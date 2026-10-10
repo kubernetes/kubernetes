@@ -30,10 +30,8 @@ import (
 
 // validateKubeletOSConfiguration validates os specific kubelet configuration and returns an error if it is invalid.
 func validateKubeletOSConfiguration(kc *kubeletconfig.KubeletConfiguration) error {
-	message := "ignored configuration option: %v (%v) %v is not supported on Windows"
-
 	if kc.CgroupsPerQOS {
-		klog.Warningf(message, "CgroupsPerQOS", "--cgroups-per-qos", kc.CgroupsPerQOS)
+		klog.Background().Info("Ignoring configuration option not supported on Windows", "option", "CgroupsPerQOS", "flag", "--cgroups-per-qos", "value", kc.CgroupsPerQOS)
 	}
 
 	if kc.SingleProcessOOMKill != nil {
@@ -42,7 +40,7 @@ func validateKubeletOSConfiguration(kc *kubeletconfig.KubeletConfiguration) erro
 
 	enforceNodeAllocatableWithoutNone := sets.New(kc.EnforceNodeAllocatable...).Delete(kubetypes.NodeAllocatableNoneKey)
 	if len(enforceNodeAllocatableWithoutNone) > 0 {
-		klog.Warningf(message, "EnforceNodeAllocatable", "--enforce-node-allocatable", kc.EnforceNodeAllocatable)
+		klog.Background().Info("Ignoring configuration option not supported on Windows", "option", "EnforceNodeAllocatable", "flag", "--enforce-node-allocatable", "value", kc.EnforceNodeAllocatable)
 	}
 
 	if kc.UserNamespaces != nil {
