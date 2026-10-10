@@ -37,10 +37,8 @@ import (
 	apiutil "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/events"
 	"k8s.io/klog/v2"
-	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/proxy"
 	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
@@ -773,10 +771,6 @@ func newProxierInternal(
 
 	klog.V(1).InfoS("Hns Network loaded", "hnsNetworkInfo", hnsNetworkInfo)
 	isDSR := config.EnableDSR
-	if isDSR && !utilfeature.DefaultFeatureGate.Enabled(kubefeatures.WinDSR) {
-		return nil, fmt.Errorf("WinDSR feature gate not enabled")
-	}
-
 	err = hcnImpl.DsrSupported()
 	if isDSR && err != nil {
 		return nil, err
@@ -785,9 +779,6 @@ func newProxierInternal(
 	var sourceVip string
 	var hostMac string
 	if isOverlay(hnsNetworkInfo) {
-		if !utilfeature.DefaultFeatureGate.Enabled(kubefeatures.WinOverlay) {
-			return nil, fmt.Errorf("WinOverlay feature gate not enabled")
-		}
 		err = hcnImpl.RemoteSubnetSupported()
 		if err != nil {
 			return nil, err
