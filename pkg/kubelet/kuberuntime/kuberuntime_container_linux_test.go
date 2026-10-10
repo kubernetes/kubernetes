@@ -976,21 +976,24 @@ func TestMemoryHighClearedWhenMemoryQoSDisabled(t *testing.T) {
 	}
 
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MemoryQoS, true)
-	enabledResources := m.generateContainerResources(tCtx, pod, &pod.Spec.Containers[0])
+	enabledResources, err := m.generateContainerResources(tCtx, pod, &pod.Spec.Containers[0])
+	require.NoError(t, err)
 	require.NotNil(t, enabledResources)
 	memoryHigh := enabledResources.GetLinux().GetUnified()["memory.high"]
 	assert.NotEmpty(t, memoryHigh, "memory.high should be set when MemoryQoS is enabled and memoryThrottlingFactor is non-nil")
 	assert.NotEqual(t, "max", memoryHigh, "memory.high should not be 'max' when MemoryQoS is enabled and memoryThrottlingFactor is non-nil")
 
 	m.memoryThrottlingFactor = nil
-	nilFactorResources := m.generateContainerResources(tCtx, pod, &pod.Spec.Containers[0])
+	nilFactorResources, err := m.generateContainerResources(tCtx, pod, &pod.Spec.Containers[0])
+	require.NoError(t, err)
 	require.NotNil(t, nilFactorResources)
 	_, hasMemoryHigh := nilFactorResources.GetLinux().GetUnified()["memory.high"]
 	assert.False(t, hasMemoryHigh,
 		"memory.high should not be set when memoryThrottlingFactor is nil")
 
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MemoryQoS, false)
-	disabledResources := m.generateContainerResources(tCtx, pod, &pod.Spec.Containers[0])
+	disabledResources, err := m.generateContainerResources(tCtx, pod, &pod.Spec.Containers[0])
+	require.NoError(t, err)
 	require.NotNil(t, disabledResources)
 	assert.Equal(t, "max", disabledResources.GetLinux().GetUnified()["memory.high"],
 		"memory.high should be 'max' when MemoryQoS is disabled on cgroup v2")
@@ -1527,11 +1530,48 @@ func TestGenerateLinuxContainerResources(t *testing.T) {
 
 			m.singleProcessOOMKill = ptr.To(tc.singleProcessOOMKill)
 
-			resources := m.generateLinuxContainerResources(tCtx, pod, &pod.Spec.Containers[0], false)
+			resources, err := m.generateLinuxContainerResources(tCtx, pod, &pod.Spec.Containers[0], false)
+			require.NoError(t, err)
 			tc.expected.HugepageLimits = resources.HugepageLimits
 			assert.Equal(t, tc.expected, resources)
 		})
 	}
+}
+
+func TestContainerResourcesZeroMemoryCapacity(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	fakeRuntime, _, m, err := createTestRuntimeManager(tCtx)
+	require.NoError(t, err)
+	m.machineInfo.MemoryCapacity = 0
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{UID: "test-pod", Name: "test-pod", Namespace: "test"},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{{
+				Name: "cpu-only", Image: "busybox",
+				Resources: v1.ResourceRequirements{
+					Limits: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")},
+				},
+			}},
+		},
+	}
+	container := &pod.Spec.Containers[0]
+
+	t.Run("generate container config", func(t *testing.T) {
+		config, cleanup, err := m.generateContainerConfig(tCtx, container, pod, 0, "", container.Image, nil, nil, nil)
+		if cleanup != nil {
+			defer cleanup()
+		}
+		require.ErrorContains(t, err, "memory capacity")
+		assert.Nil(t, config)
+	})
+
+	t.Run("update container resources", func(t *testing.T) {
+		containerID := kubecontainer.ContainerID{Type: "containerd", ID: "test-container"}
+		err := m.updateContainerResources(tCtx, pod, container, containerID)
+		require.ErrorContains(t, err, "memory capacity")
+		assert.ErrorContains(t, err, containerID.String())
+		assert.NotContains(t, fakeRuntime.GetCalls(), "UpdateContainerResources")
+	})
 }
 
 func TestGenerateLinuxContainerResourcesWithDRA(t *testing.T) {
@@ -1884,7 +1924,8 @@ func TestGenerateLinuxContainerResourcesWithDRA(t *testing.T) {
 					containerArg.Resources.Requests = tc.backfilledContainerRequests
 				}
 			}
-			resources := m.generateLinuxContainerResources(tCtx, pod, containerArg, false)
+			resources, err := m.generateLinuxContainerResources(tCtx, pod, containerArg, false)
+			require.NoError(t, err)
 
 			assert.Equal(t, tc.expectedCPUShares, resources.CpuShares)
 			assert.Equal(t, tc.expectedCPUQuota, resources.CpuQuota)
@@ -2309,8 +2350,10 @@ func TestGenerateLinuxContainerResourcesWithSwap(t *testing.T) {
 				assert.True(t, types.IsCriticalPod(pod), "pod is expected to be critical")
 			}
 
-			resourcesC1 := m.generateLinuxContainerResources(tCtx, pod, &pod.Spec.Containers[0], false)
-			resourcesC2 := m.generateLinuxContainerResources(tCtx, pod, &pod.Spec.Containers[1], false)
+			resourcesC1, err := m.generateLinuxContainerResources(tCtx, pod, &pod.Spec.Containers[0], false)
+			require.NoError(t, err)
+			resourcesC2, err := m.generateLinuxContainerResources(tCtx, pod, &pod.Spec.Containers[1], false)
+			require.NoError(t, err)
 
 			if tc.swapDisabledOnNode {
 				expectSwapDisabled(tc.cgroupVersion, resourcesC1, resourcesC2)
@@ -2854,7 +2897,8 @@ func TestContainerMemoryHighSkippedWithPodLevelResources(t *testing.T) {
 	}
 
 	t.Run("container with own limit gets per-container memory.high", func(t *testing.T) {
-		lcr := m.generateLinuxContainerResources(tCtx, pod, &pod.Spec.Containers[0], true)
+		lcr, err := m.generateLinuxContainerResources(tCtx, pod, &pod.Spec.Containers[0], true)
+		require.NoError(t, err)
 		pageSize := int64(os.Getpagesize())
 		expectedHigh := int64(math.Floor(
 			float64(containerRequest.Value())+
@@ -2865,7 +2909,8 @@ func TestContainerMemoryHighSkippedWithPodLevelResources(t *testing.T) {
 	})
 
 	t.Run("container without limit skips memory.high (pod-level handles it)", func(t *testing.T) {
-		lcr := m.generateLinuxContainerResources(tCtx, pod, &pod.Spec.Containers[1], true)
+		lcr, err := m.generateLinuxContainerResources(tCtx, pod, &pod.Spec.Containers[1], true)
+		require.NoError(t, err)
 		_, ok := lcr.Unified[cm.Cgroup2MemoryHigh]
 		assert.False(t, ok, "memory.high should NOT be set on container without own limit when PodLevelResources is active")
 	})
@@ -2888,7 +2933,8 @@ func TestContainerMemoryHighSkippedWithPodLevelResources(t *testing.T) {
 				}},
 			},
 		}
-		lcr := m.generateLinuxContainerResources(tCtx, cpuOnlyPod, &cpuOnlyPod.Spec.Containers[0], true)
+		lcr, err := m.generateLinuxContainerResources(tCtx, cpuOnlyPod, &cpuOnlyPod.Spec.Containers[0], true)
+		require.NoError(t, err)
 		_, ok := lcr.Unified[cm.Cgroup2MemoryHigh]
 		assert.True(t, ok, "memory.high should be set via node-allocatable fallback when pod has CPU-only resources")
 	})
@@ -2929,7 +2975,8 @@ func TestContainerMemoryHighSkippedWithPodLevelResources(t *testing.T) {
 				},
 			},
 		}
-		lcr := m.generateLinuxContainerResources(tCtx, guaranteedPod, &guaranteedPod.Spec.Containers[0], true)
+		lcr, err := m.generateLinuxContainerResources(tCtx, guaranteedPod, &guaranteedPod.Spec.Containers[0], true)
+		require.NoError(t, err)
 		pageSize := int64(os.Getpagesize())
 		expectedHigh := int64(math.Floor(
 			float64(containerRequest.Value())+
@@ -2964,7 +3011,8 @@ func TestContainerMemoryHighSkippedWithPodLevelResources(t *testing.T) {
 				},
 			},
 		}
-		lcr := m.generateLinuxContainerResources(tCtx, burstablePod, &burstablePod.Spec.Containers[0], true)
+		lcr, err := m.generateLinuxContainerResources(tCtx, burstablePod, &burstablePod.Spec.Containers[0], true)
+		require.NoError(t, err)
 		_, ok := lcr.Unified[cm.Cgroup2MemoryHigh]
 		assert.False(t, ok, "memory.high should NOT be set when container memory req==limit, even if pod is Burstable")
 	})

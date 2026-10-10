@@ -409,11 +409,14 @@ func (m *kubeGenericRuntimeManager) generateContainerConfig(ctx context.Context,
 
 func (m *kubeGenericRuntimeManager) updateContainerResources(ctx context.Context, pod *v1.Pod, container *v1.Container, containerID kubecontainer.ContainerID) error {
 	logger := klog.FromContext(ctx)
-	containerResources := m.generateContainerResources(ctx, pod, container)
+	containerResources, err := m.generateContainerResources(ctx, pod, container)
+	if err != nil {
+		return fmt.Errorf("container %q updateContainerResources failed: %w", containerID.String(), err)
+	}
 	if containerResources == nil {
 		return fmt.Errorf("container %q updateContainerResources failed: cannot generate resources config", containerID.String())
 	}
-	err := m.runtimeService.UpdateContainerResources(ctx, containerID.ID, containerResources)
+	err = m.runtimeService.UpdateContainerResources(ctx, containerID.ID, containerResources)
 	if err == nil {
 		err = m.setActuatedContainerResources(logger, pod, container)
 	}
