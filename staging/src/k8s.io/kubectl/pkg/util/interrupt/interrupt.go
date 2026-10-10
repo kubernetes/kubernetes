@@ -31,9 +31,10 @@ var terminationSignals = []os.Signal{syscall.SIGHUP, syscall.SIGINT, syscall.SIG
 // to a Run method), even in the presence of process termination. It guarantees exactly once
 // invocation of the provided notify functions.
 type Handler struct {
-	notify []func()
-	final  func(os.Signal)
-	once   sync.Once
+	notify    []func()
+	final     func(os.Signal)
+	once      sync.Once
+	finalOnce sync.Once
 }
 
 // Chain creates a new handler that invokes all notify functions when the critical section exits
@@ -68,13 +69,13 @@ func (h *Handler) Close() {
 }
 
 // Signal is called when an os.Signal is received, and guarantees that all notifications
-// are executed, then the final handler is executed. This function should only be called once
-// per Handler instance.
+// are executed, then the final handler is executed. The notifications and the final handler
+// are each invoked at most once per Handler instance. The final handler is invoked even if
+// the notifications were already executed by a call to Close, which is what a handler created
+// by Chain does to its parent.
 func (h *Handler) Signal(s os.Signal) {
-	h.once.Do(func() {
-		for _, fn := range h.notify {
-			fn()
-		}
+	h.Close()
+	h.finalOnce.Do(func() {
 		if h.final == nil {
 			os.Exit(1)
 		}
@@ -97,6 +98,9 @@ func (h *Handler) Run(fn func() error) error {
 		if !ok {
 			return
 		}
+		// A signal can arrive after fn has returned and the deferred Close has run,
+		// up until signal.Stop takes effect. The final handler still runs for it, so
+		// the signal is not silently ignored.
 		h.Signal(sig)
 	}()
 	defer h.Close()
