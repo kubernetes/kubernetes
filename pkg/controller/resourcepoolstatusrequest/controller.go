@@ -273,7 +273,10 @@ func (c *Controller) syncRequest(ctx context.Context, key string) error {
 		}
 	}
 	if hasIncomplete {
-		return fmt.Errorf("incomplete pools detected, requeueing")
+		if c.workqueue.NumRequeues(key) < maxRetries {
+			return fmt.Errorf("incomplete pools detected, requeueing")
+		}
+		logger.V(2).Info("Retry budget exhausted for incomplete pools, proceeding to write partial status", "request", key)
 	}
 
 	// Update the request status
