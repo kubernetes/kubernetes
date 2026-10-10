@@ -235,7 +235,10 @@ func (kvh *kubeletVolumeHost) GetNodeAllocatable() (v1.ResourceList, error) {
 
 func (kvh *kubeletVolumeHost) GetSecretFunc() func(namespace, name string) (*v1.Secret, error) {
 	if kvh.secretManager != nil {
-		return kvh.secretManager.GetSecret
+		return func(namespace, name string) (*v1.Secret, error) {
+			// TODO: Pass the caller's context when VolumeHost supports it.
+			return kvh.secretManager.GetSecret(context.TODO(), namespace, name)
+		}
 	}
 	return func(namespace, name string) (*v1.Secret, error) {
 		return nil, fmt.Errorf("not supported due to running kubelet in standalone mode")

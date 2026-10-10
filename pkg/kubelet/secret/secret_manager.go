@@ -38,8 +38,8 @@ import (
 // Manager manages Kubernetes secrets. This includes retrieving
 // secrets or registering/unregistering them via Pods.
 type Manager interface {
-	// Get secret by secret namespace and name.
-	GetSecret(namespace, name string) (*v1.Secret, error)
+	// GetSecret by secret namespace and name.
+	GetSecret(ctx context.Context, namespace, name string) (*v1.Secret, error)
 
 	// WARNING: Register/UnregisterPod functions should be efficient,
 	// i.e. should not block on network operations.
@@ -63,8 +63,8 @@ func NewSimpleSecretManager(kubeClient clientset.Interface) Manager {
 	return &simpleSecretManager{kubeClient: kubeClient}
 }
 
-func (s *simpleSecretManager) GetSecret(namespace, name string) (*v1.Secret, error) {
-	return s.kubeClient.CoreV1().Secrets(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+func (s *simpleSecretManager) GetSecret(ctx context.Context, namespace, name string) (*v1.Secret, error) {
+	return s.kubeClient.CoreV1().Secrets(namespace).Get(ctx, name, metav1.GetOptions{})
 }
 
 func (s *simpleSecretManager) RegisterPod(pod *v1.Pod) {
@@ -81,7 +81,7 @@ type secretManager struct {
 	manager manager.Manager
 }
 
-func (s *secretManager) GetSecret(namespace, name string) (*v1.Secret, error) {
+func (s *secretManager) GetSecret(ctx context.Context, namespace, name string) (*v1.Secret, error) {
 	object, err := s.manager.GetObject(namespace, name)
 	if err != nil {
 		return nil, err

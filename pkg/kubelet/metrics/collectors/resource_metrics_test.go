@@ -17,7 +17,6 @@ limitations under the License.
 package collectors
 
 import (
-	"context"
 	"fmt"
 	"strings"
 	"testing"
@@ -25,6 +24,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/component-base/metrics/testutil"
+	"k8s.io/ktesting"
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	summaryprovidertest "k8s.io/kubernetes/pkg/kubelet/server/stats/testing"
 	"k8s.io/utils/ptr"
@@ -32,6 +32,7 @@ import (
 
 func TestCollectResourceMetrics(t *testing.T) {
 	// a static timestamp: 2021-06-23 05:11:18.302091597 +0800
+	tCtx := ktesting.Init(t)
 	staticTimestamp := time.Unix(0, 1624396278302091597)
 	swapTimestamp := staticTimestamp.Add(10 * time.Second)
 	testTime := metav1.NewTime(staticTimestamp)
@@ -449,9 +450,8 @@ func TestCollectResourceMetrics(t *testing.T) {
 	for _, test := range tests {
 		tc := test
 		t.Run(tc.name, func(t *testing.T) {
-			ctx := context.TODO()
 			provider := summaryprovidertest.NewMockSummaryProvider(t)
-			provider.EXPECT().GetCPUAndMemoryStats(ctx).Return(tc.summary, tc.summaryErr).Maybe()
+			provider.EXPECT().GetCPUAndMemoryStats(tCtx).Return(tc.summary, tc.summaryErr).Maybe()
 			collector := NewResourceMetricsCollector(provider)
 
 			if err := testutil.CustomCollectAndCompare(collector, strings.NewReader(tc.expectedMetrics), interestedMetrics...); err != nil {

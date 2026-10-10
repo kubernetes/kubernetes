@@ -2259,7 +2259,7 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 	kl.containerRuntime.InitializeActuatedPod(logger, pod)
 
 	// Fetch the pull secrets for the pod
-	pullSecrets, missingPullSecretNames := kl.getPullSecretsForPod(logger, pod)
+	pullSecrets, missingPullSecretNames := kl.getPullSecretsForPod(ctx, pod)
 
 	// Ensure the pod is being probed
 	kl.probeManager.AddPod(ctx, pod)
