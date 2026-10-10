@@ -99,7 +99,7 @@ const (
 	QueueingHintResultError     = "Error"
 )
 
-// Entity label values used for queued_entities and queue_incoming_entities metrics.
+// Entity label values used for queued_entities, queue_incoming_entities, and preemption metrics.
 const (
 	Pod               = "pod"
 	PodGroup          = "podgroup"
@@ -203,7 +203,7 @@ var (
 	DRABindingConditionsPreBindDuration  *metrics.HistogramVec
 
 	WorkloadPreemptionAttempts    *metrics.CounterVec
-	WorkloadPreemptionVictims     *metrics.Histogram
+	WorkloadPreemptionVictims     *metrics.HistogramVec
 	PreemptionWorkloadDisruptions *metrics.HistogramVec
 	PreemptionEvaluationDuration  *metrics.HistogramVec
 	PreemptionExecutionDuration   *metrics.HistogramVec
@@ -622,23 +622,23 @@ func InitMetrics() {
 		&metrics.CounterOpts{
 			Subsystem:      SchedulerSubsystem,
 			Name:           "workload_preemption_attempts_total",
-			Help:           "Total preemption attempts initiated by workload (including pod groups) in the cluster till now.",
+			Help:           "Total preemption attempts initiated by workload (including either pod groups or composite pod groups) in the cluster till now.",
 			StabilityLevel: metrics.ALPHA,
-		}, []string{"result"})
-	WorkloadPreemptionVictims = metrics.NewHistogram(
+		}, []string{"preemptor", "result"})
+	WorkloadPreemptionVictims = metrics.NewHistogramVec(
 		&metrics.HistogramOpts{
 			Subsystem: SchedulerSubsystem,
 			Name:      "workload_preemption_victims",
-			Help:      "Number of pod preemption victims caused by workload preemption.",
+			Help:      "Number of pod preemption victims caused by workload preemption (including either pod groups or composite pod groups).",
 			// Start with 1 with the last bucket being [1024, Inf)
 			Buckets:        metrics.ExponentialBuckets(1, 2, 11),
 			StabilityLevel: metrics.ALPHA,
-		})
+		}, []string{"preemptor"})
 	PreemptionWorkloadDisruptions = metrics.NewHistogramVec(
 		&metrics.HistogramOpts{
 			Subsystem: SchedulerSubsystem,
 			Name:      "preemption_workload_disruptions",
-			Help:      "Number of workload preemption units being preempted. A single preemption unit can be all pods in a pod group (in case of DisruptionMode=all), or a single pod (in case of DisruptionMode=single).",
+			Help:      "Number of workload preemption units being preempted. A single preemption unit can be all pods in a pod group or composite pod group hierarchy (in case of DisruptionMode=all), or a single pod (in case of DisruptionMode=single).",
 			// Start with 1 with the last bucket being [1024, Inf)
 			Buckets:        metrics.ExponentialBuckets(1, 2, 11),
 			StabilityLevel: metrics.ALPHA,

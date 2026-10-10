@@ -181,13 +181,13 @@ func TestPodGroupEvaluator_Preempt_Victims(t *testing.T) {
 		expectedNumPDBViolations       int
 	}{
 		{
-			name: "Priority: mix of no groups and pod groups",
+			name: "Priority: pods from a group with disruption mode single rank as individual pods",
 			nodes: []*v1.Node{
 				st.MakeNode().Name("node1").Obj(),
 			},
 			initPods: []*v1.Pod{
-				st.MakePod().Name("p1").UID("v1").Node("node1").Priority(lowPriority).Labels(map[string]string{"size": "1"}).Obj(),
-				st.MakePod().Name("p2").UID("v2").Node("node1").Priority(lowPriority).Labels(map[string]string{"size": "1"}).PodGroupName("pg1").Obj(),
+				st.MakePod().Name("p1").UID("v1").Node("node1").Priority(lowPriority).Labels(map[string]string{"size": "1"}).StartTime(metav1.Unix(0, 0)).Obj(),
+				st.MakePod().Name("p2").UID("v2").Node("node1").Priority(lowPriority).Labels(map[string]string{"size": "1"}).PodGroupName("pg1").StartTime(metav1.Unix(1, 0)).Obj(),
 			},
 			initPodGroups: []*schedulingv1beta1.PodGroup{
 				st.MakePodGroup().Name("pg1").UID("pg1").DisruptionModeSingle().Priority(lowPriority).Obj(),
@@ -202,8 +202,10 @@ func TestPodGroupEvaluator_Preempt_Victims(t *testing.T) {
 					capacity: 2,
 				},
 			},
-			expectedVictims: []string{"p1"}, // p1 is less important than p2 because it's not part of a pod group
-			expectedStatus:  fwk.NewStatus(fwk.Success),
+			// p2 is evicted alone, so it ranks like the standalone p1 and the earlier start time of p1 wins.
+			expectedVictims:                []string{"p2"},
+			expectedStatus:                 fwk.NewStatus(fwk.Success),
+			expectedNumPodGroupDisruptions: 1,
 		},
 		{
 			name: "Priority: StartTime of pods from same group with disruption mode single ",
@@ -1790,18 +1792,35 @@ func (pa *mockProposedAssignment) GetCycleState() fwk.CycleState {
 func TestPodGroupPreemptionEvaluationDurationMetric(t *testing.T) {
 	nodeName := "node1"
 	preemptorPod := st.MakePod().Name("p1").UID("p1").Obj()
-	preemptorPGInfo := newTestPodGroupInfo(st.MakePodGroup().Name("preemptor-pg").Priority(highPriority).Obj(), nil, []*v1.Pod{preemptorPod})
 
 	tests := []struct {
 		name             string
+		isCPG            bool
+		wantPreemptor    string
 		evaluationStatus *fwk.Status
 	}{
 		{
-			name:             "scheduling success",
+			name:             "podgroup scheduling success",
+			isCPG:            false,
+			wantPreemptor:    metrics.PodGroup,
 			evaluationStatus: fwk.NewStatus(fwk.Success),
 		},
 		{
-			name:             "scheduling error",
+			name:             "compositepodgroup scheduling success",
+			isCPG:            true,
+			wantPreemptor:    metrics.CompositePodGroup,
+			evaluationStatus: fwk.NewStatus(fwk.Success),
+		},
+		{
+			name:             "podgroup scheduling error",
+			isCPG:            false,
+			wantPreemptor:    metrics.PodGroup,
+			evaluationStatus: fwk.NewStatus(fwk.Error, "failed to schedule"),
+		},
+		{
+			name:             "compositepodgroup scheduling error",
+			isCPG:            true,
+			wantPreemptor:    metrics.CompositePodGroup,
 			evaluationStatus: fwk.NewStatus(fwk.Error, "failed to schedule"),
 		},
 	}
@@ -1814,6 +1833,13 @@ func TestPodGroupPreemptionEvaluationDurationMetric(t *testing.T) {
 			logger, ctx := ktesting.NewTestContext(t)
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
+
+			var preemptorPGInfo fwk.PodGroupInfo
+			if tt.isCPG {
+				preemptorPGInfo = newTestPodGroupInfo(nil, st.MakeCompositePodGroup().Name("preemptor-cpg").Priority(highPriority).Obj(), []*v1.Pod{preemptorPod})
+			} else {
+				preemptorPGInfo = newTestPodGroupInfo(st.MakePodGroup().Name("preemptor-pg").Priority(highPriority).Obj(), nil, []*v1.Pod{preemptorPod})
+			}
 
 			node := st.MakeNode().Name(nodeName).Obj()
 			victimPod := st.MakePod().Name("p2").UID("p2").Node(nodeName).Priority(lowPriority).Obj()
@@ -1860,7 +1886,7 @@ func TestPodGroupPreemptionEvaluationDurationMetric(t *testing.T) {
 				return nil, tt.evaluationStatus
 			}
 			expectedStatus := tt.evaluationStatus.Code().String()
-			stateBefore := captureEvaluationDurationMetric(testRegistry, "podgroup", expectedStatus)
+			stateBefore := captureEvaluationDurationMetric(testRegistry, tt.wantPreemptor, expectedStatus)
 
 			if err := pl.Handle.MutableSnapshotSharedLister().StartMutations(); err != nil {
 				t.Fatalf("Unexpected error: %v", err)
@@ -1870,11 +1896,11 @@ func TestPodGroupPreemptionEvaluationDurationMetric(t *testing.T) {
 				t.Errorf("Unexpected error: %v", err)
 			}
 
-			stateAfter := captureEvaluationDurationMetric(testRegistry, "podgroup", expectedStatus)
+			stateAfter := captureEvaluationDurationMetric(testRegistry, tt.wantPreemptor, expectedStatus)
 
 			diff := stateAfter.count - stateBefore.count
 			if diff != 1 {
-				t.Errorf("Expected %s count delta to be 1, got %d", expectedStatus, diff)
+				t.Errorf("Expected %s count delta for %s to be 1, got %d", expectedStatus, tt.wantPreemptor, diff)
 			}
 		})
 	}
