@@ -129,6 +129,12 @@ type lifecycleSignals struct {
 	// request will receive an error.
 	NotAcceptingNewRequest lifecycleSignal
 
+	// WatchTerminationStarted event is signaled when active watch
+	// request(s) should start returning, once the rate limiter that
+	// paces them is in effect. If ShutdownWatchTerminationGracePeriod
+	// is not positive, it is signaled right after NotAcceptingNewRequest.
+	WatchTerminationStarted lifecycleSignal
+
 	// InFlightRequestsDrained event is signaled when the existing requests
 	// in flight have completed. This is used as signal to shut down the audit backends
 	InFlightRequestsDrained lifecycleSignal
@@ -147,11 +153,11 @@ type lifecycleSignals struct {
 }
 
 // ShuttingDown returns the lifecycle signal that is signaled when
-// the server is not accepting any new requests.
+// active watch request(s) should start returning.
 // this is the lifecycle event that is exported to the request handler
 // logic to indicate that the server is shutting down.
 func (s lifecycleSignals) ShuttingDown() <-chan struct{} {
-	return s.NotAcceptingNewRequest.Signaled()
+	return s.WatchTerminationStarted.Signaled()
 }
 
 // newLifecycleSignals returns an instance of lifecycleSignals interface to be used
@@ -162,6 +168,7 @@ func newLifecycleSignals() lifecycleSignals {
 		AfterShutdownDelayDuration: newNamedChannelWrapper("AfterShutdownDelayDuration"),
 		PreShutdownHooksStopped:    newNamedChannelWrapper("PreShutdownHooksStopped"),
 		NotAcceptingNewRequest:     newNamedChannelWrapper("NotAcceptingNewRequest"),
+		WatchTerminationStarted:    newNamedChannelWrapper("WatchTerminationStarted"),
 		InFlightRequestsDrained:    newNamedChannelWrapper("InFlightRequestsDrained"),
 		HTTPServerStoppedListening: newNamedChannelWrapper("HTTPServerStoppedListening"),
 		HasBeenReady:               newNamedChannelWrapper("HasBeenReady"),
