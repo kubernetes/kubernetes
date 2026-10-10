@@ -18,9 +18,11 @@ package deployment
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	apps "k8s.io/api/apps/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
@@ -122,6 +124,8 @@ func TestDeploymentController_reconcileNewReplicaSet(t *testing.T) {
 }
 
 func TestDeploymentController_reconcileOldReplicaSets(t *testing.T) {
+	errFakeRSUpdate := errors.New("fake ReplicaSet update failure")
+
 	tests := []struct {
 		deploymentReplicas  int32
 		maxUnavailable      intstr.IntOrString
@@ -131,6 +135,8 @@ func TestDeploymentController_reconcileOldReplicaSets(t *testing.T) {
 		readyPodsFromNewRS  int
 		scaleExpected       bool
 		expectedOldReplicas int32
+		// If set, ReplicaSet updates fail with this error; reconcileOldReplicaSets must return it.
+		updateErr error
 	}{
 		{
 			deploymentReplicas:  10,
@@ -181,6 +187,24 @@ func TestDeploymentController_reconcileOldReplicaSets(t *testing.T) {
 			readyPodsFromNewRS: 0,
 			scaleExpected:      false,
 		},
+		{ // ready old replicas: scaleDownOldReplicaSetsForRollingUpdate update failure must surface
+			deploymentReplicas: 10,
+			maxUnavailable:     intstr.FromInt32(2),
+			oldReplicas:        10,
+			newReplicas:        0,
+			readyPodsFromOldRS: 10,
+			readyPodsFromNewRS: 0,
+			updateErr:          errFakeRSUpdate,
+		},
+		{ // unavailable old replicas: cleanupUnhealthyReplicas update failure must surface
+			deploymentReplicas: 10,
+			maxUnavailable:     intstr.FromInt32(2),
+			oldReplicas:        10,
+			newReplicas:        0,
+			readyPodsFromOldRS: 8,
+			readyPodsFromNewRS: 0,
+			updateErr:          errFakeRSUpdate,
+		},
 	}
 	for i := range tests {
 		test := tests[i]
@@ -197,12 +221,24 @@ func TestDeploymentController_reconcileOldReplicaSets(t *testing.T) {
 		maxSurge := intstr.FromInt32(0)
 		deployment := newDeployment("foo", test.deploymentReplicas, nil, &maxSurge, &test.maxUnavailable, newSelector)
 		fakeClientset := fake.Clientset{}
+		if test.updateErr != nil {
+			updateErr := test.updateErr
+			fakeClientset.PrependReactor("update", "replicasets", func(action core.Action) (bool, runtime.Object, error) {
+				return true, nil, updateErr
+			})
+		}
 		controller := &DeploymentController{
 			client:        &fakeClientset,
 			eventRecorder: &record.FakeRecorder{},
 		}
 		_, ctx := ktesting.NewTestContext(t)
 		scaled, err := controller.reconcileOldReplicaSets(ctx, allRSs, oldRSs, newRS, deployment)
+		if test.updateErr != nil {
+			if !errors.Is(err, test.updateErr) {
+				t.Errorf("expected error %v, got %v", test.updateErr, err)
+			}
+			continue
+		}
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 			continue

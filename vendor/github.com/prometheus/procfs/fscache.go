@@ -21,7 +21,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/prometheus/procfs/internal/util"
+	"github.com/prometheus/procfs/internal/parsers"
 )
 
 // Fscacheinfo represents fscache statistics.
@@ -229,7 +229,7 @@ type Fscacheinfo struct {
 // Fscacheinfo returns information about current fscache statistics.
 // See https://www.kernel.org/doc/Documentation/filesystems/caching/fscache.txt
 func (fs FS) Fscacheinfo() (Fscacheinfo, error) {
-	b, err := util.ReadFileNoStat(fs.proc.Path("fs/fscache/stats"))
+	b, err := parsers.ReadFileNoStat(fs.proc.Path("fs/fscache/stats"))
 	if err != nil {
 		return Fscacheinfo{}, err
 	}

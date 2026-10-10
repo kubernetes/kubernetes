@@ -1692,6 +1692,14 @@ type (
 		expectedErrList field.ErrorList
 		knownTypes      sets.Set[string]
 		repeatableTypes sets.Set[string]
+		// conditionalAuthorizationGate forces the ConditionalAuthorization
+		// feature gate to this value for the duration of the subtest. Cases
+		// that don't touch ConditionsReview leave this at the zero value
+		// (false), matching the gate's own default.
+		conditionalAuthorizationGate bool
+		// checkErrorFields additionally compares each error's full field path.
+		// Older cases only set the leaf name, so this is opt-in.
+		checkErrorFields bool
 	}
 )
 
@@ -2458,10 +2466,255 @@ func TestValidateAuthorizationConfiguration(t *testing.T) {
 			knownTypes:      sets.New("Webhook"),
 			repeatableTypes: sets.New("Webhook"),
 		},
+		{
+			// Verifies the ConditionsReview wiring in ValidateAuthorizationConfiguration: a valid ConditionsReview
+			// is silently accepted when the ConditionalAuthorization gate is on.
+			// KubeConfigContextName is only allowed when connectionType=KubeConfigFile,
+			// so this happy-path fixture pairs the two.
+			name:                         "conditionsReview valid when feature gate is on and connectionType=KubeConfigFile",
+			conditionalAuthorizationGate: true,
+			configuration: api.AuthorizationConfiguration{
+				Authorizers: []api.AuthorizerConfiguration{
+					{
+						Type: "Webhook",
+						Name: "default",
+						Webhook: &api.WebhookConfiguration{
+							Timeout:                                  metav1.Duration{Duration: 5 * time.Second},
+							AuthorizedTTL:                            metav1.Duration{Duration: 5 * time.Minute},
+							UnauthorizedTTL:                          metav1.Duration{Duration: 30 * time.Second},
+							FailurePolicy:                            "NoOpinion",
+							SubjectAccessReviewVersion:               "v1",
+							MatchConditionSubjectAccessReviewVersion: "v1",
+							ConnectionInfo: api.WebhookConnectionInfo{
+								Type:           "KubeConfigFile",
+								KubeConfigFile: &tempKubeConfigFilePath,
+							},
+							ConditionsReview: &api.ConditionsReviewConfiguration{
+								KubeConfigContextName: "conditions-review",
+								Version:               "v1alpha1",
+							},
+						},
+					},
+				},
+			},
+			expectedErrList: field.ErrorList{},
+			knownTypes:      sets.New("Webhook"),
+			repeatableTypes: sets.New("Webhook"),
+		},
+		{
+			// InClusterConfig is a legitimate happy path too — the whole
+			// KubeConfigContextName field is simply omitted (the webhook itself
+			// dictates where the conditions review endpoint lives).
+			name:                         "conditionsReview valid with connectionType=InClusterConfig and no kubeConfigContextName",
+			conditionalAuthorizationGate: true,
+			configuration: api.AuthorizationConfiguration{
+				Authorizers: []api.AuthorizerConfiguration{
+					{
+						Type: "Webhook",
+						Name: "default",
+						Webhook: &api.WebhookConfiguration{
+							Timeout:                                  metav1.Duration{Duration: 5 * time.Second},
+							AuthorizedTTL:                            metav1.Duration{Duration: 5 * time.Minute},
+							UnauthorizedTTL:                          metav1.Duration{Duration: 30 * time.Second},
+							FailurePolicy:                            "NoOpinion",
+							SubjectAccessReviewVersion:               "v1",
+							MatchConditionSubjectAccessReviewVersion: "v1",
+							ConnectionInfo: api.WebhookConnectionInfo{
+								Type: "InClusterConfig",
+							},
+							ConditionsReview: &api.ConditionsReviewConfiguration{
+								Version: "v1alpha1",
+							},
+						},
+					},
+				},
+			},
+			expectedErrList: field.ErrorList{},
+			knownTypes:      sets.New("Webhook"),
+			repeatableTypes: sets.New("Webhook"),
+		},
+		{
+			// Verifies the gate check propagates through the parent: even an
+			// otherwise-valid ConditionsReview yields Forbidden when the gate
+			// is off. Guards against the ConditionsReview nil-check being
+			// bypassed if we ever refactor the delegation.
+			name:                         "conditionsReview forbidden when feature gate is off",
+			conditionalAuthorizationGate: false,
+			checkErrorFields:             true,
+			configuration: api.AuthorizationConfiguration{
+				Authorizers: []api.AuthorizerConfiguration{
+					{
+						Type: "Webhook",
+						Name: "default",
+						Webhook: &api.WebhookConfiguration{
+							Timeout:                                  metav1.Duration{Duration: 5 * time.Second},
+							AuthorizedTTL:                            metav1.Duration{Duration: 5 * time.Minute},
+							UnauthorizedTTL:                          metav1.Duration{Duration: 30 * time.Second},
+							FailurePolicy:                            "NoOpinion",
+							SubjectAccessReviewVersion:               "v1",
+							MatchConditionSubjectAccessReviewVersion: "v1",
+							ConnectionInfo: api.WebhookConnectionInfo{
+								Type:           "KubeConfigFile",
+								KubeConfigFile: &tempKubeConfigFilePath,
+							},
+							ConditionsReview: &api.ConditionsReviewConfiguration{
+								KubeConfigContextName: "conditions-review",
+								Version:               "v1alpha1",
+							},
+						},
+					},
+				},
+			},
+			expectedErrList: field.ErrorList{
+				field.Forbidden(field.NewPath("authorizers").Index(0).Child("conditionsReview"), ""),
+			},
+			knownTypes:      sets.New("Webhook"),
+			repeatableTypes: sets.New("Webhook"),
+		},
+		{
+			// Verifies the connectionType-linked check at the leaf surfaces
+			// through the parent: kubeConfigContextName cannot be set when
+			// connectionType != KubeConfigFile. This case pairs InClusterConfig
+			// with a non-empty KubeConfigContextName.
+			name:                         "conditionsReview kubeConfigContextName forbidden with connectionType=InClusterConfig",
+			conditionalAuthorizationGate: true,
+			checkErrorFields:             true,
+			configuration: api.AuthorizationConfiguration{
+				Authorizers: []api.AuthorizerConfiguration{
+					{
+						Type: "Webhook",
+						Name: "default",
+						Webhook: &api.WebhookConfiguration{
+							Timeout:                                  metav1.Duration{Duration: 5 * time.Second},
+							AuthorizedTTL:                            metav1.Duration{Duration: 5 * time.Minute},
+							UnauthorizedTTL:                          metav1.Duration{Duration: 30 * time.Second},
+							FailurePolicy:                            "NoOpinion",
+							SubjectAccessReviewVersion:               "v1",
+							MatchConditionSubjectAccessReviewVersion: "v1",
+							ConnectionInfo: api.WebhookConnectionInfo{
+								Type: "InClusterConfig",
+							},
+							ConditionsReview: &api.ConditionsReviewConfiguration{
+								KubeConfigContextName: "conditions-review",
+								Version:               "v1alpha1",
+							},
+						},
+					},
+				},
+			},
+			expectedErrList: field.ErrorList{
+				field.Forbidden(field.NewPath("authorizers").Index(0).Child("conditionsReview", "kubeConfigContextName"), ""),
+			},
+			knownTypes:      sets.New("Webhook"),
+			repeatableTypes: sets.New("Webhook"),
+		},
+		{
+			// Verifies that leaf-level failures under ConditionsReview surface
+			// through ValidateAuthorizationConfiguration, not just when the leaf
+			// function is called directly. Combines "unsupported version" with
+			// the connectionType-linked kubeConfigContextName check.
+			name:                         "conditionsReview leaf errors propagate through parent (forbidden kubeConfigContextName + unsupported version)",
+			conditionalAuthorizationGate: true,
+			checkErrorFields:             true,
+			configuration: api.AuthorizationConfiguration{
+				Authorizers: []api.AuthorizerConfiguration{
+					{
+						Type: "Webhook",
+						Name: "default",
+						Webhook: &api.WebhookConfiguration{
+							Timeout:                                  metav1.Duration{Duration: 5 * time.Second},
+							AuthorizedTTL:                            metav1.Duration{Duration: 5 * time.Minute},
+							UnauthorizedTTL:                          metav1.Duration{Duration: 30 * time.Second},
+							FailurePolicy:                            "NoOpinion",
+							SubjectAccessReviewVersion:               "v1",
+							MatchConditionSubjectAccessReviewVersion: "v1",
+							ConnectionInfo: api.WebhookConnectionInfo{
+								Type: "InClusterConfig",
+							},
+							ConditionsReview: &api.ConditionsReviewConfiguration{
+								KubeConfigContextName: "conditions-review",
+								Version:               "v99beta1",
+							},
+						},
+					},
+				},
+			},
+			expectedErrList: field.ErrorList{
+				field.Forbidden(field.NewPath("authorizers").Index(0).Child("conditionsReview", "kubeConfigContextName"), ""),
+				field.NotSupported(field.NewPath("authorizers").Index(0).Child("conditionsReview", "version"), "v99beta1", []string{"v1alpha1"}),
+			},
+			knownTypes:      sets.New("Webhook"),
+			repeatableTypes: sets.New("Webhook"),
+		},
+		{
+			// Conditions reviews are only supported together with SubjectAccessReview v1,
+			// as v1beta1 cannot express conditional decisions.
+			name:                         "conditionsReview can only be set for SAR v1",
+			conditionalAuthorizationGate: true,
+			checkErrorFields:             true,
+			configuration: api.AuthorizationConfiguration{
+				Authorizers: []api.AuthorizerConfiguration{
+					{
+						Type: "Webhook",
+						Name: "default",
+						Webhook: &api.WebhookConfiguration{
+							Timeout:                                  metav1.Duration{Duration: 5 * time.Second},
+							AuthorizedTTL:                            metav1.Duration{Duration: 5 * time.Minute},
+							UnauthorizedTTL:                          metav1.Duration{Duration: 30 * time.Second},
+							FailurePolicy:                            "NoOpinion",
+							SubjectAccessReviewVersion:               "v1beta1",
+							MatchConditionSubjectAccessReviewVersion: "v1",
+							ConnectionInfo: api.WebhookConnectionInfo{
+								Type: "InClusterConfig",
+							},
+							ConditionsReview: &api.ConditionsReviewConfiguration{
+								Version: "v1alpha1",
+							},
+						},
+					},
+				},
+			},
+			expectedErrList: field.ErrorList{
+				field.Forbidden(field.NewPath("authorizers").Index(0).Child("conditionsReview"), "may only be set when subjectAccessReviewVersion=v1"),
+			},
+			knownTypes:      sets.New("Webhook"),
+			repeatableTypes: sets.New("Webhook"),
+		},
+		{
+			// Verifies that a nil ConditionsReview yields no ConditionsReview
+			// errors even when the feature gate is off — the whole check is
+			// gated on `c.ConditionsReview != nil`, so
+			// legacy configs that never set the field must remain valid.
+			name:                         "conditionsReview absent, feature gate off, is valid",
+			conditionalAuthorizationGate: false,
+			configuration: api.AuthorizationConfiguration{
+				Authorizers: []api.AuthorizerConfiguration{
+					{
+						Type: "Webhook",
+						Name: "default",
+						Webhook: &api.WebhookConfiguration{
+							Timeout:                                  metav1.Duration{Duration: 5 * time.Second},
+							AuthorizedTTL:                            metav1.Duration{Duration: 5 * time.Minute},
+							UnauthorizedTTL:                          metav1.Duration{Duration: 30 * time.Second},
+							FailurePolicy:                            "NoOpinion",
+							SubjectAccessReviewVersion:               "v1",
+							MatchConditionSubjectAccessReviewVersion: "v1",
+							ConnectionInfo: api.WebhookConnectionInfo{
+								Type: "InClusterConfig",
+							},
+						},
+					},
+				},
+			},
+			expectedErrList: field.ErrorList{},
+			knownTypes:      sets.New("Webhook"),
+			repeatableTypes: sets.New("Webhook"),
+		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConditionalAuthorization, test.conditionalAuthorizationGate)
 			errList := ValidateAuthorizationConfiguration(authorizationcel.NewDefaultCompiler(), nil, &test.configuration, test.knownTypes, test.repeatableTypes)
 			if len(errList) != len(test.expectedErrList) {
 				t.Errorf("expected %d errs, got %d, errors %v", len(test.expectedErrList), len(errList), errList)
@@ -2478,10 +2731,123 @@ func TestValidateAuthorizationConfiguration(t *testing.T) {
 							expected.BadValue,
 							errList[i].BadValue)
 					}
+					if test.checkErrorFields && expected.Field != errList[i].Field {
+						t.Errorf("expected err field %s, got %s",
+							expected.Field,
+							errList[i].Field)
+					}
 				}
 			}
 		})
 
+	}
+}
+
+func TestValidateConditionsReviewConfiguration(t *testing.T) {
+	tests := []struct {
+		name           string
+		gateEnabled    bool
+		connectionType string
+		crc            *api.ConditionsReviewConfiguration
+		want           string
+	}{
+		{
+			name:           "valid with KubeConfigFile + kubeConfigContextName set",
+			gateEnabled:    true,
+			connectionType: api.AuthorizationWebhookConnectionInfoTypeKubeConfigFile,
+			crc: &api.ConditionsReviewConfiguration{
+				KubeConfigContextName: "conditions-review",
+				Version:               "v1alpha1",
+			},
+			want: "",
+		},
+		{
+			name:           "valid with KubeConfigFile and kubeConfigContextName omitted (defaults are allowed)",
+			gateEnabled:    true,
+			connectionType: api.AuthorizationWebhookConnectionInfoTypeKubeConfigFile,
+			crc: &api.ConditionsReviewConfiguration{
+				Version: "v1alpha1",
+			},
+			want: "",
+		},
+		{
+			name:           "valid with InClusterConfig and no kubeConfigContextName",
+			gateEnabled:    true,
+			connectionType: api.AuthorizationWebhookConnectionInfoTypeInCluster,
+			crc: &api.ConditionsReviewConfiguration{
+				Version: "v1alpha1",
+			},
+			want: "",
+		},
+		{
+			name:           "feature gate off is forbidden even for otherwise-valid config",
+			gateEnabled:    false,
+			connectionType: api.AuthorizationWebhookConnectionInfoTypeKubeConfigFile,
+			crc: &api.ConditionsReviewConfiguration{
+				KubeConfigContextName: "conditions-review",
+				Version:               "v1alpha1",
+			},
+			want: `webhook.conditionsReview: Forbidden: the ConditionalAuthorization feature gate must be on to use this field`,
+		},
+		{
+			name:           "kubeConfigContextName forbidden when connectionType=InClusterConfig",
+			gateEnabled:    true,
+			connectionType: api.AuthorizationWebhookConnectionInfoTypeInCluster,
+			crc: &api.ConditionsReviewConfiguration{
+				KubeConfigContextName: "conditions-review",
+				Version:               "v1alpha1",
+			},
+			want: `webhook.conditionsReview.kubeConfigContextName: Forbidden: may only be specified when webhook.connectionInfo.type=KubeConfigFile`,
+		},
+		{
+			name:           "kubeConfigContextName forbidden when connectionType is empty (unrecognized)",
+			gateEnabled:    true,
+			connectionType: "",
+			crc: &api.ConditionsReviewConfiguration{
+				KubeConfigContextName: "conditions-review",
+				Version:               "v1alpha1",
+			},
+			want: `webhook.conditionsReview.kubeConfigContextName: Forbidden: may only be specified when webhook.connectionInfo.type=KubeConfigFile`,
+		},
+		{
+			name:           "version required",
+			gateEnabled:    true,
+			connectionType: api.AuthorizationWebhookConnectionInfoTypeKubeConfigFile,
+			crc: &api.ConditionsReviewConfiguration{
+				KubeConfigContextName: "conditions-review",
+			},
+			want: `webhook.conditionsReview.version: Required value`,
+		},
+		{
+			name:           "version unsupported",
+			gateEnabled:    true,
+			connectionType: api.AuthorizationWebhookConnectionInfoTypeKubeConfigFile,
+			crc: &api.ConditionsReviewConfiguration{
+				KubeConfigContextName: "conditions-review",
+				Version:               "v2",
+			},
+			want: `webhook.conditionsReview.version: Unsupported value: "v2": supported values: "v1alpha1"`,
+		},
+		{
+			name:           "feature gate off + kubeConfigContextName forbidden + version unsupported: all three errors fire",
+			gateEnabled:    false,
+			connectionType: api.AuthorizationWebhookConnectionInfoTypeInCluster,
+			crc: &api.ConditionsReviewConfiguration{
+				KubeConfigContextName: "conditions-review",
+				Version:               "v99beta1",
+			},
+			want: `[webhook.conditionsReview: Forbidden: the ConditionalAuthorization feature gate must be on to use this field, webhook.conditionsReview.kubeConfigContextName: Forbidden: may only be specified when webhook.connectionInfo.type=KubeConfigFile, webhook.conditionsReview.version: Unsupported value: "v99beta1": supported values: "v1alpha1"]`,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConditionalAuthorization, tc.gateEnabled)
+			got := ValidateConditionsReviewConfiguration(field.NewPath("webhook", "conditionsReview"), field.NewPath("webhook"), tc.crc, tc.connectionType).ToAggregate()
+			if d := cmp.Diff(tc.want, errString(got)); d != "" {
+				t.Fatalf("ConditionsReviewConfiguration validation mismatch (-want +got):\n%s", d)
+			}
+		})
 	}
 }
 

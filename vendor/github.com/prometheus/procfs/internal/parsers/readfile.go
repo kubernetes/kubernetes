@@ -11,16 +11,27 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//go:build (linux && appengine) || (!linux && !darwin)
-
-package util
+package parsers
 
 import (
-	"fmt"
+	"io"
+	"os"
 )
 
-// SysReadFile is here implemented as a noop for builds that do not support
-// the read syscall. For example Windows, or Linux on Google App Engine.
-func SysReadFile(file string) (string, error) {
-	return "", fmt.Errorf("not supported on this platform")
+// ReadFileNoStat uses io.ReadAll to read contents of entire file.
+// This is similar to os.ReadFile but without the call to os.Stat, because
+// many files in /proc and /sys report incorrect file sizes (either 0 or 4096).
+// Reads a max file size of 1024kB.  For files larger than this, a scanner
+// should be used.
+func ReadFileNoStat(filename string) ([]byte, error) {
+	const maxBufferSize = 1024 * 1024
+
+	f, err := os.Open(filename)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+
+	reader := io.LimitReader(f, maxBufferSize)
+	return io.ReadAll(reader)
 }

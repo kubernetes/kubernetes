@@ -22,7 +22,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/prometheus/procfs/internal/util"
+	"github.com/prometheus/procfs/internal/parsers"
 )
 
 // ProcSnmp6 models the content of /proc/<pid>/net/snmp6.
@@ -140,7 +140,7 @@ type UdpLite6 struct { // nolint:revive
 
 func (p Proc) Snmp6() (ProcSnmp6, error) {
 	filename := p.path("net/snmp6")
-	data, err := util.ReadFileNoStat(filename)
+	data, err := parsers.ReadFileNoStat(filename)
 	if err != nil {
 		// On systems with IPv6 disabled, this file won't exist.
 		// Do nothing.

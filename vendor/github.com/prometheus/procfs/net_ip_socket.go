@@ -178,7 +178,7 @@ func parseNetIPSocketLine(fields []string, isUDP bool) (*netIPSocketLine, error)
 	}
 
 	if line.Sl, err = strconv.ParseUint(s[0], 0, 64); err != nil {
-		return nil, fmt.Errorf("%w: Unable to parse sl field in %q: %w", ErrFileParse, line.Sl, err)
+		return nil, fmt.Errorf("%w: Unable to parse sl field in %q: %w", ErrFileParse, s[0], err)
 	}
 	// local_address
 	l := strings.Split(fields[1], ":")
@@ -189,7 +189,7 @@ func parseNetIPSocketLine(fields []string, isUDP bool) (*netIPSocketLine, error)
 		return nil, err
 	}
 	if line.LocalPort, err = strconv.ParseUint(l[1], 16, 64); err != nil {
-		return nil, fmt.Errorf("%w: Unable to parse local_address port value line %q: %w", ErrFileParse, line.LocalPort, err)
+		return nil, fmt.Errorf("%w: Unable to parse local_address port value line %q: %w", ErrFileParse, l[1], err)
 	}
 
 	// remote_address
@@ -201,12 +201,12 @@ func parseNetIPSocketLine(fields []string, isUDP bool) (*netIPSocketLine, error)
 		return nil, err
 	}
 	if line.RemPort, err = strconv.ParseUint(r[1], 16, 64); err != nil {
-		return nil, fmt.Errorf("%w: Cannot parse rem_address port value in %q: %w", ErrFileParse, line.RemPort, err)
+		return nil, fmt.Errorf("%w: Cannot parse rem_address port value in %q: %w", ErrFileParse, r[1], err)
 	}
 
 	// st
 	if line.St, err = strconv.ParseUint(fields[3], 16, 64); err != nil {
-		return nil, fmt.Errorf("%w: Cannot parse st value in %q: %w", ErrFileParse, line.St, err)
+		return nil, fmt.Errorf("%w: Cannot parse st value in %q: %w", ErrFileParse, fields[3], err)
 	}
 
 	// tx_queue and rx_queue
@@ -219,27 +219,27 @@ func parseNetIPSocketLine(fields []string, isUDP bool) (*netIPSocketLine, error)
 		)
 	}
 	if line.TxQueue, err = strconv.ParseUint(q[0], 16, 64); err != nil {
-		return nil, fmt.Errorf("%w: Cannot parse tx_queue value in %q: %w", ErrFileParse, line.TxQueue, err)
+		return nil, fmt.Errorf("%w: Cannot parse tx_queue value in %q: %w", ErrFileParse, q[0], err)
 	}
 	if line.RxQueue, err = strconv.ParseUint(q[1], 16, 64); err != nil {
-		return nil, fmt.Errorf("%w: Cannot parse trx_queue value in %q: %w", ErrFileParse, line.RxQueue, err)
+		return nil, fmt.Errorf("%w: Cannot parse trx_queue value in %q: %w", ErrFileParse, q[1], err)
 	}
 
 	// uid
 	if line.UID, err = strconv.ParseUint(fields[7], 0, 64); err != nil {
-		return nil, fmt.Errorf("%w: Cannot parse UID value in %q: %w", ErrFileParse, line.UID, err)
+		return nil, fmt.Errorf("%w: Cannot parse UID value in %q: %w", ErrFileParse, fields[7], err)
 	}
 
 	// inode
 	if line.Inode, err = strconv.ParseUint(fields[9], 0, 64); err != nil {
-		return nil, fmt.Errorf("%w: Cannot parse inode value in %q: %w", ErrFileParse, line.Inode, err)
+		return nil, fmt.Errorf("%w: Cannot parse inode value in %q: %w", ErrFileParse, fields[9], err)
 	}
 
 	// drops
 	if isUDP {
 		drops, err := strconv.ParseUint(fields[12], 0, 64)
 		if err != nil {
-			return nil, fmt.Errorf("%w: Cannot parse drops value in %q: %w", ErrFileParse, drops, err)
+			return nil, fmt.Errorf("%w: Cannot parse drops value in %q: %w", ErrFileParse, fields[12], err)
 		}
 		line.Drops = &drops
 	}

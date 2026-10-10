@@ -133,6 +133,10 @@ var (
 				{Choice: false, Weight: 85},
 				{Choice: true, Weight: 15},
 			},
+			ValidateUpdate: []ChoiceWeight[bool]{
+				{Choice: false, Weight: 75},
+				{Choice: true, Weight: 25},
+			},
 		},
 	}
 

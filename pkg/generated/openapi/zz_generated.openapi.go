@@ -22,6 +22,7 @@ limitations under the License.
 package openapi
 
 import (
+	admissionv1 "k8s.io/api/admission/v1"
 	v1 "k8s.io/api/admissionregistration/v1"
 	v1alpha1 "k8s.io/api/admissionregistration/v1alpha1"
 	v1beta1 "k8s.io/api/admissionregistration/v1beta1"
@@ -34,6 +35,7 @@ import (
 	authenticationv1alpha1 "k8s.io/api/authentication/v1alpha1"
 	authenticationv1beta1 "k8s.io/api/authentication/v1beta1"
 	authorizationv1 "k8s.io/api/authorization/v1"
+	authorizationv1alpha1 "k8s.io/api/authorization/v1alpha1"
 	authorizationv1beta1 "k8s.io/api/authorization/v1beta1"
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	autoscalingv2 "k8s.io/api/autoscaling/v2"
@@ -111,6 +113,7 @@ import (
 	spec "k8s.io/kube-openapi/pkg/validation/spec"
 	kubeproxyconfigv1alpha1 "k8s.io/kube-proxy/config/v1alpha1"
 	configv1 "k8s.io/kube-scheduler/config/v1"
+	pkgconfigv1 "k8s.io/kubectl/pkg/config/v1"
 	pkgconfigv1alpha1 "k8s.io/kubectl/pkg/config/v1alpha1"
 	pkgconfigv1beta1 "k8s.io/kubectl/pkg/config/v1beta1"
 	kubeletconfigv1 "k8s.io/kubelet/config/v1"
@@ -337,9 +340,14 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		authenticationv1beta1.TokenReviewSpec{}.OpenAPIModelName():                                                      schema_k8sio_api_authentication_v1beta1_TokenReviewSpec(ref),
 		authenticationv1beta1.TokenReviewStatus{}.OpenAPIModelName():                                                    schema_k8sio_api_authentication_v1beta1_TokenReviewStatus(ref),
 		authenticationv1beta1.UserInfo{}.OpenAPIModelName():                                                             schema_k8sio_api_authentication_v1beta1_UserInfo(ref),
+		authorizationv1.AuthorizationOptions{}.OpenAPIModelName():                                                       schema_k8sio_api_authorization_v1_AuthorizationOptions(ref),
+		authorizationv1.Condition{}.OpenAPIModelName():                                                                  schema_k8sio_api_authorization_v1_Condition(ref),
+		authorizationv1.ConditionsAwareDecision{}.OpenAPIModelName():                                                    schema_k8sio_api_authorization_v1_ConditionsAwareDecision(ref),
+		authorizationv1.ConditionsMap{}.OpenAPIModelName():                                                              schema_k8sio_api_authorization_v1_ConditionsMap(ref),
 		authorizationv1.FieldSelectorAttributes{}.OpenAPIModelName():                                                    schema_k8sio_api_authorization_v1_FieldSelectorAttributes(ref),
 		authorizationv1.LabelSelectorAttributes{}.OpenAPIModelName():                                                    schema_k8sio_api_authorization_v1_LabelSelectorAttributes(ref),
 		authorizationv1.LocalSubjectAccessReview{}.OpenAPIModelName():                                                   schema_k8sio_api_authorization_v1_LocalSubjectAccessReview(ref),
+		authorizationv1.NamedConditionsAwareDecision{}.OpenAPIModelName():                                               schema_k8sio_api_authorization_v1_NamedConditionsAwareDecision(ref),
 		authorizationv1.NonResourceAttributes{}.OpenAPIModelName():                                                      schema_k8sio_api_authorization_v1_NonResourceAttributes(ref),
 		authorizationv1.NonResourceRule{}.OpenAPIModelName():                                                            schema_k8sio_api_authorization_v1_NonResourceRule(ref),
 		authorizationv1.ResourceAttributes{}.OpenAPIModelName():                                                         schema_k8sio_api_authorization_v1_ResourceAttributes(ref),
@@ -352,6 +360,10 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		authorizationv1.SubjectAccessReviewSpec{}.OpenAPIModelName():                                                    schema_k8sio_api_authorization_v1_SubjectAccessReviewSpec(ref),
 		authorizationv1.SubjectAccessReviewStatus{}.OpenAPIModelName():                                                  schema_k8sio_api_authorization_v1_SubjectAccessReviewStatus(ref),
 		authorizationv1.SubjectRulesReviewStatus{}.OpenAPIModelName():                                                   schema_k8sio_api_authorization_v1_SubjectRulesReviewStatus(ref),
+		authorizationv1.UnconditionalDecision{}.OpenAPIModelName():                                                      schema_k8sio_api_authorization_v1_UnconditionalDecision(ref),
+		authorizationv1alpha1.AuthorizationConditionsRequest{}.OpenAPIModelName():                                       schema_k8sio_api_authorization_v1alpha1_AuthorizationConditionsRequest(ref),
+		authorizationv1alpha1.AuthorizationConditionsResponse{}.OpenAPIModelName():                                      schema_k8sio_api_authorization_v1alpha1_AuthorizationConditionsResponse(ref),
+		authorizationv1alpha1.AuthorizationConditionsReview{}.OpenAPIModelName():                                        schema_k8sio_api_authorization_v1alpha1_AuthorizationConditionsReview(ref),
 		authorizationv1beta1.LocalSubjectAccessReview{}.OpenAPIModelName():                                              schema_k8sio_api_authorization_v1beta1_LocalSubjectAccessReview(ref),
 		authorizationv1beta1.NonResourceAttributes{}.OpenAPIModelName():                                                 schema_k8sio_api_authorization_v1beta1_NonResourceAttributes(ref),
 		authorizationv1beta1.NonResourceRule{}.OpenAPIModelName():                                                       schema_k8sio_api_authorization_v1beta1_NonResourceRule(ref),
@@ -1553,6 +1565,11 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		configv1.ScoringStrategy{}.OpenAPIModelName():                                                                   schema_k8sio_kube_scheduler_config_v1_ScoringStrategy(ref),
 		configv1.UtilizationShapePoint{}.OpenAPIModelName():                                                             schema_k8sio_kube_scheduler_config_v1_UtilizationShapePoint(ref),
 		configv1.VolumeBindingArgs{}.OpenAPIModelName():                                                                 schema_k8sio_kube_scheduler_config_v1_VolumeBindingArgs(ref),
+		pkgconfigv1.AliasOverride{}.OpenAPIModelName():                                                                  schema_kubectl_pkg_config_v1_AliasOverride(ref),
+		pkgconfigv1.AllowlistEntry{}.OpenAPIModelName():                                                                 schema_kubectl_pkg_config_v1_AllowlistEntry(ref),
+		pkgconfigv1.CommandDefaults{}.OpenAPIModelName():                                                                schema_kubectl_pkg_config_v1_CommandDefaults(ref),
+		pkgconfigv1.CommandOptionDefault{}.OpenAPIModelName():                                                           schema_kubectl_pkg_config_v1_CommandOptionDefault(ref),
+		pkgconfigv1.Preference{}.OpenAPIModelName():                                                                     schema_kubectl_pkg_config_v1_Preference(ref),
 		pkgconfigv1alpha1.AliasOverride{}.OpenAPIModelName():                                                            schema_kubectl_pkg_config_v1alpha1_AliasOverride(ref),
 		pkgconfigv1alpha1.CommandDefaults{}.OpenAPIModelName():                                                          schema_kubectl_pkg_config_v1alpha1_CommandDefaults(ref),
 		pkgconfigv1alpha1.CommandOptionDefault{}.OpenAPIModelName():                                                     schema_kubectl_pkg_config_v1alpha1_CommandOptionDefault(ref),
@@ -12712,6 +12729,231 @@ func schema_k8sio_api_authentication_v1beta1_UserInfo(ref common.ReferenceCallba
 	}
 }
 
+func schema_k8sio_api_authorization_v1_AuthorizationOptions(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "AuthorizationOptions contains options for specifying the client's authorization abilities.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"handledDecisionTypes": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "set",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "handledDecisionTypes specifies what decision types the client can handle in the context it is in. Currently valid values are: - [Allow, Deny, NoOpinion] (for conditions-unaware clients) or - [Allow, Deny, NoOpinion, ConditionsMap, Union, ...] (for conditions-aware clients) If the authorizer would like to return conditions, but the client does not opt in to handle those here,\n  the authorizer must fail closed to a safe unconditional decision\n  (Deny if any Deny conditions were present, otherwise NoOpinion).\nOrder does not matter in this slice; set semantics should be used. The server does not reject unrecognized decision types, but focuses on whether the client supports a mode that the server does. All clients must support \"classic\", conditions-unaware authorization.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Type:   []string{"string"},
+										Format: "",
+										Enum:   []interface{}{"Allow", "ConditionsMap", "Deny", "NoOpinion", "Union"},
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"handledDecisionTypes"},
+			},
+		},
+	}
+}
+
+func schema_k8sio_api_authorization_v1_Condition(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "Condition represents a single authorization condition to be evaluated against data available later in the request chain, e.g. objects available in admission.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"id": {
+						SchemaProps: spec.SchemaProps{
+							Description: "id uniquely identifies this condition within the scope of the authorizer that authored it and ConditionsMap it is part of. Validated as a Kubernetes label key. Any domain of form *.k8s.io or *.kubernetes.io is reserved for Kubernetes use.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"condition": {
+						SchemaProps: spec.SchemaProps{
+							Description: "condition returns a string encoding of the condition to be evaluated. It is a pure, deterministic function from ConditionsData to a boolean (or error). Might or might not be human-readable. Optional, if the ID alone is enough for the authorizer to know how to evaluate the condition.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"type": {
+						SchemaProps: spec.SchemaProps{
+							Description: "type describes the type of the condition, if there are multiple possibilities. Should be formatted as a Kubernetes label key. Any domain of form *.k8s.io or *.kubernetes.io is reserved for Kubernetes use. authorizer.kubernetes.io/cel is a conditions type for CEL, handled by kube-apiserver. Optional. Can be omitted if the authorizer already knows how to evaluate the condition.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"description": {
+						SchemaProps: spec.SchemaProps{
+							Description: "description is an optional human-friendly description that can be shown as an error message or for debugging. Optional.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"id"},
+			},
+		},
+	}
+}
+
+func schema_k8sio_api_authorization_v1_ConditionsAwareDecision(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "ConditionsAwareDecision represents one authorizer's decision. It is an enum type, with variants described in ConditionsAwareDecisionType, plus a reason and error.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"type": {
+						SchemaProps: spec.SchemaProps{
+							Description: "type describes the type of the decision, and acts as an enum discriminator.\n\nPossible enum values:\n - `\"Allow\"` represents an unconditional Allow authorizer decision.\n - `\"ConditionsMap\"` represents an authorizer decision that is dependent on request data available later in the request chain, and thus at this stage conditional.\n - `\"Deny\"` represents an unconditional Deny authorizer decision.\n - `\"NoOpinion\"` represents an unconditional NoOpinion authorizer decision, which means that the authorizer does not have a specific opinion on whether the request should be allowed or denied, and thus can other authorizers later in the union have their say.\n - `\"Union\"` is a decision type whose final decision is computed by an ordered list of sub-authorizers, with their individual decisions. A decision can thus be represented as a tree, with Union decisions being internal nodes, and Deny/Allow/NoOpinion/ConditionsMap decisions being leaf nodes, which are visited in depth-first order.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+							Enum:        []interface{}{"Allow", "ConditionsMap", "Deny", "NoOpinion", "Union"},
+						},
+					},
+					"deny": {
+						SchemaProps: spec.SchemaProps{
+							Description: "deny represents an unconditional Deny decision. Must be non-null when type == \"Deny\", otherwise this field must be unset.",
+							Ref:         ref(authorizationv1.UnconditionalDecision{}.OpenAPIModelName()),
+						},
+					},
+					"noOpinion": {
+						SchemaProps: spec.SchemaProps{
+							Description: "noOpinion represents an unconditional NoOpinion decision. Must be non-null when type == \"NoOpinion\", otherwise this field must be unset.",
+							Ref:         ref(authorizationv1.UnconditionalDecision{}.OpenAPIModelName()),
+						},
+					},
+					"allow": {
+						SchemaProps: spec.SchemaProps{
+							Description: "allow represents an unconditional Allow decision. Must be non-null when type == \"Allow\", otherwise this field must be unset.",
+							Ref:         ref(authorizationv1.UnconditionalDecision{}.OpenAPIModelName()),
+						},
+					},
+					"conditionsMap": {
+						SchemaProps: spec.SchemaProps{
+							Description: "conditionsMap represents a conditional decision, modelled as a map of conditions. Must be non-null when type == \"ConditionsMap\", otherwise this field must be unset.",
+							Ref:         ref(authorizationv1.ConditionsMap{}.OpenAPIModelName()),
+						},
+					},
+					"union": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-map-keys": []interface{}{
+									"authorizerName",
+								},
+								"x-kubernetes-list-type": "map",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "union forms an ordered tree of decisions, where the union decision is represented by an internal node, and all other decision types are leaf nodes. During evaluation, the leaf decisions are evaluated in depth-first order, until an Allow or Deny decision is found. The order of the decisions should match the order of the authorizers in the union authorizer for interpretability, but the authorizerName is the map key. At least one of the leaves must be of type ConditionsMap, as otherwise the union could be trivially reduced to just a single Allow/Deny/NoOpinion.\n\nMust have at least one element when type == \"Union\", otherwise this field must be unset.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref(authorizationv1.NamedConditionsAwareDecision{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"type"},
+			},
+		},
+		Dependencies: []string{
+			authorizationv1.ConditionsMap{}.OpenAPIModelName(), authorizationv1.NamedConditionsAwareDecision{}.OpenAPIModelName(), authorizationv1.UnconditionalDecision{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_authorization_v1_ConditionsMap(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "ConditionsMap represents a map of conditions, keyed by ID across all conditions, across all effects. The ConditionsMap must have at least one Allow condition or at least one Deny condition. It cannot contain more than 128 conditions in total. The conditions are evaluated against data available later, to determine whether the authorizer that authored the conditions allows or denies the request. If all conditions in the map evaluate to false, the final decision must be NoOpinion.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"denyConditions": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-map-keys": []interface{}{
+									"id",
+								},
+								"x-kubernetes-list-type": "map",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "denyConditions contains the conditions with Deny effect. If any such condition evaluates to true or error, the ConditionsMap as a whole must evaluate to Deny.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref(authorizationv1.Condition{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
+					"noOpinionConditions": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-map-keys": []interface{}{
+									"id",
+								},
+								"x-kubernetes-list-type": "map",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "noOpinionConditions contains the conditions with NoOpinion effect. If any such condition evaluates to true or error, the ConditionsMap as a whole must evaluate to NoOpinion.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref(authorizationv1.Condition{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
+					"allowConditions": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-map-keys": []interface{}{
+									"id",
+								},
+								"x-kubernetes-list-type": "map",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "allowConditions contains the conditions with Allow effect. If any such condition evaluates to true, the ConditionsMap as a whole must evaluate to Allow.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref(authorizationv1.Condition{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			authorizationv1.Condition{}.OpenAPIModelName()},
+	}
+}
+
 func schema_k8sio_api_authorization_v1_FieldSelectorAttributes(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
@@ -12840,6 +13082,37 @@ func schema_k8sio_api_authorization_v1_LocalSubjectAccessReview(ref common.Refer
 		},
 		Dependencies: []string{
 			authorizationv1.SubjectAccessReviewSpec{}.OpenAPIModelName(), authorizationv1.SubjectAccessReviewStatus{}.OpenAPIModelName(), metav1.ObjectMeta{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_authorization_v1_NamedConditionsAwareDecision(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "NamedConditionsAwareDecision is a named ConditionsAwareDecision, returned by a unioned authorizer.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"authorizerName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "authorizerName details the name of the authorizer that authored the condition, such that the right Decision can be paired with the right authorizer when evaluating the conditions, even across API server replicas. The name must be stable over time. This name must be unique within a given union authorizer, not necessarily globally.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"decision": {
+						SchemaProps: spec.SchemaProps{
+							Description: "decision carries the inner decision returned from the authorizer.",
+							Default:     map[string]interface{}{},
+							Ref:         ref(authorizationv1.ConditionsAwareDecision{}.OpenAPIModelName()),
+						},
+					},
+				},
+				Required: []string{"authorizerName", "decision"},
+			},
+		},
+		Dependencies: []string{
+			authorizationv1.ConditionsAwareDecision{}.OpenAPIModelName()},
 	}
 }
 
@@ -13156,11 +13429,17 @@ func schema_k8sio_api_authorization_v1_SelfSubjectAccessReviewSpec(ref common.Re
 							Ref:         ref(authorizationv1.NonResourceAttributes{}.OpenAPIModelName()),
 						},
 					},
+					"authorizationOptions": {
+						SchemaProps: spec.SchemaProps{
+							Description: "authorizationOptions contains options for specifying the client's authorization abilities. If unset, only unconditional authorization is supported, for backwards-compatibility. Requires the ConditionalAuthorization feature to be enabled.",
+							Ref:         ref(authorizationv1.AuthorizationOptions{}.OpenAPIModelName()),
+						},
+					},
 				},
 			},
 		},
 		Dependencies: []string{
-			authorizationv1.NonResourceAttributes{}.OpenAPIModelName(), authorizationv1.ResourceAttributes{}.OpenAPIModelName()},
+			authorizationv1.AuthorizationOptions{}.OpenAPIModelName(), authorizationv1.NonResourceAttributes{}.OpenAPIModelName(), authorizationv1.ResourceAttributes{}.OpenAPIModelName()},
 	}
 }
 
@@ -13361,11 +13640,17 @@ func schema_k8sio_api_authorization_v1_SubjectAccessReviewSpec(ref common.Refere
 							Format:      "",
 						},
 					},
+					"authorizationOptions": {
+						SchemaProps: spec.SchemaProps{
+							Description: "authorizationOptions contains options for specifying the client's authorization abilities. If unset, only unconditional authorization is supported, for backwards-compatibility. Requires the ConditionalAuthorization feature to be enabled.",
+							Ref:         ref(authorizationv1.AuthorizationOptions{}.OpenAPIModelName()),
+						},
+					},
 				},
 			},
 		},
 		Dependencies: []string{
-			authorizationv1.NonResourceAttributes{}.OpenAPIModelName(), authorizationv1.ResourceAttributes{}.OpenAPIModelName()},
+			authorizationv1.AuthorizationOptions{}.OpenAPIModelName(), authorizationv1.NonResourceAttributes{}.OpenAPIModelName(), authorizationv1.ResourceAttributes{}.OpenAPIModelName()},
 	}
 }
 
@@ -13378,7 +13663,7 @@ func schema_k8sio_api_authorization_v1_SubjectAccessReviewStatus(ref common.Refe
 				Properties: map[string]spec.Schema{
 					"allowed": {
 						SchemaProps: spec.SchemaProps{
-							Description: "allowed is set to true if the action is allowed, and should be set to false otherwise.",
+							Description: "allowed is true if the action would be allowed, false otherwise. allowed=true is mutually exclusive with denied=true and conditionalDecision != nil.",
 							Default:     false,
 							Type:        []string{"boolean"},
 							Format:      "",
@@ -13386,7 +13671,7 @@ func schema_k8sio_api_authorization_v1_SubjectAccessReviewStatus(ref common.Refe
 					},
 					"denied": {
 						SchemaProps: spec.SchemaProps{
-							Description: "denied is optional. True if the action would be denied, otherwise false. If both allowed is false and denied is false, then the authorizer has no opinion on whether to authorize the action. Denied may not be true if Allowed is true.",
+							Description: "denied is optional. True if the action would be denied, otherwise false If allowed is false, denied is false, and conditionalDecision is unset, then the authorizer has no opinion on whether to authorize the action. denied=true is mutually exclusive with allowed=true and conditionalDecision != nil.",
 							Type:        []string{"boolean"},
 							Format:      "",
 						},
@@ -13405,9 +13690,17 @@ func schema_k8sio_api_authorization_v1_SubjectAccessReviewStatus(ref common.Refe
 							Format:      "",
 						},
 					},
+					"conditionalDecision": {
+						SchemaProps: spec.SchemaProps{
+							Description: "conditionalDecision represents a conditional decision returned by the authorizer. When conditionalDecision is set, allowed, denied, reason and evaluationError must have their zero values. The top-level decision type should be ConditionsAwareDecisionTypeConditionsMap or ConditionsAwareDecisionTypeUnion, as Allow/Deny/NoOpinion decisions can be represented with SubjectAccessReviewStatus.Allowed and SubjectAccessReviewStatus.Denied alone. May only be set if spec.authorizationOptions.handledDecisionTypes includes `ConditionsMap` and `Union`. Requires the ConditionalAuthorization feature to be enabled.",
+							Ref:         ref(authorizationv1.ConditionsAwareDecision{}.OpenAPIModelName()),
+						},
+					},
 				},
 			},
 		},
+		Dependencies: []string{
+			authorizationv1.ConditionsAwareDecision{}.OpenAPIModelName()},
 	}
 }
 
@@ -13474,6 +13767,141 @@ func schema_k8sio_api_authorization_v1_SubjectRulesReviewStatus(ref common.Refer
 		},
 		Dependencies: []string{
 			authorizationv1.NonResourceRule{}.OpenAPIModelName(), authorizationv1.ResourceRule{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_authorization_v1_UnconditionalDecision(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "UnconditionalDecision represents the data associated with an unconditional decision.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"reason": {
+						SchemaProps: spec.SchemaProps{
+							Description: "reason is optional. It indicates why a request was allowed or denied.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"evaluationError": {
+						SchemaProps: spec.SchemaProps{
+							Description: "evaluationError is an indication that some error occurred during the authorization check. It is entirely possible to get an error and be able to continue determine authorization status in spite of it. For instance, RBAC can be missing a role, but enough roles are still present and bound to reason about the request.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+func schema_k8sio_api_authorization_v1alpha1_AuthorizationConditionsRequest(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "AuthorizationConditionsRequest describes the authorization conditions request.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"decision": {
+						SchemaProps: spec.SchemaProps{
+							Description: "decision contains the conditional decision the authorizer authored at authorization time.",
+							Default:     map[string]interface{}{},
+							Ref:         ref(authorizationv1.ConditionsAwareDecision{}.OpenAPIModelName()),
+						},
+					},
+					"admissionRequest": {
+						SchemaProps: spec.SchemaProps{
+							Description: "admissionRequest may contain additional information for evaluating the conditions.",
+							Ref:         ref(admissionv1.AdmissionRequest{}.OpenAPIModelName()),
+						},
+					},
+				},
+				Required: []string{"decision", "admissionRequest"},
+			},
+		},
+		Dependencies: []string{
+			admissionv1.AdmissionRequest{}.OpenAPIModelName(), authorizationv1.ConditionsAwareDecision{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_authorization_v1alpha1_AuthorizationConditionsResponse(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "AuthorizationConditionsResponse describes an authorization conditions response.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"uid": {
+						SchemaProps: spec.SchemaProps{
+							Description: "uid is an identifier for the individual request/response. This must be copied over from request.admissionRequest.uid of the corresponding AuthorizationConditionsReview. It is possible that the same request content (except uid) is sent to the authorizer multiple times.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"decision": {
+						SchemaProps: spec.SchemaProps{
+							Description: "decision contains the authorizer's decision after seeing the data. Currently, this must return an unconditional decision, that is, one of {Allow, Deny, NoOpinion}.",
+							Default:     map[string]interface{}{},
+							Ref:         ref(authorizationv1.ConditionsAwareDecision{}.OpenAPIModelName()),
+						},
+					},
+				},
+				Required: []string{"uid", "decision"},
+			},
+		},
+		Dependencies: []string{
+			authorizationv1.ConditionsAwareDecision{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_authorization_v1alpha1_AuthorizationConditionsReview(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "AuthorizationConditionsReview describes a request to evaluate authorization conditions.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"kind": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"apiVersion": {
+						SchemaProps: spec.SchemaProps{
+							Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Description: "metadata is the standard list metadata. In AuthorizationConditionsReview, it must be an empty struct. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+							Default:     map[string]interface{}{},
+							Ref:         ref(metav1.ObjectMeta{}.OpenAPIModelName()),
+						},
+					},
+					"request": {
+						SchemaProps: spec.SchemaProps{
+							Description: "request describes the attributes for the authorization conditions request.",
+							Ref:         ref(authorizationv1alpha1.AuthorizationConditionsRequest{}.OpenAPIModelName()),
+						},
+					},
+					"response": {
+						SchemaProps: spec.SchemaProps{
+							Description: "response describes the attributes for the authorization conditions response.",
+							Ref:         ref(authorizationv1alpha1.AuthorizationConditionsResponse{}.OpenAPIModelName()),
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			authorizationv1alpha1.AuthorizationConditionsRequest{}.OpenAPIModelName(), authorizationv1alpha1.AuthorizationConditionsResponse{}.OpenAPIModelName(), metav1.ObjectMeta{}.OpenAPIModelName()},
 	}
 }
 
@@ -74326,11 +74754,282 @@ func schema_k8sio_kube_scheduler_config_v1_VolumeBindingArgs(ref common.Referenc
 	}
 }
 
-func schema_kubectl_pkg_config_v1alpha1_AliasOverride(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_kubectl_pkg_config_v1_AliasOverride(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
 				Description: "AliasOverride stores the alias definitions.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"name": {
+						SchemaProps: spec.SchemaProps{
+							Description: "name is the name of alias that can only include alphabetical characters If the alias name conflicts with the built-in command, built-in command will be used.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"command": {
+						SchemaProps: spec.SchemaProps{
+							Description: "command is the single or set of commands to execute, such as \"set env\" or \"create\"",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"prependArgs": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "prependArgs stores the arguments such as resource names, etc. These arguments are inserted after the alias name.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Type:   []string{"string"},
+										Format: "",
+									},
+								},
+							},
+						},
+					},
+					"appendArgs": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "appendArgs stores the arguments such as resource names, etc. These arguments are appended to the USER_ARGS.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Type:   []string{"string"},
+										Format: "",
+									},
+								},
+							},
+						},
+					},
+					"options": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "options is allocated to store the option definitions of alias. options only modify the default value of the option and if user explicitly passes a value, explicit one is used.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref(pkgconfigv1.CommandOptionDefault{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"name", "command"},
+			},
+		},
+		Dependencies: []string{
+			pkgconfigv1.CommandOptionDefault{}.OpenAPIModelName()},
+	}
+}
+
+func schema_kubectl_pkg_config_v1_AllowlistEntry(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "AllowlistEntry is an entry in the allowlist. For each allowlist item, at least one field must be nonempty. A struct with all empty fields is considered a misconfiguration error. Each field is a criterion for execution. If multiple fields are specified, then the criteria of all specified fields must be met. That is, the result of an individual entry is the logical AND of all checks corresponding to the specified fields within the entry.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"command": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Command matching is performed by first resolving the absolute path of both the plugin and the name in the allowlist entry using `exec.LookPath`. It will be called on both, and the resulting strings must be equal. If either call to `exec.LookPath` results in an error, the `Command` check will be considered a failure.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+func schema_kubectl_pkg_config_v1_CommandDefaults(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "CommandDefaults stores the commands and their associated option's default values.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"command": {
+						SchemaProps: spec.SchemaProps{
+							Description: "command refers to a command whose option's default value is changed.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"options": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "options is a list of options storing different default values.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref(pkgconfigv1.CommandOptionDefault{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"command", "options"},
+			},
+		},
+		Dependencies: []string{
+			pkgconfigv1.CommandOptionDefault{}.OpenAPIModelName()},
+	}
+}
+
+func schema_kubectl_pkg_config_v1_CommandOptionDefault(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "CommandOptionDefault stores the name and the specified default value of an option.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"name": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Option name (long form, without dashes).",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"default": {
+						SchemaProps: spec.SchemaProps{
+							Description: "In a string format of a default value. It will be parsed by kubectl to the compatible value of the option.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"name", "default"},
+			},
+		},
+	}
+}
+
+func schema_kubectl_pkg_config_v1_Preference(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "Preference stores elements of KubeRC configuration file",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"kind": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"apiVersion": {
+						SchemaProps: spec.SchemaProps{
+							Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"defaults": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "defaults allow changing default option values of commands. This is especially useful, when user doesn't want to explicitly set options each time.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref(pkgconfigv1.CommandDefaults{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
+					"aliases": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "aliases allow defining command aliases for existing kubectl commands, with optional default option values. If the alias name collides with a built-in command, built-in command always takes precedence. Option overrides defined in the defaults section do NOT apply to aliases for the same command. kubectl [ALIAS NAME] [USER_OPTIONS] [USER_EXPLICIT_ARGS] expands to kubectl [COMMAND] # built-in command alias points to\n        [KUBERC_PREPEND_ARGS]\n        [USER_OPTIONS]\n        [KUBERC_OPTIONS] # rest of the options that are not passed by user in [USER_OPTIONS]\n        [USER_EXPLICIT_ARGS]\n        [KUBERC_APPEND_ARGS]\ne.g. - name: runx\n  command: run\n  options:\n  - name: image\n    default: nginx\n  appendArgs:\n  - --\n  - custom-arg1\nFor example, if user invokes \"kubectl runx test-pod\" command, this will be expanded to \"kubectl run --image=nginx test-pod -- custom-arg1\" - name: getn\n  command: get\n  options:\n  - name: output\n    default: wide\n  prependArgs:\n  - node\n\"kubectl getn control-plane-1\" expands to \"kubectl get node control-plane-1 --output=wide\" \"kubectl getn control-plane-1 --output=json\" expands to \"kubectl get node --output=json control-plane-1\"",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref(pkgconfigv1.AliasOverride{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
+					"credentialPluginPolicy": {
+						SchemaProps: spec.SchemaProps{
+							Description: "credentialPluginPolicy specifies the policy governing which, if any, client-go credential plugins may be executed. It MUST be one of { \"\", \"AllowAll\", \"DenyAll\", \"Allowlist\" }. If the policy is \"\", then it falls back to \"AllowAll\" (this is required to maintain backward compatibility). If the policy is DenyAll, no credential plugins may run. If the policy is Allowlist, only those plugins meeting the criteria specified in the `credentialPluginAllowlist` field may run.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"credentialPluginAllowlist": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "Allowlist is a slice of allowlist entries. If any of them is a match, then the executable in question may execute. That is, the result is the logical OR of all entries in the allowlist. This list MUST NOT be supplied if the policy is not \"Allowlist\".\n\ne.g. credentialPluginAllowlist: - name: cloud-provider-plugin - name: /usr/local/bin/my-plugin In the above example, the user allows the credential plugins `cloud-provider-plugin` (found somewhere in PATH), and the plugin found at the explicit path `/usr/local/bin/my-plugin`.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref(pkgconfigv1.AllowlistEntry{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"defaults", "aliases"},
+			},
+		},
+		Dependencies: []string{
+			pkgconfigv1.AliasOverride{}.OpenAPIModelName(), pkgconfigv1.AllowlistEntry{}.OpenAPIModelName(), pkgconfigv1.CommandDefaults{}.OpenAPIModelName()},
+	}
+}
+
+func schema_kubectl_pkg_config_v1alpha1_AliasOverride(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "AliasOverride stores the alias definitions.\n\nDeprecated: this type deprecated in v1.38+, use kubectl.config.k8s.io/v1 instead.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"name": {
@@ -74418,7 +75117,7 @@ func schema_kubectl_pkg_config_v1alpha1_CommandDefaults(ref common.ReferenceCall
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "CommandDefaults stores the commands and their associated option's default values.",
+				Description: "CommandDefaults stores the commands and their associated option's default values.\n\nDeprecated: this type deprecated in v1.38+, use kubectl.config.k8s.io/v1 instead.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"command": {
@@ -74460,7 +75159,7 @@ func schema_kubectl_pkg_config_v1alpha1_CommandOptionDefault(ref common.Referenc
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "CommandOptionDefault stores the name and the specified default value of an option.",
+				Description: "CommandOptionDefault stores the name and the specified default value of an option.\n\nDeprecated: this type deprecated in v1.38+, use kubectl.config.k8s.io/v1 instead.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"name": {
@@ -74490,7 +75189,7 @@ func schema_kubectl_pkg_config_v1alpha1_Preference(ref common.ReferenceCallback)
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "Preference stores elements of KubeRC configuration file",
+				Description: "Preference stores elements of KubeRC configuration file\n\nDeprecated: this type deprecated in v1.38+, use kubectl.config.k8s.io/v1 instead.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"kind": {
@@ -74556,7 +75255,7 @@ func schema_kubectl_pkg_config_v1beta1_AliasOverride(ref common.ReferenceCallbac
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "AliasOverride stores the alias definitions.",
+				Description: "AliasOverride stores the alias definitions.\n\nDeprecated: this type deprecated in v1.38+, use kubectl.config.k8s.io/v1 instead.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"name": {
@@ -74644,7 +75343,7 @@ func schema_kubectl_pkg_config_v1beta1_AllowlistEntry(ref common.ReferenceCallba
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "AllowlistEntry is an entry in the allowlist. For each allowlist item, at least one field must be nonempty. A struct with all empty fields is considered a misconfiguration error. Each field is a criterion for execution. If multiple fields are specified, then the criteria of all specified fields must be met. That is, the result of an individual entry is the logical AND of all checks corresponding to the specified fields within the entry.",
+				Description: "AllowlistEntry is an entry in the allowlist. For each allowlist item, at least one field must be nonempty. A struct with all empty fields is considered a misconfiguration error. Each field is a criterion for execution. If multiple fields are specified, then the criteria of all specified fields must be met. That is, the result of an individual entry is the logical AND of all checks corresponding to the specified fields within the entry.\n\nDeprecated: this type deprecated in v1.38+, use kubectl.config.k8s.io/v1 instead.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"name": {
@@ -74671,7 +75370,7 @@ func schema_kubectl_pkg_config_v1beta1_CommandDefaults(ref common.ReferenceCallb
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "CommandDefaults stores the commands and their associated option's default values.",
+				Description: "CommandDefaults stores the commands and their associated option's default values.\n\nDeprecated: this type deprecated in v1.38+, use kubectl.config.k8s.io/v1 instead.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"command": {
@@ -74713,7 +75412,7 @@ func schema_kubectl_pkg_config_v1beta1_CommandOptionDefault(ref common.Reference
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "CommandOptionDefault stores the name and the specified default value of an option.",
+				Description: "CommandOptionDefault stores the name and the specified default value of an option.\n\nDeprecated: this type deprecated in v1.38+, use kubectl.config.k8s.io/v1 instead.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"name": {
@@ -74743,7 +75442,7 @@ func schema_kubectl_pkg_config_v1beta1_Preference(ref common.ReferenceCallback) 
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "Preference stores elements of KubeRC configuration file",
+				Description: "Preference stores elements of KubeRC configuration file\n\nDeprecated: this type deprecated in v1.38+, use kubectl.config.k8s.io/v1 instead.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"kind": {
