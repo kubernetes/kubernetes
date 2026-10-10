@@ -183,16 +183,14 @@ func newApfHandlerWithFilter(t *testing.T, flowControlFilter utilflowcontrol.Int
 			Groups: []string{user.AllUnauthenticated},
 		}))
 		func() {
-			// the APF handler completes its run, either normally or
-			// with a panic, in either case, all APF book keeping must
-			// be completed by now. Also, whether the request is
-			// executed or rejected, we expect the counter to be zero.
-			// TODO: all test(s) using this filter must run
-			// serially to each other
+			// atomicReadOnlyExecuting is a process-global counter; other in-flight
+			// requests may transiently hold it above zero, so wait for it to settle.
 			defer func() {
-				currentValue := atomicReadOnlyExecuting.Load()
-				if currentValue != 0 {
-					t.Errorf("Wanted %d requests executing, got %d", 0, currentValue)
+				if err := wait.PollUntilContextTimeout(context.Background(), 10*time.Millisecond, wait.ForeverTestTimeout, true,
+					func(context.Context) (bool, error) {
+						return atomicReadOnlyExecuting.Load() == 0, nil
+					}); err != nil {
+					t.Errorf("Wanted %d requests executing, got %d", 0, atomicReadOnlyExecuting.Load())
 				}
 			}()
 			apfHandler.ServeHTTP(w, r)
@@ -601,6 +599,45 @@ func TestApfWatchHandlePanic(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestApfExecutingCounterToleratesConcurrentRequest is a regression test for #132956:
+// the global executing-counter check must tolerate another request transiently holding it.
+func TestApfExecutingCounterToleratesConcurrentRequest(t *testing.T) {
+	// Background request holds atomicReadOnlyExecuting at one until holdCh is closed.
+	holdCh := make(chan struct{})
+	bgServer := newApfServerWithFilter(t, newFakeWatchApfFilter(1), time.Minute/4, func() { <-holdCh }, func() {})
+	defer bgServer.Close()
+
+	bgDone := make(chan struct{})
+	go func() {
+		defer close(bgDone)
+		if err := expectHTTPGet(fmt.Sprintf("%s/api/v1/namespaces/default/pods?watch=true", bgServer.URL), http.StatusOK); err != nil {
+			t.Errorf("background request error: %v", err)
+		}
+	}()
+
+	// Wait until the background request is executing (counter held at one).
+	if err := wait.PollUntilContextTimeout(context.Background(), time.Millisecond, wait.ForeverTestTimeout, true,
+		func(context.Context) (bool, error) { return atomicReadOnlyExecuting.Load() == 1, nil }); err != nil {
+		t.Fatalf("background request never reached executing state, counter=%d", atomicReadOnlyExecuting.Load())
+	}
+
+	// Release the hold shortly so the contamination is transient.
+	go func() {
+		time.Sleep(500 * time.Millisecond)
+		close(holdCh)
+	}()
+
+	// The foreground request's counter check runs while the background holds the
+	// counter at one; with the settle-poll it waits this out instead of flaking.
+	fgServer := newApfServerWithFilter(t, newFakeWatchApfFilter(1), time.Minute/4, func() {}, func() {})
+	defer fgServer.Close()
+	if err := expectHTTPGet(fmt.Sprintf("%s/api/v1/namespaces/default/pods?watch=true", fgServer.URL), http.StatusOK); err != nil {
+		t.Errorf("foreground request error: %v", err)
+	}
+
+	<-bgDone
 }
 
 // TestContextClosesOnRequestProcessed ensures that the request context is cancelled
