@@ -1,0 +1,109 @@
+- name: StarvationIndependent_NoChurn
+  schedulerConfigPath: scheduler-config-qps100.yaml
+  featureGates:
+    SchedulerAsyncAPICalls: true
+  metricsCollectorConfig:
+    metrics:
+      scheduler_scheduling_attempt_duration_seconds:
+      - label: result
+        values: [scheduled, unschedulable, error]
+      scheduler_async_api_call_execution_duration_seconds:
+      - label: call_type
+        values: [binding, pod_status_patch]
+      - label: result
+        values: [success, error]
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $initNodes
+    nodeTemplatePath: templates/node.yaml
+  - opcode: createNamespaces
+    prefix: starvation
+    count: 1
+  # Inject unschedulable high-priority cloggers (if any)
+  - opcode: createPods
+    countParam: $cloggerPods
+    podTemplatePath: templates/clogger-pod.yaml
+    namespace: starvation-0
+    skipWaitToCompletion: true
+  # Wait until all unschedulable cloggers are attempted by the scheduler
+  - opcode: barrier
+    stageRequirement: Attempted
+  # Start metrics collection specifically for the victim pods
+  - opcode: startCollectingMetrics
+    name: victim
+    namespaces: [starvation-0]
+  # Create victim pods and wait for them to schedule
+  - opcode: createPods
+    countParam: $starvationProne
+    podTemplatePath: templates/victim-affinity-pod.yaml
+    namespace: starvation-0
+  - opcode: stopCollectingMetrics
+  workloads:
+  - name: 1000Nodes_20Cloggers_1000Schedulable_0Churn_QPS100
+    labels: [integration-test, short]
+    params:
+      initNodes: 1000
+      cloggerPods: 20
+      starvationProne: 1000
+  - name: 1000Nodes_0Cloggers_1000Schedulable_0Churn_QPS100
+    labels: [integration-test, short]
+    params:
+      initNodes: 1000
+      cloggerPods: 0
+      starvationProne: 1000
+
+- name: StarvationIndependent_200Churn
+  schedulerConfigPath: scheduler-config-qps100.yaml
+  featureGates:
+    SchedulerAsyncAPICalls: true
+  metricsCollectorConfig:
+    metrics:
+      scheduler_scheduling_attempt_duration_seconds:
+      - label: result
+        values: [scheduled, unschedulable, error]
+      scheduler_async_api_call_execution_duration_seconds:
+      - label: call_type
+        values: [binding, pod_status_patch]
+      - label: result
+        values: [success, error]
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $initNodes
+    nodeTemplatePath: templates/node.yaml
+  - opcode: createNamespaces
+    prefix: starvation
+    count: 1
+  # Start churn generator to continuously generate PodAdd/PodDelete events
+  - opcode: churn
+    mode: recreate
+    number: 200
+    intervalMilliseconds: 1000
+    namespace: starvation-0
+    templatePaths:
+    - templates/churn-pod.yaml
+  # Inject unschedulable high-priority cloggers
+  - opcode: createPods
+    countParam: $cloggerPods
+    podTemplatePath: templates/clogger-pod.yaml
+    namespace: starvation-0
+    skipWaitToCompletion: true
+  # Wait until all unschedulable cloggers are attempted by the scheduler
+  - opcode: barrier
+    stageRequirement: Attempted
+  # Start metrics collection specifically for the victim pods
+  - opcode: startCollectingMetrics
+    name: victim
+    namespaces: [starvation-0]
+  # Create victim pods and wait for them to schedule
+  - opcode: createPods
+    countParam: $starvationProne
+    podTemplatePath: templates/victim-affinity-pod.yaml
+    namespace: starvation-0
+  - opcode: stopCollectingMetrics
+  workloads:
+  - name: 1000Nodes_20Cloggers_1000Schedulable_200Churn_QPS100
+    labels: [integration-test, short]
+    params:
+      initNodes: 1000
+      cloggerPods: 20
+      starvationProne: 1000
