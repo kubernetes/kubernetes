@@ -36,37 +36,35 @@ type LeaderMetric interface {
 	SlowpathExercised(name string)
 }
 
-type noopMetric struct{}
-
-func (noopMetric) On(name string)                {}
-func (noopMetric) Off(name string)               {}
-func (noopMetric) SlowpathExercised(name string) {}
-
-// defaultLeaderMetrics expects the caller to lock before setting any metrics.
 type defaultLeaderMetrics struct {
-	// leader's value indicates if the current process is the owner of name lease
-	leader LeaderMetric
+	leaders []LeaderMetric
 }
 
 func (m *defaultLeaderMetrics) leaderOn(name string) {
 	if m == nil {
 		return
 	}
-	m.leader.On(name)
+	for _, metric := range m.leaders {
+		metric.On(name)
+	}
 }
 
 func (m *defaultLeaderMetrics) leaderOff(name string) {
 	if m == nil {
 		return
 	}
-	m.leader.Off(name)
+	for _, metric := range m.leaders {
+		metric.Off(name)
+	}
 }
 
 func (m *defaultLeaderMetrics) slowpathExercised(name string) {
 	if m == nil {
 		return
 	}
-	m.leader.SlowpathExercised(name)
+	for _, metric := range m.leaders {
+		metric.SlowpathExercised(name)
+	}
 }
 
 type noMetrics struct{}
@@ -80,40 +78,40 @@ type MetricsProvider interface {
 	NewLeaderMetric() LeaderMetric
 }
 
-type noopMetricsProvider struct{}
-
-func (noopMetricsProvider) NewLeaderMetric() LeaderMetric {
-	return noopMetric{}
-}
-
-var globalMetricsFactory = leaderMetricsFactory{
-	metricsProvider: noopMetricsProvider{},
-}
+var globalMetricsFactory = leaderMetricsFactory{}
 
 type leaderMetricsFactory struct {
-	metricsProvider MetricsProvider
-
-	onlyOnce sync.Once
+	lock             sync.RWMutex
+	metricsProviders []MetricsProvider
 }
 
 func (f *leaderMetricsFactory) setProvider(mp MetricsProvider) {
-	f.onlyOnce.Do(func() {
-		f.metricsProvider = mp
-	})
+	f.lock.Lock()
+	defer f.lock.Unlock()
+	f.metricsProviders = append(f.metricsProviders, mp)
 }
 
 func (f *leaderMetricsFactory) newLeaderMetrics() leaderMetricsAdapter {
-	mp := f.metricsProvider
-	if mp == (noopMetricsProvider{}) {
+	f.lock.RLock()
+	providers := append([]MetricsProvider(nil), f.metricsProviders...)
+	f.lock.RUnlock()
+
+	if len(providers) == 0 {
 		return noMetrics{}
 	}
+
+	leaders := make([]LeaderMetric, 0, len(providers))
+	for _, provider := range providers {
+		leaders = append(leaders, provider.NewLeaderMetric())
+	}
+
 	return &defaultLeaderMetrics{
-		leader: mp.NewLeaderMetric(),
+		leaders: leaders,
 	}
 }
 
-// SetProvider sets the metrics provider for all subsequently created work
-// queues. Only the first call has an effect.
+// SetProvider adds a metrics provider for all subsequently created leader
+// elections.
 func SetProvider(metricsProvider MetricsProvider) {
 	globalMetricsFactory.setProvider(metricsProvider)
 }
