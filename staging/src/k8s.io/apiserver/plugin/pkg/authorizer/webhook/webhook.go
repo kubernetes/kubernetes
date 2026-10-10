@@ -22,6 +22,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"strconv"
 	"time"
@@ -52,7 +53,53 @@ import (
 const (
 	// The maximum length of requester-controlled attributes to allow caching.
 	maxControlledAttrCacheSize = 10000
+
+	// maxResponseSize is the maximum size of a SubjectAccessReview response body
+	// accepted from a webhook. client-go reads the whole body into memory, so an
+	// unbounded response from a misbehaving webhook could exhaust apiserver memory.
+	maxResponseSize = 10 * 1024 * 1024
 )
+
+// errResponseTooLarge is returned when a webhook response body exceeds maxResponseSize.
+var errResponseTooLarge = fmt.Errorf("webhook response exceeds the maximum size of %d bytes", maxResponseSize)
+
+// limitedBody fails reads once more than limit bytes have been returned.
+type limitedBody struct {
+	io.ReadCloser
+	remaining int64
+}
+
+func (b *limitedBody) Read(p []byte) (int, error) {
+	if b.remaining < 0 {
+		return 0, errResponseTooLarge
+	}
+	// Read one byte past the limit so an oversized body is detected
+	// rather than silently truncated.
+	if int64(len(p)) > b.remaining+1 {
+		p = p[:b.remaining+1]
+	}
+	n, err := b.ReadCloser.Read(p)
+	b.remaining -= int64(n)
+	if b.remaining < 0 {
+		return n, errResponseTooLarge
+	}
+	return n, err
+}
+
+type limitResponseRoundTripper struct {
+	delegate http.RoundTripper
+}
+
+func (rt *limitResponseRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+	resp, err := rt.delegate.RoundTrip(req)
+	if err != nil || resp == nil || resp.Body == nil {
+		return resp, err
+	}
+	resp.Body = &limitedBody{ReadCloser: resp.Body, remaining: maxResponseSize}
+	return resp, nil
+}
+
+func (rt *limitResponseRoundTripper) WrappedRoundTripper() http.RoundTripper { return rt.delegate }
 
 // DefaultRetryBackoff returns the default backoff parameters for webhook retry.
 func DefaultRetryBackoff() *wait.Backoff {
@@ -442,6 +489,12 @@ func convertToSARExtra(extra map[string][]string) map[string]authorizationv1.Ext
 // and returns a SubjectAccessReviewInterface that uses that client. Note that the client submits SubjectAccessReview
 // requests to the exact path specified in the kubeconfig file, so arbitrary non-API servers can be targeted.
 func subjectAccessReviewInterfaceFromConfig(config *rest.Config, version string, retryBackoff wait.Backoff) (subjectAccessReviewer, error) {
+	// client-go reads the entire response body into memory, so bound it here.
+	config = rest.CopyConfig(config)
+	config.Wrap(func(rt http.RoundTripper) http.RoundTripper {
+		return &limitResponseRoundTripper{delegate: rt}
+	})
+
 	localScheme := runtime.NewScheme()
 	if err := scheme.AddToScheme(localScheme); err != nil {
 		return nil, err
