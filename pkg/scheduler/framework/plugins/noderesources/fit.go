@@ -479,15 +479,28 @@ func (f *Fit) isSchedulableAfterNodeChange(logger klog.Logger, pod *v1.Pod, oldO
 			return fwk.QueueSkip, nil
 		}
 	}
-	// Use the DRA manager's extended resource cache for event handlers
-	var draManager fwk.SharedDRAManager
-	if f.enableDRAExtendedResource {
-		draManager = f.handle.SharedDRAManager()
-	}
 
 	opts := ResourceRequestsOptions{
 		EnablePodLevelResources:   f.enablePodLevelResources,
 		EnableDRAExtendedResource: f.enableDRAExtendedResource,
+	}
+
+	// If the node's allocatable decreased for a resource this pod requests, and the pod is
+	// nominated to that node waiting for preemption victims to terminate, the preemption
+	// result may no longer be sufficient. Re-queue so the scheduler runs a fresh cycle.
+	if originalNode != nil &&
+		pod.Status.NominatedNodeName != "" &&
+		pod.Status.NominatedNodeName == modifiedNode.Name &&
+		haveAnyRequestedResourcesDecreased(pod, originalNode, modifiedNode, opts) {
+		logger.V(5).Info("node allocatable decreased for pod's nominated node; re-queuing to re-evaluate preemption",
+			"pod", klog.KObj(pod), "node", klog.KObj(modifiedNode))
+		return fwk.Queue, nil
+	}
+
+	// Use the DRA manager's extended resource cache for event handlers
+	var draManager fwk.SharedDRAManager
+	if f.enableDRAExtendedResource {
+		draManager = f.handle.SharedDRAManager()
 	}
 
 	// Leaving in the queue, since the pod won't fit into the modified node anyway.
@@ -577,6 +590,31 @@ func haveAnyRequestedResourcesIncreased(pod *v1.Pod, originalNode, modifiedNode 
 		}
 
 		if helper.ShouldDelegateResourceToDRA(rName, modifiedNodeInfo, draManager, opts) {
+			return true
+		}
+	}
+	return false
+}
+
+// haveAnyRequestedResourcesDecreased returns true if any resource requested by the pod has decreased on the node.
+func haveAnyRequestedResourcesDecreased(pod *v1.Pod, originalNode, modifiedNode *v1.Node, opts ResourceRequestsOptions) bool {
+	podRequest := computePodResourceRequest(pod, opts)
+	originalNodeInfo := framework.NewNodeInfo()
+	originalNodeInfo.SetNode(originalNode)
+	modifiedNodeInfo := framework.NewNodeInfo()
+	modifiedNodeInfo.SetNode(modifiedNode)
+
+	if (podRequest.MilliCPU > 0 && modifiedNodeInfo.Allocatable.GetMilliCPU() < originalNodeInfo.Allocatable.GetMilliCPU()) ||
+		(podRequest.Memory > 0 && modifiedNodeInfo.Allocatable.GetMemory() < originalNodeInfo.Allocatable.GetMemory()) ||
+		(podRequest.EphemeralStorage > 0 && modifiedNodeInfo.Allocatable.GetEphemeralStorage() < originalNodeInfo.Allocatable.GetEphemeralStorage()) {
+		return true
+	}
+
+	for rName, rQuant := range podRequest.ScalarResources {
+		if rQuant == 0 {
+			continue
+		}
+		if modifiedNodeInfo.Allocatable.GetScalarResources()[rName] < originalNodeInfo.Allocatable.GetScalarResources()[rName] {
 			return true
 		}
 	}
