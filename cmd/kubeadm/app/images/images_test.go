@@ -350,6 +350,17 @@ func TestGetDNSImage(t *testing.T) {
 				},
 			},
 		},
+		{
+			expected: "foo.io/coredns:v9.9.9",
+			cfg: &kubeadmapi.ClusterConfiguration{
+				ImageRepository: "foo.io",
+				DNS: kubeadmapi.DNS{
+					ImageMeta: kubeadmapi.ImageMeta{
+						ImageTag: "v9.9.9",
+					},
+				},
+			},
+		},
 	}
 
 	for _, test := range tests {
@@ -361,5 +372,38 @@ func TestGetDNSImage(t *testing.T) {
 				actual,
 			)
 		}
+	}
+}
+
+func TestGetDNSImageTag(t *testing.T) {
+	var tests = []struct {
+		name     string
+		expected string
+		cfg      *kubeadmapi.ClusterConfiguration
+	}{
+		{
+			name:     "falls back to the default CoreDNS version when no override is set",
+			expected: constants.CoreDNSVersion,
+			cfg:      &kubeadmapi.ClusterConfiguration{KubernetesVersion: "1.17.0"},
+		},
+		{
+			name:     "user override wins over the default version",
+			expected: "v9.9.9",
+			cfg: &kubeadmapi.ClusterConfiguration{
+				KubernetesVersion: "1.17.0",
+				DNS: kubeadmapi.DNS{
+					ImageMeta: kubeadmapi.ImageMeta{ImageTag: "v9.9.9"},
+				},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			actual := GetDNSImageTag(test.cfg)
+			if actual != test.expected {
+				t.Errorf("failed to GetDNSImageTag:\n\texpected: %s\n\tactual: %s", test.expected, actual)
+			}
+		})
 	}
 }
