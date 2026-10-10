@@ -43,12 +43,10 @@ const (
 // ValidateScale validates a Scale and returns an ErrorList with any errors.
 func ValidateScale(scale *autoscaling.Scale) field.ErrorList {
 	allErrs := field.ErrorList{}
-	// Only validate managed fields and replicas. Other metadata fields are ignored
-	// and discarded by the scale subresource handler.
+	// Only validate managed fields. Other metadata fields are ignored and
+	// discarded by the scale subresource handler.
+	// spec.replicas minimum is handled by declarative validation.
 	allErrs = append(allErrs, metav1validation.ValidateManagedFields(scale.GetManagedFields(), field.NewPath("metadata").Child("managedFields"))...)
-	if scale.Spec.Replicas < 0 {
-		allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(scale.Spec.Replicas), field.NewPath("spec", "replicas")).MarkCoveredByDeclarative()...)
-	}
 
 	return allErrs
 }
