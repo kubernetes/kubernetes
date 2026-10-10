@@ -12,7 +12,6 @@ authorization:
   webhook:
     cacheAuthorizedTTL: 5m0s
     cacheUnauthorizedTTL: 30s
-cgroupDriver: cgroupfs
 cgroupsPerQOS: true
 clientCertificateKeyAlgorithm: ECDSA-P256
 configMapAndSecretChangeDetectionStrategy: Watch

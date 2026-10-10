@@ -51,6 +51,7 @@ func testKubeletConfigMap(contents string) *v1.ConfigMap {
 func TestKubeletDefault(t *testing.T) {
 	tests := []struct {
 		name       string
+		config     kubeletconfig.KubeletConfiguration
 		clusterCfg kubeadmapi.ClusterConfiguration
 		expected   kubeletConfig
 	}{
@@ -79,7 +80,99 @@ func TestKubeletDefault(t *testing.T) {
 					HealthzBindAddress: kubeletHealthzBindAddress,
 					HealthzPort:        ptr.To[int32](constants.KubeletHealthzPort),
 					RotateCertificates: kubeletRotateCertificates,
-					CgroupDriver:       constants.CgroupDriverSystemd,
+				},
+			},
+		},
+		{
+			name: "CgroupDriver cleared when feature gate unspecified",
+			config: kubeletconfig.KubeletConfiguration{
+				CgroupDriver: "systemd",
+			},
+			expected: kubeletConfig{
+				config: kubeletconfig.KubeletConfiguration{
+					FeatureGates:  map[string]bool{},
+					StaticPodPath: kubeadmapiv1.DefaultManifestsDir,
+					ClusterDNS:    []string{kubeadmapiv1.DefaultClusterDNSIP},
+					Authentication: kubeletconfig.KubeletAuthentication{
+						X509: kubeletconfig.KubeletX509Authentication{
+							ClientCAFile: constants.CACertName,
+						},
+						Anonymous: kubeletconfig.KubeletAnonymousAuthentication{
+							Enabled: ptr.To(kubeletAuthenticationAnonymousEnabled),
+						},
+						Webhook: kubeletconfig.KubeletWebhookAuthentication{
+							Enabled: ptr.To(kubeletAuthenticationWebhookEnabled),
+						},
+					},
+					Authorization: kubeletconfig.KubeletAuthorization{
+						Mode: kubeletconfig.KubeletAuthorizationModeWebhook,
+					},
+					HealthzBindAddress: kubeletHealthzBindAddress,
+					HealthzPort:        ptr.To[int32](constants.KubeletHealthzPort),
+					RotateCertificates: kubeletRotateCertificates,
+				},
+			},
+		},
+		{
+			name: "CgroupDriver cleared when feature gate enabled",
+			config: kubeletconfig.KubeletConfiguration{
+				FeatureGates: map[string]bool{"DisableCgroupDriverFallback": true},
+				CgroupDriver: "systemd",
+			},
+			expected: kubeletConfig{
+				config: kubeletconfig.KubeletConfiguration{
+					FeatureGates:  map[string]bool{"DisableCgroupDriverFallback": true},
+					StaticPodPath: kubeadmapiv1.DefaultManifestsDir,
+					ClusterDNS:    []string{kubeadmapiv1.DefaultClusterDNSIP},
+					Authentication: kubeletconfig.KubeletAuthentication{
+						X509: kubeletconfig.KubeletX509Authentication{
+							ClientCAFile: constants.CACertName,
+						},
+						Anonymous: kubeletconfig.KubeletAnonymousAuthentication{
+							Enabled: ptr.To(kubeletAuthenticationAnonymousEnabled),
+						},
+						Webhook: kubeletconfig.KubeletWebhookAuthentication{
+							Enabled: ptr.To(kubeletAuthenticationWebhookEnabled),
+						},
+					},
+					Authorization: kubeletconfig.KubeletAuthorization{
+						Mode: kubeletconfig.KubeletAuthorizationModeWebhook,
+					},
+					HealthzBindAddress: kubeletHealthzBindAddress,
+					HealthzPort:        ptr.To[int32](constants.KubeletHealthzPort),
+					RotateCertificates: kubeletRotateCertificates,
+				},
+			},
+		},
+		{
+			name: "CgroupDriver preserved when feature gate disabled",
+			config: kubeletconfig.KubeletConfiguration{
+				FeatureGates: map[string]bool{"DisableCgroupDriverFallback": false},
+				CgroupDriver: "systemd",
+			},
+			expected: kubeletConfig{
+				config: kubeletconfig.KubeletConfiguration{
+					FeatureGates:  map[string]bool{"DisableCgroupDriverFallback": false},
+					CgroupDriver:  "systemd",
+					StaticPodPath: kubeadmapiv1.DefaultManifestsDir,
+					ClusterDNS:    []string{kubeadmapiv1.DefaultClusterDNSIP},
+					Authentication: kubeletconfig.KubeletAuthentication{
+						X509: kubeletconfig.KubeletX509Authentication{
+							ClientCAFile: constants.CACertName,
+						},
+						Anonymous: kubeletconfig.KubeletAnonymousAuthentication{
+							Enabled: ptr.To(kubeletAuthenticationAnonymousEnabled),
+						},
+						Webhook: kubeletconfig.KubeletWebhookAuthentication{
+							Enabled: ptr.To(kubeletAuthenticationWebhookEnabled),
+						},
+					},
+					Authorization: kubeletconfig.KubeletAuthorization{
+						Mode: kubeletconfig.KubeletAuthorizationModeWebhook,
+					},
+					HealthzBindAddress: kubeletHealthzBindAddress,
+					HealthzPort:        ptr.To[int32](constants.KubeletHealthzPort),
+					RotateCertificates: kubeletRotateCertificates,
 				},
 			},
 		},
@@ -112,7 +205,6 @@ func TestKubeletDefault(t *testing.T) {
 					HealthzBindAddress: kubeletHealthzBindAddress,
 					HealthzPort:        ptr.To[int32](constants.KubeletHealthzPort),
 					RotateCertificates: kubeletRotateCertificates,
-					CgroupDriver:       constants.CgroupDriverSystemd,
 				},
 			},
 		},
@@ -145,7 +237,6 @@ func TestKubeletDefault(t *testing.T) {
 					HealthzBindAddress: kubeletHealthzBindAddress,
 					HealthzPort:        ptr.To[int32](constants.KubeletHealthzPort),
 					RotateCertificates: kubeletRotateCertificates,
-					CgroupDriver:       constants.CgroupDriverSystemd,
 				},
 			},
 		},
@@ -179,7 +270,6 @@ func TestKubeletDefault(t *testing.T) {
 					HealthzBindAddress: kubeletHealthzBindAddress,
 					HealthzPort:        ptr.To[int32](constants.KubeletHealthzPort),
 					RotateCertificates: kubeletRotateCertificates,
-					CgroupDriver:       constants.CgroupDriverSystemd,
 				},
 			},
 		},
@@ -210,7 +300,6 @@ func TestKubeletDefault(t *testing.T) {
 					HealthzBindAddress: kubeletHealthzBindAddress,
 					HealthzPort:        ptr.To[int32](constants.KubeletHealthzPort),
 					RotateCertificates: kubeletRotateCertificates,
-					CgroupDriver:       constants.CgroupDriverSystemd,
 				},
 			},
 		},
@@ -223,6 +312,7 @@ func TestKubeletDefault(t *testing.T) {
 			expected.configBase.GroupVersion = kubeletconfig.SchemeGroupVersion
 
 			got := &kubeletConfig{
+				config: test.config,
 				configBase: configBase{
 					GroupVersion: kubeletconfig.SchemeGroupVersion,
 				},

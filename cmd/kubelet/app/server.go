@@ -1477,18 +1477,26 @@ func getCgroupDriverFromCRI(ctx context.Context, s *options.KubeletServer, kubeD
 	for range 3 {
 		runtimeConfig, err = kubeDeps.RemoteRuntimeService.RuntimeConfig(ctx)
 		if err != nil {
-			s, ok := status.FromError(err)
-			if !ok || s.Code() != codes.Unimplemented {
+			runtimeStatus, ok := status.FromError(err)
+			if !ok || runtimeStatus.Code() != codes.Unimplemented {
 				// We could introduce a backoff delay or jitter, but this is largely catching cases
 				// where the runtime is still starting up and we request too early.
 				// Give it a little more time.
 				time.Sleep(time.Second * 2)
 				continue
 			}
-			// CRI implementation doesn't support RuntimeConfig, fallback
+			if utilfeature.DefaultFeatureGate.Enabled(features.DisableCgroupDriverFallback) {
+				return fmt.Errorf("the container runtime does not implement RuntimeConfig: upgrade the runtime, or temporarily set --feature-gates=DisableCgroupDriverFallback=false to use cgroupDriver from the kubelet configuration: %w", err)
+			}
+			// FIXME: Configuration defaulting runs before command-line flags are parsed, so
+			// disabling DisableCgroupDriverFallback via flags can leave CgroupDriver empty.
+			// Apply defaults after the effective feature gates are resolved instead.
+			if s.CgroupDriver == "" {
+				s.CgroupDriver = "cgroupfs"
+			}
 			legacyregistry.MustRegister(kubeletmetrics.CRILosingSupport)
 			kubeletmetrics.CRILosingSupport.WithLabelValues("1.38.0").Inc()
-			logger.Info("CRI implementation should be updated to support RuntimeConfig. Falling back to using cgroupDriver from kubelet config.")
+			logger.Info("Falling back to cgroupDriver from the kubelet configuration because DisableCgroupDriverFallback is disabled. This fallback is deprecated; upgrade the container runtime to support RuntimeConfig")
 			return nil
 		}
 	}

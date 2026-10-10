@@ -677,7 +677,6 @@ authentication:
     clientCAFile: /etc/kubernetes/pki/ca.crt
 authorization:
   mode: Webhook
-cgroupDriver: systemd
 clusterDNS:
 - 10.96.0.10
 clusterDomain: cluster.local
