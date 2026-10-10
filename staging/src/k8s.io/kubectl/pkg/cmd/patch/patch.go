@@ -191,19 +191,14 @@ func (o *PatchOptions) Validate() error {
 	if o.Local && o.dryRunStrategy == cmdutil.DryRunServer {
 		return fmt.Errorf("cannot specify --local and --dry-run=server - did you mean --dry-run=client?")
 	}
-	if len(o.PatchType) != 0 {
-		if _, ok := patchTypes[strings.ToLower(o.PatchType)]; !ok {
-			return fmt.Errorf("--type must be one of %v, not %q", sets.List(sets.KeySet(patchTypes)), o.PatchType)
-		}
+	if _, ok := patchTypes[strings.ToLower(o.PatchType)]; !ok {
+		return fmt.Errorf("--type must be one of %v, not %q", sets.List(sets.KeySet(patchTypes)), o.PatchType)
 	}
 	return nil
 }
 
 func (o *PatchOptions) RunPatch() error {
-	patchType := types.StrategicMergePatchType
-	if len(o.PatchType) != 0 {
-		patchType = patchTypes[strings.ToLower(o.PatchType)]
-	}
+	patchType := patchTypes[strings.ToLower(o.PatchType)]
 
 	var patchBytes []byte
 	if len(o.PatchFile) > 0 {
