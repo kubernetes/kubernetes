@@ -51,6 +51,7 @@ func StartConversionWebhookServer(handler http.Handler) (func(), *apiextensionsv
 
 	webhookMux := http.NewServeMux()
 	webhookMux.Handle("/convert", handler)
+	webhookMux.Handle("/convert/", handler)
 	webhookServer := httptest.NewUnstartedServer(webhookMux)
 	webhookServer.TLS = &tls.Config{
 		RootCAs:      roots,
@@ -73,6 +74,18 @@ func StartConversionWebhookServer(handler http.Handler) (func(), *apiextensionsv
 	}
 
 	return webhookServer.Close, webhookConfig, nil
+}
+
+// WebhookClientConfigForPath returns a copy of base whose URL is suffixed with p.
+func WebhookClientConfigForPath(t *testing.T, base *apiextensionsv1.WebhookClientConfig, p string) *apiextensionsv1.WebhookClientConfig {
+	t.Helper()
+	if base.URL == nil {
+		t.Fatalf("webhook client config has no URL; got %+v", base)
+	}
+	out := base.DeepCopy()
+	url := *base.URL + "/" + p
+	out.URL = &url
+	return out
 }
 
 // V1Beta1ReviewConverterFunc converts an entire ConversionReview.
