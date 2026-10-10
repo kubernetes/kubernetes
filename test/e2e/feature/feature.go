@@ -307,10 +307,6 @@ var (
 	// Node Problem Detect e2e tests in tree.
 	NodeProblemDetector = framework.WithFeature(framework.ValidFeatures.Add("NodeProblemDetector"))
 
-	// Owner: sig-node
-	// Tests aiming to verify oom_score functionality
-	OOMScoreAdj = framework.WithFeature(framework.ValidFeatures.Add("OOMScoreAdj"))
-
 	// Owner: sig-network
 	// Marks a single test that tests cluster DNS performance with many services.
 	PerformanceDNS = framework.WithFeature(framework.ValidFeatures.Add("PerformanceDNS"))
