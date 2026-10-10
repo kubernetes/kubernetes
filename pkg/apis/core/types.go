@@ -506,8 +506,8 @@ type PersistentVolumeClaimSpec struct {
 	// Contains the types of access modes required
 	// +optional
 	AccessModes []PersistentVolumeAccessMode
-	// A label query over volumes to consider for binding. This selector is
-	// ignored when VolumeName is set
+	// A label query over volumes to consider for binding.
+	// A null or empty selector matches all volumes. This selector is ignored when VolumeName is set.
 	// +optional
 	Selector *metav1.LabelSelector
 	// Resources represents the minimum resources required
