@@ -116,7 +116,8 @@ var _ = SIGDescribe("Swap", "[LinuxOnly]", ginkgo.Ordered, feature.Swap, framewo
 		f.Context("Basic functionality", func() {
 			tempSetCurrentKubeletConfig(f, enableLimitedSwap)
 
-			ginkgo.DescribeTable("with configuration", func(qosClass v1.PodQOSClass, memoryRequestEqualLimit bool) {
+			// Under LimitedSwap only Burstable pods whose memory request differs from their limit get swap.
+			ginkgo.DescribeTable("with configuration", func(qosClass v1.PodQOSClass, memoryRequestEqualLimit, expectSwap bool) {
 				ginkgo.By(fmt.Sprintf("Creating a pod of QOS class %s. memoryRequestEqualLimit: %t", qosClass, memoryRequestEqualLimit))
 				pod := getSwapTestPod(f, qosClass, memoryRequestEqualLimit)
 				pod = runPodAndWaitUntilScheduled(f, pod)
@@ -126,13 +127,19 @@ var _ = SIGDescribe("Swap", "[LinuxOnly]", ginkgo.Ordered, feature.Swap, framewo
 				}
 				gomega.Expect(getSwapBehavior()).To(gomega.Equal(string(types.LimitedSwap)))
 
+				if !expectSwap {
+					expectNoSwap(f, pod)
+					return
+				}
+
 				expectedSwapLimit := calcSwapForBurstablePod(f, pod)
+				gomega.Expect(expectedSwapLimit).To(gomega.BeNumerically(">", 0), "expected a non-zero swap limit for a swap-eligible pod, is swap provisioned on the node?")
 				expectLimitedSwap(f, pod, expectedSwapLimit)
 			},
-				ginkgo.Entry("QOS Best-effort", v1.PodQOSBestEffort, false),
-				ginkgo.Entry("QOS Burstable", v1.PodQOSBurstable, false),
-				ginkgo.Entry("QOS Burstable with memory request equals to limit", v1.PodQOSBurstable, true),
-				ginkgo.Entry("QOS Guaranteed", v1.PodQOSGuaranteed, false),
+				ginkgo.Entry("QOS Best-effort", v1.PodQOSBestEffort, false, false),
+				ginkgo.Entry("QOS Burstable", v1.PodQOSBurstable, false, true),
+				ginkgo.Entry("QOS Burstable with memory request equals to limit", v1.PodQOSBurstable, true, false),
+				ginkgo.Entry("QOS Guaranteed", v1.PodQOSGuaranteed, false, false),
 			)
 		})
 
@@ -356,7 +363,7 @@ var _ = SIGDescribe("Swap", "[LinuxOnly]", ginkgo.Ordered, feature.Swap, framewo
 	})
 })
 
-// Note that memoryRequestEqualLimit is effective only when qosClass is not PodQOSBestEffort.
+// Note that memoryRequestEqualLimit is effective only when qosClass is PodQOSBurstable.
 func getSwapTestPod(f *framework.Framework, qosClass v1.PodQOSClass, memoryRequestEqualLimit bool) *v1.Pod {
 	podMemoryAmount := resource.MustParse("128Mi")
 
@@ -372,7 +379,7 @@ func getSwapTestPod(f *framework.Framework, qosClass v1.PodQOSClass, memoryReque
 		}
 
 		if memoryRequestEqualLimit {
-			resources.Limits = resources.Requests
+			resources.Limits = resources.Requests.DeepCopy()
 		}
 	case v1.PodQOSGuaranteed:
 		resources = v1.ResourceRequirements{
@@ -381,10 +388,12 @@ func getSwapTestPod(f *framework.Framework, qosClass v1.PodQOSClass, memoryReque
 				v1.ResourceMemory: podMemoryAmount,
 			},
 		}
-		resources.Requests = resources.Limits
+		resources.Requests = resources.Limits.DeepCopy()
 	}
 
 	pod := getSleepingPod(f.Namespace.Name)
+	pod.Spec.Containers[0].Resources = resources
+	gomega.ExpectWithOffset(1, qos.GetPodQOS(pod)).To(gomega.Equal(qosClass), "swap test pod does not have the requested QoS class")
 
 	return pod
 }
@@ -485,7 +494,7 @@ func expectLimitedSwap(f *framework.Framework, pod *v1.Pod, expectedSwapLimit in
 	const errMsg = "swap limitation is not as expected"
 
 	gomega.ExpectWithOffset(1, int64(swapLimit)).To(
-		gomega.Or(
+		gomega.And(
 			gomega.BeNumerically(">=", expectedSwapLimit-cgroupAlignment),
 			gomega.BeNumerically("<=", expectedSwapLimit+cgroupAlignment),
 		),
