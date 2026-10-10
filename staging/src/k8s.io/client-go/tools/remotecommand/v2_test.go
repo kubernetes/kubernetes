@@ -213,6 +213,11 @@ func TestV2ErrorStreamReading(t *testing.T) {
 				}
 			},
 		},
+		{
+			name:          "empty error stream (success)",
+			stream:        strings.NewReader(""),
+			expectedError: nil,
+		},
 	}
 
 	for _, test := range tests {
