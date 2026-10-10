@@ -111,6 +111,8 @@ type CertificateSigningRequestSpec struct {
 	// The minimum valid value for expirationSeconds is 600, i.e. 10 minutes.
 	//
 	// +optional
+	// +k8s:optional
+	// +k8s:alpha(since: "1.38")=+k8s:minimum=600
 	ExpirationSeconds *int32 `json:"expirationSeconds,omitempty" protobuf:"varint,8,opt,name=expirationSeconds"`
 
 	// usages specifies a set of key usages requested in the issued certificate.
