@@ -17,52 +17,85 @@ limitations under the License.
 package goroutineleak
 
 import (
+	"bytes"
 	"errors"
+	"runtime/pprof"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/google/pprof/profile"
 )
 
-// realProfile is verbatim output of GET /debug/pprof/goroutineleak?debug=1
-// from a Go 1.27 program with four deliberately leaked goroutines.
-const realProfile = `goroutineleak profile: total 4
-3 @ 0x48c1aa 0x419c2e 0x419772 0x67d745 0x493041
-#	0x67d744	main.leakForever+0x24	/tmp/leaktest/main.go:13
+// leakProfile encodes samples the way runtime/pprof writes the goroutineleak
+// profile. Each sample is a count and a stack of function names, innermost
+// first.
+func leakProfile(t *testing.T, sampleType string, samples ...sample) []byte {
+	t.Helper()
+	p := &profile.Profile{
+		SampleType: []*profile.ValueType{{Type: sampleType, Unit: "count"}},
+		PeriodType: &profile.ValueType{Type: sampleType, Unit: "count"},
+		Period:     1,
+	}
+	functions := map[string]*profile.Function{}
+	for _, s := range samples {
+		ps := &profile.Sample{Value: []int64{s.count}}
+		for _, name := range s.stack {
+			fn, ok := functions[name]
+			if !ok {
+				fn = &profile.Function{ID: uint64(len(functions) + 1), Name: name, Filename: "/src/" + name + ".go"}
+				functions[name] = fn
+				p.Function = append(p.Function, fn)
+			}
+			loc := &profile.Location{ID: uint64(len(p.Location) + 1), Line: []profile.Line{{Function: fn, Line: 13}}}
+			p.Location = append(p.Location, loc)
+			ps.Location = append(ps.Location, loc)
+		}
+		p.Sample = append(p.Sample, ps)
+	}
+	var buf bytes.Buffer
+	if err := p.Write(&buf); err != nil {
+		t.Fatalf("writing profile: %v", err)
+	}
+	return buf.Bytes()
+}
 
-1 @ 0x48c1aa 0x418d1c 0x418917 0x67d788 0x493041
-#	0x67d787	main.leakOnSend+0x27	/tmp/leaktest/main.go:19
-`
+type sample struct {
+	count int64
+	stack []string
+}
 
-const emptyProfile = `goroutineleak profile: total 0
-`
-
-func TestParseRealProfile(t *testing.T) {
-	res, err := Parse("kube-apiserver", []byte(realProfile))
+func TestParseProfile(t *testing.T) {
+	body := leakProfile(t, "goroutineleak",
+		sample{1, []string{"runtime.gopark", "runtime.chansend", "main.leakOnSend", "runtime.goexit"}},
+		sample{3, []string{"runtime.gopark", "runtime.chanrecv", "main.leakForever", "runtime.goexit"}},
+		sample{2, []string{"runtime.gopark", "runtime.goexit"}},
+	)
+	res, err := Parse("kube-apiserver", body)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if res.Total != 4 {
-		t.Errorf("Total = %d, want 4", res.Total)
+	if res.Total != 6 {
+		t.Errorf("Total = %d, want 6", res.Total)
 	}
-	if len(res.Leaks) != 2 {
-		t.Fatalf("len(Leaks) = %d, want 2", len(res.Leaks))
+	// Sorted most frequent first, runtime frames skipped unless nothing else is left.
+	want := []Leak{
+		{Count: 3, Function: "main.leakForever", Location: "/src/main.leakForever.go:13"},
+		{Count: 2, Function: "runtime.gopark", Location: "/src/runtime.gopark.go:13"},
+		{Count: 1, Function: "main.leakOnSend", Location: "/src/main.leakOnSend.go:13"},
 	}
-	// Sorted most frequent first.
-	if res.Leaks[0].Count != 3 {
-		t.Errorf("Leaks[0].Count = %d, want 3", res.Leaks[0].Count)
+	if len(res.Leaks) != len(want) {
+		t.Fatalf("Leaks = %+v, want %+v", res.Leaks, want)
 	}
-	if res.Leaks[0].Function != "main.leakForever+0x24" {
-		t.Errorf("Leaks[0].Function = %q", res.Leaks[0].Function)
-	}
-	if res.Leaks[0].Location != "/tmp/leaktest/main.go:13" {
-		t.Errorf("Leaks[0].Location = %q", res.Leaks[0].Location)
-	}
-	if res.Leaks[1].Count != 1 {
-		t.Errorf("Leaks[1].Count = %d, want 1", res.Leaks[1].Count)
+	for i := range want {
+		if res.Leaks[i] != want[i] {
+			t.Errorf("Leaks[%d] = %+v, want %+v", i, res.Leaks[i], want[i])
+		}
 	}
 }
 
 func TestParseEmptyProfile(t *testing.T) {
-	res, err := Parse("kube-apiserver", []byte(emptyProfile))
+	res, err := Parse("kube-apiserver", leakProfile(t, "goroutineleak"))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -75,21 +108,51 @@ func TestParseEmptyProfile(t *testing.T) {
 }
 
 // TestParseUnrecognized guards against silently accepting a different
-// response, for example an error page or a profile format change.
+// response, for example an error page or a different profile.
 func TestParseUnrecognized(t *testing.T) {
-	for name, body := range map[string]string{
-		"empty": "",
-		"html":  "<html><body>404 page not found</body></html>",
-		"wrongProfile": `goroutine profile: total 2376
-195 @ 0x48a88e 0x4195ee
-`,
+	for name, body := range map[string][]byte{
+		"empty":        nil,
+		"html":         []byte("<html><body>404 page not found</body></html>"),
+		"wrongProfile": leakProfile(t, "goroutine", sample{195, []string{"main.worker"}}),
 	} {
 		t.Run(name, func(t *testing.T) {
-			if _, err := Parse("kube-apiserver", []byte(body)); err == nil {
+			if _, err := Parse("kube-apiserver", body); err == nil {
 				t.Errorf("expected an error for %q", name)
 			}
 		})
 	}
+}
+
+// TestParseRuntimeProfile parses what the Go runtime actually writes, so that
+// a change of the profile format fails here instead of hiding leaks.
+func TestParseRuntimeProfile(t *testing.T) {
+	go leakForTest()
+
+	deadline := time.Now().Add(30 * time.Second)
+	for {
+		var buf bytes.Buffer
+		if err := pprof.Lookup("goroutineleak").WriteTo(&buf, 0); err != nil {
+			t.Fatalf("writing profile: %v", err)
+		}
+		res, err := Parse("test", buf.Bytes())
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		for _, l := range res.Leaks {
+			if strings.HasSuffix(l.Function, ".leakForTest") && strings.Contains(l.Location, "invariants_test.go:") {
+				return
+			}
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("leaked goroutine not found in:\n%s", Report([]Result{res}))
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+}
+
+// leakForTest blocks forever on a channel which nothing else can reach.
+func leakForTest() {
+	<-make(chan struct{})
 }
 
 func TestFailureIgnoresUnscrapedComponents(t *testing.T) {
