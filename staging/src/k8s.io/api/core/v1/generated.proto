@@ -3152,7 +3152,10 @@ message NodeSpec {
 
   // taints if specified, is the node's taints.
   // +optional
-  // +listType=atomic
+  // +listType=map
+  // +listMapKey=key
+  // +listMapKey=effect
+  // +mapType=granular
   repeated Taint taints = 5;
 
   // configSource previously used to specify the source of the node's configuration for the DynamicKubeletConfig feature. Deprecated. This feature is removed.

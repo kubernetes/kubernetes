@@ -6976,7 +6976,10 @@ type NodeSpec struct {
 	Unschedulable bool `json:"unschedulable,omitempty" protobuf:"varint,4,opt,name=unschedulable"`
 	// taints if specified, is the node's taints.
 	// +optional
-	// +listType=atomic
+	// +listType=map
+	// +listMapKey=key
+	// +listMapKey=effect
+	// +mapType=granular
 	Taints []Taint `json:"taints,omitempty" protobuf:"bytes,5,opt,name=taints"`
 
 	// configSource previously used to specify the source of the node's configuration for the DynamicKubeletConfig feature. Deprecated. This feature is removed.
