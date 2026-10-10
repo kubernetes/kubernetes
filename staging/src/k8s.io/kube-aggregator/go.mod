@@ -7,6 +7,7 @@ go 1.27.0
 godebug default=go1.27
 
 require (
+	github.com/NYTimes/gziphandler v1.1.1
 	github.com/emicklei/go-restful/v3 v3.13.0
 	github.com/google/go-cmp v0.7.0
 	github.com/spf13/cobra v1.10.2
