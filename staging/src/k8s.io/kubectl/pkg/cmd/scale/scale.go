@@ -117,7 +117,10 @@ type ScaleOptions struct {
 
 // ToOptions converts from CLI inputs to runtime inputs.
 func (flags *ScaleFlags) ToOptions(f cmdutil.Factory, cmd *cobra.Command, args []string) (*ScaleOptions, error) {
-	flags.RecordFlags.Complete(cmd)
+	err := flags.RecordFlags.Complete(cmd)
+	if err != nil {
+		return nil, err
+	}
 	recorder, err := flags.RecordFlags.ToRecorder()
 	if err != nil {
 		return nil, err
@@ -177,7 +180,7 @@ func (flags *ScaleFlags) AddFlags(cmd *cobra.Command) {
 	cmd.Flags().StringVar(&flags.ResourceVersion, "resource-version", flags.ResourceVersion, i18n.T("Precondition for resource version. Requires that the current resource version match this value in order to scale."))
 	cmd.Flags().IntVar(&flags.CurrentReplicas, "current-replicas", flags.CurrentReplicas, "Precondition for current size. Requires that the current size of the resource match this value in order to scale. -1 (default) for no condition.")
 	cmd.Flags().IntVar(&flags.Replicas, "replicas", flags.Replicas, "The new desired number of replicas. Required.")
-	cmd.MarkFlagRequired("replicas")
+	cmd.MarkFlagRequired("replicas") // nolint:errcheck
 	cmd.Flags().DurationVar(&flags.Timeout, "timeout", 0, "The length of time to wait before giving up on a scale operation, zero means don't wait. Any other values should contain a corresponding time unit (e.g. 1s, 2m, 3h).")
 	cmdutil.AddFilenameOptionFlags(cmd, &flags.FilenameOptions, "identifying the resource to set a new size")
 	cmdutil.AddDryRunFlag(cmd)
