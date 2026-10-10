@@ -825,6 +825,8 @@ type CSIStorageCapacity struct {
 	// immutable.
 	//
 	// +optional
+	// +k8s:alpha(since: "1.38")=+k8s:optional
+	// +k8s:alpha(since: "1.38")=+k8s:immutable
 	NodeTopology *metav1.LabelSelector `json:"nodeTopology,omitempty" protobuf:"bytes,2,opt,name=nodeTopology"`
 
 	// storageClassName represents the name of the StorageClass that the reported capacity applies to.
