@@ -271,18 +271,56 @@ func (p *plainResponseWriter) Close() error {
 
 var _ watchStreamWriter = &perFlushGzipWriter{}
 
+type countingWriter struct {
+	delegate     io.Writer
+	bytesWritten int64
+	timing       *watchGzipTiming
+}
+
+func (c *countingWriter) Write(b []byte) (int, error) {
+	if c.timing == nil {
+		n, err := c.delegate.Write(b)
+		c.bytesWritten += int64(n)
+		return n, err
+	}
+	start := time.Now()
+	n, err := c.delegate.Write(b)
+	c.timing.responseWrite += time.Since(start)
+	c.bytesWritten += int64(n)
+	return n, err
+}
+
+type watchGzipTiming struct {
+	streamResets  int
+	gzip          time.Duration
+	responseWrite time.Duration
+	responseFlush time.Duration
+}
+
 type perFlushGzipWriter struct {
 	delegateRW http.ResponseWriter
 	flusher    http.Flusher
 	gw         *gzip.Writer
+	compressed countingWriter
 }
 
 func (p *perFlushGzipWriter) Write(b []byte) (int, error) {
 	if p.gw == nil {
 		p.gw = watchGzipPool.Get().(*gzip.Writer)
-		p.gw.Reset(p.delegateRW)
+		p.compressed.delegate = p.delegateRW
+		p.gw.Reset(&p.compressed)
+		if p.compressed.timing != nil {
+			p.compressed.timing.streamResets++
+		}
 	}
-	return p.gw.Write(b)
+	if p.compressed.timing == nil {
+		return p.gw.Write(b)
+	}
+	responseWriteBefore := p.compressed.timing.responseWrite
+	start := time.Now()
+	n, err := p.gw.Write(b)
+	p.compressed.timing.gzip += time.Since(start) - (p.compressed.timing.responseWrite - responseWriteBefore)
+	return n, err
 }
 
 // Flush writes compressed data to the client and releases the gzip.Writer back to the pool.
@@ -291,11 +329,17 @@ func (p *perFlushGzipWriter) Flush() error {
 	if p.gw == nil {
 		return nil
 	}
-	if err := p.gw.Flush(); err != nil {
+	if err := p.timeGzip(p.gw.Flush); err != nil {
 		return err
 	}
 	err := p.Close()
-	p.flusher.Flush()
+	if p.compressed.timing == nil {
+		p.flusher.Flush()
+	} else {
+		start := time.Now()
+		p.flusher.Flush()
+		p.compressed.timing.responseFlush += time.Since(start)
+	}
 	return err
 }
 
@@ -303,11 +347,22 @@ func (p *perFlushGzipWriter) Close() error {
 	if p.gw == nil {
 		return nil
 	}
-	err := p.gw.Close()
+	err := p.timeGzip(p.gw.Close)
 	p.gw.Reset(nil)
 	watchGzipPool.Put(p.gw)
 	// prevent double-close returning the writer to the pool twice
 	p.gw = nil
+	return err
+}
+
+func (p *perFlushGzipWriter) timeGzip(fn func() error) error {
+	if p.compressed.timing == nil {
+		return fn()
+	}
+	responseWriteBefore := p.compressed.timing.responseWrite
+	start := time.Now()
+	err := fn()
+	p.compressed.timing.gzip += time.Since(start) - (p.compressed.timing.responseWrite - responseWriteBefore)
 	return err
 }
 
@@ -319,6 +374,8 @@ type watchResponseWriter struct {
 	contentEncoding    string
 	isWatchListRequest bool
 	writer             watchStreamWriter
+	bytesWritten       int64
+	gzipTiming         *watchGzipTiming
 }
 
 func newWatchResponseWriter(delegateRW http.ResponseWriter, flusher http.Flusher, contentEncoding string, isWatchListRequest bool) *watchResponseWriter {
@@ -337,7 +394,7 @@ func (w *watchResponseWriter) BeginStream(mediaType string) {
 	if w.contentEncoding == "gzip" && w.isWatchListRequest {
 		w.delegateRW.Header().Set("Content-Encoding", "gzip")
 		w.delegateRW.Header().Add("Vary", "Accept-Encoding")
-		w.writer = &perFlushGzipWriter{delegateRW: w.delegateRW, flusher: w.flusher}
+		w.writer = &perFlushGzipWriter{delegateRW: w.delegateRW, flusher: w.flusher, compressed: countingWriter{timing: w.gzipTiming}}
 	}
 	w.delegateRW.WriteHeader(http.StatusOK)
 	// Flush HTTP headers only
@@ -345,8 +402,28 @@ func (w *watchResponseWriter) BeginStream(mediaType string) {
 	w.flusher.Flush()
 }
 
+func (w *watchResponseWriter) enableGzipTiming() {
+	w.gzipTiming = &watchGzipTiming{}
+}
+
+func (w *watchResponseWriter) gzipTimingSnapshot() watchGzipTiming {
+	if w.gzipTiming == nil {
+		return watchGzipTiming{}
+	}
+	return *w.gzipTiming
+}
+
 func (w *watchResponseWriter) Write(p []byte) (int, error) {
-	return w.writer.Write(p)
+	n, err := w.writer.Write(p)
+	w.bytesWritten += int64(n)
+	return n, err
+}
+
+func (w *watchResponseWriter) compressedBytesWritten() int64 {
+	if gzipWriter, ok := w.writer.(*perFlushGzipWriter); ok {
+		return gzipWriter.compressed.bytesWritten
+	}
+	return w.bytesWritten
 }
 
 func (w *watchResponseWriter) Flush() error {
@@ -385,6 +462,10 @@ func (s *WatchServer) HandleHTTP(w http.ResponseWriter, req *http.Request) {
 
 	contentEncoding := responsewriters.ContentEncodingSupported(req, features.WatchListCompression)
 	rw := newWatchResponseWriter(w, flusher, contentEncoding, s.isWatchListRequest)
+	traceTimingEnabled := s.isWatchListRequest && klog.V(2).Enabled()
+	if traceTimingEnabled && contentEncoding == "gzip" {
+		rw.enableGzipTiming()
+	}
 	defer func() {
 		if err := rw.Close(); err != nil {
 			utilruntime.HandleErrorWithContext(req.Context(), err, "Failed to close watch response writer")
@@ -416,10 +497,17 @@ func (s *WatchServer) HandleHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 
 	watchEncoder := newWatchEncoder(req.Context(), gvr, s.EmbeddedEncoder, s.Encoder, recorder)
+	// Per-stage clocks run for every initial event, so only collect them when the trace can be emitted.
+	if traceTimingEnabled {
+		watchEncoder.enableTiming()
+	}
 	ch := s.Watching.ResultChan()
 	done := req.Context().Done()
 
 	span.AddEvent("About to start writing response")
+	var initStart time.Time
+	var encodeTime, flushTime time.Duration
+	var initEventCount int
 	for {
 		select {
 		case <-s.ServerShuttingDownCh:
@@ -440,19 +528,31 @@ func (s *WatchServer) HandleHTTP(w http.ResponseWriter, req *http.Request) {
 				// End of results.
 				return
 			}
+			if s.isWatchListRequest && initStart.IsZero() {
+				initStart = time.Now()
+			}
 			isWatchListLatencyRecordingRequired := shouldRecordWatchListLatency(req.Context(), event)
 
+			encodeStart := time.Now()
 			if err := watchEncoder.Encode(event); err != nil {
 				utilruntime.HandleErrorWithContext(req.Context(), err, "Failed to encode watch event")
 				// client disconnect.
 				return
 			}
+			if s.isWatchListRequest {
+				encodeTime += time.Since(encodeStart)
+				initEventCount++
+			}
 			recorder.RecordEvent()
 
 			if len(ch) == 0 {
+				flushStart := time.Now()
 				if err := rw.Flush(); err != nil {
 					utilruntime.HandleErrorWithContext(req.Context(), err, "Failed to flush watch response")
 					return
+				}
+				if s.isWatchListRequest {
+					flushTime += time.Since(flushStart)
 				}
 			}
 			if isWatchListLatencyRecordingRequired {
@@ -471,9 +571,28 @@ func (s *WatchServer) HandleHTTP(w http.ResponseWriter, req *http.Request) {
 					s.watchListCompleteHook()
 				}
 				// release the gzip writer back to the pool so idle watches don't hold gzip state.
+				flushStart := time.Now()
 				if err := rw.Flush(); err != nil {
 					utilruntime.HandleErrorWithContext(req.Context(), err, "Failed to flush watch response after initial events")
 					return
+				}
+				flushTime += time.Since(flushStart)
+				if !initStart.IsZero() {
+					sendingTime := time.Since(initStart)
+					var setupTime time.Duration
+					if receivedAt, ok := apirequest.ReceivedTimestampFrom(req.Context()); ok {
+						setupTime = initStart.Sub(receivedAt)
+					}
+					if total := setupTime + sendingTime; total > 7500*time.Millisecond {
+						encoderTiming := watchEncoder.timingSnapshot()
+						encoderOther := encoderTiming.other()
+						klog.FromContext(req.Context()).V(2).Info("TRACE-WATCHLIST", "path", req.URL.Path, "auditID", audit.GetAuditIDTruncated(req.Context()), "events", initEventCount, "uncompressedMB", float64(rw.bytesWritten)/1e6, "compressedMB", float64(rw.compressedBytesWritten())/1e6, "total", total, "setup", setupTime, "sending", sendingTime, "encode", encodeTime, "flush", flushTime, "other", sendingTime-encodeTime-flushTime, "mediaType", s.MediaType, "contentEncoding", contentEncoding)
+						klog.FromContext(req.Context()).V(2).Info("TRACE-WATCHLIST-ENCODER", "path", req.URL.Path, "auditID", audit.GetAuditIDTruncated(req.Context()), "events", encoderTiming.events, "total", encoderTiming.total, "avg", encoderTiming.average(encoderTiming.total), "min", encoderTiming.min, "max", encoderTiming.max, "objectEncode", encoderTiming.object, "objectEncodeAvg", encoderTiming.average(encoderTiming.object), "watchEventEncode", encoderTiming.watchEvent, "watchEventEncodeAvg", encoderTiming.average(encoderTiming.watchEvent), "framedWrite", encoderTiming.framedWrite, "framedWriteAvg", encoderTiming.average(encoderTiming.framedWrite), "other", encoderOther, "otherAvg", encoderTiming.average(encoderOther), "bucketLabels", watchEncoderLatencyBucketLabels, "totalBuckets", encoderTiming.totalBuckets, "framedWriteBuckets", encoderTiming.framedWriteBuckets, "mediaType", s.MediaType, "contentEncoding", contentEncoding)
+						if contentEncoding == "gzip" {
+							gzipTiming := rw.gzipTimingSnapshot()
+							klog.FromContext(req.Context()).V(2).Info("TRACE-WATCHLIST-GZIP", "path", req.URL.Path, "auditID", audit.GetAuditIDTruncated(req.Context()), "streamResets", gzipTiming.streamResets, "gzip", gzipTiming.gzip, "responseWrite", gzipTiming.responseWrite, "responseFlush", gzipTiming.responseFlush, "contentEncoding", contentEncoding)
+						}
+					}
 				}
 			}
 		}

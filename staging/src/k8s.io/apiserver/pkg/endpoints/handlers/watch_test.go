@@ -67,6 +67,25 @@ func init() {
 	addTestTypesV2()
 }
 
+func TestWatchResponseWriterByteCounts(t *testing.T) {
+	payload := bytes.Repeat([]byte("watch event"), 100)
+	for _, encoding := range []string{"", "gzip"} {
+		t.Run(encoding, func(t *testing.T) {
+			recorder := httptest.NewRecorder()
+			writer := newWatchResponseWriter(recorder, recorder, encoding, true)
+			writer.BeginStream("application/json")
+			_, err := writer.Write(payload)
+			require.NoError(t, err)
+			require.NoError(t, writer.Flush())
+			require.Equal(t, int64(len(payload)), writer.bytesWritten)
+			require.Equal(t, int64(recorder.Body.Len()), writer.compressedBytesWritten())
+			if encoding == "gzip" {
+				require.Less(t, writer.compressedBytesWritten(), writer.bytesWritten)
+			}
+		})
+	}
+}
+
 func TestWatchHTTPErrors(t *testing.T) {
 	ctx := t.Context()
 	watcher := watch.NewFake()
