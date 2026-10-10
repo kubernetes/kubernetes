@@ -2220,20 +2220,14 @@ func TestQuantityStringBelowNano(t *testing.T) {
 		{toDec(intQuantity(1024, math.MinInt32+2, BinarySI)), "1024e-2147483646", ""},
 		{intQuantity(math.MaxInt64, math.MinInt32+2, BinarySI), "9223372036854775807e-2147483646", ""},
 		{toDec(intQuantity(math.MaxInt64, math.MinInt32+2, BinarySI)), "9223372036854775807e-2147483646", ""},
-		// TODO(#141166): Must print the exact value, 1024e-2147483647.
-		{intQuantity(1024, math.MinInt32+1, BinarySI), "102400e2147483647", "1024e-2147483647"},
-		// TODO: Should be "1024e-2147483647"
-		{toDec(intQuantity(1024, math.MinInt32+1, BinarySI)), "1024000e2147483646", "1024e-2147483647"},
-		// TODO: Should be "1e-2147483647"
-		{intQuantity(1, math.MinInt32+1, DecimalSI), "100e2147483647", "1e-2147483647"},
-		// TODO: Should be "1e-2147483647"
-		{toDec(intQuantity(1, math.MinInt32+1, DecimalSI)), "1000e2147483646", "1e-2147483647"},
-		// TODO: Should be "1e-2147483648"
-		{intQuantity(1, math.MinInt32, DecimalSI), "10e2147483647", "1e-2147483648"},
+		{intQuantity(1024, math.MinInt32+1, BinarySI), "1024e-2147483647", ""},
+		{toDec(intQuantity(1024, math.MinInt32+1, BinarySI)), "1024e-2147483647", ""},
+		{intQuantity(1, math.MinInt32+1, DecimalSI), "1e-2147483647", ""},
+		{toDec(intQuantity(1, math.MinInt32+1, DecimalSI)), "1e-2147483647", ""},
+		{intQuantity(1, math.MinInt32, DecimalSI), "1e-2147483648", ""},
 		// TODO: Should be "1e-2147483648"
 		{toDec(intQuantity(1, math.MinInt32, DecimalSI)), "100e2147483646", "1e-2147483648"},
-		// TODO: Should be "1e-2147483647"
-		{intQuantity(10, math.MinInt32, DecimalSI), "100e2147483647", "1e-2147483647"},
+		{intQuantity(10, math.MinInt32, DecimalSI), "1e-2147483647", ""},
 		// TODO: Should be "1e-2147483647"
 		{toDec(intQuantity(10, math.MinInt32, DecimalSI)), "1000e2147483646", "1e-2147483647"},
 		// TODO(#141166): Must print the exact value, 1e-2147483648.
@@ -2255,9 +2249,8 @@ func TestQuantityStringBelowNano(t *testing.T) {
 }
 
 func TestQuantityStringDecMinInt32Scale(t *testing.T) {
-	// An inf.Scale of math.MinInt32 is one past the Scale range. Narrowing its
-	// exponent wraps, and the value still prints exactly unless trailing zeros
-	// push the exponent past int32.
+	// An inf.Scale of math.MinInt32 is one past the Scale range: its exponent,
+	// 2147483648, does not fit in an int32. The value still prints exactly.
 	for _, tc := range []struct {
 		unscaled int64
 		format   Format
@@ -2266,9 +2259,9 @@ func TestQuantityStringDecMinInt32Scale(t *testing.T) {
 		{1, DecimalExponent, "100e2147483646"},
 		{7, DecimalSI, "700e2147483646"},
 		{10, DecimalExponent, "1000e2147483646"},
-		// TODO(#141166): Must print the exact value, 10e2147483649. The exponent
-		// overflows int32 and wraps negative.
-		{100, DecimalExponent, "1e-2147483646"},
+		// 2147483646 is the largest multiple of 3 that fits in an int32, so the
+		// exponent stops there and the extra zeros stay in the mantissa.
+		{100, DecimalExponent, "10000e2147483646"},
 	} {
 		q := NewDecimalQuantity(*inf.NewDec(tc.unscaled, math.MinInt32), tc.format)
 		if got := q.String(); got != tc.expect {
@@ -2291,6 +2284,9 @@ func TestQuantityParseEmit(t *testing.T) {
 		{".000001Ki", "1024u"},
 		{".000000001Ki", "1024n"},
 		{".000000000001Ki", "2n"},
+		{"10e2147483647", "100e2147483646"},
+		{"1000e2147483646", "1000e2147483646"},
+		{"10000e2147483646", "10000e2147483646"},
 	}
 
 	for _, asDec := range []bool{false, true} {
@@ -4460,41 +4456,14 @@ func TestQuantityToDecKnownGaps(t *testing.T) {
 			decGot:     outcome{result: int64(math.MinInt64)},
 			want:       &outcome{result: int64(-1)},
 		},
-		// TODO: Should be "1e-2147483648" on both routes
+		// TODO: Should be "1e-2147483648" on the inf.Dec route
 		{
 			name:       "1*10^MinInt32 DecimalExponent String()",
 			int64Route: func() any { q := intQuantity(1, math.MinInt32, DecimalExponent); return q.String() },
 			decRoute:   func() any { q := intQuantity(1, math.MinInt32, DecimalExponent); q.ToDec(); return q.String() },
-			int64Got:   outcome{result: "10e2147483647"},
+			int64Got:   outcome{result: "1e-2147483648"},
 			decGot:     outcome{result: "100e2147483646"},
 			want:       &outcome{result: "1e-2147483648"},
-		},
-		// TODO: Should be "1e-2147483647" on both routes
-		{
-			name:       "1*10^(MinInt32+1) DecimalExponent String()",
-			int64Route: func() any { q := intQuantity(1, math.MinInt32+1, DecimalExponent); return q.String() },
-			decRoute:   func() any { q := intQuantity(1, math.MinInt32+1, DecimalExponent); q.ToDec(); return q.String() },
-			int64Got:   outcome{result: "100e2147483647"},
-			decGot:     outcome{result: "1000e2147483646"},
-			want:       &outcome{result: "1e-2147483647"},
-		},
-		// TODO: Should be "100e2147483646" on the int64 route
-		{
-			name:       "10*10^MaxInt32 DecimalExponent String()",
-			int64Route: func() any { q := intQuantity(10, math.MaxInt32, DecimalExponent); return q.String() },
-			decRoute:   func() any { q := intQuantity(10, math.MaxInt32, DecimalExponent); q.ToDec(); return q.String() },
-			int64Got:   outcome{result: "10e2147483647"},
-			decGot:     outcome{result: "100e2147483646"},
-			want:       &outcome{result: "100e2147483646"},
-		},
-		// TODO: Should be "10000e2147483646" on both routes
-		{
-			name:       "1000*10^MaxInt32 DecimalExponent String()",
-			int64Route: func() any { q := intQuantity(1000, math.MaxInt32, DecimalExponent); return q.String() },
-			decRoute:   func() any { q := intQuantity(1000, math.MaxInt32, DecimalExponent); q.ToDec(); return q.String() },
-			int64Got:   outcome{result: "1e-2147483646"},
-			decGot:     outcome{result: "1e-2147483646"},
-			want:       &outcome{result: "10000e2147483646"},
 		},
 		// TODO: Should agree between int64 and inf.Dec routes
 		{
