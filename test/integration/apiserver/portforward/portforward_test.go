@@ -55,7 +55,6 @@ const remotePort = "8765"
 
 func TestPortforward(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeatures.PortForwardWebsockets, true)
-	t.Setenv("KUBECTL_PORT_FORWARD_WEBSOCKETS", "true")
 
 	var podName string
 	var podUID string

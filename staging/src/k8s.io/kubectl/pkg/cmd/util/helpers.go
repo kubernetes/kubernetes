@@ -435,10 +435,20 @@ const (
 	// owner: @seans
 	// kep: https://kep.k8s.io/4006
 	//
-	// Transition to WebSockets.
+	// Transition to WebSockets. GA in v1.38: kubectl always attempts WebSockets
+	// first and falls back to SPDY. These variables are no longer consulted;
+	// setting them has no effect and emits a warning (see WarnIfSet).
 	RemoteCommandWebsockets FeatureGate = "KUBECTL_REMOTE_COMMAND_WEBSOCKETS"
 	PortForwardWebsockets   FeatureGate = "KUBECTL_PORT_FORWARD_WEBSOCKETS"
 )
+
+// WarnIfSet logs a deprecation warning if the environment variable is set.
+// It is for feature gates that have graduated and are no longer consulted.
+func (f FeatureGate) WarnIfSet() {
+	if _, ok := os.LookupEnv(string(f)); ok {
+		klog.Warningf("%s is deprecated and has no effect; it will be removed in a future release.", f)
+	}
+}
 
 // IsEnabled returns true iff environment variable is set to true.
 // All other cases, it returns false.

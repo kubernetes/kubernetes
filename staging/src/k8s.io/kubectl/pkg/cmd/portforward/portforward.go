@@ -141,18 +141,18 @@ func createDialer(method string, url *url.URL, opts PortForwardOptions) (streamh
 	if err != nil {
 		return nil, err
 	}
-	dialer := spdy.NewDialerForStreaming(upgrader, &http.Client{Transport: transport}, method, url)
-	if !cmdutil.PortForwardWebsockets.IsDisabled() {
-		tunnelingDialer, err := portforward.NewSPDYOverWebsocketDialerForStreaming(url, opts.Config)
-		if err != nil {
-			return nil, err
-		}
-		// First attempt tunneling (websocket) dialer, then fallback to spdy dialer.
-		dialer = portforward.NewFallbackDialerForStreaming(tunnelingDialer, dialer, func(err error) bool {
-			return streamhttp.IsUpgradeFailure(err) || streamhttp.IsHTTPSProxyError(err)
-		})
+	spdyDialer := spdy.NewDialerForStreaming(upgrader, &http.Client{Transport: transport}, method, url)
+	// WebSockets is always attempted first, falling back to SPDY; the
+	// environment variable that used to disable it has no effect.
+	cmdutil.PortForwardWebsockets.WarnIfSet()
+	tunnelingDialer, err := portforward.NewSPDYOverWebsocketDialerForStreaming(url, opts.Config)
+	if err != nil {
+		return nil, err
 	}
-	return dialer, nil
+	// First attempt tunneling (websocket) dialer, then fallback to spdy dialer.
+	return portforward.NewFallbackDialerForStreaming(tunnelingDialer, spdyDialer, func(err error) bool {
+		return streamhttp.IsUpgradeFailure(err) || streamhttp.IsHTTPSProxyError(err)
+	}), nil
 }
 
 func (f *defaultPortForwarder) ForwardPorts(method string, url *url.URL, opts PortForwardOptions) error {
