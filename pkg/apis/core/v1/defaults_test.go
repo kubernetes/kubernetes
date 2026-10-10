@@ -3530,3 +3530,88 @@ func TestSetDefaultPodTerminationGracePeriodSeconds(t *testing.T) {
 		})
 	}
 }
+
+func TestSetDefaultsPodLimitOnlyResources(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResourcesFixDefaulting, false)
+
+	t.Run("container with only swap limits keeps nil requests", func(t *testing.T) {
+		pod := &v1.Pod{
+			Spec: v1.PodSpec{
+				Resources: &v1.ResourceRequirements{
+					Limits: v1.ResourceList{
+						v1.ResourceSwap: resource.MustParse("2Gi"),
+					},
+				},
+				InitContainers: []v1.Container{
+					{
+						Name: "init-c",
+						Resources: v1.ResourceRequirements{
+							Limits: v1.ResourceList{
+								v1.ResourceSwap: resource.MustParse("512Mi"),
+							},
+						},
+					},
+				},
+				Containers: []v1.Container{
+					{
+						Name: "app",
+						Resources: v1.ResourceRequirements{
+							Limits: v1.ResourceList{
+								v1.ResourceSwap: resource.MustParse("1Gi"),
+							},
+						},
+					},
+				},
+			},
+		}
+		corev1.SetObjectDefaults_Pod(pod)
+
+		if pod.Spec.Containers[0].Resources.Requests != nil {
+			t.Errorf("expected container Requests to remain nil when only limit-only resources are in Limits, got %v", pod.Spec.Containers[0].Resources.Requests)
+		}
+		if pod.Spec.InitContainers[0].Resources.Requests != nil {
+			t.Errorf("expected initContainer Requests to remain nil when only limit-only resources are in Limits, got %v", pod.Spec.InitContainers[0].Resources.Requests)
+		}
+		if pod.Spec.Resources.Requests != nil {
+			t.Errorf("expected pod-level Requests to remain nil when only limit-only resources are in pod Limits, got %v", pod.Spec.Resources.Requests)
+		}
+	})
+
+	t.Run("container with cpu and swap limits only defaults cpu request and does not trigger pod-level request defaulting", func(t *testing.T) {
+		pod := &v1.Pod{
+			Spec: v1.PodSpec{
+				Resources: &v1.ResourceRequirements{
+					Limits: v1.ResourceList{
+						v1.ResourceSwap: resource.MustParse("2Gi"),
+					},
+				},
+				Containers: []v1.Container{
+					{
+						Name: "app",
+						Resources: v1.ResourceRequirements{
+							Limits: v1.ResourceList{
+								v1.ResourceCPU:    resource.MustParse("500m"),
+								v1.ResourceMemory: resource.MustParse("1Gi"),
+								v1.ResourceSwap:   resource.MustParse("1Gi"),
+							},
+						},
+					},
+				},
+			},
+		}
+		corev1.SetObjectDefaults_Pod(pod)
+
+		wantCtrReqs := v1.ResourceList{
+			v1.ResourceCPU:    resource.MustParse("500m"),
+			v1.ResourceMemory: resource.MustParse("1Gi"),
+		}
+		if !cmp.Equal(pod.Spec.Containers[0].Resources.Requests, wantCtrReqs) {
+			t.Errorf("unexpected container Requests (-want +got):\n%s", cmp.Diff(wantCtrReqs, pod.Spec.Containers[0].Resources.Requests))
+		}
+		if pod.Spec.Resources.Requests != nil {
+			t.Errorf("expected pod-level Requests to remain nil when pod.Spec.Resources only specifies swap limit, got %v", pod.Spec.Resources.Requests)
+		}
+	})
+}
+

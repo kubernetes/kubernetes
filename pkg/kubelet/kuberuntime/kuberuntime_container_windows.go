@@ -191,6 +191,14 @@ func (m *kubeGenericRuntimeManager) GetContainerSwapBehavior(pod *v1.Pod, contai
 	return types.NoSwap
 }
 
+func (m *kubeGenericRuntimeManager) effectiveSwapLimit(pod *v1.Pod, container *v1.Container) (int64, swapLimitSource) {
+	return 0, swapSourceNone
+}
+
+func (m *kubeGenericRuntimeManager) nodeSwapEnabled() bool {
+	return false
+}
+
 // initSwapControllerAvailabilityCheck returns a function that always returns false on Windows
 func initSwapControllerAvailabilityCheck(ctx context.Context) func() bool {
 	return func() bool { return false }

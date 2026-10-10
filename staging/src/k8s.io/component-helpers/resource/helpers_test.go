@@ -4709,3 +4709,76 @@ func TestResizeConditionsAndSupportedResources(t *testing.T) {
 		t.Errorf("expected SupportedPodLevelResources to contain CPU")
 	}
 }
+
+func TestLimitOnlyResources(t *testing.T) {
+	for _, res := range []v1.ResourceName{v1.ResourceSwap} {
+		if !IsLimitOnlyResource(res) {
+			t.Errorf("expected IsLimitOnlyResource(%q) to be true", res)
+		}
+		if IsSupportedPodLevelResource(res) {
+			t.Errorf("expected IsSupportedPodLevelResource(%q) to be false (disjoint from limitOnlyResources)", res)
+		}
+	}
+
+	podWithOnlySwapLimits := &v1.Pod{
+		Spec: v1.PodSpec{
+			Resources: &v1.ResourceRequirements{
+				Limits: v1.ResourceList{
+					v1.ResourceSwap: resource.MustParse("2Gi"),
+				},
+			},
+			InitContainers: []v1.Container{
+				{
+					Name: "init-1",
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							v1.ResourceSwap: resource.MustParse("512Mi"),
+						},
+					},
+				},
+			},
+			Containers: []v1.Container{
+				{
+					Name: "c1",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU:    resource.MustParse("100m"),
+							v1.ResourceMemory: resource.MustParse("256Mi"),
+						},
+						Limits: v1.ResourceList{
+							v1.ResourceCPU:    resource.MustParse("100m"),
+							v1.ResourceMemory: resource.MustParse("256Mi"),
+							v1.ResourceSwap:   resource.MustParse("1Gi"),
+						},
+					},
+				},
+			},
+		},
+	}
+
+	if IsPodLevelResourcesSet(podWithOnlySwapLimits) {
+		t.Errorf("expected IsPodLevelResourcesSet to be false when only limitOnlyResources are set on pod.Spec.Resources")
+	}
+	if IsPodLevelLimitsSet(podWithOnlySwapLimits) {
+		t.Errorf("expected IsPodLevelLimitsSet to be false when only limitOnlyResources are set on pod.Spec.Resources.Limits")
+	}
+
+	gotReqs := PodRequests(podWithOnlySwapLimits, PodResourcesOptions{})
+	wantReqs := v1.ResourceList{
+		v1.ResourceCPU:    resource.MustParse("100m"),
+		v1.ResourceMemory: resource.MustParse("256Mi"),
+	}
+	if !equality.Semantic.DeepEqual(gotReqs, wantReqs) {
+		t.Errorf("PodRequests() mismatch (-want +got):\n%s", diff.Diff(wantReqs, gotReqs))
+	}
+
+	gotLimits := PodLimits(podWithOnlySwapLimits, PodResourcesOptions{})
+	wantLimits := v1.ResourceList{
+		v1.ResourceCPU:    resource.MustParse("100m"),
+		v1.ResourceMemory: resource.MustParse("256Mi"),
+	}
+	if !equality.Semantic.DeepEqual(gotLimits, wantLimits) {
+		t.Errorf("PodLimits() mismatch (-want +got):\n%s", diff.Diff(wantLimits, gotLimits))
+	}
+}
+

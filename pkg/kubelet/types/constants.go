@@ -37,6 +37,9 @@ type SwapBehavior string
 const (
 	LimitedSwap SwapBehavior = "LimitedSwap"
 	NoSwap      SwapBehavior = "NoSwap"
+	// WorkloadControlledSwap (KEP-5359): swap is opt-in per workload through
+	// resources.limits.swap; containers without an explicit limit get no swap.
+	WorkloadControlledSwap SwapBehavior = "WorkloadControlledSwap"
 )
 
 // Pod status condition reasons and messages
