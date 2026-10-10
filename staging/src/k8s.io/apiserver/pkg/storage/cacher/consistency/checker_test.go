@@ -96,10 +96,10 @@ func TestConsistencyCheckerDigest(t *testing.T) {
 				ResourceVersion: "2",
 				CacheDigest:     "4ae4e750bd825b17",
 				EtcdDigest:      "f940a60af965b03",
-				DiffDetail: &diffDetail{
+				DiffDetail: &DiffDetail{
 					Index:     0,
-					CacheItem: &namespaceNameRV{Namespace: "kube-system", Name: "pod", RV: "2"},
-					EtcdItem:  &namespaceNameRV{Namespace: "kube-public", Name: "pod", RV: "2"},
+					CacheItem: &NamespaceNameRV{Namespace: "kube-system", Name: "pod", RV: "2"},
+					EtcdItem:  &NamespaceNameRV{Namespace: "kube-public", Name: "pod", RV: "2"},
 				},
 			},
 			expectConsistent: false,
@@ -118,10 +118,10 @@ func TestConsistencyCheckerDigest(t *testing.T) {
 				ResourceVersion: "2",
 				CacheDigest:     "c9120494e4c1897d",
 				EtcdDigest:      "c9156494e4c46274",
-				DiffDetail: &diffDetail{
+				DiffDetail: &DiffDetail{
 					Index:     0,
-					CacheItem: &namespaceNameRV{Namespace: "default", Name: "pod2", RV: "2"},
-					EtcdItem:  &namespaceNameRV{Namespace: "default", Name: "pod3", RV: "2"},
+					CacheItem: &NamespaceNameRV{Namespace: "default", Name: "pod2", RV: "2"},
+					EtcdItem:  &NamespaceNameRV{Namespace: "default", Name: "pod3", RV: "2"},
 				},
 			},
 			expectConsistent: false,
@@ -140,10 +140,10 @@ func TestConsistencyCheckerDigest(t *testing.T) {
 				ResourceVersion: "4",
 				CacheDigest:     "86bf3a5e80d1c5ca",
 				EtcdDigest:      "86bf3a5e80d1c5cd",
-				DiffDetail: &diffDetail{
+				DiffDetail: &DiffDetail{
 					Index:     0,
-					CacheItem: &namespaceNameRV{Namespace: "default", Name: "pod", RV: "3"},
-					EtcdItem:  &namespaceNameRV{Namespace: "default", Name: "pod", RV: "4"},
+					CacheItem: &NamespaceNameRV{Namespace: "default", Name: "pod", RV: "3"},
+					EtcdItem:  &NamespaceNameRV{Namespace: "default", Name: "pod", RV: "4"},
 				},
 			},
 			expectConsistent: false,
@@ -163,10 +163,10 @@ func TestConsistencyCheckerDigest(t *testing.T) {
 				ResourceVersion: "3",
 				CacheDigest:     "1859bac707c2cb2b",
 				EtcdDigest:      "11d147fc800df0e0",
-				DiffDetail: &diffDetail{
+				DiffDetail: &DiffDetail{
 					Index:     1,
 					CacheItem: nil,
-					EtcdItem:  &namespaceNameRV{Namespace: "Default", Name: "pod", RV: "3"},
+					EtcdItem:  &NamespaceNameRV{Namespace: "Default", Name: "pod", RV: "3"},
 				},
 			},
 			expectConsistent: false,
@@ -186,9 +186,9 @@ func TestConsistencyCheckerDigest(t *testing.T) {
 				ResourceVersion: "3",
 				CacheDigest:     "11d147fc800df0e0",
 				EtcdDigest:      "1859bac707c2cb2b",
-				DiffDetail: &diffDetail{
+				DiffDetail: &DiffDetail{
 					Index:     1,
-					CacheItem: &namespaceNameRV{Namespace: "Default", Name: "pod", RV: "3"},
+					CacheItem: &NamespaceNameRV{Namespace: "Default", Name: "pod", RV: "3"},
 					EtcdItem:  nil,
 				},
 			},
