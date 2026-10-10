@@ -543,6 +543,55 @@ func (dpo deletePodsOp) patchParams(w *Workload) (realOp, error) {
 	return &dpo, nil
 }
 
+// deleteNodesOp defines an op where nodes are deleted as a part of a workload.
+type deleteNodesOp struct {
+	// Must be "deleteNodes".
+	Opcode operationCode
+	// Number of nodes to delete. Parameterizable through CountParam.
+	Count int
+	// Template parameter for Count.
+	CountParam string
+	// Labels used to filter the nodes considered for deletion.
+	// Optional.
+	LabelSelector map[string]string
+	// If true, continue to the next operation without waiting for deletion to complete.
+	// Defaults to false if not specified.
+	// Optional
+	SkipWaitToCompletion bool
+	// Number of nodes to be deleted per second.
+	// If zero, deletion requests are sent without rate limiting.
+	// Optional
+	DeleteNodesPerSecond int
+}
+
+func (dno *deleteNodesOp) isValid(allowParameterization bool) error {
+	if dno.Opcode != deleteNodesOpcode {
+		return fmt.Errorf("invalid opcode %q; expected %q", dno.Opcode, deleteNodesOpcode)
+	}
+	if !isValidCount(allowParameterization, dno.Count, dno.CountParam) {
+		return fmt.Errorf("invalid Count=%d / CountParam=%q", dno.Count, dno.CountParam)
+	}
+	if dno.DeleteNodesPerSecond < 0 {
+		return fmt.Errorf("invalid DeleteNodesPerSecond=%d; should be non-negative", dno.DeleteNodesPerSecond)
+	}
+	return nil
+}
+
+func (dno *deleteNodesOp) collectsMetrics() bool {
+	return false
+}
+
+func (dno deleteNodesOp) patchParams(w *Workload) (realOp, error) {
+	if dno.CountParam != "" {
+		var err error
+		dno.Count, err = w.Params.get(dno.CountParam[1:])
+		if err != nil {
+			return nil, err
+		}
+	}
+	return &dno, (&dno).isValid(false)
+}
+
 // churnOp defines an op where services are created as a part of a workload.
 type churnOp struct {
 	// Must be "churnOp".

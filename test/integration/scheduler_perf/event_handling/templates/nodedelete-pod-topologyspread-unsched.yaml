@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  generateName: pod-unsched-
+  labels:
+    type: unsched
+spec:
+  nodeSelector:
+    topology.kubernetes.io/zone: zone-a
+  topologySpreadConstraints:
+    - maxSkew: 1
+      topologyKey: topology.kubernetes.io/zone
+      nodeAffinityPolicy: Ignore
+      whenUnsatisfiable: DoNotSchedule
+      labelSelector:
+        matchLabels:
+          topology: blue
+  containers:
+  - image: registry.k8s.io/pause:3.10
+    name: pause

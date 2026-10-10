@@ -29,6 +29,7 @@ import (
 	"runtime"
 	"runtime/pprof"
 	"runtime/trace"
+	"sort"
 	"strings"
 	"sync"
 	"testing"
@@ -92,6 +93,8 @@ func (e *WorkloadExecutor) runOp(tCtx ktesting.TContext, op realOp, opIndex int)
 		return e.runCreatePodsOp(tCtx, opIndex, concreteOp)
 	case *deletePodsOp:
 		return e.runDeletePodsOp(tCtx, opIndex, concreteOp)
+	case *deleteNodesOp:
+		return e.runDeleteNodesOp(tCtx, opIndex, concreteOp)
 	case *churnOp:
 		return e.runChurnOp(tCtx, opIndex, concreteOp)
 	case *barrierOp:
@@ -387,6 +390,108 @@ func (e *WorkloadExecutor) runDeletePodsOp(tCtx ktesting.TContext, opIndex int, 
 		}(opIndex)
 	} else {
 		deletePods(opIndex)
+	}
+	return nil
+}
+
+func (e *WorkloadExecutor) runDeleteNodesOp(tCtx ktesting.TContext, opIndex int, op *deleteNodesOp) error {
+	listOpts := metav1.ListOptions{}
+	if len(op.LabelSelector) > 0 {
+		labelSelector := labels.ValidatedSetSelector(op.LabelSelector)
+		listOpts.LabelSelector = labelSelector.String()
+	}
+
+	nodes, err := tCtx.Client().CoreV1().Nodes().List(tCtx, listOpts)
+	if err != nil {
+		return fmt.Errorf("error listing nodes: %w", err)
+	}
+	if op.Count > len(nodes.Items) {
+		return fmt.Errorf("requested to delete %d nodes but only %d candidates exist", op.Count, len(nodes.Items))
+	}
+
+	// Sort candidate nodes by creation timestamp, using the node name as a tie-breaker.
+	sort.Slice(nodes.Items, func(i, j int) bool {
+		if nodes.Items[i].CreationTimestamp.Equal(&nodes.Items[j].CreationTimestamp) {
+			return nodes.Items[i].Name < nodes.Items[j].Name
+		}
+		return nodes.Items[i].CreationTimestamp.Before(&nodes.Items[j].CreationTimestamp)
+	})
+	startIdx := len(nodes.Items) - op.Count
+	nodesToDelete := nodes.Items[startIdx:]
+
+	tCtx.Logf("Deleting %d nodes (opIndex: %d)", len(nodesToDelete), opIndex)
+
+	performDeletion := func() error {
+		if op.DeleteNodesPerSecond > 0 {
+			ticker := time.NewTicker(time.Second / time.Duration(op.DeleteNodesPerSecond))
+			defer ticker.Stop()
+
+			for i := range len(nodesToDelete) {
+				select {
+				case <-ticker.C:
+					if err := tCtx.Client().CoreV1().Nodes().Delete(tCtx, nodesToDelete[i].Name, metav1.DeleteOptions{}); err != nil {
+						if errors.Is(err, context.Canceled) {
+							return nil
+						}
+						return fmt.Errorf(
+							"unable to delete node %v: %w",
+							nodesToDelete[i].Name,
+							err,
+						)
+					}
+				case <-tCtx.Done():
+					return nil
+				}
+			}
+		} else {
+			for _, node := range nodesToDelete {
+				if err := tCtx.Client().CoreV1().Nodes().Delete(tCtx, node.Name, metav1.DeleteOptions{}); err != nil {
+					if errors.Is(err, context.Canceled) {
+						return nil
+					}
+					return fmt.Errorf(
+						"unable to delete node %v: %w",
+						node.Name,
+						err,
+					)
+				}
+			}
+		}
+
+		return nil
+	}
+
+	if op.SkipWaitToCompletion {
+		e.wg.Go(func() {
+			if err := performDeletion(); err != nil {
+				tCtx.Errorf("op %d: %v", opIndex, err)
+			}
+		})
+	} else {
+		if err := performDeletion(); err != nil {
+			return err
+		}
+
+		// Wait for the selected nodes to be deleted.
+		err = wait.PollUntilContextTimeout(tCtx, 1*time.Second, 5*time.Minute, true, func(ctx context.Context) (bool, error) {
+			for _, target := range nodesToDelete {
+				node, err := tCtx.Client().CoreV1().Nodes().Get(ctx, target.Name, metav1.GetOptions{})
+				if apierrors.IsNotFound(err) {
+					continue
+				} else if err != nil {
+					return false, err
+				}
+
+				if node.UID == target.UID {
+					return false, nil
+				}
+			}
+
+			return true, nil
+		})
+		if err != nil {
+			return fmt.Errorf("waiting for nodes to be deleted: %w", err)
+		}
 	}
 	return nil
 }
