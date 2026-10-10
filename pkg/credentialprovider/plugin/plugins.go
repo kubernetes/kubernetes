@@ -17,6 +17,7 @@ limitations under the License.
 package plugin
 
 import (
+	"context"
 	"fmt"
 	"sync"
 
@@ -30,7 +31,7 @@ import (
 
 type dockerConfigProviderWithCoordinates interface {
 	// provideWithCoordinates returns the DockerConfig and service account coordinates for the given image.
-	provideWithCoordinates(image string) (credentialprovider.DockerConfig, *credentialprovider.ServiceAccountCoordinates)
+	provideWithCoordinates(ctx context.Context, image string) (credentialprovider.DockerConfig, *credentialprovider.ServiceAccountCoordinates)
 }
 
 type provider struct {
@@ -52,14 +53,14 @@ func registerCredentialProviderPlugin(name string, p *pluginProvider) {
 	seenProviderNames.Insert(name)
 
 	providers = append(providers, provider{name, p})
-	klog.V(4).InfoS("Registered credential provider", "provider", name)
+	klog.Background().V(4).Info("Registered credential provider", "provider", name)
 }
 
 type externalCredentialProviderKeyring struct {
 	providers []dockerConfigProviderWithCoordinates
 }
 
-func NewExternalCredentialProviderDockerKeyring(podNamespace, podName, podUID, serviceAccountName string) credentialprovider.DockerKeyring {
+func NewExternalCredentialProviderDockerKeyring(ctx context.Context, podNamespace, podName, podUID, serviceAccountName string) credentialprovider.DockerKeyring {
 	providersMutex.RLock()
 	defer providersMutex.RUnlock()
 
@@ -72,14 +73,14 @@ func NewExternalCredentialProviderDockerKeyring(podNamespace, podName, podUID, s
 			provider: p.impl,
 		}
 		if utilfeature.DefaultFeatureGate.Enabled(features.KubeletServiceAccountTokenForCredentialProviders) {
-			klog.V(4).InfoS("Generating per pod credential provider", "provider", p.name, "podName", podName, "podNamespace", podNamespace, "podUID", podUID, "serviceAccountName", serviceAccountName)
+			klog.FromContext(ctx).V(4).Info("Generating per pod credential provider", "provider", p.name, "podName", podName, "podNamespace", podNamespace, "podUID", podUID, "serviceAccountName", serviceAccountName)
 
 			pp.podNamespace = podNamespace
 			pp.podName = podName
 			pp.podUID = types.UID(podUID)
 			pp.serviceAccountName = serviceAccountName
 		} else {
-			klog.V(4).InfoS("Generating credential provider", "provider", p.name)
+			klog.FromContext(ctx).V(4).Info("Generating credential provider", "provider", p.name)
 		}
 
 		keyring.providers = append(keyring.providers, pp)
@@ -88,11 +89,11 @@ func NewExternalCredentialProviderDockerKeyring(podNamespace, podName, podUID, s
 	return keyring
 }
 
-func (k *externalCredentialProviderKeyring) Lookup(image string) ([]credentialprovider.TrackedAuthConfig, bool) {
+func (k *externalCredentialProviderKeyring) Lookup(ctx context.Context, image string) ([]credentialprovider.TrackedAuthConfig, bool) {
 	keyring := &credentialprovider.BasicDockerKeyring{}
 
 	for _, p := range k.providers {
-		dockerConfig, saCoords := p.provideWithCoordinates(image)
+		dockerConfig, saCoords := p.provideWithCoordinates(ctx, image)
 		if saCoords != nil {
 			keyring.Add(&credentialprovider.CredentialSource{ServiceAccount: saCoords}, dockerConfig)
 		} else {
@@ -100,5 +101,5 @@ func (k *externalCredentialProviderKeyring) Lookup(image string) ([]credentialpr
 		}
 	}
 
-	return keyring.Lookup(image)
+	return keyring.Lookup(ctx, image)
 }

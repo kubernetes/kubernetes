@@ -17,6 +17,7 @@ limitations under the License.
 package secrets
 
 import (
+	"context"
 	"reflect"
 	"testing"
 
@@ -36,7 +37,7 @@ type FakeKeyring struct {
 
 // Lookup implements the DockerKeyring method for fetching credentials based on image name
 // return fake auth and ok
-func (f *FakeKeyring) Lookup(image string) ([]credentialprovider.TrackedAuthConfig, bool) {
+func (f *FakeKeyring) Lookup(ctx context.Context, image string) ([]credentialprovider.TrackedAuthConfig, bool) {
 	return f.auth, f.ok
 }
 
@@ -342,7 +343,7 @@ func Test_MakeDockerKeyring(t *testing.T) {
 				t.Fatalf("error creating secret-based docker keyring: %v", err)
 			}
 
-			authConfigs, found := keyring.Lookup(testcase.image)
+			authConfigs, found := keyring.Lookup(t.Context(), testcase.image)
 			if found != testcase.found {
 				t.Logf("actual lookup status: %v", found)
 				t.Logf("expected lookup status: %v", testcase.found)
