@@ -47,6 +47,16 @@ type CycleState interface {
 	// should be recorded.
 	// This function is mostly for the scheduling framework runtime, plugins usually don't have to use it.
 	ShouldRecordPluginMetrics() bool
+	// SetRecordPluginMetrics sets recordPluginMetrics to the given value.
+	// This function is mostly for the scheduling framework runtime, plugins usually don't have to use it.
+	SetRecordPluginMetrics(flag bool)
+	// ShouldRecordFrameworkExtensionPointMetrics returns whether framework extension metrics
+	// should be recorded.
+	// This function is mostly for the scheduling framework runtime, plugins usually don't have to use it.
+	ShouldRecordFrameworkExtensionPointMetrics() bool
+	// SetRecordFrameworkExtensionPointMetrics sets recordFrameworkExtensionPointMetrics to the given value.
+	// This function is mostly for the scheduling framework runtime, plugins usually don't have to use it.
+	SetRecordFrameworkExtensionPointMetrics(flag bool)
 	// GetSkipFilterPlugins returns plugins that will be skipped in the Filter extension point.
 	// This function is mostly for the scheduling framework runtime, plugins usually don't have to use it.
 	GetSkipFilterPlugins() sets.Set[string]
@@ -118,6 +128,10 @@ type PlacementCycleState interface {
 	// should be recorded.
 	// This function is mostly for the scheduling framework runtime, plugins usually don't have to use it.
 	ShouldRecordPluginMetrics() bool
+	// ShouldRecordFrameworkExtensionPointMetrics returns whether framework extension metrics
+	// should be recorded.
+	// This function is mostly for the scheduling framework runtime, plugins usually don't have to use it.
+	ShouldRecordFrameworkExtensionPointMetrics() bool
 	// Read retrieves data with the given "key" from PlacementCycleState. If the key is not
 	// present, ErrNotFound is returned.
 	//
@@ -145,6 +159,10 @@ type PodGroupCycleState interface {
 	// should be recorded.
 	// This function is mostly for the scheduling framework runtime, plugins usually don't have to use it.
 	ShouldRecordPluginMetrics() bool
+	// ShouldRecordFrameworkExtensionPointMetrics returns whether framework extension metrics
+	// should be recorded.
+	// This function is mostly for the scheduling framework runtime, plugins usually don't have to use it.
+	ShouldRecordFrameworkExtensionPointMetrics() bool
 	// Read retrieves data with the given "key" from PodGroupCycleState. If the key is not
 	// present, ErrNotFound is returned.
 	//
