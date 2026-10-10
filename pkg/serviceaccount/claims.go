@@ -33,6 +33,7 @@ import (
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
+	podutil "k8s.io/kubernetes/pkg/api/pod"
 	"k8s.io/kubernetes/pkg/apis/authentication"
 	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/features"
@@ -74,7 +75,7 @@ type ref struct {
 	UID  string `json:"uid,omitempty"`
 }
 
-func Claims(sa core.ServiceAccount, pod *core.Pod, secret *core.Secret, node *core.Node, validating *admissionregistrationv1.ValidatingWebhookConfiguration, mutating *admissionregistrationv1.MutatingWebhookConfiguration, expirationSeconds, warnafter int64, audience []string, attestations map[string]authentication.AttestationValue) (*jwt.Claims, interface{}, error) {
+func Claims(sa core.ServiceAccount, pod podutil.PodAccessor, secret *core.Secret, node *core.Node, validating *admissionregistrationv1.ValidatingWebhookConfiguration, mutating *admissionregistrationv1.MutatingWebhookConfiguration, expirationSeconds, warnafter int64, audience []string, attestations map[string]authentication.AttestationValue) (*jwt.Claims, interface{}, error) {
 	now := now()
 	sc := &jwt.Claims{
 		Subject:   apiserverserviceaccount.MakeUsername(sa.Namespace, sa.Name),
@@ -103,8 +104,8 @@ func Claims(sa core.ServiceAccount, pod *core.Pod, secret *core.Secret, node *co
 	switch {
 	case pod != nil:
 		pc.Kubernetes.Pod = &ref{
-			Name: pod.Name,
-			UID:  string(pod.UID),
+			Name: pod.GetName(),
+			UID:  string(pod.GetUID()),
 		}
 		// if this is bound to a pod and the node information is available, persist that too
 		if node != nil {

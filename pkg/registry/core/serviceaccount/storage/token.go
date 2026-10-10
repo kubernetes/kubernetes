@@ -44,6 +44,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/warning"
 	"k8s.io/klog/v2"
+	podutil "k8s.io/kubernetes/pkg/api/pod"
 	authenticationapi "k8s.io/kubernetes/pkg/apis/authentication"
 	authenticationvalidation "k8s.io/kubernetes/pkg/apis/authentication/validation"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -164,7 +165,7 @@ func (r *TokenREST) Create(ctx context.Context, name string, obj runtime.Object,
 	}
 
 	var (
-		pod        *api.Pod
+		pod        podutil.PodAccessor
 		node       *api.Node
 		secret     *api.Secret
 		validating *admissionregistrationv1.ValidatingWebhookConfiguration
@@ -182,12 +183,12 @@ func (r *TokenREST) Create(ctx context.Context, name string, obj runtime.Object,
 			if err != nil {
 				return nil, err
 			}
-			pod = podObj.(*api.Pod)
-			if name != pod.Spec.ServiceAccountName {
+			pod = podutil.MustAccessor(podObj)
+			if name != pod.GetSpecServiceAccountName() {
 				return nil, errors.NewBadRequest(fmt.Sprintf("cannot bind token for serviceaccount %q to pod running with different serviceaccount name.", name))
 			}
-			uid = pod.UID
-			if nodeName := pod.Spec.NodeName; nodeName != "" {
+			uid = pod.GetUID()
+			if nodeName := pod.GetSpecNodeName(); nodeName != "" {
 				newCtx := newContext(ctx, "nodes", nodeName, "", api.SchemeGroupVersion.WithKind("Node"))
 				// set ResourceVersion=0 to allow this to be read/served from the apiservers watch cache
 				nodeObj, err := r.nodes.Get(newCtx, nodeName, &metav1.GetOptions{ResourceVersion: "0"})
@@ -199,7 +200,7 @@ func (r *TokenREST) Create(ctx context.Context, name string, obj runtime.Object,
 					// if the referenced Node object does not exist, we still embed just the pod name into the
 					// claims so that clients still have some indication of what node a pod is assigned to when
 					// inspecting a token (even if the UID is not present).
-					klog.V(4).ErrorS(err, "failed fetching node for pod", "pod", klog.KObj(pod), "podUID", pod.UID, "nodeName", nodeName)
+					klog.V(4).ErrorS(err, "failed fetching node for pod", "pod", klog.KObj(pod), "podUID", pod.GetUID(), "nodeName", nodeName)
 					node = &api.Node{ObjectMeta: metav1.ObjectMeta{Name: nodeName}}
 				case err != nil:
 					return nil, errors.NewInternalError(err)

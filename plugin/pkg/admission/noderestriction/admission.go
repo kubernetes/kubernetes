@@ -347,28 +347,28 @@ func (p *Plugin) admitPodStatus(nodeName string, a admission.Attributes) error {
 	switch a.GetOperation() {
 	case admission.Update:
 		// require an existing pod
-		oldPod, ok := a.GetOldObject().(*api.Pod)
-		if !ok {
+		oldPod, err := podutil.Accessor(a.GetOldObject())
+		if err != nil {
 			return admission.NewForbidden(a, fmt.Errorf("unexpected type %T", a.GetOldObject()))
 		}
 		// only allow a node to update status of a pod bound to itself
-		if oldPod.Spec.NodeName != nodeName {
+		if oldPod.GetSpecNodeName() != nodeName {
 			return admission.NewForbidden(a, fmt.Errorf("node %q can only update pod status for pods with spec.nodeName set to itself", nodeName))
 		}
-		newPod, ok := a.GetObject().(*api.Pod)
-		if !ok {
+		newPod, err := podutil.Accessor(a.GetObject())
+		if err != nil {
 			return admission.NewForbidden(a, fmt.Errorf("unexpected type %T", a.GetObject()))
 		}
-		if !labels.Equals(oldPod.Labels, newPod.Labels) {
+		if !labels.Equals(oldPod.GetLabels(), newPod.GetLabels()) {
 			return admission.NewForbidden(a, fmt.Errorf("node %q cannot update labels through pod status", nodeName))
 		}
-		if !resourceClaimStatusesEqual(oldPod.Status.ResourceClaimStatuses, newPod.Status.ResourceClaimStatuses) {
+		if !resourceClaimStatusesEqual(oldPod.GetStatusResourceClaimStatuses(), newPod.GetStatusResourceClaimStatuses()) {
 			return admission.NewForbidden(a, fmt.Errorf("node %q cannot update resource claim statues", nodeName))
 		}
-		if !extendedResourceClaimStatusEqual(oldPod.Status.ExtendedResourceClaimStatus, newPod.Status.ExtendedResourceClaimStatus) {
+		if !extendedResourceClaimStatusEqual(oldPod.GetStatusExtendedResourceClaimStatus(), newPod.GetStatusExtendedResourceClaimStatus()) {
 			return admission.NewForbidden(a, fmt.Errorf("node %q cannot update extended resource claim status", nodeName))
 		}
-		if !nodeAllocatableResourceClaimStatusesEqual(oldPod.Status.NodeAllocatableResourceClaimStatuses, newPod.Status.NodeAllocatableResourceClaimStatuses) {
+		if !nodeAllocatableResourceClaimStatusesEqual(oldPod.GetStatusNodeAllocatableResourceClaimStatuses(), newPod.GetStatusNodeAllocatableResourceClaimStatuses()) {
 			return admission.NewForbidden(a, fmt.Errorf("node %q cannot update node allocatable resource claim statuses", nodeName))
 		}
 		return nil

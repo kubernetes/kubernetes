@@ -177,23 +177,23 @@ func (podStrategy) CheckGracefulDelete(ctx context.Context, obj runtime.Object, 
 	if options == nil {
 		return false
 	}
-	pod := obj.(*api.Pod)
+	pod := podutil.MustAccessor(obj)
 	period := int64(0)
 	// user has specified a value
 	if options.GracePeriodSeconds != nil {
 		period = *options.GracePeriodSeconds
 	} else {
 		// use the default value if set, or deletes the pod immediately (0)
-		if pod.Spec.TerminationGracePeriodSeconds != nil {
-			period = *pod.Spec.TerminationGracePeriodSeconds
+		if tgp := pod.GetSpecTerminationGracePeriodSeconds(); tgp != nil {
+			period = *tgp
 		}
 	}
 	// if the pod is not scheduled, delete immediately
-	if len(pod.Spec.NodeName) == 0 {
+	if len(pod.GetSpecNodeName()) == 0 {
 		period = 0
 	}
 	// if the pod is already terminated, delete immediately
-	if pod.Status.Phase == api.PodFailed || pod.Status.Phase == api.PodSucceeded {
+	if phase := pod.GetStatusPhase(); phase == api.PodFailed || phase == api.PodSucceeded {
 		period = 0
 	}
 
@@ -296,13 +296,13 @@ func (podStatusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Ob
 
 // WarningsOnUpdate returns warnings for the given update.
 func (podStatusStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
-	pod := obj.(*api.Pod)
+	pod := podutil.MustAccessor(obj)
 	var warnings []string
 
-	for i, podIP := range pod.Status.PodIPs {
+	for i, podIP := range pod.GetStatusPodIPs() {
 		warnings = append(warnings, utilvalidation.GetWarningsForIP(field.NewPath("status", "podIPs").Index(i).Child("ip"), podIP.IP)...)
 	}
-	for i, hostIP := range pod.Status.HostIPs {
+	for i, hostIP := range pod.GetStatusHostIPs() {
 		warnings = append(warnings, utilvalidation.GetWarningsForIP(field.NewPath("status", "hostIPs").Index(i).Child("ip"), hostIP.IP)...)
 	}
 
@@ -491,11 +491,11 @@ func (p podResizeStrategy) GetResetFieldsFilter() map[fieldpath.APIVersion]field
 
 // GetAttrs returns labels and fields of a given object for filtering purposes.
 func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
-	pod, ok := obj.(*api.Pod)
-	if !ok {
+	pod, err := podutil.Accessor(obj)
+	if err != nil {
 		return nil, nil, fmt.Errorf("not a pod")
 	}
-	return labels.Set(pod.ObjectMeta.Labels), ToSelectableFields(pod), nil
+	return labels.Set(pod.GetLabels()), ToSelectableFields(pod), nil
 }
 
 // MatchPod returns a generic matcher for a given label and field selector.
@@ -510,16 +510,16 @@ func MatchPod(label labels.Selector, field fields.Selector) storage.SelectionPre
 
 // NodeNameTriggerFunc returns value spec.nodename of given object.
 func NodeNameTriggerFunc(obj runtime.Object) string {
-	return obj.(*api.Pod).Spec.NodeName
+	return podutil.MustAccessor(obj).GetSpecNodeName()
 }
 
 // NodeNameIndexFunc return value spec.nodename of given object.
 func NodeNameIndexFunc(obj interface{}) ([]string, error) {
-	pod, ok := obj.(*api.Pod)
-	if !ok {
+	pod, err := podutil.Accessor(obj)
+	if err != nil {
 		return nil, fmt.Errorf("not a pod")
 	}
-	return []string{pod.Spec.NodeName}, nil
+	return []string{pod.GetSpecNodeName()}, nil
 }
 
 // Indexers returns the indexers for pod storage.
@@ -531,26 +531,26 @@ func Indexers() *cache.Indexers {
 
 // ToSelectableFields returns a field set that represents the object
 // TODO: fields are not labels, and the validation rules for them do not apply.
-func ToSelectableFields(pod *api.Pod) fields.Set {
+func ToSelectableFields(pod podutil.PodAccessor) fields.Set {
 	// The purpose of allocation with a given number of elements is to reduce
 	// amount of allocations needed to create the fields.Set. If you add any
 	// field here or the number of object-meta related fields changes, this should
 	// be adjusted.
 	podSpecificFieldsSet := make(fields.Set, 10)
-	podSpecificFieldsSet["spec.nodeName"] = pod.Spec.NodeName
-	podSpecificFieldsSet["spec.restartPolicy"] = string(pod.Spec.RestartPolicy)
-	podSpecificFieldsSet["spec.schedulerName"] = string(pod.Spec.SchedulerName)
-	podSpecificFieldsSet["spec.serviceAccountName"] = string(pod.Spec.ServiceAccountName)
-	podSpecificFieldsSet["spec.hostNetwork"] = strconv.FormatBool(pod.Spec.HostNetwork)
-	podSpecificFieldsSet["status.phase"] = string(pod.Status.Phase)
+	podSpecificFieldsSet["spec.nodeName"] = pod.GetSpecNodeName()
+	podSpecificFieldsSet["spec.restartPolicy"] = string(pod.GetSpecRestartPolicy())
+	podSpecificFieldsSet["spec.schedulerName"] = pod.GetSpecSchedulerName()
+	podSpecificFieldsSet["spec.serviceAccountName"] = pod.GetSpecServiceAccountName()
+	podSpecificFieldsSet["spec.hostNetwork"] = strconv.FormatBool(pod.GetSpecHostNetwork())
+	podSpecificFieldsSet["status.phase"] = string(pod.GetStatusPhase())
 	// TODO: add podIPs as a downward API value(s) with proper format
 	podIP := ""
-	if len(pod.Status.PodIPs) > 0 {
-		podIP = string(pod.Status.PodIPs[0].IP)
+	if podIPs := pod.GetStatusPodIPs(); len(podIPs) > 0 {
+		podIP = podIPs[0].IP
 	}
 	podSpecificFieldsSet["status.podIP"] = podIP
-	podSpecificFieldsSet["status.nominatedNodeName"] = string(pod.Status.NominatedNodeName)
-	return generic.AddObjectMetaFieldsSet(podSpecificFieldsSet, &pod.ObjectMeta, true)
+	podSpecificFieldsSet["status.nominatedNodeName"] = pod.GetStatusNominatedNodeName()
+	return generic.AddObjectMetaFieldsSet(podSpecificFieldsSet, &metav1.ObjectMeta{Name: pod.GetName(), Namespace: pod.GetNamespace()}, true)
 }
 
 // ResourceGetter is an interface for retrieving resources by ResourceLocation.
@@ -558,12 +558,12 @@ type ResourceGetter interface {
 	Get(context.Context, string, *metav1.GetOptions) (runtime.Object, error)
 }
 
-func getPod(ctx context.Context, getter ResourceGetter, name string) (*api.Pod, error) {
+func getPod(ctx context.Context, getter ResourceGetter, name string) (podutil.PodAccessor, error) {
 	obj, err := getter.Get(ctx, name, &metav1.GetOptions{})
 	if err != nil {
 		return nil, err
 	}
-	pod := obj.(*api.Pod)
+	pod := podutil.MustAccessor(obj)
 	if pod == nil {
 		return nil, fmt.Errorf("Unexpected object type: %#v", pod)
 	}
@@ -571,12 +571,12 @@ func getPod(ctx context.Context, getter ResourceGetter, name string) (*api.Pod, 
 }
 
 // getPodIP returns primary IP for a Pod
-func getPodIP(pod *api.Pod) string {
+func getPodIP(pod podutil.PodAccessor) string {
 	if pod == nil {
 		return ""
 	}
-	if len(pod.Status.PodIPs) > 0 {
-		return pod.Status.PodIPs[0].IP
+	if podIPs := pod.GetStatusPodIPs(); len(podIPs) > 0 {
+		return podIPs[0].IP
 	}
 
 	return ""
@@ -598,9 +598,10 @@ func ResourceLocation(ctx context.Context, getter ResourceGetter, rt http.RoundT
 
 	// Try to figure out a port.
 	if port == "" {
-		for i := range pod.Spec.Containers {
-			if len(pod.Spec.Containers[i].Ports) > 0 {
-				port = fmt.Sprintf("%d", pod.Spec.Containers[i].Ports[0].ContainerPort)
+		containers := pod.GetSpecContainers()
+		for i := range containers {
+			if len(containers[i].Ports) > 0 {
+				port = fmt.Sprintf("%d", containers[i].Ports[0].ContainerPort)
 				break
 			}
 		}
@@ -647,7 +648,7 @@ func LogLocation(
 	if err != nil {
 		return nil, nil, err
 	}
-	nodeName := types.NodeName(pod.Spec.NodeName)
+	nodeName := types.NodeName(pod.GetSpecNodeName())
 	if len(nodeName) == 0 {
 		// If pod has not been assigned a host, return an empty location
 		return nil, nil, nil
@@ -685,7 +686,7 @@ func LogLocation(
 	loc := &url.URL{
 		Scheme:   nodeInfo.Scheme,
 		Host:     net.JoinHostPort(nodeInfo.Hostname, nodeInfo.Port),
-		Path:     fmt.Sprintf("/containerLogs/%s/%s/%s", pod.Namespace, pod.Name, container),
+		Path:     fmt.Sprintf("/containerLogs/%s/%s/%s", pod.GetNamespace(), pod.GetName(), container),
 		RawQuery: params.Encode(),
 	}
 
@@ -695,16 +696,23 @@ func LogLocation(
 	return loc, nodeInfo.Transport, nil
 }
 
-func podHasContainerWithName(pod *api.Pod, containerName string) bool {
-	var hasContainer bool
-	podutil.VisitContainers(&pod.Spec, podutil.AllFeatureEnabledContainers(), func(c *api.Container, containerType podutil.ContainerType) bool {
+func podHasContainerWithName(pod podutil.PodAccessor, containerName string) bool {
+	for _, c := range pod.GetSpecInitContainers() {
 		if c.Name == containerName {
-			hasContainer = true
-			return false
+			return true
 		}
-		return true
-	})
-	return hasContainer
+	}
+	for _, c := range pod.GetSpecContainers() {
+		if c.Name == containerName {
+			return true
+		}
+	}
+	for _, c := range pod.GetSpecEphemeralContainers() {
+		if c.Name == containerName {
+			return true
+		}
+	}
+	return false
 }
 
 func streamParams(params url.Values, opts runtime.Object) error {
@@ -797,7 +805,7 @@ func streamLocation(
 		return nil, nil, err
 	}
 
-	nodeName := types.NodeName(pod.Spec.NodeName)
+	nodeName := types.NodeName(pod.GetSpecNodeName())
 	if len(nodeName) == 0 {
 		// If pod has not been assigned a host, return an empty location
 		return nil, nil, errors.NewBadRequest(fmt.Sprintf("pod %s does not have a host assigned", name))
@@ -813,7 +821,7 @@ func streamLocation(
 	loc := &url.URL{
 		Scheme:   nodeInfo.Scheme,
 		Host:     net.JoinHostPort(nodeInfo.Hostname, nodeInfo.Port),
-		Path:     fmt.Sprintf("/%s/%s/%s/%s", path, pod.Namespace, pod.Name, container),
+		Path:     fmt.Sprintf("/%s/%s/%s/%s", path, pod.GetNamespace(), pod.GetName(), container),
 		RawQuery: params.Encode(),
 	}
 	return loc, nodeInfo, nil
@@ -832,7 +840,7 @@ func PortForwardLocation(
 		return nil, nil, err
 	}
 
-	nodeName := types.NodeName(pod.Spec.NodeName)
+	nodeName := types.NodeName(pod.GetSpecNodeName())
 	if len(nodeName) == 0 {
 		// If pod has not been assigned a host, return an empty location
 		return nil, nil, errors.NewBadRequest(fmt.Sprintf("pod %s does not have a host assigned", name))
@@ -848,32 +856,38 @@ func PortForwardLocation(
 	loc := &url.URL{
 		Scheme:   nodeInfo.Scheme,
 		Host:     net.JoinHostPort(nodeInfo.Hostname, nodeInfo.Port),
-		Path:     fmt.Sprintf("/portForward/%s/%s", pod.Namespace, pod.Name),
+		Path:     fmt.Sprintf("/portForward/%s/%s", pod.GetNamespace(), pod.GetName()),
 		RawQuery: params.Encode(),
 	}
 	return loc, nodeInfo, nil
 }
 
 // validateContainer validate container is valid for pod, return valid container
-func validateContainer(container string, pod *api.Pod) (string, error) {
+func validateContainer(container string, pod podutil.PodAccessor) (string, error) {
 	if len(container) == 0 {
-		switch len(pod.Spec.Containers) {
+		containers := pod.GetSpecContainers()
+		switch len(containers) {
 		case 1:
-			container = pod.Spec.Containers[0].Name
+			container = containers[0].Name
 		case 0:
-			return "", errors.NewBadRequest(fmt.Sprintf("a container name must be specified for pod %s", pod.Name))
+			return "", errors.NewBadRequest(fmt.Sprintf("a container name must be specified for pod %s", pod.GetName()))
 		default:
 			var containerNames []string
-			podutil.VisitContainers(&pod.Spec, podutil.AllFeatureEnabledContainers(), func(c *api.Container, containerType podutil.ContainerType) bool {
+			for _, c := range pod.GetSpecInitContainers() {
 				containerNames = append(containerNames, c.Name)
-				return true
-			})
-			errStr := fmt.Sprintf("a container name must be specified for pod %s, choose one of: %s", pod.Name, containerNames)
+			}
+			for _, c := range containers {
+				containerNames = append(containerNames, c.Name)
+			}
+			for _, c := range pod.GetSpecEphemeralContainers() {
+				containerNames = append(containerNames, c.Name)
+			}
+			errStr := fmt.Sprintf("a container name must be specified for pod %s, choose one of: %s", pod.GetName(), containerNames)
 			return "", errors.NewBadRequest(errStr)
 		}
 	} else {
 		if !podHasContainerWithName(pod, container) {
-			return "", errors.NewBadRequest(fmt.Sprintf("container %s is not valid for pod %s", container, pod.Name))
+			return "", errors.NewBadRequest(fmt.Sprintf("container %s is not valid for pod %s", container, pod.GetName()))
 		}
 	}
 
