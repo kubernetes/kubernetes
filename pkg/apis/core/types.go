@@ -2662,15 +2662,14 @@ type Probe struct {
 	// Minimum consecutive failures for the probe to be considered failed after having succeeded.
 	// +optional
 	FailureThreshold int32
-	// Optional duration in seconds the pod needs to terminate gracefully upon probe failure.
-	// The grace period is the duration in seconds after the processes running in the pod are sent
-	// a termination signal and the time when the processes are forcibly halted with a kill signal.
+	// Optional duration in seconds the container needs to terminate gracefully upon probe failure.
+	// The kubelet waits up to the grace period for the preStop hook to complete, then asks the
+	// container runtime to stop the container within the remaining time or a short minimum,
+	// whichever is longer.
 	// Set this value longer than the expected cleanup time for your process.
 	// If this value is nil, the pod's terminationGracePeriodSeconds will be used. Otherwise, this
 	// value overrides the value provided by the pod spec.
-	// Value must be non-negative integer. The value zero indicates stop immediately via
-	// the kill signal (no opportunity to shut down).
-	// This is a beta field and requires enabling ProbeTerminationGracePeriod feature gate.
+	// Minimum value is 1. Must not be set for readiness probes.
 	// +optional
 	TerminationGracePeriodSeconds *int64
 }
@@ -3916,13 +3915,13 @@ type PodSpec struct {
 	EphemeralContainers []EphemeralContainer
 	// +optional
 	RestartPolicy RestartPolicy
-	// Optional duration in seconds the pod needs to terminate gracefully. May be decreased in delete request.
-	// Value must be non-negative integer. The value zero indicates stop immediately via the kill
-	// signal (no opportunity to shut down).
-	// If this value is nil, the default grace period will be used instead.
-	// The grace period is the duration in seconds after the processes running in the pod are sent
-	// a termination signal and the time when the processes are forcibly halted with a kill signal.
-	// Set this value longer than the expected cleanup time for your process.
+	// Optional duration in seconds the pod needs to terminate gracefully.
+	// The delete that starts the deletion may override it, later ones may only shorten it.
+	// Must be non-negative. Zero makes a delete request that starts the deletion
+	// without gracePeriodSeconds a force deletion, which does not wait for the pod to terminate.
+	// For each container, the kubelet waits up to the grace period for its preStop hook,
+	// then gives the runtime the rest, at least a short minimum, to stop it.
+	// Zero does not always skip preStop hooks. Set it above your cleanup time.
 	// +optional
 	TerminationGracePeriodSeconds *int64
 	// Optional duration in seconds relative to the StartTime that the pod may be active on a node
