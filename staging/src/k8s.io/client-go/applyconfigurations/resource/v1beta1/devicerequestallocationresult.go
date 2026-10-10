@@ -71,15 +71,9 @@ type DeviceRequestAllocationResultApplyConfiguration struct {
 	Tolerations []DeviceTolerationApplyConfiguration `json:"tolerations,omitempty"`
 	// bindingConditions contains a copy of the BindingConditions
 	// from the corresponding ResourceSlice at the time of allocation.
-	//
-	// This is a beta field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus
-	// feature gates.
 	BindingConditions []string `json:"bindingConditions,omitempty"`
 	// bindingFailureConditions contains a copy of the BindingFailureConditions
 	// from the corresponding ResourceSlice at the time of allocation.
-	//
-	// This is a beta field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus
-	// feature gates.
 	BindingFailureConditions []string `json:"bindingFailureConditions,omitempty"`
 	// shareID uniquely identifies an individual allocation share of the device,
 	// used when the device supports multiple simultaneous allocations.
