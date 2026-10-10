@@ -33,7 +33,7 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	logsapi "k8s.io/component-base/logs/api/v1"
 	"k8s.io/component-base/metrics"
-	"k8s.io/component-base/metrics/features"
+	metricsfeatures "k8s.io/component-base/metrics/features"
 )
 
 func TestCloudControllerNamesConsistency(t *testing.T) {
@@ -87,9 +87,9 @@ func TestNativeHistogramsFeatureGateApplied(t *testing.T) {
 	for name, newCommand := range testCases {
 		t.Run(name, func(t *testing.T) {
 			// Registered before SetFeatureGateDuringTest so that it runs after the gate is restored.
-			t.Cleanup(func() { features.ApplyFeatureGates(utilfeature.DefaultFeatureGate) })
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NativeHistograms, false)
-			features.ApplyFeatureGates(utilfeature.DefaultFeatureGate)
+			t.Cleanup(func() { metricsfeatures.ApplyFeatureGates(utilfeature.DefaultFeatureGate) })
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, metricsfeatures.NativeHistograms, false)
+			metricsfeatures.ApplyFeatureGates(utilfeature.DefaultFeatureGate)
 			if histogramIsNative(t) {
 				t.Fatal("histogram is native before the command has run")
 			}

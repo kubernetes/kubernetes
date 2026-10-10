@@ -27,7 +27,7 @@ import (
 	"k8s.io/cloud-provider/options"
 	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/component-base/cli/globalflag"
-	"k8s.io/component-base/metrics/features"
+	metricsfeatures "k8s.io/component-base/metrics/features"
 	"k8s.io/component-base/term"
 	"k8s.io/component-base/version/verflag"
 )
@@ -143,7 +143,7 @@ func (cb *CommandBuilder) BuildCommand() *cobra.Command {
 
 			// Propagate feature gate state to the metrics subsystem. This must be called
 			// after feature gates are set and before any histogram metrics are registered.
-			features.ApplyFeatureGates(utilfeature.DefaultFeatureGate)
+			metricsfeatures.ApplyFeatureGates(utilfeature.DefaultFeatureGate)
 
 			config, err := cb.options.Config(ControllerNames(cb.controllerInitFuncConstructors), ControllersDisabledByDefault.List(),
 				cb.controllerAliases, WebhookNames(cb.webhookConfigs), WebhooksDisabledByDefault.List())
