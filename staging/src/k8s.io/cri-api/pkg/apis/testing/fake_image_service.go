@@ -18,12 +18,17 @@ package testing
 
 import (
 	"context"
+	"slices"
+	"strings"
 	"sync"
 	"testing"
 
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
 
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
+	crierrors "k8s.io/cri-api/pkg/errors"
 )
 
 // FakeImageService fakes the image service.
@@ -37,6 +42,11 @@ type FakeImageService struct {
 	Pinned        map[string]bool
 
 	pulledImages []*pulledImage
+
+	// SecurityProfiles maps the references of the pulled security profiles to their kinds.
+	SecurityProfiles map[string]runtimeapi.SecurityProfileKind
+
+	pulledSecurityProfiles []*pulledSecurityProfile
 
 	FakeFilesystemUsage          []*runtimeapi.FilesystemUsage
 	FakeContainerFilesystemUsage []*runtimeapi.FilesystemUsage
@@ -108,6 +118,8 @@ func NewFakeImageService() *FakeImageService {
 		Called: make([]string, 0),
 		Errors: make(map[string][]error),
 		Images: make(map[string]*runtimeapi.Image),
+
+		SecurityProfiles: make(map[string]runtimeapi.SecurityProfileKind),
 	}
 }
 
@@ -210,6 +222,89 @@ func (r *FakeImageService) PullImage(_ context.Context, image *runtimeapi.ImageS
 	return imageID, nil
 }
 
+// PullSecurityProfile emulates pulling a security profile into the FakeImageService.
+func (r *FakeImageService) PullSecurityProfile(_ context.Context, image *runtimeapi.ImageSpec, auth *runtimeapi.AuthConfig, podSandboxConfig *runtimeapi.PodSandboxConfig, kind runtimeapi.SecurityProfileKind) (*runtimeapi.PullSecurityProfileResponse, error) {
+	r.Lock()
+	defer r.Unlock()
+
+	r.Called = append(r.Called, "PullSecurityProfile")
+	if err := r.popError("PullSecurityProfile"); err != nil {
+		return nil, err
+	}
+
+	// Runtimes reject kinds they do not support, and AppArmor is reserved.
+	if kind != runtimeapi.SecurityProfileKind_Seccomp {
+		return nil, status.Errorf(codes.InvalidArgument, "%s: unsupported security profile kind %v", crierrors.ErrSecurityProfileInvalid, kind)
+	}
+
+	r.pulledSecurityProfiles = append(r.pulledSecurityProfiles, &pulledSecurityProfile{imageSpec: image, authConfig: auth, kind: kind})
+	if r.SecurityProfiles == nil {
+		r.SecurityProfiles = make(map[string]runtimeapi.SecurityProfileKind)
+	}
+	_, cached := r.SecurityProfiles[image.Image]
+	r.SecurityProfiles[image.Image] = kind
+
+	return &runtimeapi.PullSecurityProfileResponse{Cached: cached}, nil
+}
+
+// ListSecurityProfiles lists the security profiles pulled into the
+// FakeImageService, grouping their references by digest.
+func (r *FakeImageService) ListSecurityProfiles(_ context.Context) ([]*runtimeapi.SecurityProfileInfo, error) {
+	r.Lock()
+	defer r.Unlock()
+
+	r.Called = append(r.Called, "ListSecurityProfiles")
+	if err := r.popError("ListSecurityProfiles"); err != nil {
+		return nil, err
+	}
+
+	byDigest := map[string]*runtimeapi.SecurityProfileInfo{}
+	for ref := range r.SecurityProfiles {
+		digest := securityProfileDigest(ref)
+		info, ok := byDigest[digest]
+		if !ok {
+			info = &runtimeapi.SecurityProfileInfo{Digest: digest, Size: r.FakeImageSize}
+			byDigest[digest] = info
+		}
+		info.Refs = append(info.Refs, ref)
+	}
+
+	profiles := make([]*runtimeapi.SecurityProfileInfo, 0, len(byDigest))
+	for _, info := range byDigest {
+		slices.Sort(info.Refs)
+		profiles = append(profiles, info)
+	}
+	slices.SortFunc(profiles, func(a, b *runtimeapi.SecurityProfileInfo) int {
+		return strings.Compare(a.Digest, b.Digest)
+	})
+	return profiles, nil
+}
+
+// RemoveSecurityProfile removes all references of a security profile digest
+// from the FakeImageService.
+func (r *FakeImageService) RemoveSecurityProfile(_ context.Context, digest string) error {
+	r.Lock()
+	defer r.Unlock()
+
+	r.Called = append(r.Called, "RemoveSecurityProfile")
+	if err := r.popError("RemoveSecurityProfile"); err != nil {
+		return err
+	}
+
+	for ref := range r.SecurityProfiles {
+		if securityProfileDigest(ref) == digest {
+			delete(r.SecurityProfiles, ref)
+		}
+	}
+	return nil
+}
+
+// securityProfileDigest returns the digest of a digest-pinned reference.
+func securityProfileDigest(ref string) string {
+	_, digest, _ := strings.Cut(ref, "@")
+	return digest
+}
+
 // RemoveImage removes image from the FakeImageService.
 func (r *FakeImageService) RemoveImage(_ context.Context, image *runtimeapi.ImageSpec) error {
 	r.Lock()
@@ -258,6 +353,26 @@ func (r *FakeImageService) AssertImagePulledWithAuth(t *testing.T, image *runtim
 type pulledImage struct {
 	imageSpec  *runtimeapi.ImageSpec
 	authConfig *runtimeapi.AuthConfig
+}
+
+// AssertSecurityProfilePulledWithAuth validates whether the security profile
+// was pulled with auth and kind and asserts if it wasn't.
+func (r *FakeImageService) AssertSecurityProfilePulledWithAuth(t *testing.T, image *runtimeapi.ImageSpec, auth *runtimeapi.AuthConfig, kind runtimeapi.SecurityProfileKind, failMsg string) {
+	t.Helper()
+	r.Lock()
+	defer r.Unlock()
+	for _, p := range r.pulledSecurityProfiles {
+		if proto.Equal(p.imageSpec, image) && proto.Equal(p.authConfig, auth) && p.kind == kind {
+			return
+		}
+	}
+	t.Errorf("%s: security profile %v was not pulled with auth %v and kind %v", failMsg, image, auth, kind)
+}
+
+type pulledSecurityProfile struct {
+	imageSpec  *runtimeapi.ImageSpec
+	authConfig *runtimeapi.AuthConfig
+	kind       runtimeapi.SecurityProfileKind
 }
 
 // Close will shutdown the internal gRPC client connection.
