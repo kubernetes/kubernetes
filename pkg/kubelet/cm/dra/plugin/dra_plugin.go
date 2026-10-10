@@ -48,15 +48,25 @@ var servicesSupportedByKubelet = []string{
 	drapbv1beta1.DRAPluginService,
 }
 
+// All DRAResourceHealth API versions supported by the kubelet.
+// Sorted by most recent first, oldest last. The kubelet picks the first one
+// that the plugin also advertises.
+var healthServicesSupportedByKubelet = []string{
+	drahealthv1alpha1.DRAResourceHealth_ServiceDesc.ServiceName,
+}
+
 // DRAPlugin contains information about one registered plugin of a DRA driver.
 // It implements the kubelet operations for preparing/unpreparing by calling
 // a gRPC interface that is implemented by the plugin.
 type DRAPlugin struct {
-	driverName        string
-	conn              *grpc.ClientConn
-	endpoint          string
-	chosenService     string // e.g. drapbv1.DRAPluginService
-	clientCallTimeout time.Duration
+	driverName    string
+	conn          *grpc.ClientConn
+	endpoint      string
+	chosenService string // e.g. drapbv1.DRAPluginService
+	// chosenHealthService is the negotiated DRAResourceHealth gRPC service,
+	// or "" if the plugin does not provide the optional health service.
+	chosenHealthService string
+	clientCallTimeout   time.Duration
 
 	mutex         sync.Mutex
 	backgroundCtx context.Context

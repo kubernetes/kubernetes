@@ -164,7 +164,7 @@ func TestGRPCConnIsReused(t *testing.T) {
 
 	// ensure the plugin we are using is registered
 	draPlugins := NewDRAPluginManager(tCtx, nil, nil, &mockStreamHandler{}, 0)
-	tCtx.ExpectNoError(draPlugins.add(driverName, addr, drapbv1.DRAPluginService, defaultClientCallTimeout), "add plugin")
+	tCtx.ExpectNoError(draPlugins.add(driverName, addr, drapbv1.DRAPluginService, drahealthv1alpha1.DRAResourceHealth_ServiceDesc.ServiceName, defaultClientCallTimeout), "add plugin")
 	plugin, err := draPlugins.GetPlugin(driverName)
 	tCtx.ExpectNoError(err, "get plugin")
 	conn := plugin.conn
@@ -276,7 +276,7 @@ func TestGRPCConnUsableAfterIdle(t *testing.T) {
 	// ensure the plugin we are using is registered
 	draPlugins := NewDRAPluginManager(tCtx, nil, nil, &mockStreamHandler{}, 0)
 	draPlugins.withIdleTimeout = 5 * time.Second
-	tCtx.ExpectNoError(draPlugins.add(driverName, addr, service, defaultClientCallTimeout), "add plugin")
+	tCtx.ExpectNoError(draPlugins.add(driverName, addr, service, "", defaultClientCallTimeout), "add plugin")
 	plugin, err := draPlugins.GetPlugin(driverName)
 	tCtx.ExpectNoError(err, "get plugin")
 
@@ -320,7 +320,7 @@ func TestGetDRAPlugin(t *testing.T) {
 		{
 			description: "plugin exists",
 			setup: func(draPlugins *DRAPluginManager) error {
-				return draPlugins.add("dummy-driver", "/tmp/dra.sock", "", defaultClientCallTimeout)
+				return draPlugins.add("dummy-driver", "/tmp/dra.sock", "", "", defaultClientCallTimeout)
 			},
 			driverName: "dummy-driver",
 		},
@@ -386,7 +386,7 @@ func TestGRPCMethods(t *testing.T) {
 
 			driverName := "dummy-driver"
 			draPlugins := NewDRAPluginManager(tCtx, nil, nil, &mockStreamHandler{}, 0)
-			tCtx.ExpectNoError(draPlugins.add(driverName, addr, test.chosenService, defaultClientCallTimeout))
+			tCtx.ExpectNoError(draPlugins.add(driverName, addr, test.chosenService, "", defaultClientCallTimeout))
 
 			plugin, err := draPlugins.GetPlugin(driverName)
 			if err != nil {
@@ -425,7 +425,7 @@ func TestGRPCWithTimeoutEnforced(t *testing.T) {
 	driverName := "dummy-driver"
 	timeout := time.Second
 	manager := NewDRAPluginManager(tCtx, nil, nil, nil, 0)
-	err = manager.add(driverName, addr, service, timeout)
+	err = manager.add(driverName, addr, service, "", timeout)
 	require.NoError(t, err, "unexpected error while adding the plugin")
 
 	plugin, err := manager.GetPlugin(driverName)
@@ -537,7 +537,7 @@ func TestPlugin_WatchResources(t *testing.T) {
 	defer teardown()
 
 	draPlugins := NewDRAPluginManager(tCtx, nil, nil, &mockStreamHandler{}, 0)
-	err = draPlugins.add(driverName, addr, drapbv1beta1.DRAPluginService, 5*time.Second)
+	err = draPlugins.add(driverName, addr, drapbv1beta1.DRAPluginService, drahealthv1alpha1.DRAResourceHealth_ServiceDesc.ServiceName, 5*time.Second)
 	require.NoError(t, err)
 	defer draPlugins.remove(driverName, addr)
 
