@@ -51,7 +51,7 @@ func (cf CollectionFormat) String() string {
 // Parameter is for documententing the parameter used in a Http Request
 // ParameterData kinds are Path,Query and Body
 type Parameter struct {
-	data *ParameterData
+	data ParameterData
 }
 
 // ParameterData represents the state of a Parameter.
@@ -80,7 +80,7 @@ type ParameterData struct {
 
 // Data returns the state of the Parameter
 func (p *Parameter) Data() ParameterData {
-	return *p.data
+	return p.data
 }
 
 // Kind returns the parameter type indicator (see const for valid values)
