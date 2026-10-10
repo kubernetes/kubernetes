@@ -6978,3 +6978,79 @@ func TestSysctlFiltering(t *testing.T) {
 		})
 	}
 }
+
+func TestSyncPodKillsUnwantedContainers(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		// failOneKill injects an error into one of the StopContainer calls made to the fake container runtime.
+		failOneKill bool
+	}{
+		{name: "all kills succeed"},
+		{name: "one kill fails", failOneKill: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
+
+			fakeRuntime, _, m, err := createTestRuntimeManager(tCtx)
+			require.NoError(t, err)
+
+			pod, _ := makeBasePodAndStatus()
+			makeAndSetFakePod(tCtx, m, fakeRuntime, pod)
+			runtimePod, err := m.GetPod(tCtx, pod.UID)
+			require.NoError(t, err)
+			podStatus, err := m.GetPodStatus(tCtx, runtimePod)
+			require.NoError(t, err)
+			// Change the hash of every container so computePodActions marks all of them as containers to kill.
+			var containerNames []string
+			for _, cs := range podStatus.ContainerStatuses {
+				cs.Hash = 999999
+				containerNames = append(containerNames, cs.Name)
+			}
+
+			if tc.failOneKill {
+				// Containers are killed concurrently, so the error goes to whichever
+				// StopContainer call reaches the fake runtime first.
+				fakeRuntime.InjectError("StopContainer", errors.New("injected StopContainer failure"))
+			}
+
+			backOff := flowcontrol.NewBackOff(time.Second, time.Minute)
+			result := m.SyncPod(tCtx, pod, podStatus, []v1.Secret{}, backOff, false)
+
+			// Every container must be attempted exactly once, even if one of the kills fails.
+			var killResults []*kubecontainer.SyncResult
+			var killTargets []string
+			for _, r := range result.SyncResults {
+				if r.Action == kubecontainer.KillContainer {
+					killResults = append(killResults, r)
+					killTargets = append(killTargets, r.Target.(string))
+				}
+			}
+			assert.ElementsMatch(t, containerNames, killTargets, "expected exactly one KillContainer result per container")
+
+			if !tc.failOneKill {
+				require.NoError(t, result.Error())
+				assert.Contains(t, fakeRuntime.GetCalls(), "CreateContainer", "SyncPod should recreate the killed containers")
+				return
+			}
+
+			require.Error(t, result.Error())
+			var failed []string
+			for _, r := range killResults {
+				if r.Error != nil {
+					require.ErrorIs(t, r.Error, kubecontainer.ErrKillContainer, "container %v", r.Target)
+					failed = append(failed, r.Target.(string))
+				}
+			}
+			require.Len(t, failed, 1, "expected exactly one failed kill")
+			// The failed kill must not prevent the other containers from being killed.
+			for _, c := range fakeRuntime.Containers {
+				wantState := runtimeapi.ContainerState_CONTAINER_EXITED
+				if c.Metadata.Name == failed[0] {
+					wantState = runtimeapi.ContainerState_CONTAINER_RUNNING
+				}
+				assert.Equal(t, wantState, c.State, "container %s", c.Metadata.Name)
+			}
+			assert.NotContains(t, fakeRuntime.GetCalls(), "CreateContainer", "SyncPod should return before creating containers")
+		})
+	}
+}
