@@ -19,6 +19,7 @@ package csistoragecapacity
 import (
 	"testing"
 
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
@@ -100,6 +101,56 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 		Verb:              "update",
 	}), metav1.NamespaceDefault)
 
+	withZone := func(zone string) func(obj *storage.CSIStorageCapacity) {
+		return func(obj *storage.CSIStorageCapacity) {
+			obj.NodeTopology = &metav1.LabelSelector{
+				MatchLabels: map[string]string{"topology.kubernetes.io/zone": zone},
+			}
+		}
+	}
+	testCases := map[string]struct {
+		oldObj       storage.CSIStorageCapacity
+		updateObj    storage.CSIStorageCapacity
+		expectedErrs field.ErrorList
+	}{
+		"unchanged nodeTopology": {
+			oldObj:    mkCSIStorageCapacity(withZone("zone-a")),
+			updateObj: mkCSIStorageCapacity(withZone("zone-a")),
+		},
+		"mutable field changed, nodeTopology unchanged": {
+			oldObj: mkCSIStorageCapacity(withZone("zone-a")),
+			updateObj: mkCSIStorageCapacity(withZone("zone-a"), func(obj *storage.CSIStorageCapacity) {
+				obj.Capacity = resource.NewQuantity(1024, resource.BinarySI)
+			}),
+		},
+		"nodeTopology changed": {
+			oldObj:    mkCSIStorageCapacity(withZone("zone-a")),
+			updateObj: mkCSIStorageCapacity(withZone("zone-b")),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("nodeTopology"), nil, "").WithOrigin("immutable").MarkAlpha(),
+			},
+		},
+		"nodeTopology set": {
+			oldObj:    mkCSIStorageCapacity(),
+			updateObj: mkCSIStorageCapacity(withZone("zone-a")),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("nodeTopology"), nil, "").WithOrigin("immutable").MarkAlpha(),
+			},
+		},
+		"nodeTopology cleared": {
+			oldObj:    mkCSIStorageCapacity(withZone("zone-a")),
+			updateObj: mkCSIStorageCapacity(),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("nodeTopology"), nil, "").WithOrigin("immutable").MarkAlpha(),
+			},
+		},
+	}
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			apitesting.VerifyUpdateValidationEquivalence(t, ctx, &tc.updateObj, &tc.oldObj, registry.Strategy, tc.expectedErrs)
+		})
+	}
+
 	updateObj := mkCSIStorageCapacity()
 	meta.RunObjectMetaUpdateTestCases(t, ctx, &updateObj, registry.Strategy, meta.WithStringentFinalizerValidation())
 }
@@ -107,8 +158,9 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 func mkCSIStorageCapacity(tweaks ...func(capacity *storage.CSIStorageCapacity)) storage.CSIStorageCapacity {
 	capacity := storage.CSIStorageCapacity{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "valid-obj",
-			Namespace: metav1.NamespaceDefault,
+			Name:            "valid-obj",
+			Namespace:       metav1.NamespaceDefault,
+			ResourceVersion: "1",
 		},
 		StorageClassName: "foo",
 	}
