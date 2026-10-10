@@ -488,14 +488,25 @@ func (tCtx TContext) WithoutCancel() TContext {
 // WithTimeout sets up new context with a timeout. Canceling the timeout gets
 // registered in a cleanup callback. [TContext.Cancel] cancels only
 // the new context. The cause is used as reason why the context is canceled
-// once the timeout is reached. It may be empty, in which case the usual
-// "context canceled" error is used.
+// once the timeout is reached. It may be empty, in which case just
+// "context deadline exceeded" is used as cause. Both the context's Err
+// method and errors.Is(cause, ...) report context.DeadlineExceeded once the
+// timeout is reached, matching the behavior of [context.WithTimeout].
 func (tCtx TContext) WithTimeout(timeout time.Duration, timeoutCause string) TContext {
 	ctx, cancel := withTimeout(tCtx.Context, tCtx.TB(), timeout, timeoutCause)
 
 	tCtx.Context = ctx
 	tCtx.cancel = cancel
 	return tCtx
+}
+
+// WithDeadline sets up a new context with a deadline. It behaves like
+// [TContext.WithTimeout], except that the duration gets derived from the
+// deadline instead of being given directly. This matches [context.WithDeadline],
+// including reporting context.DeadlineExceeded (both as cause and as the
+// context's Err()) once the deadline is reached.
+func (tCtx TContext) WithDeadline(deadline time.Time, timeoutCause string) TContext {
+	return tCtx.WithTimeout(time.Until(deadline), timeoutCause)
 }
 
 // Parallel signals that this test is to be run in parallel with (and

@@ -18,8 +18,6 @@ package allocatortesting
 
 import (
 	"context"
-	"errors"
-	"flag"
 	"fmt"
 	"math"
 	"slices"
@@ -27,7 +25,7 @@ import (
 	"time"
 
 	"github.com/blang/semver/v4"
-	"github.com/onsi/gomega"
+	g "github.com/onsi/gomega"
 	"github.com/onsi/gomega/format"
 	"github.com/onsi/gomega/gstruct"
 	"github.com/onsi/gomega/types"
@@ -46,7 +44,7 @@ import (
 	draapi "k8s.io/dynamic-resource-allocation/api"
 	"k8s.io/dynamic-resource-allocation/cel"
 	"k8s.io/dynamic-resource-allocation/structured/internal"
-	"k8s.io/klog/v2/ktesting"
+	"k8s.io/ktesting"
 	"k8s.io/utils/ptr"
 )
 
@@ -127,8 +125,7 @@ func init() {
 	// Bump up the default verbosity for testing. Allocate uses very
 	// high thresholds because it is used in the scheduler's per-node
 	// filter operation.
-	ktesting.DefaultConfig = ktesting.NewConfig(ktesting.Verbosity(7))
-	ktesting.DefaultConfig.AddFlags(flag.CommandLine)
+	ktesting.SetDefaultVerbosity(7)
 }
 
 // Test objects generators
@@ -814,11 +811,11 @@ func localNodeSelector(nodeName string) *v1.NodeSelector {
 func allocationResult(selector *v1.NodeSelector, results ...resourceapi.DeviceRequestAllocationResult) types.GomegaMatcher {
 	return gstruct.MatchFields(0, gstruct.Fields{
 		"Devices": gstruct.MatchFields(0, gstruct.Fields{
-			"Results": gomega.ConsistOf(results), // Order is irrelevant.
-			"Config":  gomega.BeNil(),
+			"Results": g.ConsistOf(results), // Order is irrelevant.
+			"Config":  g.BeNil(),
 		}),
 		"NodeSelector":        matchNodeSelector(selector),
-		"AllocationTimestamp": gomega.BeNil(),
+		"AllocationTimestamp": g.BeNil(),
 	})
 }
 
@@ -826,9 +823,9 @@ func allocationResult(selector *v1.NodeSelector, results ...resourceapi.DeviceRe
 // of terms, requirements, and values is irrelevant.
 func matchNodeSelector(selector *v1.NodeSelector) types.GomegaMatcher {
 	if selector == nil {
-		return gomega.BeNil()
+		return g.BeNil()
 	}
-	return gomega.HaveField("NodeSelectorTerms", matchNodeSelectorTerms(selector.NodeSelectorTerms))
+	return g.HaveField("NodeSelectorTerms", matchNodeSelectorTerms(selector.NodeSelectorTerms))
 }
 
 func matchNodeSelectorTerms(terms []v1.NodeSelectorTerm) types.GomegaMatcher {
@@ -836,7 +833,7 @@ func matchNodeSelectorTerms(terms []v1.NodeSelectorTerm) types.GomegaMatcher {
 	for _, term := range terms {
 		matchTerms = append(matchTerms, matchNodeSelectorTerm(term))
 	}
-	return gomega.ConsistOf(matchTerms)
+	return g.ConsistOf(matchTerms)
 }
 
 func matchNodeSelectorTerm(term v1.NodeSelectorTerm) types.GomegaMatcher {
@@ -851,14 +848,14 @@ func matchNodeSelectorRequirements(requirements []v1.NodeSelectorRequirement) ty
 	for _, requirement := range requirements {
 		matchRequirements = append(matchRequirements, matchNodeSelectorRequirement(requirement))
 	}
-	return gomega.ConsistOf(matchRequirements)
+	return g.ConsistOf(matchRequirements)
 }
 
 func matchNodeSelectorRequirement(requirement v1.NodeSelectorRequirement) types.GomegaMatcher {
 	return gstruct.MatchFields(0, gstruct.Fields{
-		"Key":      gomega.Equal(requirement.Key),
-		"Operator": gomega.Equal(requirement.Operator),
-		"Values":   gomega.ConsistOf(requirement.Values),
+		"Key":      g.Equal(requirement.Key),
+		"Operator": g.Equal(requirement.Operator),
+		"Values":   g.ConsistOf(requirement.Values),
 	})
 }
 
@@ -1015,6 +1012,7 @@ func TestAllocator(t *testing.T,
 		slices []*resourceapi.ResourceSlice,
 		celCache *cel.Cache,
 	) (Allocator, error)) {
+	tCtx := ktesting.Init(t)
 	nonExistentAttribute := resourceapi.FullyQualifiedName(driverA + "/" + "NonExistentAttribute")
 	boolAttribute := resourceapi.FullyQualifiedName(driverA + "/" + "boolAttribute")
 	stringAttribute := resourceapi.FullyQualifiedName(driverA + "/" + "stringAttribute")
@@ -1647,7 +1645,7 @@ func TestAllocator(t *testing.T,
 			}(),
 			node: node(node1, region1),
 
-			expectError: gomega.MatchError(gomega.ContainSubstring("invalid resource pools were encountered")),
+			expectError: g.MatchError(g.ContainSubstring("invalid resource pools were encountered")),
 		},
 		"no-slices": {
 			claimsToAllocate: objects(claimWithRequest(claim0, req0, classA)),
@@ -1673,7 +1671,7 @@ func TestAllocator(t *testing.T,
 			node:             node(node1, region1),
 
 			expectResults: nil,
-			expectError:   gomega.MatchError(gomega.ContainSubstring("could not retrieve device class class-a")),
+			expectError:   g.MatchError(g.ContainSubstring("could not retrieve device class class-a")),
 		},
 		"unknown-class": {
 			claimsToAllocate: objects(claimWithRequest(claim0, req0, "unknown-class")),
@@ -1682,7 +1680,7 @@ func TestAllocator(t *testing.T,
 			node:             node(node1, region1),
 
 			expectResults: nil,
-			expectError:   gomega.MatchError(gomega.ContainSubstring("could not retrieve device class unknown-class")),
+			expectError:   g.MatchError(g.ContainSubstring("could not retrieve device class unknown-class")),
 		},
 		"empty-class": {
 			claimsToAllocate: objects(claimWithRequest(claim0, req0, "")),
@@ -1691,7 +1689,7 @@ func TestAllocator(t *testing.T,
 			node:             node(node1, region1),
 
 			expectResults: nil,
-			expectError:   gomega.MatchError(gomega.ContainSubstring("claim claim-0, request req-0: missing device class name (unsupported request type?)")),
+			expectError:   g.MatchError(g.ContainSubstring("claim claim-0, request req-0: missing device class name (unsupported request type?)")),
 		},
 		"no-claims-to-allocate": {
 			claimsToAllocate: nil,
@@ -1745,7 +1743,7 @@ func TestAllocator(t *testing.T,
 			node: node(node1, region1),
 
 			expectResults: nil,
-			expectError:   gomega.MatchError(gomega.ContainSubstring("claim claim-0, request req-0: asks for all devices, but resource pool driver-a/pool-1 is currently invalid")),
+			expectError:   g.MatchError(g.ContainSubstring("claim claim-0, request req-0: asks for all devices, but resource pool driver-a/pool-1 is currently invalid")),
 			expectErrorIs: internal.ErrFailedAllocationOnNode,
 		},
 		"all-devices-with-consumed-counters": {
@@ -1827,7 +1825,7 @@ func TestAllocator(t *testing.T,
 			node: node(node1, region1),
 
 			expectResults: nil,
-			expectError:   gomega.MatchError(gomega.ContainSubstring("claim claim-0, request req-0: asks for all devices, but resource pool driver-a/pool-1 is currently being updated")),
+			expectError:   g.MatchError(g.ContainSubstring("claim claim-0, request req-0: asks for all devices, but resource pool driver-a/pool-1 is currently being updated")),
 			expectErrorIs: internal.ErrFailedAllocationOnNode,
 		},
 		"all-devices-plus-another": {
@@ -2409,7 +2407,7 @@ func TestAllocator(t *testing.T,
 			node:    node(node1, region1),
 
 			expectResults: nil,
-			expectError:   gomega.MatchError(gomega.ContainSubstring("claim claim-0, request req-0: admin access is requested, but the feature is disabled")),
+			expectError:   g.MatchError(g.ContainSubstring("claim claim-0, request req-0: admin access is requested, but the feature is disabled")),
 		},
 		"admin-access-enabled": {
 			features: Features{
@@ -2510,7 +2508,7 @@ func TestAllocator(t *testing.T,
 			)),
 			node: node(node1, region1),
 
-			expectError: gomega.MatchError(gomega.ContainSubstring("claim claim-0, request req-0: cannot add device driver-a/pool-1/device-2 because a claim constraint would not be satisfied")),
+			expectError: g.MatchError(g.ContainSubstring("claim claim-0, request req-0: cannot add device driver-a/pool-1/device-2 because a claim constraint would not be satisfied")),
 		},
 		"partitionable-all-mode-constraint-must-error-with-reserved-counter": {
 			// Covers allocateDevice's must=true error path when the rejected device
@@ -2554,7 +2552,7 @@ func TestAllocator(t *testing.T,
 				),
 			),
 			node:        node(node1, region1),
-			expectError: gomega.MatchError(gomega.ContainSubstring("claim claim-0, request req-0: cannot add device driver-a/pool-1/device-2 because a claim constraint would not be satisfied")),
+			expectError: g.MatchError(g.ContainSubstring("claim claim-0, request req-0: cannot add device driver-a/pool-1/device-2 because a claim constraint would not be satisfied")),
 		},
 		"with-constraint-not-matching-string-attribute": {
 			claimsToAllocate: objects(claimWithRequests(
@@ -2786,7 +2784,7 @@ func TestAllocator(t *testing.T,
 			slices:  unwrapResourceSlices(sliceWithOneDevice(slice1, node1, pool1, driverA)),
 			node:    node(node1, region1),
 
-			expectError: gomega.MatchError(gomega.ContainSubstring("CEL expression empty (unsupported selector type?)")),
+			expectError: g.MatchError(g.ContainSubstring("CEL expression empty (unsupported selector type?)")),
 		},
 		"unknown-allocation-mode": {
 			claimsToAllocate: objects(
@@ -2800,7 +2798,7 @@ func TestAllocator(t *testing.T,
 			slices:  unwrapResourceSlices(sliceWithOneDevice(slice1, node1, pool1, driverA)),
 			node:    node(node1, region1),
 
-			expectError: gomega.MatchError(gomega.ContainSubstring("unsupported count mode future-mode")),
+			expectError: g.MatchError(g.ContainSubstring("unsupported count mode future-mode")),
 		},
 		"unknown-constraint": {
 			claimsToAllocate: objects(
@@ -2816,7 +2814,7 @@ func TestAllocator(t *testing.T,
 			slices:  unwrapResourceSlices(sliceWithOneDevice(slice1, node1, pool1, driverA)),
 			node:    node(node1, region1),
 
-			expectError: gomega.MatchError(gomega.ContainSubstring("empty constraint (unsupported constraint type?)")),
+			expectError: g.MatchError(g.ContainSubstring("empty constraint (unsupported constraint type?)")),
 		},
 		"invalid-CEL-one-device": {
 			claimsToAllocate: objects(
@@ -2832,7 +2830,7 @@ func TestAllocator(t *testing.T,
 			slices:  unwrapResourceSlices(sliceWithOneDevice(slice1, node1, pool1, driverA)),
 			node:    node(node1, region1),
 
-			expectError: gomega.MatchError(gomega.ContainSubstring("undeclared reference")),
+			expectError: g.MatchError(g.ContainSubstring("undeclared reference")),
 		},
 		"invalid-CEL-one-device-class": {
 			claimsToAllocate: objects(claimWithRequest(claim0, req0, classA)),
@@ -2846,7 +2844,7 @@ func TestAllocator(t *testing.T,
 			slices: unwrapResourceSlices(sliceWithOneDevice(slice1, node1, pool1, driverA)),
 			node:   node(node1, region1),
 
-			expectError: gomega.MatchError(gomega.ContainSubstring("undeclared reference")),
+			expectError: g.MatchError(g.ContainSubstring("undeclared reference")),
 		},
 		"invalid-CEL-all-devices": {
 			claimsToAllocate: objects(
@@ -2863,13 +2861,13 @@ func TestAllocator(t *testing.T,
 			slices:  unwrapResourceSlices(sliceWithOneDevice(slice1, node1, pool1, driverA)),
 			node:    node(node1, region1),
 
-			expectError: gomega.MatchError(gomega.ContainSubstring("undeclared reference")),
+			expectError: g.MatchError(g.ContainSubstring("undeclared reference")),
 		},
 		"too-many-devices-single-request": {
 			claimsToAllocate: objects(claimWithRequests(claim0, nil, request(req0, classA, 500))),
 			classes:          objects(class(classA, driverA)),
 
-			expectError: gomega.MatchError(gomega.ContainSubstring("exceeds the claim limit")),
+			expectError: g.MatchError(g.ContainSubstring("exceeds the claim limit")),
 		},
 		"many-devices-okay": {
 			claimsToAllocate: objects(claimWithRequests(claim0, nil, request(req0, classA, resourceapi.AllocationResultsMaxSize))),
@@ -2886,7 +2884,7 @@ func TestAllocator(t *testing.T,
 			slices:  unwrapResourceSlices(sliceWithMultipleDevices(slice1, node1, pool1, driverA, resourceapi.AllocationResultsMaxSize+1)),
 			node:    node(node1, region1),
 
-			expectError: gomega.MatchError(gomega.ContainSubstring("exceeds the claim limit")),
+			expectError: g.MatchError(g.ContainSubstring("exceeds the claim limit")),
 		},
 		// Two counts that are each representable but together overflow the native
 		// int accumulator to a negative value, rejected before the sum is formed.
@@ -2897,7 +2895,7 @@ func TestAllocator(t *testing.T,
 				deviceRequest(req1, classA, int64(math.MaxInt/2+1)),
 			)),
 			classes:     objects(class(classA, driverA)),
-			expectError: gomega.MatchError(gomega.ContainSubstring("exceeds the claim limit")),
+			expectError: g.MatchError(g.ContainSubstring("exceeds the claim limit")),
 		},
 		// Four counts that would wrap a naive int accumulator back to zero rather
 		// than negative; each is rejected against remaining capacity before summing.
@@ -2909,7 +2907,7 @@ func TestAllocator(t *testing.T,
 				deviceRequest(req3, classA, int64(math.MaxInt/2+1)),
 			)),
 			classes:     objects(class(classA, driverA)),
-			expectError: gomega.MatchError(gomega.ContainSubstring("exceeds the claim limit")),
+			expectError: g.MatchError(g.ContainSubstring("exceeds the claim limit")),
 		},
 		// req0 fits on its own, so the rejection has to name req1 as the one
 		// that pushes the claim over.
@@ -2919,9 +2917,9 @@ func TestAllocator(t *testing.T,
 				deviceRequest(req1, classA, 20),
 			)),
 			classes: objects(class(classA, driverA)),
-			expectError: gomega.MatchError(gomega.And(
-				gomega.ContainSubstring("request "+req1),
-				gomega.ContainSubstring("exceeds the claim limit"),
+			expectError: g.MatchError(g.And(
+				g.ContainSubstring("request "+req1),
+				g.ContainSubstring("exceeds the claim limit"),
 			)),
 		},
 		// Two counts whose sum exactly fills the per-claim limit both allocate;
@@ -2946,7 +2944,7 @@ func TestAllocator(t *testing.T,
 			claimsToAllocate: objects(claimWithRequests(claim0, nil, request(req0, classA, 500))),
 			classes:          objects(class(classA, driverA)),
 
-			expectError: gomega.MatchError(gomega.ContainSubstring("exceeds the claim limit")),
+			expectError: g.MatchError(g.ContainSubstring("exceeds the claim limit")),
 		},
 		"prioritized-list-first-unavailable": {
 			features: Features{
@@ -3369,7 +3367,7 @@ func TestAllocator(t *testing.T,
 			node:    node(node1, region1),
 
 			expectResults: nil,
-			expectError:   gomega.MatchError(gomega.ContainSubstring("claim claim-0, request req-0: has subrequests, but the DRAPrioritizedList feature is disabled")),
+			expectError:   g.MatchError(g.ContainSubstring("claim claim-0, request req-0: has subrequests, but the DRAPrioritizedList feature is disabled")),
 		},
 		"prioritized-list-multi-request": {
 			features: Features{
@@ -3486,9 +3484,9 @@ func TestAllocator(t *testing.T,
 				),
 			)),
 			classes: objects(class(classA, driverA)),
-			expectError: gomega.MatchError(gomega.And(
-				gomega.ContainSubstring("request "+req1),
-				gomega.ContainSubstring("exceeds the claim limit"),
+			expectError: g.MatchError(g.And(
+				g.ContainSubstring("request "+req1),
+				g.ContainSubstring("exceeds the claim limit"),
 			)),
 		},
 		// The oversized alternative sits behind a device already allocated for the
@@ -5663,7 +5661,7 @@ func TestAllocator(t *testing.T,
 			slices:        unwrap(sliceWithOneDevice(slice1, node1, pool1, driverA)),
 			node:          node(node1, region1),
 			expectResults: nil,
-			expectError:   gomega.MatchError(gomega.ContainSubstring("claim claim-0, request req-0: has capacity requests, but the DRAConsumableCapacity feature is disabled")),
+			expectError:   g.MatchError(g.ContainSubstring("claim claim-0, request req-0: has capacity requests, but the DRAConsumableCapacity feature is disabled")),
 		},
 		"consumable-capacity-disabled-feature-with-prioritized-list": {
 			features: Features{
@@ -5683,7 +5681,7 @@ func TestAllocator(t *testing.T,
 			slices:        unwrap(sliceWithOneDevice(slice1, node1, pool1, driverA)),
 			node:          node(node1, region1),
 			expectResults: nil,
-			expectError:   gomega.MatchError(gomega.ContainSubstring("claim claim-0, subrequest subReq-0: has capacity requests, but the DRAConsumableCapacity feature is disabled")),
+			expectError:   g.MatchError(g.ContainSubstring("claim claim-0, subrequest subReq-0: has capacity requests, but the DRAConsumableCapacity feature is disabled")),
 		},
 		"consumable-capacity-multi-allocatable-device-with-missing-capacity-request": {
 			features: Features{
@@ -5886,7 +5884,7 @@ func TestAllocator(t *testing.T,
 				),
 			),
 			node:        node(node1, region1),
-			expectError: gomega.MatchError(gomega.ContainSubstring("requested both as")),
+			expectError: g.MatchError(g.ContainSubstring("requested both as")),
 		},
 		// Same as above, but with the values swapped. Still ambiguous, so still an error.
 		"consumable-capacity-request-with-qualified-and-unqualified-capacity-request-names-exclusive": {
@@ -5903,7 +5901,7 @@ func TestAllocator(t *testing.T,
 				),
 			),
 			node:        node(node1, region1),
-			expectError: gomega.MatchError(gomega.ContainSubstring("requested both as")),
+			expectError: g.MatchError(g.ContainSubstring("requested both as")),
 		},
 		"consumable-capacity-request-unqualified-and-unqualified-device-shared": {
 			features: Features{
@@ -6089,7 +6087,7 @@ func TestAllocator(t *testing.T,
 				),
 			),
 			node:        node(node1, region1),
-			expectError: gomega.MatchError(gomega.ContainSubstring("requested both as")),
+			expectError: g.MatchError(g.ContainSubstring("requested both as")),
 		},
 		"consumable-capacity-request-with-qualified-and-unqualified-capacity-request-names-shared": {
 			features: Features{
@@ -6105,7 +6103,7 @@ func TestAllocator(t *testing.T,
 				),
 			),
 			node:        node(node1, region1),
-			expectError: gomega.MatchError(gomega.ContainSubstring("requested both as")),
+			expectError: g.MatchError(g.ContainSubstring("requested both as")),
 		},
 		"consumable-capacity-multi-allocatable-device-without-capacity-without-capacity-request": {
 			features: Features{
@@ -6341,7 +6339,7 @@ func TestAllocator(t *testing.T,
 				),
 			),
 			node:        node(node1, region1),
-			expectError: gomega.MatchError(gomega.ContainSubstring("cannot be represented")),
+			expectError: g.MatchError(g.ContainSubstring("cannot be represented")),
 		},
 		"consumable-capacity-range-policy-rounded-value-overflow-rejected": {
 			features: Features{
@@ -6360,7 +6358,7 @@ func TestAllocator(t *testing.T,
 				),
 			),
 			node:        node(node1, region1),
-			expectError: gomega.MatchError(gomega.ContainSubstring("cannot be represented")),
+			expectError: g.MatchError(g.ContainSubstring("cannot be represented")),
 		},
 		"consumable-capacity-range-policy-overflow-aborts-not-skip": {
 			features: Features{
@@ -6383,7 +6381,7 @@ func TestAllocator(t *testing.T,
 				),
 			),
 			node:        node(node1, region1),
-			expectError: gomega.MatchError(gomega.ContainSubstring("cannot be represented")),
+			expectError: g.MatchError(g.ContainSubstring("cannot be represented")),
 		},
 		"consumable-capacity-range-policy-allocation-mode-all-overflow-aborts": {
 			features: Features{
@@ -6403,7 +6401,7 @@ func TestAllocator(t *testing.T,
 				),
 			),
 			node:        node(node1, region1),
-			expectError: gomega.MatchError(gomega.ContainSubstring("cannot be represented")),
+			expectError: g.MatchError(g.ContainSubstring("cannot be represented")),
 		},
 		"consumable-capacity-negative-request-aborts": {
 			features: Features{
@@ -6423,7 +6421,7 @@ func TestAllocator(t *testing.T,
 				),
 			),
 			node:        node(node1, region1),
-			expectError: gomega.MatchError(gomega.ContainSubstring("negative")),
+			expectError: g.MatchError(g.ContainSubstring("negative")),
 		},
 		"consumable-capacity-multi-allocatable-device-with-valid-values-policy": {
 			features: Features{
@@ -7429,7 +7427,7 @@ func TestAllocator(t *testing.T,
 			),
 			node:          node(node1, region1),
 			expectResults: []any{},
-			expectError:   gomega.MatchError(gomega.ContainSubstring("unsupported attribute value")),
+			expectError:   g.MatchError(g.ContainSubstring("unsupported attribute value")),
 		},
 		"with-distinct-constraints-with-subrequests": {
 			features: Features{
@@ -7966,7 +7964,7 @@ func TestAllocator(t *testing.T,
 			)),
 			node:          node(node1, region1),
 			expectResults: nil,
-			expectError:   gomega.MatchError(gomega.ContainSubstring("unsupported attribute value")),
+			expectError:   g.MatchError(g.ContainSubstring("unsupported attribute value")),
 		},
 		"list-attributes-disabled-match-constraint-with-lists": {
 			features: Features{
@@ -8261,7 +8259,7 @@ func TestAllocator(t *testing.T,
 			node: node(node1, region1),
 
 			expectResults: nil,
-			expectError:   gomega.MatchError(gomega.ContainSubstring("unsupported attribute value")),
+			expectError:   g.MatchError(g.ContainSubstring("unsupported attribute value")),
 		},
 		"list-attributes-disabled-distinct-constraint-with-lists": {
 			features: Features{
@@ -8587,7 +8585,7 @@ func TestAllocator(t *testing.T,
 				),
 			),
 			node:        node(node1, region1),
-			expectError: gomega.MatchError(gomega.ContainSubstring("invalid resource pools were encountered")),
+			expectError: g.MatchError(g.ContainSubstring("invalid resource pools were encountered")),
 		},
 		"partitionable-devices-device-counter-consumption-references-unknown-counter-set": {
 			features: Features{
@@ -8610,7 +8608,7 @@ func TestAllocator(t *testing.T,
 				),
 			),
 			node:        node(node1, region1),
-			expectError: gomega.MatchError(gomega.ContainSubstring("invalid resource pools were encountered")),
+			expectError: g.MatchError(g.ContainSubstring("invalid resource pools were encountered")),
 		},
 		"partitionable-devices-device-counter-consumption-references-unknown-counter-in-counter-set": {
 			features: Features{
@@ -8637,7 +8635,7 @@ func TestAllocator(t *testing.T,
 				),
 			),
 			node:        node(node1, region1),
-			expectError: gomega.MatchError(gomega.ContainSubstring("invalid resource pools were encountered")),
+			expectError: g.MatchError(g.ContainSubstring("invalid resource pools were encountered")),
 		},
 		"partitionable-devices-device-counter-consumption-references-counter-set-in-other-pool": {
 			features: Features{
@@ -8664,7 +8662,7 @@ func TestAllocator(t *testing.T,
 				),
 			),
 			node:        node(node1, region1),
-			expectError: gomega.MatchError(gomega.ContainSubstring("invalid resource pools were encountered")),
+			expectError: g.MatchError(g.ContainSubstring("invalid resource pools were encountered")),
 		},
 		"partitionable-devices-devices-on-different-nodes-consume-same-counter-set": {
 			features: Features{
@@ -8798,7 +8796,7 @@ func TestAllocator(t *testing.T,
 				),
 			),
 			node:        node(node1, region1),
-			expectError: gomega.MatchError(gomega.ContainSubstring("invalid resource pools were encountered")),
+			expectError: g.MatchError(g.ContainSubstring("invalid resource pools were encountered")),
 		},
 		"different-resourceslices-in-pool-can-target-different-nodes": {
 			claimsToAllocate: objects(
@@ -8867,7 +8865,7 @@ func TestAllocator(t *testing.T,
 				MakeDeviceID(driverA, pool2, device2),
 			},
 			node:        node(node1, region1),
-			expectError: gomega.MatchError(gomega.ContainSubstring("invalid resource pools were encountered")),
+			expectError: g.MatchError(g.ContainSubstring("invalid resource pools were encountered")),
 		},
 		"no-allocation-from-incomplete-pools": {
 			claimsToAllocate: objects(
@@ -9330,7 +9328,7 @@ func TestAllocator(t *testing.T,
 				device(device1).withAttribute("existingAttr", "yes"),
 			)),
 			node:        node(node1, region1),
-			expectError: gomega.MatchError(gomega.ContainSubstring("no such key: missingAttr")),
+			expectError: g.MatchError(g.ContainSubstring("no such key: missingAttr")),
 		},
 		// "derived-attributes-type-mismatch" verifies that when CEL
 		// dynamically evaluates to different value types for the same
@@ -9371,14 +9369,11 @@ func TestAllocator(t *testing.T,
 		},
 	}
 
-	RunTestAllocator(t, supportedFeatures, newAllocator, testcases)
+	runTestAllocator(tCtx, supportedFeatures, newAllocator, testcases)
 
-	t.Run("interrupt", func(t *testing.T) {
+	tCtx.Run("interrupt", func(tCtx ktesting.TContext) {
 		for _, name := range []string{"off", "timeout", "deadline", "cancel"} {
-			t.Run(name, func(t *testing.T) {
-				_, ctx := ktesting.NewTestContext(t)
-				g := gomega.NewWithT(t)
-
+			tCtx.Run(name, func(tCtx ktesting.TContext) {
 				// This testcase is a smaller variant of the one in https://github.com/kubernetes/kubernetes/issues/131730#issuecomment-2873598287.
 				// That one took over 30 seconds, this one here only 0.07 seconds.
 				// But even that is too long when we interrupt in the near future or
@@ -9399,7 +9394,7 @@ func TestAllocator(t *testing.T,
 				))
 				node := node(node1, region1)
 
-				t.Logf("ResourceSlices:\n%s\n\nResourceClaims:\n%s\n\nDeviceClass:\n%s",
+				tCtx.Logf("ResourceSlices:\n%s\n\nResourceClaims:\n%s\n\nDeviceClass:\n%s",
 					format.Object(slices, 1),
 					format.Object(claimsToAllocate, 1),
 					format.Object(deviceClass, 1),
@@ -9408,38 +9403,29 @@ func TestAllocator(t *testing.T,
 				switch name {
 				case "off":
 				case "timeout":
-					c, cancel := context.WithTimeout(ctx, time.Nanosecond)
-					defer cancel()
-					ctx = c
+					tCtx = tCtx.WithTimeout(time.Nanosecond, "timeout test")
 				case "deadline":
-					c, cancel := context.WithDeadline(ctx, time.Now())
-					defer cancel()
-					ctx = c
+					tCtx = tCtx.WithDeadline(time.Now(), "deadline test")
 				case "cancel":
-					c, cancel := context.WithCancel(ctx)
-					cancel()
-					ctx = c
+					tCtx = tCtx.WithCancel()
+					tCtx.Cancel("cancel test")
 				}
 
-				allocator, err := newAllocator(ctx, Features{}, AllocatedState{}, classLister, slices, cel.NewCache(1, cel.Features{}))
-				g.Expect(err).ToNot(gomega.HaveOccurred())
-				_, err = allocator.Allocate(ctx, node, claimsToAllocate)
-				t.Logf("got error %v", err)
-				if ctx.Err() != nil {
-					if !errors.Is(err, ctx.Err()) {
-						t.Fatalf("expected %v, got error: %v", ctx.Err(), err)
-					}
+				allocator, err := newAllocator(tCtx, Features{}, AllocatedState{}, classLister, slices, cel.NewCache(1, cel.Features{}))
+				tCtx.ExpectNoError(err)
+				_, err = allocator.Allocate(tCtx, node, claimsToAllocate)
+				tCtx.Logf("got error %v", err)
+				if tCtx.Err() != nil {
+					tCtx.Require(err).To(g.MatchError(tCtx.Err()))
 				} else {
-					if err != nil {
-						t.Fatalf("expected no error, got %v", err)
-					}
+					tCtx.ExpectNoError(err)
 				}
 			})
 		}
 	})
 }
 
-func RunTestAllocator(t *testing.T,
+func runTestAllocator(tCtx ktesting.TContext,
 	supportedFeatures Features,
 	newAllocator func(
 		ctx context.Context,
@@ -9451,17 +9437,14 @@ func RunTestAllocator(t *testing.T,
 	) (Allocator, error),
 	testcases map[string]AllocatorTestCase) {
 	for name, tc := range testcases {
-		t.Run(name, func(t *testing.T) {
-			_, ctx := ktesting.NewTestContext(t)
-			g := gomega.NewWithT(t)
-
+		tCtx.Run(name, func(tCtx ktesting.TContext) {
 			required := tc.features.Set()
 			supported := supportedFeatures.Set()
 			missing := required.Difference(supported)
 			if missing.Len() > 0 {
 				// Skip the test, at least one of its required features isn't supported
 				// and the test would fail.
-				t.Skipf("SKIP: required feature(s) %v not supported by allocator", sets.List(missing))
+				tCtx.Skipf("SKIP: required feature(s) %v not supported by allocator", sets.List(missing))
 			}
 
 			// Listing objects is deterministic and returns them in the same
@@ -9484,7 +9467,7 @@ func RunTestAllocator(t *testing.T,
 					slices[i] = slice.DeepCopy()
 				}
 			}
-			t.Logf("ResourceSlices:\n%s\n\nResourceClaims:\n%s\n\nDeviceClasses:\n%s\nallocated capacity:\n%s",
+			tCtx.Logf("ResourceSlices:\n%s\n\nResourceClaims:\n%s\n\nDeviceClasses:\n%s\nallocated capacity:\n%s",
 				format.Object(slices, 1),
 				format.Object(claimsToAllocate, 1),
 				format.Object(classLister.objs, 1),
@@ -9495,52 +9478,52 @@ func RunTestAllocator(t *testing.T,
 				AllocatedSharedDeviceIDs: tc.allocatedSharedDeviceIDs,
 				AggregatedCapacity:       allocatedShare,
 			}
-			allocator, err := newAllocator(ctx, tc.features, allocatedState, classLister, slices, cel.NewCache(1, cel.Features{
+			allocator, err := newAllocator(tCtx, tc.features, allocatedState, classLister, slices, cel.NewCache(1, cel.Features{
 				EnableConsumableCapacity: tc.features.ConsumableCapacity,
 				EnableListTypeAttributes: tc.features.ListTypeAttributes,
 			}))
-			g.Expect(err).ToNot(gomega.HaveOccurred())
+			tCtx.ExpectNoError(err)
 
 			if _, ok := allocator.(internal.AllocatorExtended); tc.expectNumAllocateOneInvocations > 0 && !ok {
-				t.Skipf("%T does not support the AllocatorStats interface", allocator)
+				tCtx.Skipf("%T does not support the AllocatorStats interface", allocator)
 			}
 			if tc.node == nil {
 				tc.node = node(node1, region1)
 			}
-			results, err := allocator.Allocate(ctx, tc.node, unwrap(claimsToAllocate...))
+			results, err := allocator.Allocate(tCtx, tc.node, unwrap(claimsToAllocate...))
 			matchError := tc.expectError
 			if matchError == nil {
-				matchError = gomega.Not(gomega.HaveOccurred())
+				matchError = g.Not(g.HaveOccurred())
 			}
-			g.Expect(err).To(matchError)
+			tCtx.Require(err).To(matchError)
 			if tc.expectErrorIs != nil {
-				g.Expect(err).To(gomega.MatchError(tc.expectErrorIs))
+				tCtx.Require(err).To(g.MatchError(tc.expectErrorIs))
 			}
 
-			t.Logf("name: %s", name)
+			tCtx.Logf("name: %s", name)
 			// replace any share id with fixed value for testing
 			for ri, result := range results {
 				for ai, allocation := range result.Devices.Results {
 					if allocation.ShareID != nil {
 						results[ri].Devices.Results[ai].ShareID = &fixedShareID
 					}
-					t.Logf("allocated capacity: %v", allocation.ConsumedCapacity)
+					tCtx.Logf("allocated capacity: %v", allocation.ConsumedCapacity)
 				}
 			}
-			g.Expect(results).To(gomega.ConsistOf(tc.expectResults...))
+			tCtx.Require(results).To(g.ConsistOf(tc.expectResults...))
 
 			// Objects that the allocator had access to should not have been modified.
-			g.Expect(claimsToAllocate).To(gomega.Equal(tc.claimsToAllocate))
-			g.Expect(allocatedDevices).To(gomega.HaveExactElements(tc.allocatedDevices))
-			g.Expect(slices).To(gomega.Equal(tc.slices))
-			g.Expect(classLister.objs).To(gomega.ConsistOf(tc.classes))
+			tCtx.Require(claimsToAllocate).To(g.Equal(tc.claimsToAllocate))
+			tCtx.Require(allocatedDevices).To(g.HaveExactElements(tc.allocatedDevices))
+			tCtx.Require(slices).To(g.Equal(tc.slices))
+			tCtx.Require(classLister.objs).To(g.ConsistOf(tc.classes))
 
 			if expectNumAllocateOneInvocations := tc.expectNumAllocateOneInvocations; expectNumAllocateOneInvocations > 0 {
 				stats := allocator.(internal.AllocatorExtended).GetStats()
 				if override, ok := tc.expectNumAllocateOneInvocationsByChannel[allocator.Channel()]; ok {
 					expectNumAllocateOneInvocations = override
 				}
-				g.Expect(stats.NumAllocateOneInvocations).To(gomega.Equal(expectNumAllocateOneInvocations))
+				tCtx.Require(stats.NumAllocateOneInvocations).To(g.Equal(expectNumAllocateOneInvocations))
 			}
 		})
 	}
