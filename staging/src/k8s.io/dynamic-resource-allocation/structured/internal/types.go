@@ -164,17 +164,19 @@ type DeviceAllocation struct {
 }
 
 // AllocationConstraint is a caller-supplied constraint that participates
-// in the allocator's backtracking search. Add returns false to reject
-// the candidate; the allocator then backtracks. For every Add which
-// returned true there is exactly one Remove with an equal DeviceAllocation.
+// in the allocator's backtracking search. Add returns false to reject the
+// candidate. When the search later backtracks over an accepted candidate,
+// Remove is called with the same DeviceAllocation. Remove is not called for
+// allocations retained in the final result.
 type AllocationConstraint interface {
 	Add(allocation DeviceAllocation) bool
 	Remove(allocation DeviceAllocation)
 }
 
-// NewAllocationConstraintFunc is called once per Allocate to produce
-// the constraints for that invocation. Allocate runs concurrently for
-// different nodes, so state shared between returned instances must be
-// read-only.
+// NewAllocationConstraintFunc is called once per Allocate. Each returned
+// constraint applies to every candidate allocation for every claim passed to
+// that call, in slice order. The provider may be called concurrently by
+// different Allocate calls, but each returned constraint is used only by the
+// call for which it was created.
 type NewAllocationConstraintFunc func(ctx context.Context, node *v1.Node,
 	claims []*resourceapi.ResourceClaim) ([]AllocationConstraint, error)

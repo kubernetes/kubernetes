@@ -366,21 +366,18 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node, claims []*resou
 	// Produce caller-supplied constraints, if a provider is installed.
 	// The provider is called once per Allocate, so it can build per-node
 	// state and share it across all candidate evaluations for this node.
-	// The claim index and class name are filled in at add() time, where
-	// the allocator knows which request is being satisfied.
+	// Each delegate applies to all claims so it can enforce a policy across
+	// the entire allocation.
 	if a.newConstraints != nil {
-		outer, err := a.newConstraints(ctx, node, claims)
+		delegates, err := a.newConstraints(ctx, node, claims)
 		if err != nil {
 			return nil, fmt.Errorf("%w: producing caller constraints: %w", internal.ErrFailedAllocationOnNode, err)
 		}
-		for claimIdx := range claims {
-			// The provider returns one flat list. Distribute the entries
-			// across claims by index modulo, matching how a caller that
-			// returns one constraint per claim would lay them out.
-			for i := claimIdx; i < len(outer); i += len(claims) {
+		for claimIdx, claim := range claims {
+			for _, delegate := range delegates {
 				alloc.callerConstraints[claimIdx] = append(alloc.callerConstraints[claimIdx], callerConstraint{
-					claim: claims[claimIdx],
-					outer: outer[i],
+					claim:    claim,
+					delegate: delegate,
 				})
 			}
 		}
@@ -1008,23 +1005,19 @@ func versionWithoutBuild(ver semver.Version) string {
 // state the allocator tracks. The capacity map is populated at the call site,
 // after the allocator has computed the final rounded values.
 type callerConstraint struct {
-	claim *resourceapi.ResourceClaim
-	outer internal.AllocationConstraint
+	claim    *resourceapi.ResourceClaim
+	delegate internal.AllocationConstraint
 }
 
 // add is called with the class name of the request currently being
 // satisfied, which the allocator knows at the call site.
-func (c *callerConstraint) add(requestName, subRequestName, deviceClassName string,
-	device *draapi.Device, deviceID DeviceID,
+func (c *callerConstraint) add(requestData *requestData, deviceClassName string,
+	deviceID DeviceID,
 	consumedCapacity map[resourceapi.QualifiedName]resource.Quantity,
 	adminAccess bool) bool {
-	request := requestName
-	if subRequestName != "" {
-		request = requestName + "/" + subRequestName
-	}
-	return c.outer.Add(internal.DeviceAllocation{
+	return c.delegate.Add(internal.DeviceAllocation{
 		Claim:            c.claim,
-		Request:          request,
+		Request:          requestData.fullName(),
 		DeviceClassName:  deviceClassName,
 		Device:           deviceID,
 		ConsumedCapacity: consumedCapacity,
@@ -1032,22 +1025,25 @@ func (c *callerConstraint) add(requestName, subRequestName, deviceClassName stri
 	})
 }
 
-func (c *callerConstraint) remove(requestName, subRequestName, deviceClassName string,
-	device *draapi.Device, deviceID DeviceID,
+func (c *callerConstraint) remove(requestData *requestData, deviceClassName string,
+	deviceID DeviceID,
 	consumedCapacity map[resourceapi.QualifiedName]resource.Quantity,
 	adminAccess bool) {
-	request := requestName
-	if subRequestName != "" {
-		request = requestName + "/" + subRequestName
-	}
-	c.outer.Remove(internal.DeviceAllocation{
+	c.delegate.Remove(internal.DeviceAllocation{
 		Claim:            c.claim,
-		Request:          request,
+		Request:          requestData.fullName(),
 		DeviceClassName:  deviceClassName,
 		Device:           deviceID,
 		ConsumedCapacity: consumedCapacity,
 		AdminAccess:      adminAccess,
 	})
+}
+
+func (r *requestData) fullName() string {
+	if r.parentRequest != nil {
+		return r.parentRequest.name() + "/" + r.request.name()
+	}
+	return r.request.name()
 }
 
 // matchAttributeConstraint compares an attribute value across devices.
@@ -1947,10 +1943,10 @@ func (alloc *allocator) allocateDevice(r deviceIndices, device deviceWithID, mus
 		state.callerDeviceClassName = requestData.class.Name
 	}
 	for i := range alloc.callerConstraints[r.claimIndex] {
-		if !alloc.callerConstraints[r.claimIndex][i].add(baseRequestName, subRequestName,
-			state.callerDeviceClassName, device.Device, device.id,
+		if !alloc.callerConstraints[r.claimIndex][i].add(&requestData,
+			state.callerDeviceClassName, device.id,
 			state.callerConsumedCapacity, state.callerAdminAccess) {
-			alloc.rollbackDevice(r, device, baseRequestName, subRequestName, state)
+			alloc.rollbackDevice(r, device, &requestData, state)
 			if must {
 				return false, nil, fmt.Errorf("claim %s, request %s: cannot add device %s because a caller constraint would not be satisfied", klog.KObj(claim), request.name(), device.id)
 			}
@@ -2031,8 +2027,8 @@ func (alloc *allocator) rollbackDevice(r deviceIndices, device deviceWithID, req
 		alloc.allocatingDevices[device.id].Delete(r.claimIndex)
 	}
 	for i := state.callerConstraintsAdded - 1; i >= 0; i-- {
-		alloc.callerConstraints[r.claimIndex][i].remove(baseRequestName, subRequestName,
-			state.callerDeviceClassName, device.Device, device.id,
+		alloc.callerConstraints[r.claimIndex][i].remove(requestData,
+			state.callerDeviceClassName, device.id,
 			state.callerConsumedCapacity, state.callerAdminAccess)
 	}
 	for i := state.constraintsAdded - 1; i >= 0; i-- {

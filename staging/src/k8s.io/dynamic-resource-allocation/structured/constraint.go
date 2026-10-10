@@ -16,15 +16,7 @@ limitations under the License.
 
 package structured
 
-import (
-	"context"
-
-	v1 "k8s.io/api/core/v1"
-	resourceapi "k8s.io/api/resource/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
-
-	"k8s.io/dynamic-resource-allocation/structured/internal"
-)
+import "k8s.io/dynamic-resource-allocation/structured/internal"
 
 // DeviceAllocation describes one device the allocator is about to include
 // in a claim's allocation result. All fields hold final values:
@@ -34,15 +26,17 @@ import (
 type DeviceAllocation = internal.DeviceAllocation
 
 // AllocationConstraint is a caller-supplied constraint that participates
-// in the allocator's backtracking search. Add returns false to reject
-// the candidate; the allocator then backtracks. For every Add which
-// returned true there is exactly one Remove with an equal DeviceAllocation.
+// in the allocator's backtracking search. Add returns false to reject the
+// candidate. When the search later backtracks over an accepted candidate,
+// Remove is called with the same DeviceAllocation. Remove is not called for
+// allocations retained in the final result.
 type AllocationConstraint = internal.AllocationConstraint
 
-// NewAllocationConstraintFunc is called once per Allocate to produce
-// the constraints for that invocation. Allocate runs concurrently for
-// different nodes, so state shared between returned instances must be
-// read-only.
+// NewAllocationConstraintFunc is called once per Allocate. Each returned
+// constraint applies to every candidate allocation for every claim passed to
+// that call, in slice order. The provider may be called concurrently by
+// different Allocate calls, but each returned constraint is used only by the
+// call for which it was created.
 type NewAllocationConstraintFunc = internal.NewAllocationConstraintFunc
 
 // Option customizes an Allocator created by NewAllocator.
@@ -60,21 +54,3 @@ func WithAllocationConstraints(fn NewAllocationConstraintFunc) Option {
 		o.newAllocationConstraints = fn
 	}
 }
-
-// The type assertions below keep the exported contract honest: the
-// compiler fails here if the internal types drift away from what this
-// package documents.
-var (
-	_ DeviceAllocation = internal.DeviceAllocation{
-		Claim:            nil,
-		Request:          "",
-		DeviceClassName:  "",
-		Device:           DeviceID{},
-		ConsumedCapacity: map[resourceapi.QualifiedName]resource.Quantity{},
-		AdminAccess:      false,
-	}
-	_ context.Context            = nil
-	_ *v1.Pod                    = nil
-	_ AllocationConstraint       = nil
-	_ *resourceapi.ResourceClaim = nil
-)

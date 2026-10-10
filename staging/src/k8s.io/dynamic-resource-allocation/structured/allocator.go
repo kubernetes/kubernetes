@@ -18,6 +18,7 @@ package structured
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -156,6 +157,7 @@ func NewAllocator(ctx context.Context,
 	//
 	// Unit tests are shared between all implementations.
 	var enabledAllocators []string
+	var optionErr error
 	for _, allocator := range availableAllocators {
 		// Disabled?
 		if !allocatorEnabled(allocator.name) {
@@ -171,10 +173,17 @@ func NewAllocator(ctx context.Context,
 				return nil, err
 			}
 			if err := applyOptions(impl, opts); err != nil {
+				if err == errAllocationConstraintsUnsupported {
+					optionErr = err
+					continue
+				}
 				return nil, err
 			}
 			return impl, nil
 		}
+	}
+	if optionErr != nil {
+		return nil, optionErr
 	}
 	return nil, fmt.Errorf("internal error: no allocator available for feature set %+v, enabled allocators: %s", features, strings.Join(enabledAllocators, ", "))
 }
@@ -188,8 +197,10 @@ func EnableAllocators(names ...string) {
 
 // applyOptions installs the options on the selected allocator.
 // The constraint provider is only supported by allocators that implement
-// allocationConstraintSetter; others ignore it, which keeps the exported
-// API identical across the three implementations.
+// allocationConstraintSetter. NewAllocator skips implementations that do not
+// support it instead of silently dropping caller policy.
+var errAllocationConstraintsUnsupported = errors.New("no allocator for the requested feature set supports caller-supplied allocation constraints")
+
 func applyOptions(allocator Allocator, opts []Option) error {
 	var o options
 	for _, opt := range opts {
@@ -206,7 +217,7 @@ func applyOptions(allocator Allocator, opts []Option) error {
 		// Fail rather than silently ignoring the option, because a silently
 		// ignored policy is worse than no policy.
 		// Currently only the incubating allocator supports constraints.
-		return fmt.Errorf("the selected allocator does not support caller-supplied allocation constraints")
+		return errAllocationConstraintsUnsupported
 	}
 	setter.SetAllocationConstraintProvider(o.newAllocationConstraints)
 	return nil
