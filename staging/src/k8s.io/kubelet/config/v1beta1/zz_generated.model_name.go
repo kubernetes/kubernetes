@@ -42,6 +42,11 @@ func (in ExecEnvVar) OpenAPIModelName() string {
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
+func (in ImagePreloadedRecord) OpenAPIModelName() string {
+	return "io.k8s.kubelet.config.v1beta1.ImagePreloadedRecord"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
 func (in ImagePullCredentials) OpenAPIModelName() string {
 	return "io.k8s.kubelet.config.v1beta1.ImagePullCredentials"
 }
@@ -109,6 +114,11 @@ func (in MemoryReservation) OpenAPIModelName() string {
 // OpenAPIModelName returns the OpenAPI model name for this type.
 func (in MemorySwapConfiguration) OpenAPIModelName() string {
 	return "io.k8s.kubelet.config.v1beta1.MemorySwapConfiguration"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
+func (in PreloadedImage) OpenAPIModelName() string {
+	return "io.k8s.kubelet.config.v1beta1.PreloadedImage"
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
