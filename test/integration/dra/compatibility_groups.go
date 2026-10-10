@@ -44,7 +44,7 @@ func compatGroupsSlices(nodeName, driverName, counterSet string, devices ...comp
 	c.Spec.Pool.ResourceSliceCount = 2
 	c.Spec.SharedCounters = []resourceapi.CounterSet{{
 		Name:     counterSet,
-		Counters: map[string]resourceapi.Counter{"mem": {Value: resource.MustParse("8")}},
+		Counters: map[string]resourceapi.SharedCounter{"mem": {Value: new(resource.MustParse("8"))}},
 	}}
 
 	d := st.MakeResourceSlice(nodeName, driverName)
@@ -55,7 +55,7 @@ func compatGroupsSlices(nodeName, driverName, counterSet string, devices ...comp
 			Name: dev.name,
 			ConsumesCounters: []resourceapi.DeviceCounterConsumption{{
 				CounterSet:          counterSet,
-				Counters:            map[string]resourceapi.Counter{"mem": {Value: resource.MustParse("4")}},
+				Counters:            map[string]resourceapi.ConsumeCounter{"mem": {Value: new(resource.MustParse("4"))}},
 				CompatibilityGroups: dev.groups,
 			}},
 		})

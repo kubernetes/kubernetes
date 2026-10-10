@@ -75,6 +75,8 @@ spec:
         counters:
           countersKey:
             value: "0"
+            valueFrom:
+              capacityName: capacityNameValue
       nodeAllocatableResources:
         nodeAllocatableResourcesKey:
           mapping:
@@ -126,6 +128,14 @@ spec:
   sharedCounters:
   - counters:
       countersKey:
+        requestPolicy:
+          default: "0"
+          validRange:
+            max: "0"
+            min: "0"
+            step: "0"
+          validValues:
+          - "0"
         value: "0"
     name: nameValue
   skipNodeOperations:

@@ -5171,6 +5171,10 @@ func TestAllocatorSelection(t *testing.T) {
 			features:             "AllAlpha=false,AllBeta=false,DRADerivedAttributes=true",
 			expectImplementation: "experimental",
 		},
+		"SharedConsumableCapacity": {
+			features:             "AllAlpha=false,AllBeta=false,DRAConsumableCapacity=true,DRAPartitionableDevices=true,DRASharedConsumableCapacity=true",
+			expectImplementation: "experimental",
+		},
 	} {
 		t.Run(name, func(t *testing.T) {
 			tCtx := ktesting.Init(t)

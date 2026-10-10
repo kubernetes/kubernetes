@@ -178,7 +178,25 @@
             },
             "skipNodeOperations": [
               "skipNodeOperationsValue"
-            ]
+            ],
+            "consumedCounters": {
+              "perDevice": [
+                {
+                  "counterSet": "counterSetValue",
+                  "counters": {
+                    "countersKey": "0"
+                  }
+                }
+              ],
+              "perAllocation": [
+                {
+                  "counterSet": "counterSetValue",
+                  "counters": {
+                    "countersKey": "0"
+                  }
+                }
+              ]
+            }
           }
         ],
         "config": [

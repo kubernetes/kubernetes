@@ -285,7 +285,7 @@ func testPartitionSummary(tCtx ktesting.TContext) {
 			Attributes: map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{"profile": {StringValue: new(profile)}},
 			ConsumesCounters: []resourceapi.DeviceCounterConsumption{{
 				CounterSet: "gpu-0",
-				Counters:   map[string]resourceapi.Counter{"memory": {Value: resource.MustParse(cost)}},
+				Counters:   map[string]resourceapi.ConsumeCounter{"memory": {Value: new(resource.MustParse(cost))}},
 			}},
 		}
 	}
@@ -298,7 +298,7 @@ func testPartitionSummary(tCtx ktesting.TContext) {
 			NodeName: &nodeName,
 			SharedCounters: []resourceapi.CounterSet{{
 				Name:     "gpu-0",
-				Counters: map[string]resourceapi.Counter{"memory": {Value: resource.MustParse("80Gi")}},
+				Counters: map[string]resourceapi.SharedCounter{"memory": {Value: new(resource.MustParse("80Gi"))}},
 			}},
 		},
 	}

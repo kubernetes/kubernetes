@@ -192,6 +192,7 @@ func run(tCtx ktesting.TContext, whatRE string) {
 				runSubTest(tCtx, "NoScheduleWithSlices", func(tCtx ktesting.TContext) { testNoScheduleRule(tCtx, useNoRule) })
 				runSubTest(tCtx, "PartitionableDevices", func(tCtx ktesting.TContext) { testPartitionableDevices(tCtx, false) })
 				runSubTest(tCtx, "PrioritizedList", func(tCtx ktesting.TContext) { testPrioritizedList(tCtx, true) })
+				runSubTest(tCtx, "SharedConsumableCapacity", func(tCtx ktesting.TContext) { testSharedConsumableCapacity(tCtx, false) })
 				runSubTest(tCtx, "Pod", testPod)
 				runSubTest(tCtx, "PublishResourceSlices", func(tCtx ktesting.TContext) {
 					testPublishResourceSlices(tCtx, true, features.DRAPartitionableDevices, features.DRADeviceBindingConditions, features.DRAOptionalNodeOperations)
@@ -288,6 +289,7 @@ func run(tCtx ktesting.TContext, whatRE string) {
 				features.DRAPartitionableDevices:      true,
 				features.DRAPrioritizedList:           true,
 				features.DRAResourceClaimDeviceStatus: true,
+				features.DRASharedConsumableCapacity:  true,
 				features.DRAExtendedResource:          true,
 				features.DRANodeAllocatableResources:  true,
 				features.DRAWorkloadResourceClaims:    true,
@@ -307,6 +309,8 @@ func run(tCtx ktesting.TContext, whatRE string) {
 				runSubTest(tCtx, "PartitionableDevices", func(tCtx ktesting.TContext) { testPartitionableDevices(tCtx, true) })
 				runSubTest(tCtx, "CompatibilityGroups", func(tCtx ktesting.TContext) { testCompatibilityGroups(tCtx, true) })
 				runSubTest(tCtx, "PrioritizedList", func(tCtx ktesting.TContext) { testPrioritizedList(tCtx, true) })
+				runSubTest(tCtx, "SharedConsumableCapacity", func(tCtx ktesting.TContext) { testSharedConsumableCapacity(tCtx, true) })
+				runSubTest(tCtx, "SharedStaticCounterRelease", testSharedStaticCounterRelease)
 				runSubTest(tCtx, "PrioritizedListScoring", func(tCtx ktesting.TContext) { testPrioritizedListScoring(tCtx) })
 				runSubTest(tCtx, "PublishResourceSlices", func(tCtx ktesting.TContext) { testPublishResourceSlices(tCtx, true) })
 				runSubTest(tCtx, "ExplicitExtendedResource", func(tCtx ktesting.TContext) { testExtendedResource(tCtx, true, true) })

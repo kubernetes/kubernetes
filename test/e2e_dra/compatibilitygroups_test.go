@@ -34,7 +34,7 @@ import (
 // claim plus a fresh single-device claim allocated after re-enable, with headroom.
 var compatibilityGroupsSharedCounters = []resourceapi.CounterSet{{
 	Name:     "gpu",
-	Counters: map[string]resourceapi.Counter{"mem": {Value: resource.MustParse("4")}},
+	Counters: map[string]resourceapi.SharedCounter{"mem": {Value: new(resource.MustParse("4"))}},
 }}
 
 // compatibilityGroupsDeviceList holds four devices declaring the same group, so
@@ -51,7 +51,7 @@ func compatibilityGroupsDevice(name string) resourceapi.Device {
 		Name: name,
 		ConsumesCounters: []resourceapi.DeviceCounterConsumption{{
 			CounterSet:          "gpu",
-			Counters:            map[string]resourceapi.Counter{"mem": {Value: resource.MustParse("1")}},
+			Counters:            map[string]resourceapi.ConsumeCounter{"mem": {Value: new(resource.MustParse("1"))}},
 			CompatibilityGroups: []string{"mig"},
 		}},
 	}
