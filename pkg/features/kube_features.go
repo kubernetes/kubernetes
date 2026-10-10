@@ -882,6 +882,11 @@ const (
 	// (if requested) dynamic resource allocation are complete.
 	PodReadyToStartContainersCondition featuregate.Feature = "PodReadyToStartContainersCondition"
 
+	// owner: @jwc1love
+	//
+	// Prioritizes pods awaiting admission after accounting for existing runtime instances.
+	PodStartingOrderByPriority featuregate.Feature = "PodStartingOrderByPriority"
+
 	// owner: @munnerz
 	// kep: https://kep.k8s.io/4742
 	// alpha: v1.33
@@ -1896,6 +1901,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.37"), Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // GA in 1.37, remove in 1.40
 	},
 
+	PodStartingOrderByPriority: {
+		{Version: version.MustParse("1.38"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
 	PodTopologyLabelsAdmission: {
 		{Version: version.MustParse("1.33"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.35"), Default: true, PreRelease: featuregate.Beta},
@@ -2656,6 +2665,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	PodObservedGenerationTracking: {},
 
 	PodReadyToStartContainersCondition: {},
+
+	PodStartingOrderByPriority: {},
 
 	PodTopologyLabelsAdmission: {},
 
