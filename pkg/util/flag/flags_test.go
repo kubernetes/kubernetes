@@ -308,6 +308,32 @@ func TestReservedMemoryVar(t *testing.T) {
 	}
 }
 
+func TestReservedMemoryVarClear(t *testing.T) {
+	reservedMemory := []kubeletconfig.MemoryReservation{
+		{
+			NumaNode: 0,
+			Limits: v1.ResourceList{
+				v1.ResourceMemory: resource.MustParse("1Gi"),
+			},
+		},
+	}
+	value := &ReservedMemoryVar{Value: &reservedMemory}
+
+	if err := value.Set(""); err != nil {
+		t.Fatalf("unexpected error clearing reserved memory: %v", err)
+	}
+	if reservedMemory != nil {
+		t.Fatalf("expected reserved memory to be nil after clearing, got %v", reservedMemory)
+	}
+
+	if err := value.Set("0:memory=1Gi"); err != nil {
+		t.Fatalf("unexpected error setting reserved memory after clearing: %v", err)
+	}
+	if len(reservedMemory) != 1 {
+		t.Fatalf("expected one reserved memory entry after resetting, got %d", len(reservedMemory))
+	}
+}
+
 func TestTaintsVar(t *testing.T) {
 	cases := []struct {
 		f   string
