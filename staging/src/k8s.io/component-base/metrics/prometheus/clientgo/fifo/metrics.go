@@ -55,6 +55,16 @@ var (
 		},
 		[]string{"name", "group", "version", "resource"},
 	)
+	initializationDuration = k8smetrics.NewHistogramVec(
+		&k8smetrics.HistogramOpts{
+			Subsystem:      subsystem,
+			Name:           "initialization_duration_seconds",
+			Help:           "Time from starting a shared informer until its first cache sync, including retries and LIST fallback, excluding asynchronous handler delivery, in seconds.",
+			Buckets:        []float64{0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10, 30, 60, 180, 600},
+			StabilityLevel: k8smetrics.ALPHA,
+		},
+		[]string{"name", "group", "version", "resource"},
+	)
 	registerOnce sync.Once
 )
 
@@ -81,11 +91,25 @@ func Register() {
 		legacyregistry.MustRegister(fifoQueuedItems)
 		legacyregistry.MustRegister(fifoProcessingLatency)
 		legacyregistry.MustRegister(storeResourceVersion)
+		legacyregistry.MustRegister(initializationDuration)
 	})
 	cache.SetInformerMetricsProvider(informerMetricsProvider{})
 }
 
 type informerMetricsProvider struct{}
+
+func (informerMetricsProvider) NewInitializationDurationMetric(id cache.InformerNameAndResource) cache.HistogramMetric {
+	Register()
+	return &reservedHistogramMetric{
+		id: id,
+		histogram: initializationDuration.WithLabelValues(
+			id.Name(),
+			id.GroupVersionResource().Group,
+			id.GroupVersionResource().Version,
+			id.GroupVersionResource().Resource,
+		),
+	}
+}
 
 func (informerMetricsProvider) NewQueuedItemMetric(id cache.InformerNameAndResource) cache.GaugeMetric {
 	Register()

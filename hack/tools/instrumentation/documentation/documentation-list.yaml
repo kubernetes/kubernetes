@@ -3134,6 +3134,43 @@
   componentEndpoints:
   - component: kube-controller-manager
     endpoint: /metrics
+- name: initialization_duration_seconds
+  subsystem: informer
+  help: Time from starting a shared informer until its first cache sync, including
+    retries and LIST fallback, excluding asynchronous handler delivery, in seconds.
+  type: Histogram
+  stabilityLevel: ALPHA
+  labels:
+  - group
+  - name
+  - resource
+  - version
+  buckets:
+  - 0.05
+  - 0.1
+  - 0.25
+  - 0.5
+  - 1
+  - 2.5
+  - 5
+  - 10
+  - 30
+  - 60
+  - 180
+  - 600
+  componentEndpoints:
+  - component: cloud-controller-manager
+    endpoint: /metrics
+  - component: kube-apiserver
+    endpoint: /metrics
+  - component: kube-controller-manager
+    endpoint: /metrics
+  - component: kube-proxy
+    endpoint: /metrics
+  - component: kube-scheduler
+    endpoint: /metrics
+  - component: kubelet
+    endpoint: /metrics
 - name: processing_latency_seconds
   subsystem: informer
   help: Time taken to process events after popping from the queue.
