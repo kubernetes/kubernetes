@@ -4619,10 +4619,13 @@ func setup(tCtx ktesting.TContext, args *config.DynamicResourcesArgs, nodes []*v
 	tc.client.ReactionChain = append(apiReactors, tc.client.ReactionChain...)
 
 	tc.informerFactory = informers.NewSharedInformerFactory(tc.client, 0)
+	sliceInformer := draapi.NewInformerForResourceSlice(tc.informerFactory)
+
 	var doneCheckers []cache.DoneChecker
 	resourceSliceTrackerOpts := resourceslicetracker.Options{
 		EnableDeviceTaintRules: true,
-		SliceInformer:          tc.informerFactory.Resource().V1().ResourceSlices(),
+		SliceLister:            draapi.NewResourceSliceLister(sliceInformer.GetIndexer()),
+		SliceInformer:          sliceInformer,
 		TaintInformer:          tc.informerFactory.Resource().V1().DeviceTaintRules(),
 		KubeClient:             tc.client,
 	}
@@ -5930,7 +5933,7 @@ func testGatherAllocatedState(tCtx ktesting.TContext) {
 					tCtx.Errorf("expected aggregated capacity of %s, got nil", deviceID)
 					return
 				}
-				name := draapi.MakeFullyQualifiedName(capacityName, driver)
+				name := draapi.FullyQualifiedName{Domain: draapi.MakeUniqueString(driver), Identifier: draapi.MakeUniqueString(string(capacityName))}
 				value := capacity[name]
 				if value == nil {
 					tCtx.Errorf("expected value of %s, got nil", name)

@@ -25,6 +25,7 @@ import (
 	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
+	draapi "k8s.io/dynamic-resource-allocation/api"
 	resourceslicetracker "k8s.io/dynamic-resource-allocation/resourceslice/tracker"
 	"k8s.io/klog/v2"
 	configv1 "k8s.io/kube-scheduler/config/v1"
@@ -119,10 +120,12 @@ func newFrameworkComponents(ctx context.Context,
 
 	resourceClaimInformer := informerFactory.Resource().V1().ResourceClaims().Informer()
 	resourceClaimCache := assumecache.NewAssumeCache(logger, resourceClaimInformer, "ResourceClaim", "", nil)
+	sliceInformer := draapi.NewInformerForResourceSlice(informerFactory)
 	resourceSliceTrackerOpts := resourceslicetracker.Options{
 		EnableDeviceTaintRules:   feature.DefaultFeatureGate.Enabled(features.DRADeviceTaintRules),
 		EnableConsumableCapacity: feature.DefaultFeatureGate.Enabled(features.DRAConsumableCapacity),
-		SliceInformer:            informerFactory.Resource().V1().ResourceSlices(),
+		SliceLister:              draapi.NewResourceSliceLister(sliceInformer.GetIndexer()),
+		SliceInformer:            sliceInformer,
 		KubeClient:               client,
 	}
 	// If device taint rules are disabled, the additional informers are not needed and

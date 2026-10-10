@@ -23,6 +23,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	draapi "k8s.io/dynamic-resource-allocation/api"
 	"k8s.io/dynamic-resource-allocation/cel"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/ptr"
@@ -351,7 +352,7 @@ func (r *resourceAllocationScorer) calculateDRAExtendedResourceAllocatableReques
 //	totalCapacity  - total number of devices matching the device class on the node
 //	totalAllocated - number of devices currently allocated from the matching set
 //	error          - any error encountered during processing
-func (r *resourceAllocationScorer) calculateDRAResourceTotals(ctx context.Context, node *v1.Node, deviceClass *resourceapi.DeviceClass, allocatedState *structured.AllocatedState, resourceSlices []*resourceapi.ResourceSlice,
+func (r *resourceAllocationScorer) calculateDRAResourceTotals(ctx context.Context, node *v1.Node, deviceClass *resourceapi.DeviceClass, allocatedState *structured.AllocatedState, resourceSlices []*draapi.ResourceSlice,
 ) (int64, int64, error) {
 	var totalCapacity, totalAllocated int64
 	nodeName := node.Name
@@ -360,11 +361,11 @@ func (r *resourceAllocationScorer) calculateDRAResourceTotals(ctx context.Contex
 		// Early filtering: check if slice applies to this node
 		perDeviceNodeSelection := ptr.Deref(slice.Spec.PerDeviceNodeSelection, false)
 
-		var devices []resourceapi.Device
+		var devices []draapi.Device
 
 		if perDeviceNodeSelection {
 			// Per-device node selection: filter devices individually
-			devices = make([]resourceapi.Device, 0, len(slice.Spec.Devices))
+			devices = make([]draapi.Device, 0, len(slice.Spec.Devices))
 			for _, device := range slice.Spec.Devices {
 				deviceNodeName := ptr.Deref(device.NodeName, "")
 				deviceAllNodes := ptr.Deref(device.AllNodes, false)
@@ -389,7 +390,7 @@ func (r *resourceAllocationScorer) calculateDRAResourceTotals(ctx context.Contex
 		} else {
 			// Slice-level node selection
 			sliceNodeName := ptr.Deref(slice.Spec.NodeName, "")
-			sliceAllNodes := ptr.Deref(slice.Spec.AllNodes, false)
+			sliceAllNodes := slice.Spec.AllNodes
 
 			// Fast path: check AllNodes or exact name match first
 			if !sliceAllNodes && sliceNodeName != nodeName && slice.Spec.NodeSelector != nil {
@@ -415,23 +416,22 @@ func (r *resourceAllocationScorer) calculateDRAResourceTotals(ctx context.Contex
 			pool := slice.Spec.Pool.Name
 			for _, device := range devices {
 				totalCapacity++
-				deviceID := structured.MakeDeviceID(driver, pool, device.Name)
+				// TODO (?): use unique strings in structured.IsDeviceAllocated
+				deviceID := structured.MakeDeviceID(driver.String(), pool.String(), device.Name.String())
 				if structured.IsDeviceAllocated(deviceID, allocatedState) {
 					totalAllocated++
 				}
 			}
 		} else {
 			// Slow path: check device class selectors
-			driver := slice.Spec.Driver
-			pool := slice.Spec.Pool.Name
 			for _, device := range devices {
-				matches, err := r.deviceMatchesClass(ctx, device, deviceClass, driver, pool)
+				matches, err := r.deviceMatchesClass(ctx, slice, device, deviceClass)
 				if err != nil {
 					return 0, 0, err
 				}
 				if matches {
 					totalCapacity++
-					deviceID := structured.MakeDeviceID(driver, pool, device.Name)
+					deviceID := structured.DeviceID{Driver: slice.Spec.Driver, Pool: slice.Spec.Pool.Name, Device: device.Name}
 					if structured.IsDeviceAllocated(deviceID, allocatedState) {
 						totalAllocated++
 					}
@@ -447,7 +447,7 @@ func (r *resourceAllocationScorer) calculateDRAResourceTotals(ctx context.Contex
 // Note: This method assumes the device class has ExtendedResourceName set, as filtering
 // should be done by the caller to ensure we only process DRA resources meant for extended
 // resource scoring.
-func (r *resourceAllocationScorer) deviceMatchesClass(ctx context.Context, device resourceapi.Device, deviceClass *resourceapi.DeviceClass, driver string, poolName string) (bool, error) {
+func (r *resourceAllocationScorer) deviceMatchesClass(ctx context.Context, slice *draapi.ResourceSlice, device draapi.Device, deviceClass *resourceapi.DeviceClass) (bool, error) {
 	// If no selectors are defined, all devices match
 	if len(deviceClass.Spec.Selectors) == 0 {
 		return true, nil
@@ -463,7 +463,8 @@ func (r *resourceAllocationScorer) deviceMatchesClass(ctx context.Context, devic
 			continue
 		}
 
-		key := buildDeviceMatchCacheKey(selector.CEL.Expression, driver, poolName, device.Name)
+		// TODO (?): use UniqueString
+		key := buildDeviceMatchCacheKey(selector.CEL.Expression, slice.Spec.Driver.String(), slice.Spec.Pool.Name.String(), device.Name.String())
 
 		// Check if result is already cached
 		if matches, ok := r.deviceMatchCache.Load(key); ok {
@@ -477,9 +478,10 @@ func (r *resourceAllocationScorer) deviceMatchesClass(ctx context.Context, devic
 		// Create CEL device if we haven't already
 		if !celDeviceCreated {
 			celDevice = cel.Device{
-				Driver:     driver,
-				Attributes: device.Attributes,
-				Capacity:   device.Capacity,
+				Driver:             slice.Spec.Driver.String(),
+				LookupUniqueString: slice.LookupUniqueString,
+				Attributes:         device.Attributes,
+				Capacity:           device.Capacity,
 			}
 			celDeviceCreated = true
 		}
