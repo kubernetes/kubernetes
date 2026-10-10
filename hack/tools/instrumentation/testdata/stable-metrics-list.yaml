@@ -165,6 +165,22 @@
   labels:
   - group
   - resource
+- name: stream_translator_requests_total
+  subsystem: apiserver
+  help: Total number of requests that were handled by the StreamTranslatorProxy, which
+    processes streaming RemoteCommand/V5
+  type: Counter
+  stabilityLevel: BETA
+  labels:
+  - code
+- name: stream_tunnel_requests_total
+  subsystem: apiserver
+  help: Total number of requests that were handled by the StreamTunnelProxy, which
+    processes streaming PortForward/V2
+  type: Counter
+  stabilityLevel: BETA
+  labels:
+  - code
 - name: check_duration_seconds
   subsystem: validating_admission_policy
   namespace: apiserver
@@ -288,6 +304,16 @@
     SAN extension missing (either/or, based on the runtime environment)
   type: Counter
   stabilityLevel: BETA
+- name: websocket_streaming_requests_total
+  subsystem: apiserver
+  help: Total number of WebSocket streaming requests (exec/attach/portforward) routed
+    by the API server, labeled by subresource and proxy_type. proxy_type is proxied_to_kubelet
+    when the kubelet handles the request directly; otherwise translated_at_apiserver.
+  type: Counter
+  stabilityLevel: BETA
+  labels:
+  - proxy_type
+  - subresource
 - name: disabled_metrics_total
   help: The count of disabled metrics.
   type: Counter
@@ -474,6 +500,14 @@
   help: Number of requested image volumes.
   type: Counter
   stabilityLevel: BETA
+- name: websocket_streaming_requests_total
+  subsystem: kubelet
+  help: Total number of WebSocket streaming requests (exec/attach/portforward) received
+    by the kubelet.
+  type: Counter
+  stabilityLevel: BETA
+  labels:
+  - subresource
 - name: kubernetes_build_info
   help: A metric with a constant '1' value labeled by major, minor, git version, git
     commit, git tree state, build date, Go version, and compiler from which Kubernetes
