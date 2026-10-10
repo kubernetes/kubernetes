@@ -83,6 +83,9 @@ type Config struct {
 	DBMetricPollInterval time.Duration
 	// EventsHistoryWindow specifies minimum history duration that storage is keeping.
 	EventsHistoryWindow time.Duration
+	// WatchCacheMaxAverageObjectSize, if positive, is the average object size in
+	// bytes above which a resource is served without a watch cache.
+	WatchCacheMaxAverageObjectSize int64
 	// HealthcheckTimeout specifies the timeout used when checking health
 	HealthcheckTimeout time.Duration
 	// ReadycheckTimeout specifies the timeout used when checking readiness

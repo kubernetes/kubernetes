@@ -23,6 +23,7 @@ import (
 	"reflect"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"go.opentelemetry.io/otel/attribute"
@@ -120,6 +121,12 @@ type Config struct {
 	NewListFunc func() runtime.Object
 
 	Codec runtime.Codec
+
+	// MaxAverageObjectSizeBytes, if positive, takes the resource out of the
+	// watch cache when the average size of its objects in storage exceeds it.
+	// The resource is then served directly from Storage, as if it had no watch
+	// cache. See object_size_budget.go.
+	MaxAverageObjectSizeBytes int64
 
 	Clock clock.WithTicker
 }
@@ -343,6 +350,19 @@ type Cacher struct {
 	expiredBookmarkWatchers []*cacheWatcher
 	compactor               *compactor
 	watcherMetrics          *metrics.WatcherMetricsObservers
+
+	// maxAverageObjectSize is the object size budget in bytes, or zero if
+	// disabled. See object_size_budget.go.
+	maxAverageObjectSize int64
+	// codec is the storage codec, used to measure object sizes.
+	codec runtime.Codec
+	// bypassed is set once the resource has been taken out of the watch cache
+	// for exceeding maxAverageObjectSize, and bypassedCh is closed at the same
+	// time.
+	bypassed   atomic.Bool
+	bypassedCh chan struct{}
+	// sizeScan is the progress of the periodic object size check.
+	sizeScan objectSizeScan
 }
 
 // NewCacherFromConfig creates a new Cacher responsible for servicing WATCH and LIST requests from
@@ -416,6 +436,10 @@ func NewCacherFromConfig(config Config) (*Cacher, error) {
 		timer:            time.NewTimer(time.Duration(0)),
 		bookmarkWatchers: newTimeBucketWatchers(config.Clock, defaultBookmarkFrequency),
 		watcherMetrics:   metrics.NewWatcherMetricsObservers(config.GroupResource),
+
+		maxAverageObjectSize: config.MaxAverageObjectSizeBytes,
+		codec:                config.Codec,
+		bypassedCh:           make(chan struct{}),
 	}
 
 	// Ensure that timer is stopped.
@@ -475,6 +499,9 @@ func NewCacherFromConfig(config Config) (*Cacher, error) {
 	go func() {
 		defer cacher.stopWg.Done()
 		defer cacher.terminateAllWatchers()
+		if !cacher.admitByObjectSize() {
+			return
+		}
 		wait.Until(
 			func() {
 				if !cacher.isStopped() {
@@ -483,6 +510,9 @@ func NewCacherFromConfig(config Config) (*Cacher, error) {
 			}, time.Second, stopCh,
 		)
 	}()
+	if cacher.maxAverageObjectSize > 0 {
+		go cacher.monitorObjectSize()
+	}
 	return cacher, nil
 }
 
@@ -905,7 +935,12 @@ func (c *Cacher) processEvent(event *watchCacheEvent) {
 		// Monitor if this gets backed up, and how much.
 		klog.V(1).Infof("cacher (%v): %v objects queued in incoming channel.", c.groupResource.String(), curLen)
 	}
-	c.incoming <- *event
+	select {
+	case c.incoming <- *event:
+	case <-c.stopCh:
+		// dispatchEvents no longer consumes events. Blocking here would keep
+		// the reflector, and with it Stop, from ever returning.
+	}
 }
 
 func (c *Cacher) dispatchEvents() {
@@ -1219,6 +1254,13 @@ func (c *Cacher) MarkConsistent(consistent bool) {
 
 // Stop implements the graceful termination.
 func (c *Cacher) Stop() {
+	c.signalStop()
+	c.stopWg.Wait()
+}
+
+// signalStop stops the cacher without waiting for its goroutines to finish,
+// so that it can be called from one of them.
+func (c *Cacher) signalStop() {
 	c.stopLock.Lock()
 	if c.stopped {
 		// avoid stopping twice (note: cachers are shared with subresources)
@@ -1229,7 +1271,6 @@ func (c *Cacher) Stop() {
 	c.ready.stop()
 	c.stopLock.Unlock()
 	close(c.stopCh)
-	c.stopWg.Wait()
 }
 
 func (c *Cacher) prepareKey(key string, recursive bool) (string, error) {
