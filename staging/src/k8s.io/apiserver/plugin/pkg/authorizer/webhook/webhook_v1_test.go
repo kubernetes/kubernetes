@@ -43,6 +43,7 @@ import (
 	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/apis/apiserver"
+	apiservervalidation "k8s.io/apiserver/pkg/apis/apiserver/validation"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	authorizationcel "k8s.io/apiserver/pkg/authorization/cel"
@@ -213,7 +214,7 @@ current-context: default
 			if err != nil {
 				return fmt.Errorf("error building sar client: %v", err)
 			}
-			_, err = newWithBackoff(sarClient, 0, 0, testRetryBackoff, authorizer.DecisionNoOpinion, []apiserver.WebhookMatchCondition{}, noopAuthorizerMetrics(), authorizationcel.NewDefaultCompiler(), "")
+			_, err = newWithBackoff(sarClient, 0, 0, testRetryBackoff, authorizer.DecisionNoOpinion, nil, noopAuthorizerMetrics(), "")
 			return err
 		}()
 		if err != nil && !tt.wantErr {
@@ -363,7 +364,11 @@ func newV1Authorizer(callbackURL string, clientCert, clientKey, ca []byte, cache
 	if err != nil {
 		return nil, fmt.Errorf("error building sar client: %v", err)
 	}
-	return newWithBackoff(sarClient, cacheTime, cacheTime, testRetryBackoff, authorizer.DecisionNoOpinion, expressions, metrics, compiler, authzName)
+	matcher, err := apiservervalidation.NewWebhookMatcher(compiler, expressions, authzName, metrics)
+	if err != nil {
+		return nil, err
+	}
+	return newWithBackoff(sarClient, cacheTime, cacheTime, testRetryBackoff, authorizer.DecisionNoOpinion, matcher, metrics, authzName)
 }
 
 func TestV1TLSConfig(t *testing.T) {

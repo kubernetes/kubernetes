@@ -36,11 +36,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/cache"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/apiserver/pkg/apis/apiserver"
-	apiservervalidation "k8s.io/apiserver/pkg/apis/apiserver/validation"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
-	authorizationcel "k8s.io/apiserver/pkg/authorization/cel"
 	"k8s.io/apiserver/pkg/util/webhook"
 	"k8s.io/apiserver/plugin/pkg/authorizer/webhook/metrics"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -67,6 +64,12 @@ type subjectAccessReviewer interface {
 	Create(context.Context, *authorizationv1.SubjectAccessReview, metav1.CreateOptions) (*authorizationv1.SubjectAccessReview, int, error)
 }
 
+// Matcher is the compiled form of the webhook's match conditions. The caller builds
+// it so this package does not depend on CEL; nil consults the webhook for every request.
+type Matcher interface {
+	Eval(ctx context.Context, r *authorizationv1.SubjectAccessReview) (bool, error)
+}
+
 type WebhookAuthorizer struct {
 	subjectAccessReview subjectAccessReviewer
 	responseCache       *cache.LRUExpireCache
@@ -75,13 +78,13 @@ type WebhookAuthorizer struct {
 	retryBackoff        wait.Backoff
 	decisionOnError     authorizer.Decision
 	metrics             metrics.AuthorizerMetrics
-	celMatcher          *authorizationcel.CELMatcher
+	matcher             Matcher
 	name                string
 }
 
 // NewFromInterface creates a WebhookAuthorizer using the given subjectAccessReview client
-func NewFromInterface(subjectAccessReview authorizationv1client.AuthorizationV1Interface, authorizedTTL, unauthorizedTTL time.Duration, retryBackoff wait.Backoff, decisionOnError authorizer.Decision, metrics metrics.AuthorizerMetrics, compiler authorizationcel.Compiler) (*WebhookAuthorizer, error) {
-	return newWithBackoff(&subjectAccessReviewV1Client{subjectAccessReview.RESTClient()}, authorizedTTL, unauthorizedTTL, retryBackoff, decisionOnError, nil, metrics, compiler, "")
+func NewFromInterface(subjectAccessReview authorizationv1client.AuthorizationV1Interface, authorizedTTL, unauthorizedTTL time.Duration, retryBackoff wait.Backoff, decisionOnError authorizer.Decision, metrics metrics.AuthorizerMetrics) (*WebhookAuthorizer, error) {
+	return newWithBackoff(&subjectAccessReviewV1Client{subjectAccessReview.RESTClient()}, authorizedTTL, unauthorizedTTL, retryBackoff, decisionOnError, nil, metrics, "")
 }
 
 // New creates a new WebhookAuthorizer from the provided kubeconfig file.
@@ -103,26 +106,16 @@ func NewFromInterface(subjectAccessReview authorizationv1client.AuthorizationV1I
 //
 // For additional HTTP configuration, refer to the kubeconfig documentation
 // https://kubernetes.io/docs/user-guide/kubeconfig-file/.
-func New(config *rest.Config, version string, authorizedTTL, unauthorizedTTL time.Duration, retryBackoff wait.Backoff, decisionOnError authorizer.Decision, matchConditions []apiserver.WebhookMatchCondition, name string, metrics metrics.AuthorizerMetrics, compiler authorizationcel.Compiler) (*WebhookAuthorizer, error) {
+func New(config *rest.Config, version string, authorizedTTL, unauthorizedTTL time.Duration, retryBackoff wait.Backoff, decisionOnError authorizer.Decision, matcher Matcher, name string, metrics metrics.AuthorizerMetrics) (*WebhookAuthorizer, error) {
 	subjectAccessReview, err := subjectAccessReviewInterfaceFromConfig(config, version, retryBackoff)
 	if err != nil {
 		return nil, err
 	}
-	return newWithBackoff(subjectAccessReview, authorizedTTL, unauthorizedTTL, retryBackoff, decisionOnError, matchConditions, metrics, compiler, name)
+	return newWithBackoff(subjectAccessReview, authorizedTTL, unauthorizedTTL, retryBackoff, decisionOnError, matcher, metrics, name)
 }
 
 // newWithBackoff allows tests to skip the sleep.
-func newWithBackoff(subjectAccessReview subjectAccessReviewer, authorizedTTL, unauthorizedTTL time.Duration, retryBackoff wait.Backoff, decisionOnError authorizer.Decision, matchConditions []apiserver.WebhookMatchCondition, am metrics.AuthorizerMetrics, compiler authorizationcel.Compiler, name string) (*WebhookAuthorizer, error) {
-	// compile all expressions once in validation and save the results to be used for eval later
-	cm, fieldErr := apiservervalidation.ValidateAndCompileMatchConditions(compiler, matchConditions)
-	if err := fieldErr.ToAggregate(); err != nil {
-		return nil, err
-	}
-	if cm != nil {
-		cm.AuthorizerType = "Webhook"
-		cm.AuthorizerName = name
-		cm.Metrics = am
-	}
+func newWithBackoff(subjectAccessReview subjectAccessReviewer, authorizedTTL, unauthorizedTTL time.Duration, retryBackoff wait.Backoff, decisionOnError authorizer.Decision, matcher Matcher, am metrics.AuthorizerMetrics, name string) (*WebhookAuthorizer, error) {
 	return &WebhookAuthorizer{
 		subjectAccessReview: subjectAccessReview,
 		responseCache:       cache.NewLRUExpireCache(8192),
@@ -131,7 +124,7 @@ func newWithBackoff(subjectAccessReview subjectAccessReviewer, authorizedTTL, un
 		retryBackoff:        retryBackoff,
 		decisionOnError:     decisionOnError,
 		metrics:             am,
-		celMatcher:          cm,
+		matcher:             matcher,
 		name:                name,
 	}, nil
 }
@@ -419,11 +412,10 @@ func (w *WebhookAuthorizer) RulesFor(ctx context.Context, user user.Info, namesp
 // to return match or no match found, which then is used to
 // determine if the webhook should be skipped.
 func (w *WebhookAuthorizer) match(ctx context.Context, r *authorizationv1.SubjectAccessReview) (bool, error) {
-	// A nil celMatcher or zero saved CompilationResults matches all requests.
-	if w.celMatcher == nil || w.celMatcher.CompilationResults == nil {
+	if w.matcher == nil {
 		return true, nil
 	}
-	return w.celMatcher.Eval(ctx, r)
+	return w.matcher.Eval(ctx, r)
 }
 
 func convertToSARExtra(extra map[string][]string) map[string]authorizationv1.ExtraValue {

@@ -22,7 +22,6 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
-	authorizationcel "k8s.io/apiserver/pkg/authorization/cel"
 	"k8s.io/apiserver/plugin/pkg/authorizer/webhook"
 	authorizationclient "k8s.io/client-go/kubernetes/typed/authorization/v1"
 )
@@ -31,9 +30,6 @@ import (
 // built to delegate authorization to a kube API server
 type DelegatingAuthorizerConfig struct {
 	SubjectAccessReviewClient authorizationclient.AuthorizationV1Interface
-
-	// Compiler is the CEL compiler to use for evaluating policies. If nil, a default compiler will be used.
-	Compiler authorizationcel.Compiler
 
 	// AllowCacheTTL is the length of time that a successful authorization response will be cached
 	AllowCacheTTL time.Duration
@@ -52,11 +48,6 @@ func (c DelegatingAuthorizerConfig) New() (authorizer.Authorizer, error) {
 	if c.WebhookRetryBackoff == nil {
 		return nil, errors.New("retry backoff parameters for delegating authorization webhook has not been specified")
 	}
-	compiler := c.Compiler
-	if compiler == nil {
-		compiler = authorizationcel.NewDefaultCompiler()
-	}
-
 	return webhook.NewFromInterface(
 		c.SubjectAccessReviewClient,
 		c.AllowCacheTTL,
@@ -64,6 +55,5 @@ func (c DelegatingAuthorizerConfig) New() (authorizer.Authorizer, error) {
 		*c.WebhookRetryBackoff,
 		authorizer.DecisionNoOpinion,
 		NewDelegatingAuthorizerMetrics(),
-		compiler,
 	)
 }
