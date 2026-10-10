@@ -50,7 +50,8 @@ func (f fakeClassLister) Get(name string) (*resourceapi.DeviceClass, error) {
 // makeConstraintFixture produces the smallest objects that make Allocate
 // succeed with one device: one class, one node, one slice with one device,
 // and one claim requesting exactly that device.
-func makeConstraintFixture() (fakeClassLister, *v1.Node, []*resourceapi.ResourceSlice, []*resourceapi.ResourceClaim) {
+func makeConstraintFixture(t *testing.T) (fakeClassLister, *v1.Node, []*draapi.ResourceSlice, []*resourceapi.ResourceClaim) {
+	t.Helper()
 	className := "gpu"
 	driverName := "gpu-driver"
 
@@ -99,25 +100,11 @@ func makeConstraintFixture() (fakeClassLister, *v1.Node, []*resourceapi.Resource
 		},
 	}
 
-	return fakeClassLister{className: class}, node, []*resourceapi.ResourceSlice{slice}, []*resourceapi.ResourceClaim{claim}
-}
-
-func convertConstraintSlices(t *testing.T, slices []*resourceapi.ResourceSlice) []*draapi.ResourceSlice {
-	t.Helper()
-	converted := make([]*draapi.ResourceSlice, len(slices))
-	for i, slice := range slices {
-		converted[i] = &draapi.ResourceSlice{}
-		if err := draapi.Convert_v1_ResourceSlice_To_api_ResourceSlice(slice, converted[i], nil); err != nil {
-			t.Fatalf("convert ResourceSlice %q: %v", slice.Name, err)
-		}
+	internalSlice := &draapi.ResourceSlice{}
+	if err := draapi.Convert_v1_ResourceSlice_To_api_ResourceSlice(slice, internalSlice, nil); err != nil {
+		t.Fatalf("convert ResourceSlice: %v", err)
 	}
-	return converted
-}
-
-func useConstraintAllocator(t *testing.T) {
-	t.Helper()
-	EnableAllocators("incubating")
-	t.Cleanup(func() { EnableAllocators() })
+	return fakeClassLister{className: class}, node, []*draapi.ResourceSlice{internalSlice}, []*resourceapi.ResourceClaim{claim}
 }
 
 // recordingConstraint records every Add and Remove call.
@@ -136,14 +123,13 @@ func (c *recordingConstraint) Remove(allocation DeviceAllocation) {
 }
 
 func TestAllocationConstraintSeesFinalValues(t *testing.T) {
-	useConstraintAllocator(t)
-	classLister, node, slices, claims := makeConstraintFixture()
+	classLister, node, slices, claims := makeConstraintFixture(t)
 	recorder := &recordingConstraint{}
 
 	allocator, err := NewAllocator(context.Background(),
 		Features{ConsumableCapacity: true},
 		AllocatedState{},
-		classLister, convertConstraintSlices(t, slices), cel.NewCache(10, cel.Features{}),
+		classLister, slices, cel.NewCache(10, cel.Features{}),
 		WithAllocationConstraints(func(ctx context.Context, node *v1.Node,
 			claims []*resourceapi.ResourceClaim) ([]AllocationConstraint, error) {
 			return []AllocationConstraint{recorder}, nil
@@ -183,14 +169,56 @@ func TestAllocationConstraintSeesFinalValues(t *testing.T) {
 	}
 }
 
+func TestAllocationConstraintsApplyToAllClaims(t *testing.T) {
+	classLister, node, slices, claims := makeConstraintFixture(t)
+	slices[0].Spec.Devices = append(slices[0].Spec.Devices, draapi.Device{Name: slices[0].MakeUniqueString("device-2")})
+	secondClaim := claims[0].DeepCopy()
+	secondClaim.Name = "claim-2"
+	secondClaim.Spec.Devices.Requests[0].Name = "gpu-request-2"
+	claims = append(claims, secondClaim)
+
+	recorders := []*recordingConstraint{{}, {}}
+	allocator, err := NewAllocator(context.Background(),
+		Features{ConsumableCapacity: true},
+		AllocatedState{},
+		classLister, slices, cel.NewCache(10, cel.Features{}),
+		WithAllocationConstraints(func(ctx context.Context, node *v1.Node,
+			claims []*resourceapi.ResourceClaim) ([]AllocationConstraint, error) {
+			return []AllocationConstraint{recorders[0], recorders[1]}, nil
+		}),
+	)
+	if err != nil {
+		t.Fatalf("NewAllocator: %v", err)
+	}
+
+	result, err := allocator.Allocate(context.Background(), node, claims)
+	if err != nil {
+		t.Fatalf("Allocate: %v", err)
+	}
+	if len(result) != len(claims) {
+		t.Fatalf("want %d results, got %d", len(claims), len(result))
+	}
+
+	for i, recorder := range recorders {
+		seenClaims := map[string]bool{}
+		for _, allocation := range recorder.added {
+			seenClaims[allocation.Claim.Name] = true
+		}
+		for _, claim := range claims {
+			if !seenClaims[claim.Name] {
+				t.Errorf("constraint %d did not see an allocation for claim %q", i, claim.Name)
+			}
+		}
+	}
+}
+
 func TestAllocationConstraintAddRemoveSymmetry(t *testing.T) {
-	useConstraintAllocator(t)
-	classLister, node, slices, claims := makeConstraintFixture()
+	classLister, node, slices, claims := makeConstraintFixture(t)
 	recorder := &recordingConstraint{}
 
 	allocator, err := NewAllocator(context.Background(),
 		Features{ConsumableCapacity: true}, AllocatedState{},
-		classLister, convertConstraintSlices(t, slices), cel.NewCache(10, cel.Features{}),
+		classLister, slices, cel.NewCache(10, cel.Features{}),
 		WithAllocationConstraints(func(ctx context.Context, node *v1.Node,
 			claims []*resourceapi.ResourceClaim) ([]AllocationConstraint, error) {
 			return []AllocationConstraint{recorder}, nil
@@ -225,13 +253,12 @@ func (c *rejectingConstraint) Add(allocation DeviceAllocation) bool {
 func (c *rejectingConstraint) Remove(allocation DeviceAllocation) {}
 
 func TestAllocationConstraintRejectionFailsAllocation(t *testing.T) {
-	useConstraintAllocator(t)
-	classLister, node, slices, claims := makeConstraintFixture()
+	classLister, node, slices, claims := makeConstraintFixture(t)
 	rejector := &rejectingConstraint{}
 
 	allocator, err := NewAllocator(context.Background(),
 		Features{ConsumableCapacity: true}, AllocatedState{},
-		classLister, convertConstraintSlices(t, slices), cel.NewCache(10, cel.Features{}),
+		classLister, slices, cel.NewCache(10, cel.Features{}),
 		WithAllocationConstraints(func(ctx context.Context, node *v1.Node,
 			claims []*resourceapi.ResourceClaim) ([]AllocationConstraint, error) {
 			return []AllocationConstraint{rejector}, nil
@@ -254,11 +281,11 @@ func TestAllocationConstraintRejectionFailsAllocation(t *testing.T) {
 }
 
 func TestNoConstraintProviderUnchanged(t *testing.T) {
-	classLister, node, slices, claims := makeConstraintFixture()
+	classLister, node, slices, claims := makeConstraintFixture(t)
 
 	withOption, err := NewAllocator(context.Background(),
 		Features{ConsumableCapacity: true}, AllocatedState{},
-		classLister, convertConstraintSlices(t, slices), cel.NewCache(10, cel.Features{}),
+		classLister, slices, cel.NewCache(10, cel.Features{}),
 		WithAllocationConstraints(nil),
 	)
 	if err != nil {
@@ -266,7 +293,7 @@ func TestNoConstraintProviderUnchanged(t *testing.T) {
 	}
 	withoutOption, err := NewAllocator(context.Background(),
 		Features{ConsumableCapacity: true}, AllocatedState{},
-		classLister, convertConstraintSlices(t, slices), cel.NewCache(10, cel.Features{}),
+		classLister, slices, cel.NewCache(10, cel.Features{}),
 	)
 	if err != nil {
 		t.Fatalf("NewAllocator without option: %v", err)
@@ -302,16 +329,15 @@ func (c *budgetConstraint) Remove(allocation DeviceAllocation) {
 }
 
 func TestAllocationConstraintBudgetBacktracks(t *testing.T) {
-	useConstraintAllocator(t)
 	// Two devices, budget of one.
-	classLister, node, slices, claims := makeConstraintFixture()
-	slices[0].Spec.Devices = append(slices[0].Spec.Devices, resourceapi.Device{Name: "device-2"})
+	classLister, node, slices, claims := makeConstraintFixture(t)
+	slices[0].Spec.Devices = append(slices[0].Spec.Devices, draapi.Device{Name: slices[0].MakeUniqueString("device-2")})
 	claims[0].Spec.Devices.Requests[0].Exactly.Count = 2
 	budget := &budgetConstraint{limit: 1}
 
 	allocator, err := NewAllocator(context.Background(),
 		Features{ConsumableCapacity: true}, AllocatedState{},
-		classLister, convertConstraintSlices(t, slices), cel.NewCache(10, cel.Features{}),
+		classLister, slices, cel.NewCache(10, cel.Features{}),
 		WithAllocationConstraints(func(ctx context.Context, node *v1.Node,
 			claims []*resourceapi.ResourceClaim) ([]AllocationConstraint, error) {
 			return []AllocationConstraint{budget}, nil
