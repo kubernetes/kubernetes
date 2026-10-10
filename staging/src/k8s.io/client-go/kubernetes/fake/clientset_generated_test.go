@@ -25,6 +25,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1"
+	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	v1ac "k8s.io/client-go/applyconfigurations/core/v1"
 )
@@ -61,6 +62,69 @@ func TestNewSimpleClientset(t *testing.T) {
 	pods, err := client.CoreV1().Pods("default").List(context.Background(), meta_v1.ListOptions{})
 	require.NoError(t, err)
 	cmp.Equal(expectedPods, pods.Items)
+}
+
+func TestEvictionDeletesPod(t *testing.T) {
+	testCases := []struct {
+		name  string
+		evict func(*Clientset, context.Context, string, string) error
+	}{
+		{
+			name: "core policy v1",
+			evict: func(client *Clientset, ctx context.Context, namespace, name string) error {
+				return client.CoreV1().Pods(namespace).EvictV1(ctx, &policy.Eviction{
+					ObjectMeta: meta_v1.ObjectMeta{Name: name},
+				})
+			},
+		},
+		{
+			name: "core policy v1beta1",
+			evict: func(client *Clientset, ctx context.Context, namespace, name string) error {
+				return client.CoreV1().Pods(namespace).EvictV1beta1(ctx, &policyv1beta1.Eviction{
+					ObjectMeta: meta_v1.ObjectMeta{Name: name},
+				})
+			},
+		},
+		{
+			name: "policy v1",
+			evict: func(client *Clientset, ctx context.Context, namespace, name string) error {
+				return client.PolicyV1().Evictions(namespace).Evict(ctx, &policy.Eviction{
+					ObjectMeta: meta_v1.ObjectMeta{Name: name},
+				})
+			},
+		},
+		{
+			name: "policy v1beta1",
+			evict: func(client *Clientset, ctx context.Context, namespace, name string) error {
+				return client.PolicyV1beta1().Evictions(namespace).Evict(ctx, &policyv1beta1.Eviction{
+					ObjectMeta: meta_v1.ObjectMeta{Name: name},
+				})
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := context.Background()
+			client := NewSimpleClientset()
+			namespace := "default"
+			name := "eviction-bug"
+
+			_, err := client.CoreV1().Pods(namespace).Create(ctx, &v1.Pod{
+				ObjectMeta: meta_v1.ObjectMeta{
+					Name:      name,
+					Namespace: namespace,
+				},
+			}, meta_v1.CreateOptions{})
+			require.NoError(t, err)
+
+			require.NoError(t, tc.evict(client, ctx, namespace, name))
+
+			pods, err := client.CoreV1().Pods(namespace).List(ctx, meta_v1.ListOptions{})
+			require.NoError(t, err)
+			require.Empty(t, pods.Items)
+		})
+	}
 }
 
 func TestManagedFieldClientset(t *testing.T) {
