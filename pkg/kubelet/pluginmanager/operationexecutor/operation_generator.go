@@ -83,8 +83,6 @@ func (og *operationGenerator) GenerateRegisterPluginFunc(
 	actualStateOfWorldUpdater ActualStateOfWorldUpdater) func() error {
 
 	registerPluginFunc := func() error {
-		logger := klog.FromContext(ctx)
-
 		client, conn, err := dial(ctx, socketPath, dialTimeoutDuration)
 		if err != nil {
 			return fmt.Errorf("RegisterPlugin error -- dial failed at socket %s, err: %v", socketPath, err)
@@ -127,7 +125,10 @@ func (og *operationGenerator) GenerateRegisterPluginFunc(
 			Endpoint:   infoResp.Endpoint,
 		})
 		if err != nil {
-			logger.Error(err, "RegisterPlugin error -- failed to add plugin", "path", socketPath)
+			if notifyErr := og.notifyPlugin(ctx, client, false, fmt.Sprintf("RegisterPlugin error -- failed to add plugin with err: %v", err)); notifyErr != nil {
+				return fmt.Errorf("RegisterPlugin error -- failed to notify plugin consumer for socket %s, err: %v", socketPath, notifyErr)
+			}
+			return fmt.Errorf("RegisterPlugin error -- failed to add plugin with err: %v", err)
 		}
 		if err := handler.RegisterPlugin(ctx, infoResp.Name, infoResp.Endpoint, infoResp.SupportedVersions, nil); err != nil {
 			actualStateOfWorldUpdater.RemovePlugin(socketPath)
