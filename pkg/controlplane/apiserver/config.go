@@ -60,6 +60,7 @@ import (
 	"k8s.io/kubernetes/pkg/controlplane/controller/clusterauthenticationtrust"
 	"k8s.io/kubernetes/pkg/kubeapiserver"
 	"k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes"
+	"k8s.io/kubernetes/pkg/kubeapiserver/direct"
 	rbacrest "k8s.io/kubernetes/pkg/registry/rbac/rest"
 	"k8s.io/kubernetes/pkg/serviceaccount"
 )
@@ -174,6 +175,9 @@ func BuildGenericConfig(
 		clientgoinformers.WithTransform(trim),
 		clientgoinformers.WithInformerName(informerName),
 	)
+	if s.Etcd.EnableWatchCache {
+		versionedInformers = direct.NewSharedInformerFactory(versionedInformers)
+	}
 
 	if lastErr = s.Features.ApplyTo(genericConfig, clientgoExternalClient, versionedInformers); lastErr != nil {
 		return
