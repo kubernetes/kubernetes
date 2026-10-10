@@ -18,6 +18,7 @@ package cache
 
 import (
 	"fmt"
+	"slices"
 	"strconv"
 	"sync"
 	"time"
@@ -205,8 +206,8 @@ func (i *storeIndex) updateSingleIndex(name string, oldObj interface{}, newObj i
 		i.indices[name] = idx
 	}
 
-	if len(indexValues) == 1 && len(oldIndexValues) == 1 && indexValues[0] == oldIndexValues[0] {
-		// We optimize for the most common case where indexFunc returns a single value which has not been changed
+	if slices.Equal(indexValues, oldIndexValues) {
+		// We optimize for the common case where indexFunc returns values which have not been changed
 		return
 	}
 
