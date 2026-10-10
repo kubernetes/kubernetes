@@ -35,9 +35,10 @@ import (
 	"net"
 	"regexp"
 	"sort"
-	"strconv"
 	"strings"
 	"time"
+
+	"github.com/google/pprof/profile"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
@@ -84,8 +85,8 @@ type PodDialer interface {
 type Leak struct {
 	// Count is how many goroutines share this stack.
 	Count int
-	// Function is the innermost named function of the stack, if it could be
-	// determined.
+	// Function is the innermost function outside the runtime, where the
+	// goroutine is blocked, if it could be determined.
 	Function string
 	// Location is "file:line" for Function, if it could be determined.
 	Location string
@@ -106,54 +107,76 @@ type Result struct {
 	Err error
 }
 
-var (
-	totalRE = regexp.MustCompile(`goroutineleak profile: total (\d+)`)
-	// A stack header line, for example "3 @ 0x48c1aa 0x419c2e".
-	headerRE = regexp.MustCompile(`^(\d+) @`)
-	// A frame line, for example "#\t0x67d744\tmain.leak+0x24\t/path/main.go:13".
-	frameRE = regexp.MustCompile(`^#\s+0x[0-9a-f]+\s+(\S+)\s+(\S+)$`)
-)
+// profileType is the sample type of the goroutineleak profile, see
+// printCountProfile in runtime/pprof.
+const profileType = "goroutineleak"
 
-// Parse turns the debug=1 text form of the goroutineleak profile into a
-// Result. The text form is used rather than the binary profile because it
-// carries a total, a per-stack count and a file:line, which is what makes a
-// finding actionable.
+// Parse decodes the goroutineleak profile in the protobuf format documented at
+// https://github.com/google/pprof/tree/main/proto into a Result.
 func Parse(component string, body []byte) (Result, error) {
 	res := Result{Component: component}
 
-	m := totalRE.FindSubmatch(body)
-	if m == nil {
-		return res, fmt.Errorf("unrecognized goroutineleak profile for %s: missing total line", component)
-	}
-	total, err := strconv.Atoi(string(m[1]))
+	p, err := profile.ParseData(body)
 	if err != nil {
-		return res, fmt.Errorf("parsing total for %s: %w", component, err)
+		return res, fmt.Errorf("parsing goroutineleak profile for %s: %w", component, err)
 	}
-	res.Total = total
+	// Reject anything else, for example a different profile, so that it
+	// cannot be mistaken for a clean result.
+	if len(p.SampleType) != 1 || p.SampleType[0].Type != profileType {
+		return res, fmt.Errorf("unrecognized profile for %s: sample types %v, want [%s]", component, sampleTypes(p), profileType)
+	}
 
-	var current *Leak
-	for line := range strings.SplitSeq(string(body), "\n") {
-		if h := headerRE.FindStringSubmatch(line); h != nil {
-			n, err := strconv.Atoi(h[1])
-			if err != nil {
-				continue
-			}
-			res.Leaks = append(res.Leaks, Leak{Count: n})
-			current = &res.Leaks[len(res.Leaks)-1]
-			continue
+	for _, s := range p.Sample {
+		count := int(s.Value[0])
+		res.Total += count
+		leak := Leak{Count: count}
+		if line, ok := blockedFrame(s); ok {
+			leak.Function = line.Function.Name
+			leak.Location = fmt.Sprintf("%s:%d", line.Function.Filename, line.Line)
 		}
-		// Record the first frame of each stack: the innermost named function,
-		// which is where the goroutine is blocked.
-		if current != nil && current.Function == "" {
-			if f := frameRE.FindStringSubmatch(line); f != nil {
-				current.Function = f[1]
-				current.Location = f[2]
-			}
-		}
+		res.Leaks = append(res.Leaks, leak)
 	}
 
 	sort.SliceStable(res.Leaks, func(i, j int) bool { return res.Leaks[i].Count > res.Leaks[j].Count })
 	return res, nil
+}
+
+// blockedFrame returns the innermost frame outside the runtime, which is where
+// the goroutine is blocked. This is the frame the debug=1 text form shows
+// first, see printStackRecord in runtime/pprof.
+func blockedFrame(s *profile.Sample) (profile.Line, bool) {
+	var first *profile.Line
+	for _, loc := range s.Location {
+		// Inlined calls share a location, innermost first.
+		for i := range loc.Line {
+			line := &loc.Line[i]
+			if line.Function == nil || line.Function.Name == "runtime.goexit" {
+				continue
+			}
+			if first == nil {
+				first = line
+			}
+			if !isRuntimeFunction(line.Function.Name) {
+				return *line, true
+			}
+		}
+	}
+	if first == nil {
+		return profile.Line{}, false
+	}
+	return *first, true
+}
+
+func isRuntimeFunction(name string) bool {
+	return strings.HasPrefix(name, "runtime.") || strings.HasPrefix(name, "internal/runtime/")
+}
+
+func sampleTypes(p *profile.Profile) []string {
+	var types []string
+	for _, st := range p.SampleType {
+		types = append(types, st.Type)
+	}
+	return types
 }
 
 func result(component string, body []byte, err error) Result {
@@ -175,7 +198,6 @@ func CheckAPIServer(ctx context.Context, client clientset.Interface) Result {
 
 	body, err := client.Discovery().RESTClient().Get().
 		AbsPath(profilePath).
-		Param("debug", "1").
 		DoRaw(ctx)
 	return result("kube-apiserver", body, err)
 }
@@ -218,7 +240,6 @@ func checkKubelet(ctx context.Context, client clientset.Interface, nodeName stri
 		SubResource("proxy").
 		Name(fmt.Sprintf("%v:%v", nodeName, port)).
 		Suffix(profilePath).
-		Param("debug", "1").
 		DoRaw(ctx)
 	return result("kubelet/"+nodeName, body, err)
 }
@@ -280,7 +301,6 @@ func checkControlPlanePod(ctx context.Context, config *restclient.Config, dialer
 
 	body, err := profileClient.RESTClient().Get().
 		AbsPath(profilePath).
-		Param("debug", "1").
 		DoRaw(ctx)
 	return result(component, body, err)
 }
