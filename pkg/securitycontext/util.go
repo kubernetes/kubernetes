@@ -140,6 +140,24 @@ func DetermineEffectiveRunAsUser(pod *v1.Pod, container *v1.Container) (*int64, 
 	return runAsUser, true
 }
 
+// DetermineEffectiveRunAsGroup returns the effective GID, and whether it is
+// set. Container's runAsGroup takes precedence over pod level.
+func DetermineEffectiveRunAsGroup(pod *v1.Pod, container *v1.Container) (*int64, bool) {
+	var runAsGroup *int64
+	if pod.Spec.SecurityContext != nil && pod.Spec.SecurityContext.RunAsGroup != nil {
+		runAsGroup = new(int64)
+		*runAsGroup = *pod.Spec.SecurityContext.RunAsGroup
+	}
+	if container.SecurityContext != nil && container.SecurityContext.RunAsGroup != nil {
+		runAsGroup = new(int64)
+		*runAsGroup = *container.SecurityContext.RunAsGroup
+	}
+	if runAsGroup == nil {
+		return nil, false
+	}
+	return runAsGroup, true
+}
+
 func securityContextFromPodSecurityContext(pod *v1.Pod) *v1.SecurityContext {
 	if pod.Spec.SecurityContext == nil {
 		return nil

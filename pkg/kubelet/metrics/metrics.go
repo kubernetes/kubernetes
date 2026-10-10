@@ -73,6 +73,7 @@ const (
 	ActivePodCountKey          = "active_pods"
 	MirrorPodCountKey          = "mirror_pods"
 	WorkingPodCountKey         = "working_pods"
+	InsecurePodCountKey        = "insecure_pods"
 	OrphanedRuntimePodTotalKey = "orphaned_runtime_pods_total"
 	RestartedPodTotalKey       = "restarted_pods_total"
 	ImagePullDurationKey       = "image_pull_duration_seconds"
@@ -744,6 +745,17 @@ var (
 			Help:           "The number of mirror pods the kubelet will try to create (one per admitted static pod)",
 			StabilityLevel: metrics.ALPHA,
 		},
+	)
+	// InsecurePodCount tracks pods with a container running as root (UID or GID 0), by
+	// declaration (implicit or explicit) and id_type (uid, gid, or supplementalgroups).
+	InsecurePodCount = metrics.NewGaugeVec(
+		&metrics.GaugeOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           InsecurePodCountKey,
+			Help:           "Number of active pods with a container running as root (UID/GID 0), labeled by declaration (implicit: no runAsUser/runAsGroup set, explicit: runAsUser/runAsGroup/supplementalGroups set to 0) and id_type (uid, gid, or supplementalgroups).",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"declaration", "id_type"},
 	)
 	// WorkingPodCount tracks the count of pods in each lifecycle phase, whether they are static pods, and whether they are desired, orphaned, or runtime_only
 	WorkingPodCount = metrics.NewGaugeVec(
@@ -1487,6 +1499,7 @@ func Register() {
 		legacyregistry.MustRegister(ActivePodCount)
 		legacyregistry.MustRegister(MirrorPodCount)
 		legacyregistry.MustRegister(WorkingPodCount)
+		legacyregistry.MustRegister(InsecurePodCount)
 		legacyregistry.MustRegister(OrphanedRuntimePodTotal)
 		legacyregistry.MustRegister(RestartedPodTotal)
 		legacyregistry.MustRegister(ManagedEphemeralContainers)

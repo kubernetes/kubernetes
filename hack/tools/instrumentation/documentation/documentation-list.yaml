@@ -3936,6 +3936,19 @@
   componentEndpoints:
   - component: kubelet
     endpoint: /metrics
+- name: insecure_pods
+  subsystem: kubelet
+  help: 'Number of active pods with a container running as root (UID/GID 0), labeled
+    by declaration (implicit: no runAsUser/runAsGroup set, explicit: runAsUser/runAsGroup/supplementalGroups
+    set to 0) and id_type (uid, gid, or supplementalgroups).'
+  type: Gauge
+  stabilityLevel: ALPHA
+  labels:
+  - declaration
+  - id_type
+  componentEndpoints:
+  - component: kubelet
+    endpoint: /metrics
 - name: lifecycle_handler_http_fallbacks_total
   subsystem: kubelet
   help: The number of times lifecycle handlers successfully fell back to http from
