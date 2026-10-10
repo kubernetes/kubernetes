@@ -1139,7 +1139,7 @@ func (sched *Scheduler) compositePodGroupSchedulingPlacementAlgorithm(ctx contex
 	nominatedFeasible := false
 	var nominated *fwk.Placement
 	if podGroupInfo.GetKey() == root.PodGroupInfo.GetKey() {
-		nominated = hierarchyNominatedPlacement(placements, root)
+		nominated = hierarchyNominatedPlacement(ctx, placements, root)
 	}
 	if nominated != nil {
 		result, subtreeResult, err := sched.evaluateCompositePlacement(ctx, schedFwk, podGroupCycleState, root, podGroupInfo, nominated)
@@ -1165,7 +1165,8 @@ func (sched *Scheduler) compositePodGroupSchedulingPlacementAlgorithm(ctx contex
 
 	// Only evaluate the remaining placements when the nominated one wasn't feasible.
 	if !nominatedFeasible {
-		placements, numPlacementsToFind := sched.placementsToEvaluate(schedFwk, placements)
+		var numPlacementsToFind int
+		placements, numPlacementsToFind = sched.placementsToEvaluate(schedFwk, placements)
 		numFeasiblePlacementsFound := 0
 		for _, placement := range placements {
 			if placement == nominated {
@@ -1266,7 +1267,7 @@ func (sched *Scheduler) evaluateCompositePlacement(ctx context.Context, schedFwk
 // them. Honoring a subset would silently move the remaining pods away from the nodes a previous
 // preemption cycle picked for them. When no single placement can host every nomination, or when
 // overlapping placements both can, the caller falls back to the regular sampled placement search.
-func hierarchyNominatedPlacement(placements []*fwk.Placement, queuedPodGroupInfo *framework.QueuedPodGroupInfo) *fwk.Placement {
+func hierarchyNominatedPlacement(ctx context.Context, placements []*fwk.Placement, queuedPodGroupInfo *framework.QueuedPodGroupInfo) *fwk.Placement {
 	nominatedNodes := sets.New[string]()
 	for podInfo := range queuedPodGroupInfo.ForEachPodInfo() {
 		if nnn := podInfo.Pod.Status.NominatedNodeName; nnn != "" {
@@ -1277,6 +1278,7 @@ func hierarchyNominatedPlacement(placements []*fwk.Placement, queuedPodGroupInfo
 		return nil
 	}
 
+	logger := klog.FromContext(ctx)
 	var matched *fwk.Placement
 	for _, placement := range placements {
 		nodeNames := sets.New[string]()
@@ -1287,11 +1289,13 @@ func hierarchyNominatedPlacement(placements []*fwk.Placement, queuedPodGroupInfo
 			continue
 		}
 		if matched != nil {
-			// Overlapping placements could both host every nomination, and NNN alone can't tell
-			// which one the previous preemption cycle picked.
+			logger.V(4).Info("Multiple placements contain all nominated nodes, falling back to the regular placement search", "nominatedNodes", sets.List(nominatedNodes), "firstPlacement", matched.Name, "secondPlacement", placement.Name)
 			return nil
 		}
 		matched = placement
+	}
+	if matched == nil {
+		logger.V(4).Info("No placement contains all nominated nodes, falling back to the regular placement search", "nominatedNodes", sets.List(nominatedNodes))
 	}
 	return matched
 }

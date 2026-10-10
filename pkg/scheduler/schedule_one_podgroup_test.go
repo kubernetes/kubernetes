@@ -8764,7 +8764,7 @@ func TestHierarchyNominatedPlacement(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := hierarchyNominatedPlacement(tt.placements, hierarchyWithNominations(t, tt.nominations)); got != tt.want {
+			if got := hierarchyNominatedPlacement(context.Background(), tt.placements, hierarchyWithNominations(t, tt.nominations)); got != tt.want {
 				gotName, wantName := "<nil>", "<nil>"
 				if got != nil {
 					gotName = got.Name
