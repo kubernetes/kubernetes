@@ -37,6 +37,7 @@ const (
 	UnfinishedWorkKey          = "unfinished_work_seconds"
 	LongestRunningProcessorKey = "longest_running_processor_seconds"
 	RetriesKey                 = "retries_total"
+	RateLimiterDelayKey        = "ratelimiter_delay_seconds"
 )
 
 var (
@@ -95,8 +96,16 @@ var (
 		Help:           "Total number of retries handled by workqueue",
 	}, []string{"name"})
 
+	rateLimiterDelay = k8smetrics.NewHistogramVec(&k8smetrics.HistogramOpts{
+		Subsystem:      WorkQueueSubsystem,
+		Name:           RateLimiterDelayKey,
+		StabilityLevel: k8smetrics.ALPHA,
+		Help:           "How long in seconds the rate limiter delays an item before it is added to the workqueue.",
+		Buckets:        []float64{0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10, 30, 60, 120, 300, 600, 1000},
+	}, []string{"name"})
+
 	metrics = []k8smetrics.Registerable{
-		depth, adds, latency, workDuration, unfinished, longestRunningProcessor, retries,
+		depth, adds, latency, workDuration, unfinished, longestRunningProcessor, retries, rateLimiterDelay,
 	}
 
 	registerOnce sync.Once
@@ -158,4 +167,8 @@ func (prometheusMetricsProvider) NewLongestRunningProcessorSecondsMetric(name st
 func (prometheusMetricsProvider) NewRetriesMetric(name string) workqueue.CounterMetric {
 	register()
 	return retries.WithLabelValues(name)
+}
+
+func (prometheusMetricsProvider) NewRateLimiterDelayMetric(name string) workqueue.HistogramMetric {
+	return rateLimiterDelay.WithLabelValues(name)
 }
