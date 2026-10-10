@@ -317,7 +317,7 @@ func TestMemoryBackedVolumesResizeFeatureInferForUpdate(t *testing.T) {
 			expected: false,
 		},
 		{
-			name: "NilSizeLimit_Ignored",
+			name: "SizeLimitAdded",
 			oldPodInfo: &types.PodInfo{
 				Spec: &v1.PodSpec{
 					Volumes: []v1.Volume{
@@ -348,7 +348,177 @@ func TestMemoryBackedVolumesResizeFeatureInferForUpdate(t *testing.T) {
 					},
 				},
 			},
-			expected: false,
+			expected: true,
+		},
+		{
+			name: "SizeLimitRemoved",
+			oldPodInfo: &types.PodInfo{
+				Spec: &v1.PodSpec{
+					Volumes: []v1.Volume{
+						{
+							Name: "vol-1",
+							VolumeSource: v1.VolumeSource{
+								EmptyDir: &v1.EmptyDirVolumeSource{
+									Medium:    v1.StorageMediumMemory,
+									SizeLimit: &quantity200Mi,
+								},
+							},
+						},
+					},
+				},
+			},
+			newPodInfo: &types.PodInfo{
+				Spec: &v1.PodSpec{
+					Volumes: []v1.Volume{
+						{
+							Name: "vol-1",
+							VolumeSource: v1.VolumeSource{
+								EmptyDir: &v1.EmptyDirVolumeSource{
+									Medium:    v1.StorageMediumMemory,
+									SizeLimit: nil,
+								},
+							},
+						},
+					},
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "SizeLimitZeroAdded",
+			oldPodInfo: &types.PodInfo{
+				Spec: &v1.PodSpec{
+					Volumes: []v1.Volume{
+						{
+							Name: "vol-1",
+							VolumeSource: v1.VolumeSource{
+								EmptyDir: &v1.EmptyDirVolumeSource{
+									Medium:    v1.StorageMediumMemory,
+									SizeLimit: resource.NewQuantity(0, resource.BinarySI),
+								},
+							},
+						},
+					},
+				},
+			},
+			newPodInfo: &types.PodInfo{
+				Spec: &v1.PodSpec{
+					Volumes: []v1.Volume{
+						{
+							Name: "vol-1",
+							VolumeSource: v1.VolumeSource{
+								EmptyDir: &v1.EmptyDirVolumeSource{
+									Medium:    v1.StorageMediumMemory,
+									SizeLimit: &quantity200Mi,
+								},
+							},
+						},
+					},
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "SizeLimitZeroRemoved",
+			oldPodInfo: &types.PodInfo{
+				Spec: &v1.PodSpec{
+					Volumes: []v1.Volume{
+						{
+							Name: "vol-1",
+							VolumeSource: v1.VolumeSource{
+								EmptyDir: &v1.EmptyDirVolumeSource{
+									Medium:    v1.StorageMediumMemory,
+									SizeLimit: &quantity200Mi,
+								},
+							},
+						},
+					},
+				},
+			},
+			newPodInfo: &types.PodInfo{
+				Spec: &v1.PodSpec{
+					Volumes: []v1.Volume{
+						{
+							Name: "vol-1",
+							VolumeSource: v1.VolumeSource{
+								EmptyDir: &v1.EmptyDirVolumeSource{
+									Medium:    v1.StorageMediumMemory,
+									SizeLimit: resource.NewQuantity(0, resource.BinarySI),
+								},
+							},
+						},
+					},
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "SizeLimitZeroToNil",
+			oldPodInfo: &types.PodInfo{
+				Spec: &v1.PodSpec{
+					Volumes: []v1.Volume{
+						{
+							Name: "vol-1",
+							VolumeSource: v1.VolumeSource{
+								EmptyDir: &v1.EmptyDirVolumeSource{
+									Medium:    v1.StorageMediumMemory,
+									SizeLimit: resource.NewQuantity(0, resource.BinarySI),
+								},
+							},
+						},
+					},
+				},
+			},
+			newPodInfo: &types.PodInfo{
+				Spec: &v1.PodSpec{
+					Volumes: []v1.Volume{
+						{
+							Name: "vol-1",
+							VolumeSource: v1.VolumeSource{
+								EmptyDir: &v1.EmptyDirVolumeSource{
+									Medium:    v1.StorageMediumMemory,
+									SizeLimit: nil,
+								},
+							},
+						},
+					},
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "SizeLimitNilToZero",
+			oldPodInfo: &types.PodInfo{
+				Spec: &v1.PodSpec{
+					Volumes: []v1.Volume{
+						{
+							Name: "vol-1",
+							VolumeSource: v1.VolumeSource{
+								EmptyDir: &v1.EmptyDirVolumeSource{
+									Medium:    v1.StorageMediumMemory,
+									SizeLimit: nil,
+								},
+							},
+						},
+					},
+				},
+			},
+			newPodInfo: &types.PodInfo{
+				Spec: &v1.PodSpec{
+					Volumes: []v1.Volume{
+						{
+							Name: "vol-1",
+							VolumeSource: v1.VolumeSource{
+								EmptyDir: &v1.EmptyDirVolumeSource{
+									Medium:    v1.StorageMediumMemory,
+									SizeLimit: resource.NewQuantity(0, resource.BinarySI),
+								},
+							},
+						},
+					},
+				},
+			},
+			expected: true,
 		},
 		{
 			name: "MultipleVolumes_OneResizableMemoryBackedVolumeResized",

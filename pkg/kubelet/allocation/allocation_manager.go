@@ -496,17 +496,21 @@ func updatePodLevelResourcesFromAllocation(pod *v1.Pod, allocated state.PodResou
 func updateEmptyDirVolumeLimitsFromAllocation(pod *v1.Pod, allocated state.PodResourceInfo, alreadyUpdated bool) (*v1.Pod, bool) {
 	updated := alreadyUpdated
 	for i, vol := range pod.Spec.Volumes {
-		if !VolHasMemoryBackedEmptyDirSizeLimit(&vol) {
+		if !VolHasMemoryBackedEmptyDir(&vol) {
 			continue
 		}
 		if alloc, ok := allocated.EmptyDirVolumeLimits[vol.Name]; ok {
-			if alloc.Cmp(*vol.EmptyDir.SizeLimit) != 0 {
+			if !apiequality.Semantic.DeepEqual(vol.EmptyDir.SizeLimit, alloc) {
 				if !updated {
 					pod = pod.DeepCopy()
 					updated = true
 				}
-				allocCopy := alloc.DeepCopy()
-				pod.Spec.Volumes[i].EmptyDir.SizeLimit = &allocCopy
+				if alloc == nil {
+					pod.Spec.Volumes[i].EmptyDir.SizeLimit = nil
+				} else {
+					allocCopy := alloc.DeepCopy()
+					pod.Spec.Volumes[i].EmptyDir.SizeLimit = &allocCopy
+				}
 			}
 		}
 	}
@@ -542,14 +546,18 @@ func ResourceInfoForPod(pod *v1.Pod) state.PodResourceInfo {
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingMemoryBackedVolumes) {
 		for _, vol := range pod.Spec.Volumes {
-			if !VolHasMemoryBackedEmptyDirSizeLimit(&vol) {
+			if !VolHasMemoryBackedEmptyDir(&vol) {
 				continue
 			}
-			alloc := vol.EmptyDir.SizeLimit.DeepCopy()
 			if podAlloc.EmptyDirVolumeLimits == nil {
 				podAlloc.EmptyDirVolumeLimits = make(map[string]*resource.Quantity)
 			}
-			podAlloc.EmptyDirVolumeLimits[vol.Name] = &alloc
+			var alloc *resource.Quantity
+			if vol.EmptyDir.SizeLimit != nil {
+				q := vol.EmptyDir.SizeLimit.DeepCopy()
+				alloc = &q
+			}
+			podAlloc.EmptyDirVolumeLimits[vol.Name] = alloc
 		}
 	}
 
@@ -662,6 +670,7 @@ func (m *manager) canAdmitPod(ctx context.Context, allocatedPods []*v1.Pod, pod 
 		}
 	}
 
+	m.warnIfVolumeSizeExceedsPodMemoryLimit(logger, pod)
 	return true, "", ""
 }
 
@@ -697,6 +706,24 @@ func IsResizableContainer(container *v1.Container, containerType podutil.Contain
 	}
 }
 
-func VolHasMemoryBackedEmptyDirSizeLimit(vol *v1.Volume) bool {
-	return vol != nil && vol.EmptyDir != nil && vol.EmptyDir.Medium == v1.StorageMediumMemory && vol.EmptyDir.SizeLimit != nil && !vol.EmptyDir.SizeLimit.IsZero()
+func VolHasMemoryBackedEmptyDir(vol *v1.Volume) bool {
+	return vol != nil && vol.EmptyDir != nil && vol.EmptyDir.Medium == v1.StorageMediumMemory
+}
+
+func (m *manager) warnIfVolumeSizeExceedsPodMemoryLimit(logger klog.Logger, pod *v1.Pod) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingMemoryBackedVolumes) || pod == nil {
+		return
+	}
+	podLimits := resourcehelper.PodLimits(pod, resourcehelper.PodResourcesOptions{
+		SkipPodLevelResources: !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources),
+	})
+	podMemLimit, ok := podLimits[v1.ResourceMemory]
+	if !ok || podMemLimit.IsZero() {
+		return
+	}
+	for _, vol := range pod.Spec.Volumes {
+		if VolHasMemoryBackedEmptyDir(&vol) && vol.EmptyDir.SizeLimit != nil && vol.EmptyDir.SizeLimit.Cmp(podMemLimit) > 0 {
+			m.recorder.WithLogger(logger).Eventf(pod, v1.EventTypeWarning, events.VolumeSizeExceedsPodMemoryLimit, "Volume %q size limit (%s) exceeds total pod memory limit (%s)", vol.Name, vol.EmptyDir.SizeLimit.String(), podMemLimit.String())
+		}
+	}
 }

@@ -21,7 +21,6 @@ import (
 	"fmt"
 
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 	kubetypes "k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -140,6 +139,6 @@ func (f *FakeRuntimeHelper) OnPodSandboxReady(_ context.Context, _ *v1.Pod) erro
 }
 
 // ResizeEphemeralVolume is not implemented
-func (f *FakeRuntimeHelper) ResizeEphemeralVolume(pod *v1.Pod, volumeName string, newSize *resource.Quantity) error {
+func (f *FakeRuntimeHelper) ResizeEphemeralVolume(pod *v1.Pod, volumeName string) error {
 	return nil
 }
