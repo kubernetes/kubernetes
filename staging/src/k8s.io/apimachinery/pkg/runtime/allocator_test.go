@@ -57,6 +57,30 @@ func TestAllocatorNeverShrinks(t *testing.T) {
 	}
 }
 
+func TestPutAllocatorDropsOversizedBuffer(t *testing.T) {
+	target := &Allocator{}
+	target.Allocate(uint64(maxPooledBufferCapacity + 1))
+	PutAllocator(target)
+	if target.buf != nil {
+		t.Fatalf("expected the oversized buffer to be dropped before pooling, got capacity: %v", cap(target.buf))
+	}
+}
+
+func TestPutAllocatorKeepsSmallBuffer(t *testing.T) {
+	target := &Allocator{}
+	target.Allocate(uint64(maxPooledBufferCapacity / 2))
+	PutAllocator(target)
+	if cap(target.buf) < maxPooledBufferCapacity/2 {
+		t.Fatalf("expected the buffer to be retained, got capacity: %v", cap(target.buf))
+	}
+}
+
+func TestPutAllocatorIgnoresOtherAllocators(t *testing.T) {
+	// must not panic
+	PutAllocator(&SimpleAllocator{})
+	PutAllocator(nil)
+}
+
 func TestAllocatorZero(t *testing.T) {
 	target := &Allocator{}
 	initialSize := 1000000 // 1MB
