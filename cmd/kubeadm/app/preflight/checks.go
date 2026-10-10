@@ -147,8 +147,8 @@ func (crvc ContainerRuntimeVersionCheck) Check() (warnings, errorList []error) {
 			kubeletVersion = kubeletVersion.WithMinor(kubeletVersion.Minor() + 1)
 		}
 
-		err = errors.New("You must update your container runtime to a version that supports the CRI method RuntimeConfig. " +
-			"Falling back to using cgroupDriver from kubelet config is disabled by default in 1.38; set the kubelet feature gate DisableCgroupDriverFallback=false to temporarily restore it. " +
+		err = errors.New("The container runtime does not support the CRI RuntimeConfig RPC. Upgrade to a runtime version that supports it. " +
+			"To temporarily use this runtime with kubelet 1.38 or later, explicitly set DisableCgroupDriverFallback=false and a cgroupDriver matching the runtime in KubeletConfiguration. " +
 			"For more information, see https://git.k8s.io/enhancements/keps/sig-node/4033-group-driver-detection-over-cri")
 
 		// TODO: Remove the version check and always return an error once 1.38 is the minimum supported version of kubelet.
