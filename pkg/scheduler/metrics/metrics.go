@@ -689,7 +689,7 @@ func InitMetrics() {
 		&metrics.HistogramOpts{
 			Subsystem:      SchedulerSubsystem,
 			Name:           "placement_evaluation_duration_seconds",
-			Help:           "Latency in seconds of evaluating a single candidate placement when scheduling pod groups, by result, scheduler profile, and entity type. 'feasible' means the pod group fit into the placement, while 'infeasible' means it did not.",
+			Help:           "Latency in seconds of evaluating a single candidate placement when scheduling pod groups, by result, scheduler profile, and entity type. For composite pod groups, this covers scheduling the whole subtree on the placement, including nested placement evaluations of child groups, which are also recorded separately under their own entity type. 'feasible' means the pod group fit into the placement, while 'infeasible' means it did not.",
 			Buckets:        metrics.ExponentialBuckets(0.001, 2, 15),
 			StabilityLevel: metrics.ALPHA,
 		}, []string{"result", "profile", "type"})

@@ -2977,22 +2977,31 @@ var statusCmpOpt = cmp.Comparer(func(s1 *fwk.Status, s2 *fwk.Status) bool {
 
 func assertCounterValueFromGatherer(t *testing.T, g componentmetrics.Gatherer, name string, fixedLabels map[string]string, labelName, labelValue string, want int) {
 	t.Helper()
-	got := 0
-	if vals, err := testutil.GetCounterValuesFromGatherer(g, name, fixedLabels, labelName); err == nil {
-		got = int(vals[labelValue])
+	vals, err := testutil.GetCounterValuesFromGatherer(g, name, fixedLabels, labelName)
+	if err != nil {
+		// Registries don't export metrics without samples, so a lookup error is
+		// expected when nothing should have been recorded.
+		if want == 0 {
+			return
+		}
+		t.Fatalf("failed to get %s with labels %v: %v", name, fixedLabels, err)
 	}
-	if got != want {
+	if got := int(vals[labelValue]); got != want {
 		t.Errorf("unexpected %s with labels %v and %s=%q: got %d, want %d", name, fixedLabels, labelName, labelValue, got, want)
 	}
 }
 
 func assertHistogramSampleCountFromGatherer(t *testing.T, g componentmetrics.Gatherer, name string, labels map[string]string, want int) {
 	t.Helper()
-	got := 0
-	if vec, err := testutil.GetHistogramVecFromGatherer(g, name, labels); err == nil {
-		got = int(vec.GetAggregatedSampleCount())
+	vec, err := testutil.GetHistogramVecFromGatherer(g, name, labels)
+	if err != nil {
+		// See assertCounterValueFromGatherer.
+		if want == 0 {
+			return
+		}
+		t.Fatalf("failed to get %s with labels %v: %v", name, labels, err)
 	}
-	if got != want {
+	if got := int(vec.GetAggregatedSampleCount()); got != want {
 		t.Errorf("unexpected %s sample count with labels %v: got %d, want %d", name, labels, got, want)
 	}
 }
