@@ -415,6 +415,28 @@ kube::util::download_file() {
   return 1
 }
 
+kube::util::verify_sha256() {
+  local -r file=$1
+  local -r expected=$2
+  local actual
+
+  if command -v sha256sum >/dev/null 2>&1; then
+    actual=$(sha256sum "${file}" | cut -d ' ' -f 1)
+  elif command -v shasum >/dev/null 2>&1; then
+    actual=$(shasum -a 256 "${file}" | cut -d ' ' -f 1)
+  else
+    kube::log::error "Unable to verify ${file}: sha256sum or shasum is required"
+    return 1
+  fi
+
+  if [[ "${actual}" != "${expected}" ]]; then
+    kube::log::error "SHA-256 checksum mismatch for ${file}: expected ${expected}, got ${actual}"
+    return 1
+  fi
+
+  return 0
+}
+
 # Test whether openssl is installed.
 # Sets:
 #  OPENSSL_BIN: The path to the openssl binary to use
