@@ -46,6 +46,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume/util/hostutil"
 	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
 	"k8s.io/kubernetes/pkg/volume/util/volumepathhandler"
+	"k8s.io/mount-utils"
 )
 
 const (
@@ -763,6 +764,30 @@ func (og *operationGenerator) GenerateUnmountVolumeFunc(
 		if err := subpather.CleanSubPaths(podDir, volumeToUnmount.InnerVolumeSpecName); err != nil {
 			eventErr, detailedErr := volumeToUnmount.GenerateError("error cleaning subPath mounts", err)
 			return volumetypes.NewOperationContext(eventErr, detailedErr, migrated)
+		}
+
+		// Unmount anything that leaked into the pod's volume directory, such
+		// as a terminationMessagePath bind mount that propagated back to the
+		// host through a Bidirectional volumeMount. Left in place, such mounts
+		// make TearDown fail with EBUSY on every retry and the pod never
+		// finishes terminating. Only directories under the pod directory are
+		// touched: those are owned by the kubelet, whereas a hostPath volume
+		// points at a host directory whose mounts must be left alone.
+		//
+		// This unmounts every mount below the volume path, not only the ones
+		// the kubelet or the runtime created. A mount that a privileged
+		// container made under a Bidirectional volume propagated to the host
+		// copy of the volume and to every other pod sharing that volume on
+		// this node, and unmounting it here propagates the unmount to those
+		// peers too. That is intended: the pod that created the mount is
+		// gone, and leaving it in place would keep this pod stuck in
+		// Terminating (or leak its pod directory) forever.
+		volumePath := volumeUnmounter.GetPath()
+		if mount.PathWithinBase(volumePath, podDir) {
+			if err := util.UnmountSubmounts(og.volumePluginMgr.Host.GetMounter(), volumePath); err != nil {
+				eventErr, detailedErr := volumeToUnmount.GenerateError("UnmountVolume.UnmountSubmounts failed", err)
+				return volumetypes.NewOperationContext(eventErr, detailedErr, migrated)
+			}
 		}
 
 		// Execute unmount
