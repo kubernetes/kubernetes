@@ -20,7 +20,10 @@ import (
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	apitesting "k8s.io/kubernetes/pkg/api/testing"
+	"k8s.io/kubernetes/pkg/apis/core"
 	scheduling "k8s.io/kubernetes/pkg/apis/scheduling"
 	registry "k8s.io/kubernetes/pkg/registry/scheduling/priorityclass"
 	"k8s.io/kubernetes/test/declarative_validation/meta"
@@ -67,6 +70,44 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 		Verb:              "update",
 	})
 
+	testCases := map[string]struct {
+		old, update  scheduling.PriorityClass
+		expectedErrs field.ErrorList
+	}{
+		"preemptionPolicy: unchanged = valid": {
+			old:    mkPriorityClass(tweakPreemptionPolicy(core.PreemptLowerPriority)),
+			update: mkPriorityClass(tweakPreemptionPolicy(core.PreemptLowerPriority)),
+		},
+		"preemptionPolicy: nil to set = invalid": {
+			old:    mkPriorityClass(),
+			update: mkPriorityClass(tweakPreemptionPolicy(core.PreemptLowerPriority)),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("preemptionPolicy"), nil, "field is immutable").WithOrigin("immutable").MarkAlpha(),
+			},
+		},
+		"preemptionPolicy: set to different = invalid": {
+			old:    mkPriorityClass(tweakPreemptionPolicy(core.PreemptLowerPriority)),
+			update: mkPriorityClass(tweakPreemptionPolicy(core.PreemptNever)),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("preemptionPolicy"), nil, "field is immutable").WithOrigin("immutable").MarkAlpha(),
+			},
+		},
+		"preemptionPolicy: set to nil = invalid": {
+			old:    mkPriorityClass(tweakPreemptionPolicy(core.PreemptLowerPriority)),
+			update: mkPriorityClass(),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("preemptionPolicy"), nil, "field is immutable").WithOrigin("immutable").MarkAlpha(),
+			},
+		},
+	}
+	for k, tc := range testCases {
+		t.Run(k, func(t *testing.T) {
+			tc.old.ResourceVersion = "1"
+			tc.update.ResourceVersion = "1"
+			apitesting.VerifyUpdateValidationEquivalence(t, ctx, &tc.update, &tc.old, registry.Strategy, tc.expectedErrs)
+		})
+	}
+
 	updateObj := mkPriorityClass()
 	meta.RunObjectMetaUpdateTestCases(t, ctx, &updateObj, registry.Strategy, meta.WithStringentFinalizerValidation())
 }
@@ -81,4 +122,10 @@ func mkPriorityClass(tweaks ...func(pc *scheduling.PriorityClass)) scheduling.Pr
 		tweak(&pc)
 	}
 	return pc
+}
+
+func tweakPreemptionPolicy(policy core.PreemptionPolicy) func(*scheduling.PriorityClass) {
+	return func(pc *scheduling.PriorityClass) {
+		pc.PreemptionPolicy = &policy
+	}
 }
