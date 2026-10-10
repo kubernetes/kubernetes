@@ -33,8 +33,8 @@ var utf8bom = []byte{0xEF, 0xBB, 0xBF}
 // processEnvFileLine returns a blank key if the line is empty or a comment.
 // The value will be retrieved from the environment if necessary.
 func processEnvFileLine(line []byte, filePath string,
-	currentLine int) (key, value string, err error) {
-
+	currentLine int,
+) (key, value string, err error) {
 	if !utf8.Valid(line) {
 		return ``, ``, fmt.Errorf("env file %s contains invalid utf8 bytes at line %d: %v",
 			filePath, currentLine+1, line)
@@ -80,18 +80,43 @@ func AddFromEnvFile(filePath string, addTo func(key, value string) error) error 
 
 	scanner := bufio.NewScanner(f)
 	currentLine := 0
+	var key, value string
+	var prefixedValue bool
+	var prefixedValueBuffer bytes.Buffer
+
 	for scanner.Scan() {
-		// Process the current line, retrieving a key/value pair if
-		// possible.
 		scannedBytes := scanner.Bytes()
-		key, value, err := processEnvFileLine(scannedBytes, filePath, currentLine)
+
+		if prefixedValue {
+			prefixedValueBuffer.Write(scannedBytes)
+			prefixedValueBuffer.WriteString("\n")
+			if endsWithSuffix(scannedBytes) {
+				value = prefixedValueBuffer.String()
+				// Remove surrounding quotes
+				value = value[1 : len(value)-2]
+				if err = addTo(key, value); err != nil {
+					return err
+				}
+				prefixedValue = false
+				prefixedValueBuffer.Reset()
+			}
+			continue
+		}
+
+		key, value, err = processEnvFileLine(scannedBytes, filePath, currentLine)
 		if err != nil {
 			return err
 		}
 		currentLine++
 
 		if len(key) == 0 {
-			// no key means line was empty or a comment
+			continue
+		}
+
+		if startsWithPrefix(value) && !endsWithSuffix([]byte(value)) {
+			prefixedValue = true
+			prefixedValueBuffer.WriteString(value)
+			prefixedValueBuffer.WriteString("\n")
 			continue
 		}
 
@@ -100,4 +125,16 @@ func AddFromEnvFile(filePath string, addTo func(key, value string) error) error 
 		}
 	}
 	return nil
+}
+
+// startsWithPrefix checks if a line starts with a
+// prefix quote.
+func startsWithPrefix(value string) bool {
+	return strings.HasPrefix(value, "\"")
+}
+
+// endsWithPrefix checks if the line ends with a
+// suffix quote
+func endsWithSuffix(line []byte) bool {
+	return bytes.HasSuffix(line, []byte("\""))
 }
