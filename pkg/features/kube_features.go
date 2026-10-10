@@ -625,6 +625,15 @@ const (
 	// All the node components such as CRI need to be running in the same user namespace.
 	KubeletInUserNamespace featuregate.Feature = "KubeletInUserNamespace"
 
+	// owner: @harche
+	//
+	// On large-memory nodes, Burstable containers with small memory requests all
+	// collapse to the same oom_score_adj. When enabled, kubelet adds a small,
+	// node-size-bounded tie-break by request size, and ranks containers that can
+	// never use more than their memory request below other Burstable containers.
+	// See https://github.com/kubernetes/kubernetes/issues/142230.
+	KubeletOOMScoreAdjTieBreak featuregate.Feature = "KubeletOOMScoreAdjTieBreak"
+
 	// KubeletPSI enables Kubelet to surface PSI metrics
 	// owner: @roycaihw
 	// kep: https://kep.k8s.io/4205
@@ -1697,6 +1706,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.37"), Default: true, PreRelease: featuregate.Beta},
 	},
 
+	KubeletOOMScoreAdjTieBreak: {
+		{Version: version.MustParse("1.38"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
 	KubeletPSI: {
 		{Version: version.MustParse("1.33"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.Beta},
@@ -2578,6 +2591,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	KubeletFineGrainedAuthz: {},
 
 	KubeletInUserNamespace: {},
+
+	KubeletOOMScoreAdjTieBreak: {},
 
 	KubeletPSI: {},
 
