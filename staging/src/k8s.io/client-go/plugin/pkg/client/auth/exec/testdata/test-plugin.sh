@@ -15,5 +15,9 @@
 # limitations under the License.
 
 >&2 echo "$KUBERNETES_EXEC_INFO"
-echo "$TEST_OUTPUT"
+if [ "$TEST_GENERATE_LARGE_OUTPUT" = "true" ]; then
+  head -c 1048577 /dev/zero | tr '\0' 'a'
+else
+  printf "%s" "$TEST_OUTPUT"
+fi
 exit "${TEST_EXIT_CODE:-0}"
