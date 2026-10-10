@@ -24,7 +24,6 @@ import (
 	"math"
 	"regexp"
 	"slices"
-	"strconv"
 	"strings"
 
 	"github.com/google/uuid"
@@ -1401,28 +1400,30 @@ func validateValidRequestValues(maxCapacity apiresource.Quantity, policy *resour
 }
 
 func validateRequestPolicyValidValues(defaultValue apiresource.Quantity, maxCapacity apiresource.Quantity, validValues []apiresource.Quantity, fldPath *field.Path) field.ErrorList {
+	// A list that is too long is only reported as such, which also bounds the work below.
+	if len(validValues) > resource.CapacityRequestPolicyDiscreteMaxOptions {
+		return field.ErrorList{field.TooMany(fldPath, len(validValues), resource.CapacityRequestPolicyDiscreteMaxOptions).WithOrigin("maxItems")}
+	}
+
 	var allErrs field.ErrorList
 	foundDefault := false
 
-	// Check if validValues is sorted in ascending order
+	// Strictly ascending also rules out duplicates. Without the gate, options are compared
+	// as the integers that Value() rounds them to.
+	less := func(a, b apiresource.Quantity) bool { return a.Cmp(b) < 0 }
+	if !utilfeature.DefaultFeatureGate.Enabled(features.DRAFractionalCapacityRange) {
+		less = func(a, b apiresource.Quantity) bool { return a.Value() < b.Value() }
+	}
 	for i := range len(validValues) - 1 {
-		if validValues[i].Cmp(validValues[i+1]) > 0 {
+		if !less(validValues[i], validValues[i+1]) {
 			allErrs = append(allErrs, field.Invalid(
 				fldPath.Index(i+1),
 				validValues[i+1].String(),
-				"values must be sorted in ascending order"))
+				"values must be sorted in strictly ascending order"))
 		}
 	}
 
-	// Choose the key function based on whether fractional capacity values are
-	// supported. When DRAFractionalCapacityRange is enabled, use decimal precision;
-	// otherwise, use integer-based keys.
-	quantityKeyFunc := quantityKeyInt
-	if utilfeature.DefaultFeatureGate.Enabled(features.DRAFractionalCapacityRange) {
-		quantityKeyFunc = quantityKeyAsDec
-	}
-
-	allErrs = append(allErrs, validateSet(validValues, resource.CapacityRequestPolicyDiscreteMaxOptions,
+	allErrs = append(allErrs, validateItems(validValues,
 		func(option apiresource.Quantity, fldPath *field.Path) field.ErrorList {
 			var allErrs field.ErrorList
 			if option.Cmp(maxCapacity) > 0 {
@@ -1432,7 +1433,7 @@ func validateRequestPolicyValidValues(defaultValue apiresource.Quantity, maxCapa
 				foundDefault = true
 			}
 			return allErrs
-		}, quantityKeyFunc, fldPath)...)
+		}, fldPath)...)
 	if !foundDefault {
 		allErrs = append(allErrs, field.Invalid(fldPath, defaultValue.String(), "default value is not valid according to the requestPolicy"))
 	}
@@ -1741,18 +1742,6 @@ func validateSet[T any, K comparable](slice []T, maxSize int, validateItem func(
 // stringKey uses the item itself as a key for validateSet.
 func stringKey(item string) string {
 	return item
-}
-
-// quantityKeyAsDec uses a scaled inf.Dec of the item as itself
-// as a key for validateSet.
-func quantityKeyAsDec(item apiresource.Quantity) string {
-	return item.AsDec().String()
-}
-
-// quantityKeyInt uses base-10 integer of the item itself
-// as a key for validateSet.
-func quantityKeyInt(item apiresource.Quantity) string {
-	return strconv.FormatInt(item.Value(), 10)
 }
 
 // validateMap validates keys, items and the maximum length of a map.
