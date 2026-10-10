@@ -111,13 +111,39 @@ func ValidateLabelName(labelName string, fldPath *field.Path) field.ErrorList {
 	return allErrs
 }
 
+// LabelsValidationOption specifies options for validation labels
+type LabelsValidationOption int
+
+const (
+	// LabelsCoveredByDeclarative indicates whether errors should be marked as covered by declarative validation
+	LabelsCoveredByDeclarative LabelsValidationOption = iota + 1
+)
+
 // ValidateLabels validates that a set of labels are correctly defined.
-func ValidateLabels(labels map[string]string, fldPath *field.Path) field.ErrorList {
+func ValidateLabels(labels map[string]string, fldPath *field.Path, opts ...LabelsValidationOption) field.ErrorList {
+	coveredByDeclarative := false
+	for _, opt := range opts {
+		if opt == LabelsCoveredByDeclarative {
+			coveredByDeclarative = true
+		}
+	}
 	allErrs := field.ErrorList{}
 	for k, v := range labels {
-		allErrs = append(allErrs, ValidateLabelName(k, fldPath)...)
+		nameErrs := ValidateLabelName(k, fldPath)
+		if coveredByDeclarative {
+			nameErrs = nameErrs.MarkCoveredByDeclarative()
+		}
+		allErrs = append(allErrs, nameErrs...)
 		for _, msg := range validation.IsValidLabelValue(v) {
-			allErrs = append(allErrs, field.Invalid(fldPath, v, msg).WithOrigin("format=k8s-label-value"))
+			valuePath := fldPath
+			if coveredByDeclarative {
+				valuePath = fldPath.Key(k)
+			}
+			err := field.Invalid(valuePath, v, msg).WithOrigin("format=k8s-label-value")
+			if coveredByDeclarative {
+				err = err.MarkCoveredByDeclarative()
+			}
+			allErrs = append(allErrs, err)
 		}
 	}
 	return allErrs
