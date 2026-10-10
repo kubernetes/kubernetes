@@ -319,6 +319,10 @@ type candidate struct {
 	// numPodGroupDisruptions returns the number of preemption units that affect pod groups.
 	// A single preemption unit can be all pods in a pod group (for DisruptionMode=all) or a single pod (for DisruptionMode=single).
 	numPodGroupDisruptions int
+	// nodes returns a list of nodes where the preemptor pods get nominated to run.
+	// For a single pod preemption it's equal Name but for pod group preemption
+	// it contains a set of nodes for all preemptor pods.
+	nodes []string
 }
 
 var _ fwk.PreemptionCandidate = &candidate{}
@@ -336,6 +340,13 @@ func (s *candidate) Name() string {
 // NumPodGroupDisruptions returns s.numPodGroupDisruptions.
 func (s *candidate) NumPodGroupDisruptions() int {
 	return s.numPodGroupDisruptions
+}
+
+// Nodes returns a list of nodes where the preemptor pods get nominated to run.
+// For a single pod preemption it's equal Name but for pod group preemption
+// it contains a set of nodes for all preemptor pods.
+func (s *candidate) Nodes() []string {
+	return s.nodes
 }
 
 type candidateList struct {

@@ -250,10 +250,10 @@ func (e *Executor) prepareCandidateAsync(c fwk.PreemptionCandidate, preemptor Ex
 		logger.V(2).Info("Start the preemption asynchronously", "preemptor", klog.KObj(preemptor), "node", c.Name(), "numVictims", len(c.Victims().Pods), "numVictimsToDelete", len(victimPods))
 
 		// Lower priority pods nominated to run on this node, may no longer fit on
-		// this node. So, we should remove their nomination. Removing their
+		// candidate's node. So, we should remove their nomination. Removing their
 		// nomination updates these pods and moves them to the active queue. It
 		// lets scheduler find another place for them sooner than after waiting for preemption completion.
-		nominatedPods := getLowerPriorityNominatedPods(logger, e.fh, preemptor.Priority(), c.Name())
+		nominatedPods := getLowerPriorityNominatedPods(logger, e.fh, preemptor.Priority(), c.Nodes())
 		if err := clearNominatedNodeName(ctx, e.fh.ClientSet(), e.fh.APICacher(), nominatedPods...); err != nil {
 			utilruntime.HandleErrorWithContext(ctx, err, "Cannot clear 'NominatedNodeName' field from lower priority pods on the same target node", "node", c.Name())
 			result = metrics.GoroutineResultError
@@ -342,10 +342,10 @@ func (e *Executor) prepareCandidate(ctx context.Context, c fwk.PreemptionCandida
 	}
 
 	// Lower priority pods nominated to run on this node, may no longer fit on
-	// this node. So, we should remove their nomination. Removing their
+	// candidate's node. So, we should remove their nomination. Removing their
 	// nomination updates these pods and moves them to the active queue. It
 	// lets scheduler find another place for them sooner than after waiting for preemption completion.
-	nominatedPods := getLowerPriorityNominatedPods(logger, fh, preemptor.Priority(), c.Name())
+	nominatedPods := getLowerPriorityNominatedPods(logger, fh, preemptor.Priority(), c.Nodes())
 	if err := clearNominatedNodeName(ctx, cs, fh.APICacher(), nominatedPods...); err != nil {
 		utilruntime.HandleErrorWithContext(ctx, err, "Cannot clear 'NominatedNodeName' field")
 		// We do not return as this error is not critical.
@@ -468,23 +468,19 @@ func clearNominatedNodeName(ctx context.Context, cs clientset.Interface, apiCach
 }
 
 // getLowerPriorityNominatedPods returns pods whose priority is smaller than the
-// priority of the given "pod" and are nominated to run on the given node.
+// priority of the given "pod" and are nominated to run on the given nodes.
 // Note: We could possibly check if the nominated lower priority pods still fit
 // and return those that no longer fit, but that would require lots of
 // manipulation of NodeInfo and PreFilter state per nominated pod. It may not be
 // worth the complexity, especially because we generally expect to have a very
 // small number of nominated pods per node.
-func getLowerPriorityNominatedPods(logger klog.Logger, pn fwk.PodNominator, priority int32, nodeName string) []*v1.Pod {
-	podInfos := pn.NominatedPodsForNode(logger, nodeName)
-
-	if len(podInfos) == 0 {
-		return nil
-	}
-
+func getLowerPriorityNominatedPods(logger klog.Logger, pn fwk.PodNominator, priority int32, nodeNames []string) []*v1.Pod {
 	var lowerPriorityPods []*v1.Pod
-	for _, pi := range podInfos {
-		if corev1helpers.PodPriority(pi.GetPod()) < priority {
-			lowerPriorityPods = append(lowerPriorityPods, pi.GetPod())
+	for _, n := range nodeNames {
+		for _, pi := range pn.NominatedPodsForNode(logger, n) {
+			if corev1helpers.PodPriority(pi.GetPod()) < priority {
+				lowerPriorityPods = append(lowerPriorityPods, pi.GetPod())
+			}
 		}
 	}
 	return lowerPriorityPods
