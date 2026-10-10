@@ -20,6 +20,8 @@ import (
 	"context"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
@@ -35,6 +37,47 @@ import (
 
 	cachertesting "k8s.io/apiserver/pkg/storage/cacher/testing"
 )
+
+func TestListerWatcherWatchOptions(t *testing.T) {
+	for _, tc := range []struct {
+		name               string
+		options            metav1.ListOptions
+		watchWithoutPrevKV bool
+		expectedOptions    storage.ListOptions
+	}{
+		{
+			name:            "resource version, without previous values disabled",
+			options:         metav1.ListOptions{ResourceVersion: "100"},
+			expectedOptions: storage.ListOptions{ResourceVersion: "100"},
+		},
+		{
+			name:               "without previous values enabled",
+			options:            metav1.ListOptions{ResourceVersion: "100"},
+			watchWithoutPrevKV: true,
+			expectedOptions:    storage.ListOptions{ResourceVersion: "100", WatchWithoutPrevKV: true},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchFromStorageWithoutPrevKV, tc.watchWithoutPrevKV)
+			var capturedOpts storage.ListOptions
+			backingStorage := &cachertesting.MockStorage{WatchFn: func(_ context.Context, _ string, opts storage.ListOptions) (watch.Interface, error) {
+				capturedOpts = opts
+				return watch.NewEmptyWatch(), nil
+			}}
+			lw := NewListerWatcher(backingStorage, "/pods/", newPodList, nil)
+			w, err := cache.ToListerWatcherWithContext(lw).WatchWithContext(context.Background(), tc.options)
+			require.NoError(t, err)
+			defer w.Stop()
+			expectedOpts := tc.expectedOptions
+			expectedOpts.Predicate.Label = storage.Everything.Label
+			expectedOpts.Predicate.Field = storage.Everything.Field
+			expectedOpts.Recursive = true
+			expectedOpts.ProgressNotify = true
+			expectedOpts.RecordTimestamps = true
+			require.Equal(t, expectedOpts, capturedOpts)
+		})
+	}
+}
 
 func TestDoesClientSupportWatchListSemanticsForKubeClient(t *testing.T) {
 	target1 := &cachertesting.MockStorage{}

@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/registry/generic"
+	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/server/options"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/apiserver/pkg/storage"
@@ -88,7 +89,7 @@ func setupStore(t *testing.T, decorator generic.StorageDecorator) (storage.Inter
 		storageConfig,
 		"/pods",
 		cacheKeyFunc,
-		nil,
+		genericregistry.NamespaceReverseKeyFunc("/pods"),
 		func() runtime.Object { return &api.Pod{} },
 		func() runtime.Object { return &api.PodList{} },
 		registrypod.GetAttrs,

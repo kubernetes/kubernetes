@@ -2749,7 +2749,7 @@ func newTestGenericStoreRegistry(t *testing.T, scheme *runtime.Scheme, hasCacheE
 	newListFunc := func() runtime.Object { return &example.PodList{} }
 
 	sc.Codec = apitesting.TestStorageCodec(codecs, examplev1.SchemeGroupVersion)
-	s, dFunc, err := factory.Create(*sc.ForResource(schema.GroupResource{Resource: "pods"}), newFunc, newListFunc, nil, "/pods")
+	s, dFunc, err := factory.Create(*sc.ForResource(schema.GroupResource{Resource: "pods"}), newFunc, newListFunc, NoNamespaceReverseKeyFunc("/pods"), "/pods")
 	if err != nil {
 		t.Fatalf("Error creating storage: %v", err)
 	}

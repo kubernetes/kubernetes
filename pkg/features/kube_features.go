@@ -2361,6 +2361,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.37"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 	},
 
+	genericfeatures.WatchFromStorageWithoutPrevKV: {
+		{Version: version.MustParse("1.38"), Default: true, PreRelease: featuregate.Beta},
+	},
+
 	genericfeatures.WatchList: {
 		{Version: version.MustParse("1.27"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.32"), Default: true, PreRelease: featuregate.Beta},
@@ -2844,6 +2848,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	genericfeatures.UnknownVersionInteroperabilityProxy: {genericfeatures.APIServerIdentity},
 
 	genericfeatures.WatchCacheInitializationPostStartHook: {},
+
+	genericfeatures.WatchFromStorageWithoutPrevKV: {},
 
 	genericfeatures.WatchList: {},
 

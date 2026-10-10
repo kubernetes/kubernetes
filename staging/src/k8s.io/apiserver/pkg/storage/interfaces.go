@@ -337,6 +337,14 @@ type ListOptions struct {
 	// event containing a ResourceVersion after which the server
 	// continues streaming events.
 	SendInitialEvents *bool
+	// WatchWithoutPrevKV requests omission of previous values from etcd watch
+	// events. Deleted objects then contain only name, namespace, and the deletion
+	// resource version. If no reverse key function is available, etcd storage
+	// keeps requesting previous values and returns full deleted objects instead.
+	// This is intended for the watch cache, which retains the full previous object.
+	// It requires an empty predicate, is rejected by the cacher, and is ignored
+	// for non-watch requests.
+	WatchWithoutPrevKV bool
 	// RecordTimestamps requests that the storage layer wrap each emitted watch
 	// object in a WatchEventWithRecordTime carrying its decode timestamp, for dispatch
 	// latency telemetry. This is intended for internal clients only (the watch

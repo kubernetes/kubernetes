@@ -77,10 +77,10 @@ func newEtcdTestStorage(t testing.TB, prefix string) (*etcd3testing.EtcdTestServ
 }
 
 func newEtcdTestStorageWithCodec(t testing.TB, prefix string, codec runtime.Codec) (*etcd3testing.EtcdTestServer, storage.Interface) {
-	return newEtcdTestStorageWithOptions(t, prefix, codec, identity.NewEncryptCheckTransformer())
+	return newEtcdTestStorageWithOptions(t, prefix, codec, identity.NewEncryptCheckTransformer(), storagetesting.PodReverseKeyFunc("/pods/", true))
 }
 
-func newEtcdTestStorageWithOptions(t testing.TB, prefix string, codec runtime.Codec, transformer value.Transformer) (*etcd3testing.EtcdTestServer, storage.Interface) {
+func newEtcdTestStorageWithOptions(t testing.TB, prefix string, codec runtime.Codec, transformer value.Transformer, reverseKeyFunc storage.ReverseKeyFunc) (*etcd3testing.EtcdTestServer, storage.Interface) {
 	server, _ := etcd3testing.NewUnsecuredEtcd3TestClientServer(t)
 	versioner := storage.APIObjectVersioner{}
 	compactor := etcd3.NewCompactor(server.V3Client.Client, 0, clock.RealClock{}, nil)
@@ -91,7 +91,7 @@ func newEtcdTestStorageWithOptions(t testing.TB, prefix string, codec runtime.Co
 		codec,
 		newPod,
 		newPodList,
-		nil,
+		reverseKeyFunc,
 		prefix,
 		"/pods/",
 		schema.GroupResource{Resource: "pods"},
@@ -123,7 +123,7 @@ func benchmarkEtcdTestStorage(t testing.TB) (*etcd3testing.EtcdTestServer, stora
 		config.Codec,
 		config.NewFunc,
 		config.NewListFunc,
-		nil,
+		storagetesting.PodReverseKeyFunc(config.ResourcePrefix, true),
 		etcd3testing.PathPrefix(),
 		config.ResourcePrefix,
 		config.GroupResource,
