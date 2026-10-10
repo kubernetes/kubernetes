@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"hash/fnv"
+	"slices"
 	"strings"
 
 	"k8s.io/klog/v2"
@@ -531,4 +532,38 @@ func HasAnyActiveRegularContainerStarted(spec *v1.PodSpec, podStatus *PodStatus)
 	}
 
 	return false
+}
+
+// SecurityProfileOCIRefs returns the unique references of the OCI seccomp
+// profiles used by the pod, at pod level and in any container, in the order
+// they appear.
+func SecurityProfileOCIRefs(pod *v1.Pod) []string {
+	var refs []string
+	add := func(profile *v1.SeccompProfile) {
+		if profile == nil || profile.Type != v1.SeccompProfileTypeOCI || profile.OCI == nil {
+			return
+		}
+		if !slices.Contains(refs, profile.OCI.Ref) {
+			refs = append(refs, profile.OCI.Ref)
+		}
+	}
+	if pod.Spec.SecurityContext != nil {
+		add(pod.Spec.SecurityContext.SeccompProfile)
+	}
+	for i := range pod.Spec.InitContainers {
+		if sc := pod.Spec.InitContainers[i].SecurityContext; sc != nil {
+			add(sc.SeccompProfile)
+		}
+	}
+	for i := range pod.Spec.Containers {
+		if sc := pod.Spec.Containers[i].SecurityContext; sc != nil {
+			add(sc.SeccompProfile)
+		}
+	}
+	for i := range pod.Spec.EphemeralContainers {
+		if sc := pod.Spec.EphemeralContainers[i].SecurityContext; sc != nil {
+			add(sc.SeccompProfile)
+		}
+	}
+	return refs
 }

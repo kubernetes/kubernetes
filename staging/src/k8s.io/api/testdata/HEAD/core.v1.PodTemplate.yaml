@@ -374,6 +374,11 @@ template:
           user: userValue
         seccompProfile:
           localhostProfile: localhostProfileValue
+          oci:
+            baseProfile:
+              localhostProfile: localhostProfileValue
+              type: typeValue
+            ref: refValue
           type: typeValue
         windowsOptions:
           gmsaCredentialSpec: gmsaCredentialSpecValue
@@ -612,6 +617,11 @@ template:
           user: userValue
         seccompProfile:
           localhostProfile: localhostProfileValue
+          oci:
+            baseProfile:
+              localhostProfile: localhostProfileValue
+              type: typeValue
+            ref: refValue
           type: typeValue
         windowsOptions:
           gmsaCredentialSpec: gmsaCredentialSpecValue
@@ -856,6 +866,11 @@ template:
           user: userValue
         seccompProfile:
           localhostProfile: localhostProfileValue
+          oci:
+            baseProfile:
+              localhostProfile: localhostProfileValue
+              type: typeValue
+            ref: refValue
           type: typeValue
         windowsOptions:
           gmsaCredentialSpec: gmsaCredentialSpecValue
@@ -955,6 +970,11 @@ template:
         user: userValue
       seccompProfile:
         localhostProfile: localhostProfileValue
+        oci:
+          baseProfile:
+            localhostProfile: localhostProfileValue
+            type: typeValue
+          ref: refValue
         type: typeValue
       supplementalGroups:
       - 4

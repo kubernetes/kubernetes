@@ -249,6 +249,34 @@ service ImageService {
     rpc ImageStatus(ImageStatusRequest) returns (ImageStatusResponse) {}
     // PullImage pulls an image with authentication config.
     rpc PullImage(PullImageRequest) returns (PullImageResponse) {}
+    // PullSecurityProfile pulls a security profile with authentication config
+    // into the runtime's storage. If the profile is already present, the
+    // runtime must not contact the registry, unless a signature policy that
+    // did not apply to the earlier pull requires it. The profile is applied by
+    // passing its reference in SecurityProfile.oci_ref. Accepted artifact
+    // formats and their validation are up to the runtime.
+    // Pulled profiles are not images: they must only be returned by
+    // ListSecurityProfiles, and the kubelet manages their lifecycle with
+    // RemoveSecurityProfile.
+    // Errors use the well-known messages RegistryUnavailable,
+    // SignatureValidationFailed, or, for permanent rejections of the request
+    // or the artifact, SecurityProfileInvalid as the prefix of the gRPC status
+    // message. The kubelet retries all errors with backoff except
+    // SecurityProfileInvalid and the gRPC code Unimplemented.
+    // Feature gate: SecurityProfileOCI
+    // See https://kep.k8s.io/6061 for more details.
+    rpc PullSecurityProfile(PullSecurityProfileRequest) returns (PullSecurityProfileResponse) {}
+    // ListSecurityProfiles lists the profiles pulled with PullSecurityProfile.
+    // Feature gate: SecurityProfileOCI
+    // See https://kep.k8s.io/6061 for more details.
+    rpc ListSecurityProfiles(ListSecurityProfilesRequest) returns (ListSecurityProfilesResponse) {}
+    // RemoveSecurityProfile removes a profile pulled with PullSecurityProfile.
+    // This call is idempotent, and must not return an error if the profile has
+    // already been removed. Containers already running with the profile are
+    // not affected.
+    // Feature gate: SecurityProfileOCI
+    // See https://kep.k8s.io/6061 for more details.
+    rpc RemoveSecurityProfile(RemoveSecurityProfileRequest) returns (RemoveSecurityProfileResponse) {}
     // RemoveImage removes the image.
     // This call is idempotent, and must not return an error if the image has
     // already been removed.
@@ -532,6 +560,14 @@ message SecurityProfile {
         Unconfined = 1;
         // A pre-defined profile on the node should be used.
         Localhost = 2;
+        // A profile pulled with PullSecurityProfile should be used, merged
+        // with the base profile and the runtime's configured baseline (see
+        // base_profile). If the profile is not present, runtimes must fail
+        // the call and must not pull it. Only supported for seccomp: runtimes
+        // must reject OCI in the apparmor field with InvalidArgument.
+        // Feature gate: SecurityProfileOCI
+        // See https://kep.k8s.io/6061 for more details.
+        OCI = 3;
     }
     // Indicator which `ProfileType` should be applied.
     ProfileType profile_type = 1;
@@ -539,6 +575,41 @@ message SecurityProfile {
     // Must only be set if `ProfileType` is `Localhost`.
     // For seccomp, it must be an absolute path to the seccomp profile.
     // For AppArmor, this field is the AppArmor `<profile name>/`
+    string localhost_ref = 2;
+    // oci_ref is the canonical, digest-pinned reference of a profile pulled
+    // with PullSecurityProfile, as written in the pod spec and passed in
+    // image.image of the pull (for example
+    // "registry.example.com/profile@sha256:abc123..."). Runtimes look it up
+    // by its digest, also when a mirror served the content.
+    // Must be set if `ProfileType` is `OCI`; runtimes must ignore it for
+    // other profile types.
+    string oci_ref = 3;
+    // base_profile is the optional base profile of an `OCI` profile; runtimes
+    // must ignore it for other profile types. The effective profile is the
+    // intersection of the OCI profile, the base profile, and the runtime's
+    // configured baseline (the runtime default profile unless the node
+    // administrator configured another one), so it permits an operation only
+    // if all of them do. If base_profile is not set, only the configured
+    // baseline applies; runtimes must check that it is set, because its zero
+    // value selects RuntimeDefault.
+    SecurityProfileBase base_profile = 4;
+}
+
+// SecurityProfileBase is the base profile of an OCI security profile.
+message SecurityProfileBase {
+    // Available base profile types.
+    enum BaseType {
+        // The container runtime default profile is used as the base.
+        RuntimeDefault = 0;
+        // A pre-defined profile on the node is used as the base.
+        Localhost = 1;
+    }
+    // Indicator which `BaseType` should be applied.
+    BaseType type = 1;
+    // Absolute path to the base profile on the node, with the same semantics
+    // as SecurityProfile.localhost_ref.
+    // Must be set if `BaseType` is `Localhost`; runtimes must ignore it for
+    // other base types.
     string localhost_ref = 2;
 }
 
@@ -1813,6 +1884,73 @@ message PullImageResponse {
     string image_ref = 1;
 }
 
+// SecurityProfileKind identifies the security mechanism of a profile pulled
+// with PullSecurityProfile.
+enum SecurityProfileKind {
+    // Unspecified kind. Runtimes reject it like an unsupported kind.
+    SecurityProfileKindUnspecified = 0;
+    // A seccomp profile.
+    Seccomp = 1;
+    // An AppArmor profile.
+    // Reserved: runtimes reject it like an unsupported kind until AppArmor
+    // support is defined.
+    AppArmor = 2;
+}
+
+message PullSecurityProfileRequest {
+    // Spec of the profile. image.image and image.user_specified_image both
+    // hold the canonical, digest-pinned reference from the pod spec, and
+    // image.runtime_handler selects the runtime handler, as for PullImage.
+    ImageSpec image = 1;
+    // Authentication configuration for pulling the profile, resolved by the
+    // kubelet the same way as for PullImage.
+    AuthConfig auth = 2;
+    // Config of the PodSandbox, which is used to pull the profile in
+    // PodSandbox context.
+    PodSandboxConfig sandbox_config = 3;
+    // profile_kind identifies the expected security mechanism. The runtime
+    // rejects artifacts that do not hold a profile of this kind. Kinds the
+    // runtime does not support are rejected with gRPC code InvalidArgument
+    // and the SecurityProfileInvalid well-known error message.
+    SecurityProfileKind profile_kind = 4;
+}
+
+message PullSecurityProfileResponse {
+    // cached is true if the profile was already present and no registry
+    // request was made. The kubelet calls PullSecurityProfile on every pod
+    // sync, emits pull events only for actual pulls, and labels its pull
+    // duration metric with it.
+    bool cached = 1;
+}
+
+message ListSecurityProfilesRequest {}
+
+// SecurityProfileInfo describes a profile pulled with PullSecurityProfile.
+// The kubelet considers a profile in use if a pod references its digest or
+// one of its refs.
+message SecurityProfileInfo {
+    // digest identifies the profile in the runtime's storage (for example
+    // "sha256:abc123..."). Its algorithm may differ from the digests of refs.
+    string digest = 1;
+    // refs are the image.image values of all PullSecurityProfile calls that
+    // resolved to the profile, including calls that found it already present.
+    repeated string refs = 2;
+    // size is the size of the profile in the runtime's storage, in bytes.
+    uint64 size = 3;
+}
+
+message ListSecurityProfilesResponse {
+    // List of pulled security profiles.
+    repeated SecurityProfileInfo profiles = 1;
+}
+
+message RemoveSecurityProfileRequest {
+    // digest of the profile to remove, as returned by ListSecurityProfiles.
+    string digest = 1;
+}
+
+message RemoveSecurityProfileResponse {}
+
 message RemoveImageRequest {
     // Spec of the image to remove.
     ImageSpec image = 1;
@@ -1904,6 +2042,12 @@ message RuntimeFeatures {
     // mount_options is set to true if the runtime supports additional bind
     // mount options (noexec, nodev, nosuid) on container mounts.
     bool mount_options = 3;
+    // seccomp_profile_oci is set to true if the runtime supports the `OCI`
+    // profile type in the seccomp fields of sandboxes and containers, and the
+    // security profile RPCs for the Seccomp kind.
+    // Feature gate: SecurityProfileOCI
+    // See https://kep.k8s.io/6061 for more details.
+    bool seccomp_profile_oci = 4;
 }
 
 message StatusResponse {

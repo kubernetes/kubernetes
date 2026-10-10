@@ -18,10 +18,15 @@ package kuberuntime
 
 import (
 	"context"
+	"strings"
+
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
+	crierrors "k8s.io/cri-api/pkg/errors"
 	"k8s.io/klog/v2"
 	crededentialprovider "k8s.io/kubernetes/pkg/credentialprovider"
 	"k8s.io/kubernetes/pkg/features"
@@ -68,6 +73,63 @@ func (m *kubeGenericRuntimeManager) PullImage(ctx context.Context, image kubecon
 	}
 
 	return "", nil, utilerrors.NewAggregate(pullErrs)
+}
+
+// PullSecurityProfile pulls a security profile with the supplied credentials,
+// trying them in order, and returns whether the profile was already present.
+func (m *kubeGenericRuntimeManager) PullSecurityProfile(ctx context.Context, image kubecontainer.ImageSpec, credentials []crededentialprovider.TrackedAuthConfig, podSandboxConfig *runtimeapi.PodSandboxConfig, kind runtimeapi.SecurityProfileKind) (bool, error) {
+	logger := klog.FromContext(ctx)
+	imgSpec := ToRuntimeAPIImageSpec(image)
+	// Profile references are canonical, so the reference as written in the
+	// pod spec is the one passed as image.
+	imgSpec.UserSpecifiedImage = image.Image
+
+	if len(credentials) == 0 {
+		resp, err := m.imageService.PullSecurityProfile(ctx, imgSpec, nil, podSandboxConfig, kind)
+		if err != nil {
+			logger.Error(err, "Failed to pull security profile", "ref", image.Image)
+			return false, err
+		}
+		return resp.GetCached(), nil
+	}
+
+	// The caller classifies the error by its gRPC code and well-known message
+	// prefix, so the last error is returned as is rather than aggregated.
+	var lastErr error
+	for _, currentCreds := range credentials {
+		auth := &runtimeapi.AuthConfig{
+			Username:      currentCreds.Username,
+			Password:      currentCreds.Password,
+			Auth:          currentCreds.Auth,
+			ServerAddress: currentCreds.ServerAddress,
+			IdentityToken: currentCreds.IdentityToken,
+			RegistryToken: currentCreds.RegistryToken,
+		}
+
+		resp, err := m.imageService.PullSecurityProfile(ctx, imgSpec, auth, podSandboxConfig, kind)
+		if err == nil {
+			return resp.GetCached(), nil
+		}
+		// A rejection is a property of the profile or of the runtime, not of
+		// the credentials used, so the other credentials cannot change it.
+		if strings.HasPrefix(err.Error(), crierrors.ErrSecurityProfileInvalid.Error()) || status.Code(err) == codes.Unimplemented {
+			return false, err
+		}
+		logger.V(3).Info("Failed to pull security profile with credentials, trying the next", "ref", image.Image, "err", err)
+		lastErr = err
+	}
+
+	return false, lastErr
+}
+
+// ListSecurityProfiles lists the security profiles in the runtime's storage.
+func (m *kubeGenericRuntimeManager) ListSecurityProfiles(ctx context.Context) ([]*runtimeapi.SecurityProfileInfo, error) {
+	return m.imageService.ListSecurityProfiles(ctx)
+}
+
+// RemoveSecurityProfile removes a security profile by its digest.
+func (m *kubeGenericRuntimeManager) RemoveSecurityProfile(ctx context.Context, digest string) error {
+	return m.imageService.RemoveSecurityProfile(ctx, digest)
 }
 
 // GetImageRef gets the ID of the image which has already been in

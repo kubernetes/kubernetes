@@ -2457,8 +2457,9 @@ func (ScopedResourceSelectorRequirement) SwaggerDoc() map[string]string {
 
 var map_SeccompProfile = map[string]string{
 	"":                 "SeccompProfile defines a pod/container's seccomp profile settings. Only one profile source may be set.",
-	"type":             "type indicates which kind of seccomp profile will be applied. Valid options are:\n\nLocalhost - a profile defined in a file on the node should be used. RuntimeDefault - the container runtime default profile should be used. Unconfined - no profile should be applied.",
+	"type":             "type indicates which kind of seccomp profile will be applied. Valid options are:\n\nLocalhost - a profile defined in a file on the node should be used. RuntimeDefault - the container runtime default profile should be used. Unconfined - no profile should be applied. OCI - a profile pulled from an OCI registry should be used, merged with the container runtime's configured baseline. Privileged containers cannot use it, whether it is set on the container or inherited from the pod. This is an alpha value and requires enabling the SecurityProfileOCI feature gate.",
 	"localhostProfile": "localhostProfile indicates a profile defined in a file on the node should be used. The profile must be preconfigured on the node to work. Must be a descending path, relative to the kubelet's configured seccomp profile location. Must be set if type is \"Localhost\". Must NOT be set for any other type.",
+	"oci":              "oci specifies a seccomp profile stored as an artifact in an OCI registry. The container runtime merges the profile with its configured baseline, so the effective profile permits an operation only if all inputs permit it. Must be set if type is \"OCI\". Must NOT be set for any other type. This is an alpha field and requires enabling the SecurityProfileOCI feature gate.",
 }
 
 func (SeccompProfile) SwaggerDoc() map[string]string {
@@ -2558,6 +2559,26 @@ var map_SecurityContext = map[string]string{
 
 func (SecurityContext) SwaggerDoc() map[string]string {
 	return map_SecurityContext
+}
+
+var map_SecurityProfileOCI = map[string]string{
+	"":            "SecurityProfileOCI references a security profile stored as an artifact in an OCI registry, with an optional base profile.",
+	"ref":         "ref is the OCI reference of the profile. It must be a digest-pinned reference in canonical form, registry/repository@<algorithm>:<digest>, with the registry spelled out (for example docker.io/library/profile, not profile or docker.io/profile). Tags are rejected. The digest algorithm must be sha256, sha384, or sha512. The maximum length is 1024 characters. Pull secrets are assembled in the same way as for the container image by looking up node credentials, SA image pull secrets, and pod spec image pull secrets.",
+	"baseProfile": "baseProfile optionally specifies a base profile that the container runtime merges with the OCI profile and its own configured baseline. The effective profile permits an operation only if all inputs permit it. When omitted, the container runtime's configured baseline is the only base.",
+}
+
+func (SecurityProfileOCI) SwaggerDoc() map[string]string {
+	return map_SecurityProfileOCI
+}
+
+var map_SecurityProfileOCIBase = map[string]string{
+	"":                 "SecurityProfileOCIBase specifies the base profile of an OCI security profile.",
+	"type":             "type indicates which kind of base profile will be applied. Valid options are:\n\nLocalhost - a profile defined in a file on the node should be used. RuntimeDefault - the container runtime default profile should be used.",
+	"localhostProfile": "localhostProfile indicates a base profile defined in a file on the node should be used. The profile must be preconfigured on the node to work. Must be a non-empty descending path, relative to the kubelet's configured seccomp profile location. Must be set if type is \"Localhost\". Must NOT be set for any other type.",
+}
+
+func (SecurityProfileOCIBase) SwaggerDoc() map[string]string {
+	return map_SecurityProfileOCIBase
 }
 
 var map_SerializedReference = map[string]string{
