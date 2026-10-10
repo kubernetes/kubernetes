@@ -65,18 +65,27 @@ func TestCloudControllerNamesDeclaration(t *testing.T) {
 }
 
 func TestNativeHistogramsFeatureGateApplied(t *testing.T) {
-	testCases := map[string]func(t *testing.T) *cobra.Command{
-		"NewCloudControllerManagerCommand": func(t *testing.T) *cobra.Command {
-			s, err := options.NewCloudControllerManagerOptions()
-			if err != nil {
-				t.Fatal(err)
-			}
-			return NewCloudControllerManagerCommand(s, nil, DefaultInitFuncConstructors, names.CCMControllerAliases(), cliflag.NamedFlagSets{}, wait.NeverStop)
+	testCases := []struct {
+		name       string
+		newCommand func(t *testing.T) *cobra.Command
+	}{
+		{
+			name: "NewCloudControllerManagerCommand",
+			newCommand: func(t *testing.T) *cobra.Command {
+				s, err := options.NewCloudControllerManagerOptions()
+				if err != nil {
+					t.Fatal(err)
+				}
+				return NewCloudControllerManagerCommand(s, nil, DefaultInitFuncConstructors, names.CCMControllerAliases(), cliflag.NamedFlagSets{}, wait.NeverStop)
+			},
 		},
-		"CommandBuilder": func(t *testing.T) *cobra.Command {
-			cb := NewBuilder()
-			cb.RegisterDefaultControllers()
-			return cb.BuildCommand()
+		{
+			name: "CommandBuilder",
+			newCommand: func(t *testing.T) *cobra.Command {
+				cb := NewBuilder()
+				cb.RegisterDefaultControllers()
+				return cb.BuildCommand()
+			},
 		},
 	}
 
@@ -84,8 +93,8 @@ func TestNativeHistogramsFeatureGateApplied(t *testing.T) {
 	logsapi.ReapplyHandling = logsapi.ReapplyHandlingIgnoreUnchanged
 	t.Cleanup(func() { logsapi.ReapplyHandling = originalReapplyHandling })
 
-	for name, newCommand := range testCases {
-		t.Run(name, func(t *testing.T) {
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
 			// Registered before SetFeatureGateDuringTest so that it runs after the gate is restored.
 			t.Cleanup(func() { metricsfeatures.ApplyFeatureGates(utilfeature.DefaultFeatureGate) })
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, metricsfeatures.NativeHistograms, false)
@@ -96,7 +105,7 @@ func TestNativeHistogramsFeatureGateApplied(t *testing.T) {
 
 			// The kubeconfig does not exist, so the command fails in Config,
 			// after it has applied the feature gates.
-			cmd := newCommand(t)
+			cmd := tc.newCommand(t)
 			cmd.SetArgs([]string{
 				"--kubeconfig=" + filepath.Join(t.TempDir(), "missing-kubeconfig"),
 				"--feature-gates=NativeHistograms=true",
