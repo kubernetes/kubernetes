@@ -1005,13 +1005,18 @@ func (m *kubeGenericRuntimeManager) pruneInitContainersBeforeStart(ctx context.C
 	}
 }
 
-// Remove all init containers. Note that this function does not check the state
+// Remove init containers that may run again. Note that this function does not check the state
 // of the container because it assumes all init containers have been stopped
 // before the call happens.
 func (m *kubeGenericRuntimeManager) purgeInitContainers(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus) {
 	logger := klog.FromContext(ctx)
 	initContainerNames := sets.New[string]()
 	for _, container := range pod.Spec.InitContainers {
+		// Never pods resume initialization across sandbox replacement. Keep
+		// their progress, including Created containers, if replacement fails.
+		if !shouldRestartOnFailure(pod) && !podutil.IsRestartableInitContainer(&container) {
+			continue
+		}
 		initContainerNames.Insert(container.Name)
 	}
 	for name := range initContainerNames {
@@ -1096,6 +1101,11 @@ func (m *kubeGenericRuntimeManager) computeInitContainerActions(ctx context.Cont
 	for i := len(pod.Spec.InitContainers) - 1; i >= 0; i-- {
 		container := &pod.Spec.InitContainers[i]
 		status := podStatus.FindActiveContainerStatusByName(container.Name)
+		if status == nil && !restartOnFailure && !podutil.IsRestartableInitContainer(container) && containerSucceeded(container, podStatus) {
+			// A completed init from the previous sandbox still counts for Never
+			// pods when a replacement attempt failed before creating the next init.
+			status = podStatus.FindContainerStatusByName(container.Name)
+		}
 		logger.V(4).Info("Computing init container action", "pod", klog.KObj(pod), "container", container.Name, "status", status)
 		if status == nil {
 			// If the container is previously initialized but its status is not
