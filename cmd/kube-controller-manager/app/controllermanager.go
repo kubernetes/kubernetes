@@ -48,6 +48,7 @@ import (
 	"k8s.io/apiserver/pkg/server/statusz"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	cacheddiscovery "k8s.io/client-go/discovery/cached/memory"
+	clientgofeaturegate "k8s.io/client-go/features"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
@@ -532,17 +533,26 @@ func (c ControllerContext) NewClient(name string) (kubernetes.Interface, error) 
 // controllers such as the cloud provider and clientBuilder. rootClientBuilder is only used for
 // the shared-informers client and token controller.
 func CreateControllerContext(ctx context.Context, s *config.CompletedConfig, rootClientBuilder, clientBuilder clientbuilder.ControllerClientBuilder) (ControllerContext, error) {
-	// Informer transform to trim ManagedFields for memory efficiency.
-	trim := func(obj interface{}) (interface{}, error) {
-		if accessor, err := meta.Accessor(obj); err == nil {
-			if accessor.GetManagedFields() != nil {
-				accessor.SetManagedFields(nil)
+	// Informer transform to trim ManagedFields for memory efficiency. With
+	// ManagedFieldsOptOutClient, the informer clients drop them instead.
+	var trim cache.TransformFunc
+	if !clientgofeaturegate.FeatureGates().Enabled(clientgofeaturegate.ManagedFieldsOptOutClient) {
+		trim = func(obj interface{}) (interface{}, error) {
+			if accessor, err := meta.Accessor(obj); err == nil {
+				if accessor.GetManagedFields() != nil {
+					accessor.SetManagedFields(nil)
+				}
 			}
+			return obj, nil
 		}
-		return obj, nil
 	}
 
-	versionedClient, err := rootClientBuilder.Client("shared-informers")
+	versionedConfig, err := rootClientBuilder.Config("shared-informers")
+	if err != nil {
+		return ControllerContext{}, fmt.Errorf("failed to create Kubernetes client config for %q: %w", "shared-informers", err)
+	}
+	versionedConfig.DropManagedFields = true
+	versionedClient, err := kubernetes.NewForConfig(versionedConfig)
 	if err != nil {
 		return ControllerContext{}, fmt.Errorf("failed to create Kubernetes client for %q: %w", "shared-informers", err)
 	}
@@ -558,6 +568,7 @@ func CreateControllerContext(ctx context.Context, s *config.CompletedConfig, roo
 	if err != nil {
 		return ControllerContext{}, fmt.Errorf("failed to create metadata client config: %w", err)
 	}
+	metadataConfig.DropManagedFields = true
 
 	metadataClient, err := metadata.NewForConfig(metadataConfig)
 	if err != nil {

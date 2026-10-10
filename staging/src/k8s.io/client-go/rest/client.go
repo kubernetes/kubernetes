@@ -28,6 +28,7 @@ import (
 	"time"
 
 	"github.com/munnerz/goautoneg"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
@@ -75,6 +76,10 @@ type ClientContentConfig struct {
 	// Negotiator is used for obtaining encoders and decoders for multiple
 	// supported media types.
 	Negotiator runtime.ClientNegotiator
+	// DropManagedFields asks the server to omit metadata.managedFields from responses,
+	// and strips it from decoded objects when the server returns it anyway.
+	// It has no effect unless the ManagedFieldsOptOutClient feature gate is enabled.
+	DropManagedFields bool
 }
 
 // RESTClient imposes common Kubernetes API conventions on a set of resource paths.
@@ -123,7 +128,7 @@ func NewRESTClient(baseURL *url.URL, versionedAPIPath string, config ClientConte
 	return &RESTClient{
 		base:             &base,
 		versionedAPIPath: versionedAPIPath,
-		content:          requestClientContentConfigProvider{base: scrubCBORContentConfigIfDisabled(config)},
+		content:          requestClientContentConfigProvider{base: configureDropManagedFields(scrubCBORContentConfigIfDisabled(config))},
 		createBackoffMgr: readExpBackoffConfig,
 		rateLimiter:      rateLimiter,
 		Client:           client,
@@ -153,6 +158,34 @@ func scrubCBORContentConfigIfDisabled(content ClientContentConfig) ClientContent
 		return content
 	}
 
+	content.AcceptContentTypes = formatAccept(clauses)
+
+	return content
+}
+
+func configureDropManagedFields(content ClientContentConfig) ClientContentConfig {
+	if content.DropManagedFields && !clientfeatures.FeatureGates().Enabled(clientfeatures.ManagedFieldsOptOutClient) {
+		content.DropManagedFields = false
+	}
+	if content.DropManagedFields {
+		// Servers that ignore the drop parameter still return managedFields.
+		content.Negotiator = clientNegotiatorDroppingManagedFields{content.Negotiator}
+	}
+	return content
+}
+
+func acceptDroppingManagedFields(accept string) string {
+	clauses := goautoneg.ParseAccept(accept)
+	for i := range clauses {
+		if clauses[i].Params == nil {
+			clauses[i].Params = make(map[string]string, 1)
+		}
+		clauses[i].Params["drop"] = "metadata.managedFields"
+	}
+	return formatAccept(clauses)
+}
+
+func formatAccept(clauses []goautoneg.Accept) string {
 	parts := make([]string, 0, len(clauses))
 	for _, clause := range clauses {
 		// ParseAccept does not store the parameter "q" in Params.
@@ -165,9 +198,7 @@ func scrubCBORContentConfigIfDisabled(content ClientContentConfig) ClientContent
 		}
 		parts = append(parts, mime.FormatMediaType(fmt.Sprintf("%s/%s", clause.Type, clause.SubType), params))
 	}
-	content.AcceptContentTypes = strings.Join(parts, ",")
-
-	return content
+	return strings.Join(parts, ",")
 }
 
 // GetRateLimiter returns rate limiter for a given client, or nil if it's called on a nil client
@@ -343,4 +374,55 @@ func (n clientNegotiatorWithCBORSequenceStreamDecoder) StreamDecoder(contentType
 		return n.negotiator.StreamDecoder(contentType, params)
 	}
 
+}
+
+type clientNegotiatorDroppingManagedFields struct {
+	negotiator runtime.ClientNegotiator
+}
+
+func (n clientNegotiatorDroppingManagedFields) Encoder(contentType string, params map[string]string) (runtime.Encoder, error) {
+	return n.negotiator.Encoder(contentType, params)
+}
+
+func (n clientNegotiatorDroppingManagedFields) Decoder(contentType string, params map[string]string) (runtime.Decoder, error) {
+	decoder, err := n.negotiator.Decoder(contentType, params)
+	if err != nil {
+		return nil, err
+	}
+	return decoderDroppingManagedFields{decoder}, nil
+}
+
+func (n clientNegotiatorDroppingManagedFields) StreamDecoder(contentType string, params map[string]string) (runtime.Decoder, runtime.Serializer, runtime.Framer, error) {
+	decoder, serializer, framer, err := n.negotiator.StreamDecoder(contentType, params)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	return decoderDroppingManagedFields{decoder}, serializer, framer, nil
+}
+
+type decoderDroppingManagedFields struct {
+	decoder runtime.Decoder
+}
+
+func (d decoderDroppingManagedFields) Decode(data []byte, defaults *schema.GroupVersionKind, into runtime.Object) (runtime.Object, *schema.GroupVersionKind, error) {
+	obj, gvk, err := d.decoder.Decode(data, defaults, into)
+	if err != nil {
+		return obj, gvk, err
+	}
+	if meta.IsListType(obj) {
+		_ = meta.EachListItem(obj, func(item runtime.Object) error {
+			omitManagedFields(item)
+			return nil
+		})
+	} else {
+		omitManagedFields(obj)
+	}
+	return obj, gvk, nil
+}
+
+func omitManagedFields(obj runtime.Object) {
+	// Objects without metadata, like Status, have no managedFields.
+	if acc, err := meta.Accessor(obj); err == nil {
+		acc.SetManagedFields(nil)
+	}
 }
