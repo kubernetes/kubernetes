@@ -25,9 +25,10 @@ import (
 )
 
 func TestRecordGeneratedPlacements(t *testing.T) {
-	InitMetrics()
+	Register()
 	registry := metrics.NewKubeRegistry()
 	registry.MustRegister(GeneratedPlacementsTotal)
+	GeneratedPlacementsTotal.Reset()
 
 	RecordGeneratedPlacements("test-profile", 3)
 	RecordGeneratedPlacements("test-profile", 2)
@@ -45,10 +46,12 @@ func TestRecordGeneratedPlacements(t *testing.T) {
 }
 
 func TestObservePlacementEvaluation(t *testing.T) {
-	InitMetrics()
+	Register()
 	registry := metrics.NewKubeRegistry()
 	registry.MustRegister(PlacementEvaluations)
 	registry.MustRegister(PlacementEvaluationDuration)
+	PlacementEvaluations.Reset()
+	PlacementEvaluationDuration.Reset()
 
 	ObservePlacementEvaluation(FeasibleResult, "test-profile", 0.5)
 	ObservePlacementEvaluation(FeasibleResult, "test-profile", 0.5)
