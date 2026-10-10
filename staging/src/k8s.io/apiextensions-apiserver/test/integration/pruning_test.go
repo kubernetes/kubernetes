@@ -26,7 +26,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
-	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	apiextensionsv1 "k8s.io/apiextensions/pkg/apis/apiextensions/v1"
 
 	"go.etcd.io/etcd/client/pkg/v3/transport"
 	clientv3 "go.etcd.io/etcd/client/v3"
@@ -42,8 +42,8 @@ import (
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/client-go/dynamic"
 
-	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apiextensions-apiserver/test/integration/fixtures"
+	"k8s.io/apiextensions/pkg/client/clientset/clientset"
 )
 
 var pruningFixture = &apiextensionsv1.CustomResourceDefinition{

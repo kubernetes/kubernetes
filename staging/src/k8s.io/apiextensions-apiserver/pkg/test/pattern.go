@@ -24,8 +24,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
-	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	apiextensionsv1conversion "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
+	apiextensionsv1 "k8s.io/apiextensions/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
@@ -35,7 +36,7 @@ func PatternValidators(t *testing.T, crd *apiextensionsv1.CustomResourceDefiniti
 	ret := map[string]map[string]PatternValidateFunc{}
 	for _, v := range crd.Spec.Versions {
 		var internalSchema apiextensions.JSONSchemaProps
-		err := apiextensionsv1.Convert_v1_JSONSchemaProps_To_apiextensions_JSONSchemaProps(v.Schema.OpenAPIV3Schema, &internalSchema, nil)
+		err := apiextensionsv1conversion.Convert_v1_JSONSchemaProps_To_apiextensions_JSONSchemaProps(v.Schema.OpenAPIV3Schema, &internalSchema, nil)
 		require.NoError(t, err, "failed to convert JSONSchemaProps for version %s: %v", v.Name, err)
 		structuralSchema, err := schema.NewStructural(&internalSchema)
 		require.NoError(t, err, "failed to create StructuralSchema for version %s: %v", v.Name, err)

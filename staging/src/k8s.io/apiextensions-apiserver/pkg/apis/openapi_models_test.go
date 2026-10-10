@@ -17,7 +17,9 @@ limitations under the License.
 package api
 
 import (
+	"path"
 	"reflect"
+	"strings"
 	"testing"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -50,10 +52,15 @@ func TestOpenAPIDefinitionNames(t *testing.T) {
 			lookupName := namer.OpenAPIModelName()
 
 			rtype := reflect.TypeOf(example).Elem()
-			reflectName := util.ToRESTFriendlyName(rtype.PkgPath() + "." + rtype.Name())
+			wantName := util.ToRESTFriendlyName(rtype.PkgPath() + "." + rtype.Name())
+			if strings.HasPrefix(rtype.PkgPath(), "k8s.io/apiextensions/") {
+				// The types moved to k8s.io/apiextensions but keep the model names
+				// of their old package, which are part of the published OpenAPI.
+				wantName = "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions." + path.Base(rtype.PkgPath()) + "." + rtype.Name()
+			}
 
-			if lookupName != reflectName {
-				t.Errorf("expected %v, got %v", reflectName, lookupName)
+			if lookupName != wantName {
+				t.Errorf("expected %v, got %v", wantName, lookupName)
 			}
 		})
 	}

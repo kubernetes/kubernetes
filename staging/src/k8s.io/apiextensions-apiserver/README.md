@@ -14,6 +14,13 @@ It provides an API for registering `CustomResourceDefinitions`.
 This API server provides the implementation for `CustomResourceDefinitions` which is included as
 delegate server inside of `kube-apiserver`.
 
+The `apiextensions.k8s.io` API types and their generated clients are published in
+[`k8s.io/apiextensions`](https://github.com/kubernetes/apiextensions), which doesn't depend on
+the server libraries. The packages under `pkg/apis/apiextensions/v1`, `pkg/apis/apiextensions/v1beta1`
+and `pkg/client` here are deprecated aliases of those, except that `AddToScheme` in
+`pkg/apis/apiextensions/v1` and `v1beta1` also registers the conversions to the internal version.
+See the [k8s.io/apiextensions README](https://github.com/kubernetes/apiextensions) for how to migrate.
+
 
 ## Compatibility
 

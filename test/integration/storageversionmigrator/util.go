@@ -39,9 +39,9 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	svmv1 "k8s.io/api/storagemigration/v1"
-	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
-	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	crdintegration "k8s.io/apiextensions-apiserver/test/integration"
+	apiextensionsv1 "k8s.io/apiextensions/pkg/apis/apiextensions/v1"
+	apiextensionsclientset "k8s.io/apiextensions/pkg/client/clientset/clientset"
 	metaconditions "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"

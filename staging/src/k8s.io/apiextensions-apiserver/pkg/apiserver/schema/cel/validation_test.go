@@ -35,9 +35,10 @@ import (
 	"k8s.io/utils/ptr"
 
 	apiextensionsinternal "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
-	apiextensions "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	apiextensionsconversion "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema/cel/model"
+	apiextensions "k8s.io/apiextensions/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	celconfig "k8s.io/apiserver/pkg/apis/cel"
@@ -3849,7 +3850,7 @@ func mustSchema(source string) *schema.Structural {
 		panic(err)
 	}
 	convertedProps := &apiextensionsinternal.JSONSchemaProps{}
-	if err := apiextensions.Convert_v1_JSONSchemaProps_To_apiextensions_JSONSchemaProps(props, convertedProps, nil); err != nil {
+	if err := apiextensionsconversion.Convert_v1_JSONSchemaProps_To_apiextensions_JSONSchemaProps(props, convertedProps, nil); err != nil {
 		panic(err)
 	}
 

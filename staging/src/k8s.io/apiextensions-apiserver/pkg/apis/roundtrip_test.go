@@ -26,8 +26,10 @@ import (
 
 	apiextensionsfuzzer "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/fuzzer"
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/install"
-	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
-	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	apiextensionsv1conversion "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	apiextensionsv1beta1conversion "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	apiextensionsv1 "k8s.io/apiextensions/pkg/apis/apiextensions/v1"
+	apiextensionsv1beta1 "k8s.io/apiextensions/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/apitesting/fuzzer"
 	"k8s.io/apimachinery/pkg/api/apitesting/roundtrip"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -37,8 +39,8 @@ import (
 )
 
 var groups = []runtime.SchemeBuilder{
-	apiextensionsv1.SchemeBuilder,
-	apiextensionsv1beta1.SchemeBuilder,
+	apiextensionsv1conversion.SchemeBuilder,
+	apiextensionsv1beta1conversion.SchemeBuilder,
 }
 
 func TestCompatibility(t *testing.T) {

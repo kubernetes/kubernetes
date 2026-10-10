@@ -866,6 +866,25 @@ rules:
     smoke-test: |
       # assumes GO111MODULE=on
       go build -mod=mod .
+- destination: apiextensions
+  branches:
+  - name: master
+    dependencies:
+    - repository: apimachinery
+      branch: master
+    - repository: streaming
+      branch: master
+    - repository: api
+      branch: master
+    - repository: ktesting
+      branch: master
+    - repository: client-go
+      branch: master
+    source:
+      branch: master
+      dirs:
+      - staging/src/k8s.io/apiextensions
+  library: true
 - destination: apiextensions-apiserver
   branches:
   - name: master
@@ -887,6 +906,8 @@ rules:
     - repository: kms
       branch: master
     - repository: ktesting
+      branch: master
+    - repository: apiextensions
       branch: master
     source:
       branch: master
