@@ -12,7 +12,6 @@
 // limitations under the License.
 
 //go:build !js || wasm
-// +build !js wasm
 
 package prometheus
 
