@@ -112,6 +112,10 @@ const (
 	// TieredReservationMemoryReservationPolicy enables tiered memory protection:
 	// memory.min for Guaranteed pods, memory.low for Burstable pods.
 	TieredReservationMemoryReservationPolicy MemoryReservationPolicy = "TieredReservation"
+	// SoftMemoryReservationPolicy protects memory requests of Guaranteed and Burstable pods with memory.low.
+	SoftMemoryReservationPolicy MemoryReservationPolicy = "Soft"
+	// HardMemoryReservationPolicy protects memory requests of Guaranteed and Burstable pods with memory.min.
+	HardMemoryReservationPolicy MemoryReservationPolicy = "Hard"
 )
 
 // CertificateKeyAlgorithmType defines the type of key algorithm used for certificate signing requests.
@@ -958,6 +962,9 @@ type KubeletConfiguration struct {
 	// "None" (default): The kubelet does not set memory.min for containers and pods,
 	// ensuring no hard memory is locked by the kernel.
 	// "TieredReservation": The kubelet sets cgroup v2 memory.min for Guaranteed pods and memory.low for Burstable pods based on memory requests.
+	// "Soft": The kubelet sets memory.low for Guaranteed and Burstable pods and containers based on memory requests.
+	// "Hard": The kubelet sets memory.min for Guaranteed and Burstable pods and containers based on memory requests.
+	// Soft and Hard require the NodeMemoryReservationPolicy feature gate.
 	// Guaranteed memory is never reclaimed by the kernel; Burstable memory is preferentially retained but may be reclaimed under extreme pressure.
 	// See https://kep.k8s.io/2570 for more details.
 	// Default: None
