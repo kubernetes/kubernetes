@@ -327,19 +327,28 @@ func (pl *GangScheduling) checkCPGHierarchyReadiness(snapshot fwk.PodGroupManage
 		return fwk.NewStatus(fwk.UnschedulableAndUnresolvable, fmt.Sprintf("failed to build hierarchy snapshot: composite pod group object not found in state for %s", cpgKey.String()))
 	}
 
-	if !pl.isCPGTreeReady(snapshot, rootKey.Namespace, rootKey.Name, readinessCountFn) {
+	if !pl.isGroupTreeReady(snapshot, rootKey, 0, readinessCountFn) {
 		return fwk.NewStatus(fwk.UnschedulableAndUnresolvable, fmt.Sprintf("waiting for composite pod group %q tree to meet quorum", rootKey.Name))
 	}
 	return nil
 }
 
-func (pl *GangScheduling) isCPGTreeReady(snapshot fwk.PodGroupManager, namespace, cpgName string, readinessCountFn func(fwk.PodGroupState) int) bool {
-	cpgState, err := snapshot.CompositePodGroupStates().Get(namespace, cpgName)
+// isGroupTreeReady reports whether the group at key, sitting depth levels below the root
+// of the hierarchy, meets its quorum.
+func (pl *GangScheduling) isGroupTreeReady(snapshot fwk.PodGroupManager, key fwk.EntityKey, depth int, readinessCountFn func(fwk.PodGroupState) int) bool {
+	if depth >= schedulingapi.WorkloadMaxTreeDepth {
+		return false
+	}
+	if key.Type != fwk.CompositePodGroupKeyType {
+		return pl.isPGReady(snapshot, key.Namespace, key.Name, readinessCountFn)
+	}
+
+	cpgState, err := snapshot.CompositePodGroupStates().Get(key.Namespace, key.Name)
 	if err != nil {
 		return false
 	}
 
-	cpgSpec, err := snapshot.CompositePodGroups().Get(namespace, cpgName)
+	cpgSpec, err := snapshot.CompositePodGroups().Get(key.Namespace, key.Name)
 	if err != nil {
 		return false
 	}
@@ -351,15 +360,8 @@ func (pl *GangScheduling) isCPGTreeReady(snapshot fwk.PodGroupManager, namespace
 
 	successfulChildren := 0
 	for _, childKey := range cpgState.GetChildren() {
-		childType, _, childName := childKey.Type, childKey.Namespace, childKey.Name
-		if childType == fwk.CompositePodGroupKeyType {
-			if pl.isCPGTreeReady(snapshot, namespace, childName, readinessCountFn) {
-				successfulChildren++
-			}
-		} else {
-			if pl.isPGReady(snapshot, namespace, childName, readinessCountFn) {
-				successfulChildren++
-			}
+		if pl.isGroupTreeReady(snapshot, childKey, depth+1, readinessCountFn) {
+			successfulChildren++
 		}
 	}
 

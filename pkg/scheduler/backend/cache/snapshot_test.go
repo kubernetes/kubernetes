@@ -1991,6 +1991,12 @@ func TestSnapshot_GetRootKeyForGroup(t *testing.T) {
 
 		s.podGroupStates[fwk.PodGroupKey("ns1", "pg_missing_parent")] = &podGroupStateSnapshot{podGroupStateData: podGroupStateData{podGroup: st.MakePodGroup().Name("pg_missing_parent").Namespace("ns1").ParentCompositePodGroup("non-existent").Obj()}}
 
+		s.podGroupStates[fwk.PodGroupKey("ns1", "pg_depth")] = &podGroupStateSnapshot{podGroupStateData: podGroupStateData{podGroup: st.MakePodGroup().Name("pg_depth").Namespace("ns1").ParentCompositePodGroup("cpg_d1").Obj()}}
+		s.compositePodGroupStates[fwk.CompositePodGroupKey("ns1", "cpg_d1")] = &compositePodGroupStateSnapshot{compositePodGroupStateData: compositePodGroupStateData{compositePodGroup: st.MakeCompositePodGroup().Name("cpg_d1").Namespace("ns1").ParentCompositePodGroup("cpg_d2").Obj()}}
+		s.compositePodGroupStates[fwk.CompositePodGroupKey("ns1", "cpg_d2")] = &compositePodGroupStateSnapshot{compositePodGroupStateData: compositePodGroupStateData{compositePodGroup: st.MakeCompositePodGroup().Name("cpg_d2").Namespace("ns1").ParentCompositePodGroup("cpg_d3").Obj()}}
+		s.compositePodGroupStates[fwk.CompositePodGroupKey("ns1", "cpg_d3")] = &compositePodGroupStateSnapshot{compositePodGroupStateData: compositePodGroupStateData{compositePodGroup: st.MakeCompositePodGroup().Name("cpg_d3").Namespace("ns1").ParentCompositePodGroup("cpg_d4").Obj()}}
+		s.compositePodGroupStates[fwk.CompositePodGroupKey("ns1", "cpg_d4")] = &compositePodGroupStateSnapshot{compositePodGroupStateData: compositePodGroupStateData{compositePodGroup: st.MakeCompositePodGroup().Name("cpg_d4").Namespace("ns1").Obj()}}
+
 		return s
 	}
 
@@ -2056,6 +2062,13 @@ func TestSnapshot_GetRootKeyForGroup(t *testing.T) {
 			genericWorkloadEnabled:   true,
 			compositePodGroupEnabled: true,
 			key:                      fwk.PodGroupKey("ns1", "pg_cycle"),
+			wantErr:                  true,
+		},
+		{
+			name:                     "depth limit exceeded",
+			genericWorkloadEnabled:   true,
+			compositePodGroupEnabled: true,
+			key:                      fwk.PodGroupKey("ns1", "pg_depth"),
 			wantErr:                  true,
 		},
 		{
