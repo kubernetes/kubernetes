@@ -156,7 +156,6 @@ type Proxier struct {
 	masqueradeAll  bool
 	masqueradeMark string
 	conntrack      conntrack.Interface
-	nfacct         nfacct.Interface
 	localDetector  proxyutil.LocalTrafficDetector
 	nodeName       string
 	nodeIP         net.IP
@@ -198,8 +197,13 @@ type Proxier struct {
 
 	logger klog.Logger
 
+	// nfacct is nil if nfacct based metrics are unavailable. It is reset to nil
+	// by probeNFAcctMatch if the iptables nfacct match turns out to be unusable.
+	nfacct nfacct.Interface
 	// nfAcctCounters can be used to determine if a counter exist in the nfacct subsystem.
 	nfAcctCounters map[string]bool
+	// nfacctMatchProbed is set once probeNFAcctMatch has run.
+	nfacctMatchProbed bool
 }
 
 // Proxier implements proxy.Provider
@@ -597,6 +601,50 @@ func isServiceChainName(chainString string) bool {
 	return false
 }
 
+// probeNFAcctMatch checks, once, that the iptables "nfacct" match can be used.
+// nfacct.New() only proves that the nfnetlink_acct subsystem works, but the
+// rules also need the xt_nfacct match, which can be missing independently.
+// Since iptables-restore is atomic, a single unusable "-m nfacct" rule would
+// make every sync fail, so if the match doesn't work we stop using nfacct
+// entirely and lose only the nfacct based metrics.
+// Assumes proxier.mu is held.
+func (proxier *Proxier) probeNFAcctMatch() {
+	if proxier.nfacctMatchProbed {
+		return
+	}
+	// xt_nfacct refuses to load for a counter that doesn't exist, so probe
+	// with one that was just ensured.
+	var counter string
+	for name, ok := range proxier.nfAcctCounters {
+		if ok {
+			counter = name
+			break
+		}
+	}
+	if counter == "" {
+		return
+	}
+	proxier.nfacctMatchProbed = true
+
+	// The canary chain is never jumped to, so the probe rule never sees traffic.
+	args := []string{"-m", "nfacct", "--nfacct-name", counter}
+	_, err := proxier.iptables.EnsureChain(utiliptables.TableFilter, kubeProxyCanaryChain)
+	if err == nil {
+		_, err = proxier.iptables.EnsureRule(utiliptables.Append, utiliptables.TableFilter, kubeProxyCanaryChain, args...)
+	}
+	if err != nil {
+		proxier.logger.Error(err, "Failed to use the iptables nfacct match (is the xt_nfacct kernel module available?), nfacct based metrics won't be updated", "counter", counter)
+		proxier.nfacct = nil
+		for name := range proxier.nfAcctCounters {
+			proxier.nfAcctCounters[name] = false
+		}
+		return
+	}
+	if err := proxier.iptables.DeleteRule(utiliptables.TableFilter, kubeProxyCanaryChain, args...); err != nil {
+		proxier.logger.Error(err, "Failed to delete nfacct probe rule", "table", utiliptables.TableFilter, "chain", kubeProxyCanaryChain)
+	}
+}
+
 // Assumes proxier.mu is held.
 func (proxier *Proxier) appendServiceCommentLocked(args []string, svcName string) []string {
 	// Not printing these comments, can reduce size of iptables (in case of large
@@ -709,6 +757,7 @@ func (proxier *Proxier) syncProxyRules() (retryError error) {
 					proxier.nfAcctCounters[name] = true
 				}
 			}
+			proxier.probeNFAcctMatch()
 		}
 	}
 

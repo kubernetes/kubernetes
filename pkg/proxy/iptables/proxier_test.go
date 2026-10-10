@@ -52,6 +52,7 @@ import (
 	"k8s.io/kubernetes/pkg/proxy/metrics"
 	"k8s.io/kubernetes/pkg/proxy/runner"
 	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
+	"k8s.io/kubernetes/pkg/proxy/util/nfacct"
 	proxyutiltest "k8s.io/kubernetes/pkg/proxy/util/testing"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 	iptablestest "k8s.io/kubernetes/pkg/util/iptables/testing"
@@ -2591,6 +2592,90 @@ func TestDropInvalidRule(t *testing.T) {
 
 			expected := tc.dropRule + kubeForwardChainRules
 			assertIPTablesChainEqual(t, getLine(), utiliptables.TableFilter, kubeForwardChain, expected, fp.iptablesData.String())
+		})
+	}
+}
+
+// fakeNFAcct is an nfacct.Interface on which every counter already exists.
+type fakeNFAcct struct{}
+
+func (fakeNFAcct) Ensure(string) error { return nil }
+func (fakeNFAcct) Add(string) error    { return nil }
+func (fakeNFAcct) Get(name string) (*nfacct.Counter, error) {
+	return &nfacct.Counter{Name: name}, nil
+}
+func (fakeNFAcct) List() ([]*nfacct.Counter, error) { return nil, nil }
+
+// nfacctMatchIPTables wraps FakeIPTables to model whether the kernel has the
+// iptables "nfacct" match (xt_nfacct). When it doesn't, any rule using it is
+// rejected, both by EnsureRule and by iptables-restore.
+type nfacctMatchIPTables struct {
+	*iptablestest.FakeIPTables
+	matchAvailable bool
+	probes         int
+}
+
+func (f *nfacctMatchIPTables) EnsureRule(position utiliptables.RulePosition, table utiliptables.Table, chain utiliptables.Chain, args ...string) (bool, error) {
+	if strings.Contains(strings.Join(args, " "), "-m nfacct") {
+		f.probes++
+		if !f.matchAvailable {
+			return false, fmt.Errorf("error appending rule: exit status 2: Couldn't load match `nfacct'")
+		}
+	}
+	return f.FakeIPTables.EnsureRule(position, table, chain, args...)
+}
+
+func (f *nfacctMatchIPTables) RestoreAll(data []byte, flush utiliptables.FlushFlag, counters utiliptables.RestoreCountersFlag) error {
+	if !f.matchAvailable && bytes.Contains(data, []byte("-m nfacct")) {
+		return fmt.Errorf("iptables-restore: line 4 failed")
+	}
+	return f.FakeIPTables.RestoreAll(data, flush, counters)
+}
+
+func TestNFAcctMatchProbe(t *testing.T) {
+	testCases := []struct {
+		name           string
+		ipv6           bool
+		matchAvailable bool
+	}{
+		{name: "IPv4, match available", matchAvailable: true},
+		{name: "IPv4, match unavailable", matchAvailable: false},
+		{name: "IPv6, match available", ipv6: true, matchAvailable: true},
+		{name: "IPv6, match unavailable", ipv6: true, matchAvailable: false},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			fake := iptablestest.NewFake()
+			if tc.ipv6 {
+				fake = iptablestest.NewIPv6Fake()
+			}
+			ipt := &nfacctMatchIPTables{FakeIPTables: fake, matchAvailable: tc.matchAvailable}
+			fp := NewFakeProxier(ipt)
+			fp.nfacct = fakeNFAcct{}
+
+			// Run two full syncs: the counters are re-ensured on every full
+			// sync, and that must not re-enable the nfacct rules (or re-probe).
+			for i := range 2 {
+				fp.needFullSync = true
+				if err := fp.syncProxyRules(); err != nil {
+					t.Fatalf("sync %d failed: %v", i, err)
+				}
+				if got := strings.Contains(fp.iptablesData.String(), "-m nfacct"); got != tc.matchAvailable {
+					t.Errorf("sync %d: expected nfacct rules to be present=%t, got %t", i, tc.matchAvailable, got)
+				}
+			}
+
+			if ipt.probes != 1 {
+				t.Errorf("expected the nfacct match to be probed once, got %d", ipt.probes)
+			}
+			for name, enabled := range fp.nfAcctCounters {
+				if enabled != tc.matchAvailable {
+					t.Errorf("expected nfacct counter %q enabled=%t, got %t", name, tc.matchAvailable, enabled)
+				}
+			}
+			if canary, _ := fake.Dump.GetChain(utiliptables.TableFilter, kubeProxyCanaryChain); canary != nil && len(canary.Rules) != 0 {
+				t.Errorf("expected probe rule to be removed, got %v", canary.Rules)
+			}
 		})
 	}
 }
