@@ -50,6 +50,11 @@ func newNavigationSteps(path string) (*navigationSteps, error) {
 			// store them as a single step.  In order to do that, we need to determine what set of tokens is a legal step AFTER the name of the map key
 			// This set of reflective code pulls the type of the map values, uses that type to look up the set of legal tags.  Those legal tags are used to
 			// walk the list of remaining parts until we find a match to a legal tag or the end of the string.  That name is used to burn all the used parts.
+			// Only maps of struct pointers can be navigated.  Other maps, like extensions (map[string]runtime.Object), can't be, and calling
+			// Elem on their interface value type would panic.
+			if currType.Elem().Kind() != reflect.Pointer {
+				return nil, fmt.Errorf("unable to parse one or more field values of %v, please configure these values directly in the file.", path)
+			}
 			mapValueType := currType.Elem().Elem()
 			mapValueOptions, err := getPotentialTypeValues(mapValueType)
 			if err != nil {
