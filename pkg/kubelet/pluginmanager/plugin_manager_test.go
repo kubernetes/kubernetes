@@ -28,6 +28,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/record"
@@ -150,7 +151,7 @@ func TestPluginManager(t *testing.T) {
 	stopChan := make(chan struct{})
 	defer close(stopChan)
 	go func() {
-		sourcesReady := config.NewSourcesReady(func(_ sets.Set[string]) bool { return true })
+		sourcesReady := config.NewSourcesReady(func(_ sets.Set[string]) bool { return true }, func(_ types.UID) bool { return true })
 		pluginManager.Run(tCtx, sourcesReady, stopChan)
 	}()
 
