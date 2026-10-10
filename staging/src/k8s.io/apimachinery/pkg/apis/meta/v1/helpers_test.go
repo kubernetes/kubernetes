@@ -24,6 +24,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/randfill"
 )
@@ -479,5 +480,59 @@ func TestFieldsV1UnmarshalCBOR(t *testing.T) {
 				t.Errorf("unexpected diff:\n%s", diff)
 			}
 		})
+	}
+}
+
+func TestPartialObjectMetadataWithTypeMeta(t *testing.T) {
+	obj := (&PartialObjectMetadata{}).WithAPIVersion("apps/v1").WithKind("Deployment")
+	if obj.APIVersion != "apps/v1" {
+		t.Errorf("apiVersion: got %q, want %q", obj.APIVersion, "apps/v1")
+	}
+	if obj.Kind != "Deployment" {
+		t.Errorf("kind: got %q, want %q", obj.Kind, "Deployment")
+	}
+}
+
+func TestPartialObjectMetadataWithGroupVersionKind(t *testing.T) {
+	gvk := schema.GroupVersionKind{Group: "apps", Version: "v1", Kind: "Deployment"}
+	obj := (&PartialObjectMetadata{}).WithGroupVersionKind(gvk)
+	if obj.APIVersion != "apps/v1" {
+		t.Errorf("apiVersion: got %q, want %q", obj.APIVersion, "apps/v1")
+	}
+	if obj.Kind != "Deployment" {
+		t.Errorf("kind: got %q, want %q", obj.Kind, "Deployment")
+	}
+	if got := obj.GroupVersionKind(); got != gvk {
+		t.Errorf("GroupVersionKind: got %v, want %v", got, gvk)
+	}
+}
+
+func TestPartialObjectMetadataWithIdentity(t *testing.T) {
+	gvk := schema.GroupVersionKind{Version: "v1", Kind: "Pod"}
+	obj := (&PartialObjectMetadata{}).WithGroupVersionKind(gvk).WithNamespace("ns").WithName("n")
+	if obj.Namespace != "ns" {
+		t.Errorf("namespace: got %q, want %q", obj.Namespace, "ns")
+	}
+	if obj.Name != "n" {
+		t.Errorf("name: got %q, want %q", obj.Name, "n")
+	}
+	if got := obj.GroupVersionKind(); got != gvk {
+		t.Errorf("GroupVersionKind: got %v, want %v", got, gvk)
+	}
+}
+
+func TestPartialObjectMetadataListWithTypeMeta(t *testing.T) {
+	gvk := schema.GroupVersionKind{Version: "v1", Kind: "PodList"}
+	list := (&PartialObjectMetadataList{}).WithGroupVersionKind(gvk)
+	if got := list.GroupVersionKind(); got != gvk {
+		t.Errorf("GroupVersionKind: got %v, want %v", got, gvk)
+	}
+
+	list = (&PartialObjectMetadataList{}).WithAPIVersion("v1").WithKind("PodList")
+	if list.APIVersion != "v1" {
+		t.Errorf("apiVersion: got %q, want %q", list.APIVersion, "v1")
+	}
+	if list.Kind != "PodList" {
+		t.Errorf("kind: got %q, want %q", list.Kind, "PodList")
 	}
 }
