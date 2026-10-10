@@ -691,6 +691,65 @@ items:
       rbac.authorization.kubernetes.io/autoupdate: "true"
     labels:
       kubernetes.io/bootstrapping: rbac-defaults
+    name: system:controller:evictionrequest-controller
+  rules:
+  - apiGroups:
+    - lifecycle.k8s.io
+    resources:
+    - evictions
+    verbs:
+    - create
+    - get
+    - list
+    - patch
+    - update
+    - watch
+  - apiGroups:
+    - lifecycle.k8s.io
+    resources:
+    - evictions/status
+    verbs:
+    - patch
+    - update
+  - apiGroups:
+    - lifecycle.k8s.io
+    resources:
+    - evictionrequests
+    verbs:
+    - get
+    - list
+    - watch
+  - apiGroups:
+    - lifecycle.k8s.io
+    resources:
+    - evictionrequests/status
+    verbs:
+    - patch
+    - update
+  - apiGroups:
+    - ""
+    resources:
+    - pods
+    verbs:
+    - get
+    - list
+    - watch
+  - apiGroups:
+    - ""
+    - events.k8s.io
+    resources:
+    - events
+    verbs:
+    - create
+    - patch
+    - update
+- apiVersion: rbac.authorization.k8s.io/v1
+  kind: ClusterRole
+  metadata:
+    annotations:
+      rbac.authorization.kubernetes.io/autoupdate: "true"
+    labels:
+      kubernetes.io/bootstrapping: rbac-defaults
     name: system:controller:expand-controller
   rules:
   - apiGroups:
