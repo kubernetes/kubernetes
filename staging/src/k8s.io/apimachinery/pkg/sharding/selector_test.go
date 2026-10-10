@@ -139,3 +139,92 @@ func TestSelectorString(t *testing.T) {
 		t.Errorf("String() = %q, want %q", sel.String(), expected)
 	}
 }
+
+func TestNewShardRangeSelector(t *testing.T) {
+	if _, err := NewShardRangeSelector("", 0, 2); err == nil {
+		t.Fatal("expected error for empty key")
+	}
+	if _, err := NewShardRangeSelector("metadata.uid", 0, 2); err == nil {
+		t.Fatal("expected error for unsupported key without object. prefix")
+	}
+	if _, err := NewShardRangeSelector("object.metadata.uid", 0, 0); err == nil {
+		t.Fatal("expected error for non-positive totalShards")
+	}
+	if _, err := NewShardRangeSelector("object.metadata.uid", -1, 2); err == nil {
+		t.Fatal("expected error for negative shardIndex")
+	}
+	if _, err := NewShardRangeSelector("object.metadata.uid", 2, 2); err == nil {
+		t.Fatal("expected error for out-of-range shardIndex")
+	}
+
+	single, err := NewShardRangeSelector("object.metadata.namespace", 0, 1)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got, want := single.String(), "shardRange(object.metadata.namespace, '0x0000000000000000', '0x10000000000000000')"; got != want {
+		t.Errorf("single.String() = %q, want %q", got, want)
+	}
+
+	s0, err := NewShardRangeSelector("object.metadata.uid", 0, 2)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	s1, err := NewShardRangeSelector("object.metadata.uid", 1, 2)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got, want := s0.String(), "shardRange(object.metadata.uid, '0x0000000000000000', '0x8000000000000000')"; got != want {
+		t.Errorf("s0.String() = %q, want %q", got, want)
+	}
+	if got, want := s1.String(), "shardRange(object.metadata.uid, '0x8000000000000000', '0x10000000000000000')"; got != want {
+		t.Errorf("s1.String() = %q, want %q", got, want)
+	}
+
+	// Non-power-of-two shard count must form a contiguous partition covering [0, 2^64).
+	const nonPow2 = 3
+	var prevEnd string
+	for i := range nonPow2 {
+		sel, err := NewShardRangeSelector("object.metadata.uid", i, nonPow2)
+		if err != nil {
+			t.Fatalf("NewShardRangeSelector(%d, %d): %v", i, nonPow2, err)
+		}
+		reqs := sel.Requirements()
+		if len(reqs) != 1 {
+			t.Fatalf("expected 1 requirement, got %d", len(reqs))
+		}
+		if i == 0 && reqs[0].Start != "0x0000000000000000" {
+			t.Errorf("shard 0 Start = %q, want 0x0000000000000000", reqs[0].Start)
+		}
+		if i > 0 && reqs[0].Start != prevEnd {
+			t.Errorf("shard %d Start %q != shard %d End %q", i, reqs[0].Start, i-1, prevEnd)
+		}
+		if !HexLess(reqs[0].Start, reqs[0].End) {
+			t.Errorf("shard %d Start %q not less than End %q", i, reqs[0].Start, reqs[0].End)
+		}
+		prevEnd = reqs[0].End
+	}
+	if prevEnd != "0x10000000000000000" {
+		t.Errorf("final shard End = %q, want 0x10000000000000000", prevEnd)
+	}
+}
+
+func BenchmarkSelectorMatches(b *testing.B) {
+	obj := &testObject{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:       types.UID("2a9c1b7e-0042-4f3a-9c1d-000000000042"),
+			Name:      "pod-42",
+			Namespace: "default",
+		},
+	}
+	sel, err := NewShardRangeSelector("object.metadata.uid", 0, 4)
+	if err != nil {
+		b.Fatal(err)
+	}
+	b.ReportAllocs()
+	b.ResetTimer()
+	for b.Loop() {
+		if _, err := sel.Matches(obj); err != nil {
+			b.Fatal(err)
+		}
+	}
+}

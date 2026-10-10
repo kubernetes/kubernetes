@@ -84,3 +84,16 @@ func TestEmptyCreationTimestampIsOmitted(t *testing.T) {
 		t.Errorf("unexpected creation timestamp field: %q", creationTimestamp)
 	}
 }
+
+func TestUnstructuredListShardInfo(t *testing.T) {
+	var list UnstructuredList
+	require.Nil(t, list.GetShardInfo())
+
+	sel := "shardRange(object.metadata.uid, '0x0000000000000000', '0x8000000000000000')"
+	list.SetShardInfo(&metav1.ShardInfo{Selector: sel})
+	require.NotNil(t, list.GetShardInfo())
+	assert.Equal(t, sel, list.GetShardInfo().Selector)
+
+	list.SetShardInfo(nil)
+	assert.Nil(t, list.GetShardInfo())
+}
