@@ -230,6 +230,48 @@ func TestWatchListResourceVersion(t *testing.T) {
 	}
 }
 
+func TestRewatchResourceVersion(t *testing.T) {
+	tests := []struct {
+		name                string
+		lastSyncRV          string
+		resourceUnavailable bool
+		expected            string
+	}{
+		{
+			name:     "initial watch list uses any resource version",
+			expected: "0",
+		},
+		{
+			name:                "unavailable resource version uses a consistent read",
+			lastSyncRV:          "42",
+			resourceUnavailable: true,
+			expected:            "",
+		},
+		{
+			name:                "unavailable initial resource version uses a consistent read",
+			resourceUnavailable: true,
+			expected:            "",
+		},
+		{
+			name:       "established watch resumes from last resource version",
+			lastSyncRV: "42",
+			expected:   "42",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			r := &Reflector{
+				lastSyncResourceVersion:              test.lastSyncRV,
+				isLastSyncResourceVersionUnavailable: test.resourceUnavailable,
+			}
+			if got := r.rewatchResourceVersion(); got != test.expected {
+				t.Fatalf("rewatchResourceVersion() = %q, want %q", got, test.expected)
+			}
+		})
+	}
+}
+
 func TestWatchList(t *testing.T) {
 	scenarios := []struct {
 		name                string
@@ -262,6 +304,7 @@ func TestWatchList(t *testing.T) {
 			expectedWatchRequests: 1,
 			expectedRequestOptions: []metav1.ListOptions{{
 				SendInitialEvents:    ptr.To(true),
+				ResourceVersion:      "0",
 				AllowWatchBookmarks:  true,
 				ResourceVersionMatch: metav1.ResourceVersionMatchNotOlderThan,
 				TimeoutSeconds:       ptr.To[int64](1),
@@ -309,6 +352,7 @@ func TestWatchList(t *testing.T) {
 			expectedRequestOptions: []metav1.ListOptions{
 				{
 					SendInitialEvents:    ptr.To(true),
+					ResourceVersion:      "0",
 					AllowWatchBookmarks:  true,
 					ResourceVersionMatch: metav1.ResourceVersionMatchNotOlderThan,
 					TimeoutSeconds:       ptr.To[int64](1),
@@ -344,6 +388,7 @@ func TestWatchList(t *testing.T) {
 			expectedRequestOptions: []metav1.ListOptions{
 				{
 					SendInitialEvents:    ptr.To(true),
+					ResourceVersion:      "0",
 					AllowWatchBookmarks:  true,
 					ResourceVersionMatch: metav1.ResourceVersionMatchNotOlderThan,
 					TimeoutSeconds:       ptr.To[int64](1),
@@ -375,6 +420,7 @@ func TestWatchList(t *testing.T) {
 			expectedWatchRequests: 1,
 			expectedRequestOptions: []metav1.ListOptions{{
 				SendInitialEvents:    ptr.To(true),
+				ResourceVersion:      "0",
 				AllowWatchBookmarks:  true,
 				ResourceVersionMatch: metav1.ResourceVersionMatchNotOlderThan,
 				TimeoutSeconds:       ptr.To[int64](1),
@@ -404,6 +450,7 @@ func TestWatchList(t *testing.T) {
 			expectedWatchRequests: 1,
 			expectedRequestOptions: []metav1.ListOptions{{
 				SendInitialEvents:    ptr.To(true),
+				ResourceVersion:      "0",
 				AllowWatchBookmarks:  true,
 				ResourceVersionMatch: metav1.ResourceVersionMatchNotOlderThan,
 				TimeoutSeconds:       ptr.To[int64](1),
@@ -443,18 +490,21 @@ func TestWatchList(t *testing.T) {
 			expectedRequestOptions: []metav1.ListOptions{
 				{
 					SendInitialEvents:    ptr.To(true),
+					ResourceVersion:      "0",
 					AllowWatchBookmarks:  true,
 					ResourceVersionMatch: metav1.ResourceVersionMatchNotOlderThan,
 					TimeoutSeconds:       ptr.To[int64](1),
 				},
 				{
 					SendInitialEvents:    ptr.To(true),
+					ResourceVersion:      "0",
 					AllowWatchBookmarks:  true,
 					ResourceVersionMatch: metav1.ResourceVersionMatchNotOlderThan,
 					TimeoutSeconds:       ptr.To[int64](1),
 				},
 				{
 					SendInitialEvents:    ptr.To(true),
+					ResourceVersion:      "0",
 					AllowWatchBookmarks:  true,
 					ResourceVersionMatch: metav1.ResourceVersionMatchNotOlderThan,
 					TimeoutSeconds:       ptr.To[int64](1),
@@ -481,12 +531,14 @@ func TestWatchList(t *testing.T) {
 			expectedRequestOptions: []metav1.ListOptions{
 				{
 					SendInitialEvents:    ptr.To(true),
+					ResourceVersion:      "0",
 					AllowWatchBookmarks:  true,
 					ResourceVersionMatch: metav1.ResourceVersionMatchNotOlderThan,
 					TimeoutSeconds:       ptr.To[int64](1),
 				},
 				{
 					SendInitialEvents:    ptr.To(true),
+					ResourceVersion:      "0",
 					AllowWatchBookmarks:  true,
 					ResourceVersionMatch: metav1.ResourceVersionMatchNotOlderThan,
 					TimeoutSeconds:       ptr.To[int64](1),
@@ -515,6 +567,7 @@ func TestWatchList(t *testing.T) {
 			expectedRequestOptions: []metav1.ListOptions{
 				{
 					SendInitialEvents:    ptr.To(true),
+					ResourceVersion:      "0",
 					AllowWatchBookmarks:  true,
 					ResourceVersionMatch: metav1.ResourceVersionMatchNotOlderThan,
 					TimeoutSeconds:       ptr.To[int64](1),
@@ -554,6 +607,7 @@ func TestWatchList(t *testing.T) {
 			expectedRequestOptions: []metav1.ListOptions{
 				{
 					SendInitialEvents:    ptr.To(true),
+					ResourceVersion:      "0",
 					AllowWatchBookmarks:  true,
 					ResourceVersionMatch: metav1.ResourceVersionMatchNotOlderThan,
 					TimeoutSeconds:       ptr.To[int64](1),
@@ -583,6 +637,7 @@ func TestWatchList(t *testing.T) {
 			expectedWatchRequests: 1,
 			expectedRequestOptions: []metav1.ListOptions{{
 				SendInitialEvents:    ptr.To(true),
+				ResourceVersion:      "0",
 				AllowWatchBookmarks:  true,
 				ResourceVersionMatch: metav1.ResourceVersionMatchNotOlderThan,
 				TimeoutSeconds:       ptr.To[int64](1),
