@@ -2225,17 +2225,24 @@ func (kl *Kubelet) convertToAPIPodLevelResourcesStatus(logger klog.Logger, alloc
 	// output inconsistent. We should decide if the information is useful enough to
 	//  outweigh the consistency issues,
 	pcm := kl.containerManager.NewPodContainerManager()
-	memoryConfig, err := pcm.GetPodCgroupConfig(allocatedPod, v1.ResourceMemory)
-	if err != nil {
-		logger.Error(err, "failed to read memory cgroup config for the pod", "podName", allocatedPod.Name)
+	var memoryConfig, cpuConfig *cm.ResourceConfig
+	// During teardown, a terminating pod's phase may still be Running even after
+	// its cgroup has already been removed. Check if the cgroup exists before reading,
+	// and if a race condition still results in ENOENT / not found, log at info level
+	// rather than error.
+	if pcm.Exists(allocatedPod) {
+		var err error
+		memoryConfig, err = pcm.GetPodCgroupConfig(allocatedPod, v1.ResourceMemory)
+		if err != nil {
+			logPodCgroupReadError(logger, err, "failed to read memory cgroup config for the pod", allocatedPod.Name)
+		}
+		cpuConfig, err = pcm.GetPodCgroupConfig(allocatedPod, v1.ResourceCPU)
+		if err != nil {
+			logPodCgroupReadError(logger, err, "failed to read cpu cgroup limits for the pod", allocatedPod.Name)
+		}
 	}
+
 	memoryLimit := cm.MemoryLimitsFromConfig(memoryConfig)
-	cpuConfig, err := pcm.GetPodCgroupConfig(allocatedPod, v1.ResourceCPU)
-	if err != nil {
-		logger.Error(err, "failed to read memory cgroup limits for the pod", "podName", allocatedPod.Name)
-
-	}
-
 	cpuRequest := cm.CPURequestsFromConfig(cpuConfig)
 	cpuLimit := cm.CPULimitsFromConfig(cpuConfig)
 
@@ -2320,6 +2327,24 @@ func (kl *Kubelet) convertToAPIPodLevelResourcesStatus(logger klog.Logger, alloc
 	}
 
 	return resources
+}
+
+// logPodCgroupReadError logs an error reading pod cgroup configuration.
+// If the error indicates the cgroup does not exist (expected if teardown races the existence check),
+// it is logged at V(4) info level instead of error level.
+func logPodCgroupReadError(logger klog.Logger, err error, msg, podName string) {
+	if isPodCgroupNotExist(err) {
+		logger.V(4).Info(msg, "err", err, "podName", podName)
+		return
+	}
+	logger.Error(err, msg, "podName", podName)
+}
+
+func isPodCgroupNotExist(err error) bool {
+	if goerrors.Is(err, os.ErrNotExist) {
+		return true
+	}
+	return strings.Contains(err.Error(), "no such file or directory")
 }
 
 // convertToAPIContainerStatuses converts the given internal container
