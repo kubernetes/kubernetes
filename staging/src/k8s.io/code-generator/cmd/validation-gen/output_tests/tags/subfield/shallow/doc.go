@@ -49,11 +49,41 @@ type Struct struct {
 type OtherStruct struct {
 	StringField  string            `json:"stringField"`
 	PointerField *string           `json:"pointerField"`
-	StructField  SmallStruct       `json:"structField"`
+	StructField  UnvalidatedStruct `json:"structField"`
 	SliceField   []string          `json:"sliceField"`
 	MapField     map[string]string `json:"mapField"`
 }
 
-type SmallStruct struct {
+type UnvalidatedStruct struct {
 	StringField string `json:"stringField"`
+}
+type StructWithOptionalField struct {
+	// +k8s:optional
+	OptionalField string `json:"optionalField"`
+}
+
+type SetByServerStruct struct {
+	TypeMeta int `json:"typeMeta"`
+
+	// +k8s:subfield(optionalField)=+k8s:setByServer
+	SubfieldSetByServer StructWithOptionalField `json:"subfieldSetByServer"`
+
+	// +k8s:subfield(stringField)=+k8s:setByServer
+	// +k8s:subfield(stringField)=+k8s:optional
+	EmbeddedSetByServer UnvalidatedStruct `json:"embeddedSetByServer"`
+
+	// +k8s:subfield(optionalField)=+k8s:required
+	// +k8s:opaqueType
+	OpaqueSubfieldRequired StructWithOptionalField `json:"opaqueSubfieldRequired"`
+
+	// +k8s:subfield(optionalField)=+k8s:required
+	SubfieldRequired StructWithOptionalField `json:"subfieldRequired"`
+
+	// +k8s:optional
+	// +k8s:subfield(optionalField)=+k8s:setByServer
+	SubfieldPtrSetByServer *StructWithOptionalField `json:"subfieldPtrSetByServer"`
+
+	// +k8s:optional
+	// +k8s:subfield(optionalField)=+k8s:required
+	SubfieldPtrRequired *StructWithOptionalField `json:"subfieldPtrRequired"`
 }
