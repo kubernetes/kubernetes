@@ -21,6 +21,7 @@ syntax = "proto2";
 
 package k8s.io.apimachinery.pkg.apis.meta.v1;
 
+import "google/protobuf/any.proto";
 import "k8s.io/apimachinery/pkg/runtime/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
 
@@ -1203,6 +1204,53 @@ message StatusDetails {
   optional int32 retryAfterSeconds = 5;
 }
 
+// Table is a tabular representation of a set of API resources. The server transforms the
+// object into a set of preferred columns for quickly reviewing the objects.
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +protobuf=true
+message Table {
+  // Standard list metadata.
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+  // +optional
+  optional ListMeta metadata = 1;
+
+  // columnDefinitions describes each column in the returned items array. The number of cells per row
+  // will always match the number of column definitions.
+  // +listType=atomic
+  repeated TableColumnDefinition columnDefinitions = 2;
+
+  // rows is the list of items in the table.
+  // +listType=atomic
+  repeated TableRow rows = 3;
+}
+
+// TableColumnDefinition contains information about a column returned in the Table.
+// +protobuf=true
+message TableColumnDefinition {
+  // name is a human readable name for the column.
+  optional string name = 1;
+
+  // type is an OpenAPI type definition for this column, such as number, integer, string, or
+  // array.
+  // See https://github.com/OAI/OpenAPI-Specification/blob/master/versions/2.0.md#data-types for more.
+  optional string type = 2;
+
+  // format is an optional OpenAPI type modifier for this column. A format modifies the type and
+  // imposes additional rules, like date or time formatting for a string. The 'name' format is applied
+  // to the primary identifier column which has type 'string' to assist in clients identifying column
+  // is the resource name.
+  // See https://github.com/OAI/OpenAPI-Specification/blob/master/versions/2.0.md#data-types for more.
+  optional string format = 3;
+
+  // description is a human readable description of this column.
+  optional string description = 4;
+
+  // priority is an integer defining the relative importance of this column compared to others. Lower
+  // numbers are considered higher priority. Columns that may be omitted in limited space scenarios
+  // should be given a higher priority.
+  optional int32 priority = 5;
+}
+
 // TableOptions are used when a Table is requested by the caller.
 // +k8s:conversion-gen:explicit-from=net/url.Values
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -1212,6 +1260,54 @@ message TableOptions {
   // specifying "Metadata" (the default) will return the object's metadata in the PartialObjectMetadata kind
   // in version v1beta1 of the meta.k8s.io API group.
   optional string includeObject = 1;
+}
+
+// TableRow is an individual row in a table.
+// +protobuf=true
+message TableRow {
+  // cells will be as wide as the column definitions array and may contain strings, numbers (float64 or
+  // int64), booleans, simple maps, lists, or null. See the type field of the column definition for a
+  // more detailed description.
+  // +listType=atomic
+  repeated .google.protobuf.Any cells = 1;
+
+  // conditions describe additional status of a row that are relevant for a human user. These conditions
+  // apply to the row, not to the object, and will be specific to table output. The only defined
+  // condition type is 'Completed', for a row that indicates a resource that has run to completion and
+  // can be given less visual priority.
+  // +optional
+  // +listType=atomic
+  repeated TableRowCondition conditions = 2;
+
+  // This field contains the requested additional information about each object based on the includeObject
+  // policy when requesting the Table. If "None", this field is empty, if "Object" this will be the
+  // default serialization of the object for the current API version, and if "Metadata" (the default) will
+  // contain the object metadata. Check the returned kind and apiVersion of the object before parsing.
+  // The media type of the object will always match the enclosing list - if this as a JSON table, these
+  // will be JSON encoded objects.
+  // +optional
+  optional .k8s.io.apimachinery.pkg.runtime.RawExtension object = 3;
+}
+
+// TableRowCondition allows a row to be marked with additional information.
+// +protobuf=true
+message TableRowCondition {
+  // Type of row condition. The only defined value is 'Completed' indicating that the
+  // object this row represents has reached a completed state and may be given less visual
+  // priority than other rows. Clients are not required to honor any conditions but should
+  // be consistent where possible about handling the conditions.
+  optional string type = 1;
+
+  // Status of the condition, one of True, False, Unknown.
+  optional string status = 2;
+
+  // (brief) machine readable reason for the condition's last transition.
+  // +optional
+  optional string reason = 3;
+
+  // Human readable message indicating details about last transition.
+  // +optional
+  optional string message = 4;
 }
 
 // Time is a wrapper around time.Time which supports correct
