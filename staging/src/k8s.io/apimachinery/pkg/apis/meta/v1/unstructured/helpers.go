@@ -493,12 +493,25 @@ func (s unstructuredJSONScheme) decodeToList(data []byte, list *UnstructuredList
 	listKind := list.GetKind()
 	itemKind := strings.TrimSuffix(listKind, "List")
 
+	// Decoding list.Object already decoded each item, so reuse those maps.
+	// dList still rejects an items value that is not an array, and supplies
+	// the raw bytes for items that are not objects, such as null.
+	decodedItems, _ := list.Object["items"].([]interface{})
+	if len(decodedItems) != len(dList.Items) {
+		// Defensive; both decodes see the same array.
+		decodedItems = nil
+	}
 	delete(list.Object, "items")
 	list.Items = make([]Unstructured, 0, len(dList.Items))
-	for _, i := range dList.Items {
+	for i, rawItem := range dList.Items {
 		unstruct := &Unstructured{}
-		if err := s.decodeToUnstructured([]byte(i), unstruct); err != nil {
-			return err
+		if decodedItems != nil {
+			unstruct.Object, _ = decodedItems[i].(map[string]interface{})
+		}
+		if unstruct.Object == nil {
+			if err := s.decodeToUnstructured(rawItem, unstruct); err != nil {
+				return err
+			}
 		}
 		// This is hacky. Set the item's Kind and APIVersion to those inferred
 		// from the List.
