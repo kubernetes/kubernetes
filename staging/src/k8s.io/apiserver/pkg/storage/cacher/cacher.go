@@ -1345,11 +1345,10 @@ func (c *Cacher) waitUntilWatchCacheFreshAndForceAllEvents(ctx context.Context, 
 		// In this very rare scenario, the worst case will be that this
 		// request will wait for 3 seconds before it fails.
 		span := tracing.SpanFromContext(ctx)
-		consistentReadSupported := delegator.ConsistentReadSupported()
 		c.watchCache.RLock()
 		span.AddEvent("watchCache locked acquired")
 		defer c.watchCache.RUnlock()
-		err := c.watchCache.waitUntilFreshLocked(ctx, consistentReadSupported, requestedWatchRV)
+		err := c.watchCache.waitUntilFreshLocked(ctx, requestedWatchRV)
 		if err != nil {
 			return err
 		}
