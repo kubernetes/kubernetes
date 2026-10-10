@@ -3032,6 +3032,15 @@ func countClientVerb(actions []clienttesting.Action, verb string) int {
 	return count
 }
 
+// newBufferedLogContext returns a context whose logger also captures log output in memory,
+// and a function that returns the output captured so far.
+func newBufferedLogContext(t *testing.T) (context.Context, func() string) {
+	logger := ktesting.NewLogger(t, ktesting.NewConfig(ktesting.BufferLogs(true)))
+	return klog.NewContext(context.Background(), logger), func() string {
+		return logger.GetSink().(ktesting.Underlier).GetBuffer().String()
+	}
+}
+
 // versionedPodGroup returns PodGroup ns/pg with the given UID, resourceVersion and conditions.
 func versionedPodGroup(uid types.UID, resourceVersion string, conditions ...metav1.Condition) *schedulingv1beta1.PodGroup {
 	pg := st.MakePodGroup().Name("pg").Namespace("ns").UID(uid).Conditions(conditions...).Obj()
@@ -3123,7 +3132,7 @@ func TestUpdatePodGroupConditionConflict(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, ctx := ktesting.NewTestContext(t)
+			ctx, logs := newBufferedLogContext(t)
 
 			var objects []runtime.Object
 			if tt.live != nil {
@@ -3157,6 +3166,10 @@ func TestUpdatePodGroupConditionConflict(t *testing.T) {
 			}
 			if got := countClientVerb(client.Actions(), "get"); got != tt.expectGets {
 				t.Errorf("Expected %d get requests, got %d", tt.expectGets, got)
+			}
+			// None of these cases is a failure: a deleted or recreated PodGroup has nothing left to update.
+			if strings.Contains(logs(), "Failed to update pod group status") {
+				t.Errorf("Expected no status update error to be reported, got logs:\n%s", logs())
 			}
 
 			podGroups, err := client.SchedulingV1beta1().PodGroups(tt.cached.Namespace).List(ctx, metav1.ListOptions{})
@@ -8959,7 +8972,7 @@ func TestUpdateCompositePodGroupConditionConflict(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, ctx := ktesting.NewTestContext(t)
+			ctx, logs := newBufferedLogContext(t)
 
 			var objects []runtime.Object
 			if tt.live != nil {
@@ -8991,6 +9004,10 @@ func TestUpdateCompositePodGroupConditionConflict(t *testing.T) {
 			if got := countClientVerb(client.Actions(), "get"); got != tt.expectGets {
 				t.Errorf("Expected %d get requests, got %d", tt.expectGets, got)
 			}
+			// None of these cases is a failure: a deleted or recreated CompositePodGroup has nothing left to update.
+			if strings.Contains(logs(), "Failed to update pod group status") {
+				t.Errorf("Expected no status update error to be reported, got logs:\n%s", logs())
+			}
 
 			compositePodGroups, err := client.SchedulingV1alpha3().CompositePodGroups(tt.cached.Namespace).List(ctx, metav1.ListOptions{})
 			if err != nil {
@@ -9007,6 +9024,110 @@ func TestUpdateCompositePodGroupConditionConflict(t *testing.T) {
 			}
 			if diff := cmp.Diff(tt.expectConditions, compositePodGroups.Items[0].Status.Conditions, cmpopts.EquateEmpty(), cmpopts.IgnoreFields(metav1.Condition{}, "LastTransitionTime")); diff != "" {
 				t.Errorf("Unexpected CompositePodGroup conditions (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+// TestUpdateScheduledConditionOfDeletedOrRecreatedPodGroup covers the unpinned Scheduled condition
+// write for a (Composite)PodGroup that is gone since the cycle scheduled it. A deleted object fails
+// the write with NotFound, which must not be reported as an error. A recreated object that is
+// already in the cache must not be written at all. Non-True writes are covered by the Conflict tests.
+func TestUpdateScheduledConditionOfDeletedOrRecreatedPodGroup(t *testing.T) {
+	scheduled := metav1.Condition{
+		Type:    schedulingapi.PodGroupInitiallyScheduled,
+		Status:  metav1.ConditionTrue,
+		Reason:  schedulingapi.PodGroupReasonScheduled,
+		Message: "All pods scheduled",
+	}
+	pgInfo := func(uid types.UID) *framework.PodGroupInfo {
+		return &framework.PodGroupInfo{GenericPodGroup: fwk.NewGenericPodGroup(versionedPodGroup(uid, "1"))}
+	}
+	cpgInfo := func(uid string) *framework.PodGroupInfo {
+		return &framework.PodGroupInfo{GenericPodGroup: fwk.NewGenericCompositePodGroup(versionedCompositePodGroup(uid, "1"))}
+	}
+
+	tests := []struct {
+		name string
+		// scheduled is the (Composite)PodGroup the cycle scheduled.
+		scheduled *framework.PodGroupInfo
+		// cached is the (Composite)PodGroup in the scheduler cache, and in the API server if live is set.
+		cached        *framework.PodGroupInfo
+		live          bool
+		resource      schema.GroupVersionResource
+		update        func(*Scheduler, context.Context, *framework.PodGroupInfo, *metav1.Condition)
+		expectPatches int
+		expectLog     string
+	}{
+		{
+			name:          "deleted PodGroup",
+			scheduled:     pgInfo("pg"),
+			cached:        pgInfo("pg"),
+			resource:      podGroupsResource,
+			update:        (*Scheduler).updatePodGroupCondition,
+			expectPatches: 1,
+			expectLog:     "Skipping pod group status update for a deleted object",
+		},
+		{
+			name:          "recreated PodGroup",
+			scheduled:     pgInfo("old"),
+			cached:        pgInfo("new"),
+			live:          true,
+			resource:      podGroupsResource,
+			update:        (*Scheduler).updatePodGroupCondition,
+			expectPatches: 0,
+			expectLog:     "Skipping pod group status update for a recreated object",
+		},
+		{
+			name:          "deleted CompositePodGroup",
+			scheduled:     cpgInfo("cpg"),
+			cached:        cpgInfo("cpg"),
+			resource:      compositePodGroupsResource,
+			update:        (*Scheduler).updateCompositePodGroupCondition,
+			expectPatches: 1,
+			expectLog:     "Skipping pod group status update for a deleted object",
+		},
+		{
+			name:          "recreated CompositePodGroup",
+			scheduled:     cpgInfo("old"),
+			cached:        cpgInfo("new"),
+			live:          true,
+			resource:      compositePodGroupsResource,
+			update:        (*Scheduler).updateCompositePodGroupCondition,
+			expectPatches: 0,
+			expectLog:     "Skipping pod group status update for a recreated object",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx, logs := newBufferedLogContext(t)
+
+			var objects []runtime.Object
+			if tt.live {
+				if pg := tt.cached.PodGroup; pg != nil {
+					objects = append(objects, pg)
+				} else {
+					objects = append(objects, tt.cached.CompositePodGroup)
+				}
+			}
+			client := clientsetfake.NewClientset(objects...)
+			patches := enforceStatusPatchPrecondition(client, tt.resource, nil)
+			cache := internalcache.New(ctx, nil, true, true)
+			cache.AddGenericPodGroup(tt.cached.GenericPodGroup)
+			sched := &Scheduler{client: client, Cache: cache}
+
+			condition := scheduled
+			tt.update(sched, ctx, tt.scheduled, &condition)
+
+			if got := len(*patches); got != tt.expectPatches {
+				t.Errorf("Expected %d status patches, got %d: %v", tt.expectPatches, got, *patches)
+			}
+			if !strings.Contains(logs(), tt.expectLog) {
+				t.Errorf("Expected log %q, got logs:\n%s", tt.expectLog, logs())
+			}
+			if strings.Contains(logs(), "Failed to update pod group status") {
+				t.Errorf("Expected no status update error to be reported, got logs:\n%s", logs())
 			}
 		})
 	}

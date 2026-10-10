@@ -28,6 +28,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -944,7 +945,8 @@ func setInitiallyScheduledCondition(conditions *[]metav1.Condition, generation i
 // writes, so a True condition written in a recent cycle may not be visible in it yet (#142677).
 // Setting True can't regress anything and is patched as is. Any other status is patched with the
 // resourceVersion it was computed from as a precondition; on a conflict the patch is recomputed
-// from the live object, which re-checks that a True condition is not regressed.
+// from the live object, which re-checks that a True condition is not regressed. Nothing is written
+// to a PodGroup that was deleted, or deleted and recreated, since the cycle scheduled it.
 func (sched *Scheduler) updatePodGroupCondition(ctx context.Context,
 	podGroupInfo *framework.PodGroupInfo, condition *metav1.Condition) {
 	logger := klog.FromContext(ctx)
@@ -954,22 +956,24 @@ func (sched *Scheduler) updatePodGroupCondition(ctx context.Context,
 	if err != nil {
 		return
 	}
+	if isRecreated(logger, podGroupInfo, pg.UID) {
+		return
+	}
 	newStatus := pg.Status.DeepCopy()
 	if !setInitiallyScheduledCondition(&newStatus.Conditions, pg.Generation, condition) {
 		return
 	}
 
 	if condition.Status == metav1.ConditionTrue {
-		if err := util.PatchPodGroupStatus(ctx, sched.client, name, namespace, &pg.Status, newStatus); err != nil {
-			utilruntime.HandleErrorWithLogger(logger, err, "Failed to update PodGroup status", "podGroup", klog.KObj(podGroupInfo))
-		}
+		err := util.PatchPodGroupStatus(ctx, sched.client, name, namespace, &pg.Status, newStatus)
+		handlePodGroupStatusUpdateError(logger, err, podGroupInfo)
 		return
 	}
 
 	// Without a resourceVersion the patch can't be pinned, so start from the live object.
-	refresh := pg.ResourceVersion == ""
+	fetchLive := pg.ResourceVersion == ""
 	err = retry.OnError(retry.DefaultBackoff, util.RetriableWithConflict, func() error {
-		if refresh {
+		if fetchLive {
 			latest, err := sched.client.SchedulingV1beta1().PodGroups(namespace).Get(ctx, name, metav1.GetOptions{})
 			if err != nil {
 				return err
@@ -980,17 +984,13 @@ func (sched *Scheduler) updatePodGroupCondition(ctx context.Context,
 				return nil
 			}
 		}
-		refresh = true
-		if uid := podGroupInfo.GetUID(); uid != "" && pg.UID != uid {
-			// The PodGroup was deleted and recreated; the condition is for the old object.
-			logger.V(4).Info("Skipping PodGroup status update for a recreated object", "podGroup", klog.KObj(podGroupInfo))
+		fetchLive = true
+		if isRecreated(logger, podGroupInfo, pg.UID) {
 			return nil
 		}
 		return util.PatchPodGroupStatusWithPrecondition(ctx, sched.client, name, namespace, pg.ResourceVersion, &pg.Status, newStatus)
 	})
-	if err != nil {
-		utilruntime.HandleErrorWithLogger(logger, err, "Failed to update PodGroup status", "podGroup", klog.KObj(podGroupInfo))
-	}
+	handlePodGroupStatusUpdateError(logger, err, podGroupInfo)
 }
 
 // updateCompositePodGroupCondition sets the given condition on a CompositePodGroup.
@@ -1004,22 +1004,24 @@ func (sched *Scheduler) updateCompositePodGroupCondition(ctx context.Context,
 	if err != nil {
 		return
 	}
+	if isRecreated(logger, podGroupInfo, cpg.UID) {
+		return
+	}
 	newStatus := cpg.Status.DeepCopy()
 	if !setInitiallyScheduledCondition(&newStatus.Conditions, cpg.Generation, condition) {
 		return
 	}
 
 	if condition.Status == metav1.ConditionTrue {
-		if err := util.PatchCompositePodGroupStatus(ctx, sched.client, name, namespace, &cpg.Status, newStatus); err != nil {
-			utilruntime.HandleErrorWithLogger(logger, err, "Failed to update CompositePodGroup status", "compositePodGroup", klog.KObj(podGroupInfo))
-		}
+		err := util.PatchCompositePodGroupStatus(ctx, sched.client, name, namespace, &cpg.Status, newStatus)
+		handlePodGroupStatusUpdateError(logger, err, podGroupInfo)
 		return
 	}
 
 	// Without a resourceVersion the patch can't be pinned, so start from the live object.
-	refresh := cpg.ResourceVersion == ""
+	fetchLive := cpg.ResourceVersion == ""
 	err = retry.OnError(retry.DefaultBackoff, util.RetriableWithConflict, func() error {
-		if refresh {
+		if fetchLive {
 			latest, err := sched.client.SchedulingV1alpha3().CompositePodGroups(namespace).Get(ctx, name, metav1.GetOptions{})
 			if err != nil {
 				return err
@@ -1030,16 +1032,36 @@ func (sched *Scheduler) updateCompositePodGroupCondition(ctx context.Context,
 				return nil
 			}
 		}
-		refresh = true
-		if uid := podGroupInfo.GetUID(); uid != "" && cpg.UID != uid {
-			// The CompositePodGroup was deleted and recreated; the condition is for the old object.
-			logger.V(4).Info("Skipping CompositePodGroup status update for a recreated object", "compositePodGroup", klog.KObj(podGroupInfo))
+		fetchLive = true
+		if isRecreated(logger, podGroupInfo, cpg.UID) {
 			return nil
 		}
 		return util.PatchCompositePodGroupStatusWithPrecondition(ctx, sched.client, name, namespace, cpg.ResourceVersion, &cpg.Status, newStatus)
 	})
-	if err != nil {
-		utilruntime.HandleErrorWithLogger(logger, err, "Failed to update CompositePodGroup status", "compositePodGroup", klog.KObj(podGroupInfo))
+	handlePodGroupStatusUpdateError(logger, err, podGroupInfo)
+}
+
+// isRecreated reports whether uid, the UID of a (Composite)PodGroup about to be written, differs
+// from the one the cycle scheduled. That means the object was deleted and recreated, so the
+// condition is for the old object and must not be written.
+func isRecreated(logger klog.Logger, podGroupInfo *framework.PodGroupInfo, uid types.UID) bool {
+	if expected := podGroupInfo.GetUID(); expected == "" || uid == expected {
+		return false
+	}
+	logger.V(4).Info("Skipping pod group status update for a recreated object", "podGroupType", podGroupInfo.GetType(), "podGroup", klog.KObj(podGroupInfo))
+	return true
+}
+
+// handlePodGroupStatusUpdateError reports err from a (Composite)PodGroup status update, if any.
+// NotFound means the object was deleted after the scheduler cache last saw it. There is
+// nothing left to update, so it is logged instead of being reported as an error.
+func handlePodGroupStatusUpdateError(logger klog.Logger, err error, podGroupInfo *framework.PodGroupInfo) {
+	switch {
+	case err == nil:
+	case apierrors.IsNotFound(err):
+		logger.V(4).Info("Skipping pod group status update for a deleted object", "podGroupType", podGroupInfo.GetType(), "podGroup", klog.KObj(podGroupInfo))
+	default:
+		utilruntime.HandleErrorWithLogger(logger, err, "Failed to update pod group status", "podGroupType", podGroupInfo.GetType(), "podGroup", klog.KObj(podGroupInfo))
 	}
 }
 
