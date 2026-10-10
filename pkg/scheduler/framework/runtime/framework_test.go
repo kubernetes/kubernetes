@@ -5671,3 +5671,247 @@ func newQueuedPodGroupInfoForTest(ns, name string) *framework.QueuedPodGroupInfo
 		},
 	}
 }
+
+type fakeDefaultFilterPlugin struct {
+	name      string
+	evalCount int
+}
+
+func (p *fakeDefaultFilterPlugin) Name() string { return p.name }
+func (p *fakeDefaultFilterPlugin) Filter(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) *fwk.Status {
+	p.evalCount++
+	return nil
+}
+
+type fakeNodeLocalFilterPlugin struct {
+	name        string
+	isNodeLocal bool
+	evalCount   int
+	statusCode  fwk.Code
+}
+
+var _ fwk.NodeLocalFilterPlugin = &fakeNodeLocalFilterPlugin{}
+
+func (p *fakeNodeLocalFilterPlugin) Name() string      { return p.name }
+func (p *fakeNodeLocalFilterPlugin) IsNodeLocal() bool { return p.isNodeLocal }
+func (p *fakeNodeLocalFilterPlugin) Filter(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) *fwk.Status {
+	p.evalCount++
+	if p.statusCode != fwk.Success {
+		return fwk.NewStatus(p.statusCode, "node-local filter failed")
+	}
+	return nil
+}
+
+func TestRunNodeLocalFilterPlugins(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	defaultPl := &fakeDefaultFilterPlugin{name: "DefaultFilter"}
+	nodeLocalPl := &fakeNodeLocalFilterPlugin{name: "NodeLocalFilter", isNodeLocal: true, statusCode: fwk.Success}
+	crossNodePl := &fakeNodeLocalFilterPlugin{name: "CrossNodeFilter", isNodeLocal: false, statusCode: fwk.Success}
+
+	reg := Registry{
+		queueSortPlugin: newQueueSortPlugin,
+		bindPlugin:      newBindPlugin,
+		defaultPl.Name(): func(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
+			return defaultPl, nil
+		},
+		nodeLocalPl.Name(): func(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
+			return nodeLocalPl, nil
+		},
+		crossNodePl.Name(): func(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
+			return crossNodePl, nil
+		},
+	}
+
+	cfgPls := &config.Plugins{}
+	cfgPls.Filter.Enabled = append(
+		cfgPls.Filter.Enabled,
+		config.Plugin{Name: defaultPl.Name()},
+		config.Plugin{Name: nodeLocalPl.Name()},
+		config.Plugin{Name: crossNodePl.Name()},
+	)
+	profile := config.KubeSchedulerProfile{
+		SchedulerName: "test-node-local-profile",
+		Plugins:       cfgPls,
+	}
+
+	f, err := newFrameworkWithQueueSortAndBind(ctx, reg, profile, WithSnapshotSharedLister(cache.NewEmptySnapshot()))
+	if err != nil {
+		t.Fatalf("failed to create framework: %v", err)
+	}
+	defer func() { _ = f.Close() }()
+
+	nodeInfo := framework.NewNodeInfo()
+	nodeInfo.SetNode(&v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node1"}})
+
+	// 1. RunFilterPlugins with FilterPluginModeNodeLocalOnly runs only plugins with IsNodeLocal() == true;
+	// plugins not implementing NodeLocalFilterPlugin default to cross-node (IsNodeLocal() == false).
+	state := framework.NewCycleState()
+	state.SetFilterPluginExecutionMode(fwk.FilterPluginModeNodeLocalOnly)
+	status := f.RunFilterPlugins(ctx, state, pod, nodeInfo)
+	if !status.IsSuccess() {
+		t.Fatalf("expected success, got %v", status)
+	}
+	if defaultPl.evalCount != 0 {
+		t.Errorf("expected defaultPl (not implementing NodeLocalFilterPlugin) not to be called, got %d", defaultPl.evalCount)
+	}
+	if nodeLocalPl.evalCount != 1 {
+		t.Errorf("expected nodeLocalPl (IsNodeLocal()=true) to be called once, got %d", nodeLocalPl.evalCount)
+	}
+	if crossNodePl.evalCount != 0 {
+		t.Errorf("expected crossNodePl (IsNodeLocal()=false) not to be called, got %d", crossNodePl.evalCount)
+	}
+
+	// 2. SkipFilterPlugins is respected
+	state.SetSkipFilterPlugins(sets.New(nodeLocalPl.Name()))
+	status = f.RunFilterPlugins(ctx, state, pod, nodeInfo)
+	if !status.IsSuccess() {
+		t.Fatalf("expected success when skipped, got %v", status)
+	}
+	if nodeLocalPl.evalCount != 1 {
+		t.Errorf("expected nodeLocalPl to be skipped, got %d", nodeLocalPl.evalCount)
+	}
+
+	// 3. Setting FilterPluginModeAll (default) runs all filter plugins
+	stateAll := framework.NewCycleState()
+	stateAll.SetFilterPluginExecutionMode(fwk.FilterPluginModeAll)
+	status = f.RunFilterPlugins(ctx, stateAll, pod, nodeInfo)
+	if !status.IsSuccess() {
+		t.Fatalf("expected success when running all filter plugins, got %v", status)
+	}
+	if defaultPl.evalCount != 1 {
+		t.Errorf("expected defaultPl evalCount=1, got %d", defaultPl.evalCount)
+	}
+	if nodeLocalPl.evalCount != 2 {
+		t.Errorf("expected nodeLocalPl evalCount=2, got %d", nodeLocalPl.evalCount)
+	}
+	if crossNodePl.evalCount != 1 {
+		t.Errorf("expected crossNodePl evalCount=1, got %d", crossNodePl.evalCount)
+	}
+
+	// 4. Setting FilterPluginModeNonNodeLocalOnly skips plugins with IsNodeLocal() == true
+	stateSkipLocal := framework.NewCycleState()
+	stateSkipLocal.SetFilterPluginExecutionMode(fwk.FilterPluginModeNonNodeLocalOnly)
+	status = f.RunFilterPlugins(ctx, stateSkipLocal, pod, nodeInfo)
+	if !status.IsSuccess() {
+		t.Fatalf("expected success when skipping node-local filter plugins, got %v", status)
+	}
+	if defaultPl.evalCount != 2 {
+		t.Errorf("expected defaultPl evalCount=2, got %d", defaultPl.evalCount)
+	}
+	if nodeLocalPl.evalCount != 2 {
+		t.Errorf("expected nodeLocalPl to be skipped (evalCount=2), got %d", nodeLocalPl.evalCount)
+	}
+	if crossNodePl.evalCount != 2 {
+		t.Errorf("expected crossNodePl evalCount=2, got %d", crossNodePl.evalCount)
+	}
+}
+
+type fakePreFilterWithExtensionsPlugin struct {
+	name          string
+	withExt       bool
+	preFilterCode fwk.Code
+	addPodCalls   int
+	rmPodCalls    int
+}
+
+func (p *fakePreFilterWithExtensionsPlugin) Name() string { return p.name }
+func (p *fakePreFilterWithExtensionsPlugin) PreFilter(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodes []fwk.NodeInfo) (*fwk.PreFilterResult, *fwk.Status) {
+	return nil, fwk.NewStatus(p.preFilterCode)
+}
+func (p *fakePreFilterWithExtensionsPlugin) PreFilterExtensions() fwk.PreFilterExtensions {
+	if !p.withExt {
+		return nil
+	}
+	return p
+}
+func (p *fakePreFilterWithExtensionsPlugin) AddPod(ctx context.Context, state fwk.CycleState, podToSchedule *v1.Pod, podInfoToAdd fwk.PodInfo, nodeInfo fwk.NodeInfo) *fwk.Status {
+	p.addPodCalls++
+	return nil
+}
+func (p *fakePreFilterWithExtensionsPlugin) RemovePod(ctx context.Context, state fwk.CycleState, podToSchedule *v1.Pod, podInfoToRemove fwk.PodInfo, nodeInfo fwk.NodeInfo) *fwk.Status {
+	p.rmPodCalls++
+	return nil
+}
+
+func TestSkipAllPreFilterExtensions(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	noExtPl := &fakePreFilterWithExtensionsPlugin{name: "NoExtPreFilter", withExt: false, preFilterCode: fwk.Success}
+	extPl := &fakePreFilterWithExtensionsPlugin{name: "ExtPreFilter", withExt: true, preFilterCode: fwk.Skip}
+
+	reg := Registry{
+		queueSortPlugin: newQueueSortPlugin,
+		bindPlugin:      newBindPlugin,
+		noExtPl.Name(): func(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
+			return noExtPl, nil
+		},
+		extPl.Name(): func(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
+			return extPl, nil
+		},
+	}
+
+	cfgPls := &config.Plugins{}
+	cfgPls.PreFilter.Enabled = append(
+		cfgPls.PreFilter.Enabled,
+		config.Plugin{Name: noExtPl.Name()},
+		config.Plugin{Name: extPl.Name()},
+	)
+	profile := config.KubeSchedulerProfile{
+		SchedulerName: "test-skip-prefilter-ext-profile",
+		Plugins:       cfgPls,
+	}
+
+	f, err := newFrameworkWithQueueSortAndBind(ctx, reg, profile, WithSnapshotSharedLister(cache.NewEmptySnapshot()))
+	if err != nil {
+		t.Fatalf("failed to create framework: %v", err)
+	}
+	defer func() { _ = f.Close() }()
+
+	nodeInfo := framework.NewNodeInfo()
+	nodeInfo.SetNode(&v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node1"}})
+	pi, _ := framework.NewPodInfo(pod)
+
+	// 1. When all PreFilter plugins with PreFilterExtensions() != nil return Skip,
+	// ShouldSkipAllPreFilterExtensions() is true.
+	stateSkip := framework.NewCycleState()
+	if _, status, _ := f.RunPreFilterPlugins(ctx, stateSkip, pod); !status.IsSuccess() {
+		t.Fatalf("unexpected PreFilter status: %v", status)
+	}
+	if !stateSkip.ShouldSkipAllPreFilterExtensions() {
+		t.Errorf("expected ShouldSkipAllPreFilterExtensions() to be true when all PreFilterExtensions plugins returned Skip")
+	}
+	if status := f.RunPreFilterExtensionAddPod(ctx, stateSkip, pod, pi, nodeInfo); !status.IsSuccess() {
+		t.Fatalf("unexpected AddPod status: %v", status)
+	}
+	if status := f.RunPreFilterExtensionRemovePod(ctx, stateSkip, pod, pi, nodeInfo); !status.IsSuccess() {
+		t.Fatalf("unexpected RemovePod status: %v", status)
+	}
+	if extPl.addPodCalls != 0 || extPl.rmPodCalls != 0 {
+		t.Errorf("expected 0 AddPod/RemovePod calls when skipped, got add=%d rm=%d", extPl.addPodCalls, extPl.rmPodCalls)
+	}
+
+	// 2. When a PreFilter plugin with PreFilterExtensions() != nil returns Success,
+	// ShouldSkipAllPreFilterExtensions() is false and AddPod/RemovePod are invoked.
+	extPl.preFilterCode = fwk.Success
+	stateActive := framework.NewCycleState()
+	if _, status, _ := f.RunPreFilterPlugins(ctx, stateActive, pod); !status.IsSuccess() {
+		t.Fatalf("unexpected PreFilter status: %v", status)
+	}
+	if stateActive.ShouldSkipAllPreFilterExtensions() {
+		t.Errorf("expected ShouldSkipAllPreFilterExtensions() to be false when an active PreFilterExtensions plugin exists")
+	}
+	if status := f.RunPreFilterExtensionAddPod(ctx, stateActive, pod, pi, nodeInfo); !status.IsSuccess() {
+		t.Fatalf("unexpected AddPod status: %v", status)
+	}
+	if status := f.RunPreFilterExtensionRemovePod(ctx, stateActive, pod, pi, nodeInfo); !status.IsSuccess() {
+		t.Fatalf("unexpected RemovePod status: %v", status)
+	}
+	if extPl.addPodCalls != 1 || extPl.rmPodCalls != 1 {
+		t.Errorf("expected 1 AddPod and 1 RemovePod call, got add=%d rm=%d", extPl.addPodCalls, extPl.rmPodCalls)
+	}
+}

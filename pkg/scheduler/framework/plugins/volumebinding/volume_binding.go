@@ -81,6 +81,7 @@ type VolumeBinding struct {
 
 var _ fwk.PreFilterPlugin = &VolumeBinding{}
 var _ fwk.FilterPlugin = &VolumeBinding{}
+var _ fwk.NodeLocalFilterPlugin = &VolumeBinding{}
 var _ fwk.ReservePlugin = &VolumeBinding{}
 var _ fwk.PreBindPlugin = &VolumeBinding{}
 var _ fwk.PreScorePlugin = &VolumeBinding{}
@@ -94,6 +95,10 @@ const Name = names.VolumeBinding
 // Name returns name of the plugin. It is used in logs, etc.
 func (pl *VolumeBinding) Name() string {
 	return Name
+}
+
+func (pl *VolumeBinding) IsNodeLocal() bool {
+	return true
 }
 
 // Feasibility and scoring based on the non-synthetic volume sources.
