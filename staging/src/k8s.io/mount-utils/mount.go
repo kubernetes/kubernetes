@@ -22,9 +22,11 @@ package mount
 import (
 	"fmt"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
+	"k8s.io/apimachinery/pkg/util/sets"
 	utilexec "k8s.io/utils/exec"
 )
 
@@ -264,8 +266,7 @@ func GetDeviceNameFromMount(mounter Interface, mountPath string) (string, int, e
 	}
 
 	// Find the device name.
-	// FIXME if multiple devices mounted on the same mount path, only the first one is returned.
-	device := ""
+	devices := sets.New[string]()
 	// If mountPath is symlink, need get its target path.
 	slTarget, err := filepath.EvalSymlinks(mountPath)
 	if err != nil {
@@ -273,9 +274,17 @@ func GetDeviceNameFromMount(mounter Interface, mountPath string) (string, int, e
 	}
 	for i := range mps {
 		if mps[i].Path == slTarget {
-			device = mps[i].Device
-			break
+			devices.Insert(mps[i].Device)
 		}
+	}
+	if len(devices) > 1 {
+		deviceList := sets.List(devices)
+		sort.Strings(deviceList)
+		return "", 0, fmt.Errorf("multiple devices mounted on %q: %s", slTarget, strings.Join(deviceList, ", "))
+	}
+	device := ""
+	if len(devices) == 1 {
+		device = sets.List(devices)[0]
 	}
 
 	// Find all references to the device.
