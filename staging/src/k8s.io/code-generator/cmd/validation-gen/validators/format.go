@@ -71,6 +71,7 @@ var (
 	resourcePoolNameValidator           = types.Name{Package: libValidationPkg, Name: "ResourcePoolName"}
 	shortNameValidator                  = types.Name{Package: libValidationPkg, Name: "ShortName"}
 	uuidValidator                       = types.Name{Package: libValidationPkg, Name: "UUID"}
+	conditionReasonValidator            = types.Name{Package: libValidationPkg, Name: "ConditionReason"}
 )
 
 func (ftv *formatTagValidator) GetValidations(context Context, tag codetags.Tag) (Validations, error) {
@@ -153,6 +154,9 @@ func getBuiltInFormatValidationFunction(format string) (FunctionGen, error) {
 	case "k8s-uuid":
 		return Function(formatTagName, DefaultFlags, uuidValidator).
 			WithEmits(Emission{field.ErrorTypeInvalid, "format=k8s-uuid", ""}), nil
+	case "k8s-condition-reason":
+		return Function(formatTagName, DefaultFlags, conditionReasonValidator).
+			WithEmits(Emission{field.ErrorTypeInvalid, "format=k8s-condition-reason", ""}), nil
 	}
 	// TODO: Flesh out the list of validation functions
 

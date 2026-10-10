@@ -66,6 +66,11 @@ func init() {
 			"metadata.uid": {
 				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
 			},
+			"status.storageHealth[*].healthConditions[*].reason": {
+				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-condition-reason"},
+				{ErrorType: "FieldValueRequired"},
+				{ErrorType: "FieldValueTooLong", Origin: "maxBytes"},
+			},
 			"status.storageHealth[*].name": {
 				{ErrorType: "FieldValueRequired"},
 			},
