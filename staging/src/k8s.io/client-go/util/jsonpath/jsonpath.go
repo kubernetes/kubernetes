@@ -324,7 +324,7 @@ func (j *JSONPath) evalArray(input []reflect.Value, node *ArrayNode) ([]reflect.
 				return input, fmt.Errorf("starting index %d is greater than ending index %d", params[0].Value, params[1].Value)
 			}
 		} else {
-			return result, nil
+			continue
 		}
 
 		value = value.Slice(params[0].Value, params[1].Value)
