@@ -19,6 +19,7 @@ package daemon
 import (
 	"context"
 	"fmt"
+	"maps"
 	"math/rand"
 	"reflect"
 	"strings"
@@ -27,6 +28,7 @@ import (
 
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -1068,5 +1070,109 @@ func TestControlledHistories(t *testing.T) {
 			}
 			t.Logf("Test case: %s done", c.name)
 		}
+	}
+}
+
+func TestDedupCurHistories(t *testing.T) {
+	const (
+		keepHash = "keep-hash"
+		dupHash  = "dup-hash"
+		oldHash  = "old-hash"
+	)
+
+	newDedupPod := func(name, nodeName, hash string, ds *apps.DaemonSet) *v1.Pod {
+		pod := newPod(name, nodeName, maps.Clone(simpleDaemonSetLabel), nil)
+		pod.Labels[apps.DefaultDaemonSetUniqueLabelKey] = hash
+		pod.OwnerReferences = []metav1.OwnerReference{*metav1.NewControllerRef(ds, controllerKind)}
+		return pod
+	}
+
+	cases := []struct {
+		name     string
+		keepRev  int64
+		dupRev   int64
+		wantKeep string
+	}{
+		{"duplicate has a lower revision", 3, 2, "keep"},
+		{"duplicate has an equal revision", 2, 2, "dup"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			ds := newDaemonSet("foo")
+			data := []byte(`{"spec":{"template":{"$patch":"replace"}}}`)
+
+			keepCur := newControllerRevision(ds.Name+"-keep", ds.Namespace,
+				map[string]string{apps.DefaultDaemonSetUniqueLabelKey: keepHash},
+				[]metav1.OwnerReference{*metav1.NewControllerRef(ds, controllerKind)})
+			keepCur.Revision = c.keepRev
+			keepCur.Data.Raw = data
+
+			dup := newControllerRevision(ds.Name+"-dup", ds.Namespace,
+				map[string]string{apps.DefaultDaemonSetUniqueLabelKey: dupHash},
+				[]metav1.OwnerReference{*metav1.NewControllerRef(ds, controllerKind)})
+			dup.Revision = c.dupRev
+			dup.Data.Raw = data
+
+			podKeep := newDedupPod("keep-pod", "node-1", keepHash, ds)
+			podDup := newDedupPod("dup-pod", "node-2", dupHash, ds)
+			podOld := newDedupPod("old-pod", "node-3", oldHash, ds)
+
+			manager, _, client, err := newTestController(ctx, keepCur, dup, podKeep, podDup, podOld)
+			if err != nil {
+				t.Fatalf("error creating DaemonSets controller: %v", err)
+			}
+			manager.dsStore.Add(ds)
+			manager.podStore.Add(podKeep)
+			manager.podStore.Add(podDup)
+			manager.podStore.Add(podOld)
+
+			got, err := manager.dedupCurHistories(ctx, ds, []*apps.ControllerRevision{keepCur, dup})
+			if err != nil {
+				t.Fatalf("unexpected error calling dedupCurHistories: %v", err)
+			}
+
+			var keptLabel, deletedName, deletedLabel string
+			if c.wantKeep == "keep" {
+				if got.Name != keepCur.Name {
+					t.Fatalf("expected history %q to be kept, got %q", keepCur.Name, got.Name)
+				}
+				keptLabel, deletedName, deletedLabel = keepHash, dup.Name, dupHash
+			} else {
+				if got.Name != dup.Name {
+					t.Fatalf("expected history %q to be kept, got %q", dup.Name, got.Name)
+				}
+				keptLabel, deletedName, deletedLabel = dupHash, keepCur.Name, keepHash
+			}
+
+			// The duplicate must be deleted while the kept history survives.
+			if _, err := client.AppsV1().ControllerRevisions(ds.Namespace).Get(ctx, deletedName, metav1.GetOptions{}); !errors.IsNotFound(err) {
+				t.Errorf("expected history %q to be deleted, got err=%v", deletedName, err)
+			}
+			if _, err := client.AppsV1().ControllerRevisions(ds.Namespace).Get(ctx, got.Name, metav1.GetOptions{}); err != nil {
+				t.Errorf("expected history %q to survive: %v", got.Name, err)
+			}
+
+			// Only pods owned by the deleted duplicate may be relabeled. In
+			// particular pods from older histories must never be touched,
+			// otherwise the daemonset rolling update never replaces them.
+			for podName, startHash := range map[string]string{
+				podKeep.Name: keepHash,
+				podDup.Name:  dupHash,
+				podOld.Name:  oldHash,
+			} {
+				want := startHash
+				if startHash == deletedLabel {
+					want = keptLabel
+				}
+				pod, err := client.CoreV1().Pods(ds.Namespace).Get(ctx, podName, metav1.GetOptions{})
+				if err != nil {
+					t.Fatalf("unexpected error getting pod %q: %v", podName, err)
+				}
+				if got := pod.Labels[apps.DefaultDaemonSetUniqueLabelKey]; got != want {
+					t.Errorf("pod %q: expected unique label %q, got %q", podName, want, got)
+				}
+			}
+		})
 	}
 }
