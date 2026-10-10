@@ -18,6 +18,7 @@ package json
 
 import (
 	"encoding/json"
+	jsonv2 "encoding/json/v2"
 	"io"
 	"strconv"
 
@@ -68,7 +69,7 @@ func identifier(options SerializerOptions) runtime.Identifier {
 		"pretty": strconv.FormatBool(options.Pretty),
 		"strict": strconv.FormatBool(options.Strict),
 	}
-	identifier, err := json.Marshal(result)
+	identifier, err := jsonv2.Marshal(result, json.DefaultOptionsV1())
 	if err != nil {
 		//nolint:logcheck // Should not be reached.
 		klog.Fatalf("Failed marshaling identifier for json Serializer: %v", err)
@@ -226,7 +227,7 @@ func (s *Serializer) Encode(obj runtime.Object, w io.Writer) error {
 
 func (s *Serializer) doEncode(obj runtime.Object, w io.Writer) error {
 	if s.options.Yaml {
-		json, err := json.Marshal(obj)
+		json, err := jsonv2.Marshal(obj, json.DefaultOptionsV1())
 		if err != nil {
 			return err
 		}
