@@ -130,7 +130,7 @@ func (r *Replay) validateList(req Request, resp Response) error {
 		return fmt.Errorf("resource version %d not found in history", respRV)
 	}
 	expected := state.list(req.Key, req.List.Options)
-	if !reflect.DeepEqual(expected, resp) {
+	if !state.equalListResponse(req.Key, req.List.Options, expected, resp) {
 		return fmt.Errorf("list response at RV %d differs (-want +got):\n%s", respRV, cmp.Diff(expected, resp))
 	}
 	return nil
