@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"path"
 	"strings"
 	"sync"
 	"testing"
@@ -47,16 +48,16 @@ import (
 	"k8s.io/utils/ptr"
 )
 
-func RunTestWatch(ctx context.Context, t *testing.T, store storage.Interface) {
-	testWatch(ctx, t, store, false)
-	testWatch(ctx, t, store, true)
+func RunTestWatch(ctx context.Context, t *testing.T, store storage.Interface, watchCacheEnabled bool) {
+	testWatch(ctx, t, store, false, watchCacheEnabled)
+	testWatch(ctx, t, store, true, watchCacheEnabled)
 }
 
 // It tests that
 // - first occurrence of objects should notify Add event
 // - update should trigger Modified event
 // - update that gets filtered should trigger Deleted event
-func testWatch(ctx context.Context, t *testing.T, store storage.Interface, recursive bool) {
+func testWatch(ctx context.Context, t *testing.T, store storage.Interface, recursive, watchCacheEnabled bool) {
 	basePod := &example.Pod{
 		ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 		Spec:       example.PodSpec{NodeName: ""},
@@ -72,13 +73,7 @@ func testWatch(ctx context.Context, t *testing.T, store storage.Interface, recur
 		return result
 	}
 
-	tests := []struct {
-		name       string
-		namespace  string
-		key        string
-		pred       storage.SelectionPredicate
-		watchTests []*testWatchStruct
-	}{{
+	tests := []watchTestCase{{
 		name:       "create a key",
 		namespace:  fmt.Sprintf("test-ns-1-%t", recursive),
 		watchTests: []*testWatchStruct{{basePod, true, watch.Added}},
@@ -130,73 +125,189 @@ func testWatch(ctx context.Context, t *testing.T, store storage.Interface, recur
 				return labels.Set(pod.Labels), nil, nil
 			},
 		},
+	}, {
+		name:                        "watch without previous values",
+		namespace:                   fmt.Sprintf("test-ns-6-%t", recursive),
+		pred:                        storage.Everything,
+		watchWithoutPrevKV:          true,
+		expectedWatchError:          nil,
+		expectedWatchErrorForCacher: fmt.Errorf("watchWithoutPrevKV is not supported by the cacher"),
+		watchTests: []*testWatchStruct{
+			{selectedPod(basePod), true, watch.Added},
+			{selectedPod(basePodAssigned), true, watch.Modified},
+			{nil, true, watch.Deleted},
+		},
+	}, {
+		name:                        "watch without previous values with a field selector",
+		namespace:                   fmt.Sprintf("test-ns-7-%t", recursive),
+		watchWithoutPrevKV:          true,
+		expectedWatchError:          errors.NewInternalError(fmt.Errorf("watchWithoutPrevKV requires an empty predicate")),
+		expectedWatchErrorForCacher: fmt.Errorf("watchWithoutPrevKV is not supported by the cacher"),
+		pred: storage.SelectionPredicate{
+			Label: labels.Everything(),
+			Field: fields.OneTermEqualSelector("spec.nodeName", "bar"),
+			GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, error) {
+				return nil, fields.Set{"spec.nodeName": obj.(*example.Pod).Spec.NodeName}, nil
+			},
+		},
+	}, {
+		name:                        "watch without previous values with a label selector",
+		namespace:                   fmt.Sprintf("test-ns-8-%t", recursive),
+		watchWithoutPrevKV:          true,
+		expectedWatchError:          errors.NewInternalError(fmt.Errorf("watchWithoutPrevKV requires an empty predicate")),
+		expectedWatchErrorForCacher: fmt.Errorf("watchWithoutPrevKV is not supported by the cacher"),
+		pred: storage.SelectionPredicate{
+			Label: labels.SelectorFromSet(labels.Set{"select": "true"}),
+			Field: fields.Everything(),
+			GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, error) {
+				return labels.Set(obj.(*example.Pod).Labels), nil, nil
+			},
+		},
 	}}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			watchKey := fmt.Sprintf("/pods/%s", tt.namespace)
-			key := watchKey + "/foo"
-			if !recursive {
-				watchKey = key
+			if watchCacheEnabled {
+				tt.expectedWatchError = tt.expectedWatchErrorForCacher
 			}
+			testWatchCase(ctx, t, store, recursive, tt)
+		})
+	}
+}
 
-			// Get the current RV from which we can start watching.
-			out := &example.PodList{}
-			if err := store.GetList(ctx, watchKey, storage.ListOptions{ResourceVersion: "", Predicate: tt.pred, Recursive: recursive}, out); err != nil {
-				t.Fatalf("List failed: %v", err)
-			}
+type watchTestCase struct {
+	name                        string
+	namespace                   string
+	pred                        storage.SelectionPredicate
+	watchWithoutPrevKV          bool
+	expectFullDeleteObject      bool
+	expectedWatchError          error
+	expectedWatchErrorForCacher error
+	expectedErrorMessage        string
+	watchTests                  []*testWatchStruct
+}
 
-			w, err := store.Watch(ctx, watchKey, storage.ListOptions{ResourceVersion: out.ResourceVersion, Predicate: tt.pred, Recursive: recursive})
-			if err != nil {
-				t.Fatalf("Watch failed: %v", err)
-			}
+func testWatchCase(ctx context.Context, t *testing.T, store storage.Interface, recursive bool, tt watchTestCase) {
+	t.Helper()
+	watchKey := path.Join("/pods", tt.namespace)
+	key := watchKey + "/foo"
+	if !recursive {
+		watchKey = key
+	}
 
-			// Create a pod in a different namespace first to ensure
-			// that its corresponding event will not be propagated.
-			badKey := fmt.Sprintf("/pods/%s-bad/foo", tt.namespace)
-			badOut := &example.Pod{}
-			err = store.GuaranteedUpdate(ctx, badKey, badOut, true, nil, storage.SimpleUpdate(
+	// Get the current RV from which we can start watching.
+	out := &example.PodList{}
+	if err := store.GetList(ctx, watchKey, storage.ListOptions{ResourceVersion: "", Predicate: tt.pred, Recursive: recursive}, out); err != nil {
+		t.Fatalf("List failed: %v", err)
+	}
+
+	w, err := store.Watch(ctx, watchKey, storage.ListOptions{
+		ResourceVersion: out.ResourceVersion, Predicate: tt.pred, Recursive: recursive, WatchWithoutPrevKV: tt.watchWithoutPrevKV,
+	})
+	if w != nil {
+		t.Cleanup(w.Stop)
+	}
+	if tt.expectedWatchError != nil {
+		require.EqualError(t, err, tt.expectedWatchError.Error())
+		require.Nil(t, w)
+		require.Equal(t, errors.IsInternalError(tt.expectedWatchError), errors.IsInternalError(err), "unexpected watch error type")
+		return
+	}
+	if err != nil {
+		t.Fatalf("Watch failed: %v", err)
+	}
+
+	if tt.namespace != "" {
+		// Create a pod in a different namespace first to ensure
+		// that its corresponding event will not be propagated.
+		badKey := fmt.Sprintf("/pods/%s-bad/foo", tt.namespace)
+		badOut := &example.Pod{}
+		err = store.GuaranteedUpdate(ctx, badKey, badOut, true, nil, storage.SimpleUpdate(
+			func(runtime.Object) (runtime.Object, error) {
+				obj := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: fmt.Sprintf("%s-bad", tt.namespace)}}
+				return obj, nil
+			}), nil)
+		if err != nil {
+			t.Fatalf("GuaranteedUpdate of bad pod failed: %v", err)
+		}
+	}
+
+	var prevObj *example.Pod
+	for _, watchTest := range tt.watchTests {
+		out := &example.Pod{}
+		if watchTest.obj != nil {
+			err := store.GuaranteedUpdate(ctx, key, out, true, nil, storage.SimpleUpdate(
 				func(runtime.Object) (runtime.Object, error) {
-					obj := basePod.DeepCopy()
-					obj.Namespace = fmt.Sprintf("%s-bad", tt.namespace)
+					obj := watchTest.obj.DeepCopy()
+					obj.Namespace = tt.namespace
 					return obj, nil
 				}), nil)
 			if err != nil {
-				t.Fatalf("GuaranteedUpdate of bad pod failed: %v", err)
+				t.Fatalf("GuaranteedUpdate failed: %v", err)
 			}
-
-			var prevObj *example.Pod
-			for _, watchTest := range tt.watchTests {
-				out := &example.Pod{}
-				if watchTest.obj != nil {
-					err := store.GuaranteedUpdate(ctx, key, out, true, nil, storage.SimpleUpdate(
-						func(runtime.Object) (runtime.Object, error) {
-							obj := watchTest.obj.DeepCopy()
-							obj.Namespace = tt.namespace
-							return obj, nil
-						}), nil)
-					if err != nil {
-						t.Fatalf("GuaranteedUpdate failed: %v", err)
-					}
-				} else {
-					err := store.Delete(ctx, key, out, nil, storage.ValidateAllObjectFunc, nil, storage.DeleteOptions{})
-					if err != nil {
-						t.Fatalf("Delete failed: %v", err)
-					}
-				}
-				if watchTest.expectEvent {
-					expectObj := out
-					if watchTest.watchType == watch.Deleted {
-						expectObj = prevObj
-						expectObj.ResourceVersion = out.ResourceVersion
-					}
-					testCheckResult(t, w, watch.Event{Type: watchTest.watchType, Object: expectObj})
-				}
-				prevObj = out
+		} else {
+			err := store.Delete(ctx, key, out, nil, storage.ValidateAllObjectFunc, nil, storage.DeleteOptions{})
+			if err != nil {
+				t.Fatalf("Delete failed: %v", err)
 			}
-			w.Stop()
-			testCheckStop(t, w)
-		})
+		}
+		if watchTest.expectEvent {
+			expectObj := out
+			if watchTest.watchType == watch.Deleted {
+				expectObj = prevObj
+				expectObj.ResourceVersion = out.ResourceVersion
+				if tt.watchWithoutPrevKV && !tt.expectFullDeleteObject {
+					expectObj = &example.Pod{ObjectMeta: metav1.ObjectMeta{
+						Name: prevObj.Name, Namespace: prevObj.Namespace, ResourceVersion: out.ResourceVersion,
+					}}
+				}
+			}
+			if watchTest.watchType == watch.Error {
+				testCheckResultFunc(t, w, func(actualEvent watch.Event) {
+					require.Equal(t, watch.Error, actualEvent.Type)
+					err := errors.FromObject(actualEvent.Object)
+					require.True(t, errors.IsInternalError(err), "expected an internal error, got %v", err)
+					require.ErrorContains(t, err, tt.expectedErrorMessage)
+				})
+			} else {
+				testCheckResult(t, w, watch.Event{Type: watchTest.watchType, Object: expectObj})
+			}
+		}
+		prevObj = out
 	}
+	w.Stop()
+	testCheckStop(t, w)
+}
+
+func RunTestWatchWithoutPrevKV(ctx context.Context, t *testing.T, store storage.Interface, recorder *WatchRecorder, namespace string, expectPrevKV bool) {
+	pod := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Labels: map[string]string{"app": "test"}}}
+	updatedPod := pod.DeepCopy()
+	updatedPod.Spec.NodeName = "bar"
+	testWatchCase(ctx, t, store, true, watchTestCase{
+		namespace:              namespace,
+		pred:                   storage.Everything,
+		watchWithoutPrevKV:     true,
+		expectFullDeleteObject: expectPrevKV,
+		watchTests: []*testWatchStruct{
+			{pod, true, watch.Added},
+			{updatedPod, true, watch.Modified},
+			{nil, true, watch.Deleted},
+		},
+	})
+	requests := recorder.PrevKVRequests()
+	require.Len(t, requests, 1)
+	require.Equal(t, expectPrevKV, requests[0], "etcd watch PrevKV option")
+}
+
+func RunTestWatchWithoutPrevKVReverseError(ctx context.Context, t *testing.T, store storage.Interface, wantErr error) {
+	pod := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
+	testWatchCase(ctx, t, store, true, watchTestCase{
+		namespace: "ns", pred: storage.Everything,
+		watchWithoutPrevKV: true, expectedErrorMessage: wantErr.Error(),
+		watchTests: []*testWatchStruct{
+			{pod, true, watch.Added},
+			{nil, true, watch.Error},
+		},
+	})
 }
 
 // RunTestWatchFromZero tests that

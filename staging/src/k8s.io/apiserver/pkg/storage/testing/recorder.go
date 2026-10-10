@@ -59,6 +59,31 @@ func (r *KVRecorder) GetStreamReadsAndReset() uint64 {
 	return atomic.SwapUint64(&r.streamReads, 0)
 }
 
+type WatchRecorder struct {
+	clientv3.Watcher
+
+	mux    sync.Mutex
+	prevKV []bool
+}
+
+func NewWatchRecorder(watcher clientv3.Watcher) *WatchRecorder {
+	return &WatchRecorder{Watcher: watcher}
+}
+
+func (r *WatchRecorder) Watch(ctx context.Context, key string, opts ...clientv3.OpOption) clientv3.WatchChan {
+	op := clientv3.OpGet(key, opts...)
+	r.mux.Lock()
+	r.prevKV = append(r.prevKV, op.IsPrevKV())
+	r.mux.Unlock()
+	return r.Watcher.Watch(ctx, key, opts...)
+}
+
+func (r *WatchRecorder) PrevKVRequests() []bool {
+	r.mux.Lock()
+	defer r.mux.Unlock()
+	return append([]bool(nil), r.prevKV...)
+}
+
 type KubernetesRecorder struct {
 	kubernetes.Interface
 
