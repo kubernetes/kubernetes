@@ -253,18 +253,7 @@ func (s *Model) validCacherContinue(key string, opts storage.ListOptions, expCon
 		items, err := s.listItems(key, opts)
 		return err == nil && int64(len(items)) == opts.Predicate.Limit
 	}
-	// Cacher passes the raw key instead of preparedKey to storage.PrepareContinueToken,
-	// so recursive lists on a key without a trailing slash encode StartKey with a leading slash.
-	preparedKey, err := storage.PrepareKey("", key, opts.Recursive)
-	if err != nil {
-		return false
-	}
-	fromKey, rv, err := storage.DecodeContinue(expContinue, preparedKey)
-	if err != nil {
-		return false
-	}
-	cacherContinue, err := storage.EncodeContinue(fromKey, key, rv)
-	return err == nil && outContinue == cacherContinue
+	return false
 }
 
 func (s *Model) listResponseRV(output Response) (uint64, bool) {
