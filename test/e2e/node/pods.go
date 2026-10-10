@@ -444,6 +444,7 @@ var _ = SIGDescribe("Pods Extended (pod generation)", func() {
 			ginkgo.By("submitting the pod to kubernetes")
 			pod = podClient.CreateSync(ctx, pod)
 			gomega.Expect(pod.Generation).To(gomega.BeEquivalentTo(1))
+			framework.ExpectNoError(e2epod.WaitForPodObservedGeneration(ctx, f.ClientSet, f.Namespace.Name, pod.Name, 1, 20*time.Second))
 			ginkgo.DeferCleanup(func(ctx context.Context) error {
 				ginkgo.By("deleting the pod")
 				return podClient.Delete(ctx, pod.Name, metav1.DeleteOptions{})
