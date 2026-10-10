@@ -181,13 +181,13 @@ func TestPodGroupEvaluator_Preempt_Victims(t *testing.T) {
 		expectedNumPDBViolations       int
 	}{
 		{
-			name: "Priority: mix of no groups and pod groups",
+			name: "Priority: pods from a group with disruption mode single rank as individual pods",
 			nodes: []*v1.Node{
 				st.MakeNode().Name("node1").Obj(),
 			},
 			initPods: []*v1.Pod{
-				st.MakePod().Name("p1").UID("v1").Node("node1").Priority(lowPriority).Labels(map[string]string{"size": "1"}).Obj(),
-				st.MakePod().Name("p2").UID("v2").Node("node1").Priority(lowPriority).Labels(map[string]string{"size": "1"}).PodGroupName("pg1").Obj(),
+				st.MakePod().Name("p1").UID("v1").Node("node1").Priority(lowPriority).Labels(map[string]string{"size": "1"}).StartTime(metav1.Unix(0, 0)).Obj(),
+				st.MakePod().Name("p2").UID("v2").Node("node1").Priority(lowPriority).Labels(map[string]string{"size": "1"}).PodGroupName("pg1").StartTime(metav1.Unix(1, 0)).Obj(),
 			},
 			initPodGroups: []*schedulingv1beta1.PodGroup{
 				st.MakePodGroup().Name("pg1").UID("pg1").DisruptionModeSingle().Priority(lowPriority).Obj(),
@@ -202,8 +202,10 @@ func TestPodGroupEvaluator_Preempt_Victims(t *testing.T) {
 					capacity: 2,
 				},
 			},
-			expectedVictims: []string{"p1"}, // p1 is less important than p2 because it's not part of a pod group
-			expectedStatus:  fwk.NewStatus(fwk.Success),
+			// p2 is evicted alone, so it ranks like the standalone p1 and the earlier start time of p1 wins.
+			expectedVictims:                []string{"p2"},
+			expectedStatus:                 fwk.NewStatus(fwk.Success),
+			expectedNumPodGroupDisruptions: 1,
 		},
 		{
 			name: "Priority: StartTime of pods from same group with disruption mode single ",
