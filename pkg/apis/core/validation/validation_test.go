@@ -29179,6 +29179,67 @@ func TestValidateLoadBalancerStatus(t *testing.T) {
 	}
 }
 
+func TestValidateLoadBalancerStatusIPModeRouter(t *testing.T) {
+	ipModeRouter := core.LoadBalancerIPModeRouter
+	ipModeVIP := core.LoadBalancerIPModeVIP
+
+	testCases := []struct {
+		name    string
+		gate    bool
+		numErrs int
+	}{
+		{
+			name:    "router ipMode accepted when gate enabled",
+			gate:    true,
+			numErrs: 0,
+		},
+		{
+			name:    "router ipMode rejected when gate disabled",
+			gate:    false,
+			numErrs: 1,
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.39"))
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LoadBalancerIPModeRouter, tc.gate)
+			status := core.LoadBalancerStatus{
+				Ingress: []core.LoadBalancerIngress{{
+					IP:     "10.0.0.1",
+					IPMode: &ipModeRouter,
+				}},
+			}
+			spec := core.ServiceSpec{Type: core.ServiceTypeLoadBalancer}
+			errs := ValidateLoadBalancerStatus(&status, nil, field.NewPath("status"), &spec)
+			if len(errs) != tc.numErrs {
+				t.Errorf("expected %d errors, got %d: %v", tc.numErrs, len(errs), errs.ToAggregate())
+			}
+		})
+	}
+
+	for _, gate := range []bool{true, false} {
+		for _, mode := range []core.LoadBalancerIPMode{ipModeVIP, core.LoadBalancerIPModeProxy} {
+			name := fmt.Sprintf("%s accepted when router gate=%v", mode, gate)
+			t.Run(name, func(t *testing.T) {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.39"))
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LoadBalancerIPModeRouter, gate)
+				m := mode
+				status := core.LoadBalancerStatus{
+					Ingress: []core.LoadBalancerIngress{{
+						IP:     "10.0.0.1",
+						IPMode: &m,
+					}},
+				}
+				spec := core.ServiceSpec{Type: core.ServiceTypeLoadBalancer}
+				errs := ValidateLoadBalancerStatus(&status, nil, field.NewPath("status"), &spec)
+				if len(errs) != 0 {
+					t.Errorf("expected 0 errors, got %d: %v", len(errs), errs.ToAggregate())
+				}
+			})
+		}
+	}
+}
+
 func TestValidateSleepAction(t *testing.T) {
 	fldPath := field.NewPath("root")
 

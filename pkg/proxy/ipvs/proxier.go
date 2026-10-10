@@ -915,6 +915,9 @@ func (proxier *Proxier) syncProxyRules() (retryError error) {
 
 		// Capture load-balancer ingress.
 		for _, ingress := range svcInfo.LoadBalancerVIPs() {
+			if svcInfo.LoadBalancerIPModeRouter(ingress) && len(proxier.endpointsMap[svcPortName]) == 0 {
+				continue
+			}
 			// ipset call
 			entry = &utilipset.Entry{
 				IP:       ingress.String(),
