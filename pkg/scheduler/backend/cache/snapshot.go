@@ -893,54 +893,6 @@ func removeNodeInfoFromList(logger klog.Logger, list []fwk.NodeInfo, nodeInfoToR
 	return list
 }
 
-// GetRootKeyForGroup returns the root key of the given EntityKey.
-// The key must be of PodGroupKey or CompositePodGroupKey type.
-func (s *Snapshot) GetRootKeyForGroup(key fwk.EntityKey) (fwk.EntityKey, bool, error) {
-	currentKey := key
-	visited := sets.New[fwk.EntityKey]()
-	for {
-		if visited.Has(currentKey) {
-			return fwk.EntityKey{}, false, fmt.Errorf("cycle detected in the hierarchy: %v", visited.UnsortedList())
-		}
-		visited.Insert(currentKey)
-
-		switch currentKey.Type {
-		case fwk.PodGroupKeyType:
-			pgs, ok := s.podGroupStates[currentKey]
-			if !ok {
-				return fwk.EntityKey{}, false, nil
-			}
-			pg := pgs.podGroup
-			if pg == nil {
-				return fwk.EntityKey{}, false, nil
-			}
-			if !s.compositePodGroupEnabled || pg.Spec.ParentCompositePodGroupName == nil {
-				return currentKey, true, nil
-			}
-			currentKey = fwk.CompositePodGroupKey(pg.Namespace, *pg.Spec.ParentCompositePodGroupName)
-		case fwk.CompositePodGroupKeyType:
-			cpgs, ok := s.compositePodGroupStates[currentKey]
-			if !ok {
-				return fwk.EntityKey{}, false, nil
-			}
-			cpg := cpgs.compositePodGroup
-			if cpg == nil {
-				return fwk.EntityKey{}, false, nil
-			}
-			if cpg.Spec.ParentCompositePodGroupName == nil {
-				return currentKey, true, nil
-			}
-			currentKey = fwk.CompositePodGroupKey(cpg.Namespace, *cpg.Spec.ParentCompositePodGroupName)
-		case fwk.PodKeyType:
-			return fwk.EntityKey{}, false, fmt.Errorf("pod key type not supported in snapshot GetRootKeyForGroup for %s", currentKey.String())
-		}
-	}
-}
-
-func (s *Snapshot) BuildHierarchySnapshotFromPod(pod *v1.Pod) (fwk.PodGroupManager, error) {
-	return s, nil
-}
-
 // AddGenericPodGroup adds generic pod group object to the snapshot,
 // linking it to its parent composite pod group if CompositePodGroup is enabled.
 // NOTE: this function is meant to be use by tests and simulation library ONLY.

@@ -57,6 +57,7 @@ import (
 	apicalls "k8s.io/kubernetes/pkg/scheduler/framework/api_calls"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultbinder"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/dynamicresources"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/gangscheduling"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/queuesort"
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
@@ -1312,9 +1313,10 @@ func TestAddPodGroup(t *testing.T) {
 			defer cancel()
 
 			sched := &Scheduler{
-				Cache:           internalcache.New(ctx, nil, true, false /* CompositePodGroup */),
-				SchedulingQueue: internalqueue.NewTestQueue(ctx, nil),
-				logger:          logger,
+				Cache:                    internalcache.New(ctx, nil, true, false /* CompositePodGroup */),
+				SchedulingQueue:          internalqueue.NewTestQueue(ctx, nil),
+				podGroupHierarchyTracker: gangscheduling.NewHierarchyTracker(false /* CompositePodGroup */),
+				logger:                   logger,
 			}
 
 			sched.addPodGroup(tt.podGroup)
@@ -1363,9 +1365,10 @@ func TestUpdatePodGroup(t *testing.T) {
 			defer cancel()
 
 			sched := &Scheduler{
-				Cache:           internalcache.New(ctx, nil, true, false /* CompositePodGroup */),
-				SchedulingQueue: internalqueue.NewTestQueue(ctx, nil),
-				logger:          logger,
+				Cache:                    internalcache.New(ctx, nil, true, false /* CompositePodGroup */),
+				SchedulingQueue:          internalqueue.NewTestQueue(ctx, nil),
+				podGroupHierarchyTracker: gangscheduling.NewHierarchyTracker(false /* CompositePodGroup */),
+				logger:                   logger,
 			}
 
 			sched.Cache.AddGenericPodGroup(fwk.NewGenericPodGroup(tt.oldPodGroup))
@@ -1410,9 +1413,10 @@ func TestDeletePodGroup(t *testing.T) {
 			defer cancel()
 
 			sched := &Scheduler{
-				Cache:           internalcache.New(ctx, nil, true, false /* CompositePodGroup */),
-				SchedulingQueue: internalqueue.NewTestQueue(ctx, nil),
-				logger:          logger,
+				Cache:                    internalcache.New(ctx, nil, true, false /* CompositePodGroup */),
+				SchedulingQueue:          internalqueue.NewTestQueue(ctx, nil),
+				podGroupHierarchyTracker: gangscheduling.NewHierarchyTracker(false /* CompositePodGroup */),
+				logger:                   logger,
 			}
 
 			if tt.initPodGroup != nil {
@@ -1507,9 +1511,10 @@ func TestAddCompositePodGroup(t *testing.T) {
 			)
 
 			sched := &Scheduler{
-				Cache:           internalcache.New(ctx, nil, true, tt.cpgEnabled),
-				SchedulingQueue: queue,
-				logger:          logger,
+				Cache:                    internalcache.New(ctx, nil, true, tt.cpgEnabled),
+				SchedulingQueue:          queue,
+				podGroupHierarchyTracker: gangscheduling.NewHierarchyTracker(tt.cpgEnabled),
+				logger:                   logger,
 			}
 
 			if tt.triggerQueueingHint {
@@ -1664,9 +1669,10 @@ func TestUpdateCompositePodGroup(t *testing.T) {
 			)
 
 			sched := &Scheduler{
-				Cache:           internalcache.New(ctx, nil, true, tt.cpgEnabled),
-				SchedulingQueue: queue,
-				logger:          logger,
+				Cache:                    internalcache.New(ctx, nil, true, tt.cpgEnabled),
+				SchedulingQueue:          queue,
+				podGroupHierarchyTracker: gangscheduling.NewHierarchyTracker(tt.cpgEnabled),
+				logger:                   logger,
 			}
 
 			if tt.cpgEnabled {
@@ -1802,9 +1808,10 @@ func TestDeleteCompositePodGroup(t *testing.T) {
 			)
 
 			sched := &Scheduler{
-				Cache:           internalcache.New(ctx, nil, true, tt.cpgEnabled),
-				SchedulingQueue: queue,
-				logger:          logger,
+				Cache:                    internalcache.New(ctx, nil, true, tt.cpgEnabled),
+				SchedulingQueue:          queue,
+				podGroupHierarchyTracker: gangscheduling.NewHierarchyTracker(tt.cpgEnabled),
+				logger:                   logger,
 			}
 
 			if tt.triggerQueueingHint {
