@@ -110,7 +110,8 @@ func (c *Config) TransportConfig() (*transport.Config, error) {
 			Groups:   c.Impersonate.Groups,
 			Extra:    c.Impersonate.Extra,
 		},
-		Proxy: c.Proxy,
+		Proxy:          c.Proxy,
+		ConnectionPool: c.ConnectionPool,
 	}
 
 	if c.Dial != nil {
