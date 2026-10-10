@@ -167,12 +167,8 @@ func (s *RequestHeaderAuthenticationOptions) ToAuthenticationRequestHeaderConfig
 	}
 
 	return &authenticatorfactory.RequestHeaderConfig{
-		UsernameHeaders:     headerrequest.StaticStringSlice(s.UsernameHeaders),
-		UIDHeaders:          headerrequest.StaticStringSlice(s.UIDHeaders),
-		GroupHeaders:        headerrequest.StaticStringSlice(s.GroupHeaders),
-		ExtraHeaderPrefixes: headerrequest.StaticStringSlice(s.ExtraHeaderPrefixes),
-		CAContentProvider:   caBundleProvider,
-		AllowedClientNames:  headerrequest.StaticStringSlice(s.AllowedNames),
+		Config:            headerrequest.NewStaticRequestHeaderConfig(s.UsernameHeaders, s.UIDHeaders, s.GroupHeaders, s.ExtraHeaderPrefixes, s.AllowedNames),
+		CAContentProvider: caBundleProvider,
 	}, nil
 }
 
@@ -448,12 +444,8 @@ func (s *DelegatingAuthenticationOptions) createRequestHeaderConfig(client kuber
 	}
 
 	return &authenticatorfactory.RequestHeaderConfig{
-		CAContentProvider:   dynamicRequestHeaderProvider,
-		UsernameHeaders:     headerrequest.StringSliceProvider(headerrequest.StringSliceProviderFunc(dynamicRequestHeaderProvider.UsernameHeaders)),
-		UIDHeaders:          headerrequest.StringSliceProvider(headerrequest.StringSliceProviderFunc(dynamicRequestHeaderProvider.UIDHeaders)),
-		GroupHeaders:        headerrequest.StringSliceProvider(headerrequest.StringSliceProviderFunc(dynamicRequestHeaderProvider.GroupHeaders)),
-		ExtraHeaderPrefixes: headerrequest.StringSliceProvider(headerrequest.StringSliceProviderFunc(dynamicRequestHeaderProvider.ExtraHeaderPrefixes)),
-		AllowedClientNames:  headerrequest.StringSliceProvider(headerrequest.StringSliceProviderFunc(dynamicRequestHeaderProvider.AllowedClientNames)),
+		CAContentProvider: dynamicRequestHeaderProvider,
+		Config:            dynamicRequestHeaderProvider,
 	}, nil
 }
 
