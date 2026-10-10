@@ -25,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kube-openapi/pkg/schemaconv"
 	"k8s.io/kube-openapi/pkg/util/proto"
+	"k8s.io/kube-openapi/pkg/validation/spec"
 )
 
 // groupVersionKindExtensionKey is the key used to lookup the
@@ -73,6 +74,35 @@ func NewGVKParser(models proto.Models, preserveUnknownFields bool) (*GvkParser, 
 				if ok {
 					return nil, fmt.Errorf("duplicate entry for %v", gvk)
 				}
+				parser.gvks[gvk] = modelName
+			}
+		}
+	}
+	return &parser, nil
+}
+
+// NewGVKParserFromOpenAPIV3 builds a GvkParser from the component schemas of
+// an OpenAPI v3 document, such as the one a group-version serves at
+// /openapi/v3/apis/<group>/<version>. The schemas are interpreted the same
+// way NewTypeConverter interprets them for server-side apply; as there, a
+// group-version-kind listed by more than one schema resolves to the last one
+// seen.
+func NewGVKParserFromOpenAPIV3(schemas map[string]*spec.Schema, preserveUnknownFields bool) (*GvkParser, error) {
+	typeSchema, err := schemaconv.ToSchemaFromOpenAPI(schemas, preserveUnknownFields)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert models to schema: %w", err)
+	}
+	parser := GvkParser{
+		gvks:   map[schema.GroupVersionKind]string{},
+		parser: typed.Parser{Schema: smdschema.Schema{Types: typeSchema.Types}},
+	}
+	for modelName, model := range schemas {
+		var gvkList []schema.GroupVersionKind
+		if err := model.Extensions.GetObject(groupVersionKindExtensionKey, &gvkList); err != nil {
+			return nil, fmt.Errorf("failed to parse %s of %s: %w", groupVersionKindExtensionKey, modelName, err)
+		}
+		for _, gvk := range gvkList {
+			if len(gvk.Kind) > 0 {
 				parser.gvks[gvk] = modelName
 			}
 		}
