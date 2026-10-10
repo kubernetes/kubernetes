@@ -35,7 +35,13 @@ import (
 	"k8s.io/klog/v2"
 )
 
-// FileRefreshDuration is exposed so that integration tests can crank up the reload speed.
+// FileRefreshDuration is how often file-backed CA content is re-read even if
+// fsnotify did not report a change. Integration tests may shorten this.
+//
+// fsnotify watches a specific inode. Atomic replace (rename), overlay, or
+// bind-mount updates can leave the watch on a stale inode so no event is
+// delivered. The poll is the safety net; it was removed when fsnotify was
+// added in #104102 but FileRefreshDuration was left unused.
 var FileRefreshDuration = 1 * time.Minute
 
 // ControllerRunner is a generic interface for starting a controller
@@ -163,6 +169,14 @@ func (c *DynamicFileCAContent) Run(ctx context.Context, workers int) {
 
 	// doesn't matter what workers say, only start one.
 	go wait.Until(c.runWorker, time.Second, ctx.Done())
+
+	// Periodic reload in case fsnotify misses the write (new inode / bind-mount /
+	// atomic rename). This is the original FileRefreshDuration loop from before
+	// #104102; watchCAFile blocks for the life of a successful watch, so without
+	// this poll the in-memory client CA bundle can stay stale forever.
+	go wait.Until(func() {
+		c.queue.Add(workItemKey)
+	}, FileRefreshDuration, ctx.Done())
 
 	// start the loop that watches the CA file until stopCh is closed.
 	go wait.Until(func() {
