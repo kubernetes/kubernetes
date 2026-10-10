@@ -22,8 +22,6 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	versionutil "k8s.io/apimachinery/pkg/util/version"
-	pkgversion "k8s.io/apimachinery/pkg/version"
-	fakediscovery "k8s.io/client-go/discovery/fake"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/component-base/version"
 
@@ -65,29 +63,14 @@ func NewKubeVersionGetter(client clientset.Interface) VersionGetter {
 
 // ClusterVersion gets API server version
 func (g *KubeVersionGetter) ClusterVersion() (string, *versionutil.Version, error) {
-	var (
-		clusterVersionInfo *pkgversion.Info
-		err                error
-	)
-	// If we are dry-running, do not attempt to fetch the /version resource and just return
-	// the stored FakeServerVersion, which is done when constructing the dry-run client in
-	// common.go#getClient()
-	// The problem here is that during upgrade dry-run client reactors are backed by a dynamic client
-	// via NewClientBackedDryRunGetterFromKubeconfig() and for GetActions there seems to be no analog to
-	// Discovery().ServerVersion() resource for a dynamic client(?).
-	fakeclientDiscovery, ok := g.client.Discovery().(*fakediscovery.FakeDiscovery)
-	if ok {
-		clusterVersionInfo = fakeclientDiscovery.FakedServerVersion
-	} else {
-		clusterVersionInfo, err = g.client.Discovery().ServerVersion()
-		if err != nil {
-			return "", nil, errors.Wrap(err, "Couldn't fetch cluster version from the API Server")
-		}
+	clusterVersionInfo, err := g.client.Discovery().ServerVersion()
+	if err != nil {
+		return "", nil, errors.Wrap(err, "couldn't fetch cluster version from the API server")
 	}
 
 	clusterVersion, err := versionutil.ParseSemantic(clusterVersionInfo.String())
 	if err != nil {
-		return "", nil, errors.Wrap(err, "Couldn't parse cluster version")
+		return "", nil, errors.Wrap(err, "couldn't parse cluster version")
 	}
 	return clusterVersionInfo.String(), clusterVersion, nil
 }
@@ -98,7 +81,7 @@ func (g *KubeVersionGetter) KubeadmVersion() (string, *versionutil.Version, erro
 
 	kubeadmVersion, err := versionutil.ParseSemantic(kubeadmVersionInfo.String())
 	if err != nil {
-		return "", nil, errors.Wrap(err, "Couldn't parse kubeadm version")
+		return "", nil, errors.Wrap(err, "couldn't parse kubeadm version")
 	}
 	return kubeadmVersionInfo.String(), kubeadmVersion, nil
 }
@@ -107,12 +90,12 @@ func (g *KubeVersionGetter) KubeadmVersion() (string, *versionutil.Version, erro
 func (g *KubeVersionGetter) VersionFromCILabel(ciVersionLabel, description string) (string, *versionutil.Version, error) {
 	versionStr, err := kubeadmutil.KubernetesReleaseVersion(ciVersionLabel)
 	if err != nil {
-		return "", nil, errors.Wrapf(err, "Couldn't fetch latest %s from the internet", description)
+		return "", nil, errors.Wrapf(err, "couldn't fetch latest %s from the internet", description)
 	}
 
 	ver, err := versionutil.ParseSemantic(versionStr)
 	if err != nil {
-		return "", nil, errors.Wrapf(err, "Couldn't parse latest %s", description)
+		return "", nil, errors.Wrapf(err, "couldn't parse latest %s", description)
 	}
 	return versionStr, ver, nil
 }
@@ -182,7 +165,7 @@ func (o *OfflineVersionGetter) VersionFromCILabel(ciVersionLabel, description st
 	}
 	ver, err := versionutil.ParseSemantic(o.version)
 	if err != nil {
-		return "", nil, errors.Wrapf(err, "Couldn't parse version %s", description)
+		return "", nil, errors.Wrapf(err, "couldn't parse version %s", description)
 	}
 	return o.version, ver, nil
 }
