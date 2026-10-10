@@ -46,8 +46,8 @@ import (
 const (
 	controllerName = "leader-election-controller"
 
-	// Requeue interval is the interval at which a Lease is requeued to verify that it is
-	// being renewed properly.
+	// defaultRequeueInterval is the fallback requeue interval used on errors
+	// or when a more precise requeue duration cannot be computed.
 	defaultRequeueInterval = 5 * time.Second
 	noRequeue              = 0
 
@@ -263,11 +263,11 @@ func (c *Controller) reconcileElectionStep(ctx context.Context, leaseNN types.Na
 
 	// Check if an election is really needed by looking at the current lease and candidates
 	needElection, err := c.electionNeeded(candidates, leaseNN)
-	if !needElection {
-		return defaultRequeueInterval, err
-	}
 	if err != nil {
 		return defaultRequeueInterval, err
+	}
+	if !needElection {
+		return c.requeueForHealthyLease(leaseNN), nil
 	}
 
 	now := c.clock.Now()
@@ -302,7 +302,9 @@ func (c *Controller) reconcileElectionStep(ctx context.Context, leaseNN types.Na
 		return defaultRequeueInterval, err
 	}
 	if !canVoteYet {
-		return defaultRequeueInterval, nil
+		// Candidate acks arrive via informer events. Requeue after electionDuration
+		// as a timeout in case candidates don't respond.
+		return electionDuration, nil
 	}
 
 	// election is ongoing as long as unexpired PingTimes exist
@@ -371,7 +373,7 @@ func (c *Controller) reconcileElectionStep(ctx context.Context, leaseNN types.Na
 		} else {
 			klog.Infof("Created lease %s without leader", leaseNN)
 		}
-		return defaultRequeueInterval, nil
+		return time.Duration(defaultLeaseDurationSeconds) * time.Second, nil
 	} else if !apierrors.IsAlreadyExists(err) {
 		return noRequeue, err
 	}
@@ -417,8 +419,12 @@ func (c *Controller) reconcileElectionStep(ctx context.Context, leaseNN types.Na
 		} else {
 			klog.V(5).Infof("Lease %s already has the most optimal leader %q", leaseNN, "")
 		}
-		// We need to requeue to ensure that we are aware of an expired lease
-		return defaultRequeueInterval, nil
+		// Requeue at lease expiry to detect if the holder stops renewing
+		d := timeUntilLeaseExpiry(c.clock, existing)
+		if d <= 0 {
+			d = defaultRequeueInterval
+		}
+		return d, nil
 	}
 
 	_, err = c.leaseClient.Leases(leaseNN.Namespace).Update(ctx, existing, metav1.UpdateOptions{})
@@ -426,7 +432,27 @@ func (c *Controller) reconcileElectionStep(ctx context.Context, leaseNN types.Na
 		return noRequeue, err
 	}
 
-	return defaultRequeueInterval, nil
+	d := timeUntilLeaseExpiry(c.clock, existing)
+	if d <= 0 {
+		d = defaultRequeueInterval
+	}
+	return d, nil
+}
+
+// requeueForHealthyLease computes the requeue duration for a lease that does not
+// need election. While the holder is alive, lease renewal informer events will
+// wake the controller. This timer is a safety net for when the holder dies and
+// stops generating events.
+func (c *Controller) requeueForHealthyLease(leaseNN types.NamespacedName) time.Duration {
+	lease, err := c.leaseInformer.Lister().Leases(leaseNN.Namespace).Get(leaseNN.Name)
+	if err != nil {
+		return defaultRequeueInterval
+	}
+	d := timeUntilLeaseExpiry(c.clock, lease)
+	if d <= 0 {
+		return defaultRequeueInterval
+	}
+	return d
 }
 
 func (c *Controller) listAdmissableCandidates(leaseNN types.NamespacedName) ([]*v1beta1.LeaseCandidate, error) {

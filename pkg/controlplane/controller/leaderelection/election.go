@@ -115,6 +115,20 @@ func isLeaseExpired(clock clock.Clock, lease *v1.Lease) bool {
 		lease.Spec.RenewTime.Add(time.Duration(*lease.Spec.LeaseDurationSeconds)*time.Second).Before(currentTime)
 }
 
+// timeUntilLeaseExpiry returns the duration until the given lease expires.
+// Returns 0 if the lease is already expired or has missing fields.
+func timeUntilLeaseExpiry(clk clock.Clock, lease *v1.Lease) time.Duration {
+	if lease == nil || lease.Spec.RenewTime == nil || lease.Spec.LeaseDurationSeconds == nil {
+		return 0
+	}
+	expiry := lease.Spec.RenewTime.Add(time.Duration(*lease.Spec.LeaseDurationSeconds) * time.Second)
+	d := expiry.Sub(clk.Now())
+	if d <= 0 {
+		return 0
+	}
+	return d
+}
+
 func isLeaseCandidateExpired(clock clock.Clock, lease *v1beta1.LeaseCandidate) bool {
 	currentTime := clock.Now()
 	return lease.Spec.RenewTime == nil ||
