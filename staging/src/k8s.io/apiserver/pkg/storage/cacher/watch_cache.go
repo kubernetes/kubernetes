@@ -527,6 +527,12 @@ func (w *watchCache) waitAndGetLatestSnapshot(ctx context.Context, minResourceVe
 		return nil, 0, "", err
 	}
 	span.AddEvent("watchCache fresh enough")
+	snap, index = w.getLatestSnapshotLocked(ctx, matchValues)
+	return snap, w.resourceVersion, index, nil
+}
+
+func (w *watchCache) getLatestSnapshotLocked(ctx context.Context, matchValues []storage.MatchValue) (snap store.Snapshot, index string) {
+	span := tracing.SpanFromContext(ctx)
 	// This isn't the place where we do "final filtering" - only some "prefiltering" is happening here. So the only
 	// requirement here is to NOT miss anything that should be returned. We can return as many non-matching items as we
 	// want - they will be filtered out later. The fact that we return less things is only further performance improvement.
@@ -536,14 +542,14 @@ func (w *watchCache) waitAndGetLatestSnapshot(ctx context.Context, minResourceVe
 		if err == nil {
 			span.AddEvent("GetByIndexSnapshot success", attribute.String("index", matchValue.IndexName))
 			w.checkSnapshotResourceVersion(snap, w.resourceVersion)
-			return snap, w.resourceVersion, matchValue.IndexName, nil
+			return snap, matchValue.IndexName
 		}
 		span.AddEvent("GetByIndexSnapshot fail", attribute.String("index", matchValue.IndexName), attribute.String("error", err.Error()))
 	}
 	snap = w.storage.LatestSnapshot()
 	span.AddEvent("LatestSnapshot success")
 	w.checkSnapshotResourceVersion(snap, w.resourceVersion)
-	return snap, w.resourceVersion, "", nil
+	return snap, ""
 }
 
 func (w *watchCache) checkSnapshotResourceVersion(snap store.Snapshot, expectedRV uint64) {
@@ -665,11 +671,10 @@ func (w *watchCache) suggestedWatchChannelSize(indexExists, triggerUsed bool) in
 // getAllEventsSinceLocked returns a watchCacheInterval that can be used to
 // retrieve events since a certain resourceVersion. This function assumes to
 // be called under the watchCache lock.
-func (w *watchCache) getAllEventsSinceLocked(resourceVersion uint64, key string, opts storage.ListOptions) (*watchCacheInterval, error) {
-	_, matchesSingle := opts.Predicate.MatchesSingle()
-	matchesSingle = matchesSingle && !opts.Recursive
+func (w *watchCache) getAllEventsSinceLocked(ctx context.Context, resourceVersion uint64, key string, opts storage.ListOptions) (*watchCacheInterval, error) {
 	if opts.SendInitialEvents != nil && *opts.SendInitialEvents {
-		return w.getIntervalFromStoreLocked(key, matchesSingle)
+		interval, _, err := w.getIntervalFromStoreLocked(ctx, key, opts)
+		return interval, err
 	}
 
 	if resourceVersion == 0 {
@@ -680,7 +685,8 @@ func (w *watchCache) getAllEventsSinceLocked(resourceVersion uint64, key string,
 			// current state and only then start watching from that point.
 			//
 			// TODO: In v2 api, we should stop returning the current state - #13969.
-			return w.getIntervalFromStoreLocked(key, matchesSingle)
+			interval, _, err := w.getIntervalFromStoreLocked(ctx, key, opts)
+			return interval, err
 		}
 		// SendInitialEvents = false and resourceVersion = 0
 		// means that the request would like to start watching
@@ -694,13 +700,17 @@ func (w *watchCache) getAllEventsSinceLocked(resourceVersion uint64, key string,
 // getIntervalFromStoreLocked returns a watchCacheInterval
 // that covers the entire storage state.
 // This function assumes to be called under the watchCache lock.
-func (w *watchCache) getIntervalFromStoreLocked(key string, matchesSingle bool) (*watchCacheInterval, error) {
-	snap := w.storage.LatestSnapshot()
-	w.checkSnapshotResourceVersion(snap, w.resourceVersion)
+func (w *watchCache) getIntervalFromStoreLocked(ctx context.Context, key string, opts storage.ListOptions) (*watchCacheInterval, string, error) {
+	_, matchesSingle := opts.Predicate.MatchesSingle()
+	matchesSingle = matchesSingle && !opts.Recursive
 	// When not matching a single key, an immutable snapshot lets us
 	// defer the O(N) interval build off the watchCache lock.
 	if !matchesSingle {
-		return newCacheIntervalFromLazySnapshot(w.resourceVersion, snap), nil
+		snapshot, index := w.getLatestSnapshotLocked(ctx, opts.Predicate.MatcherIndex(ctx))
+		return newCacheIntervalFromLazySnapshot(w.resourceVersion, snapshot, key), index, nil
 	}
-	return newCacheIntervalFromStore(w.resourceVersion, snap, key, matchesSingle)
+	snap := w.storage.LatestSnapshot()
+	w.checkSnapshotResourceVersion(snap, w.resourceVersion)
+	interval, err := newCacheIntervalFromStore(w.resourceVersion, snap, key, matchesSingle)
+	return interval, "", err
 }
