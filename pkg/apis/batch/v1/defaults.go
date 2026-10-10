@@ -18,6 +18,7 @@ package v1
 
 import (
 	"math"
+	"strconv"
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -62,6 +63,14 @@ func SetDefaults_Job(obj *batchv1.Job) {
 			obj.Spec.PodReplacementPolicy = ptr.To(batchv1.Failed)
 		} else {
 			obj.Spec.PodReplacementPolicy = ptr.To(batchv1.TerminatingOrFailed)
+		}
+	}
+	if obj.Spec.PodFailurePolicy != nil {
+		for idx, rule := range obj.Spec.PodFailurePolicy.Rules {
+			// If rule name is unset, default to the rule index.
+			if rule.Name == nil {
+				obj.Spec.PodFailurePolicy.Rules[idx].Name = ptr.To(strconv.Itoa(idx))
+			}
 		}
 	}
 	if obj.Spec.ManualSelector == nil {
