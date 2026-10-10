@@ -98,6 +98,10 @@ the cloud specific control loops shipped with Kubernetes.`,
 			}
 			cliflag.PrintFlags(cmd.Flags())
 
+			// Propagate feature gate state to the metrics subsystem. This must be called
+			// after feature gates are set and before any histogram metrics are registered.
+			features.ApplyFeatureGates(utilfeature.DefaultFeatureGate)
+
 			c, err := s.Config(ControllerNames(controllerInitFuncConstructors), ControllersDisabledByDefault.List(), controllerAliases, AllWebhooks, DisabledByDefaultWebhooks)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "%v\n", err)

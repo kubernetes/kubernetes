@@ -22,10 +22,12 @@ import (
 
 	"github.com/spf13/cobra"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/cloud-provider/names"
 	"k8s.io/cloud-provider/options"
 	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/component-base/cli/globalflag"
+	"k8s.io/component-base/metrics/features"
 	"k8s.io/component-base/term"
 	"k8s.io/component-base/version/verflag"
 )
@@ -138,6 +140,10 @@ func (cb *CommandBuilder) BuildCommand() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			verflag.PrintAndExitIfRequested()
 			cliflag.PrintFlags(cmd.Flags())
+
+			// Propagate feature gate state to the metrics subsystem. This must be called
+			// after feature gates are set and before any histogram metrics are registered.
+			features.ApplyFeatureGates(utilfeature.DefaultFeatureGate)
 
 			config, err := cb.options.Config(ControllerNames(cb.controllerInitFuncConstructors), ControllersDisabledByDefault.List(),
 				cb.controllerAliases, WebhookNames(cb.webhookConfigs), WebhooksDisabledByDefault.List())

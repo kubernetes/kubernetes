@@ -17,12 +17,23 @@ limitations under the License.
 package app
 
 import (
+	"path/filepath"
 	"regexp"
 	"strings"
 	"testing"
 
+	"github.com/spf13/cobra"
+
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/cloud-provider/names"
+	"k8s.io/cloud-provider/options"
+	cliflag "k8s.io/component-base/cli/flag"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	logsapi "k8s.io/component-base/logs/api/v1"
+	"k8s.io/component-base/metrics"
+	"k8s.io/component-base/metrics/features"
 )
 
 func TestCloudControllerNamesConsistency(t *testing.T) {
@@ -51,4 +62,71 @@ func TestCloudControllerNamesDeclaration(t *testing.T) {
 			t.Errorf("name declaration check failed: controller name %q should be declared in  \"controller_names.go\" and added to this test", name)
 		}
 	}
+}
+
+func TestNativeHistogramsFeatureGateApplied(t *testing.T) {
+	testCases := map[string]func(t *testing.T) *cobra.Command{
+		"NewCloudControllerManagerCommand": func(t *testing.T) *cobra.Command {
+			s, err := options.NewCloudControllerManagerOptions()
+			if err != nil {
+				t.Fatal(err)
+			}
+			return NewCloudControllerManagerCommand(s, nil, DefaultInitFuncConstructors, names.CCMControllerAliases(), cliflag.NamedFlagSets{}, wait.NeverStop)
+		},
+		"CommandBuilder": func(t *testing.T) *cobra.Command {
+			cb := NewBuilder()
+			cb.RegisterDefaultControllers()
+			return cb.BuildCommand()
+		},
+	}
+
+	originalReapplyHandling := logsapi.ReapplyHandling
+	logsapi.ReapplyHandling = logsapi.ReapplyHandlingIgnoreUnchanged
+	t.Cleanup(func() { logsapi.ReapplyHandling = originalReapplyHandling })
+
+	for name, newCommand := range testCases {
+		t.Run(name, func(t *testing.T) {
+			// Registered before SetFeatureGateDuringTest so that it runs after the gate is restored.
+			t.Cleanup(func() { features.ApplyFeatureGates(utilfeature.DefaultFeatureGate) })
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NativeHistograms, false)
+			features.ApplyFeatureGates(utilfeature.DefaultFeatureGate)
+			if histogramIsNative(t) {
+				t.Fatal("histogram is native before the command has run")
+			}
+
+			// The kubeconfig does not exist, so the command fails in Config,
+			// after it has applied the feature gates.
+			cmd := newCommand(t)
+			cmd.SetArgs([]string{
+				"--kubeconfig=" + filepath.Join(t.TempDir(), "missing-kubeconfig"),
+				"--feature-gates=NativeHistograms=true",
+			})
+			if err := cmd.Execute(); err == nil {
+				t.Fatal("expected the command to fail")
+			}
+
+			if !histogramIsNative(t) {
+				t.Error("histogram is not native although the NativeHistograms feature gate is enabled")
+			}
+		})
+	}
+}
+
+func histogramIsNative(t *testing.T) bool {
+	t.Helper()
+	h := metrics.NewHistogram(&metrics.HistogramOpts{Name: "test_histogram", Help: "test"})
+	registry := metrics.NewKubeRegistry()
+	registry.MustRegister(h)
+	h.Observe(0.5)
+	mfs, err := registry.Gather()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, mf := range mfs {
+		if mf.GetName() == "test_histogram" {
+			return mf.GetMetric()[0].GetHistogram().Schema != nil
+		}
+	}
+	t.Fatal("histogram not gathered")
+	return false
 }
