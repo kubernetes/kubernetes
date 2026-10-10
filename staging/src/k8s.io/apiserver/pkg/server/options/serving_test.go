@@ -522,3 +522,34 @@ func generateSelfSignedCertKey(host string, alternateIPs []net.IP, alternateDNS 
 
 	return certBuffer.Bytes(), keyBuffer.Bytes(), nil
 }
+
+func TestSecureServingOptionsValidateCertKeyPair(t *testing.T) {
+	tests := []struct {
+		name      string
+		certFile  string
+		keyFile   string
+		wantError bool
+	}{
+		{name: "neither set", wantError: false},
+		{name: "cert and key set", certFile: "cert.pem", keyFile: "key.pem", wantError: false},
+		{name: "cert without key", certFile: "cert.pem", wantError: true},
+		{name: "key without cert", keyFile: "key.pem", wantError: true},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			s := &SecureServingOptions{
+				BindPort: 443,
+				ServerCert: GeneratableKeyCert{
+					CertKey: CertKey{CertFile: tc.certFile, KeyFile: tc.keyFile},
+				},
+			}
+			errs := s.Validate()
+			if tc.wantError && len(errs) == 0 {
+				t.Fatalf("expected a validation error for cert=%q key=%q, got none", tc.certFile, tc.keyFile)
+			}
+			if !tc.wantError && len(errs) != 0 {
+				t.Fatalf("expected no validation error for cert=%q key=%q, got %v", tc.certFile, tc.keyFile, errs)
+			}
+		})
+	}
+}

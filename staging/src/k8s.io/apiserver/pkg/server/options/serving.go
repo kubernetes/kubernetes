@@ -152,6 +152,12 @@ func (s *SecureServingOptions) Validate() []error {
 		errors = append(errors, fmt.Errorf("cert/key file and in-memory certificate cannot both be set"))
 	}
 
+	// A cert without its key (or the reverse) can never load; without this check it only surfaces
+	// as an opaque "open : no such file or directory" when the listener is set up.
+	if (len(s.ServerCert.CertKey.CertFile) != 0) != (len(s.ServerCert.CertKey.KeyFile) != 0) {
+		errors = append(errors, fmt.Errorf("--tls-cert-file and --tls-private-key-file must be set together"))
+	}
+
 	return errors
 }
 
