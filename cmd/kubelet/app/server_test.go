@@ -17,6 +17,10 @@ limitations under the License.
 package app
 
 import (
+	"context"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -29,6 +33,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/component-base/configz"
 	"k8s.io/kubernetes/cmd/kubelet/app/options"
 	kubeletconfiginternal "k8s.io/kubernetes/pkg/kubelet/apis/config"
 )
@@ -608,5 +613,45 @@ func TestMarshalKubeletConfigForLog(t *testing.T) {
 	require.NotContains(t, out, "super-secret-token")
 
 	// The helper must not mutate the caller's config when masking.
+	require.Equal(t, []string{"Bearer super-secret-token"}, kc.StaticPodURLHeader["Authorization"])
+}
+
+func TestInitConfigzMasksStaticPodURLHeader(t *testing.T) {
+	kc := &kubeletconfiginternal.KubeletConfiguration{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "KubeletConfiguration",
+			APIVersion: "kubelet.config.k8s.io/v1beta1",
+		},
+		// Non-sensitive value, to show the rest of the config still reaches /configz.
+		EvictionHard: map[string]string{"memory.available": "200Mi"},
+		// Credentials passed via --manifest-url-header, which /configz must not serve.
+		StaticPodURLHeader: map[string][]string{
+			"Authorization": {"Bearer super-secret-token"},
+		},
+	}
+
+	require.NoError(t, initConfigz(context.Background(), kc))
+	t.Cleanup(func() { configz.Delete("kubeletconfig") })
+
+	mux := http.NewServeMux()
+	configz.InstallHandler(mux)
+	recorder := httptest.NewRecorder()
+	mux.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, configz.DefaultConfigzPath, nil))
+
+	require.Equal(t, http.StatusOK, recorder.Code)
+
+	var served struct {
+		KubeletConfig struct {
+			EvictionHard       map[string]string   `json:"evictionHard"`
+			StaticPodURLHeader map[string][]string `json:"staticPodURLHeader"`
+		} `json:"kubeletconfig"`
+	}
+	require.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &served))
+
+	require.Equal(t, map[string]string{"memory.available": "200Mi"}, served.KubeletConfig.EvictionHard)
+	require.Equal(t, map[string][]string{"Authorization": {"<masked>"}}, served.KubeletConfig.StaticPodURLHeader)
+	require.NotContains(t, recorder.Body.String(), "super-secret-token")
+
+	// Registering the config must not mutate the caller's copy.
 	require.Equal(t, []string{"Bearer super-secret-token"}, kc.StaticPodURLHeader["Authorization"])
 }
