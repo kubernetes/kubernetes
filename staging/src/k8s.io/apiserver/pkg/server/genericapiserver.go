@@ -1014,17 +1014,26 @@ func (s *GenericAPIServer) newAPIGroupVersion(apiGroupInfo *APIGroupInfo, groupV
 	}
 }
 
-// NewDefaultAPIGroupInfo returns an APIGroupInfo stubbed with "normal" values
-// exposed for easier composition from other packages
-func NewDefaultAPIGroupInfo(group string, scheme *runtime.Scheme, parameterCodec runtime.ParameterCodec, codecs serializer.CodecFactory) APIGroupInfo {
-	opts := []serializer.CodecFactoryOptionsMutator{
-		serializer.WithStreamingCollectionEncodingToJSON(),
-		serializer.WithStreamingCollectionEncodingToProtobuf(),
-	}
+func codecFactoryMutators() []serializer.CodecFactoryOptionsMutator {
+	opts := []serializer.CodecFactoryOptionsMutator{}
 	if utilfeature.DefaultFeatureGate.Enabled(features.CBORServingAndStorage) {
 		opts = append(opts, serializer.WithSerializer(cbor.NewSerializerInfo))
 	}
-	if len(opts) != 0 {
+
+	opts = append(opts, serializer.WithStreamingCollectionEncodingToJSON())
+	opts = append(opts, serializer.WithStreamingCollectionEncodingToProtobuf())
+
+	return opts
+}
+
+func streamingCollectionNegotiationSerializer() runtime.NegotiatedSerializer {
+	return serializer.NewCodecFactory(runtime.NewScheme(), codecFactoryMutators()...)
+}
+
+// NewDefaultAPIGroupInfo returns an APIGroupInfo stubbed with "normal" values
+// exposed for easier composition from other packages
+func NewDefaultAPIGroupInfo(group string, scheme *runtime.Scheme, parameterCodec runtime.ParameterCodec, codecs serializer.CodecFactory) APIGroupInfo {
+	if opts := codecFactoryMutators(); len(opts) != 0 {
 		codecs = serializer.NewCodecFactory(scheme, opts...)
 	}
 	return APIGroupInfo{
