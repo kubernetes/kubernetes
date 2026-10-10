@@ -25,7 +25,6 @@ import (
 	unsafe "unsafe"
 
 	flowcontrolv1 "k8s.io/api/flowcontrol/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	flowcontrol "k8s.io/kubernetes/pkg/apis/flowcontrol"
@@ -466,14 +465,7 @@ func Convert_flowcontrol_LimitResponse_To_v1_LimitResponse(in *flowcontrol.Limit
 }
 
 func autoConvert_v1_LimitedPriorityLevelConfiguration_To_flowcontrol_LimitedPriorityLevelConfiguration(in *flowcontrolv1.LimitedPriorityLevelConfiguration, out *flowcontrol.LimitedPriorityLevelConfiguration, s conversion.Scope) error {
-	if err := metav1.Convert_Pointer_int32_To_int32(&in.NominalConcurrencyShares, &out.NominalConcurrencyShares, s); err != nil {
-		return err
-	}
-	if err := Convert_v1_LimitResponse_To_flowcontrol_LimitResponse(&in.LimitResponse, &out.LimitResponse, s); err != nil {
-		return err
-	}
-	out.LendablePercent = (*int32)(unsafe.Pointer(in.LendablePercent))
-	out.BorrowingLimitPercent = (*int32)(unsafe.Pointer(in.BorrowingLimitPercent))
+	*out = *(*flowcontrol.LimitedPriorityLevelConfiguration)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -483,14 +475,7 @@ func Convert_v1_LimitedPriorityLevelConfiguration_To_flowcontrol_LimitedPriority
 }
 
 func autoConvert_flowcontrol_LimitedPriorityLevelConfiguration_To_v1_LimitedPriorityLevelConfiguration(in *flowcontrol.LimitedPriorityLevelConfiguration, out *flowcontrolv1.LimitedPriorityLevelConfiguration, s conversion.Scope) error {
-	if err := metav1.Convert_int32_To_Pointer_int32(&in.NominalConcurrencyShares, &out.NominalConcurrencyShares, s); err != nil {
-		return err
-	}
-	if err := Convert_flowcontrol_LimitResponse_To_v1_LimitResponse(&in.LimitResponse, &out.LimitResponse, s); err != nil {
-		return err
-	}
-	out.LendablePercent = (*int32)(unsafe.Pointer(in.LendablePercent))
-	out.BorrowingLimitPercent = (*int32)(unsafe.Pointer(in.BorrowingLimitPercent))
+	*out = *(*flowcontrolv1.LimitedPriorityLevelConfiguration)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -593,17 +578,7 @@ func Convert_flowcontrol_PriorityLevelConfigurationCondition_To_v1_PriorityLevel
 
 func autoConvert_v1_PriorityLevelConfigurationList_To_flowcontrol_PriorityLevelConfigurationList(in *flowcontrolv1.PriorityLevelConfigurationList, out *flowcontrol.PriorityLevelConfigurationList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	if in.Items != nil {
-		in, out := &in.Items, &out.Items
-		*out = make([]flowcontrol.PriorityLevelConfiguration, len(*in))
-		for i := range *in {
-			if err := Convert_v1_PriorityLevelConfiguration_To_flowcontrol_PriorityLevelConfiguration(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.Items = nil
-	}
+	out.Items = *(*[]flowcontrol.PriorityLevelConfiguration)(unsafe.Pointer(&in.Items))
 	return nil
 }
 
@@ -614,17 +589,7 @@ func Convert_v1_PriorityLevelConfigurationList_To_flowcontrol_PriorityLevelConfi
 
 func autoConvert_flowcontrol_PriorityLevelConfigurationList_To_v1_PriorityLevelConfigurationList(in *flowcontrol.PriorityLevelConfigurationList, out *flowcontrolv1.PriorityLevelConfigurationList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	if in.Items != nil {
-		in, out := &in.Items, &out.Items
-		*out = make([]flowcontrolv1.PriorityLevelConfiguration, len(*in))
-		for i := range *in {
-			if err := Convert_flowcontrol_PriorityLevelConfiguration_To_v1_PriorityLevelConfiguration(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.Items = nil
-	}
+	out.Items = *(*[]flowcontrolv1.PriorityLevelConfiguration)(unsafe.Pointer(&in.Items))
 	return nil
 }
 
@@ -654,17 +619,7 @@ func Convert_flowcontrol_PriorityLevelConfigurationReference_To_v1_PriorityLevel
 }
 
 func autoConvert_v1_PriorityLevelConfigurationSpec_To_flowcontrol_PriorityLevelConfigurationSpec(in *flowcontrolv1.PriorityLevelConfigurationSpec, out *flowcontrol.PriorityLevelConfigurationSpec, s conversion.Scope) error {
-	out.Type = flowcontrol.PriorityLevelEnablement(in.Type)
-	if in.Limited != nil {
-		in, out := &in.Limited, &out.Limited
-		*out = new(flowcontrol.LimitedPriorityLevelConfiguration)
-		if err := Convert_v1_LimitedPriorityLevelConfiguration_To_flowcontrol_LimitedPriorityLevelConfiguration(*in, *out, s); err != nil {
-			return err
-		}
-	} else {
-		out.Limited = nil
-	}
-	out.Exempt = (*flowcontrol.ExemptPriorityLevelConfiguration)(unsafe.Pointer(in.Exempt))
+	*out = *(*flowcontrol.PriorityLevelConfigurationSpec)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -674,17 +629,7 @@ func Convert_v1_PriorityLevelConfigurationSpec_To_flowcontrol_PriorityLevelConfi
 }
 
 func autoConvert_flowcontrol_PriorityLevelConfigurationSpec_To_v1_PriorityLevelConfigurationSpec(in *flowcontrol.PriorityLevelConfigurationSpec, out *flowcontrolv1.PriorityLevelConfigurationSpec, s conversion.Scope) error {
-	out.Type = flowcontrolv1.PriorityLevelEnablement(in.Type)
-	if in.Limited != nil {
-		in, out := &in.Limited, &out.Limited
-		*out = new(flowcontrolv1.LimitedPriorityLevelConfiguration)
-		if err := Convert_flowcontrol_LimitedPriorityLevelConfiguration_To_v1_LimitedPriorityLevelConfiguration(*in, *out, s); err != nil {
-			return err
-		}
-	} else {
-		out.Limited = nil
-	}
-	out.Exempt = (*flowcontrolv1.ExemptPriorityLevelConfiguration)(unsafe.Pointer(in.Exempt))
+	*out = *(*flowcontrolv1.PriorityLevelConfigurationSpec)(unsafe.Pointer(in))
 	return nil
 }
 

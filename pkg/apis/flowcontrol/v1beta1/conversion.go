@@ -20,6 +20,7 @@ import (
 	"k8s.io/api/flowcontrol/v1beta1"
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/kubernetes/pkg/apis/flowcontrol"
+	"k8s.io/utils/ptr"
 )
 
 // LimitedPriorityLevelConfiguration.AssuredConcurrencyShares has been
@@ -29,7 +30,7 @@ func Convert_v1beta1_LimitedPriorityLevelConfiguration_To_flowcontrol_LimitedPri
 		return err
 	}
 
-	out.NominalConcurrencyShares = in.AssuredConcurrencyShares
+	out.NominalConcurrencyShares = new(in.AssuredConcurrencyShares)
 	return nil
 }
 
@@ -40,6 +41,6 @@ func Convert_flowcontrol_LimitedPriorityLevelConfiguration_To_v1beta1_LimitedPri
 		return err
 	}
 
-	out.AssuredConcurrencyShares = in.NominalConcurrencyShares
+	out.AssuredConcurrencyShares = ptr.Deref(in.NominalConcurrencyShares, 0)
 	return nil
 }

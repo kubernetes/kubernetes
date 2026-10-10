@@ -737,7 +737,7 @@ func TestPriorityLevelConfigurationValidation(t *testing.T) {
 	badSpec := flowcontrol.PriorityLevelConfigurationSpec{
 		Type: flowcontrol.PriorityLevelEnablementLimited,
 		Limited: &flowcontrol.LimitedPriorityLevelConfiguration{
-			NominalConcurrencyShares: 42,
+			NominalConcurrencyShares: ptr.To[int32](42),
 			LimitResponse: flowcontrol.LimitResponse{
 				Type: flowcontrol.LimitResponseTypeReject},
 		},
@@ -762,7 +762,7 @@ func TestPriorityLevelConfigurationValidation(t *testing.T) {
 		Type:   flowcontrol.PriorityLevelEnablementExempt,
 		Exempt: &flowcontrol.ExemptPriorityLevelConfiguration{},
 		Limited: &flowcontrol.LimitedPriorityLevelConfiguration{
-			NominalConcurrencyShares: 42,
+			NominalConcurrencyShares: ptr.To[int32](42),
 			LimitResponse: flowcontrol.LimitResponse{
 				Type: flowcontrol.LimitResponseTypeReject},
 		},
@@ -788,7 +788,7 @@ func TestPriorityLevelConfigurationValidation(t *testing.T) {
 			Type:   flowcontrol.PriorityLevelEnablementLimited,
 			Exempt: &flowcontrol.ExemptPriorityLevelConfiguration{},
 			Limited: &flowcontrol.LimitedPriorityLevelConfiguration{
-				NominalConcurrencyShares: 42,
+				NominalConcurrencyShares: ptr.To[int32](42),
 				LimitResponse: flowcontrol.LimitResponse{
 					Type: flowcontrol.LimitResponseTypeReject},
 			},
@@ -915,7 +915,7 @@ func TestPriorityLevelConfigurationValidation(t *testing.T) {
 			Spec: flowcontrol.PriorityLevelConfigurationSpec{
 				Type: flowcontrol.PriorityLevelEnablementLimited,
 				Limited: &flowcontrol.LimitedPriorityLevelConfiguration{
-					NominalConcurrencyShares: 42,
+					NominalConcurrencyShares: ptr.To[int32](42),
 					LimitResponse: flowcontrol.LimitResponse{
 						Type: flowcontrol.LimitResponseTypeReject},
 				},
@@ -931,7 +931,7 @@ func TestPriorityLevelConfigurationValidation(t *testing.T) {
 			Spec: flowcontrol.PriorityLevelConfigurationSpec{
 				Type: flowcontrol.PriorityLevelEnablementLimited,
 				Limited: &flowcontrol.LimitedPriorityLevelConfiguration{
-					NominalConcurrencyShares: 100,
+					NominalConcurrencyShares: ptr.To[int32](100),
 					LimitResponse: flowcontrol.LimitResponse{
 						Type: flowcontrol.LimitResponseTypeReject,
 						Queuing: &flowcontrol.QueuingConfiguration{
@@ -959,7 +959,7 @@ func TestPriorityLevelConfigurationValidation(t *testing.T) {
 			Spec: flowcontrol.PriorityLevelConfigurationSpec{
 				Type: flowcontrol.PriorityLevelEnablementLimited,
 				Limited: &flowcontrol.LimitedPriorityLevelConfiguration{
-					NominalConcurrencyShares: 5,
+					NominalConcurrencyShares: ptr.To[int32](5),
 					LendablePercent:          ptr.To[int32](0),
 					LimitResponse: flowcontrol.LimitResponse{
 						Type: flowcontrol.LimitResponseTypeReject,
@@ -975,7 +975,7 @@ func TestPriorityLevelConfigurationValidation(t *testing.T) {
 			Spec: flowcontrol.PriorityLevelConfigurationSpec{
 				Type: flowcontrol.PriorityLevelEnablementLimited,
 				Limited: &flowcontrol.LimitedPriorityLevelConfiguration{
-					NominalConcurrencyShares: 100,
+					NominalConcurrencyShares: ptr.To[int32](100),
 					LimitResponse: flowcontrol.LimitResponse{
 						Type: flowcontrol.LimitResponseTypeQueue,
 					}}},
@@ -990,7 +990,7 @@ func TestPriorityLevelConfigurationValidation(t *testing.T) {
 			Spec: flowcontrol.PriorityLevelConfigurationSpec{
 				Type: flowcontrol.PriorityLevelEnablementLimited,
 				Limited: &flowcontrol.LimitedPriorityLevelConfiguration{
-					NominalConcurrencyShares: 100,
+					NominalConcurrencyShares: ptr.To[int32](100),
 					LimitResponse: flowcontrol.LimitResponse{
 						Type: flowcontrol.LimitResponseTypeQueue,
 						Queuing: &flowcontrol.QueuingConfiguration{
@@ -1009,7 +1009,7 @@ func TestPriorityLevelConfigurationValidation(t *testing.T) {
 			Spec: flowcontrol.PriorityLevelConfigurationSpec{
 				Type: flowcontrol.PriorityLevelEnablementLimited,
 				Limited: &flowcontrol.LimitedPriorityLevelConfiguration{
-					NominalConcurrencyShares: 100,
+					NominalConcurrencyShares: ptr.To[int32](100),
 					LimitResponse: flowcontrol.LimitResponse{
 						Type: flowcontrol.LimitResponseTypeQueue,
 						Queuing: &flowcontrol.QueuingConfiguration{
@@ -1030,7 +1030,7 @@ func TestPriorityLevelConfigurationValidation(t *testing.T) {
 			Spec: flowcontrol.PriorityLevelConfigurationSpec{
 				Type: flowcontrol.PriorityLevelEnablementLimited,
 				Limited: &flowcontrol.LimitedPriorityLevelConfiguration{
-					NominalConcurrencyShares: 100,
+					NominalConcurrencyShares: ptr.To[int32](100),
 					LimitResponse: flowcontrol.LimitResponse{
 						Type: flowcontrol.LimitResponseTypeQueue,
 						Queuing: &flowcontrol.QueuingConfiguration{
@@ -1051,7 +1051,7 @@ func TestPriorityLevelConfigurationValidation(t *testing.T) {
 			Spec: flowcontrol.PriorityLevelConfigurationSpec{
 				Type: flowcontrol.PriorityLevelEnablementLimited,
 				Limited: &flowcontrol.LimitedPriorityLevelConfiguration{
-					NominalConcurrencyShares: 100,
+					NominalConcurrencyShares: ptr.To[int32](100),
 					LimitResponse: flowcontrol.LimitResponse{
 						Type: flowcontrol.LimitResponseTypeQueue,
 						Queuing: &flowcontrol.QueuingConfiguration{
@@ -1073,7 +1073,7 @@ func TestPriorityLevelConfigurationValidation(t *testing.T) {
 			Spec: flowcontrol.PriorityLevelConfigurationSpec{
 				Type: flowcontrol.PriorityLevelEnablementLimited,
 				Limited: &flowcontrol.LimitedPriorityLevelConfiguration{
-					NominalConcurrencyShares: 100,
+					NominalConcurrencyShares: ptr.To[int32](100),
 					LimitResponse: flowcontrol.LimitResponse{
 						Type: flowcontrol.LimitResponseTypeQueue,
 						Queuing: &flowcontrol.QueuingConfiguration{
@@ -1092,7 +1092,7 @@ func TestPriorityLevelConfigurationValidation(t *testing.T) {
 			Spec: flowcontrol.PriorityLevelConfigurationSpec{
 				Type: flowcontrol.PriorityLevelEnablementLimited,
 				Limited: &flowcontrol.LimitedPriorityLevelConfiguration{
-					NominalConcurrencyShares: 100,
+					NominalConcurrencyShares: ptr.To[int32](100),
 					LimitResponse: flowcontrol.LimitResponse{
 						Type: flowcontrol.LimitResponseTypeQueue,
 						Queuing: &flowcontrol.QueuingConfiguration{
@@ -1116,7 +1116,7 @@ func TestPriorityLevelConfigurationValidation(t *testing.T) {
 			Spec: flowcontrol.PriorityLevelConfigurationSpec{
 				Type: flowcontrol.PriorityLevelEnablementLimited,
 				Limited: &flowcontrol.LimitedPriorityLevelConfiguration{
-					NominalConcurrencyShares: 42,
+					NominalConcurrencyShares: ptr.To[int32](42),
 					LimitResponse: flowcontrol.LimitResponse{
 						Type: flowcontrol.LimitResponseTypeReject},
 				},
@@ -1149,7 +1149,7 @@ func TestPriorityLevelConfigurationValidation(t *testing.T) {
 			Spec: flowcontrol.PriorityLevelConfigurationSpec{
 				Type: flowcontrol.PriorityLevelEnablementLimited,
 				Limited: &flowcontrol.LimitedPriorityLevelConfiguration{
-					NominalConcurrencyShares: 42,
+					NominalConcurrencyShares: ptr.To[int32](42),
 					LimitResponse: flowcontrol.LimitResponse{
 						Type: "",
 					},
@@ -1365,7 +1365,7 @@ func TestValidateLimitedPriorityLevelConfiguration(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.requestVersion.String(), func(t *testing.T) {
 			configuration := &flowcontrol.LimitedPriorityLevelConfiguration{
-				NominalConcurrencyShares: test.concurrencyShares,
+				NominalConcurrencyShares: new(test.concurrencyShares),
 				LimitResponse: flowcontrol.LimitResponse{
 					Type: flowcontrol.LimitResponseTypeReject,
 				},
@@ -1441,7 +1441,7 @@ func TestValidateLimitedPriorityLevelConfigurationWithBorrowing(t *testing.T) {
 	for _, test := range tests {
 		t.Run(makeTestNameFn(test.lendablePercent, test.borrowingLimitPercent), func(t *testing.T) {
 			configuration := &flowcontrol.LimitedPriorityLevelConfiguration{
-				NominalConcurrencyShares: 1,
+				NominalConcurrencyShares: ptr.To[int32](1),
 				LimitResponse: flowcontrol.LimitResponse{
 					Type: flowcontrol.LimitResponseTypeReject,
 				},
