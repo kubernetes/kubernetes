@@ -114,7 +114,7 @@ var _ = SIGDescribe("ImageGCNoEviction", framework.WithSlow(), framework.WithSer
 	const pressureTimeout = 10 * time.Minute
 	const expectedNodeCondition = v1.NodeDiskPressure
 	const expectedStarvedResource = resourceInodes
-	const inodesToThreshold = uint64(100000)
+	const inodesToThreshold = uint64(50000)
 	ginkgo.Context(fmt.Sprintf(testContextFmt, expectedNodeCondition), func() {
 		prepull := func(ctx context.Context) {
 			// Prepull images for image garbage collector to remove them
@@ -143,7 +143,7 @@ var _ = SIGDescribe("ImageGCNoEviction", framework.WithSlow(), framework.WithSer
 		runEvictionTest(f, pressureTimeout, expectedNodeCondition, expectedStarvedResource, logInodeMetrics, []podEvictSpec{
 			{
 				evictionPriority: 0,
-				pod:              inodeConsumingPod("container-inode", 110000, nil, true),
+				pod:              inodeConsumingPod("container-inode", 60000, nil, true),
 			},
 		})
 	})
