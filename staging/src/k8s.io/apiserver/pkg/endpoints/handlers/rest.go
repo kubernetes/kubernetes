@@ -106,6 +106,10 @@ type RequestScope struct {
 	HubGroupVersion schema.GroupVersion
 
 	MaxRequestBodyBytes int64
+
+	// AdmissionEquivalents are declared by the storage behind this endpoint. Must not be modified
+	// after installation.
+	AdmissionEquivalents []admission.Equivalent
 }
 
 func (scope *RequestScope) err(err error, w http.ResponseWriter, req *http.Request) {
@@ -171,6 +175,14 @@ func (r *RequestScope) GetObjectDefaulter() runtime.ObjectDefaulter { return r.D
 func (r *RequestScope) GetObjectConvertor() runtime.ObjectConvertor { return r.Convertor }
 func (r *RequestScope) GetEquivalentResourceMapper() runtime.EquivalentResourceMapper {
 	return r.EquivalentResourceMapper
+}
+
+// Admission plugins receive the RequestScope as ObjectInterfaces; this is how they learn the
+// endpoint's admission equivalents.
+var _ admission.EquivalentsGetter = &RequestScope{}
+
+func (r *RequestScope) GetAdmissionEquivalents() []admission.Equivalent {
+	return r.AdmissionEquivalents
 }
 
 // ConnectResource returns a function that handles a connect request on a rest.Storage object.
