@@ -35,13 +35,27 @@ const (
 )
 
 // NewContext instantiates a base context object for request flows.
+//
+//logcheck:context // Use the parent context or context.TODO()/context.Background() instead.
 func NewContext() context.Context {
-	return context.TODO()
+	return context.Background()
 }
 
 // NewDefaultContext instantiates a base context object for request flows in the default namespace
+//
+//logcheck:context // WithDefaultNamespace with a suitable parent context should be used instead of NewDefaultContext. Use context.WithoutCancel(ctx) as parent context if unsure about propagation of cancellation.
 func NewDefaultContext() context.Context {
 	return WithNamespace(NewContext(), metav1.NamespaceDefault)
+}
+
+// WithDefaultNamespace returns a copy of parent with the default namespace.
+//
+// Context cancellation is inherited from that parent context.
+// When that is not desired, context.WithoutCancel can be used:
+//
+//	requestCtx := WithDefaultNamespace(context.WithoutCancel(ctx))
+func WithDefaultNamespace(parent context.Context) context.Context {
+	return WithNamespace(parent, metav1.NamespaceDefault)
 }
 
 // WithValue returns a copy of parent in which the value associated with key is val.
