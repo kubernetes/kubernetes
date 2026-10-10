@@ -1,0 +1,1242 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: representative-infrastructure-pod-0
+  namespace: default
+  uid: fuzzed-uid-00000000-9pPfd2dd
+  annotations:
+    cluster-autoscaler.kubernetes.io/enable-ds-eviction: fuzzed-val-o6U5ghpJSbYGbte5
+    components.gke.io/component-name: fuzzed-val-E38Wq2JBHd5rDGSS
+    components.gke.io/component-version: fuzzed-val-MJqGKEdNysOsEDId
+    prometheus.io/port: fuzzed-val-SeNieV5AUpIh2y3Z
+    prometheus.io/scrape: fuzzed-val-MA6FU3Qg8sNKK01S
+  generation: 1
+  labels:
+    controller-revision-hash: fuzzed-label-3FP9xNIO
+    k8s-app: fuzzed-label-uuW3P5ia
+    pod-template-generation: fuzzed-label-4IqogvHL
+  managedFields:
+  - apiVersion: v1
+    fieldsType: FieldsV1
+    fieldsV1:
+      f:fuzzed_field_EItr:
+        f:fuzzed_field_3xxQ: {}
+        f:fuzzed_field_7F1p:
+          .: {}
+          k:{"id":13,"name":"fuzzed-node-FwZt"}:
+            .: {}
+            f:fuzzed_field_LuOM:
+              .: {}
+              f:fuzzed_field_O6dW: {}
+              f:fuzzed_field_kUxe:
+                .: {}
+                f:fuzzed_field_7Uyf: {}
+            f:fuzzed_field_TW6D: {}
+            f:fuzzed_field_WU3O: {}
+            f:fuzzed_field_b5nt:
+              .: {}
+              k:{"id":40,"name":"fuzzed-node-YTv7"}:
+                .: {}
+                f:fuzzed_field_2i9o:
+                  .: {}
+                  f:fuzzed_field_ZdwT: {}
+                f:fuzzed_field_p4xF: {}
+              k:{"id":54,"name":"fuzzed-node-B40n"}:
+                .: {}
+                f:fuzzed_field_DMtL: {}
+                f:fuzzed_field_TiTb:
+                  .: {}
+                  f:fuzzed_field_eBfh: {}
+              k:{"id":91,"name":"fuzzed-node-34MX"}:
+                .: {}
+                f:fuzzed_field_j9Z0:
+                  .: {}
+                  f:fuzzed_field_u620: {}
+                f:fuzzed_field_stsf: {}
+            f:fuzzed_field_cdbB:
+              .: {}
+              f:fuzzed_field_8x6d:
+                .: {}
+                f:fuzzed_field_Jqyk: {}
+                f:fuzzed_field_oGev: {}
+            f:fuzzed_field_iHV8: {}
+            f:fuzzed_field_p2xL: {}
+            f:fuzzed_field_qenB: {}
+            f:fuzzed_field_vRvM:
+              .: {}
+              k:{"id":67,"name":"fuzzed-node-4vyu"}:
+                .: {}
+                f:fuzzed_field_6CAF: {}
+                f:fuzzed_field_LgRl: {}
+                f:fuzzed_field_a289: {}
+              k:{"id":86,"name":"fuzzed-node-8U9r"}:
+                .: {}
+                f:fuzzed_field_s019: {}
+                f:fuzzed_field_w0un: {}
+            f:fuzzed_field_wXfa: {}
+          k:{"id":51,"name":"fuzzed-node-7UDG"}:
+            .: {}
+            f:fuzzed_field_1XLH:
+              .: {}
+              f:fuzzed_field_tmZ8:
+                .: {}
+                f:fuzzed_field_LL2N: {}
+            f:fuzzed_field_6bCn:
+              .: {}
+              k:{"id":41,"name":"fuzzed-node-f6Tn"}:
+                .: {}
+                f:fuzzed_field_jdko: {}
+                f:fuzzed_field_jmgb: {}
+            f:fuzzed_field_25jj: {}
+            f:fuzzed_field_CpIH: {}
+            f:fuzzed_field_EjAk:
+              .: {}
+              k:{"id":29,"name":"fuzzed-node-z2Z2"}:
+                .: {}
+                f:fuzzed_field_f9L2: {}
+                f:fuzzed_field_oYYt: {}
+            f:fuzzed_field_J3Rs: {}
+            f:fuzzed_field_VVy3: {}
+            f:fuzzed_field_hTmx: {}
+            f:fuzzed_field_kmhu:
+              .: {}
+              f:fuzzed_field_2heo:
+                .: {}
+                f:fuzzed_field_Bbpb: {}
+                f:fuzzed_field_c7Zf: {}
+            f:fuzzed_field_o9gq: {}
+          k:{"id":80,"name":"fuzzed-node-YRAk"}:
+            .: {}
+            f:fuzzed_field_5KnV:
+              .: {}
+              k:{"id":0,"name":"fuzzed-node-tqpl"}:
+                .: {}
+                f:fuzzed_field_hWG9: {}
+                f:fuzzed_field_iYTw: {}
+                f:fuzzed_field_pcez: {}
+              k:{"id":3,"name":"fuzzed-node-O3JT"}:
+                .: {}
+                f:fuzzed_field_Hbzm: {}
+                f:fuzzed_field_Ziq7: {}
+                f:fuzzed_field_bb6T: {}
+              k:{"id":29,"name":"fuzzed-node-aVKZ"}:
+                .: {}
+                f:fuzzed_field_CFJ3: {}
+                f:fuzzed_field_Vd7A: {}
+                f:fuzzed_field_v0d3: {}
+              k:{"id":47,"name":"fuzzed-node-0EtE"}:
+                .: {}
+                f:fuzzed_field_An3m: {}
+                f:fuzzed_field_BCcb: {}
+                f:fuzzed_field_Xy2d: {}
+              k:{"id":53,"name":"fuzzed-node-NSVb"}:
+                .: {}
+                f:fuzzed_field_8sb8: {}
+                f:fuzzed_field_uiBt: {}
+                f:fuzzed_field_uktn: {}
+              k:{"id":66,"name":"fuzzed-node-VyJ5"}:
+                .: {}
+                f:fuzzed_field_Gco8: {}
+                f:fuzzed_field_QdJ9: {}
+                f:fuzzed_field_aurY: {}
+              k:{"id":72,"name":"fuzzed-node-qqOM"}:
+                .: {}
+                f:fuzzed_field_7Aoh: {}
+                f:fuzzed_field_kIqN: {}
+                f:fuzzed_field_qhJi: {}
+              k:{"id":84,"name":"fuzzed-node-BsnO"}:
+                .: {}
+                f:fuzzed_field_RUo5: {}
+                f:fuzzed_field_djMU: {}
+                f:fuzzed_field_hUwi: {}
+              k:{"id":89,"name":"fuzzed-node-GTMI"}:
+                .: {}
+                f:fuzzed_field_RIWT: {}
+                f:fuzzed_field_WWss: {}
+            f:fuzzed_field_8Q0X: {}
+            f:fuzzed_field_AEHV: {}
+            f:fuzzed_field_DdFk: {}
+            f:fuzzed_field_FmyH:
+              .: {}
+              k:{"id":27,"name":"fuzzed-node-feZz"}:
+                .: {}
+                f:fuzzed_field_1Wdd:
+                  .: {}
+                  f:fuzzed_field_G71g: {}
+                f:fuzzed_field_VIqJ: {}
+            f:fuzzed_field_Iop4: {}
+            f:fuzzed_field_OYSA: {}
+            f:fuzzed_field_WAES:
+              .: {}
+              f:fuzzed_field_rmJW:
+                .: {}
+                f:fuzzed_field_IB6L: {}
+                f:fuzzed_field_MNp4: {}
+            f:fuzzed_field_Zyeb:
+              .: {}
+              f:fuzzed_field_AUzI:
+                .: {}
+                f:fuzzed_field_N2CH: {}
+              f:fuzzed_field_Ey04: {}
+              f:fuzzed_field_nRXN: {}
+            f:fuzzed_field_uci8: {}
+            f:fuzzed_field_zfGJ: {}
+        f:fuzzed_field_C6kr: {}
+        f:fuzzed_field_ETdR: {}
+        f:fuzzed_field_N0Zg: {}
+        f:fuzzed_field_No07: {}
+        f:fuzzed_field_P7Z8: {}
+        f:fuzzed_field_PK3p: {}
+        f:fuzzed_field_TO4k: {}
+        f:fuzzed_field_ToZv: {}
+        f:fuzzed_field_bWyr: {}
+        f:fuzzed_field_gVZI: {}
+        f:fuzzed_field_j9w8:
+          .: {}
+          f:fuzzed_field_O0Br:
+            .: {}
+            f:fuzzed_field_y8jQ: {}
+        f:fuzzed_field_kCNo: {}
+        f:fuzzed_field_mkzp:
+          k:{"id":40,"name":"fuzzed-node-o0gi"}:
+            .: {}
+            f:fuzzed_field_0fWP: {}
+            f:fuzzed_field_0jjo: {}
+            f:fuzzed_field_5pMG:
+              .: {}
+              k:{"id":14,"name":"fuzzed-node-UwRT"}:
+                .: {}
+                f:fuzzed_field_B8aW:
+                  .: {}
+                  f:fuzzed_field_x2Cu: {}
+                f:fuzzed_field_JGzF: {}
+              k:{"id":22,"name":"fuzzed-node-oyYM"}:
+                .: {}
+                f:fuzzed_field_DdIL:
+                  .: {}
+                  f:fuzzed_field_OqIl: {}
+                f:fuzzed_field_Is3M: {}
+              k:{"id":29,"name":"fuzzed-node-OeKC"}:
+                .: {}
+                f:fuzzed_field_7yEA: {}
+                f:fuzzed_field_Z8oq:
+                  .: {}
+                  f:fuzzed_field_jJdj: {}
+              k:{"id":29,"name":"fuzzed-node-k4sE"}:
+                .: {}
+                f:fuzzed_field_6NjS: {}
+                f:fuzzed_field_s8rL: {}
+              k:{"id":71,"name":"fuzzed-node-XaZg"}:
+                .: {}
+                f:fuzzed_field_RmaJ:
+                  .: {}
+                  f:fuzzed_field_9tNP: {}
+                f:fuzzed_field_tBXs: {}
+              k:{"id":71,"name":"fuzzed-node-oW4k"}:
+                .: {}
+                f:fuzzed_field_DYLJ: {}
+                f:fuzzed_field_OLYn:
+                  .: {}
+                  f:fuzzed_field_4wdL: {}
+              k:{"id":81,"name":"fuzzed-node-OTEK"}:
+                .: {}
+                f:fuzzed_field_IceV: {}
+                f:fuzzed_field_ZqNA:
+                  .: {}
+                  f:fuzzed_field_Ui0z: {}
+              k:{"id":82,"name":"fuzzed-node-A6sR"}:
+                .: {}
+                f:fuzzed_field_2oKw: {}
+                f:fuzzed_field_U6kS: {}
+              k:{"id":84,"name":"fuzzed-node-k9iy"}:
+                .: {}
+                f:fuzzed_field_Pxvw:
+                  .: {}
+                  f:fuzzed_field_Ie1v: {}
+                f:fuzzed_field_XKtK: {}
+              k:{"id":89,"name":"fuzzed-node-1byw"}:
+                .: {}
+                f:fuzzed_field_HIXc: {}
+                f:fuzzed_field_iuvu: {}
+            f:fuzzed_field_7usg:
+              .: {}
+              k:{"id":14,"name":"fuzzed-node-tCjb"}:
+                .: {}
+                f:fuzzed_field_96es: {}
+                f:fuzzed_field_Q7Ba: {}
+                f:fuzzed_field_moeW: {}
+              k:{"id":17,"name":"fuzzed-node-60m1"}:
+                .: {}
+                f:fuzzed_field_hVtc: {}
+                f:fuzzed_field_o7j0: {}
+                f:fuzzed_field_s2rg: {}
+              k:{"id":18,"name":"fuzzed-node-rbvf"}:
+                .: {}
+                f:fuzzed_field_8QFB: {}
+                f:fuzzed_field_OYeY: {}
+                f:fuzzed_field_jEgs: {}
+              k:{"id":21,"name":"fuzzed-node-LNhG"}:
+                .: {}
+                f:fuzzed_field_ckzT: {}
+                f:fuzzed_field_pLe2: {}
+                f:fuzzed_field_zch5: {}
+              k:{"id":27,"name":"fuzzed-node-bGut"}:
+                .: {}
+                f:fuzzed_field_nHNB: {}
+                f:fuzzed_field_oBR2: {}
+              k:{"id":28,"name":"fuzzed-node-cDGl"}:
+                .: {}
+                f:fuzzed_field_Kci8: {}
+                f:fuzzed_field_T9ey: {}
+                f:fuzzed_field_TN98: {}
+                f:fuzzed_field_zLi2: {}
+              k:{"id":28,"name":"fuzzed-node-pa3i"}:
+                .: {}
+                f:fuzzed_field_IuBf: {}
+                f:fuzzed_field_YAgk: {}
+                f:fuzzed_field_lbNX: {}
+              k:{"id":40,"name":"fuzzed-node-xVgX"}:
+                .: {}
+                f:fuzzed_field_1pPj: {}
+                f:fuzzed_field_zgSg: {}
+              k:{"id":49,"name":"fuzzed-node-o5XR"}:
+                .: {}
+                f:fuzzed_field_Bd80: {}
+                f:fuzzed_field_hG6o: {}
+                f:fuzzed_field_zLNI: {}
+              k:{"id":52,"name":"fuzzed-node-qk3D"}:
+                .: {}
+                f:fuzzed_field_5Ls5: {}
+                f:fuzzed_field_iukX: {}
+              k:{"id":58,"name":"fuzzed-node-QZoO"}:
+                .: {}
+                f:fuzzed_field_LX09: {}
+                f:fuzzed_field_kUax: {}
+                f:fuzzed_field_nznq: {}
+              k:{"id":74,"name":"fuzzed-node-Tppi"}:
+                .: {}
+                f:fuzzed_field_RdKU: {}
+                f:fuzzed_field_aQlA: {}
+                f:fuzzed_field_z28E: {}
+              k:{"id":75,"name":"fuzzed-node-dIaU"}:
+                .: {}
+                f:fuzzed_field_rtxN: {}
+                f:fuzzed_field_zqL0: {}
+              k:{"id":93,"name":"fuzzed-node-Tnmz"}:
+                .: {}
+                f:fuzzed_field_C8oz: {}
+                f:fuzzed_field_uXyu: {}
+              k:{"id":96,"name":"fuzzed-node-62GS"}:
+                .: {}
+                f:fuzzed_field_esY8: {}
+                f:fuzzed_field_pvq3: {}
+                f:fuzzed_field_vKdt: {}
+              k:{"id":97,"name":"fuzzed-node-A8Fj"}:
+                .: {}
+                f:fuzzed_field_dfHJ: {}
+                f:fuzzed_field_ebXS: {}
+            f:fuzzed_field_EBxH: {}
+            f:fuzzed_field_Psa1:
+              .: {}
+              k:{"id":58,"name":"fuzzed-node-xZXp"}:
+                .: {}
+                f:fuzzed_field_7npr: {}
+                f:fuzzed_field_9IJW: {}
+                f:fuzzed_field_36vz: {}
+                f:fuzzed_field_awg2: {}
+            f:fuzzed_field_SkJu: {}
+            f:fuzzed_field_SvW0:
+              .: {}
+              f:fuzzed_field_5dPX: {}
+              f:fuzzed_field_EICo: {}
+              f:fuzzed_field_Hyv4: {}
+              f:fuzzed_field_JWuf:
+                .: {}
+                f:fuzzed_field_0kgk: {}
+                f:fuzzed_field_8do1: {}
+                f:fuzzed_field_G2dY: {}
+                f:fuzzed_field_Sn7F: {}
+                f:fuzzed_field_UPQl: {}
+              f:fuzzed_field_tqaW: {}
+            f:fuzzed_field_U7ti: {}
+            f:fuzzed_field_ijE4: {}
+            f:fuzzed_field_o2AT:
+              .: {}
+              f:fuzzed_field_7lpO: {}
+              f:fuzzed_field_A51w: {}
+              f:fuzzed_field_HCy2: {}
+              f:fuzzed_field_YVta:
+                .: {}
+                f:fuzzed_field_406c: {}
+                f:fuzzed_field_DlLX: {}
+                f:fuzzed_field_Zthr: {}
+                f:fuzzed_field_dS0U: {}
+                f:fuzzed_field_nwYu: {}
+              f:fuzzed_field_cSyN: {}
+            f:fuzzed_field_pRFR: {}
+            f:fuzzed_field_r2fM:
+              .: {}
+              f:fuzzed_field_MLzk:
+                .: {}
+                f:fuzzed_field_5sAL: {}
+                f:fuzzed_field_PDsx: {}
+            f:fuzzed_field_rvCA:
+              .: {}
+              f:fuzzed_field_08AM: {}
+              f:fuzzed_field_yAcK:
+                .: {}
+                f:fuzzed_field_Se06: {}
+            f:fuzzed_field_wmPa:
+              .: {}
+              f:fuzzed_field_R2wK: {}
+              f:fuzzed_field_XHAG: {}
+              f:fuzzed_field_b2rE: {}
+              f:fuzzed_field_bpRA:
+                .: {}
+                f:fuzzed_field_D3bG: {}
+                f:fuzzed_field_RQMC: {}
+                f:fuzzed_field_W7VZ: {}
+                f:fuzzed_field_aFWk: {}
+                f:fuzzed_field_p3Eb: {}
+              f:fuzzed_field_dwLK: {}
+          k:{"id":81,"name":"fuzzed-node-u1b7"}:
+            .: {}
+            f:fuzzed_field_0ev4:
+              .: {}
+              f:fuzzed_field_0ffO: {}
+              f:fuzzed_field_8gTF:
+                .: {}
+                f:fuzzed_field_QjB2: {}
+              f:fuzzed_field_PALX: {}
+              f:fuzzed_field_S0Iy: {}
+              f:fuzzed_field_bsyK: {}
+              f:fuzzed_field_hHrN:
+                .: {}
+                f:fuzzed_field_m1SU: {}
+              f:fuzzed_field_q18E: {}
+            f:fuzzed_field_HEwE:
+              .: {}
+              f:fuzzed_field_6Wsk:
+                .: {}
+                f:fuzzed_field_LoOO: {}
+                f:fuzzed_field_NJOY: {}
+              f:fuzzed_field_Yse0:
+                .: {}
+                f:fuzzed_field_eSj7: {}
+                f:fuzzed_field_l2hk: {}
+            f:fuzzed_field_JLDv: {}
+            f:fuzzed_field_dcAD: {}
+            f:fuzzed_field_fgnm:
+              .: {}
+              k:{"id":42,"name":"fuzzed-node-eerT"}:
+                .: {}
+                f:fuzzed_field_UsOi: {}
+                f:fuzzed_field_dPY6: {}
+            f:fuzzed_field_jIMD: {}
+            f:fuzzed_field_lqAD: {}
+            f:fuzzed_field_mF4F: {}
+            f:fuzzed_field_pgVv:
+              .: {}
+              k:{"id":38,"name":"fuzzed-node-2Kr8"}:
+                .: {}
+                f:fuzzed_field_lEJR: {}
+                f:fuzzed_field_lJjA:
+                  .: {}
+                  f:fuzzed_field_6kwz: {}
+              k:{"id":44,"name":"fuzzed-node-ONVK"}:
+                .: {}
+                f:fuzzed_field_9brQ: {}
+                f:fuzzed_field_FW8x: {}
+              k:{"id":46,"name":"fuzzed-node-OuF6"}:
+                .: {}
+                f:fuzzed_field_C1Iv: {}
+                f:fuzzed_field_Yyqt: {}
+              k:{"id":55,"name":"fuzzed-node-bTsj"}:
+                .: {}
+                f:fuzzed_field_I4pW: {}
+                f:fuzzed_field_xMvM:
+                  .: {}
+                  f:fuzzed_field_UR22: {}
+              k:{"id":57,"name":"fuzzed-node-R7n0"}:
+                .: {}
+                f:fuzzed_field_K2ZZ: {}
+                f:fuzzed_field_sDmJ: {}
+              k:{"id":58,"name":"fuzzed-node-diu5"}:
+                .: {}
+                f:fuzzed_field_LDZY: {}
+                f:fuzzed_field_jVLH: {}
+              k:{"id":65,"name":"fuzzed-node-E2CZ"}:
+                .: {}
+                f:fuzzed_field_bugy: {}
+                f:fuzzed_field_k90A: {}
+              k:{"id":74,"name":"fuzzed-node-77oe"}:
+                .: {}
+                f:fuzzed_field_Azsa: {}
+                f:fuzzed_field_bESh: {}
+              k:{"id":76,"name":"fuzzed-node-tpCx"}:
+                .: {}
+                f:fuzzed_field_Frvi:
+                  .: {}
+                  f:fuzzed_field_CJ5T: {}
+                f:fuzzed_field_fIBB: {}
+              k:{"id":85,"name":"fuzzed-node-5eLb"}:
+                .: {}
+                f:fuzzed_field_6DTy: {}
+                f:fuzzed_field_NoX6:
+                  .: {}
+                  f:fuzzed_field_yGuM: {}
+              k:{"id":94,"name":"fuzzed-node-ymMl"}:
+                .: {}
+                f:fuzzed_field_JmsN: {}
+                f:fuzzed_field_fyuE:
+                  .: {}
+                  f:fuzzed_field_dUgQ: {}
+              k:{"id":97,"name":"fuzzed-node-s7o8"}:
+                .: {}
+                f:fuzzed_field_g9FU: {}
+                f:fuzzed_field_mWeV: {}
+        f:fuzzed_field_n6PT: {}
+        f:fuzzed_field_tn7k:
+          .: {}
+          k:{"id":5,"name":"fuzzed-node-JQMs"}:
+            .: {}
+            f:fuzzed_field_B3xg: {}
+            f:fuzzed_field_p2t3:
+              .: {}
+              f:fuzzed_field_ACQB: {}
+              f:fuzzed_field_GScf: {}
+          k:{"id":14,"name":"fuzzed-node-9fXS"}:
+            .: {}
+            f:fuzzed_field_LkhT:
+              .: {}
+              f:fuzzed_field_3Yuj: {}
+              f:fuzzed_field_vlgq: {}
+            f:fuzzed_field_pyPX: {}
+          k:{"id":14,"name":"fuzzed-node-sdNJ"}:
+            .: {}
+            f:fuzzed_field_FIjM:
+              .: {}
+              f:fuzzed_field_6vRI: {}
+              f:fuzzed_field_XGzb: {}
+              f:fuzzed_field_x4Wu: {}
+            f:fuzzed_field_URrI: {}
+          k:{"id":21,"name":"fuzzed-node-p7yn"}:
+            .: {}
+            f:fuzzed_field_WQf2:
+              .: {}
+              f:fuzzed_field_02vG: {}
+              f:fuzzed_field_zH8R: {}
+            f:fuzzed_field_eNvy: {}
+          k:{"id":24,"name":"fuzzed-node-cqbv"}:
+            .: {}
+            f:fuzzed_field_gpMM: {}
+            f:fuzzed_field_zQ9e:
+              .: {}
+              f:fuzzed_field_DDeL: {}
+              f:fuzzed_field_pmFE: {}
+          k:{"id":26,"name":"fuzzed-node-PYCK"}:
+            .: {}
+            f:fuzzed_field_ck7E: {}
+            f:fuzzed_field_pqjZ:
+              .: {}
+              f:fuzzed_field_9axx: {}
+              f:fuzzed_field_CEI3: {}
+          k:{"id":28,"name":"fuzzed-node-vH7o"}:
+            .: {}
+            f:fuzzed_field_FQnu: {}
+            f:fuzzed_field_VICR: {}
+          k:{"id":42,"name":"fuzzed-node-RbWo"}:
+            .: {}
+            f:fuzzed_field_1YI4: {}
+            f:fuzzed_field_QAJP:
+              .: {}
+              f:fuzzed_field_eaIM: {}
+              f:fuzzed_field_maf0: {}
+          k:{"id":46,"name":"fuzzed-node-l4Ci"}:
+            .: {}
+            f:fuzzed_field_Fqgv: {}
+            f:fuzzed_field_t5uS:
+              .: {}
+              f:fuzzed_field_HODS: {}
+              f:fuzzed_field_iPxU: {}
+              f:fuzzed_field_vuQm: {}
+          k:{"id":50,"name":"fuzzed-node-C0hr"}:
+            .: {}
+            f:fuzzed_field_hAl2:
+              .: {}
+              f:fuzzed_field_ax7z: {}
+              f:fuzzed_field_pW8P: {}
+            f:fuzzed_field_weYQ: {}
+          k:{"id":55,"name":"fuzzed-node-Ntbb"}:
+            .: {}
+            f:fuzzed_field_0zvS:
+              .: {}
+              f:fuzzed_field_GWQF: {}
+              f:fuzzed_field_iOv3: {}
+            f:fuzzed_field_Q1I9: {}
+          k:{"id":55,"name":"fuzzed-node-s9GS"}:
+            .: {}
+            f:fuzzed_field_p2Ju:
+              .: {}
+              f:fuzzed_field_JwoE: {}
+              f:fuzzed_field_ecX7: {}
+            f:fuzzed_field_wAVA: {}
+          k:{"id":56,"name":"fuzzed-node-61UW"}:
+            .: {}
+            f:fuzzed_field_2Bpn:
+              .: {}
+              f:fuzzed_field_QFIZ: {}
+              f:fuzzed_field_Wqax: {}
+            f:fuzzed_field_Urfj: {}
+          k:{"id":61,"name":"fuzzed-node-N9tV"}:
+            .: {}
+            f:fuzzed_field_EuHt: {}
+            f:fuzzed_field_yjp5:
+              .: {}
+              f:fuzzed_field_cmUm: {}
+              f:fuzzed_field_vLE0: {}
+          k:{"id":64,"name":"fuzzed-node-ddC8"}:
+            .: {}
+            f:fuzzed_field_asN0:
+              .: {}
+              f:fuzzed_field_0ct2: {}
+              f:fuzzed_field_SYWw: {}
+              f:fuzzed_field_aywx: {}
+              f:fuzzed_field_oczB: {}
+            f:fuzzed_field_nzD1: {}
+          k:{"id":87,"name":"fuzzed-node-DGNM"}:
+            .: {}
+            f:fuzzed_field_4uJm:
+              .: {}
+              f:fuzzed_field_8WZL: {}
+              f:fuzzed_field_E1t5: {}
+              f:fuzzed_field_okcE: {}
+              f:fuzzed_field_wpdL: {}
+            f:fuzzed_field_JpM1: {}
+          k:{"id":90,"name":"fuzzed-node-gjbA"}:
+            .: {}
+            f:fuzzed_field_29Js:
+              .: {}
+              f:fuzzed_field_Lf8n: {}
+              f:fuzzed_field_r6Gg: {}
+            f:fuzzed_field_X7AF: {}
+          k:{"id":93,"name":"fuzzed-node-Zh1b"}:
+            .: {}
+            f:fuzzed_field_NnVp: {}
+            f:fuzzed_field_OXVf:
+              .: {}
+              f:fuzzed_field_JA8v: {}
+              f:fuzzed_field_bmL7: {}
+          k:{"id":94,"name":"fuzzed-node-pHAh"}:
+            .: {}
+            f:fuzzed_field_HnQF: {}
+            f:fuzzed_field_Kyws:
+              .: {}
+              f:fuzzed_field_LG6S: {}
+              f:fuzzed_field_xrl5: {}
+          k:{"id":95,"name":"fuzzed-node-dqoG"}:
+            .: {}
+            f:fuzzed_field_2PcZ:
+              .: {}
+              f:fuzzed_field_2RDF: {}
+              f:fuzzed_field_81cf: {}
+            f:fuzzed_field_T4Xg: {}
+      f:fuzzed_field_f3pD:
+        f:fuzzed_field_6zhT:
+          .: {}
+          f:fuzzed_field_87aX: {}
+          f:fuzzed_field_eYmQ: {}
+          f:fuzzed_field_jzaU: {}
+        f:fuzzed_field_8hUA:
+          .: {}
+          f:fuzzed_field_EYyw: {}
+          f:fuzzed_field_LwLm: {}
+          f:fuzzed_field_ZV7a: {}
+          f:fuzzed_field_dwuM: {}
+          f:fuzzed_field_fkto: {}
+        f:fuzzed_field_OLmM: {}
+        f:fuzzed_field_mVz6:
+          .: {}
+          k:{"id":22,"name":"fuzzed-node-jZau"}: {}
+    manager: kube-controller-manager
+    operation: Update
+    time: "2026-02-09T03:24:00Z"
+  - apiVersion: v1
+    fieldsType: FieldsV1
+    fieldsV1:
+      f:fuzzed_field_5ifW:
+        f:fuzzed_field_2Fid:
+          .: {}
+          k:{"id":85,"name":"fuzzed-node-GWnj"}:
+            .: {}
+            f:fuzzed_field_ag1f: {}
+        f:fuzzed_field_3RV8: {}
+        f:fuzzed_field_6na6:
+          k:{"id":13,"name":"fuzzed-node-Ww7N"}:
+            .: {}
+            f:fuzzed_field_5oVO: {}
+            f:fuzzed_field_MfzX: {}
+            f:fuzzed_field_Mjmy: {}
+            f:fuzzed_field_Q0r4: {}
+            f:fuzzed_field_aA5b: {}
+          k:{"id":33,"name":"fuzzed-node-D3yj"}:
+            .: {}
+            f:fuzzed_field_DYpM: {}
+            f:fuzzed_field_R1sP: {}
+            f:fuzzed_field_ZMEm: {}
+            f:fuzzed_field_ehob: {}
+            f:fuzzed_field_lH0a: {}
+          k:{"id":44,"name":"fuzzed-node-pGzT"}:
+            f:fuzzed_field_vqE3: {}
+          k:{"id":77,"name":"fuzzed-node-lLIu"}:
+            .: {}
+            f:fuzzed_field_25vj: {}
+            f:fuzzed_field_MKvC: {}
+            f:fuzzed_field_PGdV: {}
+            f:fuzzed_field_snuG: {}
+            f:fuzzed_field_vXlE: {}
+          k:{"id":92,"name":"fuzzed-node-yaZZ"}:
+            .: {}
+            f:fuzzed_field_8xrw: {}
+            f:fuzzed_field_A5ti: {}
+            f:fuzzed_field_GP6V: {}
+            f:fuzzed_field_Iy0Q: {}
+            f:fuzzed_field_jeuI: {}
+        f:fuzzed_field_9rmW: {}
+        f:fuzzed_field_EPHI: {}
+        f:fuzzed_field_GjPf: {}
+        f:fuzzed_field_K4BR: {}
+        f:fuzzed_field_OTYQ: {}
+        f:fuzzed_field_hVAr: {}
+        f:fuzzed_field_rGO0: {}
+    manager: kubelet
+    operation: Update
+    subresource: status
+    time: "2026-02-09T03:29:49Z"
+  ownerReferences:
+  - apiVersion: apps/v1
+    blockOwnerDeletion: true
+    controller: true
+    kind: DaemonSet
+    name: fuzzed-owner-xh64Xk3K
+    uid: fuzzed-uid-vPTLPxoE
+spec:
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+        - matchFields:
+          - key: metadata.name
+            operator: In
+            values:
+            - gke-tpu-6291e798-nd5p
+  automountServiceAccountToken: false
+  containers:
+  - args:
+    - |
+      exec {BASH_XTRACEFD}>&1 && set -x
+
+      if [[ -n "$${CILIUM_CONFIG_MAP}" ]] \
+          && [[ ! -f "$${CILIUM_CONFIG_MAP}/mtu" ]] \
+          && [[ -n "$${MTU_DEVICE_IP}" ]]; then
+        # Get mtu of the interface which has ip address '$${MTU_DEVICE_IP}'
+        mtu="$$(ip addr show to "$${MTU_DEVICE_IP}" | grep mtu | awk '{for (I=1;I<NF;I++) if ($$I == "mtu") print $$(I+1)}')"
+
+        # Check if we could retrive a number in 'mtu'
+        if [[ "$${mtu}" =~ ^[0-9]+$$ ]]; then
+          mtuArg="--mtu=$${mtu}"
+        fi
+      fi
+
+      exec /usr/bin/cilium-agent \
+        --k8s-kubeconfig-path=/var/lib/kubelet/kubeconfig \
+        --config-dir="$${CILIUM_CONFIG_MAP}" \
+        $${mtuArg:-}
+    command:
+    - bash
+    - -euc
+    env:
+    - name: FUZZED_ENV_RkjkhqaN
+      value: duAUkTSWLjDrVbSt594sJrFrZIK0twEPMpOCoASy4QFhLzmeMpJOgsBytEZHIDDY
+    - name: FUZZED_ENV_v4vZAZTV
+      value: rxHqyqZ1ammNsPL313bbCrnRyxBFzCpnu81NQgwlESx4Wqrh0ocz9AmYuVMRTgsU
+      valueFrom:
+        fieldRef:
+          apiVersion: v1
+          fieldPath: spec.nodeName
+    - name: FUZZED_ENV_Jp7ert8U
+      value: EO1gDKB1o0vuczcKcRfmEl2hCcAbRrEqumkfiEe3CawWScEU9z4KlkOGSCDybMnY
+      valueFrom:
+        fieldRef:
+          apiVersion: v1
+          fieldPath: metadata.namespace
+    - name: FUZZED_ENV_r78G6HW9
+      value: eirv743qoBmUvQe9svudJ4eWDkyUuNMAPdG0aY6bhrSsfzSx6vQ7E9lUiB0ZOmMe
+      valueFrom:
+        configMapKeyRef:
+          key: flannel-master-device
+          name: cilium-config
+          optional: true
+    - name: FUZZED_ENV_tl5e5dlw
+      value: qNUuGxfku328Wem7LMCMo41faAf0QgoonB36KeVzjKleoNQxkovAGxP2FBq1doyM
+      valueFrom:
+        configMapKeyRef:
+          key: flannel-uninstall-on-exit
+          name: cilium-config
+          optional: true
+    - name: FUZZED_ENV_zKdv2ynJ
+      value: DV2msWARx5YderPJzgdmXHuwKkj5uK8WYi8yj8IrlKfz4nzZlAn3qGp0nlDv11pe
+      valueFrom:
+        fieldRef:
+          apiVersion: v1
+          fieldPath: status.hostIP
+    - name: FUZZED_ENV_3pPLaPPl
+      value: eMwyxdGJumrukVwdSHWU8p0AcinW2aZKk3iino8cNPuoG5lJB9JO2laa4WdyCnEJ
+    - name: FUZZED_ENV_sb8odzMG
+      value: 2qhI5gtLZwB1pdun95JfvezssVHmUMDBzHBVQzx3aRJQmHcnEqRQ5LjjM2ouivf8
+    - name: FUZZED_ENV_N72pMtQG
+      value: qvGiIv3UOqPkllQ3LBYKx0cDIsTssorTQK7Fkphoa7Sa2VIuJt3LKwPaieJjIWBc
+      valueFrom:
+        configMapKeyRef:
+          key: cni-chaining-mode
+          name: cilium-config
+          optional: true
+    - name: FUZZED_ENV_59wbBXPH
+      value: o4lPM8L5MjZqnW9rqLOE1MV2lEyFnO9PmTQKifxnbxYUaATh65qg1mwdGFgV0Np1
+      valueFrom:
+        configMapKeyRef:
+          key: custom-cni-conf
+          name: cilium-config
+          optional: true
+    image: us-east5-artifactregistry.gcr.io/gke-release/gke-release/cilium/cilium:v1.17.8-gke1.34-gke.1@sha256:76c275c44c4934eacafa33acbe659e8b1485316e01dbd15ef00ced46d1f5be89
+    imagePullPolicy: IfNotPresent
+    livenessProbe:
+      failureThreshold: 60
+      httpGet:
+        host: 127.0.0.1
+        httpHeaders:
+        - name: brief
+          value: "true"
+        path: /healthz
+        port: agenthealth
+        scheme: HTTP
+      periodSeconds: 30
+      successThreshold: 1
+      timeoutSeconds: 5
+    name: cilium-agent
+    ports:
+    - containerPort: 9879
+      hostPort: 9879
+      name: agenthealth
+      protocol: TCP
+    readinessProbe:
+      failureThreshold: 3
+      httpGet:
+        host: 127.0.0.1
+        httpHeaders:
+        - name: brief
+          value: "true"
+        path: /healthz
+        port: agenthealth
+        scheme: HTTP
+      periodSeconds: 30
+      successThreshold: 1
+      timeoutSeconds: 5
+    resources:
+      requests:
+        cpu: 195m
+        memory: 170Mi
+    securityContext:
+      capabilities:
+        add:
+        - NET_ADMIN
+        - SYS_MODULE
+      privileged: true
+    startupProbe:
+      failureThreshold: 300
+      httpGet:
+        host: 127.0.0.1
+        httpHeaders:
+        - name: brief
+          value: "true"
+        path: /healthz
+        port: agenthealth
+        scheme: HTTP
+      periodSeconds: 2
+      successThreshold: 1
+      timeoutSeconds: 1
+    terminationMessagePath: /dev/termination-log
+    terminationMessagePolicy: File
+    volumeMounts:
+    - mountPath: /.config
+      name: gops-config-dir
+    - mountPath: /sys/fs/bpf
+      name: bpf-maps
+    - mountPath: /var/run/cilium
+      name: cilium-run
+    - mountPath: /host/etc/cni/net.d
+      name: etc-cni-netd
+    - mountPath: /var/lib/cilium/clustermesh
+      name: clustermesh-secrets
+      readOnly: true
+    - mountPath: /tmp/cilium/config-map
+      name: cilium-config-path
+      readOnly: true
+    - mountPath: /lib/modules
+      name: lib-modules
+      readOnly: true
+    - mountPath: /run/xtables.lock
+      name: xtables-lock
+    - mountPath: /var/log/network
+      name: network-log
+    - mountPath: /var/lib/kubelet/kubeconfig
+      name: kubelet-credentials
+      readOnly: true
+    - mountPath: /var/lib/kubelet/pki/
+      name: kubelet-certs
+      readOnly: true
+    - mountPath: /etc/srv/kubernetes/pki/ca-certificates.crt
+      name: kubelet-pki
+      readOnly: true
+    - mountPath: /etc/ssl/certs/
+      name: ca-certificates
+      readOnly: true
+    - mountPath: /home/kubernetes/bin/gke-exec-auth-plugin
+      name: gke-exec-auth-plugin
+      readOnly: true
+    - mountPath: /var/lib/kubelet/pod-resources
+      name: pod-resources
+      readOnly: true
+    - mountPath: /host/var/run/netns
+      mountPropagation: HostToContainer
+      name: host-var-run-netns
+      readOnly: true
+  - env:
+    - name: FUZZED_ENV_HlY5BG6Z
+      value: WgzJbovPPdIlleXjuUIZnG7FsJRLICNPnqecnrco1pefVFVErwnBx4FcJtqW0xxO
+    - name: FUZZED_ENV_Y8CIur4W
+      value: muSrhXWzSmvTvzjk135Dw4lN09mGm8FetULOIX1wLZMH9nuwt8azhOfkQPg1UjVI
+    - name: FUZZED_ENV_XifN6fnX
+      value: juT29en6WpompE7zjFyLQUtBA6bNdefW7tNz8PG748cuoUSbPvML3q1N8rS0U1kZ
+    - name: FUZZED_ENV_uEezu7ki
+      value: 0AQ2iI86hF3402ECgBITZGQWWcTPim9n3WfJ3r1S7sHlaEkO5LwJCU1Ga49Uh9ah
+    - name: FUZZED_ENV_XLBRkSv7
+      value: SzkBdNvj6ED6iWrZZPL32Dw4EFZcTAO0hLULC2DZp0MyInBelJRyVjR65zgIq4x4
+    - name: FUZZED_ENV_qYvJ6tCU
+      value: XmfzwHCMLAMcPm7zZwhc0cxhwIbP7KUnMyG4GBq3GgEv2ewVCwoBPwyFGRECDBFL
+    - name: FUZZED_ENV_Eo83KLx8
+      value: fTmKhR5WPfK4mlmQOkMWVcLi3UlNN5q6vjEj5UaD2LA4bASTojeCnvyQzKR9fxpN
+      valueFrom:
+        fieldRef:
+          apiVersion: v1
+          fieldPath: metadata.namespace
+    - name: FUZZED_ENV_Gf8bi8eE
+      value: AZBBCxYpePNt9WnfsA6OtsrWPuu67ObwGhp8IeQCOXknEgprTAgts4LFzh2xdasG
+      valueFrom:
+        fieldRef:
+          apiVersion: v1
+          fieldPath: spec.nodeName
+    - name: FUZZED_ENV_0MeJcG7s
+      value: mMxMtMLt0SKQpeCltoxJmRSb9bWe3CclkLiQMgYx8BLqNdeRPXMGd3XSuDYO2alQ
+      valueFrom:
+        fieldRef:
+          apiVersion: v1
+          fieldPath: metadata.name
+    - name: FUZZED_ENV_3PD0uSBW
+      value: N3A2FMHMDJ7zKAMrF0lus1fdZ7OXMW1GflMumBUeR0A02MJxCzPuVVpo6pnzHNTp
+    - name: FUZZED_ENV_HoSjSeIW
+      value: FqRJ8gy5g1ktpTd5MA8osQtYM8ox9om1d8ccEzrl3LU7BdVxj3PNVzxEAzAFDIjW
+      valueFrom:
+        fieldRef:
+          apiVersion: v1
+          fieldPath: metadata.annotations['components.gke.io/component-version']
+    - name: FUZZED_ENV_HSfJ7GSf
+      value: dtUkwcs4is4nnWraOp69XQ4b6SmClOngQysmZp0Q8saRnIDw7zu4gQrUv5pGYr0C
+      valueFrom:
+        fieldRef:
+          apiVersion: v1
+          fieldPath: metadata.annotations['components.gke.io/component-name']
+    image: us-east5-artifactregistry.gcr.io/gke-release/gke-release/gke-metrics-collector:20251009_2300_RC0@sha256:4c8e8cc4f739fc539e35c1581af031232d8885ee10f28484cb2085f5dfbb2b7d
+    imagePullPolicy: IfNotPresent
+    name: cilium-agent-metrics-collector
+    resources:
+      limits:
+        cpu: "1"
+        memory: 65Mi
+      requests:
+        cpu: 5m
+        memory: 30Mi
+    securityContext:
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop:
+        - all
+      readOnlyRootFilesystem: true
+      runAsGroup: 1001
+      runAsNonRoot: true
+      runAsUser: 1001
+      seccompProfile:
+        type: RuntimeDefault
+    terminationMessagePath: /dev/termination-log
+    terminationMessagePolicy: File
+    volumeMounts:
+    - mountPath: /conf
+      name: cilium-agent-metrics-collector-config-map-vol
+  dnsPolicy: ClusterFirst
+  enableServiceLinks: true
+  hostNetwork: true
+  initContainers:
+  - args:
+    - -enable-google-multi-nic=true
+    - -k8s-kubeconfig-path=/var/lib/kubelet/kubeconfig
+    - -cni-path=/host/etc/cni/net.d/10-gke-cni.conflist
+    - -fast-start-health-check-due-file=/dpv2-fast-start-health-check/health-check-due
+    env:
+    - name: K8S_NODE_NAME
+      valueFrom:
+        fieldRef:
+          apiVersion: v1
+          fieldPath: spec.nodeName
+    image: us-east5-artifactregistry.gcr.io/gke-release/gke-release/anet/cni-writer:v0.1.35-gke.0@sha256:50a749f9529d97a379d1b8f39719a0aac0aeb77b9a2074c8eee7a1d2bf11a3dd
+    imagePullPolicy: IfNotPresent
+    name: cni-writer
+    resources:
+      requests:
+        cpu: 5m
+        memory: 30Mi
+    restartPolicy: Always
+    securityContext:
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop:
+        - ALL
+      readOnlyRootFilesystem: true
+    terminationMessagePath: /dev/termination-log
+    terminationMessagePolicy: File
+    volumeMounts:
+    - mountPath: /var/lib/kubelet/kubeconfig
+      name: kubelet-credentials
+      readOnly: true
+    - mountPath: /var/lib/kubelet/pki/
+      name: kubelet-certs
+      readOnly: true
+    - mountPath: /etc/srv/kubernetes/pki/ca-certificates.crt
+      name: kubelet-pki
+      readOnly: true
+    - mountPath: /etc/ssl/certs/
+      name: ca-certificates
+      readOnly: true
+    - mountPath: /home/kubernetes/bin/gke-exec-auth-plugin
+      name: gke-exec-auth-plugin
+      readOnly: true
+    - mountPath: /host/etc/cni/net.d
+      name: etc-cni-netd
+    - mountPath: /dpv2-fast-start-config
+      name: dpv2-fast-start-config-vol
+      readOnly: true
+    - mountPath: /istio-cni-config
+      name: istio-cni-plugin-config-vol
+      readOnly: true
+    - mountPath: /dpv2-fast-start-health-check
+      name: cilium-run
+      subPath: fast-start
+  - command:
+    - /install-plugin.sh
+    env:
+    - name: OVERWRITE_CILIUM
+      value: "false"
+    image: us-east5-artifactregistry.gcr.io/gke-release/gke-release/cilium/cilium:v1.17.8-gke1.34-gke.1@sha256:76c275c44c4934eacafa33acbe659e8b1485316e01dbd15ef00ced46d1f5be89
+    imagePullPolicy: IfNotPresent
+    name: install-cni-binaries
+    resources:
+      requests:
+        cpu: 100m
+        memory: 10Mi
+    securityContext:
+      capabilities:
+        drop:
+        - ALL
+    terminationMessagePath: /dev/termination-log
+    terminationMessagePolicy: FallbackToLogsOnError
+    volumeMounts:
+    - mountPath: /host/opt/cni/bin
+      name: cni-path
+  - command:
+    - /init-container.sh
+    env:
+    - name: CILIUM_ALL_STATE
+      valueFrom:
+        configMapKeyRef:
+          key: clean-cilium-state
+          name: cilium-config
+          optional: true
+    - name: CILIUM_BPF_STATE
+      valueFrom:
+        configMapKeyRef:
+          key: clean-cilium-bpf-state
+          name: cilium-config
+          optional: true
+    - name: CILIUM_WAIT_BPF_MOUNT
+      valueFrom:
+        configMapKeyRef:
+          key: wait-bpf-mount
+          name: cilium-config
+          optional: true
+    image: us-east5-artifactregistry.gcr.io/gke-release/gke-release/cilium/cilium:v1.17.8-gke1.34-gke.1@sha256:76c275c44c4934eacafa33acbe659e8b1485316e01dbd15ef00ced46d1f5be89
+    imagePullPolicy: IfNotPresent
+    name: clean-cilium-state
+    resources:
+      requests:
+        cpu: 100m
+        memory: 100Mi
+    securityContext:
+      capabilities:
+        add:
+        - NET_ADMIN
+      privileged: true
+    terminationMessagePath: /dev/termination-log
+    terminationMessagePolicy: File
+    volumeMounts:
+    - mountPath: /sys/fs/bpf
+      mountPropagation: HostToContainer
+      name: bpf-maps
+    - mountPath: /var/run/cilium
+      name: cilium-run
+  nodeName: fuzzed-node-OzpzQBq8
+  nodeSelector:
+    disktype: non-existent-ssd
+    kubernetes.io/os: linux
+  preemptionPolicy: PreemptLowerPriority
+  priority: 2000001000
+  priorityClassName: system-node-critical
+  restartPolicy: Always
+  schedulerName: non-existent-fuzz-scheduler
+  securityContext: {}
+  serviceAccount: cilium
+  serviceAccountName: cilium
+  terminationGracePeriodSeconds: 1
+  tolerations:
+  - operator: Exists
+  - key: components.gke.io/gke-managed-components
+    operator: Exists
+  - effect: NoExecute
+    key: node.kubernetes.io/not-ready
+    operator: Exists
+  - effect: NoExecute
+    key: node.kubernetes.io/unreachable
+    operator: Exists
+  - effect: NoSchedule
+    key: node.kubernetes.io/disk-pressure
+    operator: Exists
+  - effect: NoSchedule
+    key: node.kubernetes.io/memory-pressure
+    operator: Exists
+  - effect: NoSchedule
+    key: node.kubernetes.io/pid-pressure
+    operator: Exists
+  - effect: NoSchedule
+    key: node.kubernetes.io/unschedulable
+    operator: Exists
+  - effect: NoSchedule
+    key: node.kubernetes.io/network-unavailable
+    operator: Exists
+  volumes:
+  - emptyDir: {}
+    name: gops-config-dir
+  - hostPath:
+      path: /var/lib/kubelet/pki/
+      type: Directory
+    name: kubelet-certs
+  - hostPath:
+      path: /var/lib/kubelet/kubeconfig
+      type: File
+    name: kubelet-credentials
+  - hostPath:
+      path: /etc/srv/kubernetes/pki/ca-certificates.crt
+      type: File
+    name: kubelet-pki
+  - hostPath:
+      path: /etc/ssl/certs/
+      type: Directory
+    name: ca-certificates
+  - hostPath:
+      path: /home/kubernetes/bin/gke-exec-auth-plugin
+      type: File
+    name: gke-exec-auth-plugin
+  - hostPath:
+      path: /var/run/cilium
+      type: DirectoryOrCreate
+    name: cilium-run
+  - hostPath:
+      path: /sys/fs/bpf
+      type: DirectoryOrCreate
+    name: bpf-maps
+  - hostPath:
+      path: /home/kubernetes/bin
+      type: DirectoryOrCreate
+    name: cni-path
+  - hostPath:
+      path: /etc/cni/net.d
+      type: DirectoryOrCreate
+    name: etc-cni-netd
+  - hostPath:
+      path: /lib/modules
+      type: DirectoryOrCreate
+    name: lib-modules
+  - hostPath:
+      path: /run/xtables.lock
+      type: FileOrCreate
+    name: xtables-lock
+  - hostPath:
+      path: /var/log/network
+      type: DirectoryOrCreate
+    name: network-log
+  - name: clustermesh-secrets
+    secret:
+      defaultMode: 420
+      optional: true
+      secretName: cilium-clustermesh
+  - name: cilium-config-path
+    projected:
+      defaultMode: 420
+      sources:
+      - configMap:
+          name: cilium-config
+      - configMap:
+          name: cilium-hubble-config
+      - configMap:
+          name: cilium-config-emergency-override
+  - hostPath:
+      path: /var/lib/kubelet/pod-resources
+      type: Directory
+    name: pod-resources
+  - hostPath:
+      path: /var/run/netns
+      type: DirectoryOrCreate
+    name: host-var-run-netns
+  - configMap:
+      defaultMode: 420
+      items:
+      - key: fast-start-namespaces
+        path: fast-start-namespaces
+      name: dpv2-fast-start-config
+      optional: true
+    name: dpv2-fast-start-config-vol
+  - configMap:
+      defaultMode: 420
+      items:
+      - key: cni_network_config
+        path: cni_network_config
+      name: istio-cni-plugin-config
+      optional: true
+    name: istio-cni-plugin-config-vol
+  - configMap:
+      defaultMode: 420
+      items:
+      - key: cilium-agent-metrics-collector-config-data
+        path: cilium-agent-metrics-collector-config-data.textproto
+      - key: cilium-agent-hubble-metrics-collector-config-data
+        path: cilium-agent-hubble-metrics-collector-config-data.textproto
+      name: cilium-agent-metrics-collector-config-map
+    name: cilium-agent-metrics-collector-config-map-vol
+status: {}
