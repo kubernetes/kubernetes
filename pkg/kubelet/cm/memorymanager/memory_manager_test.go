@@ -64,6 +64,7 @@ type testMemoryManager struct {
 	removeContainerID          string
 	nodeAllocatableReservation v1.ResourceList
 	policyName                 policyType
+	policyOptions              map[string]string
 	affinity                   topologymanager.Store
 	systemReservedMemory       []kubeletconfig.MemoryReservation
 	expectedHints              map[string][]topologymanager.TopologyHint
@@ -81,7 +82,7 @@ func returnPolicyByName(logger klog.Logger, testCase testMemoryManager) Policy {
 			err: fmt.Errorf("fake reg error"),
 		}
 	case PolicyTypeStatic:
-		policy, _ := NewPolicyStatic(logger, &testCase.machineInfo, testCase.reserved, topologymanager.NewFakeManager(logger))
+		policy, _ := NewPolicyStatic(logger, &testCase.machineInfo, testCase.reserved, topologymanager.NewFakeManager(logger), PolicyOptions{})
 		return policy
 	case policyTypeNone:
 		return NewPolicyNone(logger)
@@ -2014,6 +2015,22 @@ func TestNewManager(t *testing.T) {
 			expectedError:              nil,
 			expectedReserved:           expectedReserved,
 		},
+		{
+			description:   "Should return an error when policy options are set for the None policy",
+			policyName:    policyTypeNone,
+			policyOptions: map[string]string{MemoryDriftTolerance: "off"},
+			machineInfo:   machineInfo,
+			affinity:      getAffinityForOs(logger),
+			expectedError: fmt.Errorf("policy %q does not support policy options %v", policyTypeNone, map[string]string{MemoryDriftTolerance: "off"}),
+		},
+		{
+			description:   "Should return an error when policy options are set for the BestEffort policy",
+			policyName:    policyTypeBestEffort,
+			policyOptions: map[string]string{MemoryDriftTolerance: "off"},
+			machineInfo:   machineInfo,
+			affinity:      getAffinityForOs(logger),
+			expectedError: fmt.Errorf("policy %q does not support policy options %v", policyTypeBestEffort, map[string]string{MemoryDriftTolerance: "off"}),
+		},
 	}
 	for _, testCase := range testCases {
 		t.Run(testCase.description, func(t *testing.T) {
@@ -2025,7 +2042,7 @@ func TestNewManager(t *testing.T) {
 				require.NoErrorf(t, os.RemoveAll(stateFileDirectory), "unable to remove dir %s", stateFileDirectory)
 			})
 
-			mgr, err := NewManager(logger, string(testCase.policyName), &testCase.machineInfo, testCase.nodeAllocatableReservation, testCase.systemReservedMemory, stateFileDirectory, testCase.affinity)
+			mgr, err := NewManager(logger, string(testCase.policyName), testCase.policyOptions, &testCase.machineInfo, testCase.nodeAllocatableReservation, testCase.systemReservedMemory, stateFileDirectory, testCase.affinity)
 
 			if !reflect.DeepEqual(err, testCase.expectedError) {
 				t.Errorf("Could not create the Memory Manager. Expected error: '%v', but got: '%v'",
