@@ -268,6 +268,19 @@ func (m topologyToMatchedTermCount) mergeWithList(toMerge topologyToMatchedTermC
 	}
 }
 
+// subtractWithList undoes mergeWithList, so that a node the memo recomputed can replace its previous
+// contribution in the aggregate instead of the aggregate being rebuilt from scratch every cycle. An
+// entry that reaches zero is deleted rather than left at zero: PreFilter's Skip branch asks whether
+// this map is empty, and a full computation never leaves a zero behind.
+func (m topologyToMatchedTermCount) subtractWithList(toSubtract topologyToMatchedTermCountList) {
+	for _, tmtc := range toSubtract {
+		m[tmtc.topologyPair] -= tmtc.count
+		if m[tmtc.topologyPair] <= 0 {
+			delete(m, tmtc.topologyPair)
+		}
+	}
+}
+
 func (m topologyToMatchedTermCount) clone() topologyToMatchedTermCount {
 	copy := make(topologyToMatchedTermCount, len(m))
 	copy.merge(m)
@@ -395,25 +408,12 @@ func (pl *InterPodAffinity) getExistingAntiAffinityCounts(ctx context.Context, i
 	index := int32(-1)
 	var hasHostScopedAntiAffinity atomic.Bool
 	processNode := func(i int) {
-		nodeInfo := nodes[i]
-		node := nodeInfo.Node()
-
-		clusterWideAntiAffinityCounts := make(topologyToMatchedTermCountList, 0)
-		hasHostScoped := false
-		for _, existingPod := range nodeInfo.GetPodsWithRequiredAntiAffinity() {
-			for _, term := range existingPod.GetRequiredAntiAffinityTerms() {
-				if pl.enableInterPodAffinityHostnameFastPath && term.TopologyKey == v1.LabelHostname {
-					hasHostScoped = true
-				} else if term.Matches(incomingPod, nsLabels) {
-					clusterWideAntiAffinityCounts.recordMatch(node, term.TopologyKey, 1)
-				}
-			}
-		}
-		if hasHostScoped && !hasHostScopedAntiAffinity.Load() {
+		counts := pl.countExistingAntiAffinityOnNode(nodes[i], incomingPod, nsLabels)
+		if counts.hostScopedTerms > 0 && !hasHostScopedAntiAffinity.Load() {
 			hasHostScopedAntiAffinity.Store(true)
 		}
-		if len(clusterWideAntiAffinityCounts) != 0 {
-			antiAffinityCountsList[atomic.AddInt32(&index, 1)] = clusterWideAntiAffinityCounts
+		if len(counts.counts) != 0 {
+			antiAffinityCountsList[atomic.AddInt32(&index, 1)] = counts.counts
 		}
 	}
 	pl.parallelizer.Until(ctx, len(nodes), processNode, pl.Name())
@@ -425,6 +425,25 @@ func (pl *InterPodAffinity) getExistingAntiAffinityCounts(ctx context.Context, i
 	}
 
 	return result, hasHostScopedAntiAffinity.Load()
+}
+
+// countExistingAntiAffinityOnNode is one node's contribution to getExistingAntiAffinityCounts: the
+// topology pairs in which the node's existing pods' required anti-affinity terms match the incoming
+// pod, plus how many of those terms are hostname scoped. The full computation above and the memo in
+// filtering_memo.go both call this, so the two cannot drift in what they count.
+func (pl *InterPodAffinity) countExistingAntiAffinityOnNode(nodeInfo fwk.NodeInfo, incomingPod *v1.Pod, nsLabels labels.Set) existingNodeCounts {
+	node := nodeInfo.Node()
+	counts := existingNodeCounts{counts: make(topologyToMatchedTermCountList, 0)}
+	for _, existingPod := range nodeInfo.GetPodsWithRequiredAntiAffinity() {
+		for _, term := range existingPod.GetRequiredAntiAffinityTerms() {
+			if pl.enableInterPodAffinityHostnameFastPath && term.TopologyKey == v1.LabelHostname {
+				counts.hostScopedTerms++
+			} else if term.Matches(incomingPod, nsLabels) {
+				counts.counts.recordMatch(node, term.TopologyKey, 1)
+			}
+		}
+	}
+	return counts
 }
 
 // getIncomingAffinityAntiAffinityCounts scans all nodes concurrently to count how many
@@ -447,22 +466,11 @@ func (pl *InterPodAffinity) getIncomingAffinityAntiAffinityCounts(ctx context.Co
 	antiAffinityCountsList := make([]topologyToMatchedTermCountList, len(allNodes))
 	index := int32(-1)
 	processNode := func(i int) {
-		nodeInfo := allNodes[i]
-		node := nodeInfo.Node()
-
-		affinity := make(topologyToMatchedTermCountList, 0)
-		antiAffinity := make(topologyToMatchedTermCountList, 0)
-		for _, existingPod := range nodeInfo.GetPods() {
-			affinity.appendWithAffinityTerms(affinityTerms, existingPod.GetPod(), node, 1)
-			// The incoming pod's terms have the namespaceSelector merged into the namespaces, and so
-			// here we don't lookup the existing pod's namespace labels, hence passing nil for nsLabels.
-			antiAffinity.appendWithAntiAffinityTerms(antiAffinityTerms, existingPod.GetPod(), nil, node, 1)
-		}
-
-		if len(affinity) > 0 || len(antiAffinity) > 0 {
+		counts := countIncomingOnNode(allNodes[i], affinityTerms, antiAffinityTerms)
+		if len(counts.affinity) > 0 || len(counts.antiAffinity) > 0 {
 			k := atomic.AddInt32(&index, 1)
-			affinityCountsList[k] = affinity
-			antiAffinityCountsList[k] = antiAffinity
+			affinityCountsList[k] = counts.affinity
+			antiAffinityCountsList[k] = counts.antiAffinity
 		}
 	}
 	pl.parallelizer.Until(ctx, len(allNodes), processNode, pl.Name())
@@ -473,6 +481,24 @@ func (pl *InterPodAffinity) getIncomingAffinityAntiAffinityCounts(ctx context.Co
 	}
 
 	return clusterWideAffinityCounts, clusterWideAntiAffinityCounts
+}
+
+// countIncomingOnNode is one node's contribution to getIncomingAffinityAntiAffinityCounts: the pods on
+// the node matched against the incoming pod's own required terms. The full computation above and the
+// memo in filtering_memo.go both call this, so the two cannot drift in what they count.
+func countIncomingOnNode(nodeInfo fwk.NodeInfo, affinityTerms, antiAffinityTerms []fwk.AffinityTerm) incomingNodeCounts {
+	node := nodeInfo.Node()
+	counts := incomingNodeCounts{
+		affinity:     make(topologyToMatchedTermCountList, 0),
+		antiAffinity: make(topologyToMatchedTermCountList, 0),
+	}
+	for _, existingPod := range nodeInfo.GetPods() {
+		counts.affinity.appendWithAffinityTerms(affinityTerms, existingPod.GetPod(), node, 1)
+		// The incoming pod's terms have the namespaceSelector merged into the namespaces, and so
+		// here we don't lookup the existing pod's namespace labels, hence passing nil for nsLabels.
+		counts.antiAffinity.appendWithAntiAffinityTerms(antiAffinityTerms, existingPod.GetPod(), nil, node, 1)
+	}
+	return counts
 }
 
 // PreFilter is invoked at the prefilter extension point to pre-compute state for the node-by-node Filter phase.
@@ -530,6 +556,11 @@ func (pl *InterPodAffinity) PreFilter(ctx context.Context, cycleState fwk.CycleS
 	logger := klog.FromContext(ctx)
 	s.namespaceLabels = GetNamespaceLabelsSnapshot(logger, pod.Namespace, pl.nsLister)
 
+	// The memo derives its counts from this cycle's snapshot, which is exactly what Filter is about to
+	// read, so it can stand in for the full computation everywhere except a pod group scheduling cycle -
+	// see existingAntiAffinityCounts for why that one has to count from the snapshot itself.
+	useMemo := !cycleState.IsPodGroupSchedulingCycle() && pl.filteringMemoReady()
+
 	var mustEvaluateHostScopedAntiAffinity bool
 	if s.enableInterPodAffinityHostnameFastPath {
 		var nodesWithNonHostScopedAntiAffinityPods []fwk.NodeInfo
@@ -544,23 +575,23 @@ func (pl *InterPodAffinity) PreFilter(ctx context.Context, cycleState fwk.CycleS
 		s.classifyTermsBasedOnScope()
 
 		var nonHostScopedNodesContainHostScopedTerms bool
-		s.existingClusterWideAntiAffinityCounts, nonHostScopedNodesContainHostScopedTerms = pl.getExistingAntiAffinityCounts(ctx, pod, s.namespaceLabels, nodesWithNonHostScopedAntiAffinityPods)
+		s.existingClusterWideAntiAffinityCounts, nonHostScopedNodesContainHostScopedTerms = pl.existingAntiAffinityCounts(ctx, pod, s.namespaceLabels, nodesWithNonHostScopedAntiAffinityPods, useMemo)
 		nodeExistsWithPodsWithOnlyHostScopedAntiAffinityTerms := len(nodesWithAnyRequiredAntiAffinityPods) > len(nodesWithNonHostScopedAntiAffinityPods)
 		mustEvaluateHostScopedAntiAffinity = nonHostScopedNodesContainHostScopedTerms || nodeExistsWithPodsWithOnlyHostScopedAntiAffinityTerms
 
-		s.clusterWideAffinityCounts, s.clusterWideAntiAffinityCounts = pl.getIncomingAffinityAntiAffinityCounts(ctx, s.clusterWideAffinityTerms, s.clusterWideAntiAffinityTerms, allNodes)
+		s.clusterWideAffinityCounts, s.clusterWideAntiAffinityCounts = pl.incomingAffinityAntiAffinityCounts(ctx, s.clusterWideAffinityTerms, s.clusterWideAntiAffinityTerms, allNodes, useMemo)
 
 		// Check if a pod with matching host-scoped affinity exists on the cluster
 		if len(s.hostScopedAffinityTerms) > 0 {
-			s.matchingHostScopedAffinityPodsCount = pl.countMatchingHostScopedAffinityPodsGlobally(ctx, allNodes, s)
+			s.matchingHostScopedAffinityPodsCount = pl.matchingHostScopedAffinityPodsCount(ctx, s.hostScopedAffinityTerms, allNodes, useMemo)
 		}
 	} else {
 		var nodesWithRequiredAntiAffinityPods []fwk.NodeInfo
 		if nodesWithRequiredAntiAffinityPods, err = pl.sharedLister.NodeInfos().HavePodsWithRequiredAntiAffinityList(); err != nil {
 			return nil, fwk.AsStatus(fmt.Errorf("failed to list NodeInfos with pods with affinity: %w", err))
 		}
-		s.existingClusterWideAntiAffinityCounts, _ = pl.getExistingAntiAffinityCounts(ctx, pod, s.namespaceLabels, nodesWithRequiredAntiAffinityPods)
-		s.clusterWideAffinityCounts, s.clusterWideAntiAffinityCounts = pl.getIncomingAffinityAntiAffinityCounts(ctx, s.podInfo.GetRequiredAffinityTerms(), s.podInfo.GetRequiredAntiAffinityTerms(), allNodes)
+		s.existingClusterWideAntiAffinityCounts, _ = pl.existingAntiAffinityCounts(ctx, pod, s.namespaceLabels, nodesWithRequiredAntiAffinityPods, useMemo)
+		s.clusterWideAffinityCounts, s.clusterWideAntiAffinityCounts = pl.incomingAffinityAntiAffinityCounts(ctx, s.podInfo.GetRequiredAffinityTerms(), s.podInfo.GetRequiredAntiAffinityTerms(), allNodes, useMemo)
 		s.clusterWideAffinityTerms = s.podInfo.GetRequiredAffinityTerms()
 		s.clusterWideAntiAffinityTerms = s.podInfo.GetRequiredAntiAffinityTerms()
 	}
@@ -574,21 +605,28 @@ func (pl *InterPodAffinity) PreFilter(ctx context.Context, cycleState fwk.CycleS
 	return nil, nil
 }
 
-func (pl *InterPodAffinity) countMatchingHostScopedAffinityPodsGlobally(ctx context.Context, allNodes []fwk.NodeInfo, s *preFilterState) int64 {
+func (pl *InterPodAffinity) countMatchingHostScopedAffinityPodsGlobally(ctx context.Context, allNodes []fwk.NodeInfo, terms []fwk.AffinityTerm) int64 {
 	var count int64
 	countMatchingPodsOnNode := func(i int) {
-		nodeInfo := allNodes[i]
-		var localCount int64
-		for _, existingPod := range nodeInfo.GetPods() {
-			if podMatchesAllAffinityTerms(s.hostScopedAffinityTerms, existingPod.GetPod()) {
-				localCount++
-			}
-		}
-		if localCount > 0 {
+		if localCount := countMatchingHostScopedAffinityPodsOnNode(allNodes[i], terms); localCount > 0 {
 			atomic.AddInt64(&count, localCount)
 		}
 	}
 	pl.parallelizer.Until(ctx, len(allNodes), countMatchingPodsOnNode, pl.Name())
+	return count
+}
+
+// countMatchingHostScopedAffinityPodsOnNode is one node's contribution to
+// countMatchingHostScopedAffinityPodsGlobally: how many of the node's pods match all of the incoming
+// pod's host scoped affinity terms. The full computation above and the memo in filtering_memo.go both
+// call this, so the two cannot drift in what they count.
+func countMatchingHostScopedAffinityPodsOnNode(nodeInfo fwk.NodeInfo, terms []fwk.AffinityTerm) int64 {
+	var count int64
+	for _, existingPod := range nodeInfo.GetPods() {
+		if podMatchesAllAffinityTerms(terms, existingPod.GetPod()) {
+			count++
+		}
+	}
 	return count
 }
 
