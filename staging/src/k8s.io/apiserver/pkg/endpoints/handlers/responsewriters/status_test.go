@@ -18,6 +18,7 @@ package responsewriters
 
 import (
 	stderrs "errors"
+	"fmt"
 	"net/http"
 	"reflect"
 	"testing"
@@ -37,6 +38,35 @@ func TestBadStatusErrorToAPIStatus(t *testing.T) {
 	}
 	if !reflect.DeepEqual(actual, expected) {
 		t.Errorf("%s: Expected %#v, Got %#v", actual, expected, actual)
+	}
+}
+
+func TestWrappedStatusErrorToAPIStatus(t *testing.T) {
+	cases := []struct {
+		name string
+		err  error
+		want metav1.Status
+	}{
+		{
+			name: "wrapped NotFound",
+			err:  fmt.Errorf("additional context: %w", errors.NewNotFound(schema.GroupResource{Resource: "pods"}, "test")),
+			want: metav1.Status{
+				TypeMeta: metav1.TypeMeta{Kind: "Status", APIVersion: "v1"},
+				Status:   metav1.StatusFailure,
+				Code:     http.StatusNotFound,
+				Reason:   metav1.StatusReasonNotFound,
+				Message:  `pods "test" not found`,
+				Details:  &metav1.StatusDetails{Kind: "pods", Name: "test"},
+			},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			actual := ErrorToAPIStatus(tc.err)
+			if !reflect.DeepEqual(actual, &tc.want) {
+				t.Errorf("Expected %#v, Got %#v", tc.want, *actual)
+			}
+		})
 	}
 }
 
