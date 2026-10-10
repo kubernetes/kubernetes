@@ -35,6 +35,7 @@ require (
 	github.com/google/cel-go v0.29.2
 	github.com/google/gnostic-models v0.7.0
 	github.com/google/go-cmp v0.7.0
+	github.com/google/pprof v0.0.0-20260402051712-545e8a4df936
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/websocket v1.5.4-0.20250319132907-e064f32e3674
 	github.com/ishidawataru/sctp v0.0.0-20250521072954-ae8eb7fa7995
@@ -171,7 +172,6 @@ require (
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/google/btree v1.1.3 // indirect
 	github.com/google/nftables v0.3.0 // indirect
-	github.com/google/pprof v0.0.0-20260402051712-545e8a4df936 // indirect
 	github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus v1.1.0 // indirect
 	github.com/grpc-ecosystem/go-grpc-middleware/v2 v2.3.3 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.29.0 // indirect
