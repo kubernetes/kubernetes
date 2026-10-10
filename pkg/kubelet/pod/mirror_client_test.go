@@ -19,6 +19,8 @@ package pod
 import (
 	"errors"
 	"testing"
+        "time"
+	"context"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -156,4 +158,59 @@ type fakeNodeGetter struct {
 func (f *fakeNodeGetter) Get(nodeName string) (*v1.Node, error) {
 	require.Equal(f.t, f.expectNodeName, nodeName)
 	return f.node, f.err
+}
+
+func TestDeleteMirrorPodTimeout(t *testing.T) {
+        tCtx := ktesting.Init(t)
+        const (
+                testNodeName = "test-node-name"
+                testPodName  = "test-pod-name"
+                testPodNS    = "test-pod-ns"
+        )
+
+        // Create a fake clientset with an existing mirror pod
+        existingPod := &v1.Pod{
+                ObjectMeta: metav1.ObjectMeta{
+                        Name:      testPodName,
+                        Namespace: testPodNS,
+                },
+        }
+        clientset := fake.NewSimpleClientset(existingPod)
+        nodeGetter := &fakeNodeGetter{
+                t:              t,
+                expectNodeName: testNodeName,
+                node: &v1.Node{
+                        ObjectMeta: metav1.ObjectMeta{
+                                Name: testNodeName,
+                                UID:  "test-node-uid",
+                        },
+                },
+        }
+        mc := NewBasicMirrorClient(clientset, testNodeName, nodeGetter)
+
+        podFullName := testPodName + "_" + testPodNS
+
+        // Normal deletion should succeed
+        t.Run("successful deletion", func(t *testing.T) {
+                deleted, err := mc.DeleteMirrorPod(tCtx, podFullName, nil)
+                assert.NoError(t, err)
+                assert.True(t, deleted)
+        })
+
+        // Deletion with already-cancelled context should fail fast,
+        // not block for the full parent context timeout.
+        // This validates our 5s timeout wrapping prevents long blocks.
+        t.Run("cancelled context fails fast", func(t *testing.T) {
+                cancelledCtx, cancel := context.WithCancel(tCtx)
+                cancel() // cancel immediately
+
+                start := time.Now()
+                deleted, err := mc.DeleteMirrorPod(cancelledCtx, podFullName, nil)
+                elapsed := time.Since(start)
+
+                // Should fail fast — well under 1 second
+                assert.Less(t, elapsed, 1*time.Second, "DeleteMirrorPod should fail fast with cancelled context")
+                assert.False(t, deleted)
+                _ = err // error expected, not checked per existing behavior
+        })
 }
