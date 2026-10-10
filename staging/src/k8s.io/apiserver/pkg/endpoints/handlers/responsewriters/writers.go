@@ -24,6 +24,7 @@ import (
 	"io"
 	"net/http"
 	"strconv"
+	"sync"
 	"time"
 
 	"go.opentelemetry.io/otel/attribute"
@@ -160,10 +161,23 @@ const (
 	// (usually the entire object), and if the size is smaller no gzipping will be performed
 	// if the client requests it.
 	defaultGzipThresholdBytes = 128 * 1024
+	// maxDeferredBufferCap is the maximum capacity of a buffer returned to deferredWriterBufferPool.
+	// Buffers that grow up to 256 KiB (2x defaultGzipThresholdBytes due to slice doubling) are reused;
+	// larger buffers are left for garbage collection.
+	maxDeferredBufferCap = 256 * 1024
 	// Use the length of the first write to recognize streaming implementations.
 	// When streaming JSON first write is "{", while Kubernetes protobuf starts unique 4 byte header.
 	firstWriteStreamingThresholdBytes = 4
 )
+
+// deferredWriterBufferPool pools byte slices used by deferredResponseWriter while buffering
+// responses up to defaultGzipThresholdBytes before deciding whether to gzip-compress.
+var deferredWriterBufferPool = sync.Pool{
+	New: func() any {
+		b := make([]byte, 0, 1024)
+		return &b
+	},
+}
 
 type deferredResponseWriter struct {
 	mediaType       string
@@ -172,6 +186,7 @@ type deferredResponseWriter struct {
 
 	hasBuffered bool
 	buffer      []byte
+	bufferPtr   *[]byte
 	hasWritten  bool
 	hw          http.ResponseWriter
 	w           io.Writer
@@ -181,6 +196,17 @@ type deferredResponseWriter struct {
 	lastWriteErr error
 
 	ctx context.Context
+}
+
+func (w *deferredResponseWriter) releaseBuffer() {
+	if w.bufferPtr != nil {
+		if cap(w.buffer) <= maxDeferredBufferCap {
+			*w.bufferPtr = w.buffer[:0]
+			deferredWriterBufferPool.Put(w.bufferPtr)
+		}
+		w.bufferPtr = nil
+	}
+	w.buffer = nil
 }
 
 func (w *deferredResponseWriter) Write(p []byte) (n int, err error) {
@@ -204,17 +230,16 @@ func (w *deferredResponseWriter) Write(p []byte) (n int, err error) {
 	default:
 		if !w.hasBuffered {
 			w.hasBuffered = true
-			// Start at 80 bytes to avoid rapid reallocation of the buffer.
-			// The minimum size of a 0-item serialized list object is 80 bytes:
-			// {"kind":"List","apiVersion":"v1","metadata":{"resourceVersion":"1"},"items":[]}\n
-			w.buffer = make([]byte, 0, max(80, len(p)))
+			bufPtr := deferredWriterBufferPool.Get().(*[]byte)
+			w.bufferPtr = bufPtr
+			w.buffer = (*bufPtr)[:0]
 		}
 		w.buffer = append(w.buffer, p...)
 		var err error
 		if len(w.buffer) > defaultGzipThresholdBytes {
 			// we've accumulated enough to trigger gzip, write and clear buffer
 			_, err = w.unbufferedWrite(w.buffer)
-			w.buffer = nil
+			w.releaseBuffer()
 		}
 		return len(p), err
 	}
@@ -225,7 +250,7 @@ func (w *deferredResponseWriter) discardBufferedResponse() {
 		return
 	}
 	w.hasBuffered = false
-	w.buffer = nil
+	w.releaseBuffer()
 }
 
 func (w *deferredResponseWriter) unbufferedWrite(p []byte) (n int, err error) {
@@ -289,7 +314,7 @@ func (w *deferredResponseWriter) Close() (err error) {
 		}
 		// never reached defaultGzipThresholdBytes, no need to do the gzip writer cleanup
 		_, err := w.unbufferedWrite(w.buffer)
-		w.buffer = nil
+		w.releaseBuffer()
 		return err
 	}
 

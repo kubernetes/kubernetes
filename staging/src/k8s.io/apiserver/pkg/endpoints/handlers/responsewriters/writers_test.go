@@ -1103,3 +1103,90 @@ func BenchmarkJSONStreaming(b *testing.B) {
 		}
 	})
 }
+
+func TestDeferredResponseWriterBufferPooling(t *testing.T) {
+	t.Run("Close without Write is a safe no-op", func(t *testing.T) {
+		rec := httptest.NewRecorder()
+		w := &deferredResponseWriter{
+			mediaType:       "application/json",
+			statusCode:      http.StatusOK,
+			contentEncoding: "gzip",
+			hw:              rec,
+			ctx:             context.Background(),
+		}
+		if err := w.Close(); err != nil {
+			t.Fatalf("first Close() unexpected error: %v", err)
+		}
+		if err := w.Close(); err != nil {
+			t.Fatalf("second Close() unexpected error: %v", err)
+		}
+		if w.buffer != nil || w.bufferPtr != nil {
+			t.Fatalf("expected nil buffer and bufferPtr, got buffer=%v bufferPtr=%v", w.buffer, w.bufferPtr)
+		}
+		if rec.Body.Len() != 0 {
+			t.Fatalf("rec.Body.Len() = %d, want 0", rec.Body.Len())
+		}
+	})
+
+	t.Run("Close is idempotent after buffered small write", func(t *testing.T) {
+		rec := httptest.NewRecorder()
+		w := &deferredResponseWriter{
+			mediaType:       "application/json",
+			statusCode:      http.StatusOK,
+			contentEncoding: "gzip",
+			hw:              rec,
+			ctx:             context.Background(),
+		}
+		if _, err := w.Write([]byte("{")); err != nil {
+			t.Fatalf("Write(\"{\") unexpected error: %v", err)
+		}
+		if _, err := w.Write([]byte(`"kind":"Pod"}`)); err != nil {
+			t.Fatalf("Write(body) unexpected error: %v", err)
+		}
+		if w.bufferPtr == nil {
+			t.Fatalf("expected bufferPtr to be set while buffering")
+		}
+		if err := w.Close(); err != nil {
+			t.Fatalf("first Close() unexpected error: %v", err)
+		}
+		if w.buffer != nil || w.bufferPtr != nil {
+			t.Fatalf("expected nil buffer and bufferPtr after Close(), got buffer=%v bufferPtr=%v", w.buffer, w.bufferPtr)
+		}
+		if err := w.Close(); err != nil {
+			t.Fatalf("second Close() unexpected error: %v", err)
+		}
+		if got, want := rec.Body.String(), `{"kind":"Pod"}`; got != want {
+			t.Fatalf("rec.Body = %q, want %q", got, want)
+		}
+	})
+
+	t.Run("oversized buffer is not returned to pool", func(t *testing.T) {
+		rec := httptest.NewRecorder()
+		w := &deferredResponseWriter{
+			mediaType:       "application/json",
+			statusCode:      http.StatusOK,
+			contentEncoding: "gzip",
+			hw:              rec,
+			ctx:             context.Background(),
+		}
+		if _, err := w.Write([]byte("{")); err != nil {
+			t.Fatalf("Write(\"{\") unexpected error: %v", err)
+		}
+		oversized := bytes.Repeat([]byte("a"), maxDeferredBufferCap+1024)
+		if _, err := w.Write(oversized); err != nil {
+			t.Fatalf("Write(oversized) unexpected error: %v", err)
+		}
+		if w.buffer != nil || w.bufferPtr != nil {
+			t.Fatalf("expected buffer and bufferPtr to be cleared after threshold flush")
+		}
+		if err := w.Close(); err != nil {
+			t.Fatalf("Close() unexpected error: %v", err)
+		}
+		for range 16 {
+			bp := deferredWriterBufferPool.Get().(*[]byte)
+			if cap(*bp) > maxDeferredBufferCap {
+				t.Fatalf("deferredWriterBufferPool returned buffer with cap %d > maxDeferredBufferCap (%d)", cap(*bp), maxDeferredBufferCap)
+			}
+		}
+	})
+}
