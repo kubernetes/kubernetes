@@ -35,6 +35,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
+	"k8s.io/kubernetes/test/e2e/framework/service"
 	"k8s.io/kubernetes/test/e2e/network/common"
 	admissionapi "k8s.io/pod-security-admission/api"
 	utilnet "k8s.io/utils/net"
@@ -1318,6 +1319,47 @@ var _ = common.SIGDescribe("Netpol", func() {
 			reachability := NewReachability(k8s.AllPodStrings(), true)
 			reachability.ExpectPeer(&Peer{Namespace: nsX, Pod: "a"}, &Peer{Namespace: nsY}, false)
 			ValidateOrFail(k8s, &TestCase{ToPort: 80, Protocol: v1.ProtocolTCP, Reachability: reachability})
+		})
+
+		f.It("should block ingress from external clients when default-deny ingress policy is applied with LoadBalancer service using Local externalTrafficPolicy", feature.NetworkPolicy, func(ctx context.Context) {
+			// This test validates that a default-deny ingress NetworkPolicy takes precedence
+			// over the Local externalTrafficPolicy of a LoadBalancer service. Even when
+			// externalTrafficPolicy is set to Local (which preserves client source IP),
+			// the NetworkPolicy should block unwanted external ingress traffic.
+			// See https://github.com/kubernetes/kubernetes/issues/114369
+			protocols := []v1.Protocol{protocolTCP}
+			ports := []int32{80}
+			// We need x/a as the backend pod and y/a as a client pod within the cluster
+			// to verify internal connectivity is unaffected.
+			k8s = initializeResources(ctx, f, protocols, ports, "x/a", "y/a")
+			nsX, _, _ := getK8sNamespaces(k8s)
+
+			// Create a LoadBalancer service with externalTrafficPolicy=Local.
+			// The TestJig helper creates the service and waits for an assigned ingress IP.
+			jig := service.NewTestJig(f.ClientSet, nsX, "lb-service")
+			svc, err := jig.CreateOnlyLocalLoadBalancerService(ctx, 3*time.Minute, true, nil)
+			framework.ExpectNoError(err, "creating LoadBalancer service with externalTrafficPolicy=Local")
+
+			// Clean up the service after the test.
+			ginkgo.DeferCleanup(func() {
+				deleteCtx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
+				defer cancel()
+				if err := f.ClientSet.CoreV1().Services(nsX).Delete(deleteCtx, svc.Name, metav1.DeleteOptions{}); err != nil {
+					framework.Logf("failed to delete LoadBalancer service %s/%s: %v", nsX, svc.Name, err)
+				}
+			})
+
+			// Apply a default-deny ingress NetworkPolicy on the same namespace.
+			// This policy selects all pods (empty podSelector) and blocks all ingress.
+			denyIngressPolicy := GenNetworkPolicyWithNameAndPodSelector("deny-all-ingress", metav1.LabelSelector{}, SetSpecIngressRules())
+			CreatePolicy(ctx, k8s, denyIngressPolicy, nsX)
+
+			// Verify that pods within the cluster can still reach the backend.
+			// Internal traffic (y/a -> x/a) must be allowed regardless of the LoadBalancer.
+			ginkgo.By("Verifying internal cluster connectivity is still allowed after applying default-deny ingress policy")
+			reachabilityInternal := NewReachability(k8s.AllPodStrings(), true)
+			reachabilityInternal.ExpectAllIngress(NewPodString(nsX, "a"), false)
+			ValidateOrFail(k8s, &TestCase{ToPort: 80, Protocol: v1.ProtocolTCP, Reachability: reachabilityInternal})
 		})
 	})
 })
