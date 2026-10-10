@@ -693,6 +693,8 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		corev1.SecretReference{}.OpenAPIModelName():                                                                     schema_k8sio_api_core_v1_SecretReference(ref),
 		corev1.SecretVolumeSource{}.OpenAPIModelName():                                                                  schema_k8sio_api_core_v1_SecretVolumeSource(ref),
 		corev1.SecurityContext{}.OpenAPIModelName():                                                                     schema_k8sio_api_core_v1_SecurityContext(ref),
+		corev1.SecurityProfileOCI{}.OpenAPIModelName():                                                                  schema_k8sio_api_core_v1_SecurityProfileOCI(ref),
+		corev1.SecurityProfileOCIBase{}.OpenAPIModelName():                                                              schema_k8sio_api_core_v1_SecurityProfileOCIBase(ref),
 		corev1.SerializedReference{}.OpenAPIModelName():                                                                 schema_k8sio_api_core_v1_SerializedReference(ref),
 		corev1.Service{}.OpenAPIModelName():                                                                             schema_k8sio_api_core_v1_Service(ref),
 		corev1.ServiceAccount{}.OpenAPIModelName():                                                                      schema_k8sio_api_core_v1_ServiceAccount(ref),
@@ -31595,11 +31597,11 @@ func schema_k8sio_api_core_v1_SeccompProfile(ref common.ReferenceCallback) commo
 				Properties: map[string]spec.Schema{
 					"type": {
 						SchemaProps: spec.SchemaProps{
-							Description: "type indicates which kind of seccomp profile will be applied. Valid options are:\n\nLocalhost - a profile defined in a file on the node should be used. RuntimeDefault - the container runtime default profile should be used. Unconfined - no profile should be applied.\n\nPossible enum values:\n - `\"Localhost\"` indicates a profile defined in a file on the node should be used. The file's location relative to <kubelet-root-dir>/seccomp.\n - `\"RuntimeDefault\"` represents the default container runtime seccomp profile.\n - `\"Unconfined\"` indicates no seccomp profile is applied (A.K.A. unconfined).",
+							Description: "type indicates which kind of seccomp profile will be applied. Valid options are:\n\nLocalhost - a profile defined in a file on the node should be used. RuntimeDefault - the container runtime default profile should be used. Unconfined - no profile should be applied. OCI - a profile pulled from an OCI registry should be used, merged with the container runtime's configured baseline. Privileged containers cannot use it, whether it is set on the container or inherited from the pod. This is an alpha value and requires enabling the SecurityProfileOCI feature gate.\n\nPossible enum values:\n - `\"Localhost\"` indicates a profile defined in a file on the node should be used. The file's location relative to <kubelet-root-dir>/seccomp.\n - `\"OCI\"` indicates a profile pulled from an OCI registry should be used.\n - `\"RuntimeDefault\"` represents the default container runtime seccomp profile.\n - `\"Unconfined\"` indicates no seccomp profile is applied (A.K.A. unconfined).",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
-							Enum:        []interface{}{"Localhost", "RuntimeDefault", "Unconfined"},
+							Enum:        []interface{}{"Localhost", "OCI", "RuntimeDefault", "Unconfined"},
 						},
 					},
 					"localhostProfile": {
@@ -31607,6 +31609,12 @@ func schema_k8sio_api_core_v1_SeccompProfile(ref common.ReferenceCallback) commo
 							Description: "localhostProfile indicates a profile defined in a file on the node should be used. The profile must be preconfigured on the node to work. Must be a descending path, relative to the kubelet's configured seccomp profile location. Must be set if type is \"Localhost\". Must NOT be set for any other type.",
 							Type:        []string{"string"},
 							Format:      "",
+						},
+					},
+					"oci": {
+						SchemaProps: spec.SchemaProps{
+							Description: "oci specifies a seccomp profile stored as an artifact in an OCI registry. The container runtime merges the profile with its configured baseline, so the effective profile permits an operation only if all inputs permit it. Must be set if type is \"OCI\". Must NOT be set for any other type. This is an alpha field and requires enabling the SecurityProfileOCI feature gate.",
+							Ref:         ref(corev1.SecurityProfileOCI{}.OpenAPIModelName()),
 						},
 					},
 				},
@@ -31619,12 +31627,15 @@ func schema_k8sio_api_core_v1_SeccompProfile(ref common.ReferenceCallback) commo
 							"discriminator": "type",
 							"fields-to-discriminateBy": map[string]interface{}{
 								"localhostProfile": "LocalhostProfile",
+								"oci":              "OCI",
 							},
 						},
 					},
 				},
 			},
 		},
+		Dependencies: []string{
+			corev1.SecurityProfileOCI{}.OpenAPIModelName()},
 	}
 }
 
@@ -32061,6 +32072,78 @@ func schema_k8sio_api_core_v1_SecurityContext(ref common.ReferenceCallback) comm
 		},
 		Dependencies: []string{
 			corev1.AppArmorProfile{}.OpenAPIModelName(), corev1.Capabilities{}.OpenAPIModelName(), corev1.SELinuxOptions{}.OpenAPIModelName(), corev1.SeccompProfile{}.OpenAPIModelName(), corev1.WindowsSecurityContextOptions{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_core_v1_SecurityProfileOCI(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "SecurityProfileOCI references a security profile stored as an artifact in an OCI registry, with an optional base profile.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"ref": {
+						SchemaProps: spec.SchemaProps{
+							Description: "ref is the OCI reference of the profile. It must be a digest-pinned reference in canonical form, registry/repository@<algorithm>:<digest>, with the registry spelled out (for example docker.io/library/profile, not profile or docker.io/profile). Tags are rejected. The digest algorithm must be sha256, sha384, or sha512. The maximum length is 1024 characters. Pull secrets are assembled in the same way as for the container image by looking up node credentials, SA image pull secrets, and pod spec image pull secrets.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"baseProfile": {
+						SchemaProps: spec.SchemaProps{
+							Description: "baseProfile optionally specifies a base profile that the container runtime merges with the OCI profile and its own configured baseline. The effective profile permits an operation only if all inputs permit it. When omitted, the container runtime's configured baseline is the only base.",
+							Ref:         ref(corev1.SecurityProfileOCIBase{}.OpenAPIModelName()),
+						},
+					},
+				},
+				Required: []string{"ref"},
+			},
+		},
+		Dependencies: []string{
+			corev1.SecurityProfileOCIBase{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_core_v1_SecurityProfileOCIBase(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "SecurityProfileOCIBase specifies the base profile of an OCI security profile.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"type": {
+						SchemaProps: spec.SchemaProps{
+							Description: "type indicates which kind of base profile will be applied. Valid options are:\n\nLocalhost - a profile defined in a file on the node should be used. RuntimeDefault - the container runtime default profile should be used.\n\nPossible enum values:\n - `\"Localhost\"` indicates a profile defined in a file on the node should be used. For seccomp, the file's location is relative to <kubelet-root-dir>/seccomp.\n - `\"RuntimeDefault\"` represents the default container runtime profile.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+							Enum:        []interface{}{"Localhost", "RuntimeDefault"},
+						},
+					},
+					"localhostProfile": {
+						SchemaProps: spec.SchemaProps{
+							Description: "localhostProfile indicates a base profile defined in a file on the node should be used. The profile must be preconfigured on the node to work. Must be a non-empty descending path, relative to the kubelet's configured seccomp profile location. Must be set if type is \"Localhost\". Must NOT be set for any other type.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"type"},
+			},
+			VendorExtensible: spec.VendorExtensible{
+				Extensions: spec.Extensions{
+					"x-kubernetes-unions": []interface{}{
+						map[string]interface{}{
+							"discriminator": "type",
+							"fields-to-discriminateBy": map[string]interface{}{
+								"localhostProfile": "LocalhostProfile",
+							},
+						},
+					},
+				},
+			},
+		},
 	}
 }
 

@@ -26,6 +26,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
+	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -2669,5 +2670,116 @@ func TestDRAStatusPreservedOnStatusUpdate(t *testing.T) {
 	}
 	if len(cleared.Status.ResourceClaimStatuses) != 0 {
 		t.Errorf("ResourceClaimStatuses not cleared: %v", cleared.Status.ResourceClaimStatuses)
+	}
+}
+
+func TestSecurityProfileOCI(t *testing.T) {
+	const ref = "registry.example.com/profiles/seccomp@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+	etcdConfig := framework.SharedEtcd()
+
+	ociPod := func(name, ref string) *v1.Pod {
+		return &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{Name: name},
+			Spec: v1.PodSpec{
+				SecurityContext: &v1.PodSecurityContext{
+					SeccompProfile: &v1.SeccompProfile{
+						Type: v1.SeccompProfileTypeOCI,
+						OCI:  &v1.SecurityProfileOCI{Ref: ref},
+					},
+				},
+				Containers: []v1.Container{{Name: "fake-name", Image: "fakeimage"}},
+			},
+		}
+	}
+
+	// With the feature enabled, valid OCI profiles are accepted.
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SecurityProfileOCI, true)
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), etcdConfig)
+	client := clientset.NewForConfigOrDie(server.ClientConfig)
+	ns := framework.CreateNamespaceOrDie(client, "security-profile-oci", t)
+
+	if _, err := client.CoreV1().Pods(ns.Name).Create(t.Context(), ociPod("oci", ref), metav1.CreateOptions{}); err != nil {
+		t.Fatalf("Unexpected error creating pod with an OCI seccomp profile: %v", err)
+	}
+	deployment := &appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{Name: "oci"},
+		Spec: appsv1.DeploymentSpec{
+			Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": "oci"}},
+			Template: v1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"app": "oci"}},
+				Spec:       ociPod("", ref).Spec,
+			},
+		},
+	}
+	if _, err := client.AppsV1().Deployments(ns.Name).Create(t.Context(), deployment, metav1.CreateOptions{}); err != nil {
+		t.Fatalf("Unexpected error creating deployment with an OCI seccomp profile: %v", err)
+	}
+
+	for name, invalidRef := range map[string]string{
+		"tag":        "registry.example.com/profiles/seccomp:v1",
+		"short-name": "seccomp@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+	} {
+		_, err := client.CoreV1().Pods(ns.Name).Create(t.Context(), ociPod(name, invalidRef), metav1.CreateOptions{})
+		if !apierrors.IsInvalid(err) {
+			t.Errorf("%s: expected invalid error, got %v", name, err)
+		}
+	}
+
+	// PodSecurity baseline and restricted keep rejecting OCI profiles.
+	for _, level := range []string{"baseline", "restricted"} {
+		psaNS, err := client.CoreV1().Namespaces().Create(t.Context(), &v1.Namespace{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "security-profile-oci-" + level + "-",
+				Labels:       map[string]string{"pod-security.kubernetes.io/enforce": level},
+			},
+		}, metav1.CreateOptions{})
+		if err != nil {
+			t.Fatalf("Failed to create %s namespace: %v", level, err)
+		}
+		_, err = client.CoreV1().Pods(psaNS.Name).Create(t.Context(), ociPod("oci", ref), metav1.CreateOptions{})
+		if !apierrors.IsForbidden(err) || !strings.Contains(err.Error(), `"OCI"`) {
+			t.Errorf("%s: expected PodSecurity to reject the seccomp profile, got %v", level, err)
+		}
+		framework.DeleteNamespaceOrDie(client, psaNS, t)
+	}
+	server.TearDownFn()
+
+	// With the feature disabled, existing pods keep the field and new ones are rejected.
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SecurityProfileOCI, false)
+	server = kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), etcdConfig)
+	defer server.TearDownFn()
+	client = clientset.NewForConfigOrDie(server.ClientConfig)
+	defer framework.DeleteNamespaceOrDie(client, ns, t)
+
+	pod, err := client.CoreV1().Pods(ns.Name).Get(t.Context(), "oci", metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("Failed to get pod: %v", err)
+	}
+	pod.Labels = map[string]string{"updated": "true"}
+	pod, err = client.CoreV1().Pods(ns.Name).Update(t.Context(), pod, metav1.UpdateOptions{})
+	if err != nil {
+		t.Fatalf("Unexpected error updating existing pod with an OCI seccomp profile: %v", err)
+	}
+	if profile := pod.Spec.SecurityContext.SeccompProfile; profile.OCI == nil || profile.OCI.Ref != ref {
+		t.Errorf("Expected the oci field to be retained, got %+v", profile)
+	}
+
+	if _, err := client.CoreV1().Pods(ns.Name).Create(t.Context(), ociPod("oci-disabled", ref), metav1.CreateOptions{}); !apierrors.IsInvalid(err) {
+		t.Errorf("Expected invalid error creating pod with the feature disabled, got %v", err)
+	}
+
+	// Workloads created while the feature was enabled can still be scaled, and
+	// their template can move to another profile type.
+	deployment, err = client.AppsV1().Deployments(ns.Name).Get(t.Context(), "oci", metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("Failed to get deployment: %v", err)
+	}
+	deployment.Spec.Replicas = new(int32(2))
+	if deployment, err = client.AppsV1().Deployments(ns.Name).Update(t.Context(), deployment, metav1.UpdateOptions{}); err != nil {
+		t.Fatalf("Unexpected error scaling deployment with an OCI seccomp profile: %v", err)
+	}
+	deployment.Spec.Template.Spec.SecurityContext.SeccompProfile = &v1.SeccompProfile{Type: v1.SeccompProfileTypeRuntimeDefault}
+	if _, err := client.AppsV1().Deployments(ns.Name).Update(t.Context(), deployment, metav1.UpdateOptions{}); err != nil {
+		t.Errorf("Unexpected error switching deployment to RuntimeDefault: %v", err)
 	}
 }

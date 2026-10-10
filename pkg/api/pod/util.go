@@ -435,6 +435,7 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 		AllowExistingRestartContainerForNonSidecarInitContainer: hasRestartContainerForNonSidecarInitContainer(oldPodSpec),
 		AllowSysAdminWhenPrivilegeEscalationFalse:               false,
 		AllowMLDSAPodCertificateKeyTypes:                        utilfeature.DefaultFeatureGate.Enabled(features.PodCertificateMLDSA),
+		AllowSecurityProfileOCI:                                 utilfeature.DefaultFeatureGate.Enabled(features.SecurityProfileOCI),
 	}
 
 	// If old spec uses relaxed validation or enabled the RelaxedEnvironmentVariableValidation feature gate,
@@ -494,6 +495,9 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 
 		// If old spec has a projected pod certificate requesting an ML-DSA key type, allow it
 		opts.AllowMLDSAPodCertificateKeyTypes = opts.AllowMLDSAPodCertificateKeyTypes || hasMLDSAPodCertificateProjection(oldPodSpec.Volumes)
+
+		// If old spec uses a seccomp profile of type OCI, allow it
+		opts.AllowSecurityProfileOCI = opts.AllowSecurityProfileOCI || seccompProfileOCIInUse(oldPodSpec)
 	}
 	if oldPodMeta != nil && !opts.AllowInvalidPodDeletionCost {
 		// This is an update, so validate only if the existing object was valid.
@@ -765,6 +769,7 @@ func dropDisabledFields(
 
 	dropDisabledPodLevelResources(podSpec, oldPodSpec)
 	dropDisabledProcMountField(podSpec, oldPodSpec)
+	dropDisabledSeccompProfileOCIField(podSpec, oldPodSpec)
 
 	dropDisabledNodeInclusionPolicyFields(podSpec, oldPodSpec)
 	dropDisabledMatchLabelKeysFieldInTopologySpread(podSpec, oldPodSpec)
@@ -1245,6 +1250,24 @@ func dropDisabledProcMountField(podSpec, oldPodSpec *api.PodSpec) {
 	}
 }
 
+// dropDisabledSeccompProfileOCIField removes the oci field of seccomp profiles
+// if the SecurityProfileOCI feature gate is disabled and the old spec does not
+// use it.
+func dropDisabledSeccompProfileOCIField(podSpec, oldPodSpec *api.PodSpec) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.SecurityProfileOCI) || seccompProfileOCIInUse(oldPodSpec) {
+		return
+	}
+	if podSpec.SecurityContext != nil && podSpec.SecurityContext.SeccompProfile != nil {
+		podSpec.SecurityContext.SeccompProfile.OCI = nil
+	}
+	VisitContainers(podSpec, AllContainers, func(c *api.Container, containerType ContainerType) bool {
+		if c.SecurityContext != nil && c.SecurityContext.SeccompProfile != nil {
+			c.SecurityContext.SeccompProfile.OCI = nil
+		}
+		return true
+	})
+}
+
 // dropDisabledNodeInclusionPolicyFields removes disabled fields from PodSpec related
 // to NodeInclusionPolicy only if it is not used by the old spec.
 func dropDisabledNodeInclusionPolicyFields(podSpec, oldPodSpec *api.PodSpec) {
@@ -1423,6 +1446,29 @@ func procMountInUse(podSpec *api.PodSpec) bool {
 		return true
 	})
 
+	return inUse
+}
+
+// seccompProfileOCIInUse returns true if the pod spec or any of its containers
+// uses a seccomp profile of type OCI or sets the oci field.
+func seccompProfileOCIInUse(podSpec *api.PodSpec) bool {
+	if podSpec == nil {
+		return false
+	}
+	usesOCI := func(p *api.SeccompProfile) bool {
+		return p != nil && (p.Type == api.SeccompProfileTypeOCI || p.OCI != nil)
+	}
+	if podSpec.SecurityContext != nil && usesOCI(podSpec.SecurityContext.SeccompProfile) {
+		return true
+	}
+	var inUse bool
+	VisitContainers(podSpec, AllContainers, func(c *api.Container, containerType ContainerType) bool {
+		if c.SecurityContext != nil && usesOCI(c.SecurityContext.SeccompProfile) {
+			inUse = true
+			return false
+		}
+		return true
+	})
 	return inUse
 }
 
