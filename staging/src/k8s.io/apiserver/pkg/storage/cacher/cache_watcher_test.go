@@ -19,6 +19,7 @@ package cacher
 import (
 	"context"
 	"fmt"
+	"io"
 	"reflect"
 	"strings"
 	"sync"
@@ -28,10 +29,12 @@ import (
 	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/storage"
@@ -732,5 +735,88 @@ func gatherWithoutBuckets(gatherer compbasemetrics.Gatherer) testutil.GathererFu
 			}
 		}
 		return got, err
+	}
+}
+
+func TestGetMutableObject(t *testing.T) {
+	pod := loadExemplarPod(t)
+	pod.TypeMeta = metav1.TypeMeta{}
+	pod.ResourceVersion = "100"
+	mutable := getMutableObject(pod)
+	if mutable == runtime.Object(pod) {
+		t.Fatalf("getMutableObject returned the original object")
+	}
+	if diff := cmp.Diff(pod, mutable); diff != "" {
+		t.Errorf("unexpected difference between original and copy (-want +got):\n%s", diff)
+	}
+
+	// Writing the fields the watch path is allowed to write must not be
+	// visible through the original object.
+	mutable.GetObjectKind().SetGroupVersionKind(v1.SchemeGroupVersion.WithKind("Pod"))
+	versioner := storage.APIObjectVersioner{}
+	if err := versioner.UpdateObject(mutable, 200); err != nil {
+		t.Fatal(err)
+	}
+	empty := metav1.TypeMeta{}
+	if pod.TypeMeta != empty {
+		t.Errorf("original object TypeMeta was modified: %#v", pod.TypeMeta)
+	}
+	if got := pod.ResourceVersion; got != "100" {
+		t.Errorf("original object resourceVersion was modified: %q", got)
+	}
+}
+
+func TestGetMutableObjectCachingObject(t *testing.T) {
+	cached, err := newCachingObject(loadExemplarPod(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if mutable := getMutableObject(cached); mutable != runtime.Object(cached) {
+		t.Errorf("expected the cachingObject to be returned as is, got %T", mutable)
+	}
+}
+
+func TestGetMutableObjectUnstructured(t *testing.T) {
+	object := &unstructured.Unstructured{Object: map[string]interface{}{
+		"apiVersion": "example.com/v1",
+		"kind":       "Example",
+		"metadata":   map[string]interface{}{"name": "example"},
+	}}
+	mutable := getMutableObject(object)
+	mutable.GetObjectKind().SetGroupVersionKind(v1.SchemeGroupVersion.WithKind("Pod"))
+	if got := object.GetObjectKind().GroupVersionKind().String(); got != "example.com/v1, Kind=Example" {
+		t.Errorf("original unstructured object was modified, got %q", got)
+	}
+}
+
+func TestGetMutableObjectConcurrentEncode(t *testing.T) {
+	scheme := runtime.NewScheme()
+	if err := v1.AddToScheme(scheme); err != nil {
+		t.Fatal(err)
+	}
+	metav1.AddToGroupVersion(scheme, v1.SchemeGroupVersion)
+	codecs := serializer.NewCodecFactory(scheme)
+
+	shared := loadExemplarPod(t)
+	shared.TypeMeta = metav1.TypeMeta{}
+	expected := shared.DeepCopy()
+
+	for _, info := range codecs.SupportedMediaTypes() {
+		var wg sync.WaitGroup
+		for range 8 {
+			wg.Go(func() {
+				encoder := codecs.EncoderForVersion(info.Serializer, v1.SchemeGroupVersion)
+				for range 100 {
+					if err := encoder.Encode(getMutableObject(shared), io.Discard); err != nil {
+						t.Errorf("failed to encode: %v", err)
+						return
+					}
+				}
+			})
+		}
+		wg.Wait()
+	}
+	if diff := cmp.Diff(expected, shared); diff != "" {
+		t.Errorf("shared object was modified by encoding (-want +got):\n%s", diff)
 	}
 }
