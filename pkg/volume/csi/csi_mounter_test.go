@@ -50,6 +50,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume"
 	fakecsi "k8s.io/kubernetes/pkg/volume/csi/fake"
 	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
+	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/mount-utils"
 	testingexec "k8s.io/utils/exec/testing"
 	"k8s.io/utils/ptr"
@@ -1680,6 +1681,7 @@ func Test_csiMountMgr_supportsFSGroup(t *testing.T) {
 
 func TestMounterGetFSGroupPolicy(t *testing.T) {
 	defaultPolicy := storage.ReadWriteOnceWithFSTypeFSGroupPolicy
+	logger, _ := ktesting.NewTestContext(t)
 	testCases := []struct {
 		name                  string
 		defined               bool
@@ -1728,7 +1730,7 @@ func TestMounterGetFSGroupPolicy(t *testing.T) {
 		csiMounter := mounter.(*csiMountMgr)
 
 		// Check to see if we can obtain the CSIDriver, along with examining its FSGroupPolicy
-		fsGroup, err := csiMounter.getFSGroupPolicy()
+		fsGroup, err := csiMounter.getFSGroupPolicy(logger)
 		if err != nil {
 			t.Fatalf("Error attempting to obtain FSGroupPolicy: %v", err)
 		}

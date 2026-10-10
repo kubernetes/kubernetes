@@ -894,7 +894,7 @@ func (asw *actualStateOfWorld) MarkRemountRequired(
 				continue
 			}
 
-			if volumePlugin.RequiresRemount(podObj.volumeSpec) {
+			if volumePlugin.RequiresRemount(logger, podObj.volumeSpec) {
 				podObj.remountRequired = true
 				asw.attachedVolumes[volumeName].mountedPods[podName] = podObj
 			}

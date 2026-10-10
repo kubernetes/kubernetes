@@ -173,10 +173,7 @@ func (kvh *kubeletVolumeHost) CSIDriversSynced() cache.InformerSynced {
 }
 
 // WaitForCacheSync is a helper function that waits for cache sync for CSIDriverLister
-func (kvh *kubeletVolumeHost) WaitForCacheSync() error {
-	// Use context.TODO() because we currently do not have a proper context to pass in.
-	// Replace this with an appropriate context when refactoring this function to accept a context parameter.
-	logger := klog.FromContext(context.TODO())
+func (kvh *kubeletVolumeHost) WaitForCacheSync(logger klog.Logger) error {
 	if kvh.csiDriversSynced == nil {
 		logger.Error(nil, "CsiDriversSynced not found on KubeletVolumeHost")
 		return fmt.Errorf("csiDriversSynced not found on KubeletVolumeHost")

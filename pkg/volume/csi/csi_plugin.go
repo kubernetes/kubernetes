@@ -189,7 +189,7 @@ func updateCSIDriver(pluginName string) error {
 	return nil
 }
 
-func (p *csiPlugin) VerifyExhaustedResource(spec *volume.Spec) bool {
+func (p *csiPlugin) VerifyExhaustedResource(logger klog.Logger, spec *volume.Spec) bool {
 	if spec == nil || spec.PersistentVolume == nil || spec.PersistentVolume.Spec.CSI == nil {
 		klog.ErrorS(nil, "Invalid volume spec for CSI")
 		return false
@@ -197,7 +197,7 @@ func (p *csiPlugin) VerifyExhaustedResource(spec *volume.Spec) bool {
 
 	pluginName := spec.PersistentVolume.Spec.CSI.Driver
 
-	driver, err := p.getCSIDriver(pluginName)
+	driver, err := p.getCSIDriver(logger, pluginName)
 	if err != nil {
 		klog.ErrorS(err, "Failed to retrieve CSIDriver", "pluginName", pluginName)
 		return false
@@ -454,7 +454,7 @@ func (p *csiPlugin) CanSupport(spec *volume.Spec) bool {
 		(spec.Volume != nil && spec.Volume.CSI != nil)
 }
 
-func (p *csiPlugin) RequiresRemount(spec *volume.Spec) bool {
+func (p *csiPlugin) RequiresRemount(logger klog.Logger, spec *volume.Spec) bool {
 	if p.csiDriverLister == nil {
 		return false
 	}
@@ -463,7 +463,7 @@ func (p *csiPlugin) RequiresRemount(spec *volume.Spec) bool {
 		klog.V(5).Info(log("Failed to mark %q as republish required, err: %v", spec.Name(), err))
 		return false
 	}
-	csiDriver, err := p.getCSIDriver(driverName)
+	csiDriver, err := p.getCSIDriver(logger, driverName)
 	if err != nil {
 		klog.V(5).Info(log("Failed to mark %q as republish required, err: %v", spec.Name(), err))
 		return false
@@ -634,13 +634,13 @@ func (p *csiPlugin) SupportsMountOption() bool {
 	return true
 }
 
-func (p *csiPlugin) SupportsSELinuxContextMount(spec *volume.Spec) (bool, error) {
+func (p *csiPlugin) SupportsSELinuxContextMount(logger klog.Logger, spec *volume.Spec) (bool, error) {
 	if utilfeature.DefaultFeatureGate.Enabled(features.SELinuxMountReadWriteOncePod) {
 		driver, err := GetCSIDriverName(spec)
 		if err != nil {
 			return false, err
 		}
-		csiDriver, err := p.getCSIDriver(driver)
+		csiDriver, err := p.getCSIDriver(logger, driver)
 		if err != nil {
 			if apierrors.IsNotFound(err) {
 				return false, nil
@@ -672,7 +672,7 @@ func (p *csiPlugin) NewDetacher() (volume.Detacher, error) {
 	return p.newAttacherDetacher()
 }
 
-func (p *csiPlugin) CanAttach(spec *volume.Spec) (bool, error) {
+func (p *csiPlugin) CanAttach(logger klog.Logger, spec *volume.Spec) (bool, error) {
 	volumeLifecycleMode, err := p.getVolumeLifecycleMode(spec)
 	if err != nil {
 		return false, err
@@ -690,7 +690,7 @@ func (p *csiPlugin) CanAttach(spec *volume.Spec) (bool, error) {
 
 	driverName := pvSrc.Driver
 
-	skipAttach, err := p.skipAttach(driverName)
+	skipAttach, err := p.skipAttach(logger, driverName)
 	if err != nil {
 		return false, err
 	}
@@ -855,8 +855,8 @@ func (p *csiPlugin) ConstructBlockVolumeSpec(podUID types.UID, specVolName, mapP
 
 // skipAttach looks up CSIDriver object associated with driver name
 // to determine if driver requires attachment volume operation
-func (p *csiPlugin) skipAttach(driver string) (bool, error) {
-	csiDriver, err := p.getCSIDriver(driver)
+func (p *csiPlugin) skipAttach(logger klog.Logger, driver string) (bool, error) {
+	csiDriver, err := p.getCSIDriver(logger, driver)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			// Don't skip attach if CSIDriver does not exist
@@ -870,10 +870,10 @@ func (p *csiPlugin) skipAttach(driver string) (bool, error) {
 	return false, nil
 }
 
-func (p *csiPlugin) getCSIDriver(driver string) (*storage.CSIDriver, error) {
+func (p *csiPlugin) getCSIDriver(logger klog.Logger, driver string) (*storage.CSIDriver, error) {
 	kletHost, ok := p.host.(volume.KubeletVolumeHost)
 	if ok {
-		if err := kletHost.WaitForCacheSync(); err != nil {
+		if err := kletHost.WaitForCacheSync(logger); err != nil {
 			return nil, err
 		}
 	}
@@ -903,8 +903,8 @@ func (p *csiPlugin) getVolumeLifecycleMode(spec *volume.Spec) (storage.VolumeLif
 	return storage.VolumeLifecyclePersistent, nil
 }
 
-func (p *csiPlugin) getPublishContext(client clientset.Interface, handle, driver, nodeName string) (map[string]string, error) {
-	skip, err := p.skipAttach(driver)
+func (p *csiPlugin) getPublishContext(logger klog.Logger, client clientset.Interface, handle, driver, nodeName string) (map[string]string, error) {
+	skip, err := p.skipAttach(logger, driver)
 	if err != nil {
 		return nil, err
 	}
@@ -941,8 +941,8 @@ func (p *csiPlugin) newAttacherDetacher() (*csiAttacher, error) {
 }
 
 // podInfoEnabled  check CSIDriver enabled pod info flag
-func (p *csiPlugin) podInfoEnabled(driverName string) (bool, error) {
-	csiDriver, err := p.getCSIDriver(driverName)
+func (p *csiPlugin) podInfoEnabled(logger klog.Logger, driverName string) (bool, error) {
+	csiDriver, err := p.getCSIDriver(logger, driverName)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			klog.V(4).Info(log("CSIDriver %q not found, not adding pod information", driverName))
