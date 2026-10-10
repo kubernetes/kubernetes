@@ -62,6 +62,21 @@ const (
 	immediateEvictionGracePeriodSeconds = 1
 )
 
+// softEvictionGracePeriod returns the grace period for soft eviction.
+// Negative max means defer to pod value per flag help, avoids passing -1 to CRI.
+func softEvictionGracePeriod(maxPodGracePeriodSeconds int64, podGracePeriodSeconds *int64) int64 {
+	if maxPodGracePeriodSeconds < 0 {
+		if podGracePeriodSeconds != nil {
+			return *podGracePeriodSeconds
+		}
+		return 0
+	}
+	if podGracePeriodSeconds != nil {
+		return min(maxPodGracePeriodSeconds, *podGracePeriodSeconds)
+	}
+	return maxPodGracePeriodSeconds
+}
+
 // managerImpl implements Manager
 type managerImpl struct {
 	//  used to track time
@@ -430,10 +445,7 @@ func (m *managerImpl) synchronize(ctx context.Context, diskInfoProvider DiskInfo
 		pod := activePods[i]
 		gracePeriodOverride := int64(immediateEvictionGracePeriodSeconds)
 		if !isHardEvictionThreshold(thresholdToReclaim) {
-			gracePeriodOverride = m.config.MaxPodGracePeriodSeconds
-			if pod.Spec.TerminationGracePeriodSeconds != nil {
-				gracePeriodOverride = min(m.config.MaxPodGracePeriodSeconds, *pod.Spec.TerminationGracePeriodSeconds)
-			}
+			gracePeriodOverride = softEvictionGracePeriod(m.config.MaxPodGracePeriodSeconds, pod.Spec.TerminationGracePeriodSeconds)
 		}
 
 		message, annotations := evictionMessage(resourceToReclaim, pod, statsFunc, thresholds, observations)
