@@ -377,6 +377,9 @@ func (sched *Scheduler) deletePodFromSchedulingQueue(pod *v1.Pod, inBinding bool
 	}
 	// If the pod is not assumed, we must clean pod group state explicitly here.
 	sched.Cache.RemovePodGroupMember(pod)
+	if fwk, err := sched.frameworkForPod(pod); err == nil && fwk != nil {
+		fwk.RemovePodInPreBind(pod.UID)
+	}
 	if pod.Status.NominatedNodeName != "" {
 		// When a pod that had nominated node is deleted, it can unblock scheduling of other pods,
 		// because the lower or equal priority pods treat such a pod as if it was assigned.
