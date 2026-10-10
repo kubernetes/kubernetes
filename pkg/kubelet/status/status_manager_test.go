@@ -3504,3 +3504,55 @@ func TestPodDeferredResizeDurationSeconds(t *testing.T) {
 		})
 	}
 }
+
+// The eviction status set while the containers may still be running is not
+// published as terminal; once the containers have stopped, the terminal
+// status (as generateAPIPodStatus regenerates it from the stopped containers)
+// is published with the Failed phase, the eviction reason and the original
+// message, even though the container exited 0.
+func TestSyncBatch_EvictionPublishedAfterCleanExit(t *testing.T) {
+	logger, ctx := ktesting.NewTestContext(t)
+	pod := getTestPod()
+	pod.Status = v1.PodStatus{Phase: v1.PodRunning}
+	client := fake.NewSimpleClientset(pod)
+	podManager := kubepod.NewBasicPodManager()
+	podManager.(mutablePodManager).AddPod(pod)
+	deletionSafety := &statustest.FakePodDeletionSafetyProvider{HasRunning: true}
+	syncer := NewManager(client, podManager, deletionSafety, util.NewPodStartupLatencyTracker()).(*manager)
+
+	apiPod := func() *v1.Pod {
+		got, err := client.CoreV1().Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
+		require.NoError(t, err)
+		return got
+	}
+	const message = "Pod ephemeral local storage usage exceeds the total limit of containers 1Gi."
+	evicting := v1.PodStatus{
+		Phase:             v1.PodFailed,
+		Reason:            "Evicted",
+		Message:           message,
+		ContainerStatuses: []v1.ContainerStatus{{Name: "bar", State: v1.ContainerState{Running: &v1.ContainerStateRunning{}}}},
+	}
+	syncer.SetPodStatus(logger, pod, evicting)
+	syncer.syncBatch(ctx, true)
+	published := apiPod()
+	assert.Equal(t, v1.PodRunning, published.Status.Phase, "the terminal phase must be withheld while containers may run")
+	assert.Empty(t, published.Status.Reason)
+	assert.Empty(t, published.Status.Message)
+
+	deletionSafety.HasRunning = false
+	terminal := v1.PodStatus{
+		Phase:             v1.PodFailed,
+		Reason:            "Evicted",
+		Message:           message,
+		ContainerStatuses: []v1.ContainerStatus{{Name: "bar", State: v1.ContainerState{Terminated: &v1.ContainerStateTerminated{ExitCode: 0}}}},
+	}
+	syncer.SetPodStatus(logger, pod, terminal)
+	syncer.syncBatch(ctx, true)
+	published = apiPod()
+	assert.Equal(t, v1.PodFailed, published.Status.Phase)
+	assert.Equal(t, "Evicted", published.Status.Reason)
+	assert.Equal(t, message, published.Status.Message)
+	require.Len(t, published.Status.ContainerStatuses, 1)
+	require.NotNil(t, published.Status.ContainerStatuses[0].State.Terminated)
+	assert.Equal(t, int32(0), published.Status.ContainerStatuses[0].State.Terminated.ExitCode)
+}

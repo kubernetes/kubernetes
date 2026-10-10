@@ -2463,6 +2463,18 @@ func (kl *Kubelet) SyncTerminatingPod(ctx context.Context, pod *v1.Pod, podStatu
 	// information about the container end states (including exit codes) - when
 	// SyncTerminatedPod is called the containers may already be removed.
 	apiPodStatus = kl.generateAPIPodStatus(ctx, pod, stoppedPodStatus, true)
+	// Re-apply the caller's status override to the status generated after the
+	// containers have stopped: this is the update the status manager is
+	// allowed to publish as terminal, so the override must be part of it.
+	// The application before the kill above is still required. Some callers,
+	// such as the node shutdown manager, only set Failed when the status is
+	// not already Succeeded. If a container handles SIGTERM by exiting 0 the
+	// status generated here computes Succeeded, which such a callback leaves
+	// alone; the earlier application recorded Failed in the status manager
+	// cache, and the phase merge in generateAPIPodStatus preserves it.
+	if podStatusFn != nil {
+		podStatusFn(&apiPodStatus)
+	}
 	kl.statusManager.SetPodStatus(logger, pod, apiPodStatus)
 
 	// we have successfully stopped all containers, the pod is terminating, our status is "done"

@@ -26,6 +26,7 @@ import (
 	"k8s.io/klog/v2"
 	kubeapi "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
+	"k8s.io/kubernetes/pkg/kubelet/events"
 	kubelettypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -86,7 +87,8 @@ var _ = SIGDescribe("CriticalPod", framework.WithSerial(), framework.WithDisrupt
 				if p.Name == nonCriticalBestEffort.Name {
 					gomega.Expect(p.Status.Phase).To(gomega.Equal(v1.PodRunning), "pod: %v should not be preempted with status: %#v", p.Name, p.Status)
 				} else {
-					gomega.Expect(p.Status.Phase).To(gomega.Equal(v1.PodSucceeded), "pod: %v should be preempted with status: %#v", p.Name, p.Status)
+					gomega.Expect(p.Status.Phase).To(gomega.Equal(v1.PodFailed), "pod: %v should be preempted with status: %#v", p.Name, p.Status)
+					gomega.Expect(p.Status.Reason).To(gomega.Equal(events.PreemptContainer), "pod: %v should be preempted with status: %#v", p.Name, p.Status)
 				}
 			}
 		})
@@ -127,7 +129,8 @@ var _ = SIGDescribe("CriticalPod", framework.WithSerial(), framework.WithDisrupt
 			framework.ExpectNoError(err)
 			for _, p := range updatedPodList.Items {
 				ginkgo.By(fmt.Sprintf("verify that the non-critical pod %q is preempted and has the DisruptionTarget condition", klog.KObj(&p)))
-				gomega.Expect(p.Status.Phase).To(gomega.Equal(v1.PodSucceeded), "pod: %v should be preempted with status: %#v", p.Name, p.Status)
+				gomega.Expect(p.Status.Phase).To(gomega.Equal(v1.PodFailed), "pod: %v should be preempted with status: %#v", p.Name, p.Status)
+				gomega.Expect(p.Status.Reason).To(gomega.Equal(events.PreemptContainer), "pod: %v should be preempted with status: %#v", p.Name, p.Status)
 				if condition := e2epod.FindPodConditionByType(&p.Status, v1.DisruptionTarget); condition == nil {
 					framework.Failf("pod %q should have the condition: %q, pod status: %v", klog.KObj(&p), v1.DisruptionTarget, p.Status)
 				}
@@ -189,7 +192,8 @@ var _ = SIGDescribe("CriticalPodWithPodLevelResources", framework.WithSerial(), 
 				if p.Name == nonCriticalBestEffort.Name {
 					gomega.Expect(p.Status.Phase).To(gomega.Equal(v1.PodRunning), "pod: %v should not be preempted with status: %#v", p.Name, p.Status)
 				} else {
-					gomega.Expect(p.Status.Phase).To(gomega.Equal(v1.PodSucceeded), "pod: %v should be preempted with status: %#v", p.Name, p.Status)
+					gomega.Expect(p.Status.Phase).To(gomega.Equal(v1.PodFailed), "pod: %v should be preempted with status: %#v", p.Name, p.Status)
+					gomega.Expect(p.Status.Reason).To(gomega.Equal(events.PreemptContainer), "pod: %v should be preempted with status: %#v", p.Name, p.Status)
 				}
 			}
 		})

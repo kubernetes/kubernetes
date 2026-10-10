@@ -1939,14 +1939,22 @@ func (kl *Kubelet) generateAPIPodStatus(ctx context.Context, pod *v1.Pod, podSta
 
 	// Perform a three-way merge between the statuses from the status manager,
 	// runtime, and generated status to ensure terminal status is correctly set.
-	if s.Phase != v1.PodFailed && s.Phase != v1.PodSucceeded {
+	// A phase already recorded as Failed is kept even when the container exit
+	// codes alone would compute Succeeded: the kubelet may have failed the pod
+	// for a reason the containers cannot see, such as an eviction whose
+	// SIGTERM the container handled by exiting 0.
+	if s.Phase != v1.PodFailed {
 		switch {
 		case oldPodStatus.Phase == v1.PodFailed || oldPodStatus.Phase == v1.PodSucceeded:
-			logger.V(4).Info("Status manager phase was terminal, updating phase to match", "pod", klog.KObj(pod), "phase", oldPodStatus.Phase)
-			s.Phase = oldPodStatus.Phase
+			if s.Phase != oldPodStatus.Phase {
+				logger.V(4).Info("Status manager phase was terminal, updating phase to match", "pod", klog.KObj(pod), "phase", oldPodStatus.Phase)
+				s.Phase = oldPodStatus.Phase
+			}
 		case pod.Status.Phase == v1.PodFailed || pod.Status.Phase == v1.PodSucceeded:
-			logger.V(4).Info("API phase was terminal, updating phase to match", "pod", klog.KObj(pod), "phase", pod.Status.Phase)
-			s.Phase = pod.Status.Phase
+			if s.Phase != pod.Status.Phase {
+				logger.V(4).Info("API phase was terminal, updating phase to match", "pod", klog.KObj(pod), "phase", pod.Status.Phase)
+				s.Phase = pod.Status.Phase
+			}
 		}
 	}
 
