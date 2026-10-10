@@ -85,6 +85,27 @@ func TestCPGQueueing(t *testing.T) {
 	pSubUnready1 := st.MakePod().Name("p-sub-ptree-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Container("image").PodGroupName("pg-sub-ptree-1").Obj()
 	pSubUnready2 := st.MakePod().Name("p-sub-ptree-2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Container("image").PodGroupName("pg-sub-ptree-2").Obj()
 
+	taintedNode := st.MakeNode().Name("tainted-node").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "8"}).Taints([]v1.Taint{{Key: "dedicated", Value: "special", Effect: v1.TaintEffectNoSchedule}}).Obj()
+
+	blockingPod := st.MakePod().Name("blocking-pod").Req(map[v1.ResourceName]string{v1.ResourceCPU: "8"}).Container("image").Obj()
+
+	cpgRoot5 := st.MakeCompositePodGroup().Name("cpg-root5").WorkloadRef("w5", "cpg-t5").MinGroupCount(3).Obj()
+	pg5_1 := st.MakePodGroup().Name("pg5-1").WorkloadRef("w5", "pg-t5-1").MinCount(2).ParentCompositePodGroup("cpg-root5").Obj()
+	pg5_2 := st.MakePodGroup().Name("pg5-2").WorkloadRef("w5", "pg-t5-2").MinCount(2).ParentCompositePodGroup("cpg-root5").Obj()
+	pg5_3 := st.MakePodGroup().Name("pg5-3").WorkloadRef("w5", "pg-t5-3").MinCount(2).ParentCompositePodGroup("cpg-root5").Obj()
+	pg5_4 := st.MakePodGroup().Name("pg5-4").WorkloadRef("w5", "pg-t5-4").MinCount(2).ParentCompositePodGroup("cpg-root5").Obj()
+	p5_1 := st.MakePod().Name("p5-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg5-1").Obj()
+	p5_2 := st.MakePod().Name("p5-2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg5-1").Obj()
+	p5_3 := st.MakePod().Name("p5-3").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg5-2").Obj()
+	p5_4 := st.MakePod().Name("p5-4").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg5-2").Obj()
+	p5_5 := st.MakePod().Name("p5-5").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg5-3").Obj()
+	p5_6 := st.MakePod().Name("p5-6").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg5-3").Obj()
+	p5_7 := st.MakePod().Name("p5-7").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg5-4").Obj()
+	p5_8 := st.MakePod().Name("p5-8").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg5-4").Obj()
+
+	// cpgRootCyclic forms a dependency cycle with cpgMid (cpg-root -> cpg-mid -> cpg-root) to test hierarchy loop detection.
+	cpgRootCyclic := st.MakeCompositePodGroup().Name("cpg-root").WorkloadRef("w1", "cpg-t").MinGroupCount(1).ParentCompositePodGroup("cpg-mid").Obj()
+
 	tests := []struct {
 		name  string
 		steps []stepsframework.Step
@@ -464,6 +485,341 @@ func TestCPGQueueing(t *testing.T) {
 				{
 					Name:                 "Verify subtree pods get scheduled once the subtree minGroupCount is satisfied",
 					WaitForPodsScheduled: []string{"p-sub-ptree-1", "p-sub-ptree-2"},
+				},
+			},
+		},
+		{
+			name: "Node update (taint removal) triggers queueing hint for complete CPG tree from unschedulableQ",
+			steps: []stepsframework.Step{
+				{
+					Name:        "Create initial tainted node",
+					CreateNodes: []*v1.Node{taintedNode},
+				},
+				{
+					Name:                    "Create root CPG",
+					CreateCompositePodGroup: cpgRoot,
+				},
+				{
+					Name:                    "Create intermediate CPG",
+					CreateCompositePodGroup: cpgMid,
+				},
+				{
+					Name:           "Create PodGroup",
+					CreatePodGroup: pg1,
+				},
+				{
+					Name:       "Create member pods while node is tainted",
+					CreatePods: []*v1.Pod{p1, p2},
+				},
+				{
+					Name:                     "Verify pods are unschedulable (taint mismatch) and move to unschedulableQ",
+					WaitForPodsUnschedulable: []string{"p1", "p2"},
+				},
+				{
+					Name: "Remove taint from node",
+					UpdateNode: &stepsframework.UpdateNode{
+						NodeName: "tainted-node",
+						ModifyFn: func(n *v1.Node) {
+							n.Spec.Taints = nil
+						},
+					},
+				},
+				{
+					Name:                 "Verify pods get scheduled successfully after taint is removed",
+					WaitForPodsScheduled: []string{"p1", "p2"},
+				},
+			},
+		},
+		{
+			name: "Intermediate CPG creation triggers queueing hint for incomplete CPG hierarchy",
+			steps: []stepsframework.Step{
+				{
+					Name:        "Create initial node",
+					CreateNodes: []*v1.Node{node},
+				},
+				{
+					Name:                    "Create root CPG",
+					CreateCompositePodGroup: cpgRoot,
+				},
+				{
+					Name:           "Create leaf PodGroup referencing missing intermediate CPG",
+					CreatePodGroup: pg1,
+				},
+				{
+					Name:       "Create member pods",
+					CreatePods: []*v1.Pod{p1, p2},
+				},
+				{
+					Name:                                "Verify pods are buffered in incompletePodGroupPods due to missing intermediate CPG",
+					WaitForPodsInIncompletePodGroupPods: []string{"p1", "p2"},
+				},
+				{
+					Name:                    "Create the missing intermediate CPG",
+					CreateCompositePodGroup: cpgMid,
+				},
+				{
+					Name:                 "Verify pods get scheduled successfully after intermediate CPG completes the tree",
+					WaitForPodsScheduled: []string{"p1", "p2"},
+				},
+			},
+		},
+		{
+			name: "Pod deletion triggers queueing hint for complete CPG tree from unschedulableQ",
+			steps: []stepsframework.Step{
+				{
+					Name:        "Create initial node",
+					CreateNodes: []*v1.Node{node},
+				},
+				{
+					Name:       "Create blocking pod consuming entire node capacity",
+					CreatePods: []*v1.Pod{blockingPod},
+				},
+				{
+					Name:                 "Wait for blocking pod to be scheduled",
+					WaitForPodsScheduled: []string{"blocking-pod"},
+				},
+				{
+					Name:                    "Create root CPG",
+					CreateCompositePodGroup: cpgRoot2,
+				},
+				{
+					Name:           "Create first leaf PodGroup",
+					CreatePodGroup: pg2_1,
+				},
+				{
+					Name:           "Create second leaf PodGroup",
+					CreatePodGroup: pg2_2,
+				},
+				{
+					Name:       "Create member pods for CPG tree",
+					CreatePods: []*v1.Pod{p2_1, p2_2, p2_3, p2_4},
+				},
+				{
+					Name:                     "Verify CPG member pods are unschedulable due to saturated node",
+					WaitForPodsUnschedulable: []string{"p2-1", "p2-2", "p2-3", "p2-4"},
+				},
+				{
+					Name:       "Delete blocking pod to free node capacity",
+					DeletePods: []string{"blocking-pod"},
+				},
+				{
+					Name:                 "Verify CPG member pods are scheduled after blocking pod deletion",
+					WaitForPodsScheduled: []string{"p2-1", "p2-2", "p2-3", "p2-4"},
+				},
+			},
+		},
+		{
+			name: "Intermediate CPG deletion transitions child pods to incompletePodGroupPods",
+			steps: []stepsframework.Step{
+				{
+					Name:        "Create node",
+					CreateNodes: []*v1.Node{node},
+				},
+				{
+					Name:                    "Create root CPG",
+					CreateCompositePodGroup: cpgRoot,
+				},
+				{
+					Name:                    "Create intermediate CPG",
+					CreateCompositePodGroup: cpgMid,
+				},
+				{
+					Name:           "Create leaf PodGroup with MinCount=2",
+					CreatePodGroup: pg1,
+				},
+				{
+					// The pod has to be held back by the PodGroup quorum (PreEnqueue). A pod group
+					// rejected by Filter plugins (or by missing nodes) is requeued to activeQ/backoffQ
+					// and never parks in unschedulableEntities.
+					Name:       "Create 1 out of 2 pods",
+					CreatePods: []*v1.Pod{p1},
+				},
+				{
+					Name:                               "Verify pod is in unschedulableEntities because PodGroup requires 2 pods",
+					WaitForPodsInUnschedulableEntities: []string{"p1"},
+				},
+				{
+					Name:                    "Delete intermediate CPG",
+					DeleteCompositePodGroup: "cpg-mid",
+				},
+				{
+					Name:                                "Verify pod transitions to incompletePodGroupPods due to broken hierarchy",
+					WaitForPodsInIncompletePodGroupPods: []string{"p1"},
+				},
+				{
+					Name:                    "Re-create intermediate CPG",
+					CreateCompositePodGroup: cpgMid,
+				},
+				{
+					Name:                               "Verify pod moves back to unschedulableEntities",
+					WaitForPodsInUnschedulableEntities: []string{"p1"},
+				},
+				{
+					Name:       "Create the second pod to satisfy the PodGroup quorum",
+					CreatePods: []*v1.Pod{p2},
+				},
+				{
+					Name:                 "Verify pods are scheduled",
+					WaitForPodsScheduled: []string{"p1", "p2"},
+				},
+			},
+		},
+		{
+			name: "Root CPG deletion transitions descendant pods from unschedulableQ to incompletePodGroupPods",
+			steps: []stepsframework.Step{
+				{
+					Name:        "Create node",
+					CreateNodes: []*v1.Node{node},
+				},
+				{
+					Name:                    "Create root CPG requiring 2 child groups",
+					CreateCompositePodGroup: cpgRoot2,
+				},
+				{
+					Name:           "Create first leaf PodGroup",
+					CreatePodGroup: pg2_1,
+				},
+				{
+					Name:       "Create pods for first leaf group",
+					CreatePods: []*v1.Pod{p2_1, p2_2},
+				},
+				{
+					Name:                               "Verify pods are in unschedulableEntities because root CPG requires 2 groups",
+					WaitForPodsInUnschedulableEntities: []string{"p2-1", "p2-2"},
+				},
+				{
+					Name:                    "Delete root CPG",
+					DeleteCompositePodGroup: "cpg-root2",
+				},
+				{
+					Name:                                "Verify pods transition to incompletePodGroupPods after root CPG deletion",
+					WaitForPodsInIncompletePodGroupPods: []string{"p2-1", "p2-2"},
+				},
+				{
+					Name:                    "Re-create root CPG",
+					CreateCompositePodGroup: cpgRoot2,
+				},
+				{
+					Name:                               "Verify pods transition back to unschedulableEntities as tree is restored",
+					WaitForPodsInUnschedulableEntities: []string{"p2-1", "p2-2"},
+				},
+				{
+					Name:           "Create second leaf PodGroup under root CPG",
+					CreatePodGroup: pg2_2,
+				},
+				{
+					Name:       "Create pods for second leaf group, satisfying quorum",
+					CreatePods: []*v1.Pod{p2_3, p2_4},
+				},
+				{
+					Name:                 "Verify all pods are scheduled after quorum is satisfied",
+					WaitForPodsScheduled: []string{"p2-1", "p2-2", "p2-3", "p2-4"},
+				},
+			},
+		},
+		{
+			name: "Leaf PodGroup deletion in multi-branch CPG preserves sibling subtree in unschedulableQ",
+			steps: []stepsframework.Step{
+				{
+					Name:        "Create node",
+					CreateNodes: []*v1.Node{node},
+				},
+				{
+					Name:                    "Create root CPG requiring 3 child groups",
+					CreateCompositePodGroup: cpgRoot5,
+				},
+				{
+					Name:           "Create first leaf PodGroup",
+					CreatePodGroup: pg5_1,
+				},
+				{
+					Name:           "Create second leaf PodGroup",
+					CreatePodGroup: pg5_2,
+				},
+				{
+					Name:       "Create pods for first two leaf groups",
+					CreatePods: []*v1.Pod{p5_1, p5_2, p5_3, p5_4},
+				},
+				{
+					Name:                               "Verify all pods are in unschedulableEntities because root CPG requires 3 groups",
+					WaitForPodsInUnschedulableEntities: []string{"p5-1", "p5-2", "p5-3", "p5-4"},
+				},
+				{
+					Name:           "Delete first leaf PodGroup",
+					DeletePodGroup: "pg5-1",
+				},
+				{
+					Name:                                "Verify deleted group pods transition to incompletePodGroupPods",
+					WaitForPodsInIncompletePodGroupPods: []string{"p5-1", "p5-2"},
+				},
+				{
+					Name:                               "Verify sibling group pods remain in unschedulableEntities",
+					WaitForPodsInUnschedulableEntities: []string{"p5-3", "p5-4"},
+				},
+				{
+					Name:           "Create third leaf PodGroup",
+					CreatePodGroup: pg5_3,
+				},
+				{
+					Name:       "Create pods for third leaf group",
+					CreatePods: []*v1.Pod{p5_5, p5_6},
+				},
+				{
+					Name:           "Create fourth leaf PodGroup",
+					CreatePodGroup: pg5_4,
+				},
+				{
+					Name:       "Create pods for fourth leaf group, completing 3 groups under root CPG",
+					CreatePods: []*v1.Pod{p5_7, p5_8},
+				},
+				{
+					Name:                 "Verify remaining groups are scheduled after quorum of 3 is satisfied",
+					WaitForPodsScheduled: []string{"p5-3", "p5-4", "p5-5", "p5-6", "p5-7", "p5-8"},
+				},
+				{
+					Name:                                "Verify pods of the deleted PodGroup are still in incompletePodGroupPods",
+					WaitForPodsInIncompletePodGroupPods: []string{"p5-1", "p5-2"},
+				},
+			},
+		},
+		{
+			name: "Cyclic CPG hierarchy loop protection buffers pods in incompletePodGroupPods until cycle is broken",
+			steps: []stepsframework.Step{
+				{
+					Name:        "Create node",
+					CreateNodes: []*v1.Node{node},
+				},
+				{
+					Name:                    "Create CPG mid referencing root CPG",
+					CreateCompositePodGroup: cpgMid,
+				},
+				{
+					Name:                    "Create root CPG referencing mid CPG (forming cyclic dependency)",
+					CreateCompositePodGroup: cpgRootCyclic,
+				},
+				{
+					Name:           "Create leaf PodGroup referencing mid CPG",
+					CreatePodGroup: pg1,
+				},
+				{
+					Name:       "Create member pods",
+					CreatePods: []*v1.Pod{p1, p2},
+				},
+				{
+					Name:                                "Verify pods are held in incompletePodGroupPods due to detected cyclic hierarchy",
+					WaitForPodsInIncompletePodGroupPods: []string{"p1", "p2"},
+				},
+				{
+					Name:                    "Delete cyclic root CPG",
+					DeleteCompositePodGroup: "cpg-root",
+				},
+				{
+					Name:                    "Re-create root CPG without parent, establishing it as legitimate root CPG",
+					CreateCompositePodGroup: cpgRoot,
+				},
+				{
+					Name:                 "Verify pods are scheduled after cycle is broken and hierarchy is resolved",
+					WaitForPodsScheduled: []string{"p1", "p2"},
 				},
 			},
 		},

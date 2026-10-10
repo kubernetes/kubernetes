@@ -28,6 +28,7 @@ import (
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
@@ -67,6 +68,11 @@ type VerifyPodsSchedulingAttempts struct {
 type UpdatePod struct {
 	PodName  string
 	ModifyFn func(*v1.Pod)
+}
+
+type UpdateNode struct {
+	NodeName string
+	ModifyFn func(*v1.Node)
 }
 
 // Step is allowing us to create a test in a more readable way.
@@ -142,6 +148,8 @@ type Step struct {
 	CreateCompositePodGroup *schedulingv1alpha3.CompositePodGroup
 	// UpdateCompositePodGroup is used to update an existing composite pod group and wait for it to propagate.
 	UpdateCompositePodGroup *schedulingv1alpha3.CompositePodGroup
+	// DeleteCompositePodGroup is used to delete a composite pod group by name and wait for it to propagate.
+	DeleteCompositePodGroup string
 	// CreatePods is use to create pods in the cluster.
 	CreatePods []*v1.Pod
 	// CreatePodsInOrder is use to create pods in the cluster and have them enqueued by the scheduler in the specified order.
@@ -160,6 +168,8 @@ type Step struct {
 	// queue-level barrier so a following step can rely on the scheduler reading
 	// the nominated node during the placement cycle.
 	WaitForPodsNominated map[string]string
+	// UpdateNode is used to mutate any field of the node.
+	UpdateNode *UpdateNode
 	// WaitForPodsInActiveQ is used to check if the pods are present in ActiveQ.
 	WaitForPodsInActiveQ []string
 	// WaitForPodsInUnschedulableEntities is use to wait for pods to be in unschedulableEntities.
@@ -279,6 +289,20 @@ func createNodes(testCtx *testutils.TestContext, nodes []*v1.Node) error {
 		if err != nil {
 			return fmt.Errorf("failed to wait for node %s to be in the scheduler cache: %w", n.Name, err)
 		}
+	}
+	return nil
+}
+
+func updateNode(testCtx *testutils.TestContext, update *UpdateNode) error {
+	cs := testCtx.ClientSet
+	node, err := cs.CoreV1().Nodes().Get(testCtx.Ctx, update.NodeName, metav1.GetOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to get node %s for update: %w", update.NodeName, err)
+	}
+	update.ModifyFn(node)
+	_, err = cs.CoreV1().Nodes().Update(testCtx.Ctx, node, metav1.UpdateOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to update node %s: %w", update.NodeName, err)
 	}
 	return nil
 }
@@ -425,20 +449,21 @@ func updatePodGroup(testCtx *testutils.TestContext, ns string, pg *schedulingapi
 	return nil
 }
 
-func deletePodGroup(testCtx *testutils.TestContext, ns string, pgName string) error {
-	cs := testCtx.ClientSet
+// clearFinalizersPatch is applied as a merge patch instead of Get+Update: no
+// read-modify-write, so no conflicts with concurrent writers.
+var clearFinalizersPatch = []byte(`{"metadata":{"finalizers":null}}`)
 
-	pg, err := cs.SchedulingV1beta1().PodGroups(ns).Get(testCtx.Ctx, pgName, metav1.GetOptions{})
-	if err == nil && len(pg.Finalizers) > 0 {
-		pg.Finalizers = nil
-		if _, err = cs.SchedulingV1beta1().PodGroups(ns).Update(testCtx.Ctx, pg, metav1.UpdateOptions{}); err != nil {
-			return fmt.Errorf("failed to clear finalizers of pod group %s: %w", pgName, err)
-		}
+func deletePodGroup(testCtx *testutils.TestContext, ns string, pgName string) error {
+	pgs := testCtx.ClientSet.SchedulingV1beta1().PodGroups(ns)
+	// PodGroupProtection admission adds a finalizer and no controller removes it here.
+	// NotFound is an error on purpose: a delete step that deletes nothing is a broken test.
+	if _, err := pgs.Patch(testCtx.Ctx, pgName, types.MergePatchType, clearFinalizersPatch, metav1.PatchOptions{}); err != nil {
+		return fmt.Errorf("failed to clear finalizers of pod group %s/%s (does the step reference an existing object?): %w", ns, pgName, err)
 	}
-	if err := cs.SchedulingV1beta1().PodGroups(ns).Delete(testCtx.Ctx, pgName, metav1.DeleteOptions{}); err != nil {
-		return fmt.Errorf("failed to delete pod group %s: %w", pgName, err)
+	if err := pgs.Delete(testCtx.Ctx, pgName, metav1.DeleteOptions{}); err != nil {
+		return fmt.Errorf("failed to delete pod group %s/%s: %w", ns, pgName, err)
 	}
-	err = wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, wait.ForeverTestTimeout, false,
+	err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, wait.ForeverTestTimeout, false,
 		func(_ context.Context) (bool, error) {
 			_, err := testCtx.InformerFactory.Scheduling().V1beta1().PodGroups().Lister().PodGroups(ns).Get(pgName)
 			if err != nil {
@@ -452,6 +477,34 @@ func deletePodGroup(testCtx *testutils.TestContext, ns string, pgName string) er
 	)
 	if err != nil {
 		return fmt.Errorf("failed to wait for pod group %s deletion to propagate: %w", pgName, err)
+	}
+	return nil
+}
+
+func deleteCompositePodGroup(testCtx *testutils.TestContext, ns string, cpgName string) error {
+	cpgs := testCtx.ClientSet.SchedulingV1alpha3().CompositePodGroups(ns)
+	// PodGroupProtection admission adds a finalizer and no controller removes it here.
+	// NotFound is an error on purpose: a delete step that deletes nothing is a broken test.
+	if _, err := cpgs.Patch(testCtx.Ctx, cpgName, types.MergePatchType, clearFinalizersPatch, metav1.PatchOptions{}); err != nil {
+		return fmt.Errorf("failed to clear finalizers of composite pod group %s/%s (does the step reference an existing object?): %w", ns, cpgName, err)
+	}
+	if err := cpgs.Delete(testCtx.Ctx, cpgName, metav1.DeleteOptions{}); err != nil {
+		return fmt.Errorf("failed to delete composite pod group %s/%s: %w", ns, cpgName, err)
+	}
+	err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, wait.ForeverTestTimeout, false,
+		func(_ context.Context) (bool, error) {
+			_, err := testCtx.InformerFactory.Scheduling().V1alpha3().CompositePodGroups().Lister().CompositePodGroups(ns).Get(cpgName)
+			if err != nil {
+				if apierrors.IsNotFound(err) {
+					return true, nil
+				}
+				return false, err
+			}
+			return false, nil
+		},
+	)
+	if err != nil {
+		return fmt.Errorf("failed to wait for composite pod group %s deletion to propagate: %w", cpgName, err)
 	}
 	return nil
 }
@@ -471,8 +524,25 @@ func createWorkloads(testCtx *testutils.TestContext, ns string, wls []*schedulin
 func deletePods(testCtx *testutils.TestContext, ns string, podNames []string) error {
 	cs := testCtx.ClientSet
 	for _, podName := range podNames {
-		if err := cs.CoreV1().Pods(ns).Delete(testCtx.Ctx, podName, metav1.DeleteOptions{}); err != nil {
+		if err := cs.CoreV1().Pods(ns).Delete(testCtx.Ctx, podName, metav1.DeleteOptions{GracePeriodSeconds: new(int64)}); err != nil {
 			return fmt.Errorf("failed to delete pod %s: %w", podName, err)
+		}
+	}
+	for _, podName := range podNames {
+		err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, wait.ForeverTestTimeout, false,
+			func(_ context.Context) (bool, error) {
+				_, err := testCtx.InformerFactory.Core().V1().Pods().Lister().Pods(ns).Get(podName)
+				if err != nil {
+					if apierrors.IsNotFound(err) {
+						return true, nil
+					}
+					return false, err
+				}
+				return false, nil
+			},
+		)
+		if err != nil {
+			return fmt.Errorf("failed to wait for pod %s deletion to propagate: %w", podName, err)
 		}
 	}
 	return nil
@@ -831,6 +901,8 @@ func RunSteps(testCtx *testutils.TestContext, t *testing.T, ns string, steps []S
 		switch {
 		case step.CreateNodes != nil:
 			err = createNodes(testCtx, step.CreateNodes)
+		case step.UpdateNode != nil:
+			err = updateNode(testCtx, step.UpdateNode)
 		case step.CreatePods != nil:
 			err = createPods(testCtx, ns, step.CreatePods, false)
 		case step.CreatePodsInOrder != nil:
@@ -839,6 +911,8 @@ func RunSteps(testCtx *testutils.TestContext, t *testing.T, ns string, steps []S
 			err = createCompositePodGroup(testCtx, ns, step.CreateCompositePodGroup)
 		case step.UpdateCompositePodGroup != nil:
 			err = updateCompositePodGroup(testCtx, ns, step.UpdateCompositePodGroup)
+		case step.DeleteCompositePodGroup != "":
+			err = deleteCompositePodGroup(testCtx, ns, step.DeleteCompositePodGroup)
 		case step.CreatePodGroup != nil:
 			err = createPodGroup(testCtx, ns, step.CreatePodGroup)
 		case step.UpdatePodGroup != nil:
