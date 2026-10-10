@@ -29,8 +29,10 @@ import (
 
 	admissionv1 "k8s.io/api/admission/v1"
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
+	authenticationv1 "k8s.io/api/authentication/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -68,6 +70,7 @@ const (
 type mutatingDispatcher struct {
 	cm     *webhookutil.ClientManager
 	plugin *Plugin
+	// tokenAccessor corev1.ServiceAccountInterface
 }
 
 func newMutatingDispatcher(p *Plugin) func(cm *webhookutil.ClientManager) generic.Dispatcher {
@@ -112,6 +115,8 @@ func (a *mutatingDispatcher) Dispatch(ctx context.Context, attr admission.Attrib
 		reinvokeCtx.SetValue(PluginName, webhookReinvokeCtx)
 	}
 
+	// a.tokenAccessor.CreateToken()
+
 	if reinvokeCtx.IsReinvoke() && webhookReinvokeCtx.IsOutputChangedSinceLastWebhookInvocation(attr.GetObject()) {
 		// If the object has changed, we know the in-tree plugin re-invocations have mutated the object,
 		// and we need to reinvoke all eligible webhooks.
@@ -136,6 +141,11 @@ func (a *mutatingDispatcher) Dispatch(ctx context.Context, attr admission.Attrib
 		}
 		if invocation == nil {
 			continue
+		}
+
+		token, err := a.getWebhookAuthenticationToken(ctx, hook)
+		if err != nil {
+			return err
 		}
 
 		hook, ok := invocation.Webhook.GetMutatingWebhook()
@@ -163,7 +173,7 @@ func (a *mutatingDispatcher) Dispatch(ctx context.Context, attr admission.Attrib
 		}
 
 		annotator := newWebhookAnnotator(versionedAttr, round, i, hook.Name, invocation.Webhook.GetConfigurationName())
-		changed, err := a.callAttrMutatingHook(ctx, hook, invocation, versionedAttr, annotator, o, round, i)
+		changed, err := a.callAttrMutatingHook(ctx, hook, invocation, versionedAttr, annotator, o, round, i, token)
 		ignoreClientCallFailures := hook.FailurePolicy != nil && *hook.FailurePolicy == admissionregistrationv1.Ignore
 		rejected := false
 		if err != nil {
@@ -239,9 +249,33 @@ func (a *mutatingDispatcher) Dispatch(ctx context.Context, attr admission.Attrib
 	return nil
 }
 
+func (*mutatingDispatcher) getWebhookAuthenticationToken(ctx context.Context, hook webhook.WebhookAccessor) (string, error) {
+	cl := hook.GetKubeClient()
+
+	tokenRequest, err := cl.CoreV1().ServiceAccounts("kube-system").CreateToken(ctx, "webhook-auth", &authenticationv1.TokenRequest{
+		Spec: authenticationv1.TokenRequestSpec{
+			Audiences:         []string{"foo"},
+			ExpirationSeconds: nil,
+			BoundObjectRef: &authenticationv1.BoundObjectReference{
+				Kind: "MutatingWebhookConfiguration",
+				Name: hook.GetConfigurationName(),
+				UID:  hook.GetConfigurationUID(),
+			},
+			Attestations: map[string]authenticationv1.AttestationValue{
+				authenticationv1.AttestationAdmissionReviewAPIGroups: {"*"},
+			},
+		},
+	}, v1.CreateOptions{})
+	if err != nil {
+		return "", err
+	}
+
+	return tokenRequest.Status.Token, nil
+}
+
 // note that callAttrMutatingHook updates attr
 
-func (a *mutatingDispatcher) callAttrMutatingHook(ctx context.Context, h *admissionregistrationv1.MutatingWebhook, invocation *generic.WebhookInvocation, attr *admission.VersionedAttributes, annotator *webhookAnnotator, o admission.ObjectInterfaces, round, idx int) (bool, error) {
+func (a *mutatingDispatcher) callAttrMutatingHook(ctx context.Context, h *admissionregistrationv1.MutatingWebhook, invocation *generic.WebhookInvocation, attr *admission.VersionedAttributes, annotator *webhookAnnotator, o admission.ObjectInterfaces, round, idx int, token string) (bool, error) {
 	configurationName := invocation.Webhook.GetConfigurationName()
 	changed := false
 	defer func() { annotator.addMutationAnnotation(changed) }()
@@ -279,7 +313,7 @@ func (a *mutatingDispatcher) callAttrMutatingHook(ctx context.Context, h *admiss
 		defer cancel()
 	}
 
-	r := client.Post().Body(request)
+	r := client.Post().Body(request).SetHeader("Authentication", fmt.Sprintf("bearer %s", token))
 
 	// if the context has a deadline, set it as a parameter to inform the backend
 	if deadline, hasDeadline := ctx.Deadline(); hasDeadline {

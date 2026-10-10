@@ -185,9 +185,10 @@ func BuildValidatingAccessors(configs []*admissionregistrationv1.ValidatingWebho
 		for i := range config.Webhooks {
 			w := &config.Webhooks[i]
 			n := w.Name
+			u := config.UID
 			uid := fmt.Sprintf("manifest/%s/%s/%d", config.Name, n, names[n])
 			names[n]++
-			accessors = append(accessors, webhook.NewValidatingWebhookAccessor(uid, config.Name, w))
+			accessors = append(accessors, webhook.NewValidatingWebhookAccessor(uid, config.Name, u, w, nil))
 		}
 	}
 	return accessors
@@ -201,9 +202,10 @@ func BuildMutatingAccessors(configs []*admissionregistrationv1.MutatingWebhookCo
 		for i := range config.Webhooks {
 			w := &config.Webhooks[i]
 			n := w.Name
+			u := config.UID
 			uid := fmt.Sprintf("manifest/%s/%s/%d", config.Name, n, names[n])
 			names[n]++
-			accessors = append(accessors, webhook.NewMutatingWebhookAccessor(uid, config.Name, w))
+			accessors = append(accessors, webhook.NewMutatingWebhookAccessor(uid, config.Name, u, w, nil))
 		}
 	}
 	return accessors

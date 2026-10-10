@@ -24,11 +24,13 @@ import (
 	v1 "k8s.io/api/admissionregistration/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/generic"
 	"k8s.io/client-go/informers"
+	"k8s.io/client-go/kubernetes"
 	admissionregistrationlisters "k8s.io/client-go/listers/admissionregistration/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/cache/synctrack"
@@ -36,7 +38,7 @@ import (
 )
 
 // Type for test injection.
-type mutatingWebhookAccessorCreator func(uid string, configurationName string, h *v1.MutatingWebhook) webhook.WebhookAccessor
+type mutatingWebhookAccessorCreator func(uid string, configurationName string, configurationUID types.UID, h *v1.MutatingWebhook) webhook.WebhookAccessor
 
 // mutatingWebhookConfigurationManager collects the mutating webhook objects so that they can be called.
 type mutatingWebhookConfigurationManager struct {
@@ -53,12 +55,14 @@ type mutatingWebhookConfigurationManager struct {
 
 var _ generic.Source = &mutatingWebhookConfigurationManager{}
 
-func NewMutatingWebhookConfigurationManager(f informers.SharedInformerFactory, excludedWebhookResources sets.Set[schema.GroupResource]) generic.Source {
+func NewMutatingWebhookConfigurationManager(f informers.SharedInformerFactory, excludedWebhookResources sets.Set[schema.GroupResource], kubeClient kubernetes.Interface) generic.Source {
 	informer := f.Admissionregistration().V1().MutatingWebhookConfigurations()
 	manager := &mutatingWebhookConfigurationManager{
-		lister:                        informer.Lister(),
-		createMutatingWebhookAccessor: webhook.NewMutatingWebhookAccessor,
-		excludedWebhookResources:      excludedWebhookResources,
+		lister: informer.Lister(),
+		createMutatingWebhookAccessor: func(uid, configurationName string, h *v1.MutatingWebhook) webhook.WebhookAccessor {
+			return webhook.NewMutatingWebhookAccessor(uid, configurationName, h, kubeClient)
+		},
+		excludedWebhookResources: excludedWebhookResources,
 	}
 	manager.lazy.Evaluate = manager.getConfiguration
 
@@ -147,7 +151,8 @@ func (m *mutatingWebhookConfigurationManager) getMutatingWebhookConfigurations(c
 			n := c.Webhooks[i].Name
 			uid := fmt.Sprintf("%s/%s/%d", c.Name, n, names[n])
 			names[n]++
-			configurationAccessor := m.createMutatingWebhookAccessor(uid, c.Name, &c.Webhooks[i])
+			u := c.UID
+			configurationAccessor := m.createMutatingWebhookAccessor(uid, c.Name, u, &c.Webhooks[i])
 			configurationAccessors = append(configurationAccessors, configurationAccessor)
 		}
 		accessors = append(accessors, configurationAccessors...)
