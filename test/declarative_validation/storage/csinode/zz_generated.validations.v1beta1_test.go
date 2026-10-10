@@ -66,6 +66,12 @@ func init() {
 			"metadata.uid": {
 				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
 			},
+			"spec.driverRegistrations[*].name": {
+				{ErrorType: "FieldValueRequired"},
+			},
+			"spec.driverRegistrations[*].nodeID": {
+				{ErrorType: "FieldValueRequired"},
+			},
 			"status.storageHealth[*].name": {
 				{ErrorType: "FieldValueRequired"},
 			},

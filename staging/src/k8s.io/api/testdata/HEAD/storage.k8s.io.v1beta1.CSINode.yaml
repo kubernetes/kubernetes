@@ -33,6 +33,9 @@ metadata:
   selfLink: selfLinkValue
   uid: uidValue
 spec:
+  driverRegistrations:
+  - name: nameValue
+    nodeID: nodeIDValue
   drivers:
   - allocatable:
       count: 1

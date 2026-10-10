@@ -363,6 +363,42 @@ func ValidateCSINodeStatusUpdate(new, old *storage.CSINode) field.ErrorList {
 func validateCSINodeSpec(spec *storage.CSINodeSpec, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, validateCSINodeDrivers(spec.Drivers, fldPath.Child("drivers"))...)
+	allErrs = append(allErrs, validateCSINodeDriverRegistrations(spec.DriverRegistrations, spec.Drivers, fldPath.Child("driverRegistrations"))...)
+	return allErrs
+}
+
+// validateCSINodeDriverRegistrations validates each registration and checks that its node ID
+// matches the drivers entry with the same name.
+func validateCSINodeDriverRegistrations(registrations []storage.CSINodeDriverRegistration, drivers []storage.CSINodeDriver, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	driverNodeIDs := make(map[string]string, len(drivers))
+	for _, driver := range drivers {
+		driverNodeIDs[driver.Name] = driver.NodeID
+	}
+
+	registrationNames := make(sets.Set[string], len(registrations))
+	for i, registration := range registrations {
+		idxPath := fldPath.Index(i)
+		allErrs = append(allErrs, apivalidation.ValidateCSIDriverName(registration.Name, idxPath.Child("name"), apivalidation.RequiredCovered)...)
+
+		if registrationNames.Has(registration.Name) {
+			allErrs = append(allErrs, field.Duplicate(idxPath.Child("name"), registration.Name))
+		}
+		registrationNames.Insert(registration.Name)
+
+		if len(registration.NodeID) == 0 {
+			allErrs = append(allErrs, field.Required(idxPath.Child("nodeID"), "").MarkCoveredByDeclarative())
+			continue
+		}
+		allErrs = append(allErrs, validateCSINodeDriverNodeID(registration.NodeID, idxPath.Child("nodeID"))...)
+
+		driverNodeID, ok := driverNodeIDs[registration.Name]
+		if ok && driverNodeID != registration.NodeID {
+			allErrs = append(allErrs, field.Invalid(idxPath.Child("nodeID"), registration.NodeID, "must match the nodeID of the drivers entry with the same name"))
+		}
+	}
+
 	return allErrs
 }
 

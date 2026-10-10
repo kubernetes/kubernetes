@@ -271,7 +271,27 @@ func Validate_CSINode(
 		errs = append(errs, fn(fldPath.Child("metadata"), &obj.ObjectMeta, oldVal, oldObj != nil)...)
 	}
 
-	// field storagev1beta1.CSINode.Spec has no validation
+	{ // field storagev1beta1.CSINode.Spec
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *storagev1beta1.CSINodeSpec,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if validate.SemanticDeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_CSINodeSpec(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *storagev1beta1.CSINode) *storagev1beta1.CSINodeSpec {
+				return &oldObj.Spec
+			})
+		errs = append(errs, fn(fldPath.Child("spec"), &obj.Spec, oldVal, oldObj != nil)...)
+	}
 
 	{ // field storagev1beta1.CSINode.Status
 		fn := func(
@@ -293,6 +313,116 @@ func Validate_CSINode(
 				return &oldObj.Status
 			})
 		errs = append(errs, fn(fldPath.Child("status"), &obj.Status, oldVal, oldObj != nil)...)
+	}
+
+	return errs
+}
+
+// Validate_CSINodeDriverRegistration validates an instance of CSINodeDriverRegistration according
+// to declarative validation rules in the API schema.
+func Validate_CSINodeDriverRegistration(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *storagev1beta1.CSINodeDriverRegistration) (errs field.ErrorList) {
+
+	{ // field storagev1beta1.CSINodeDriverRegistration.Name
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *string,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *storagev1beta1.CSINodeDriverRegistration) *string {
+				return &oldObj.Name
+			})
+		errs = append(errs, fn(fldPath.Child("name"), &obj.Name, oldVal, oldObj != nil)...)
+	}
+
+	{ // field storagev1beta1.CSINodeDriverRegistration.NodeID
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *string,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *storagev1beta1.CSINodeDriverRegistration) *string {
+				return &oldObj.NodeID
+			})
+		errs = append(errs, fn(fldPath.Child("nodeID"), &obj.NodeID, oldVal, oldObj != nil)...)
+	}
+
+	return errs
+}
+
+// Validate_CSINodeSpec validates an instance of CSINodeSpec according
+// to declarative validation rules in the API schema.
+func Validate_CSINodeSpec(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *storagev1beta1.CSINodeSpec) (errs field.ErrorList) {
+
+	// field storagev1beta1.CSINodeSpec.Drivers has no validation
+
+	{ // field storagev1beta1.CSINodeSpec.DriverRegistrations
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj []storagev1beta1.CSINodeDriverRegistration,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if validate.SemanticDeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			// iterate the list and call the type's validation function
+			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_CSINodeDriverRegistration); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *storagev1beta1.CSINodeSpec) []storagev1beta1.CSINodeDriverRegistration {
+				return oldObj.DriverRegistrations
+			})
+		errs = append(errs, fn(fldPath.Child("driverRegistrations"), obj.DriverRegistrations, oldVal, oldObj != nil)...)
 	}
 
 	return errs

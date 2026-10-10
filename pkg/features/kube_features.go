@@ -118,6 +118,13 @@ const (
 	// Enables using streaming RPCs for CRI list operations.
 	CRIListStreaming featuregate.Feature = "CRIListStreaming"
 
+	// owner: @huww98, @torredil
+	// kep: https://kep.k8s.io/6011
+	//
+	// Enables CSI drivers to report a node's topology and volume attachment limit from
+	// the controller, through ControllerGetNodeInfo, instead of from the node.
+	CSIControllerGetNodeInfo featuregate.Feature = "CSIControllerGetNodeInfo"
+
 	// owner: @aramase
 	// kep:  http://kep.k8s.io/5538
 	//
@@ -1331,6 +1338,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.36"), Default: false, PreRelease: featuregate.Alpha},
 	},
 
+	CSIControllerGetNodeInfo: {
+		{Version: version.MustParse("1.38"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
 	CSIServiceAccountTokenSecrets: {
 		{Version: version.MustParse("1.35"), Default: true, PreRelease: featuregate.Beta},
 		{Version: version.MustParse("1.36"), Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // GA in 1.36; remove in 1.39
@@ -2424,6 +2435,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	CPUManagerPolicyOptions: {},
 
 	CRIListStreaming: {},
+
+	CSIControllerGetNodeInfo: {},
 
 	CSIServiceAccountTokenSecrets: {},
 

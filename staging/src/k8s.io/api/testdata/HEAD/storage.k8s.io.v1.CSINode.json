@@ -55,6 +55,12 @@
           "count": 1
         }
       }
+    ],
+    "driverRegistrations": [
+      {
+        "name": "nameValue",
+        "nodeID": "nodeIDValue"
+      }
     ]
   },
   "status": {
