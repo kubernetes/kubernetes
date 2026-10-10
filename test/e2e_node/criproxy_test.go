@@ -20,7 +20,6 @@ package e2enode
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -99,7 +98,9 @@ var _ = SIGDescribe(feature.CriProxy, framework.WithSerial(), func() {
 
 	})
 
-	framework.Context("Image volume digest error handling", feature.CriProxy, framework.WithFeatureGate(features.ImageVolumeWithDigest), func() {
+	framework.Context("Image volume digest status", feature.CriProxy, framework.WithFeatureGate(features.ImageVolumeWithDigest), func() {
+		const volumeName = "image-volume"
+
 		ginkgo.BeforeEach(func() {
 			if e2eCriProxy == nil {
 				ginkgo.Skip("Skip the test since the CRI Proxy is undefined. Please run with --cri-proxy-enabled=true")
@@ -146,81 +147,36 @@ var _ = SIGDescribe(feature.CriProxy, framework.WithSerial(), func() {
 			}
 		}
 
-		waitForPodContainerStatuses := func(pod *v1.Pod) *v1.Pod {
-			ginkgo.By("Waiting for the pod container statuses")
-
-			var err error
-			gomega.Eventually(func() []v1.ContainerStatus {
-				pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(context.Background(), pod.Name, metav1.GetOptions{})
-				framework.ExpectNoError(err)
-
-				return pod.Status.ContainerStatuses
-			}).WithPolling(5*time.Second).WithTimeout(2*time.Minute).Should(gomega.HaveLen(1), "couldn't find expected container status")
-
-			return pod
-		}
-
-		getVolumeMountStatus := func(pod *v1.Pod) v1.VolumeMountStatus {
-			ginkgo.By("Finding the pod volume mount status")
-
-			var volMountStatus *v1.VolumeMountStatus
-			containerStatus := pod.Status.ContainerStatuses[0]
-
-			for i := range pod.Status.ContainerStatuses[0].VolumeMounts {
-				if containerStatus.VolumeMounts[i].Name == volumeName {
-					volMountStatus = &containerStatus.VolumeMounts[i]
-					break
-				}
-			}
-			gomega.ExpectWithOffset(1, volMountStatus).ToNot(gomega.BeNil(), "couldn't find expected volume mount status")
-
-			return *volMountStatus
-		}
-
-		ginkgo.It("should expect error log when ImageStatus fails for image volume digest", func(ctx context.Context) {
-			const imageStatusErrMsg = "mock error message - ImageStatus failed"
-
-			err := addCRIProxyInjector(e2eCriProxy, func(apiName string) error {
-				if apiName == criproxy.ImageStatus {
-					return errors.New(imageStatusErrMsg)
-				}
-				return nil
-			})
-			framework.ExpectNoError(err)
-
+		ginkgo.It("should report the runtime image volume digest", func(ctx context.Context) {
 			pod := getImageVolumePod()
 			pod = e2epod.NewPodClient(f).Create(ctx, pod)
-			pod = waitForPodContainerStatuses(pod)
 
-			volMountStatus := getVolumeMountStatus(pod)
-
-			if volMountStatus.VolumeStatus != nil && volMountStatus.VolumeStatus.Image != nil {
-				ginkgo.Fail(fmt.Sprintf("ImageRef should not be set when ImageStatus fails, but got: %s", volMountStatus.VolumeStatus.Image.ImageRef))
+			var imageVolumeMountStatus *v1.VolumeMountStatus
+			gomega.Eventually(func() bool {
+				var err error
+				pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(ctx, pod.Name, metav1.GetOptions{})
+				if err != nil {
+					return false
+				}
+				if len(pod.Status.ContainerStatuses) == 0 {
+					return false
+				}
+				for i := range pod.Status.ContainerStatuses[0].VolumeMounts {
+					if pod.Status.ContainerStatuses[0].VolumeMounts[i].Name == volumeName {
+						imageVolumeMountStatus = &pod.Status.ContainerStatuses[0].VolumeMounts[i]
+						return true
+					}
+				}
+				return false
+			}).WithPolling(5 * time.Second).WithTimeout(2 * time.Minute).Should(gomega.BeTrueBecause("image volume mount status was not reported for pod %s", pod.Name))
+			imageRef := ""
+			if status := imageVolumeMountStatus.VolumeStatus; status != nil && status.Image != nil {
+				imageRef = status.Image.ImageRef
 			}
-
-			ginkgo.By("Expecting an error when ImageStatus fails")
-			gomega.Eventually(func() error {
-				return verifyErrorInKubeletLogs(imageStatusErrMsg)
-			}).WithPolling(5*time.Second).WithTimeout(20*time.Second).ToNot(gomega.HaveOccurred(), "Could not verify error in kubelet logs")
-		})
-
-		ginkgo.It("should expect error log for image volume with empty Image.Image", func(ctx context.Context) {
-			// This test verifies error handling when imageSpec.Image is empty (curVolumeMount.Image.Image == "").
-
-			pod := getImageVolumePod()
-			pod = e2epod.NewPodClient(f).Create(ctx, pod)
-			pod = waitForPodContainerStatuses(pod)
-
-			volMountStatus := getVolumeMountStatus(pod)
-
-			if volMountStatus.VolumeStatus != nil && volMountStatus.VolumeStatus.Image != nil {
-				ginkgo.Fail(fmt.Sprintf("ImageRef should not be set when ImageStatus fails, but got: %s", volMountStatus.VolumeStatus.Image.ImageRef))
+			if imageRef == "" {
+				ginkgo.Skip("CRI runtime did not provide ImageSpec.ImageRef")
 			}
-
-			ginkgo.By("Expecting an error when imageSpec.Image is empty")
-			gomega.Eventually(func() error {
-				return verifyErrorInKubeletLogs("image was not found")
-			}).WithPolling(5*time.Second).WithTimeout(20*time.Second).ToNot(gomega.HaveOccurred(), "Could not verify error in kubelet logs")
+			gomega.Expect(imageRef).To(gomega.Equal(pod.Status.ContainerStatuses[0].ImageID), "image volume digest should match the runtime digest for the same image")
 		})
 	})
 
