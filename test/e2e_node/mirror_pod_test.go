@@ -772,7 +772,7 @@ func checkMirrorPodRecreated(ctx context.Context, cl clientset.Interface, name, 
 	return nil
 }
 
-var _ = SIGDescribe("MirrorPod", framework.WithSerial(), func() {
+var _ = SIGDescribe("MirrorPod", framework.WithFeatureGate(features.ChangeContainerStatusOnKubeletRestart), framework.WithSerial(), func() {
 	f := framework.NewDefaultFramework("mirror-pod-serial")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	ginkgo.Context("when kubelet restarts", func() {
@@ -802,11 +802,14 @@ var _ = SIGDescribe("MirrorPod", framework.WithSerial(), func() {
 						ReadinessProbe: &v1.Probe{
 							ProbeHandler: v1.ProbeHandler{
 								Exec: &v1.ExecAction{
-									Command: []string{"/bin/true"},
+									// Give kubelet time to publish its restored status before
+									// a successful probe can mask an incorrect readiness reset.
+									Command: []string{"/bin/sh", "-c", "sleep 30; /bin/true"},
 								},
 							},
 							InitialDelaySeconds: 1,
 							PeriodSeconds:       1,
+							TimeoutSeconds:      60,
 						},
 					},
 				},
@@ -922,8 +925,8 @@ var _ = SIGDescribe("MirrorPod", framework.WithSerial(), func() {
 			restartKubelet := mustStopKubelet(ctx, f)
 			restartKubelet(ctx)
 
-			// Let the goroutine run for a few more seconds to catch any delayed changes
-			time.Sleep(5 * time.Second)
+			// Allow status updates to reach the API before the delayed readiness probe succeeds.
+			time.Sleep(20 * time.Second)
 			close(stopCh)
 
 			for err := range errCh {
