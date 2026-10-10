@@ -36,19 +36,19 @@ GOTOOLCHAIN="go${GOLANG_VERSION}"
 # NOTE(claudiub): In the test image build jobs, this script is not being run in a git repository,
 # which would cause git log to fail. Instead, we can use the GIT_COMMIT_ID set in cloudbuild.yaml.
 GIT_COMMIT_ID=$(git log -1 --format=%h || echo "${GIT_COMMIT_ID}")
-windows_os_versions=(1809 ltsc2022 ltsc2025)
-declare -A WINDOWS_OS_VERSIONS_MAP
 
-initWindowsOsVersions() {
-  for os_version in "${windows_os_versions[@]}"; do
-    img_base="mcr.microsoft.com/windows/nanoserver:${os_version}"
-    # we use awk to also trim the quotes around the OS version string.
-    full_version=$(docker manifest inspect "${img_base}" | grep "os.version" | head -n 1 | awk -F\" '{print $4}') || true
-    WINDOWS_OS_VERSIONS_MAP["${os_version}"]="${full_version}"
-  done
+getWindowsOsVersion() {
+  local manifest_list=${1}
+  local image_ref=${2}
+  local full_version
+  # We use awk to also trim the quotes around the OS version string.
+  full_version=$(docker manifest inspect --verbose "${manifest_list}" "${image_ref}" | grep -Eo '"os.version"[[:space:]]*:[[:space:]]*"[^"]+"' | head -n 1 | awk -F\" '{print $4}') || true
+  if [[ -z "${full_version}" ]]; then
+    echo "Could not determine the Windows os.version from ${image_ref}." >&2
+    return 1
+  fi
+  echo "${full_version}"
 }
-
-initWindowsOsVersions
 
 # Returns list of all supported architectures from BASEIMAGE file
 listOsArchs() {
@@ -184,6 +184,7 @@ push() {
 
   TAG=$(<"${image}"/VERSION)
   local -a os_archs=()
+  local child_ref full_version
   if [[ -f ${image}/BASEIMAGE ]]; then
     kube::util::read-array os_archs < <(listOsArchs "$image")
   else
@@ -213,8 +214,9 @@ push() {
     # For Windows images, we also need to include the "os.version" in the manifest list, so the Windows node
     # can pull the proper image it needs.
     if [[ "$os_name" = "windows" ]]; then
-      full_version="${WINDOWS_OS_VERSIONS_MAP[$os_version]}"
-      docker manifest annotate --os "${os_name}" --arch "${arch}" --os-version "${full_version}" "${REGISTRY}/${image}:${TAG}" "${REGISTRY}/${image}:${TAG}-${suffix}"
+      child_ref="${REGISTRY}/${image}:${TAG}-${suffix}"
+      full_version=$(getWindowsOsVersion "${REGISTRY}/${image}:${TAG}" "${child_ref}")
+      docker manifest annotate --os "${os_name}" --arch "${arch}" --os-version "${full_version}" "${REGISTRY}/${image}:${TAG}" "${child_ref}"
     else
       docker manifest annotate --os "${os_name}" --arch "${arch}" "${REGISTRY}/${image}:${TAG}" "${REGISTRY}/${image}:${TAG}-${suffix}"
     fi
