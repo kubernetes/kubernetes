@@ -1136,7 +1136,7 @@ type ServiceReference struct {
 	// If specified, the port on the service that hosting webhook.
 	// `port` should be a valid port number (1-65535, inclusive).
 	// +optional
-	Port int32
+	Port *int32
 }
 
 // MatchCondition represents a condition which must by fulfilled for a request to be sent to a webhook.
