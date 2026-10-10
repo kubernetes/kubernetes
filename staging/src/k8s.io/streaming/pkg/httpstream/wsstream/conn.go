@@ -18,6 +18,8 @@ package wsstream
 
 import (
 	"encoding/base64"
+	"encoding/binary"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -64,6 +66,9 @@ const ChannelWebSocketProtocol = "channel.k8s.io"
 const Base64ChannelWebSocketProtocol = "base64.channel.k8s.io"
 
 const streamCloseSignal = 255
+
+// closeStatusNormal is the WebSocket close status for a normal closure.
+const closeStatusNormal = 1000
 
 type codecType int
 
@@ -189,8 +194,12 @@ type Conn struct {
 	channels         []*websocketChannel
 	codec            codecType
 	ready            chan struct{}
-	ws               *websocket.Conn
-	timeout          time.Duration
+	// ws is written to through codecs: the channel codec in write and
+	// closeFrameCodec in CloseWrite.
+	ws      *websocket.Conn
+	timeout time.Duration
+	// closeChan is closed once the connection's read loop has ended.
+	closeChan chan bool
 }
 
 // NewConn creates a WebSocket connection that supports a set of channels. Channels begin each
@@ -204,6 +213,7 @@ func NewConn(protocols map[string]ChannelProtocolConfig) *Conn {
 	return &Conn{
 		ready:     make(chan struct{}),
 		protocols: protocols,
+		closeChan: make(chan bool),
 	}
 }
 
@@ -320,6 +330,40 @@ func (conn *Conn) Close() error {
 	return conn.closeNonThreadSafe()
 }
 
+// CloseChan returns a channel that is closed once the connection has been
+// closed: the client closed it, the idle timeout expired, or Close was called.
+func (conn *Conn) CloseChan() <-chan bool {
+	return conn.closeChan
+}
+
+// CloseWrite tells the client that the server is done with the connection
+// without closing it. It sends a close frame, to which the client replies
+// with its own close frame, at which point the read loop ends and the
+// connection is closed (see CloseChan). Output still in the socket's send
+// buffer keeps flowing to the client in the meantime, whereas Close tears the
+// socket down immediately and lets the kernel reset the connection if the
+// client sends anything after that, discarding the output that was still in
+// flight. A client that never replies holds the connection until the idle
+// timeout, if one is set, or until the caller closes it. Close, which the
+// read loop calls when it ends, sends a second close frame; by then the client
+// has closed or ignores it.
+func (conn *Conn) CloseWrite() error {
+	<-conn.ready
+	status := make([]byte, 2)
+	binary.BigEndian.PutUint16(status, closeStatusNormal)
+	return closeFrameCodec.Send(conn.ws, status)
+}
+
+// closeFrameCodec sends its payload as a close frame. x/net/websocket only
+// sends a close frame as part of Close, which also closes the socket; Codec.Send
+// takes the connection's write lock and uses the frame type Marshal returns, so
+// it can send one on its own.
+var closeFrameCodec = websocket.Codec{
+	Marshal: func(v interface{}) ([]byte, byte, error) {
+		return v.([]byte), websocket.CloseFrame, nil
+	},
+}
+
 // protocolSupportsStreamClose returns true if the passed protocol
 // supports the stream close signal (currently only V5 remotecommand);
 // false otherwise.
@@ -335,6 +379,7 @@ func protocolSupportsWebsocketTunneling(protocol string) bool {
 
 // handle implements a websocket handler.
 func (conn *Conn) handle(ws *websocket.Conn) {
+	defer close(conn.closeChan)
 	conn.initialize(ws)
 	defer conn.Close()
 	supportsStreamClose := protocolSupportsStreamClose(conn.selectedProtocol)
@@ -442,16 +487,26 @@ func (p *websocketChannel) DataFromSocket(data []byte) (int, error) {
 
 	switch p.conn.codec {
 	case rawCodec:
-		return p.w.Write(data)
+		return p.writeToReader(data)
 	case base64Codec:
 		dst := make([]byte, len(data))
 		n, err := base64.StdEncoding.Decode(dst, data)
 		if err != nil {
 			return 0, err
 		}
-		return p.w.Write(dst[:n])
+		return p.writeToReader(dst[:n])
 	}
 	return 0, nil
+}
+
+// writeToReader hands data received from the socket to the channel's reader.
+// Data for a channel that has been closed is discarded.
+func (p *websocketChannel) writeToReader(data []byte) (int, error) {
+	n, err := p.w.Write(data)
+	if errors.Is(err, io.ErrClosedPipe) {
+		return len(data), nil
+	}
+	return n, err
 }
 
 func (p *websocketChannel) Read(data []byte) (int, error) {

@@ -76,7 +76,10 @@ func TestStreamTranslator_LoopbackStdinToStdout(t *testing.T) {
 		if err != nil {
 			t.Fatalf("error copying STDIN to STDOUT: %v", err)
 		}
-
+		// A v4 server writes the command's status before it closes.
+		if err := ctx.writeStatus(&apierrors.StatusError{ErrStatus: metav1.Status{Status: metav1.StatusSuccess}}); err != nil {
+			t.Errorf("error writing status: %v", err)
+		}
 	}))
 	defer spdyServer.Close()
 	// Create StreamTranslatorHandler, which points upstream to fake SPDY server with
@@ -176,6 +179,10 @@ func TestStreamTranslator_LoopbackStdinToStderr(t *testing.T) {
 		_, err = io.Copy(ctx.stderrStream, ctx.stdinStream)
 		if err != nil {
 			t.Fatalf("error copying STDIN to STDERR: %v", err)
+		}
+		// A v4 server writes the command's status before it closes.
+		if err := ctx.writeStatus(&apierrors.StatusError{ErrStatus: metav1.Status{Status: metav1.StatusSuccess}}); err != nil {
+			t.Errorf("error writing status: %v", err)
 		}
 	}))
 	defer spdyServer.Close()
@@ -391,6 +398,10 @@ func TestStreamTranslator_MultipleReadChannels(t *testing.T) {
 		if err != nil {
 			t.Errorf("error copying STDIN to STDOUT: %v", err)
 		}
+		// A v4 server writes the command's status before it closes.
+		if err := ctx.writeStatus(&apierrors.StatusError{ErrStatus: metav1.Status{Status: metav1.StatusSuccess}}); err != nil {
+			t.Errorf("error writing status: %v", err)
+		}
 	}))
 	defer spdyServer.Close()
 	// Create StreamTranslatorHandler, which points upstream to fake SPDY server with
@@ -495,6 +506,10 @@ func TestStreamTranslator_ThrottleReadChannels(t *testing.T) {
 		_, err = io.Copy(ctx.stdoutStream, stdinReader)
 		if err != nil {
 			t.Errorf("error copying STDIN to STDOUT: %v", err)
+		}
+		// A v4 server writes the command's status before it closes.
+		if err := ctx.writeStatus(&apierrors.StatusError{ErrStatus: metav1.Status{Status: metav1.StatusSuccess}}); err != nil {
+			t.Errorf("error writing status: %v", err)
 		}
 	}))
 	defer spdyServer.Close()
@@ -634,6 +649,10 @@ func TestStreamTranslator_TTYResizeChannel(t *testing.T) {
 		for i := 0; i < numSizeQueue; i++ {
 			actualTerminalSize := <-ctx.resizeChan
 			actualTerminalSizes = append(actualTerminalSizes, actualTerminalSize)
+		}
+		// A v4 server writes the command's status before it closes.
+		if err := ctx.writeStatus(&apierrors.StatusError{ErrStatus: metav1.Status{Status: metav1.StatusSuccess}}); err != nil {
+			t.Errorf("error writing status: %v", err)
 		}
 	}))
 	defer spdyServer.Close()
