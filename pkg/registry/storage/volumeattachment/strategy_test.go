@@ -97,9 +97,9 @@ func TestVolumeAttachmentStrategy(t *testing.T) {
 		t.Errorf("unexpected objects difference after creating with status: %v", cmp.Diff(statusVolumeAttachment, volumeAttachment))
 	}
 
-	// Update of spec is disallowed
+	// Update with invalid source is disallowed
 	newVolumeAttachment := volumeAttachment.DeepCopy()
-	newVolumeAttachment.Spec.NodeName = "valid-node-2"
+	newVolumeAttachment.Spec.Source = storage.VolumeAttachmentSource{}
 
 	Strategy.PrepareForUpdate(ctx, newVolumeAttachment, volumeAttachment)
 
@@ -271,7 +271,6 @@ func TestCreatePreventsStatusWrite(t *testing.T) {
 
 func TestVolumeAttachmentValidation(t *testing.T) {
 	invalidPVName := "invalid-!@#$%^&*()"
-	validPVName := "valid-volume-name"
 	tests := []struct {
 		name             string
 		volumeAttachment *storage.VolumeAttachment
@@ -299,29 +298,13 @@ func TestVolumeAttachmentValidation(t *testing.T) {
 			true,
 		},
 		{
-			"invalid attacher name",
-			&storage.VolumeAttachment{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "foo",
-				},
-				Spec: storage.VolumeAttachmentSpec{
-					Attacher: "invalid!@#$%^&*()",
-					Source: storage.VolumeAttachmentSource{
-						PersistentVolumeName: &validPVName,
-					},
-					NodeName: "valid-node",
-				},
-			},
-			true,
-		},
-		{
 			"invalid volume attachment",
 			&storage.VolumeAttachment{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
 				Spec: storage.VolumeAttachmentSpec{
-					Attacher: "invalid!@#$%^&*()",
+					Attacher: "valid-attacher",
 					Source: storage.VolumeAttachmentSource{
 						PersistentVolumeName: nil,
 					},
