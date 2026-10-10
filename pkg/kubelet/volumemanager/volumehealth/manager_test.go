@@ -112,7 +112,7 @@ type storageCall struct {
 	conditions []storagev1.StorageHealthCondition
 }
 
-func (f *fakeCSINodeUpdater) UpdateCSINodeStorageHealth(driverName string, conditions []storagev1.StorageHealthCondition) error {
+func (f *fakeCSINodeUpdater) UpdateCSINodeStorageHealth(ctx context.Context, driverName string, conditions []storagev1.StorageHealthCondition) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.calls = append(f.calls, storageCall{
