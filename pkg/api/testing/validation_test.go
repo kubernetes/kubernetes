@@ -18,6 +18,7 @@ package testing
 
 import (
 	"math/rand"
+	"reflect"
 	"sort"
 	"testing"
 
@@ -27,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	authorizationvalidation "k8s.io/kubernetes/pkg/apis/authorization/validation"
 	nodevalidation "k8s.io/kubernetes/pkg/apis/node/validation"
 	resourcevalidation "k8s.io/kubernetes/pkg/apis/resource/validation"
 )
@@ -83,6 +85,10 @@ func TestVersionedValidationByFuzzing(t *testing.T) {
 				allRules = append(allRules, nodevalidation.NodeNormalizationRules...)
 				opts = append(opts, WithNormalizationRules(allRules...), WithFuzzer(f))
 
+				// TODO: accumulate omitted fields and and set opts
+				allOmittedPaths := authorizationvalidation.OmittedFieldPaths()
+				opts = append(opts, WithOmittedFieldPaths(allOmittedPaths))
+
 				if subresource != "" {
 					opts = append(opts, WithSubResources(subresource))
 				}
@@ -97,5 +103,31 @@ func TestVersionedValidationByFuzzing(t *testing.T) {
 				VerifyVersionedValidationEquivalence(t, obj, old, opts...)
 			}
 		})
+	}
+}
+
+func TestOmitErrorsForPaths(t *testing.T) {
+	errs := field.ErrorList{
+		field.Invalid(field.NewPath("spec", "authorizationOptions"), nil, ""),
+		field.Invalid(field.NewPath("spec", "authorizationOptions", "handledDecisionTypes"), nil, ""),
+		field.Invalid(field.NewPath("spec", "authorizationOptions").Index(0), nil, ""),
+		field.Invalid(field.NewPath("spec", "authorizationOptions").Key("k"), nil, ""),
+		// shares the prefix but is a sibling field, so must be retained
+		field.Invalid(field.NewPath("spec", "authorizationOptionsX"), nil, ""),
+		field.Invalid(field.NewPath("spec", "user"), nil, ""),
+	}
+
+	got := omitErrorsForPaths(errs, []string{"spec.authorizationOptions"})
+	var gotFields []string
+	for _, e := range got {
+		gotFields = append(gotFields, e.Field)
+	}
+	want := []string{"spec.authorizationOptionsX", "spec.user"}
+	if !reflect.DeepEqual(gotFields, want) {
+		t.Errorf("retained fields = %v, want %v", gotFields, want)
+	}
+
+	if got := omitErrorsForPaths(errs, nil); len(got) != len(errs) {
+		t.Errorf("with no omitted paths, retained %d errors, want %d", len(got), len(errs))
 	}
 }
