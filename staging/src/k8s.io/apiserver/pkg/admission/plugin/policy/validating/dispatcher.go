@@ -159,6 +159,8 @@ func (c *dispatcher) Dispatch(ctx context.Context, a admission.Attributes, o adm
 				hook.ParamScope,
 				binding.Spec.ParamRef,
 				a.GetNamespace(),
+				hook.DynamicClient,
+				hook.RESTMapper,
 			)
 
 			if err != nil {
