@@ -41,7 +41,9 @@ import (
 
 // ApplyPodLevelMemoryHigh sets memory.high on the pod cgroup using the KEP-2570 formula.
 // Applies when PodLevelResources is enabled and the pod has memory limits declared
-// (either pod-level or all containers). Skips Guaranteed-like pods where request == limit.
+// (either pod-level or all containers). Pods with request == limit get memory.high=max
+// (no throttling) rather than an omitted key, so a resize landing there clears any
+// previously computed throttle instead of leaving it stale.
 func ApplyPodLevelMemoryHigh(pod *v1.Pod, rc *ResourceConfig, throttlingFactor float64) {
 	podLevelResourcesEnabled := utilfeature.DefaultFeatureGate.Enabled(kubefeatures.PodLevelResources)
 	if !podLevelResourcesEnabled || !resourcehelper.IsPodLevelResourcesSet(pod) {
@@ -78,7 +80,13 @@ func ApplyPodLevelMemoryHigh(pod *v1.Pod, rc *ResourceConfig, throttlingFactor f
 }
 
 func memoryHighForPod(memoryRequest, memoryLimit int64, throttlingFactor float64) string {
-	if (memoryRequest == memoryLimit && memoryRequest != 0) || memoryLimit == 0 {
+	if memoryRequest == memoryLimit && memoryRequest != 0 {
+		// Request equals limit: no throttling. Reset explicitly so a resize
+		// landing here clears a previously computed memory.high instead of
+		// leaving it stale behind an omitted key.
+		return Cgroup2MemoryMax
+	}
+	if memoryLimit == 0 {
 		return ""
 	}
 	pageSize := int64(os.Getpagesize())

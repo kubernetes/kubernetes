@@ -1393,6 +1393,31 @@ func TestApplyPodLevelMemoryHigh(t *testing.T) {
 			t.Errorf("expected no Unified map for mixed limits, got %v", rc.Unified)
 		}
 	})
+
+	t.Run("request equals limit resets memory.high to max", func(t *testing.T) {
+		pod := &v1.Pod{
+			Spec: v1.PodSpec{
+				Resources: &v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						v1.ResourceMemory: resource.MustParse("256Mi"),
+						v1.ResourceCPU:    resource.MustParse("1"),
+					},
+					Limits: v1.ResourceList{
+						v1.ResourceMemory: resource.MustParse("256Mi"),
+						v1.ResourceCPU:    resource.MustParse("1"),
+					},
+				},
+				Containers: []v1.Container{
+					{Resources: getResourceRequirements(getResourceList("1", "256Mi"), getResourceList("1", "256Mi"))},
+				},
+			},
+		}
+		rc := &ResourceConfig{}
+		ApplyPodLevelMemoryHigh(pod, rc, 0.9)
+		if rc.Unified[Cgroup2MemoryHigh] != Cgroup2MemoryMax {
+			t.Errorf("expected memory.high reset to max when request equals limit, got %v", rc.Unified)
+		}
+	})
 }
 
 func TestCPUSharesEqualAfterV2RoundTrip(t *testing.T) {

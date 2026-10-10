@@ -223,7 +223,7 @@ func (m *kubeGenericRuntimeManager) generateLinuxContainerResources(ctx context.
 			utilfeature.DefaultFeatureGate.Enabled(kubefeatures.PodLevelResources) &&
 			resourcehelper.IsPodLevelResourcesSet(pod) &&
 			!pod.Spec.Resources.Limits.Memory().IsZero()
-		if m.memoryThrottlingFactor != nil && !skipContainerMemoryHigh && (memoryRequest != memoryLimitSpec || memoryRequest == 0) {
+		if m.memoryThrottlingFactor != nil && !skipContainerMemoryHigh {
 			memoryLimitVal := memoryLimitSpec
 			if _, exists := draAllocations[v1.ResourceMemory]; exists && memoryLimit != nil && memoryLimitSpec != 0 {
 				// memoryLimit computed above should include DRA already.
@@ -240,21 +240,31 @@ func (m *kubeGenericRuntimeManager) generateLinuxContainerResources(ctx context.
 			// `memory.high=floor[(requests.memory + memory throttling factor * (limits.memory or node allocatable memory - requests.memory))/pageSize] * pageSize`
 			// More info: https://git.k8s.io/enhancements/keps/sig-node/2570-memory-qos
 			memoryHigh := int64(0)
-			if memoryLimitVal != 0 {
-				memoryHigh = int64(math.Floor(
-					float64(memoryRequest)+
-						(float64(memoryLimitVal)-float64(memoryRequest))*float64(*m.memoryThrottlingFactor))/float64(defaultPageSize)) * defaultPageSize
-			} else {
-				allocatable := m.getNodeAllocatable()
-				allocatableMemory, ok := allocatable[v1.ResourceMemory]
-				if ok && allocatableMemory.Value() > 0 {
+			if memoryRequest != memoryLimitSpec || memoryRequest == 0 {
+				if memoryLimitVal != 0 {
 					memoryHigh = int64(math.Floor(
 						float64(memoryRequest)+
-							(float64(allocatableMemory.Value())-float64(memoryRequest))*(*m.memoryThrottlingFactor))/float64(defaultPageSize)) * defaultPageSize
+							(float64(memoryLimitVal)-float64(memoryRequest))*float64(*m.memoryThrottlingFactor))/float64(defaultPageSize)) * defaultPageSize
+				} else {
+					allocatable := m.getNodeAllocatable()
+					allocatableMemory, ok := allocatable[v1.ResourceMemory]
+					if ok && allocatableMemory.Value() > 0 {
+						memoryHigh = int64(math.Floor(
+							float64(memoryRequest)+
+								(float64(allocatableMemory.Value())-float64(memoryRequest))*(*m.memoryThrottlingFactor))/float64(defaultPageSize)) * defaultPageSize
+					}
 				}
 			}
-			if memoryHigh != 0 && memoryHigh > memoryRequest {
+			if memoryHigh > memoryRequest {
 				unified[cm.Cgroup2MemoryHigh] = strconv.FormatInt(memoryHigh, 10)
+			} else {
+				// No effective throttle: request equals limit, the computed value
+				// floored back down to the request, or there was no basis to
+				// compute one. Reset explicitly: runtimes leave absent Unified
+				// keys untouched on UpdateContainerResources, which would
+				// otherwise keep a stale memory.high from before an in-place
+				// resize.
+				unified[cm.Cgroup2MemoryHigh] = cm.Cgroup2MemoryMax
 			}
 		}
 		if len(unified) > 0 {
@@ -274,7 +284,7 @@ func (m *kubeGenericRuntimeManager) generateLinuxContainerResources(ctx context.
 		if lcr.Unified == nil {
 			lcr.Unified = map[string]string{}
 		}
-		lcr.Unified[cm.Cgroup2MemoryHigh] = "max"
+		lcr.Unified[cm.Cgroup2MemoryHigh] = cm.Cgroup2MemoryMax
 	}
 
 	return lcr
