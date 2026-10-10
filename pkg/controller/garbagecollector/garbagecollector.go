@@ -291,6 +291,8 @@ var enqueuedVirtualDeleteEventErr = goerrors.New("enqueued virtual delete event"
 
 var namespacedOwnerOfClusterScopedObjectErr = goerrors.New("cluster-scoped objects cannot refer to namespaced owners")
 
+var dependencyGraphNotSyncedErr = goerrors.New("dependency graph not synced")
+
 func (gc *GarbageCollector) processAttemptToDeleteWorker(ctx context.Context) bool {
 	item, quit := gc.attemptToDelete.Get()
 	if quit {
@@ -348,6 +350,9 @@ func (gc *GarbageCollector) attemptToDeleteWorker(ctx context.Context, item inte
 	} else if err == namespacedOwnerOfClusterScopedObjectErr {
 		// a cluster-scoped object referring to a namespaced owner is an error that will not resolve on retry, no need to requeue this node
 		return forgetItem
+	} else if err == dependencyGraphNotSyncedErr {
+		// if the dependency graph is not synced, there is a chance of false positive orphans, so requeue and wait for it to be synced
+		return requeueItem
 	} else if err != nil {
 		if _, ok := err.(*restMappingError); ok {
 			// There are at least two ways this can happen:
@@ -661,6 +666,10 @@ func (gc *GarbageCollector) attemptToDeleteItem(ctx context.Context, item *node)
 func (gc *GarbageCollector) processDeletingDependentsItem(logger klog.Logger, item *node) error {
 	blockingDependents := item.blockingDependents()
 	if len(blockingDependents) == 0 {
+		if !gc.dependencyGraphBuilder.IsSynced(logger) {
+			logger.V(2).Info("dependency graph not synced, delaying removal of DeleteDependents finalizer", "item", item.identity)
+			return dependencyGraphNotSyncedErr
+		}
 		logger.V(2).Info("remove DeleteDependents finalizer for item", "item", item.identity)
 		return gc.removeFinalizer(logger, item, metav1.FinalizerDeleteDependents)
 	}
@@ -748,6 +757,10 @@ func (gc *GarbageCollector) attemptToOrphanWorker(logger klog.Logger, item inter
 	if !ok {
 		utilruntime.HandleError(fmt.Errorf("expect *node, got %#v", item))
 		return forgetItem
+	}
+	if !gc.dependencyGraphBuilder.IsSynced(logger) {
+		logger.V(2).Info("dependency graph not synced, delaying orphaning of dependents", "owner", owner.identity)
+		return requeueItem
 	}
 	// we don't need to lock each element, because they never get updated
 	owner.dependentsLock.RLock()
