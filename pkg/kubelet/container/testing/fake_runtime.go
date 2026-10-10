@@ -79,6 +79,12 @@ type FakeRuntime struct {
 	imagePullErrBucket chan error
 	SwapBehavior       map[string]kubetypes.SwapBehavior
 	T                  TB
+	// Blocking hooks let cancellation tests verify that kubelet forwards the
+	// pod worker context into runtime operations that are already in flight.
+	BlockSyncPod   bool
+	BlockKillPod   bool
+	SyncPodStarted chan struct{}
+	KillPodStarted chan struct{}
 }
 
 const FakeHost = "localhost:12345"
@@ -259,7 +265,27 @@ func (f *FakeRuntime) GetPod(_ context.Context, podUID types.UID) (*kubecontaine
 	return nil, kubecontainer.ErrPodNotFound
 }
 
-func (f *FakeRuntime) SyncPod(_ context.Context, pod *v1.Pod, _ *kubecontainer.PodStatus, _ []v1.Secret, backOff *flowcontrol.Backoff, _ bool) (result kubecontainer.PodSyncResult) {
+func (f *FakeRuntime) SyncPod(ctx context.Context, pod *v1.Pod, _ *kubecontainer.PodStatus, _ []v1.Secret, backOff *flowcontrol.Backoff, _ bool) (result kubecontainer.PodSyncResult) {
+	f.Lock()
+	blockSyncPod := f.BlockSyncPod
+	syncPodStarted := f.SyncPodStarted
+	syncResults := f.SyncResults
+	f.Unlock()
+	if blockSyncPod {
+		if syncPodStarted != nil {
+			select {
+			case syncPodStarted <- struct{}{}:
+			default:
+			}
+		}
+		<-ctx.Done()
+		if syncResults != nil {
+			result = *syncResults
+		}
+		result.Fail(ctx.Err())
+		return result
+	}
+
 	f.Lock()
 	defer f.Unlock()
 
@@ -278,7 +304,22 @@ func (f *FakeRuntime) SyncPod(_ context.Context, pod *v1.Pod, _ *kubecontainer.P
 	return
 }
 
-func (f *FakeRuntime) KillPod(_ context.Context, pod *v1.Pod, runningPod kubecontainer.Pod, gracePeriodOverride *int64) error {
+func (f *FakeRuntime) KillPod(ctx context.Context, pod *v1.Pod, runningPod kubecontainer.Pod, gracePeriodOverride *int64) error {
+	f.Lock()
+	blockKillPod := f.BlockKillPod
+	killPodStarted := f.KillPodStarted
+	f.Unlock()
+	if blockKillPod {
+		if killPodStarted != nil {
+			select {
+			case killPodStarted <- struct{}{}:
+			default:
+			}
+		}
+		<-ctx.Done()
+		return ctx.Err()
+	}
+
 	f.Lock()
 	defer f.Unlock()
 
