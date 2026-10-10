@@ -203,3 +203,9 @@ type errorDecoderV2 struct{}
 func (d *errorDecoderV2) decode(message []byte) error {
 	return fmt.Errorf("error executing remote command: %s", message)
 }
+
+// decodeEmpty reports success. A v2 or v3 server writes only the text of an
+// error to the error stream, so the stream is empty when the command succeeded.
+func (d *errorDecoderV2) decodeEmpty() error {
+	return nil
+}

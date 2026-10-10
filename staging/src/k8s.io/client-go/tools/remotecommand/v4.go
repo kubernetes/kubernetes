@@ -85,6 +85,15 @@ func (p *streamProtocolV4) stream(logger klog.Logger, conn streamCreator, ready 
 // and creates an exec.ExitError from it.
 type errorDecoderV4 struct{}
 
+// decodeEmpty reports an error stream that ended without a status. A v4 or v5
+// server writes the command's status before it closes the error stream, so an
+// empty one means the connection was closed before the command finished or
+// before the server's last frames were delivered, and the output may be
+// incomplete.
+func (d *errorDecoderV4) decodeEmpty() error {
+	return errors.New("connection closed before the command's status was received; the output may be incomplete")
+}
+
 func (d *errorDecoderV4) decode(message []byte) error {
 	status := metav1.Status{}
 	err := json.Unmarshal(message, &status)

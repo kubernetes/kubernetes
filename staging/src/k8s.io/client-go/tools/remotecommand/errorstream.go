@@ -27,11 +27,15 @@ import (
 // errorStreamDecoder interprets the data on the error channel and creates a go error object from it.
 type errorStreamDecoder interface {
 	decode(message []byte) error
+	// decodeEmpty returns the result of a session whose error stream ended
+	// without any data.
+	decodeEmpty() error
 }
 
 // watchErrorStream watches the errorStream for remote command error data,
 // decodes it with the given errorStreamDecoder, sends the decoded error (or nil if the remote
-// command exited successfully) to the returned error channel, and closes it.
+// command exited successfully) to the returned error channel, and closes it. An error stream
+// that ends without any data is decoded with decodeEmpty.
 // This function returns immediately.
 func watchErrorStream(logger klog.Logger, errorStream io.Reader, d errorStreamDecoder) chan error {
 	errorChan := make(chan error)
@@ -46,7 +50,7 @@ func watchErrorStream(logger klog.Logger, errorStream io.Reader, d errorStreamDe
 		case len(message) > 0:
 			errorChan <- d.decode(message)
 		default:
-			errorChan <- nil
+			errorChan <- d.decodeEmpty()
 		}
 		close(errorChan)
 	}()
