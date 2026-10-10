@@ -48,6 +48,7 @@ type Sample = model.Sample
 type Time = model.Time
 type Metric = model.Metric
 type LabelValue = model.LabelValue
+type LabelValues = model.LabelValues
 type LabelName = model.LabelName
 type SampleHistogram = model.SampleHistogram
 type FloatString = model.FloatString
