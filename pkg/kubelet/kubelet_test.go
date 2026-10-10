@@ -71,6 +71,7 @@ import (
 	fakeremote "k8s.io/cri-client/pkg/fake"
 	"k8s.io/klog/v2"
 	"k8s.io/ktesting"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/allocation"
 	"k8s.io/kubernetes/pkg/kubelet/allocation/state"
@@ -5802,4 +5803,157 @@ func TestStaticPodURLHeaderAndKeys(t *testing.T) {
 			}
 		})
 	}
+}
+
+// A committed EvictionTarget condition, whether still only in the status
+// manager cache or already persisted on the API object (the state after a
+// kubelet restart), is carried forward and makes the pod report Failed with
+// the eviction reason and message. An already published terminal phase is
+// never changed, and with the gate off a persisted condition is preserved as
+// is without any reconstruction.
+func TestGenerateAPIPodStatusEvictionTarget(t *testing.T) {
+	const message = "Usage of EmptyDir volume \"fill\" exceeds the limit \"64Mi\". "
+	evictionTarget := v1.PodCondition{Type: v1.EvictionTarget, Status: v1.ConditionTrue, Reason: v1.PodReasonEmptyDirSizeLimitExceeded, Message: message}
+	containerStatus := func(state kubecontainer.State, exitCode int) *kubecontainer.PodStatus {
+		return &kubecontainer.PodStatus{ID: "12345678", Name: "foo", Namespace: "new", ContainerStatuses: []*kubecontainer.Status{{Name: "bar", State: state, ExitCode: exitCode}}}
+	}
+	tests := []struct {
+		name            string
+		gate            bool
+		cached          *v1.PodStatus
+		apiStatus       v1.PodStatus
+		podStatus       *kubecontainer.PodStatus
+		expectedPhase   v1.PodPhase
+		expectedReason  string
+		expectedMessage string
+		expectCondition bool
+	}{
+		{
+			name:            "cached condition while containers run",
+			gate:            true,
+			cached:          &v1.PodStatus{Phase: v1.PodRunning, Conditions: []v1.PodCondition{evictionTarget}},
+			apiStatus:       v1.PodStatus{Phase: v1.PodRunning},
+			podStatus:       containerStatus(kubecontainer.ContainerStateRunning, 0),
+			expectedPhase:   v1.PodFailed,
+			expectedReason:  eviction.Reason,
+			expectedMessage: message,
+			expectCondition: true,
+		},
+		{
+			name:            "persisted condition after restart, clean exit",
+			gate:            true,
+			apiStatus:       v1.PodStatus{Phase: v1.PodRunning, Conditions: []v1.PodCondition{evictionTarget}},
+			podStatus:       containerStatus(kubecontainer.ContainerStateExited, 0),
+			expectedPhase:   v1.PodFailed,
+			expectedReason:  eviction.Reason,
+			expectedMessage: message,
+			expectCondition: true,
+		},
+		{
+			name:            "published Succeeded is not changed",
+			gate:            true,
+			apiStatus:       v1.PodStatus{Phase: v1.PodSucceeded, Reason: "Completed", Message: "all containers exited", Conditions: []v1.PodCondition{evictionTarget}},
+			podStatus:       containerStatus(kubecontainer.ContainerStateExited, 0),
+			expectedPhase:   v1.PodSucceeded,
+			expectedReason:  "Completed",
+			expectedMessage: "all containers exited",
+			expectCondition: true,
+		},
+		{
+			name:            "published Failed keeps its own reason and message",
+			gate:            true,
+			apiStatus:       v1.PodStatus{Phase: v1.PodFailed, Reason: "OutOfcpu", Message: "Pod was rejected: node had insufficient cpu", Conditions: []v1.PodCondition{evictionTarget}},
+			podStatus:       containerStatus(kubecontainer.ContainerStateExited, 0),
+			expectedPhase:   v1.PodFailed,
+			expectedReason:  "OutOfcpu",
+			expectedMessage: "Pod was rejected: node had insufficient cpu",
+			expectCondition: true,
+		},
+		{
+			name:            "gate off preserves the condition without reconstruction",
+			gate:            false,
+			apiStatus:       v1.PodStatus{Phase: v1.PodRunning, Conditions: []v1.PodCondition{evictionTarget}},
+			podStatus:       containerStatus(kubecontainer.ContainerStateExited, 0),
+			expectedPhase:   v1.PodSucceeded,
+			expectCondition: true,
+		},
+		{
+			name:          "no condition, clean exit",
+			gate:          true,
+			apiStatus:     v1.PodStatus{Phase: v1.PodRunning},
+			podStatus:     containerStatus(kubecontainer.ContainerStateExited, 0),
+			expectedPhase: v1.PodSucceeded,
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KubeletEvictionTargetCondition, tc.gate)
+			logger, tCtx := ktesting.NewTestContext(t)
+			testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+			defer testKubelet.Cleanup()
+			kl := testKubelet.kubelet
+			pod := podWithUIDNameNs("12345678", "foo", "new")
+			pod.Spec = v1.PodSpec{RestartPolicy: v1.RestartPolicyNever, Containers: []v1.Container{{Name: "bar"}}}
+			pod.Status = tc.apiStatus
+			kl.podManager.SetPods([]*v1.Pod{pod})
+			if tc.cached != nil {
+				kl.statusManager.SetPodStatus(logger, pod, *tc.cached)
+			}
+
+			status := kl.generateAPIPodStatus(tCtx, pod, tc.podStatus, true)
+			assert.Equal(t, tc.expectedPhase, status.Phase)
+			assert.Equal(t, tc.expectedReason, status.Reason)
+			assert.Equal(t, tc.expectedMessage, status.Message)
+			_, condition := podutil.GetPodCondition(&status, v1.EvictionTarget)
+			if !tc.expectCondition {
+				assert.Nil(t, condition)
+				return
+			}
+			require.NotNil(t, condition, "EvictionTarget must be carried forward")
+			assert.Equal(t, evictionTarget.Status, condition.Status)
+			assert.Equal(t, evictionTarget.Reason, condition.Reason)
+			assert.Equal(t, evictionTarget.Message, condition.Message)
+
+			// Regenerating the status keeps the recorded decision unchanged.
+			again := kl.generateAPIPodStatus(tCtx, pod, tc.podStatus, true)
+			_, conditionAgain := podutil.GetPodCondition(&again, v1.EvictionTarget)
+			require.NotNil(t, conditionAgain)
+			assert.Equal(t, *condition, *conditionAgain)
+			assert.Equal(t, status.Phase, again.Phase)
+			assert.Equal(t, status.Reason, again.Reason)
+		})
+	}
+}
+
+// An admission rejection replaces the pod status with a Failed status built
+// without any conditions; a committed EvictionTarget condition persisted on
+// the pod must survive it while the rejection reason and message are kept.
+func TestRejectPodKeepsEvictionTargetCondition(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KubeletEvictionTargetCondition, true)
+	tCtx := ktesting.Init(t)
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
+	kl := testKubelet.kubelet
+	persisted := v1.PodCondition{
+		Type:               v1.EvictionTarget,
+		Status:             v1.ConditionTrue,
+		Reason:             v1.PodReasonNodePressure,
+		Message:            "The node was low on resource: memory.",
+		LastTransitionTime: metav1.NewTime(time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)),
+		ObservedGeneration: 3,
+	}
+	pod := podWithUIDNameNs("12345678", "foo", "new")
+	pod.Status = v1.PodStatus{Phase: v1.PodRunning, Conditions: []v1.PodCondition{persisted}}
+	kl.podManager.SetPods([]*v1.Pod{pod})
+
+	kl.rejectPod(tCtx, pod, "OutOfcpu", "Node didn't have enough resource: cpu")
+
+	status, found := kl.statusManager.GetPodStatus(pod.UID)
+	require.True(t, found)
+	assert.Equal(t, v1.PodFailed, status.Phase)
+	assert.Equal(t, "OutOfcpu", status.Reason)
+	assert.Equal(t, "Pod was rejected: Node didn't have enough resource: cpu", status.Message)
+	_, got := podutil.GetPodCondition(&status, v1.EvictionTarget)
+	require.NotNil(t, got, "rejectPod must not drop a committed EvictionTarget")
+	assert.Equal(t, persisted, *got)
 }

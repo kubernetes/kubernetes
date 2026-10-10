@@ -3296,3 +3296,86 @@ func TestContainerEphemeralStorageLimitEvictionForRestartableInitContainers(t *t
 		t.Fatalf("Expected evicted pod %q, got %v", pod.Name, evictedPods)
 	}
 }
+
+// evictPod attaches the EvictionTarget condition with the typed reason of the
+// eviction cause, alongside the existing eviction status, only while the gate
+// is enabled. The decision is sticky: an existing True condition keeps its
+// original reason and message.
+func TestEvictPod_EvictionTargetCondition(t *testing.T) {
+	const message = "Pod ephemeral local storage usage exceeds the total limit of containers 1Gi. "
+	disruption := func() *v1.PodCondition {
+		return &v1.PodCondition{Type: v1.DisruptionTarget, Status: v1.ConditionTrue, Reason: v1.PodReasonTerminationByKubelet, Message: message}
+	}
+	tests := []struct {
+		name           string
+		gate           bool
+		reason         string
+		disruption     *v1.PodCondition
+		existing       *v1.PodCondition
+		wantConditions []v1.PodCondition
+	}{
+		{
+			name:       "node pressure",
+			gate:       true,
+			reason:     v1.PodReasonNodePressure,
+			disruption: disruption(),
+			wantConditions: []v1.PodCondition{
+				{Type: v1.DisruptionTarget, Status: v1.ConditionTrue, Reason: v1.PodReasonTerminationByKubelet, Message: message},
+				{Type: v1.EvictionTarget, Status: v1.ConditionTrue, Reason: v1.PodReasonNodePressure, Message: message},
+			},
+		},
+		{
+			name:   "pod or container ephemeral storage limit",
+			gate:   true,
+			reason: v1.PodReasonEphemeralStorageLimitExceeded,
+			wantConditions: []v1.PodCondition{
+				{Type: v1.EvictionTarget, Status: v1.ConditionTrue, Reason: v1.PodReasonEphemeralStorageLimitExceeded, Message: message},
+			},
+		},
+		{
+			name:   "emptyDir size limit",
+			gate:   true,
+			reason: v1.PodReasonEmptyDirSizeLimitExceeded,
+			wantConditions: []v1.PodCondition{
+				{Type: v1.EvictionTarget, Status: v1.ConditionTrue, Reason: v1.PodReasonEmptyDirSizeLimitExceeded, Message: message},
+			},
+		},
+		{
+			name:     "existing decision is kept",
+			gate:     true,
+			reason:   v1.PodReasonEmptyDirSizeLimitExceeded,
+			existing: &v1.PodCondition{Type: v1.EvictionTarget, Status: v1.ConditionTrue, Reason: v1.PodReasonNodePressure, Message: "earlier"},
+			wantConditions: []v1.PodCondition{
+				{Type: v1.EvictionTarget, Status: v1.ConditionTrue, Reason: v1.PodReasonNodePressure, Message: "earlier"},
+			},
+		},
+		{
+			name:           "gate disabled",
+			gate:           false,
+			reason:         v1.PodReasonEphemeralStorageLimitExceeded,
+			disruption:     disruption(),
+			wantConditions: []v1.PodCondition{{Type: v1.DisruptionTarget, Status: v1.ConditionTrue, Reason: v1.PodReasonTerminationByKubelet, Message: message}},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KubeletEvictionTargetCondition, tc.gate)
+			logger, _ := ktesting.NewTestContext(t)
+			podKiller := &mockPodKiller{}
+			manager := &managerImpl{killPodFunc: podKiller.killPodNow, recorder: &record.FakeRecorder{}}
+			pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod", Namespace: "ns", UID: "uid"}}
+			if !manager.evictPod(logger, pod, immediateEvictionGracePeriodSeconds, message, nil, tc.disruption, tc.reason) {
+				t.Fatalf("evictPod returned false")
+			}
+			status := v1.PodStatus{Phase: v1.PodRunning}
+			if tc.existing != nil {
+				status.Conditions = []v1.PodCondition{*tc.existing}
+			}
+			podKiller.statusFn(&status)
+			want := v1.PodStatus{Phase: v1.PodFailed, Reason: Reason, Message: message, Conditions: tc.wantConditions}
+			if diff := cmp.Diff(want, status, cmpopts.IgnoreFields(v1.PodCondition{}, "LastProbeTime", "LastTransitionTime", "ObservedGeneration")); diff != "" {
+				t.Errorf("Unexpected pod status (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}
