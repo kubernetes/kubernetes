@@ -63,8 +63,7 @@ func newTypeModels(openAPISchemaFilePath string, pkgTypes map[string]*types.Pack
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse comments of package %s: %w", p.Name, err)
 		}
-		// openapi-gen names types after the package's +k8s:openapi-model-package if set.
-		modelPackage, hasModelPackage, err := apidefinitions.OpenAPIModelPackageForPackage(p.Comments)
+		modelPackage, err := apidefinitions.OpenAPIModelPackage(p.Comments)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse comments of package %s: %w", p.Name, err)
 		}
@@ -72,9 +71,17 @@ func newTypeModels(openAPISchemaFilePath string, pkgTypes map[string]*types.Pack
 			tags := genclientTags(t)
 			hasApply := tags.HasVerb("apply") || tags.HasVerb("applyStatus")
 			if tags.GenerateClient && hasApply {
+				// Type-level model packages override package-level ones, as in openapi-gen.
+				modelPackageForType, err := apidefinitions.OpenAPIModelPackage(t.CommentLines)
+				if err != nil {
+					return nil, fmt.Errorf("failed to parse comments of type %s: %w", t.Name, err)
+				}
+				if modelPackageForType == "" {
+					modelPackageForType = modelPackage
+				}
 				openAPIType := util.ToRESTFriendlyName(typeName(t))
-				if hasModelPackage {
-					openAPIType = modelPackage + "." + t.Name.Name
+				if modelPackageForType != "" {
+					openAPIType = modelPackageForType + "." + t.Name.Name
 				}
 				def, ok := openAPISchema.Definitions[openAPIType]
 				if !ok {
