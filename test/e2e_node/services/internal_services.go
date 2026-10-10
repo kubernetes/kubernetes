@@ -19,7 +19,6 @@ package services
 import (
 	"context"
 	"os"
-	"testing"
 
 	etcd3testing "k8s.io/apiserver/pkg/storage/etcd3/testing"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
@@ -46,7 +45,7 @@ func newE2EServices() *e2eServices {
 
 // run starts all e2e services and wait for the termination signal. Once receives the
 // termination signal, it will stop the e2e services gracefully.
-func (es *e2eServices) run(t *testing.T) error {
+func (es *e2eServices) run(t ktesting.TB) error {
 	defer es.stop(t)
 	if err := es.start(t); err != nil {
 		return err
@@ -57,7 +56,7 @@ func (es *e2eServices) run(t *testing.T) error {
 }
 
 // start starts the tests embedded services or returns an error.
-func (es *e2eServices) start(t *testing.T) error {
+func (es *e2eServices) start(t ktesting.TB) error {
 	tCtx := ktesting.Init(t)
 	klog.Info("Starting e2e services...")
 	err := es.startEtcd(t)
@@ -77,7 +76,7 @@ func (es *e2eServices) start(t *testing.T) error {
 }
 
 // stop stops the embedded e2e services.
-func (es *e2eServices) stop(t *testing.T) {
+func (es *e2eServices) stop(t ktesting.TB) {
 	klog.Info("Stopping e2e services...")
 	// TODO(random-liu): Use a loop to stop all services after introducing
 	// service interface.
@@ -112,7 +111,7 @@ func (es *e2eServices) stop(t *testing.T) {
 }
 
 // startEtcd starts the embedded etcd instance or returns an error.
-func (es *e2eServices) startEtcd(t *testing.T) error {
+func (es *e2eServices) startEtcd(t ktesting.TB) error {
 	klog.Info("Starting etcd")
 	server, etcdStorage := etcd3testing.NewUnsecuredEtcd3TestClientServer(t)
 	es.etcdServer = server

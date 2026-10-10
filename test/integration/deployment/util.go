@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"math"
 	"sync"
-	"testing"
 	"time"
 
 	apps "k8s.io/api/apps/v1"
@@ -29,6 +28,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
+	"k8s.io/client-go/ktesting"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
@@ -58,7 +58,7 @@ var resumeFn = func(update *apps.Deployment) {
 }
 
 type deploymentTester struct {
-	t          *testing.T
+	t          testutil.TB
 	c          clientset.Interface
 	deployment *apps.Deployment
 }
@@ -103,7 +103,7 @@ func newDeployment(name, ns string, replicas int32) *apps.Deployment {
 }
 
 // dcSetup sets up necessities for Deployment integration test, including control plane, apiserver, informers, and clientset
-func dcSetup(ctx context.Context, t *testing.T) (kubeapiservertesting.TearDownFunc, *replicaset.ReplicaSetController, *deployment.DeploymentController, informers.SharedInformerFactory, clientset.Interface) {
+func dcSetup(ctx context.Context, t ktesting.TB) (kubeapiservertesting.TearDownFunc, *replicaset.ReplicaSetController, *deployment.DeploymentController, informers.SharedInformerFactory, clientset.Interface) {
 	// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
 	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
 
@@ -137,7 +137,7 @@ func dcSetup(ctx context.Context, t *testing.T) (kubeapiservertesting.TearDownFu
 
 // dcSimpleSetup sets up necessities for Deployment integration test, including control plane, apiserver,
 // and clientset, but not controllers and informers
-func dcSimpleSetup(t *testing.T) (kubeapiservertesting.TearDownFunc, clientset.Interface) {
+func dcSimpleSetup(t ktesting.TB) (kubeapiservertesting.TearDownFunc, clientset.Interface) {
 	// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
 	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
 
@@ -150,7 +150,7 @@ func dcSimpleSetup(t *testing.T) (kubeapiservertesting.TearDownFunc, clientset.I
 }
 
 // runControllersAndInformers runs RS and deployment controllers and informers
-func runControllersAndInformers(t *testing.T, rm *replicaset.ReplicaSetController, dc *deployment.DeploymentController, informers informers.SharedInformerFactory) func() {
+func runControllersAndInformers(t testutil.TB, rm *replicaset.ReplicaSetController, dc *deployment.DeploymentController, informers informers.SharedInformerFactory) func() {
 	ctx, cancelFn := context.WithCancel(context.Background())
 	informers.Start(ctx.Done())
 	go rm.Run(ctx, 5)

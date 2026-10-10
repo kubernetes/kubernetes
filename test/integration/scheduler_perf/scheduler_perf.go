@@ -55,6 +55,7 @@ import (
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	"k8s.io/kubernetes/test/integration/framework"
+	testutils "k8s.io/kubernetes/test/utils"
 	"sigs.k8s.io/yaml"
 )
 
@@ -599,7 +600,7 @@ func isValidCount(allowParameterization bool, count int, countParam string) bool
 	return isValidParameterizable(countParam)
 }
 
-func initTestOutput(tb testing.TB) io.Writer {
+func initTestOutput(tb testutils.TB) io.Writer {
 	var output io.Writer
 	if UseTestingLog {
 		output = framework.NewTBWriter(tb)
@@ -632,7 +633,7 @@ func initTestOutput(tb testing.TB) io.Writer {
 
 var specialFilenameChars = regexp.MustCompile(`[^a-zA-Z0-9-_]`)
 
-func setupTestCase(t testing.TB, tc *testCase, featureGates map[featuregate.Feature]bool, workload *Workload, opts *schedulerPerfOptions) (*scheduler.Scheduler, informers.SharedInformerFactory, <-chan struct{}, ktesting.TContext) {
+func setupTestCase(t ktesting.TB, tc *testCase, featureGates map[featuregate.Feature]bool, workload *Workload, opts *schedulerPerfOptions) (*scheduler.Scheduler, informers.SharedInformerFactory, <-chan struct{}, ktesting.TContext) {
 	tCtx := ktesting.Init(t, initoption.PerTestOutput(UseTestingLog))
 	artifacts, doArtifacts := os.LookupEnv("ARTIFACTS")
 	if !UseTestingLog && doArtifacts {
@@ -916,7 +917,7 @@ func RunBenchmarkPerfScheduling(b *testing.B, configFile string, topicName strin
 }
 
 // RunIntegrationPerfScheduling runs the scheduler performance integration tests.
-func RunIntegrationPerfScheduling(t *testing.T, configFile string, options ...SchedulerPerfOption) {
+func RunIntegrationPerfScheduling(t *testing.T, configFile string, options ...SchedulerPerfOption) { //nolint:forbidigo // calls t.Run, which requires *testing.T
 	opts := &schedulerPerfOptions{}
 	for _, option := range options {
 		option(opts)
@@ -936,9 +937,9 @@ func RunIntegrationPerfScheduling(t *testing.T, configFile string, options ...Sc
 	testcaseLabelSelectors := strings.Split(TestSchedulingLabelFilter, ",")
 
 	for _, tc := range testCases {
-		t.Run(tc.Name, func(t *testing.T) {
+		t.Run(tc.Name, func(t *testing.T) { //nolint:forbidigo // t.Run requires *testing.T
 			for _, w := range tc.Workloads {
-				t.Run(w.Name, func(t *testing.T) {
+				t.Run(w.Name, func(t *testing.T) { //nolint:forbidigo // t.Run requires *testing.T
 					if !enabled(testcaseLabelSelectors, append(tc.Labels, w.Labels...)...) {
 						t.Skipf("disabled by label filter %q", TestSchedulingLabelFilter)
 					}
@@ -986,7 +987,7 @@ func loadSchedulerConfig(file string) (*config.KubeSchedulerConfiguration, error
 	return nil, fmt.Errorf("couldn't decode as KubeSchedulerConfiguration, got %s: ", gvk)
 }
 
-func unrollWorkloadTemplate(tb ktesting.TB, wt []op, w *Workload) []op {
+func unrollWorkloadTemplate(tb testutils.TB, wt []op, w *Workload) []op {
 	var unrolled []op
 	for opIndex, o := range wt {
 		realOp, err := o.realOp.patchParams(w)

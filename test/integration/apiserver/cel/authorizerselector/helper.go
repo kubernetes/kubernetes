@@ -33,10 +33,11 @@ import (
 	"k8s.io/client-go/kubernetes"
 	apiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/test/integration/framework"
+	testutils "k8s.io/kubernetes/test/utils"
 	"k8s.io/utils/ptr"
 )
 
-func RunAuthzSelectorsLibraryTests(t *testing.T) {
+func RunAuthzSelectorsLibraryTests(t *testing.T) { //nolint:forbidigo // calls t.Run, which requires *testing.T
 	// Start the server
 	args := []string{
 		fmt.Sprintf("--runtime-config=%s=true", resourceapi.SchemeGroupVersion), // For ResourceClaim test case below.
@@ -200,7 +201,7 @@ func RunAuthzSelectorsLibraryTests(t *testing.T) {
 		},
 	}
 	for _, tc := range testcases {
-		t.Run(tc.name, func(t *testing.T) {
+		t.Run(tc.name, func(t *testing.T) { //nolint:forbidigo // t.Run requires *testing.T
 			err := tc.createObject()
 
 			switch {
@@ -234,7 +235,7 @@ func RunAuthzSelectorsLibraryTests(t *testing.T) {
 	}
 }
 
-func getCauses(t *testing.T, err error) sets.Set[string] {
+func getCauses(t testutils.TB, err error) sets.Set[string] {
 	t.Helper()
 	status, ok := err.(apierrors.APIStatus)
 	if !ok {

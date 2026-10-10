@@ -17,15 +17,14 @@ limitations under the License.
 package storage
 
 import (
-	"context"
 	"errors"
 	"fmt"
-	"testing"
 	"time"
+
+	"github.com/onsi/gomega"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/server/options"
@@ -35,12 +34,13 @@ import (
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/klog/v2"
+	"k8s.io/ktesting"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 	"k8s.io/kubernetes/pkg/kubeapiserver"
 	registrypod "k8s.io/kubernetes/pkg/registry/core/pod"
 	"k8s.io/kubernetes/test/integration/framework"
+	testutils "k8s.io/kubernetes/test/utils"
 )
 
 func cacheKeyFunc(obj runtime.Object) (string, error) {
@@ -54,7 +54,7 @@ func cacheKeyFunc(obj runtime.Object) (string, error) {
 	return "/pods/" + pod.Namespace + "/" + pod.Name, nil
 }
 
-func newEtcdStorageForResource(t *testing.T, etcdConfig *storagebackend.Config, resource schema.GroupResource) *storagebackend.ConfigForResource {
+func newEtcdStorageForResource(t testutils.TB, etcdConfig *storagebackend.Config, resource schema.GroupResource) *storagebackend.ConfigForResource {
 	t.Helper()
 
 	completedConfig := kubeapiserver.NewStorageFactoryConfig().Complete(options.NewEtcdOptions(etcdConfig))
@@ -70,18 +70,18 @@ func newEtcdStorageForResource(t *testing.T, etcdConfig *storagebackend.Config, 
 	return resourceConfig
 }
 
-func setupStore(t *testing.T, decorator generic.StorageDecorator) (storage.Interface, string) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchList, true)
-	etcdURL, stop, err := framework.RunCustomEtcd(klog.FromContext(t.Context()), "storage_correctness_etcd", nil)
+func setupStore(tCtx ktesting.TContext, decorator generic.StorageDecorator) (storage.Interface, string) {
+	featuregatetesting.SetFeatureGateDuringTest(tCtx, utilfeature.DefaultFeatureGate, features.WatchList, true)
+	etcdURL, stop, err := framework.RunCustomEtcd(tCtx.Logger(), "storage_correctness_etcd", nil)
 	if err != nil {
-		t.Fatalf("failed to start dedicated etcd: %v", err)
+		tCtx.Fatalf("failed to start dedicated etcd: %v", err)
 	}
-	t.Cleanup(stop)
+	tCtx.Cleanup(stop)
 
 	etcdConfig := storagebackend.NewDefaultConfig("registry", nil)
 	etcdConfig.Transport.ServerList = []string{etcdURL}
 
-	storageConfig := newEtcdStorageForResource(t, etcdConfig, schema.GroupResource{Resource: "pods"})
+	storageConfig := newEtcdStorageForResource(tCtx, etcdConfig, schema.GroupResource{Resource: "pods"})
 	storageConfig.EventsHistoryWindow = cacher.DefaultEventFreshDuration
 
 	store, destroyFunc, err := decorator(
@@ -96,17 +96,12 @@ func setupStore(t *testing.T, decorator generic.StorageDecorator) (storage.Inter
 		registrypod.Indexers(),
 	)
 	if err != nil {
-		t.Fatalf("failed to create storage: %v", err)
+		tCtx.Fatalf("failed to create storage: %v", err)
 	}
-	t.Cleanup(destroyFunc)
+	tCtx.Cleanup(destroyFunc)
 
 	if rc, ok := store.(interface{ ReadinessCheck() error }); ok {
-		err := wait.PollUntilContextTimeout(t.Context(), 10*time.Millisecond, 5*time.Second, true, func(ctx context.Context) (bool, error) {
-			return rc.ReadinessCheck() == nil, nil
-		})
-		if err != nil {
-			t.Fatalf("storage failed to become ready: %v", err)
-		}
+		tCtx.Eventually(rc.ReadinessCheck).WithPolling(10*time.Millisecond).WithTimeout(5*time.Second).Should(gomega.Succeed(), "storage ready")
 	}
 
 	return store, "/" + etcdConfig.Prefix

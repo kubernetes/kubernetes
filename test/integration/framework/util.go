@@ -21,18 +21,17 @@ package framework
 import (
 	"context"
 	"fmt"
-	"testing"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
-	"k8s.io/ktesting"
 	nodectlr "k8s.io/kubernetes/pkg/controller/nodelifecycle"
+	testutils "k8s.io/kubernetes/test/utils"
 )
 
 // CreateNamespaceOrDie creates a namespace.
-func CreateNamespaceOrDie(c clientset.Interface, baseName string, t testing.TB) *v1.Namespace {
+func CreateNamespaceOrDie(c clientset.Interface, baseName string, t testutils.TB) *v1.Namespace {
 	ns := &v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: baseName}}
 	result, err := c.CoreV1().Namespaces().Create(context.TODO(), ns, metav1.CreateOptions{})
 	if err != nil {
@@ -42,7 +41,7 @@ func CreateNamespaceOrDie(c clientset.Interface, baseName string, t testing.TB) 
 }
 
 // DeleteNamespaceOrDie deletes a namespace.
-func DeleteNamespaceOrDie(c clientset.Interface, ns *v1.Namespace, t ktesting.TB) {
+func DeleteNamespaceOrDie(c clientset.Interface, ns *v1.Namespace, t testutils.TB) {
 	err := c.CoreV1().Namespaces().Delete(context.TODO(), ns.Name, metav1.DeleteOptions{})
 	if err != nil {
 		t.Fatalf("Failed to delete namespace: %v", err)

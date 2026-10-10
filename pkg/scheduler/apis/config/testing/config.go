@@ -17,16 +17,19 @@ limitations under the License.
 package testing
 
 import (
-	"testing"
-
 	"k8s.io/component-base/config/v1alpha1"
 	v1 "k8s.io/kube-scheduler/config/v1"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/scheme"
 )
 
+// TB is the subset of testing.T/testing.TB needed by V1ToInternalWithDefaults.
+type TB interface {
+	Fatal(args ...any)
+}
+
 // V1ToInternalWithDefaults creates a v1 default configuration.
-func V1ToInternalWithDefaults(t *testing.T, versionedCfg v1.KubeSchedulerConfiguration) *config.KubeSchedulerConfiguration {
+func V1ToInternalWithDefaults(t TB, versionedCfg v1.KubeSchedulerConfiguration) *config.KubeSchedulerConfiguration {
 	versionedCfg.DebuggingConfiguration = *v1alpha1.NewRecommendedDebuggingConfiguration()
 
 	scheme.Scheme.Default(&versionedCfg)

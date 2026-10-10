@@ -16,11 +16,12 @@ limitations under the License.
 
 package fake
 
-import (
-	"testing"
-)
+type T interface {
+	Helper()
+	Error(...any)
+}
 
-func NewCloser(t *testing.T) *Closer {
+func NewCloser(t T) *Closer {
 	return &Closer{
 		t: t,
 	}
@@ -28,7 +29,7 @@ func NewCloser(t *testing.T) *Closer {
 
 type Closer struct {
 	wasCalled bool
-	t         *testing.T
+	t         T
 }
 
 func (c *Closer) Close() error {

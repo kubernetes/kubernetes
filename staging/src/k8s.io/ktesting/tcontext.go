@@ -87,6 +87,9 @@ type TB interface {
 	TempDir() string
 }
 
+// This tells the vet printf checker that methods in the interface must be checked.
+var _ TB = &testing.T{}
+
 // ContextTB adds support for cleanup callbacks with explicit context
 // parameter. This is used when integrating with Ginkgo: then CleanupCtx
 // gets implemented via ginkgo.DeferCleanup.

@@ -35,7 +35,6 @@ import (
 	"path/filepath"
 	"runtime"
 	"sync"
-	"testing"
 	"time"
 
 	"github.com/spf13/pflag"
@@ -644,7 +643,7 @@ func GetEtcdClients(config storagebackend.TransportConfig) (*clientv3.Client, cl
 }
 
 // StartTestServerOrDie calls StartTestServer t.Fatal if it does not succeed.
-func StartTestServerOrDie(t testing.TB, instanceOptions *TestServerInstanceOptions, flags []string, storageConfig *storagebackend.Config) *TestServer {
+func StartTestServerOrDie(t ktesting.TB, instanceOptions *TestServerInstanceOptions, flags []string, storageConfig *storagebackend.Config) *TestServer {
 	result, err := StartTestServer(t, instanceOptions, flags, storageConfig)
 	if err == nil {
 		return &result

@@ -34,6 +34,7 @@ import (
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/testing/correctness"
+	"k8s.io/ktesting"
 	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
@@ -211,18 +212,19 @@ var (
 func TestCorrectness(t *testing.T) {
 	storages := []struct {
 		name string
-		fn   func(t *testing.T) (storage.Interface, string)
+		fn   func(tCtx ktesting.TContext) (storage.Interface, string)
 	}{
-		{"etcd3", func(t *testing.T) (storage.Interface, string) {
-			return setupStore(t, generic.UndecoratedStorage)
+		{"etcd3", func(tCtx ktesting.TContext) (storage.Interface, string) {
+			return setupStore(tCtx, generic.UndecoratedStorage)
 		}},
-		{"cacher", func(t *testing.T) (storage.Interface, string) {
-			return setupStore(t, genericregistry.StorageWithCacher())
+		{"cacher", func(tCtx ktesting.TContext) (storage.Interface, string) {
+			return setupStore(tCtx, genericregistry.StorageWithCacher())
 		}},
 	}
 	for _, s := range storages {
 		t.Run(s.name, func(t *testing.T) {
-			store, storagePrefix := s.fn(t)
+			tCtx := ktesting.Init(t)
+			store, storagePrefix := s.fn(tCtx)
 			testCorrectness(t, store, storagePrefix)
 		})
 	}

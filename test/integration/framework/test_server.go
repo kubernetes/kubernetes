@@ -25,7 +25,6 @@ import (
 	"path"
 	"strings"
 	"sync"
-	"testing"
 	"time"
 
 	"github.com/google/uuid"
@@ -91,7 +90,7 @@ type TearDownFunc func()
 //   - ctx cancellation
 //   - TearDownFunc gets called (blocks until shutdown is complete)
 //   - the test ends and cleanup starts
-func StartTestServer(ctx context.Context, t testing.TB, setup TestServerSetup) (client.Interface, *rest.Config, TearDownFunc) {
+func StartTestServer(ctx context.Context, t utils.TB, setup TestServerSetup) (client.Interface, *rest.Config, TearDownFunc) {
 	// This code manages the lifecycle of ctx itself, via the explicit
 	// cancel call in tearDown below. It must not get canceled
 	// automatically once the test ends because TearDownFn still needs a
