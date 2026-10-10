@@ -292,6 +292,7 @@ func TestConsistencyCheckerListOpts(t *testing.T) {
 			ResourceVersionMatch: metav1.ResourceVersionMatchNotOlderThan,
 			Predicate:            storage.Everything,
 			Recursive:            true,
+			KeysOnly:             true,
 		},
 	}
 	if diff := cmp.Diff(cacherOpts, wantCacherOpts); diff != "" {
@@ -307,6 +308,7 @@ func TestConsistencyCheckerListOpts(t *testing.T) {
 				Limit: checkerListPageSize,
 			},
 			Recursive: true,
+			KeysOnly:  true,
 		},
 	}
 	if diff := cmp.Diff(etcdOpts, wantEtcdOpts); diff != "" {

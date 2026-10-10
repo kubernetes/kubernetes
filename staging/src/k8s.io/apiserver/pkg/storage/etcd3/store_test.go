@@ -1102,6 +1102,7 @@ func withDefaults(options *setupOptions) {
 	options.codec = apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion)
 	options.newFunc = newPod
 	options.newListFunc = newPodList
+	options.reverseKeyFunc = reversePodKey
 	options.prefix = ""
 	options.resourcePrefix = "/pods/"
 	options.groupResource = schema.GroupResource{Resource: "pods"}
@@ -1478,6 +1479,14 @@ func computePodKey(obj *example.Pod) string {
 	return fmt.Sprintf("/pods/%s/%s", obj.Namespace, obj.Name)
 }
 
+func reversePodKey(key string) (string, string, error) {
+	ns, name, ok := strings.Cut(strings.TrimPrefix(key, "/pods/"), "/")
+	if !ok || ns == "" || name == "" || strings.Contains(name, "/") {
+		return "", "", fmt.Errorf("invalid pod key: %q", key)
+	}
+	return name, ns, nil
+}
+
 func TestGetCurrentResourceVersion(t *testing.T) {
 	ctx, store, _ := testSetup(t)
 
@@ -1665,4 +1674,35 @@ func TestCorrectness(t *testing.T) {
 		pod := obj.(*example.Pod)
 		return computePodKey(pod), nil
 	})
+}
+
+func TestGetListKeysOnly(t *testing.T) {
+	for _, rangeStream := range []bool{true, false} {
+		t.Run(fmt.Sprintf("rangeStream=%v", rangeStream), func(t *testing.T) {
+			resetFeatureSupportCheckerDuringTest(t)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EtcdRangeStream, rangeStream)
+			ctx, store, c := testSetup(t, withPrefix("/registry"), withResourcePrefix("/pods/"))
+
+			out := &example.Pod{}
+			require.NoError(t, store.Create(ctx, "/pods/ns1/pod1", &example.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: "ns1", Name: "pod1"}}, out, 0))
+			// Raw corrupt value verifies that KeysOnly does not fetch or decode values when reverseKeyFunc is set.
+			putResp, err := c.KV.Put(ctx, "/registry/pods/ns2/pod2", "corrupt")
+			require.NoError(t, err)
+			kvRecorder := c.KV.(*storagetesting.KVRecorder)
+			kvRecorder.GetStreamReadsAndReset()
+
+			list := &example.PodList{}
+			require.NoError(t, store.GetList(ctx, "/pods/", storage.ListOptions{Recursive: true, Predicate: storage.Everything, KeysOnly: true}, list))
+			want := []example.Pod{
+				{ObjectMeta: metav1.ObjectMeta{Namespace: "ns1", Name: "pod1", ResourceVersion: out.ResourceVersion}},
+				{ObjectMeta: metav1.ObjectMeta{Namespace: "ns2", Name: "pod2", ResourceVersion: fmt.Sprintf("%d", putResp.Header.Revision)}},
+			}
+			if diff := cmp.Diff(want, list.Items); diff != "" {
+				t.Errorf("PodList diff (-want +got):\n%s", diff)
+			}
+			if rangeStream && kvRecorder.GetStreamReadsAndReset() == 0 {
+				t.Errorf("expected RangeStream read when rangeStream=true")
+			}
+		})
+	}
 }

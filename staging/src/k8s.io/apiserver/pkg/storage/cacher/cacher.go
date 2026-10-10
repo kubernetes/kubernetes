@@ -809,7 +809,13 @@ func (c *Cacher) GetList(ctx context.Context, key string, opts storage.ListOptio
 			if err != nil {
 				return err
 			}
-			listVal.Index(numFetched).Set(reflect.ValueOf(elem.Object).Elem())
+			if opts.KeysOnly {
+				if err := copyKeysOnly(listVal.Index(numFetched).Addr().Interface(), elem.Object); err != nil {
+					return err
+				}
+			} else {
+				listVal.Index(numFetched).Set(reflect.ValueOf(elem.Object).Elem())
+			}
 			lastSelectedObjectKey = elem.Key
 			numFetched++
 			if numFetched == count {
@@ -872,6 +878,21 @@ func (c *Cacher) GetList(ctx context.Context, key string, opts storage.ListOptio
 		opts.Predicate.SetShardInfoOnList(listObj)
 	}
 	metrics.RecordListCacheMetrics(c.groupResource, indexUsed, numFetched, listVal.Len())
+	return nil
+}
+
+func copyKeysOnly(dst, src any) error {
+	srcMeta, err := meta.Accessor(src)
+	if err != nil {
+		return storage.NewInternalError(err)
+	}
+	dstMeta, err := meta.Accessor(dst)
+	if err != nil {
+		return storage.NewInternalError(err)
+	}
+	dstMeta.SetName(srcMeta.GetName())
+	dstMeta.SetNamespace(srcMeta.GetNamespace())
+	dstMeta.SetResourceVersion(srcMeta.GetResourceVersion())
 	return nil
 }
 

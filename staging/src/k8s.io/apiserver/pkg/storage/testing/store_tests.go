@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"math"
 	"reflect"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -691,6 +692,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 		expectRV                   string
 		expectRVFunc               func(string) error
 		expectCacherRequestsToEtcd func() []RecordedList
+		keysOnly                   bool
 	}{
 		{
 			name:        "rejects invalid resource version",
@@ -2186,6 +2188,21 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 		},
 	}
 
+	for _, tt := range slices.Clone(tests) {
+		tt.name += " (keysOnly)"
+		tt.keysOnly = true
+		if !tt.pred.Empty() {
+			tt.expectError = true
+			tt.expectRVTooLarge = false
+			tt.expectRVTooOld = false
+			tt.expectContinueTooOld = false
+		} else {
+			tt.expectedOut = stripPodsToKeysOnly(tt.expectedOut)
+			tt.expectedAlternatives = stripPodAlternativesToKeysOnly(tt.expectedAlternatives)
+		}
+		tests = append(tests, tt)
+	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// For some asynchronous implementations of storage interface (in particular watchcache),
@@ -2211,6 +2228,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 				ResourceVersionMatch: tt.rvMatch,
 				Predicate:            tt.pred,
 				Recursive:            true,
+				KeysOnly:             tt.keysOnly,
 			}
 			recorderKey := t.Name()
 			listCtx := context.WithValue(ctx, RecorderContextKey, recorderKey)
@@ -2284,6 +2302,34 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			}
 		})
 	}
+}
+
+func stripPodsToKeysOnly(pods []example.Pod) []example.Pod {
+	if pods == nil {
+		return nil
+	}
+	out := make([]example.Pod, len(pods))
+	for i := range pods {
+		out[i] = example.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:            pods[i].Name,
+				Namespace:       pods[i].Namespace,
+				ResourceVersion: pods[i].ResourceVersion,
+			},
+		}
+	}
+	return out
+}
+
+func stripPodAlternativesToKeysOnly(alts [][]example.Pod) [][]example.Pod {
+	if alts == nil {
+		return nil
+	}
+	out := make([][]example.Pod, len(alts))
+	for i := range alts {
+		out[i] = stripPodsToKeysOnly(alts[i])
+	}
+	return out
 }
 
 func ExpectContinueMatches(t *testing.T, expect, got string) {
@@ -2608,6 +2654,8 @@ func RunTestGetListNonRecursive(ctx context.Context, t *testing.T, increaseRV In
 		rv                   string
 		rvMatch              metav1.ResourceVersionMatch
 		expectRVTooLarge     bool
+		expectError          bool
+		keysOnly             bool
 	}{{
 		name:        "existing key",
 		key:         key,
@@ -2699,6 +2747,19 @@ func RunTestGetListNonRecursive(ctx context.Context, t *testing.T, increaseRV In
 		rv:          fmt.Sprintf("%d", objRV),
 	}}
 
+	for _, tt := range slices.Clone(tests) {
+		tt.name += " (keysOnly)"
+		tt.keysOnly = true
+		if !tt.pred.Empty() {
+			tt.expectError = true
+			tt.expectRVTooLarge = false
+		} else {
+			tt.expectedOut = stripPodsToKeysOnly(tt.expectedOut)
+			tt.expectedAlternatives = stripPodAlternativesToKeysOnly(tt.expectedAlternatives)
+		}
+		tests = append(tests, tt)
+	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// For some asynchronous implementations of storage interface (in particular watchcache),
@@ -2716,8 +2777,16 @@ func RunTestGetListNonRecursive(ctx context.Context, t *testing.T, increaseRV In
 				ResourceVersionMatch: tt.rvMatch,
 				Predicate:            tt.pred,
 				Recursive:            false,
+				KeysOnly:             tt.keysOnly,
 			}
 			err := store.GetList(ctx, tt.key, storageOpts, out)
+
+			if tt.expectError {
+				if err == nil {
+					t.Fatalf("expected error but got none")
+				}
+				return
+			}
 
 			if tt.expectRVTooLarge {
 				if err == nil || !storage.IsTooLargeResourceVersion(err) {

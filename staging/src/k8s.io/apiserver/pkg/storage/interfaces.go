@@ -343,6 +343,10 @@ type ListOptions struct {
 	// cache); external clients cannot set it. The watch cache strips the wrapper
 	// before storing or serializing the object, so it never reaches other watchers.
 	RecordTimestamps bool
+	// KeysOnly is an option for internal list callers that requests returned
+	// list items populate only name, namespace, and resource version.
+	// Requires Predicate.Empty() to be true. Ignored for Watch.
+	KeysOnly bool
 }
 
 // WatchEventWithRecordTime wraps a runtime.Object with the timestamp at which the
@@ -369,6 +373,9 @@ type DeleteOptions struct {
 }
 
 func ValidateListOptions(keyPrefix string, versioner Versioner, opts ListOptions) (withRev int64, continueKey string, err error) {
+	if opts.KeysOnly && !opts.Predicate.Empty() {
+		return 0, "", fmt.Errorf("keysOnly requires an empty predicate")
+	}
 	if opts.Recursive && len(opts.Predicate.Continue) > 0 {
 		continueKey, continueRV, err := DecodeContinue(opts.Predicate.Continue, keyPrefix)
 		if err != nil {
