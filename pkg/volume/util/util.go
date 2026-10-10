@@ -19,6 +19,7 @@ package util
 import (
 	"context"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -155,9 +156,25 @@ func CalculateTimeoutForVolume(minimumTimeout, timeoutIncrement int, pv *v1.Pers
 	pvQty := pv.Spec.Capacity[v1.ResourceStorage]
 	giSize := giQty.Value()
 	pvSize := pvQty.Value()
-	timeout := (pvSize / giSize) * int64(timeoutIncrement)
+	giCount := pvSize / giSize
+	increment := int64(timeoutIncrement)
+	// pvSize saturates with the volume size, so a large increment wraps this
+	// product: at 100E and an increment of math.MaxInt32 it lands below the
+	// minimum, turning the largest volumes into the shortest timeouts.
+	var timeout int64
+	if increment > 0 && giCount > math.MaxInt64/increment {
+		timeout = math.MaxInt64
+	} else {
+		timeout = giCount * increment
+	}
 	if timeout < int64(minimumTimeout) {
-		return int64(minimumTimeout)
+		timeout = int64(minimumTimeout)
+	}
+	// The result becomes the recycler pod's activeDeadlineSeconds, which the
+	// API server rejects above math.MaxInt32, so a large enough volume would
+	// otherwise produce a pod that cannot be created.
+	if timeout > math.MaxInt32 {
+		return math.MaxInt32
 	}
 	return timeout
 }
