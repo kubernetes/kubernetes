@@ -23,6 +23,8 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apiserver/pkg/storage"
+	etcdfeature "k8s.io/apiserver/pkg/storage/feature"
 
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
@@ -36,7 +38,27 @@ var (
 	pollTimeout     = 5 * time.Second
 )
 
+type fakeFeatureSupportChecker struct {
+	etcdfeature.FeatureSupportChecker
+	supported atomic.Bool
+}
+
+func (f *fakeFeatureSupportChecker) Supports(feature storage.Feature) bool {
+	if feature == storage.RequestWatchProgress {
+		return f.supported.Load()
+	}
+	return false
+}
+
 func TestConditionalProgressRequester(t *testing.T) {
+	origChecker := etcdfeature.DefaultFeatureSupportChecker
+	checker := &fakeFeatureSupportChecker{}
+	checker.supported.Store(true)
+	etcdfeature.DefaultFeatureSupportChecker = checker
+	t.Cleanup(func() {
+		etcdfeature.DefaultFeatureSupportChecker = origChecker
+	})
+
 	_, ctx := ktesting.NewTestContext(t)
 	logger := klog.FromContext(ctx)
 
@@ -71,6 +93,17 @@ func TestConditionalProgressRequester(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("Failed to wait progress requests, err: %s, want: %d , got %d", err, wantRequestsSent, requestsSent)
 	}
+
+	logger.Info("No progress requests when RequestWatchProgress is not supported")
+	checker.supported.Store(false)
+	clock.Step(progressRequestPeriod * 2)
+	if err := pollConditionNoChange(pollPeriod, minimalNoChange, pollTimeout, func() bool {
+		requestsSent = pr.progressRequestsSentCount.Load()
+		return requestsSent == wantRequestsSent
+	}); err != nil {
+		t.Fatalf("Failed to wait progress requests, err: %s, want: %d , got %d", err, wantRequestsSent, requestsSent)
+	}
+	checker.supported.Store(true)
 
 	logger.Info("Periodically request progress to be sent every period")
 	for wantRequestsSent < 10 {
