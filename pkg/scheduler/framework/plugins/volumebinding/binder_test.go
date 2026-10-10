@@ -2282,6 +2282,27 @@ func TestCapacity(t *testing.T) {
 			},
 			reasons: ConflictReasons{ErrReasonNotEnoughSpace},
 		},
+		"capacity-exceeds-int64": {
+			// 800E saturates Value() to MaxInt64 and is still ordered above the 1Gi request.
+			pvcs: []*v1.PersistentVolumeClaim{provisionedPVC},
+			capacities: []*storagev1.CSIStorageCapacity{
+				makeCapacity("net", waitClassWithProvisioner, node1, "800E", ""),
+			},
+			expectedProvisions: []*DynamicProvision{{
+				PVC:          provisionedPVC,
+				NodeCapacity: makeCapacity("net", waitClassWithProvisioner, node1, "800E", ""),
+			}},
+		},
+		"insufficient-storage-exceeds-int64": {
+			// Both sizes saturate Value() to MaxInt64 and are compared as sufficient before Cmp.
+			pvcs: []*v1.PersistentVolumeClaim{
+				makeTestPVC("provisioned-pvc", "20E", "", pvcUnbound, "", "1", &waitClassWithProvisioner),
+			},
+			capacities: []*storagev1.CSIStorageCapacity{
+				makeCapacity("net", waitClassWithProvisioner, node1, "10E", ""),
+			},
+			reasons: ConflictReasons{ErrReasonNotEnoughSpace},
+		},
 	}
 
 	testNode := &v1.Node{
