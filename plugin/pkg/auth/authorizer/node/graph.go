@@ -17,7 +17,6 @@ limitations under the License.
 package node
 
 import (
-	"fmt"
 	"sync"
 	"time"
 
@@ -144,21 +143,6 @@ var vertexTypes = map[vertexType]string{
 	pcrVertexType:            "podcertificaterequest",
 }
 
-// vertexTypeWithAuthoritativeIndex indicates which types of vertices can hold
-// a destination edge index that is authoritative i.e. if the index exists,
-// then it always stores all of the Nodes that are reachable from that vertex
-// in the graph.
-var vertexTypeWithAuthoritativeIndex = map[vertexType]bool{
-	configMapVertexType:      true,
-	sliceVertexType:          true,
-	podVertexType:            true,
-	pvcVertexType:            true,
-	resourceClaimVertexType:  true,
-	vaVertexType:             true,
-	serviceAccountVertexType: true,
-	pcrVertexType:            true,
-}
-
 // must be called under a write lock
 func (g *Graph) getOrCreateVertexLocked(vertexType vertexType, namespace, name string) *namedVertex {
 	if vertex, exists := g.getVertexRLocked(vertexType, namespace, name); exists {
@@ -216,11 +200,18 @@ func (g *Graph) deleteVertexLocked(vertexType vertexType, namespace, name string
 			// this upstream neighbor has only one edge (which must be to us), so remove them as well
 			neighborsToRemove = append(neighborsToRemove, neighbor)
 		} else {
-			// decrement the destination edge index on this neighbor if the edge between us was a destination edge
+			// decrement the destination edge index on this neighbor
 			edgesToRemoveFromIndexes = append(edgesToRemoveFromIndexes, g.graph.EdgeBetween(vertex, neighbor))
 		}
 		return true
 	})
+
+	// remove edges from destination indexes for neighbors that dropped outbound edges
+	// before removing the vertices so downstream paths remain traversable.
+	for _, edge := range edgesToRemoveFromIndexes {
+		g.graph.RemoveEdge(edge)
+		g.removeEdgeFromDestinationIndexLocked(edge)
+	}
 
 	// remove the vertex
 	g.removeVertexLocked(vertex)
@@ -228,11 +219,6 @@ func (g *Graph) deleteVertexLocked(vertexType vertexType, namespace, name string
 	// remove neighbors that are now edgeless
 	for _, neighbor := range neighborsToRemove {
 		g.removeVertexLocked(neighbor.(*namedVertex))
-	}
-
-	// remove edges from destination indexes for neighbors that dropped outbound edges
-	for _, edge := range edgesToRemoveFromIndexes {
-		g.removeEdgeFromDestinationIndexLocked(edge)
 	}
 }
 
@@ -275,9 +261,56 @@ func (g *Graph) deleteEdgesLocked(fromType, toType vertexType, toNamespace, toNa
 	}
 }
 
+// visitEdgeDestinationsLocked invokes fn with every destination node ID and path
+// count reachable through e. If e.To() already has a destinationEdgeIndex, it
+// reads the precomputed counts directly instead of walking e.To()'s outgoing edges.
+// Only pv and pvc vertices are targets of non-destination edges.
+func (g *Graph) visitEdgeDestinationsLocked(e graph.Edge, fn func(destID, count int)) {
+	if destinationEdge, ok := e.(*destinationEdge); ok {
+		fn(destinationEdge.DestinationID(), 1)
+		return
+	}
+	to := e.To()
+	if vt := to.(*namedVertex).vertexType; vt != pvVertexType && vt != pvcVertexType {
+		return
+	}
+	if toIndex := g.destinationEdgeIndex[to.ID()]; toIndex != nil {
+		for destID, count := range toIndex.members {
+			fn(destID, count)
+		}
+		return
+	}
+	g.graph.VisitFrom(to, func(next graph.Node) bool {
+		g.visitEdgeDestinationsLocked(g.graph.EdgeBetween(to, next), fn)
+		return true
+	})
+}
+
+// visitUpstreamIndexesLocked invokes fn with any active destinationEdgeIndex on
+// vertices upstream of n along non-destination edges (secret -> pv -> pvc).
+// Only pvc and pv vertices can have incoming non-destination edges.
+func (g *Graph) visitUpstreamIndexesLocked(n graph.Node, fn func(index *intSet)) {
+	if vt := n.(*namedVertex).vertexType; vt != pvcVertexType && vt != pvVertexType {
+		return
+	}
+	g.graph.VisitTo(n, func(upstream graph.Node) bool {
+		if index := g.destinationEdgeIndex[upstream.ID()]; index != nil {
+			fn(index)
+		}
+		g.visitUpstreamIndexesLocked(upstream, fn)
+		return true
+	})
+}
+
 // A fastpath for recomputeDestinationIndexLocked for "removing edge" case.
 func (g *Graph) removeEdgeFromDestinationIndexLocked(e graph.Edge) {
 	n := e.From()
+	g.visitUpstreamIndexesLocked(n, func(upstreamIndex *intSet) {
+		g.visitEdgeDestinationsLocked(e, func(destID, count int) {
+			upstreamIndex.add(destID, -count)
+		})
+	})
+
 	// don't maintain indices for nodes with few edges
 	edgeCount := g.graph.Degree(n)
 	if edgeCount < g.destinationEdgeThreshold {
@@ -290,14 +323,18 @@ func (g *Graph) removeEdgeFromDestinationIndexLocked(e graph.Edge) {
 	if index == nil {
 		return
 	}
-	if destinationEdge, ok := e.(*destinationEdge); ok {
-		index.decrement(destinationEdge.DestinationID())
-	}
+	g.visitEdgeDestinationsLocked(e, func(destID, count int) {
+		index.add(destID, -count)
+	})
 }
 
 // A fastpath for recomputeDestinationIndexLocked for "adding edge case".
 func (g *Graph) addEdgeToDestinationIndexLocked(e graph.Edge) {
 	n := e.From()
+	g.visitUpstreamIndexesLocked(n, func(upstreamIndex *intSet) {
+		g.visitEdgeDestinationsLocked(e, upstreamIndex.add)
+	})
+
 	index := g.destinationEdgeIndex[n.ID()]
 	if index == nil {
 		// There is no index, use the full index computation method
@@ -305,9 +342,7 @@ func (g *Graph) addEdgeToDestinationIndexLocked(e graph.Edge) {
 		return
 	}
 	// fast-add the new edge to an existing index
-	if destinationEdge, ok := e.(*destinationEdge); ok {
-		index.increment(destinationEdge.DestinationID())
-	}
+	g.visitEdgeDestinationsLocked(e, index.add)
 }
 
 // must be called under write lock
@@ -342,9 +377,7 @@ func (g *Graph) recomputeDestinationIndexLocked(n graph.Node) {
 
 	// populate the index
 	g.graph.VisitFrom(n, func(dest graph.Node) bool {
-		if destinationEdge, ok := g.graph.EdgeBetween(n, dest).(*destinationEdge); ok {
-			index.increment(destinationEdge.DestinationID())
-		}
+		g.visitEdgeDestinationsLocked(g.graph.EdgeBetween(n, dest), index.add)
 		return true
 	})
 	g.destinationEdgeIndex[n.ID()] = index
@@ -451,23 +484,15 @@ func (g *Graph) AddPod(pod *corev1.Pod) {
 // Must be called under a write lock.
 // All edge adds must be handled by that method rather than by calling
 // g.graph.SetEdge directly.
-// Note: if "from" belongs to vertexTypeWithAuthoritativeIndex, then
-// "destination" must be non-nil.
 func (g *Graph) addEdgeLocked(from, to, destination *namedVertex) {
+	var e graph.Edge
 	if destination != nil {
-		e := newDestinationEdge(from, to, destination)
-		g.graph.SetEdge(e)
-		g.addEdgeToDestinationIndexLocked(e)
-		return
+		e = newDestinationEdge(from, to, destination)
+	} else {
+		e = simple.Edge{F: from, T: to}
 	}
-
-	// We must not create edges without a Node label from a vertex that is
-	// supposed to hold authoritative destination edge index only.
-	// Entering this branch would mean there's a bug in the Node authorizer.
-	if vertexTypeWithAuthoritativeIndex[from.vertexType] {
-		panic(fmt.Sprintf("vertex of type %q must have destination edges only", vertexTypes[from.vertexType]))
-	}
-	g.graph.SetEdge(simple.Edge{F: from, T: to})
+	g.graph.SetEdge(e)
+	g.addEdgeToDestinationIndexLocked(e)
 }
 
 func (g *Graph) DeletePod(name, namespace string) {
