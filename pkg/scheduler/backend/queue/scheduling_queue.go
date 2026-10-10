@@ -539,6 +539,27 @@ func (p *PriorityQueue) isEventOfInterest(logger klog.Logger, event fwk.ClusterE
 	return false
 }
 
+// isEventOfInterestForEntity returns true if the event is registered by a plugin
+// that previously rejected at least one Pod in the entity.
+func (p *PriorityQueue) isEventOfInterestForEntity(entity framework.QueuedEntityInfo, event fwk.ClusterEvent) bool {
+	if framework.ClusterEventIsWildCard(event) {
+		return true
+	}
+
+	for pInfo := range entity.ForEachPodInfo() {
+		rejectorPlugins := pInfo.GetUnschedulablePlugins().Union(pInfo.GetPendingPlugins())
+		for plugin := range rejectorPlugins {
+			for _, eventToMatch := range p.pluginToEventsMap[plugin] {
+				if framework.MatchClusterEvents(eventToMatch, event) {
+					return true
+				}
+			}
+		}
+	}
+
+	return false
+}
+
 // isPodGroupMember returns true if the pod is a member of a pod group.
 func (p *PriorityQueue) isPodGroupMember(pod *v1.Pod) bool {
 	if p.isInPlacePodVerticalScalingSchedulerPreemptionEnabled {
@@ -1820,9 +1841,12 @@ func (p *PriorityQueue) moveEntitiesToActiveOrBackoffQueue(logger klog.Logger, e
 		// As an optimization, we avoid re-evaluating gated entities for events unrelated to their gating plugin.
 		// However, wildcard events (e.g., periodic flushes) always trigger re-evaluation to entities pods don't
 		// get stuck due to incomplete or incorrect queueing hints.
-		if entity.Gated() && !framework.ClusterEventIsWildCard(event) && !framework.MatchAnyClusterEvent(event, entity.GetGatingPluginEvents()) {
-			// This event doesn't interest the gating plugin of this Pod,
-			// which means this event never moves this Pod to activeQ.
+		if entity.Gated() &&
+			!framework.ClusterEventIsWildCard(event) &&
+			!framework.MatchAnyClusterEvent(event, entity.GetGatingPluginEvents()) &&
+			!p.isEventOfInterestForEntity(entity, event) {
+			// This event doesn't interest the gating plugin or any plugin
+			// that previously rejected a Pod in this entity.
 			continue
 		}
 
