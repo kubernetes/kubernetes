@@ -201,11 +201,44 @@ func (m *qosContainerManagerImpl) setHugePagesUnbounded(cgroupConfig *CgroupConf
 }
 
 func (m *qosContainerManagerImpl) setHugePagesConfig(configs map[v1.PodQOSClass]*CgroupConfig) error {
-	for _, v := range configs {
-		if err := m.setHugePagesUnbounded(v); err != nil {
-			return err
+	for qos, cfg := range configs {
+		if qos == v1.PodQOSGuaranteed {
+			if err := m.setHugePagesForGuaranteed(cfg); err != nil {
+				return err
+			}
+		} else {
+			if err := m.setHugePagesUnbounded(cfg); err != nil {
+				return err
+			}
 		}
 	}
+	return nil
+}
+
+// setHugePagesForGuaranteed applies node-allocatable hugepage limits to the
+// Guaranteed QoS class cgroup. When no hugepages appear in allocatable
+// the limits stay unbounded, preserving backward compatibility.
+func (m *qosContainerManagerImpl) setHugePagesForGuaranteed(cgroupConfig *CgroupConfig) error {
+	allocatable := m.getNodeAllocatable()
+	allocatableHugePages := HugePageLimits(allocatable)
+
+	if len(allocatableHugePages) == 0 {
+		return m.setHugePagesUnbounded(cgroupConfig)
+	}
+
+	hugePageLimit := map[int64]int64{}
+	for _, pageSize := range libcontainercgroups.HugePageSizes() {
+		pageSizeBytes, err := units.RAMInBytes(pageSize)
+		if err != nil {
+			return err
+		}
+		if limit, ok := allocatableHugePages[pageSizeBytes]; ok {
+			hugePageLimit[pageSizeBytes] = limit
+		} else {
+			hugePageLimit[pageSizeBytes] = int64(1 << 62)
+		}
+	}
+	cgroupConfig.ResourceParameters.HugePageLimit = hugePageLimit
 	return nil
 }
 
@@ -392,7 +425,7 @@ func (m *qosContainerManagerImpl) UpdateCgroups(logger klog.Logger) error {
 		return err
 	}
 
-	// update the qos level cgroup settings for huge pages (ensure they remain unbounded)
+	// update the qos level cgroup settings for huge pages
 	if err := m.setHugePagesConfig(qosConfigs); err != nil {
 		return err
 	}
