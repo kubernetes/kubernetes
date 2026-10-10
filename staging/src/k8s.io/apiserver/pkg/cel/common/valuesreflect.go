@@ -531,6 +531,7 @@ func addToMapList(elements []ref.Val, other traits.Lister, escapedKeyProps []str
 			elements[overwritePosition] = v
 		} else {
 			elements = append(elements, v)
+			keyToIdx[k] = len(elements) - 1
 		}
 	}
 	return &refValMapList{
