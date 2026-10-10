@@ -18,7 +18,6 @@ package etcd3
 
 import (
 	"context"
-	"crypto/rand"
 	"errors"
 	"fmt"
 	"io"
@@ -40,8 +39,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/apitesting"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/fields"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
@@ -1283,135 +1280,6 @@ func TestInvalidKeys(t *testing.T) {
 	expectInvalidKey("Get", store.Get(ctx, invalidKey, storage.GetOptions{}, nil))
 	expectInvalidKey("GetList", store.GetList(ctx, invalidKey, storage.ListOptions{}, nil))
 	expectInvalidKey("GuaranteedUpdate", store.GuaranteedUpdate(ctx, invalidKey, nil, true, nil, nil, nil))
-}
-
-func BenchmarkStore_GetList(b *testing.B) {
-	generateBigPod := func(index int, total int, expect int) runtime.Object {
-		l := map[string]string{}
-		if index%(total/expect) == 0 {
-			l["foo"] = "bar"
-		}
-		terminationGracePeriodSeconds := int64(42)
-		activeDeadlineSeconds := int64(42)
-		pod := &examplev1.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Labels: l,
-			},
-			Spec: examplev1.PodSpec{
-				RestartPolicy:                 examplev1.RestartPolicy("Always"),
-				TerminationGracePeriodSeconds: &terminationGracePeriodSeconds,
-				ActiveDeadlineSeconds:         &activeDeadlineSeconds,
-				NodeSelector:                  map[string]string{},
-				ServiceAccountName:            "demo-sa",
-			},
-		}
-		pod.Name = fmt.Sprintf("object-%d", index)
-		data := make([]byte, 1024*2, 1024*2) // 2k labels
-		rand.Read(data)
-		pod.Spec.NodeSelector["key"] = string(data)
-		return pod
-	}
-	testCases := []struct {
-		name              string
-		objectNum         int
-		expectNum         int
-		selector          labels.Selector
-		newObjectFunc     func(index int, total int, expect int) runtime.Object
-		newListObjectFunc func() runtime.Object
-	}{
-		{
-			name:              "pick 50 pods out of 5000 pod",
-			objectNum:         5000,
-			expectNum:         50,
-			selector:          labels.SelectorFromSet(map[string]string{"foo": "bar"}),
-			newObjectFunc:     generateBigPod,
-			newListObjectFunc: func() runtime.Object { return &examplev1.PodList{} },
-		},
-		{
-			name:              "pick 500 pods out of 5000 pod",
-			objectNum:         5000,
-			expectNum:         500,
-			selector:          labels.SelectorFromSet(map[string]string{"foo": "bar"}),
-			newObjectFunc:     generateBigPod,
-			newListObjectFunc: func() runtime.Object { return &examplev1.PodList{} },
-		},
-		{
-			name:              "pick 1000 pods out of 5000 pod",
-			objectNum:         5000,
-			expectNum:         1000,
-			selector:          labels.SelectorFromSet(map[string]string{"foo": "bar"}),
-			newObjectFunc:     generateBigPod,
-			newListObjectFunc: func() runtime.Object { return &examplev1.PodList{} },
-		},
-		{
-			name:              "pick 2500 pods out of 5000 pod",
-			objectNum:         5000,
-			expectNum:         2500,
-			selector:          labels.SelectorFromSet(map[string]string{"foo": "bar"}),
-			newObjectFunc:     generateBigPod,
-			newListObjectFunc: func() runtime.Object { return &examplev1.PodList{} },
-		},
-		{
-			name:              "pick 5000 pods out of 5000 pod",
-			objectNum:         5000,
-			expectNum:         5000,
-			selector:          labels.SelectorFromSet(map[string]string{"foo": "bar"}),
-			newObjectFunc:     generateBigPod,
-			newListObjectFunc: func() runtime.Object { return &examplev1.PodList{} },
-		},
-	}
-	for _, tc := range testCases {
-		b.Run(tc.name, func(b *testing.B) {
-			// booting etcd instance
-			ctx, store, etcdClient := testSetup(b)
-			defer etcdClient.Close()
-
-			// make fake objects..
-			dir := "/testing"
-			originalRevision := ""
-			for i := 0; i < tc.objectNum; i++ {
-				obj := tc.newObjectFunc(i, tc.objectNum, tc.expectNum)
-				o := obj.(metav1.Object)
-				key := fmt.Sprintf("/testing/testkey/%s", o.GetName())
-				out := tc.newObjectFunc(i, tc.objectNum, tc.expectNum)
-				if err := store.Create(ctx, key, obj, out, 0); err != nil {
-					b.Fatalf("Set failed: %v", err)
-				}
-				originalRevision = out.(metav1.Object).GetResourceVersion()
-			}
-
-			// prepare result and pred
-			pred := storage.SelectionPredicate{
-				Label: tc.selector,
-				Field: fields.Everything(),
-				GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, error) {
-					pod, ok := obj.(*examplev1.Pod)
-					if !ok {
-						return nil, nil, fmt.Errorf("not a pod")
-					}
-					return pod.ObjectMeta.Labels, fields.Set{
-						"metadata.name": pod.Name,
-					}, nil
-				},
-			}
-
-			// now we start benchmarking
-			b.ResetTimer()
-			for i := 0; i < b.N; i++ {
-				list := tc.newListObjectFunc()
-				if err := store.GetList(ctx, dir, storage.ListOptions{Predicate: pred, Recursive: true}, list); err != nil {
-					b.Errorf("Unexpected List error: %v", err)
-				}
-				listObject := list.(*examplev1.PodList)
-				if originalRevision != listObject.GetResourceVersion() {
-					b.Fatalf("original revision (%s) did not match final revision after linearized reads (%s)", originalRevision, listObject.GetResourceVersion())
-				}
-				if len(listObject.Items) != tc.expectNum {
-					b.Fatalf("expect (%d) items but got (%d)", tc.expectNum, len(listObject.Items))
-				}
-			}
-		})
-	}
 }
 
 func BenchmarkStoreWriteThroughput(b *testing.B) {
