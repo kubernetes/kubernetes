@@ -618,6 +618,14 @@ func TestErrorFormatting(t *testing.T) {
 		input:  NotSupported(NewPath("path.to.field"), "the value", []string{"val1", "val2"}),
 		expect: `path.to.field: Unsupported value: "the value": supported values: "val1", "val2"`,
 	}, {
+		name:   "not supported func int32",
+		input:  NotSupported(NewPath("path.to.field"), int32(3), []int32{1, 2}),
+		expect: `path.to.field: Unsupported value: 3: supported values: "1", "2"`,
+	}, {
+		name:   "not supported func int64",
+		input:  NotSupported(NewPath("path.to.field"), int64(30), []int64{10, 20}),
+		expect: `path.to.field: Unsupported value: 30: supported values: "10", "20"`,
+	}, {
 		name: "duplicate",
 		input: &Error{
 			Type:                 ErrorTypeDuplicate,

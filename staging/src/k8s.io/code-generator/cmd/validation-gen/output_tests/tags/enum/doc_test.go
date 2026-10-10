@@ -32,31 +32,41 @@ func Test(t *testing.T) {
 		field.NotSupported(field.NewPath("enum0Field"), Enum0(""), []Enum0{}),
 		field.NotSupported(field.NewPath("enum1Field"), Enum1(""), []Enum1{E1V1}),
 		field.NotSupported(field.NewPath("enum2Field"), Enum2(""), []Enum2{E2V1, E2V2}),
+		field.NotSupported(field.NewPath("enumInt32Field"), EnumInt32(0), []EnumInt32{EInt32V1, EInt32V2}),
+		field.NotSupported(field.NewPath("enumInt64Field"), EnumInt64(0), []EnumInt64{EInt64V1, EInt64V2}),
 	})
 
 	st.Value(&Struct{
-		Enum0Field:      "",                // no valid value exists
-		Enum0PtrField:   ptr.To(Enum0("")), // no valid value exists
-		Enum1Field:      E1V1,
-		Enum1PtrField:   ptr.To(E1V1),
-		Enum2Field:      E2V1,
-		Enum2PtrField:   ptr.To(E2V1),
-		NotEnumField:    "x",
-		NotEnumPtrField: ptr.To(NotEnum("x")),
+		Enum0Field:        "",                // no valid value exists
+		Enum0PtrField:     ptr.To(Enum0("")), // no valid value exists
+		Enum1Field:        E1V1,
+		Enum1PtrField:     ptr.To(E1V1),
+		Enum2Field:        E2V1,
+		Enum2PtrField:     ptr.To(E2V1),
+		NotEnumField:      "x",
+		NotEnumPtrField:   ptr.To(NotEnum("x")),
+		EnumInt32Field:    EInt32V1,
+		EnumInt32PtrField: ptr.To(EInt32V1),
+		EnumInt64Field:    EInt64V1,
+		EnumInt64PtrField: ptr.To(EInt64V1),
 	}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
 		field.NotSupported(field.NewPath("enum0Field"), Enum0(""), []Enum0{}),
 		field.NotSupported(field.NewPath("enum0PtrField"), Enum0(""), []Enum0{}),
 	})
 
 	st.Value(&Struct{
-		Enum0Field:      "x",                // no valid value exists
-		Enum0PtrField:   ptr.To(Enum0("x")), // no valid value exists
-		Enum1Field:      "x",
-		Enum1PtrField:   ptr.To(Enum1("x")),
-		Enum2Field:      "x",
-		Enum2PtrField:   ptr.To(Enum2("x")),
-		NotEnumField:    "x",
-		NotEnumPtrField: ptr.To(NotEnum("x")),
+		Enum0Field:        "x",                // no valid value exists
+		Enum0PtrField:     ptr.To(Enum0("x")), // no valid value exists
+		Enum1Field:        "x",
+		Enum1PtrField:     ptr.To(Enum1("x")),
+		Enum2Field:        "x",
+		Enum2PtrField:     ptr.To(Enum2("x")),
+		NotEnumField:      "x",
+		NotEnumPtrField:   ptr.To(NotEnum("x")),
+		EnumInt32Field:    99,
+		EnumInt32PtrField: ptr.To(EnumInt32(99)),
+		EnumInt64Field:    999,
+		EnumInt64PtrField: ptr.To(EnumInt64(999)),
 	}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
 		field.NotSupported(field.NewPath("enum0Field"), Enum0("x"), []Enum0{}),
 		field.NotSupported(field.NewPath("enum0PtrField"), Enum0("x"), []Enum0{}),
@@ -64,5 +74,9 @@ func Test(t *testing.T) {
 		field.NotSupported(field.NewPath("enum1PtrField"), Enum1("x"), []Enum1{E1V1}),
 		field.NotSupported(field.NewPath("enum2Field"), Enum2("x"), []Enum2{E2V1, E2V2}),
 		field.NotSupported(field.NewPath("enum2PtrField"), Enum2("x"), []Enum2{E2V1, E2V2}),
+		field.NotSupported(field.NewPath("enumInt32Field"), EnumInt32(99), []EnumInt32{EInt32V1, EInt32V2}),
+		field.NotSupported(field.NewPath("enumInt32PtrField"), EnumInt32(99), []EnumInt32{EInt32V1, EInt32V2}),
+		field.NotSupported(field.NewPath("enumInt64Field"), EnumInt64(999), []EnumInt64{EInt64V1, EInt64V2}),
+		field.NotSupported(field.NewPath("enumInt64PtrField"), EnumInt64(999), []EnumInt64{EInt64V1, EInt64V2}),
 	})
 }
