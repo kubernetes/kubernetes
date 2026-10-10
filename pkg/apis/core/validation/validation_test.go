@@ -3201,8 +3201,8 @@ func TestValidationOptionsForPersistentVolumeClaim(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeAttributesClass, tc.enableVolumeAttributesClass)
 
 			opts := ValidationOptionsForPersistentVolumeClaim(nil, tc.oldPvc)
-			if opts != tc.expectValidationOpts {
-				t.Errorf("Expected opts: %+v, received: %+v", tc.expectValidationOpts, opts)
+			if diff := cmp.Diff(tc.expectValidationOpts, opts); diff != "" {
+				t.Errorf("unexpected validation options (-want +got):\n%s", diff)
 			}
 		})
 	}
@@ -3235,8 +3235,8 @@ func TestValidationOptionsForPersistentVolumeClaimTemplate(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeAttributesClass, tc.enableVolumeAttributesClass)
 
 			opts := ValidationOptionsForPersistentVolumeClaimTemplate(nil, tc.oldPvcTemplate)
-			if opts != tc.expectValidationOpts {
-				t.Errorf("Expected opts: %+v, received: %+v", opts, tc.expectValidationOpts)
+			if diff := cmp.Diff(tc.expectValidationOpts, opts); diff != "" {
+				t.Errorf("unexpected validation options (-want +got):\n%s", diff)
 			}
 		})
 	}
@@ -6503,7 +6503,7 @@ func TestAlphaLocalStorageCapacityIsolation(t *testing.T) {
 				resource.BinarySI),
 		},
 	}
-	if errs := ValidateContainerResourceRequirements(&containerLimitCase, nil, field.NewPath("resources"), PodValidationOptions{}); len(errs) != 0 {
+	if errs := ValidateContainerResourceRequirements(&containerLimitCase, nil, field.NewPath("resources"), PodValidationOptions{}, ""); len(errs) != 0 {
 		t.Errorf("expected success: %v", errs)
 	}
 }
@@ -14014,6 +14014,23 @@ func TestValidatePodUpdate(t *testing.T) {
 		now    = metav1.Now()
 		grace  = int64(30)
 		grace2 = int64(31)
+
+		fractionalGPULimit = podtest.SetContainerResources(core.ResourceRequirements{
+			Limits: core.ResourceList{core.ResourceName("example.com/gpu"): resource.MustParse("18446744073709551616m")},
+		})
+		fractionalGPUPod         = *podtest.MakePod("pod", podtest.SetContainers(podtest.MakeContainer("container", fractionalGPULimit)))
+		fractionalGPUInitPod     = *podtest.MakePod("pod", podtest.SetInitContainers(podtest.MakeContainer("init", fractionalGPULimit)))
+		fractionalGPUOverheadPod = *podtest.MakePod("pod", podtest.SetOverhead(core.ResourceList{
+			core.ResourceName("example.com/gpu"): resource.MustParse("18446744073709551616m"),
+		}))
+		// Value() overflowed to a positive number for -9.5Gi, so a release that checked the sign
+		// through it may have stored this.
+		negativeMemory = func(v string) core.Pod {
+			return *podtest.MakePod("pod", podtest.SetPodResources(&core.ResourceRequirements{
+				Limits: core.ResourceList{core.ResourceMemory: resource.MustParse(v)},
+			}))
+		}
+		negativePodLevelMemoryPod = negativeMemory("-9.5Gi")
 	)
 
 	tests := []struct {
@@ -14274,37 +14291,35 @@ func TestValidatePodUpdate(t *testing.T) {
 			err:  "Forbidden: pod updates may not change fields other than",
 			test: "storage request change",
 		}, {
-			// TODO(#141166): An unchanged stored value must pass on update. Expect no error.
-			new: *podtest.MakePod("pod",
-				podtest.SetContainers(podtest.MakeContainer("container",
-					podtest.SetContainerResources(core.ResourceRequirements{
-						Limits: core.ResourceList{core.ResourceName("example.com/gpu"): resource.MustParse("18446744073709551616m")},
-					}))),
-			),
-			old: *podtest.MakePod("pod",
-				podtest.SetContainers(podtest.MakeContainer("container",
-					podtest.SetContainerResources(core.ResourceRequirements{
-						Limits: core.ResourceList{core.ResourceName("example.com/gpu"): resource.MustParse("18446744073709551616m")},
-					}))),
-			),
-			err:  "must be an integer",
+			new:  fractionalGPUPod,
+			old:  fractionalGPUPod,
+			opts: PodValidationOptions{StoredResourceQuantities: StoredResourceQuantitiesOf(&fractionalGPUPod.Spec)},
+			err:  "",
 			test: "unchanged fractional extended resource limit",
 		}, {
-			// TODO(#141166): An unchanged stored value must pass on update. Expect no error.
-			new: *podtest.MakePod("pod",
-				podtest.SetInitContainers(podtest.MakeContainer("init",
-					podtest.SetContainerResources(core.ResourceRequirements{
-						Limits: core.ResourceList{core.ResourceName("example.com/gpu"): resource.MustParse("18446744073709551616m")},
-					}))),
-			),
-			old: *podtest.MakePod("pod",
-				podtest.SetInitContainers(podtest.MakeContainer("init",
-					podtest.SetContainerResources(core.ResourceRequirements{
-						Limits: core.ResourceList{core.ResourceName("example.com/gpu"): resource.MustParse("18446744073709551616m")},
-					}))),
-			),
-			err:  "must be an integer",
+			new:  fractionalGPUInitPod,
+			old:  fractionalGPUInitPod,
+			opts: PodValidationOptions{StoredResourceQuantities: StoredResourceQuantitiesOf(&fractionalGPUInitPod.Spec)},
+			err:  "",
 			test: "unchanged fractional extended resource limit in init container",
+		}, {
+			new:  fractionalGPUOverheadPod,
+			old:  fractionalGPUOverheadPod,
+			opts: PodValidationOptions{StoredResourceQuantities: StoredResourceQuantitiesOf(&fractionalGPUOverheadPod.Spec)},
+			err:  "",
+			test: "unchanged fractional extended resource in overhead",
+		}, {
+			new:  negativePodLevelMemoryPod,
+			old:  negativePodLevelMemoryPod,
+			opts: PodValidationOptions{PodLevelResourcesEnabled: true, StoredResourceQuantities: StoredResourceQuantitiesOf(&negativePodLevelMemoryPod.Spec)},
+			err:  "",
+			test: "unchanged negative memory in pod-level resources",
+		}, {
+			new:  negativeMemory("-9Gi"),
+			old:  negativePodLevelMemoryPod,
+			opts: PodValidationOptions{PodLevelResourcesEnabled: true, StoredResourceQuantities: StoredResourceQuantitiesOf(&negativePodLevelMemoryPod.Spec)},
+			err:  "spec.resources.limits[memory]",
+			test: "changed negative memory in pod-level resources",
 		}, {
 			new: *podtest.MakePod("pod",
 				podtest.SetContainers(podtest.MakeContainer("container",
@@ -15674,21 +15689,31 @@ func TestValidatePodTemplateUpdate(t *testing.T) {
 		new:  makeTemplate(nil, podtest.SetContainers(podtest.MakeContainer("ctr"), podtest.MakeContainer("ctr"))),
 		err:  "template.spec.containers[1].name",
 	}, {
-		// TODO(#141166): An unchanged stored value must pass on update. Expect no error.
 		test: "unchanged fractional extended resource limit",
 		old:  makeTemplate(nil, podtest.SetContainers(podtest.MakeContainer("ctr", fractionalGPULimit))),
 		new:  makeTemplate(nil, podtest.SetContainers(podtest.MakeContainer("ctr", fractionalGPULimit))),
-		err:  "must be an integer",
+		err:  "",
 	}, {
-		// TODO(#141166): An unchanged stored value must pass on update. Expect no error.
 		test: "unchanged fractional extended resource limit in init container",
 		old:  makeTemplate(nil, podtest.SetInitContainers(podtest.MakeContainer("init", fractionalGPULimit))),
 		new:  makeTemplate(nil, podtest.SetInitContainers(podtest.MakeContainer("init", fractionalGPULimit))),
+		err:  "",
+	}, {
+		// A pod template update can freely restructure the container lists (unlike a live pod
+		// update). The same name moving from initContainers to containers, even with the exact
+		// same value, is a different field, not the same field left unchanged, so it must still be
+		// validated rather than ratcheted.
+		test: "same name and value moving from an init container to a regular container is not unchanged",
+		old:  makeTemplate(nil, podtest.SetInitContainers(podtest.MakeContainer("worker", fractionalGPULimit))),
+		new:  makeTemplate(nil, podtest.SetContainers(podtest.MakeContainer("worker", fractionalGPULimit))),
 		err:  "must be an integer",
 	}}
 	for _, tc := range tests {
 		t.Run(tc.test, func(t *testing.T) {
-			errs := ValidatePodTemplateUpdate(&tc.new, &tc.old, PodValidationOptions{})
+			// build the options the way the podtemplate strategy does on update, so a value the stored
+			// template already holds is ratcheted instead of re-validated
+			opts := PodValidationOptions{StoredResourceQuantities: StoredResourceQuantitiesOf(&tc.old.Template.Spec)}
+			errs := ValidatePodTemplateUpdate(&tc.new, &tc.old, opts)
 			if tc.err == "" {
 				if len(errs) != 0 {
 					t.Errorf("unexpected invalid: %v", errs)
@@ -18117,7 +18142,6 @@ func TestValidatePodEphemeralContainersUpdate(t *testing.T) {
 		}(),
 		"Forbidden: static pods do not support ephemeral containers",
 	}, {
-		// TODO(#141166): An unchanged stored value must pass on update. Expect no error.
 		"Add an Ephemeral Container next to an unchanged fractional extended resource limit",
 		func() *core.Pod {
 			p := makePod([]core.EphemeralContainer{{
@@ -18152,9 +18176,8 @@ func TestValidatePodEphemeralContainersUpdate(t *testing.T) {
 			}}
 			return p
 		}(),
-		"must be an integer",
+		"",
 	}, {
-		// TODO(#141166): An unchanged stored value must pass on update. Expect no error.
 		"Add an Ephemeral Container next to an unchanged fractional extended resource limit in an init container",
 		func() *core.Pod {
 			p := makePod([]core.EphemeralContainer{{
@@ -18189,12 +18212,15 @@ func TestValidatePodEphemeralContainersUpdate(t *testing.T) {
 			}}
 			return p
 		}(),
-		"must be an integer",
+		"",
 	},
 	}
 
 	for _, tc := range tests {
-		errs := ValidatePodEphemeralContainersUpdate(tc.new, tc.old, PodValidationOptions{})
+		// build the options the way the ephemeral-containers strategy does on update, so a value
+		// the stored pod already holds is ratcheted instead of re-validated
+		opts := PodValidationOptions{StoredResourceQuantities: StoredResourceQuantitiesOf(&tc.old.Spec)}
+		errs := ValidatePodEphemeralContainersUpdate(tc.new, tc.old, opts)
 		if tc.err == "" {
 			if len(errs) != 0 {
 				t.Errorf("unexpected invalid for test: %s\nErrors returned: %+v\nLocal diff of test objects (-old +new):\n%s", tc.name, errs, cmp.Diff(tc.old, tc.new))
@@ -20192,7 +20218,7 @@ func TestValidateNode(t *testing.T) {
 	}
 	for _, successCase := range successCases {
 		t.Run("", func(t *testing.T) {
-			if errs := ValidateNode(&successCase); len(errs) != 0 {
+			if errs := ValidateNode(&successCase, nil); len(errs) != 0 {
 				t.Errorf("expected success: %v", errs)
 			}
 		})
@@ -20221,7 +20247,7 @@ func TestValidateNode(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.37"))
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StrictIPCIDRValidation, false)
-			if errs := ValidateNode(&legacyCase); len(errs) != 0 {
+			if errs := ValidateNode(&legacyCase, nil); len(errs) != 0 {
 				t.Errorf("expected success: %v", errs)
 			}
 		})
@@ -20446,7 +20472,7 @@ func TestValidateNode(t *testing.T) {
 	}
 	for k, v := range errorCases {
 		t.Run(k, func(t *testing.T) {
-			errs := ValidateNode(&v)
+			errs := ValidateNode(&v, nil)
 			if len(errs) == 0 {
 				t.Errorf("expected failure")
 			}
@@ -20807,7 +20833,6 @@ func TestValidateNodeUpdate(t *testing.T) {
 				},
 			},
 		}, false},
-		// TODO(#141166): An unchanged stored value must pass on update. Expect no error.
 		{core.Node{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "unchanged-fractional-extended-capacity-and-allocatable",
@@ -20840,7 +20865,34 @@ func TestValidateNodeUpdate(t *testing.T) {
 					core.ResourceName("example.com/a"):     resource.MustParse("18446744073709551616m"),
 				},
 			},
-		}, false},
+		}, true},
+		// The stored value is scoped to the list that holds it: unchanged in capacity it passes;
+		// newly in allocatable it is validated (TestStoredResourceQuantityScope).
+		{core.Node{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "unchanged-fractional-extended-capacity-only",
+			},
+			Status: core.NodeStatus{
+				Capacity: core.ResourceList{
+					core.ResourceName("example.com/a"): resource.MustParse("18446744073709551616m"),
+				},
+				Allocatable: core.ResourceList{
+					core.ResourceName("example.com/a"): resource.MustParse("4"),
+				},
+			},
+		}, core.Node{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "unchanged-fractional-extended-capacity-only",
+			},
+			Status: core.NodeStatus{
+				Capacity: core.ResourceList{
+					core.ResourceName("example.com/a"): resource.MustParse("18446744073709551616m"),
+				},
+				Allocatable: core.ResourceList{
+					core.ResourceName("example.com/a"): resource.MustParse("4"),
+				},
+			},
+		}, true},
 		{core.Node{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "update-provider-id-when-not-set",
@@ -23149,6 +23201,43 @@ func TestValidatePersistentVolumeClaimStatusUpdate(t *testing.T) {
 		},
 	})
 
+	negativeAllocatedResources := testVolumeClaimWithStatus("foo", "ns", core.PersistentVolumeClaimSpec{
+		AccessModes: []core.PersistentVolumeAccessMode{
+			core.ReadWriteOnce,
+			core.ReadOnlyMany,
+		},
+		Resources: core.VolumeResourceRequirements{
+			Requests: core.ResourceList{
+				core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
+			},
+		},
+	}, core.PersistentVolumeClaimStatus{
+		Phase: core.ClaimPending,
+		AllocatedResources: core.ResourceList{
+			core.ResourceName(core.ResourceStorage): resource.MustParse("-10G"),
+		},
+	})
+
+	negativeAllocatedResourcesConditionUpdate := testVolumeClaimWithStatus("foo", "ns", core.PersistentVolumeClaimSpec{
+		AccessModes: []core.PersistentVolumeAccessMode{
+			core.ReadWriteOnce,
+			core.ReadOnlyMany,
+		},
+		Resources: core.VolumeResourceRequirements{
+			Requests: core.ResourceList{
+				core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
+			},
+		},
+	}, core.PersistentVolumeClaimStatus{
+		Phase: core.ClaimPending,
+		Conditions: []core.PersistentVolumeClaimCondition{
+			{Type: core.PersistentVolumeClaimResizing, Status: core.ConditionTrue},
+		},
+		AllocatedResources: core.ResourceList{
+			core.ResourceName(core.ResourceStorage): resource.MustParse("-10G"),
+		},
+	})
+
 	noStoraegeClaimStatus := testVolumeClaimWithStatus("foo", "ns", core.PersistentVolumeClaimSpec{
 		AccessModes: []core.PersistentVolumeAccessMode{
 			core.ReadWriteOnce,
@@ -23346,9 +23435,8 @@ func TestValidatePersistentVolumeClaimStatusUpdate(t *testing.T) {
 			oldClaim:          validClaim,
 			newClaim:          negativeCapacity,
 		},
-		// TODO(#141166): An unchanged stored capacity must pass a status update that does not change it. Expect no errors.
 		"condition-update-with-unchanged-negative-capacity": {
-			isExpectedFailure: true,
+			isExpectedFailure: false,
 			oldClaim:          negativeCapacity,
 			newClaim:          negativeCapacityConditionUpdate,
 		},
@@ -23357,11 +23445,16 @@ func TestValidatePersistentVolumeClaimStatusUpdate(t *testing.T) {
 			oldClaim:          validClaim,
 			newClaim:          hugeNegativeCapacity,
 		},
-		// TODO(#141166): An unchanged stored capacity must pass a status update that does not change it. Expect no errors.
 		"condition-update-with-unchanged-negative-capacity-past-int64": {
-			isExpectedFailure: true,
+			isExpectedFailure: false,
 			oldClaim:          hugeNegativeCapacity,
 			newClaim:          hugeNegativeCapacityConditionUpdate,
+		},
+		"condition-update-with-unchanged-negative-allocatedResources": {
+			isExpectedFailure:          false,
+			oldClaim:                   negativeAllocatedResources,
+			newClaim:                   negativeAllocatedResourcesConditionUpdate,
+			enableRecoverFromExpansion: true,
 		},
 		"status-update-with-no-storage-update": {
 			isExpectedFailure:          true,
@@ -26959,7 +27052,7 @@ func TestValidateOverhead(t *testing.T) {
 	},
 	}
 	for _, tc := range successCase {
-		if errs := validateOverhead(tc.overhead, field.NewPath("overheads"), PodValidationOptions{}); len(errs) != 0 {
+		if errs := ValidateOverhead(tc.overhead, field.NewPath("overheads"), PodValidationOptions{}); len(errs) != 0 {
 			t.Errorf("%q unexpected error: %v", tc.Name, errs)
 		}
 	}
@@ -26975,7 +27068,7 @@ func TestValidateOverhead(t *testing.T) {
 	},
 	}
 	for _, tc := range errorCase {
-		if errs := validateOverhead(tc.overhead, field.NewPath("resources"), PodValidationOptions{}); len(errs) == 0 {
+		if errs := ValidateOverhead(tc.overhead, field.NewPath("resources"), PodValidationOptions{}); len(errs) == 0 {
 			t.Errorf("%q expected error", tc.Name)
 		}
 	}
@@ -27313,7 +27406,7 @@ func TestValidateNodeCIDRs(t *testing.T) {
 		},
 	}
 	for _, testCase := range testCases {
-		errs := ValidateNode(&testCase.node)
+		errs := ValidateNode(&testCase.node, nil)
 		if len(errs) == 0 && testCase.expectError {
 			t.Errorf("expected failure for %s, but there were none", testCase.node.Name)
 			return
@@ -27725,7 +27818,7 @@ func TestValidateResourceRequirements(t *testing.T) {
 		requirements core.ResourceRequirements
 		validateFn   func(requirements *core.ResourceRequirements,
 			podClaimNames sets.Set[string], fldPath *field.Path,
-			opts PodValidationOptions) field.ErrorList
+			opts PodValidationOptions, location string) field.ErrorList
 	}{{
 		name: "limits and requests of hugepage resource are equal",
 		requirements: core.ResourceRequirements{
@@ -27831,7 +27924,7 @@ func TestValidateResourceRequirements(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			if errs := tc.validateFn(&tc.requirements, nil, path, PodValidationOptions{}); len(errs) != 0 {
+			if errs := tc.validateFn(&tc.requirements, nil, path, PodValidationOptions{}, ""); len(errs) != 0 {
 				t.Errorf("unexpected errors: %v", errs)
 			}
 		})
@@ -27842,7 +27935,7 @@ func TestValidateResourceRequirements(t *testing.T) {
 		requirements core.ResourceRequirements
 		validateFn   func(requirements *core.ResourceRequirements,
 			podClaimNames sets.Set[string], fldPath *field.Path,
-			opts PodValidationOptions) field.ErrorList
+			opts PodValidationOptions, location string) field.ErrorList
 	}{
 		{
 			name: "container resource hugepage without cpu or memory",
@@ -27934,7 +28027,7 @@ func TestValidateResourceRequirements(t *testing.T) {
 
 	for _, tc := range errTests {
 		t.Run(tc.name, func(t *testing.T) {
-			if errs := tc.validateFn(&tc.requirements, nil, path, PodValidationOptions{}); len(errs) == 0 {
+			if errs := tc.validateFn(&tc.requirements, nil, path, PodValidationOptions{}, ""); len(errs) == 0 {
 				t.Error("expected errors")
 			}
 		})
@@ -31336,7 +31429,6 @@ func TestValidatePodResize(t *testing.T) {
 				return p
 			}(),
 		},
-		// TODO(#141166): An unchanged stored value must pass on update. Expect no error.
 		{
 			test: "cpu resize next to an unchanged fractional extended resource",
 			old: mkPod(
@@ -31346,6 +31438,33 @@ func TestValidatePodResize(t *testing.T) {
 			new: mkPod(
 				core.ResourceList{core.ResourceCPU: resource.MustParse("200m"), core.ResourceName("example.com/gpu"): resource.MustParse("18446744073709551616m")},
 				core.ResourceList{core.ResourceCPU: resource.MustParse("200m"), core.ResourceName("example.com/gpu"): resource.MustParse("18446744073709551616m")},
+			),
+			err: "",
+		},
+		{
+			// A different container newly introducing the same invalid value another container
+			// already held unchanged must still be rejected: the ratchet is scoped per container,
+			// not per resource name pod-wide.
+			test: "second container's changed value must not ratchet off the first container's unchanged one",
+			old: podtest.MakePod("pod",
+				podtest.SetContainers(
+					podtest.MakeContainer("a", podtest.SetContainerResources(core.ResourceRequirements{
+						Limits: core.ResourceList{core.ResourceName("example.com/gpu"): resource.MustParse("18446744073709551616m")},
+					})),
+					podtest.MakeContainer("b", podtest.SetContainerResources(core.ResourceRequirements{
+						Limits: core.ResourceList{core.ResourceCPU: resource.MustParse("100m")},
+					})),
+				),
+			),
+			new: podtest.MakePod("pod",
+				podtest.SetContainers(
+					podtest.MakeContainer("a", podtest.SetContainerResources(core.ResourceRequirements{
+						Limits: core.ResourceList{core.ResourceName("example.com/gpu"): resource.MustParse("18446744073709551616m")},
+					})),
+					podtest.MakeContainer("b", podtest.SetContainerResources(core.ResourceRequirements{
+						Limits: core.ResourceList{core.ResourceName("example.com/gpu"): resource.MustParse("18446744073709551616m")},
+					})),
+				),
 			),
 			err: "must be an integer",
 		},
@@ -31389,11 +31508,14 @@ func TestValidatePodResize(t *testing.T) {
 				test.old.Spec.RestartPolicy = "Always"
 			}
 
+			// build options the way the resize strategy does on update, so a value the stored pod
+			// already holds is ratcheted instead of re-validated
 			errs := ValidatePodResize(test.new, test.old, PodValidationOptions{
 				AllowSidecarResizePolicy:                            true,
 				InPlacePodLevelResourcesVerticalScalingEnabled:      true,
 				PodLevelResourcesEnabled:                            true,
 				InPlacePodVerticalScalingMemoryBackedVolumesEnabled: test.enableMemoryBackedVolumesResize,
+				StoredResourceQuantities:                            StoredResourceQuantitiesOf(&test.old.Spec),
 			})
 
 			if test.err == "" {
@@ -31409,6 +31531,72 @@ func TestValidatePodResize(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestStoredResourceQuantitySetMatching checks, at the unit level, three properties
+// StoredResourceQuantitySet and StoredResourceQuantitiesOf must hold:
+//  1. Has compares by Quantity.Cmp, not by string equality, since Quantity.String() only
+//     canonicalizes within one format ("500m" and "5e-1" are equal quantities that format
+//     differently).
+//  2. a container's stored resources are keyed by both its kind (container/initContainer/
+//     ephemeralContainer) and its name, so moving a same-named container between those lists does
+//     not make its old resources look unchanged.
+//  3. spec.Overhead has its own location, distinct from the pod level's own spec.Resources, so an
+//     unchanged overhead value is matched by an unchanged overhead value and nothing else.
+func TestStoredResourceQuantitySetMatching(t *testing.T) {
+	t.Run("Has matches equal quantities spelled differently", func(t *testing.T) {
+		spec := &core.PodSpec{Containers: []core.Container{{
+			Name: "ctr",
+			Resources: core.ResourceRequirements{
+				Limits: core.ResourceList{core.ResourceCPU: resource.MustParse("500m")},
+			},
+		}}}
+		stored := StoredResourceQuantitiesOf(spec)
+		reSpelled := resource.MustParse("5e-1")
+		if reSpelled.String() == "500m" {
+			t.Fatalf("test assumption broken: %q now formats identically to %q, pick a pair whose String() differs", "5e-1", "500m")
+		}
+		original := resource.MustParse("500m")
+		if !stored.Has("container:ctr/limits", core.ResourceCPU, reSpelled) {
+			t.Errorf("Has(%q) = false, want true: %q and %q are equal quantities (Cmp=%d) that format differently", reSpelled.String(), "500m", reSpelled.String(), original.Cmp(reSpelled))
+		}
+	})
+
+	t.Run("a container moving from initContainers to containers is not treated as unchanged", func(t *testing.T) {
+		badQty := resource.MustParse("18446744073709551616m")
+		oldSpec := &core.PodSpec{InitContainers: []core.Container{{
+			Name:      "worker",
+			Resources: core.ResourceRequirements{Limits: core.ResourceList{core.ResourceName("example.com/gpu"): badQty}},
+		}}}
+		stored := StoredResourceQuantitiesOf(oldSpec)
+		if stored.Has("container:worker/limits", core.ResourceName("example.com/gpu"), badQty) {
+			t.Errorf("Has(\"container:worker/limits\") = true, want false: worker's stored value was under initContainer, not container")
+		}
+		if !stored.Has("initContainer:worker/limits", core.ResourceName("example.com/gpu"), badQty) {
+			t.Errorf("Has(\"initContainer:worker/limits\") = false, want true: that is where worker's value was actually stored")
+		}
+	})
+
+	t.Run("spec.Overhead and spec.Resources do not share a location", func(t *testing.T) {
+		qty := resource.MustParse("18446744073709551616m")
+		spec := &core.PodSpec{
+			Overhead:  core.ResourceList{core.ResourceName("example.com/gpu"): qty},
+			Resources: &core.ResourceRequirements{Limits: core.ResourceList{core.ResourceName("example.com/gpu"): qty}},
+		}
+		stored := StoredResourceQuantitiesOf(spec)
+		if !stored.Has("overhead:/limits", core.ResourceName("example.com/gpu"), qty) {
+			t.Errorf("Has(\"overhead:/limits\") = false, want true: spec.Overhead should be collected under its own location")
+		}
+		if !stored.Has("pod:/limits", core.ResourceName("example.com/gpu"), qty) {
+			t.Errorf("Has(\"pod:/limits\") = false, want true: spec.Resources should still be collected under its own location")
+		}
+		// The two locations must be distinct: overhead alone, with spec.Resources absent, must not
+		// satisfy a pod-level lookup, and vice versa.
+		overheadOnly := StoredResourceQuantitiesOf(&core.PodSpec{Overhead: core.ResourceList{core.ResourceName("example.com/gpu"): qty}})
+		if overheadOnly.Has("pod:/limits", core.ResourceName("example.com/gpu"), qty) {
+			t.Errorf("Has(\"pod:/limits\") = true, want false: only overhead was stored, not spec.Resources")
+		}
+	})
 }
 
 func TestValidateNodeSwapStatus(t *testing.T) {
@@ -31458,7 +31646,7 @@ func TestValidateNodeSwapStatus(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			errs := ValidateNode(&tc.node)
+			errs := ValidateNode(&tc.node, nil)
 
 			if len(errs) == 0 && tc.expectError {
 				t.Errorf("expected failure for %s, but there were none", tc.name)
@@ -33066,7 +33254,7 @@ func TestValidateNodeDeclaredFeatures(t *testing.T) {
 			t.Run(strings.Join([]string{tc.name, op}, "-"), func(t *testing.T) {
 				var errs field.ErrorList
 				if op == "create" {
-					errs = ValidateNode(makeNode(tc.declaredFeatures))
+					errs = ValidateNode(makeNode(tc.declaredFeatures), nil)
 				} else {
 					errs = ValidateNodeUpdate(makeNode(tc.declaredFeatures), makeNode([]string{}))
 				}
@@ -33322,6 +33510,119 @@ func TestValidateBasicResource(t *testing.T) {
 				if got.Cmp(q) != 0 {
 					t.Errorf("%s: error reports %q, want a quantity equal to the one submitted", tc.quantity, reported)
 				}
+			}
+		})
+	}
+}
+
+// TestStoredResourceQuantityScope checks that a stored quantity ratchets only the place that
+// stored it: the same value newly appearing under another resource name, in the other of limits
+// and requests, or in the other of a Node's or a PVC's two status lists, is validated as new.
+func TestStoredResourceQuantityScope(t *testing.T) {
+	fractional := resource.MustParse("18446744073709551616m")
+	negative := resource.MustParse("-1Gi")
+	template := func(resources core.ResourceRequirements) core.PodTemplate {
+		return core.PodTemplate{
+			ObjectMeta: metav1.ObjectMeta{Name: "t", Namespace: "ns", ResourceVersion: "1"},
+			Template: core.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"a": "b"}},
+				Spec:       podtest.MakePodSpec(podtest.SetContainers(podtest.MakeContainer("ctr", podtest.SetContainerResources(resources)))),
+			},
+		}
+	}
+	templateUpdate := func(newResources, oldResources core.ResourceRequirements) field.ErrorList {
+		newTemplate, oldTemplate := template(newResources), template(oldResources)
+		return ValidatePodTemplateUpdate(&newTemplate, &oldTemplate, PodValidationOptions{StoredResourceQuantities: StoredResourceQuantitiesOf(&oldTemplate.Template.Spec)})
+	}
+	nodeUpdate := func(newStatus, oldStatus core.NodeStatus) field.ErrorList {
+		oldNode := makeNode("n", nil)
+		oldNode.ResourceVersion = "1"
+		oldNode.Status = oldStatus
+		newNode := *oldNode.DeepCopy()
+		newNode.Status = newStatus
+		return ValidateNodeUpdate(&newNode, &oldNode)
+	}
+	pvcUpdate := func(t *testing.T, newStatus, oldStatus core.PersistentVolumeClaimStatus) field.ErrorList {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RecoverVolumeExpansionFailure, true)
+		spec := core.PersistentVolumeClaimSpec{
+			AccessModes: []core.PersistentVolumeAccessMode{core.ReadWriteOnce},
+			Resources:   core.VolumeResourceRequirements{Requests: core.ResourceList{core.ResourceStorage: resource.MustParse("10G")}},
+		}
+		oldPVC := testVolumeClaimWithStatus("foo", "ns", spec, oldStatus)
+		newPVC := testVolumeClaimWithStatus("foo", "ns", spec, newStatus)
+		oldPVC.ResourceVersion, newPVC.ResourceVersion = "1", "1"
+		return ValidatePersistentVolumeClaimStatusUpdate(newPVC, oldPVC, ValidationOptionsForPersistentVolumeClaim(newPVC, oldPVC))
+	}
+	storage := func(v string) core.ResourceList {
+		return core.ResourceList{core.ResourceStorage: resource.MustParse(v)}
+	}
+
+	tests := []struct {
+		name   string
+		errs   func(t *testing.T) field.ErrorList
+		wantIn string
+	}{{
+		name: "another resource name in the same container",
+		errs: func(*testing.T) field.ErrorList {
+			return templateUpdate(
+				core.ResourceRequirements{Limits: core.ResourceList{"example.com/gpu": fractional, "example.com/fpga": fractional}},
+				core.ResourceRequirements{Limits: core.ResourceList{"example.com/gpu": fractional}})
+		},
+		wantIn: "limits[example.com/fpga]",
+	}, {
+		name: "from limits to requests",
+		errs: func(*testing.T) field.ErrorList {
+			return templateUpdate(
+				core.ResourceRequirements{Requests: core.ResourceList{core.ResourceMemory: negative}},
+				core.ResourceRequirements{Limits: core.ResourceList{core.ResourceMemory: negative}})
+		},
+		wantIn: "requests[memory]",
+	}, {
+		name: "from requests to limits",
+		errs: func(*testing.T) field.ErrorList {
+			return templateUpdate(
+				core.ResourceRequirements{Requests: core.ResourceList{core.ResourceMemory: negative}, Limits: core.ResourceList{core.ResourceMemory: negative}},
+				core.ResourceRequirements{Requests: core.ResourceList{core.ResourceMemory: negative}})
+		},
+		wantIn: "limits[memory]",
+	}, {
+		name: "node from allocatable to capacity",
+		errs: func(*testing.T) field.ErrorList {
+			return nodeUpdate(
+				core.NodeStatus{Capacity: core.ResourceList{"example.com/a": fractional}, Allocatable: core.ResourceList{"example.com/a": fractional}},
+				core.NodeStatus{Allocatable: core.ResourceList{"example.com/a": fractional}})
+		},
+		wantIn: "status.capacity",
+	}, {
+		name: "node from capacity to allocatable",
+		errs: func(*testing.T) field.ErrorList {
+			return nodeUpdate(
+				core.NodeStatus{Capacity: core.ResourceList{"example.com/a": fractional}, Allocatable: core.ResourceList{"example.com/a": fractional}},
+				core.NodeStatus{Capacity: core.ResourceList{"example.com/a": fractional}})
+		},
+		wantIn: "status.allocatable",
+	}, {
+		name: "pvc from allocatedResources to capacity",
+		errs: func(t *testing.T) field.ErrorList {
+			return pvcUpdate(t,
+				core.PersistentVolumeClaimStatus{Phase: core.ClaimBound, AllocatedResources: storage("-10G"), Capacity: storage("-10G")},
+				core.PersistentVolumeClaimStatus{Phase: core.ClaimBound, AllocatedResources: storage("-10G")})
+		},
+		wantIn: "status.capacity",
+	}, {
+		name: "pvc from capacity to allocatedResources",
+		errs: func(t *testing.T) field.ErrorList {
+			return pvcUpdate(t,
+				core.PersistentVolumeClaimStatus{Phase: core.ClaimBound, AllocatedResources: storage("-10G"), Capacity: storage("-10G")},
+				core.PersistentVolumeClaimStatus{Phase: core.ClaimBound, Capacity: storage("-10G")})
+		},
+		wantIn: "status.allocatedResources",
+	}}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			errs := tc.errs(t)
+			if len(errs) == 0 || !strings.Contains(errs.ToAggregate().Error(), tc.wantIn) {
+				t.Errorf("expected an error at %s, got %v", tc.wantIn, errs)
 			}
 		})
 	}
