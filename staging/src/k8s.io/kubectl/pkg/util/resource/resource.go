@@ -18,7 +18,6 @@ package resource
 
 import (
 	"fmt"
-	"math"
 	"strconv"
 	"strings"
 
@@ -68,32 +67,60 @@ func ExtractContainerResourceValue(fs *corev1.ResourceFieldSelector, container *
 	return "", fmt.Errorf("Unsupported container resource : %v", fs.Resource)
 }
 
+// convertResourceToString divides value by divisor at the given scale and returns the
+// ceiling, formatted as a base 10 integer.
+//
+// Both operands are read through the checked accessors so a quantity that does not fit
+// in an int64 is reported rather than silently saturating at the rail, and the division
+// is done in integer arithmetic: float64 carries a 53 bit mantissa, so converting values
+// above 2^53 loses precision before the ceiling is taken.
+func convertResourceToString(value *resource.Quantity, divisor resource.Quantity, scale resource.Scale) (string, error) {
+	v, ok := value.AsScaledInt64(scale)
+	if !ok {
+		return "", fmt.Errorf("value %s is too large to be represented at scale %d", value.String(), scale)
+	}
+	d, ok := divisor.AsScaledInt64(scale)
+	if !ok {
+		return "", fmt.Errorf("divisor %s is too large to be represented at scale %d", divisor.String(), scale)
+	}
+	if d == 0 {
+		// Callers substitute 1 for an unset divisor, so this is unreachable today.
+		// Guard anyway: unlike the float division this replaces, integer division by
+		// zero panics.
+		return "", fmt.Errorf("divisor must not be zero")
+	}
+
+	// Integer ceiling. Computing v+d-1 first would overflow near the rails, so round up
+	// from the truncated quotient instead, and only when the exact result is positive.
+	q := v / d
+	if v%d != 0 && (v > 0) == (d > 0) {
+		q++
+	}
+	return strconv.FormatInt(q, 10), nil
+}
+
 // convertResourceCPUToString converts cpu value to the format of divisor and returns
 // ceiling of the value.
 func convertResourceCPUToString(cpu *resource.Quantity, divisor resource.Quantity) (string, error) {
-	c := int64(math.Ceil(float64(cpu.MilliValue()) / float64(divisor.MilliValue())))
-	return strconv.FormatInt(c, 10), nil
+	return convertResourceToString(cpu, divisor, resource.Milli)
 }
 
 // convertResourceMemoryToString converts memory value to the format of divisor and returns
 // ceiling of the value.
 func convertResourceMemoryToString(memory *resource.Quantity, divisor resource.Quantity) (string, error) {
-	m := int64(math.Ceil(float64(memory.Value()) / float64(divisor.Value())))
-	return strconv.FormatInt(m, 10), nil
+	return convertResourceToString(memory, divisor, 0)
 }
 
 // convertResourceHugePagesToString converts hugepages value to the format of divisor and returns
 // ceiling of the value.
 func convertResourceHugePagesToString(hugePages *resource.Quantity, divisor resource.Quantity) (string, error) {
-	m := int64(math.Ceil(float64(hugePages.Value()) / float64(divisor.Value())))
-	return strconv.FormatInt(m, 10), nil
+	return convertResourceToString(hugePages, divisor, 0)
 }
 
 // convertResourceEphemeralStorageToString converts ephemeral storage value to the format of divisor and returns
 // ceiling of the value.
 func convertResourceEphemeralStorageToString(ephemeralStorage *resource.Quantity, divisor resource.Quantity) (string, error) {
-	m := int64(math.Ceil(float64(ephemeralStorage.Value()) / float64(divisor.Value())))
-	return strconv.FormatInt(m, 10), nil
+	return convertResourceToString(ephemeralStorage, divisor, 0)
 }
 
 var standardContainerResources = sets.New(
