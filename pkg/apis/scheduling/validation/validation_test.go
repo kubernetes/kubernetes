@@ -124,8 +124,8 @@ func TestValidatePriorityClassUpdate(t *testing.T) {
 	}
 
 	errorCases := map[string]struct {
-		P scheduling.PriorityClass
-		T field.ErrorType
+		P            scheduling.PriorityClass
+		expectedErrs field.ErrorList
 	}{
 		"add namespace": {
 			P: scheduling.PriorityClass{
@@ -133,7 +133,9 @@ func TestValidatePriorityClassUpdate(t *testing.T) {
 				Value:            100,
 				PreemptionPolicy: &preemptLowerPriority,
 			},
-			T: field.ErrorTypeInvalid,
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("metadata.namespace"), nil, "field is immutable").WithOrigin("immutable"),
+			},
 		},
 		"change name": {
 			P: scheduling.PriorityClass{
@@ -141,14 +143,18 @@ func TestValidatePriorityClassUpdate(t *testing.T) {
 				Value:            100,
 				PreemptionPolicy: &preemptLowerPriority,
 			},
-			T: field.ErrorTypeInvalid,
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("metadata.name"), nil, "field is immutable"),
+			},
 		},
 		"remove value": {
 			P: scheduling.PriorityClass{
 				ObjectMeta:       metav1.ObjectMeta{Name: "tier1", Namespace: "", ResourceVersion: "2"},
 				PreemptionPolicy: &preemptLowerPriority,
 			},
-			T: field.ErrorTypeForbidden,
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("value"), nil, "field is immutable").WithOrigin("immutable"),
+			},
 		},
 		"change value": {
 			P: scheduling.PriorityClass{
@@ -156,7 +162,9 @@ func TestValidatePriorityClassUpdate(t *testing.T) {
 				Value:            101,
 				PreemptionPolicy: &preemptLowerPriority,
 			},
-			T: field.ErrorTypeForbidden,
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("value"), nil, "field is immutable").WithOrigin("immutable"),
+			},
 		},
 		"change preemptionPolicy": {
 			P: scheduling.PriorityClass{
@@ -164,7 +172,9 @@ func TestValidatePriorityClassUpdate(t *testing.T) {
 				Value:            100,
 				PreemptionPolicy: &preemptNever,
 			},
-			T: field.ErrorTypeInvalid,
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("preemptionPolicy"), nil, "field is immutable"),
+			},
 		},
 	}
 
@@ -174,11 +184,8 @@ func TestValidatePriorityClassUpdate(t *testing.T) {
 			t.Errorf("Expected error for %s, but it succeeded", k)
 			continue
 		}
-		for i := range errs {
-			if errs[i].Type != v.T {
-				t.Errorf("%s: expected errors to have type %s: %v", k, v.T, errs[i])
-			}
-		}
+		matcher := field.ErrorMatcher{}.ByType().ByField().ByOrigin().ByDetailSubstring()
+		matcher.Test(t, v.expectedErrs, errs)
 	}
 }
 
