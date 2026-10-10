@@ -1418,7 +1418,8 @@ func TestAsyncPreemption(t *testing.T) {
 				{
 					// This Pod is lower priority than the preemptor Pod.
 					// Given the preemptor Pod is nominated to the node, this Pod should be unschedulable.
-					// This Pod will trigger the preemption to target the two victims that the first Pod doesn't target.
+					// Because preemptor-high-priority's preemption API calls are still blocked when this Pod runs PostFilter,
+					// all 4 victims are still present in the snapshot and this Pod selects all 4 victims (overlapping on lastVictim).
 					Name: "create a second Pod that is lower priority than the first preemptor Pod",
 					CreatePod: &asyncframework.CreatePod{
 						Pod: st.MakePod().Name("preemptor-mid-priority").Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Container("image").Priority(50).Obj(),

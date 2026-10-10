@@ -448,6 +448,7 @@ func TestPrepareCandidate(t *testing.T) {
 			nodeNames:             []string{node1Name},
 			expectedStatus:        nil,
 			expectedPreemptingMap: sets.New(types.UID("preemptor")),
+			expectedActivatedPods: map[string]*v1.Pod{preemptor.Name: preemptor},
 		},
 		{
 			name: "one victim with same condition",
@@ -1526,12 +1527,12 @@ func TestPreemptPod(t *testing.T) {
 					preemptor = &podExecutorPreemptor{Pod: preemptorPod}
 				}
 
-				preemptedInMemory, err := pe.PreemptPod(ctx, &candidate{name: "fake-node"}, preemptor, victimPod, "test-plugin")
+				willProduceDeletionEvent, err := pe.PreemptPod(ctx, &candidate{name: "fake-node"}, preemptor, victimPod, "test-plugin")
 				if err != nil {
 					t.Fatal(err)
 				}
-				if preemptedInMemory != (tt.addVictimToPrebind || tt.addVictimToWaiting) {
-					t.Errorf("PreemptPod() preemptedInMemory = %v, want %v", preemptedInMemory, tt.addVictimToPrebind || tt.addVictimToWaiting)
+				if willProduceDeletionEvent != (!tt.addVictimToPrebind && !tt.addVictimToWaiting) {
+					t.Errorf("PreemptPod() willProduceDeletionEvent = %v, want %v", willProduceDeletionEvent, !tt.addVictimToPrebind && !tt.addVictimToWaiting)
 				}
 				if tt.expectCancel {
 					if victimCtx.Err() == nil {
@@ -1566,11 +1567,14 @@ func TestPrepareCandidateAsyncActivatesPreemptorAfterLastVictimInMemoryPreemptio
 	waitingVictim := st.MakePod().Name("waiting-v").UID("waiting-v").Priority(midPriority).Node("node1").Obj()
 	preBindVictim := st.MakePod().Name("prebind-v").UID("prebind-v").Priority(midPriority).Node("node1").Obj()
 	apiVictim := st.MakePod().Name("api-v").UID("api-v").Priority(midPriority).Node("node1").Obj()
+	secondAPIVictim := st.MakePod().Name("api-v2").UID("api-v2").Priority(midPriority).Node("node1").Obj()
 
 	tests := []struct {
 		name                        string
 		victimPods                  []*v1.Pod
 		inMemoryVictim              *v1.Pod
+		notFoundOnPatchVictim       *v1.Pod
+		notFoundOnDeleteVictim      *v1.Pod
 		addVictimToPrebind          bool
 		addVictimToPrebindOnPreempt bool
 		addVictimToWaiting          bool
@@ -1625,6 +1629,24 @@ func TestPrepareCandidateAsyncActivatesPreemptorAfterLastVictimInMemoryPreemptio
 			wantPreemptorActivate:    true,
 		},
 		{
+			name:                  "last victim already deleted on patch",
+			victimPods:            []*v1.Pod{apiVictim.DeepCopy()},
+			notFoundOnPatchVictim: apiVictim,
+			wantPreemptorActivate: true,
+		},
+		{
+			name:                   "last victim already deleted on delete",
+			victimPods:             []*v1.Pod{apiVictim.DeepCopy()},
+			notFoundOnDeleteVictim: apiVictim,
+			wantPreemptorActivate:  true,
+		},
+		{
+			name:                   "last victim already deleted after API-deleted victim",
+			victimPods:             []*v1.Pod{apiVictim.DeepCopy(), secondAPIVictim.DeepCopy()},
+			notFoundOnDeleteVictim: secondAPIVictim,
+			wantPreemptorActivate:  true,
+		},
+		{
 			name:               "non-last waiting pod",
 			victimPods:         []*v1.Pod{waitingVictim.DeepCopy(), apiVictim.DeepCopy()},
 			inMemoryVictim:     waitingVictim.DeepCopy(),
@@ -1635,6 +1657,11 @@ func TestPrepareCandidateAsyncActivatesPreemptorAfterLastVictimInMemoryPreemptio
 			victimPods:         []*v1.Pod{preBindVictim.DeepCopy(), apiVictim.DeepCopy()},
 			inMemoryVictim:     preBindVictim.DeepCopy(),
 			addVictimToPrebind: true,
+		},
+		{
+			name:                   "non-last already deleted pod",
+			victimPods:             []*v1.Pod{secondAPIVictim.DeepCopy(), apiVictim.DeepCopy()},
+			notFoundOnDeleteVictim: secondAPIVictim,
 		},
 	}
 
@@ -1676,6 +1703,22 @@ func TestPrepareCandidateAsyncActivatesPreemptorAfterLastVictimInMemoryPreemptio
 				podsForSnapshot = append(podsForSnapshot, pod)
 			}
 			cs := clientsetfake.NewClientset(objects...)
+			if tt.notFoundOnPatchVictim != nil {
+				cs.PrependReactor("patch", "pods", func(action clienttesting.Action) (bool, runtime.Object, error) {
+					if action.(clienttesting.PatchAction).GetName() == tt.notFoundOnPatchVictim.Name {
+						return true, nil, apierrors.NewNotFound(v1.Resource("pods"), tt.notFoundOnPatchVictim.Name)
+					}
+					return false, nil, nil
+				})
+			}
+			if tt.notFoundOnDeleteVictim != nil {
+				cs.PrependReactor("delete", "pods", func(action clienttesting.Action) (bool, runtime.Object, error) {
+					if action.(clienttesting.DeleteAction).GetName() == tt.notFoundOnDeleteVictim.Name {
+						return true, nil, apierrors.NewNotFound(v1.Resource("pods"), tt.notFoundOnDeleteVictim.Name)
+					}
+					return false, nil, nil
+				})
+			}
 			informerFactory := informers.NewSharedInformerFactory(cs, 0)
 			eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: cs.EventsV1()})
 
