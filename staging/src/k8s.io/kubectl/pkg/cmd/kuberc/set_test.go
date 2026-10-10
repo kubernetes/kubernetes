@@ -853,6 +853,106 @@ aliases:
 	}
 }
 
+func TestSetOptions_Run_CredentialPluginPaths(t *testing.T) {
+	tests := []struct {
+		name        string
+		command     string
+		expectError bool
+	}{
+		{name: "command name", command: "credential-helper"},
+		{name: "normalized relative path", command: filepath.Join("bin", "credential-helper")},
+		{name: "normalized absolute path", command: filepath.Join(t.TempDir(), "credential-helper")},
+		{name: "dot prefix", command: "./credential-helper", expectError: true},
+		{name: "parent component", command: "bin/../credential-helper", expectError: true},
+		{name: "duplicate separator", command: "bin//credential-helper", expectError: true},
+		{name: "trailing separator", command: "bin/credential-helper/", expectError: true},
+	}
+	for _, existing := range []struct {
+		name    string
+		content string
+	}{
+		{name: "new file"},
+		{
+			name: "existing file",
+			content: `apiVersion: kubectl.config.k8s.io/v1beta1
+kind: Preference
+credentialPluginPolicy: Allowlist
+credentialPluginAllowlist:
+- command: original-helper
+`,
+		},
+	} {
+		t.Run(existing.name, func(t *testing.T) {
+			for _, tt := range tests {
+				t.Run(tt.name, func(t *testing.T) {
+					kubercPath := filepath.Join(t.TempDir(), "kuberc")
+					if existing.content != "" {
+						if err := os.WriteFile(kubercPath, []byte(existing.content), 0644); err != nil {
+							t.Fatalf("failed to write existing kuberc file: %v", err)
+						}
+					}
+					streams, _, out, _ := genericiooptions.NewTestIOStreams()
+					o := SetOptions{
+						KubeRCFile:       kubercPath,
+						Section:          sectionCredentialPlugin,
+						PluginPolicy:     string(v1beta1.PluginPolicyAllowlist),
+						AllowlistEntries: []string{"command=" + tt.command},
+						IOStreams:        streams,
+					}
+					if err := o.Validate(); err != nil {
+						t.Fatalf("Validate() unexpected error: %v", err)
+					}
+					runErr := o.Run()
+					if tt.expectError {
+						if runErr == nil || !strings.Contains(runErr.Error(), "non-normalized file path:") {
+							t.Fatalf("expected non-normalized path error, got: %v", runErr)
+						}
+						data, err := os.ReadFile(kubercPath)
+						if existing.content == "" {
+							if !os.IsNotExist(err) {
+								t.Fatalf("expected kuberc file not to be created, got: %v", err)
+							}
+						} else {
+							if err != nil {
+								t.Fatalf("failed to read existing kuberc file: %v", err)
+							}
+							if string(data) != existing.content {
+								t.Errorf("existing kuberc file was modified:\n%s", data)
+							}
+						}
+						if out.Len() != 0 {
+							t.Errorf("unexpected success output: %s", out.String())
+						}
+						return
+					}
+					if runErr != nil {
+						t.Fatalf("Run() unexpected error: %v", runErr)
+					}
+					data, err := os.ReadFile(kubercPath)
+					if err != nil {
+						t.Fatalf("failed to read written kuberc file: %v", err)
+					}
+					var actualPref v1beta1.Preference
+					if err := yaml.Unmarshal(data, &actualPref); err != nil {
+						t.Fatalf("failed to unmarshal actual output: %v", err)
+					}
+					expectedPref := &v1beta1.Preference{
+						TypeMeta: metav1.TypeMeta{
+							APIVersion: "kubectl.config.k8s.io/v1beta1",
+							Kind:       "Preference",
+						},
+						CredentialPluginPolicy:    v1beta1.PluginPolicyAllowlist,
+						CredentialPluginAllowlist: []v1beta1.AllowlistEntry{{Command: tt.command}},
+					}
+					if diff := cmp.Diff(expectedPref, &actualPref); diff != "" {
+						t.Errorf("Run() output mismatch (-expected +got):\n%s", diff)
+					}
+				})
+			}
+		})
+	}
+}
+
 func TestSetOptions_Run_CredentialPlugin(t *testing.T) {
 	tests := []struct {
 		name           string
