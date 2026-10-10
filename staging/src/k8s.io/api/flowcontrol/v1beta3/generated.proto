@@ -386,15 +386,15 @@ message PriorityLevelConfigurationSpec {
   // Required.
   // +required
   // +unionDiscriminator
-  // +k8s:beta(since: "1.37")=+k8s:required
-  // +k8s:beta(since: "1.37")=+k8s:modeDiscriminator
+  // +k8s:required
+  // +k8s:modeDiscriminator
   optional string type = 1;
 
   // limited specifies how requests are handled for a Limited priority level.
   // This field must be non-empty if and only if `type` is `"Limited"`.
   // +optional
-  // +k8s:beta(since: "1.37")=+k8s:optional
-  // +k8s:beta(since: "1.37")=+k8s:ifMode("Limited")=+k8s:required
+  // +k8s:optional
+  // +k8s:ifMode("Limited")=+k8s:required
   optional LimitedPriorityLevelConfiguration limited = 2;
 
   // exempt specifies how requests are handled for an exempt priority level.
@@ -403,8 +403,8 @@ message PriorityLevelConfigurationSpec {
   // If empty and `type` is `"Exempt"` then the default values
   // for `ExemptPriorityLevelConfiguration` apply.
   // +optional
-  // +k8s:beta(since: "1.37")=+k8s:optional
-  // +k8s:beta(since: "1.37")=+k8s:ifMode("Exempt")=+k8s:optional
+  // +k8s:optional
+  // +k8s:ifMode("Exempt")=+k8s:optional
   optional ExemptPriorityLevelConfiguration exempt = 3;
 }
 
