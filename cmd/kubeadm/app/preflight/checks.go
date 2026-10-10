@@ -151,7 +151,8 @@ func (crvc ContainerRuntimeVersionCheck) Check() (warnings, errorList []error) {
 			"To temporarily use this runtime with kubelet 1.38 or later, explicitly set DisableCgroupDriverFallback=false and a cgroupDriver matching the runtime in KubeletConfiguration. " +
 			"For more information, see https://git.k8s.io/enhancements/keps/sig-node/4033-group-driver-detection-over-cri")
 
-		// TODO: Remove the version check and always return an error once 1.38 is the minimum supported version of kubelet.
+		// TODO: Always return an error once the feature gate DisableCgroupDriverFallback is removed in a future version
+		// Remove the version check once the n-3 version kubelet does not support DisableCgroupDriverFallback
 		// https://github.com/kubernetes/kubeadm/issues/3229
 		if kubeletVersion.Major() > 1 || kubeletVersion.Minor() >= 38 {
 			errorList = append(errorList, err)
