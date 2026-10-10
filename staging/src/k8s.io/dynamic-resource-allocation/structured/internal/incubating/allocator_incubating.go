@@ -325,21 +325,18 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node, claims []*resou
 	// Produce caller-supplied constraints, if a provider is installed.
 	// The provider is called once per Allocate, so it can build per-node
 	// state and share it across all candidate evaluations for this node.
-	// The claim index and class name are filled in at add() time, where
-	// the allocator knows which request is being satisfied.
+	// Each delegate applies to all claims so it can enforce a policy across
+	// the entire allocation.
 	if a.newConstraints != nil {
-		outer, err := a.newConstraints(ctx, node, claims)
+		delegates, err := a.newConstraints(ctx, node, claims)
 		if err != nil {
 			return nil, fmt.Errorf("%w: producing caller constraints: %w", internal.ErrFailedAllocationOnNode, err)
 		}
-		for claimIdx := range claims {
-			// The provider returns one flat list. Distribute the entries
-			// across claims by index modulo, matching how a caller that
-			// returns one constraint per claim would lay them out.
-			for i := claimIdx; i < len(outer); i += len(claims) {
+		for claimIdx, claim := range claims {
+			for _, delegate := range delegates {
 				alloc.callerConstraints[claimIdx] = append(alloc.callerConstraints[claimIdx], callerConstraint{
-					claim: claims[claimIdx],
-					outer: outer[i],
+					claim:    claim,
+					delegate: delegate,
 				})
 			}
 		}
@@ -817,8 +814,8 @@ type constraint interface {
 // state the allocator tracks. The capacity map is populated at the call site,
 // after the allocator has computed the final rounded values.
 type callerConstraint struct {
-	claim *resourceapi.ResourceClaim
-	outer internal.AllocationConstraint
+	claim    *resourceapi.ResourceClaim
+	delegate internal.AllocationConstraint
 }
 
 // add is called with the class name of the request currently being
@@ -831,7 +828,7 @@ func (c *callerConstraint) add(requestName, subRequestName, deviceClassName stri
 	if subRequestName != "" {
 		request = requestName + "/" + subRequestName
 	}
-	return c.outer.Add(internal.DeviceAllocation{
+	return c.delegate.Add(internal.DeviceAllocation{
 		Claim:            c.claim,
 		Request:          request,
 		DeviceClassName:  deviceClassName,
@@ -849,7 +846,7 @@ func (c *callerConstraint) remove(requestName, subRequestName, deviceClassName s
 	if subRequestName != "" {
 		request = requestName + "/" + subRequestName
 	}
-	c.outer.Remove(internal.DeviceAllocation{
+	c.delegate.Remove(internal.DeviceAllocation{
 		Claim:            c.claim,
 		Request:          request,
 		DeviceClassName:  deviceClassName,

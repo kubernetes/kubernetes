@@ -163,6 +163,49 @@ func TestAllocationConstraintSeesFinalValues(t *testing.T) {
 	}
 }
 
+func TestAllocationConstraintsApplyToAllClaims(t *testing.T) {
+	classLister, node, slices, claims := makeConstraintFixture()
+	slices[0].Spec.Devices = append(slices[0].Spec.Devices, resourceapi.Device{Name: "device-2"})
+	secondClaim := claims[0].DeepCopy()
+	secondClaim.Name = "claim-2"
+	secondClaim.Spec.Devices.Requests[0].Name = "gpu-request-2"
+	claims = append(claims, secondClaim)
+
+	recorders := []*recordingConstraint{{}, {}}
+	allocator, err := NewAllocator(context.Background(),
+		Features{ConsumableCapacity: true},
+		AllocatedState{},
+		classLister, slices, cel.NewCache(10, cel.Features{}),
+		WithAllocationConstraints(func(ctx context.Context, node *v1.Node,
+			claims []*resourceapi.ResourceClaim) ([]AllocationConstraint, error) {
+			return []AllocationConstraint{recorders[0], recorders[1]}, nil
+		}),
+	)
+	if err != nil {
+		t.Fatalf("NewAllocator: %v", err)
+	}
+
+	result, err := allocator.Allocate(context.Background(), node, claims)
+	if err != nil {
+		t.Fatalf("Allocate: %v", err)
+	}
+	if len(result) != len(claims) {
+		t.Fatalf("want %d results, got %d", len(claims), len(result))
+	}
+
+	for i, recorder := range recorders {
+		seenClaims := map[string]bool{}
+		for _, allocation := range recorder.added {
+			seenClaims[allocation.Claim.Name] = true
+		}
+		for _, claim := range claims {
+			if !seenClaims[claim.Name] {
+				t.Errorf("constraint %d did not see an allocation for claim %q", i, claim.Name)
+			}
+		}
+	}
+}
+
 func TestAllocationConstraintAddRemoveSymmetry(t *testing.T) {
 	classLister, node, slices, claims := makeConstraintFixture()
 	recorder := &recordingConstraint{}
