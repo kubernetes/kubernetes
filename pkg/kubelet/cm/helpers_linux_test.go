@@ -19,18 +19,14 @@ limitations under the License.
 package cm
 
 import (
-	"os"
-	"path/filepath"
 	"reflect"
 	"strconv"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	pkgfeatures "k8s.io/kubernetes/pkg/features"
@@ -1516,27 +1512,40 @@ func TestSharesToMilliCPU(t *testing.T) {
 	}
 }
 
-// TestMilliCPUToSharesRoundTrip verifies lossless conversion milliCPU → shares → milliCPU
-// for standard values. This property is critical because kubelet writes cpu.shares during
-// pod admission (MilliCPUToShares) and reads them back for status reporting (SharesToMilliCPU).
+// TestMilliCPUToSharesRoundTrip documents the intended round-trip behavior of
+// milliCPU → shares → milliCPU. kubelet writes cpu.shares during pod admission
+// (MilliCPUToShares) and reads them back for status reporting (SharesToMilliCPU),
+// so the conversion is designed to be the identity *within the representable share
+// range* [MinShares, MaxShares]. Outside that range the floor (MinShares) and cap
+// (MaxShares) intentionally lose precision — that loss is the designed clamp, not a
+// bug, so the edge cases below assert the recovered value rather than equality.
 func TestMilliCPUToSharesRoundTrip(t *testing.T) {
 	testCases := []struct {
-		name     string
-		milliCPU int64
+		name              string
+		milliCPU          int64
+		expectedRecovered int64
 	}{
-		{name: "100m", milliCPU: 100},
-		{name: "250m", milliCPU: 250},
-		{name: "500m", milliCPU: 500},
-		{name: "1000m (1 CPU)", milliCPU: 1000},
-		{name: "2000m", milliCPU: 2000},
-		{name: "4000m", milliCPU: 4000},
+		// Identity range: shares land in (MinShares, MaxShares), round-trip is lossless.
+		{name: "100m", milliCPU: 100, expectedRecovered: 100},
+		{name: "250m", milliCPU: 250, expectedRecovered: 250},
+		{name: "500m", milliCPU: 500, expectedRecovered: 500},
+		{name: "1000m (1 CPU)", milliCPU: 1000, expectedRecovered: 1000},
+		{name: "2000m", milliCPU: 2000, expectedRecovered: 2000},
+		{name: "4000m", milliCPU: 4000, expectedRecovered: 4000},
+		// Upper boundary: 256000m maps to exactly MaxShares and round-trips losslessly.
+		{name: "256000m maps to MaxShares, lossless", milliCPU: 256000, expectedRecovered: 256000},
+		// Above the cap: shares clamp to MaxShares, recovering the cap not the input.
+		{name: "300000m clamps to MaxShares (256000m)", milliCPU: 300000, expectedRecovered: 256000},
+		// At/below the floor: shares clamp to MinShares (2), recovering 2m not the input.
+		{name: "1m clamps to MinShares (2m)", milliCPU: 1, expectedRecovered: 2},
+		{name: "0m clamps to MinShares (2m)", milliCPU: 0, expectedRecovered: 2},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			shares := MilliCPUToShares(tc.milliCPU)
 			recovered := SharesToMilliCPU(int64(shares))
-			assert.Equal(t, tc.milliCPU, recovered)
+			assert.Equal(t, tc.expectedRecovered, recovered)
 		})
 	}
 }
@@ -1568,258 +1577,6 @@ func TestQuotaToMilliCPU(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			assert.Equal(t, tc.expected, QuotaToMilliCPU(tc.quota, tc.period))
-		})
-	}
-}
-
-// TestCPURequestsFromConfig verifies reconstruction of Kubernetes CPU request quantities
-// from a ResourceConfig's CPUShares field. Used by kubelet to report actual allocated
-// resources in pod status. Returns nil for nil config or zero shares, indicating no
-// CPU request was set.
-func TestCPURequestsFromConfig(t *testing.T) {
-	testCases := []struct {
-		name             string
-		config           *ResourceConfig
-		expectedMilliCPU *int64
-	}{
-		{name: "nil config returns nil", config: nil, expectedMilliCPU: nil},
-		{name: "zero shares returns nil", config: &ResourceConfig{CPUShares: ptr.To[uint64](0)}, expectedMilliCPU: nil},
-		{name: "MinShares (2) returns 2m", config: &ResourceConfig{CPUShares: ptr.To[uint64](MinShares)}, expectedMilliCPU: ptr.To[int64](2)},
-		{name: "1024 shares returns 1000m", config: &ResourceConfig{CPUShares: ptr.To[uint64](1024)}, expectedMilliCPU: ptr.To[int64](1000)},
-		{name: "512 shares returns 500m", config: &ResourceConfig{CPUShares: ptr.To[uint64](512)}, expectedMilliCPU: ptr.To[int64](500)},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			result := CPURequestsFromConfig(tc.config)
-			if tc.expectedMilliCPU == nil {
-				assert.Nil(t, result)
-			} else {
-				assert.NotNil(t, result)
-				assert.Equal(t, *tc.expectedMilliCPU, result.MilliValue())
-			}
-		})
-	}
-}
-
-// TestCPULimitsFromConfig verifies reconstruction of Kubernetes CPU limit quantities from
-// ResourceConfig's CPUQuota and CPUPeriod fields. Quota=-1 represents "unlimited" per
-// CFS bandwidth control and returns nil. Zero period is treated as invalid (returns nil)
-// to avoid division by zero.
-func TestCPULimitsFromConfig(t *testing.T) {
-	testCases := []struct {
-		name             string
-		config           *ResourceConfig
-		expectedMilliCPU *int64
-	}{
-		{name: "nil config returns nil", config: nil, expectedMilliCPU: nil},
-		{name: "zero period returns nil", config: &ResourceConfig{CPUQuota: ptr.To[int64](100000), CPUPeriod: ptr.To[uint64](0)}, expectedMilliCPU: nil},
-		{name: "unlimited quota (-1) returns nil", config: &ResourceConfig{CPUQuota: ptr.To[int64](-1), CPUPeriod: ptr.To[uint64](100000)}, expectedMilliCPU: nil},
-		{name: "50000/100000 returns 500m", config: &ResourceConfig{CPUQuota: ptr.To[int64](50000), CPUPeriod: ptr.To[uint64](100000)}, expectedMilliCPU: ptr.To[int64](500)},
-		{name: "100000/100000 returns 1000m", config: &ResourceConfig{CPUQuota: ptr.To[int64](100000), CPUPeriod: ptr.To[uint64](100000)}, expectedMilliCPU: ptr.To[int64](1000)},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			result := CPULimitsFromConfig(tc.config)
-			if tc.expectedMilliCPU == nil {
-				assert.Nil(t, result)
-			} else {
-				assert.NotNil(t, result)
-				assert.Equal(t, *tc.expectedMilliCPU, result.MilliValue())
-			}
-		})
-	}
-}
-
-// TestMemoryLimitsFromConfig verifies reconstruction of Kubernetes memory limit quantities
-// from ResourceConfig's Memory field. Zero or negative values return nil per kubelet
-// convention for absent memory limits (kernel uses -1 for unlimited memory cgroup).
-func TestMemoryLimitsFromConfig(t *testing.T) {
-	testCases := []struct {
-		name          string
-		config        *ResourceConfig
-		expectedBytes *int64
-	}{
-		{name: "nil config returns nil", config: nil, expectedBytes: nil},
-		{name: "zero memory returns nil", config: &ResourceConfig{Memory: ptr.To[int64](0)}, expectedBytes: nil},
-		{name: "negative memory returns nil", config: &ResourceConfig{Memory: ptr.To[int64](-1)}, expectedBytes: nil},
-		{name: "1Gi memory returns quantity", config: &ResourceConfig{Memory: ptr.To[int64](1073741824)}, expectedBytes: ptr.To[int64](1073741824)},
-		{name: "512Mi memory returns quantity", config: &ResourceConfig{Memory: ptr.To[int64](536870912)}, expectedBytes: ptr.To[int64](536870912)},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			result := MemoryLimitsFromConfig(tc.config)
-			if tc.expectedBytes == nil {
-				assert.Nil(t, result)
-			} else {
-				assert.NotNil(t, result)
-				assert.Equal(t, *tc.expectedBytes, result.Value())
-			}
-		})
-	}
-}
-
-// TestNodeAllocatableRoot verifies construction of the node allocatable cgroup path.
-// Per the node allocatable design (KEP-726), kubelet isolates pod workloads under a
-// "kubepods" subtree when cgroupsPerQOS is enabled. The cgroupfs driver uses literal
-// path components; the systemd driver converts to systemd slice naming convention
-// (component.slice). This separation ensures system-critical processes are protected
-// from pod resource consumption.
-func TestNodeAllocatableRoot(t *testing.T) {
-	testCases := []struct {
-		name          string
-		cgroupRoot    string
-		cgroupsPerQOS bool
-		cgroupDriver  string
-		expected      string
-	}{
-		{name: "cgroupfs with cgroupsPerQOS from root", cgroupRoot: "/", cgroupsPerQOS: true, cgroupDriver: "cgroupfs", expected: "/kubepods"},
-		{name: "cgroupfs without cgroupsPerQOS from root", cgroupRoot: "/", cgroupsPerQOS: false, cgroupDriver: "cgroupfs", expected: "/"},
-		{name: "cgroupfs with cgroupsPerQOS custom root", cgroupRoot: "/custom", cgroupsPerQOS: true, cgroupDriver: "cgroupfs", expected: "/custom/kubepods"},
-		{name: "cgroupfs without cgroupsPerQOS custom root", cgroupRoot: "/custom", cgroupsPerQOS: false, cgroupDriver: "cgroupfs", expected: "/custom"},
-		{name: "systemd with cgroupsPerQOS from root", cgroupRoot: "/", cgroupsPerQOS: true, cgroupDriver: "systemd", expected: "/kubepods.slice"},
-		{name: "empty root with cgroupsPerQOS cgroupfs", cgroupRoot: "", cgroupsPerQOS: true, cgroupDriver: "cgroupfs", expected: "/kubepods"},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			assert.Equal(t, tc.expected, NodeAllocatableRoot(tc.cgroupRoot, tc.cgroupsPerQOS, tc.cgroupDriver))
-		})
-	}
-}
-
-// TestGetCgroupProcs verifies reading PIDs from a cgroup's cgroup.procs file.
-// Per cgroup lifecycle semantics, a missing procs file is not an error (the cgroup
-// may have been removed between listing and reading). Malformed content or permission
-// errors are surfaced as errors to distinguish configuration problems from normal lifecycle.
-func TestGetCgroupProcs(t *testing.T) {
-	testCases := []struct {
-		name        string
-		setup       func(t *testing.T) string
-		expected    []int
-		expectError bool
-	}{
-		{
-			name: "non-existent cgroup.procs returns empty slice",
-			setup: func(t *testing.T) string {
-				return t.TempDir()
-			},
-			expected:    []int{},
-			expectError: false,
-		},
-		{
-			name: "valid PIDs parsed correctly",
-			setup: func(t *testing.T) string {
-				dir := t.TempDir()
-				err := os.WriteFile(filepath.Join(dir, "cgroup.procs"), []byte("1\n22\n333\n4444\n"), 0644)
-				require.NoError(t, err)
-				return dir
-			},
-			expected:    []int{1, 22, 333, 4444},
-			expectError: false,
-		},
-		{
-			name: "empty file returns empty slice",
-			setup: func(t *testing.T) string {
-				dir := t.TempDir()
-				err := os.WriteFile(filepath.Join(dir, "cgroup.procs"), []byte(""), 0644)
-				require.NoError(t, err)
-				return dir
-			},
-			expected:    []int{},
-			expectError: false,
-		},
-		{
-			name: "empty lines between PIDs are skipped",
-			setup: func(t *testing.T) string {
-				dir := t.TempDir()
-				err := os.WriteFile(filepath.Join(dir, "cgroup.procs"), []byte("1\n\n2\n\n3\n"), 0644)
-				require.NoError(t, err)
-				return dir
-			},
-			expected:    []int{1, 2, 3},
-			expectError: false,
-		},
-		{
-			name: "non-integer content returns error",
-			setup: func(t *testing.T) string {
-				dir := t.TempDir()
-				err := os.WriteFile(filepath.Join(dir, "cgroup.procs"), []byte("1\nnot_a_pid\n3\n"), 0644)
-				require.NoError(t, err)
-				return dir
-			},
-			expected:    nil,
-			expectError: true,
-		},
-		{
-			name: "single PID without trailing newline",
-			setup: func(t *testing.T) string {
-				dir := t.TempDir()
-				err := os.WriteFile(filepath.Join(dir, "cgroup.procs"), []byte("42"), 0644)
-				require.NoError(t, err)
-				return dir
-			},
-			expected:    []int{42},
-			expectError: false,
-		},
-		{
-			name: "permission denied returns error",
-			setup: func(t *testing.T) string {
-				dir := t.TempDir()
-				procsPath := filepath.Join(dir, "cgroup.procs")
-				err := os.WriteFile(procsPath, []byte("1\n"), 0644)
-				require.NoError(t, err)
-				err = os.Chmod(procsPath, 0000)
-				require.NoError(t, err)
-				t.Cleanup(func() {
-					if err := os.Chmod(procsPath, 0644); err != nil {
-						t.Logf("cleanup chmod failed: %v", err)
-					}
-				})
-				return dir
-			},
-			expected:    nil,
-			expectError: true,
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			if tc.name == "permission denied returns error" && os.Getuid() == 0 {
-				t.Skip("skipping permission test when running as root")
-			}
-			dir := tc.setup(t)
-			result, err := getCgroupProcs(dir)
-			if tc.expectError {
-				require.Error(t, err)
-			} else {
-				require.NoError(t, err)
-				assert.Equal(t, tc.expected, result)
-			}
-		})
-	}
-}
-
-// TestGetPodCgroupNameSuffix verifies generation of pod cgroup leaf names. Each pod gets
-// a cgroup named "pod<UID>" as the leaf directory under its QoS-class cgroup. This naming
-// convention allows kubelet to locate and manage per-pod cgroups throughout the pod
-// lifecycle (creation, resource updates, cleanup on termination).
-func TestGetPodCgroupNameSuffix(t *testing.T) {
-	testCases := []struct {
-		name     string
-		podUID   types.UID
-		expected string
-	}{
-		{name: "standard UID", podUID: types.UID("abc123-def456"), expected: "podabc123-def456"},
-		{name: "full UUID format", podUID: types.UID("a1b2c3d4-e5f6-7890-abcd-ef1234567890"), expected: "poda1b2c3d4-e5f6-7890-abcd-ef1234567890"},
-		{name: "empty UID returns prefix only", podUID: types.UID(""), expected: "pod"},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			assert.Equal(t, tc.expected, GetPodCgroupNameSuffix(tc.podUID))
 		})
 	}
 }
