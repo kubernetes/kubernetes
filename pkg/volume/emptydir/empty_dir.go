@@ -554,12 +554,11 @@ func (ed *emptyDir) TearDownAt(dir string) error {
 
 func (ed *emptyDir) teardownDefault(dir string) error {
 	if utilfeature.DefaultFeatureGate.Enabled(features.LocalStorageCapacityIsolationFSQuotaMonitoring) {
-		// Remove any quota
-		userNamespacesEnabled := false
-		if usernamespacefeature.EnabledUserNamespacesSupport() {
-			userNamespacesEnabled = ed.pod.Spec.HostUsers != nil && !*ed.pod.Spec.HostUsers
-		}
-		err := fsquota.ClearQuota(ed.mounter, dir, userNamespacesEnabled)
+		// Remove any quota.
+		// The unmounter is built from the pod UID alone, so ed.pod carries no
+		// spec here and pod.Spec.HostUsers cannot be consulted.  Always clear
+		// the quota; otherwise the project ID assigned during SetUp is leaked.
+		err := fsquota.ClearQuota(ed.mounter, dir)
 		if err != nil {
 			klog.Warningf("Failed to clear quota on %s: %v", dir, err)
 		}
