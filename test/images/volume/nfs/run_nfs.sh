@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# Copyright 2015 The Kubernetes Authors.
+# Copyright The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,6 +13,28 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+function fail()
+{
+    echo "ERROR: $*" >&2
+    exit 1
+}
+
+# wait_for_nfs blocks until the NFS service is registered with rpcbind, which is
+# the point at which the server actually answers mount requests. rpc.nfsd can
+# leave the kernel server unusable without reporting an error, so registration is
+# checked instead of trusting the exit status alone.
+function wait_for_nfs()
+{
+    local i
+    for i in $(seq 60); do
+        if /usr/sbin/rpcinfo -p 127.0.0.1 2>/dev/null | grep -qw nfs; then
+            return 0
+        fi
+        sleep 1
+    done
+    return 1
+}
 
 function start()
 {
@@ -45,18 +67,24 @@ function start()
     /usr/sbin/rpcinfo 127.0.0.1 > /dev/null; s=$?
     if [ $s -ne 0 ]; then
        echo "Starting rpcbind"
-       /usr/sbin/rpcbind -w
+       /usr/sbin/rpcbind -w || fail "rpcbind failed to start"
     fi
 
-    mount -t nfsd nfsd /proc/fs/nfsd
+    mount -t nfsd nfsd /proc/fs/nfsd || fail "failed to mount /proc/fs/nfsd"
 
     # -V 3: enable NFSv3
-    /usr/sbin/rpc.mountd -V 3
+    /usr/sbin/rpc.mountd -V 3 || fail "rpc.mountd failed to start"
 
-    /usr/sbin/exportfs -r
+    /usr/sbin/exportfs -r || fail "failed to export the configured paths"
     # -G 10 to reduce grace time to 10 seconds (the lowest allowed)
-    /usr/sbin/rpc.nfsd -G 10 -V 3
-    /usr/sbin/rpc.statd --no-notify
+    /usr/sbin/rpc.nfsd -G 10 -V 3 || fail "rpc.nfsd failed to start"
+    /usr/sbin/rpc.statd --no-notify || fail "rpc.statd failed to start"
+
+    # Only report readiness once the server really serves. Callers wait for the
+    # message below before pointing workloads at this server, so printing it
+    # while the server is down strands them on mounts that can never succeed.
+    wait_for_nfs || fail "NFS service did not register with rpcbind"
+
     echo "NFS started"
 }
 
