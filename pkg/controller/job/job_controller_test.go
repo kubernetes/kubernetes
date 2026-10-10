@@ -7474,7 +7474,7 @@ func TestSyncJobPodSchedulingGroup(t *testing.T) {
 
 	gangJob := newGangSchedulingJob("test-job", 4)
 	gangJob.Spec.BackoffLimit = ptr.To[int32](6)
-	templateName := fmt.Sprintf("%s-pgt-%d", gangJob.Name, 0)
+	templateName := podGroupTemplateName(gangJob)
 
 	makeWorkload := func(job *batch.Job) *schedulingv1beta1.Workload {
 		return &schedulingv1beta1.Workload{

@@ -516,8 +516,12 @@ func (jm *Controller) listPodGroupsForWorkload(workload *schedulingv1beta1.Workl
 
 // podGroupTemplateName returns the name of the single PodGroupTemplate the
 // controller compiles for a Job. For alpha there is exactly one template per Job.
+// The name is local to the Workload and is never used to embed the Job name, so a
+// fixed value keeps it a valid DNS label (<=63 bytes) regardless of Job name length.
+// The owner path always selects this single template by index, so the fixed name
+// also matches templates on Workloads created before this value changed.
 func podGroupTemplateName(job *batch.Job) string {
-	return fmt.Sprintf("%s-pgt-%d", job.Name, 0)
+	return "pgt-0"
 }
 
 // buildWorkloadItem assembles the single-node logical workload tree for a Job.
