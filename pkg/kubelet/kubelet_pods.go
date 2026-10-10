@@ -2563,6 +2563,15 @@ func (kl *Kubelet) convertToAPIContainerStatuses(ctx context.Context, pod *v1.Po
 			Image: container.Image,
 			State: defaultWaitingState,
 		}
+		if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+			// Admission reserves resources before the runtime creates the container, e.g. while
+			// an image is pulled. Publish the allocation so the scheduler does not fall back to a
+			// pending downsize in the spec. Resources stays unset until the runtime reports
+			// actuated values.
+			if allocatedResources, found := kl.allocationManager.GetContainerResourceAllocation(pod.UID, container.Name); found {
+				status.AllocatedResources = allocatedResources.Requests
+			}
+		}
 		// status.VolumeMounts cannot be propagated from kubecontainer.Status
 		// because the CRI API is unaware of the volume names.
 		if utilfeature.DefaultFeatureGate.Enabled(features.RecursiveReadOnlyMounts) {
