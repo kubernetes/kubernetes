@@ -40,6 +40,7 @@ type Config struct {
 	// +optional
 	APIVersion string `json:"apiVersion,omitempty"`
 	// Preferences holds general information to be use for cli interactions
+	//
 	// Deprecated: this field is deprecated in v1.34. It is not used by any of the Kubernetes components.
 	Preferences Preferences `json:"preferences,omitzero"`
 	// Clusters is a map of referencable names to cluster configs
@@ -56,6 +57,7 @@ type Config struct {
 }
 
 // IMPORTANT if you add fields to this struct, please update IsConfigEmpty()
+//
 // Deprecated: this structure is deprecated in v1.34. It is not used by any of the Kubernetes components.
 type Preferences struct {
 	// +optional
@@ -421,6 +423,7 @@ func NewAuthInfo() *AuthInfo {
 
 // NewPreferences is a convenience function that returns a new
 // Preferences object with non-nil maps
+//
 // Deprecated: this method is deprecated in v1.34. It is not used by any of the Kubernetes components.
 func NewPreferences() *Preferences {
 	return &Preferences{Extensions: make(map[string]runtime.Object)}

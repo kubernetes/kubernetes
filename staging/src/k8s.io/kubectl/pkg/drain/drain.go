@@ -89,6 +89,7 @@ type Helper struct {
 	DryRunStrategy cmdutil.DryRunStrategy
 
 	// OnPodDeletedOrEvicted is called when a pod is evicted/deleted; for printing progress output
+	//
 	// Deprecated: use OnPodDeletionOrEvictionFinished instead
 	OnPodDeletedOrEvicted func(pod *corev1.Pod, usingEviction bool)
 

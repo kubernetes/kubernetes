@@ -73,11 +73,13 @@ var MapBasedSelectorForObjectFn MapBasedSelectorForObjectFunc = mapBasedSelector
 
 // ProtocolsForObjectFunc will call the provided function on the protocols for the object,
 // return nil-map if no protocols for the object, or return an error.
+//
 // Deprecated: use PortsProtocolsForObjectFunc instead.
 // When the same port has different protocols, data will be lost
 type ProtocolsForObjectFunc func(object runtime.Object) (map[string]string, error)
 
 // ProtocolsForObjectFn gives a way to easily override the function for unit testing if needed
+//
 // Deprecated: use MultiProtocolsForObjectFn instead.
 var ProtocolsForObjectFn ProtocolsForObjectFunc = protocolsForObject
 

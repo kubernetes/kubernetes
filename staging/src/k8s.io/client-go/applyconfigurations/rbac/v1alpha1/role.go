@@ -31,7 +31,8 @@ import (
 // with apply.
 //
 // Role is a namespaced, logical grouping of PolicyRules that can be referenced as a unit by a RoleBinding.
-// Deprecated in v1.17 in favor of rbac.authorization.k8s.io/v1 Role, and will no longer be served in v1.22.
+//
+// Deprecated: This API is deprecated in v1.17 in favor of rbac.authorization.k8s.io/v1 Role, and will no longer be served in v1.22.
 type RoleApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration `json:""`
 	// metadata is the standard object's metadata.

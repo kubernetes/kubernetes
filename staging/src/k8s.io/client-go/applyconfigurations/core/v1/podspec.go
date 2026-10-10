@@ -87,6 +87,7 @@ type PodSpecApplyConfiguration struct {
 	// More info: https://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/
 	ServiceAccountName *string `json:"serviceAccountName,omitempty"`
 	// serviceAccount is a deprecated alias for ServiceAccountName.
+	//
 	// Deprecated: Use serviceAccountName instead.
 	DeprecatedServiceAccount *string `json:"serviceAccount,omitempty"`
 	// automountServiceAccountToken indicates whether a service account token should be automatically mounted.

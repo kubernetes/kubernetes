@@ -22,6 +22,7 @@ package v1
 // with apply.
 //
 // EndpointAddress is a tuple that describes single IP address.
+//
 // Deprecated: This API is deprecated in v1.33+.
 type EndpointAddressApplyConfiguration struct {
 	// The IP of this endpoint.

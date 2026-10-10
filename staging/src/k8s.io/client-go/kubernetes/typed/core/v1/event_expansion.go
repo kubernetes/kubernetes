@@ -203,7 +203,8 @@ func (e *events) GetFieldSelector(involvedObjectName, involvedObjectNamespace, i
 }
 
 // Returns the appropriate field label to use for name of the involved object as per the given API version.
-// DEPRECATED: please use "involvedObject.name" inline.
+//
+// Deprecated: please use "involvedObject.name" inline.
 func GetInvolvedObjectNameFieldLabel(version string) string {
 	return "involvedObject.name"
 }

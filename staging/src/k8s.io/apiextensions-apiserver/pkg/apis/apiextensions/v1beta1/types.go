@@ -47,6 +47,7 @@ type CustomResourceDefinitionSpec struct {
 	// The custom resources are served under `/apis/<group>/<version>/...`.
 	// Must match the name of the first item in the `versions` list if `version` and `versions` are both specified.
 	// Optional if `versions` is specified.
+	//
 	// Deprecated: use `versions` instead.
 	// +optional
 	Version string `json:"version,omitempty" protobuf:"bytes,2,opt,name=version"`
@@ -103,6 +104,7 @@ type CustomResourceDefinitionSpec struct {
 	// apiVersion, kind, metadata and known fields inside metadata are always preserved.
 	// If false, schemas must be defined for all versions.
 	// Defaults to true in v1beta for backwards compatibility.
+	//
 	// Deprecated: will be required to be false in v1. Preservation of unknown fields can be specified
 	// in the validation schema using the `x-kubernetes-preserve-unknown-fields: true` extension.
 	// See https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/#field-pruning for details.
@@ -438,7 +440,8 @@ const CustomResourceCleanupFinalizer = "customresourcecleanup.apiextensions.k8s.
 
 // CustomResourceDefinition represents a resource that should be exposed on the API server.  Its name MUST be in the format
 // <.spec.name>.<.spec.group>.
-// Deprecated in v1.16, planned for removal in v1.22. Use apiextensions.k8s.io/v1 CustomResourceDefinition instead.
+//
+// Deprecated: This API is deprecated in v1.16, planned for removal in v1.22. Use apiextensions.k8s.io/v1 CustomResourceDefinition instead.
 type CustomResourceDefinition struct {
 	metav1.TypeMeta `json:""`
 	// Standard object's metadata

@@ -59,6 +59,12 @@ linters:
           - gocritic
         text: "ifElseChain: rewrite if-else to switch statement"
 
+      # The CRD "deprecated" field documents itself; gocritic reads "deprecated in..." as a malformed notice.
+      - linters:
+          - gocritic
+        text: "deprecatedComment:"
+        source: "// deprecated indicates this version of the custom resource API is deprecated"
+
       # Only packages listed here opt into the strict "exported symbols must be documented".
       #
       # Exclude texts from https://github.com/golangci/golangci-lint/blob/ab3c3cd69e602ff53bb4c3e2c188f0caeb80305d/pkg/config/issues.go#L11-L103
@@ -579,7 +585,6 @@ linters:
         - assignOp # https://github.com/kubernetes/kubernetes/issues/117288#issuecomment-1507008918
         - captLocal
         - commentFormatting
-        - deprecatedComment
         - elseif
         # The following have few (single-digit) occurrences left in k/k and wouldn't be too onerous to enable
         - exitAfterDefer

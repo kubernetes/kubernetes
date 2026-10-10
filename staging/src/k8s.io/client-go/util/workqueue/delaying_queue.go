@@ -120,6 +120,7 @@ func NewTypedDelayingQueueWithConfig[T comparable](config TypedDelayingQueueConf
 
 // NewDelayingQueueWithCustomQueue constructs a new workqueue with ability to
 // inject custom queue Interface instead of the default one
+//
 // Deprecated: Use NewDelayingQueueWithConfig instead.
 func NewDelayingQueueWithCustomQueue(q Interface, name string) DelayingInterface {
 	return NewDelayingQueueWithConfig(DelayingQueueConfig{
@@ -129,6 +130,7 @@ func NewDelayingQueueWithCustomQueue(q Interface, name string) DelayingInterface
 }
 
 // NewNamedDelayingQueue constructs a new named workqueue with delayed queuing ability.
+//
 // Deprecated: Use NewDelayingQueueWithConfig instead.
 func NewNamedDelayingQueue(name string) DelayingInterface {
 	return NewDelayingQueueWithConfig(DelayingQueueConfig{Name: name})
@@ -136,6 +138,7 @@ func NewNamedDelayingQueue(name string) DelayingInterface {
 
 // NewDelayingQueueWithCustomClock constructs a new named workqueue
 // with ability to inject real or fake clock for testing purposes.
+//
 // Deprecated: Use NewDelayingQueueWithConfig instead.
 func NewDelayingQueueWithCustomClock(clock clock.WithTicker, name string) DelayingInterface {
 	return NewDelayingQueueWithConfig(DelayingQueueConfig{
