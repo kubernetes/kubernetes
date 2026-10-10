@@ -312,7 +312,7 @@ func (rc *reconciler) reconcile(ctx context.Context) {
 	// Update Node Status
 	err := rc.nodeStatusUpdater.UpdateNodeStatuses(logger)
 	if err != nil {
-		logger.Info("UpdateNodeStatuses failed", "err", err)
+		logger.Error(err, "UpdateNodeStatuses failed")
 	}
 }
 
