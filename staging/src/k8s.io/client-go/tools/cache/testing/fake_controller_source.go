@@ -241,6 +241,11 @@ func (f *FakePVCControllerSource) List(options metav1.ListOptions) (runtime.Obje
 // Watch returns a watch, which will be pre-populated with all changes
 // after resourceVersion.
 func (f *FakeControllerSource) Watch(options metav1.ListOptions) (watch.Interface, error) {
+	// Reject WatchList requests so reflectors fall back to LIST/WATCH;
+	// this source does not send initial events or the required bookmark.
+	if options.SendInitialEvents != nil && *options.SendInitialEvents {
+		return nil, apierrors.NewBadRequest("sendInitialEvents is not supported by FakeControllerSource")
+	}
 	f.lock.RLock()
 	defer f.lock.RUnlock()
 	rc, err := strconv.Atoi(options.ResourceVersion)

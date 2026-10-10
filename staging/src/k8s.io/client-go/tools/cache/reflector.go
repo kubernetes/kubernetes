@@ -785,17 +785,23 @@ func (r *Reflector) list(ctx context.Context) error {
 // watchList establishes a stream to get a consistent snapshot of data
 // from the server as described in https://github.com/kubernetes/enhancements/tree/master/keps/sig-api-machinery/3157-watch-list#proposal
 //
-// case 1: start at Most Recent (RV="", ResourceVersionMatch=ResourceVersionMatchNotOlderThan)
-// Establishes a consistent stream with the server.
-// That means the returned data is consistent, as if, served directly from etcd via a quorum read.
-// It begins with synthetic "Added" events of all resources up to the most recent ResourceVersion.
-// It ends with a synthetic "Bookmark" event containing the most recent ResourceVersion.
+// case 1: start at Any (RV="0", ResourceVersionMatch=ResourceVersionMatchNotOlderThan)
+// Establishes a stream from the current watch cache state, without waiting for
+// the cache to catch up to the latest resource version.
+// It begins with synthetic "Added" events of all resources in the watch cache.
+// It ends with a synthetic "Bookmark" event containing the watch cache's resource version.
 // After receiving a "Bookmark" event the reflector is considered to be synchronized.
 // It replaces its internal store with the collected items and
 // reuses the current watch requests for getting further events.
 //
-// case 2: start at Exact (RV>"0", ResourceVersionMatch=ResourceVersionMatchNotOlderThan)
-// Establishes a stream with the server at the provided resource version.
+// case 2: start at Most Recent (RV="", ResourceVersionMatch=ResourceVersionMatchNotOlderThan)
+// Establishes a consistent stream with the server.
+// That means the returned data is consistent, as if served directly from etcd via a quorum read.
+// It begins with synthetic "Added" events of all resources up to the most recent ResourceVersion.
+// It ends with a synthetic "Bookmark" event containing the most recent ResourceVersion.
+//
+// case 3: start at Not Older Than (RV>"0", ResourceVersionMatch=ResourceVersionMatchNotOlderThan)
+// Establishes a stream with the server at the provided or newer resource version.
 // To establish the initial state the server begins with synthetic "Added" events.
 // It ends with a synthetic "Bookmark" event containing the provided or newer resource version.
 // After receiving a "Bookmark" event the reflector is considered to be synchronized.
@@ -821,7 +827,7 @@ func (r *Reflector) watchList(ctx context.Context) (watch.Interface, error) {
 			// we tried to re-establish a watch request but the provided RV
 			// has either expired or it is greater than the server knows about.
 			// In that case we reset the RV and
-			// try to get a consistent snapshot from the watch cache (case 1)
+			// try to get a consistent snapshot from the watch cache (case 2)
 			r.setIsLastSyncResourceVersionUnavailable(true)
 			return true
 		}
@@ -1139,6 +1145,12 @@ func (r *Reflector) rewatchResourceVersion() string {
 		// initial stream should return data at the most recent resource version.
 		// the returned data must be consistent i.e. as if served from etcd via a quorum read
 		return ""
+	}
+	if r.lastSyncResourceVersion == "" {
+		// For the initial WatchList request, use the same "any resource version"
+		// semantics as the legacy LIST/WATCH path. This allows the watch cache to
+		// serve a temporarily stale snapshot without waiting to catch up to etcd.
+		return "0"
 	}
 	return r.lastSyncResourceVersion
 }
