@@ -28,6 +28,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strconv"
 	"testing"
 	"time"
@@ -42,6 +43,7 @@ import (
 	informers "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions"
 	listers "k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/pkg/controller/establish"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -519,7 +521,7 @@ func testHandlerConversion(t *testing.T, enableWatchCache bool) {
 		t.Fatal(err)
 	}
 
-	crdInfo, err := handler.getOrCreateServingInfoFor(crd.UID, crd.Name)
+	crdInfo, err := handler.getOrCreateServingInfoFor(crd)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -647,6 +649,221 @@ func testHandlerConversion(t *testing.T, enableWatchCache bool) {
 			t.Errorf("unexpected event: %#v", event)
 		case <-time.After(time.Second):
 		}
+	}
+}
+
+// TestGetOrCreateServingInfoForFreshness verifies that cached serving info is validated against the
+// CRD state it was built from, not merely by presence of the UID key. See kubernetes#130235: discovery
+// is level-triggered off the shared CRD informer while the handler cached edge-triggered, so the handler
+// could keep serving a stale storage version after discovery had already advertised the new one.
+func TestGetOrCreateServingInfoForFreshness(t *testing.T) {
+	informers := informers.NewSharedInformerFactoryWithOptions(fake.NewSimpleClientset(), 0)
+	crdInformer := informers.Apiextensions().V1().CustomResourceDefinitions()
+
+	server, storageConfig := etcd3testing.NewUnsecuredEtcd3TestClientServer(t)
+	defer server.Terminate(t)
+
+	crd := multiVersionFixture.DeepCopy()
+	crd.Generation = 1
+	if err := crdInformer.Informer().GetStore().Add(crd); err != nil {
+		t.Fatal(err)
+	}
+
+	etcdOptions := options.NewEtcdOptions(storageConfig)
+	etcdOptions.StorageConfig.Codec = unstructured.UnstructuredJSONScheme
+	restOptionsGetter := generic.RESTOptions{
+		StorageConfig:           etcdOptions.StorageConfig.ForResource(schema.GroupResource{Group: crd.Spec.Group, Resource: crd.Spec.Names.Plural}),
+		Decorator:               generic.UndecoratedStorage,
+		EnableGarbageCollection: true,
+		DeleteCollectionWorkers: 1,
+		ResourcePrefix:          crd.Spec.Group + "/" + crd.Spec.Names.Plural,
+		CountMetricPollPeriod:   time.Minute,
+	}
+
+	handler, err := NewCustomResourceDefinitionHandler(
+		&versionDiscoveryHandler{}, &groupDiscoveryHandler{},
+		crdInformer,
+		http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}),
+		restOptionsGetter,
+		dummyAdmissionImpl{},
+		&establish.EstablishingController{},
+		dummyServiceResolverImpl{},
+		func(r webhook.AuthenticationInfoResolver) webhook.AuthenticationInfoResolver { return r },
+		1,
+		dummyAuthorizerImpl{},
+		time.Minute, time.Minute, nil, 3*1024*1024)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer handler.destroy()
+
+	initial, err := handler.getOrCreateServingInfoFor(crd)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if initial.storageVersion != "v1beta1" {
+		t.Fatalf("expected initial storage version v1beta1, got %q", initial.storageVersion)
+	}
+
+	// A status-only write must not rebuild: it drops the watch cache and forces a full relist for a
+	// change that cannot affect storage. metadata.generation does not advance for status writes, which
+	// is exactly why it is the freshness key rather than resourceVersion.
+	statusOnly := crd.DeepCopy()
+	statusOnly.ResourceVersion = "2"
+	statusOnly.Status.StoredVersions = []string{"v1beta1"}
+	statusOnly.Status.Conditions = []apiextensionsv1.CustomResourceDefinitionCondition{
+		{Type: apiextensionsv1.Established, Status: apiextensionsv1.ConditionTrue},
+	}
+	if err := crdInformer.Informer().GetStore().Update(statusOnly); err != nil {
+		t.Fatal(err)
+	}
+	afterStatus, err := handler.getOrCreateServingInfoFor(statusOnly)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if afterStatus != initial {
+		t.Errorf("status-only update rebuilt the serving info; storage and watch cache were torn down for a change that does not affect them")
+	}
+
+	// A spec change that moves the storage version must rebuild, and the new info must encode to the
+	// new storage version. This is the direction discovery already reflects, so leaving it stale is the
+	// bug: discovery advertises v1alpha1 while etcd receives v1beta1.
+	specChange := statusOnly.DeepCopy()
+	specChange.Generation = 2
+	specChange.ResourceVersion = "3"
+	for i := range specChange.Spec.Versions {
+		specChange.Spec.Versions[i].Storage = specChange.Spec.Versions[i].Name == "v1alpha1"
+	}
+	if err := crdInformer.Informer().GetStore().Update(specChange); err != nil {
+		t.Fatal(err)
+	}
+	afterSpec, err := handler.getOrCreateServingInfoFor(specChange)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if afterSpec == initial {
+		t.Fatal("spec change did not rebuild the serving info")
+	}
+	if afterSpec.storageVersion != "v1alpha1" {
+		t.Errorf("expected storage version v1alpha1 after spec change, got %q", afterSpec.storageVersion)
+	}
+
+	// A caller holding an older CRD than the cache must not force a rebuild. CRDFinalizer passes a CRD
+	// read earlier in its sync; the check is directional (>=) so a newer cache still satisfies it.
+	afterStale, err := handler.getOrCreateServingInfoFor(crd)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if afterStale != afterSpec {
+		t.Errorf("a caller with an older CRD rebuilt the serving info; the freshness check must be directional")
+	}
+
+	// A write that advances the generation without changing the stored spec must not rebuild.
+	// PrepareForUpdate increments the generation before dropDisabledFields strips fields behind
+	// disabled feature gates, so the generation can run ahead of the spec the storage is built from.
+	// Treating the bump alone as a change would tear down storage updateCustomResourceDefinition
+	// deliberately keeps.
+	generationOnly := specChange.DeepCopy()
+	generationOnly.Generation = 3
+	generationOnly.ResourceVersion = "4"
+	if err := crdInformer.Informer().GetStore().Update(generationOnly); err != nil {
+		t.Fatal(err)
+	}
+	afterGeneration, err := handler.getOrCreateServingInfoFor(generationOnly)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if afterGeneration != afterSpec {
+		t.Errorf("a generation bump with an unchanged spec rebuilt the serving info; the two must agree with updateCustomResourceDefinition, which keeps storage when neither spec nor accepted names changed")
+	}
+
+	// acceptedNames lives in status, where the generation never advances, so it has to be compared
+	// on its own: the naming controller can move an accepted name from one non-empty value to
+	// another when a conflicting CRD in the group goes away, with no write to this CRD's spec.
+	namesChange := generationOnly.DeepCopy()
+	namesChange.ResourceVersion = "5"
+	namesChange.Status.AcceptedNames.ShortNames = []string{"multiv"}
+	if err := crdInformer.Informer().GetStore().Update(namesChange); err != nil {
+		t.Fatal(err)
+	}
+	afterNames, err := handler.getOrCreateServingInfoFor(namesChange)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if afterNames == afterGeneration {
+		t.Fatal("an accepted names change did not rebuild the serving info; the generation does not advance for status writes, so it cannot cover this")
+	}
+	if !reflect.DeepEqual(afterNames.acceptedNames.ShortNames, []string{"multiv"}) {
+		t.Errorf("rebuilt serving info has accepted short names %v, want [multiv]", afterNames.acceptedNames.ShortNames)
+	}
+}
+
+// TestNamesEqualCoversAllFields fails when a field is added to CustomResourceDefinitionNames, since
+// namesEqual is hand-rolled and would silently ignore it. Update namesEqual, then bump the count here.
+func TestNamesEqualCoversAllFields(t *testing.T) {
+	const covered = 6 // Plural, Singular, ShortNames, Kind, ListKind, Categories
+	if got := reflect.TypeOf(apiextensionsv1.CustomResourceDefinitionNames{}).NumField(); got != covered {
+		t.Fatalf("CustomResourceDefinitionNames has %d fields, namesEqual compares %d; add the new field to namesEqual and update this test", got, covered)
+	}
+}
+
+func TestNamesEqual(t *testing.T) {
+	base := apiextensionsv1.CustomResourceDefinitionNames{
+		Plural: "widgets", Singular: "widget", Kind: "Widget", ListKind: "WidgetList",
+		ShortNames: []string{"w", "wg"}, Categories: []string{"all"},
+	}
+	mutate := func(f func(*apiextensionsv1.CustomResourceDefinitionNames)) apiextensionsv1.CustomResourceDefinitionNames {
+		out := *base.DeepCopy()
+		f(&out)
+		return out
+	}
+
+	tests := []struct {
+		name  string
+		other apiextensionsv1.CustomResourceDefinitionNames
+	}{
+		{"identical", *base.DeepCopy()},
+		{"plural", mutate(func(n *apiextensionsv1.CustomResourceDefinitionNames) { n.Plural = "gadgets" })},
+		{"singular", mutate(func(n *apiextensionsv1.CustomResourceDefinitionNames) { n.Singular = "gadget" })},
+		{"kind", mutate(func(n *apiextensionsv1.CustomResourceDefinitionNames) { n.Kind = "Gadget" })},
+		{"listKind", mutate(func(n *apiextensionsv1.CustomResourceDefinitionNames) { n.ListKind = "GadgetList" })},
+		{"shortNames added", mutate(func(n *apiextensionsv1.CustomResourceDefinitionNames) { n.ShortNames = []string{"w", "wg", "x"} })},
+		{"shortNames removed", mutate(func(n *apiextensionsv1.CustomResourceDefinitionNames) { n.ShortNames = []string{"w"} })},
+		{"shortNames reordered", mutate(func(n *apiextensionsv1.CustomResourceDefinitionNames) { n.ShortNames = []string{"wg", "w"} })},
+		{"shortNames nil", mutate(func(n *apiextensionsv1.CustomResourceDefinitionNames) { n.ShortNames = nil })},
+		{"shortNames empty", mutate(func(n *apiextensionsv1.CustomResourceDefinitionNames) { n.ShortNames = []string{} })},
+		{"categories", mutate(func(n *apiextensionsv1.CustomResourceDefinitionNames) { n.Categories = []string{"other"} })},
+		{"categories nil", mutate(func(n *apiextensionsv1.CustomResourceDefinitionNames) { n.Categories = nil })},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			// namesEqual must agree with the reflection-based comparison it replaced, including its
+			// treatment of nil versus empty slices.
+			want := apiequality.Semantic.DeepEqual(&base, &tc.other)
+			if got := namesEqual(&base, &tc.other); got != want {
+				t.Errorf("namesEqual = %v, apiequality.Semantic.DeepEqual = %v", got, want)
+			}
+			// isUpToDateFor calls this with the cached names on either side depending on the path, so
+			// it has to be symmetric.
+			if got := namesEqual(&tc.other, &base); got != want {
+				t.Errorf("namesEqual reversed = %v, apiequality.Semantic.DeepEqual = %v", got, want)
+			}
+		})
+	}
+
+	// nil and empty must compare equal, which is the one place namesEqual could plausibly diverge:
+	// Equalities.DeepEqual passes equateNilAndEmpty=true, and comparing lengths reproduces that.
+	// Comparing each against a populated slice above does not exercise it, since both are unequal there.
+	nilNames := mutate(func(n *apiextensionsv1.CustomResourceDefinitionNames) { n.ShortNames, n.Categories = nil, nil })
+	emptyNames := mutate(func(n *apiextensionsv1.CustomResourceDefinitionNames) {
+		n.ShortNames, n.Categories = []string{}, []string{}
+	})
+	if !namesEqual(&nilNames, &emptyNames) {
+		t.Error("namesEqual treats nil and empty slices as different; apiequality.Semantic.DeepEqual equates them")
+	}
+	if !apiequality.Semantic.DeepEqual(&nilNames, &emptyNames) {
+		t.Error("apiequality.Semantic.DeepEqual no longer equates nil and empty slices; namesEqual must be updated to match")
 	}
 }
 
