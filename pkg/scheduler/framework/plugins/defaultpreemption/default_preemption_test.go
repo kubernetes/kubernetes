@@ -3859,10 +3859,10 @@ func TestPreEnqueue(t *testing.T) {
 			executor := p.Executor.(*preemption.Executor)
 			executor.PreemptPod = func(ctx context.Context, c fwk.PreemptionCandidate, preemptor preemption.ExecutorPreemptor, victim *v1.Pod, pluginName string) (bool, error) {
 				if !tt.features.EnableAsyncPreemption {
-					return false, nil
+					return true, nil
 				}
 				<-finishPreemption
-				return false, nil
+				return true, nil
 			}
 
 			// Fill the cycle state
