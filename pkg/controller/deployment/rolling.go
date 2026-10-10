@@ -22,6 +22,7 @@ import (
 	"sort"
 
 	apps "k8s.io/api/apps/v1"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
@@ -38,6 +39,9 @@ func (dc *DeploymentController) rolloutRolling(ctx context.Context, d *apps.Depl
 	// Scale up, if we can.
 	scaledUp, err := dc.reconcileNewReplicaSet(ctx, allRSs, newRS, d)
 	if err != nil {
+		if statusErr := dc.syncRolloutStatus(ctx, allRSs, newRS, d); statusErr != nil {
+			return utilerrors.NewAggregate([]error{err, statusErr})
+		}
 		return err
 	}
 	if scaledUp {
@@ -48,6 +52,10 @@ func (dc *DeploymentController) rolloutRolling(ctx context.Context, d *apps.Depl
 	// Scale down, if we can.
 	scaledDown, err := dc.reconcileOldReplicaSets(ctx, allRSs, controller.FilterActiveReplicaSets(oldRSs), newRS, d)
 	if err != nil {
+		// Scaling failures must not prevent progress deadline checks.
+		if statusErr := dc.syncRolloutStatus(ctx, allRSs, newRS, d); statusErr != nil {
+			return utilerrors.NewAggregate([]error{err, statusErr})
+		}
 		return err
 	}
 	if scaledDown {

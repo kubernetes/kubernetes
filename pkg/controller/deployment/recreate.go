@@ -21,6 +21,7 @@ import (
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/deployment/util"
 )
@@ -38,6 +39,9 @@ func (dc *DeploymentController) rolloutRecreate(ctx context.Context, d *apps.Dep
 	// scale down old replica sets.
 	scaledDown, err := dc.scaleDownOldReplicaSetsForRecreate(ctx, activeOldRSs, d)
 	if err != nil {
+		if statusErr := dc.syncRolloutStatus(ctx, allRSs, newRS, d); statusErr != nil {
+			return utilerrors.NewAggregate([]error{err, statusErr})
+		}
 		return err
 	}
 	if scaledDown {
@@ -61,6 +65,9 @@ func (dc *DeploymentController) rolloutRecreate(ctx context.Context, d *apps.Dep
 
 	// scale up new replica set.
 	if _, err := dc.scaleUpNewReplicaSetForRecreate(ctx, newRS, d); err != nil {
+		if statusErr := dc.syncRolloutStatus(ctx, allRSs, newRS, d); statusErr != nil {
+			return utilerrors.NewAggregate([]error{err, statusErr})
+		}
 		return err
 	}
 
