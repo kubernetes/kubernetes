@@ -315,7 +315,9 @@ func (p *Patcher) buildStrategicMergePatchFromOpenAPIV3(original, modified, curr
 			continue
 		}
 		lookupPatchMeta := strategicpatch.PatchMetaFromOpenAPIV3{Schema: c, SchemaList: gvSpec.Components.Schemas}
-		if openapiv3Patch, err := strategicpatch.CreateThreeWayMergePatch(original, modified, current, lookupPatchMeta, p.Overwrite); err != nil {
+		if openapiv3Patch, err := strategicpatch.CreateThreeWayMergePatch(
+			original, modified, current, lookupPatchMeta, p.Overwrite,
+			strategicpatch.WithDuplicateMergeKeySupport(true)); err != nil {
 			return nil, err
 		} else {
 			return openapiv3Patch, nil
@@ -334,7 +336,9 @@ func (p *Patcher) buildStrategicMergeFromOpenAPI(openAPISchema openapi.Resources
 		return nil, nil
 	}
 	lookupPatchMeta := strategicpatch.PatchMetaFromOpenAPI{Schema: schema}
-	if openapiPatch, err := strategicpatch.CreateThreeWayMergePatch(original, modified, current, lookupPatchMeta, p.Overwrite); err != nil {
+	if openapiPatch, err := strategicpatch.CreateThreeWayMergePatch(
+		original, modified, current, lookupPatchMeta, p.Overwrite,
+		strategicpatch.WithDuplicateMergeKeySupport(true)); err != nil {
 		return nil, err
 	} else {
 		return openapiPatch, nil
@@ -364,7 +368,9 @@ func (p *Patcher) buildStrategicMergeFromBuiltins(versionedObj runtime.Object, o
 	if err != nil {
 		return nil, err
 	}
-	patch, err := strategicpatch.CreateThreeWayMergePatch(original, modified, current, lookupPatchMeta, p.Overwrite)
+	patch, err := strategicpatch.CreateThreeWayMergePatch(
+		original, modified, current, lookupPatchMeta, p.Overwrite,
+		strategicpatch.WithDuplicateMergeKeySupport(true))
 	if err != nil {
 		return nil, err
 	}
