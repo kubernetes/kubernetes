@@ -318,20 +318,9 @@ readonly KUBE_ALL_TARGETS=(
 )
 readonly KUBE_ALL_BINARIES=("${KUBE_ALL_TARGETS[@]##*/}")
 
-readonly KUBE_STATIC_BINARIES=(
-  apiextensions-apiserver
-  kube-aggregator
-  kube-apiserver
-  kube-controller-manager
-  kube-scheduler
-  kube-proxy
-  kube-log-runner
-  kubeadm
-  kubectl
-  kubectl-convert
-  kubelet
-  mounter
-)
+# Binaries that need CGO. Everything else is built with CGO_ENABLED=0, so a new
+# binary only links dynamically if it is added here.
+readonly KUBE_CGO_BINARIES=()
 
 # Fully-qualified package names that we want to instrument for coverage information.
 readonly KUBE_COVERAGE_INSTRUMENTED_PACKAGES=(
@@ -344,12 +333,11 @@ readonly KUBE_COVERAGE_INSTRUMENTED_PACKAGES=(
 
 # KUBE_CGO_OVERRIDES is a space-separated list of binaries which should be built
 # with CGO enabled, assuming CGO is supported on the target platform.
-# This overrides any entry in KUBE_STATIC_BINARIES.
+# This overrides KUBE_STATIC_OVERRIDES.
 IFS=" " read -ra KUBE_CGO_OVERRIDES_LIST <<< "${KUBE_CGO_OVERRIDES:-}"
 readonly KUBE_CGO_OVERRIDES_LIST
 # KUBE_STATIC_OVERRIDES is a space-separated list of binaries which should be
-# built with CGO disabled. This is in addition to the list in
-# KUBE_STATIC_BINARIES.
+# built with CGO disabled even if they are listed in KUBE_CGO_BINARIES.
 IFS=" " read -ra KUBE_STATIC_OVERRIDES_LIST <<< "${KUBE_STATIC_OVERRIDES:-}"
 readonly KUBE_STATIC_OVERRIDES_LIST
 
@@ -361,11 +349,11 @@ kube::golang::is_statically_linked() {
   if [[ -n "${KUBE_CGO_OVERRIDES_LIST:+x}" ]]; then
     for e in "${KUBE_CGO_OVERRIDES_LIST[@]}"; do [[ "${1}" == *"/${e}" ]] && return 1; done;
   fi
-  for e in "${KUBE_STATIC_BINARIES[@]}"; do [[ "${1}" == *"/${e}" ]] && return 0; done;
   if [[ -n "${KUBE_STATIC_OVERRIDES_LIST:+x}" ]]; then
     for e in "${KUBE_STATIC_OVERRIDES_LIST[@]}"; do [[ "${1}" == *"/${e}" ]] && return 0; done;
   fi
-  return 1;
+  for e in "${KUBE_CGO_BINARIES[@]}"; do [[ "${1}" == *"/${e}" ]] && return 1; done;
+  return 0;
 }
 
 # kube::golang::best_guess_go_targets takes a list of build targets, which might
