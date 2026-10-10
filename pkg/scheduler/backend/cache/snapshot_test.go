@@ -509,6 +509,76 @@ func TestNewSnapshot(t *testing.T) {
 	}
 }
 
+// TestNewSnapshotNodeOrder checks the order of NewSnapshot's node lists.
+func TestNewSnapshotNodeOrder(t *testing.T) {
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.InterPodAffinityHostnameFastPath: true,
+	})
+	selector := &metav1.LabelSelector{MatchLabels: map[string]string{"app": "a"}}
+	antiAffinityPod := func(name, nodeName string) *v1.Pod {
+		return st.MakePod().Name(name).Namespace("ns").Node(nodeName).PodAntiAffinity("zone", selector, st.PodAntiAffinityWithRequiredReq).Obj()
+	}
+	pods := []*v1.Pod{
+		antiAffinityPod("p1", "missing-b"),
+		st.MakePod().Name("p2").Namespace("ns").Obj(),
+		antiAffinityPod("p3", "node-a"),
+		st.MakePod().Name("p4").Namespace("ns").Node("missing-a").Obj(),
+		st.MakePod().Name("p5").Namespace("ns").Node("node-c").PodAffinity("zone", selector, st.PodAffinityWithRequiredReq).Obj(),
+		antiAffinityPod("p6", "node-d"),
+		st.MakePod().Name("p7").Namespace("ns").Node("missing-b").Obj(),
+	}
+	var nodes []*v1.Node
+	for _, name := range []string{"node-c", "node-a", "node-e", "node-a", "node-d"} {
+		nodes = append(nodes, st.MakeNode().Name(name).Obj())
+	}
+	names := func(list []fwk.NodeInfo, err error) []string {
+		if err != nil {
+			t.Fatal(err)
+		}
+		var got []string
+		for _, nodeInfo := range list {
+			if nodeInfo.Node() != nil {
+				got = append(got, nodeInfo.Node().Name)
+			} else {
+				got = append(got, "nodeless:"+nodeInfo.GetPods()[0].GetPod().Spec.NodeName)
+			}
+		}
+		return got
+	}
+	wantAntiAffinity := []string{"node-a", "node-d", "nodeless:missing-b"}
+
+	lister := NewSnapshot(pods, nodes).NodeInfos()
+	for _, list := range []struct {
+		name      string
+		got, want []string
+	}{
+		{
+			name: "List",
+			got:  names(lister.List()),
+			want: []string{"node-c", "node-a", "node-e", "node-d", "nodeless:missing-b", "nodeless:", "nodeless:missing-a"},
+		},
+		{
+			name: "HavePodsWithAffinityList",
+			got:  names(lister.HavePodsWithAffinityList()),
+			want: []string{"node-c", "node-a", "node-d", "nodeless:missing-b"},
+		},
+		{
+			name: "HavePodsWithRequiredAntiAffinityList",
+			got:  names(lister.HavePodsWithRequiredAntiAffinityList()),
+			want: wantAntiAffinity,
+		},
+		{
+			name: "HavePodsWithRequiredNonHostScopedAntiAffinityList",
+			got:  names(lister.HavePodsWithRequiredNonHostScopedAntiAffinityList()),
+			want: wantAntiAffinity,
+		},
+	} {
+		if diff := cmp.Diff(list.want, list.got); diff != "" {
+			t.Errorf("%s: unexpected node order (-want +got):\n%s", list.name, diff)
+		}
+	}
+}
+
 func TestSnapshot_AssumeForget(t *testing.T) {
 	node1 := st.MakeNode().Name("node-1").Obj()
 	node2 := st.MakeNode().Name("node-2").Obj()
