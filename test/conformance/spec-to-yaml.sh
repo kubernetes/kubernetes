@@ -27,4 +27,5 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 kube::golang::setup_env
 
 # convert dumped spec (see dump-spec.sh) to conformance.yaml
-go run ./test/conformance/walk.go --source="${KUBE_ROOT}" ./_output/specsummaries.json > ./_output/conformance.yaml
+go run ./test/conformance/walk.go --source="${KUBE_ROOT}" --label="Conformance" ./_output/specsummaries.json > ./_output/conformance.yaml
+go run ./test/conformance/walk.go --source="${KUBE_ROOT}" --label="FutureConformance" ./_output/specsummaries.json > ./_output/future-conformance.yaml
