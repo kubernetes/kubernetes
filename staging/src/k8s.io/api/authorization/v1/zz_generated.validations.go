@@ -873,7 +873,10 @@ func Validate_SelfSubjectAccessReviewSpec(
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.IfOption(ctx, op, fldPath, obj, oldObj, "ConditionalAuthorization", false, validate.ForbiddenPointer).MarkShortCircuit(); len(e) != 0 {
+			if e := validate.IfOption(ctx, op, fldPath, obj, oldObj, "ConditionalAuthorization", false,
+				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *AuthorizationOptions) field.ErrorList {
+					return validate.ForbiddenPointer(ctx, op, fldPath, obj, oldObj)
+				}).MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
@@ -1054,7 +1057,10 @@ func Validate_SubjectAccessReviewSpec(
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.IfOption(ctx, op, fldPath, obj, oldObj, "ConditionalAuthorization", false, validate.ForbiddenPointer).MarkShortCircuit(); len(e) != 0 {
+			if e := validate.IfOption(ctx, op, fldPath, obj, oldObj, "ConditionalAuthorization", false,
+				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *AuthorizationOptions) field.ErrorList {
+					return validate.ForbiddenPointer(ctx, op, fldPath, obj, oldObj)
+				}).MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
@@ -1105,7 +1111,10 @@ func Validate_SubjectAccessReviewStatus(
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.IfOption(ctx, op, fldPath, obj, oldObj, "ConditionalAuthorization", false, validate.ForbiddenPointer).MarkShortCircuit(); len(e) != 0 {
+			if e := validate.IfOption(ctx, op, fldPath, obj, oldObj, "ConditionalAuthorization", false,
+				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *ConditionsAwareDecision) field.ErrorList {
+					return validate.ForbiddenPointer(ctx, op, fldPath, obj, oldObj)
+				}).MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}

@@ -702,7 +702,10 @@ func Validate_JobSpec(
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.IfOption(ctx, op, fldPath, obj, oldObj, "WorkloadWithJob", false, validate.ForbiddenPointer).MarkShortCircuit(); len(e) != 0 {
+			if e := validate.IfOption(ctx, op, fldPath, obj, oldObj, "WorkloadWithJob", false,
+				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *batchv1.JobSchedulingConfiguration) field.ErrorList {
+					return validate.ForbiddenPointer(ctx, op, fldPath, obj, oldObj)
+				}).MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}

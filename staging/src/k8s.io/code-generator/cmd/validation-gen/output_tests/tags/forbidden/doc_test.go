@@ -89,3 +89,34 @@ func Test(t *testing.T) {
 		field.Forbidden(field.NewPath("mapTypedefField"), ""),
 	})
 }
+
+func TestPayload(t *testing.T) {
+	st := localSchemeBuilder.Test(t)
+
+	st.Value(&PayloadStruct{
+		StringField:    "abc",
+		StringPtrField: ptr.To("xyz"),
+		SliceField:     []string{"a"},
+		MapField:       map[string]string{"a": "b"},
+	}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField().ByDetailExact(), field.ErrorList{
+		field.Forbidden(field.NewPath("stringField"), "custom string msg"),
+		field.Forbidden(field.NewPath("stringPtrField"), "custom pointer msg"),
+		field.Forbidden(field.NewPath("sliceField"), "custom slice msg"),
+		field.Forbidden(field.NewPath("mapField"), "custom map msg"),
+	})
+}
+
+func TestOptions(t *testing.T) {
+	st := localSchemeBuilder.Test(t)
+
+	st.Value(&OptionsStruct{
+		EnabledField:  "abc",
+		DisabledField: "def",
+	}).Opts(map[string]bool{
+		"Enabled":  true,
+		"Disabled": false,
+	}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField().ByDetailExact(), field.ErrorList{
+		field.Forbidden(field.NewPath("enabledField"), "custom enabled msg"),
+		field.Forbidden(field.NewPath("disabledField"), "custom disabled msg"),
+	})
+}

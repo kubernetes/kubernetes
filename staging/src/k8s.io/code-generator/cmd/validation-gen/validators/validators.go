@@ -465,6 +465,11 @@ const (
 	// accumulated as an error, but should trigger other aspects of the failure
 	// path (e.g. early return when combined with ShortCircuit).
 	NonError
+
+	// VariadicArgs indicates that the validator function has variadic trailing
+	// arguments, so its signature does not match ValidateFunc even when Args is
+	// empty, and WrapperFunction must wrap it in a closure.
+	VariadicArgs
 )
 
 // Conditions defines what conditions must be true for a resource to be validated.
