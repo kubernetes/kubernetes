@@ -97,7 +97,7 @@ var (
 	oneOfError             = "must specify one of: `basic`, `gang`"
 	multipleFieldsSetError = "must specify exactly one of: `basic`, `gang`"
 	tooManyItemsError      = "must have at most 1 item"
-	maximumError           = "must be less than or equal to 1000000000"
+	maximumError           = "must be less than or equal to 2000001000"
 	subdomainNameError     = "lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters"
 	forbiddenError         = "Forbidden"
 	notAllowedToUnsetError = "field cannot be cleared once set"
@@ -239,10 +239,22 @@ func TestStrategyCreate(t *testing.T) {
 				return pg
 			}(),
 		},
+		"system-node-critical priority": {
+			obj: func() *scheduling.PodGroup {
+				pg := podGroup.DeepCopy()
+				pg.Spec.Priority = new(int32(scheduling.SystemCriticalPriority + 1000))
+				return pg
+			}(),
+			expectObj: func() *scheduling.PodGroup {
+				pg := podGroup.DeepCopy()
+				pg.Spec.Priority = new(int32(scheduling.SystemCriticalPriority + 1000))
+				return pg
+			}(),
+		},
 		"too high priority": {
 			obj: func() *scheduling.PodGroup {
 				pg := podGroup.DeepCopy()
-				pg.Spec.Priority = new(int32(scheduling.HighestUserDefinablePriority + 1))
+				pg.Spec.Priority = new(int32(scheduling.SystemCriticalPriority + 1001))
 				return pg
 			}(),
 			expectValidationError: maximumError,

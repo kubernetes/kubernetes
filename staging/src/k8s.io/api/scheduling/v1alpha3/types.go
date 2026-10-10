@@ -220,7 +220,7 @@ type PodGroupTemplate struct {
 	//
 	// +optional
 	// +k8s:optional
-	// +k8s:maximum=1000000000 # HighestUserDefinablePriority
+	// +k8s:maximum=2000001000 # SystemCriticalPriority + 1000 (system-node-critical)
 	// +k8s:immutable
 	Priority *int32 `json:"priority,omitempty" protobuf:"varint,7,opt,name=priority"`
 
@@ -291,7 +291,7 @@ type CompositePodGroupTemplate struct {
 	//
 	// +optional
 	// +k8s:optional
-	// +k8s:maximum=1000000000 # HighestUserDefinablePriority
+	// +k8s:maximum=2000001000 # SystemCriticalPriority + 1000 (system-node-critical)
 	// +k8s:immutable
 	Priority *int32 `json:"priority,omitempty" protobuf:"varint,6,opt,name=priority"`
 
@@ -635,7 +635,7 @@ type PodGroupSpec struct {
 	// +optional
 	// +k8s:optional
 	// +k8s:immutable
-	// +k8s:maximum=1000000000 # HighestUserDefinablePriority
+	// +k8s:maximum=2000001000 # SystemCriticalPriority + 1000 (system-node-critical)
 	Priority *int32 `json:"priority,omitempty" protobuf:"varint,8,opt,name=priority"`
 
 	// preemptionPolicy is the Policy for preempting pods/podgroups with lower priority.
@@ -1291,7 +1291,7 @@ type CompositePodGroupSpec struct {
 	// +optional
 	// +k8s:optional
 	// +k8s:immutable
-	// +k8s:maximum=1000000000 # HighestUserDefinablePriority
+	// +k8s:maximum=2000001000 # SystemCriticalPriority + 1000 (system-node-critical)
 	Priority *int32 `json:"priority,omitempty" protobuf:"varint,7,opt,name=priority"`
 
 	// preemptionPolicy is the Policy for preempting pods/podgroups with lower priority.

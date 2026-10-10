@@ -64,6 +64,7 @@ var (
 	forbiddenError          = "Forbidden"
 	fieldCannotBeUnsetError = "field cannot be cleared once set"
 	supportedPoliciesError  = `supported values: "Never", "PreemptLowerPriority"`
+	maximumError            = "must be less than or equal to 2000001000"
 )
 
 func TestWorkloadStrategy(t *testing.T) {
@@ -215,6 +216,26 @@ func TestStrategyCreate(t *testing.T) {
 				return w
 			}(),
 			expectValidationError: subdomainNameError,
+		},
+		"system-node-critical priority": {
+			obj: func() *scheduling.Workload {
+				w := workload.DeepCopy()
+				w.Spec.PodGroupTemplates[0].Priority = new(int32(scheduling.SystemCriticalPriority + 1000))
+				return w
+			}(),
+			expectObj: func() *scheduling.Workload {
+				w := workload.DeepCopy()
+				w.Spec.PodGroupTemplates[0].Priority = new(int32(scheduling.SystemCriticalPriority + 1000))
+				return w
+			}(),
+		},
+		"too high priority": {
+			obj: func() *scheduling.Workload {
+				w := workload.DeepCopy()
+				w.Spec.PodGroupTemplates[0].Priority = new(int32(scheduling.SystemCriticalPriority + 1001))
+				return w
+			}(),
+			expectValidationError: maximumError,
 		},
 		"drop preemptionPolicy with PodGroupPreemptionPolicy disabled": {
 			obj: func() *scheduling.Workload {

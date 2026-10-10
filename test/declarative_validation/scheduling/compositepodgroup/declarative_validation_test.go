@@ -65,8 +65,17 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 			input:        mkValidCompositePodGroup(setParentCompositePodGroupName("invalid/name")),
 			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("spec", "parentCompositePodGroupName"), nil, "").WithOrigin("format=k8s-long-name")},
 		},
+		"valid priority above user-defined maximum": {
+			input: mkValidCompositePodGroup(setPriority(scheduling.HighestUserDefinablePriority + 1)),
+		},
+		"valid system-cluster-critical priority": {
+			input: mkValidCompositePodGroup(setPriority(scheduling.SystemCriticalPriority)),
+		},
+		"valid system-node-critical priority": {
+			input: mkValidCompositePodGroup(setPriority(scheduling.SystemCriticalPriority + 1000)),
+		},
 		"priority too high": {
-			input:        mkValidCompositePodGroup(setPriority(scheduling.HighestUserDefinablePriority + 1)),
+			input:        mkValidCompositePodGroup(setPriority(scheduling.SystemCriticalPriority + 1001)),
 			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("spec", "priority"), nil, "").WithOrigin("maximum")},
 		},
 		"priorityClassName invalid": {
