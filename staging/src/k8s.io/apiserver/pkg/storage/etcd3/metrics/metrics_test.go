@@ -384,7 +384,7 @@ apiserver_storage_objects{resource="bar.foo"} 10
 			want: `# HELP apiserver_resource_objects [ALPHA] Number of stored objects at the time of last check split by kind.
 # TYPE apiserver_resource_objects gauge
 apiserver_resource_objects{group="foo",resource="bar"} 10 1234567890000
-# HELP apiserver_resource_size_estimate_bytes [ALPHA] Estimated size of stored objects in database. Estimate is based on sum of last observed sizes of serialized objects.
+# HELP apiserver_resource_size_estimate_bytes [BETA] Estimated size of stored objects in database. Estimate is based on sum of last observed sizes of serialized objects.
 # TYPE apiserver_resource_size_estimate_bytes gauge
 apiserver_resource_size_estimate_bytes{group="foo",resource="bar"} 100 1234567890000
 # HELP apiserver_storage_objects [STABLE] [DEPRECATED, consider using apiserver_resource_objects instead] Number of stored objects at the time of last check split by kind. In case of a fetching error, the value will be -1.
@@ -399,7 +399,7 @@ apiserver_storage_objects{resource="bar.foo"} 10
 			want: `# HELP apiserver_resource_objects [ALPHA] Number of stored objects at the time of last check split by kind.
 # TYPE apiserver_resource_objects gauge
 apiserver_resource_objects{group="foo",resource="bar"} 0 1234567890000
-# HELP apiserver_resource_size_estimate_bytes [ALPHA] Estimated size of stored objects in database. Estimate is based on sum of last observed sizes of serialized objects.
+# HELP apiserver_resource_size_estimate_bytes [BETA] Estimated size of stored objects in database. Estimate is based on sum of last observed sizes of serialized objects.
 # TYPE apiserver_resource_size_estimate_bytes gauge
 apiserver_resource_size_estimate_bytes{group="foo",resource="bar"} 0 1234567890000
 # HELP apiserver_storage_objects [STABLE] [DEPRECATED, consider using apiserver_resource_objects instead] Number of stored objects at the time of last check split by kind. In case of a fetching error, the value will be -1.
@@ -450,7 +450,7 @@ func TestDeleteStoreStats(t *testing.T) {
 # TYPE apiserver_resource_objects gauge
 apiserver_resource_objects{group="foo1",resource="bar1"} 10 1234567890000
 apiserver_resource_objects{group="foo2",resource="bar2"} 20 1234567890000
-# HELP apiserver_resource_size_estimate_bytes [ALPHA] Estimated size of stored objects in database. Estimate is based on sum of last observed sizes of serialized objects.
+# HELP apiserver_resource_size_estimate_bytes [BETA] Estimated size of stored objects in database. Estimate is based on sum of last observed sizes of serialized objects.
 # TYPE apiserver_resource_size_estimate_bytes gauge
 apiserver_resource_size_estimate_bytes{group="foo2",resource="bar2"} 200 1234567890000
 # HELP apiserver_storage_objects [STABLE] [DEPRECATED, consider using apiserver_resource_objects instead] Number of stored objects at the time of last check split by kind. In case of a fetching error, the value will be -1.
@@ -467,7 +467,7 @@ apiserver_storage_objects{resource="bar2.foo2"} 20
 	expectedMetrics = `# HELP apiserver_resource_objects [ALPHA] Number of stored objects at the time of last check split by kind.
 # TYPE apiserver_resource_objects gauge
 apiserver_resource_objects{group="foo2",resource="bar2"} 20 1234567890000
-# HELP apiserver_resource_size_estimate_bytes [ALPHA] Estimated size of stored objects in database. Estimate is based on sum of last observed sizes of serialized objects.
+# HELP apiserver_resource_size_estimate_bytes [BETA] Estimated size of stored objects in database. Estimate is based on sum of last observed sizes of serialized objects.
 # TYPE apiserver_resource_size_estimate_bytes gauge
 apiserver_resource_size_estimate_bytes{group="foo2",resource="bar2"} 200 1234567890000
 # HELP apiserver_storage_objects [STABLE] [DEPRECATED, consider using apiserver_resource_objects instead] Number of stored objects at the time of last check split by kind. In case of a fetching error, the value will be -1.
@@ -483,7 +483,7 @@ apiserver_storage_objects{resource="bar2.foo2"} 20
 # TYPE apiserver_storage_objects gauge
 # HELP apiserver_resource_objects [ALPHA] Number of stored objects at the time of last check split by kind.
 # TYPE apiserver_resource_objects gauge
-# HELP apiserver_resource_size_estimate_bytes [ALPHA] Estimated size of stored objects in database. Estimate is based on sum of last observed sizes of serialized objects.
+# HELP apiserver_resource_size_estimate_bytes [BETA] Estimated size of stored objects in database. Estimate is based on sum of last observed sizes of serialized objects.
 # TYPE apiserver_resource_size_estimate_bytes gauge
 `
 	if err := testutil.GatherAndCompare(registry, strings.NewReader(expectedMetrics), "apiserver_storage_objects", "apiserver_resource_objects", "apiserver_resource_size_estimate_bytes"); err != nil {
