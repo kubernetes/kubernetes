@@ -20,6 +20,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/pem"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -141,39 +142,21 @@ func (s *fileStore) recover() error {
 
 func (s *fileStore) Current() (*tls.Certificate, error) {
 	pairFile := filepath.Join(s.certDirectory, s.filename(currentPair))
-	if pairFileExists, err := fileExists(pairFile); err != nil {
-		return nil, err
-	} else if pairFileExists {
+	if cert, err := loadFile(pairFile); !errors.Is(err, os.ErrNotExist) {
 		s.logger.Info("Loading cert/key pair from a file", "filePath", pairFile)
-		return loadFile(pairFile)
+		return cert, err
 	}
 
-	certFileExists, err := fileExists(s.certFile)
-	if err != nil {
-		return nil, err
-	}
-	keyFileExists, err := fileExists(s.keyFile)
-	if err != nil {
-		return nil, err
-	}
-	if certFileExists && keyFileExists {
+	if cert, err := loadX509KeyPair(s.certFile, s.keyFile); !errors.Is(err, os.ErrNotExist) {
 		s.logger.Info("Loading cert/key pair", "certFile", s.certFile, "keyFile", s.keyFile)
-		return loadX509KeyPair(s.certFile, s.keyFile)
+		return cert, err
 	}
 
 	c := filepath.Join(s.certDirectory, s.pairNamePrefix+certExtension)
 	k := filepath.Join(s.keyDirectory, s.pairNamePrefix+keyExtension)
-	certFileExists, err = fileExists(c)
-	if err != nil {
-		return nil, err
-	}
-	keyFileExists, err = fileExists(k)
-	if err != nil {
-		return nil, err
-	}
-	if certFileExists && keyFileExists {
+	if cert, err := loadX509KeyPair(c, k); !errors.Is(err, os.ErrNotExist) {
 		s.logger.Info("Loading cert/key pair", "certFile", c, "keyFile", k)
-		return loadX509KeyPair(c, k)
+		return cert, err
 	}
 
 	noKeyErr := NoCertKeyError(
@@ -191,7 +174,7 @@ func loadFile(pairFile string) (*tls.Certificate, error) {
 	// the same file.
 	cert, err := tls.LoadX509KeyPair(pairFile, pairFile)
 	if err != nil {
-		return nil, fmt.Errorf("could not convert data from %q into cert/key pair: %v", pairFile, err)
+		return nil, fmt.Errorf("could not convert data from %q into cert/key pair: %w", pairFile, err)
 	}
 	certs, err := x509.ParseCertificates(cert.Certificate[0])
 	if err != nil {
