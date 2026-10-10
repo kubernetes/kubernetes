@@ -342,8 +342,10 @@ func (c *csiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMo
 	klog.V(4).Info(log("created target path successfully [%s]", deviceMountPath))
 	dataDir := filepath.Dir(deviceMountPath)
 	data := map[string]string{
-		volDataKey.volHandle:  csiSource.VolumeHandle,
-		volDataKey.driverName: csiSource.Driver,
+		volDataKey.volHandle:           csiSource.VolumeHandle,
+		volDataKey.driverName:          csiSource.Driver,
+		volDataKey.specVolID:           spec.Name(),
+		volDataKey.volumeLifecycleMode: string(storage.VolumeLifecyclePersistent),
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.SELinuxMountReadWriteOncePod) && seLinuxSupported {
