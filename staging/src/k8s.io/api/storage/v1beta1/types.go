@@ -834,6 +834,9 @@ type CSIStorageCapacity struct {
 	// creator.
 	// This field is immutable.
 	// +required
+	// +k8s:alpha(since: "1.38")=+k8s:required
+	// +k8s:alpha(since: "1.38")=+k8s:immutable
+	// +k8s:alpha(since: "1.38")=+k8s:format=k8s-long-name
 	StorageClassName string `json:"storageClassName" protobuf:"bytes,3,name=storageClassName"`
 
 	// capacity is the value reported by the CSI driver in its GetCapacityResponse

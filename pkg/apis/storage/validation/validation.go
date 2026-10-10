@@ -623,8 +623,12 @@ func ValidateCSIStorageCapacity(capacity *storage.CSIStorageCapacity, opts CSISt
 	allErrs := apivalidation.ValidateObjectMeta(&capacity.ObjectMeta, true, ValidateStorageCapacityName, field.NewPath("metadata"))
 	labelSelectorValidationOptions := metav1validation.LabelSelectorValidationOptions{AllowInvalidLabelValueInSelector: opts.AllowInvalidLabelValueInSelector}
 	allErrs = append(allErrs, metav1validation.ValidateLabelSelector(capacity.NodeTopology, labelSelectorValidationOptions, field.NewPath("nodeTopology"))...)
-	for _, msg := range apivalidation.ValidateClassName(capacity.StorageClassName, false) {
-		allErrs = append(allErrs, field.Invalid(field.NewPath("storageClassName"), capacity.StorageClassName, msg))
+	if len(capacity.StorageClassName) == 0 {
+		allErrs = append(allErrs, field.Required(field.NewPath("storageClassName"), "").MarkCoveredByDeclarative())
+	} else {
+		for _, msg := range apivalidation.ValidateClassName(capacity.StorageClassName, false) {
+			allErrs = append(allErrs, field.Invalid(field.NewPath("storageClassName"), capacity.StorageClassName, msg).WithOrigin("format=k8s-long-name").MarkCoveredByDeclarative())
+		}
 	}
 	if capacity.Capacity != nil {
 		allErrs = append(allErrs, apivalidation.ValidateNonnegativeQuantity(*capacity.Capacity, field.NewPath("capacity"))...)
@@ -642,7 +646,7 @@ func ValidateCSIStorageCapacityUpdate(capacity, oldCapacity *storage.CSIStorageC
 		allErrs = append(allErrs, field.Invalid(field.NewPath("nodeTopology"), capacity.NodeTopology, "field is immutable"))
 	}
 	if capacity.StorageClassName != oldCapacity.StorageClassName {
-		allErrs = append(allErrs, field.Invalid(field.NewPath("storageClassName"), capacity.StorageClassName, "field is immutable"))
+		allErrs = append(allErrs, field.Invalid(field.NewPath("storageClassName"), capacity.StorageClassName, "field is immutable").MarkCoveredByDeclarative().WithOrigin("immutable"))
 	}
 
 	return allErrs
