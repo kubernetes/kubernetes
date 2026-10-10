@@ -71,7 +71,7 @@ func prepareVolumeInfoFile(mountPath string, plug *csiPlugin, specVolumeName, vo
 		volDataKey.volHandle:           volumeID,
 		volDataKey.driverName:          driverName,
 		volDataKey.nodeName:            nodeName,
-		volDataKey.attachmentID:        getAttachmentName(volumeID, driverName, nodeName),
+		volDataKey.attachmentID:        GetVolumeAttachmentName(volumeID, driverName, nodeName),
 		volDataKey.volumeLifecycleMode: lifecycleMode,
 		volDataKey.seLinuxMountContext: seLinuxMountContext,
 	}
@@ -263,7 +263,7 @@ func TestMounterSetUp(t *testing.T) {
 			csiMounter := mounter.(*csiMountMgr)
 			csiMounter.csiClient = setupClient(t, true)
 
-			attachID := getAttachmentName(csiMounter.volumeID, string(csiMounter.driverName), string(plug.host.GetNodeName()))
+			attachID := GetVolumeAttachmentName(csiMounter.volumeID, string(csiMounter.driverName), string(plug.host.GetNodeName()))
 
 			attachment := &storage.VolumeAttachment{
 				ObjectMeta: meta.ObjectMeta{
@@ -451,7 +451,7 @@ func TestMounterSetupJsonFileHandling(t *testing.T) {
 			csiMounter := mounter.(*csiMountMgr)
 			csiMounter.csiClient = setupClient(t, true)
 
-			attachID := getAttachmentName(csiMounter.volumeID, string(csiMounter.driverName), string(plug.host.GetNodeName()))
+			attachID := GetVolumeAttachmentName(csiMounter.volumeID, string(csiMounter.driverName), string(plug.host.GetNodeName()))
 			attachment := makeTestAttachment(attachID, "test-node", csiMounter.spec.Name())
 			_, err = csiMounter.k8s.StorageV1().VolumeAttachments().Create(context.TODO(), attachment, meta.CreateOptions{})
 			if err != nil {
@@ -592,7 +592,7 @@ func TestMounterSetUpSimple(t *testing.T) {
 				t.Fatal("unexpected volume mode: ", csiMounter.volumeLifecycleMode)
 			}
 
-			attachID := getAttachmentName(csiMounter.volumeID, string(csiMounter.driverName), string(plug.host.GetNodeName()))
+			attachID := GetVolumeAttachmentName(csiMounter.volumeID, string(csiMounter.driverName), string(plug.host.GetNodeName()))
 			attachment := makeTestAttachment(attachID, "test-node", csiMounter.spec.Name())
 			_, err = csiMounter.k8s.StorageV1().VolumeAttachments().Create(context.TODO(), attachment, meta.CreateOptions{})
 			if err != nil {
@@ -767,7 +767,7 @@ func TestMounterSetupWithStatusTracking(t *testing.T) {
 			}
 
 			if tc.createAttachment {
-				attachID := getAttachmentName(csiMounter.volumeID, string(csiMounter.driverName), string(plug.host.GetNodeName()))
+				attachID := GetVolumeAttachmentName(csiMounter.volumeID, string(csiMounter.driverName), string(plug.host.GetNodeName()))
 				attachment := makeTestAttachment(attachID, "test-node", csiMounter.spec.Name())
 				_, err = csiMounter.k8s.StorageV1().VolumeAttachments().Create(context.TODO(), attachment, meta.CreateOptions{})
 				if err != nil {
@@ -878,7 +878,7 @@ func TestMounterSetUpWithInline(t *testing.T) {
 			}
 
 			if csiMounter.volumeLifecycleMode == storage.VolumeLifecyclePersistent {
-				attachID := getAttachmentName(csiMounter.volumeID, string(csiMounter.driverName), string(plug.host.GetNodeName()))
+				attachID := GetVolumeAttachmentName(csiMounter.volumeID, string(csiMounter.driverName), string(plug.host.GetNodeName()))
 				attachment := makeTestAttachment(attachID, "test-node", csiMounter.spec.Name())
 				_, err = csiMounter.k8s.StorageV1().VolumeAttachments().Create(context.TODO(), attachment, meta.CreateOptions{})
 				if err != nil {
@@ -1138,7 +1138,7 @@ func TestMounterSetUpWithFSGroup(t *testing.T) {
 		csiMounter := mounter.(*csiMountMgr)
 		csiMounter.csiClient = setupClientWithVolumeMountGroup(t, true /* stageUnstageSet */, tc.driverSupportsVolumeMountGroup)
 
-		attachID := getAttachmentName(csiMounter.volumeID, string(csiMounter.driverName), string(plug.host.GetNodeName()))
+		attachID := GetVolumeAttachmentName(csiMounter.volumeID, string(csiMounter.driverName), string(plug.host.GetNodeName()))
 		attachment := makeTestAttachment(attachID, "test-node", pvName)
 
 		_, err = csiMounter.k8s.StorageV1().VolumeAttachments().Create(context.TODO(), attachment, meta.CreateOptions{})
@@ -1253,7 +1253,7 @@ func TestMounterSetUpFWithNodePublishFinalError(t *testing.T) {
 			csiMounter := mounter.(*csiMountMgr)
 			csiMounter.csiClient = setupClient(t, true)
 
-			attachID := getAttachmentName(csiMounter.volumeID, string(csiMounter.driverName), string(plug.host.GetNodeName()))
+			attachID := GetVolumeAttachmentName(csiMounter.volumeID, string(csiMounter.driverName), string(plug.host.GetNodeName()))
 			attachment := makeTestAttachment(attachID, "test-node", csiMounter.spec.Name())
 			_, err = csiMounter.k8s.StorageV1().VolumeAttachments().Create(context.TODO(), attachment, meta.CreateOptions{})
 			if err != nil {
