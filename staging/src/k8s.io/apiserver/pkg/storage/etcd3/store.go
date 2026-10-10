@@ -18,6 +18,7 @@ package etcd3
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -808,6 +809,7 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 	if err != nil {
 		return err
 	}
+	opts.KeysOnly = opts.KeysOnly && opts.Recursive && s.watcher.reverseKeyFunc != nil
 
 	// loop until we have filled the requested limit from etcd or there are no more results
 	var lastKey []byte
@@ -829,7 +831,7 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 
 	chunks := s.pagedChunks(ctx, keyPrefix, opts, withRev, limit, continueKey)
 	if shouldStream(opts) {
-		streamChunks, supported := s.streamChunks(ctx, keyPrefix, withRev, limit, continueKey)
+		streamChunks, supported := s.streamChunks(ctx, keyPrefix, withRev, limit, continueKey, opts.KeysOnly)
 		if supported {
 			chunks = streamChunks
 			streamed = true
@@ -859,7 +861,7 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 		}
 		count = chunk.count
 
-		chunkLastKey, chunkEvaluated, limitReached, err := s.appendChunk(ctx, chunk.kvs, opts.Predicate, newItemFunc, aggregator, v, paging)
+		chunkLastKey, chunkEvaluated, limitReached, err := s.appendChunk(ctx, chunk.kvs, opts.Predicate, opts.KeysOnly, newItemFunc, aggregator, v, paging)
 		if err != nil {
 			return err
 		}
@@ -898,7 +900,7 @@ type listChunk struct {
 func (s *store) pagedChunks(ctx context.Context, keyPrefix string, opts storage.ListOptions, withRev, limit int64, continueKey string) iter.Seq2[listChunk, error] {
 	return func(yield func(listChunk, error) bool) {
 		for {
-			getResp, err := s.getList(ctx, keyPrefix, opts.Recursive, kubernetes.ListOptions{
+			getResp, err := s.getList(ctx, keyPrefix, opts.Recursive, opts.KeysOnly, kubernetes.ListOptions{
 				Revision: withRev,
 				Limit:    limit,
 				Continue: continueKey,
@@ -951,7 +953,7 @@ func (s *store) listReadError(ctx context.Context, err error, withRev int64, pag
 // streamChunks reads the list as a single etcd RangeStream, pinned to withRev when
 // nonzero, capped at limit keys and resumed from continueKey when set.
 // supported is false when the etcd server does not implement RangeStream.
-func (s *store) streamChunks(ctx context.Context, keyPrefix string, withRev, limit int64, continueKey string) (chunks iter.Seq2[listChunk, error], supported bool) {
+func (s *store) streamChunks(ctx context.Context, keyPrefix string, withRev, limit int64, continueKey string, keysOnly bool) (chunks iter.Seq2[listChunk, error], supported bool) {
 	startTime := time.Now()
 	paging := continueKey != ""
 	startKey := keyPrefix
@@ -964,6 +966,9 @@ func (s *store) streamChunks(ctx context.Context, keyPrefix string, withRev, lim
 	}
 	if limit > 0 {
 		streamOpts = append(streamOpts, clientv3.WithLimit(limit))
+	}
+	if keysOnly {
+		streamOpts = append(streamOpts, clientv3.WithKeysOnly())
 	}
 	stream, streamErr := s.client.KV.GetStream(ctx, startKey, streamOpts...)
 	var first clientv3.RangeStreamResponse
@@ -997,7 +1002,7 @@ func (s *store) streamChunks(ctx context.Context, keyPrefix string, withRev, lim
 				return
 			}
 			rangeResp := resp.RangeResponse
-			if estimator != nil && len(rangeResp.Kvs) > 0 {
+			if !keysOnly && estimator != nil && len(rangeResp.Kvs) > 0 {
 				estimator.Update(rangeResp.Kvs)
 			}
 			// A pinned stream's final header holds the latest store revision, not withRev.
@@ -1036,7 +1041,26 @@ func (s *store) finalizeList(listObj runtime.Object, pred storage.SelectionPredi
 	return nil
 }
 
-func (s *store) processListItem(ctx context.Context, kv *mvccpb.KeyValue, pred storage.SelectionPredicate, newItemFunc func() runtime.Object, aggregator listItemErrors, v reflect.Value) (bool, error) {
+func (s *store) processListItem(ctx context.Context, kv *mvccpb.KeyValue, pred storage.SelectionPredicate, keysOnly bool, newItemFunc func() runtime.Object, aggregator listItemErrors, v reflect.Value) (bool, error) {
+	if keysOnly {
+		name, namespace, err := s.watcher.reverseKeyFunc(storageKey(kv.Key))
+		if err != nil {
+			return false, storage.NewInternalError(err)
+		}
+		obj := newItemFunc()
+		accessor, err := meta.Accessor(obj)
+		if err != nil {
+			return false, storage.NewInternalError(err)
+		}
+		accessor.SetName(name)
+		accessor.SetNamespace(namespace)
+		if err := s.versioner.UpdateObject(obj, uint64(kv.ModRevision)); err != nil {
+			return false, storage.NewInternalError(err)
+		}
+		v.Set(reflect.Append(v, reflect.ValueOf(obj).Elem()))
+		return true, nil
+	}
+
 	data, _, err := s.transformer.TransformFromStorage(ctx, kv.Value, authenticatedDataString(kv.Key))
 	if err != nil {
 		if done := aggregator.Append(string(kv.Key), storage.NewInternalError(fmt.Errorf("unable to transform key %q: %w", kv.Key, err))); done {
@@ -1071,7 +1095,7 @@ func (s *store) processListItem(ctx context.Context, kv *mvccpb.KeyValue, pred s
 }
 
 // appendChunk appends the kvs matching pred to v.
-func (s *store) appendChunk(ctx context.Context, kvs []*mvccpb.KeyValue, pred storage.SelectionPredicate, newItemFunc func() runtime.Object, aggregator listItemErrors, v reflect.Value, paging bool) (lastKey []byte, evaluated int, limitReached bool, err error) {
+func (s *store) appendChunk(ctx context.Context, kvs []*mvccpb.KeyValue, pred storage.SelectionPredicate, keysOnly bool, newItemFunc func() runtime.Object, aggregator listItemErrors, v reflect.Value, paging bool) (lastKey []byte, evaluated int, limitReached bool, err error) {
 	// avoid small allocations for the result slice, since this can be called in many
 	// different contexts and we don't know how significantly the result will be filtered
 	if pred.Empty() {
@@ -1084,7 +1108,7 @@ func (s *store) appendChunk(ctx context.Context, kvs []*mvccpb.KeyValue, pred st
 			return lastKey, evaluated, true, nil
 		}
 		lastKey = kv.Key
-		ok, err := s.processListItem(ctx, kv, pred, newItemFunc, aggregator, v)
+		ok, err := s.processListItem(ctx, kv, pred, keysOnly, newItemFunc, aggregator, v)
 		if err != nil {
 			return lastKey, evaluated, false, err
 		}
@@ -1097,9 +1121,17 @@ func (s *store) appendChunk(ctx context.Context, kvs []*mvccpb.KeyValue, pred st
 	return lastKey, evaluated, false, nil
 }
 
-func (s *store) getList(ctx context.Context, keyPrefix string, recursive bool, options kubernetes.ListOptions) (resp kubernetes.ListResponse, err error) {
+func (s *store) getList(ctx context.Context, keyPrefix string, recursive, keysOnly bool, options kubernetes.ListOptions) (resp kubernetes.ListResponse, err error) {
 	startTime := time.Now()
 	if recursive {
+		if keysOnly {
+			rangeResp, err := s.client.KV.Get(ctx, cmp.Or(options.Continue, keyPrefix), clientv3.WithRange(clientv3.GetPrefixRangeEnd(keyPrefix)), clientv3.WithLimit(options.Limit), clientv3.WithRev(options.Revision), clientv3.WithKeysOnly())
+			metrics.RecordEtcdRequest("list", s.groupResource, err, startTime)
+			if err != nil {
+				return resp, err
+			}
+			return kubernetes.ListResponse{Kvs: rangeResp.Kvs, Count: rangeResp.Count, Revision: rangeResp.Header.Revision}, nil
+		}
 		resp, err = s.client.Kubernetes.List(ctx, keyPrefix, options)
 		metrics.RecordEtcdRequest("list", s.groupResource, err, startTime)
 	} else {

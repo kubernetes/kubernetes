@@ -1666,3 +1666,31 @@ func TestCorrectness(t *testing.T) {
 		return computePodKey(pod), nil
 	})
 }
+
+func TestGetListKeysOnly(t *testing.T) {
+	reverseKey := func(key string) (string, string, error) {
+		ns, name, _ := strings.Cut(strings.TrimPrefix(key, "/pods/"), "/")
+		return name, ns, nil
+	}
+	for _, rangeStream := range []bool{true, false} {
+		t.Run(fmt.Sprintf("rangeStream=%v", rangeStream), func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EtcdRangeStream, rangeStream)
+			ctx, store, c := testSetup(t, withPrefix("/registry"), withResourcePrefix("/pods/"), withReverseKeyFunc(reverseKey))
+
+			out := &example.Pod{}
+			require.NoError(t, store.Create(ctx, "/pods/ns1/pod1", &example.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: "ns1", Name: "pod1"}}, out, 0))
+			putResp, err := c.KV.Put(ctx, "/registry/pods/ns2/pod2", "corrupt")
+			require.NoError(t, err)
+
+			list := &example.PodList{}
+			require.NoError(t, store.GetList(ctx, "/pods/", storage.ListOptions{Recursive: true, Predicate: storage.Everything, KeysOnly: true}, list))
+			want := []example.Pod{
+				{ObjectMeta: metav1.ObjectMeta{Namespace: "ns1", Name: "pod1", ResourceVersion: out.ResourceVersion}},
+				{ObjectMeta: metav1.ObjectMeta{Namespace: "ns2", Name: "pod2", ResourceVersion: fmt.Sprintf("%d", putResp.Header.Revision)}},
+			}
+			if diff := cmp.Diff(want, list.Items); diff != "" {
+				t.Errorf("PodList diff (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
