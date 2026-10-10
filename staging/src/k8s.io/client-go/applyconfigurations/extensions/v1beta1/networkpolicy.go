@@ -276,3 +276,9 @@ func (b *NetworkPolicyApplyConfiguration) GetNamespace() *string {
 	b.ensureObjectMetaApplyConfigurationExists()
 	return b.ObjectMetaApplyConfiguration.Namespace
 }
+
+// GetResourceVersion retrieves the value of the ResourceVersion field in the declarative configuration.
+func (b *NetworkPolicyApplyConfiguration) GetResourceVersion() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.ObjectMetaApplyConfiguration.ResourceVersion
+}
