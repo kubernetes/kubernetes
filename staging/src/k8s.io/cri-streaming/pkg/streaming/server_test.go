@@ -20,6 +20,7 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/binary"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -291,6 +292,42 @@ func TestServePortForward(t *testing.T) {
 	requireWebSocketPayload(t, wsConn, 0, []byte("portforward"+testOutput), false)
 }
 
+func TestServeExecAuthorizesStream(t *testing.T) {
+	var s Server
+	testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		s.ServeHTTP(w, r)
+	}))
+	defer testServer.Close()
+
+	testURL, err := url.Parse(testServer.URL)
+	require.NoError(t, err)
+
+	config := DefaultConfig
+	config.BaseURL = testURL
+	config.AuthorizeStream = func(req *http.Request, streamRequest any) error {
+		assert.Equal(t, http.MethodGet, req.Method)
+		execReq, ok := streamRequest.(*runtimeapi.ExecRequest)
+		require.True(t, ok)
+		assert.Equal(t, testContainerID, execReq.ContainerId)
+		return errors.New("denied")
+	}
+
+	s, err = NewServer(config, &panicRuntime{})
+	require.NoError(t, err)
+
+	resp, err := s.GetExec(&runtimeapi.ExecRequest{
+		ContainerId: testContainerID,
+		Cmd:         []string{"echo"},
+		Stdout:      true,
+	})
+	require.NoError(t, err)
+
+	httpResp, err := http.Get(resp.Url)
+	require.NoError(t, err)
+	defer httpResp.Body.Close()
+	assert.Equal(t, http.StatusForbidden, httpResp.StatusCode)
+}
+
 // Run the remote command test.
 // commandType is either "exec" or "attach".
 func runRemoteCommandTest(t *testing.T, commandType string) {
@@ -377,6 +414,20 @@ func newFakeRuntime(t *testing.T) *fakeRuntime {
 
 type fakeRuntime struct {
 	t *testing.T
+}
+
+type panicRuntime struct{}
+
+func (p *panicRuntime) Exec(context.Context, string, []string, io.Reader, io.WriteCloser, io.WriteCloser, bool, <-chan remotecommandserver.TerminalSize) error {
+	panic("Exec should not be called")
+}
+
+func (p *panicRuntime) Attach(context.Context, string, io.Reader, io.WriteCloser, io.WriteCloser, bool, <-chan remotecommandserver.TerminalSize) error {
+	panic("Attach should not be called")
+}
+
+func (p *panicRuntime) PortForward(context.Context, string, int32, io.ReadWriteCloser) error {
+	panic("PortForward should not be called")
 }
 
 func (f *fakeRuntime) Exec(_ context.Context, containerID string, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan remotecommandserver.TerminalSize) error {
