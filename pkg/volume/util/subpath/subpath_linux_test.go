@@ -115,6 +115,40 @@ func TestSafeMakeDir(t *testing.T) {
 			false,
 		},
 		{
+			"directory-exists-wrong-permissions",
+			func(base string) error {
+				return os.MkdirAll(filepath.Join(base, "test/directory"), 0755)
+			},
+			"test/directory",
+			"test/directory",
+			os.FileMode(0775) + os.ModeDir,
+			false,
+		},
+		{
+			"directory-exists-wrong-permissions-sgid",
+			func(base string) error {
+				return os.MkdirAll(filepath.Join(base, "test/directory"), 0755)
+			},
+			"test/directory",
+			"test/directory",
+			os.FileMode(0775) + os.ModeDir + os.ModeSetgid,
+			false,
+		},
+		{
+			"directory-exists-already-correct-permissions-sgid",
+			func(base string) error {
+				dir := filepath.Join(base, "test/directory")
+				if err := os.MkdirAll(dir, 0775); err != nil {
+					return err
+				}
+				return syscall.Chmod(dir, 02775)
+			},
+			"test/directory",
+			"test/directory",
+			os.FileMode(0775) + os.ModeDir + os.ModeSetgid,
+			false,
+		},
+		{
 			"create-base",
 			func(base string) error {
 				return nil
@@ -257,6 +291,26 @@ func TestSafeMakeDir(t *testing.T) {
 			"test/directory",
 			"",
 			defaultPerm,
+			true,
+		},
+		{
+			"escape-with-symlink-existing-dir-wrong-perm",
+			func(base string) error {
+				return os.Symlink("/tmp", filepath.Join(base, "test"))
+			},
+			"test",
+			"",
+			os.FileMode(0775) + os.ModeDir,
+			true,
+		},
+		{
+			"escape-with-symlink-child-existing-dir-wrong-perm",
+			func(base string) error {
+				return os.Symlink("/tmp", filepath.Join(base, "test"))
+			},
+			"test/directory",
+			"",
+			os.FileMode(0775) + os.ModeDir,
 			true,
 		},
 	}
