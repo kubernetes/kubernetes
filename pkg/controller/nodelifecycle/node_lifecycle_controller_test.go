@@ -19,7 +19,6 @@ package nodelifecycle
 import (
 	"context"
 	"fmt"
-	goruntime "runtime"
 	"strings"
 	"testing"
 	"time"
@@ -2542,10 +2541,6 @@ func TestMonitorNodeHealthMarkPodsNotReadyRetry(t *testing.T) {
 // NodeController is just responsible for enqueuing the node to tainting queue from which taint manager picks up
 // and evicts the pods on the node.
 func TestApplyNoExecuteTaints(t *testing.T) {
-	// TODO: Remove skip once https://github.com/kubernetes/kubernetes/pull/114607 merges.
-	if goruntime.GOOS == "windows" {
-		t.Skip("Skipping test on Windows.")
-	}
 	fakeNow := metav1.Date(2017, 1, 1, 12, 0, 0, 0, time.UTC)
 
 	fakeNodeHandler := &testutil.FakeNodeHandler{
@@ -2781,10 +2776,6 @@ func TestApplyNoExecuteTaints(t *testing.T) {
 // TestApplyNoExecuteTaintsToUnreachableNode ensures a NoExecute taint is applied to node that hasn't posted the
 // node status for a period greater than nodeMonitorGracePeriod.
 func TestApplyNoExecuteTaintsToUnreachableNode(t *testing.T) {
-	// TODO: Remove skip once https://github.com/kubernetes/kubernetes/pull/114607 merges.
-	if goruntime.GOOS == "windows" {
-		t.Skip("Skipping test on Windows.")
-	}
 	time1 := metav1.Date(2017, 1, 1, 12, 0, 0, 0, time.UTC)
 	// time2 is set to NodeMonitorGracePeriod plus 1 second after time1.
 	time2 := metav1.Time{Time: time1.Add(testNodeMonitorGracePeriod + time.Second)}
@@ -2965,10 +2956,6 @@ func TestApplyNoExecuteTaintsToUnreachableNode(t *testing.T) {
 
 // TestApplyNoExecuteTaintsToNodesEnqueueTwice ensures we taint every node with NoExecute even if enqueued twice
 func TestApplyNoExecuteTaintsToNodesEnqueueTwice(t *testing.T) {
-	// TODO: Remove skip once https://github.com/kubernetes/kubernetes/pull/114607 merges.
-	if goruntime.GOOS == "windows" {
-		t.Skip("Skipping test on Windows.")
-	}
 	fakeNow := metav1.Date(2017, 1, 1, 12, 0, 0, 0, time.UTC)
 
 	fakeNodeHandler := &testutil.FakeNodeHandler{
