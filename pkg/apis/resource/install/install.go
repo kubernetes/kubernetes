@@ -21,12 +21,15 @@ package install
 import (
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/resource"
 	v1 "k8s.io/kubernetes/pkg/apis/resource/v1"
 	"k8s.io/kubernetes/pkg/apis/resource/v1alpha3"
 	"k8s.io/kubernetes/pkg/apis/resource/v1beta1"
 	"k8s.io/kubernetes/pkg/apis/resource/v1beta2"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 func init() {
@@ -37,8 +40,21 @@ func init() {
 func Install(scheme *runtime.Scheme) {
 	utilruntime.Must(resource.AddToScheme(scheme))
 	utilruntime.Must(v1alpha3.AddToScheme(scheme))
-	utilruntime.Must(v1beta1.AddToScheme(scheme))
 	utilruntime.Must(v1beta2.AddToScheme(scheme))
 	utilruntime.Must(v1.AddToScheme(scheme))
-	utilruntime.Must(scheme.SetVersionPriority(v1.SchemeGroupVersion, v1beta2.SchemeGroupVersion, v1beta1.SchemeGroupVersion, v1alpha3.SchemeGroupVersion))
+	// v1beta1 is intentionally excluded here: if it gets added later,
+	// it'll have a lower priority than any version listed here.
+	// We never want it to be used.
+	utilruntime.Must(scheme.SetVersionPriority(v1.SchemeGroupVersion, v1beta2.SchemeGroupVersion, v1alpha3.SchemeGroupVersion))
+
+	// Installing resource.k8s.io/v1beta1 is deferred to a scheme init func because
+	// it depends on the DRAResourceV1beta1API feature gate, which is not
+	// initialized yet when package init functions run.
+	scheme.AddInitFunc(func(logger klog.Logger, scheme *runtime.Scheme) error {
+		if !utilfeature.DefaultFeatureGate.Enabled(features.DRAResourceV1beta1API) {
+			logger.V(4).Info("Not installing resource.k8s.io/v1beta1, DRAResourceV1beta1API feature gate is disabled")
+			return nil
+		}
+		return v1beta1.AddToScheme(scheme)
+	})
 }
