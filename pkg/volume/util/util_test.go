@@ -17,6 +17,7 @@ limitations under the License.
 package util
 
 import (
+	"fmt"
 	"os"
 	"reflect"
 	"runtime"
@@ -1110,5 +1111,90 @@ func TestVolumeHealthConditionSetsEqual_IgnoresMessageChanges(t *testing.T) {
 
 	if !VolumeHealthConditionSetsEqual(a, b) {
 		t.Fatal("expected same status/reason with different message to be equal")
+	}
+}
+
+func TestDeduplicateVolumeHealthConditions(t *testing.T) {
+	tests := []struct {
+		name       string
+		conditions []v1.VolumeHealthCondition
+		want       []v1.VolumeHealthCondition
+	}{
+		{
+			name:       "nil conditions returns nil",
+			conditions: nil,
+			want:       nil,
+		},
+		{
+			name:       "empty conditions returns nil",
+			conditions: []v1.VolumeHealthCondition{},
+			want:       nil,
+		},
+		{
+			name: "unique conditions are preserved",
+			conditions: []v1.VolumeHealthCondition{
+				{Status: v1.VolumeHealthDegraded, Reason: "R1", Message: "M1"},
+				{Status: v1.VolumeHealthInaccessible, Reason: "R2", Message: "M2"},
+			},
+			want: []v1.VolumeHealthCondition{
+				{Status: v1.VolumeHealthDegraded, Reason: "R1", Message: "M1"},
+				{Status: v1.VolumeHealthInaccessible, Reason: "R2", Message: "M2"},
+			},
+		},
+		{
+			name: "duplicate (status, reason) entries are deduplicated keeping the first occurrence",
+			conditions: []v1.VolumeHealthCondition{
+				{Status: v1.VolumeHealthDegraded, Reason: "missing_controller", Message: "missing controller for storage"},
+				{Status: v1.VolumeHealthDegraded, Reason: "missing_controller", Message: "missing controller for k8s"},
+			},
+			want: []v1.VolumeHealthCondition{
+				{Status: v1.VolumeHealthDegraded, Reason: "missing_controller", Message: "missing controller for storage"},
+			},
+		},
+		{
+			name: "same reason with different status is not considered duplicate",
+			conditions: []v1.VolumeHealthCondition{
+				{Status: v1.VolumeHealthDegraded, Reason: "R", Message: "M1"},
+				{Status: v1.VolumeHealthDataLoss, Reason: "R", Message: "M2"},
+			},
+			want: []v1.VolumeHealthCondition{
+				{Status: v1.VolumeHealthDegraded, Reason: "R", Message: "M1"},
+				{Status: v1.VolumeHealthDataLoss, Reason: "R", Message: "M2"},
+			},
+		},
+		{
+			name: "caps conditions at MaxVolumeHealthConditions (16)",
+			conditions: func() []v1.VolumeHealthCondition {
+				conds := make([]v1.VolumeHealthCondition, 20)
+				for i := range 20 {
+					conds[i] = v1.VolumeHealthCondition{
+						Status:  v1.VolumeHealthDegraded,
+						Reason:  fmt.Sprintf("Reason%d", i),
+						Message: fmt.Sprintf("Message%d", i),
+					}
+				}
+				return conds
+			}(),
+			want: func() []v1.VolumeHealthCondition {
+				conds := make([]v1.VolumeHealthCondition, 16)
+				for i := range 16 {
+					conds[i] = v1.VolumeHealthCondition{
+						Status:  v1.VolumeHealthDegraded,
+						Reason:  fmt.Sprintf("Reason%d", i),
+						Message: fmt.Sprintf("Message%d", i),
+					}
+				}
+				return conds
+			}(),
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := DeduplicateVolumeHealthConditions(tc.conditions)
+			if !reflect.DeepEqual(got, tc.want) {
+				t.Fatalf("DeduplicateVolumeHealthConditions() = %+v, want %+v", got, tc.want)
+			}
+		})
 	}
 }
