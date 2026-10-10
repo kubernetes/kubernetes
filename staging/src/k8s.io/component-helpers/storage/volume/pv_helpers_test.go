@@ -406,3 +406,59 @@ func makeTestVolume(uid types.UID, name string, capacity string, available bool,
 	}
 	return &pv
 }
+
+func TestIsPopulatorDataSource(t *testing.T) {
+	cdiGroup := "cdi.kubevirt.io"
+	snapshotGroup := "snapshot.storage.k8s.io"
+	emptyGroup := ""
+
+	tests := []struct {
+		name     string
+		ref      *v1.TypedObjectReference
+		expected bool
+	}{
+		{
+			name:     "nil DataSourceRef",
+			ref:      nil,
+			expected: false,
+		},
+		{
+			name:     "nil APIGroup",
+			ref:      &v1.TypedObjectReference{Kind: "DataVolume", Name: "dv1"},
+			expected: false,
+		},
+		{
+			name:     "empty APIGroup",
+			ref:      &v1.TypedObjectReference{APIGroup: &emptyGroup, Kind: "PersistentVolumeClaim", Name: "pvc1"},
+			expected: false,
+		},
+		{
+			name:     "VolumeSnapshot",
+			ref:      &v1.TypedObjectReference{APIGroup: &snapshotGroup, Kind: "VolumeSnapshot", Name: "snap1"},
+			expected: false,
+		},
+		{
+			name:     "custom populator (CDI DataVolume)",
+			ref:      &v1.TypedObjectReference{APIGroup: &cdiGroup, Kind: "DataVolume", Name: "dv1"},
+			expected: true,
+		},
+		{
+			name:     "custom populator (other kind in snapshot group)",
+			ref:      &v1.TypedObjectReference{APIGroup: &snapshotGroup, Kind: "VolumeSnapshotContent", Name: "vsc1"},
+			expected: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			claim := &v1.PersistentVolumeClaim{
+				Spec: v1.PersistentVolumeClaimSpec{
+					DataSourceRef: tt.ref,
+				},
+			}
+			if got := IsPopulatorDataSource(claim); got != tt.expected {
+				t.Errorf("IsPopulatorDataSource() = %v, want %v", got, tt.expected)
+			}
+		})
+	}
+}
