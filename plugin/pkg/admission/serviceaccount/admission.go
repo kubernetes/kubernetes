@@ -32,13 +32,14 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 	genericadmissioninitializer "k8s.io/apiserver/pkg/admission/initializer"
 	"k8s.io/apiserver/pkg/storage/names"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	corev1listers "k8s.io/client-go/listers/core/v1"
 	podutil "k8s.io/kubernetes/pkg/api/pod"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/serviceaccount"
-	"k8s.io/utils/ptr"
 )
 
 const (
@@ -475,39 +476,46 @@ func (s *Plugin) mountServiceAccountToken(serviceAccount *corev1.ServiceAccount,
 	// Add the volume if a container needs it
 	if !hasTokenVolume && needsTokenVolume {
 		pod.Spec.Volumes = append(pod.Spec.Volumes, api.Volume{
-			Name: tokenVolumeName,
-			VolumeSource: api.VolumeSource{
-				Projected: TokenVolumeSource(),
-			},
+			Name:      tokenVolumeName,
+			Projected: TokenVolumeSource(),
 		})
 	}
 }
 
 // TokenVolumeSource returns the projected volume source for service account token.
 func TokenVolumeSource() *api.ProjectedVolumeSource {
+	kubeAPIServerTrustProjection := api.VolumeProjection{
+		ConfigMap: &api.ConfigMapProjection{
+			Name: "kube-root-ca.crt",
+			Items: []api.KeyToPath{
+				{
+					Key:  "ca.crt",
+					Path: "ca.crt",
+				},
+			},
+		},
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.KubeAPIServerWorkloadsTrust) {
+		kubeAPIServerTrustProjection = api.VolumeProjection{
+			ClusterTrustBundle: &api.ClusterTrustBundleProjection{
+				SignerName:    new("kubernetes.io/kube-apiserver-serving"),
+				LabelSelector: &metav1.LabelSelector{},
+				Path:          "ca.crt",
+			},
+		}
+	}
+
 	return &api.ProjectedVolumeSource{
 		// explicitly set default value, see #104464
-		DefaultMode: ptr.To[int32](corev1.ProjectedVolumeSourceDefaultMode),
+		DefaultMode: new(corev1.ProjectedVolumeSourceDefaultMode),
 		Sources: []api.VolumeProjection{
 			{
 				ServiceAccountToken: &api.ServiceAccountTokenProjection{
 					Path:              "token",
-					ExpirationSeconds: ptr.To[int64](serviceaccount.WarnOnlyBoundTokenExpirationSeconds),
+					ExpirationSeconds: new(int64(serviceaccount.WarnOnlyBoundTokenExpirationSeconds)),
 				},
 			},
-			{
-				ConfigMap: &api.ConfigMapProjection{
-					LocalObjectReference: api.LocalObjectReference{
-						Name: "kube-root-ca.crt",
-					},
-					Items: []api.KeyToPath{
-						{
-							Key:  "ca.crt",
-							Path: "ca.crt",
-						},
-					},
-				},
-			},
+			kubeAPIServerTrustProjection,
 			{
 				DownwardAPI: &api.DownwardAPIProjection{
 					Items: []api.DownwardAPIVolumeFile{
