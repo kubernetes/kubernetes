@@ -114,6 +114,7 @@ ENABLE_TRACING=${ENABLE_TRACING:-false}
 # Enable ML-DSA post-quantum cryptography for all cluster certificates.
 # When true, generates ML-DSA CAs and certs, enables the CertificateSigningRequestMLDSA
 # feature gate, and configures the kubelet to use ML-DSA keys for certificate rotation.
+# ML-DSA API server health checks require curl using OpenSSL 3.5.0 or newer.
 ENABLE_MLDSA=${ENABLE_MLDSA:-false}
 MLDSA_ALGORITHM=${MLDSA_ALGORITHM:-"ML-DSA-65"}
 if [[ "${ENABLE_MLDSA}" == "true" ]]; then
@@ -283,6 +284,10 @@ function run {
         echo "RUN ${what}: ${*}"
     fi
 }
+
+if [[ "${ENABLE_MLDSA}" == "true" && "${START_MODE}" != "kubeletonly" && -z "${DRY_RUN}" ]]; then
+  kube::util::test_curl_mldsa_support || exit 1
+fi
 
 if [ -z "${GO_OUT}" ]; then
     binaries_to_build="cmd/kubectl cmd/kube-apiserver cmd/kube-controller-manager cmd/cloud-controller-manager cmd/kube-scheduler"
