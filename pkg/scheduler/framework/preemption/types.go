@@ -220,21 +220,12 @@ func (v *victim) Type() fwk.EntityKeyType {
 // NewPodVictim creates a new Victim representing a single Pod.
 // It calculates the priority of the pod, taking into account its scheduling group if applicable.
 // It ignores the error from NewVictim internally as it is guaranteed to succeed for a single valid pod.
-// TODO: what we do below is not ideal:
-//   - From the victim's importance POV, individual Pods should always have the PodKeyType.
-//   - On the other hand, we need to store the information that the Pod victim belongs to the "single"
-//     disruption mode PodGroup due to WAP-related metrics bookkeeping.
-//   - Ideally, we should store another bit of information denoting the type of top-level group the victim
-//     Pod belongs to.
-//
-// We should fix this on the occasion of adding support for CompositePodGroup WAP-related metrics.
+// The victim is always of PodKeyType, even if the pod belongs to a PodGroup or CompositePodGroup with
+// disruption mode Single: it is evicted alone, so it ranks as an individual pod. Group membership needed
+// for metrics is derived from the pod itself, see [isGroupVictim].
 func NewPodVictim(podInfo fwk.PodInfo, pgLister fwk.PodGroupLister, cpgLister fwk.CompositePodGroupLister) Victim {
 	priority := getPodPriority(podInfo.GetPod(), pgLister, cpgLister)
-	keyType := fwk.PodKeyType
-	if podInfo.GetPod().Spec.SchedulingGroup != nil && pgLister != nil {
-		keyType = fwk.PodGroupKeyType
-	}
-	vi, _ := NewVictim([]fwk.PodInfo{podInfo}, priority, keyType)
+	vi, _ := NewVictim([]fwk.PodInfo{podInfo}, priority, fwk.PodKeyType)
 	return vi
 }
 
