@@ -27,6 +27,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
+	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
@@ -581,6 +582,7 @@ func TestGeneratePodInitializedCondition(t *testing.T) {
 }
 
 func TestGeneratePodReadyToStartContainersCondition(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	for desc, test := range map[string]struct {
 		pod      *v1.Pod
 		status   *kubecontainer.PodStatus
@@ -706,7 +708,7 @@ func TestGeneratePodReadyToStartContainersCondition(t *testing.T) {
 	} {
 		t.Run(desc, func(t *testing.T) {
 			test.expected.Type = v1.PodReadyToStartContainers
-			condition := GeneratePodReadyToStartContainersCondition(test.pod, &v1.PodStatus{}, test.status)
+			condition := GeneratePodReadyToStartContainersCondition(logger, test.pod, &v1.PodStatus{}, test.status)
 			require.Equal(t, test.expected.Type, condition.Type)
 			require.Equal(t, test.expected.Status, condition.Status)
 			require.Equal(t, test.expected.Reason, condition.Reason)
