@@ -676,7 +676,7 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 		return newImmediateCloseWatcher(), nil
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.ShardedListAndWatch) && pred.ShardSelector != nil && !pred.ShardSelector.Empty() {
+	if pred.ShardSelector != nil && !pred.ShardSelector.Empty() && utilfeature.DefaultFeatureGate.Enabled(features.ShardedListAndWatch) {
 		metrics.RecordShardedWatchStarted(c.groupResource)
 		originalForget := watcher.forget
 		watcher.forget = func(drainWatcher bool) {
@@ -822,7 +822,6 @@ func (c *Cacher) GetList(ctx context.Context, key string, opts storage.ListOptio
 		//   the elements in ListObject are Struct type, making slice will bring excessive memory consumption.
 		//   so we try to delay this action as much as possible
 		var selectedObjects []runtime.Object
-		shardingEnabled := utilfeature.DefaultFeatureGate.Enabled(features.ShardedListAndWatch)
 		for elem, err := range resp.All() {
 			if err != nil {
 				return err
@@ -833,14 +832,14 @@ func (c *Cacher) GetList(ctx context.Context, key string, opts storage.ListOptio
 				hasMoreListItems = true
 				break
 			}
-			shardMatch := true
-			if shardingEnabled {
-				shardMatch, err = opts.Predicate.MatchesSharding(elem.Object)
-				if err != nil {
-					return fmt.Errorf("shard matching failed: %w", err)
-				}
+			if !opts.Predicate.MatchesObjectAttributes(elem.Labels, elem.Fields) {
+				continue
 			}
-			if shardMatch && opts.Predicate.MatchesObjectAttributes(elem.Labels, elem.Fields) {
+			shardMatch, err := opts.Predicate.MatchesSharding(elem.Object)
+			if err != nil {
+				return fmt.Errorf("shard matching failed: %w", err)
+			}
+			if shardMatch {
 				selectedObjects = append(selectedObjects, elem.Object)
 				lastSelectedObjectKey = elem.Key
 			}
@@ -868,9 +867,7 @@ func (c *Cacher) GetList(ctx context.Context, key string, opts storage.ListOptio
 			return err
 		}
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.ShardedListAndWatch) {
-		opts.Predicate.SetShardInfoOnList(listObj)
-	}
+	opts.Predicate.SetShardInfoOnList(listObj)
 	metrics.RecordListCacheMetrics(c.groupResource, indexUsed, numFetched, listVal.Len())
 	return nil
 }
@@ -1252,25 +1249,24 @@ func forgetWatcher(c *Cacher, w *cacheWatcher, index int, scope namespacedName, 
 }
 
 func filterWithAttrsAndPrefixFunction(prefix string, p storage.SelectionPredicate, groupResource schema.GroupResource) filterWithAttrsFunc {
-	isSharded := utilfeature.DefaultFeatureGate.Enabled(features.ShardedListAndWatch) && p.ShardSelector != nil && !p.ShardSelector.Empty()
-	filterFunc := func(objKey string, label labels.Set, field fields.Set, obj runtime.Object) bool {
+	return func(objKey string, label labels.Set, field fields.Set, obj runtime.Object) bool {
 		if !key.HasPathPrefix(objKey, prefix) {
 			return false
 		}
-		if isSharded {
-			matches, err := p.MatchesSharding(obj)
-			if err != nil {
-				utilruntime.HandleError(fmt.Errorf("shard matching failed for %v: %w", groupResource, err))
-				return false
-			}
-			if !matches {
-				metrics.RecordWatchFilteredEvent(groupResource)
-				return false
-			}
+		if !p.MatchesObjectAttributes(label, field) {
+			return false
 		}
-		return p.MatchesObjectAttributes(label, field)
+		matches, err := p.MatchesSharding(obj)
+		if err != nil {
+			utilruntime.HandleError(fmt.Errorf("shard matching failed for %v: %w", groupResource, err))
+			return false
+		}
+		if !matches {
+			metrics.RecordWatchFilteredEvent(groupResource)
+			return false
+		}
+		return true
 	}
-	return filterFunc
 }
 
 // LastSyncResourceVersion returns resource version to which the underlying cache is synced.
