@@ -56,8 +56,33 @@ import (
 
 func TestWatch(t *testing.T) {
 	t.Run("Watch", func(t *testing.T) {
-		ctx, store, _ := testSetup(t)
-		storagetesting.RunTestWatch(ctx, t, store)
+		ctx, store, _ := testSetup(t, withReverseKeyFunc(storagetesting.PodReverseKeyFunc("/pods", true)))
+		storagetesting.RunTestWatch(ctx, t, store, false)
+	})
+	t.Run("WatchWithoutPrevKVRootPrefix", func(t *testing.T) {
+		ctx, store, client := testSetup(t, withPrefix("/"), withResourcePrefix("/pods"), withReverseKeyFunc(storagetesting.PodReverseKeyFunc("/pods", true)))
+		recorder := storagetesting.NewWatchRecorder(client.Watcher)
+		client.Watcher = recorder
+		storagetesting.RunTestWatchWithoutPrevKV(ctx, t, store, recorder, "ns", false)
+	})
+	t.Run("WatchWithoutPrevKVClusterScoped", func(t *testing.T) {
+		ctx, store, client := testSetup(t, withPrefix("/custom/prefix"), withResourcePrefix("/pods"), withReverseKeyFunc(storagetesting.PodReverseKeyFunc("/pods", false)))
+		recorder := storagetesting.NewWatchRecorder(client.Watcher)
+		client.Watcher = recorder
+		storagetesting.RunTestWatchWithoutPrevKV(ctx, t, store, recorder, "", false)
+	})
+	t.Run("WatchWithoutPrevKVFallback", func(t *testing.T) {
+		ctx, store, client := testSetup(t, withPrefix("/registry"), withResourcePrefix("/pods"))
+		recorder := storagetesting.NewWatchRecorder(client.Watcher)
+		client.Watcher = recorder
+		storagetesting.RunTestWatchWithoutPrevKV(ctx, t, store, recorder, "ns", true)
+	})
+	t.Run("WatchWithoutPrevKVReverseError", func(t *testing.T) {
+		wantErr := errors.New("invalid resource key")
+		ctx, store, _ := testSetup(t, withPrefix("/registry"), withReverseKeyFunc(func(string) (string, string, error) {
+			return "", "", wantErr
+		}))
+		storagetesting.RunTestWatchWithoutPrevKVReverseError(ctx, t, store, wantErr)
 	})
 	t.Run("ClusterScopedWatch", func(t *testing.T) {
 		ctx, store, _ := testSetup(t)
@@ -180,6 +205,15 @@ func TestWatchErrorIncorrectConfiguration(t *testing.T) {
 			requestOpts: storage.ListOptions{ProgressNotify: true},
 			expectedErr: apierrors.NewInternalError(errors.New("progressNotify for watch is unsupported by the etcd storage because no newFunc was provided")),
 		},
+		{
+			name: "watch without previous values requires an object constructor",
+			setupFn: func(opts *setupOptions) {
+				opts.newFunc = nil
+				opts.reverseKeyFunc = storagetesting.PodReverseKeyFunc("/pods", true)
+			},
+			requestOpts: storage.ListOptions{WatchWithoutPrevKV: true, Predicate: storage.Everything},
+			expectedErr: apierrors.NewInternalError(errors.New("watchWithoutPrevKV requires a newFunc")),
+		},
 	}
 	for _, scenario := range scenarios {
 		t.Run(scenario.name, func(t *testing.T) {
@@ -199,6 +233,9 @@ func TestWatchErrorIncorrectConfiguration(t *testing.T) {
 			}
 			if err.Error() != scenario.expectedErr.Error() {
 				t.Fatalf("unexpected err = %v, expected = %v", err, scenario.expectedErr)
+			}
+			if !apierrors.IsInternalError(err) {
+				t.Fatalf("expected an internal error, got %v", err)
 			}
 		})
 	}

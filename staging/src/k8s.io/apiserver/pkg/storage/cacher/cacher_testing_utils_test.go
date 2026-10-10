@@ -19,7 +19,6 @@ package cacher
 import (
 	"context"
 	"fmt"
-	"strings"
 	"testing"
 	"time"
 
@@ -78,7 +77,7 @@ func newEtcdTestStorage(t testing.TB, prefix string) (*etcd3testing.EtcdTestServ
 }
 
 func newEtcdTestStorageWithCodec(t testing.TB, prefix string, codec runtime.Codec) (*etcd3testing.EtcdTestServer, storage.Interface) {
-	return newEtcdTestStorageWithOptions(t, prefix, codec, identity.NewEncryptCheckTransformer(), reverseKeyFunc("/pods/", true))
+	return newEtcdTestStorageWithOptions(t, prefix, codec, identity.NewEncryptCheckTransformer(), storagetesting.PodReverseKeyFunc("/pods/", true))
 }
 
 func newEtcdTestStorageWithOptions(t testing.TB, prefix string, codec runtime.Codec, transformer value.Transformer, reverseKeyFunc storage.ReverseKeyFunc) (*etcd3testing.EtcdTestServer, storage.Interface) {
@@ -111,65 +110,6 @@ func computePodKey(obj metav1.Object) string {
 	return fmt.Sprintf("/pods/%s/%s", obj.GetNamespace(), obj.GetName())
 }
 
-func reverseKeyFunc(prefix string, namespaced bool) storage.ReverseKeyFunc {
-	prefix = strings.TrimSuffix(prefix, "/") + "/"
-	return func(key string) (name string, namespace string, err error) {
-		relativeKey, ok := strings.CutPrefix(key, prefix)
-		if !ok {
-			return "", "", fmt.Errorf("invalid key %q, expected prefix %q", key, prefix)
-		}
-		if namespaced {
-			namespace, name, ok = strings.Cut(relativeKey, "/")
-			// Storage tests bypass API validation and use empty namespaces, which
-			// storage.NamespaceKeyFunc preserves as an empty path segment.
-			if !ok || name == "" || strings.Contains(name, "/") {
-				return "", "", fmt.Errorf("invalid namespaced key %q", key)
-			}
-			return name, namespace, nil
-		}
-		if relativeKey == "" || strings.Contains(relativeKey, "/") {
-			return "", "", fmt.Errorf("invalid cluster-scoped key %q", key)
-		}
-		return relativeKey, "", nil
-	}
-}
-
-func TestReverseKeyFunc(t *testing.T) {
-	for _, tc := range []struct {
-		name       string
-		namespaced bool
-		namespace  string
-	}{
-		{name: "cluster scoped"},
-		{name: "namespaced", namespaced: true, namespace: "ns"},
-		{name: "empty namespace in storage tests", namespaced: true},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			pod := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod", Namespace: tc.namespace}}
-			var key string
-			var err error
-			if tc.namespaced {
-				key, err = storage.NamespaceKeyFunc("/pods/", pod)
-			} else {
-				key, err = storage.NoNamespaceKeyFunc("/pods/", pod)
-			}
-			if err != nil {
-				t.Fatal(err)
-			}
-			reverse := reverseKeyFunc("/pods/", tc.namespaced)
-			name, namespace, err := reverse(key)
-			if err != nil || name != pod.Name || namespace != pod.Namespace {
-				t.Fatalf("reverse(%q) = (%q, %q, %v)", key, name, namespace, err)
-			}
-			for _, invalid := range []string{"/other/ns/pod", "/pods", "/pods/", "/pods/ns/", "/pods/ns/pod/extra"} {
-				if _, _, err := reverse(invalid); err == nil {
-					t.Errorf("expected error for key %q", invalid)
-				}
-			}
-		})
-	}
-}
-
 func benchmarkEtcdTestStorage(t testing.TB) (*etcd3testing.EtcdTestServer, storage.Interface) {
 	config := storagetesting.StoreConfigForBenchmarks()
 	server := &etcd3testing.EtcdTestServer{V3Client: testserver.RunEtcd(t, func(cfg *embed.Config) {
@@ -183,7 +123,7 @@ func benchmarkEtcdTestStorage(t testing.TB) (*etcd3testing.EtcdTestServer, stora
 		config.Codec,
 		config.NewFunc,
 		config.NewListFunc,
-		reverseKeyFunc(config.ResourcePrefix, true),
+		storagetesting.PodReverseKeyFunc(config.ResourcePrefix, true),
 		etcd3testing.PathPrefix(),
 		config.ResourcePrefix,
 		config.GroupResource,

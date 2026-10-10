@@ -23,6 +23,7 @@ import (
 	"path"
 	"reflect"
 	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -78,6 +79,29 @@ func DeepEqualSafePodSpec() example.PodSpec {
 		RestartPolicy:                 "Always",
 		TerminationGracePeriodSeconds: &grace,
 		SchedulerName:                 "default-scheduler",
+	}
+}
+
+func PodReverseKeyFunc(prefix string, namespaced bool) storage.ReverseKeyFunc {
+	prefix = strings.TrimSuffix(prefix, "/") + "/"
+	return func(key string) (name string, namespace string, err error) {
+		relativeKey, ok := strings.CutPrefix(key, prefix)
+		if !ok {
+			return "", "", fmt.Errorf("invalid key %q, expected prefix %q", key, prefix)
+		}
+		if namespaced {
+			namespace, name, ok = strings.Cut(relativeKey, "/")
+			// Storage tests bypass API validation and use empty namespaces, which
+			// storage.NamespaceKeyFunc preserves as an empty path segment.
+			if !ok || name == "" || strings.Contains(name, "/") {
+				return "", "", fmt.Errorf("invalid namespaced key %q", key)
+			}
+			return name, namespace, nil
+		}
+		if relativeKey == "" || strings.Contains(relativeKey, "/") {
+			return "", "", fmt.Errorf("invalid cluster-scoped key %q", key)
+		}
+		return relativeKey, "", nil
 	}
 }
 
