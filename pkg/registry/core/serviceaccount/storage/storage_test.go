@@ -33,11 +33,8 @@ import (
 	genericregistrytest "k8s.io/apiserver/pkg/registry/generic/testing"
 	"k8s.io/apiserver/pkg/registry/rest"
 	etcd3testing "k8s.io/apiserver/pkg/storage/etcd3/testing"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	authenticationapi "k8s.io/kubernetes/pkg/apis/authentication"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 	token "k8s.io/kubernetes/pkg/serviceaccount"
 )
@@ -115,9 +112,6 @@ func TestCreate_Token_SetsCredentialIDAuditAnnotation(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-
-	// Enable JTI feature
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceAccountTokenJTI, true)
 
 	serviceAccount := validNewServiceAccount("foo")
 	ctx := genericregistrytest.NewNamespaceScopeContext(storage.Store, serviceAccount.Namespace)
