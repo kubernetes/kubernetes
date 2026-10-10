@@ -24,6 +24,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -1443,6 +1444,139 @@ func TestCPUSharesEqualAfterV2RoundTrip(t *testing.T) {
 				t.Fatalf("CPUSharesEqualAfterV2RoundTrip(%d, %d) = %t, want %t",
 					tc.allocatedShares, tc.readbackShares, got, tc.expected)
 			}
+		})
+	}
+}
+
+// TestMilliCPUToShares verifies conversion from Kubernetes milliCPU to Linux CFS cpu.shares.
+// The formula (milliCPU * 1024 / 1000) derives from Docker's convention where 1 CPU = 1024
+// shares (kernel default for a new cgroup). Bounds are enforced per the Linux kernel:
+//   - MinShares (2): kernel/sched/sched.h line 427
+//   - MaxShares (262144): kernel/sched/sched.h line 428
+//
+// Zero milliCPU returns MinShares (not 0) because the kernel treats 0 as "use default (1024)",
+// and Kubernetes needs a distinct floor value to represent "no CPU request".
+func TestMilliCPUToShares(t *testing.T) {
+	testCases := []struct {
+		name     string
+		input    int64
+		expected uint64
+	}{
+		{name: "zero milliCPU returns MinShares", input: 0, expected: MinShares},
+		{name: "1 milliCPU rounds down to MinShares", input: 1, expected: MinShares},
+		{name: "2 milliCPU computes to exactly MinShares (2*1024/1000=2)", input: 2, expected: MinShares},
+		{name: "3 milliCPU computes to 3 shares (3*1024/1000=3)", input: 3, expected: 3},
+		{name: "100 milliCPU maps to 102 shares", input: 100, expected: 102},
+		{name: "500 milliCPU maps to 512 shares", input: 500, expected: 512},
+		{name: "1000 milliCPU (1 CPU) maps to 1024 shares", input: 1000, expected: 1024},
+		{name: "255999 milliCPU just below MaxShares", input: 255999, expected: uint64(255999 * 1024 / 1000)},
+		{name: "256000 milliCPU hits exactly MaxShares", input: 256000, expected: MaxShares},
+		{name: "256001 milliCPU clamped to MaxShares", input: 256001, expected: MaxShares},
+		{name: "1000000 milliCPU clamped to MaxShares", input: 1000000, expected: MaxShares},
+		{name: "negative milliCPU clamped to MinShares", input: -1, expected: MinShares},
+		{name: "large negative clamped to MinShares", input: -1000000, expected: MinShares},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.expected, MilliCPUToShares(tc.input))
+		})
+	}
+}
+
+// TestSharesToMilliCPU verifies the inverse conversion from Linux CFS cpu.shares back to
+// Kubernetes milliCPU. Uses ceiling division — ceil(shares * 1000 / 1024) — to avoid
+// losing precision on round-trips. Shares below MinShares return 0, indicating "unset"
+// per kubelet convention for pods without explicit CPU requests.
+func TestSharesToMilliCPU(t *testing.T) {
+	testCases := []struct {
+		name     string
+		input    int64
+		expected int64
+	}{
+		{name: "zero shares returns 0 (below MinShares threshold)", input: 0, expected: 0},
+		{name: "1 share returns 0 (below MinShares)", input: 1, expected: 0},
+		{name: "MinShares (2) returns ceil(2*1000/1024)=2", input: int64(MinShares), expected: 2},
+		{name: "3 shares returns ceil(3*1000/1024)=3", input: 3, expected: 3},
+		{name: "102 shares returns ceil(102*1000/1024)=100", input: 102, expected: 100},
+		{name: "512 shares returns ceil(512*1000/1024)=500", input: 512, expected: 500},
+		{name: "1024 shares returns ceil(1024*1000/1024)=1000", input: 1024, expected: 1000},
+		{name: "MaxShares (262144) returns ceil(262144*1000/1024)=256000", input: int64(MaxShares), expected: 256000},
+		{name: "negative shares returns 0", input: -1, expected: 0},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.expected, SharesToMilliCPU(tc.input))
+		})
+	}
+}
+
+// TestMilliCPUToSharesRoundTrip documents the intended round-trip behavior of
+// milliCPU → shares → milliCPU. kubelet writes cpu.shares during pod admission
+// (MilliCPUToShares) and reads them back for status reporting (SharesToMilliCPU),
+// so the conversion is designed to be the identity *within the representable share
+// range* [MinShares, MaxShares]. Outside that range the floor (MinShares) and cap
+// (MaxShares) intentionally lose precision — that loss is the designed clamp, not a
+// bug, so the edge cases below assert the recovered value rather than equality.
+func TestMilliCPUToSharesRoundTrip(t *testing.T) {
+	testCases := []struct {
+		name              string
+		milliCPU          int64
+		expectedRecovered int64
+	}{
+		// Identity range: shares land in (MinShares, MaxShares), round-trip is lossless.
+		{name: "100m", milliCPU: 100, expectedRecovered: 100},
+		{name: "250m", milliCPU: 250, expectedRecovered: 250},
+		{name: "500m", milliCPU: 500, expectedRecovered: 500},
+		{name: "1000m (1 CPU)", milliCPU: 1000, expectedRecovered: 1000},
+		{name: "2000m", milliCPU: 2000, expectedRecovered: 2000},
+		{name: "4000m", milliCPU: 4000, expectedRecovered: 4000},
+		// Upper boundary: 256000m maps to exactly MaxShares and round-trips losslessly.
+		{name: "256000m maps to MaxShares, lossless", milliCPU: 256000, expectedRecovered: 256000},
+		// Above the cap: shares clamp to MaxShares, recovering the cap not the input.
+		{name: "300000m clamps to MaxShares (256000m)", milliCPU: 300000, expectedRecovered: 256000},
+		// At/below the floor: shares clamp to MinShares (2), recovering 2m not the input.
+		{name: "1m clamps to MinShares (2m)", milliCPU: 1, expectedRecovered: 2},
+		{name: "0m clamps to MinShares (2m)", milliCPU: 0, expectedRecovered: 2},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			shares := MilliCPUToShares(tc.milliCPU)
+			recovered := SharesToMilliCPU(int64(shares))
+			assert.Equal(t, tc.expectedRecovered, recovered)
+		})
+	}
+}
+
+// TestQuotaToMilliCPU verifies conversion from CFS bandwidth control quota/period to
+// Kubernetes milliCPU. Per the CFS bandwidth control specification
+// (Documentation/scheduler/sched-bwc.txt), quota=-1 means "unlimited" (no CPU limit)
+// and is mapped to 0 milliCPU. The formula (quota * 1000 / period) uses integer division,
+// so sub-milliCPU fractions are truncated.
+func TestQuotaToMilliCPU(t *testing.T) {
+	testCases := []struct {
+		name     string
+		quota    int64
+		period   int64
+		expected int64
+	}{
+		{name: "unlimited quota (-1) returns 0", quota: -1, period: 100000, expected: 0},
+		{name: "zero quota returns 0", quota: 0, period: 100000, expected: 0},
+		{name: "quota=1000 period=100000 returns 10 (MinMilliCPULimit)", quota: 1000, period: 100000, expected: 10},
+		{name: "quota=5000 period=100000 returns 50", quota: 5000, period: 100000, expected: 50},
+		{name: "quota=50000 period=100000 returns 500", quota: 50000, period: 100000, expected: 500},
+		{name: "quota=100000 period=100000 returns 1000 (1 CPU)", quota: 100000, period: 100000, expected: 1000},
+		{name: "quota=200000 period=100000 returns 2000 (2 CPUs)", quota: 200000, period: 100000, expected: 2000},
+		{name: "non-standard period: quota=5000 period=5000 returns 1000", quota: 5000, period: 5000, expected: 1000},
+		{name: "sub-milliCPU truncation: quota=1 period=100000 returns 0", quota: 1, period: 100000, expected: 0},
+		{name: "near-minimum: quota=100 period=100000 returns 1", quota: 100, period: 100000, expected: 1},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.expected, QuotaToMilliCPU(tc.quota, tc.period))
 		})
 	}
 }
