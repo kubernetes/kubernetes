@@ -66,6 +66,9 @@ func init() {
 			"metadata.uid": {
 				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
 			},
+			"spec.volumeName": {
+				{ErrorType: "FieldValueInvalid", Origin: "update"},
+			},
 			"status.healthStatus.healthConditions": {
 				{ErrorType: "FieldValueTooMany", Origin: "maxItems"},
 			},
