@@ -24,6 +24,7 @@ import (
 	"k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apiserver/pkg/admission"
+	podutil "k8s.io/kubernetes/pkg/api/pod"
 	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
@@ -58,11 +59,11 @@ func (p *Plugin) Validate(ctx context.Context, attributes admission.Attributes, 
 	if len(attributes.GetSubresource()) != 0 || attributes.GetResource().GroupResource() != api.Resource("pods") {
 		return nil
 	}
-	pod, ok := attributes.GetObject().(*api.Pod)
-	if !ok {
+	pod, err := podutil.Accessor(attributes.GetObject())
+	if err != nil {
 		return apierrors.NewBadRequest("Resource was marked with kind Pod but was unable to be converted")
 	}
-	affinity := pod.Spec.Affinity
+	affinity := pod.GetSpecAffinity()
 	if affinity != nil && affinity.PodAntiAffinity != nil {
 		var podAntiAffinityTerms []api.PodAffinityTerm
 		if len(affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution) != 0 {
@@ -74,7 +75,7 @@ func (p *Plugin) Validate(ctx context.Context, attributes admission.Attributes, 
 		//}
 		for _, v := range podAntiAffinityTerms {
 			if v.TopologyKey != v1.LabelHostname {
-				return apierrors.NewForbidden(attributes.GetResource().GroupResource(), pod.Name, fmt.Errorf("affinity.PodAntiAffinity.RequiredDuringScheduling has TopologyKey %v but only key %v is allowed", v.TopologyKey, v1.LabelHostname))
+				return apierrors.NewForbidden(attributes.GetResource().GroupResource(), pod.GetName(), fmt.Errorf("affinity.PodAntiAffinity.RequiredDuringScheduling has TopologyKey %v but only key %v is allowed", v.TopologyKey, v1.LabelHostname))
 			}
 		}
 	}
