@@ -53,7 +53,7 @@ func newNavigationSteps(path string) (*navigationSteps, error) {
 			// Only maps of struct pointers can be navigated.  Other maps, like extensions (map[string]runtime.Object), can't be, and calling
 			// Elem on their interface value type would panic.
 			if currType.Elem().Kind() != reflect.Pointer {
-				return nil, fmt.Errorf("unable to parse one or more field values of %v", path)
+				return nil, fmt.Errorf("unable to parse one or more field values of %v, please configure these values directly in the file.", path)
 			}
 			mapValueType := currType.Elem().Elem()
 			mapValueOptions, err := getPotentialTypeValues(mapValueType)
