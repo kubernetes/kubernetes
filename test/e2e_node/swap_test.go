@@ -197,7 +197,7 @@ func expectLimitedSwap(f *framework.Framework, pod *v1.Pod, expectedSwapLimit in
 	const errMsg = "swap limitation is not as expected"
 
 	gomega.ExpectWithOffset(1, int64(swapLimit)).To(
-		gomega.Or(
+		gomega.And(
 			gomega.BeNumerically(">=", expectedSwapLimit-cgroupAlignment),
 			gomega.BeNumerically("<=", expectedSwapLimit+cgroupAlignment),
 		),
