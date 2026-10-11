@@ -17,6 +17,7 @@ limitations under the License.
 package flexvolume
 
 import (
+	"context"
 	"os"
 	"strconv"
 
@@ -40,12 +41,12 @@ var _ volume.Mounter = &flexVolumeMounter{}
 // Mounter interface
 
 // SetUp creates new directory.
-func (f *flexVolumeMounter) SetUp(mounterArgs volume.MounterArgs) error {
-	return f.SetUpAt(f.GetPath(), mounterArgs)
+func (f *flexVolumeMounter) SetUp(ctx context.Context, mounterArgs volume.MounterArgs) error {
+	return f.SetUpAt(ctx, f.GetPath(), mounterArgs)
 }
 
 // SetUpAt creates new directory.
-func (f *flexVolumeMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs) error {
+func (f *flexVolumeMounter) SetUpAt(ctx context.Context, dir string, mounterArgs volume.MounterArgs) error {
 	// Mount only once.
 	alreadyMounted, err := prepareForMount(f.mounter, dir)
 	if err != nil {

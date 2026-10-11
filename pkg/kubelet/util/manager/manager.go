@@ -17,6 +17,8 @@ limitations under the License.
 package manager
 
 import (
+	"context"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -27,7 +29,7 @@ import (
 // extracting those from that cache if needed.
 type Manager interface {
 	// Get object by its namespace and name.
-	GetObject(namespace, name string) (runtime.Object, error)
+	GetObject(ct context.Context, namespace, name string) (runtime.Object, error)
 
 	// WARNING: Register/UnregisterPod functions should be efficient,
 	// i.e. should not block on network operations.
@@ -57,5 +59,5 @@ type Store interface {
 	// when refcount of every referenceFrom was reduced to zero).
 	DeleteReference(namespace, name string, referencedFrom types.UID)
 	// Get an object from a store.
-	Get(namespace, name string) (runtime.Object, error)
+	Get(ctx context.Context, namespace, name string) (runtime.Object, error)
 }

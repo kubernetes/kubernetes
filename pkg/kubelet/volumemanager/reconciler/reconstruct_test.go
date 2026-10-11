@@ -26,14 +26,14 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/klog/v2/ktesting"
+	"k8s.io/ktesting"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetesting "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/pkg/volume/util"
 )
 
 func TestReconstructVolumes(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
 	tests := []struct {
 		name                                string
 		volumePaths                         []string
@@ -107,7 +107,7 @@ func TestReconstructVolumes(t *testing.T) {
 			rcInstance, _ := rc.(*reconciler)
 
 			// Act
-			rcInstance.reconstructVolumes(logger)
+			rcInstance.reconstructVolumes(tCtx)
 
 			// Assert
 			// Convert to []UniqueVolumeName
@@ -250,7 +250,7 @@ func TestReconstructVolumesMount(t *testing.T) {
 	// Since the volume is reconstructed, it must be marked as uncertain
 	// even after a final SetUp error, see https://github.com/kubernetes/kubernetes/issues/96635
 	// and https://github.com/kubernetes/kubernetes/pull/110670.
-	logger, ctx := ktesting.NewTestContext(t)
+	logger, tCtx := ktesting.NewTestContext(t)
 
 	tests := []struct {
 		name            string
@@ -310,7 +310,7 @@ func TestReconstructVolumesMount(t *testing.T) {
 			rcInstance, _ := rc.(*reconciler)
 
 			// Act 1 - reconstruction
-			rcInstance.reconstructVolumes(logger)
+			rcInstance.reconstructVolumes(tCtx)
 
 			// Assert 1 - the volume is Uncertain
 			mountedPods := rcInstance.actualStateOfWorld.GetMountedVolumes()
@@ -339,7 +339,7 @@ func TestReconstructVolumesMount(t *testing.T) {
 			rcInstance.volumesNeedUpdateFromNodeStatus = nil
 
 			// Act 2 - reconcile once
-			rcInstance.reconcile(ctx)
+			rcInstance.reconcile(tCtx)
 
 			// Assert 2
 			// MountDevice was attempted

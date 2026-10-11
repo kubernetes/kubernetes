@@ -52,7 +52,7 @@ type projectedPlugin struct {
 	kvHost                    volume.KubeletVolumeHost
 	getSecret                 func(namespace, name string) (*v1.Secret, error)
 	getConfigMap              func(namespace, name string) (*v1.ConfigMap, error)
-	getServiceAccountToken    func(namespace, name string, tr *authenticationv1.TokenRequest) (*authenticationv1.TokenRequest, error)
+	getServiceAccountToken    func(ctx context.Context, namespace, name string, tr *authenticationv1.TokenRequest) (*authenticationv1.TokenRequest, error)
 	deleteServiceAccountToken func(podUID types.UID)
 }
 
@@ -111,7 +111,7 @@ func (plugin *projectedPlugin) SupportsSELinuxContextMount(logger klog.Logger, s
 	return false, nil
 }
 
-func (plugin *projectedPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod) (volume.Mounter, error) {
+func (plugin *projectedPlugin) NewMounter(ctx context.Context, spec *volume.Spec, pod *v1.Pod) (volume.Mounter, error) {
 	return &projectedVolumeMounter{
 		projectedVolume: &projectedVolume{
 			volName:         spec.Name(),
@@ -181,26 +181,28 @@ func (sv *projectedVolume) GetAttributes() volume.Attributes {
 
 }
 
-func (s *projectedVolumeMounter) SetUp(mounterArgs volume.MounterArgs) error {
-	return s.SetUpAt(s.GetPath(), mounterArgs)
+func (s *projectedVolumeMounter) SetUp(ctx context.Context, mounterArgs volume.MounterArgs) error {
+	return s.SetUpAt(ctx, s.GetPath(), mounterArgs)
 }
 
-func (s *projectedVolumeMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs) error {
+func (s *projectedVolumeMounter) SetUpAt(ctx context.Context, dir string, mounterArgs volume.MounterArgs) error {
 	klog.V(3).Infof("Setting up volume %v for pod %v at %v", s.volName, s.pod.UID, dir)
 
-	wrapped, err := s.plugin.host.NewWrapperMounter(s.volName, wrappedVolumeSpec(), s.pod)
+	wrapped, err := s.plugin.host.NewWrapperMounter(ctx, s.volName, wrappedVolumeSpec(), s.pod)
 	if err != nil {
 		return err
 	}
 
-	data, err := s.collectData(mounterArgs)
+	// Use context.TODO() because we currently do not have a proper context to pass in.
+	// Replace this with an appropriate context when refactoring this function to accept a context parameter.
+	data, err := s.collectData(context.TODO(), mounterArgs)
 	if err != nil {
 		klog.Errorf("Error preparing data for projected volume %v for pod %v/%v: %s", s.volName, s.pod.Namespace, s.pod.Name, err.Error())
 		return err
 	}
 
 	setupSuccess := false
-	if err := wrapped.SetUpAt(dir, mounterArgs); err != nil {
+	if err := wrapped.SetUpAt(ctx, dir, mounterArgs); err != nil {
 		return err
 	}
 
@@ -246,7 +248,7 @@ func (s *projectedVolumeMounter) SetUpAt(dir string, mounterArgs volume.MounterA
 	return nil
 }
 
-func (s *projectedVolumeMounter) collectData(mounterArgs volume.MounterArgs) (map[string]volumeutil.FileProjection, error) {
+func (s *projectedVolumeMounter) collectData(ctx context.Context, mounterArgs volume.MounterArgs) (map[string]volumeutil.FileProjection, error) {
 	if s.source.DefaultMode == nil {
 		return nil, fmt.Errorf("no defaultMode used, not even the default value for it")
 	}
@@ -311,7 +313,7 @@ func (s *projectedVolumeMounter) collectData(mounterArgs volume.MounterArgs) (ma
 				payload[k] = v
 			}
 		case source.DownwardAPI != nil:
-			downwardAPIPayload, err := downwardapi.CollectData(source.DownwardAPI.Items, s.pod, s.plugin.host, s.source.DefaultMode, s.source.DefaultUser)
+			downwardAPIPayload, err := downwardapi.CollectData(ctx, source.DownwardAPI.Items, s.pod, s.plugin.host, s.source.DefaultMode, s.source.DefaultUser)
 			if err != nil {
 				errlist = append(errlist, err)
 				continue
@@ -334,7 +336,7 @@ func (s *projectedVolumeMounter) collectData(mounterArgs volume.MounterArgs) (ma
 			if len(tp.Audience) != 0 {
 				auds = []string{tp.Audience}
 			}
-			tr, err := s.plugin.getServiceAccountToken(s.pod.Namespace, s.pod.Spec.ServiceAccountName, &authenticationv1.TokenRequest{
+			tr, err := s.plugin.getServiceAccountToken(ctx, s.pod.Namespace, s.pod.Spec.ServiceAccountName, &authenticationv1.TokenRequest{
 				Spec: authenticationv1.TokenRequestSpec{
 					Audiences:         auds,
 					ExpirationSeconds: tp.ExpirationSeconds,

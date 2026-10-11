@@ -32,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/ktesting"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/kubelet/util/manager"
 	"k8s.io/kubernetes/test/integration/framework"
@@ -39,6 +40,7 @@ import (
 )
 
 func TestWatchBasedManager(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	testNamespace := "test-watch-based-manager"
 	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
 	t.Cleanup(server.TearDownFn)
@@ -75,7 +77,7 @@ func TestWatchBasedManager(t *testing.T) {
 	stopCh := make(chan struct{})
 	t.Cleanup(func() { close(stopCh) })
 
-	store := manager.NewObjectCache(listObj, watchObj, newObj, isImmutable, listWatcherWithWatchListSemanticsWrapper, schema.GroupResource{Group: "v1", Resource: "secrets"}, fakeClock, time.Minute, stopCh)
+	store := manager.NewObjectCache(tCtx, listObj, watchObj, newObj, isImmutable, listWatcherWithWatchListSemanticsWrapper, schema.GroupResource{Group: "v1", Resource: "secrets"}, fakeClock, time.Minute, stopCh)
 
 	// create 1000 secrets in parallel
 	t.Log(time.Now(), "creating 1000 secrets")
@@ -118,7 +120,7 @@ func TestWatchBasedManager(t *testing.T) {
 				start := time.Now()
 				store.AddReference(testNamespace, name, types.UID(name))
 				err := wait.PollImmediate(10*time.Millisecond, 10*time.Second, func() (bool, error) {
-					obj, err := store.Get(testNamespace, name)
+					obj, err := store.Get(tCtx, testNamespace, name)
 					if err != nil {
 						t.Logf("failed on %s, retrying: %v", name, err)
 						return false, nil

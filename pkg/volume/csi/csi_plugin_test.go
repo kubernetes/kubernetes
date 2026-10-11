@@ -318,6 +318,7 @@ func TestPluginCanSupport(t *testing.T) {
 }
 
 func TestPluginConstructVolumeSpec(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	plug, tmpDir := newTestPlugin(t, nil)
 	defer os.RemoveAll(tmpDir)
 
@@ -378,6 +379,7 @@ func TestPluginConstructVolumeSpec(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SELinuxMountReadWriteOncePod, tc.seLinuxMountEnabled)
 
 			mounter, err := plug.NewMounter(
+				tCtx,
 				tc.originSpec,
 				&api.Pod{ObjectMeta: meta.ObjectMeta{UID: tc.podUID, Namespace: testns}},
 			)
@@ -438,6 +440,7 @@ func TestPluginConstructVolumeSpec(t *testing.T) {
 }
 
 func TestPluginConstructVolumeSpecWithInline(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	testCases := []struct {
 		name       string
 		originSpec *volume.Spec
@@ -511,6 +514,7 @@ func TestPluginConstructVolumeSpecWithInline(t *testing.T) {
 			defer os.RemoveAll(tmpDir)
 
 			mounter, err := plug.NewMounter(
+				tCtx,
 				tc.originSpec,
 				&api.Pod{ObjectMeta: meta.ObjectMeta{UID: tc.podUID, Namespace: testns}},
 			)
@@ -581,6 +585,7 @@ func TestPluginConstructVolumeSpecWithInline(t *testing.T) {
 }
 
 func TestPluginNewMounter(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	tests := []struct {
 		name                string
 		spec                *volume.Spec
@@ -617,6 +622,7 @@ func TestPluginNewMounter(t *testing.T) {
 
 			registerFakePlugin(testDriver, "endpoint", []string{"1.2.0"}, t)
 			mounter, err := plug.NewMounter(
+				tCtx,
 				test.spec,
 				&api.Pod{ObjectMeta: meta.ObjectMeta{UID: test.podUID, Namespace: test.namespace}},
 			)
@@ -661,6 +667,7 @@ func TestPluginNewMounter(t *testing.T) {
 }
 
 func TestPluginNewMounterWithInline(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	bothModes := []storage.VolumeLifecycleMode{
 		storage.VolumeLifecycleEphemeral,
 		storage.VolumeLifecyclePersistent,
@@ -719,6 +726,7 @@ func TestPluginNewMounterWithInline(t *testing.T) {
 				registerFakePlugin(testDriver, "endpoint", []string{"1.2.0"}, t)
 
 				mounter, err := plug.NewMounter(
+					tCtx,
 					test.spec,
 					&api.Pod{ObjectMeta: meta.ObjectMeta{UID: test.podUID, Namespace: test.namespace}},
 				)

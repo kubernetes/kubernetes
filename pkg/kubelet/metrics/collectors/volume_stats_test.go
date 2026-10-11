@@ -17,19 +17,19 @@ limitations under the License.
 package collectors
 
 import (
-	"context"
 	"strings"
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/component-base/metrics/testutil"
+	"k8s.io/ktesting"
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	statstest "k8s.io/kubernetes/pkg/kubelet/server/stats/testing"
 	"k8s.io/utils/ptr"
 )
 
 func TestVolumeStatsCollector(t *testing.T) {
-	ctx := context.TODO()
+	tCtx := ktesting.Init(t)
 	// Fixed metadata on type and help text. We prepend this to every expected
 	// output so we only have to modify a single place when doing adjustments.
 	const metadata = `
@@ -130,15 +130,15 @@ func TestVolumeStatsCollector(t *testing.T) {
 
 	mockStatsProvider := statstest.NewMockProvider(t)
 
-	mockStatsProvider.EXPECT().ListPodStats(ctx).Return(podStats, nil).Maybe()
-	mockStatsProvider.EXPECT().ListPodStatsAndUpdateCPUNanoCoreUsage(ctx).Return(podStats, nil).Maybe()
+	mockStatsProvider.EXPECT().ListPodStats(tCtx).Return(podStats, nil).Maybe()
+	mockStatsProvider.EXPECT().ListPodStatsAndUpdateCPUNanoCoreUsage(tCtx).Return(podStats, nil).Maybe()
 	if err := testutil.CustomCollectAndCompare(&volumeStatsCollector{statsProvider: mockStatsProvider}, strings.NewReader(want), metrics...); err != nil {
 		t.Errorf("unexpected collecting result:\n%s", err)
 	}
 }
 
 func TestVolumeStatsCollectorWithNullVolumeStatus(t *testing.T) {
-	ctx := context.TODO()
+	tCtx := ktesting.Init(t)
 	// Fixed metadata on type and help text. We prepend this to every expected
 	// output so we only have to modify a single place when doing adjustments.
 	const metadata = `
@@ -216,8 +216,8 @@ func TestVolumeStatsCollectorWithNullVolumeStatus(t *testing.T) {
 
 	mockStatsProvider := statstest.NewMockProvider(t)
 
-	mockStatsProvider.EXPECT().ListPodStats(ctx).Return(podStats, nil).Maybe()
-	mockStatsProvider.EXPECT().ListPodStatsAndUpdateCPUNanoCoreUsage(ctx).Return(podStats, nil).Maybe()
+	mockStatsProvider.EXPECT().ListPodStats(tCtx).Return(podStats, nil).Maybe()
+	mockStatsProvider.EXPECT().ListPodStatsAndUpdateCPUNanoCoreUsage(tCtx).Return(podStats, nil).Maybe()
 	if err := testutil.CustomCollectAndCompare(&volumeStatsCollector{statsProvider: mockStatsProvider}, strings.NewReader(want), metrics...); err != nil {
 		t.Errorf("unexpected collecting result:\n%s", err)
 	}

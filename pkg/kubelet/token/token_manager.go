@@ -43,13 +43,13 @@ const (
 )
 
 // NewManager returns a new token manager.
-func NewManager(c clientset.Interface) *Manager {
+func NewManager(ctx context.Context, c clientset.Interface) *Manager {
 	// check whether the server supports token requests so we can give a more helpful error message
 	supported := false
 	once := &sync.Once{}
 	tokenRequestsSupported := func() bool {
 		once.Do(func() {
-			resources, err := c.Discovery().ServerResourcesForGroupVersionWithContext(context.TODO(), ("v1"))
+			resources, err := c.Discovery().ServerResourcesForGroupVersionWithContext(ctx, ("v1"))
 			if err != nil {
 				return
 			}
@@ -68,7 +68,7 @@ func NewManager(c clientset.Interface) *Manager {
 			if c == nil {
 				return nil, errors.New("cannot use TokenManager when kubelet is in standalone mode")
 			}
-			tokenRequest, err := c.CoreV1().ServiceAccounts(namespace).CreateToken(context.TODO(), name, tr, metav1.CreateOptions{})
+			tokenRequest, err := c.CoreV1().ServiceAccounts(namespace).CreateToken(ctx, name, tr, metav1.CreateOptions{})
 			if apierrors.IsNotFound(err) && !tokenRequestsSupported() {
 				return nil, fmt.Errorf("the API server does not have TokenRequest endpoints enabled")
 			}
@@ -101,9 +101,7 @@ type Manager struct {
 // * If the token is refreshed successfully, save it in the cache and return the token.
 // * If refresh fails and the old token is still valid, log an error and return the old token.
 // * If refresh fails and the old token is no longer valid, return an error
-func (m *Manager) GetServiceAccountToken(namespace, name string, tr *authenticationv1.TokenRequest) (*authenticationv1.TokenRequest, error) {
-	// TODO: pass ctx to GetServiceAccountToken after switching pkg/volume to contextual logging
-	ctx := context.TODO()
+func (m *Manager) GetServiceAccountToken(ctx context.Context, namespace, name string, tr *authenticationv1.TokenRequest) (*authenticationv1.TokenRequest, error) {
 	key := keyFunc(name, namespace, tr)
 
 	ctr, ok := m.get(key)

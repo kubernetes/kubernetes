@@ -67,7 +67,7 @@ type csiPlugin struct {
 	host                      volume.VolumeHost
 	csiDriverLister           storagelisters.CSIDriverLister
 	csiDriverInformer         cache.SharedIndexInformer
-	serviceAccountTokenGetter func(namespace, name string, tr *authenticationv1.TokenRequest) (*authenticationv1.TokenRequest, error)
+	serviceAccountTokenGetter func(ctx context.Context, namespace, name string, tr *authenticationv1.TokenRequest) (*authenticationv1.TokenRequest, error)
 	volumeAttachmentLister    storagelisters.VolumeAttachmentLister
 }
 
@@ -472,6 +472,7 @@ func (p *csiPlugin) RequiresRemount(logger klog.Logger, spec *volume.Spec) bool 
 }
 
 func (p *csiPlugin) NewMounter(
+	ctx context.Context,
 	spec *volume.Spec,
 	pod *api.Pod) (volume.Mounter, error) {
 

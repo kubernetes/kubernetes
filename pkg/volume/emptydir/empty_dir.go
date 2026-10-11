@@ -17,6 +17,7 @@ limitations under the License.
 package emptydir
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -121,8 +122,8 @@ func (plugin *emptyDirPlugin) SupportsSELinuxContextMount(logger klog.Logger, sp
 	return false, nil
 }
 
-func (plugin *emptyDirPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod) (volume.Mounter, error) {
-	return plugin.newMounterInternal(spec, pod, plugin.host.GetMounter(), &realMountDetector{plugin.host.GetMounter()})
+func (plugin *emptyDirPlugin) NewMounter(ctx context.Context, spec *volume.Spec, pod *v1.Pod) (volume.Mounter, error) {
+	return plugin.newMounterInternal(ctx, spec, pod, plugin.host.GetMounter(), &realMountDetector{plugin.host.GetMounter()})
 }
 
 func calculateEmptyDirMemorySize(nodeAllocatableMemory *resource.Quantity, spec *volume.Spec, pod *v1.Pod) *resource.Quantity {
@@ -153,14 +154,14 @@ func calculateEmptyDirMemorySize(nodeAllocatableMemory *resource.Quantity, spec 
 	return sizeLimit
 }
 
-func (plugin *emptyDirPlugin) newMounterInternal(spec *volume.Spec, pod *v1.Pod, mounter mount.Interface, mountDetector mountDetector) (volume.Mounter, error) {
+func (plugin *emptyDirPlugin) newMounterInternal(ctx context.Context, spec *volume.Spec, pod *v1.Pod, mounter mount.Interface, mountDetector mountDetector) (volume.Mounter, error) {
 	medium := v1.StorageMediumDefault
 	sizeLimit := &resource.Quantity{}
 	var mode *int32
 	if spec.Volume.EmptyDir != nil { // Support a non-specified source as EmptyDir.
 		medium = spec.Volume.EmptyDir.Medium
 		if medium == v1.StorageMediumMemory {
-			nodeAllocatable, err := plugin.host.GetNodeAllocatable()
+			nodeAllocatable, err := plugin.host.GetNodeAllocatable(ctx)
 			if err != nil {
 				return nil, err
 			}
@@ -246,12 +247,13 @@ func (ed *emptyDir) GetAttributes() volume.Attributes {
 }
 
 // SetUp creates new directory.
-func (ed *emptyDir) SetUp(mounterArgs volume.MounterArgs) error {
-	return ed.SetUpAt(ed.GetPath(), mounterArgs)
+func (ed *emptyDir) SetUp(ctx context.Context, mounterArgs volume.MounterArgs) error {
+	return ed.SetUpAt(ctx, ed.GetPath(), mounterArgs)
 }
 
 // SetUpAt creates new directory.
-func (ed *emptyDir) SetUpAt(dir string, mounterArgs volume.MounterArgs) error {
+func (ed *emptyDir) SetUpAt(ctx context.Context, dir string, mounterArgs volume.MounterArgs) error {
+	logger := klog.FromContext(ctx)
 	notMnt, err := ed.mounter.IsLikelyNotMountPoint(dir)
 	// Getting an os.IsNotExist err from is a contingency; the directory
 	// may not exist yet, in which case, setup should run.
@@ -287,7 +289,7 @@ func (ed *emptyDir) SetUpAt(dir string, mounterArgs volume.MounterArgs) error {
 	case ed.medium == v1.StorageMediumDefault:
 		err = ed.setupDir(dir)
 	case ed.medium == v1.StorageMediumMemory:
-		err = ed.setupTmpfs(dir)
+		err = ed.setupTmpfs(logger, dir)
 	case v1helper.IsHugePageMedium(ed.medium):
 		err = ed.setupHugepages(dir)
 	default:
@@ -335,7 +337,7 @@ func (ed *emptyDir) assignQuota(dir string, mounterSize *resource.Quantity) erro
 }
 
 // setupTmpfs creates a tmpfs mount at the specified directory.
-func (ed *emptyDir) setupTmpfs(dir string) error {
+func (ed *emptyDir) setupTmpfs(logger klog.Logger, dir string) error {
 	if ed.mounter == nil {
 		return fmt.Errorf("memory storage requested, but mounter is nil")
 	}
@@ -353,7 +355,7 @@ func (ed *emptyDir) setupTmpfs(dir string) error {
 		return nil
 	}
 
-	options := ed.generateTmpfsMountOptions(swap.IsTmpfsNoswapOptionSupported(ed.mounter, ed.plugin.host.GetPluginDir(EmptyDirPluginName)))
+	options := ed.generateTmpfsMountOptions(swap.IsTmpfsNoswapOptionSupported(logger, ed.mounter, ed.plugin.host.GetPluginDir(EmptyDirPluginName)))
 
 	klog.V(3).Infof("pod %v: mounting tmpfs for volume %v", ed.pod.UID, ed.volName)
 	return ed.mounter.MountSensitiveWithoutSystemd("tmpfs", dir, "tmpfs", options, nil)

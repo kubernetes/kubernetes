@@ -17,6 +17,7 @@ limitations under the License.
 package csi
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/json"
 	"errors"
@@ -96,11 +97,12 @@ func getTargetPath(uid types.UID, specVolumeID string, host volume.VolumeHost) s
 // volume.Mounter methods
 var _ volume.Mounter = &csiMountMgr{}
 
-func (c *csiMountMgr) SetUp(mounterArgs volume.MounterArgs) error {
-	return c.SetUpAt(c.GetPath(), mounterArgs)
+func (c *csiMountMgr) SetUp(ctx context.Context, mounterArgs volume.MounterArgs) error {
+	return c.SetUpAt(ctx, c.GetPath(), mounterArgs)
 }
 
-func (c *csiMountMgr) SetUpAt(dir string, mounterArgs volume.MounterArgs) error {
+func (c *csiMountMgr) SetUpAt(ctx context.Context, dir string, mounterArgs volume.MounterArgs) error {
+	logger := klog.FromContext(ctx)
 	klog.V(4).Info(log("Mounter.SetUpAt(%s)", dir))
 
 	csi, err := c.csiClientGetter.Get()
@@ -112,8 +114,6 @@ func (c *csiMountMgr) SetUpAt(dir string, mounterArgs volume.MounterArgs) error 
 
 	ctx, cancel := createCSIOperationContext(c.spec, csiTimeout)
 	defer cancel()
-
-	logger := klog.FromContext(ctx)
 
 	volSrc, pvSrc, err := getSourceFromSpec(c.spec)
 	if err != nil {
@@ -236,7 +236,7 @@ func (c *csiMountMgr) SetUpAt(dir string, mounterArgs volume.MounterArgs) error 
 		volAttribs = mergeMap(volAttribs, getPodInfoAttrs(c.pod, c.volumeLifecycleMode))
 	}
 
-	serviceAccountTokenAttrs, serviceAccountTokenInSecrets, err := c.podServiceAccountTokenAttrs()
+	serviceAccountTokenAttrs, serviceAccountTokenInSecrets, err := c.podServiceAccountTokenAttrs(ctx)
 	if err != nil {
 		return volumetypes.NewTransientOperationFailure(log("mounter.SetUpAt failed to get service accoount token attributes: %v", err))
 	}
@@ -362,7 +362,7 @@ func (c *csiMountMgr) SetUpAt(dir string, mounterArgs volume.MounterArgs) error 
 	return nil
 }
 
-func (c *csiMountMgr) podServiceAccountTokenAttrs() (map[string]string, bool, error) {
+func (c *csiMountMgr) podServiceAccountTokenAttrs(ctx context.Context) (map[string]string, bool, error) {
 	if c.plugin.serviceAccountTokenGetter == nil {
 		return nil, false, errors.New("ServiceAccountTokenGetter is nil")
 	}
@@ -387,7 +387,7 @@ func (c *csiMountMgr) podServiceAccountTokenAttrs() (map[string]string, bool, er
 		if audience == "" {
 			audiences = []string{}
 		}
-		tr, err := c.plugin.serviceAccountTokenGetter(c.pod.Namespace, c.pod.Spec.ServiceAccountName, &authenticationv1.TokenRequest{
+		tr, err := c.plugin.serviceAccountTokenGetter(ctx, c.pod.Namespace, c.pod.Spec.ServiceAccountName, &authenticationv1.TokenRequest{
 			Spec: authenticationv1.TokenRequestSpec{
 				Audiences:         audiences,
 				ExpirationSeconds: tokenRequest.ExpirationSeconds,

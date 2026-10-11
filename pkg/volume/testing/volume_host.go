@@ -156,7 +156,7 @@ func (f *fakeVolumeHost) GetAttachedVolumesFromNodeStatus() (map[v1.UniqueVolume
 	return map[v1.UniqueVolumeName]string{}, nil
 }
 
-func (f *fakeVolumeHost) NewWrapperMounter(volName string, spec Spec, pod *v1.Pod) (Mounter, error) {
+func (f *fakeVolumeHost) NewWrapperMounter(ctx context.Context, volName string, spec Spec, pod *v1.Pod) (Mounter, error) {
 	// The name of wrapper volume is set to "wrapped_{wrapped_volume_name}"
 	wrapperVolumeName := "wrapped_" + volName
 	if spec.Volume != nil {
@@ -166,7 +166,7 @@ func (f *fakeVolumeHost) NewWrapperMounter(volName string, spec Spec, pod *v1.Po
 	if err != nil {
 		return nil, err
 	}
-	return plug.NewMounter(&spec, pod)
+	return plug.NewMounter(ctx, &spec, pod)
 }
 
 func (f *fakeVolumeHost) NewWrapperUnmounter(volName string, spec Spec, podUID types.UID) (Unmounter, error) {
@@ -182,7 +182,7 @@ func (f *fakeVolumeHost) NewWrapperUnmounter(volName string, spec Spec, podUID t
 	return plug.NewUnmounter(spec.Name(), podUID)
 }
 
-func (f *fakeVolumeHost) GetNodeAllocatable() (v1.ResourceList, error) {
+func (f *fakeVolumeHost) GetNodeAllocatable(ctx context.Context) (v1.ResourceList, error) {
 	return v1.ResourceList{}, nil
 }
 
@@ -198,9 +198,9 @@ func (f *fakeVolumeHost) GetConfigMapFunc() func(namespace, name string) (*v1.Co
 	}
 }
 
-func (f *fakeVolumeHost) GetServiceAccountTokenFunc() func(string, string, *authenticationv1.TokenRequest) (*authenticationv1.TokenRequest, error) {
-	return func(namespace, name string, tr *authenticationv1.TokenRequest) (*authenticationv1.TokenRequest, error) {
-		return f.kubeClient.CoreV1().ServiceAccounts(namespace).CreateToken(context.TODO(), name, tr, metav1.CreateOptions{})
+func (f *fakeVolumeHost) GetServiceAccountTokenFunc() func(context.Context, string, string, *authenticationv1.TokenRequest) (*authenticationv1.TokenRequest, error) {
+	return func(ctx context.Context, namespace, name string, tr *authenticationv1.TokenRequest) (*authenticationv1.TokenRequest, error) {
+		return f.kubeClient.CoreV1().ServiceAccounts(namespace).CreateToken(ctx, name, tr, metav1.CreateOptions{})
 	}
 }
 

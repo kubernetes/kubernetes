@@ -17,6 +17,7 @@ limitations under the License.
 package reconciler
 
 import (
+	"context"
 	"fmt"
 	"io/fs"
 	"os"
@@ -249,7 +250,7 @@ func getVolumesFromPodDir(logger klog.Logger, podDir string) ([]podVolume, error
 }
 
 // Reconstruct volume data structure by reading the pod's volume directories
-func (rc *reconciler) reconstructVolume(volume podVolume) (rvolume *reconstructedVolume, rerr error) {
+func (rc *reconciler) reconstructVolume(ctx context.Context, volume podVolume) (rvolume *reconstructedVolume, rerr error) {
 	metrics.ReconstructVolumeOperationsTotal.Inc()
 	defer func() {
 		if rerr != nil {
@@ -349,7 +350,7 @@ func (rc *reconciler) reconstructVolume(volume podVolume) (rvolume *reconstructe
 		}
 	} else {
 		var err error
-		volumeMounter, err = plugin.NewMounter(volumeSpec, pod)
+		volumeMounter, err = plugin.NewMounter(ctx, volumeSpec, pod)
 		if err != nil {
 			return nil, fmt.Errorf(
 				"reconstructVolume.NewMounter failed for volume %q (spec.Name: %q) pod %q (UID: %q) with: %v",

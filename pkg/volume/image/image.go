@@ -17,6 +17,7 @@ limitations under the License.
 package image
 
 import (
+	"context"
 	"fmt"
 
 	v1 "k8s.io/api/core/v1"
@@ -61,7 +62,7 @@ func (o *imagePlugin) CanSupport(spec *volume.Spec) bool {
 	return spec != nil && spec.Volume != nil && spec.Volume.Image != nil
 }
 
-func (o *imagePlugin) NewMounter(spec *volume.Spec, podRef *v1.Pod) (volume.Mounter, error) {
+func (o *imagePlugin) NewMounter(ctx context.Context, spec *volume.Spec, podRef *v1.Pod) (volume.Mounter, error) {
 	return o, nil
 }
 
@@ -81,12 +82,14 @@ func (o *imagePlugin) GetAttributes() volume.Attributes {
 	}
 }
 
-func (o *imagePlugin) GetPath() string                                            { return "" }
-func (o *imagePlugin) RequiresFSResize() bool                                     { return false }
-func (o *imagePlugin) RequiresRemount(logger klog.Logger, spec *volume.Spec) bool { return false }
-func (o *imagePlugin) SetUp(mounterArgs volume.MounterArgs) error                 { return nil }
-func (o *imagePlugin) SetUpAt(dir string, mounterArgs volume.MounterArgs) error   { return nil }
-func (o *imagePlugin) SupportsMountOption() bool                                  { return false }
+func (o *imagePlugin) GetPath() string                                                 { return "" }
+func (o *imagePlugin) RequiresFSResize() bool                                          { return false }
+func (o *imagePlugin) RequiresRemount(logger klog.Logger, spec *volume.Spec) bool      { return false }
+func (o *imagePlugin) SetUp(ctx context.Context, mounterArgs volume.MounterArgs) error { return nil }
+func (o *imagePlugin) SetUpAt(ctx context.Context, dir string, mounterArgs volume.MounterArgs) error {
+	return nil
+}
+func (o *imagePlugin) SupportsMountOption() bool { return false }
 func (o *imagePlugin) SupportsSELinuxContextMount(logger klog.Logger, spec *volume.Spec) (bool, error) {
 	return false, nil
 }

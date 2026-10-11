@@ -82,7 +82,7 @@ type secretManager struct {
 }
 
 func (s *secretManager) GetSecret(ctx context.Context, namespace, name string) (*v1.Secret, error) {
-	object, err := s.manager.GetObject(namespace, name)
+	object, err := s.manager.GetObject(ctx, namespace, name)
 	if err != nil {
 		return nil, err
 	}
@@ -158,6 +158,6 @@ func NewWatchingSecretManager(kubeClient clientset.Interface, resyncInterval tim
 	}
 	gr := corev1.Resource("secret")
 	return &secretManager{
-		manager: manager.NewWatchBasedManager(listSecret, watchSecret, newSecret, isImmutable, listWatcherWithWatchListSemanticsWrapper, gr, resyncInterval, getSecretNames),
+		manager: manager.NewWatchBasedManager(context.TODO(), listSecret, watchSecret, newSecret, isImmutable, listWatcherWithWatchListSemanticsWrapper, gr, resyncInterval, getSecretNames),
 	}
 }

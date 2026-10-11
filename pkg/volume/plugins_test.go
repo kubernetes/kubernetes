@@ -17,6 +17,7 @@ limitations under the License.
 package volume
 
 import (
+	"context"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -93,7 +94,7 @@ func (plugin *testPlugins) SupportsSELinuxContextMount(logger klog.Logger, spec 
 	return false, nil
 }
 
-func (plugin *testPlugins) NewMounter(spec *Spec, podRef *v1.Pod) (Mounter, error) {
+func (plugin *testPlugins) NewMounter(ctx context.Context, spec *Spec, podRef *v1.Pod) (Mounter, error) {
 	return nil, nil
 }
 

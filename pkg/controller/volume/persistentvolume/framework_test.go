@@ -1007,7 +1007,7 @@ func (plugin *mockVolumePlugin) SupportsSELinuxContextMount(logger klog.Logger, 
 	return false, nil
 }
 
-func (plugin *mockVolumePlugin) NewMounter(spec *volume.Spec, podRef *v1.Pod) (volume.Mounter, error) {
+func (plugin *mockVolumePlugin) NewMounter(ctx context.Context, spec *volume.Spec, podRef *v1.Pod) (volume.Mounter, error) {
 	return nil, fmt.Errorf("Mounter is not supported by this plugin")
 }
 

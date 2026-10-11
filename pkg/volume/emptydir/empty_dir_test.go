@@ -19,6 +19,7 @@ limitations under the License.
 package emptydir
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -28,6 +29,7 @@ import (
 
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/ktesting"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/util/swap"
 
@@ -149,6 +151,7 @@ type pluginTestConfig struct {
 
 // doTestPlugin sets up a volume and tears it back down.
 func doTestPlugin(t *testing.T, config pluginTestConfig) {
+	tCtx := ktesting.Init(t)
 	basePath, err := utiltesting.MkTmpdir("emptydir_volume_test")
 	if err != nil {
 		t.Fatalf("can't make a temp rootdir: %v", err)
@@ -195,7 +198,7 @@ func doTestPlugin(t *testing.T, config pluginTestConfig) {
 		volumeutil.SetReady(metadataDir)
 	}
 
-	mounter, err := plug.(*emptyDirPlugin).newMounterInternal(volume.NewSpecFromVolume(spec),
+	mounter, err := plug.(*emptyDirPlugin).newMounterInternal(tCtx, volume.NewSpecFromVolume(spec),
 		pod,
 		physicalMounter,
 		&mountDetector)
@@ -217,7 +220,7 @@ func doTestPlugin(t *testing.T, config pluginTestConfig) {
 	}
 
 	// Stat the directory and check the permission bits
-	testSetUp(mounter, metadataDir, volPath)
+	testSetUp(tCtx, mounter, metadataDir, volPath)
 
 	log := physicalMounter.GetLog()
 	// Check the number of mounts performed during setup
@@ -268,8 +271,8 @@ func doTestPlugin(t *testing.T, config pluginTestConfig) {
 	physicalMounter.ResetLog()
 }
 
-func testSetUp(mounter volume.Mounter, metadataDir, volPath string) error {
-	if err := mounter.SetUp(volume.MounterArgs{}); err != nil {
+func testSetUp(tCtx context.Context, mounter volume.Mounter, metadataDir, volPath string) error {
+	if err := mounter.SetUp(tCtx, volume.MounterArgs{}); err != nil {
 		return fmt.Errorf("expected success, got: %w", err)
 	}
 	// Stat the directory and check the permission bits
@@ -305,6 +308,7 @@ func testTearDown(unmounter volume.Unmounter, metadataDir, volPath string) error
 }
 
 func TestPluginBackCompat(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	basePath, err := utiltesting.MkTmpdir("emptydirTest")
 	if err != nil {
 		t.Fatalf("can't make a temp dir： %v", err)
@@ -317,7 +321,7 @@ func TestPluginBackCompat(t *testing.T) {
 		Name: "vol1",
 	}
 	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: types.UID("poduid")}}
-	mounter, err := plug.NewMounter(volume.NewSpecFromVolume(spec), pod)
+	mounter, err := plug.NewMounter(tCtx, volume.NewSpecFromVolume(spec), pod)
 	if err != nil {
 		t.Errorf("Failed to make a new Mounter: %v", err)
 	}
@@ -333,6 +337,7 @@ func TestPluginBackCompat(t *testing.T) {
 
 // TestMetrics tests that MetricProvider methods return sane values.
 func TestMetrics(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	// Create an empty temp directory for the volume
 	tmpDir, err := utiltesting.MkTmpdir("empty_dir_test")
 	if err != nil {
@@ -346,7 +351,7 @@ func TestMetrics(t *testing.T) {
 		Name: "vol1",
 	}
 	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: types.UID("poduid")}}
-	mounter, err := plug.NewMounter(volume.NewSpecFromVolume(spec), pod)
+	mounter, err := plug.NewMounter(tCtx, volume.NewSpecFromVolume(spec), pod)
 	if err != nil {
 		t.Errorf("Failed to make a new Mounter: %v", err)
 	}
@@ -1214,6 +1219,7 @@ func TestTmpfsMountOptions(t *testing.T) {
 }
 
 func TestResizeEphemeralVolume(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	if runtime.GOOS != "linux" {
 		t.Skip("only supported on linux")
 	}
@@ -1303,7 +1309,7 @@ func TestResizeEphemeralVolume(t *testing.T) {
 			}
 
 			volumeSpec := volume.NewSpecFromVolume(spec)
-			mounterInstance, err := plug.NewMounter(volumeSpec, pod)
+			mounterInstance, err := plug.NewMounter(tCtx, volumeSpec, pod)
 			require.NoError(t, err)
 			volPath := mounterInstance.GetPath()
 
@@ -1350,6 +1356,7 @@ func TestResizeEphemeralVolume(t *testing.T) {
 }
 
 func TestEmptyDirVolumeMode(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EmptyDirVolumeMode, true)
 
 	testCases := []struct {
@@ -1400,6 +1407,7 @@ func TestEmptyDirVolumeMode(t *testing.T) {
 			}
 
 			mounter, err := plug.(*emptyDirPlugin).newMounterInternal(
+				tCtx,
 				volume.NewSpecFromVolume(spec),
 				pod,
 				mount.NewFakeMounter(nil),
@@ -1409,7 +1417,7 @@ func TestEmptyDirVolumeMode(t *testing.T) {
 				t.Fatalf("Failed to make a new Mounter: %v", err)
 			}
 
-			if err := mounter.SetUp(volume.MounterArgs{}); err != nil {
+			if err := mounter.SetUp(tCtx, volume.MounterArgs{}); err != nil {
 				t.Fatalf("SetUp failed: %v", err)
 			}
 
@@ -1433,6 +1441,7 @@ func TestEmptyDirVolumeMode(t *testing.T) {
 }
 
 func TestEmptyDirVolumeModeFeatureGateDisabled(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EmptyDirVolumeMode, false)
 
 	basePath, err := utiltesting.MkTmpdir("emptydir_mode_gate_test")
@@ -1458,6 +1467,7 @@ func TestEmptyDirVolumeModeFeatureGateDisabled(t *testing.T) {
 	}
 
 	mounter, err := plug.(*emptyDirPlugin).newMounterInternal(
+		tCtx,
 		volume.NewSpecFromVolume(spec),
 		pod,
 		mount.NewFakeMounter(nil),
@@ -1467,7 +1477,7 @@ func TestEmptyDirVolumeModeFeatureGateDisabled(t *testing.T) {
 		t.Fatalf("Failed to make a new Mounter: %v", err)
 	}
 
-	if err := mounter.SetUp(volume.MounterArgs{}); err != nil {
+	if err := mounter.SetUp(tCtx, volume.MounterArgs{}); err != nil {
 		t.Fatalf("SetUp failed: %v", err)
 	}
 

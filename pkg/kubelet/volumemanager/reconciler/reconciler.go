@@ -25,7 +25,7 @@ import (
 
 func (rc *reconciler) Run(ctx context.Context) {
 	logger := klog.FromContext(ctx)
-	rc.reconstructVolumes(logger)
+	rc.reconstructVolumes(ctx)
 	logger.Info("Reconciler: start to sync state")
 	wait.Until(func() { rc.reconcile(ctx) }, rc.loopSleepDuration, ctx.Done())
 }

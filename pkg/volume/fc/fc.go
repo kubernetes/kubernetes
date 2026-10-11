@@ -17,6 +17,7 @@ limitations under the License.
 package fc
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -108,7 +109,7 @@ func (plugin *fcPlugin) GetAccessModes() []v1.PersistentVolumeAccessMode {
 	}
 }
 
-func (plugin *fcPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod) (volume.Mounter, error) {
+func (plugin *fcPlugin) NewMounter(ctx context.Context, spec *volume.Spec, pod *v1.Pod) (volume.Mounter, error) {
 	// Inject real implementations here, test through the internal function.
 	return plugin.newMounterInternal(spec, pod.UID, &fcUtil{}, plugin.host.GetMounter(), utilexec.New())
 }
@@ -392,11 +393,11 @@ func (b *fcDiskMounter) GetAttributes() volume.Attributes {
 	}
 }
 
-func (b *fcDiskMounter) SetUp(mounterArgs volume.MounterArgs) error {
-	return b.SetUpAt(b.GetPath(), mounterArgs)
+func (b *fcDiskMounter) SetUp(ctx context.Context, mounterArgs volume.MounterArgs) error {
+	return b.SetUpAt(ctx, b.GetPath(), mounterArgs)
 }
 
-func (b *fcDiskMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs) error {
+func (b *fcDiskMounter) SetUpAt(ctx context.Context, dir string, mounterArgs volume.MounterArgs) error {
 	// diskSetUp checks mountpoints and prevent repeated calls
 	err := diskSetUp(b.manager, *b, dir, b.mounter, mounterArgs.FsGroup, mounterArgs.FSGroupChangePolicy)
 	if err != nil {

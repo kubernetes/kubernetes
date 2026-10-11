@@ -29,7 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/client-go/kubernetes/fake"
-	"k8s.io/klog/v2/ktesting"
+	"k8s.io/ktesting"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/pkg/volume/util/hostutil"
@@ -190,6 +190,7 @@ func TestProvisioner(t *testing.T) {
 }
 
 func TestInvalidHostPath(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	plugMgr := volume.VolumePluginMgr{}
 	plugMgr.InitPlugins(ProbeVolumePlugins(volume.VolumeConfig{}), nil /* prober */, volumetest.NewFakeKubeletVolumeHost(t, "fake", nil, nil))
 
@@ -202,12 +203,12 @@ func TestInvalidHostPath(t *testing.T) {
 		VolumeSource: v1.VolumeSource{HostPath: &v1.HostPathVolumeSource{Path: "/no/backsteps/allowed/.."}},
 	}
 	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: types.UID("poduid")}}
-	mounter, err := plug.NewMounter(volume.NewSpecFromVolume(spec), pod)
+	mounter, err := plug.NewMounter(tCtx, volume.NewSpecFromVolume(spec), pod)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	err = mounter.SetUp(volume.MounterArgs{})
+	err = mounter.SetUp(tCtx, volume.MounterArgs{})
 	expectedMsg := "invalid HostPath `/no/backsteps/allowed/..`: must not contain '..'"
 	if err.Error() != expectedMsg {
 		t.Fatalf("expected error `%s` but got `%s`", expectedMsg, err)
@@ -215,6 +216,7 @@ func TestInvalidHostPath(t *testing.T) {
 }
 
 func TestPlugin(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	plugMgr := volume.VolumePluginMgr{}
 	plugMgr.InitPlugins(ProbeVolumePlugins(volume.VolumeConfig{}), nil /* prober */, volumetest.NewFakeKubeletVolumeHost(t, "fake", nil, nil))
 
@@ -230,7 +232,7 @@ func TestPlugin(t *testing.T) {
 	}
 	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: types.UID("poduid")}}
 	defer os.RemoveAll(volPath)
-	mounter, err := plug.NewMounter(volume.NewSpecFromVolume(spec), pod)
+	mounter, err := plug.NewMounter(tCtx, volume.NewSpecFromVolume(spec), pod)
 	if err != nil {
 		t.Errorf("Failed to make a new Mounter: %v", err)
 	}
@@ -243,7 +245,7 @@ func TestPlugin(t *testing.T) {
 		t.Errorf("Got unexpected path: %s", path)
 	}
 
-	if err := mounter.SetUp(volume.MounterArgs{}); err != nil {
+	if err := mounter.SetUp(tCtx, volume.MounterArgs{}); err != nil {
 		t.Errorf("Expected success, got: %v", err)
 	}
 
@@ -261,6 +263,7 @@ func TestPlugin(t *testing.T) {
 }
 
 func TestPersistentClaimReadOnlyFlag(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	pv := &v1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "pvA",
@@ -298,7 +301,7 @@ func TestPersistentClaimReadOnlyFlag(t *testing.T) {
 	// readOnly bool is supplied by persistent-claim volume source when its mounter creates other volumes
 	spec := volume.NewSpecFromPersistentVolume(pv, true)
 	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: types.UID("poduid")}}
-	mounter, _ := plug.NewMounter(spec, pod)
+	mounter, _ := plug.NewMounter(tCtx, spec, pod)
 	if mounter == nil {
 		t.Fatalf("Got a nil Mounter")
 	}

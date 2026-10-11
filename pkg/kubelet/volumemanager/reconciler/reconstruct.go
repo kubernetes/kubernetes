@@ -47,7 +47,8 @@ func (rc *reconciler) readyToUnmount() bool {
 // directories from the disk. For the volumes that cannot support or fail reconstruction, it will
 // put the volumes to volumesFailedReconstruction to be cleaned up later when DesiredStateOfWorld
 // is populated.
-func (rc *reconciler) reconstructVolumes(logger klog.Logger) {
+func (rc *reconciler) reconstructVolumes(ctx context.Context) {
+	logger := klog.FromContext(ctx)
 	// Get volumes information by reading the pod's directory
 	podVolumes, err := getVolumesFromPodDir(logger, rc.kubeletPodsDir)
 	if err != nil {
@@ -62,7 +63,7 @@ func (rc *reconciler) reconstructVolumes(logger klog.Logger) {
 			// There is nothing to reconstruct
 			continue
 		}
-		reconstructedVolume, err := rc.reconstructVolume(volume)
+		reconstructedVolume, err := rc.reconstructVolume(ctx, volume)
 		if err != nil {
 			logger.Info("Could not construct volume information", "podName", volume.podName, "volumeSpecName", volume.volumeSpecName, "err", err)
 			// We can't reconstruct the volume. Remember to check DSW after it's fully populated and force unmount the volume when it's orphaned.

@@ -17,6 +17,7 @@ limitations under the License.
 package kubelet
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -98,15 +99,16 @@ func (kl *Kubelet) podVolumesExist(logger klog.Logger, podUID types.UID) bool {
 // newVolumeMounterFromPlugins attempts to find a plugin by volume spec, pod
 // and volume options and then creates a Mounter.
 // Returns a valid mounter or an error.
-func (kl *Kubelet) newVolumeMounterFromPlugins(logger klog.Logger, spec *volume.Spec, pod *v1.Pod) (volume.Mounter, error) {
+func (kl *Kubelet) newVolumeMounterFromPlugins(ctx context.Context, spec *volume.Spec, pod *v1.Pod) (volume.Mounter, error) {
 	plugin, err := kl.volumePluginMgr.FindPluginBySpec(spec)
 	if err != nil {
 		return nil, fmt.Errorf("can't use volume plugins for %s: %v", spec.Name(), err)
 	}
-	physicalMounter, err := plugin.NewMounter(spec, pod)
+	physicalMounter, err := plugin.NewMounter(ctx, spec, pod)
 	if err != nil {
 		return nil, fmt.Errorf("failed to instantiate mounter for volume: %s using plugin: %s with a root cause: %v", spec.Name(), plugin.GetPluginName(), err)
 	}
+	logger := klog.FromContext(ctx)
 	logger.V(10).Info("Using volume plugin for mount", "volumePluginName", plugin.GetPluginName(), "volumeName", spec.Name())
 	return physicalMounter, nil
 }

@@ -460,7 +460,10 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 			return volumetypes.NewOperationContext(eventErr, detailedErr, migrated)
 		}
 
+		// Use context.TODO() because we currently do not have a proper context to pass in.
+		// Replace this with an appropriate context when refactoring this function to accept a context parameter.
 		volumeMounter, newMounterErr := volumePlugin.NewMounter(
+			context.TODO(),
 			volumeToMount.VolumeSpec,
 			volumeToMount.Pod)
 		if newMounterErr != nil {
@@ -583,7 +586,9 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 
 		// Execute mount
 		og.markVolumeMountAsAttempted(actualStateOfWorld, volumeToMount.PodName, volumeToMount.VolumeName)
-		mountErr := volumeMounter.SetUp(volume.MounterArgs{
+		// Use context.TODO() because we currently do not have a proper context to pass in.
+		// Replace this with an appropriate context when refactoring this function to accept a context parameter.
+		mountErr := volumeMounter.SetUp(context.TODO(), volume.MounterArgs{
 			FsUser:              util.FsUserFrom(volumeToMount.Pod),
 			FsGroup:             fsGroup,
 			DesiredSize:         volumeToMount.DesiredSizeLimit,
@@ -1865,8 +1870,11 @@ func (og *operationGenerator) GenerateExpandInUseVolumeFunc(
 			return volumetypes.NewOperationContext(eventErr, detailedErr, migrated)
 		}
 
+		// Use context.TODO() because we currently do not have a proper context to pass in.
+		// Replace this with an appropriate context when refactoring this function to accept a context parameter.
 		if fsVolume {
 			volumeMounter, newMounterErr := volumePlugin.NewMounter(
+				context.TODO(),
 				volumeToMount.VolumeSpec,
 				volumeToMount.Pod)
 			if newMounterErr != nil {

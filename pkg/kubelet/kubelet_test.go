@@ -440,7 +440,7 @@ func newTestKubeletWithImageList(
 
 	var prober volume.DynamicPluginProber // TODO (#51147) inject mock
 	kubelet.volumePluginMgr, err =
-		NewInitializedVolumePluginMgr(logger, kubelet, kubelet.secretManager, kubelet.configMapManager, token.NewManager(kubelet.kubeClient), &clustertrustbundle.NoopManager{}, allPlugins, prober)
+		NewInitializedVolumePluginMgr(logger, kubelet, kubelet.secretManager, kubelet.configMapManager, token.NewManager(tCtx, kubelet.kubeClient), &clustertrustbundle.NoopManager{}, allPlugins, prober)
 	require.NoError(t, err, "Failed to initialize VolumePluginMgr")
 
 	kubelet.volumeManager = kubeletvolume.NewVolumeManager(
@@ -553,7 +553,7 @@ func createGenericRuntimeManager(ctx context.Context, kubelet *Kubelet, kubeCfg 
 		kubeCfg.MemoryReservationPolicy,
 		kubelet.podStartupLatencyTracker,
 		tracerProvider,
-		token.NewManager(kubelet.kubeClient),
+		token.NewManager(ctx, kubelet.kubeClient),
 		func(string, string) (*v1.ServiceAccount, error) { return nil, nil },
 		kubelet.podStartupLatencyTracker,
 	)

@@ -17,6 +17,7 @@ limitations under the License.
 package persistentvolume
 
 import (
+	"context"
 	"fmt"
 
 	"k8s.io/klog/v2"
@@ -63,7 +64,7 @@ func (ctrl *PersistentVolumeController) GetKubeClient() clientset.Interface {
 	return ctrl.kubeClient
 }
 
-func (ctrl *PersistentVolumeController) NewWrapperMounter(volName string, spec vol.Spec, pod *v1.Pod) (vol.Mounter, error) {
+func (ctrl *PersistentVolumeController) NewWrapperMounter(ctx context.Context, volName string, spec vol.Spec, pod *v1.Pod) (vol.Mounter, error) {
 	return nil, fmt.Errorf("PersistentVolumeController.NewWrapperMounter is not implemented")
 }
 
@@ -75,7 +76,7 @@ func (ctrl *PersistentVolumeController) GetMounter() mount.Interface {
 	return nil
 }
 
-func (ctrl *PersistentVolumeController) GetNodeAllocatable() (v1.ResourceList, error) {
+func (ctrl *PersistentVolumeController) GetNodeAllocatable(ctx context.Context) (v1.ResourceList, error) {
 	return v1.ResourceList{}, nil
 }
 
@@ -95,8 +96,8 @@ func (ctrl *PersistentVolumeController) GetConfigMapFunc() func(namespace, name 
 	}
 }
 
-func (ctrl *PersistentVolumeController) GetServiceAccountTokenFunc() func(_, _ string, _ *authenticationv1.TokenRequest) (*authenticationv1.TokenRequest, error) {
-	return func(_, _ string, _ *authenticationv1.TokenRequest) (*authenticationv1.TokenRequest, error) {
+func (ctrl *PersistentVolumeController) GetServiceAccountTokenFunc() func(ctx context.Context, _, _ string, _ *authenticationv1.TokenRequest) (*authenticationv1.TokenRequest, error) {
+	return func(ctx context.Context, _, _ string, _ *authenticationv1.TokenRequest) (*authenticationv1.TokenRequest, error) {
 		return nil, fmt.Errorf("GetServiceAccountToken unsupported in PersistentVolumeController")
 	}
 }

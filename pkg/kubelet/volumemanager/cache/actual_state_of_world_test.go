@@ -24,11 +24,11 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/ktesting"
 
 	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetesting "k8s.io/kubernetes/pkg/volume/testing"
@@ -185,6 +185,7 @@ func Test_MarkVolumeAsAttached_Positive_ExistingVolume(t *testing.T) {
 // Calls AddPodToVolume() to add a pod to the volume
 // Verifies volume/pod combo exist using PodExistsInVolume()
 func Test_AddPodToVolume_Positive_ExistingVolumeNewNode(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	// Arrange
 	volumePluginMgr, plugin := volumetesting.GetTestKubeletVolumePluginMgr(t)
 	asw := NewActualStateOfWorld("mynode" /* nodeName */, volumePluginMgr)
@@ -220,7 +221,7 @@ func Test_AddPodToVolume_Positive_ExistingVolumeNewNode(t *testing.T) {
 	}
 	podName := util.GetUniquePodName(pod)
 
-	mounter, err := plugin.NewMounter(volumeSpec, pod)
+	mounter, err := plugin.NewMounter(tCtx, volumeSpec, pod)
 	if err != nil {
 		t.Fatalf("NewMounter failed. Expected: <no error> Actual: <%v>", err)
 	}
@@ -258,6 +259,7 @@ func Test_AddPodToVolume_Positive_ExistingVolumeNewNode(t *testing.T) {
 // Verifies volume/pod combo exist using PodExistsInVolume() and the second call
 // did not fail.
 func Test_AddPodToVolume_Positive_ExistingVolumeExistingNode(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	// Arrange
 	volumePluginMgr, plugin := volumetesting.GetTestKubeletVolumePluginMgr(t)
 	asw := NewActualStateOfWorld("mynode" /* nodeName */, volumePluginMgr)
@@ -295,7 +297,7 @@ func Test_AddPodToVolume_Positive_ExistingVolumeExistingNode(t *testing.T) {
 	}
 	podName := util.GetUniquePodName(pod)
 
-	mounter, err := plugin.NewMounter(volumeSpec, pod)
+	mounter, err := plugin.NewMounter(tCtx, volumeSpec, pod)
 	if err != nil {
 		t.Fatalf("NewMounter failed. Expected: <no error> Actual: <%v>", err)
 	}
@@ -338,6 +340,7 @@ func Test_AddPodToVolume_Positive_ExistingVolumeExistingNode(t *testing.T) {
 // Verifies volume/pod combo exist using PodExistsInVolume() and the second call
 // did not fail.
 func Test_AddTwoPodsToVolume_Positive(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	// Arrange
 	volumePluginMgr, plugin := volumetesting.GetTestKubeletVolumePluginMgr(t)
 	asw := NewActualStateOfWorld("mynode" /* nodeName */, volumePluginMgr)
@@ -402,7 +405,7 @@ func Test_AddTwoPodsToVolume_Positive(t *testing.T) {
 	}
 	podName1 := util.GetUniquePodName(pod1)
 
-	mounter1, err := plugin.NewMounter(volumeSpec1, pod1)
+	mounter1, err := plugin.NewMounter(tCtx, volumeSpec1, pod1)
 	if err != nil {
 		t.Fatalf("NewMounter failed. Expected: <no error> Actual: <%v>", err)
 	}
@@ -427,7 +430,7 @@ func Test_AddTwoPodsToVolume_Positive(t *testing.T) {
 
 	podName2 := util.GetUniquePodName(pod2)
 
-	mounter2, err := plugin.NewMounter(volumeSpec2, pod2)
+	mounter2, err := plugin.NewMounter(tCtx, volumeSpec2, pod2)
 	if err != nil {
 		t.Fatalf("NewMounter failed. Expected: <no error> Actual: <%v>", err)
 	}
@@ -466,6 +469,7 @@ func Test_AddTwoPodsToVolume_Positive(t *testing.T) {
 // Test if volumes that were recorded to be read from disk during reconstruction
 // are handled correctly by the ASOW.
 func TestActualStateOfWorld_FoundDuringReconstruction(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	logger, _ := ktesting.NewTestContext(t)
 	tests := []struct {
 		name           string
@@ -588,7 +592,7 @@ func TestActualStateOfWorld_FoundDuringReconstruction(t *testing.T) {
 			}
 			podName1 := util.GetUniquePodName(pod1)
 
-			mounter1, err := plugin.NewMounter(volumeSpec1, pod1)
+			mounter1, err := plugin.NewMounter(tCtx, volumeSpec1, pod1)
 			if err != nil {
 				t.Fatalf("NewMounter failed. Expected: <no error> Actual: <%v>", err)
 			}
@@ -636,6 +640,7 @@ func TestActualStateOfWorld_FoundDuringReconstruction(t *testing.T) {
 
 // Call MarkVolumeAsDetached() on a volume which mounted by pod(s) should be skipped
 func Test_MarkVolumeAsDetached_Negative_PodInVolume(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	// Arrange
 	volumePluginMgr, plugin := volumetesting.GetTestVolumePluginMgr(t)
 	devicePath := "fake/device/path"
@@ -671,7 +676,7 @@ func Test_MarkVolumeAsDetached_Negative_PodInVolume(t *testing.T) {
 	}
 
 	podName := util.GetUniquePodName(pod)
-	mounter, err := plugin.NewMounter(volumeSpec, pod)
+	mounter, err := plugin.NewMounter(tCtx, volumeSpec, pod)
 	if err != nil {
 		t.Fatalf("NewMounter failed. Expected: <no error> Actual: <%v>", err)
 	}
@@ -769,6 +774,7 @@ func getTestPod(podName, podUID, outerVolumeName, pdName string) *v1.Pod {
 // Calls AddPodToVolume() to add pod to empty data struct
 // Verifies call fails with "volume does not exist" error.
 func Test_AddPodToVolume_Negative_VolumeDoesntExist(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	// Arrange
 	volumePluginMgr, _ := volumetesting.GetTestKubeletVolumePluginMgr(t)
 	asw := NewActualStateOfWorld("mynode" /* nodeName */, volumePluginMgr)
@@ -819,7 +825,7 @@ func Test_AddPodToVolume_Negative_VolumeDoesntExist(t *testing.T) {
 
 	podName := util.GetUniquePodName(pod)
 
-	mounter, err := plugin.NewMounter(volumeSpec, pod)
+	mounter, err := plugin.NewMounter(tCtx, volumeSpec, pod)
 	if err != nil {
 		t.Fatalf("NewMounter failed. Expected: <no error> Actual: <%v>", err)
 	}
@@ -913,6 +919,7 @@ func Test_MarkDeviceAsMounted_Positive_NewVolume(t *testing.T) {
 // Calls AddPodToVolume() to add a pod to the volume
 // Verifies volume/pod combo exist using PodExistsInVolume()
 func Test_AddPodToVolume_Positive_SELinux(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	// Arrange
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SELinuxMountReadWriteOncePod, true)
 	volumePluginMgr, plugin := volumetesting.GetTestKubeletVolumePluginMgr(t)
@@ -949,7 +956,7 @@ func Test_AddPodToVolume_Positive_SELinux(t *testing.T) {
 	}
 	podName := util.GetUniquePodName(pod)
 
-	mounter, err := plugin.NewMounter(volumeSpec, pod)
+	mounter, err := plugin.NewMounter(tCtx, volumeSpec, pod)
 	if err != nil {
 		t.Fatalf("NewMounter failed. Expected: <no error> Actual: <%v>", err)
 	}
@@ -1039,6 +1046,7 @@ func Test_MarkDeviceAsMounted_Positive_SELinux(t *testing.T) {
 }
 
 func TestUncertainVolumeMounts(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	// Arrange
 	volumePluginMgr, plugin := volumetesting.GetTestKubeletVolumePluginMgr(t)
 	asw := NewActualStateOfWorld("mynode" /* nodeName */, volumePluginMgr)
@@ -1073,7 +1081,7 @@ func TestUncertainVolumeMounts(t *testing.T) {
 	}
 	podName1 := util.GetUniquePodName(pod1)
 
-	mounter1, err := plugin.NewMounter(volumeSpec1, pod1)
+	mounter1, err := plugin.NewMounter(tCtx, volumeSpec1, pod1)
 	if err != nil {
 		t.Fatalf("NewMounter failed. Expected: <no error> Actual: <%v>", err)
 	}

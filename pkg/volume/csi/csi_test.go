@@ -33,6 +33,7 @@ import (
 	"k8s.io/client-go/informers"
 	fakeclient "k8s.io/client-go/kubernetes/fake"
 	utiltesting "k8s.io/client-go/util/testing"
+	"k8s.io/ktesting"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 )
@@ -40,6 +41,7 @@ import (
 // TestCSI_VolumeAll runs a close approximation of volume workflow
 // based on operations from the volume manager/reconciler/operation executor
 func TestCSI_VolumeAll(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	defaultFSGroupPolicy := storage.ReadWriteOnceWithFSTypeFSGroupPolicy
 
 	tests := []struct {
@@ -398,7 +400,7 @@ func TestCSI_VolumeAll(t *testing.T) {
 				t.Fatal("csiTest.VolumeAll volumePlugin.CanSupport returned false")
 			}
 
-			mounter, err := volPlug.NewMounter(volSpec, pod)
+			mounter, err := volPlug.NewMounter(tCtx, volSpec, pod)
 			if err != nil || mounter == nil {
 				t.Fatalf("csiTest.VolumeAll volPlugin.NewMounter is nil or error: %s", err)
 			}
@@ -412,7 +414,7 @@ func TestCSI_VolumeAll(t *testing.T) {
 			csiMounter.csiClient = csiClient
 			var mounterArgs volume.MounterArgs
 			mounterArgs.FsGroup = fsGroup
-			err = csiMounter.SetUp(mounterArgs)
+			err = csiMounter.SetUp(tCtx, mounterArgs)
 			if test.isInline && (test.driverSpec == nil || !containsVolumeMode(test.driverSpec.VolumeLifecycleModes, storage.VolumeLifecycleEphemeral)) {
 				// This *must* fail because a CSIDriver.Spec.VolumeLifecycleModes entry "ephemeral"
 				// is required.
@@ -485,7 +487,7 @@ func TestCSI_VolumeAll(t *testing.T) {
 			if volPlug == nil {
 				t.Fatalf("csiTest.VolumeAll volumePlugin is nil")
 			}
-			mounter, err = volPlug.NewMounter(volSpec, pod)
+			mounter, err = volPlug.NewMounter(tCtx, volSpec, pod)
 			if err != nil || mounter == nil {
 				t.Fatalf("csiTest.VolumeAll volPlugin.NewMounter is nil or error: %s", err)
 			}

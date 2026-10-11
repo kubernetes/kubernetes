@@ -801,7 +801,7 @@ func NewMainKubelet(ctx context.Context,
 		}
 	}
 
-	tokenManager := token.NewManager(kubeDeps.KubeClient)
+	tokenManager := token.NewManager(ctx, kubeDeps.KubeClient)
 	getServiceAccount := func(namespace, name string) (*v1.ServiceAccount, error) {
 		return nil, fmt.Errorf("get service account is not implemented")
 	}

@@ -17,6 +17,7 @@ limitations under the License.
 package git_repo
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -92,7 +93,7 @@ func (plugin *gitRepoPlugin) SupportsSELinuxContextMount(logger klog.Logger, spe
 	return false, nil
 }
 
-func (plugin *gitRepoPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod) (volume.Mounter, error) {
+func (plugin *gitRepoPlugin) NewMounter(ctx context.Context, spec *volume.Spec, pod *v1.Pod) (volume.Mounter, error) {
 	if err := validateVolume(spec.Volume.GitRepo); err != nil {
 		return nil, err
 	}
@@ -171,26 +172,26 @@ func (b *gitRepoVolumeMounter) GetAttributes() volume.Attributes {
 }
 
 // SetUp creates new directory and clones a git repo.
-func (b *gitRepoVolumeMounter) SetUp(mounterArgs volume.MounterArgs) error {
+func (b *gitRepoVolumeMounter) SetUp(ctx context.Context, mounterArgs volume.MounterArgs) error {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.GitRepoVolumeDriver) {
 		return fmt.Errorf("git-repo volume plugin has been disabled; if necessary, it may be re-enabled by enabling the feature-gate `GitRepoVolumeDriver`")
 	}
 
-	return b.SetUpAt(b.GetPath(), mounterArgs)
+	return b.SetUpAt(ctx, b.GetPath(), mounterArgs)
 }
 
 // SetUpAt creates new directory and clones a git repo.
-func (b *gitRepoVolumeMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs) error {
+func (b *gitRepoVolumeMounter) SetUpAt(ctx context.Context, dir string, mounterArgs volume.MounterArgs) error {
 	if volumeutil.IsReady(b.getMetaDir()) {
 		return nil
 	}
 
 	// Wrap EmptyDir, let it do the setup.
-	wrapped, err := b.plugin.host.NewWrapperMounter(b.volName, wrappedVolumeSpec(), &b.pod)
+	wrapped, err := b.plugin.host.NewWrapperMounter(ctx, b.volName, wrappedVolumeSpec(), &b.pod)
 	if err != nil {
 		return err
 	}
-	if err := wrapped.SetUpAt(dir, mounterArgs); err != nil {
+	if err := wrapped.SetUpAt(ctx, dir, mounterArgs); err != nil {
 		return err
 	}
 

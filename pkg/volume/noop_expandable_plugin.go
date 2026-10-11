@@ -17,6 +17,8 @@ limitations under the License.
 package volume
 
 import (
+	"context"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
@@ -53,7 +55,7 @@ func (n *noopExpandableVolumePluginInstance) RequiresRemount(logger klog.Logger,
 	return false
 }
 
-func (n *noopExpandableVolumePluginInstance) NewMounter(spec *Spec, podRef *v1.Pod) (Mounter, error) {
+func (n *noopExpandableVolumePluginInstance) NewMounter(ctx context.Context, spec *Spec, podRef *v1.Pod) (Mounter, error) {
 	return nil, nil
 }
 

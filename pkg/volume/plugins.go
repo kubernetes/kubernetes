@@ -159,7 +159,7 @@ type VolumePlugin interface {
 	// Ownership of the spec pointer in *not* transferred.
 	// - spec: The v1.Volume spec
 	// - pod: The enclosing pod
-	NewMounter(spec *Spec, podRef *v1.Pod) (Mounter, error)
+	NewMounter(ctx context.Context, spec *Spec, podRef *v1.Pod) (Mounter, error)
 
 	// NewUnmounter creates a new volume.Unmounter from recoverable state.
 	// - name: The volume name, as per the v1.Volume spec.
@@ -388,7 +388,7 @@ type VolumeHost interface {
 	// the provided spec.  This is used to implement volume plugins which
 	// "wrap" other plugins.  For example, the "secret" volume is
 	// implemented in terms of the "emptyDir" volume.
-	NewWrapperMounter(volName string, spec Spec, pod *v1.Pod) (Mounter, error)
+	NewWrapperMounter(ctx context.Context, volName string, spec Spec, pod *v1.Pod) (Mounter, error)
 
 	// NewWrapperUnmounter finds an appropriate plugin with which to handle
 	// the provided spec.  See comments on NewWrapperMounter for more
@@ -399,7 +399,7 @@ type VolumeHost interface {
 	GetMounter() mount.Interface
 
 	// Returns node allocatable.
-	GetNodeAllocatable() (v1.ResourceList, error)
+	GetNodeAllocatable(ctx context.Context) (v1.ResourceList, error)
 
 	// Returns a function that returns a secret.
 	GetSecretFunc() func(namespace, name string) (*v1.Secret, error)
@@ -407,7 +407,7 @@ type VolumeHost interface {
 	// Returns a function that returns a configmap.
 	GetConfigMapFunc() func(namespace, name string) (*v1.ConfigMap, error)
 
-	GetServiceAccountTokenFunc() func(namespace, name string, tr *authenticationv1.TokenRequest) (*authenticationv1.TokenRequest, error)
+	GetServiceAccountTokenFunc() func(ctx context.Context, namespace, name string, tr *authenticationv1.TokenRequest) (*authenticationv1.TokenRequest, error)
 
 	DeleteServiceAccountTokenFunc() func(podUID types.UID)
 

@@ -178,6 +178,7 @@ const minIdleTime = 1 * time.Minute
 
 // NewObjectCache returns a new watch-based instance of Store interface.
 func NewObjectCache(
+	ctx context.Context,
 	listObject listObjectFunc,
 	watchObject watchObjectFunc,
 	newObject newObjectFunc,
@@ -204,7 +205,11 @@ func NewObjectCache(
 		items:                                    make(map[objectKey]*objectCacheItem),
 	}
 
-	go wait.Until(store.startRecycleIdleWatch, time.Minute, stopCh)
+	logger := klog.FromContext(ctx)
+
+	go wait.Until(func() {
+		store.startRecycleIdleWatch(logger)
+	}, time.Minute, stopCh)
 	go store.shutdownWhenStopped(stopCh)
 	return store
 }
@@ -307,7 +312,7 @@ func (c *objectCache) isStopped() bool {
 	return c.stopped
 }
 
-func (c *objectCache) Get(namespace, name string) (runtime.Object, error) {
+func (c *objectCache) Get(ctx context.Context, namespace, name string) (runtime.Object, error) {
 	key := objectKey{namespace: namespace, name: name}
 
 	c.lock.RLock()
@@ -349,8 +354,6 @@ func (c *objectCache) Get(namespace, name string) (runtime.Object, error) {
 		if c.isImmutable(object) {
 			item.setImmutable()
 			if item.stop() {
-				// TODO: it needs to be replaced by a proper context in the future
-				ctx := context.TODO()
 				logger := klog.FromContext(ctx)
 				logger.V(4).Info("Stopped watching for changes - object is immutable", "obj", klog.KRef(namespace, name))
 			}
@@ -360,10 +363,7 @@ func (c *objectCache) Get(namespace, name string) (runtime.Object, error) {
 	return nil, fmt.Errorf("unexpected object type: %v", obj)
 }
 
-func (c *objectCache) startRecycleIdleWatch() {
-	// TODO: it needs to be replaced by a proper context in the future
-	ctx := context.TODO()
-	logger := klog.FromContext(ctx)
+func (c *objectCache) startRecycleIdleWatch(logger klog.Logger) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
@@ -393,6 +393,7 @@ func (c *objectCache) shutdownWhenStopped(stopCh <-chan struct{}) {
 //     referenced objects that aren't referenced from other registered pods
 //   - every GetObject() returns a value from local cache propagated via watches
 func NewWatchBasedManager(
+	ctx context.Context,
 	listObject listObjectFunc,
 	watchObject watchObjectFunc,
 	newObject newObjectFunc,
@@ -409,6 +410,6 @@ func NewWatchBasedManager(
 	maxIdleTime := resyncInterval * 5
 
 	// TODO propagate stopCh from the higher level.
-	objectStore := NewObjectCache(listObject, watchObject, newObject, isImmutable, listWatcherWithWatchListSemanticsWrapper, groupResource, clock.RealClock{}, maxIdleTime, wait.NeverStop)
+	objectStore := NewObjectCache(ctx, listObject, watchObject, newObject, isImmutable, listWatcherWithWatchListSemanticsWrapper, groupResource, clock.RealClock{}, maxIdleTime, wait.NeverStop)
 	return NewCacheBasedManager(objectStore, getReferencedObjects)
 }

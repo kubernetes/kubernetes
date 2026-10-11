@@ -104,7 +104,7 @@ func TestSecretCache(t *testing.T) {
 	store := newSecretCache(tCtx, fakeClient, fakeClock, time.Minute)
 
 	store.AddReference("ns", "name", "pod")
-	_, err := store.Get("ns", "name")
+	_, err := store.Get(tCtx, "ns", "name")
 	if !apierrors.IsNotFound(err) {
 		t.Errorf("Expected NotFound error, got: %v", err)
 	}
@@ -115,7 +115,7 @@ func TestSecretCache(t *testing.T) {
 	}
 	fakeWatch.Add(secret)
 	getFn := func(_ context.Context) (bool, error) {
-		object, err := store.Get("ns", "name")
+		object, err := store.Get(tCtx, "ns", "name")
 		if err != nil {
 			if apierrors.IsNotFound(err) {
 				return false, nil
@@ -136,7 +136,7 @@ func TestSecretCache(t *testing.T) {
 	// Eventually we should observer secret deletion.
 	fakeWatch.Delete(secret)
 	getFn = func(_ context.Context) (bool, error) {
-		_, err := store.Get("ns", "name")
+		_, err := store.Get(tCtx, "ns", "name")
 		if err != nil {
 			if apierrors.IsNotFound(err) {
 				return true, nil
@@ -152,7 +152,7 @@ func TestSecretCache(t *testing.T) {
 	}
 
 	store.DeleteReference("ns", "name", "pod")
-	_, err = store.Get("ns", "name")
+	_, err = store.Get(tCtx, "ns", "name")
 	if err == nil || !strings.Contains(err.Error(), "not registered") {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -206,7 +206,7 @@ func TestSecretCacheMultipleRegistrations(t *testing.T) {
 
 	// Final delete also doesn't trigger any action.
 	store.DeleteReference("ns", "name", "pod")
-	_, err := store.Get("ns", "name")
+	_, err := store.Get(tCtx, "ns", "name")
 	if err == nil || !strings.Contains(err.Error(), "not registered") {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -307,7 +307,7 @@ func TestImmutableSecretStopsTheReflector(t *testing.T) {
 				t.Errorf("item wasn't added to cache")
 			}
 
-			obj, err := store.Get("ns", "name")
+			obj, err := store.Get(tCtx, "ns", "name")
 			if tc.initial != nil {
 				assert.True(t, apiequality.Semantic.DeepEqual(tc.initial, obj))
 			} else {
@@ -324,7 +324,7 @@ func TestImmutableSecretStopsTheReflector(t *testing.T) {
 
 			// Eventually Get should return that secret.
 			getFn := func(_ context.Context) (bool, error) {
-				object, err := store.Get("ns", "name")
+				object, err := store.Get(tCtx, "ns", "name")
 				if err != nil {
 					if apierrors.IsNotFound(err) {
 						return false, nil
@@ -347,7 +347,7 @@ func TestImmutableSecretStopsTheReflector(t *testing.T) {
 }
 
 func TestMaxIdleTimeStopsTheReflector(t *testing.T) {
-	tCtx := ktesting.Init(t)
+	logger, tCtx := ktesting.NewTestContext(t)
 	secret := &v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "name",
@@ -398,36 +398,36 @@ func TestMaxIdleTimeStopsTheReflector(t *testing.T) {
 		t.Errorf("item wasn't added to cache")
 	}
 
-	obj, _ := store.Get("ns", "name")
+	obj, _ := store.Get(tCtx, "ns", "name")
 	assert.True(t, apiequality.Semantic.DeepEqual(secret, obj))
 
 	assert.True(t, reflectorRunning())
 
 	fakeClock.Step(90 * time.Second)
-	store.startRecycleIdleWatch()
+	store.startRecycleIdleWatch(logger)
 
 	// Reflector should already be stopped for maxIdleTime exceeded.
 	assert.False(t, reflectorRunning())
 
-	obj, _ = store.Get("ns", "name")
+	obj, _ = store.Get(tCtx, "ns", "name")
 	assert.True(t, apiequality.Semantic.DeepEqual(secret, obj))
 	// Reflector should reRun after get secret again.
 	assert.True(t, reflectorRunning())
 
 	fakeClock.Step(20 * time.Second)
-	_, _ = store.Get("ns", "name")
+	_, _ = store.Get(tCtx, "ns", "name")
 	fakeClock.Step(20 * time.Second)
-	_, _ = store.Get("ns", "name")
+	_, _ = store.Get(tCtx, "ns", "name")
 	fakeClock.Step(20 * time.Second)
-	_, _ = store.Get("ns", "name")
-	store.startRecycleIdleWatch()
+	_, _ = store.Get(tCtx, "ns", "name")
+	store.startRecycleIdleWatch(logger)
 
 	// Reflector should be running when the get function is called periodically.
 	assert.True(t, reflectorRunning())
 }
 
 func TestReflectorNotStoppedOnSlowInitialization(t *testing.T) {
-	tCtx := ktesting.Init(t)
+	logger, tCtx := ktesting.NewTestContext(t)
 	secret := &v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "name",
@@ -492,14 +492,14 @@ func TestReflectorNotStoppedOnSlowInitialization(t *testing.T) {
 	}
 
 	fakeClock.Step(90 * time.Second)
-	store.startRecycleIdleWatch()
+	store.startRecycleIdleWatch(logger)
 
 	// Reflector didn't yet initialize, so it shouldn't be stopped.
 	// However, Get should still be failing.
 	assert.True(t, reflectorRunning())
 	initialized, _ := reflectorInitialized(tCtx)
 	assert.False(t, initialized)
-	_, err := store.Get("ns", "name")
+	_, err := store.Get(tCtx, "ns", "name")
 	if err == nil || !strings.Contains(err.Error(), "failed to sync") {
 		t.Errorf("Expected failed to sync error, got: %v", err)
 	}
@@ -513,10 +513,10 @@ func TestReflectorNotStoppedOnSlowInitialization(t *testing.T) {
 	}
 
 	// recycling shouldn't stop the reflector because it was accessed within last minute.
-	store.startRecycleIdleWatch()
+	store.startRecycleIdleWatch(logger)
 	assert.True(t, reflectorRunning())
 
-	obj, _ := store.Get("ns", "name")
+	obj, _ := store.Get(tCtx, "ns", "name")
 	assert.True(t, apiequality.Semantic.DeepEqual(secret, obj))
 }
 

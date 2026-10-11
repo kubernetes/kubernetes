@@ -17,6 +17,7 @@ limitations under the License.
 package testing
 
 import (
+	"context"
 	"fmt"
 	"sync"
 	"time"
@@ -93,7 +94,7 @@ func (plugin *TestPlugin) RequiresRemount(logger klog.Logger, spec *volume.Spec)
 	return false
 }
 
-func (plugin *TestPlugin) NewMounter(spec *volume.Spec, podRef *v1.Pod) (volume.Mounter, error) {
+func (plugin *TestPlugin) NewMounter(ctx context.Context, spec *volume.Spec, podRef *v1.Pod) (volume.Mounter, error) {
 	plugin.pluginLock.Lock()
 	defer plugin.pluginLock.Unlock()
 	if spec == nil {

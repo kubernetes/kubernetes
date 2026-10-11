@@ -17,6 +17,7 @@ limitations under the License.
 package flexvolume
 
 import (
+	"context"
 	"fmt"
 	"path/filepath"
 	"runtime"
@@ -166,7 +167,7 @@ func (plugin *flexVolumePlugin) GetAccessModes() []api.PersistentVolumeAccessMod
 }
 
 // NewMounter is part of the volume.VolumePlugin interface.
-func (plugin *flexVolumePlugin) NewMounter(spec *volume.Spec, pod *api.Pod) (volume.Mounter, error) {
+func (plugin *flexVolumePlugin) NewMounter(ctx context.Context, spec *volume.Spec, pod *api.Pod) (volume.Mounter, error) {
 	return plugin.newMounterInternal(spec, pod, plugin.host.GetMounter(), plugin.runner)
 }
 
