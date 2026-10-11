@@ -1273,7 +1273,7 @@ func TestMonitorNodeHealthUpdateStatus(t *testing.T) {
 
 		podStatusUpdated := false
 		for _, action := range item.fakeNodeHandler.Actions() {
-			if action.GetVerb() == "update" && action.GetResource().Resource == "pods" && action.GetSubresource() == "status" {
+			if action.GetVerb() == "patch" && action.GetResource().Resource == "pods" && action.GetSubresource() == "status" {
 				podStatusUpdated = true
 			}
 		}
@@ -2014,7 +2014,7 @@ func TestMonitorNodeHealthUpdateNodeAndPodStatusWithLease(t *testing.T) {
 
 			podStatusUpdated := false
 			for _, action := range item.fakeNodeHandler.Actions() {
-				if action.GetVerb() == "update" && action.GetResource().Resource == "pods" && action.GetSubresource() == "status" {
+				if action.GetVerb() == "patch" && action.GetResource().Resource == "pods" && action.GetSubresource() == "status" {
 					podStatusUpdated = true
 				}
 			}
@@ -2164,7 +2164,7 @@ func TestMonitorNodeHealthMarkPodsNotReady(t *testing.T) {
 
 		podStatusUpdated := false
 		for _, action := range item.fakeNodeHandler.Actions() {
-			if action.GetVerb() == "update" && action.GetResource().Resource == "pods" && action.GetSubresource() == "status" {
+			if action.GetVerb() == "patch" && action.GetResource().Resource == "pods" && action.GetSubresource() == "status" {
 				podStatusUpdated = true
 			}
 		}
@@ -2284,7 +2284,7 @@ func TestMonitorNodeHealthMarkPodsNotReadyWithWorkerSize(t *testing.T) {
 
 		podStatusUpdates := 0
 		for _, action := range fakeNodeHandler.Actions() {
-			if action.GetVerb() == "update" && action.GetResource().Resource == "pods" && action.GetSubresource() == "status" {
+			if action.GetVerb() == "patch" && action.GetResource().Resource == "pods" && action.GetSubresource() == "status" {
 				podStatusUpdates++
 			}
 		}
@@ -2427,7 +2427,7 @@ func TestMonitorNodeHealthMarkPodsNotReadyRetry(t *testing.T) {
 			updateReactor: func() func(action testcore.Action) (bool, runtime.Object, error) {
 				i := 0
 				return func(action testcore.Action) (bool, runtime.Object, error) {
-					if action.GetVerb() == "update" && action.GetResource().Resource == "pods" && action.GetSubresource() == "status" {
+					if action.GetVerb() == "patch" && action.GetResource().Resource == "pods" && action.GetSubresource() == "status" {
 						i++
 						switch i {
 						case 1:
@@ -2509,7 +2509,7 @@ func TestMonitorNodeHealthMarkPodsNotReadyRetry(t *testing.T) {
 				testNodeMonitorPeriod,
 			)
 			if item.updateReactor != nil {
-				item.fakeNodeHandler.Clientset.PrependReactor("update", "pods", item.updateReactor)
+				item.fakeNodeHandler.Clientset.PrependReactor("patch", "pods", item.updateReactor)
 			}
 			nodeController.now = func() metav1.Time { return timeNow }
 			nodeController.recorder = testutil.NewFakeRecorder()
@@ -2527,7 +2527,7 @@ func TestMonitorNodeHealthMarkPodsNotReadyRetry(t *testing.T) {
 
 			podStatusUpdates := 0
 			for _, action := range item.fakeNodeHandler.Actions() {
-				if action.GetVerb() == "update" && action.GetResource().Resource == "pods" && action.GetSubresource() == "status" {
+				if action.GetVerb() == "patch" && action.GetResource().Resource == "pods" && action.GetSubresource() == "status" {
 					podStatusUpdates++
 				}
 			}
@@ -4146,7 +4146,7 @@ func TestProcessPodMarkPodNotReady(t *testing.T) {
 
 			podStatusUpdated := false
 			for _, action := range item.fakeNodeHandler.Actions() {
-				if action.GetVerb() == "update" && action.GetResource().Resource == "pods" && action.GetSubresource() == "status" {
+				if action.GetVerb() == "patch" && action.GetResource().Resource == "pods" && action.GetSubresource() == "status" {
 					podStatusUpdated = true
 				}
 			}

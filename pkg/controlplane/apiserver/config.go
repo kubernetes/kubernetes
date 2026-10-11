@@ -23,7 +23,6 @@ import (
 	"net/http"
 	"time"
 
-	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
@@ -164,16 +163,10 @@ func BuildGenericConfig(
 		lastErr = fmt.Errorf("failed to create real external clientset: %w", err)
 		return
 	}
-	trim := func(obj interface{}) (interface{}, error) {
-		if accessor, err := meta.Accessor(obj); err == nil && accessor.GetManagedFields() != nil {
-			accessor.SetManagedFields(nil)
-		}
-		return obj, nil
-	}
 	versionedInformers = clientgoinformers.NewSharedInformerFactoryWithOptions(
 		clientgoExternalClient,
 		10*time.Minute,
-		clientgoinformers.WithTransform(trim),
+		clientgoinformers.WithTransform(trimInformerObject),
 		clientgoinformers.WithInformerName(informerName),
 	)
 
