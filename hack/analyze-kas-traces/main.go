@@ -592,6 +592,7 @@ func printPhaseLegend(output io.Writer) {
 	fmt.Fprintln(output, "  apf_queue_wait is measured directly by APF. fl_priorityandfairness is total APF filter latency; apf_execution_time covers its execution phase. Do not subtract these for queue time.")
 	fmt.Fprintln(output, "  watch_storage_init is the synchronous storage Watch call; watch_first_event_wait is the time from its return until the handler receives the first event.")
 	fmt.Fprintln(output, "  TRACE-WATCHLIST-CACHE-SETUP breaks cacher Watch into resource-version lookup, cache-freshness wait, event-interval selection, and watcher registration.")
+	fmt.Fprintln(output, "  watchlist_rv_source and watchlist_rv_lookup are request-scoped fields; TRACE-WATCHLIST-RV is emitted only when GetCurrentResourceVersion is called.")
 }
 
 func printSlowest(output io.Writer, requests []trace, byAuditID map[string][]trace, apfRecords map[string]apfRecord, queueWaits map[string]string) {
@@ -628,7 +629,7 @@ func printSlowest(output io.Writer, requests []trace, byAuditID map[string][]tra
 					fmt.Fprintf(output, "     %s\n", detail)
 				}
 			}
-			if entry.kind == "TRACE-WATCHLIST" && !foundResourceVersionTrace {
+			if entry.kind == "TRACE-WATCHLIST" && !foundResourceVersionTrace && apfRecords[auditID].fields["watchlist_rv_source"] == "" {
 				fmt.Fprintln(output, "     resource-version resolution: no TRACE-WATCHLIST-RV with this audit ID")
 			}
 		}
@@ -653,6 +654,9 @@ func printAPFDetails(output io.Writer, auditID string, records map[string]apfRec
 	fmt.Fprintf(output, " (%s:%d)\n", record.file, record.line)
 	if fields["watch_storage_init"] != "" || fields["watch_first_event_wait"] != "" {
 		fmt.Fprintf(output, "     watch setup: storage-init=%s first-event-wait=%s\n", fieldDuration(trace{fields: fields}, "watch_storage_init"), fieldDuration(trace{fields: fields}, "watch_first_event_wait"))
+	}
+	if fields["watchlist_rv_source"] != "" {
+		fmt.Fprintf(output, "     watch resource-version: source=%s requested=%s lookup=%s\n", fields["watchlist_rv_source"], fields["watchlist_requested_rv"], fieldDuration(trace{fields: fields}, "watchlist_rv_lookup"))
 	}
 }
 
