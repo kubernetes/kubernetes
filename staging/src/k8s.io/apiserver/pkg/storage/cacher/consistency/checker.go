@@ -195,6 +195,7 @@ func (c *Checker) calculateStoreDigest(ctx context.Context, store getLister, res
 		opts.ResourceVersionMatch = metav1.ResourceVersionMatchNotOlderThan
 	} else {
 		opts.ResourceVersionMatch = metav1.ResourceVersionMatchExact
+		opts.KeysOnly = true
 	}
 	h := fnv.New64()
 	for {

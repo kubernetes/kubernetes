@@ -307,6 +307,7 @@ func TestConsistencyCheckerListOpts(t *testing.T) {
 				Limit: checkerListPageSize,
 			},
 			Recursive: true,
+			KeysOnly:  true,
 		},
 	}
 	if diff := cmp.Diff(etcdOpts, wantEtcdOpts); diff != "" {
