@@ -186,9 +186,10 @@ var (
 			{Choice: RVEmpty, Weight: 15},
 			{Choice: RVZero, Weight: 15},
 			{Choice: RVOne, Weight: 10},
-			{Choice: RVCurrent, Weight: 20},
-			{Choice: RVPast, Weight: 20},
-			{Choice: RVFuture, Weight: 20},
+			{Choice: RVCached, Weight: 15},
+			{Choice: RVCurrent, Weight: 15},
+			{Choice: RVPast, Weight: 15},
+			{Choice: RVFuture, Weight: 15},
 		},
 		WatcherBehavior: []ChoiceWeight[WatcherBehavior]{
 			{Choice: WatcherFast, Weight: 40},
@@ -199,11 +200,11 @@ var (
 	}
 
 	watchCfg = WatchConfig{
-		Concurrency:         4,
+		Concurrency:         16,
 		Duration:            500 * time.Millisecond,
 		SlowDelay:           2 * time.Millisecond,
-		HiccupDuration:      50 * time.Millisecond,
-		MaxEvents:           50,
+		HiccupDuration:      150 * time.Millisecond,
+		MaxEvents:           200,
 		RequestDistribution: watchRequestDistribution,
 	}
 )
