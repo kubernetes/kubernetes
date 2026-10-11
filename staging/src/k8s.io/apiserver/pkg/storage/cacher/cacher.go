@@ -572,11 +572,11 @@ func (c *Cacher) watch(ctx context.Context, key string, requestedWatchRV uint64,
 		if !watchList || total < 500*time.Millisecond {
 			return
 		}
-		rvSource := "explicit"
+		rvSource := "request"
 		if opts.ResourceVersion == "" {
 			rvSource = "default"
 			if opts.SendInitialEvents != nil && *opts.SendInitialEvents {
-				rvSource = "etcd-current"
+				rvSource = "etcd"
 			}
 		}
 		other := total - resourceVersionTime - cacheFreshTime - cacheIntervalTime - registerTime
@@ -1407,6 +1407,9 @@ func isListWatchRequest(opts storage.ListOptions) bool {
 //	if ResourceVersionmatch != nil => ResourceVersionMatch = NotOlderThan & SendInitialEvents != nil
 func (c *Cacher) getWatchCacheResourceVersion(ctx context.Context, parsedWatchResourceVersion uint64, opts storage.ListOptions) (uint64, error) {
 	if len(opts.ResourceVersion) != 0 {
+		if isListWatchRequest(opts) {
+			klog.FromContext(ctx).V(2).Info("TRACE-WATCHLIST-RV", "resource", c.groupResource, "auditID", audit.GetAuditIDTruncated(ctx), "source", "request", "requestedRV", opts.ResourceVersion, "duration", time.Duration(0), "resourceVersion", parsedWatchResourceVersion)
+		}
 		return parsedWatchResourceVersion, nil
 	}
 	// legacy case
@@ -1416,7 +1419,7 @@ func (c *Cacher) getWatchCacheResourceVersion(ctx context.Context, parsedWatchRe
 	start := time.Now()
 	rv, err := c.storage.GetCurrentResourceVersion(ctx)
 	if isListWatchRequest(opts) {
-		klog.FromContext(ctx).V(2).Info("TRACE-WATCHLIST-RV", "resource", c.groupResource, "auditID", audit.GetAuditIDTruncated(ctx), "duration", time.Since(start), "resourceVersion", rv, "err", err)
+		klog.FromContext(ctx).V(2).Info("TRACE-WATCHLIST-RV", "resource", c.groupResource, "auditID", audit.GetAuditIDTruncated(ctx), "source", "etcd", "requestedRV", opts.ResourceVersion, "duration", time.Since(start), "resourceVersion", rv, "err", err)
 	}
 	return rv, err
 }
