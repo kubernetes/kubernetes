@@ -150,11 +150,11 @@ func run(ctx context.Context, inputURL, outputDir string, output io.Writer) erro
 		return err
 	}
 
-	traces, counts, apfRecords, queueWaits, err := scrape(localFiles)
+	traces, counts, apfRecords, queueWaits, userAgents, err := scrape(localFiles)
 	if err != nil {
 		return err
 	}
-	printReport(output, traces, counts, apfRecords, queueWaits)
+	printReport(output, traces, counts, apfRecords, queueWaits, userAgents)
 	return nil
 }
 
@@ -331,15 +331,16 @@ func download(ctx context.Context, client *http.Client, rawURL, path string) err
 	return errors.Join(copyErr, closeErr)
 }
 
-func scrape(files []string) ([]trace, map[string]int, map[string]apfRecord, map[string]string, error) {
+func scrape(files []string) ([]trace, map[string]int, map[string]apfRecord, map[string]string, map[string]string, error) {
 	var traces []trace
 	counts := make(map[string]int)
 	apfRecords := make(map[string]apfRecord)
 	queueWaits := make(map[string]string)
+	userAgents := make(map[string]string)
 	for _, file := range files {
 		input, err := os.Open(file)
 		if err != nil {
-			return nil, nil, nil, nil, fmt.Errorf("open downloaded log %q: %w", file, err)
+			return nil, nil, nil, nil, nil, fmt.Errorf("open downloaded log %q: %w", file, err)
 		}
 		scanner := bufio.NewScanner(input)
 		scanner.Buffer(make([]byte, 64*1024), 16*1024*1024)
@@ -352,6 +353,9 @@ func scrape(files []string) ([]trace, map[string]int, map[string]apfRecord, map[
 				auditID := fields["audit-ID"]
 				if auditID == "" {
 					auditID = fields["auditID"]
+				}
+				if auditID != "" && fields["userAgent"] != "" {
+					userAgents[auditID] = fields["userAgent"]
 				}
 				if auditID != "" && fields["fl_priorityandfairness"] != "" {
 					apfRecords[auditID] = apfRecord{file: filepath.Base(file), line: lineNumber, fields: fields}
@@ -385,10 +389,10 @@ func scrape(files []string) ([]trace, map[string]int, map[string]apfRecord, map[
 		scanErr := scanner.Err()
 		closeErr := input.Close()
 		if err := errors.Join(scanErr, closeErr); err != nil {
-			return nil, nil, nil, nil, fmt.Errorf("read downloaded log %q: %w", file, err)
+			return nil, nil, nil, nil, nil, fmt.Errorf("read downloaded log %q: %w", file, err)
 		}
 	}
-	return traces, counts, apfRecords, queueWaits, nil
+	return traces, counts, apfRecords, queueWaits, userAgents, nil
 }
 
 func parseFields(rest string) map[string]string {
@@ -463,7 +467,7 @@ func traceDuration(entry trace) time.Duration {
 	return duration
 }
 
-func printReport(output io.Writer, traces []trace, counts map[string]int, apfRecords map[string]apfRecord, queueWaits map[string]string) {
+func printReport(output io.Writer, traces []trace, counts map[string]int, apfRecords map[string]apfRecord, queueWaits map[string]string, userAgents map[string]string) {
 	watchListAuditIDs := make(map[string]struct{})
 	for _, entry := range traces {
 		if entry.kind == "TRACE-WATCHLIST" && entry.fields["auditID"] != "" {
@@ -507,7 +511,7 @@ func printReport(output io.Writer, traces []trace, counts map[string]int, apfRec
 	printResourceVersionStats(output, traces)
 	printWatchListPhaseStats(output, traces)
 	printPhaseLegend(output)
-	printSlowest(output, requests, byAuditID, apfRecords, queueWaits)
+	printSlowest(output, requests, byAuditID, apfRecords, queueWaits, userAgents)
 }
 
 func printRequestStats(output io.Writer, requests []trace) {
@@ -569,17 +573,15 @@ func printWatchListPhaseStats(output io.Writer, traces []trace) {
 		return
 	}
 	fmt.Fprintf(output, "\nWatchList phase averages across %d request trace(s)\n", len(watchLists))
+	averages := make(map[string][]time.Duration, len(fields))
 	for _, field := range fields {
-		var values []time.Duration
 		for _, entry := range watchLists {
 			if value, err := time.ParseDuration(entry.fields[field]); err == nil {
-				values = append(values, value)
+				averages[field] = append(averages[field], value)
 			}
 		}
-		if len(values) > 0 {
-			fmt.Fprintf(output, "  %-8s %s\n", field, average(values))
-		}
 	}
+	fmt.Fprintf(output, "  setup=%s sending=%s (encode=%s, flush=%s, other=%s)\n", average(averages["setup"]), average(averages["sending"]), average(averages["encode"]), average(averages["flush"]), average(averages["other"]))
 }
 
 func printPhaseLegend(output io.Writer) {
@@ -595,7 +597,7 @@ func printPhaseLegend(output io.Writer) {
 	fmt.Fprintln(output, "  watchlist_rv_source and watchlist_rv_lookup are request-scoped fields; TRACE-WATCHLIST-RV is emitted only when GetCurrentResourceVersion is called.")
 }
 
-func printSlowest(output io.Writer, requests []trace, byAuditID map[string][]trace, apfRecords map[string]apfRecord, queueWaits map[string]string) {
+func printSlowest(output io.Writer, requests []trace, byAuditID map[string][]trace, apfRecords map[string]apfRecord, queueWaits map[string]string, userAgents map[string]string) {
 	fmt.Fprintln(output, "\nTop 5 slowest traced requests")
 	if len(requests) == 0 {
 		fmt.Fprintln(output, "  No request summaries to rank.")
@@ -619,6 +621,11 @@ func printSlowest(output io.Writer, requests []trace, byAuditID map[string][]tra
 		fmt.Fprintf(output, " (%s:%d)\n", entry.file, entry.line)
 		printRequestDetails(output, entry)
 		if auditID := entry.fields["auditID"]; auditID != "" {
+			if userAgent := userAgents[auditID]; userAgent != "" {
+				fmt.Fprintf(output, "     user agent: %s\n", userAgent)
+			} else {
+				fmt.Fprintln(output, "     user agent: no correlated HTTP log")
+			}
 			printAPFDetails(output, auditID, apfRecords, queueWaits)
 			foundResourceVersionTrace := false
 			for _, related := range byAuditID[auditID] {
@@ -668,7 +675,7 @@ func printRequestDetails(output io.Writer, entry trace) {
 	if value := entry.fields["uncompressedMB"]; value != "" {
 		fmt.Fprintf(output, "     payload=%s MB uncompressed / %s MB compressed, encoding=%s, mediaType=%s\n", value, entry.fields["compressedMB"], entry.fields["contentEncoding"], entry.fields["mediaType"])
 	}
-	fmt.Fprintf(output, "     request phases: setup=%s sending=%s encode=%s flush=%s other=%s\n", fieldDuration(entry, "setup"), fieldDuration(entry, "sending"), fieldDuration(entry, "encode"), fieldDuration(entry, "flush"), fieldDuration(entry, "other"))
+	fmt.Fprintf(output, "     request phases: setup=%s sending=%s (encode=%s, flush=%s, other=%s)\n", fieldDuration(entry, "setup"), fieldDuration(entry, "sending"), fieldDuration(entry, "encode"), fieldDuration(entry, "flush"), fieldDuration(entry, "other"))
 }
 
 func relatedTraceSummary(entry trace) string {
