@@ -198,6 +198,9 @@ func (cfgCtlr *configController) Handle(ctx context.Context, requestDigest Reque
 }
 
 func observeQueueWaitTime(ctx context.Context, priorityLevelName, flowSchemaName, execute string, waitTime time.Duration) {
+	// Per-request logs need this value because the Prometheus histogram cannot
+	// attribute queueing delay to an individual slow request.
+	httplog.AddKeyValue(ctx, "apf_queue_wait", waitTime)
 	metrics.ObserveWaitingDuration(ctx, priorityLevelName, flowSchemaName, execute, waitTime)
 	endpointsrequest.TrackAPFQueueWaitLatency(ctx, waitTime)
 }

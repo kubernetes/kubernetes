@@ -469,7 +469,10 @@ func (c *cacheWatcher) sendWatchCacheEvent(event *watchCacheEvent, timing *inter
 }
 
 type intervalTiming struct {
-	next time.Duration
+	next           time.Duration
+	firstEvent     time.Duration
+	firstEventSent bool
+	startTime      time.Time
 	intervalEventTiming
 }
 
@@ -487,7 +490,11 @@ func (c *cacheWatcher) streamInterval(cacheInterval *watchCacheInterval, resourc
 		if err != nil {
 			return eventCount, err
 		}
-		c.sendWatchCacheEvent(event, &timing.intervalEventTiming)
+		_, sentAt := c.sendWatchCacheEvent(event, &timing.intervalEventTiming)
+		if !timing.firstEventSent && !sentAt.IsZero() {
+			timing.firstEvent = time.Since(timing.startTime)
+			timing.firstEventSent = true
+		}
 
 		// With some events already sent, update resourceVersion so that
 		// events that were buffered and not yet processed won't be delivered
@@ -535,7 +542,7 @@ func (c *cacheWatcher) processInterval(ctx context.Context, cacheInterval *watch
 		resourceVersion = cacheInterval.resourceVersion
 	}
 
-	timing := &intervalTiming{}
+	timing := &intervalTiming{startTime: startTime}
 	initEventCount, err := c.streamInterval(cacheInterval, &resourceVersion, timing)
 	if err != nil {
 		// An error indicates that the cache interval
@@ -563,13 +570,16 @@ func (c *cacheWatcher) processInterval(ctx context.Context, cacheInterval *watch
 	if processingTime > initProcessThreshold {
 		klog.V(2).Infof("processing %d initEvents of %s (%s) took %v", initEventCount, c.groupResource, c.identifier, processingTime)
 	}
-	if processingTime > 10*time.Second {
-		klog.FromContext(ctx).V(2).Info("TRACE-CACHER", "resource", c.groupResource, "auditID", audit.GetAuditIDTruncated(ctx), "identifier", c.identifier, "events", initEventCount, "total", processingTime, "next", timing.next, "convert", timing.convert, "send", timing.send, "other", processingTime-timing.next-timing.convert-timing.send)
-	}
-
 	// send bookmark after sending all events in cacheInterval for watchlist request
 	if cacheInterval.initialEventsEndBookmark != nil {
-		c.sendWatchCacheEvent(cacheInterval.initialEventsEndBookmark, nil)
+		_, sentAt := c.sendWatchCacheEvent(cacheInterval.initialEventsEndBookmark, nil)
+		if !timing.firstEventSent && !sentAt.IsZero() {
+			timing.firstEvent = time.Since(timing.startTime)
+			timing.firstEventSent = true
+		}
+	}
+	if processingTime > 10*time.Second || timing.firstEvent > 500*time.Millisecond {
+		klog.FromContext(ctx).V(2).Info("TRACE-CACHER", "resource", c.groupResource, "auditID", audit.GetAuditIDTruncated(ctx), "identifier", c.identifier, "events", initEventCount, "total", processingTime, "firstEvent", timing.firstEvent, "next", timing.next, "convert", timing.convert, "send", timing.send, "other", processingTime-timing.next-timing.convert-timing.send)
 	}
 	c.process(ctx, resourceVersion)
 }

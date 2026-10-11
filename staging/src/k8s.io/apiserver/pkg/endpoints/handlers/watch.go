@@ -71,7 +71,7 @@ func (w *realTimeoutFactory) TimeoutCh() (<-chan time.Time, func() bool) {
 
 // serveWatchHandler returns a handle to serve a watch response.
 // TODO: the functionality in this method and in WatchServer.Serve is not cleanly decoupled.
-func serveWatchHandler(watcher watch.Interface, scope *RequestScope, mediaTypeOptions negotiation.MediaTypeOptions, req *http.Request, w http.ResponseWriter, timeout time.Duration, metricsScope string, isWatchListRequest bool, completeHook WatchListCompleteHook) (http.Handler, error) {
+func serveWatchHandler(watcher watch.Interface, scope *RequestScope, mediaTypeOptions negotiation.MediaTypeOptions, req *http.Request, w http.ResponseWriter, timeout time.Duration, metricsScope string, isWatchListRequest bool, completeHook WatchListCompleteHook, watchStorageInitDone time.Time) (http.Handler, error) {
 	options, err := optionsForTransform(mediaTypeOptions, req)
 	if err != nil {
 		return nil, err
@@ -181,6 +181,7 @@ func serveWatchHandler(watcher watch.Interface, scope *RequestScope, mediaTypeOp
 		metricsScope:          metricsScope,
 		isWatchListRequest:    isWatchListRequest,
 		watchListCompleteHook: completeHook,
+		watchStorageInitDone:  watchStorageInitDone,
 	}
 
 	if wsstream.IsWebSocketRequest(req) {
@@ -213,6 +214,7 @@ type WatchServer struct {
 	metricsScope          string
 	isWatchListRequest    bool
 	watchListCompleteHook WatchListCompleteHook
+	watchStorageInitDone  time.Time
 }
 
 type WatchListCompleteHook func()
@@ -530,6 +532,7 @@ func (s *WatchServer) HandleHTTP(w http.ResponseWriter, req *http.Request) {
 			}
 			if s.isWatchListRequest && initStart.IsZero() {
 				initStart = time.Now()
+				httplog.AddKeyValue(req.Context(), "watch_first_event_wait", initStart.Sub(s.watchStorageInitDone))
 			}
 			isWatchListLatencyRecordingRequired := shouldRecordWatchListLatency(req.Context(), event)
 

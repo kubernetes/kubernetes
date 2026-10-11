@@ -514,10 +514,29 @@ type namespacedName struct {
 }
 
 func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions) (watch.Interface, error) {
+	watchList := isListWatchRequest(opts)
+	startTime := time.Now()
+	var resourceVersionTime, cacheFreshTime, cacheIntervalTime, registerTime time.Duration
+	var requiredResourceVersion uint64
 	ctx, span := tracing.Start(ctx, "cacher.Watch",
 		attribute.String("audit-id", audit.GetAuditIDTruncated(ctx)),
 		attribute.Stringer("type", c.groupResource))
 	defer span.End(500 * time.Millisecond)
+	defer func() {
+		total := time.Since(startTime)
+		if !watchList || total < 500*time.Millisecond {
+			return
+		}
+		rvSource := "explicit"
+		if opts.ResourceVersion == "" {
+			rvSource = "default"
+			if opts.SendInitialEvents != nil && *opts.SendInitialEvents {
+				rvSource = "etcd-current"
+			}
+		}
+		other := total - resourceVersionTime - cacheFreshTime - cacheIntervalTime - registerTime
+		klog.FromContext(ctx).V(2).Info("TRACE-WATCHLIST-CACHE-SETUP", "resource", c.groupResource, "auditID", audit.GetAuditIDTruncated(ctx), "total", total, "rvSource", rvSource, "requestedRV", opts.ResourceVersion, "requiredRV", requiredResourceVersion, "rvLookup", resourceVersionTime, "cacheFresh", cacheFreshTime, "cacheInterval", cacheIntervalTime, "register", registerTime, "other", other)
+	}()
 	key, err := c.prepareKey(key, opts.Recursive)
 	if err != nil {
 		return nil, err
@@ -578,7 +597,9 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 	}
 
 	// Determine the ResourceVersion to which the watch cache must be synchronized
-	requiredResourceVersion, err := c.getWatchCacheResourceVersion(ctx, requestedWatchRV, opts)
+	phaseStart := time.Now()
+	requiredResourceVersion, err = c.getWatchCacheResourceVersion(ctx, requestedWatchRV, opts)
+	resourceVersionTime = time.Since(phaseStart)
 	if err != nil {
 		return newErrWatcher(err), nil
 	}
@@ -618,7 +639,9 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 	// moreover even though the c.waitUntilWatchCacheFreshAndForceAllEvents acquires a lock
 	// it is safe to release the lock after the method finishes because we don't require
 	// any atomicity between the call to the method and further calls that actually get the events.
+	phaseStart = time.Now()
 	err = c.waitUntilWatchCacheFreshAndForceAllEvents(ctx, requiredResourceVersion, opts)
+	cacheFreshTime = time.Since(phaseStart)
 	if err != nil {
 		return newErrWatcher(err), nil
 	}
@@ -632,7 +655,9 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 	defer c.watchCache.RUnlock()
 
 	var cacheInterval *watchCacheInterval
+	phaseStart = time.Now()
 	cacheInterval, err = c.watchCache.getAllEventsSinceLocked(requiredResourceVersion, key, opts)
+	cacheIntervalTime = time.Since(phaseStart)
 	if err != nil {
 		// To match the uncached watch implementation, once we have passed authn/authz/admission,
 		// and successfully parsed a resource version, other errors must fail with a watch event of type ERROR,
@@ -643,6 +668,7 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 	c.setInitialEventsEndBookmarkIfRequested(cacheInterval, opts, c.watchCache.resourceVersion)
 
 	addedWatcher := false
+	phaseStart = time.Now()
 	func() {
 		c.Lock()
 		defer c.Unlock()
@@ -667,6 +693,7 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 		}
 		c.watcherIdx++
 	}()
+	registerTime = time.Since(phaseStart)
 
 	if !addedWatcher {
 		// Watcher isn't really started at this point, so it's safe to just drop it.

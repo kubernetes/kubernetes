@@ -39,6 +39,7 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/registry/rest"
+	"k8s.io/apiserver/pkg/server/httplog"
 	"k8s.io/apiserver/pkg/server/routine"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/tracing"
@@ -280,11 +281,16 @@ func handleWatch(ctx context.Context, rw rest.Watcher, scope *RequestScope, req 
 	klog.V(3).InfoS("Starting watch", "path", req.URL.Path, "resourceVersion", opts.ResourceVersion, "labels", opts.LabelSelector, "fields", opts.FieldSelector, "sendInitialEvents", opts.SendInitialEvents, "timeout", timeout, "audit-ID", audit.GetAuditIDTruncated(ctx))
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer func() { cancel() }()
+	watchStorageInitStart := time.Now()
 	watcher, err := rw.Watch(ctx, &opts)
+	watchStorageInitDone := time.Now()
+	if isWatchList {
+		httplog.AddKeyValue(ctx, "watch_storage_init", watchStorageInitDone.Sub(watchStorageInitStart))
+	}
 	if err != nil {
 		return err
 	}
-	handler, err := serveWatchHandler(watcher, scope, outputMediaType, req, w, timeout, metrics.CleanListScope(ctx, &opts), isWatchList, onWatchListComplete)
+	handler, err := serveWatchHandler(watcher, scope, outputMediaType, req, w, timeout, metrics.CleanListScope(ctx, &opts), isWatchList, onWatchListComplete, watchStorageInitDone)
 	if err != nil {
 		return err
 	}
