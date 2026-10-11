@@ -132,7 +132,10 @@ func Validate_Struct(
 			if e := validate.EachMapVal(ctx, op, fldPath, obj, oldObj, validate.DirectEqual,
 				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *ShortCircuitStruct) field.ErrorList {
 					return validate.Subfield(ctx, op, fldPath, obj, oldObj, "a",
-						func(o *ShortCircuitStruct) *string { return &o.A }, validate.DirectEqual, validate.RequiredValue)
+						func(o *ShortCircuitStruct) *string { return &o.A }, validate.DirectEqual,
+						func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
+							return validate.RequiredValue(ctx, op, fldPath, obj, oldObj)
+						})
 				}); len(e) != 0 {
 				errs = append(errs, e...)
 			}

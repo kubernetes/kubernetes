@@ -20,7 +20,6 @@ import (
 	"testing"
 
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/utils/ptr"
 )
 
 func Test(t *testing.T) {
@@ -53,13 +52,13 @@ func Test(t *testing.T) {
 
 	st.Value(&Struct{
 		StringField:           "abc",
-		StringPtrField:        ptr.To("xyz"),
+		StringPtrField:        new("xyz"),
 		StringTypedefField:    StringType("abc"),
-		StringTypedefPtrField: ptr.To(StringType("xyz")),
+		StringTypedefPtrField: new(StringType("xyz")),
 		IntField:              123,
-		IntPtrField:           ptr.To(456),
+		IntPtrField:           new(456),
 		IntTypedefField:       IntType(123),
-		IntTypedefPtrField:    ptr.To(IntType(456)),
+		IntTypedefPtrField:    new(IntType(456)),
 		BoolField:             true,
 		FloatField:            1.23,
 		ByteField:             'a',
@@ -87,5 +86,21 @@ func Test(t *testing.T) {
 		field.Forbidden(field.NewPath("byteArrayField"), ""),
 		field.Forbidden(field.NewPath("mapField"), ""),
 		field.Forbidden(field.NewPath("mapTypedefField"), ""),
+	})
+}
+
+func TestPayload(t *testing.T) {
+	st := localSchemeBuilder.Test(t)
+
+	st.Value(&PayloadStruct{
+		StringField:    "abc",
+		StringPtrField: new("xyz"),
+		SliceField:     []string{"a"},
+		MapField:       map[string]string{"a": "b"},
+	}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField().ByDetailExact(), field.ErrorList{
+		field.Forbidden(field.NewPath("stringField"), "custom string msg"),
+		field.Forbidden(field.NewPath("stringPtrField"), "custom pointer msg"),
+		field.Forbidden(field.NewPath("sliceField"), "custom slice msg"),
+		field.Forbidden(field.NewPath("mapField"), "custom map msg"),
 	})
 }

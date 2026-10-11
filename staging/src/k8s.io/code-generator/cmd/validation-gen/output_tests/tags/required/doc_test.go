@@ -130,3 +130,15 @@ func Test(t *testing.T) {
 		"mapTypedefField":       {"field Struct.MapTypedefField", "type MapType"},
 	})
 }
+
+func TestPayload(t *testing.T) {
+	st := localSchemeBuilder.Test(t)
+
+	st.Value(&PayloadStruct{}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField().ByDetailExact(), field.ErrorList{
+		field.Required(field.NewPath("stringField"), "custom string msg"),
+		field.Required(field.NewPath("stringPtrField"), "custom pointer msg"),
+		field.Required(field.NewPath("sliceField"), "custom slice msg"),
+		field.Required(field.NewPath("mapField"), "custom map msg"),
+		field.Invalid(field.NewPath("otherStructField"), nil, "forced failure: type OtherStruct"),
+	})
+}

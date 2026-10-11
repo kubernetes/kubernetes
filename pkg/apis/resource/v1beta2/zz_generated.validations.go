@@ -3702,7 +3702,10 @@ func Validate_ResourceSliceSpec(
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.IfOption(ctx, op, fldPath, obj, oldObj, "DRAPartitionableDevicesType", false, validate.ForbiddenPointer).MarkShortCircuit(); len(e) != 0 {
+			if e := validate.IfOption(ctx, op, fldPath, obj, oldObj, "DRAPartitionableDevicesType", false,
+				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *resourcev1beta2.FullyQualifiedName) field.ErrorList {
+					return validate.ForbiddenPointer(ctx, op, fldPath, obj, oldObj)
+				}).MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
