@@ -437,7 +437,7 @@ func TestMostRecentScheduleTime(t *testing.T) {
 				},
 			},
 			now:                   *deltaTimeAfterTopOfTheHour(30*time.Hour + 30*time.Minute),
-			expectedRecentTime:    nil,
+			expectedRecentTime:    deltaTimeAfterTopOfTheHour(26*time.Hour + 30*time.Minute),
 			expectedEarliestTime:  *deltaTimeAfterTopOfTheHour(30 * time.Minute),
 			expectedTooManyMissed: fewMissed,
 		},
@@ -606,6 +606,101 @@ func TestMostRecentScheduleTime(t *testing.T) {
 			}
 			if gotTooManyMissed != tt.expectedTooManyMissed {
 				t.Errorf("expectedNumberOfMisses - got %v, want %v", gotTooManyMissed, tt.expectedTooManyMissed)
+			}
+		})
+	}
+}
+
+func TestMostRecentScheduleTimeDuringScheduleGap(t *testing.T) {
+	tests := []struct {
+		name             string
+		schedule         string
+		created          time.Time
+		now              time.Time
+		want             time.Time
+		lastScheduleTime *metav1.Time
+		deadline         *int64
+	}{
+		{
+			name:     "weekend",
+			schedule: "0 0 * * 1-5",
+			created:  time.Date(2026, time.October, 5, 0, 0, 0, 0, time.UTC),
+			now:      time.Date(2026, time.October, 11, 12, 0, 0, 0, time.UTC),
+			want:     time.Date(2026, time.October, 9, 0, 0, 0, 0, time.UTC),
+		},
+		{
+			name:     "monthly gap",
+			schedule: "0 0 1,2 * *",
+			created:  time.Date(2025, time.December, 31, 0, 0, 0, 0, time.UTC),
+			now:      time.Date(2026, time.January, 20, 0, 0, 0, 0, time.UTC),
+			want:     time.Date(2026, time.January, 2, 0, 0, 0, 0, time.UTC),
+		},
+		{
+			name:     "overnight gap",
+			schedule: "0 10,11,12 * * *",
+			created:  time.Date(2026, time.October, 9, 9, 0, 0, 0, time.UTC),
+			now:      time.Date(2026, time.October, 9, 20, 0, 0, 0, time.UTC),
+			want:     time.Date(2026, time.October, 9, 12, 0, 0, 0, time.UTC),
+		},
+		{
+			name:     "weekend within starting deadline",
+			schedule: "0 0 * * 1-5",
+			created:  time.Date(2026, time.October, 5, 0, 0, 0, 0, time.UTC),
+			now:      time.Date(2026, time.October, 11, 12, 0, 0, 0, time.UTC),
+			want:     time.Date(2026, time.October, 9, 0, 0, 0, 0, time.UTC),
+			deadline: ptr.To[int64](4 * 24 * 60 * 60),
+		},
+		{
+			name:     "weekend outside starting deadline",
+			schedule: "0 0 * * 1-5",
+			created:  time.Date(2026, time.October, 5, 0, 0, 0, 0, time.UTC),
+			now:      time.Date(2026, time.October, 11, 12, 0, 0, 0, time.UTC),
+			deadline: ptr.To[int64](2 * 24 * 60 * 60),
+		},
+		{
+			name:             "overnight gap after previous run",
+			schedule:         "0 10,11,12 * * *",
+			created:          time.Date(2026, time.October, 9, 9, 0, 0, 0, time.UTC),
+			now:              time.Date(2026, time.October, 9, 20, 0, 0, 0, time.UTC),
+			want:             time.Date(2026, time.October, 9, 12, 0, 0, 0, time.UTC),
+			lastScheduleTime: ptr.To(metav1.NewTime(time.Date(2026, time.October, 9, 10, 0, 0, 0, time.UTC))),
+		},
+		{
+			name:     "weekend crossing daylight saving time",
+			schedule: "CRON_TZ=America/New_York 0 1 * * 1-5",
+			created:  time.Date(2026, time.October, 26, 0, 0, 0, 0, time.UTC),
+			now:      time.Date(2026, time.November, 1, 12, 0, 0, 0, time.UTC),
+			want:     time.Date(2026, time.October, 30, 5, 0, 0, 0, time.UTC),
+		},
+		{
+			name:     "monthly gap after long downtime",
+			schedule: "0 0 1,2 * *",
+			created:  time.Date(2025, time.December, 31, 0, 0, 0, 0, time.UTC),
+			now:      time.Date(2036, time.January, 20, 0, 0, 0, 0, time.UTC),
+			want:     time.Date(2036, time.January, 2, 0, 0, 0, 0, time.UTC),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			sched, err := cron.ParseStandard(tt.schedule)
+			if err != nil {
+				t.Fatal(err)
+			}
+			cj := &batchv1.CronJob{
+				ObjectMeta: metav1.ObjectMeta{CreationTimestamp: metav1.NewTime(tt.created)},
+				Spec:       batchv1.CronJobSpec{Schedule: tt.schedule, StartingDeadlineSeconds: tt.deadline},
+				Status:     batchv1.CronJobStatus{LastScheduleTime: tt.lastScheduleTime},
+			}
+			_, got, _, err := mostRecentScheduleTime(cj, tt.now, sched, true)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if tt.want.IsZero() {
+				if got != nil {
+					t.Errorf("most recent schedule = %v, want none", got)
+				}
+			} else if got == nil || !got.Equal(tt.want) {
+				t.Errorf("most recent schedule = %v, want %v", got, tt.want)
 			}
 		})
 	}
