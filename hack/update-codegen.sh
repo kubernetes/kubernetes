@@ -932,6 +932,15 @@ function codegen::informers() {
     fi
 }
 
+function codegen::informertrim() {
+    if [[ -n "${LINT:-}" ]]; then
+        return
+    fi
+    kube::log::status "Generating informer trim code"
+    GOTOOLCHAIN="$(kube::golang::hack_tools_gotoolchain)" \
+        go -C "${KUBE_ROOT}/hack/tools" run ./informertrim --kube-root="${KUBE_ROOT}"
+}
+
 function indent() {
     while read -r X; do
         echo "    ${X}"
