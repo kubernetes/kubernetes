@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 // Command analyze-kas-traces downloads kube-apiserver logs from a Prow job and
-// summarizes the request traces added for slow LIST and WatchList requests.
+// summarizes WatchList request traces and their correlated storage/APF phases.
 //
 // Usage:
 //
@@ -72,7 +72,7 @@ func main() {
 	outputDir := flag.String("out", defaultOutputDir, "directory for downloaded kube-apiserver logs")
 	flag.Usage = func() {
 		fmt.Fprintf(flag.CommandLine.Output(), "Usage: %s [flags] <prow-job-downloads-url>\n\n", os.Args[0])
-		fmt.Fprintln(flag.CommandLine.Output(), "Downloads kube-apiserver logs, summarizes TRACE-* entries, and ranks the five slowest traced LIST/WATCHLIST requests.")
+		fmt.Fprintln(flag.CommandLine.Output(), "Downloads kube-apiserver logs, summarizes WatchList traces, and ranks the five slowest WatchList requests.")
 		fmt.Fprintln(flag.CommandLine.Output(), "A URL ending in /downloads is resolved through the Prow job's artifacts index.")
 		flag.PrintDefaults()
 	}
@@ -373,6 +373,9 @@ func scrape(files []string) ([]trace, map[string]int, map[string]apfRecord, map[
 				continue
 			}
 			kind := line[match[2]:match[3]]
+			if kind == "TRACE-LIST" {
+				continue
+			}
 			fields := parseFields(line[match[1]:])
 			entry := trace{kind: kind, file: filepath.Base(file), line: lineNumber, fields: fields}
 			entry.duration = traceDuration(entry)
@@ -461,6 +464,25 @@ func traceDuration(entry trace) time.Duration {
 }
 
 func printReport(output io.Writer, traces []trace, counts map[string]int, apfRecords map[string]apfRecord, queueWaits map[string]string) {
+	watchListAuditIDs := make(map[string]struct{})
+	for _, entry := range traces {
+		if entry.kind == "TRACE-WATCHLIST" && entry.fields["auditID"] != "" {
+			watchListAuditIDs[entry.fields["auditID"]] = struct{}{}
+		}
+	}
+	watchListTraces := make([]trace, 0, len(traces))
+	watchListCounts := make(map[string]int)
+	for _, entry := range traces {
+		_, relatedToWatchList := watchListAuditIDs[entry.fields["auditID"]]
+		if entry.kind != "TRACE-WATCHLIST" && !relatedToWatchList {
+			continue
+		}
+		watchListTraces = append(watchListTraces, entry)
+		watchListCounts[entry.kind]++
+	}
+	traces = watchListTraces
+	counts = watchListCounts
+
 	fmt.Fprintf(output, "\nTrace entries: %d\n", len(traces))
 	markers := make([]string, 0, len(counts))
 	for marker := range counts {
@@ -477,7 +499,7 @@ func printReport(output io.Writer, traces []trace, counts map[string]int, apfRec
 		if id := entry.fields["auditID"]; id != "" {
 			byAuditID[id] = append(byAuditID[id], entry)
 		}
-		if (entry.kind == "TRACE-LIST" || entry.kind == "TRACE-WATCHLIST") && entry.duration > 0 {
+		if entry.kind == "TRACE-WATCHLIST" && entry.duration > 0 {
 			requests = append(requests, entry)
 		}
 	}
@@ -489,40 +511,50 @@ func printReport(output io.Writer, traces []trace, counts map[string]int, apfRec
 }
 
 func printRequestStats(output io.Writer, requests []trace) {
-	fmt.Fprintf(output, "\nSlow request traces (only requests above the apiserver trace threshold)\n")
+	fmt.Fprintf(output, "\nWatchList request traces (only requests above the apiserver trace threshold)\n")
 	if len(requests) == 0 {
-		fmt.Fprintln(output, "  No TRACE-LIST or TRACE-WATCHLIST request summaries found.")
+		fmt.Fprintln(output, "  No TRACE-WATCHLIST request summaries found.")
 		return
 	}
 	sort.Slice(requests, func(i, j int) bool { return requests[i].duration < requests[j].duration })
-	for _, kind := range []string{"TRACE-LIST", "TRACE-WATCHLIST"} {
-		var durations []time.Duration
-		for _, entry := range requests {
-			if entry.kind == kind {
-				durations = append(durations, entry.duration)
-			}
-		}
-		if len(durations) == 0 {
-			continue
-		}
-		fmt.Fprintf(output, "  %-16s n=%d avg=%s p50=%s p95=%s max=%s\n", kind, len(durations), average(durations), percentile(durations, 0.50), percentile(durations, 0.95), durations[len(durations)-1])
+	durations := make([]time.Duration, 0, len(requests))
+	for _, entry := range requests {
+		durations = append(durations, entry.duration)
 	}
+	fmt.Fprintf(output, "  %-16s n=%d avg=%s p50=%s p95=%s max=%s\n", "TRACE-WATCHLIST", len(durations), average(durations), percentile(durations, 0.50), percentile(durations, 0.95), durations[len(durations)-1])
 }
 
 func printResourceVersionStats(output io.Writer, traces []trace) {
-	var durations []time.Duration
+	var etcdDurations []time.Duration
+	requestRVCount := 0
 	for _, entry := range traces {
-		if entry.kind == "TRACE-WATCHLIST-RV" && entry.duration > 0 {
-			durations = append(durations, entry.duration)
+		if entry.kind != "TRACE-WATCHLIST-RV" {
+			continue
+		}
+		switch entry.fields["source"] {
+		case "request":
+			requestRVCount++
+		case "etcd":
+			if duration, err := time.ParseDuration(entry.fields["duration"]); err == nil {
+				etcdDurations = append(etcdDurations, duration)
+			}
+		default:
+			// Older traces were emitted only for GetCurrentResourceVersion calls.
+			if entry.duration > 0 {
+				etcdDurations = append(etcdDurations, entry.duration)
+			}
 		}
 	}
-	fmt.Fprintln(output, "\nInitial resource-version lookups (TRACE-WATCHLIST-RV)")
-	if len(durations) == 0 {
-		fmt.Fprintln(output, "  No resource-version lookup traces found.")
-		return
+	fmt.Fprintln(output, "\nWatchList resource-version resolution")
+	if len(etcdDurations) == 0 {
+		fmt.Fprintln(output, "  No etcd GetCurrentResourceVersion calls recorded.")
+	} else {
+		sort.Slice(etcdDurations, func(i, j int) bool { return etcdDurations[i] < etcdDurations[j] })
+		fmt.Fprintf(output, "  etcd GetCurrentResourceVersion: n=%d avg=%s p50=%s p95=%s max=%s\n", len(etcdDurations), average(etcdDurations), percentile(etcdDurations, 0.50), percentile(etcdDurations, 0.95), etcdDurations[len(etcdDurations)-1])
 	}
-	sort.Slice(durations, func(i, j int) bool { return durations[i] < durations[j] })
-	fmt.Fprintf(output, "  GetCurrentResourceVersion (etcd): n=%d avg=%s p50=%s p95=%s max=%s\n", len(durations), average(durations), percentile(durations, 0.50), percentile(durations, 0.95), durations[len(durations)-1])
+	if requestRVCount > 0 {
+		fmt.Fprintf(output, "  resourceVersion supplied by request: n=%d\n", requestRVCount)
+	}
 }
 
 func printWatchListPhaseStats(output io.Writer, traces []trace) {
@@ -588,44 +620,19 @@ func printSlowest(output io.Writer, requests []trace, byAuditID map[string][]tra
 		if auditID := entry.fields["auditID"]; auditID != "" {
 			printAPFDetails(output, auditID, apfRecords, queueWaits)
 			foundResourceVersionTrace := false
-			resourceVersionSource, requestedResourceVersion := "", ""
 			for _, related := range byAuditID[auditID] {
 				if related.kind == "TRACE-WATCHLIST-RV" {
 					foundResourceVersionTrace = true
-				}
-				if related.kind == "TRACE-WATCHLIST-CACHE-SETUP" {
-					resourceVersionSource = related.fields["rvSource"]
-					requestedResourceVersion = related.fields["requestedRV"]
 				}
 				if detail := relatedTraceSummary(related); detail != "" {
 					fmt.Fprintf(output, "     %s\n", detail)
 				}
 			}
 			if entry.kind == "TRACE-WATCHLIST" && !foundResourceVersionTrace {
-				if resourceVersionSource == "explicit" {
-					fmt.Fprintf(output, "     resource-version lookup: skipped (request supplied resourceVersion=%q)\n", requestedResourceVersion)
-				} else if resourceVersionSource == "default" {
-					fmt.Fprintln(output, "     resource-version lookup: skipped (request used the default resource-version path)")
-				} else if resourceVersion, ok := explicitResourceVersion(apfRecords[auditID].fields); ok {
-					fmt.Fprintf(output, "     resource-version lookup: skipped (request supplied resourceVersion=%q)\n", resourceVersion)
-				} else {
-					fmt.Fprintln(output, "     resource-version lookup: no TRACE-WATCHLIST-RV with this audit ID")
-				}
+				fmt.Fprintln(output, "     resource-version resolution: no TRACE-WATCHLIST-RV with this audit ID")
 			}
 		}
 	}
-}
-
-func explicitResourceVersion(fields map[string]string) (string, bool) {
-	requestURI, err := url.ParseRequestURI(fields["URI"])
-	if err != nil {
-		return "", false
-	}
-	values, ok := requestURI.Query()["resourceVersion"]
-	if !ok || len(values) == 0 || values[0] == "" {
-		return "", false
-	}
-	return values[0], true
 }
 
 func printAPFDetails(output io.Writer, auditID string, records map[string]apfRecord, queueWaits map[string]string) {
@@ -663,7 +670,13 @@ func printRequestDetails(output io.Writer, entry trace) {
 func relatedTraceSummary(entry trace) string {
 	switch entry.kind {
 	case "TRACE-WATCHLIST-RV":
-		return "resource-version lookup=" + fieldDuration(entry, "duration")
+		if entry.fields["source"] == "request" {
+			return fmt.Sprintf("resource-version resolution=request-supplied rv=%s", entry.fields["requestedRV"])
+		}
+		if entry.fields["source"] == "etcd" {
+			return fmt.Sprintf("resource-version resolution=etcd GetCurrentResourceVersion=%s rv=%s", fieldDuration(entry, "duration"), entry.fields["resourceVersion"])
+		}
+		return "resource-version etcd lookup=" + fieldDuration(entry, "duration")
 	case "TRACE-CACHER":
 		return fmt.Sprintf("watch-cache total=%s first-event=%s (next=%s convert=%s send=%s other=%s)", fieldDuration(entry, "total"), fieldDuration(entry, "firstEvent"), fieldDuration(entry, "next"), fieldDuration(entry, "convert"), fieldDuration(entry, "send"), fieldDuration(entry, "other"))
 	case "TRACE-WATCHLIST-CACHE-SETUP":
