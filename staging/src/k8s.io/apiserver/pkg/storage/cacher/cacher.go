@@ -42,6 +42,7 @@ import (
 	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/features"
+	"k8s.io/apiserver/pkg/server/httplog"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/cacher/delegator"
 	"k8s.io/apiserver/pkg/storage/cacher/key"
@@ -1349,7 +1350,9 @@ func isListWatchRequest(opts storage.ListOptions) bool {
 func (c *Cacher) getWatchCacheResourceVersion(ctx context.Context, parsedWatchResourceVersion uint64, opts storage.ListOptions) (uint64, error) {
 	if len(opts.ResourceVersion) != 0 {
 		if isListWatchRequest(opts) {
-			klog.FromContext(ctx).V(2).Info("TRACE-WATCHLIST-RV", "resource", c.groupResource, "auditID", audit.GetAuditIDTruncated(ctx), "source", "request", "requestedRV", opts.ResourceVersion, "duration", time.Duration(0), "resourceVersion", parsedWatchResourceVersion)
+			httplog.AddKeyValue(ctx, "watchlist_rv_source", "request")
+			httplog.AddKeyValue(ctx, "watchlist_requested_rv", opts.ResourceVersion)
+			httplog.AddKeyValue(ctx, "watchlist_rv_lookup", time.Duration(0))
 		}
 		return parsedWatchResourceVersion, nil
 	}
@@ -1360,7 +1363,11 @@ func (c *Cacher) getWatchCacheResourceVersion(ctx context.Context, parsedWatchRe
 	start := time.Now()
 	rv, err := c.storage.GetCurrentResourceVersion(ctx)
 	if isListWatchRequest(opts) {
-		klog.FromContext(ctx).V(2).Info("TRACE-WATCHLIST-RV", "resource", c.groupResource, "auditID", audit.GetAuditIDTruncated(ctx), "source", "etcd", "requestedRV", opts.ResourceVersion, "duration", time.Since(start), "resourceVersion", rv, "err", err)
+		duration := time.Since(start)
+		httplog.AddKeyValue(ctx, "watchlist_rv_source", "etcd")
+		httplog.AddKeyValue(ctx, "watchlist_requested_rv", opts.ResourceVersion)
+		httplog.AddKeyValue(ctx, "watchlist_rv_lookup", duration)
+		klog.FromContext(ctx).V(2).Info("TRACE-WATCHLIST-RV", "resource", c.groupResource, "auditID", audit.GetAuditIDTruncated(ctx), "source", "etcd", "requestedRV", opts.ResourceVersion, "duration", duration, "resourceVersion", rv, "err", err)
 	}
 	return rv, err
 }
