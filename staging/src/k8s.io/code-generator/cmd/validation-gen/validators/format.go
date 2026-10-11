@@ -60,6 +60,7 @@ var (
 	// TODO: uncomment the following when we've done the homework
 	// to be sure it works the current state of IP manual-ratcheting
 	// ipSloppyValidator         = types.Name{Package: libValidationPkg, Name: "IPSloppy"}
+	cidrValidator                       = types.Name{Package: libValidationPkg, Name: "CIDR"}
 	extendedResourceNameValidator       = types.Name{Package: libValidationPkg, Name: "ExtendedResourceName"}
 	labelKeyValidator                   = types.Name{Package: libValidationPkg, Name: "LabelKey"}
 	labelValueValidator                 = types.Name{Package: libValidationPkg, Name: "LabelValue"}
@@ -106,6 +107,9 @@ func getBuiltInFormatValidationFunction(format string) (FunctionGen, error) {
 
 	switch format {
 	// Keep this sequence alphabetized.
+	case "k8s-cidr":
+		return Function(formatTagName, DefaultFlags, cidrValidator).
+			WithEmits(Emission{field.ErrorTypeInvalid, "format=k8s-cidr", ""}), nil
 	case "k8s-extended-resource-name":
 		return Function(formatTagName, DefaultFlags, extendedResourceNameValidator).
 			WithEmits(Emission{field.ErrorTypeInvalid, "format=k8s-extended-resource-name", ""}), nil
@@ -166,6 +170,9 @@ func (ftv *formatTagValidator) Docs() TagDoc {
 		Scopes:         sets.List(ftv.ValidScopes()),
 		Description:    "Indicates that a string field has a particular format.",
 		Payloads: append([]TagPayloadDoc{{ // Keep this list alphabetized.
+			Description: "k8s-cidr",
+			Docs:        "This field holds an IPv4 or IPv6 CIDR value in subnet form (e.g. \"10.9.8.0/24\" or \"2001:db8::/64\"). Leading 0s, IPv4-mapped IPv6 addresses and bits set beyond the prefix length are not allowed.",
+		}, {
 			Description: "k8s-extended-resource-name",
 			Docs:        "This field holds a Kubernetes extended resource name. This is a domain-prefixed name that must not have a `kubernetes.io` or `requests.` prefix. When `requests.` is prepended, the result must be a valid label key, as used by quota.",
 		}, {
