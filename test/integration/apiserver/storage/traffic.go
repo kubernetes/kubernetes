@@ -104,6 +104,7 @@ var (
 	nonEmptyApps  = []string{"app-a", "app-b"}
 
 	errDeleteRejected = errors.New("delete rejected by validateDeletion")
+	errUpdateRejected = errors.New("update rejected by tryUpdate")
 )
 
 type RequestDistribution struct {
@@ -125,6 +126,7 @@ type ListDistribution struct {
 	LabelSelector        []ChoiceWeight[LabelSelector]
 	ResourceVersion      []ChoiceWeight[RVType]
 	ResourceVersionMatch []ChoiceWeight[metav1.ResourceVersionMatch]
+	Limit                []ChoiceWeight[int64]
 }
 
 type UpdateDistribution struct {
@@ -132,6 +134,7 @@ type UpdateDistribution struct {
 	NoOp           []ChoiceWeight[bool]
 	CachedObject   []ChoiceWeight[bool]
 	IgnoreNotFound []ChoiceWeight[bool]
+	ValidateUpdate []ChoiceWeight[bool]
 }
 
 type DeleteDistribution struct {
@@ -373,6 +376,9 @@ func randomRequest(ctx context.Context, store storage.Interface, keys []types.Na
 				return nil
 			}
 		}
+		if len(dist.List.Limit) > 0 && rv != "0" {
+			opts.Predicate.Limit = PickRandom(dist.List.Limit)
+		}
 		return &correctness.Request{
 			Op:   correctness.OpList,
 			Key:  listKey,
@@ -396,12 +402,7 @@ func randomRequest(ctx context.Context, store storage.Interface, keys []types.Na
 		if useCached {
 			cachedExisting = cached.DeepCopyObject()
 		}
-		updateFn := randomUpdate(key)
-		if noOp {
-			updateFn = storage.SimpleUpdate(func(obj runtime.Object) (runtime.Object, error) {
-				return obj.(*api.Pod).DeepCopy(), nil
-			})
-		}
+		validateUpdate := PickRandom(dist.Update.ValidateUpdate)
 		return &correctness.Request{
 			Op:  correctness.OpUpdate,
 			Key: storageKey(key),
@@ -409,7 +410,7 @@ func randomRequest(ctx context.Context, store storage.Interface, keys []types.Na
 				IgnoreNotFound:       ignoreNotFound,
 				Preconditions:        preconditions,
 				CachedExistingObject: cachedExisting,
-				UpdateFunc:           updateFn,
+				UpdateFunc:           randomUpdate(key, noOp, validateUpdate),
 			},
 		}
 	default:
@@ -474,12 +475,19 @@ func storageKey(key types.NamespacedName) string {
 	return "/pods/" + key.String()
 }
 
-func randomUpdate(key types.NamespacedName) storage.UpdateFunc {
+func randomUpdate(key types.NamespacedName, noOp, validateUpdate bool) storage.UpdateFunc {
 	version := strconv.Itoa(rand.Intn(10000))
 	nodeName := nodeNames[rand.Intn(len(nodeNames))]
 	appLabel := appLabels[rand.Intn(len(appLabels))]
+	rejectedNode := nodeNames[rand.Intn(len(nodeNames))]
 	return func(obj runtime.Object, res storage.ResponseMeta) (runtime.Object, *uint64, error) {
 		pod := obj.(*api.Pod).DeepCopy()
+		if validateUpdate && pod.Spec.NodeName == rejectedNode {
+			return nil, nil, errUpdateRejected
+		}
+		if noOp {
+			return pod, nil, nil
+		}
 		if pod.Name == "" {
 			pod = validPod(key.Namespace, key.Name)
 		}
@@ -521,7 +529,7 @@ func runTraffic(ctx context.Context, store storage.Interface, request *correctne
 		panic(fmt.Sprintf("%v: unknown operation", request.Op))
 	}
 	if err != nil {
-		if _, ok := errors.AsType[*storage.StorageError](err); ok || storage.IsTooLargeResourceVersion(err) || errors.Is(err, errDeleteRejected) {
+		if _, ok := errors.AsType[*storage.StorageError](err); ok || storage.IsTooLargeResourceVersion(err) || errors.Is(err, errDeleteRejected) || errors.Is(err, errUpdateRejected) {
 			return correctness.Response{
 				Err: err,
 			}

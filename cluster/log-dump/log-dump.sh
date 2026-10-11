@@ -290,7 +290,7 @@ function save-windows-logs-via-diagnostics-tool() {
     logs_archive_in_gcs=$(gcloud alpha compute diagnose export-logs "${node}" "--zone=${ZONE}" "--project=${PROJECT}" | tail -n 1)
     local temp_local_path="${node}.zip"
     for retry in {1..20}; do
-      if gsutil mv "${logs_archive_in_gcs}" "${temp_local_path}"  > /dev/null 2>&1; then
+      if gcloud storage mv "${logs_archive_in_gcs}" "${temp_local_path}"  > /dev/null 2>&1; then
         echo "Downloaded diagnostics log from ${logs_archive_in_gcs}"
         break
       else
@@ -507,7 +507,7 @@ function dump_nodes() {
 function find_non_logexported_nodes() {
   local file="${gcs_artifacts_dir}/logexported-nodes-registry"
   echo "Listing marker files ($file) for successful nodes..."
-  succeeded_nodes=$(gsutil ls "${file}") || return 1
+  succeeded_nodes=$(gcloud storage ls "${file}") || return 1
   echo 'Successfully listed marker files for successful nodes'
   NON_LOGEXPORTED_NODES=()
   for node in "${NODE_NAMES[@]}"; do

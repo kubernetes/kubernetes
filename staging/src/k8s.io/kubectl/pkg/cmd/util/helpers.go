@@ -426,12 +426,6 @@ func GetPodRunningTimeoutFlag(cmd *cobra.Command) (time.Duration, error) {
 type FeatureGate string
 
 const (
-	// owner: @ardaguclu
-	// kep: https://kep.k8s.io/3104
-	//
-	// Separate kubectl user preferences.
-	KubeRC FeatureGate = "KUBECTL_KUBERC"
-
 	// owner: @justinb
 	// kep: https://kep.k8s.io/3659
 	//

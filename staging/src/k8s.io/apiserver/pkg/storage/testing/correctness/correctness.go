@@ -1620,6 +1620,188 @@ func readTestCases() []testStep {
 				{Object: nil, Err: nil},
 			},
 		},
+		{
+			Name: "List pods with Limit=1 when one pod exists",
+			Request: Request{
+				Op:  OpList,
+				Key: "/pods/",
+				List: ListRequest{Options: storage.ListOptions{
+					ResourceVersion: "",
+					Recursive:       true,
+					Predicate: storage.SelectionPredicate{
+						Label: labels.Everything(),
+						Field: fields.Everything(),
+						Limit: 1,
+					},
+				}},
+			},
+			CorrectResponse: Response{
+				Object: newTestPodList("19", withLabel(pod4, "17", "version", "v2")),
+			},
+			InvalidResponses: []Response{
+				{Object: newTestPodListWithContinue("19", new(int64(0)), withLabel(pod4, "17", "version", "v2"))},
+				{Object: newTestPodList("19")},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name: "List pods with Exact ResourceVersion=15 and Limit=1",
+			Request: Request{
+				Op:  OpList,
+				Key: "/pods/",
+				List: ListRequest{Options: storage.ListOptions{
+					ResourceVersion:      "15",
+					ResourceVersionMatch: metav1.ResourceVersionMatchExact,
+					Recursive:            true,
+					Predicate: storage.SelectionPredicate{
+						Label: labels.Everything(),
+						Field: fields.Everything(),
+						Limit: 1,
+					},
+				}},
+			},
+			CorrectResponse: Response{
+				Object: newTestPodListWithContinue("15", new(int64(1)), withRV(pod4, "14")),
+			},
+			InvalidResponses: []Response{
+				{Object: newTestPodList("15", withRV(pod4, "14"))},
+				{Object: newTestPodListWithContinue("15", new(int64(2)), withRV(pod4, "14"))},
+				{Object: newTestPodListWithContinue("15", nil, withRV(pod4, "14"))},
+				{Object: newTestPodListWithContinue("15", new(int64(1)), withRV(pod4, "14"), withRV(pod5, "15"))},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name: "List pods with legacy ResourceVersion=15 and Limit=1",
+			Request: Request{
+				Op:  OpList,
+				Key: "/pods/",
+				List: ListRequest{Options: storage.ListOptions{
+					ResourceVersion: "15",
+					Recursive:       true,
+					Predicate: storage.SelectionPredicate{
+						Label: labels.Everything(),
+						Field: fields.Everything(),
+						Limit: 1,
+					},
+				}},
+			},
+			CorrectResponse: Response{
+				Object: newTestPodListWithContinue("15", new(int64(1)), withRV(pod4, "14")),
+			},
+			InvalidResponses: []Response{
+				{Object: newTestPodList("15", withRV(pod4, "14"))},
+				{Object: newTestPodListWithContinue("15", new(int64(2)), withRV(pod4, "14"))},
+				{Object: newTestPodListWithContinue("15", nil, withRV(pod4, "14"))},
+				{Object: newTestPodListWithContinue("15", new(int64(1)), withRV(pod4, "14"), withRV(pod5, "15"))},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name: "List pods with Exact ResourceVersion=16, Limit=1, and field selector matching second pod",
+			Request: Request{
+				Op:  OpList,
+				Key: "/pods/",
+				List: ListRequest{Options: storage.ListOptions{
+					ResourceVersion:      "16",
+					ResourceVersionMatch: metav1.ResourceVersionMatchExact,
+					Recursive:            true,
+					Predicate: storage.SelectionPredicate{
+						Label:    labels.Everything(),
+						Field:    fields.OneTermEqualSelector("metadata.namespace", "ns10"),
+						GetAttrs: storage.DefaultNamespaceScopedAttr,
+						Limit:    1,
+					},
+				}},
+			},
+			CorrectResponse: Response{
+				Object: newTestPodList("16", withRV(pod5, "15")),
+			},
+			InvalidResponses: []Response{
+				{Object: newTestPodList("16")},
+				{Object: newTestPodListWithContinue("16", new(int64(1)), withRV(pod5, "15"))},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name: "List pods without trailing slash with Exact ResourceVersion=15 and Limit=1",
+			Request: Request{
+				Op:  OpList,
+				Key: "/pods",
+				List: ListRequest{Options: storage.ListOptions{
+					ResourceVersion:      "15",
+					ResourceVersionMatch: metav1.ResourceVersionMatchExact,
+					Recursive:            true,
+					Predicate: storage.SelectionPredicate{
+						Label: labels.Everything(),
+						Field: fields.Everything(),
+						Limit: 1,
+					},
+				}},
+			},
+			CorrectResponse: Response{
+				Object: newTestPodListWithContinue("15", new(int64(1)), withRV(pod4, "14")),
+			},
+			InvalidResponses: []Response{
+				{Object: newTestPodList("15", withRV(pod4, "14"))},
+				{Object: newTestPodListWithContinue("15", nil, withRV(pod4, "14"))},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name: "List pods with NotOlderThan ResourceVersion=15, Limit=1, and field selector matching first pod",
+			Request: Request{
+				Op:  OpList,
+				Key: "/pods/",
+				List: ListRequest{Options: storage.ListOptions{
+					ResourceVersion:      "15",
+					ResourceVersionMatch: metav1.ResourceVersionMatchNotOlderThan,
+					Recursive:            true,
+					Predicate: storage.SelectionPredicate{
+						Label:    labels.Everything(),
+						Field:    fields.OneTermEqualSelector("metadata.namespace", "ns1"),
+						GetAttrs: storage.DefaultNamespaceScopedAttr,
+						Limit:    1,
+					},
+				}},
+			},
+			CorrectResponse: Response{
+				Object: newTestPodList("16", withLabel(pod4, "16", "version", "v1")),
+			},
+			InvalidResponses: []Response{
+				{Object: newTestPodList("16")},
+				{Object: newTestPodListWithContinue("16", new(int64(1)), withLabel(pod4, "16", "version", "v1"))},
+				{Object: newTestPodList("16", withLabel(pod4, "16", "version", "v1"), withRV(pod5, "15"))},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name: "List pods with Exact ResourceVersion=16, Limit=1, and field selector matching both pods",
+			Request: Request{
+				Op:  OpList,
+				Key: "/pods/",
+				List: ListRequest{Options: storage.ListOptions{
+					ResourceVersion:      "16",
+					ResourceVersionMatch: metav1.ResourceVersionMatchExact,
+					Recursive:            true,
+					Predicate: storage.SelectionPredicate{
+						Label:    labels.Everything(),
+						Field:    fields.OneTermNotEqualSelector("metadata.namespace", "ns2"),
+						GetAttrs: storage.DefaultNamespaceScopedAttr,
+						Limit:    1,
+					},
+				}},
+			},
+			CorrectResponse: Response{
+				Object: newTestPodListWithContinue("16", nil, withLabel(pod4, "16", "version", "v1")),
+			},
+			InvalidResponses: []Response{
+				{Object: newTestPodList("16", withLabel(pod4, "16", "version", "v1"))},
+				{Object: newTestPodListWithContinue("16", new(int64(1)), withLabel(pod4, "16", "version", "v1"))},
+				{Object: newTestPodListWithContinue("16", nil, withLabel(pod4, "16", "version", "v1"), withRV(pod5, "15"))},
+				{Object: nil, Err: nil},
+			},
+		},
 	}
 }
 
@@ -1943,6 +2125,22 @@ func newTestPodList(rv string, pods ...*example.Pod) *example.PodList {
 	for _, pod := range pods {
 		list.Items = append(list.Items, *pod)
 	}
+	return list
+}
+
+func newTestPodListWithContinue(rv string, remaining *int64, pods ...*example.Pod) *example.PodList {
+	list := newTestPodList(rv, pods...)
+	parsedRV, err := (storage.APIObjectVersioner{}).ParseResourceVersion(rv)
+	if err != nil {
+		panic(err)
+	}
+	lastPod := pods[len(pods)-1]
+	continueToken, err := storage.EncodeContinue(mustGetKey(lastPod)+"\x00", "/pods/", int64(parsedRV))
+	if err != nil {
+		panic(err)
+	}
+	list.Continue = continueToken
+	list.RemainingItemCount = remaining
 	return list
 }
 

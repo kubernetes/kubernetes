@@ -109,6 +109,11 @@ var (
 				{Choice: metav1.ResourceVersionMatchNotOlderThan, Weight: 25},
 				{Choice: metav1.ResourceVersionMatchExact, Weight: 25},
 			},
+			Limit: []ChoiceWeight[int64]{
+				{Choice: 0, Weight: 70},
+				{Choice: 1, Weight: 15},
+				{Choice: 2, Weight: 15},
+			},
 		},
 		Update: UpdateDistribution{
 			Preconditions: PreconditionsDistribution{
@@ -132,6 +137,10 @@ var (
 			IgnoreNotFound: []ChoiceWeight[bool]{
 				{Choice: false, Weight: 85},
 				{Choice: true, Weight: 15},
+			},
+			ValidateUpdate: []ChoiceWeight[bool]{
+				{Choice: false, Weight: 75},
+				{Choice: true, Weight: 25},
 			},
 		},
 	}

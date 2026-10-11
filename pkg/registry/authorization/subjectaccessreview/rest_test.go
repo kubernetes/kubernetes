@@ -29,7 +29,10 @@ import (
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	genericfeatures "k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/registry/rest"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	authorizationapi "k8s.io/kubernetes/pkg/apis/authorization"
 	_ "k8s.io/kubernetes/pkg/apis/authorization/install"
@@ -287,4 +290,69 @@ func mustParse(s string) labels.Requirements {
 	}
 	reqs, _ := selector.Requirements()
 	return reqs
+}
+
+// TestCreateIgnoresPostedStatus pins the behavior of k8s 1.37 and earlier: a client
+// could post a SubjectAccessReview carrying a bogus status and the request still
+// succeeded. The handler clears the status before validating, so status rules that would
+// otherwise reject it, here allowed and denied both being set, cannot turn a
+// previously-working request into an error. The status that comes back is the
+// authorizer's answer rather than what was posted.
+//
+// It also covers the other half of that pre-validation fixup: the opt-in to
+// conditions-awareness is dropped while the feature gate is off, so the request falls
+// back to the conditions-unaware Authorize.
+func TestCreateIgnoresPostedStatus(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ConditionalAuthorization, false)
+
+	auth := &fakeAuthorizer{decision: authorizer.DecisionAllow, reason: "myreason"}
+	storage := NewREST(auth, legacyscheme.Scheme)
+
+	ctx := genericapirequest.WithRequestInfo(
+		genericapirequest.NewContext(),
+		&genericapirequest.RequestInfo{
+			APIGroup:          "authorization.k8s.io",
+			APIVersion:        "v1",
+			Resource:          "subjectaccessreviews",
+			IsResourceRequest: true,
+			Verb:              "create",
+		},
+	)
+
+	sar := &authorizationapi.SubjectAccessReview{
+		Spec: authorizationapi.SubjectAccessReviewSpec{
+			User:               "bob",
+			ResourceAttributes: &authorizationapi.ResourceAttributes{Verb: "get", Resource: "pods"},
+			AuthorizationOptions: &authorizationapi.AuthorizationOptions{
+				HandledDecisionTypes: []authorizationapi.ConditionsAwareDecisionType{
+					authorizationapi.ConditionsAwareDecisionTypeAllow,
+					authorizationapi.ConditionsAwareDecisionTypeDeny,
+					authorizationapi.ConditionsAwareDecisionTypeNoOpinion,
+					authorizationapi.ConditionsAwareDecisionTypeConditionsMap,
+					authorizationapi.ConditionsAwareDecisionTypeUnion,
+				},
+			},
+		},
+		// Mutually exclusive, so validating this status would reject the request.
+		Status: authorizationapi.SubjectAccessReviewStatus{
+			Allowed:         true,
+			Denied:          true,
+			Reason:          "posted by the client",
+			EvaluationError: "posted by the client",
+		},
+	}
+
+	result, err := storage.Create(ctx, sar, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("expected the posted status to be ignored, got: %v", err)
+	}
+
+	got := result.(*authorizationapi.SubjectAccessReview)
+	want := authorizationapi.SubjectAccessReviewStatus{Allowed: true, Reason: "myreason"}
+	if !reflect.DeepEqual(got.Status, want) {
+		t.Errorf("expected status\n%#v\ngot\n%#v", want, got.Status)
+	}
+	if got.Spec.AuthorizationOptions != nil {
+		t.Errorf("expected the conditions opt-in to be cleared while the feature gate is off, got %#v", got.Spec.AuthorizationOptions)
+	}
 }

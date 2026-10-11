@@ -113,7 +113,7 @@ func (s *Model) Step(input Request, output Response) (ok bool, next *Model, chan
 	case OpGet:
 		return s.validateGet(input.Get.Options, expected, output), s, nil
 	case OpList:
-		return s.validateList(input.List.Options, expected, output), s, nil
+		return s.validateList(input.Key, input.List.Options, expected, output), s, nil
 	default:
 		if !reflect.DeepEqual(expected, output) {
 			return false, s, nil
@@ -184,7 +184,7 @@ func (s *Model) validateGet(opts storage.GetOptions, expected, output Response) 
 	}
 }
 
-func (s *Model) validateList(opts storage.ListOptions, expected, output Response) bool {
+func (s *Model) validateList(key string, opts storage.ListOptions, expected, output Response) bool {
 	if expected.Err != nil {
 		switch {
 		case storage.IsTooLargeResourceVersion(expected.Err):
@@ -199,7 +199,7 @@ func (s *Model) validateList(opts storage.ListOptions, expected, output Response
 	}
 	switch consistency {
 	case ConsistencyConsistent:
-		return reflect.DeepEqual(expected, output)
+		return s.equalListResponse(key, opts, expected, output)
 	case ConsistencyExact:
 		// Model only validates consistent reads, for stale reads we just validate RV and contents are validated later during replay.
 		respRV, ok := s.listResponseRV(output)
@@ -211,6 +211,60 @@ func (s *Model) validateList(opts storage.ListOptions, expected, output Response
 	default:
 		return false
 	}
+}
+
+func (s *Model) equalListResponse(key string, opts storage.ListOptions, expected, output Response) bool {
+	if reflect.DeepEqual(expected, output) {
+		return true
+	}
+	if opts.Predicate.Limit <= 0 || expected.Err != nil || output.Err != nil || expected.Object == nil || output.Object == nil {
+		return false
+	}
+	expAccessor, err := meta.ListAccessor(expected.Object)
+	if err != nil || expAccessor.GetContinue() == "" {
+		return false
+	}
+	outAccessor, err := meta.ListAccessor(output.Object)
+	if err != nil {
+		return false
+	}
+	outContinue := outAccessor.GetContinue()
+	if !s.validCacherContinue(key, opts, expAccessor.GetContinue(), outContinue) {
+		return false
+	}
+	expectedWithOutContinue := expected.Object.DeepCopyObject()
+	accessor, err := meta.ListAccessor(expectedWithOutContinue)
+	if err != nil {
+		return false
+	}
+	accessor.SetContinue(outContinue)
+	return reflect.DeepEqual(expectedWithOutContinue, output.Object)
+}
+
+func (s *Model) validCacherContinue(key string, opts storage.ListOptions, expContinue, outContinue string) bool {
+	if outContinue == "" {
+		// When filtering with a limit and the number of matching items equals the limit,
+		// full-range scans (etcd3, cacher without index) return a continue token if
+		// non-matching items follow the last match, whereas index-backed cacher scans
+		// only the matching index bucket and returns an empty continue token.
+		if opts.Predicate.Empty() {
+			return false
+		}
+		items, err := s.listItems(key, opts)
+		return err == nil && int64(len(items)) == opts.Predicate.Limit
+	}
+	// Cacher passes the raw key instead of preparedKey to storage.PrepareContinueToken,
+	// so recursive lists on a key without a trailing slash encode StartKey with a leading slash.
+	preparedKey, err := storage.PrepareKey("", key, opts.Recursive)
+	if err != nil {
+		return false
+	}
+	fromKey, rv, err := storage.DecodeContinue(expContinue, preparedKey)
+	if err != nil {
+		return false
+	}
+	cacherContinue, err := storage.EncodeContinue(fromKey, key, rv)
+	return err == nil && outContinue == cacherContinue
 }
 
 func (s *Model) listResponseRV(output Response) (uint64, bool) {
@@ -335,7 +389,8 @@ func (s *Model) get(key string, opts storage.GetOptions) Response {
 }
 
 func (s *Model) list(key string, opts storage.ListOptions) Response {
-	if err := checkKey(key, opts.Recursive); err != nil {
+	preparedKey, err := storage.PrepareKey("", key, opts.Recursive)
+	if err != nil {
 		return Response{Err: err}
 	}
 	consistency, rv, _, err := ListReadConsistency("", s.Versioner, opts)
@@ -346,8 +401,11 @@ func (s *Model) list(key string, opts storage.ListOptions) Response {
 		// etcd3 and the cacher call methods on both selectors.
 		panic("nil label or field selector is not supported, use storage.Everything to match everything")
 	}
-	if opts.Predicate.Limit != 0 || opts.Predicate.Continue != "" {
-		panic("pagination (limit, continue) is not supported")
+	if opts.Predicate.Limit < 0 || opts.Predicate.Continue != "" {
+		panic("negative limit or continue is not supported")
+	}
+	if opts.Predicate.Limit > 0 && opts.ResourceVersion == "0" {
+		panic("limit with resourceVersion 0 is not supported (#108003)")
 	}
 	if !opts.Predicate.Empty() && opts.Predicate.GetAttrs == nil {
 		panic("selectors without GetAttrs are not supported")
@@ -361,7 +419,31 @@ func (s *Model) list(key string, opts storage.ListOptions) Response {
 	if consistency == ConsistencyExact && rv < s.CompactResourceVersion {
 		return Response{Err: apierrors.NewResourceExpired("The resourceVersion for the provided list is too old.")}
 	}
-	items, err := s.listItems(key, opts)
+	var items []runtime.Object
+	var lastKey string
+	var hasMore bool
+	var totalCount int64
+	limit := opts.Predicate.Limit
+	for _, k := range slices.Sorted(maps.Keys(s.Items)) {
+		if !keyInScope(key, opts.Recursive, k) {
+			continue
+		}
+		totalCount++
+		if limit > 0 && int64(len(items)) >= limit {
+			hasMore = true
+			continue
+		}
+		obj := s.Items[k]
+		matches, err := opts.Predicate.Matches(obj)
+		if err != nil {
+			return Response{Err: err}
+		}
+		if matches {
+			items = append(items, obj.DeepCopyObject())
+			lastKey = k
+		}
+	}
+	continueValue, remainingItemCount, err := storage.PrepareContinueToken(lastKey, preparedKey, int64(s.ResourceVersion), totalCount, hasMore, opts)
 	if err != nil {
 		return Response{Err: err}
 	}
@@ -369,7 +451,7 @@ func (s *Model) list(key string, opts storage.ListOptions) Response {
 	if err := meta.SetList(list, items); err != nil {
 		return Response{Object: nil, Err: err}
 	}
-	if err := s.Versioner.UpdateList(list, s.ResourceVersion, "", nil); err != nil {
+	if err := s.Versioner.UpdateList(list, s.ResourceVersion, continueValue, remainingItemCount); err != nil {
 		return Response{Object: nil, Err: err}
 	}
 	return Response{Object: list, Err: nil}

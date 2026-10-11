@@ -34,12 +34,6 @@ if [[ $# -eq 0 || ! $1 =~ ^[Yy]$ ]]; then
   fi
 fi
 
-# Check that user has gsutil
-if [[ $(which gsutil) == "" ]]; then
-  echo "Could not find gsutil when running \`which gsutil\`"
-  exit 1
-fi
-
 # Check that user has gcloud
 if [[ $(which gcloud) == "" ]]; then
   echo "Could not find gcloud when running: \`which gcloud\`"
@@ -52,17 +46,17 @@ if ! gcloud auth list | grep -q "ACTIVE"; then
   exit 1
 fi
 
-readonly gcs_acl="public-read"
+readonly gcs_acl="publicRead"
 bucket_name="${USER}-g8r-logs"
 echo ""
 V=2 kube::log::status "Using bucket ${bucket_name}"
 
 # Check if the bucket exists
-if ! gsutil ls gs:// | grep -q "gs://${bucket_name}/"; then
+if ! gcloud storage ls | grep -q "gs://${bucket_name}/"; then
   V=2 kube::log::status "Creating public bucket ${bucket_name}"
-  gsutil mb "gs://${bucket_name}/"
+  gcloud storage buckets create "gs://${bucket_name}"
   # Make all files in the bucket publicly readable
-  gsutil acl ch -u AllUsers:R "gs://${bucket_name}"
+  gcloud storage buckets update "gs://${bucket_name}" --add-acl-grant=entity=allUsers,role=READER
 else
   V=2 kube::log::status "Bucket already exists"
 fi
@@ -102,7 +96,7 @@ BUILD_STAMP=$(echo "${start_time}" | sed 's/\///' | sed 's/ /_/')
 GCS_LOGS_PATH="${GCS_JOBS_PATH}/${BUILD_STAMP}"
 
 # Check if folder for same logs already exists
-if gsutil ls "${GCS_JOBS_PATH}" | grep -q "${BUILD_STAMP}"; then
+if gcloud storage ls "${GCS_JOBS_PATH}" | grep -q "${BUILD_STAMP}"; then
   V=2 kube::log::status "Log files already uploaded"
   echo "Gubernator linked below:"
   echo "k8s-gubernator.appspot.com/build/${GCS_LOGS_PATH}?local=on"
@@ -119,15 +113,17 @@ done < <(find "${ARTIFACTS}" -type d -name "results")
 for upload_attempt in $(seq 3); do
   if [[ -d "${ARTIFACTS}" && -n $(ls -A "${ARTIFACTS}") ]]; then
     V=2 kube::log::status "Uploading artifacts"
-    gsutil -m -q -o "GSUtil:use_magicfile=True" cp -a "${gcs_acl}" -r -c \
-      -z log,xml,json "${ARTIFACTS}" "${GCS_LOGS_PATH}/artifacts" || continue
+    CLOUDSDK_STORAGE_USE_MAGICFILE=True gcloud storage cp --no-user-output-enabled \
+      --predefined-acl="${gcs_acl}" -r --continue-on-error \
+      --gzip-local=log,xml,json "${ARTIFACTS}" "${GCS_LOGS_PATH}/artifacts" || continue
   fi
   break
 done
 for upload_attempt in $(seq 3); do
   if [[ -e "${BUILD_LOG_PATH}" ]]; then
     V=2 kube::log::status "Uploading build log"
-    gsutil -q cp -Z -a "${gcs_acl}" "${BUILD_LOG_PATH}" "${GCS_LOGS_PATH}" || continue
+    gcloud storage cp --no-user-output-enabled --gzip-local-all --predefined-acl="${gcs_acl}" \
+      "${BUILD_LOG_PATH}" "${GCS_LOGS_PATH}" || continue
   fi
   break
 done
@@ -191,16 +187,16 @@ json_file="${GCS_LOGS_PATH}/started.json"
 
 for upload_attempt in $(seq 3); do
   V=2 kube::log::status "Uploading started.json to ${json_file} (attempt ${upload_attempt})"
-  gsutil -q -h "Content-Type:application/json" cp -a "${gcs_acl}" "${ARTIFACTS}/started.json" \
-    "${json_file}" || continue
+  gcloud storage cp --no-user-output-enabled --content-type=application/json --predefined-acl="${gcs_acl}" \
+    "${ARTIFACTS}/started.json" "${json_file}" || continue
   break
 done
 
 # Upload finished.json
 for upload_attempt in $(seq 3); do
   V=2 kube::log::status "Uploading finished.json to ${GCS_LOGS_PATH} (attempt ${upload_attempt})"
-  gsutil -q -h "Content-Type:application/json" cp -a "${gcs_acl}" "${ARTIFACTS}/finished.json" \
-    "${GCS_LOGS_PATH}/finished.json" || continue
+  gcloud storage cp --no-user-output-enabled --content-type=application/json --predefined-acl="${gcs_acl}" \
+    "${ARTIFACTS}/finished.json" "${GCS_LOGS_PATH}/finished.json" || continue
   break
 done
 

@@ -170,14 +170,12 @@ function verify-prereqs() {
     exit 1
   fi
 
-  # we use gcloud to create the cluster, gsutil to stage binaries and data
-  for cmd in gcloud gsutil; do
-    if ! which "${cmd}" >/dev/null; then
-      echo "Can't find ${cmd} in PATH, please fix and retry. The Google Cloud " >&2
-      echo "SDK can be downloaded from https://cloud.google.com/sdk/." >&2
-      exit 1
-    fi
-  done
+  # we use gcloud to create the cluster and gcloud storage to stage binaries and data
+  if ! which gcloud >/dev/null; then
+    echo "Can't find gcloud in PATH, please fix and retry. The Google Cloud " >&2
+    echo "SDK can be downloaded from https://cloud.google.com/sdk/." >&2
+    exit 1
+  fi
   update-or-verify-gcloud
 }
 
@@ -208,22 +206,19 @@ function detect-project() {
   fi
 }
 
-# Use gsutil to get the md5 hash for a particular tar
-function gsutil_get_tar_md5() {
+# Use gcloud storage to get the md5 hash for a particular tar
+function gcloud_storage_get_tar_md5() {
   # location_tar could be local or in the cloud
   # local tar_location example ./_output/release-tars/kubernetes-server-linux-amd64.tar.gz
   # cloud tar_location example gs://kubernetes-staging-PROJECT/kubernetes-devel/kubernetes-server-linux-amd64.tar.gz
   local -r tar_location=$1
-  #parse the output and return the md5 hash
-  #the sed command at the end removes whitespace
-  local -r tar_md5=$(gsutil hash -h -m "${tar_location}" 2>/dev/null | grep "Hash (md5):" | awk -F ':' '{print $2}' | sed 's/^[[:space:]]*//g')
+  local -r tar_md5=$(gcloud storage hash --hex --skip-crc32c --format='value(md5_hash)' "${tar_location}" 2>/dev/null)
   echo "${tar_md5}"
 }
 
 # Copy a release tar and its accompanying hash.
 function copy-to-staging() {
   local -r staging_path=$1
-  local -r gs_url=$2
   local -r tar=$3
   local -r hash=$4
   local -r basename_tar=$(basename "${tar}")
@@ -234,11 +229,11 @@ function copy-to-staging() {
   #remote_tar_md5 checks the remote location for the existing tarball and its md5
   #staging_path example gs://kubernetes-staging-PROJECT/kubernetes-devel
   #basename_tar example kubernetes-server-linux-amd64.tar.gz
-  local -r remote_tar_md5=$(gsutil_get_tar_md5 "${staging_path}/${basename_tar}")
+  local -r remote_tar_md5=$(gcloud_storage_get_tar_md5 "${staging_path}/${basename_tar}")
   if [[ -n ${remote_tar_md5} ]]; then
     #local_tar_md5 checks the remote location for the existing tarball and its md5 hash
     #tar example ./_output/release-tars/kubernetes-server-linux-amd64.tar.gz
-    local -r local_tar_md5=$(gsutil_get_tar_md5 "${tar}")
+    local -r local_tar_md5=$(gcloud_storage_get_tar_md5 "${tar}")
     if [[ "${remote_tar_md5}" == "${local_tar_md5}" ]]; then
       echo "+++ ${basename_tar} uploaded earlier, cloud and local file md5 match (md5 = ${local_tar_md5})"
       return 0
@@ -246,8 +241,7 @@ function copy-to-staging() {
   fi
 
   echo "${hash}" > "${tar}.sha512"
-  gsutil -m -q -h "Cache-Control:private, max-age=0" cp "${tar}" "${tar}.sha512" "${staging_path}"
-  gsutil -m acl ch -g all:R "${gs_url}" "${gs_url}.sha512" >/dev/null 2>&1 || true
+  gcloud storage cp --no-user-output-enabled --cache-control="private, max-age=0" "${tar}" "${tar}.sha512" "${staging_path}"
   echo "+++ ${basename_tar} uploaded (sha512 = ${hash})"
 }
 
@@ -338,9 +332,9 @@ function upload-tars() {
     local staging_bucket="gs://kubernetes-staging-${project_hash}${suffix}"
 
     # Ensure the buckets are created
-    if ! gsutil ls "${staging_bucket}" >/dev/null; then
+    if ! gcloud storage ls "${staging_bucket}" >/dev/null; then
       echo "Creating ${staging_bucket}"
-      gsutil mb -l "${region}" -p "${PROJECT}" "${staging_bucket}"
+      gcloud storage buckets create "${staging_bucket}" --location="${region}" --project="${PROJECT}"
     fi
 
     local staging_path="${staging_bucket}/${INSTANCE_PREFIX}-devel"

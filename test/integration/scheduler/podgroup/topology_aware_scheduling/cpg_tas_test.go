@@ -71,14 +71,6 @@ func makeGangPodGroupWithParent(podGroupName, parentCPGName, topologyKey string,
 	return pg.Obj()
 }
 
-func makeBasicPodGroupWithParent(podGroupName, parentCPGName, topologyKey string) *schedulingapi.PodGroup {
-	pg := st.MakePodGroup().Name(podGroupName).WorkloadRef("workload", "pg").BasicPolicy().Priority(100).ParentCompositePodGroup(parentCPGName)
-	if topologyKey != "" {
-		pg.TopologyKey(topologyKey)
-	}
-	return pg.Obj()
-}
-
 func makeGangCompositePodGroup(cpgName, parentCPGName, topologyKey string, minGroupCount int32) *schedulingv1alpha3.CompositePodGroup {
 	cpg := st.MakeCompositePodGroup().Name(cpgName).WorkloadRef("workload", "cpg").MinGroupCount(minGroupCount).Priority(100)
 	if parentCPGName != "" {
@@ -228,12 +220,12 @@ func TestCPGTopologyAwareScheduling(t *testing.T) {
 					CreateCompositePodGroup: makeGangCompositePodGroup("cpg-root", "", "rack", 2),
 				},
 				{
-					Name:           "Create child PodGroup pg1 (Basic policy, without topology constraints, Parent=cpg-root)",
-					CreatePodGroup: makeBasicPodGroupWithParent("pg1", "cpg-root", ""),
+					Name:           "Create child PodGroup pg1 (Gang policy without topology constraints, Parent=cpg-root)",
+					CreatePodGroup: makeGangPodGroupWithParent("pg1", "cpg-root", "", 1),
 				},
 				{
-					Name:           "Create child PodGroup pg2 (Basic policy, without topology constraints, Parent=cpg-root)",
-					CreatePodGroup: makeBasicPodGroupWithParent("pg2", "cpg-root", ""),
+					Name:           "Create child PodGroup pg2 (Gang policy without topology constraints, Parent=cpg-root)",
+					CreatePodGroup: makeGangPodGroupWithParent("pg2", "cpg-root", "", 1),
 				},
 				{
 					Name: "Create all pods belonging to pg1 and pg2 (total 2 pods)",
@@ -614,12 +606,12 @@ func TestCPGTopologyAwareScheduling(t *testing.T) {
 					CreateCompositePodGroup: makeGangCompositePodGroup("cpg-root", "", "zone", 2),
 				},
 				{
-					Name:                    "Create sub CompositePodGroup cpg-sub1 (Basic without topology constraints, Parent=cpg-root)",
-					CreateCompositePodGroup: makeBasicCompositePodGroup("cpg-sub1", "cpg-root", ""),
+					Name:                    "Create sub CompositePodGroup cpg-sub1 (Gang without topology constraints, Parent=cpg-root)",
+					CreateCompositePodGroup: makeGangCompositePodGroup("cpg-sub1", "cpg-root", "", 1),
 				},
 				{
-					Name:                    "Create sub CompositePodGroup cpg-sub2 (Basic without topology constraints, Parent=cpg-root)",
-					CreateCompositePodGroup: makeBasicCompositePodGroup("cpg-sub2", "cpg-root", ""),
+					Name:                    "Create sub CompositePodGroup cpg-sub2 (Gang without topology constraints, Parent=cpg-root)",
+					CreateCompositePodGroup: makeGangCompositePodGroup("cpg-sub2", "cpg-root", "", 1),
 				},
 				{
 					Name:           "Create child PodGroup pg1 (Gang with minCount=2, TopologyKey=rack, Parent=cpg-sub1)",
@@ -1155,12 +1147,12 @@ func TestCPGTopologyAwareSchedulingWorkloadAwarePreemption(t *testing.T) {
 					CreateCompositePodGroup: makeGangCompositePodGroup("cpg-root", "", "rack", 2),
 				},
 				{
-					Name:           "Create child PodGroup pg1 (Basic policy, without topology constraints, Parent=cpg-root)",
-					CreatePodGroup: makeBasicPodGroupWithParent("pg1", "cpg-root", ""),
+					Name:           "Create child PodGroup pg1 (Gang policy without topology constraints, Parent=cpg-root)",
+					CreatePodGroup: makeGangPodGroupWithParent("pg1", "cpg-root", "", 1),
 				},
 				{
-					Name:           "Create child PodGroup pg2 (Basic policy, without topology constraints, Parent=cpg-root)",
-					CreatePodGroup: makeBasicPodGroupWithParent("pg2", "cpg-root", ""),
+					Name:           "Create child PodGroup pg2 (Gang policy without topology constraints, Parent=cpg-root)",
+					CreatePodGroup: makeGangPodGroupWithParent("pg2", "cpg-root", "", 1),
 				},
 				{
 					Name: "Create all pods belonging to pg1 and pg2 (total 2 pods)",
@@ -1640,12 +1632,12 @@ func TestCPGTopologyAwareSchedulingWorkloadAwarePreemption(t *testing.T) {
 					CreateCompositePodGroup: makeGangCompositePodGroup("cpg-root", "", "zone", 2),
 				},
 				{
-					Name:                    "Create sub CompositePodGroup cpg-sub1 (Basic without topology constraints, Parent=cpg-root)",
-					CreateCompositePodGroup: makeBasicCompositePodGroup("cpg-sub1", "cpg-root", ""),
+					Name:                    "Create sub CompositePodGroup cpg-sub1 (Gang without topology constraints, Parent=cpg-root)",
+					CreateCompositePodGroup: makeGangCompositePodGroup("cpg-sub1", "cpg-root", "", 1),
 				},
 				{
-					Name:                    "Create sub CompositePodGroup cpg-sub2 (Basic without topology constraints, Parent=cpg-root)",
-					CreateCompositePodGroup: makeBasicCompositePodGroup("cpg-sub2", "cpg-root", ""),
+					Name:                    "Create sub CompositePodGroup cpg-sub2 (Gang without topology constraints, Parent=cpg-root)",
+					CreateCompositePodGroup: makeGangCompositePodGroup("cpg-sub2", "cpg-root", "", 1),
 				},
 				{
 					Name:           "Create child PodGroup pg1 (Gang with minCount=2, TopologyKey=rack, Parent=cpg-sub1)",

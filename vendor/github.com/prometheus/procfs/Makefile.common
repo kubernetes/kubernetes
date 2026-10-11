@@ -61,7 +61,7 @@ PROMU_URL     := https://github.com/prometheus/promu/releases/download/v$(PROMU_
 SKIP_GOLANGCI_LINT :=
 GOLANGCI_LINT :=
 GOLANGCI_LINT_OPTS ?=
-GOLANGCI_LINT_VERSION ?= v2.11.4
+GOLANGCI_LINT_VERSION ?= v2.12.2
 GOLANGCI_FMT_OPTS ?=
 # golangci-lint only supports linux, darwin and windows platforms on i386/amd64/arm64.
 # windows isn't included here because of the path separator being different.
@@ -165,8 +165,9 @@ common-deps:
 .PHONY: update-go-deps
 update-go-deps:
 	@echo ">> updating Go dependencies"
+	# GOTOOLCHAIN prevents go get from pulling deps that require a newer Go version.
 	@for m in $$($(GO) list -mod=readonly -m -f '{{ if and (not .Indirect) (not .Main)}}{{.Path}}{{end}}' all); do \
-		$(GO) get $$m; \
+		GOTOOLCHAIN=go$$($(GO) mod edit -json | jq -r .Go) $(GO) get $$m; \
 	done
 	$(GO) mod tidy
 
@@ -246,6 +247,7 @@ common-docker-repo-name:
 
 .PHONY: common-docker $(BUILD_DOCKER_ARCHS)
 common-docker: $(BUILD_DOCKER_ARCHS)
+# DOCKER_ARCHS holds promu architecture names, which are not OCI platform strings.
 $(BUILD_DOCKER_ARCHS): common-docker-%:
 	@for variant in $(DOCKERFILE_VARIANTS_WITH_NAMES); do \
 		dockerfile=$${variant#*:}; \
@@ -254,10 +256,16 @@ $(BUILD_DOCKER_ARCHS): common-docker-%:
 		if [ "$*" = "armv7" ]; then \
 			distroless_arch="arm"; \
 		fi; \
+		arch="$*"; \
+		case "$$arch" in \
+			armv*) docker_platform="linux/arm/v$${arch#armv}";; \
+			*)     docker_platform="linux/$$arch";; \
+		esac; \
 		if [ "$$dockerfile" = "Dockerfile" ]; then \
 			echo "Building default variant ($$variant_name) for linux-$* using $$dockerfile"; \
 			docker build -t "$(DOCKER_REPO)/$(DOCKER_IMAGE_NAME)-linux-$*:$(SANITIZED_DOCKER_IMAGE_TAG)" \
 				-f $$dockerfile \
+				--platform "$$docker_platform" \
 				--build-arg ARCH="$*" \
 				--build-arg OS="linux" \
 				--build-arg DISTROLESS_ARCH="$$distroless_arch" \
@@ -271,6 +279,7 @@ $(BUILD_DOCKER_ARCHS): common-docker-%:
 			echo "Building $$variant_name variant for linux-$* using $$dockerfile"; \
 			docker build -t "$(DOCKER_REPO)/$(DOCKER_IMAGE_NAME)-linux-$*:$(SANITIZED_DOCKER_IMAGE_TAG)-$$variant_name" \
 				-f $$dockerfile \
+				--platform "$$docker_platform" \
 				--build-arg ARCH="$*" \
 				--build-arg OS="linux" \
 				--build-arg DISTROLESS_ARCH="$$distroless_arch" \

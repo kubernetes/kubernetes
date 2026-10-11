@@ -111,9 +111,9 @@ var _ = SIGDescribe("Security Context", func() {
 			}
 
 			logs1, err := getLogs(createdPod1)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "get logs of Pod %q for the security context test", createdPod1.Name)
 			logs2, err := getLogs(createdPod2)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "get logs of Pod %q for the security context test", createdPod2.Name)
 
 			// 65536 is the size used for a user namespace.  Verify that the value is present
 			// in the /proc/self/uid_map file.
@@ -154,7 +154,7 @@ var _ = SIGDescribe("Security Context", func() {
 				}
 
 				logs, err := getLogs(createdPod)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "get logs of Pod %q for the security context test", createdPod.Name)
 
 				// The hostUID is the second field in the /proc/self/uid_map file.
 				hostMap := strings.Fields(logs)
@@ -403,7 +403,7 @@ var _ = SIGDescribe("Security Context", func() {
 
 			createdPod = e2epod.NewPodClient(f).Create(ctx, createdPod)
 			ev, err := e2epod.NewPodClient(f).WaitForErrorEventOrSuccess(ctx, createdPod)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "observe an error event or successful completion for Pod %q", createdPod.Name)
 			gomega.Expect(ev).NotTo(gomega.BeNil())
 			gomega.Expect(ev.Reason).To(gomega.Equal(events.FailedToCreateContainer))
 
@@ -506,7 +506,7 @@ var _ = SIGDescribe("Security Context", func() {
 			podClient.Create(ctx, pod)
 
 			podClient.WaitForSuccess(ctx, name, framework.PodStartTimeout)
-			framework.ExpectNoError(podClient.MatchContainerOutput(ctx, name, name, "1000"))
+			framework.ExpectNoError(podClient.MatchContainerOutput(ctx, name, name, "1000"), "verify container %q in Pod %q outputs %q", name, name, "1000")
 		})
 		ginkgo.It("should not run with an explicit root user ID [LinuxOnly]", func(ctx context.Context) {
 			// creates a pod with RunAsUser, which is not supported on Windows.
@@ -516,7 +516,7 @@ var _ = SIGDescribe("Security Context", func() {
 			pod = podClient.Create(ctx, pod)
 
 			ev, err := podClient.WaitForErrorEventOrSuccess(ctx, pod)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "observe an error event or successful completion for Pod %q", pod.Name)
 			gomega.Expect(ev).NotTo(gomega.BeNil())
 			gomega.Expect(ev.Reason).To(gomega.Equal(events.FailedToCreateContainer))
 		})
@@ -532,7 +532,7 @@ var _ = SIGDescribe("Security Context", func() {
 			podClient.Create(ctx, pod)
 
 			podClient.WaitForSuccess(ctx, name, framework.PodStartTimeout)
-			framework.ExpectNoError(podClient.MatchContainerOutput(ctx, name, name, expectedUser))
+			framework.ExpectNoError(podClient.MatchContainerOutput(ctx, name, name, expectedUser), "verify container %q in Pod %q outputs %q", name, name, expectedUser)
 		})
 		ginkgo.It("should not run without a specified user ID", func(ctx context.Context) {
 			name := "implicit-root-uid"
@@ -540,7 +540,7 @@ var _ = SIGDescribe("Security Context", func() {
 			pod = podClient.Create(ctx, pod)
 
 			ev, err := podClient.WaitForErrorEventOrSuccess(ctx, pod)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "observe an error event or successful completion for Pod %q", pod.Name)
 			gomega.Expect(ev).NotTo(gomega.BeNil())
 			gomega.Expect(ev.Reason).To(gomega.Equal(events.FailedToCreateContainer))
 		})
@@ -796,7 +796,7 @@ var _ = SIGDescribe("Security Context", func() {
 		}
 		nodeSupportsSupplementalGroupsPolicy := func(ctx context.Context, f *framework.Framework, nodeName string) bool {
 			node, err := f.ClientSet.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "get Node %q", nodeName)
 			gomega.Expect(node).NotTo(gomega.BeNil())
 			if node.Status.Features != nil {
 				supportsSupplementalGroupsPolicy := node.Status.Features.SupplementalGroupsPolicy
@@ -842,9 +842,9 @@ var _ = SIGDescribe("Security Context", func() {
 			}
 
 			if featureSupportedOnNode {
-				framework.ExpectNoError(waitForContainerUser(ctx, f, podName, containerName, expectedContainerUser))
+				framework.ExpectNoError(waitForContainerUser(ctx, f, podName, containerName, expectedContainerUser), "wait for container %q in Pod %q to report expected user %v", containerName, podName, expectedContainerUser)
 			}
-			framework.ExpectNoError(waitForPodLogs(ctx, f, podName, containerName, expectedOutput+"\n"))
+			framework.ExpectNoError(waitForPodLogs(ctx, f, podName, containerName, expectedOutput+"\n"), "wait for container %q in Pod %q to log %q", containerName, podName, expectedOutput+"\n")
 
 			stdout := e2epod.ExecCommandInContainer(f, podName, containerName, "id", "-G")
 			gomega.Expect(stdout).To(gomega.Equal(expectedOutput))
@@ -860,9 +860,9 @@ var _ = SIGDescribe("Security Context", func() {
 			}
 
 			if featureSupportedOnNode {
-				framework.ExpectNoError(waitForContainerUser(ctx, f, podName, containerName, expectedContainerUser))
+				framework.ExpectNoError(waitForContainerUser(ctx, f, podName, containerName, expectedContainerUser), "wait for container %q in Pod %q to report expected user %v", containerName, podName, expectedContainerUser)
 			}
-			framework.ExpectNoError(waitForPodLogs(ctx, f, podName, containerName, expectedOutput+"\n"))
+			framework.ExpectNoError(waitForPodLogs(ctx, f, podName, containerName, expectedOutput+"\n"), "wait for container %q in Pod %q to log %q", containerName, podName, expectedOutput+"\n")
 
 			stdout := e2epod.ExecCommandInContainer(f, podName, containerName, "id", "-G")
 			gomega.Expect(stdout).To(gomega.Equal(expectedOutput))
@@ -906,10 +906,10 @@ var _ = SIGDescribe("Security Context", func() {
 				ginkgo.BeforeEach(func(ctx context.Context) {
 					ginkgo.By("creating a pod", func() {
 						pod = e2epod.NewPodClient(f).Create(ctx, mkPod(ptr.To(v1.SupplementalGroupsPolicyStrict)))
-						framework.ExpectNoError(e2epod.WaitForPodScheduled(ctx, f.ClientSet, pod.Namespace, pod.Name))
+						framework.ExpectNoError(e2epod.WaitForPodScheduled(ctx, f.ClientSet, pod.Namespace, pod.Name), "wait for Pod %q in namespace %q to be scheduled", pod.Name, pod.Namespace)
 						var err error
 						pod, err = e2epod.NewPodClient(f).Get(ctx, pod.Name, metav1.GetOptions{})
-						framework.ExpectNoError(err)
+						framework.ExpectNoError(err, "get Pod in namespace %q", f.Namespace.Name)
 					})
 					if !nodeSupportsSupplementalGroupsPolicy(ctx, f, pod.Spec.NodeName) {
 						e2eskipper.Skipf("scheduled node does not support SupplementalGroupsPolicy")

@@ -20,6 +20,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/onsi/gomega"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -64,7 +66,7 @@ func TestMutationDetector(t *testing.T) {
 
 	fakeWatch.Add(pod)
 
-	wait.PollImmediate(100*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
+	gomega.NewWithT(t).Eventually(func() int {
 		detector.addedObjsLock.Lock()
 		addedLen := len(detector.addedObjs)
 		detector.addedObjsLock.Unlock()
@@ -73,8 +75,8 @@ func TestMutationDetector(t *testing.T) {
 		cachedLen := len(detector.cachedObjs)
 		detector.compareObjectsLock.Unlock()
 
-		return addedLen+cachedLen > 0, nil
-	})
+		return addedLen + cachedLen
+	}).WithTimeout(wait.ForeverTestTimeout).WithPolling(100*time.Millisecond).Should(gomega.BeNumerically(">", 0), "mutation detector should observe pod")
 
 	detector.compareObjectsLock.Lock()
 	pod.Labels["change"] = "true"

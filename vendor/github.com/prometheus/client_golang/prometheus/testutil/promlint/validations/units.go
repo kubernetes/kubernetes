@@ -67,7 +67,7 @@ var (
 		"kilo",
 		"kibi",
 		"mega",
-		"mibi",
+		"mebi",
 		"giga",
 		"gibi",
 		"tera",
@@ -98,9 +98,9 @@ var (
 // metricUnits attempts to detect known unit types used as part of a metric name,
 // e.g. "foo_bytes_total" or "bar_baz_milligrams".
 func metricUnits(m string) (unit, base string, ok bool) {
-	ss := strings.Split(m, "_")
+	ss := strings.SplitSeq(m, "_")
 
-	for _, s := range ss {
+	for s := range ss {
 		if base, found := units[s]; found {
 			return s, base, true
 		}

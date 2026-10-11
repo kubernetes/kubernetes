@@ -102,11 +102,6 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*authorization.SelfSubjectAccessReviewSpec)(nil), (*authorizationv1beta1.SelfSubjectAccessReviewSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_authorization_SelfSubjectAccessReviewSpec_To_v1beta1_SelfSubjectAccessReviewSpec(a.(*authorization.SelfSubjectAccessReviewSpec), b.(*authorizationv1beta1.SelfSubjectAccessReviewSpec), scope)
-	}); err != nil {
-		return err
-	}
 	if err := s.AddGeneratedConversionFunc((*authorizationv1beta1.SelfSubjectRulesReview)(nil), (*authorization.SelfSubjectRulesReview)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_v1beta1_SelfSubjectRulesReview_To_authorization_SelfSubjectRulesReview(a.(*authorizationv1beta1.SelfSubjectRulesReview), b.(*authorization.SelfSubjectRulesReview), scope)
 	}); err != nil {
@@ -142,18 +137,8 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*authorization.SubjectAccessReviewSpec)(nil), (*authorizationv1beta1.SubjectAccessReviewSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_authorization_SubjectAccessReviewSpec_To_v1beta1_SubjectAccessReviewSpec(a.(*authorization.SubjectAccessReviewSpec), b.(*authorizationv1beta1.SubjectAccessReviewSpec), scope)
-	}); err != nil {
-		return err
-	}
 	if err := s.AddGeneratedConversionFunc((*authorizationv1beta1.SubjectAccessReviewStatus)(nil), (*authorization.SubjectAccessReviewStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_v1beta1_SubjectAccessReviewStatus_To_authorization_SubjectAccessReviewStatus(a.(*authorizationv1beta1.SubjectAccessReviewStatus), b.(*authorization.SubjectAccessReviewStatus), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*authorization.SubjectAccessReviewStatus)(nil), (*authorizationv1beta1.SubjectAccessReviewStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_authorization_SubjectAccessReviewStatus_To_v1beta1_SubjectAccessReviewStatus(a.(*authorization.SubjectAccessReviewStatus), b.(*authorizationv1beta1.SubjectAccessReviewStatus), scope)
 	}); err != nil {
 		return err
 	}
@@ -164,6 +149,21 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}
 	if err := s.AddGeneratedConversionFunc((*authorization.SubjectRulesReviewStatus)(nil), (*authorizationv1beta1.SubjectRulesReviewStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_authorization_SubjectRulesReviewStatus_To_v1beta1_SubjectRulesReviewStatus(a.(*authorization.SubjectRulesReviewStatus), b.(*authorizationv1beta1.SubjectRulesReviewStatus), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*authorization.SelfSubjectAccessReviewSpec)(nil), (*authorizationv1beta1.SelfSubjectAccessReviewSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_authorization_SelfSubjectAccessReviewSpec_To_v1beta1_SelfSubjectAccessReviewSpec(a.(*authorization.SelfSubjectAccessReviewSpec), b.(*authorizationv1beta1.SelfSubjectAccessReviewSpec), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*authorization.SubjectAccessReviewSpec)(nil), (*authorizationv1beta1.SubjectAccessReviewSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_authorization_SubjectAccessReviewSpec_To_v1beta1_SubjectAccessReviewSpec(a.(*authorization.SubjectAccessReviewSpec), b.(*authorizationv1beta1.SubjectAccessReviewSpec), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*authorization.SubjectAccessReviewStatus)(nil), (*authorizationv1beta1.SubjectAccessReviewStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_authorization_SubjectAccessReviewStatus_To_v1beta1_SubjectAccessReviewStatus(a.(*authorization.SubjectAccessReviewStatus), b.(*authorizationv1beta1.SubjectAccessReviewStatus), scope)
 	}); err != nil {
 		return err
 	}
@@ -315,7 +315,8 @@ func Convert_authorization_SelfSubjectAccessReview_To_v1beta1_SelfSubjectAccessR
 }
 
 func autoConvert_v1beta1_SelfSubjectAccessReviewSpec_To_authorization_SelfSubjectAccessReviewSpec(in *authorizationv1beta1.SelfSubjectAccessReviewSpec, out *authorization.SelfSubjectAccessReviewSpec, s conversion.Scope) error {
-	*out = *(*authorization.SelfSubjectAccessReviewSpec)(unsafe.Pointer(in))
+	out.ResourceAttributes = (*authorization.ResourceAttributes)(unsafe.Pointer(in.ResourceAttributes))
+	out.NonResourceAttributes = (*authorization.NonResourceAttributes)(unsafe.Pointer(in.NonResourceAttributes))
 	return nil
 }
 
@@ -325,13 +326,10 @@ func Convert_v1beta1_SelfSubjectAccessReviewSpec_To_authorization_SelfSubjectAcc
 }
 
 func autoConvert_authorization_SelfSubjectAccessReviewSpec_To_v1beta1_SelfSubjectAccessReviewSpec(in *authorization.SelfSubjectAccessReviewSpec, out *authorizationv1beta1.SelfSubjectAccessReviewSpec, s conversion.Scope) error {
-	*out = *(*authorizationv1beta1.SelfSubjectAccessReviewSpec)(unsafe.Pointer(in))
+	out.ResourceAttributes = (*authorizationv1beta1.ResourceAttributes)(unsafe.Pointer(in.ResourceAttributes))
+	out.NonResourceAttributes = (*authorizationv1beta1.NonResourceAttributes)(unsafe.Pointer(in.NonResourceAttributes))
+	// WARNING: in.AuthorizationOptions requires manual conversion: does not exist in peer-type
 	return nil
-}
-
-// Convert_authorization_SelfSubjectAccessReviewSpec_To_v1beta1_SelfSubjectAccessReviewSpec is an autogenerated conversion function.
-func Convert_authorization_SelfSubjectAccessReviewSpec_To_v1beta1_SelfSubjectAccessReviewSpec(in *authorization.SelfSubjectAccessReviewSpec, out *authorizationv1beta1.SelfSubjectAccessReviewSpec, s conversion.Scope) error {
-	return autoConvert_authorization_SelfSubjectAccessReviewSpec_To_v1beta1_SelfSubjectAccessReviewSpec(in, out, s)
 }
 
 func autoConvert_v1beta1_SelfSubjectRulesReview_To_authorization_SelfSubjectRulesReview(in *authorizationv1beta1.SelfSubjectRulesReview, out *authorization.SelfSubjectRulesReview, s conversion.Scope) error {
@@ -419,7 +417,12 @@ func Convert_authorization_SubjectAccessReview_To_v1beta1_SubjectAccessReview(in
 }
 
 func autoConvert_v1beta1_SubjectAccessReviewSpec_To_authorization_SubjectAccessReviewSpec(in *authorizationv1beta1.SubjectAccessReviewSpec, out *authorization.SubjectAccessReviewSpec, s conversion.Scope) error {
-	*out = *(*authorization.SubjectAccessReviewSpec)(unsafe.Pointer(in))
+	out.ResourceAttributes = (*authorization.ResourceAttributes)(unsafe.Pointer(in.ResourceAttributes))
+	out.NonResourceAttributes = (*authorization.NonResourceAttributes)(unsafe.Pointer(in.NonResourceAttributes))
+	out.User = in.User
+	out.Groups = *(*[]string)(unsafe.Pointer(&in.Groups))
+	out.Extra = *(*map[string]authorization.ExtraValue)(unsafe.Pointer(&in.Extra))
+	out.UID = in.UID
 	return nil
 }
 
@@ -429,17 +432,21 @@ func Convert_v1beta1_SubjectAccessReviewSpec_To_authorization_SubjectAccessRevie
 }
 
 func autoConvert_authorization_SubjectAccessReviewSpec_To_v1beta1_SubjectAccessReviewSpec(in *authorization.SubjectAccessReviewSpec, out *authorizationv1beta1.SubjectAccessReviewSpec, s conversion.Scope) error {
-	*out = *(*authorizationv1beta1.SubjectAccessReviewSpec)(unsafe.Pointer(in))
+	out.ResourceAttributes = (*authorizationv1beta1.ResourceAttributes)(unsafe.Pointer(in.ResourceAttributes))
+	out.NonResourceAttributes = (*authorizationv1beta1.NonResourceAttributes)(unsafe.Pointer(in.NonResourceAttributes))
+	out.User = in.User
+	out.Groups = *(*[]string)(unsafe.Pointer(&in.Groups))
+	out.Extra = *(*map[string]authorizationv1beta1.ExtraValue)(unsafe.Pointer(&in.Extra))
+	out.UID = in.UID
+	// WARNING: in.AuthorizationOptions requires manual conversion: does not exist in peer-type
 	return nil
 }
 
-// Convert_authorization_SubjectAccessReviewSpec_To_v1beta1_SubjectAccessReviewSpec is an autogenerated conversion function.
-func Convert_authorization_SubjectAccessReviewSpec_To_v1beta1_SubjectAccessReviewSpec(in *authorization.SubjectAccessReviewSpec, out *authorizationv1beta1.SubjectAccessReviewSpec, s conversion.Scope) error {
-	return autoConvert_authorization_SubjectAccessReviewSpec_To_v1beta1_SubjectAccessReviewSpec(in, out, s)
-}
-
 func autoConvert_v1beta1_SubjectAccessReviewStatus_To_authorization_SubjectAccessReviewStatus(in *authorizationv1beta1.SubjectAccessReviewStatus, out *authorization.SubjectAccessReviewStatus, s conversion.Scope) error {
-	*out = *(*authorization.SubjectAccessReviewStatus)(unsafe.Pointer(in))
+	out.Allowed = in.Allowed
+	out.Denied = in.Denied
+	out.Reason = in.Reason
+	out.EvaluationError = in.EvaluationError
 	return nil
 }
 
@@ -449,13 +456,12 @@ func Convert_v1beta1_SubjectAccessReviewStatus_To_authorization_SubjectAccessRev
 }
 
 func autoConvert_authorization_SubjectAccessReviewStatus_To_v1beta1_SubjectAccessReviewStatus(in *authorization.SubjectAccessReviewStatus, out *authorizationv1beta1.SubjectAccessReviewStatus, s conversion.Scope) error {
-	*out = *(*authorizationv1beta1.SubjectAccessReviewStatus)(unsafe.Pointer(in))
+	out.Allowed = in.Allowed
+	out.Denied = in.Denied
+	out.Reason = in.Reason
+	out.EvaluationError = in.EvaluationError
+	// WARNING: in.ConditionalDecision requires manual conversion: does not exist in peer-type
 	return nil
-}
-
-// Convert_authorization_SubjectAccessReviewStatus_To_v1beta1_SubjectAccessReviewStatus is an autogenerated conversion function.
-func Convert_authorization_SubjectAccessReviewStatus_To_v1beta1_SubjectAccessReviewStatus(in *authorization.SubjectAccessReviewStatus, out *authorizationv1beta1.SubjectAccessReviewStatus, s conversion.Scope) error {
-	return autoConvert_authorization_SubjectAccessReviewStatus_To_v1beta1_SubjectAccessReviewStatus(in, out, s)
 }
 
 func autoConvert_v1beta1_SubjectRulesReviewStatus_To_authorization_SubjectRulesReviewStatus(in *authorizationv1beta1.SubjectRulesReviewStatus, out *authorization.SubjectRulesReviewStatus, s conversion.Scope) error {

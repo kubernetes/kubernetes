@@ -20,7 +20,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/prometheus/procfs/internal/util"
+	"github.com/prometheus/procfs/internal/parsers"
 )
 
 // ProcStatus provides status information about the process,
@@ -100,7 +100,7 @@ type ProcStatus struct {
 
 // NewStatus returns the current status information of the process.
 func (p Proc) NewStatus() (ProcStatus, error) {
-	data, err := util.ReadFileNoStat(p.path("status"))
+	data, err := parsers.ReadFileNoStat(p.path("status"))
 	if err != nil {
 		return ProcStatus{}, err
 	}

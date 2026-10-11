@@ -224,28 +224,6 @@ func (ss SampleStream) MarshalJSON() ([]byte, error) {
 	}
 }
 
-func (ss *SampleStream) UnmarshalJSON(b []byte) error {
-	v := struct {
-		Metric     Metric                `json:"metric"`
-		Values     []SamplePair          `json:"values"`
-		Histograms []SampleHistogramPair `json:"histograms"`
-	}{
-		Metric:     ss.Metric,
-		Values:     ss.Values,
-		Histograms: ss.Histograms,
-	}
-
-	if err := json.Unmarshal(b, &v); err != nil {
-		return err
-	}
-
-	ss.Metric = v.Metric
-	ss.Values = v.Values
-	ss.Histograms = v.Histograms
-
-	return nil
-}
-
 // Scalar is a scalar value evaluated at the set timestamp.
 type Scalar struct {
 	Value     SampleValue `json:"value"`

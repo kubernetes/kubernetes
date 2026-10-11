@@ -20,7 +20,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/prometheus/procfs/internal/util"
+	"github.com/prometheus/procfs/internal/parsers"
 )
 
 // Cgroup models one line from /proc/[pid]/cgroup. Each Cgroup struct describes the placement of a PID inside a
@@ -90,7 +90,7 @@ func parseCgroups(data []byte) ([]Cgroup, error) {
 // control hierarchy running on this system. On every system (v1 and v2), all hierarchies contain all processes,
 // so the len of the returned struct is equal to the number of active hierarchies on this system.
 func (p Proc) Cgroups() ([]Cgroup, error) {
-	data, err := util.ReadFileNoStat(p.path("cgroup"))
+	data, err := parsers.ReadFileNoStat(p.path("cgroup"))
 	if err != nil {
 		return nil, err
 	}

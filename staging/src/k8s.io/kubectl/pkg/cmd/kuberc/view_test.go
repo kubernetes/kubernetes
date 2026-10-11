@@ -27,12 +27,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/genericiooptions"
-	"k8s.io/kubectl/pkg/config/v1beta1"
+	v1 "k8s.io/kubectl/pkg/config/v1"
 	"sigs.k8s.io/yaml"
 )
 
 func TestViewOptions_Run(t *testing.T) {
-	kubercContent := `apiVersion: kubectl.config.k8s.io/v1beta1
+	kubercContent := `apiVersion: kubectl.config.k8s.io/v1
 kind: Preference
 defaults:
 - command: get
@@ -46,15 +46,15 @@ aliases:
   - nodes
 `
 
-	expectedPref := &v1beta1.Preference{
+	expectedPref := &v1.Preference{
 		TypeMeta: metav1.TypeMeta{
-			APIVersion: "kubectl.config.k8s.io/v1beta1",
+			APIVersion: "kubectl.config.k8s.io/v1",
 			Kind:       "Preference",
 		},
-		Defaults: []v1beta1.CommandDefaults{
+		Defaults: []v1.CommandDefaults{
 			{
 				Command: "get",
-				Options: []v1beta1.CommandOptionDefault{
+				Options: []v1.CommandOptionDefault{
 					{
 						Name:    "output",
 						Default: "wide",
@@ -62,7 +62,7 @@ aliases:
 				},
 			},
 		},
-		Aliases: []v1beta1.AliasOverride{
+		Aliases: []v1.AliasOverride{
 			{
 				Name:        "getn",
 				Command:     "get",
@@ -135,8 +135,8 @@ aliases:
 				t.Fatalf("Run() unexpected error = %v", err)
 			}
 
-			// Unmarshal actual output to v1beta1.Preference
-			var actualPref v1beta1.Preference
+			// Unmarshal actual output to v1.Preference
+			var actualPref v1.Preference
 			if err := yaml.Unmarshal(out.Bytes(), &actualPref); err != nil {
 				t.Fatalf("failed to unmarshal actual output: %v", err)
 			}

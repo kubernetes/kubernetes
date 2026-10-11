@@ -26,7 +26,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/cli-runtime/pkg/genericiooptions"
-	"k8s.io/kubectl/pkg/config/v1beta1"
+	v1 "k8s.io/kubectl/pkg/config/v1"
 	"sigs.k8s.io/yaml"
 )
 
@@ -35,7 +35,7 @@ func TestSetOptions_Run_Defaults(t *testing.T) {
 		name           string
 		existingKuberc string
 		options        SetOptions
-		expectedPref   *v1beta1.Preference
+		expectedPref   *v1.Preference
 		expectError    bool
 		errorContains  string
 	}{
@@ -47,15 +47,15 @@ func TestSetOptions_Run_Defaults(t *testing.T) {
 				Command: "get",
 				Options: []string{"output=wide"},
 			},
-			expectedPref: &v1beta1.Preference{
+			expectedPref: &v1.Preference{
 				TypeMeta: metav1.TypeMeta{
-					APIVersion: "kubectl.config.k8s.io/v1beta1",
+					APIVersion: "kubectl.config.k8s.io/v1",
 					Kind:       "Preference",
 				},
-				Defaults: []v1beta1.CommandDefaults{
+				Defaults: []v1.CommandDefaults{
 					{
 						Command: "get",
-						Options: []v1beta1.CommandOptionDefault{
+						Options: []v1.CommandOptionDefault{
 							{
 								Name:    "output",
 								Default: "wide",
@@ -67,6 +67,48 @@ func TestSetOptions_Run_Defaults(t *testing.T) {
 		},
 		{
 			name: "add defaults to existing file",
+			existingKuberc: `apiVersion: kubectl.config.k8s.io/v1
+kind: Preference
+defaults:
+- command: get
+  options:
+  - name: output
+    default: wide
+`,
+			options: SetOptions{
+				Section: sectionDefaults,
+				Command: "create",
+				Options: []string{"output=yaml"},
+			},
+			expectedPref: &v1.Preference{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: "kubectl.config.k8s.io/v1",
+					Kind:       "Preference",
+				},
+				Defaults: []v1.CommandDefaults{
+					{
+						Command: "get",
+						Options: []v1.CommandOptionDefault{
+							{
+								Name:    "output",
+								Default: "wide",
+							},
+						},
+					},
+					{
+						Command: "create",
+						Options: []v1.CommandOptionDefault{
+							{
+								Name:    "output",
+								Default: "yaml",
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "add defaults to existing v1beta1 file",
 			existingKuberc: `apiVersion: kubectl.config.k8s.io/v1beta1
 kind: Preference
 defaults:
@@ -80,15 +122,15 @@ defaults:
 				Command: "create",
 				Options: []string{"output=yaml"},
 			},
-			expectedPref: &v1beta1.Preference{
+			expectedPref: &v1.Preference{
 				TypeMeta: metav1.TypeMeta{
-					APIVersion: "kubectl.config.k8s.io/v1beta1",
+					APIVersion: "kubectl.config.k8s.io/v1",
 					Kind:       "Preference",
 				},
-				Defaults: []v1beta1.CommandDefaults{
+				Defaults: []v1.CommandDefaults{
 					{
 						Command: "get",
-						Options: []v1beta1.CommandOptionDefault{
+						Options: []v1.CommandOptionDefault{
 							{
 								Name:    "output",
 								Default: "wide",
@@ -97,7 +139,7 @@ defaults:
 					},
 					{
 						Command: "create",
-						Options: []v1beta1.CommandOptionDefault{
+						Options: []v1.CommandOptionDefault{
 							{
 								Name:    "output",
 								Default: "yaml",
@@ -109,6 +151,74 @@ defaults:
 		},
 		{
 			name: "overwrite existing defaults",
+			existingKuberc: `apiVersion: kubectl.config.k8s.io/v1
+kind: Preference
+defaults:
+- command: get
+  options:
+  - name: output
+    default: wide
+`,
+			options: SetOptions{
+				Section:   sectionDefaults,
+				Command:   "get",
+				Options:   []string{"output=json"},
+				Overwrite: true,
+			},
+			expectedPref: &v1.Preference{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: "kubectl.config.k8s.io/v1",
+					Kind:       "Preference",
+				},
+				Defaults: []v1.CommandDefaults{
+					{
+						Command: "get",
+						Options: []v1.CommandOptionDefault{
+							{
+								Name:    "output",
+								Default: "json",
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "overwrite existing defaults converting from v1alpha1 to v1",
+			existingKuberc: `apiVersion: kubectl.config.k8s.io/v1alpha1
+kind: Preference
+overrides:
+- command: get
+  flags:
+  - name: output
+    default: wide
+`,
+			options: SetOptions{
+				Section:   sectionDefaults,
+				Command:   "get",
+				Options:   []string{"output=json"},
+				Overwrite: true,
+			},
+			expectedPref: &v1.Preference{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: "kubectl.config.k8s.io/v1",
+					Kind:       "Preference",
+				},
+				Defaults: []v1.CommandDefaults{
+					{
+						Command: "get",
+						Options: []v1.CommandOptionDefault{
+							{
+								Name:    "output",
+								Default: "json",
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "overwrite existing defaults converting from v1beta1 to v1",
 			existingKuberc: `apiVersion: kubectl.config.k8s.io/v1beta1
 kind: Preference
 defaults:
@@ -123,15 +233,15 @@ defaults:
 				Options:   []string{"output=json"},
 				Overwrite: true,
 			},
-			expectedPref: &v1beta1.Preference{
+			expectedPref: &v1.Preference{
 				TypeMeta: metav1.TypeMeta{
-					APIVersion: "kubectl.config.k8s.io/v1beta1",
+					APIVersion: "kubectl.config.k8s.io/v1",
 					Kind:       "Preference",
 				},
-				Defaults: []v1beta1.CommandDefaults{
+				Defaults: []v1.CommandDefaults{
 					{
 						Command: "get",
-						Options: []v1beta1.CommandOptionDefault{
+						Options: []v1.CommandOptionDefault{
 							{
 								Name:    "output",
 								Default: "json",
@@ -143,7 +253,7 @@ defaults:
 		},
 		{
 			name: "overwrite without options preserves existing options",
-			existingKuberc: `apiVersion: kubectl.config.k8s.io/v1beta1
+			existingKuberc: `apiVersion: kubectl.config.k8s.io/v1
 kind: Preference
 defaults:
 - command: get
@@ -157,15 +267,15 @@ defaults:
 				Options:   []string{}, // no options provided
 				Overwrite: true,
 			},
-			expectedPref: &v1beta1.Preference{
+			expectedPref: &v1.Preference{
 				TypeMeta: metav1.TypeMeta{
-					APIVersion: "kubectl.config.k8s.io/v1beta1",
+					APIVersion: "kubectl.config.k8s.io/v1",
 					Kind:       "Preference",
 				},
-				Defaults: []v1beta1.CommandDefaults{
+				Defaults: []v1.CommandDefaults{
 					{
 						Command: "get",
-						Options: []v1beta1.CommandOptionDefault{
+						Options: []v1.CommandOptionDefault{
 							{
 								Name:    "output",
 								Default: "wide",
@@ -177,7 +287,7 @@ defaults:
 		},
 		{
 			name: "overwrite with single option replaces all options",
-			existingKuberc: `apiVersion: kubectl.config.k8s.io/v1beta1
+			existingKuberc: `apiVersion: kubectl.config.k8s.io/v1
 kind: Preference
 defaults:
 - command: get
@@ -193,15 +303,15 @@ defaults:
 				Options:   []string{"output=json"},
 				Overwrite: true,
 			},
-			expectedPref: &v1beta1.Preference{
+			expectedPref: &v1.Preference{
 				TypeMeta: metav1.TypeMeta{
-					APIVersion: "kubectl.config.k8s.io/v1beta1",
+					APIVersion: "kubectl.config.k8s.io/v1",
 					Kind:       "Preference",
 				},
-				Defaults: []v1beta1.CommandDefaults{
+				Defaults: []v1.CommandDefaults{
 					{
 						Command: "get",
-						Options: []v1beta1.CommandOptionDefault{
+						Options: []v1.CommandOptionDefault{
 							{
 								Name:    "output",
 								Default: "json",
@@ -214,7 +324,7 @@ defaults:
 		},
 		{
 			name: "error without overwrite",
-			existingKuberc: `apiVersion: kubectl.config.k8s.io/v1beta1
+			existingKuberc: `apiVersion: kubectl.config.k8s.io/v1
 kind: Preference
 defaults:
 - command: get
@@ -239,15 +349,15 @@ defaults:
 				Command: "set env",
 				Options: []string{"output=yaml", "local=true"},
 			},
-			expectedPref: &v1beta1.Preference{
+			expectedPref: &v1.Preference{
 				TypeMeta: metav1.TypeMeta{
-					APIVersion: "kubectl.config.k8s.io/v1beta1",
+					APIVersion: "kubectl.config.k8s.io/v1",
 					Kind:       "Preference",
 				},
-				Defaults: []v1beta1.CommandDefaults{
+				Defaults: []v1.CommandDefaults{
 					{
 						Command: "set env",
-						Options: []v1beta1.CommandOptionDefault{
+						Options: []v1.CommandOptionDefault{
 							{
 								Name:    "output",
 								Default: "yaml",
@@ -317,7 +427,7 @@ defaults:
 				t.Fatalf("failed to read written kuberc file: %v", err)
 			}
 
-			var actualPref v1beta1.Preference
+			var actualPref v1.Preference
 			if err := yaml.Unmarshal(data, &actualPref); err != nil {
 				t.Fatalf("failed to unmarshal actual output: %v", err)
 			}
@@ -339,7 +449,7 @@ func TestSetOptions_Run_Aliases(t *testing.T) {
 		name           string
 		existingKuberc string
 		options        SetOptions
-		expectedPref   *v1beta1.Preference
+		expectedPref   *v1.Preference
 		expectError    bool
 		errorContains  string
 	}{
@@ -353,17 +463,17 @@ func TestSetOptions_Run_Aliases(t *testing.T) {
 				PrependArgs: []string{"nodes"},
 				Options:     []string{"output=wide"},
 			},
-			expectedPref: &v1beta1.Preference{
+			expectedPref: &v1.Preference{
 				TypeMeta: metav1.TypeMeta{
-					APIVersion: "kubectl.config.k8s.io/v1beta1",
+					APIVersion: "kubectl.config.k8s.io/v1",
 					Kind:       "Preference",
 				},
-				Aliases: []v1beta1.AliasOverride{
+				Aliases: []v1.AliasOverride{
 					{
 						Name:        "getn",
 						Command:     "get",
 						PrependArgs: []string{"nodes"},
-						Options: []v1beta1.CommandOptionDefault{
+						Options: []v1.CommandOptionDefault{
 							{
 								Name:    "output",
 								Default: "wide",
@@ -375,7 +485,7 @@ func TestSetOptions_Run_Aliases(t *testing.T) {
 		},
 		{
 			name: "add alias to existing file",
-			existingKuberc: `apiVersion: kubectl.config.k8s.io/v1beta1
+			existingKuberc: `apiVersion: kubectl.config.k8s.io/v1
 kind: Preference
 aliases:
 - name: getn
@@ -389,12 +499,12 @@ aliases:
 				Command:     "get",
 				PrependArgs: []string{"pods"},
 			},
-			expectedPref: &v1beta1.Preference{
+			expectedPref: &v1.Preference{
 				TypeMeta: metav1.TypeMeta{
-					APIVersion: "kubectl.config.k8s.io/v1beta1",
+					APIVersion: "kubectl.config.k8s.io/v1",
 					Kind:       "Preference",
 				},
-				Aliases: []v1beta1.AliasOverride{
+				Aliases: []v1.AliasOverride{
 					{
 						Name:        "getn",
 						Command:     "get",
@@ -410,7 +520,7 @@ aliases:
 		},
 		{
 			name: "overwrite existing alias",
-			existingKuberc: `apiVersion: kubectl.config.k8s.io/v1beta1
+			existingKuberc: `apiVersion: kubectl.config.k8s.io/v1
 kind: Preference
 aliases:
 - name: getn
@@ -425,12 +535,12 @@ aliases:
 				PrependArgs: []string{"namespaces"},
 				Overwrite:   true,
 			},
-			expectedPref: &v1beta1.Preference{
+			expectedPref: &v1.Preference{
 				TypeMeta: metav1.TypeMeta{
-					APIVersion: "kubectl.config.k8s.io/v1beta1",
+					APIVersion: "kubectl.config.k8s.io/v1",
 					Kind:       "Preference",
 				},
-				Aliases: []v1beta1.AliasOverride{
+				Aliases: []v1.AliasOverride{
 					{
 						Name:        "getn",
 						Command:     "get",
@@ -441,7 +551,7 @@ aliases:
 		},
 		{
 			name: "overwrite alias without options preserves existing options",
-			existingKuberc: `apiVersion: kubectl.config.k8s.io/v1beta1
+			existingKuberc: `apiVersion: kubectl.config.k8s.io/v1
 kind: Preference
 aliases:
 - name: getn
@@ -457,17 +567,17 @@ aliases:
 				Options:   []string{}, // no options provided
 				Overwrite: true,
 			},
-			expectedPref: &v1beta1.Preference{
+			expectedPref: &v1.Preference{
 				TypeMeta: metav1.TypeMeta{
-					APIVersion: "kubectl.config.k8s.io/v1beta1",
+					APIVersion: "kubectl.config.k8s.io/v1",
 					Kind:       "Preference",
 				},
-				Aliases: []v1beta1.AliasOverride{
+				Aliases: []v1.AliasOverride{
 					{
 						Name:        "getn",
 						Command:     "get",
 						PrependArgs: nil,
-						Options: []v1beta1.CommandOptionDefault{
+						Options: []v1.CommandOptionDefault{
 							{
 								Name:    "output",
 								Default: "wide",
@@ -479,7 +589,7 @@ aliases:
 		},
 		{
 			name: "overwrite alias without prependArgs preserves existing prependArgs",
-			existingKuberc: `apiVersion: kubectl.config.k8s.io/v1beta1
+			existingKuberc: `apiVersion: kubectl.config.k8s.io/v1
 kind: Preference
 aliases:
 - name: getn
@@ -494,12 +604,12 @@ aliases:
 				PrependArgs: []string{}, // no prependArgs provided
 				Overwrite:   true,
 			},
-			expectedPref: &v1beta1.Preference{
+			expectedPref: &v1.Preference{
 				TypeMeta: metav1.TypeMeta{
-					APIVersion: "kubectl.config.k8s.io/v1beta1",
+					APIVersion: "kubectl.config.k8s.io/v1",
 					Kind:       "Preference",
 				},
-				Aliases: []v1beta1.AliasOverride{
+				Aliases: []v1.AliasOverride{
 					{
 						Name:        "getn",
 						Command:     "get",
@@ -512,7 +622,7 @@ aliases:
 
 		{
 			name: "overwrite alias without appendArgs preserves existing appendArgs",
-			existingKuberc: `apiVersion: kubectl.config.k8s.io/v1beta1
+			existingKuberc: `apiVersion: kubectl.config.k8s.io/v1
 kind: Preference
 aliases:
 - name: getn
@@ -530,12 +640,12 @@ aliases:
 				AppendArgs: []string{}, // no appendArgs provided
 				Overwrite:  true,
 			},
-			expectedPref: &v1beta1.Preference{
+			expectedPref: &v1.Preference{
 				TypeMeta: metav1.TypeMeta{
-					APIVersion: "kubectl.config.k8s.io/v1beta1",
+					APIVersion: "kubectl.config.k8s.io/v1",
 					Kind:       "Preference",
 				},
-				Aliases: []v1beta1.AliasOverride{
+				Aliases: []v1.AliasOverride{
 					{
 						Name:        "getn",
 						Command:     "get",
@@ -548,7 +658,7 @@ aliases:
 		},
 		{
 			name: "update multiple fields simultaneously",
-			existingKuberc: `apiVersion: kubectl.config.k8s.io/v1beta1
+			existingKuberc: `apiVersion: kubectl.config.k8s.io/v1
 kind: Preference
 aliases:
 - name: getn
@@ -570,18 +680,18 @@ aliases:
 				AppendArgs:  []string{}, // no appendArgs provided
 				Overwrite:   true,
 			},
-			expectedPref: &v1beta1.Preference{
+			expectedPref: &v1.Preference{
 				TypeMeta: metav1.TypeMeta{
-					APIVersion: "kubectl.config.k8s.io/v1beta1",
+					APIVersion: "kubectl.config.k8s.io/v1",
 					Kind:       "Preference",
 				},
-				Aliases: []v1beta1.AliasOverride{
+				Aliases: []v1.AliasOverride{
 					{
 						Name:        "getn",
 						Command:     "get",
 						PrependArgs: []string{"pods"},
 						AppendArgs:  []string{"--watch"},
-						Options: []v1beta1.CommandOptionDefault{
+						Options: []v1.CommandOptionDefault{
 							{
 								Name:    "output",
 								Default: "json",
@@ -593,7 +703,7 @@ aliases:
 		},
 		{
 			name: "overwrite with single option replaces all options",
-			existingKuberc: `apiVersion: kubectl.config.k8s.io/v1beta1
+			existingKuberc: `apiVersion: kubectl.config.k8s.io/v1
 kind: Preference
 aliases:
 - name: getn
@@ -611,16 +721,16 @@ aliases:
 				Options:   []string{"output=json"},
 				Overwrite: true,
 			},
-			expectedPref: &v1beta1.Preference{
+			expectedPref: &v1.Preference{
 				TypeMeta: metav1.TypeMeta{
-					APIVersion: "kubectl.config.k8s.io/v1beta1",
+					APIVersion: "kubectl.config.k8s.io/v1",
 					Kind:       "Preference",
 				},
-				Aliases: []v1beta1.AliasOverride{
+				Aliases: []v1.AliasOverride{
 					{
 						Name:    "getn",
 						Command: "get",
-						Options: []v1beta1.CommandOptionDefault{
+						Options: []v1.CommandOptionDefault{
 							{
 								Name:    "output",
 								Default: "json",
@@ -633,7 +743,7 @@ aliases:
 		},
 		{
 			name: "error without overwrite",
-			existingKuberc: `apiVersion: kubectl.config.k8s.io/v1beta1
+			existingKuberc: `apiVersion: kubectl.config.k8s.io/v1
 kind: Preference
 aliases:
 - name: getn
@@ -661,17 +771,17 @@ aliases:
 				AppendArgs: []string{"--", "custom-arg1"},
 				Options:    []string{"image=nginx"},
 			},
-			expectedPref: &v1beta1.Preference{
+			expectedPref: &v1.Preference{
 				TypeMeta: metav1.TypeMeta{
-					APIVersion: "kubectl.config.k8s.io/v1beta1",
+					APIVersion: "kubectl.config.k8s.io/v1",
 					Kind:       "Preference",
 				},
-				Aliases: []v1beta1.AliasOverride{
+				Aliases: []v1.AliasOverride{
 					{
 						Name:       "runx",
 						Command:    "run",
 						AppendArgs: []string{"--", "custom-arg1"},
-						Options: []v1beta1.CommandOptionDefault{
+						Options: []v1.CommandOptionDefault{
 							{
 								Name:    "image",
 								Default: "nginx",
@@ -726,7 +836,7 @@ aliases:
 				t.Fatalf("failed to read written kuberc file: %v", err)
 			}
 
-			var actualPref v1beta1.Preference
+			var actualPref v1.Preference
 			if err := yaml.Unmarshal(data, &actualPref); err != nil {
 				t.Fatalf("failed to unmarshal actual output: %v", err)
 			}
@@ -748,7 +858,7 @@ func TestSetOptions_Run_CredentialPlugin(t *testing.T) {
 		name           string
 		existingKuberc string
 		options        SetOptions
-		expectedPref   *v1beta1.Preference
+		expectedPref   *v1.Preference
 		expectError    bool
 		errorContains  string
 	}{
@@ -757,14 +867,14 @@ func TestSetOptions_Run_CredentialPlugin(t *testing.T) {
 			existingKuberc: "",
 			options: SetOptions{
 				Section:      sectionCredentialPlugin,
-				PluginPolicy: string(v1beta1.PluginPolicyAllowAll),
+				PluginPolicy: string(v1.PluginPolicyAllowAll),
 			},
-			expectedPref: &v1beta1.Preference{
+			expectedPref: &v1.Preference{
 				TypeMeta: metav1.TypeMeta{
-					APIVersion: "kubectl.config.k8s.io/v1beta1",
+					APIVersion: "kubectl.config.k8s.io/v1",
 					Kind:       "Preference",
 				},
-				CredentialPluginPolicy: v1beta1.PluginPolicyAllowAll,
+				CredentialPluginPolicy: v1.PluginPolicyAllowAll,
 			},
 		},
 		{
@@ -772,14 +882,14 @@ func TestSetOptions_Run_CredentialPlugin(t *testing.T) {
 			existingKuberc: "",
 			options: SetOptions{
 				Section:      sectionCredentialPlugin,
-				PluginPolicy: string(v1beta1.PluginPolicyDenyAll),
+				PluginPolicy: string(v1.PluginPolicyDenyAll),
 			},
-			expectedPref: &v1beta1.Preference{
+			expectedPref: &v1.Preference{
 				TypeMeta: metav1.TypeMeta{
-					APIVersion: "kubectl.config.k8s.io/v1beta1",
+					APIVersion: "kubectl.config.k8s.io/v1",
 					Kind:       "Preference",
 				},
-				CredentialPluginPolicy: v1beta1.PluginPolicyDenyAll,
+				CredentialPluginPolicy: v1.PluginPolicyDenyAll,
 			},
 		},
 		{
@@ -787,16 +897,16 @@ func TestSetOptions_Run_CredentialPlugin(t *testing.T) {
 			existingKuberc: "",
 			options: SetOptions{
 				Section:          sectionCredentialPlugin,
-				PluginPolicy:     string(v1beta1.PluginPolicyAllowlist),
+				PluginPolicy:     string(v1.PluginPolicyAllowlist),
 				AllowlistEntries: []string{"command=foobar"},
 			},
-			expectedPref: &v1beta1.Preference{
+			expectedPref: &v1.Preference{
 				TypeMeta: metav1.TypeMeta{
-					APIVersion: "kubectl.config.k8s.io/v1beta1",
+					APIVersion: "kubectl.config.k8s.io/v1",
 					Kind:       "Preference",
 				},
-				CredentialPluginPolicy: v1beta1.PluginPolicyAllowlist,
-				CredentialPluginAllowlist: []v1beta1.AllowlistEntry{
+				CredentialPluginPolicy: v1.PluginPolicyAllowlist,
+				CredentialPluginAllowlist: []v1.AllowlistEntry{
 					{Command: "foobar"},
 				},
 			},
@@ -806,16 +916,16 @@ func TestSetOptions_Run_CredentialPlugin(t *testing.T) {
 			existingKuberc: "",
 			options: SetOptions{
 				Section:          sectionCredentialPlugin,
-				PluginPolicy:     string(v1beta1.PluginPolicyAllowlist),
+				PluginPolicy:     string(v1.PluginPolicyAllowlist),
 				AllowlistEntries: []string{"command=foobar", "command=barbaz"},
 			},
-			expectedPref: &v1beta1.Preference{
+			expectedPref: &v1.Preference{
 				TypeMeta: metav1.TypeMeta{
-					APIVersion: "kubectl.config.k8s.io/v1beta1",
+					APIVersion: "kubectl.config.k8s.io/v1",
 					Kind:       "Preference",
 				},
-				CredentialPluginPolicy: v1beta1.PluginPolicyAllowlist,
-				CredentialPluginAllowlist: []v1beta1.AllowlistEntry{
+				CredentialPluginPolicy: v1.PluginPolicyAllowlist,
+				CredentialPluginAllowlist: []v1.AllowlistEntry{
 					{Command: "foobar"},
 					{Command: "barbaz"},
 				},
@@ -826,14 +936,14 @@ func TestSetOptions_Run_CredentialPlugin(t *testing.T) {
 			existingKuberc: "",
 			options: SetOptions{
 				Section:      sectionCredentialPlugin,
-				PluginPolicy: string(v1beta1.PluginPolicyAllowlist),
+				PluginPolicy: string(v1.PluginPolicyAllowlist),
 			},
-			expectedPref: &v1beta1.Preference{
+			expectedPref: &v1.Preference{
 				TypeMeta: metav1.TypeMeta{
-					APIVersion: "kubectl.config.k8s.io/v1beta1",
+					APIVersion: "kubectl.config.k8s.io/v1",
 					Kind:       "Preference",
 				},
-				CredentialPluginPolicy: v1beta1.PluginPolicyAllowlist,
+				CredentialPluginPolicy: v1.PluginPolicyAllowlist,
 			},
 			expectError: true,
 		},
@@ -842,16 +952,16 @@ func TestSetOptions_Run_CredentialPlugin(t *testing.T) {
 			existingKuberc: "",
 			options: SetOptions{
 				Section:          sectionCredentialPlugin,
-				PluginPolicy:     string(v1beta1.PluginPolicyAllowlist),
+				PluginPolicy:     string(v1.PluginPolicyAllowlist),
 				AllowlistEntries: []string{"calvinball=asdf"},
 			},
-			expectedPref: &v1beta1.Preference{
+			expectedPref: &v1.Preference{
 				TypeMeta: metav1.TypeMeta{
-					APIVersion: "kubectl.config.k8s.io/v1beta1",
+					APIVersion: "kubectl.config.k8s.io/v1",
 					Kind:       "Preference",
 				},
-				CredentialPluginPolicy: v1beta1.PluginPolicyAllowlist,
-				CredentialPluginAllowlist: []v1beta1.AllowlistEntry{
+				CredentialPluginPolicy: v1.PluginPolicyAllowlist,
+				CredentialPluginAllowlist: []v1.AllowlistEntry{
 					{Command: "hello"},
 				},
 			},
@@ -862,16 +972,16 @@ func TestSetOptions_Run_CredentialPlugin(t *testing.T) {
 			existingKuberc: "",
 			options: SetOptions{
 				Section:          sectionCredentialPlugin,
-				PluginPolicy:     string(v1beta1.PluginPolicyAllowlist),
+				PluginPolicy:     string(v1.PluginPolicyAllowlist),
 				AllowlistEntries: []string{"command="},
 			},
-			expectedPref: &v1beta1.Preference{
+			expectedPref: &v1.Preference{
 				TypeMeta: metav1.TypeMeta{
-					APIVersion: "kubectl.config.k8s.io/v1beta1",
+					APIVersion: "kubectl.config.k8s.io/v1",
 					Kind:       "Preference",
 				},
-				CredentialPluginPolicy: v1beta1.PluginPolicyAllowlist,
-				CredentialPluginAllowlist: []v1beta1.AllowlistEntry{
+				CredentialPluginPolicy: v1.PluginPolicyAllowlist,
+				CredentialPluginAllowlist: []v1.AllowlistEntry{
 					{Command: ""},
 				},
 			},
@@ -882,16 +992,16 @@ func TestSetOptions_Run_CredentialPlugin(t *testing.T) {
 			existingKuberc: "",
 			options: SetOptions{
 				Section:          sectionCredentialPlugin,
-				PluginPolicy:     string(v1beta1.PluginPolicyAllowlist),
+				PluginPolicy:     string(v1.PluginPolicyAllowlist),
 				AllowlistEntries: []string{"command=hello", "calvinball=asdf"},
 			},
-			expectedPref: &v1beta1.Preference{
+			expectedPref: &v1.Preference{
 				TypeMeta: metav1.TypeMeta{
-					APIVersion: "kubectl.config.k8s.io/v1beta1",
+					APIVersion: "kubectl.config.k8s.io/v1",
 					Kind:       "Preference",
 				},
-				CredentialPluginPolicy: v1beta1.PluginPolicyAllowlist,
-				CredentialPluginAllowlist: []v1beta1.AllowlistEntry{
+				CredentialPluginPolicy: v1.PluginPolicyAllowlist,
+				CredentialPluginAllowlist: []v1.AllowlistEntry{
 					{Command: "hello"},
 				},
 			},
@@ -904,12 +1014,12 @@ func TestSetOptions_Run_CredentialPlugin(t *testing.T) {
 				Section:      sectionCredentialPlugin,
 				PluginPolicy: "Foo",
 			},
-			expectedPref: &v1beta1.Preference{
+			expectedPref: &v1.Preference{
 				TypeMeta: metav1.TypeMeta{
-					APIVersion: "kubectl.config.k8s.io/v1beta1",
+					APIVersion: "kubectl.config.k8s.io/v1",
 					Kind:       "Preference",
 				},
-				CredentialPluginPolicy: v1beta1.CredentialPluginPolicy("Foo"),
+				CredentialPluginPolicy: v1.CredentialPluginPolicy("Foo"),
 			},
 			expectError: true,
 		},
@@ -920,9 +1030,9 @@ func TestSetOptions_Run_CredentialPlugin(t *testing.T) {
 				Section:      sectionCredentialPlugin,
 				PluginPolicy: "",
 			},
-			expectedPref: &v1beta1.Preference{
+			expectedPref: &v1.Preference{
 				TypeMeta: metav1.TypeMeta{
-					APIVersion: "kubectl.config.k8s.io/v1beta1",
+					APIVersion: "kubectl.config.k8s.io/v1",
 					Kind:       "Preference",
 				},
 			},
@@ -933,16 +1043,16 @@ func TestSetOptions_Run_CredentialPlugin(t *testing.T) {
 			existingKuberc: "",
 			options: SetOptions{
 				Section:          sectionCredentialPlugin,
-				PluginPolicy:     string(v1beta1.PluginPolicyAllowAll),
+				PluginPolicy:     string(v1.PluginPolicyAllowAll),
 				AllowlistEntries: []string{"command=foo"},
 			},
-			expectedPref: &v1beta1.Preference{
+			expectedPref: &v1.Preference{
 				TypeMeta: metav1.TypeMeta{
-					APIVersion: "kubectl.config.k8s.io/v1beta1",
+					APIVersion: "kubectl.config.k8s.io/v1",
 					Kind:       "Preference",
 				},
-				CredentialPluginPolicy: v1beta1.PluginPolicyAllowAll,
-				CredentialPluginAllowlist: []v1beta1.AllowlistEntry{
+				CredentialPluginPolicy: v1.PluginPolicyAllowAll,
+				CredentialPluginAllowlist: []v1.AllowlistEntry{
 					{Command: "foo"},
 				},
 			},
@@ -953,16 +1063,16 @@ func TestSetOptions_Run_CredentialPlugin(t *testing.T) {
 			existingKuberc: "",
 			options: SetOptions{
 				Section:          sectionCredentialPlugin,
-				PluginPolicy:     string(v1beta1.PluginPolicyDenyAll),
+				PluginPolicy:     string(v1.PluginPolicyDenyAll),
 				AllowlistEntries: []string{"command=foo"},
 			},
-			expectedPref: &v1beta1.Preference{
+			expectedPref: &v1.Preference{
 				TypeMeta: metav1.TypeMeta{
-					APIVersion: "kubectl.config.k8s.io/v1beta1",
+					APIVersion: "kubectl.config.k8s.io/v1",
 					Kind:       "Preference",
 				},
-				CredentialPluginPolicy: v1beta1.PluginPolicyDenyAll,
-				CredentialPluginAllowlist: []v1beta1.AllowlistEntry{
+				CredentialPluginPolicy: v1.PluginPolicyDenyAll,
+				CredentialPluginAllowlist: []v1.AllowlistEntry{
 					{Command: "foo"},
 				},
 			},
@@ -973,16 +1083,16 @@ func TestSetOptions_Run_CredentialPlugin(t *testing.T) {
 			existingKuberc: "",
 			options: SetOptions{
 				Section:          sectionCredentialPlugin,
-				PluginPolicy:     string(v1beta1.PluginPolicyAllowlist),
+				PluginPolicy:     string(v1.PluginPolicyAllowlist),
 				AllowlistEntries: []string{"name=foo"},
 			},
-			expectedPref: &v1beta1.Preference{
+			expectedPref: &v1.Preference{
 				TypeMeta: metav1.TypeMeta{
-					APIVersion: "kubectl.config.k8s.io/v1beta1",
+					APIVersion: "kubectl.config.k8s.io/v1",
 					Kind:       "Preference",
 				},
-				CredentialPluginPolicy: v1beta1.PluginPolicyDenyAll,
-				CredentialPluginAllowlist: []v1beta1.AllowlistEntry{
+				CredentialPluginPolicy: v1.PluginPolicyDenyAll,
+				CredentialPluginAllowlist: []v1.AllowlistEntry{
 					{Command: "foo"},
 				},
 			},
@@ -993,16 +1103,16 @@ func TestSetOptions_Run_CredentialPlugin(t *testing.T) {
 			existingKuberc: "",
 			options: SetOptions{
 				Section:          sectionCredentialPlugin,
-				PluginPolicy:     string(v1beta1.PluginPolicyAllowlist),
+				PluginPolicy:     string(v1.PluginPolicyAllowlist),
 				AllowlistEntries: []string{"command:foo"},
 			},
-			expectedPref: &v1beta1.Preference{
+			expectedPref: &v1.Preference{
 				TypeMeta: metav1.TypeMeta{
-					APIVersion: "kubectl.config.k8s.io/v1beta1",
+					APIVersion: "kubectl.config.k8s.io/v1",
 					Kind:       "Preference",
 				},
-				CredentialPluginPolicy: v1beta1.PluginPolicyDenyAll,
-				CredentialPluginAllowlist: []v1beta1.AllowlistEntry{
+				CredentialPluginPolicy: v1.PluginPolicyDenyAll,
+				CredentialPluginAllowlist: []v1.AllowlistEntry{
 					{Command: "foo"},
 				},
 			},
@@ -1013,16 +1123,16 @@ func TestSetOptions_Run_CredentialPlugin(t *testing.T) {
 			existingKuberc: "",
 			options: SetOptions{
 				Section:          sectionCredentialPlugin,
-				PluginPolicy:     string(v1beta1.PluginPolicyAllowlist),
+				PluginPolicy:     string(v1.PluginPolicyAllowlist),
 				AllowlistEntries: []string{"command=foo,command=bar"},
 			},
-			expectedPref: &v1beta1.Preference{
+			expectedPref: &v1.Preference{
 				TypeMeta: metav1.TypeMeta{
-					APIVersion: "kubectl.config.k8s.io/v1beta1",
+					APIVersion: "kubectl.config.k8s.io/v1",
 					Kind:       "Preference",
 				},
-				CredentialPluginPolicy: v1beta1.PluginPolicyAllowlist,
-				CredentialPluginAllowlist: []v1beta1.AllowlistEntry{
+				CredentialPluginPolicy: v1.PluginPolicyAllowlist,
+				CredentialPluginAllowlist: []v1.AllowlistEntry{
 					{Command: "foo"},
 					{Command: "bar"},
 				},
@@ -1039,19 +1149,19 @@ credentialPluginAllowlist:
 `,
 			options: SetOptions{
 				Section:      sectionCredentialPlugin,
-				PluginPolicy: string(v1beta1.PluginPolicyAllowAll),
+				PluginPolicy: string(v1.PluginPolicyAllowAll),
 			},
-			expectedPref: &v1beta1.Preference{
+			expectedPref: &v1.Preference{
 				TypeMeta: metav1.TypeMeta{
-					APIVersion: "kubectl.config.k8s.io/v1beta1",
+					APIVersion: "kubectl.config.k8s.io/v1",
 					Kind:       "Preference",
 				},
-				CredentialPluginPolicy: v1beta1.PluginPolicyAllowAll,
+				CredentialPluginPolicy: v1.PluginPolicyAllowAll,
 			},
 		},
 		{
 			name: "switching from Allowlist to DenyAll clears existing allowlist",
-			existingKuberc: `apiVersion: kubectl.config.k8s.io/v1beta1
+			existingKuberc: `apiVersion: kubectl.config.k8s.io/v1
 kind: Preference
 credentialPluginPolicy: Allowlist
 credentialPluginAllowlist:
@@ -1059,14 +1169,14 @@ credentialPluginAllowlist:
 `,
 			options: SetOptions{
 				Section:      sectionCredentialPlugin,
-				PluginPolicy: string(v1beta1.PluginPolicyDenyAll),
+				PluginPolicy: string(v1.PluginPolicyDenyAll),
 			},
-			expectedPref: &v1beta1.Preference{
+			expectedPref: &v1.Preference{
 				TypeMeta: metav1.TypeMeta{
-					APIVersion: "kubectl.config.k8s.io/v1beta1",
+					APIVersion: "kubectl.config.k8s.io/v1",
 					Kind:       "Preference",
 				},
-				CredentialPluginPolicy: v1beta1.PluginPolicyDenyAll,
+				CredentialPluginPolicy: v1.PluginPolicyDenyAll,
 			},
 		},
 	}
@@ -1120,7 +1230,7 @@ credentialPluginAllowlist:
 				t.Fatalf("failed to read written kuberc file: %v", err)
 			}
 
-			var actualPref v1beta1.Preference
+			var actualPref v1.Preference
 			if err := yaml.Unmarshal(data, &actualPref); err != nil {
 				t.Fatalf("failed to unmarshal actual output: %v", err)
 			}

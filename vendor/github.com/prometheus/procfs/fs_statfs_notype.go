@@ -15,8 +15,8 @@
 
 package procfs
 
-// isRealProc returns true on architectures that don't have a Type argument
+// isRealProc returns false on architectures that don't have a Type argument
 // in their Statfs_t struct.
 func isRealProc(_ string) (bool, error) {
-	return true, nil
+	return false, nil
 }

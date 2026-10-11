@@ -96,7 +96,7 @@ The `proc` and `sys` filesystems are pseudo file systems and work a bit differen
 Many of the files are changing continuously and the data being read can in some cases change between subsequent 
 reads in the same file.  Also, most of the files are relatively small (less than a few KBs), and system calls
 to the `stat` function will often return the wrong size.  Therefore, for most files it's recommended to read the 
-full file in a single operation using an internal utility function called `util.ReadFileNoStat`.
+full file in a single operation using an internal utility function called `parsers.ReadFileNoStat`.
 This function is similar to `os.ReadFile`, but it avoids the system call to `stat` to get the current size of
 the file.
 
@@ -104,7 +104,7 @@ Note that parsing the file's contents can still be performed one line at a time.
 the full file, and then using a scanner on the `[]byte` or `string` containing the data.
 
 ```
-    data, err := util.ReadFileNoStat("/proc/cpuinfo")
+    data, err := parsers.ReadFileNoStat("/proc/cpuinfo")
     if err != nil {
         return err
     }
@@ -113,9 +113,9 @@ the full file, and then using a scanner on the `[]byte` or `string` containing t
 ```
 
 The `/sys` filesystem contains many very small files which contain only a single numeric or text value.  These files
-can be read using an internal function called `util.SysReadFile` which is similar to `os.ReadFile` but does
+can be read using an internal function called `parsers.SysReadFile` which is similar to `os.ReadFile` but does
 not bother to check the size of the file before reading.
 ```
-    data, err := util.SysReadFile("/sys/class/power_supply/BAT0/capacity")
+    data, err := parsers.SysReadFile("/sys/class/power_supply/BAT0/capacity")
 ```
 

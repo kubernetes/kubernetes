@@ -22,6 +22,8 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -40,6 +42,11 @@ func TestConfigToExecCluster(t *testing.T) {
 	const proxyURL = "https://some-proxy-url.com/tuna/fish"
 	proxy := func(r *http.Request) (*url.URL, error) {
 		return url.Parse(proxyURL)
+	}
+
+	caFile := filepath.Join(t.TempDir(), "ca.pem")
+	if err := os.WriteFile(caFile, []byte("a CA bundle lives here"), 0644); err != nil {
+		t.Fatal(err)
 	}
 
 	tests := []struct {
@@ -89,7 +96,7 @@ func TestConfigToExecCluster(t *testing.T) {
 				TLSClientConfig: TLSClientConfig{
 					ServerName: "some-server-name",
 					Insecure:   true,
-					CAFile:     "testdata/ca.pem",
+					CAFile:     caFile,
 				},
 				Proxy: proxy,
 			},
@@ -129,7 +136,7 @@ func TestConfigToExecCluster(t *testing.T) {
 				TLSClientConfig: TLSClientConfig{
 					ServerName: "some-server-name",
 					Insecure:   true,
-					CAFile:     "testdata/ca.pem",
+					CAFile:     caFile,
 				},
 			},
 			wantOut: clientauthenticationapi.Cluster{
