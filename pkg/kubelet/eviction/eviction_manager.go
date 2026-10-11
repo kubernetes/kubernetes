@@ -106,6 +106,9 @@ type managerImpl struct {
 	thresholdsLastUpdated time.Time
 	// whether can support local storage capacity isolation
 	localStorageCapacityIsolation bool
+	// systemPartitionPodFunc lists the pods of the system partition. It is nil
+	// when the node has no system partition.
+	systemPartitionPodFunc ActivePodsFunc
 }
 
 // ensure it implements the required interface
@@ -184,8 +187,9 @@ func (m *managerImpl) Admit(ctx context.Context, attrs *lifecycle.PodAdmitAttrib
 }
 
 // Start starts the control loop to observe and response to low compute resources.
-func (m *managerImpl) Start(ctx context.Context, diskInfoProvider DiskInfoProvider, podFunc ActivePodsFunc, podCleanedUpFunc PodCleanedUpFunc, monitoringInterval time.Duration) {
+func (m *managerImpl) Start(ctx context.Context, diskInfoProvider DiskInfoProvider, podFunc ActivePodsFunc, systemPartitionPodFunc ActivePodsFunc, podCleanedUpFunc PodCleanedUpFunc, monitoringInterval time.Duration) {
 	logger := klog.FromContext(ctx)
+	m.systemPartitionPodFunc = systemPartitionPodFunc
 	thresholdHandler := func(message string) {
 		logger.Info(message)
 		_, _ = m.synchronize(ctx, diskInfoProvider, podFunc)
@@ -412,6 +416,19 @@ func (m *managerImpl) synchronize(ctx context.Context, diskInfoProvider DiskInfo
 		return nil, nil
 	}
 
+	// Pressure inside the system partition is relieved only by evicting the
+	// partition's own pods. Pods elsewhere do not charge its memory.
+	if thresholdToReclaim.Signal == evictionapi.SignalSystemPartitionMemoryAvailable {
+		activePods = nil
+		if m.systemPartitionPodFunc != nil {
+			activePods = m.systemPartitionPodFunc()
+		}
+		if len(activePods) == 0 {
+			logger.Error(nil, "Eviction manager: system partition eviction thresholds have been met, but no pods in the partition are active to evict")
+			return nil, nil
+		}
+	}
+
 	// rank the running pods for eviction for the specified resource
 	rank(activePods, statsFunc)
 
@@ -436,7 +453,13 @@ func (m *managerImpl) synchronize(ctx context.Context, diskInfoProvider DiskInfo
 			}
 		}
 
-		message, annotations := evictionMessage(resourceToReclaim, pod, statsFunc, thresholds, observations)
+		var message string
+		var annotations map[string]string
+		if thresholdToReclaim.Signal == evictionapi.SignalSystemPartitionMemoryAvailable {
+			message, annotations = systemPartitionEvictionMessage(resourceToReclaim, pod, statsFunc, thresholdToReclaim, observations)
+		} else {
+			message, annotations = evictionMessage(resourceToReclaim, pod, statsFunc, thresholds, observations)
+		}
 		condition := &v1.PodCondition{
 			Type:               v1.DisruptionTarget,
 			ObservedGeneration: pod.Generation,

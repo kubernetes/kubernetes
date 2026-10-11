@@ -1350,6 +1350,7 @@ func newRestoreTestManager(logger klog.Logger, numCPUs int, stateDir string) (Ma
 		v1.ResourceList{v1.ResourceCPU: *resource.NewQuantity(1, resource.DecimalSI)},
 		stateDir,
 		topologymanager.NewFakeManager(logger),
+		nil,
 	)
 }
 

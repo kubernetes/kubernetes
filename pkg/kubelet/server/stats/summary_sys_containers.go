@@ -30,18 +30,30 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 )
 
-func (sp *summaryProviderImpl) GetSystemContainersStats(ctx context.Context, nodeConfig cm.NodeConfig, podStats []statsapi.PodStats, updateStats bool) (stats []statsapi.ContainerStats) {
-	logger := klog.FromContext(ctx)
-	systemContainers := map[string]struct {
-		name             string
-		forceStatsUpdate bool
-		startTime        metav1.Time
-	}{
+// systemContainerSpec describes a cgroup that is reported as a system container.
+type systemContainerSpec struct {
+	name             string
+	forceStatsUpdate bool
+	startTime        metav1.Time
+}
+
+// systemContainerSpecs returns the cgroups to report as system containers.
+func (sp *summaryProviderImpl) systemContainerSpecs(nodeConfig cm.NodeConfig, updateStats bool) map[string]systemContainerSpec {
+	specs := map[string]systemContainerSpec{
 		statsapi.SystemContainerKubelet: {name: nodeConfig.KubeletCgroupsName, forceStatsUpdate: false, startTime: sp.kubeletCreationTime},
 		statsapi.SystemContainerRuntime: {name: nodeConfig.RuntimeCgroupsName, forceStatsUpdate: false},
 		statsapi.SystemContainerMisc:    {name: nodeConfig.SystemCgroupsName, forceStatsUpdate: false},
 		statsapi.SystemContainerPods:    {name: sp.provider.GetPodCgroupRoot(), forceStatsUpdate: updateStats},
 	}
+	if systemPartitionRoot := sp.provider.GetSystemPartitionCgroupRoot(); systemPartitionRoot != "" {
+		specs[statsapi.SystemContainerSystemPods] = systemContainerSpec{name: systemPartitionRoot, forceStatsUpdate: updateStats}
+	}
+	return specs
+}
+
+func (sp *summaryProviderImpl) GetSystemContainersStats(ctx context.Context, nodeConfig cm.NodeConfig, podStats []statsapi.PodStats, updateStats bool) (stats []statsapi.ContainerStats) {
+	logger := klog.FromContext(ctx)
+	systemContainers := sp.systemContainerSpecs(nodeConfig, updateStats)
 	for sys, cont := range systemContainers {
 		// skip if cgroup name is undefined (not all system containers are required)
 		if cont.name == "" {
@@ -68,16 +80,7 @@ func (sp *summaryProviderImpl) GetSystemContainersStats(ctx context.Context, nod
 
 func (sp *summaryProviderImpl) GetSystemContainersCPUAndMemoryStats(ctx context.Context, nodeConfig cm.NodeConfig, podStats []statsapi.PodStats, updateStats bool) (stats []statsapi.ContainerStats) {
 	logger := klog.FromContext(ctx)
-	systemContainers := map[string]struct {
-		name             string
-		forceStatsUpdate bool
-		startTime        metav1.Time
-	}{
-		statsapi.SystemContainerKubelet: {name: nodeConfig.KubeletCgroupsName, forceStatsUpdate: false, startTime: sp.kubeletCreationTime},
-		statsapi.SystemContainerRuntime: {name: nodeConfig.RuntimeCgroupsName, forceStatsUpdate: false},
-		statsapi.SystemContainerMisc:    {name: nodeConfig.SystemCgroupsName, forceStatsUpdate: false},
-		statsapi.SystemContainerPods:    {name: sp.provider.GetPodCgroupRoot(), forceStatsUpdate: updateStats},
-	}
+	systemContainers := sp.systemContainerSpecs(nodeConfig, updateStats)
 	for sys, cont := range systemContainers {
 		// skip if cgroup name is undefined (not all system containers are required)
 		if cont.name == "" {
