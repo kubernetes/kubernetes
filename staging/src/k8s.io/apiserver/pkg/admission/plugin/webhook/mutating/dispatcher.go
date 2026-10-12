@@ -257,9 +257,10 @@ func (*mutatingDispatcher) getWebhookAuthenticationToken(ctx context.Context, ho
 			Audiences:         []string{"foo"},
 			ExpirationSeconds: nil,
 			BoundObjectRef: &authenticationv1.BoundObjectReference{
-				Kind: "MutatingWebhookConfiguration",
-				Name: hook.GetConfigurationName(),
-				UID:  hook.GetConfigurationUID(),
+				Kind:       "MutatingWebhookConfiguration",
+				Name:       hook.GetConfigurationName(),
+				UID:        hook.GetConfigurationUID(),
+				APIVersion: "admissionregistration.k8s.io/v1",
 			},
 			Attestations: map[string]authenticationv1.AttestationValue{
 				authenticationv1.AttestationAdmissionReviewAPIGroups: {"*"},
