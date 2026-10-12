@@ -254,7 +254,7 @@ func Init(tb TB, opts ...InitOption) TContext {
 	ctx := defaultProgressReporter.init(tb, isSyncTest)
 	var header func() string
 	if c.PerTestOutput {
-		logger := newLogger(tb, c.BufferLogs)
+		logger := newLogger(tb, c.BufferLogs, c.Verbosity)
 		ctx = klog.NewContext(ctx, logger)
 		header = klogHeader
 	}
@@ -345,8 +345,8 @@ func analyzeTB(tb TB) (isSyncTest bool, deadline *time.Time) {
 	return
 }
 
-func newLogger(tb TB, bufferLogs bool) klog.Logger {
-	config := ktesting.NewConfig(
+func newLogger(tb TB, bufferLogs bool, verbosity *int) klog.Logger {
+	opts := []ktesting.ConfigOption{
 		ktesting.AnyToString(func(v interface{}) string {
 			// For basic types where the string
 			// representation is "obvious" we use
@@ -365,13 +365,23 @@ func newLogger(tb TB, bufferLogs bool) klog.Logger {
 		ktesting.VerbosityFlagName("v"),
 		ktesting.VModuleFlagName("vmodule"),
 		ktesting.BufferLogs(bufferLogs),
-	)
+	}
+	if verbosity != nil {
+		opts = append(opts, ktesting.Verbosity(*verbosity))
+	}
+	config := ktesting.NewConfig(opts...)
 
 	// Copy klog settings instead of making the ktesting logger
-	// configurable directly.
+	// configurable directly. An explicit verbosity override behaves
+	// exactly like [ktesting.Verbosity] in the underlying klog package:
+	// it sets the verbosity level for this logger, overriding the
+	// global "-v" command line flag.
 	var fs flag.FlagSet
 	config.AddFlags(&fs)
 	for _, name := range []string{"v", "vmodule"} {
+		if name == "v" && verbosity != nil {
+			continue
+		}
 		from := flag.CommandLine.Lookup(name)
 		to := fs.Lookup(name)
 		if err := to.Value.Set(from.Value.String()); err != nil {
@@ -408,7 +418,7 @@ func newLogger(tb TB, bufferLogs bool) klog.Logger {
 func (tCtx TContext) withTB(tb TB) TContext {
 	tCtx.testingTB.TB = tb
 	if tCtx.perTestHeader != nil {
-		logger := newLogger(tb, false /* don't buffer logs in sub-test */)
+		logger := newLogger(tb, false /* don't buffer logs in sub-test */, nil /* no verbosity override in sub-test */)
 		tCtx.Context = klog.NewContext(tCtx.Context, logger)
 	}
 

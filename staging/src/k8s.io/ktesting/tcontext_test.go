@@ -28,6 +28,7 @@ import (
 
 	"k8s.io/klog/v2"
 	"k8s.io/ktesting"
+	"k8s.io/ktesting/initoption"
 )
 
 func TestCancelManual(t *testing.T) {
@@ -237,4 +238,45 @@ func TestWithContext(t *testing.T) {
 	tCtx.Expect(context.Cause(tCtx)).To(gomega.MatchError(gomega.ContainSubstring("done")))
 	tCtx.Expect(newCtx.Err()).To(gomega.MatchError(context.DeadlineExceeded))
 	tCtx.Expect(newCtx.Value("foo")).To(gomega.Equal("bar"))
+}
+
+// TestVerbosityConcurrentIsolation verifies that initoption.Verbosity
+// overrides the verbosity threshold only for the TContext it is passed to,
+// without leaking into other tests that run concurrently and use a
+// different override.
+func TestVerbosityConcurrentIsolation(t *testing.T) {
+	const (
+		lowVerbosity  = 2
+		highVerbosity = 10
+		maxLevel      = highVerbosity + 3 // Check a bit beyond the highest requested level.
+	)
+
+	var ready, checked sync.WaitGroup
+	ready.Add(2)
+	checked.Add(2)
+
+	check := func(t *testing.T, verbosity int) {
+		tCtx := ktesting.Init(t, initoption.Verbosity(verbosity))
+		ready.Done()
+		ready.Wait() // Both Init calls must complete before either test checks its verbosity.
+
+		for level := range maxLevel {
+			enabled := tCtx.Logger().V(level).Enabled()
+			expected := level <= verbosity
+			tCtx.Expect(enabled).To(gomega.Equal(expected), "V(%d).Enabled()", level)
+		}
+
+		checked.Done()
+		checked.Wait() // Both tests must finish checking before either returns.
+	}
+
+	t.Run("low", func(t *testing.T) {
+		t.Parallel()
+		check(t, lowVerbosity)
+	})
+
+	t.Run("high", func(t *testing.T) {
+		t.Parallel()
+		check(t, highVerbosity)
+	})
 }
