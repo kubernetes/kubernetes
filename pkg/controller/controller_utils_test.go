@@ -436,7 +436,7 @@ func TestDeletePodsAllowsMissing(t *testing.T) {
 
 	controllerSpec := newReplicationController(1)
 
-	err := podControl.DeletePod(context.TODO(), "namespace-name", "podName", controllerSpec)
+	err := podControl.DeletePod(context.TODO(), "namespace-name", "podName", controllerSpec, metav1.DeleteOptions{})
 	assert.True(t, apierrors.IsNotFound(err))
 }
 
