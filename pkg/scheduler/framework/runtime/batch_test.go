@@ -701,3 +701,54 @@ func TestBatchRescoreChain(t *testing.T) {
 		t.Fatalf("remaining node after pod3: got %q, want %q", got, "n1")
 	}
 }
+
+func TestBatchSetDisabled(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	testFwk, lister, err := newBatchTestFramework(ctx, nil, nil)
+	if err != nil {
+		t.Fatalf("Failed to create framework: %v", err)
+	}
+
+	pod1 := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod1", UID: types.UID(blockingPodID("1"))}}
+	pod2 := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod2", UID: types.UID(blockingPodID("2"))}}
+	pod3 := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod3", UID: types.UID(blockingPodID("3"))}}
+	n3Info := framework.NewNodeInfo(pod1)
+	n3Info.SetNode(&v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "n3", UID: "n3"}})
+	lister.nodes = nodeInfoLister{n3Info}
+
+	sig := fwk.PodSignature("sig")
+	batch := newOpportunisticBatch(testFwk, true, time.Minute)
+	state := framework.NewCycleState()
+
+	// Seed batch state in cycle 1.
+	batch.StoreScheduleResults(ctx, sig, "", "n3", newTestNodes([]string{"n1", "n2"}), 1)
+	if batch.state == nil {
+		t.Fatal("expected non-nil batch state before disabling")
+	}
+
+	// Disabling clears existing state and suppresses hints and result storage.
+	batch.SetDisabled(true)
+	if batch.state != nil {
+		t.Fatal("expected nil batch state after SetDisabled(true)")
+	}
+	if hint := batch.GetNodeHint(ctx, pod2, sig, state, 1); hint != "" {
+		t.Fatalf("expected empty hint while disabled, got %q", hint)
+	}
+	batch.StoreScheduleResults(ctx, sig, "", "n1", newTestNodes([]string{"n2"}), 1)
+	if batch.state != nil {
+		t.Fatal("expected StoreScheduleResults to be ignored while disabled")
+	}
+
+	// Re-enabling starts with clean state and allows subsequent cycles to batch normally.
+	batch.SetDisabled(false)
+	if hint := batch.GetNodeHint(ctx, pod2, sig, state, 1); hint != "" {
+		t.Fatalf("expected empty hint immediately after SetDisabled(false), got %q", hint)
+	}
+	batch.StoreScheduleResults(ctx, sig, "", "n3", newTestNodes([]string{"n1"}), 2)
+	if hint := batch.GetNodeHint(ctx, pod3, sig, state, 2); hint != "n1" {
+		t.Fatalf("expected hint %q after re-enabling, got %q", "n1", hint)
+	}
+}
