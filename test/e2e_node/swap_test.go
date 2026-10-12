@@ -194,6 +194,12 @@ var _ = SIGDescribe("Swap", "[LinuxOnly]", ginkgo.Ordered, feature.Swap, framewo
 					initialConfig.EvictionHard["memory.available"] = "100Mi"
 				})
 
+				// The AfterEach above restarts the kubelet to restore its config, and nothing kills the
+				// stress pods while it is down. Delete them before that, also when the test failed.
+				ginkgo.JustAfterEach(func(ctx context.Context) {
+					deleteNamespacePodsSync(ctx, f)
+				})
+
 				getRequestBySwapLimit := func(swapPercentage int64) *resource.Quantity {
 					gomega.ExpectWithOffset(1, swapPercentage).To(gomega.And(
 						gomega.BeNumerically(">=", 1),
@@ -248,10 +254,6 @@ var _ = SIGDescribe("Swap", "[LinuxOnly]", ginkgo.Ordered, feature.Swap, framewo
 
 						return nil
 					}, 5*time.Minute, 1*time.Second).Should(gomega.Succeed(), "swap usage is above zero: %s", swapUsage.String())
-
-					// Wait for the stress pod to be gone: the kubelet restarts right after this test to
-					// restore its config, and nothing would kill the pod while it is down.
-					podClient.DeleteSync(context.Background(), stressPod.Name, metav1.DeleteOptions{}, e2epod.PodDeleteTimeout)
 				})
 
 				ginkgo.It("should be able to use more memory than memory limits", func() {
