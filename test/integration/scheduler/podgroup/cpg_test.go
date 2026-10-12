@@ -1223,6 +1223,58 @@ func TestCPGScheduling(t *testing.T) {
 			},
 		},
 		{
+			name: "TestCPGHierarchyValidationMismatchedPodGroupPriorityOnly",
+			// TestCPGHierarchyValidationMismatchedPodGroupPriorityOnly verifies that child PodGroups
+			// whose priority differs from the root CompositePodGroup are rejected even when every
+			// pod matches the root. The per-pod check would accept this hierarchy, so only the
+			// per-PodGroup check against the root can reject it.
+			steps: []stepsframework.Step{
+				{
+					Name:        "Create Node",
+					CreateNodes: []*v1.Node{st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "20"}).Obj()},
+				},
+				{
+					// Templates stay uniform: Workload validation rejects mixed priorities.
+					Name: "Create Workload",
+					CreateWorkloads: []*schedulingapi.Workload{
+						st.MakeWorkload().Name("workload-cpg-mismatched-pg-only-prio").
+							Children(
+								st.MakeCompositePodGroupTemplate().Name("root-t").BasicPolicy().Priority(100).Children(
+									st.MakePodGroupTemplate().Name("basic-t1").BasicPolicy().Priority(100),
+									st.MakePodGroupTemplate().Name("basic-t2").BasicPolicy().Priority(100),
+								),
+							).Obj(),
+					},
+				},
+				{
+					Name:                    "Create root CPG with Priority 100",
+					CreateCompositePodGroup: st.MakeCompositePodGroup().Name("cpg-root").WorkloadRef("workload-cpg-mismatched-pg-only-prio", "root-t").BasicPolicy().Priority(100).Obj(),
+				},
+				{
+					Name:           "Create pg1 with Priority 50",
+					CreatePodGroup: st.MakePodGroup().Name("pg1").WorkloadRef("workload-cpg-mismatched-pg-only-prio", "basic-t1").ParentCompositePodGroup("cpg-root").Priority(50).BasicPolicy().Obj(),
+				},
+				{
+					Name:           "Create pg2 with Priority 50",
+					CreatePodGroup: st.MakePodGroup().Name("pg2").WorkloadRef("workload-cpg-mismatched-pg-only-prio", "basic-t2").ParentCompositePodGroup("cpg-root").Priority(50).BasicPolicy().Obj(),
+				},
+				{
+					Name: "Create pods with priority 100 (matching the root, not their PodGroups)",
+					CreatePods: concatPods(
+						makeTestPods("pg1", "1", "1"),
+						makeTestPods("pg2", "1", "1"),
+					),
+				},
+				{
+					Name: "Verify pods get scheduling error due to PodGroup priority differing from root",
+					WaitForPodsSchedulingError: podNames(concatPods(
+						makeTestPods("pg1", "1", "1"),
+						makeTestPods("pg2", "1", "1"),
+					)),
+				},
+			},
+		},
+		{
 			name: "TestCPG3LevelMixedGangAndBasicSubtrees",
 			// TestCPG3LevelMixedGangAndBasicSubtrees tests a 3-level hierarchy with a Basic root CPG,
 			// one Gang intermediate CPG (minGroupCount=2 with 2 Gang child PGs), and one Basic

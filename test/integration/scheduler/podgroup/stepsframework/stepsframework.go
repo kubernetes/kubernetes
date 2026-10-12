@@ -156,7 +156,7 @@ type Step struct {
 	CreatePodsInOrder []*v1.Pod
 	// CreateWorkloads is use to create workloads in the cluster.
 	CreateWorkloads []*schedulingapi.Workload
-	// DeletePods is use to delete pods from the cluster.
+	// DeletePods is used to delete pods from the cluster and wait for it to propagate.
 	DeletePods []string
 	// UpdatePod is used to mutate any field of the pod.
 	UpdatePod *UpdatePod

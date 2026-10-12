@@ -63,6 +63,14 @@ func makeAssignedGroupPod(podName, podGroupName, nodeName, consumedCPU string) *
 	return st.MakePod().Name(podName).PodGroupName(podGroupName).Node(nodeName).Req(map[v1.ResourceName]string{v1.ResourceCPU: consumedCPU}).Container("image").Priority(100).ZeroTerminationGracePeriod().Obj()
 }
 
+func makeBasicPodGroupWithParent(podGroupName, parentCPGName, topologyKey string) *schedulingapi.PodGroup {
+	pg := st.MakePodGroup().Name(podGroupName).WorkloadRef("workload", "pg").BasicPolicy().Priority(100).ParentCompositePodGroup(parentCPGName)
+	if topologyKey != "" {
+		pg.TopologyKey(topologyKey)
+	}
+	return pg.Obj()
+}
+
 func makeGangPodGroupWithParent(podGroupName, parentCPGName, topologyKey string, minCount int32) *schedulingapi.PodGroup {
 	pg := st.MakePodGroup().Name(podGroupName).WorkloadRef("workload", "pg").MinCount(minCount).Priority(100).ParentCompositePodGroup(parentCPGName)
 	if topologyKey != "" {
@@ -985,12 +993,17 @@ func TestCPGTopologyAwareScheduling(t *testing.T) {
 			name: "CPG schedules on a single rack, choosing placement that accommodates more descendant pods (PodGroupPodsCount placement scoring)",
 			steps: []stepsframework.Step{
 				{
-					Name: "Create nodes in two racks, each rack with 4 CPU capacity",
+					// After placement rack-1 is more utilized than rack-2, so NodeResourcesFit
+					// (MostAllocated) prefers rack-1; only PodGroupPodsCount favors rack-2:
+					//   rack-1: fits one gang PG (2 pods) -> PodGroupPodsCount 2/4, ~3/4 of CPU used
+					//   rack-2: fits both PGs (4 pods)    -> PodGroupPodsCount 4/4, ~4/6 of CPU used
+					Name: "Create nodes in two racks: rack-1 with 4 CPU, rack-2 with 6 CPU",
 					CreateNodes: []*v1.Node{
 						makeNode("node1-z1-r1", "rack-1", "zone-1"),
 						makeNode("node2-z1-r1", "rack-1", "zone-1"),
 						makeNode("node3-z1-r2", "rack-2", "zone-1"),
 						makeNode("node4-z1-r2", "rack-2", "zone-1"),
+						makeNode("node5-z1-r2", "rack-2", "zone-1"),
 					},
 				},
 				{
@@ -1025,10 +1038,10 @@ func TestCPGTopologyAwareScheduling(t *testing.T) {
 					WaitForPodsScheduled: []string{"p1", "p2", "p3", "p4"},
 				},
 				{
-					Name: "Verify all pods scheduled on rack-2 which fits all 4 pods",
+					Name: "Verify all pods scheduled on rack-2, the rack that fits more of the hierarchy",
 					VerifyAssignments: &stepsframework.VerifyAssignments{
 						Pods:  []string{"p1", "p2", "p3", "p4"},
-						Nodes: sets.New("node3-z1-r2", "node4-z1-r2"),
+						Nodes: sets.New("node3-z1-r2", "node4-z1-r2", "node5-z1-r2"),
 					},
 				},
 			},
@@ -1330,13 +1343,18 @@ func TestCPGTopologyAwareScheduling(t *testing.T) {
 			},
 		},
 		{
-			name: "two CPG hierarchies schedule consecutively, second remains pending when no additional rack is available",
+			name: "two CPG hierarchies schedule consecutively, second remains pending while spare capacity is split across racks",
 			steps: []stepsframework.Step{
 				{
-					Name: "Create nodes in a single rack with 4 CPU capacity",
+					// Only rack-1 can hold a whole hierarchy. Once cpg-root1 takes it, 4 CPU remain
+					// in total but at most 2 per rack, so cpg-root2 cannot meet minGroupCount=2 within
+					// a single rack and its TopologyKey forbids spanning racks 2 and 3.
+					Name: "Create rack-1 with 4 CPU and racks 2 and 3 with 2 CPU each",
 					CreateNodes: []*v1.Node{
 						makeNode("node1-z1-r1", "rack-1", "zone-1"),
 						makeNode("node2-z1-r1", "rack-1", "zone-1"),
+						makeNode("node3-z1-r2", "rack-2", "zone-1"),
+						makeNode("node4-z1-r3", "rack-3", "zone-1"),
 					},
 				},
 				{
@@ -1365,6 +1383,13 @@ func TestCPGTopologyAwareScheduling(t *testing.T) {
 					WaitForPodsScheduled: []string{"p1-1", "p1-2", "p1-3", "p1-4"},
 				},
 				{
+					Name: "Verify cpg-root1 landed on rack-1, the only rack that fits it",
+					VerifyAssignments: &stepsframework.VerifyAssignments{
+						Pods:  []string{"p1-1", "p1-2", "p1-3", "p1-4"},
+						Nodes: sets.New("node1-z1-r1", "node2-z1-r1"),
+					},
+				},
+				{
 					Name:                    "Create second CompositePodGroup cpg-root2 (Gang minGroupCount=2, TopologyKey=rack)",
 					CreateCompositePodGroup: makeGangCompositePodGroup("cpg-root2", "", "rack", 2),
 				},
@@ -1386,8 +1411,23 @@ func TestCPGTopologyAwareScheduling(t *testing.T) {
 					},
 				},
 				{
-					Name:                     "Verify pods for cpg-root2 remain unschedulable",
+					Name:                     "Verify pods for cpg-root2 remain unschedulable: 4 CPU free in total, at most 2 per rack",
 					WaitForPodsUnschedulable: []string{"p2-1", "p2-2", "p2-3", "p2-4"},
+				},
+				{
+					Name:        "Add a node to rack-2 so one rack can fit cpg-root2",
+					CreateNodes: []*v1.Node{makeNode("node5-z1-r2", "rack-2", "zone-1")},
+				},
+				{
+					Name:                 "Verify cpg-root2 schedules once a single rack has room",
+					WaitForPodsScheduled: []string{"p2-1", "p2-2", "p2-3", "p2-4"},
+				},
+				{
+					Name: "Verify cpg-root2 is on rack-2",
+					VerifyAssignments: &stepsframework.VerifyAssignments{
+						Pods:  []string{"p2-1", "p2-2", "p2-3", "p2-4"},
+						Nodes: sets.New("node3-z1-r2", "node5-z1-r2"),
+					},
 				},
 			},
 		},
