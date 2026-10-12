@@ -6785,6 +6785,11 @@ func (in *Ulimits) DeepCopyInto(out *Ulimits) {
 		*out = new(Ulimit)
 		(*in).DeepCopyInto(*out)
 	}
+	if in.Msgqueue != nil {
+		in, out := &in.Msgqueue, &out.Msgqueue
+		*out = new(Ulimit)
+		(*in).DeepCopyInto(*out)
+	}
 	return
 }
 

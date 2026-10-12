@@ -25187,6 +25187,47 @@ func TestValidateLinuxSecurityContext(t *testing.T) {
 	}
 }
 
+func TestValidateMsgqueueUlimit(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		soft       *int64
+		hard       *int64
+		errorType  field.ErrorType
+		errorField string
+	}{
+		{name: "zero", soft: ptr.To[int64](0), hard: ptr.To[int64](0)},
+		{name: "finite", soft: ptr.To[int64](819200), hard: ptr.To[int64](1048576)},
+		{name: "maximum", soft: ptr.To[int64](17179869184), hard: ptr.To[int64](17179869184)},
+		{name: "unlimited", soft: ptr.To[int64](-1), hard: ptr.To[int64](-1)},
+		{name: "unlimited hard", soft: ptr.To[int64](819200), hard: ptr.To[int64](-1)},
+		{name: "soft below minimum", soft: ptr.To[int64](-2), hard: ptr.To[int64](0), errorType: field.ErrorTypeInvalid, errorField: "soft"},
+		{name: "hard below minimum", soft: ptr.To[int64](-2), hard: ptr.To[int64](-2), errorType: field.ErrorTypeInvalid, errorField: "hard"},
+		{name: "soft above maximum", soft: ptr.To[int64](17179869185), hard: ptr.To[int64](-1), errorType: field.ErrorTypeInvalid, errorField: "soft"},
+		{name: "hard above maximum", soft: ptr.To[int64](0), hard: ptr.To[int64](17179869185), errorType: field.ErrorTypeInvalid, errorField: "hard"},
+		{name: "soft exceeds hard", soft: ptr.To[int64](1), hard: ptr.To[int64](0), errorType: field.ErrorTypeInvalid, errorField: "soft"},
+		{name: "unlimited soft with finite hard", soft: ptr.To[int64](-1), hard: ptr.To[int64](819200), errorType: field.ErrorTypeInvalid, errorField: "soft"},
+		{name: "missing soft", hard: ptr.To[int64](819200), errorType: field.ErrorTypeRequired, errorField: "soft"},
+		{name: "missing hard", soft: ptr.To[int64](819200), errorType: field.ErrorTypeRequired, errorField: "hard"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			sc := &core.SecurityContext{Ulimits: &core.Ulimits{Msgqueue: &core.Ulimit{Soft: tc.soft, Hard: tc.hard}}}
+			errs := ValidateSecurityContext(sc, field.NewPath("securityContext"), true, false)
+			if tc.errorType == "" {
+				if len(errs) != 0 {
+					t.Fatalf("expected valid msgqueue limits, got %v", errs)
+				}
+				return
+			}
+			for _, err := range errs {
+				if err.Type == tc.errorType && err.Field == "securityContext.ulimits.msgqueue."+tc.errorField {
+					return
+				}
+			}
+			t.Errorf("expected %s error for msgqueue.%s, got %v", tc.errorType, tc.errorField, errs)
+		})
+	}
+}
+
 func TestValidateSecurityContext(t *testing.T) {
 	runAsUser := int64(1)
 	fullValidSC := func() *core.SecurityContext {
