@@ -597,6 +597,7 @@ profiles:
 								},
 								Disabled: []kubeschedulerconfig.Plugin{
 									{Name: names.VolumeBinding},
+									{Name: names.DefaultPreemption},
 								},
 							},
 							PreBind: kubeschedulerconfig.PluginSet{
@@ -725,6 +726,7 @@ profiles:
 								},
 								Disabled: []kubeschedulerconfig.Plugin{
 									{Name: names.VolumeBinding},
+									{Name: names.DefaultPreemption},
 								},
 							},
 						},
@@ -734,6 +736,7 @@ profiles:
 						SchedulerName: "bar-profile",
 						Plugins: &kubeschedulerconfig.Plugins{
 							MultiPoint: defaults.PluginsV1.MultiPoint,
+							Reserve:    defaults.PluginsV1.Reserve,
 							PreBind: kubeschedulerconfig.PluginSet{
 								Disabled: []kubeschedulerconfig.Plugin{
 									{Name: names.VolumeBinding},
