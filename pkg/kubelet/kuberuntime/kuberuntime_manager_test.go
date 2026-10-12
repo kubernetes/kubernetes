@@ -6985,8 +6985,13 @@ func TestSyncPodKillsUnwantedContainers(t *testing.T) {
 		// failOneKill injects an error into one of the StopContainer calls made to the fake container runtime.
 		failOneKill bool
 	}{
-		{name: "all kills succeed"},
-		{name: "one kill fails", failOneKill: true},
+		{
+			name: "all kills succeed",
+		},
+		{
+			name:        "one kill fails",
+			failOneKill: true,
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			tCtx := ktesting.Init(t)

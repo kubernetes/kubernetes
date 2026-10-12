@@ -628,6 +628,101 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 				regularContainerTerminationImageUpdateTest(ctx)
 			})
 		})
+
+		ginkgo.When("all regular containers with PreStop hooks have their images updated", func() {
+			ginkgo.It("should call the PreStop hooks simultaneously", func(ctx context.Context) {
+				const (
+					numContainers  = 3
+					preStopSeconds = 10
+				)
+
+				var containerNames []string
+				var containers []v1.Container
+				for i := range numContainers {
+					name := fmt.Sprintf("regular-%d", i+1)
+					containerNames = append(containerNames, name)
+					containers = append(containers, v1.Container{
+						Name:  name,
+						Image: defaultImage,
+						Command: ExecCommand(name, execCommand{
+							Delay:    600,
+							ExitCode: 0,
+						}),
+						Lifecycle: &v1.Lifecycle{
+							PreStop: &v1.LifecycleHandler{
+								Exec: &v1.ExecAction{
+									Command: ExecCommand(prefixedName(PreStopPrefix, name), execCommand{
+										Delay:         preStopSeconds,
+										ExitCode:      0,
+										ContainerName: name,
+									}),
+								},
+							},
+						},
+					})
+				}
+
+				pod := &v1.Pod{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "regular-containers-imgupdate-prestop",
+					},
+					Spec: v1.PodSpec{
+						RestartPolicy:                 v1.RestartPolicyAlways,
+						TerminationGracePeriodSeconds: ptr.To[int64](preStopSeconds + 30),
+						Containers:                    containers,
+					},
+				}
+				preparePod(pod)
+
+				client := e2epod.NewPodClient(f)
+				pod = client.Create(ctx, pod)
+
+				ginkgo.By("Running the pod")
+				framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod))
+
+				ginkgo.By("Updating the image of every container")
+				start := time.Now()
+				client.Update(ctx, pod.Name, func(pod *v1.Pod) {
+					for i := range pod.Spec.Containers {
+						pod.Spec.Containers[i].Image = alternateImage
+					}
+				})
+
+				ginkgo.By("Waiting for every container to restart with the updated image")
+				err := e2epod.WaitForPodCondition(ctx, f.ClientSet, pod.Namespace, pod.Name, "all containers restarted with the updated image", 2*time.Minute, func(pod *v1.Pod) (bool, error) {
+					if len(pod.Status.ContainerStatuses) != numContainers {
+						return false, nil
+					}
+					for _, status := range pod.Status.ContainerStatuses {
+						if status.State.Running == nil || status.RestartCount < 1 || status.Image != alternateImage {
+							return false, nil
+						}
+					}
+					return true, nil
+				})
+				framework.ExpectNoError(err)
+				elapsed := time.Since(start)
+
+				ginkgo.By("Analyzing results")
+				pod, err = client.Get(ctx, pod.Name, metav1.GetOptions{})
+				framework.ExpectNoError(err)
+				results := parseOutput(ctx, f, pod)
+
+				// Every PreStop hook should start before any of the others exits.
+				for i := range containerNames {
+					for j := i + 1; j < len(containerNames); j++ {
+						framework.ExpectNoError(results.RunTogether(
+							prefixedName(PreStopPrefix, containerNames[i]),
+							prefixedName(PreStopPrefix, containerNames[j])))
+					}
+				}
+
+				// Killing the containers sequentially would take at least
+				// numContainers * preStopSeconds.
+				gomega.Expect(elapsed).To(gomega.BeNumerically("<", (numContainers-1)*preStopSeconds*time.Second),
+					"expected the containers to restart within %d seconds, got %s:\n%s", (numContainers-1)*preStopSeconds, elapsed, results)
+			})
+		})
 	})
 
 	ginkgo.When("Running a pod with init containers and regular containers, restartPolicy=Never", func() {
