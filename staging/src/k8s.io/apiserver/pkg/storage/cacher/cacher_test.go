@@ -267,7 +267,7 @@ func TestLists(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ListFromCacheSnapshot, listFromCacheSnapshot)
 			t.Run("List", func(t *testing.T) {
 				t.Parallel()
-				ctx, cacher, server, terminate := testSetupWithEtcdServer(t)
+				ctx, cacher, server, terminate := testSetupWithEtcdServer(t, withNodeNameAndNamespaceIndex)
 				t.Cleanup(terminate)
 				storagetesting.RunTestList(ctx, t, cacher, compactStore(cacher, server.V3Client.Client), true, server.V3Client.Kubernetes.(*storagetesting.KubernetesRecorder))
 			})
