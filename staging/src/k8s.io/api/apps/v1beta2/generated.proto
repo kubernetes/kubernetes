@@ -92,7 +92,7 @@ message DaemonSet {
 // DaemonSetCondition describes the state of a DaemonSet at a certain point.
 message DaemonSetCondition {
   // type of DaemonSet condition.
-  // +optional
+  // +required
   optional string type = 1;
 
   // status of the condition, one of True, False, Unknown.
@@ -252,7 +252,7 @@ message Deployment {
 // DeploymentCondition describes the state of a deployment at a certain point.
 message DeploymentCondition {
   // type of deployment condition.
-  // +optional
+  // +required
   optional string type = 1;
 
   // status of the condition, one of True, False, Unknown.
@@ -431,7 +431,7 @@ message ReplicaSet {
 // ReplicaSetCondition describes the state of a replica set at a certain point.
 message ReplicaSetCondition {
   // type of replica set condition.
-  // +optional
+  // +required
   optional string type = 1;
 
   // status of the condition, one of True, False, Unknown.
@@ -705,7 +705,7 @@ message StatefulSet {
 // StatefulSetCondition describes the state of a statefulset at a certain point.
 message StatefulSetCondition {
   // type of statefulset condition.
-  // +optional
+  // +required
   optional string type = 1;
 
   // status of the condition, one of True, False, Unknown.
