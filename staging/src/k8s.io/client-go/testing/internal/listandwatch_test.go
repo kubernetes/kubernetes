@@ -30,8 +30,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/klog/v2/ktesting"
-	_ "k8s.io/klog/v2/ktesting/init" // for -testing.v
+	"k8s.io/ktesting"
 )
 
 // TestListAndWatch mirrors how fake client-go is often used with real
@@ -46,9 +45,8 @@ import (
 // This runs in a synctest bubble, therefore time is virtual.
 func TestListAndWatch(t *testing.T) { synctest.Test(t, testListAndWatch) }
 func testListAndWatch(t *testing.T) {
-	logger, ctx := ktesting.NewTestContext(t)
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
+	tCtx := ktesting.Init(t)
+	logger := tCtx.Logger()
 	cm := &v1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "cm1",
@@ -96,8 +94,8 @@ func testListAndWatch(t *testing.T) {
 	defer configMapInformer.RemoveEventHandler(handle)
 
 	configMapStore := configMapInformer.GetStore()
-	f.StartWithContext(ctx)
-	f.WaitForCacheSyncWithContext(ctx)
+	f.StartWithContext(tCtx)
+	f.WaitForCacheSyncWithContext(tCtx)
 	logger.Info("Caches synced")
 
 	objs := configMapStore.List()
@@ -111,7 +109,7 @@ func testListAndWatch(t *testing.T) {
 			Namespace: "default",
 		},
 	}
-	_, err = client.CoreV1().ConfigMaps(cm.Namespace).Create(ctx, cm, metav1.CreateOptions{})
+	_, err = client.CoreV1().ConfigMaps(cm.Namespace).Create(tCtx, cm, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("Unexpected error creating ConfigMap: %v", err)
 	}

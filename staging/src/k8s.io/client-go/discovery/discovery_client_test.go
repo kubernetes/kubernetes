@@ -28,8 +28,7 @@ import (
 	openapi_v2 "github.com/google/gnostic-models/openapiv2"
 	openapi_v3 "github.com/google/gnostic-models/openapiv3"
 	"github.com/google/go-cmp/cmp"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	"github.com/onsi/gomega"
 	golangproto "google.golang.org/protobuf/proto"
 
 	apidiscovery "k8s.io/api/apidiscovery/v2"
@@ -41,6 +40,7 @@ import (
 	"k8s.io/client-go/openapi"
 	restclient "k8s.io/client-go/rest"
 	testutil "k8s.io/client-go/util/testing"
+	"k8s.io/ktesting"
 	"k8s.io/kube-openapi/pkg/spec3"
 )
 
@@ -219,9 +219,10 @@ func TestGetServerGroupsWithBrokenServer(t *testing.T) {
 }
 
 func TestTimeoutIsSet(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	cfg := &restclient.Config{}
 	setDiscoveryDefaults(cfg)
-	assert.Equal(t, defaultTimeout, cfg.Timeout)
+	tCtx.Assert(cfg.Timeout).Should(gomega.Equal(defaultTimeout))
 }
 
 func TestGetServerResourcesForGroupVersion(t *testing.T) {
@@ -590,13 +591,12 @@ func TestGetOpenAPISchemaV3(t *testing.T) {
 		runtime.ContentTypeJSON, openapi.ContentTypeOpenAPIV3PB,
 	}
 
+	tCtx := ktesting.Init(t)
 	for _, contentType := range contentTypes {
-		t.Run(contentType, func(t *testing.T) {
+		tCtx.Run(contentType, func(tCtx ktesting.TContext) {
 			for k, v := range paths {
 				actual, err := v.Schema(contentType)
-				if err != nil {
-					t.Fatal(err)
-				}
+				tCtx.ExpectNoError(err)
 
 				expected := testV3Specs[k]
 				switch contentType {
@@ -604,33 +604,25 @@ func TestGetOpenAPISchemaV3(t *testing.T) {
 				case runtime.ContentTypeJSON:
 					var actualSpec spec3.OpenAPI
 
-					if err := json.Unmarshal(actual, &actualSpec); err != nil {
-						t.Fatal(err)
-					}
+					tCtx.ExpectNoError(json.Unmarshal(actual, &actualSpec))
 
 					// Cannot use DeepEqual directly due to differences in how
 					// default key is being handled in gnostic vs kube-openapi
 					// Our test server parses the files in directly as gnostic
 					// which retains empty maps/lists, etc.
-					require.EqualValues(t, expected, &actualSpec)
+					tCtx.Require(&actualSpec).Should(gomega.BeEquivalentTo(expected))
 				case openapi.ContentTypeOpenAPIV3PB:
 					// Convert to JSON then to gnostic then to PB for comparison
 					expectedJSON, err := json.Marshal(expected)
-					if err != nil {
-						t.Fatal(err)
-					}
+					tCtx.ExpectNoError(err)
 
 					expectedGnostic, err := openapi_v3.ParseDocument(expectedJSON)
-					if err != nil {
-						t.Fatal(err)
-					}
+					tCtx.ExpectNoError(err)
 
 					expectedPB, err := golangproto.Marshal(expectedGnostic)
-					if err != nil {
-						t.Fatal(err)
-					}
+					tCtx.ExpectNoError(err)
 					if !reflect.DeepEqual(expectedPB, actual) {
-						t.Fatalf("expected equal values: %v", cmp.Diff(expectedPB, actual))
+						tCtx.Fatalf("expected equal values: %v", cmp.Diff(expectedPB, actual))
 					}
 				default:
 					panic(fmt.Errorf("unrecognized content type: %v", contentType))
@@ -638,12 +630,10 @@ func TestGetOpenAPISchemaV3(t *testing.T) {
 
 				// Ensure that fetching schema once again does not return same instance
 				actualAgain, err := v.Schema(contentType)
-				if err != nil {
-					t.Fatal(err)
-				}
+				tCtx.ExpectNoError(err)
 
 				if reflect.ValueOf(actual).Pointer() == reflect.ValueOf(actualAgain).Pointer() {
-					t.Fatal("expected schema not to be cached")
+					tCtx.Fatal("expected schema not to be cached")
 				}
 			}
 
@@ -1307,16 +1297,17 @@ func TestAggregatedServerGroups(t *testing.T) {
 		},
 	}
 
-	for _, test := range tests {
+	tCtx := ktesting.Init(t)
+	run := func(tCtx ktesting.TContext, corev1, apis *apidiscovery.APIGroupDiscoveryList, expectedGroupNames, expectedGroupVersions, expectedPreferredVersions []string) {
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 			var output []byte
 			var err error
 			var agg *apidiscovery.APIGroupDiscoveryList
 			switch req.URL.Path {
 			case "/api":
-				agg = test.corev1
+				agg = corev1
 			case "/apis":
-				agg = test.apis
+				agg = apis
 			default:
 				w.WriteHeader(http.StatusNotFound)
 				return
@@ -1339,22 +1330,24 @@ func TestAggregatedServerGroups(t *testing.T) {
 		defer server.Close()
 		client := NewDiscoveryClientForConfigOrDie(&restclient.Config{Host: server.URL})
 		apiGroupList, err := client.ServerGroups()
-		require.NoError(t, err)
+		tCtx.ExpectNoError(err)
 		// Test the expected groups are returned for the aggregated format.
-		expectedGroupNames := sets.NewString(test.expectedGroupNames...)
+		expectedGroupNamesSet := sets.NewString(expectedGroupNames...)
 		actualGroupNames := sets.NewString(groupNamesFromList(apiGroupList)...)
-		assert.True(t, expectedGroupNames.Equal(actualGroupNames),
-			"%s: Expected groups (%s), got (%s)", test.name, expectedGroupNames.List(), actualGroupNames.List())
+		tCtx.Assert(actualGroupNames.List()).Should(gomega.Equal(expectedGroupNamesSet.List()))
 		// Test the expected group versions for the aggregated discovery is correct.
-		expectedGroupVersions := sets.NewString(test.expectedGroupVersions...)
+		expectedGroupVersionsSet := sets.NewString(expectedGroupVersions...)
 		actualGroupVersions := sets.NewString(groupVersionsFromGroups(apiGroupList)...)
-		assert.True(t, expectedGroupVersions.Equal(actualGroupVersions),
-			"%s: Expected group/versions (%s), got (%s)", test.name, expectedGroupVersions.List(), actualGroupVersions.List())
+		tCtx.Assert(actualGroupVersions.List()).Should(gomega.Equal(expectedGroupVersionsSet.List()))
 		// Test the groups preferred version is correct.
-		expectedPreferredVersions := sets.NewString(test.expectedPreferredVersions...)
+		expectedPreferredVersionsSet := sets.NewString(expectedPreferredVersions...)
 		actualPreferredVersions := sets.NewString(preferredVersionsFromList(apiGroupList)...)
-		assert.True(t, expectedPreferredVersions.Equal(actualPreferredVersions),
-			"%s: Expected preferred group/version (%s), got (%s)", test.name, expectedPreferredVersions.List(), actualPreferredVersions.List())
+		tCtx.Assert(actualPreferredVersions.List()).Should(gomega.Equal(expectedPreferredVersionsSet.List()))
+	}
+	for _, test := range tests {
+		tCtx.Run(test.name, func(tCtx ktesting.TContext) {
+			run(tCtx, test.corev1, test.apis, test.expectedGroupNames, test.expectedGroupVersions, test.expectedPreferredVersions)
+		})
 	}
 }
 
@@ -1907,14 +1900,15 @@ func TestAggregatedServerGroupsAndResources(t *testing.T) {
 		},
 	}
 
-	for _, test := range tests {
+	tCtx := ktesting.Init(t)
+	run := func(tCtx ktesting.TContext, corev1, apis *apidiscovery.APIGroupDiscoveryList, expectedGroupNames, expectedGroupVersions, expectedGVKs, expectedFailedGVs []string) {
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 			var agg *apidiscovery.APIGroupDiscoveryList
 			switch req.URL.Path {
 			case "/api":
-				agg = test.corev1
+				agg = corev1
 			case "/apis":
-				agg = test.apis
+				agg = apis
 			default:
 				w.WriteHeader(http.StatusNotFound)
 				return
@@ -1937,38 +1931,39 @@ func TestAggregatedServerGroupsAndResources(t *testing.T) {
 		defer server.Close()
 		client := NewDiscoveryClientForConfigOrDie(&restclient.Config{Host: server.URL})
 		apiGroups, resources, err := client.ServerGroupsAndResources()
-		if len(test.expectedFailedGVs) > 0 {
-			require.Error(t, err)
-			expectedFailedGVs := sets.NewString(test.expectedFailedGVs...)
+		if len(expectedFailedGVs) > 0 {
+			tCtx.Require(err).Should(gomega.HaveOccurred())
+			expectedFailedGVsSet := sets.NewString(expectedFailedGVs...)
 			actualFailedGVs := sets.NewString(failedGroupVersions(err)...)
-			assert.True(t, expectedFailedGVs.Equal(actualFailedGVs),
-				"%s: Expected Failed GVs (%s), got (%s)", test.name, expectedFailedGVs, actualFailedGVs)
+			tCtx.Assert(actualFailedGVs.List()).Should(gomega.Equal(expectedFailedGVsSet.List()))
 		} else {
-			require.NoError(t, err)
+			tCtx.ExpectNoError(err)
 		}
 		// Test the expected groups are returned for the aggregated format.
-		expectedGroupNames := sets.NewString(test.expectedGroupNames...)
+		expectedGroupNamesSet := sets.NewString(expectedGroupNames...)
 		actualGroupNames := sets.NewString(groupNames(apiGroups)...)
-		assert.True(t, expectedGroupNames.Equal(actualGroupNames),
-			"%s: Expected GVKs (%s), got (%s)", test.name, expectedGroupNames.List(), actualGroupNames.List())
+		tCtx.Assert(actualGroupNames.List()).Should(gomega.Equal(expectedGroupNamesSet.List()))
 		// If the core V1 group is returned from /api, it should be the first group.
-		if expectedGroupNames.Has("") {
-			assert.NotEmpty(t, apiGroups)
+		if expectedGroupNamesSet.Has("") {
+			tCtx.Assert(apiGroups).ShouldNot(gomega.BeEmpty())
 			actualFirstGroup := apiGroups[0]
-			assert.NotEmpty(t, actualFirstGroup.Versions)
+			tCtx.Assert(actualFirstGroup.Versions).ShouldNot(gomega.BeEmpty())
 			actualFirstGroupVersion := actualFirstGroup.Versions[0].GroupVersion
-			assert.Equal(t, "v1", actualFirstGroupVersion)
+			tCtx.Assert(actualFirstGroupVersion).Should(gomega.Equal("v1"))
 		}
 		// Test the expected group/versions are returned from the aggregated discovery.
-		expectedGroupVersions := sets.NewString(test.expectedGroupVersions...)
+		expectedGroupVersionsSet := sets.NewString(expectedGroupVersions...)
 		actualGroupVersions := sets.NewString(groupVersions(resources)...)
-		assert.True(t, expectedGroupVersions.Equal(actualGroupVersions),
-			"%s: Expected GroupVersions(%s), got (%s)", test.name, expectedGroupVersions.List(), actualGroupVersions.List())
+		tCtx.Assert(actualGroupVersions.List()).Should(gomega.Equal(expectedGroupVersionsSet.List()))
 		// Test the expected GVKs are returned from the aggregated discovery.
-		expectedGVKs := sets.NewString(test.expectedGVKs...)
+		expectedGVKsSet := sets.NewString(expectedGVKs...)
 		actualGVKs := sets.NewString(groupVersionKinds(resources)...)
-		assert.True(t, expectedGVKs.Equal(actualGVKs),
-			"%s: Expected GVKs (%s), got (%s)", test.name, expectedGVKs.List(), actualGVKs.List())
+		tCtx.Assert(actualGVKs.List()).Should(gomega.Equal(expectedGVKsSet.List()))
+	}
+	for _, test := range tests {
+		tCtx.Run(test.name, func(tCtx ktesting.TContext) {
+			run(tCtx, test.corev1, test.apis, test.expectedGroupNames, test.expectedGroupVersions, test.expectedGVKs, test.expectedFailedGVs)
+		})
 	}
 }
 
@@ -2052,7 +2047,8 @@ func TestAggregatedServerGroupsAndResourcesWithErrors(t *testing.T) {
 		},
 	}
 
-	for _, test := range tests {
+	tCtx := ktesting.Init(t)
+	run := func(tCtx ktesting.TContext, corev1 *apidiscovery.APIGroupDiscoveryList, coreHttpStatus int, apis *apidiscovery.APIGroupDiscoveryList, apisHttpStatus int, expectedGroups, expectedResources []string, expectedErr bool) {
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 			var output []byte
 			var err error
@@ -2060,11 +2056,11 @@ func TestAggregatedServerGroupsAndResourcesWithErrors(t *testing.T) {
 			var agg *apidiscovery.APIGroupDiscoveryList
 			switch req.URL.Path {
 			case "/api":
-				agg = test.corev1
-				status = test.coreHttpStatus
+				agg = corev1
+				status = coreHttpStatus
 			case "/apis":
-				agg = test.apis
-				status = test.apisHttpStatus
+				agg = apis
+				status = apisHttpStatus
 			default:
 				w.WriteHeader(http.StatusNotFound)
 				return
@@ -2087,23 +2083,26 @@ func TestAggregatedServerGroupsAndResourcesWithErrors(t *testing.T) {
 
 		client := NewDiscoveryClientForConfigOrDie(&restclient.Config{Host: server.URL})
 		apiGroups, resources, err := client.ServerGroupsAndResources()
-		if test.expectedErr {
-			require.Error(t, err)
-			require.Nil(t, apiGroups)
-			require.Nil(t, resources)
-			continue
+		if expectedErr {
+			tCtx.Require(err).Should(gomega.HaveOccurred())
+			tCtx.Require(apiGroups).Should(gomega.BeNil())
+			tCtx.Require(resources).Should(gomega.BeNil())
+			return
 		}
-		require.NoError(t, err)
+		tCtx.ExpectNoError(err)
 		// First check the returned groups
-		expectedGroups := sets.NewString(test.expectedGroups...)
+		expectedGroupsSet := sets.NewString(expectedGroups...)
 		actualGroups := sets.NewString(groupNames(apiGroups)...)
-		assert.True(t, expectedGroups.Equal(actualGroups),
-			"%s: Expected GVKs (%s), got (%s)", test.name, expectedGroups.List(), actualGroups.List())
+		tCtx.Assert(actualGroups.List()).Should(gomega.Equal(expectedGroupsSet.List()))
 		// Next check the returned resources
-		expectedGVKs := sets.NewString(test.expectedResources...)
+		expectedGVKsSet := sets.NewString(expectedResources...)
 		actualGVKs := sets.NewString(groupVersionKinds(resources)...)
-		assert.True(t, expectedGVKs.Equal(actualGVKs),
-			"%s: Expected GVKs (%s), got (%s)", test.name, expectedGVKs.List(), actualGVKs.List())
+		tCtx.Assert(actualGVKs.List()).Should(gomega.Equal(expectedGVKsSet.List()))
+	}
+	for _, test := range tests {
+		tCtx.Run(test.name, func(tCtx ktesting.TContext) {
+			run(tCtx, test.corev1, test.coreHttpStatus, test.apis, test.apisHttpStatus, test.expectedGroups, test.expectedResources, test.expectedErr)
+		})
 	}
 }
 
@@ -2673,16 +2672,17 @@ func TestAggregatedServerPreferredResources(t *testing.T) {
 		},
 	}
 
-	for _, test := range tests {
+	tCtx := ktesting.Init(t)
+	run := func(tCtx ktesting.TContext, corev1, apis *apidiscovery.APIGroupDiscoveryList, expectedGVKs, expectedFailedGVs []string) {
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 			var output []byte
 			var err error
 			var agg *apidiscovery.APIGroupDiscoveryList
 			switch req.URL.Path {
 			case "/api":
-				agg = test.corev1
+				agg = corev1
 			case "/apis":
-				agg = test.apis
+				agg = apis
 			default:
 				w.WriteHeader(http.StatusNotFound)
 				return
@@ -2704,20 +2704,23 @@ func TestAggregatedServerPreferredResources(t *testing.T) {
 		defer server.Close()
 		client := NewDiscoveryClientForConfigOrDie(&restclient.Config{Host: server.URL})
 		resources, err := client.ServerPreferredResources()
-		if len(test.expectedFailedGVs) > 0 {
-			require.Error(t, err)
-			expectedFailedGVs := sets.NewString(test.expectedFailedGVs...)
+		if len(expectedFailedGVs) > 0 {
+			tCtx.Require(err).Should(gomega.HaveOccurred())
+			expectedFailedGVsSet := sets.NewString(expectedFailedGVs...)
 			actualFailedGVs := sets.NewString(failedGroupVersions(err)...)
-			assert.True(t, expectedFailedGVs.Equal(actualFailedGVs),
-				"%s: Expected Failed GVs (%s), got (%s)", test.name, expectedFailedGVs, actualFailedGVs)
+			tCtx.Assert(actualFailedGVs.List()).Should(gomega.Equal(expectedFailedGVsSet.List()))
 		} else {
-			require.NoError(t, err)
+			tCtx.ExpectNoError(err)
 		}
 		// Test the expected preferred GVKs are returned from the aggregated discovery.
-		expectedGVKs := sets.NewString(test.expectedGVKs...)
+		expectedGVKsSet := sets.NewString(expectedGVKs...)
 		actualGVKs := sets.NewString(groupVersionKinds(resources)...)
-		assert.True(t, expectedGVKs.Equal(actualGVKs),
-			"%s: Expected GVKs (%s), got (%s)", test.name, expectedGVKs.List(), actualGVKs.List())
+		tCtx.Assert(actualGVKs.List()).Should(gomega.Equal(expectedGVKsSet.List()))
+	}
+	for _, test := range tests {
+		tCtx.Run(test.name, func(tCtx ktesting.TContext) {
+			run(tCtx, test.corev1, test.apis, test.expectedGVKs, test.expectedFailedGVs)
+		})
 	}
 }
 
@@ -2788,18 +2791,20 @@ func TestDiscoveryContentTypeVersion(t *testing.T) {
 		},
 	}
 
+	tCtx := ktesting.Init(t)
 	for _, test := range tests {
 		match, err := ContentTypeIsGVK(test.contentType, test.gvk)
-		assert.Equal(t, test.expectErr, err != nil)
-		assert.Equal(t, test.match, match)
+		tCtx.Assert(err != nil).Should(gomega.Equal(test.expectErr))
+		tCtx.Assert(match).Should(gomega.Equal(test.match))
 	}
 }
 
 func TestUseLegacyDiscovery(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	// Default client sends aggregated discovery accept format (first) as well as legacy format.
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		acceptHeader := req.Header.Get("Accept")
-		assert.Equal(t, acceptDiscoveryFormats, acceptHeader)
+		tCtx.Assert(acceptHeader).Should(gomega.Equal(acceptDiscoveryFormats))
 	}))
 	defer server.Close()
 	client := NewDiscoveryClientForConfigOrDie(&restclient.Config{Host: server.URL})
@@ -2807,7 +2812,7 @@ func TestUseLegacyDiscovery(t *testing.T) {
 	// When "UseLegacyDiscovery" field is set, only the legacy discovery format is requested.
 	server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		acceptHeader := req.Header.Get("Accept")
-		assert.Equal(t, AcceptV1, acceptHeader)
+		tCtx.Assert(acceptHeader).Should(gomega.Equal(AcceptV1))
 	}))
 	defer server.Close()
 	client = NewDiscoveryClientForConfigOrDie(&restclient.Config{Host: server.URL})

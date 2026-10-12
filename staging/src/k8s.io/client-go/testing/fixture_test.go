@@ -24,8 +24,7 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	"github.com/onsi/gomega"
 	"sigs.k8s.io/structured-merge-diff/v7/typed"
 
 	v1 "k8s.io/api/core/v1"
@@ -40,7 +39,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/managedfields"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/util/watchlist"
-	"k8s.io/klog/v2/ktesting"
+	"k8s.io/ktesting"
 	"k8s.io/utils/ptr"
 )
 
@@ -62,7 +61,8 @@ func getArbitraryResource(s schema.GroupVersionResource, name, namespace string)
 }
 
 func TestWatchCallNonNamespace(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+	logger := tCtx.Logger()
 	testResource := schema.GroupVersionResource{Group: "", Version: "test_version", Resource: "test_kind"}
 	testObj := getArbitraryResource(testResource, "test_name", "test_namespace")
 	accessor, err := meta.Accessor(testObj)
@@ -84,11 +84,12 @@ func TestWatchCallNonNamespace(t *testing.T) {
 		}
 	}()
 	out := <-watch.ResultChan()
-	assert.Equal(t, testObj, out.Object, "watched object mismatch")
+	tCtx.Assert(out.Object).Should(gomega.Equal(testObj), "watched object mismatch")
 }
 
 func TestWatchCallAllNamespace(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+	logger := tCtx.Logger()
 	testResource := schema.GroupVersionResource{Group: "", Version: "test_version", Resource: "test_kind"}
 	testObj := getArbitraryResource(testResource, "test_name", "test_namespace")
 	accessor, err := meta.Accessor(testObj)
@@ -109,38 +110,39 @@ func TestWatchCallAllNamespace(t *testing.T) {
 	}
 	go func() {
 		err := o.Create(testResource, testObj, ns)
-		assert.NoError(t, err, "test resource creation failed")
+		tCtx.AssertNoError(err, "test resource creation failed")
 	}()
 	out := <-w.ResultChan()
 	outAll := <-wAll.ResultChan()
-	assert.Equal(t, watch.Added, out.Type, "watch event mismatch")
-	assert.Equal(t, watch.Added, outAll.Type, "watch event mismatch")
-	assert.Equal(t, testObj, out.Object, "watched created object mismatch")
-	assert.Equal(t, testObj, outAll.Object, "watched created object mismatch")
+	tCtx.Assert(out.Type).Should(gomega.Equal(watch.Added), "watch event mismatch")
+	tCtx.Assert(outAll.Type).Should(gomega.Equal(watch.Added), "watch event mismatch")
+	tCtx.Assert(out.Object).Should(gomega.Equal(testObj), "watched created object mismatch")
+	tCtx.Assert(outAll.Object).Should(gomega.Equal(testObj), "watched created object mismatch")
 	go func() {
 		err := o.Update(testResource, testObj, ns)
-		assert.NoError(t, err, "test resource updating failed")
+		tCtx.AssertNoError(err, "test resource updating failed")
 	}()
 	out = <-w.ResultChan()
 	outAll = <-wAll.ResultChan()
-	assert.Equal(t, watch.Modified, out.Type, "watch event mismatch")
-	assert.Equal(t, watch.Modified, outAll.Type, "watch event mismatch")
-	assert.Equal(t, testObj, out.Object, "watched updated object mismatch")
-	assert.Equal(t, testObj, outAll.Object, "watched updated object mismatch")
+	tCtx.Assert(out.Type).Should(gomega.Equal(watch.Modified), "watch event mismatch")
+	tCtx.Assert(outAll.Type).Should(gomega.Equal(watch.Modified), "watch event mismatch")
+	tCtx.Assert(out.Object).Should(gomega.Equal(testObj), "watched updated object mismatch")
+	tCtx.Assert(outAll.Object).Should(gomega.Equal(testObj), "watched updated object mismatch")
 	go func() {
 		err := o.Delete(testResource, "test_namespace", "test_name")
-		assert.NoError(t, err, "test resource deletion failed")
+		tCtx.AssertNoError(err, "test resource deletion failed")
 	}()
 	out = <-w.ResultChan()
 	outAll = <-wAll.ResultChan()
-	assert.Equal(t, watch.Deleted, out.Type, "watch event mismatch")
-	assert.Equal(t, watch.Deleted, outAll.Type, "watch event mismatch")
-	assert.Equal(t, testObj, out.Object, "watched deleted object mismatch")
-	assert.Equal(t, testObj, outAll.Object, "watched deleted object mismatch")
+	tCtx.Assert(out.Type).Should(gomega.Equal(watch.Deleted), "watch event mismatch")
+	tCtx.Assert(outAll.Type).Should(gomega.Equal(watch.Deleted), "watch event mismatch")
+	tCtx.Assert(out.Object).Should(gomega.Equal(testObj), "watched deleted object mismatch")
+	tCtx.Assert(outAll.Object).Should(gomega.Equal(testObj), "watched deleted object mismatch")
 }
 
 func TestWatchCallMultipleInvocation(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+	logger := tCtx.Logger()
 	cases := []struct {
 		name string
 		op   watch.EventType
@@ -209,7 +211,7 @@ func TestWatchCallMultipleInvocation(t *testing.T) {
 			t.Fatalf("test resource watch failed in %s: %v", watchNamespace, err)
 		}
 		go func() {
-			assert.NoError(t, err, "watch invocation failed")
+			tCtx.AssertNoError(err, "watch invocation failed")
 			for _, c := range cases {
 				if watchNamespace == "" || c.ns == watchNamespace {
 					fmt.Printf("%#v %#v\n", c, i)
@@ -219,9 +221,9 @@ func TestWatchCallMultipleInvocation(t *testing.T) {
 						t.Errorf("unexpected error: %v", err)
 						break
 					}
-					assert.Equal(t, c.op, event.Type, "watch event mismatched")
-					assert.Equal(t, c.name, accessor.GetName(), "watched object mismatch")
-					assert.Equal(t, c.ns, accessor.GetNamespace(), "watched object mismatch")
+					tCtx.Assert(event.Type).Should(gomega.Equal(c.op), "watch event mismatched")
+					tCtx.Assert(accessor.GetName()).Should(gomega.Equal(c.name), "watched object mismatch")
+					tCtx.Assert(accessor.GetNamespace()).Should(gomega.Equal(c.ns), "watched object mismatch")
 				}
 			}
 			wg.Done()
@@ -275,7 +277,8 @@ func TestWatchAddAfterStop(t *testing.T) {
 }
 
 func TestPatchWithMissingObject(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+	logger := tCtx.Logger()
 	nodesResource := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "nodes"}
 
 	scheme := runtime.NewScheme()
@@ -284,13 +287,14 @@ func TestPatchWithMissingObject(t *testing.T) {
 	reaction := ObjectReaction(o)
 	action := NewRootPatchSubresourceAction(nodesResource, "node-1", types.StrategicMergePatchType, []byte(`{}`))
 	handled, node, err := reaction(action)
-	assert.True(t, handled)
-	assert.Nil(t, node)
-	assert.EqualError(t, err, `nodes "node-1" not found`)
+	tCtx.Assert(handled).Should(gomega.BeTrueBecause("the patch action should be handled by the reaction"))
+	tCtx.Assert(node).Should(gomega.BeNil())
+	tCtx.Assert(err).Should(gomega.MatchError(`nodes "node-1" not found`))
 }
 
 func TestApplyCreate(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+	logger := tCtx.Logger()
 	cmResource := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "configMaps"}
 	scheme := runtime.NewScheme()
 	scheme.AddKnownTypes(cmResource.GroupVersion(), &v1.ConfigMap{})
@@ -302,16 +306,17 @@ func TestApplyCreate(t *testing.T) {
 	action := NewPatchActionWithOptions(cmResource, "default", "cm-1", types.ApplyPatchType, patch,
 		metav1.PatchOptions{FieldManager: "test-manager"})
 	handled, configMap, err := reaction(action)
-	assert.True(t, handled)
+	tCtx.Assert(handled).Should(gomega.BeTrueBecause("the apply action should be handled by the reaction"))
 	if err != nil {
 		t.Fatalf("Failed to create a resource with apply: %v", err)
 	}
 	cm := configMap.(*v1.ConfigMap)
-	assert.Equal(t, map[string]string{"k": "v"}, cm.Data)
+	tCtx.Assert(cm.Data).Should(gomega.Equal(map[string]string{"k": "v"}))
 }
 
 func TestApplyNoMeta(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+	logger := tCtx.Logger()
 	cmResource := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "configMaps"}
 	scheme := runtime.NewScheme()
 	scheme.AddKnownTypes(cmResource.GroupVersion(), &v1.ConfigMap{})
@@ -323,17 +328,18 @@ func TestApplyNoMeta(t *testing.T) {
 	action := NewPatchActionWithOptions(cmResource, "default", "cm-1", types.ApplyPatchType, patch,
 		metav1.PatchOptions{FieldManager: "test-manager"})
 	handled, configMap, err := reaction(action)
-	assert.True(t, handled)
+	tCtx.Assert(handled).Should(gomega.BeTrueBecause("the apply action should be handled by the reaction"))
 	if err != nil {
 		t.Fatalf("Failed to create a resource with apply: %v", err)
 	}
 	cm := configMap.(*v1.ConfigMap)
-	assert.Equal(t, "cm-1", cm.Name)
-	assert.Equal(t, map[string]string{"k": "v"}, cm.Data)
+	tCtx.Assert(cm.Name).Should(gomega.Equal("cm-1"))
+	tCtx.Assert(cm.Data).Should(gomega.Equal(map[string]string{"k": "v"}))
 }
 
 func TestApplyUpdateMultipleFieldManagers(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+	logger := tCtx.Logger()
 	cmResource := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "configMaps"}
 	scheme := runtime.NewScheme()
 	scheme.AddKnownTypes(cmResource.GroupVersion(), &v1.ConfigMap{})
@@ -354,7 +360,7 @@ func TestApplyUpdateMultipleFieldManagers(t *testing.T) {
 		},
 	})
 	handled, _, err := reaction(action)
-	assert.True(t, handled)
+	tCtx.Assert(handled).Should(gomega.BeTrueBecause("the action should be handled by the reaction"))
 	if err != nil {
 		t.Errorf("Failed to create resource: %v", err)
 	}
@@ -365,22 +371,20 @@ func TestApplyUpdateMultipleFieldManagers(t *testing.T) {
 	applyAction := NewPatchActionWithOptions(cmResource, "default", "cm-1", types.ApplyPatchType, patch,
 		metav1.PatchOptions{FieldManager: "test-manager-1"})
 	handled, configMap, err := reaction(applyAction)
-	assert.True(t, handled)
+	tCtx.Assert(handled).Should(gomega.BeTrueBecause("the action should be handled by the reaction"))
 	if err != nil {
 		t.Errorf("Failed to apply resource: %v", err)
 	}
 	cm := configMap.(*v1.ConfigMap)
-	assert.Equal(t, map[string]string{"k0": "v0", "k1": "v1"}, cm.Data)
+	tCtx.Assert(cm.Data).Should(gomega.Equal(map[string]string{"k0": "v0", "k1": "v1"}))
 
 	// Apply conflicting with test-manager-2, expect apply to fail
 	patch = []byte(`{"apiVersion": "v1", "kind": "ConfigMap", "metadata": {"name": "cm-1"}, "data": {"k1": "xyz"}}`)
 	applyAction = NewPatchActionWithOptions(cmResource, "default", "cm-1", types.ApplyPatchType, patch,
 		metav1.PatchOptions{FieldManager: "test-manager-2"})
 	handled, _, err = reaction(applyAction)
-	assert.True(t, handled)
-	if assert.Error(t, err) {
-		assert.Equal(t, "Apply failed with 1 conflict: conflict with \"test-manager-1\": .data.k1", err.Error())
-	}
+	tCtx.Assert(handled).Should(gomega.BeTrueBecause("the action should be handled by the reaction"))
+	tCtx.Assert(err).Should(gomega.MatchError("Apply failed with 1 conflict: conflict with \"test-manager-1\": .data.k1"))
 
 	// Apply with test-manager-2
 	// Expect data to be shared with initial create and test-manager-1
@@ -388,12 +392,12 @@ func TestApplyUpdateMultipleFieldManagers(t *testing.T) {
 	applyAction = NewPatchActionWithOptions(cmResource, "default", "cm-1", types.ApplyPatchType, patch,
 		metav1.PatchOptions{FieldManager: "test-manager-2"})
 	handled, configMap, err = reaction(applyAction)
-	assert.True(t, handled)
+	tCtx.Assert(handled).Should(gomega.BeTrueBecause("the action should be handled by the reaction"))
 	if err != nil {
 		t.Errorf("Failed to apply resource: %v", err)
 	}
 	cm = configMap.(*v1.ConfigMap)
-	assert.Equal(t, map[string]string{"k0": "v0", "k1": "v1", "k2": "v2"}, cm.Data)
+	tCtx.Assert(cm.Data).Should(gomega.Equal(map[string]string{"k0": "v0", "k1": "v1", "k2": "v2"}))
 
 	// Apply with test-manager-1
 	// Expect owned data to be updated
@@ -401,12 +405,12 @@ func TestApplyUpdateMultipleFieldManagers(t *testing.T) {
 	applyAction = NewPatchActionWithOptions(cmResource, "default", "cm-1", types.ApplyPatchType, patch,
 		metav1.PatchOptions{FieldManager: "test-manager-1"})
 	handled, configMap, err = reaction(applyAction)
-	assert.True(t, handled)
+	tCtx.Assert(handled).Should(gomega.BeTrueBecause("the action should be handled by the reaction"))
 	if err != nil {
 		t.Errorf("Failed to apply resource: %v", err)
 	}
 	cm = configMap.(*v1.ConfigMap)
-	assert.Equal(t, map[string]string{"k0": "v0", "k1": "v101", "k2": "v2"}, cm.Data)
+	tCtx.Assert(cm.Data).Should(gomega.Equal(map[string]string{"k0": "v0", "k1": "v101", "k2": "v2"}))
 
 	// Force apply with test-manager-2
 	// Expect data owned by test-manager-1 to be updated, expect data already owned but not in apply configuration to be removed
@@ -414,12 +418,12 @@ func TestApplyUpdateMultipleFieldManagers(t *testing.T) {
 	applyAction = NewPatchActionWithOptions(cmResource, "default", "cm-1", types.ApplyPatchType, patch,
 		metav1.PatchOptions{FieldManager: "test-manager-2", Force: ptr.To(true)})
 	handled, configMap, err = reaction(applyAction)
-	assert.True(t, handled)
+	tCtx.Assert(handled).Should(gomega.BeTrueBecause("the action should be handled by the reaction"))
 	if err != nil {
 		t.Errorf("Failed to apply resource: %v", err)
 	}
 	cm = configMap.(*v1.ConfigMap)
-	assert.Equal(t, map[string]string{"k0": "v0", "k1": "v202"}, cm.Data)
+	tCtx.Assert(cm.Data).Should(gomega.Equal(map[string]string{"k0": "v0", "k1": "v202"}))
 
 	// Update with test-manager-1 to perform a force update of the entire resource
 	reaction = ObjectReaction(o)
@@ -436,23 +440,24 @@ func TestApplyUpdateMultipleFieldManagers(t *testing.T) {
 		},
 	}, metav1.UpdateOptions{FieldManager: "test-manager-1"})
 	handled, configMap, err = reaction(updateAction)
-	assert.True(t, handled)
+	tCtx.Assert(handled).Should(gomega.BeTrueBecause("the action should be handled by the reaction"))
 	if err != nil {
 		t.Errorf("Failed to apply resource: %v", err)
 	}
 	typedCm := configMap.(*v1.ConfigMap)
-	assert.Equal(t, map[string]string{"k99": "v99"}, typedCm.Data)
+	tCtx.Assert(typedCm.Data).Should(gomega.Equal(map[string]string{"k99": "v99"}))
 }
 
 func TestGetWithExactMatch(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+	logger := tCtx.Logger()
 	scheme := runtime.NewScheme()
 	codecs := serializer.NewCodecFactory(scheme)
 
 	constructObject := func(s schema.GroupVersionResource, name, namespace string) (*unstructured.Unstructured, schema.GroupVersionResource) {
 		obj := getArbitraryResource(s, name, namespace)
 		gvks, _, err := scheme.ObjectKinds(obj)
-		assert.NoError(t, err)
+		tCtx.AssertNoError(err)
 		gvr, _ := meta.UnsafeGuessKindToResource(gvks[0])
 		return obj, gvr
 	}
@@ -463,33 +468,31 @@ func TestGetWithExactMatch(t *testing.T) {
 	nodeResource := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "node"}
 	node, gvr := constructObject(nodeResource, "node", "")
 
-	assert.NoError(t, o.Add(node))
+	tCtx.AssertNoError(o.Add(node))
 
 	// Exact match
 	_, err = o.Get(gvr, "", "node")
-	assert.NoError(t, err)
+	tCtx.AssertNoError(err)
 
 	// Unexpected namespace provided
 	_, err = o.Get(gvr, "ns", "node")
-	assert.Error(t, err)
-	errNotFound := errors.NewNotFound(gvr.GroupResource(), "node")
-	assert.EqualError(t, err, errNotFound.Error())
+	nodeErrNotFound := errors.NewNotFound(gvr.GroupResource(), "node")
+	tCtx.Assert(err).Should(gomega.MatchError(nodeErrNotFound))
 
 	// Object with non-empty namespace
 	o = NewObjectTrackerWithLogger(logger, scheme, codecs.UniversalDecoder())
 	podResource := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "pod"}
 	pod, gvr := constructObject(podResource, "pod", "default")
-	assert.NoError(t, o.Add(pod))
+	tCtx.AssertNoError(o.Add(pod))
 
 	// Exact match
 	_, err = o.Get(gvr, "default", "pod")
-	assert.NoError(t, err)
+	tCtx.AssertNoError(err)
 
 	// Missing namespace
 	_, err = o.Get(gvr, "", "pod")
-	assert.Error(t, err)
-	errNotFound = errors.NewNotFound(gvr.GroupResource(), "pod")
-	assert.EqualError(t, err, errNotFound.Error())
+	podErrNotFound := errors.NewNotFound(gvr.GroupResource(), "pod")
+	tCtx.Assert(err).Should(gomega.MatchError(podErrNotFound))
 }
 
 func Test_resourceCovers(t *testing.T) {
@@ -676,7 +679,8 @@ var configMapTypedSchema = typed.YAMLObject(`types:
 `)
 
 func TestManagedFieldsObjectTrackerReloadsScheme(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+	logger := tCtx.Logger()
 	cmResource := schema.GroupVersionResource{Version: "v1", Resource: "configmaps"}
 	scheme := runtime.NewScheme()
 	codecs := serializer.NewCodecFactory(scheme)
@@ -695,11 +699,12 @@ func TestManagedFieldsObjectTrackerReloadsScheme(t *testing.T) {
 	scheme.AddKnownTypes(cmResource.GroupVersion(), &v1.ConfigMap{})
 
 	err := tracker.Create(cmResource, cm, "default", metav1.CreateOptions{FieldManager: "test-manager"})
-	assert.NoError(t, err, "Create should succeed after registering type")
+	tCtx.AssertNoError(err, "Create should succeed after registering type")
 }
 
 func TestManagedFielsdObjectTrackerWithUnstructured(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+	logger := tCtx.Logger()
 	cmResource := schema.GroupVersionResource{Version: "v1", Resource: "configmaps"}
 	cmGVK := schema.GroupVersionKind{Version: "v1", Kind: "ConfigMap"}
 	scheme := runtime.NewScheme()
@@ -713,7 +718,7 @@ func TestManagedFielsdObjectTrackerWithUnstructured(t *testing.T) {
 	cm.SetKind("ConfigMap")
 	cm.SetName("test-cm")
 	cm.SetNamespace("default")
-	require.NoError(t, unstructured.SetNestedMap(cm.Object,
+	tCtx.ExpectNoError(unstructured.SetNestedMap(cm.Object,
 		map[string]any{
 			"key": "value",
 		},
@@ -723,18 +728,18 @@ func TestManagedFielsdObjectTrackerWithUnstructured(t *testing.T) {
 	// Validate creating through apply works
 	cmOriginal := cm.DeepCopy()
 
-	require.NoError(t, tracker.Apply(cmResource, cm, "default", metav1.PatchOptions{FieldManager: "test-manager"}))
+	tCtx.ExpectNoError(tracker.Apply(cmResource, cm, "default", metav1.PatchOptions{FieldManager: "test-manager"}))
 	cmActualUntyped, err := tracker.Get(cmResource, "default", cm.GetName())
-	require.NoError(t, err)
+	tCtx.ExpectNoError(err)
 
 	cmActual, ok := cmActualUntyped.(*unstructured.Unstructured)
-	require.True(t, ok)
+	tCtx.Require(ok).Should(gomega.BeTrueBecause("Get should return an *unstructured.Unstructured"))
 
 	unstructured.RemoveNestedField(cmActual.Object, "metadata", "managedFields")
-	require.Empty(t, cmp.Diff(cmOriginal, cmActual))
+	tCtx.Require(cmp.Diff(cmOriginal, cmActual)).Should(gomega.BeEmpty())
 
 	// Validate updating through apply works
-	require.NoError(t, unstructured.SetNestedMap(cmActual.Object,
+	tCtx.ExpectNoError(unstructured.SetNestedMap(cmActual.Object,
 		map[string]any{
 			"key":         "value",
 			"another-key": "another-value",
@@ -743,15 +748,15 @@ func TestManagedFielsdObjectTrackerWithUnstructured(t *testing.T) {
 	)
 
 	cmOriginal = cmActual.DeepCopy()
-	require.NoError(t, tracker.Apply(cmResource, cmActual, "default", metav1.PatchOptions{FieldManager: "test-manager"}))
+	tCtx.ExpectNoError(tracker.Apply(cmResource, cmActual, "default", metav1.PatchOptions{FieldManager: "test-manager"}))
 	cmActualUntyped, err = tracker.Get(cmResource, "default", cm.GetName())
-	require.NoError(t, err)
+	tCtx.ExpectNoError(err)
 
 	cmActual, ok = cmActualUntyped.(*unstructured.Unstructured)
-	require.True(t, ok)
+	tCtx.Require(ok).Should(gomega.BeTrueBecause("Get should return an *unstructured.Unstructured"))
 
 	unstructured.RemoveNestedField(cmActual.Object, "metadata", "managedFields")
-	require.Empty(t, cmp.Diff(cmOriginal, cmActual))
+	tCtx.Require(cmp.Diff(cmOriginal, cmActual)).Should(gomega.BeEmpty())
 }
 
 func TestDoesClientSupportWatchListSemantics(t *testing.T) {

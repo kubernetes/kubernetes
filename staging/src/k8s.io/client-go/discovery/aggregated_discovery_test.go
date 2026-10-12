@@ -19,10 +19,11 @@ package discovery
 import (
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/onsi/gomega"
 	apidiscovery "k8s.io/api/apidiscovery/v2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/ktesting"
 )
 
 func TestSplitGroupsAndResources(t *testing.T) {
@@ -954,10 +955,11 @@ func TestSplitGroupsAndResources(t *testing.T) {
 		},
 	}
 
+	tCtx := ktesting.Init(t)
 	for _, test := range tests {
 		apiGroups, resourcesByGV, failedGVs := SplitGroupsAndResources(test.agg)
-		assert.Equal(t, test.expectedFailedGVs, failedGVs)
-		assert.Equal(t, test.expectedGroups, *apiGroups)
-		assert.Equal(t, test.expectedGVResources, resourcesByGV)
+		tCtx.Assert(failedGVs).Should(gomega.Equal(test.expectedFailedGVs))
+		tCtx.Assert(*apiGroups).Should(gomega.Equal(test.expectedGroups))
+		tCtx.Assert(resourcesByGV).Should(gomega.Equal(test.expectedGVResources))
 	}
 }

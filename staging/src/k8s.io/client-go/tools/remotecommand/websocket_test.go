@@ -37,7 +37,6 @@ import (
 	"time"
 
 	gwebsocket "github.com/gorilla/websocket"
-	"github.com/stretchr/testify/require"
 
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -47,7 +46,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/rest"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
-	"k8s.io/klog/v2/ktesting"
+	"k8s.io/ktesting"
 	"k8s.io/streaming/pkg/httpstream/wsstream"
 )
 
@@ -1050,7 +1049,7 @@ func TestWebSocketClient_ExecutorErrors(t *testing.T) {
 }
 
 func TestWebSocketClient_HeartbeatSucceeds(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
 	var upgrader = gwebsocket.Upgrader{
 		CheckOrigin: func(r *http.Request) bool {
 			return true // Accepting all requests
@@ -1083,7 +1082,7 @@ func TestWebSocketClient_HeartbeatSucceeds(t *testing.T) {
 	var expectedMsg = "test heartbeat message"
 	var period = 100 * time.Millisecond
 	var deadline = 200 * time.Millisecond
-	heartbeat := newHeartbeat(logger, client, period, deadline)
+	heartbeat := newHeartbeat(tCtx.Logger(), client, period, deadline)
 	heartbeat.setMessage(expectedMsg)
 	// Add a channel to the handler to retrieve the "pong" message.
 	pongMsgCh := make(chan string)
@@ -1123,8 +1122,8 @@ func TestWebSocketClient_HeartbeatSucceeds(t *testing.T) {
 }
 
 func TestLateStreamCreation(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
-	c := newWSStreamCreator(logger, nil)
+	tCtx := ktesting.Init(t)
+	c := newWSStreamCreator(tCtx.Logger(), nil)
 	c.closeAllStreamReaders(nil)
 	if err := c.setStream(0, nil); err == nil {
 		t.Fatal("expected error adding stream after closeAllStreamReaders")
@@ -1132,10 +1131,10 @@ func TestLateStreamCreation(t *testing.T) {
 }
 
 func TestWebSocketClient_StreamsAndExpectedErrors(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
 
 	// Validate Stream functions.
-	c := newWSStreamCreator(logger, nil)
+	c := newWSStreamCreator(tCtx.Logger(), nil)
 	headers := http.Header{}
 	headers.Set(v1.StreamType, v1.StreamTypeStdin)
 	s, err := c.CreateStream(headers)
@@ -1351,6 +1350,7 @@ func createWebSocketStreams(req *http.Request, w http.ResponseWriter, opts *opti
 }
 
 func TestWebSocketClient_ProxySucceeds(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	// Validate websocket proxy succeeds for each of the enumerated schemes.
 	proxySchemes := []string{"http", "https"}
 	for _, proxyScheme := range proxySchemes {
@@ -1375,7 +1375,7 @@ func TestWebSocketClient_ProxySucceeds(t *testing.T) {
 		}
 		defer proxyServer.Close() //nolint:errcheck
 		proxyLocation, err := url.Parse(proxyServer.URL)
-		require.NoError(t, err)
+		tCtx.ExpectNoError(err)
 		t.Logf("Proxy URL: %s", proxyLocation.String())
 
 		// Create fake WebSocket server. Copy received STDIN data back onto STDOUT stream.
@@ -1397,7 +1397,7 @@ func TestWebSocketClient_ProxySucceeds(t *testing.T) {
 		// The proxy server should open a websocket connection to the fake websocket server.
 		websocketServer.URL = websocketServer.URL + "?" + "stdin=true" + "&" + "stdout=true"
 		websocketLocation, err := url.Parse(websocketServer.URL)
-		require.NoError(t, err)
+		tCtx.ExpectNoError(err)
 		clientConfig := &rest.Config{
 			Host: websocketLocation.Host,
 			// Unused if "http" scheme.
@@ -1407,7 +1407,7 @@ func TestWebSocketClient_ProxySucceeds(t *testing.T) {
 			},
 		}
 		exec, err := NewWebSocketExecutor(clientConfig, "GET", websocketServer.URL)
-		require.NoError(t, err)
+		tCtx.ExpectNoError(err)
 
 		// Generate random data, and set it up to stream on STDIN. The data will be
 		// returned on the STDOUT buffer.

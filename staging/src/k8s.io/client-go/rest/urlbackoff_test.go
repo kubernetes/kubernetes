@@ -23,9 +23,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/onsi/gomega"
 
 	"k8s.io/client-go/util/flowcontrol"
+	"k8s.io/ktesting"
 )
 
 func parse(raw string) *url.URL {
@@ -82,37 +83,71 @@ func TestURLBackoffFunctionality(t *testing.T) {
 	}
 }
 
+// fakeBackoffManager is a hand-written stand-in for BackoffManager that
+// records the arguments it receives so the nop-context wrapper's delegation
+// can be verified.
+type fakeBackoffManager struct {
+	sleepCalls           []time.Duration
+	calculateBackoffCall *url.URL
+	calculateBackoffRet  time.Duration
+	updateBackoffURL     *url.URL
+	updateBackoffErr     error
+	updateBackoffCode    int
+}
+
+func (f *fakeBackoffManager) UpdateBackoff(actualURL *url.URL, err error, responseCode int) {
+	f.updateBackoffURL = actualURL
+	f.updateBackoffErr = err
+	f.updateBackoffCode = responseCode
+}
+
+func (f *fakeBackoffManager) CalculateBackoff(actualURL *url.URL) time.Duration {
+	f.calculateBackoffCall = actualURL
+	return f.calculateBackoffRet
+}
+
+func (f *fakeBackoffManager) Sleep(d time.Duration) {
+	f.sleepCalls = append(f.sleepCalls, d)
+}
+
 func TestBackoffManagerNopContext(t *testing.T) {
-	mock := NewMockBackoffManager(t)
+	tCtx := ktesting.Init(t)
 
 	sleepDuration := 42 * time.Second
-	mock.On("Sleep", sleepDuration).Return()
-	url := &url.URL{}
-	mock.On("CalculateBackoff", url).Return(time.Second)
+	backoffURL := &url.URL{}
+	calculateBackoffRet := time.Second
 	err := errors.New("fake error")
 	responseCode := 404
-	mock.On("UpdateBackoff", url, err, responseCode).Return()
+
+	mock := &fakeBackoffManager{calculateBackoffRet: calculateBackoffRet}
 
 	ctx := context.Background()
 	wrapper := backoffManagerNopContext{BackoffManager: mock}
 	wrapper.SleepWithContext(ctx, sleepDuration)
-	wrapper.CalculateBackoffWithContext(ctx, url)
-	wrapper.UpdateBackoffWithContext(ctx, url, err, responseCode)
+	wrapper.CalculateBackoffWithContext(ctx, backoffURL)
+	wrapper.UpdateBackoffWithContext(ctx, backoffURL, err, responseCode)
+
+	tCtx.Assert(mock.sleepCalls).Should(gomega.Equal([]time.Duration{sleepDuration}))
+	tCtx.Assert(mock.calculateBackoffCall).Should(gomega.Equal(backoffURL))
+	tCtx.Assert(mock.updateBackoffURL).Should(gomega.Equal(backoffURL))
+	tCtx.Assert(mock.updateBackoffErr).Should(gomega.Equal(err))
+	tCtx.Assert(mock.updateBackoffCode).Should(gomega.Equal(responseCode))
 }
 
 func TestNoBackoff(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	var backoff NoBackoff
-	assert.Equal(t, 0*time.Second, backoff.CalculateBackoff(nil))
-	assert.Equal(t, 0*time.Second, backoff.CalculateBackoffWithContext(context.Background(), nil))
+	tCtx.Assert(backoff.CalculateBackoff(nil)).Should(gomega.Equal(0 * time.Second))
+	tCtx.Assert(backoff.CalculateBackoffWithContext(context.Background(), nil)).Should(gomega.Equal(0 * time.Second))
 
 	start := time.Now()
 	backoff.Sleep(0 * time.Second)
-	assert.WithinDuration(t, start, time.Now(), time.Minute /* pretty generous, but we don't want to flake */, time.Since(start), "backoff.Sleep")
+	tCtx.Assert(time.Now()).Should(gomega.BeTemporally("~", start, time.Minute /* pretty generous, but we don't want to flake */), "backoff.Sleep")
 
 	// Cancel right away to prevent sleeping.
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	start = time.Now()
 	backoff.SleepWithContext(ctx, 10*time.Minute)
-	assert.WithinDuration(t, start, time.Now(), time.Minute /* pretty generous, but we don't want to flake */, time.Since(start), "backoff.SleepWithContext")
+	tCtx.Assert(time.Now()).Should(gomega.BeTemporally("~", start, time.Minute /* pretty generous, but we don't want to flake */), "backoff.SleepWithContext")
 }

@@ -31,7 +31,7 @@ import (
 	"k8s.io/client-go/openapi"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
-	"k8s.io/klog/v2/ktesting"
+	"k8s.io/ktesting"
 )
 
 func TestReplaceAliases(t *testing.T) {

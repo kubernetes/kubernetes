@@ -16,10 +16,5 @@ limitations under the License.
 
 package cache
 
-import (
-	"k8s.io/klog/v2"
-)
-
-func init() {
-	klog.InitFlags(nil)
-}
+// klog flags ("v", "vmodule") are registered globally by k8s.io/ktesting's
+// own init(), which other test files in this package import.

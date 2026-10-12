@@ -33,7 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/util/watchlist"
-	"k8s.io/klog/v2/ktesting"
+	"k8s.io/ktesting"
 )
 
 func TestDoesClientSupportWatchListSemantics(t *testing.T) {

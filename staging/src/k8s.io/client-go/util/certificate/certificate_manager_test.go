@@ -31,7 +31,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/require"
+	"github.com/onsi/gomega"
 
 	certificatesv1 "k8s.io/api/certificates/v1"
 	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
@@ -45,8 +45,8 @@ import (
 	certificatesclient "k8s.io/client-go/kubernetes/typed/certificates/v1beta1"
 	clienttesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/util/keyutil"
-	"k8s.io/klog/v2"
-	"k8s.io/klog/v2/ktesting"
+	"k8s.io/ktesting"
+	"k8s.io/ktesting/initoption"
 	netutils "k8s.io/utils/net"
 )
 
@@ -277,7 +277,7 @@ func TestSetRotationDeadline(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			logger, ctx := ktesting.NewTestContext(t)
+			tCtx := ktesting.Init(t)
 			m := manager{
 				cert: &tls.Certificate{
 					Leaf: &x509.Certificate{
@@ -287,12 +287,12 @@ func TestSetRotationDeadline(t *testing.T) {
 				},
 				getTemplate: func() *x509.CertificateRequest { return &x509.CertificateRequest{} },
 				now:         func() time.Time { return now },
-				ctx:         ctx,
+				ctx:         tCtx,
 			}
 			jitteryDuration = func(float64) time.Duration { return time.Duration(float64(tc.notAfter.Sub(tc.notBefore)) * 0.7) }
 			lowerBound := tc.notBefore.Add(time.Duration(float64(tc.notAfter.Sub(tc.notBefore)) * 0.7))
 
-			deadline := m.nextRotationDeadline(logger)
+			deadline := m.nextRotationDeadline(tCtx.Logger())
 
 			if !deadline.Equal(lowerBound) {
 				t.Errorf("For notBefore %v, notAfter %v, the rotationDeadline %v should be %v.",
@@ -448,7 +448,7 @@ func TestCertSatisfiesTemplate(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			logger, ctx := ktesting.NewTestContext(t)
+			tCtx := ktesting.Init(t)
 			var tlsCert *tls.Certificate
 
 			if tc.cert != nil {
@@ -461,10 +461,10 @@ func TestCertSatisfiesTemplate(t *testing.T) {
 				cert:        tlsCert,
 				getTemplate: func() *x509.CertificateRequest { return tc.template },
 				now:         time.Now,
-				ctx:         ctx,
+				ctx:         tCtx,
 			}
 
-			result := m.certSatisfiesTemplate(logger)
+			result := m.certSatisfiesTemplate(tCtx.Logger())
 			if result != tc.shouldSatisfy {
 				t.Errorf("cert: %+v, template: %+v, certSatisfiesTemplate returned %v, want %v", m.cert, tc.template, result, tc.shouldSatisfy)
 			}
@@ -473,7 +473,7 @@ func TestCertSatisfiesTemplate(t *testing.T) {
 }
 
 func TestRotateCertCreateCSRError(t *testing.T) {
-	_, ctx := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
 	now := time.Now()
 	m := manager{
 		cert: &tls.Certificate{
@@ -487,10 +487,10 @@ func TestRotateCertCreateCSRError(t *testing.T) {
 			return newClientset(fakeClient{failureType: createError}), nil
 		},
 		now: func() time.Time { return now },
-		ctx: ctx,
+		ctx: tCtx,
 	}
 
-	if success, err := m.rotateCerts(ctx); success {
+	if success, err := m.rotateCerts(tCtx); success {
 		t.Errorf("Got success from 'rotateCerts', wanted failure")
 	} else if err != nil {
 		t.Errorf("Got error %v from 'rotateCerts', wanted no error.", err)
@@ -498,7 +498,7 @@ func TestRotateCertCreateCSRError(t *testing.T) {
 }
 
 func TestRotateCertWaitingForResultError(t *testing.T) {
-	_, ctx := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
 	now := time.Now()
 	m := manager{
 		cert: &tls.Certificate{
@@ -512,12 +512,12 @@ func TestRotateCertWaitingForResultError(t *testing.T) {
 			return newClientset(fakeClient{failureType: watchError}), nil
 		},
 		now: func() time.Time { return now },
-		ctx: ctx,
+		ctx: tCtx,
 	}
 
 	defer func(t time.Duration) { certificateWaitTimeout = t }(certificateWaitTimeout)
 	certificateWaitTimeout = 1 * time.Millisecond
-	if success, err := m.rotateCerts(ctx); success {
+	if success, err := m.rotateCerts(tCtx); success {
 		t.Errorf("Got success from 'rotateCerts', wanted failure.")
 	} else if err != nil {
 		t.Errorf("Got error %v from 'rotateCerts', wanted no error.", err)
@@ -623,13 +623,13 @@ func TestGetCurrentCertificateOrBootstrap(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
-			logger, _ := ktesting.NewTestContext(t)
+			tCtx := ktesting.Init(t)
 			store := &fakeStore{
 				cert: tc.storeCert,
 			}
 
 			certResult, shouldRotate, err := getCurrentCertificateOrBootstrap(
-				logger,
+				tCtx.Logger(),
 				store,
 				tc.bootstrapCertData,
 				tc.bootstrapKeyData)
@@ -732,11 +732,12 @@ func TestInitializeCertificateSigningRequestClient(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
-			_, ctx := ktesting.NewTestContext(t)
+			tCtx := ktesting.Init(t)
 			certificateStore := &fakeStore{
 				cert: tc.storeCert.certificate,
 			}
 
+			ctx := context.Context(tCtx)
 			certificateManager, err := NewManager(&Config{
 				Template: &x509.CertificateRequest{
 					Subject: pkix.Name{
@@ -781,7 +782,7 @@ func TestInitializeCertificateSigningRequestClient(t *testing.T) {
 				t.Errorf("Expected a '*manager' from 'NewManager'")
 			} else {
 				if m.forceRotation {
-					if success, err := m.rotateCerts(ctx); !success {
+					if success, err := m.rotateCerts(tCtx); !success {
 						t.Errorf("Got failure from 'rotateCerts', wanted success.")
 					} else if err != nil {
 						t.Errorf("Got error %v, expected none.", err)
@@ -849,7 +850,7 @@ func TestInitializeOtherRESTClients(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
-			_, ctx := ktesting.NewTestContext(t)
+			tCtx := ktesting.Init(t)
 			certificateStore := &fakeStore{
 				cert: tc.storeCert.certificate,
 			}
@@ -888,7 +889,7 @@ func TestInitializeOtherRESTClients(t *testing.T) {
 				t.Errorf("Expected a '*manager' from 'NewManager'")
 			} else {
 				if m.forceRotation {
-					success, err := certificateManager.(*manager).rotateCerts(ctx)
+					success, err := certificateManager.(*manager).rotateCerts(tCtx)
 					if err != nil {
 						t.Errorf("Got error %v, expected none.", err)
 						return
@@ -995,7 +996,7 @@ func TestServerHealth(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
-			_, ctx := ktesting.NewTestContext(t)
+			tCtx := ktesting.Init(t)
 			certificateStore := &fakeStore{
 				cert: tc.storeCert.certificate,
 			}
@@ -1035,7 +1036,7 @@ func TestServerHealth(t *testing.T) {
 			if _, ok := certificateManager.(*manager); !ok {
 				t.Errorf("Expected a '*manager' from 'NewManager'")
 			} else {
-				success, err := certificateManager.(*manager).rotateCerts(ctx)
+				success, err := certificateManager.(*manager).rotateCerts(tCtx)
 				if err != nil {
 					t.Errorf("Got error %v, expected none.", err)
 					return
@@ -1058,7 +1059,7 @@ func TestServerHealth(t *testing.T) {
 }
 
 func TestRotationLogsDuration(t *testing.T) {
-	_, ctx := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
 	h := metricMock{}
 	now := time.Now()
 	certIss := now.Add(-2 * time.Hour)
@@ -1078,9 +1079,9 @@ func TestRotationLogsDuration(t *testing.T) {
 		},
 		certificateRotation: &h,
 		now:                 func() time.Time { return now },
-		ctx:                 ctx,
+		ctx:                 tCtx,
 	}
-	ok, err := m.rotateCerts(ctx)
+	ok, err := m.rotateCerts(tCtx)
 	if err != nil || !ok {
 		t.Errorf("failed to rotate certs: %v", err)
 	}
@@ -1094,6 +1095,7 @@ func TestRotationLogsDuration(t *testing.T) {
 }
 
 func TestStop(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	// No certificate yet, will be added while manager runs.
 	store := &fakeStore{}
 	m, err := NewManager(&Config{
@@ -1113,13 +1115,13 @@ func TestStop(t *testing.T) {
 			}), nil
 		},
 	})
-	require.NoError(t, err, "initialize the certificate manager")
-	require.Nil(t, m.Current(), "no certificate yet")
+	tCtx.ExpectNoError(err, "initialize the certificate manager")
+	tCtx.Require(m.Current()).Should(gomega.BeNil(), "no certificate yet")
 
 	// Run the manager and stop it when the test cleans up.
 	var wg sync.WaitGroup
 	defer func() {
-		t.Log("Waiting for manager to stop...")
+		tCtx.Log("Waiting for manager to stop...")
 		wg.Wait()
 	}()
 	wg.Add(1)
@@ -1129,18 +1131,15 @@ func TestStop(t *testing.T) {
 	}()
 	defer m.Stop()
 
-	require.Eventually(t, func() bool {
+	tCtx.Eventually(func() bool {
 		return m.Current() != nil
-	}, 10*time.Second, time.Microsecond, "current certificate")
+	}).WithTimeout(10 * time.Second).WithPolling(time.Microsecond).Should(gomega.BeTrueBecause("current certificate"))
 }
 
 func TestContext(t *testing.T) {
-	logger := ktesting.NewLogger(t, ktesting.NewConfig(
-		ktesting.BufferLogs(true),
-		ktesting.Verbosity(2),
-	))
-	ctx := klog.NewContext(context.Background(), logger)
-	ctx, cancel := context.WithCancelCause(ctx)
+	// V(2) needs to be enabled to capture the "Rotating certificates" log line below.
+	tCtx := ktesting.Init(t, initoption.BufferLogs(true), initoption.Verbosity(2))
+	ctx, cancel := context.WithCancelCause(tCtx)
 	defer cancel(errors.New("test is done"))
 
 	// No certificate yet, will be added while manager runs.
@@ -1163,13 +1162,13 @@ func TestContext(t *testing.T) {
 			}), nil
 		},
 	})
-	require.NoError(t, err, "initialize the certificate manager")
-	require.Nil(t, m.Current(), "no certificate yet")
+	tCtx.ExpectNoError(err, "initialize the certificate manager")
+	tCtx.Require(m.Current()).Should(gomega.BeNil(), "no certificate yet")
 
 	// Run the manager and stop it when the test cleans up.
 	var wg sync.WaitGroup
 	defer func() {
-		t.Log("Waiting for manager to stop...")
+		tCtx.Log("Waiting for manager to stop...")
 		wg.Wait()
 
 		// Must be a no-op.
@@ -1182,10 +1181,10 @@ func TestContext(t *testing.T) {
 	}()
 	defer cancel(errors.New("testing context cancellation"))
 
-	require.Eventually(t, func() bool {
+	tCtx.Eventually(func() bool {
 		return m.Current() != nil
-	}, 10*time.Second, time.Microsecond, "current certificate")
-	require.Contains(t, logger.GetSink().(ktesting.Underlier).GetBuffer().String(), "certificate: Rotating certificates", "contextual log output from manager.rotateCerts")
+	}).WithTimeout(10 * time.Second).WithPolling(time.Microsecond).Should(gomega.BeTrueBecause("current certificate"))
+	tCtx.Require(tCtx.Logger().GetSink().(ktesting.Underlier).GetBuffer().String()).Should(gomega.ContainSubstring("certificate: Rotating certificates"), "contextual log output from manager.rotateCerts")
 }
 
 // testGenerateECKeyPEM1 is a EC P-256 private key fixture.
@@ -1309,12 +1308,12 @@ func TestGenerateKeyConfig(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			_, ctx := ktesting.NewTestContext(t)
+			tCtx := ktesting.Init(t)
 			m := manager{
 				getTemplate: func() *x509.CertificateRequest { return &x509.CertificateRequest{} },
 				generateKey: tc.generateKey,
 				now:         time.Now,
-				ctx:         ctx,
+				ctx:         tCtx,
 			}
 			_, _, _, key, err := m.generateCSR()
 			if tc.wantErr != nil {

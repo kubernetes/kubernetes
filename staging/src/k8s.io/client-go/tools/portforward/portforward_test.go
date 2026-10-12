@@ -28,10 +28,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/onsi/gomega"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/httpstream"
+	"k8s.io/ktesting"
 )
 
 type fakeDialer struct {
@@ -477,6 +478,7 @@ func TestGetPortsReturnsDynamicallyAssignedLocalPort(t *testing.T) {
 }
 
 func TestHandleConnection(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	out := bytes.NewBufferString("")
 
 	pf, err := New(&fakeDialer{}, []string{":2222"}, nil, nil, out, nil)
@@ -512,13 +514,14 @@ func TestHandleConnection(t *testing.T) {
 
 	// Test handleConnection
 	pf.handleConnection(localConnection, ForwardedPort{Local: 1111, Remote: 2222})
-	assert.Equal(t, 0, remoteConnection.streamCount, "stream count should be zero")
-	assert.Equal(t, "test data from local", remoteDataReceived.String())
-	assert.Equal(t, "test data from remote", localConnection.receiveBuffer.String())
-	assert.Equal(t, "Handling connection for 1111\n", out.String())
+	tCtx.Assert(remoteConnection.streamCount).Should(gomega.BeZero(), "stream count should be zero")
+	tCtx.Assert(remoteDataReceived.String()).Should(gomega.Equal("test data from local"))
+	tCtx.Assert(localConnection.receiveBuffer.String()).Should(gomega.Equal("test data from remote"))
+	tCtx.Assert(out.String()).Should(gomega.Equal("Handling connection for 1111\n"))
 }
 
 func TestHandleConnectionSendsRemoteError(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	out := bytes.NewBufferString("")
 	errOut := bytes.NewBufferString("")
 
@@ -546,10 +549,10 @@ func TestHandleConnectionSendsRemoteError(t *testing.T) {
 	// Test handleConnection, using go-routine because it needs to be able to write to unbuffered pf.errorChan
 	pf.handleConnection(localConnection, ForwardedPort{Local: 1111, Remote: 2222})
 
-	assert.Equal(t, 0, remoteConnection.streamCount, "stream count should be zero")
-	assert.Equal(t, "", remoteDataReceived.String())
-	assert.Equal(t, "", localConnection.receiveBuffer.String())
-	assert.Equal(t, "Handling connection for 1111\n", out.String())
+	tCtx.Assert(remoteConnection.streamCount).Should(gomega.BeZero(), "stream count should be zero")
+	tCtx.Assert(remoteDataReceived.String()).Should(gomega.BeEmpty())
+	tCtx.Assert(localConnection.receiveBuffer.String()).Should(gomega.BeEmpty())
+	tCtx.Assert(out.String()).Should(gomega.Equal("Handling connection for 1111\n"))
 }
 
 func TestWaitForConnectionExitsOnStreamConnClosed(t *testing.T) {

@@ -26,19 +26,20 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	"github.com/onsi/gomega"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/remotecommand"
 	restclient "k8s.io/client-go/rest"
+	"k8s.io/ktesting"
 	"k8s.io/streaming/pkg/httpstream"
 	"k8s.io/streaming/pkg/httpstream/wsstream"
 )
 
 func TestWebSocketRoundTripper_RoundTripperSucceeds(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	// Create fake WebSocket server.
 	websocketServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		conns, err := webSocketServerStreams(req, w)
@@ -51,19 +52,19 @@ func TestWebSocketRoundTripper_RoundTripperSucceeds(t *testing.T) {
 
 	// Create the wrapped roundtripper and websocket upgrade roundtripper and call "RoundTrip()".
 	websocketLocation, err := url.Parse(websocketServer.URL)
-	require.NoError(t, err)
+	tCtx.ExpectNoError(err)
 	req, err := http.NewRequestWithContext(context.Background(), "GET", websocketServer.URL, nil)
-	require.NoError(t, err)
+	tCtx.ExpectNoError(err)
 	rt, wsRt, err := RoundTripperFor(&restclient.Config{Host: websocketLocation.Host})
-	require.NoError(t, err)
+	tCtx.ExpectNoError(err)
 	requestedProtocol := remotecommand.StreamProtocolV5Name
 	req.Header[wsstream.WebSocketProtocolHeader] = []string{requestedProtocol}
 	_, err = rt.RoundTrip(req)
-	require.NoError(t, err)
+	tCtx.ExpectNoError(err)
 	// WebSocket Connection is stored in websocket RoundTripper.
 	// Compare the expected negotiated subprotocol with the actual subprotocol.
 	actualProtocol := wsRt.Connection().Subprotocol()
-	assert.Equal(t, requestedProtocol, actualProtocol)
+	tCtx.Assert(actualProtocol).Should(gomega.Equal(requestedProtocol))
 
 }
 
@@ -104,8 +105,9 @@ func TestWebSocketRoundTripper_RoundTripperFails(t *testing.T) {
 		},
 	}
 	encoder := statusCodecs.LegacyCodec(metav1.SchemeGroupVersion)
+	tCtx := ktesting.Init(t)
 	for testName, testCase := range testCases {
-		t.Run(testName, func(t *testing.T) {
+		tCtx.Run(testName, func(tCtx ktesting.TContext) {
 			// Create fake WebSocket server.
 			websocketServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 				if testCase.statusCode > 0 {
@@ -114,18 +116,18 @@ func TestWebSocketRoundTripper_RoundTripperFails(t *testing.T) {
 				if testCase.status != nil {
 					statusBytes, err := runtime.Encode(encoder, testCase.status)
 					if err != nil {
-						t.Errorf("unexpected error %v", err)
+						tCtx.Errorf("unexpected error %v", err)
 						return
 					}
 					_, err = w.Write(statusBytes)
 					if err != nil {
-						t.Errorf("unexpected error %v", err)
+						tCtx.Errorf("unexpected error %v", err)
 						return
 					}
 				} else if len(testCase.body) > 0 {
 					_, err := w.Write([]byte(testCase.body))
 					if err != nil {
-						t.Errorf("unexpected error %v", err)
+						tCtx.Errorf("unexpected error %v", err)
 						return
 					}
 				}
@@ -134,25 +136,25 @@ func TestWebSocketRoundTripper_RoundTripperFails(t *testing.T) {
 
 			// Create the wrapped roundtripper and websocket upgrade roundtripper and call "RoundTrip()".
 			websocketLocation, err := url.Parse(websocketServer.URL)
-			require.NoError(t, err)
+			tCtx.ExpectNoError(err)
 			req, err := http.NewRequestWithContext(context.Background(), "GET", websocketServer.URL, nil)
-			require.NoError(t, err)
+			tCtx.ExpectNoError(err)
 			rt, _, err := RoundTripperFor(&restclient.Config{Host: websocketLocation.Host})
-			require.NoError(t, err)
+			tCtx.ExpectNoError(err)
 			_, err = rt.RoundTrip(req)
-			require.Error(t, err)
-			assert.True(t, httpstream.IsUpgradeFailure(err))
+			tCtx.Require(err).Should(gomega.HaveOccurred())
+			tCtx.Assert(httpstream.IsUpgradeFailure(err)).Should(gomega.BeTrueBecause("error should be a websocket upgrade failure"))
 			if testCase.status != nil {
 				upgradeErr := &httpstream.UpgradeFailureError{}
 				validErr := errors.As(err, &upgradeErr)
-				assert.True(t, validErr, "could not cast error as httpstream.UpgradeFailureError")
+				tCtx.Assert(validErr).Should(gomega.BeTrueBecause("could not cast error as httpstream.UpgradeFailureError"))
 				statusErr := upgradeErr.Cause
 				apiErr := &apierrors.StatusError{}
 				validErr = errors.As(statusErr, &apiErr)
-				assert.True(t, validErr, "could not cast error as apierrors.StatusError")
-				assert.Equal(t, *testCase.status, apiErr.ErrStatus)
+				tCtx.Assert(validErr).Should(gomega.BeTrueBecause("could not cast error as apierrors.StatusError"))
+				tCtx.Assert(apiErr.ErrStatus).Should(gomega.Equal(*testCase.status))
 			} else {
-				assert.Contains(t, err.Error(), testCase.expectedError,
+				tCtx.Assert(err.Error()).Should(gomega.ContainSubstring(testCase.expectedError),
 					"expected (%s), got (%s)", testCase.expectedError, err.Error())
 			}
 		})
@@ -160,6 +162,7 @@ func TestWebSocketRoundTripper_RoundTripperFails(t *testing.T) {
 }
 
 func TestWebSocketRoundTripper_NegotiateCreatesConnection(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	// Create fake WebSocket server.
 	websocketServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		conns, err := webSocketServerStreams(req, w)
@@ -172,17 +175,17 @@ func TestWebSocketRoundTripper_NegotiateCreatesConnection(t *testing.T) {
 
 	// Create the websocket roundtripper and call "Negotiate" to create websocket connection.
 	websocketLocation, err := url.Parse(websocketServer.URL)
-	require.NoError(t, err)
+	tCtx.ExpectNoError(err)
 	req, err := http.NewRequestWithContext(context.Background(), "GET", websocketServer.URL, nil)
-	require.NoError(t, err)
+	tCtx.ExpectNoError(err)
 	rt, wsRt, err := RoundTripperFor(&restclient.Config{Host: websocketLocation.Host})
-	require.NoError(t, err)
+	tCtx.ExpectNoError(err)
 	requestedProtocol := remotecommand.StreamProtocolV5Name
 	conn, err := Negotiate(rt, wsRt, req, requestedProtocol)
-	require.NoError(t, err)
+	tCtx.ExpectNoError(err)
 	// Compare the expected negotiated subprotocol with the actual subprotocol.
 	actualProtocol := conn.Subprotocol()
-	assert.Equal(t, requestedProtocol, actualProtocol)
+	tCtx.Assert(actualProtocol).Should(gomega.Equal(requestedProtocol))
 }
 
 // websocketStreams contains the WebSocket connection and streams from a server.

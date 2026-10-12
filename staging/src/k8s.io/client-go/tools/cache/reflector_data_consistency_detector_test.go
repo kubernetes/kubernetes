@@ -30,7 +30,7 @@ import (
 	clientfeatures "k8s.io/client-go/features"
 	clientfeaturestesting "k8s.io/client-go/features/testing"
 	"k8s.io/client-go/util/consistencydetector"
-	"k8s.io/klog/v2/ktesting"
+	"k8s.io/ktesting"
 )
 
 func TestReflectorDataConsistencyDetector(t *testing.T) {
@@ -68,12 +68,10 @@ func TestReflectorDataConsistencyDetector(t *testing.T) {
 }
 
 func runTestReflectorDataConsistencyDetector(t *testing.T, transformer TransformFunc) {
-	logger, ctx := ktesting.NewTestContext(t)
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
+	tCtx := ktesting.Init(t)
 
 	store := NewStore(MetaNamespaceKeyFunc)
-	_, fifo := newQueueFIFO(logger, nil, store, transformer, InformerNameAndResource{}, nil)
+	_, fifo := newQueueFIFO(tCtx.Logger(), nil, store, transformer, InformerNameAndResource{}, nil)
 
 	lw := &ListWatch{
 		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
@@ -101,13 +99,13 @@ func runTestReflectorDataConsistencyDetector(t *testing.T, transformer Transform
 	r := NewReflector(lw, &v1.Pod{}, fifo, 0)
 
 	go func() {
-		_ = wait.PollUntilContextTimeout(ctx, 10*time.Millisecond, 5*time.Second, true, func(ctx context.Context) (bool, error) {
+		_ = wait.PollUntilContextTimeout(tCtx, 10*time.Millisecond, 5*time.Second, true, func(ctx context.Context) (bool, error) {
 			return r.LastSyncResourceVersion() != "", nil
 		})
-		cancel()
+		tCtx.Cancel("reflector observed a resource version")
 	}()
 
-	err := r.ListAndWatchWithContext(ctx)
+	err := r.ListAndWatchWithContext(tCtx)
 	if err != nil {
 		t.Errorf("ListAndWatchWithContext returned error: %v", err)
 	}

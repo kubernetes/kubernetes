@@ -35,7 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
 	utiltesting "k8s.io/client-go/util/testing"
-	"k8s.io/klog/v2/ktesting"
+	"k8s.io/ktesting"
 
 	"github.com/google/go-cmp/cmp"
 )

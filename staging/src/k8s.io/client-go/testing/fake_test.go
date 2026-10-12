@@ -19,13 +19,14 @@ package testing
 import (
 	"testing"
 
-	"github.com/stretchr/testify/assert"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/ktesting"
 )
 
 func TestOriginalObjectCaptured(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	// this ReactionFunc sets the resources SelfLink
 	const testSelfLink = "some-value"
 	reactors := []ReactionFunc{
@@ -60,7 +61,7 @@ func TestOriginalObjectCaptured(t *testing.T) {
 
 	// execute the reaction chain
 	ret, err := f.Invokes(action, nil)
-	assert.NoError(t, err, "running Invokes failed")
+	tCtx.AssertNoError(err, "running Invokes failed")
 
 	// obtain a metadata accessor for the returned resource
 	accessor, err := meta.Accessor(ret)
@@ -89,6 +90,7 @@ func TestOriginalObjectCaptured(t *testing.T) {
 }
 
 func TestReactorChangesPersisted(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	// this ReactionFunc sets the resources SelfLink
 	const testSelfLink = "some-value"
 	reactors := []ReactionFunc{
@@ -137,7 +139,7 @@ func TestReactorChangesPersisted(t *testing.T) {
 
 	// execute the reaction chain
 	ret, err := f.Invokes(action, nil)
-	assert.NoError(t, err, "running Invokes failed")
+	tCtx.AssertNoError(err, "running Invokes failed")
 
 	// obtain a metadata accessor for the returned resource
 	accessor, err := meta.Accessor(ret)

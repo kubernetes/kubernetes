@@ -21,12 +21,13 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	"github.com/onsi/gomega"
 	"k8s.io/apimachinery/pkg/util/httpstream"
+	"k8s.io/ktesting"
 )
 
 func TestFallbackDialer(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	primaryProtocol := "primary.fake.protocol"
 	secondaryProtocol := "secondary.fake.protocol"
 	protocols := []string{primaryProtocol, secondaryProtocol}
@@ -35,19 +36,19 @@ func TestFallbackDialer(t *testing.T) {
 	secondary := &fakeDialer{dialed: false, negotiatedProtocol: secondaryProtocol}
 	fallbackDialer := NewFallbackDialer(primary, secondary, notCalled)
 	_, negotiated, err := fallbackDialer.Dial(protocols...)
-	assert.True(t, primary.dialed, "no fallback; primary should have dialed")
-	assert.False(t, secondary.dialed, "no fallback; secondary should *not* have dialed")
-	assert.Equal(t, primaryProtocol, negotiated, "primary negotiated protocol returned")
-	require.NoError(t, err, "error from primary dialer should be nil")
+	tCtx.Assert(primary.dialed).Should(gomega.BeTrueBecause("no fallback; primary should have dialed"))
+	tCtx.Assert(secondary.dialed).Should(gomega.BeFalseBecause("no fallback; secondary should *not* have dialed"))
+	tCtx.Assert(negotiated).Should(gomega.Equal(primaryProtocol), "primary negotiated protocol returned")
+	tCtx.ExpectNoError(err, "error from primary dialer should be nil")
 	// If primary dialer error is upgrade error, then fallback returning secondary dial response.
 	primary = &fakeDialer{dialed: false, negotiatedProtocol: primaryProtocol, err: &httpstream.UpgradeFailureError{Cause: fmt.Errorf("fake error")}}
 	secondary = &fakeDialer{dialed: false, negotiatedProtocol: secondaryProtocol}
 	fallbackDialer = NewFallbackDialer(primary, secondary, httpstream.IsUpgradeFailure)
 	_, negotiated, err = fallbackDialer.Dial(protocols...)
-	assert.True(t, primary.dialed, "fallback; primary should have dialed")
-	assert.True(t, secondary.dialed, "fallback; secondary should have dialed")
-	assert.Equal(t, secondaryProtocol, negotiated, "negotiated protocol is from secondary dialer")
-	require.NoError(t, err, "error from secondary dialer should be nil")
+	tCtx.Assert(primary.dialed).Should(gomega.BeTrueBecause("fallback; primary should have dialed"))
+	tCtx.Assert(secondary.dialed).Should(gomega.BeTrueBecause("fallback; secondary should have dialed"))
+	tCtx.Assert(negotiated).Should(gomega.Equal(secondaryProtocol), "negotiated protocol is from secondary dialer")
+	tCtx.ExpectNoError(err, "error from secondary dialer should be nil")
 	// If primary dialer error is https proxy dialing error, then fallback returning secondary dial response.
 	primary = &fakeDialer{negotiatedProtocol: primaryProtocol, err: errors.New("proxy: unknown scheme: https")}
 	secondary = &fakeDialer{negotiatedProtocol: secondaryProtocol}
@@ -55,19 +56,19 @@ func TestFallbackDialer(t *testing.T) {
 		return httpstream.IsUpgradeFailure(err) || httpstream.IsHTTPSProxyError(err)
 	})
 	_, negotiated, err = fallbackDialer.Dial(protocols...)
-	assert.True(t, primary.dialed, "fallback; primary should have dialed")
-	assert.True(t, secondary.dialed, "fallback; secondary should have dialed")
-	assert.Equal(t, secondaryProtocol, negotiated, "negotiated protocol is from secondary dialer")
-	require.NoError(t, err, "error from secondary dialer should be nil")
+	tCtx.Assert(primary.dialed).Should(gomega.BeTrueBecause("fallback; primary should have dialed"))
+	tCtx.Assert(secondary.dialed).Should(gomega.BeTrueBecause("fallback; secondary should have dialed"))
+	tCtx.Assert(negotiated).Should(gomega.Equal(secondaryProtocol), "negotiated protocol is from secondary dialer")
+	tCtx.ExpectNoError(err, "error from secondary dialer should be nil")
 	// If primary dialer returns non-upgrade error, then primary error is returned.
 	nonUpgradeErr := fmt.Errorf("This is a non-upgrade error")
 	primary = &fakeDialer{dialed: false, err: nonUpgradeErr}
 	secondary = &fakeDialer{dialed: false}
 	fallbackDialer = NewFallbackDialer(primary, secondary, httpstream.IsUpgradeFailure)
 	_, _, err = fallbackDialer.Dial(protocols...)
-	assert.True(t, primary.dialed, "no fallback; primary should have dialed")
-	assert.False(t, secondary.dialed, "no fallback; secondary should *not* have dialed")
-	assert.Equal(t, nonUpgradeErr, err, "error is from primary dialer")
+	tCtx.Assert(primary.dialed).Should(gomega.BeTrueBecause("no fallback; primary should have dialed"))
+	tCtx.Assert(secondary.dialed).Should(gomega.BeFalseBecause("no fallback; secondary should *not* have dialed"))
+	tCtx.Assert(err).Should(gomega.Equal(nonUpgradeErr), "error is from primary dialer")
 }
 
 func notCalled(err error) bool { return false }

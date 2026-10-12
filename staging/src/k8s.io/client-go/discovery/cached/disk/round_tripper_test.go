@@ -26,8 +26,10 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/onsi/gomega"
 	"github.com/peterbourgon/diskv/v3"
-	"github.com/stretchr/testify/assert"
+
+	"k8s.io/ktesting"
 )
 
 // copied from k8s.io/client-go/transport/round_trippers_test.go
@@ -129,7 +131,7 @@ func TestCacheRoundTripper(t *testing.T) {
 }
 
 func TestCacheRoundTripperPathPerm(t *testing.T) {
-	assert := assert.New(t)
+	tCtx := ktesting.Init(t)
 
 	rt := &testRoundTripper{}
 	cacheDir, err := os.MkdirTemp("", "cache-rt")
@@ -168,24 +170,22 @@ func TestCacheRoundTripperPathPerm(t *testing.T) {
 			return err
 		}
 		if info.IsDir() {
-			assert.Equal(os.FileMode(0750), info.Mode().Perm())
+			tCtx.Assert(info.Mode().Perm()).Should(gomega.Equal(os.FileMode(0750)))
 		} else {
-			assert.Equal(os.FileMode(0660), info.Mode().Perm())
+			tCtx.Assert(info.Mode().Perm()).Should(gomega.Equal(os.FileMode(0660)))
 		}
 		return nil
 	})
-	assert.NoError(err)
+	tCtx.AssertNoError(err)
 }
 
 func TestSumDiskCache(t *testing.T) {
-	assert := assert.New(t)
+	tCtx := ktesting.Init(t)
 
 	// Ensure that we'll return a cache miss if the backing file doesn't exist.
-	t.Run("NoSuchKey", func(t *testing.T) {
+	tCtx.Run("NoSuchKey", func(tCtx ktesting.TContext) {
 		cacheDir, err := os.MkdirTemp("", "cache-test")
-		if err != nil {
-			t.Fatal(err)
-		}
+		tCtx.ExpectNoError(err)
 		defer os.RemoveAll(cacheDir)
 		d := diskv.New(diskv.Options{BasePath: cacheDir, TempDir: filepath.Join(cacheDir, ".diskv-temp")})
 		c := &sumDiskCache{disk: d}
@@ -193,16 +193,14 @@ func TestSumDiskCache(t *testing.T) {
 		key := "testing"
 
 		got, ok := c.Get(key)
-		assert.False(ok)
-		assert.Equal([]byte{}, got)
+		tCtx.Assert(ok).Should(gomega.BeFalseBecause("key does not exist, should be a cache miss"))
+		tCtx.Assert(got).Should(gomega.Equal([]byte{}))
 	})
 
 	// Ensure that we'll return a cache miss if the backing file is empty.
-	t.Run("EmptyFile", func(t *testing.T) {
+	tCtx.Run("EmptyFile", func(tCtx ktesting.TContext) {
 		cacheDir, err := os.MkdirTemp("", "cache-test")
-		if err != nil {
-			t.Fatal(err)
-		}
+		tCtx.ExpectNoError(err)
 		defer os.RemoveAll(cacheDir)
 		d := diskv.New(diskv.Options{BasePath: cacheDir, TempDir: filepath.Join(cacheDir, ".diskv-temp")})
 		c := &sumDiskCache{disk: d}
@@ -210,23 +208,19 @@ func TestSumDiskCache(t *testing.T) {
 		key := "testing"
 
 		f, err := os.Create(filepath.Join(cacheDir, sanitize(key)))
-		if err != nil {
-			t.Fatal(err)
-		}
+		tCtx.ExpectNoError(err)
 		f.Close()
 
 		got, ok := c.Get(key)
-		assert.False(ok)
-		assert.Equal([]byte{}, got)
+		tCtx.Assert(ok).Should(gomega.BeFalseBecause("backing file is empty, should be a cache miss"))
+		tCtx.Assert(got).Should(gomega.Equal([]byte{}))
 	})
 
 	// Ensure that we'll return a cache miss if the backing has an invalid
 	// checksum.
-	t.Run("InvalidChecksum", func(t *testing.T) {
+	tCtx.Run("InvalidChecksum", func(tCtx ktesting.TContext) {
 		cacheDir, err := os.MkdirTemp("", "cache-test")
-		if err != nil {
-			t.Fatal(err)
-		}
+		tCtx.ExpectNoError(err)
 		defer os.RemoveAll(cacheDir)
 		d := diskv.New(diskv.Options{BasePath: cacheDir, TempDir: filepath.Join(cacheDir, ".diskv-temp")})
 		c := &sumDiskCache{disk: d}
@@ -239,17 +233,15 @@ func TestSumDiskCache(t *testing.T) {
 		// Create a file with the sum of 'value' followed by the bytes of
 		// 'mismatchedValue'.
 		f, err := os.Create(filepath.Join(cacheDir, sanitize(key)))
-		if err != nil {
-			t.Fatal(err)
-		}
+		tCtx.ExpectNoError(err)
 		f.Write(sum[:])
 		f.Write(mismatchedValue)
 		f.Close()
 
 		// The mismatched checksum should result in a cache miss.
 		got, ok := c.Get(key)
-		assert.False(ok)
-		assert.Equal([]byte{}, got)
+		tCtx.Assert(ok).Should(gomega.BeFalseBecause("checksum mismatch, should be a cache miss"))
+		tCtx.Assert(got).Should(gomega.Equal([]byte{}))
 	})
 
 	// Ensure that our disk cache will happily cache over the top of an existing
@@ -257,11 +249,9 @@ func TestSumDiskCache(t *testing.T) {
 	// entries. When Get detects a bad checksum it will return a cache miss.
 	// This should cause httpcache to fall back to its underlying transport and
 	// to subsequently cache the new value, overwriting the corrupt one.
-	t.Run("OverwriteExistingKey", func(t *testing.T) {
+	tCtx.Run("OverwriteExistingKey", func(tCtx ktesting.TContext) {
 		cacheDir, err := os.MkdirTemp("", "cache-test")
-		if err != nil {
-			t.Fatal(err)
-		}
+		tCtx.ExpectNoError(err)
 		defer os.RemoveAll(cacheDir)
 		d := diskv.New(diskv.Options{BasePath: cacheDir, TempDir: filepath.Join(cacheDir, ".diskv-temp")})
 		c := &sumDiskCache{disk: d}
@@ -274,8 +264,8 @@ func TestSumDiskCache(t *testing.T) {
 		got, ok := c.Get(key)
 
 		// Ensure we can read back what we wrote.
-		assert.True(ok)
-		assert.Equal(value, got)
+		tCtx.Assert(ok).Should(gomega.BeTrueBecause("value was just written, should be a cache hit"))
+		tCtx.Assert(got).Should(gomega.Equal(value))
 
 		differentValue := []byte("I'm different!")
 
@@ -284,16 +274,14 @@ func TestSumDiskCache(t *testing.T) {
 		got, ok = c.Get(key)
 
 		// Ensure we can read back the different value.
-		assert.True(ok)
-		assert.Equal(differentValue, got)
+		tCtx.Assert(ok).Should(gomega.BeTrueBecause("different value was just written, should be a cache hit"))
+		tCtx.Assert(got).Should(gomega.Equal(differentValue))
 	})
 
 	// Ensure that deleting a key does in fact delete it.
-	t.Run("DeleteKey", func(t *testing.T) {
+	tCtx.Run("DeleteKey", func(tCtx ktesting.TContext) {
 		cacheDir, err := os.MkdirTemp("", "cache-test")
-		if err != nil {
-			t.Fatal(err)
-		}
+		tCtx.ExpectNoError(err)
 		defer os.RemoveAll(cacheDir)
 		d := diskv.New(diskv.Options{BasePath: cacheDir, TempDir: filepath.Join(cacheDir, ".diskv-temp")})
 		c := &sumDiskCache{disk: d}
@@ -305,15 +293,15 @@ func TestSumDiskCache(t *testing.T) {
 
 		// Ensure we successfully set the value.
 		got, ok := c.Get(key)
-		assert.True(ok)
-		assert.Equal(value, got)
+		tCtx.Assert(ok).Should(gomega.BeTrueBecause("value was just set, should be a cache hit"))
+		tCtx.Assert(got).Should(gomega.Equal(value))
 
 		c.Delete(key)
 
 		// Ensure the value is gone.
 		got, ok = c.Get(key)
-		assert.False(ok)
-		assert.Equal([]byte{}, got)
+		tCtx.Assert(ok).Should(gomega.BeFalseBecause("value was just deleted, should be a cache miss"))
+		tCtx.Assert(got).Should(gomega.Equal([]byte{}))
 
 		// Ensure that deleting a non-existent value is a no-op.
 		c.Delete(key)

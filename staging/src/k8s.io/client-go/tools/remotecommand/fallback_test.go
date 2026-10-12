@@ -21,6 +21,7 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/tls"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -30,8 +31,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	"github.com/onsi/gomega"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilnettesting "k8s.io/apimachinery/pkg/util/net/testing"
@@ -39,10 +39,12 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/rest"
 	utilexec "k8s.io/client-go/util/exec"
+	"k8s.io/ktesting"
 	"k8s.io/streaming/pkg/httpstream"
 )
 
 func TestFallbackClient_WebSocketPrimarySucceeds(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	// Create fake WebSocket server. Copy received STDIN data back onto STDOUT stream.
 	websocketServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		conns, err := webSocketServerStreams(req, w, streamOptionsFromRequest(req))
@@ -63,14 +65,14 @@ func TestFallbackClient_WebSocketPrimarySucceeds(t *testing.T) {
 	// Must add STDIN and STDOUT query params for the client request.
 	websocketServer.URL = websocketServer.URL + "?" + "stdin=true" + "&" + "stdout=true"
 	websocketLocation, err := url.Parse(websocketServer.URL)
-	require.NoError(t, err)
+	tCtx.ExpectNoError(err)
 	websocketExecutor, err := NewWebSocketExecutor(&rest.Config{Host: websocketLocation.Host}, "GET", websocketServer.URL)
-	require.NoError(t, err)
+	tCtx.ExpectNoError(err)
 	spdyExecutor, err := NewSPDYExecutor(&rest.Config{Host: websocketLocation.Host}, "POST", websocketLocation)
-	require.NoError(t, err)
+	tCtx.ExpectNoError(err)
 	// Never fallback, so always use the websocketExecutor, which succeeds against websocket server.
 	exec, err := NewFallbackExecutor(websocketExecutor, spdyExecutor, func(error) bool { return false })
-	require.NoError(t, err)
+	tCtx.ExpectNoError(err)
 	// Generate random data, and set it up to stream on STDIN. The data will be
 	// returned on the STDOUT buffer.
 	randomSize := 1024 * 1024
@@ -110,6 +112,7 @@ func TestFallbackClient_WebSocketPrimarySucceeds(t *testing.T) {
 }
 
 func TestFallbackClient_SPDYSecondarySucceeds(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	// Create fake SPDY server. Copy received STDIN data back onto STDOUT stream.
 	spdyServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		var stdin, stdout bytes.Buffer
@@ -130,14 +133,14 @@ func TestFallbackClient_SPDYSecondarySucceeds(t *testing.T) {
 	defer spdyServer.Close()
 
 	spdyLocation, err := url.Parse(spdyServer.URL)
-	require.NoError(t, err)
+	tCtx.ExpectNoError(err)
 	websocketExecutor, err := NewWebSocketExecutor(&rest.Config{Host: spdyLocation.Host}, "GET", spdyServer.URL)
-	require.NoError(t, err)
+	tCtx.ExpectNoError(err)
 	spdyExecutor, err := NewSPDYExecutor(&rest.Config{Host: spdyLocation.Host}, "POST", spdyLocation)
-	require.NoError(t, err)
+	tCtx.ExpectNoError(err)
 	// Always fallback to spdyExecutor, and spdyExecutor succeeds against fake spdy server.
 	exec, err := NewFallbackExecutor(websocketExecutor, spdyExecutor, func(error) bool { return true })
-	require.NoError(t, err)
+	tCtx.ExpectNoError(err)
 	// Generate random data, and set it up to stream on STDIN. The data will be
 	// returned on the STDOUT buffer.
 	randomSize := 1024 * 1024
@@ -176,6 +179,7 @@ func TestFallbackClient_SPDYSecondarySucceeds(t *testing.T) {
 }
 
 func TestFallbackClient_PrimaryAndSecondaryFail(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	// Create fake WebSocket server. Copy received STDIN data back onto STDOUT stream.
 	websocketServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		conns, err := webSocketServerStreams(req, w, streamOptionsFromRequest(req))
@@ -196,19 +200,19 @@ func TestFallbackClient_PrimaryAndSecondaryFail(t *testing.T) {
 	// Must add STDIN and STDOUT query params for the client request.
 	websocketServer.URL = websocketServer.URL + "?" + "stdin=true" + "&" + "stdout=true"
 	websocketLocation, err := url.Parse(websocketServer.URL)
-	require.NoError(t, err)
+	tCtx.ExpectNoError(err)
 	websocketExecutor, err := NewWebSocketExecutor(&rest.Config{Host: websocketLocation.Host}, "GET", websocketServer.URL)
-	require.NoError(t, err)
+	tCtx.ExpectNoError(err)
 	spdyExecutor, err := NewSPDYExecutor(&rest.Config{Host: websocketLocation.Host}, "POST", websocketLocation)
-	require.NoError(t, err)
+	tCtx.ExpectNoError(err)
 	// Always fallback to spdyExecutor, but spdyExecutor fails against websocket server.
 	exec, err := NewFallbackExecutor(websocketExecutor, spdyExecutor, func(error) bool { return true })
-	require.NoError(t, err)
+	tCtx.ExpectNoError(err)
 	// Update the websocket executor to request remote command v4, which is unsupported.
-	fallbackExec, ok := exec.(*FallbackExecutor)
-	assert.True(t, ok, "error casting executor as FallbackExecutor")
-	websocketExec, ok := fallbackExec.primary.(*wsStreamExecutor)
-	assert.True(t, ok, "error casting executor as websocket executor")
+	tCtx.Assert(exec).Should(gomega.BeAssignableToTypeOf(&FallbackExecutor{}), "error casting executor as FallbackExecutor")
+	fallbackExec, _ := exec.(*FallbackExecutor)
+	tCtx.Assert(fallbackExec.primary).Should(gomega.BeAssignableToTypeOf(&wsStreamExecutor{}), "error casting executor as websocket executor")
+	websocketExec, _ := fallbackExec.primary.(*wsStreamExecutor)
 	// Set the attempted subprotocol version to V4; websocket server only accepts V5.
 	websocketExec.protocols = []string{remotecommand.StreamProtocolV4Name}
 
@@ -234,11 +238,12 @@ func TestFallbackClient_PrimaryAndSecondaryFail(t *testing.T) {
 		t.Fatalf("expect stream to be closed after connection is closed.")
 	case err := <-errorChan:
 		// Ensure secondary executor returned an error.
-		require.Error(t, err)
+		tCtx.Require(err).Should(gomega.HaveOccurred())
 	}
 }
 
 func TestFallbackClient_SPDYSecondaryNonZeroExitCode(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	const expectedExitCode = 23
 	const expectedStdout = "stdout-before-exit"
 
@@ -278,32 +283,32 @@ func TestFallbackClient_SPDYSecondaryNonZeroExitCode(t *testing.T) {
 	defer spdyServer.Close()
 
 	spdyLocation, err := url.Parse(spdyServer.URL)
-	require.NoError(t, err)
+	tCtx.ExpectNoError(err)
 	// Primary websocket executor points at a SPDY-only endpoint and should fail.
 	websocketExecutor, err := NewWebSocketExecutor(&rest.Config{Host: spdyLocation.Host}, "GET", spdyServer.URL+"?stdin=true&stdout=true")
-	require.NoError(t, err)
+	tCtx.ExpectNoError(err)
 	spdyExecutor, err := NewSPDYExecutor(&rest.Config{Host: spdyLocation.Host}, "POST", spdyLocation)
-	require.NoError(t, err)
+	tCtx.ExpectNoError(err)
 
 	var sawPrimaryError atomic.Bool
 	exec, err := NewFallbackExecutor(websocketExecutor, spdyExecutor, func(err error) bool {
 		sawPrimaryError.Store(true)
 		return true
 	})
-	require.NoError(t, err)
+	tCtx.ExpectNoError(err)
 
 	var stdout bytes.Buffer
 	err = exec.StreamWithContext(context.Background(), StreamOptions{
 		Stdin:  strings.NewReader("input"),
 		Stdout: &stdout,
 	})
-	require.Error(t, err)
-	require.True(t, sawPrimaryError.Load(), "expected primary websocket path to fail and trigger fallback")
+	tCtx.Require(err).Should(gomega.HaveOccurred())
+	tCtx.Require(sawPrimaryError.Load()).Should(gomega.BeTrueBecause("expected primary websocket path to fail and trigger fallback"))
 
 	var exitErr utilexec.ExitError
-	require.ErrorAs(t, err, &exitErr, "expected ExitError from secondary SPDY path, got: %T: %v", err, err)
-	require.Equal(t, expectedExitCode, exitErr.ExitStatus())
-	require.Equal(t, expectedStdout, stdout.String())
+	tCtx.Require(errors.As(err, &exitErr)).Should(gomega.BeTrueBecause("expected ExitError from secondary SPDY path, got: %T: %v", err, err))
+	tCtx.Require(exitErr.ExitStatus()).Should(gomega.Equal(expectedExitCode))
+	tCtx.Require(stdout.String()).Should(gomega.Equal(expectedStdout))
 }
 
 // localhostCert was generated from crypto/tls/generate_cert.go with the following command:
@@ -361,6 +366,7 @@ KR8NJEkK99Vh/tew6jAMll70xFrE7aF8VLXJVE7w4sQzuvHxl9Q=
 
 // See (https://github.com/kubernetes/kubernetes/issues/126134).
 func TestFallbackClient_WebSocketHTTPSProxyNoFallback(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	cert, err := tls.X509KeyPair(localhostCert, localhostKey)
 	if err != nil {
 		t.Errorf("https (valid hostname): proxy_test: %v", err)
@@ -379,7 +385,7 @@ func TestFallbackClient_WebSocketHTTPSProxyNoFallback(t *testing.T) {
 	defer proxyServer.Close() //nolint:errcheck
 
 	proxyLocation, err := url.Parse(proxyServer.URL)
-	require.NoError(t, err)
+	tCtx.ExpectNoError(err)
 
 	// Create fake WebSocket server. Copy received STDIN data back onto STDOUT stream.
 	websocketServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
@@ -401,7 +407,7 @@ func TestFallbackClient_WebSocketHTTPSProxyNoFallback(t *testing.T) {
 	// The proxy server should open a websocket connection to the fake websocket server.
 	websocketServer.URL = websocketServer.URL + "?" + "stdin=true" + "&" + "stdout=true"
 	websocketLocation, err := url.Parse(websocketServer.URL)
-	require.NoError(t, err)
+	tCtx.ExpectNoError(err)
 	clientConfig := &rest.Config{
 		Host:            websocketLocation.Host,
 		TLSClientConfig: rest.TLSClientConfig{CAData: localhostCert},
@@ -410,10 +416,10 @@ func TestFallbackClient_WebSocketHTTPSProxyNoFallback(t *testing.T) {
 		},
 	}
 	websocketExecutor, err := NewWebSocketExecutor(clientConfig, "GET", websocketServer.URL)
-	require.NoError(t, err)
+	tCtx.ExpectNoError(err)
 	emptyURL, _ := url.Parse("")
 	spdyExecutor, err := NewSPDYExecutor(clientConfig, "POST", emptyURL)
-	require.NoError(t, err)
+	tCtx.ExpectNoError(err)
 	// No fallback to spdyExecutor with websocket.
 	sawHTTPSProxyError := false
 	exec, err := NewFallbackExecutor(websocketExecutor, spdyExecutor, func(err error) bool {
@@ -428,7 +434,7 @@ func TestFallbackClient_WebSocketHTTPSProxyNoFallback(t *testing.T) {
 		}
 		return false
 	})
-	require.NoError(t, err)
+	tCtx.ExpectNoError(err)
 
 	// Generate random data, and set it up to stream on STDIN. The data will be
 	// returned on the STDOUT buffer.

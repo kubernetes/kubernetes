@@ -22,9 +22,9 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/stretchr/testify/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/ktesting"
 )
 
 func TestThreadSafeStoreDeleteRemovesEmptySetsFromIndex(t *testing.T) {
@@ -113,7 +113,7 @@ func TestThreadSafeStoreIndexingFunctionsWithMultipleValues(t *testing.T) {
 	store.Add("key1", "foo")
 	store.Add("key2", "bar")
 
-	assert := assert.New(t)
+	tCtx := ktesting.Init(t)
 
 	compare := func(key string, expected []string) error {
 		values := sets.List(store.index.indices[testIndexer][key])
@@ -123,48 +123,48 @@ func TestThreadSafeStoreIndexingFunctionsWithMultipleValues(t *testing.T) {
 		return fmt.Errorf("unexpected index for key %s, diff=%s", key, cmp.Diff(values, expected))
 	}
 
-	assert.NoError(compare("foo", []string{"key1"}))
-	assert.NoError(compare("bar", []string{"key2"}))
+	tCtx.AssertNoError(compare("foo", []string{"key1"}))
+	tCtx.AssertNoError(compare("bar", []string{"key2"}))
 
 	store.Update("key2", "foo,bar")
 
-	assert.NoError(compare("foo", []string{"key1", "key2"}))
-	assert.NoError(compare("bar", []string{"key2"}))
+	tCtx.AssertNoError(compare("foo", []string{"key1", "key2"}))
+	tCtx.AssertNoError(compare("bar", []string{"key2"}))
 
 	store.Update("key1", "foo,bar")
 
-	assert.NoError(compare("foo", []string{"key1", "key2"}))
-	assert.NoError(compare("bar", []string{"key1", "key2"}))
+	tCtx.AssertNoError(compare("foo", []string{"key1", "key2"}))
+	tCtx.AssertNoError(compare("bar", []string{"key1", "key2"}))
 
 	store.Add("key3", "foo,bar,baz")
 
-	assert.NoError(compare("foo", []string{"key1", "key2", "key3"}))
-	assert.NoError(compare("bar", []string{"key1", "key2", "key3"}))
-	assert.NoError(compare("baz", []string{"key3"}))
+	tCtx.AssertNoError(compare("foo", []string{"key1", "key2", "key3"}))
+	tCtx.AssertNoError(compare("bar", []string{"key1", "key2", "key3"}))
+	tCtx.AssertNoError(compare("baz", []string{"key3"}))
 
 	store.Update("key1", "foo")
 
-	assert.NoError(compare("foo", []string{"key1", "key2", "key3"}))
-	assert.NoError(compare("bar", []string{"key2", "key3"}))
-	assert.NoError(compare("baz", []string{"key3"}))
+	tCtx.AssertNoError(compare("foo", []string{"key1", "key2", "key3"}))
+	tCtx.AssertNoError(compare("bar", []string{"key2", "key3"}))
+	tCtx.AssertNoError(compare("baz", []string{"key3"}))
 
 	store.Update("key2", "bar")
 
-	assert.NoError(compare("foo", []string{"key1", "key3"}))
-	assert.NoError(compare("bar", []string{"key2", "key3"}))
-	assert.NoError(compare("baz", []string{"key3"}))
+	tCtx.AssertNoError(compare("foo", []string{"key1", "key3"}))
+	tCtx.AssertNoError(compare("bar", []string{"key2", "key3"}))
+	tCtx.AssertNoError(compare("baz", []string{"key3"}))
 
 	store.Delete("key1")
 
-	assert.NoError(compare("foo", []string{"key3"}))
-	assert.NoError(compare("bar", []string{"key2", "key3"}))
-	assert.NoError(compare("baz", []string{"key3"}))
+	tCtx.AssertNoError(compare("foo", []string{"key3"}))
+	tCtx.AssertNoError(compare("bar", []string{"key2", "key3"}))
+	tCtx.AssertNoError(compare("baz", []string{"key3"}))
 
 	store.Delete("key3")
 
-	assert.NoError(compare("foo", []string{}))
-	assert.NoError(compare("bar", []string{"key2"}))
-	assert.NoError(compare("baz", []string{}))
+	tCtx.AssertNoError(compare("foo", []string{}))
+	tCtx.AssertNoError(compare("bar", []string{"key2"}))
+	tCtx.AssertNoError(compare("baz", []string{}))
 }
 
 func TestThreadSafeStoreRV(t *testing.T) {

@@ -27,7 +27,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
-	"github.com/stretchr/testify/require"
+	"github.com/onsi/gomega"
 
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -38,7 +38,7 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	clientfeatures "k8s.io/client-go/features"
 	clientfeaturestesting "k8s.io/client-go/features/testing"
-	"k8s.io/klog/v2/ktesting"
+	"k8s.io/ktesting"
 	testingclock "k8s.io/utils/clock/testing"
 	"k8s.io/utils/ptr"
 )
@@ -100,25 +100,25 @@ func TestNewReflectorWithDisablementWatchList(t *testing.T) {
 }
 
 func TestInitialEventsEndBookmarkTicker(t *testing.T) {
-	assertNoEvents := func(t *testing.T, c <-chan time.Time) {
+	assertNoEvents := func(tCtx ktesting.TContext, c <-chan time.Time) {
 		select {
 		case e := <-c:
-			t.Errorf("Unexpected: %#v event received, expected no events", e)
+			tCtx.Errorf("Unexpected: %#v event received, expected no events", e)
 		default:
 			return
 		}
 	}
 
 	t.Run("testing NoopInitialEventsEndBookmarkTicker", func(t *testing.T) {
-		logger, _ := ktesting.NewTestContext(t)
+		tCtx := ktesting.Init(t)
 		clock := testingclock.NewFakeClock(time.Now())
-		target := newInitialEventsEndBookmarkTickerInternal(logger, "testName", clock, clock.Now(), time.Second, false)
+		target := newInitialEventsEndBookmarkTickerInternal(tCtx.Logger(), "testName", clock, clock.Now(), time.Second, false)
 
 		clock.Step(30 * time.Second)
-		assertNoEvents(t, target.C())
+		assertNoEvents(tCtx, target.C())
 		actualWarning := target.produceWarningIfExpired()
 
-		require.Empty(t, actualWarning, "didn't expect any warning")
+		tCtx.Require(actualWarning).ShouldNot(gomega.HaveOccurred(), "didn't expect any warning")
 		// validate if the other methods don't produce panic
 		target.warnIfExpired()
 		target.observeLastEventTimeStamp(clock.Now())
@@ -126,45 +126,45 @@ func TestInitialEventsEndBookmarkTicker(t *testing.T) {
 		// make sure that after calling the other methods
 		// nothing hasn't changed
 		actualWarning = target.produceWarningIfExpired()
-		require.Empty(t, actualWarning, "didn't expect any warning")
-		assertNoEvents(t, target.C())
+		tCtx.Require(actualWarning).ShouldNot(gomega.HaveOccurred(), "didn't expect any warning")
+		assertNoEvents(tCtx, target.C())
 
 		target.Stop()
 	})
 
 	t.Run("testing InitialEventsEndBookmarkTicker backed by a fake clock", func(t *testing.T) {
-		logger, _ := ktesting.NewTestContext(t)
+		tCtx := ktesting.Init(t)
 		clock := testingclock.NewFakeClock(time.Now())
-		target := newInitialEventsEndBookmarkTickerInternal(logger, "testName", clock, clock.Now(), time.Second, true)
+		target := newInitialEventsEndBookmarkTickerInternal(tCtx.Logger(), "testName", clock, clock.Now(), time.Second, true)
 		clock.Step(500 * time.Millisecond)
-		assertNoEvents(t, target.C())
+		assertNoEvents(tCtx, target.C())
 
 		clock.Step(500 * time.Millisecond)
 		<-target.C()
 		actualWarning := target.produceWarningIfExpired()
-		require.Equal(t, errors.New("testName: awaiting required bookmark event for initial events stream, no events received for 1s"), actualWarning)
+		tCtx.Require(actualWarning).Should(gomega.Equal(errors.New("testName: awaiting required bookmark event for initial events stream, no events received for 1s")))
 
 		clock.Step(time.Second)
 		<-target.C()
 		actualWarning = target.produceWarningIfExpired()
-		require.Equal(t, errors.New("testName: awaiting required bookmark event for initial events stream, no events received for 2s"), actualWarning)
+		tCtx.Require(actualWarning).Should(gomega.Equal(errors.New("testName: awaiting required bookmark event for initial events stream, no events received for 2s")))
 
 		target.observeLastEventTimeStamp(clock.Now())
 		clock.Step(500 * time.Millisecond)
-		assertNoEvents(t, target.C())
+		assertNoEvents(tCtx, target.C())
 
 		clock.Step(500 * time.Millisecond)
 		<-target.C()
 		actualWarning = target.produceWarningIfExpired()
-		require.Equal(t, errors.New("testName: hasn't received required bookmark event marking the end of initial events stream, received last event 1s ago"), actualWarning)
+		tCtx.Require(actualWarning).Should(gomega.Equal(errors.New("testName: hasn't received required bookmark event marking the end of initial events stream, received last event 1s ago")))
 
 		clock.Step(time.Second)
 		<-target.C()
 		actualWarning = target.produceWarningIfExpired()
-		require.Equal(t, errors.New("testName: hasn't received required bookmark event marking the end of initial events stream, received last event 2s ago"), actualWarning)
+		tCtx.Require(actualWarning).Should(gomega.Equal(errors.New("testName: hasn't received required bookmark event marking the end of initial events stream, received last event 2s ago")))
 
 		target.Stop()
-		assertNoEvents(t, target.C())
+		assertNoEvents(tCtx, target.C())
 	})
 }
 
@@ -200,11 +200,11 @@ func TestWatchListResourceVersion(t *testing.T) {
 	}
 	for _, scenario := range scenarios {
 		t.Run(scenario.name, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
 			scenario := scenario
-			_, ctx := ktesting.NewTestContext(t)
 			clientfeaturestesting.SetFeatureDuringTest(t, clientfeatures.WatchListClient, true)
 
-			lw, s, r, ctx, cancel := testData(ctx)
+			lw, s, r, ctx, cancel := testData(tCtx)
 
 			go func() {
 				for _, e := range scenario.watchEvents {
@@ -225,7 +225,7 @@ func TestWatchListResourceVersion(t *testing.T) {
 				t.Errorf("expected errorStopRequested, got %v", err)
 			}
 
-			require.Equal(t, scenario.expectedResourceVersion, curRV)
+			tCtx.Require(curRV).Should(gomega.Equal(scenario.expectedResourceVersion))
 		})
 	}
 }
@@ -592,9 +592,9 @@ func TestWatchList(t *testing.T) {
 	for _, s := range scenarios {
 		t.Run(s.name, func(t *testing.T) {
 			scenario := s // capture as local variable
-			_, ctx := ktesting.NewTestContext(t)
+			tCtx := ktesting.Init(t)
 			clientfeaturestesting.SetFeatureDuringTest(t, clientfeatures.WatchListClient, !scenario.disableUseWatchList)
-			listWatcher, store, reflector, ctx, cancel := testData(ctx)
+			listWatcher, store, reflector, ctx, cancel := testData(tCtx)
 			go func() {
 				for i, e := range scenario.watchEvents {
 					listWatcher.fakeWatcher.Action(e.Type, e.Object)

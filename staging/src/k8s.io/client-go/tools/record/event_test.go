@@ -27,7 +27,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/onsi/gomega"
 	"go.uber.org/goleak"
 
 	v1 "k8s.io/api/core/v1"
@@ -38,8 +38,8 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	restclient "k8s.io/client-go/rest"
 	ref "k8s.io/client-go/tools/reference"
-	"k8s.io/klog/v2"
-	"k8s.io/klog/v2/ktesting"
+	"k8s.io/ktesting"
+	"k8s.io/ktesting/initoption"
 	"k8s.io/utils/clock"
 	testclocks "k8s.io/utils/clock/testing"
 )
@@ -114,15 +114,18 @@ func OnPatchFactory(testCache map[string]*v1.Event, patchEvent chan<- *v1.Event)
 // output if StartStructuredLogging is used. Will be shut down automatically
 // after the test.
 func newBroadcasterForTests(tb testing.TB) EventBroadcaster {
-	_, ctx := ktesting.NewTestContext(tb)
-	caster := NewBroadcaster(WithSleepDuration(0), WithContext(ctx))
+	tCtx := ktesting.Init(tb)
+	caster := NewBroadcaster(WithSleepDuration(0), WithContext(tCtx))
 	tb.Cleanup(caster.Shutdown)
 	return caster
 }
 
 func TestBroadcasterShutdown(t *testing.T) {
-	_, ctx := ktesting.NewTestContext(t)
-	ctx, cancel := context.WithCancelCause(ctx)
+	// Intentionally avoid ktesting.Init here: it starts background
+	// goroutines (progress reporting, timeout handling) that are only
+	// cleaned up via t.Cleanup, which would make the goleak check below
+	// fail despite there being no actual leak from the broadcaster.
+	ctx, cancel := context.WithCancelCause(context.Background())
 
 	// Start a broadcaster with background activity.
 	caster := NewBroadcaster(WithContext(ctx))
@@ -188,6 +191,7 @@ func TestNonRacyShutdown(t *testing.T) {
 }
 
 func TestEventf(t *testing.T) {
+	tCtx := ktesting.Init(t, initoption.BufferLogs(true))
 	testPod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "foo",
@@ -452,10 +456,8 @@ func TestEventf(t *testing.T) {
 		},
 		OnPatch: OnPatchFactory(testCache, patchEvent),
 	}
-	logger := ktesting.NewLogger(t, ktesting.NewConfig(ktesting.BufferLogs(true)))
-	logSink := logger.GetSink().(ktesting.Underlier)
-	ctx := klog.NewContext(context.Background(), logger)
-	eventBroadcaster := NewBroadcaster(WithSleepDuration(0), WithContext(ctx))
+	logSink := tCtx.Logger().GetSink().(ktesting.Underlier)
+	eventBroadcaster := NewBroadcaster(WithSleepDuration(0), WithContext(tCtx))
 	defer eventBroadcaster.Shutdown()
 	sinkWatcher := eventBroadcaster.StartRecordingToSink(&testEvents)
 
@@ -478,9 +480,9 @@ func TestEventf(t *testing.T) {
 
 		// We don't get notified by the structured test logger directly.
 		// Instead, we periodically check what new output it has produced.
-		assert.EventuallyWithT(t, func(t *assert.CollectT) {
-			assert.Equal(t, item.expectStructuredLog, logSink.GetBuffer().String()[oldEnd:], "new structured log output")
-		}, time.Minute, time.Millisecond)
+		tCtx.Eventually(func(tCtx ktesting.TContext) {
+			tCtx.Expect(logSink.GetBuffer().String()[oldEnd:]).Should(gomega.Equal(item.expectStructuredLog), "new structured log output")
+		}).WithTimeout(time.Minute).WithPolling(time.Millisecond).Should(gomega.Succeed())
 
 		// validate event
 		if item.expectUpdate {

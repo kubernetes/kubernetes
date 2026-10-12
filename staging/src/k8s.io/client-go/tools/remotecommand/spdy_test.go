@@ -37,7 +37,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/rest"
 	utilexec "k8s.io/client-go/util/exec"
-	"k8s.io/klog/v2/ktesting"
+	"k8s.io/ktesting"
 	"k8s.io/streaming/pkg/httpstream"
 	"k8s.io/streaming/pkg/httpstream/spdy"
 )

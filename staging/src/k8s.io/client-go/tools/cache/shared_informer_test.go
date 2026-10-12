@@ -31,8 +31,6 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/onsi/gomega"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -42,8 +40,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	fcache "k8s.io/client-go/tools/cache/testing"
 	"k8s.io/klog/v2"
-	"k8s.io/klog/v2/ktesting"
 	"k8s.io/klog/v2/textlogger"
+	"k8s.io/ktesting"
 	testingclock "k8s.io/utils/clock/testing"
 )
 
@@ -151,7 +149,7 @@ func isRegistered(i SharedInformer, h ResourceEventHandlerRegistration) bool {
 }
 
 func TestIndexer(t *testing.T) {
-	assert := assert.New(t)
+	tCtx := ktesting.Init(t)
 	// source simulates an apiserver object endpoint.
 	source := newFakeControllerSource(t)
 	pod1 := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod1", Labels: map[string]string{"a": "a-val", "b": "b-val1"}}}
@@ -191,7 +189,7 @@ func TestIndexer(t *testing.T) {
 
 	// We should be able to lookup by index
 	res, err := informer.GetIndexer().ByIndex("labels", "a")
-	assert.NoError(err)
+	tCtx.AssertNoError(err)
 	if diff := cmp.Diff([]any{pod1}, res); diff != "" {
 		t.Fatal(diff)
 	}
@@ -199,10 +197,10 @@ func TestIndexer(t *testing.T) {
 	// Adding an item later is fine as well
 	source.Add(pod3)
 	// Event is async, need to poll
-	assert.Eventually(func() bool {
+	tCtx.Eventually(func(tCtx ktesting.TContext) bool {
 		res, _ := informer.GetIndexer().ByIndex("labels", "a")
 		return cmp.Diff([]any{pod1, pod3}, res, cmpOps) == ""
-	}, time.Second*3, time.Millisecond)
+	}).WithTimeout(time.Second * 3).WithPolling(time.Millisecond).Should(gomega.BeTrueBecause("the index should eventually contain pod1 and pod3"))
 
 	// Adding an index later is also fine
 	err = informer.AddIndexers(map[string]IndexFunc{
@@ -214,11 +212,11 @@ func TestIndexer(t *testing.T) {
 			return res, nil
 		},
 	})
-	assert.NoError(err)
+	tCtx.AssertNoError(err)
 
 	// Should be immediately available
 	res, err = informer.GetIndexer().ByIndex("labels-again", "a")
-	assert.NoError(err)
+	tCtx.AssertNoError(err)
 	if diff := cmp.Diff([]any{pod1, pod3}, res, cmpOps); diff != "" {
 		t.Fatal(diff)
 	}
@@ -1155,15 +1153,16 @@ func TestAddWhileActive(t *testing.T) {
 // all goroutines really have stopped in the different scenarios.
 func TestShutdown(t *testing.T) {
 	t.Run("no-context", func(t *testing.T) {
+		tCtx := ktesting.Init(t)
 		source := newFakeControllerSource(t)
 
 		informer := NewSharedInformer(source, &v1.Pod{}, 1*time.Second)
 		handler, err := informer.AddEventHandler(ResourceEventHandlerFuncs{
 			AddFunc: func(_ any) {},
 		})
-		require.NoError(t, err)
+		tCtx.ExpectNoError(err)
 		defer func() {
-			assert.NoError(t, informer.RemoveEventHandler(handler))
+			tCtx.AssertNoError(informer.RemoveEventHandler(handler))
 		}()
 
 		var wg wait.Group
@@ -1174,10 +1173,11 @@ func TestShutdown(t *testing.T) {
 			wg.Wait()
 		}()
 
-		require.Eventually(t, informer.HasSynced, time.Minute, time.Millisecond, "informer has synced")
+		tCtx.Eventually(informer.HasSynced).WithTimeout(time.Minute).WithPolling(time.Millisecond).Should(gomega.BeTrueBecause("informer has synced"))
 	})
 
 	t.Run("no-context-later", func(t *testing.T) {
+		tCtx := ktesting.Init(t)
 		source := newFakeControllerSource(t)
 		informer := NewSharedInformer(source, &v1.Pod{}, 1*time.Second)
 
@@ -1189,22 +1189,23 @@ func TestShutdown(t *testing.T) {
 			wg.Wait()
 		}()
 
-		require.Eventually(t, informer.HasSynced, time.Minute, time.Millisecond, "informer has synced")
+		tCtx.Eventually(informer.HasSynced).WithTimeout(time.Minute).WithPolling(time.Millisecond).Should(gomega.BeTrueBecause("informer has synced"))
 
 		handler, err := informer.AddEventHandler(ResourceEventHandlerFuncs{
 			AddFunc: func(_ any) {},
 		})
-		require.NoError(t, err)
-		assert.NoError(t, informer.RemoveEventHandler(handler))
+		tCtx.ExpectNoError(err)
+		tCtx.AssertNoError(informer.RemoveEventHandler(handler))
 	})
 
 	t.Run("no-run", func(t *testing.T) {
+		tCtx := ktesting.Init(t)
 		source := newFakeControllerSource(t)
 		informer := NewSharedInformer(source, &v1.Pod{}, 1*time.Second)
 		_, err := informer.AddEventHandler(ResourceEventHandlerFuncs{
 			AddFunc: func(_ any) {},
 		})
-		require.NoError(t, err)
+		tCtx.ExpectNoError(err)
 
 		// At this point, neither informer nor handler have any goroutines running
 		// and it doesn't matter that nothing gets stopped or removed.
@@ -1260,33 +1261,34 @@ func TestEventPanics(t *testing.T) {
 	handler := newHandler(context.Background())
 
 	t.Run("simple", func(t *testing.T) {
+		tCtx := ktesting.Init(t)
 		init(t)
 		klog.SetLogger(logger)
 		stop := make(chan struct{})
 		informer := NewSharedInformer(source, &v1.Pod{}, 1*time.Second)
 		handle, err := informer.AddEventHandler(handler)
-		require.NoError(t, err)
+		tCtx.ExpectNoError(err)
 		defer func() {
-			assert.NoError(t, informer.RemoveEventHandler(handle))
+			tCtx.AssertNoError(informer.RemoveEventHandler(handle))
 		}()
 		var wg wait.Group
 		wg.StartWithChannel(stop, informer.Run)
 		defer func() {
 			close(stop)
-			assert.Eventually(t, informer.IsStopped, time.Minute, time.Millisecond, "informer has stopped")
+			tCtx.Eventually(informer.IsStopped).WithTimeout(time.Minute).WithPolling(time.Millisecond).Should(gomega.BeTrueBecause("informer has stopped"))
 			wg.Wait() // For race detector...
 		}()
-		require.Eventually(t, informer.HasSynced, time.Minute, time.Millisecond, "informer has synced")
+		tCtx.Eventually(informer.HasSynced).WithTimeout(time.Minute).WithPolling(time.Millisecond).Should(gomega.BeTrueBecause("informer has synced"))
 
 		// This times out (https://github.com/kubernetes/kubernetes/issues/129024) because the
 		// handler never syncs when the callback panics:
-		//    require.Eventually(t, handle.HasSynced, time.Minute, time.Millisecond, "handler has synced")
+		//    tCtx.Eventually(handle.HasSynced).WithTimeout(time.Minute).WithPolling(time.Millisecond).Should(gomega.BeTrueBecause("handler has synced"))
 		//
 		// Wait for a non-empty buffer instead. This implies that we have to make
 		// the buffer thread-safe, which wouldn't be necessary otherwise.
-		assert.EventuallyWithT(t, func(t *assert.CollectT) {
-			assert.Contains(t, buffer.String(), expectedLog(""))
-		}, time.Minute, time.Millisecond, "handler has panicked")
+		tCtx.Eventually(func(tCtx ktesting.TContext) {
+			tCtx.Expect(buffer.String()).Should(gomega.ContainSubstring(expectedLog("")))
+		}).WithTimeout(time.Minute).WithPolling(time.Millisecond).Should(gomega.Succeed(), "handler has panicked")
 	})
 
 	t.Run("many", func(t *testing.T) {
@@ -1296,55 +1298,52 @@ func TestEventPanics(t *testing.T) {
 		for i := 1; i < numPods; i++ {
 			source.Add(&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: fmt.Sprintf("pod%d", i+1)}})
 		}
-		_, ctx := ktesting.NewTestContext(t)
-		ctx, cancel := context.WithCancel(ctx)
-		defer cancel()
+		tCtx := ktesting.Init(t)
 
 		informer := NewSharedInformer(source, &v1.Pod{}, 1*time.Second)
 		name1 := "fake-event-handler-1"
 		logger1 := klog.LoggerWithName(logger, name1)
-		ctx1 := klog.NewContext(ctx, logger1)
+		ctx1 := klog.NewContext(tCtx, logger1)
 		handle1, err := informer.AddEventHandlerWithOptions(newHandler(ctx1), HandlerOptions{Logger: &logger1})
-		require.NoError(t, err)
+		tCtx.ExpectNoError(err)
 		defer func() {
-			assert.NoError(t, informer.RemoveEventHandler(handle1))
+			tCtx.AssertNoError(informer.RemoveEventHandler(handle1))
 		}()
 		name2 := "fake-event-handler-2"
 		logger2 := klog.LoggerWithName(logger, name2)
-		ctx2 := klog.NewContext(ctx, logger2)
+		ctx2 := klog.NewContext(tCtx, logger2)
 		handle2, err := informer.AddEventHandlerWithOptions(newHandler(ctx2), HandlerOptions{Logger: &logger2})
-		require.NoError(t, err)
+		tCtx.ExpectNoError(err)
 		defer func() {
-			assert.NoError(t, informer.RemoveEventHandler(handle2))
+			tCtx.AssertNoError(informer.RemoveEventHandler(handle2))
 		}()
 
 		start := time.Now()
 		var wg wait.Group
 		informerName := "informer"
 		informerLogger := klog.LoggerWithName(logger, informerName)
-		informerCtx := klog.NewContext(ctx, informerLogger)
+		runCtx := tCtx.WithCancel()
+		informerCtx := klog.NewContext(runCtx, informerLogger)
 		wg.StartWithContext(informerCtx, informer.RunWithContext)
 		defer func() {
-			cancel()
-			assert.Eventually(t, informer.IsStopped, time.Minute, time.Millisecond, "informer has stopped")
+			runCtx.Cancel("test is stopping the informer")
+			tCtx.Eventually(informer.IsStopped).WithTimeout(time.Minute).WithPolling(time.Millisecond).Should(gomega.BeTrueBecause("informer has stopped"))
 			wg.Wait() // For race detector...
 		}()
-		require.Eventually(t, informer.HasSynced, time.Minute, time.Millisecond, "informer has synced")
+		tCtx.Eventually(informer.HasSynced).WithTimeout(time.Minute).WithPolling(time.Millisecond).Should(gomega.BeTrueBecause("informer has synced"))
 
-		assert.EventuallyWithT(t, func(t *assert.CollectT) {
+		tCtx.Eventually(func(tCtx ktesting.TContext) {
 			output := buffer.String()
 			expected := expectedLog(name1)
-			if !assert.Equal(t, numPods, numOccurrences(output, expected), "Log output should have the right number of panics for %q (search string: %q), got instead:\n%s", name1, expected, output) {
-				return
-			}
+			tCtx.Expect(numOccurrences(output, expected)).Should(gomega.Equal(numPods), "Log output should have the right number of panics for %q (search string: %q), got instead:\n%s", name1, expected, output)
 			expected = expectedLog(name2)
-			assert.Equal(t, numPods, numOccurrences(output, expected), "Log output should have the right number of panics for %q (search string %q, got instead:\n%s", name2, expected, output)
-		}, 30*time.Second, time.Millisecond, "handler has panicked")
+			tCtx.Expect(numOccurrences(output, expected)).Should(gomega.Equal(numPods), "Log output should have the right number of panics for %q (search string %q, got instead:\n%s", name2, expected, output)
+		}).WithTimeout(30*time.Second).WithPolling(time.Millisecond).Should(gomega.Succeed(), "handler has panicked")
 
 		// Both handlers should have slept for one second after each panic,
 		// except after the last pod event because then the input channel
 		// gets closed.
-		assert.GreaterOrEqual(t, time.Since(start), time.Duration(numPods-1)*time.Second, "Delay in processorListener.run")
+		tCtx.Assert(time.Since(start)).Should(gomega.BeNumerically(">=", time.Duration(numPods-1)*time.Second), "Delay in processorListener.run")
 	})
 }
 

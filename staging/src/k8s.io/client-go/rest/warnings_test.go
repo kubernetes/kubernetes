@@ -20,38 +20,41 @@ import (
 	"context"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/onsi/gomega"
+
+	"k8s.io/ktesting"
 )
 
 func TestDefaultWarningHandler(t *testing.T) {
-	t.Run("default", func(t *testing.T) {
-		assert.IsType(t, WarningHandlerWithContext(WarningLogger{}), getDefaultWarningHandler())
+	tCtx := ktesting.Init(t)
+	tCtx.Run("default", func(tCtx ktesting.TContext) {
+		tCtx.Assert(getDefaultWarningHandler()).Should(gomega.BeAssignableToTypeOf(WarningHandlerWithContext(WarningLogger{})))
 	})
 
-	deferRestore := func(t *testing.T) {
+	deferRestore := func(tCtx ktesting.TContext) {
 		handler := getDefaultWarningHandler()
-		t.Cleanup(func() {
+		tCtx.Cleanup(func() {
 			SetDefaultWarningHandlerWithContext(handler)
 		})
 	}
 
-	t.Run("no-context", func(t *testing.T) {
-		deferRestore(t)
+	tCtx.Run("no-context", func(tCtx ktesting.TContext) {
+		deferRestore(tCtx)
 		handler := &fakeWarningHandlerWithLogging{}
 		//nolint:logcheck
 		SetDefaultWarningHandler(handler)
 		getDefaultWarningHandler().HandleWarningHeaderWithContext(context.Background(), 0, "", "message")
-		assert.Equal(t, []string{"message"}, handler.messages)
+		tCtx.Assert(handler.messages).Should(gomega.Equal([]string{"message"}))
 		SetDefaultWarningHandler(nil)
-		assert.Nil(t, getDefaultWarningHandler())
+		tCtx.Assert(getDefaultWarningHandler()).Should(gomega.BeNil())
 	})
 
-	t.Run("with-context", func(t *testing.T) {
-		deferRestore(t)
+	tCtx.Run("with-context", func(tCtx ktesting.TContext) {
+		deferRestore(tCtx)
 		handler := &fakeWarningHandlerWithContext{}
 		SetDefaultWarningHandlerWithContext(handler)
-		assert.Equal(t, handler, getDefaultWarningHandler())
+		tCtx.Assert(getDefaultWarningHandler()).Should(gomega.Equal(handler))
 		SetDefaultWarningHandlerWithContext(nil)
-		assert.Nil(t, getDefaultWarningHandler())
+		tCtx.Assert(getDefaultWarningHandler()).Should(gomega.BeNil())
 	})
 }
