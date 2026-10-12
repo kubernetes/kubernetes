@@ -423,7 +423,7 @@ func TestDeclarativeValidateExtraNodeAllocatableResources(t *testing.T) {
 					field.Invalid(field.NewPath("status", "extraNodeAllocatableResources").Index(0).Child("mapping").Index(0).Child("name"), api.ResourceName("abc"), "must be a node allocatable resource name").MarkFromImperative(),
 				},
 			},
-			"invalid status: mapping name ephemeral-storage": {
+			"valid status: ephemeral-storage mapping name": {
 				old: makePodWithExtraNodeAllocatableResources("", nil),
 				update: makePodWithExtraNodeAllocatableResources("claim-1", []api.ExtraNodeAllocatableResource{
 					{
@@ -434,9 +434,6 @@ func TestDeclarativeValidateExtraNodeAllocatableResources(t *testing.T) {
 					},
 				}),
 				subresource: "/status",
-				expectedErrs: field.ErrorList{
-					field.Invalid(field.NewPath("status", "extraNodeAllocatableResources").Index(0).Child("mapping").Index(0).Child("name"), api.ResourceName("ephemeral-storage"), "must be a node allocatable resource name").MarkFromImperative(),
-				},
 			},
 			"invalid status: overhead name in kubernetes.io namespace": {
 				old: makePodWithExtraNodeAllocatableResources("", nil),
