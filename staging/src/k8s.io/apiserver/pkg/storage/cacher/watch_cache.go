@@ -407,16 +407,10 @@ func (c *watchCache) waitUntilFreshAndGetList(ctx context.Context, key string, o
 // with their ResourceVersion and the name of the index, if any, that was used.
 func (w *watchCache) WaitUntilFreshAndGetKeys(ctx context.Context, resourceVersion uint64) ([]string, error) {
 	span := tracing.SpanFromContext(ctx)
-	w.RLock()
-	span.AddEvent("watchCache locked acquired")
-	defer w.RUnlock()
-	err := w.waitUntilFreshLocked(ctx, resourceVersion)
+	snap, _, _, err := w.waitAndGetLatestSnapshot(ctx, resourceVersion, nil)
 	if err != nil {
 		return nil, err
 	}
-	span.AddEvent("watchCache fresh enough")
-	snap := w.storage.LatestSnapshot()
-	w.checkSnapshotResourceVersion(snap, w.resourceVersion)
 	var keys []string
 	for elem, err := range snap.RangePrefix("", "").All() {
 		if err != nil {
@@ -559,23 +553,17 @@ func (w *watchCache) notFresh(resourceVersion uint64) bool {
 // WaitUntilFreshAndGet returns a pointers to <storeElement> object.
 func (w *watchCache) WaitUntilFreshAndGet(ctx context.Context, resourceVersion uint64, key string) (interface{}, bool, uint64, error) {
 	span := tracing.SpanFromContext(ctx)
-	w.RLock()
-	span.AddEvent("watchCache locked acquired")
-	defer w.RUnlock()
-	err := w.waitUntilFreshLocked(ctx, resourceVersion)
+	snap, readResourceVersion, _, err := w.waitAndGetLatestSnapshot(ctx, resourceVersion, nil)
 	if err != nil {
 		return nil, false, 0, err
 	}
-	span.AddEvent("watchCache fresh enough")
-	snap := w.storage.LatestSnapshot()
-	w.checkSnapshotResourceVersion(snap, w.resourceVersion)
 	value, exists, err := snap.GetByKey(key)
 	if err != nil {
 		span.AddEvent("GetByKey failed", attribute.String("error", err.Error()))
 		return nil, false, 0, err
 	}
 	span.AddEvent("GetByKey success")
-	return value, exists, w.resourceVersion, err
+	return value, exists, readResourceVersion, err
 }
 
 // Replace takes slice of runtime.Object as a parameter.
