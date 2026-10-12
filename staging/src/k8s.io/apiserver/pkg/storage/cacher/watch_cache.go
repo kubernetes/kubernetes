@@ -616,7 +616,7 @@ func (w *watchCache) Replace(objs []interface{}, resourceVersion string) error {
 	// content.
 
 	// Empty the cyclic buffer, ensuring startIndex doesn't decrease.
-	w.history.ResetLocked()
+	w.history.ResetLocked(version)
 
 	if err := w.storage.Replace(toReplace, version); err != nil {
 		return err
@@ -646,7 +646,7 @@ func (w *watchCache) Resync() error {
 func (w *watchCache) getListResourceVersion() uint64 {
 	w.RLock()
 	defer w.RUnlock()
-	return w.storage.ListResourceVersion()
+	return w.history.listResourceVersion
 }
 
 func (w *watchCache) suggestedWatchChannelSize(indexExists, triggerUsed bool) int {
@@ -681,7 +681,7 @@ func (w *watchCache) getAllEventsSinceLocked(resourceVersion uint64, key string,
 		resourceVersion = w.resourceVersion
 	}
 
-	return w.history.GetIntervalLocked(resourceVersion, w.storage.ListResourceVersion(), w.RWMutex.RLocker())
+	return w.history.GetIntervalLocked(resourceVersion, w.RWMutex.RLocker())
 }
 
 // getIntervalFromStoreLocked returns a watchCacheInterval

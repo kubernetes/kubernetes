@@ -176,7 +176,7 @@ func compactWatch(c *CacheDelegator, client *clientv3.Client) storagetesting.Com
 
 			c.cacher.watchCache.history.startIndex++
 		}
-		c.cacher.watchCache.storage.UpdateListResourceVersion(rv)
+		c.cacher.watchCache.history.listResourceVersion = rv
 		if _, err := client.Compact(ctx, int64(rv)); err != nil {
 			t.Fatalf("Could not compact: %v", err)
 		}
