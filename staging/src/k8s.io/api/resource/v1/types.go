@@ -1082,6 +1082,8 @@ type DeviceTaintSelector struct {
 	// This fields corresponds to slice.spec.driver.
 	//
 	// +optional
+	// +k8s:optional
+	// +k8s:alpha(since: "1.38")=+k8s:dependentForbidden("all")
 	Driver *string `json:"driver,omitempty" protobuf:"bytes,2,opt,name=driver"`
 
 	// pool is the pool name. If pool is set, only devices in that pool are selected.
@@ -1094,6 +1096,8 @@ type DeviceTaintSelector struct {
 	// their pool name.
 	//
 	// +optional
+	// +k8s:optional
+	// +k8s:alpha(since: "1.38")=+k8s:dependentForbidden("all")
 	Pool *string `json:"pool,omitempty" protobuf:"bytes,3,opt,name=pool"`
 
 	// device represents the name of the device. If device is set, only devices with that name are selected.
@@ -1103,6 +1107,8 @@ type DeviceTaintSelector struct {
 	// but is not required.
 	//
 	// +optional
+	// +k8s:optional
+	// +k8s:alpha(since: "1.38")=+k8s:dependentForbidden("all")
 	Device *string `json:"device,omitempty" protobuf:"bytes,4,opt,name=device"`
 
 	// Selectors contains the same selection criteria as a ResourceClaim.
@@ -1130,9 +1136,6 @@ type DeviceTaintSelector struct {
 	// +optional
 	// +k8s:optional
 	// +k8s:alpha(since: "1.38")=+k8s:neq=false
-	// +k8s:alpha(since: "1.38")=+k8s:dependentForbidden("driver")
-	// +k8s:alpha(since: "1.38")=+k8s:dependentForbidden("pool")
-	// +k8s:alpha(since: "1.38")=+k8s:dependentForbidden("device")
 	All *bool `json:"all,omitempty" protobuf:"varint,6,opt,name=all"`
 }
 

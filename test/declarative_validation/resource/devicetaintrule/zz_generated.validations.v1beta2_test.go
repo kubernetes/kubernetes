@@ -62,16 +62,10 @@ func init() {
 				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
 			},
 			"spec.deviceSelector.all": {
+				{ErrorType: "FieldValueForbidden", Origin: "dependentForbidden"},
+				{ErrorType: "FieldValueForbidden", Origin: "dependentForbidden"},
+				{ErrorType: "FieldValueForbidden", Origin: "dependentForbidden"},
 				{ErrorType: "FieldValueInvalid", Origin: "neq"},
-			},
-			"spec.deviceSelector.device": {
-				{ErrorType: "FieldValueForbidden", Origin: "dependentForbidden"},
-			},
-			"spec.deviceSelector.driver": {
-				{ErrorType: "FieldValueForbidden", Origin: "dependentForbidden"},
-			},
-			"spec.deviceSelector.pool": {
-				{ErrorType: "FieldValueForbidden", Origin: "dependentForbidden"},
 			},
 			"spec.taint.effect": {
 				{ErrorType: "FieldValueNotSupported"},
