@@ -17,10 +17,15 @@ limitations under the License.
 package cost
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
+	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
+	"time"
 
 	v1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
@@ -32,7 +37,7 @@ import (
 )
 
 // BenchmarkRequestCost measures per-request heap allocations (B/op and allocs/op)
-// and wire bytes for kube-apiserver operations using the 10KB exemplar pod
+// and HTTP request/response sizes for kube-apiserver operations using the 10KB exemplar pod
 // across request methods, options, and wire formats.
 func BenchmarkRequestCost(b *testing.B) {
 	featuregatetesting.SetFeatureGatesDuringTest(b, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
@@ -359,10 +364,14 @@ func BenchmarkRequestCost(b *testing.B) {
 		},
 	}
 
+	report := perfData{Version: "v1"}
 	for _, sc := range scenarios {
 		b.Run(fmt.Sprintf("Method=%s/Options=%s", sc.method, sc.options), func(b *testing.B) {
-			benchmarkScenario(b, sc)
+			report.DataItems = append(report.DataItems, benchmarkScenario(b, sc)...)
 		})
+	}
+	if artifacts := os.Getenv("ARTIFACTS"); artifacts != "" && len(report.DataItems) > 0 {
+		writePerfData(b, artifacts, report)
 	}
 }
 
@@ -378,7 +387,25 @@ type requestScenario struct {
 	body               func(mediaType string, pod *v1.Pod) []byte
 }
 
-func benchmarkScenario(b *testing.B, sc requestScenario) {
+// perfData and dataItem match k8s.io/kubernetes/test/e2e/perftype (duplicated
+// because test/integration/.import-restrictions forbids importing test/e2e).
+type perfData struct {
+	Version   string     `json:"version"`
+	DataItems []dataItem `json:"dataItems"`
+}
+
+type dataItem struct {
+	Data   map[string]float64 `json:"data"`
+	Unit   string             `json:"unit"`
+	Labels map[string]string  `json:"labels,omitempty"`
+}
+
+func benchmarkScenario(b *testing.B, sc requestScenario) []dataItem {
+	allocBytesByFormat := make(map[string]float64, len(sc.acceptContentTypes))
+	allocsByFormat := make(map[string]float64, len(sc.acceptContentTypes))
+	requestBytesByFormat := make(map[string]float64, len(sc.acceptContentTypes))
+	responseBytesByFormat := make(map[string]float64, len(sc.acceptContentTypes))
+
 	for _, wf := range sc.acceptContentTypes {
 		b.Run(fmt.Sprintf("Format=%s", wf.name), func(b *testing.B) {
 			b.ReportAllocs()
@@ -401,14 +428,71 @@ func benchmarkScenario(b *testing.B, sc requestScenario) {
 				payload = sc.body(wf.accept, pod)
 			}
 
-			var wireBytes int
-			for b.Loop() {
-				wireBytes = runHTTP(b, server, sc.httpMethod, fullPath, reqContentType, wf.accept, payload)
+			var startMem, endMem runtime.MemStats
+			var responseBytes int
+			for i := 0; b.Loop(); i++ {
+				if i == 0 {
+					runtime.ReadMemStats(&startMem)
+				}
+				responseBytes = runHTTP(b, server, sc.httpMethod, fullPath, reqContentType, wf.accept, payload)
 			}
+			runtime.ReadMemStats(&endMem)
 
-			b.ReportMetric(float64(wireBytes), "wire-B/op")
+			b.ReportMetric(float64(len(payload)), "request-B/op")
+			b.ReportMetric(float64(responseBytes), "response-B/op")
+
+			if b.N > 0 {
+				allocBytesByFormat[wf.name] = float64(endMem.TotalAlloc-startMem.TotalAlloc) / float64(b.N)
+				allocsByFormat[wf.name] = float64(endMem.Mallocs-startMem.Mallocs) / float64(b.N)
+				requestBytesByFormat[wf.name] = float64(len(payload))
+				responseBytesByFormat[wf.name] = float64(responseBytes)
+			}
 		})
 	}
+
+	if len(allocBytesByFormat) == 0 {
+		return nil
+	}
+	requestLabel := fmt.Sprintf("%s %s", sc.method, sc.options)
+	return []dataItem{
+		{
+			Labels: map[string]string{"Request": requestLabel, "Metric": "Allocated bytes per operation"},
+			Unit:   "B",
+			Data:   allocBytesByFormat,
+		},
+		{
+			Labels: map[string]string{"Request": requestLabel, "Metric": "Allocations per operation"},
+			Unit:   "1",
+			Data:   allocsByFormat,
+		},
+		{
+			Labels: map[string]string{"Request": requestLabel, "Metric": "Request body bytes per operation"},
+			Unit:   "B",
+			Data:   requestBytesByFormat,
+		},
+		{
+			Labels: map[string]string{"Request": requestLabel, "Metric": "Response body bytes per operation"},
+			Unit:   "B",
+			Data:   responseBytesByFormat,
+		},
+	}
+}
+
+func writePerfData(tb testing.TB, artifactsDir string, data perfData) {
+	tb.Helper()
+	if err := os.MkdirAll(artifactsDir, 0750); err != nil {
+		tb.Fatalf("failed to create artifacts dir %s: %v", artifactsDir, err)
+	}
+	testName := strings.ReplaceAll(tb.Name(), "/", "_")
+	path := filepath.Join(artifactsDir, fmt.Sprintf("%s_benchmark_%s.json", testName, time.Now().UTC().Format("2006-01-02T15:04:05Z")))
+	raw, err := json.MarshalIndent(data, "", "  ")
+	if err != nil {
+		tb.Fatalf("failed to marshal perf data: %v", err)
+	}
+	if err := os.WriteFile(path, raw, 0644); err != nil {
+		tb.Fatalf("failed to write perf data to %s: %v", path, err)
+	}
+	tb.Logf("PerfData report written to: %s", path)
 }
 
 func buildRequestPath(sc requestScenario, pods []*v1.Pod) string {
