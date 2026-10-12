@@ -643,6 +643,7 @@ type FakePodControl struct {
 	DeletePodName   []string
 	Patches         [][]byte
 	Err             error
+	DeleteErr       error
 	CreateLimit     int
 	CreateCallCount int
 }
@@ -686,6 +687,9 @@ func (f *FakePodControl) DeletePod(ctx context.Context, namespace string, podID 
 	f.Lock()
 	defer f.Unlock()
 	f.DeletePodName = append(f.DeletePodName, podID)
+	if f.DeleteErr != nil {
+		return f.DeleteErr
+	}
 	if f.Err != nil {
 		return f.Err
 	}

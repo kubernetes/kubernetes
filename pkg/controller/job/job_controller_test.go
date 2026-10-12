@@ -276,6 +276,7 @@ func TestControllerSyncJob(t *testing.T) {
 		// This means that there is no status update so the counters for
 		// failedPods and succeededPods cannot be incremented.
 		podControllerError        error
+		podDeleteError            error
 		pendingPods               int
 		activePods                int
 		readyPods                 int
@@ -560,6 +561,19 @@ func TestControllerSyncJob(t *testing.T) {
 			expectedPodPatches:  1,
 			expectedReady:       ptr.To[int32](2),
 			expectedTerminating: ptr.To[int32](1),
+		},
+		"count ready pods when too many active pods, with delete error": {
+			parallelism:         2,
+			completions:         5,
+			backoffLimit:        6,
+			podDeleteError:      fmt.Errorf("fake delete error"),
+			activePods:          3,
+			readyPods:           3,
+			expectedDeletions:   1,
+			expectedActive:      3,
+			expectedPodPatches:  1,
+			expectedReady:       ptr.To[int32](3),
+			expectedTerminating: ptr.To[int32](0),
 		},
 		"failed + succeed pods: reset backoff delay": {
 			parallelism:         2,
@@ -944,6 +958,21 @@ func TestControllerSyncJob(t *testing.T) {
 			expectedReady:       ptr.To[int32](0),
 			expectedDeletions:   2,
 			expectedTerminating: ptr.To[int32](2),
+		},
+		"count ready pods when job fails, with delete error": {
+			parallelism:         2,
+			completions:         3,
+			backoffLimit:        0,
+			podDeleteError:      fmt.Errorf("fake delete error"),
+			activePods:          2,
+			readyPods:           2,
+			failedPods:          1,
+			expectedFailed:      1,
+			expectedPodPatches:  1,
+			expectedReady:       ptr.To[int32](2),
+			expectedDeletions:   2,
+			expectedActive:      2,
+			expectedTerminating: ptr.To[int32](0),
 		},
 		"indexed job repeated completed index": {
 			parallelism:    2,
@@ -1333,7 +1362,7 @@ func TestControllerSyncJob(t *testing.T) {
 			}
 
 			manager, sharedInformerFactory := newControllerFromClientWithClock(ctx, t, clientSet, controller.NoResyncPeriodFunc, fakeClock)
-			fakePodControl := controller.FakePodControl{Err: tc.podControllerError, CreateLimit: tc.podLimit}
+			fakePodControl := controller.FakePodControl{Err: tc.podControllerError, DeleteErr: tc.podDeleteError, CreateLimit: tc.podLimit}
 			manager.podControl = &fakePodControl
 			manager.podStoreSynced = alwaysReady
 			manager.jobStoreSynced = alwaysReady
@@ -1391,7 +1420,7 @@ func TestControllerSyncJob(t *testing.T) {
 			// run
 			err = manager.syncJob(ctx, testutil.GetKey(job, t))
 			// We need requeue syncJob task if podController error
-			if tc.podControllerError != nil {
+			if tc.podControllerError != nil || tc.podDeleteError != nil {
 				if err == nil {
 					t.Error("Syncing jobs expected to return error on podControl exception")
 				}
