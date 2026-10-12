@@ -74,11 +74,12 @@ func TestDefaultResourceHelpers(t *testing.T) {
 
 func TestGetResourceRequest(t *testing.T) {
 	cases := []struct {
-		pod                      *v1.Pod
-		cName                    string
-		resourceName             v1.ResourceName
-		expectedValue            int64
-		podLevelResourcesEnabled bool
+		pod                                *v1.Pod
+		cName                              string
+		resourceName                       v1.ResourceName
+		expectedValue                      int64
+		podLevelResourcesEnabled           bool
+		draNodeAllocatableResourcesEnabled bool
 	}{
 		{
 			pod:           getPod(containerName, resources{cpuRequest: "9"}),
@@ -170,10 +171,76 @@ func TestGetResourceRequest(t *testing.T) {
 			expectedValue:            94371840,
 			podLevelResourcesEnabled: true,
 		},
+		{
+			cName: "dra mapping and overhead ignored when feature gate disabled",
+			pod: func() *v1.Pod {
+				p := getPod(containerName, resources{memoryRequest: "100Mi"})
+				p.Status.ExtraNodeAllocatableResources = []v1.ExtraNodeAllocatableResource{
+					{
+						Source:     v1.ExtraNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "claim-1"},
+						Containers: []string{containerName},
+						Mapping: []v1.NodeAllocatableMappedResources{
+							{Name: v1.ResourceMemory, Quantity: new(resource.MustParse("200Mi"))},
+						},
+					},
+				}
+				return p
+			}(),
+			resourceName:                       v1.ResourceMemory,
+			expectedValue:                      100 * 1024 * 1024,
+			draNodeAllocatableResourcesEnabled: false,
+		},
+		{
+			cName: "dra mapping and overhead included when feature gate enabled",
+			pod: func() *v1.Pod {
+				p := getPod(containerName, resources{memoryRequest: "100Mi"})
+				p.Status.ExtraNodeAllocatableResources = []v1.ExtraNodeAllocatableResource{
+					{
+						Source:     v1.ExtraNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "claim-1"},
+						Containers: []string{containerName},
+						Mapping: []v1.NodeAllocatableMappedResources{
+							{Name: v1.ResourceMemory, Quantity: new(resource.MustParse("200Mi"))},
+						},
+						Overhead: []v1.NodeAllocatableOverheadResources{
+							{
+								Name:         v1.ResourceMemory,
+								PerPod:       new(resource.MustParse("50Mi")),
+								PerContainer: new(resource.MustParse("25Mi")),
+							},
+						},
+					},
+				}
+				return p
+			}(),
+			resourceName:                       v1.ResourceMemory,
+			expectedValue:                      375 * 1024 * 1024, // 100Mi + 200Mi + 50Mi + 25Mi
+			draNodeAllocatableResourcesEnabled: true,
+		},
+		{
+			cName: "pod level resources take precedence over container and dra requests",
+			pod: func() *v1.Pod {
+				p := getPodWithPodLevelResources(containerName, resources{memoryRequest: "500Mi"}, resources{memoryRequest: "100Mi"})
+				p.Status.ExtraNodeAllocatableResources = []v1.ExtraNodeAllocatableResource{
+					{
+						Source:     v1.ExtraNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "claim-1"},
+						Containers: []string{containerName},
+						Mapping: []v1.NodeAllocatableMappedResources{
+							{Name: v1.ResourceMemory, Quantity: new(resource.MustParse("200Mi"))},
+						},
+					},
+				}
+				return p
+			}(),
+			resourceName:                       v1.ResourceMemory,
+			expectedValue:                      500 * 1024 * 1024,
+			podLevelResourcesEnabled:           true,
+			draNodeAllocatableResourcesEnabled: true,
+		},
 	}
 	as := assert.New(t)
 	for idx, tc := range cases {
 		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, tc.podLevelResourcesEnabled)
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRANodeAllocatableResources, tc.draNodeAllocatableResourcesEnabled)
 
 		actual := GetResourceRequest(tc.pod, tc.resourceName)
 		as.Equal(tc.expectedValue, actual, "expected test case [%d] %v: to return %q; got %q instead", idx, tc.cName, tc.expectedValue, actual)
