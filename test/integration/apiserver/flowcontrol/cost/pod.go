@@ -98,7 +98,12 @@ func encodeObject(tb testing.TB, mediaType string, obj kruntime.Object) []byte {
 	if !ok {
 		tb.Fatalf("serializer not found for %s", mediaType)
 	}
-	codec := podCodecs.CodecForVersions(info.Serializer, podCodecs.UniversalDeserializer(), v1.SchemeGroupVersion, v1.SchemeGroupVersion)
+	gvks, _, err := legacyscheme.Scheme.ObjectKinds(obj)
+	if err != nil || len(gvks) == 0 {
+		tb.Fatalf("failed to determine GVK for %T: %v", obj, err)
+	}
+	gv := gvks[0].GroupVersion()
+	codec := podCodecs.CodecForVersions(info.Serializer, podCodecs.UniversalDeserializer(), gv, gv)
 	data, err := kruntime.Encode(codec, obj)
 	if err != nil {
 		tb.Fatalf("failed to encode %T as %s: %v", obj, mediaType, err)
