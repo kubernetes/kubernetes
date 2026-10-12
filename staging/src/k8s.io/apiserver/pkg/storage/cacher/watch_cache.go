@@ -32,7 +32,6 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/cacher/consistency"
-	"k8s.io/apiserver/pkg/storage/cacher/delegator"
 	"k8s.io/apiserver/pkg/storage/cacher/metrics"
 	"k8s.io/apiserver/pkg/storage/cacher/progress"
 	"k8s.io/apiserver/pkg/storage/cacher/store"
@@ -324,14 +323,12 @@ func (w *watchCache) UpdateResourceVersion(resourceVersion string) {
 }
 
 // waitUntilFreshLocked waits until cache is at least as fresh as given resourceVersion.
-func (w *watchCache) waitUntilFreshLocked(ctx context.Context, consistentReadSupported bool, resourceVersion uint64) error {
+func (w *watchCache) waitUntilFreshLocked(ctx context.Context, resourceVersion uint64) error {
 	if resourceVersion == 0 || resourceVersion <= w.resourceVersion {
 		return nil
 	}
-	if consistentReadSupported {
-		w.config.waitingUntilFresh.Add()
-		defer w.config.waitingUntilFresh.Remove()
-	}
+	w.config.waitingUntilFresh.Add()
+	defer w.config.waitingUntilFresh.Remove()
 	startTime := w.config.clock.Now()
 	defer func() {
 		if resourceVersion > 0 {
@@ -410,11 +407,10 @@ func (c *watchCache) waitUntilFreshAndGetList(ctx context.Context, key string, o
 // with their ResourceVersion and the name of the index, if any, that was used.
 func (w *watchCache) WaitUntilFreshAndGetKeys(ctx context.Context, resourceVersion uint64) ([]string, error) {
 	span := tracing.SpanFromContext(ctx)
-	consistentReadSupported := delegator.ConsistentReadSupported()
 	w.RLock()
 	span.AddEvent("watchCache locked acquired")
 	defer w.RUnlock()
-	err := w.waitUntilFreshLocked(ctx, consistentReadSupported, resourceVersion)
+	err := w.waitUntilFreshLocked(ctx, resourceVersion)
 	if err != nil {
 		return nil, err
 	}
@@ -478,11 +474,10 @@ func (w *watchCache) waitAndListExactRV(ctx context.Context, key, continueKey st
 
 func (w *watchCache) waitAndGetExactSnapshot(ctx context.Context, resourceVersion uint64) (store.Snapshot, error) {
 	span := tracing.SpanFromContext(ctx)
-	consistentReadSupported := delegator.ConsistentReadSupported()
 	w.RLock()
 	span.AddEvent("watchCache locked acquired")
 	defer w.RUnlock()
-	err := w.waitUntilFreshLocked(ctx, consistentReadSupported, resourceVersion)
+	err := w.waitUntilFreshLocked(ctx, resourceVersion)
 	if err != nil {
 		return nil, err
 	}
@@ -517,12 +512,11 @@ func (w *watchCache) waitAndListLatestRV(ctx context.Context, minResourceVersion
 }
 
 func (w *watchCache) waitAndGetLatestSnapshot(ctx context.Context, minResourceVersion uint64, matchValues []storage.MatchValue) (snap store.Snapshot, resourceVersion uint64, index string, err error) {
-	consistentReadSupported := delegator.ConsistentReadSupported()
 	span := tracing.SpanFromContext(ctx)
 	w.RLock()
 	span.AddEvent("watchCache locked acquired")
 	defer w.RUnlock()
-	err = w.waitUntilFreshLocked(ctx, consistentReadSupported, minResourceVersion)
+	err = w.waitUntilFreshLocked(ctx, minResourceVersion)
 	if err != nil {
 		return nil, 0, "", err
 	}
@@ -565,11 +559,10 @@ func (w *watchCache) notFresh(resourceVersion uint64) bool {
 // WaitUntilFreshAndGet returns a pointers to <storeElement> object.
 func (w *watchCache) WaitUntilFreshAndGet(ctx context.Context, resourceVersion uint64, key string) (interface{}, bool, uint64, error) {
 	span := tracing.SpanFromContext(ctx)
-	consistentReadSupported := delegator.ConsistentReadSupported()
 	w.RLock()
 	span.AddEvent("watchCache locked acquired")
 	defer w.RUnlock()
-	err := w.waitUntilFreshLocked(ctx, consistentReadSupported, resourceVersion)
+	err := w.waitUntilFreshLocked(ctx, resourceVersion)
 	if err != nil {
 		return nil, false, 0, err
 	}
