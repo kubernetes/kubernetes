@@ -484,7 +484,7 @@ func writePerfData(tb testing.TB, artifactsDir string, data perfData) {
 		tb.Fatalf("failed to create artifacts dir %s: %v", artifactsDir, err)
 	}
 	testName := strings.ReplaceAll(tb.Name(), "/", "_")
-	path := filepath.Join(artifactsDir, fmt.Sprintf("%s_benchmark_%s.json", testName, time.Now().UTC().Format("2006-01-02T15:04:05Z")))
+	path := filepath.Join(artifactsDir, fmt.Sprintf("GenericPrometheusQuery %s_%s.json", testName, time.Now().UTC().Format("2006-01-02T15:04:05Z")))
 	raw, err := json.MarshalIndent(data, "", "  ")
 	if err != nil {
 		tb.Fatalf("failed to marshal perf data: %v", err)
