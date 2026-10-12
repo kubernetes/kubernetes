@@ -7481,6 +7481,30 @@ func TestAllocator(t *testing.T,
 				deviceRequestAllocationResult(req2SubReq0, driverA, pool1, device1).withConsumedCapacity(&fixedShareID, nil),
 			)},
 		},
+		"with-distinct-constraints-mixed-types": {
+			features: Features{
+				ConsumableCapacity: true,
+			},
+			claimsToAllocate: objects(
+				claim(claim0).withConstraints(
+					resourceapi.DeviceConstraint{DistinctAttribute: &stringAttribute, Requests: []string{req0}},
+				).withRequests(
+					deviceRequest(req0, classA, 3),
+				),
+			),
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, pool1, driverA,
+					device(device1).withAttribute("stringAttribute", 1),
+					device(device2).withAttribute("stringAttribute", "same"),
+					device(device3).withAttribute("stringAttribute", "same"),
+				),
+			),
+			node: node(node1, region1),
+
+			// device3 duplicates device2, so three distinct devices don't exist.
+			expectResults: nil,
+		},
 		"distinct-constraint-single-request-multiple-devices-attribute-not-set": {
 			features: Features{
 				ConsumableCapacity: true,
