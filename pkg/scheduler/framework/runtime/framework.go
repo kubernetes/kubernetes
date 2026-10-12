@@ -479,9 +479,6 @@ func NewFramework(ctx context.Context, r Registry, profile *config.KubeScheduler
 	if len(f.bindPlugins) == 0 {
 		return nil, fmt.Errorf("at least one bind plugin is needed for profile with scheduler name %q", profile.SchedulerName)
 	}
-	if len(f.placementGeneratePlugins) > 1 {
-		return nil, fmt.Errorf("at most one placement generate plugin is allowed for profile with scheduler name %q", profile.SchedulerName)
-	}
 
 	podScoreWeights, err := getValidScoreWeights(f, reflect.TypeFor[fwk.ScorePlugin](), append(profile.Plugins.Score.Enabled, profile.Plugins.MultiPoint.Enabled...))
 	if err != nil {
@@ -2232,34 +2229,68 @@ func (f *frameworkImpl) AddWaitingPod(pod *v1.Pod, pluginsWaitTime map[string]ti
 	f.waitingPods.add(waitingPod)
 }
 
-// RunPlacementGeneratePlugins runs the set of configured PlacementGeneratePlugins and returns the generated placements.
-// If no plugins are defined, the input placement is returned instead.
+// RunPlacementGeneratePlugins runs the configured PlacementGeneratePlugins and returns the
+// generated placements. Each plugin runs independently against the same input node set.
+// The framework merges their results as the cross product of the per-plugin placements,
+// intersected by node. The framework clones and combines per-placement state attached via
+// state.PlacementState onto each merged placement. If no plugins constrain the input, the
+// framework returns the input placement. Placements from a single constraining plugin
+// return without modification.
 func (f *frameworkImpl) RunPlacementGeneratePlugins(ctx context.Context, state fwk.PodGroupCycleState, podGroup fwk.PodGroupInfo, nodes []fwk.NodeInfo) (placements []*fwk.Placement, status *fwk.Status) {
 	startTime := time.Now()
 	defer func() {
 		metrics.FrameworkExtensionPointDuration.WithLabelValues(metrics.PlacementGenerate, status.Code().String(), f.profileName).Observe(metrics.SinceInSeconds(startTime))
 	}()
 
-	placement := &fwk.Placement{
-		Nodes: nodes,
-	}
-
 	if len(f.placementGeneratePlugins) == 0 {
-		return []*fwk.Placement{placement}, nil
+		return []*fwk.Placement{{Nodes: nodes}}, nil
 	}
 
-	plugin := f.placementGeneratePlugins[0]
-
-	result, status := f.runPlacementGeneratePlugin(ctx, plugin, state, podGroup, placement)
-	if !status.IsSuccess() {
-		return nil, status.WithPlugin(plugin.Name())
+	// Run each plugin and keep the ones that constrain the input.
+	// Each plugin gets its own input placement pointer so per-placement state remains isolated.
+	// If a plugin returns that placement unchanged, carry its state into every final placement.
+	var constrained [][]*fwk.Placement
+	var unconstrained []*fwk.Placement
+	for _, plugin := range f.placementGeneratePlugins {
+		inputPlacement := &fwk.Placement{Nodes: nodes}
+		result, status := f.runPlacementGeneratePlugin(ctx, plugin, state, podGroup, inputPlacement)
+		if !status.IsSuccess() {
+			return nil, status.WithPlugin(plugin.Name())
+		}
+		if result == nil || len(result.Placements) == 0 {
+			return nil, fwk.NewStatus(fwk.Unschedulable, "no feasible placements found").WithPlugin(plugin.Name())
+		}
+		if err := validatePlacementNames(result.Placements); err != nil {
+			return nil, fwk.AsStatus(err).WithPlugin(plugin.Name())
+		}
+		if len(result.Placements) == 1 && result.Placements[0] == inputPlacement {
+			unconstrained = append(unconstrained, inputPlacement)
+			continue
+		}
+		constrained = append(constrained, result.Placements)
 	}
 
-	if len(result.Placements) == 0 {
-		return nil, fwk.NewStatus(fwk.Unschedulable, "no feasible placements found").WithPlugin(plugin.Name())
+	var merged []*fwk.Placement
+	if len(constrained) == 0 {
+		merged = []*fwk.Placement{unconstrained[0]}
+		unconstrained = unconstrained[1:]
+	} else {
+		merged = constrained[0]
+		for i := 1; i < len(constrained); i++ {
+			merged, status = mergePlacements(merged, constrained[i], state)
+			if !status.IsSuccess() {
+				return nil, status
+			}
+			if len(merged) == 0 {
+				return nil, fwk.NewStatus(fwk.Unschedulable, "no feasible merged placements found")
+			}
+		}
 	}
 
-	return result.Placements, nil
+	if err := mergePlacementStateSources(merged, unconstrained, state); err != nil {
+		return nil, fwk.AsStatus(err)
+	}
+	return merged, nil
 }
 
 func (f *frameworkImpl) runPlacementGeneratePlugin(ctx context.Context, pl fwk.PlacementGeneratePlugin, state fwk.PodGroupCycleState, podGroup fwk.PodGroupInfo, parentPlacement *fwk.Placement) (*fwk.GeneratePlacementsResult, *fwk.Status) {
