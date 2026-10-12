@@ -23,6 +23,7 @@ import (
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
+	policyv1 "k8s.io/api/policy/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apiserver/pkg/features"
@@ -198,15 +199,6 @@ func BenchmarkRequestCost(b *testing.B) {
 		},
 		{
 			method:             "POST",
-			options:            "create (dryRun)",
-			httpMethod:         http.MethodPost,
-			path:               podsPath,
-			query:              "dryRun=All&fieldManager=bench",
-			acceptContentTypes: writeFormats,
-			body:               staticPodBody(b, "pod-new"),
-		},
-		{
-			method:             "POST",
 			options:            "binding",
 			httpMethod:         http.MethodPost,
 			path:               podPath + "/binding",
@@ -222,6 +214,20 @@ func BenchmarkRequestCost(b *testing.B) {
 				Target: v1.ObjectReference{
 					Kind: "Node",
 					Name: "kind-worker6",
+				},
+			}),
+		},
+		{
+			method:             "POST",
+			options:            "eviction",
+			httpMethod:         http.MethodPost,
+			path:               podPath + "/eviction",
+			seedPods:           1,
+			acceptContentTypes: writeFormats,
+			body: staticObjectBody(b, &policyv1.Eviction{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: metav1.NamespaceDefault,
+					Name:      "pod-000",
 				},
 			}),
 		},
@@ -269,6 +275,17 @@ func BenchmarkRequestCost(b *testing.B) {
 		},
 		{
 			method:             "PATCH",
+			options:            "spec tolerations",
+			httpMethod:         http.MethodPatch,
+			path:               podPath,
+			query:              "fieldManager=bench",
+			seedPods:           1,
+			requestContentType: string(types.StrategicMergePatchType),
+			acceptContentTypes: writeFormats,
+			body:               staticBytesBody(`{"spec":{"tolerations":[{"key":"node.kubernetes.io/not-ready","operator":"Exists","effect":"NoExecute","tolerationSeconds":900},{"key":"node.kubernetes.io/unreachable","operator":"Exists","effect":"NoExecute","tolerationSeconds":900},{"key":"bench.k8s.io/taint","operator":"Exists","effect":"NoSchedule"}]}}`),
+		},
+		{
+			method:             "PATCH",
 			options:            "merge-patch",
 			httpMethod:         http.MethodPatch,
 			path:               podPath,
@@ -310,6 +327,17 @@ func BenchmarkRequestCost(b *testing.B) {
 			requestContentType: string(types.StrategicMergePatchType),
 			acceptContentTypes: writeFormats,
 			body:               staticBytesBody(`{"status":{"message":"updated-status"}}`),
+		},
+		{
+			method:             "PATCH",
+			options:            "status kubelet",
+			httpMethod:         http.MethodPatch,
+			path:               podPath + "/status",
+			query:              "fieldManager=kubelet",
+			seedPods:           1,
+			requestContentType: string(types.StrategicMergePatchType),
+			acceptContentTypes: writeFormats,
+			body:               staticBytesBody(`{"status":{"phase":"Running","podIP":"10.244.7.83","podIPs":[{"ip":"10.244.7.83"}],"conditions":[{"type":"Ready","status":"True","reason":"ContainersReady","lastTransitionTime":"2026-04-23T12:24:00Z"}],"containerStatuses":[{"name":"main","ready":true,"started":true,"restartCount":0,"image":"registry.k8s.io/pause:3.9","imageID":"registry.k8s.io/pause@sha256:1234","containerID":"containerd://main1","state":{"running":{"startedAt":"2026-04-23T12:24:00Z"}}}]}}`),
 		},
 		{
 			method:             "DELETE",
