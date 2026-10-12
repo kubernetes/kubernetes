@@ -875,6 +875,10 @@
                 "stack": {
                   "hard": 1,
                   "soft": 2
+                },
+                "msgqueue": {
+                  "hard": 1,
+                  "soft": 2
                 }
               }
             },
@@ -1233,6 +1237,10 @@
                 "stack": {
                   "hard": 1,
                   "soft": 2
+                },
+                "msgqueue": {
+                  "hard": 1,
+                  "soft": 2
                 }
               }
             },
@@ -1589,6 +1597,10 @@
                   "soft": 2
                 },
                 "stack": {
+                  "hard": 1,
+                  "soft": 2
+                },
+                "msgqueue": {
                   "hard": 1,
                   "soft": 2
                 }

@@ -8615,6 +8615,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: memlock
       type:
         namedType: io.k8s.api.core.v1.Ulimit
+    - name: msgqueue
+      type:
+        namedType: io.k8s.api.core.v1.Ulimit
     - name: nice
       type:
         namedType: io.k8s.api.core.v1.Ulimit
