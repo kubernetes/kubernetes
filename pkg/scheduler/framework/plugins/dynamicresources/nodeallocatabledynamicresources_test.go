@@ -658,6 +658,7 @@ func TestBuildNodeAllocatableDRAInfo(t *testing.T) {
 		claims                          []*resourceapi.ResourceClaim
 		resourceSlices                  []*resourceapi.ResourceSlice
 		nodeAllocatableClaimAllocations map[v1.ObjectReference]*resourceapi.AllocationResult
+		extendedResourceRequestMappings []v1.ContainerExtendedResourceRequest
 		want                            []v1.ExtraNodeAllocatableResource
 		wantErr                         bool
 	}{
@@ -1310,6 +1311,67 @@ func TestBuildNodeAllocatableDRAInfo(t *testing.T) {
 			},
 			wantErr: true,
 		},
+		{
+			name: "Extended resource claim - DRA GPU with CPU and memory overhead",
+			pod: st.MakePod().Name("test-pod").Namespace(claimNameSpace).UID("test-uid").
+				Containers([]v1.Container{{
+					Name: "c1",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							"example.com/gpu": resource.MustParse("1"),
+						},
+					},
+				}}).
+				Obj(),
+			resourceSlices: []*resourceapi.ResourceSlice{
+				makeSlice("slice1", resourceapi.Device{
+					Name: "gpu0",
+					NodeAllocatableResources: map[v1.ResourceName]resourceapi.NodeAllocatableResource{
+						v1.ResourceCPU: {
+							Overhead: &resourceapi.NodeAllocatableOverhead{
+								PerContainer: new(resource.MustParse("500m")),
+							},
+						},
+						v1.ResourceMemory: {
+							Overhead: &resourceapi.NodeAllocatableOverhead{
+								PerPod:       new(resource.MustParse("1Gi")),
+								PerContainer: new(resource.MustParse("500Mi")),
+							},
+						},
+					},
+				}),
+			},
+			nodeAllocatableClaimAllocations: map[v1.ObjectReference]*resourceapi.AllocationResult{
+				{Name: specialClaimInMemName, UID: "ext-claim-uid"}: {
+					Devices: resourceapi.DeviceAllocationResult{
+						Results: []resourceapi.DeviceRequestAllocationResult{{
+							Request: "container-0-request-0",
+							Driver:  "dra.example.com",
+							Pool:    "pool1",
+							Device:  "gpu0",
+						}},
+					},
+				},
+			},
+			extendedResourceRequestMappings: []v1.ContainerExtendedResourceRequest{
+				{ContainerName: "c1", ResourceName: "example.com/gpu", RequestName: "container-0-request-0"},
+			},
+			want: []v1.ExtraNodeAllocatableResource{{
+				Source:     v1.ExtraNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: specialClaimInMemName},
+				Containers: []string{"c1"},
+				Overhead: []v1.NodeAllocatableOverheadResources{
+					{
+						Name:         v1.ResourceCPU,
+						PerContainer: new(resource.MustParse("500m")),
+					},
+					{
+						Name:         v1.ResourceMemory,
+						PerPod:       new(resource.MustParse("1Gi")),
+						PerContainer: new(resource.MustParse("500Mi")),
+					},
+				},
+			}},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -1328,7 +1390,7 @@ func TestBuildNodeAllocatableDRAInfo(t *testing.T) {
 			}
 
 			slices, _ := draManager.ResourceSlices().ListWithDeviceTaintRules()
-			got, err := pl.buildNodeAllocatableDRAInfo(tt.pod, tt.nodeAllocatableClaimAllocations, claimNametoUID, slices, nil)
+			got, err := pl.buildNodeAllocatableDRAInfo(tt.pod, tt.nodeAllocatableClaimAllocations, claimNametoUID, tt.extendedResourceRequestMappings, slices, nil)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("buildNodeAllocatableDRAInfo() error = %v, wantErr %v", err, tt.wantErr)
 				return

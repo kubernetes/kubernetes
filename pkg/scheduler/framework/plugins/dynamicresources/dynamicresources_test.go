@@ -4218,7 +4218,7 @@ func testPlugin(tCtx ktesting.TContext) {
 				tc.pod.Status.ExtraNodeAllocatableResources = []v1.ExtraNodeAllocatableResource{
 					{
 						Source:     v1.ExtraNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: specialClaimInMemName},
-						Containers: []string{},
+						Containers: []string{tc.pod.Spec.Containers[0].Name},
 						Mapping: []v1.NodeAllocatableMappedResources{
 							{
 								Name:     v1.ResourceCPU,
@@ -4243,7 +4243,7 @@ func testPlugin(tCtx ktesting.TContext) {
 						extraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
 							{
 								Source:     v1.ExtraNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: specialClaimInMemName},
-								Containers: []string{},
+								Containers: []string{podWithExtendedResourceName.Spec.Containers[0].Name},
 								Mapping: []v1.NodeAllocatableMappedResources{
 									{
 										Name:     v1.ResourceCPU,
@@ -4267,7 +4267,7 @@ func testPlugin(tCtx ktesting.TContext) {
 								p.Status.ExtraNodeAllocatableResources = []v1.ExtraNodeAllocatableResource{
 									{
 										Source:     v1.ExtraNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: extendedResourceClaim.Name},
-										Containers: []string{},
+										Containers: []string{p.Spec.Containers[0].Name},
 										Mapping: []v1.NodeAllocatableMappedResources{
 											{
 												Name:     v1.ResourceCPU,

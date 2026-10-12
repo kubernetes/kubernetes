@@ -1093,7 +1093,7 @@ func (pl *DynamicResources) Filter(ctx context.Context, cs fwk.CycleState, pod *
 
 	if pl.fts.EnableDRANodeAllocatableResources && len(unavailableClaims) == 0 {
 		var status *fwk.Status
-		extraResources, status = pl.calculateAndCheckNodeAllocatableResources(ctx, state, pod, nodeInfo, allocationsMap)
+		extraResources, status = pl.calculateAndCheckNodeAllocatableResources(ctx, state, pod, nodeInfo, allocationsMap, containerResourceRequestMappings)
 		if status != nil {
 			return status
 		}
