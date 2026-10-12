@@ -622,14 +622,14 @@ func InitMetrics() {
 		&metrics.CounterOpts{
 			Subsystem:      SchedulerSubsystem,
 			Name:           "workload_preemption_attempts_total",
-			Help:           "Total preemption attempts initiated by workload (including either pod groups or composite pod groups) in the cluster till now.",
+			Help:           "Total preemption attempts initiated by workload (either pod groups or composite pod groups) in the cluster till now.",
 			StabilityLevel: metrics.ALPHA,
 		}, []string{"preemptor", "result"})
 	WorkloadPreemptionVictims = metrics.NewHistogramVec(
 		&metrics.HistogramOpts{
 			Subsystem: SchedulerSubsystem,
 			Name:      "workload_preemption_victims",
-			Help:      "Number of pod preemption victims caused by workload preemption (including either pod groups or composite pod groups).",
+			Help:      "Number of pod preemption victims caused by workload preemption (either pod groups or composite pod groups).",
 			// Start with 1 with the last bucket being [1024, Inf)
 			Buckets:        metrics.ExponentialBuckets(1, 2, 11),
 			StabilityLevel: metrics.ALPHA,

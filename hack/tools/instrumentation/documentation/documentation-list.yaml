@@ -6943,8 +6943,8 @@
     endpoint: /metrics
 - name: workload_preemption_attempts_total
   subsystem: scheduler
-  help: Total preemption attempts initiated by workload (including either pod groups
-    or composite pod groups) in the cluster till now.
+  help: Total preemption attempts initiated by workload (either pod groups or composite
+    pod groups) in the cluster till now.
   type: Counter
   stabilityLevel: ALPHA
   labels:
@@ -6955,8 +6955,8 @@
     endpoint: /metrics
 - name: workload_preemption_victims
   subsystem: scheduler
-  help: Number of pod preemption victims caused by workload preemption (including
-    either pod groups or composite pod groups).
+  help: Number of pod preemption victims caused by workload preemption (either pod
+    groups or composite pod groups).
   type: Histogram
   stabilityLevel: ALPHA
   labels:
