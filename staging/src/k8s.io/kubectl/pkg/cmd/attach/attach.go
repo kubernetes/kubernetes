@@ -131,12 +131,14 @@ func (flags *AttachFlags) ToOptions(f cmdutil.Factory, cmd *cobra.Command, args 
 	}
 
 	o := &AttachOptions{
-		Namespace:     namespace,
-		ContainerName: flags.ContainerName,
-		Stdin:         flags.Stdin,
-		TTY:           flags.TTY,
-		Quiet:         flags.Quiet,
-		IOStreams:     flags.IOStreams,
+		StreamOptions: exec.StreamOptions{
+			Namespace:     namespace,
+			ContainerName: flags.ContainerName,
+			Stdin:         flags.Stdin,
+			TTY:           flags.TTY,
+			Quiet:         flags.Quiet,
+			IOStreams:     flags.IOStreams,
+		},
 
 		DetachKeys:  flags.DetachKeys,
 		CommandName: cmd.CommandPath(),
