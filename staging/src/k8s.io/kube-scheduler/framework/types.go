@@ -727,6 +727,8 @@ type Placement struct {
 	// Name uniquely identifies the placement.
 	// This is used for diagnostics and debugability.
 	// The choice of the name is up to the PlacementGeneratePlugin.
+	// Names returned by one plugin must be unique and must not contain "/",
+	// which the framework uses to join names when merging placements.
 	Name string
 	// Nodes specifies the nodes that are valid for this placement.
 	// Scheduler will try to schedule the pod group using only those nodes.
