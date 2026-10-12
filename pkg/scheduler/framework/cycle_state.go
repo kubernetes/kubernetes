@@ -17,6 +17,7 @@ limitations under the License.
 package framework
 
 import (
+	"fmt"
 	"sync"
 
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -50,6 +51,14 @@ type CycleState struct {
 	// If set to nil, it means this pod is not being scheduled within a placement context.
 	// This field can only be non-nil when GenericWorkload feature flag is enabled.
 	placementCycleState fwk.PlacementCycleState
+	// placementStates holds per-placement state keyed by Placement pointer.
+	// PlacementGeneratePlugins populate it via PlacementState during placement generation.
+	// The framework merges entries across plugins and copies the state for a placement
+	// into the per-placement CycleState before placement evaluation.
+	// Only populated on a PodGroup-level CycleState.
+	placementStates map[*fwk.Placement]*CycleState
+	// placementStatesMu guards placementStates.
+	placementStatesMu sync.Mutex
 }
 
 // NewCycleState initializes a new CycleState and returns its pointer.
@@ -132,6 +141,106 @@ func (c *CycleState) SetPlacementCycleState(placementCycleState fwk.PlacementCyc
 	c.placementCycleState = placementCycleState
 }
 
+// PlacementState returns the PlacementCycleState for the given placement.
+// If no state exists for the placement, the method initializes and returns a new one.
+// If placement is nil, the method returns nil.
+func (c *CycleState) PlacementState(placement *fwk.Placement) fwk.PlacementCycleState {
+	if c == nil || placement == nil {
+		return nil
+	}
+	c.placementStatesMu.Lock()
+	defer c.placementStatesMu.Unlock()
+	if c.placementStates == nil {
+		c.placementStates = make(map[*fwk.Placement]*CycleState)
+	}
+	ps := c.placementStates[placement]
+	if ps == nil {
+		ps = NewCycleState()
+		c.placementStates[placement] = ps
+	}
+	return ps
+}
+
+// DeletePlacementStates removes the PlacementCycleState entries for the given placements.
+// The framework calls this method after merging placements to remove intermediate parent states.
+func (c *CycleState) DeletePlacementStates(placements ...*fwk.Placement) {
+	if c == nil {
+		return
+	}
+	c.placementStatesMu.Lock()
+	defer c.placementStatesMu.Unlock()
+	if len(c.placementStates) == 0 {
+		return
+	}
+	for _, p := range placements {
+		delete(c.placementStates, p)
+	}
+}
+
+// CopyPlacementDataInto clones every StateData entry registered for placement and writes
+// it into dst. The scheduler calls this method to seed a per-placement CycleState before
+// placement evaluation.
+func (c *CycleState) CopyPlacementDataInto(placement *fwk.Placement, dst *CycleState) {
+	if c == nil || placement == nil || dst == nil {
+		return
+	}
+	c.placementStatesMu.Lock()
+	src := c.placementStates[placement]
+	c.placementStatesMu.Unlock()
+	if src == nil {
+		return
+	}
+	src.storage.Range(func(k, v interface{}) bool {
+		dst.storage.Store(k, v.(fwk.StateData).Clone())
+		return true
+	})
+}
+
+// MergePlacementStatesInto combines the placement states for srcs into a single
+// PlacementCycleState for dst. The method clones each StateData entry so the merged
+// placement does not share mutable state with the source placements. If no source
+// holds state, the method leaves dst unregistered and allocates nothing on the heap.
+// If two source states contain the same StateKey, the method returns an error.
+func (c *CycleState) MergePlacementStatesInto(dst *fwk.Placement, srcs ...*fwk.Placement) error {
+	if c == nil || dst == nil {
+		return nil
+	}
+	c.placementStatesMu.Lock()
+	defer c.placementStatesMu.Unlock()
+	if len(c.placementStates) == 0 {
+		return nil
+	}
+
+	var merged *CycleState
+	for _, srcPlacement := range srcs {
+		src := c.placementStates[srcPlacement]
+		if src == nil {
+			continue
+		}
+		var conflict *fwk.StateKey
+		src.storage.Range(func(k, v interface{}) bool {
+			key := k.(fwk.StateKey)
+			if merged == nil {
+				merged = NewCycleState()
+			}
+			if _, loaded := merged.storage.LoadOrStore(key, v.(fwk.StateData).Clone()); loaded {
+				keyCopy := key
+				conflict = &keyCopy
+				return false
+			}
+			return true
+		})
+		if conflict != nil {
+			return fmt.Errorf("conflicting placement cycle state key %q while merging into placement %q", *conflict, dst.Name)
+		}
+	}
+	if merged == nil {
+		return nil
+	}
+	c.placementStates[dst] = merged
+	return nil
+}
+
 func (c *CycleState) SetSkipAllPostFilterPlugins(flag bool) {
 	c.skipAllPostFilterPlugins = flag
 }
@@ -161,6 +270,24 @@ func (c *CycleState) Clone() fwk.CycleState {
 	copy.podGroupCycleState = c.podGroupCycleState
 	copy.placementCycleState = c.placementCycleState
 	copy.skipAllPostFilterPlugins = c.skipAllPostFilterPlugins
+
+	// Deep copy the per-placement states so the clone does not share mutable StateData.
+	c.placementStatesMu.Lock()
+	if len(c.placementStates) > 0 {
+		copy.placementStates = make(map[*fwk.Placement]*CycleState, len(c.placementStates))
+		for p, st := range c.placementStates {
+			if st == nil {
+				continue
+			}
+			dup := NewCycleState()
+			st.storage.Range(func(k, v interface{}) bool {
+				dup.storage.Store(k, v.(fwk.StateData).Clone())
+				return true
+			})
+			copy.placementStates[p] = dup
+		}
+	}
+	c.placementStatesMu.Unlock()
 
 	return copy
 }
