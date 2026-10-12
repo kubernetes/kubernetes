@@ -1187,6 +1187,7 @@ func TestOrderedByMemory(t *testing.T) {
 
 // TestOrderedByPriorityMemory ensures we order by priority and then memory consumption relative to request.
 func TestOrderedByPriorityMemory(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRANodeAllocatableResources, true)
 	pod1 := newPod("above-requests-low-priority-high-usage", lowPriority, []v1.Container{
 		newContainer("above-requests-low-priority-high-usage", newResourceList("", "", ""), newResourceList("", "", "")),
 	}, nil)
@@ -1211,6 +1212,18 @@ func TestOrderedByPriorityMemory(t *testing.T) {
 	pod8 := newPod("below-requests-high-priority-low-usage", highPriority, []v1.Container{
 		newContainer("below-requests-high-priority-low-usage", newResourceList("", "1Gi", ""), newResourceList("", "", "")),
 	}, nil)
+	pod9 := newPod("below-requests-with-dra-high-priority-low-usage", highPriority, []v1.Container{
+		newContainer("c1", newResourceList("", "100Mi", ""), newResourceList("", "", "")),
+	}, nil)
+	pod9.Status.ExtraNodeAllocatableResources = []v1.ExtraNodeAllocatableResource{
+		{
+			Source:     v1.ExtraNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "mem-claim"},
+			Containers: []string{"c1"},
+			Mapping: []v1.NodeAllocatableMappedResources{
+				{Name: v1.ResourceMemory, Quantity: quantityMustParse("1Gi")},
+			},
+		},
+	}
 	stats := map[*v1.Pod]statsapi.PodStats{
 		pod1: newPodMemoryStats(pod1, resource.MustParse("500Mi")), // 500 relative to request
 		pod2: newPodMemoryStats(pod2, resource.MustParse("50Mi")),  // 50 relative to request
@@ -1220,13 +1233,14 @@ func TestOrderedByPriorityMemory(t *testing.T) {
 		pod6: newPodMemoryStats(pod6, resource.MustParse("200Mi")), // -800 relative to request
 		pod7: newPodMemoryStats(pod7, resource.MustParse("800Mi")), // -200 relative to request
 		pod8: newPodMemoryStats(pod8, resource.MustParse("200Mi")), // -800 relative to request
+		pod9: newPodMemoryStats(pod9, resource.MustParse("200Mi")), // -900 relative to request (100Mi spec + 1Gi DRA)
 	}
 	statsFn := func(pod *v1.Pod) (statsapi.PodStats, bool) {
 		result, found := stats[pod]
 		return result, found
 	}
-	pods := []*v1.Pod{pod8, pod7, pod6, pod5, pod4, pod3, pod2, pod1}
-	expected := []*v1.Pod{pod1, pod2, pod3, pod4, pod5, pod6, pod7, pod8}
+	pods := []*v1.Pod{pod9, pod8, pod7, pod6, pod5, pod4, pod3, pod2, pod1}
+	expected := []*v1.Pod{pod1, pod2, pod3, pod4, pod5, pod6, pod7, pod8, pod9}
 	orderedBy(exceedMemoryRequests(statsFn), priority, memory(statsFn)).Sort(pods)
 	for i := range expected {
 		if pods[i] != expected[i] {
