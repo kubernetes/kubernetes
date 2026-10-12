@@ -59,8 +59,8 @@ func NewMutatingWebhookConfigurationManager(f informers.SharedInformerFactory, e
 	informer := f.Admissionregistration().V1().MutatingWebhookConfigurations()
 	manager := &mutatingWebhookConfigurationManager{
 		lister: informer.Lister(),
-		createMutatingWebhookAccessor: func(uid, configurationName string, h *v1.MutatingWebhook) webhook.WebhookAccessor {
-			return webhook.NewMutatingWebhookAccessor(uid, configurationName, h, kubeClient)
+		createMutatingWebhookAccessor: func(uid, configurationName string, configurationUID types.UID, h *v1.MutatingWebhook) webhook.WebhookAccessor {
+			return webhook.NewMutatingWebhookAccessor(uid, configurationName, configurationUID, h, kubeClient)
 		},
 		excludedWebhookResources: excludedWebhookResources,
 	}

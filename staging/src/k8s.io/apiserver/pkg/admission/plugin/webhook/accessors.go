@@ -28,11 +28,9 @@ import (
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/predicates/namespace"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/predicates/object"
 	"k8s.io/apiserver/pkg/cel/environment"
-	"k8s.io/apiserver/pkg/server/dynamiccertificates"
 	webhookutil "k8s.io/apiserver/pkg/util/webhook"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
-	"k8s.io/klog/v2"
 )
 
 // WebhookAccessor provides a common interface to both mutating and validating webhook types.
@@ -381,40 +379,26 @@ func (v *validatingWebhookAccessor) GetKubeClient() kubernetes.Interface {
 }
 
 // hookClientConfigForWebhook construct a webhookutil.ClientConfig using a WebhookAccessor to access
-// MutatingWebhook and ValidatingWebhook API objects. webhookutil.ClientConfig is used
+// v1beta1.MutatingWebhook and v1beta1.ValidatingWebhook API objects.  webhookutil.ClientConfig is used
 // to create a HookClient and the purpose of the config struct is to share that with other packages
 // that need to create a HookClient.
 func hookClientConfigForWebhook(w WebhookAccessor) webhookutil.ClientConfig {
-	whClientConfig := w.GetClientConfig()
-
-	ret := webhookutil.ClientConfig{Name: w.GetName()} // FIXME: here
-
-	var err error
-	if caBundle := whClientConfig.CABundle; caBundle != nil {
-		ret.CABundle, err = dynamiccertificates.NewStaticCAContent(w.GetName()+"_trust", caBundle) // FIXME: gotta return error now!
-	} else if ctbSelector := whClientConfig.ClusterTrustBundle; ctbSelector != nil {
-		ret.CABundle, err = dynamiccertificates.NewDynamicCAContentFromClusterTrustBundles(w.GetKubeClient(), w.GetName()+"_trust", *ctbSelector.SignerName)
+	ret := webhookutil.ClientConfig{Name: w.GetName(), CABundle: w.GetClientConfig().CABundle}
+	if w.GetClientConfig().URL != nil {
+		ret.URL = *w.GetClientConfig().URL
 	}
-	if err != nil {
-		klog.Error(err)
-		// FIXME: return
-	}
-
-	if whClientConfig.URL != nil {
-		ret.URL = *whClientConfig.URL
-	}
-	if whClientConfig.Service != nil {
+	if w.GetClientConfig().Service != nil {
 		ret.Service = &webhookutil.ClientConfigService{
-			Name:      whClientConfig.Service.Name,
-			Namespace: whClientConfig.Service.Namespace,
+			Name:      w.GetClientConfig().Service.Name,
+			Namespace: w.GetClientConfig().Service.Namespace,
 		}
-		if whClientConfig.Service.Port != nil {
-			ret.Service.Port = *whClientConfig.Service.Port
+		if w.GetClientConfig().Service.Port != nil {
+			ret.Service.Port = *w.GetClientConfig().Service.Port
 		} else {
 			ret.Service.Port = 443
 		}
-		if whClientConfig.Service.Path != nil {
-			ret.Service.Path = *whClientConfig.Service.Path
+		if w.GetClientConfig().Service.Path != nil {
+			ret.Service.Path = *w.GetClientConfig().Service.Path
 		}
 	}
 	return ret

@@ -59,8 +59,8 @@ func NewValidatingWebhookConfigurationManager(f informers.SharedInformerFactory,
 	informer := f.Admissionregistration().V1().ValidatingWebhookConfigurations()
 	manager := &validatingWebhookConfigurationManager{
 		lister: informer.Lister(),
-		createValidatingWebhookAccessor: func(uid, configurationName string, h *v1.ValidatingWebhook) webhook.WebhookAccessor {
-			return webhook.NewValidatingWebhookAccessor(uid, configurationName, h, kubeClient)
+		createValidatingWebhookAccessor: func(uid, configurationName string, configurationUID types.UID, h *v1.ValidatingWebhook) webhook.WebhookAccessor {
+			return webhook.NewValidatingWebhookAccessor(uid, configurationName, configurationUID, h, kubeClient)
 		},
 		excludedWebhookResources: excludedWebhookResources,
 	}
