@@ -1309,6 +1309,13 @@ func (f *frameworkImpl) RunPodGroupPostFilterPlugins(ctx context.Context, state 
 		metrics.FrameworkExtensionPointDuration.WithLabelValues(metrics.PodGroupPostFilter, status.Code().String(), f.profileName).Observe(metrics.SinceInSeconds(startTime))
 	}()
 
+	// Disable opportunistic batching during PodGroupPostFilter so preemption evaluations
+	// neither reuse node hints cached from the normal pass nor bypass RankNodes when
+	// dynamic victim condemnations change node ranks across pods in the group.
+	// TODO(#142718): Implement support for batching with RankNodes during preemption.
+	f.batch.SetDisabled(true)
+	defer f.batch.SetDisabled(false)
+
 	logger := klog.FromContext(ctx)
 	verboseLogs := logger.V(4).Enabled()
 	if verboseLogs {

@@ -28,8 +28,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2/ktesting"
 	fwk "k8s.io/kube-scheduler/framework"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 )
@@ -699,5 +702,178 @@ func TestBatchRescoreChain(t *testing.T) {
 	}
 	if got := batch.state.sortedNodes.Pop().Name; got != "n1" {
 		t.Fatalf("remaining node after pod3: got %q, want %q", got, "n1")
+	}
+}
+
+func TestBatchSetDisabled(t *testing.T) {
+	var nilBatch *OpportunisticBatch
+	nilBatch.SetDisabled(true)
+
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	testFwk, lister, err := newBatchTestFramework(ctx, nil, nil)
+	if err != nil {
+		t.Fatalf("Failed to create framework: %v", err)
+	}
+
+	pod1 := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod1", UID: types.UID(blockingPodID("1"))}}
+	pod2 := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod2", UID: types.UID(blockingPodID("2"))}}
+	pod3 := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod3", UID: types.UID(blockingPodID("3"))}}
+	n3Info := framework.NewNodeInfo(pod1)
+	n3Info.SetNode(&v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "n3", UID: "n3"}})
+	lister.nodes = nodeInfoLister{n3Info}
+
+	sig := fwk.PodSignature("sig")
+	batch := newOpportunisticBatch(testFwk, true, time.Minute)
+	state := framework.NewCycleState()
+
+	// Seed batch state in cycle 1.
+	batch.StoreScheduleResults(ctx, sig, "", "n3", newTestNodes([]string{"n1", "n2"}), 1)
+	if batch.state == nil {
+		t.Fatal("expected non-nil batch state before disabling")
+	}
+
+	// Disabling clears existing state and suppresses hints and result storage.
+	batch.SetDisabled(true)
+	if batch.state != nil {
+		t.Fatal("expected nil batch state after SetDisabled(true)")
+	}
+	if hint := batch.GetNodeHint(ctx, pod2, sig, state, 1); hint != "" {
+		t.Fatalf("expected empty hint while disabled, got %q", hint)
+	}
+	batch.StoreScheduleResults(ctx, sig, "", "n1", newTestNodes([]string{"n2"}), 1)
+	if batch.state != nil {
+		t.Fatal("expected StoreScheduleResults to be ignored while disabled")
+	}
+
+	// Re-enabling starts with clean state and allows subsequent cycles to batch normally.
+	batch.SetDisabled(false)
+	if hint := batch.GetNodeHint(ctx, pod2, sig, state, 1); hint != "" {
+		t.Fatalf("expected empty hint immediately after SetDisabled(false), got %q", hint)
+	}
+	batch.StoreScheduleResults(ctx, sig, "", "n3", newTestNodes([]string{"n1"}), 2)
+	if hint := batch.GetNodeHint(ctx, pod3, sig, state, 2); hint != "n1" {
+		t.Fatalf("expected hint %q after re-enabling, got %q", "n1", hint)
+	}
+}
+
+type podGroupPostFilterCallbackPlugin struct {
+	name string
+}
+
+func (pl *podGroupPostFilterCallbackPlugin) Name() string {
+	return pl.name
+}
+
+func (pl *podGroupPostFilterCallbackPlugin) PodGroupPostFilter(ctx context.Context, _ fwk.PodGroupCycleState, _ fwk.PodGroupInfo, pgSchedulingFunc fwk.PodGroupSchedulingFunc) (*fwk.PodGroupPostFilterResult, *fwk.Status) {
+	if _, status := pgSchedulingFunc(ctx); !status.IsSuccess() {
+		return nil, status
+	}
+	return &fwk.PodGroupPostFilterResult{}, fwk.NewStatus(fwk.Success)
+}
+
+func TestRunPodGroupPostFilterPluginsBatching(t *testing.T) {
+	for _, opportunisticBatchingEnabled := range []bool{true, false} {
+		t.Run(fmt.Sprintf("OpportunisticBatching=%v", opportunisticBatchingEnabled), func(t *testing.T) {
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.GenericWorkload:       true,
+				features.OpportunisticBatching: opportunisticBatchingEnabled,
+			})
+
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+
+			pod1 := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod1", UID: types.UID(blockingPodID("1"))}}
+			pod2 := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod2", UID: types.UID(blockingPodID("2"))}}
+			pod3 := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod3", UID: types.UID(blockingPodID("3"))}}
+			n3Info := framework.NewNodeInfo(pod1)
+			n3Info.SetNode(&v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "n3", UID: "n3"}})
+			lister := &sharedLister{nodes: nodeInfoLister{n3Info}}
+
+			const pgPostFilterPluginName = "pgPostFilterCallback"
+			r := Registry{
+				"batchTest":     newBatchTestPlugin,
+				queueSortPlugin: newQueueSortPlugin,
+				bindPlugin:      newBindPlugin,
+				pgPostFilterPluginName: func(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
+					return &podGroupPostFilterCallbackPlugin{name: pgPostFilterPluginName}, nil
+				},
+			}
+			profile := config.KubeSchedulerProfile{
+				Plugins: &config.Plugins{
+					QueueSort:          config.PluginSet{Enabled: []config.Plugin{{Name: queueSortPlugin}}},
+					Bind:               config.PluginSet{Enabled: []config.Plugin{{Name: bindPlugin}}},
+					Filter:             config.PluginSet{Enabled: []config.Plugin{{Name: "batchTest"}}},
+					PodGroupPostFilter: config.PluginSet{Enabled: []config.Plugin{{Name: pgPostFilterPluginName}}},
+				},
+			}
+
+			f, err := NewFramework(ctx, r, &profile, WithSnapshotSharedLister(lister))
+			if err != nil {
+				t.Fatalf("Failed to create framework: %v", err)
+			}
+			defer func() { _ = f.Close() }()
+
+			fwkImpl := f.(*frameworkImpl)
+			sig := fwk.PodSignature("sig")
+			state := framework.NewCycleState()
+
+			if opportunisticBatchingEnabled {
+				if fwkImpl.batch == nil {
+					t.Fatal("expected non-nil batch when OpportunisticBatching is enabled")
+				}
+				f.StoreScheduleResults(ctx, sig, "", "n3", newTestNodes([]string{"n1", "n2"}), 1)
+				if fwkImpl.batch.state == nil {
+					t.Fatal("expected non-nil batch state before RunPodGroupPostFilterPlugins")
+				}
+			} else if fwkImpl.batch != nil {
+				t.Fatal("expected nil batch when OpportunisticBatching is disabled")
+			}
+
+			schedulingFuncCalled := false
+			pgSchedulingFunc := func(ctx context.Context) (*fwk.PodGroupAssignments, *fwk.Status) {
+				schedulingFuncCalled = true
+				if opportunisticBatchingEnabled {
+					if !fwkImpl.batch.disabled {
+						t.Error("expected batch.disabled to be true inside RunPodGroupPostFilterPlugins")
+					}
+					if fwkImpl.batch.state != nil {
+						t.Error("expected batch.state to be cleared inside RunPodGroupPostFilterPlugins")
+					}
+					if hint := f.GetNodeHint(ctx, pod2, sig, state, 1); hint != "" {
+						t.Errorf("expected empty hint inside RunPodGroupPostFilterPlugins, got %q", hint)
+					}
+					f.StoreScheduleResults(ctx, sig, "", "n1", newTestNodes([]string{"n2"}), 1)
+					if fwkImpl.batch.state != nil {
+						t.Error("expected StoreScheduleResults to be ignored inside RunPodGroupPostFilterPlugins")
+					}
+				}
+				return &fwk.PodGroupAssignments{}, fwk.NewStatus(fwk.Success)
+			}
+
+			_, status := f.RunPodGroupPostFilterPlugins(ctx, framework.NewCycleState(), newQueuedPodGroupInfoForTest("default", "pg").PodGroupInfo, pgSchedulingFunc)
+			if !status.IsSuccess() {
+				t.Fatalf("RunPodGroupPostFilterPlugins failed: %v", status)
+			}
+			if !schedulingFuncCalled {
+				t.Fatal("expected pgSchedulingFunc to be called")
+			}
+
+			if opportunisticBatchingEnabled {
+				if fwkImpl.batch.disabled {
+					t.Fatal("expected batch.disabled to be restored to false after RunPodGroupPostFilterPlugins")
+				}
+				if hint := f.GetNodeHint(ctx, pod2, sig, state, 1); hint != "" {
+					t.Fatalf("expected empty hint immediately after RunPodGroupPostFilterPlugins, got %q", hint)
+				}
+				f.StoreScheduleResults(ctx, sig, "", "n3", newTestNodes([]string{"n1"}), 2)
+				if hint := f.GetNodeHint(ctx, pod3, sig, state, 2); hint != "n1" {
+					t.Fatalf("expected hint %q after RunPodGroupPostFilterPlugins re-enables batching, got %q", "n1", hint)
+				}
+			}
+		})
 	}
 }
