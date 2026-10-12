@@ -184,14 +184,103 @@ func TestPodGroupPreemption(t *testing.T) {
 				st.MakePod().Name("high-2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).Obj(),
 				st.MakePod().Name("high-3").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).Obj(),
 			},
-			// With custom scoring, preemptor pods will prefer high-1 node
-			// which will force preemption of low-1 pod.
-			expectedScheduled:               []string{"high-1", "high-2", "high-3", "very-low-1"},
-			expectedCandidatesForPreemption: []string{"low-1"},
+			// Even though custom scoring prefers node1, DefaultPreemption RankNodes
+			// ranks node2 better because very-low-1 has lower priority than low-1.
+			expectedScheduled:               []string{"high-1", "high-2", "high-3", "low-1"},
+			expectedCandidatesForPreemption: []string{"very-low-1"},
 			expectedToHaveNNNInfo:           []string{},
 			expectedPodsPreemptedByWAP:      1,
 			customPluginName:                "mockScorePlugin",
 			customPluginFunc:                newPresetScorePlugin(map[string]int64{"node1": 100, "node2": 0}),
+		},
+		{
+			name: "Preemption node ranking prefers node requiring no preemption over custom score plugin",
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "1", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
+				st.MakeNode().Name("node2").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "1", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
+				st.MakeNode().Name("node3").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "1", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
+			},
+			podGroups: []*schedulingv1beta1.PodGroup{
+				st.MakePodGroup().Name("pg1").Namespace("default").Priority(100).MinCount(2).Obj(),
+			},
+			initialPods: []*v1.Pod{
+				st.MakePod().Name("low-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").ZeroTerminationGracePeriod().Priority(10).Node("node1").Obj(),
+				st.MakePod().Name("low-2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").ZeroTerminationGracePeriod().Priority(10).Node("node3").Obj(),
+			},
+			preemptorPods: []*v1.Pod{
+				st.MakePod().Name("high-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).Obj(),
+				st.MakePod().Name("high-2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).Obj(),
+			},
+			// node2 has no victims (Rank 0), so it is chosen for one pod
+			// despite mockScorePlugin preferring node1 and node3. The second pod picks node1 over node3
+			// via mockScorePlugin tie-breaking, sparing low-2 on node3.
+			expectedScheduled:               []string{"high-1", "high-2", "low-2"},
+			expectedCandidatesForPreemption: []string{"low-1"},
+			expectedToHaveNNNInfo:           []string{"high-1", "high-2"},
+			expectedPodsPreemptedByWAP:      1,
+			tempRemovePG:                    true,
+			customPluginName:                "mockScorePlugin",
+			customPluginFunc:                newPresetScorePlugin(map[string]int64{"node1": 100, "node2": 0, "node3": 50}),
+		},
+		{
+			name: "Preemption node ranking prefers node with lower priority victim over custom score plugin",
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "2", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
+				st.MakeNode().Name("node2").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "2", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
+			},
+			podGroups: []*schedulingv1beta1.PodGroup{
+				st.MakePodGroup().Name("pg1").Namespace("default").Priority(100).MinCount(2).Obj(),
+			},
+			initialPods: []*v1.Pod{
+				st.MakePod().Name("mid-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Container("image").ZeroTerminationGracePeriod().Priority(50).Node("node1").Obj(),
+				st.MakePod().Name("low-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Container("image").ZeroTerminationGracePeriod().Priority(10).Node("node2").Obj(),
+			},
+			preemptorPods: []*v1.Pod{
+				st.MakePod().Name("high-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).Obj(),
+				st.MakePod().Name("high-2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).Obj(),
+			},
+			expectedScheduled:               []string{"high-1", "high-2", "mid-1"},
+			expectedCandidatesForPreemption: []string{"low-1"},
+			expectedToHaveNNNInfo:           []string{"high-1", "high-2"},
+			expectedPodsPreemptedByWAP:      1,
+			tempRemovePG:                    true,
+			customPluginName:                "mockScorePlugin",
+			customPluginFunc:                newPresetScorePlugin(map[string]int64{"node1": 100, "node2": 0}),
+		},
+		{
+			name: "Preemption node ranking reuses capacity from already-condemned DisruptionModeAll PodGroup victim across nodes",
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "1", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
+				st.MakeNode().Name("node2").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "1", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
+				st.MakeNode().Name("node3").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "1", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
+				st.MakeNode().Name("node4").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "1", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
+			},
+			podGroups: []*schedulingv1beta1.PodGroup{
+				st.MakePodGroup().Name("victim-pg-1").Namespace("default").Priority(10).DisruptionModeAll().MinCount(2).Obj(),
+				st.MakePodGroup().Name("victim-pg-2").Namespace("default").Priority(10).DisruptionModeAll().MinCount(2).Obj(),
+				st.MakePodGroup().Name("preemptor-pg").Namespace("default").Priority(100).MinCount(2).Obj(),
+			},
+			initialPods: []*v1.Pod{
+				st.MakePod().Name("v1-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("victim-pg-1").ZeroTerminationGracePeriod().Priority(10).Node("node1").Obj(),
+				st.MakePod().Name("v1-2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("victim-pg-1").ZeroTerminationGracePeriod().Priority(10).Node("node2").Obj(),
+				st.MakePod().Name("v2-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("victim-pg-2").ZeroTerminationGracePeriod().Priority(10).Node("node3").Obj(),
+				st.MakePod().Name("v2-2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("victim-pg-2").ZeroTerminationGracePeriod().Priority(10).Node("node4").Obj(),
+			},
+			preemptorPods: []*v1.Pod{
+				st.MakePod().Name("high-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("preemptor-pg").ZeroTerminationGracePeriod().Priority(100).Obj(),
+				st.MakePod().Name("high-2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("preemptor-pg").ZeroTerminationGracePeriod().Priority(100).Obj(),
+			},
+			// For high-1, all nodes have equal victim cost (Rank 1), so mockScorePlugin picks node1, condemning victim-pg-1.
+			// For high-2 (identical to high-1), node2 now has 0 surviving victims because victim-pg-1 is already
+			// condemned, so DefaultPreemption ranks node2 (Rank 0) ahead of node3 (Rank 1), sparing victim-pg-2.
+			expectedScheduled:               []string{"high-1", "high-2", "v2-1", "v2-2"},
+			expectedCandidatesForPreemption: []string{"v1-1", "v1-2"},
+			expectedToHaveNNNInfo:           []string{"high-1", "high-2"},
+			expectedPodsPreemptedByWAP:      2,
+			enablePodGroupPreemptionPolicy:  true,
+			tempRemovePG:                    true,
+			customPluginName:                "mockScorePlugin",
+			customPluginFunc:                newPresetScorePlugin(map[string]int64{"node1": 100, "node2": 0, "node3": 90, "node4": 0}),
 		},
 		{
 			name: "PDB Violation Handling (Reprieve)",
