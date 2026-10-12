@@ -17,6 +17,7 @@ limitations under the License.
 package framework
 
 import (
+	"errors"
 	"fmt"
 	"testing"
 
@@ -285,96 +286,139 @@ func TestPlacementCycleState(t *testing.T) {
 	})
 }
 
-func TestPlacementCycleStateForName(t *testing.T) {
+func TestPlacementState(t *testing.T) {
+	var nilState *CycleState
+	if got := nilState.PlacementState(&fwk.Placement{Name: "p1"}); got != nil {
+		t.Errorf("expected nil PlacementState on nil CycleState, got %v", got)
+	}
+
 	c := NewCycleState()
-
-	if got := c.GetPlacementCycleStateForName("missing"); got != nil {
-		t.Errorf("expected nil for unknown placement name, got %v", got)
+	if got := c.PlacementState(nil); got != nil {
+		t.Errorf("expected nil for nil placement pointer, got %v", got)
 	}
 
-	state := NewCycleState()
-	state.Write(key, &fakeData{data: "v"})
-	c.SetPlacementCycleStateForName("p1", state)
+	// Two distinct Placement pointers with the exact same Name have independent states.
+	p1 := &fwk.Placement{Name: "same"}
+	p2 := &fwk.Placement{Name: "same"}
 
-	if got := c.GetPlacementCycleStateForName("p1"); got != state {
-		t.Errorf("expected to read back the registered state, got %v", got)
+	s1 := c.PlacementState(p1)
+	if s1 == nil {
+		t.Fatal("expected non-nil PlacementCycleState for p1")
+	}
+	s1.Write(key, &fakeData{data: "v1"})
+
+	if got := c.PlacementState(p1); got != s1 {
+		t.Errorf("expected PlacementState(p1) to return the same instance, got %v", got)
 	}
 
-	c.DeletePlacementCycleStateForName("p1")
-	if got := c.GetPlacementCycleStateForName("p1"); got != nil {
-		t.Errorf("expected nil after delete, got %v", got)
+	s2 := c.PlacementState(p2)
+	if s2 == nil || s2 == s1 {
+		t.Fatalf("expected distinct PlacementCycleState for p2, got %v", s2)
+	}
+	if _, err := s2.Read(key); !errors.Is(err, fwk.ErrNotFound) {
+		t.Errorf("expected p2 state to be isolated from p1, got err=%v", err)
+	}
+	s2.Write(key, &fakeData{data: "v2"})
+
+	c.DeletePlacementStates(p1)
+	if _, err := c.PlacementState(p1).Read(key); !errors.Is(err, fwk.ErrNotFound) {
+		t.Errorf("expected p1 state to be empty after DeletePlacementStates, got err=%v", err)
+	}
+	got2, err := c.PlacementState(p2).Read(key)
+	if err != nil || got2.(*fakeData).data != "v2" {
+		t.Errorf("expected p2 state to remain intact after deleting p1, got %v, err=%v", got2, err)
 	}
 }
 
 func TestMergePlacementStatesInto(t *testing.T) {
-	keyA := fwk.StateKey("a")
-	keyB := fwk.StateKey("b")
+	tests := map[string]struct {
+		sources   []map[fwk.StateKey]string
+		wantData  map[fwk.StateKey]string
+		wantError bool
+	}{
+		"disjoint keys are combined": {
+			sources:  []map[fwk.StateKey]string{{"a": "va"}, {"b": "vb", "c": "vc"}},
+			wantData: map[fwk.StateKey]string{"a": "va", "b": "vb", "c": "vc"},
+		},
+		"conflicting keys return an error without registering the destination": {
+			sources:   []map[fwk.StateKey]string{{"a": "va"}, {"a": "vb"}},
+			wantError: true,
+		},
+		"single source is cloned": {
+			sources:  []map[fwk.StateKey]string{{"a": "va", "b": "vb"}},
+			wantData: map[fwk.StateKey]string{"a": "va", "b": "vb"},
+		},
+		"missing and empty sources are skipped": {
+			sources:  []map[fwk.StateKey]string{nil, {"a": "va"}, {}, {"b": "vb"}},
+			wantData: map[fwk.StateKey]string{"a": "va", "b": "vb"},
+		},
+		"sources without state leave destination unregistered": {
+			sources: []map[fwk.StateKey]string{nil, {}},
+		},
+		"no sources leave destination unregistered": {},
+	}
 
-	t.Run("disjoint keys are combined", func(t *testing.T) {
-		c := NewCycleState()
-		sa := NewCycleState()
-		sa.Write(keyA, &fakeData{data: "va"})
-		sb := NewCycleState()
-		sb.Write(keyB, &fakeData{data: "vb"})
-		c.SetPlacementCycleStateForName("a", sa)
-		c.SetPlacementCycleStateForName("b", sb)
-
-		if err := c.MergePlacementStatesInto("a/b", "a", "b"); err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		merged := c.GetPlacementCycleStateForName("a/b").(*CycleState)
-		for _, k := range []fwk.StateKey{keyA, keyB} {
-			if _, err := merged.Read(k); err != nil {
-				t.Errorf("merged state missing key %q: %v", k, err)
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			c := NewCycleState()
+			dst := &fwk.Placement{Name: "dst"}
+			sources := make([]*fwk.Placement, 0, len(tt.sources)+1)
+			var originals []*fakeData
+			for i, data := range tt.sources {
+				source := &fwk.Placement{Name: fmt.Sprintf("source-%d", i)}
+				sources = append(sources, source)
+				if data == nil {
+					continue
+				}
+				state := c.PlacementState(source)
+				for key, value := range data {
+					original := &fakeData{data: value}
+					originals = append(originals, original)
+					state.Write(key, original)
+				}
 			}
-		}
-	})
+			if len(sources) > 0 {
+				sources = append(sources, nil)
+			}
 
-	t.Run("conflicting keys return an error", func(t *testing.T) {
-		c := NewCycleState()
-		sa := NewCycleState()
-		sa.Write(keyA, &fakeData{data: "va"})
-		sb := NewCycleState()
-		sb.Write(keyA, &fakeData{data: "vb"})
-		c.SetPlacementCycleStateForName("a", sa)
-		c.SetPlacementCycleStateForName("b", sb)
+			err := c.MergePlacementStatesInto(dst, sources...)
+			if (err != nil) != tt.wantError {
+				t.Fatalf("MergePlacementStatesInto() error = %v, want error: %v", err, tt.wantError)
+			}
+			for _, original := range originals {
+				original.data = "mutated"
+			}
 
-		if err := c.MergePlacementStatesInto("a/b", "a", "b"); err == nil {
-			t.Errorf("expected an error for conflicting keys, got nil")
-		}
-	})
-
-	t.Run("merged state is isolated from sources", func(t *testing.T) {
-		c := NewCycleState()
-		sa := NewCycleState()
-		original := &fakeData{data: "va"}
-		sa.Write(keyA, original)
-		c.SetPlacementCycleStateForName("a", sa)
-
-		if err := c.MergePlacementStatesInto("a/b", "a"); err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		// Mutate the source value; the merged copy must not change.
-		original.data = "mutated"
-
-		merged := c.GetPlacementCycleStateForName("a/b").(*CycleState)
-		got, err := merged.Read(keyA)
-		if err != nil {
-			t.Fatalf("merged state missing key: %v", err)
-		}
-		if got.(*fakeData).data != "va" {
-			t.Errorf("merged state shares mutable data with source: got %q", got.(*fakeData).data)
-		}
-	})
+			merged := c.placementStates[dst]
+			if len(tt.wantData) == 0 {
+				if merged != nil {
+					t.Errorf("expected destination to remain unregistered, got %v", merged)
+				}
+				return
+			}
+			if merged == nil {
+				t.Fatal("expected destination state to be registered")
+			}
+			gotData := make(map[fwk.StateKey]string)
+			merged.storage.Range(func(key, value interface{}) bool {
+				gotData[key.(fwk.StateKey)] = value.(*fakeData).data
+				return true
+			})
+			if diff := cmp.Diff(tt.wantData, gotData); diff != "" {
+				t.Errorf("unexpected merged state (-want,+got):\n%s", diff)
+			}
+		})
+	}
 }
 
 func TestCopyPlacementDataInto(t *testing.T) {
-	src := NewCycleState()
+	c := NewCycleState()
+	p := &fwk.Placement{Name: "p1"}
 	original := &fakeData{data: "v"}
-	src.Write(key, original)
+	c.PlacementState(p).Write(key, original)
 
 	dst := NewCycleState()
-	src.CopyPlacementDataInto(dst)
+	c.CopyPlacementDataInto(p, dst)
 
 	original.data = "mutated"
 	got, err := dst.Read(key)
@@ -384,27 +428,29 @@ func TestCopyPlacementDataInto(t *testing.T) {
 	if got.(*fakeData).data != "v" {
 		t.Errorf("copied data shares mutable state with source: got %q", got.(*fakeData).data)
 	}
+
+	// No-op checks for nil or unregistered inputs.
+	c.CopyPlacementDataInto(nil, dst)
+	c.CopyPlacementDataInto(&fwk.Placement{Name: "unregistered"}, dst)
+	c.CopyPlacementDataInto(p, nil)
 }
 
 func TestCloneCopiesPlacementStates(t *testing.T) {
 	c := NewCycleState()
-	src := NewCycleState()
+	p := &fwk.Placement{Name: "p1"}
 	original := &fakeData{data: "v"}
-	src.Write(key, original)
-	c.SetPlacementCycleStateForName("p1", src)
+	c.PlacementState(p).Write(key, original)
 
 	cloned := c.Clone().(*CycleState)
 	original.data = "mutated"
 
-	got := cloned.GetPlacementCycleStateForName("p1")
-	if got == nil {
-		t.Fatal("cloned state lost the named placement state")
-	}
-	data, err := got.Read(key)
+	dst := NewCycleState()
+	cloned.CopyPlacementDataInto(p, dst)
+	data, err := dst.Read(key)
 	if err != nil {
-		t.Fatalf("cloned named state missing key: %v", err)
+		t.Fatalf("cloned placement state missing key: %v", err)
 	}
 	if data.(*fakeData).data != "v" {
-		t.Errorf("cloned named state shares mutable data with source: got %q", data.(*fakeData).data)
+		t.Errorf("cloned placement state shares mutable data with source: got %q", data.(*fakeData).data)
 	}
 }

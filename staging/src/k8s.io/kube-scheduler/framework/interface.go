@@ -809,6 +809,15 @@ type PlacementGeneratePlugin interface {
 	// Each Placement represents a candidate set of resources, e.g., nodes matching a selector.
 	// The scheduler may shuffle and evaluate only a subset of the returned Placements, so plugins
 	// must not rely on their order.
+	//
+	// A plugin can attach per-placement data by calling state.PlacementState(placement).Write
+	// and returning that same placement pointer. When multiple PlacementGenerate plugins
+	// constrain the input, the framework intersects their placements and combines the attached
+	// state. Returning parentPlacement unchanged as the only placement imposes no constraints,
+	// and state attached through PlacementState(parentPlacement) is ignored. Use PodGroupCycleState
+	// for group-wide data instead. During placement evaluation, pod scheduling reads the combined
+	// state from CycleState.GetPlacementCycleState, and PlacementFeasible and ScorePlacement
+	// receive it directly.
 	GeneratePlacements(ctx context.Context, state PodGroupCycleState, podGroup PodGroupInfo, parentPlacement *Placement) (*GeneratePlacementsResult, *Status)
 }
 

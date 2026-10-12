@@ -32,7 +32,7 @@ import (
 
 // nodePoolPlacementName is the name of the out-of-tree PlacementGenerate plugin used by the
 // multi-placement workload. It must match the plugin name enabled in
-// config/multi-placement.yaml.
+// scheduler-config-multi-placement.yaml.
 const nodePoolPlacementName = "NodePoolPlacement"
 
 // nodePoolPlacement is a test PlacementGenerate plugin that keeps only nodes in a fixed "pool".
