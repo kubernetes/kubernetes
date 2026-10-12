@@ -937,16 +937,10 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 				Field: fields.Everything(),
 				Limit: 1,
 			},
-			expectedOut:    []example.Pod{*createdPods[1]},
-			expectRV:       currentRV,
-			expectContinue: true,
-			expectContinueExact: func() string {
-				if watchCacheEnabled {
-					// cacher passes raw key instead of preparedKey to storage.PrepareContinueToken, leaving a leading slash in StartKey.
-					return encodeContinueOrDie("/"+createdPods[1].Name+"\x00", int64(mustAtoi(currentRV)))
-				}
-				return encodeContinueOrDie(createdPods[1].Name+"\x00", int64(mustAtoi(currentRV)))
-			}(),
+			expectedOut:                []example.Pod{*createdPods[1]},
+			expectRV:                   currentRV,
+			expectContinue:             true,
+			expectContinueExact:        encodeContinueOrDie(createdPods[1].Name+"\x00", int64(mustAtoi(currentRV))),
 			expectedRemainingItemCount: ptr.To[int64](1),
 			expectCacherRequestsToEtcd: func() []RecordedList {
 				return nil
