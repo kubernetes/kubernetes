@@ -17569,7 +17569,7 @@ func TestValidateExtraNodeAllocatableResources(t *testing.T) {
 			errorMsg:    "must be a node allocatable resource name",
 		},
 		{
-			name: "Ephemeral Storage resource name is rejected",
+			name: "Valid ephemeral-storage resource name",
 			spec: validPodSpec1,
 			podStatus: core.PodStatus{
 				ExtraNodeAllocatableResources: []core.ExtraNodeAllocatableResource{
@@ -17577,15 +17577,15 @@ func TestValidateExtraNodeAllocatableResources(t *testing.T) {
 						Source:     core.ExtraNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "my-claim1"},
 						Containers: []string{"c1"},
 						Mapping: []core.NodeAllocatableMappedResources{
-							{Name: "ephemeral-storage", Quantity: new(resource.MustParse("10Gi"))},
+							{Name: core.ResourceEphemeralStorage, Quantity: new(resource.MustParse("10Gi"))},
+						},
+						Overhead: []core.NodeAllocatableOverheadResources{
+							{Name: core.ResourceEphemeralStorage, PerPod: new(resource.MustParse("1Gi")), PerContainer: new(resource.MustParse("500Mi"))},
 						},
 					},
 				},
 			},
-			expectError: true,
-			errorType:   field.ErrorTypeInvalid,
-			errorField:  "status.extraNodeAllocatableResources[0].mapping[0].name",
-			errorMsg:    "must be a node allocatable resource name",
+			expectError: false,
 		},
 		{
 			name: "Valid hugepages resource name",
