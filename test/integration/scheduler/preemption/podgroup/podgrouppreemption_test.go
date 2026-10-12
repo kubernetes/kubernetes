@@ -4786,8 +4786,7 @@ func TestCompositePodGroupPreemptionStatus(t *testing.T) {
 		return false, nil
 	})
 	if err != nil {
-		t.Logf("Failed to verify PodGroup condition: %v", err)
-		t.Fatalf("Last observed podGroup condition: Status=%s, Reason=%s, Message=%q", cond.Status, cond.Reason, cond.Message)
+		t.Fatalf("Failed to verify PodGroup condition: %v; last observed: %+v", err, cond)
 	}
 	// Verify the root CompositePodGroup condition mirrors the child's: still unschedulable,
 	// with the preemption outcome carried in the message.
