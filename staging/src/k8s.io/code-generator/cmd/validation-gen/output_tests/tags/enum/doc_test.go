@@ -20,7 +20,6 @@ import (
 	"testing"
 
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/utils/ptr"
 )
 
 func Test(t *testing.T) {
@@ -37,36 +36,36 @@ func Test(t *testing.T) {
 	})
 
 	st.Value(&Struct{
-		Enum0Field:        "",                // no valid value exists
-		Enum0PtrField:     ptr.To(Enum0("")), // no valid value exists
+		Enum0Field:        "",             // no valid value exists
+		Enum0PtrField:     new(Enum0("")), // no valid value exists
 		Enum1Field:        E1V1,
-		Enum1PtrField:     ptr.To(E1V1),
+		Enum1PtrField:     new(E1V1),
 		Enum2Field:        E2V1,
-		Enum2PtrField:     ptr.To(E2V1),
+		Enum2PtrField:     new(E2V1),
 		NotEnumField:      "x",
-		NotEnumPtrField:   ptr.To(NotEnum("x")),
+		NotEnumPtrField:   new(NotEnum("x")),
 		EnumInt32Field:    EInt32V1,
-		EnumInt32PtrField: ptr.To(EInt32V1),
+		EnumInt32PtrField: new(EInt32V1),
 		EnumInt64Field:    EInt64V1,
-		EnumInt64PtrField: ptr.To(EInt64V1),
+		EnumInt64PtrField: new(EInt64V1),
 	}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
 		field.NotSupported(field.NewPath("enum0Field"), Enum0(""), []Enum0{}),
 		field.NotSupported(field.NewPath("enum0PtrField"), Enum0(""), []Enum0{}),
 	})
 
 	st.Value(&Struct{
-		Enum0Field:        "x",                // no valid value exists
-		Enum0PtrField:     ptr.To(Enum0("x")), // no valid value exists
+		Enum0Field:        "x",             // no valid value exists
+		Enum0PtrField:     new(Enum0("x")), // no valid value exists
 		Enum1Field:        "x",
-		Enum1PtrField:     ptr.To(Enum1("x")),
+		Enum1PtrField:     new(Enum1("x")),
 		Enum2Field:        "x",
-		Enum2PtrField:     ptr.To(Enum2("x")),
+		Enum2PtrField:     new(Enum2("x")),
 		NotEnumField:      "x",
-		NotEnumPtrField:   ptr.To(NotEnum("x")),
+		NotEnumPtrField:   new(NotEnum("x")),
 		EnumInt32Field:    99,
-		EnumInt32PtrField: ptr.To(EnumInt32(99)),
+		EnumInt32PtrField: new(EnumInt32(99)),
 		EnumInt64Field:    999,
-		EnumInt64PtrField: ptr.To(EnumInt64(999)),
+		EnumInt64PtrField: new(EnumInt64(999)),
 	}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
 		field.NotSupported(field.NewPath("enum0Field"), Enum0("x"), []Enum0{}),
 		field.NotSupported(field.NewPath("enum0PtrField"), Enum0("x"), []Enum0{}),
