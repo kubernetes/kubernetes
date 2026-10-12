@@ -313,7 +313,9 @@ func (dsw *desiredStateOfWorld) AddPodToVolume(
 		var sizeLimit *resource.Quantity
 		if volumeSpec.Volume != nil {
 			if util.IsLocalEphemeralVolume(*volumeSpec.Volume) {
-				podLimits := resourcehelper.PodLimits(pod, resourcehelper.PodResourcesOptions{})
+				podLimits := resourcehelper.PodLimits(pod, resourcehelper.PodResourcesOptions{
+					UseExtraNodeAllocatableResources: feature.DefaultFeatureGate.Enabled(features.DRANodeAllocatableResources),
+				})
 				ephemeralStorageLimit := podLimits[v1.ResourceEphemeralStorage]
 				sizeLimit = resource.NewQuantity(ephemeralStorageLimit.Value(), resource.BinarySI)
 				if volumeSpec.Volume.EmptyDir != nil &&

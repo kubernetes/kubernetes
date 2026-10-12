@@ -569,7 +569,10 @@ func (m *managerImpl) emptyDirLimitEviction(logger klog.Logger, podStats statsap
 }
 
 func (m *managerImpl) podEphemeralStorageLimitEviction(logger klog.Logger, podStats statsapi.PodStats, pod *v1.Pod) bool {
-	podLimits := resourcehelper.PodLimits(pod, resourcehelper.PodResourcesOptions{})
+	// Extra node allocatable resources (like DRA allocations) count even if the feature gate is disabled after allocation.
+	podLimits := resourcehelper.PodLimits(pod, resourcehelper.PodResourcesOptions{
+		UseExtraNodeAllocatableResources: true,
+	})
 	_, found := podLimits[v1.ResourceEphemeralStorage]
 	if !found {
 		return false
@@ -595,24 +598,35 @@ func (m *managerImpl) podEphemeralStorageLimitEviction(logger klog.Logger, podSt
 
 func (m *managerImpl) containerEphemeralStorageLimitEviction(logger klog.Logger, podStats statsapi.PodStats, pod *v1.Pod) bool {
 	thresholdsMap := make(map[string]*resource.Quantity)
-	for _, container := range pod.Spec.Containers {
+	setContainerThreshold := func(container v1.Container) {
 		ephemeralLimit := container.Resources.Limits.StorageEphemeral()
 		// Use IsZero rather than Value to test whether a limit is set. Value can
 		// overflow an int64 and returns 0 when it does, so a large but valid limit
 		// such as "100E" would otherwise be mistaken for an unset limit and never
 		// enforced. The comparison below uses Cmp, which is overflow-safe.
 		if ephemeralLimit != nil && !ephemeralLimit.IsZero() {
+			// Not gated, like podEphemeralStorageLimitEviction.
+			containerExtraNodeAllocatableRes := resourcehelper.GetContainerExtraNodeAllocatableResources(pod, container.Name)
+			if extraNodeAllocatableEphemeral, exists := containerExtraNodeAllocatableRes[v1.ResourceEphemeralStorage]; exists && !extraNodeAllocatableEphemeral.IsZero() {
+				// Extra node allocatable ephemeral storage (like DRA allocations) is added only when a limit is explicitly set in the
+				// container spec (similar to CPU and memory limit enforcement). A container without a
+				// spec limit is unbounded at the container level and is only bound by
+				// podEphemeralStorageLimitEviction if a pod level ephemeral storage limit applies.
+				q := *ephemeralLimit
+				q.Add(extraNodeAllocatableEphemeral)
+				ephemeralLimit = &q
+			}
 			thresholdsMap[container.Name] = ephemeralLimit
 		}
+	}
+	for _, container := range pod.Spec.Containers {
+		setContainerThreshold(container)
 	}
 	for _, container := range pod.Spec.InitContainers {
 		if !podutil.IsRestartableInitContainer(&container) {
 			continue
 		}
-		ephemeralLimit := container.Resources.Limits.StorageEphemeral()
-		if ephemeralLimit != nil && !ephemeralLimit.IsZero() {
-			thresholdsMap[container.Name] = ephemeralLimit
-		}
+		setContainerThreshold(container)
 	}
 
 	for _, containerStat := range podStats.Containers {
