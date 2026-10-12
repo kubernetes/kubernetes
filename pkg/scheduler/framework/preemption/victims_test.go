@@ -175,12 +175,22 @@ func TestGetHighestAllAncestor(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			pgLister := &mockPodGroupLister{podGroups: tt.podGroups}
-			var cpgLister fwk.CompositePodGroupLister
-			if tt.compositePodGroups != nil {
-				cpgLister = &mockCompositePodGroupLister{compositePodGroups: tt.compositePodGroups}
+			// The snapshot's listers enforce the feature gates; this test exercises the traversal itself.
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.GenericWorkload:                 true,
+				features.TopologyAwareWorkloadScheduling: true,
+				features.CompositePodGroup:               true,
+			})
+			var pgs []*schedulingv1beta1.PodGroup
+			for _, pg := range tt.podGroups {
+				pgs = append(pgs, pg)
 			}
-			gotKey, gotHasAll := getHighestAllAncestor(tt.pod, pgLister, cpgLister)
+			var cpgs []*schedulingv1alpha3.CompositePodGroup
+			for _, cpg := range tt.compositePodGroups {
+				cpgs = append(cpgs, cpg)
+			}
+			snapshot := internalcache.NewTestSnapshotWithPodGroups(nil, nil, pgs, cpgs)
+			gotKey, gotHasAll := getHighestAllAncestor(tt.pod, snapshot)
 			if gotHasAll != tt.wantHasAll {
 				t.Errorf("hasAll mismatch: got %v, want %v", gotHasAll, tt.wantHasAll)
 			}
@@ -238,8 +248,8 @@ func TestGetWorkloadPreemptionVictims(t *testing.T) {
 				st.MakeNode().Name("node2").Obj(),
 			},
 			pods: []*v1.Pod{
-				st.MakePod().Name("p1").UID("p1").Node("node1").PodGroupName("pg1").Priority(10).Obj(),
-				st.MakePod().Name("p2").UID("p2").Node("node2").PodGroupName("pg1").Priority(10).Obj(),
+				st.MakePod().Name("p1").UID("p1").Node("node1").PodGroupName("pg1").Priority(50).Obj(),
+				st.MakePod().Name("p2").UID("p2").Node("node2").PodGroupName("pg1").Priority(50).Obj(),
 			},
 			podGroups: map[string]*schedulingv1beta1.PodGroup{
 				"pg1": st.MakePodGroup().Name("pg1").UID("pg1").DisruptionModeAll().Priority(50).Obj(),
@@ -255,8 +265,8 @@ func TestGetWorkloadPreemptionVictims(t *testing.T) {
 				st.MakeNode().Name("node2").Obj(),
 			},
 			pods: []*v1.Pod{
-				st.MakePod().Name("p1").UID("p1").Node("node1").PodGroupName("pg1").Priority(10).Obj(),
-				st.MakePod().Name("p2").UID("p2").Node("node2").PodGroupName("pg1").Priority(20).Obj(),
+				st.MakePod().Name("p1").UID("p1").Node("node1").PodGroupName("pg1").Priority(50).Obj(),
+				st.MakePod().Name("p2").UID("p2").Node("node2").PodGroupName("pg1").Priority(50).Obj(),
 			},
 			podGroups: map[string]*schedulingv1beta1.PodGroup{
 				"pg1": st.MakePodGroup().Name("pg1").UID("pg1").DisruptionModeSingle().Priority(50).Obj(),
@@ -273,9 +283,9 @@ func TestGetWorkloadPreemptionVictims(t *testing.T) {
 				st.MakeNode().Name("node2").Obj(),
 			},
 			pods: []*v1.Pod{
-				st.MakePod().Name("p1").UID("p1").Node("node1").PodGroupName("pg1").Priority(10).Obj(),
-				st.MakePod().Name("p2").UID("p2").Node("node2").PodGroupName("pg1").Priority(10).Obj(),
-				st.MakePod().Name("p3").UID("p3").Node("node1").PodGroupName("pg2").Priority(20).Obj(),
+				st.MakePod().Name("p1").UID("p1").Node("node1").PodGroupName("pg1").Priority(50).Obj(),
+				st.MakePod().Name("p2").UID("p2").Node("node2").PodGroupName("pg1").Priority(50).Obj(),
+				st.MakePod().Name("p3").UID("p3").Node("node1").PodGroupName("pg2").Priority(60).Obj(),
 				st.MakePod().Name("p4").UID("p4").Node("node2").Priority(30).Obj(),
 			},
 			podGroups: map[string]*schedulingv1beta1.PodGroup{
@@ -780,12 +790,7 @@ func TestGetWorkloadPreemptionVictims(t *testing.T) {
 			if err := cache.UpdateSnapshot(logger, snapshot); err != nil {
 				t.Fatalf("Failed to update snapshot: %v", err)
 			}
-			pgLister := &mockPodGroupLister{podGroups: tt.podGroups}
-			var cpgLister fwk.CompositePodGroupLister
-			if tt.enableCompositePodGroup {
-				cpgLister = &mockCompositePodGroupLister{compositePodGroups: tt.compositePodGroups}
-			}
-			victims, err := getWorkloadPreemptionVictims(logger, snapshot, pgLister, cpgLister)
+			victims, err := getWorkloadPreemptionVictims(logger, snapshot)
 			if err != nil {
 				t.Fatalf("Failed to create victims: %v", err)
 			}

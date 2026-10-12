@@ -2487,10 +2487,10 @@ func TestPodEligibleToPreemptOthers(t *testing.T) {
 			expected: true,
 		},
 		{
-			name: "Preemptor with SchedulingGroup, victim priority overridden by PodGroup in victim namespace",
+			name: "Preemptor with SchedulingGroup, terminating victim is judged by its own priority, which matches its PodGroup's",
 			pod:  st.MakePod().Name("p").UID("p").Namespace("ns1").Priority(highPriority).PodGroupName("pg1").NominatedNodeName("node1").Obj(),
 			pods: []*v1.Pod{
-				st.MakePod().Name("v1").UID("v1").Namespace("ns2").Node("node1").Priority(veryHighPriority).PodGroupName("pg1").Terminating().
+				st.MakePod().Name("v1").UID("v1").Namespace("ns2").Node("node1").Priority(lowPriority).PodGroupName("pg1").Terminating().
 					Condition(v1.DisruptionTarget, v1.ConditionTrue, v1.PodReasonPreemptionByScheduler).Obj(),
 			},
 			podGroups: []*v1beta1.PodGroup{
@@ -2498,66 +2498,6 @@ func TestPodEligibleToPreemptOthers(t *testing.T) {
 			},
 			nodes:    []string{"node1"},
 			features: feature.Features{EnableGenericWorkload: true},
-			expected: false,
-		},
-		{
-			name: "Preemptor with SchedulingGroup, victim priority overridden by CompositePodGroup in victim namespace",
-			pod:  st.MakePod().Name("p").UID("p").Namespace("ns1").Priority(highPriority).PodGroupName("pg1").NominatedNodeName("node1").Obj(),
-			pods: []*v1.Pod{
-				st.MakePod().Name("v1").UID("v1").Namespace("ns2").Node("node1").Priority(veryHighPriority).PodGroupName("pg1").Terminating().
-					Condition(v1.DisruptionTarget, v1.ConditionTrue, v1.PodReasonPreemptionByScheduler).Obj(),
-			},
-			podGroups: []*v1beta1.PodGroup{
-				st.MakePodGroup().Name("pg1").UID("pg1").Namespace("ns2").ParentCompositePodGroup("cpg1").Priority(lowPriority).Obj(),
-			},
-			compositePodGroups: []*v1alpha3.CompositePodGroup{
-				st.MakeCompositePodGroup().Name("cpg1").UID("cpg1").Namespace("ns2").Priority(lowPriority).Obj(),
-			},
-			nodes:    []string{"node1"},
-			features: feature.Features{EnableGenericWorkload: true, EnableCompositePodGroup: true},
-			expected: false,
-		},
-		{
-			name: "Preemptor with SchedulingGroup, CompositePodGroup not found in victim namespace, fallback to PodGroup priority",
-			pod:  st.MakePod().Name("p").UID("p").Namespace("ns1").Priority(highPriority).PodGroupName("pg1").NominatedNodeName("node1").Obj(),
-			pods: []*v1.Pod{
-				st.MakePod().Name("v1").UID("v1").Namespace("ns2").Node("node1").Priority(veryHighPriority).PodGroupName("pg1").Terminating().
-					Condition(v1.DisruptionTarget, v1.ConditionTrue, v1.PodReasonPreemptionByScheduler).Obj(),
-			},
-			podGroups: []*v1beta1.PodGroup{
-				st.MakePodGroup().Name("pg1").UID("pg1").Namespace("ns2").ParentCompositePodGroup("cpg1").Priority(lowPriority).Obj(),
-			},
-			nodes:    []string{"node1"},
-			features: feature.Features{EnableGenericWorkload: true, EnableCompositePodGroup: true},
-			expected: false,
-		},
-		{
-			name: "Preemptor with SchedulingGroup, PodGroup not found in victim namespace, fallback to pod priority when CompositePodGroup is enabled",
-			pod:  st.MakePod().Name("p").UID("p").Namespace("ns1").Priority(highPriority).PodGroupName("pg1").NominatedNodeName("node1").Obj(),
-			pods: []*v1.Pod{
-				st.MakePod().Name("v1").UID("v1").Namespace("ns2").Node("node1").Priority(veryHighPriority).PodGroupName("pg1").Terminating().
-					Condition(v1.DisruptionTarget, v1.ConditionTrue, v1.PodReasonPreemptionByScheduler).Obj(),
-			},
-			nodes:    []string{"node1"},
-			features: feature.Features{EnableGenericWorkload: true, EnableCompositePodGroup: true},
-			expected: true,
-		},
-		{
-			name: "Preemptor with SchedulingGroup, victim priority overridden by root CompositePodGroup in multi-level CPG hierarchy",
-			pod:  st.MakePod().Name("p").UID("p").Namespace("ns1").Priority(highPriority).PodGroupName("pg1").NominatedNodeName("node1").Obj(),
-			pods: []*v1.Pod{
-				st.MakePod().Name("v1").UID("v1").Namespace("ns2").Node("node1").Priority(veryHighPriority).PodGroupName("leaf-pg").Terminating().
-					Condition(v1.DisruptionTarget, v1.ConditionTrue, v1.PodReasonPreemptionByScheduler).Obj(),
-			},
-			podGroups: []*v1beta1.PodGroup{
-				st.MakePodGroup().Name("leaf-pg").UID("leaf-pg").Namespace("ns2").ParentCompositePodGroup("child-cpg").Priority(veryHighPriority).Obj(),
-			},
-			compositePodGroups: []*v1alpha3.CompositePodGroup{
-				st.MakeCompositePodGroup().Name("child-cpg").UID("child-cpg").Namespace("ns2").ParentCompositePodGroup("root-cpg").Priority(veryHighPriority).Obj(),
-				st.MakeCompositePodGroup().Name("root-cpg").UID("root-cpg").Namespace("ns2").Priority(lowPriority).Obj(),
-			},
-			nodes:    []string{"node1"},
-			features: feature.Features{EnableGenericWorkload: true, EnableCompositePodGroup: true},
 			expected: false,
 		},
 	}

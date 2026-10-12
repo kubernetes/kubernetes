@@ -2157,13 +2157,11 @@ func TestIsPodGroupWaitingForVictims(t *testing.T) {
 	}
 
 	tests := []struct {
-		name                    string
-		enableCompositePodGroup bool
-		initPods                []*v1.Pod
-		initPodGroups           []*schedulingv1beta1.PodGroup
-		initCompositePodGroups  []*schedulingv1alpha3.CompositePodGroup
-		preemptor               fwk.PodGroupInfo
-		want                    bool
+		name          string
+		initPods      []*v1.Pod
+		initPodGroups []*schedulingv1beta1.PodGroup
+		preemptor     fwk.PodGroupInfo
+		want          bool
 	}{
 		{
 			name: "returns true when member has nominated node with lower-priority pod terminating by preemption",
@@ -2234,9 +2232,9 @@ func TestIsPodGroupWaitingForVictims(t *testing.T) {
 			want:      false,
 		},
 		{
-			name: "returns true when terminating pod on nominated node belongs to lower-priority PodGroup with DisruptionModeAll",
+			name: "returns true when terminating pod on nominated node belongs to a lower-priority PodGroup",
 			initPods: []*v1.Pod{
-				makeTerminatingVictim("victim", "node1", highPriority).PodGroupName("victim-pg").Obj(),
+				makeTerminatingVictim("victim", "node1", lowPriority).PodGroupName("victim-pg").Obj(),
 			},
 			initPodGroups: []*schedulingv1beta1.PodGroup{
 				st.MakePodGroup().Name("victim-pg").Namespace("default").UID("victim-pg").Priority(lowPriority).DisruptionModeAll().Obj(),
@@ -2245,79 +2243,12 @@ func TestIsPodGroupWaitingForVictims(t *testing.T) {
 			want:      true,
 		},
 		{
-			name: "returns true when terminating pod on nominated node belongs to lower-priority PodGroup with DisruptionModeSingle",
+			name: "returns false when terminating pod on nominated node belongs to a higher-priority PodGroup",
 			initPods: []*v1.Pod{
 				makeTerminatingVictim("victim", "node1", highPriority).PodGroupName("victim-pg").Obj(),
-			},
-			initPodGroups: []*schedulingv1beta1.PodGroup{
-				st.MakePodGroup().Name("victim-pg").Namespace("default").UID("victim-pg").Priority(lowPriority).DisruptionModeSingle().Obj(),
-			},
-			preemptor: makePreemptor(highPriority, "node1"),
-			want:      true,
-		},
-		{
-			name: "returns false when terminating pod on nominated node belongs to higher-priority PodGroup with DisruptionModeAll",
-			initPods: []*v1.Pod{
-				makeTerminatingVictim("victim", "node1", lowPriority).PodGroupName("victim-pg").Obj(),
 			},
 			initPodGroups: []*schedulingv1beta1.PodGroup{
 				st.MakePodGroup().Name("victim-pg").Namespace("default").UID("victim-pg").Priority(highPriority).DisruptionModeAll().Obj(),
-			},
-			preemptor: makePreemptor(midPriority, "node1"),
-			want:      false,
-		},
-		{
-			name: "returns false when terminating pod on nominated node belongs to higher-priority PodGroup with DisruptionModeSingle",
-			initPods: []*v1.Pod{
-				makeTerminatingVictim("victim", "node1", lowPriority).PodGroupName("victim-pg").Obj(),
-			},
-			initPodGroups: []*schedulingv1beta1.PodGroup{
-				st.MakePodGroup().Name("victim-pg").Namespace("default").UID("victim-pg").Priority(highPriority).DisruptionModeSingle().Obj(),
-			},
-			preemptor: makePreemptor(midPriority, "node1"),
-			want:      false,
-		},
-		{
-			name:                    "returns true when victim uses its hierarchy's lower priority (CompositePodGroup root overrides higher pod and child PodGroup priority)",
-			enableCompositePodGroup: true,
-			initPods: []*v1.Pod{
-				makeTerminatingVictim("victim", "node1", highPriority).PodGroupName("victim-pg").Obj(),
-			},
-			initPodGroups: []*schedulingv1beta1.PodGroup{
-				st.MakePodGroup().Name("victim-pg").Namespace("default").UID("victim-pg").Priority(highPriority).ParentCompositePodGroup("victim-cpg").Obj(),
-			},
-			initCompositePodGroups: []*schedulingv1alpha3.CompositePodGroup{
-				st.MakeCompositePodGroup().Name("victim-cpg").Namespace("default").UID("victim-cpg").Priority(lowPriority).Obj(),
-			},
-			preemptor: makePreemptor(midPriority, "node1"),
-			want:      true,
-		},
-		{
-			name:                    "returns false when victim uses its hierarchy's higher priority (CompositePodGroup root overrides lower pod and child PodGroup priority)",
-			enableCompositePodGroup: true,
-			initPods: []*v1.Pod{
-				makeTerminatingVictim("victim", "node1", lowPriority).PodGroupName("victim-pg").Obj(),
-			},
-			initPodGroups: []*schedulingv1beta1.PodGroup{
-				st.MakePodGroup().Name("victim-pg").Namespace("default").UID("victim-pg").Priority(lowPriority).ParentCompositePodGroup("victim-cpg").Obj(),
-			},
-			initCompositePodGroups: []*schedulingv1alpha3.CompositePodGroup{
-				st.MakeCompositePodGroup().Name("victim-cpg").Namespace("default").UID("victim-cpg").Priority(highPriority).Obj(),
-			},
-			preemptor: makePreemptor(midPriority, "node1"),
-			want:      false,
-		},
-		{
-			name:                    "returns false when CompositePodGroup is disabled and child PodGroup has higher priority than preemptor",
-			enableCompositePodGroup: false,
-			initPods: []*v1.Pod{
-				makeTerminatingVictim("victim", "node1", highPriority).PodGroupName("victim-pg").Obj(),
-			},
-			initPodGroups: []*schedulingv1beta1.PodGroup{
-				st.MakePodGroup().Name("victim-pg").Namespace("default").UID("victim-pg").Priority(highPriority).ParentCompositePodGroup("victim-cpg").Obj(),
-			},
-			initCompositePodGroups: []*schedulingv1alpha3.CompositePodGroup{
-				st.MakeCompositePodGroup().Name("victim-cpg").Namespace("default").UID("victim-cpg").Priority(lowPriority).Obj(),
 			},
 			preemptor: makePreemptor(midPriority, "node1"),
 			want:      false,
@@ -2327,13 +2258,11 @@ func TestIsPodGroupWaitingForVictims(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-				features.GenericWorkload:                 true,
-				features.TopologyAwareWorkloadScheduling: true,
-				features.CompositePodGroup:               tt.enableCompositePodGroup,
+				features.GenericWorkload: true,
 			})
 			client := clientsetfake.NewSimpleClientset()
 			informerFactory := informers.NewSharedInformerFactory(client, 0)
-			snapshot := internalcache.NewTestSnapshotWithPodGroups(tt.initPods, nodes, tt.initPodGroups, tt.initCompositePodGroups)
+			snapshot := internalcache.NewTestSnapshotWithPodGroups(tt.initPods, nodes, tt.initPodGroups, nil)
 			fh := &fakeHandleForLister{
 				informerFactory: informerFactory,
 				snapshot:        snapshot,

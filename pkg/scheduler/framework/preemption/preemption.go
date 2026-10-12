@@ -65,12 +65,10 @@ type Interface interface {
 
 // Evaluator is a preemption evaluator. It runs preemption logic with a given Interface.
 type Evaluator struct {
-	PluginName                string
-	Handler                   fwk.Handle
-	PodLister                 corelisters.PodLister
-	PdbLister                 policylisters.PodDisruptionBudgetLister
-	podGroupSnapshot          fwk.PodGroupLister
-	compositePodGroupSnapshot fwk.CompositePodGroupLister
+	PluginName string
+	Handler    fwk.Handle
+	PodLister  corelisters.PodLister
+	PdbLister  policylisters.PodDisruptionBudgetLister
 
 	Interface
 	executor fwk.PreemptionExecutor
@@ -79,7 +77,7 @@ type Evaluator struct {
 
 // NewEvaluator creates a new Evaluator.
 func NewEvaluator(pluginName string, fh fwk.Handle, i Interface, fts feature.Features) *Evaluator {
-	ev := &Evaluator{
+	return &Evaluator{
 		PluginName: pluginName,
 		Handler:    fh,
 		PodLister:  fh.SharedInformerFactory().Core().V1().Pods().Lister(),
@@ -88,13 +86,6 @@ func NewEvaluator(pluginName string, fh fwk.Handle, i Interface, fts feature.Fea
 		executor:   fh.PreemptionManager().Executor(),
 		fts:        fts,
 	}
-	if fts.EnableGenericWorkload {
-		ev.podGroupSnapshot = fh.MutableSnapshotSharedLister().PodGroups()
-	}
-	if fts.EnableCompositePodGroup {
-		ev.compositePodGroupSnapshot = fh.MutableSnapshotSharedLister().CompositePodGroups()
-	}
-	return ev
 }
 
 // evaluate determines victims for preemption, without actuation.
@@ -539,22 +530,21 @@ func (ev *Evaluator) DryRunPreemption(ctx context.Context, state fwk.CycleState,
 // (with disruption mode All) across the cluster into a single victim.
 // If GenericWorkload is disabled, it treats each pod on the node as an individual victim.
 func (ev *Evaluator) GetVictimsOnNode(ctx context.Context, nodeInfo fwk.NodeInfo) ([]*DomainVictim, error) {
-	fh := ev.Handler
+	snapshot := ev.Handler.MutableSnapshotSharedLister()
 
-	// If GenericWorkload is disabled, we treat each pod on the node
-	// as an individual preemption victim. We bypass getCrossNodesVictims and call NewPodVictim
-	// with a nil pgLister to force using the pod's own priority. Otherwise, if we used the
-	// pgLister, it would resolve to the PodGroup's priority, which might be nil (treated as 0)
-	// when GenericWorkload is disabled.
+	// With GenericWorkload disabled, pod groups are not a scheduling concept: every pod on the node
+	// is an individual PodKeyType victim, so skip the hierarchy lookups altogether.
 	if !ev.fts.EnableGenericWorkload {
 		var victims []Victim
 		for _, podInfo := range nodeInfo.GetPods() {
-			victims = append(victims, NewPodVictim(podInfo, nil, nil))
+			// NewVictim only fails for an empty pod list or key type, neither of which can happen here.
+			victim, _ := NewVictim([]fwk.PodInfo{podInfo}, corev1helpers.PodPriority(podInfo.GetPod()), fwk.PodKeyType)
+			victims = append(victims, victim)
 		}
-		return createDomainVictims(fh.MutableSnapshotSharedLister(), victims)
+		return createDomainVictims(snapshot, victims)
 	}
 
 	logger := klog.FromContext(ctx)
-	victims := getCrossNodesVictims(logger, fh.MutableSnapshotSharedLister(), ev.podGroupSnapshot, ev.compositePodGroupSnapshot, []fwk.NodeInfo{nodeInfo})
-	return createDomainVictims(fh.SnapshotSharedLister(), victims)
+	victims := getCrossNodesVictims(logger, snapshot, []fwk.NodeInfo{nodeInfo})
+	return createDomainVictims(snapshot, victims)
 }
