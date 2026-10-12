@@ -359,12 +359,13 @@ func observeVictims(preemptor ExecutorPreemptor, candidate fwk.PreemptionCandida
 	if preemptor.Type() == fwk.PodKeyType {
 		metrics.PreemptionVictims.Observe(numVictims)
 	} else {
-		metrics.WorkloadPreemptionVictims.WithLabelValues(metrics.EntityTypeToLabel(preemptor.Type())).Observe(numVictims)
-	}
-
-	workloadDisruptions := float64(candidate.NumPodGroupDisruptions())
-	if workloadDisruptions > 0 {
-		metrics.PreemptionWorkloadDisruptions.WithLabelValues(metrics.EntityTypeToLabel(preemptor.Type())).Observe(workloadDisruptions)
+		preemptorLabel := metrics.EntityTypeToLabel(preemptor.Type())
+		metrics.WorkloadPreemptionVictims.WithLabelValues(preemptorLabel).Observe(numVictims)
+		for victimType, n := range candidate.NumDisruptionsByVictimType() {
+			if n > 0 {
+				metrics.PreemptionWorkloadDisruptions.WithLabelValues(preemptorLabel, metrics.EntityTypeToLabel(victimType)).Observe(float64(n))
+			}
+		}
 	}
 
 	numPDBViolations := float64(candidate.Victims().NumPDBViolations)

@@ -166,10 +166,10 @@ func TestDryRunPreemption(t *testing.T) {
 				{
 					newCandidate(&extenderv1.Victims{
 						Pods: []*v1.Pod{st.MakePod().Name("p1").UID("p1").Node("node1").Priority(midPriority).Obj()},
-					}, "node1", 0, "node1"),
+					}, "node1", nil, "node1"),
 					newCandidate(&extenderv1.Victims{
 						Pods: []*v1.Pod{st.MakePod().Name("p2").UID("p2").Node("node2").Priority(midPriority).Obj()},
-					}, "node2", 0, "node2"),
+					}, "node2", nil, "node2"),
 				},
 			},
 		},
@@ -192,11 +192,11 @@ func TestDryRunPreemption(t *testing.T) {
 					newCandidate(&extenderv1.Victims{
 						Pods:             []*v1.Pod{st.MakePod().Name("p1").UID("p1").Node("node1").Priority(midPriority).Obj()},
 						NumPDBViolations: 1,
-					}, "node1", 0, "node1"),
+					}, "node1", nil, "node1"),
 					newCandidate(&extenderv1.Victims{
 						Pods:             []*v1.Pod{st.MakePod().Name("p2").UID("p2").Node("node2").Priority(midPriority).Obj()},
 						NumPDBViolations: 1,
-					}, "node2", 0, "node2"),
+					}, "node2", nil, "node2"),
 				},
 			},
 		},
