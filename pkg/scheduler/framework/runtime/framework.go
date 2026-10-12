@@ -1245,6 +1245,13 @@ func (f *frameworkImpl) RunPodGroupPostFilterPlugins(ctx context.Context, state 
 		metrics.FrameworkExtensionPointDuration.WithLabelValues(metrics.PodGroupPostFilter, status.Code().String(), f.profileName).Observe(metrics.SinceInSeconds(startTime))
 	}()
 
+	// Disable opportunistic batching during PodGroupPostFilter so preemption evaluations
+	// neither reuse scores cached from the normal pass nor cache scores that do not
+	// reflect dynamic victim condemnations across nodes.
+	// TODO(wojtek-t): Implement support for batching for preemption-based scoring.
+	f.batch.SetDisabled(true)
+	defer f.batch.SetDisabled(false)
+
 	logger := klog.FromContext(ctx)
 	verboseLogs := logger.V(4).Enabled()
 	if verboseLogs {

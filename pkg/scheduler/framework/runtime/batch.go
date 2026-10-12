@@ -46,6 +46,7 @@ type OpportunisticBatch struct {
 	lastCycle   schedulingCycle
 	handle      batchHandle
 	maxBatchAge time.Duration
+	disabled    bool
 
 	// Used primarily for tests, count the total pods we
 	// have successfully batched.
@@ -71,11 +72,24 @@ const (
 	DefaultMaxBatchAge = 500 * time.Millisecond
 )
 
+// SetDisabled disables or re-enables opportunistic batching and clears any cached batch state.
+func (b *OpportunisticBatch) SetDisabled(disabled bool) {
+	if b == nil {
+		return
+	}
+	b.disabled = disabled
+	b.state = nil
+	b.lastCycle = schedulingCycle{}
+}
+
 // GetNodeHint provides a hint for the pod based on filtering a scoring results of previous cycles. Caching works only for consecutive pods
 // with the same signature that are scheduled in 1-pod-per-node manner (otherwise previous scores could not be reused).
 // It's assured by checking the top-rated node is no longer feasible (meaning the previous pod was successfully scheduled and the
 // current one does not fit).
 func (b *OpportunisticBatch) GetNodeHint(ctx context.Context, pod *v1.Pod, signature fwk.PodSignature, state fwk.CycleState, cycleCount int64) string {
+	if b.disabled {
+		return ""
+	}
 	logger := klog.FromContext(ctx)
 	var hint string
 
@@ -113,6 +127,9 @@ func (b *OpportunisticBatch) GetNodeHint(ctx context.Context, pod *v1.Pod, signa
 
 // StoreScheduleResults stores results from scheduling for use as a batch later.
 func (b *OpportunisticBatch) StoreScheduleResults(ctx context.Context, signature fwk.PodSignature, hintedNode, chosenNode string, otherNodes framework.SortedScoredNodes, cycleCount int64) {
+	if b.disabled {
+		return
+	}
 	logger := klog.FromContext(ctx)
 
 	defer metrics.StoreScheduleResultsDuration.ObserveSince(time.Now(), b.handle.ProfileName())()
