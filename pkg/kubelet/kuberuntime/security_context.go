@@ -132,7 +132,7 @@ func convertToRuntimeUlimits(ulimits *v1.Ulimits) []*runtimeapi.Ulimit {
 		return nil
 	}
 
-	runtimeUlimits := make([]*runtimeapi.Ulimit, 0, 6)
+	runtimeUlimits := make([]*runtimeapi.Ulimit, 0, 7)
 	appendUlimit := func(name string, ulimit *v1.Ulimit) {
 		if ulimit == nil || ulimit.Hard == nil || ulimit.Soft == nil {
 			return
@@ -150,6 +150,7 @@ func convertToRuntimeUlimits(ulimits *v1.Ulimits) []*runtimeapi.Ulimit {
 	appendUlimit("nice", ulimits.Nice)
 	appendUlimit("rtprio", ulimits.Rtprio)
 	appendUlimit("stack", ulimits.Stack)
+	appendUlimit("msgqueue", ulimits.Msgqueue)
 
 	if len(runtimeUlimits) == 0 {
 		return nil

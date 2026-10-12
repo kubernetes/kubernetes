@@ -387,6 +387,9 @@ spec:
             memlock:
               hard: 1
               soft: 2
+            msgqueue:
+              hard: 1
+              soft: 2
             nice:
               hard: 1
               soft: 2
@@ -642,6 +645,9 @@ spec:
               hard: 1
               soft: 2
             memlock:
+              hard: 1
+              soft: 2
+            msgqueue:
               hard: 1
               soft: 2
             nice:
@@ -905,6 +911,9 @@ spec:
               hard: 1
               soft: 2
             memlock:
+              hard: 1
+              soft: 2
+            msgqueue:
               hard: 1
               soft: 2
             nice:

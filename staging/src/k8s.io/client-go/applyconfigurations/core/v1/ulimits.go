@@ -53,6 +53,11 @@ type UlimitsApplyConfiguration struct {
 	// Valid values are -1 or 262144 through 17179869184. A value of -1 means
 	// unlimited; 0 is not valid.
 	Stack *UlimitApplyConfiguration `json:"stack,omitempty"`
+	// msgqueue configures the "msgqueue" ulimit, which controls the maximum
+	// bytes allocated for POSIX message queues for the process's real user ID.
+	// Valid values are -1 or 0 through 17179869184. A value of -1 means
+	// unlimited; 0 prevents creating new POSIX message queues.
+	Msgqueue *UlimitApplyConfiguration `json:"msgqueue,omitempty"`
 }
 
 // UlimitsApplyConfiguration constructs a declarative configuration of the Ulimits type for use with
@@ -106,5 +111,13 @@ func (b *UlimitsApplyConfiguration) WithRtprio(value *UlimitApplyConfiguration) 
 // If called multiple times, the Stack field is set to the value of the last call.
 func (b *UlimitsApplyConfiguration) WithStack(value *UlimitApplyConfiguration) *UlimitsApplyConfiguration {
 	b.Stack = value
+	return b
+}
+
+// WithMsgqueue sets the Msgqueue field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the Msgqueue field is set to the value of the last call.
+func (b *UlimitsApplyConfiguration) WithMsgqueue(value *UlimitApplyConfiguration) *UlimitsApplyConfiguration {
+	b.Msgqueue = value
 	return b
 }

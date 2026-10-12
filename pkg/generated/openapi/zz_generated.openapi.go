@@ -32963,6 +32963,12 @@ func schema_k8sio_api_core_v1_Ulimits(ref common.ReferenceCallback) common.OpenA
 							Ref:         ref(corev1.Ulimit{}.OpenAPIModelName()),
 						},
 					},
+					"msgqueue": {
+						SchemaProps: spec.SchemaProps{
+							Description: "msgqueue configures the \"msgqueue\" ulimit, which controls the maximum bytes allocated for POSIX message queues for the process's real user ID. Valid values are -1 or 0 through 17179869184. A value of -1 means unlimited; 0 prevents creating new POSIX message queues.",
+							Ref:         ref(corev1.Ulimit{}.OpenAPIModelName()),
+						},
+					},
 				},
 			},
 		},

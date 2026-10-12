@@ -14522,6 +14522,18 @@ func (m *Ulimits) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
+	if m.Msgqueue != nil {
+		{
+			size, err := m.Msgqueue.MarshalToSizedBuffer(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarintGenerated(dAtA, i, uint64(size))
+		}
+		i--
+		dAtA[i] = 0x3a
+	}
 	if m.Stack != nil {
 		{
 			size, err := m.Stack.MarshalToSizedBuffer(dAtA[:i])
@@ -20923,6 +20935,10 @@ func (m *Ulimits) Size() (n int) {
 		l = m.Stack.Size()
 		n += 1 + l + sovGenerated(uint64(l))
 	}
+	if m.Msgqueue != nil {
+		l = m.Msgqueue.Size()
+		n += 1 + l + sovGenerated(uint64(l))
+	}
 	return n
 }
 
@@ -25213,6 +25229,7 @@ func (this *Ulimits) String() string {
 		`Nice:` + strings.Replace(this.Nice.String(), "Ulimit", "Ulimit", 1) + `,`,
 		`Rtprio:` + strings.Replace(this.Rtprio.String(), "Ulimit", "Ulimit", 1) + `,`,
 		`Stack:` + strings.Replace(this.Stack.String(), "Ulimit", "Ulimit", 1) + `,`,
+		`Msgqueue:` + strings.Replace(this.Msgqueue.String(), "Ulimit", "Ulimit", 1) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -70356,6 +70373,42 @@ func (m *Ulimits) Unmarshal(dAtA []byte) error {
 				m.Stack = &Ulimit{}
 			}
 			if err := m.Stack.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 7:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Msgqueue", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.Msgqueue == nil {
+				m.Msgqueue = &Ulimit{}
+			}
+			if err := m.Msgqueue.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex

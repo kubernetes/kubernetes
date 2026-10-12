@@ -7270,6 +7270,12 @@ type Ulimits struct {
 	// unlimited; 0 is not valid.
 	// +optional
 	Stack *Ulimit
+	// msgqueue configures the "msgqueue" ulimit, which controls the maximum
+	// bytes allocated for POSIX message queues for the process's real user ID.
+	// Valid values are -1 or 0 through 17179869184. A value of -1 means
+	// unlimited; 0 prevents creating new POSIX message queues.
+	// +optional
+	Msgqueue *Ulimit
 }
 
 type Ulimit struct {

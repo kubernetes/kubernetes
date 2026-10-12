@@ -13031,6 +13031,10 @@
           "$ref": "#/definitions/io.k8s.api.core.v1.Ulimit",
           "description": "memlock configures the \"memlock\" ulimit, which controls the maximum bytes of memory that may be locked into RAM. Valid values are -1 or 8192 through 17179869184. A value of -1 means unlimited; 0 is not valid."
         },
+        "msgqueue": {
+          "$ref": "#/definitions/io.k8s.api.core.v1.Ulimit",
+          "description": "msgqueue configures the \"msgqueue\" ulimit, which controls the maximum bytes allocated for POSIX message queues for the process's real user ID. Valid values are -1 or 0 through 17179869184. A value of -1 means unlimited; 0 prevents creating new POSIX message queues."
+        },
         "nice": {
           "$ref": "#/definitions/io.k8s.api.core.v1.Ulimit",
           "description": "nice configures the \"nice\" ulimit, which controls the maximum nice priority adjustment a process may apply. Valid values are -1 or 0 through 40. A value of -1 means unlimited; 0 means the process may not increase its nice priority adjustment."

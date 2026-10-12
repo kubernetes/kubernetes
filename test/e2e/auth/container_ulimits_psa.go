@@ -94,34 +94,37 @@ var _ = SIGDescribe("ContainerUlimits PSA Integration",
 			ns := createNamespaceWithPSALevel(ctx, admissionapi.LevelPrivileged)
 
 			minPod := newPodWithUlimits(ns, "ulimits-privileged-min-boundary", &v1.Ulimits{
-				Nofile:  &v1.Ulimit{Soft: ptr.To[int64](256), Hard: ptr.To[int64](256)},
-				Nice:    &v1.Ulimit{Soft: ptr.To[int64](0), Hard: ptr.To[int64](0)},
-				Rtprio:  &v1.Ulimit{Soft: ptr.To[int64](0), Hard: ptr.To[int64](0)},
-				Stack:   &v1.Ulimit{Soft: ptr.To[int64](262144), Hard: ptr.To[int64](262144)},
-				Memlock: &v1.Ulimit{Soft: ptr.To[int64](8192), Hard: ptr.To[int64](8192)},
-				Core:    &v1.Ulimit{Soft: ptr.To[int64](0), Hard: ptr.To[int64](0)},
+				Nofile:   &v1.Ulimit{Soft: ptr.To[int64](256), Hard: ptr.To[int64](256)},
+				Nice:     &v1.Ulimit{Soft: ptr.To[int64](0), Hard: ptr.To[int64](0)},
+				Rtprio:   &v1.Ulimit{Soft: ptr.To[int64](0), Hard: ptr.To[int64](0)},
+				Stack:    &v1.Ulimit{Soft: ptr.To[int64](262144), Hard: ptr.To[int64](262144)},
+				Memlock:  &v1.Ulimit{Soft: ptr.To[int64](8192), Hard: ptr.To[int64](8192)},
+				Core:     &v1.Ulimit{Soft: ptr.To[int64](0), Hard: ptr.To[int64](0)},
+				Msgqueue: &v1.Ulimit{Soft: ptr.To[int64](0), Hard: ptr.To[int64](0)},
 			})
 			_, err := f.ClientSet.CoreV1().Pods(ns).Create(ctx, minPod, metav1.CreateOptions{DryRun: []string{metav1.DryRunAll}})
 			framework.ExpectNoError(err)
 
 			maxPod := newPodWithUlimits(ns, "ulimits-privileged-max-boundary", &v1.Ulimits{
-				Nofile:  &v1.Ulimit{Soft: ptr.To[int64](65536), Hard: ptr.To[int64](65536)},
-				Nice:    &v1.Ulimit{Soft: ptr.To[int64](40), Hard: ptr.To[int64](40)},
-				Rtprio:  &v1.Ulimit{Soft: ptr.To[int64](99), Hard: ptr.To[int64](99)},
-				Stack:   &v1.Ulimit{Soft: ptr.To[int64](17179869184), Hard: ptr.To[int64](17179869184)},
-				Memlock: &v1.Ulimit{Soft: ptr.To[int64](17179869184), Hard: ptr.To[int64](17179869184)},
-				Core:    &v1.Ulimit{Soft: ptr.To[int64](17179869184), Hard: ptr.To[int64](17179869184)},
+				Nofile:   &v1.Ulimit{Soft: ptr.To[int64](65536), Hard: ptr.To[int64](65536)},
+				Nice:     &v1.Ulimit{Soft: ptr.To[int64](40), Hard: ptr.To[int64](40)},
+				Rtprio:   &v1.Ulimit{Soft: ptr.To[int64](99), Hard: ptr.To[int64](99)},
+				Stack:    &v1.Ulimit{Soft: ptr.To[int64](17179869184), Hard: ptr.To[int64](17179869184)},
+				Memlock:  &v1.Ulimit{Soft: ptr.To[int64](17179869184), Hard: ptr.To[int64](17179869184)},
+				Core:     &v1.Ulimit{Soft: ptr.To[int64](17179869184), Hard: ptr.To[int64](17179869184)},
+				Msgqueue: &v1.Ulimit{Soft: ptr.To[int64](17179869184), Hard: ptr.To[int64](17179869184)},
 			})
 			_, err = f.ClientSet.CoreV1().Pods(ns).Create(ctx, maxPod, metav1.CreateOptions{DryRun: []string{metav1.DryRunAll}})
 			framework.ExpectNoError(err)
 
 			unlimitedPod := newPodWithUlimits(ns, "ulimits-privileged-unlimited", &v1.Ulimits{
-				Nofile:  &v1.Ulimit{Soft: ptr.To[int64](-1), Hard: ptr.To[int64](-1)},
-				Nice:    &v1.Ulimit{Soft: ptr.To[int64](-1), Hard: ptr.To[int64](-1)},
-				Rtprio:  &v1.Ulimit{Soft: ptr.To[int64](-1), Hard: ptr.To[int64](-1)},
-				Stack:   &v1.Ulimit{Soft: ptr.To[int64](-1), Hard: ptr.To[int64](-1)},
-				Memlock: &v1.Ulimit{Soft: ptr.To[int64](-1), Hard: ptr.To[int64](-1)},
-				Core:    &v1.Ulimit{Soft: ptr.To[int64](-1), Hard: ptr.To[int64](-1)},
+				Nofile:   &v1.Ulimit{Soft: ptr.To[int64](-1), Hard: ptr.To[int64](-1)},
+				Nice:     &v1.Ulimit{Soft: ptr.To[int64](-1), Hard: ptr.To[int64](-1)},
+				Rtprio:   &v1.Ulimit{Soft: ptr.To[int64](-1), Hard: ptr.To[int64](-1)},
+				Stack:    &v1.Ulimit{Soft: ptr.To[int64](-1), Hard: ptr.To[int64](-1)},
+				Memlock:  &v1.Ulimit{Soft: ptr.To[int64](-1), Hard: ptr.To[int64](-1)},
+				Core:     &v1.Ulimit{Soft: ptr.To[int64](-1), Hard: ptr.To[int64](-1)},
+				Msgqueue: &v1.Ulimit{Soft: ptr.To[int64](-1), Hard: ptr.To[int64](-1)},
 			})
 			_, err = f.ClientSet.CoreV1().Pods(ns).Create(ctx, unlimitedPod, metav1.CreateOptions{DryRun: []string{metav1.DryRunAll}})
 			framework.ExpectNoError(err)
@@ -156,6 +159,14 @@ var _ = SIGDescribe("ContainerUlimits PSA Integration",
 				{
 					name:    "memlock-below-min",
 					ulimits: &v1.Ulimits{Memlock: &v1.Ulimit{Soft: ptr.To[int64](8191), Hard: ptr.To[int64](8192)}},
+				},
+				{
+					name:    "msgqueue-below-min",
+					ulimits: &v1.Ulimits{Msgqueue: &v1.Ulimit{Soft: ptr.To[int64](-2), Hard: ptr.To[int64](0)}},
+				},
+				{
+					name:    "msgqueue-above-max",
+					ulimits: &v1.Ulimits{Msgqueue: &v1.Ulimit{Soft: ptr.To[int64](0), Hard: ptr.To[int64](17179869185)}},
 				},
 				{
 					name:    "core-above-max",

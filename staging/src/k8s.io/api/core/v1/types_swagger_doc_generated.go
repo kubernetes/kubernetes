@@ -2844,13 +2844,14 @@ func (Ulimit) SwaggerDoc() map[string]string {
 }
 
 var map_Ulimits = map[string]string{
-	"":        "Ulimits corresponds to Linux system ulimit settings.",
-	"nofile":  "nofile configures the \"nofile\" ulimit, which controls the maximum number of open file descriptors. Valid values are -1 or 256 through 65536. A value of -1 means unlimited; 0 is not valid.",
-	"memlock": "memlock configures the \"memlock\" ulimit, which controls the maximum bytes of memory that may be locked into RAM. Valid values are -1 or 8192 through 17179869184. A value of -1 means unlimited; 0 is not valid.",
-	"core":    "core configures the \"core\" ulimit, which controls the maximum size of a core dump file, in bytes. Valid values are -1 or 0 through 17179869184. A value of -1 means unlimited; 0 means core dumps are disabled.",
-	"nice":    "nice configures the \"nice\" ulimit, which controls the maximum nice priority adjustment a process may apply. Valid values are -1 or 0 through 40. A value of -1 means unlimited; 0 means the process may not increase its nice priority adjustment.",
-	"rtprio":  "rtprio configures the \"rtprio\" ulimit, which controls the maximum real-time scheduling priority. Valid values are -1 or 0 through 99. A value of -1 means unlimited; 0 means real-time scheduling priority is not allowed.",
-	"stack":   "stack configures the \"stack\" ulimit, which controls the maximum process stack size, in bytes. Valid values are -1 or 262144 through 17179869184. A value of -1 means unlimited; 0 is not valid.",
+	"":         "Ulimits corresponds to Linux system ulimit settings.",
+	"nofile":   "nofile configures the \"nofile\" ulimit, which controls the maximum number of open file descriptors. Valid values are -1 or 256 through 65536. A value of -1 means unlimited; 0 is not valid.",
+	"memlock":  "memlock configures the \"memlock\" ulimit, which controls the maximum bytes of memory that may be locked into RAM. Valid values are -1 or 8192 through 17179869184. A value of -1 means unlimited; 0 is not valid.",
+	"core":     "core configures the \"core\" ulimit, which controls the maximum size of a core dump file, in bytes. Valid values are -1 or 0 through 17179869184. A value of -1 means unlimited; 0 means core dumps are disabled.",
+	"nice":     "nice configures the \"nice\" ulimit, which controls the maximum nice priority adjustment a process may apply. Valid values are -1 or 0 through 40. A value of -1 means unlimited; 0 means the process may not increase its nice priority adjustment.",
+	"rtprio":   "rtprio configures the \"rtprio\" ulimit, which controls the maximum real-time scheduling priority. Valid values are -1 or 0 through 99. A value of -1 means unlimited; 0 means real-time scheduling priority is not allowed.",
+	"stack":    "stack configures the \"stack\" ulimit, which controls the maximum process stack size, in bytes. Valid values are -1 or 262144 through 17179869184. A value of -1 means unlimited; 0 is not valid.",
+	"msgqueue": "msgqueue configures the \"msgqueue\" ulimit, which controls the maximum bytes allocated for POSIX message queues for the process's real user ID. Valid values are -1 or 0 through 17179869184. A value of -1 means unlimited; 0 prevents creating new POSIX message queues.",
 }
 
 func (Ulimits) SwaggerDoc() map[string]string {

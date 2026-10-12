@@ -147,6 +147,9 @@ const (
 	minMemlockUlimitValue int64 = 8192
 	maxMemlockUlimitValue int64 = 17179869184
 
+	minMsgqueueUlimitValue int64 = 0
+	maxMsgqueueUlimitValue int64 = 17179869184
+
 	minCoreUlimitValue int64 = 0
 	maxCoreUlimitValue int64 = 17179869184
 )
@@ -8954,6 +8957,7 @@ func validateUlimits(ulimits *core.Ulimits, fldPath *field.Path) field.ErrorList
 	validateNamedUlimit("nice", ulimits.Nice, fldPath.Child("nice"))
 	validateNamedUlimit("rtprio", ulimits.Rtprio, fldPath.Child("rtprio"))
 	validateNamedUlimit("stack", ulimits.Stack, fldPath.Child("stack"))
+	validateNamedUlimit("msgqueue", ulimits.Msgqueue, fldPath.Child("msgqueue"))
 
 	return allErrs
 }
@@ -8981,6 +8985,8 @@ func validateUlimitValue(name string, value *int64, fldPath *field.Path) field.E
 		minValue, maxValue = minMemlockUlimitValue, maxMemlockUlimitValue
 	case "core":
 		minValue, maxValue = minCoreUlimitValue, maxCoreUlimitValue
+	case "msgqueue":
+		minValue, maxValue = minMsgqueueUlimitValue, maxMsgqueueUlimitValue
 	default:
 		return nil
 	}

@@ -8867,6 +8867,12 @@ type Ulimits struct {
 	// unlimited; 0 is not valid.
 	// +optional
 	Stack *Ulimit `json:"stack,omitempty" protobuf:"bytes,6,opt,name=stack"`
+	// msgqueue configures the "msgqueue" ulimit, which controls the maximum
+	// bytes allocated for POSIX message queues for the process's real user ID.
+	// Valid values are -1 or 0 through 17179869184. A value of -1 means
+	// unlimited; 0 prevents creating new POSIX message queues.
+	// +optional
+	Msgqueue *Ulimit `json:"msgqueue,omitempty" protobuf:"bytes,7,opt,name=msgqueue"`
 }
 
 // Ulimit corresponds to a single Linux system ulimit setting.

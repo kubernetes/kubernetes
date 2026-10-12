@@ -7324,6 +7324,13 @@ message Ulimits {
   // unlimited; 0 is not valid.
   // +optional
   optional Ulimit stack = 6;
+
+  // msgqueue configures the "msgqueue" ulimit, which controls the maximum
+  // bytes allocated for POSIX message queues for the process's real user ID.
+  // Valid values are -1 or 0 through 17179869184. A value of -1 means
+  // unlimited; 0 prevents creating new POSIX message queues.
+  // +optional
+  optional Ulimit msgqueue = 7;
 }
 
 // Volume represents a named volume in a pod that may be accessed by any container in the pod.
