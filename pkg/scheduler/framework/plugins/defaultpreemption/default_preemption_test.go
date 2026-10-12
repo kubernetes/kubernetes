@@ -4420,6 +4420,10 @@ func (v *fakeVictim) NumPDBViolations() int {
 	return 0
 }
 
+func (v *fakeVictim) Type() fwk.EntityKeyType {
+	return fwk.PodKeyType
+}
+
 type mockPreemptionManager struct {
 	fwk.PreemptionManager
 	fwk.PreemptionExecutor

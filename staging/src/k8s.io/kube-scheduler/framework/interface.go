@@ -1015,6 +1015,11 @@ type PreemptionVictim interface {
 	// NumPDBViolations returns the number of PDB violations that evicting this victim would cause.
 	// This value is used for metrics and doesn't impact victim selection.
 	NumPDBViolations() int
+
+	// Type returns the type of the preemption unit: PodKeyType for a pod evicted on its own,
+	// or the type of the topmost group with DisruptionMode=All whose pods are evicted together.
+	// This value is used for metrics and doesn't impact victim selection.
+	Type() EntityKeyType
 }
 
 // PreemptionExecutor is an interface that provides preemption actuation and tracking operations.
@@ -1038,10 +1043,11 @@ type PreemptionCandidate interface {
 	Victims() *extenderv1.Victims
 	// Name returns the target node name (or "cluster" for pod group preemption) where the preemptor gets nominated to run.
 	Name() string
-	// NumPodGroupDisruptions returns the number of preemption units that affect pod groups.
-	// A single preemption unit can be all pods in a pod group (for DisruptionMode=all) or a single pod (for DisruptionMode=single).
+	// NumDisruptionsByVictimType returns the number of preemption units to be evicted, keyed by unit type.
+	// A unit is either a single pod evicted on its own (PodKeyType), or all pods of a pod group or
+	// composite pod group hierarchy with DisruptionMode=All (keyed by the type of its topmost group).
 	// This value is used for metrics and doesn't impact victim actuation.
-	NumPodGroupDisruptions() int
+	NumDisruptionsByVictimType() map[EntityKeyType]int
 }
 
 // Parallelizer helps run scheduling operations in parallel chunks where possible, to improve performance and CPU utilization.

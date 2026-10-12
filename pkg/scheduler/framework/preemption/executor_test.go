@@ -340,6 +340,8 @@ func TestPrepareCandidate(t *testing.T) {
 		// Only compared when async preemption is enabled.
 		expectedPreemptingMap sets.Set[types.UID]
 		expectedActivatedPods map[string]*v1.Pod
+		// expectedDisruptions is the expected preemption_workload_disruptions sum per victim type.
+		expectedDisruptions map[fwk.EntityKeyType]int
 	}{
 		{
 			name: "no victims",
@@ -601,7 +603,7 @@ func TestPrepareCandidate(t *testing.T) {
 						victim1,
 					},
 				},
-				numPodGroupDisruptions: 2,
+				disruptions: map[fwk.EntityKeyType]int{fwk.PodGroupKeyType: 2},
 			},
 			preemptor:                preemptor,
 			preemptorGenericPodGroup: fwk.NewGenericPodGroup(podGroupPreemptor),
@@ -612,6 +614,7 @@ func TestPrepareCandidate(t *testing.T) {
 			expectedDeletedPod:    []string{"victim1"},
 			expectedStatus:        nil,
 			expectedPreemptingMap: sets.New(types.UID("pg1")),
+			expectedDisruptions:   map[fwk.EntityKeyType]int{fwk.PodGroupKeyType: 2},
 		},
 		{
 			name: "metrics: pod preemptor with PDB violations",
@@ -623,6 +626,8 @@ func TestPrepareCandidate(t *testing.T) {
 					},
 					NumPDBViolations: 3,
 				},
+				// Legacy pod preemption doesn't report workload disruptions, even if the candidate carries them.
+				disruptions: map[fwk.EntityKeyType]int{fwk.PodKeyType: 1},
 			},
 			preemptor: preemptor,
 			testPods: []*v1.Pod{
@@ -643,7 +648,7 @@ func TestPrepareCandidate(t *testing.T) {
 					},
 					NumPDBViolations: 1,
 				},
-				numPodGroupDisruptions: 1,
+				disruptions: map[fwk.EntityKeyType]int{fwk.CompositePodGroupKeyType: 1},
 			},
 			preemptor:                preemptor,
 			preemptorGenericPodGroup: fwk.NewGenericPodGroup(podGroupPreemptor),
@@ -654,6 +659,7 @@ func TestPrepareCandidate(t *testing.T) {
 			expectedDeletedPod:    []string{"victim1"},
 			expectedStatus:        nil,
 			expectedPreemptingMap: sets.New(types.UID("pg1")),
+			expectedDisruptions:   map[fwk.EntityKeyType]int{fwk.CompositePodGroupKeyType: 1},
 		},
 		{
 			name: "metrics: compositepodgroup preemptor with PDB violations and disruptions",
@@ -665,7 +671,7 @@ func TestPrepareCandidate(t *testing.T) {
 					},
 					NumPDBViolations: 1,
 				},
-				numPodGroupDisruptions: 1,
+				disruptions: map[fwk.EntityKeyType]int{fwk.PodKeyType: 1, fwk.PodGroupKeyType: 1},
 			},
 			preemptor:                preemptor,
 			preemptorGenericPodGroup: fwk.NewGenericCompositePodGroup(compositePodGroupPreemptor),
@@ -676,6 +682,7 @@ func TestPrepareCandidate(t *testing.T) {
 			expectedDeletedPod:    []string{"victim1"},
 			expectedStatus:        nil,
 			expectedPreemptingMap: sets.New(types.UID("cpg1")),
+			expectedDisruptions:   map[fwk.EntityKeyType]int{fwk.PodKeyType: 1, fwk.PodGroupKeyType: 1},
 		},
 	}
 
@@ -895,7 +902,7 @@ func TestPrepareCandidate(t *testing.T) {
 						t.Fatal(lastErrMsg)
 					}
 
-					verifyPreemptionMetricsDelta(t, testRegistry, preemptor, tt.candidate, metricsBefore)
+					verifyPreemptionMetricsDelta(t, testRegistry, preemptor, tt.candidate, tt.expectedDisruptions, metricsBefore)
 				})
 			}
 		}
@@ -1997,27 +2004,32 @@ func (c counterState) assertDelta(t *testing.T, before counterState, expectedDif
 type preemptionMetricsState struct {
 	workloadPreemptionVictims histogramState
 	preemptionVictims         histogramState
-	workloadDisruptions       histogramState
+	workloadDisruptions       map[fwk.EntityKeyType]histogramState
 	pdbViolations             counterState
 }
 
+var victimTypes = []fwk.EntityKeyType{fwk.PodKeyType, fwk.PodGroupKeyType, fwk.CompositePodGroupKeyType}
+
 func capturePreemptionMetricsState(g componentmetrics.Gatherer, preemptorType string) preemptionMetricsState {
+	disruptions := make(map[fwk.EntityKeyType]histogramState, len(victimTypes))
+	for _, vt := range victimTypes {
+		disruptions[vt] = newHistogramState(g, "scheduler_preemption_workload_disruptions", map[string]string{"preemptor": preemptorType, "victim": metrics.EntityTypeToLabel(vt)})
+	}
 	return preemptionMetricsState{
 		workloadPreemptionVictims: newHistogramState(g, "scheduler_workload_preemption_victims", map[string]string{"preemptor": preemptorType}),
 		preemptionVictims:         newHistogramState(g, "scheduler_preemption_victims", map[string]string{}),
-		workloadDisruptions:       newHistogramState(g, "scheduler_preemption_workload_disruptions", map[string]string{"preemptor": preemptorType}),
+		workloadDisruptions:       disruptions,
 		pdbViolations:             newCounterState(g, "scheduler_preemption_pdb_violations_total", map[string]string{}, "preemptor", preemptorType),
 	}
 }
 
-func verifyPreemptionMetricsDelta(t *testing.T, reg componentmetrics.KubeRegistry, preemptor ExecutorPreemptor, c fwk.PreemptionCandidate, before preemptionMetricsState) {
+func verifyPreemptionMetricsDelta(t *testing.T, reg componentmetrics.KubeRegistry, preemptor ExecutorPreemptor, c fwk.PreemptionCandidate, expectedDisruptions map[fwk.EntityKeyType]int, before preemptionMetricsState) {
 	t.Helper()
 	preemptorType := preemptor.Type()
 	after := capturePreemptionMetricsState(reg, metrics.EntityTypeToLabel(preemptorType))
 
 	numVictims := float64(len(c.Victims().Pods))
 	numPDBViolations := float64(c.Victims().NumPDBViolations)
-	workloadDisruptions := float64(c.NumPodGroupDisruptions())
 
 	if preemptorType == fwk.PodKeyType {
 		after.preemptionVictims.assertDelta(t, before.preemptionVictims, 1, numVictims)
@@ -2027,11 +2039,14 @@ func verifyPreemptionMetricsDelta(t *testing.T, reg componentmetrics.KubeRegistr
 		after.preemptionVictims.assertDelta(t, before.preemptionVictims, 0, 0)
 	}
 
-	expectedDisruptionsObservations := uint64(0)
-	if workloadDisruptions > 0 {
-		expectedDisruptionsObservations = 1
+	for _, vt := range victimTypes {
+		n := expectedDisruptions[vt]
+		expectedObservations := uint64(0)
+		if n > 0 {
+			expectedObservations = 1
+		}
+		after.workloadDisruptions[vt].assertDelta(t, before.workloadDisruptions[vt], expectedObservations, float64(n))
 	}
-	after.workloadDisruptions.assertDelta(t, before.workloadDisruptions, expectedDisruptionsObservations, workloadDisruptions)
 
 	after.pdbViolations.assertDelta(t, before.pdbViolations, numPDBViolations)
 }

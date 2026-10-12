@@ -221,8 +221,7 @@ func (v *victim) Type() fwk.EntityKeyType {
 // It calculates the priority of the pod, taking into account its scheduling group if applicable.
 // It ignores the error from NewVictim internally as it is guaranteed to succeed for a single valid pod.
 // The victim is always of PodKeyType, even if the pod belongs to a PodGroup or CompositePodGroup with
-// disruption mode Single: it is evicted alone, so it ranks as an individual pod. Group membership needed
-// for metrics is derived from the pod itself, see [isGroupVictim].
+// disruption mode Single: it is evicted alone, so it ranks and is reported in metrics as an individual pod.
 func NewPodVictim(podInfo fwk.PodInfo, pgLister fwk.PodGroupLister, cpgLister fwk.CompositePodGroupLister) Victim {
 	priority := getPodPriority(podInfo.GetPod(), pgLister, cpgLister)
 	vi, _ := NewVictim([]fwk.PodInfo{podInfo}, priority, fwk.PodKeyType)
@@ -307,9 +306,8 @@ type candidate struct {
 	victims *extenderv1.Victims
 	// name returns the target domain(for pod group)/node name where the preemptor gets nominated to run.
 	name string
-	// numPodGroupDisruptions returns the number of preemption units that affect pod groups.
-	// A single preemption unit can be all pods in a pod group or composite pod group hierarchy (for DisruptionMode=all) or a single pod (for DisruptionMode=single).
-	numPodGroupDisruptions int
+	// disruptions is the number of preemption units per victim type. Used only for metrics.
+	disruptions map[fwk.EntityKeyType]int
 }
 
 var _ fwk.PreemptionCandidate = &candidate{}
@@ -324,9 +322,9 @@ func (s *candidate) Name() string {
 	return s.name
 }
 
-// NumPodGroupDisruptions returns s.numPodGroupDisruptions.
-func (s *candidate) NumPodGroupDisruptions() int {
-	return s.numPodGroupDisruptions
+// NumDisruptionsByVictimType returns s.disruptions.
+func (s *candidate) NumDisruptionsByVictimType() map[fwk.EntityKeyType]int {
+	return s.disruptions
 }
 
 type candidateList struct {
