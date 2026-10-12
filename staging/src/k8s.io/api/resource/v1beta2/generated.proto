@@ -1470,6 +1470,8 @@ message DeviceTaintSelector {
   // This fields corresponds to slice.spec.driver.
   //
   // +optional
+  // +k8s:optional
+  // +k8s:alpha(since: "1.38")=+k8s:dependentForbidden("all")
   optional string driver = 2;
 
   // pool is the pool name. If pool is set, only devices in that pool are selected.
@@ -1482,6 +1484,8 @@ message DeviceTaintSelector {
   // their pool name.
   //
   // +optional
+  // +k8s:optional
+  // +k8s:alpha(since: "1.38")=+k8s:dependentForbidden("all")
   optional string pool = 3;
 
   // device is the device name. If device is set, only devices with that name are selected.
@@ -1491,6 +1495,8 @@ message DeviceTaintSelector {
   // but is not required.
   //
   // +optional
+  // +k8s:optional
+  // +k8s:alpha(since: "1.38")=+k8s:dependentForbidden("all")
   optional string device = 4;
 
   // all explicitly selects every device from every driver in the
@@ -1505,9 +1511,6 @@ message DeviceTaintSelector {
   // +optional
   // +k8s:optional
   // +k8s:alpha(since: "1.38")=+k8s:neq=false
-  // +k8s:alpha(since: "1.38")=+k8s:dependentForbidden("driver")
-  // +k8s:alpha(since: "1.38")=+k8s:dependentForbidden("pool")
-  // +k8s:alpha(since: "1.38")=+k8s:dependentForbidden("device")
   optional bool all = 6;
 }
 
