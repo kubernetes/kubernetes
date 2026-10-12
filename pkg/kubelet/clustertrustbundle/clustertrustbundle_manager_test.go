@@ -181,14 +181,14 @@ func testGetTrustAnchorsByName[T clusterTrustBundle](tCtx ktesting.TContext, b t
 
 func TestGetTrustAnchorsByNameCaching(t *testing.T) {
 	tCtx := ktesting.Init(t)
-	tCtx.SyncTest("v1alpha1/unsigned", func(tCtx ktesting.TContext) { testGetTrustAnchorsByNameCaching(tCtx, alphaFunctionsBundle, "") })
-	tCtx.SyncTest("v1alpha1/signed", func(tCtx ktesting.TContext) {
+	tCtx.SyncTest("v1alpha1/signer-absent", func(tCtx ktesting.TContext) { testGetTrustAnchorsByNameCaching(tCtx, alphaFunctionsBundle, "") })
+	tCtx.SyncTest("v1alpha1/signer-present", func(tCtx ktesting.TContext) {
 		testGetTrustAnchorsByNameCaching(tCtx, alphaFunctionsBundle, "foo.bar/a")
 	})
-	tCtx.SyncTest("v1beta1/unsigned", func(tCtx ktesting.TContext) { testGetTrustAnchorsByNameCaching(tCtx, betaFunctionsBundle, "") })
-	tCtx.SyncTest("v1beta1/signed", func(tCtx ktesting.TContext) { testGetTrustAnchorsByNameCaching(tCtx, betaFunctionsBundle, "foo.bar/a") })
-	tCtx.SyncTest("v1/unsigned", func(tCtx ktesting.TContext) { testGetTrustAnchorsByNameCaching(tCtx, gaFunctionsBundle, "") })
-	tCtx.SyncTest("v1/signed", func(tCtx ktesting.TContext) { testGetTrustAnchorsByNameCaching(tCtx, gaFunctionsBundle, "foo.bar/a") })
+	tCtx.SyncTest("v1beta1/signer-absent", func(tCtx ktesting.TContext) { testGetTrustAnchorsByNameCaching(tCtx, betaFunctionsBundle, "") })
+	tCtx.SyncTest("v1beta1/signer-present", func(tCtx ktesting.TContext) { testGetTrustAnchorsByNameCaching(tCtx, betaFunctionsBundle, "foo.bar/a") })
+	tCtx.SyncTest("v1/signer-absent", func(tCtx ktesting.TContext) { testGetTrustAnchorsByNameCaching(tCtx, gaFunctionsBundle, "") })
+	tCtx.SyncTest("v1/signer-present", func(tCtx ktesting.TContext) { testGetTrustAnchorsByNameCaching(tCtx, gaFunctionsBundle, "foo.bar/a") })
 }
 
 func testGetTrustAnchorsByNameCaching[T clusterTrustBundle](tCtx ktesting.TContext, b testingFunctionBundle[T], signerName string) {
