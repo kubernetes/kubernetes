@@ -18,16 +18,16 @@ limitations under the License.
 
 package v1
 
-// RuntimeClassPodCheckpointApplyConfiguration represents a declarative configuration of the RuntimeClassPodCheckpoint type for use
+// RuntimeClassPodCheckpointOptionsApplyConfiguration represents a declarative configuration of the RuntimeClassPodCheckpointOptions type for use
 // with apply.
 //
-// RuntimeClassPodCheckpoint configures user-supplied checkpoint and restore
+// RuntimeClassPodCheckpointOptions configures user-supplied checkpoint and restore
 // options for a runtime handler. It permits option keys, not administrator
 // configuration or secrets. Administrators should only allow documented keys
 // that are safe for untrusted users. The runtime must reject unsupported or
 // unsafe values, including values that grant privileges, select unallocated
 // devices, or override administrator configuration.
-type RuntimeClassPodCheckpointApplyConfiguration struct {
+type RuntimeClassPodCheckpointOptionsApplyConfiguration struct {
 	// allowedCheckpointOptions lists the keys users may set in
 	// PodCheckpoint.spec.checkpointOptions for Pods of this RuntimeClass.
 	// An empty list permits no keys. Each key must be nonempty and at most
@@ -44,16 +44,16 @@ type RuntimeClassPodCheckpointApplyConfiguration struct {
 	AllowedRestoreOptions []string `json:"allowedRestoreOptions,omitempty"`
 }
 
-// RuntimeClassPodCheckpointApplyConfiguration constructs a declarative configuration of the RuntimeClassPodCheckpoint type for use with
+// RuntimeClassPodCheckpointOptionsApplyConfiguration constructs a declarative configuration of the RuntimeClassPodCheckpointOptions type for use with
 // apply.
-func RuntimeClassPodCheckpoint() *RuntimeClassPodCheckpointApplyConfiguration {
-	return &RuntimeClassPodCheckpointApplyConfiguration{}
+func RuntimeClassPodCheckpointOptions() *RuntimeClassPodCheckpointOptionsApplyConfiguration {
+	return &RuntimeClassPodCheckpointOptionsApplyConfiguration{}
 }
 
 // WithAllowedCheckpointOptions adds the given value to the AllowedCheckpointOptions field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the AllowedCheckpointOptions field.
-func (b *RuntimeClassPodCheckpointApplyConfiguration) WithAllowedCheckpointOptions(values ...string) *RuntimeClassPodCheckpointApplyConfiguration {
+func (b *RuntimeClassPodCheckpointOptionsApplyConfiguration) WithAllowedCheckpointOptions(values ...string) *RuntimeClassPodCheckpointOptionsApplyConfiguration {
 	for i := range values {
 		b.AllowedCheckpointOptions = append(b.AllowedCheckpointOptions, values[i])
 	}
@@ -63,7 +63,7 @@ func (b *RuntimeClassPodCheckpointApplyConfiguration) WithAllowedCheckpointOptio
 // WithAllowedRestoreOptions adds the given value to the AllowedRestoreOptions field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the AllowedRestoreOptions field.
-func (b *RuntimeClassPodCheckpointApplyConfiguration) WithAllowedRestoreOptions(values ...string) *RuntimeClassPodCheckpointApplyConfiguration {
+func (b *RuntimeClassPodCheckpointOptionsApplyConfiguration) WithAllowedRestoreOptions(values ...string) *RuntimeClassPodCheckpointOptionsApplyConfiguration {
 	for i := range values {
 		b.AllowedRestoreOptions = append(b.AllowedRestoreOptions, values[i])
 	}

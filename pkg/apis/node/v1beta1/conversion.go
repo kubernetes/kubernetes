@@ -28,7 +28,7 @@ func Convert_v1beta1_RuntimeClass_To_node_RuntimeClass(in *nodev1beta1.RuntimeCl
 	if err := autoConvert_v1beta1_RuntimeClass_To_node_RuntimeClass(in, out, s); err != nil {
 		return err
 	}
-	out.PodCheckpoint = nil
+	out.PodCheckpointOptions = nil
 	return nil
 }
 

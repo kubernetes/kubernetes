@@ -28,7 +28,7 @@ type CheckpointReferenceApplyConfiguration struct {
 	Name *string `json:"name,omitempty"`
 	// options contains opaque runtime-specific options for this restore attempt.
 	// Empty options use runtime defaults. Each key must appear in this Pod's
-	// RuntimeClass podCheckpoint.allowedRestoreOptions; without a RuntimeClass
+	// RuntimeClass podCheckpointOptions.allowedRestoreOptions; without a RuntimeClass
 	// or allowlist, only empty options are permitted. Admission and the kubelet
 	// check the keys, and the kubelet passes the map unchanged to
 	// RestorePodRequest.options as untrusted user input. The runtime must reject

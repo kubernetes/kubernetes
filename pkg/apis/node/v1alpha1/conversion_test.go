@@ -139,12 +139,12 @@ func TestRuntimeClassConversionClearsCheckpointPolicy(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{Name: "runc"},
 		Spec:       v1alpha1.RuntimeClassSpec{RuntimeHandler: "runc"},
 	}
-	out := &node.RuntimeClass{PodCheckpoint: &node.RuntimeClassPodCheckpoint{
+	out := &node.RuntimeClass{PodCheckpointOptions: &node.RuntimeClassPodCheckpointOptions{
 		AllowedCheckpointOptions: []string{"compression"},
 		AllowedRestoreOptions:    []string{"tcp-close"},
 	}}
 	require.NoError(t, Convert_v1alpha1_RuntimeClass_To_node_RuntimeClass(in, out, nil))
-	require.Nil(t, out.PodCheckpoint)
+	require.Nil(t, out.PodCheckpointOptions)
 	require.Equal(t, in.Name, out.Name)
 	require.Equal(t, in.Spec.RuntimeHandler, out.Handler)
 }

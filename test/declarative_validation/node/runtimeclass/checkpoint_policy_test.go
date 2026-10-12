@@ -61,7 +61,7 @@ func TestRuntimeClassCheckpointPolicyValidation(t *testing.T) {
 					}
 					for _, fieldName := range []string{"allowedCheckpointOptions", "allowedRestoreOptions"} {
 						t.Run(fieldName, func(t *testing.T) {
-							path := field.NewPath("podCheckpoint", fieldName)
+							path := field.NewPath("podCheckpointOptions", fieldName)
 							for _, tc := range []struct {
 								name string
 								keys []string
@@ -80,11 +80,11 @@ func TestRuntimeClassCheckpointPolicyValidation(t *testing.T) {
 							} {
 								t.Run(tc.name, func(t *testing.T) {
 									obj := mkRuntimeClassHandlerOnly()
-									obj.PodCheckpoint = &node.RuntimeClassPodCheckpoint{}
+									obj.PodCheckpointOptions = &node.RuntimeClassPodCheckpointOptions{}
 									if fieldName == "allowedCheckpointOptions" {
-										obj.PodCheckpoint.AllowedCheckpointOptions = tc.keys
+										obj.PodCheckpointOptions.AllowedCheckpointOptions = tc.keys
 									} else {
-										obj.PodCheckpoint.AllowedRestoreOptions = tc.keys
+										obj.PodCheckpointOptions.AllowedRestoreOptions = tc.keys
 									}
 									var errs field.ErrorList
 									if operation == "create" {

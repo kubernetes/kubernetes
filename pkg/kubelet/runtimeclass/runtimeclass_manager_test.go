@@ -71,7 +71,7 @@ func TestLookupRuntimeHandlerForRestore(t *testing.T) {
 		name         string
 		className    *string
 		options      map[string]string
-		policy       *nodev1.RuntimeClassPodCheckpoint
+		policy       *nodev1.RuntimeClassPodCheckpointOptions
 		missingClass bool
 		wantErr      string
 	}{
@@ -80,14 +80,14 @@ func TestLookupRuntimeHandlerForRestore(t *testing.T) {
 		{name: "options with empty class", className: ptr.To(""), options: map[string]string{"tcp": "close"}, wantErr: "spec.runtimeClassName"},
 		{name: "missing class", className: ptr.To("runtime"), options: map[string]string{"tcp": "close"}, missingClass: true, wantErr: "failed to read RuntimeClass"},
 		{name: "missing policy", className: ptr.To("runtime"), options: map[string]string{"tcp": "close"}, wantErr: `runtime option "tcp" is not allowed`},
-		{name: "checkpoint list cannot authorize restore", className: ptr.To("runtime"), options: map[string]string{"tcp": "close"}, policy: &nodev1.RuntimeClassPodCheckpoint{AllowedCheckpointOptions: []string{"tcp"}}, wantErr: `runtime option "tcp" is not allowed`},
-		{name: "restore list authorizes key", className: ptr.To("runtime"), options: map[string]string{"tcp": "close"}, policy: &nodev1.RuntimeClassPodCheckpoint{AllowedRestoreOptions: []string{"tcp"}}},
-		{name: "other restore key denied", className: ptr.To("runtime"), options: map[string]string{"device-map": "sensitive-value"}, policy: &nodev1.RuntimeClassPodCheckpoint{AllowedRestoreOptions: []string{"tcp"}}, wantErr: `runtime option "device-map" is not allowed`},
+		{name: "checkpoint list cannot authorize restore", className: ptr.To("runtime"), options: map[string]string{"tcp": "close"}, policy: &nodev1.RuntimeClassPodCheckpointOptions{AllowedCheckpointOptions: []string{"tcp"}}, wantErr: `runtime option "tcp" is not allowed`},
+		{name: "restore list authorizes key", className: ptr.To("runtime"), options: map[string]string{"tcp": "close"}, policy: &nodev1.RuntimeClassPodCheckpointOptions{AllowedRestoreOptions: []string{"tcp"}}},
+		{name: "other restore key denied", className: ptr.To("runtime"), options: map[string]string{"device-map": "sensitive-value"}, policy: &nodev1.RuntimeClassPodCheckpointOptions{AllowedRestoreOptions: []string{"tcp"}}, wantErr: `runtime option "device-map" is not allowed`},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			var objects []runtime.Object
 			if tc.className != nil && *tc.className != "" && !tc.missingClass {
-				objects = append(objects, &nodev1.RuntimeClass{ObjectMeta: metav1.ObjectMeta{Name: *tc.className}, Handler: "handler", PodCheckpoint: tc.policy})
+				objects = append(objects, &nodev1.RuntimeClass{ObjectMeta: metav1.ObjectMeta{Name: *tc.className}, Handler: "handler", PodCheckpointOptions: tc.policy})
 			}
 			client := fake.NewClientset(objects...)
 			manager := runtimeclass.NewManager(client)
@@ -122,7 +122,7 @@ func TestRestoreRuntimeHandlerAndPolicyUseSameClass(t *testing.T) {
 			// observes the new handler and policy.
 			live := &nodev1.RuntimeClass{ObjectMeta: metav1.ObjectMeta{Name: rctest.SandboxRuntimeClass}, Handler: "new-handler"}
 			if allow {
-				live.PodCheckpoint = &nodev1.RuntimeClassPodCheckpoint{AllowedRestoreOptions: []string{"tcp"}}
+				live.PodCheckpointOptions = &nodev1.RuntimeClassPodCheckpointOptions{AllowedRestoreOptions: []string{"tcp"}}
 			}
 			client.PrependReactor("get", "runtimeclasses", func(clienttesting.Action) (bool, runtime.Object, error) {
 				return true, live.DeepCopy(), nil

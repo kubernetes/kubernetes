@@ -37,8 +37,8 @@ func (in RuntimeClassList) OpenAPIModelName() string {
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
-func (in RuntimeClassPodCheckpoint) OpenAPIModelName() string {
-	return "io.k8s.api.node.v1.RuntimeClassPodCheckpoint"
+func (in RuntimeClassPodCheckpointOptions) OpenAPIModelName() string {
+	return "io.k8s.api.node.v1.RuntimeClassPodCheckpointOptions"
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.

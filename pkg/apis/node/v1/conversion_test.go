@@ -34,7 +34,7 @@ func TestRuntimeClassCheckpointPolicyRoundTrip(t *testing.T) {
 	codecs := serializer.NewCodecFactory(scheme)
 	in := &node.RuntimeClass{
 		ObjectMeta: metav1.ObjectMeta{Name: "runc"}, Handler: "runc",
-		PodCheckpoint: &node.RuntimeClassPodCheckpoint{
+		PodCheckpointOptions: &node.RuntimeClassPodCheckpointOptions{
 			AllowedCheckpointOptions: []string{"compression", "tcp-established"},
 			AllowedRestoreOptions:    []string{"tcp-close"},
 		},
@@ -55,13 +55,13 @@ func TestRuntimeClassCheckpointPolicyRoundTrip(t *testing.T) {
 }
 
 func TestRuntimeClassCheckpointPolicyDeepCopy(t *testing.T) {
-	in := &nodev1.RuntimeClass{PodCheckpoint: &nodev1.RuntimeClassPodCheckpoint{
+	in := &nodev1.RuntimeClass{PodCheckpointOptions: &nodev1.RuntimeClassPodCheckpointOptions{
 		AllowedCheckpointOptions: []string{"compression"},
 		AllowedRestoreOptions:    []string{"tcp-close"},
 	}}
 	out := in.DeepCopy()
-	out.PodCheckpoint.AllowedCheckpointOptions[0] = "changed-checkpoint"
-	out.PodCheckpoint.AllowedRestoreOptions[0] = "changed-restore"
-	require.Equal(t, "compression", in.PodCheckpoint.AllowedCheckpointOptions[0])
-	require.Equal(t, "tcp-close", in.PodCheckpoint.AllowedRestoreOptions[0])
+	out.PodCheckpointOptions.AllowedCheckpointOptions[0] = "changed-checkpoint"
+	out.PodCheckpointOptions.AllowedRestoreOptions[0] = "changed-restore"
+	require.Equal(t, "compression", in.PodCheckpointOptions.AllowedCheckpointOptions[0])
+	require.Equal(t, "tcp-close", in.PodCheckpointOptions.AllowedRestoreOptions[0])
 }

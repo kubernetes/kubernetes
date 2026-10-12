@@ -117,8 +117,8 @@ func (p *Plugin) Validate(ctx context.Context, a admission.Attributes, _ admissi
 		return admission.NewForbidden(a, fmt.Errorf("cannot read RuntimeClass %q for spec.checkpointOptions: %w", className, err))
 	}
 	var allowed []string
-	if class.PodCheckpoint != nil {
-		allowed = class.PodCheckpoint.AllowedCheckpointOptions
+	if class.PodCheckpointOptions != nil {
+		allowed = class.PodCheckpointOptions.AllowedCheckpointOptions
 	}
 	if err := checkpointutil.ValidateRuntimeOptions(checkpoint.Spec.CheckpointOptions, allowed); err != nil {
 		return admission.NewForbidden(a, fmt.Errorf("spec.checkpointOptions for RuntimeClass %q: %w", className, err))

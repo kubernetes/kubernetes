@@ -133,8 +133,8 @@ func TestValidateUpdate(t *testing.T) {
 }
 
 func TestCheckpointPolicyFeatureGate(t *testing.T) {
-	policy := func() *node.RuntimeClassPodCheckpoint {
-		return &node.RuntimeClassPodCheckpoint{
+	policy := func() *node.RuntimeClassPodCheckpointOptions {
+		return &node.RuntimeClassPodCheckpointOptions{
 			AllowedCheckpointOptions: []string{"compression"},
 			AllowedRestoreOptions:    []string{"tcp-close"},
 		}
@@ -148,33 +148,33 @@ func TestCheckpointPolicyFeatureGate(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelCheckpointRestore, enabled)
 			ctx := genericapirequest.NewDefaultContext()
 			t.Run("create", func(t *testing.T) {
-				obj := &node.RuntimeClass{PodCheckpoint: policy()}
+				obj := &node.RuntimeClass{PodCheckpointOptions: policy()}
 				Strategy.PrepareForCreate(ctx, obj)
 				if enabled {
-					require.Equal(t, policy(), obj.PodCheckpoint)
+					require.Equal(t, policy(), obj.PodCheckpointOptions)
 				} else {
-					require.Nil(t, obj.PodCheckpoint)
+					require.Nil(t, obj.PodCheckpointOptions)
 				}
 			})
 			for _, tc := range []struct {
 				name     string
-				old, new *node.RuntimeClassPodCheckpoint
+				old, new *node.RuntimeClassPodCheckpointOptions
 			}{
 				{name: "new use", new: policy()},
 				{name: "existing use", old: policy(), new: policy()},
-				{name: "empty existing policy", old: &node.RuntimeClassPodCheckpoint{}, new: policy()},
+				{name: "empty existing policy", old: &node.RuntimeClassPodCheckpointOptions{}, new: policy()},
 				{name: "clear policy", old: policy()},
 			} {
 				t.Run(tc.name, func(t *testing.T) {
-					obj := &node.RuntimeClass{PodCheckpoint: tc.new}
-					old := &node.RuntimeClass{PodCheckpoint: tc.old}
+					obj := &node.RuntimeClass{PodCheckpointOptions: tc.new}
+					old := &node.RuntimeClass{PodCheckpointOptions: tc.old}
 					Strategy.PrepareForUpdate(ctx, obj, old)
 					if enabled || tc.old != nil {
-						require.Equal(t, tc.new, obj.PodCheckpoint)
+						require.Equal(t, tc.new, obj.PodCheckpointOptions)
 					} else {
-						require.Nil(t, obj.PodCheckpoint)
+						require.Nil(t, obj.PodCheckpointOptions)
 					}
-					require.Equal(t, tc.old, old.PodCheckpoint, "preparation must not alter the old object")
+					require.Equal(t, tc.old, old.PodCheckpointOptions, "preparation must not alter the old object")
 				})
 			}
 		})

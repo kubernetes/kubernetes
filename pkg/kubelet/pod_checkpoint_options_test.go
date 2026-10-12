@@ -51,10 +51,10 @@ func TestValidatePodCheckpointOptions(t *testing.T) {
 		{name: "options without RuntimeClass", options: map[string]string{"tcp": "close"}, wantErr: "require a RuntimeClass"},
 		{name: "missing RuntimeClass", className: new("runtime"), options: map[string]string{"tcp": "close"}, wantErr: "get RuntimeClass"},
 		{name: "no policy", className: new("runtime"), class: &nodev1.RuntimeClass{ObjectMeta: metav1.ObjectMeta{Name: "runtime"}, Handler: "handler"}, handler: "handler", options: map[string]string{"tcp": "close"}, wantErr: "not allowed"},
-		{name: "allowed", className: new("runtime"), class: &nodev1.RuntimeClass{ObjectMeta: metav1.ObjectMeta{Name: "runtime"}, Handler: "handler", PodCheckpoint: &nodev1.RuntimeClassPodCheckpoint{AllowedCheckpointOptions: []string{"tcp"}}}, handler: "handler", options: map[string]string{"tcp": "close"}},
-		{name: "restore list does not grant checkpoint", className: new("runtime"), class: &nodev1.RuntimeClass{ObjectMeta: metav1.ObjectMeta{Name: "runtime"}, Handler: "handler", PodCheckpoint: &nodev1.RuntimeClassPodCheckpoint{AllowedRestoreOptions: []string{"tcp"}}}, handler: "handler", options: map[string]string{"tcp": "close"}, wantErr: "not allowed"},
-		{name: "no wildcard matching", className: new("runtime"), class: &nodev1.RuntimeClass{ObjectMeta: metav1.ObjectMeta{Name: "runtime"}, Handler: "handler", PodCheckpoint: &nodev1.RuntimeClassPodCheckpoint{AllowedCheckpointOptions: []string{"*"}}}, handler: "handler", options: map[string]string{"tcp": "close"}, wantErr: "not allowed"},
-		{name: "recreated handler", className: new("runtime"), class: &nodev1.RuntimeClass{ObjectMeta: metav1.ObjectMeta{Name: "runtime"}, Handler: "new-handler", PodCheckpoint: &nodev1.RuntimeClassPodCheckpoint{AllowedCheckpointOptions: []string{"tcp"}}}, handler: "old-handler", options: map[string]string{"tcp": "close"}, wantErr: "does not match source sandbox handler"},
+		{name: "allowed", className: new("runtime"), class: &nodev1.RuntimeClass{ObjectMeta: metav1.ObjectMeta{Name: "runtime"}, Handler: "handler", PodCheckpointOptions: &nodev1.RuntimeClassPodCheckpointOptions{AllowedCheckpointOptions: []string{"tcp"}}}, handler: "handler", options: map[string]string{"tcp": "close"}},
+		{name: "restore list does not grant checkpoint", className: new("runtime"), class: &nodev1.RuntimeClass{ObjectMeta: metav1.ObjectMeta{Name: "runtime"}, Handler: "handler", PodCheckpointOptions: &nodev1.RuntimeClassPodCheckpointOptions{AllowedRestoreOptions: []string{"tcp"}}}, handler: "handler", options: map[string]string{"tcp": "close"}, wantErr: "not allowed"},
+		{name: "no wildcard matching", className: new("runtime"), class: &nodev1.RuntimeClass{ObjectMeta: metav1.ObjectMeta{Name: "runtime"}, Handler: "handler", PodCheckpointOptions: &nodev1.RuntimeClassPodCheckpointOptions{AllowedCheckpointOptions: []string{"*"}}}, handler: "handler", options: map[string]string{"tcp": "close"}, wantErr: "not allowed"},
+		{name: "recreated handler", className: new("runtime"), class: &nodev1.RuntimeClass{ObjectMeta: metav1.ObjectMeta{Name: "runtime"}, Handler: "new-handler", PodCheckpointOptions: &nodev1.RuntimeClassPodCheckpointOptions{AllowedCheckpointOptions: []string{"tcp"}}}, handler: "old-handler", options: map[string]string{"tcp": "close"}, wantErr: "does not match source sandbox handler"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			client := fake.NewClientset()
@@ -79,13 +79,13 @@ func TestValidatePodCheckpointOptions(t *testing.T) {
 
 func TestPodCheckpointOptionsUseLivePolicy(t *testing.T) {
 	ctx := context.Background()
-	client := fake.NewClientset(&nodev1.RuntimeClass{ObjectMeta: metav1.ObjectMeta{Name: "runtime"}, Handler: "handler", PodCheckpoint: &nodev1.RuntimeClassPodCheckpoint{AllowedCheckpointOptions: []string{"tcp"}}})
+	client := fake.NewClientset(&nodev1.RuntimeClass{ObjectMeta: metav1.ObjectMeta{Name: "runtime"}, Handler: "handler", PodCheckpointOptions: &nodev1.RuntimeClassPodCheckpointOptions{AllowedCheckpointOptions: []string{"tcp"}}})
 	kl := &Kubelet{kubeClient: client}
 	pod := &v1.Pod{Spec: v1.PodSpec{RuntimeClassName: new("runtime")}}
 	require.NoError(t, kl.validatePodCheckpointOptions(ctx, pod, map[string]string{"tcp": "close"}, "handler"))
 	rc, err := client.NodeV1().RuntimeClasses().Get(ctx, "runtime", metav1.GetOptions{})
 	require.NoError(t, err)
-	rc.PodCheckpoint = nil
+	rc.PodCheckpointOptions = nil
 	_, err = client.NodeV1().RuntimeClasses().Update(ctx, rc, metav1.UpdateOptions{})
 	require.NoError(t, err)
 	require.ErrorContains(t, kl.validatePodCheckpointOptions(ctx, pod, map[string]string{"tcp": "close"}, "handler"), "not allowed")
@@ -112,7 +112,7 @@ func TestCheckpointPolicyLookupRetries(t *testing.T) {
 		ContainerStatuses: []*kubecontainer.Status{{ID: kubecontainer.ContainerID{Type: "test", ID: "container"}, Name: "app", State: kubecontainer.ContainerStateRunning, ImageRef: "registry.example/app@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}},
 	}
 	checkpoint := &nodev1alpha1.PodCheckpoint{ObjectMeta: metav1.ObjectMeta{Name: "checkpoint", Namespace: "ns", UID: "checkpoint-uid"}, Spec: nodev1alpha1.PodCheckpointSpec{SourcePod: &nodev1alpha1.PodReference{Name: pod.Name}, CheckpointOptions: map[string]string{"tcp": "close"}}}
-	client := fake.NewClientset(checkpoint, &nodev1.RuntimeClass{ObjectMeta: metav1.ObjectMeta{Name: "runtime"}, Handler: "handler", PodCheckpoint: &nodev1.RuntimeClassPodCheckpoint{AllowedCheckpointOptions: []string{"tcp"}}})
+	client := fake.NewClientset(checkpoint, &nodev1.RuntimeClass{ObjectMeta: metav1.ObjectMeta{Name: "runtime"}, Handler: "handler", PodCheckpointOptions: &nodev1.RuntimeClassPodCheckpointOptions{AllowedCheckpointOptions: []string{"tcp"}}})
 	kl.kubeClient = client
 	unavailable := true
 	client.PrependReactor("get", "runtimeclasses", func(clienttesting.Action) (bool, runtime.Object, error) {

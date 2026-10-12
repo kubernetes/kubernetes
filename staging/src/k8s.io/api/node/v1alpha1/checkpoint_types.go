@@ -97,7 +97,7 @@ type PodCheckpointSpec struct {
 
 	// checkpointOptions contains opaque runtime-specific options for this
 	// checkpoint operation. Empty options use runtime defaults. Each key must
-	// appear in the source Pod's RuntimeClass podCheckpoint.allowedCheckpointOptions;
+	// appear in the source Pod's RuntimeClass podCheckpointOptions.allowedCheckpointOptions;
 	// without a RuntimeClass or allowlist, only empty options are permitted.
 	// Admission and the kubelet check the keys, and the kubelet passes the map
 	// unchanged to CheckpointPodRequest.options as untrusted user input. The

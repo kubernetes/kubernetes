@@ -62,13 +62,13 @@ type RuntimeClassApplyConfiguration struct {
 	// If scheduling is nil, this RuntimeClass is assumed to be supported by all
 	// nodes.
 	Scheduling *SchedulingApplyConfiguration `json:"scheduling,omitempty"`
-	// podCheckpoint lists the runtime-specific option keys that users may supply
+	// podCheckpointOptions lists the runtime-specific option keys that users may supply
 	// when checkpointing or restoring Pods of this RuntimeClass. If unset, users
 	// cannot supply options; checkpoint and restore use the runtime's defaults.
 	// Administrator settings belong in the runtime's configuration, not in
 	// user-supplied options. Values are validated by the runtime.
 	// This field is alpha-level and requires PodLevelCheckpointRestore.
-	PodCheckpoint *RuntimeClassPodCheckpointApplyConfiguration `json:"podCheckpoint,omitempty"`
+	PodCheckpointOptions *RuntimeClassPodCheckpointOptionsApplyConfiguration `json:"podCheckpointOptions,omitempty"`
 }
 
 // RuntimeClass constructs a declarative configuration of the RuntimeClass type for use with
@@ -299,11 +299,11 @@ func (b *RuntimeClassApplyConfiguration) WithScheduling(value *SchedulingApplyCo
 	return b
 }
 
-// WithPodCheckpoint sets the PodCheckpoint field in the declarative configuration to the given value
+// WithPodCheckpointOptions sets the PodCheckpointOptions field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the PodCheckpoint field is set to the value of the last call.
-func (b *RuntimeClassApplyConfiguration) WithPodCheckpoint(value *RuntimeClassPodCheckpointApplyConfiguration) *RuntimeClassApplyConfiguration {
-	b.PodCheckpoint = value
+// If called multiple times, the PodCheckpointOptions field is set to the value of the last call.
+func (b *RuntimeClassApplyConfiguration) WithPodCheckpointOptions(value *RuntimeClassPodCheckpointOptionsApplyConfiguration) *RuntimeClassApplyConfiguration {
+	b.PodCheckpointOptions = value
 	return b
 }
 

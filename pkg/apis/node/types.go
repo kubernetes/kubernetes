@@ -61,15 +61,15 @@ type RuntimeClass struct {
 	// +optional
 	Scheduling *Scheduling
 
-	// podCheckpoint permits user-supplied checkpoint and restore option keys
+	// podCheckpointOptions permits user-supplied checkpoint and restore option keys
 	// for this runtime handler. An unset policy permits no user options.
 	// +optional
-	PodCheckpoint *RuntimeClassPodCheckpoint
+	PodCheckpointOptions *RuntimeClassPodCheckpointOptions
 }
 
-// RuntimeClassPodCheckpoint configures the runtime-specific option keys users
+// RuntimeClassPodCheckpointOptions configures the runtime-specific option keys users
 // may supply. Administrator configuration remains separate in the runtime.
-type RuntimeClassPodCheckpoint struct {
+type RuntimeClassPodCheckpointOptions struct {
 	// allowedCheckpointOptions lists keys permitted in checkpoint requests.
 	// +optional
 	AllowedCheckpointOptions []string

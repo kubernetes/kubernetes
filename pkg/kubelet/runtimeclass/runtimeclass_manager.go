@@ -98,8 +98,8 @@ func (m *Manager) LookupRuntimeHandlerForRestore(ctx context.Context, runtimeCla
 		return "", fmt.Errorf("failed to read RuntimeClass %q for restore options: %w", name, err)
 	}
 	var allowed []string
-	if rc.PodCheckpoint != nil {
-		allowed = rc.PodCheckpoint.AllowedRestoreOptions
+	if rc.PodCheckpointOptions != nil {
+		allowed = rc.PodCheckpointOptions.AllowedRestoreOptions
 	}
 	if err := checkpointutil.ValidateRuntimeOptions(options, allowed); err != nil {
 		return "", fmt.Errorf("spec.restoreFrom.options for RuntimeClass %q: %w", name, err)

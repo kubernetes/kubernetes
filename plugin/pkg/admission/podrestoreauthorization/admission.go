@@ -262,8 +262,8 @@ func (p *Plugin) Validate(ctx context.Context, a admission.Attributes, o admissi
 			return admission.NewForbidden(a, fmt.Errorf("cannot read RuntimeClass %q for spec.restoreFrom.options: %w", className, err))
 		}
 		var allowed []string
-		if class.PodCheckpoint != nil {
-			allowed = class.PodCheckpoint.AllowedRestoreOptions
+		if class.PodCheckpointOptions != nil {
+			allowed = class.PodCheckpointOptions.AllowedRestoreOptions
 		}
 		if err := checkpointutil.ValidateRuntimeOptions(pod.Spec.RestoreFrom.Options, allowed); err != nil {
 			return admission.NewForbidden(a, fmt.Errorf("spec.restoreFrom.options for RuntimeClass %q: %w", className, err))

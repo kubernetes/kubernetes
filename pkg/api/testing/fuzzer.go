@@ -58,7 +58,7 @@ func overrideGenericFuncs(codecs runtimeserializer.CodecFactory) []interface{} {
 			c.FillNoCustom(rc)
 			// Legacy unserved versions cannot represent the v1-only policy.
 			// Its serialization is covered by a dedicated v1 round-trip test.
-			rc.PodCheckpoint = nil
+			rc.PodCheckpointOptions = nil
 		},
 		func(j *runtime.Object, c randfill.Continue) {
 			// TODO: uncomment when round trip starts from a versioned object

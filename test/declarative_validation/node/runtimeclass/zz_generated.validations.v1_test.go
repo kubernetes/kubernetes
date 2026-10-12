@@ -71,18 +71,18 @@ func init() {
 			"metadata.uid": {
 				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
 			},
-			"podCheckpoint.allowedCheckpointOptions": {
+			"podCheckpointOptions.allowedCheckpointOptions": {
 				{ErrorType: "FieldValueTooMany", Origin: "maxItems"},
 			},
-			"podCheckpoint.allowedCheckpointOptions[*]": {
+			"podCheckpointOptions.allowedCheckpointOptions[*]": {
 				{ErrorType: "FieldValueDuplicate"},
 				{ErrorType: "FieldValueTooLong", Origin: "maxBytes"},
 				{ErrorType: "FieldValueTooShort", Origin: "minLength"},
 			},
-			"podCheckpoint.allowedRestoreOptions": {
+			"podCheckpointOptions.allowedRestoreOptions": {
 				{ErrorType: "FieldValueTooMany", Origin: "maxItems"},
 			},
-			"podCheckpoint.allowedRestoreOptions[*]": {
+			"podCheckpointOptions.allowedRestoreOptions[*]": {
 				{ErrorType: "FieldValueDuplicate"},
 				{ErrorType: "FieldValueTooLong", Origin: "maxBytes"},
 				{ErrorType: "FieldValueTooShort", Origin: "minLength"},

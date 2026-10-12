@@ -28,7 +28,7 @@ func Convert_v1alpha1_RuntimeClass_To_node_RuntimeClass(in *v1alpha1.RuntimeClas
 	out.ObjectMeta = in.ObjectMeta
 	out.Handler = in.Spec.RuntimeHandler
 	// This version predates the v1-only checkpoint option policy.
-	out.PodCheckpoint = nil
+	out.PodCheckpointOptions = nil
 
 	if in.Spec.Overhead != nil {
 		out.Overhead = &node.Overhead{}

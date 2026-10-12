@@ -49,8 +49,8 @@ func (kl *Kubelet) validatePodCheckpointOptions(ctx context.Context, pod *v1.Pod
 		return fmt.Errorf("RuntimeClass %q handler %q does not match source sandbox handler %q", runtimeClass.Name, runtimeClass.Handler, runtimeHandler)
 	}
 	var allowed []string
-	if runtimeClass.PodCheckpoint != nil {
-		allowed = runtimeClass.PodCheckpoint.AllowedCheckpointOptions
+	if runtimeClass.PodCheckpointOptions != nil {
+		allowed = runtimeClass.PodCheckpointOptions.AllowedCheckpointOptions
 	}
 	return nodeutil.ValidateRuntimeOptions(options, allowed)
 }

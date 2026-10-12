@@ -2020,7 +2020,7 @@ func TestCheckpointPod(t *testing.T) {
 		fakeRuntime.PodStatus.SandboxStatuses[0].RuntimeHandler = "checkpoint-handler"
 		kubelet.kubeClient = fake.NewClientset(&nodev1.RuntimeClass{
 			ObjectMeta: metav1.ObjectMeta{Name: "checkpoint-runtime"}, Handler: "checkpoint-handler",
-			PodCheckpoint: &nodev1.RuntimeClassPodCheckpoint{AllowedCheckpointOptions: []string{"example.runtime/mode"}},
+			PodCheckpointOptions: &nodev1.RuntimeClassPodCheckpointOptions{AllowedCheckpointOptions: []string{"example.runtime/mode"}},
 		})
 		requests := make(chan *runtimeapi.CheckpointPodRequest, 1)
 		kubelet.containerRuntime = &checkpointRuntime{

@@ -106,7 +106,7 @@ func TestValidateCheckpointRuntimeOptions(t *testing.T) {
 		options      map[string]string
 		useClass     bool
 		missingClass bool
-		policy       *nodev1.RuntimeClassPodCheckpoint
+		policy       *nodev1.RuntimeClassPodCheckpointOptions
 		disabled     bool
 		wantErr      string
 	}{
@@ -115,10 +115,10 @@ func TestValidateCheckpointRuntimeOptions(t *testing.T) {
 		{name: "options without RuntimeClass", options: map[string]string{"tcp": "close"}, wantErr: "spec.runtimeClassName"},
 		{name: "missing RuntimeClass", options: map[string]string{"tcp": "close"}, useClass: true, missingClass: true, wantErr: "cannot read RuntimeClass"},
 		{name: "missing policy", options: map[string]string{"tcp": "close"}, useClass: true, wantErr: `runtime option "tcp" is not allowed`},
-		{name: "empty checkpoint allowlist", options: map[string]string{"tcp": "close"}, useClass: true, policy: &nodev1.RuntimeClassPodCheckpoint{}, wantErr: `runtime option "tcp" is not allowed`},
-		{name: "allowed checkpoint key", options: map[string]string{"tcp": "close"}, useClass: true, policy: &nodev1.RuntimeClassPodCheckpoint{AllowedCheckpointOptions: []string{"tcp"}}},
-		{name: "disallowed checkpoint key", options: map[string]string{"device-map": "sensitive-value"}, useClass: true, policy: &nodev1.RuntimeClassPodCheckpoint{AllowedCheckpointOptions: []string{"tcp"}}, wantErr: `runtime option "device-map" is not allowed`},
-		{name: "restore list cannot authorize checkpoint", options: map[string]string{"tcp": "close"}, useClass: true, policy: &nodev1.RuntimeClassPodCheckpoint{AllowedRestoreOptions: []string{"tcp"}}, wantErr: `runtime option "tcp" is not allowed`},
+		{name: "empty checkpoint allowlist", options: map[string]string{"tcp": "close"}, useClass: true, policy: &nodev1.RuntimeClassPodCheckpointOptions{}, wantErr: `runtime option "tcp" is not allowed`},
+		{name: "allowed checkpoint key", options: map[string]string{"tcp": "close"}, useClass: true, policy: &nodev1.RuntimeClassPodCheckpointOptions{AllowedCheckpointOptions: []string{"tcp"}}},
+		{name: "disallowed checkpoint key", options: map[string]string{"device-map": "sensitive-value"}, useClass: true, policy: &nodev1.RuntimeClassPodCheckpointOptions{AllowedCheckpointOptions: []string{"tcp"}}, wantErr: `runtime option "device-map" is not allowed`},
+		{name: "restore list cannot authorize checkpoint", options: map[string]string{"tcp": "close"}, useClass: true, policy: &nodev1.RuntimeClassPodCheckpointOptions{AllowedRestoreOptions: []string{"tcp"}}, wantErr: `runtime option "tcp" is not allowed`},
 		{name: "feature disabled ignores options", options: map[string]string{"tcp": "close"}, disabled: true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -129,7 +129,7 @@ func TestValidateCheckpointRuntimeOptions(t *testing.T) {
 				className := "checkpoint-runtime"
 				pod.Spec.RuntimeClassName = &className
 				if !tc.missingClass {
-					objects = append(objects, &nodev1.RuntimeClass{ObjectMeta: metav1.ObjectMeta{Name: className}, Handler: "runtime", PodCheckpoint: tc.policy})
+					objects = append(objects, &nodev1.RuntimeClass{ObjectMeta: metav1.ObjectMeta{Name: className}, Handler: "runtime", PodCheckpointOptions: tc.policy})
 				}
 			}
 			checkpoint := &node.PodCheckpoint{ObjectMeta: metav1.ObjectMeta{Name: "checkpoint", Namespace: "ns"}, Spec: node.PodCheckpointSpec{SourcePod: &node.PodReference{Name: "source"}, CheckpointOptions: tc.options}}

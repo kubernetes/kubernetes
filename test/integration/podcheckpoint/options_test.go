@@ -44,20 +44,20 @@ func TestRuntimeOptionPolicyAdmission(t *testing.T) {
 	for _, tc := range []struct {
 		name              string
 		class             bool
-		policy            *nodev1.RuntimeClassPodCheckpoint
+		policy            *nodev1.RuntimeClassPodCheckpointOptions
 		checkpointAllowed bool
 		restoreAllowed    bool
 	}{
 		{name: "no-class"},
 		{name: "no-policy", class: true},
-		{name: "checkpoint-only", class: true, policy: &nodev1.RuntimeClassPodCheckpoint{AllowedCheckpointOptions: []string{"tcp"}}, checkpointAllowed: true},
-		{name: "restore-only", class: true, policy: &nodev1.RuntimeClassPodCheckpoint{AllowedRestoreOptions: []string{"tcp"}}, restoreAllowed: true},
-		{name: "both", class: true, policy: &nodev1.RuntimeClassPodCheckpoint{AllowedCheckpointOptions: []string{"tcp"}, AllowedRestoreOptions: []string{"tcp"}}, checkpointAllowed: true, restoreAllowed: true},
+		{name: "checkpoint-only", class: true, policy: &nodev1.RuntimeClassPodCheckpointOptions{AllowedCheckpointOptions: []string{"tcp"}}, checkpointAllowed: true},
+		{name: "restore-only", class: true, policy: &nodev1.RuntimeClassPodCheckpointOptions{AllowedRestoreOptions: []string{"tcp"}}, restoreAllowed: true},
+		{name: "both", class: true, policy: &nodev1.RuntimeClassPodCheckpointOptions{AllowedCheckpointOptions: []string{"tcp"}, AllowedRestoreOptions: []string{"tcp"}}, checkpointAllowed: true, restoreAllowed: true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			spec := v1.PodSpec{Containers: []v1.Container{{Name: "app", Image: "registry.example/app@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}}}
 			if tc.class {
-				_, err := client.NodeV1().RuntimeClasses().Create(ctx, &nodev1.RuntimeClass{ObjectMeta: metav1.ObjectMeta{Name: tc.name}, Handler: "handler", PodCheckpoint: tc.policy}, metav1.CreateOptions{})
+				_, err := client.NodeV1().RuntimeClasses().Create(ctx, &nodev1.RuntimeClass{ObjectMeta: metav1.ObjectMeta{Name: tc.name}, Handler: "handler", PodCheckpointOptions: tc.policy}, metav1.CreateOptions{})
 				require.NoError(t, err)
 				spec.RuntimeClassName = new(tc.name)
 			}
@@ -95,7 +95,7 @@ func TestRuntimeOptionPolicyAdmission(t *testing.T) {
 			if tc.class && (tc.checkpointAllowed || tc.restoreAllowed) {
 				rc, err := client.NodeV1().RuntimeClasses().Get(ctx, tc.name, metav1.GetOptions{})
 				require.NoError(t, err)
-				rc.PodCheckpoint = nil
+				rc.PodCheckpointOptions = nil
 				_, err = client.NodeV1().RuntimeClasses().Update(ctx, rc, metav1.UpdateOptions{})
 				require.NoError(t, err)
 				request.Name = tc.name + "-revoked"

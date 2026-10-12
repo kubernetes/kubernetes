@@ -41,7 +41,7 @@ func (m *RuntimeClass) Reset() { *m = RuntimeClass{} }
 
 func (m *RuntimeClassList) Reset() { *m = RuntimeClassList{} }
 
-func (m *RuntimeClassPodCheckpoint) Reset() { *m = RuntimeClassPodCheckpoint{} }
+func (m *RuntimeClassPodCheckpointOptions) Reset() { *m = RuntimeClassPodCheckpointOptions{} }
 
 func (m *Scheduling) Reset() { *m = Scheduling{} }
 
@@ -117,9 +117,9 @@ func (m *RuntimeClass) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
-	if m.PodCheckpoint != nil {
+	if m.PodCheckpointOptions != nil {
 		{
-			size, err := m.PodCheckpoint.MarshalToSizedBuffer(dAtA[:i])
+			size, err := m.PodCheckpointOptions.MarshalToSizedBuffer(dAtA[:i])
 			if err != nil {
 				return 0, err
 			}
@@ -218,7 +218,7 @@ func (m *RuntimeClassList) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	return len(dAtA) - i, nil
 }
 
-func (m *RuntimeClassPodCheckpoint) Marshal() (dAtA []byte, err error) {
+func (m *RuntimeClassPodCheckpointOptions) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
 	n, err := m.MarshalToSizedBuffer(dAtA[:size])
@@ -228,12 +228,12 @@ func (m *RuntimeClassPodCheckpoint) Marshal() (dAtA []byte, err error) {
 	return dAtA[:n], nil
 }
 
-func (m *RuntimeClassPodCheckpoint) MarshalTo(dAtA []byte) (int, error) {
+func (m *RuntimeClassPodCheckpointOptions) MarshalTo(dAtA []byte) (int, error) {
 	size := m.Size()
 	return m.MarshalToSizedBuffer(dAtA[:size])
 }
 
-func (m *RuntimeClassPodCheckpoint) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+func (m *RuntimeClassPodCheckpointOptions) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	i := len(dAtA)
 	_ = i
 	var l int
@@ -367,8 +367,8 @@ func (m *RuntimeClass) Size() (n int) {
 		l = m.Scheduling.Size()
 		n += 1 + l + sovGenerated(uint64(l))
 	}
-	if m.PodCheckpoint != nil {
-		l = m.PodCheckpoint.Size()
+	if m.PodCheckpointOptions != nil {
+		l = m.PodCheckpointOptions.Size()
 		n += 1 + l + sovGenerated(uint64(l))
 	}
 	return n
@@ -391,7 +391,7 @@ func (m *RuntimeClassList) Size() (n int) {
 	return n
 }
 
-func (m *RuntimeClassPodCheckpoint) Size() (n int) {
+func (m *RuntimeClassPodCheckpointOptions) Size() (n int) {
 	if m == nil {
 		return 0
 	}
@@ -470,7 +470,7 @@ func (this *RuntimeClass) String() string {
 		`Handler:` + fmt.Sprintf("%v", this.Handler) + `,`,
 		`Overhead:` + strings.Replace(this.Overhead.String(), "Overhead", "Overhead", 1) + `,`,
 		`Scheduling:` + strings.Replace(this.Scheduling.String(), "Scheduling", "Scheduling", 1) + `,`,
-		`PodCheckpoint:` + strings.Replace(this.PodCheckpoint.String(), "RuntimeClassPodCheckpoint", "RuntimeClassPodCheckpoint", 1) + `,`,
+		`PodCheckpointOptions:` + strings.Replace(this.PodCheckpointOptions.String(), "RuntimeClassPodCheckpointOptions", "RuntimeClassPodCheckpointOptions", 1) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -491,11 +491,11 @@ func (this *RuntimeClassList) String() string {
 	}, "")
 	return s
 }
-func (this *RuntimeClassPodCheckpoint) String() string {
+func (this *RuntimeClassPodCheckpointOptions) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&RuntimeClassPodCheckpoint{`,
+	s := strings.Join([]string{`&RuntimeClassPodCheckpointOptions{`,
 		`AllowedCheckpointOptions:` + fmt.Sprintf("%v", this.AllowedCheckpointOptions) + `,`,
 		`AllowedRestoreOptions:` + fmt.Sprintf("%v", this.AllowedRestoreOptions) + `,`,
 		`}`,
@@ -883,7 +883,7 @@ func (m *RuntimeClass) Unmarshal(dAtA []byte) error {
 			iNdEx = postIndex
 		case 5:
 			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field PodCheckpoint", wireType)
+				return fmt.Errorf("proto: wrong wireType = %d for field PodCheckpointOptions", wireType)
 			}
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
@@ -910,10 +910,10 @@ func (m *RuntimeClass) Unmarshal(dAtA []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			if m.PodCheckpoint == nil {
-				m.PodCheckpoint = &RuntimeClassPodCheckpoint{}
+			if m.PodCheckpointOptions == nil {
+				m.PodCheckpointOptions = &RuntimeClassPodCheckpointOptions{}
 			}
-			if err := m.PodCheckpoint.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+			if err := m.PodCheckpointOptions.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex
@@ -1055,7 +1055,7 @@ func (m *RuntimeClassList) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
-func (m *RuntimeClassPodCheckpoint) Unmarshal(dAtA []byte) error {
+func (m *RuntimeClassPodCheckpointOptions) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
@@ -1078,10 +1078,10 @@ func (m *RuntimeClassPodCheckpoint) Unmarshal(dAtA []byte) error {
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
 		if wireType == 4 {
-			return fmt.Errorf("proto: RuntimeClassPodCheckpoint: wiretype end group for non-group")
+			return fmt.Errorf("proto: RuntimeClassPodCheckpointOptions: wiretype end group for non-group")
 		}
 		if fieldNum <= 0 {
-			return fmt.Errorf("proto: RuntimeClassPodCheckpoint: illegal tag %d (wire type %d)", fieldNum, wire)
+			return fmt.Errorf("proto: RuntimeClassPodCheckpointOptions: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
 		case 1:

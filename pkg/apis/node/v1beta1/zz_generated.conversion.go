@@ -113,7 +113,7 @@ func autoConvert_node_RuntimeClass_To_v1beta1_RuntimeClass(in *node.RuntimeClass
 	out.Handler = in.Handler
 	out.Overhead = (*nodev1beta1.Overhead)(unsafe.Pointer(in.Overhead))
 	out.Scheduling = (*nodev1beta1.Scheduling)(unsafe.Pointer(in.Scheduling))
-	// WARNING: in.PodCheckpoint requires manual conversion: does not exist in peer-type
+	// WARNING: in.PodCheckpointOptions requires manual conversion: does not exist in peer-type
 	return nil
 }
 

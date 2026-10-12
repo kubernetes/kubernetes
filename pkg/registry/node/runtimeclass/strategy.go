@@ -72,8 +72,8 @@ func (strategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 
 func dropDisabledFields(runtimeClass, oldRuntimeClass *node.RuntimeClass) {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelCheckpointRestore) &&
-		(oldRuntimeClass == nil || oldRuntimeClass.PodCheckpoint == nil) {
-		runtimeClass.PodCheckpoint = nil
+		(oldRuntimeClass == nil || oldRuntimeClass.PodCheckpointOptions == nil) {
+		runtimeClass.PodCheckpointOptions = nil
 	}
 }
 

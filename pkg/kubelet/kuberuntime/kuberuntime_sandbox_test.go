@@ -223,7 +223,7 @@ func TestRestorePodSandbox_RuntimeClass(t *testing.T) {
 	client := rctest.NewPopulatedClient()
 	class, err := client.NodeV1().RuntimeClasses().Get(tCtx, rctest.SandboxRuntimeClass, metav1.GetOptions{})
 	require.NoError(t, err)
-	class.PodCheckpoint = &nodev1.RuntimeClassPodCheckpoint{AllowedRestoreOptions: []string{"example.runtime/target"}}
+	class.PodCheckpointOptions = &nodev1.RuntimeClassPodCheckpointOptions{AllowedRestoreOptions: []string{"example.runtime/target"}}
 	_, err = client.NodeV1().RuntimeClasses().Update(tCtx, class, metav1.UpdateOptions{})
 	require.NoError(t, err)
 	rcm := runtimeclass.NewManager(client)
@@ -281,7 +281,7 @@ func TestRestorePodSandboxUsesLiveRuntimeClass(t *testing.T) {
 			// handler and policy, as after deletion and recreation.
 			class := &nodev1.RuntimeClass{ObjectMeta: metav1.ObjectMeta{Name: rctest.SandboxRuntimeClass}, Handler: "new-handler"}
 			if allow {
-				class.PodCheckpoint = &nodev1.RuntimeClassPodCheckpoint{AllowedRestoreOptions: []string{"tcp"}}
+				class.PodCheckpointOptions = &nodev1.RuntimeClassPodCheckpointOptions{AllowedRestoreOptions: []string{"tcp"}}
 			}
 			client.PrependReactor("get", "runtimeclasses", func(clienttesting.Action) (bool, apiruntime.Object, error) {
 				return true, class.DeepCopy(), nil

@@ -158,10 +158,10 @@ func Validate_RuntimeClass(
 		errs = append(errs, fn(fldPath.Child("scheduling"), obj.Scheduling, oldVal, oldObj != nil)...)
 	}
 
-	{ // field nodev1.RuntimeClass.PodCheckpoint
+	{ // field nodev1.RuntimeClass.PodCheckpointOptions
 		fn := func(
 			fldPath *field.Path,
-			obj, oldObj *nodev1.RuntimeClassPodCheckpoint,
+			obj, oldObj *nodev1.RuntimeClassPodCheckpointOptions,
 			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
 			if oldValueCorrelated && op.Type == operation.Update {
@@ -178,26 +178,26 @@ func Validate_RuntimeClass(
 				return // do not proceed
 			}
 			// call the type's validation function
-			errs = append(errs, Validate_RuntimeClassPodCheckpoint(ctx, op, fldPath, obj, oldObj)...)
+			errs = append(errs, Validate_RuntimeClassPodCheckpointOptions(ctx, op, fldPath, obj, oldObj)...)
 			return
 		}
 		oldVal := safe.Field(oldObj,
-			func(oldObj *nodev1.RuntimeClass) *nodev1.RuntimeClassPodCheckpoint {
-				return oldObj.PodCheckpoint
+			func(oldObj *nodev1.RuntimeClass) *nodev1.RuntimeClassPodCheckpointOptions {
+				return oldObj.PodCheckpointOptions
 			})
-		errs = append(errs, fn(fldPath.Child("podCheckpoint"), obj.PodCheckpoint, oldVal, oldObj != nil)...)
+		errs = append(errs, fn(fldPath.Child("podCheckpointOptions"), obj.PodCheckpointOptions, oldVal, oldObj != nil)...)
 	}
 
 	return errs
 }
 
-// Validate_RuntimeClassPodCheckpoint validates an instance of RuntimeClassPodCheckpoint according
+// Validate_RuntimeClassPodCheckpointOptions validates an instance of RuntimeClassPodCheckpointOptions according
 // to declarative validation rules in the API schema.
-func Validate_RuntimeClassPodCheckpoint(
+func Validate_RuntimeClassPodCheckpointOptions(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
-	obj, oldObj *nodev1.RuntimeClassPodCheckpoint) (errs field.ErrorList) {
+	obj, oldObj *nodev1.RuntimeClassPodCheckpointOptions) (errs field.ErrorList) {
 
-	{ // field nodev1.RuntimeClassPodCheckpoint.AllowedCheckpointOptions
+	{ // field nodev1.RuntimeClassPodCheckpointOptions.AllowedCheckpointOptions
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []string,
@@ -239,13 +239,13 @@ func Validate_RuntimeClassPodCheckpoint(
 			return
 		}
 		oldVal := safe.Field(oldObj,
-			func(oldObj *nodev1.RuntimeClassPodCheckpoint) []string {
+			func(oldObj *nodev1.RuntimeClassPodCheckpointOptions) []string {
 				return oldObj.AllowedCheckpointOptions
 			})
 		errs = append(errs, fn(fldPath.Child("allowedCheckpointOptions"), obj.AllowedCheckpointOptions, oldVal, oldObj != nil)...)
 	}
 
-	{ // field nodev1.RuntimeClassPodCheckpoint.AllowedRestoreOptions
+	{ // field nodev1.RuntimeClassPodCheckpointOptions.AllowedRestoreOptions
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []string,
@@ -287,7 +287,7 @@ func Validate_RuntimeClassPodCheckpoint(
 			return
 		}
 		oldVal := safe.Field(oldObj,
-			func(oldObj *nodev1.RuntimeClassPodCheckpoint) []string {
+			func(oldObj *nodev1.RuntimeClassPodCheckpointOptions) []string {
 				return oldObj.AllowedRestoreOptions
 			})
 		errs = append(errs, fn(fldPath.Child("allowedRestoreOptions"), obj.AllowedRestoreOptions, oldVal, oldObj != nil)...)
