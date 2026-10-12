@@ -1488,6 +1488,70 @@ func TestControllerSyncJob(t *testing.T) {
 	}
 }
 
+func TestJobPodsCreationTotal(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+
+	testCases := map[string]struct {
+		podControllerError error
+		wantSucceeded      float64
+		wantFailed         float64
+		wantSyncErr        bool
+	}{
+		"create succeeded": {
+			wantSucceeded: 1,
+			wantFailed:    0,
+		},
+		"create failed": {
+			podControllerError: errors.New("fake pod create error"),
+			wantSucceeded:      0,
+			wantFailed:         1,
+			wantSyncErr:        true,
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			clientSet := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
+			manager, sharedInformerFactory := newControllerFromClient(ctx, t, clientSet, controller.NoResyncPeriodFunc)
+			fakePodControl := controller.FakePodControl{Err: tc.podControllerError}
+			manager.podControl = &fakePodControl
+			manager.podStoreSynced = alwaysReady
+			manager.jobStoreSynced = alwaysReady
+			metrics.JobPodsCreationTotal.Reset()
+
+			job := newJob(1, 1, 6, batch.NonIndexedCompletion)
+			sharedInformerFactory.Batch().V1().Jobs().Informer().GetIndexer().Add(job)
+			manager.updateStatusHandler = func(ctx context.Context, job *batch.Job) (*batch.Job, error) {
+				return job, nil
+			}
+
+			err := manager.syncJob(ctx, testutil.GetKey(job, t))
+			if tc.wantSyncErr {
+				if err == nil {
+					t.Fatal("Expected syncJob to return an error on pod create failure")
+				}
+			} else if err != nil {
+				t.Fatalf("Unexpected syncJob error: %v", err)
+			}
+
+			gotSucceeded, err := metricstestutil.GetCounterMetricValue(metrics.JobPodsCreationTotal.WithLabelValues(metrics.PodCreateNew, metrics.Succeeded))
+			if err != nil {
+				t.Fatalf("Obtaining succeeded job_pods_creation_total: %v", err)
+			}
+			if gotSucceeded != tc.wantSucceeded {
+				t.Errorf("Metric reports %.0f succeeded pod creations, want %.0f", gotSucceeded, tc.wantSucceeded)
+			}
+			gotFailed, err := metricstestutil.GetCounterMetricValue(metrics.JobPodsCreationTotal.WithLabelValues(metrics.PodCreateNew, metrics.Failed))
+			if err != nil {
+				t.Fatalf("Obtaining failed job_pods_creation_total: %v", err)
+			}
+			if gotFailed != tc.wantFailed {
+				t.Errorf("Metric reports %.0f failed pod creations, want %.0f", gotFailed, tc.wantFailed)
+			}
+		})
+	}
+}
+
 func checkIndexedJobPods(t *testing.T, control *controller.FakePodControl, wantIndexes sets.Set[int], jobName string) {
 	t.Helper()
 	gotIndexes := sets.New[int]()
