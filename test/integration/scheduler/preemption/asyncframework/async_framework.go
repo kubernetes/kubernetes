@@ -320,6 +320,17 @@ func registerBlockBindingPlugin(registry frameworkruntime.Registry, blockBinding
 	return blockingBindPluginName, err
 }
 
+// delayedPreemptionPlugin wraps DefaultPreemption to override Name() so that
+// NewFramework's ScorePlugin weight check matches the custom registered plugin name.
+type delayedPreemptionPlugin struct {
+	*defaultpreemption.DefaultPreemption
+	name string
+}
+
+func (pl *delayedPreemptionPlugin) Name() string {
+	return pl.name
+}
+
 // registerDelayedPreemptionPlugin register a custom preemption plugin to test async preemption behavior.
 func registerDelayedPreemptionPlugin(registry *frameworkruntime.Registry, preemptionDoneChannels *sync.Map, enableGenericWorkload bool) (string, func() *defaultpreemption.DefaultPreemption, error) {
 	delayedPreemptionPluginName := "delay-preemption"
@@ -355,7 +366,7 @@ func registerDelayedPreemptionPlugin(registry *frameworkruntime.Registry, preemp
 			return preemptPodFn(ctx, c, preemptor, victim, pluginName)
 		}
 
-		return preemptionPlugin, nil
+		return &delayedPreemptionPlugin{DefaultPreemption: preemptionPlugin, name: delayedPreemptionPluginName}, nil
 	})
 	return delayedPreemptionPluginName, func() *defaultpreemption.DefaultPreemption { return preemptionPlugin }, err
 }
