@@ -384,3 +384,32 @@ func (f *fakePodFailAdmission) Validate(ctx context.Context, attr admission.Attr
 	f.succeedPodsCount++
 	return nil
 }
+
+// deleteOldRevisionPods used to test OnDelete strategy, it waits until the new generation is observed and makes sure to
+// to delete pods allowing the controller to recreate them
+func deleteOldRevisionPods(ctx context.Context, t *testing.T, c clientset.Interface, sts *appsv1.StatefulSet) {
+	stsClient := c.AppsV1().StatefulSets(sts.Namespace)
+	podClient := c.CoreV1().Pods(sts.Namespace)
+	var ss *appsv1.StatefulSet
+	if err := wait.PollUntilContextTimeout(ctx, pollInterval, pollTimeout, false, func(ctx context.Context) (bool, error) {
+		var err error
+		ss, err = stsClient.Get(ctx, sts.Name, metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+		return ss.Status.ObservedGeneration >= ss.Generation &&
+			ss.Status.CurrentRevision != ss.Status.UpdateRevision, nil
+	}); err != nil {
+		t.Fatalf("Timed out waiting for StatefulSet %s/%s to observe the new revision: %v", sts.Namespace, sts.Name, err)
+	}
+
+	pods := getPods(t, podClient, labelMap())
+	for _, pod := range pods.Items {
+		if pod.Labels[appsv1.ControllerRevisionHashLabelKey] == ss.Status.UpdateRevision {
+			t.Fatalf("Pod %s was updated to revision %s without being deleted", pod.Name, ss.Status.UpdateRevision)
+		}
+		if err := podClient.Delete(ctx, pod.Name, metav1.DeleteOptions{}); err != nil {
+			t.Fatalf("Failed to delete pod %s: %v", pod.Name, err)
+		}
+	}
+}

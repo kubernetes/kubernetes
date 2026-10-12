@@ -50,6 +50,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	watchtools "k8s.io/client-go/tools/watch"
 	"k8s.io/client-go/util/retry"
+	"k8s.io/kubernetes/pkg/cluster/ports"
 	"k8s.io/kubernetes/pkg/features"
 	apimachineryutils "k8s.io/kubernetes/test/e2e/common/apimachinery"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -1477,6 +1478,69 @@ var _ = SIGDescribe("StatefulSet", func() {
 				ss.Name,
 				ss.Status.UpdatedReplicas,
 				*ss.Spec.Replicas)
+		})
+
+		f.It("should resume recreate update after kube-controller-manager restart", f.WithDisruptive(), f.WithSerial(), f.WithProvider(framework.ProvidersWithSSH...), framework.WithFeatureGate(features.StatefulSetRecreateStrategy), func(ctx context.Context) {
+			ginkgo.By("Creating a new StatefulSet")
+			var err error
+			ss, err = c.AppsV1().StatefulSets(ns).Create(ctx, ss, metav1.CreateOptions{})
+			framework.ExpectNoError(err)
+			e2estatefulset.WaitForRunningAndReady(ctx, c, *ss.Spec.Replicas, ss)
+			ss = waitForStatus(ctx, c, ss)
+			gomega.Expect(ss.Status.CurrentRevision).To(gomega.Equal(ss.Status.UpdateRevision), "StatefulSet %s/%s created with update revision %s not equal to current revision %s",
+				ss.Namespace, ss.Name, ss.Status.UpdateRevision, ss.Status.CurrentRevision)
+
+			newImage := AgnhostImage
+			oldImage := ss.Spec.Template.Spec.Containers[0].Image
+			ginkgo.By(fmt.Sprintf("Updating stateful set template: update image from %s to %s", oldImage, newImage))
+			gomega.Expect(oldImage).NotTo(gomega.Equal(newImage), "Incorrect test setup: should update to a different image")
+			ss, err = updateStatefulSetWithRetries(ctx, c, ns, ss.Name, func(update *appsv1.StatefulSet) {
+				update.Spec.Template.Spec.Containers[0].Image = newImage
+			})
+			framework.ExpectNoError(err)
+
+			ginkgo.By("Waiting for the recreate update to be in progress")
+			e2estatefulset.WaitForState(ctx, c, ss, e2estatefulset.StatefulSetPoll, func(set *appsv1.StatefulSet, pods *v1.PodList) (bool, error) {
+				return set.Status.ObservedGeneration >= set.Generation &&
+					set.Status.CurrentRevision != set.Status.UpdateRevision &&
+					set.Status.ReadyReplicas < *set.Spec.Replicas, nil
+			})
+
+			ginkgo.By("Restarting kube-controller-manager")
+			nodes := framework.GetControlPlaneNodes(ctx, c)
+			gomega.Expect(nodes.Items).NotTo(gomega.BeEmpty(), "at least one node with label %s should exist.", framework.ControlPlaneLabel)
+			for i := range nodes.Items {
+				ips := framework.GetNodeExternalIPs(&nodes.Items[i])
+				gomega.Expect(ips).NotTo(gomega.BeEmpty(), "at least one external ip should exist.")
+				restarter := NewRestartConfig(
+					ips[0], "kube-controller", ports.KubeControllerManagerPort, restartPollInterval, restartTimeout, true)
+				restarter.restart(ctx)
+			}
+
+			ginkgo.By("Waiting for the recreate update to complete")
+			var pods *v1.PodList
+			e2estatefulset.WaitForState(ctx, c, ss, e2estatefulset.StatefulSetPoll, func(set *appsv1.StatefulSet, podList *v1.PodList) (bool, error) {
+				ss = set
+				pods = podList
+				return set.Status.CurrentRevision == set.Status.UpdateRevision &&
+					set.Status.UpdatedReplicas == *set.Spec.Replicas &&
+					set.Status.ReadyReplicas == *set.Spec.Replicas &&
+					len(podList.Items) == int(*set.Spec.Replicas), nil
+			})
+
+			ginkgo.By("Verifying all pods were recreated with the new revision")
+			for i := range pods.Items {
+				gomega.Expect(pods.Items[i].Spec.Containers[0].Image).To(gomega.Equal(newImage), "Pod %s/%s has image %s not equal to the new image %s",
+					pods.Items[i].Namespace,
+					pods.Items[i].Name,
+					pods.Items[i].Spec.Containers[0].Image,
+					newImage)
+				gomega.Expect(pods.Items[i].Labels).To(gomega.HaveKeyWithValue(appsv1.StatefulSetRevisionLabel, ss.Status.UpdateRevision), "Pod %s/%s has revision %s not equal to update revision %s",
+					pods.Items[i].Namespace,
+					pods.Items[i].Name,
+					pods.Items[i].Labels[appsv1.StatefulSetRevisionLabel],
+					ss.Status.UpdateRevision)
+			}
 		})
 	})
 

@@ -843,40 +843,7 @@ func TestRecreateStatefulSetUpdate(t *testing.T) {
 		sts.Spec.Template.Spec.Containers[0].Image = newImage
 	})
 
-	if err := wait.PollUntilContextTimeout(tCtx, pollInterval, pollTimeout, false, func(ctx context.Context) (bool, error) {
-		ss, err := stsClient.Get(ctx, sts.Name, metav1.GetOptions{})
-		if err != nil {
-			return false, err
-		}
-		currentPods := getPods(t, podClient, labelMap)
-
-		// At no point mixed revisions should exists between pods in recreate
-		revisions := make(map[string]bool)
-		for _, pod := range currentPods.Items {
-			rev := pod.Labels[appsv1.ControllerRevisionHashLabelKey]
-			if rev != "" {
-				revisions[rev] = true
-			}
-		}
-		if len(revisions) > 1 {
-			return false, fmt.Errorf("found mixed revisions among pods: %v", revisions)
-		}
-
-		pendingPods := v1.PodList{}
-		for _, pod := range currentPods.Items {
-			if pod.Status.Phase == v1.PodPending {
-				pendingPods.Items = append(pendingPods.Items, pod)
-			}
-		}
-		if len(pendingPods.Items) > 0 {
-			setPodsReadyCondition(t, c, &pendingPods, v1.ConditionTrue, time.Now())
-		}
-
-		return ss.Status.ReadyReplicas == *ss.Spec.Replicas &&
-			ss.Status.CurrentRevision == ss.Status.UpdateRevision, nil
-	}); err != nil {
-		t.Fatalf("Timed out waiting for recreate update to complete: %v", err)
-	}
+	waitForStatefulSetUpdate(tCtx, t, c, sts)
 
 	sts, err = stsClient.Get(tCtx, sts.Name, metav1.GetOptions{})
 	if err != nil {
@@ -914,6 +881,171 @@ func TestRecreateStatefulSetUpdate(t *testing.T) {
 		if pvc.UID != oldUID {
 			t.Fatalf("PVC %s was recreated (UID changed from %s to %s), should be preserved",
 				pvc.Name, oldUID, pvc.UID)
+		}
+	}
+}
+
+func TestStatefulSetUpdateStrategySwitch(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetRecreateStrategy, true)
+	tCtx, rm, informers, c := scSetup(t)
+	cancel := runControllerAndInformers(tCtx, rm, informers)
+	defer cancel()
+
+	tests := []struct {
+		name           string
+		namespace      string
+		initStrategy   appsv1.StatefulSetUpdateStrategy
+		switchStrategy appsv1.StatefulSetUpdateStrategy
+	}{
+		{
+			name:           "RollingUpdate to Recreate",
+			namespace:      "rolling-to-recreate",
+			initStrategy:   appsv1.StatefulSetUpdateStrategy{Type: appsv1.RollingUpdateStatefulSetStrategyType},
+			switchStrategy: appsv1.StatefulSetUpdateStrategy{Type: appsv1.RecreateStatefulSetStrategyType},
+		},
+		{
+			name:           "OnDelete to Recreate",
+			namespace:      "ondelete-to-recreate",
+			initStrategy:   appsv1.StatefulSetUpdateStrategy{Type: appsv1.OnDeleteStatefulSetStrategyType},
+			switchStrategy: appsv1.StatefulSetUpdateStrategy{Type: appsv1.RecreateStatefulSetStrategyType},
+		},
+		{
+			name:           "Recreate to RollingUpdate",
+			namespace:      "recreate-to-rolling",
+			initStrategy:   appsv1.StatefulSetUpdateStrategy{Type: appsv1.RecreateStatefulSetStrategyType},
+			switchStrategy: appsv1.StatefulSetUpdateStrategy{Type: appsv1.RollingUpdateStatefulSetStrategyType},
+		},
+		{
+			name:           "Recreate to OnDelete",
+			namespace:      "recreate-to-ondelete",
+			initStrategy:   appsv1.StatefulSetUpdateStrategy{Type: appsv1.RecreateStatefulSetStrategyType},
+			switchStrategy: appsv1.StatefulSetUpdateStrategy{Type: appsv1.OnDeleteStatefulSetStrategyType},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			ns := framework.CreateNamespaceOrDie(c, test.namespace, t)
+			defer framework.DeleteNamespaceOrDie(c, ns, t)
+
+			createHeadlessService(t, c, newHeadlessService(ns.Name))
+			labelMap := labelMap()
+			sts := newSTS("sts", ns.Name, 3)
+			sts.Spec.UpdateStrategy = test.initStrategy
+			stss, _ := createSTSsPods(t, c, []*appsv1.StatefulSet{sts}, []*v1.Pod{})
+			sts = stss[0]
+			waitSTSStable(t, c, sts)
+
+			podClient := c.CoreV1().Pods(ns.Name)
+			pods := getPods(t, podClient, labelMap)
+			if len(pods.Items) != 3 {
+				t.Fatalf("len(pods) = %d, want 3", len(pods.Items))
+			}
+			setPodsReadyCondition(t, c, pods, v1.ConditionTrue, time.Now())
+
+			stsClient := c.AppsV1().StatefulSets(ns.Name)
+			sts, err := stsClient.Get(tCtx, sts.Name, metav1.GetOptions{})
+			if err != nil {
+				t.Fatalf("Failed to get StatefulSet: %v", err)
+			}
+			oldCurrentRevision := sts.Status.CurrentRevision
+
+			oldPodUIDs := make(map[string]types.UID)
+			for _, pod := range pods.Items {
+				oldPodUIDs[pod.Name] = pod.UID
+			}
+
+			newImage := "new-image"
+			updateSTS(t, stsClient, sts.Name, func(sts *appsv1.StatefulSet) {
+				sts.Spec.Template.Spec.Containers[0].Image = newImage
+				sts.Spec.UpdateStrategy = test.switchStrategy
+			})
+
+			if test.switchStrategy.Type == appsv1.OnDeleteStatefulSetStrategyType {
+				deleteOldRevisionPods(tCtx, t, c, sts)
+			}
+
+			waitForStatefulSetUpdate(tCtx, t, c, sts)
+
+			sts, err = stsClient.Get(tCtx, sts.Name, metav1.GetOptions{})
+			if err != nil {
+				t.Fatalf("Failed to get StatefulSet after update: %v", err)
+			}
+			if sts.Status.CurrentRevision == oldCurrentRevision {
+				t.Fatalf("CurrentRevision should have changed from %s after update", oldCurrentRevision)
+			}
+
+			pods = getPods(t, podClient, labelMap)
+			for _, pod := range pods.Items {
+				if oldUID, ok := oldPodUIDs[pod.Name]; ok && pod.UID == oldUID {
+					t.Fatalf("Pod %s was not recreated", pod.Name)
+				}
+				if pod.Spec.Containers[0].Image != newImage {
+					t.Fatalf("Pod %s has image %s, want %s", pod.Name, pod.Spec.Containers[0].Image, newImage)
+				}
+			}
+		})
+	}
+}
+
+func waitForStatefulSetUpdate(ctx context.Context, t *testing.T, c clientset.Interface, sts *appsv1.StatefulSet) {
+	stsClient := c.AppsV1().StatefulSets(sts.Namespace)
+	podClient := c.CoreV1().Pods(sts.Namespace)
+	var mixedRevisions bool
+	var ss *appsv1.StatefulSet
+	if err := wait.PollUntilContextTimeout(ctx, pollInterval, pollTimeout, false, func(ctx context.Context) (bool, error) {
+		var err error
+		ss, err = stsClient.Get(ctx, sts.Name, metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+
+		currentPods := getPods(t, podClient, labelMap())
+
+		revisions := make(map[string]bool)
+		for _, pod := range currentPods.Items {
+			rev := pod.Labels[appsv1.ControllerRevisionHashLabelKey]
+			if rev != "" {
+				revisions[rev] = true
+			}
+		}
+
+		if len(revisions) > 1 {
+			mixedRevisions = true
+		}
+
+		pendingPods := v1.PodList{}
+		for _, pod := range currentPods.Items {
+			if pod.Status.Phase == v1.PodPending {
+				pendingPods.Items = append(pendingPods.Items, pod)
+			}
+		}
+		if len(pendingPods.Items) > 0 {
+			setPodsReadyCondition(t, c, &pendingPods, v1.ConditionTrue, time.Now())
+		}
+
+		return ss.Status.ObservedGeneration >= ss.Generation &&
+			ss.Status.ReadyReplicas == *ss.Spec.Replicas &&
+			ss.Status.CurrentRevision == ss.Status.UpdateRevision, nil
+	}); err != nil {
+		t.Fatalf("Timed out waiting for update of StatefulSet %s/%s to complete: %v", sts.Namespace, sts.Name, err)
+	}
+
+	updateStrategy := ss.Spec.UpdateStrategy.Type
+	if mixedRevisions && updateStrategy == appsv1.RecreateStatefulSetStrategyType {
+		t.Fatalf("StatefulSet %s/%s has mixed revision pods in RecreateStatefulSetStrategyType", sts.Namespace, sts.Name)
+	}
+	if !mixedRevisions && updateStrategy == appsv1.RollingUpdateStatefulSetStrategyType {
+		t.Fatalf("StatefulSet %s/%s never had old and new revision pods at the same time in RollingUpdateStatefulSetStrategyType", sts.Namespace, sts.Name)
+	}
+
+	pods := getPods(t, podClient, labelMap())
+	if len(pods.Items) != int(*ss.Spec.Replicas) {
+		t.Fatalf("Expected %d pods, got %d", *ss.Spec.Replicas, len(pods.Items))
+	}
+	for _, pod := range pods.Items {
+		if rev := pod.Labels[appsv1.ControllerRevisionHashLabelKey]; rev != ss.Status.UpdateRevision {
+			t.Fatalf("Pod %s has revision %s, want %s", pod.Name, rev, ss.Status.UpdateRevision)
 		}
 	}
 }
