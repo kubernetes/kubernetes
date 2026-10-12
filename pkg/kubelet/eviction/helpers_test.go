@@ -1012,6 +1012,7 @@ func TestOrderedbyInodes(t *testing.T) {
 
 // TestOrderedByPriorityDisk ensures we order pods by priority and then greediest resource consumer
 func TestOrderedByPriorityDisk(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRANodeAllocatableResources, true)
 	pod1 := newPod("above-requests-low-priority-high-usage", lowPriority, []v1.Container{
 		newContainer("above-requests-low-priority-high-usage", newResourceList("", "", ""), newResourceList("", "", "")),
 	}, []v1.Volume{
@@ -1068,6 +1069,22 @@ func TestOrderedByPriorityDisk(t *testing.T) {
 			EmptyDir: &v1.EmptyDirVolumeSource{},
 		}),
 	})
+	pod9 := newPod("below-requests-with-dra-high-priority-low-usage", highPriority, []v1.Container{
+		newContainer("c1", newResourceList("", "", "100Mi"), newResourceList("", "", "")),
+	}, []v1.Volume{
+		newVolume("local-volume", v1.VolumeSource{
+			EmptyDir: &v1.EmptyDirVolumeSource{},
+		}),
+	})
+	pod9.Status.ExtraNodeAllocatableResources = []v1.ExtraNodeAllocatableResource{
+		{
+			Source:     v1.ExtraNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "disk-claim"},
+			Containers: []string{"c1"},
+			Overhead: []v1.NodeAllocatableOverheadResources{
+				{Name: v1.ResourceEphemeralStorage, PerPod: quantityMustParse("1Gi")},
+			},
+		},
+	}
 	stats := map[*v1.Pod]statsapi.PodStats{
 		pod1: newPodDiskStats(pod1, resource.MustParse("200Mi"), resource.MustParse("100Mi"), resource.MustParse("200Mi")), // 500 relative to request
 		pod2: newPodDiskStats(pod2, resource.MustParse("10Mi"), resource.MustParse("10Mi"), resource.MustParse("30Mi")),    // 50 relative to request
@@ -1077,13 +1094,14 @@ func TestOrderedByPriorityDisk(t *testing.T) {
 		pod6: newPodDiskStats(pod6, resource.MustParse("50Mi"), resource.MustParse("100Mi"), resource.MustParse("50Mi")),   // -800 relative to request
 		pod7: newPodDiskStats(pod7, resource.MustParse("250Mi"), resource.MustParse("500Mi"), resource.MustParse("50Mi")),  // -200 relative to request
 		pod8: newPodDiskStats(pod8, resource.MustParse("100Mi"), resource.MustParse("60Mi"), resource.MustParse("40Mi")),   // -800 relative to request
+		pod9: newPodDiskStats(pod9, resource.MustParse("100Mi"), resource.MustParse("60Mi"), resource.MustParse("40Mi")),   // -900 relative to request (100Mi spec + 1Gi DRA)
 	}
 	statsFn := func(pod *v1.Pod) (statsapi.PodStats, bool) {
 		result, found := stats[pod]
 		return result, found
 	}
-	pods := []*v1.Pod{pod8, pod7, pod6, pod5, pod4, pod3, pod2, pod1}
-	expected := []*v1.Pod{pod1, pod2, pod3, pod4, pod5, pod6, pod7, pod8}
+	pods := []*v1.Pod{pod9, pod8, pod7, pod6, pod5, pod4, pod3, pod2, pod1}
+	expected := []*v1.Pod{pod1, pod2, pod3, pod4, pod5, pod6, pod7, pod8, pod9}
 	fsStatsToMeasure := []fsStatsType{fsStatsRoot, fsStatsLogs, fsStatsLocalVolumeSource}
 	orderedBy(exceedDiskRequests(statsFn, fsStatsToMeasure, v1.ResourceEphemeralStorage), priority, disk(statsFn, fsStatsToMeasure, v1.ResourceEphemeralStorage)).Sort(pods)
 	for i := range expected {
