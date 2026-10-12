@@ -5,6 +5,10 @@
         "version": "v1.9.0",
         "reason": "pin to v1.9.0 until we figure out what the future of fsnotify library is, see #138812"
       },
+      "github.com/godbus/dbus/v5": {
+        "version": "v5.2.2",
+        "reason": "pin to v5.2.2 until a release with godbus/dbus#448 is out; v5.2.3 does not compile on windows/darwin, see #142936"
+      },
       "github.com/google/cel-go": {
         "version": "v0.29.2",
         "reason": "pin to v0.29.2 until the CEL runtime cost changes in newer releases are handled, see #141056"
