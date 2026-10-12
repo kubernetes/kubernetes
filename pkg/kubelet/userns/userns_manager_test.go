@@ -533,7 +533,9 @@ func TestRecordBounds(t *testing.T) {
 
 // When the kubelet ID range changes between restarts, a persisted mapping can
 // fall outside it and the kubelet refuses to start. The error is all the
-// operator gets, so it has to name the pod, the file and both ranges.
+// operator gets, so it has to name the pod and both ranges and say to drain
+// the node. It must not point at the mapping file: the pod may still be
+// running on those IDs, so deleting the file is not a fix.
 func TestMakeUserNsManagerMappingOutsideRange(t *testing.T) {
 	logger, _ := ktesting.NewTestContext(t)
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.UserNamespacesSupport, true)
@@ -582,9 +584,10 @@ func TestMakeUserNsManagerMappingOutsideRange(t *testing.T) {
 			}
 			_, err := MakeUserNsManager(logger, kl, nil)
 			require.Error(t, err)
-			for _, want := range []string{`"pod-a"`, mappingPath, "out of range", tc.wantMapping, tc.wantRange} {
+			for _, want := range []string{`"pod-a"`, "out of range", tc.wantMapping, tc.wantRange, "drain the node"} {
 				assert.ErrorContains(t, err, want)
 			}
+			assert.NotContains(t, err.Error(), mappingPath)
 		})
 	}
 }
