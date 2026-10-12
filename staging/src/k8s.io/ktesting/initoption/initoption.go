@@ -38,6 +38,8 @@ type InitOption func(c *internal.InitConfig)
 //	    tCtx := ktesting.Init(b, initoption.PerTestOutput(false))
 //	    // ...
 //	}
+//
+// Sub-tests inherit this setting from their parent.
 func PerTestOutput(enabled bool) InitOption {
 	return func(c *internal.InitConfig) {
 		c.PerTestOutput = enabled
@@ -59,9 +61,26 @@ func PerTestOutput(enabled bool) InitOption {
 //	    log := underlier.GetBuffer().Data()
 //	    // Check log entries...
 //	}
+//
+// Sub-tests run with their own logger and do not write to the same buffer
+// as their parent.
 func BufferLogs(enabled bool) InitOption {
 	return func(c *internal.InitConfig) {
 		c.BufferLogs = enabled
+	}
+}
+
+// Verbosity overrides the effective verbosity threshold for the per-test
+// logger, regardless of the "-v" command line flag. This matches the
+// behavior of [k8s.io/klog/v2/ktesting.Verbosity]. It is useful for tests
+// which need to ensure that verbosity is predictable, for example for
+// testing log output with [BufferLogs].
+//
+// Sub-tests run with their own logger and do not inherit the modified
+// verbosity.
+func Verbosity(level int) InitOption {
+	return func(c *internal.InitConfig) {
+		c.Verbosity = &level
 	}
 }
 

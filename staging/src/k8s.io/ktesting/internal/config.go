@@ -22,4 +22,5 @@ type InitConfig struct {
 	PerTestOutput      bool
 	BufferLogs         bool
 	CleanupGracePeriod time.Duration // Zero means use the package default [DefaultCleanupGracePeriod].
+	Verbosity          *int          // Nil means use the "-v" command line flag as usual.
 }
