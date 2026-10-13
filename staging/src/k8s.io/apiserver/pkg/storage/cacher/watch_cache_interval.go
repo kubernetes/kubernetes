@@ -17,6 +17,7 @@ limitations under the License.
 package cacher
 
 import (
+	"errors"
 	"fmt"
 	"iter"
 	"sync"
@@ -24,6 +25,10 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/storage/cacher/store"
 )
+
+// errCacheIntervalInvalidated is returned by a cache-backed interval's Next
+// once the watch cache event history has moved past the interval's start.
+var errCacheIntervalInvalidated = errors.New("cache interval invalidated")
 
 // cacheIntervalSource provides the iteration logic for a watchCacheInterval.
 type cacheIntervalSource interface {
@@ -233,7 +238,7 @@ func (s *historyCacheIntervalSource) next() (*watchCacheEvent, error) {
 	defer s.lock.Unlock()
 
 	if valid := s.indexValidator(s.startIndex); !valid {
-		return nil, fmt.Errorf("cache interval invalidated, interval startIndex: %d", s.startIndex)
+		return nil, fmt.Errorf("%w, interval startIndex: %d", errCacheIntervalInvalidated, s.startIndex)
 	}
 
 	s.fillBuffer()
