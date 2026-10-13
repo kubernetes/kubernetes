@@ -1,6 +1,20 @@
 {
   "components": {
     "schemas": {
+      "io.k8s.api.scheduling.v1.TopologyConstraint": {
+        "description": "TopologyConstraint defines a topology constraint for a PodGroup.",
+        "properties": {
+          "key": {
+            "default": "",
+            "description": "key specifies the key of the node label representing the topology domain. All pods within the PodGroup must be colocated within the same domain instance. Different PodGroups can land on different domain instances even if they derive from the same PodGroupTemplate. Examples: \"topology.kubernetes.io/rack\"",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key"
+        ],
+        "type": "object"
+      },
       "io.k8s.api.scheduling.v1alpha3.AllCompositeDisruptionMode": {
         "description": "AllCompositeDisruptionMode means that children of a CompositePodGroup can only be disrupted or preempted together.",
         "type": "object"
@@ -159,7 +173,7 @@
           "topology": {
             "description": "topology defines the topology constraints for the composite pod group. Currently only a single topology constraint can be specified. This may change in the future.",
             "items": {
-              "$ref": "#/components/schemas/io.k8s.api.scheduling.v1alpha3.TopologyConstraint"
+              "$ref": "#/components/schemas/io.k8s.api.scheduling.v1.TopologyConstraint"
             },
             "type": "array",
             "x-kubernetes-list-type": "atomic"
@@ -536,7 +550,7 @@
           "topology": {
             "description": "topology defines the topology constraints for the pod group. Currently only a single topology constraint can be specified. This may change in the future.",
             "items": {
-              "$ref": "#/components/schemas/io.k8s.api.scheduling.v1alpha3.TopologyConstraint"
+              "$ref": "#/components/schemas/io.k8s.api.scheduling.v1.TopologyConstraint"
             },
             "type": "array",
             "x-kubernetes-list-type": "atomic"
@@ -753,20 +767,6 @@
       },
       "io.k8s.api.scheduling.v1alpha3.SingleDisruptionMode": {
         "description": "SingleDisruptionMode specifies that children can be disrupted independently.",
-        "type": "object"
-      },
-      "io.k8s.api.scheduling.v1alpha3.TopologyConstraint": {
-        "description": "TopologyConstraint defines a topology constraint for a PodGroup.",
-        "properties": {
-          "key": {
-            "default": "",
-            "description": "key specifies the key of the node label representing the topology domain. All pods within the PodGroup must be colocated within the same domain instance. Different PodGroups can land on different domain instances even if they derive from the same PodGroupTemplate. Examples: \"topology.kubernetes.io/rack\"",
-            "type": "string"
-          }
-        },
-        "required": [
-          "key"
-        ],
         "type": "object"
       },
       "io.k8s.api.scheduling.v1alpha3.TypedLocalObjectReference": {

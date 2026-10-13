@@ -18,6 +18,10 @@ limitations under the License.
 
 package v1alpha3
 
+import (
+	v1 "k8s.io/client-go/applyconfigurations/scheduling/v1"
+)
+
 // CompositePodGroupSchedulingConstraintsApplyConfiguration represents a declarative configuration of the CompositePodGroupSchedulingConstraints type for use
 // with apply.
 //
@@ -25,7 +29,7 @@ package v1alpha3
 type CompositePodGroupSchedulingConstraintsApplyConfiguration struct {
 	// topology defines the topology constraints for the composite pod group.
 	// Currently only a single topology constraint can be specified. This may change in the future.
-	Topology []TopologyConstraintApplyConfiguration `json:"topology,omitempty"`
+	Topology []v1.TopologyConstraintApplyConfiguration `json:"topology,omitempty"`
 }
 
 // CompositePodGroupSchedulingConstraintsApplyConfiguration constructs a declarative configuration of the CompositePodGroupSchedulingConstraints type for use with
@@ -37,7 +41,7 @@ func CompositePodGroupSchedulingConstraints() *CompositePodGroupSchedulingConstr
 // WithTopology adds the given value to the Topology field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the Topology field.
-func (b *CompositePodGroupSchedulingConstraintsApplyConfiguration) WithTopology(values ...*TopologyConstraintApplyConfiguration) *CompositePodGroupSchedulingConstraintsApplyConfiguration {
+func (b *CompositePodGroupSchedulingConstraintsApplyConfiguration) WithTopology(values ...*v1.TopologyConstraintApplyConfiguration) *CompositePodGroupSchedulingConstraintsApplyConfiguration {
 	for i := range values {
 		if values[i] == nil {
 			panic("nil value passed to WithTopology")
