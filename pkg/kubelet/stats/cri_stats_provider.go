@@ -925,9 +925,10 @@ func makePSIStats(stats *runtimeapi.PsiStats) *statsapi.PSIStats {
 		return nil
 	}
 	result := &statsapi.PSIStats{}
+	// CRI totals are nanoseconds; the summary API uses the kernel's microseconds.
 	if stats.Full != nil {
 		result.Full = statsapi.PSIData{
-			Total:  stats.Full.Total,
+			Total:  stats.Full.Total / uint64(time.Microsecond),
 			Avg10:  stats.Full.Avg10,
 			Avg60:  stats.Full.Avg60,
 			Avg300: stats.Full.Avg300,
@@ -935,7 +936,7 @@ func makePSIStats(stats *runtimeapi.PsiStats) *statsapi.PSIStats {
 	}
 	if stats.Some != nil {
 		result.Some = statsapi.PSIData{
-			Total:  stats.Some.Total,
+			Total:  stats.Some.Total / uint64(time.Microsecond),
 			Avg10:  stats.Some.Avg10,
 			Avg60:  stats.Some.Avg60,
 			Avg300: stats.Some.Avg300,

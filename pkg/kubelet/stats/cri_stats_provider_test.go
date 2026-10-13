@@ -97,6 +97,49 @@ const (
 
 const testPodLogDirectory = "/var/log/kube/pods/" // Use non-default path to ensure stats are collected properly
 
+func TestMakePSIStats(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KubeletPSI, true)
+	tests := []struct {
+		name  string
+		input *runtimeapi.PsiStats
+		want  *statsapi.PSIStats
+	}{
+		{name: "nil"},
+		{name: "empty", input: &runtimeapi.PsiStats{}, want: &statsapi.PSIStats{}},
+		{
+			name:  "some below one microsecond",
+			input: &runtimeapi.PsiStats{Some: &runtimeapi.PsiData{Total: 999}},
+			want:  &statsapi.PSIStats{},
+		},
+		{
+			name:  "full truncates fractional microseconds",
+			input: &runtimeapi.PsiStats{Full: &runtimeapi.PsiData{Total: 1234999, Avg10: 1.25, Avg60: 2.5, Avg300: 3.75}},
+			want:  &statsapi.PSIStats{Full: statsapi.PSIData{Total: 1234, Avg10: 1.25, Avg60: 2.5, Avg300: 3.75}},
+		},
+		{
+			name: "full and some",
+			input: &runtimeapi.PsiStats{
+				Full: &runtimeapi.PsiData{Total: 1000, Avg10: 1, Avg60: 2, Avg300: 3},
+				Some: &runtimeapi.PsiData{Total: 2000000, Avg10: 4, Avg60: 5, Avg300: 6},
+			},
+			want: &statsapi.PSIStats{
+				Full: statsapi.PSIData{Total: 1, Avg10: 1, Avg60: 2, Avg300: 3},
+				Some: statsapi.PSIData{Total: 2000, Avg10: 4, Avg60: 5, Avg300: 6},
+			},
+		},
+		{
+			name:  "maximum counter",
+			input: &runtimeapi.PsiStats{Some: &runtimeapi.PsiData{Total: ^uint64(0)}},
+			want:  &statsapi.PSIStats{Some: statsapi.PSIData{Total: 18446744073709551}},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			assert.Equal(t, test.want, makePSIStats(test.input))
+		})
+	}
+}
+
 func TestCRIListPodStats(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KubeletPSI, true)
 	tCtx := ktesting.Init(t)
@@ -1082,7 +1125,7 @@ func getCRITestPSIStats(seed int) *runtimeapi.PsiStats {
 
 func getCRITestPSIData(seed int) *runtimeapi.PsiData {
 	return &runtimeapi.PsiData{
-		Total:  uint64(seed + offsetPSIDataTotal),
+		Total:  uint64(seed+offsetPSIDataTotal) * uint64(time.Microsecond),
 		Avg10:  float64(10),
 		Avg60:  float64(10),
 		Avg300: float64(10),
