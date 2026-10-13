@@ -55,6 +55,7 @@ const (
 	TriggerReasonPodsAdded     = "pods_added"
 	TriggerReasonPodsRemoved   = "pods_removed"
 	TriggerReasonPodTerminated = "pod_terminated"
+	TriggerReasonNodeUpdated   = "node_updated"
 
 	triggerReasonPeriodic = "periodic_retry"
 )
