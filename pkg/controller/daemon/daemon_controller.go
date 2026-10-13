@@ -1247,8 +1247,11 @@ func (dsc *DaemonSetsController) updateDaemonSetStatus(ctx context.Context, ds *
 			if err != nil {
 				generation = nil
 			}
-			if util.IsPodUpdated(pod, hash, generation) {
-				updatedNumberScheduled++
+			for _, daemonPod := range daemonPods {
+				if util.IsPodUpdated(daemonPod, hash, generation) {
+					updatedNumberScheduled++
+					break
+				}
 			}
 		} else {
 			if scheduled {

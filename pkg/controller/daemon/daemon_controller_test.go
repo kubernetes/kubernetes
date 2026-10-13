@@ -1640,6 +1640,79 @@ func TestNodeAffinityDaemonLaunchesPods(t *testing.T) {
 	}
 }
 
+func TestUpdatedNumberScheduledDuringSurge(t *testing.T) {
+	tests := []struct {
+		name        string
+		oldPod      bool
+		newPods     int
+		wantUpdated int32
+		wantReady   int32
+	}{
+		{name: "old revision only", oldPod: true, wantReady: 1},
+		{name: "new revision while old pod terminates", oldPod: true, newPods: 1, wantUpdated: 1, wantReady: 1},
+		{name: "multiple updated pods count once per node", oldPod: true, newPods: 2, wantUpdated: 1, wantReady: 1},
+		{name: "updated pod only", newPods: 1, wantUpdated: 1},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			ds := newDaemonSet("foo")
+			ds.Spec.UpdateStrategy = *newRollingUpdateStrategy()
+			surge := intstr.FromInt32(1)
+			unavailable := intstr.FromInt32(0)
+			ds.Spec.UpdateStrategy.RollingUpdate.MaxSurge = &surge
+			ds.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable = &unavailable
+			_, ctx := ktesting.NewTestContext(t)
+			manager, _, clientset, err := newTestController(ctx, ds)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var updated *apps.DaemonSet
+			clientset.PrependReactor("update", "daemonsets", func(action core.Action) (bool, runtime.Object, error) {
+				if action.GetSubresource() == "status" {
+					updated = action.(core.UpdateAction).GetObject().(*apps.DaemonSet)
+				}
+				return false, nil, nil
+			})
+			node := newNode("node-0", simpleNodeLabel)
+			if test.oldPod {
+				pod := newPod("old-", node.Name, simpleDaemonSetLabel, ds)
+				pod.Labels[apps.DefaultDaemonSetUniqueLabelKey] = "old-hash"
+				pod.CreationTimestamp = metav1.NewTime(time.Unix(1, 0))
+				deletionTime := metav1.NewTime(time.Unix(3, 0))
+				pod.DeletionTimestamp = &deletionTime
+				pod.Status.Phase = v1.PodRunning
+				pod.Status.Conditions = []v1.PodCondition{{Type: v1.PodReady, Status: v1.ConditionTrue}}
+				if err := manager.podStore.Add(pod); err != nil {
+					t.Fatal(err)
+				}
+			}
+			for i := 0; i < test.newPods; i++ {
+				pod := newPod("updated-", node.Name, simpleDaemonSetLabel, ds)
+				pod.CreationTimestamp = metav1.NewTime(time.Unix(2, 0))
+				if err := manager.podStore.Add(pod); err != nil {
+					t.Fatal(err)
+				}
+			}
+			hash := controller.ComputeHash(&ds.Spec.Template, ds.Status.CollisionCount)
+			if err := manager.updateDaemonSetStatus(ctx, ds, []*v1.Node{node}, hash, false); err != nil {
+				t.Fatal(err)
+			}
+			if updated == nil {
+				t.Fatal("DaemonSet status was not updated")
+			}
+			if updated.Status.UpdatedNumberScheduled != test.wantUpdated {
+				t.Errorf("UpdatedNumberScheduled = %d, want %d", updated.Status.UpdatedNumberScheduled, test.wantUpdated)
+			}
+			if updated.Status.NumberReady != test.wantReady {
+				t.Errorf("NumberReady = %d, want %d", updated.Status.NumberReady, test.wantReady)
+			}
+			if updated.Status.CurrentNumberScheduled != 1 {
+				t.Errorf("CurrentNumberScheduled = %d, want 1", updated.Status.CurrentNumberScheduled)
+			}
+		})
+	}
+}
+
 func TestNumberReadyStatus(t *testing.T) {
 	for _, strategy := range updateStrategies() {
 		ds := newDaemonSet("foo")
