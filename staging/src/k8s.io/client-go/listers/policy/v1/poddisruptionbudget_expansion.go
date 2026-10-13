@@ -37,24 +37,17 @@ type PodDisruptionBudgetNamespaceListerExpansion interface{}
 
 // GetPodPodDisruptionBudgets returns a list of PodDisruptionBudgets matching a pod.
 func (s *podDisruptionBudgetLister) GetPodPodDisruptionBudgets(pod *v1.Pod) ([]*policy.PodDisruptionBudget, error) {
-	var selector labels.Selector
-
 	list, err := s.PodDisruptionBudgets(pod.Namespace).List(labels.Everything())
 	if err != nil {
 		return nil, err
 	}
 
+	podLabels := labels.Set(pod.Labels)
 	var pdbList []*policy.PodDisruptionBudget
 	for i := range list {
 		pdb := list[i]
-		selector, err = metav1.LabelSelectorAsSelector(pdb.Spec.Selector)
-		if err != nil {
-			// This object has an invalid selector, it does not match the pod
-			continue
-		}
-
 		// Unlike the v1beta version, here we let an empty selector match everything.
-		if !selector.Matches(labels.Set(pod.Labels)) {
+		if !metav1.LabelSelectorMatches(pdb.Spec.Selector, podLabels) {
 			continue
 		}
 		pdbList = append(pdbList, pdb)

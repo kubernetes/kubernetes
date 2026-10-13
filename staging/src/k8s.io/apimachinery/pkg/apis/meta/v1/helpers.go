@@ -73,6 +73,26 @@ func LabelSelectorAsSelector(ps *LabelSelector) (labels.Selector, error) {
 	return selector, nil
 }
 
+// LabelSelectorMatches reports whether ps matches ls. The result is the same as
+// converting ps with LabelSelectorAsSelector and calling Matches on it: a nil
+// selector matches nothing, an empty selector matches everything, and an
+// invalid selector matches nothing.
+//
+// matchLabels are compared before ps is converted, so a selector that doesn't
+// match is rejected without allocating. Use it when matching many selectors
+// against one label set.
+func LabelSelectorMatches(ps *LabelSelector, ls labels.Labels) bool {
+	if ps == nil {
+		return false
+	}
+	// Prefilter only: matchLabels aren't validated yet, LabelSelectorAsSelector does that below.
+	if !labels.ValidatedSetSelector(ps.MatchLabels).Matches(ls) {
+		return false
+	}
+	s, err := LabelSelectorAsSelector(ps)
+	return err == nil && s.Matches(ls)
+}
+
 // LabelSelectorAsMap converts the LabelSelector api type into a map of strings, ie. the
 // original structure of a label selector. Operators that cannot be converted into plain
 // labels (Exists, DoesNotExist, NotIn, and In with more than one value) will result in
