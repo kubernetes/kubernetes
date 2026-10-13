@@ -90,9 +90,10 @@ func ShouldDelegateResourceToDRA(rName v1.ResourceName, nodeInfo fwk.NodeInfo, d
 func ComputePodResourceRequest(pod *v1.Pod, opts ResourceRequestsOptions) framework.Resource {
 	// pod hasn't scheduled yet so we don't need to worry about InPlacePodVerticalScalingEnabled
 	reqs := resource.PodRequests(pod, resource.PodResourcesOptions{
-		// SkipPodLevelResources is set to false when PodLevelResources feature is enabled.
-		SkipPodLevelResources:                    !opts.EnablePodLevelResources,
-		UseDRANodeAllocatableResourceClaimStatus: opts.EnableDRANodeAllocatableResources,
+		Features: resource.Features{
+			PodLevelResources:           opts.EnablePodLevelResources,
+			DRANodeAllocatableResources: opts.EnableDRANodeAllocatableResources,
+		},
 	})
 	var result framework.Resource
 	result.SetMaxResource(reqs)

@@ -223,9 +223,10 @@ func (m *qosContainerManagerImpl) setCPUCgroupConfig(configs map[v1.PodQOSClass]
 		draNodeAllocatableEnabled := utilfeature.DefaultFeatureGate.Enabled(kubefeatures.DRANodeAllocatableResources)
 		req := resource.PodRequests(pod, resource.PodResourcesOptions{
 			Reuse: reuseReqs,
-			// SkipPodLevelResources is set to false when PodLevelResources feature is enabled.
-			SkipPodLevelResources:                    !utilfeature.DefaultFeatureGate.Enabled(kubefeatures.PodLevelResources),
-			UseDRANodeAllocatableResourceClaimStatus: draNodeAllocatableEnabled,
+			Features: resource.Features{
+				PodLevelResources:           utilfeature.DefaultFeatureGate.Enabled(kubefeatures.PodLevelResources),
+				DRANodeAllocatableResources: draNodeAllocatableEnabled,
+			},
 		})
 		if request, found := req[v1.ResourceCPU]; found {
 			burstablePodCPURequest += request.MilliValue()
@@ -262,8 +263,10 @@ func (m *qosContainerManagerImpl) getQoSMemoryRequests() map[v1.PodQOSClass]int6
 		}
 		draNodeAllocatableEnabled := utilfeature.DefaultFeatureGate.Enabled(kubefeatures.DRANodeAllocatableResources)
 		req := resource.PodRequests(pod, resource.PodResourcesOptions{
-			Reuse:                                    reuseReqs,
-			UseDRANodeAllocatableResourceClaimStatus: draNodeAllocatableEnabled,
+			Reuse: reuseReqs,
+			Features: resource.Features{
+				DRANodeAllocatableResources: draNodeAllocatableEnabled,
+			},
 		})
 		if request, found := req[v1.ResourceMemory]; found {
 			podMemoryRequest += request.Value()

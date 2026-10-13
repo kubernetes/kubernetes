@@ -35,33 +35,62 @@ const (
 	InitContainers
 )
 
+// Features contains feature gate flags used by the resource helpers.
+type Features struct {
+	PodLevelResources                       bool
+	InPlacePodVerticalScaling               bool
+	InPlacePodLevelResourcesVerticalScaling bool
+	DRANodeAllocatableResources             bool
+}
+
+// AllFeatures returns a Features struct with all features enabled.
+func AllFeatures() Features {
+	return Features{
+		PodLevelResources:                       true,
+		InPlacePodVerticalScaling:               true,
+		InPlacePodLevelResourcesVerticalScaling: true,
+		DRANodeAllocatableResources:             true,
+	}
+}
+
 // PodResourcesOptions controls the behavior of PodRequests and PodLimits.
 type PodResourcesOptions struct {
 	// Reuse, if provided will be reused to accumulate resources and returned by the PodRequests or PodLimits
 	// functions. All existing values in Reuse will be lost.
 	Reuse v1.ResourceList
-	// UseStatusResources indicates whether resources reported by the PodStatus should be considered
-	// when evaluating the pod resources. This MUST be false if the InPlacePodVerticalScaling
-	// feature is not enabled.
+	// UseStatusResources indicates whether resize state reported in the PodStatus (allocated
+	// resources for pending resizes, and actuated container/pod resources for in-progress
+	// resizes) should be considered when evaluating the pod resources, assuming the relevant
+	// vertical scaling feature gates (InPlacePodVerticalScaling, InPlacePodLevelResourcesVerticalScaling)
+	// are enabled in Features. It does not affect DRA node allocatable resources.
 	UseStatusResources bool
-	// InPlacePodLevelResourcesVerticalScalingEnabled indicates whether resources reported by the
-	// PodStatus should be considered when evaluating the pod resources.
-	// This MUST be false if the InPlacePodLevelResourcesVerticalScaling
-	// feature is not enabled.
-	InPlacePodLevelResourcesVerticalScalingEnabled bool
 	// ExcludeOverhead controls if pod overhead is excluded from the calculation.
 	ExcludeOverhead bool
 	// NonMissingContainerRequests if provided will replace any missing container level requests for the specified resources
 	// with the given values.  If the requests for those resources are explicitly set, even if zero, they will not be modified.
 	NonMissingContainerRequests v1.ResourceList
-	// SkipPodLevelResources controls whether pod-level resources should be skipped
-	// from the calculation. If pod-level resources are not set in PodSpec,
-	// pod-level resources will always be skipped.
-	SkipPodLevelResources bool
-	// SkipContainerLevelResources
-	SkipContainerLevelResources bool
-	// Use node allocatable resource claim information from pod status to compute the effective pod resource request.
-	UseDRANodeAllocatableResourceClaimStatus bool
+	// ExcludeContainerLevelResources controls whether aggregated container-level requests are
+	// excluded from the PodRequests calculation, so only pod-level requests (if set and enabled)
+	// and overhead are counted.
+	ExcludeContainerLevelResources bool
+	// Features contains the feature gate flags used when evaluating pod resources.
+	Features Features
+}
+
+// useStatusResources returns true if container status resources should be considered.
+func (o PodResourcesOptions) useStatusResources() bool {
+	return o.UseStatusResources && o.Features.InPlacePodVerticalScaling
+}
+
+// usePodLevelStatusResources returns true if pod-level status resources should be considered.
+func (o PodResourcesOptions) usePodLevelStatusResources() bool {
+	return o.useStatusResources() && o.Features.InPlacePodLevelResourcesVerticalScaling
+}
+
+// includeDRANodeAllocatableResources returns true if node allocatable resources allocated
+// through DRA claims should be included.
+func (o PodResourcesOptions) includeDRANodeAllocatableResources() bool {
+	return o.Features.DRANodeAllocatableResources
 }
 
 var supportedPodLevelResources = sets.New(v1.ResourceCPU, v1.ResourceMemory)
@@ -151,13 +180,13 @@ func IsPodLevelLimitsSet(pod *v1.Pod) bool {
 // The computation is part of the API and must be reviewed as an API change.
 func PodRequests(pod *v1.Pod, opts PodResourcesOptions) v1.ResourceList {
 	reqs := v1.ResourceList{}
-	if !opts.SkipContainerLevelResources {
+	if !opts.ExcludeContainerLevelResources {
 		reqs = AggregateContainerRequests(pod, opts)
 	}
 
-	if !opts.SkipPodLevelResources && IsPodLevelRequestsSet(pod) {
+	if opts.Features.PodLevelResources && IsPodLevelRequestsSet(pod) {
 		effectiveReqs := pod.Spec.Resources.Requests
-		if opts.InPlacePodLevelResourcesVerticalScalingEnabled && opts.UseStatusResources && pod.Status.Resources != nil {
+		if opts.usePodLevelStatusResources() && pod.Status.Resources != nil {
 			effectiveReqs = effectivePodLevelResources(pod, pod.Spec.Resources.Requests, pod.Status.Resources.Requests, pod.Status.AllocatedResources)
 		}
 
@@ -233,14 +262,15 @@ func isRestartableInitContainer(container *v1.Container) bool {
 }
 
 func aggregateContainerResourcesByFn(pod *v1.Pod, opts PodResourcesOptions, getResourceList func(container *v1.Container, containerStatus *v1.ContainerStatus, isResizeInfeasible bool) v1.ResourceList) v1.ResourceList {
+	useStatusResources := opts.useStatusResources()
 	var isResizeInfeasible bool
-	if opts.UseStatusResources {
+	if useStatusResources {
 		isResizeInfeasible = IsPodResizeInfeasible(pod)
 	}
 	result := v1.ResourceList{}
 	for _, container := range pod.Spec.Containers {
 		var cs *v1.ContainerStatus
-		if opts.UseStatusResources {
+		if useStatusResources {
 			cs = findContainerStatus(pod, container.Name)
 		}
 		containerResources := getResourceList(&container, cs, isResizeInfeasible)
@@ -261,7 +291,7 @@ func aggregateContainerResourcesByFn(pod *v1.Pod, opts PodResourcesOptions, getR
 	// See https://github.com/kubernetes/enhancements/tree/master/keps/sig-node/753-sidecar-containers#exposing-pod-resource-requirements for the detail.
 	for _, container := range pod.Spec.InitContainers {
 		var cs *v1.ContainerStatus
-		if opts.UseStatusResources {
+		if useStatusResources {
 			cs = findContainerStatus(pod, container.Name)
 		}
 		containerResources := getResourceList(&container, cs, isResizeInfeasible)
@@ -295,7 +325,7 @@ func aggregateContainerResourcesByFn(pod *v1.Pod, opts PodResourcesOptions, getR
 func AggregateContainerRequests(pod *v1.Pod, opts PodResourcesOptions) v1.ResourceList {
 	// attempt to reuse the maps if passed, or allocate otherwise
 	reqs := reuseOrClearResourceList(opts.Reuse)
-	if !opts.UseStatusResources {
+	if !opts.useStatusResources() {
 		addResourceList(reqs, aggregateContainerResourcesByFn(pod, opts, containerSpecRequests))
 		addDRANodeAllocatableClaimResources(reqs, pod, opts)
 	} else {
@@ -307,7 +337,7 @@ func AggregateContainerRequests(pod *v1.Pod, opts PodResourcesOptions) v1.Resour
 		// When unpopulated (e.g., at creation time or when feature gates are disabled), we fall back to container status aggregation.
 		// Once InPlacePodLevelResourcesVerticalScaling and InPlacePodVerticalScaling are GA and feature gates are removed,
 		// container-level fallback becomes redundant because max(spec, actuated, allocated) naturally evaluates to spec at creation time.
-		if opts.InPlacePodLevelResourcesVerticalScalingEnabled && pod.Status.AllocatedResources != nil && pod.Status.Resources != nil && pod.Status.Resources.Requests != nil {
+		if opts.usePodLevelStatusResources() && pod.Status.AllocatedResources != nil && pod.Status.Resources != nil && pod.Status.Resources.Requests != nil {
 			allocatedReqs = pod.Status.AllocatedResources
 			actuatedReqs = pod.Status.Resources.Requests
 			// DRA values are not added to allocatedReqs and actuatedReqs because
@@ -388,9 +418,9 @@ func containerActuatedLimits(c *v1.Container, cs *v1.ContainerStatus, isResizeIn
 func PodLimits(pod *v1.Pod, opts PodResourcesOptions) v1.ResourceList {
 	// attempt to reuse the maps if passed, or allocate otherwise
 	limits := AggregateContainerLimits(pod, opts)
-	if !opts.SkipPodLevelResources && IsPodLevelResourcesSet(pod) {
+	if opts.Features.PodLevelResources && IsPodLevelResourcesSet(pod) {
 		effectiveLims := pod.Spec.Resources.Limits
-		if opts.InPlacePodLevelResourcesVerticalScalingEnabled && opts.UseStatusResources && pod.Status.Resources != nil {
+		if opts.usePodLevelStatusResources() && pod.Status.Resources != nil {
 			effectiveLims = effectivePodLevelResources(pod, pod.Spec.Resources.Limits, pod.Status.Resources.Limits)
 		}
 		applyPodLevelResources(limits, effectiveLims)
@@ -445,7 +475,7 @@ func AggregateContainerLimits(pod *v1.Pod, opts PodResourcesOptions) v1.Resource
 	opts.NonMissingContainerRequests = nil
 	// attempt to reuse the maps if passed, or allocate otherwise
 	limits := reuseOrClearResourceList(opts.Reuse)
-	if !opts.UseStatusResources {
+	if !opts.useStatusResources() {
 		addResourceList(limits, aggregateContainerResourcesByFn(pod, opts, containerSpecLimits))
 		limits = addDRANodeAllocatableLimits(limits, pod, opts)
 	} else {
@@ -457,7 +487,7 @@ func AggregateContainerLimits(pod *v1.Pod, opts PodResourcesOptions) v1.Resource
 		// When unpopulated (e.g., at creation time or when feature gates are disabled), we fall back to container status aggregation.
 		// Once InPlacePodLevelResourcesVerticalScaling and InPlacePodVerticalScaling are GA and feature gates are removed,
 		// container-level fallback becomes redundant because max(spec, actuated) naturally evaluates to spec at creation time.
-		if opts.InPlacePodLevelResourcesVerticalScalingEnabled && pod.Status.Resources != nil && pod.Status.Resources.Limits != nil {
+		if opts.usePodLevelStatusResources() && pod.Status.Resources != nil && pod.Status.Resources.Limits != nil {
 			actuatedLimits = pod.Status.Resources.Limits
 			// Kubelet includes DRA values when populating pod limits. Since pod.Status.Resources.Limits is updated based on cgroup settings, it already contains DRA values, so we should not add them again here.
 		} else {
@@ -574,7 +604,7 @@ func addDRANodeAllocatableLimits(specLimits v1.ResourceList, pod *v1.Pod, opts P
 }
 
 func addDRANodeAllocatableClaimResources(resources v1.ResourceList, pod *v1.Pod, opts PodResourcesOptions) {
-	if opts.UseDRANodeAllocatableResourceClaimStatus && len(pod.Status.NodeAllocatableResourceClaimStatuses) > 0 {
+	if opts.includeDRANodeAllocatableResources() && len(pod.Status.NodeAllocatableResourceClaimStatuses) > 0 {
 		for _, claimStatus := range pod.Status.NodeAllocatableResourceClaimStatuses {
 			// TODO(pravk03): Handle claim references by init containers and peak resource calculation based on that.
 			// Currently, any DRA allocation is always added into the pod footprint.

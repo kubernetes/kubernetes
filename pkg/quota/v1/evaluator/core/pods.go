@@ -399,9 +399,11 @@ func PodUsageFunc(obj runtime.Object, clock clock.Clock) (corev1.ResourceList, e
 	}
 
 	opts := resourcehelper.PodResourcesOptions{
-		UseStatusResources: feature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling),
-		// SkipPodLevelResources is set to false when PodLevelResources feature is enabled.
-		SkipPodLevelResources: !feature.DefaultFeatureGate.Enabled(features.PodLevelResources),
+		UseStatusResources: true,
+		Features: resourcehelper.Features{
+			InPlacePodVerticalScaling: feature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling),
+			PodLevelResources:         feature.DefaultFeatureGate.Enabled(features.PodLevelResources),
+		},
 	}
 	requests := resourcehelper.PodRequests(pod, opts)
 	limits := resourcehelper.PodLimits(pod, opts)

@@ -171,18 +171,20 @@ func ResourceConfigForPod(allocatedPod *v1.Pod, enforceCPULimits bool, cpuPeriod
 	draNodeAllocatableEnabled := utilfeature.DefaultFeatureGate.Enabled(kubefeatures.DRANodeAllocatableResources)
 	// sum requests and limits.
 	reqs := resourcehelper.PodRequests(allocatedPod, resourcehelper.PodResourcesOptions{
-		// SkipPodLevelResources is set to false when PodLevelResources feature is enabled.
-		SkipPodLevelResources:                    !podLevelResourcesEnabled,
-		UseStatusResources:                       false,
-		UseDRANodeAllocatableResourceClaimStatus: draNodeAllocatableEnabled,
+		UseStatusResources: false,
+		Features: resourcehelper.Features{
+			PodLevelResources:           podLevelResourcesEnabled,
+			DRANodeAllocatableResources: draNodeAllocatableEnabled,
+		},
 	})
 	// PodLimits() omits a cpu or memory limit that is not declared by every container (or
 	// at the pod level), so presence in the map below doubles as the "limits declared"
 	// signal.
 	limits := resourcehelper.PodLimits(allocatedPod, resourcehelper.PodResourcesOptions{
-		// SkipPodLevelResources is set to false when PodLevelResources feature is enabled.
-		SkipPodLevelResources:                    !podLevelResourcesEnabled,
-		UseDRANodeAllocatableResourceClaimStatus: draNodeAllocatableEnabled,
+		Features: resourcehelper.Features{
+			PodLevelResources:           podLevelResourcesEnabled,
+			DRANodeAllocatableResources: draNodeAllocatableEnabled,
+		},
 	})
 
 	// map hugepage pagesize (bytes) to limits (bytes)
