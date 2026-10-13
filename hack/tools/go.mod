@@ -11,6 +11,7 @@ require (
 )
 
 require (
+	github.com/aarzilli/whydeadcode v0.0.0-20260303092945-8d908f77de3a // indirect
 	github.com/aojea/sloppy-netparser v0.0.0-20210819230639-a7bbdb117ea5 // indirect
 	github.com/bitfield/gotestdox v0.2.2 // indirect
 	github.com/brunoga/deep v1.3.1 // indirect
@@ -63,6 +64,7 @@ require (
 )
 
 tool (
+	github.com/aarzilli/whydeadcode
 	github.com/aojea/sloppy-netparser
 	github.com/cespare/prettybench
 	github.com/golangci/misspell

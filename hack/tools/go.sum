@@ -1,3 +1,5 @@
+github.com/aarzilli/whydeadcode v0.0.0-20260303092945-8d908f77de3a h1:qHtQIeFjOta2EylF59J2UJxZrYT0dCprYXe399PO8xw=
+github.com/aarzilli/whydeadcode v0.0.0-20260303092945-8d908f77de3a/go.mod h1:rHV6WbQI4oOtjbl+J0d9UYVs8eBU9bqZIp9UB5QACiQ=
 github.com/aojea/sloppy-netparser v0.0.0-20210819230639-a7bbdb117ea5 h1:RTX0fCKlAKB5QNgbwE+ccwHzCer7te0WadlFn9mTyDI=
 github.com/aojea/sloppy-netparser v0.0.0-20210819230639-a7bbdb117ea5/go.mod h1:mvGhtsRJ93QhZrMOx+PJt/6+HDM7l2rrz/Mn5bkdL5c=
 github.com/bitfield/gotestdox v0.2.2 h1:x6RcPAbBbErKLnapz1QeAlf3ospg8efBsedU93CDsnE=
