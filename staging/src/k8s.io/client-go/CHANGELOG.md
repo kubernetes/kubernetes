@@ -4,6 +4,19 @@ Go API changes are typically not included in the Kubernetes release notes, so
 noteworthy Go API changes *may* be documented here. This is currently not
 *required*, so consult the git history to see all changes.
 
+### Add informer initialization duration metric
+
+`cache.InformerMetricsProvider` now requires
+`NewInitializationDurationMetric(InformerNameAndResource) HistogramMetric`.
+This affects only custom implementations of the exported metrics-provider
+interface; ordinary client-go informer users do not call this method. Custom
+providers must implement it, and may return a no-op `HistogramMetric` when
+they do not publish the initialization-duration metric.
+
+```
+- ./tools/cache.InformerMetricsProvider.NewInitializationDurationMetric: added
+```
+
 ### Dynamic shared informer factory: add StartWithContext
 
 The same change was made earlier for the type informer factory:

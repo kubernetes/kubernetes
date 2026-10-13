@@ -846,6 +846,8 @@ func (s *sharedIndexInformer) RunWithContext(ctx context.Context) {
 		logger.Info("Warning: the sharedIndexInformer has started, run more than once is not allowed")
 		return
 	}
+	initializationStart := s.clock.Now()
+	metrics := newInitializationMetrics(s.identifier, s.informerMetricsProvider)
 
 	func() {
 		s.startedLock.Lock()
@@ -892,6 +894,7 @@ func (s *sharedIndexInformer) RunWithContext(ctx context.Context) {
 			// We were stopped without completing the sync.
 		case <-s.controller.HasSyncedChecker().Done():
 			// Controller has synced and thus so have we.
+			metrics.initializationDuration.Observe(s.clock.Since(initializationStart).Seconds())
 			close(s.synced)
 		}
 	})

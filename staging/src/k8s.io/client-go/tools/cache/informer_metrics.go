@@ -56,12 +56,23 @@ type InformerMetricsProvider interface {
 	// The returned metric should check id.Reserved() before updating to support
 	// dynamic informers that may shut down while the process is still running.
 	NewStoreResourceVersionMetric(id InformerNameAndResource) GaugeMetric
+
+	// NewInitializationDurationMetric measures seconds from SharedIndexInformer.Run
+	// until its first cache sync, including retries and LIST fallback. It excludes
+	// asynchronous handler delivery. Returned metrics must check id.Reserved()
+	// before observing to suppress updates after identity release.
+	NewInitializationDurationMetric(id InformerNameAndResource) HistogramMetric
 }
 
 // fifoMetrics holds all metrics for a FIFO.
 type fifoMetrics struct {
 	numberOfQueuedItem GaugeMetric
 	processingLatency  HistogramMetric
+}
+
+// initializationMetrics holds metrics for informer initialization.
+type initializationMetrics struct {
+	initializationDuration HistogramMetric
 }
 
 // storeMetrics holds all metrics for a store.
@@ -94,6 +105,21 @@ func newFIFOMetrics(id InformerNameAndResource, metricsProvider InformerMetricsP
 	return metrics
 }
 
+func newInitializationMetrics(id InformerNameAndResource, metricsProvider InformerMetricsProvider) *initializationMetrics {
+	if metricsProvider == nil {
+		metricsProvider = globalInformerMetricsProvider
+	}
+	metrics := &initializationMetrics{
+		initializationDuration: noopMetric{},
+	}
+
+	if id.Reserved() {
+		metrics.initializationDuration = metricsProvider.NewInitializationDurationMetric(id)
+	}
+
+	return metrics
+}
+
 func newStoreMetrics(id InformerNameAndResource, metricsProvider InformerMetricsProvider) *storeMetrics {
 	if metricsProvider == nil {
 		metricsProvider = globalInformerMetricsProvider
@@ -118,5 +144,9 @@ func (noopInformerMetricsProvider) NewProcessingLatencyMetric(InformerNameAndRes
 }
 
 func (noopInformerMetricsProvider) NewStoreResourceVersionMetric(InformerNameAndResource) GaugeMetric {
+	return noopMetric{}
+}
+
+func (noopInformerMetricsProvider) NewInitializationDurationMetric(InformerNameAndResource) HistogramMetric {
 	return noopMetric{}
 }

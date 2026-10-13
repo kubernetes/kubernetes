@@ -501,6 +501,14 @@ func (p *testInformerMetricsProvider) NewStoreResourceVersionMetric(id cache.Inf
 	return p.storeResourceVersion.WithLabelValues(id.Name(), id.GroupVersionResource().Group, id.GroupVersionResource().Version, id.GroupVersionResource().Resource)
 }
 
+func (p *testInformerMetricsProvider) NewInitializationDurationMetric(id cache.InformerNameAndResource) cache.HistogramMetric {
+	return noopHistogramMetric{}
+}
+
+type noopHistogramMetric struct{}
+
+func (noopHistogramMetric) Observe(float64) {}
+
 func verifyQueuedItems(t *testing.T, metricsProvider *testInformerMetricsProvider, informerName string, gvr schema.GroupVersionResource, expected int) {
 	t.Helper()
 	want := fmt.Sprintf(`# HELP informer_queued_items [ALPHA] Number of items currently queued in the FIFO.
