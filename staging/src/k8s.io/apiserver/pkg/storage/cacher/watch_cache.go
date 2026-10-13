@@ -551,11 +551,19 @@ func (w *watchCache) notFresh(resourceVersion uint64) bool {
 }
 
 // WaitUntilFreshAndGet returns a pointers to <storeElement> object.
-func (w *watchCache) WaitUntilFreshAndGet(ctx context.Context, resourceVersion uint64, key string) (interface{}, bool, uint64, error) {
+func (w *watchCache) WaitUntilFreshAndGet(ctx context.Context, minResourceVersion uint64, key string) (interface{}, bool, uint64, error) {
 	span := tracing.SpanFromContext(ctx)
-	snap, readResourceVersion, _, err := w.waitAndGetLatestSnapshot(ctx, resourceVersion, nil)
-	if err != nil {
-		return nil, false, 0, err
+	var snap store.Snapshot
+	var readResourceVersion uint64
+	if minResourceVersion == 0 {
+		snap = w.storage.LatestSnapshot()
+		readResourceVersion = snap.ResourceVersion()
+	} else {
+		var err error
+		snap, readResourceVersion, _, err = w.waitAndGetLatestSnapshot(ctx, minResourceVersion, nil)
+		if err != nil {
+			return nil, false, 0, err
+		}
 	}
 	value, exists, err := snap.GetByKey(key)
 	if err != nil {
