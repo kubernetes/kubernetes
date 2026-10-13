@@ -623,7 +623,10 @@ func Validate_CompositePodGroupSpec(
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.IfOption(ctx, op, fldPath, obj, oldObj, "PodGroupPreemptionPolicy", false, validate.ForbiddenPointer).MarkShortCircuit(); len(e) != 0 {
+			if e := validate.IfOption(ctx, op, fldPath, obj, oldObj, "PodGroupPreemptionPolicy", false,
+				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *PreemptionPolicy) field.ErrorList {
+					return validate.ForbiddenPointer(ctx, op, fldPath, obj, oldObj)
+				}).MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
@@ -912,7 +915,10 @@ func Validate_CompositePodGroupTemplate(
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.IfOption(ctx, op, fldPath, obj, oldObj, "PodGroupPreemptionPolicy", false, validate.ForbiddenPointer).MarkShortCircuit(); len(e) != 0 {
+			if e := validate.IfOption(ctx, op, fldPath, obj, oldObj, "PodGroupPreemptionPolicy", false,
+				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *PreemptionPolicy) field.ErrorList {
+					return validate.ForbiddenPointer(ctx, op, fldPath, obj, oldObj)
+				}).MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
@@ -1574,7 +1580,10 @@ func Validate_PodGroupSpec(
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.IfOption(ctx, op, fldPath, obj, oldObj, "CompositePodGroup", false, validate.ForbiddenPointer).MarkShortCircuit(); len(e) != 0 {
+			if e := validate.IfOption(ctx, op, fldPath, obj, oldObj, "CompositePodGroup", false,
+				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
+					return validate.ForbiddenPointer(ctx, op, fldPath, obj, oldObj)
+				}).MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
@@ -1672,7 +1681,10 @@ func Validate_PodGroupSpec(
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.IfOption(ctx, op, fldPath, obj, oldObj, "TopologyAwareWorkloadScheduling", false, validate.ForbiddenPointer).MarkShortCircuit(); len(e) != 0 {
+			if e := validate.IfOption(ctx, op, fldPath, obj, oldObj, "TopologyAwareWorkloadScheduling", false,
+				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *PodGroupSchedulingConstraints) field.ErrorList {
+					return validate.ForbiddenPointer(ctx, op, fldPath, obj, oldObj)
+				}).MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
@@ -1865,7 +1877,10 @@ func Validate_PodGroupSpec(
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.IfOption(ctx, op, fldPath, obj, oldObj, "PodGroupPreemptionPolicy", false, validate.ForbiddenPointer).MarkShortCircuit(); len(e) != 0 {
+			if e := validate.IfOption(ctx, op, fldPath, obj, oldObj, "PodGroupPreemptionPolicy", false,
+				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *PreemptionPolicy) field.ErrorList {
+					return validate.ForbiddenPointer(ctx, op, fldPath, obj, oldObj)
+				}).MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
@@ -2058,7 +2073,10 @@ func Validate_PodGroupTemplate(
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.IfOption(ctx, op, fldPath, obj, oldObj, "TopologyAwareWorkloadScheduling", false, validate.ForbiddenPointer).MarkShortCircuit(); len(e) != 0 {
+			if e := validate.IfOption(ctx, op, fldPath, obj, oldObj, "TopologyAwareWorkloadScheduling", false,
+				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *PodGroupSchedulingConstraints) field.ErrorList {
+					return validate.ForbiddenPointer(ctx, op, fldPath, obj, oldObj)
+				}).MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
@@ -2249,7 +2267,10 @@ func Validate_PodGroupTemplate(
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.IfOption(ctx, op, fldPath, obj, oldObj, "PodGroupPreemptionPolicy", false, validate.ForbiddenPointer).MarkShortCircuit(); len(e) != 0 {
+			if e := validate.IfOption(ctx, op, fldPath, obj, oldObj, "PodGroupPreemptionPolicy", false,
+				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *PreemptionPolicy) field.ErrorList {
+					return validate.ForbiddenPointer(ctx, op, fldPath, obj, oldObj)
+				}).MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
@@ -3313,7 +3334,10 @@ func Validate_WorkloadSpec(
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.IfOption(ctx, op, fldPath, obj, oldObj, "CompositePodGroup", false, validate.ForbiddenSlice).MarkShortCircuit(); len(e) != 0 {
+			if e := validate.IfOption(ctx, op, fldPath, obj, oldObj, "CompositePodGroup", false,
+				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj []CompositePodGroupTemplate) field.ErrorList {
+					return validate.ForbiddenSlice(ctx, op, fldPath, obj, oldObj)
+				}).MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}

@@ -70,14 +70,14 @@ func (*requirednessTagValidator) ValidScopes() sets.Set[Scope] {
 	return requirednessTagValidScopes
 }
 
-func (rtv *requirednessTagValidator) GetValidations(context Context, _ codetags.Tag) (Validations, error) {
+func (rtv *requirednessTagValidator) GetValidations(context Context, tag codetags.Tag) (Validations, error) {
 	switch rtv.mode {
 	case requirednessRequired:
-		return rtv.doRequired(context)
+		return rtv.doRequired(context, tag.Value)
 	case requirednessOptional:
 		return rtv.doOptional(context)
 	case requirednessForbidden:
-		return rtv.doForbidden(context)
+		return rtv.doForbidden(context, tag.Value)
 	}
 	panic(fmt.Sprintf("unknown requiredness mode: %q", rtv.mode))
 }
@@ -89,9 +89,11 @@ var (
 	requiredMapValidator     = types.Name{Package: libValidationPkg, Name: "RequiredMap"}
 )
 
-// TODO: It might be valuable to have a string payload for when requiredness is
-// conditional (e.g. required when <otherfield> is specified).
-func (rtv *requirednessTagValidator) doRequired(context Context) (Validations, error) {
+func (rtv *requirednessTagValidator) doRequired(context Context, msg string) (Validations, error) {
+	var extraArgs []any
+	if msg != "" {
+		extraArgs = append(extraArgs, msg)
+	}
 	// Most validators don't care whether the value they are validating was
 	// originally defined as a value-type or a pointer-type in the API.  This
 	// one does.  Since Go doesn't do partial specialization of templates, we
@@ -99,11 +101,11 @@ func (rtv *requirednessTagValidator) doRequired(context Context) (Validations, e
 	emits := Emission{field.ErrorTypeRequired, "", ""}
 	switch util.NativeType(context.Type).Kind {
 	case types.Slice:
-		return Validations{Functions: []FunctionGen{Function(requiredTagName, ShortCircuit, requiredSliceValidator).WithEmits(emits)}}, nil
+		return Validations{Functions: []FunctionGen{Function(requiredTagName, ShortCircuit|VariadicArgs, requiredSliceValidator, extraArgs...).WithEmits(emits)}}, nil
 	case types.Map:
-		return Validations{Functions: []FunctionGen{Function(requiredTagName, ShortCircuit, requiredMapValidator).WithEmits(emits)}}, nil
+		return Validations{Functions: []FunctionGen{Function(requiredTagName, ShortCircuit|VariadicArgs, requiredMapValidator, extraArgs...).WithEmits(emits)}}, nil
 	case types.Pointer:
-		return Validations{Functions: []FunctionGen{Function(requiredTagName, ShortCircuit, requiredPointerValidator).WithEmits(emits)}}, nil
+		return Validations{Functions: []FunctionGen{Function(requiredTagName, ShortCircuit|VariadicArgs, requiredPointerValidator, extraArgs...).WithEmits(emits)}}, nil
 	case types.Struct:
 		// We cannot reliably enforce required presence semantics for non-pointer structs.
 		//
@@ -118,7 +120,7 @@ func (rtv *requirednessTagValidator) doRequired(context Context) (Validations, e
 		// enforce tag pairing. Treat this tag as documentation-only.
 		return Validations{Comments: []string{"+" + rtv.prefix + requiredTagName + " on non-pointer struct fields is purely documentation"}}, nil
 	}
-	return Validations{Functions: []FunctionGen{Function(requiredTagName, ShortCircuit, requiredValueValidator).WithEmits(emits)}}, nil
+	return Validations{Functions: []FunctionGen{Function(requiredTagName, ShortCircuit|VariadicArgs, requiredValueValidator, extraArgs...).WithEmits(emits)}}, nil
 }
 
 var (
@@ -160,7 +162,7 @@ func (rtv *requirednessTagValidator) doOptional(context Context) (Validations, e
 		if !util.IsNilableType(context.Type) && zeroDefault {
 			return Validations{Comments: []string{"optional value-type fields with zero-value defaults are purely documentation"}}, nil
 		}
-		validations, err := rtv.doRequired(context)
+		validations, err := rtv.doRequired(context, "")
 		if err != nil {
 			return Validations{}, err
 		}
@@ -280,9 +282,11 @@ var (
 	forbiddenMapValidator     = types.Name{Package: libValidationPkg, Name: "ForbiddenMap"}
 )
 
-// TODO: It might be valuable to have a string payload for when forbidden is
-// conditional (e.g. forbidden when <option> is disabled).
-func (rtv *requirednessTagValidator) doForbidden(context Context) (Validations, error) {
+func (rtv *requirednessTagValidator) doForbidden(context Context, msg string) (Validations, error) {
+	var extraArgs []any
+	if msg != "" {
+		extraArgs = append(extraArgs, msg)
+	}
 	// Forbidden is weird.  Each of these emits two checks, which are polar
 	// opposites.  If the field fails the forbidden check, it will
 	// short-circuit and not run the optional check.  If it passes the
@@ -297,21 +301,21 @@ func (rtv *requirednessTagValidator) doForbidden(context Context) (Validations, 
 	case types.Slice:
 		return Validations{
 			Functions: []FunctionGen{
-				Function(forbiddenTagName, ShortCircuit, forbiddenSliceValidator).WithEmits(forbids),
+				Function(forbiddenTagName, ShortCircuit|VariadicArgs, forbiddenSliceValidator, extraArgs...).WithEmits(forbids),
 				Function(forbiddenTagName, ShortCircuit|NonError, optionalSliceValidator),
 			},
 		}, nil
 	case types.Map:
 		return Validations{
 			Functions: []FunctionGen{
-				Function(forbiddenTagName, ShortCircuit, forbiddenMapValidator).WithEmits(forbids),
+				Function(forbiddenTagName, ShortCircuit|VariadicArgs, forbiddenMapValidator, extraArgs...).WithEmits(forbids),
 				Function(forbiddenTagName, ShortCircuit|NonError, optionalMapValidator),
 			},
 		}, nil
 	case types.Pointer:
 		return Validations{
 			Functions: []FunctionGen{
-				Function(forbiddenTagName, ShortCircuit, forbiddenPointerValidator).WithEmits(forbids),
+				Function(forbiddenTagName, ShortCircuit|VariadicArgs, forbiddenPointerValidator, extraArgs...).WithEmits(forbids),
 				Function(forbiddenTagName, ShortCircuit|NonError, optionalPointerValidator),
 			},
 		}, nil
@@ -325,7 +329,7 @@ func (rtv *requirednessTagValidator) doForbidden(context Context) (Validations, 
 	}
 	return Validations{
 		Functions: []FunctionGen{
-			Function(forbiddenTagName, ShortCircuit, forbiddenValueValidator).WithEmits(forbids),
+			Function(forbiddenTagName, ShortCircuit|VariadicArgs, forbiddenValueValidator, extraArgs...).WithEmits(forbids),
 			Function(forbiddenTagName, ShortCircuit|NonError, optionalValueValidator),
 		},
 	}, nil
@@ -341,12 +345,26 @@ func (rtv *requirednessTagValidator) Docs() TagDoc {
 	case requirednessRequired:
 		doc.StabilityLevel = TagStabilityLevelStable
 		doc.Description = "Indicates that a field must be specified by clients."
+		doc.PayloadsType = codetags.ValueTypeString
+		doc.Payloads = []TagPayloadDoc{{
+			Description: "<none>",
+		}, {
+			Description: "<string>",
+			Docs:        "Additional detail to include in the validation error message.",
+		}}
 	case requirednessOptional:
 		doc.StabilityLevel = TagStabilityLevelStable
 		doc.Description = "Indicates that a field is optional to clients."
 	case requirednessForbidden:
 		doc.StabilityLevel = TagStabilityLevelBeta
 		doc.Description = "Indicates that a field may not be specified."
+		doc.PayloadsType = codetags.ValueTypeString
+		doc.Payloads = []TagPayloadDoc{{
+			Description: "<none>",
+		}, {
+			Description: "<string>",
+			Docs:        "Additional detail to include in the validation error message.",
+		}}
 	default:
 		panic(fmt.Sprintf("unknown requiredness mode: %q", rtv.mode))
 	}

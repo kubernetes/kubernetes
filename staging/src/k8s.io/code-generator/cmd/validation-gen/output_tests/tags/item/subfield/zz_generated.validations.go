@@ -99,7 +99,10 @@ func Validate_Struct(
 					func(item *Item) bool { return item.Key == "target" }, validate.DirectEqual,
 					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *Item) field.ErrorList {
 						return validate.Subfield(ctx, op, fldPath, obj, oldObj, "otherField",
-							func(o *Item) *string { return &o.OtherField }, validate.DirectEqual, validate.RequiredValue)
+							func(o *Item) *string { return &o.OtherField }, validate.DirectEqual,
+							func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
+								return validate.RequiredValue(ctx, op, fldPath, obj, oldObj)
+							})
 					}).MarkShortCircuit(); len(e) != 0 {
 					errs = append(errs, e...)
 					earlyReturn = true
