@@ -51,7 +51,7 @@ func TestBootstrapPriorityLevelConfigurationWithBorrowing(t *testing.T) {
 		{
 			name:                    "workload-low",
 			nominalSharesExpected:   100,
-			lendablePercentexpected: 90,
+			lendablePercentexpected: 0,
 		},
 		{
 			name:                    "global-default",

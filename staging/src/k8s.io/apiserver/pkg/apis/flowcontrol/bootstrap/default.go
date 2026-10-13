@@ -243,7 +243,7 @@ var (
 			Type: flowcontrol.PriorityLevelEnablementLimited,
 			Limited: &flowcontrol.LimitedPriorityLevelConfiguration{
 				NominalConcurrencyShares: ptr.To(int32(100)),
-				LendablePercent:          ptr.To(int32(90)),
+				LendablePercent:          ptr.To(int32(0)),
 				LimitResponse: flowcontrol.LimitResponse{
 					Type: flowcontrol.LimitResponseTypeQueue,
 					Queuing: &flowcontrol.QueuingConfiguration{

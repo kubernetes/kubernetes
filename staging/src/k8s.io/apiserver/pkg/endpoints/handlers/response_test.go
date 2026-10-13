@@ -363,6 +363,68 @@ func TestAsPartialObjectMetadataList(t *testing.T) {
 	}
 }
 
+func TestWatchEncoderTiming(t *testing.T) {
+	timing := watchEncoderTiming{
+		object:      2 * time.Millisecond,
+		watchEvent:  3 * time.Millisecond,
+		framedWrite: 4 * time.Millisecond,
+	}
+	timing.recordEvent(6*time.Millisecond, 2*time.Millisecond)
+	timing.recordEvent(8*time.Millisecond, 12*time.Millisecond)
+
+	if got, want := timing.events, 2; got != want {
+		t.Errorf("events = %d, want %d", got, want)
+	}
+	if got, want := timing.total, 14*time.Millisecond; got != want {
+		t.Errorf("total = %v, want %v", got, want)
+	}
+	if got, want := timing.average(timing.total), 7*time.Millisecond; got != want {
+		t.Errorf("average = %v, want %v", got, want)
+	}
+	if got, want := timing.min, 6*time.Millisecond; got != want {
+		t.Errorf("min = %v, want %v", got, want)
+	}
+	if got, want := timing.max, 8*time.Millisecond; got != want {
+		t.Errorf("max = %v, want %v", got, want)
+	}
+	if got, want := timing.other(), 5*time.Millisecond; got != want {
+		t.Errorf("other = %v, want %v", got, want)
+	}
+	if got, want := timing.totalBuckets, (watchEncoderLatencyBuckets{0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0}); got != want {
+		t.Errorf("total buckets = %v, want %v", got, want)
+	}
+	if got, want := timing.framedWriteBuckets, (watchEncoderLatencyBuckets{0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0}); got != want {
+		t.Errorf("framed write buckets = %v, want %v", got, want)
+	}
+}
+
+func TestWatchEncoderLatencyBuckets(t *testing.T) {
+	var buckets watchEncoderLatencyBuckets
+	for _, duration := range []time.Duration{
+		0,
+		10*time.Microsecond - 1,
+		10 * time.Microsecond,
+		25*time.Microsecond - 1,
+		25 * time.Microsecond,
+		50 * time.Microsecond,
+		100 * time.Microsecond,
+		250 * time.Microsecond,
+		time.Millisecond,
+		10 * time.Millisecond,
+		25 * time.Millisecond,
+		50 * time.Millisecond,
+		100 * time.Millisecond,
+		250 * time.Millisecond,
+		time.Second,
+	} {
+		buckets.observe(duration)
+	}
+
+	if got, want := buckets, (watchEncoderLatencyBuckets{2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1}); got != want {
+		t.Errorf("buckets = %v, want %v", got, want)
+	}
+}
+
 func TestWatchEncoderIdentifier(t *testing.T) {
 	eventFields := reflect.VisibleFields(reflect.TypeOf(metav1.WatchEvent{}))
 	if len(eventFields) != 2 {
