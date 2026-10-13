@@ -1330,6 +1330,14 @@ func printJob(obj *batch.Job, options printers.GenerateOptions) ([]metav1.TableR
 		status = "FailureTarget"
 	} else if hasJobCondition(obj.Status.Conditions, batch.JobSuccessCriteriaMet) {
 		status = "SuccessCriteriaMet"
+	} else if obj.Status.Active == 0 && (obj.Status.Ready == nil || *obj.Status.Ready == 0) &&
+		obj.Status.Succeeded == 0 && obj.Status.Failed == 0 &&
+		obj.Status.CompletionTime == nil {
+		// No pods are running or have ever run, and the Job has not completed.
+		// This covers the case where all pods are Pending due to scheduling
+		// constraints or cluster resource shortage — the Job has been created
+		// but is not yet actively executing any pods.
+		status = "Pending"
 	} else {
 		status = "Running"
 	}

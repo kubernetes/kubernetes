@@ -2932,7 +2932,7 @@ func TestPrintJob(t *testing.T) {
 			},
 			options: printers.GenerateOptions{},
 			// Columns: Name, Status, Completions, Duration, Age
-			expected: []metav1.TableRow{{Cells: []interface{}{"job2", "Running", "0/1", "", "10y"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"job2", "Pending", "0/1", "", "10y"}}},
 		},
 		// Job with duration.
 		{
@@ -2970,7 +2970,7 @@ func TestPrintJob(t *testing.T) {
 			},
 			options: printers.GenerateOptions{},
 			// Columns: Name, Status, Completions, Duration, Age
-			expected: []metav1.TableRow{{Cells: []interface{}{"job4", "Running", "0/1", "20m", "10y"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"job4", "Pending", "0/1", "20m", "10y"}}},
 		},
 		{
 			job: batch.Job{
