@@ -2192,7 +2192,10 @@ func TestValidatePodLevelResourcesCoverDRA(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			pl := &DynamicResources{
-				fts: feature.Features{EnablePodLevelResources: true},
+				fts: feature.Features{
+					EnablePodLevelResources:           true,
+					EnableDRANodeAllocatableResources: true,
+				},
 			}
 			tt.pod.Status.NodeAllocatableResourceClaimStatuses = tt.nodeAllocatableStatus
 			gotStatus := pl.validatePodLevelResourcesCoverDRA(tt.pod)
