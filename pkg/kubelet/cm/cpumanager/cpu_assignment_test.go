@@ -657,6 +657,88 @@ func TestSortAvailableUncoreCachesForResizeNoDuplicate(t *testing.T) {
 	}
 }
 
+// TestSortAvailableUncoreCachesForResizePrioritizesSpanningUncoreCache verifies
+// that an UncoreCache spanning multiple NUMA nodes is prioritized when it holds
+// retained CPUs, even if it is first encountered on a NUMA node without retained
+// CPUs in that cache.
+func TestSortAvailableUncoreCachesForResizePrioritizesSpanningUncoreCache(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	// Minimal topology: 8 CPUs across 2 NUMA nodes, 4 UncoreCaches.
+	//
+	//                | NUMA-0  | NUMA-1  |
+	//  --------------+---------+---------+
+	//  UncoreCache-0 |  0   1  |  2   3  |
+	//  --------------+---------+---------+
+	//  UncoreCache-1 |  4   5  |  6   7  |
+	//  --------------+---------+---------+
+	//  UncoreCache-2 |  8   9  | 10  11  |
+	//  --------------+---------+---------+
+	//  UncoreCache-3 | 12  13  | 14  15  |
+	//  --------------+---------+---------+
+	//
+	// This is an artificial topology in which NUMA ranges cross UncoreCaches.
+	// In real-life hardware there is no crossing either an uncoire cache is subdivided into NUMAs
+	// or NUMA is subdivided into L3 caches.
+	// However such topology can be artificialy emulated e.g. by using `numa=fake` kernel parameter.
+	topo := &topology.CPUTopology{
+		NumCPUs:        16,
+		NumCores:       16,
+		NumUncoreCache: 4,
+		NumSockets:     1,
+		NumNUMANodes:   2,
+		CPUDetails: topology.CPUDetails{
+			0:  topology.CPUInfo{CoreID: 0, SocketID: 0, NUMANodeID: 0, UncoreCacheID: 0},
+			1:  topology.CPUInfo{CoreID: 1, SocketID: 0, NUMANodeID: 0, UncoreCacheID: 0},
+			2:  topology.CPUInfo{CoreID: 2, SocketID: 0, NUMANodeID: 1, UncoreCacheID: 0},
+			3:  topology.CPUInfo{CoreID: 3, SocketID: 0, NUMANodeID: 1, UncoreCacheID: 0},
+			4:  topology.CPUInfo{CoreID: 4, SocketID: 0, NUMANodeID: 0, UncoreCacheID: 1},
+			5:  topology.CPUInfo{CoreID: 5, SocketID: 0, NUMANodeID: 0, UncoreCacheID: 1},
+			6:  topology.CPUInfo{CoreID: 6, SocketID: 0, NUMANodeID: 1, UncoreCacheID: 1},
+			7:  topology.CPUInfo{CoreID: 7, SocketID: 0, NUMANodeID: 1, UncoreCacheID: 1},
+			8:  topology.CPUInfo{CoreID: 8, SocketID: 0, NUMANodeID: 0, UncoreCacheID: 2},
+			9:  topology.CPUInfo{CoreID: 9, SocketID: 0, NUMANodeID: 0, UncoreCacheID: 2},
+			10: topology.CPUInfo{CoreID: 10, SocketID: 0, NUMANodeID: 1, UncoreCacheID: 2},
+			11: topology.CPUInfo{CoreID: 11, SocketID: 0, NUMANodeID: 1, UncoreCacheID: 2},
+			12: topology.CPUInfo{CoreID: 12, SocketID: 0, NUMANodeID: 0, UncoreCacheID: 3},
+			13: topology.CPUInfo{CoreID: 13, SocketID: 0, NUMANodeID: 0, UncoreCacheID: 3},
+			14: topology.CPUInfo{CoreID: 14, SocketID: 0, NUMANodeID: 1, UncoreCacheID: 3},
+			15: topology.CPUInfo{CoreID: 15, SocketID: 0, NUMANodeID: 1, UncoreCacheID: 3},
+		},
+	}
+	//                | NUMA-0  | NUMA-1  |
+	//  --------------+---------+---------+
+	//  UncoreCache-0 |  0   1  |  2   3  |
+	//  --------------+---------+---------+
+	//  UncoreCache-1 |  4      |  6*  7  |
+	//  --------------+---------+---------+
+	//  UncoreCache-2 |  8*  9  | 10  11  |
+	//  --------------+---------+---------+
+	//  UncoreCache-3 |     13  |         |
+	//  --------------+---------+---------+
+	//
+	// Retain CPU 6 (NUMA-1, UC-1) and CPU 8 (NUMA-0, UC-2).
+	// CPUs 5, 12 are unavailable (busy).
+	// NUMA 0 (5 free CPUs) is sorted and processed before NUMA 1 (7 free CPUs).
+
+	availableCPUs := mustParseCPUSet(t, "0-4,6-11,13")
+	currentlyAllocatedCPUs := mustParseCPUSet(t, "6,8")
+	numCPUs := 4 // scale-up: 2 -> 4 (2 new)
+
+	acc := newCPUAccumulatorForResize(logger, topo, availableCPUs, numCPUs, CPUSortingStrategyPacked, currentlyAllocatedCPUs, cpuset.New())
+
+	result := acc.sortAvailableUncoreCachesForResize()
+
+	// Expected result:
+	// * UC-1 - has allocated CPUs and 2 free CPUs
+	// * UC-2 - has allocated CPUs and 3 free CPUs
+	// * UC-3 - doesn't have allocated CPUs and has 1 free CPUs
+	// * UC-0 - doesn't have allocated CPUs and has 4 free CPUs
+	expected := []int{1, 2, 3, 0}
+	if !reflect.DeepEqual(result, expected) {
+		t.Errorf("expected %v, got %v", expected, result)
+	}
+}
+
 func TestCPUAccumulatorTake(t *testing.T) {
 	logger, _ := ktesting.NewTestContext(t)
 	testCases := []struct {
