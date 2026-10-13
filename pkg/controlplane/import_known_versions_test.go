@@ -21,7 +21,7 @@ import (
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
-	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
+	schedulingv1 "k8s.io/api/scheduling/v1"
 	apinamingtest "k8s.io/apimachinery/pkg/api/apitesting/naming"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -80,10 +80,10 @@ var typesAllowedTags = map[reflect.Type]bool{
 
 func init() {
 	for _, t := range []reflect.Type{
-		reflect.TypeFor[schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy](),
-		reflect.TypeFor[schedulingv1alpha3.WorkloadPodGroupSchedulingConstraints](),
-		reflect.TypeFor[schedulingv1alpha3.WorkloadPodGroupDisruptionMode](),
-		reflect.TypeFor[schedulingv1alpha3.WorkloadPodGroupResourceClaim](),
+		reflect.TypeFor[schedulingv1.WorkloadPodGroupSchedulingPolicy](),
+		reflect.TypeFor[schedulingv1.WorkloadPodGroupSchedulingConstraints](),
+		reflect.TypeFor[schedulingv1.WorkloadPodGroupDisruptionMode](),
+		reflect.TypeFor[schedulingv1.WorkloadPodGroupResourceClaim](),
 	} {
 		typesAllowedTags[t] = true
 	}
