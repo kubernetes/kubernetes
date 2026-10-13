@@ -14,9 +14,11 @@ require (
 	github.com/aarzilli/whydeadcode v0.0.0-20260303092945-8d908f77de3a // indirect
 	github.com/aojea/sloppy-netparser v0.0.0-20210819230639-a7bbdb117ea5 // indirect
 	github.com/bitfield/gotestdox v0.2.2 // indirect
+	github.com/blang/semver/v4 v4.0.0 // indirect
 	github.com/brunoga/deep v1.3.1 // indirect
 	github.com/cespare/prettybench v0.1.0 // indirect
 	github.com/clipperhouse/uax29/v2 v2.2.0 // indirect
+	github.com/common-nighthawk/go-figure v0.0.0-20210622060536-734e95fb86be // indirect
 	github.com/dnephin/pflag v1.0.7 // indirect
 	github.com/fatih/color v1.18.0 // indirect
 	github.com/fatih/structs v1.1.0 // indirect
@@ -42,6 +44,7 @@ require (
 	github.com/mitchellh/copystructure v1.2.0 // indirect
 	github.com/mitchellh/reflectwalk v1.0.2 // indirect
 	github.com/rs/zerolog v1.34.0 // indirect
+	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/spf13/cobra v1.10.2 // indirect
 	github.com/spf13/pflag v1.0.10 // indirect
 	github.com/vektra/mockery/v3 v3.7.4 // indirect
@@ -60,7 +63,9 @@ require (
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	gotest.tools/gotestsum v1.13.0 // indirect
+	sigs.k8s.io/release-utils v0.8.5 // indirect
 	sigs.k8s.io/yaml v1.6.0 // indirect
+	sigs.k8s.io/zeitgeist v0.5.4 // indirect
 )
 
 tool (
@@ -77,4 +82,5 @@ tool (
 	gotest.tools/gotestsum
 	k8s.io/publishing-bot/cmd/publishing-bot/config
 	sigs.k8s.io/yaml/yamlfmt
+	sigs.k8s.io/zeitgeist
 )
