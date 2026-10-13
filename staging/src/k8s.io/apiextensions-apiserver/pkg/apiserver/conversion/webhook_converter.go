@@ -409,6 +409,10 @@ func validateConvertedObject(in, out *unstructured.Unstructured) error {
 func restoreObjectMeta(original, converted *unstructured.Unstructured) error {
 	obj, found := converted.Object["metadata"]
 	if !found {
+		// Server-side apply can convert partial objects without metadata.
+		if _, originalHasMetadata := original.Object["metadata"]; !originalHasMetadata {
+			return nil
+		}
 		return fmt.Errorf("missing metadata in converted object")
 	}
 	responseMetaData, ok := obj.(map[string]interface{})
