@@ -188,6 +188,18 @@ const (
 	maxWatchChanSizeWithoutIndex = 100
 )
 
+// suggestedWatchChannelSize returns the size of a watcher's input and result
+// channels.
+//
+// Without the WatchCacheStallResume feature gate this size is a survival
+// criterion: a watcher whose input channel stays full for longer than the
+// dispatch time budget is terminated, so the channels bound how long a slow
+// or hiccuping client is tolerated (roughly 2*chanSize events of write
+// traffic). With the gate enabled the channels are only burst absorption: a
+// watcher whose input channel fills up is deferred to a catch-up round from
+// the event history instead of being terminated, so the size trades memory
+// for the frequency of catch-up rounds and no longer decides survival; a
+// watcher is terminated only once it falls out of the whole history window.
 func (w *watchCacheHistory) suggestedWatchChannelSize(indexExists, triggerUsed bool) int {
 	// To estimate the channel size we use a heuristic that a channel
 	// should roughly be able to keep one second of history.
@@ -216,20 +228,8 @@ func (w *watchCacheHistory) suggestedWatchChannelSize(indexExists, triggerUsed b
 // be called under the lock.
 func (w *watchCacheHistory) GetIntervalLocked(resourceVersion uint64, listResourceVersion uint64, locker sync.Locker) (*watchCacheInterval, error) {
 	size := w.endIndex - w.startIndex
-	var oldest uint64
-	switch {
-	case listResourceVersion > 0 && !w.removedEventSinceRelist:
-		// If no event was removed from the buffer since last relist, the oldest watch
-		// event we can deliver is one greater than the resource version of the list.
-		oldest = listResourceVersion + 1
-	case size > 0:
-		// If the previous condition is not satisfied: either some event was already
-		// removed from the buffer or we've never completed a list (the latter can
-		// only happen in unit tests that populate the buffer without performing
-		// list/replace operations), the oldest watch event we can deliver is the first
-		// one in the buffer.
-		oldest = w.cache[w.startIndex%w.capacity].ResourceVersion
-	default:
+	oldest, ok := w.oldestServableLocked(listResourceVersion)
+	if !ok {
 		return nil, fmt.Errorf("watch cache isn't correctly initialized")
 	}
 
@@ -247,6 +247,29 @@ func (w *watchCacheHistory) GetIntervalLocked(resourceVersion uint64, listResour
 	}
 	ci := newCacheInterval(w.startIndex+first, w.endIndex, indexerFunc, w.config.indexValidator, resourceVersion, locker)
 	return ci, nil
+}
+
+// oldestServableLocked returns the oldest resourceVersion of a watch event
+// the history can deliver, or false when the history is not initialized.
+// It never dereferences an empty buffer. This function assumes to be called
+// under the lock.
+func (w *watchCacheHistory) oldestServableLocked(listResourceVersion uint64) (uint64, bool) {
+	size := w.endIndex - w.startIndex
+	switch {
+	case listResourceVersion > 0 && !w.removedEventSinceRelist:
+		// If no event was removed from the buffer since last relist, the oldest watch
+		// event we can deliver is one greater than the resource version of the list.
+		return listResourceVersion + 1, true
+	case size > 0:
+		// If the previous condition is not satisfied: either some event was already
+		// removed from the buffer or we've never completed a list (the latter can
+		// only happen in unit tests that populate the buffer without performing
+		// list/replace operations), the oldest watch event we can deliver is the first
+		// one in the buffer.
+		return w.cache[w.startIndex%w.capacity].ResourceVersion, true
+	default:
+		return 0, false
+	}
 }
 
 // OldestResourceVersionLocked returns the resource version of the oldest event in the cyclic buffer.
