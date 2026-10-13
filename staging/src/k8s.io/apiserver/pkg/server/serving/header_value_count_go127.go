@@ -16,7 +16,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package server
+package serving
 
 import "net/http"
 
@@ -24,6 +24,6 @@ import "net/http"
 // while allowing thousands of identity groups sent one per header line.
 const maxHeaderValueCount = 16384
 
-func setMaxHeaderValueCount(server *http.Server) {
+func SetMaxHeaderValueCount(server *http.Server) {
 	server.MaxHeaderValueCount = maxHeaderValueCount
 }
