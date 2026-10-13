@@ -1,20 +1,8 @@
 dependencies:
-  # zeitgeist (https://github.com/kubernetes-sigs/zeitgeist) was inspired by
-  # (and now replaces) the cmd/verifydependencies tool to verify external
-  # dependencies across the repo.
-  #
-  # The zeitgeist dependencies.yaml file format is intended to be
-  # backwards-compatible with the original tooling.
-  #
-  # In instances where the file format may change across versions, this meta
-  # dependency check exists to ensure we're pinned to a known good version.
-  #
-  # ref: https://github.com/kubernetes/kubernetes/pull/98845
-  - name: "zeitgeist"
-    version: "v0.5.4"
-    refPaths:
-    - path: hack/verify-external-dependencies-version.sh
-      match: sigs.k8s.io/zeitgeist@v.*
+  # This file specifies dependencies that zeitgeist must check.
+  # The zeitgeist version in use is determined by hack/tools/go.mod.
+  # Bumping that may require changes to this file (in particular if
+  # the file format changes).
 
   # CNI plugins
   - name: "cni"
