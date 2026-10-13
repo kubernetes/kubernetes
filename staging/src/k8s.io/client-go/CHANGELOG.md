@@ -4,6 +4,24 @@ Go API changes are typically not included in the Kubernetes release notes, so
 noteworthy Go API changes *may* be documented here. This is currently not
 *required*, so consult the git history to see all changes.
 
+### Dynamic and metadata shared informer factories: add Release
+
+`ForResource` now counts its callers, and the new `Release` stops and drops the
+informer for a resource once every caller released it, so a later `ForResource`
+builds a fresh one. This is for a resource the server no longer serves (a
+deleted CRD or APIService): until now such an informer kept listing and
+watching it until the factory shut down. Every `ForResource` call must be
+paired with exactly one `Release`; callers that never call `Release` see no
+change in behavior.
+
+Mock implementations of the DynamicSharedInformerFactory and
+metadatainformer.SharedInformerFactory have to add a Release implementation.
+
+```
+- ./dynamic/dynamicinformer.DynamicSharedInformerFactory.Release: added
+- ./metadata/metadatainformer.SharedInformerFactory.Release: added
+```
+
 ### Dynamic shared informer factory: add StartWithContext
 
 The same change was made earlier for the type informer factory:
