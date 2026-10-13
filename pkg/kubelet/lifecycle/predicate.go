@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/types"
 	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework"
+	schedfeature "k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/helper"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeaffinity"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodename"
@@ -435,9 +436,7 @@ func (e *PredicateFailureError) GetReason() string {
 func generalFilter(logger klog.Logger, pod *v1.Pod, nodeInfo *schedulerframework.NodeInfo) []PredicateFailureReason {
 	var reasons []PredicateFailureReason
 	for _, r := range helper.Fits(pod, nodeInfo, nil, helper.ResourceRequestsOptions{
-		EnablePodLevelResources:           utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources),
-		EnableDRAExtendedResource:         utilfeature.DefaultFeatureGate.Enabled(features.DRAExtendedResource),
-		EnableDRANodeAllocatableResources: utilfeature.DefaultFeatureGate.Enabled(features.DRANodeAllocatableResources),
+		Features: schedfeature.NewSchedulerFeaturesFromGates(utilfeature.DefaultFeatureGate),
 	}) {
 		reasons = append(reasons, &InsufficientResourceError{
 			ResourceName: r.ResourceName,

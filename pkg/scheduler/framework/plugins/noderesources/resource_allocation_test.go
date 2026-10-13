@@ -42,6 +42,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/dynamicresources"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	"k8s.io/kubernetes/pkg/scheduler/util"
 	"k8s.io/kubernetes/pkg/scheduler/util/assumecache"
@@ -558,9 +559,11 @@ func testCalculateResourceAllocatableRequest(tCtx ktesting.TContext) {
 			nodeInfo.SetNode(tc.node)
 
 			scorer := &resourceAllocationScorer{
-				enableDRAExtendedResource: tc.enableDRAExtendedResource,
-				draManager:                draManager,
-				draFeatures:               draFeatures,
+				fts: feature.Features{
+					EnableDRAExtendedResource: tc.enableDRAExtendedResource,
+				},
+				draManager:  draManager,
+				draFeatures: draFeatures,
 				DRACaches: DRACaches{
 					celCache: celCache,
 				},
