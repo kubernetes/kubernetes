@@ -188,6 +188,21 @@ func TestCalculateTimeoutForVolume(t *testing.T) {
 	if timeout != math.MaxInt32 {
 		t.Errorf("Expected %v for timeout but got %v", int64(math.MaxInt32), timeout)
 	}
+
+	// A negative increment must not wrap the product either: at 100E it wraps
+	// to 2147483648, which the cap would hand back as a 68-year deadline.
+	pv.Spec.Capacity[v1.ResourceStorage] = resource.MustParse("100E")
+	timeout = CalculateTimeoutForVolume(50, math.MinInt32, pv)
+	if timeout != 50 {
+		t.Errorf("Expected 50 for timeout but got %v", timeout)
+	}
+
+	// Below the wrap a negative increment already fell back to the minimum.
+	pv.Spec.Capacity[v1.ResourceStorage] = resource.MustParse("2Gi")
+	timeout = CalculateTimeoutForVolume(50, math.MinInt32, pv)
+	if timeout != 50 {
+		t.Errorf("Expected 50 for timeout but got %v", timeout)
+	}
 }
 
 func TestFsUserFrom(t *testing.T) {

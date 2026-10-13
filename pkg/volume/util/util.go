@@ -150,7 +150,7 @@ func LoadPodFromFile(filePath string) (*v1.Pod, error) {
 // CalculateTimeoutForVolume calculates time for a Recycler pod to complete a
 // recycle operation. The calculation and return value is either the
 // minimumTimeout or the timeoutIncrement per Gi of storage size, whichever is
-// greater.
+// greater, capped at math.MaxInt32.
 func CalculateTimeoutForVolume(minimumTimeout, timeoutIncrement int, pv *v1.PersistentVolume) int64 {
 	giQty := resource.MustParse("1Gi")
 	pvQty := pv.Spec.Capacity[v1.ResourceStorage]
@@ -158,13 +158,15 @@ func CalculateTimeoutForVolume(minimumTimeout, timeoutIncrement int, pv *v1.Pers
 	pvSize := pvQty.Value()
 	giCount := pvSize / giSize
 	increment := int64(timeoutIncrement)
-	// pvSize saturates with the volume size, so a large increment wraps this
-	// product: at 100E and an increment of math.MaxInt32 it lands below the
-	// minimum, turning the largest volumes into the shortest timeouts.
+	// Neither the volume size nor the increment is bounded, so multiplying them
+	// directly can wrap in either direction and land back in range.
 	var timeout int64
-	if increment > 0 && giCount > math.MaxInt64/increment {
+	switch {
+	case increment <= 0:
+		timeout = 0
+	case giCount > math.MaxInt64/increment:
 		timeout = math.MaxInt64
-	} else {
+	default:
 		timeout = giCount * increment
 	}
 	if timeout < int64(minimumTimeout) {
