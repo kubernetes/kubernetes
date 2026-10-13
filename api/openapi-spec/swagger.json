@@ -5074,7 +5074,7 @@
           "type": "string"
         },
         "name": {
-          "description": "Name of the pod failure policy rule. Defaults to the index of the rule if unset. The name must be unique within the given Job, and the Job failure condition reason that would be generated from a given rule name (i.e., `PodFailurePolicy_{ruleName}`) must be a valid condition reason.",
+          "description": "name of the pod failure policy rule. Defaults to the index of the rule if unset. The name must be unique within the given Job, and the Job failure condition reason that would be generated from a given rule name (i.e., `PodFailurePolicy_{ruleName}`) must be a valid condition reason.",
           "type": "string"
         },
         "onExitCodes": {

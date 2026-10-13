@@ -211,6 +211,7 @@ var map_PodFailurePolicyRule = map[string]string{
 	"action":          "action specifies the action taken on a pod failure when the requirements are satisfied. Possible values are:\n\n- FailJob: indicates that the pod's job is marked as Failed and all\n  running pods are terminated.\n- FailIndex: indicates that the pod's index is marked as Failed and will\n  not be restarted.\n- Ignore: indicates that the counter towards the .backoffLimit is not\n  incremented and a replacement pod is created.\n- Count: indicates that the pod is handled in the default way - the\n  counter towards the .backoffLimit is incremented.\nAdditional values are considered to be added in the future. Clients should react to an unknown action by skipping the rule.",
 	"onExitCodes":     "onExitCodes represents the requirement on the container exit codes.",
 	"onPodConditions": "onPodConditions represents the requirement on the pod conditions. The requirement is represented as a list of pod condition patterns. The requirement is satisfied if at least one pattern matches an actual pod condition. At most 20 elements are allowed.",
+	"name":            "name of the pod failure policy rule. Defaults to the index of the rule if unset. The name must be unique within the given Job, and the Job failure condition reason that would be generated from a given rule name (i.e., `PodFailurePolicy_{ruleName}`) must be a valid condition reason.",
 }
 
 func (PodFailurePolicyRule) SwaggerDoc() map[string]string {

@@ -48,7 +48,11 @@ type PodFailurePolicyRuleApplyConfiguration struct {
 	// as a list of pod condition patterns. The requirement is satisfied if at
 	// least one pattern matches an actual pod condition. At most 20 elements are allowed.
 	OnPodConditions []PodFailurePolicyOnPodConditionsPatternApplyConfiguration `json:"onPodConditions,omitempty"`
-	Name            *string                                                    `json:"name,omitempty"`
+	// name of the pod failure policy rule. Defaults to the index of the rule if unset.
+	// The name must be unique within the given Job, and the Job failure condition
+	// reason that would be generated from a given rule name
+	// (i.e., `PodFailurePolicy_{ruleName}`) must be a valid condition reason.
+	Name *string `json:"name,omitempty"`
 }
 
 // PodFailurePolicyRuleApplyConfiguration constructs a declarative configuration of the PodFailurePolicyRule type for use with
