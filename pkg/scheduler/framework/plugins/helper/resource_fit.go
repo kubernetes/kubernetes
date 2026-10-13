@@ -26,22 +26,15 @@ import (
 	fwk "k8s.io/kube-scheduler/framework"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 )
-
-// ResourceRequestsOptions contains feature gate flags for resource request computation.
-type ResourceRequestsOptions struct {
-	EnablePodLevelResources                            bool
-	EnableDRAExtendedResource                          bool
-	EnableDRANodeAllocatableResources                  bool
-	EnableInPlacePodVerticalScalingSchedulerPreemption bool
-}
 
 // ShouldDelegateResourceToDRA checks if the given resource should be delegated to the DRA plugin.
 // It returns true if:
 //  1. The resource is not a scalar resource in the node's allocatable (not provided by device plugin)
 //  2. A device class mapping exists for the resource in the cache (when draManager is available)
-func ShouldDelegateResourceToDRA(rName v1.ResourceName, nodeInfo fwk.NodeInfo, draManager fwk.SharedDRAManager, opts ResourceRequestsOptions) bool {
-	if !opts.EnableDRAExtendedResource {
+func ShouldDelegateResourceToDRA(rName v1.ResourceName, nodeInfo fwk.NodeInfo, draManager fwk.SharedDRAManager, fts feature.Features) bool {
+	if !fts.EnableDRAExtendedResource {
 		return false
 	}
 
@@ -87,13 +80,10 @@ func ShouldDelegateResourceToDRA(rName v1.ResourceName, nodeInfo fwk.NodeInfo, d
 //	    Memory: 1G
 //
 // Result: CPU: 3, Memory: 3G
-func ComputePodResourceRequest(pod *v1.Pod, opts ResourceRequestsOptions) framework.Resource {
+func ComputePodResourceRequest(pod *v1.Pod, fts feature.Features) framework.Resource {
 	// pod hasn't scheduled yet so we don't need to worry about InPlacePodVerticalScalingEnabled
 	reqs := resource.PodRequests(pod, resource.PodResourcesOptions{
-		Features: resource.Features{
-			PodLevelResources:           opts.EnablePodLevelResources,
-			DRANodeAllocatableResources: opts.EnableDRANodeAllocatableResources,
-		},
+		Features: fts.ResourceFeatures(),
 	})
 	var result framework.Resource
 	result.SetMaxResource(reqs)
@@ -115,14 +105,14 @@ type InsufficientResource struct {
 }
 
 // Fits checks if node have enough resources to host the pod.
-func Fits(pod *v1.Pod, nodeInfo fwk.NodeInfo, draManager fwk.SharedDRAManager, opts ResourceRequestsOptions) []InsufficientResource {
-	req := ComputePodResourceRequest(pod, opts)
-	return FitsRequest(&req, nodeInfo, nil, nil, draManager, opts, pod)
+func Fits(pod *v1.Pod, nodeInfo fwk.NodeInfo, draManager fwk.SharedDRAManager, fts feature.Features) []InsufficientResource {
+	req := ComputePodResourceRequest(pod, fts)
+	return FitsRequest(&req, nodeInfo, nil, nil, draManager, fts, pod)
 }
 
 // FitsRequest checks if the node has enough resources for an already computed pod
 // request, skipping the ignored extended resources and the resources DRA provides.
-func FitsRequest(podRequest *framework.Resource, nodeInfo fwk.NodeInfo, ignoredExtendedResources, ignoredResourceGroups sets.Set[string], draManager fwk.SharedDRAManager, opts ResourceRequestsOptions, pod *v1.Pod) []InsufficientResource {
+func FitsRequest(podRequest *framework.Resource, nodeInfo fwk.NodeInfo, ignoredExtendedResources, ignoredResourceGroups sets.Set[string], draManager fwk.SharedDRAManager, fts feature.Features, pod *v1.Pod) []InsufficientResource {
 	insufficientResources := make([]InsufficientResource, 0, 4)
 
 	allowedPodNumber := nodeInfo.GetAllocatable().GetAllowedPodNumber()
@@ -143,7 +133,7 @@ func FitsRequest(podRequest *framework.Resource, nodeInfo fwk.NodeInfo, ignoredE
 		return insufficientResources
 	}
 
-	deltaMilliCPU, deltaMemory, deltaEphemeralStorage, deltaScalarResources := adjustDeltasToAccomodateCacheDiscrepancy(opts, podRequest, nodeInfo, pod)
+	deltaMilliCPU, deltaMemory, deltaEphemeralStorage, deltaScalarResources := adjustDeltasToAccomodateCacheDiscrepancy(fts, podRequest, nodeInfo, pod)
 
 	if podRequest.MilliCPU > 0 && deltaMilliCPU > (nodeInfo.GetAllocatable().GetMilliCPU()-nodeInfo.GetRequested().GetMilliCPU()) {
 		insufficientResources = append(insufficientResources, InsufficientResource{
@@ -195,7 +185,7 @@ func FitsRequest(podRequest *framework.Resource, nodeInfo fwk.NodeInfo, ignoredE
 			}
 		}
 
-		if ShouldDelegateResourceToDRA(rName, nodeInfo, draManager, opts) {
+		if ShouldDelegateResourceToDRA(rName, nodeInfo, draManager, fts) {
 			continue
 		}
 		if podRequest.ScalarResources[rName] > 0 && rQuant > (nodeInfo.GetAllocatable().GetScalarResources()[rName]-nodeInfo.GetRequested().GetScalarResources()[rName]) {
@@ -218,13 +208,13 @@ func FitsRequest(podRequest *framework.Resource, nodeInfo fwk.NodeInfo, ignoredE
 // node cache (max(desired, allocated, actual)), so ideally we only check if the node is
 // overallocated. This function exists to amortize asynchronous discrepancies between the
 // pod info in the scheduling queue and the node snapshot cache.
-func adjustDeltasToAccomodateCacheDiscrepancy(opts ResourceRequestsOptions, podRequest *framework.Resource, nodeInfo fwk.NodeInfo, pod *v1.Pod) (int64, int64, int64, map[v1.ResourceName]int64) {
+func adjustDeltasToAccomodateCacheDiscrepancy(fts feature.Features, podRequest *framework.Resource, nodeInfo fwk.NodeInfo, pod *v1.Pod) (int64, int64, int64, map[v1.ResourceName]int64) {
 	deltaMilliCPU := podRequest.MilliCPU
 	deltaMemory := podRequest.Memory
 	deltaEphemeralStorage := podRequest.EphemeralStorage
 	deltaScalarResources := podRequest.ScalarResources
 
-	if !opts.EnableInPlacePodVerticalScalingSchedulerPreemption || pod == nil || len(pod.Spec.NodeName) == 0 || pod.Spec.NodeName != nodeInfo.Node().Name {
+	if !fts.EnableInPlacePodVerticalScalingSchedulerPreemption || pod == nil || len(pod.Spec.NodeName) == 0 || pod.Spec.NodeName != nodeInfo.Node().Name {
 		return deltaMilliCPU, deltaMemory, deltaEphemeralStorage, deltaScalarResources
 	}
 

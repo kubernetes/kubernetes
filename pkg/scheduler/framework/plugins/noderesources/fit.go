@@ -90,14 +90,10 @@ var nodeResourceStrategyTypeMap = map[config.ScoringStrategyType]scorer{
 
 // Fit is a plugin that checks if a node has sufficient resources.
 type Fit struct {
-	ignoredResources                                   sets.Set[string]
-	ignoredResourceGroups                              sets.Set[string]
-	enableInPlacePodVerticalScaling                    bool
-	enablePodLevelResources                            bool
-	enableDRAExtendedResource                          bool
-	enableInPlacePodLevelResourcesVerticalScaling      bool
-	enableInPlacePodVerticalScalingSchedulerPreemption bool
-	handle                                             fwk.Handle
+	ignoredResources      sets.Set[string]
+	ignoredResourceGroups sets.Set[string]
+	fts                   feature.Features
+	handle                fwk.Handle
 	*resourceAllocationScorer
 	placementScorer *resourceAllocationScorer
 }
@@ -138,7 +134,7 @@ func (f *Fit) PreScore(ctx context.Context, cycleState fwk.CycleState, pod *v1.P
 	state := &preScoreState{
 		podRequests: podRequests,
 	}
-	if f.enableDRAExtendedResource {
+	if f.fts.EnableDRAExtendedResource {
 		draPreScoreState, status := getDRAPreScoredParams(f.draManager, f.resources)
 		if status != nil {
 			return status
@@ -172,25 +168,21 @@ func (f *Fit) Name() string {
 
 // Filtering and scoring based on the container resources and overheads.
 func (pl *Fit) SignPod(ctx context.Context, pod *v1.Pod) ([]fwk.SignFragment, *fwk.Status) {
-	opts := ResourceRequestsOptions{
-		EnablePodLevelResources:   pl.enablePodLevelResources,
-		EnableDRAExtendedResource: pl.enableDRAExtendedResource,
-	}
-	if pl.enableDRAExtendedResource {
-		podRequest := computePodResourceRequest(pod, opts)
+	if pl.fts.EnableDRAExtendedResource {
+		podRequest := computePodResourceRequest(pod, pl.fts)
 		for rName, rQuant := range podRequest.ScalarResources {
 			// Skip in case request quantity is zero
 			if rQuant == 0 {
 				continue
 			}
-			if helper.ShouldDelegateResourceToDRA(rName, nil, pl.draManager, opts) {
+			if helper.ShouldDelegateResourceToDRA(rName, nil, pl.draManager, pl.fts) {
 				return nil, fwk.NewStatus(fwk.Unschedulable, "signature disabled when dra extended resources are used in the cluster")
 			}
 		}
 	}
 
 	return []fwk.SignFragment{
-		{Key: fwk.ResourcesSignerName, Value: computePodResourceRequest(pod, opts)},
+		{Key: fwk.ResourcesSignerName, Value: computePodResourceRequest(pod, pl.fts)},
 	}, nil
 }
 
@@ -219,8 +211,8 @@ func NewFit(_ context.Context, plArgs runtime.Object, h fwk.Handle, fts feature.
 	if err != nil {
 		return nil, err
 	}
+	scorer.fts = fts
 	if fts.EnableDRAExtendedResource {
-		scorer.enableDRAExtendedResource = true
 		scorer.draManager = h.SharedDRAManager()
 		scorer.draFeatures = dynamicresources.AllocatorFeatures(fts)
 		// Create a CEL cache for device class selector compilation
@@ -232,17 +224,10 @@ func NewFit(_ context.Context, plArgs runtime.Object, h fwk.Handle, fts feature.
 	}
 
 	pl := &Fit{
-		ignoredResources:                sets.New(args.IgnoredResources...),
-		ignoredResourceGroups:           sets.New(args.IgnoredResourceGroups...),
-		enableInPlacePodVerticalScaling: fts.EnableInPlacePodVerticalScaling,
-		handle:                          h,
-		enablePodLevelResources:         fts.EnablePodLevelResources,
-		enableDRAExtendedResource:       fts.EnableDRAExtendedResource,
-
-		enableInPlacePodLevelResourcesVerticalScaling: fts.EnableInPlacePodLevelResourcesVerticalScaling,
-
-		enableInPlacePodVerticalScalingSchedulerPreemption: fts.EnableInPlacePodVerticalScalingSchedulerPreemption,
-
+		ignoredResources:         sets.New(args.IgnoredResources...),
+		ignoredResourceGroups:    sets.New(args.IgnoredResourceGroups...),
+		fts:                      fts,
+		handle:                   h,
 		resourceAllocationScorer: scorer,
 	}
 
@@ -254,31 +239,29 @@ func NewFit(_ context.Context, plArgs runtime.Object, h fwk.Handle, fts feature.
 		if err != nil {
 			return nil, err
 		}
+		placementScorer.fts = fts
 		pl.placementScorer = placementScorer
 	}
 
 	return pl, nil
 }
 
-// InsufficientResource, ResourceRequestsOptions and Fits live in plugins/helper
+// InsufficientResource and Fits live in plugins/helper
 // so the kubelet can use them without this plugin's DRA imports.
 type InsufficientResource = helper.InsufficientResource
 
-// ResourceRequestsOptions contains feature gate flags for resource request computation.
-type ResourceRequestsOptions = helper.ResourceRequestsOptions
-
 // Fits checks if node have enough resources to host the pod.
-func Fits(pod *v1.Pod, nodeInfo fwk.NodeInfo, draManager fwk.SharedDRAManager, opts ResourceRequestsOptions) []InsufficientResource {
-	return helper.Fits(pod, nodeInfo, draManager, opts)
+func Fits(pod *v1.Pod, nodeInfo fwk.NodeInfo, draManager fwk.SharedDRAManager, fts feature.Features) []InsufficientResource {
+	return helper.Fits(pod, nodeInfo, draManager, fts)
 }
 
-func computePodResourceRequest(pod *v1.Pod, opts ResourceRequestsOptions) *preFilterState {
-	return &preFilterState{Resource: helper.ComputePodResourceRequest(pod, opts)}
+func computePodResourceRequest(pod *v1.Pod, fts feature.Features) *preFilterState {
+	return &preFilterState{Resource: helper.ComputePodResourceRequest(pod, fts)}
 }
 
 // PreFilter invoked at the prefilter extension point.
 func (f *Fit) PreFilter(ctx context.Context, cycleState fwk.CycleState, pod *v1.Pod, nodes []fwk.NodeInfo) (*fwk.PreFilterResult, *fwk.Status) {
-	result := computePodResourceRequest(pod, ResourceRequestsOptions{EnablePodLevelResources: f.enablePodLevelResources})
+	result := computePodResourceRequest(pod, f.fts)
 
 	cycleState.Write(preFilterStateKey, result)
 	return nil, nil
@@ -310,19 +293,19 @@ func (f *Fit) EventsToRegister(_ context.Context) ([]fwk.ClusterEventWithHint, e
 		{Event: fwk.ClusterEvent{Resource: fwk.AssignedPod, ActionType: fwk.Delete}, QueueingHintFn: f.isSchedulableAfterAssignedPodDelete},
 		{Event: fwk.ClusterEvent{Resource: fwk.Node, ActionType: fwk.Add | fwk.UpdateNodeAllocatable}, QueueingHintFn: f.isSchedulableAfterNodeChange},
 	}
-	if f.enableDRAExtendedResource {
+	if f.fts.EnableDRAExtendedResource {
 		events = append(events,
 			// A pod might be waiting for an exteneded resurce from a class to get created or modified.
 			fwk.ClusterEventWithHint{Event: fwk.ClusterEvent{Resource: fwk.DeviceClass, ActionType: fwk.Add | fwk.Update}, QueueingHintFn: f.isSchedulableAfterDeviceClassEvent})
 	}
-	if f.enableInPlacePodVerticalScaling {
+	if f.fts.EnableInPlacePodVerticalScaling {
 		// If InPlacePodVerticalScaling (KEP 1287) is enabled, then UpdatePodScaleDown event should be registered
 		// for this plugin since a Pod update may free up resources that make other Pods schedulable.
 		events = append(events,
 			fwk.ClusterEventWithHint{Event: fwk.ClusterEvent{Resource: fwk.AssignedPod, ActionType: fwk.UpdatePodScaleDown}, QueueingHintFn: f.isSchedulableAfterAssignedPodScaleDown},
 			fwk.ClusterEventWithHint{Event: fwk.ClusterEvent{Resource: fwk.TargetPod, ActionType: fwk.UpdatePodScaleDown}, QueueingHintFn: f.isSchedulableAfterTargetPodScaleDown})
 	}
-	if f.enableInPlacePodVerticalScalingSchedulerPreemption {
+	if f.fts.EnableInPlacePodVerticalScalingSchedulerPreemption {
 		events = append(events,
 			fwk.ClusterEventWithHint{Event: fwk.ClusterEvent{Resource: fwk.AssignedPod, ActionType: fwk.UpdatePodScaleUp}, QueueingHintFn: f.isSchedulableAfterAssignedPodScaleUp},
 			fwk.ClusterEventWithHint{Event: fwk.ClusterEvent{Resource: fwk.TargetPod, ActionType: fwk.UpdatePodScaleUp}, QueueingHintFn: f.isSchedulableAfterTargetPodScaleUp})
@@ -343,7 +326,7 @@ func (f *Fit) isSchedulableAfterAssignedPodDelete(logger klog.Logger, pod *v1.Po
 		return fwk.QueueSkip, nil
 	}
 
-	if f.enableInPlacePodVerticalScalingSchedulerPreemption && resource.IsPodResizeDeferred(pod) {
+	if f.fts.EnableInPlacePodVerticalScalingSchedulerPreemption && resource.IsPodResizeDeferred(pod) {
 		if deletedPod.Spec.NodeName != pod.Spec.NodeName {
 			logger.V(5).Info("another scheduled pod was deleted, but it's on a different node than the deferred resize pod", "pod", klog.KObj(pod), "deletedPod", klog.KObj(deletedPod))
 			return fwk.QueueSkip, nil
@@ -423,7 +406,7 @@ func (f *Fit) haveEnoughRelevantResourcesDecreased(targetPod *v1.Pod, originalPo
 		return false
 	}
 
-	if f.enableInPlacePodVerticalScalingSchedulerPreemption && resource.IsPodResizeDeferred(targetPod) {
+	if f.fts.EnableInPlacePodVerticalScalingSchedulerPreemption && resource.IsPodResizeDeferred(targetPod) {
 		// A pod with deferred resize is already bound to a specific node, so changes to other nodes do not affect its schedulability.
 		if modifiedPod.Spec.NodeName != targetPod.Spec.NodeName {
 			return false
@@ -434,10 +417,7 @@ func (f *Fit) haveEnoughRelevantResourcesDecreased(targetPod *v1.Pod, originalPo
 	originalMaxResourceReq, modifiedMaxResourceReq := &framework.Resource{}, &framework.Resource{}
 	opts := resource.PodResourcesOptions{
 		UseStatusResources: true,
-		Features: resource.Features{
-			InPlacePodVerticalScaling:               f.enableInPlacePodVerticalScaling,
-			InPlacePodLevelResourcesVerticalScaling: f.enableInPlacePodLevelResourcesVerticalScaling,
-		},
+		Features:           f.fts.ResourceFeatures(),
 	}
 	originalMaxResourceReq.SetMaxResource(resource.PodRequests(originalPod, opts))
 	modifiedMaxResourceReq.SetMaxResource(resource.PodRequests(modifiedPod, opts))
@@ -478,7 +458,7 @@ func (f *Fit) isSchedulableAfterNodeChange(logger klog.Logger, pod *v1.Pod, oldO
 	if err != nil {
 		return fwk.Queue, err
 	}
-	if f.enableInPlacePodVerticalScalingSchedulerPreemption && resource.IsPodResizeDeferred(pod) {
+	if f.fts.EnableInPlacePodVerticalScalingSchedulerPreemption && resource.IsPodResizeDeferred(pod) {
 		// A pod with deferred resize is already bound to a specific node, so changes to other nodes do not affect its schedulability.
 		if modifiedNode.Name != pod.Spec.NodeName {
 			logger.V(5).Info("node was updated, but it is a different node than the deferred resize pod's node", "pod", klog.KObj(pod), "node", klog.KObj(modifiedNode))
@@ -487,17 +467,12 @@ func (f *Fit) isSchedulableAfterNodeChange(logger klog.Logger, pod *v1.Pod, oldO
 	}
 	// Use the DRA manager's extended resource cache for event handlers
 	var draManager fwk.SharedDRAManager
-	if f.enableDRAExtendedResource {
+	if f.fts.EnableDRAExtendedResource {
 		draManager = f.handle.SharedDRAManager()
 	}
 
-	opts := ResourceRequestsOptions{
-		EnablePodLevelResources:   f.enablePodLevelResources,
-		EnableDRAExtendedResource: f.enableDRAExtendedResource,
-	}
-
 	// Leaving in the queue, since the pod won't fit into the modified node anyway.
-	if !isFit(pod, modifiedNode, draManager, opts) {
+	if !isFit(pod, modifiedNode, draManager, f.fts) {
 		logger.V(5).Info("node was created or updated, but it doesn't have enough resource(s) to accommodate this pod", "pod", klog.KObj(pod), "node", klog.KObj(modifiedNode))
 		return fwk.QueueSkip, nil
 	}
@@ -507,7 +482,7 @@ func (f *Fit) isSchedulableAfterNodeChange(logger klog.Logger, pod *v1.Pod, oldO
 		return fwk.Queue, nil
 	}
 	// The pod will fit, but since there was no increase in available resources, the change won't make the pod schedulable.
-	if !haveAnyRequestedResourcesIncreased(pod, originalNode, modifiedNode, draManager, opts) {
+	if !haveAnyRequestedResourcesIncreased(pod, originalNode, modifiedNode, draManager, f.fts) {
 		logger.V(5).Info("node was updated, but haven't changed the pod's resource requestments fit assessment", "pod", klog.KObj(pod), "node", klog.KObj(modifiedNode))
 		return fwk.QueueSkip, nil
 	}
@@ -523,6 +498,9 @@ func (f *Fit) isSchedulableAfterDeviceClassEvent(logger klog.Logger, pod *v1.Pod
 	if err != nil {
 		return fwk.Queue, err
 	}
+	opts := resource.PodResourcesOptions{
+		Features: f.fts.ResourceFeatures(),
+	}
 	if originalClass != nil {
 		if ptr.Deref(originalClass.Spec.ExtendedResourceName, "") == ptr.Deref(modifiedClass.Spec.ExtendedResourceName, "") {
 			logger.V(5).Info("device class has identical extended resource name", "pod", klog.KObj(pod), "deviceclass", klog.KObj(modifiedClass))
@@ -530,14 +508,14 @@ func (f *Fit) isSchedulableAfterDeviceClassEvent(logger klog.Logger, pod *v1.Pod
 		}
 	} else {
 		// only check implicit extended resource name for Add, as device class name does not change during Update.
-		reqs := resource.PodRequests(pod, resource.PodResourcesOptions{})
+		reqs := resource.PodRequests(pod, opts)
 		if _, ok := reqs[v1.ResourceName(resourceapi.ResourceDeviceClassPrefix+modifiedClass.Name)]; ok {
 			logger.V(5).Info("device class was added, and may now fit the pod's resource requests", "pod", klog.KObj(pod), "deviceclass", klog.KObj(modifiedClass))
 			return fwk.Queue, nil
 		}
 	}
 	if modifiedClass.Spec.ExtendedResourceName != nil {
-		reqs := resource.PodRequests(pod, resource.PodResourcesOptions{})
+		reqs := resource.PodRequests(pod, opts)
 		if _, ok := reqs[v1.ResourceName(*modifiedClass.Spec.ExtendedResourceName)]; ok {
 			logger.V(5).Info("device class was created or updated, and may fit the pod's resoruce requests", "pod", klog.KObj(pod), "deviceclass", klog.KObj(modifiedClass))
 			return fwk.Queue, nil
@@ -548,8 +526,8 @@ func (f *Fit) isSchedulableAfterDeviceClassEvent(logger klog.Logger, pod *v1.Pod
 }
 
 // haveAnyRequestedResourcesIncreased returns true if any of the resources requested by the pod have increased or if allowed pod number increased.
-func haveAnyRequestedResourcesIncreased(pod *v1.Pod, originalNode, modifiedNode *v1.Node, draManager fwk.SharedDRAManager, opts ResourceRequestsOptions) bool {
-	podRequest := computePodResourceRequest(pod, opts)
+func haveAnyRequestedResourcesIncreased(pod *v1.Pod, originalNode, modifiedNode *v1.Node, draManager fwk.SharedDRAManager, fts feature.Features) bool {
+	podRequest := computePodResourceRequest(pod, fts)
 	originalNodeInfo := framework.NewNodeInfo()
 	originalNodeInfo.SetNode(originalNode)
 	modifiedNodeInfo := framework.NewNodeInfo()
@@ -582,7 +560,7 @@ func haveAnyRequestedResourcesIncreased(pod *v1.Pod, originalNode, modifiedNode 
 			return true
 		}
 
-		if helper.ShouldDelegateResourceToDRA(rName, modifiedNodeInfo, draManager, opts) {
+		if helper.ShouldDelegateResourceToDRA(rName, modifiedNodeInfo, draManager, fts) {
 			return true
 		}
 	}
@@ -591,14 +569,14 @@ func haveAnyRequestedResourcesIncreased(pod *v1.Pod, originalNode, modifiedNode 
 
 // isFit checks if the pod fits the node. If the node is nil, it returns false.
 // It constructs a fake NodeInfo object for the node and checks if the pod fits the node.
-func isFit(pod *v1.Pod, node *v1.Node, draManager fwk.SharedDRAManager, opts ResourceRequestsOptions) bool {
+func isFit(pod *v1.Pod, node *v1.Node, draManager fwk.SharedDRAManager, fts feature.Features) bool {
 	if node == nil {
 		return false
 	}
 	nodeInfo := framework.NewNodeInfo()
 	nodeInfo.SetNode(node)
 
-	return len(Fits(pod, nodeInfo, draManager, opts)) == 0
+	return len(Fits(pod, nodeInfo, draManager, fts)) == 0
 }
 
 // Filter invoked at the filter extension point.
@@ -611,17 +589,11 @@ func (f *Fit) Filter(ctx context.Context, cycleState fwk.CycleState, pod *v1.Pod
 	}
 
 	var draManager fwk.SharedDRAManager
-	if f.enableDRAExtendedResource {
+	if f.fts.EnableDRAExtendedResource {
 		draManager = f.handle.SharedDRAManager()
 	}
 
-	opts := ResourceRequestsOptions{
-		EnablePodLevelResources:                            f.enablePodLevelResources,
-		EnableDRAExtendedResource:                          f.enableDRAExtendedResource,
-		EnableInPlacePodVerticalScalingSchedulerPreemption: f.enableInPlacePodVerticalScalingSchedulerPreemption,
-	}
-
-	insufficientResources := helper.FitsRequest(&s.Resource, nodeInfo, f.ignoredResources, f.ignoredResourceGroups, draManager, opts, pod)
+	insufficientResources := helper.FitsRequest(&s.Resource, nodeInfo, f.ignoredResources, f.ignoredResourceGroups, draManager, f.fts, pod)
 
 	if len(insufficientResources) != 0 {
 		// We will keep all failure reasons.
@@ -648,7 +620,7 @@ func (f *Fit) Score(ctx context.Context, state fwk.CycleState, pod *v1.Pod, node
 		s = &preScoreState{
 			podRequests: f.calculatePodResourceRequestList(pod, f.resources),
 		}
-		if f.enableDRAExtendedResource {
+		if f.fts.EnableDRAExtendedResource {
 			draPreScoreState, status := getDRAPreScoredParams(f.draManager, f.resources)
 			if status != nil {
 				return 0, status
