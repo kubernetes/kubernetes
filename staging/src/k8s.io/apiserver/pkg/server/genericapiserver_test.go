@@ -26,6 +26,7 @@ import (
 	"net/http/httptest"
 	goruntime "runtime"
 	"strconv"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -54,6 +55,7 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	restclient "k8s.io/client-go/rest"
 	basecompatibility "k8s.io/component-base/compatibility"
+	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/klog/v2/ktesting"
 	kubeopenapi "k8s.io/kube-openapi/pkg/common"
 	"k8s.io/kube-openapi/pkg/validation/spec"
@@ -117,6 +119,28 @@ func buildTestOpenAPIDefinition() kubeopenapi.OpenAPIDefinition {
 	}
 }
 
+func buildTestDeprecatedOpenAPIDefinition() kubeopenapi.OpenAPIDefinition {
+	return kubeopenapi.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "Description",
+				Properties:  map[string]spec.Schema{},
+			},
+			VendorExtensible: spec.VendorExtensible{
+				Extensions: spec.Extensions{
+					"x-kubernetes-group-version-kind": []interface{}{
+						map[string]interface{}{
+							"group":   "test.example.com",
+							"version": "v1alpha1",
+							"kind":    "Deprecated",
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
 func testGetOpenAPIDefinitions(_ kubeopenapi.ReferenceCallback) map[string]kubeopenapi.OpenAPIDefinition {
 	return map[string]kubeopenapi.OpenAPIDefinition{
 		"io.k8s.apimachinery.pkg.apis.meta.v1.Status":          {},
@@ -124,6 +148,7 @@ func testGetOpenAPIDefinitions(_ kubeopenapi.ReferenceCallback) map[string]kubeo
 		"io.k8s.apimachinery.pkg.apis.meta.v1.APIGroupList":    {},
 		"io.k8s.apimachinery.pkg.apis.meta.v1.APIGroup":        buildTestOpenAPIDefinition(),
 		"io.k8s.apimachinery.pkg.apis.meta.v1.APIResourceList": {},
+		"k8s.io/apiserver/pkg/server.testDeprecatedType":       buildTestDeprecatedOpenAPIDefinition(),
 	}
 }
 
@@ -594,6 +619,166 @@ func (p *testNoVerbsStorage) Destroy() {
 
 func (p *testNoVerbsStorage) GetSingularName() string {
 	return "noverb"
+}
+
+type testDeprecatedType struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+}
+
+func (t *testDeprecatedType) DeepCopyObject() runtime.Object {
+	if t == nil {
+		return nil
+	}
+	out := new(testDeprecatedType)
+	t.DeepCopyInto(out)
+	return out
+}
+
+func (t *testDeprecatedType) DeepCopyInto(out *testDeprecatedType) {
+	*out = *t
+	t.ObjectMeta.DeepCopyInto(&out.ObjectMeta)
+}
+
+func (t *testDeprecatedType) APILifecycleDeprecated() (major, minor int) {
+	return 1, 0
+}
+
+func (t *testDeprecatedType) APILifecycleRemoved() (major, minor int) {
+	return 1, 99
+}
+
+func (t *testDeprecatedType) APILifecycleReplacement() schema.GroupVersionKind {
+	return schema.GroupVersionKind{Group: "test.example.com", Version: "v1", Kind: "Deprecated"}
+}
+
+type testDeprecatedStorage struct {
+	Version string
+}
+
+func (p *testDeprecatedStorage) NamespaceScoped() bool {
+	return false
+}
+
+func (p *testDeprecatedStorage) New() runtime.Object {
+	return &testDeprecatedType{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Deprecated",
+			APIVersion: p.Version,
+		},
+	}
+}
+
+func (p *testDeprecatedStorage) Destroy() {
+}
+
+func (p *testDeprecatedStorage) Get(ctx context.Context, name string, options *metav1.GetOptions) (runtime.Object, error) {
+	return &testDeprecatedType{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Deprecated",
+			APIVersion: p.Version,
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+	}, nil
+}
+
+func (p *testDeprecatedStorage) GetSingularName() string {
+	return "deprecated"
+}
+
+func TestGenericAPIServerDeprecatedAPIs(t *testing.T) {
+	config, _ := setUp(t)
+	s, err := config.Complete(nil).New("test", NewEmptyDelegate())
+	if err != nil {
+		t.Fatalf("Error in bringing up the server: %v", err)
+	}
+
+	deprecatedGV := schema.GroupVersion{Group: "test.example.com", Version: "v1alpha1"}
+	storage := &testDeprecatedStorage{Version: deprecatedGV.Version}
+
+	scheme := runtime.NewScheme()
+	scheme.AddKnownTypeWithName(deprecatedGV.WithKind("Deprecated"), storage.New())
+	scheme.AddKnownTypes(v1GroupVersion, &metav1.Status{})
+	metav1.AddToGroupVersion(scheme, v1GroupVersion)
+	metav1.AddToGroupVersion(scheme, deprecatedGV)
+
+	apiGroup := APIGroupInfo{
+		PrioritizedVersions: []schema.GroupVersion{deprecatedGV},
+		VersionedResourcesStorageMap: map[string]map[string]rest.Storage{
+			deprecatedGV.Version: {
+				"deprecateds": storage,
+			},
+		},
+		OptionsExternalVersion: &schema.GroupVersion{Version: "v1"},
+		ParameterCodec:         runtime.NewParameterCodec(scheme),
+		NegotiatedSerializer:   serializer.NewCodecFactory(scheme),
+		Scheme:                 scheme,
+	}
+
+	if err := s.InstallAPIGroup(&apiGroup); err != nil {
+		t.Fatalf("unexpected error installing API group: %v", err)
+	}
+
+	server := httptest.NewServer(s.Handler)
+	defer server.Close()
+
+	resp, err := http.Get(server.URL + "/apis/test.example.com/v1alpha1/deprecateds/foo")
+	if err != nil {
+		t.Fatalf("unexpected error making request to deprecated API: %v", err)
+	}
+	defer func() {
+		_ = resp.Body.Close()
+	}()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected status OK, got %d", resp.StatusCode)
+	}
+
+	warningHeader := resp.Header.Get("Warning")
+	if !strings.Contains(warningHeader, "deprecated") || !strings.Contains(warningHeader, "unavailable in v1.99+") {
+		t.Errorf("expected warning header indicating deprecation in v1.0+ and removal in v1.99+, got: %q", warningHeader)
+	}
+
+	metricsResp, err := http.Get(server.URL + "/metrics")
+	if err != nil {
+		t.Fatalf("unexpected error scraping metrics: %v", err)
+	}
+	defer func() {
+		_ = metricsResp.Body.Close()
+	}()
+
+	metricsBody, err := io.ReadAll(metricsResp.Body)
+	if err != nil {
+		t.Fatalf("unexpected error reading metrics body: %v", err)
+	}
+
+	parsedMetrics := testutil.NewMetrics()
+	if err := testutil.ParseMetrics(string(metricsBody), &parsedMetrics); err != nil {
+		t.Fatalf("unexpected error parsing metrics: %v", err)
+	}
+
+	samples, found := parsedMetrics["apiserver_requested_deprecated_apis"]
+	if !found || len(samples) == 0 {
+		t.Fatalf("expected metric apiserver_requested_deprecated_apis to be recorded, but not found")
+	}
+
+	var foundMatchingSample bool
+	for _, sample := range samples {
+		if sample.Metric["group"] == "test.example.com" &&
+			sample.Metric["version"] == "v1alpha1" &&
+			sample.Metric["resource"] == "deprecateds" &&
+			sample.Metric["removed_release"] == "1.99" {
+			foundMatchingSample = true
+			if sample.Value != 1 {
+				t.Errorf("expected metric value 1, got %v", sample.Value)
+			}
+		}
+	}
+	if !foundMatchingSample {
+		t.Errorf("did not find sample matching test.example.com/v1alpha1 deprecateds in %v", samples)
+	}
 }
 
 func fakeVersion() version.Info {
