@@ -96,6 +96,10 @@ func (c completedConfig) New(name string, delegationTarget genericapiserver.Dele
 		return nil, err
 	}
 
+	if signer, ok := c.ServiceAccountIssuer.(interface{ Destroy() }); ok {
+		generic.RegisterDestroyFunc(signer.Destroy)
+	}
+
 	if c.EnableLogsSupport {
 		routes.Logs{}.Install(generic.Handler.GoRestfulContainer)
 	}

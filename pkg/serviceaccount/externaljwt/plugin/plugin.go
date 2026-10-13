@@ -23,6 +23,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
+	"sync"
 	"time"
 
 	jose "github.com/go-jose/go-jose/v4"
@@ -31,6 +32,7 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 
 	externaljwtv1 "k8s.io/externaljwt/apis/v1"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/serviceaccount"
 	externaljwtmetrics "k8s.io/kubernetes/pkg/serviceaccount/externaljwt/metrics"
 )
@@ -47,8 +49,8 @@ type VerificationKeys struct {
 
 // New calls external signer to fill out supported keys.
 // It also starts a periodic sync of external keys.
-// In order for the key cache and external signing to work correctly, pass a context that will live as
-// long as the dependent process; is used to maintain the lifetime of the connection to external signer.
+// ctx controls the initial key fetch. The caller must call Destroy after requests
+// have drained to stop key synchronization and close the signer connection.
 func New(ctx context.Context, issuer, socketPath string, keySyncTimeout time.Duration, allowSigningWithNonOIDCKeys bool) (*Plugin, *keyCache, error) {
 	conn, err := grpc.Dial(
 		socketPath,
@@ -65,19 +67,17 @@ func New(ctx context.Context, issuer, socketPath string, keySyncTimeout time.Dur
 	}
 
 	plugin := newPlugin(issuer, conn, allowSigningWithNonOIDCKeys)
+	syncCtx, cancelSync := context.WithCancel(context.WithoutCancel(ctx))
+	plugin.cancelSync = cancelSync
 
 	initialFillCtx, cancel := context.WithTimeout(ctx, keySyncTimeout)
 	defer cancel()
 
 	if err := plugin.keyCache.initialFill(initialFillCtx); err != nil {
+		plugin.Destroy()
 		return nil, nil, fmt.Errorf("while initially filling key cache: %w", err)
 	}
-	go plugin.keyCache.scheduleSync(ctx, keySyncTimeout)
-
-	go func() {
-		<-ctx.Done()
-		_ = conn.Close()
-	}()
+	go plugin.keyCache.scheduleSync(syncCtx, keySyncTimeout)
 
 	return plugin, plugin.keyCache, nil
 }
@@ -88,12 +88,29 @@ type Plugin struct {
 	client                      externaljwtv1.ExternalJWTSignerClient
 	keyCache                    *keyCache
 	allowSigningWithNonOIDCKeys bool
+	conn                        *grpc.ClientConn
+	cancelSync                  context.CancelFunc
+	destroyOnce                 sync.Once
+}
+
+// Destroy stops key synchronization and closes the signer connection.
+// It is safe to call more than once.
+func (p *Plugin) Destroy() {
+	p.destroyOnce.Do(func() {
+		if p.cancelSync != nil {
+			p.cancelSync()
+		}
+		if err := p.conn.Close(); err != nil {
+			klog.ErrorS(err, "Failed to close external JWT signer connection")
+		}
+	})
 }
 
 // newPlugin constructs an implementation of external JWT signer plugin.
 func newPlugin(iss string, conn *grpc.ClientConn, allowSigningWithNonOIDCKeys bool) *Plugin {
 	client := externaljwtv1.NewExternalJWTSignerClient(conn)
 	plugin := &Plugin{
+		conn:                        conn,
 		iss:                         iss,
 		client:                      client,
 		allowSigningWithNonOIDCKeys: allowSigningWithNonOIDCKeys,

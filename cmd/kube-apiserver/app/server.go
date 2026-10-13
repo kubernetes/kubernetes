@@ -109,6 +109,10 @@ cluster's shared state through which all other components interact.`,
 				return err
 			}
 
+			if signer, ok := completedOptions.ServiceAccountIssuer.(interface{ Destroy() }); ok {
+				defer signer.Destroy()
+			}
+
 			// validate options
 			if errs := completedOptions.Validate(); len(errs) != 0 {
 				return utilerrors.NewAggregate(errs)
@@ -149,6 +153,10 @@ cluster's shared state through which all other components interact.`,
 
 // Run runs the specified APIServer.  This should never exit.
 func Run(ctx context.Context, opts options.CompletedOptions) error {
+	if signer, ok := opts.ServiceAccountIssuer.(interface{ Destroy() }); ok {
+		defer signer.Destroy()
+	}
+
 	// To help debugging, immediately log version
 	klog.Infof("Version: %+v", utilversion.Get())
 

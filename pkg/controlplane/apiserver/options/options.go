@@ -287,7 +287,7 @@ func (o *Options) Complete(ctx context.Context, alternateDNS []string, alternate
 	}, nil
 }
 
-func (o *Options) completeServiceAccountOptions(ctx context.Context, completed *completedOptions) error {
+func (o *Options) completeServiceAccountOptions(ctx context.Context, completed *completedOptions) (retErr error) {
 	transitionWarningFmt := "service-account-extend-token-expiration is true, in order to correctly trigger safe transition logic, service-account-max-token-expiration must be set longer than %d seconds (currently %s)"
 	expExtensionWarningFmt := "service-account-extend-token-expiration is true, enabling tokens valid up to %d seconds, which is longer than service-account-max-token-expiration set to %s"
 	// verify service-account-max-token-expiration
@@ -318,6 +318,11 @@ func (o *Options) completeServiceAccountOptions(ctx context.Context, completed *
 			if err != nil {
 				return fmt.Errorf("while setting up external-jwt-signer: %w", err)
 			}
+			defer func() {
+				if retErr != nil {
+					plugin.Destroy()
+				}
+			}()
 			timedContext, cancel := context.WithTimeout(ctx, 10*time.Second)
 			defer cancel()
 			metadata, err := plugin.GetServiceMetadata(timedContext)

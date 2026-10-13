@@ -519,6 +519,9 @@ func TestCompleteForServiceAccount(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 			err := options.completeServiceAccountOptions(ctx, &co)
+			if signer, ok := co.ServiceAccountIssuer.(interface{ Destroy() }); ok {
+				t.Cleanup(signer.Destroy)
+			}
 
 			if tc.wantError != nil {
 				if err == nil || tc.wantError.Error() != err.Error() {

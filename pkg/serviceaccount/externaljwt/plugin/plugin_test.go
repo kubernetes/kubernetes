@@ -40,6 +40,7 @@ import (
 
 	utilnettesting "k8s.io/apimachinery/pkg/util/net/testing"
 	externaljwtv1 "k8s.io/externaljwt/apis/v1"
+	v1testing "k8s.io/kubernetes/pkg/serviceaccount/externaljwt/plugin/testing/v1"
 )
 
 var (
@@ -58,6 +59,51 @@ func init() {
 	rsaKey2, err = rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
 		panic("Error while generating second RSA key")
+	}
+}
+
+func TestStartupCancellationDoesNotStopSigning(t *testing.T) {
+	socketPath := utilnettesting.MakeSocketNameForTest(t, "signer-startup-cancellation.sock")
+	v1testing.NewMockSigner(t, socketPath)
+	startupCtx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	p, _, err := New(startupCtx, "issuer", socketPath, time.Second, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(p.Destroy)
+	cancel()
+
+	ticker := time.NewTicker(10 * time.Millisecond)
+	defer ticker.Stop()
+	for i := 0; i < 10; i++ {
+		<-ticker.C
+		requestCtx, cancelRequest := context.WithTimeout(context.Background(), time.Second)
+		token, err := p.GenerateToken(requestCtx, &jwt.Claims{Subject: "subject"}, privateClaimsT{})
+		cancelRequest()
+		if err != nil {
+			t.Fatalf("signing after startup cancellation failed: %v", err)
+		}
+		if token == "" {
+			t.Fatal("signer returned an empty token")
+		}
+	}
+}
+
+func TestExternalSignerDestroy(t *testing.T) {
+	socketPath := utilnettesting.MakeSocketNameForTest(t, "signer-destroy.sock")
+	v1testing.NewMockSigner(t, socketPath)
+	p, _, err := New(context.Background(), "issuer", socketPath, time.Second, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(p.Destroy)
+	p.Destroy()
+	p.Destroy()
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	if _, err := p.GenerateToken(ctx, &jwt.Claims{Subject: "subject"}, privateClaimsT{}); err == nil {
+		t.Fatal("signing succeeded after the signer was destroyed")
 	}
 }
 
