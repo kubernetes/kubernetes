@@ -643,6 +643,7 @@ func (r *Reflector) watch(ctx context.Context, w watch.Interface, resyncerrc cha
 		retry.After(err)
 		if err != nil {
 			if !errors.Is(err, errorStopRequested) {
+				var shortWatchError *VeryShortWatchError
 				switch {
 				case isExpiredError(err):
 					// Don't set LastSyncResourceVersionUnavailable - LIST call with ResourceVersion=RV already
@@ -660,6 +661,19 @@ func (r *Reflector) watch(ctx context.Context, w watch.Interface, resyncerrc cha
 				case apierrors.IsInternalError(err) && retry.ShouldRetry():
 					logger.V(2).Info("Retrying watch after internal error", "reflector", r.name, "type", r.typeDescription, "err", err)
 					continue
+				case errors.As(err, &shortWatchError) && r.LastSyncResourceVersion() != "" && r.LastSyncResourceVersion() != "0":
+					if ctx.Err() != nil {
+						return nil
+					}
+					// A closed watch does not invalidate its resource version. Retry without
+					// relisting, but back off to avoid adding load to an unresponsive server.
+					logger.V(2).Info("Very short watch - backing off", "reflector", r.name, "type", r.typeDescription, "err", err)
+					select {
+					case <-stopCh:
+						return nil
+					case <-r.clock.After(r.delayHandler()):
+						continue
+					}
 				default:
 					logger.Info("Warning: watch ended with error", "reflector", r.name, "type", r.typeDescription, "err", err)
 				}

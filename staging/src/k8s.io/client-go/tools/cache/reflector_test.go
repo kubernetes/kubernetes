@@ -61,6 +61,12 @@ var nevererrc chan error
 
 func TestCloseWatchChannelOnError(t *testing.T) {
 	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	done := make(chan struct{})
+	defer func() {
+		cancel()
+		<-done
+	}()
 	r := NewReflector(&ListWatch{}, &v1.Pod{}, NewStore(MetaNamespaceKeyFunc), 0)
 	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "bar"}}
 	fw := watch.NewFake()
@@ -72,7 +78,10 @@ func TestCloseWatchChannelOnError(t *testing.T) {
 			return &v1.PodList{ListMeta: metav1.ListMeta{ResourceVersion: "1"}}, nil
 		},
 	}
-	go func() { assert.NoError(t, r.ListAndWatchWithContext(ctx)) }()
+	go func() {
+		defer close(done)
+		assert.NoError(t, r.ListAndWatchWithContext(ctx))
+	}()
 	fw.Error(pod)
 	select {
 	case _, ok := <-fw.ResultChan():
@@ -896,8 +905,149 @@ func (f *fakeDelayFunc) delayFunc() time.Duration {
 	return 0
 }
 
+func TestRetryVeryShortEstablishedWatch(t *testing.T) {
+	for _, resourceVersion := range []string{"10", "", "0"} {
+		t.Run("resourceVersion="+resourceVersion, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+			fd := &fakeDelayFunc{}
+			listCalls, watchCalls := 0, 0
+			store := NewFIFO(MetaNamespaceKeyFunc)
+			lw := &ListWatch{
+				ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+					listCalls++
+					return &v1.PodList{
+						ListMeta: metav1.ListMeta{ResourceVersion: resourceVersion},
+						Items:    []v1.Pod{{ObjectMeta: metav1.ObjectMeta{Name: "pod", ResourceVersion: "10"}}},
+					}, nil
+				},
+				WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+					watchCalls++
+					w := watch.NewFakeWithChanSize(1, false)
+					switch watchCalls {
+					case 1, 2:
+						require.Equal(t, resourceVersion, options.ResourceVersion)
+					case 3:
+						require.Equal(t, "10", options.ResourceVersion)
+						w.Modify(&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod", ResourceVersion: "11"}})
+					default:
+						require.Equal(t, "11", options.ResourceVersion)
+						cancel()
+					}
+					w.Stop()
+					return w, nil
+				},
+			}
+			r := &Reflector{
+				name:              "test-reflector",
+				listerWatcher:     lw,
+				store:             store,
+				delayHandler:      fd.delayFunc,
+				clock:             &clock.RealClock{},
+				watchErrorHandler: WatchErrorHandlerWithContext(DefaultWatchErrorHandler),
+			}
+			require.NoError(t, r.ListAndWatchWithContext(ctx))
+			require.Equal(t, 1, listCalls)
+			if resourceVersion == "10" {
+				require.Equal(t, 4, watchCalls)
+				require.Equal(t, 2, fd.calls)
+				require.Equal(t, "11", r.LastSyncResourceVersion())
+				pod, exists, err := store.GetByKey("pod")
+				require.NoError(t, err)
+				require.True(t, exists)
+				require.Equal(t, "11", pod.(*v1.Pod).ResourceVersion)
+			} else {
+				require.Equal(t, 1, watchCalls)
+				require.Zero(t, fd.calls)
+			}
+		})
+	}
+}
+
+func TestShortWatchRetryStillRelistsOnExpiration(t *testing.T) {
+	for _, watchError := range []*apierrors.StatusError{
+		apierrors.NewResourceExpired("expired"),
+		apierrors.NewGone("gone"),
+	} {
+		t.Run(string(watchError.Status().Reason), func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+			fd := &fakeDelayFunc{}
+			listCalls, watchCalls := 0, 0
+			r := &Reflector{
+				listerWatcher: &ListWatch{
+					ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+						listCalls++
+						return &v1.PodList{ListMeta: metav1.ListMeta{ResourceVersion: strconv.Itoa(listCalls * 10)}}, nil
+					},
+					WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+						watchCalls++
+						w := watch.NewFakeWithChanSize(1, false)
+						switch watchCalls {
+						case 1:
+							require.Equal(t, "10", options.ResourceVersion)
+							w.Stop()
+						case 2:
+							require.Equal(t, "10", options.ResourceVersion)
+							status := watchError.Status()
+							w.Error(&status)
+						default:
+							require.Equal(t, "20", options.ResourceVersion)
+							cancel()
+							w.Stop()
+						}
+						return w, nil
+					},
+				},
+				store:             NewFIFO(MetaNamespaceKeyFunc),
+				delayHandler:      fd.delayFunc,
+				clock:             &clock.RealClock{},
+				watchErrorHandler: WatchErrorHandlerWithContext(DefaultWatchErrorHandler),
+			}
+			require.NoError(t, r.ListAndWatchWithContext(ctx))
+			require.Equal(t, 1, listCalls)
+			require.Equal(t, 2, watchCalls)
+			require.Equal(t, 1, fd.calls)
+			require.NoError(t, r.ListAndWatchWithContext(ctx))
+			require.Equal(t, 2, listCalls)
+			require.Equal(t, 3, watchCalls)
+			require.Equal(t, 1, fd.calls)
+		})
+	}
+}
+
+func TestShortWatchBackoffCancellation(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	backoffs := 0
+	r := &Reflector{
+		listerWatcher: &ListWatch{
+			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+				w := watch.NewFake()
+				w.Stop()
+				return w, nil
+			},
+		},
+		store: NewFIFO(MetaNamespaceKeyFunc),
+		clock: &clock.RealClock{},
+		delayHandler: func() time.Duration {
+			backoffs++
+			cancel()
+			return time.Hour
+		},
+	}
+	r.setLastSyncResourceVersion("10")
+	require.NoError(t, r.watch(ctx, nil, nevererrc))
+	require.Equal(t, 1, backoffs)
+}
+
 func TestBackoffOnTooManyRequests(t *testing.T) {
 	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 	err := apierrors.NewTooManyRequests("too many requests", 1)
 	clock := &clock.RealClock{}
 	fd := &fakeDelayFunc{}
@@ -918,6 +1068,7 @@ func TestBackoffOnTooManyRequests(t *testing.T) {
 			default:
 				w := watch.NewFake()
 				w.Stop()
+				cancel()
 				return w, nil
 			}
 		},
@@ -943,6 +1094,9 @@ func TestBackoffOnTooManyRequests(t *testing.T) {
 }
 
 func TestNoRelistOnTooManyRequests(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancelCause(ctx)
+	defer cancel(errors.New("done"))
 	err := apierrors.NewTooManyRequests("too many requests", 1)
 	clock := &clock.RealClock{}
 	fd := &fakeDelayFunc{}
@@ -960,6 +1114,7 @@ func TestNoRelistOnTooManyRequests(t *testing.T) {
 			}
 			w := watch.NewFake()
 			w.Stop()
+			cancel(errors.New("done"))
 			return w, nil
 		},
 	}
@@ -973,8 +1128,6 @@ func TestNoRelistOnTooManyRequests(t *testing.T) {
 		watchErrorHandler: WatchErrorHandlerWithContext(DefaultWatchErrorHandler),
 	}
 
-	_, ctx := ktesting.NewTestContext(t)
-	ctx, cancel := context.WithCancelCause(ctx)
 	if err := r.ListAndWatchWithContext(ctx); err != nil {
 		t.Fatal(err)
 	}
