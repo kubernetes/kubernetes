@@ -1087,7 +1087,7 @@ func (jm *Controller) syncJob(ctx context.Context, key string) (rErr error) {
 		if failureTargetCondition != nil && failureTargetCondition.Status == v1.ConditionTrue {
 			jobCtx.finishedCondition = newFailedConditionForFailureTarget(failureTargetCondition, jm.clock.Now())
 			// Evaluate failure scenarios for PodFailurePolicy.
-			} else if failJobMessage, failJobReason := getFailJobMessageAndReason(&job, pods); failJobMessage != nil && failJobReason != nil {
+		} else if failJobMessage, failJobReason := getFailJobMessageAndReason(&job, pods); failJobMessage != nil && failJobReason != nil {
 			// Prepare the interim FailureTarget condition to record the failure message before the finalizers (allowing removal of the pods) are removed.
 			jobCtx.finishedCondition = newCondition(batch.JobFailureTarget, v1.ConditionTrue, *failJobReason, *failJobMessage, jm.clock.Now())
 		}

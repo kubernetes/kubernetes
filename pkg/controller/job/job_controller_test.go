@@ -3010,7 +3010,7 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 
 	onExitCodeRules := []batch.PodFailurePolicyRule{
 		{
-			Name:   ptr.To("0"),
+			Name:   new("0"),
 			Action: batch.PodFailurePolicyActionIgnore,
 			OnExitCodes: &batch.PodFailurePolicyOnExitCodesRequirement{
 				Operator: batch.PodFailurePolicyOnExitCodesOpIn,
@@ -3018,7 +3018,7 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 			},
 		},
 		{
-			Name:   ptr.To("1"),
+			Name:   new("1"),
 			Action: batch.PodFailurePolicyActionFailJob,
 			OnExitCodes: &batch.PodFailurePolicyOnExitCodesRequirement{
 				Operator: batch.PodFailurePolicyOnExitCodesOpIn,
@@ -3049,7 +3049,7 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 					PodFailurePolicy: &batch.PodFailurePolicy{
 						Rules: []batch.PodFailurePolicyRule{
 							{
-								Name:   ptr.To("0"),
+								Name:   new("0"),
 								Action: batch.PodFailurePolicyActionIgnore,
 								OnExitCodes: &batch.PodFailurePolicyOnExitCodesRequirement{
 									ContainerName: ptr.To("main-container"),
@@ -3058,7 +3058,7 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 								},
 							},
 							{
-								Name:   ptr.To("1"),
+								Name:   new("1"),
 								Action: batch.PodFailurePolicyActionFailJob,
 								OnExitCodes: &batch.PodFailurePolicyOnExitCodesRequirement{
 									ContainerName: ptr.To("main-container"),
@@ -3472,7 +3472,7 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 					PodFailurePolicy: &batch.PodFailurePolicy{
 						Rules: []batch.PodFailurePolicyRule{
 							{
-								Name:   ptr.To("0"),
+								Name:   new("0"),
 								Action: batch.PodFailurePolicyActionFailJob,
 								OnExitCodes: &batch.PodFailurePolicyOnExitCodesRequirement{
 									Operator: batch.PodFailurePolicyOnExitCodesOpNotIn,
@@ -3531,7 +3531,7 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 					PodFailurePolicy: &batch.PodFailurePolicy{
 						Rules: []batch.PodFailurePolicyRule{
 							{
-								Name:   ptr.To("0"),
+								Name:   new("0"),
 								Action: batch.PodFailurePolicyActionFailJob,
 								OnExitCodes: &batch.PodFailurePolicyOnExitCodesRequirement{
 									Operator: batch.PodFailurePolicyOnExitCodesOpNotIn,
@@ -3817,7 +3817,7 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 					PodFailurePolicy: &batch.PodFailurePolicy{
 						Rules: []batch.PodFailurePolicyRule{
 							{
-								Name:   ptr.To("0"),
+								Name:   new("0"),
 								Action: batch.PodFailurePolicyActionCount,
 								OnExitCodes: &batch.PodFailurePolicyOnExitCodesRequirement{
 									Operator: batch.PodFailurePolicyOnExitCodesOpIn,
@@ -3825,7 +3825,7 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 								},
 							},
 							{
-								Name:   ptr.To("1"),
+								Name:   new("1"),
 								Action: batch.PodFailurePolicyActionIgnore,
 								OnExitCodes: &batch.PodFailurePolicyOnExitCodesRequirement{
 									Operator: batch.PodFailurePolicyOnExitCodesOpIn,
@@ -3871,7 +3871,7 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 					PodFailurePolicy: &batch.PodFailurePolicy{
 						Rules: []batch.PodFailurePolicyRule{
 							{
-								Name:   ptr.To("0"),
+								Name:   new("0"),
 								Action: batch.PodFailurePolicyActionCount,
 								OnPodConditions: []batch.PodFailurePolicyOnPodConditionsPattern{
 									{
@@ -3937,7 +3937,7 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 					PodFailurePolicy: &batch.PodFailurePolicy{
 						Rules: []batch.PodFailurePolicyRule{
 							{
-								Name:   ptr.To("0"),
+								Name:   new("0"),
 								Action: batch.PodFailurePolicyActionIgnore,
 								OnPodConditions: []batch.PodFailurePolicyOnPodConditionsPattern{
 									{
@@ -3981,7 +3981,7 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 					PodFailurePolicy: &batch.PodFailurePolicy{
 						Rules: []batch.PodFailurePolicyRule{
 							{
-								Name:   ptr.To("0"),
+								Name:   new("0"),
 								Action: batch.PodFailurePolicyActionIgnore,
 								OnPodConditions: []batch.PodFailurePolicyOnPodConditionsPattern{
 									{
@@ -4028,7 +4028,7 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 					PodFailurePolicy: &batch.PodFailurePolicy{
 						Rules: []batch.PodFailurePolicyRule{
 							{
-								Name:   ptr.To("0"),
+								Name:   new("0"),
 								Action: batch.PodFailurePolicyActionFailJob,
 								OnPodConditions: []batch.PodFailurePolicyOnPodConditionsPattern{
 									{
@@ -4084,7 +4084,7 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 					PodFailurePolicy: &batch.PodFailurePolicy{
 						Rules: []batch.PodFailurePolicyRule{
 							{
-								Name:   ptr.To("0"),
+								Name:   new("0"),
 								Action: batch.PodFailurePolicyActionCount,
 								OnPodConditions: []batch.PodFailurePolicyOnPodConditionsPattern{
 									{
@@ -4251,7 +4251,7 @@ func TestSyncJobWithJobSuccessPolicy(t *testing.T) {
 					},
 					PodFailurePolicy: &batch.PodFailurePolicy{
 						Rules: []batch.PodFailurePolicyRule{{
-							Name:   ptr.To("0"),
+							Name:   new("0"),
 							Action: batch.PodFailurePolicyActionFailJob,
 							OnPodConditions: []batch.PodFailurePolicyOnPodConditionsPattern{{
 								Type:   v1.DisruptionTarget,
@@ -4454,7 +4454,7 @@ func TestSyncJobWithJobSuccessPolicy(t *testing.T) {
 					},
 					PodFailurePolicy: &batch.PodFailurePolicy{
 						Rules: []batch.PodFailurePolicyRule{{
-							Name:   ptr.To("0"),
+							Name:   new("0"),
 							Action: batch.PodFailurePolicyActionFailJob,
 							OnPodConditions: []batch.PodFailurePolicyOnPodConditionsPattern{{
 								Type:   v1.DisruptionTarget,
@@ -4602,7 +4602,7 @@ func TestSyncJobWithJobSuccessPolicy(t *testing.T) {
 					},
 					PodFailurePolicy: &batch.PodFailurePolicy{
 						Rules: []batch.PodFailurePolicyRule{{
-							Name:   ptr.To("0"),
+							Name:   new("0"),
 							Action: batch.PodFailurePolicyActionFailJob,
 							OnPodConditions: []batch.PodFailurePolicyOnPodConditionsPattern{{
 								Type:   v1.DisruptionTarget,
@@ -4799,7 +4799,7 @@ func TestSyncJobWithJobSuccessPolicy(t *testing.T) {
 					},
 					PodFailurePolicy: &batch.PodFailurePolicy{
 						Rules: []batch.PodFailurePolicyRule{{
-							Name:   ptr.To("0"),
+							Name:   new("0"),
 							Action: batch.PodFailurePolicyActionFailJob,
 							OnPodConditions: []batch.PodFailurePolicyOnPodConditionsPattern{{
 								Type:   v1.DisruptionTarget,
@@ -5142,7 +5142,7 @@ func TestSyncJobWithJobBackoffLimitPerIndex(t *testing.T) {
 					PodFailurePolicy: &batch.PodFailurePolicy{
 						Rules: []batch.PodFailurePolicyRule{
 							{
-								Name:   ptr.To("0"),
+								Name:   new("0"),
 								Action: batch.PodFailurePolicyActionFailIndex,
 								OnExitCodes: &batch.PodFailurePolicyOnExitCodesRequirement{
 									Operator: batch.PodFailurePolicyOnExitCodesOpIn,
@@ -5190,7 +5190,7 @@ func TestSyncJobWithJobBackoffLimitPerIndex(t *testing.T) {
 					PodFailurePolicy: &batch.PodFailurePolicy{
 						Rules: []batch.PodFailurePolicyRule{
 							{
-								Name:   ptr.To("0"),
+								Name:   new("0"),
 								Action: batch.PodFailurePolicyActionFailJob,
 								OnExitCodes: &batch.PodFailurePolicyOnExitCodesRequirement{
 									Operator: batch.PodFailurePolicyOnExitCodesOpIn,
@@ -5253,7 +5253,7 @@ func TestSyncJobWithJobBackoffLimitPerIndex(t *testing.T) {
 					PodFailurePolicy: &batch.PodFailurePolicy{
 						Rules: []batch.PodFailurePolicyRule{
 							{
-								Name:   ptr.To("0"),
+								Name:   new("0"),
 								Action: batch.PodFailurePolicyActionIgnore,
 								OnExitCodes: &batch.PodFailurePolicyOnExitCodesRequirement{
 									Operator: batch.PodFailurePolicyOnExitCodesOpIn,

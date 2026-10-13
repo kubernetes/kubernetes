@@ -69,7 +69,7 @@ func SetDefaults_Job(obj *batchv1.Job) {
 		for idx, rule := range obj.Spec.PodFailurePolicy.Rules {
 			// If rule name is unset, default to the rule index.
 			if rule.Name == nil {
-				obj.Spec.PodFailurePolicy.Rules[idx].Name = ptr.To(strconv.Itoa(idx))
+				obj.Spec.PodFailurePolicy.Rules[idx].Name = new(strconv.Itoa(idx))
 			}
 		}
 	}

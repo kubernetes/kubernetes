@@ -803,7 +803,7 @@ func TestMatchPodFailurePolicy(t *testing.T) {
 				Rules: []batch.PodFailurePolicyRule{
 					{
 						// simulating pod failure policy rule name defaulting to rule index when unset
-						Name:   ptr.To("0"),
+						Name:   new("0"),
 						Action: batch.PodFailurePolicyActionFailJob,
 						OnPodConditions: []batch.PodFailurePolicyOnPodConditionsPattern{
 							{
@@ -813,7 +813,7 @@ func TestMatchPodFailurePolicy(t *testing.T) {
 						},
 					},
 					{
-						Name:   ptr.To("HostMaintenanceRule"),
+						Name:   new("HostMaintenanceRule"),
 						Action: batch.PodFailurePolicyActionIgnore,
 						OnPodConditions: []batch.PodFailurePolicyOnPodConditionsPattern{
 							{
@@ -839,7 +839,7 @@ func TestMatchPodFailurePolicy(t *testing.T) {
 			wantJobFailureMessage: nil,
 			wantCountFailed:       false,
 			wantAction:            &ignore,
-			wantRuleName:          ptr.To("HostMaintenanceRule"),
+			wantRuleName:          new("HostMaintenanceRule"),
 		},
 	}
 	for name, tc := range testCases {
