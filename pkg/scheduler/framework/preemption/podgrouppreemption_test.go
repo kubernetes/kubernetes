@@ -39,12 +39,14 @@ import (
 	"k8s.io/klog/v2/ktesting"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/backend/cache"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/backend/queue"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/parallelize"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultbinder"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/interpodaffinity"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/queuesort"
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
@@ -1489,6 +1491,105 @@ func TestPodGroupEvaluator_Preempt_Victims(t *testing.T) {
 				t.Errorf("NumPDBViolations mismatch. Want %d, Got %d", tt.expectedNumPDBViolations, mockPreemptionManager.candidate.Victims().NumPDBViolations)
 			}
 		})
+	}
+}
+
+func TestPodGroupPreemptionHonorsReprievedAntiAffinity(t *testing.T) {
+	for _, fastPath := range []bool{false, true} {
+		for _, topologyKey := range []string{v1.LabelHostname, v1.LabelTopologyZone} {
+			for _, conflicting := range []bool{false, true} {
+				t.Run(topologyKey+"/fastPath="+strconv.FormatBool(fastPath)+"/conflicting="+strconv.FormatBool(conflicting), func(t *testing.T) {
+					featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+						features.GenericWorkload:                  true,
+						features.InterPodAffinityHostnameFastPath: fastPath,
+					})
+					logger, ctx := ktesting.NewTestContext(t)
+					ctx, cancel := context.WithCancel(ctx)
+					defer cancel()
+					node := st.MakeNode().Name("node").Label(v1.LabelHostname, "node").Label(v1.LabelTopologyZone, "zone").Obj()
+					preemptor := st.MakePod().Name("preemptor").UID("preemptor").Namespace("ns").
+						Labels(map[string]string{"app": "preemptor"}).PodGroupName("group").Priority(highPriority).Obj()
+					matchingValue := "other"
+					if conflicting {
+						matchingValue = "preemptor"
+					}
+					victimPod := st.MakePod().Name("victim").UID("victim").Namespace("ns").Node("node").Priority(lowPriority).
+						PodAntiAffinityIn("app", topologyKey, []string{matchingValue}, st.PodAntiAffinityWithRequiredReq).Obj()
+					informerFactory := informers.NewSharedInformerFactory(clientsetfake.NewClientset(
+						node, victimPod, preemptor, &v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "ns"}},
+					), 0)
+					snapshot := internalcache.NewSnapshot([]*v1.Pod{victimPod}, []*v1.Node{node})
+					affinityFactory := func(ctx context.Context, _ runtime.Object, fh fwk.Handle) (fwk.Plugin, error) {
+						return interpodaffinity.New(ctx, &config.InterPodAffinityArgs{}, fh, feature.Features{
+							EnableInterPodAffinityHostnameFastPath: fastPath,
+						})
+					}
+					fh, err := tf.NewFramework(ctx, []tf.RegisterPluginFunc{
+						tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+						tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+						tf.RegisterPluginAsExtensions(interpodaffinity.Name, affinityFactory, "PreFilter", "Filter"),
+					}, "",
+						frameworkruntime.WithPodNominator(internalqueue.NewSchedulingQueue(nil, informerFactory)),
+						frameworkruntime.WithInformerFactory(informerFactory),
+						frameworkruntime.WithSnapshotSharedLister(snapshot),
+						frameworkruntime.WithMutableSnapshotLister(snapshot),
+						frameworkruntime.WithLogger(logger),
+						frameworkruntime.WithPreemptionManager(func(fh fwk.Handle) fwk.PreemptionManager {
+							return NewPreemptionManager(fh, feature.NewSchedulerFeaturesFromGates(utilfeature.DefaultFeatureGate))
+						}),
+					)
+					if err != nil {
+						t.Fatal(err)
+					}
+					informerFactory.Start(ctx.Done())
+					informerFactory.WaitForCacheSync(ctx.Done())
+					schedule := func(ctx context.Context) (*fwk.PodGroupAssignments, *fwk.Status) {
+						state := framework.NewCycleState()
+						state.SetPodGroupCycleState(framework.NewCycleState())
+						if _, status, _ := fh.RunPreFilterPlugins(ctx, state, preemptor); !status.IsSuccess() {
+							return nil, status
+						}
+						nodeInfo, err := snapshot.NodeInfos().Get(node.Name)
+						if err != nil {
+							return nil, fwk.AsStatus(err)
+						}
+						if status := fh.RunFilterPluginsWithNominatedPods(ctx, state, preemptor, nodeInfo); !status.IsSuccess() {
+							return nil, status
+						}
+						return &fwk.PodGroupAssignments{ProposedAssignments: []fwk.ProposedAssignment{
+							&mockProposedAssignment{pod: preemptor, nodeName: node.Name, cycleState: state},
+						}}, nil
+					}
+					victimInfo, err := framework.NewPodInfo(victimPod)
+					if err != nil {
+						t.Fatal(err)
+					}
+					if err := snapshot.StartMutations(); err != nil {
+						t.Fatal(err)
+					}
+					defer func() {
+						if err := snapshot.EndMutations(); err != nil {
+							t.Error(err)
+						}
+					}()
+					ev := &PodGroupEvaluator{Handle: fh}
+					victims := prepareDomainVictims([]Victim{
+						NewPodVictim(victimInfo, nil, nil),
+					}, highPriority, nil)
+					result, status := ev.selectVictimsOnDomain(ctx, victims, schedule)
+					if !status.IsSuccess() {
+						t.Fatalf("victim selection failed: %v", status)
+					}
+					wantVictims := 0
+					if conflicting {
+						wantVictims = 1
+					}
+					if len(result.victims.Pods) != wantVictims {
+						t.Errorf("expected %d victims, got %d; a conflicting anti-affinity victim must not be reprieved", wantVictims, len(result.victims.Pods))
+					}
+				})
+			}
+		}
 	}
 }
 

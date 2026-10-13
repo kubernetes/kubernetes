@@ -501,7 +501,8 @@ func (pl *InterPodAffinity) getIncomingAffinityAntiAffinityCounts(ctx context.Co
 //     `matchingHostScopedAffinityPodsCount`.
 //
 // Finally, if no global tracking maps were populated, no host-scoped evaluation is needed, and the incoming pod
-// has no terms of its own, PreFilter returns `fwk.Skip` to completely bypass this plugin during the Filter phase.
+// has no terms of its own, PreFilter returns `fwk.Skip` for single-pod cycles to bypass the Filter phase.
+// PodGroup cycles retain the plugin because preemption victim reprieves may introduce new anti-affinity terms.
 func (pl *InterPodAffinity) PreFilter(ctx context.Context, cycleState fwk.CycleState, pod *v1.Pod, allNodes []fwk.NodeInfo) (*fwk.PreFilterResult, *fwk.Status) {
 	if pl.enableInPlacePodVerticalScalingSchedulerPreemption && resource.IsPodResizeDeferred(pod) {
 		return nil, fwk.NewStatus(fwk.Skip)
@@ -566,7 +567,7 @@ func (pl *InterPodAffinity) PreFilter(ctx context.Context, cycleState fwk.CycleS
 	}
 
 	incomingPodHasNoTerms := len(s.podInfo.GetRequiredAffinityTerms()) == 0 && len(s.podInfo.GetRequiredAntiAffinityTerms()) == 0
-	if len(s.existingClusterWideAntiAffinityCounts) == 0 && incomingPodHasNoTerms && !mustEvaluateHostScopedAntiAffinity {
+	if !cycleState.IsPodGroupSchedulingCycle() && len(s.existingClusterWideAntiAffinityCounts) == 0 && incomingPodHasNoTerms && !mustEvaluateHostScopedAntiAffinity {
 		return nil, fwk.NewStatus(fwk.Skip)
 	}
 
