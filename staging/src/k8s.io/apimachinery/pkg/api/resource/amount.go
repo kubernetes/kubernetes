@@ -71,10 +71,16 @@ func widenScale(s Scale) widenedScale {
 }
 
 // narrowScale returns s as a Scale. fits is false when s is outside
-// of the Scale range, in which case the result wraps must not be treated
-// as a valid value.
+// of the Scale range, in which case the result saturates to the nearest Scale bound.
 func narrowScale(s widenedScale) (narrowed Scale, fits bool) {
-	return Scale(s), s >= math.MinInt32 && s <= math.MaxInt32
+	switch {
+	case s < math.MinInt32:
+		return math.MinInt32, false
+	case s > math.MaxInt32:
+		return math.MaxInt32, false
+	default:
+		return Scale(s), true
+	}
 }
 
 // widenInfScale returns the base-10 exponent of an inf.Dec with scale s.
