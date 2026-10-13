@@ -208,6 +208,28 @@ var (
 		[]string{"group", "resource"},
 	)
 
+	WatchCacheEstimatedBytes = compbasemetrics.NewGaugeVec(
+		&compbasemetrics.GaugeOpts{
+			Namespace:      namespace,
+			Subsystem:      subsystem,
+			Name:           "estimated_bytes",
+			Help:           "Estimated total bytes of objects held in watch cache broken by resource type.",
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+		[]string{"group", "resource"},
+	)
+
+	WatchCacheBypassed = compbasemetrics.NewGaugeVec(
+		&compbasemetrics.GaugeOpts{
+			Namespace:      namespace,
+			Subsystem:      subsystem,
+			Name:           "bypassed",
+			Help:           "Indicates whether watch cache is bypassed for the resource (1) or active (0).",
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+		[]string{"group", "resource"},
+	)
+
 	WatchCacheInitializations = compbasemetrics.NewCounterVec(
 		&compbasemetrics.CounterOpts{
 			Namespace:      namespace,
@@ -317,6 +339,8 @@ func Register() {
 		legacyregistry.MustRegister(watchCacheCapacityIncreaseTotal)
 		legacyregistry.MustRegister(watchCacheCapacityDecreaseTotal)
 		legacyregistry.MustRegister(WatchCacheCapacity)
+		legacyregistry.MustRegister(WatchCacheEstimatedBytes)
+		legacyregistry.MustRegister(WatchCacheBypassed)
 		legacyregistry.MustRegister(WatchCacheInitializations)
 		legacyregistry.MustRegister(WatchCacheInitializationErrors)
 		legacyregistry.MustRegister(WatchCacheInitializationDuration)

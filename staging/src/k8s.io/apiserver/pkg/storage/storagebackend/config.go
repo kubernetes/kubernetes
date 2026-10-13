@@ -102,6 +102,10 @@ type ConfigForResource struct {
 
 	// GroupResource is the relevant one
 	GroupResource schema.GroupResource
+
+	// MaxBytes specifies maximum total bytes of objects that can be stored in the watch cache for this resource.
+	// 0 means unlimited.
+	MaxBytes int64
 }
 
 // ForResource specializes to the given resource

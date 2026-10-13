@@ -279,6 +279,9 @@ type Interface interface {
 	// EnableResourceSizeEstimation enables estimating resource size by providing function get keys from storage.
 	EnableResourceSizeEstimation(KeysFunc) error
 
+	// DisableResourceSizeEstimation disables estimating resource size and closes any active estimator.
+	DisableResourceSizeEstimation()
+
 	// CompactRevision returns latest observed revision that was compacted.
 	// Without ListFromCacheSnapshot enabled only locally executed compaction will be observed.
 	// Returns 0 if no compaction was yet observed.
