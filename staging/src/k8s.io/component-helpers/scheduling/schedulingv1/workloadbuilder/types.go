@@ -17,7 +17,7 @@ limitations under the License.
 package workloadbuilder
 
 import (
-	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
+	schedulingv1 "k8s.io/api/scheduling/v1"
 	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 )
@@ -185,11 +185,11 @@ type WorkloadInput struct {
 // nodes (len(WorkloadItem.Children) > 0).
 type PolicyInput struct {
 	// PodGroupData is the Workload scheduling policy info for a leaf PodGroup.
-	PodGroupData *schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy
+	PodGroupData *schedulingv1.WorkloadPodGroupSchedulingPolicy
 
 	// CompositePodGroupData is the group-of-groups scheduling policy info for a
 	// composite CompositePodGroup node.
-	CompositePodGroupData *schedulingv1alpha3.WorkloadCompositePodGroupSchedulingPolicy
+	CompositePodGroupData *schedulingv1.WorkloadCompositePodGroupSchedulingPolicy
 
 	// PathElements is the path, relative to the WorkloadItem's Path, at
 	// which this building block is embedded in the controller's API. When
@@ -203,11 +203,11 @@ type PolicyInput struct {
 // CompositePodGroupData should be set.
 type ConstraintsInput struct {
 	// PodGroupData is the Workload scheduling constraints info for a leaf PodGroup.
-	PodGroupData *schedulingv1alpha3.WorkloadPodGroupSchedulingConstraints
+	PodGroupData *schedulingv1.WorkloadPodGroupSchedulingConstraints
 
 	// CompositePodGroupData is the scheduling constraints info for a composite
 	// CompositePodGroup node.
-	CompositePodGroupData *schedulingv1alpha3.WorkloadCompositePodGroupSchedulingConstraints
+	CompositePodGroupData *schedulingv1.WorkloadCompositePodGroupSchedulingConstraints
 
 	// PathElements is the path, relative to the WorkloadItem's Path, at which
 	// this building block is embedded in the controller's API; see PolicyInput.PathElements.
@@ -220,11 +220,11 @@ type ConstraintsInput struct {
 // CompositePodGroupData should be set.
 type DisruptionModeInput struct {
 	// PodGroupData is the Workload disruption mode info for a leaf PodGroup.
-	PodGroupData *schedulingv1alpha3.WorkloadPodGroupDisruptionMode
+	PodGroupData *schedulingv1.WorkloadPodGroupDisruptionMode
 
 	// CompositePodGroupData is the disruption mode info for a composite
 	// CompositePodGroup node.
-	CompositePodGroupData *schedulingv1alpha3.WorkloadCompositePodGroupDisruptionMode
+	CompositePodGroupData *schedulingv1.WorkloadCompositePodGroupDisruptionMode
 
 	// PathElements is the path, relative to the WorkloadItem's Path, at which
 	// this building block is embedded in the controller's API.
@@ -234,7 +234,7 @@ type DisruptionModeInput struct {
 // ResourceClaimsInput wraps the resource claims building block with its field path.
 type ResourceClaimsInput struct {
 	// PodGroupData is the list of Workload resource claims for the PodGroup.
-	PodGroupData []schedulingv1alpha3.WorkloadPodGroupResourceClaim
+	PodGroupData []schedulingv1.WorkloadPodGroupResourceClaim
 
 	// PathElements is the path, relative to the WorkloadItem's Path, at which
 	// this building block is embedded in the controller's API; see PolicyInput.PathElements.

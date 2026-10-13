@@ -20,7 +20,7 @@ import (
 	"context"
 	"testing"
 
-	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
+	schedulingv1 "k8s.io/api/scheduling/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
@@ -77,7 +77,7 @@ func TestCronJobStrategy_ValidateUpdate_GangMinCount(t *testing.T) {
 				JobTemplate: batch.JobTemplateSpec{Spec: batch.JobSpec{
 					Parallelism: new(parallelism),
 					Template:    validPodTemplateSpec,
-					Scheduling:  &batch.JobSchedulingConfiguration{SchedulingPolicy: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{Gang: &schedulingv1alpha3.WorkloadPodGroupGangSchedulingPolicy{MinCount: new(minCount)}}},
+					Scheduling:  &batch.JobSchedulingConfiguration{SchedulingPolicy: &schedulingv1.WorkloadPodGroupSchedulingPolicy{Gang: &schedulingv1.WorkloadPodGroupGangSchedulingPolicy{MinCount: new(minCount)}}},
 				}},
 			},
 		}

@@ -34,7 +34,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	eventsv1 "k8s.io/api/events/v1"
-	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
+	schedulingv1 "k8s.io/api/scheduling/v1"
 	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -5173,11 +5173,11 @@ func TestJobGangScheduling(t *testing.T) {
 				Completions:    ptr.To[int32](4),
 				CompletionMode: new(batchv1.IndexedCompletion),
 				Scheduling: &batchv1.JobSchedulingConfiguration{
-					SchedulingPolicy: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{
-						Gang: &schedulingv1alpha3.WorkloadPodGroupGangSchedulingPolicy{MinCount: ptr.To[int32](4)},
+					SchedulingPolicy: &schedulingv1.WorkloadPodGroupSchedulingPolicy{
+						Gang: &schedulingv1.WorkloadPodGroupGangSchedulingPolicy{MinCount: ptr.To[int32](4)},
 					},
-					DisruptionMode: &schedulingv1alpha3.WorkloadPodGroupDisruptionMode{
-						All: &schedulingv1alpha3.WorkloadPodGroupAllDisruptionMode{},
+					DisruptionMode: &schedulingv1.WorkloadPodGroupDisruptionMode{
+						All: &schedulingv1.WorkloadPodGroupAllDisruptionMode{},
 					},
 				},
 			},
@@ -5193,11 +5193,11 @@ func TestJobGangScheduling(t *testing.T) {
 				Completions:    ptr.To[int32](4),
 				CompletionMode: new(batchv1.IndexedCompletion),
 				Scheduling: &batchv1.JobSchedulingConfiguration{
-					SchedulingPolicy: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{
-						Gang: &schedulingv1alpha3.WorkloadPodGroupGangSchedulingPolicy{MinCount: ptr.To[int32](2)},
+					SchedulingPolicy: &schedulingv1.WorkloadPodGroupSchedulingPolicy{
+						Gang: &schedulingv1.WorkloadPodGroupGangSchedulingPolicy{MinCount: ptr.To[int32](2)},
 					},
-					SchedulingConstraints: &schedulingv1alpha3.WorkloadPodGroupSchedulingConstraints{
-						Topology: []schedulingv1alpha3.TopologyConstraint{{Key: "topology.kubernetes.io/rack"}},
+					SchedulingConstraints: &schedulingv1.WorkloadPodGroupSchedulingConstraints{
+						Topology: []schedulingv1.TopologyConstraint{{Key: "topology.kubernetes.io/rack"}},
 					},
 				},
 			},
@@ -5213,14 +5213,14 @@ func TestJobGangScheduling(t *testing.T) {
 				Completions:    ptr.To[int32](6),
 				CompletionMode: new(batchv1.IndexedCompletion),
 				Scheduling: &batchv1.JobSchedulingConfiguration{
-					SchedulingPolicy: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{
-						Gang: &schedulingv1alpha3.WorkloadPodGroupGangSchedulingPolicy{MinCount: ptr.To[int32](6)},
+					SchedulingPolicy: &schedulingv1.WorkloadPodGroupSchedulingPolicy{
+						Gang: &schedulingv1.WorkloadPodGroupGangSchedulingPolicy{MinCount: ptr.To[int32](6)},
 					},
-					DisruptionMode: &schedulingv1alpha3.WorkloadPodGroupDisruptionMode{
-						All: &schedulingv1alpha3.WorkloadPodGroupAllDisruptionMode{},
+					DisruptionMode: &schedulingv1.WorkloadPodGroupDisruptionMode{
+						All: &schedulingv1.WorkloadPodGroupAllDisruptionMode{},
 					},
-					SchedulingConstraints: &schedulingv1alpha3.WorkloadPodGroupSchedulingConstraints{
-						Topology: []schedulingv1alpha3.TopologyConstraint{{Key: "topology.kubernetes.io/zone"}},
+					SchedulingConstraints: &schedulingv1.WorkloadPodGroupSchedulingConstraints{
+						Topology: []schedulingv1.TopologyConstraint{{Key: "topology.kubernetes.io/zone"}},
 					},
 				},
 			},
@@ -5398,8 +5398,8 @@ func TestJobGangSchedulingElasticScaling(t *testing.T) {
 			Completions:    ptr.To[int32](8),
 			CompletionMode: new(batchv1.IndexedCompletion),
 			Scheduling: &batchv1.JobSchedulingConfiguration{
-				SchedulingPolicy: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{
-					Gang: &schedulingv1alpha3.WorkloadPodGroupGangSchedulingPolicy{MinCount: ptr.To[int32](4)},
+				SchedulingPolicy: &schedulingv1.WorkloadPodGroupSchedulingPolicy{
+					Gang: &schedulingv1.WorkloadPodGroupGangSchedulingPolicy{MinCount: ptr.To[int32](4)},
 				},
 			},
 		},
@@ -5465,8 +5465,8 @@ func TestJobGangSchedulingSuspendResume(t *testing.T) {
 			CompletionMode: new(batchv1.IndexedCompletion),
 			Suspend:        new(true),
 			Scheduling: &batchv1.JobSchedulingConfiguration{
-				SchedulingPolicy: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{
-					Gang: &schedulingv1alpha3.WorkloadPodGroupGangSchedulingPolicy{MinCount: ptr.To[int32](4)},
+				SchedulingPolicy: &schedulingv1.WorkloadPodGroupSchedulingPolicy{
+					Gang: &schedulingv1.WorkloadPodGroupGangSchedulingPolicy{MinCount: ptr.To[int32](4)},
 				},
 			},
 		},
