@@ -400,6 +400,13 @@ const (
 	// from the specified file in the emptyDir volume, without mounting the file.
 	EnvFiles featuregate.Feature = "EnvFiles"
 
+	// owner: @devrint
+	// kep: https://kep.k8s.io/5384
+	//
+	// Allows kubelet to infer the key for ConfigMapKeyRef and SecretKeyRef
+	// from the environment variable name when the key is not specified.
+	EnvVarKeyInference featuregate.Feature = "EnvVarKeyInference"
+
 	// owner: @harche
 	// kep: http://kep.k8s.io/3386
 	//
@@ -1520,6 +1527,9 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.34"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.35"), Default: true, PreRelease: featuregate.Beta},
 		{Version: version.MustParse("1.38"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
+	},
+	EnvVarKeyInference: {
+		{Version: version.MustParse("1.35"), Default: false, PreRelease: featuregate.Alpha},
 	},
 	EventedPLEG: {
 		{Version: version.MustParse("1.26"), Default: false, PreRelease: featuregate.Alpha},
