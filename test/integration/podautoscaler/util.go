@@ -176,7 +176,7 @@ func startHPAControllerAndWaitForCaches(t *testing.T, clients testClients) {
 	t.Helper()
 
 	ctx := t.Context()
-	metricsClient := metricsclient.NewRESTMetricsClient(clients.metrics.MetricsV1beta1(), nil, clients.externalMetrics)
+	metricsClient := metricsclient.NewRESTMetricsClient(clients.metrics.MetricsV1(), nil, clients.externalMetrics)
 
 	informerSet := informers.NewSharedInformerFactory(clients.apiServer, 0)
 	controller := podautoscaler.NewHorizontalController(
