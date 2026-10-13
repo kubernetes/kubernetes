@@ -115,7 +115,7 @@ func NewConsumedCapacity() ConsumedCapacity {
 func (s ConsumedCapacity) Clone() ConsumedCapacity {
 	clone := make(ConsumedCapacity)
 	for name, quantity := range s {
-		q := quantity.DeepCopy()
+		q := *quantity
 		clone[name] = &q
 	}
 	return clone
@@ -125,7 +125,7 @@ func (s ConsumedCapacity) Clone() ConsumedCapacity {
 // and creates a new entry if no capacity created yet.
 func (s ConsumedCapacity) Add(addedCapacity ConsumedCapacity) {
 	for name, quantity := range addedCapacity {
-		val := quantity.DeepCopy()
+		val := *quantity
 		if _, found := s[name]; found {
 			s[name].Add(val)
 		} else {
