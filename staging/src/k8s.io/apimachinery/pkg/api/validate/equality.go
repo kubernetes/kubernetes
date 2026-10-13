@@ -18,11 +18,25 @@ package validate
 
 import (
 	"context"
+	"fmt"
 
 	"k8s.io/apimachinery/pkg/api/operation"
 	"k8s.io/apimachinery/pkg/api/validate/content"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 )
+
+// EQ validates that the specified comparable value is equal to the expected value.
+func EQ[T comparable](_ context.Context, _ operation.Operation, fldPath *field.Path, value, _ *T, expected T) field.ErrorList {
+	if value == nil {
+		return nil
+	}
+	if *value != expected {
+		return field.ErrorList{
+			field.NotSupported(fldPath, *value, []string{fmt.Sprint(expected)}),
+		}
+	}
+	return nil
+}
 
 // NEQ validates that the specified comparable value is not equal to the disallowed value.
 func NEQ[T comparable](_ context.Context, _ operation.Operation, fldPath *field.Path, value, _ *T, disallowed T) field.ErrorList {
