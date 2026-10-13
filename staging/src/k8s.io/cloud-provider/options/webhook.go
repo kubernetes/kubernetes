@@ -25,9 +25,9 @@ import (
 
 	"github.com/spf13/pflag"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/dynamiccertificates"
-	apiserveroptions "k8s.io/apiserver/pkg/server/options"
+	server "k8s.io/apiserver/pkg/server/serving"
+	apiserveroptions "k8s.io/apiserver/pkg/server/serving/options"
 	"k8s.io/cloud-provider/config"
 	cliflag "k8s.io/component-base/cli/flag"
 	netutils "k8s.io/utils/net"
