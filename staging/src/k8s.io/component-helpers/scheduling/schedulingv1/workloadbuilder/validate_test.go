@@ -20,7 +20,7 @@ import (
 	"strings"
 	"testing"
 
-	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
+	schedulingv1 "k8s.io/api/scheduling/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/klog/v2/ktesting"
 )
@@ -37,13 +37,13 @@ func TestBuilderValidate(t *testing.T) {
 		return PolicyInput{PodGroupData: gangData(2)}
 	}
 	basic := func() PolicyInput {
-		return PolicyInput{PodGroupData: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{Basic: &schedulingv1alpha3.WorkloadPodGroupBasicSchedulingPolicy{}}}
+		return PolicyInput{PodGroupData: &schedulingv1.WorkloadPodGroupSchedulingPolicy{Basic: &schedulingv1.WorkloadPodGroupBasicSchedulingPolicy{}}}
 	}
 	compositeGang := func() PolicyInput {
 		return PolicyInput{CompositePodGroupData: compositeGangData(2)}
 	}
 	compositeBasic := func() PolicyInput {
-		return PolicyInput{CompositePodGroupData: &schedulingv1alpha3.WorkloadCompositePodGroupSchedulingPolicy{Basic: &schedulingv1alpha3.WorkloadCompositePodGroupBasicSchedulingPolicy{}}}
+		return PolicyInput{CompositePodGroupData: &schedulingv1.WorkloadCompositePodGroupSchedulingPolicy{Basic: &schedulingv1.WorkloadCompositePodGroupBasicSchedulingPolicy{}}}
 	}
 
 	tests := []struct {
@@ -195,9 +195,9 @@ func TestBuilderValidate(t *testing.T) {
 				Policy: gang(),
 				DisruptionMode: DisruptionModeInput{
 					PathElements: []string{"disruptionMode"},
-					PodGroupData: &schedulingv1alpha3.WorkloadPodGroupDisruptionMode{
-						Single: &schedulingv1alpha3.WorkloadPodGroupSingleDisruptionMode{},
-						All:    &schedulingv1alpha3.WorkloadPodGroupAllDisruptionMode{},
+					PodGroupData: &schedulingv1.WorkloadPodGroupDisruptionMode{
+						Single: &schedulingv1.WorkloadPodGroupSingleDisruptionMode{},
+						All:    &schedulingv1.WorkloadPodGroupAllDisruptionMode{},
 					},
 				},
 			}},
@@ -213,8 +213,8 @@ func TestBuilderValidate(t *testing.T) {
 				Policy: gang(),
 				Constraints: ConstraintsInput{
 					PathElements: []string{"schedulingConstraints"},
-					PodGroupData: &schedulingv1alpha3.WorkloadPodGroupSchedulingConstraints{
-						Topology: []schedulingv1alpha3.TopologyConstraint{{Key: "zone"}, {Key: "rack"}},
+					PodGroupData: &schedulingv1.WorkloadPodGroupSchedulingConstraints{
+						Topology: []schedulingv1.WorkloadTopologyConstraint{{Key: "zone"}, {Key: "rack"}},
 					},
 				},
 			}},
@@ -230,7 +230,7 @@ func TestBuilderValidate(t *testing.T) {
 				Policy: gang(),
 				ResourceClaims: ResourceClaimsInput{
 					PathElements: []string{"resourceClaims"},
-					PodGroupData: []schedulingv1alpha3.WorkloadPodGroupResourceClaim{{Name: "claim0"}},
+					PodGroupData: []schedulingv1.WorkloadPodGroupResourceClaim{{Name: "claim0"}},
 				},
 			}},
 			allowPolicies:    allPolicies,
@@ -269,9 +269,9 @@ func TestBuilderValidate(t *testing.T) {
 			name: "composite policy with basic and gang fails union declarative validation",
 			root: compositeRoot(WorkloadInput{Policy: PolicyInput{
 				PathElements: []string{"schedulingPolicy"},
-				CompositePodGroupData: &schedulingv1alpha3.WorkloadCompositePodGroupSchedulingPolicy{
-					Basic: &schedulingv1alpha3.WorkloadCompositePodGroupBasicSchedulingPolicy{},
-					Gang:  &schedulingv1alpha3.WorkloadCompositePodGroupGangSchedulingPolicy{MinGroupCount: new(int32(2))},
+				CompositePodGroupData: &schedulingv1.WorkloadCompositePodGroupSchedulingPolicy{
+					Basic: &schedulingv1.WorkloadCompositePodGroupBasicSchedulingPolicy{},
+					Gang:  &schedulingv1.WorkloadCompositePodGroupGangSchedulingPolicy{MinGroupCount: new(int32(2))},
 				},
 			}}),
 			allowPolicies:    allPolicies,
@@ -366,8 +366,8 @@ func TestBuilderValidate(t *testing.T) {
 			oldRoot: &WorkloadItem{Name: "job", Input: WorkloadInput{
 				Policy: gang(),
 				Constraints: ConstraintsInput{
-					PodGroupData: &schedulingv1alpha3.WorkloadPodGroupSchedulingConstraints{
-						Topology: []schedulingv1alpha3.TopologyConstraint{{Key: "zone"}},
+					PodGroupData: &schedulingv1.WorkloadPodGroupSchedulingConstraints{
+						Topology: []schedulingv1.WorkloadTopologyConstraint{{Key: "zone"}},
 					},
 				},
 			}},
@@ -507,7 +507,14 @@ func TestBuilderValidate(t *testing.T) {
 			name: "composite gang parent with basic composite child is rejected",
 			root: newWorkloadItem("root", withPath(schedulingPath), withCompositeGang(1),
 				withChildren(newWorkloadItem("mid", withPath(field.NewPath("spec", "midScheduling")),
-					withInput(WorkloadInput{Policy: PolicyInput{PathElements: []string{"schedulingPolicy"}, CompositePodGroupData: &schedulingv1alpha3.WorkloadCompositePodGroupSchedulingPolicy{Basic: &schedulingv1alpha3.WorkloadCompositePodGroupBasicSchedulingPolicy{}}}}),
+					withInput(WorkloadInput{
+						Policy: PolicyInput{
+							PathElements: []string{"schedulingPolicy"},
+							CompositePodGroupData: &schedulingv1.WorkloadCompositePodGroupSchedulingPolicy{
+								Basic: &schedulingv1.WorkloadCompositePodGroupBasicSchedulingPolicy{},
+							},
+						},
+					}),
 					withChildren(newWorkloadItem("leaf", withPath(field.NewPath("spec", "leafScheduling")), withGang(2)))))),
 			allowPolicies:    allPolicies,
 			allowModes:       allModes,
@@ -519,7 +526,14 @@ func TestBuilderValidate(t *testing.T) {
 			name: "composite gang parent with basic composite child and basic leaf grandchild rejects both",
 			root: newWorkloadItem("root", withPath(schedulingPath), withCompositeGang(1),
 				withChildren(newWorkloadItem("mid", withPath(field.NewPath("spec", "midScheduling")),
-					withInput(WorkloadInput{Policy: PolicyInput{PathElements: []string{"schedulingPolicy"}, CompositePodGroupData: &schedulingv1alpha3.WorkloadCompositePodGroupSchedulingPolicy{Basic: &schedulingv1alpha3.WorkloadCompositePodGroupBasicSchedulingPolicy{}}}}),
+					withInput(WorkloadInput{
+						Policy: PolicyInput{
+							PathElements: []string{"schedulingPolicy"},
+							CompositePodGroupData: &schedulingv1.WorkloadCompositePodGroupSchedulingPolicy{
+								Basic: &schedulingv1.WorkloadCompositePodGroupBasicSchedulingPolicy{},
+							},
+						},
+					}),
 					withChildren(newWorkloadItem("leaf", withPath(field.NewPath("spec", "leafScheduling")), withBasic()))))),
 			allowPolicies:    allPolicies,
 			allowModes:       allModes,
@@ -589,8 +603,10 @@ func TestBuilderValidate(t *testing.T) {
 					withInput(WorkloadInput{
 						Policy: compositeGang(),
 						DisruptionMode: DisruptionModeInput{
-							PathElements:          []string{"disruptionMode"},
-							CompositePodGroupData: &schedulingv1alpha3.WorkloadCompositePodGroupDisruptionMode{Single: &schedulingv1alpha3.WorkloadCompositePodGroupSingleDisruptionMode{}},
+							PathElements: []string{"disruptionMode"},
+							CompositePodGroupData: &schedulingv1.WorkloadCompositePodGroupDisruptionMode{
+								Single: &schedulingv1.WorkloadCompositePodGroupSingleDisruptionMode{},
+							},
 						},
 					}),
 					withChildren(newWorkloadItem("leaf", withPath(schedulingPath), withGang(2), withLeafDisruption(allDisruption())))))),
@@ -685,8 +701,8 @@ func withBasic() itemOption {
 	return func(i *WorkloadItem) {
 		i.Input.Policy = PolicyInput{
 			PathElements: []string{"schedulingPolicy"},
-			PodGroupData: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{
-				Basic: &schedulingv1alpha3.WorkloadPodGroupBasicSchedulingPolicy{},
+			PodGroupData: &schedulingv1.WorkloadPodGroupSchedulingPolicy{
+				Basic: &schedulingv1.WorkloadPodGroupBasicSchedulingPolicy{},
 			},
 		}
 	}
@@ -730,47 +746,47 @@ func compositeRoot(in WorkloadInput) *WorkloadItem {
 
 func singleDisruption() DisruptionModeInput {
 	return DisruptionModeInput{
-		PodGroupData: &schedulingv1alpha3.WorkloadPodGroupDisruptionMode{
-			Single: &schedulingv1alpha3.WorkloadPodGroupSingleDisruptionMode{},
+		PodGroupData: &schedulingv1.WorkloadPodGroupDisruptionMode{
+			Single: &schedulingv1.WorkloadPodGroupSingleDisruptionMode{},
 		},
 	}
 }
 
 func allDisruption() DisruptionModeInput {
 	return DisruptionModeInput{
-		PodGroupData: &schedulingv1alpha3.WorkloadPodGroupDisruptionMode{
-			All: &schedulingv1alpha3.WorkloadPodGroupAllDisruptionMode{},
+		PodGroupData: &schedulingv1.WorkloadPodGroupDisruptionMode{
+			All: &schedulingv1.WorkloadPodGroupAllDisruptionMode{},
 		},
 	}
 }
 
 func compositeSingleDisruption() DisruptionModeInput {
 	return DisruptionModeInput{
-		CompositePodGroupData: &schedulingv1alpha3.WorkloadCompositePodGroupDisruptionMode{
-			Single: &schedulingv1alpha3.WorkloadCompositePodGroupSingleDisruptionMode{},
+		CompositePodGroupData: &schedulingv1.WorkloadCompositePodGroupDisruptionMode{
+			Single: &schedulingv1.WorkloadCompositePodGroupSingleDisruptionMode{},
 		},
 	}
 }
 
 func compositeAllDisruption() DisruptionModeInput {
 	return DisruptionModeInput{
-		CompositePodGroupData: &schedulingv1alpha3.WorkloadCompositePodGroupDisruptionMode{
-			All: &schedulingv1alpha3.WorkloadCompositePodGroupAllDisruptionMode{},
+		CompositePodGroupData: &schedulingv1.WorkloadCompositePodGroupDisruptionMode{
+			All: &schedulingv1.WorkloadCompositePodGroupAllDisruptionMode{},
 		},
 	}
 }
 
-func gangData(minCount int32) *schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy {
-	return &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{
-		Gang: &schedulingv1alpha3.WorkloadPodGroupGangSchedulingPolicy{
+func gangData(minCount int32) *schedulingv1.WorkloadPodGroupSchedulingPolicy {
+	return &schedulingv1.WorkloadPodGroupSchedulingPolicy{
+		Gang: &schedulingv1.WorkloadPodGroupGangSchedulingPolicy{
 			MinCount: new(minCount),
 		},
 	}
 }
 
-func compositeGangData(minGroupCount int32) *schedulingv1alpha3.WorkloadCompositePodGroupSchedulingPolicy {
-	return &schedulingv1alpha3.WorkloadCompositePodGroupSchedulingPolicy{
-		Gang: &schedulingv1alpha3.WorkloadCompositePodGroupGangSchedulingPolicy{
+func compositeGangData(minGroupCount int32) *schedulingv1.WorkloadCompositePodGroupSchedulingPolicy {
+	return &schedulingv1.WorkloadCompositePodGroupSchedulingPolicy{
+		Gang: &schedulingv1.WorkloadCompositePodGroupGangSchedulingPolicy{
 			MinGroupCount: new(minGroupCount),
 		},
 	}
