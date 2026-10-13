@@ -320,9 +320,9 @@ func TestNarrowScale(t *testing.T) {
 		{"zero", 0, 0, true},
 		{"MaxInt32", math.MaxInt32, math.MaxInt32, true},
 		{"MinInt32", math.MinInt32, math.MinInt32, true},
-		{"MaxInt32+1 wraps", math.MaxInt32 + 1, math.MinInt32, false},
-		{"MinInt32-1 wraps", math.MinInt32 - 1, math.MaxInt32, false},
-		{"2^32 wraps to zero", 1 << 32, 0, false},
+		{"MaxInt32+1 saturates", math.MaxInt32 + 1, math.MaxInt32, false},
+		{"MinInt32-1 saturates", math.MinInt32 - 1, math.MinInt32, false},
+		{"2^32 saturates", 1 << 32, math.MaxInt32, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			if got, fits := narrowScale(tc.in); got != tc.want || fits != tc.wantFits {
