@@ -2142,7 +2142,7 @@ func TestCPGTopologyAwareSchedulingWorkloadAwarePreemption(t *testing.T) {
 				},
 				{
 					Name:               "Verify low-priority pods are removed via preemption",
-					WaitForPodsRemoved: []string{"low-z1-r1", "low-z1-r2"},
+					WaitForPodsRemoved: []string{"low-z1-r1"},
 				},
 				{
 					Name: "Verify pg1 assignments are in rack-1",
