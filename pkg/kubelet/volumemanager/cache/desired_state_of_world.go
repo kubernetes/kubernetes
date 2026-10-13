@@ -35,6 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume/csi"
 
 	resourcehelper "k8s.io/component-helpers/resource"
+	v1resource "k8s.io/kubernetes/pkg/api/v1/resource"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
@@ -313,7 +314,7 @@ func (dsw *desiredStateOfWorld) AddPodToVolume(
 		var sizeLimit *resource.Quantity
 		if volumeSpec.Volume != nil {
 			if util.IsLocalEphemeralVolume(*volumeSpec.Volume) {
-				podLimits := resourcehelper.PodLimits(pod, resourcehelper.PodResourcesOptions{})
+				podLimits := resourcehelper.PodLimits(pod, v1resource.PodResourcesOptions())
 				ephemeralStorageLimit := podLimits[v1.ResourceEphemeralStorage]
 				sizeLimit = resource.NewQuantity(ephemeralStorageLimit.Value(), resource.BinarySI)
 				if volumeSpec.Volume.EmptyDir != nil &&

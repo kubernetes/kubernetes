@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	resourcehelper "k8s.io/component-helpers/resource"
+	v1resource "k8s.io/kubernetes/pkg/api/v1/resource"
 	"k8s.io/kubernetes/pkg/api/v1/service"
 	corev1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/features"
@@ -540,7 +541,7 @@ func defaultPodRequests(obj *v1.Pod) {
 		podReqs = make(v1.ResourceList)
 	}
 
-	aggrCtrReqs := resourcehelper.AggregateContainerRequests(obj, resourcehelper.PodResourcesOptions{})
+	aggrCtrReqs := resourcehelper.AggregateContainerRequests(obj, v1resource.PodResourcesOptions())
 
 	// When containers specify requests for a resource (supported by
 	// PodLevelResources feature) and pod-level requests are not set, the pod-level requests
@@ -594,7 +595,7 @@ func defaultHugePagePodLimits(pod *v1.Pod) {
 		podLims = make(v1.ResourceList)
 	}
 
-	aggrCtrLims := resourcehelper.AggregateContainerLimits(pod, resourcehelper.PodResourcesOptions{})
+	aggrCtrLims := resourcehelper.AggregateContainerLimits(pod, v1resource.PodResourcesOptions())
 
 	// When containers specify limits for hugepages and pod-level limits are not
 	// set for that resource, the pod-level limit will default to the aggregated

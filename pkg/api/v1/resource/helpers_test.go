@@ -399,3 +399,29 @@ func getPodWithPodLevelResources(cname string, podResources resources, resources
 
 	return pod
 }
+
+func TestFeatures(t *testing.T) {
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.PodLevelResources:                       false,
+		features.InPlacePodLevelResourcesVerticalScaling: false,
+		features.DRANodeAllocatableResources:             true,
+	})
+
+	fts := Features()
+	assert.False(t, fts.PodLevelResources)
+	assert.True(t, fts.InPlacePodVerticalScaling)
+	assert.False(t, fts.InPlacePodLevelResourcesVerticalScaling)
+	assert.True(t, fts.DRANodeAllocatableResources)
+
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.PodLevelResources:                       true,
+		features.InPlacePodLevelResourcesVerticalScaling: true,
+		features.DRANodeAllocatableResources:             false,
+	})
+
+	opts := PodResourcesOptions()
+	assert.True(t, opts.Features.PodLevelResources)
+	assert.True(t, opts.Features.InPlacePodVerticalScaling)
+	assert.True(t, opts.Features.InPlacePodLevelResourcesVerticalScaling)
+	assert.False(t, opts.Features.DRANodeAllocatableResources)
+}
