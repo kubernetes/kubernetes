@@ -84,6 +84,13 @@ type AuthorizationInfo struct {
 	// Authorizer determines whether the subject is allowed to make the request based only
 	// on the RequestURI
 	Authorizer authorizer.Authorizer
+
+	// ConditionalAuthorizationRequestClassifier is a function that returns true if a request with the given attributes supports conditional authorization.
+	// It has the underlying type of k8s.io/apiserver/pkg/endpoints/filters.ConditionalAuthorizationRequestClassifier, which this package must not import.
+	ConditionalAuthorizationRequestClassifier func(attrs authorizer.Attributes) bool
+
+	// ConditionsEnforcerPluginEnabled is set to true by AdmissionOptions when the admission plugin is enabled
+	ConditionsEnforcerPluginEnabled bool
 }
 
 func (c *AuthenticationInfo) ApplyClientCert(clientCA dynamiccertificates.CAContentProvider, servingInfo *SecureServingInfo) error {

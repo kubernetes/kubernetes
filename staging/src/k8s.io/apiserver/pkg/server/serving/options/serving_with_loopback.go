@@ -23,9 +23,9 @@ import (
 
 	"github.com/google/uuid"
 
-	"k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/dynamiccertificates"
 	"k8s.io/apiserver/pkg/server/healthz"
+	server "k8s.io/apiserver/pkg/server/serving"
 	"k8s.io/client-go/rest"
 	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/utils/clock"

@@ -16,9 +16,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package server
+package serving
 
 import "net/http"
 
 // Go versions before 1.27 do not limit the number of header values.
-func setMaxHeaderValueCount(*http.Server) {}
+func SetMaxHeaderValueCount(*http.Server) {}
