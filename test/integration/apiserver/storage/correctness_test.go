@@ -33,6 +33,7 @@ import (
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/storage"
+	"k8s.io/apiserver/pkg/storage/cacher"
 	"k8s.io/apiserver/pkg/storage/testing/correctness"
 	api "k8s.io/kubernetes/pkg/apis/core"
 )
@@ -218,6 +219,14 @@ func TestCorrectness(t *testing.T) {
 			return setupStore(t, generic.UndecoratedStorage)
 		}},
 		{"cacher", func(t *testing.T) (storage.Interface, string) {
+			return setupStore(t, genericregistry.StorageWithCacher())
+		}},
+		{"cacher_small_history", func(t *testing.T) (storage.Interface, string) {
+			origFreshDuration := cacher.DefaultEventFreshDuration
+			cacher.DefaultEventFreshDuration = 50 * time.Millisecond
+			t.Cleanup(func() {
+				cacher.DefaultEventFreshDuration = origFreshDuration
+			})
 			return setupStore(t, genericregistry.StorageWithCacher())
 		}},
 	}

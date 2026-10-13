@@ -59,12 +59,6 @@ import (
 var (
 	emptyFunc             = func(bool) {}
 	coreNamespaceResource = schema.GroupResource{Group: "", Resource: "namespaces"}
-)
-
-const (
-	// storageWatchListPageSize is the cacher's request chunk size of
-	// initial and resync watch lists to storage.
-	storageWatchListPageSize = int64(10000)
 
 	// DefaultEventFreshDuration is the default time duration of events
 	// we want to keep.
@@ -72,6 +66,12 @@ const (
 	// chances that last bookmark was sent within kept history, at the
 	// same time, minimizing the needed memory usage.
 	DefaultEventFreshDuration = defaultBookmarkFrequency + 15*time.Second
+)
+
+const (
+	// storageWatchListPageSize is the cacher's request chunk size of
+	// initial and resync watch lists to storage.
+	storageWatchListPageSize = int64(10000)
 
 	// defaultBookmarkFrequency defines how frequently watch bookmarks should be send
 	// in addition to sending a bookmark right before watch deadline.
