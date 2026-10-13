@@ -1250,9 +1250,19 @@ func validateDeviceCounterConsumption(deviceCounterConsumption resource.DeviceCo
 }
 
 var (
-	numericIdentifier = `(0|[1-9]\d*)`
+	// numericIdentifier limits numbers to at most 18 digits, which is more
+	// restrictive than strictly required by semver.org but guarantees that
+	// the result always fits into an int64 (max 9223372036854775807, 19
+	// digits) and thus can be handled by the implementation: blang/semver
+	// only supports uint64 to start with and CEL then casts to int64 as
+	// native value.
+	numericIdentifier = `(0|[1-9]\d{0,17})`
 
-	preReleaseIdentifier = `(0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)`
+	// digit-only pre-release identifiers are also parsed as uint64, so
+	// we must apply the same length limit. Identifiers containing at least
+	// one non-digit are stored as strings. We don't apply a custom length
+	// limit to those.
+	preReleaseIdentifier = `(` + numericIdentifier + `|\d*[a-zA-Z-][0-9a-zA-Z-]*)`
 
 	buildIdentifier = `[0-9a-zA-Z-]+`
 
@@ -1339,7 +1349,7 @@ func validateDeviceAttributeStringValue(value *string, fldPath *field.Path) fiel
 func validateDeviceAttributeVersionValue(value *string, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 	if !semverRe.MatchString(*value) {
-		allErrs = append(allErrs, field.Invalid(fldPath, *value, "must be a string compatible with semver.org spec 2.0.0"))
+		allErrs = append(allErrs, field.Invalid(fldPath, *value, "must be a string compatible with semver.org spec 2.0.0, with at most 18 digits in numbers"))
 	}
 	if len(*value) > resource.DeviceAttributeMaxValueLength {
 		allErrs = append(allErrs, field.TooLong(fldPath, "" /*unused*/, resource.DeviceAttributeMaxValueLength))
