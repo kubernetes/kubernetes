@@ -2498,8 +2498,8 @@ func TestForgetWatcher(t *testing.T) {
 		cacher.Lock()
 		defer cacher.Unlock()
 
-		require.Len(t, cacher.watchers.allWatchers, expectedWatchersCounter)
-		require.Len(t, cacher.watchers.valueWatchers, expectedValueWatchersCounter)
+		require.Len(t, cacher.watchers.scopeWatchers, expectedWatchersCounter)
+		require.Len(t, cacher.watchers.indexWatchers, expectedValueWatchersCounter)
 	}
 	assertCacherInternalState(0, 0)
 
@@ -2521,12 +2521,12 @@ func TestForgetWatcher(t *testing.T) {
 		testingclock.NewFakeClock(time.Now()),
 		"1",
 	)
-	forgetWatcherFn = forgetWatcher(cacher, w, 0, namespacedName{}, "", false)
+	forgetWatcherFn = forgetWatcher(cacher, w, 0, watchSelector{})
 	addWatcher := func(w *cacheWatcher) {
 		cacher.Lock()
 		defer cacher.Unlock()
 
-		cacher.watchers.addWatcher(w, 0, namespacedName{}, "", false)
+		cacher.watchers.addWatcher(w, 0, watchSelector{})
 	}
 
 	addWatcher(w)
