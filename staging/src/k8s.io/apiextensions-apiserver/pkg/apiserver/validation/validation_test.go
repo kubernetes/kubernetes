@@ -621,6 +621,22 @@ func TestValidateCustomResource(t *testing.T) {
 				}},
 			},
 		},
+		{name: "minLength",
+			schema: apiextensions.JSONSchemaProps{
+				Type: "object",
+				Properties: map[string]apiextensions.JSONSchemaProps{
+					"fieldX": {
+						Type:      "string",
+						MinLength: ptr.To[int64](3),
+					},
+				},
+			},
+			failingObjects: []failingObject{
+				{object: map[string]interface{}{"fieldX": "ab"}, expectErrs: []string{
+					`fieldX: Too short: must be at least 3 characters`,
+				}},
+			},
+		},
 		{name: "maxLength",
 			schema: apiextensions.JSONSchemaProps{
 				Type: "object",
