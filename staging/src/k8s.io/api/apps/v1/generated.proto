@@ -136,6 +136,7 @@ message DaemonSetSpec {
   // The only allowed template.spec.restartPolicy value is "Always".
   // More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicationcontroller#pod-template
   // +required
+  // +k8s:alpha(since: "1.38")=+k8s:subfield(spec)=+k8s:subfield(restartPolicy)=+k8s:eq="Always"
   optional .k8s.io.api.core.v1.PodTemplateSpec template = 2;
 
   // updateStrategy to replace existing DaemonSet pods with new pods.
@@ -735,6 +736,7 @@ message StatefulSetSpec {
   // "web" with index number "3" would be named "web-3".
   // The only allowed template.spec.restartPolicy value is "Always".
   // +required
+  // +k8s:alpha(since: "1.38")=+k8s:subfield(spec)=+k8s:subfield(restartPolicy)=+k8s:eq="Always"
   optional .k8s.io.api.core.v1.PodTemplateSpec template = 3;
 
   // volumeClaimTemplates is a list of claims that pods are allowed to reference.

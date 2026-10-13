@@ -477,6 +477,7 @@ message StatefulSetSpec {
   // <statefulsetname>-<podindex>. For example, a pod in a StatefulSet named
   // "web" with index number "3" would be named "web-3".
   // +required
+  // +k8s:alpha(since: "1.38")=+k8s:subfield(spec)=+k8s:subfield(restartPolicy)=+k8s:eq="Always"
   optional .k8s.io.api.core.v1.PodTemplateSpec template = 3;
 
   // volumeClaimTemplates is a list of claims that pods are allowed to reference.

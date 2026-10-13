@@ -413,6 +413,20 @@ func Validate_StatefulSetSpec(
 					return nil
 				}
 			}
+			// call field-attached validations
+			func() { // cohort = "spec.restartPolicy"
+				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "spec",
+					func(o *apicorev1.PodTemplateSpec) *apicorev1.PodSpec { return &o.Spec }, validate.SemanticDeepEqual,
+					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *apicorev1.PodSpec) field.ErrorList {
+						return validate.Subfield(ctx, op, fldPath, obj, oldObj, "restartPolicy",
+							func(o *apicorev1.PodSpec) *apicorev1.RestartPolicy { return &o.RestartPolicy }, validate.DirectEqual,
+							func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *apicorev1.RestartPolicy) field.ErrorList {
+								return validate.EQ(ctx, op, fldPath, obj, oldObj, "Always")
+							})
+					}).MarkAlpha(); len(e) != 0 {
+					errs = append(errs, e...)
+				}
+			}()
 			// call the type's validation function
 			errs = append(errs, corev1.Validate_PodTemplateSpec(ctx, op, fldPath, obj, oldObj)...)
 			return

@@ -612,19 +612,19 @@ func TestValidateStatefulSet(t *testing.T) {
 		name: "invalid restart policy 1",
 		set:  mkStatefulSet(&validPodTemplate, tweakTemplateRestartPolicy(api.RestartPolicyOnFailure)),
 		errs: field.ErrorList{
-			field.NotSupported[string](field.NewPath("spec", "template", "spec", "restartPolicy"), nil, nil),
+			field.NotSupported[string](field.NewPath("spec", "template", "spec", "restartPolicy"), nil, nil).MarkCoveredByDeclarative(),
 		},
 	}, {
 		name: "invalid restart policy 2",
 		set:  mkStatefulSet(&validPodTemplate, tweakTemplateRestartPolicy(api.RestartPolicyNever)),
 		errs: field.ErrorList{
-			field.NotSupported[string](field.NewPath("spec", "template", "spec", "restartPolicy"), nil, nil),
+			field.NotSupported[string](field.NewPath("spec", "template", "spec", "restartPolicy"), nil, nil).MarkCoveredByDeclarative(),
 		},
 	}, {
 		name: "empty restart policy",
 		set:  mkStatefulSet(&validPodTemplate, tweakTemplateRestartPolicy("")),
 		errs: field.ErrorList{
-			field.NotSupported[string](field.NewPath("spec", "template", "spec", "restartPolicy"), nil, nil),
+			field.NotSupported[string](field.NewPath("spec", "template", "spec", "restartPolicy"), nil, nil).MarkCoveredByDeclarative(),
 			field.Required(field.NewPath("spec", "template", "spec", "restartPolicy"), ""),
 		},
 	}, {

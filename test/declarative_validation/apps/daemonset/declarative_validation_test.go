@@ -107,6 +107,12 @@ func TestDeclarativeValidate(t *testing.T) {
 					field.Invalid(field.NewPath("spec", "template", "spec", "activeDeadlineSeconds"), int64(2147483648), "").WithOrigin("maximum").MarkAlpha(),
 				},
 			},
+			"restartPolicy not Always": {
+				input: mkDaemonSet(tweakPodSpec(podtest.SetRestartPolicy(api.RestartPolicyNever))),
+				expectedErrs: field.ErrorList{
+					field.NotSupported(field.NewPath("spec", "template", "spec", "restartPolicy"), api.RestartPolicyNever, []api.RestartPolicy{api.RestartPolicyAlways}).MarkAlpha(),
+				},
+			},
 		}
 
 		for _, tc := range poddeclarativevalidation.InvalidPodSpecTestcases(field.NewPath("spec", "template", "spec")) {
