@@ -35,6 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
+	corelistersv1 "k8s.io/client-go/listers/core/v1"
 	storagelistersv1 "k8s.io/client-go/listers/storage/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
@@ -340,6 +341,8 @@ type AttachDetachVolumeHost interface {
 	CSINodeLister() storagelistersv1.CSINodeLister
 	// VolumeAttachmentLister returns the informer lister for the VolumeAttachment API Object
 	VolumeAttachmentLister() storagelistersv1.VolumeAttachmentLister
+	// PersistentVolumeLister returns the informer lister for the PersistentVolume API Object
+	PersistentVolumeLister() corelistersv1.PersistentVolumeLister
 	// IsAttachDetachController is an interface marker to strictly tie AttachDetachVolumeHost
 	// to the attachDetachController
 	IsAttachDetachController() bool

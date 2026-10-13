@@ -213,7 +213,7 @@ func TestBlockMapperSetupDevice(t *testing.T) {
 
 	csiMapper.csiClient = setupClient(t, true)
 
-	attachID := getAttachmentName(csiMapper.volumeID, string(csiMapper.driverName), string(nodeName))
+	attachID := GetVolumeAttachmentName(csiMapper.volumeID, string(csiMapper.driverName), string(nodeName))
 	attachment := makeTestAttachment(attachID, nodeName, pvName)
 	attachment.Status.Attached = true
 	_, err = csiMapper.k8s.StorageV1().VolumeAttachments().Create(context.TODO(), attachment, metav1.CreateOptions{})
@@ -254,7 +254,7 @@ func TestBlockMapperSetupDeviceError(t *testing.T) {
 	fClient := csiMapper.csiClient.(*fakeCsiDriverClient)
 	fClient.nodeClient.SetNextError(status.Error(codes.InvalidArgument, "mock final error"))
 
-	attachID := getAttachmentName(csiMapper.volumeID, string(csiMapper.driverName), string(nodeName))
+	attachID := GetVolumeAttachmentName(csiMapper.volumeID, string(csiMapper.driverName), string(nodeName))
 	attachment := makeTestAttachment(attachID, nodeName, pvName)
 	attachment.Status.Attached = true
 	_, err = csiMapper.k8s.StorageV1().VolumeAttachments().Create(context.Background(), attachment, metav1.CreateOptions{})
@@ -299,7 +299,7 @@ func TestBlockMapperSetupDeviceNoClientError(t *testing.T) {
 
 	csiMapper.csiClient = setupClient(t, true)
 
-	attachID := getAttachmentName(csiMapper.volumeID, string(csiMapper.driverName), string(nodeName))
+	attachID := GetVolumeAttachmentName(csiMapper.volumeID, string(csiMapper.driverName), string(nodeName))
 	attachment := makeTestAttachment(attachID, nodeName, pvName)
 	attachment.Status.Attached = true
 	_, err = csiMapper.k8s.StorageV1().VolumeAttachments().Create(context.TODO(), attachment, metav1.CreateOptions{})
@@ -337,7 +337,7 @@ func TestBlockMapperMapPodDevice(t *testing.T) {
 
 	csiMapper.csiClient = setupClient(t, true)
 
-	attachID := getAttachmentName(csiMapper.volumeID, string(csiMapper.driverName), nodeName)
+	attachID := GetVolumeAttachmentName(csiMapper.volumeID, string(csiMapper.driverName), nodeName)
 	attachment := makeTestAttachment(attachID, nodeName, pvName)
 	attachment.Status.Attached = true
 	_, err = csiMapper.k8s.StorageV1().VolumeAttachments().Create(context.Background(), attachment, metav1.CreateOptions{})
@@ -468,7 +468,7 @@ func TestBlockMapperMapPodDeviceNoClientError(t *testing.T) {
 
 	csiMapper.csiClient = setupClient(t, true)
 
-	attachID := getAttachmentName(csiMapper.volumeID, string(csiMapper.driverName), nodeName)
+	attachID := GetVolumeAttachmentName(csiMapper.volumeID, string(csiMapper.driverName), nodeName)
 	attachment := makeTestAttachment(attachID, nodeName, pvName)
 	attachment.Status.Attached = true
 	_, err = csiMapper.k8s.StorageV1().VolumeAttachments().Create(context.Background(), attachment, metav1.CreateOptions{})
@@ -516,7 +516,7 @@ func TestBlockMapperMapPodDeviceGetStageSecretsError(t *testing.T) {
 
 	csiMapper.csiClient = setupClient(t, true)
 
-	attachID := getAttachmentName(csiMapper.volumeID, string(csiMapper.driverName), nodeName)
+	attachID := GetVolumeAttachmentName(csiMapper.volumeID, string(csiMapper.driverName), nodeName)
 	attachment := makeTestAttachment(attachID, nodeName, pvName)
 	attachment.Status.Attached = true
 	if _, err = csiMapper.k8s.StorageV1().VolumeAttachments().Create(context.Background(), attachment, metav1.CreateOptions{}); err != nil {
@@ -663,7 +663,7 @@ func TestVolumeSetupTeardown(t *testing.T) {
 
 	csiMapper.csiClient = setupClient(t, true)
 
-	attachID := getAttachmentName(csiMapper.volumeID, string(csiMapper.driverName), string(nodeName))
+	attachID := GetVolumeAttachmentName(csiMapper.volumeID, string(csiMapper.driverName), string(nodeName))
 	attachment := makeTestAttachment(attachID, nodeName, pvName)
 	attachment.Status.Attached = true
 	_, err = csiMapper.k8s.StorageV1().VolumeAttachments().Create(context.TODO(), attachment, metav1.CreateOptions{})
@@ -778,7 +778,7 @@ func TestUnmapPodDeviceNoClientError(t *testing.T) {
 
 	csiMapper.csiClient = setupClient(t, true)
 
-	attachID := getAttachmentName(csiMapper.volumeID, string(csiMapper.driverName), string(nodeName))
+	attachID := GetVolumeAttachmentName(csiMapper.volumeID, string(csiMapper.driverName), string(nodeName))
 	attachment := makeTestAttachment(attachID, nodeName, pvName)
 	attachment.Status.Attached = true
 	_, err = csiMapper.k8s.StorageV1().VolumeAttachments().Create(context.TODO(), attachment, metav1.CreateOptions{})

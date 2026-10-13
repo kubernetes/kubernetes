@@ -77,14 +77,84 @@ func (c *csiAttacher) Attach(spec *volume.Spec, nodeName types.NodeName) (string
 	}
 
 	node := string(nodeName)
-	attachID := getAttachmentName(pvSrc.VolumeHandle, pvSrc.Driver, node)
+	attachID := GetVolumeAttachmentName(pvSrc.VolumeHandle, pvSrc.Driver, node)
 
 	attachment, err := c.plugin.volumeAttachmentLister.Get(attachID)
 	if err != nil && !apierrors.IsNotFound(err) {
 		return "", errors.New(log("failed to get volume attachment from lister: %v", err))
 	}
 
+	// Name of the PV that the VolumeAttachment must refer to. Empty for volumes that
+	// are attached from an inline volume spec, those are not referenced by PV name.
+	var specPVName string
+	if !spec.InlineVolumeSpecForCSIMigration && spec.PersistentVolume != nil {
+		specPVName = spec.PersistentVolume.Name
+	}
+
+	// Empty unless the PV is being deleted or is gone, in which case it describes which
+	// of the two it is.
+	var specPVDeletion string
+	if specPVName != "" {
+		specPVDeletion, err = c.persistentVolumeDeletion(specPVName)
+		if err != nil {
+			return "", err
+		}
+	}
+
+	// Several PVs can share a volume handle,
+	// so the VolumeAttachment found above may refer to a PV that is already
+	// being deleted and never become attached (external-attacher refuses it).
+	// Since spec.source of a VolumeAttachment is immutable, the only way to
+	// fix it is to delete it.
+	if attachment != nil && attachment.Spec.Source.PersistentVolumeName != nil &&
+		!attachment.Status.Attached && attachment.Status.AttachError != nil {
+		// Safe to delete: !Attached means we have never reported this as attached.
+		// Also check AttachError to try our best not to abort an in-flight attach,
+		// which may succeed eventually.
+		// If it really cannot attach, waitForVolumeAttachmentWithLister will abort
+		// and we return to here fast on retry.
+		referencedPVName := *attachment.Spec.Source.PersistentVolumeName
+		// Ask about the same PV only once, so that this attempt cannot delete the object
+		// because the PV is dying and then create a new one for that same PV as if it were
+		// alive.
+		referencedPVDeletion := specPVDeletion
+		if referencedPVName != specPVName {
+			referencedPVDeletion, err = c.persistentVolumeDeletion(referencedPVName)
+			if err != nil {
+				return "", err
+			}
+		}
+
+		if referencedPVDeletion != "" {
+			// Just continue to wait if a previous detach timed out.
+			if attachment.GetDeletionTimestamp() == nil {
+				if err := c.deleteStaleVolumeAttachment(attachment, referencedPVDeletion); err != nil {
+					return "", err
+				}
+			}
+			attachment = nil
+
+			if specPVDeletion == "" {
+				// The new VolumeAttachment has the same name as the deleted one, wait
+				// until the old object is really gone before creating it again.
+				if err := c.waitForVolumeDetachmentWithLister(spec, pvSrc.VolumeHandle, attachID, c.watchTimeout); err != nil {
+					return "", err
+				}
+			}
+		}
+	}
+
 	if attachment == nil {
+		if specPVDeletion != "" {
+			// Creating the VolumeAttachment would be pointless, external-attacher
+			// refuses to attach a PV that is being deleted or gone. It would also
+			// outlive this attach attempt and, because its name does not depend on the
+			// PV name, block attaching the next PV that uses the same volume handle on
+			// this node until something deletes it. This error surfaces in the pod's
+			// FailedAttachVolume event.
+			return "", errors.New(log("attacher.Attach failed: %s", specPVDeletion))
+		}
+
 		var vaSrc storage.VolumeAttachmentSource
 		if spec.InlineVolumeSpecForCSIMigration {
 			// inline PV scenario - use PV spec to populate VA source.
@@ -134,8 +204,52 @@ func (c *csiAttacher) Attach(spec *volume.Spec, nodeName types.NodeName) (string
 
 	klog.V(4).Info(log("attacher.Attach finished OK with VolumeAttachment object [%s]", attachID))
 
-	// Don't return attachID as a devicePath. We can reconstruct the attachID using getAttachmentName()
+	// Don't return attachID as a devicePath. We can reconstruct the attachID using GetVolumeAttachmentName()
 	return "", nil
+}
+
+// persistentVolumeDeletion returns a message describing why the named PersistentVolume
+// cannot be attached, or an empty string if it can. The wording matches external-attacher,
+// which refuses to attach a PV that is being deleted and cannot attach one that is gone.
+func (c *csiAttacher) persistentVolumeDeletion(pvName string) (string, error) {
+	pv, err := c.plugin.persistentVolumeLister.Get(pvName)
+	if apierrors.IsNotFound(err) {
+		// The specs that reach Attach come from this same cache,
+		// so a PV missing from it is one whose deletion was observed.
+		return fmt.Sprintf("persistentvolume %q not found", pvName), nil
+	}
+	if err != nil {
+		return "", errors.New(log("failed to get PersistentVolume %q from lister: %v", pvName, err))
+	}
+	if pv.GetDeletionTimestamp() != nil {
+		return fmt.Sprintf("PersistentVolume %q is marked for deletion", pvName), nil
+	}
+	return "", nil
+}
+
+// deleteStaleVolumeAttachment deletes a VolumeAttachment that refers to a PersistentVolume
+// that is being deleted or gone, so that it can be created again referring to the PV that
+// is being attached now.
+func (c *csiAttacher) deleteStaleVolumeAttachment(attachment *storage.VolumeAttachment, referencedPVDeletion string) error {
+	klog.V(2).Info(log("attacher.Attach is deleting VolumeAttachment [%s]: %s and the volume was never attached",
+		attachment.Name, referencedPVDeletion))
+
+	// Delete the exact revision we made decision on,
+	// not one that has changed since and is attached by now.
+	opts := metav1.DeleteOptions{
+		Preconditions: &metav1.Preconditions{
+			UID:             &attachment.UID,
+			ResourceVersion: &attachment.ResourceVersion,
+		},
+	}
+
+	err := c.k8s.StorageV1().VolumeAttachments().Delete(context.TODO(), attachment.Name, opts)
+	if err != nil && !apierrors.IsNotFound(err) {
+		// A conflict means the object changed since it was cached. Report the error and
+		// let the next attach attempt look at the current object.
+		return errors.New(log("attacher.Attach failed to delete stale VolumeAttachment [%s]: %v", attachment.Name, err))
+	}
+	return nil
 }
 
 // WaitForAttach waits for the attach operation to complete and returns the device path when it is done.
@@ -150,7 +264,7 @@ func (c *csiAttacher) WaitForAttach(spec *volume.Spec, _ string, pod *v1.Pod, _ 
 	}
 
 	volumeHandle := source.VolumeHandle
-	attachID := getAttachmentName(source.VolumeHandle, source.Driver, string(c.plugin.host.GetNodeName()))
+	attachID := GetVolumeAttachmentName(source.VolumeHandle, source.Driver, string(c.plugin.host.GetNodeName()))
 
 	attach, err := c.k8s.StorageV1().VolumeAttachments().Get(context.TODO(), attachID, metav1.GetOptions{})
 	if err != nil {
@@ -225,7 +339,7 @@ func (c *csiAttacher) VolumesAreAttached(specs []*volume.Spec, nodeName types.No
 			}
 		}
 
-		attachID := getAttachmentName(volumeHandle, driverName, string(nodeName))
+		attachID := GetVolumeAttachmentName(volumeHandle, driverName, string(nodeName))
 		var attach *storage.VolumeAttachment
 		if c.plugin.volumeAttachmentLister != nil {
 			attach, err = c.plugin.volumeAttachmentLister.Get(attachID)
@@ -437,7 +551,7 @@ func (c *csiAttacher) Detach(volumeName string, nodeName types.NodeName) error {
 
 	driverName := parts[0]
 	volID = parts[1]
-	attachID = getAttachmentName(volID, driverName, string(nodeName))
+	attachID = GetVolumeAttachmentName(volID, driverName, string(nodeName))
 
 	if err := c.k8s.StorageV1().VolumeAttachments().Delete(context.TODO(), attachID, metav1.DeleteOptions{}); err != nil {
 		if apierrors.IsNotFound(err) {
@@ -452,10 +566,12 @@ func (c *csiAttacher) Detach(volumeName string, nodeName types.NodeName) error {
 
 	// Attach and detach functionality is exclusive to the CSI plugin that runs in the AttachDetachController,
 	// and has access to a VolumeAttachment lister that can be polled for the current status.
-	return c.waitForVolumeDetachmentWithLister(volID, attachID, c.watchTimeout)
+	return c.waitForVolumeDetachmentWithLister(nil, volID, attachID, c.watchTimeout)
 }
 
-func (c *csiAttacher) waitForVolumeDetachmentWithLister(volumeHandle, attachID string, timeout time.Duration) error {
+// waitForVolumeDetachmentWithLister waits until the VolumeAttachment object is gone. spec
+// may be nil, it is only used to name the CSI driver in log messages.
+func (c *csiAttacher) waitForVolumeDetachmentWithLister(spec *volume.Spec, volumeHandle, attachID string, timeout time.Duration) error {
 	klog.V(4).Info(log("probing VolumeAttachment [id=%v]", attachID))
 
 	verifyStatus := func() (bool, error) {
@@ -479,7 +595,7 @@ func (c *csiAttacher) waitForVolumeDetachmentWithLister(volumeHandle, attachID s
 		return successful, nil
 	}
 
-	return c.waitForVolumeAttachDetachStatusWithLister(nil, volumeHandle, attachID, timeout, verifyStatus, "Detach")
+	return c.waitForVolumeAttachDetachStatusWithLister(spec, volumeHandle, attachID, timeout, verifyStatus, "Detach")
 }
 
 func (c *csiAttacher) waitForVolumeAttachDetachStatusWithLister(spec *volume.Spec, volumeHandle, attachID string, timeout time.Duration, verifyStatus func() (bool, error), operation string) error {
@@ -589,8 +705,11 @@ func (c *csiAttacher) UnmountDevice(deviceMountPath string) error {
 	return nil
 }
 
-// getAttachmentName returns csi-<sha256(volName,csiDriverName,NodeName)>
-func getAttachmentName(volName, csiDriverName, nodeName string) string {
+// GetVolumeAttachmentName returns csi-<sha256(volName,csiDriverName,NodeName)>, the name of
+// the VolumeAttachment object for one volume handle attached to one node. Note that the
+// PersistentVolume name does not take part in it: several PersistentVolumes of the same
+// volume can share a VolumeAttachment.
+func GetVolumeAttachmentName(volName, csiDriverName, nodeName string) string {
 	result := sha256.Sum256([]byte(fmt.Sprintf("%s%s%s", volName, csiDriverName, nodeName)))
 	return fmt.Sprintf("csi-%x", result)
 }

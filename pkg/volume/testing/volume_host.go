@@ -36,6 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
+	corelistersv1 "k8s.io/client-go/listers/core/v1"
 	storagelistersv1 "k8s.io/client-go/listers/storage/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
@@ -66,6 +67,7 @@ type fakeVolumeHost struct {
 	node                   *v1.Node
 	csiDriverLister        storagelistersv1.CSIDriverLister
 	volumeAttachmentLister storagelistersv1.VolumeAttachmentLister
+	persistentVolumeLister corelistersv1.PersistentVolumeLister
 	informerFactory        informers.SharedInformerFactory
 	kubeletErr             error
 	mux                    sync.Mutex
@@ -229,17 +231,18 @@ type fakeAttachDetachVolumeHost struct {
 var _ AttachDetachVolumeHost = &fakeAttachDetachVolumeHost{}
 var _ FakeVolumeHost = &fakeAttachDetachVolumeHost{}
 
-func NewFakeAttachDetachVolumeHostWithCSINodeName(t *testing.T, rootDir string, kubeClient clientset.Interface, plugins []VolumePlugin, nodeName string, driverLister storagelistersv1.CSIDriverLister, volumeAttachLister storagelistersv1.VolumeAttachmentLister) FakeVolumeHost {
-	return newFakeAttachDetachVolumeHost(t, rootDir, kubeClient, plugins, nil, nodeName, driverLister, volumeAttachLister)
+func NewFakeAttachDetachVolumeHostWithCSINodeName(t *testing.T, rootDir string, kubeClient clientset.Interface, plugins []VolumePlugin, nodeName string, driverLister storagelistersv1.CSIDriverLister, volumeAttachLister storagelistersv1.VolumeAttachmentLister, pvLister corelistersv1.PersistentVolumeLister) FakeVolumeHost {
+	return newFakeAttachDetachVolumeHost(t, rootDir, kubeClient, plugins, nil, nodeName, driverLister, volumeAttachLister, pvLister)
 }
 
-func newFakeAttachDetachVolumeHost(t *testing.T, rootDir string, kubeClient clientset.Interface, plugins []VolumePlugin, pathToTypeMap map[string]hostutil.FileType, nodeName string, driverLister storagelistersv1.CSIDriverLister, volumeAttachLister storagelistersv1.VolumeAttachmentLister) FakeVolumeHost {
+func newFakeAttachDetachVolumeHost(t *testing.T, rootDir string, kubeClient clientset.Interface, plugins []VolumePlugin, pathToTypeMap map[string]hostutil.FileType, nodeName string, driverLister storagelistersv1.CSIDriverLister, volumeAttachLister storagelistersv1.VolumeAttachmentLister, pvLister corelistersv1.PersistentVolumeLister) FakeVolumeHost {
 	host := &fakeAttachDetachVolumeHost{}
 	host.rootDir = rootDir
 	host.kubeClient = kubeClient
 	host.nodeName = nodeName
 	host.csiDriverLister = driverLister
 	host.volumeAttachmentLister = volumeAttachLister
+	host.persistentVolumeLister = pvLister
 	host.mounter = mount.NewFakeMounter(nil)
 	host.hostUtil = hostutil.NewFakeHostUtil(pathToTypeMap)
 	host.pluginMgr = &VolumePluginMgr{}
@@ -286,6 +289,10 @@ func (f *fakeAttachDetachVolumeHost) CSIDriverLister() storagelistersv1.CSIDrive
 
 func (f *fakeAttachDetachVolumeHost) VolumeAttachmentLister() storagelistersv1.VolumeAttachmentLister {
 	return f.volumeAttachmentLister
+}
+
+func (f *fakeAttachDetachVolumeHost) PersistentVolumeLister() corelistersv1.PersistentVolumeLister {
+	return f.persistentVolumeLister
 }
 
 func (f *fakeAttachDetachVolumeHost) IsAttachDetachController() bool {
