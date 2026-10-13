@@ -32,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/runtime/serializer/protobuf"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/apis/example"
 	examplev1 "k8s.io/apiserver/pkg/apis/example/v1"
 	example2v1 "k8s.io/apiserver/pkg/apis/example2/v1"
@@ -103,6 +104,13 @@ func newEtcdTestStorageWithOptions(t testing.TB, prefix string, codec runtime.Co
 		t.Fatal(err)
 	}
 	t.Cleanup(storage.Close)
+	// Runs before storage.Close and after the cacher using this storage has
+	// been stopped (cleanups run in reverse order).
+	t.Cleanup(func() {
+		if err := etcd3.TestOnlyWaitForWatches(storage, wait.ForeverTestTimeout); err != nil {
+			t.Error(err)
+		}
+	})
 	return server, storage
 }
 
