@@ -206,6 +206,20 @@ func GetBackoffKey(pod *v1.Pod, container *v1.Container) string {
 	return strconv.FormatUint(hash.Sum64(), 16)
 }
 
+// GetSandboxBackoffKey generates a key (string) to uniquely identify a pod for tracking
+// pod sandbox creation backoff. Unlike GetBackoffKey, this isn't tied to a single container,
+// since a RunPodSandbox failure isn't either.
+func GetSandboxBackoffKey(pod *v1.Pod) string {
+	key := []string{
+		pod.Name,
+		pod.Namespace,
+		string(pod.UID),
+	}
+	hash := fnv.New64a()
+	hash.Write([]byte(strings.Join(key, "/")))
+	return strconv.FormatUint(hash.Sum64(), 16)
+}
+
 // logPathDelimiter is the delimiter used in the log path.
 const logPathDelimiter = "_"
 

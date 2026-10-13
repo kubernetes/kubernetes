@@ -6419,7 +6419,7 @@ func TestDoBackOff(t *testing.T) {
 			backoff: flowcontrol.NewFakeBackOff(time.Second, time.Minute, fakeClock),
 			backoffUpdateFn: func(backoff *flowcontrol.Backoff, pod *v1.Pod, podStatus *kubecontainer.PodStatus) {
 				// Simulates the backOff.Next() call added to the start() closure when
-				// startContainer() fails with ErrCreateContainer/ErrCreateContainerConfig/etc.
+				// startContainer() fails with ErrCreateContainer/ErrRunContainer.
 				key := GetBackoffKey(pod, &pod.Spec.Containers[0])
 				backoff.Next(key, fakeClock.Now())
 			},
@@ -6427,7 +6427,7 @@ func TestDoBackOff(t *testing.T) {
 			expectedError:     kubecontainer.NewBackoffError(ErrCreateContainerBackOff, fakeClock.Now().Add(time.Second)),
 		},
 		{
-			name: "no container status, CreateContainerConfig error preserved through backoff",
+			name: "no container status, CreateContainer error preserved through backoff",
 			podStatus: &kubecontainer.PodStatus{
 				ContainerStatuses: []*kubecontainer.Status{}, // CreateContainer was rejected; no status was ever recorded
 			},
@@ -6436,11 +6436,11 @@ func TestDoBackOff(t *testing.T) {
 				key := GetBackoffKey(pod, &pod.Spec.Containers[0])
 				backoff.Next(key, fakeClock.Now())
 			},
-			cachedFailureErr:     ErrCreateContainerConfig,
-			cachedFailureMsg:     "container has runtime VolumeMounts set which is not allowed",
+			cachedFailureErr:     ErrCreateContainer,
+			cachedFailureMsg:     "failed to add conmon to systemd sandbox cgroup",
 			expectedInBackOff:    true,
-			expectedError:        kubecontainer.NewBackoffError(ErrCreateContainerConfig, fakeClock.Now().Add(time.Second)),
-			expectedMsgSubstring: "container has runtime VolumeMounts set which is not allowed",
+			expectedError:        kubecontainer.NewBackoffError(ErrCreateContainer, fakeClock.Now().Add(time.Second)),
+			expectedMsgSubstring: "failed to add conmon to systemd sandbox cgroup",
 		},
 	}
 
@@ -6485,6 +6485,66 @@ func TestDoBackOff(t *testing.T) {
 			}
 			if tc.expectedMsgSubstring != "" {
 				assert.Contains(t, msg, tc.expectedMsgSubstring)
+			}
+		})
+	}
+}
+
+func TestDoSandboxBackOff(t *testing.T) {
+	fakeClock := testingclock.NewFakeClock(time.Now())
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:       "12345678",
+			Name:      "foo",
+			Namespace: "new",
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:  "foocontainer",
+					Image: "busybox",
+				},
+			},
+		},
+	}
+
+	tests := []struct {
+		name              string
+		backoffUpdateFn   func(backoff *flowcontrol.Backoff)
+		expectedInBackOff bool
+	}{
+		{
+			name:              "sandbox never failed — should not be in backoff",
+			expectedInBackOff: false,
+		},
+		{
+			name: "sandbox creation already failed once",
+			backoffUpdateFn: func(backoff *flowcontrol.Backoff) {
+				backoff.Next(GetSandboxBackoffKey(pod), fakeClock.Now())
+			},
+			expectedInBackOff: true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
+			_, _, m, err := createTestRuntimeManager(tCtx)
+			require.NoError(t, err)
+
+			backoff := flowcontrol.NewFakeBackOff(time.Second, time.Minute, fakeClock)
+			if tc.backoffUpdateFn != nil {
+				tc.backoffUpdateFn(backoff)
+			}
+
+			inBackOff, msg, err := m.doSandboxBackOff(tCtx, pod, backoff)
+			assert.Equal(t, tc.expectedInBackOff, inBackOff)
+			if tc.expectedInBackOff {
+				assert.NotEmpty(t, msg)
+				assert.Equal(t, kubecontainer.NewBackoffError(kubecontainer.ErrCreatePodSandbox, fakeClock.Now().Add(time.Second)), err)
+			} else {
+				assert.Empty(t, msg)
+				assert.NoError(t, err)
 			}
 		})
 	}
