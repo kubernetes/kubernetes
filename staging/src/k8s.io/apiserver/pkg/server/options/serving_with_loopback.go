@@ -51,7 +51,7 @@ const maxAge = (3*365 + 1) * 24 * time.Hour
 
 // ApplyTo fills up serving information in the server configuration.
 func (s *SecureServingOptionsWithLoopback) ApplyTo(secureServingInfo **server.SecureServingInfo, loopbackClientConfig **rest.Config) error {
-	return s.applyTo(secureServingInfo, loopbackClientConfig, nil)
+	return s.ApplyToWithHealthChecks(secureServingInfo, loopbackClientConfig, nil)
 }
 
 type HealthzLivezHealthChecksAdder interface {
@@ -59,7 +59,9 @@ type HealthzLivezHealthChecksAdder interface {
 	AddLivezChecks(checks ...healthz.HealthChecker)
 }
 
-func (s *SecureServingOptionsWithLoopback) applyTo(secureServingInfo **server.SecureServingInfo, loopbackClientConfig **rest.Config, healthCheckAdder HealthzLivezHealthChecksAdder) error {
+// ApplyToWithHealthChecks is ApplyTo plus, when healthCheckAdder is not nil, a healthz and livez
+// check that fails once the self-signed loopback serving certificate has expired.
+func (s *SecureServingOptionsWithLoopback) ApplyToWithHealthChecks(secureServingInfo **server.SecureServingInfo, loopbackClientConfig **rest.Config, healthCheckAdder HealthzLivezHealthChecksAdder) error {
 	if s == nil || s.SecureServingOptions == nil || secureServingInfo == nil {
 		return nil
 	}
@@ -107,10 +109,6 @@ func (s *SecureServingOptionsWithLoopback) applyTo(secureServingInfo **server.Se
 	}
 
 	return nil
-}
-
-func (s *SecureServingOptionsWithLoopback) ApplyToConfig(cfg *server.Config) error {
-	return s.applyTo(&cfg.SecureServing, &cfg.LoopbackClientConfig, cfg)
 }
 
 // addLoopbackServingCertificateHealthCheck adds a health check called `loopback-certificate-expiry` to the
