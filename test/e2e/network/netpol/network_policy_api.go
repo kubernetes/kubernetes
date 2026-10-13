@@ -300,4 +300,37 @@ var _ = common.SIGDescribe("Netpol API", func() {
 			framework.Failf("unexpected error deleting existing network policies: %v", err)
 		}
 	})
+
+	/*
+		Testname: NetworkPolicy API rejects an invalid selector label value
+		Description:
+		- A NetworkPolicy whose namespaceSelector matchExpressions contains a label
+		  value that is not a valid Kubernetes label value (e.g. one containing a
+		  space) MUST be rejected by the API server at admission time.
+	*/
+	ginkgo.It("should reject a NetworkPolicy with an invalid label value in a selector", func(ctx context.Context) {
+		ns := f.Namespace.Name
+		npClient := f.ClientSet.NetworkingV1().NetworkPolicies(ns)
+
+		ginkgo.By("creating a NetworkPolicy whose namespaceSelector has an invalid label value")
+		// A label value may not contain spaces, so "invalid value" is not a valid
+		// label value and the API server must reject the NetworkPolicy.
+		ingressRule := networkingv1.NetworkPolicyIngressRule{
+			From: []networkingv1.NetworkPolicyPeer{{
+				NamespaceSelector: &metav1.LabelSelector{
+					MatchExpressions: []metav1.LabelSelectorRequirement{{
+						Key:      "name",
+						Operator: metav1.LabelSelectorOpIn,
+						Values:   []string{"invalid value"},
+					}},
+				},
+			}},
+		}
+		npTemplate := GenNetworkPolicy(SetGenerateName("e2e-example-netpol-invalid-selector"),
+			SetObjectMetaLabel(map[string]string{"special-label": f.UniqueName}),
+			SetSpecPodSelectorMatchLabels(map[string]string{"pod-name": "test-pod"}),
+			SetSpecIngressRules(ingressRule))
+		_, err := npClient.Create(ctx, npTemplate, metav1.CreateOptions{})
+		gomega.Expect(err).To(gomega.HaveOccurred(), "expected API server to reject NetworkPolicy with an invalid selector label value, request template:%v", npTemplate)
+	})
 })
