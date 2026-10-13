@@ -38,9 +38,18 @@ lintersConfig:
       - ["k8s:optional", "optional", "kubebuilder:validation:Optional"]
       - ["k8s:required", "required", "kubebuilder:validation:Required"]
       description: "fields cannot be both optional and required"
+    - name: "required_vs_+setByServer"
+      sets:
+      - ["k8s:required"]
+      - ["k8s:setByServer"]
+      description: "fields cannot be both required and +setByServer"
   dependenttags:
     rules:
       - identifier: "k8s:unionMember"
+        type: "All"
+        dependsOn:
+          - "k8s:optional"
+      - identifier: "k8s:setByServer"
         type: "All"
         dependsOn:
           - "k8s:optional"
