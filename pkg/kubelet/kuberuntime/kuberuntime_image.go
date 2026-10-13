@@ -18,7 +18,9 @@ package kuberuntime
 
 import (
 	"context"
+	"fmt"
 
+	v1 "k8s.io/api/core/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -26,6 +28,7 @@ import (
 	crededentialprovider "k8s.io/kubernetes/pkg/credentialprovider"
 	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/images"
 )
 
 // PullImage pulls an image from the network to local storage using the supplied
@@ -172,4 +175,36 @@ func (m *kubeGenericRuntimeManager) ImageFsInfo(ctx context.Context) (*runtimeap
 		return nil, err
 	}
 	return allImages, nil
+}
+
+// ensureImageInUse is EnsureImageExists that also keeps image GC from removing
+// the image until release is called. Callers release the image once the
+// container using it exists in the runtime, because from then on image GC sees
+// the container itself. release is never nil.
+func (m *kubeGenericRuntimeManager) ensureImageInUse(ctx context.Context, objRef *v1.ObjectReference, pod *v1.Pod, image string, pullSecrets []v1.Secret, podSandboxConfig *runtimeapi.PodSandboxConfig, runtimeHandler string, pullPolicy v1.PullPolicy) (imageRef, msg string, release func(), err error) {
+	for {
+		removals := m.imageUseTracker.Removals()
+		imageRef, msg, err = m.imagePuller.EnsureImageExists(ctx, objRef, pod, image, pullSecrets, podSandboxConfig, runtimeHandler, pullPolicy)
+		if err != nil {
+			return "", msg, func() {}, err
+		}
+
+		release = m.imageUseTracker.Acquire(imageRef, runtimeHandler)
+		if m.imageUseTracker.Removals() == removals {
+			return imageRef, msg, release, nil
+		}
+
+		// Image GC removed some image while EnsureImageExists was running, so
+		// this one may be gone. It can't be removed any more, check it's there.
+		presentRef, err := m.GetImageRef(ctx, kubecontainer.ImageSpec{Image: imageRef, RuntimeHandler: runtimeHandler})
+		if err != nil {
+			release()
+			return "", fmt.Sprintf("Failed to inspect image %q: %v", imageRef, err), func() {}, images.ErrImageInspect
+		}
+		if presentRef != "" {
+			return imageRef, msg, release, nil
+		}
+		klog.FromContext(ctx).V(2).Info("Image was removed by image garbage collection, ensuring it again", "pod", klog.KObj(pod), "image", image, "imageRef", imageRef)
+		release()
+	}
 }

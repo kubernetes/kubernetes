@@ -17,6 +17,7 @@ limitations under the License.
 package kuberuntime
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"testing"
@@ -24,9 +25,12 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	noopoteltrace "go.opentelemetry.io/otel/trace/noop"
 
 	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/flowcontrol"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/ktesting"
@@ -506,4 +510,81 @@ func TestPullThenListWithAnnotations(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Len(t, images, 1)
 	assert.Equal(t, images[0].Spec, imageSpec)
+}
+
+// gcDuringEnsureImage runs image GC right after the first EnsureImageExists,
+// while the image it found is not in use by any container yet.
+type gcDuringEnsureImage struct {
+	images.ImageManager
+	gc    images.ImageGCManager
+	calls int
+}
+
+func (p *gcDuringEnsureImage) EnsureImageExists(ctx context.Context, objRef *v1.ObjectReference, pod *v1.Pod, requestedImage string, pullSecrets []v1.Secret, podSandboxConfig *runtimeapi.PodSandboxConfig, podRuntimeHandler string, pullPolicy v1.PullPolicy) (string, string, error) {
+	p.calls++
+	imageRef, msg, err := p.ImageManager.EnsureImageExists(ctx, objRef, pod, requestedImage, pullSecrets, podSandboxConfig, podRuntimeHandler, pullPolicy)
+	if p.calls == 1 && p.gc != nil {
+		if err := p.gc.DeleteUnusedImages(ctx); err != nil {
+			return "", "", err
+		}
+	}
+	return imageRef, msg, err
+}
+
+func TestEnsureImageInUse(t *testing.T) {
+	const image = "busybox:latest"
+	testCases := []struct {
+		name string
+		// gcDuringEnsure removes the image after EnsureImageExists found it.
+		gcDuringEnsure bool
+		pullPolicy     v1.PullPolicy
+		wantCalls      int
+		wantPulls      int
+		wantErr        error
+	}{
+		{name: "image present", pullPolicy: v1.PullIfNotPresent, wantCalls: 1},
+		{name: "image removed during lookup is pulled again", gcDuringEnsure: true, pullPolicy: v1.PullIfNotPresent, wantCalls: 2, wantPulls: 1},
+		{name: "image removed during lookup with pull policy Never", gcDuringEnsure: true, pullPolicy: v1.PullNever, wantCalls: 2, wantErr: images.ErrImageNeverPull},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
+			_, fakeImageService, fakeManager, err := createTestRuntimeManager(tCtx)
+			require.NoError(t, err)
+			fakeImageService.SetFakeImages([]string{image})
+
+			gc, err := images.NewImageGCManager(fakeManager, nil, nil, &record.FakeRecorder{}, nil, images.ImageGCPolicy{}, noopoteltrace.NewTracerProvider(), fakeManager.imageUseTracker)
+			require.NoError(t, err)
+			puller := &gcDuringEnsureImage{ImageManager: fakeManager.imagePuller}
+			if tc.gcDuringEnsure {
+				puller.gc = gc
+			}
+			fakeManager.imagePuller = puller
+
+			pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "default", UID: "12345678"}}
+			podSandboxConfig := &runtimeapi.PodSandboxConfig{Metadata: &runtimeapi.PodSandboxMetadata{Name: pod.Name, Namespace: pod.Namespace, Uid: string(pod.UID)}}
+			imageRef, _, release, err := fakeManager.ensureImageInUse(tCtx, nil, pod, image, nil, podSandboxConfig, "", tc.pullPolicy)
+			require.NotNil(t, release)
+			defer release()
+			assert.Equal(t, tc.wantCalls, puller.calls, "EnsureImageExists calls")
+			pulls := 0
+			for _, call := range fakeImageService.Called {
+				if call == "PullImage" {
+					pulls++
+				}
+			}
+			assert.Equal(t, tc.wantPulls, pulls, "image pulls")
+			if tc.wantErr != nil {
+				require.ErrorIs(t, err, tc.wantErr)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, image, imageRef)
+
+			// No container uses the image, but it is held until released.
+			require.NoError(t, gc.DeleteUnusedImages(tCtx))
+			assert.Contains(t, fakeImageService.Images, image)
+		})
+	}
 }

@@ -142,6 +142,7 @@ func newFakeKubeRuntimeManager(ctx context.Context, runtimeService internalapi.R
 		0,
 		&fakePodPullingTimeRecorder{},
 	)
+	kubeRuntimeManager.imageUseTracker = images.NewUseTracker()
 	kubeRuntimeManager.runner = lifecycle.NewHandlerRunner(
 		&fakeHTTP{},
 		kubecontainer.NewCommandRunner(runtimeService),
