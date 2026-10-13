@@ -79,6 +79,24 @@ func BenchmarkRequestCost(b *testing.B) {
 		},
 		{
 			method:             "LIST",
+			options:            `N=100 rv="" labelSelector`,
+			httpMethod:         http.MethodGet,
+			path:               podsPath,
+			query:              "labelSelector=name=small-deployment-00",
+			seedPods:           1000,
+			acceptContentTypes: allReadFormats,
+		},
+		{
+			method:             "LIST",
+			options:            `N=100 rv="" nodeSelector`,
+			httpMethod:         http.MethodGet,
+			path:               podsPath,
+			query:              "fieldSelector=spec.nodeName=kind-worker0",
+			seedPods:           1000,
+			acceptContentTypes: allReadFormats,
+		},
+		{
+			method:             "LIST",
 			options:            "N=100 rv=0",
 			httpMethod:         http.MethodGet,
 			path:               podsPath,
@@ -88,11 +106,47 @@ func BenchmarkRequestCost(b *testing.B) {
 		},
 		{
 			method:             "LIST",
+			options:            "N=100 rv=0 labelSelector",
+			httpMethod:         http.MethodGet,
+			path:               podsPath,
+			query:              "resourceVersion=0&labelSelector=name=small-deployment-00",
+			seedPods:           1000,
+			acceptContentTypes: allReadFormats,
+		},
+		{
+			method:             "LIST",
+			options:            "N=100 rv=0 nodeSelector",
+			httpMethod:         http.MethodGet,
+			path:               podsPath,
+			query:              "resourceVersion=0&fieldSelector=spec.nodeName=kind-worker0",
+			seedPods:           1000,
+			acceptContentTypes: allReadFormats,
+		},
+		{
+			method:             "LIST",
 			options:            "N=100 rv=Exact",
 			httpMethod:         http.MethodGet,
 			path:               podsPath,
 			query:              "resourceVersion=LATEST_RV&resourceVersionMatch=Exact",
 			seedPods:           100,
+			acceptContentTypes: allReadFormats,
+		},
+		{
+			method:             "LIST",
+			options:            "N=100 rv=Exact labelSelector",
+			httpMethod:         http.MethodGet,
+			path:               podsPath,
+			query:              "resourceVersion=LATEST_RV&resourceVersionMatch=Exact&labelSelector=name=small-deployment-00",
+			seedPods:           1000,
+			acceptContentTypes: allReadFormats,
+		},
+		{
+			method:             "LIST",
+			options:            "N=100 rv=Exact nodeSelector",
+			httpMethod:         http.MethodGet,
+			path:               podsPath,
+			query:              "resourceVersion=LATEST_RV&resourceVersionMatch=Exact&fieldSelector=spec.nodeName=kind-worker0",
+			seedPods:           1000,
 			acceptContentTypes: allReadFormats,
 		},
 		{
@@ -132,11 +186,47 @@ func BenchmarkRequestCost(b *testing.B) {
 		},
 		{
 			method:             "WATCH",
+			options:            `N=100 rv="" labelSelector`,
+			httpMethod:         http.MethodGet,
+			path:               podsPath,
+			query:              "watch=true&labelSelector=name=small-deployment-00&timeoutSeconds=1",
+			seedPods:           1000,
+			acceptContentTypes: watchFormats,
+		},
+		{
+			method:             "WATCH",
+			options:            `N=100 rv="" nodeSelector`,
+			httpMethod:         http.MethodGet,
+			path:               podsPath,
+			query:              "watch=true&fieldSelector=spec.nodeName=kind-worker0&timeoutSeconds=1",
+			seedPods:           1000,
+			acceptContentTypes: watchFormats,
+		},
+		{
+			method:             "WATCH",
 			options:            "N=100 rv=0",
 			httpMethod:         http.MethodGet,
 			path:               podsPath,
 			query:              "watch=true&resourceVersion=0&timeoutSeconds=1",
 			seedPods:           100,
+			acceptContentTypes: watchFormats,
+		},
+		{
+			method:             "WATCH",
+			options:            "N=100 rv=0 labelSelector",
+			httpMethod:         http.MethodGet,
+			path:               podsPath,
+			query:              "watch=true&resourceVersion=0&labelSelector=name=small-deployment-00&timeoutSeconds=1",
+			seedPods:           1000,
+			acceptContentTypes: watchFormats,
+		},
+		{
+			method:             "WATCH",
+			options:            "N=100 rv=0 nodeSelector",
+			httpMethod:         http.MethodGet,
+			path:               podsPath,
+			query:              "watch=true&resourceVersion=0&fieldSelector=spec.nodeName=kind-worker0&timeoutSeconds=1",
+			seedPods:           1000,
 			acceptContentTypes: watchFormats,
 		},
 		{
@@ -155,6 +245,24 @@ func BenchmarkRequestCost(b *testing.B) {
 			path:               podsPath,
 			query:              "watch=true&resourceVersion=FIRST_RV&timeoutSeconds=1",
 			seedPods:           100,
+			acceptContentTypes: watchFormats,
+		},
+		{
+			method:             "WATCH",
+			options:            "N=100 rv=FIRST_RV labelSelector",
+			httpMethod:         http.MethodGet,
+			path:               podsPath,
+			query:              "watch=true&resourceVersion=FIRST_RV&labelSelector=name=small-deployment-00&timeoutSeconds=1",
+			seedPods:           1000,
+			acceptContentTypes: watchFormats,
+		},
+		{
+			method:             "WATCH",
+			options:            "N=100 rv=FIRST_RV nodeSelector",
+			httpMethod:         http.MethodGet,
+			path:               podsPath,
+			query:              "watch=true&resourceVersion=FIRST_RV&fieldSelector=spec.nodeName=kind-worker0&timeoutSeconds=1",
+			seedPods:           1000,
 			acceptContentTypes: watchFormats,
 		},
 		{
@@ -186,11 +294,47 @@ func BenchmarkRequestCost(b *testing.B) {
 		},
 		{
 			method:             "WATCH",
+			options:            `N=100 rv="" WatchList labelSelector`,
+			httpMethod:         http.MethodGet,
+			path:               podsPath,
+			query:              "watch=true&sendInitialEvents=true&resourceVersionMatch=NotOlderThan&allowWatchBookmarks=true&labelSelector=name=small-deployment-00&timeoutSeconds=1",
+			seedPods:           1000,
+			acceptContentTypes: watchFormats,
+		},
+		{
+			method:             "WATCH",
+			options:            `N=100 rv="" WatchList nodeSelector`,
+			httpMethod:         http.MethodGet,
+			path:               podsPath,
+			query:              "watch=true&sendInitialEvents=true&resourceVersionMatch=NotOlderThan&allowWatchBookmarks=true&fieldSelector=spec.nodeName=kind-worker0&timeoutSeconds=1",
+			seedPods:           1000,
+			acceptContentTypes: watchFormats,
+		},
+		{
+			method:             "WATCH",
 			options:            "N=100 rv=0 WatchList",
 			httpMethod:         http.MethodGet,
 			path:               podsPath,
 			query:              "watch=true&resourceVersion=0&sendInitialEvents=true&resourceVersionMatch=NotOlderThan&allowWatchBookmarks=true&timeoutSeconds=1",
 			seedPods:           100,
+			acceptContentTypes: watchFormats,
+		},
+		{
+			method:             "WATCH",
+			options:            "N=100 rv=0 WatchList labelSelector",
+			httpMethod:         http.MethodGet,
+			path:               podsPath,
+			query:              "watch=true&resourceVersion=0&sendInitialEvents=true&resourceVersionMatch=NotOlderThan&allowWatchBookmarks=true&labelSelector=name=small-deployment-00&timeoutSeconds=1",
+			seedPods:           1000,
+			acceptContentTypes: watchFormats,
+		},
+		{
+			method:             "WATCH",
+			options:            "N=100 rv=0 WatchList nodeSelector",
+			httpMethod:         http.MethodGet,
+			path:               podsPath,
+			query:              "watch=true&resourceVersion=0&sendInitialEvents=true&resourceVersionMatch=NotOlderThan&allowWatchBookmarks=true&fieldSelector=spec.nodeName=kind-worker0&timeoutSeconds=1",
+			seedPods:           1000,
 			acceptContentTypes: watchFormats,
 		},
 		{
@@ -401,10 +545,8 @@ type dataItem struct {
 }
 
 func benchmarkScenario(b *testing.B, sc requestScenario) []dataItem {
-	allocBytesByFormat := make(map[string]float64, len(sc.acceptContentTypes))
-	allocsByFormat := make(map[string]float64, len(sc.acceptContentTypes))
-	requestBytesByFormat := make(map[string]float64, len(sc.acceptContentTypes))
-	responseBytesByFormat := make(map[string]float64, len(sc.acceptContentTypes))
+	var items []dataItem
+	requestLabel := fmt.Sprintf("%s %s", sc.method, sc.options)
 
 	for _, wf := range sc.acceptContentTypes {
 		b.Run(fmt.Sprintf("Format=%s", wf.name), func(b *testing.B) {
@@ -442,40 +584,35 @@ func benchmarkScenario(b *testing.B, sc requestScenario) []dataItem {
 			b.ReportMetric(float64(responseBytes), "response-B/op")
 
 			if b.N > 0 {
-				allocBytesByFormat[wf.name] = float64(endMem.TotalAlloc-startMem.TotalAlloc) / float64(b.N)
-				allocsByFormat[wf.name] = float64(endMem.Mallocs-startMem.Mallocs) / float64(b.N)
-				requestBytesByFormat[wf.name] = float64(len(payload))
-				responseBytesByFormat[wf.name] = float64(responseBytes)
+				allocBytes := float64(endMem.TotalAlloc-startMem.TotalAlloc) / float64(b.N)
+				allocs := float64(endMem.Mallocs-startMem.Mallocs) / float64(b.N)
+				items = append(items,
+					dataItem{
+						Labels: map[string]string{"Request": requestLabel, "Format": wf.name, "Metric": "Allocated bytes per operation"},
+						Unit:   "B",
+						Data:   map[string]float64{wf.name: allocBytes},
+					},
+					dataItem{
+						Labels: map[string]string{"Request": requestLabel, "Format": wf.name, "Metric": "Allocations per operation"},
+						Unit:   "1",
+						Data:   map[string]float64{wf.name: allocs},
+					},
+					dataItem{
+						Labels: map[string]string{"Request": requestLabel, "Format": wf.name, "Metric": "Request body bytes per operation"},
+						Unit:   "B",
+						Data:   map[string]float64{wf.name: float64(len(payload))},
+					},
+					dataItem{
+						Labels: map[string]string{"Request": requestLabel, "Format": wf.name, "Metric": "Response body bytes per operation"},
+						Unit:   "B",
+						Data:   map[string]float64{wf.name: float64(responseBytes)},
+					},
+				)
 			}
 		})
 	}
 
-	if len(allocBytesByFormat) == 0 {
-		return nil
-	}
-	requestLabel := fmt.Sprintf("%s %s", sc.method, sc.options)
-	return []dataItem{
-		{
-			Labels: map[string]string{"Request": requestLabel, "Metric": "Allocated bytes per operation"},
-			Unit:   "B",
-			Data:   allocBytesByFormat,
-		},
-		{
-			Labels: map[string]string{"Request": requestLabel, "Metric": "Allocations per operation"},
-			Unit:   "1",
-			Data:   allocsByFormat,
-		},
-		{
-			Labels: map[string]string{"Request": requestLabel, "Metric": "Request body bytes per operation"},
-			Unit:   "B",
-			Data:   requestBytesByFormat,
-		},
-		{
-			Labels: map[string]string{"Request": requestLabel, "Metric": "Response body bytes per operation"},
-			Unit:   "B",
-			Data:   responseBytesByFormat,
-		},
-	}
+	return items
 }
 
 func writePerfData(tb testing.TB, artifactsDir string, data perfData) {
