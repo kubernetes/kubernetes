@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v2
+package v2_test
 
 import (
 	"encoding/json"
@@ -27,6 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	v1 "k8s.io/kubernetes/pkg/apis/autoscaling/v1"
+	v2 "k8s.io/kubernetes/pkg/apis/autoscaling/v2"
 	"k8s.io/kubernetes/pkg/apis/autoscaling/validation"
 	"k8s.io/utils/ptr"
 )
@@ -77,7 +78,7 @@ func TestObjectMetricAverageValue_RoundTripV2V1(t *testing.T) {
 
 	// Convert from v2 to internal HPA and ensure that no validation errors are produced
 	hpaInternal := &autoscaling.HorizontalPodAutoscaler{}
-	err = Convert_v2_HorizontalPodAutoscaler_To_autoscaling_HorizontalPodAutoscaler(hpaV2, hpaInternal, nil)
+	err = v2.Convert_v2_HorizontalPodAutoscaler_To_autoscaling_HorizontalPodAutoscaler(hpaV2, hpaInternal, nil)
 	assert.NoError(t, err, "Conversion to internal should not fail")
 
 	validationErrors := validation.ValidateHorizontalPodAutoscaler(hpaInternal, validation.HorizontalPodAutoscalerSpecValidationOptions{})

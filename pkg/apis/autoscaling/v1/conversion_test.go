@@ -17,16 +17,66 @@ limitations under the License.
 package v1
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/utils/ptr"
 )
+
+func TestBehaviorAnnotationVersionedSchema(t *testing.T) {
+	want := &autoscaling.HorizontalPodAutoscalerBehavior{
+		ScaleUp: &autoscaling.HPAScalingRules{
+			StabilizationWindowSeconds: ptr.To[int32](60),
+			SelectPolicy:               ptr.To(autoscaling.MaxPolicySelect),
+			Policies: []autoscaling.HPAScalingPolicy{
+				{Type: autoscaling.PercentScalingPolicy, Value: 100, PeriodSeconds: 60},
+			},
+			Tolerance: ptr.To(resource.MustParse("0.05")),
+		},
+		ScaleDown: &autoscaling.HPAScalingRules{SelectPolicy: ptr.To(autoscaling.DisabledPolicySelect)},
+	}
+	canonical := `{"scaleUp":{"stabilizationWindowSeconds":60,"selectPolicy":"Max","policies":[{"type":"Percent","value":100,"periodSeconds":60}],"tolerance":"50m"},"scaleDown":{"selectPolicy":"Disabled"}}`
+	legacy := `{"ScaleUp":{"StabilizationWindowSeconds":60,"SelectPolicy":"Max","Policies":[{"Type":"Percent","Value":100,"PeriodSeconds":60}],"Tolerance":"0.05"},"ScaleDown":{"SelectPolicy":"Disabled"}}`
+
+	t.Run("writer uses versioned field names and remains readable by legacy readers", func(t *testing.T) {
+		in := &autoscaling.HorizontalPodAutoscaler{}
+		in.Spec.Behavior = want
+		in.Annotations = map[string]string{"keep": "value"}
+		out := &autoscalingv1.HorizontalPodAutoscaler{}
+		if err := Convert_autoscaling_HorizontalPodAutoscaler_To_v1_HorizontalPodAutoscaler(in, out, nil); err != nil {
+			t.Fatal(err)
+		}
+		encoded := out.Annotations[autoscaling.BehaviorSpecsAnnotation]
+		assert.JSONEq(t, canonical, encoded)
+		var legacyReader autoscaling.HorizontalPodAutoscalerBehavior
+		if err := json.Unmarshal([]byte(encoded), &legacyReader); err != nil {
+			t.Fatal(err)
+		}
+		assert.True(t, apiequality.Semantic.DeepEqual(want, &legacyReader), "legacy reader lost behavior fields")
+		assert.Equal(t, map[string]string{"keep": "value"}, in.Annotations)
+		assert.Equal(t, "value", out.Annotations["keep"])
+	})
+	for name, encoded := range map[string]string{"legacy": legacy, "versioned": canonical} {
+		t.Run("reader/"+name, func(t *testing.T) {
+			in := &autoscalingv1.HorizontalPodAutoscaler{}
+			in.Annotations = map[string]string{autoscaling.BehaviorSpecsAnnotation: encoded, "keep": "value"}
+			out := &autoscaling.HorizontalPodAutoscaler{}
+			if err := Convert_v1_HorizontalPodAutoscaler_To_autoscaling_HorizontalPodAutoscaler(in, out, nil); err != nil {
+				t.Fatal(err)
+			}
+			assert.True(t, apiequality.Semantic.DeepEqual(want, out.Spec.Behavior), "reader lost behavior fields")
+			assert.Equal(t, "value", out.Annotations["keep"])
+			assert.Contains(t, in.Annotations, autoscaling.BehaviorSpecsAnnotation)
+		})
+	}
+}
 
 // Test for #101370
 func TestConvert_autoscaling_HorizontalPodAutoscalerSpec_To_v1_HorizontalPodAutoscalerSpec(t *testing.T) {

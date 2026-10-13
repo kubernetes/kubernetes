@@ -20,11 +20,13 @@ import (
 	"encoding/json"
 
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
+	autoscalingv2 "k8s.io/api/autoscaling/v2"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
+	autoscalingapiv2 "k8s.io/kubernetes/pkg/apis/autoscaling/v2"
 	"k8s.io/kubernetes/pkg/apis/core"
 )
 
@@ -350,8 +352,11 @@ func Convert_autoscaling_HorizontalPodAutoscaler_To_v1_HorizontalPodAutoscaler(i
 	}
 
 	if in.Spec.Behavior != nil {
-		// TODO: this is marshaling an internal type. Fix this without breaking backwards compatibility.
-		behaviorEnc, err := json.Marshal(in.Spec.Behavior)
+		var behavior autoscalingv2.HorizontalPodAutoscalerBehavior
+		if err := autoscalingapiv2.Convert_autoscaling_HorizontalPodAutoscalerBehavior_To_v2_HorizontalPodAutoscalerBehavior(in.Spec.Behavior, &behavior, s); err != nil {
+			return err
+		}
+		behaviorEnc, err := json.Marshal(&behavior)
 		if err != nil {
 			return err
 		}
@@ -403,10 +408,13 @@ func Convert_v1_HorizontalPodAutoscaler_To_autoscaling_HorizontalPodAutoscaler(i
 	}
 
 	if behaviorEnc, hasConstraints := out.Annotations[autoscaling.BehaviorSpecsAnnotation]; hasConstraints {
-		// TODO: this is unmarshaling an internal type. Fix this without breaking backwards compatibility.
-		var behavior autoscaling.HorizontalPodAutoscalerBehavior
-		if err := json.Unmarshal([]byte(behaviorEnc), &behavior); err == nil && behavior != (autoscaling.HorizontalPodAutoscalerBehavior{}) {
-			out.Spec.Behavior = &behavior
+		// Case-insensitive field matching also accepts the legacy internal field names.
+		var behavior autoscalingv2.HorizontalPodAutoscalerBehavior
+		if err := json.Unmarshal([]byte(behaviorEnc), &behavior); err == nil && behavior != (autoscalingv2.HorizontalPodAutoscalerBehavior{}) {
+			out.Spec.Behavior = &autoscaling.HorizontalPodAutoscalerBehavior{}
+			if err := autoscalingapiv2.Convert_v2_HorizontalPodAutoscalerBehavior_To_autoscaling_HorizontalPodAutoscalerBehavior(&behavior, out.Spec.Behavior, s); err != nil {
+				return err
+			}
 		}
 	}
 
