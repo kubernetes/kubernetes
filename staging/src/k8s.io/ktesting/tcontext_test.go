@@ -19,6 +19,7 @@ package ktesting_test
 import (
 	"context"
 	"fmt"
+	"runtime"
 	"sync"
 	"testing"
 	"testing/synctest"
@@ -184,6 +185,10 @@ func TestCancelCtx(t *testing.T) {
 }
 
 func TestParallel(t *testing.T) {
+	if runtime.GOMAXPROCS(0) < 3 {
+		t.Skip("needs GOMAXPROCS >= 3")
+	}
+
 	var wg sync.WaitGroup
 	wg.Add(3)
 
