@@ -1,0 +1,21 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-dep-null
+spec:
+  selector:
+    matchLabels:
+      l1: l1
+  template:
+    metadata:
+      labels:
+        l1: l1
+    spec:
+      containers:
+        - name: nginx
+          image: registry.k8s.io/nginx:1.7.9
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: null
+          terminationMessagePolicy: null

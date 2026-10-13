@@ -1,0 +1,56 @@
+diff --git a/staging/src/k8s.io/apiserver/pkg/storage/cacher/cacher.go b/staging/src/k8s.io/apiserver/pkg/storage/cacher/cacher.go
+index 9df8cdd9e34..7c69f4290be 100644
+--- a/staging/src/k8s.io/apiserver/pkg/storage/cacher/cacher.go
++++ b/staging/src/k8s.io/apiserver/pkg/storage/cacher/cacher.go
+@@ -528,7 +528,7 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
+ 		return nil, err
+ 	}
+ 
+-	readyGeneration, downtime, err := c.ready.checkAndReadGeneration()
++	_, downtime, err := c.ready.checkAndReadGeneration()
+ 	if err != nil {
+ 		return nil, errors.NewTooManyRequests(err.Error(), calculateRetryAfterForUnreadyCache(downtime))
+ 	}
+@@ -642,24 +642,19 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
+ 
+ 	c.setInitialEventsEndBookmarkIfRequested(cacheInterval, opts, c.watchCache.resourceVersion)
+ 
+-	addedWatcher := false
+ 	func() {
+ 		c.Lock()
+ 		defer c.Unlock()
+ 
+-		if generation, _, err := c.ready.checkAndReadGeneration(); generation != readyGeneration || err != nil {
+-			// We went unready or are already on a different generation.
+-			// Avoid registering and starting the watch as it will have to be
+-			// terminated immediately anyway.
+-			return
+-		}
++		// BUG REVERT (#116172): pre-fix there was no check that the cache is still
++		// on the ready generation observed at the start of Watch, so a watcher
++		// registered while the cache was reinitializing silently missed events.
+ 
+ 		// Update watcher.forget function once we can compute it.
+ 		watcher.forget = forgetWatcher(c, watcher, c.watcherIdx, scope, triggerValue, triggerSupported)
+ 		// Update the bookMarkAfterResourceVersion
+ 		watcher.setBookmarkAfterResourceVersion(bookmarkAfterResourceVersionFn())
+ 		c.watchers.addWatcher(watcher, c.watcherIdx, scope, triggerValue, triggerSupported)
+-		addedWatcher = true
+ 
+ 		// Add it to the queue only when the client support watch bookmarks.
+ 		if watcher.allowWatchBookmarks {
+@@ -668,14 +663,6 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
+ 		c.watcherIdx++
+ 	}()
+ 
+-	if !addedWatcher {
+-		// Watcher isn't really started at this point, so it's safe to just drop it.
+-		//
+-		// We're simulating the immediate watch termination, which boils down to simply
+-		// closing the watcher.
+-		return newImmediateCloseWatcher(), nil
+-	}
+-
+ 	if utilfeature.DefaultFeatureGate.Enabled(features.ShardedListAndWatch) && pred.ShardSelector != nil && !pred.ShardSelector.Empty() {
+ 		metrics.RecordShardedWatchStarted(c.groupResource)
+ 		originalForget := watcher.forget

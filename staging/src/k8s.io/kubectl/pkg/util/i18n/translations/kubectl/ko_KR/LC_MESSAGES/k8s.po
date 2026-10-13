@@ -1,0 +1,96 @@
+# Test translations for unit tests.
+# Copyright (C) 2017
+# This file is distributed under the same license as the Kubernetes package.
+# FIRST AUTHOR ianyrchoi@gmail.com, 2018.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: gettext-go-examples-hello\n"
+"Report-Msgid-Bugs-To: EMAIL\n"
+"POT-Creation-Date: 2021-07-07 20:15+0200\n"
+"PO-Revision-Date: 2018-04-03 06:05+0900\n"
+"Last-Translator: Ian Y. Choi <ianyrchoi@gmail.com>\n"
+"Language-Team: \n"
+"Language: ko_KR\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: Poedit 2.0.6\n"
+"X-Poedit-SourceCharset: UTF-8\n"
+"Plural-Forms: nplurals=1; plural=0;\n"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/delete_cluster.go#L38
+#: staging/src/k8s.io/kubectl/pkg/cmd/config/delete_cluster.go:42
+msgid "Delete the specified cluster from the kubeconfig"
+msgstr "kubeconfig에서 지정된 클러스터를 삭제합니다"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/delete_context.go#L38
+#: staging/src/k8s.io/kubectl/pkg/cmd/config/delete_context.go:42
+msgid "Delete the specified context from the kubeconfig"
+msgstr "kubeconfig에서 지정된 컨텍스트를 삭제합니다"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/get_contexts.go#L62
+#: staging/src/k8s.io/kubectl/pkg/cmd/config/get_contexts.go:72
+msgid "Describe one or many contexts"
+msgstr "하나 또는 여러 컨텍스트를 설명합니다"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/get_clusters.go#L40
+#: staging/src/k8s.io/kubectl/pkg/cmd/config/get_clusters.go:41
+msgid "Display clusters defined in the kubeconfig"
+msgstr "kubeconfig에 정의된 클러스터를 표시합니다"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/view.go#L64
+#: staging/src/k8s.io/kubectl/pkg/cmd/config/view.go:81
+msgid "Display merged kubeconfig settings or a specified kubeconfig file"
+msgstr "병합된 kubeconfig 설정 또는 지정된 kubeconfig 파일을 표시합니다"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/config.go#L39
+#: staging/src/k8s.io/kubectl/pkg/cmd/config/config.go:42
+msgid "Modify kubeconfig files"
+msgstr "kubeconfig 파일을 수정합니다"
+
+#: staging/src/k8s.io/kubectl/pkg/cmd/annotate/annotate.go:135
+msgid "Update the annotations on a resource"
+msgstr "자원에 대한 주석을 업데이트합니다"
+
+# https://github.com/kubernetes/kubernetes/blob/masterpkg/kubectl/cmd/apply.go#L98
+#~ msgid "Apply a configuration to a resource by filename or stdin"
+#~ msgstr "구성을 파일 이름 또는 stdin에 의한 자원에 적용합니다"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/current_context.go#L48
+#~ msgid "Displays the current-context"
+#~ msgstr "현재-컨텍스트를 표시합니다"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/create_cluster.go#L67
+#~ msgid "Sets a cluster entry in kubeconfig"
+#~ msgstr "kubeconfig에서 클러스터 항목을 설정합니다"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/create_context.go#L57
+#~ msgid "Sets a context entry in kubeconfig"
+#~ msgstr "kubeconfig에서 컨텍스트 항목을 설정합니다"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/create_authinfo.go#L103
+#~ msgid "Sets a user entry in kubeconfig"
+#~ msgstr "kubeconfig에서 사용자 항목을 설정합니다"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/set.go#L59
+#~ msgid "Sets an individual value in a kubeconfig file"
+#~ msgstr "kubeconfig 파일에서 단일값을 설정합니다"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/use_context.go#L48
+#~ msgid "Sets the current-context in a kubeconfig file"
+#~ msgstr "kubeconfig 파일에서 현재-컨텍스트를 설정합니다"
+
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/unset.go#L47
+#~ msgid "Unsets an individual value in a kubeconfig file"
+#~ msgstr "kubeconfig 파일에서 단일값 설정을 해제합니다"
+
+#~ msgid ""
+#~ "watch is only supported on individual resources and resource collections "
+#~ "- %d resources were found"
+#~ msgid_plural ""
+#~ "watch is only supported on individual resources and resource collections "
+#~ "- %d resources were found"
+#~ msgstr[0] ""
+#~ "watch는 단일 리소스와 리소스 모음만을 지원합니다 - %d 개 자원을 발견하였습"
+#~ "니다"

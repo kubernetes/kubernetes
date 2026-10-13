@@ -1,0 +1,20 @@
+diff --git a/staging/src/k8s.io/apiserver/pkg/storage/cacher/delegator.go b/staging/src/k8s.io/apiserver/pkg/storage/cacher/delegator.go
+index 3e12f481a9c..12d78a04c11 100644
+--- a/staging/src/k8s.io/apiserver/pkg/storage/cacher/delegator.go
++++ b/staging/src/k8s.io/apiserver/pkg/storage/cacher/delegator.go
+@@ -108,12 +108,9 @@ func (c *CacheDelegator) Watch(ctx context.Context, key string, opts storage.Lis
+ }
+ 
+ func (c *CacheDelegator) Get(ctx context.Context, key string, opts storage.GetOptions, objPtr runtime.Object) error {
+-	if opts.ResourceVersion == "" {
+-		// If resourceVersion is not specified, serve it from underlying
+-		// storage (for backward compatibility).
+-		return c.storage.Get(ctx, key, opts, objPtr)
+-	}
+-
++	// BUG INJECTION: the RV=="" bypass that routes consistent Gets to etcd has
++	// been removed, so they are served from the watch cache instead, which may
++	// be arbitrarily stale.
+ 	if !c.cacher.Ready() {
+ 		// If Cache is not initialized, delegator Get requests to storage
+ 		// as described in https://kep.k8s.io/4568

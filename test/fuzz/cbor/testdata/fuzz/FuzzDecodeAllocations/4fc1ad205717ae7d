@@ -1,0 +1,2 @@
+go test fuzz v1
+[]byte("\xa2J\t\t\t\t\t\t\t\t0080@0")

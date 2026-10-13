@@ -1,0 +1,116 @@
+version: "2"
+linters:
+  default: none
+  enable:
+    - asciicheck
+    - bidichk
+    - depguard
+    - errcheck
+    - forbidigo
+    - goconst
+    - gocritic
+    - gocyclo
+    - goprintffuncname
+    - gosec
+    - govet
+    - ineffassign
+    - misspell
+    - nilerr
+    - revive
+    - staticcheck
+    - unconvert
+    - unused
+  settings:
+    depguard:
+      rules:
+        prevent_unmaintained_packages:
+          list-mode: strict
+          files:
+            - $all
+            - '!$test'
+          allow:
+            - $gostd
+            - github.com/x448/float16
+          deny:
+            - pkg: io/ioutil
+              desc: 'replaced by io and os packages since Go 1.16: https://tip.golang.org/doc/go1.16#ioutil'
+    dupl:
+      threshold: 100
+    funlen:
+      lines: 100
+      statements: 50
+    goconst:
+      min-len: 2
+      min-occurrences: 3
+    gocritic:
+      disabled-checks:
+        - commentedOutCode
+        - dupImport
+        - ifElseChain
+        - octalLiteral
+        - paramTypeCombine
+        - whyNoLint
+      enabled-tags:
+        - diagnostic
+        - experimental
+        - opinionated
+        - performance
+        - style
+    govet:
+      enable:
+        - shadow
+    lll:
+      line-length: 140
+    misspell:
+      locale: US
+    staticcheck:
+      checks:
+        - all
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    rules:
+      - path: decode.go
+        text: string ` overflows ` has (\d+) occurrences, make it a constant
+      - path: decode.go
+        text: string ` \(range is \[` has (\d+) occurrences, make it a constant
+      - path: decode.go
+        text: string `, ` has (\d+) occurrences, make it a constant
+      - path: decode.go
+        text: string ` overflows Go's int64` has (\d+) occurrences, make it a constant
+      - path: decode.go
+        text: string `\]\)` has (\d+) occurrences, make it a constant
+      - path: valid.go
+        text: string ` for type ` has (\d+) occurrences, make it a constant
+      - path: valid.go
+        text: 'string `cbor: ` has (\d+) occurrences, make it a constant'
+      - linters:
+          - goconst
+        path: (.+)_test\.go
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  settings:
+    gofmt:
+      simplify: false
+    goimports:
+      local-prefixes:
+        - github.com/fxamacker/cbor
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$

@@ -1,0 +1,21 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx0-deployment
+  labels:
+    app: nginx0-deployment
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: nginx0
+  template:
+    metadata:
+      labels:
+        app: nginx0
+    spec:
+      containers:
+      - name: nginx
+        image: registry.k8s.io/nginx:1.7.9
+        ports:
+        - containerPort: 80

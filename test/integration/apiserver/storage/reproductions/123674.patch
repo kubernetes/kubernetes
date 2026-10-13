@@ -1,0 +1,19 @@
+diff --git a/staging/src/k8s.io/apiserver/pkg/storage/cacher/watch_cache.go b/staging/src/k8s.io/apiserver/pkg/storage/cacher/watch_cache.go
+index 06ae150447c..21f87a903bc 100644
+--- a/staging/src/k8s.io/apiserver/pkg/storage/cacher/watch_cache.go
++++ b/staging/src/k8s.io/apiserver/pkg/storage/cacher/watch_cache.go
+@@ -550,10 +550,11 @@ func (w *watchCache) notFresh(resourceVersion uint64) bool {
+ // WaitUntilFreshAndGet returns a pointers to <storeElement> object.
+ func (w *watchCache) WaitUntilFreshAndGet(ctx context.Context, resourceVersion uint64, key string) (interface{}, bool, uint64, error) {
+ 	span := tracing.SpanFromContext(ctx)
+-	consistentReadSupported := delegator.ConsistentReadSupported()
+ 	w.RLock()
+ 	span.AddEvent("watchCache locked acquired")
+ 	defer w.RUnlock()
+-	err := w.waitUntilFreshLocked(ctx, consistentReadSupported, resourceVersion)
++	// BUG REVERT (#123674): do not request watch progress when waiting for
++	// freshness in WaitUntilFreshAndGet.
++	err := w.waitUntilFreshLocked(ctx, false, resourceVersion)
+ 	if err != nil {
+ 		return nil, false, 0, err
+ 	}

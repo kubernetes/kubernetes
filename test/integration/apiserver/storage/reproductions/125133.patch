@@ -1,0 +1,33 @@
+diff --git a/staging/src/k8s.io/apiserver/pkg/storage/cacher/cacher.go b/staging/src/k8s.io/apiserver/pkg/storage/cacher/cacher.go
+index 9df8cdd9e34..7182c904a1b 100644
+--- a/staging/src/k8s.io/apiserver/pkg/storage/cacher/cacher.go
++++ b/staging/src/k8s.io/apiserver/pkg/storage/cacher/cacher.go
+@@ -1115,26 +1115,8 @@ func (c *Cacher) startDispatching(event *watchCacheEvent) {
+ 	}
+ 
+ 	// iterate over watchers for each applicable namespace/name tuple
+-	namespace := event.ObjFields["metadata.namespace"]
+-	name := event.ObjFields["metadata.name"]
+-	if len(namespace) > 0 {
+-		if len(name) > 0 {
+-			// namespaced watchers scoped by name
+-			for _, watcher := range c.watchers.allWatchers[namespacedName{namespace: namespace, name: name}] {
+-				c.watchersBuffer = append(c.watchersBuffer, watcher)
+-			}
+-		}
+-		// namespaced watchers not scoped by name
+-		for _, watcher := range c.watchers.allWatchers[namespacedName{namespace: namespace}] {
+-			c.watchersBuffer = append(c.watchersBuffer, watcher)
+-		}
+-	}
+-	if len(name) > 0 {
+-		// cluster-wide watchers scoped by name
+-		for _, watcher := range c.watchers.allWatchers[namespacedName{name: name}] {
+-			c.watchersBuffer = append(c.watchersBuffer, watcher)
+-		}
+-	}
++	// BUG REVERT (#125133-class): watchers scoped by namespace and/or name are
++	// never added to the dispatch buffer, so they miss all live events.
+ 	// cluster-wide watchers unscoped by name
+ 	for _, watcher := range c.watchers.allWatchers[namespacedName{}] {
+ 		c.watchersBuffer = append(c.watchersBuffer, watcher)

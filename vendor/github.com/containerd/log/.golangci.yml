@@ -1,0 +1,50 @@
+version: "2"
+linters:
+  enable:
+    - copyloopvar
+    - dupword
+    - gosec
+    - govet
+    - ineffassign
+    - misspell
+    - nolintlint
+    - revive
+    - staticcheck
+    - unconvert
+    - unused
+  disable:
+    - errcheck
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    paths:
+      - api
+      - cluster
+      - design
+      - docs
+      - docs/man
+      - releases
+      - reports
+      - test
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  exclusions:
+    generated: lax
+    paths:
+      - api
+      - cluster
+      - design
+      - docs
+      - docs/man
+      - releases
+      - reports
+      - test
+
+run:
+  timeout: 5m

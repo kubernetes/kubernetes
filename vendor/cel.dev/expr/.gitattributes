@@ -1,0 +1,2 @@
+*.pb.go linguist-generated=true
+*.pb.go -diff -merge

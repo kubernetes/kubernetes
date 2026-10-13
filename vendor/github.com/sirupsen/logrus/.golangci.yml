@@ -1,0 +1,39 @@
+version: "2"
+linters:
+  enable:
+    - asasalint
+    - asciicheck
+    - bidichk
+    - contextcheck
+    - durationcheck
+    - errchkjson
+    - errorlint
+    - exhaustive
+    - gocheckcompilerdirectives
+    - gochecksumtype
+    - gosec
+    - gosmopolitan
+    - loggercheck
+    - makezero
+    - musttag
+    - nilerr
+    - nilnesserr
+    - noctx
+    - reassign
+    - recvcheck
+    - testifylint
+    - unparam
+  exclusions:
+    presets:
+      - legacy
+      - std-error-handling
+    rules:
+      # Exclude some linters from running on tests files.
+      - path: _test\.go
+        linters:
+          - gosec
+          - musttag
+          - noctx # TODO: enable once we switch to Go 1.24+.
+      - linters: # TODO: remove once golangci-lint is updated with https://github.com/golangci/golangci-lint/pull/6584
+          - gocheckcompilerdirectives
+        text: 'compiler directive unrecognized: //go:fix'

@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name: agnhost-rc
+spec:
+  replicas: 1
+  selector:
+    run: agnhost-rc
+  template:
+    metadata:
+      labels:
+        run: agnhost-rc
+    spec:
+      containers:
+      - image: {{.AgnhostPrevImage}}
+        name: agnhost-rc

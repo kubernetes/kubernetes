@@ -1,0 +1,45 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  generateName: pod-clogger-
+spec:
+  priority: 1000
+  affinity:
+    podAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+      # Term 1: Direct match on target label
+      - labelSelector:
+          matchExpressions:
+          - key: service
+            operator: In
+            values:
+            - target
+        namespaces: ["starvation-0", "default", "kube-system"]
+        topologyKey: kubernetes.io/hostname
+
+      # Term 2: Match on key existence (forces more selector processing)
+      - labelSelector:
+          matchExpressions:
+          - key: service
+            operator: Exists
+          - key: service
+            operator: NotIn
+            values:
+            - non-existent-value
+        namespaces: ["starvation-0", "default"]
+        topologyKey: kubernetes.io/hostname
+
+    podAntiAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+      # Term 1: Direct anti-affinity match
+      - labelSelector:
+          matchExpressions:
+          - key: service
+            operator: In
+            values:
+            - target
+        namespaces: ["starvation-0", "default", "kube-system"]
+        topologyKey: kubernetes.io/hostname
+  containers:
+  - image: registry.k8s.io/pause:3.10.1
+    name: pause

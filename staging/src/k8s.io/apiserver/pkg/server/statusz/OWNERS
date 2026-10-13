@@ -1,0 +1,7 @@
+approvers:
+  - sig-instrumentation-approvers
+  - sig-api-machinery-approvers
+reviewers:
+  - sig-instrumentation-reviewers
+labels:
+  - sig/instrumentation

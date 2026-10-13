@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: Node
+metadata:
+  generateName: node-churn-
+status:
+  capacity:
+    pods: "0"
+  conditions:
+    - status: "True"
+      type: Ready
+  phase: Running

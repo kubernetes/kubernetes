@@ -1,0 +1,2 @@
+linux/amd64=debian:bookworm-slim
+linux/arm64=arm64v8/debian:bookworm-slim

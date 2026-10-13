@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Node
+metadata:
+  generateName: scheduler-perf-extended-resource-
+  labels:
+    node-with-extended-resource: "true"
+spec: {}
+status:
+  capacity:
+    pods: "110"
+    cpu: "4"
+    memory: 32Gi
+    foo.com/bar-{{.Index}}: 1
+  conditions:
+    - status: "True"
+      type: Ready
+  phase: Running

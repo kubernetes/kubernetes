@@ -1,0 +1,117 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: fluentd-gcp-{{ fluentd_gcp_yaml_version }}
+  namespace: kube-system
+  labels:
+    k8s-app: fluentd-gcp
+    kubernetes.io/cluster-service: "true"
+    addonmanager.kubernetes.io/mode: Reconcile
+    version: {{ fluentd_gcp_yaml_version }}
+spec:
+  selector:
+    matchLabels:
+      k8s-app: fluentd-gcp
+      version: {{ fluentd_gcp_yaml_version }}
+  updateStrategy:
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        k8s-app: fluentd-gcp
+        kubernetes.io/cluster-service: "true"
+        version: {{ fluentd_gcp_yaml_version }}
+    spec:
+      priorityClassName: system-node-critical
+      serviceAccountName: fluentd-gcp
+      dnsPolicy: Default
+      hostNetwork: true
+      containers:
+      - name: fluentd-gcp
+        image: gcr.io/stackdriver-agents/stackdriver-logging-agent:{{ fluentd_gcp_version }}
+        volumeMounts:
+        - name: varlog
+          mountPath: /var/log
+        - name: varlibdockercontainers
+          mountPath: /var/lib/docker/containers
+          readOnly: true
+        - name: config-volume
+          mountPath: /etc/google-fluentd/config.d
+        env:
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: spec.nodeName
+        - name: STACKDRIVER_METADATA_AGENT_URL
+          value: http://$(NODE_NAME):8799
+        # Liveness probe is aimed to help in situarions where fluentd
+        # silently hangs for no apparent reasons until manual restart.
+        # The idea of this probe is that if fluentd is not queueing or
+        # flushing chunks for 5 minutes, something is not right. If
+        # you want to change the fluentd configuration, reducing amount of
+        # logs fluentd collects, consider changing the threshold or turning
+        # liveness probe off completely.
+        livenessProbe:
+          initialDelaySeconds: 600
+          periodSeconds: 60
+          exec:
+            command:
+            - '/bin/sh'
+            - '-c'
+            - >
+              LIVENESS_THRESHOLD_SECONDS=${LIVENESS_THRESHOLD_SECONDS:-300};
+              STUCK_THRESHOLD_SECONDS=${STUCK_THRESHOLD_SECONDS:-900};
+              if [ ! -e /var/log/fluentd-buffers ];
+              then
+                exit 1;
+              fi;
+              touch -d "${STUCK_THRESHOLD_SECONDS} seconds ago" /tmp/marker-stuck;
+              if [ -z "$(find /var/log/fluentd-buffers -type d -newer /tmp/marker-stuck -print -quit)" ];
+              then
+                rm -rf /var/log/fluentd-buffers;
+                exit 1;
+              fi;
+              touch -d "${LIVENESS_THRESHOLD_SECONDS} seconds ago" /tmp/marker-liveness;
+              if [ -z "$(find /var/log/fluentd-buffers -type d -newer /tmp/marker-liveness -print -quit)" ];
+              then
+                exit 1;
+              fi;
+      # BEGIN_PROMETHEUS_TO_SD
+      - name: prometheus-to-sd-exporter
+        image: gke.gcr.io/prometheus-to-sd:v0.11.1-gke.1
+        command:
+          - /monitor
+          - --stackdriver-prefix={{ prometheus_to_sd_prefix }}/addons
+          - --api-override={{ prometheus_to_sd_endpoint }}
+          - --source=fluentd:http://localhost:24231?whitelisted=stackdriver_successful_requests_count,stackdriver_failed_requests_count,stackdriver_ingested_entries_count,stackdriver_dropped_entries_count
+          - --pod-id=$(POD_NAME)
+          - --namespace-id=$(POD_NAMESPACE)
+        env:
+          - name: POD_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
+          - name: POD_NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
+      # END_PROMETHEUS_TO_SD
+      nodeSelector:
+        kubernetes.io/os: linux
+      terminationGracePeriodSeconds: 60
+      tolerations:
+      - operator: "Exists"
+        effect: "NoExecute"
+      - operator: "Exists"
+        effect: "NoSchedule"
+      volumes:
+      - name: varlog
+        hostPath:
+          path: /var/log
+      - name: varlibdockercontainers
+        hostPath:
+          path: /var/lib/docker/containers
+      - name: config-volume
+        configMap:
+          name: {{ fluentd_gcp_configmap_name }}-v1.2.5

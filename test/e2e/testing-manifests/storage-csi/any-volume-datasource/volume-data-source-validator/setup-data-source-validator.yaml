@@ -1,0 +1,24 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: volume-data-source-validator
+  namespace: kube-system
+spec:
+  serviceName: volume-data-source-validator
+  replicas: 1
+  selector:
+    matchLabels:
+      app: volume-data-source-validator
+  template:
+    metadata:
+      labels:
+        app: volume-data-source-validator
+    spec:
+      serviceAccount: volume-data-source-validator
+      containers:
+        - name: volume-data-source-validator
+          image: registry.k8s.io/sig-storage/volume-data-source-validator:v1.0.0
+          args:
+            - "--v=5"
+            - "--leader-election=false"
+          imagePullPolicy: Always

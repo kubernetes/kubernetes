@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: test-basic-scheduling-{{.Index}}
+spec:
+  schedulingGroup:
+    podGroupName: basic-group-{{DivideInt .Index .podsPerGroup}}
+  containers:
+  - image: registry.k8s.io/pause:3.10.1
+    name: pause
+    resources:
+      requests:
+        cpu: 100m
+        memory: 100Mi

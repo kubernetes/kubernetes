@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Node
+metadata:
+  name: scheduler-perf-node
+  labels:
+    kubernetes.io/hostname: scheduler-perf-node
+spec: {}
+status:
+  capacity:
+    pods: "90000"
+    cpu: "4"
+    memory: 32Gi
+  conditions:
+    - status: "True"
+      type: Ready
+  phase: Running

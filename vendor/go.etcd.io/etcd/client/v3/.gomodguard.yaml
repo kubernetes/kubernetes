@@ -1,0 +1,13 @@
+---
+blocked:
+  modules:
+    - go.etcd.io/etcd:
+        reason: "Forbidden dependency"
+    - go.etcd.io/etcd/pkg/v3:
+        reason: "Forbidden dependency"
+    - go.etcd.io/etcd/server/v3:
+        reason: "Forbidden dependency"
+    - go.etcd.io/etcd/tests/v3:
+        reason: "Forbidden dependency"
+    - go.etcd.io/etcd/v3:
+        reason: "Forbidden dependency"

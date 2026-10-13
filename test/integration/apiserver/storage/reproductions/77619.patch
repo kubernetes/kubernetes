@@ -1,0 +1,37 @@
+diff --git a/staging/src/k8s.io/apiserver/pkg/storage/etcd3/store.go b/staging/src/k8s.io/apiserver/pkg/storage/etcd3/store.go
+index 0cb165fb4ec..4129b7a219c 100644
+--- a/staging/src/k8s.io/apiserver/pkg/storage/etcd3/store.go
++++ b/staging/src/k8s.io/apiserver/pkg/storage/etcd3/store.go
+@@ -432,29 +432,9 @@ func (s *store) conditionalDelete(
+ 			}
+ 		}
+ 		if err := validateDeletion(ctx, origState.obj); err != nil {
+-			if origStateIsCurrent {
+-				return err
+-			}
+-
+-			// It's possible we're working with stale data.
+-			// Remember the revision of the potentially stale data and the resulting update error
+-			cachedRev := origState.rev
+-			cachedUpdateErr := err
+-
+-			// Actually fetch
+-			origState, err = getCurrentState()
+-			if err != nil {
+-				return err
+-			}
+-			origStateIsCurrent = true
+-
+-			// it turns out our cached data was not stale, return the error
+-			if cachedRev == origState.rev {
+-				return cachedUpdateErr
+-			}
+-
+-			// Retry
+-			continue
++			// BUG REVERT (#77619): do not refetch live data when validateDeletion
++			// fails on a stale cached suggestion.
++			return err
+ 		}
+ 
+ 		startTime := time.Now()

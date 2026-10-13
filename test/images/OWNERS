@@ -1,0 +1,12 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
+reviewers:
+  - dims
+  - justaugustus
+  - mkumatag
+approvers:
+  - dims
+  - mkumatag
+emeritus_approvers:
+  - ixdy
+  - luxas

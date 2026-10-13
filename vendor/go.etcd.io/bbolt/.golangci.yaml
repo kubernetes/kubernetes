@@ -1,0 +1,40 @@
+formatters:
+  enable:
+    - gci
+    - gofmt
+    - goimports
+  settings: # please keep this alphabetized
+    gci:
+      sections:
+        - standard
+        - default
+        - prefix(go.etcd.io)
+    goimports:
+      local-prefixes:
+        - go.etcd.io # Put imports beginning with prefix after 3rd-party packages.
+issues:
+  max-same-issues: 0
+linters:
+  default: none
+  enable: # please keep this alphabetized
+    - errcheck
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+  exclusions:
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+  settings: # please keep this alphabetized
+    staticcheck:
+      checks:
+        - all
+        - -QF1003 # Convert if/else-if chain to tagged switch
+        - -QF1010 # Convert slice of bytes to string when printing it
+        - -ST1003 # Poorly chosen identifier
+        - -ST1005 # Incorrectly formatted error string
+        - -ST1012 # Poorly chosen name for error variable
+version: "2"

@@ -1,0 +1,27 @@
+diff --git a/staging/src/k8s.io/apiserver/pkg/storage/etcd3/store.go b/staging/src/k8s.io/apiserver/pkg/storage/etcd3/store.go
+index 0cb165fb4ec..e149c0198ab 100644
+--- a/staging/src/k8s.io/apiserver/pkg/storage/etcd3/store.go
++++ b/staging/src/k8s.io/apiserver/pkg/storage/etcd3/store.go
+@@ -579,20 +579,8 @@ func (s *store) GuaranteedUpdate(
+ 		}
+ 		span.AddEvent("Encode succeeded", attribute.Int("len", len(data)))
+ 		if !origState.stale && bytes.Equal(data, origState.data) {
+-			// if we skipped the original Get in this loop, we must refresh from
+-			// etcd in order to be sure the data in the store is equivalent to
+-			// our desired serialization
+-			if !origStateIsCurrent {
+-				origState, err = getCurrentState()
+-				if err != nil {
+-					return err
+-				}
+-				origStateIsCurrent = true
+-				if !bytes.Equal(data, origState.data) {
+-					// original data changed, restart loop
+-					continue
+-				}
+-			}
++			// BUG REVERT (#48394): short-circuit no-op updates against a stale cached
++			// suggestion without refreshing from etcd to verify live stored data.
+ 			// recheck that the data from etcd is not stale before short-circuiting a write
+ 			if !origState.stale {
+ 				err = s.decoder.Decode(origState.data, destination, origState.rev)

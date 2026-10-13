@@ -1,0 +1,4 @@
+apiVersion: v1
+kind: PodPortForwardOptions
+ports:
+- 1

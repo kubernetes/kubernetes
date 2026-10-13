@@ -1,0 +1,8 @@
+kind: ResourceQuota
+apiVersion: v1
+metadata:
+  name: my-rq
+spec:
+  hard:
+    limits.cpu: null
+    limits.memory: null

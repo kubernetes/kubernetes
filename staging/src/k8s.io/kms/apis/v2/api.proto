@@ -1,0 +1,90 @@
+/*
+Copyright 2022 The Kubernetes Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+// To regenerate api.pb.go run `hack/update-codegen.sh protobindings`
+syntax = "proto3";
+
+package v2;
+option go_package = "k8s.io/kms/apis/v2";
+
+// This service defines the public APIs for remote KMS provider.
+service KeyManagementService {
+    // this API is meant to be polled
+    rpc Status(StatusRequest) returns (StatusResponse) {}
+
+    // Execute decryption operation in KMS provider.
+    rpc Decrypt(DecryptRequest) returns (DecryptResponse) {}
+    // Execute encryption operation in KMS provider.
+    rpc Encrypt(EncryptRequest) returns (EncryptResponse) {}
+}
+
+message StatusRequest {}
+
+message StatusResponse {
+    // Version of the KMS gRPC plugin API. Must equal v2 to v2beta1 (v2 is recommended, but both are equivalent).
+    string version = 1;
+    // Any value other than "ok" is failing healthz.  On failure, the associated API server healthz endpoint will contain this value as part of the error message.
+    string healthz = 2;
+    // the current write key, used to determine staleness of data updated via value.Transformer.TransformFromStorage.
+    // keyID must satisfy the following constraints:
+    // 1. The keyID is not empty.
+    // 2. The size of keyID is less than 1 kB.
+    string key_id = 3;
+}
+
+message DecryptRequest {
+    // The data to be decrypted.
+    bytes ciphertext = 1;
+    // UID is a unique identifier for the request.
+    string uid = 2;
+    // The keyID that was provided to the apiserver during encryption.
+    // This represents the KMS KEK that was used to encrypt the data.
+    string key_id = 3;
+    // Additional metadata that was sent by the KMS plugin during encryption.
+    map<string, bytes> annotations = 4;
+}
+
+message DecryptResponse {
+    // The decrypted data.
+    bytes plaintext = 1;
+}
+
+message EncryptRequest {
+    // The data to be encrypted.
+    bytes plaintext = 1;
+    // UID is a unique identifier for the request.
+    string uid = 2;
+}
+
+message EncryptResponse {
+    // The encrypted data.
+    // ciphertext must satisfy the following constraints:  
+    // 1. The ciphertext is not empty.  
+    // 2. The ciphertext is less than 1 kB.
+    bytes ciphertext = 1;
+    // The KMS key ID used to encrypt the data. This must always refer to the KMS KEK and not any local KEKs that may be in use.
+    // This can be used to inform staleness of data updated via value.Transformer.TransformFromStorage.
+    // keyID must satisfy the following constraints:
+    // 1. The keyID is not empty.
+    // 2. The size of keyID is less than 1 kB.
+    string key_id = 2;
+    // Additional metadata to be stored with the encrypted data.
+    // This data is stored in plaintext in etcd. KMS plugin implementations are responsible for pre-encrypting any sensitive data.
+    // Annotations must satisfy the following constraints:
+    //  1. Annotation key must be a fully qualified domain name that conforms to the definition in DNS (RFC 1123).
+    //  2. The size of annotations keys + values is less than 32 kB.
+    map<string, bytes> annotations = 3;
+}

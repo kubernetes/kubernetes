@@ -1,0 +1,80 @@
+//go:build windows
+
+/*
+Copyright 2024 The Kubernetes Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package logs
+
+import (
+	"os"
+	"path/filepath"
+	"syscall"
+)
+
+// evalSymlinksFunc is a seam so tests can deterministically exercise the
+// fallback branch where filepath.EvalSymlinks fails on an otherwise
+// accessible path (for example a Windows volume-mount point).
+var evalSymlinksFunc = filepath.EvalSymlinks
+
+// evalSymlinks resolves symbolic links in the log path so that fsnotify
+// (which is used when following logs) can watch the real file. On Windows,
+// fsnotify does not follow symlinks, so we resolve them up front.
+//
+// Windows path resolution is best-effort: filepath.EvalSymlinks cannot
+// traverse Windows volume-mount points and reparse points (for example
+// when the container log root C:\var is mounted from a secondary disk),
+// even though the log file is otherwise fully accessible. In that case we
+// fall back to the original path, which is still readable through normal
+// file operations.
+func evalSymlinks(path string) (string, error) {
+	evaluated, err := evalSymlinksFunc(path)
+	if err == nil {
+		return evaluated, nil
+	}
+	// The path is accessible even though it cannot be resolved through
+	// reparse points, so keep it as-is rather than failing to read logs.
+	// The strictly safe Windows pattern is open-first-then-validate: an actor
+	// with write access to the log tree can swap a reparse point between this
+	// check and the subsequent open, so this fallback is not airtight.
+	if _, statErr := os.Stat(path); statErr == nil {
+		return path, nil
+	}
+	return "", err
+}
+
+// Based on Windows implementation of Windows' syscall.Open
+// https://cs.opensource.google/go/go/+/refs/tags/go1.22.2:src/syscall/syscall_windows.go;l=342
+// In addition to syscall.Open, this function also adds the syscall.FILE_SHARE_DELETE flag to sharemode,
+// which will allow us to read from the file without blocking the file from being deleted or renamed.
+// This is essential for Log Rotation which is done by renaming the open file. Without this, the file rename would fail.
+func openFileShareDelete(path string) (*os.File, error) {
+	pathp, err := syscall.UTF16PtrFromString(path)
+	if err != nil {
+		return nil, err
+	}
+
+	var access uint32 = syscall.GENERIC_READ
+	var sharemode uint32 = syscall.FILE_SHARE_READ | syscall.FILE_SHARE_WRITE | syscall.FILE_SHARE_DELETE
+	var createmode uint32 = syscall.OPEN_EXISTING
+	var attrs uint32 = syscall.FILE_ATTRIBUTE_NORMAL
+
+	handle, err := syscall.CreateFile(pathp, access, sharemode, nil, createmode, attrs, 0)
+	if err != nil {
+		return nil, err
+	}
+
+	return os.NewFile(uintptr(handle), path), nil
+}

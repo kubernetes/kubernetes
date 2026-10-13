@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: webhook
+  namespace: pod-security-webhook
+  labels:
+    app: pod-security-webhook
+spec:
+  ports:
+    - port: 443
+      targetPort: webhook
+      protocol: TCP
+      name: https
+  selector:
+    app: pod-security-webhook

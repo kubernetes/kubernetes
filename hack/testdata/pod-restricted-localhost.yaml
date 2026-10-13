@@ -1,0 +1,23 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    run: target
+  name: target
+spec:
+  securityContext:
+    seccompProfile: 
+      type: Localhost
+      localhostProfile: dummy.json
+  containers:
+  - image: busybox
+    name: target
+    command: ["/bin/sh", "-c", "sleep 100"]
+    securityContext:
+        runAsUser: 1000
+        runAsGroup: 1000
+        runAsNonRoot: true
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop: 
+          - "ALL"

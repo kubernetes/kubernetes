@@ -1,0 +1,21 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: cronjob-test
+spec:
+  schedule: "*/1 * * * *"
+  concurrencyPolicy: Allow
+  suspend: false
+  startingDeadlineSeconds: 30
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: test
+            image: {{.BusyBoxImage}}
+            args:
+            - "/bin/true"
+          restartPolicy: OnFailure

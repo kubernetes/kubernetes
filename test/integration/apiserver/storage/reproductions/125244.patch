@@ -1,0 +1,15 @@
+diff --git a/staging/src/k8s.io/apiserver/pkg/storage/cacher/watch_cache.go b/staging/src/k8s.io/apiserver/pkg/storage/cacher/watch_cache.go
+index 06ae150447c..56800808357 100644
+--- a/staging/src/k8s.io/apiserver/pkg/storage/cacher/watch_cache.go
++++ b/staging/src/k8s.io/apiserver/pkg/storage/cacher/watch_cache.go
+@@ -635,7 +635,9 @@ func (w *watchCache) Resync() error {
+ func (w *watchCache) getListResourceVersion() uint64 {
+ 	w.RLock()
+ 	defer w.RUnlock()
+-	return w.storage.ListResourceVersion()
++	// BUG REVERT (#125244): pre-fix this returned the event RV rather than the
++	// list RV, so dispatchEvents could start before the initial list completed.
++	return w.resourceVersion
+ }
+ 
+ func (w *watchCache) suggestedWatchChannelSize(indexExists, triggerUsed bool) int {

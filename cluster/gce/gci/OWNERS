@@ -1,0 +1,10 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
+reviewers:
+  - roycaihw
+  - SergeyKanzhelev
+approvers:
+  - dchen1107
+  - cheftako
+emeritus_approvers:
+  - yguo0905

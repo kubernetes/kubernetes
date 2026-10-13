@@ -1,0 +1,7 @@
+apiVersion: storage.k8s.io/v1
+kind: CSIDriver
+metadata:
+  name: mock.storage.k8s.io
+# Intentionally no spec. All values in the
+# spec will be inserted dynamically by PatchCSIDeployment()
+# in test/e2e/storage/utils/deployment.go.

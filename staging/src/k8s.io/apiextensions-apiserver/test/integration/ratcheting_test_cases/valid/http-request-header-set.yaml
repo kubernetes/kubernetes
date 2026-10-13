@@ -1,0 +1,21 @@
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: HTTPRoute
+metadata:
+  name: header-http-echo
+spec:
+  parentRefs:
+    - name: acme-gw
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /edit-a-request-header
+      filters:
+        - type: RequestHeaderModifier
+          requestHeaderModifier:
+            set:
+              - name: my-header-name
+                value: my-new-header-value
+      backendRefs:
+        - name: echo
+          port: 8080

@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    run: target
+  name: target
+spec:
+  securityContext:
+    runAsUser: 1000
+    runAsGroup: 1000
+    runAsNonRoot: true
+  containers:
+  - image: busybox
+    name: target
+    command: ["/bin/sh", "-c", "sleep 100"]

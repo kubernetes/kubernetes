@@ -1,0 +1,60 @@
+# SPDX-License-Identifier: MPL-2.0
+
+# Copyright (C) 2025 Aleksa Sarai <cyphar@cyphar.com>
+# Copyright (C) 2025 SUSE LLC
+#
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
+version: "2"
+
+run:
+  build-tags:
+    - libpathrs
+
+linters:
+  enable:
+    - asasalint
+    - asciicheck
+    - containedctx
+    - contextcheck
+    - errcheck
+    - errorlint
+    - exhaustive
+    - forcetypeassert
+    - godot
+    - goprintffuncname
+    - govet
+    - importas
+    - ineffassign
+    - makezero
+    - misspell
+    - musttag
+    - nilerr
+    - nilnesserr
+    - nilnil
+    - noctx
+    - prealloc
+    - revive
+    - staticcheck
+    - testifylint
+    - unconvert
+    - unparam
+    - unused
+    - usetesting
+  settings:
+    govet:
+      enable:
+        - nilness
+    testifylint:
+      enable-all: true
+
+formatters:
+  enable:
+    - gofumpt
+    - goimports
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/cyphar/filepath-securejoin

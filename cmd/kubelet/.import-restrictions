@@ -1,0 +1,8 @@
+# Importing the generic API server, directly or transitively, pulls admission
+# and etcd storage into the kubelet. The kubelet only needed it for the signal
+# helpers, which now live in the stdlib-only pkg/server/signals package.
+rules:
+  - selectorRegexp: ^k8s[.]io/apiserver/pkg/server(/options)?$
+    forbiddenPrefixes:
+      - ''
+    transitive: true
