@@ -19,7 +19,6 @@ package server
 import (
 	"context"
 	"crypto/sha256"
-	"crypto/tls"
 	"encoding/base32"
 	"fmt"
 	"net"
@@ -33,7 +32,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/google/uuid"
 	"golang.org/x/crypto/cryptobyte"
 	jsonpatch "gopkg.in/evanphx/json-patch.v4"
 
@@ -48,10 +46,6 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/admission/plugin/authorizer/conditionsenforcer"
 	"k8s.io/apiserver/pkg/audit"
-	"k8s.io/apiserver/pkg/authentication/authenticator"
-	"k8s.io/apiserver/pkg/authentication/authenticatorfactory"
-	authenticatorunion "k8s.io/apiserver/pkg/authentication/request/union"
-	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/endpoints/discovery"
 	discoveryendpoint "k8s.io/apiserver/pkg/endpoints/discovery/aggregated"
@@ -62,7 +56,6 @@ import (
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic"
-	"k8s.io/apiserver/pkg/server/dynamiccertificates"
 	"k8s.io/apiserver/pkg/server/egressselector"
 	genericfilters "k8s.io/apiserver/pkg/server/filters"
 	"k8s.io/apiserver/pkg/server/flagz"
@@ -89,7 +82,6 @@ import (
 	"k8s.io/kube-openapi/pkg/spec3"
 	"k8s.io/kube-openapi/pkg/validation/spec"
 	"k8s.io/utils/clock"
-	utilsnet "k8s.io/utils/net"
 
 	// install apis
 	_ "k8s.io/apiserver/pkg/apis/apiserver/install"
@@ -349,65 +341,6 @@ type RecommendedConfig struct {
 	ClientConfig *restclient.Config
 }
 
-type SecureServingInfo struct {
-	// Listener is the secure server network listener.
-	Listener net.Listener
-
-	// Cert is the main server cert which is used if SNI does not match. Cert must be non-nil and is
-	// allowed to be in SNICerts.
-	Cert dynamiccertificates.CertKeyContentProvider
-
-	// SNICerts are the TLS certificates used for SNI.
-	SNICerts []dynamiccertificates.SNICertKeyContentProvider
-
-	// ClientCA is the certificate bundle for all the signers that you'll recognize for incoming client certificates
-	ClientCA dynamiccertificates.CAContentProvider
-
-	// MinTLSVersion optionally overrides the minimum TLS version supported.
-	// Values are from tls package constants (https://golang.org/pkg/crypto/tls/#pkg-constants).
-	MinTLSVersion uint16
-
-	// CipherSuites optionally overrides the list of allowed cipher suites for the server.
-	// Values are from tls package constants (https://golang.org/pkg/crypto/tls/#pkg-constants).
-	CipherSuites []uint16
-
-	// CurvePreferences optionally specifies the set of allowed key exchange mechanisms for the server.
-	// The order of the list is ignored, and key exchange mechanisms
-	// are chosen by Go from this list using an internal preference order.
-	// If empty, the default Go curves will be used.
-	// Values are from the Go crypto/tls CurveID constants (https://golang.org/pkg/crypto/tls/#CurveID).
-	CurvePreferences []tls.CurveID
-
-	// HTTP2MaxStreamsPerConnection is the limit that the api server imposes on each client.
-	// A value of zero means to use the default provided by golang's HTTP/2 support.
-	HTTP2MaxStreamsPerConnection int
-
-	// DisableHTTP2 indicates that http2 should not be enabled.
-	DisableHTTP2 bool
-}
-
-type AuthenticationInfo struct {
-	// APIAudiences is a list of identifier that the API identifies as. This is
-	// used by some authenticators to validate audience bound credentials.
-	APIAudiences authenticator.Audiences
-	// Authenticator determines which subject is making the request
-	Authenticator authenticator.Request
-
-	RequestHeaderConfig *authenticatorfactory.RequestHeaderConfig
-}
-
-type AuthorizationInfo struct {
-	// Authorizer determines whether the subject is allowed to make the request based only
-	// on the RequestURI
-	Authorizer authorizer.Authorizer
-
-	// ConditionalAuthorizationRequestClassifier is a function that returns true if a request with the given attributes supports conditional authorization
-	ConditionalAuthorizationRequestClassifier genericapifilters.ConditionalAuthorizationRequestClassifier
-
-	// ConditionsEnforcerPluginEnabled is set to true by AdmissionOptions when the admission plugin is enabled
-	ConditionsEnforcerPluginEnabled bool
-}
-
 func init() {
 	utilruntime.Must(features.AddFeatureGates(utilfeature.DefaultMutableFeatureGate))
 }
@@ -558,22 +491,6 @@ func DefaultOpenAPIV3Config(getDefinitions openapicommon.GetOpenAPIDefinitions, 
 	})
 
 	return defaultConfig
-}
-
-func (c *AuthenticationInfo) ApplyClientCert(clientCA dynamiccertificates.CAContentProvider, servingInfo *SecureServingInfo) error {
-	if servingInfo == nil {
-		return nil
-	}
-	if clientCA == nil {
-		return nil
-	}
-	if servingInfo.ClientCA == nil {
-		servingInfo.ClientCA = clientCA
-		return nil
-	}
-
-	servingInfo.ClientCA = dynamiccertificates.NewUnionCAContentProvider(servingInfo.ClientCA, clientCA)
-	return nil
 }
 
 type completedConfig struct {
@@ -1223,52 +1140,6 @@ func NewRequestInfoResolver(c *Config) *apirequest.RequestInfoFactory {
 		APIPrefixes:          apiPrefixes,
 		GrouplessAPIPrefixes: legacyAPIPrefixes,
 	}
-}
-
-func (s *SecureServingInfo) HostPort() (string, int, error) {
-	if s == nil || s.Listener == nil {
-		return "", 0, fmt.Errorf("no listener found")
-	}
-	addr := s.Listener.Addr().String()
-	host, portStr, err := net.SplitHostPort(addr)
-	if err != nil {
-		return "", 0, fmt.Errorf("failed to get port from listener address %q: %v", addr, err)
-	}
-	port, err := utilsnet.ParsePort(portStr, true)
-	if err != nil {
-		return "", 0, fmt.Errorf("invalid non-numeric port %q", portStr)
-	}
-	return host, port, nil
-}
-
-// AuthorizeClientBearerToken wraps the authenticator and authorizer in loopback authentication logic
-// if the loopback client config is specified AND it has a bearer token. Note that if either authn or
-// authz is nil, this function won't add a token authenticator or authorizer.
-func AuthorizeClientBearerToken(loopback *restclient.Config, authn *AuthenticationInfo, authz *AuthorizationInfo) {
-	if loopback == nil || len(loopback.BearerToken) == 0 {
-		return
-	}
-	if authn == nil || authz == nil {
-		// prevent nil pointer panic
-		return
-	}
-	if authn.Authenticator == nil || authz.Authorizer == nil {
-		// authenticator or authorizer might be nil if we want to bypass authz/authn
-		// and we also do nothing in this case.
-		return
-	}
-
-	privilegedLoopbackToken := loopback.BearerToken
-	var uid = uuid.New().String()
-	tokens := make(map[string]*user.DefaultInfo)
-	tokens[privilegedLoopbackToken] = &user.DefaultInfo{
-		Name:   user.APIServerUser,
-		UID:    uid,
-		Groups: []string{user.AllAuthenticated, user.SystemPrivilegedGroup},
-	}
-
-	tokenAuthenticator := authenticatorfactory.NewFromTokens(tokens, authn.APIAudiences)
-	authn.Authenticator = authenticatorunion.New(tokenAuthenticator, authn.Authenticator)
 }
 
 // For testing purpose only
