@@ -125,13 +125,17 @@ func ensureDefaultServiceAccount(tb testing.TB, client clientset.Interface) {
 // kube-apiserver's podStrategy.PrepareForCreate resets pod.Status on creation,
 // so a second write to /status is required to populate the exemplar's status
 // payload and kubelet managedFields entry (~10KB total stored size).
-func seedExemplarPod(tb testing.TB, client clientset.Interface, name string) *v1.Pod {
+func seedExemplarPod(tb testing.TB, client clientset.Interface, name, nodeName, deploymentLabel string) *v1.Pod {
 	tb.Helper()
 	const ns = metav1.NamespaceDefault
 	ctx := tb.Context()
 	pod := exemplarPod.DeepCopy()
 	pod.Namespace = ns
 	pod.Name = name
+	pod.Spec.NodeName = nodeName
+	if deploymentLabel != "" {
+		pod.Labels["name"] = deploymentLabel
+	}
 
 	created, err := client.CoreV1().Pods(ns).Create(ctx, pod, metav1.CreateOptions{FieldManager: "seed-client"})
 	if err != nil {
@@ -149,7 +153,12 @@ func seedPods(tb testing.TB, client clientset.Interface, count int) []*v1.Pod {
 	tb.Helper()
 	pods := make([]*v1.Pod, count)
 	for i := range count {
-		pods[i] = seedExemplarPod(tb, client, fmt.Sprintf("pod-%03d", i))
+		var nodeName, deploymentLabel string
+		if count > 1 {
+			nodeName = fmt.Sprintf("kind-worker%d", i%10)
+			deploymentLabel = fmt.Sprintf("small-deployment-%02d", i%10)
+		}
+		pods[i] = seedExemplarPod(tb, client, fmt.Sprintf("pod-%03d", i), nodeName, deploymentLabel)
 	}
 	if _, err := client.CoreV1().Pods(metav1.NamespaceDefault).List(tb.Context(), metav1.ListOptions{}); err != nil {
 		tb.Fatalf("waiting for watch cache sync failed: %v", err)
