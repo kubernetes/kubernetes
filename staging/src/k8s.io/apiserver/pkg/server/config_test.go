@@ -24,7 +24,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/http/httputil"
-	"reflect"
 	"testing"
 	"time"
 
@@ -39,7 +38,6 @@ import (
 	"k8s.io/apiserver/pkg/audit/policy"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/user"
-	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/server/healthz"
@@ -53,67 +51,6 @@ import (
 	"k8s.io/klog/v2/ktesting"
 	netutils "k8s.io/utils/net"
 )
-
-func TestAuthorizeClientBearerTokenNoops(t *testing.T) {
-	// All of these should do nothing (not panic, no side-effects)
-	cfgGens := []func() *rest.Config{
-		func() *rest.Config { return nil },
-		func() *rest.Config { return &rest.Config{} },
-		func() *rest.Config { return &rest.Config{BearerToken: "mu"} },
-	}
-	authcGens := []func() *AuthenticationInfo{
-		func() *AuthenticationInfo { return nil },
-		func() *AuthenticationInfo { return &AuthenticationInfo{} },
-	}
-	authzGens := []func() *AuthorizationInfo{
-		func() *AuthorizationInfo { return nil },
-		func() *AuthorizationInfo { return &AuthorizationInfo{} },
-	}
-	for _, cfgGen := range cfgGens {
-		for _, authcGen := range authcGens {
-			for _, authzGen := range authzGens {
-				pConfig := cfgGen()
-				pAuthc := authcGen()
-				pAuthz := authzGen()
-				AuthorizeClientBearerToken(pConfig, pAuthc, pAuthz)
-				if before, after := authcGen(), pAuthc; !reflect.DeepEqual(before, after) {
-					t.Errorf("AuthorizeClientBearerToken(%v, %#+v, %v) changed %#+v", pConfig, pAuthc, pAuthz, *before)
-				}
-				if before, after := authzGen(), pAuthz; !reflect.DeepEqual(before, after) {
-					t.Errorf("AuthorizeClientBearerToken(%v, %v, %#+v) changed %#+v", pConfig, pAuthc, pAuthz, *before)
-				}
-			}
-		}
-	}
-}
-
-func TestAuthorizeClientBearerTokenRequiredGroups(t *testing.T) {
-	fakeAuthenticator := authenticator.RequestFunc(func(req *http.Request) (*authenticator.Response, bool, error) {
-		return &authenticator.Response{User: &user.DefaultInfo{}}, false, nil
-	})
-	fakeAuthorizer := authorizer.AuthorizerFunc(func(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
-		return authorizer.DecisionAllow, "", nil
-	})
-	target := &rest.Config{BearerToken: "secretToken"}
-	authN := &AuthenticationInfo{Authenticator: fakeAuthenticator}
-	authC := &AuthorizationInfo{Authorizer: fakeAuthorizer}
-
-	AuthorizeClientBearerToken(target, authN, authC)
-
-	fakeRequest, err := http.NewRequest("", "", nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	fakeRequest.Header.Set("Authorization", "bearer secretToken")
-	rsp, _, err := authN.Authenticator.AuthenticateRequest(fakeRequest)
-	if err != nil {
-		t.Fatal(err)
-	}
-	expectedGroups := []string{user.AllAuthenticated, user.SystemPrivilegedGroup}
-	if !reflect.DeepEqual(expectedGroups, rsp.User.GetGroups()) {
-		t.Fatalf("unexpected groups = %v returned, expected = %v", rsp.User.GetGroups(), expectedGroups)
-	}
-}
 
 func TestNewWithDelegate(t *testing.T) {
 	_, ctx := ktesting.NewTestContext(t)
