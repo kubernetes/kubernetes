@@ -88,6 +88,10 @@ const (
 	OutOfMemory           = "OutOfmemory"
 	OutOfEphemeralStorage = "OutOfephemeral-storage"
 	OutOfPods             = "OutOfpods"
+
+	// CapacityInfeasible is used internally to indicate that a resize request
+	// exceeds the node's total allocatable for a resource.
+	CapacityInfeasible = "CapacityInfeasible"
 )
 
 type getNodeAnyWayFuncType func(ctx context.Context, useCache bool) (*v1.Node, error)
@@ -218,6 +222,12 @@ func (w *predicateAdmitHandler) Admit(ctx context.Context, attrs *PodAdmitAttrib
 			message = re.Error()
 			logger.V(2).Info("Predicate failed on Pod", "pod", klog.KObj(admitPod), "err", message)
 		case *InsufficientResourceError:
+			if attrs.Operation == ResizeOperation && re.Requested > re.Capacity {
+				reason = CapacityInfeasible
+				message = re.Error()
+				logger.V(2).Info("Predicate failed on Pod: resize exceeds total node capacity", "pod", klog.KObj(admitPod), "err", message)
+				break
+			}
 			switch re.ResourceName {
 			case v1.ResourceCPU:
 				reason = OutOfCPU
