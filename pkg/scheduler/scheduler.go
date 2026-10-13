@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -217,10 +218,12 @@ func WithPercentageOfPlacementsToScore(percentageOfPlacementsToScore *int32) Opt
 }
 
 // WithFrameworkOutOfTreeRegistry sets the registry for out-of-tree plugins. Those plugins
-// will be appended to the default registry.
+// will be appended to the default registry. It clones the map so that later caller mutations
+// do not affect subsequent NewFrameworkMap calls.
 func WithFrameworkOutOfTreeRegistry(registry frameworkruntime.Registry) Option {
+	cloned := maps.Clone(registry)
 	return func(o *schedulerOptions) {
-		o.frameworkOutOfTreeRegistry = registry
+		o.frameworkOutOfTreeRegistry = cloned
 	}
 }
 
