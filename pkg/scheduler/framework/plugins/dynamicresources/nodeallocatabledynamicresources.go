@@ -413,8 +413,9 @@ func (pl *DynamicResources) validatePodLevelResourcesCoverDRA(pod *v1.Pod) *fwk.
 	if pod.Spec.Resources.Requests != nil {
 		// Calculate Sum(Containers) + DRA + overhead resources. Skip pod level resources for this sum
 		opts := resourcehelper.PodResourcesOptions{
-			SkipPodLevelResources:                    true,
-			UseDRANodeAllocatableResourceClaimStatus: true,
+			Features: resourcehelper.Features{
+				DRANodeAllocatableResources: true,
+			},
 		}
 		requestWithoutPodLevel := resourcehelper.AggregateContainerRequests(pod, opts)
 
@@ -435,8 +436,9 @@ func (pl *DynamicResources) validatePodLevelResourcesCoverDRA(pod *v1.Pod) *fwk.
 
 	if pod.Spec.Resources.Limits != nil {
 		opts := resourcehelper.PodResourcesOptions{
-			SkipPodLevelResources:                    true,
-			UseDRANodeAllocatableResourceClaimStatus: true,
+			Features: resourcehelper.Features{
+				DRANodeAllocatableResources: true,
+			},
 		}
 		limitsWithoutPodLevel := resourcehelper.AggregateContainerLimits(pod, opts)
 
@@ -521,8 +523,10 @@ func (pl *DynamicResources) getPodNodeAllocatableResourceFootprint(logger klog.L
 
 	// Calculate the final totalPodDemand to be used for node fitting
 	optsTotal := resourcehelper.PodResourcesOptions{
-		SkipPodLevelResources:                    !pl.fts.EnablePodLevelResources,
-		UseDRANodeAllocatableResourceClaimStatus: true,
+		Features: resourcehelper.Features{
+			PodLevelResources:           pl.fts.EnablePodLevelResources,
+			DRANodeAllocatableResources: true,
+		},
 	}
 	// Perform shallow copy - we only use the resource information from container and pod spec to calculatate the resource foot print.
 	podCopy := *pod

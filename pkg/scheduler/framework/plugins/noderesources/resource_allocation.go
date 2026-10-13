@@ -236,10 +236,12 @@ func (r *resourceAllocationScorer) calculateResourceAllocatableRequest(
 func (r *resourceAllocationScorer) calculatePodResourceRequest(pod *v1.Pod, resourceName v1.ResourceName) int64 {
 
 	opts := resourcehelper.PodResourcesOptions{
-		UseStatusResources: r.enableInPlacePodVerticalScaling,
-		InPlacePodLevelResourcesVerticalScalingEnabled: r.enableInPlacePodLevelResourcesVerticalScaling,
-		// SkipPodLevelResources is set to false when PodLevelResources feature is enabled.
-		SkipPodLevelResources: !r.enablePodLevelResources,
+		UseStatusResources: true,
+		Features: resourcehelper.Features{
+			InPlacePodVerticalScaling:               r.enableInPlacePodVerticalScaling,
+			InPlacePodLevelResourcesVerticalScaling: r.enableInPlacePodLevelResourcesVerticalScaling,
+			PodLevelResources:                       r.enablePodLevelResources,
+		},
 	}
 
 	if !r.useRequested {

@@ -390,7 +390,9 @@ func (m *manager) isResizeIncreasingRequests(pod *v1.Pod) bool {
 	}
 
 	opts := resourcehelper.PodResourcesOptions{
-		SkipPodLevelResources: !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources),
+		Features: resourcehelper.Features{
+			PodLevelResources: utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources),
+		},
 	}
 	oldRequest := resourcehelper.PodRequests(allocatedPod, opts)
 	newRequest := resourcehelper.PodRequests(pod, opts)

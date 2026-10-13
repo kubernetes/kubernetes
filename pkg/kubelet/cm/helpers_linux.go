@@ -182,19 +182,21 @@ func ResourceConfigForPod(allocatedPod *v1.Pod, enforceCPULimits bool, cpuPeriod
 	draNodeAllocatableEnabled := utilfeature.DefaultFeatureGate.Enabled(kubefeatures.DRANodeAllocatableResources)
 	// sum requests and limits.
 	reqs := resourcehelper.PodRequests(allocatedPod, resourcehelper.PodResourcesOptions{
-		// SkipPodLevelResources is set to false when PodLevelResources feature is enabled.
-		SkipPodLevelResources:                    !podLevelResourcesEnabled,
-		UseStatusResources:                       false,
-		UseDRANodeAllocatableResourceClaimStatus: draNodeAllocatableEnabled,
+		UseStatusResources: false,
+		Features: resourcehelper.Features{
+			PodLevelResources:           podLevelResourcesEnabled,
+			DRANodeAllocatableResources: draNodeAllocatableEnabled,
+		},
 	})
 	// track if limits were applied for each resource.
 	memoryLimitsDeclared := true
 	cpuLimitsDeclared := true
 
 	limits := resourcehelper.PodLimits(allocatedPod, resourcehelper.PodResourcesOptions{
-		// SkipPodLevelResources is set to false when PodLevelResources feature is enabled.
-		SkipPodLevelResources:                    !podLevelResourcesEnabled,
-		UseDRANodeAllocatableResourceClaimStatus: draNodeAllocatableEnabled,
+		Features: resourcehelper.Features{
+			PodLevelResources:           podLevelResourcesEnabled,
+			DRANodeAllocatableResources: draNodeAllocatableEnabled,
+		},
 	})
 
 	for c := range podutil.ContainerIter(&allocatedPod.Spec, podutil.InitContainers|podutil.Containers) {
