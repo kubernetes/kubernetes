@@ -4,6 +4,24 @@ Go API changes are typically not included in the Kubernetes release notes, so
 noteworthy Go API changes *may* be documented here. This is currently not
 *required*, so consult the git history to see all changes.
 
+### WAS building blocks applyconfigurations moved to scheduling/v1
+
+Workload Aware Scheduling building-block applyconfigurations graduated from
+`applyconfigurations/scheduling/v1alpha3` to `applyconfigurations/scheduling/v1`
+(KEP-6089 Beta). Callers of `batch/v1.JobSchedulingConfigurationApplyConfiguration`
+must import the `scheduling/v1` applyconfiguration types instead.
+
+```
+- ./applyconfigurations/batch/v1.(*JobSchedulingConfigurationApplyConfiguration).WithDisruptionMode: changed from func(*k8s.io/client-go/applyconfigurations/scheduling/v1alpha3.WorkloadPodGroupDisruptionModeApplyConfiguration) *JobSchedulingConfigurationApplyConfiguration to func(*k8s.io/client-go/applyconfigurations/scheduling/v1.WorkloadPodGroupDisruptionModeApplyConfiguration) *JobSchedulingConfigurationApplyConfiguration
+- ./applyconfigurations/batch/v1.(*JobSchedulingConfigurationApplyConfiguration).WithResourceClaims: changed from func(...*k8s.io/client-go/applyconfigurations/scheduling/v1alpha3.WorkloadPodGroupResourceClaimApplyConfiguration) *JobSchedulingConfigurationApplyConfiguration to func(...*k8s.io/client-go/applyconfigurations/scheduling/v1.WorkloadPodGroupResourceClaimApplyConfiguration) *JobSchedulingConfigurationApplyConfiguration
+- ./applyconfigurations/batch/v1.(*JobSchedulingConfigurationApplyConfiguration).WithSchedulingConstraints: changed from func(*k8s.io/client-go/applyconfigurations/scheduling/v1alpha3.WorkloadPodGroupSchedulingConstraintsApplyConfiguration) *JobSchedulingConfigurationApplyConfiguration to func(*k8s.io/client-go/applyconfigurations/scheduling/v1.WorkloadPodGroupSchedulingConstraintsApplyConfiguration) *JobSchedulingConfigurationApplyConfiguration
+- ./applyconfigurations/batch/v1.(*JobSchedulingConfigurationApplyConfiguration).WithSchedulingPolicy: changed from func(*k8s.io/client-go/applyconfigurations/scheduling/v1alpha3.WorkloadPodGroupSchedulingPolicyApplyConfiguration) *JobSchedulingConfigurationApplyConfiguration to func(*k8s.io/client-go/applyconfigurations/scheduling/v1.WorkloadPodGroupSchedulingPolicyApplyConfiguration) *JobSchedulingConfigurationApplyConfiguration
+- ./applyconfigurations/batch/v1.JobSchedulingConfigurationApplyConfiguration.DisruptionMode: changed from *k8s.io/client-go/applyconfigurations/scheduling/v1alpha3.WorkloadPodGroupDisruptionModeApplyConfiguration to *k8s.io/client-go/applyconfigurations/scheduling/v1.WorkloadPodGroupDisruptionModeApplyConfiguration
+- ./applyconfigurations/batch/v1.JobSchedulingConfigurationApplyConfiguration.ResourceClaims: changed from []k8s.io/client-go/applyconfigurations/scheduling/v1alpha3.WorkloadPodGroupResourceClaimApplyConfiguration to []k8s.io/client-go/applyconfigurations/scheduling/v1.WorkloadPodGroupResourceClaimApplyConfiguration
+- ./applyconfigurations/batch/v1.JobSchedulingConfigurationApplyConfiguration.SchedulingConstraints: changed from *k8s.io/client-go/applyconfigurations/scheduling/v1alpha3.WorkloadPodGroupSchedulingConstraintsApplyConfiguration to *k8s.io/client-go/applyconfigurations/scheduling/v1.WorkloadPodGroupSchedulingConstraintsApplyConfiguration
+- ./applyconfigurations/batch/v1.JobSchedulingConfigurationApplyConfiguration.SchedulingPolicy: changed from *k8s.io/client-go/applyconfigurations/scheduling/v1alpha3.WorkloadPodGroupSchedulingPolicyApplyConfiguration to *k8s.io/client-go/applyconfigurations/scheduling/v1.WorkloadPodGroupSchedulingPolicyApplyConfiguration
+```
+
 ### SharedInformer: add SetShardSelector
 
 Mock implementations of the SharedInformer or SharedIndexInformer interfaces
