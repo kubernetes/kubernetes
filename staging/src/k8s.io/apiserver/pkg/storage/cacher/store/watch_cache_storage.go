@@ -32,19 +32,15 @@ import (
 
 func NewWatchCacheStorage(indexers *cache.Indexers) *WatchCacheStorage {
 	storage := &WatchCacheStorage{
-		store:               newBtreeStore(btreeDegree),
-		indexer:             newIndexer(ElementIndexers(indexers)),
-		snapshots:           newSnapshotter(utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot)),
-		listResourceVersion: 0,
+		store:     newBtreeStore(btreeDegree),
+		indexer:   newIndexer(ElementIndexers(indexers)),
+		snapshots: newSnapshotter(utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot)),
 	}
 	storage.latestSnapshot.Store(storage.store.Clone())
 	return storage
 }
 
 type WatchCacheStorage struct {
-	// ResourceVersion of the last list result (populated via ReplaceLocked() method).
-	listResourceVersion uint64
-
 	// latestSnapshot is an immutable clone of store, republished under lock
 	// after every write, so reads of the latest state don't need lock.
 	latestSnapshot atomic.Pointer[btreeStore]
@@ -66,10 +62,6 @@ func (w *WatchCacheStorage) CanServeExactRV(rv uint64) bool {
 	w.lock.RLock()
 	defer w.lock.RUnlock()
 	return w.snapshots.HasSnapshot(rv)
-}
-
-func (w *WatchCacheStorage) UpdateListResourceVersion(rv uint64) {
-	w.listResourceVersion = rv
 }
 
 func (w *WatchCacheStorage) Compact(rev uint64) {
@@ -220,7 +212,6 @@ func (w *WatchCacheStorage) Replace(toReplace []*Element, version uint64) error 
 	latest := w.store.Clone()
 	w.latestSnapshot.Store(latest)
 	w.snapshots.Replace(latest)
-	w.listResourceVersion = version
 	return nil
 }
 
@@ -244,9 +235,4 @@ func (w *WatchCacheStorage) GetByIndexSnapshot(indexName, value string) (Snapsho
 		return nil, err
 	}
 	return listSnapshot{Items: result, resourceVersion: resourceVersion}, nil
-}
-
-// ListResourceVersion returns the list resource version.
-func (w *WatchCacheStorage) ListResourceVersion() uint64 {
-	return w.listResourceVersion
 }
