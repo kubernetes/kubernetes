@@ -486,14 +486,12 @@ func ParseQuantity(str string) (Quantity, error) {
 	return q, nil
 }
 
-// DeepCopy returns a deep-copy of the Quantity value.  Note that the method
-// receiver is a value, so we can mutate it in-place and return it.
-// Quantity is a value type. Each shallow copy is independent from its source.
+// DeepCopy returns a deep-copy of the Quantity value.
+//
+// Deprecated: Quantity is now a normal value type, so a regular shallow copy can be used instead of this method. No need to update existing code, DeepCopy is not going to be removed.
+//
+//go:fix inline
 func (q Quantity) DeepCopy() Quantity {
-	if q.d.Dec != nil {
-		tmp := &inf.Dec{}
-		q.d.Dec = tmp.Set(q.d.Dec)
-	}
 	return q
 }
 
