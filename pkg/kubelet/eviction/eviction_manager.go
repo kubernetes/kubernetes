@@ -36,6 +36,7 @@ import (
 
 	resourcehelper "k8s.io/component-helpers/resource"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	v1resource "k8s.io/kubernetes/pkg/api/v1/resource"
 	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 	"k8s.io/kubernetes/pkg/features"
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
@@ -569,7 +570,7 @@ func (m *managerImpl) emptyDirLimitEviction(logger klog.Logger, podStats statsap
 }
 
 func (m *managerImpl) podEphemeralStorageLimitEviction(logger klog.Logger, podStats statsapi.PodStats, pod *v1.Pod) bool {
-	podLimits := resourcehelper.PodLimits(pod, resourcehelper.PodResourcesOptions{})
+	podLimits := resourcehelper.PodLimits(pod, v1resource.PodResourcesOptions())
 	_, found := podLimits[v1.ResourceEphemeralStorage]
 	if !found {
 		return false

@@ -31,6 +31,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	resourcehelper "k8s.io/component-helpers/resource"
 	"k8s.io/klog/v2"
+	v1resource "k8s.io/kubernetes/pkg/api/v1/resource"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
@@ -46,10 +47,11 @@ func ApplyPodLevelMemoryHigh(pod *v1.Pod, rc *ResourceConfig, throttlingFactor f
 	if !podLevelResourcesEnabled || !resourcehelper.IsPodLevelResourcesSet(pod) {
 		return
 	}
-	reqs := resourcehelper.PodRequests(pod, resourcehelper.PodResourcesOptions{})
+	opts := v1resource.PodResourcesOptions()
+	reqs := resourcehelper.PodRequests(pod, opts)
 	// PodLimits() omits the memory limit unless every container declares it or a pod-level
 	// limit is set, so memoryLimit stays 0 (and memory.high stays unset) otherwise.
-	limits := resourcehelper.PodLimits(pod, resourcehelper.PodResourcesOptions{})
+	limits := resourcehelper.PodLimits(pod, opts)
 	memoryRequest := int64(0)
 	memoryLimit := int64(0)
 	if req, found := reqs[v1.ResourceMemory]; found {
@@ -167,25 +169,15 @@ func HugePageLimits(resourceList v1.ResourceList) map[int64]int64 {
 
 // ResourceConfigForPod takes the input pod and outputs the cgroup resource config.
 func ResourceConfigForPod(allocatedPod *v1.Pod, enforceCPULimits bool, cpuPeriod uint64, enforceMemoryQoS bool, memoryReservationPolicy kubeletconfig.MemoryReservationPolicy) *ResourceConfig {
-	podLevelResourcesEnabled := utilfeature.DefaultFeatureGate.Enabled(kubefeatures.PodLevelResources)
-	draNodeAllocatableEnabled := utilfeature.DefaultFeatureGate.Enabled(kubefeatures.DRANodeAllocatableResources)
 	// sum requests and limits.
 	reqs := resourcehelper.PodRequests(allocatedPod, resourcehelper.PodResourcesOptions{
 		UseStatusResources: false,
-		Features: resourcehelper.Features{
-			PodLevelResources:           podLevelResourcesEnabled,
-			DRANodeAllocatableResources: draNodeAllocatableEnabled,
-		},
+		Features:           v1resource.Features(),
 	})
 	// PodLimits() omits a cpu or memory limit that is not declared by every container (or
 	// at the pod level), so presence in the map below doubles as the "limits declared"
 	// signal.
-	limits := resourcehelper.PodLimits(allocatedPod, resourcehelper.PodResourcesOptions{
-		Features: resourcehelper.Features{
-			PodLevelResources:           podLevelResourcesEnabled,
-			DRANodeAllocatableResources: draNodeAllocatableEnabled,
-		},
-	})
+	limits := resourcehelper.PodLimits(allocatedPod, v1resource.PodResourcesOptions())
 
 	// map hugepage pagesize (bytes) to limits (bytes)
 	hugePageLimits := HugePageLimits(reqs)
