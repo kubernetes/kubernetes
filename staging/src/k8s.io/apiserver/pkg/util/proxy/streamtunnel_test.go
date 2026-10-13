@@ -127,7 +127,7 @@ func TestTunnelingHandler_UpgradeStreamingAndTunneling(t *testing.T) {
 	// Validate the streamtunnel metrics; should be one 101 Switching Protocols.
 	metricNames := []string{"apiserver_stream_tunnel_requests_total"}
 	expected := `
-# HELP apiserver_stream_tunnel_requests_total [ALPHA] Total number of requests that were handled by the StreamTunnelProxy, which processes streaming PortForward/V2
+# HELP apiserver_stream_tunnel_requests_total [BETA] Total number of requests that were handled by the StreamTunnelProxy, which processes streaming PortForward/V2
 # TYPE apiserver_stream_tunnel_requests_total counter
 apiserver_stream_tunnel_requests_total{code="101"} 1
 `
@@ -164,7 +164,7 @@ func TestTunnelingHandler_BadRequestWithoutProtcols(t *testing.T) {
 	// Validate the streamtunnel metrics; should be one 400 failure.
 	metricNames := []string{"apiserver_stream_tunnel_requests_total"}
 	expected := `
-# HELP apiserver_stream_tunnel_requests_total [ALPHA] Total number of requests that were handled by the StreamTunnelProxy, which processes streaming PortForward/V2
+# HELP apiserver_stream_tunnel_requests_total [BETA] Total number of requests that were handled by the StreamTunnelProxy, which processes streaming PortForward/V2
 # TYPE apiserver_stream_tunnel_requests_total counter
 apiserver_stream_tunnel_requests_total{code="400"} 1
 `
@@ -215,7 +215,7 @@ func TestTunnelingHandler_BadHandshakeError(t *testing.T) {
 	// Validate the streamtunnel metrics; should be one 400 failure.
 	metricNames := []string{"apiserver_stream_tunnel_requests_total"}
 	expected := `
-# HELP apiserver_stream_tunnel_requests_total [ALPHA] Total number of requests that were handled by the StreamTunnelProxy, which processes streaming PortForward/V2
+# HELP apiserver_stream_tunnel_requests_total [BETA] Total number of requests that were handled by the StreamTunnelProxy, which processes streaming PortForward/V2
 # TYPE apiserver_stream_tunnel_requests_total counter
 apiserver_stream_tunnel_requests_total{code="400"} 1
 `
@@ -271,7 +271,7 @@ func TestTunnelingHandler_UpstreamSPDYServerErrorPropagated(t *testing.T) {
 		// Validate the streamtunnel metrics are incrementing 500-level status codes.
 		metricNames := []string{"apiserver_stream_tunnel_requests_total"}
 		expected := `
-# HELP apiserver_stream_tunnel_requests_total [ALPHA] Total number of requests that were handled by the StreamTunnelProxy, which processes streaming PortForward/V2
+# HELP apiserver_stream_tunnel_requests_total [BETA] Total number of requests that were handled by the StreamTunnelProxy, which processes streaming PortForward/V2
 # TYPE apiserver_stream_tunnel_requests_total counter
 apiserver_stream_tunnel_requests_total{code="` + codeStr + `"} 1
 `

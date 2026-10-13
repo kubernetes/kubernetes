@@ -95,7 +95,7 @@ var (
 			Subsystem:      kubeletSubsystem,
 			Name:           "websocket_streaming_requests_total",
 			Help:           "Total number of WebSocket streaming requests (exec/attach/portforward) received by the kubelet.",
-			StabilityLevel: metrics.ALPHA,
+			StabilityLevel: metrics.BETA,
 		},
 		[]string{"subresource"},
 	)

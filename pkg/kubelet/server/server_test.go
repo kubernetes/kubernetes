@@ -2346,7 +2346,7 @@ func TestGetExecWebSocketHandlerSelection(t *testing.T) {
 
 			if tt.expectMetricInc {
 				expected := `
-# HELP kubelet_websocket_streaming_requests_total [ALPHA] Total number of WebSocket streaming requests (exec/attach/portforward) received by the kubelet.
+# HELP kubelet_websocket_streaming_requests_total [BETA] Total number of WebSocket streaming requests (exec/attach/portforward) received by the kubelet.
 # TYPE kubelet_websocket_streaming_requests_total counter
 kubelet_websocket_streaming_requests_total{subresource="exec"} 1
 `
@@ -2436,7 +2436,7 @@ func TestGetAttachWebSocketHandlerSelection(t *testing.T) {
 
 			if tt.expectMetricInc {
 				expected := `
-# HELP kubelet_websocket_streaming_requests_total [ALPHA] Total number of WebSocket streaming requests (exec/attach/portforward) received by the kubelet.
+# HELP kubelet_websocket_streaming_requests_total [BETA] Total number of WebSocket streaming requests (exec/attach/portforward) received by the kubelet.
 # TYPE kubelet_websocket_streaming_requests_total counter
 kubelet_websocket_streaming_requests_total{subresource="attach"} 1
 `
@@ -2518,7 +2518,7 @@ func TestGetPortForwardWebSocketHandlerSelection(t *testing.T) {
 
 			if tt.expectMetricInc {
 				expected := `
-# HELP kubelet_websocket_streaming_requests_total [ALPHA] Total number of WebSocket streaming requests (exec/attach/portforward) received by the kubelet.
+# HELP kubelet_websocket_streaming_requests_total [BETA] Total number of WebSocket streaming requests (exec/attach/portforward) received by the kubelet.
 # TYPE kubelet_websocket_streaming_requests_total counter
 kubelet_websocket_streaming_requests_total{subresource="portforward"} 1
 `

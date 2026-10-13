@@ -258,7 +258,7 @@ func TestExecRESTConnect(t *testing.T) {
 
 			if tt.expectedProxyType != "" {
 				expectedMetric := fmt.Sprintf(`
-# HELP apiserver_websocket_streaming_requests_total [ALPHA] Total number of WebSocket streaming requests (exec/attach/portforward) routed by the API server, labeled by subresource and proxy_type. proxy_type is proxied_to_kubelet when the kubelet handles the request directly; otherwise translated_at_apiserver.
+# HELP apiserver_websocket_streaming_requests_total [BETA] Total number of WebSocket streaming requests (exec/attach/portforward) routed by the API server, labeled by subresource and proxy_type. proxy_type is proxied_to_kubelet when the kubelet handles the request directly; otherwise translated_at_apiserver.
 # TYPE apiserver_websocket_streaming_requests_total counter
 apiserver_websocket_streaming_requests_total{proxy_type=%q,subresource="exec"} 1
 `, tt.expectedProxyType)
@@ -407,7 +407,7 @@ func TestAttachRESTConnect(t *testing.T) {
 
 			if tt.expectedProxyType != "" {
 				expectedMetric := fmt.Sprintf(`
-# HELP apiserver_websocket_streaming_requests_total [ALPHA] Total number of WebSocket streaming requests (exec/attach/portforward) routed by the API server, labeled by subresource and proxy_type. proxy_type is proxied_to_kubelet when the kubelet handles the request directly; otherwise translated_at_apiserver.
+# HELP apiserver_websocket_streaming_requests_total [BETA] Total number of WebSocket streaming requests (exec/attach/portforward) routed by the API server, labeled by subresource and proxy_type. proxy_type is proxied_to_kubelet when the kubelet handles the request directly; otherwise translated_at_apiserver.
 # TYPE apiserver_websocket_streaming_requests_total counter
 apiserver_websocket_streaming_requests_total{proxy_type=%q,subresource="attach"} 1
 `, tt.expectedProxyType)
@@ -556,7 +556,7 @@ func TestPortForwardRESTConnect(t *testing.T) {
 
 			if tt.expectedProxyType != "" {
 				expectedMetric := fmt.Sprintf(`
-# HELP apiserver_websocket_streaming_requests_total [ALPHA] Total number of WebSocket streaming requests (exec/attach/portforward) routed by the API server, labeled by subresource and proxy_type. proxy_type is proxied_to_kubelet when the kubelet handles the request directly; otherwise translated_at_apiserver.
+# HELP apiserver_websocket_streaming_requests_total [BETA] Total number of WebSocket streaming requests (exec/attach/portforward) routed by the API server, labeled by subresource and proxy_type. proxy_type is proxied_to_kubelet when the kubelet handles the request directly; otherwise translated_at_apiserver.
 # TYPE apiserver_websocket_streaming_requests_total counter
 apiserver_websocket_streaming_requests_total{proxy_type=%q,subresource="portforward"} 1
 `, tt.expectedProxyType)
