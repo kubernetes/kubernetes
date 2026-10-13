@@ -41,6 +41,7 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	kubeutil "k8s.io/kubernetes/pkg/kubelet/util"
@@ -87,6 +88,7 @@ type manager struct {
 type podResizeConditions struct {
 	PodResizePending    *v1.PodCondition
 	PodResizeInProgress *v1.PodCondition
+	CapacityInfeasible  bool
 }
 
 func (prc podResizeConditions) List() []*v1.PodCondition {
@@ -207,6 +209,11 @@ type Manager interface {
 	// IsPodResizeInfeasible returns true if the pod resize is infeasible.
 	IsPodResizeInfeasible(podUID types.UID) bool
 
+	// IsPodResizeCapacityInfeasible returns true if the pod resize is Infeasible
+	// specifically because the request exceeds total node allocatable. Such
+	// resizes are retriable when Node.Status.Allocatable increases.
+	IsPodResizeCapacityInfeasible(podUID types.UID) bool
+
 	// BackfillPodResizeConditions backfills the status manager's resize conditions by reading them from the
 	// provided pods' statuses.
 	BackfillPodResizeConditions(pods []*v1.Pod)
@@ -321,14 +328,21 @@ func (m *manager) SetPodResizePendingCondition(podUID types.UID, reason, message
 
 	previousCondition := m.podResizeConditions[podUID].PodResizePending
 
-	if reason != v1.PodReasonInfeasible {
-		// For all other "pending" reasons, we set the reason to "Deferred".
+	isCapacityInfeasible := reason == lifecycle.CapacityInfeasible
+	if isCapacityInfeasible || reason == v1.PodReasonInfeasible {
+		// Both capacity-bound and policy-bound Infeasible are surfaced as
+		// Infeasible externally. The distinction is preserved via
+		// CapacityInfeasible so the allocation manager can retry on upscale.
+		reason = v1.PodReasonInfeasible
+	} else {
+		// All other pending reasons (OutOf*, etc.) are surfaced as Deferred.
 		reason = v1.PodReasonDeferred
 	}
 
 	m.podResizeConditions[podUID] = podResizeConditions{
 		PodResizePending:    updatedPodResizeCondition(v1.PodResizePending, m.podResizeConditions[podUID].PodResizePending, reason, message, observedGeneration),
 		PodResizeInProgress: m.podResizeConditions[podUID].PodResizeInProgress,
+		CapacityInfeasible:  isCapacityInfeasible,
 	}
 
 	if previousCondition == nil {
@@ -422,6 +436,7 @@ func (m *manager) ClearPodResizeInProgressCondition(podUID types.UID) (int64, bo
 	m.podResizeConditions[podUID] = podResizeConditions{
 		PodResizePending:    m.podResizeConditions[podUID].PodResizePending,
 		PodResizeInProgress: nil,
+		CapacityInfeasible:  m.podResizeConditions[podUID].CapacityInfeasible,
 	}
 
 	m.recordInProgressResizeCount()
@@ -438,10 +453,12 @@ func (m *manager) BackfillPodResizeConditions(pods []*v1.Pod) {
 			case v1.PodResizePending:
 				newCondition := updatedPodResizeCondition(v1.PodResizePending, nil, c.Reason, c.Message, c.ObservedGeneration)
 				oldConditions := m.podResizeConditions[pod.UID]
+				isCapacityInfeasible := c.Reason == v1.PodReasonInfeasible
 
 				m.podResizeConditions[pod.UID] = podResizeConditions{
 					PodResizePending:    newCondition,
 					PodResizeInProgress: oldConditions.PodResizeInProgress,
+					CapacityInfeasible:  isCapacityInfeasible,
 				}
 
 			case v1.PodResizeInProgress:
@@ -451,6 +468,7 @@ func (m *manager) BackfillPodResizeConditions(pods []*v1.Pod) {
 				m.podResizeConditions[pod.UID] = podResizeConditions{
 					PodResizeInProgress: newCondition,
 					PodResizePending:    oldConditions.PodResizePending,
+					CapacityInfeasible:  oldConditions.CapacityInfeasible,
 				}
 			}
 		}
@@ -473,6 +491,18 @@ func (m *manager) IsPodResizeInfeasible(podUID types.UID) bool {
 	defer m.podStatusesLock.RUnlock()
 
 	return m.podResizeConditions[podUID].PodResizePending != nil && m.podResizeConditions[podUID].PodResizePending.Reason == v1.PodReasonInfeasible
+}
+
+// IsPodResizeCapacityInfeasible returns true if the pod resize is Infeasible
+// because the request exceeds total node allocatable.
+func (m *manager) IsPodResizeCapacityInfeasible(podUID types.UID) bool {
+	m.podStatusesLock.RLock()
+	defer m.podStatusesLock.RUnlock()
+
+	conds := m.podResizeConditions[podUID]
+	return conds.PodResizePending != nil &&
+		conds.PodResizePending.Reason == v1.PodReasonInfeasible &&
+		conds.CapacityInfeasible
 }
 
 func (m *manager) GetPodStatus(uid types.UID) (v1.PodStatus, bool) {

@@ -52,6 +52,7 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	statustest "k8s.io/kubernetes/pkg/kubelet/status/testing"
@@ -2612,12 +2613,13 @@ func TestPodResizeConditions(t *testing.T) {
 	podUID := types.UID("12345")
 
 	testCases := []struct {
-		name                          string
-		updateFunc                    func(types.UID) bool
-		expected                      []*v1.PodCondition
-		expectedUpdateFuncReturnVal   bool
-		expectedIsPodResizeDeferred   bool
-		expectedIsPodResizeInfeasible bool
+		name                                  string
+		updateFunc                            func(types.UID) bool
+		expected                              []*v1.PodCondition
+		expectedUpdateFuncReturnVal           bool
+		expectedIsPodResizeDeferred           bool
+		expectedIsPodResizeInfeasible         bool
+		expectedIsPodResizeCapacityInfeasible bool
 	}{
 		{
 			name:       "initial empty conditions",
@@ -2737,11 +2739,13 @@ func TestPodResizeConditions(t *testing.T) {
 			expectedIsPodResizeDeferred: true,
 		},
 		{
-			name: "set pod resize pending condition to infeasible with message",
+			name: "set pod resize pending condition to infeasible (policy-bound) with message",
 			updateFunc: func(podUID types.UID) bool {
 				return m.SetPodResizePendingCondition(podUID, v1.PodReasonInfeasible, "some-message", 3)
 			},
-			expectedUpdateFuncReturnVal: true,
+			expectedUpdateFuncReturnVal:           true,
+			expectedIsPodResizeInfeasible:         true,
+			expectedIsPodResizeCapacityInfeasible: false,
 			expected: []*v1.PodCondition{
 				{
 					Type:               v1.PodResizePending,
@@ -2756,7 +2760,29 @@ func TestPodResizeConditions(t *testing.T) {
 					ObservedGeneration: 2,
 				},
 			},
-			expectedIsPodResizeInfeasible: true,
+		},
+		{
+			name: "set pod resize pending condition to capacity-infeasible with message",
+			updateFunc: func(podUID types.UID) bool {
+				return m.SetPodResizePendingCondition(podUID, lifecycle.CapacityInfeasible, "some-capacity-message", 3)
+			},
+			expectedUpdateFuncReturnVal:           false,
+			expectedIsPodResizeInfeasible:         true,
+			expectedIsPodResizeCapacityInfeasible: true,
+			expected: []*v1.PodCondition{
+				{
+					Type:               v1.PodResizePending,
+					Status:             v1.ConditionTrue,
+					Reason:             v1.PodReasonInfeasible,
+					Message:            "some-capacity-message",
+					ObservedGeneration: 3,
+				},
+				{
+					Type:               v1.PodResizeInProgress,
+					Status:             v1.ConditionTrue,
+					ObservedGeneration: 2,
+				},
+			},
 		},
 		{
 			name: "clear pod resize in progress condition",
@@ -2764,17 +2790,18 @@ func TestPodResizeConditions(t *testing.T) {
 				_, b := m.ClearPodResizeInProgressCondition(podUID)
 				return b
 			},
-			expectedUpdateFuncReturnVal: true,
+			expectedUpdateFuncReturnVal:           true,
+			expectedIsPodResizeInfeasible:         true,
+			expectedIsPodResizeCapacityInfeasible: true,
 			expected: []*v1.PodCondition{
 				{
 					Type:               v1.PodResizePending,
 					Status:             v1.ConditionTrue,
 					Reason:             v1.PodReasonInfeasible,
-					Message:            "some-message",
+					Message:            "some-capacity-message",
 					ObservedGeneration: 3,
 				},
 			},
-			expectedIsPodResizeInfeasible: true,
 		},
 		{
 			name: "clear pod resize pending condition",
@@ -2804,6 +2831,7 @@ func TestPodResizeConditions(t *testing.T) {
 			}
 			require.Equal(t, tc.expectedIsPodResizeDeferred, m.IsPodResizeDeferred(podUID))
 			require.Equal(t, tc.expectedIsPodResizeInfeasible, m.IsPodResizeInfeasible(podUID))
+			require.Equal(t, tc.expectedIsPodResizeCapacityInfeasible, m.IsPodResizeCapacityInfeasible(podUID))
 		})
 	}
 }
@@ -3270,6 +3298,7 @@ func TestBackfillPodResizeConditions(t *testing.T) {
 				Reason:             v1.PodReasonInfeasible,
 				Message:            "error-message",
 			},
+			CapacityInfeasible: true,
 		},
 	}
 

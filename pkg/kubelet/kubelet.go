@@ -53,6 +53,7 @@ import (
 	"k8s.io/utils/ptr"
 
 	v1 "k8s.io/api/core/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -752,6 +753,27 @@ func NewMainKubelet(ctx context.Context,
 		kubeDeps.Recorder,
 		logger,
 	)
+
+	// When node allocatable changes, pending pod resizes may become feasible or
+	// need to transition to Infeasible. Register a node informer handler to
+	// trigger a retry pass whenever Node.Status.Allocatable is mutated.
+	if nodeInformer != nil && utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+		if _, err := nodeInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+			UpdateFunc: func(oldObj, newObj interface{}) {
+				oldNode, ok1 := oldObj.(*v1.Node)
+				newNode, ok2 := newObj.(*v1.Node)
+				if !ok1 || !ok2 {
+					return
+				}
+				if apiequality.Semantic.DeepEqual(oldNode.Status.Allocatable, newNode.Status.Allocatable) {
+					return
+				}
+				klet.allocationManager.RetryPendingResizes(ctx, allocation.TriggerReasonNodeUpdated)
+			},
+		}); err != nil {
+			return nil, fmt.Errorf("failed to add node informer event handler for resize: %w", err)
+		}
+	}
 
 	klet.resourceAnalyzer = serverstats.NewResourceAnalyzer(ctx, klet, kubeCfg.VolumeStatsAggPeriod.Duration, kubeDeps.Recorder)
 	klet.runtimeService = kubeDeps.RemoteRuntimeService
