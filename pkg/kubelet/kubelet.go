@@ -3212,10 +3212,13 @@ func (kl *Kubelet) HandlePodReconcile(ctx context.Context, pods []*v1.Pod) {
 				// If there are pending resizes, check whether the requests shrank as a result of the status
 				// resources changing.
 				opts := resourcehelper.PodResourcesOptions{
-					UseStatusResources:                             true,
-					SkipPodLevelResources:                          !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources),
-					InPlacePodLevelResourcesVerticalScalingEnabled: utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling),
-					UseDRANodeAllocatableResourceClaimStatus:       utilfeature.DefaultFeatureGate.Enabled(features.DRANodeAllocatableResources),
+					UseStatusResources: true,
+					Features: resourcehelper.Features{
+						PodLevelResources:                       utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources),
+						InPlacePodVerticalScaling:               true,
+						InPlacePodLevelResourcesVerticalScaling: utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling),
+						DRANodeAllocatableResources:             utilfeature.DefaultFeatureGate.Enabled(features.DRANodeAllocatableResources),
+					},
 				}
 
 				// Ignore desired resources when aggregating the resources.

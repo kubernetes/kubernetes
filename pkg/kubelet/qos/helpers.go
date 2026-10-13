@@ -64,7 +64,9 @@ func remainingPodMemReqPerContainer(pod *v1.Pod) int64 {
 	numContainers := len(pod.Spec.Containers) + len(pod.Spec.InitContainers)
 	// Aggregated requests of all containers (including DRA if enabled).
 	opts := resourcehelper.PodResourcesOptions{
-		UseDRANodeAllocatableResourceClaimStatus: utilfeature.DefaultFeatureGate.Enabled(features.DRANodeAllocatableResources),
+		Features: resourcehelper.Features{
+			DRANodeAllocatableResources: utilfeature.DefaultFeatureGate.Enabled(features.DRANodeAllocatableResources),
+		},
 	}
 	aggrContainerReqs := resourcehelper.AggregateContainerRequests(pod, opts)
 	remainingMemory = pod.Spec.Resources.Requests.Memory().Value() - aggrContainerReqs.Memory().Value()
