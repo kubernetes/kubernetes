@@ -31,7 +31,7 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 DIRGLOBS=(
   "staging/src/k8s.io/api/**/*/doc.go"
   "staging/src/k8s.io/kube-aggregator/pkg/apis/**/*/doc.go"
-  "staging/src/k8s.io/apiextensions-apiserver/pkg/apis/**/*/doc.go"
+  "staging/src/k8s.io/apiextensions/pkg/apis/**/*/doc.go"
 )
 
 cd "${KUBE_ROOT}"

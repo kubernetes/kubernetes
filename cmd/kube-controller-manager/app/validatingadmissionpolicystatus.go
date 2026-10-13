@@ -20,7 +20,7 @@ import (
 	"context"
 	"fmt"
 
-	apiextensionsscheme "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/scheme"
+	apiextensionsscheme "k8s.io/apiextensions/pkg/client/clientset/clientset/scheme"
 	pluginvalidatingadmissionpolicy "k8s.io/apiserver/pkg/admission/plugin/policy/validating"
 	"k8s.io/apiserver/pkg/cel/openapi/resolver"
 	k8sscheme "k8s.io/client-go/kubernetes/scheme"

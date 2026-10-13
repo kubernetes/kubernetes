@@ -31,8 +31,9 @@ import (
 
 	yaml "go.yaml.in/yaml/v2"
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
-	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	apiextensionsv1beta1conversion "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	structuralschema "k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
+	apiextensionsv1beta1 "k8s.io/apiextensions/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/kube-openapi/pkg/util/proto"
 	"k8s.io/kube-openapi/pkg/validation/spec"
 	"k8s.io/utils/ptr"
@@ -92,7 +93,7 @@ properties:
 	}
 
 	specInternal := apiextensions.JSONSchemaProps{}
-	if err := apiextensionsv1beta1.Convert_v1beta1_JSONSchemaProps_To_apiextensions_JSONSchemaProps(&specV1beta1, &specInternal, nil); err != nil {
+	if err := apiextensionsv1beta1conversion.Convert_v1beta1_JSONSchemaProps_To_apiextensions_JSONSchemaProps(&specV1beta1, &specInternal, nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -740,7 +741,7 @@ func TestKubeOpenapiRejectionFiltering(t *testing.T) {
 
 		// convert to internal
 		internalSchema := &apiextensions.JSONSchemaProps{}
-		if err := apiextensionsv1beta1.Convert_v1beta1_JSONSchemaProps_To_apiextensions_JSONSchemaProps(schema, internalSchema, nil); err != nil {
+		if err := apiextensionsv1beta1conversion.Convert_v1beta1_JSONSchemaProps_To_apiextensions_JSONSchemaProps(schema, internalSchema, nil); err != nil {
 			t.Fatalf("failed to convert from apiextensions/v1beta1 to internal: %v", err)
 		}
 

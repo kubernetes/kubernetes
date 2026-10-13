@@ -23,9 +23,9 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
-	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apiextensions-apiserver/test/integration/fixtures"
+	apiextensionsv1 "k8s.io/apiextensions/pkg/apis/apiextensions/v1"
+	"k8s.io/apiextensions/pkg/client/clientset/clientset"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/dynamic"
 	kubernetes "k8s.io/client-go/kubernetes"

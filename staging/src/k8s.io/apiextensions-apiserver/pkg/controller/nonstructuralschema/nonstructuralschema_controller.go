@@ -33,11 +33,12 @@ import (
 
 	apiextensionshelpers "k8s.io/apiextensions-apiserver/pkg/apihelpers"
 	apiextensionsinternal "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
-	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	apiextensionsv1conversion "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
-	client "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1"
-	informers "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions/apiextensions/v1"
-	listers "k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/v1"
+	apiextensionsv1 "k8s.io/apiextensions/pkg/apis/apiextensions/v1"
+	client "k8s.io/apiextensions/pkg/client/clientset/clientset/typed/apiextensions/v1"
+	informers "k8s.io/apiextensions/pkg/client/informers/externalversions/apiextensions/v1"
+	listers "k8s.io/apiextensions/pkg/client/listers/apiextensions/v1"
 )
 
 // ConditionController is maintaining the NonStructuralSchema condition.
@@ -105,7 +106,7 @@ func calculateCondition(in *apiextensionsv1.CustomResourceDefinition) *apiextens
 		}
 
 		internalSchema := &apiextensionsinternal.CustomResourceValidation{}
-		if err := apiextensionsv1.Convert_v1_CustomResourceValidation_To_apiextensions_CustomResourceValidation(v.Schema, internalSchema, nil); err != nil {
+		if err := apiextensionsv1conversion.Convert_v1_CustomResourceValidation_To_apiextensions_CustomResourceValidation(v.Schema, internalSchema, nil); err != nil {
 			klog.Errorf("failed to convert CRD validation to internal version: %v", err)
 			continue
 		}

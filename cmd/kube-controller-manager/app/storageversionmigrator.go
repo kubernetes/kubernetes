@@ -20,7 +20,7 @@ import (
 	"context"
 	"fmt"
 
-	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
+	apiextensionsclientset "k8s.io/apiextensions/pkg/client/clientset/clientset"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"

@@ -30,8 +30,8 @@ import (
 	"k8s.io/kubernetes/test/integration/framework"
 
 	apidiscoveryv2 "k8s.io/api/apidiscovery/v2"
-	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
-	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
+	apiextensionsv1 "k8s.io/apiextensions/pkg/apis/apiextensions/v1"
+	apiextensionsclient "k8s.io/apiextensions/pkg/client/clientset/clientset"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"

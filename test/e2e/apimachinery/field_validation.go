@@ -23,9 +23,9 @@ import (
 	"strings"
 
 	"github.com/onsi/ginkgo/v2"
-	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
-	apiextensionclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apiextensions-apiserver/test/integration/fixtures"
+	apiextensionsv1 "k8s.io/apiextensions/pkg/apis/apiextensions/v1"
+	apiextensionclientset "k8s.io/apiextensions/pkg/client/clientset/clientset"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/dynamic"

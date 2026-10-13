@@ -24,9 +24,9 @@ import (
 	"time"
 
 	"k8s.io/apiextensions-apiserver/pkg/apihelpers"
-	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
-	applyconfigurationapiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/client/applyconfiguration/apiextensions/v1"
-	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1"
+	apiextensionsv1 "k8s.io/apiextensions/pkg/apis/apiextensions/v1"
+	applyconfigurationapiextensionsv1 "k8s.io/apiextensions/pkg/client/applyconfiguration/apiextensions/v1"
+	apiextensionsclient "k8s.io/apiextensions/pkg/client/clientset/clientset/typed/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/wait"

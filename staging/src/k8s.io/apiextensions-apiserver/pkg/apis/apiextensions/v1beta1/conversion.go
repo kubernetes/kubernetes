@@ -23,9 +23,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/json"
 
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
+	v1beta1 "k8s.io/apiextensions/pkg/apis/apiextensions/v1beta1"
 )
 
-func Convert_apiextensions_JSONSchemaProps_To_v1beta1_JSONSchemaProps(in *apiextensions.JSONSchemaProps, out *JSONSchemaProps, s conversion.Scope) error {
+func Convert_apiextensions_JSONSchemaProps_To_v1beta1_JSONSchemaProps(in *apiextensions.JSONSchemaProps, out *v1beta1.JSONSchemaProps, s conversion.Scope) error {
 	if err := autoConvert_apiextensions_JSONSchemaProps_To_v1beta1_JSONSchemaProps(in, out, s); err != nil {
 		return err
 	}
@@ -40,7 +41,7 @@ func Convert_apiextensions_JSONSchemaProps_To_v1beta1_JSONSchemaProps(in *apiext
 
 var nullLiteral = []byte(`null`)
 
-func Convert_apiextensions_JSON_To_v1beta1_JSON(in *apiextensions.JSON, out *JSON, s conversion.Scope) error {
+func Convert_apiextensions_JSON_To_v1beta1_JSON(in *apiextensions.JSON, out *v1beta1.JSON, s conversion.Scope) error {
 	raw, err := json.Marshal(*in)
 	if err != nil {
 		return err
@@ -54,7 +55,7 @@ func Convert_apiextensions_JSON_To_v1beta1_JSON(in *apiextensions.JSON, out *JSO
 	return nil
 }
 
-func Convert_v1beta1_JSON_To_apiextensions_JSON(in *JSON, out *apiextensions.JSON, s conversion.Scope) error {
+func Convert_v1beta1_JSON_To_apiextensions_JSON(in *v1beta1.JSON, out *apiextensions.JSON, s conversion.Scope) error {
 	if in != nil {
 		var i interface{}
 		if len(in.Raw) > 0 && !bytes.Equal(in.Raw, nullLiteral) {

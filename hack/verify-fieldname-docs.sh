@@ -44,7 +44,7 @@ find_files() {
     \) \
     \( -wholename './staging/src/k8s.io/api/*/v*/types.go' \
        -o -wholename './staging/src/k8s.io/kube-aggregator/pkg/apis/*/v*/types.go' \
-       -o -wholename './staging/src/k8s.io/apiextensions-apiserver/pkg/apis/*/v*/types.go' \
+       -o -wholename './staging/src/k8s.io/apiextensions/pkg/apis/*/v*/types.go' \
     \)
 }
 

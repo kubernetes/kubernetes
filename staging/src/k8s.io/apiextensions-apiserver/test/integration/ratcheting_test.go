@@ -33,12 +33,13 @@ import (
 	jsonpatch "gopkg.in/evanphx/json-patch.v4"
 
 	apiextensionsinternal "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
-	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	apiextensionsv1conversion "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	structuralschema "k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
 	apiservervalidation "k8s.io/apiextensions-apiserver/pkg/apiserver/validation"
-	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apiextensions-apiserver/pkg/registry/customresource"
 	"k8s.io/apiextensions-apiserver/test/integration/fixtures"
+	apiextensionsv1 "k8s.io/apiextensions/pkg/apis/apiextensions/v1"
+	"k8s.io/apiextensions/pkg/client/clientset/clientset"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -1863,7 +1864,7 @@ func BenchmarkRatcheting(b *testing.B) {
 
 			// Create structural schema from v.Schema.OpenAPIV3Schema
 			internalValidation := &apiextensionsinternal.CustomResourceValidation{}
-			if err := apiextensionsv1.Convert_v1_CustomResourceValidation_To_apiextensions_CustomResourceValidation(v.Schema, internalValidation, nil); err != nil {
+			if err := apiextensionsv1conversion.Convert_v1_CustomResourceValidation_To_apiextensions_CustomResourceValidation(v.Schema, internalValidation, nil); err != nil {
 				b.Fatal(fmt.Errorf("failed converting CRD validation to internal version: %v", err))
 				return
 			}

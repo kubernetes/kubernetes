@@ -26,10 +26,12 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
-	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
-	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
-	clientschema "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/scheme"
+	apiextensionsv1conversion "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	apiextensionsv1beta1conversion "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apiextensions-apiserver/test/integration/fixtures"
+	apiextensionsv1 "k8s.io/apiextensions/pkg/apis/apiextensions/v1"
+	apiextensionsv1beta1 "k8s.io/apiextensions/pkg/apis/apiextensions/v1beta1"
+	clientschema "k8s.io/apiextensions/pkg/client/clientset/clientset/scheme"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -2046,13 +2048,13 @@ properties:
 			betaCRD.Name = fmt.Sprintf("foos.%s", betaCRD.Spec.Group)
 
 			internalCRD := &apiextensions.CustomResourceDefinition{}
-			err = apiextensionsv1beta1.Convert_v1beta1_CustomResourceDefinition_To_apiextensions_CustomResourceDefinition(betaCRD, internalCRD, nil)
+			err = apiextensionsv1beta1conversion.Convert_v1beta1_CustomResourceDefinition_To_apiextensions_CustomResourceDefinition(betaCRD, internalCRD, nil)
 			if err != nil {
 				t.Fatal(err)
 			}
 
 			crd := &apiextensionsv1.CustomResourceDefinition{}
-			err = apiextensionsv1.Convert_apiextensions_CustomResourceDefinition_To_v1_CustomResourceDefinition(internalCRD, crd, nil)
+			err = apiextensionsv1conversion.Convert_apiextensions_CustomResourceDefinition_To_v1_CustomResourceDefinition(internalCRD, crd, nil)
 			if err != nil {
 				t.Fatal(err)
 			}

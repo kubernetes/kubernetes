@@ -31,11 +31,12 @@ import (
 	v1 "k8s.io/api/autoscaling/v1"
 	apiextensionshelpers "k8s.io/apiextensions-apiserver/pkg/apihelpers"
 	apiextensionsinternal "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
-	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	apiextensionsv1conversion "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/validation"
 	structuralschema "k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
 	openapiv2 "k8s.io/apiextensions-apiserver/pkg/controller/openapi/v2"
 	generatedopenapi "k8s.io/apiextensions-apiserver/pkg/generated/openapi"
+	apiextensionsv1 "k8s.io/apiextensions/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -112,7 +113,7 @@ func generateBuilder(crd *apiextensionsv1.CustomResourceDefinition, version stri
 
 	if s != nil && s.OpenAPIV3Schema != nil {
 		internalCRDSchema := &apiextensionsinternal.CustomResourceValidation{}
-		if err := apiextensionsv1.Convert_v1_CustomResourceValidation_To_apiextensions_CustomResourceValidation(s, internalCRDSchema, nil); err != nil {
+		if err := apiextensionsv1conversion.Convert_v1_CustomResourceValidation_To_apiextensions_CustomResourceValidation(s, internalCRDSchema, nil); err != nil {
 			return nil, fmt.Errorf("failed converting CRD validation to internal version: %v", err)
 		}
 		if !validation.SchemaHasInvalidTypes(internalCRDSchema.OpenAPIV3Schema) {

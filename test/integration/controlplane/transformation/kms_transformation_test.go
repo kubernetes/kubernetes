@@ -38,7 +38,7 @@ import (
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"golang.org/x/crypto/cryptobyte"
 
-	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
+	apiextensionsclientset "k8s.io/apiextensions/pkg/client/clientset/clientset"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured/unstructuredscheme"

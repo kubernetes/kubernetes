@@ -26,6 +26,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
+	v1 "k8s.io/apiextensions/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/utils/ptr"
 )
@@ -42,8 +43,8 @@ func TestConversion(t *testing.T) {
 		{
 			Name:      "internal to v1, no versions",
 			In:        &apiextensions.CustomResourceDefinition{},
-			Out:       &CustomResourceDefinition{},
-			ExpectOut: &CustomResourceDefinition{},
+			Out:       &v1.CustomResourceDefinition{},
+			ExpectOut: &v1.CustomResourceDefinition{},
 		},
 		{
 			Name: "internal to v1, top-level version",
@@ -52,10 +53,10 @@ func TestConversion(t *testing.T) {
 					Version: "v1",
 				},
 			},
-			Out: &CustomResourceDefinition{},
-			ExpectOut: &CustomResourceDefinition{
-				Spec: CustomResourceDefinitionSpec{
-					Versions: []CustomResourceDefinitionVersion{{Name: "v1", Served: true, Storage: true}},
+			Out: &v1.CustomResourceDefinition{},
+			ExpectOut: &v1.CustomResourceDefinition{
+				Spec: v1.CustomResourceDefinitionSpec{
+					Versions: []v1.CustomResourceDefinitionVersion{{Name: "v1", Served: true, Storage: true}},
 				},
 			},
 		},
@@ -69,10 +70,10 @@ func TestConversion(t *testing.T) {
 					},
 				},
 			},
-			Out: &CustomResourceDefinition{},
-			ExpectOut: &CustomResourceDefinition{
-				Spec: CustomResourceDefinitionSpec{
-					Versions: []CustomResourceDefinitionVersion{
+			Out: &v1.CustomResourceDefinition{},
+			ExpectOut: &v1.CustomResourceDefinition{
+				Spec: v1.CustomResourceDefinitionSpec{
+					Versions: []v1.CustomResourceDefinitionVersion{
 						{Name: "v1", Served: true, Storage: true},
 						{Name: "v2", Served: false, Storage: false},
 					},
@@ -81,7 +82,7 @@ func TestConversion(t *testing.T) {
 		},
 		{
 			Name: "v1 to internal, no versions",
-			In:   &CustomResourceDefinition{},
+			In:   &v1.CustomResourceDefinition{},
 			Out:  &apiextensions.CustomResourceDefinition{},
 			ExpectOut: &apiextensions.CustomResourceDefinition{
 				Spec: apiextensions.CustomResourceDefinitionSpec{
@@ -91,9 +92,9 @@ func TestConversion(t *testing.T) {
 		},
 		{
 			Name: "v1 to internal, single version",
-			In: &CustomResourceDefinition{
-				Spec: CustomResourceDefinitionSpec{
-					Versions: []CustomResourceDefinitionVersion{{Name: "v1", Served: true, Storage: true}},
+			In: &v1.CustomResourceDefinition{
+				Spec: v1.CustomResourceDefinitionSpec{
+					Versions: []v1.CustomResourceDefinitionVersion{{Name: "v1", Served: true, Storage: true}},
 				},
 			},
 			Out: &apiextensions.CustomResourceDefinition{},
@@ -107,9 +108,9 @@ func TestConversion(t *testing.T) {
 		},
 		{
 			Name: "v1 to internal, multiple versions",
-			In: &CustomResourceDefinition{
-				Spec: CustomResourceDefinitionSpec{
-					Versions: []CustomResourceDefinitionVersion{
+			In: &v1.CustomResourceDefinition{
+				Spec: v1.CustomResourceDefinitionSpec{
+					Versions: []v1.CustomResourceDefinitionVersion{
 						{Name: "v1", Served: true, Storage: true},
 						{Name: "v2", Served: false, Storage: false},
 					},
@@ -136,11 +137,11 @@ func TestConversion(t *testing.T) {
 					Validation: &apiextensions.CustomResourceValidation{OpenAPIV3Schema: &apiextensions.JSONSchemaProps{Type: "object"}},
 				},
 			},
-			Out: &CustomResourceDefinition{},
-			ExpectOut: &CustomResourceDefinition{
-				Spec: CustomResourceDefinitionSpec{
-					Versions: []CustomResourceDefinitionVersion{
-						{Name: "v1", Served: true, Storage: true, Schema: &CustomResourceValidation{OpenAPIV3Schema: &JSONSchemaProps{Type: "object"}}},
+			Out: &v1.CustomResourceDefinition{},
+			ExpectOut: &v1.CustomResourceDefinition{
+				Spec: v1.CustomResourceDefinitionSpec{
+					Versions: []v1.CustomResourceDefinitionVersion{
+						{Name: "v1", Served: true, Storage: true, Schema: &v1.CustomResourceValidation{OpenAPIV3Schema: &v1.JSONSchemaProps{Type: "object"}}},
 					},
 				},
 			},
@@ -155,23 +156,23 @@ func TestConversion(t *testing.T) {
 					},
 				},
 			},
-			Out: &CustomResourceDefinition{},
-			ExpectOut: &CustomResourceDefinition{
-				Spec: CustomResourceDefinitionSpec{
-					Versions: []CustomResourceDefinitionVersion{
-						{Name: "v1", Served: true, Storage: true, Schema: &CustomResourceValidation{OpenAPIV3Schema: &JSONSchemaProps{Description: "v1", Type: "object"}}},
-						{Name: "v2", Served: false, Storage: false, Schema: &CustomResourceValidation{OpenAPIV3Schema: &JSONSchemaProps{Description: "v2", Type: "object"}}},
+			Out: &v1.CustomResourceDefinition{},
+			ExpectOut: &v1.CustomResourceDefinition{
+				Spec: v1.CustomResourceDefinitionSpec{
+					Versions: []v1.CustomResourceDefinitionVersion{
+						{Name: "v1", Served: true, Storage: true, Schema: &v1.CustomResourceValidation{OpenAPIV3Schema: &v1.JSONSchemaProps{Description: "v1", Type: "object"}}},
+						{Name: "v2", Served: false, Storage: false, Schema: &v1.CustomResourceValidation{OpenAPIV3Schema: &v1.JSONSchemaProps{Description: "v2", Type: "object"}}},
 					},
 				},
 			},
 		},
 		{
 			Name: "v1 to internal, identical validation moves to top-level",
-			In: &CustomResourceDefinition{
-				Spec: CustomResourceDefinitionSpec{
-					Versions: []CustomResourceDefinitionVersion{
-						{Name: "v1", Served: true, Storage: true, Schema: &CustomResourceValidation{OpenAPIV3Schema: &JSONSchemaProps{Type: "object"}}},
-						{Name: "v2", Served: true, Storage: false, Schema: &CustomResourceValidation{OpenAPIV3Schema: &JSONSchemaProps{Type: "object"}}},
+			In: &v1.CustomResourceDefinition{
+				Spec: v1.CustomResourceDefinitionSpec{
+					Versions: []v1.CustomResourceDefinitionVersion{
+						{Name: "v1", Served: true, Storage: true, Schema: &v1.CustomResourceValidation{OpenAPIV3Schema: &v1.JSONSchemaProps{Type: "object"}}},
+						{Name: "v2", Served: true, Storage: false, Schema: &v1.CustomResourceValidation{OpenAPIV3Schema: &v1.JSONSchemaProps{Type: "object"}}},
 					},
 				},
 			},
@@ -190,11 +191,11 @@ func TestConversion(t *testing.T) {
 		},
 		{
 			Name: "v1 to internal, distinct validation remains per-version",
-			In: &CustomResourceDefinition{
-				Spec: CustomResourceDefinitionSpec{
-					Versions: []CustomResourceDefinitionVersion{
-						{Name: "v1", Served: true, Storage: true, Schema: &CustomResourceValidation{OpenAPIV3Schema: &JSONSchemaProps{Description: "v1", Type: "object"}}},
-						{Name: "v2", Served: true, Storage: false, Schema: &CustomResourceValidation{OpenAPIV3Schema: &JSONSchemaProps{Description: "v2", Type: "object"}}},
+			In: &v1.CustomResourceDefinition{
+				Spec: v1.CustomResourceDefinitionSpec{
+					Versions: []v1.CustomResourceDefinitionVersion{
+						{Name: "v1", Served: true, Storage: true, Schema: &v1.CustomResourceValidation{OpenAPIV3Schema: &v1.JSONSchemaProps{Description: "v1", Type: "object"}}},
+						{Name: "v2", Served: true, Storage: false, Schema: &v1.CustomResourceValidation{OpenAPIV3Schema: &v1.JSONSchemaProps{Description: "v2", Type: "object"}}},
 					},
 				},
 			},
@@ -219,11 +220,11 @@ func TestConversion(t *testing.T) {
 					Subresources: &apiextensions.CustomResourceSubresources{Scale: &apiextensions.CustomResourceSubresourceScale{SpecReplicasPath: "spec.replicas"}},
 				},
 			},
-			Out: &CustomResourceDefinition{},
-			ExpectOut: &CustomResourceDefinition{
-				Spec: CustomResourceDefinitionSpec{
-					Versions: []CustomResourceDefinitionVersion{
-						{Name: "v1", Served: true, Storage: true, Subresources: &CustomResourceSubresources{Scale: &CustomResourceSubresourceScale{SpecReplicasPath: "spec.replicas"}}},
+			Out: &v1.CustomResourceDefinition{},
+			ExpectOut: &v1.CustomResourceDefinition{
+				Spec: v1.CustomResourceDefinitionSpec{
+					Versions: []v1.CustomResourceDefinitionVersion{
+						{Name: "v1", Served: true, Storage: true, Subresources: &v1.CustomResourceSubresources{Scale: &v1.CustomResourceSubresourceScale{SpecReplicasPath: "spec.replicas"}}},
 					},
 				},
 			},
@@ -238,23 +239,23 @@ func TestConversion(t *testing.T) {
 					},
 				},
 			},
-			Out: &CustomResourceDefinition{},
-			ExpectOut: &CustomResourceDefinition{
-				Spec: CustomResourceDefinitionSpec{
-					Versions: []CustomResourceDefinitionVersion{
-						{Name: "v1", Served: true, Storage: true, Subresources: &CustomResourceSubresources{Scale: &CustomResourceSubresourceScale{SpecReplicasPath: "spec.replicas1"}}},
-						{Name: "v2", Served: false, Storage: false, Subresources: &CustomResourceSubresources{Scale: &CustomResourceSubresourceScale{SpecReplicasPath: "spec.replicas2"}}},
+			Out: &v1.CustomResourceDefinition{},
+			ExpectOut: &v1.CustomResourceDefinition{
+				Spec: v1.CustomResourceDefinitionSpec{
+					Versions: []v1.CustomResourceDefinitionVersion{
+						{Name: "v1", Served: true, Storage: true, Subresources: &v1.CustomResourceSubresources{Scale: &v1.CustomResourceSubresourceScale{SpecReplicasPath: "spec.replicas1"}}},
+						{Name: "v2", Served: false, Storage: false, Subresources: &v1.CustomResourceSubresources{Scale: &v1.CustomResourceSubresourceScale{SpecReplicasPath: "spec.replicas2"}}},
 					},
 				},
 			},
 		},
 		{
 			Name: "v1 to internal, identical subresources moves to top-level",
-			In: &CustomResourceDefinition{
-				Spec: CustomResourceDefinitionSpec{
-					Versions: []CustomResourceDefinitionVersion{
-						{Name: "v1", Served: true, Storage: true, Subresources: &CustomResourceSubresources{Scale: &CustomResourceSubresourceScale{SpecReplicasPath: "spec.replicas"}}},
-						{Name: "v2", Served: true, Storage: false, Subresources: &CustomResourceSubresources{Scale: &CustomResourceSubresourceScale{SpecReplicasPath: "spec.replicas"}}},
+			In: &v1.CustomResourceDefinition{
+				Spec: v1.CustomResourceDefinitionSpec{
+					Versions: []v1.CustomResourceDefinitionVersion{
+						{Name: "v1", Served: true, Storage: true, Subresources: &v1.CustomResourceSubresources{Scale: &v1.CustomResourceSubresourceScale{SpecReplicasPath: "spec.replicas"}}},
+						{Name: "v2", Served: true, Storage: false, Subresources: &v1.CustomResourceSubresources{Scale: &v1.CustomResourceSubresourceScale{SpecReplicasPath: "spec.replicas"}}},
 					},
 				},
 			},
@@ -273,11 +274,11 @@ func TestConversion(t *testing.T) {
 		},
 		{
 			Name: "v1 to internal, distinct subresources remains per-version",
-			In: &CustomResourceDefinition{
-				Spec: CustomResourceDefinitionSpec{
-					Versions: []CustomResourceDefinitionVersion{
-						{Name: "v1", Served: true, Storage: true, Subresources: &CustomResourceSubresources{Scale: &CustomResourceSubresourceScale{SpecReplicasPath: "spec.replicas1"}}},
-						{Name: "v2", Served: true, Storage: false, Subresources: &CustomResourceSubresources{Scale: &CustomResourceSubresourceScale{SpecReplicasPath: "spec.replicas2"}}},
+			In: &v1.CustomResourceDefinition{
+				Spec: v1.CustomResourceDefinitionSpec{
+					Versions: []v1.CustomResourceDefinitionVersion{
+						{Name: "v1", Served: true, Storage: true, Subresources: &v1.CustomResourceSubresources{Scale: &v1.CustomResourceSubresourceScale{SpecReplicasPath: "spec.replicas1"}}},
+						{Name: "v2", Served: true, Storage: false, Subresources: &v1.CustomResourceSubresources{Scale: &v1.CustomResourceSubresourceScale{SpecReplicasPath: "spec.replicas2"}}},
 					},
 				},
 			},
@@ -302,11 +303,11 @@ func TestConversion(t *testing.T) {
 					AdditionalPrinterColumns: []apiextensions.CustomResourceColumnDefinition{{Name: "column1"}},
 				},
 			},
-			Out: &CustomResourceDefinition{},
-			ExpectOut: &CustomResourceDefinition{
-				Spec: CustomResourceDefinitionSpec{
-					Versions: []CustomResourceDefinitionVersion{
-						{Name: "v1", Served: true, Storage: true, AdditionalPrinterColumns: []CustomResourceColumnDefinition{{Name: "column1"}}},
+			Out: &v1.CustomResourceDefinition{},
+			ExpectOut: &v1.CustomResourceDefinition{
+				Spec: v1.CustomResourceDefinitionSpec{
+					Versions: []v1.CustomResourceDefinitionVersion{
+						{Name: "v1", Served: true, Storage: true, AdditionalPrinterColumns: []v1.CustomResourceColumnDefinition{{Name: "column1"}}},
 					},
 				},
 			},
@@ -321,23 +322,23 @@ func TestConversion(t *testing.T) {
 					},
 				},
 			},
-			Out: &CustomResourceDefinition{},
-			ExpectOut: &CustomResourceDefinition{
-				Spec: CustomResourceDefinitionSpec{
-					Versions: []CustomResourceDefinitionVersion{
-						{Name: "v1", Served: true, Storage: true, AdditionalPrinterColumns: []CustomResourceColumnDefinition{{Name: "column1"}}},
-						{Name: "v2", Served: false, Storage: false, AdditionalPrinterColumns: []CustomResourceColumnDefinition{{Name: "column2"}}},
+			Out: &v1.CustomResourceDefinition{},
+			ExpectOut: &v1.CustomResourceDefinition{
+				Spec: v1.CustomResourceDefinitionSpec{
+					Versions: []v1.CustomResourceDefinitionVersion{
+						{Name: "v1", Served: true, Storage: true, AdditionalPrinterColumns: []v1.CustomResourceColumnDefinition{{Name: "column1"}}},
+						{Name: "v2", Served: false, Storage: false, AdditionalPrinterColumns: []v1.CustomResourceColumnDefinition{{Name: "column2"}}},
 					},
 				},
 			},
 		},
 		{
 			Name: "v1 to internal, identical printer columns moves to top-level",
-			In: &CustomResourceDefinition{
-				Spec: CustomResourceDefinitionSpec{
-					Versions: []CustomResourceDefinitionVersion{
-						{Name: "v1", Served: true, Storage: true, AdditionalPrinterColumns: []CustomResourceColumnDefinition{{Name: "column1"}}},
-						{Name: "v2", Served: true, Storage: false, AdditionalPrinterColumns: []CustomResourceColumnDefinition{{Name: "column1"}}},
+			In: &v1.CustomResourceDefinition{
+				Spec: v1.CustomResourceDefinitionSpec{
+					Versions: []v1.CustomResourceDefinitionVersion{
+						{Name: "v1", Served: true, Storage: true, AdditionalPrinterColumns: []v1.CustomResourceColumnDefinition{{Name: "column1"}}},
+						{Name: "v2", Served: true, Storage: false, AdditionalPrinterColumns: []v1.CustomResourceColumnDefinition{{Name: "column1"}}},
 					},
 				},
 			},
@@ -356,11 +357,11 @@ func TestConversion(t *testing.T) {
 		},
 		{
 			Name: "v1 to internal, distinct printer columns remains per-version",
-			In: &CustomResourceDefinition{
-				Spec: CustomResourceDefinitionSpec{
-					Versions: []CustomResourceDefinitionVersion{
-						{Name: "v1", Served: true, Storage: true, AdditionalPrinterColumns: []CustomResourceColumnDefinition{{Name: "column1"}}},
-						{Name: "v2", Served: true, Storage: false, AdditionalPrinterColumns: []CustomResourceColumnDefinition{{Name: "column2"}}},
+			In: &v1.CustomResourceDefinition{
+				Spec: v1.CustomResourceDefinitionSpec{
+					Versions: []v1.CustomResourceDefinitionVersion{
+						{Name: "v1", Served: true, Storage: true, AdditionalPrinterColumns: []v1.CustomResourceColumnDefinition{{Name: "column1"}}},
+						{Name: "v2", Served: true, Storage: false, AdditionalPrinterColumns: []v1.CustomResourceColumnDefinition{{Name: "column2"}}},
 					},
 				},
 			},
@@ -388,11 +389,11 @@ func TestConversion(t *testing.T) {
 					},
 				},
 			},
-			Out: &CustomResourceDefinition{},
-			ExpectOut: &CustomResourceDefinition{
-				Spec: CustomResourceDefinitionSpec{
-					Versions: []CustomResourceDefinitionVersion{
-						{Name: "v1", Served: true, Storage: true, SelectableFields: []SelectableField{{JSONPath: ".spec.x"}}},
+			Out: &v1.CustomResourceDefinition{},
+			ExpectOut: &v1.CustomResourceDefinition{
+				Spec: v1.CustomResourceDefinitionSpec{
+					Versions: []v1.CustomResourceDefinitionVersion{
+						{Name: "v1", Served: true, Storage: true, SelectableFields: []v1.SelectableField{{JSONPath: ".spec.x"}}},
 					},
 				},
 			},
@@ -407,23 +408,23 @@ func TestConversion(t *testing.T) {
 					},
 				},
 			},
-			Out: &CustomResourceDefinition{},
-			ExpectOut: &CustomResourceDefinition{
-				Spec: CustomResourceDefinitionSpec{
-					Versions: []CustomResourceDefinitionVersion{
-						{Name: "v1", Served: true, Storage: true, SelectableFields: []SelectableField{{JSONPath: ".spec.x"}}},
-						{Name: "v2", Served: false, Storage: false, SelectableFields: []SelectableField{{JSONPath: ".spec.y"}}},
+			Out: &v1.CustomResourceDefinition{},
+			ExpectOut: &v1.CustomResourceDefinition{
+				Spec: v1.CustomResourceDefinitionSpec{
+					Versions: []v1.CustomResourceDefinitionVersion{
+						{Name: "v1", Served: true, Storage: true, SelectableFields: []v1.SelectableField{{JSONPath: ".spec.x"}}},
+						{Name: "v2", Served: false, Storage: false, SelectableFields: []v1.SelectableField{{JSONPath: ".spec.y"}}},
 					},
 				},
 			},
 		},
 		{
 			Name: "v1 to internal, identical selectable fields moves to top-level",
-			In: &CustomResourceDefinition{
-				Spec: CustomResourceDefinitionSpec{
-					Versions: []CustomResourceDefinitionVersion{
-						{Name: "v1", Served: true, Storage: true, SelectableFields: []SelectableField{{JSONPath: ".spec.x"}}},
-						{Name: "v2", Served: true, Storage: false, SelectableFields: []SelectableField{{JSONPath: ".spec.x"}}},
+			In: &v1.CustomResourceDefinition{
+				Spec: v1.CustomResourceDefinitionSpec{
+					Versions: []v1.CustomResourceDefinitionVersion{
+						{Name: "v1", Served: true, Storage: true, SelectableFields: []v1.SelectableField{{JSONPath: ".spec.x"}}},
+						{Name: "v2", Served: true, Storage: false, SelectableFields: []v1.SelectableField{{JSONPath: ".spec.x"}}},
 					},
 				},
 			},
@@ -442,10 +443,10 @@ func TestConversion(t *testing.T) {
 		},
 		{
 			Name: "v1 to internal, single selectable field moves to top-level",
-			In: &CustomResourceDefinition{
-				Spec: CustomResourceDefinitionSpec{
-					Versions: []CustomResourceDefinitionVersion{
-						{Name: "v1", Served: true, Storage: true, SelectableFields: []SelectableField{{JSONPath: ".spec.x"}}},
+			In: &v1.CustomResourceDefinition{
+				Spec: v1.CustomResourceDefinitionSpec{
+					Versions: []v1.CustomResourceDefinitionVersion{
+						{Name: "v1", Served: true, Storage: true, SelectableFields: []v1.SelectableField{{JSONPath: ".spec.x"}}},
 					},
 				},
 			},
@@ -463,11 +464,11 @@ func TestConversion(t *testing.T) {
 		},
 		{
 			Name: "v1 to internal, distinct selectable fields remains per-version",
-			In: &CustomResourceDefinition{
-				Spec: CustomResourceDefinitionSpec{
-					Versions: []CustomResourceDefinitionVersion{
-						{Name: "v1", Served: true, Storage: true, SelectableFields: []SelectableField{{JSONPath: ".spec.x"}}},
-						{Name: "v2", Served: true, Storage: false, SelectableFields: []SelectableField{{JSONPath: ".spec.y"}}},
+			In: &v1.CustomResourceDefinition{
+				Spec: v1.CustomResourceDefinitionSpec{
+					Versions: []v1.CustomResourceDefinitionVersion{
+						{Name: "v1", Served: true, Storage: true, SelectableFields: []v1.SelectableField{{JSONPath: ".spec.x"}}},
+						{Name: "v2", Served: true, Storage: false, SelectableFields: []v1.SelectableField{{JSONPath: ".spec.y"}}},
 					},
 				},
 			},
@@ -491,10 +492,10 @@ func TestConversion(t *testing.T) {
 					Conversion: &apiextensions.CustomResourceConversion{},
 				},
 			},
-			Out: &CustomResourceDefinition{},
-			ExpectOut: &CustomResourceDefinition{
-				Spec: CustomResourceDefinitionSpec{
-					Conversion: &CustomResourceConversion{},
+			Out: &v1.CustomResourceDefinition{},
+			ExpectOut: &v1.CustomResourceDefinition{
+				Spec: v1.CustomResourceDefinitionSpec{
+					Conversion: &v1.CustomResourceConversion{},
 				},
 			},
 		},
@@ -507,12 +508,12 @@ func TestConversion(t *testing.T) {
 					},
 				},
 			},
-			Out: &CustomResourceDefinition{},
-			ExpectOut: &CustomResourceDefinition{
-				Spec: CustomResourceDefinitionSpec{
-					Conversion: &CustomResourceConversion{
-						Webhook: &WebhookConversion{
-							ClientConfig: &WebhookClientConfig{URL: ptr.To("http://example.com")},
+			Out: &v1.CustomResourceDefinition{},
+			ExpectOut: &v1.CustomResourceDefinition{
+				Spec: v1.CustomResourceDefinitionSpec{
+					Conversion: &v1.CustomResourceConversion{
+						Webhook: &v1.WebhookConversion{
+							ClientConfig: &v1.WebhookClientConfig{URL: ptr.To("http://example.com")},
 						},
 					},
 				},
@@ -527,11 +528,11 @@ func TestConversion(t *testing.T) {
 					},
 				},
 			},
-			Out: &CustomResourceDefinition{},
-			ExpectOut: &CustomResourceDefinition{
-				Spec: CustomResourceDefinitionSpec{
-					Conversion: &CustomResourceConversion{
-						Webhook: &WebhookConversion{
+			Out: &v1.CustomResourceDefinition{},
+			ExpectOut: &v1.CustomResourceDefinition{
+				Spec: v1.CustomResourceDefinitionSpec{
+					Conversion: &v1.CustomResourceConversion{
+						Webhook: &v1.WebhookConversion{
 							ConversionReviewVersions: []string{"v1"},
 						},
 					},
@@ -540,9 +541,9 @@ func TestConversion(t *testing.T) {
 		},
 		{
 			Name: "v1 to internal, no webhook client config",
-			In: &CustomResourceDefinition{
-				Spec: CustomResourceDefinitionSpec{
-					Conversion: &CustomResourceConversion{},
+			In: &v1.CustomResourceDefinition{
+				Spec: v1.CustomResourceDefinitionSpec{
+					Conversion: &v1.CustomResourceConversion{},
 				},
 			},
 			Out: &apiextensions.CustomResourceDefinition{},
@@ -555,11 +556,11 @@ func TestConversion(t *testing.T) {
 		},
 		{
 			Name: "v1 to internal, webhook client config",
-			In: &CustomResourceDefinition{
-				Spec: CustomResourceDefinitionSpec{
-					Conversion: &CustomResourceConversion{
-						Webhook: &WebhookConversion{
-							ClientConfig: &WebhookClientConfig{URL: ptr.To("http://example.com")},
+			In: &v1.CustomResourceDefinition{
+				Spec: v1.CustomResourceDefinitionSpec{
+					Conversion: &v1.CustomResourceConversion{
+						Webhook: &v1.WebhookConversion{
+							ClientConfig: &v1.WebhookClientConfig{URL: ptr.To("http://example.com")},
 						},
 					},
 				},
@@ -576,10 +577,10 @@ func TestConversion(t *testing.T) {
 		},
 		{
 			Name: "v1 to internal, webhook versions",
-			In: &CustomResourceDefinition{
-				Spec: CustomResourceDefinitionSpec{
-					Conversion: &CustomResourceConversion{
-						Webhook: &WebhookConversion{
+			In: &v1.CustomResourceDefinition{
+				Spec: v1.CustomResourceDefinitionSpec{
+					Conversion: &v1.CustomResourceConversion{
+						Webhook: &v1.WebhookConversion{
 							ConversionReviewVersions: []string{"v1"},
 						},
 					},
@@ -637,26 +638,26 @@ func TestJSONConversion(t *testing.T) {
 
 	testCases := map[string]struct {
 		input    *apiextensions.JSONSchemaProps
-		expected *JSONSchemaProps
+		expected *v1.JSONSchemaProps
 	}{
 		"nil": {
 			input: &apiextensions.JSONSchemaProps{
 				Default: nil,
 			},
-			expected: &JSONSchemaProps{},
+			expected: &v1.JSONSchemaProps{},
 		},
 		"aliased nil": {
 			input: &apiextensions.JSONSchemaProps{
 				Default: &nilJSON,
 			},
-			expected: &JSONSchemaProps{},
+			expected: &v1.JSONSchemaProps{},
 		},
 		"null": {
 			input: &apiextensions.JSONSchemaProps{
 				Default: &nullJSON,
 			},
-			expected: &JSONSchemaProps{
-				Default: &JSON{
+			expected: &v1.JSONSchemaProps{
+				Default: &v1.JSON{
 					Raw: []byte(`"null"`),
 				},
 			},
@@ -665,8 +666,8 @@ func TestJSONConversion(t *testing.T) {
 			input: &apiextensions.JSONSchemaProps{
 				Default: &stringJSON,
 			},
-			expected: &JSONSchemaProps{
-				Default: &JSON{
+			expected: &v1.JSONSchemaProps{
+				Default: &v1.JSON{
 					Raw: []byte(`"foo"`),
 				},
 			},
@@ -675,8 +676,8 @@ func TestJSONConversion(t *testing.T) {
 			input: &apiextensions.JSONSchemaProps{
 				Default: &boolJSON,
 			},
-			expected: &JSONSchemaProps{
-				Default: &JSON{
+			expected: &v1.JSONSchemaProps{
+				Default: &v1.JSON{
 					Raw: []byte(`true`),
 				},
 			},
@@ -685,8 +686,8 @@ func TestJSONConversion(t *testing.T) {
 			input: &apiextensions.JSONSchemaProps{
 				Default: &sliceJSON,
 			},
-			expected: &JSONSchemaProps{
-				Default: &JSON{
+			expected: &v1.JSONSchemaProps{
+				Default: &v1.JSON{
 					Raw: []byte(`["foo","bar","baz"]`),
 				},
 			},
@@ -704,7 +705,7 @@ func TestJSONConversion(t *testing.T) {
 	}
 
 	for k, tc := range testCases {
-		external := &JSONSchemaProps{}
+		external := &v1.JSONSchemaProps{}
 		if err := scheme.Convert(tc.input, external, nil); err != nil {
 			t.Errorf("%s: unexpected error: %v", k, err)
 		}
@@ -744,7 +745,7 @@ func TestJSONRoundTrip(t *testing.T) {
 
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-			external := &JSONSchemaProps{}
+			external := &v1.JSONSchemaProps{}
 			if err := json.Unmarshal([]byte(tc.in), external); err != nil {
 				t.Fatal(err)
 			}
@@ -753,7 +754,7 @@ func TestJSONRoundTrip(t *testing.T) {
 			if err := scheme.Convert(external, internal, nil); err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
-			roundtripped := &JSONSchemaProps{}
+			roundtripped := &v1.JSONSchemaProps{}
 			if err := scheme.Convert(internal, roundtripped, nil); err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
@@ -774,7 +775,7 @@ func TestMemoryEqual(t *testing.T) {
 		a interface{}
 		b interface{}
 	}{
-		{apiextensions.JSONSchemaProps{}.XValidations, JSONSchemaProps{}.XValidations},
+		{apiextensions.JSONSchemaProps{}.XValidations, v1.JSONSchemaProps{}.XValidations},
 	}
 
 	for _, tc := range testcases {

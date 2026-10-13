@@ -24,8 +24,8 @@ import (
 	"sync"
 	"time"
 
-	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
-	crdclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
+	apiextensionsv1 "k8s.io/apiextensions/pkg/apis/apiextensions/v1"
+	crdclientset "k8s.io/apiextensions/pkg/client/clientset/clientset"
 
 	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 

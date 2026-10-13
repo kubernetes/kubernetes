@@ -7,6 +7,7 @@ top-level k8s.io repositories.
 Repositories currently staged here:
 
 - [`k8s.io/api`](https://github.com/kubernetes/api)
+- [`k8s.io/apiextensions`](https://github.com/kubernetes/apiextensions)
 - [`k8s.io/apiextensions-apiserver`](https://github.com/kubernetes/apiextensions-apiserver)
 - [`k8s.io/apimachinery`](https://github.com/kubernetes/apimachinery)
 - [`k8s.io/apiserver`](https://github.com/kubernetes/apiserver)

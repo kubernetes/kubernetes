@@ -21,7 +21,8 @@ import (
 	"strings"
 
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
-	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	apiextensionsv1conversion "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	apiextensionsv1 "k8s.io/apiextensions/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apiserver/pkg/cel/common"
@@ -372,7 +373,7 @@ func ConvertJSONSchemaPropsWithPostProcess(in *apiextensions.JSONSchemaProps, ou
 	}
 	if len(in.XValidations) != 0 {
 		var serializationValidationRules apiextensionsv1.ValidationRules
-		if err := apiextensionsv1.Convert_apiextensions_ValidationRules_To_v1_ValidationRules(&in.XValidations, &serializationValidationRules, nil); err != nil {
+		if err := apiextensionsv1conversion.Convert_apiextensions_ValidationRules_To_v1_ValidationRules(&in.XValidations, &serializationValidationRules, nil); err != nil {
 			return err
 		}
 		out.VendorExtensible.AddExtension("x-kubernetes-validations", convertSliceToInterfaceSlice(serializationValidationRules))
