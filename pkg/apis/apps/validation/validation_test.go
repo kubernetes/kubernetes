@@ -1627,6 +1627,46 @@ func TestValidateControllerRevisionUpdate(t *testing.T) {
 	}
 }
 
+func TestControllerRevisionDataSerialization(t *testing.T) {
+	tests := []struct {
+		name          string
+		oldData       string
+		newData       string
+		valid         bool
+		objectChanged bool
+	}{
+		{name: "object key order", oldData: `{"b":2,"a":1}`, newData: `{"a":1,"b":2}`, valid: true},
+		{name: "nested keys and whitespace", oldData: `{"spec":{"b":[1,2],"a":true}}`, newData: `{ "spec": { "a": true, "b": [1, 2] } }`, valid: true},
+		{name: "large integer unchanged", oldData: `{"b":2,"a":18446744073709551615}`, newData: `{"a":18446744073709551615,"b":2}`, valid: true},
+		{name: "large integer changed", oldData: `{"a":18446744073709551615}`, newData: `{"a":18446744073709551614}`},
+		{name: "array order changed", oldData: `{"a":[1,2]}`, newData: `{"a":[2,1]}`},
+		{name: "value changed", oldData: `{"a":1}`, newData: `{"a":2}`},
+		{name: "missing field", oldData: `{"a":null}`, newData: `{}`},
+		{name: "number spelling changed", oldData: `{"a":1}`, newData: `{"a":1.0}`},
+		{name: "invalid new JSON", oldData: `{"a":1}`, newData: `{"a":1} trailing`},
+		{name: "invalid old JSON", oldData: `{"a":1} trailing`, newData: `{"a":1}`},
+		{name: "decoded object changed", oldData: `{"b":2,"a":1}`, newData: `{"a":1,"b":2}`, objectChanged: true},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			oldHistory := &apps.ControllerRevision{
+				ObjectMeta: metav1.ObjectMeta{Name: "revision", Namespace: "default", ResourceVersion: "1"},
+				Data:       runtime.RawExtension{Raw: []byte(test.oldData)},
+			}
+			newHistory := oldHistory.DeepCopy()
+			newHistory.Data.Raw = []byte(test.newData)
+			if test.objectChanged {
+				newHistory.Data.Object = &api.Pod{}
+			}
+			newHistory.Labels = map[string]string{"updated": "true"}
+			errs := ValidateControllerRevisionUpdate(newHistory, oldHistory)
+			if (len(errs) == 0) != test.valid {
+				t.Errorf("validation errors = %v, want valid = %t", errs, test.valid)
+			}
+		})
+	}
+}
+
 func TestValidateDaemonSetStatusUpdate(t *testing.T) {
 	type dsUpdateTest struct {
 		old    apps.DaemonSet

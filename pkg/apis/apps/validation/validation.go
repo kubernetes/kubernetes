@@ -17,6 +17,7 @@ limitations under the License.
 package validation
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"strconv"
@@ -353,12 +354,28 @@ func ValidateControllerRevisionCreate(revision *apps.ControllerRevision) field.E
 // ValidateControllerRevisionUpdate collects errors pertaining to the mutation of an ControllerRevision Object. If the
 // returned ErrorList is empty the update operation is valid. Any mutation to the ControllerRevision's Data or Revision
 // is considered to be invalid.
+// JSON object key order and insignificant whitespace do not constitute a Data mutation.
 func ValidateControllerRevisionUpdate(newHistory, oldHistory *apps.ControllerRevision) field.ErrorList {
 	errs := field.ErrorList{}
 
 	errs = append(errs, apivalidation.ValidateObjectMetaUpdate(&newHistory.ObjectMeta, &oldHistory.ObjectMeta, field.NewPath("metadata"))...)
 	errs = append(errs, validateControllerRevision(newHistory)...)
-	errs = append(errs, apivalidation.ValidateImmutableField(newHistory.Data, oldHistory.Data, field.NewPath("data"))...)
+	dataErrs := apivalidation.ValidateImmutableField(newHistory.Data, oldHistory.Data, field.NewPath("data"))
+	if len(dataErrs) > 0 && apiequality.Semantic.DeepEqual(newHistory.Data.Object, oldHistory.Data.Object) &&
+		json.Valid(newHistory.Data.Raw) && json.Valid(oldHistory.Data.Raw) {
+		// Serialization may reorder object keys; preserve number spelling and precision.
+		var newData, oldData any
+		newDecoder := json.NewDecoder(bytes.NewReader(newHistory.Data.Raw))
+		newDecoder.UseNumber()
+		oldDecoder := json.NewDecoder(bytes.NewReader(oldHistory.Data.Raw))
+		oldDecoder.UseNumber()
+		newErr := newDecoder.Decode(&newData)
+		oldErr := oldDecoder.Decode(&oldData)
+		if newErr == nil && oldErr == nil && apiequality.Semantic.DeepEqual(newData, oldData) {
+			dataErrs = nil
+		}
+	}
+	errs = append(errs, dataErrs...)
 	return errs
 }
 
