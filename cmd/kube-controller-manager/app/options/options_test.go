@@ -33,7 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/version"
 
 	"k8s.io/apiserver/pkg/apis/apiserver"
-	apiserveroptions "k8s.io/apiserver/pkg/server/options"
+	apiserveroptions "k8s.io/apiserver/pkg/server/serving/options"
 	basecompatibility "k8s.io/component-base/compatibility"
 
 	componentbaseconfig "k8s.io/component-base/config"
