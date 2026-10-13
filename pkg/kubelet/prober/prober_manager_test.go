@@ -937,11 +937,8 @@ func TestUpdatePodStatusStartupProbeOnKubeletRestart(t *testing.T) {
 		// from the API server.
 		readyBeforeRestart v1.ConditionStatus
 		readinessProbe     *v1.Probe
-		// staticPod makes the pod a static pod, which carries no status from the
-		// API server.
-		staticPod       bool
-		expectedStarted bool
-		expectedReady   bool
+		expectedStarted    bool
+		expectedReady      bool
 	}{
 		{
 			name:                 "feature is disabled, the container is still in its startup period",
@@ -971,14 +968,6 @@ func TestUpdatePodStatusStartupProbeOnKubeletRestart(t *testing.T) {
 			readyBeforeRestart:   v1.ConditionTrue,
 			expectedStarted:      true,
 			expectedReady:        true,
-		},
-		{
-			// A static pod has no status to preserve Started from until its mirror
-			// pod arrives, so it keeps the legacy first-sync result.
-			name:            "feature is disabled, static pod",
-			staticPod:       true,
-			expectedStarted: true,
-			expectedReady:   true,
 		},
 		// The feature gate restores the legacy behavior: the startup probe is
 		// verified again after a restart, but the first sync, which runs before
@@ -1010,75 +999,84 @@ func TestUpdatePodStatusStartupProbeOnKubeletRestart(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ChangeContainerStatusOnKubeletRestart, tc.featureEnabled)
-
-			ctx := ktesting.Init(t)
-			m := newTestManager()
-			// no cleanup: no workers, as on the first sync after a kubelet restart.
-
-			// The runtime reports a container that started before the kubelet
-			// restart grace period, so its start time alone makes it look like a
-			// container that survived the restart.
-			startedBeforeKubeletRestart := metav1.Time{Time: kubeletRestartGracePeriod(m.start).Add(-time.Minute)}
-			// convertToAPIContainerStatuses preserves Started only while the gate is disabled.
-			var generatedStarted *bool
-			if !tc.featureEnabled && !tc.staticPod {
-				generatedStarted = tc.startedBeforeRestart
+		for _, staticPod := range []bool{false, true} {
+			name := tc.name
+			if staticPod {
+				name += ", static pod"
 			}
-			podStatus := v1.PodStatus{
-				Phase: v1.PodRunning,
-				ContainerStatuses: []v1.ContainerStatus{{
-					Name:        containerName,
-					ContainerID: containerID,
-					State: v1.ContainerState{
-						Running: &v1.ContainerStateRunning{StartedAt: startedBeforeKubeletRestart},
-					},
-					Started: generatedStarted,
-				}},
-			}
+			t.Run(name, func(t *testing.T) {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ChangeContainerStatusOnKubeletRestart, tc.featureEnabled)
 
-			pod := &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{UID: testPodUID},
-				Spec: v1.PodSpec{
-					Containers: []v1.Container{{
-						Name:           containerName,
-						StartupProbe:   defaultProbe,
-						ReadinessProbe: tc.readinessProbe,
-					}},
-				},
-				Status: v1.PodStatus{
-					Conditions: []v1.PodCondition{{
-						Type:   v1.PodReady,
-						Status: tc.readyBeforeRestart,
-					}},
+				ctx := ktesting.Init(t)
+				m := newTestManager()
+				// no cleanup: no workers, as on the first sync after a kubelet restart.
+
+				// The runtime reports a container that started before the kubelet
+				// restart grace period, so its start time alone makes it look like a
+				// container that survived the restart.
+				startedBeforeKubeletRestart := metav1.Time{Time: kubeletRestartGracePeriod(m.start).Add(-time.Minute)}
+				// convertToAPIContainerStatuses preserves Started only while the gate is disabled.
+				var generatedStarted *bool
+				// A static pod manifest carries no container statuses, so nothing is
+				// preserved for it.
+				if !tc.featureEnabled && !staticPod {
+					generatedStarted = tc.startedBeforeRestart
+				}
+				podStatus := v1.PodStatus{
+					Phase: v1.PodRunning,
 					ContainerStatuses: []v1.ContainerStatus{{
 						Name:        containerName,
 						ContainerID: containerID,
-						Ready:       tc.readyBeforeRestart == v1.ConditionTrue,
-						Started:     tc.startedBeforeRestart,
+						State: v1.ContainerState{
+							Running: &v1.ContainerStateRunning{StartedAt: startedBeforeKubeletRestart},
+						},
+						Started: generatedStarted,
 					}},
-				},
-			}
+				}
 
-			if tc.staticPod {
-				pod.Annotations = map[string]string{kubetypes.ConfigSourceAnnotationKey: kubetypes.FileSource}
-				pod.Status = v1.PodStatus{}
-			}
+				pod := &v1.Pod{
+					ObjectMeta: metav1.ObjectMeta{UID: testPodUID},
+					Spec: v1.PodSpec{
+						Containers: []v1.Container{{
+							Name:           containerName,
+							StartupProbe:   defaultProbe,
+							ReadinessProbe: tc.readinessProbe,
+						}},
+					},
+					Status: v1.PodStatus{
+						Conditions: []v1.PodCondition{{
+							Type:   v1.PodReady,
+							Status: tc.readyBeforeRestart,
+						}},
+						ContainerStatuses: []v1.ContainerStatus{{
+							Name:        containerName,
+							ContainerID: containerID,
+							Ready:       tc.readyBeforeRestart == v1.ConditionTrue,
+							Started:     tc.startedBeforeRestart,
+						}},
+					},
+				}
 
-			m.UpdatePodStatus(ctx, pod, &podStatus)
+				// The pod passed to the probe manager carries the API status. For a
+				// static pod, that is the status of its mirror pod.
+				if staticPod {
+					pod.Annotations = map[string]string{kubetypes.ConfigSourceAnnotationKey: kubetypes.FileSource}
+				}
 
-			got := podStatus.ContainerStatuses[0]
-			if got.Started == nil {
-				t.Fatalf("Unexpected started for container %v: expected %v but got nil", containerName, tc.expectedStarted)
-			}
-			if *got.Started != tc.expectedStarted {
-				t.Errorf("Unexpected started for container %v: expected %v but got %v", containerName, tc.expectedStarted, *got.Started)
-			}
-			if got.Ready != tc.expectedReady {
-				t.Errorf("Unexpected readiness for container %v: expected %v but got %v", containerName, tc.expectedReady, got.Ready)
-			}
-		})
+				m.UpdatePodStatus(ctx, pod, &podStatus)
+
+				got := podStatus.ContainerStatuses[0]
+				if got.Started == nil {
+					t.Fatalf("Unexpected started for container %v: expected %v but got nil", containerName, tc.expectedStarted)
+				}
+				if *got.Started != tc.expectedStarted {
+					t.Errorf("Unexpected started for container %v: expected %v but got %v", containerName, tc.expectedStarted, *got.Started)
+				}
+				if got.Ready != tc.expectedReady {
+					t.Errorf("Unexpected readiness for container %v: expected %v but got %v", containerName, tc.expectedReady, got.Ready)
+				}
+			})
+		}
 	}
 }
 
