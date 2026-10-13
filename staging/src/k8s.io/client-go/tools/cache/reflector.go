@@ -814,7 +814,10 @@ func (r *Reflector) watchList(ctx context.Context) (watch.Interface, error) {
 	isErrorRetriableWithSideEffectsFn := func(err error) bool {
 		if canRetry := isWatchErrorRetriable(err); canRetry {
 			logger.V(2).Info("watch-list failed - backing off", "reflector", r.name, "type", r.typeDescription, "err", err)
-			<-r.clock.After(r.delayHandler())
+			select {
+			case <-stopCh:
+			case <-r.clock.After(r.delayHandler()):
+			}
 			return true
 		}
 		if isExpiredError(err) || isTooLargeResourceVersionError(err) {

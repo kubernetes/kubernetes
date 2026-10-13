@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"sort"
 	"sync"
+	"syscall"
 	"testing"
 	"time"
 
@@ -94,6 +95,77 @@ func TestNewReflectorWithDisablementWatchList(t *testing.T) {
 
 			if r.useWatchList != scenario.expectUseWatchListValue {
 				t.Fatalf("got: %v, want: %v", r.useWatchList, scenario.expectUseWatchListValue)
+			}
+		})
+	}
+}
+
+func TestWatchListCancellationDuringBackoff(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		requestErr  error
+		streamError bool
+	}{
+		{name: "request throttled", requestErr: apierrors.NewTooManyRequests("throttled", 1)},
+		{name: "connection refused", requestErr: fmt.Errorf("dial: %w", syscall.ECONNREFUSED)},
+		{name: "stream throttled", streamError: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			fakeClock := testingclock.NewFakeClock(time.Now())
+			store := NewStore(MetaNamespaceKeyFunc)
+			original := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "original", ResourceVersion: "10"}}
+			require.NoError(t, store.Add(original))
+			watchCalls, listCalls := 0, 0
+			var stream *watch.FakeWatcher
+			lw := &ListWatch{
+				ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+					listCalls++
+					return nil, errors.New("unexpected LIST after cancellation")
+				},
+				WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+					watchCalls++
+					if !tc.streamError {
+						return nil, tc.requestErr
+					}
+					stream = watch.NewFakeWithChanSize(2, false)
+					stream.Add(&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "partial", ResourceVersion: "11"}})
+					status := apierrors.NewTooManyRequests("throttled", 1).Status()
+					stream.Error(&status)
+					return stream, nil
+				},
+			}
+			r := NewReflector(lw, &v1.Pod{}, store, 0)
+			r.useWatchList = true
+			r.clock = fakeClock
+			r.delayHandler = func() time.Duration { return time.Hour }
+			r.setLastSyncResourceVersion("10")
+			done := make(chan struct{})
+			var result error
+			go func() {
+				defer close(done)
+				result = r.ListAndWatchWithContext(ctx)
+			}()
+			t.Cleanup(func() {
+				cancel()
+				fakeClock.Step(time.Hour)
+				<-done
+			})
+			require.Eventually(t, fakeClock.HasWaiters, time.Second, time.Millisecond)
+			cancel()
+			select {
+			case <-done:
+				require.NoError(t, result)
+				require.Equal(t, 1, watchCalls)
+				require.Zero(t, listCalls)
+				require.Equal(t, "10", r.LastSyncResourceVersion())
+				require.Equal(t, []interface{}{original}, store.List())
+				if stream != nil {
+					require.True(t, stream.IsStopped())
+				}
+			case <-time.After(time.Second):
+				t.Error("reflector did not stop on cancellation while its backoff timer was pending")
 			}
 		})
 	}
