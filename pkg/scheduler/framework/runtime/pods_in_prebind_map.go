@@ -40,20 +40,45 @@ func NewPodsInPreBindMap() *podsInPreBindMap {
 
 // get returns a pod from the map if it exists.
 func (pbm *podsInPreBindMap) get(uid types.UID) *podInPreBind {
+	if pbm == nil {
+		return nil
+	}
 	pbm.mu.RLock()
 	defer pbm.mu.RUnlock()
 	return pbm.pods[uid]
 }
 
-// add adds a pod to map, overwriting existing one.
+// add adds a pod to map, or attaches a cancel function to an existing uncommitted entry.
 func (pbm *podsInPreBindMap) add(uid types.UID, cancel context.CancelCauseFunc) {
+	if pbm == nil {
+		return
+	}
 	pbm.mu.Lock()
 	defer pbm.mu.Unlock()
+	if cancel != nil {
+		if existing, ok := pbm.pods[uid]; ok {
+			existing.mu.Lock()
+			if !existing.finished {
+				if existing.canceled {
+					cancel(existing.cause)
+					existing.mu.Unlock()
+					return
+				}
+				existing.cancel = cancel
+				existing.mu.Unlock()
+				return
+			}
+			existing.mu.Unlock()
+		}
+	}
 	pbm.pods[uid] = &podInPreBind{cancel: cancel}
 }
 
 // remove removes a pod from the map.
 func (pbm *podsInPreBindMap) remove(uid types.UID) {
+	if pbm == nil {
+		return
+	}
 	pbm.mu.Lock()
 	defer pbm.mu.Unlock()
 	delete(pbm.pods, uid)
@@ -65,6 +90,7 @@ var _ fwk.PodInPreBind = &podInPreBind{}
 type podInPreBind struct {
 	finished bool
 	canceled bool
+	cause    error
 	cancel   context.CancelCauseFunc
 	mu       sync.Mutex
 }
@@ -78,7 +104,11 @@ func (bp *podInPreBind) CancelPod(message string) bool {
 		return false
 	}
 	if !bp.canceled {
-		bp.cancel(errors.New(message))
+		bp.cause = errors.New(message)
+		if bp.cancel != nil {
+			bp.cancel(bp.cause)
+			bp.cancel = nil
+		}
 	}
 	bp.canceled = true
 	return true

@@ -83,9 +83,10 @@ type Executor struct {
 	// to prevent the pods/podgroups from entering the scheduling cycle while waiting for preemption to complete.
 	lastVictimsPendingPreemption map[types.UID]pendingVictim
 
-	// PreemptPod is a function that actually preempts a specific Pod. It returns true
-	// when the victim was preempted only in scheduler memory, without a delete call.
-	// This is exposed to be replaced during tests.
+	// PreemptPod is a function that preempts a specific Pod. It returns true
+	// when the API server deletes a bound victim and will emit a pod deletion event,
+	// and false when no deletion event will follow.
+	// When you run tests, you can replace this function.
 	PreemptPod func(ctx context.Context, c fwk.PreemptionCandidate, preemptor ExecutorPreemptor, victim *v1.Pod, pluginName string) (bool, error)
 }
 
@@ -113,13 +114,16 @@ func NewExecutor(fh fwk.Handle, fts feature.Features) *Executor {
 				logger.V(2).Info("Preemptor preempted a waiting pod", "preemptorType", preemptor.Type(), "preemptor", klog.KObj(preemptor), "waitingPod", klog.KObj(victim), "node", c.Name())
 				preemptedInMemory = true
 			}
-		} else if podInPreBind := e.fh.GetPodInPreBind(victim.UID); podInPreBind != nil {
-			// If the victim is in the preBind cancel the binding process.
-			if podInPreBind.CancelPod(fmt.Sprintf("preempted by %s", pluginName)) {
-				logger.V(2).Info("Preemptor rejected a pod in preBind", "preemptorType", preemptor.Type(), "preemptor", klog.KObj(preemptor), "podInPreBind", klog.KObj(victim), "node", c.Name())
-				preemptedInMemory = true
-			} else {
-				logger.V(5).Info("Failed to reject a pod in preBind, falling back to deletion via api call", "preemptor", klog.KObj(preemptor), "podInPreBind", klog.KObj(victim), "node", c.Name())
+		}
+		if !preemptedInMemory {
+			if podInPreBind := e.fh.GetPodInPreBind(victim.UID); podInPreBind != nil {
+				// If the victim is in the binding cycle or was already rejected in memory, cancel the binding process.
+				if podInPreBind.CancelPod(fmt.Sprintf("preempted by %s", pluginName)) {
+					logger.V(2).Info("Preemptor rejected a pod in preBind", "preemptorType", preemptor.Type(), "preemptor", klog.KObj(preemptor), "podInPreBind", klog.KObj(victim), "node", c.Name())
+					preemptedInMemory = true
+				} else {
+					logger.V(5).Info("Failed to reject a pod in preBind, falling back to deletion via api call", "preemptor", klog.KObj(preemptor), "podInPreBind", klog.KObj(victim), "node", c.Name())
+				}
 			}
 		}
 		if !preemptedInMemory {
@@ -157,7 +161,7 @@ func NewExecutor(fh fwk.Handle, fts feature.Features) *Executor {
 
 		fh.EventRecorder().WithLogger(logger).Eventf(victim, preemptor.Obj(), v1.EventTypeNormal, "Preempted", "Preempting", eventMessage)
 
-		return preemptedInMemory, nil
+		return !preemptedInMemory, nil
 	}
 
 	return e
@@ -214,7 +218,7 @@ func (e *Executor) prepareCandidateAsync(c fwk.PreemptionCandidate, preemptor Ex
 
 	errCh := parallelize.NewResultChannel[error]()
 	// PreEnqueue only watches the last victim for completion, so activate when that victim won't emit a deletion event.
-	preemptedLastVictimInMemory := false
+	willProduceDeletionEvent := false
 	preemptPod := func(index int) {
 		victim := victimPods[index]
 		if _, err := e.PreemptPod(ctx, c, preemptor, victim, pluginName); err != nil {
@@ -240,7 +244,7 @@ func (e *Executor) prepareCandidateAsync(c fwk.PreemptionCandidate, preemptor Ex
 			metrics.PreemptionGoroutinesExecutionTotal.WithLabelValues(result).Inc()
 		}()
 		defer func() {
-			if result == metrics.GoroutineResultError || preemptedLastVictimInMemory {
+			if result == metrics.GoroutineResultError || !willProduceDeletionEvent {
 				// When API call isn't successful or no victim deletion event will be produced, the preemptor's
 				// Pods may get stuck in the unschedulable pod pool in the worst case.
 				e.fh.Activate(logger, preemptor.Pods())
@@ -289,12 +293,11 @@ func (e *Executor) prepareCandidateAsync(c fwk.PreemptionCandidate, preemptor Ex
 			e.lastVictimsPendingPreemption[preemptor.UID()] = pendingVictim{namespace: lastVictim.Namespace, name: lastVictim.Name}
 			e.mu.Unlock()
 
-			preemptedInMemory, err := e.PreemptPod(ctx, c, preemptor, lastVictim, pluginName)
+			var err error
+			willProduceDeletionEvent, err = e.PreemptPod(ctx, c, preemptor, lastVictim, pluginName)
 			if err != nil {
 				utilruntime.HandleErrorWithContext(ctx, err, "Error occurred during async preemption of the last victim")
 				result = metrics.GoroutineResultError
-			} else if preemptedInMemory {
-				preemptedLastVictimInMemory = true
 			}
 		}
 		e.mu.Lock()

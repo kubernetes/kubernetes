@@ -448,6 +448,7 @@ func TestPrepareCandidate(t *testing.T) {
 			nodeNames:             []string{node1Name},
 			expectedStatus:        nil,
 			expectedPreemptingMap: sets.New(types.UID("preemptor")),
+			expectedActivatedPods: map[string]*v1.Pod{preemptor.Name: preemptor},
 		},
 		{
 			name: "one victim with same condition",
@@ -1439,32 +1440,61 @@ func TestPreemptPod(t *testing.T) {
 	victimPod := st.MakePod().Name("v").UID("v").Priority(midPriority).Obj()
 
 	tests := []struct {
-		name               string
-		addVictimToPrebind bool
-		addVictimToWaiting bool
-		expectCancel       bool
-		expectedActions    []string
+		name                         string
+		addVictimToPrebind           bool
+		cancelVictimInPrebind        bool
+		addVictimToWaiting           bool
+		rejectWaitingVictim          bool
+		notFoundOnPatch              bool
+		notFoundOnDelete             bool
+		expectCancel                 bool
+		wantWillProduceDeletionEvent bool
+		expectedActions              []string
 	}{
 		{
-			name:               "victim is in preBind, context should be cancelled",
-			addVictimToPrebind: true,
-			addVictimToWaiting: false,
-			expectCancel:       true,
-			expectedActions:    []string{},
+			name:                         "victim is in preBind, context should be cancelled",
+			addVictimToPrebind:           true,
+			expectCancel:                 true,
+			wantWillProduceDeletionEvent: false,
+			expectedActions:              []string{},
 		},
 		{
-			name:               "victim is in waiting pods, it should be rejected (no calls to apiserver)",
-			addVictimToPrebind: false,
-			addVictimToWaiting: true,
-			expectCancel:       false,
-			expectedActions:    []string{},
+			name:                         "Trigger C: victim in preBind was already cancelled, returns false without API delete",
+			addVictimToPrebind:           true,
+			cancelVictimInPrebind:        true,
+			expectCancel:                 true,
+			wantWillProduceDeletionEvent: false,
+			expectedActions:              []string{},
 		},
 		{
-			name:               "victim is not in waiting/preBind pods, pod should be deleted",
-			addVictimToPrebind: false,
-			addVictimToWaiting: false,
-			expectCancel:       false,
-			expectedActions:    []string{"patch", "delete"},
+			name:                         "victim is in waiting pods, it should be rejected (no calls to apiserver)",
+			addVictimToWaiting:           true,
+			wantWillProduceDeletionEvent: false,
+			expectedActions:              []string{},
+		},
+		{
+			name:                         "Trigger C: waiting victim was already rejected in memory, returns false without API delete",
+			addVictimToWaiting:           true,
+			rejectWaitingVictim:          true,
+			wantWillProduceDeletionEvent: false,
+			expectedActions:              []string{},
+		},
+		{
+			name:                         "victim is not in waiting/preBind pods, pod should be deleted",
+			wantWillProduceDeletionEvent: true,
+			expectedActions:              []string{"patch", "delete"},
+		},
+		{
+			name:                         "Trigger B: victim is already deleted from apiserver when patching, returns false without error",
+			notFoundOnPatch:              true,
+			wantWillProduceDeletionEvent: false,
+			expectedActions:              []string{"patch"},
+		},
+		{
+			name:                         "Trigger B: victim is already deleted from apiserver when deleting, returns false without error",
+			notFoundOnDelete:             true,
+			wantWillProduceDeletionEvent: false,
+			expectedActions:              []string{"patch", "delete"},
 		},
 	}
 
@@ -1478,13 +1508,24 @@ func TestPreemptPod(t *testing.T) {
 					tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 					tf.RegisterPermitPlugin(waitingPermitPluginName, newWaitingPermitPlugin),
 				)
-				objs := []runtime.Object{preemptorPod, victimPod}
+				victimCopy := victimPod.DeepCopy()
+				objs := []runtime.Object{preemptorPod, victimCopy}
 				if preemptorType != "pod" {
 					for _, p := range preemptorPods {
 						objs = append(objs, p)
 					}
 				}
 				cs := clientsetfake.NewClientset(objs...)
+				if tt.notFoundOnPatch {
+					cs.PrependReactor("patch", "pods", func(action clienttesting.Action) (bool, runtime.Object, error) {
+						return true, nil, apierrors.NewNotFound(v1.Resource("pods"), victimCopy.Name)
+					})
+				}
+				if tt.notFoundOnDelete {
+					cs.PrependReactor("delete", "pods", func(action clienttesting.Action) (bool, runtime.Object, error) {
+						return true, nil, apierrors.NewNotFound(v1.Resource("pods"), victimCopy.Name)
+					})
+				}
 				informerFactory := informers.NewSharedInformerFactory(cs, 0)
 				eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: cs.EventsV1()})
 				logger, ctx := ktesting.NewTestContext(t)
@@ -1507,14 +1548,20 @@ func TestPreemptPod(t *testing.T) {
 				var cancel context.CancelCauseFunc
 				if tt.addVictimToPrebind {
 					victimCtx, cancel = context.WithCancelCause(context.Background())
-					schedFramework.AddPodInPreBind(victimPod.UID, cancel)
+					schedFramework.AddPodInPreBind(victimCopy.UID, cancel)
+					if tt.cancelVictimInPrebind {
+						schedFramework.GetPodInPreBind(victimCopy.UID).CancelPod("already cancelled")
+					}
 				}
 				if tt.addVictimToWaiting {
-					pluginsWaitTime, status := schedFramework.RunPermitPlugins(ctx, framework.NewCycleState(), victimPod, "fake-node")
+					pluginsWaitTime, status := schedFramework.RunPermitPlugins(ctx, framework.NewCycleState(), victimCopy, "fake-node")
 					if !status.IsWait() {
 						t.Fatalf("Failed to add a pod to waiting list")
 					}
-					schedFramework.AddWaitingPod(victimPod, pluginsWaitTime)
+					schedFramework.AddWaitingPod(victimCopy, pluginsWaitTime)
+					if tt.rejectWaitingVictim {
+						schedFramework.GetWaitingPod(victimCopy.UID).Reject(waitingPermitPluginName, "rejected")
+					}
 				}
 				pe := NewExecutor(schedFramework, feature.Features{})
 
@@ -1526,12 +1573,12 @@ func TestPreemptPod(t *testing.T) {
 					preemptor = &podExecutorPreemptor{Pod: preemptorPod}
 				}
 
-				preemptedInMemory, err := pe.PreemptPod(ctx, &candidate{name: "fake-node"}, preemptor, victimPod, "test-plugin")
+				willProduceDeletionEvent, err := pe.PreemptPod(ctx, &candidate{name: "fake-node"}, preemptor, victimCopy, "test-plugin")
 				if err != nil {
 					t.Fatal(err)
 				}
-				if preemptedInMemory != (tt.addVictimToPrebind || tt.addVictimToWaiting) {
-					t.Errorf("PreemptPod() preemptedInMemory = %v, want %v", preemptedInMemory, tt.addVictimToPrebind || tt.addVictimToWaiting)
+				if willProduceDeletionEvent != tt.wantWillProduceDeletionEvent {
+					t.Errorf("PreemptPod() willProduceDeletionEvent = %v, want %v", willProduceDeletionEvent, tt.wantWillProduceDeletionEvent)
 				}
 				if tt.expectCancel {
 					if victimCtx.Err() == nil {
@@ -1546,10 +1593,10 @@ func TestPreemptPod(t *testing.T) {
 				// check if the API call was made
 				actions := cs.Actions()
 				if len(actions) != len(tt.expectedActions) {
-					t.Errorf("Expected %d actions, but got %d", len(tt.expectedActions), len(actions))
+					t.Errorf("Expected %d actions, but got %d: %v", len(tt.expectedActions), len(actions), actions)
 				}
 				for i, action := range actions {
-					if action.GetVerb() != tt.expectedActions[i] {
+					if i < len(tt.expectedActions) && action.GetVerb() != tt.expectedActions[i] {
 						t.Errorf("Expected action %s, but got %s", tt.expectedActions[i], action.GetVerb())
 					}
 				}
@@ -1566,6 +1613,10 @@ func TestPrepareCandidateAsyncActivatesPreemptorAfterLastVictimInMemoryPreemptio
 	waitingVictim := st.MakePod().Name("waiting-v").UID("waiting-v").Priority(midPriority).Node("node1").Obj()
 	preBindVictim := st.MakePod().Name("prebind-v").UID("prebind-v").Priority(midPriority).Node("node1").Obj()
 	apiVictim := st.MakePod().Name("api-v").UID("api-v").Priority(midPriority).Node("node1").Obj()
+	gracePeriodSec := int64(30)
+	gracePeriodVictim := st.MakePod().Name("grace-v").UID("grace-v").Priority(midPriority).Node("node1").TerminationGracePeriodSeconds(gracePeriodSec).Obj()
+	notFoundPatchVictim := st.MakePod().Name("not-found-patch-v").UID("not-found-patch-v").Priority(midPriority).Node("node1").Obj()
+	notFoundDeleteVictim := st.MakePod().Name("not-found-delete-v").UID("not-found-delete-v").Priority(midPriority).Node("node1").Obj()
 
 	tests := []struct {
 		name                        string
@@ -1574,6 +1625,7 @@ func TestPrepareCandidateAsyncActivatesPreemptorAfterLastVictimInMemoryPreemptio
 		addVictimToPrebind          bool
 		addVictimToPrebindOnPreempt bool
 		addVictimToWaiting          bool
+		rejectWaitingVictim         bool
 		preemptorGenericPodGroup    *fwk.GenericPodGroup
 		preemptorPods               []*v1.Pod
 		wantPreemptorActivate       bool
@@ -1583,6 +1635,14 @@ func TestPrepareCandidateAsyncActivatesPreemptorAfterLastVictimInMemoryPreemptio
 			victimPods:            []*v1.Pod{waitingVictim},
 			inMemoryVictim:        waitingVictim,
 			addVictimToWaiting:    true,
+			wantPreemptorActivate: true,
+		},
+		{
+			name:                  "Trigger C: last waiting pod already rejected before PreemptPod",
+			victimPods:            []*v1.Pod{waitingVictim.DeepCopy()},
+			inMemoryVictim:        waitingVictim.DeepCopy(),
+			addVictimToWaiting:    true,
+			rejectWaitingVictim:   true,
 			wantPreemptorActivate: true,
 		},
 		{
@@ -1625,6 +1685,72 @@ func TestPrepareCandidateAsyncActivatesPreemptorAfterLastVictimInMemoryPreemptio
 			wantPreemptorActivate:    true,
 		},
 		{
+			name:                     "last preBind pod for pod group",
+			victimPods:               []*v1.Pod{preBindVictim.DeepCopy()},
+			inMemoryVictim:           preBindVictim.DeepCopy(),
+			addVictimToPrebind:       true,
+			preemptorGenericPodGroup: fwk.NewGenericPodGroup(preemptorPodGroup),
+			preemptorPods:            []*v1.Pod{preemptorPod.DeepCopy(), secondPreemptorPod.DeepCopy()},
+			wantPreemptorActivate:    true,
+		},
+		{
+			name:                     "last preBind pod for composite pod group",
+			victimPods:               []*v1.Pod{preBindVictim.DeepCopy()},
+			inMemoryVictim:           preBindVictim.DeepCopy(),
+			addVictimToPrebind:       true,
+			preemptorGenericPodGroup: fwk.NewGenericCompositePodGroup(preemptorCompositePodGroup),
+			preemptorPods:            []*v1.Pod{preemptorPod.DeepCopy(), secondPreemptorPod.DeepCopy()},
+			wantPreemptorActivate:    true,
+		},
+		{
+			name:                  "Trigger B: last victim already deleted (NotFound on patch) for pod",
+			victimPods:            []*v1.Pod{notFoundPatchVictim.DeepCopy()},
+			wantPreemptorActivate: true,
+		},
+		{
+			name:                  "Trigger B: last victim already deleted (NotFound on delete) for pod",
+			victimPods:            []*v1.Pod{notFoundDeleteVictim.DeepCopy()},
+			wantPreemptorActivate: true,
+		},
+		{
+			name:                  "Trigger B: last victim already deleted (NotFound) after in-memory waiting victim",
+			victimPods:            []*v1.Pod{waitingVictim.DeepCopy(), notFoundDeleteVictim.DeepCopy()},
+			inMemoryVictim:        waitingVictim.DeepCopy(),
+			addVictimToWaiting:    true,
+			wantPreemptorActivate: true,
+		},
+		{
+			name:                  "Trigger B: last victim already deleted (NotFound) after API-deleted victim",
+			victimPods:            []*v1.Pod{apiVictim.DeepCopy(), notFoundDeleteVictim.DeepCopy()},
+			wantPreemptorActivate: true,
+		},
+		{
+			name:                     "Trigger B: last victim already deleted (NotFound) for pod group",
+			victimPods:               []*v1.Pod{notFoundDeleteVictim.DeepCopy()},
+			preemptorGenericPodGroup: fwk.NewGenericPodGroup(preemptorPodGroup),
+			preemptorPods:            []*v1.Pod{preemptorPod.DeepCopy(), secondPreemptorPod.DeepCopy()},
+			wantPreemptorActivate:    true,
+		},
+		{
+			name:                     "Trigger B: last victim already deleted (NotFound) for composite pod group",
+			victimPods:               []*v1.Pod{notFoundDeleteVictim.DeepCopy()},
+			preemptorGenericPodGroup: fwk.NewGenericCompositePodGroup(preemptorCompositePodGroup),
+			preemptorPods:            []*v1.Pod{preemptorPod.DeepCopy(), secondPreemptorPod.DeepCopy()},
+			wantPreemptorActivate:    true,
+		},
+		{
+			name:                  "R3: bound victim with non-zero termination grace period for pod",
+			victimPods:            []*v1.Pod{gracePeriodVictim.DeepCopy()},
+			wantPreemptorActivate: false,
+		},
+		{
+			name:                     "R3: bound victim with non-zero termination grace period for pod group",
+			victimPods:               []*v1.Pod{gracePeriodVictim.DeepCopy()},
+			preemptorGenericPodGroup: fwk.NewGenericPodGroup(preemptorPodGroup),
+			preemptorPods:            []*v1.Pod{preemptorPod.DeepCopy(), secondPreemptorPod.DeepCopy()},
+			wantPreemptorActivate:    false,
+		},
+		{
 			name:               "non-last waiting pod",
 			victimPods:         []*v1.Pod{waitingVictim.DeepCopy(), apiVictim.DeepCopy()},
 			inMemoryVictim:     waitingVictim.DeepCopy(),
@@ -1635,6 +1761,10 @@ func TestPrepareCandidateAsyncActivatesPreemptorAfterLastVictimInMemoryPreemptio
 			victimPods:         []*v1.Pod{preBindVictim.DeepCopy(), apiVictim.DeepCopy()},
 			inMemoryVictim:     preBindVictim.DeepCopy(),
 			addVictimToPrebind: true,
+		},
+		{
+			name:       "non-last NotFound pod followed by bound API-deleted victim",
+			victimPods: []*v1.Pod{notFoundDeleteVictim.DeepCopy(), apiVictim.DeepCopy()},
 		},
 	}
 
@@ -1676,6 +1806,18 @@ func TestPrepareCandidateAsyncActivatesPreemptorAfterLastVictimInMemoryPreemptio
 				podsForSnapshot = append(podsForSnapshot, pod)
 			}
 			cs := clientsetfake.NewClientset(objects...)
+			cs.PrependReactor("patch", "pods", func(action clienttesting.Action) (bool, runtime.Object, error) {
+				if action.(clienttesting.PatchAction).GetName() == notFoundPatchVictim.Name {
+					return true, nil, apierrors.NewNotFound(v1.Resource("pods"), notFoundPatchVictim.Name)
+				}
+				return false, nil, nil
+			})
+			cs.PrependReactor("delete", "pods", func(action clienttesting.Action) (bool, runtime.Object, error) {
+				if action.(clienttesting.DeleteAction).GetName() == notFoundDeleteVictim.Name {
+					return true, nil, apierrors.NewNotFound(v1.Resource("pods"), notFoundDeleteVictim.Name)
+				}
+				return false, nil, nil
+			})
 			informerFactory := informers.NewSharedInformerFactory(cs, 0)
 			eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: cs.EventsV1()})
 
@@ -1708,6 +1850,9 @@ func TestPrepareCandidateAsyncActivatesPreemptorAfterLastVictimInMemoryPreemptio
 					t.Fatalf("Failed to add a pod to waiting list")
 				}
 				schedFwk.AddWaitingPod(tt.inMemoryVictim, pluginsWaitTime)
+				if tt.rejectWaitingVictim {
+					schedFwk.GetWaitingPod(tt.inMemoryVictim.UID).Reject(waitingPermitPluginName, "rejected")
+				}
 			}
 
 			executor := NewExecutor(schedFwk, feature.Features{EnableAsyncPreemption: true})
