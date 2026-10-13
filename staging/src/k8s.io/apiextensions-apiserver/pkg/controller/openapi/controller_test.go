@@ -28,6 +28,7 @@ import (
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/fake"
 	"k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions"
+	"k8s.io/kube-openapi/pkg/cached"
 	"k8s.io/kube-openapi/pkg/handler"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -341,7 +342,7 @@ func setup(t *testing.T) (*testEnv, context.Context) {
 	stopCh := make(chan struct{})
 
 	env.runFunc = func() {
-		go c.Run(&spec.Swagger{
+		go c.Run(cached.Static(&spec.Swagger{
 			SwaggerProps: spec.SwaggerProps{
 				Paths: &spec.Paths{
 					Paths: map[string]spec.PathItem{
@@ -349,7 +350,7 @@ func setup(t *testing.T) (*testEnv, context.Context) {
 					},
 				},
 			},
-		}, h, stopCh)
+		}, "static"), h, stopCh)
 	}
 
 	env.cleanFunc = func() {
