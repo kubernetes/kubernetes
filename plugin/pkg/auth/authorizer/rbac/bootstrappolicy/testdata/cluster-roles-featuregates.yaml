@@ -1043,6 +1043,13 @@ items:
     - patch
     - update
   - apiGroups:
+    - resource.k8s.io
+    resources:
+    - resourceclaims/driver
+    verbs:
+    - arbitrary-node:patch
+    - arbitrary-node:update
+  - apiGroups:
     - scheduling.k8s.io
     resources:
     - podgroups

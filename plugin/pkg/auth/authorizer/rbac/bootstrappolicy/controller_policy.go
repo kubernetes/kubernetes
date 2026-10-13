@@ -216,7 +216,12 @@ func buildControllerRoles() ([]rbacv1.ClusterRole, []rbacv1.ClusterRoleBinding) 
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.DRAResourceClaimGranularStatusAuthorization) {
 		rules = append(rules,
+			// Modifying status.allocation and status.reservedFor requires binding permission.
 			rbacv1helpers.NewRule("update", "patch").Groups(resourceGroup).Resources("resourceclaims/binding").RuleOrDie(),
+			// Resource claim controller runs outside of any node and may clear
+			// status.devices when deallocating a claim, so it needs arbitrary-node
+			// permission on the synthetic driver subresource.
+			rbacv1helpers.NewRule("arbitrary-node:update", "arbitrary-node:patch").Groups(resourceGroup).Resources("resourceclaims/driver").RuleOrDie(),
 		)
 	}
 	addControllerRole(&controllerRoles, &controllerRoleBindings, rbacv1.ClusterRole{
