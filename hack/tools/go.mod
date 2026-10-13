@@ -58,6 +58,7 @@ require (
 	golang.org/x/term v0.40.0 // indirect
 	golang.org/x/text v0.34.0 // indirect
 	golang.org/x/tools v0.51.0 // indirect
+	golang.org/x/vuln v1.8.0 // indirect
 	google.golang.org/grpc/cmd/protoc-gen-go-grpc v1.6.2 // indirect
 	google.golang.org/protobuf v1.36.12 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
@@ -77,6 +78,7 @@ tool (
 	github.com/vektra/mockery/v3
 	golang.org/x/mod/modfile
 	golang.org/x/tools/cmd/goimports
+	golang.org/x/vuln/cmd/govulncheck
 	google.golang.org/grpc/cmd/protoc-gen-go-grpc
 	google.golang.org/protobuf/cmd/protoc-gen-go
 	gotest.tools/gotestsum
