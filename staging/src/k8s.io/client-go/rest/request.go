@@ -1064,14 +1064,14 @@ func (r *Request) request(ctx context.Context, fn func(*http.Request, *http.Resp
 	}
 
 	isErrRetryableFunc := func(req *http.Request, err error) bool {
-		// "Connection reset by peer" or "apiserver is shutting down" are usually a transient errors.
+		// Connection resets, network timeouts, and apiserver shutdowns are usually transient errors.
 		// Thus in case of "GET" operations, we simply retry it.
 		// We are not automatically retrying "write" operations, as they are not idempotent.
 		if req.Method != "GET" {
 			return false
 		}
-		// For connection errors and apiserver shutdown errors retry.
-		if net.IsConnectionReset(err) || net.IsProbableEOF(err) || net.IsHTTP2ConnectionLost(err) {
+		// For connection errors, network timeouts, and apiserver shutdown errors retry.
+		if net.IsConnectionReset(err) || net.IsProbableEOF(err) || net.IsHTTP2ConnectionLost(err) || net.IsTimeout(err) {
 			return true
 		}
 		return false

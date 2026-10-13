@@ -65,6 +65,81 @@ import (
 	testingclock "k8s.io/utils/clock/testing"
 )
 
+func TestRequestRetriesTLSHandshakeTimeout(t *testing.T) {
+	for _, tc := range []struct {
+		name         string
+		verb         string
+		maxRetries   int
+		wantDials    int32
+		wantTimeout  bool
+		wantDeadline bool
+	}{
+		{name: "GET recovers", verb: http.MethodGet, maxRetries: 2, wantDials: 2},
+		{name: "GET retries disabled", verb: http.MethodGet, wantDials: 1, wantTimeout: true},
+		{name: "POST is not replayed", verb: http.MethodPost, maxRetries: 2, wantDials: 1, wantTimeout: true},
+		{name: "PUT is not replayed", verb: http.MethodPut, maxRetries: 2, wantDials: 1, wantTimeout: true},
+		{name: "DELETE is not replayed", verb: http.MethodDelete, maxRetries: 2, wantDials: 1, wantTimeout: true},
+		{name: "PATCH is not replayed", verb: http.MethodPatch, maxRetries: 2, wantDials: 1, wantTimeout: true},
+		{name: "GET respects deadline", verb: http.MethodGet, maxRetries: 2, wantDials: 1, wantDeadline: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var dials, requests int32
+			server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+				atomic.AddInt32(&requests, 1)
+				_, _ = w.Write([]byte("ok"))
+			}))
+			t.Cleanup(server.Close)
+			transport := server.Client().Transport.(*http.Transport).Clone()
+			t.Cleanup(transport.CloseIdleConnections)
+			transport.TLSHandshakeTimeout = 100 * time.Millisecond
+			firstConnection, blackhole := net.Pipe()
+			drained := make(chan struct{})
+			// Read ClientHello without responding, so the real HTTP transport times out its TLS handshake.
+			go func() {
+				defer close(drained)
+				_, _ = io.Copy(io.Discard, blackhole)
+			}()
+			t.Cleanup(func() {
+				_ = firstConnection.Close()
+				_ = blackhole.Close()
+				<-drained
+			})
+			transport.DialContext = func(ctx context.Context, network, address string) (net.Conn, error) {
+				if atomic.AddInt32(&dials, 1) == 1 {
+					return firstConnection, nil
+				}
+				return (&net.Dialer{}).DialContext(ctx, network, address)
+			}
+			baseURL, err := url.Parse(server.URL)
+			require.NoError(t, err)
+			r := NewRequestWithClient(baseURL, "", ClientContentConfig{}, &http.Client{Transport: transport}).
+				Verb(tc.verb).MaxRetries(tc.maxRetries)
+			_, ctx := ktesting.NewTestContext(t)
+			if tc.wantDeadline {
+				var cancel context.CancelFunc
+				ctx, cancel = context.WithTimeout(ctx, 500*time.Millisecond)
+				defer cancel()
+			}
+			body, err := r.DoRaw(ctx)
+			switch {
+			case tc.wantDeadline:
+				require.ErrorIs(t, err, context.DeadlineExceeded)
+			case tc.wantTimeout:
+				require.Error(t, err)
+				require.True(t, utilnet.IsTimeout(err), "expected a TLS handshake timeout, got %v", err)
+			default:
+				require.NoError(t, err)
+				require.Equal(t, "ok", string(body))
+				require.Equal(t, int32(1), atomic.LoadInt32(&requests))
+			}
+			require.Equal(t, tc.wantDials, atomic.LoadInt32(&dials))
+			if tc.wantTimeout || tc.wantDeadline {
+				require.Zero(t, atomic.LoadInt32(&requests))
+			}
+		})
+	}
+}
+
 func TestNewRequestSetsAccept(t *testing.T) {
 	r := NewRequestWithClient(&url.URL{Path: "/path/"}, "", ClientContentConfig{}, nil).Verb("get")
 	if r.headers.Get("Accept") != "application/json, */*" {
@@ -4006,15 +4081,26 @@ func TestRetryableConditions(t *testing.T) {
 				"Stream": false,
 			},
 		},
-		// Timeout error gets retries by watch only
+		// Retry timed-out GETs, except streaming requests.
 		{
 			name:          "server returns net.Timeout() == true error",
 			verbs:         []string{"GET"},
 			serverReturns: responseErr{response: nil, err: &net.DNSError{IsTimeout: true}},
 			retryExpectation: map[string]bool{
+				"Do":     true,
+				"DoRaw":  true,
+				"Watch":  true,
+				"Stream": false,
+			},
+		},
+		{
+			name:          "write timeout is not replayed",
+			verbs:         []string{"POST", "PUT", "DELETE", "PATCH"},
+			serverReturns: responseErr{response: nil, err: &net.DNSError{IsTimeout: true}},
+			retryExpectation: map[string]bool{
 				"Do":     false,
 				"DoRaw":  false,
-				"Watch":  true,
+				"Watch":  true, // Watch always uses GET.
 				"Stream": false,
 			},
 		},
