@@ -310,7 +310,7 @@
           "disruptionMode": {
             "allOf": [
               {
-                "$ref": "#/components/schemas/io.k8s.api.scheduling.v1alpha3.WorkloadPodGroupDisruptionMode"
+                "$ref": "#/components/schemas/io.k8s.api.scheduling.v1.WorkloadPodGroupDisruptionMode"
               }
             ],
             "description": "disruptionMode defines the mode in which the Job's pods can be disrupted. One of Single, All. This field is immutable after creation: it may not be added or removed, and the selected mode may not be changed."
@@ -318,7 +318,7 @@
           "resourceClaims": {
             "description": "resourceClaims defines which ResourceClaims may be shared among Pods in the Job. Pods consume the devices allocated to a PodGroup's claim by defining a claim in its own Spec.ResourceClaims that matches the PodGroup's claim exactly. The claim must have the same name and refer to the same ResourceClaim or ResourceClaimTemplate. At most 4 claims may be set, matching the limit on the resulting PodGroup. This list is immutable after creation: entries may neither be added, removed, nor modified.",
             "items": {
-              "$ref": "#/components/schemas/io.k8s.api.scheduling.v1alpha3.WorkloadPodGroupResourceClaim"
+              "$ref": "#/components/schemas/io.k8s.api.scheduling.v1.WorkloadPodGroupResourceClaim"
             },
             "type": "array",
             "x-kubernetes-list-map-keys": [
@@ -331,7 +331,7 @@
           "schedulingConstraints": {
             "allOf": [
               {
-                "$ref": "#/components/schemas/io.k8s.api.scheduling.v1alpha3.WorkloadPodGroupSchedulingConstraints"
+                "$ref": "#/components/schemas/io.k8s.api.scheduling.v1.WorkloadPodGroupSchedulingConstraints"
               }
             ],
             "description": "schedulingConstraints defines scheduling constraints (e.g. topology) for the Job's pods. This field is immutable after creation."
@@ -339,7 +339,7 @@
           "schedulingPolicy": {
             "allOf": [
               {
-                "$ref": "#/components/schemas/io.k8s.api.scheduling.v1alpha3.WorkloadPodGroupSchedulingPolicy"
+                "$ref": "#/components/schemas/io.k8s.api.scheduling.v1.WorkloadPodGroupSchedulingPolicy"
               }
             ],
             "description": "schedulingPolicy defines the scheduling policy for this Job. Exactly one of Basic or Gang must be set. This field is immutable after creation: the policy may not be added or removed. The policy variant (basic/gang) is frozen by hand-written validation; only schedulingPolicy.gang.minCount may be changed."
@@ -4639,35 +4639,21 @@
         },
         "type": "object"
       },
-      "io.k8s.api.scheduling.v1alpha3.TopologyConstraint": {
-        "description": "TopologyConstraint defines a topology constraint for a PodGroup.",
-        "properties": {
-          "key": {
-            "default": "",
-            "description": "key specifies the key of the node label representing the topology domain. All pods within the PodGroup must be colocated within the same domain instance. Different PodGroups can land on different domain instances even if they derive from the same PodGroupTemplate. Nodes where this label is missing or has an empty value do not belong to any domain instance, so pods within the PodGroup cannot be scheduled onto them. Examples: \"topology.kubernetes.io/rack\"",
-            "type": "string"
-          }
-        },
-        "required": [
-          "key"
-        ],
-        "type": "object"
-      },
-      "io.k8s.api.scheduling.v1alpha3.WorkloadPodGroupAllDisruptionMode": {
+      "io.k8s.api.scheduling.v1.WorkloadPodGroupAllDisruptionMode": {
         "description": "WorkloadPodGroupAllDisruptionMode indicates that all pods in the group must be disrupted together.",
         "type": "object"
       },
-      "io.k8s.api.scheduling.v1alpha3.WorkloadPodGroupBasicSchedulingPolicy": {
+      "io.k8s.api.scheduling.v1.WorkloadPodGroupBasicSchedulingPolicy": {
         "description": "WorkloadPodGroupBasicSchedulingPolicy indicates standard Kubernetes scheduling behavior.",
         "type": "object"
       },
-      "io.k8s.api.scheduling.v1alpha3.WorkloadPodGroupDisruptionMode": {
+      "io.k8s.api.scheduling.v1.WorkloadPodGroupDisruptionMode": {
         "description": "WorkloadPodGroupDisruptionMode defines how individual pods within a group can be disrupted. Exactly one mode must be set.",
         "properties": {
           "all": {
             "allOf": [
               {
-                "$ref": "#/components/schemas/io.k8s.api.scheduling.v1alpha3.WorkloadPodGroupAllDisruptionMode"
+                "$ref": "#/components/schemas/io.k8s.api.scheduling.v1.WorkloadPodGroupAllDisruptionMode"
               }
             ],
             "description": "all specifies that all pods in the group must be disrupted together."
@@ -4675,7 +4661,7 @@
           "single": {
             "allOf": [
               {
-                "$ref": "#/components/schemas/io.k8s.api.scheduling.v1alpha3.WorkloadPodGroupSingleDisruptionMode"
+                "$ref": "#/components/schemas/io.k8s.api.scheduling.v1.WorkloadPodGroupSingleDisruptionMode"
               }
             ],
             "description": "single specifies that pods can be disrupted independently from each other."
@@ -4691,7 +4677,7 @@
           }
         ]
       },
-      "io.k8s.api.scheduling.v1alpha3.WorkloadPodGroupGangSchedulingPolicy": {
+      "io.k8s.api.scheduling.v1.WorkloadPodGroupGangSchedulingPolicy": {
         "description": "WorkloadPodGroupGangSchedulingPolicy defines the parameters for gang (all-or-nothing) scheduling.",
         "properties": {
           "minCount": {
@@ -4702,7 +4688,7 @@
         },
         "type": "object"
       },
-      "io.k8s.api.scheduling.v1alpha3.WorkloadPodGroupResourceClaim": {
+      "io.k8s.api.scheduling.v1.WorkloadPodGroupResourceClaim": {
         "description": "WorkloadPodGroupResourceClaim references a dynamic resource claim that is shared across pods in the group.",
         "properties": {
           "name": {
@@ -4724,13 +4710,13 @@
         ],
         "type": "object"
       },
-      "io.k8s.api.scheduling.v1alpha3.WorkloadPodGroupSchedulingConstraints": {
+      "io.k8s.api.scheduling.v1.WorkloadPodGroupSchedulingConstraints": {
         "description": "WorkloadPodGroupSchedulingConstraints defines leaf-level scheduling constraints, such as topology.",
         "properties": {
           "topology": {
             "description": "topology specifies desired topological placements for all pods within the pod group. If unset, no topology placement is requested.",
             "items": {
-              "$ref": "#/components/schemas/io.k8s.api.scheduling.v1alpha3.TopologyConstraint"
+              "$ref": "#/components/schemas/io.k8s.api.scheduling.v1.WorkloadTopologyConstraint"
             },
             "type": "array",
             "x-kubernetes-list-type": "atomic"
@@ -4738,13 +4724,13 @@
         },
         "type": "object"
       },
-      "io.k8s.api.scheduling.v1alpha3.WorkloadPodGroupSchedulingPolicy": {
+      "io.k8s.api.scheduling.v1.WorkloadPodGroupSchedulingPolicy": {
         "description": "WorkloadPodGroupSchedulingPolicy defines the scheduling policy for a group of pods managed by a workload controller. Exactly one policy must be set.",
         "properties": {
           "basic": {
             "allOf": [
               {
-                "$ref": "#/components/schemas/io.k8s.api.scheduling.v1alpha3.WorkloadPodGroupBasicSchedulingPolicy"
+                "$ref": "#/components/schemas/io.k8s.api.scheduling.v1.WorkloadPodGroupBasicSchedulingPolicy"
               }
             ],
             "description": "basic specifies that standard, pod-by-pod Kubernetes scheduling behavior should be used."
@@ -4752,7 +4738,7 @@
           "gang": {
             "allOf": [
               {
-                "$ref": "#/components/schemas/io.k8s.api.scheduling.v1alpha3.WorkloadPodGroupGangSchedulingPolicy"
+                "$ref": "#/components/schemas/io.k8s.api.scheduling.v1.WorkloadPodGroupGangSchedulingPolicy"
               }
             ],
             "description": "gang specifies all-or-nothing scheduling semantics."
@@ -4768,8 +4754,22 @@
           }
         ]
       },
-      "io.k8s.api.scheduling.v1alpha3.WorkloadPodGroupSingleDisruptionMode": {
+      "io.k8s.api.scheduling.v1.WorkloadPodGroupSingleDisruptionMode": {
         "description": "WorkloadPodGroupSingleDisruptionMode indicates that individual pods can be disrupted independently.",
+        "type": "object"
+      },
+      "io.k8s.api.scheduling.v1.WorkloadTopologyConstraint": {
+        "description": "WorkloadTopologyConstraint defines a topology constraint for a group of pods managed by a workload controller.",
+        "properties": {
+          "key": {
+            "default": "",
+            "description": "key specifies the key of the node label representing the topology domain. All pods within the PodGroup must be colocated within the same domain instance. Different PodGroups can land on different domain instances even if they derive from the same PodGroupTemplate. Nodes where this label is missing or has an empty value do not belong to any domain instance, so pods within the PodGroup cannot be scheduled onto them. Examples: \"topology.kubernetes.io/rack\"",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key"
+        ],
         "type": "object"
       },
       "io.k8s.apimachinery.pkg.api.resource.Quantity": {

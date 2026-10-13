@@ -50,4 +50,148 @@ func (PriorityClassList) SwaggerDoc() map[string]string {
 	return map_PriorityClassList
 }
 
+var map_WorkloadCompositePodGroupAllDisruptionMode = map[string]string{
+	"": "WorkloadCompositePodGroupAllDisruptionMode indicates that all child groups must be disrupted together.",
+}
+
+func (WorkloadCompositePodGroupAllDisruptionMode) SwaggerDoc() map[string]string {
+	return map_WorkloadCompositePodGroupAllDisruptionMode
+}
+
+var map_WorkloadCompositePodGroupBasicSchedulingPolicy = map[string]string{
+	"": "WorkloadCompositePodGroupBasicSchedulingPolicy indicates that the child groups of a composite group should be scheduled independently.",
+}
+
+func (WorkloadCompositePodGroupBasicSchedulingPolicy) SwaggerDoc() map[string]string {
+	return map_WorkloadCompositePodGroupBasicSchedulingPolicy
+}
+
+var map_WorkloadCompositePodGroupDisruptionMode = map[string]string{
+	"":       "WorkloadCompositePodGroupDisruptionMode defines how the child groups of a composite group can be disrupted. Exactly one mode must be set.",
+	"single": "single specifies that child groups can be disrupted independently from each other.",
+	"all":    "all specifies that all child groups must be disrupted together.",
+}
+
+func (WorkloadCompositePodGroupDisruptionMode) SwaggerDoc() map[string]string {
+	return map_WorkloadCompositePodGroupDisruptionMode
+}
+
+var map_WorkloadCompositePodGroupGangSchedulingPolicy = map[string]string{
+	"":              "WorkloadCompositePodGroupGangSchedulingPolicy defines the parameters for gang scheduling of a composite group's child groups.",
+	"minGroupCount": "minGroupCount is the minimum number of child groups that must be schedulable at the same time for the scheduler to admit the entire composite group. This field is optional. If it is not specified, the controller should inject a context-specific sane default (e.g., the number of child groups). If set, it must be a positive integer.",
+}
+
+func (WorkloadCompositePodGroupGangSchedulingPolicy) SwaggerDoc() map[string]string {
+	return map_WorkloadCompositePodGroupGangSchedulingPolicy
+}
+
+var map_WorkloadCompositePodGroupSchedulingConstraints = map[string]string{
+	"":         "WorkloadCompositePodGroupSchedulingConstraints defines composite-level scheduling constraints, such as topology, for a CompositePodGroup (a group of groups) managed by a workload controller.",
+	"topology": "topology specifies desired topological placements for all child groups within the composite group. If unset, no topology placement is requested.",
+}
+
+func (WorkloadCompositePodGroupSchedulingConstraints) SwaggerDoc() map[string]string {
+	return map_WorkloadCompositePodGroupSchedulingConstraints
+}
+
+var map_WorkloadCompositePodGroupSchedulingPolicy = map[string]string{
+	"":      "WorkloadCompositePodGroupSchedulingPolicy defines the scheduling policy for a CompositePodGroup (a group of groups) managed by a workload controller. Exactly one policy must be set.",
+	"basic": "basic specifies that the child groups of this composite group should be scheduled independently.",
+	"gang":  "gang specifies that the child groups of this composite group should be scheduled using all-or-nothing semantics.",
+}
+
+func (WorkloadCompositePodGroupSchedulingPolicy) SwaggerDoc() map[string]string {
+	return map_WorkloadCompositePodGroupSchedulingPolicy
+}
+
+var map_WorkloadCompositePodGroupSingleDisruptionMode = map[string]string{
+	"": "WorkloadCompositePodGroupSingleDisruptionMode indicates that child groups can be disrupted independently.",
+}
+
+func (WorkloadCompositePodGroupSingleDisruptionMode) SwaggerDoc() map[string]string {
+	return map_WorkloadCompositePodGroupSingleDisruptionMode
+}
+
+var map_WorkloadPodGroupAllDisruptionMode = map[string]string{
+	"": "WorkloadPodGroupAllDisruptionMode indicates that all pods in the group must be disrupted together.",
+}
+
+func (WorkloadPodGroupAllDisruptionMode) SwaggerDoc() map[string]string {
+	return map_WorkloadPodGroupAllDisruptionMode
+}
+
+var map_WorkloadPodGroupBasicSchedulingPolicy = map[string]string{
+	"": "WorkloadPodGroupBasicSchedulingPolicy indicates standard Kubernetes scheduling behavior.",
+}
+
+func (WorkloadPodGroupBasicSchedulingPolicy) SwaggerDoc() map[string]string {
+	return map_WorkloadPodGroupBasicSchedulingPolicy
+}
+
+var map_WorkloadPodGroupDisruptionMode = map[string]string{
+	"":       "WorkloadPodGroupDisruptionMode defines how individual pods within a group can be disrupted. Exactly one mode must be set.",
+	"single": "single specifies that pods can be disrupted independently from each other.",
+	"all":    "all specifies that all pods in the group must be disrupted together.",
+}
+
+func (WorkloadPodGroupDisruptionMode) SwaggerDoc() map[string]string {
+	return map_WorkloadPodGroupDisruptionMode
+}
+
+var map_WorkloadPodGroupGangSchedulingPolicy = map[string]string{
+	"":         "WorkloadPodGroupGangSchedulingPolicy defines the parameters for gang (all-or-nothing) scheduling.",
+	"minCount": "minCount is the minimum number of pods that must be scheduled at the same time for the scheduler to admit the entire group. This field is optional. If it is not specified, the controller should inject a context-specific sane default (e.g., parallelism for a Job). If set, it must be a positive integer.",
+}
+
+func (WorkloadPodGroupGangSchedulingPolicy) SwaggerDoc() map[string]string {
+	return map_WorkloadPodGroupGangSchedulingPolicy
+}
+
+var map_WorkloadPodGroupResourceClaim = map[string]string{
+	"":                          "WorkloadPodGroupResourceClaim references a dynamic resource claim that is shared across pods in the group.",
+	"name":                      "name uniquely identifies this resource claim inside the group. This field is required. It must be a DNS_LABEL.",
+	"resourceClaimName":         "resourceClaimName is the name of a ResourceClaim object in the same namespace. This field is optional. If it is not specified, no resource claim is used. If set, it must be a DNS subdomain.",
+	"resourceClaimTemplateName": "resourceClaimTemplateName is the name of a ResourceClaimTemplate object in the same namespace. This field is optional. If it is not specified, no resource claim template is used. If set, it must be a DNS subdomain.",
+}
+
+func (WorkloadPodGroupResourceClaim) SwaggerDoc() map[string]string {
+	return map_WorkloadPodGroupResourceClaim
+}
+
+var map_WorkloadPodGroupSchedulingConstraints = map[string]string{
+	"":         "WorkloadPodGroupSchedulingConstraints defines leaf-level scheduling constraints, such as topology.",
+	"topology": "topology specifies desired topological placements for all pods within the pod group. If unset, no topology placement is requested.",
+}
+
+func (WorkloadPodGroupSchedulingConstraints) SwaggerDoc() map[string]string {
+	return map_WorkloadPodGroupSchedulingConstraints
+}
+
+var map_WorkloadPodGroupSchedulingPolicy = map[string]string{
+	"":      "WorkloadPodGroupSchedulingPolicy defines the scheduling policy for a group of pods managed by a workload controller. Exactly one policy must be set.",
+	"basic": "basic specifies that standard, pod-by-pod Kubernetes scheduling behavior should be used.",
+	"gang":  "gang specifies all-or-nothing scheduling semantics.",
+}
+
+func (WorkloadPodGroupSchedulingPolicy) SwaggerDoc() map[string]string {
+	return map_WorkloadPodGroupSchedulingPolicy
+}
+
+var map_WorkloadPodGroupSingleDisruptionMode = map[string]string{
+	"": "WorkloadPodGroupSingleDisruptionMode indicates that individual pods can be disrupted independently.",
+}
+
+func (WorkloadPodGroupSingleDisruptionMode) SwaggerDoc() map[string]string {
+	return map_WorkloadPodGroupSingleDisruptionMode
+}
+
+var map_WorkloadTopologyConstraint = map[string]string{
+	"":    "WorkloadTopologyConstraint defines a topology constraint for a group of pods managed by a workload controller.",
+	"key": "key specifies the key of the node label representing the topology domain. All pods within the PodGroup must be colocated within the same domain instance. Different PodGroups can land on different domain instances even if they derive from the same PodGroupTemplate. Nodes where this label is missing or has an empty value do not belong to any domain instance, so pods within the PodGroup cannot be scheduled onto them. Examples: \"topology.kubernetes.io/rack\"",
+}
+
+func (WorkloadTopologyConstraint) SwaggerDoc() map[string]string {
+	return map_WorkloadTopologyConstraint
+}
+
 // AUTO-GENERATED FUNCTIONS END HERE
