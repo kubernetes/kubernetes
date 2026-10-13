@@ -25,9 +25,32 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-base/featuregate"
 	resourcehelper "k8s.io/component-helpers/resource"
 	"k8s.io/kubernetes/pkg/features"
 )
+
+// Features returns resourcehelper.Features populated from utilfeature.DefaultFeatureGate.
+func Features() resourcehelper.Features {
+	return FeaturesFromGate(utilfeature.DefaultFeatureGate)
+}
+
+// FeaturesFromGate returns resourcehelper.Features populated from the given featuregate.FeatureGate.
+func FeaturesFromGate(fg featuregate.FeatureGate) resourcehelper.Features {
+	return resourcehelper.Features{
+		PodLevelResources:                       fg.Enabled(features.PodLevelResources),
+		InPlacePodVerticalScaling:               fg.Enabled(features.InPlacePodVerticalScaling),
+		InPlacePodLevelResourcesVerticalScaling: fg.Enabled(features.InPlacePodLevelResourcesVerticalScaling),
+		DRANodeAllocatableResources:             fg.Enabled(features.DRANodeAllocatableResources),
+	}
+}
+
+// PodResourcesOptions returns resourcehelper.PodResourcesOptions with Features populated from utilfeature.DefaultFeatureGate.
+func PodResourcesOptions() resourcehelper.PodResourcesOptions {
+	return resourcehelper.PodResourcesOptions{
+		Features: Features(),
+	}
+}
 
 // GetResourceRequestQuantity finds and returns the request quantity for a specific resource.
 func GetResourceRequestQuantity(pod *v1.Pod, resourceName v1.ResourceName) resource.Quantity {
@@ -43,10 +66,15 @@ func GetResourceRequestQuantity(pod *v1.Pod, resourceName v1.ResourceName) resou
 	}
 
 	// Supported pod level resources will be used instead of container level ones when available
-	hasPodLevelResources := utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) && resourcehelper.IsPodLevelResourcesSet(pod)
+	fts := Features()
+	hasPodLevelResources := fts.PodLevelResources && resourcehelper.IsPodLevelResourcesSet(pod)
 
 	// TODO(pravk03): considering DRA Node Allocatable resources for eviction ranking.
-	if rQuantity, ok := resourcehelper.PodRequests(pod, resourcehelper.PodResourcesOptions{SkipContainerLevelResources: hasPodLevelResources, ExcludeOverhead: true})[resourceName]; ok {
+	if rQuantity, ok := resourcehelper.PodRequests(pod, resourcehelper.PodResourcesOptions{
+		SkipContainerLevelResources: hasPodLevelResources,
+		ExcludeOverhead:             true,
+		Features:                    fts,
+	})[resourceName]; ok {
 		requestQuantity.Add(rQuantity)
 	}
 

@@ -34,6 +34,7 @@ import (
 	resourcehelper "k8s.io/component-helpers/resource"
 	"k8s.io/klog/v2"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	v1resource "k8s.io/kubernetes/pkg/api/v1/resource"
 	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/allocation/state"
@@ -389,11 +390,7 @@ func (m *manager) isResizeIncreasingRequests(pod *v1.Pod) bool {
 		return false
 	}
 
-	opts := resourcehelper.PodResourcesOptions{
-		Features: resourcehelper.Features{
-			PodLevelResources: utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources),
-		},
-	}
+	opts := v1resource.PodResourcesOptions()
 	oldRequest := resourcehelper.PodRequests(allocatedPod, opts)
 	newRequest := resourcehelper.PodRequests(pod, opts)
 

@@ -577,7 +577,7 @@ func getNodeRequestedMilliCPU(ctx context.Context, f *framework.Framework, nodeN
 			continue
 		}
 
-		requests := resourcehelper.PodRequests(pod, resourcehelper.PodResourcesOptions{})
+		requests := resourcehelper.PodRequests(pod, resourcehelper.PodResourcesOptions{Features: resourcehelper.AllFeatures()})
 		cpuRequest := requests.Cpu()
 		if cpuRequest == nil || cpuRequest.IsZero() {
 			continue

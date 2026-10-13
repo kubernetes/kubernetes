@@ -37,6 +37,7 @@ import (
 	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
+	v1resource "k8s.io/kubernetes/pkg/api/v1/resource"
 	"k8s.io/kubernetes/pkg/features"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 )
@@ -1296,22 +1297,13 @@ func (pi *PodInfo) CalculateResource() fwk.PodResource {
 	if pi.cachedResource != nil {
 		return *pi.cachedResource
 	}
-	inPlacePodVerticalScalingEnabled := utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling)
-	podLevelResourcesEnabled := utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources)
-	inPlacePodLevelResourcesVerticalScalingEnabled := utilfeature.DefaultMutableFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling)
-	nodeAllocatableResourcesDRAEnabled := utilfeature.DefaultFeatureGate.Enabled(features.DRANodeAllocatableResources)
-	fts := resourcehelper.Features{
-		InPlacePodVerticalScaling:               inPlacePodVerticalScalingEnabled,
-		InPlacePodLevelResourcesVerticalScaling: inPlacePodLevelResourcesVerticalScalingEnabled,
-		PodLevelResources:                       podLevelResourcesEnabled,
-		DRANodeAllocatableResources:             nodeAllocatableResourcesDRAEnabled,
-	}
+	fts := v1resource.Features()
 
 	requests := resourcehelper.PodRequests(pi.Pod, resourcehelper.PodResourcesOptions{
 		UseStatusResources: true,
 		Features:           fts,
 	})
-	isPodLevelResourcesSet := podLevelResourcesEnabled && resourcehelper.IsPodLevelRequestsSet(pi.Pod)
+	isPodLevelResourcesSet := fts.PodLevelResources && resourcehelper.IsPodLevelRequestsSet(pi.Pod)
 	nonMissingContainerRequests := getNonMissingContainerRequests(requests, isPodLevelResourcesSet)
 	non0Requests := requests
 	if len(nonMissingContainerRequests) > 0 {

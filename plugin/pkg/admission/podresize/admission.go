@@ -32,6 +32,7 @@ import (
 	corev1listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/component-base/featuregate"
 	"k8s.io/component-helpers/resource"
+	v1resource "k8s.io/kubernetes/pkg/api/v1/resource"
 	"k8s.io/kubernetes/pkg/apis/core"
 	v1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	"k8s.io/kubernetes/pkg/features"
@@ -57,6 +58,7 @@ type Plugin struct {
 	*admission.Handler
 	nodeLister                       corev1listers.NodeLister
 	inPlacePodVerticalScalingEnabled bool
+	resourceFeatures                 resource.Features
 }
 
 var _ admission.ValidationInterface = &Plugin{}
@@ -79,6 +81,7 @@ func (p *Plugin) SetExternalKubeInformerFactory(f informers.SharedInformerFactor
 // InspectFeatureGates sets the feature gates for the plugin.
 func (p *Plugin) InspectFeatureGates(featureGates featuregate.FeatureGate) {
 	p.inPlacePodVerticalScalingEnabled = featureGates.Enabled(features.InPlacePodVerticalScaling)
+	p.resourceFeatures = v1resource.FeaturesFromGate(featureGates)
 }
 
 // ValidateInitialization ensures that the plugin is properly initialized.
@@ -152,7 +155,7 @@ func (p *Plugin) validatePodResize(pod *core.Pod, a admission.Attributes) error 
 	}
 
 	// If the new requests are larger than the node allocatable, reject the update.
-	if err := validateNodeAllocatable(pod, node); err != nil {
+	if err := p.validateNodeAllocatable(pod, node); err != nil {
 		return resizeValidationError(a, err, ReasonNodeCapacity)
 	}
 
@@ -160,13 +163,13 @@ func (p *Plugin) validatePodResize(pod *core.Pod, a admission.Attributes) error 
 }
 
 // Returns nil if the pod's resource requests fit within the node's allocatable, err otherwise.
-func validateNodeAllocatable(pod *core.Pod, node *corev1.Node) error {
+func (p *Plugin) validateNodeAllocatable(pod *core.Pod, node *corev1.Node) error {
 	// Convert internal to external pods for the helper library.
 	podV1 := &corev1.Pod{}
 	if err := v1.Convert_core_Pod_To_v1_Pod(pod, podV1, nil); err != nil {
 		return errors.NewBadRequest(fmt.Sprintf("failed to convert pod: %v", err))
 	}
-	return validateRequestsWithinAllocatable(podV1, node.Status.Allocatable)
+	return p.validateRequestsWithinAllocatable(podV1, node.Status.Allocatable)
 }
 
 // Returns nil if the node is a linux node, err otherwise.
@@ -193,11 +196,13 @@ func resizeValidationError(a admission.Attributes, err error, reason metav1.Caus
 
 // validateRequestsWithinAllocatable returns an error if the pod requests exceed the allocatable
 // capacity.
-func validateRequestsWithinAllocatable(pod *corev1.Pod, allocatable corev1.ResourceList) error {
+func (p *Plugin) validateRequestsWithinAllocatable(pod *corev1.Pod, allocatable corev1.ResourceList) error {
 	cpuAllocatable := allocatable.Cpu()
 	memAllocatable := allocatable.Memory()
 
-	requests := resource.PodRequests(pod, resource.PodResourcesOptions{})
+	requests := resource.PodRequests(pod, resource.PodResourcesOptions{
+		Features: p.resourceFeatures,
+	})
 	cpuRequests := requests[corev1.ResourceCPU]
 	memRequests := requests[corev1.ResourceMemory]
 

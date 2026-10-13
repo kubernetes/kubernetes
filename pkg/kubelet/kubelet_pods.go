@@ -2191,13 +2191,7 @@ func (kl *Kubelet) convertStatusToAPIStatus(ctx context.Context, pod *v1.Pod, po
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling) {
 		apiPodStatus.Resources = kl.convertToAPIPodLevelResourcesStatus(logger, pod, oldPodStatus)
-		opts := resourcehelper.PodResourcesOptions{
-			Features: resourcehelper.Features{
-				PodLevelResources:           utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources),
-				DRANodeAllocatableResources: utilfeature.DefaultFeatureGate.Enabled(features.DRANodeAllocatableResources),
-			},
-		}
-		apiPodStatus.AllocatedResources = resourcehelper.PodRequests(pod, opts)
+		apiPodStatus.AllocatedResources = resourcehelper.PodRequests(pod, resource.PodResourcesOptions())
 	}
 
 	return &apiPodStatus
@@ -2208,12 +2202,7 @@ func getEffectiveAllocatedResources(allocatedPod *v1.Pod) *v1.ResourceRequiremen
 	if allocatedResources == nil {
 		allocatedResources = &v1.ResourceRequirements{}
 	}
-	opts := resourcehelper.PodResourcesOptions{
-		Features: resourcehelper.Features{
-			PodLevelResources:           utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources),
-			DRANodeAllocatableResources: utilfeature.DefaultFeatureGate.Enabled(features.DRANodeAllocatableResources),
-		},
-	}
+	opts := resource.PodResourcesOptions()
 	allocatedResources.Requests = resourcehelper.PodRequests(allocatedPod, opts)
 	allocatedResources.Limits = resourcehelper.PodLimits(allocatedPod, opts)
 	return allocatedResources
@@ -2295,13 +2284,7 @@ func (kl *Kubelet) convertToAPIPodLevelResourcesStatus(logger klog.Logger, alloc
 	}
 
 	if _, found := resources.Requests[v1.ResourceMemory]; !found {
-		opts := resourcehelper.PodResourcesOptions{
-			Features: resourcehelper.Features{
-				PodLevelResources:           utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources),
-				DRANodeAllocatableResources: utilfeature.DefaultFeatureGate.Enabled(features.DRANodeAllocatableResources),
-			},
-		}
-		aggregatedResources := resourcehelper.PodRequests(allocatedPod, opts)
+		aggregatedResources := resourcehelper.PodRequests(allocatedPod, resource.PodResourcesOptions())
 		if val, ok := aggregatedResources[v1.ResourceMemory]; ok {
 			resources.Requests[v1.ResourceMemory] = val
 		}

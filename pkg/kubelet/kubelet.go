@@ -86,6 +86,7 @@ import (
 	pluginwatcherapi "k8s.io/kubelet/pkg/apis/pluginregistration/v1"
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	v1resource "k8s.io/kubernetes/pkg/api/v1/resource"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/allocation"
 	kubeletconfiginternal "k8s.io/kubernetes/pkg/kubelet/apis/config"
@@ -3213,12 +3214,7 @@ func (kl *Kubelet) HandlePodReconcile(ctx context.Context, pods []*v1.Pod) {
 				// resources changing.
 				opts := resourcehelper.PodResourcesOptions{
 					UseStatusResources: true,
-					Features: resourcehelper.Features{
-						PodLevelResources:                       utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources),
-						InPlacePodVerticalScaling:               true,
-						InPlacePodLevelResourcesVerticalScaling: utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling),
-						DRANodeAllocatableResources:             utilfeature.DefaultFeatureGate.Enabled(features.DRANodeAllocatableResources),
-					},
+					Features:           v1resource.Features(),
 				}
 
 				// Ignore desired resources when aggregating the resources.

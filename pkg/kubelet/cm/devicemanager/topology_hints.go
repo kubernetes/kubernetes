@@ -23,6 +23,7 @@ import (
 	"k8s.io/klog/v2"
 	pluginapi "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
 
+	v1resource "k8s.io/kubernetes/pkg/api/v1/resource"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
@@ -265,6 +266,7 @@ func (m *ManagerImpl) getPodDeviceRequest(pod *v1.Pod) map[string]int {
 	// for these device plugin resources, requests == limits
 	limits := resource.PodLimits(pod, resource.PodResourcesOptions{
 		ExcludeOverhead: true,
+		Features:        v1resource.Features(),
 	})
 	podRequests := make(map[string]int)
 	for resourceName, quantity := range limits {

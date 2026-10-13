@@ -31,6 +31,7 @@ import (
 	corelisters "k8s.io/client-go/listers/core/v1"
 	resourcehelpers "k8s.io/component-helpers/resource"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	v1resource "k8s.io/kubernetes/pkg/api/v1/resource"
 	metricsclient "k8s.io/kubernetes/pkg/controller/podautoscaler/metrics"
 	"k8s.io/kubernetes/pkg/features"
 )
@@ -498,6 +499,7 @@ func calculateRequests(pods []*v1.Pod, container string, resource v1.ResourceNam
 func calculatePodLevelRequests(pod *v1.Pod, resource v1.ResourceName) (int64, error) {
 	podLevelRequests := resourcehelpers.PodRequests(pod, resourcehelpers.PodResourcesOptions{
 		ExcludeOverhead: true,
+		Features:        v1resource.Features(),
 	})
 	podRequest, ok := podLevelRequests[resource]
 	if !ok {

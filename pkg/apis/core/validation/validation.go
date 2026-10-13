@@ -60,6 +60,7 @@ import (
 
 	apiservice "k8s.io/kubernetes/pkg/api/service"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	v1resource "k8s.io/kubernetes/pkg/api/v1/resource"
 	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
 	"k8s.io/kubernetes/pkg/apis/core/helper/qos"
@@ -4956,7 +4957,7 @@ func validatePodResourceConsistency(spec *core.PodSpec, fldPath *field.Path) fie
 	// v1PodSpec i.e. (&v1.Pod{Spec: *v1PodSpec}, is created on the fly, and passed
 	// to the AggregateContainerRequests method to facilitate proper resource
 	// calculation without modifying AggregateContainerRequests method.
-	aggrContainerReqs := resourcehelper.AggregateContainerRequests(&v1.Pod{Spec: *v1PodSpec}, resourcehelper.PodResourcesOptions{})
+	aggrContainerReqs := resourcehelper.AggregateContainerRequests(&v1.Pod{Spec: *v1PodSpec}, v1resource.PodResourcesOptions())
 
 	// Pod-level requests must be >= aggregate requests of all containers in a pod.
 	for resourceName, ctrReqs := range aggrContainerReqs {
@@ -4979,7 +4980,7 @@ func validatePodResourceConsistency(spec *core.PodSpec, fldPath *field.Path) fie
 	// This is also why hugepages overcommitment is not allowed in pod level resources,
 	// the pod cgroup values must reflect the request/limit set at pod level, and the
 	// container level cgroup values must be within that limit.
-	aggrContainerLims := resourcehelper.AggregateContainerLimits(&v1.Pod{Spec: *v1PodSpec}, resourcehelper.PodResourcesOptions{})
+	aggrContainerLims := resourcehelper.AggregateContainerLimits(&v1.Pod{Spec: *v1PodSpec}, v1resource.PodResourcesOptions())
 	for resourceName, ctrLims := range aggrContainerLims {
 		if !helper.IsHugePageResourceName(core.ResourceName(resourceName)) {
 			continue
@@ -6851,12 +6852,7 @@ func validatePodLevelResourcesCoverDRA(pod *v1.Pod) (bool, string) {
 	}
 
 	if pod.Spec.Resources.Requests != nil {
-		opts := resourcehelper.PodResourcesOptions{
-			Features: resourcehelper.Features{
-				DRANodeAllocatableResources: true,
-			},
-		}
-		requestWithoutPodLevel := resourcehelper.AggregateContainerRequests(pod, opts)
+		requestWithoutPodLevel := resourcehelper.AggregateContainerRequests(pod, v1resource.PodResourcesOptions())
 
 		for resName, podLevelReq := range pod.Spec.Resources.Requests {
 			if !resourcehelper.IsSupportedPodLevelResource(resName) {
@@ -6873,12 +6869,7 @@ func validatePodLevelResourcesCoverDRA(pod *v1.Pod) (bool, string) {
 	}
 
 	if pod.Spec.Resources.Limits != nil {
-		opts := resourcehelper.PodResourcesOptions{
-			Features: resourcehelper.Features{
-				DRANodeAllocatableResources: true,
-			},
-		}
-		limitsWithoutPodLevel := resourcehelper.AggregateContainerLimits(pod, opts)
+		limitsWithoutPodLevel := resourcehelper.AggregateContainerLimits(pod, v1resource.PodResourcesOptions())
 
 		// Pod level hugepage limits must be always equal or greater than the aggregated
 		// container level hugepage limits + DRA limits

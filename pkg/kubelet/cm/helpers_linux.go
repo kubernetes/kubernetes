@@ -32,6 +32,7 @@ import (
 	resourcehelper "k8s.io/component-helpers/resource"
 	"k8s.io/klog/v2"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	v1resource "k8s.io/kubernetes/pkg/api/v1/resource"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
@@ -47,8 +48,9 @@ func ApplyPodLevelMemoryHigh(pod *v1.Pod, rc *ResourceConfig, throttlingFactor f
 	if !podLevelResourcesEnabled || !resourcehelper.IsPodLevelResourcesSet(pod) {
 		return
 	}
-	reqs := resourcehelper.PodRequests(pod, resourcehelper.PodResourcesOptions{})
-	limits := resourcehelper.PodLimits(pod, resourcehelper.PodResourcesOptions{})
+	opts := v1resource.PodResourcesOptions()
+	reqs := resourcehelper.PodRequests(pod, opts)
+	limits := resourcehelper.PodLimits(pod, opts)
 	memoryLimitsDeclared := true
 	for c := range podutil.ContainerIter(&pod.Spec, podutil.InitContainers|podutil.Containers) {
 		if c.Resources.Limits.Memory().IsZero() {
@@ -179,25 +181,16 @@ func HugePageLimits(resourceList v1.ResourceList) map[int64]int64 {
 // ResourceConfigForPod takes the input pod and outputs the cgroup resource config.
 func ResourceConfigForPod(allocatedPod *v1.Pod, enforceCPULimits bool, cpuPeriod uint64, enforceMemoryQoS bool, memoryReservationPolicy kubeletconfig.MemoryReservationPolicy) *ResourceConfig {
 	podLevelResourcesEnabled := utilfeature.DefaultFeatureGate.Enabled(kubefeatures.PodLevelResources)
-	draNodeAllocatableEnabled := utilfeature.DefaultFeatureGate.Enabled(kubefeatures.DRANodeAllocatableResources)
 	// sum requests and limits.
 	reqs := resourcehelper.PodRequests(allocatedPod, resourcehelper.PodResourcesOptions{
 		UseStatusResources: false,
-		Features: resourcehelper.Features{
-			PodLevelResources:           podLevelResourcesEnabled,
-			DRANodeAllocatableResources: draNodeAllocatableEnabled,
-		},
+		Features:           v1resource.Features(),
 	})
 	// track if limits were applied for each resource.
 	memoryLimitsDeclared := true
 	cpuLimitsDeclared := true
 
-	limits := resourcehelper.PodLimits(allocatedPod, resourcehelper.PodResourcesOptions{
-		Features: resourcehelper.Features{
-			PodLevelResources:           podLevelResourcesEnabled,
-			DRANodeAllocatableResources: draNodeAllocatableEnabled,
-		},
-	})
+	limits := resourcehelper.PodLimits(allocatedPod, v1resource.PodResourcesOptions())
 
 	for c := range podutil.ContainerIter(&allocatedPod.Spec, podutil.InitContainers|podutil.Containers) {
 		if c.Resources.Limits.Cpu().IsZero() {
