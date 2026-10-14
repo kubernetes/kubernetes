@@ -521,7 +521,7 @@ func TestWatch(t *testing.T) {
 			t.Run("WatchDeleteEventObjectHaveLatestRV", func(t *testing.T) {
 				ctx, cacher, terminate := testSetup(t)
 				t.Cleanup(terminate)
-				storagetesting.RunTestWatchDeleteEventObjectHaveLatestRV(ctx, t, cacher)
+				storagetesting.RunTestWatchDeleteEventObjectHaveLatestRV(ctx, t, cacher, "test-ns", false, nil)
 			})
 			t.Run("WatchInitializationSignal", func(t *testing.T) {
 				ctx, cacher, terminate := testSetup(t)

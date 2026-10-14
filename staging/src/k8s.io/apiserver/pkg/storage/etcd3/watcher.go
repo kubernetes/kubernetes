@@ -144,21 +144,23 @@ func (w *watcher) Watch(ctx context.Context, key string, rev int64, opts storage
 	if opts.ProgressNotify && w.newFunc == nil {
 		return nil, apierrors.NewInternalError(errors.New("progressNotify for watch is unsupported by the etcd storage because no newFunc was provided"))
 	}
-	if opts.WatchWithoutPrevKV && !opts.Predicate.Empty() {
-		return nil, apierrors.NewInternalError(errors.New("watchWithoutPrevKV requires an empty predicate"))
-	}
-	// Custom key functions may not have a reverse mapping. Keep requesting the
-	// previous value in that case so the watch cache can still identify deletions.
-	watchWithoutPrevKV := opts.WatchWithoutPrevKV && w.reverseKeyFunc != nil
-	if watchWithoutPrevKV && w.newFunc == nil {
-		return nil, apierrors.NewInternalError(errors.New("watchWithoutPrevKV requires a newFunc"))
+	if opts.WatchWithoutPrevKV {
+		if !opts.Predicate.Empty() {
+			return nil, apierrors.NewInternalError(errors.New("watchWithoutPrevKV requires an empty predicate"))
+		}
+		if w.newFunc == nil {
+			return nil, apierrors.NewInternalError(errors.New("watchWithoutPrevKV requires a newFunc"))
+		}
+		if w.reverseKeyFunc == nil {
+			return nil, apierrors.NewInternalError(errors.New("watchWithoutPrevKV requires a reverseKeyFunc"))
+		}
 	}
 	startWatchRV, err := w.getStartWatchResourceVersion(ctx, rev, opts)
 	if err != nil {
 		return nil, err
 	}
 	wc := w.createWatchChan(ctx, key, startWatchRV, opts.Recursive, opts.ProgressNotify, opts.RecordTimestamps, opts.Predicate)
-	wc.watchWithoutPrevKV = watchWithoutPrevKV
+	wc.watchWithoutPrevKV = opts.WatchWithoutPrevKV
 	go wc.run(isInitialEventsEndBookmarkRequired(opts), areInitialEventsRequired(rev, opts))
 
 	// For etcd watch we don't have an easy way to answer whether the watch
