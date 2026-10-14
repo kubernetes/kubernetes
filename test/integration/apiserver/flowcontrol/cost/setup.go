@@ -21,22 +21,22 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
-	"testing"
 
 	genericapiserver "k8s.io/apiserver/pkg/server"
-	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/ktesting"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	"k8s.io/kubernetes/pkg/controlplane"
 	"k8s.io/kubernetes/test/integration/framework"
+	testutils "k8s.io/kubernetes/test/utils"
 	netutils "k8s.io/utils/net"
 )
 
-func setupAPIServer(tb testing.TB) (clientset.Interface, http.Handler) {
-	tb.Helper()
+func setupAPIServer(tCtx ktesting.TContext) (ktesting.TContext, http.Handler) {
+	tCtx.Helper()
 
 	var handler http.Handler
 
-	client, _, tearDownFn := framework.StartTestServer(tb.Context(), tb, framework.TestServerSetup{
+	client, _, tearDownFn := framework.StartTestServer(tCtx, tCtx, framework.TestServerSetup{
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
 			opts.GenericServerRunOptions.AdvertiseAddress = netutils.ParseIPSloppy("10.0.1.1")
 			opts.Authorization.Modes = []string{"AlwaysAllow"}
@@ -57,8 +57,9 @@ func setupAPIServer(tb testing.TB) (clientset.Interface, http.Handler) {
 			}
 		},
 	})
-	tb.Cleanup(tearDownFn)
-	return client, handler
+	tCtx.Cleanup(tearDownFn)
+	tCtx = tCtx.WithClients(nil, nil, client, nil)
+	return tCtx, handler
 }
 
 // responseSink is a non-buffering http.ResponseWriter so measurement only
@@ -89,7 +90,7 @@ func (s *responseSink) Flush() {}
 
 func (s *responseSink) CloseNotify() <-chan bool { return nil }
 
-func runHTTP(tb testing.TB, server http.Handler, method, path, contentType, accept string, body []byte) int {
+func runHTTP(tb testutils.TB, server http.Handler, method, path, contentType, accept string, body []byte) int {
 	tb.Helper()
 	var bodyReader *bytes.Reader
 	if body != nil {

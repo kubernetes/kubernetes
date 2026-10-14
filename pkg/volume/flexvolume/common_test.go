@@ -34,7 +34,7 @@ func testPlugin(h *harness.Harness) (*flexVolumeAttachablePlugin, string) {
 		flexVolumePlugin: &flexVolumePlugin{
 			driverName:          "test",
 			execPath:            "/plugin",
-			host:                volumetesting.NewFakeVolumeHost(h.T, rootDir, nil, nil),
+			host:                volumetesting.NewFakeVolumeHost(h.TB, rootDir, nil, nil),
 			unsupportedCommands: []string{},
 		},
 	}, rootDir

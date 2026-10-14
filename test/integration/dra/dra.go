@@ -22,7 +22,6 @@ import (
 	"sort"
 	"strings"
 	"sync"
-	"testing"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -114,7 +113,7 @@ var featureNodeSetups = map[featuregate.Feature]func(tCtx ktesting.TContext, nod
 	},
 }
 
-func Run(t *testing.T, whatRE string) { run(ktesting.Init(t), whatRE) }
+func Run(t ktesting.TB, whatRE string) { run(ktesting.Init(t), whatRE) }
 func run(tCtx ktesting.TContext, whatRE string) {
 	re, err := regexp.Compile(whatRE)
 	if err != nil {

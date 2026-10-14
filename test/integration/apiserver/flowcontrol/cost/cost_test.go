@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/ktesting"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 )
 
@@ -551,10 +552,11 @@ func benchmarkScenario(b *testing.B, sc requestScenario) []dataItem {
 	for _, wf := range sc.acceptContentTypes {
 		b.Run(fmt.Sprintf("Format=%s", wf.name), func(b *testing.B) {
 			b.ReportAllocs()
+			tCtx := ktesting.Init(b)
 
-			client, server := setupAPIServer(b)
-			ensureDefaultServiceAccount(b, client)
-			pods := seedPods(b, client, sc.seedPods)
+			tCtx, server := setupAPIServer(tCtx)
+			ensureDefaultServiceAccount(tCtx)
+			pods := seedPods(tCtx, sc.seedPods)
 
 			reqContentType := sc.requestContentType
 			if reqContentType == "" && sc.body != nil {

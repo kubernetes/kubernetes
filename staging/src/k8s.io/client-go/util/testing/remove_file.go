@@ -17,12 +17,25 @@ limitations under the License.
 package testing
 
 import (
+	"errors"
+	"fmt"
 	"os"
-	"testing"
 )
 
+// TB is the subset of testing.TB needed by CloseAndRemove. A locally-defined
+// interface avoids a hard dependency on the testing package, so callers can
+// also pass things like ginkgo.GinkgoTB() or ktesting.TContext.
+type TB interface {
+	Helper()
+	Fatalf(format string, args ...any)
+}
+
 // CloseAndRemove is a helper to close and remove test file.
-func CloseAndRemove(t *testing.T, files ...*os.File) {
+//
+// Don't pass &testing.T{} here, it crashes when Fatalf invokes
+// FailNow ("panic: test executed panic(nil) or runtime.Goexit").
+// FatalToError can be used instead.
+func CloseAndRemove(t TB, files ...*os.File) {
 	t.Helper()
 	// We should close it first before remove a file, it's not only a good practice,
 	// but also can avoid failed file removing on Windows OS.
@@ -37,4 +50,24 @@ func CloseAndRemove(t *testing.T, files ...*os.File) {
 			t.Fatalf("Error removing %s: %v", f.Name(), err)
 		}
 	}
+}
+
+// FatalToError enables calling CloseAndRemove such that problems
+// encountered during the call get joined together. Use it like this:
+//
+//	func doSomething(...) (finalErr error) {
+//	...
+//	defer utiltesting.CloseAndRemove(utiltesting.FatalToError(&finalErr), file)
+func FatalToError(err *error) TB {
+	return fatalToError{err: err}
+}
+
+type fatalToError struct {
+	err *error
+}
+
+func (f fatalToError) Helper() {}
+func (f fatalToError) Fatalf(format string, args ...any) {
+	err := fmt.Errorf(format, args...)
+	*f.err = errors.Join(*f.err, err)
 }
