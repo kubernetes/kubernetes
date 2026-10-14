@@ -82,7 +82,7 @@ func (c *CacheDelegator) Delete(ctx context.Context, key string, out runtime.Obj
 	// read from cache.
 	if obj, exists, _, err := c.cacher.get(ctx, key, 0); err != nil {
 		klog.Errorf("GetByKey returned error: %v", err)
-	} else if exists {
+	} else if exists && preconditions.Check(key, obj) == nil {
 		// DeepCopy the object since we modify resource version when serializing the
 		// current object.
 		return c.storage.Delete(ctx, key, out, preconditions, validateDeletion, obj.DeepCopyObject(), opts)
@@ -193,7 +193,7 @@ func (c *CacheDelegator) GuaranteedUpdate(ctx context.Context, key string, desti
 	// read from cache.
 	if obj, exists, _, err := c.cacher.get(ctx, key, 0); err != nil {
 		klog.Errorf("GetByKey returned error: %v", err)
-	} else if exists {
+	} else if exists && preconditions.Check(key, obj) == nil {
 		// DeepCopy the object since we modify resource version when serializing the
 		// current object.
 		return c.storage.GuaranteedUpdate(ctx, key, destination, ignoreNotFound, preconditions, tryUpdate, obj.DeepCopyObject())
