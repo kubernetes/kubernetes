@@ -981,7 +981,11 @@ type Handle interface {
 	// SignPod creates a PodSignature for a pod.
 	SignPod(ctx context.Context, pod *v1.Pod) PodSignature
 
-	// PreemptionManager returns PreemptionManager that can be used to customize preemption logic.
+	// PreemptionManager returns the PreemptionManager that customizes preemption logic.
+	// Because callers can set or replace the PreemptionManager after plugin initialization
+	// (for example, between scheduling cycles in simulation libraries via SetPreemptionManager),
+	// plugins must call PreemptionManager() and Executor() dynamically during extension point
+	// execution and must not call or cache them during plugin initialization.
 	PreemptionManager() PreemptionManager
 }
 

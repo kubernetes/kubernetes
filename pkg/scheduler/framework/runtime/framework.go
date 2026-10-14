@@ -591,6 +591,10 @@ func (f *frameworkImpl) SetAPICacher(c fwk.APICacher) {
 	f.apiCacher = c
 }
 
+func (f *frameworkImpl) SetPreemptionManager(m fwk.PreemptionManager) {
+	f.preemptionManager = m
+}
+
 // Close closes each plugin, when they implement io.Closer interface.
 func (f *frameworkImpl) Close() error {
 	var errs []error
