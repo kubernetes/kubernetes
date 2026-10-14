@@ -492,9 +492,9 @@ func TestPreemptionAndNominatedNodeNameScenarios(t *testing.T) {
 							return nil, fmt.Errorf("unexpected plugin type %T", p)
 						}
 
-						executor, ok := preemptionPlugin.Executor.(*preemption.Executor)
+						executor, ok := preemptionPlugin.Executor().(*preemption.Executor)
 						if !ok {
-							return nil, fmt.Errorf("unexpected executor type %T", preemptionPlugin.Executor)
+							return nil, fmt.Errorf("unexpected executor type %T", preemptionPlugin.Executor())
 						}
 						preemptPodFn := executor.PreemptPod
 						executor.PreemptPod = func(ctx context.Context, c fwk.PreemptionCandidate, preemptor preemption.ExecutorPreemptor, victim *v1.Pod, pluginName string) (bool, error) {

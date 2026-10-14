@@ -267,7 +267,6 @@ func TestDryRunPreemption(t *testing.T) {
 					PluginName: "FakePostFilter",
 					Handler:    fwk,
 					Interface:  fakePostPlugin,
-					executor:   nil,
 				}
 				got, _, _ := pe.DryRunPreemption(ctx, state, preemptor, nodeInfos, nil, 0, int32(len(nodeInfos)))
 				// Sort the values (inner victims) and the candidate itself (by its NominatedNodeName).
@@ -370,7 +369,6 @@ func TestSelectCandidate(t *testing.T) {
 					PluginName: "FakePreemptionScorePostFilter",
 					Handler:    fwk,
 					Interface:  fakePreemptionScorePostFilterPlugin,
-					executor:   nil,
 				}
 				candidates, _, _ := pe.DryRunPreemption(ctx, state, pod, nodeInfos, nil, 0, int32(len(nodeInfos)))
 				s := pe.SelectCandidate(ctx, candidates)
@@ -1094,7 +1092,6 @@ func TestGetVictimsOnNode(t *testing.T) {
 			pe := Evaluator{
 				PluginName:                "TestPlugin",
 				Handler:                   fw,
-				executor:                  nil,
 				fts:                       fts,
 				podGroupSnapshot:          fw.MutableSnapshotSharedLister().PodGroups(),
 				compositePodGroupSnapshot: cpgSnapshot,

@@ -340,7 +340,7 @@ func registerDelayedPreemptionPlugin(registry *frameworkruntime.Registry, preemp
 			return nil, fmt.Errorf("unexpected plugin type %T", p)
 		}
 
-		exec, ok := preemptionPlugin.Executor.(*preemption.Executor)
+		exec, ok := preemptionPlugin.Executor().(*preemption.Executor)
 		if !ok {
 			return nil, fmt.Errorf("unexpected executor type %T", preemptionPlugin.Executor)
 		}
@@ -389,10 +389,10 @@ func podRunningPreemption(testCtx *testutils.TestContext, t utiltesting.TB, crea
 		if pod.Spec.SchedulingGroup != nil && pod.Spec.SchedulingGroup.PodGroupName != nil {
 			pg, err := testCtx.InformerFactory.Scheduling().V1beta1().PodGroups().Lister().PodGroups(pod.Namespace).Get(*pod.Spec.SchedulingGroup.PodGroupName)
 			if err == nil {
-				return preemptionPlugin.Executor.IsPodGroupRunningPreemption(pg.UID), nil
+				return preemptionPlugin.Executor().IsPodGroupRunningPreemption(pg.UID), nil
 			}
 		}
-		return preemptionPlugin.Executor.IsPodRunningPreemption(pod.GetUID()), nil
+		return preemptionPlugin.Executor().IsPodRunningPreemption(pod.GetUID()), nil
 	}); err != nil {
 		t.Fatalf("Expected the pod %s to be running preemption", createdPods[*podIndex].Name)
 	}

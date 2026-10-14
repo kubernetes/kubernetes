@@ -40,6 +40,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -3856,7 +3857,7 @@ func TestPreEnqueue(t *testing.T) {
 
 			finishPreemption := make(chan struct{})
 
-			executor := p.Executor.(*preemption.Executor)
+			executor := p.Executor().(*preemption.Executor)
 			executor.PreemptPod = func(ctx context.Context, c fwk.PreemptionCandidate, preemptor preemption.ExecutorPreemptor, victim *v1.Pod, pluginName string) (bool, error) {
 				if !tt.features.EnableAsyncPreemption {
 					return false, nil
@@ -4424,9 +4425,12 @@ type mockPreemptionManager struct {
 	fwk.PreemptionManager
 	fwk.PreemptionExecutor
 
-	victims        []fwk.PreemptionVictim
-	reprieveFilter fwk.ReprieveFilter
-	candidate      fwk.PreemptionCandidate
+	victims                     []fwk.PreemptionVictim
+	reprieveFilter              fwk.ReprieveFilter
+	candidate                   fwk.PreemptionCandidate
+	podCandidate                fwk.PreemptionCandidate
+	isPodRunningPreemption      bool
+	isPodGroupRunningPreemption bool
 }
 
 func (m *mockPreemptionManager) GenerateVictims(_ context.Context, pgi fwk.PodGroupInfo) ([]fwk.PreemptionVictim, *fwk.Status) {
@@ -4444,9 +4448,22 @@ func (m *mockPreemptionManager) NewReprieveFilter(ctx context.Context, allVictim
 	return m.PreemptionManager.NewReprieveFilter(ctx, allVictims)
 }
 
+func (m *mockPreemptionManager) ActuatePodPreemption(_ context.Context, candidate fwk.PreemptionCandidate, _ *v1.Pod, _ string) *fwk.Status {
+	m.podCandidate = candidate
+	return nil
+}
+
 func (m *mockPreemptionManager) ActuatePodGroupPreemption(_ context.Context, candidate fwk.PreemptionCandidate, _ fwk.PodGroupInfo, _ string) *fwk.Status {
 	m.candidate = candidate
 	return nil
+}
+
+func (m *mockPreemptionManager) IsPodRunningPreemption(_ types.UID) bool {
+	return m.isPodRunningPreemption
+}
+
+func (m *mockPreemptionManager) IsPodGroupRunningPreemption(_ types.UID) bool {
+	return m.isPodGroupRunningPreemption
 }
 
 type maxReprievesFilter struct {
@@ -4738,5 +4755,200 @@ func TestDefaultPreemption_PodGroupPostFilter_CustomPreemptionManager(t *testing
 				t.Fatalf("Unexpected assignments (-want, +got):\n%s", diff)
 			}
 		})
+	}
+}
+
+func TestDefaultPreemption_SetPreemptionManager(t *testing.T) {
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.GenericWorkload:          true,
+		features.SchedulerAsyncAPICalls:   true,
+		features.SchedulerAsyncPreemption: true,
+	})
+	features := feature.NewSchedulerFeaturesFromGates(utilfeature.DefaultFeatureGate)
+
+	logger, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	cpuResource := func(val int) map[v1.ResourceName]string {
+		return map[v1.ResourceName]string{
+			v1.ResourceCPU: strconv.Itoa(val),
+		}
+	}
+
+	node := st.MakeNode().Name("node1").Capacity(cpuResource(10)).Obj()
+	nodes := []*v1.Node{node}
+
+	standalonePreemptorPod := st.MakePod().Name("standalone-preemptor").UID("standalone-preemptor").Namespace(v1.NamespaceDefault).Priority(highPriority).Req(cpuResource(6)).Obj()
+	preemptorPods := []*v1.Pod{
+		st.MakePod().Name("preemptor-pod-1").UID("preemptor-pod-1").Namespace(v1.NamespaceDefault).PodGroupName("preemptor-pg").Priority(highPriority).Req(cpuResource(3)).Obj(),
+		st.MakePod().Name("preemptor-pod-2").UID("preemptor-pod-2").Namespace(v1.NamespaceDefault).PodGroupName("preemptor-pg").Priority(highPriority).Req(cpuResource(3)).Obj(),
+	}
+
+	victimPod := st.MakePod().Name("victim-1").UID("victim-1").Namespace(v1.NamespaceDefault).Node("node1").Req(cpuResource(6)).Obj()
+	allPods := []*v1.Pod{victimPod}
+
+	pg := st.MakePodGroup().Name("preemptor-pg").UID("preemptor-pg").Namespace(v1.NamespaceDefault).Priority(highPriority).Obj()
+	pgInfo := newPGInfo(pg, preemptorPods...)
+
+	client := clientsetfake.NewClientset(pg, victimPod, standalonePreemptorPod)
+	informerFactory := informers.NewSharedInformerFactory(client, 0)
+	podInformer := informerFactory.Core().V1().Pods().Informer()
+	if err := podInformer.GetStore().Add(standalonePreemptorPod); err != nil {
+		t.Fatal(err)
+	}
+	if err := podInformer.GetStore().Add(victimPod); err != nil {
+		t.Fatal(err)
+	}
+
+	cache := internalcache.New(ctx, nil, true, false)
+	cache.AddGenericPodGroup(fwk.NewGenericPodGroup(pg))
+
+	snapshot := internalcache.NewTestSnapshotWithPodGroups(allPods, nodes, []*v1beta1.PodGroup{pg}, nil)
+
+	registeredPlugins := []tf.RegisterPluginFunc{
+		tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+		tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+		tf.RegisterPluginAsExtensions(noderesources.Name, nodeResourcesFitFunc, "Filter", "PreFilter"),
+	}
+
+	schedFwk, err := tf.NewFramework(ctx, registeredPlugins, "",
+		frameworkruntime.WithClientSet(client),
+		frameworkruntime.WithSnapshotSharedLister(snapshot),
+		frameworkruntime.WithMutableSnapshotLister(snapshot),
+		frameworkruntime.WithInformerFactory(informerFactory),
+		frameworkruntime.WithPodNominator(internalqueue.NewSchedulingQueue(nil, informerFactory)),
+		frameworkruntime.WithLogger(logger),
+		frameworkruntime.WithPodGroupManager(cache),
+		frameworkruntime.WithPreemptionManager(func(fh fwk.Handle) fwk.PreemptionManager {
+			return preemption.NewPreemptionManager(fh, features)
+		}),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	pl, err := New(ctx, getDefaultDefaultPreemptionArgs(), schedFwk, features)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	victimPodInfo, err := framework.NewPodInfo(victimPod)
+	if err != nil {
+		t.Fatal(err)
+	}
+	m := preemption.NewPreemptionManager(schedFwk, features)
+	manager := &mockPreemptionManager{
+		PreemptionManager:  m,
+		PreemptionExecutor: m.Executor(),
+		victims: []fwk.PreemptionVictim{
+			&fakeVictim{
+				pods: []fwk.PodInfo{victimPodInfo},
+			},
+		},
+		isPodRunningPreemption:      true,
+		isPodGroupRunningPreemption: true,
+	}
+	schedFwk.SetPreemptionManager(manager)
+
+	// Check that PreEnqueue is using new PreemptionManager
+	status := pl.PreEnqueue(ctx, standalonePreemptorPod)
+	wantPodStatus := fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "waiting for the preemption for this pod to be finished")
+	if diff := cmp.Diff(wantPodStatus, status); diff != "" {
+		t.Errorf("Unexpected PreEnqueue status for standalone pod (-want, +got):\n%s", diff)
+	}
+
+	status = pl.PreEnqueue(ctx, preemptorPods[0])
+	wantPGStatus := fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "waiting for the preemption for this pod group to be finished")
+	if diff := cmp.Diff(wantPGStatus, status); diff != "" {
+		t.Errorf("Unexpected PreEnqueue status for pod group pod (-want, +got):\n%s", diff)
+	}
+
+	// Check that PostFilter is using new PreemptionManager
+	podState := framework.NewCycleState()
+	if _, s, _ := schedFwk.RunPreFilterPlugins(ctx, podState, standalonePreemptorPod); !s.IsSuccess() {
+		t.Fatalf("Unexpected PreFilter status: %v", s)
+	}
+	filteredNodesStatuses := framework.NewNodeToStatus(map[string]*fwk.Status{
+		node.Name: fwk.NewStatus(fwk.Unschedulable),
+	}, fwk.NewStatus(fwk.UnschedulableAndUnresolvable))
+
+	podPostFilterResult, status := pl.PostFilter(ctx, podState, standalonePreemptorPod, filteredNodesStatuses)
+	if !status.IsSuccess() {
+		t.Fatalf("Expected success status, got %s: %s", status.Code(), status.Message())
+	}
+
+	if manager.podCandidate == nil {
+		t.Fatal("Expected podCandidate to be non-nil")
+	}
+	podCandidateVictims := manager.podCandidate.Victims()
+	if podCandidateVictims == nil {
+		t.Fatal("Expected non-nil victims in podCandidate")
+	}
+	actualPodVictimNames := make([]string, 0, len(podCandidateVictims.Pods))
+	for _, pod := range podCandidateVictims.Pods {
+		actualPodVictimNames = append(actualPodVictimNames, pod.Name)
+	}
+	if diff := cmp.Diff([]string{"victim-1"}, actualPodVictimNames); diff != "" {
+		t.Errorf("Unexpected victims (-want, +got):\n%s", diff)
+	}
+	if podPostFilterResult == nil || podPostFilterResult.NominatingInfo == nil || podPostFilterResult.NominatingInfo.NominatedNodeName != node.Name {
+		t.Errorf("Expected NominatedNodeName %q, got %v", node.Name, podPostFilterResult)
+	}
+
+	// Check that PodGroupPostFilter is using new PreemptionManager
+	schedulingFunc := func(ctx context.Context) (*fwk.PodGroupAssignments, *fwk.Status) {
+		var assignments []fwk.ProposedAssignment
+		for _, preemptorPod := range preemptorPods {
+			cs := framework.NewCycleState()
+			if _, s, _ := schedFwk.RunPreFilterPlugins(ctx, cs, preemptorPod); !s.IsSuccess() {
+				return nil, s
+			}
+			preemptorPodInfo, _ := framework.NewPodInfo(preemptorPod)
+			assignments = append(assignments, &mockProposedAssignment{
+				nodeName:   node.Name,
+				podInfo:    preemptorPodInfo,
+				cycleState: cs,
+			})
+		}
+		return &fwk.PodGroupAssignments{ProposedAssignments: assignments}, nil
+	}
+
+	state := framework.NewCycleState()
+	postFilterResult, status := pl.PodGroupPostFilter(ctx, state, pgInfo, schedulingFunc)
+	if !status.IsSuccess() {
+		t.Fatalf("Expected success status, got %s", status.Code())
+	}
+
+	if manager.candidate == nil {
+		t.Fatal("Expected savedCandidate to be non-nil")
+	}
+
+	candidateVictims := manager.candidate.Victims()
+	if candidateVictims == nil {
+		t.Fatal("Expected non-nil victims in savedCandidate")
+	}
+	actualVictimNames := make([]string, 0, len(candidateVictims.Pods))
+	for _, pod := range candidateVictims.Pods {
+		actualVictimNames = append(actualVictimNames, pod.Name)
+	}
+	if diff := cmp.Diff([]string{"victim-1"}, actualVictimNames); diff != "" {
+		t.Errorf("Unexpected victims (-want, +got):\n%s", diff)
+	}
+
+	if _, err := client.CoreV1().Pods(victimPod.Namespace).Get(ctx, victimPod.Name, metav1.GetOptions{}); err != nil {
+		t.Errorf("Expected pod %s to still exist in client, got error: %v", victimPod.Name, err)
+	}
+
+	actualAssignments := map[string]string{}
+	for key, nomInfo := range postFilterResult.NominatingInfos {
+		actualAssignments[key.Name] = nomInfo.NominatedNodeName
+	}
+	expectedAssignments := map[string]string{
+		"preemptor-pod-1": node.Name,
+		"preemptor-pod-2": node.Name,
+	}
+	if diff := cmp.Diff(expectedAssignments, actualAssignments); diff != "" {
+		t.Fatalf("Unexpected assignments (-want, +got):\n%s", diff)
 	}
 }
