@@ -95,7 +95,7 @@ log_status "Running correctness suite (expected to fail)"
 OUTPUT_FILE=$(mktemp)
 
 rc=0
-go -C "${KUBE_ROOT}" test -v -run "^TestCorrectness$" -count="${COUNT}" "${WHAT}" >"${OUTPUT_FILE}" 2>&1 || rc=$?
+go -C "${KUBE_ROOT}" test -v -failfast -run "^TestCorrectness$" -count="${COUNT}" "${WHAT}" >"${OUTPUT_FILE}" 2>&1 || rc=$?
 cat "${OUTPUT_FILE}"
 
 reproduced=

@@ -703,7 +703,7 @@ func runWatch(ctx context.Context, store storage.Interface, req correctness.Watc
 	timer := time.NewTimer(cfg.Duration)
 	defer timer.Stop()
 
-	if mode == WatcherStalled {
+	if mode == WatcherStalled && watchCtx.Err() == nil {
 		stalledTimer := timer.C
 		if cfg.HiccupDuration > 0 {
 			stalledTimer = time.After(cfg.HiccupDuration)
