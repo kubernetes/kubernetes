@@ -70,6 +70,9 @@ func init() {
 				{ErrorType: "FieldValueInvalid", Origin: "maximum"},
 				{ErrorType: "FieldValueInvalid", Origin: "minimum"},
 			},
+			"template.spec.containers": {
+				{ErrorType: "FieldValueRequired"},
+			},
 			"template.spec.evictionResponders": {
 				{ErrorType: "FieldValueTooMany", Origin: "maxItems"},
 			},
