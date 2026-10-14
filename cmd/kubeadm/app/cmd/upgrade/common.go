@@ -25,7 +25,6 @@ import (
 
 	"github.com/spf13/pflag"
 
-	"k8s.io/apimachinery/pkg/util/sets"
 	fakediscovery "k8s.io/client-go/discovery/fake"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
@@ -37,7 +36,6 @@ import (
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
-	"k8s.io/kubernetes/cmd/kubeadm/app/images"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/upgrade"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
@@ -71,6 +69,13 @@ func enforceRequirements(flagSet *pflag.FlagSet, flags *applyPlanFlags, args []s
 		return nil, nil, nil, nil, err
 	}
 
+	// Ensure the user is root before doing anything else.
+	klog.V(1).Info("running preflight checks")
+	_, _ = printer.Printf("[preflight] Running pre-flight checks.\n")
+	if err := preflight.RunRootCheckOnly(ignorePreflightErrorsSet); err != nil {
+		return nil, nil, nil, nil, err
+	}
+
 	getNodeRegistration := true
 	getAPIEndpoint := staticpodutil.IsControlPlaneNode()
 	getComponentConfigs := true
@@ -80,10 +85,8 @@ func enforceRequirements(flagSet *pflag.FlagSet, flags *applyPlanFlags, args []s
 	}
 
 	// The CoreDNS migration check needs the target version, which honors any
-	// ClusterConfiguration.dns.imageTag override, so preflight runs after fetching initCfg.
-	targetCoreDNSVersion := images.GetDNSImageTag(&initCfg.ClusterConfiguration)
-	klog.V(1).Info("running preflight checks")
-	if err := runPreflightChecks(client, ignorePreflightErrorsSet, targetCoreDNSVersion, printer); err != nil {
+	// ClusterConfiguration.dns.imageTag override, so it runs after fetching initCfg.
+	if err := upgrade.RunCoreDNSMigrationCheck(client, ignorePreflightErrorsSet, &initCfg.ClusterConfiguration); err != nil {
 		return nil, nil, nil, nil, err
 	}
 
@@ -133,16 +136,6 @@ func printConfiguration(clustercfg *kubeadmapi.ClusterConfiguration, w io.Writer
 			printer.Fprintf(w, "\t%s\n", scanner.Text())
 		}
 	}
-}
-
-// runPreflightChecks runs the root preflight check and the CoreDNS migration checks
-func runPreflightChecks(client clientset.Interface, ignorePreflightErrors sets.Set[string], targetCoreDNSVersion string, printer output.Printer) error {
-	printer.Printf("[preflight] Running pre-flight checks.\n")
-	err := preflight.RunRootCheckOnly(ignorePreflightErrors)
-	if err != nil {
-		return err
-	}
-	return upgrade.RunCoreDNSMigrationCheck(client, ignorePreflightErrors, targetCoreDNSVersion)
 }
 
 // getClient gets a real or fake client depending on whether the user is dry-running or not

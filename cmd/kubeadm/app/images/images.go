@@ -56,10 +56,9 @@ func GetDNSImage(cfg *kubeadmapi.ClusterConfiguration) string {
 	return GetGenericImage(dnsImageRepository, constants.CoreDNSImageName, dnsImageTag)
 }
 
-// GetDNSImageTag generates and returns the image tag for CoreDNS, honoring
-// cfg.DNS.ImageTag if the user has set an override.
+// GetDNSImageTag returns constants.CoreDNSVersion unless cfg.DNS.ImageTag overrides it.
 func GetDNSImageTag(cfg *kubeadmapi.ClusterConfiguration) string {
-	// DNS uses an imageTag that corresponds to the DNS version matching the Kubernetes version
+	// DNS uses the version kubeadm defaults to
 	dnsImageTag := constants.CoreDNSVersion
 
 	// unless an override is specified

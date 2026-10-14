@@ -162,12 +162,17 @@ func coreDNSAddon(cfg *kubeadmapi.ClusterConfiguration, client clientset.Interfa
 		return nil
 	}
 
-	targetCoreDNSVersion := strings.TrimLeft(images.GetDNSImageTag(cfg), "v")
-	if err := createCoreDNSAddon(coreDNSDeploymentBytes, coreDNSServiceBytes, coreDNSConfigMapBytes, client, targetCoreDNSVersion); err != nil {
+	if err := createCoreDNSAddon(coreDNSDeploymentBytes, coreDNSServiceBytes, coreDNSConfigMapBytes, client, GetCoreDNSMigrationVersion(cfg)); err != nil {
 		return err
 	}
 	fmt.Fprintln(out, "[addons] Applied essential addon: CoreDNS")
 	return nil
+}
+
+// GetCoreDNSMigrationVersion returns the target CoreDNS version in the form expected by corefile-migration,
+// i.e. the image tag (which honors cfg.DNS.ImageTag) without the "v" prefix.
+func GetCoreDNSMigrationVersion(cfg *kubeadmapi.ClusterConfiguration) string {
+	return strings.TrimPrefix(images.GetDNSImageTag(cfg), "v")
 }
 
 func createCoreDNSAddon(deploymentBytes, serviceBytes, configBytes []byte, client clientset.Interface, targetCoreDNSVersion string) error {
@@ -302,7 +307,12 @@ func isCoreDNSConfigMapMigrationRequired(corefile, currentInstalledCoreDNSVersio
 	}
 	deprecated, err := migration.Deprecated(currentInstalledCoreDNSVersion, targetCoreDNSVersion, corefile)
 	if err != nil {
-		return isMigrationRequired, errors.Wrap(err, "unable to get list of changes to the configuration.")
+		// A target tag unknown to corefile-migration (e.g. a custom dns.imageTag) must not fail the upgrade
+		// after the control plane is already upgraded. Report migration as required so that
+		// migrateCoreDNSCorefile fails into the retain-ConfigMap fallback with a warning.
+		klog.Warningf("unable to get list of changes to the CoreDNS configuration between %q and %q: %v",
+			currentInstalledCoreDNSVersion, targetCoreDNSVersion, err)
+		return true, nil
 	}
 
 	// Check if there are any plugins/options which needs to be removed or is a new default

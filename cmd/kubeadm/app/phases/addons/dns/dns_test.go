@@ -1626,6 +1626,7 @@ func TestIsCoreDNSConfigMapMigrationRequired(t *testing.T) {
 		name                           string
 		corefile                       string
 		currentInstalledCoreDNSVersion string
+		targetCoreDNSVersion           string // defaults to kubeadmconstants.CoreDNSVersion
 		want                           bool
 		wantErr                        bool
 	}{
@@ -1651,16 +1652,46 @@ func TestIsCoreDNSConfigMapMigrationRequired(t *testing.T) {
 			wantErr:                        false,
 		},
 		{
+			// corefile-migration cannot compute the changes, so the caller falls back to retaining the ConfigMap.
 			name:                           "currentInstalledCoreDNSVersion is not supported",
 			corefile:                       "",
 			currentInstalledCoreDNSVersion: "v0.11.1",
+			want:                           true,
+			wantErr:                        false,
+		},
+		{
+			name:                           "overridden target version is the same as the installed version",
+			corefile:                       "Corefile: fake",
+			currentInstalledCoreDNSVersion: "v1.8.0",
+			targetCoreDNSVersion:           "1.8.0",
 			want:                           false,
-			wantErr:                        true,
+			wantErr:                        false,
+		},
+		{
+			name:                           "overridden target version is known and differs from the constant",
+			corefile:                       "Corefile: fake",
+			currentInstalledCoreDNSVersion: "v1.2.0",
+			targetCoreDNSVersion:           "1.8.0",
+			want:                           true,
+			wantErr:                        false,
+		},
+		{
+			// A custom dns.imageTag unknown to corefile-migration must not fail the upgrade.
+			name:                           "overridden target version is unknown to corefile-migration",
+			corefile:                       "Corefile: fake",
+			currentInstalledCoreDNSVersion: "v1.8.0",
+			targetCoreDNSVersion:           "99.0.0-custom",
+			want:                           true,
+			wantErr:                        false,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := isCoreDNSConfigMapMigrationRequired(tt.corefile, tt.currentInstalledCoreDNSVersion, strings.TrimLeft(kubeadmconstants.CoreDNSVersion, "v"))
+			target := tt.targetCoreDNSVersion
+			if target == "" {
+				target = strings.TrimPrefix(kubeadmconstants.CoreDNSVersion, "v")
+			}
+			got, err := isCoreDNSConfigMapMigrationRequired(tt.corefile, tt.currentInstalledCoreDNSVersion, target)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("isCoreDNSConfigMapMigrationRequired() error = %v, wantErr %v", err, tt.wantErr)
 				return

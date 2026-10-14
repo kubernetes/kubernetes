@@ -29,7 +29,6 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
-	"k8s.io/kubernetes/cmd/kubeadm/app/images"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/upgrade"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
@@ -76,8 +75,7 @@ func runPreflight(c workflow.RunData) error {
 	}
 
 	// Run CoreDNS migration check.
-	targetCoreDNSVersion := images.GetDNSImageTag(&initCfg.ClusterConfiguration)
-	if err := upgrade.RunCoreDNSMigrationCheck(client, ignorePreflightErrors, targetCoreDNSVersion); err != nil {
+	if err := upgrade.RunCoreDNSMigrationCheck(client, ignorePreflightErrors, &initCfg.ClusterConfiguration); err != nil {
 		return err
 	}
 

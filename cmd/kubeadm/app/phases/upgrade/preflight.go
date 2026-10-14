@@ -27,6 +27,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
 
+	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/dns"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
@@ -54,8 +55,8 @@ func (c CoreDNSCheck) Check() (warnings, errors []error) {
 }
 
 // RunCoreDNSMigrationCheck initializes checks related to CoreDNS migration.
-func RunCoreDNSMigrationCheck(client clientset.Interface, ignorePreflightErrors sets.Set[string], targetCoreDNSVersion string) error {
-	targetCoreDNSVersion = strings.TrimLeft(targetCoreDNSVersion, "v")
+func RunCoreDNSMigrationCheck(client clientset.Interface, ignorePreflightErrors sets.Set[string], cfg *kubeadmapi.ClusterConfiguration) error {
+	targetCoreDNSVersion := dns.GetCoreDNSMigrationVersion(cfg)
 	migrationChecks := []preflight.Checker{
 		&CoreDNSCheck{
 			name:          "CoreDNSUnsupportedPlugins",
