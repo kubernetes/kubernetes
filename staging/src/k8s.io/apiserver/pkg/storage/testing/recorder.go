@@ -62,8 +62,8 @@ func (r *KVRecorder) GetStreamReadsAndReset() uint64 {
 type WatchRecorder struct {
 	clientv3.Watcher
 
-	mux    sync.Mutex
-	prevKV []bool
+	mux      sync.Mutex
+	requests []clientv3.Op
 }
 
 func NewWatchRecorder(watcher clientv3.Watcher) *WatchRecorder {
@@ -73,15 +73,15 @@ func NewWatchRecorder(watcher clientv3.Watcher) *WatchRecorder {
 func (r *WatchRecorder) Watch(ctx context.Context, key string, opts ...clientv3.OpOption) clientv3.WatchChan {
 	op := clientv3.OpGet(key, opts...)
 	r.mux.Lock()
-	r.prevKV = append(r.prevKV, op.IsPrevKV())
+	r.requests = append(r.requests, op)
 	r.mux.Unlock()
 	return r.Watcher.Watch(ctx, key, opts...)
 }
 
-func (r *WatchRecorder) PrevKVRequests() []bool {
+func (r *WatchRecorder) WatchRequests() []clientv3.Op {
 	r.mux.Lock()
 	defer r.mux.Unlock()
-	return append([]bool(nil), r.prevKV...)
+	return append([]clientv3.Op(nil), r.requests...)
 }
 
 type KubernetesRecorder struct {

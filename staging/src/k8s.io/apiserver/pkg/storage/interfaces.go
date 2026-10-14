@@ -340,8 +340,8 @@ type ListOptions struct {
 	SendInitialEvents *bool
 	// WatchWithoutPrevKV requests omission of previous values from etcd watch
 	// events. Deleted objects then contain only name, namespace, and the deletion
-	// resource version. If no reverse key function is available, etcd storage
-	// keeps requesting previous values and returns full deleted objects instead.
+	// resource version. It requires an object constructor and a reverse key
+	// function; etcd storage rejects the request if either is unavailable.
 	// This is intended for the watch cache, which retains the full previous object.
 	// It requires an empty predicate, is rejected by the cacher, and is ignored
 	// for non-watch requests.
@@ -465,5 +465,6 @@ func PrepareKey(resourcePrefix, key string, recursive bool) (string, error) {
 // cluster-scoped resources, namespace is empty and name is non-empty. An error
 // is returned if the key cannot be parsed into a valid object identity.
 // A nil ReverseKeyFunc indicates that identity cannot be derived from the
-// key and callers must fall back to decoding the stored object.
+// key. Callers must decode the stored object or reject operations that require
+// key-derived identity.
 type ReverseKeyFunc func(key string) (name string, namespace string, err error)

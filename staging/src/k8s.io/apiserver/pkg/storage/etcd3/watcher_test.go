@@ -63,19 +63,13 @@ func TestWatch(t *testing.T) {
 		ctx, store, client := testSetup(t, withPrefix("/"), withResourcePrefix("/pods"), withReverseKeyFunc(storagetesting.PodReverseKeyFunc("/pods", true)))
 		recorder := storagetesting.NewWatchRecorder(client.Watcher)
 		client.Watcher = recorder
-		storagetesting.RunTestWatchWithoutPrevKV(ctx, t, store, recorder, "ns", false)
+		storagetesting.RunTestWatchDeleteEventObjectHaveLatestRV(ctx, t, store, "ns", true, recorder)
 	})
 	t.Run("WatchWithoutPrevKVClusterScoped", func(t *testing.T) {
 		ctx, store, client := testSetup(t, withPrefix("/custom/prefix"), withResourcePrefix("/pods"), withReverseKeyFunc(storagetesting.PodReverseKeyFunc("/pods", false)))
 		recorder := storagetesting.NewWatchRecorder(client.Watcher)
 		client.Watcher = recorder
-		storagetesting.RunTestWatchWithoutPrevKV(ctx, t, store, recorder, "", false)
-	})
-	t.Run("WatchWithoutPrevKVFallback", func(t *testing.T) {
-		ctx, store, client := testSetup(t, withPrefix("/registry"), withResourcePrefix("/pods"))
-		recorder := storagetesting.NewWatchRecorder(client.Watcher)
-		client.Watcher = recorder
-		storagetesting.RunTestWatchWithoutPrevKV(ctx, t, store, recorder, "ns", true)
+		storagetesting.RunTestWatchDeleteEventObjectHaveLatestRV(ctx, t, store, "", true, recorder)
 	})
 	t.Run("WatchWithoutPrevKVReverseError", func(t *testing.T) {
 		wantErr := errors.New("invalid resource key")
@@ -122,7 +116,7 @@ func TestWatch(t *testing.T) {
 	})
 	t.Run("WatchDeleteEventObjectHaveLatestRV", func(t *testing.T) {
 		ctx, store, _ := testSetup(t)
-		storagetesting.RunTestWatchDeleteEventObjectHaveLatestRV(ctx, t, store)
+		storagetesting.RunTestWatchDeleteEventObjectHaveLatestRV(ctx, t, store, "test-ns", false, nil)
 	})
 	t.Run("WatchInitializationSignal", func(t *testing.T) {
 		ctx, store, _ := testSetup(t)
@@ -210,6 +204,21 @@ func TestWatchErrorIncorrectConfiguration(t *testing.T) {
 			setupFn: func(opts *setupOptions) {
 				opts.newFunc = nil
 				opts.reverseKeyFunc = storagetesting.PodReverseKeyFunc("/pods", true)
+			},
+			requestOpts: storage.ListOptions{WatchWithoutPrevKV: true, Predicate: storage.Everything},
+			expectedErr: apierrors.NewInternalError(errors.New("watchWithoutPrevKV requires a newFunc")),
+		},
+		{
+			name:        "watch without previous values requires a reverse key function",
+			setupFn:     func(opts *setupOptions) { opts.reverseKeyFunc = nil },
+			requestOpts: storage.ListOptions{WatchWithoutPrevKV: true, Predicate: storage.Everything},
+			expectedErr: apierrors.NewInternalError(errors.New("watchWithoutPrevKV requires a reverseKeyFunc")),
+		},
+		{
+			name: "watch without previous values requires both functions",
+			setupFn: func(opts *setupOptions) {
+				opts.newFunc = nil
+				opts.reverseKeyFunc = nil
 			},
 			requestOpts: storage.ListOptions{WatchWithoutPrevKV: true, Predicate: storage.Everything},
 			expectedErr: apierrors.NewInternalError(errors.New("watchWithoutPrevKV requires a newFunc")),
