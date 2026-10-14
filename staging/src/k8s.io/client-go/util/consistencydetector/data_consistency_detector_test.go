@@ -21,17 +21,19 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/stretchr/testify/require"
+	"github.com/onsi/gomega"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/ktesting"
 	"k8s.io/utils/ptr"
 )
 
 func TestDataConsistencyChecker(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	scenarios := []struct {
 		name string
 
@@ -203,8 +205,7 @@ func TestDataConsistencyChecker(t *testing.T) {
 	}
 
 	for _, scenario := range scenarios {
-		t.Run(scenario.name, func(t *testing.T) {
-			ctx := context.TODO()
+		tCtx.Run(scenario.name, func(tCtx ktesting.TContext) {
 			if scenario.listResponse == nil {
 				scenario.listResponse = &v1.PodList{}
 			}
@@ -214,29 +215,29 @@ func TestDataConsistencyChecker(t *testing.T) {
 			}
 
 			if scenario.expectPanic {
-				require.Panics(t, func() {
-					CheckDataConsistency(ctx, "", scenario.lastSyncedResourceVersion, fakeLister.List, nil, scenario.requestOptions, retrievedItemsFunc)
-				})
+				tCtx.Require(func() {
+					CheckDataConsistency(tCtx, "", scenario.lastSyncedResourceVersion, fakeLister.List, nil, scenario.requestOptions, retrievedItemsFunc)
+				}).Should(gomega.Panic())
 			} else {
-				CheckDataConsistency(ctx, "", scenario.lastSyncedResourceVersion, fakeLister.List, nil, scenario.requestOptions, retrievedItemsFunc)
+				CheckDataConsistency(tCtx, "", scenario.lastSyncedResourceVersion, fakeLister.List, nil, scenario.requestOptions, retrievedItemsFunc)
 			}
 
-			require.Equal(t, scenario.expectedListRequests, fakeLister.counter)
-			require.Equal(t, scenario.expectedRequestOptions, fakeLister.requestOptions)
+			tCtx.Require(fakeLister.counter).Should(gomega.Equal(scenario.expectedListRequests))
+			tCtx.Require(fakeLister.requestOptions).Should(gomega.Equal(scenario.expectedRequestOptions))
 		})
 	}
 }
 
 func TestDataConsistencyCheckerRetry(t *testing.T) {
-	ctx := context.TODO()
+	tCtx := ktesting.Init(t)
 	retrievedItemsFunc := func() []*v1.Pod {
 		return nil
 	}
 	stopListErrorAfter := 5
 	fakeErrLister := &errorLister{stopErrorAfter: stopListErrorAfter}
 
-	CheckDataConsistency(ctx, "", "", fakeErrLister.List, nil, metav1.ListOptions{}, retrievedItemsFunc)
-	require.Equal(t, fakeErrLister.listCounter, fakeErrLister.stopErrorAfter)
+	CheckDataConsistency(tCtx, "", "", fakeErrLister.List, nil, metav1.ListOptions{}, retrievedItemsFunc)
+	tCtx.Require(fakeErrLister.listCounter).Should(gomega.Equal(fakeErrLister.stopErrorAfter))
 }
 
 type errorLister struct {

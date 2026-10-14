@@ -65,6 +65,17 @@ func BufferLogs(enabled bool) InitOption {
 	}
 }
 
+// Verbosity overrides the effective verbosity threshold for the per-test
+// logger, regardless of the "-v" command line flag. This matches the
+// behavior of [k8s.io/klog/v2/ktesting.Verbosity]. It is useful for tests
+// which need to ensure that verbosity is predictable, for example for
+// testing log output with [BufferLogs].
+func Verbosity(level int) InitOption {
+	return func(c *internal.InitConfig) {
+		c.Verbosity = &level
+	}
+}
+
 // WithCleanupGracePeriod overrides the default cleanup grace period.
 // The cleanup grace period is the time reserved before the test-suite
 // deadline so that cleanup callbacks can complete before the test binary is

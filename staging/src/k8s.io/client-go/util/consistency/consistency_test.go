@@ -17,56 +17,59 @@ limitations under the License.
 package consistency
 
 import (
+	"errors"
 	"sync"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	"github.com/onsi/gomega"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/ktesting"
 )
 
 func TestOwnerRecord_WroteAt(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	uid := types.UID("owner-uid-1")
 	or := newOwnerRecord(uid)
-	assert.Equal(t, uid, or.ownerUID)
-	require.NotNil(t, or.versions)
+	tCtx.Assert(or.ownerUID).Should(gomega.Equal(uid))
+	tCtx.Require(or.versions).ShouldNot(gomega.BeNil())
 
 	grPod := schema.GroupResource{Group: "", Resource: "pods"}
 	grDs := schema.GroupResource{Group: "apps", Resource: "daemonsets"}
 
 	// Empty or malformed initial write is ignored
 	or.WroteAt(grPod, "")
-	assert.Empty(t, or.versions)
+	tCtx.Assert(or.versions).Should(gomega.BeEmpty())
 	or.WroteAt(grPod, "invalid")
-	assert.Empty(t, or.versions)
+	tCtx.Assert(or.versions).Should(gomega.BeEmpty())
 
 	// First write
 	or.WroteAt(grPod, "5")
-	assert.Equal(t, "5", or.versions[grPod])
+	tCtx.Assert(or.versions[grPod]).Should(gomega.Equal("5"))
 
 	// Second write (higher)
 	or.WroteAt(grPod, "10")
-	assert.Equal(t, "10", or.versions[grPod])
+	tCtx.Assert(or.versions[grPod]).Should(gomega.Equal("10"))
 
 	// Third write (lower)
 	or.WroteAt(grPod, "8")
-	assert.Equal(t, "10", or.versions[grPod])
+	tCtx.Assert(or.versions[grPod]).Should(gomega.Equal("10"))
 
 	// Empty or malformed write does not overwrite existing valid RV
 	or.WroteAt(grPod, "")
-	assert.Equal(t, "10", or.versions[grPod])
+	tCtx.Assert(or.versions[grPod]).Should(gomega.Equal("10"))
 	or.WroteAt(grPod, "invalid")
-	assert.Equal(t, "10", or.versions[grPod])
+	tCtx.Assert(or.versions[grPod]).Should(gomega.Equal("10"))
 
 	// Write to different resource
 	or.WroteAt(grDs, "1")
-	assert.Equal(t, "1", or.versions[grDs])
-	assert.Equal(t, "10", or.versions[grPod], "Pod version should be unchanged")
+	tCtx.Assert(or.versions[grDs]).Should(gomega.Equal("1"))
+	tCtx.Assert(or.versions[grPod]).Should(gomega.Equal("10"), "Pod version should be unchanged")
 }
 
 func TestOwnerRecord_IsReady(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	uid := types.UID("owner-uid-1")
 	or := newOwnerRecord(uid)
 	grPod := schema.GroupResource{Group: "", Resource: "pods"}
@@ -81,7 +84,7 @@ func TestOwnerRecord_IsReady(t *testing.T) {
 	store := newConsistencyStore(resourceStores)
 
 	// Case 1: No writes. Should be ready.
-	require.NoError(t, or.EnsureReady(store), "Should be ready if no writes are recorded")
+	tCtx.ExpectNoError(or.EnsureReady(store), "Should be ready if no writes are recorded")
 
 	// Add a write
 	or.WroteAt(grPod, "10")
@@ -89,44 +92,45 @@ func TestOwnerRecord_IsReady(t *testing.T) {
 	// Case 2: Write exists, but no reads observed yet (readRV == ""). Not ready (fails in safe direction).
 	var consistencyErr *ConsistencyError
 	err := or.EnsureReady(store)
-	require.ErrorAs(t, err, &consistencyErr, "Not ready if write exists and no read observed")
-	assert.Empty(t, consistencyErr.ReadRV)
-	assert.Equal(t, "10", consistencyErr.WroteRV)
-	assert.Equal(t, grPod, consistencyErr.GroupResource)
+	tCtx.Require(errors.As(err, &consistencyErr)).Should(gomega.BeTrueBecause("error must match target type"), "Not ready if write exists and no read observed")
+	tCtx.Assert(consistencyErr.ReadRV).Should(gomega.BeEmpty())
+	tCtx.Assert(consistencyErr.WroteRV).Should(gomega.Equal("10"))
+	tCtx.Assert(consistencyErr.GroupResource).Should(gomega.Equal(grPod))
 
 	// Add a read, but it's lower
 	podStore.Bookmark("5")
 
 	// Case 3: Write exists, read is lower. Not ready.
-	require.Error(t, or.EnsureReady(store), "Not ready if read < write")
+	tCtx.Require(or.EnsureReady(store)).Should(gomega.HaveOccurred(), "Not ready if read < write")
 
 	// Add a read, equal
 	podStore.Bookmark("10")
 
 	// Case 4: Write exists, read is equal. Ready.
-	require.NoError(t, or.EnsureReady(store), "Ready if read == write")
+	tCtx.ExpectNoError(or.EnsureReady(store), "Ready if read == write")
 
 	// Add a read, higher
 	podStore.Bookmark("15")
 
 	// Case 5: Write exists, read is higher. Ready.
-	require.NoError(t, or.EnsureReady(store), "Ready if read > write")
+	tCtx.ExpectNoError(or.EnsureReady(store), "Ready if read > write")
 
 	// Add a second write and read
 	or.WroteAt(grDs, "100")
 	dsStore.Bookmark("50")
 
 	// Case 6: One resource ready, one not. Not ready.
-	require.Error(t, or.EnsureReady(store), "Not ready if one of multiple writes is not ready")
+	tCtx.Require(or.EnsureReady(store)).Should(gomega.HaveOccurred(), "Not ready if one of multiple writes is not ready")
 
 	// Make the second one ready
 	dsStore.Bookmark("100")
 
 	// Case 7: All resources ready. Ready.
-	require.NoError(t, or.EnsureReady(store), "Ready if all writes are ready")
+	tCtx.ExpectNoError(or.EnsureReady(store), "Ready if all writes are ready")
 }
 
 func TestOwnerRecord_EnsureReady_MissingOrNilStore(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	uid := types.UID("owner-uid-1")
 	or := newOwnerRecord(uid)
 	grPod := schema.GroupResource{Group: "", Resource: "pods"}
@@ -135,57 +139,61 @@ func TestOwnerRecord_EnsureReady_MissingOrNilStore(t *testing.T) {
 	// Missing store in map
 	storeWithoutPod := newConsistencyStore(map[schema.GroupResource]LastSyncRVGetter{})
 	err := or.EnsureReady(storeWithoutPod)
-	require.ErrorContains(t, err, "no store registered for group resource pods")
+	tCtx.Require(err).Should(gomega.MatchError(gomega.ContainSubstring("no store registered for group resource pods")))
 
 	// Nil store in map
 	storeWithNilPod := newConsistencyStore(map[schema.GroupResource]LastSyncRVGetter{
 		grPod: nil,
 	})
 	err = or.EnsureReady(storeWithNilPod)
-	require.ErrorContains(t, err, "no store registered for group resource pods")
+	tCtx.Require(err).Should(gomega.MatchError(gomega.ContainSubstring("no store registered for group resource pods")))
 }
 
 func TestConsistencyError_Error(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	gr := schema.GroupResource{Group: "apps", Resource: "statefulsets"}
 	errUnsynced := &ConsistencyError{
 		WroteRV:       "10",
 		ReadRV:        "",
 		GroupResource: gr,
 	}
-	assert.Equal(t, "read version is not synced (written version: 10) for group resource statefulsets.apps", errUnsynced.Error())
+	tCtx.Assert(errUnsynced.Error()).Should(gomega.Equal("read version is not synced (written version: 10) for group resource statefulsets.apps"))
 
 	errStale := &ConsistencyError{
 		WroteRV:       "10",
 		ReadRV:        "5",
 		GroupResource: gr,
 	}
-	assert.Equal(t, "read version: 5 is not as new as written version: 10 for group resource statefulsets.apps", errStale.Error())
+	tCtx.Assert(errStale.Error()).Should(gomega.Equal("read version: 5 is not as new as written version: 10 for group resource statefulsets.apps"))
 }
 
 func TestConsistencyStore_New(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	store := NewConsistencyStore(nil)
-	require.NotNil(t, store)
+	tCtx.Require(store).ShouldNot(gomega.BeNil())
 	internalStore, ok := store.(*consistencyStore)
-	require.True(t, ok)
-	require.NotNil(t, internalStore.writes)
-	assert.Empty(t, internalStore.writes)
+	tCtx.Require(ok).Should(gomega.BeTrueBecause("NewConsistencyStore must return a *consistencyStore"))
+	tCtx.Require(internalStore.writes).ShouldNot(gomega.BeNil())
+	tCtx.Assert(internalStore.writes).Should(gomega.BeEmpty())
 }
 
 func TestNoopConsistencyStore(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	store := NewNoopConsistencyStore()
-	require.NotNil(t, store)
+	tCtx.Require(store).ShouldNot(gomega.BeNil())
 
 	owner := types.NamespacedName{Namespace: "default", Name: "owner1"}
 	uid := types.UID("uid-1")
 	grPod := schema.GroupResource{Group: "", Resource: "pods"}
 
 	store.WroteAt(owner, uid, grPod, "10")
-	require.NoError(t, store.EnsureReady(owner))
+	tCtx.ExpectNoError(store.EnsureReady(owner))
 	store.Clear(owner, uid)
-	require.NoError(t, store.EnsureReady(owner))
+	tCtx.ExpectNoError(store.EnsureReady(owner))
 }
 
 func TestConsistencyStore_EnsureWrittenRecord(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	store := newConsistencyStore(nil)
 	owner := types.NamespacedName{Name: "owner1"}
 	uid1 := types.UID("uid-1")
@@ -193,29 +201,30 @@ func TestConsistencyStore_EnsureWrittenRecord(t *testing.T) {
 
 	// Create new
 	r1 := store.ensureWrittenRecord(owner, uid1)
-	require.NotNil(t, r1)
-	assert.Equal(t, uid1, r1.ownerUID)
-	assert.Same(t, r1, store.writes[owner])
+	tCtx.Require(r1).ShouldNot(gomega.BeNil())
+	tCtx.Assert(r1.ownerUID).Should(gomega.Equal(uid1))
+	tCtx.Assert(store.writes[owner]).Should(gomega.BeIdenticalTo(r1))
 
 	// Get existing with same UID
 	r2 := store.ensureWrittenRecord(owner, uid1)
-	assert.Same(t, r1, r2, "Should return existing record for same UID")
+	tCtx.Assert(r2).Should(gomega.BeIdenticalTo(r1), "Should return existing record for same UID")
 
 	// Get existing with different UID (should replace)
 	r3 := store.ensureWrittenRecord(owner, uid2)
-	require.NotNil(t, r3)
-	assert.NotSame(t, r1, r3, "Should be a new record")
-	assert.Equal(t, uid2, r3.ownerUID)
-	assert.Same(t, r3, store.writes[owner], "New record should replace old one in map")
-	assert.Empty(t, r3.versions, "New record should be empty")
+	tCtx.Require(r3).ShouldNot(gomega.BeNil())
+	tCtx.Assert(r3).ShouldNot(gomega.BeIdenticalTo(r1), "Should be a new record")
+	tCtx.Assert(r3.ownerUID).Should(gomega.Equal(uid2))
+	tCtx.Assert(store.writes[owner]).Should(gomega.BeIdenticalTo(r3), "New record should replace old one in map")
+	tCtx.Assert(r3.versions).Should(gomega.BeEmpty(), "New record should be empty")
 
 	// Check that old record is detached
 	grPod := schema.GroupResource{Group: "", Resource: "pods"}
 	r1.WroteAt(grPod, "10") // Write to old record
-	assert.Empty(t, r3.versions, "Write to old record should not affect new record")
+	tCtx.Assert(r3.versions).Should(gomega.BeEmpty(), "Write to old record should not affect new record")
 }
 
 func TestConsistencyStore_EnsureWrittenRecord_Concurrent(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	store := newConsistencyStore(nil)
 	owner := types.NamespacedName{Name: "owner1"}
 	uid1 := types.UID("uid-1")
@@ -232,16 +241,16 @@ func TestConsistencyStore_EnsureWrittenRecord_Concurrent(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			r := store.ensureWrittenRecord(owner, uid1)
-			assert.Equal(t, uid1, r.ownerUID)
+			tCtx.Assert(r.ownerUID).Should(gomega.Equal(uid1))
 			once.Do(func() {
 				firstRecord = r
 			})
-			assert.Same(t, firstRecord, r)
+			tCtx.Assert(r).Should(gomega.BeIdenticalTo(firstRecord))
 		}()
 	}
 	wg.Wait()
-	require.NotNil(t, firstRecord)
-	assert.Len(t, store.writes, 1)
+	tCtx.Require(firstRecord).ShouldNot(gomega.BeNil())
+	tCtx.Assert(store.writes).Should(gomega.HaveLen(1))
 
 	// Concurrent replacement with new UID
 	var replacementRecord *ownerRecord
@@ -251,21 +260,22 @@ func TestConsistencyStore_EnsureWrittenRecord_Concurrent(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			r := store.ensureWrittenRecord(owner, uid2)
-			assert.Equal(t, uid2, r.ownerUID)
+			tCtx.Assert(r.ownerUID).Should(gomega.Equal(uid2))
 			replaceOnce.Do(func() {
 				replacementRecord = r
 			})
-			assert.Same(t, replacementRecord, r)
+			tCtx.Assert(r).Should(gomega.BeIdenticalTo(replacementRecord))
 		}()
 	}
 	wg.Wait()
-	require.NotNil(t, replacementRecord)
-	assert.Len(t, store.writes, 1)
-	assert.Same(t, replacementRecord, store.writes[owner])
-	assert.NotSame(t, firstRecord, replacementRecord)
+	tCtx.Require(replacementRecord).ShouldNot(gomega.BeNil())
+	tCtx.Assert(store.writes).Should(gomega.HaveLen(1))
+	tCtx.Assert(store.writes[owner]).Should(gomega.BeIdenticalTo(replacementRecord))
+	tCtx.Assert(replacementRecord).ShouldNot(gomega.BeIdenticalTo(firstRecord))
 }
 
 func TestConsistencyStore_WroteAt(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	store := newConsistencyStore(nil)
 	owner := types.NamespacedName{Name: "owner1"}
 	uid1 := types.UID("uid-1")
@@ -273,22 +283,23 @@ func TestConsistencyStore_WroteAt(t *testing.T) {
 
 	// Empty RV allocates a record but does not add any versions
 	store.WroteAt(owner, uid1, grPod, "")
-	assert.Empty(t, store.getWrittenRecord(owner).versions[grPod])
+	tCtx.Assert(store.getWrittenRecord(owner).versions[grPod]).Should(gomega.BeEmpty())
 
 	store.WroteAt(owner, uid1, grPod, "10")
 
 	record := store.getWrittenRecord(owner)
-	require.NotNil(t, record)
-	assert.Equal(t, uid1, record.ownerUID)
+	tCtx.Require(record).ShouldNot(gomega.BeNil())
+	tCtx.Assert(record.ownerUID).Should(gomega.Equal(uid1))
 
-	assert.Equal(t, "10", record.versions[grPod])
+	tCtx.Assert(record.versions[grPod]).Should(gomega.Equal("10"))
 
 	// Write again
 	store.WroteAt(owner, uid1, grPod, "20")
-	assert.Equal(t, "20", record.versions[grPod])
+	tCtx.Assert(record.versions[grPod]).Should(gomega.Equal("20"))
 }
 
 func TestConsistencyStore_Clear(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	store := newConsistencyStore(nil)
 	owner1 := types.NamespacedName{Name: "owner1"}
 	owner2 := types.NamespacedName{Name: "owner2"}
@@ -298,35 +309,36 @@ func TestConsistencyStore_Clear(t *testing.T) {
 	// Setup
 	r1 := store.ensureWrittenRecord(owner1, uid1)
 	r2 := store.ensureWrittenRecord(owner2, uid2)
-	require.Len(t, store.writes, 2)
+	tCtx.Require(store.writes).Should(gomega.HaveLen(2))
 
 	// Clear non-existent
 	store.Clear(types.NamespacedName{Name: "non-existent"}, uid1)
-	assert.Len(t, store.writes, 2)
+	tCtx.Assert(store.writes).Should(gomega.HaveLen(2))
 
 	// Clear with wrong UID
 	store.Clear(owner1, uid2)
-	assert.Len(t, store.writes, 2, "Should not clear with wrong UID")
-	assert.Same(t, r1, store.writes[owner1])
+	tCtx.Assert(store.writes).Should(gomega.HaveLen(2), "Should not clear with wrong UID")
+	tCtx.Assert(store.writes[owner1]).Should(gomega.BeIdenticalTo(r1))
 
 	// Clear with correct UID
 	store.Clear(owner1, uid1)
-	assert.Len(t, store.writes, 1, "Should clear with correct UID")
-	assert.Nil(t, store.writes[owner1])
-	assert.Same(t, r2, store.writes[owner2], "Other record should remain")
+	tCtx.Assert(store.writes).Should(gomega.HaveLen(1), "Should clear with correct UID")
+	tCtx.Assert(store.writes[owner1]).Should(gomega.BeNil())
+	tCtx.Assert(store.writes[owner2]).Should(gomega.BeIdenticalTo(r2), "Other record should remain")
 
 	// Re-add r1
 	store.ensureWrittenRecord(owner1, uid1)
-	require.Len(t, store.writes, 2)
+	tCtx.Require(store.writes).Should(gomega.HaveLen(2))
 
 	// Clear with empty UID
 	store.Clear(owner1, "")
-	assert.Len(t, store.writes, 1, "Should clear with empty UID")
-	assert.Nil(t, store.writes[owner1])
-	assert.Same(t, r2, store.writes[owner2])
+	tCtx.Assert(store.writes).Should(gomega.HaveLen(1), "Should clear with empty UID")
+	tCtx.Assert(store.writes[owner1]).Should(gomega.BeNil())
+	tCtx.Assert(store.writes[owner2]).Should(gomega.BeIdenticalTo(r2))
 }
 
 func TestConsistencyStore_IsReady(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	owner1 := types.NamespacedName{Name: "owner1"}
 	uid1 := types.UID("uid-1")
 	grPod := schema.GroupResource{Group: "", Resource: "pods"}
@@ -338,33 +350,33 @@ func TestConsistencyStore_IsReady(t *testing.T) {
 	store := newConsistencyStore(resourceStores)
 
 	// Case 1: No record. Ready.
-	require.NoError(t, store.EnsureReady(owner1), "Ready if no record exists")
+	tCtx.ExpectNoError(store.EnsureReady(owner1), "Ready if no record exists")
 
 	// Add a write before any reads
 	store.WroteAt(owner1, uid1, grPod, "10")
 
 	// Case 2: Record exists, but store has not synced any reads yet. Not ready.
-	require.Error(t, store.EnsureReady(owner1), "Not ready if readRV is empty")
+	tCtx.Require(store.EnsureReady(owner1)).Should(gomega.HaveOccurred(), "Not ready if readRV is empty")
 
 	// Add read, but lower
 	podStore.Bookmark("5")
 
 	// Case 3: Record exists, read < write. Not ready.
-	require.Error(t, store.EnsureReady(owner1), "Not ready if read < write")
+	tCtx.Require(store.EnsureReady(owner1)).Should(gomega.HaveOccurred(), "Not ready if read < write")
 
 	// Add read, equal
 	podStore.Bookmark("10")
 
 	// Case 4: Record exists, read == write. Ready.
-	require.NoError(t, store.EnsureReady(owner1), "Ready if read == write")
+	tCtx.ExpectNoError(store.EnsureReady(owner1), "Ready if read == write")
 
 	// Add read, higher
 	podStore.Bookmark("15")
 
 	// Case 5: Record exists, read > write. Ready.
-	require.NoError(t, store.EnsureReady(owner1), "Ready if read > write")
+	tCtx.ExpectNoError(store.EnsureReady(owner1), "Ready if read > write")
 
 	// Assert that the record no longer exists, we no longer need to track the
 	// reads as long as the read has been higher than the latest write.
-	assert.Nil(t, store.getWrittenRecord(owner1), "Written record should no longer exist")
+	tCtx.Assert(store.getWrittenRecord(owner1)).Should(gomega.BeNil(), "Written record should no longer exist")
 }

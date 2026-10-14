@@ -22,7 +22,7 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/stretchr/testify/require"
+	"github.com/onsi/gomega"
 	jsonpatch "gopkg.in/evanphx/json-patch.v4"
 	"sigs.k8s.io/structured-merge-diff/v7/fieldpath"
 
@@ -31,9 +31,11 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/client-go/util/csaupgrade"
+	"k8s.io/ktesting"
 )
 
 func TestFindOwners(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	testCases := []struct {
 		Name              string
 		ManagedFieldsYAML string
@@ -268,12 +270,12 @@ func TestFindOwners(t *testing.T) {
 		},
 	}
 	for _, tcase := range testCases {
-		t.Run(tcase.Name, func(t *testing.T) {
+		tCtx.Run(tcase.Name, func(tCtx ktesting.TContext) {
 			var entries struct {
 				ManagedFields []metav1.ManagedFieldsEntry `json:"managedFields"`
 			}
 			err := yaml.Unmarshal([]byte(tcase.ManagedFieldsYAML), &entries)
-			require.NoError(t, err)
+			tCtx.ExpectNoError(err)
 
 			result := csaupgrade.FindFieldsOwners(entries.ManagedFields, tcase.Operation, tcase.Fields)
 
@@ -282,9 +284,9 @@ func TestFindOwners(t *testing.T) {
 			ownerNames := []string{}
 			for _, entry := range result {
 				ownerNames = append(ownerNames, entry.Manager)
-				require.Equal(t, tcase.Operation, entry.Operation)
+				tCtx.Require(entry.Operation).Should(gomega.Equal(tcase.Operation))
 			}
-			require.ElementsMatch(t, tcase.Expectation, ownerNames)
+			tCtx.Require(ownerNames).Should(gomega.ConsistOf(tcase.Expectation))
 		})
 	}
 }

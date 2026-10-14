@@ -25,7 +25,7 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/stretchr/testify/assert"
+	"github.com/onsi/gomega"
 	coordinationv1 "k8s.io/api/coordination/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
@@ -37,7 +37,7 @@ import (
 	fakeclient "k8s.io/client-go/testing"
 	rl "k8s.io/client-go/tools/leaderelection/resourcelock"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/klog/v2/ktesting"
+	"k8s.io/ktesting"
 	"k8s.io/utils/clock"
 )
 
@@ -266,7 +266,7 @@ func testTryAcquireOrRenew(t *testing.T, objectType string) {
 	for i := range tests {
 		test := &tests[i]
 		t.Run(test.name, func(t *testing.T) {
-			_, ctx := ktesting.NewTestContext(t)
+			tCtx := ktesting.Init(t)
 
 			// OnNewLeader is called async so we have to wait for it.
 			var wg sync.WaitGroup
@@ -319,10 +319,10 @@ func testTryAcquireOrRenew(t *testing.T, objectType string) {
 				clock:             clock,
 				metrics:           globalMetricsFactory.newLeaderMetrics(),
 			}
-			if test.expectSuccess != le.tryAcquireOrRenew(ctx) {
+			if test.expectSuccess != le.tryAcquireOrRenew(tCtx) {
 				if test.retryAfter != 0 {
 					time.Sleep(test.retryAfter)
-					if test.expectSuccess != le.tryAcquireOrRenew(ctx) {
+					if test.expectSuccess != le.tryAcquireOrRenew(tCtx) {
 						t.Errorf("unexpected result of tryAcquireOrRenew: [succeeded=%v]", !test.expectSuccess)
 					}
 				} else {
@@ -414,7 +414,7 @@ func TestTryCoordinatedRenew(t *testing.T) {
 	for i := range tests {
 		test := &tests[i]
 		t.Run(test.name, func(t *testing.T) {
-			_, ctx := ktesting.NewTestContext(t)
+			tCtx := ktesting.Init(t)
 
 			// OnNewLeader is called async so we have to wait for it.
 			var wg sync.WaitGroup
@@ -462,10 +462,10 @@ func TestTryCoordinatedRenew(t *testing.T) {
 				clock:             clock,
 				metrics:           globalMetricsFactory.newLeaderMetrics(),
 			}
-			if test.expectSuccess != le.tryCoordinatedRenew(ctx) {
+			if test.expectSuccess != le.tryCoordinatedRenew(tCtx) {
 				if test.retryAfter != 0 {
 					time.Sleep(test.retryAfter)
-					if test.expectSuccess != le.tryCoordinatedRenew(ctx) {
+					if test.expectSuccess != le.tryCoordinatedRenew(tCtx) {
 						t.Errorf("unexpected result of tryCoordinatedRenew: [succeeded=%v]", !test.expectSuccess)
 					}
 				} else {
@@ -595,7 +595,7 @@ func testReleaseLease(t *testing.T, objectType string) {
 	for i := range tests {
 		test := &tests[i]
 		t.Run(test.name, func(t *testing.T) {
-			logger, ctx := ktesting.NewTestContext(t)
+			tCtx := ktesting.Init(t)
 
 			// OnNewLeader is called async so we have to wait for it.
 			var wg sync.WaitGroup
@@ -648,7 +648,7 @@ func testReleaseLease(t *testing.T, objectType string) {
 				clock:             clock.RealClock{},
 				metrics:           globalMetricsFactory.newLeaderMetrics(),
 			}
-			if !le.tryAcquireOrRenew(ctx) {
+			if !le.tryAcquireOrRenew(tCtx) {
 				t.Errorf("unexpected result of tryAcquireOrRenew: [succeeded=%v]", true)
 			}
 
@@ -658,7 +658,7 @@ func testReleaseLease(t *testing.T, objectType string) {
 			wg.Wait()
 			wg.Add(1)
 
-			if test.expectSuccess != le.release(logger) {
+			if test.expectSuccess != le.release(tCtx.Logger()) {
 				t.Errorf("unexpected result of release: [succeeded=%v]", !test.expectSuccess)
 			}
 
@@ -693,7 +693,7 @@ func TestReleaseLeaseLeases(t *testing.T) {
 
 // TestReleaseMethodCallsGet test release method calls Get
 func TestReleaseMethodCallsGet(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
 	objectType := "leases"
 	getCalled := false
 
@@ -738,7 +738,7 @@ func TestReleaseMethodCallsGet(t *testing.T) {
 		metrics:           globalMetricsFactory.newLeaderMetrics(),
 	}
 
-	le.release(logger)
+	le.release(tCtx.Logger())
 
 	if !getCalled {
 		t.Errorf("release method does not call Get")
@@ -748,7 +748,7 @@ func TestReleaseMethodCallsGet(t *testing.T) {
 // TestReleaseRetriesOnConflict verifies that release retries when the
 // Update call returns a conflict error (e.g. from an inflight renew).
 func TestReleaseRetriesOnConflict(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
 	objectType := "leases"
 	var conflicted bool
 
@@ -796,7 +796,7 @@ func TestReleaseRetriesOnConflict(t *testing.T) {
 		metrics:           globalMetricsFactory.newLeaderMetrics(),
 	}
 
-	if !le.release(logger) {
+	if !le.release(tCtx.Logger()) {
 		t.Error("release should have succeeded after retrying on conflict")
 	}
 	if !conflicted {
@@ -970,7 +970,7 @@ func testReleaseOnCancellation(t *testing.T, objectType string) {
 	for i := range tests {
 		test := &tests[i]
 		t.Run(test.name, func(t *testing.T) {
-			_, ctx := ktesting.NewTestContext(t)
+			tCtx := ktesting.Init(t)
 
 			wg.Add(1)
 			resetVars()
@@ -999,7 +999,7 @@ func testReleaseOnCancellation(t *testing.T, objectType string) {
 				t.Fatal("Failed to create leader elector: ", err)
 			}
 
-			ctx, cancel := context.WithCancel(ctx)
+			ctx, cancel := context.WithCancel(tCtx)
 
 			go elector.Run(ctx)
 
@@ -1037,6 +1037,7 @@ func testReleaseOnCancellation(t *testing.T, objectType string) {
 }
 
 func TestLeaderElectionConfigValidation(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	resourceLockConfig := rl.ResourceLockConfig{
 		Identity: "baz",
 	}
@@ -1061,14 +1062,14 @@ func TestLeaderElectionConfigValidation(t *testing.T) {
 	}
 
 	_, err := NewLeaderElector(lec)
-	assert.NoError(t, err)
+	tCtx.AssertNoError(err)
 
 	// Invalid lock identity
 	resourceLockConfig.Identity = ""
 	lock.LockConfig = resourceLockConfig
 	lec.Lock = lock
 	_, err = NewLeaderElector(lec)
-	assert.EqualError(t, err, "Lock identity is empty")
+	tCtx.Assert(err).Should(gomega.MatchError("Lock identity is empty"))
 }
 
 func assertEqualEvents(t *testing.T, expected []string, actual <-chan string) {
@@ -1213,7 +1214,7 @@ func TestFastPathLeaderElection(t *testing.T) {
 	for i := range tests {
 		test := &tests[i]
 		t.Run(test.name, func(t *testing.T) {
-			_, ctx := ktesting.NewTestContext(t)
+			tCtx := ktesting.Init(t)
 
 			resetVars()
 
@@ -1241,11 +1242,11 @@ func TestFastPathLeaderElection(t *testing.T) {
 				t.Fatal("Failed to create leader elector: ", err)
 			}
 
-			ctx, cancel := context.WithCancel(ctx)
+			ctx, cancel := context.WithCancel(tCtx)
 			cancelFunc = cancel
 
 			elector.Run(ctx)
-			assert.Equal(t, test.expectedLockOps, lockOps, "Expected lock ops %q, got %q", test.expectedLockOps, lockOps)
+			tCtx.Assert(lockOps).Should(gomega.Equal(test.expectedLockOps))
 		})
 	}
 }

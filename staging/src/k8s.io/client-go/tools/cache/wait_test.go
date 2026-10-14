@@ -29,9 +29,10 @@ import (
 	"testing/synctest"
 	"time"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/onsi/gomega"
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/textlogger"
+	"k8s.io/ktesting"
 )
 
 func init() {
@@ -119,6 +120,7 @@ I0101 00:01:00.000000 %7[1]d wait_test.go:%[2]d] "Timed out waiting" for="my-cac
 	} {
 		t.Run(name, func(t *testing.T) {
 			synctest.Test(t, func(t *testing.T) {
+				tCtx := ktesting.Init(t)
 				var buffer bytes.Buffer
 				logger := textlogger.NewLogger(textlogger.NewConfig(textlogger.Output(&buffer)))
 				ctx := klog.NewContext(context.Background(), logger)
@@ -151,8 +153,8 @@ I0101 00:01:00.000000 %7[1]d wait_test.go:%[2]d] "Timed out waiting" for="my-cac
 				if expectOutput != "" {
 					expectOutput = fmt.Sprintf(expectOutput, os.Getpid(), line+1)
 				}
-				assert.Equal(t, tc.expectDone, done, "done")
-				assert.Equal(t, expectOutput, buffer.String(), "output")
+				tCtx.Assert(done).Should(gomega.Equal(tc.expectDone), "done")
+				tCtx.Assert(buffer.String()).Should(gomega.Equal(expectOutput), "output")
 			})
 		})
 	}

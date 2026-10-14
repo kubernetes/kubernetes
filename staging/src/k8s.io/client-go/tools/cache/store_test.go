@@ -21,9 +21,10 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/onsi/gomega"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/ktesting"
 )
 
 // Test public interface
@@ -190,6 +191,7 @@ func TestKeyError(t *testing.T) {
 }
 
 func TestCacheTransactionShouldIndexErrors(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	successObj1 := 1
 	successObj2 := 2
 	failObj1 := 3
@@ -198,7 +200,7 @@ func TestCacheTransactionShouldIndexErrors(t *testing.T) {
 	testCases := []struct {
 		name        string
 		objs        []interface{}
-		assertError func(*TransactionError) bool
+		assertError func(ktesting.TContext, *TransactionError)
 	}{
 		{
 			name: "txn all success objects should work",
@@ -207,20 +209,20 @@ func TestCacheTransactionShouldIndexErrors(t *testing.T) {
 		{
 			name: "txn all fail objects should work",
 			objs: []interface{}{failObj1, failObj2},
-			assertError: func(err *TransactionError) bool {
-				return assert.Equal(t, []int{}, err.SuccessfulIndices)
+			assertError: func(tCtx ktesting.TContext, err *TransactionError) {
+				tCtx.Assert(err.SuccessfulIndices).Should(gomega.Equal([]int{}))
 			},
 		},
 		{
 			name: "txn mix success and fail objects should work",
 			objs: []interface{}{successObj1, failObj1, successObj2, failObj2},
-			assertError: func(err *TransactionError) bool {
-				return assert.Equal(t, []int{0, 2}, err.SuccessfulIndices)
+			assertError: func(tCtx ktesting.TContext, err *TransactionError) {
+				tCtx.Assert(err.SuccessfulIndices).Should(gomega.Equal([]int{0, 2}))
 			},
 		},
 	}
 	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
+		tCtx.Run(tc.name, func(tCtx ktesting.TContext) {
 			testKeyFunc := func(obj interface{}) (string, error) {
 				if obj == successObj1 || obj == successObj2 {
 					return "", nil
@@ -238,11 +240,11 @@ func TestCacheTransactionShouldIndexErrors(t *testing.T) {
 			}
 			txnErr := txnStore.Transaction(txns...)
 			if tc.assertError != nil {
-				tc.assertError(txnErr)
+				tc.assertError(tCtx, txnErr)
 				return
 			}
 			if txnErr != nil {
-				t.Errorf("unexpected error: %v", txnErr)
+				tCtx.Errorf("unexpected error: %v", txnErr)
 			}
 		})
 	}

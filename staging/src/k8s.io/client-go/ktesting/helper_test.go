@@ -24,7 +24,8 @@ import (
 	"testing/synctest"
 	"time"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/onsi/gomega"
+	kt "k8s.io/ktesting"
 )
 
 // testcase wraps a callback which is called with a TContext that intercepts
@@ -53,8 +54,9 @@ func (tc testcase) run(t *testing.T) {
 
 		trace := buffer.log.String()
 		t.Logf("Trace:\n%s\n", trace)
-		assert.Equal(t, tc.expectDuration, duration, "callback invocation duration %s")
-		assert.Equal(t, tc.expectTrace, normalize(trace))
+		assertTCtx := kt.Init(t)
+		assertTCtx.Assert(duration).Should(gomega.Equal(tc.expectDuration), "callback invocation duration %%s")
+		assertTCtx.Assert(normalize(trace)).Should(gomega.Equal(tc.expectTrace))
 	})
 }
 

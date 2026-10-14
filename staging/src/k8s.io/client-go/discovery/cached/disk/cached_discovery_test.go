@@ -27,8 +27,7 @@ import (
 	"time"
 
 	openapi_v2 "github.com/google/gnostic-models/openapiv2"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	"github.com/onsi/gomega"
 
 	apidiscovery "k8s.io/api/apidiscovery/v2"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -42,75 +41,76 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
 	testutil "k8s.io/client-go/util/testing"
+	"k8s.io/ktesting"
 )
 
 func TestCachedDiscoveryClient_Fresh(t *testing.T) {
-	assert := assert.New(t)
+	tCtx := ktesting.Init(t)
 
 	d, err := os.MkdirTemp("", "")
-	assert.NoError(err)
+	tCtx.AssertNoError(err)
 	defer os.RemoveAll(d)
 
 	c := fakeDiscoveryClient{}
 	cdc := newCachedDiscoveryClient(discovery.ToDiscoveryInterfaceWithContext(&c), d, 60*time.Second)
-	assert.True(cdc.Fresh(), "should be fresh after creation")
+	tCtx.Assert(cdc.Fresh()).Should(gomega.BeTrueBecause("should be fresh after creation"))
 
 	cdc.ServerGroups()
-	assert.True(cdc.Fresh(), "should be fresh after groups call without cache")
-	assert.Equal(1, c.groupCalls)
+	tCtx.Assert(cdc.Fresh()).Should(gomega.BeTrueBecause("should be fresh after groups call without cache"))
+	tCtx.Assert(c.groupCalls).Should(gomega.Equal(1))
 
 	cdc.ServerGroups()
-	assert.True(cdc.Fresh(), "should be fresh after another groups call")
-	assert.Equal(1, c.groupCalls)
+	tCtx.Assert(cdc.Fresh()).Should(gomega.BeTrueBecause("should be fresh after another groups call"))
+	tCtx.Assert(c.groupCalls).Should(gomega.Equal(1))
 
 	cdc.ServerGroupsAndResources()
-	assert.True(cdc.Fresh(), "should be fresh after resources call")
-	assert.Equal(1, c.resourceCalls)
+	tCtx.Assert(cdc.Fresh()).Should(gomega.BeTrueBecause("should be fresh after resources call"))
+	tCtx.Assert(c.resourceCalls).Should(gomega.Equal(1))
 
 	cdc.ServerGroupsAndResources()
-	assert.True(cdc.Fresh(), "should be fresh after another resources call")
-	assert.Equal(1, c.resourceCalls)
+	tCtx.Assert(cdc.Fresh()).Should(gomega.BeTrueBecause("should be fresh after another resources call"))
+	tCtx.Assert(c.resourceCalls).Should(gomega.Equal(1))
 
 	cdc = newCachedDiscoveryClient(discovery.ToDiscoveryInterfaceWithContext(&c), d, 60*time.Second)
 	cdc.ServerGroups()
-	assert.False(cdc.Fresh(), "should NOT be fresh after recreation with existing groups cache")
-	assert.Equal(1, c.groupCalls)
+	tCtx.Assert(cdc.Fresh()).Should(gomega.BeFalseBecause("should NOT be fresh after recreation with existing groups cache"))
+	tCtx.Assert(c.groupCalls).Should(gomega.Equal(1))
 
 	cdc.ServerGroupsAndResources()
-	assert.False(cdc.Fresh(), "should NOT be fresh after recreation with existing resources cache")
-	assert.Equal(1, c.resourceCalls)
+	tCtx.Assert(cdc.Fresh()).Should(gomega.BeFalseBecause("should NOT be fresh after recreation with existing resources cache"))
+	tCtx.Assert(c.resourceCalls).Should(gomega.Equal(1))
 
 	cdc.Invalidate()
-	assert.True(cdc.Fresh(), "should be fresh after cache invalidation")
+	tCtx.Assert(cdc.Fresh()).Should(gomega.BeTrueBecause("should be fresh after cache invalidation"))
 
 	cdc.ServerGroupsAndResources()
-	assert.True(cdc.Fresh(), "should ignore existing resources cache after invalidation")
-	assert.Equal(2, c.resourceCalls)
+	tCtx.Assert(cdc.Fresh()).Should(gomega.BeTrueBecause("should ignore existing resources cache after invalidation"))
+	tCtx.Assert(c.resourceCalls).Should(gomega.Equal(2))
 }
 
 func TestNewCachedDiscoveryClient_TTL(t *testing.T) {
-	assert := assert.New(t)
+	tCtx := ktesting.Init(t)
 
 	d, err := os.MkdirTemp("", "")
-	assert.NoError(err)
+	tCtx.AssertNoError(err)
 	defer os.RemoveAll(d)
 
 	c := fakeDiscoveryClient{}
 	cdc := newCachedDiscoveryClient(discovery.ToDiscoveryInterfaceWithContext(&c), d, 1*time.Nanosecond)
 	cdc.ServerGroups()
-	assert.Equal(1, c.groupCalls)
+	tCtx.Assert(c.groupCalls).Should(gomega.Equal(1))
 
 	time.Sleep(1 * time.Second)
 
 	cdc.ServerGroups()
-	assert.Equal(2, c.groupCalls)
+	tCtx.Assert(c.groupCalls).Should(gomega.Equal(2))
 }
 
 func TestNewCachedDiscoveryClient_PathPerm(t *testing.T) {
-	assert := assert.New(t)
+	tCtx := ktesting.Init(t)
 
 	d, err := os.MkdirTemp("", "")
-	assert.NoError(err)
+	tCtx.AssertNoError(err)
 	os.RemoveAll(d)
 	defer os.RemoveAll(d)
 
@@ -123,36 +123,38 @@ func TestNewCachedDiscoveryClient_PathPerm(t *testing.T) {
 			return err
 		}
 		if info.IsDir() {
-			assert.Equal(os.FileMode(0750), info.Mode().Perm())
+			tCtx.Assert(info.Mode().Perm()).Should(gomega.Equal(os.FileMode(0750)))
 		} else {
-			assert.Equal(os.FileMode(0660), info.Mode().Perm())
+			tCtx.Assert(info.Mode().Perm()).Should(gomega.Equal(os.FileMode(0660)))
 		}
 		return nil
 	})
-	assert.NoError(err)
+	tCtx.AssertNoError(err)
 }
 
 // Tests that schema instances returned by openapi cached and returned after
 // successive calls
 func TestOpenAPIDiskCache(t *testing.T) {
+	tCtx := ktesting.Init(t)
+
 	// Create discovery cache dir (unused)
 	discoCache, err := os.MkdirTemp("", "test-cached-discovery-client-disco-*")
-	require.NoError(t, err)
+	tCtx.ExpectNoError(err)
 	os.RemoveAll(discoCache)
 	defer os.RemoveAll(discoCache)
 
 	// Create http cache dir
 	httpCache, err := os.MkdirTemp("", "test-cached-discovery-client-http-*")
-	require.NoError(t, err)
+	tCtx.ExpectNoError(err)
 	os.RemoveAll(httpCache)
 	defer os.RemoveAll(httpCache)
 
 	// Start test OpenAPI server
 	fakeServer, err := testutil.NewFakeOpenAPIV3Server("../../testdata")
-	require.NoError(t, err)
+	tCtx.ExpectNoError(err)
 	defer fakeServer.HttpServer.Close()
 
-	require.NotEmpty(t, fakeServer.ServedDocuments)
+	tCtx.Require(fakeServer.ServedDocuments).ShouldNot(gomega.BeEmpty())
 
 	client, err := NewCachedDiscoveryClientForConfig(
 		&restclient.Config{Host: fakeServer.HttpServer.URL},
@@ -160,29 +162,29 @@ func TestOpenAPIDiskCache(t *testing.T) {
 		httpCache,
 		1*time.Nanosecond,
 	)
-	require.NoError(t, err)
+	tCtx.ExpectNoError(err)
 
 	openapiClient := client.OpenAPIV3()
 
 	// Ensure initial Paths call hits server
 	_, err = openapiClient.Paths()
-	require.NoError(t, err)
-	assert.Equal(t, 1, fakeServer.RequestCounters["/openapi/v3"])
+	tCtx.ExpectNoError(err)
+	tCtx.Assert(fakeServer.RequestCounters["/openapi/v3"]).Should(gomega.Equal(1))
 
 	// Ensure Paths call does hits server again
 	// This is expected since openapiClient is the same instance, so Paths()
 	// should be cached in memory.
 	paths, err := openapiClient.Paths()
-	require.NoError(t, err)
-	assert.Equal(t, 1, fakeServer.RequestCounters["/openapi/v3"])
-	require.NotEmpty(t, paths)
+	tCtx.ExpectNoError(err)
+	tCtx.Assert(fakeServer.RequestCounters["/openapi/v3"]).Should(gomega.Equal(1))
+	tCtx.Require(paths).ShouldNot(gomega.BeEmpty())
 
 	contentTypes := []string{
 		runtime.ContentTypeJSON, openapi.ContentTypeOpenAPIV3PB,
 	}
 
 	for _, contentType := range contentTypes {
-		t.Run(contentType, func(t *testing.T) {
+		tCtx.Run(contentType, func(tCtx ktesting.TContext) {
 			// Reset all counters (cant just reset to nil since reference is shared)
 			for k := range fakeServer.RequestCounters {
 				delete(fakeServer.RequestCounters, k)
@@ -193,29 +195,29 @@ func TestOpenAPIDiskCache(t *testing.T) {
 				i++
 
 				_, err = v.Schema(contentType)
-				assert.NoError(t, err)
+				tCtx.AssertNoError(err)
 
 				path := "/openapi/v3/" + strings.TrimPrefix(k, "/")
-				assert.Equal(t, 1, fakeServer.RequestCounters[path])
+				tCtx.Assert(fakeServer.RequestCounters[path]).Should(gomega.Equal(1))
 
 				// Ensure schema call is served from memory
 				_, err = v.Schema(contentType)
-				assert.NoError(t, err)
-				assert.Equal(t, 1, fakeServer.RequestCounters[path])
+				tCtx.AssertNoError(err)
+				tCtx.Assert(fakeServer.RequestCounters[path]).Should(gomega.Equal(1))
 
 				client.Invalidate()
 
 				// Refetch the schema from a new openapi client to try to force a new
 				// http request
 				newPaths, err := client.OpenAPIV3().Paths()
-				if !assert.NoError(t, err) {
+				if !tCtx.AssertNoError(err) {
 					continue
 				}
 
 				// Ensure schema call is still served from disk
 				_, err = newPaths[k].Schema(contentType)
-				assert.NoError(t, err)
-				assert.Equal(t, 1, fakeServer.RequestCounters[path])
+				tCtx.AssertNoError(err)
+				tCtx.Assert(fakeServer.RequestCounters[path]).Should(gomega.Equal(1))
 			}
 		})
 	}
@@ -224,6 +226,8 @@ func TestOpenAPIDiskCache(t *testing.T) {
 
 // Tests function "ServerGroups" when the "unaggregated" discovery is returned.
 func TestCachedDiscoveryClientUnaggregatedServerGroups(t *testing.T) {
+	tCtx := ktesting.Init(t)
+
 	tests := []struct {
 		name                  string
 		corev1                *metav1.APIVersions
@@ -327,31 +331,31 @@ func TestCachedDiscoveryClientUnaggregatedServerGroups(t *testing.T) {
 		},
 	}
 
-	for _, test := range tests {
+	run := func(tCtx ktesting.TContext, corev1 *metav1.APIVersions, apis *metav1.APIGroupList, expectedGroupNames, expectedGroupVersions []string) {
 		// Create discovery cache dir
 		discoCache, err := os.MkdirTemp("", "test-cached-discovery-client-disco-*")
-		require.NoError(t, err)
+		tCtx.ExpectNoError(err)
 		os.RemoveAll(discoCache)
 		defer os.RemoveAll(discoCache)
 		// Create http cache dir (unused)
 		httpCache, err := os.MkdirTemp("", "test-cached-discovery-client-http-*")
-		require.NoError(t, err)
+		tCtx.ExpectNoError(err)
 		os.RemoveAll(httpCache)
 		defer os.RemoveAll(httpCache)
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 			var body interface{}
 			switch req.URL.Path {
 			case "/api":
-				body = test.corev1
+				body = corev1
 			case "/apis":
-				body = test.apis
+				body = apis
 			default:
 				w.WriteHeader(http.StatusNotFound)
 				return
 			}
 			output, err := json.Marshal(body)
 			if err != nil {
-				t.Errorf("unexpected error %v", err)
+				tCtx.Errorf("unexpected error %v", err)
 				return
 			}
 			// Content-type is "unaggregated" discovery format -- no resources returned.
@@ -366,29 +370,33 @@ func TestCachedDiscoveryClientUnaggregatedServerGroups(t *testing.T) {
 			httpCache,
 			1*time.Nanosecond,
 		)
-		require.NoError(t, err)
+		tCtx.ExpectNoError(err)
 		apiGroupList, err := client.ServerGroups()
-		require.NoError(t, err)
+		tCtx.ExpectNoError(err)
 		// Discovery groups cached in servergroups.json file.
 		numFound, err := numFilesFound(discoCache, "servergroups.json")
-		assert.NoError(t, err)
-		assert.Equal(t, 1, numFound,
-			"%s: expected 1 discovery cache file servergroups.json found, got %d", test.name, numFound)
+		tCtx.AssertNoError(err)
+		tCtx.Assert(numFound).Should(gomega.Equal(1))
 		// Test expected groups returned by server groups.
-		expectedGroupNames := sets.NewString(test.expectedGroupNames...)
+		expectedGroupNamesSet := sets.NewString(expectedGroupNames...)
 		actualGroupNames := sets.NewString(groupNamesFromList(apiGroupList)...)
-		assert.True(t, expectedGroupNames.Equal(actualGroupNames),
-			"%s: Expected groups (%s), got (%s)", test.name, expectedGroupNames.List(), actualGroupNames.List())
+		tCtx.Assert(actualGroupNames.List()).Should(gomega.ConsistOf(expectedGroupNamesSet.List()))
 		// Test the expected group versions for the aggregated discovery is correct.
-		expectedGroupVersions := sets.NewString(test.expectedGroupVersions...)
+		expectedGroupVersionsSet := sets.NewString(expectedGroupVersions...)
 		actualGroupVersions := sets.NewString(groupVersionsFromGroups(apiGroupList)...)
-		assert.True(t, expectedGroupVersions.Equal(actualGroupVersions),
-			"%s: Expected group/versions (%s), got (%s)", test.name, expectedGroupVersions.List(), actualGroupVersions.List())
+		tCtx.Assert(actualGroupVersions.List()).Should(gomega.ConsistOf(expectedGroupVersionsSet.List()))
+	}
+	for _, test := range tests {
+		tCtx.Run(test.name, func(tCtx ktesting.TContext) {
+			run(tCtx, test.corev1, test.apis, test.expectedGroupNames, test.expectedGroupVersions)
+		})
 	}
 }
 
 // Aggregated discovery format returned
 func TestCachedDiscoveryClientAggregatedServerGroups(t *testing.T) {
+	tCtx := ktesting.Init(t)
+
 	tests := []struct {
 		name                      string
 		corev1                    *apidiscovery.APIGroupDiscoveryList
@@ -618,31 +626,31 @@ func TestCachedDiscoveryClientAggregatedServerGroups(t *testing.T) {
 		},
 	}
 
-	for _, test := range tests {
+	run := func(tCtx ktesting.TContext, corev1, apis *apidiscovery.APIGroupDiscoveryList, expectedGroupNames, expectedGroupVersions, expectedPreferredVersions []string) {
 		// Create discovery cache dir
 		discoCache, err := os.MkdirTemp("", "test-cached-discovery-client-disco-*")
-		require.NoError(t, err)
+		tCtx.ExpectNoError(err)
 		os.RemoveAll(discoCache)
 		defer os.RemoveAll(discoCache)
 		// Create http cache dir (unused)
 		httpCache, err := os.MkdirTemp("", "test-cached-discovery-client-http-*")
-		require.NoError(t, err)
+		tCtx.ExpectNoError(err)
 		os.RemoveAll(httpCache)
 		defer os.RemoveAll(httpCache)
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 			var agg *apidiscovery.APIGroupDiscoveryList
 			switch req.URL.Path {
 			case "/api":
-				agg = test.corev1
+				agg = corev1
 			case "/apis":
-				agg = test.apis
+				agg = apis
 			default:
 				w.WriteHeader(http.StatusNotFound)
 				return
 			}
 			output, err := json.Marshal(agg)
 			if err != nil {
-				t.Fatalf("unexpected encoding error: %v", err)
+				tCtx.Fatalf("unexpected encoding error: %v", err)
 				return
 			}
 			// Content-type is "aggregated" discovery format.
@@ -657,29 +665,30 @@ func TestCachedDiscoveryClientAggregatedServerGroups(t *testing.T) {
 			httpCache,
 			1*time.Nanosecond,
 		)
-		require.NoError(t, err)
+		tCtx.ExpectNoError(err)
 		apiGroupList, err := client.ServerGroups()
-		require.NoError(t, err)
+		tCtx.ExpectNoError(err)
 		// Discovery groups cached in servergroups.json file.
 		numFound, err := numFilesFound(discoCache, "servergroups.json")
-		assert.NoError(t, err)
-		assert.Equal(t, 1, numFound,
-			"%s: expected 1 discovery cache file servergroups.json found, got %d", test.name, numFound)
+		tCtx.AssertNoError(err)
+		tCtx.Assert(numFound).Should(gomega.Equal(1))
 		// Test expected groups returned by server groups.
-		expectedGroupNames := sets.NewString(test.expectedGroupNames...)
+		expectedGroupNamesSet := sets.NewString(expectedGroupNames...)
 		actualGroupNames := sets.NewString(groupNamesFromList(apiGroupList)...)
-		assert.True(t, expectedGroupNames.Equal(actualGroupNames),
-			"%s: Expected groups (%s), got (%s)", test.name, expectedGroupNames.List(), actualGroupNames.List())
+		tCtx.Assert(actualGroupNames.List()).Should(gomega.ConsistOf(expectedGroupNamesSet.List()))
 		// Test the expected group versions for the aggregated discovery is correct.
-		expectedGroupVersions := sets.NewString(test.expectedGroupVersions...)
+		expectedGroupVersionsSet := sets.NewString(expectedGroupVersions...)
 		actualGroupVersions := sets.NewString(groupVersionsFromGroups(apiGroupList)...)
-		assert.True(t, expectedGroupVersions.Equal(actualGroupVersions),
-			"%s: Expected group/versions (%s), got (%s)", test.name, expectedGroupVersions.List(), actualGroupVersions.List())
+		tCtx.Assert(actualGroupVersions.List()).Should(gomega.ConsistOf(expectedGroupVersionsSet.List()))
 		// Test the groups preferred version is correct.
-		expectedPreferredVersions := sets.NewString(test.expectedPreferredVersions...)
+		expectedPreferredVersionsSet := sets.NewString(expectedPreferredVersions...)
 		actualPreferredVersions := sets.NewString(preferredVersionsFromList(apiGroupList)...)
-		assert.True(t, expectedPreferredVersions.Equal(actualPreferredVersions),
-			"%s: Expected preferred group/version (%s), got (%s)", test.name, expectedPreferredVersions.List(), actualPreferredVersions.List())
+		tCtx.Assert(actualPreferredVersions.List()).Should(gomega.ConsistOf(expectedPreferredVersionsSet.List()))
+	}
+	for _, test := range tests {
+		tCtx.Run(test.name, func(tCtx ktesting.TContext) {
+			run(tCtx, test.corev1, test.apis, test.expectedGroupNames, test.expectedGroupVersions, test.expectedPreferredVersions)
+		})
 	}
 }
 

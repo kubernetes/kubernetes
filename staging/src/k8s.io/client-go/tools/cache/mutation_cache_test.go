@@ -20,12 +20,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog/v2"
+	"k8s.io/ktesting"
 )
 
 func makeMutationTestPod(name string, uid types.UID, rv string) *v1.Pod {
@@ -67,6 +67,7 @@ func TestMutationCacheOnAddOrUpdate(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
 			store := NewStore(MetaNamespaceKeyFunc)
 			indexer := NewIndexer(MetaNamespaceKeyFunc, Indexers{})
 			mc := NewIntegerResourceVersionMutationCache(klog.Background(), store, indexer, time.Minute, false)
@@ -79,17 +80,17 @@ func TestMutationCacheOnAddOrUpdate(t *testing.T) {
 			// Add the pod to the backing store at RV "1" (always older than the
 			// mutation's RV "2"), so we can tell whether GetByKey returns the
 			// mutation or the backing copy.
-			require.NoError(t, store.Add(makeMutationTestPod("pod", "uid-1", "1")))
+			tCtx.ExpectNoError(store.Add(makeMutationTestPod("pod", "uid-1", "1")))
 
 			got, exists, err := mc.GetByKey("pod")
-			require.NoError(t, err)
-			require.True(t, exists)
+			tCtx.ExpectNoError(err)
+			tCtx.Require(exists).Should(gomega.BeTrueBecause("pod should exist in the mutation cache"))
 
 			gotRV := got.(*v1.Pod).ResourceVersion
 			if tc.wantCleared {
-				assert.Equal(t, "1", gotRV, "backing store version expected after mutation cleared")
+				tCtx.Assert(gotRV).Should(gomega.Equal("1"), "backing store version expected after mutation cleared")
 			} else {
-				assert.Equal(t, tc.mutationRV, gotRV, "mutation version expected")
+				tCtx.Assert(gotRV).Should(gomega.Equal(tc.mutationRV), "mutation version expected")
 			}
 		})
 	}
@@ -122,22 +123,23 @@ func TestMutationCacheOnDelete(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
 			store := NewStore(MetaNamespaceKeyFunc)
 			indexer := NewIndexer(MetaNamespaceKeyFunc, Indexers{})
 			mc := NewIntegerResourceVersionMutationCache(klog.Background(), store, indexer, time.Minute, true)
 
 			// Backing store has the pod at RV "2".
-			require.NoError(t, store.Add(makeMutationTestPod("pod", "uid-1", "2")))
+			tCtx.ExpectNoError(store.Add(makeMutationTestPod("pod", "uid-1", "2")))
 
 			// Mutation brings it to RV "3".
 			mc.Mutation(makeMutationTestPod("pod", "uid-1", "3"))
 			deletedPod := makeMutationTestPod("pod", tc.deleteUID, tc.deleteRV)
-			require.NoError(t, store.Delete(deletedPod))
+			tCtx.ExpectNoError(store.Delete(deletedPod))
 			mc.OnDelete(deletedPod)
 
 			_, exists, err := mc.GetByKey("pod")
-			require.NoError(t, err)
-			require.Equal(t, tc.wantExists, exists)
+			tCtx.ExpectNoError(err)
+			tCtx.Require(exists).Should(gomega.Equal(tc.wantExists))
 		})
 	}
 }
@@ -145,19 +147,20 @@ func TestMutationCacheOnDelete(t *testing.T) {
 // TestMutationCacheUpdateConcurrentDelete checks the behavior when
 // Mutation is called after some informer events.
 func TestMutationCacheUpdateConcurrentDelete(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	store := NewStore(MetaNamespaceKeyFunc)
 	indexer := NewIndexer(MetaNamespaceKeyFunc, Indexers{})
 	mc := NewIntegerResourceVersionMutationCache(klog.Background(), store, indexer, time.Hour, true)
 
 	// Backing store has the pod at RV "1".
-	require.NoError(t, store.Add(makeMutationTestPod("pod", "uid-1", "1")))
+	tCtx.ExpectNoError(store.Add(makeMutationTestPod("pod", "uid-1", "1")))
 
 	// Client starts an update leading to RV "2", which immediately gets
 	// deleted by some other client. That deletion is received before the
 	// client finishes its update.
 	updatedPod := makeMutationTestPod("pod", "uid-1", "2")
-	require.NoError(t, store.Update(updatedPod))
-	require.NoError(t, store.Delete(updatedPod))
+	tCtx.ExpectNoError(store.Update(updatedPod))
+	tCtx.ExpectNoError(store.Delete(updatedPod))
 
 	// Informer events get delivered with a delay.
 	mc.OnAddOrUpdate(updatedPod)
@@ -168,29 +171,30 @@ func TestMutationCacheUpdateConcurrentDelete(t *testing.T) {
 	mc.Mutation(updatedPod)
 
 	_, exists, err := mc.GetByKey("pod")
-	require.NoError(t, err)
-	require.False(t, exists)
-	require.Equal(t, []any{"pod"}, mc.(*mutationCache).mutationCache.Keys())
+	tCtx.ExpectNoError(err)
+	tCtx.Require(exists).Should(gomega.BeFalseBecause("pod should have been deleted"))
+	tCtx.Require(mc.(*mutationCache).mutationCache.Keys()).Should(gomega.Equal([]any{"pod"}))
 }
 
 // TestMutationCacheUpdateConcurrentRecreate checks the behavior when
 // Mutation is called after some informer events.
 func TestMutationCacheUpdateConcurrentRecreate(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	store := NewStore(MetaNamespaceKeyFunc)
 	indexer := NewIndexer(MetaNamespaceKeyFunc, Indexers{})
 	mc := NewIntegerResourceVersionMutationCache(klog.Background(), store, indexer, time.Hour, true)
 
 	// Backing store has the pod at RV "1".
-	require.NoError(t, store.Add(makeMutationTestPod("pod", "uid-1", "1")))
+	tCtx.ExpectNoError(store.Add(makeMutationTestPod("pod", "uid-1", "1")))
 
 	// Client starts an update leading to RV "2", which immediately gets
 	// replaced by some other pod using the same name. Those changes are
 	// received before the client finishes its update.
 	updatedPod := makeMutationTestPod("pod", "uid-1", "2")
-	require.NoError(t, store.Update(updatedPod))
-	require.NoError(t, store.Delete(updatedPod))
+	tCtx.ExpectNoError(store.Update(updatedPod))
+	tCtx.ExpectNoError(store.Delete(updatedPod))
 	replacementPod := makeMutationTestPod("pod", "uid-2", "3")
-	require.NoError(t, store.Add(replacementPod))
+	tCtx.ExpectNoError(store.Add(replacementPod))
 
 	// Informer events get delivered with a delay.
 	mc.OnAddOrUpdate(updatedPod)
@@ -202,10 +206,10 @@ func TestMutationCacheUpdateConcurrentRecreate(t *testing.T) {
 	mc.Mutation(updatedPod)
 
 	got, exists, err := mc.GetByKey("pod")
-	require.NoError(t, err)
-	require.True(t, exists)
-	require.Equal(t, replacementPod, got)
-	require.Empty(t, mc.(*mutationCache).mutationCache.Keys())
+	tCtx.ExpectNoError(err)
+	tCtx.Require(exists).Should(gomega.BeTrueBecause("replacement pod should exist in the mutation cache"))
+	tCtx.Require(got).Should(gomega.Equal(replacementPod))
+	tCtx.Require(mc.(*mutationCache).mutationCache.Keys()).Should(gomega.BeEmpty())
 }
 
 // TestMutationCacheOnDeleteClearsStaleMutation exercises the core bug that motivated
@@ -219,6 +223,7 @@ func TestMutationCacheUpdateConcurrentRecreate(t *testing.T) {
 //  3. Without OnDelete the mutation would linger in the cache and ByIndex
 //     would still return it, preventing the caller from recreating it.
 func TestMutationCacheOnDeleteClearsStaleMutation(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	store := NewStore(MetaNamespaceKeyFunc)
 	byNameIndex := "by-name"
 	indexer := NewIndexer(MetaNamespaceKeyFunc, Indexers{
@@ -233,8 +238,8 @@ func TestMutationCacheOnDeleteClearsStaleMutation(t *testing.T) {
 	mc.Mutation(makeMutationTestPod("pod", "uid-1", "2"))
 
 	items, err := mc.ByIndex(byNameIndex, "pod")
-	require.NoError(t, err)
-	assert.Len(t, items, 1, "mutation should be visible via ByIndex when backing store is empty")
+	tCtx.ExpectNoError(err)
+	tCtx.Assert(items).Should(gomega.HaveLen(1), "mutation should be visible via ByIndex when backing store is empty")
 
 	// Informer reports the delete: OnDelete must clear the stale mutation so
 	// that the next ByIndex call returns nothing and lets the caller recreate
@@ -242,8 +247,8 @@ func TestMutationCacheOnDeleteClearsStaleMutation(t *testing.T) {
 	mc.OnDelete(makeMutationTestPod("pod", "uid-1", "1"))
 
 	items, err = mc.ByIndex(byNameIndex, "pod")
-	require.NoError(t, err)
-	assert.Empty(t, items, "OnDelete must clear the mutation; ByIndex must return nothing")
+	tCtx.ExpectNoError(err)
+	tCtx.Assert(items).Should(gomega.BeEmpty(), "OnDelete must clear the mutation; ByIndex must return nothing")
 }
 
 // racingIndexer removes objects from the wrapped Indexer on the first GetByKey
@@ -270,6 +275,7 @@ func (r *racingIndexer) GetByKey(key string) (interface{}, bool, error) {
 // cached replacement when the indexed object with the same key disappears
 // between IndexKeys and GetByKey.
 func TestMutationCacheByIndexConcurrentDelete(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	byNameIndex := "by-name"
 	indexer := NewIndexer(MetaNamespaceKeyFunc, Indexers{
 		byNameIndex: func(obj interface{}) ([]string, error) {
@@ -279,7 +285,7 @@ func TestMutationCacheByIndexConcurrentDelete(t *testing.T) {
 
 	// The informer still has the old instance when ByIndex starts.
 	oldPod := makeMutationTestPod("pod", "uid-1", "1")
-	require.NoError(t, indexer.Add(oldPod))
+	tCtx.ExpectNoError(indexer.Add(oldPod))
 
 	racer := &racingIndexer{Indexer: indexer}
 	mc := NewIntegerResourceVersionMutationCache(klog.Background(), NewStore(MetaNamespaceKeyFunc), racer, time.Minute, true /* includeAdds */)
@@ -291,6 +297,6 @@ func TestMutationCacheByIndexConcurrentDelete(t *testing.T) {
 	// Delete oldPod when ByIndex calls GetByKey, after IndexKeys returns its key.
 	racer.deleteOnNextGet = []interface{}{oldPod}
 	items, err := mc.ByIndex(byNameIndex, "pod")
-	require.NoError(t, err)
-	require.Equal(t, []interface{}{replacementPod}, items)
+	tCtx.ExpectNoError(err)
+	tCtx.Require(items).Should(gomega.Equal([]interface{}{replacementPod}))
 }

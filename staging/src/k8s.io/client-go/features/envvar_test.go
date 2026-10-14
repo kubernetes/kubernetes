@@ -20,7 +20,8 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/stretchr/testify/require"
+	"github.com/onsi/gomega"
+	"k8s.io/ktesting"
 )
 
 var defaultTestFeatures = map[Feature]FeatureSpec{
@@ -37,6 +38,7 @@ var defaultTestFeatures = map[Feature]FeatureSpec{
 }
 
 func TestEnvVarFeatureGates(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	expectedDefaultFeaturesState := map[Feature]bool{"TestAlpha": false, "TestBeta": true}
 	copyExpectedStateMap := func(toCopy map[Feature]bool) map[Feature]bool {
 		m := map[Feature]bool{}
@@ -150,62 +152,65 @@ func TestEnvVarFeatureGates(t *testing.T) {
 		},
 	}
 	for _, scenario := range scenarios {
-		t.Run(scenario.name, func(t *testing.T) {
+		tCtx.Run(scenario.name, func(tCtx ktesting.TContext) {
 			for k, v := range scenario.envVariables {
-				t.Setenv(k, v)
+				tCtx.Setenv(k, v)
 			}
 			target := newEnvVarFeatureGates(scenario.features)
 
 			for k, v := range scenario.setMethodFeatures {
 				err := target.Set(k, v)
-				require.NoError(t, err)
+				tCtx.AssertNoError(err)
 			}
 			for k, v := range scenario.setForTestingFeatures {
 				err := target.SetForTesting(k, v)
-				require.NoError(t, err)
+				tCtx.AssertNoError(err)
 			}
 			for expectedFeature, expectedValue := range scenario.expectedFeaturesState {
 				actualValue := target.Enabled(expectedFeature)
-				require.Equal(t, expectedValue, actualValue, "expected feature=%v, to be=%v, not=%v", expectedFeature, expectedValue, actualValue)
+				tCtx.Assert(actualValue).Should(gomega.Equal(expectedValue), "feature %v", expectedFeature)
 			}
 
 			enabledViaEnvVarInternalMap := target.enabledViaEnvVar.Load().(map[Feature]bool)
-			require.Len(t, enabledViaEnvVarInternalMap, len(scenario.expectedInternalEnabledViaEnvVarFeatureState))
+			tCtx.Assert(enabledViaEnvVarInternalMap).Should(gomega.HaveLen(len(scenario.expectedInternalEnabledViaEnvVarFeatureState)))
 			for expectedFeatureName, expectedFeatureValue := range scenario.expectedInternalEnabledViaEnvVarFeatureState {
 				actualFeatureValue, wasExpectedFeatureFound := enabledViaEnvVarInternalMap[expectedFeatureName]
 				if !wasExpectedFeatureFound {
-					t.Errorf("feature %v has not been found in enabledViaEnvVarInternalMap", expectedFeatureName)
+					tCtx.Errorf("feature %v has not been found in enabledViaEnvVarInternalMap", expectedFeatureName)
 				}
-				require.Equal(t, expectedFeatureValue, actualFeatureValue, "feature %v has incorrect value = %v, expected = %v", expectedFeatureName, actualFeatureValue, expectedFeatureValue)
+				tCtx.Assert(actualFeatureValue).Should(gomega.Equal(expectedFeatureValue), "feature %v", expectedFeatureName)
 			}
 
 			enabledViaSetMethodInternalMap := target.enabledViaSetMethod
-			require.Len(t, enabledViaSetMethodInternalMap, len(scenario.expectedInternalEnabledViaSetMethodFeatureState))
+			tCtx.Assert(enabledViaSetMethodInternalMap).Should(gomega.HaveLen(len(scenario.expectedInternalEnabledViaSetMethodFeatureState)))
 			for expectedFeatureName, expectedFeatureValue := range scenario.expectedInternalEnabledViaSetMethodFeatureState {
 				actualFeatureValue, wasExpectedFeatureFound := enabledViaSetMethodInternalMap[expectedFeatureName]
 				if !wasExpectedFeatureFound {
-					t.Errorf("feature %v has not been found in enabledViaSetMethod", expectedFeatureName)
+					tCtx.Errorf("feature %v has not been found in enabledViaSetMethod", expectedFeatureName)
 				}
-				require.Equal(t, expectedFeatureValue, actualFeatureValue, "feature %v has incorrect value = %v, expected = %v", expectedFeatureName, actualFeatureValue, expectedFeatureValue)
+				tCtx.Assert(actualFeatureValue).Should(gomega.Equal(expectedFeatureValue), "feature %v", expectedFeatureName)
 			}
 		})
 	}
 }
 
 func TestEnvVarFeatureGatesEnabledPanic(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	target := newEnvVarFeatureGates(nil)
-	require.PanicsWithError(t, fmt.Errorf("feature %q is not registered in FeatureGates %q", "UnknownFeature", target.callSiteName).Error(), func() { target.Enabled("UnknownFeature") })
+	tCtx.Require(func() { target.Enabled("UnknownFeature") }).Should(gomega.PanicWith(gomega.MatchError(fmt.Errorf("feature %q is not registered in FeatureGates %q", "UnknownFeature", target.callSiteName))))
 }
 
 func TestHasAlreadyReadEnvVar(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	target := newEnvVarFeatureGates(nil)
-	require.False(t, target.hasAlreadyReadEnvVar())
+	tCtx.Assert(target.hasAlreadyReadEnvVar()).Should(gomega.BeFalseBecause("env var has not been read yet"))
 
 	_ = target.getEnabledMapFromEnvVar()
-	require.True(t, target.hasAlreadyReadEnvVar())
+	tCtx.Assert(target.hasAlreadyReadEnvVar()).Should(gomega.BeTrueBecause("env var has been read"))
 }
 
 func TestEnvVarFeatureGatesSetNegative(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	scenarios := []struct {
 		name         string
 		features     map[Feature]FeatureSpec
@@ -241,11 +246,11 @@ func TestEnvVarFeatureGatesSetNegative(t *testing.T) {
 	}
 
 	for _, scenario := range scenarios {
-		t.Run(scenario.name, func(t *testing.T) {
+		tCtx.Run(scenario.name, func(tCtx ktesting.TContext) {
 			target := newEnvVarFeatureGates(scenario.features)
 
 			err := target.Set(scenario.featureName, scenario.featureValue)
-			require.Equal(t, scenario.expectedErr(target.callSiteName), err)
+			tCtx.Require(err).Should(gomega.Equal(scenario.expectedErr(target.callSiteName)))
 		})
 	}
 }

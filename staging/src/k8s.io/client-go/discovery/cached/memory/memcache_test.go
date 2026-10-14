@@ -27,8 +27,8 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	"github.com/onsi/gomega"
+
 	apidiscovery "k8s.io/api/apidiscovery/v2"
 	errorsutil "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -39,7 +39,7 @@ import (
 	"k8s.io/client-go/openapi"
 	"k8s.io/client-go/rest"
 	testutil "k8s.io/client-go/util/testing"
-	"k8s.io/klog/v2/ktesting"
+	"k8s.io/ktesting"
 )
 
 type resourceMapEntry struct {
@@ -510,11 +510,13 @@ func TestPartialRetryableFailure(t *testing.T) {
 // Tests that schema instances returned by openapi cached and returned after
 // successive calls
 func TestOpenAPIMemCache(t *testing.T) {
+	tCtx := ktesting.Init(t)
+
 	fakeServer, err := testutil.NewFakeOpenAPIV3Server("../../testdata")
-	require.NoError(t, err)
+	tCtx.ExpectNoError(err)
 	defer fakeServer.HttpServer.Close()
 
-	require.NotEmpty(t, fakeServer.ServedDocuments)
+	tCtx.Require(fakeServer.ServedDocuments).ShouldNot(gomega.BeEmpty())
 
 	client := NewMemCacheClient(
 		discovery.NewDiscoveryClientForConfigOrDie(
@@ -524,52 +526,52 @@ func TestOpenAPIMemCache(t *testing.T) {
 	openapiClient := client.OpenAPIV3()
 
 	paths, err := openapiClient.Paths()
-	require.NoError(t, err)
+	tCtx.ExpectNoError(err)
 
 	contentTypes := []string{
 		runtime.ContentTypeJSON, openapi.ContentTypeOpenAPIV3PB,
 	}
 
 	for _, contentType := range contentTypes {
-		t.Run(contentType, func(t *testing.T) {
+		tCtx.Run(contentType, func(tCtx ktesting.TContext) {
 			for k, v := range paths {
 				original, err := v.Schema(contentType)
-				if !assert.NoError(t, err) {
+				if !tCtx.AssertNoError(err) {
 					continue
 				}
 
 				// This is the original OpenAPI client. It is not affected
 				// by client.Invalidate() below.
 				pathsAgain, err := openapiClient.Paths()
-				if !assert.NoError(t, err) {
+				if !tCtx.AssertNoError(err) {
 					continue
 				}
 
 				schemaAgain, err := pathsAgain[k].Schema(contentType)
-				if !assert.NoError(t, err) {
+				if !tCtx.AssertNoError(err) {
 					continue
 				}
 
 				// The map itself might be different, but the content should not be.
-				assert.Equal(t, reflect.ValueOf(paths[k]).Pointer(), reflect.ValueOf(pathsAgain[k]).Pointer())
-				assert.Equal(t, reflect.ValueOf(original).Pointer(), reflect.ValueOf(schemaAgain).Pointer())
+				tCtx.Assert(reflect.ValueOf(pathsAgain[k]).Pointer()).Should(gomega.Equal(reflect.ValueOf(paths[k]).Pointer()))
+				tCtx.Assert(reflect.ValueOf(schemaAgain).Pointer()).Should(gomega.Equal(reflect.ValueOf(original).Pointer()))
 
 				// Invalidate and try again. This time pointers should not be equal
 				client.Invalidate()
 
 				pathsAgain, err = client.OpenAPIV3().Paths()
-				if !assert.NoError(t, err) {
+				if !tCtx.AssertNoError(err) {
 					continue
 				}
 
 				schemaAgain, err = pathsAgain[k].Schema(contentType)
-				if !assert.NoError(t, err) {
+				if !tCtx.AssertNoError(err) {
 					continue
 				}
 
-				assert.NotEqual(t, reflect.ValueOf(paths[k]).Pointer(), reflect.ValueOf(pathsAgain[k]).Pointer())
-				assert.NotEqual(t, reflect.ValueOf(original).Pointer(), reflect.ValueOf(schemaAgain).Pointer())
-				assert.Equal(t, original, schemaAgain)
+				tCtx.Assert(reflect.ValueOf(pathsAgain[k]).Pointer()).ShouldNot(gomega.Equal(reflect.ValueOf(paths[k]).Pointer()))
+				tCtx.Assert(reflect.ValueOf(schemaAgain).Pointer()).ShouldNot(gomega.Equal(reflect.ValueOf(original).Pointer()))
+				tCtx.Assert(schemaAgain).Should(gomega.Equal(original))
 			}
 		})
 	}
@@ -578,68 +580,69 @@ func TestOpenAPIMemCache(t *testing.T) {
 // Tests that schema instances returned by openapi are cached and returned after
 // successive calls.
 func TestOpenAPIMemCacheWithContext(t *testing.T) {
-	_, ctx := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
+
 	fakeServer, err := testutil.NewFakeOpenAPIV3Server("../../testdata")
-	require.NoError(t, err)
+	tCtx.ExpectNoError(err)
 	defer fakeServer.HttpServer.Close()
 
-	require.NotEmpty(t, fakeServer.ServedDocuments)
+	tCtx.Require(fakeServer.ServedDocuments).ShouldNot(gomega.BeEmpty())
 
 	client := NewMemCacheClientWithContext(
 		discovery.NewDiscoveryClientForConfigOrDie(
 			&rest.Config{Host: fakeServer.HttpServer.URL},
 		),
 	)
-	openapiClient := client.OpenAPIV3WithContext(ctx)
+	openapiClient := client.OpenAPIV3WithContext(tCtx)
 
-	paths, err := openapiClient.PathsWithContext(ctx)
-	require.NoError(t, err)
+	paths, err := openapiClient.PathsWithContext(tCtx)
+	tCtx.ExpectNoError(err)
 
 	contentTypes := []string{
 		runtime.ContentTypeJSON, openapi.ContentTypeOpenAPIV3PB,
 	}
 
 	for _, contentType := range contentTypes {
-		t.Run(contentType, func(t *testing.T) {
-			//nolint:testifylint // "for error assertions use require" is a false positive here, we abort the iteration on failures.
+		tCtx.Run(contentType, func(tCtx ktesting.TContext) {
+			// for error assertions use require" is a false positive here, we abort the iteration on failures.
 			for k, v := range paths {
-				original, err := v.SchemaWithContext(ctx, contentType)
-				if !assert.NoError(t, err) {
+				original, err := v.SchemaWithContext(tCtx, contentType)
+				if !tCtx.AssertNoError(err) {
 					continue
 				}
 
 				// This is the original OpenAPI client. It is not affected
 				// by client.Invalidate() below.
-				pathsAgain, err := openapiClient.PathsWithContext(ctx)
-				if !assert.NoError(t, err) {
+				pathsAgain, err := openapiClient.PathsWithContext(tCtx)
+				if !tCtx.AssertNoError(err) {
 					continue
 				}
 
-				schemaAgain, err := pathsAgain[k].SchemaWithContext(ctx, contentType)
-				if !assert.NoError(t, err) {
+				schemaAgain, err := pathsAgain[k].SchemaWithContext(tCtx, contentType)
+				if !tCtx.AssertNoError(err) {
 					continue
 				}
 
 				// When using the *WithContext API, the map itself is cached.
-				assert.Equal(t, reflect.ValueOf(paths).Pointer(), reflect.ValueOf(pathsAgain).Pointer())
-				assert.Equal(t, reflect.ValueOf(original).Pointer(), reflect.ValueOf(schemaAgain).Pointer())
+				tCtx.Assert(reflect.ValueOf(pathsAgain).Pointer()).Should(gomega.Equal(reflect.ValueOf(paths).Pointer()))
+				tCtx.Assert(reflect.ValueOf(schemaAgain).Pointer()).Should(gomega.Equal(reflect.ValueOf(original).Pointer()))
 
 				// Invalidate and try again. This time pointers should not be equal
-				client.InvalidateWithContext(ctx)
+				client.InvalidateWithContext(tCtx)
 
-				pathsAgain, err = client.OpenAPIV3WithContext(ctx).PathsWithContext(ctx)
-				if !assert.NoError(t, err) {
+				pathsAgain, err = client.OpenAPIV3WithContext(tCtx).PathsWithContext(tCtx)
+				if !tCtx.AssertNoError(err) {
 					continue
 				}
 
-				schemaAgain, err = pathsAgain[k].SchemaWithContext(ctx, contentType)
-				if !assert.NoError(t, err) {
+				schemaAgain, err = pathsAgain[k].SchemaWithContext(tCtx, contentType)
+				if !tCtx.AssertNoError(err) {
 					continue
 				}
 
-				assert.NotEqual(t, reflect.ValueOf(paths).Pointer(), reflect.ValueOf(pathsAgain).Pointer())
-				assert.NotEqual(t, reflect.ValueOf(original).Pointer(), reflect.ValueOf(schemaAgain).Pointer())
-				assert.Equal(t, original, schemaAgain)
+				tCtx.Assert(reflect.ValueOf(pathsAgain).Pointer()).ShouldNot(gomega.Equal(reflect.ValueOf(paths).Pointer()))
+				tCtx.Assert(reflect.ValueOf(schemaAgain).Pointer()).ShouldNot(gomega.Equal(reflect.ValueOf(original).Pointer()))
+				tCtx.Assert(schemaAgain).Should(gomega.Equal(original))
 			}
 		})
 	}
@@ -647,6 +650,8 @@ func TestOpenAPIMemCacheWithContext(t *testing.T) {
 
 // Tests function "GroupsAndMaybeResources" when the "unaggregated" discovery is returned.
 func TestMemCacheGroupsAndMaybeResources(t *testing.T) {
+	tCtx := ktesting.Init(t)
+
 	tests := []struct {
 		name                  string
 		corev1                *metav1.APIVersions
@@ -750,14 +755,14 @@ func TestMemCacheGroupsAndMaybeResources(t *testing.T) {
 		},
 	}
 
-	for _, test := range tests {
+	run := func(tCtx ktesting.TContext, corev1 *metav1.APIVersions, apis *metav1.APIGroupList, expectedGroupNames, expectedGroupVersions []string) {
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 			var body interface{}
 			switch req.URL.Path {
 			case "/api":
-				body = test.corev1
+				body = corev1
 			case "/apis":
-				body = test.apis
+				body = apis
 			default:
 				w.WriteHeader(http.StatusNotFound)
 				return
@@ -778,40 +783,44 @@ func TestMemCacheGroupsAndMaybeResources(t *testing.T) {
 			delegate:               client,
 			groupToServerResources: map[string]*cacheEntry{},
 		}
-		assert.False(t, memClient.Fresh())
+		tCtx.Assert(memClient.Fresh()).Should(gomega.BeFalseBecause("not fetched from server yet"))
 		apiGroupList, resourcesMap, failedGVs, err := memClient.GroupsAndMaybeResources()
-		require.NoError(t, err)
+		tCtx.ExpectNoError(err)
 		// "Unaggregated" discovery always returns nil for resources.
-		assert.Nil(t, resourcesMap)
-		assert.Emptyf(t, failedGVs, "expected empty failed GroupVersions, got (%d)", len(failedGVs))
-		assert.False(t, memClient.receivedAggregatedDiscovery)
-		assert.True(t, memClient.Fresh())
+		tCtx.Assert(resourcesMap).Should(gomega.BeNil())
+		tCtx.Assert(failedGVs).Should(gomega.BeEmpty())
+		tCtx.Assert(memClient.receivedAggregatedDiscovery).Should(gomega.BeFalseBecause("server returned unaggregated discovery"))
+		tCtx.Assert(memClient.Fresh()).Should(gomega.BeTrueBecause("just fetched from server"))
 		// Test the expected groups are returned for the aggregated format.
-		expectedGroupNames := sets.NewString(test.expectedGroupNames...)
+		expectedGroupNamesSet := sets.NewString(expectedGroupNames...)
 		actualGroupNames := sets.NewString(groupNamesFromList(apiGroupList)...)
-		assert.True(t, expectedGroupNames.Equal(actualGroupNames),
-			"%s: Expected groups (%s), got (%s)", test.name, expectedGroupNames.List(), actualGroupNames.List())
+		tCtx.Assert(actualGroupNames.List()).Should(gomega.ConsistOf(expectedGroupNamesSet.List()))
 		// Test the expected group versions for the aggregated discovery is correct.
-		expectedGroupVersions := sets.NewString(test.expectedGroupVersions...)
+		expectedGroupVersionsSet := sets.NewString(expectedGroupVersions...)
 		actualGroupVersions := sets.NewString(groupVersionsFromGroups(apiGroupList)...)
-		assert.True(t, expectedGroupVersions.Equal(actualGroupVersions),
-			"%s: Expected group/versions (%s), got (%s)", test.name, expectedGroupVersions.List(), actualGroupVersions.List())
+		tCtx.Assert(actualGroupVersions.List()).Should(gomega.ConsistOf(expectedGroupVersionsSet.List()))
 		// Invalidate the cache and retrieve the server groups and resources again.
 		memClient.Invalidate()
-		assert.False(t, memClient.Fresh())
+		tCtx.Assert(memClient.Fresh()).Should(gomega.BeFalseBecause("just invalidated"))
 		apiGroupList, resourcesMap, _, err = memClient.GroupsAndMaybeResources()
-		require.NoError(t, err)
-		assert.Nil(t, resourcesMap)
-		assert.False(t, memClient.receivedAggregatedDiscovery)
+		tCtx.ExpectNoError(err)
+		tCtx.Assert(resourcesMap).Should(gomega.BeNil())
+		tCtx.Assert(memClient.receivedAggregatedDiscovery).Should(gomega.BeFalseBecause("server returned unaggregated discovery"))
 		// Test the expected groups are returned for the aggregated format.
 		actualGroupNames = sets.NewString(groupNamesFromList(apiGroupList)...)
-		assert.True(t, expectedGroupNames.Equal(actualGroupNames),
-			"%s: Expected after invalidation groups (%s), got (%s)", test.name, expectedGroupNames.List(), actualGroupNames.List())
+		tCtx.Assert(actualGroupNames.List()).Should(gomega.ConsistOf(expectedGroupNamesSet.List()))
+	}
+	for _, test := range tests {
+		tCtx.Run(test.name, func(tCtx ktesting.TContext) {
+			run(tCtx, test.corev1, test.apis, test.expectedGroupNames, test.expectedGroupVersions)
+		})
 	}
 }
 
 // Tests function "GroupsAndMaybeResources" when the "aggregated" discovery is returned.
 func TestAggregatedMemCacheGroupsAndMaybeResources(t *testing.T) {
+	tCtx := ktesting.Init(t)
+
 	tests := []struct {
 		name                  string
 		corev1                *apidiscovery.APIGroupDiscoveryList
@@ -1282,14 +1291,14 @@ func TestAggregatedMemCacheGroupsAndMaybeResources(t *testing.T) {
 		},
 	}
 
-	for _, test := range tests {
+	run := func(tCtx ktesting.TContext, corev1, apis *apidiscovery.APIGroupDiscoveryList, expectedGroupNames, expectedGroupVersions, expectedGVKs, expectedFailedGVs []string) {
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 			var agg *apidiscovery.APIGroupDiscoveryList
 			switch req.URL.Path {
 			case "/api":
-				agg = test.corev1
+				agg = corev1
 			case "/apis":
-				agg = test.apis
+				agg = apis
 			default:
 				w.WriteHeader(http.StatusNotFound)
 				return
@@ -1310,50 +1319,52 @@ func TestAggregatedMemCacheGroupsAndMaybeResources(t *testing.T) {
 			delegate:               client,
 			groupToServerResources: map[string]*cacheEntry{},
 		}
-		assert.False(t, memClient.Fresh())
+		tCtx.Assert(memClient.Fresh()).Should(gomega.BeFalseBecause("not fetched from server yet"))
 		apiGroupList, resourcesMap, failedGVs, err := memClient.GroupsAndMaybeResources()
-		require.NoError(t, err)
-		assert.True(t, memClient.receivedAggregatedDiscovery)
-		assert.True(t, memClient.Fresh())
+		tCtx.ExpectNoError(err)
+		tCtx.Assert(memClient.receivedAggregatedDiscovery).Should(gomega.BeTrueBecause("server returned aggregated discovery"))
+		tCtx.Assert(memClient.Fresh()).Should(gomega.BeTrueBecause("just fetched from server"))
 		// Test the expected groups are returned for the aggregated format.
-		expectedGroupNames := sets.NewString(test.expectedGroupNames...)
+		expectedGroupNamesSet := sets.NewString(expectedGroupNames...)
 		actualGroupNames := sets.NewString(groupNamesFromList(apiGroupList)...)
-		assert.True(t, expectedGroupNames.Equal(actualGroupNames),
-			"%s: Expected groups (%s), got (%s)", test.name, expectedGroupNames.List(), actualGroupNames.List())
+		tCtx.Assert(actualGroupNames.List()).Should(gomega.ConsistOf(expectedGroupNamesSet.List()))
 		// Test the expected group versions for the aggregated discovery is correct.
-		expectedGroupVersions := sets.NewString(test.expectedGroupVersions...)
+		expectedGroupVersionsSet := sets.NewString(expectedGroupVersions...)
 		actualGroupVersions := sets.NewString(groupVersionsFromGroups(apiGroupList)...)
-		assert.True(t, expectedGroupVersions.Equal(actualGroupVersions),
-			"%s: Expected group/versions (%s), got (%s)", test.name, expectedGroupVersions.List(), actualGroupVersions.List())
+		tCtx.Assert(actualGroupVersions.List()).Should(gomega.ConsistOf(expectedGroupVersionsSet.List()))
 		// Test the resources are correct.
-		expectedGVKs := sets.NewString(test.expectedGVKs...)
+		expectedGVKsSet := sets.NewString(expectedGVKs...)
 		resources := []*metav1.APIResourceList{}
 		for _, resourceList := range resourcesMap {
 			resources = append(resources, resourceList)
 		}
 		actualGVKs := sets.NewString(groupVersionKinds(resources)...)
-		assert.True(t, expectedGVKs.Equal(actualGVKs),
-			"%s: Expected GVKs (%s), got (%s)", test.name, expectedGVKs.List(), actualGVKs.List())
+		tCtx.Assert(actualGVKs.List()).Should(gomega.ConsistOf(expectedGVKsSet.List()))
 		// Test the returned failed GroupVersions are correct.
-		expectedFailedGVs := sets.NewString(test.expectedFailedGVs...)
+		expectedFailedGVsSet := sets.NewString(expectedFailedGVs...)
 		actualFailedGVs := sets.NewString(failedGroupVersions(failedGVs)...)
-		assert.True(t, expectedFailedGVs.Equal(actualFailedGVs),
-			"%s: Expected Failed GroupVersions (%s), got (%s)", test.name, expectedFailedGVs.List(), actualFailedGVs.List())
+		tCtx.Assert(actualFailedGVs.List()).Should(gomega.ConsistOf(expectedFailedGVsSet.List()))
 		// Invalidate the cache and retrieve the server groups again.
 		memClient.Invalidate()
-		assert.False(t, memClient.Fresh())
+		tCtx.Assert(memClient.Fresh()).Should(gomega.BeFalseBecause("just invalidated"))
 		apiGroupList, _, _, err = memClient.GroupsAndMaybeResources()
 
-		require.NoError(t, err)
+		tCtx.ExpectNoError(err)
 		// Test the expected groups are returned for the aggregated format.
 		actualGroupNames = sets.NewString(groupNamesFromList(apiGroupList)...)
-		assert.True(t, expectedGroupNames.Equal(actualGroupNames),
-			"%s: Expected after invalidation groups (%s), got (%s)", test.name, expectedGroupNames.List(), actualGroupNames.List())
+		tCtx.Assert(actualGroupNames.List()).Should(gomega.ConsistOf(expectedGroupNamesSet.List()))
+	}
+	for _, test := range tests {
+		tCtx.Run(test.name, func(tCtx ktesting.TContext) {
+			run(tCtx, test.corev1, test.apis, test.expectedGroupNames, test.expectedGroupVersions, test.expectedGVKs, test.expectedFailedGVs)
+		})
 	}
 }
 
 // Tests function "ServerGroups" when the "aggregated" discovery is returned.
 func TestMemCacheAggregatedServerGroups(t *testing.T) {
+	tCtx := ktesting.Init(t)
+
 	tests := []struct {
 		name                      string
 		corev1                    *apidiscovery.APIGroupDiscoveryList
@@ -1583,14 +1594,14 @@ func TestMemCacheAggregatedServerGroups(t *testing.T) {
 		},
 	}
 
-	for _, test := range tests {
+	run := func(tCtx ktesting.TContext, corev1, apis *apidiscovery.APIGroupDiscoveryList, expectedGroupNames, expectedGroupVersions, expectedPreferredVersions []string) {
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 			var agg *apidiscovery.APIGroupDiscoveryList
 			switch req.URL.Path {
 			case "/api":
-				agg = test.corev1
+				agg = corev1
 			case "/apis":
-				agg = test.apis
+				agg = apis
 			default:
 				w.WriteHeader(http.StatusNotFound)
 				return
@@ -1608,34 +1619,35 @@ func TestMemCacheAggregatedServerGroups(t *testing.T) {
 		defer server.Close()
 		client := discovery.NewDiscoveryClientForConfigOrDie(&rest.Config{Host: server.URL})
 		memCacheClient := NewMemCacheClient(client)
-		assert.False(t, memCacheClient.Fresh())
+		tCtx.Assert(memCacheClient.Fresh()).Should(gomega.BeFalseBecause("not fetched from server yet"))
 		apiGroupList, err := memCacheClient.ServerGroups()
-		require.NoError(t, err)
-		assert.True(t, memCacheClient.Fresh())
+		tCtx.ExpectNoError(err)
+		tCtx.Assert(memCacheClient.Fresh()).Should(gomega.BeTrueBecause("just fetched from server"))
 		// Test the expected groups are returned for the aggregated format.
-		expectedGroupNames := sets.NewString(test.expectedGroupNames...)
+		expectedGroupNamesSet := sets.NewString(expectedGroupNames...)
 		actualGroupNames := sets.NewString(groupNamesFromList(apiGroupList)...)
-		assert.True(t, expectedGroupNames.Equal(actualGroupNames),
-			"%s: Expected groups (%s), got (%s)", test.name, expectedGroupNames.List(), actualGroupNames.List())
+		tCtx.Assert(actualGroupNames.List()).Should(gomega.ConsistOf(expectedGroupNamesSet.List()))
 		// Test the expected group versions for the aggregated discovery is correct.
-		expectedGroupVersions := sets.NewString(test.expectedGroupVersions...)
+		expectedGroupVersionsSet := sets.NewString(expectedGroupVersions...)
 		actualGroupVersions := sets.NewString(groupVersionsFromGroups(apiGroupList)...)
-		assert.True(t, expectedGroupVersions.Equal(actualGroupVersions),
-			"%s: Expected group/versions (%s), got (%s)", test.name, expectedGroupVersions.List(), actualGroupVersions.List())
+		tCtx.Assert(actualGroupVersions.List()).Should(gomega.ConsistOf(expectedGroupVersionsSet.List()))
 		// Test the groups preferred version is correct.
-		expectedPreferredVersions := sets.NewString(test.expectedPreferredVersions...)
+		expectedPreferredVersionsSet := sets.NewString(expectedPreferredVersions...)
 		actualPreferredVersions := sets.NewString(preferredVersionsFromList(apiGroupList)...)
-		assert.True(t, expectedPreferredVersions.Equal(actualPreferredVersions),
-			"%s: Expected preferred group/version (%s), got (%s)", test.name, expectedPreferredVersions.List(), actualPreferredVersions.List())
+		tCtx.Assert(actualPreferredVersions.List()).Should(gomega.ConsistOf(expectedPreferredVersionsSet.List()))
 		// Invalidate the cache and retrieve the server groups again.
 		memCacheClient.Invalidate()
-		assert.False(t, memCacheClient.Fresh())
+		tCtx.Assert(memCacheClient.Fresh()).Should(gomega.BeFalseBecause("just invalidated"))
 		apiGroupList, err = memCacheClient.ServerGroups()
-		require.NoError(t, err)
+		tCtx.ExpectNoError(err)
 		// Test the expected groups are returned for the aggregated format.
 		actualGroupNames = sets.NewString(groupNamesFromList(apiGroupList)...)
-		assert.True(t, expectedGroupNames.Equal(actualGroupNames),
-			"%s: Expected after invalidation groups (%s), got (%s)", test.name, expectedGroupNames.List(), actualGroupNames.List())
+		tCtx.Assert(actualGroupNames.List()).Should(gomega.ConsistOf(expectedGroupNamesSet.List()))
+	}
+	for _, test := range tests {
+		tCtx.Run(test.name, func(tCtx ktesting.TContext) {
+			run(tCtx, test.corev1, test.apis, test.expectedGroupNames, test.expectedGroupVersions, test.expectedPreferredVersions)
+		})
 	}
 }
 

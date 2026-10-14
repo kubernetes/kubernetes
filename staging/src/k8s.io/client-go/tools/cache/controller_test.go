@@ -28,8 +28,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	"github.com/onsi/gomega"
 
 	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -40,7 +39,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	fcache "k8s.io/client-go/tools/cache/testing"
-	"k8s.io/klog/v2/ktesting"
+	"k8s.io/ktesting"
 
 	"sigs.k8s.io/randfill"
 )
@@ -233,13 +232,12 @@ func TestHammerController(t *testing.T) {
 	}
 
 	// Run the controller and run it until we cancel.
-	_, ctx := ktesting.NewTestContext(t)
-	ctx, cancel := context.WithCancel(ctx)
+	tCtx := ktesting.Init(t)
 	var controllerWG sync.WaitGroup
 	controllerWG.Add(1)
 	go func() {
 		defer controllerWG.Done()
-		controller.RunWithContext(ctx)
+		controller.RunWithContext(tCtx)
 	}()
 
 	// Let's wait for the controller to do its initial sync
@@ -299,7 +297,7 @@ func TestHammerController(t *testing.T) {
 	// Let's wait for the controller to finish processing the things we just added.
 	// TODO: look in the queue to see how many items need to be processed.
 	time.Sleep(100 * time.Millisecond)
-	cancel()
+	tCtx.Cancel("hammer test is done")
 
 	// Before we permanently lock this mutex, we have to be sure
 	// that the controller has stopped running. At this point,
@@ -402,10 +400,8 @@ func TestUpdate(t *testing.T) {
 	// Run the controller and run it until we cancel.
 	// Once Run() is called, calls to testDoneWG.Done() might start, so
 	// all testDoneWG.Add() calls must happen before this point
-	_, ctx := ktesting.NewTestContext(t)
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-	go controller.RunWithContext(ctx)
+	tCtx := ktesting.Init(t)
+	go controller.RunWithContext(tCtx)
 	<-watchCh
 
 	// run every test a few times, in parallel
@@ -443,9 +439,7 @@ func TestPanicPropagated(t *testing.T) {
 	)
 
 	// Run the controller and run it until we cancel.
-	_, ctx := ktesting.NewTestContext(t)
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
+	tCtx := ktesting.Init(t)
 
 	propagated := make(chan interface{})
 	go func() {
@@ -454,7 +448,7 @@ func TestPanicPropagated(t *testing.T) {
 				propagated <- r
 			}
 		}()
-		controller.RunWithContext(ctx)
+		controller.RunWithContext(tCtx)
 	}()
 	// Let's add a object to the source. It will trigger a panic.
 	source.Add(&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "test"}})
@@ -571,10 +565,8 @@ func TestTransformingInformer(t *testing.T) {
 		}
 	}
 
-	_, ctx := ktesting.NewTestContext(t)
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-	go controller.RunWithContext(ctx)
+	tCtx := ktesting.Init(t)
+	go controller.RunWithContext(tCtx)
 
 	verifyEvent(watch.Added, nil, expectedPod("pod1", "2"))
 	verifyStore([]interface{}{expectedPod("pod1", "2")})
@@ -595,13 +587,9 @@ func TestTransformingInformer(t *testing.T) {
 }
 
 func TestTransformingInformerRace(t *testing.T) {
-	_, ctx := ktesting.NewTestContext(t)
-	// Canceled *only* when the test is done.
-	testCtx, cancel := context.WithCancel(ctx)
-	defer cancel()
+	tCtx := ktesting.Init(t)
 	// Canceled *also* during the test.
-	ctx, cancel = context.WithCancel(ctx)
-	defer cancel()
+	ctx := tCtx.WithCancel()
 
 	// source simulates an apiserver object endpoint.
 	source := newFakeControllerSource(t)
@@ -644,7 +632,7 @@ func TestTransformingInformerRace(t *testing.T) {
 	recordEvent := func(eventType watch.EventType, previous, current interface{}) {
 		select {
 		case events <- event{}:
-		case <-testCtx.Done():
+		case <-tCtx.Done():
 			// Don't block forever in the write above when test is already done.
 		}
 	}
@@ -701,7 +689,7 @@ func TestTransformingInformerRace(t *testing.T) {
 	// Let resyncs to happen for some time.
 	time.Sleep(time.Second)
 
-	cancel()
+	ctx.Cancel("test is stopping the periodic fetchers")
 	wg.Wait()
 	close(errors)
 	for err := range errors {
@@ -897,7 +885,7 @@ func TestProcessDeltasInBatch(t *testing.T) {
 		failingObjects                  []runtime.Object
 		expectedListenerReceivedObjects []interface{}
 		expectedSuccessCount            int
-		assertErr                       func(error) bool
+		assertErr                       func(ktesting.TContext, error)
 	}{
 		{
 			name:                            "all transaction succeeding should works",
@@ -910,8 +898,8 @@ func TestProcessDeltasInBatch(t *testing.T) {
 			deltaList:            []Delta{testDelta1},
 			failingObjects:       []runtime.Object{cm1},
 			expectedSuccessCount: 0,
-			assertErr: func(err error) bool {
-				return assert.Contains(t, err.Error(), "failed to execute (1/1) transactions")
+			assertErr: func(tCtx ktesting.TContext, err error) {
+				tCtx.Assert(err.Error()).Should(gomega.ContainSubstring("failed to execute (1/1) transactions"))
 			},
 			expectedListenerReceivedObjects: make([]interface{}, 0),
 		},
@@ -920,8 +908,8 @@ func TestProcessDeltasInBatch(t *testing.T) {
 			deltaList:            []Delta{testDelta1, testDelta2},
 			failingObjects:       []runtime.Object{cm2},
 			expectedSuccessCount: 1,
-			assertErr: func(err error) bool {
-				return assert.Contains(t, err.Error(), "failed to execute (1/2) transactions")
+			assertErr: func(tCtx ktesting.TContext, err error) {
+				tCtx.Assert(err.Error()).Should(gomega.ContainSubstring("failed to execute (1/2) transactions"))
 			},
 			expectedListenerReceivedObjects: []interface{}{cm1},
 		},
@@ -930,15 +918,16 @@ func TestProcessDeltasInBatch(t *testing.T) {
 			deltaList:            []Delta{testDelta1, testDelta2, testDelta3},
 			failingObjects:       []runtime.Object{cm2},
 			expectedSuccessCount: 2,
-			assertErr: func(err error) bool {
-				return assert.Contains(t, err.Error(), "failed to execute (1/3) transactions")
+			assertErr: func(tCtx ktesting.TContext, err error) {
+				tCtx.Assert(err.Error()).Should(gomega.ContainSubstring("failed to execute (1/3) transactions"))
 			},
 			expectedListenerReceivedObjects: []interface{}{cm1, cm3},
 		},
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			logger, _ := ktesting.NewTestContext(t)
+			tCtx := ktesting.Init(t)
+			logger := tCtx.Logger()
 			mockStore := &mockTxnStore{
 				Store:       NewStore(MetaNamespaceKeyFunc),
 				failingObjs: tc.failingObjects,
@@ -963,10 +952,10 @@ func TestProcessDeltasInBatch(t *testing.T) {
 				true,
 				DeletionHandlingMetaNamespaceKeyFunc)
 			if tc.assertErr != nil {
-				assert.True(t, tc.assertErr(err))
+				tc.assertErr(tCtx, err)
 			}
-			assert.Equal(t, tc.expectedSuccessCount, mockStore.succeedCount)
-			assert.Equal(t, tc.expectedListenerReceivedObjects, actualListenerReceivedObjects)
+			tCtx.Assert(mockStore.succeedCount).Should(gomega.Equal(tc.expectedSuccessCount))
+			tCtx.Assert(actualListenerReceivedObjects).Should(gomega.Equal(tc.expectedListenerReceivedObjects))
 		})
 	}
 }
@@ -1007,9 +996,7 @@ func (m *mockTxnStore) Transaction(txns ...Transaction) *TransactionError {
 }
 
 func TestReplaceEvents(t *testing.T) {
-	_, ctx := ktesting.NewTestContext(t)
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
+	tCtx := ktesting.Init(t)
 	// Test that both atomic and non-atomic replace have the same behavior
 	// in regards to events and store state.
 	for _, atomic := range []bool{false, true} {
@@ -1044,15 +1031,15 @@ func TestReplaceEvents(t *testing.T) {
 			},
 		}
 		c := New(cfg)
-		go c.RunWithContext(ctx)
-		if !WaitForCacheSync(ctx.Done(), c.HasSynced) {
+		go c.RunWithContext(tCtx)
+		if !WaitForCacheSync(tCtx.Done(), c.HasSynced) {
 			t.Fatal("Timed out waiting for cache sync")
 		}
-		testReplaceEvents(t, ctx, fifo, recorder, store, atomic)
+		testReplaceEvents(tCtx, fifo, recorder, store, atomic)
 	}
 }
 
-func testReplaceEvents(t *testing.T, ctx context.Context, fifo Queue, m *eventRecorder, store Store, atomic bool) {
+func testReplaceEvents(tCtx ktesting.TContext, fifo Queue, m *eventRecorder, store Store, atomic bool) {
 	tcs := []struct {
 		name            string
 		initialObjs     []metav1.Object
@@ -1107,31 +1094,31 @@ func testReplaceEvents(t *testing.T, ctx context.Context, fifo Queue, m *eventRe
 
 	for _, tc := range tcs {
 		testName := tc.name + " atomic: " + strconv.FormatBool(atomic)
-		t.Run(testName, func(t *testing.T) {
+		tCtx.Run(testName, func(tCtx ktesting.TContext) {
 			// Clear history to ensure we don't count events from previous tests
 			m.clearHistory()
 
 			for _, obj := range tc.initialObjs {
-				require.NoError(t, fifo.Add(obj), "failed to add")
+				tCtx.ExpectNoError(fifo.Add(obj), "failed to add")
 			}
 
 			// Wait for all create events to appear
-			require.NoError(t, m.waitForEventCount(ctx, len(tc.initialObjs), 5*time.Second), "Controller failed to receive initial setup all events, got: %v", m.getHistory())
+			tCtx.ExpectNoError(m.waitForEventCount(tCtx, len(tc.initialObjs), 5*time.Second), "Controller failed to receive initial setup all events, got: %v", m.getHistory())
 
 			// Clear history so we only compare what happens during the RESYNC/REPLACE
 			m.clearHistory()
 
 			// Run replace
-			require.NoError(t, fifo.Replace(tc.replacedItems, tc.replaceRV), "failed to replace")
+			tCtx.ExpectNoError(fifo.Replace(tc.replacedItems, tc.replaceRV), "failed to replace")
 
 			// Wait for all expected events to be received
-			require.NoError(t, m.waitForEventCount(ctx, len(tc.expectedHistory), 5*time.Second), "Controller failed to receive all events, got: %v", m.getHistory())
+			tCtx.ExpectNoError(m.waitForEventCount(tCtx, len(tc.expectedHistory), 5*time.Second), "Controller failed to receive all events, got: %v", m.getHistory())
 
 			items := sortItemsByKey(store.List(), DeletionHandlingMetaNamespaceKeyFunc)
-			assert.Equal(t, tc.replacedItems, items)
+			tCtx.Assert(items).Should(gomega.Equal(tc.replacedItems))
 			// synthetic delete events from a replace are not ordered, sort by key to make the test deterministic
 			history := sortDeleteEventsByKey(m.getHistory())
-			assert.Equal(t, tc.expectedHistory, history)
+			tCtx.Assert(history).Should(gomega.Equal(tc.expectedHistory))
 		})
 	}
 }
@@ -1139,9 +1126,7 @@ func testReplaceEvents(t *testing.T, ctx context.Context, fifo Queue, m *eventRe
 func TestResetWatch(t *testing.T) {
 	for _, atomic := range []bool{false, true} {
 		t.Run("atomic "+strconv.FormatBool(atomic), func(t *testing.T) {
-			_, ctx := ktesting.NewTestContext(t)
-			ctx, cancel := context.WithCancel(ctx)
-			defer cancel()
+			tCtx := ktesting.Init(t)
 			source := fcache.NewFakeControllerSource()
 			pod := &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
@@ -1181,23 +1166,23 @@ func TestResetWatch(t *testing.T) {
 				},
 			}
 			c := New(cfg)
-			go c.RunWithContext(ctx)
-			if !WaitForCacheSync(ctx.Done(), c.HasSynced) {
+			go c.RunWithContext(tCtx)
+			if !WaitForCacheSync(tCtx.Done(), c.HasSynced) {
 				t.Fatal("Timed out waiting for cache sync")
 			}
-			testResetWatch(t, ctx, source, recorder)
+			testResetWatch(tCtx, source, recorder)
 		})
 	}
 }
 
-func testResetWatch(t *testing.T, ctx context.Context, source *fcache.FakeControllerSource, recorder *eventRecorder) {
+func testResetWatch(tCtx ktesting.TContext, source *fcache.FakeControllerSource, recorder *eventRecorder) {
 	// The first event should be the initial add.
-	require.NoError(t, recorder.waitForEventCount(ctx, 1, 5*time.Second), "Controller failed to receive initial setup all events, got: %v", recorder.getHistory())
+	tCtx.ExpectNoError(recorder.waitForEventCount(tCtx, 1, 5*time.Second), "Controller failed to receive initial setup all events, got: %v", recorder.getHistory())
 	history := recorder.getHistory()
-	assert.Len(t, history, 1)
-	assert.Equal(t, "add", history[0].Action)
-	assert.Equal(t, "default/pod-1", history[0].Key)
-	assert.True(t, history[0].IsInInitialList)
+	tCtx.Assert(history).Should(gomega.HaveLen(1))
+	tCtx.Assert(history[0].Action).Should(gomega.Equal("add"))
+	tCtx.Assert(history[0].Key).Should(gomega.Equal("default/pod-1"))
+	tCtx.Assert(history[0].IsInInitialList).Should(gomega.BeTrueBecause("pod-1 was part of the initial list"))
 
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -1218,9 +1203,9 @@ func testResetWatch(t *testing.T, ctx context.Context, source *fcache.FakeContro
 	source.ResetWatch()
 
 	// We should get an add for the second pod and update for the initial pod on reset.
-	require.NoError(t, recorder.waitForEventCount(ctx, 2, 5*time.Second), "Controller failed to receive initial setup all events, got: %v", recorder.getHistory())
+	tCtx.ExpectNoError(recorder.waitForEventCount(tCtx, 2, 5*time.Second), "Controller failed to receive initial setup all events, got: %v", recorder.getHistory())
 	history = recorder.getHistory()
-	assert.Len(t, history, 2)
+	tCtx.Assert(history).Should(gomega.HaveLen(2))
 
 	var addEvent eventRecord
 	var updateEvent eventRecord
@@ -1232,16 +1217,14 @@ func testResetWatch(t *testing.T, ctx context.Context, source *fcache.FakeContro
 			addEvent = event
 		}
 	}
-	assert.Equal(t, "default/pod-1", updateEvent.Key)
-	assert.False(t, updateEvent.IsInInitialList)
-	assert.Equal(t, "default/pod-2", addEvent.Key)
-	assert.False(t, addEvent.IsInInitialList)
+	tCtx.Assert(updateEvent.Key).Should(gomega.Equal("default/pod-1"))
+	tCtx.Assert(updateEvent.IsInInitialList).Should(gomega.BeFalseBecause("pod-1 update was not part of the initial list"))
+	tCtx.Assert(addEvent.Key).Should(gomega.Equal("default/pod-2"))
+	tCtx.Assert(addEvent.IsInInitialList).Should(gomega.BeFalseBecause("pod-2 add was not part of the initial list"))
 }
 
 func TestStoreResourceVersion(t *testing.T) {
-	_, ctx := ktesting.NewTestContext(t)
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
+	tCtx := ktesting.Init(t)
 	source := fcache.NewFakeControllerSource()
 	source.Add(&v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -1258,7 +1241,7 @@ func TestStoreResourceVersion(t *testing.T) {
 		AtomicEvents: true,
 	})
 	recorder := newEventRecorder(store, DeletionHandlingMetaNamespaceKeyFunc)
-	logger, _ := ktesting.NewTestContext(t)
+	logger := tCtx.Logger()
 
 	cfg := &Config{
 		Queue:            fifo,
@@ -1276,21 +1259,21 @@ func TestStoreResourceVersion(t *testing.T) {
 		},
 	}
 	c := New(cfg)
-	go c.RunWithContext(ctx)
-	if !WaitForCacheSync(ctx.Done(), c.HasSynced) {
+	go c.RunWithContext(tCtx)
+	if !WaitForCacheSync(tCtx.Done(), c.HasSynced) {
 		t.Fatal("Timed out waiting for cache sync")
 	}
-	testResourceVersion(t, ctx, source, recorder, store)
+	testResourceVersion(tCtx, source, recorder, store)
 }
 
-func testResourceVersion(t *testing.T, ctx context.Context, source *fcache.FakeControllerSource, recorder *eventRecorder, store Store) {
+func testResourceVersion(tCtx ktesting.TContext, source *fcache.FakeControllerSource, recorder *eventRecorder, store Store) {
 	// The first event should be the initial add.
-	require.NoError(t, recorder.waitForEventCount(ctx, 1, 5*time.Second), "Controller failed to receive initial setup all events, got: %v", recorder.getHistory())
+	tCtx.ExpectNoError(recorder.waitForEventCount(tCtx, 1, 5*time.Second), "Controller failed to receive initial setup all events, got: %v", recorder.getHistory())
 	history := recorder.getHistory()
-	assert.Len(t, history, 1)
-	assert.Equal(t, "add", history[0].Action)
-	assert.Equal(t, "default/pod-1", history[0].Key)
-	assert.True(t, history[0].IsInInitialList)
+	tCtx.Assert(history).Should(gomega.HaveLen(1))
+	tCtx.Assert(history[0].Action).Should(gomega.Equal("add"))
+	tCtx.Assert(history[0].Key).Should(gomega.Equal("default/pod-1"))
+	tCtx.Assert(history[0].IsInInitialList).Should(gomega.BeTrueBecause("pod-1 was part of the initial list"))
 
 	recorder.clearHistory()
 	// Update the pod labels to increment the resource version.
@@ -1303,10 +1286,10 @@ func testResourceVersion(t *testing.T, ctx context.Context, source *fcache.FakeC
 			},
 		},
 	})
-	require.NoError(t, recorder.waitForEventCount(ctx, 1, 5*time.Second), "Controller failed to receive update event, got: %v", recorder.getHistory())
+	tCtx.ExpectNoError(recorder.waitForEventCount(tCtx, 1, 5*time.Second), "Controller failed to receive update event, got: %v", recorder.getHistory())
 	history = recorder.getHistory()
 	// The stored resource version should have changed.
-	assert.Equal(t, history[0].EventRV, store.LastStoreSyncResourceVersion())
+	tCtx.Assert(store.LastStoreSyncResourceVersion()).Should(gomega.Equal(history[0].EventRV))
 
 	recorder.clearHistory()
 	// Delete the pod.
@@ -1316,16 +1299,14 @@ func testResourceVersion(t *testing.T, ctx context.Context, source *fcache.FakeC
 			Namespace: "default",
 		},
 	})
-	require.NoError(t, recorder.waitForEventCount(ctx, 1, 5*time.Second), "Controller failed to receive delete event, got: %v", recorder.getHistory())
+	tCtx.ExpectNoError(recorder.waitForEventCount(tCtx, 1, 5*time.Second), "Controller failed to receive delete event, got: %v", recorder.getHistory())
 	history = recorder.getHistory()
 	// The stored resource version should have changed.
-	assert.Equal(t, history[0].EventRV, store.LastStoreSyncResourceVersion())
+	tCtx.Assert(store.LastStoreSyncResourceVersion()).Should(gomega.Equal(history[0].EventRV))
 }
 
 func TestStoreResourceVersionWithNonMetaTransform(t *testing.T) {
-	_, ctx := ktesting.NewTestContext(t)
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
+	tCtx := ktesting.Init(t)
 	source := fcache.NewFakeControllerSource()
 	source.Add(&v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -1355,7 +1336,7 @@ func TestStoreResourceVersionWithNonMetaTransform(t *testing.T) {
 		AtomicEvents: true,
 	})
 	recorder := newEventRecorder(store, keyFunc)
-	logger, _ := ktesting.NewTestContext(t)
+	logger := tCtx.Logger()
 
 	cfg := &Config{
 		Queue:            fifo,
@@ -1374,21 +1355,21 @@ func TestStoreResourceVersionWithNonMetaTransform(t *testing.T) {
 		},
 	}
 	c := New(cfg)
-	go c.RunWithContext(ctx)
-	if !WaitForCacheSync(ctx.Done(), c.HasSynced) {
+	go c.RunWithContext(tCtx)
+	if !WaitForCacheSync(tCtx.Done(), c.HasSynced) {
 		t.Fatal("Timed out waiting for cache sync")
 	}
-	testResourceVersionWithNonMetaTransform(t, ctx, source, recorder, store)
+	testResourceVersionWithNonMetaTransform(tCtx, source, recorder, store)
 }
 
-func testResourceVersionWithNonMetaTransform(t *testing.T, ctx context.Context, source *fcache.FakeControllerSource, recorder *eventRecorder, store Store) {
+func testResourceVersionWithNonMetaTransform(tCtx ktesting.TContext, source *fcache.FakeControllerSource, recorder *eventRecorder, store Store) {
 	// The first event should be the initial add.
-	require.NoError(t, recorder.waitForEventCount(ctx, 1, 5*time.Second), "Controller failed to receive initial setup all events, got: %v", recorder.getHistory())
+	tCtx.ExpectNoError(recorder.waitForEventCount(tCtx, 1, 5*time.Second), "Controller failed to receive initial setup all events, got: %v", recorder.getHistory())
 	history := recorder.getHistory()
-	assert.Len(t, history, 1)
-	assert.Equal(t, "add", history[0].Action)
-	assert.Equal(t, "pod-1", history[0].Key)
-	assert.True(t, history[0].IsInInitialList)
+	tCtx.Assert(history).Should(gomega.HaveLen(1))
+	tCtx.Assert(history[0].Action).Should(gomega.Equal("add"))
+	tCtx.Assert(history[0].Key).Should(gomega.Equal("pod-1"))
+	tCtx.Assert(history[0].IsInInitialList).Should(gomega.BeTrueBecause("pod-1 was part of the initial list"))
 
 	// The stored resource version should stay at the initial value given by the replace event since
 	// the update event does not have metadata.
@@ -1404,9 +1385,9 @@ func testResourceVersionWithNonMetaTransform(t *testing.T, ctx context.Context, 
 			},
 		},
 	})
-	require.NoError(t, recorder.waitForEventCount(ctx, 1, 5*time.Second), "Controller failed to receive update event, got: %v", recorder.getHistory())
+	tCtx.ExpectNoError(recorder.waitForEventCount(tCtx, 1, 5*time.Second), "Controller failed to receive update event, got: %v", recorder.getHistory())
 	// The stored resource version should not be changed due to the transform.
-	assert.Equal(t, replaceRV, store.LastStoreSyncResourceVersion())
+	tCtx.Assert(store.LastStoreSyncResourceVersion()).Should(gomega.Equal(replaceRV))
 
 	recorder.clearHistory()
 	// Modify the pod but do not send the event.
@@ -1422,9 +1403,9 @@ func testResourceVersionWithNonMetaTransform(t *testing.T, ctx context.Context, 
 	// Trigger a replace by resetting the watch
 	source.ResetWatch()
 
-	require.NoError(t, recorder.waitForEventCount(ctx, 1, 5*time.Second), "Controller failed to receive replace event, got: %v", recorder.getHistory())
+	tCtx.ExpectNoError(recorder.waitForEventCount(tCtx, 1, 5*time.Second), "Controller failed to receive replace event, got: %v", recorder.getHistory())
 	// The stored resource version should be updated to the replace events RV.
-	assert.Equal(t, "3", store.LastStoreSyncResourceVersion())
+	tCtx.Assert(store.LastStoreSyncResourceVersion()).Should(gomega.Equal("3"))
 }
 
 type eventRecord struct {

@@ -24,10 +24,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/onsi/gomega"
 
 	clientfeatures "k8s.io/client-go/features"
 	clientfeaturestesting "k8s.io/client-go/features/testing"
+	"k8s.io/ktesting"
 )
 
 func (f *RealFIFO) getItems() []Delta {
@@ -1024,6 +1025,7 @@ func TestRealFIFO_PopShouldUnblockWhenClosed(t *testing.T) {
 }
 
 func TestRealFIFO_PopMultipleDeltaInBatch(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	clientfeaturestesting.SetFeatureDuringTest(t, clientfeatures.InOrderInformersBatchProcess, true)
 	const unlimitedBatchSize = 999999
 	obj1 := mkFifoObj("foo1", 5)
@@ -1152,7 +1154,7 @@ func TestRealFIFO_PopMultipleDeltaInBatch(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
+		tCtx.Run(tc.name, func(tCtx ktesting.TContext) {
 			f := NewRealFIFO(
 				testFifoObjectKeyFunc,
 				literalListerGetter(func() []testFifoObject {
@@ -1215,7 +1217,7 @@ func TestRealFIFO_PopMultipleDeltaInBatch(t *testing.T) {
 
 			idx := 0
 			for _, batch := range tc.expectedBatches {
-				assert.Equal(t, receivedItems[idx], batch)
+				tCtx.Assert(batch).Should(gomega.Equal(receivedItems[idx]))
 				idx++
 			}
 			receivedInitialItems := make([]testFifoObject, 0)
@@ -1225,12 +1227,13 @@ func TestRealFIFO_PopMultipleDeltaInBatch(t *testing.T) {
 				}
 			}
 
-			assert.Equal(t, tc.initialItems, receivedInitialItems)
+			tCtx.Assert(receivedInitialItems).Should(gomega.Equal(tc.initialItems))
 		})
 	}
 }
 
 func TestRealFIFO_PopBrokenItemsInBatch(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	clientfeaturestesting.SetFeatureDuringTest(t, clientfeatures.InOrderInformersBatchProcess, true)
 	const unlimitedBatchSize = 999999
 	sucessObj1 := mkFifoObj("foo1", 5)
@@ -1285,7 +1288,7 @@ func TestRealFIFO_PopBrokenItemsInBatch(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
+		tCtx.Run(tc.name, func(tCtx ktesting.TContext) {
 			testBrokenItemKeyFunc := func(obj interface{}) (string, error) {
 				if obj == failObj3 || obj == failObj4 {
 					return "", errors.New("test key func error")
@@ -1333,9 +1336,9 @@ func TestRealFIFO_PopBrokenItemsInBatch(t *testing.T) {
 			f.Close()
 
 			idx := 0
-			assert.Len(t, tc.expectedBatches, len(receivedItems))
+			tCtx.Assert(tc.expectedBatches).Should(gomega.HaveLen(len(receivedItems)))
 			for _, batch := range tc.expectedBatches {
-				assert.Equal(t, receivedItems[idx], batch)
+				tCtx.Assert(batch).Should(gomega.Equal(receivedItems[idx]))
 				idx++
 			}
 		})

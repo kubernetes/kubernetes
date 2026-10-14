@@ -34,7 +34,7 @@ import (
 	"k8s.io/client-go/dynamic"
 	fakerest "k8s.io/client-go/rest/fake"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/onsi/gomega"
 	appsv1beta1 "k8s.io/api/apps/v1beta1"
 	appsv1beta2 "k8s.io/api/apps/v1beta2"
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
@@ -42,6 +42,7 @@ import (
 	extv1beta1 "k8s.io/api/extensions/v1beta1"
 	"k8s.io/client-go/restmapper"
 	coretesting "k8s.io/client-go/testing"
+	"k8s.io/ktesting"
 )
 
 func bytesBody(bodyBytes []byte) io.ReadCloser {
@@ -256,6 +257,7 @@ func fakeScaleClient(t *testing.T) (ScalesGetter, []schema.GroupResource) {
 }
 
 func TestGetScale(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	scaleClient, groupResources := fakeScaleClient(t)
 	expectedScale := &autoscalingv1.Scale{
 		TypeMeta: metav1.TypeMeta{
@@ -274,16 +276,17 @@ func TestGetScale(t *testing.T) {
 
 	for _, groupResource := range groupResources {
 		scale, err := scaleClient.Scales("default").Get(context.TODO(), groupResource, "foo", metav1.GetOptions{})
-		if !assert.NoError(t, err, "should have been able to fetch a scale for %s", groupResource.String()) {
+		if !tCtx.AssertNoError(err, "should have been able to fetch a scale for %s", groupResource) {
 			continue
 		}
-		assert.NotNil(t, scale, "should have returned a non-nil scale for %s", groupResource.String())
+		tCtx.Assert(scale).ShouldNot(gomega.BeNil(), "should have returned a non-nil scale for %s", groupResource)
 
-		assert.Equal(t, expectedScale, scale, "should have returned the expected scale for %s", groupResource.String())
+		tCtx.Assert(scale).Should(gomega.Equal(expectedScale), "should have returned the expected scale for %s", groupResource)
 	}
 }
 
 func TestUpdateScale(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	scaleClient, groupResources := fakeScaleClient(t)
 	expectedScale := &autoscalingv1.Scale{
 		TypeMeta: metav1.TypeMeta{
@@ -302,16 +305,17 @@ func TestUpdateScale(t *testing.T) {
 
 	for _, groupResource := range groupResources {
 		scale, err := scaleClient.Scales("default").Update(context.TODO(), groupResource, expectedScale, metav1.UpdateOptions{})
-		if !assert.NoError(t, err, "should have been able to fetch a scale for %s", groupResource.String()) {
+		if !tCtx.AssertNoError(err, "should have been able to fetch a scale for %s", groupResource) {
 			continue
 		}
-		assert.NotNil(t, scale, "should have returned a non-nil scale for %s", groupResource.String())
+		tCtx.Assert(scale).ShouldNot(gomega.BeNil(), "should have returned a non-nil scale for %s", groupResource)
 
-		assert.Equal(t, expectedScale, scale, "should have returned the expected scale for %s", groupResource.String())
+		tCtx.Assert(scale).Should(gomega.Equal(expectedScale), "should have returned the expected scale for %s", groupResource)
 	}
 }
 
 func TestPatchScale(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	scaleClient, groupResources := fakeScaleClient(t)
 	expectedScale := &autoscalingv1.Scale{
 		TypeMeta: metav1.TypeMeta{
@@ -345,20 +349,20 @@ func TestPatchScale(t *testing.T) {
 	patch := []byte(`{"spec":{"replicas":5}}`)
 	for _, gvr := range gvrs {
 		scale, err := scaleClient.Scales("default").Patch(context.TODO(), gvr, "foo", types.MergePatchType, patch, metav1.PatchOptions{})
-		if !assert.NoError(t, err, "should have been able to fetch a scale for %s", gvr.String()) {
+		if !tCtx.AssertNoError(err, "should have been able to fetch a scale for %s", gvr) {
 			continue
 		}
-		assert.NotNil(t, scale, "should have returned a non-nil scale for %s", gvr.String())
-		assert.Equal(t, expectedScale, scale, "should have returned the expected scale for %s", gvr.String())
+		tCtx.Assert(scale).ShouldNot(gomega.BeNil(), "should have returned a non-nil scale for %s", gvr)
+		tCtx.Assert(scale).Should(gomega.Equal(expectedScale), "should have returned the expected scale for %s", gvr)
 	}
 
 	patch = []byte(`[{"op":"replace","path":"/spec/replicas","value":5}]`)
 	for _, gvr := range gvrs {
 		scale, err := scaleClient.Scales("default").Patch(context.TODO(), gvr, "foo", types.JSONPatchType, patch, metav1.PatchOptions{})
-		if !assert.NoError(t, err, "should have been able to fetch a scale for %s", gvr.String()) {
+		if !tCtx.AssertNoError(err, "should have been able to fetch a scale for %s", gvr) {
 			continue
 		}
-		assert.NotNil(t, scale, "should have returned a non-nil scale for %s", gvr.String())
-		assert.Equal(t, expectedScale, scale, "should have returned the expected scale for %s", gvr.String())
+		tCtx.Assert(scale).ShouldNot(gomega.BeNil(), "should have returned a non-nil scale for %s", gvr)
+		tCtx.Assert(scale).Should(gomega.Equal(expectedScale), "should have returned the expected scale for %s", gvr)
 	}
 }

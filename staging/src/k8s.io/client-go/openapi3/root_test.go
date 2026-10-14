@@ -21,14 +21,15 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	"github.com/onsi/gomega"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/openapi"
 	"k8s.io/client-go/openapi/openapitest"
+	"k8s.io/ktesting"
 )
 
 func TestOpenAPIV3Root_GroupVersions(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	tests := []struct {
 		name        string
 		paths       map[string]openapi.GroupVersion
@@ -88,7 +89,7 @@ func TestOpenAPIV3Root_GroupVersions(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
+		tCtx.Run(test.name, func(tCtx ktesting.TContext) {
 			fakeClient := openapitest.FakeClient{
 				PathsMap:  test.paths,
 				ForcedErr: test.forcedErr,
@@ -96,12 +97,12 @@ func TestOpenAPIV3Root_GroupVersions(t *testing.T) {
 			root := NewRoot(fakeClient)
 			actualGVs, err := root.GroupVersions()
 			if test.forcedErr != nil {
-				require.Error(t, err)
+				tCtx.Assert(err).Should(gomega.HaveOccurred())
 			} else {
-				require.NoError(t, err)
+				tCtx.AssertNoError(err)
 			}
 			if !reflect.DeepEqual(test.expectedGVs, actualGVs) {
-				t.Errorf("expected GroupVersions (%s), got (%s): (%s)\n",
+				tCtx.Errorf("expected GroupVersions (%s), got (%s): (%s)\n",
 					test.expectedGVs, actualGVs, err)
 			}
 		})
@@ -109,6 +110,7 @@ func TestOpenAPIV3Root_GroupVersions(t *testing.T) {
 }
 
 func TestOpenAPIV3Root_GVSpec(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	tests := []struct {
 		name          string
 		gv            schema.GroupVersion
@@ -149,25 +151,24 @@ func TestOpenAPIV3Root_GVSpec(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
+		tCtx.Run(test.name, func(tCtx ktesting.TContext) {
 			client := openapitest.NewEmbeddedFileClient()
 			root := NewRoot(client)
 			gvSpec, err := root.GVSpec(test.gv)
 			if test.err != nil {
-				assert.True(t, reflect.DeepEqual(test.err, err))
+				tCtx.Assert(err).Should(gomega.Equal(test.err))
 				return
 			}
-			require.NoError(t, err)
+			tCtx.ExpectNoError(err)
 			for _, path := range test.expectedPaths {
-				if _, found := gvSpec.Paths.Paths[path]; !found {
-					assert.True(t, found, "expected path not found (%s)\n", path)
-				}
+				tCtx.Assert(gvSpec.Paths.Paths).Should(gomega.HaveKey(path))
 			}
 		})
 	}
 }
 
 func TestOpenAPIV3Root_GVSpecAsMap(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	tests := []struct {
 		name          string
 		gv            schema.GroupVersion
@@ -208,25 +209,24 @@ func TestOpenAPIV3Root_GVSpecAsMap(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
+		tCtx.Run(test.name, func(tCtx ktesting.TContext) {
 			root := NewRoot(openapitest.NewEmbeddedFileClient())
 			gvSpecAsMap, err := root.GVSpecAsMap(test.gv)
 			if test.err != nil {
-				assert.True(t, reflect.DeepEqual(test.err, err))
+				tCtx.Assert(err).Should(gomega.Equal(test.err))
 				return
 			}
-			require.NoError(t, err)
+			tCtx.ExpectNoError(err)
 			for _, path := range test.expectedPaths {
 				pathsMap := gvSpecAsMap["paths"]
-				if _, found := pathsMap.(map[string]interface{})[path]; !found {
-					assert.True(t, found, "expected path not found (%s)\n", path)
-				}
+				tCtx.Assert(pathsMap.(map[string]interface{})).Should(gomega.HaveKey(path))
 			}
 		})
 	}
 }
 
 func TestOpenAPIV3Root_GroupVersionToPath(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	tests := []struct {
 		name         string
 		groupVersion schema.GroupVersion
@@ -258,15 +258,15 @@ func TestOpenAPIV3Root_GroupVersionToPath(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
+		tCtx.Run(test.name, func(tCtx ktesting.TContext) {
 			actualPath := gvToAPIPath(test.groupVersion)
-			assert.Equal(t, test.expectedPath, actualPath, "expected API path (%s), got (%s)",
-				test.expectedPath, actualPath)
+			tCtx.Assert(actualPath).Should(gomega.Equal(test.expectedPath))
 		})
 	}
 }
 
 func TestOpenAPIV3Root_PathToGroupVersion(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	tests := []struct {
 		name        string
 		path        string
@@ -304,14 +304,13 @@ func TestOpenAPIV3Root_PathToGroupVersion(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
+		tCtx.Run(test.name, func(tCtx ktesting.TContext) {
 			actualGV, err := pathToGroupVersion(test.path)
 			if test.expectedErr {
-				require.Error(t, err, "should have received error for path: %s", test.path)
+				tCtx.Require(err).Should(gomega.HaveOccurred(), "should have received error for path: %s", test.path)
 			} else {
-				require.NoError(t, err, "expected no error, got (%v)", err)
-				assert.Equal(t, test.expectedGV, actualGV, "expected GroupVersion (%s), got (%s)",
-					test.expectedGV, actualGV)
+				tCtx.ExpectNoError(err)
+				tCtx.Assert(actualGV).Should(gomega.Equal(test.expectedGV))
 			}
 		})
 	}

@@ -19,11 +19,12 @@ package watchlist
 import (
 	"testing"
 
-	"github.com/stretchr/testify/require"
+	"github.com/onsi/gomega"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientfeatures "k8s.io/client-go/features"
 	clientfeaturestesting "k8s.io/client-go/features/testing"
+	"k8s.io/ktesting"
 	"k8s.io/utils/ptr"
 )
 
@@ -81,6 +82,7 @@ func TestDoesClientNotSupportWatchListSemantics(t *testing.T) {
 // | unset/NotOlderThan/Exact | unset/0/100     | unset/4 | unset/FakeToken |
 // +--------------------------+-----------------+---------+-----------------+
 func TestPrepareWatchListOptionsFromListOptions(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	scenarios := []struct {
 		name              string
 		listOptions       metav1.ListOptions
@@ -221,14 +223,14 @@ func TestPrepareWatchListOptionsFromListOptions(t *testing.T) {
 		},
 	}
 	for _, scenario := range scenarios {
-		t.Run(scenario.name, func(t *testing.T) {
-			clientfeaturestesting.SetFeatureDuringTest(t, clientfeatures.WatchListClient, scenario.enableWatchListFG)
+		tCtx.Run(scenario.name, func(tCtx ktesting.TContext) {
+			clientfeaturestesting.SetFeatureDuringTest(tCtx.TB().(testing.TB), clientfeatures.WatchListClient, scenario.enableWatchListFG)
 
 			watchListOptions, hasWatchListOptionsPrepared, err := PrepareWatchListOptionsFromListOptions(scenario.listOptions)
 
-			require.NoError(t, err)
-			require.Equal(t, scenario.expectToPrepareWatchListOptions, hasWatchListOptionsPrepared)
-			require.Equal(t, scenario.expectedWatchListOptions, watchListOptions)
+			tCtx.ExpectNoError(err)
+			tCtx.Require(hasWatchListOptionsPrepared).Should(gomega.Equal(scenario.expectToPrepareWatchListOptions))
+			tCtx.Require(watchListOptions).Should(gomega.Equal(scenario.expectedWatchListOptions))
 		})
 	}
 }

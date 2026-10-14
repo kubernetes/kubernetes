@@ -21,64 +21,69 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/stretchr/testify/require"
+	"github.com/onsi/gomega"
 
 	"k8s.io/client-go/features"
+	"k8s.io/ktesting"
 )
 
 // replaceFeatureGatesForTest installs newGates globally and restores the previous gates when the test ends, so fake gates don't leak across tests when unit test run order gets shuffled.
-func replaceFeatureGatesForTest(t *testing.T, newGates features.Gates) {
-	t.Helper()
+func replaceFeatureGatesForTest(tCtx ktesting.TContext, newGates features.Gates) {
+	tCtx.Helper()
 	original := features.FeatureGates()
-	t.Cleanup(func() {
+	tCtx.Cleanup(func() {
 		features.ReplaceFeatureGates(original)
 	})
 	features.ReplaceFeatureGates(newGates)
 }
 
 func TestDriveInitDefaultFeatureGates(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	featureGates := features.FeatureGates()
 	assertFunctionPanicsWithMessage(t, func() { featureGates.Enabled("FakeFeatureGate") }, "features.FeatureGates().Enabled", fmt.Sprintf("feature %q is not registered in FeatureGate", "FakeFeatureGate"))
 
 	fakeGates := &fakeFeatureGates{features: map[features.Feature]bool{"FakeFeatureGate": true}}
-	require.True(t, fakeGates.Enabled("FakeFeatureGate"))
+	tCtx.Assert(fakeGates.Enabled("FakeFeatureGate")).Should(gomega.BeTrueBecause("FakeFeatureGate was set to true"))
 
-	replaceFeatureGatesForTest(t, fakeGates)
+	replaceFeatureGatesForTest(tCtx, fakeGates)
 	featureGates = features.FeatureGates()
 
 	assertFeatureGatesType(t, featureGates)
-	require.True(t, featureGates.Enabled("FakeFeatureGate"))
+	tCtx.Assert(featureGates.Enabled("FakeFeatureGate")).Should(gomega.BeTrueBecause("FakeFeatureGate was set to true"))
 }
 
 func TestSetFeatureGatesDuringTest(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	featureA := features.Feature("FeatureA")
 	featureB := features.Feature("FeatureB")
 	fakeGates := &fakeFeatureGates{map[features.Feature]bool{featureA: true, featureB: true}}
-	replaceFeatureGatesForTest(t, fakeGates)
-	t.Cleanup(func() {
+	replaceFeatureGatesForTest(tCtx, fakeGates)
+	tCtx.Cleanup(func() {
 		// since cleanup functions will be called in last added, first called order.
 		// check if the original feature wasn't restored
-		require.True(t, features.FeatureGates().Enabled(featureA), "the original feature = %v wasn't restored", featureA)
+		tCtx.Assert(features.FeatureGates().Enabled(featureA)).Should(gomega.BeTrueBecause("the original feature = %v wasn't restored", featureA))
 	})
 
 	SetFeatureDuringTest(t, featureA, false)
 
-	require.False(t, features.FeatureGates().Enabled(featureA))
-	require.True(t, features.FeatureGates().Enabled(featureB))
+	tCtx.Assert(features.FeatureGates().Enabled(featureA)).Should(gomega.BeFalseBecause("featureA was set to false"))
+	tCtx.Assert(features.FeatureGates().Enabled(featureB)).Should(gomega.BeTrueBecause("featureB was not changed"))
 }
 
 func TestSetFeatureGatesDuringTestPanics(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	fakeGates := &fakeFeatureGates{features: map[features.Feature]bool{"FakeFeatureGate": true}}
 
-	replaceFeatureGatesForTest(t, fakeGates)
+	replaceFeatureGatesForTest(tCtx, fakeGates)
 	assertFunctionPanicsWithMessage(t, func() { SetFeatureDuringTest(t, "UnknownFeature", false) }, "SetFeatureDuringTest", fmt.Sprintf("feature %q is not registered in featureGates", "UnknownFeature"))
 
 	readOnlyGates := &readOnlyAlwaysDisabledFeatureGates{}
-	replaceFeatureGatesForTest(t, readOnlyGates)
+	replaceFeatureGatesForTest(tCtx, readOnlyGates)
 	assertFunctionPanicsWithMessage(t, func() { SetFeatureDuringTest(t, "FakeFeature", false) }, "SetFeatureDuringTest", fmt.Sprintf("clientfeatures.FeatureGates(): %T does not implement featureGatesSetter interface", readOnlyGates))
 }
 
 func TestOverridesForSetFeatureGatesDuringTest(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	scenarios := []struct {
 		name           string
 		firstTestName  string
@@ -107,18 +112,18 @@ func TestOverridesForSetFeatureGatesDuringTest(t *testing.T) {
 		},
 	}
 	for _, scenario := range scenarios {
-		t.Run(scenario.name, func(t *testing.T) {
+		tCtx.Run(scenario.name, func(tCtx ktesting.TContext) {
 			featureA := features.Feature("FeatureA")
 			fakeGates := &fakeFeatureGates{map[features.Feature]bool{featureA: true}}
 			fakeTesting := &fakeT{fakeTestName: scenario.firstTestName, TB: t}
 
-			replaceFeatureGatesForTest(t, fakeGates)
-			require.NoError(t, setFeatureDuringTestInternal(fakeTesting, featureA, true))
-			require.True(t, features.FeatureGates().Enabled(featureA))
+			replaceFeatureGatesForTest(tCtx, fakeGates)
+			tCtx.AssertNoError(setFeatureDuringTestInternal(fakeTesting, featureA, true))
+			tCtx.Assert(features.FeatureGates().Enabled(featureA)).Should(gomega.BeTrueBecause("featureA was set to true"))
 
 			fakeTesting.fakeTestName = scenario.secondTestName
 			err := setFeatureDuringTestInternal(fakeTesting, featureA, false)
-			require.Equal(t, scenario.expectError, err != nil)
+			tCtx.Assert(err != nil).Should(gomega.Equal(scenario.expectError), "expected error presence to match")
 		})
 	}
 }

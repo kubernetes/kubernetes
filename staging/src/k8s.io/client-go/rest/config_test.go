@@ -37,10 +37,10 @@ import (
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/client-go/transport"
 	"k8s.io/client-go/util/flowcontrol"
+	"k8s.io/ktesting"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	"github.com/onsi/gomega"
 	"sigs.k8s.io/randfill"
 )
 
@@ -110,39 +110,40 @@ func TestSetKubernetesDefaultsUserAgent(t *testing.T) {
 }
 
 func TestAdjustVersion(t *testing.T) {
-	assert := assert.New(t)
-	assert.Equal("1.2.3", adjustVersion("1.2.3-alpha4"))
-	assert.Equal("1.2.3", adjustVersion("1.2.3-alpha"))
-	assert.Equal("1.2.3", adjustVersion("1.2.3"))
-	assert.Equal("unknown", adjustVersion(""))
+	tCtx := ktesting.Init(t)
+	tCtx.Assert(adjustVersion("1.2.3-alpha4")).Should(gomega.Equal("1.2.3"))
+	tCtx.Assert(adjustVersion("1.2.3-alpha")).Should(gomega.Equal("1.2.3"))
+	tCtx.Assert(adjustVersion("1.2.3")).Should(gomega.Equal("1.2.3"))
+	tCtx.Assert(adjustVersion("")).Should(gomega.Equal("unknown"))
 }
 
 func TestAdjustCommit(t *testing.T) {
-	assert := assert.New(t)
-	assert.Equal("1234567", adjustCommit("1234567890"))
-	assert.Equal("123456", adjustCommit("123456"))
-	assert.Equal("unknown", adjustCommit(""))
+	tCtx := ktesting.Init(t)
+	tCtx.Assert(adjustCommit("1234567890")).Should(gomega.Equal("1234567"))
+	tCtx.Assert(adjustCommit("123456")).Should(gomega.Equal("123456"))
+	tCtx.Assert(adjustCommit("")).Should(gomega.Equal("unknown"))
 }
 
 func TestAdjustCommand(t *testing.T) {
-	assert := assert.New(t)
-	assert.Equal("beans", adjustCommand(filepath.Join("home", "bob", "Downloads", "beans")))
-	assert.Equal("beans", adjustCommand(filepath.Join(".", "beans")))
-	assert.Equal("beans", adjustCommand("beans"))
-	assert.Equal("unknown", adjustCommand(""))
+	tCtx := ktesting.Init(t)
+	tCtx.Assert(adjustCommand(filepath.Join("home", "bob", "Downloads", "beans"))).Should(gomega.Equal("beans"))
+	tCtx.Assert(adjustCommand(filepath.Join(".", "beans"))).Should(gomega.Equal("beans"))
+	tCtx.Assert(adjustCommand("beans")).Should(gomega.Equal("beans"))
+	tCtx.Assert(adjustCommand("")).Should(gomega.Equal("unknown"))
 }
 
 func TestBuildUserAgent(t *testing.T) {
-	assert.New(t).Equal(
-		"lynx/nicest (beos/itanium) kubernetes/baaaaaaaaad",
-		buildUserAgent(
-			"lynx", "nicest",
-			"beos", "itanium", "baaaaaaaaad"))
+	tCtx := ktesting.Init(t)
+	tCtx.Assert(buildUserAgent(
+		"lynx", "nicest",
+		"beos", "itanium", "baaaaaaaaad")).Should(gomega.Equal(
+		"lynx/nicest (beos/itanium) kubernetes/baaaaaaaaad"))
 }
 
 // This function untestable since it doesn't accept arguments.
 func TestDefaultKubernetesUserAgent(t *testing.T) {
-	assert.New(t).Contains(DefaultKubernetesUserAgent(), "kubernetes")
+	tCtx := ktesting.Init(t)
+	tCtx.Assert(DefaultKubernetesUserAgent()).Should(gomega.ContainSubstring("kubernetes"))
 }
 
 func TestRESTClientRequires(t *testing.T) {
@@ -664,44 +665,44 @@ func TestConfigSprint(t *testing.T) {
 }
 
 func TestConfigWarningHandler(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	config := &Config{}
 	config.GroupVersion = &schema.GroupVersion{}
 	config.NegotiatedSerializer = &fakeNegotiatedSerializer{}
 	handlerNoContext := &fakeWarningHandler{}
 	handlerWithContext := &fakeWarningHandlerWithContext{}
 
-	t.Run("none", func(t *testing.T) {
+	tCtx.Run("none", func(tCtx ktesting.TContext) {
 		client, err := RESTClientForConfigAndClient(config, nil)
-		require.NoError(t, err)
-		assert.Nil(t, client.warningHandler)
+		tCtx.ExpectNoError(err)
+		tCtx.Assert(client.warningHandler).Should(gomega.BeNil())
 	})
 
-	t.Run("no-context", func(t *testing.T) {
+	tCtx.Run("no-context", func(tCtx ktesting.TContext) {
 		config := CopyConfig(config)
 		handler := &fakeWarningHandlerWithLogging{}
 		config.WarningHandler = handler
 		client, err := RESTClientForConfigAndClient(config, nil)
-		require.NoError(t, err)
+		tCtx.ExpectNoError(err)
 		client.warningHandler.HandleWarningHeaderWithContext(context.Background(), 0, "", "message")
-		assert.Equal(t, []string{"message"}, handler.messages)
-
+		tCtx.Assert(handler.messages).Should(gomega.Equal([]string{"message"}))
 	})
 
-	t.Run("with-context", func(t *testing.T) {
+	tCtx.Run("with-context", func(tCtx ktesting.TContext) {
 		config := CopyConfig(config)
 		config.WarningHandlerWithContext = handlerWithContext
 		client, err := RESTClientForConfigAndClient(config, nil)
-		require.NoError(t, err)
-		assert.Equal(t, handlerWithContext, client.warningHandler)
+		tCtx.ExpectNoError(err)
+		tCtx.Assert(client.warningHandler).Should(gomega.Equal(handlerWithContext))
 	})
 
-	t.Run("both", func(t *testing.T) {
+	tCtx.Run("both", func(tCtx ktesting.TContext) {
 		config := CopyConfig(config)
 		config.WarningHandler = handlerNoContext
 		config.WarningHandlerWithContext = handlerWithContext
 		client, err := RESTClientForConfigAndClient(config, nil)
-		require.NoError(t, err)
-		assert.NotNil(t, client.warningHandler)
-		assert.Equal(t, handlerWithContext, client.warningHandler)
+		tCtx.ExpectNoError(err)
+		tCtx.Assert(client.warningHandler).ShouldNot(gomega.BeNil())
+		tCtx.Assert(client.warningHandler).Should(gomega.Equal(handlerWithContext))
 	})
 }

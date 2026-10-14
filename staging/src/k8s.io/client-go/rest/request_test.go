@@ -39,10 +39,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-
 	"github.com/google/go-cmp/cmp"
+	"github.com/onsi/gomega"
 
 	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -61,7 +59,7 @@ import (
 	"k8s.io/client-go/util/flowcontrol"
 	utiltesting "k8s.io/client-go/util/testing"
 	"k8s.io/klog/v2"
-	"k8s.io/klog/v2/ktesting"
+	"k8s.io/ktesting"
 	testingclock "k8s.io/utils/clock/testing"
 )
 
@@ -583,7 +581,7 @@ func TestURLTemplate(t *testing.T) {
 }
 
 func TestTransformResponse(t *testing.T) {
-	_, ctx := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
 	invalid := []byte("aaaaa")
 	uri, _ := url.Parse("http://localhost")
 	testCases := []struct {
@@ -632,7 +630,7 @@ func TestTransformResponse(t *testing.T) {
 		if test.Response.Body == nil {
 			test.Response.Body = io.NopCloser(bytes.NewReader([]byte{}))
 		}
-		result := r.transformResponse(ctx, test.Response, &http.Request{})
+		result := r.transformResponse(tCtx, test.Response, &http.Request{})
 		response, created, err := result.body, result.statusCode == http.StatusCreated, result.err
 		hasErr := err != nil
 		if hasErr != test.Error {
@@ -683,7 +681,7 @@ func (r *renegotiator) StreamDecoder(contentType string, params map[string]strin
 }
 
 func TestTransformResponseNegotiate(t *testing.T) {
-	_, ctx := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
 	invalid := []byte("aaaaa")
 	uri, _ := url.Parse("http://localhost")
 	testCases := []struct {
@@ -797,7 +795,7 @@ func TestTransformResponseNegotiate(t *testing.T) {
 		if test.Response.Body == nil {
 			test.Response.Body = io.NopCloser(bytes.NewReader([]byte{}))
 		}
-		result := r.transformResponse(ctx, test.Response, &http.Request{})
+		result := r.transformResponse(tCtx, test.Response, &http.Request{})
 		_, err := result.body, result.err
 		hasErr := err != nil
 		if hasErr != test.Error {
@@ -922,14 +920,14 @@ func TestTransformUnstructuredError(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run("", func(t *testing.T) {
-			_, ctx := ktesting.NewTestContext(t)
+			tCtx := ktesting.Init(t)
 			r := &Request{
 				contentConfig: defaultContentConfig(),
 				c:             &RESTClient{},
 				resourceName:  testCase.Name,
 				resource:      testCase.Resource,
 			}
-			result := r.transformResponse(ctx, testCase.Res, testCase.Req)
+			result := r.transformResponse(tCtx, testCase.Res, testCase.Req)
 			err := result.err
 			if !testCase.ErrFn(err) {
 				t.Fatalf("unexpected error: %v", err)
@@ -1511,7 +1509,7 @@ func TestDoRequestNewWay(t *testing.T) {
 
 // This test assumes that the client implementation backs off exponentially, for an individual request.
 func TestBackoffLifecycle(t *testing.T) {
-	_, ctx := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
 	count := 0
 	testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		count++
@@ -1544,7 +1542,7 @@ func TestBackoffLifecycle(t *testing.T) {
 	}
 
 	for _, sec := range seconds {
-		thisBackoff := request.backoff.CalculateBackoffWithContext(ctx, request.URL())
+		thisBackoff := request.backoff.CalculateBackoffWithContext(tCtx, request.URL())
 		t.Logf("Current backoff %v", thisBackoff)
 		if thisBackoff != time.Duration(sec)*time.Second {
 			t.Errorf("Backoff is %v instead of %v", thisBackoff, sec)
@@ -1554,7 +1552,7 @@ func TestBackoffLifecycle(t *testing.T) {
 		// that SleepWithContext is being called for while DoRaw is executing.
 		// stepClockDuringSleep.SleepWithContext ensures that this happens.
 		now := clock.Now()
-		request.DoRaw(ctx)
+		_, _ = request.DoRaw(tCtx) // Return value intentionally ignored; only backoff timing is checked.
 		elapsed := clock.Since(now)
 		if clock.Since(now) != thisBackoff {
 			t.Errorf("CalculatedBackoff not honored by clock: Expected time of %v, but got %v ", thisBackoff, elapsed)
@@ -2347,10 +2345,6 @@ func buildString(length int) string {
 		s[i] = 'a'
 	}
 	return string(s)
-}
-
-func init() {
-	klog.InitFlags(nil)
 }
 
 func TestTruncateBody(t *testing.T) {
@@ -4195,9 +4189,10 @@ warnings.go] "Warning: warning 2" logger="TestLogger"
 		},
 	}
 
+	tCtx := ktesting.Init(t)
 	for name, tc := range testcases {
 		//nolint:logcheck // Intentionally testing with plain klog here.
-		t.Run(name, func(t *testing.T) {
+		tCtx.Run(name, func(tCtx ktesting.TContext) {
 			state := klog.CaptureState()
 			defer state.Restore()
 
@@ -4206,8 +4201,8 @@ warnings.go] "Warning: warning 2" logger="TestLogger"
 			klog.LogToStderr(false)
 			var fs flag.FlagSet
 			klog.InitFlags(&fs)
-			require.NoError(t, fs.Set("v", fmt.Sprintf("%d", tc.v)), "set verbosity")
-			require.NoError(t, fs.Set("one_output", "true"), "set one_output")
+			tCtx.ExpectNoError(fs.Set("v", fmt.Sprintf("%d", tc.v)), "set verbosity")
+			tCtx.ExpectNoError(fs.Set("one_output", "true"), "set one_output")
 
 			client := clientForFunc(func(req *http.Request) (*http.Response, error) {
 				return tc.response, nil
@@ -4222,7 +4217,7 @@ warnings.go] "Warning: warning 2" logger="TestLogger"
 
 			_, file, line, _ := goruntime.Caller(0)
 			result := req.Do(ctx)
-			require.NoError(t, result.Error(), "request.Do")
+			tCtx.ExpectNoError(result.Error(), "request.Do")
 
 			// Compare log output:
 			// - strip date/time/pid from each line (fixed length header)
@@ -4233,48 +4228,50 @@ warnings.go] "Warning: warning 2" logger="TestLogger"
 			actualOutput := buffer.String()
 			actualOutput = regexp.MustCompile(`(?m)^.{30}`).ReplaceAllString(actualOutput, "")
 			actualOutput = regexp.MustCompile(`(?m)^warnings\.go:\d+`).ReplaceAllString(actualOutput, "warnings.go")
-			assert.Equal(t, expectedOutput, actualOutput)
+			tCtx.Assert(actualOutput).Should(gomega.Equal(expectedOutput))
 		})
 	}
 }
 
 func TestRequestWarningHandler(t *testing.T) {
-	t.Run("no-context", func(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	tCtx.Run("no-context", func(tCtx ktesting.TContext) {
 		request := &Request{}
 		handler := &fakeWarningHandlerWithLogging{}
 		//nolint:logcheck
-		assert.Equal(t, request, request.WarningHandler(handler))
-		assert.NotNil(t, request.warningHandler)
+		tCtx.Assert(request.WarningHandler(handler)).Should(gomega.Equal(request))
+		tCtx.Assert(request.warningHandler).ShouldNot(gomega.BeNil())
 		request.warningHandler.HandleWarningHeaderWithContext(context.Background(), 0, "", "message")
-		assert.Equal(t, []string{"message"}, handler.messages)
+		tCtx.Assert(handler.messages).Should(gomega.Equal([]string{"message"}))
 	})
 
-	t.Run("with-context", func(t *testing.T) {
+	tCtx.Run("with-context", func(tCtx ktesting.TContext) {
 		request := &Request{}
 		handler := &fakeWarningHandlerWithContext{}
-		assert.Equal(t, request, request.WarningHandlerWithContext(handler))
-		assert.Equal(t, request.warningHandler, handler)
+		tCtx.Assert(request.WarningHandlerWithContext(handler)).Should(gomega.Equal(request))
+		tCtx.Assert(request.warningHandler).Should(gomega.Equal(handler))
 	})
 
-	t.Run("nil-no-context", func(t *testing.T) {
+	tCtx.Run("nil-no-context", func(tCtx ktesting.TContext) {
 		request := &Request{
 			warningHandler: &fakeWarningHandlerWithContext{},
 		}
 		//nolint:logcheck
-		assert.Equal(t, request, request.WarningHandler(nil))
-		assert.Nil(t, request.warningHandler)
+		tCtx.Assert(request.WarningHandler(nil)).Should(gomega.Equal(request))
+		tCtx.Assert(request.warningHandler).Should(gomega.BeNil())
 	})
 
-	t.Run("nil-with-context", func(t *testing.T) {
+	tCtx.Run("nil-with-context", func(tCtx ktesting.TContext) {
 		request := &Request{
 			warningHandler: &fakeWarningHandlerWithContext{},
 		}
-		assert.Equal(t, request, request.WarningHandlerWithContext(nil))
-		assert.Nil(t, request.warningHandler)
+		tCtx.Assert(request.WarningHandlerWithContext(nil)).Should(gomega.Equal(request))
+		tCtx.Assert(request.warningHandler).Should(gomega.BeNil())
 	})
 }
 
 func TestTryThrottleWithInfoContextDeadline(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
@@ -4283,6 +4280,6 @@ func TestTryThrottleWithInfoContextDeadline(t *testing.T) {
 		c:           &RESTClient{base: &url.URL{Path: "/"}},
 	}
 	err := r.tryThrottleWithInfo(ctx, "")
-	require.ErrorIs(t, err, context.Canceled)
-	assert.NotContains(t, err.Error(), "client rate limiter")
+	tCtx.Require(err).Should(gomega.MatchError(context.Canceled))
+	tCtx.Assert(err.Error()).ShouldNot(gomega.ContainSubstring("client rate limiter"))
 }

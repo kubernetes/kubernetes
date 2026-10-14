@@ -20,24 +20,27 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/stretchr/testify/require"
+	"github.com/onsi/gomega"
 	"k8s.io/apimachinery/pkg/util/version"
+	"k8s.io/ktesting"
 )
 
 // TestAddFeaturesToExistingFeatureGates ensures that
 // the defaultVersionedKubernetesFeatureGates are added to a test feature gates registry.
 func TestAddFeaturesToExistingFeatureGates(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	fakeFeatureGates := &fakeRegistry{}
-	require.NoError(t, AddFeaturesToExistingFeatureGates(fakeFeatureGates))
-	require.Equal(t, unversionedFeatureGates(defaultVersionedKubernetesFeatureGates), fakeFeatureGates.specs)
+	tCtx.AssertNoError(AddFeaturesToExistingFeatureGates(fakeFeatureGates))
+	tCtx.Assert(fakeFeatureGates.specs).Should(gomega.Equal(unversionedFeatureGates(defaultVersionedKubernetesFeatureGates)))
 }
 
 // TestAddVersionedFeaturesToExistingFeatureGates ensures that
 // the defaultVersionedKubernetesFeatureGates are added to a versioned test feature gates registry.
 func TestAddVersionedFeaturesToExistingFeatureGates(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	fakeFeatureGates := &fakeVersionedRegistry{}
-	require.NoError(t, AddVersionedFeaturesToExistingFeatureGates(fakeFeatureGates))
-	require.Equal(t, defaultVersionedKubernetesFeatureGates, fakeFeatureGates.specs)
+	tCtx.AssertNoError(AddVersionedFeaturesToExistingFeatureGates(fakeFeatureGates))
+	tCtx.Assert(fakeFeatureGates.specs).Should(gomega.Equal(defaultVersionedKubernetesFeatureGates))
 }
 
 func TestUnversionedFeatureGates(t *testing.T) {
@@ -81,8 +84,9 @@ func TestUnversionedFeatureGates(t *testing.T) {
 }
 
 func TestReplaceFeatureGatesWithWarningIndicator(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	defaultFeatureGates := FeatureGates()
-	require.Panics(t, func() { defaultFeatureGates.Enabled("Foo") }, "reading an unregistered feature gate Foo should panic")
+	tCtx.Require(func() { defaultFeatureGates.Enabled("Foo") }).Should(gomega.Panic(), "reading an unregistered feature gate Foo should panic")
 
 	if !replaceFeatureGatesWithWarningIndicator(defaultFeatureGates) {
 		t.Error("replacing the default feature gates after reading a value hasn't produced a warning")

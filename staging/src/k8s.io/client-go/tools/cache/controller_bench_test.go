@@ -17,7 +17,6 @@ limitations under the License.
 package cache
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"testing"
@@ -26,7 +25,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	fcache "k8s.io/client-go/tools/cache/testing"
-	"k8s.io/klog/v2/ktesting"
+	"k8s.io/ktesting"
 )
 
 const handlerWaitTime = time.Millisecond
@@ -34,11 +33,9 @@ const handlerWaitTime = time.Millisecond
 func BenchmarkAddWithSlowHandlers(b *testing.B) {
 	for _, unlockWhileProcessing := range []bool{false, true} {
 		b.Run(fmt.Sprintf("unlockWhileProcessing=%t", unlockWhileProcessing), func(b *testing.B) {
-			logger, ctx := ktesting.NewTestContext(b)
-			ctx, cancel := context.WithCancel(ctx)
+			tCtx := ktesting.Init(b)
 			source := fcache.NewFakeControllerSource()
 			b.Cleanup(func() {
-				cancel()
 				source.Shutdown()
 			})
 			testIDs := []string{"a-hello"}
@@ -67,17 +64,17 @@ func BenchmarkAddWithSlowHandlers(b *testing.B) {
 
 				Process: func(obj interface{}, isInInitialList bool) error {
 					if deltas, ok := obj.(Deltas); ok {
-						return processDeltas(logger, handler, store, deltas, isInInitialList, DeletionHandlingMetaNamespaceKeyFunc)
+						return processDeltas(tCtx.Logger(), handler, store, deltas, isInInitialList, DeletionHandlingMetaNamespaceKeyFunc)
 					}
 					return errors.New("object given as Process argument is not Deltas")
 				},
 				ProcessBatch: func(deltaList []Delta, isInInitialList bool) error {
-					return processDeltasInBatch(logger, handler, store, deltaList, isInInitialList, DeletionHandlingMetaNamespaceKeyFunc)
+					return processDeltasInBatch(tCtx.Logger(), handler, store, deltaList, isInInitialList, DeletionHandlingMetaNamespaceKeyFunc)
 				},
 			}
 			c := New(cfg)
-			go c.RunWithContext(ctx)
-			if !WaitForCacheSync(ctx.Done(), c.HasSynced) {
+			go c.RunWithContext(tCtx)
+			if !WaitForCacheSync(tCtx.Done(), c.HasSynced) {
 				b.Fatal("Timed out waiting for cache sync")
 			}
 
@@ -88,7 +85,7 @@ func BenchmarkAddWithSlowHandlers(b *testing.B) {
 				defer ticker.Stop()
 				for {
 					select {
-					case <-ctx.Done():
+					case <-tCtx.Done():
 						return
 					case <-ticker.C:
 						source.Modify(&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: testIDs[0]}})

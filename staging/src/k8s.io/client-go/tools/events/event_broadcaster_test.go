@@ -25,7 +25,7 @@ import (
 	eventsv1 "k8s.io/api/events/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
-	"k8s.io/klog/v2/ktesting"
+	"k8s.io/ktesting"
 )
 
 func TestRecordEventToSink(t *testing.T) {

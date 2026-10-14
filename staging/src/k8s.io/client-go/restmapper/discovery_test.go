@@ -29,10 +29,11 @@ import (
 	"k8s.io/client-go/openapi"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
+	"k8s.io/ktesting"
 	"k8s.io/utils/dump"
 
 	openapi_v2 "github.com/google/gnostic-models/openapiv2"
-	"github.com/stretchr/testify/assert"
+	"github.com/onsi/gomega"
 )
 
 func TestRESTMapper(t *testing.T) {
@@ -243,38 +244,38 @@ func TestRESTMapper(t *testing.T) {
 }
 
 func TestDeferredDiscoveryRESTMapper_CacheMiss(t *testing.T) {
-	assert := assert.New(t)
+	tCtx := ktesting.Init(t)
 
 	cdc := fakeCachedDiscoveryInterface{fresh: false}
 	m := NewDeferredDiscoveryRESTMapper(&cdc)
-	assert.False(cdc.fresh, "should NOT be fresh after instantiation")
-	assert.Zero(cdc.invalidateCalls, "should not have called Invalidate()")
+	tCtx.Assert(cdc.fresh).Should(gomega.BeFalseBecause("should NOT be fresh after instantiation"))
+	tCtx.Assert(cdc.invalidateCalls).Should(gomega.BeZero(), "should not have called Invalidate()")
 
 	gvk, err := m.KindFor(schema.GroupVersionResource{
 		Group:    "a",
 		Version:  "v1",
 		Resource: "foo",
 	})
-	assert.NoError(err)
-	assert.True(cdc.fresh, "should be fresh after a cache-miss")
-	assert.Equal(1, cdc.invalidateCalls, "should have called Invalidate() once")
-	assert.Equal("Foo", gvk.Kind)
+	tCtx.AssertNoError(err)
+	tCtx.Assert(cdc.fresh).Should(gomega.BeTrueBecause("should be fresh after a cache-miss"))
+	tCtx.Assert(cdc.invalidateCalls).Should(gomega.Equal(1), "should have called Invalidate() once")
+	tCtx.Assert(gvk.Kind).Should(gomega.Equal("Foo"))
 
 	gvk, err = m.KindFor(schema.GroupVersionResource{
 		Group:    "a",
 		Version:  "v1",
 		Resource: "foo",
 	})
-	assert.NoError(err)
-	assert.Equal(1, cdc.invalidateCalls, "should NOT have called Invalidate() again")
+	tCtx.AssertNoError(err)
+	tCtx.Assert(cdc.invalidateCalls).Should(gomega.Equal(1), "should NOT have called Invalidate() again")
 
 	gvk, err = m.KindFor(schema.GroupVersionResource{
 		Group:    "a",
 		Version:  "v1",
 		Resource: "bar",
 	})
-	assert.Error(err)
-	assert.Equal(1, cdc.invalidateCalls, "should NOT have called Invalidate() again after another cache-miss, but with fresh==true")
+	tCtx.Assert(err).Should(gomega.HaveOccurred())
+	tCtx.Assert(cdc.invalidateCalls).Should(gomega.Equal(1), "should NOT have called Invalidate() again after another cache-miss, but with fresh==true")
 
 	cdc.fresh = false
 	gvk, err = m.KindFor(schema.GroupVersionResource{
@@ -282,8 +283,8 @@ func TestDeferredDiscoveryRESTMapper_CacheMiss(t *testing.T) {
 		Version:  "v1",
 		Resource: "bar",
 	})
-	assert.Error(err)
-	assert.Equal(2, cdc.invalidateCalls, "should HAVE called Invalidate() again after another cache-miss, but with fresh==false")
+	tCtx.Assert(err).Should(gomega.HaveOccurred())
+	tCtx.Assert(cdc.invalidateCalls).Should(gomega.Equal(2), "should HAVE called Invalidate() again after another cache-miss, but with fresh==false")
 }
 
 func TestGetAPIGroupResources(t *testing.T) {

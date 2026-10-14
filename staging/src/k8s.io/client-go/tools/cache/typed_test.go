@@ -21,11 +21,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	"github.com/onsi/gomega"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/ktesting"
 )
 
 // recordingTypedHandler implements TypedResourceEventHandler[*v1.Pod] and
@@ -57,6 +57,7 @@ func TestTypedResourceEventHandlerFuncs(t *testing.T) {
 	oldPod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "old-pod"}}
 
 	t.Run("callbacks-are-invoked", func(t *testing.T) {
+		tCtx := ktesting.Init(t)
 		var added []*v1.Pod
 		var addedInitial bool
 		var updatedOld, updatedNew *v1.Pod
@@ -75,25 +76,26 @@ func TestTypedResourceEventHandlerFuncs(t *testing.T) {
 		}
 
 		funcs.OnAdd(pod, true)
-		assert.Equal(t, []*v1.Pod{pod}, added)
+		tCtx.Assert(added).Should(gomega.Equal([]*v1.Pod{pod}))
 		addedInitial = true // AddFunc doesn't get isInInitialList, only presence is checked above
 		_ = addedInitial
 
 		funcs.OnUpdate(oldPod, pod)
-		assert.Equal(t, oldPod, updatedOld)
-		assert.Equal(t, pod, updatedNew)
+		tCtx.Assert(updatedOld).Should(gomega.Equal(oldPod))
+		tCtx.Assert(updatedNew).Should(gomega.Equal(pod))
 
 		funcs.OnDelete(DeletedObject[*v1.Pod]{OptionalObj: pod})
-		assert.Equal(t, pod, deleted.OptionalObj)
+		tCtx.Assert(deleted.OptionalObj).Should(gomega.Equal(pod))
 	})
 
 	t.Run("nil-callbacks-do-not-panic", func(t *testing.T) {
+		tCtx := ktesting.Init(t)
 		var funcs TypedResourceEventHandlerFuncs[*v1.Pod]
-		assert.NotPanics(t, func() {
+		tCtx.Assert(func() {
 			funcs.OnAdd(pod, false)
 			funcs.OnUpdate(oldPod, pod)
 			funcs.OnDelete(DeletedObject[*v1.Pod]{OptionalObj: pod})
-		})
+		}).ShouldNot(gomega.Panic())
 	})
 
 	// Compile-time and runtime check that the type implements the interface.
@@ -105,6 +107,7 @@ func TestTypedResourceEventHandlerDetailedFuncs(t *testing.T) {
 	oldPod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "old-pod"}}
 
 	t.Run("callbacks-are-invoked-including-isInInitialList", func(t *testing.T) {
+		tCtx := ktesting.Init(t)
 		var added *v1.Pod
 		var addedInitial bool
 		var updatedOld, updatedNew *v1.Pod
@@ -124,27 +127,28 @@ func TestTypedResourceEventHandlerDetailedFuncs(t *testing.T) {
 		}
 
 		funcs.OnAdd(pod, true)
-		assert.Equal(t, pod, added)
-		assert.True(t, addedInitial)
+		tCtx.Assert(added).Should(gomega.Equal(pod))
+		tCtx.Assert(addedInitial).Should(gomega.BeTrueBecause("isInInitialList was passed as true"))
 
 		funcs.OnAdd(pod, false)
-		assert.False(t, addedInitial)
+		tCtx.Assert(addedInitial).Should(gomega.BeFalseBecause("isInInitialList was passed as false"))
 
 		funcs.OnUpdate(oldPod, pod)
-		assert.Equal(t, oldPod, updatedOld)
-		assert.Equal(t, pod, updatedNew)
+		tCtx.Assert(updatedOld).Should(gomega.Equal(oldPod))
+		tCtx.Assert(updatedNew).Should(gomega.Equal(pod))
 
 		funcs.OnDelete(DeletedObject[*v1.Pod]{OptionalObj: pod})
-		assert.Equal(t, pod, deleted.OptionalObj)
+		tCtx.Assert(deleted.OptionalObj).Should(gomega.Equal(pod))
 	})
 
 	t.Run("nil-callbacks-do-not-panic", func(t *testing.T) {
+		tCtx := ktesting.Init(t)
 		var funcs TypedResourceEventHandlerDetailedFuncs[*v1.Pod]
-		assert.NotPanics(t, func() {
+		tCtx.Assert(func() {
 			funcs.OnAdd(pod, true)
 			funcs.OnUpdate(oldPod, pod)
 			funcs.OnDelete(DeletedObject[*v1.Pod]{OptionalObj: pod})
-		})
+		}).ShouldNot(gomega.Panic())
 	})
 
 	var _ TypedResourceEventHandler[*v1.Pod] = TypedResourceEventHandlerDetailedFuncs[*v1.Pod]{}
@@ -163,6 +167,7 @@ func TestTypedFilteringResourceEventHandler(t *testing.T) {
 			{name: "filter-fails", passes: false},
 		} {
 			t.Run(tc.name, func(t *testing.T) {
+				tCtx := ktesting.Init(t)
 				handler := &recordingTypedHandler{}
 				r := TypedFilteringResourceEventHandler[*v1.Pod]{
 					FilterFunc: func(obj *v1.Pod) bool { return tc.passes },
@@ -170,11 +175,11 @@ func TestTypedFilteringResourceEventHandler(t *testing.T) {
 				}
 				r.OnAdd(newPod, true)
 				if tc.passes {
-					require.Len(t, handler.added, 1)
-					assert.Equal(t, newPod, handler.added[0])
-					assert.Equal(t, []bool{true}, handler.addedInitial)
+					tCtx.Require(handler.added).Should(gomega.HaveLen(1))
+					tCtx.Assert(handler.added[0]).Should(gomega.Equal(newPod))
+					tCtx.Assert(handler.addedInitial).Should(gomega.Equal([]bool{true}))
 				} else {
-					assert.Empty(t, handler.added)
+					tCtx.Assert(handler.added).Should(gomega.BeEmpty())
 				}
 			})
 		}
@@ -189,6 +194,7 @@ func TestTypedFilteringResourceEventHandler(t *testing.T) {
 			{name: "filter-fails", passes: false},
 		} {
 			t.Run(tc.name, func(t *testing.T) {
+				tCtx := ktesting.Init(t)
 				handler := &recordingTypedHandler{}
 				r := TypedFilteringResourceEventHandler[*v1.Pod]{
 					FilterFunc: func(obj *v1.Pod) bool { return tc.passes },
@@ -197,10 +203,10 @@ func TestTypedFilteringResourceEventHandler(t *testing.T) {
 				deleted := DeletedObject[*v1.Pod]{OptionalObj: oldPod}
 				r.OnDelete(deleted)
 				if tc.passes {
-					require.Len(t, handler.deleted, 1)
-					assert.Equal(t, deleted, handler.deleted[0])
+					tCtx.Require(handler.deleted).Should(gomega.HaveLen(1))
+					tCtx.Assert(handler.deleted[0]).Should(gomega.Equal(deleted))
 				} else {
-					assert.Empty(t, handler.deleted)
+					tCtx.Assert(handler.deleted).Should(gomega.BeEmpty())
 				}
 			})
 		}
@@ -220,6 +226,7 @@ func TestTypedFilteringResourceEventHandler(t *testing.T) {
 			{name: "still-failing-to-nothing", older: false, newer: false},
 		} {
 			t.Run(tc.name, func(t *testing.T) {
+				tCtx := ktesting.Init(t)
 				handler := &recordingTypedHandler{}
 				r := TypedFilteringResourceEventHandler[*v1.Pod]{
 					FilterFunc: func(obj *v1.Pod) bool {
@@ -237,26 +244,26 @@ func TestTypedFilteringResourceEventHandler(t *testing.T) {
 				r.OnUpdate(oldPod, newPod)
 
 				if tc.wantAdd {
-					require.Len(t, handler.added, 1)
-					assert.Equal(t, newPod, handler.added[0])
-					assert.Equal(t, []bool{false}, handler.addedInitial)
+					tCtx.Require(handler.added).Should(gomega.HaveLen(1))
+					tCtx.Assert(handler.added[0]).Should(gomega.Equal(newPod))
+					tCtx.Assert(handler.addedInitial).Should(gomega.Equal([]bool{false}))
 				} else {
-					assert.Empty(t, handler.added)
+					tCtx.Assert(handler.added).Should(gomega.BeEmpty())
 				}
 
 				if tc.wantUpdate {
-					require.Len(t, handler.updatedNew, 1)
-					assert.Equal(t, oldPod, handler.updatedOld[0])
-					assert.Equal(t, newPod, handler.updatedNew[0])
+					tCtx.Require(handler.updatedNew).Should(gomega.HaveLen(1))
+					tCtx.Assert(handler.updatedOld[0]).Should(gomega.Equal(oldPod))
+					tCtx.Assert(handler.updatedNew[0]).Should(gomega.Equal(newPod))
 				} else {
-					assert.Empty(t, handler.updatedNew)
+					tCtx.Assert(handler.updatedNew).Should(gomega.BeEmpty())
 				}
 
 				if tc.wantDelete {
-					require.Len(t, handler.deleted, 1)
-					assert.Equal(t, oldPod, handler.deleted[0].OptionalObj)
+					tCtx.Require(handler.deleted).Should(gomega.HaveLen(1))
+					tCtx.Assert(handler.deleted[0].OptionalObj).Should(gomega.Equal(oldPod))
 				} else {
-					assert.Empty(t, handler.deleted)
+					tCtx.Assert(handler.deleted).Should(gomega.BeEmpty())
 				}
 			})
 		}
@@ -271,59 +278,65 @@ func TestTypedResourceEventHandlerAdapter(t *testing.T) {
 	oldPod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "old-pod"}}
 
 	t.Run("OnAdd", func(t *testing.T) {
+		tCtx := ktesting.Init(t)
 		handler := &recordingTypedHandler{}
 		adapter := &typedResourceEventHandler[*v1.Pod]{handler: handler}
 		adapter.OnAdd(pod, true)
-		require.Len(t, handler.added, 1)
-		assert.Equal(t, pod, handler.added[0])
-		assert.Equal(t, []bool{true}, handler.addedInitial)
+		tCtx.Require(handler.added).Should(gomega.HaveLen(1))
+		tCtx.Assert(handler.added[0]).Should(gomega.Equal(pod))
+		tCtx.Assert(handler.addedInitial).Should(gomega.Equal([]bool{true}))
 	})
 
 	t.Run("OnUpdate", func(t *testing.T) {
+		tCtx := ktesting.Init(t)
 		handler := &recordingTypedHandler{}
 		adapter := &typedResourceEventHandler[*v1.Pod]{handler: handler}
 		adapter.OnUpdate(oldPod, pod)
-		require.Len(t, handler.updatedNew, 1)
-		assert.Equal(t, oldPod, handler.updatedOld[0])
-		assert.Equal(t, pod, handler.updatedNew[0])
+		tCtx.Require(handler.updatedNew).Should(gomega.HaveLen(1))
+		tCtx.Assert(handler.updatedOld[0]).Should(gomega.Equal(oldPod))
+		tCtx.Assert(handler.updatedNew[0]).Should(gomega.Equal(pod))
 	})
 
 	t.Run("OnDelete-with-a-plain-object", func(t *testing.T) {
+		tCtx := ktesting.Init(t)
 		handler := &recordingTypedHandler{}
 		adapter := &typedResourceEventHandler[*v1.Pod]{handler: handler}
 		adapter.OnDelete(pod)
-		require.Len(t, handler.deleted, 1)
-		assert.Equal(t, pod, handler.deleted[0].OptionalObj)
-		assert.Nil(t, handler.deleted[0].FinalStateUnknown)
+		tCtx.Require(handler.deleted).Should(gomega.HaveLen(1))
+		tCtx.Assert(handler.deleted[0].OptionalObj).Should(gomega.Equal(pod))
+		tCtx.Assert(handler.deleted[0].FinalStateUnknown).Should(gomega.BeNil())
 	})
 
 	t.Run("OnDelete-with-DeletedFinalStateUnknown-carrying-an-object", func(t *testing.T) {
+		tCtx := ktesting.Init(t)
 		handler := &recordingTypedHandler{}
 		adapter := &typedResourceEventHandler[*v1.Pod]{handler: handler}
 		tomb := DeletedFinalStateUnknown{Key: "default/pod", Obj: pod}
 		adapter.OnDelete(tomb)
-		require.Len(t, handler.deleted, 1)
-		assert.Equal(t, pod, handler.deleted[0].OptionalObj)
-		require.NotNil(t, handler.deleted[0].FinalStateUnknown)
-		assert.Equal(t, "default/pod", handler.deleted[0].FinalStateUnknown.Key)
+		tCtx.Require(handler.deleted).Should(gomega.HaveLen(1))
+		tCtx.Assert(handler.deleted[0].OptionalObj).Should(gomega.Equal(pod))
+		tCtx.Require(handler.deleted[0].FinalStateUnknown).ShouldNot(gomega.BeNil())
+		tCtx.Assert(handler.deleted[0].FinalStateUnknown.Key).Should(gomega.Equal("default/pod"))
 	})
 
 	t.Run("OnDelete-with-DeletedFinalStateUnknown-without-an-object", func(t *testing.T) {
+		tCtx := ktesting.Init(t)
 		handler := &recordingTypedHandler{}
 		adapter := &typedResourceEventHandler[*v1.Pod]{handler: handler}
 		tomb := DeletedFinalStateUnknown{Key: "default/pod", Obj: nil}
 		adapter.OnDelete(tomb)
-		require.Len(t, handler.deleted, 1)
+		tCtx.Require(handler.deleted).Should(gomega.HaveLen(1))
 		var zero *v1.Pod
-		assert.Equal(t, zero, handler.deleted[0].OptionalObj)
-		require.NotNil(t, handler.deleted[0].FinalStateUnknown)
-		assert.Equal(t, "default/pod", handler.deleted[0].FinalStateUnknown.Key)
+		tCtx.Assert(handler.deleted[0].OptionalObj).Should(gomega.Equal(zero))
+		tCtx.Require(handler.deleted[0].FinalStateUnknown).ShouldNot(gomega.BeNil())
+		tCtx.Assert(handler.deleted[0].FinalStateUnknown.Key).Should(gomega.Equal("default/pod"))
 	})
 
 	var _ ResourceEventHandler = &typedResourceEventHandler[*v1.Pod]{}
 }
 
 func TestTypedIndexer(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	pod1 := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: "ns", Name: "pod1", Labels: map[string]string{"foo": "bar"}}}
 	pod2 := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: "ns", Name: "pod2", Labels: map[string]string{"foo": "bar"}}}
 
@@ -332,39 +345,39 @@ func TestTypedIndexer(t *testing.T) {
 			return []string{obj.(*v1.Pod).Labels["foo"]}, nil
 		},
 	})
-	require.NoError(t, raw.Add(pod1))
-	require.NoError(t, raw.Add(pod2))
+	tCtx.ExpectNoError(raw.Add(pod1))
+	tCtx.ExpectNoError(raw.Add(pod2))
 
 	typed := typedIndexer[*v1.Pod]{Indexer: raw}
 
-	t.Run("TypedIndex", func(t *testing.T) {
+	tCtx.Run("TypedIndex", func(tCtx ktesting.TContext) {
 		res, err := typed.TypedIndex("foo", pod1)
-		require.NoError(t, err)
-		assert.ElementsMatch(t, []*v1.Pod{pod1, pod2}, res)
+		tCtx.ExpectNoError(err)
+		tCtx.Assert(res).Should(gomega.ConsistOf(pod1, pod2))
 	})
 
-	t.Run("ByTypedIndex", func(t *testing.T) {
+	tCtx.Run("ByTypedIndex", func(tCtx ktesting.TContext) {
 		res, err := typed.ByTypedIndex("foo", "bar")
-		require.NoError(t, err)
-		assert.ElementsMatch(t, []*v1.Pod{pod1, pod2}, res)
+		tCtx.ExpectNoError(err)
+		tCtx.Assert(res).Should(gomega.ConsistOf(pod1, pod2))
 	})
 
-	t.Run("ByTypedIndex-propagates-errors", func(t *testing.T) {
+	tCtx.Run("ByTypedIndex-propagates-errors", func(tCtx ktesting.TContext) {
 		_, err := typed.ByTypedIndex("does-not-exist", "bar")
-		require.Error(t, err)
+		tCtx.Require(err).Should(gomega.HaveOccurred())
 	})
 
-	t.Run("AddTypedIndexers", func(t *testing.T) {
+	tCtx.Run("AddTypedIndexers", func(tCtx ktesting.TContext) {
 		err := typed.AddTypedIndexers(TypedIndexers[*v1.Pod]{
 			"name": func(obj *v1.Pod) ([]string, error) {
 				return []string{obj.Name}, nil
 			},
 		})
-		require.NoError(t, err)
+		tCtx.ExpectNoError(err)
 
 		res, err := raw.ByIndex("name", "pod1")
-		require.NoError(t, err)
-		assert.Equal(t, []interface{}{pod1}, res)
+		tCtx.ExpectNoError(err)
+		tCtx.Assert(res).Should(gomega.Equal([]interface{}{pod1}))
 	})
 
 	var _ TypedIndexer[*v1.Pod] = typedIndexer[*v1.Pod]{}
@@ -423,23 +436,25 @@ func TestTypedSharedIndexInformerAddTypedEventHandler(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
 			fake := &fakeSharedIndexInformer{}
 			typed := NewTypedSharedIndexInformer[*v1.Pod](fake)
 
 			_, err := typed.AddTypedEventHandler(TypedResourceEventHandlerFuncs[*v1.Pod]{}, tc.options...)
 			if tc.wantErr {
-				require.Error(t, err)
-				assert.Empty(t, fake.handlerOptions)
+				tCtx.Require(err).Should(gomega.HaveOccurred())
+				tCtx.Assert(fake.handlerOptions).Should(gomega.BeEmpty())
 				return
 			}
-			require.NoError(t, err)
-			require.Len(t, fake.handlerOptions, 1)
-			assert.Equal(t, tc.want, fake.handlerOptions[0])
+			tCtx.ExpectNoError(err)
+			tCtx.Require(fake.handlerOptions).Should(gomega.HaveLen(1))
+			tCtx.Assert(fake.handlerOptions[0]).Should(gomega.Equal(tc.want))
 		})
 	}
 }
 
 func TestTypedSharedIndexInformerAddTypedIndexers(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod"}}
 
 	fake := &fakeSharedIndexInformer{}
@@ -450,41 +465,43 @@ func TestTypedSharedIndexInformerAddTypedIndexers(t *testing.T) {
 			return []string{obj.Name}, nil
 		},
 	})
-	require.NoError(t, err)
-	require.Contains(t, fake.addedIndexers, "name")
+	tCtx.ExpectNoError(err)
+	tCtx.Require(fake.addedIndexers).Should(gomega.HaveKey("name"))
 
 	values, err := fake.addedIndexers["name"](pod)
-	require.NoError(t, err)
-	assert.Equal(t, []string{"pod"}, values)
+	tCtx.ExpectNoError(err)
+	tCtx.Assert(values).Should(gomega.Equal([]string{"pod"}))
 
 	fake.addIndexersErr = fmt.Errorf("boom")
 	err = typed.AddTypedIndexers(TypedIndexers[*v1.Pod]{})
-	assert.EqualError(t, err, "boom")
+	tCtx.Assert(err).Should(gomega.MatchError("boom"))
 }
 
 func TestTypedSharedIndexInformerGetTypedIndexer(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: "ns", Name: "pod"}}
 	raw := NewIndexer(MetaNamespaceKeyFunc, Indexers{
 		"name": func(obj interface{}) ([]string, error) {
 			return []string{obj.(*v1.Pod).Name}, nil
 		},
 	})
-	require.NoError(t, raw.Add(pod))
+	tCtx.ExpectNoError(raw.Add(pod))
 
 	fake := &fakeSharedIndexInformer{indexer: raw}
 	typed := NewTypedSharedIndexInformer[*v1.Pod](fake)
 
 	typedIndexer := typed.GetTypedIndexer()
 	res, err := typedIndexer.TypedIndex("name", pod)
-	require.NoError(t, err)
-	assert.Equal(t, []*v1.Pod{pod}, res)
+	tCtx.ExpectNoError(err)
+	tCtx.Assert(res).Should(gomega.Equal([]*v1.Pod{pod}))
 
 	res, err = typedIndexer.ByTypedIndex("name", "pod")
-	require.NoError(t, err)
-	assert.Equal(t, []*v1.Pod{pod}, res)
+	tCtx.ExpectNoError(err)
+	tCtx.Assert(res).Should(gomega.Equal([]*v1.Pod{pod}))
 }
 
 func TestTypedIndexersToIndexers(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod"}}
 
 	untyped := TypedIndexersToIndexers(TypedIndexers[*v1.Pod]{
@@ -492,8 +509,8 @@ func TestTypedIndexersToIndexers(t *testing.T) {
 			return []string{obj.Name}, nil
 		},
 	})
-	require.Contains(t, untyped, "name")
+	tCtx.Require(untyped).Should(gomega.HaveKey("name"))
 	values, err := untyped["name"](pod)
-	require.NoError(t, err)
-	assert.Equal(t, []string{"pod"}, values)
+	tCtx.ExpectNoError(err)
+	tCtx.Assert(values).Should(gomega.Equal([]string{"pod"}))
 }

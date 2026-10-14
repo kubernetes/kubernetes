@@ -21,15 +21,17 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/stretchr/testify/require"
+	"github.com/onsi/gomega"
 
 	v1 "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	v1ac "k8s.io/client-go/applyconfigurations/core/v1"
+	"k8s.io/ktesting"
 )
 
 func TestNewSimpleClientset(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	client := NewSimpleClientset()
 	expectedPods := []*v1.Pod{}
 
@@ -39,7 +41,7 @@ func TestNewSimpleClientset(t *testing.T) {
 			Namespace: "default",
 		},
 	}, meta_v1.CreateOptions{})
-	require.NoError(t, err)
+	tCtx.AssertNoError(err)
 	expectedPods = append(expectedPods, pod)
 
 	pod, err = client.CoreV1().Pods("default").Create(context.Background(), &v1.Pod{
@@ -48,7 +50,7 @@ func TestNewSimpleClientset(t *testing.T) {
 			Namespace: "default",
 		},
 	}, meta_v1.CreateOptions{})
-	require.NoError(t, err)
+	tCtx.AssertNoError(err)
 	expectedPods = append(expectedPods, pod)
 
 	err = client.CoreV1().Pods("default").EvictV1(context.Background(), &policy.Eviction{
@@ -56,14 +58,15 @@ func TestNewSimpleClientset(t *testing.T) {
 			Name: "pod-2",
 		},
 	})
-	require.NoError(t, err)
+	tCtx.AssertNoError(err)
 
 	pods, err := client.CoreV1().Pods("default").List(context.Background(), meta_v1.ListOptions{})
-	require.NoError(t, err)
+	tCtx.AssertNoError(err)
 	cmp.Equal(expectedPods, pods.Items)
 }
 
 func TestManagedFieldClientset(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	client := NewClientset()
 	name := "pod-1"
 	namespace := "default"
@@ -72,47 +75,47 @@ func TestManagedFieldClientset(t *testing.T) {
 			ObjectMeta: meta_v1.ObjectMeta{Name: name, Namespace: namespace},
 			Data:       map[string]string{"k0": "v0"},
 		}, meta_v1.CreateOptions{FieldManager: "test-manager-0"})
-	require.NoError(t, err)
-	require.Equal(t, map[string]string{"k0": "v0"}, cm.Data)
+	tCtx.AssertNoError(err)
+	tCtx.Assert(cm.Data).Should(gomega.Equal(map[string]string{"k0": "v0"}))
 
 	// Apply with test-manager-1
 	// Expect data to be shared with initial create
 	cm, err = client.CoreV1().ConfigMaps("default").Apply(context.Background(),
 		v1ac.ConfigMap(name, namespace).WithData(map[string]string{"k1": "v1"}),
 		meta_v1.ApplyOptions{FieldManager: "test-manager-1"})
-	require.NoError(t, err)
-	require.Equal(t, map[string]string{"k0": "v0", "k1": "v1"}, cm.Data)
+	tCtx.AssertNoError(err)
+	tCtx.Assert(cm.Data).Should(gomega.Equal(map[string]string{"k0": "v0", "k1": "v1"}))
 
 	// Apply conflicting with test-manager-2, expect apply to fail
 	_, err = client.CoreV1().ConfigMaps("default").Apply(context.Background(),
 		v1ac.ConfigMap(name, namespace).WithData(map[string]string{"k1": "xyz"}),
 		meta_v1.ApplyOptions{FieldManager: "test-manager-2"})
-	require.Error(t, err)
-	require.Equal(t, "Apply failed with 1 conflict: conflict with \"test-manager-1\": .data.k1", err.Error())
+	tCtx.Assert(err).Should(gomega.HaveOccurred())
+	tCtx.Assert(err.Error()).Should(gomega.Equal("Apply failed with 1 conflict: conflict with \"test-manager-1\": .data.k1"))
 
 	// Apply with test-manager-2
 	// Expect data to be shared with initial create and test-manager-1
 	cm, err = client.CoreV1().ConfigMaps("default").Apply(context.Background(),
 		v1ac.ConfigMap(name, namespace).WithData(map[string]string{"k2": "v2"}),
 		meta_v1.ApplyOptions{FieldManager: "test-manager-2"})
-	require.NoError(t, err)
-	require.Equal(t, map[string]string{"k0": "v0", "k1": "v1", "k2": "v2"}, cm.Data)
+	tCtx.AssertNoError(err)
+	tCtx.Assert(cm.Data).Should(gomega.Equal(map[string]string{"k0": "v0", "k1": "v1", "k2": "v2"}))
 
 	// Apply with test-manager-1
 	// Expect owned data to be updated
 	cm, err = client.CoreV1().ConfigMaps("default").Apply(context.Background(),
 		v1ac.ConfigMap(name, namespace).WithData(map[string]string{"k1": "v101"}),
 		meta_v1.ApplyOptions{FieldManager: "test-manager-1"})
-	require.NoError(t, err)
-	require.Equal(t, map[string]string{"k0": "v0", "k1": "v101", "k2": "v2"}, cm.Data)
+	tCtx.AssertNoError(err)
+	tCtx.Assert(cm.Data).Should(gomega.Equal(map[string]string{"k0": "v0", "k1": "v101", "k2": "v2"}))
 
 	// Force apply with test-manager-2
 	// Expect data owned by test-manager-1 to be updated, expect data already owned but not in apply configuration to be removed
 	cm, err = client.CoreV1().ConfigMaps("default").Apply(context.Background(),
 		v1ac.ConfigMap(name, namespace).WithData(map[string]string{"k1": "v202"}),
 		meta_v1.ApplyOptions{FieldManager: "test-manager-2", Force: true})
-	require.NoError(t, err)
-	require.Equal(t, map[string]string{"k0": "v0", "k1": "v202"}, cm.Data)
+	tCtx.AssertNoError(err)
+	tCtx.Assert(cm.Data).Should(gomega.Equal(map[string]string{"k0": "v0", "k1": "v202"}))
 
 	// Update with test-manager-1 to perform a force update of the entire resource
 	cm, err = client.CoreV1().ConfigMaps("default").Update(context.Background(),
@@ -129,6 +132,6 @@ func TestManagedFieldClientset(t *testing.T) {
 				"k99": "v99",
 			},
 		}, meta_v1.UpdateOptions{FieldManager: "test-manager-0"})
-	require.NoError(t, err)
-	require.Equal(t, map[string]string{"k99": "v99"}, cm.Data)
+	tCtx.AssertNoError(err)
+	tCtx.Assert(cm.Data).Should(gomega.Equal(map[string]string{"k99": "v99"}))
 }
