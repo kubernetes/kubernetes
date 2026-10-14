@@ -2284,6 +2284,19 @@ func commonTakeByTopologyTestCasesForResize(t *testing.T) []takeByTopologyTestCa
 			expErr:        "",
 			expResult:     cpuset.New(4, 5, 6, 12, 13, 14),
 		},
+		// CPU 15 (UncoreCache 1) is unavailable, so the UncoreCache holding the
+		// retained CPUs cannot be taken in full; allocation falls back to packed mode.
+		{
+			description:   "Scale-up: 2 to 8 CPUs, cannot take full UncoreCache with allocatedCPUs, fall back to packed CPUs from single socket with SMT",
+			topo:          topoUncoreSingleSocketSMT,
+			opts:          StaticPolicyOptions{PreferAlignByUncoreCacheOption: true},
+			availableCPUs: mustParseCPUSet(t, "0-14"),
+			allocatedCPUs: cpuset.New(4, 5),
+			baselineCPUs:  cpuset.New(4, 5),
+			numCPUs:       8,
+			expErr:        "",
+			expResult:     mustParseCPUSet(t, "0-1,4-5,8-9,12-13"),
+		},
 		// TODO: Will test this case after below issue fixed
 		// Issue: CoresNeededInUncoreCache select cores without checking the available CPUs number per core.
 		// This issue is addressed in https://github.com/kubernetes/kubernetes/pull/137583
