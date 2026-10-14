@@ -138,7 +138,7 @@ func cmpRequestOverCapacity(currentConsumedCapacity ConsumedCapacity, requestedC
 		if _, allocatedFound := clone[name]; allocatedFound {
 			clone[name].Add(consumedCapacity)
 		} else {
-			clone[name] = new(consumedCapacity.DeepCopy())
+			clone[name] = new(consumedCapacity)
 		}
 		// If allocatingCapacity contains an entry for this capacity, add its value to clone as well.
 		if allocatingVal, allocatingFound := allocatingCapacity[name]; allocatingFound {
@@ -271,7 +271,7 @@ func calculateConsumedCapacity(requestedVal *resource.Quantity, capacity resourc
 		return fillEmptyRequest(capacity), nil
 	}
 	if capacity.RequestPolicy == nil {
-		return requestedVal.DeepCopy(), nil
+		return *requestedVal, nil
 	}
 	switch {
 	case capacity.RequestPolicy.ValidRange != nil && capacity.RequestPolicy.ValidRange.Min != nil:
@@ -287,9 +287,9 @@ func calculateConsumedCapacity(requestedVal *resource.Quantity, capacity resourc
 // Otherwise, return capacity value.
 func fillEmptyRequest(capacity resourceapi.DeviceCapacity) resource.Quantity {
 	if capacity.RequestPolicy != nil && capacity.RequestPolicy.Default != nil {
-		return capacity.RequestPolicy.Default.DeepCopy()
+		return *capacity.RequestPolicy.Default
 	}
-	return capacity.Value.DeepCopy()
+	return capacity.Value
 }
 
 // roundUpRange rounds the requestedVal up to fit within the specified validRange.
@@ -308,7 +308,7 @@ func fillEmptyRequest(capacity resourceapi.DeviceCapacity) resource.Quantity {
 // that error rather than acting on a wrapped read or a silently capped value.
 func roundUpRange(requestedVal *resource.Quantity, validRange *resourceapi.CapacityRequestPolicyRange, fractionalCapacityRange bool) (resource.Quantity, error) {
 	if requestedVal.Cmp(*validRange.Min) < 0 {
-		return validRange.Min.DeepCopy(), nil
+		return *validRange.Min, nil
 	}
 	if validRange.Step == nil {
 		return *requestedVal, nil
@@ -371,7 +371,7 @@ func roundUpValidValues(requestedVal *resource.Quantity, validValues []resource.
 	// Note: A binary search could alternatively be used for better efficiency if the list grows larger.
 	for _, validValue := range validValues {
 		if requestedVal.Cmp(validValue) <= 0 {
-			return validValue.DeepCopy()
+			return validValue
 		}
 	}
 	return *requestedVal

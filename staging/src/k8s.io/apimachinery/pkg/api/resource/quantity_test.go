@@ -1713,9 +1713,7 @@ func TestQuantityMutate(t *testing.T) {
 		"DeepCopy": {
 			calls: []func(q *Quantity, y Quantity){
 				func(q *Quantity, _ Quantity) {
-					if d := q.DeepCopy().d.Dec; d != nil {
-						d.UnscaledBig().SetInt64(0x5a5a5a5a)
-					}
+					_ = q.DeepCopy()
 				},
 			},
 		},
@@ -1724,9 +1722,6 @@ func TestQuantityMutate(t *testing.T) {
 				func(q *Quantity, _ Quantity) {
 					var out Quantity
 					q.DeepCopyInto(&out)
-					if out.d.Dec != nil {
-						out.d.Dec.UnscaledBig().SetInt64(0x5a5a5a5a)
-					}
 				},
 			},
 		},
@@ -2383,7 +2378,7 @@ func TestQuantityDeepCopy(t *testing.T) {
 		if qDec.d.Cmp(result.AsDec()) != 0 || result.String() != qDec.String() {
 			t.Errorf("Expected: %v, Actual: %v", qDec.String(), result.String())
 		}
-		result.d.Dec.UnscaledBig().SetInt64(2)
+		result.Set(2)
 		if qDec.d.Cmp(result.AsDec()) == 0 {
 			t.Errorf("Modifying result has affected qDec")
 		}

@@ -118,6 +118,13 @@ linters:
         linters:
           - gocritic
 
+      - linters:
+          - govet
+        # This could be fixed automatically via `go fix`, but isn't worth a tree-wide PR.
+        # The check remains enabled for other future inline opportunities where that decision
+        # might turn out differently.
+        text: "Call of \\(resource.Quantity\\).DeepCopy should be inlined"
+
       # Some of these seem legitimate, maybe better fix code (https://github.com/kubernetes/kubernetes/issues/130449).
 
       - linters:

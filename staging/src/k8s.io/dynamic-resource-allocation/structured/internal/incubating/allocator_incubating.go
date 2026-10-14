@@ -362,7 +362,7 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node, claims []*resou
 			if internal.consumedCapacity != nil {
 				consumedCapacity = make(map[resourceapi.QualifiedName]resource.Quantity, len(internal.consumedCapacity))
 				for name, val := range internal.consumedCapacity {
-					consumedCapacity[capacityNameForStatus(name, internal.id.Driver, internal.Device.Capacity)] = val.DeepCopy()
+					consumedCapacity[capacityNameForStatus(name, internal.id.Driver, internal.Device.Capacity)] = *val
 				}
 			}
 			allocationResult.Devices.Results[i] = resourceapi.DeviceRequestAllocationResult{
@@ -1587,7 +1587,6 @@ func (alloc *allocator) checkAvailableCounters(device deviceWithID) (bool, error
 		for _, counterSet := range pool.CounterSets {
 			availableCountersForCounterSet := make(map[string]resourceapi.Counter, len(counterSet.Counters))
 			for name, c := range counterSet.Counters {
-				c.Value = c.Value.DeepCopy()
 				availableCountersForCounterSet[name] = c
 			}
 			availableCountersForPool[counterSet.Name] = availableCountersForCounterSet
@@ -1655,7 +1654,6 @@ func (alloc *allocator) checkAvailableCounters(device deviceWithID) (bool, error
 		for name, c := range deviceCounterConsumption.Counters {
 			consumedCounters, found := consumedCountersForCounterSet[name]
 			if !found {
-				c.Value = c.Value.DeepCopy()
 				consumedCountersForCounterSet[name] = c
 				continue
 			}
