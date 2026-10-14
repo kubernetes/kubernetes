@@ -108,6 +108,14 @@ func (s *Model) Equal(other *Model) bool {
 // Step applies an operation to the sequential state machine. change is the
 // write the operation made, or nil if the operation didn't write.
 func (s *Model) Step(input Request, output Response) (ok bool, next *Model, change *Change) {
+	if output.Object == nil && apierrors.IsTooManyRequests(output.Err) {
+		switch input.Op {
+		case OpGet, OpList:
+			return true, s, nil
+		default:
+			panic("Errors on writes not supported by the model")
+		}
+	}
 	expected, next, change := s.execute(input)
 	switch input.Op {
 	case OpGet:

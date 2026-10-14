@@ -30,8 +30,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apiserver/pkg/registry/generic"
-	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/cacher"
 	"k8s.io/apiserver/pkg/storage/testing/correctness"
@@ -216,10 +214,15 @@ func TestCorrectness(t *testing.T) {
 		fn   func(t *testing.T) (storage.Interface, string)
 	}{
 		{"etcd3", func(t *testing.T) (storage.Interface, string) {
-			return setupStore(t, generic.UndecoratedStorage)
+			return setupStore(t)
 		}},
 		{"cacher", func(t *testing.T) (storage.Interface, string) {
-			return setupStore(t, genericregistry.StorageWithCacher())
+			store, prefix := setupStore(t)
+			return setupCacher(t, store), prefix
+		}},
+		{"cacher with watch-breaking etcd", func(t *testing.T) (storage.Interface, string) {
+			store, prefix := setupStore(t)
+			return setupCacher(t, &watchBreakingStore{Interface: store, expireAfter: 500 * time.Millisecond}), prefix
 		}},
 		{"cacher_small_history", func(t *testing.T) (storage.Interface, string) {
 			origFreshDuration := cacher.DefaultEventFreshDuration
@@ -227,7 +230,8 @@ func TestCorrectness(t *testing.T) {
 			t.Cleanup(func() {
 				cacher.DefaultEventFreshDuration = origFreshDuration
 			})
-			return setupStore(t, genericregistry.StorageWithCacher())
+			store, prefix := setupStore(t)
+			return setupCacher(t, store), prefix
 		}},
 	}
 	for _, s := range storages {
