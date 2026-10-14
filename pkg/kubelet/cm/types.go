@@ -92,6 +92,9 @@ type CgroupManager interface {
 	GetCgroupConfig(name CgroupName, resource v1.ResourceName) (*ResourceConfig, error)
 	// Set resource config for the specified resource type on the cgroup
 	SetCgroupConfig(logger klog.Logger, name CgroupName, resourceConfig *ResourceConfig) error
+	// EnsureUnified sets the cgroup v2 interface files in values on the cgroup,
+	// writing only the files whose content differs.
+	EnsureUnified(name CgroupName, values map[string]string) error
 	// Version of the cgroup implementation on the host
 	Version() int
 }
@@ -114,6 +117,10 @@ type PodContainerManager interface {
 	// pod cgroup exists if qos cgroup hierarchy flag is enabled.
 	// If the pod cgroup doesn't already exist this method creates it.
 	EnsureExists(logger klog.Logger, pod *v1.Pod) error
+
+	// EnsureWritableCgroupLimits sets descendant and depth limits on the cgroup
+	// of a pod that requests writable cgroups.
+	EnsureWritableCgroupLimits(pod *v1.Pod) error
 
 	// Exists returns true if the pod cgroup exists.
 	Exists(*v1.Pod) bool

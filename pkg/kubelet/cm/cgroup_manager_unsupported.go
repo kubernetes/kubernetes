@@ -93,6 +93,10 @@ func (m *unsupportedCgroupManager) SetCgroupConfig(logger klog.Logger, name Cgro
 	return errNotSupported
 }
 
+func (m *unsupportedCgroupManager) EnsureUnified(_ CgroupName, _ map[string]string) error {
+	return errNotSupported
+}
+
 var RootCgroupName = CgroupName([]string{})
 
 func NewCgroupName(base CgroupName, components ...string) CgroupName {
