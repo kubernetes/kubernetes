@@ -4374,6 +4374,155 @@ func TestUpdatePodContainerResources(t *testing.T) {
 	}
 }
 
+// failingRuntimeService fails UpdateContainerResources for specific container IDs and
+// records every container ID it was called with.
+type failingRuntimeService struct {
+	*apitest.FakeRuntimeService
+	// maps container to the error to return for that container.
+	errs map[string]error
+	// list of containers passed to UpdateContainerResources
+	attempted []string
+}
+
+func (f *failingRuntimeService) UpdateContainerResources(ctx context.Context, containerID string, resources *runtimeapi.ContainerResources) error {
+	f.attempted = append(f.attempted, containerID)
+	err := f.errs[containerID]
+	if err != nil {
+		return err
+	}
+	return f.FakeRuntimeService.UpdateContainerResources(ctx, containerID, resources)
+}
+
+func TestUpdatePodContainerResources_Failures(t *testing.T) {
+	if goruntime.GOOS != "linux" {
+		t.Skip("in-place resize is only supported on Linux")
+	}
+
+	tCtx := ktesting.Init(t)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
+
+	cpu100m := resource.MustParse("100m")
+	mem100M := resource.MustParse("100Mi")
+	mem200M := resource.MustParse("200Mi")
+	decrease := func() (desired resourceRequirements, current resourceRequirements) {
+		return resourceRequirements{memoryLimit: mem100M.Value(), memoryRequest: mem100M.Value(), cpuLimit: cpu100m.MilliValue(), cpuRequest: cpu100m.MilliValue()},
+			resourceRequirements{memoryLimit: mem200M.Value(), memoryRequest: mem200M.Value(), cpuLimit: cpu100m.MilliValue(), cpuRequest: cpu100m.MilliValue()}
+	}
+	increase := func() (desired resourceRequirements, current resourceRequirements) {
+		return resourceRequirements{memoryLimit: mem200M.Value(), memoryRequest: mem200M.Value(), cpuLimit: cpu100m.MilliValue(), cpuRequest: cpu100m.MilliValue()},
+			resourceRequirements{memoryLimit: mem100M.Value(), memoryRequest: mem100M.Value(), cpuLimit: cpu100m.MilliValue(), cpuRequest: cpu100m.MilliValue()}
+	}
+
+	for _, tc := range []struct {
+		name string
+		// failing lists the containers whose UpdateContainerResources call fails.
+		failing []string
+		// expectAttempted lists the containers UpdateContainerResources is called for.
+		expectAttempted []string
+		// expectUpdated lists the containers whose update succeeded.
+		expectUpdated []string
+		// expectErrorsFor lists the containers whose failure to resize is expected.
+		expectErrorsFor []string
+	}{
+		{
+			name:            "one of two memory decreases fails",
+			failing:         []string{"down-1"},
+			expectAttempted: []string{"down-1"},
+			expectUpdated:   []string{},
+			expectErrorsFor: []string{"down-1"},
+		},
+		{
+			name:            "both memory decreases fail",
+			failing:         []string{"down-1", "down-2"},
+			expectAttempted: []string{"down-1"},
+			expectUpdated:   []string{},
+			expectErrorsFor: []string{"down-1"},
+		},
+		{
+			name:            "one of two memory increases fails",
+			failing:         []string{"up-1"},
+			expectAttempted: []string{"down-1", "down-2", "up-1"},
+			expectUpdated:   []string{"down-1", "down-2"},
+			expectErrorsFor: []string{"up-1"},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			fakeRuntime, _, m, err := createTestRuntimeManager(tCtx)
+			require.NoError(t, err)
+			m.machineInfo.MemoryCapacity = 17179860387 // 16GB
+			m.cpuCFSQuota = true
+
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					UID:       "resize-failures-uid",
+					Name:      "resize-failures",
+					Namespace: "default",
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{Name: "down-1", Image: "busybox"},
+						{Name: "down-2", Image: "busybox"},
+						{Name: "up-1", Image: "busybox"},
+						{Name: "up-2", Image: "busybox"},
+					},
+				},
+			}
+			_, fakeContainers := makeAndSetFakePod(tCtx, m, fakeRuntime, pod)
+			nameToContainerID := map[string]string{}
+			for _, c := range fakeContainers {
+				nameToContainerID[c.Metadata.Name] = c.Id
+			}
+
+			errsByID := map[string]error{}
+			for _, name := range tc.failing {
+				errsByID[nameToContainerID[name]] = fmt.Errorf("injected failure for %s", name)
+			}
+			rs := &failingRuntimeService{FakeRuntimeService: fakeRuntime, errs: errsByID}
+			m.runtimeService = rs
+
+			var containersToUpdate []containerToUpdateInfo
+			for i := range pod.Spec.Containers {
+				c := &pod.Spec.Containers[i]
+				desired, current := increase()
+				if strings.HasPrefix(c.Name, "down-") {
+					desired, current = decrease()
+				}
+				containersToUpdate = append(containersToUpdate, containerToUpdateInfo{
+					container:                 c,
+					kubeContainerID:           kubecontainer.ContainerID{Type: "testRuntime", ID: nameToContainerID[c.Name]},
+					desiredContainerResources: desired,
+					currentContainerResources: &current,
+				})
+			}
+
+			err = m.updatePodContainerResources(tCtx, pod, v1.ResourceMemory, containersToUpdate)
+			require.Error(t, err)
+			for _, name := range tc.expectErrorsFor {
+				require.ErrorIs(t, err, errsByID[nameToContainerID[name]], "returned error should include the failure for %s", name)
+			}
+
+			var expectedIDs []string
+			for _, name := range tc.expectAttempted {
+				expectedIDs = append(expectedIDs, nameToContainerID[name])
+			}
+			assert.ElementsMatch(t, expectedIDs, rs.attempted, "containers UpdateContainerResources was called for")
+
+			updated := sets.New(tc.expectUpdated...)
+			for _, cInfo := range containersToUpdate {
+				name := cInfo.container.Name
+				_, actuated := m.actuatedState.GetContainerResources(pod.UID, name)
+				if updated.Has(name) {
+					assert.Equal(t, cInfo.desiredContainerResources.memoryLimit, cInfo.currentContainerResources.memoryLimit, "current memory limit for %s", name)
+					assert.True(t, actuated, "actuated resources should be recorded for %s", name)
+				} else {
+					assert.NotEqual(t, cInfo.desiredContainerResources.memoryLimit, cInfo.currentContainerResources.memoryLimit, "current memory limit for %s", name)
+					assert.False(t, actuated, "actuated resources should not be recorded for %s", name)
+				}
+			}
+		})
+	}
+}
+
 func TestToKubeContainerImageVolumes(t *testing.T) {
 	tCtx := ktesting.Init(t)
 	_, _, manager, err := createTestRuntimeManager(tCtx)
