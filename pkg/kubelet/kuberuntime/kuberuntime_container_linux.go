@@ -344,10 +344,17 @@ func (m *kubeGenericRuntimeManager) generateContainerResources(ctx context.Conte
 func (m *kubeGenericRuntimeManager) generateUpdatePodSandboxResourcesRequest(sandboxID string, pod *v1.Pod, podResources *cm.ResourceConfig) *runtimeapi.UpdatePodSandboxResourcesRequest {
 
 	podResourcesWithoutOverhead := subtractOverheadFromResourceConfig(podResources, pod)
+	resources := convertResourceConfigToLinuxContainerResources(podResourcesWithoutOverhead)
+	// Pod cgroup shares may exceed MaxShares on large cgroup v2 nodes, but
+	// runtimes convert CRI shares with the fixed [2, MaxShares] range and some
+	// reject anything larger.
+	if resources != nil && resources.CpuShares > cm.MaxShares {
+		resources.CpuShares = cm.MaxShares
+	}
 	return &runtimeapi.UpdatePodSandboxResourcesRequest{
 		PodSandboxId: sandboxID,
 		Overhead:     m.convertOverheadToLinuxResources(pod),
-		Resources:    convertResourceConfigToLinuxContainerResources(podResourcesWithoutOverhead),
+		Resources:    resources,
 	}
 }
 

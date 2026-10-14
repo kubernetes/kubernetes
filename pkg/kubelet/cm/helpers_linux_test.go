@@ -1446,3 +1446,85 @@ func TestCPUSharesEqualAfterV2RoundTrip(t *testing.T) {
 		})
 	}
 }
+
+func setCgroupV2CPUCapacityForTest(t *testing.T, milliCPU int64) {
+	t.Helper()
+	old := cgroupV2MaxShares.Load()
+	SetCgroupV2CPUCapacity(milliCPU)
+	t.Cleanup(func() { cgroupV2MaxShares.Store(old) })
+}
+
+func cpuWeightForMilliCPU(milliCPU int64) uint64 {
+	shares := MilliCPUToCgroupShares(milliCPU)
+	return getCPUWeight(&shares)
+}
+
+func TestCgroupV2CPUWeightDefaultSaturatesAt256CPUs(t *testing.T) {
+	// Without a node capacity the historical conversion is kept.
+	if got := cpuWeightForMilliCPU(256000); got != 10000 {
+		t.Errorf("weight for 256 CPUs = %d, want 10000", got)
+	}
+	if got := cpuWeightForMilliCPU(288000); got != 10000 {
+		t.Errorf("weight for 288 CPUs = %d, want 10000", got)
+	}
+}
+
+func TestCgroupV2CPUWeightUnchangedOnSmallNodes(t *testing.T) {
+	for _, capacity := range []int64{0, 4000, 64000, 256000} {
+		t.Run(strconv.FormatInt(capacity, 10), func(t *testing.T) {
+			setCgroupV2CPUCapacityForTest(t, capacity)
+			for _, milliCPU := range []int64{0, 1, 2, 50, 100, 1000, 3500, 64000, 255999, 256000, 300000} {
+				legacy := MilliCPUToShares(milliCPU)
+				if got := MilliCPUToCgroupShares(milliCPU); got != legacy {
+					t.Errorf("MilliCPUToCgroupShares(%d) = %d, want %d", milliCPU, got, legacy)
+				}
+				wantWeight := uint64(10000)
+				if legacy < MaxShares {
+					wantWeight = 1 + ((legacy-2)*9999)/(MaxShares-2)
+				}
+				if got := getCPUWeight(&legacy); got != wantWeight {
+					t.Errorf("getCPUWeight(%d) = %d, want %d", legacy, got, wantWeight)
+				}
+			}
+		})
+	}
+}
+
+func TestCgroupV2CPUWeightScalesOnLargeNodes(t *testing.T) {
+	setCgroupV2CPUCapacityForTest(t, 384000)
+
+	w256 := cpuWeightForMilliCPU(256000)
+	w288 := cpuWeightForMilliCPU(288000)
+	if w256 >= w288 || w288 >= 10000 {
+		t.Fatalf("expected weight(256 CPUs) < weight(288 CPUs) < 10000, got %d and %d", w256, w288)
+	}
+	if ratio := float64(w288) / float64(w256); ratio < 1.12 || ratio > 1.13 {
+		t.Errorf("weight ratio 288:256 = %.4f, want ~1.125", ratio)
+	}
+	if got := cpuWeightForMilliCPU(384000); got != 10000 {
+		t.Errorf("weight at node capacity = %d, want 10000", got)
+	}
+	if got := cpuWeightForMilliCPU(512000); got != 10000 {
+		t.Errorf("weight above node capacity = %d, want 10000", got)
+	}
+	if got := cpuWeightForMilliCPU(0); got != 1 {
+		t.Errorf("weight for zero request = %d, want 1", got)
+	}
+
+	// Shares handed to container runtimes keep the cgroup v1 range.
+	if got := MilliCPUToShares(288000); got != MaxShares {
+		t.Errorf("MilliCPUToShares(288000) = %d, want %d", got, MaxShares)
+	}
+
+	// Resize status relies on writes and readbacks using the same scale.
+	for _, milliCPU := range []int64{100, 1000, 256000, 288000, 384000} {
+		allocated := MilliCPUToCgroupShares(milliCPU)
+		readback := cpuWeightToCPUShares(getCPUWeight(&allocated))
+		if !CPUSharesEqualAfterV2RoundTrip(allocated, readback) {
+			t.Errorf("round trip for %dm: allocated %d, readback %d not considered equal", milliCPU, allocated, readback)
+		}
+		if readback > allocated {
+			t.Errorf("round trip for %dm inflated shares: allocated %d, readback %d", milliCPU, allocated, readback)
+		}
+	}
+}

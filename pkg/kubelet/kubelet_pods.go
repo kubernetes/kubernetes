@@ -2259,7 +2259,7 @@ func (kl *Kubelet) convertToAPIPodLevelResourcesStatus(logger klog.Logger, alloc
 		// comparisons at the cgroup minimum floor.
 		if cpuRequest.MilliValue() > cm.MinShares || resources.Requests.Cpu().MilliValue() > cm.MinShares {
 			allocatedMilliCPU := resources.Requests.Cpu().MilliValue()
-			allocatedShares := cm.MilliCPUToShares(allocatedMilliCPU)
+			allocatedShares := cm.MilliCPUToCgroupShares(allocatedMilliCPU)
 			// On cgroup v2, cpu.weight has coarse granularity and converting
 			// shares -> weight -> shares can be lossy. If the cgroup readback
 			// matches the round-tripped allocated shares, preserve the allocated

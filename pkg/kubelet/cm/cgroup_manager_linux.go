@@ -265,15 +265,17 @@ func (m *cgroupCommon) SetCgroupConfig(logger klog.Logger, name CgroupName, reso
 	return m.Update(logger, containerConfig)
 }
 
-// getCPUWeight converts from the range [2, 262144] to [1, 10000]
+// getCPUWeight converts from the range [2, cgroupV2MaxShares] to [1, 10000].
+// cgroupV2MaxShares is 262144 unless raised for nodes with more than 256 CPUs.
 func getCPUWeight(cpuShares *uint64) uint64 {
 	if cpuShares == nil {
 		return 0
 	}
-	if *cpuShares >= 262144 {
+	maxShares := cgroupV2MaxShares.Load()
+	if *cpuShares >= maxShares {
 		return 10000
 	}
-	return 1 + ((*cpuShares-2)*9999)/262142
+	return 1 + ((*cpuShares-2)*9999)/(maxShares-2)
 }
 
 var (
