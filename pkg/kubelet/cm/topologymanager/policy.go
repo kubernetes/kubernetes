@@ -30,6 +30,23 @@ type Policy interface {
 	// Returns a merged TopologyHint based on input from hint providers
 	// and a Pod Admit Handler Response based on hints and policy type
 	Merge(logger klog.Logger, providersHints []map[string][]TopologyHint) (TopologyHint, bool)
+	// UsesHintScores reports whether this policy reads the Score field of the
+	// hints it merges. Hint providers ask through HintScoresNeeded so they can
+	// skip computing a score nothing will read.
+	UsesHintScores() bool
+}
+
+// usesHintScores reports whether the given options select a NUMA allocation
+// strategy, which is the only thing that reads hint scores.
+//
+// The empty value is checked as well as the explicit "none" because policies
+// are handed their options rather than building them. NewPolicyOptions always
+// supplies a strategy, defaulting to NUMAAllocationStrategyNone and rejecting
+// an empty value outright, but a PolicyOptions assembled any other way leaves
+// the field zero, and an unconfigured policy must not score. NewHintMerger
+// guards the same two values for the same reason.
+func usesHintScores(opts PolicyOptions) bool {
+	return opts.NUMAAllocationStrategy != "" && opts.NUMAAllocationStrategy != NUMAAllocationStrategyNone
 }
 
 // IsAlignmentGuaranteed return true if the given policy guarantees that either
