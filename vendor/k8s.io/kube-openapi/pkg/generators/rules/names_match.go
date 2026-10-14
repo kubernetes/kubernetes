@@ -22,6 +22,7 @@ import (
 
 	"k8s.io/kube-openapi/pkg/util/sets"
 
+	"k8s.io/gengo/v2/namer"
 	"k8s.io/gengo/v2/types"
 )
 
@@ -87,7 +88,13 @@ func (n *NamesMatch) Validate(t *types.Type) ([]string, error) {
 	// Only validate struct type and ignore the rest
 	switch t.Kind {
 	case types.Struct:
+		_, isMarshaler := t.Methods["MarshalJSON"]
+		_, isUnmarshaler := t.Methods["UnmarshalJSON"]
 		for _, m := range t.Members {
+			// Unexported fields of types with custom JSON serialization are not serialized.
+			if isMarshaler && isUnmarshaler && !m.Embedded && namer.IsPrivateGoName(m.Name) {
+				continue
+			}
 			goName := m.Name
 			jsonTag, ok := reflect.StructTag(m.Tags).Lookup("json")
 			// Distinguish empty JSON tag and missing JSON tag. Empty JSON tag / name is

@@ -377,6 +377,10 @@ func (g openAPITypeWriter) generateMembers(t *types.Type, required []string) ([]
 		if hasOpenAPITagValue(m.CommentLines, tagValueFalse) {
 			continue
 		}
+		// Unexported fields of types with custom JSON serialization are not serialized.
+		if !m.Embedded && namer.IsPrivateGoName(m.Name) && implementsCustomJSONSerialization(t) {
+			continue
+		}
 		if shouldInlineMembers(&m) {
 			required, err = g.generateMembers(m.Type, required)
 			if err != nil {
@@ -935,6 +939,13 @@ func implementsCustomUnmarshalling(t *types.Type) bool {
 	default:
 		return false
 	}
+}
+
+// implementsCustomJSONSerialization returns true if t has both MarshalJSON and UnmarshalJSON methods.
+func implementsCustomJSONSerialization(t *types.Type) bool {
+	_, isMarshaler := t.Methods["MarshalJSON"]
+	_, isUnmarshaler := t.Methods["UnmarshalJSON"]
+	return isMarshaler && isUnmarshaler
 }
 
 func mustEnforceDefault(t *types.Type, omitEmpty bool) (interface{}, error) {
