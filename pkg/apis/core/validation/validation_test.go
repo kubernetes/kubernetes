@@ -36,6 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
@@ -44,6 +45,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	ndf "k8s.io/component-helpers/nodedeclaredfeatures/features"
+	"k8s.io/dynamic-resource-allocation/resourceclaim"
 	kubeletapis "k8s.io/kubelet/pkg/apis"
 	podtest "k8s.io/kubernetes/pkg/api/pod/testing"
 	"k8s.io/kubernetes/pkg/apis/core"
@@ -17293,8 +17295,22 @@ func TestValidateExtraNodeAllocatableResources(t *testing.T) {
 		},
 	}
 
+	const podName = "my-pod"
+	const podUID = types.UID("0e8b5a3c-6f1d-4b2a-9c7e-5d4f3a2b1c0d")
+	extendedResourceClaimName := resourceclaim.ExtendedResourceClaimName(podName, podUID)
+	extendedResourcePodSpec := func(resourceName core.ResourceName, quantity string) core.PodSpec {
+		return core.PodSpec{
+			Containers: []core.Container{{Name: "c1", Image: "image", Resources: core.ResourceRequirements{
+				Requests: core.ResourceList{resourceName: resource.MustParse(quantity)},
+				Limits:   core.ResourceList{resourceName: resource.MustParse(quantity)},
+			}}},
+		}
+	}
+
 	testCases := []struct {
 		name        string
+		podName     string
+		podUID      types.UID
 		podStatus   core.PodStatus
 		spec        core.PodSpec
 		expectError bool
@@ -17883,11 +17899,50 @@ func TestValidateExtraNodeAllocatableResources(t *testing.T) {
 			errorField:  "status.extraNodeAllocatableResources[0].source.name",
 			errorMsg:    "no mapping found in pod reference",
 		},
+		{
+			name: "Valid derived extended resource claim name without ExtendedResourceClaimStatus",
+			spec: extendedResourcePodSpec("example.com/gpu", "1"),
+			podStatus: core.PodStatus{
+				ExtraNodeAllocatableResources: []core.ExtraNodeAllocatableResource{
+					{
+						Source:     core.ExtraNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: extendedResourceClaimName},
+						Containers: []string{"c1"},
+						Mapping:    []core.NodeAllocatableMappedResources{{Name: core.ResourceCPU, Quantity: new(resource.MustParse("1"))}},
+					},
+				},
+			},
+		},
+		{
+			name: "Invalid derived extended resource claim name not matching pod",
+			spec: extendedResourcePodSpec("example.com/gpu", "1"),
+			podStatus: core.PodStatus{
+				ExtraNodeAllocatableResources: []core.ExtraNodeAllocatableResource{
+					{
+						Source:     core.ExtraNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "other-claim-name"},
+						Containers: []string{"c1"},
+						Mapping:    []core.NodeAllocatableMappedResources{{Name: core.ResourceCPU, Quantity: new(resource.MustParse("1"))}},
+					},
+				},
+			},
+			expectError: true,
+			errorType:   field.ErrorTypeInvalid,
+			errorField:  "status.extraNodeAllocatableResources[0].source.name",
+			errorMsg:    "no mapping found in pod reference",
+		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			errs := validateExtraNodeAllocatableResources(tc.podStatus, &tc.spec, field.NewPath("status", "extraNodeAllocatableResources"))
+			name := tc.podName
+			if name == "" {
+				name = podName
+			}
+			uid := tc.podUID
+			if uid == "" {
+				uid = podUID
+			}
+			pod := &core.Pod{ObjectMeta: metav1.ObjectMeta{Name: name, UID: uid}, Spec: tc.spec, Status: tc.podStatus}
+			errs := validateExtraNodeAllocatableResources(pod, field.NewPath("status", "extraNodeAllocatableResources"))
 
 			if !tc.expectError {
 				if len(errs) != 0 {
