@@ -1250,6 +1250,10 @@ type AWSElasticBlockStoreVolumeSource struct {
 // GitRepoVolumeSource represents a volume that is populated with the contents of a git repository.
 // Git repo volumes do not support ownership management.
 // Git repo volumes support SELinux relabeling.
+//
+// Deprecated: GitRepo is deprecated. To provision a container with a git repo, mount an
+// EmptyDir into an InitContainer that clones the repo using git, then mount the EmptyDir
+// into the Pod's container.
 type GitRepoVolumeSource struct {
 	// Repository URL
 	Repository string
@@ -3411,7 +3415,7 @@ type PodCondition struct {
 	Message string
 }
 
-// PodResizeStatus shows status of desired resize of a pod's containers.
+// Deprecated: PodResizeStatus shows status of desired resize of a pod's containers.
 type PodResizeStatus string
 
 const (
@@ -5797,12 +5801,12 @@ type NodePodPreemptionPolicy struct {
 	DisableResizePreemption []string
 }
 
-// NodeConfigSource specifies a source of node configuration. Exactly one subfield must be non-nil.
+// Deprecated: NodeConfigSource specifies a source of node configuration. Exactly one subfield must be non-nil.
 type NodeConfigSource struct {
 	ConfigMap *ConfigMapNodeConfigSource
 }
 
-// ConfigMapNodeConfigSource represents the config map of a node
+// Deprecated: ConfigMapNodeConfigSource represents the config map of a node
 type ConfigMapNodeConfigSource struct {
 	// Namespace is the metadata.namespace of the referenced ConfigMap.
 	// This field is required in all cases.
