@@ -142,36 +142,36 @@ func (wm watchersMap) terminateAll(done func(*cacheWatcher)) {
 }
 
 type indexedWatchers struct {
-	allWatchers   map[namespacedName]watchersMap
-	valueWatchers map[string]watchersMap
+	scopeWatchers map[namespacedName]watchersMap
+	indexWatchers map[string]watchersMap
 }
 
-func (i *indexedWatchers) addWatcher(w *cacheWatcher, number int, scope namespacedName, value string, supported bool) {
-	if supported {
-		if _, ok := i.valueWatchers[value]; !ok {
-			i.valueWatchers[value] = watchersMap{}
+func (i *indexedWatchers) addWatcher(w *cacheWatcher, number int, selector watchSelector) {
+	if selector.indexValue != nil {
+		if _, ok := i.indexWatchers[*selector.indexValue]; !ok {
+			i.indexWatchers[*selector.indexValue] = watchersMap{}
 		}
-		i.valueWatchers[value].addWatcher(w, number)
+		i.indexWatchers[*selector.indexValue].addWatcher(w, number)
 	} else {
-		scopedWatchers, ok := i.allWatchers[scope]
+		scopedWatchers, ok := i.scopeWatchers[selector.scope]
 		if !ok {
 			scopedWatchers = watchersMap{}
-			i.allWatchers[scope] = scopedWatchers
+			i.scopeWatchers[selector.scope] = scopedWatchers
 		}
 		scopedWatchers.addWatcher(w, number)
 	}
 }
 
-func (i *indexedWatchers) deleteWatcher(number int, scope namespacedName, value string, supported bool) {
-	if supported {
-		i.valueWatchers[value].deleteWatcher(number)
-		if len(i.valueWatchers[value]) == 0 {
-			delete(i.valueWatchers, value)
+func (i *indexedWatchers) deleteWatcher(number int, selector watchSelector) {
+	if selector.indexValue != nil {
+		i.indexWatchers[*selector.indexValue].deleteWatcher(number)
+		if len(i.indexWatchers[*selector.indexValue]) == 0 {
+			delete(i.indexWatchers, *selector.indexValue)
 		}
 	} else {
-		i.allWatchers[scope].deleteWatcher(number)
-		if len(i.allWatchers[scope]) == 0 {
-			delete(i.allWatchers, scope)
+		i.scopeWatchers[selector.scope].deleteWatcher(number)
+		if len(i.scopeWatchers[selector.scope]) == 0 {
+			delete(i.scopeWatchers, selector.scope)
 		}
 	}
 }
@@ -180,18 +180,23 @@ func (i *indexedWatchers) terminateAll(groupResource schema.GroupResource, done 
 	// note that we don't have to call setDrainInputBufferLocked method on the watchers
 	// because we take advantage of the default value - stop immediately
 	// also watchers that have had already its draining strategy set
-	// are no longer available (they were removed from the allWatchers and the valueWatchers maps)
-	if len(i.allWatchers) > 0 || len(i.valueWatchers) > 0 {
+	// are no longer available (they were removed from the scopeWatchers and the indexWatchers maps)
+	if len(i.scopeWatchers) > 0 || len(i.indexWatchers) > 0 {
 		klog.Warningf("Terminating all watchers from cacher %v", groupResource)
 	}
-	for _, watchers := range i.allWatchers {
+	for _, watchers := range i.scopeWatchers {
 		watchers.terminateAll(done)
 	}
-	for _, watchers := range i.valueWatchers {
+	for _, watchers := range i.indexWatchers {
 		watchers.terminateAll(done)
 	}
-	i.allWatchers = map[namespacedName]watchersMap{}
-	i.valueWatchers = map[string]watchersMap{}
+	i.scopeWatchers = map[namespacedName]watchersMap{}
+	i.indexWatchers = map[string]watchersMap{}
+}
+
+type watchSelector struct {
+	scope      namespacedName
+	indexValue *string
 }
 
 // As we don't need a high precision here, we keep all watchers timeout within a
@@ -400,8 +405,8 @@ func NewCacherFromConfig(config Config) (*Cacher, error) {
 		indexedTrigger: indexedTrigger,
 		watcherIdx:     0,
 		watchers: indexedWatchers{
-			allWatchers:   make(map[namespacedName]watchersMap),
-			valueWatchers: make(map[string]watchersMap),
+			scopeWatchers: make(map[namespacedName]watchersMap),
+			indexWatchers: make(map[string]watchersMap),
 		},
 		// TODO: Figure out the correct value for the buffer size.
 		incoming:              make(chan watchCacheEvent, 100),
@@ -533,43 +538,14 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 		return nil, errors.NewTooManyRequests(err.Error(), calculateRetryAfterForUnreadyCache(downtime))
 	}
 
-	// determine the namespace and name scope of the watch, first from the request, secondarily from the field selector
-	scope := namespacedName{}
-	if requestNamespace, ok := request.NamespaceFrom(ctx); ok && len(requestNamespace) > 0 {
-		scope.namespace = requestNamespace
-	} else if selectorNamespace, ok := pred.Field.RequiresExactMatch("metadata.namespace"); ok {
-		scope.namespace = selectorNamespace
-	}
-	if requestInfo, ok := request.RequestInfoFrom(ctx); ok && requestInfo != nil && len(requestInfo.Name) > 0 {
-		scope.name = requestInfo.Name
-	} else if selectorName, ok := pred.Field.RequiresExactMatch("metadata.name"); ok {
-		scope.name = selectorName
-	}
-
-	// for request like '/api/v1/watch/namespaces/*', set scope.namespace to empty.
-	// namespaces don't populate metadata.namespace in ObjFields.
-	if c.groupResource == coreNamespaceResource && len(scope.namespace) > 0 && scope.namespace == scope.name {
-		scope.namespace = ""
-	}
-
-	triggerValue, triggerSupported := "", false
-	if c.indexedTrigger != nil {
-		for _, field := range pred.IndexFields {
-			if field == c.indexedTrigger.indexName {
-				if value, ok := pred.Field.RequiresExactMatch(field); ok {
-					triggerValue, triggerSupported = value, true
-					break
-				}
-			}
-		}
-	}
+	selector := c.watchSelector(ctx, pred)
 
 	// It boils down to a tradeoff between:
 	// - having it as small as possible to reduce memory usage
 	// - having it large enough to ensure that watchers that need to process
 	//   a bunch of changes have enough buffer to avoid from blocking other
 	//   watchers on our watcher having a processing hiccup
-	chanSize := c.watchCache.suggestedWatchChannelSize(c.indexedTrigger != nil, triggerSupported)
+	chanSize := c.watchCache.suggestedWatchChannelSize(c.indexedTrigger != nil, selector.indexValue != nil)
 
 	// client-go is going to fall back to a standard LIST on any error
 	// returned for watch-list requests
@@ -655,10 +631,10 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 		}
 
 		// Update watcher.forget function once we can compute it.
-		watcher.forget = forgetWatcher(c, watcher, c.watcherIdx, scope, triggerValue, triggerSupported)
+		watcher.forget = forgetWatcher(c, watcher, c.watcherIdx, selector)
 		// Update the bookMarkAfterResourceVersion
 		watcher.setBookmarkAfterResourceVersion(bookmarkAfterResourceVersionFn())
-		c.watchers.addWatcher(watcher, c.watcherIdx, scope, triggerValue, triggerSupported)
+		c.watchers.addWatcher(watcher, c.watcherIdx, selector)
 		addedWatcher = true
 
 		// Add it to the queue only when the client support watch bookmarks.
@@ -687,6 +663,43 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 
 	go watcher.processInterval(ctx, cacheInterval, requiredResourceVersion)
 	return watcher, nil
+}
+
+func (c *Cacher) watchSelector(ctx context.Context, pred storage.SelectionPredicate) watchSelector {
+	// determine the namespace and name scope of the watch, first from the request, secondarily from the field selector
+	scope := namespacedName{}
+	if requestNamespace, ok := request.NamespaceFrom(ctx); ok && len(requestNamespace) > 0 {
+		scope.namespace = requestNamespace
+	} else if selectorNamespace, ok := pred.Field.RequiresExactMatch("metadata.namespace"); ok {
+		scope.namespace = selectorNamespace
+	}
+	if requestInfo, ok := request.RequestInfoFrom(ctx); ok && requestInfo != nil && len(requestInfo.Name) > 0 {
+		scope.name = requestInfo.Name
+	} else if selectorName, ok := pred.Field.RequiresExactMatch("metadata.name"); ok {
+		scope.name = selectorName
+	}
+
+	// for request like '/api/v1/watch/namespaces/*', set scope.namespace to empty.
+	// namespaces don't populate metadata.namespace in ObjFields.
+	if c.groupResource == coreNamespaceResource && len(scope.namespace) > 0 && scope.namespace == scope.name {
+		scope.namespace = ""
+	}
+
+	var indexValue *string
+	if c.indexedTrigger != nil {
+		for _, field := range pred.IndexFields {
+			if field == c.indexedTrigger.indexName {
+				if value, ok := pred.Field.RequiresExactMatch(field); ok {
+					indexValue = &value
+					break
+				}
+			}
+		}
+	}
+	return watchSelector{
+		scope:      scope,
+		indexValue: indexValue,
+	}
 }
 
 func (c *Cacher) Get(ctx context.Context, key string, opts storage.GetOptions, objPtr runtime.Object) error {
@@ -1118,30 +1131,30 @@ func (c *Cacher) startDispatching(event *watchCacheEvent) {
 	if len(namespace) > 0 {
 		if len(name) > 0 {
 			// namespaced watchers scoped by name
-			for _, watcher := range c.watchers.allWatchers[namespacedName{namespace: namespace, name: name}] {
+			for _, watcher := range c.watchers.scopeWatchers[namespacedName{namespace: namespace, name: name}] {
 				c.watchersBuffer = append(c.watchersBuffer, watcher)
 			}
 		}
 		// namespaced watchers not scoped by name
-		for _, watcher := range c.watchers.allWatchers[namespacedName{namespace: namespace}] {
+		for _, watcher := range c.watchers.scopeWatchers[namespacedName{namespace: namespace}] {
 			c.watchersBuffer = append(c.watchersBuffer, watcher)
 		}
 	}
 	if len(name) > 0 {
 		// cluster-wide watchers scoped by name
-		for _, watcher := range c.watchers.allWatchers[namespacedName{name: name}] {
+		for _, watcher := range c.watchers.scopeWatchers[namespacedName{name: name}] {
 			c.watchersBuffer = append(c.watchersBuffer, watcher)
 		}
 	}
 	// cluster-wide watchers unscoped by name
-	for _, watcher := range c.watchers.allWatchers[namespacedName{}] {
+	for _, watcher := range c.watchers.scopeWatchers[namespacedName{}] {
 		c.watchersBuffer = append(c.watchersBuffer, watcher)
 	}
 
 	if supported {
 		// Iterate over watchers interested in the given values of the trigger.
 		for _, triggerValue := range triggerValues {
-			for _, watcher := range c.watchers.valueWatchers[triggerValue] {
+			for _, watcher := range c.watchers.indexWatchers[triggerValue] {
 				c.watchersBuffer = append(c.watchersBuffer, watcher)
 			}
 		}
@@ -1153,7 +1166,7 @@ func (c *Cacher) startDispatching(event *watchCacheEvent) {
 		// misconfiguration. Thus we paranoidly leave this branch.
 
 		// Iterate over watchers interested in exact values for all values.
-		for _, watchers := range c.watchers.valueWatchers {
+		for _, watchers := range c.watchers.indexWatchers {
 			for _, watcher := range watchers {
 				c.watchersBuffer = append(c.watchersBuffer, watcher)
 			}
@@ -1236,7 +1249,7 @@ func (c *Cacher) prepareKey(key string, recursive bool) (string, error) {
 	return storage.PrepareKey(c.resourcePrefix, key, recursive)
 }
 
-func forgetWatcher(c *Cacher, w *cacheWatcher, index int, scope namespacedName, triggerValue string, triggerSupported bool) func(bool) {
+func forgetWatcher(c *Cacher, w *cacheWatcher, index int, selector watchSelector) func(bool) {
 	return func(drainWatcher bool) {
 		c.Lock()
 		defer c.Unlock()
@@ -1246,7 +1259,7 @@ func forgetWatcher(c *Cacher, w *cacheWatcher, index int, scope namespacedName, 
 		// It's possible that the watcher is already not in the structure (e.g. in case of
 		// simultaneous Stop() and terminateAllWatchers(), but it is safe to call stopLocked()
 		// on a watcher multiple times.
-		c.watchers.deleteWatcher(index, scope, triggerValue, triggerSupported)
+		c.watchers.deleteWatcher(index, selector)
 		c.stopWatcherLocked(w)
 	}
 }
