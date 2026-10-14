@@ -74,10 +74,11 @@ func TestDeclarativeValidate(t *testing.T) {
 			APIGroup:   "apps",
 			APIVersion: apiVersion,
 		})
-		testCases := map[string]struct {
+		type testCase struct {
 			input        *apps.Deployment
 			expectedErrs field.ErrorList
-		}{
+		}
+		testCases := map[string]testCase{
 			"valid": {
 				input: mkDeployment(),
 			},
@@ -114,6 +115,14 @@ func TestDeclarativeValidate(t *testing.T) {
 				},
 			},
 		}
+
+		for _, tc := range poddeclarativevalidation.InvalidPodSpecTestcases(field.NewPath("spec", "template", "spec")) {
+			testCases["podspec:"+tc.ID] = testCase{
+				input:        mkDeployment(tweakPodSpec(tc.Tweaks...)),
+				expectedErrs: tc.ExpectedErrs,
+			}
+		}
+
 		for k, tc := range testCases {
 			t.Run(k, func(t *testing.T) {
 				apitesting.VerifyValidationEquivalence(t, ctx, tc.input, registry.Strategy, tc.expectedErrs)
