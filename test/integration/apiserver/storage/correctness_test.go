@@ -210,39 +210,106 @@ var (
 
 func TestCorrectness(t *testing.T) {
 	storages := []struct {
-		name string
-		fn   func(t *testing.T) (storage.Interface, string)
+		name                   string
+		setupStorage           func(t *testing.T) (storage.Interface, string)
+		validateFaultInjection func(t *testing.T, ops []correctness.Operation, watches []correctness.WatchOperation)
 	}{
-		{"etcd3", func(t *testing.T) (storage.Interface, string) {
-			return setupStore(t)
-		}},
-		{"cacher", func(t *testing.T) (storage.Interface, string) {
-			store, prefix := setupStore(t)
-			return setupCacher(t, store), prefix
-		}},
-		{"cacher with watch-breaking etcd", func(t *testing.T) (storage.Interface, string) {
-			store, prefix := setupStore(t)
-			return setupCacher(t, &watchBreakingStore{Interface: store, expireAfter: 500 * time.Millisecond}), prefix
-		}},
-		{"cacher_small_history", func(t *testing.T) (storage.Interface, string) {
-			origFreshDuration := cacher.DefaultEventFreshDuration
-			cacher.DefaultEventFreshDuration = 50 * time.Millisecond
-			t.Cleanup(func() {
-				cacher.DefaultEventFreshDuration = origFreshDuration
-			})
-			store, prefix := setupStore(t)
-			return setupCacher(t, store), prefix
-		}},
+		{
+			name: "etcd3",
+			setupStorage: func(t *testing.T) (storage.Interface, string) {
+				return setupStore(t)
+			},
+		},
+		{
+			name: "cacher",
+			setupStorage: func(t *testing.T) (storage.Interface, string) {
+				store, prefix := setupStore(t)
+				return setupCacher(t, store), prefix
+			},
+		},
+		{
+			// Covers cacher reinitialization and unready (Pending) state handling:
+			// - Watch expiration (410 Gone) and reconnect failure (cacher.startCaching WatchCacheInitializationErrors)
+			// - Reflector fallback from WatchList to listerWatcher.List and watchCache.Replace
+			// - CacheDelegator fallback to etcd on Get and bounded unfiltered GetList when !cacher.Ready()
+			// - Cacher 429 TooManyRequests rejection on non-delegated GetList and Watch when !cacher.Ready()
+			name: "cacher with watch-breaking etcd",
+			setupStorage: func(t *testing.T) (storage.Interface, string) {
+				store, prefix := setupStore(t)
+				return setupCacher(t, &watchBreakingStore{Interface: store, expireAfter: 200 * time.Millisecond}), prefix
+			},
+			validateFaultInjection: func(t *testing.T, ops []correctness.Operation, watches []correctness.WatchOperation) {
+				require.True(t, hasUnreadyListError(ops), "expected cacher.GetList to reject requests with 429 TooManyRequests while unready")
+				require.True(t, hasWatchTooManyRequestsError(watches), "expected cacher.Watch to reject watches with 429 TooManyRequests while unready")
+			},
+		},
+		{
+			// Covers watch delivery lag exceeding blockTimeout (3s):
+			// - watchCache.waitUntilFreshLocked timing out with TooLargeResourceVersionError
+			// - CacheDelegator.GetList catching TooLargeResourceVersionError on consistent reads (RV="") and falling back to etcd
+			// - Cacher.GetList (non-consistent RVCached) and Cacher.Get returning TooLargeResourceVersionError
+			// - Cacher.Watch (SendInitialEvents=true) timing out in waitUntilWatchCacheFreshAndForceAllEvents and returning errWatcher
+			name: "cacher with watch-delaying etcd",
+			setupStorage: func(t *testing.T) (storage.Interface, string) {
+				store, prefix := setupStore(t)
+				return setupCacher(t, &watchDelayingStore{Interface: store, delay: 3600 * time.Millisecond}), prefix
+			},
+			validateFaultInjection: func(t *testing.T, ops []correctness.Operation, watches []correctness.WatchOperation) {
+				require.True(t, hasConsistentListFallback(ops) || hasUnaryTimeoutError(ops),
+					"expected >3s watch delay to trigger consistent List fallback to etcd or unary TooLargeResourceVersionError")
+				require.True(t, hasWatchEventReason(watches, metav1.StatusReasonTimeout),
+					"expected >3s watch delay to trigger WatchList StatusReasonTimeout error events")
+			},
+		},
+		{
+			// Covers broken watch progress notifications when etcd revision advances outside the watched prefix:
+			// - ConditionalProgressRequester requesting watch progress every 100ms and handling RequestWatchProgress errors
+			// - Dropped progress bookmarks preventing watchCache.resourceVersion from advancing during an idle window (>3s),
+			//   causing waitUntilFreshLocked timeouts on GetList (falling back to etcd on consistent reads) and WatchList
+			name: "cacher with bookmark-dropping etcd",
+			setupStorage: func(t *testing.T) (storage.Interface, string) {
+				store, prefix := setupStore(t)
+				return setupCacher(t, &bookmarkDroppingStore{Interface: store, stallDuration: 4700 * time.Millisecond}), prefix
+			},
+			validateFaultInjection: func(t *testing.T, ops []correctness.Operation, watches []correctness.WatchOperation) {
+				require.True(t, hasConsistentListFallback(ops) || hasUnaryTimeoutError(ops),
+					"expected dropped progress bookmarks during >3s idle window to trigger consistent List fallback to etcd or unary TooLargeResourceVersionError")
+				require.True(t, hasWatchEventReason(watches, metav1.StatusReasonTimeout),
+					"expected dropped progress bookmarks during >3s idle window to trigger WatchList StatusReasonTimeout error events")
+			},
+		},
+		{
+			// Covers watch history cyclic buffer eviction and snapshot compaction under a short freshness window (50ms):
+			// - watchCacheHistory dynamic capacity resize (grow and shrink), event eviction, and B-tree snapshot compaction
+			// - watchCacheHistory.GetIntervalLocked returning 410 ResourceExpired when a watch requests an evicted RV
+			name: "cacher_small_history",
+			setupStorage: func(t *testing.T) (storage.Interface, string) {
+				origFreshDuration := cacher.DefaultEventFreshDuration
+				cacher.DefaultEventFreshDuration = 50 * time.Millisecond
+				t.Cleanup(func() {
+					cacher.DefaultEventFreshDuration = origFreshDuration
+				})
+				store, prefix := setupStore(t)
+				return setupCacher(t, store), prefix
+			},
+			validateFaultInjection: func(t *testing.T, _ []correctness.Operation, watches []correctness.WatchOperation) {
+				require.True(t, hasWatchEventReason(watches, metav1.StatusReasonExpired),
+					"expected small history window to expire old watch resource versions with StatusReasonExpired")
+			},
+		},
 	}
 	for _, s := range storages {
 		t.Run(s.name, func(t *testing.T) {
-			store, storagePrefix := s.fn(t)
-			testCorrectness(t, store, storagePrefix)
+			store, storagePrefix := s.setupStorage(t)
+			ops, watches := testCorrectness(t, store, storagePrefix)
+			if s.validateFaultInjection != nil {
+				s.validateFaultInjection(t, ops, watches)
+			}
 		})
 	}
 }
 
-func testCorrectness(t *testing.T, store storage.Interface, storagePrefix string) {
+func testCorrectness(t *testing.T, store storage.Interface, storagePrefix string) ([]correctness.Operation, []correctness.WatchOperation) {
 	ctx := t.Context()
 	versioner := store.Versioner()
 
@@ -311,6 +378,7 @@ func testCorrectness(t *testing.T, store storage.Interface, storagePrefix string
 		require.NoError(t, validator.ValidateWatch(w.Request, w.Response))
 	}
 	require.Positive(t, watchEvents, "expected at least one watch event across %d watches", len(watches))
+	return operations, watches
 }
 
 func orderByLinearization(ops []correctness.Operation, linearization []int) []correctness.Operation {
