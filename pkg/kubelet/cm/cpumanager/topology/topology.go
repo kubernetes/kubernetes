@@ -235,6 +235,31 @@ func (d CPUDetails) SocketsInNUMANodes(ids ...int) cpuset.CPUSet {
 	return cpuset.New(socketIDs...)
 }
 
+// CPUsByCore groups the logical CPUs present in d by core ID.
+// CPU IDs within each group are unordered.
+// Say we have
+//
+//	CPUDetails{
+//		0: {CoreID: 0},
+//		1: {CoreID: 1},
+//		2: {CoreID: 0},
+//		3: {CoreID: 1},
+//	}
+//
+// One possible result is:
+//
+//	map[int][]int{
+//		0: {0, 2},
+//		1: {1, 3},
+//	}
+func (d CPUDetails) CPUsByCore() map[int][]int {
+	cpusByCore := make(map[int][]int)
+	for cpuID, info := range d {
+		cpusByCore[info.CoreID] = append(cpusByCore[info.CoreID], cpuID)
+	}
+	return cpusByCore
+}
+
 // Cores returns all of the core IDs associated with the CPUs in this
 // CPUDetails.
 func (d CPUDetails) Cores() cpuset.CPUSet {

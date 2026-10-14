@@ -147,10 +147,21 @@ func (n *numaFirst) sortAvailableSockets() []int {
 // If NUMA nodes are higher in the memory hierarchy than sockets, then
 // cores sit directly below sockets in the memory hierarchy.
 func (n *numaFirst) sortAvailableCores() []int {
+	if len(n.acc.details) == 0 {
+		return nil
+	}
+	cpusByCore := n.acc.details.CPUsByCore()
 	var result []int
 	for _, socket := range n.acc.sortAvailableSockets() {
 		cores := n.acc.details.CoresInSockets(socket).UnsortedList()
-		n.acc.sort(cores, n.acc.details.CPUsInCores)
+		sort.Slice(cores, func(i, j int) bool {
+			iCPUs := len(cpusByCore[cores[i]])
+			jCPUs := len(cpusByCore[cores[j]])
+			if iCPUs != jCPUs {
+				return iCPUs < jCPUs
+			}
+			return cores[i] < cores[j]
+		})
 		result = append(result, cores...)
 	}
 	return result
@@ -192,10 +203,21 @@ func (s *socketsFirst) sortAvailableSockets() []int {
 // If sockets are higher in the memory hierarchy than NUMA nodes, then cores
 // sit directly below NUMA Nodes in the memory hierarchy.
 func (s *socketsFirst) sortAvailableCores() []int {
+	if len(s.acc.details) == 0 {
+		return nil
+	}
+	cpusByCore := s.acc.details.CPUsByCore()
 	var result []int
 	for _, numa := range s.acc.sortAvailableNUMANodes() {
 		cores := s.acc.details.CoresInNUMANodes(numa).UnsortedList()
-		s.acc.sort(cores, s.acc.details.CPUsInCores)
+		sort.Slice(cores, func(i, j int) bool {
+			iCPUs := len(cpusByCore[cores[i]])
+			jCPUs := len(cpusByCore[cores[j]])
+			if iCPUs != jCPUs {
+				return iCPUs < jCPUs
+			}
+			return cores[i] < cores[j]
+		})
 		result = append(result, cores...)
 	}
 	return result
@@ -488,9 +510,13 @@ func (a *cpuAccumulator) sortAvailableCores() []int {
 // sockets is inverted (e.g. first sort the CPUs by number of free CPUs in their NUMA nodes, then,
 // for each NUMA node, sort the CPUs by number of free CPUs in their sockets, etc...).
 func (a *cpuAccumulator) sortAvailableCPUsPacked() []int {
+	if len(a.details) == 0 {
+		return nil
+	}
+	cpusByCore := a.details.CPUsByCore()
 	var result []int
 	for _, core := range a.sortAvailableCores() {
-		cpus := a.details.CPUsInCores(core).UnsortedList()
+		cpus := cpusByCore[core]
 		sort.Ints(cpus)
 		result = append(result, cpus...)
 	}
@@ -503,17 +529,29 @@ func (a *cpuAccumulator) sortAvailableCPUsPacked() []int {
 //     CPUs round-robin across those cores so sibling threads are only used
 //     once every physical core has contributed a CPU.
 func (a *cpuAccumulator) sortAvailableCPUsSpread() []int {
+	if len(a.details) == 0 {
+		return nil
+	}
+	cpusByCore := a.details.CPUsByCore()
 	var result []int
 	for _, socket := range a.sortAvailableSockets() {
 		cores := a.details.CoresInSockets(socket).UnsortedList()
 		// Deliberately sorted by free-CPU count instead of sortAvailableCores():
 		// sortAvailableCores() performs NUMA ranking, but spread mode at
 		// this stage only cares about physical-core coverage.
-		a.sort(cores, a.details.CPUsInCores)
+		sort.Slice(cores, func(i, j int) bool {
+			iCPUs := len(cpusByCore[cores[i]])
+			jCPUs := len(cpusByCore[cores[j]])
+			if iCPUs != jCPUs {
+				return iCPUs < jCPUs
+			}
+			return cores[i] < cores[j]
+		})
 		cpusPerCore := make([][]int, 0, len(cores))
 		maxCPUsPerCore := 0
 		for _, core := range cores {
-			cpus := a.details.CPUsInCores(core).List()
+			cpus := cpusByCore[core]
+			sort.Ints(cpus)
 			cpusPerCore = append(cpusPerCore, cpus)
 			if len(cpus) > maxCPUsPerCore {
 				maxCPUsPerCore = len(cpus)
