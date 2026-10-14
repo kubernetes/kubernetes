@@ -176,6 +176,9 @@ func (s *Model) validateGet(opts storage.GetOptions, expected, output Response) 
 	case ConsistencyConsistent:
 		return reflect.DeepEqual(expected, output)
 	case ConsistencyNotOlderThan:
+		if _, retry := apierrors.SuggestsClientDelay(output.Err); retry && reqRV > 0 && storage.IsTooLargeResourceVersion(output.Err) {
+			return true
+		}
 		// Model only validates consistent reads, for stale reads we just validate RV and contents are validated later during replay.
 		if storage.IsNotFound(output.Err) {
 			outputErr := output.Err.(*storage.StorageError)
@@ -204,6 +207,9 @@ func (s *Model) validateList(key string, opts storage.ListOptions, expected, out
 	consistency, reqRV, _, err := ListReadConsistency("", s.Versioner, opts)
 	if err != nil {
 		return false
+	}
+	if _, retry := apierrors.SuggestsClientDelay(output.Err); retry && reqRV > 0 && output.Object == nil && storage.IsTooLargeResourceVersion(output.Err) {
+		return true
 	}
 	switch consistency {
 	case ConsistencyConsistent:
