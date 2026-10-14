@@ -81,7 +81,10 @@ func returnPolicyByName(logger klog.Logger, testCase testMemoryManager) Policy {
 			err: fmt.Errorf("fake reg error"),
 		}
 	case PolicyTypeStatic:
-		policy, _ := NewPolicyStatic(logger, &testCase.machineInfo, testCase.reserved, topologymanager.NewFakeManager(logger))
+		// Wrap the store so the policy reads hint scores: providers skip
+		// computing them when no NUMA allocation strategy is selected, and
+		// TestGetTopologyHints asserts on the scores.
+		policy, _ := NewPolicyStatic(logger, &testCase.machineInfo, testCase.reserved, scoringStore{topologymanager.NewFakeManager(logger)})
 		return policy
 	case policyTypeNone:
 		return NewPolicyNone(logger)
