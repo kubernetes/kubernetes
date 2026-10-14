@@ -58,6 +58,7 @@ import (
 	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	"k8s.io/kubernetes/pkg/scheduler/profile"
+	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	taintutils "k8s.io/kubernetes/pkg/util/taints"
 	"k8s.io/kubernetes/test/integration/framework"
 	testutils "k8s.io/kubernetes/test/utils"
@@ -584,8 +585,21 @@ func InitPausePod(conf *PausePodConfig) *v1.Pod {
 }
 
 // CreatePausePod creates a pod with "Pause" image and the given config and
-// return its pointer and error status.
-func CreatePausePod(cs clientset.Interface, p *v1.Pod) (*v1.Pod, error) {
+// return its pointer and error status. If scheduleAsPodGroup is true, the pod
+// is wrapped in a basic PodGroup.
+func CreatePausePod(cs clientset.Interface, p *v1.Pod, scheduleAsPodGroup ...bool) (*v1.Pod, error) {
+	if len(scheduleAsPodGroup) > 0 && scheduleAsPodGroup[0] {
+		pg := st.MakePodGroup().Namespace(p.Namespace).BasicPolicy().Obj()
+		pg.GenerateName = p.Name + "-"
+		createdPG, err := cs.SchedulingV1beta1().PodGroups(p.Namespace).Create(context.TODO(), pg, metav1.CreateOptions{})
+		if err != nil {
+			return nil, fmt.Errorf("failed to create PodGroup for pod %s/%s: %w", p.Namespace, p.Name, err)
+		}
+		p = p.DeepCopy()
+		p.Spec.SchedulingGroup = &v1.PodSchedulingGroup{
+			PodGroupName: &createdPG.Name,
+		}
+	}
 	return cs.CoreV1().Pods(p.Namespace).Create(context.TODO(), p, metav1.CreateOptions{})
 }
 
