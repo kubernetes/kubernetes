@@ -116,7 +116,7 @@ func (s *SecureServingInfo) HostPort() (string, int, error) {
 	addr := s.Listener.Addr().String()
 	host, portStr, err := net.SplitHostPort(addr)
 	if err != nil {
-		return "", 0, fmt.Errorf("failed to get port from listener address %q: %v", addr, err)
+		return "", 0, fmt.Errorf("failed to get port from listener address %q: %w", addr, err)
 	}
 	port, err := utilsnet.ParsePort(portStr, true)
 	if err != nil {
