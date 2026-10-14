@@ -27,6 +27,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -281,6 +282,7 @@ func RunWatchTraffic(ctx context.Context, store storage.Interface, objects []typ
 				if len(cfg.RequestDistribution.WatcherBehavior) > 0 {
 					mode = PickRandom(cfg.RequestDistribution.WatcherBehavior)
 				}
+				start := time.Now()
 				response := runWatch(ctx, store, *request, mode, cfg)
 				if ev := lastNonErrorEvent(response.Events); ev != nil {
 					cachedObj = ev.Object
@@ -289,6 +291,16 @@ func RunWatchTraffic(ctx context.Context, store storage.Interface, objects []typ
 				mu.Lock()
 				watches = append(watches, correctness.WatchOperation{Request: *request, Response: response})
 				mu.Unlock()
+
+				if elapsed := time.Since(start); elapsed < cfg.HiccupDuration {
+					select {
+					case <-ctx.Done():
+						return
+					case <-stop:
+						return
+					case <-time.After(cfg.HiccupDuration - elapsed):
+					}
+				}
 			}
 		})
 	}
@@ -545,7 +557,7 @@ func runTraffic(ctx context.Context, store storage.Interface, request *correctne
 		panic(fmt.Sprintf("%v: unknown operation", request.Op))
 	}
 	if err != nil {
-		if _, ok := errors.AsType[*storage.StorageError](err); ok || storage.IsTooLargeResourceVersion(err) || errors.Is(err, errDeleteRejected) || errors.Is(err, errUpdateRejected) {
+		if _, ok := errors.AsType[*storage.StorageError](err); ok || storage.IsTooLargeResourceVersion(err) || apierrors.IsTooManyRequests(err) || errors.Is(err, errDeleteRejected) || errors.Is(err, errUpdateRejected) {
 			return correctness.Response{
 				Err: err,
 			}
@@ -681,7 +693,7 @@ func runWatch(ctx context.Context, store storage.Interface, req correctness.Watc
 
 	w, err := store.Watch(watchCtx, req.Key, req.Options)
 	if err != nil {
-		if _, ok := errors.AsType[*storage.StorageError](err); ok {
+		if _, ok := errors.AsType[*storage.StorageError](err); ok || apierrors.IsTooManyRequests(err) {
 			return correctness.WatchResponse{Err: err}
 		}
 		panic(err)

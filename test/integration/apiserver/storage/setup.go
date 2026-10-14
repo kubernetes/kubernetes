@@ -70,7 +70,7 @@ func newEtcdStorageForResource(t *testing.T, etcdConfig *storagebackend.Config, 
 	return resourceConfig
 }
 
-func setupStore(t *testing.T, decorator generic.StorageDecorator) (storage.Interface, string) {
+func setupStore(t *testing.T) (storage.Interface, string) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchList, true)
 	etcdURL, stop, err := framework.RunCustomEtcd(klog.FromContext(t.Context()), "storage_correctness_etcd", nil)
 	if err != nil {
@@ -82,32 +82,51 @@ func setupStore(t *testing.T, decorator generic.StorageDecorator) (storage.Inter
 	etcdConfig.Transport.ServerList = []string{etcdURL}
 
 	storageConfig := newEtcdStorageForResource(t, etcdConfig, schema.GroupResource{Resource: "pods"})
-	storageConfig.EventsHistoryWindow = cacher.DefaultEventFreshDuration
-
-	store, destroyFunc, err := decorator(
+	store, destroyFunc, err := generic.NewRawStorage(
 		storageConfig,
-		"/pods",
-		cacheKeyFunc,
-		nil,
 		func() runtime.Object { return &api.Pod{} },
 		func() runtime.Object { return &api.PodList{} },
-		registrypod.GetAttrs,
-		map[string]storage.IndexerFunc{"spec.nodeName": registrypod.NodeNameTriggerFunc},
-		registrypod.Indexers(),
+		nil,
+		"/pods",
 	)
 	if err != nil {
 		t.Fatalf("failed to create storage: %v", err)
 	}
 	t.Cleanup(destroyFunc)
 
-	if rc, ok := store.(interface{ ReadinessCheck() error }); ok {
-		err := wait.PollUntilContextTimeout(t.Context(), 10*time.Millisecond, 5*time.Second, true, func(ctx context.Context) (bool, error) {
-			return rc.ReadinessCheck() == nil, nil
-		})
-		if err != nil {
-			t.Fatalf("storage failed to become ready: %v", err)
-		}
-	}
-
 	return store, "/" + etcdConfig.Prefix
+}
+
+func setupCacher(t *testing.T, s storage.Interface) storage.Interface {
+	storageConfig := newEtcdStorageForResource(t, storagebackend.NewDefaultConfig("registry", nil), schema.GroupResource{Resource: "pods"})
+	cacherConfig := cacher.Config{
+		Storage:             s,
+		Versioner:           storage.APIObjectVersioner{},
+		GroupResource:       storageConfig.GroupResource,
+		EventsHistoryWindow: cacher.DefaultEventFreshDuration,
+		ResourcePrefix:      "/pods",
+		KeyFunc:             cacheKeyFunc,
+		NewFunc:             func() runtime.Object { return &api.Pod{} },
+		NewListFunc:         func() runtime.Object { return &api.PodList{} },
+		GetAttrsFunc:        registrypod.GetAttrs,
+		IndexerFuncs:        map[string]storage.IndexerFunc{"spec.nodeName": registrypod.NodeNameTriggerFunc},
+		Indexers:            registrypod.Indexers(),
+		Codec:               storageConfig.Codec,
+	}
+	c, err := cacher.NewCacherFromConfig(cacherConfig)
+	if err != nil {
+		t.Fatalf("failed to create cacher: %v", err)
+	}
+	delegator := cacher.NewCacheDelegator(c, s)
+	t.Cleanup(func() {
+		delegator.Stop()
+		c.Stop()
+	})
+	err = wait.PollUntilContextTimeout(t.Context(), 10*time.Millisecond, 5*time.Second, true, func(ctx context.Context) (bool, error) {
+		return delegator.ReadinessCheck() == nil, nil
+	})
+	if err != nil {
+		t.Fatalf("storage failed to become ready: %v", err)
+	}
+	return delegator
 }

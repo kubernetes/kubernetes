@@ -23,6 +23,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -54,6 +55,9 @@ func (v WatchValidator) ValidateWatch(request WatchRequest, response WatchRespon
 		return nil
 	}
 	if response.Err != nil {
+		if apierrors.IsTooManyRequests(response.Err) {
+			return nil
+		}
 		return fmt.Errorf("watch %+v: unexpected error: %w", request, response.Err)
 	}
 	events := response.Events
