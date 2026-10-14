@@ -58,6 +58,7 @@ import (
 	"k8s.io/component-helpers/nodedeclaredfeatures/features/draoptionalnodeoperations"
 	draapi "k8s.io/dynamic-resource-allocation/api"
 	"k8s.io/dynamic-resource-allocation/deviceclass/extendedresourcecache"
+	"k8s.io/dynamic-resource-allocation/resourceclaim"
 	resourceslicetracker "k8s.io/dynamic-resource-allocation/resourceslice/tracker"
 	"k8s.io/dynamic-resource-allocation/structured"
 	"k8s.io/dynamic-resource-allocation/structured/schedulerapi"
@@ -124,6 +125,8 @@ var (
 	implicitExtendedResourceName        = "deviceclass.resource.kubernetes.io/my-resource-class"
 	nodeAllocatableResourceDriver       = "node-allocatable-resource-driver"
 	nodeAllocatableResourceCapacityName = resourceapi.QualifiedName("example.com/cpus")
+	// extendedResourceClaimName is the name of the extended resource claim of the test pods.
+	extendedResourceClaimName = resourceclaim.ExtendedResourceClaimName(podName, types.UID(podUID))
 
 	deviceClass = &resourceapi.DeviceClass{
 		ObjectMeta: metav1.ObjectMeta{
@@ -799,6 +802,12 @@ var (
 		RequestWithName("container-0-request-0", className).
 		Allocation(extendedResourceAllocationResult).
 		Obj()
+	// extendedResourceClaimDerivedName is extendedResourceClaim as created on
+	// nodes where it consumes node allocatable resources.
+	extendedResourceClaimDerivedName = st.FromResourceClaim(extendedResourceClaim).
+						Name(extendedResourceClaimName).
+						GenerateName("").
+						Obj()
 	extendedResourceClaim2 = st.MakeResourceClaim().
 				Name("my-pod-extended-resources-0").
 				GenerateName("my-pod-extended-resources-").
@@ -4217,7 +4226,7 @@ func testPlugin(tCtx ktesting.TContext) {
 				tc.pod = tc.pod.DeepCopy()
 				tc.pod.Status.ExtraNodeAllocatableResources = []v1.ExtraNodeAllocatableResource{
 					{
-						Source:     v1.ExtraNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: specialClaimInMemName},
+						Source:     v1.ExtraNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: extendedResourceClaimName},
 						Containers: []string{tc.pod.Spec.Containers[0].Name},
 						Mapping: []v1.NodeAllocatableMappedResources{
 							{
@@ -4242,7 +4251,7 @@ func testPlugin(tCtx ktesting.TContext) {
 						status: nil,
 						extraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
 							{
-								Source:     v1.ExtraNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: specialClaimInMemName},
+								Source:     v1.ExtraNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: extendedResourceClaimName},
 								Containers: []string{podWithExtendedResourceName.Spec.Containers[0].Name},
 								Mapping: []v1.NodeAllocatableMappedResources{
 									{
@@ -4258,15 +4267,15 @@ func testPlugin(tCtx ktesting.TContext) {
 					inFlightClaims: []metav1.Object{extendedResourceClaimNoName},
 				},
 				prebind: result{
-					assumedClaim: addAllocationTimestamp(reserve(extendedResourceClaim, podWithExtendedResourceName)),
-					added:        []metav1.Object{addAllocationTimestamp(reserve(extendedResourceClaim, podWithExtendedResourceName))},
+					assumedClaim: addAllocationTimestamp(reserve(extendedResourceClaimDerivedName, podWithExtendedResourceName)),
+					added:        []metav1.Object{addAllocationTimestamp(reserve(extendedResourceClaimDerivedName, podWithExtendedResourceName))},
 					changes: change{
 						pod: func(pod *v1.Pod) *v1.Pod {
 							if pod.Name == podName {
 								p := pod.DeepCopy()
 								p.Status.ExtraNodeAllocatableResources = []v1.ExtraNodeAllocatableResource{
 									{
-										Source:     v1.ExtraNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: extendedResourceClaim.Name},
+										Source:     v1.ExtraNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: extendedResourceClaimName},
 										Containers: []string{p.Spec.Containers[0].Name},
 										Mapping: []v1.NodeAllocatableMappedResources{
 											{
@@ -4280,7 +4289,7 @@ func testPlugin(tCtx ktesting.TContext) {
 									RequestMappings: []v1.ContainerExtendedResourceRequest{
 										{ContainerName: p.Spec.Containers[0].Name, ResourceName: extendedResourceName, RequestName: "container-0-request-0"},
 									},
-									ResourceClaimName: extendedResourceClaim.Name,
+									ResourceClaimName: extendedResourceClaimName,
 								}
 								return p
 							}
@@ -4288,6 +4297,55 @@ func testPlugin(tCtx ktesting.TContext) {
 						},
 					},
 				},
+			},
+		},
+		"node-allocatable-extended-resource-name-taken": {
+			// Some other claim has the derived name. Creating the claim fails
+			// and the other claim is left alone.
+			enableDRAExtendedResource:         true,
+			enableDRANodeAllocatableResources: true,
+			nodes:                             []*v1.Node{workerNodeWithCapacity},
+			pod:                               podWithExtendedResourceName,
+			claims:                            []*resourceapi.ResourceClaim{st.MakeResourceClaim().Name(extendedResourceClaimName).Namespace(namespace).Obj()},
+			classes:                           []*resourceapi.DeviceClass{deviceClassWithExtendResourceName},
+			objs: func() []apiruntime.Object {
+				slice := st.MakeResourceSlice(nodeName, driver).Device("instance-1").Obj()
+				slice.Spec.Devices[0].NodeAllocatableResources = map[v1.ResourceName]resourceapi.NodeAllocatableResource{
+					v1.ResourceCPU: {Mapping: &resourceapi.NodeAllocatableMapping{DeviceMultiplier: new(apiresource.MustParse("1"))}},
+				}
+				return []apiruntime.Object{slice, podWithExtendedResourceName}
+			}(),
+			want: want{
+				filter: perNodeResult{
+					workerNodeWithCapacity.Name: {
+						status: nil,
+						extraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
+							{
+								Source:     v1.ExtraNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: extendedResourceClaimName},
+								Containers: []string{podWithExtendedResourceName.Spec.Containers[0].Name},
+								Mapping: []v1.NodeAllocatableMappedResources{
+									{
+										Name:     v1.ResourceCPU,
+										Quantity: new(apiresource.MustParse("1")),
+									},
+								},
+							},
+						},
+					},
+				},
+				reserve: result{
+					inFlightClaims: []metav1.Object{extendedResourceClaimNoName},
+				},
+				prebind: result{
+					inFlightClaims: []metav1.Object{extendedResourceClaimNoName},
+					status:         fwk.NewStatus(fwk.Unschedulable, fmt.Sprintf("%q already exists", extendedResourceClaimName)),
+				},
+				unreserveAfterBindFailure: &result{},
+			},
+			metrics: func(tCtx ktesting.TContext, g compbasemetrics.Gatherer) {
+				metric, err := testutil.GetCounterValuesFromGatherer(g, "dynamic_resource_allocation_resourceclaim_creates_total", map[string]string{}, "status")
+				require.NoError(tCtx, err)
+				require.Equal(tCtx, 1, int(metric["failure"]))
 			},
 		},
 	}

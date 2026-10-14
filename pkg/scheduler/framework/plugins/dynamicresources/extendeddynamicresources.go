@@ -37,6 +37,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/client-go/util/retry"
 	resourcehelper "k8s.io/component-helpers/resource"
+	"k8s.io/dynamic-resource-allocation/resourceclaim"
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
@@ -56,6 +57,9 @@ import (
 // - if stale claim with Spec is identified, return Unschedulable for PostFilter extension point to cleanup
 // - check which resources satisfied by device plugin vs need DRA
 // - if extended resources need to be allocated through DRA, create node-specific claim
+// - if the devices allocated for the claim on the node consume node allocatable resources,
+//   pod.status.extraNodeAllocatableResources may reference the claim before PreBind
+//   creates it, so the claim gets a name derived from the pod on that node
 //
 // PostFilter
 // - if extended resource claim has real name (not "<extended-resources>"):
@@ -70,7 +74,8 @@ import (
 // - Delete claim from API server if it has real name
 //
 // PreBind - bindClaim()
-// - For "<extended-resources>" claims: create in API server and update stateData
+// - For "<extended-resources>" claims: create in API server, with the derived name if
+//   the node needs it and with a generated name otherwise, and update stateData
 // - Update claim status: add finalizer, allocation, and pod reservation
 // - Store in assume cache (poll for extended resource claims)
 // - Update pod.Status.ExtendedResourceClaimStatus with request mappings
@@ -545,6 +550,14 @@ func (pl *DynamicResources) createExtendedResourceClaimInAPI(
 	claim.Status.Allocation = nil
 	claim.Name = ""
 	claim.UID = ""
+	if nodeAllocation.extendedResourceClaimHasNodeAllocatable {
+		// Pod status references the claim by this name already, so the
+		// apiserver must not pick a different one.
+		//
+		// TODO(pravk03): explore using the same derived name for all extended resource claims and not just when node allocatable resources are present for the device
+		claim.Name = resourceclaim.ExtendedResourceClaimName(pod.Name, pod.UID)
+		claim.GenerateName = ""
+	}
 
 	createdClaim, err := pl.clientset.ResourceV1().ResourceClaims(claim.Namespace).Create(ctx, claim, metav1.CreateOptions{})
 	if err != nil {

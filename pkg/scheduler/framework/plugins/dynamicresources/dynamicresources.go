@@ -170,6 +170,10 @@ type nodeAllocation struct {
 	// extendedResourceClaim has the special claim for extended resource backed by DRA
 	// created during Filter for the nodes.
 	extendedResourceClaim *resourceapi.ResourceClaim
+	// extendedResourceClaimHasNodeAllocatable is true if devices allocated for
+	// extendedResourceClaim consume node allocatable resources. Pod status then
+	// references the claim by its derived name, so PreBind must create it with that name.
+	extendedResourceClaimHasNodeAllocatable bool
 	// containerResourceRequestMappings has the container, extended resource, and device request mappings
 	// calculated at the Filter phase, and used at the PreBind phase.
 	containerResourceRequestMappings []v1.ContainerExtendedResourceRequest
@@ -1007,7 +1011,7 @@ func (pl *DynamicResources) Filter(ctx context.Context, cs fwk.CycleState, pod *
 	}
 	// Use allocator to check the node and cache the result in case that the node is picked.
 	var allocations []resourceapi.AllocationResult
-	var extraResources []v1.ExtraNodeAllocatableResource
+	var extraNodeAllocatableDRAInfo nodeAllocatableDRAInfo
 	allocationsMap := make(map[types.UID]*resourceapi.AllocationResult)
 	if state.allocator != nil {
 		allocCtx := ctx
@@ -1093,7 +1097,7 @@ func (pl *DynamicResources) Filter(ctx context.Context, cs fwk.CycleState, pod *
 
 	if pl.fts.EnableDRANodeAllocatableResources && len(unavailableClaims) == 0 {
 		var status *fwk.Status
-		extraResources, status = pl.calculateAndCheckNodeAllocatableResources(ctx, state, pod, nodeInfo, allocationsMap, containerResourceRequestMappings)
+		extraNodeAllocatableDRAInfo, status = pl.calculateAndCheckNodeAllocatableResources(ctx, state, pod, nodeInfo, allocationsMap, containerResourceRequestMappings)
 		if status != nil {
 			return status
 		}
@@ -1122,14 +1126,15 @@ func (pl *DynamicResources) Filter(ctx context.Context, cs fwk.CycleState, pod *
 
 	if state.allocator != nil {
 		state.nodeAllocations[node.Name] = nodeAllocation{
-			allocationResults:                allocations,
-			extendedResourceClaim:            nodeExtendedResourceClaim,
-			containerResourceRequestMappings: containerResourceRequestMappings,
+			allocationResults:                       allocations,
+			extendedResourceClaim:                   nodeExtendedResourceClaim,
+			extendedResourceClaimHasNodeAllocatable: extraNodeAllocatableDRAInfo.extendedResourceHasNodeAllocatable,
+			containerResourceRequestMappings:        containerResourceRequestMappings,
 		}
 	}
 
-	if pl.fts.EnableDRANodeAllocatableResources && state.extraNodeAllocatableResources != nil && len(extraResources) > 0 {
-		state.extraNodeAllocatableResources.Set(node.Name, Name, extraResources)
+	if pl.fts.EnableDRANodeAllocatableResources && state.extraNodeAllocatableResources != nil && len(extraNodeAllocatableDRAInfo.resources) > 0 {
+		state.extraNodeAllocatableResources.Set(node.Name, Name, extraNodeAllocatableDRAInfo.resources)
 	}
 
 	return nil
@@ -1659,7 +1664,7 @@ func (pl *DynamicResources) PreBind(ctx context.Context, cs fwk.CycleState, pod 
 
 	if pl.fts.EnableDRANodeAllocatableResources {
 		if extraResources := state.extraNodeAllocatableResources.Get(nodeName); len(extraResources) > 0 {
-			if status := pl.patchExtraNodeAllocatableResources(ctx, pod, extraResources, state.claims.extendedResourceClaim()); status != nil {
+			if status := pl.patchExtraNodeAllocatableResources(ctx, pod, extraResources); status != nil {
 				return status
 			}
 		}
