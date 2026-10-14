@@ -235,7 +235,7 @@ func TestReScheduling(t *testing.T) {
 						scheduler.WithFrameworkOutOfTreeRegistry(registry))
 					defer teardown()
 
-					pod, err := createPausePod(testCtx, testCtx.Client(),
+					pod, err := testutils.CreatePausePod(testCtx.Client(),
 						testutils.InitPausePod(&testutils.PausePodConfig{Name: "test-pod", Namespace: testCtx.Namespace()}), scheduleAsPodGroup)
 					if err != nil {
 						t.Fatalf("Error while creating a test pod: %v", err)
