@@ -72,7 +72,6 @@ type DefaultPreemption struct {
 	fts  feature.Features
 	args config.DefaultPreemptionArgs
 
-	Executor          fwk.PreemptionExecutor
 	Evaluator         *preemption.Evaluator
 	pgLister          fwk.PodGroupLister
 	podGroupEvaluator podGroupEvaluator
@@ -113,10 +112,9 @@ func New(_ context.Context, dpArgs runtime.Object, fh fwk.Handle, fts feature.Fe
 	}
 
 	pl := DefaultPreemption{
-		fh:       fh,
-		fts:      fts,
-		args:     *args,
-		Executor: fh.PreemptionManager().Executor(),
+		fh:   fh,
+		fts:  fts,
+		args: *args,
 	}
 	pl.Evaluator = preemption.NewEvaluator(Name, fh, &pl, pl.fts)
 
@@ -139,6 +137,11 @@ func New(_ context.Context, dpArgs runtime.Object, fh fwk.Handle, fts feature.Fe
 	pl.MoreImportantVictim = preemption.MoreImportantVictim
 
 	return &pl, nil
+}
+
+// Executor returns the current PreemptionExecutor from PreemptionManager.
+func (pl *DefaultPreemption) Executor() fwk.PreemptionExecutor {
+	return pl.fh.PreemptionManager().Executor()
 }
 
 // PostFilter invoked at the postFilter extension point.
@@ -179,13 +182,13 @@ func (pl *DefaultPreemption) PreEnqueue(ctx context.Context, p *v1.Pod) *fwk.Sta
 			}
 			rootUID = root.GetUID()
 		}
-		if pl.Executor.IsPodGroupRunningPreemption(rootUID) {
+		if pl.Executor().IsPodGroupRunningPreemption(rootUID) {
 			return fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "waiting for the preemption for this pod group to be finished")
 		}
 		return nil
 	}
 
-	if pl.Executor.IsPodRunningPreemption(p.GetUID()) {
+	if pl.Executor().IsPodRunningPreemption(p.GetUID()) {
 		return fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "waiting for the preemption for this pod to be finished")
 	}
 	return nil

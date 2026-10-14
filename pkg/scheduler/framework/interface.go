@@ -308,6 +308,8 @@ type Framework interface {
 	SetPodActivator(activator fwk.PodActivator)
 	// SetAPICacher sets the APICacher
 	SetAPICacher(apiCacher fwk.APICacher)
+	// SetPreemptionManager sets the PreemptionManager
+	SetPreemptionManager(preemptionManager fwk.PreemptionManager)
 
 	// Close calls Close method of each plugin.
 	Close() error
