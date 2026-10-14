@@ -711,7 +711,7 @@ func testCEL(tCtx ktesting.TContext) {
 				Attributes:               out.Spec.Devices[0].Attributes,
 				Capacity:                 out.Spec.Devices[0].Capacity,
 				Driver:                   scenario.driver,
-				LookupUniqueString:       out.MakeUniqueString,
+				LookupUniqueString:       out.LookupUniqueString,
 			}
 
 			match, details, err := result.DeviceMatches(tCtx, device)

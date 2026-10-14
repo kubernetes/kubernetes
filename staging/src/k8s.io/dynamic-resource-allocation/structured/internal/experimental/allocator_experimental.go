@@ -990,29 +990,36 @@ func (m *matchAttributeConstraint) add(request *requestData, device *draapi.Devi
 		return false, nil
 	}
 
+	// Check value and convert to a set if needed.
+	var newSet *deviceAttributeListAsSet
+	if m.features.ListTypeAttributes {
+		newSet = attributeAsSet(attribute)
+		if newSet == nil {
+			// Internal error: attribute was already validated by lookupAttribute, so
+			// attributeAsSet must recognize its type. This should never be reached.
+			return false, fmt.Errorf("internal error: unexpected attribute type %T", attribute)
+		}
+	} else {
+		switch attribute.(type) {
+		case string:
+		case int64:
+		case bool:
+		case semver.Version:
+		default:
+			// Unknown value type, cannot match. Better stop instead of
+			// silently ignoring the device.
+			//
+			// This can be reached for list values.
+			return false, fmt.Errorf("device %s: unsupported attribute value for %s", deviceID, m.attributeName)
+		}
+	}
+
 	if m.numDevices == 0 {
-		// The first device can always get picked.
-		// Initialize either scalar attribute or list set based on the attribute type.
+		// The first device can always get picked. Validation above ensures that
+		// we have a valid set resp. attribute.
 		if m.features.ListTypeAttributes {
-			// Convert attribute to set representation (both scalar and list)
-			first := attributeAsSet(attribute)
-			if first == nil {
-				m.logger.V(7).Info("Attribute type unknown")
-				return false, nil
-			}
-			m.intersectionStack = append(m.intersectionStack, first)
+			m.intersectionStack = append(m.intersectionStack, newSet)
 		} else {
-			// Scalar attribute: use existing behavior
-			switch attribute.(type) {
-			case string:
-			case int64:
-			case bool:
-			case semver.Version:
-			default:
-				// Unknown value type, cannot match.
-				m.logger.V(7).Info("Match attribute type unknown")
-				return false, nil
-			}
 			m.attribute = attribute
 		}
 		m.numDevices = 1
@@ -1023,11 +1030,6 @@ func (m *matchAttributeConstraint) add(request *requestData, device *draapi.Devi
 	// Check if we are matching with set-based logic or scalar-based logic
 	if m.features.ListTypeAttributes {
 		// Set-based matching: check if there is non-empty intersection
-		newSet := attributeAsSet(attribute)
-		if newSet == nil {
-			m.logger.V(7).Info("Unknown attribute type")
-			return false, nil
-		}
 		current := m.intersectionStack[m.numDevices-1]
 		narrowed := current.intersection(newSet)
 		if narrowed == nil {
@@ -1079,9 +1081,8 @@ func (m *matchAttributeConstraint) add(request *requestData, device *draapi.Devi
 				return false, nil
 			}
 		default:
-			// Unknown value type, cannot match.
-			m.logger.V(7).Info("Unknown attribute type")
-			return false, nil
+			// Validated above already; this should never be reached.
+			return false, fmt.Errorf("internal error: unexpected attribute type %T", m.attribute)
 		}
 	}
 
@@ -1152,7 +1153,17 @@ func (alloc *allocator) lookupAttribute(request *requestData, device *draapi.Dev
 		return evaluatedAttr, nil
 	}
 
-	return device.Attributes.Lookup(attribute), nil
+	value, found := device.Attributes.Lookup(attribute)
+	if !found {
+		// Doesn't have the attribute.
+		return nil, nil
+	}
+	if value == nil {
+		// Has the attribute, but with a value that this client cannot
+		// represent (for example, a value type added in a newer API version).
+		return nil, fmt.Errorf("device %s: unsupported attribute value for %s", deviceID, attribute)
+	}
+	return value, nil
 }
 
 // allocateOne iterates over all eligible devices (not in use, match selector,
