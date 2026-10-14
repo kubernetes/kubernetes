@@ -4,5 +4,3 @@ reviewers:
   - MrHohn
 approvers:
   - MrHohn
-labels:
-  - area/provider/gcp
