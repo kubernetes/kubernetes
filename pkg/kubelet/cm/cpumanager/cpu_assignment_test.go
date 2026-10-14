@@ -2298,6 +2298,41 @@ func commonTakeByTopologyTestCasesForResize(t *testing.T) []takeByTopologyTestCa
 			expErr:        "",
 			expResult:     cpuset.New(4, 5, 7, 12, 13, 15),
 		},*/
+		// topoDualSocketSubNumaPerSocketHTMonolithicUncore: 2 sockets x 2 NUMA, 120 cores,
+		// 240 CPUs (HT), one monolithic UncoreCache per socket. Sibling threads: x and x+120.
+		// UncoreCache 0: NUMA 0-1, cores 0-59 (CPUs 0-59,120-179)
+		// UncoreCache 1: NUMA 2-3, cores 60-119 (CPUs 60-119,180-239)
+		// NUMA 2: cores 60-89 (CPUs 60-89,180-209); NUMA 3: cores 90-119 (CPUs 90-119,210-239)
+		{
+			// The resized container needs a whole monolithic UncoreCache, so the
+			// UncoreCache containing the retained CPU (spanning NUMA 2 and NUMA 3)
+			// is taken in full rather than the other socket's UncoreCache.
+			description:   "Scale-up: 1 to 120 CPUs, take the full monolithic UncoreCache containing the retained core",
+			topo:          topoDualSocketSubNumaPerSocketHTMonolithicUncore,
+			opts:          StaticPolicyOptions{PreferAlignByUncoreCacheOption: true},
+			availableCPUs: mustParseCPUSet(t, "0-239"),
+			allocatedCPUs: cpuset.New(70),
+			baselineCPUs:  cpuset.New(70),
+			numCPUs:       120,
+			expErr:        "",
+			expResult:     mustParseCPUSet(t, "60-119,180-239"),
+		},
+		{
+			// The resized container needs fewer CPUs than a whole monolithic
+			// UncoreCache, so no UncoreCache is taken in full; the UncoreCache
+			// containing the retained CPU is taken partially instead: the core
+			// containing the retained CPU is completed first, then full cores
+			// of the same UncoreCache across its NUMA nodes (NUMA 2 -> NUMA 3).
+			description:   "Scale-up: 1 to 80 CPUs, take cores partially within the monolithic UncoreCache containing the retained core",
+			topo:          topoDualSocketSubNumaPerSocketHTMonolithicUncore,
+			opts:          StaticPolicyOptions{PreferAlignByUncoreCacheOption: true},
+			availableCPUs: mustParseCPUSet(t, "0-239"),
+			allocatedCPUs: cpuset.New(70),
+			baselineCPUs:  cpuset.New(70),
+			numCPUs:       80,
+			expErr:        "",
+			expResult:     mustParseCPUSet(t, "60-99,180-219"),
+		},
 	}
 }
 
