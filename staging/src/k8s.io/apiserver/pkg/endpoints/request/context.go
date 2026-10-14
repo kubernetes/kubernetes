@@ -18,9 +18,11 @@ package request
 
 import (
 	"context"
+	"errors"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/authentication/user"
+	"k8s.io/apiserver/pkg/authorization/authorizer"
 )
 
 // The key type is unexported to prevent collisions
@@ -32,6 +34,9 @@ const (
 
 	// userKey is the context key for the request user.
 	userKey
+
+	// used for propagating a conditional authorization decision between authorization and admission
+	conditionallyAuthorizedDecisionKey
 )
 
 // NewContext instantiates a base context object for request flows.
@@ -75,4 +80,27 @@ func WithUser(parent context.Context, user user.Info) context.Context {
 func UserFrom(ctx context.Context) (user.Info, bool) {
 	user, ok := ctx.Value(userKey).(user.Info)
 	return user, ok
+}
+
+type authorizerDecisionTuple struct {
+	authorizer authorizer.Authorizer
+	decision   authorizer.ConditionsAwareDecision
+}
+
+// WithConditionallyAuthorizedDecision returns a copy of parent in which a conditionally authorized decision is stored, along with the authorizer that produced it.
+// An error is returned if a decision already exists in the parent context.
+func WithConditionallyAuthorizedDecision(parent context.Context, authorizer authorizer.Authorizer, decision authorizer.ConditionsAwareDecision) (context.Context, error) {
+	if _, _, ok := ConditionallyAuthorizedDecisionFrom(parent); ok {
+		return parent, errors.New("a conditionally authorized decision is already set in the request context")
+	}
+	return WithValue(parent, conditionallyAuthorizedDecisionKey, authorizerDecisionTuple{
+		authorizer: authorizer,
+		decision:   decision,
+	}), nil
+}
+
+// ConditionallyAuthorizedDecisionsFrom returns the decision to be enforced, along with the authorizer that produced it (and should be called back)
+func ConditionallyAuthorizedDecisionFrom(ctx context.Context) (authorizer.Authorizer, authorizer.ConditionsAwareDecision, bool) {
+	tuple, ok := ctx.Value(conditionallyAuthorizedDecisionKey).(authorizerDecisionTuple)
+	return tuple.authorizer, tuple.decision, ok
 }
