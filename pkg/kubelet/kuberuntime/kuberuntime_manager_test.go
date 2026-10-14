@@ -45,6 +45,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/version"
+	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/flowcontrol"
@@ -4524,6 +4525,150 @@ func TestUpdatePodContainerResources_Failures(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// newBarrier returns a function that blocks until n callers have entered it, so it only
+// returns once all n calls are in flight at the same time. If that never happens, it fails
+// the test after wait.ForeverTestTimeout instead of hanging.
+func newBarrier(t *testing.T, n int, what string) func() error {
+	var (
+		mu       sync.Mutex
+		arrived  int
+		released = make(chan struct{})
+	)
+	return func() error {
+		mu.Lock()
+		arrived++
+		if arrived == n {
+			close(released)
+		}
+		mu.Unlock()
+		select {
+		case <-released:
+			return nil
+		case <-time.After(wait.ForeverTestTimeout):
+			t.Errorf("%s were not issued concurrently", what)
+			return fmt.Errorf("timed out waiting for %s", what)
+		}
+	}
+}
+
+// barrierRuntimeService calls onUpdate before every UpdateContainerResources call. Embed the
+// FakeRuntimeService, and override UpdateContainerResources to call the onUpdate hook first.
+type barrierRuntimeService struct {
+	*apitest.FakeRuntimeService
+	onUpdate func(containerID string) error
+}
+
+// UpdateContainerResources calls onUpdate before forwarding to the fake. The fake holds its
+// mutex for the whole call, so blocking inside it would serialize the calls.
+func (b *barrierRuntimeService) UpdateContainerResources(ctx context.Context, containerID string, resources *runtimeapi.ContainerResources) error {
+	if err := b.onUpdate(containerID); err != nil {
+		return err
+	}
+	return b.FakeRuntimeService.UpdateContainerResources(ctx, containerID, resources)
+}
+
+// TestUpdatePodContainerResources_Concurrently verifies that container decreases are applied
+// concurrently, that container increases are applied concurrently, and that no increase
+// starts before every decrease has completed. For this test, we only resize memory for simplicity.
+// CPU resizing goes through the same code path.
+func TestUpdatePodContainerResources_Concurrently(t *testing.T) {
+	if goruntime.GOOS != "linux" {
+		t.Skip("in-place resize is only supported on Linux")
+	}
+
+	tCtx := ktesting.Init(t)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
+
+	fakeRuntime, _, m, err := createTestRuntimeManager(tCtx)
+	require.NoError(t, err)
+	m.machineInfo.MemoryCapacity = 17179860387 // 16GB
+	m.cpuCFSQuota = true
+
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:       "resize-concurrently-uid",
+			Name:      "resize-concurrently",
+			Namespace: "default",
+		},
+		Spec: v1.PodSpec{
+			// Increases and decreases are interleaved on purpose. The update order must come
+			// from each container's resizing direction, not from its position in the container list.
+			Containers: []v1.Container{
+				{Name: "up-1", Image: "busybox"},
+				{Name: "down-1", Image: "busybox"},
+				{Name: "up-2", Image: "busybox"},
+				{Name: "down-2", Image: "busybox"},
+			},
+		},
+	}
+	_, fakeContainers := makeAndSetFakePod(tCtx, m, fakeRuntime, pod)
+	idByName := map[string]string{}
+	for _, c := range fakeContainers {
+		idByName[c.Metadata.Name] = c.Id
+	}
+
+	cpu100m := resource.MustParse("100m")
+	mem100M := resource.MustParse("100Mi")
+	mem200M := resource.MustParse("200Mi")
+	small := resourceRequirements{memoryLimit: mem100M.Value(), memoryRequest: mem100M.Value(), cpuLimit: cpu100m.MilliValue(), cpuRequest: cpu100m.MilliValue()}
+	large := resourceRequirements{memoryLimit: mem200M.Value(), memoryRequest: mem200M.Value(), cpuLimit: cpu100m.MilliValue(), cpuRequest: cpu100m.MilliValue()}
+
+	var containersToUpdate []containerToUpdateInfo
+	decreaseIDs := sets.New[string]()
+	for i := range pod.Spec.Containers {
+		c := &pod.Spec.Containers[i]
+		current, desired := small, large // increase
+		if strings.HasPrefix(c.Name, "down-") {
+			current, desired = large, small // decrease
+			decreaseIDs.Insert(idByName[c.Name])
+		}
+		containersToUpdate = append(containersToUpdate, containerToUpdateInfo{
+			container:                 c,
+			kubeContainerID:           kubecontainer.ContainerID{Type: "testRuntime", ID: idByName[c.Name]},
+			desiredContainerResources: desired,
+			currentContainerResources: &current,
+		})
+	}
+	numDecreases := decreaseIDs.Len()
+	numIncreases := len(containersToUpdate) - numDecreases
+
+	var (
+		mu                sync.Mutex
+		decreasesFinished int
+		increaseTooEarly  bool
+		decreaseBarrier   = newBarrier(t, numDecreases, "container decreases")
+		increaseBarrier   = newBarrier(t, numIncreases, "container increases")
+	)
+	m.runtimeService = &barrierRuntimeService{
+		FakeRuntimeService: fakeRuntime,
+		onUpdate: func(containerID string) error {
+			if decreaseIDs.Has(containerID) {
+				if err := decreaseBarrier(); err != nil {
+					return err
+				}
+				mu.Lock()
+				decreasesFinished++
+				mu.Unlock()
+				return nil
+			}
+			mu.Lock()
+			if decreasesFinished < numDecreases {
+				increaseTooEarly = true
+			}
+			mu.Unlock()
+			return increaseBarrier()
+		},
+	}
+
+	err = m.updatePodContainerResources(tCtx, pod, v1.ResourceMemory, containersToUpdate)
+	require.NoError(t, err)
+	assert.False(t, increaseTooEarly, "container increases must not start before all container decreases complete")
+	for _, cInfo := range containersToUpdate {
+		assert.Equal(t, cInfo.desiredContainerResources.memoryLimit, cInfo.currentContainerResources.memoryLimit,
+			"current memory limit for %s", cInfo.container.Name)
 	}
 }
 
