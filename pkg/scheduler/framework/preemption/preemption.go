@@ -102,7 +102,7 @@ func (ev *Evaluator) evaluate(ctx context.Context, state fwk.CycleState, pod *v1
 	logger := klog.FromContext(ctx)
 	startTime := time.Now()
 	defer func() {
-		metrics.PreemptionEvaluationDuration.WithLabelValues("pod", status.Code().String()).Observe(metrics.SinceInSeconds(startTime))
+		metrics.PreemptionEvaluationDuration.WithLabelValues(metrics.Pod, status.Code().String()).Observe(metrics.SinceInSeconds(startTime))
 	}()
 
 	// 0) Fetch the latest version of <pod>.
