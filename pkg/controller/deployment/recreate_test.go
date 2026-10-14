@@ -41,13 +41,16 @@ func TestDeploymentController_rolloutRecreate(t *testing.T) {
 	scaleErr := errors.New("ReplicaSet update failed")
 	statusErr := errors.New("Deployment status update failed")
 	tests := []struct {
-		name        string
-		oldReplicas int32
-		hasNewRS    bool
+		name          string
+		oldReplicas   int32
+		hasNewRS      bool
+		scaleSucceeds bool
 	}{
 		{name: "old ReplicaSet scale-down failure", oldReplicas: 1, hasNewRS: true},
 		{name: "old ReplicaSet scale-down failure without a new ReplicaSet", oldReplicas: 1},
 		{name: "new ReplicaSet scale-up failure", hasNewRS: true},
+		{name: "old ReplicaSet scale-down succeeds", oldReplicas: 1, hasNewRS: true, scaleSucceeds: true},
+		{name: "new ReplicaSet scale-up succeeds", hasNewRS: true, scaleSucceeds: true},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -58,7 +61,7 @@ func TestDeploymentController_rolloutRecreate(t *testing.T) {
 			}{
 				{name: "rollout times out", progressExpired: true},
 				{name: "status is updated before the deadline"},
-				{name: "scaling and status update errors are returned", progressExpired: true, statusErr: statusErr},
+				{name: "status update error is returned", progressExpired: true, statusErr: statusErr},
 			}
 			for _, statusTest := range statusTests {
 				t.Run(statusTest.name, func(t *testing.T) {
@@ -93,9 +96,11 @@ func TestDeploymentController_rolloutRecreate(t *testing.T) {
 					deploymentutil.SetDeploymentCondition(&d.Status, *condition)
 
 					client := fake.NewClientset(objects...)
-					client.PrependReactor("update", "replicasets", func(action core.Action) (bool, runtime.Object, error) {
-						return true, nil, scaleErr
-					})
+					if !test.scaleSucceeds {
+						client.PrependReactor("update", "replicasets", func(action core.Action) (bool, runtime.Object, error) {
+							return true, nil, scaleErr
+						})
+					}
 					if statusTest.statusErr != nil {
 						client.PrependReactor("update", "deployments", func(action core.Action) (bool, runtime.Object, error) {
 							return true, nil, statusTest.statusErr
@@ -107,11 +112,14 @@ func TestDeploymentController_rolloutRecreate(t *testing.T) {
 					}
 					_, ctx := ktesting.NewTestContext(t)
 					err := dc.rolloutRecreate(ctx, d, allRSs, nil)
-					if !errors.Is(err, scaleErr) {
+					if !test.scaleSucceeds && !errors.Is(err, scaleErr) {
 						t.Errorf("expected scaling error %v, got %v", scaleErr, err)
 					}
 					if statusTest.statusErr != nil && !errors.Is(err, statusTest.statusErr) {
 						t.Errorf("expected status update error %v, got %v", statusTest.statusErr, err)
+					}
+					if test.scaleSucceeds && !errors.Is(err, statusTest.statusErr) {
+						t.Errorf("expected original error %v, got %v", statusTest.statusErr, err)
 					}
 
 					actions := client.Actions()

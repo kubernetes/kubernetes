@@ -37,12 +37,16 @@ import (
 
 func TestDeploymentController_rolloutRolling(t *testing.T) {
 	scaleErr := errors.New("ReplicaSet update failed")
+	cleanupErr := errors.New("ReplicaSet deletion failed")
 	statusErr := errors.New("Deployment status update failed")
 	tests := []struct {
 		name            string
 		oldAvailable    int32
 		newReplicas     int32
 		progressExpired bool
+		scaleSucceeds   bool
+		cleanup         bool
+		cleanupErr      error
 		statusErr       error
 	}{
 		{
@@ -93,6 +97,49 @@ func TestDeploymentController_rolloutRolling(t *testing.T) {
 			newReplicas:     5,
 			progressExpired: true,
 		},
+		{
+			name:          "new ReplicaSet scale-up updates status without scaling down old replicas",
+			oldAvailable:  1,
+			newReplicas:   3,
+			scaleSucceeds: true,
+		},
+		{
+			name:          "old ReplicaSet scale-down updates status",
+			oldAvailable:  1,
+			newReplicas:   4,
+			scaleSucceeds: true,
+		},
+		{
+			name:          "new ReplicaSet scale-up succeeds but status update fails",
+			oldAvailable:  1,
+			newReplicas:   3,
+			scaleSucceeds: true,
+			statusErr:     statusErr,
+		},
+		{
+			name:        "status is updated after cleanup",
+			newReplicas: 4,
+			cleanup:     true,
+		},
+		{
+			name:        "status is updated after cleanup failure",
+			newReplicas: 4,
+			cleanup:     true,
+			cleanupErr:  cleanupErr,
+		},
+		{
+			name:        "status update error after cleanup is returned",
+			newReplicas: 4,
+			cleanup:     true,
+			statusErr:   statusErr,
+		},
+		{
+			name:        "cleanup and status update errors are returned",
+			newReplicas: 4,
+			cleanup:     true,
+			cleanupErr:  cleanupErr,
+			statusErr:   statusErr,
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -115,10 +162,17 @@ func TestDeploymentController_rolloutRolling(t *testing.T) {
 			oldRS.Spec.Template.Spec.Containers[0].Image = "foo/old"
 			oldRS.Annotations = map[string]string{deploymentutil.RevisionAnnotation: "1"}
 			oldRS.Status = apps.ReplicaSetStatus{Replicas: 1, ReadyReplicas: test.oldAvailable, AvailableReplicas: test.oldAvailable}
+			if test.cleanup {
+				d.Spec.RevisionHistoryLimit = ptr.To[int32](0)
+				oldRS.Spec.Replicas = ptr.To[int32](0)
+				oldRS.Status.Replicas = 0
+			}
 			allRSs := []*apps.ReplicaSet{oldRS, newRS}
 
 			d.Status = calculateStatus(allRSs, newRS, d)
-			d.Status.ObservedGeneration = 1
+			if !test.cleanup {
+				d.Status.ObservedGeneration = 1
+			}
 			condition := deploymentutil.NewDeploymentCondition(apps.DeploymentProgressing, v1.ConditionTrue, deploymentutil.ReplicaSetUpdatedReason, "Deployment is progressing.")
 			if test.progressExpired {
 				condition.LastUpdateTime = metav1.NewTime(time.Now().Add(-time.Hour))
@@ -126,9 +180,16 @@ func TestDeploymentController_rolloutRolling(t *testing.T) {
 			deploymentutil.SetDeploymentCondition(&d.Status, *condition)
 
 			client := fake.NewClientset(d, oldRS, newRS)
-			client.PrependReactor("update", "replicasets", func(action core.Action) (bool, runtime.Object, error) {
-				return true, nil, scaleErr
-			})
+			if !test.scaleSucceeds {
+				client.PrependReactor("update", "replicasets", func(action core.Action) (bool, runtime.Object, error) {
+					return true, nil, scaleErr
+				})
+			}
+			if test.cleanupErr != nil {
+				client.PrependReactor("delete", "replicasets", func(action core.Action) (bool, runtime.Object, error) {
+					return true, nil, test.cleanupErr
+				})
+			}
 			if test.statusErr != nil {
 				client.PrependReactor("update", "deployments", func(action core.Action) (bool, runtime.Object, error) {
 					return true, nil, test.statusErr
@@ -140,27 +201,50 @@ func TestDeploymentController_rolloutRolling(t *testing.T) {
 			}
 			_, ctx := ktesting.NewTestContext(t)
 			err := dc.rolloutRolling(ctx, d, allRSs)
-			if !errors.Is(err, scaleErr) {
-				t.Errorf("expected scaling error %v, got %v", scaleErr, err)
+			expectedErr := scaleErr
+			if test.cleanup {
+				expectedErr = test.cleanupErr
+			} else if test.scaleSucceeds {
+				expectedErr = nil
+			}
+			if expectedErr != nil && !errors.Is(err, expectedErr) {
+				t.Errorf("expected reconciliation error %v, got %v", expectedErr, err)
 			}
 			if test.statusErr != nil && !errors.Is(err, test.statusErr) {
 				t.Errorf("expected status update error %v, got %v", test.statusErr, err)
 			}
+			if expectedErr == nil || test.statusErr == nil {
+				if expectedErr == nil {
+					expectedErr = test.statusErr
+				}
+				if !errors.Is(err, expectedErr) {
+					t.Errorf("expected original error %v, got %v", expectedErr, err)
+				}
+			}
 
 			actions := client.Actions()
 			if len(actions) != 2 {
-				t.Fatalf("expected ReplicaSet update followed by Deployment status update, got %v", actions)
+				t.Fatalf("expected ReplicaSet reconciliation followed by Deployment status update, got %v", actions)
 			}
-			if !actions[0].Matches("update", "replicasets") {
-				t.Fatalf("expected ReplicaSet update, got %v", actions[0])
-			}
-			scaledRS := actions[0].(core.UpdateAction).GetObject().(*apps.ReplicaSet)
-			expectedRS, expectedReplicas := oldRS.Name, int32(0)
-			if test.newReplicas != *d.Spec.Replicas {
-				expectedRS, expectedReplicas = newRS.Name, *d.Spec.Replicas
-			}
-			if scaledRS.Name != expectedRS || *scaledRS.Spec.Replicas != expectedReplicas {
-				t.Errorf("expected ReplicaSet %s to scale to %d replicas, got %s with %d replicas", expectedRS, expectedReplicas, scaledRS.Name, *scaledRS.Spec.Replicas)
+			if test.cleanup {
+				if !actions[0].Matches("delete", "replicasets") {
+					t.Fatalf("expected ReplicaSet deletion, got %v", actions[0])
+				}
+				if deletedRS := actions[0].(core.DeleteAction).GetName(); deletedRS != oldRS.Name {
+					t.Errorf("expected ReplicaSet %s to be deleted, got %s", oldRS.Name, deletedRS)
+				}
+			} else {
+				if !actions[0].Matches("update", "replicasets") {
+					t.Fatalf("expected ReplicaSet update, got %v", actions[0])
+				}
+				scaledRS := actions[0].(core.UpdateAction).GetObject().(*apps.ReplicaSet)
+				expectedRS, expectedReplicas := oldRS.Name, int32(0)
+				if test.newReplicas != *d.Spec.Replicas {
+					expectedRS, expectedReplicas = newRS.Name, *d.Spec.Replicas
+				}
+				if scaledRS.Name != expectedRS || *scaledRS.Spec.Replicas != expectedReplicas {
+					t.Errorf("expected ReplicaSet %s to scale to %d replicas, got %s with %d replicas", expectedRS, expectedReplicas, scaledRS.Name, *scaledRS.Spec.Replicas)
+				}
 			}
 			if !actions[1].Matches("update", "deployments") || actions[1].GetSubresource() != "status" {
 				t.Fatalf("expected Deployment status update, got %v", actions[1])
@@ -172,7 +256,9 @@ func TestDeploymentController_rolloutRolling(t *testing.T) {
 			}
 			expectedReason := deploymentutil.ReplicaSetUpdatedReason
 			expectedStatus := v1.ConditionTrue
-			if test.progressExpired {
+			if test.cleanup {
+				expectedReason = deploymentutil.NewRSAvailableReason
+			} else if test.progressExpired {
 				expectedReason = deploymentutil.TimedOutReason
 				expectedStatus = v1.ConditionFalse
 			}
