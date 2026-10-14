@@ -711,7 +711,10 @@ func (c *Cacher) Get(ctx context.Context, key string, opts storage.GetOptions, o
 	if err != nil {
 		return err
 	}
-	getRV, err := c.versioner.ParseResourceVersion(opts.ResourceVersion)
+	if opts.ResourceVersion == "" {
+		return storage.NewInternalError(fmt.Errorf("cacher doesn't support consistent Get"))
+	}
+	minResourceVersion, err := c.versioner.ParseResourceVersion(opts.ResourceVersion)
 	if err != nil {
 		return err
 	}
@@ -721,7 +724,7 @@ func (c *Cacher) Get(ctx context.Context, key string, opts storage.GetOptions, o
 		return err
 	}
 
-	obj, exists, readResourceVersion, err := c.watchCache.WaitUntilFreshAndGet(ctx, getRV, key)
+	obj, exists, readResourceVersion, err := c.get(ctx, key, minResourceVersion)
 	if err != nil {
 		return err
 	}
@@ -729,11 +732,7 @@ func (c *Cacher) Get(ctx context.Context, key string, opts storage.GetOptions, o
 	defer span.End(500 * time.Millisecond)
 
 	if exists {
-		elem, ok := obj.(*store.Element)
-		if !ok {
-			return fmt.Errorf("non *store.Element returned from storage: %v", obj)
-		}
-		objVal.Set(reflect.ValueOf(elem.Object).Elem())
+		objVal.Set(reflect.ValueOf(obj).Elem())
 	} else {
 		objVal.Set(reflect.Zero(objVal.Type()))
 		if !opts.IgnoreNotFound {
@@ -741,6 +740,21 @@ func (c *Cacher) Get(ctx context.Context, key string, opts storage.GetOptions, o
 		}
 	}
 	return nil
+}
+
+func (c *Cacher) get(ctx context.Context, key string, minResourceVersion uint64) (runtime.Object, bool, uint64, error) {
+	obj, exists, readResourceVersion, err := c.watchCache.WaitUntilFreshAndGet(ctx, minResourceVersion, key)
+	if err != nil {
+		return nil, false, 0, err
+	}
+	if !exists {
+		return nil, false, readResourceVersion, nil
+	}
+	elem, ok := obj.(*store.Element)
+	if !ok {
+		return nil, false, 0, fmt.Errorf("non *store.Element returned from storage: %v", obj)
+	}
+	return elem.Object, true, readResourceVersion, nil
 }
 
 // computeListLimit determines whether the cacher should
