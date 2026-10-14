@@ -75,13 +75,13 @@ const (
 	// maximum number of rules in successPolicy.
 	maxSuccessPolicyRule = 20
 
-	// Maximium allowed length of pod failure policy rule names.
-	// The rule name is used in condition reasons in the format
-	// "PodFailurePolicy_{rule.Name}". Condition reasons have a
-	// max length of 1024 characters: https://github.com/kubernetes/kubernetes/blob/d76a8fae674c972b5d2e2cfc226c607c9f63a412/staging/src/k8s.io/apimachinery/pkg/apis/meta/v1/types.go#L1609
-	// The "PodFailurePolicy_" prefix before the rule name is 17
-	// characters, so this leaves 1007 characters for the rule name.
-	maxPodFailurePolicyRuleNameLength = 1024 - len(batchv1.JobReasonPodFailurePolicy+"_")
+	// podFailurePolicyReasonPrefix prefixes the rule name (or index) in the
+	// Job Failed condition reason set by a FailJob rule.
+	podFailurePolicyReasonPrefix = batchv1.JobReasonPodFailurePolicy + "_"
+	// maxPodFailurePolicyReasonLength bounds the generated condition reason.
+	maxPodFailurePolicyReasonLength = 128
+	// maxPodFailurePolicyRuleNameLength leaves room for the reason prefix.
+	maxPodFailurePolicyRuleNameLength = maxPodFailurePolicyReasonLength - len(podFailurePolicyReasonPrefix)
 )
 
 var (
@@ -103,9 +103,6 @@ var (
 	supportedPodReplacementPolicy = sets.New(
 		batch.Failed,
 		batch.TerminatingOrFailed)
-
-	// Source: https://github.com/kubernetes/kubernetes/blob/8ccc878de07dd302b6115095884daa787a00c58c/staging/src/k8s.io/apimachinery/pkg/apis/meta/v1/types.go#L1595-L1598
-	conditionReasonRegex = regexp.MustCompile(`^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$`)
 )
 
 // validateGeneratedSelector validates that the generated selector on a controller object match the controller object
@@ -340,7 +337,11 @@ func validatePodFailurePolicy(spec *batch.JobSpec, fldPath *field.Path) field.Er
 
 	ruleNames := sets.Set[string]{}
 	for i, rule := range spec.PodFailurePolicy.Rules {
-		allErrs = append(allErrs, validatePodFailurePolicyRule(spec, &rule, rulesPath.Index(i), ruleNames, containerNames)...)
+		rulePath := rulesPath.Index(i)
+		allErrs = append(allErrs, validatePodFailurePolicyRule(spec, &rule, rulePath, containerNames)...)
+		if rule.Name != nil {
+			allErrs = append(allErrs, validatePodFailurePolicyRuleName(*rule.Name, i, len(spec.PodFailurePolicy.Rules), ruleNames, rulePath.Child("name"))...)
+		}
 	}
 	return allErrs
 }
@@ -361,7 +362,7 @@ func validatePodReplacementPolicy(spec *batch.JobSpec, fldPath *field.Path) fiel
 	return allErrs
 }
 
-func validatePodFailurePolicyRule(spec *batch.JobSpec, rule *batch.PodFailurePolicyRule, rulePath *field.Path, ruleNames, containerNames sets.Set[string]) field.ErrorList {
+func validatePodFailurePolicyRule(spec *batch.JobSpec, rule *batch.PodFailurePolicyRule, rulePath *field.Path, containerNames sets.Set[string]) field.ErrorList {
 	var allErrs field.ErrorList
 	actionPath := rulePath.Child("action")
 	if rule.Action == "" {
@@ -385,23 +386,30 @@ func validatePodFailurePolicyRule(spec *batch.JobSpec, rule *batch.PodFailurePol
 	if rule.OnExitCodes == nil && len(rule.OnPodConditions) == 0 {
 		allErrs = append(allErrs, field.Invalid(rulePath, field.OmitValueType{}, "specifying one of OnExitCodes and OnPodConditions is required"))
 	}
-	if rule.Name != nil {
-		// Validate rule name is unique within the Job.
-		ruleName := *rule.Name
-		if ruleNames.Has(ruleName) {
-			allErrs = append(allErrs, field.Invalid(rulePath, ruleName, "pod failure policy rule names must be unique within a Job"))
-		}
-		ruleNames.Insert(ruleName)
+	return allErrs
+}
 
-		// Validate the "JobFailed" condition reason that uses this pod failure policy
-		// rule name must be a valid condition reason.
-		if len(ruleName) > maxPodFailurePolicyRuleNameLength {
-			allErrs = append(allErrs, field.Invalid(rulePath, ruleName, fmt.Sprintf("pod failure policy rule name length must be <= %d characters", maxPodFailurePolicyRuleNameLength)))
-		}
-		reason := fmt.Sprintf("%s_%s", batchv1.JobReasonPodFailurePolicy, ruleName)
-		if !conditionReasonRegex.MatchString(reason) {
-			allErrs = append(allErrs, field.Invalid(rulePath, ruleName, fmt.Sprintf("pod failure policy rule name must match regular expression: %s", conditionReasonRegex.String())))
-		}
+// validatePodFailurePolicyRuleName validates a rule name, which the Job
+// controller turns into the Job Failed condition reason
+// "PodFailurePolicy_<name>". Unnamed rules use "PodFailurePolicy_<index>"
+// instead, so a name must not reproduce another rule's index.
+func validatePodFailurePolicyRuleName(name string, index, numRules int, seen sets.Set[string], fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	if len(name) == 0 {
+		return append(allErrs, field.Invalid(fldPath, name, "must not be empty when set"))
+	}
+	if seen.Has(name) {
+		allErrs = append(allErrs, field.Duplicate(fldPath, name))
+	}
+	seen.Insert(name)
+	if n, err := strconv.Atoi(name); err == nil && strconv.Itoa(n) == name && n != index && n >= 0 && n < numRules {
+		allErrs = append(allErrs, field.Invalid(fldPath, name, fmt.Sprintf("must not equal the index of another rule; a numeric name is only allowed if it equals the rule's own index (%d)", index)))
+	}
+	if len(name) > maxPodFailurePolicyRuleNameLength {
+		allErrs = append(allErrs, field.TooLong(fldPath, "", maxPodFailurePolicyRuleNameLength))
+	}
+	for _, msg := range unversionedvalidation.IsValidConditionReason(podFailurePolicyReasonPrefix + name) {
+		allErrs = append(allErrs, field.Invalid(fldPath, name, fmt.Sprintf("generated reason %q is invalid: %s", podFailurePolicyReasonPrefix+name, msg)))
 	}
 	return allErrs
 }

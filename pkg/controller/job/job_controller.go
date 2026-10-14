@@ -1087,9 +1087,9 @@ func (jm *Controller) syncJob(ctx context.Context, key string) (rErr error) {
 		if failureTargetCondition != nil && failureTargetCondition.Status == v1.ConditionTrue {
 			jobCtx.finishedCondition = newFailedConditionForFailureTarget(failureTargetCondition, jm.clock.Now())
 			// Evaluate failure scenarios for PodFailurePolicy.
-		} else if failJobMessage, failJobReason := getFailJobMessageAndReason(&job, pods); failJobMessage != nil && failJobReason != nil {
+		} else if failJobMessage, failJobReason := getFailJobMessageAndReason(&job, pods); failJobMessage != nil {
 			// Prepare the interim FailureTarget condition to record the failure message before the finalizers (allowing removal of the pods) are removed.
-			jobCtx.finishedCondition = newCondition(batch.JobFailureTarget, v1.ConditionTrue, *failJobReason, *failJobMessage, jm.clock.Now())
+			jobCtx.finishedCondition = newCondition(batch.JobFailureTarget, v1.ConditionTrue, failJobReason, *failJobMessage, jm.clock.Now())
 		}
 	}
 	// Evaluate failure scenarios for BackoffLimit and ActiveDeadlineSeconds.
@@ -1369,9 +1369,9 @@ func (jm *Controller) trackJobStatusAndRemoveFinalizers(ctx context.Context, job
 			ix := getCompletionIndex(pod.Annotations)
 			if !jobCtx.uncounted.failed.Has(pod.UID) && (!isIndexed || (ix != unknownCompletionIndex && ix < int(*jobCtx.job.Spec.Completions))) {
 				if jobCtx.job.Spec.PodFailurePolicy != nil {
-					_, countFailed, rule := matchPodFailurePolicy(jobCtx.job.Spec.PodFailurePolicy, pod)
-					if rule != nil {
-						podFailureCountByPolicyAction[string(rule.Action)] += 1
+					_, countFailed, action := matchPodFailurePolicy(jobCtx.job.Spec.PodFailurePolicy, pod)
+					if action != nil {
+						podFailureCountByPolicyAction[string(*action)] += 1
 					}
 					if countFailed {
 						needsFlush = true
@@ -1650,7 +1650,7 @@ func (jm *Controller) recordJobFinished(job *batch.Job, finishedCond *batch.JobC
 		metrics.JobFinishedNum.WithLabelValues(completionMode, "succeeded", finishedCond.Reason).Inc()
 	} else {
 		jm.recorder.Event(job, v1.EventTypeWarning, finishedCond.Reason, finishedCond.Message)
-		metrics.JobFinishedNum.WithLabelValues(completionMode, "failed", finishedCond.Reason).Inc()
+		metrics.JobFinishedNum.WithLabelValues(completionMode, "failed", metricsReason(finishedCond.Reason)).Inc()
 	}
 	return true
 }
@@ -1720,24 +1720,21 @@ func newCondition(conditionType batch.JobConditionType, status v1.ConditionStatu
 	}
 }
 
-// getFailJobMessageAndReason returns a job failure message and reason if the
-// job should fail with the current counters.
-func getFailJobMessageAndReason(job *batch.Job, pods []*v1.Pod) (*string, *string) {
+// getFailJobMessageAndReason returns a job failure message and condition
+// reason if a failed pod matches a FailJob rule of the pod failure policy.
+func getFailJobMessageAndReason(job *batch.Job, pods []*v1.Pod) (*string, string) {
 	if job.Spec.PodFailurePolicy == nil {
-		return nil, nil
+		return nil, ""
 	}
 	for _, p := range pods {
 		if isPodFailed(p, job) {
-			// If the pod failure policy rule matches the failed pod,
-			// return the failure message and rule.
-			jobFailureMessage, _, rule := matchPodFailurePolicy(job.Spec.PodFailurePolicy, p)
-			if rule != nil {
-				jobFailureReason := conditionReasonForPodFailurePolicyRule(rule)
-				return jobFailureMessage, &jobFailureReason
+			jobFailureMessage, _, ruleIndex := matchPodFailurePolicyRule(job.Spec.PodFailurePolicy, p)
+			if jobFailureMessage != nil {
+				return jobFailureMessage, failJobReason(job.Spec.PodFailurePolicy, ruleIndex)
 			}
 		}
 	}
-	return nil, nil
+	return nil, ""
 }
 
 // getNewFinishedPods returns the list of newly succeeded and failed pods that are not accounted
@@ -2251,15 +2248,4 @@ func managedByExternalController(jobObj *batch.Job) *string {
 		return controllerName
 	}
 	return nil
-}
-
-// conditionReasonForPodFailurePolicyRule accepts a pod failure policy rule as input
-// and returns the condition reason which can be used in a Job condition when the
-// pod failure policy is triggered.
-// Reason format: "PodFailurePolicy_{rule.Name}"
-func conditionReasonForPodFailurePolicyRule(rule *batch.PodFailurePolicyRule) string {
-	if rule == nil {
-		return batch.JobReasonPodFailurePolicy
-	}
-	return fmt.Sprintf("%s_%s", batch.JobReasonPodFailurePolicy, *rule.Name)
 }

@@ -832,6 +832,13 @@ const (
 	// Enables controlling pod ranking on replicaset scale-down.
 	PodDeletionCost featuregate.Feature = "PodDeletionCost"
 
+	// owner: @danielvegamyhre @ameukam
+	// kep: https://kep.k8s.io/4443
+	//
+	// Allows naming Job pod failure policy rules; a matching FailJob rule sets
+	// the Job failure reason to PodFailurePolicy_<name|index>.
+	PodFailurePolicyName featuregate.Feature = "PodFailurePolicyName"
+
 	// owner: @wojtek-t @argh4k
 	// kep: https://kep.k8s.io/5710
 	//
@@ -1857,6 +1864,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.22"), Default: true, PreRelease: featuregate.Beta},
 	},
 
+	PodFailurePolicyName: {
+		{Version: version.MustParse("1.38"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
 	PodGroupPreemptionPolicy: {
 		{Version: version.MustParse("1.37"), Default: false, PreRelease: featuregate.Alpha},
 	},
@@ -2634,6 +2645,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	PodCertificateRequest: {},
 
 	PodDeletionCost: {},
+
+	PodFailurePolicyName: {},
 
 	PodGroupPreemptionPolicy: {GenericWorkload},
 

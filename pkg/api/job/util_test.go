@@ -105,6 +105,65 @@ func TestDropDisabledFieldsScheduling(t *testing.T) {
 	}
 }
 
+func TestDropDisabledFieldsPodFailurePolicyName(t *testing.T) {
+	policy := func(names ...*string) *batch.PodFailurePolicy {
+		p := &batch.PodFailurePolicy{}
+		for _, n := range names {
+			p.Rules = append(p.Rules, batch.PodFailurePolicyRule{Action: batch.PodFailurePolicyActionFailJob, Name: n})
+		}
+		return p
+	}
+
+	cases := map[string]struct {
+		enabled bool
+		newPFP  *batch.PodFailurePolicy
+		oldPFP  *batch.PodFailurePolicy
+		hasOld  bool
+		wantPFP *batch.PodFailurePolicy
+	}{
+		"feature enabled, create keeps names": {
+			enabled: true,
+			newPFP:  policy(new("a"), nil),
+			wantPFP: policy(new("a"), nil),
+		},
+		"feature disabled, create drops names": {
+			newPFP:  policy(new("a"), nil, new("b")),
+			wantPFP: policy(nil, nil, nil),
+		},
+		"feature disabled, create without pod failure policy": {},
+		"feature disabled, update preserves names already in use": {
+			newPFP:  policy(new("a"), new("b")),
+			oldPFP:  policy(new("a"), nil),
+			hasOld:  true,
+			wantPFP: policy(new("a"), new("b")),
+		},
+		"feature disabled, update drops newly added names": {
+			newPFP:  policy(new("a")),
+			oldPFP:  policy(nil),
+			hasOld:  true,
+			wantPFP: policy(nil),
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodFailurePolicyName, tc.enabled)
+
+			newSpec := &batch.JobSpec{PodFailurePolicy: tc.newPFP}
+			var oldSpec *batch.JobSpec
+			if tc.hasOld {
+				oldSpec = &batch.JobSpec{PodFailurePolicy: tc.oldPFP}
+			}
+
+			DropDisabledFields(newSpec, oldSpec)
+
+			if diff := cmp.Diff(tc.wantPFP, newSpec.PodFailurePolicy); diff != "" {
+				t.Errorf("unexpected podFailurePolicy after DropDisabledFields (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}
+
 func TestWorkloadInput(t *testing.T) {
 	policy := &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{
 		Gang: &schedulingv1alpha3.WorkloadPodGroupGangSchedulingPolicy{MinCount: ptr.To[int32](3)},

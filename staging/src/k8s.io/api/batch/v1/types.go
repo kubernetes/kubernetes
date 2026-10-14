@@ -252,10 +252,16 @@ type PodFailurePolicyRule struct {
 	// +optional
 	OnPodConditions []PodFailurePolicyOnPodConditionsPattern `json:"onPodConditions,omitempty" protobuf:"bytes,3,opt,name=onPodConditions"`
 
-	// name of the pod failure policy rule. Defaults to the index of the rule if unset.
-	// The name must be unique within the given Job, and the Job failure condition
-	// reason that would be generated from a given rule name
-	// (i.e., `PodFailurePolicy_{ruleName}`) must be a valid condition reason.
+	// name of the pod failure policy rule. When a rule with the FailJob action
+	// fails the Job, the Job Failed condition reason is set to
+	// `PodFailurePolicy_<name>`, or to `PodFailurePolicy_<index>` when the name
+	// is unset, where <index> is the zero-based index of the rule.
+	// The name must be non-empty, unique within the Job, must not equal the index
+	// of another rule, and the generated reason must be a valid condition reason
+	// of at most 128 characters.
+	// This field is alpha-level and is only honored by servers that enable the
+	// PodFailurePolicyName feature gate.
+	// +featureGate=PodFailurePolicyName
 	// +optional
 	Name *string `json:"name,omitempty" protobuf:"bytes,4,opt,name=name"`
 }
