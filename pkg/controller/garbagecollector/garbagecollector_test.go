@@ -61,6 +61,7 @@ import (
 	fakemetadata "k8s.io/client-go/metadata/fake"
 	"k8s.io/client-go/metadata/metadatainformer"
 	restclient "k8s.io/client-go/rest"
+	"k8s.io/client-go/restmapper"
 	clientgotesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
@@ -1218,6 +1219,67 @@ func (*fakeServerResources) ServerPreferredNamespacedResources() ([]*metav1.APIR
 	return nil, nil
 }
 
+func TestNodeResource(t *testing.T) {
+	restMapper := restmapper.NewDiscoveryRESTMapper([]*restmapper.APIGroupResources{{
+		Group: metav1.APIGroup{
+			Name:             "example.com",
+			Versions:         []metav1.GroupVersionForDiscovery{{GroupVersion: "example.com/v1", Version: "v1"}, {GroupVersion: "example.com/v1beta1", Version: "v1beta1"}},
+			PreferredVersion: metav1.GroupVersionForDiscovery{GroupVersion: "example.com/v1", Version: "v1"},
+		},
+		VersionedResources: map[string][]metav1.APIResource{
+			"v1":      {{Name: "gadgets", Kind: "Gadget", Namespaced: true}},
+			"v1beta1": {{Name: "gadgets", Kind: "Gadget", Namespaced: true}},
+		},
+	}})
+	gc := &GarbageCollector{restMapper: &testRESTMapper{restMapper}}
+
+	testCases := []struct {
+		name         string
+		node         *node
+		wantResource schema.GroupVersionResource
+		wantErr      bool
+	}{
+		{
+			name:         "observed node with served version keeps its version",
+			node:         makeNode(makeID("example.com/v1beta1", "Gadget", "ns1", "gadget1", "uid1")),
+			wantResource: schema.GroupVersionResource{Group: "example.com", Version: "v1beta1", Resource: "gadgets"},
+		},
+		{
+			name:         "observed node with no longer served version uses preferred version",
+			node:         makeNode(makeID("example.com/v1alpha1", "Gadget", "ns1", "gadget1", "uid1")),
+			wantResource: schema.GroupVersionResource{Group: "example.com", Version: "v1", Resource: "gadgets"},
+		},
+		{
+			name:    "virtual node with no longer served version is not resolved",
+			node:    makeNode(makeID("example.com/v1alpha1", "Gadget", "ns1", "gadget1", "uid1"), virtual),
+			wantErr: true,
+		},
+		{
+			name:    "observed node with unknown kind is not resolved",
+			node:    makeNode(makeID("example.com/v1alpha1", "Widget", "ns1", "widget1", "uid1")),
+			wantErr: true,
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			resource, namespaced, err := gc.nodeResource(tc.node)
+			if tc.wantErr {
+				var mappingErr *restMappingError
+				if !goerrors.As(err, &mappingErr) {
+					t.Fatalf("expected restMappingError, got %v", err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if resource != tc.wantResource || !namespaced {
+				t.Errorf("expected namespaced %v, got %v (namespaced=%v)", tc.wantResource, resource, namespaced)
+			}
+		})
+	}
+}
+
 func TestConflictingData(t *testing.T) {
 	pod1ns1 := makeID("v1", "Pod", "ns1", "podname1", "poduid1")
 	pod2ns1 := makeID("v1", "Pod", "ns1", "podname2", "poduid2")
@@ -1229,6 +1291,7 @@ func TestConflictingData(t *testing.T) {
 
 	deployment1apps := makeID("apps/v1", "Deployment", "ns1", "deployment1", "deploymentuid1")
 	deployment1extensions := makeID("extensions/v1beta1", "Deployment", "ns1", "deployment1", "deploymentuid1") // not served, still referenced
+	deployment1unserved := makeID("apps/v1beta3", "Deployment", "ns1", "deployment1", "deploymentuid1")         // observed while served, no longer served
 
 	// when a reference is made to node1 from a namespaced resource, the virtual node inserted has namespace coordinates
 	node1WithNamespace := makeID("v1", "Node", "ns1", "nodename", "nodeuid1")
@@ -2572,6 +2635,45 @@ func TestConflictingData(t *testing.T) {
 				}),
 			},
 		},
+		// child observed via an apiVersion that is no longer served (e.g. a CRD version switched to served: false)
+		// * should be resolved via a served version of the same group/kind and deleted once its owner is absent
+		{
+			name: "observed child with no longer served API version -> absent owner",
+			steps: []step{
+				// 0: setup
+				createObjectInClient("apps", "v1", "deployments", "ns1", makeMetadataObj(deployment1apps, pod1ns1)),
+				// 1,2: observe child via the old version, owner not yet observed
+				processEvent(makeAddEvent(deployment1unserved, pod1ns1)),
+				assertState(state{
+					graphNodes:             []*node{makeNode(deployment1unserved, withOwners(pod1ns1)), makeNode(pod1ns1, virtual)},
+					pendingAttemptToDelete: []*node{makeNode(pod1ns1, virtual)},
+				}),
+				// 3,4: handle queued attempted delete of virtual owner
+				processAttemptToDelete(1),
+				assertState(state{
+					clientActions:       []string{"get /v1, Resource=pods ns=ns1 name=podname1"},
+					graphNodes:          []*node{makeNode(deployment1unserved, withOwners(pod1ns1)), makeNode(pod1ns1, virtual)},
+					pendingGraphChanges: []*event{makeVirtualDeleteEvent(pod1ns1)},
+				}),
+				// 5,6: process the virtual delete of the owner
+				processPendingGraphChanges(1),
+				assertState(state{
+					graphNodes:             []*node{makeNode(deployment1unserved, withOwners(pod1ns1))},
+					absentOwnerCache:       []objectReference{pod1ns1},
+					pendingAttemptToDelete: []*node{makeNode(deployment1unserved, withOwners(pod1ns1))},
+				}),
+				// 7,8: child is looked up and deleted via the served version
+				processAttemptToDelete(1),
+				assertState(state{
+					clientActions: []string{
+						"get apps/v1, Resource=deployments ns=ns1 name=deployment1",
+						"delete apps/v1, Resource=deployments ns=ns1 name=deployment1",
+					},
+					graphNodes:       []*node{makeNode(deployment1unserved, withOwners(pod1ns1))},
+					absentOwnerCache: []objectReference{pod1ns1},
+				}),
+			},
+		},
 	}
 
 	alwaysStarted := make(chan struct{})
@@ -2586,7 +2688,8 @@ func TestConflictingData(t *testing.T) {
 
 			metadataClient := fakemetadata.NewSimpleMetadataClient(fakemetadata.NewTestScheme())
 
-			tweakableRM := meta.NewDefaultRESTMapper(nil)
+			// apps/v1 is the default for version-less lookups, like a preferred version from discovery
+			tweakableRM := meta.NewDefaultRESTMapper([]schema.GroupVersion{{Group: "apps", Version: "v1"}})
 			tweakableRM.AddSpecific(
 				schema.GroupVersionKind{Group: "rbac.authorization.k8s.io", Version: "v1", Kind: "Role"},
 				schema.GroupVersionResource{Group: "rbac.authorization.k8s.io", Version: "v1", Resource: "roles"},
