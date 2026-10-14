@@ -125,8 +125,8 @@ func TestCause(t *testing.T) {
 			parentCtx:   contextBackground,
 			timeout:     time.Millisecond,
 			sleep:       5 * time.Millisecond,
-			expectErr:   context.Canceled,
-			expectCause: canceledError(timeoutCause),
+			expectErr:   context.DeadlineExceeded,
+			expectCause: deadlineExceededError(timeoutCause),
 		},
 		"parent-canceled": {
 			parentCtx: func(t *testing.T) context.Context {

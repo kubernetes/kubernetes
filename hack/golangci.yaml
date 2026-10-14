@@ -556,9 +556,7 @@ linters:
             # Some normal packages are meant to be used only in tests and thus
             # are also exempt.
             - "!**/test/**"
-            - "!**/testing/**"
-            - "!**/ktesting/**"
-            - "!**/apitesting/**"
+            - "!**/*testing/**"
           deny:
             - pkg: "github.com/google/go-cmp/cmp"
               desc: "cmp is allowed only in test files"
