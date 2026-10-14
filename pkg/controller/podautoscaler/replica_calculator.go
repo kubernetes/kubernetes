@@ -468,6 +468,7 @@ func groupPods(pods []*v1.Pod, metrics metricsclient.PodMetricsInfo, resource v1
 // It returns a map of pod names to their calculated request values.
 func calculateRequests(pods []*v1.Pod, container string, resource v1.ResourceName) (map[string]int64, error) {
 	podLevelResourcesEnabled := feature.DefaultFeatureGate.Enabled(features.PodLevelResources)
+	extraNodeAllocatableEnabled := feature.DefaultFeatureGate.Enabled(features.DRANodeAllocatableResources)
 	requests := make(map[string]int64, len(pods))
 	for _, pod := range pods {
 		var request int64
@@ -481,9 +482,9 @@ func calculateRequests(pods []*v1.Pod, container string, resource v1.ResourceNam
 			container == ""
 
 		if usePodLevelRequests {
-			request, err = calculatePodLevelRequests(pod, resource)
+			request, err = calculatePodLevelRequests(pod, resource, extraNodeAllocatableEnabled)
 		} else {
-			request, err = calculatePodRequestsFromContainers(pod, container, resource)
+			request, err = calculatePodRequestsFromContainers(pod, container, resource, extraNodeAllocatableEnabled)
 		}
 		if err != nil {
 			return nil, err
@@ -495,9 +496,10 @@ func calculateRequests(pods []*v1.Pod, container string, resource v1.ResourceNam
 
 // calculatePodLevelRequests computes the requests for the specific resource at
 // the pod level.
-func calculatePodLevelRequests(pod *v1.Pod, resource v1.ResourceName) (int64, error) {
+func calculatePodLevelRequests(pod *v1.Pod, resource v1.ResourceName, extraNodeAllocatableEnabled bool) (int64, error) {
 	podLevelRequests := resourcehelpers.PodRequests(pod, resourcehelpers.PodResourcesOptions{
-		ExcludeOverhead: true,
+		ExcludeOverhead:                  true,
+		UseExtraNodeAllocatableResources: extraNodeAllocatableEnabled,
 	})
 	podRequest, ok := podLevelRequests[resource]
 	if !ok {
@@ -509,7 +511,7 @@ func calculatePodLevelRequests(pod *v1.Pod, resource v1.ResourceName) (int64, er
 // calculatePodRequestsFromContainers computes the requests for the specified
 // resource by summing requests from all containers in the pod.
 // If a container name is specified, it uses only that container.
-func calculatePodRequestsFromContainers(pod *v1.Pod, container string, resource v1.ResourceName) (int64, error) {
+func calculatePodRequestsFromContainers(pod *v1.Pod, container string, resource v1.ResourceName, extraNodeAllocatableEnabled bool) (int64, error) {
 	containers := append([]v1.Container{}, pod.Spec.Containers...)
 	for _, c := range pod.Spec.InitContainers {
 		if c.RestartPolicy != nil && *c.RestartPolicy == v1.ContainerRestartPolicyAlways {
@@ -521,10 +523,20 @@ func calculatePodRequestsFromContainers(pod *v1.Pod, container string, resource 
 	for _, c := range containers {
 		if container == "" || container == c.Name {
 			containerRequest, ok := c.Resources.Requests[resource]
-			if !ok {
+			var extraNodeAllocatableRes v1.ResourceList
+			if extraNodeAllocatableEnabled {
+				extraNodeAllocatableRes = resourcehelpers.GetContainerExtraNodeAllocatableResources(pod, c.Name)
+			}
+			extraNodeAllocatableRequest, hasExtraNodeAllocatableRequest := extraNodeAllocatableRes[resource]
+			// Extra node allocatable resources (like DRA allocations) stand in for a missing spec request.
+			if !ok && !hasExtraNodeAllocatableRequest {
 				return 0, fmt.Errorf("missing request for %s in container %s of Pod %s", resource, c.Name, pod.Name)
 			}
 			request += containerRequest.MilliValue()
+			// Only this container is summed, so a source it shares with others can't be counted twice.
+			if container == c.Name {
+				request += extraNodeAllocatableRequest.MilliValue()
+			}
 		}
 		// container names are unique inside the pod
 		if container == c.Name {
@@ -535,6 +547,14 @@ func calculatePodRequestsFromContainers(pod *v1.Pod, container string, resource 
 	// If we're looking for a specific container and didn't find it
 	if container != "" {
 		return 0, fmt.Errorf("container %s not found in Pod %s", container, pod.Name)
+	}
+
+	if extraNodeAllocatableEnabled {
+		// Added once for the pod: summing each container's extra node allocatable
+		// resources (like DRA allocations) would count a source shared by several
+		// containers once per container.
+		extraNodeAllocatableRequest := resourcehelpers.GetPodExtraNodeAllocatableResources(pod)[resource]
+		request += extraNodeAllocatableRequest.MilliValue()
 	}
 
 	return request, nil
