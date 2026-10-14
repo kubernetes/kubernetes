@@ -19,40 +19,113 @@ package watch
 import (
 	"fmt"
 	"io"
+	"os"
+	"strconv"
 	"sync"
+	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer/streaming"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/klog/v2"
 )
 
 const (
 	defaultFixedWorkersBufferedConcurrentOutputBufferSize           = 100
 	defaultFixedWorkersBufferedConcurrentEnvelopeBufferSize         = 100
 	defaultFixedWorkersBufferedConcurrentEventProcessingConcurrency = 10
+
+	concurrentDecoderWithFixedWorkersAndOutputQueueInputQueueSizeEnvVar  = "CONCURRENT_DECODER_WITH_FIXED_WORKERS_AND_OUTPUT_QUEUE_INPUT_QUEUE_SIZE"
+	concurrentDecoderWithFixedWorkersAndOutputQueueOutputQueueSizeEnvVar = "CONCURRENT_DECODER_WITH_FIXED_WORKERS_AND_OUTPUT_QUEUE_OUTPUT_QUEUE_SIZE"
+	concurrentDecoderWithFixedWorkersAndOutputQueueWorkerCountEnvVar     = "CONCURRENT_DECODER_WITH_FIXED_WORKERS_AND_OUTPUT_QUEUE_WORKER_COUNT"
 )
+
+type concurrentDecoderWithFixedWorkersAndOutputQueueConfig struct {
+	inputQueueSize  int
+	outputQueueSize int
+	workerCount     int
+}
+
+func concurrentDecoderWithFixedWorkersAndOutputQueueConfigFromEnv() concurrentDecoderWithFixedWorkersAndOutputQueueConfig {
+	config := concurrentDecoderWithFixedWorkersAndOutputQueueConfig{
+		inputQueueSize:  defaultFixedWorkersBufferedConcurrentEnvelopeBufferSize,
+		outputQueueSize: defaultFixedWorkersBufferedConcurrentOutputBufferSize,
+		workerCount:     defaultFixedWorkersBufferedConcurrentEventProcessingConcurrency,
+	}
+	config.inputQueueSize = intFromEnv(concurrentDecoderWithFixedWorkersAndOutputQueueInputQueueSizeEnvVar, config.inputQueueSize, 0)
+	config.outputQueueSize = intFromEnv(concurrentDecoderWithFixedWorkersAndOutputQueueOutputQueueSizeEnvVar, config.outputQueueSize, 0)
+	config.workerCount = intFromEnv(concurrentDecoderWithFixedWorkersAndOutputQueueWorkerCountEnvVar, config.workerCount, 1)
+	return config
+}
+
+func intFromEnv(name string, defaultValue, minimum int) int {
+	value, ok := os.LookupEnv(name)
+	if !ok || value == "" {
+		return defaultValue
+	}
+	parsed, err := strconv.Atoi(value)
+	if err != nil || parsed < minimum {
+		klog.Warningf("Ignoring environment variable %s=%q: must be an integer greater than or equal to %d", name, value, minimum)
+		return defaultValue
+	}
+	return parsed
+}
+
+// These timings describe draining the stream, including envelope decoding and
+// client backpressure. They do not isolate server or network execution time.
+type fixedWorkersStreamReadStats struct {
+	startedAt          time.Time
+	readAt             time.Time
+	envelopesRead      uint64
+	streamReadDuration time.Duration
+	queueFullCount     uint64
+	queueWaitDuration  time.Duration
+}
+
+func (s fixedWorkersStreamReadStats) report() {
+	var elapsed time.Duration
+	if !s.readAt.IsZero() {
+		elapsed = s.readAt.Sub(s.startedAt)
+	}
+	klog.InfoS("Fixed-workers watch stream read timing",
+		"envelopesRead", s.envelopesRead,
+		"readElapsed", elapsed,
+		"streamReadAndDecodeDurationTotal", s.streamReadDuration,
+		"inputQueueFullCount", s.queueFullCount,
+		"inputQueueWaitDurationTotal", s.queueWaitDuration,
+	)
+}
 
 type ConcurrentDecoderWithFixedWorkersAndOutputQueue struct {
 	fixedWorkersBufferedConcurrentEnvelopeDecoder        *fixedWorkersBufferedConcurrentEnvelopeDecoder
 	fixedWorkersBufferedConcurrentOrderedEventProcessing *fixedWorkersBufferedConcurrentOrderedEventProcessing
 	wg                                                   sync.WaitGroup
+	closeOnce                                            sync.Once
 }
 
 func NewConcurrentDecoderWithFixedWorkersAndOutputQueue(envelopeDecoder streaming.Decoder, embeddedDecoder runtime.Decoder) *ConcurrentDecoderWithFixedWorkersAndOutputQueue {
+	config := concurrentDecoderWithFixedWorkersAndOutputQueueConfigFromEnv()
+	klog.InfoS("Creating watch decoder",
+		"decoder", "ConcurrentDecoderWithFixedWorkersAndOutputQueue",
+		"envelopeBufferSize", config.inputQueueSize,
+		"outputQueueSize", config.outputQueueSize,
+		"workerCount", config.workerCount,
+		"processingResultsBufferSize", config.workerCount-1,
+	)
 	d := &ConcurrentDecoderWithFixedWorkersAndOutputQueue{
 		fixedWorkersBufferedConcurrentEnvelopeDecoder: &fixedWorkersBufferedConcurrentEnvelopeDecoder{
 			envelopeDecoder:     envelopeDecoder,
-			incomingEnvelopesCh: make(chan fixedWorkersBufferedConcurrentEnvelopeResult, defaultFixedWorkersBufferedConcurrentEnvelopeBufferSize),
+			incomingEnvelopesCh: make(chan fixedWorkersBufferedConcurrentEnvelopeResult, config.inputQueueSize),
 			doneCh:              make(chan struct{}),
 		},
 	}
 	d.fixedWorkersBufferedConcurrentOrderedEventProcessing = &fixedWorkersBufferedConcurrentOrderedEventProcessing{
 		incomingEnvelopesCh: d.fixedWorkersBufferedConcurrentEnvelopeDecoder.incomingEnvelopesCh,
 		embeddedDecoder:     embeddedDecoder,
-		outputResultsCh:     make(chan *fixedWorkersBufferedConcurrentOrderedEventProcessingResult, defaultFixedWorkersBufferedConcurrentOutputBufferSize),
-		processingResultsCh: make(chan chan *fixedWorkersBufferedConcurrentOrderedEventProcessingResult, defaultFixedWorkersBufferedConcurrentEventProcessingConcurrency-1),
+		outputResultsCh:     make(chan *fixedWorkersBufferedConcurrentOrderedEventProcessingResult, config.outputQueueSize),
+		processingResultsCh: make(chan chan *fixedWorkersBufferedConcurrentOrderedEventProcessingResult, config.workerCount-1),
 		doneCh:              make(chan struct{}),
 	}
 	d.wg.Add(3)
@@ -62,7 +135,7 @@ func NewConcurrentDecoderWithFixedWorkersAndOutputQueue(envelopeDecoder streamin
 	}()
 	go func() {
 		defer d.wg.Done()
-		d.fixedWorkersBufferedConcurrentOrderedEventProcessing.scheduleEventProcessing(&d.wg)
+		d.fixedWorkersBufferedConcurrentOrderedEventProcessing.scheduleEventProcessing(&d.wg, config.workerCount)
 	}()
 	go func() {
 		defer d.wg.Done()
@@ -80,11 +153,15 @@ func (d *ConcurrentDecoderWithFixedWorkersAndOutputQueue) Decode() (watch.EventT
 }
 
 func (d *ConcurrentDecoderWithFixedWorkersAndOutputQueue) Close() {
-	d.fixedWorkersBufferedConcurrentOrderedEventProcessing.close()
-	d.fixedWorkersBufferedConcurrentEnvelopeDecoder.close()
-	d.wg.Wait()
-	d.fixedWorkersBufferedConcurrentEnvelopeDecoder.drain()
-	d.fixedWorkersBufferedConcurrentOrderedEventProcessing.drain()
+	d.closeOnce.Do(func() {
+		d.fixedWorkersBufferedConcurrentOrderedEventProcessing.close()
+		d.fixedWorkersBufferedConcurrentEnvelopeDecoder.close()
+		d.wg.Wait()
+		d.fixedWorkersBufferedConcurrentEnvelopeDecoder.drain()
+		d.fixedWorkersBufferedConcurrentOrderedEventProcessing.drain()
+		// The reader owns the counters; waiting above makes this safe without a mutex.
+		d.fixedWorkersBufferedConcurrentEnvelopeDecoder.readStats.report()
+	})
 }
 
 type fixedWorkersBufferedConcurrentOrderedEventProcessingResult struct {
@@ -158,7 +235,7 @@ func (p *fixedWorkersBufferedConcurrentOrderedEventProcessing) collectResults() 
 	}
 }
 
-func (p *fixedWorkersBufferedConcurrentOrderedEventProcessing) scheduleEventProcessing(wg *sync.WaitGroup) {
+func (p *fixedWorkersBufferedConcurrentOrderedEventProcessing) scheduleEventProcessing(wg *sync.WaitGroup, workerCount int) {
 	defer close(p.processingResultsCh)
 	type job struct {
 		envelopeResult fixedWorkersBufferedConcurrentEnvelopeResult
@@ -166,8 +243,8 @@ func (p *fixedWorkersBufferedConcurrentOrderedEventProcessing) scheduleEventProc
 	}
 	jobs := make(chan job)
 	defer close(jobs)
-	wg.Add(defaultFixedWorkersBufferedConcurrentEventProcessingConcurrency)
-	for i := 0; i < defaultFixedWorkersBufferedConcurrentEventProcessingConcurrency; i++ {
+	wg.Add(workerCount)
+	for i := 0; i < workerCount; i++ {
 		go func() {
 			defer wg.Done()
 			for job := range jobs {
@@ -220,6 +297,7 @@ type fixedWorkersBufferedConcurrentEnvelopeResult struct {
 }
 
 type fixedWorkersBufferedConcurrentEnvelopeDecoder struct {
+	readStats           fixedWorkersStreamReadStats
 	envelopeDecoder     streaming.Decoder
 	incomingEnvelopesCh chan fixedWorkersBufferedConcurrentEnvelopeResult
 	doneCh              chan struct{}
@@ -242,18 +320,37 @@ func (d *fixedWorkersBufferedConcurrentEnvelopeDecoder) drain() {
 
 func (d *fixedWorkersBufferedConcurrentEnvelopeDecoder) read() {
 	defer close(d.incomingEnvelopesCh)
+	stats := &d.readStats
+	stats.startedAt = time.Now()
 	for {
 		select {
 		case <-d.doneCh:
 			return
 		default:
 		}
-
+		readStarted := time.Now()
 		result := d.readEnvelope()
+		// A read interrupted by Close may have waited long after the last data arrived.
+		if result.err == nil {
+			stats.readAt = time.Now()
+			stats.streamReadDuration += stats.readAt.Sub(readStarted)
+			stats.envelopesRead++
+		}
 		select {
 		case <-d.doneCh:
 			return
 		case d.incomingEnvelopesCh <- result:
+		default:
+			// Only time sends which could not proceed immediately.
+			stats.queueFullCount++
+			waitStarted := time.Now()
+			select {
+			case <-d.doneCh:
+				stats.queueWaitDuration += time.Since(waitStarted)
+				return
+			case d.incomingEnvelopesCh <- result:
+				stats.queueWaitDuration += time.Since(waitStarted)
+			}
 		}
 		if result.err != nil {
 			return

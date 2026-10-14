@@ -66,6 +66,42 @@ func TestConcurrentDecoderWithFixedWorkersAndOutputQueueReadAhead(t *testing.T) 
 	}
 }
 
+func TestConcurrentDecoderWithFixedWorkersAndOutputQueueEnvironmentConfiguration(t *testing.T) {
+	t.Setenv(concurrentDecoderWithFixedWorkersAndOutputQueueInputQueueSizeEnvVar, "7")
+	t.Setenv(concurrentDecoderWithFixedWorkersAndOutputQueueOutputQueueSizeEnvVar, "11")
+	t.Setenv(concurrentDecoderWithFixedWorkersAndOutputQueueWorkerCountEnvVar, "3")
+
+	d := NewConcurrentDecoderWithFixedWorkersAndOutputQueue(outputQueueTestStream(0, io.EOF), getDecoder())
+	defer d.Close()
+
+	if got := cap(d.fixedWorkersBufferedConcurrentEnvelopeDecoder.incomingEnvelopesCh); got != 7 {
+		t.Fatalf("input queue capacity = %d, want 7", got)
+	}
+	if got := cap(d.fixedWorkersBufferedConcurrentOrderedEventProcessing.outputResultsCh); got != 11 {
+		t.Fatalf("output queue capacity = %d, want 11", got)
+	}
+	if got := cap(d.fixedWorkersBufferedConcurrentOrderedEventProcessing.processingResultsCh); got != 2 {
+		t.Fatalf("processing results queue capacity = %d, want 2", got)
+	}
+}
+
+func TestConcurrentDecoderWithFixedWorkersAndOutputQueueEnvironmentConfigurationInvalidValues(t *testing.T) {
+	t.Setenv(concurrentDecoderWithFixedWorkersAndOutputQueueInputQueueSizeEnvVar, "-1")
+	t.Setenv(concurrentDecoderWithFixedWorkersAndOutputQueueOutputQueueSizeEnvVar, "not-an-int")
+	t.Setenv(concurrentDecoderWithFixedWorkersAndOutputQueueWorkerCountEnvVar, "0")
+
+	config := concurrentDecoderWithFixedWorkersAndOutputQueueConfigFromEnv()
+	if config.inputQueueSize != defaultFixedWorkersBufferedConcurrentEnvelopeBufferSize {
+		t.Errorf("input queue size = %d, want default %d", config.inputQueueSize, defaultFixedWorkersBufferedConcurrentEnvelopeBufferSize)
+	}
+	if config.outputQueueSize != defaultFixedWorkersBufferedConcurrentOutputBufferSize {
+		t.Errorf("output queue size = %d, want default %d", config.outputQueueSize, defaultFixedWorkersBufferedConcurrentOutputBufferSize)
+	}
+	if config.workerCount != defaultFixedWorkersBufferedConcurrentEventProcessingConcurrency {
+		t.Errorf("worker count = %d, want default %d", config.workerCount, defaultFixedWorkersBufferedConcurrentEventProcessingConcurrency)
+	}
+}
+
 func TestConcurrentDecoderWithFixedWorkersAndOutputQueueOrdering(t *testing.T) {
 	release := make(chan struct{})
 	var releaseOnce sync.Once
@@ -226,5 +262,91 @@ func TestConcurrentDecoderWithFixedWorkersAndOutputQueueWorkerLimit(t *testing.T
 	}
 	if _, _, err := d.Decode(); err != io.EOF {
 		t.Fatalf("terminal error = %v, want EOF", err)
+	}
+}
+
+func TestFixedWorkersStreamReadInputQueueFull(t *testing.T) {
+	readStarted := make(chan struct{})
+	secondRead := make(chan struct{})
+	calls := 0
+	stream := &concurrentReaderTestStream{decode: func(into runtime.Object) (runtime.Object, error) {
+		calls++
+		if calls > 1 {
+			close(secondRead)
+			return nil, io.EOF
+		}
+		envelope := into.(*metav1.WatchEvent)
+		envelope.Type = string(watch.Added)
+		close(readStarted)
+		return envelope, nil
+	}}
+	d := &fixedWorkersBufferedConcurrentEnvelopeDecoder{
+		envelopeDecoder:     stream,
+		incomingEnvelopesCh: make(chan fixedWorkersBufferedConcurrentEnvelopeResult, 1),
+		doneCh:              make(chan struct{}),
+	}
+	// Hold the input queue full before starting the producer.
+	d.incomingEnvelopesCh <- fixedWorkersBufferedConcurrentEnvelopeResult{}
+	done := make(chan struct{})
+	go func() { defer close(done); d.read() }()
+	defer func() { d.close(); waitForOutputQueueTest(t, done) }()
+	waitForOutputQueueTest(t, readStarted)
+	select {
+	case <-secondRead:
+		t.Fatal("producer read another envelope while the input queue was full")
+	case <-time.After(50 * time.Millisecond):
+	}
+	<-d.incomingEnvelopesCh
+	<-d.incomingEnvelopesCh
+	terminal := <-d.incomingEnvelopesCh
+	waitForOutputQueueTest(t, done)
+	if terminal.err != io.EOF {
+		t.Fatalf("terminal error = %v, want EOF", terminal.err)
+	}
+	stats := d.readStats
+	if stats.queueFullCount < 1 || stats.queueWaitDuration <= 0 {
+		t.Fatalf("queue stats = %+v, want a full-queue occurrence and positive wait", stats)
+	}
+	if stats.envelopesRead != 1 || stats.readAt.Before(stats.startedAt) {
+		t.Fatalf("read stats = %+v, want one envelope and a read timestamp after starting", stats)
+	}
+
+}
+
+func TestFixedWorkersStreamReadCloseExcludesInterruptedRead(t *testing.T) {
+	secondRead := make(chan time.Time, 1)
+	closed := make(chan struct{})
+	calls := 0
+	stream := &concurrentReaderTestStream{
+		decode: func(into runtime.Object) (runtime.Object, error) {
+			calls++
+			if calls > 1 {
+				secondRead <- time.Now()
+				<-closed
+				return nil, io.EOF
+			}
+			envelope := into.(*metav1.WatchEvent)
+			envelope.Type = string(watch.Added)
+			return envelope, nil
+		},
+		close: func() error { close(closed); return nil },
+	}
+	objectDecoder := &concurrentProcessingTestDecoder{decode: func([]byte) (runtime.Object, error) { return &v1.Pod{}, nil }}
+	d := NewConcurrentDecoderWithFixedWorkersAndOutputQueue(stream, objectDecoder)
+	defer d.Close()
+	var interruptedReadStart time.Time
+	select {
+	case interruptedReadStart = <-secondRead:
+	case <-time.After(5 * time.Second):
+		t.Fatal("producer did not start the second read")
+	}
+	d.Close()
+	d.Close()
+	stats := d.fixedWorkersBufferedConcurrentEnvelopeDecoder.readStats
+	if stats.envelopesRead != 1 || stats.readAt.After(interruptedReadStart) {
+		t.Fatalf("read stats = %+v, want one envelope ending before the interrupted read", stats)
+	}
+	if stats.streamReadDuration > interruptedReadStart.Sub(stats.startedAt) {
+		t.Fatalf("read duration = %v, includes the interrupted read", stats.streamReadDuration)
 	}
 }
