@@ -447,42 +447,29 @@ func (c *cacheWatcher) sendWatchCacheEvent(event *watchCacheEvent) (builtAt, sen
 	return builtAt, sentAt
 }
 
-// streamInterval sends every event of cacheInterval to the result channel,
-// advancing *resourceVersion to the highest resourceVersion of any event the
-// interval yielded (including events the watcher's filter drops). It returns
-// the number of events the interval yielded. A non-nil error means the
-// interval has been invalidated (the watch cache history moved past it) and
-// can no longer serve events; the returned count is then meaningless.
-func (c *cacheWatcher) streamInterval(cacheInterval *watchCacheInterval, resourceVersion *uint64) (int, error) {
-	eventCount := 0
-	for event, err := range cacheInterval.All() {
-		if err != nil {
-			return eventCount, err
-		}
-		c.sendWatchCacheEvent(event)
-
-		// With some events already sent, update resourceVersion so that
-		// events that were buffered and not yet processed won't be delivered
-		// to this watcher second time causing going back in time.
-		//
-		// There is one case where events are not necessary ordered by
-		// resourceVersion, being a case of watching from resourceVersion=0,
-		// which at the beginning returns the state of each objects.
-		// For the purpose of it, we need to max it with the resource version
-		// that we have so far.
-		if event.ResourceVersion > *resourceVersion {
-			*resourceVersion = event.ResourceVersion
-		}
-		eventCount++
-	}
-	return eventCount, nil
-}
-
-func (c *cacheWatcher) processInterval(ctx context.Context, cacheInterval *watchCacheInterval, resourceVersion uint64) {
+func (c *cacheWatcher) process(ctx context.Context, cacheInterval *watchCacheInterval, resourceVersion uint64) {
 	defer utilruntime.HandleCrashWithContext(ctx)
 	defer close(c.result)
 	defer c.Stop()
 
+	resourceVersion, err := c.processInitialEvents(cacheInterval, resourceVersion)
+	if err != nil {
+		return
+	}
+	// At this point we already start processing incoming watch events.
+	// However, the init event can still be processed because their serialization
+	// and sending to the client happens asynchrnously.
+	// TODO: As describe in the KEP, we would like to estimate that by delaying
+	//   the initialization signal proportionally to the number of events to
+	//   process, but we're leaving this to the tuning phase.
+	utilflowcontrol.WatchInitialized(ctx)
+	c.processIncomingEvents(ctx, resourceVersion)
+}
+
+func (c *cacheWatcher) processInitialEvents(cacheInterval *watchCacheInterval, resourceVersion uint64) (uint64, error) {
+	if cacheInterval == nil {
+		return resourceVersion, nil
+	}
 	// Check how long we are processing initEvents.
 	// As long as these are not processed, we are not processing
 	// any incoming events, so if it takes long, we may actually
@@ -506,24 +493,41 @@ func (c *cacheWatcher) processInterval(ctx context.Context, cacheInterval *watch
 		resourceVersion = cacheInterval.resourceVersion
 	}
 
-	initEventCount, err := c.streamInterval(cacheInterval, &resourceVersion)
-	if err != nil {
-		// An error indicates that the cache interval
-		// has been invalidated and can no longer serve
-		// events.
+	initEventCount := 0
+	for event, err := range cacheInterval.All() {
+		if err != nil {
+			// An error indicates that the cache interval
+			// has been invalidated and can no longer serve
+			// events.
+			//
+			// Initially we considered sending an "out-of-history"
+			// Error event in this case, but because historically
+			// such events weren't sent out of the watchCache, we
+			// decided not to. This is still ok, because on watch
+			// closure, the watcher will try to re-instantiate the
+			// watch and then will get an explicit "out-of-history"
+			// window. There is potential for optimization, but for
+			// now, in order to be on the safe side and not break
+			// custom clients, the cost of it is something that we
+			// are fully accepting.
+			klog.Warningf("couldn't retrieve watch event to serve: %#v", err)
+			return resourceVersion, err
+		}
+		c.sendWatchCacheEvent(event)
+
+		// With some events already sent, update resourceVersion so that
+		// events that were buffered and not yet processed won't be delivered
+		// to this watcher second time causing going back in time.
 		//
-		// Initially we considered sending an "out-of-history"
-		// Error event in this case, but because historically
-		// such events weren't sent out of the watchCache, we
-		// decided not to. This is still ok, because on watch
-		// closure, the watcher will try to re-instantiate the
-		// watch and then will get an explicit "out-of-history"
-		// window. There is potential for optimization, but for
-		// now, in order to be on the safe side and not break
-		// custom clients, the cost of it is something that we
-		// are fully accepting.
-		klog.Warningf("couldn't retrieve watch event to serve: %#v", err)
-		return
+		// There is one case where events are not necessary ordered by
+		// resourceVersion, being a case of watching from resourceVersion=0,
+		// which at the beginning returns the state of each objects.
+		// For the purpose of it, we need to max it with the resource version
+		// that we have so far.
+		if event.ResourceVersion > resourceVersion {
+			resourceVersion = event.ResourceVersion
+		}
+		initEventCount++
 	}
 
 	if initEventCount > 0 {
@@ -538,18 +542,10 @@ func (c *cacheWatcher) processInterval(ctx context.Context, cacheInterval *watch
 	if cacheInterval.initialEventsEndBookmark != nil {
 		c.sendWatchCacheEvent(cacheInterval.initialEventsEndBookmark)
 	}
-	c.process(ctx, resourceVersion)
+	return resourceVersion, nil
 }
 
-func (c *cacheWatcher) process(ctx context.Context, resourceVersion uint64) {
-	// At this point we already start processing incoming watch events.
-	// However, the init event can still be processed because their serialization
-	// and sending to the client happens asynchrnously.
-	// TODO: As describe in the KEP, we would like to estimate that by delaying
-	//   the initialization signal proportionally to the number of events to
-	//   process, but we're leaving this to the tuning phase.
-	utilflowcontrol.WatchInitialized(ctx)
-
+func (c *cacheWatcher) processIncomingEvents(ctx context.Context, resourceVersion uint64) {
 	for {
 		select {
 		case event, ok := <-c.input:

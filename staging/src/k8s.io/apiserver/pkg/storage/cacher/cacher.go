@@ -661,7 +661,7 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 		}
 	}
 
-	go watcher.processInterval(ctx, cacheInterval, requiredResourceVersion)
+	go watcher.process(ctx, cacheInterval, requiredResourceVersion)
 	return watcher, nil
 }
 
