@@ -1440,6 +1440,12 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.22"
+- name: PodFailurePolicyName
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.38"
 - name: PodGroupPreemptionPolicy
   versionedSpecs:
   - default: false
