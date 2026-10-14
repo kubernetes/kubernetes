@@ -1330,6 +1330,76 @@ type sampleDataOpts struct {
 	podCertificateRequestsPerPod int
 }
 
+// TestNodeAuthorizerPVSecretFanout covers both traversal directions of
+// hasPathFrom over the node <- pod <- pvc <- pv <- secret chain: forward from
+// the secret while it is referenced by fewer objects than the node is, and
+// backwards from the node once the secret's fan-out is the larger of the two.
+func TestNodeAuthorizerPVSecretFanout(t *testing.T) {
+	g := NewGraph()
+	addChain := func(name, secret, node string) {
+		g.AddPV(&corev1.PersistentVolume{
+			ObjectMeta: metav1.ObjectMeta{Name: "pv-" + name},
+			Spec: corev1.PersistentVolumeSpec{
+				ClaimRef: &corev1.ObjectReference{Namespace: "ns", Name: "pvc-" + name},
+				PersistentVolumeSource: corev1.PersistentVolumeSource{
+					CSI: &corev1.CSIPersistentVolumeSource{
+						Driver:             "csi.example.com",
+						VolumeHandle:       "volume-" + name,
+						NodeStageSecretRef: &corev1.SecretReference{Namespace: "ns", Name: secret},
+					},
+				},
+			},
+		})
+		g.AddPod(&corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{Namespace: "ns", Name: "pod-" + name},
+			Spec: corev1.PodSpec{
+				NodeName: node,
+				Volumes: []corev1.Volume{{
+					Name:         "data",
+					VolumeSource: corev1.VolumeSource{PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: "pvc-" + name}},
+				}},
+			},
+		})
+	}
+
+	// shared-secret is referenced by more PVs than node-0 has pods, so queries
+	// for it traverse backwards from the node.
+	for i := range 5 {
+		addChain(fmt.Sprintf("shared-%d", i), "shared-secret", fmt.Sprintf("node-%d", i))
+	}
+	addChain("lone", "lone-secret", "node-lone")
+
+	authz := &NodeAuthorizer{graph: g}
+
+	testcases := []struct {
+		name         string
+		nodeName     string
+		vertexType   vertexType
+		namespace    string
+		resourceName string
+		expect       bool
+	}{
+		{"shared secret from a referencing node", "node-0", secretVertexType, "ns", "shared-secret", true},
+		{"shared secret from another referencing node", "node-4", secretVertexType, "ns", "shared-secret", true},
+		{"shared secret from an unrelated node", "node-lone", secretVertexType, "ns", "shared-secret", false},
+		{"lone secret from its node", "node-lone", secretVertexType, "ns", "lone-secret", true},
+		{"lone secret from an unrelated node", "node-0", secretVertexType, "ns", "lone-secret", false},
+		{"pv from its node", "node-0", pvVertexType, "", "pv-shared-0", true},
+		{"pv from an unrelated node", "node-1", pvVertexType, "", "pv-shared-0", false},
+	}
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			allowed, err := authz.hasPathFrom(tc.nodeName, tc.vertexType, tc.namespace, tc.resourceName)
+			if allowed != tc.expect {
+				t.Errorf("hasPathFrom() = (%t, %v), want %t", allowed, err, tc.expect)
+			}
+			if (err != nil) == tc.expect {
+				t.Errorf("hasPathFrom() error = %v, want error: %t", err, !tc.expect)
+			}
+		})
+	}
+}
+
 func mustParseFields(s string) fields.Requirements {
 	selector, err := fields.ParseSelector(s)
 	if err != nil {
