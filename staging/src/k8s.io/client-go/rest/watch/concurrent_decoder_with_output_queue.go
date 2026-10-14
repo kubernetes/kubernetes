@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer/streaming"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/klog/v2"
 )
 
 const (
@@ -41,6 +42,12 @@ type ConcurrentDecoderWithOutputQueue struct {
 }
 
 func NewConcurrentDecoderWithOutputQueue(envelopeDecoder streaming.Decoder, embeddedDecoder runtime.Decoder) *ConcurrentDecoderWithOutputQueue {
+	klog.InfoS("Creating watch decoder",
+		"decoder", "ConcurrentDecoderWithOutputQueue",
+		"envelopeBufferSize", defaultBufferedConcurrentEnvelopeBufferSize,
+		"outputQueueSize", defaultBufferedConcurrentOutputBufferSize,
+		"processingResultsBufferSize", defaultBufferedConcurrentEventProcessingConcurrency-1,
+	)
 	d := &ConcurrentDecoderWithOutputQueue{
 		bufferedConcurrentEnvelopeDecoder: &bufferedConcurrentEnvelopeDecoder{
 			envelopeDecoder:     envelopeDecoder,
