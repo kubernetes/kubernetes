@@ -18,6 +18,7 @@ package unstructured
 
 import (
 	gojson "encoding/json"
+	jsonv2 "encoding/json/v2"
 	"fmt"
 	"io"
 	"math/big"
@@ -474,18 +475,22 @@ func (unstructuredJSONScheme) decodeToUnstructured(data []byte, unstruct *Unstru
 }
 
 func (s unstructuredJSONScheme) decodeToList(data []byte, list *UnstructuredList) error {
+	// embed collects the members other than items, so one decode covers both.
 	type decodeList struct {
-		Items []gojson.RawMessage `json:"items"`
+		Object map[string]interface{}   `json:",embed"`
+		Items  []map[string]interface{} `json:"items"`
 	}
 
-	var dList decodeList
-	if err := json.Unmarshal(data, &dList); err != nil {
+	// Decoding into list.Object keeps the keys that data does not set, as
+	// decoding into a non-nil map does.
+	if list.Object == nil {
+		list.Object = map[string]interface{}{}
+	}
+	dList := decodeList{Object: list.Object}
+	if err := jsonv2.Unmarshal(data, &dList, json.CaseSensitivePreserveIntsV2Options()); err != nil {
 		return err
 	}
-
-	if err := json.Unmarshal(data, &list.Object); err != nil {
-		return err
-	}
+	delete(list.Object, "items") // a reused list may hold a stale items key
 
 	// For typed lists, e.g., a PodList, API server doesn't set each item's
 	// APIVersion and Kind. We need to set it.
@@ -493,33 +498,16 @@ func (s unstructuredJSONScheme) decodeToList(data []byte, list *UnstructuredList
 	listKind := list.GetKind()
 	itemKind := strings.TrimSuffix(listKind, "List")
 
-	// Decoding list.Object already decoded each item, so reuse those maps.
-	// dList still rejects an items value that is not an array, and supplies
-	// the raw bytes for items that are not objects, such as null.
-	decodedItems, _ := list.Object["items"].([]interface{})
-	if len(decodedItems) != len(dList.Items) {
-		// Defensive; both decodes see the same array.
-		decodedItems = nil
-	}
-	delete(list.Object, "items")
 	list.Items = make([]Unstructured, 0, len(dList.Items))
-	for i, rawItem := range dList.Items {
-		unstruct := &Unstructured{}
-		if decodedItems != nil {
-			unstruct.Object, _ = decodedItems[i].(map[string]interface{})
-		}
-		if unstruct.Object == nil {
-			if err := s.decodeToUnstructured(rawItem, unstruct); err != nil {
-				return err
-			}
-		}
+	for _, obj := range dList.Items {
+		unstruct := Unstructured{Object: obj}
 		// This is hacky. Set the item's Kind and APIVersion to those inferred
 		// from the List.
 		if len(unstruct.GetKind()) == 0 && len(unstruct.GetAPIVersion()) == 0 {
 			unstruct.SetKind(itemKind)
 			unstruct.SetAPIVersion(listAPIVersion)
 		}
-		list.Items = append(list.Items, *unstruct)
+		list.Items = append(list.Items, unstruct)
 	}
 	return nil
 }
