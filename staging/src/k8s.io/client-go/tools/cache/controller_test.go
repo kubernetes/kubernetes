@@ -1006,6 +1006,157 @@ func (m *mockTxnStore) Transaction(txns ...Transaction) *TransactionError {
 	return nil
 }
 
+func TestProcessDeltasInBatchRepeatedKeys(t *testing.T) {
+	mkCM := func(name, rv string) *v1.ConfigMap {
+		return &v1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Namespace: "ns", Name: name, ResourceVersion: rv}}
+	}
+	a1, a2, a3 := mkCM("a", "1"), mkCM("a", "2"), mkCM("a", "3")
+	b1, b2 := mkCM("b", "1"), mkCM("b", "2")
+
+	testCases := []struct {
+		name           string
+		initialObjects []interface{}
+		deltas         []Delta
+		// StoreRV is read from inside the callbacks, after the whole batch is applied.
+		expectedHistory []eventRecord
+		expectedStore   map[string]string
+	}{
+		{
+			name:   "multiple updates of a new object",
+			deltas: []Delta{{Added, a1}, {Updated, a2}, {Updated, a3}},
+			expectedHistory: []eventRecord{
+				{Action: "add", Key: "ns/a", EventRV: "1", StoreRV: "3"},
+				{Action: "update", Key: "ns/a", OldRV: "1", EventRV: "2", StoreRV: "3"},
+				{Action: "update", Key: "ns/a", OldRV: "2", EventRV: "3", StoreRV: "3"},
+			},
+			expectedStore: map[string]string{"ns/a": "3"},
+		},
+		{
+			name:           "multiple updates of a stored object",
+			initialObjects: []interface{}{a1},
+			deltas:         []Delta{{Updated, a2}, {Updated, a3}},
+			expectedHistory: []eventRecord{
+				{Action: "update", Key: "ns/a", OldRV: "1", EventRV: "2", StoreRV: "3"},
+				{Action: "update", Key: "ns/a", OldRV: "2", EventRV: "3", StoreRV: "3"},
+			},
+			expectedStore: map[string]string{"ns/a": "3"},
+		},
+		{
+			name:   "add then delete",
+			deltas: []Delta{{Added, a1}, {Deleted, a1}},
+			expectedHistory: []eventRecord{
+				{Action: "add", Key: "ns/a", EventRV: "1"},
+				{Action: "delete", Key: "ns/a", EventRV: "1"},
+			},
+			expectedStore: map[string]string{},
+		},
+		{
+			name:   "add then delete then add",
+			deltas: []Delta{{Added, a1}, {Deleted, a1}, {Added, a2}},
+			expectedHistory: []eventRecord{
+				{Action: "add", Key: "ns/a", EventRV: "1", StoreRV: "2"},
+				{Action: "delete", Key: "ns/a", EventRV: "1", StoreRV: "2"},
+				{Action: "add", Key: "ns/a", EventRV: "2", StoreRV: "2"},
+			},
+			expectedStore: map[string]string{"ns/a": "2"},
+		},
+		{
+			name:           "delete then add",
+			initialObjects: []interface{}{a1},
+			deltas:         []Delta{{Deleted, a1}, {Added, a2}},
+			expectedHistory: []eventRecord{
+				{Action: "delete", Key: "ns/a", EventRV: "1", StoreRV: "2"},
+				{Action: "add", Key: "ns/a", EventRV: "2", StoreRV: "2"},
+			},
+			expectedStore: map[string]string{"ns/a": "2"},
+		},
+		{
+			name:           "tombstone delete then add and update",
+			initialObjects: []interface{}{a1},
+			deltas:         []Delta{{Deleted, DeletedFinalStateUnknown{Key: "ns/a", Obj: a1}}, {Added, a2}, {Updated, a3}},
+			expectedHistory: []eventRecord{
+				{Action: "delete", Key: "ns/a", EventRV: "1", StoreRV: "3"},
+				{Action: "add", Key: "ns/a", EventRV: "2", StoreRV: "3"},
+				{Action: "update", Key: "ns/a", OldRV: "2", EventRV: "3", StoreRV: "3"},
+			},
+			expectedStore: map[string]string{"ns/a": "3"},
+		},
+		{
+			name:           "interleaved objects",
+			initialObjects: []interface{}{b1},
+			deltas:         []Delta{{Added, a1}, {Updated, b2}, {Updated, a2}, {Deleted, b2}, {Sync, a2}},
+			expectedHistory: []eventRecord{
+				{Action: "add", Key: "ns/a", EventRV: "1", StoreRV: "2"},
+				{Action: "update", Key: "ns/b", OldRV: "1", EventRV: "2"},
+				{Action: "update", Key: "ns/a", OldRV: "1", EventRV: "2", StoreRV: "2"},
+				{Action: "delete", Key: "ns/b", EventRV: "2"},
+				{Action: "update", Key: "ns/a", OldRV: "2", EventRV: "2", StoreRV: "2"},
+			},
+			expectedStore: map[string]string{"ns/a": "2"},
+		},
+	}
+
+	newStore := func(t *testing.T, objs []interface{}) Store {
+		store := NewStore(DeletionHandlingMetaNamespaceKeyFunc)
+		require.NoError(t, store.Replace(objs, ""))
+		return store
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			logger, _ := ktesting.NewTestContext(t)
+
+			batchStore := newStore(t, tc.initialObjects)
+			batchRecorder := newEventRecorder(batchStore, DeletionHandlingMetaNamespaceKeyFunc)
+			err := processDeltasInBatch(logger, batchRecorder, batchStore, tc.deltas, false, DeletionHandlingMetaNamespaceKeyFunc)
+			require.NoError(t, err)
+
+			individualStore := newStore(t, tc.initialObjects)
+			individualRecorder := newEventRecorder(individualStore, DeletionHandlingMetaNamespaceKeyFunc)
+			for _, d := range tc.deltas {
+				err := processDeltas(logger, individualRecorder, individualStore, Deltas{d}, false, DeletionHandlingMetaNamespaceKeyFunc)
+				require.NoError(t, err)
+			}
+
+			storeContents := storeResourceVersions(t, batchStore)
+
+			assert.Equal(t, tc.expectedHistory, batchRecorder.getHistory())
+			// Callbacks receive the same objects as with individual processing, but may observe
+			// later Deltas of the batch in the store.
+			assert.Equal(t, withoutStoreRV(individualRecorder.getHistory()), withoutStoreRV(batchRecorder.getHistory()))
+			assert.Equal(t, tc.expectedStore, storeContents)
+		})
+	}
+}
+
+func TestProcessDeltasInBatchKeyError(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	mkCM := func(name string) *v1.ConfigMap {
+		return &v1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Namespace: "ns", Name: name}}
+	}
+	ok1, broken, ok2 := mkCM("ok1"), mkCM("broken"), mkCM("ok2")
+	keyFunc := func(obj interface{}) (string, error) {
+		if obj == broken {
+			return "", errors.New("test key func error")
+		}
+		return DeletionHandlingMetaNamespaceKeyFunc(obj)
+	}
+
+	store := NewStore(DeletionHandlingMetaNamespaceKeyFunc)
+	callbacks := 0
+	handler := ResourceEventHandlerFuncs{
+		AddFunc: func(interface{}) { callbacks++ },
+	}
+
+	err := processDeltasInBatch(logger, handler, store, []Delta{{Added, ok1}, {Added, broken}, {Added, ok2}}, false, keyFunc)
+
+	var keyErr KeyError
+	require.ErrorAs(t, err, &keyErr)
+	assert.Equal(t, broken, keyErr.Obj)
+	assert.Equal(t, 2, callbacks)
+	assert.ElementsMatch(t, []interface{}{ok1, ok2}, store.List())
+}
+
 // TestProcessLoopUnkeyableObject checks that the handler receives the same events and the store
 // ends up in the same state with and without batch processing, when an object whose key cannot
 // be computed is queued between Deltas of repeated keys.
@@ -1053,7 +1204,7 @@ func TestProcessLoopUnkeyableObject(t *testing.T) {
 
 			expectedNonBatchProcessCalls:   8,
 			expectedBatchProcessCalls:      0,
-			expectedBatchProcessBatchCalls: 4,
+			expectedBatchProcessBatchCalls: 1,
 		},
 		{
 			name:   "unkeyable object first",
@@ -1066,8 +1217,8 @@ func TestProcessLoopUnkeyableObject(t *testing.T) {
 			expectedStoreRV: "3",
 
 			expectedNonBatchProcessCalls:   3,
-			expectedBatchProcessCalls:      3,
-			expectedBatchProcessBatchCalls: 0,
+			expectedBatchProcessCalls:      0,
+			expectedBatchProcessBatchCalls: 1,
 		},
 		{
 			name:   "unkeyable object last",
@@ -1080,7 +1231,7 @@ func TestProcessLoopUnkeyableObject(t *testing.T) {
 			expectedStoreRV: "2",
 
 			expectedNonBatchProcessCalls:   3,
-			expectedBatchProcessCalls:      1,
+			expectedBatchProcessCalls:      0,
 			expectedBatchProcessBatchCalls: 1,
 		},
 		{
@@ -1094,7 +1245,7 @@ func TestProcessLoopUnkeyableObject(t *testing.T) {
 			expectedStoreRV: "4",
 
 			expectedNonBatchProcessCalls:   4,
-			expectedBatchProcessCalls:      2,
+			expectedBatchProcessCalls:      0,
 			expectedBatchProcessBatchCalls: 1,
 		},
 	}
@@ -1150,6 +1301,13 @@ func TestProcessLoopUnkeyableObject(t *testing.T) {
 			})
 		}
 	}
+}
+
+func withoutStoreRV(history []eventRecord) []eventRecord {
+	for i := range history {
+		history[i].StoreRV = ""
+	}
+	return history
 }
 
 // storeResourceVersions returns the resource version of every object in the store by key.

@@ -273,6 +273,12 @@ func (c *threadSafeMap) Transaction(txns ...ThreadSafeStoreTransaction) {
 	finalObj := txns[len(txns)-1].Object
 	rv, rvErr := rvFromObject(finalObj)
 	rvInt, parseErr := parseRVForMetricsWithTruncation(rv)
+	// A key can occur multiple times in a transaction. Only its last write is applied, which
+	// avoids indexing objects that are overwritten within the same transaction.
+	lastWrite := make(map[string]int, len(txns))
+	for i, txn := range txns {
+		lastWrite[txn.Key] = i
+	}
 	c.lock.Lock()
 	defer c.lock.Unlock()
 	trace := utiltrace.New("ThreadSafeMap Transaction Process",
@@ -280,11 +286,12 @@ func (c *threadSafeMap) Transaction(txns ...ThreadSafeStoreTransaction) {
 		utiltrace.Field{Key: "Reason", Value: "Slow batch process due to too many items"})
 	defer trace.LogIfLong(min(500*time.Millisecond*time.Duration(len(txns)), 5*time.Second))
 
-	for _, txn := range txns {
+	for i, txn := range txns {
+		if lastWrite[txn.Key] != i {
+			continue
+		}
 		switch txn.Type {
-		case TransactionTypeAdd:
-			c.addLocked(txn.Key, txn.Object)
-		case TransactionTypeUpdate:
+		case TransactionTypeAdd, TransactionTypeUpdate:
 			c.updateLocked(txn.Key, txn.Object)
 		case TransactionTypeDelete:
 			c.deleteLocked(txn.Key)
@@ -300,10 +307,6 @@ func (c *threadSafeMap) Transaction(txns ...ThreadSafeStoreTransaction) {
 
 func (c *threadSafeMap) Add(key string, obj interface{}) {
 	c.Update(key, obj)
-}
-
-func (c *threadSafeMap) addLocked(key string, obj interface{}) {
-	c.updateLocked(key, obj)
 }
 
 func (c *threadSafeMap) Update(key string, obj interface{}) {

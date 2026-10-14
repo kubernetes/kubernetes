@@ -110,7 +110,7 @@ type ShouldResyncFunc func() bool
 type ProcessFunc func(obj interface{}, isInInitialList bool) error
 
 // ProcessBatchFunc processes multiple objects in batch.
-// The deltas must not contain multiple entries for the same object.
+// The deltas are ordered from oldest to newest and may contain multiple entries for the same object.
 type ProcessBatchFunc func(deltas []Delta, isInInitialList bool) error
 
 // `*controller` implements Controller
@@ -887,8 +887,15 @@ func processDeltas(
 // atomically in a single transaction and corresponding handler callbacks are
 // executed afterward. Otherwise, each Delta is processed individually.
 //
-// Returns an error if any Delta or transaction fails. For TransactionError,
-// only successful operations trigger callbacks.
+// The batch may contain multiple Deltas for the same object. Each of them
+// triggers its own callback, which receives the object as of the previous Delta
+// as the old object. Since callbacks run after the whole transaction, the Store
+// may already reflect later Deltas of the batch when a callback reads it.
+//
+// Returns an error if any Delta or transaction fails. Like with individual
+// processing, a Delta whose object key cannot be computed is skipped without
+// a callback, and the rest of the batch is still processed. For
+// TransactionError, only successful operations trigger callbacks.
 func processDeltasInBatch(
 	logger klog.Logger,
 	handler ResourceEventHandler,
@@ -913,13 +920,26 @@ func processDeltasInBatch(
 		}
 		return nil
 	}
-	// deltasList is a list of unique objects
+	// inBatch holds the newest object of every key seen so far in the batch, or nil if it was
+	// deleted. The store only changes after the loop, so it cannot provide the old object of a
+	// key that repeats within the batch.
+	inBatch := make(map[string]interface{}, len(deltas))
+	var keyErrs []error
 	for _, d := range deltas {
 		obj := d.Object
+		key, err := keyFunc(obj)
+		if err != nil {
+			keyErrs = append(keyErrs, KeyError{obj, err})
+			continue
+		}
 		switch d.Type {
 		case Sync, Replaced, Added, Updated:
-			// it will only return one old object for each because items are unique
-			if old, exists, err := clientState.Get(obj); err == nil && exists {
+			old, seen := inBatch[key]
+			if !seen {
+				old, _, _ = clientState.GetByKey(key)
+			}
+			inBatch[key] = obj
+			if old != nil {
 				txn := Transaction{
 					Type:   TransactionTypeUpdate,
 					Object: obj,
@@ -939,6 +959,7 @@ func processDeltasInBatch(
 				})
 			}
 		case Deleted:
+			inBatch[key] = nil
 			txn := Transaction{
 				Type:   TransactionTypeDelete,
 				Object: obj,
@@ -961,12 +982,12 @@ func processDeltasInBatch(
 			}
 		}
 		// formatting the error so txns doesn't escape and keeps allocated in the stack.
-		return fmt.Errorf("not all items in the batch successfully processed: %s", err.Error())
+		return errors.Join(append(keyErrs, fmt.Errorf("not all items in the batch successfully processed: %s", err.Error()))...)
 	}
 	for _, callback := range callbacks {
 		callback()
 	}
-	return nil
+	return errors.Join(keyErrs...)
 }
 
 func processReplacedAllInfo(logger klog.Logger, handler ResourceEventHandler, info ReplacedAllInfo, clientState Store, isInInitialList bool, keyFunc KeyFunc) error {
