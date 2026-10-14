@@ -60,7 +60,7 @@ func storeInterfaces(src, dest any) error {
 }
 
 func store(dest, src reflect.Value) error {
-	if dest.Kind() == reflect.Ptr {
+	if dest.Kind() == reflect.Pointer {
 		if dest.IsNil() {
 			dest.Set(reflect.New(dest.Type().Elem()))
 		}
@@ -119,7 +119,7 @@ func isConvertibleTo(dest, src reflect.Type) bool {
 	case dest.Kind() == reflect.Slice:
 		return src.Kind() == reflect.Slice &&
 			isConvertibleTo(dest.Elem(), src.Elem())
-	case dest.Kind() == reflect.Ptr:
+	case dest.Kind() == reflect.Pointer:
 		dest = dest.Elem()
 		return isConvertibleTo(dest, src)
 	case dest.Kind() == reflect.Struct:
@@ -358,7 +358,7 @@ func alignment(t reflect.Type) int {
 		return 4
 	case reflect.Uint64, reflect.Int64, reflect.Float64, reflect.Struct:
 		return 8
-	case reflect.Ptr:
+	case reflect.Pointer:
 		return alignment(t.Elem())
 	}
 	return 1
