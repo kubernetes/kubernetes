@@ -31,9 +31,9 @@ import (
 // It abstracts individual Pods and PodGroup, ensuring that
 // atomic entities are treated as a single unit during eviction.
 type Victim interface {
-	// Priority returns the priority of the preemption unit.
-	// For a single Pod, this is the Pod's priority.
-	// For a PodGroup, this is the priority of the PodGroup.
+	// Priority returns the priority of the preemption unit, which is the priority of its Pods.
+	// For a PodGroup or CompositePodGroup this is also the group's priority: the scheduling cycle
+	// guarantees that every Pod in a hierarchy shares the priority of the hierarchy's root.
 	Priority() int32
 
 	// Pods returns the list of all Pods that belong to this preemption unit.
@@ -65,9 +65,9 @@ func (v *victim) Pods() []fwk.PodInfo {
 	return v.pods
 }
 
-// Priority returns the priority of the preemption unit.
-// For a single Pod, this is the Pod's priority.
-// For a PodGroup, this is the priority of the PodGroup.
+// Priority returns the priority of the preemption unit, which is the priority of its Pods.
+// For a PodGroup or CompositePodGroup this is also the group's priority: the scheduling cycle
+// guarantees that every Pod in a hierarchy shares the priority of the hierarchy's root.
 func (v *victim) Priority() int32 {
 	return v.priority
 }

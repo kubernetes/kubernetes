@@ -2232,7 +2232,7 @@ func TestIsPodGroupWaitingForVictims(t *testing.T) {
 			want:      false,
 		},
 		{
-			name: "returns true when terminating pod on nominated node belongs to a lower-priority PodGroup",
+			name: "returns true when terminating pod on nominated node belongs to a lower-priority PodGroup with DisruptionModeAll",
 			initPods: []*v1.Pod{
 				makeTerminatingVictim("victim", "node1", lowPriority).PodGroupName("victim-pg").Obj(),
 			},
@@ -2243,12 +2243,34 @@ func TestIsPodGroupWaitingForVictims(t *testing.T) {
 			want:      true,
 		},
 		{
-			name: "returns false when terminating pod on nominated node belongs to a higher-priority PodGroup",
+			name: "returns true when terminating pod on nominated node belongs to a lower-priority PodGroup with DisruptionModeSingle",
+			initPods: []*v1.Pod{
+				makeTerminatingVictim("victim", "node1", lowPriority).PodGroupName("victim-pg").Obj(),
+			},
+			initPodGroups: []*schedulingv1beta1.PodGroup{
+				st.MakePodGroup().Name("victim-pg").Namespace("default").UID("victim-pg").Priority(lowPriority).DisruptionModeSingle().Obj(),
+			},
+			preemptor: makePreemptor(highPriority, "node1"),
+			want:      true,
+		},
+		{
+			name: "returns false when terminating pod on nominated node belongs to a higher-priority PodGroup with DisruptionModeAll",
 			initPods: []*v1.Pod{
 				makeTerminatingVictim("victim", "node1", highPriority).PodGroupName("victim-pg").Obj(),
 			},
 			initPodGroups: []*schedulingv1beta1.PodGroup{
 				st.MakePodGroup().Name("victim-pg").Namespace("default").UID("victim-pg").Priority(highPriority).DisruptionModeAll().Obj(),
+			},
+			preemptor: makePreemptor(midPriority, "node1"),
+			want:      false,
+		},
+		{
+			name: "returns false when terminating pod on nominated node belongs to a higher-priority PodGroup with DisruptionModeSingle",
+			initPods: []*v1.Pod{
+				makeTerminatingVictim("victim", "node1", highPriority).PodGroupName("victim-pg").Obj(),
+			},
+			initPodGroups: []*schedulingv1beta1.PodGroup{
+				st.MakePodGroup().Name("victim-pg").Namespace("default").UID("victim-pg").Priority(highPriority).DisruptionModeSingle().Obj(),
 			},
 			preemptor: makePreemptor(midPriority, "node1"),
 			want:      false,
