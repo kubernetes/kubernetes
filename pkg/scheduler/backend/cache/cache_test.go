@@ -3446,247 +3446,115 @@ func Test_RemoveCompositePodGroup(t *testing.T) {
 	}
 }
 
-func Test_BuildHierarchySnapshotFromPod(t *testing.T) {
-	podNoGroup := st.MakePod().Name("p0").Namespace("ns1").UID("p0").Obj()
-	pod1 := st.MakePod().Name("p1").Namespace("ns1").UID("p1").PodGroupName("pg1").Obj()
+func TestCache_FindRootGroup(t *testing.T) {
+	pg1 := st.MakePodGroup().Name("pg1").Namespace("ns1").ParentCompositePodGroup("cpg1").Obj()
+	pgRoot := st.MakePodGroup().Name("pg_root").Namespace("ns1").Obj()
+	pgMissingParent := st.MakePodGroup().Name("pg_missing_parent").Namespace("ns1").ParentCompositePodGroup("non-existent").Obj()
+	cpg1 := st.MakeCompositePodGroup().Name("cpg1").Namespace("ns1").ParentCompositePodGroup("cpg2").Obj()
+	cpg2 := st.MakeCompositePodGroup().Name("cpg2").Namespace("ns1").Obj()
 
-	pg1 := st.MakePodGroup().Name("pg1").Namespace("ns1").UID("pg1").Obj()
-
-	pod2 := st.MakePod().Name("p2").Namespace("ns1").UID("p2").PodGroupName("pg2").Obj()
-	pg2 := st.MakePodGroup().Name("pg2").Namespace("ns1").UID("pg2").ParentCompositePodGroup("cpg1").Obj()
-	cpg1 := st.MakeCompositePodGroup().Name("cpg1").Namespace("ns1").Obj()
-
-	pod3 := st.MakePod().Name("p3").Namespace("ns1").UID("p3").PodGroupName("pg3").Obj()
-	pg3 := st.MakePodGroup().Name("pg3").Namespace("ns1").UID("pg3").ParentCompositePodGroup("cpg2").Obj()
-	cpg2 := st.MakeCompositePodGroup().Name("cpg2").Namespace("ns1").ParentCompositePodGroup("cpg3").Obj()
-	cpg3 := st.MakeCompositePodGroup().Name("cpg3").Namespace("ns1").Obj()
-
-	podCycle := st.MakePod().Name("pCycle").Namespace("ns1").UID("pCycle").PodGroupName("pgCycle").Obj()
-	pgCycle := st.MakePodGroup().Name("pgCycle").Namespace("ns1").UID("pgCycle").ParentCompositePodGroup("cycle1").Obj()
-	cpgCycle1 := st.MakeCompositePodGroup().Name("cycle1").Namespace("ns1").ParentCompositePodGroup("cycle2").Obj()
-	cpgCycle2 := st.MakeCompositePodGroup().Name("cycle2").Namespace("ns1").ParentCompositePodGroup("cycle1").Obj()
+	setupCacheForRootGroupTest := func(ctx context.Context, compositePodGroupEnabled bool) *cacheImpl {
+		c := newCache(ctx, time.Second, nil, true, compositePodGroupEnabled)
+		c.AddGenericPodGroup(fwk.NewGenericPodGroup(pg1))
+		c.AddGenericPodGroup(fwk.NewGenericPodGroup(pgRoot))
+		c.AddGenericPodGroup(fwk.NewGenericPodGroup(pgMissingParent))
+		c.AddGenericPodGroup(fwk.NewGenericCompositePodGroup(cpg1))
+		c.AddGenericPodGroup(fwk.NewGenericCompositePodGroup(cpg2))
+		return c
+	}
 
 	tests := []struct {
 		name                     string
-		pod                      *v1.Pod
-		initialPGs               []*schedulingv1beta1.PodGroup
-		initialCPGs              []*schedulingv1alpha3.CompositePodGroup
-		genericWorkloadEnabled   bool
 		compositePodGroupEnabled bool
-		wantErr                  bool
-		wantPGKeys               []fwk.EntityKey
-		wantCPGKeys              []fwk.EntityKey
+		key                      fwk.EntityKey
+		want                     *fwk.GenericPodGroup
 	}{
 		{
-			name:                   "pod without scheduling group",
-			pod:                    podNoGroup,
-			wantErr:                true,
-			genericWorkloadEnabled: true,
-		},
-		{
-			name:                   "pod with scheduling group but no pod group in cache",
-			pod:                    pod1,
-			wantErr:                true,
-			genericWorkloadEnabled: true,
-		},
-		{
-			name:                   "simple pod group",
-			pod:                    pod1,
-			initialPGs:             []*schedulingv1beta1.PodGroup{pg1},
-			genericWorkloadEnabled: true,
-			wantPGKeys: []fwk.EntityKey{
-				fwk.PodGroupKey("ns1", "pg1"),
-			},
-		},
-		{
-			name:                     "pod group with parent CPG",
-			pod:                      pod2,
-			initialPGs:               []*schedulingv1beta1.PodGroup{pg2},
-			initialCPGs:              []*schedulingv1alpha3.CompositePodGroup{cpg1},
-			genericWorkloadEnabled:   true,
+			name:                     "from pg to cpg root (CompositePodGroupEnabled=true)",
 			compositePodGroupEnabled: true,
-			wantPGKeys: []fwk.EntityKey{
-				fwk.PodGroupKey("ns1", "pg2"),
-			},
-			wantCPGKeys: []fwk.EntityKey{
-				fwk.CompositePodGroupKey("ns1", "cpg1"),
-			},
+			key:                      fwk.PodGroupKey("ns1", "pg1"),
+			want:                     fwk.NewGenericCompositePodGroup(cpg2),
 		},
 		{
-			name:                     "pod group with parent CPG hierarchy",
-			pod:                      pod3,
-			initialPGs:               []*schedulingv1beta1.PodGroup{pg3},
-			initialCPGs:              []*schedulingv1alpha3.CompositePodGroup{cpg2, cpg3},
-			genericWorkloadEnabled:   true,
+			name:                     "from cpg to cpg root (CompositePodGroupEnabled=true)",
 			compositePodGroupEnabled: true,
-			wantPGKeys: []fwk.EntityKey{
-				fwk.PodGroupKey("ns1", "pg3"),
-			},
-			wantCPGKeys: []fwk.EntityKey{
-				fwk.CompositePodGroupKey("ns1", "cpg2"),
-				fwk.CompositePodGroupKey("ns1", "cpg3"),
-			},
+			key:                      fwk.CompositePodGroupKey("ns1", "cpg1"),
+			want:                     fwk.NewGenericCompositePodGroup(cpg2),
 		},
 		{
-			name:                     "cycle detection in hierarchy",
-			pod:                      podCycle,
-			initialPGs:               []*schedulingv1beta1.PodGroup{pgCycle},
-			initialCPGs:              []*schedulingv1alpha3.CompositePodGroup{cpgCycle1, cpgCycle2},
-			genericWorkloadEnabled:   true,
+			name:                     "from cpg root to cpg root (CompositePodGroupEnabled=true)",
 			compositePodGroupEnabled: true,
-			wantErr:                  true,
+			key:                      fwk.CompositePodGroupKey("ns1", "cpg2"),
+			want:                     fwk.NewGenericCompositePodGroup(cpg2),
 		},
 		{
-			name:                     "pod group with parent CPG but feature disabled",
-			pod:                      pod2,
-			initialPGs:               []*schedulingv1beta1.PodGroup{pg2},
-			initialCPGs:              []*schedulingv1alpha3.CompositePodGroup{cpg1},
-			genericWorkloadEnabled:   true,
-			compositePodGroupEnabled: false,
-			wantPGKeys: []fwk.EntityKey{
-				fwk.PodGroupKey("ns1", "pg2"),
-			},
-			wantCPGKeys: nil,
+			name:                     "from pg to pg root (CompositePodGroupEnabled=true)",
+			compositePodGroupEnabled: true,
+			key:                      fwk.PodGroupKey("ns1", "pg_root"),
+			want:                     fwk.NewGenericPodGroup(pgRoot),
+		},
+		{
+			name: "from pg (with parent set), (CompositePodGroupEnabled=false)",
+			key:  fwk.PodGroupKey("ns1", "pg1"),
+			want: fwk.NewGenericPodGroup(pg1),
+		},
+		{
+			name:                     "missing intermediate",
+			compositePodGroupEnabled: true,
+			key:                      fwk.PodGroupKey("ns1", "pg_missing_parent"),
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			_, ctx := ktesting.NewTestContext(t)
-			cache := newCache(ctx, time.Second, nil, tt.genericWorkloadEnabled, tt.compositePodGroupEnabled)
-			for _, pg := range tt.initialPGs {
-				cache.AddGenericPodGroup(fwk.NewGenericPodGroup(pg))
-			}
-			for _, cpg := range tt.initialCPGs {
-				cache.AddGenericPodGroup(fwk.NewGenericCompositePodGroup(cpg))
-			}
+			c := setupCacheForRootGroupTest(ctx, tt.compositePodGroupEnabled)
 
-			snapshot, err := cache.BuildHierarchySnapshotFromPod(tt.pod)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("BuildHierarchySnapshotFromPod() error = %v, wantErr %v", err, tt.wantErr)
-				return
+			root, err := c.FindRootGroup(tt.key)
+			if err != nil {
+				t.Fatalf("FindRootGroup(%v) failed unexpectedly: %v", tt.key, err)
 			}
-			if tt.wantErr {
-				return
-			}
-
-			snap := snapshot.(*Snapshot)
-			if len(snap.podGroupStates) != len(tt.wantPGKeys) {
-				t.Errorf("Expected %d podGroupStates, got %d", len(tt.wantPGKeys), len(snap.podGroupStates))
-			}
-			for _, k := range tt.wantPGKeys {
-				if _, ok := snap.podGroupStates[k]; !ok {
-					t.Errorf("Expected podGroupState %v not found in snapshot", k)
-				}
-			}
-
-			if len(snap.compositePodGroupStates) != len(tt.wantCPGKeys) {
-				t.Errorf("Expected %d compositePodGroupStates, got %d", len(tt.wantCPGKeys), len(snap.compositePodGroupStates))
-			}
-			for _, k := range tt.wantCPGKeys {
-				if _, ok := snap.compositePodGroupStates[k]; !ok {
-					t.Errorf("Expected compositePodGroupState %v not found in snapshot", k)
-				}
+			if diff := cmp.Diff(tt.want, root); diff != "" {
+				t.Errorf("FindRootGroup(%v) unexpected diff (-want,+got):\n%s", tt.key, diff)
 			}
 		})
 	}
 }
 
-func TestCache_GetRootKeyForGroup(t *testing.T) {
-	setupCacheForRootKeyTest := func(genericWorkloadEnabled, compositePodGroupEnabled bool) *cacheImpl {
-		ctx := context.Background()
-		c := newCache(ctx, time.Second, nil, genericWorkloadEnabled, compositePodGroupEnabled)
+func TestCache_FindRootGroup_Errors(t *testing.T) {
+	pgCycle := st.MakePodGroup().Name("pg_cycle").Namespace("ns1").ParentCompositePodGroup("cpg_cycle_1").Obj()
+	cpgCycle1 := st.MakeCompositePodGroup().Name("cpg_cycle_1").Namespace("ns1").ParentCompositePodGroup("cpg_cycle_2").Obj()
+	cpgCycle2 := st.MakeCompositePodGroup().Name("cpg_cycle_2").Namespace("ns1").ParentCompositePodGroup("cpg_cycle_1").Obj()
 
-		pg1 := st.MakePodGroup().Name("pg1").Namespace("ns1").ParentCompositePodGroup("cpg1").Obj()
-		cpg1 := st.MakeCompositePodGroup().Name("cpg1").Namespace("ns1").ParentCompositePodGroup("cpg2").Obj()
-		cpg2 := st.MakeCompositePodGroup().Name("cpg2").Namespace("ns1").Obj()
-
-		c.podGroupStates[fwk.PodGroupKey("ns1", "pg1")] = &podGroupState{podGroupStateData: podGroupStateData{podGroup: pg1}}
-		c.compositePodGroupStates[fwk.CompositePodGroupKey("ns1", "cpg1")] = &compositePodGroupState{compositePodGroupStateData: compositePodGroupStateData{compositePodGroup: cpg1}}
-		c.compositePodGroupStates[fwk.CompositePodGroupKey("ns1", "cpg2")] = &compositePodGroupState{compositePodGroupStateData: compositePodGroupStateData{compositePodGroup: cpg2}}
-
-		c.podGroupStates[fwk.PodGroupKey("ns1", "pg_cycle")] = &podGroupState{podGroupStateData: podGroupStateData{podGroup: st.MakePodGroup().Name("pg_cycle").Namespace("ns1").ParentCompositePodGroup("cpg_cycle_1").Obj()}}
-		c.compositePodGroupStates[fwk.CompositePodGroupKey("ns1", "cpg_cycle_1")] = &compositePodGroupState{compositePodGroupStateData: compositePodGroupStateData{compositePodGroup: st.MakeCompositePodGroup().Name("cpg_cycle_1").Namespace("ns1").ParentCompositePodGroup("cpg_cycle_2").Obj()}}
-		c.compositePodGroupStates[fwk.CompositePodGroupKey("ns1", "cpg_cycle_2")] = &compositePodGroupState{compositePodGroupStateData: compositePodGroupStateData{compositePodGroup: st.MakeCompositePodGroup().Name("cpg_cycle_2").Namespace("ns1").ParentCompositePodGroup("cpg_cycle_1").Obj()}}
-
-		c.podGroupStates[fwk.PodGroupKey("ns1", "pg_missing_parent")] = &podGroupState{podGroupStateData: podGroupStateData{podGroup: st.MakePodGroup().Name("pg_missing_parent").Namespace("ns1").ParentCompositePodGroup("non-existent").Obj()}}
-
-		pod1 := st.MakePod().Name("pod1").Namespace("ns1").PodGroupName("pg1").Obj()
-		c.podStates["ns1/pod1"] = &podState{pod: pod1}
-
+	setupCacheForRootGroupTest := func(ctx context.Context) *cacheImpl {
+		c := newCache(ctx, time.Second, nil, true, true)
+		c.AddGenericPodGroup(fwk.NewGenericPodGroup(pgCycle))
+		c.AddGenericPodGroup(fwk.NewGenericCompositePodGroup(cpgCycle1))
+		c.AddGenericPodGroup(fwk.NewGenericCompositePodGroup(cpgCycle2))
 		return c
 	}
 
 	tests := []struct {
-		name                     string
-		genericWorkloadEnabled   bool
-		compositePodGroupEnabled bool
-		key                      fwk.EntityKey
-		want                     fwk.EntityKey
-		wantErr                  bool
-		wantOk                   bool
+		name string
+		key  fwk.EntityKey
 	}{
 		{
-			name:                     "from pg to root (GW=true, CPG=true)",
-			genericWorkloadEnabled:   true,
-			compositePodGroupEnabled: true,
-			key:                      fwk.PodGroupKey("ns1", "pg1"),
-			want:                     fwk.CompositePodGroupKey("ns1", "cpg2"),
-			wantOk:                   true,
+			name: "cycle detected",
+			key:  fwk.PodGroupKey("ns1", "pg_cycle"),
 		},
 		{
-			name:                     "from cpg to root (GW=true, CPG=true)",
-			genericWorkloadEnabled:   true,
-			compositePodGroupEnabled: true,
-			key:                      fwk.CompositePodGroupKey("ns1", "cpg1"),
-			want:                     fwk.CompositePodGroupKey("ns1", "cpg2"),
-			wantOk:                   true,
-		},
-		{
-			name:                     "from root (GW=true, CPG=true)",
-			genericWorkloadEnabled:   true,
-			compositePodGroupEnabled: true,
-			key:                      fwk.CompositePodGroupKey("ns1", "cpg2"),
-			want:                     fwk.CompositePodGroupKey("ns1", "cpg2"),
-			wantOk:                   true,
-		},
-		{
-			name:                     "from pg (with parent set), compositePodGroup disabled",
-			genericWorkloadEnabled:   true,
-			compositePodGroupEnabled: false,
-			key:                      fwk.PodGroupKey("ns1", "pg1"),
-			want:                     fwk.PodGroupKey("ns1", "pg1"),
-			wantOk:                   true,
-		},
-		{
-			name:                     "missing intermediate",
-			genericWorkloadEnabled:   true,
-			compositePodGroupEnabled: true,
-			key:                      fwk.PodGroupKey("ns1", "pg_missing_parent"),
-			wantOk:                   false,
-		},
-		{
-			name:                     "cycle detected",
-			genericWorkloadEnabled:   true,
-			compositePodGroupEnabled: true,
-			key:                      fwk.PodGroupKey("ns1", "pg_cycle"),
-			wantErr:                  true,
+			name: "pod key type is not supported",
+			key:  fwk.PodKey("ns1", "pod1"),
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			c := setupCacheForRootKeyTest(tt.genericWorkloadEnabled, tt.compositePodGroupEnabled)
-			got, gotOk, err := c.GetRootKeyForGroup(tt.key)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("GetRootKeyForGroup() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if gotOk != tt.wantOk {
-				t.Errorf("GetRootKeyForGroup() gotOk = %v, wantOk %v", gotOk, tt.wantOk)
-			}
-			if gotOk && got != tt.want {
-				t.Errorf("GetRootKeyForGroup() got = %v, want %v", got, tt.want)
+			_, ctx := ktesting.NewTestContext(t)
+			c := setupCacheForRootGroupTest(ctx)
+
+			if _, err := c.FindRootGroup(tt.key); err == nil {
+				t.Fatalf("FindRootGroup(%v) expected an error, got nil", tt.key)
 			}
 		})
 	}
