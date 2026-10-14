@@ -384,9 +384,15 @@ func (sched *Scheduler) bindingCycle(
 
 	// Verify that pod was not preempted during prebinding.
 	bindingPod := schedFramework.GetPodInPreBind(assumedPod.UID)
-	if bindingPod != nil && !bindingPod.MarkPrebound() {
-		err := context.Cause(ctx)
-		return fwk.AsStatus(err)
+	if bindingPod != nil {
+		if !bindingPod.MarkPrebound() {
+			err := context.Cause(ctx)
+			return fwk.AsStatus(err)
+		}
+	} else {
+		defer schedFramework.RemovePodInPreBind(assumedPod.UID)
+		schedFramework.AddPodInPreBind(assumedPod.UID, nil)
+		schedFramework.GetPodInPreBind(assumedPod.UID).MarkPrebound()
 	}
 
 	// Run "bind" plugins.
