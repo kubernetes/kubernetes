@@ -35,12 +35,14 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/ktesting"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/kubernetes/test/integration/framework"
 )
 
 // BenchmarkRequestCost measures per-request heap allocations (B/op and allocs/op)
 // and HTTP request/response sizes for kube-apiserver operations using the 10KB exemplar pod
 // across request methods, options, and wire formats.
 func BenchmarkRequestCost(b *testing.B) {
+	framework.FixBenchmarkJSONOutput(b)
 	featuregatetesting.SetFeatureGatesDuringTest(b, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 		features.CBORServingAndStorage:    true,
 		features.DetectCacheInconsistency: false,
@@ -512,6 +514,7 @@ func BenchmarkRequestCost(b *testing.B) {
 	report := perfData{Version: "v1"}
 	for _, sc := range scenarios {
 		b.Run(fmt.Sprintf("Method=%s/Options=%s", sc.method, sc.options), func(b *testing.B) {
+			framework.FixBenchmarkJSONOutput(b)
 			report.DataItems = append(report.DataItems, benchmarkScenario(b, sc)...)
 		})
 	}
@@ -551,6 +554,7 @@ func benchmarkScenario(b *testing.B, sc requestScenario) []dataItem {
 
 	for _, wf := range sc.acceptContentTypes {
 		b.Run(fmt.Sprintf("Format=%s", wf.name), func(b *testing.B) {
+			framework.FixBenchmarkJSONOutput(b)
 			b.ReportAllocs()
 			tCtx := ktesting.Init(b)
 
