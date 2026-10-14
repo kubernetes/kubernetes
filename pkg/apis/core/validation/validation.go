@@ -4156,7 +4156,7 @@ func validateContainers(containers []core.Container, os *core.PodOS, volumes map
 	allErrs := field.ErrorList{}
 
 	if len(containers) == 0 {
-		return append(allErrs, field.Required(fldPath, ""))
+		return append(allErrs, field.Required(fldPath, "").MarkCoveredByDeclarative())
 	}
 
 	allNames := sets.Set[string]{}
