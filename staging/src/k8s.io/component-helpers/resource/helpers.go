@@ -557,6 +557,14 @@ func GetContainerExtraNodeAllocatableResources(pod *v1.Pod, containerName string
 	return extraNodeAllocatableRes
 }
 
+// GetPodExtraNodeAllocatableResources returns the sum of all extra node allocatable
+// resources (like DRA allocations) of a pod.
+func GetPodExtraNodeAllocatableResources(pod *v1.Pod) v1.ResourceList {
+	extraNodeAllocatableRes := make(v1.ResourceList)
+	addExtraNodeAllocatableResources(extraNodeAllocatableRes, pod, PodResourcesOptions{UseExtraNodeAllocatableResources: true})
+	return extraNodeAllocatableRes
+}
+
 func addExtraNodeAllocatableLimits(specLimits v1.ResourceList, pod *v1.Pod, opts PodResourcesOptions) v1.ResourceList {
 	extraNodeAllocatableRes := v1.ResourceList{}
 	addExtraNodeAllocatableResources(extraNodeAllocatableRes, pod, opts)

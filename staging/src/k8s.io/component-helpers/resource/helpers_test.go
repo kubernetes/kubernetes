@@ -4588,6 +4588,106 @@ func TestGetContainerExtraNodeAllocatableResources(t *testing.T) {
 	}
 }
 
+func TestGetPodExtraNodeAllocatableResources(t *testing.T) {
+	testCases := []struct {
+		description string
+		pod         *v1.Pod
+		expected    v1.ResourceList
+	}{
+		{
+			description: "no claims",
+			pod:         &v1.Pod{},
+			expected:    v1.ResourceList{},
+		},
+		{
+			description: "mapping shared by several containers counts once",
+			pod: &v1.Pod{
+				Status: v1.PodStatus{
+					ExtraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
+						{
+							Source:     v1.ExtraNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "shared-claim"},
+							Containers: []string{"c1", "c2"},
+							Mapping: []v1.NodeAllocatableMappedResources{
+								{
+									Name:     v1.ResourceCPU,
+									Quantity: new(resource.MustParse("2")),
+								},
+							},
+						},
+					},
+				},
+			},
+			expected: v1.ResourceList{
+				v1.ResourceCPU: resource.MustParse("2"),
+			},
+		},
+		{
+			description: "per-pod overhead counts once, per-container overhead once per referencing container",
+			pod: &v1.Pod{
+				Status: v1.PodStatus{
+					ExtraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
+						{
+							Source:     v1.ExtraNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "shared-overhead"},
+							Containers: []string{"c1", "c2"},
+							Overhead: []v1.NodeAllocatableOverheadResources{
+								{
+									Name:         v1.ResourceMemory,
+									PerPod:       new(resource.MustParse("3Gi")),
+									PerContainer: new(resource.MustParse("1Gi")),
+								},
+							},
+						},
+					},
+				},
+			},
+			expected: v1.ResourceList{
+				v1.ResourceMemory: resource.MustParse("5Gi"),
+			},
+		},
+		{
+			description: "claims of different containers add up",
+			pod: &v1.Pod{
+				Status: v1.PodStatus{
+					ExtraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
+						{
+							Source:     v1.ExtraNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "claim-1"},
+							Containers: []string{"c1"},
+							Mapping: []v1.NodeAllocatableMappedResources{
+								{
+									Name:     v1.ResourceCPU,
+									Quantity: new(resource.MustParse("1")),
+								},
+							},
+						},
+						{
+							Source:     v1.ExtraNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "claim-2"},
+							Containers: []string{"c2"},
+							Mapping: []v1.NodeAllocatableMappedResources{
+								{
+									Name:     v1.ResourceCPU,
+									Quantity: new(resource.MustParse("2")),
+								},
+							},
+						},
+					},
+				},
+			},
+			expected: v1.ResourceList{
+				v1.ResourceCPU: resource.MustParse("3"),
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			res := GetPodExtraNodeAllocatableResources(tc.pod)
+			if !equality.Semantic.DeepEqual(res, tc.expected) {
+				t.Errorf("expected=%v, got=%v", tc.expected, res)
+			}
+		})
+	}
+}
+
 func TestPodRequestsAndLimitsVerticalScalingWrappers(t *testing.T) {
 	cases := []struct {
 		name             string
