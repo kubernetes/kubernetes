@@ -37,11 +37,14 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	listersv1 "k8s.io/client-go/listers/core/v1"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2"
 	configv1 "k8s.io/kube-scheduler/config/v1"
 	fwk "k8s.io/kube-scheduler/framework"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler"
 	schedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	configtesting "k8s.io/kubernetes/pkg/scheduler/apis/config/testing"
@@ -740,8 +743,6 @@ func (pl *PreEnqueueGateAfterPreBindPlugin) PreEnqueue(ctx context.Context, p *v
 
 // TestPreFilterPlugin tests invocation of prefilter plugins.
 func TestPreFilterPlugin(t *testing.T) {
-	testContext := testutils.InitTestAPIServer(t, "prefilter-plugin", nil)
-
 	tests := []struct {
 		name                 string
 		fail                 bool
@@ -777,44 +778,51 @@ func TestPreFilterPlugin(t *testing.T) {
 		},
 	}
 
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			// Create a plugin registry for testing. Register only a pre-filter plugin.
-			preFilterPlugin := &PreFilterPlugin{}
-			registry, prof := initRegistryAndConfig(t, preFilterPlugin)
+	// Test scheduling scenarios treating the pod as individual or part of a pod group.
+	for _, scheduleAsPodGroup := range []bool{false, true} {
+		t.Run(fmt.Sprintf("Schedule as PodGroup: %v", scheduleAsPodGroup), func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GenericWorkload, scheduleAsPodGroup)
+			testContext := testutils.InitTestAPIServer(t, "prefilter-plugin", nil)
+			for _, test := range tests {
+				t.Run(test.name, func(t *testing.T) {
+					// Create a plugin registry for testing. Register only a pre-filter plugin.
+					preFilterPlugin := &PreFilterPlugin{}
+					registry, prof := initRegistryAndConfig(t, preFilterPlugin)
 
-			testCtx, teardown := schedulerutils.InitTestSchedulerForFrameworkTest(t, testContext, 2, true,
-				scheduler.WithProfiles(prof),
-				scheduler.WithFrameworkOutOfTreeRegistry(registry))
-			defer teardown()
+					testCtx, teardown := schedulerutils.InitTestSchedulerForFrameworkTest(t, testContext, 2, true,
+						scheduler.WithProfiles(prof),
+						scheduler.WithFrameworkOutOfTreeRegistry(registry))
+					defer teardown()
 
-			preFilterPlugin.failPreFilter = test.fail
-			preFilterPlugin.rejectPreFilter = test.reject
-			preFilterPlugin.preFilterResultNodes = test.preFilterResultNodes
-			// Create a best effort pod.
-			pod, err := testutils.CreatePausePod(testCtx.ClientSet,
-				testutils.InitPausePod(&testutils.PausePodConfig{Name: "test-pod", Namespace: testCtx.NS.Name}))
-			if err != nil {
-				t.Errorf("Error while creating a test pod: %v", err)
-			}
+					preFilterPlugin.failPreFilter = test.fail
+					preFilterPlugin.rejectPreFilter = test.reject
+					preFilterPlugin.preFilterResultNodes = test.preFilterResultNodes
+					// Create a best effort pod.
+					pod, err := testutils.CreatePausePod(testCtx.ClientSet,
+						testutils.InitPausePod(&testutils.PausePodConfig{Name: "test-pod", Namespace: testCtx.NS.Name}), scheduleAsPodGroup)
+					if err != nil {
+						t.Errorf("Error while creating a test pod: %v", err)
+					}
 
-			if test.reject {
-				if err = testutils.WaitForPodUnschedulable(testCtx.Ctx, testCtx.ClientSet, pod); err != nil {
-					t.Errorf("Didn't expect the pod to be scheduled. error: %v", err)
-				}
-			} else if test.fail {
-				if err = wait.PollUntilContextTimeout(testCtx.Ctx, 10*time.Millisecond, 30*time.Second, false,
-					testutils.PodSchedulingError(testCtx.ClientSet, pod.Namespace, pod.Name)); err != nil {
-					t.Errorf("Expected a scheduling error, but got: %v", err)
-				}
-			} else {
-				if err = testutils.WaitForPodToSchedule(testCtx.Ctx, testCtx.ClientSet, pod); err != nil {
-					t.Errorf("Expected the pod to be scheduled. error: %v", err)
-				}
-			}
+					if test.reject {
+						if err = testutils.WaitForPodUnschedulable(testCtx.Ctx, testCtx.ClientSet, pod); err != nil {
+							t.Errorf("Didn't expect the pod to be scheduled. error: %v", err)
+						}
+					} else if test.fail {
+						if err = wait.PollUntilContextTimeout(testCtx.Ctx, 10*time.Millisecond, 30*time.Second, false,
+							testutils.PodSchedulingError(testCtx.ClientSet, pod.Namespace, pod.Name)); err != nil {
+							t.Errorf("Expected a scheduling error, but got: %v", err)
+						}
+					} else {
+						if err = testutils.WaitForPodToSchedule(testCtx.Ctx, testCtx.ClientSet, pod); err != nil {
+							t.Errorf("Expected the pod to be scheduled. error: %v", err)
+						}
+					}
 
-			if preFilterPlugin.numPreFilterCalled.Load() == 0 {
-				t.Errorf("Expected the prefilter plugin to be called.")
+					if preFilterPlugin.numPreFilterCalled.Load() == 0 {
+						t.Errorf("Expected the prefilter plugin to be called.")
+					}
+				})
 			}
 		})
 	}
@@ -1088,8 +1096,6 @@ func TestPostFilterPlugin(t *testing.T) {
 
 // TestScorePlugin tests invocation of score plugins.
 func TestScorePlugin(t *testing.T) {
-	testContext := testutils.InitTestAPIServer(t, "score-plugin", nil)
-
 	tests := []struct {
 		name string
 		fail bool
@@ -1104,45 +1110,52 @@ func TestScorePlugin(t *testing.T) {
 		},
 	}
 
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			// Create a plugin registry for testing. Register only a score plugin.
-			scorePlugin := &ScorePlugin{}
-			registry, prof := initRegistryAndConfig(t, scorePlugin)
+	// Test scheduling scenarios treating the pod as individual or part of a pod group.
+	for _, scheduleAsPodGroup := range []bool{false, true} {
+		t.Run(fmt.Sprintf("Schedule as PodGroup: %v", scheduleAsPodGroup), func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GenericWorkload, scheduleAsPodGroup)
+			testContext := testutils.InitTestAPIServer(t, "score-plugin", nil)
+			for _, test := range tests {
+				t.Run(test.name, func(t *testing.T) {
+					// Create a plugin registry for testing. Register only a score plugin.
+					scorePlugin := &ScorePlugin{}
+					registry, prof := initRegistryAndConfig(t, scorePlugin)
 
-			testCtx, teardown := schedulerutils.InitTestSchedulerForFrameworkTest(t, testContext, 10, true,
-				scheduler.WithProfiles(prof),
-				scheduler.WithFrameworkOutOfTreeRegistry(registry))
-			defer teardown()
+					testCtx, teardown := schedulerutils.InitTestSchedulerForFrameworkTest(t, testContext, 10, true,
+						scheduler.WithProfiles(prof),
+						scheduler.WithFrameworkOutOfTreeRegistry(registry))
+					defer teardown()
 
-			scorePlugin.failScore = test.fail
-			// Create a best effort pod.
-			pod, err := testutils.CreatePausePod(testCtx.ClientSet,
-				testutils.InitPausePod(&testutils.PausePodConfig{Name: "test-pod", Namespace: testCtx.NS.Name}))
-			if err != nil {
-				t.Fatalf("Error while creating a test pod: %v", err)
-			}
-
-			if test.fail {
-				if err = wait.PollUntilContextTimeout(testCtx.Ctx, 10*time.Millisecond, 30*time.Second, false,
-					testutils.PodSchedulingError(testCtx.ClientSet, pod.Namespace, pod.Name)); err != nil {
-					t.Errorf("Expected a scheduling error, but got: %v", err)
-				}
-			} else {
-				if err = testutils.WaitForPodToSchedule(testCtx.Ctx, testCtx.ClientSet, pod); err != nil {
-					t.Errorf("Expected the pod to be scheduled. error: %v", err)
-				} else {
-					p, err := testutils.GetPod(testCtx.ClientSet, pod.Name, pod.Namespace)
+					scorePlugin.failScore = test.fail
+					// Create a best effort pod.
+					pod, err := testutils.CreatePausePod(testCtx.ClientSet,
+						testutils.InitPausePod(&testutils.PausePodConfig{Name: "test-pod", Namespace: testCtx.NS.Name}), scheduleAsPodGroup)
 					if err != nil {
-						t.Errorf("Failed to retrieve the pod. error: %v", err)
-					} else if p.Spec.NodeName != scorePlugin.highScoreNode {
-						t.Errorf("Expected the pod to be scheduled on node %q, got %q", scorePlugin.highScoreNode, p.Spec.NodeName)
+						t.Fatalf("Error while creating a test pod: %v", err)
 					}
-				}
-			}
 
-			if numScoreCalled := scorePlugin.deepCopy().numScoreCalled; numScoreCalled == 0 {
-				t.Errorf("Expected the score plugin to be called.")
+					if test.fail {
+						if err = wait.PollUntilContextTimeout(testCtx.Ctx, 10*time.Millisecond, 30*time.Second, false,
+							testutils.PodSchedulingError(testCtx.ClientSet, pod.Namespace, pod.Name)); err != nil {
+							t.Errorf("Expected a scheduling error, but got: %v", err)
+						}
+					} else {
+						if err = testutils.WaitForPodToSchedule(testCtx.Ctx, testCtx.ClientSet, pod); err != nil {
+							t.Errorf("Expected the pod to be scheduled. error: %v", err)
+						} else {
+							p, err := testutils.GetPod(testCtx.ClientSet, pod.Name, pod.Namespace)
+							if err != nil {
+								t.Errorf("Failed to retrieve the pod. error: %v", err)
+							} else if p.Spec.NodeName != scorePlugin.highScoreNode {
+								t.Errorf("Expected the pod to be scheduled on node %q, got %q", scorePlugin.highScoreNode, p.Spec.NodeName)
+							}
+						}
+					}
+
+					if numScoreCalled := scorePlugin.deepCopy().numScoreCalled; numScoreCalled == 0 {
+						t.Errorf("Expected the score plugin to be called.")
+					}
+				})
 			}
 		})
 	}
@@ -1150,38 +1163,43 @@ func TestScorePlugin(t *testing.T) {
 
 // TestNormalizeScorePlugin tests invocation of normalize score plugins.
 func TestNormalizeScorePlugin(t *testing.T) {
-	// Create a plugin registry for testing. Register only a normalize score plugin.
-	scoreWithNormalizePlugin := &ScoreWithNormalizePlugin{}
-	registry, prof := initRegistryAndConfig(t, scoreWithNormalizePlugin)
+	// Test scheduling scenarios treating the pod as individual or part of a pod group.
+	for _, scheduleAsPodGroup := range []bool{false, true} {
+		t.Run(fmt.Sprintf("Schedule as PodGroup: %v", scheduleAsPodGroup), func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GenericWorkload, scheduleAsPodGroup)
 
-	testCtx, _ := schedulerutils.InitTestSchedulerForFrameworkTest(t, testutils.InitTestAPIServer(t, "score-plugin", nil), 10, true,
-		scheduler.WithProfiles(prof),
-		scheduler.WithFrameworkOutOfTreeRegistry(registry))
+			// Create a plugin registry for testing. Register only a normalize score plugin.
+			scoreWithNormalizePlugin := &ScoreWithNormalizePlugin{}
+			registry, prof := initRegistryAndConfig(t, scoreWithNormalizePlugin)
 
-	// Create a best effort pod.
-	pod, err := testutils.CreatePausePod(testCtx.ClientSet,
-		testutils.InitPausePod(&testutils.PausePodConfig{Name: "test-pod", Namespace: testCtx.NS.Name}))
-	if err != nil {
-		t.Fatalf("Error while creating a test pod: %v", err)
-	}
+			testCtx, _ := schedulerutils.InitTestSchedulerForFrameworkTest(t, testutils.InitTestAPIServer(t, "score-plugin", nil), 10, true,
+				scheduler.WithProfiles(prof),
+				scheduler.WithFrameworkOutOfTreeRegistry(registry))
 
-	if err = testutils.WaitForPodToSchedule(testCtx.Ctx, testCtx.ClientSet, pod); err != nil {
-		t.Errorf("Expected the pod to be scheduled. error: %v", err)
-	}
+			// Create a best effort pod.
+			pod, err := testutils.CreatePausePod(testCtx.ClientSet,
+				testutils.InitPausePod(&testutils.PausePodConfig{Name: "test-pod", Namespace: testCtx.NS.Name}), scheduleAsPodGroup)
+			if err != nil {
+				t.Fatalf("Error while creating a test pod: %v", err)
+			}
 
-	p := scoreWithNormalizePlugin.deepCopy()
-	if p.numScoreCalled == 0 {
-		t.Errorf("Expected the score plugin to be called.")
-	}
-	if p.numNormalizeScoreCalled == 0 {
-		t.Error("Expected the normalize score plugin to be called")
+			if err = testutils.WaitForPodToSchedule(testCtx.Ctx, testCtx.ClientSet, pod); err != nil {
+				t.Errorf("Expected the pod to be scheduled. error: %v", err)
+			}
+
+			p := scoreWithNormalizePlugin.deepCopy()
+			if p.numScoreCalled == 0 {
+				t.Errorf("Expected the score plugin to be called.")
+			}
+			if p.numNormalizeScoreCalled == 0 {
+				t.Error("Expected the normalize score plugin to be called")
+			}
+		})
 	}
 }
 
 // TestReservePlugin tests invocation of reserve plugins.
 func TestReservePluginReserve(t *testing.T) {
-	testContext := testutils.InitTestAPIServer(t, "reserve-plugin-reserve", nil)
-
 	tests := []struct {
 		name string
 		fail bool
@@ -1196,38 +1214,45 @@ func TestReservePluginReserve(t *testing.T) {
 		},
 	}
 
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			// Create a plugin registry for testing. Register only a reserve plugin.
-			reservePlugin := &ReservePlugin{}
-			registry, prof := initRegistryAndConfig(t, reservePlugin)
+	// Test scheduling scenarios treating the pod as individual or part of a pod group.
+	for _, scheduleAsPodGroup := range []bool{false, true} {
+		t.Run(fmt.Sprintf("Schedule as PodGroup: %v", scheduleAsPodGroup), func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GenericWorkload, scheduleAsPodGroup)
+			testContext := testutils.InitTestAPIServer(t, "reserve-plugin-reserve", nil)
+			for _, test := range tests {
+				t.Run(test.name, func(t *testing.T) {
+					// Create a plugin registry for testing. Register only a reserve plugin.
+					reservePlugin := &ReservePlugin{}
+					registry, prof := initRegistryAndConfig(t, reservePlugin)
 
-			testCtx, teardown := schedulerutils.InitTestSchedulerForFrameworkTest(t, testContext, 2, true,
-				scheduler.WithProfiles(prof),
-				scheduler.WithFrameworkOutOfTreeRegistry(registry))
-			defer teardown()
+					testCtx, teardown := schedulerutils.InitTestSchedulerForFrameworkTest(t, testContext, 2, true,
+						scheduler.WithProfiles(prof),
+						scheduler.WithFrameworkOutOfTreeRegistry(registry))
+					defer teardown()
 
-			reservePlugin.failReserve = test.fail
-			// Create a best effort pod.
-			pod, err := testutils.CreatePausePod(testCtx.ClientSet,
-				testutils.InitPausePod(&testutils.PausePodConfig{Name: "test-pod", Namespace: testCtx.NS.Name}))
-			if err != nil {
-				t.Errorf("Error while creating a test pod: %v", err)
-			}
+					reservePlugin.failReserve = test.fail
+					// Create a best effort pod.
+					pod, err := testutils.CreatePausePod(testCtx.ClientSet,
+						testutils.InitPausePod(&testutils.PausePodConfig{Name: "test-pod", Namespace: testCtx.NS.Name}), scheduleAsPodGroup)
+					if err != nil {
+						t.Errorf("Error while creating a test pod: %v", err)
+					}
 
-			if test.fail {
-				if err = wait.PollUntilContextTimeout(testCtx.Ctx, 10*time.Millisecond, 30*time.Second, false,
-					testutils.PodSchedulingError(testCtx.ClientSet, pod.Namespace, pod.Name)); err != nil {
-					t.Errorf("Didn't expect the pod to be scheduled. error: %v", err)
-				}
-			} else {
-				if err = testutils.WaitForPodToSchedule(testCtx.Ctx, testCtx.ClientSet, pod); err != nil {
-					t.Errorf("Expected the pod to be scheduled. error: %v", err)
-				}
-			}
+					if test.fail {
+						if err = wait.PollUntilContextTimeout(testCtx.Ctx, 10*time.Millisecond, 30*time.Second, false,
+							testutils.PodSchedulingError(testCtx.ClientSet, pod.Namespace, pod.Name)); err != nil {
+							t.Errorf("Didn't expect the pod to be scheduled. error: %v", err)
+						}
+					} else {
+						if err = testutils.WaitForPodToSchedule(testCtx.Ctx, testCtx.ClientSet, pod); err != nil {
+							t.Errorf("Expected the pod to be scheduled. error: %v", err)
+						}
+					}
 
-			if reservePlugin.deepCopy().numReserveCalled == 0 {
-				t.Errorf("Expected the reserve plugin to be called.")
+					if reservePlugin.deepCopy().numReserveCalled == 0 {
+						t.Errorf("Expected the reserve plugin to be called.")
+					}
+				})
 			}
 		})
 	}
@@ -1235,140 +1260,146 @@ func TestReservePluginReserve(t *testing.T) {
 
 // TestPrebindPlugin tests invocation of prebind plugins.
 func TestPrebindPlugin(t *testing.T) {
-	testContext := testutils.InitTestAPIServer(t, "prebind-plugin", nil)
-
 	nodesNum := 2
 
-	tests := []struct {
-		name             string
-		fail             bool
-		reject           bool
-		succeedOnRetry   bool
-		unschedulablePod *v1.Pod
-	}{
-		{
-			name:   "disable fail and reject flags",
-			fail:   false,
-			reject: false,
-		},
-		{
-			name:   "enable fail and disable reject flags",
-			fail:   true,
-			reject: false,
-		},
-		{
-			name:   "disable fail and enable reject flags",
-			fail:   false,
-			reject: true,
-		},
-		{
-			name:   "enable fail and reject flags",
-			fail:   true,
-			reject: true,
-		},
-		{
-			name:           "fail on 1st try but succeed on retry",
-			fail:           true,
-			reject:         false,
-			succeedOnRetry: true,
-		},
-		{
-			name:             "failure on preBind moves unschedulable pods",
-			fail:             true,
-			unschedulablePod: st.MakePod().Name("unschedulable-pod").Namespace(testContext.NS.Name).Container(imageutils.GetPauseImageName()).Obj(),
-		},
-	}
+	// Test scheduling scenarios treating the pod as individual or part of a pod group.
+	for _, scheduleAsPodGroup := range []bool{false, true} {
+		t.Run(fmt.Sprintf("Schedule as PodGroup: %v", scheduleAsPodGroup), func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GenericWorkload, scheduleAsPodGroup)
+			testContext := testutils.InitTestAPIServer(t, "prebind-plugin", nil)
 
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			// Create a plugin registry for testing. Register a prebind and a filter plugin.
-			preBindPlugin := &PreBindPlugin{podUIDs: make(map[types.UID]struct{})}
-			filterPlugin := &FilterPlugin{}
-			registry := frameworkruntime.Registry{
-				preBindPluginName: newPlugin(preBindPlugin),
-				filterPluginName:  newPlugin(filterPlugin),
-			}
-
-			// Setup initial prebind and filter plugin in different profiles.
-			// The second profile ensures the embedded filter plugin is exclusively called, and hence
-			// we can use its internal `numFilterCalled` to perform some precise checking logic.
-			cfg := configtesting.V1ToInternalWithDefaults(t, configv1.KubeSchedulerConfiguration{
-				Profiles: []configv1.KubeSchedulerProfile{
-					{
-						SchedulerName: ptr.To(v1.DefaultSchedulerName),
-						Plugins: &configv1.Plugins{
-							PreBind: configv1.PluginSet{
-								Enabled: []configv1.Plugin{
-									{Name: preBindPluginName},
-								},
-							},
-						},
-					},
-					{
-						SchedulerName: ptr.To("2nd-scheduler"),
-						Plugins: &configv1.Plugins{
-							Filter: configv1.PluginSet{
-								Enabled: []configv1.Plugin{
-									{Name: filterPluginName},
-								},
-							},
-						},
-					},
+			tests := []struct {
+				name             string
+				fail             bool
+				reject           bool
+				succeedOnRetry   bool
+				unschedulablePod *v1.Pod
+			}{
+				{
+					name:   "disable fail and reject flags",
+					fail:   false,
+					reject: false,
 				},
-			})
-
-			testCtx, teardown := schedulerutils.InitTestSchedulerForFrameworkTest(t, testContext, nodesNum, true,
-				scheduler.WithProfiles(cfg.Profiles...),
-				scheduler.WithFrameworkOutOfTreeRegistry(registry))
-			defer teardown()
-
-			if p := test.unschedulablePod; p != nil {
-				p.Spec.SchedulerName = "2nd-scheduler"
-				filterPlugin.rejectFilter = true
-				if _, err := testutils.CreatePausePod(testCtx.ClientSet, p); err != nil {
-					t.Fatalf("Error while creating an unschedulable pod: %v", err)
-				}
+				{
+					name:   "enable fail and disable reject flags",
+					fail:   true,
+					reject: false,
+				},
+				{
+					name:   "disable fail and enable reject flags",
+					fail:   false,
+					reject: true,
+				},
+				{
+					name:   "enable fail and reject flags",
+					fail:   true,
+					reject: true,
+				},
+				{
+					name:           "fail on 1st try but succeed on retry",
+					fail:           true,
+					reject:         false,
+					succeedOnRetry: true,
+				},
+				{
+					name:             "failure on preBind moves unschedulable pods",
+					fail:             true,
+					unschedulablePod: st.MakePod().Name("unschedulable-pod").Namespace(testContext.NS.Name).Container(imageutils.GetPauseImageName()).Obj(),
+				},
 			}
 
-			preBindPlugin.set(test.fail, test.reject, test.succeedOnRetry)
-
-			// Create a best effort pod.
-			pod, err := testutils.CreatePausePod(testCtx.ClientSet,
-				testutils.InitPausePod(&testutils.PausePodConfig{Name: "test-pod", Namespace: testCtx.NS.Name}))
-			if err != nil {
-				t.Errorf("Error while creating a test pod: %v", err)
-			}
-
-			if test.fail {
-				if test.succeedOnRetry {
-					if err = testutils.WaitForPodToScheduleWithTimeout(testCtx.Ctx, testCtx.ClientSet, pod, 10*time.Second); err != nil {
-						t.Errorf("Expected the pod to be schedulable on retry, but got an error: %v", err)
+			for _, test := range tests {
+				t.Run(test.name, func(t *testing.T) {
+					// Create a plugin registry for testing. Register a prebind and a filter plugin.
+					preBindPlugin := &PreBindPlugin{podUIDs: make(map[types.UID]struct{})}
+					filterPlugin := &FilterPlugin{}
+					registry := frameworkruntime.Registry{
+						preBindPluginName: newPlugin(preBindPlugin),
+						filterPluginName:  newPlugin(filterPlugin),
 					}
-				} else if err = wait.PollUntilContextTimeout(testCtx.Ctx, 10*time.Millisecond, 30*time.Second, false,
-					testutils.PodSchedulingError(testCtx.ClientSet, pod.Namespace, pod.Name)); err != nil {
-					t.Errorf("Expected a scheduling error, but didn't get it. error: %v", err)
-				}
-			} else if test.reject {
-				if err = testutils.WaitForPodUnschedulable(testCtx.Ctx, testCtx.ClientSet, pod); err != nil {
-					t.Errorf("Expected the pod to be unschedulable")
-				}
-			} else if err = testutils.WaitForPodToSchedule(testCtx.Ctx, testCtx.ClientSet, pod); err != nil {
-				t.Errorf("Expected the pod to be scheduled. error: %v", err)
-			}
 
-			p := preBindPlugin.deepCopy()
-			if p.numPreBindCalled == 0 {
-				t.Errorf("Expected the prebind plugin to be called.")
-			}
+					// Setup initial prebind and filter plugin in different profiles.
+					// The second profile ensures the embedded filter plugin is exclusively called, and hence
+					// we can use its internal `numFilterCalled` to perform some precise checking logic.
+					cfg := configtesting.V1ToInternalWithDefaults(t, configv1.KubeSchedulerConfiguration{
+						Profiles: []configv1.KubeSchedulerProfile{
+							{
+								SchedulerName: ptr.To(v1.DefaultSchedulerName),
+								Plugins: &configv1.Plugins{
+									PreBind: configv1.PluginSet{
+										Enabled: []configv1.Plugin{
+											{Name: preBindPluginName},
+										},
+									},
+								},
+							},
+							{
+								SchedulerName: ptr.To("2nd-scheduler"),
+								Plugins: &configv1.Plugins{
+									Filter: configv1.PluginSet{
+										Enabled: []configv1.Plugin{
+											{Name: filterPluginName},
+										},
+									},
+								},
+							},
+						},
+					})
 
-			if test.unschedulablePod != nil {
-				if err := wait.PollUntilContextTimeout(testCtx.Ctx, 10*time.Millisecond, 15*time.Second, false, func(ctx context.Context) (bool, error) {
-					// 2 means the unschedulable pod is expected to be retried at least twice.
-					// (one initial attempt plus the one moved by the preBind pod)
-					return filterPlugin.deepCopy().numFilterCalled >= 2*nodesNum, nil
-				}); err != nil {
-					t.Errorf("Timed out waiting for the unschedulable Pod to be retried at least twice.")
-				}
+					testCtx, teardown := schedulerutils.InitTestSchedulerForFrameworkTest(t, testContext, nodesNum, true,
+						scheduler.WithProfiles(cfg.Profiles...),
+						scheduler.WithFrameworkOutOfTreeRegistry(registry))
+					defer teardown()
+
+					if p := test.unschedulablePod; p != nil {
+						p.Spec.SchedulerName = "2nd-scheduler"
+						filterPlugin.rejectFilter = true
+						if _, err := testutils.CreatePausePod(testCtx.ClientSet, p, scheduleAsPodGroup); err != nil {
+							t.Fatalf("Error while creating an unschedulable pod: %v", err)
+						}
+					}
+
+					preBindPlugin.set(test.fail, test.reject, test.succeedOnRetry)
+
+					// Create a best effort pod.
+					pod, err := testutils.CreatePausePod(testCtx.ClientSet,
+						testutils.InitPausePod(&testutils.PausePodConfig{Name: "test-pod", Namespace: testCtx.NS.Name}), scheduleAsPodGroup)
+					if err != nil {
+						t.Errorf("Error while creating a test pod: %v", err)
+					}
+
+					if test.fail {
+						if test.succeedOnRetry {
+							if err = testutils.WaitForPodToScheduleWithTimeout(testCtx.Ctx, testCtx.ClientSet, pod, 10*time.Second); err != nil {
+								t.Errorf("Expected the pod to be schedulable on retry, but got an error: %v", err)
+							}
+						} else if err = wait.PollUntilContextTimeout(testCtx.Ctx, 10*time.Millisecond, 30*time.Second, false,
+							testutils.PodSchedulingError(testCtx.ClientSet, pod.Namespace, pod.Name)); err != nil {
+							t.Errorf("Expected a scheduling error, but didn't get it. error: %v", err)
+						}
+					} else if test.reject {
+						if err = testutils.WaitForPodUnschedulable(testCtx.Ctx, testCtx.ClientSet, pod); err != nil {
+							t.Errorf("Expected the pod to be unschedulable")
+						}
+					} else if err = testutils.WaitForPodToSchedule(testCtx.Ctx, testCtx.ClientSet, pod); err != nil {
+						t.Errorf("Expected the pod to be scheduled. error: %v", err)
+					}
+
+					p := preBindPlugin.deepCopy()
+					if p.numPreBindCalled == 0 {
+						t.Errorf("Expected the prebind plugin to be called.")
+					}
+
+					if test.unschedulablePod != nil {
+						if err := wait.PollUntilContextTimeout(testCtx.Ctx, 10*time.Millisecond, 15*time.Second, false, func(ctx context.Context) (bool, error) {
+							// 2 means the unschedulable pod is expected to be retried at least twice.
+							// (one initial attempt plus the one moved by the preBind pod)
+							return filterPlugin.deepCopy().numFilterCalled >= 2*nodesNum, nil
+						}); err != nil {
+							t.Errorf("Timed out waiting for the unschedulable Pod to be retried at least twice.")
+						}
+					}
+				})
 			}
 		})
 	}
@@ -1963,8 +1994,6 @@ func TestBindPlugin(t *testing.T) {
 
 // TestPostBindPlugin tests invocation of postbind plugins.
 func TestPostBindPlugin(t *testing.T) {
-	testContext := testutils.InitTestAPIServer(t, "postbind-plugin", nil)
-
 	tests := []struct {
 		name        string
 		preBindFail bool
@@ -1979,51 +2008,58 @@ func TestPostBindPlugin(t *testing.T) {
 		},
 	}
 
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			// Create a plugin registry for testing. Register a prebind and a postbind plugin.
-			preBindPlugin := &PreBindPlugin{
-				failPreBind: test.preBindFail,
-				podUIDs:     make(map[types.UID]struct{}),
-			}
-			postBindPlugin := &PostBindPlugin{
-				name:                  postBindPluginName,
-				pluginInvokeEventChan: make(chan pluginInvokeEvent, 1),
-			}
+	// Test scheduling scenarios treating the pod as individual or part of a pod group.
+	for _, scheduleAsPodGroup := range []bool{false, true} {
+		t.Run(fmt.Sprintf("Schedule as PodGroup: %v", scheduleAsPodGroup), func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GenericWorkload, scheduleAsPodGroup)
+			testContext := testutils.InitTestAPIServer(t, "postbind-plugin", nil)
+			for _, test := range tests {
+				t.Run(test.name, func(t *testing.T) {
+					// Create a plugin registry for testing. Register a prebind and a postbind plugin.
+					preBindPlugin := &PreBindPlugin{
+						failPreBind: test.preBindFail,
+						podUIDs:     make(map[types.UID]struct{}),
+					}
+					postBindPlugin := &PostBindPlugin{
+						name:                  postBindPluginName,
+						pluginInvokeEventChan: make(chan pluginInvokeEvent, 1),
+					}
 
-			registry, prof := initRegistryAndConfig(t, preBindPlugin, postBindPlugin)
-			testCtx, teardown := schedulerutils.InitTestSchedulerForFrameworkTest(t, testContext, 2, true,
-				scheduler.WithProfiles(prof),
-				scheduler.WithFrameworkOutOfTreeRegistry(registry))
-			defer teardown()
+					registry, prof := initRegistryAndConfig(t, preBindPlugin, postBindPlugin)
+					testCtx, teardown := schedulerutils.InitTestSchedulerForFrameworkTest(t, testContext, 2, true,
+						scheduler.WithProfiles(prof),
+						scheduler.WithFrameworkOutOfTreeRegistry(registry))
+					defer teardown()
 
-			// Create a best effort pod.
-			pod, err := testutils.CreatePausePod(testCtx.ClientSet,
-				testutils.InitPausePod(&testutils.PausePodConfig{Name: "test-pod", Namespace: testCtx.NS.Name}))
-			if err != nil {
-				t.Errorf("Error while creating a test pod: %v", err)
-			}
+					// Create a best effort pod.
+					pod, err := testutils.CreatePausePod(testCtx.ClientSet,
+						testutils.InitPausePod(&testutils.PausePodConfig{Name: "test-pod", Namespace: testCtx.NS.Name}), scheduleAsPodGroup)
+					if err != nil {
+						t.Errorf("Error while creating a test pod: %v", err)
+					}
 
-			if test.preBindFail {
-				if err = wait.PollUntilContextTimeout(testCtx.Ctx, 10*time.Millisecond, 30*time.Second, false,
-					testutils.PodSchedulingError(testCtx.ClientSet, pod.Namespace, pod.Name)); err != nil {
-					t.Errorf("Expected a scheduling error, but didn't get it. error: %v", err)
-				}
-				if postBindPlugin.numPostBindCalled > 0 {
-					t.Errorf("Didn't expect the postbind plugin to be called %d times.", postBindPlugin.numPostBindCalled)
-				}
-			} else {
-				if err = testutils.WaitForPodToSchedule(testCtx.Ctx, testCtx.ClientSet, pod); err != nil {
-					t.Errorf("Expected the pod to be scheduled. error: %v", err)
-				}
-				select {
-				case <-postBindPlugin.pluginInvokeEventChan:
-				case <-time.After(time.Second * 15):
-					t.Errorf("pluginInvokeEventChan timed out")
-				}
-				if postBindPlugin.numPostBindCalled == 0 {
-					t.Errorf("Expected the postbind plugin to be called, was called %d times.", postBindPlugin.numPostBindCalled)
-				}
+					if test.preBindFail {
+						if err = wait.PollUntilContextTimeout(testCtx.Ctx, 10*time.Millisecond, 30*time.Second, false,
+							testutils.PodSchedulingError(testCtx.ClientSet, pod.Namespace, pod.Name)); err != nil {
+							t.Errorf("Expected a scheduling error, but didn't get it. error: %v", err)
+						}
+						if postBindPlugin.numPostBindCalled > 0 {
+							t.Errorf("Didn't expect the postbind plugin to be called %d times.", postBindPlugin.numPostBindCalled)
+						}
+					} else {
+						if err = testutils.WaitForPodToSchedule(testCtx.Ctx, testCtx.ClientSet, pod); err != nil {
+							t.Errorf("Expected the pod to be scheduled. error: %v", err)
+						}
+						select {
+						case <-postBindPlugin.pluginInvokeEventChan:
+						case <-time.After(time.Second * 15):
+							t.Errorf("pluginInvokeEventChan timed out")
+						}
+						if postBindPlugin.numPostBindCalled == 0 {
+							t.Errorf("Expected the postbind plugin to be called, was called %d times.", postBindPlugin.numPostBindCalled)
+						}
+					}
+				})
 			}
 		})
 	}
@@ -2031,8 +2067,6 @@ func TestPostBindPlugin(t *testing.T) {
 
 // TestPermitPlugin tests invocation of permit plugins.
 func TestPermitPlugin(t *testing.T) {
-	testContext := testutils.InitTestAPIServer(t, "permit-plugin", nil)
-
 	tests := []struct {
 		name    string
 		fail    bool
@@ -2077,50 +2111,57 @@ func TestPermitPlugin(t *testing.T) {
 		},
 	}
 
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
+	// Test scheduling scenarios treating the pod as individual or part of a pod group.
+	for _, scheduleAsPodGroup := range []bool{false, true} {
+		t.Run(fmt.Sprintf("Schedule as PodGroup: %v", scheduleAsPodGroup), func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GenericWorkload, scheduleAsPodGroup)
+			testContext := testutils.InitTestAPIServer(t, "permit-plugin", nil)
+			for _, test := range tests {
+				t.Run(test.name, func(t *testing.T) {
 
-			// Create a plugin registry for testing. Register only a permit plugin.
-			perPlugin := &PermitPlugin{name: permitPluginName}
-			registry, prof := initRegistryAndConfig(t, perPlugin)
+					// Create a plugin registry for testing. Register only a permit plugin.
+					perPlugin := &PermitPlugin{name: permitPluginName}
+					registry, prof := initRegistryAndConfig(t, perPlugin)
 
-			testCtx, teardown := schedulerutils.InitTestSchedulerForFrameworkTest(t, testContext, 2, true,
-				scheduler.WithProfiles(prof),
-				scheduler.WithFrameworkOutOfTreeRegistry(registry))
-			defer teardown()
+					testCtx, teardown := schedulerutils.InitTestSchedulerForFrameworkTest(t, testContext, 2, true,
+						scheduler.WithProfiles(prof),
+						scheduler.WithFrameworkOutOfTreeRegistry(registry))
+					defer teardown()
 
-			perPlugin.failPermit = test.fail
-			perPlugin.rejectPermit = test.reject
-			perPlugin.timeoutPermit = test.timeout
-			perPlugin.waitAndRejectPermit = false
-			perPlugin.waitAndAllowPermit = false
+					perPlugin.failPermit = test.fail
+					perPlugin.rejectPermit = test.reject
+					perPlugin.timeoutPermit = test.timeout
+					perPlugin.waitAndRejectPermit = false
+					perPlugin.waitAndAllowPermit = false
 
-			// Create a best effort pod.
-			pod, err := testutils.CreatePausePod(testCtx.ClientSet,
-				testutils.InitPausePod(&testutils.PausePodConfig{Name: "test-pod", Namespace: testCtx.NS.Name}))
-			if err != nil {
-				t.Errorf("Error while creating a test pod: %v", err)
-			}
-			if test.fail {
-				if err = wait.PollUntilContextTimeout(testCtx.Ctx, 10*time.Millisecond, 30*time.Second, false,
-					testutils.PodSchedulingError(testCtx.ClientSet, pod.Namespace, pod.Name)); err != nil {
-					t.Errorf("Expected a scheduling error, but didn't get it. error: %v", err)
-				}
-			} else {
-				if test.reject || test.timeout {
-					if err = testutils.WaitForPodUnschedulable(testCtx.Ctx, testCtx.ClientSet, pod); err != nil {
-						t.Errorf("Didn't expect the pod to be scheduled. error: %v", err)
+					// Create a best effort pod.
+					pod, err := testutils.CreatePausePod(testCtx.ClientSet,
+						testutils.InitPausePod(&testutils.PausePodConfig{Name: "test-pod", Namespace: testCtx.NS.Name}), scheduleAsPodGroup)
+					if err != nil {
+						t.Errorf("Error while creating a test pod: %v", err)
 					}
-				} else {
-					if err = testutils.WaitForPodToSchedule(testCtx.Ctx, testCtx.ClientSet, pod); err != nil {
-						t.Errorf("Expected the pod to be scheduled. error: %v", err)
+					if test.fail {
+						if err = wait.PollUntilContextTimeout(testCtx.Ctx, 10*time.Millisecond, 30*time.Second, false,
+							testutils.PodSchedulingError(testCtx.ClientSet, pod.Namespace, pod.Name)); err != nil {
+							t.Errorf("Expected a scheduling error, but didn't get it. error: %v", err)
+						}
+					} else {
+						if test.reject || test.timeout {
+							if err = testutils.WaitForPodUnschedulable(testCtx.Ctx, testCtx.ClientSet, pod); err != nil {
+								t.Errorf("Didn't expect the pod to be scheduled. error: %v", err)
+							}
+						} else {
+							if err = testutils.WaitForPodToSchedule(testCtx.Ctx, testCtx.ClientSet, pod); err != nil {
+								t.Errorf("Expected the pod to be scheduled. error: %v", err)
+							}
+						}
 					}
-				}
-			}
 
-			p := perPlugin.deepCopy()
-			if p.numPermitCalled == 0 {
-				t.Errorf("Expected the permit plugin to be called.")
+					p := perPlugin.deepCopy()
+					if p.numPermitCalled == 0 {
+						t.Errorf("Expected the permit plugin to be called.")
+					}
+				})
 			}
 		})
 	}
@@ -2128,53 +2169,60 @@ func TestPermitPlugin(t *testing.T) {
 
 // TestMultiplePermitPlugins tests multiple permit plugins returning wait for a same pod.
 func TestMultiplePermitPlugins(t *testing.T) {
-	// Create a plugin registry for testing.
-	perPlugin1 := &PermitPlugin{name: "permit-plugin-1"}
-	perPlugin2 := &PermitPlugin{name: "permit-plugin-2"}
-	registry, prof := initRegistryAndConfig(t, perPlugin1, perPlugin2)
+	// Test scheduling scenarios treating the pod as individual or part of a pod group.
+	for _, scheduleAsPodGroup := range []bool{false, true} {
+		t.Run(fmt.Sprintf("Schedule as PodGroup: %v", scheduleAsPodGroup), func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GenericWorkload, scheduleAsPodGroup)
 
-	// Create the API server and the scheduler with the test plugin set.
-	testCtx, _ := schedulerutils.InitTestSchedulerForFrameworkTest(t, testutils.InitTestAPIServer(t, "multi-permit-plugin", nil), 2, true,
-		scheduler.WithProfiles(prof),
-		scheduler.WithFrameworkOutOfTreeRegistry(registry))
+			// Create a plugin registry for testing.
+			perPlugin1 := &PermitPlugin{name: "permit-plugin-1"}
+			perPlugin2 := &PermitPlugin{name: "permit-plugin-2"}
+			registry, prof := initRegistryAndConfig(t, perPlugin1, perPlugin2)
 
-	// Both permit plugins will return Wait for permitting
-	perPlugin1.timeoutPermit = true
-	perPlugin2.timeoutPermit = true
+			// Create the API server and the scheduler with the test plugin set.
+			testCtx, _ := schedulerutils.InitTestSchedulerForFrameworkTest(t, testutils.InitTestAPIServer(t, "multi-permit-plugin", nil), 2, true,
+				scheduler.WithProfiles(prof),
+				scheduler.WithFrameworkOutOfTreeRegistry(registry))
 
-	// Create a test pod.
-	podName := "test-pod"
-	pod, err := testutils.CreatePausePod(testCtx.ClientSet,
-		testutils.InitPausePod(&testutils.PausePodConfig{Name: podName, Namespace: testCtx.NS.Name}))
-	if err != nil {
-		t.Errorf("Error while creating a test pod: %v", err)
-	}
+			// Both permit plugins will return Wait for permitting
+			perPlugin1.timeoutPermit = true
+			perPlugin2.timeoutPermit = true
 
-	var waitingPod fwk.WaitingPod
-	// Wait until the test pod is actually waiting.
-	wait.PollUntilContextTimeout(testCtx.Ctx, 10*time.Millisecond, 30*time.Second, false, func(ctx context.Context) (bool, error) {
-		waitingPod = perPlugin1.fh.GetWaitingPod(pod.UID)
-		return waitingPod != nil, nil
-	})
+			// Create a test pod.
+			podName := "test-pod"
+			pod, err := testutils.CreatePausePod(testCtx.ClientSet,
+				testutils.InitPausePod(&testutils.PausePodConfig{Name: podName, Namespace: testCtx.NS.Name}), scheduleAsPodGroup)
+			if err != nil {
+				t.Errorf("Error while creating a test pod: %v", err)
+			}
 
-	// Check the number of pending permits
-	if l := len(waitingPod.GetPendingPlugins()); l != 2 {
-		t.Errorf("Expected the number of pending plugins is 2, but got %d", l)
-	}
+			var waitingPod fwk.WaitingPod
+			// Wait until the test pod is actually waiting.
+			wait.PollUntilContextTimeout(testCtx.Ctx, 10*time.Millisecond, 30*time.Second, false, func(ctx context.Context) (bool, error) {
+				waitingPod = perPlugin1.fh.GetWaitingPod(pod.UID)
+				return waitingPod != nil, nil
+			})
 
-	perPlugin1.allowAllPods()
-	// Check the number of pending permits
-	if l := len(waitingPod.GetPendingPlugins()); l != 1 {
-		t.Errorf("Expected the number of pending plugins is 1, but got %d", l)
-	}
+			// Check the number of pending permits
+			if l := len(waitingPod.GetPendingPlugins()); l != 2 {
+				t.Errorf("Expected the number of pending plugins is 2, but got %d", l)
+			}
 
-	perPlugin2.allowAllPods()
-	if err = testutils.WaitForPodToSchedule(testCtx.Ctx, testCtx.ClientSet, pod); err != nil {
-		t.Errorf("Expected the pod to be scheduled. error: %v", err)
-	}
+			perPlugin1.allowAllPods()
+			// Check the number of pending permits
+			if l := len(waitingPod.GetPendingPlugins()); l != 1 {
+				t.Errorf("Expected the number of pending plugins is 1, but got %d", l)
+			}
 
-	if perPlugin1.deepCopy().numPermitCalled == 0 || perPlugin2.deepCopy().numPermitCalled == 0 {
-		t.Errorf("Expected the permit plugin to be called.")
+			perPlugin2.allowAllPods()
+			if err = testutils.WaitForPodToSchedule(testCtx.Ctx, testCtx.ClientSet, pod); err != nil {
+				t.Errorf("Expected the pod to be scheduled. error: %v", err)
+			}
+
+			if perPlugin1.deepCopy().numPermitCalled == 0 || perPlugin2.deepCopy().numPermitCalled == 0 {
+				t.Errorf("Expected the permit plugin to be called.")
+			}
+		})
 	}
 }
 
@@ -2314,8 +2362,6 @@ func TestCoSchedulingWithPermitPlugin(t *testing.T) {
 
 // TestFilterPlugin tests invocation of filter plugins.
 func TestFilterPlugin(t *testing.T) {
-	testContext := testutils.InitTestAPIServer(t, "filter-plugin", nil)
-
 	tests := []struct {
 		name string
 		fail bool
@@ -2330,40 +2376,47 @@ func TestFilterPlugin(t *testing.T) {
 		},
 	}
 
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			// Create a plugin registry for testing. Register only a filter plugin.
-			filterPlugin := &FilterPlugin{}
-			registry, prof := initRegistryAndConfig(t, filterPlugin)
+	// Test scheduling scenarios treating the pod as individual or part of a pod group.
+	for _, scheduleAsPodGroup := range []bool{false, true} {
+		t.Run(fmt.Sprintf("Schedule as PodGroup: %v", scheduleAsPodGroup), func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GenericWorkload, scheduleAsPodGroup)
+			testContext := testutils.InitTestAPIServer(t, "filter-plugin", nil)
+			for _, test := range tests {
+				t.Run(test.name, func(t *testing.T) {
+					// Create a plugin registry for testing. Register only a filter plugin.
+					filterPlugin := &FilterPlugin{}
+					registry, prof := initRegistryAndConfig(t, filterPlugin)
 
-			testCtx, teardown := schedulerutils.InitTestSchedulerForFrameworkTest(t, testContext, 1, true,
-				scheduler.WithProfiles(prof),
-				scheduler.WithFrameworkOutOfTreeRegistry(registry))
-			defer teardown()
+					testCtx, teardown := schedulerutils.InitTestSchedulerForFrameworkTest(t, testContext, 1, true,
+						scheduler.WithProfiles(prof),
+						scheduler.WithFrameworkOutOfTreeRegistry(registry))
+					defer teardown()
 
-			filterPlugin.failFilter = test.fail
-			// Create a best effort pod.
-			pod, err := testutils.CreatePausePod(testCtx.ClientSet,
-				testutils.InitPausePod(&testutils.PausePodConfig{Name: "test-pod", Namespace: testCtx.NS.Name}))
-			if err != nil {
-				t.Errorf("Error while creating a test pod: %v", err)
-			}
+					filterPlugin.failFilter = test.fail
+					// Create a best effort pod.
+					pod, err := testutils.CreatePausePod(testCtx.ClientSet,
+						testutils.InitPausePod(&testutils.PausePodConfig{Name: "test-pod", Namespace: testCtx.NS.Name}), scheduleAsPodGroup)
+					if err != nil {
+						t.Errorf("Error while creating a test pod: %v", err)
+					}
 
-			if test.fail {
-				if err = wait.PollUntilContextTimeout(testCtx.Ctx, 10*time.Millisecond, 30*time.Second, false,
-					testutils.PodSchedulingError(testCtx.ClientSet, pod.Namespace, pod.Name)); err != nil {
-					t.Errorf("Expected a scheduling error, but got: %v", err)
-				}
-				if filterPlugin.numFilterCalled < 1 {
-					t.Errorf("Expected the filter plugin to be called at least 1 time, but got %v.", filterPlugin.numFilterCalled)
-				}
-			} else {
-				if err = testutils.WaitForPodToSchedule(testCtx.Ctx, testCtx.ClientSet, pod); err != nil {
-					t.Errorf("Expected the pod to be scheduled. error: %v", err)
-				}
-				if filterPlugin.numFilterCalled != 1 {
-					t.Errorf("Expected the filter plugin to be called 1 time, but got %v.", filterPlugin.numFilterCalled)
-				}
+					if test.fail {
+						if err = wait.PollUntilContextTimeout(testCtx.Ctx, 10*time.Millisecond, 30*time.Second, false,
+							testutils.PodSchedulingError(testCtx.ClientSet, pod.Namespace, pod.Name)); err != nil {
+							t.Errorf("Expected a scheduling error, but got: %v", err)
+						}
+						if filterPlugin.numFilterCalled < 1 {
+							t.Errorf("Expected the filter plugin to be called at least 1 time, but got %v.", filterPlugin.numFilterCalled)
+						}
+					} else {
+						if err = testutils.WaitForPodToSchedule(testCtx.Ctx, testCtx.ClientSet, pod); err != nil {
+							t.Errorf("Expected the pod to be scheduled. error: %v", err)
+						}
+						if filterPlugin.numFilterCalled != 1 {
+							t.Errorf("Expected the filter plugin to be called 1 time, but got %v.", filterPlugin.numFilterCalled)
+						}
+					}
+				})
 			}
 		})
 	}
@@ -2371,8 +2424,6 @@ func TestFilterPlugin(t *testing.T) {
 
 // TestPreScorePlugin tests invocation of pre-score plugins.
 func TestPreScorePlugin(t *testing.T) {
-	testContext := testutils.InitTestAPIServer(t, "pre-score-plugin", nil)
-
 	tests := []struct {
 		name string
 		fail bool
@@ -2387,38 +2438,45 @@ func TestPreScorePlugin(t *testing.T) {
 		},
 	}
 
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			// Create a plugin registry for testing. Register only a pre-score plugin.
-			preScorePlugin := &PreScorePlugin{}
-			registry, prof := initRegistryAndConfig(t, preScorePlugin)
+	// Test scheduling scenarios treating the pod as individual or part of a pod group.
+	for _, scheduleAsPodGroup := range []bool{false, true} {
+		t.Run(fmt.Sprintf("Schedule as PodGroup: %v", scheduleAsPodGroup), func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GenericWorkload, scheduleAsPodGroup)
+			testContext := testutils.InitTestAPIServer(t, "pre-score-plugin", nil)
+			for _, test := range tests {
+				t.Run(test.name, func(t *testing.T) {
+					// Create a plugin registry for testing. Register only a pre-score plugin.
+					preScorePlugin := &PreScorePlugin{}
+					registry, prof := initRegistryAndConfig(t, preScorePlugin)
 
-			testCtx, teardown := schedulerutils.InitTestSchedulerForFrameworkTest(t, testContext, 2, true,
-				scheduler.WithProfiles(prof),
-				scheduler.WithFrameworkOutOfTreeRegistry(registry))
-			defer teardown()
+					testCtx, teardown := schedulerutils.InitTestSchedulerForFrameworkTest(t, testContext, 2, true,
+						scheduler.WithProfiles(prof),
+						scheduler.WithFrameworkOutOfTreeRegistry(registry))
+					defer teardown()
 
-			preScorePlugin.failPreScore = test.fail
-			// Create a best effort pod.
-			pod, err := testutils.CreatePausePod(testCtx.ClientSet,
-				testutils.InitPausePod(&testutils.PausePodConfig{Name: "test-pod", Namespace: testCtx.NS.Name}))
-			if err != nil {
-				t.Errorf("Error while creating a test pod: %v", err)
-			}
+					preScorePlugin.failPreScore = test.fail
+					// Create a best effort pod.
+					pod, err := testutils.CreatePausePod(testCtx.ClientSet,
+						testutils.InitPausePod(&testutils.PausePodConfig{Name: "test-pod", Namespace: testCtx.NS.Name}), scheduleAsPodGroup)
+					if err != nil {
+						t.Errorf("Error while creating a test pod: %v", err)
+					}
 
-			if test.fail {
-				if err = wait.PollUntilContextTimeout(testCtx.Ctx, 10*time.Millisecond, 30*time.Second, false,
-					testutils.PodSchedulingError(testCtx.ClientSet, pod.Namespace, pod.Name)); err != nil {
-					t.Errorf("Expected a scheduling error, but got: %v", err)
-				}
-			} else {
-				if err = testutils.WaitForPodToSchedule(testCtx.Ctx, testCtx.ClientSet, pod); err != nil {
-					t.Errorf("Expected the pod to be scheduled. error: %v", err)
-				}
-			}
+					if test.fail {
+						if err = wait.PollUntilContextTimeout(testCtx.Ctx, 10*time.Millisecond, 30*time.Second, false,
+							testutils.PodSchedulingError(testCtx.ClientSet, pod.Namespace, pod.Name)); err != nil {
+							t.Errorf("Expected a scheduling error, but got: %v", err)
+						}
+					} else {
+						if err = testutils.WaitForPodToSchedule(testCtx.Ctx, testCtx.ClientSet, pod); err != nil {
+							t.Errorf("Expected the pod to be scheduled. error: %v", err)
+						}
+					}
 
-			if preScorePlugin.numPreScoreCalled == 0 {
-				t.Errorf("Expected the pre-score plugin to be called.")
+					if preScorePlugin.numPreScoreCalled == 0 {
+						t.Errorf("Expected the pre-score plugin to be called.")
+					}
+				})
 			}
 		})
 	}
@@ -2426,61 +2484,67 @@ func TestPreScorePlugin(t *testing.T) {
 
 // TestPreEnqueuePlugin tests invocation of enqueue plugins.
 func TestPreEnqueuePlugin(t *testing.T) {
-	testContext := testutils.InitTestAPIServer(t, "enqueue-plugin", nil)
+	// Test scheduling scenarios treating the pod as individual or part of a pod group.
+	for _, scheduleAsPodGroup := range []bool{false, true} {
+		t.Run(fmt.Sprintf("Schedule as PodGroup: %v", scheduleAsPodGroup), func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GenericWorkload, scheduleAsPodGroup)
+			testContext := testutils.InitTestAPIServer(t, "enqueue-plugin", nil)
 
-	tests := []struct {
-		name         string
-		pod          *v1.Pod
-		admitEnqueue bool
-	}{
-		{
-			name:         "pod is admitted to enqueue",
-			pod:          st.MakePod().Name("p").Namespace(testContext.NS.Name).Container("pause").Obj(),
-			admitEnqueue: true,
-		},
-		{
-			name:         "pod is not admitted to enqueue",
-			pod:          st.MakePod().Name("p").Namespace(testContext.NS.Name).SchedulingGates([]string{"foo"}).Container("pause").Obj(),
-			admitEnqueue: false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			// Create a plugin registry for testing. Register only a filter plugin.
-			enqueuePlugin := &PreEnqueuePlugin{}
-			// Plumb a preFilterPlugin to verify if it's called or not.
-			preFilterPlugin := &PreFilterPlugin{}
-			registry, prof := initRegistryAndConfig(t, enqueuePlugin, preFilterPlugin)
-
-			testCtx, teardown := schedulerutils.InitTestSchedulerForFrameworkTest(t, testContext, 1, true,
-				scheduler.WithProfiles(prof),
-				scheduler.WithFrameworkOutOfTreeRegistry(registry))
-			defer teardown()
-
-			enqueuePlugin.admit = tt.admitEnqueue
-			// Create a best effort pod.
-			pod, err := testutils.CreatePausePod(testCtx.ClientSet, tt.pod)
-			if err != nil {
-				t.Errorf("Error while creating a test pod: %v", err)
+			tests := []struct {
+				name         string
+				pod          *v1.Pod
+				admitEnqueue bool
+			}{
+				{
+					name:         "pod is admitted to enqueue",
+					pod:          st.MakePod().Name("p").Namespace(testContext.NS.Name).Container("pause").Obj(),
+					admitEnqueue: true,
+				},
+				{
+					name:         "pod is not admitted to enqueue",
+					pod:          st.MakePod().Name("p").Namespace(testContext.NS.Name).SchedulingGates([]string{"foo"}).Container("pause").Obj(),
+					admitEnqueue: false,
+				},
 			}
 
-			if tt.admitEnqueue {
-				if err := testutils.WaitForPodToScheduleWithTimeout(testCtx.Ctx, testCtx.ClientSet, pod, 10*time.Second); err != nil {
-					t.Errorf("Expected the pod to be schedulable, but got: %v", err)
-				}
-				// Also verify enqueuePlugin is called.
-				if enqueuePlugin.called.Load() == 0 {
-					t.Errorf("Expected the enqueuePlugin plugin to be called at least once, but got 0")
-				}
-			} else {
-				if err := testutils.WaitForPodSchedulingGated(testCtx.Ctx, testCtx.ClientSet, pod, 10*time.Second); err != nil {
-					t.Errorf("Expected the pod to be scheduling waiting, but got: %v", err)
-				}
-				// Also verify preFilterPlugin is not called.
-				if called := preFilterPlugin.numPreFilterCalled.Load(); called != 0 {
-					t.Errorf("Expected the preFilter plugin not to be called, but got %v", called)
-				}
+			for _, tt := range tests {
+				t.Run(tt.name, func(t *testing.T) {
+					// Create a plugin registry for testing. Register only a filter plugin.
+					enqueuePlugin := &PreEnqueuePlugin{}
+					// Plumb a preFilterPlugin to verify if it's called or not.
+					preFilterPlugin := &PreFilterPlugin{}
+					registry, prof := initRegistryAndConfig(t, enqueuePlugin, preFilterPlugin)
+
+					testCtx, teardown := schedulerutils.InitTestSchedulerForFrameworkTest(t, testContext, 1, true,
+						scheduler.WithProfiles(prof),
+						scheduler.WithFrameworkOutOfTreeRegistry(registry))
+					defer teardown()
+
+					enqueuePlugin.admit = tt.admitEnqueue
+					// Create a best effort pod.
+					pod, err := testutils.CreatePausePod(testCtx.ClientSet, tt.pod, scheduleAsPodGroup)
+					if err != nil {
+						t.Errorf("Error while creating a test pod: %v", err)
+					}
+
+					if tt.admitEnqueue {
+						if err := testutils.WaitForPodToScheduleWithTimeout(testCtx.Ctx, testCtx.ClientSet, pod, 10*time.Second); err != nil {
+							t.Errorf("Expected the pod to be schedulable, but got: %v", err)
+						}
+						// Also verify enqueuePlugin is called.
+						if enqueuePlugin.called.Load() == 0 {
+							t.Errorf("Expected the enqueuePlugin plugin to be called at least once, but got 0")
+						}
+					} else {
+						if err := testutils.WaitForPodSchedulingGated(testCtx.Ctx, testCtx.ClientSet, pod, 10*time.Second); err != nil {
+							t.Errorf("Expected the pod to be scheduling waiting, but got: %v", err)
+						}
+						// Also verify preFilterPlugin is not called.
+						if called := preFilterPlugin.numPreFilterCalled.Load(); called != 0 {
+							t.Errorf("Expected the preFilter plugin not to be called, but got %v", called)
+						}
+					}
+				})
 			}
 		})
 	}

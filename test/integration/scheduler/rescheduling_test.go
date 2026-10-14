@@ -170,7 +170,7 @@ func TestReScheduling(t *testing.T) {
 					name:   "Rescheduling pod rejected by Permit Plugin with unrelated event",
 					plugin: &PermitPlugin{name: "permit", statusCode: fwk.Unschedulable},
 					action: func() error {
-						_, err := createPausePod(testContext.ClientSet,
+						_, err := testutils.CreatePausePod(testContext.ClientSet,
 							testutils.InitPausePod(&testutils.PausePodConfig{Name: "test-pod-2", Namespace: testContext.NS.Name}), scheduleAsPodGroup)
 						return err
 					},
@@ -203,7 +203,7 @@ func TestReScheduling(t *testing.T) {
 					name:   "Rescheduling pod rejected by Reserve Plugin with unrelated event",
 					plugin: &ReservePlugin{name: "reserve", statusCode: fwk.Unschedulable},
 					action: func() error {
-						_, err := createPausePod(testContext.ClientSet,
+						_, err := testutils.CreatePausePod(testContext.ClientSet,
 							testutils.InitPausePod(&testutils.PausePodConfig{Name: "test-pod-2", Namespace: testContext.NS.Name}), scheduleAsPodGroup)
 						return err
 					},
@@ -238,7 +238,7 @@ func TestReScheduling(t *testing.T) {
 							scheduler.WithFrameworkOutOfTreeRegistry(registry))
 						defer teardown()
 
-						pod, err := createPausePod(testCtx.ClientSet,
+						pod, err := testutils.CreatePausePod(testCtx.ClientSet,
 							testutils.InitPausePod(&testutils.PausePodConfig{Name: "test-pod", Namespace: testCtx.NS.Name}), scheduleAsPodGroup)
 						if err != nil {
 							t.Errorf("Error while creating a test pod: %v", err)

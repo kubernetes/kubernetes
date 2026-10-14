@@ -35,14 +35,17 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/klog/v2"
 	configv1 "k8s.io/kube-scheduler/config/v1"
 	fwk "k8s.io/kube-scheduler/framework"
 	apiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler"
 	configtesting "k8s.io/kubernetes/pkg/scheduler/apis/config/testing"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
@@ -370,71 +373,78 @@ func TestCustomResourceEnqueue(t *testing.T) {
 // TestRequeueByBindFailure verify Pods failed by bind plugin are
 // put back to the queue regardless of whether event happens or not.
 func TestRequeueByBindFailure(t *testing.T) {
-	fakeBind := &firstFailBindPlugin{}
-	registry := frameworkruntime.Registry{
-		"firstFailBindPlugin": func(ctx context.Context, o runtime.Object, fh fwk.Handle) (fwk.Plugin, error) {
-			binder, err := defaultbinder.New(ctx, nil, fh)
-			if err != nil {
-				return nil, err
+	// Test scheduling scenarios treating the pod as individual or part of a pod group.
+	for _, scheduleAsPodGroup := range []bool{false, true} {
+		t.Run(fmt.Sprintf("Schedule as PodGroup: %v", scheduleAsPodGroup), func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GenericWorkload, scheduleAsPodGroup)
+
+			fakeBind := &firstFailBindPlugin{}
+			registry := frameworkruntime.Registry{
+				"firstFailBindPlugin": func(ctx context.Context, o runtime.Object, fh fwk.Handle) (fwk.Plugin, error) {
+					binder, err := defaultbinder.New(ctx, nil, fh)
+					if err != nil {
+						return nil, err
+					}
+
+					fakeBind.defaultBinderPlugin = binder.(fwk.BindPlugin)
+					return fakeBind, nil
+				},
 			}
 
-			fakeBind.defaultBinderPlugin = binder.(fwk.BindPlugin)
-			return fakeBind, nil
-		},
-	}
-
-	cfg := configtesting.V1ToInternalWithDefaults(t, configv1.KubeSchedulerConfiguration{
-		Profiles: []configv1.KubeSchedulerProfile{{
-			SchedulerName: ptr.To(v1.DefaultSchedulerName),
-			Plugins: &configv1.Plugins{
-				MultiPoint: configv1.PluginSet{
-					Enabled: []configv1.Plugin{
-						{Name: "firstFailBindPlugin"},
+			cfg := configtesting.V1ToInternalWithDefaults(t, configv1.KubeSchedulerConfiguration{
+				Profiles: []configv1.KubeSchedulerProfile{{
+					SchedulerName: ptr.To(v1.DefaultSchedulerName),
+					Plugins: &configv1.Plugins{
+						MultiPoint: configv1.PluginSet{
+							Enabled: []configv1.Plugin{
+								{Name: "firstFailBindPlugin"},
+							},
+							Disabled: []configv1.Plugin{
+								{Name: names.DefaultBinder},
+							},
+						},
 					},
-					Disabled: []configv1.Plugin{
-						{Name: names.DefaultBinder},
-					},
-				},
-			},
-		}}})
+				}}})
 
-	// Use zero backoff seconds to bypass backoffQ.
-	testCtx := testutils.InitTestSchedulerWithOptions(
-		t,
-		testutils.InitTestAPIServer(t, "core-res-enqueue", nil),
-		0,
-		scheduler.WithPodInitialBackoffSeconds(0),
-		scheduler.WithPodMaxBackoffSeconds(0),
-		scheduler.WithProfiles(cfg.Profiles...),
-		scheduler.WithFrameworkOutOfTreeRegistry(registry),
-	)
-	testutils.SyncSchedulerInformerFactory(testCtx)
+			// Use zero backoff seconds to bypass backoffQ.
+			testCtx := testutils.InitTestSchedulerWithOptions(
+				t,
+				testutils.InitTestAPIServer(t, "core-res-enqueue", nil),
+				0,
+				scheduler.WithPodInitialBackoffSeconds(0),
+				scheduler.WithPodMaxBackoffSeconds(0),
+				scheduler.WithProfiles(cfg.Profiles...),
+				scheduler.WithFrameworkOutOfTreeRegistry(registry),
+			)
+			testutils.SyncSchedulerInformerFactory(testCtx)
 
-	go testCtx.Scheduler.Run(testCtx.Ctx)
+			go testCtx.Scheduler.Run(testCtx.Ctx)
 
-	cs, ns, ctx := testCtx.ClientSet, testCtx.NS.Name, testCtx.Ctx
-	node := st.MakeNode().Name("fake-node").Obj()
-	if _, err := cs.CoreV1().Nodes().Create(ctx, node, metav1.CreateOptions{}); err != nil {
-		t.Fatalf("Failed to create Node %q: %v", node.Name, err)
-	}
-	// create a pod.
-	pod := st.MakePod().Namespace(ns).Name("pod-1").Container(imageutils.GetPauseImageName()).Obj()
-	if _, err := cs.CoreV1().Pods(ns).Create(ctx, pod, metav1.CreateOptions{}); err != nil {
-		t.Fatalf("Failed to create Pod %q: %v", pod.Name, err)
-	}
+			cs, ns, ctx := testCtx.ClientSet, testCtx.NS.Name, testCtx.Ctx
+			node := st.MakeNode().Name("fake-node").Obj()
+			if _, err := cs.CoreV1().Nodes().Create(ctx, node, metav1.CreateOptions{}); err != nil {
+				t.Fatalf("Failed to create Node %q: %v", node.Name, err)
+			}
+			// create a pod.
+			pod := st.MakePod().Namespace(ns).Name("pod-1").Container(imageutils.GetPauseImageName()).Obj()
+			if _, err := testutils.CreatePausePod(cs, pod, scheduleAsPodGroup); err != nil {
+				t.Fatalf("Failed to create Pod %q: %v", pod.Name, err)
+			}
 
-	// 1. first binding try should fail.
-	// 2. The pod should be enqueued to activeQ/backoffQ without any event.
-	// 3. The pod should be scheduled in the second binding try.
-	// Here, waiting until (3).
-	err := wait.PollUntilContextTimeout(ctx, 200*time.Millisecond, wait.ForeverTestTimeout, false, testutils.PodScheduled(cs, ns, pod.Name))
-	if err != nil {
-		t.Fatalf("Expect pod-1 to be scheduled by the bind plugin: %v", err)
-	}
+			// 1. first binding try should fail.
+			// 2. The pod should be enqueued to activeQ/backoffQ without any event.
+			// 3. The pod should be scheduled in the second binding try.
+			// Here, waiting until (3).
+			err := wait.PollUntilContextTimeout(ctx, 200*time.Millisecond, wait.ForeverTestTimeout, false, testutils.PodScheduled(cs, ns, pod.Name))
+			if err != nil {
+				t.Fatalf("Expect pod-1 to be scheduled by the bind plugin: %v", err)
+			}
 
-	// Make sure the first binding trial was failed, and this pod is scheduled at the second trial.
-	if fakeBind.counter != 1 {
-		t.Fatalf("Expect pod-1 to be scheduled by the bind plugin in the second binding try: %v", err)
+			// Make sure the first binding trial was failed, and this pod is scheduled at the second trial.
+			if fakeBind.counter != 1 {
+				t.Fatalf("Expect pod-1 to be scheduled by the bind plugin in the second binding try: %v", err)
+			}
+		})
 	}
 }
 
