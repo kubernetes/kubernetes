@@ -63,6 +63,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/images"
 	"k8s.io/kubernetes/pkg/kubelet/kuberuntime"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
+	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	"k8s.io/kubernetes/pkg/kubelet/status"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	envutil "k8s.io/kubernetes/pkg/kubelet/util/env"
@@ -2024,7 +2025,16 @@ func (kl *Kubelet) generateAPIPodStatus(ctx context.Context, pod *v1.Pod, podSta
 		}
 	}
 
-	kl.probeManager.UpdatePodStatus(ctx, pod, s)
+	oldProbeStatus := &pod.Status
+	if !utilfeature.DefaultFeatureGate.Enabled(features.ChangeContainerStatusOnKubeletRestart) && kubetypes.IsStaticPod(pod) {
+		if mirrorPod, ok := kl.podManager.GetMirrorPodByPod(pod); ok && kubepod.IsMirrorPodOf(mirrorPod, pod) {
+			// Static pod manifests lack the API conditions and container IDs needed
+			// to preserve readiness after a kubelet restart. Only expose the mirror
+			// status to probes to avoid inheriting unrelated fields such as the phase.
+			oldProbeStatus = &mirrorPod.Status
+		}
+	}
+	kl.probeManager.UpdatePodStatus(ctx, pod, oldProbeStatus, s)
 
 	// update the allocated resources status
 	if utilfeature.DefaultFeatureGate.Enabled(features.ResourceHealthStatus) {
