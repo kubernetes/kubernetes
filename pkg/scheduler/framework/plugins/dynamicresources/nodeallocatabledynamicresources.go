@@ -18,16 +18,13 @@ package dynamicresources
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"slices"
 	"sort"
 
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
-	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	resourcehelper "k8s.io/component-helpers/resource"
 	"k8s.io/component-helpers/scheduling/corev1/nodeaffinity"
@@ -37,7 +34,6 @@ import (
 	fwk "k8s.io/kube-scheduler/framework"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
-	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 )
 
 type nodeAllocatableDRAInfo struct {
@@ -619,56 +615,4 @@ func (pl *DynamicResources) nodeFitsResources(nodeInfo fwk.NodeInfo, podRequest 
 		return fwk.NewStatus(statusCode, failureReasons...)
 	}
 	return nil
-}
-
-func (pl *DynamicResources) patchExtraNodeAllocatableResources(ctx context.Context, pod *v1.Pod, extraResources []v1.ExtraNodeAllocatableResource) *fwk.Status {
-	if len(pod.Status.ExtraNodeAllocatableResources) == 0 && len(extraResources) == 0 {
-		return nil
-	}
-	logger := klog.FromContext(ctx)
-
-	// The incoming 'pod' is from the scheduler cache and would have ExtraNodeAllocatableResources
-	// pre-populated in the assume phase without persisting to the API server.
-	// schedutil.PatchPodStatus skips patching if the old and new status are identical.
-	// To ensure the status is persisted to the API server we clear it in the baseStatus, forcing a patch.
-	baseStatus := pod.Status.DeepCopy()
-	if !apiequality.Semantic.DeepEqual(baseStatus.ExtraNodeAllocatableResources, extraResources) {
-		logger.V(5).Info("ExtraNodeAllocatableResources difference: assumed pod status does not match calculated status", "pod", klog.KObj(pod))
-		return statusError(logger, errors.New("assumed pod status does not match calculated status to be patched"))
-	}
-
-	baseStatus.ExtraNodeAllocatableResources = nil
-
-	targetStatus := pod.Status.DeepCopy()
-
-	targetStatus.ExtraNodeAllocatableResources = extraResources
-	if err := schedutil.PatchPodStatus(ctx, pl.clientset, pod.Name, pod.Namespace, baseStatus, targetStatus); err != nil {
-		return statusError(logger, fmt.Errorf("updating pod %s/%s ExtraNodeAllocatableResources: %w", pod.Namespace, pod.Name, err))
-	}
-	logger.V(5).Info("Patched pod status with ExtraNodeAllocatableResources", "pod", klog.KObj(pod), "status", targetStatus.ExtraNodeAllocatableResources)
-
-	return nil
-}
-
-func (pl *DynamicResources) clearExtraNodeAllocatableResources(ctx context.Context, pod *v1.Pod) {
-	if len(pod.Status.ExtraNodeAllocatableResources) == 0 {
-		return
-	}
-
-	logger := klog.FromContext(ctx)
-	logger.V(5).Info("Clearing ExtraNodeAllocatableResources on Unreserve", "pod", klog.KObj(pod))
-
-	// An explicit empty list distinguishes an intentional clear from an old
-	// client omitting a field that it does not know about. PatchPodStatus cannot
-	// preserve that distinction because the field has an omitempty JSON tag.
-	//
-	// The uid is included as a precondition so the patch cannot silently apply
-	// to a different pod object if this one got deleted and recreated with the
-	// same name in the meantime.
-	patch := fmt.Appendf(nil, `{"metadata":{"uid":%q},"status":{"extraNodeAllocatableResources":[]}}`, pod.UID)
-	if _, err := pl.clientset.CoreV1().Pods(pod.Namespace).Patch(ctx, pod.Name, types.MergePatchType, patch, metav1.PatchOptions{}, "status"); err != nil {
-		logger.Error(err, "Failed to clear ExtraNodeAllocatableResources on Unreserve", "pod", klog.KObj(pod))
-	} else {
-		logger.V(5).Info("Cleared ExtraNodeAllocatableResources", "pod", klog.KObj(pod))
-	}
 }

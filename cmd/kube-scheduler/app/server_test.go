@@ -294,6 +294,16 @@ leaderElection:
 						{Name: "TaintToleration", Weight: 1},
 						{Name: "DynamicResources", Weight: 1},
 					}
+					plugins.Reserve.Enabled = []config.Plugin{
+						{Name: "VolumeBinding"},
+						{Name: "NodeResourcesFit"},
+						{Name: "DynamicResources"},
+					}
+					plugins.PreBind.Enabled = []config.Plugin{
+						{Name: "VolumeBinding"},
+						{Name: "NodeResourcesFit"},
+						{Name: "DynamicResources"},
+					}
 					return plugins
 				}(),
 			},
