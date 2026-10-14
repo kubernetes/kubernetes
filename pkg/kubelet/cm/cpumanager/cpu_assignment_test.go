@@ -2727,6 +2727,40 @@ func commonTakeByTopologyExtendedTestCasesForResize(t *testing.T) []takeByTopolo
 			expErr:        "",
 			expResult:     mustParseCPUSet(t, "0-3,10-13,50,51"),
 		},
+		{
+			// Scale-up with retained CPUs on a NUMA node that has no free CPUs
+			// left. The allocation is expected to consider combinations that
+			// include the retained NUMA node, distributing CPUs evenly across
+			// the retained node and the nodes with free CPUs: the 2 retained
+			// CPUs on NUMA node 0 count as its share, and 1 full core is taken
+			// from each of NUMA nodes 1 and 2.
+			description:   "Scale-up: 2 to 6 CPUs, retained NUMA node fully consumed (no free CPUs), distribute across retained and free NUMA nodes",
+			topo:          topoDualSocketMultiNumaPerSocketHT,
+			availableCPUs: mustParseCPUSet(t, "0-1,10-11,20-21,50-51,60-61"),
+			allocatedCPUs: mustParseCPUSet(t, "0-1"),
+			baselineCPUs:  mustParseCPUSet(t, "0-1"),
+			numCPUs:       6,
+			cpuGroupSize:  1,
+			expErr:        "",
+			expResult:     mustParseCPUSet(t, "0-1,10,20,50,60"),
+		},
+		{
+			// Scale-up with retained CPUs spread over three NUMA nodes, two of
+			// which have no free CPUs left. The allocation is expected to cover
+			// all NUMA nodes with retained CPUs, which requires the 4-node
+			// combination here. Each node's even share of 2 CPUs is already
+			// satisfied by its retained CPUs, except NUMA node 3, so the 2
+			// additional CPUs are allocated from NUMA node 3.
+			description:   "Scale-up: 6 to 8 CPUs, 2 retained NUMA nodes fully consumed (no free CPUs), distribute across all retained and free NUMA nodes",
+			topo:          topoDualSocketMultiNumaPerSocketHT,
+			availableCPUs: mustParseCPUSet(t, "0-2,10-11,20-21,30-32"),
+			allocatedCPUs: mustParseCPUSet(t, "0-1,10-11,20-21"),
+			baselineCPUs:  mustParseCPUSet(t, "0-1,10-11,20-21"),
+			numCPUs:       8,
+			cpuGroupSize:  1,
+			expErr:        "",
+			expResult:     mustParseCPUSet(t, "0-1,10-11,20-21,30-31"),
+		},
 		// Scale-up cases, numCPUs > allocatedCPUs.Size() > baselineCPUs.Size()
 		{
 			description:   "Scale-up: 2 to 4 CPUs, take 2 full cores (1 core with allocatedCPUs + 1 more core) on 1 NUMA node from single socket with HT",

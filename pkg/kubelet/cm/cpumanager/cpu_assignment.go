@@ -233,8 +233,8 @@ func (s *socketsFirst) sortAvailableCores() []int {
 func (a *cpuAccumulator) sortAvailableUncoreCachesForResize() []int {
 	var result []int
 	added := cpuset.New()
+	allocatedUncoreCachesSet := a.resultDetails.UncoreCaches()
 	for _, numa := range a.sortAvailableNUMANodesForResize() {
-		allocatedUncoreCachesSet := a.resultDetails.UncoreInNUMANodes(numa)
 		availableUncoreCachesSet := a.details.UncoreInNUMANodes(numa)
 		// UncoreCache can span NUMA nodes, so skip already added
 		availableUncoreCachesSet = availableUncoreCachesSet.Difference(added)
@@ -1253,7 +1253,9 @@ func (a *cpuAccumulator) rangeNUMANodesNeededToSatisfy(cpuGroupSize int, minNumN
 	numNUMANodes := a.topo.CPUDetails.NUMANodes().Size()
 
 	// Get the total number of NUMA nodes that have CPUs available on them.
-	numNUMANodesAvailable := a.details.NUMANodes().Size()
+	// For resize, also count NUMA nodes that have no available CPUs but hold CPUs retained by this container.
+	// For add, resultDetails is unset, so the count is the number of NUMA nodes with available CPUs.
+	numNUMANodesAvailable := a.details.NUMANodes().Union(a.resultDetails.NUMANodes()).Size()
 
 	// Get the total number of CPUs in the system.
 	numCPUs := a.topo.CPUDetails.CPUs().Size()
@@ -1842,6 +1844,12 @@ func takeByTopologyNUMADistributedForResize(logger klog.Logger, topo *topology.C
 	// For resize operations, use sortAvailableNUMANodesForResize to prioritize NUMA nodes with retained CPUs,
 	// ensuring topology continuity during resize operations.
 	numas := acc.sortAvailableNUMANodesForResize()
+
+	// NUMA nodes with only retained CPUs have no free CPUs and are missing
+	// from the sorted list; combos must cover all NUMA nodes with retained
+	// CPUs, so prepend them back.
+	missingRetainedNUMANodes := acc.resultDetails.NUMANodes().Difference(cpuset.New(numas...))
+	numas = append(missingRetainedNUMANodes.List(), numas...)
 
 	// Calculate the minimum and maximum possible number of NUMA nodes that
 	// could satisfy this request. This is used to optimize how many iterations
