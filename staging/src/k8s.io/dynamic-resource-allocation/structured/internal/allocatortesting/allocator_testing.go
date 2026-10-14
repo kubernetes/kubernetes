@@ -7526,8 +7526,7 @@ func TestAllocator(t *testing.T,
 			),
 			node:          node(node1, region1),
 			expectResults: []any{},
-			// TODO: do we *want* an error?
-			// expectError:   g.MatchError(gomega.ContainSubstring("unsupported attribute value")),
+			expectError:   g.MatchError(g.ContainSubstring("unsupported attribute value")),
 		},
 		"with-distinct-constraints-with-subrequests": {
 			features: Features{
@@ -7983,6 +7982,45 @@ func TestAllocator(t *testing.T,
 				deviceAllocationResult(req0, driverA, pool1, device2, false),
 			)},
 		},
+		"list-attributes-disabled-distinct-constraint-single-device-with-list": {
+			features: Features{
+				ListTypeAttributes: false,
+				ConsumableCapacity: true,
+			},
+			claimsToAllocate: objects(claimWithRequests(
+				claim0,
+				[]resourceapi.DeviceConstraint{{DistinctAttribute: &stringAttribute}},
+				request(req0, classA, 1)),
+			),
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(sliceWithDevices(slice1, node1, pool1, driverA,
+				device(device1).withAttribute("stringAttribute", []string{"value1", "value2"}),
+			)),
+			node: node(node1, region1),
+
+			expectResults: nil,
+			expectError:   g.MatchError(g.ContainSubstring("unsupported attribute value")),
+		},
+		"list-attributes-disabled-distinct-constraint-scalar-and-list": {
+			features: Features{
+				ListTypeAttributes: false,
+				ConsumableCapacity: true,
+			},
+			claimsToAllocate: objects(claimWithRequests(
+				claim0,
+				[]resourceapi.DeviceConstraint{{DistinctAttribute: &stringAttribute}},
+				request(req0, classA, 2)),
+			),
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(sliceWithDevices(slice1, node1, pool1, driverA,
+				device(device1).withAttribute("stringAttribute", "value1"),
+				device(device2).withAttribute("stringAttribute", []string{"value1", "value2"}),
+			)),
+			node: node(node1, region1),
+
+			expectResults: nil,
+			expectError:   g.MatchError(g.ContainSubstring("unsupported attribute value")),
+		},
 		// KEP-6072: standardized numaNode attribute, list form. Two devices whose
 		// numaNode lists share an element (physical node + same-socket equidistant
 		// nodes) are co-placed by matchAttribute set intersection.
@@ -8134,8 +8172,7 @@ func TestAllocator(t *testing.T,
 			)),
 			node:          node(node1, region1),
 			expectResults: nil,
-			// TODO: do we *want* an error?
-			// expectError:   g.MatchError(gomega.ContainSubstring("unsupported attribute value")),
+			expectError:   g.MatchError(g.ContainSubstring("unsupported attribute value")),
 		},
 		"list-attributes-disabled-match-constraint-with-lists": {
 			features: Features{
@@ -8154,6 +8191,7 @@ func TestAllocator(t *testing.T,
 			node: node(node1, region1),
 
 			expectResults: nil,
+			expectError:   g.MatchError(g.ContainSubstring("unsupported attribute value")),
 		},
 		"list-attributes-distinct-constraint-scalar-string-values-all-distinct": {
 			features: Features{
@@ -8478,8 +8516,7 @@ func TestAllocator(t *testing.T,
 			node: node(node1, region1),
 
 			expectResults: nil,
-			// TODO: do we *want* an error?
-			// expectError:   g.MatchError(gomega.ContainSubstring("unsupported attribute value")),
+			expectError:   g.MatchError(g.ContainSubstring("unsupported attribute value")),
 		},
 		"list-attributes-disabled-distinct-constraint-with-lists": {
 			features: Features{
@@ -8499,6 +8536,7 @@ func TestAllocator(t *testing.T,
 			node: node(node1, region1),
 
 			expectResults: nil,
+			expectError:   g.MatchError(g.ContainSubstring("unsupported attribute value")),
 		},
 		"list-attributes-distinct-constraint-backtrack-needs-remove": {
 			features: Features{

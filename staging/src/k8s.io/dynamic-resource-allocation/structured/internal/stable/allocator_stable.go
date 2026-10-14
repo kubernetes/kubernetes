@@ -664,8 +664,11 @@ func (idr internalDeviceResult) lookupRequest(claim *resourceapi.ResourceClaim) 
 type constraint interface {
 	// add is called whenever a device is about to be allocated. It must
 	// check whether the device matches the constraint and if yes,
-	// track that it is allocated.
-	add(requestName, subRequestName string, device *draapi.Device, deviceID DeviceID) bool
+	// track that it is allocated. add returns an error if the device has
+	// an attribute value that this constraint cannot evaluate (for
+	// example, an unsupported type), which aborts the allocation attempt
+	// instead of merely rejecting this one device.
+	add(requestName, subRequestName string, device *draapi.Device, deviceID DeviceID) (bool, error)
 
 	// For every successful add there is exactly one matching removed call
 	// with the exact same parameters.
@@ -688,18 +691,23 @@ type matchAttributeConstraint struct {
 	numDevices int
 }
 
-func (m *matchAttributeConstraint) add(requestName, subRequestName string, device *draapi.Device, deviceID DeviceID) bool {
+func (m *matchAttributeConstraint) add(requestName, subRequestName string, device *draapi.Device, deviceID DeviceID) (bool, error) {
 	if m.requestNames.Len() > 0 && !m.matches(requestName, subRequestName) {
 		// Device not affected by constraint.
 		m.logger.V(7).Info("Constraint does not apply to request", "request", requestName)
-		return true
+		return true, nil
 	}
 
-	attribute := device.Attributes.Lookup(m.attributeName)
-	if attribute == nil {
+	attribute, ok := device.Attributes.Lookup(m.attributeName)
+	if !ok {
 		// Doesn't have the attribute.
 		m.logger.V(7).Info("Constraint not satisfied, attribute not set")
-		return false
+		return false, nil
+	}
+	if attribute == nil {
+		// Has the attribute, but with a value that this client cannot represent
+		// (for example, a value type added in a newer API version).
+		return false, fmt.Errorf("device %s: unsupported attribute value for %s", deviceID, m.attributeName)
 	}
 
 	switch attribute.(type) {
@@ -708,9 +716,9 @@ func (m *matchAttributeConstraint) add(requestName, subRequestName string, devic
 	case bool:
 	case semver.Version:
 	default:
-		// Unknown value type, cannot match.
-		m.logger.V(7).Info("Match attribute type unknown", "candidate", attribute)
-		return false
+		// Unknown value type, cannot match. Better stop instead of
+		// silently ignoring the device.
+		return false, fmt.Errorf("device %s: unsupported attribute value for %s", deviceID, m.attributeName)
 	}
 
 	if m.numDevices == 0 {
@@ -718,7 +726,7 @@ func (m *matchAttributeConstraint) add(requestName, subRequestName string, devic
 		m.attribute = attribute
 		m.numDevices = 1
 		m.logger.V(7).Info("First in set")
-		return true
+		return true, nil
 	}
 
 	switch existing := m.attribute.(type) {
@@ -726,47 +734,47 @@ func (m *matchAttributeConstraint) add(requestName, subRequestName string, devic
 		candidate, ok := attribute.(string)
 		if !ok {
 			m.logger.V(7).Info("Attribute types don't match", "existing", m.attribute, "candidate", attribute)
-			return false
+			return false, nil
 		}
 		if existing != candidate {
 			m.logger.V(7).Info("Attribute values don't match", "existing", m.attribute, "candidate", attribute)
-			return false
+			return false, nil
 		}
 	case int64:
 		candidate, ok := attribute.(int64)
 		if !ok {
 			m.logger.V(7).Info("Attribute types don't match", "existing", m.attribute, "candidate", attribute)
-			return false
+			return false, nil
 		}
 		if existing != candidate {
 			m.logger.V(7).Info("Attribute values don't match", "existing", m.attribute, "candidate", attribute)
-			return false
+			return false, nil
 		}
 	case bool:
 		candidate, ok := attribute.(bool)
 		if !ok {
 			m.logger.V(7).Info("Attribute types don't match", "existing", m.attribute, "candidate", attribute)
-			return false
+			return false, nil
 		}
 		if existing != candidate {
 			m.logger.V(7).Info("Attribute values don't match", "existing", m.attribute, "candidate", attribute)
-			return false
+			return false, nil
 		}
 	case semver.Version:
 		candidate, ok := attribute.(semver.Version)
 		if !ok {
 			m.logger.V(7).Info("Attribute types don't match", "existing", m.attribute, "candidate", attribute)
-			return false
+			return false, nil
 		}
 		if !existing.Equals(candidate) {
 			m.logger.V(7).Info("Attribute values don't match", "existing", m.attribute, "candidate", attribute)
-			return false
+			return false, nil
 		}
 	}
 
 	m.numDevices++
 	m.logger.V(7).Info("Constraint satisfied by device", "device", deviceID, "numDevices", m.numDevices)
-	return true
+	return true, nil
 }
 
 func (m *matchAttributeConstraint) remove(requestName, subRequestName string, device *draapi.Device, deviceID DeviceID) {
@@ -1196,7 +1204,12 @@ func (alloc *allocator) allocateDevice(r deviceIndices, device deviceWithID, mus
 
 	// It's available. Now check constraints.
 	for _, constraint := range alloc.constraints[r.claimIndex] {
-		if !constraint.add(baseRequestName, subRequestName, device.Device, device.id) {
+		added, err := constraint.add(baseRequestName, subRequestName, device.Device, device.id)
+		if err != nil {
+			alloc.rollbackDevice(r, device, baseRequestName, subRequestName, state)
+			return false, nil, fmt.Errorf("claim %s, request %s: %w", klog.KObj(claim), request.name(), err)
+		}
+		if !added {
 			alloc.rollbackDevice(r, device, baseRequestName, subRequestName, state)
 			if must {
 				// It does not make sense to declare a claim where a constraint prevents getting

@@ -28,7 +28,11 @@ import (
 
 // attributeProvider defines how constraints retrieve device attributes.
 type attributeProvider interface {
-	lookupAttribute(request *requestData, device *draapi.Device, deviceID DeviceID, attribute draapi.FullyQualifiedName) (any, error)
+	// lookupAttribute returns the attribute's value, or nil if the device
+	// doesn't have it. It returns an error if the attribute is set but has
+	// a value that cannot be represented (for example, a value type added
+	// in a newer API version) or if evaluating a derived attribute fails.
+	lookupAttribute(request *requestData, device *draapi.Device, deviceID DeviceID, attribute draapi.FullyQualifiedName) (value any, err error)
 }
 
 // distinctAttributeConstraint compares an attribute value across devices.
@@ -64,7 +68,31 @@ func (m *distinctAttributeConstraint) add(request *requestData, device *draapi.D
 		return false, nil
 	}
 
-	if !m.matchesAttribute(attribute) {
+	// Check value and convert to a set if needed.
+	var newSet *deviceAttributeListAsSet
+	if m.features.ListTypeAttributes {
+		newSet = attributeAsSet(attribute)
+		if newSet == nil {
+			// Internal error: attribute was already validated above (non-nil), so
+			// attributeAsSet must recognize its type. This should never be reached.
+			return false, fmt.Errorf("internal error: unexpected attribute type %T", attribute)
+		}
+	} else {
+		switch attribute.(type) {
+		case string:
+		case int64:
+		case bool:
+		case semver.Version:
+		default:
+			// Unknown value type, cannot match. Better stop instead of
+			// silently ignoring the device.
+			//
+			// This can be reached for list values.
+			return false, fmt.Errorf("device %s: unsupported attribute value for %s", deviceID, m.attributeName)
+		}
+	}
+
+	if !m.matchesAttribute(attribute, newSet) {
 		m.logger.V(7).Info("Constraint not satisfied, has some duplicated attributes")
 		return false, nil
 	}
@@ -94,21 +122,14 @@ func (m *distinctAttributeConstraint) matches(request *requestData) bool {
 	}
 }
 
-func (m *distinctAttributeConstraint) matchesAttribute(attribute any) bool {
+func (m *distinctAttributeConstraint) matchesAttribute(attribute any, newSet *deviceAttributeListAsSet) bool {
 	if m.features.ListTypeAttributes {
-		// Set-based comparison for ListAttributes feature:
-		// Check that the new device's attribute set is disjoint from all existing devices.
-		// This implements "Pairwise Disjoint" semantics for distinct attributes.
-		newSet := attributeAsSet(attribute)
-		if newSet == nil {
-			m.logger.V(7).Info("Unknown attribute type")
-			return false
-		}
-
 		// Check that the new device is disjoint from each existing device
 		for _, attr := range m.attributes {
 			existingSet := attributeAsSet(attr)
 			if existingSet == nil {
+				// Should not happen, all existing attributes where already converted when adding them.
+				// TODO: avoid repeated conversions.
 				continue
 			}
 			if newSet.intersection(existingSet) != nil {
@@ -173,8 +194,7 @@ func (m *distinctAttributeConstraint) matchesAttribute(attribute any) bool {
 			}
 			m.logger.V(7).Info("Attribute values don't match", "existing", attr, "candidate", attribute)
 		default:
-			// Unknown value type, cannot match.
-			m.logger.V(7).Info("Distinct attribute type unknown", "existing", attr)
+			// Dead code, existing values were checked already.
 			return false
 		}
 	}

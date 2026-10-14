@@ -41,26 +41,43 @@ type distinctAttributeConstraint struct {
 	attributes []any
 }
 
-func (m *distinctAttributeConstraint) add(requestName, subRequestName string, device *draapi.Device, deviceID DeviceID) bool {
+func (m *distinctAttributeConstraint) add(requestName, subRequestName string, device *draapi.Device, deviceID DeviceID) (bool, error) {
 	if m.requestNames.Len() > 0 && !m.matches(requestName, subRequestName) {
 		// Device not affected by constraint.
-		return true
+		return true, nil
 	}
 
-	attribute := device.Attributes.Lookup(m.attributeName)
-	if attribute == nil {
+	attribute, ok := device.Attributes.Lookup(m.attributeName)
+	if !ok {
 		// Doesn't have the attribute.
 		m.logger.V(7).Info("Constraint not satisfied, attribute not set")
-		return false
+		return false, nil
+	}
+	if attribute == nil {
+		// Has the attribute, but with a value that this client cannot represent
+		// (for example, a value type added in a newer API version).
+		return false, fmt.Errorf("device %s: unsupported attribute value for %s", deviceID, m.attributeName)
 	}
 
-	if !m.matchesAttribute(attribute) {
+	switch attribute.(type) {
+	case string:
+	case int64:
+	case bool:
+	case semver.Version:
+	default:
+		// Unknown value type, cannot compare. Better stop instead of
+		// silently ignoring the device.
+		return false, fmt.Errorf("device %s: unsupported attribute value for %s", deviceID, m.attributeName)
+	}
+
+	matches := m.matchesAttribute(attribute)
+	if !matches {
 		m.logger.V(7).Info("Constraint not satisfied, has some duplicated attributes")
-		return false
+		return false, nil
 	}
 	m.attributes = append(m.attributes, attribute)
 	m.logger.V(7).Info("Constraint satisfied by device", "device", deviceID, "numDevices", len(m.attributes))
-	return true
+	return true, nil
 }
 
 func (m *distinctAttributeConstraint) remove(requestName, subRequestName string, device *draapi.Device, deviceID DeviceID) {
@@ -130,8 +147,7 @@ func (m *distinctAttributeConstraint) matchesAttribute(attribute any) bool {
 			}
 			m.logger.V(7).Info("Attribute values don't match", "existing", attr, "candidate", attribute)
 		default:
-			// Unknown value type, cannot match.
-			m.logger.V(7).Info("Distinct attribute type unknown", "existing", attr)
+			// Dead code, existing values were checked already.
 			return false
 		}
 	}

@@ -236,8 +236,14 @@ func (m DeviceAttributes) DeepCopy() DeviceAttributes {
 	return out
 }
 
-func (m DeviceAttributes) Lookup(name FullyQualifiedName) any {
-	return m.Nested[name.Domain][name.Identifier]
+// Lookup returns the attribute's value and whether it was set at all. This
+// distinguishes an attribute that is genuinely absent (ok == false) from one
+// which is present but whose value could not be represented (ok == true,
+// value == nil), for example because it uses a value type that this client
+// doesn't know about yet.
+func (m DeviceAttributes) Lookup(name FullyQualifiedName) (value any, ok bool) {
+	value, ok = m.Nested[name.Domain][name.Identifier]
+	return
 }
 
 // DeviceCapacity holds the capacity value for a single capacity entry.
