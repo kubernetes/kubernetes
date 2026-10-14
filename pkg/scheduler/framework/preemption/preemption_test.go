@@ -1245,11 +1245,11 @@ func TestPreemptionEvaluationDurationMetric(t *testing.T) {
 				fwk.NewStatus(fwk.UnschedulableAndUnresolvable),
 			)
 
-			stateBefore := captureEvaluationDurationMetric(testRegistry, "pod", tt.expectedStatus)
+			stateBefore := captureEvaluationDurationMetric(testRegistry, metrics.Pod, tt.expectedStatus)
 
 			pe.evaluate(ctx, state, preemptor, m)
 
-			stateAfter := captureEvaluationDurationMetric(testRegistry, "pod", tt.expectedStatus)
+			stateAfter := captureEvaluationDurationMetric(testRegistry, metrics.Pod, tt.expectedStatus)
 
 			diff := stateAfter.count - stateBefore.count
 			if diff != 1 {

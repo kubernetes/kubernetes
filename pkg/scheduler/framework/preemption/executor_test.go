@@ -308,7 +308,8 @@ func TestPrepareCandidate(t *testing.T) {
 				Containers([]v1.Container{st.MakeContainer().Name("container1").Obj()}).
 				Obj()
 
-		podGroupPreemptor = &schedulingv1beta1.PodGroup{ObjectMeta: metav1.ObjectMeta{Name: "pg1", Namespace: "default", UID: "pg1"}}
+		podGroupPreemptor          = &schedulingv1beta1.PodGroup{ObjectMeta: metav1.ObjectMeta{Name: "pg1", Namespace: "default", UID: "pg1"}}
+		compositePodGroupPreemptor = &schedulingv1alpha3.CompositePodGroup{ObjectMeta: metav1.ObjectMeta{Name: "cpg1", Namespace: "default", UID: "cpg1"}}
 
 		errDeletePodFailed   = errors.New("delete pod failed")
 		errPatchStatusFailed = errors.New("patch pod status failed")
@@ -405,7 +406,7 @@ func TestPrepareCandidate(t *testing.T) {
 				},
 			},
 			preemptor:                preemptor,
-			preemptorGenericPodGroup: fwk.NewGenericCompositePodGroup(&schedulingv1alpha3.CompositePodGroup{ObjectMeta: metav1.ObjectMeta{Name: "cpg1", Namespace: "default", UID: "cpg1"}}),
+			preemptorGenericPodGroup: fwk.NewGenericCompositePodGroup(compositePodGroupPreemptor),
 			testPods: []*v1.Pod{
 				victim1,
 			},
@@ -653,6 +654,28 @@ func TestPrepareCandidate(t *testing.T) {
 			expectedDeletedPod:    []string{"victim1"},
 			expectedStatus:        nil,
 			expectedPreemptingMap: sets.New(types.UID("pg1")),
+		},
+		{
+			name: "metrics: compositepodgroup preemptor with PDB violations and disruptions",
+			candidate: &candidate{
+				name: node1Name,
+				victims: &extenderv1.Victims{
+					Pods: []*v1.Pod{
+						victim1,
+					},
+					NumPDBViolations: 1,
+				},
+				numPodGroupDisruptions: 1,
+			},
+			preemptor:                preemptor,
+			preemptorGenericPodGroup: fwk.NewGenericCompositePodGroup(compositePodGroupPreemptor),
+			testPods: []*v1.Pod{
+				victim1,
+			},
+			nodeNames:             []string{node1Name},
+			expectedDeletedPod:    []string{"victim1"},
+			expectedStatus:        nil,
+			expectedPreemptingMap: sets.New(types.UID("cpg1")),
 		},
 	}
 
@@ -1479,7 +1502,7 @@ func TestPreemptPod(t *testing.T) {
 					tf.RegisterPermitPlugin(waitingPermitPluginName, newWaitingPermitPlugin),
 				)
 				objs := []runtime.Object{preemptorPod, victimPod}
-				if preemptorType != "pod" {
+				if preemptorType != fwk.PodKeyType {
 					for _, p := range preemptorPods {
 						objs = append(objs, p)
 					}
@@ -1980,7 +2003,7 @@ type preemptionMetricsState struct {
 
 func capturePreemptionMetricsState(g componentmetrics.Gatherer, preemptorType string) preemptionMetricsState {
 	return preemptionMetricsState{
-		workloadPreemptionVictims: newHistogramState(g, "scheduler_workload_preemption_victims", map[string]string{}),
+		workloadPreemptionVictims: newHistogramState(g, "scheduler_workload_preemption_victims", map[string]string{"preemptor": preemptorType}),
 		preemptionVictims:         newHistogramState(g, "scheduler_preemption_victims", map[string]string{}),
 		workloadDisruptions:       newHistogramState(g, "scheduler_preemption_workload_disruptions", map[string]string{"preemptor": preemptorType}),
 		pdbViolations:             newCounterState(g, "scheduler_preemption_pdb_violations_total", map[string]string{}, "preemptor", preemptorType),
@@ -2019,6 +2042,23 @@ func TestPreemptionExecutionDurationMetric(t *testing.T) {
 	victim := st.MakePod().Name("victim").UID("victim").Node(nodeName).Priority(midPriority).Obj()
 	preemptor := st.MakePod().Name("preemptor").UID("preemptor").Priority(highPriority).Obj()
 
+	preemptors := []struct {
+		name                     string
+		preemptorGenericPodGroup *fwk.GenericPodGroup
+	}{
+		{
+			name: metrics.Pod,
+		},
+		{
+			name:                     metrics.PodGroup,
+			preemptorGenericPodGroup: fwk.NewGenericPodGroup(&schedulingv1beta1.PodGroup{ObjectMeta: metav1.ObjectMeta{Name: "pg1", Namespace: "default", UID: "pg1"}}),
+		},
+		{
+			name:                     metrics.CompositePodGroup,
+			preemptorGenericPodGroup: fwk.NewGenericCompositePodGroup(&schedulingv1alpha3.CompositePodGroup{ObjectMeta: metav1.ObjectMeta{Name: "cpg1", Namespace: "default", UID: "cpg1"}}),
+		},
+	}
+
 	tests := []struct {
 		name                string
 		injectDeletionError bool
@@ -2036,83 +2076,91 @@ func TestPreemptionExecutionDurationMetric(t *testing.T) {
 	}
 
 	for _, async := range []bool{false, true} {
-		for _, tt := range tests {
-			t.Run(fmt.Sprintf("%s (async=%v)", tt.name, async), func(t *testing.T) {
-				testRegistry := componentmetrics.NewKubeRegistry()
-				testRegistry.MustRegister(metrics.PreemptionExecutionDuration)
+		for _, p := range preemptors {
+			for _, tt := range tests {
+				t.Run(fmt.Sprintf("%s preemptor, %s (async=%v)", p.name, tt.name, async), func(t *testing.T) {
+					testRegistry := componentmetrics.NewKubeRegistry()
+					testRegistry.MustRegister(metrics.PreemptionExecutionDuration)
 
-				_, ctx := ktesting.NewTestContext(t)
-				ctx, cancel := context.WithCancel(ctx)
-				defer cancel()
+					_, ctx := ktesting.NewTestContext(t)
+					ctx, cancel := context.WithCancel(ctx)
+					defer cancel()
 
-				cs := clientsetfake.NewClientset(victim)
-				if tt.injectDeletionError {
-					cs.PrependReactor("delete", "pods", func(action clienttesting.Action) (bool, runtime.Object, error) {
-						return true, nil, errors.New("delete failed")
-					})
-				}
-
-				informerFactory := informers.NewSharedInformerFactory(cs, 0)
-				eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: cs.EventsV1()})
-
-				queue := internalqueue.NewSchedulingQueue(nil, informerFactory)
-				fwk, err := tf.NewFramework(
-					ctx,
-					[]tf.RegisterPluginFunc{
-						tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
-						tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
-					},
-					"",
-					frameworkruntime.WithClientSet(cs),
-					frameworkruntime.WithInformerFactory(informerFactory),
-					frameworkruntime.WithWaitingPods(frameworkruntime.NewWaitingPodsMap()),
-					frameworkruntime.WithPodsInPreBind(frameworkruntime.NewPodsInPreBindMap()),
-					frameworkruntime.WithSnapshotSharedLister(internalcache.NewSnapshot([]*v1.Pod{victim}, []*v1.Node{st.MakeNode().Name(nodeName).Capacity(veryLargeRes).Obj()})),
-					frameworkruntime.WithEventRecorder(eventBroadcaster.NewRecorder(scheme.Scheme, "test-scheduler")),
-					frameworkruntime.WithPodNominator(queue),
-					frameworkruntime.WithPodActivator(queue),
-				)
-				if err != nil {
-					t.Fatal(err)
-				}
-				informerFactory.Start(ctx.Done())
-
-				executor := NewExecutor(fwk, feature.Features{EnableAsyncPreemption: async})
-				podPreemptor := &podExecutorPreemptor{Pod: preemptor}
-				candidate := &candidate{
-					name: nodeName,
-					victims: &extenderv1.Victims{
-						Pods: []*v1.Pod{victim},
-					},
-				}
-
-				// Capture metrics before
-				preemptorType := podPreemptor.Type()
-				stateBefore := captureExecutionDurationMetric(testRegistry, preemptorType, tt.expectedResult)
-
-				if async {
-					executor.prepareCandidateAsync(candidate, podPreemptor, "test-plugin")
-					// Wait for async preemption to complete
-					err := wait.PollUntilContextTimeout(ctx, time.Millisecond*50, wait.ForeverTestTimeout, false, func(ctx context.Context) (bool, error) {
-						executor.mu.Lock()
-						defer executor.mu.Unlock()
-						return len(executor.preempting) == 0, nil
-					})
-					if err != nil {
-						t.Fatal("async preemption did not complete in time")
+					cs := clientsetfake.NewClientset(victim)
+					if tt.injectDeletionError {
+						cs.PrependReactor("delete", "pods", func(action clienttesting.Action) (bool, runtime.Object, error) {
+							return true, nil, errors.New("delete failed")
+						})
 					}
-				} else {
-					executor.prepareCandidate(ctx, candidate, podPreemptor, "test-plugin")
-				}
 
-				// Capture metrics after
-				stateAfter := captureExecutionDurationMetric(testRegistry, preemptorType, tt.expectedResult)
+					informerFactory := informers.NewSharedInformerFactory(cs, 0)
+					eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: cs.EventsV1()})
 
-				diff := stateAfter.count - stateBefore.count
-				if diff != 1 {
-					t.Errorf("Expected success count delta to be %d, got %d", 1, diff)
-				}
-			})
+					queue := internalqueue.NewSchedulingQueue(nil, informerFactory)
+					fwk, err := tf.NewFramework(
+						ctx,
+						[]tf.RegisterPluginFunc{
+							tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+							tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+						},
+						"",
+						frameworkruntime.WithClientSet(cs),
+						frameworkruntime.WithInformerFactory(informerFactory),
+						frameworkruntime.WithWaitingPods(frameworkruntime.NewWaitingPodsMap()),
+						frameworkruntime.WithPodsInPreBind(frameworkruntime.NewPodsInPreBindMap()),
+						frameworkruntime.WithSnapshotSharedLister(internalcache.NewSnapshot([]*v1.Pod{victim}, []*v1.Node{st.MakeNode().Name(nodeName).Capacity(veryLargeRes).Obj()})),
+						frameworkruntime.WithEventRecorder(eventBroadcaster.NewRecorder(scheme.Scheme, "test-scheduler")),
+						frameworkruntime.WithPodNominator(queue),
+						frameworkruntime.WithPodActivator(queue),
+					)
+					if err != nil {
+						t.Fatal(err)
+					}
+					informerFactory.Start(ctx.Done())
+
+					executor := NewExecutor(fwk, feature.Features{EnableAsyncPreemption: async})
+					var execPreemptor ExecutorPreemptor
+					if p.preemptorGenericPodGroup != nil {
+						pgInfo := &framework.PodGroupInfo{GenericPodGroup: p.preemptorGenericPodGroup}
+						execPreemptor = &podGroupExecutorPreemptor{PodGroupInfo: pgInfo, pods: []*v1.Pod{preemptor}}
+					} else {
+						execPreemptor = &podExecutorPreemptor{Pod: preemptor}
+					}
+					candidate := &candidate{
+						name: nodeName,
+						victims: &extenderv1.Victims{
+							Pods: []*v1.Pod{victim},
+						},
+					}
+
+					// Capture metrics before
+					preemptorType := execPreemptor.Type()
+					stateBefore := captureExecutionDurationMetric(testRegistry, preemptorType, tt.expectedResult)
+
+					if async {
+						executor.prepareCandidateAsync(candidate, execPreemptor, "test-plugin")
+						// Wait for async preemption to complete
+						err := wait.PollUntilContextTimeout(ctx, time.Millisecond*50, wait.ForeverTestTimeout, false, func(ctx context.Context) (bool, error) {
+							executor.mu.Lock()
+							defer executor.mu.Unlock()
+							return len(executor.preempting) == 0, nil
+						})
+						if err != nil {
+							t.Fatal("async preemption did not complete in time")
+						}
+					} else {
+						executor.prepareCandidate(ctx, candidate, execPreemptor, "test-plugin")
+					}
+
+					// Capture metrics after
+					stateAfter := captureExecutionDurationMetric(testRegistry, preemptorType, tt.expectedResult)
+
+					diff := stateAfter.count - stateBefore.count
+					if diff != 1 {
+						t.Errorf("Expected %s count delta for %s preemptor to be 1, got %d", tt.expectedResult, preemptorType, diff)
+					}
+				})
+			}
 		}
 	}
 }
