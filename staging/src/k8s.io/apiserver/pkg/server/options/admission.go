@@ -18,6 +18,7 @@ package options
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -178,6 +179,8 @@ func (a *AdmissionOptions) ApplyTo(
 	}
 
 	c.AdmissionControl = admissionmetrics.WithStepMetrics(admissionChain)
+	// Propagate to BuildHandlerChain whether the authorization-critical admission plugin is enabled, and thus whether it is safe to enable conditional authorization.
+	c.Authorization.ConditionsEnforcerPluginEnabled = slices.Contains(pluginNames, conditionsenforcer.PluginName)
 	return nil
 }
 
