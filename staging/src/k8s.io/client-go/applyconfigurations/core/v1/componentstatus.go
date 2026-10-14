@@ -31,7 +31,6 @@ import (
 // with apply.
 //
 // ComponentStatus (and ComponentStatusList) holds the cluster validation info.
-// Deprecated: This API is deprecated in v1.19+
 type ComponentStatusApplyConfiguration struct {
 	metav1.TypeMetaApplyConfiguration `json:""`
 	// Standard object's metadata.

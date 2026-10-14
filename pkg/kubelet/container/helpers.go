@@ -486,6 +486,7 @@ func MakePortMappings(logger klog.Logger, container *v1.Container) (ports []Port
 
 // HasAnyRegularContainerStarted returns true if any regular container has
 // started, which indicates all init containers have been initialized.
+//
 // Deprecated: This function is not accurate when its pod sandbox is recreated.
 // Use HasAnyActiveRegularContainerStarted instead.
 func HasAnyRegularContainerStarted(spec *v1.PodSpec, statuses []v1.ContainerStatus) bool {
