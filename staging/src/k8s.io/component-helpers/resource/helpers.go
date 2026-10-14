@@ -598,6 +598,18 @@ func GetContainerExtraNodeAllocatableResources(pod *v1.Pod, containerName string
 	return extraNodeAllocatableRes
 }
 
+// GetPodExtraNodeAllocatableResources returns the sum of all extra node allocatable
+// resources (like DRA allocations) of a pod.
+func GetPodExtraNodeAllocatableResources(pod *v1.Pod) v1.ResourceList {
+	extraRes := getExtraNodeAllocatableResources(pod, PodResourcesOptions{UseExtraNodeAllocatableResources: true})
+	extraNodeAllocatableRes := v1.ResourceList{}
+	addResourceList(extraNodeAllocatableRes, extraRes.podFixed)
+	for _, containerExtraRes := range extraRes.perContainer {
+		addResourceList(extraNodeAllocatableRes, containerExtraRes)
+	}
+	return extraNodeAllocatableRes
+}
+
 // extraNodeAllocatableResources holds the pod's extra node allocatable resources (like DRA allocations).
 type extraNodeAllocatableResources struct {
 	// podFixed is charged to this pod for its entire lifetime
