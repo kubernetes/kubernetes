@@ -1831,6 +1831,20 @@ func Test_isSchedulableAfterNodeChange(t *testing.T) {
 			}).Obj(),
 			expectedHint: fwk.QueueSkip,
 		},
+		"skip-queue-nominated-pod-when-nominated-node-already-too-small-and-shrinks-further": {
+			pod: func() *v1.Pod {
+				p := newResourcePod(framework.Resource{Memory: 4})
+				p.Status.NominatedNodeName = "target-node"
+				return p
+			}(),
+			oldObj: st.MakeNode().Name("target-node").Capacity(map[v1.ResourceName]string{
+				v1.ResourceMemory: "2",
+			}).Obj(),
+			newObj: st.MakeNode().Name("target-node").Capacity(map[v1.ResourceName]string{
+				v1.ResourceMemory: "1",
+			}).Obj(),
+			expectedHint: fwk.QueueSkip,
+		},
 		"skip-queue-nominated-pod-on-new-node-too-small": {
 			pod: func() *v1.Pod {
 				p := newResourcePod(framework.Resource{Memory: 4})
