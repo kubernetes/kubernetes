@@ -1888,9 +1888,12 @@ func verifyActions(t *testing.T, expected, actual *podActions, desc string) {
 			actual.ContainersToKill[k] = info
 		}
 	}
-	if expected.ContainersToUpdate == nil && actual.ContainersToUpdate != nil {
-		// No need to distinguish empty and nil maps for the test.
-		expected.ContainersToUpdate = map[v1.ResourceName][]containerToUpdateInfo{}
+	// No need to distinguish empty and nil maps for the test.
+	if len(expected.ContainersToUpsize) == 0 && len(actual.ContainersToUpsize) == 0 {
+		expected.ContainersToUpsize, actual.ContainersToUpsize = nil, nil
+	}
+	if len(expected.ContainersToDownsize) == 0 && len(actual.ContainersToDownsize) == 0 {
+		expected.ContainersToDownsize, actual.ContainersToDownsize = nil, nil
 	}
 	assert.Equal(t, expected, actual, desc)
 }
@@ -2160,7 +2163,7 @@ func TestComputePodActionsWithInitContainers(t *testing.T) {
 				InitContainersToStart: nil,
 				ContainersToStart:     []int{},
 				ContainersToKill:      getKillMapWithInitContainers(basePod, baseStatus, []int{}),
-				ContainersToUpdate: map[v1.ResourceName][]containerToUpdateInfo{
+				ContainersToUpsize: map[v1.ResourceName][]containerToUpdateInfo{
 					v1.ResourceMemory: {
 						{
 							containerType:   podutil.InitContainers,
@@ -2211,7 +2214,7 @@ func TestComputePodActionsWithInitContainers(t *testing.T) {
 				InitContainersToStart: nil,
 				ContainersToStart:     []int{},
 				ContainersToKill:      getKillMapWithInitContainers(basePod, baseStatus, []int{}),
-				ContainersToUpdate:    map[v1.ResourceName][]containerToUpdateInfo{},
+				ContainersToUpsize:    map[v1.ResourceName][]containerToUpdateInfo{},
 			},
 			skipWindows:          true, // Windows does not support resize.
 			disableIPPRInitCtrFG: true,
@@ -2236,11 +2239,11 @@ func TestComputePodActionsWithInitContainers(t *testing.T) {
 			// Sync the actuated state with the base values before any resize
 			m.InitializeActuatedPod(tCtx.Logger(), pod)
 
-			if test.actions.ContainersToUpdate != nil {
-				for res := range test.actions.ContainersToUpdate {
-					for i := range test.actions.ContainersToUpdate[res] {
+			for _, containersToUpdate := range []map[v1.ResourceName][]containerToUpdateInfo{test.actions.ContainersToUpsize, test.actions.ContainersToDownsize} {
+				for res := range containersToUpdate {
+					for i := range containersToUpdate[res] {
 						// Link the expected action to the mutated pod container
-						test.actions.ContainersToUpdate[res][i].container = &pod.Spec.InitContainers[0]
+						containersToUpdate[res][i].container = &pod.Spec.InitContainers[0]
 					}
 				}
 			}
@@ -3181,7 +3184,7 @@ func TestComputePodActionsForPodResize(t *testing.T) {
 					SandboxID:          podStatus.SandboxStatuses[0].Id,
 					ContainersToStart:  []int{},
 					ContainersToKill:   getKillMap(pod, podStatus, []int{}),
-					ContainersToUpdate: map[v1.ResourceName][]containerToUpdateInfo{},
+					ContainersToUpsize: map[v1.ResourceName][]containerToUpdateInfo{},
 				}
 				return &pa
 			},
@@ -3218,7 +3221,7 @@ func TestComputePodActionsForPodResize(t *testing.T) {
 					SandboxID:               podStatus.SandboxStatuses[0].Id,
 					ContainersToStart:       []int{},
 					ContainersToKill:        getKillMap(pod, podStatus, []int{}),
-					ContainersToUpdate:      map[v1.ResourceName][]containerToUpdateInfo{},
+					ContainersToUpsize:      map[v1.ResourceName][]containerToUpdateInfo{},
 					UpdatePodLevelResources: true,
 				}
 				return &pa
@@ -3250,7 +3253,7 @@ func TestComputePodActionsForPodResize(t *testing.T) {
 					SandboxID:         podStatus.SandboxStatuses[0].Id,
 					ContainersToStart: []int{},
 					ContainersToKill:  getKillMap(pod, podStatus, []int{}),
-					ContainersToUpdate: map[v1.ResourceName][]containerToUpdateInfo{
+					ContainersToDownsize: map[v1.ResourceName][]containerToUpdateInfo{
 						v1.ResourceMemory: {
 							{
 								container:       &pod.Spec.Containers[1],
@@ -3324,7 +3327,7 @@ func TestComputePodActionsForPodResize(t *testing.T) {
 					SandboxID:         podStatus.SandboxStatuses[0].Id,
 					ContainersToStart: []int{},
 					ContainersToKill:  getKillMap(pod, podStatus, []int{}),
-					ContainersToUpdate: map[v1.ResourceName][]containerToUpdateInfo{
+					ContainersToUpsize: map[v1.ResourceName][]containerToUpdateInfo{
 						v1.ResourceMemory: {
 							{
 								container:       &pod.Spec.Containers[1],
@@ -3402,7 +3405,7 @@ func TestComputePodActionsForPodResize(t *testing.T) {
 					SandboxID:         podStatus.SandboxStatuses[0].Id,
 					ContainersToStart: []int{},
 					ContainersToKill:  getKillMap(pod, podStatus, []int{}),
-					ContainersToUpdate: map[v1.ResourceName][]containerToUpdateInfo{
+					ContainersToUpsize: map[v1.ResourceName][]containerToUpdateInfo{
 						v1.ResourceMemory: {
 							{
 								container:       &pod.Spec.Containers[1],
@@ -3489,7 +3492,7 @@ func TestComputePodActionsForPodResize(t *testing.T) {
 					SandboxID:               podStatus.SandboxStatuses[0].Id,
 					ContainersToStart:       []int{1},
 					ContainersToKill:        killMap,
-					ContainersToUpdate:      map[v1.ResourceName][]containerToUpdateInfo{},
+					ContainersToUpsize:      map[v1.ResourceName][]containerToUpdateInfo{},
 					UpdatePodLevelResources: true,
 					UpdatePodResources:      true,
 				}
@@ -3516,7 +3519,7 @@ func TestComputePodActionsForPodResize(t *testing.T) {
 					SandboxID:         podStatus.SandboxStatuses[0].Id,
 					ContainersToStart: []int{},
 					ContainersToKill:  getKillMap(pod, podStatus, []int{}),
-					ContainersToUpdate: map[v1.ResourceName][]containerToUpdateInfo{
+					ContainersToDownsize: map[v1.ResourceName][]containerToUpdateInfo{
 						v1.ResourceMemory: {
 							{
 								container:       &pod.Spec.Containers[1],
@@ -3571,7 +3574,7 @@ func TestComputePodActionsForPodResize(t *testing.T) {
 					SandboxID:         podStatus.SandboxStatuses[0].Id,
 					ContainersToStart: []int{},
 					ContainersToKill:  getKillMap(pod, podStatus, []int{}),
-					ContainersToUpdate: map[v1.ResourceName][]containerToUpdateInfo{
+					ContainersToDownsize: map[v1.ResourceName][]containerToUpdateInfo{
 						v1.ResourceCPU: {
 							{
 								container:       &pod.Spec.Containers[1],
@@ -3611,7 +3614,7 @@ func TestComputePodActionsForPodResize(t *testing.T) {
 					SandboxID:         podStatus.SandboxStatuses[0].Id,
 					ContainersToStart: []int{},
 					ContainersToKill:  getKillMap(pod, podStatus, []int{}),
-					ContainersToUpdate: map[v1.ResourceName][]containerToUpdateInfo{
+					ContainersToUpsize: map[v1.ResourceName][]containerToUpdateInfo{
 						v1.ResourceMemory: {
 							{
 								container:       &pod.Spec.Containers[2],
@@ -3658,7 +3661,7 @@ func TestComputePodActionsForPodResize(t *testing.T) {
 					SandboxID:         podStatus.SandboxStatuses[0].Id,
 					ContainersToStart: []int{},
 					ContainersToKill:  getKillMap(pod, podStatus, []int{}),
-					ContainersToUpdate: map[v1.ResourceName][]containerToUpdateInfo{
+					ContainersToUpsize: map[v1.ResourceName][]containerToUpdateInfo{
 						v1.ResourceCPU: {
 							{
 								container:       &pod.Spec.Containers[0],
@@ -3739,7 +3742,7 @@ func TestComputePodActionsForPodResize(t *testing.T) {
 					SandboxID:          podStatus.SandboxStatuses[0].Id,
 					ContainersToKill:   getKillMap(pod, podStatus, []int{}),
 					ContainersToStart:  []int{},
-					ContainersToUpdate: map[v1.ResourceName][]containerToUpdateInfo{},
+					ContainersToUpsize: map[v1.ResourceName][]containerToUpdateInfo{},
 				}
 				return &pa
 			},
@@ -3755,7 +3758,7 @@ func TestComputePodActionsForPodResize(t *testing.T) {
 					SandboxID:          podStatus.SandboxStatuses[0].Id,
 					ContainersToKill:   getKillMap(pod, podStatus, []int{}),
 					ContainersToStart:  []int{},
-					ContainersToUpdate: map[v1.ResourceName][]containerToUpdateInfo{},
+					ContainersToUpsize: map[v1.ResourceName][]containerToUpdateInfo{},
 				}
 				return &pa
 			},
@@ -3785,7 +3788,7 @@ func TestComputePodActionsForPodResize(t *testing.T) {
 					SandboxID:          podStatus.SandboxStatuses[0].Id,
 					ContainersToStart:  []int{0},
 					ContainersToKill:   killMap,
-					ContainersToUpdate: map[v1.ResourceName][]containerToUpdateInfo{},
+					ContainersToUpsize: map[v1.ResourceName][]containerToUpdateInfo{},
 					UpdatePodResources: true,
 				}
 				return &pa
@@ -3816,7 +3819,7 @@ func TestComputePodActionsForPodResize(t *testing.T) {
 					SandboxID:          podStatus.SandboxStatuses[0].Id,
 					ContainersToStart:  []int{2},
 					ContainersToKill:   killMap,
-					ContainersToUpdate: map[v1.ResourceName][]containerToUpdateInfo{},
+					ContainersToUpsize: map[v1.ResourceName][]containerToUpdateInfo{},
 					UpdatePodResources: true,
 				}
 				return &pa
@@ -3842,7 +3845,7 @@ func TestComputePodActionsForPodResize(t *testing.T) {
 					SandboxID:         podStatus.SandboxStatuses[0].Id,
 					ContainersToStart: []int{},
 					ContainersToKill:  getKillMap(pod, podStatus, []int{}),
-					ContainersToUpdate: map[v1.ResourceName][]containerToUpdateInfo{
+					ContainersToUpsize: map[v1.ResourceName][]containerToUpdateInfo{
 						v1.ResourceMemory: {
 							{
 								container:       &pod.Spec.Containers[1],
@@ -3883,7 +3886,7 @@ func TestComputePodActionsForPodResize(t *testing.T) {
 					SandboxID:         podStatus.SandboxStatuses[0].Id,
 					ContainersToStart: []int{},
 					ContainersToKill:  getKillMap(pod, podStatus, []int{}),
-					ContainersToUpdate: map[v1.ResourceName][]containerToUpdateInfo{
+					ContainersToUpsize: map[v1.ResourceName][]containerToUpdateInfo{
 						v1.ResourceCPU: {
 							{
 								container:       &pod.Spec.Containers[2],
@@ -3934,7 +3937,7 @@ func TestComputePodActionsForPodResize(t *testing.T) {
 					SandboxID:          podStatus.SandboxStatuses[0].Id,
 					ContainersToStart:  []int{2},
 					ContainersToKill:   killMap,
-					ContainersToUpdate: map[v1.ResourceName][]containerToUpdateInfo{},
+					ContainersToUpsize: map[v1.ResourceName][]containerToUpdateInfo{},
 					UpdatePodResources: true,
 				}
 				return &pa
@@ -3970,7 +3973,7 @@ func TestComputePodActionsForPodResize(t *testing.T) {
 					SandboxID:         podStatus.SandboxStatuses[0].Id,
 					ContainersToStart: []int{},
 					ContainersToKill:  getKillMap(pod, podStatus, []int{}),
-					ContainersToUpdate: map[v1.ResourceName][]containerToUpdateInfo{
+					ContainersToDownsize: map[v1.ResourceName][]containerToUpdateInfo{
 						v1.ResourceMemory: {
 							{
 								container:       &pod.Spec.Containers[2],
@@ -4079,8 +4082,9 @@ func TestComputePodResizeActionForOOMKilledContainer(t *testing.T) {
 
 	actions := m.computePodActions(tCtx, pod, status, false)
 
-	// the container is OOMKilled and must not be added to ContainersToUpdate (no live CRI call).
-	assert.Empty(t, actions.ContainersToUpdate, "OOMKilled container must not be in ContainersToUpdate")
+	// the container is OOMKilled and must not be added to ContainersToUpsize/ContainersToDownsize (no live CRI call).
+	assert.Empty(t, actions.ContainersToUpsize, "OOMKilled container must not be in ContainersToUpsize")
+	assert.Empty(t, actions.ContainersToDownsize, "OOMKilled container must not be in ContainersToDownsize")
 	// UpdatePodResources must be true so doPodResizeAction updates the pod-level cgroup.
 	assert.True(t, actions.UpdatePodResources, "UpdatePodResources must be true for OOMKilled container with pending resize")
 }
@@ -4140,8 +4144,9 @@ func TestComputePodResizeActionForOOMKilledInitContainer(t *testing.T) {
 
 	actions := m.computePodActions(tCtx, pod, status, false)
 
-	// the init container is OOMKilled and must not be in ContainersToUpdate.
-	assert.Empty(t, actions.ContainersToUpdate, "OOMKilled init container must not be in ContainersToUpdate")
+	// the init container is OOMKilled and must not be in ContainersToUpsize/ContainersToDownsize.
+	assert.Empty(t, actions.ContainersToUpsize, "OOMKilled init container must not be in ContainersToUpsize")
+	assert.Empty(t, actions.ContainersToDownsize, "OOMKilled init container must not be in ContainersToDownsize")
 	// UpdatePodResources must be true so doPodResizeAction updates the pod-level cgroup.
 	assert.True(t, actions.UpdatePodResources, "UpdatePodResources must be true for OOMKilled init container with pending resize")
 }
@@ -4213,8 +4218,9 @@ func TestComputePodResizeActionForOOMKilledSidecarContainer(t *testing.T) {
 
 	actions := m.computePodActions(tCtx, pod, status, false)
 
-	// the sidecar is OOMKilled and must not be in ContainersToUpdate.
-	assert.Empty(t, actions.ContainersToUpdate, "OOMKilled sidecar must not be in ContainersToUpdate")
+	// the sidecar is OOMKilled and must not be in ContainersToUpsize/ContainersToDownsize.
+	assert.Empty(t, actions.ContainersToUpsize, "OOMKilled sidecar must not be in ContainersToUpsize")
+	assert.Empty(t, actions.ContainersToDownsize, "OOMKilled sidecar must not be in ContainersToDownsize")
 	// UpdatePodResources must be true so doPodResizeAction updates the pod-level cgroup.
 	assert.True(t, actions.UpdatePodResources, "UpdatePodResources must be true for OOMKilled sidecar with pending resize")
 }
@@ -4351,7 +4357,8 @@ func TestUpdatePodContainerResources(t *testing.T) {
 			}
 
 			fakeRuntime.Called = []string{}
-			err := m.updatePodContainerResources(tCtx, pod, tc.resourceName, containersToUpdate)
+			// All test cases are increases.
+			err := m.updatePodContainerResources(tCtx, pod, tc.resourceName, nil, containersToUpdate)
 			require.NoError(t, err, dsc)
 
 			if tc.invokeUpdateResources {
@@ -4485,22 +4492,29 @@ func TestUpdatePodContainerResources_Failures(t *testing.T) {
 			rs := &failingRuntimeService{FakeRuntimeService: fakeRuntime, errs: errsByID}
 			m.runtimeService = rs
 
-			var containersToUpdate []containerToUpdateInfo
+			var containersToUpdate, downsize, upsize []containerToUpdateInfo
 			for i := range pod.Spec.Containers {
 				c := &pod.Spec.Containers[i]
 				desired, current := increase()
-				if strings.HasPrefix(c.Name, "down-") {
+				isDecrease := strings.HasPrefix(c.Name, "down-")
+				if isDecrease {
 					desired, current = decrease()
 				}
-				containersToUpdate = append(containersToUpdate, containerToUpdateInfo{
+				cInfo := containerToUpdateInfo{
 					container:                 c,
 					kubeContainerID:           kubecontainer.ContainerID{Type: "testRuntime", ID: nameToContainerID[c.Name]},
 					desiredContainerResources: desired,
 					currentContainerResources: &current,
-				})
+				}
+				containersToUpdate = append(containersToUpdate, cInfo)
+				if isDecrease {
+					downsize = append(downsize, cInfo)
+				} else {
+					upsize = append(upsize, cInfo)
+				}
 			}
 
-			err = m.updatePodContainerResources(tCtx, pod, v1.ResourceMemory, containersToUpdate)
+			err = m.updatePodContainerResources(tCtx, pod, v1.ResourceMemory, downsize, upsize)
 			require.Error(t, err)
 			for _, name := range tc.expectErrorsFor {
 				require.ErrorIs(t, err, errsByID[nameToContainerID[name]], "returned error should include the failure for %s", name)
@@ -4594,8 +4608,6 @@ func TestUpdatePodContainerResources_Concurrently(t *testing.T) {
 			Namespace: "default",
 		},
 		Spec: v1.PodSpec{
-			// Increases and decreases are interleaved on purpose. The update order must come
-			// from each container's resizing direction, not from its position in the container list.
 			Containers: []v1.Container{
 				{Name: "up-1", Image: "busybox"},
 				{Name: "down-1", Image: "busybox"},
@@ -4616,21 +4628,28 @@ func TestUpdatePodContainerResources_Concurrently(t *testing.T) {
 	small := resourceRequirements{memoryLimit: mem100M.Value(), memoryRequest: mem100M.Value(), cpuLimit: cpu100m.MilliValue(), cpuRequest: cpu100m.MilliValue()}
 	large := resourceRequirements{memoryLimit: mem200M.Value(), memoryRequest: mem200M.Value(), cpuLimit: cpu100m.MilliValue(), cpuRequest: cpu100m.MilliValue()}
 
-	var containersToUpdate []containerToUpdateInfo
+	var containersToUpdate, downsize, upsize []containerToUpdateInfo
 	decreaseIDs := sets.New[string]()
 	for i := range pod.Spec.Containers {
 		c := &pod.Spec.Containers[i]
 		current, desired := small, large // increase
-		if strings.HasPrefix(c.Name, "down-") {
+		isDecrease := strings.HasPrefix(c.Name, "down-")
+		if isDecrease {
 			current, desired = large, small // decrease
 			decreaseIDs.Insert(idByName[c.Name])
 		}
-		containersToUpdate = append(containersToUpdate, containerToUpdateInfo{
+		cInfo := containerToUpdateInfo{
 			container:                 c,
 			kubeContainerID:           kubecontainer.ContainerID{Type: "testRuntime", ID: idByName[c.Name]},
 			desiredContainerResources: desired,
 			currentContainerResources: &current,
-		})
+		}
+		containersToUpdate = append(containersToUpdate, cInfo)
+		if isDecrease {
+			downsize = append(downsize, cInfo)
+		} else {
+			upsize = append(upsize, cInfo)
+		}
 	}
 	numDecreases := decreaseIDs.Len()
 	numIncreases := len(containersToUpdate) - numDecreases
@@ -4663,7 +4682,7 @@ func TestUpdatePodContainerResources_Concurrently(t *testing.T) {
 		},
 	}
 
-	err = m.updatePodContainerResources(tCtx, pod, v1.ResourceMemory, containersToUpdate)
+	err = m.updatePodContainerResources(tCtx, pod, v1.ResourceMemory, downsize, upsize)
 	require.NoError(t, err)
 	assert.False(t, increaseTooEarly, "container increases must not start before all container decreases complete")
 	for _, cInfo := range containersToUpdate {
@@ -5533,13 +5552,19 @@ func TestDoPodResizeAction(t *testing.T) {
 				desiredContainerResources: tc.desiredResources,
 				currentContainerResources: &tc.currentResources,
 			}
-			containersToUpdate := make(map[v1.ResourceName][]containerToUpdateInfo)
+			containersToUpsize := make(map[v1.ResourceName][]containerToUpdateInfo)
+			containersToDownsize := make(map[v1.ResourceName][]containerToUpdateInfo)
 			for _, r := range tc.updatedResources {
-				containersToUpdate[r] = []containerToUpdateInfo{updateInfo}
+				if updateInfo.isDecrease(r) {
+					containersToDownsize[r] = []containerToUpdateInfo{updateInfo}
+				} else {
+					containersToUpsize[r] = []containerToUpdateInfo{updateInfo}
+				}
 			}
 
 			actions := podActions{
-				ContainersToUpdate:      containersToUpdate,
+				ContainersToUpsize:      containersToUpsize,
+				ContainersToDownsize:    containersToDownsize,
 				UpdatePodLevelResources: tc.updatedPodLevelResources,
 				SandboxID:               "sandbox-id",
 			}
@@ -6229,8 +6254,11 @@ func TestValidatePodResizeAction(t *testing.T) {
 				v1.ResourceMemory: {updateInfo},
 			}
 
-			actions := podActions{
-				ContainersToUpdate: containersToUpdate,
+			actions := podActions{}
+			if updateInfo.isDecrease(v1.ResourceMemory) {
+				actions.ContainersToDownsize = containersToUpdate
+			} else {
+				actions.ContainersToUpsize = containersToUpdate
 			}
 
 			podStats := &statsapi.PodStats{

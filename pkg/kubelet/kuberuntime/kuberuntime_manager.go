@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -598,7 +599,7 @@ type containerToUpdateInfo struct {
 	currentContainerResources *resourceRequirements
 }
 
-// isDecrease retuns whether this update decreases resource type resourceName. The resource
+// isDecrease returns whether this update decreases resource type resourceName. The resource
 // limit decides the direction if it changes, otherwise the request does.
 func (c *containerToUpdateInfo) isDecrease(resourceName v1.ResourceName) bool {
 	switch resourceName {
@@ -654,9 +655,12 @@ type podActions struct {
 	// EphemeralContainersToStart is a list of indexes for the ephemeral containers to start,
 	// where the index is the index of the specific container in pod.Spec.EphemeralContainers.
 	EphemeralContainersToStart []int
-	// ContainersToUpdate keeps a list of containers needing resource update.
+	// ContainersToUpsize keeps a list of containers needing a resource increase, per resource.
 	// Container resource update is applicable only for CPU and memory.
-	ContainersToUpdate map[v1.ResourceName][]containerToUpdateInfo
+	ContainersToUpsize map[v1.ResourceName][]containerToUpdateInfo
+	// ContainersToDownsize keeps a list of containers needing a resource decrease, per resource.
+	// Container resource update is applicable only for CPU and memory.
+	ContainersToDownsize map[v1.ResourceName][]containerToUpdateInfo
 	// VolumesToUpsize keeps a list of volumes needing size increase.
 	VolumesToUpsize []v1.Volume
 	// VolumesToDownsize keeps a list of volumes needing size decrease.
@@ -681,8 +685,13 @@ type resourceRequirements struct {
 }
 
 func (p podActions) String() string {
-	return fmt.Sprintf("KillPod: %t, CreateSandbox: %t, UpdatePodResources: %t, UpdatePodLevelResources: %t, Attempt: %d, InitContainersToStart: %v, ContainersToStart: %v, EphemeralContainersToStart: %v, ContainersToUpdate: %v, VolumesToUpsize: %v, VolumesToDownsize: %v, ContainersToKill: %v, ContainersToRemove: %v",
-		p.KillPod, p.CreateSandbox, p.UpdatePodResources, p.UpdatePodLevelResources, p.Attempt, p.InitContainersToStart, p.ContainersToStart, p.EphemeralContainersToStart, p.ContainersToUpdate, p.VolumesToUpsize, p.VolumesToDownsize, p.ContainersToKill, p.ContainersToReset)
+	return fmt.Sprintf("KillPod: %t, CreateSandbox: %t, UpdatePodResources: %t, UpdatePodLevelResources: %t, Attempt: %d, InitContainersToStart: %v, ContainersToStart: %v, EphemeralContainersToStart: %v, ContainersToUpsize: %v, ContainersToDownsize: %v, VolumesToUpsize: %v, VolumesToDownsize: %v, ContainersToKill: %v, ContainersToRemove: %v",
+		p.KillPod, p.CreateSandbox, p.UpdatePodResources, p.UpdatePodLevelResources, p.Attempt, p.InitContainersToStart, p.ContainersToStart, p.EphemeralContainersToStart, p.ContainersToUpsize, p.ContainersToDownsize, p.VolumesToUpsize, p.VolumesToDownsize, p.ContainersToKill, p.ContainersToReset)
+}
+
+// hasContainersToUpdate returns true if any container needs a resourceName update.
+func (p podActions) hasContainersToUpdate(resourceName v1.ResourceName) bool {
+	return len(p.ContainersToUpsize[resourceName]) > 0 || len(p.ContainersToDownsize[resourceName]) > 0
 }
 
 // containerChanged will determine whether the container has changed based on the fields that will affect the running of the container.
@@ -805,7 +814,11 @@ func (m *kubeGenericRuntimeManager) computePodResizeAction(ctx context.Context, 
 			desiredContainerResources: desiredResources,
 			currentContainerResources: &currentResources,
 		}
-		changes.ContainersToUpdate[rName] = append(changes.ContainersToUpdate[rName], cUpdateInfo)
+		if cUpdateInfo.isDecrease(rName) {
+			changes.ContainersToDownsize[rName] = append(changes.ContainersToDownsize[rName], cUpdateInfo)
+		} else {
+			changes.ContainersToUpsize[rName] = append(changes.ContainersToUpsize[rName], cUpdateInfo)
+		}
 	}
 	resizeMemLim, restartMemLim := determineContainerResize(v1.ResourceMemory, desiredResources.memoryLimit, currentResources.memoryLimit)
 	resizeMemReq, restartMemReq := determineContainerResize(v1.ResourceMemory, desiredResources.memoryRequest, currentResources.memoryRequest)
@@ -1113,8 +1126,8 @@ func (m *kubeGenericRuntimeManager) doPodResizeAction(ctx context.Context, pod *
 				return err
 			}
 		}
-		if len(podContainerChanges.ContainersToUpdate[rName]) > 0 {
-			if err = m.updatePodContainerResources(ctx, pod, rName, podContainerChanges.ContainersToUpdate[rName]); err != nil {
+		if podContainerChanges.hasContainersToUpdate(rName) {
+			if err = m.updatePodContainerResources(ctx, pod, rName, podContainerChanges.ContainersToDownsize[rName], podContainerChanges.ContainersToUpsize[rName]); err != nil {
 				logger.Error(err, "updatePodContainerResources failed", "pod", format.Pod(pod), "resource", rName)
 				return err
 			}
@@ -1153,7 +1166,7 @@ func (m *kubeGenericRuntimeManager) doPodResizeAction(ctx context.Context, pod *
 	}
 
 	// 2. Memory cgroups
-	if len(podContainerChanges.ContainersToUpdate[v1.ResourceMemory]) > 0 || podContainerChanges.UpdatePodResources || podContainerChanges.UpdatePodLevelResources {
+	if podContainerChanges.hasContainersToUpdate(v1.ResourceMemory) || podContainerChanges.UpdatePodResources || podContainerChanges.UpdatePodLevelResources {
 		if podResources.Memory == nil {
 			// Default pod memory limit to the current memory limit if unset to prevent it from updating.
 			// TODO(#128675): This does not support removing limits.
@@ -1174,7 +1187,7 @@ func (m *kubeGenericRuntimeManager) doPodResizeAction(ctx context.Context, pod *
 	}
 
 	// 4. CPU cgroups
-	if len(podContainerChanges.ContainersToUpdate[v1.ResourceCPU]) > 0 || podContainerChanges.UpdatePodResources || podContainerChanges.UpdatePodLevelResources {
+	if podContainerChanges.hasContainersToUpdate(v1.ResourceCPU) || podContainerChanges.UpdatePodResources || podContainerChanges.UpdatePodLevelResources {
 		if podResources.CPUShares == nil {
 			// This shouldn't happen: ResourceConfigForPod always returns a non-nil value for CPUShares.
 			logger.Error(nil, "podResources.CPUShares is nil", "pod", pod.Name)
@@ -1207,7 +1220,7 @@ func (m *kubeGenericRuntimeManager) validatePodResizeAction(
 	currentPodResources, desiredPodResources *cm.ResourceConfig,
 	podContainerChanges podActions,
 ) error {
-	if len(podContainerChanges.ContainersToUpdate[v1.ResourceMemory]) > 0 || podContainerChanges.UpdatePodResources {
+	if podContainerChanges.hasContainersToUpdate(v1.ResourceMemory) || podContainerChanges.UpdatePodResources {
 		return m.validateMemoryResizeAction(ctx, pod, podStatus, currentPodResources, desiredPodResources, podContainerChanges)
 	}
 
@@ -1227,7 +1240,10 @@ func (m *kubeGenericRuntimeManager) validateMemoryResizeAction(
 			*desiredPodResources.Memory < *currentPodResources.Memory) // Pod memory limit decreasing
 
 	decreasingContainerLimits := map[string]int64{} // Map of container name to desired memory limit.
-	for _, cUpdate := range podContainerChanges.ContainersToUpdate[v1.ResourceMemory] {
+	// Check upsizes too: adding a memory limit (0 -> N) is classified as an upsize, but it can
+	// still put the limit below current usage.
+	memoryUpdates := slices.Concat(podContainerChanges.ContainersToDownsize[v1.ResourceMemory], podContainerChanges.ContainersToUpsize[v1.ResourceMemory])
+	for _, cUpdate := range memoryUpdates {
 		if cUpdate.desiredContainerResources.memoryLimit != 0 {
 			if cUpdate.currentContainerResources == nil || cUpdate.currentContainerResources.memoryLimit == 0 || // Limit added
 				cUpdate.desiredContainerResources.memoryLimit < cUpdate.currentContainerResources.memoryLimit { // Limit decreasing
@@ -1275,7 +1291,7 @@ func (m *kubeGenericRuntimeManager) validateMemoryResizeAction(
 	return nil
 }
 
-func (m *kubeGenericRuntimeManager) updatePodContainerResources(ctx context.Context, pod *v1.Pod, resourceName v1.ResourceName, containersToUpdate []containerToUpdateInfo) error {
+func (m *kubeGenericRuntimeManager) updatePodContainerResources(ctx context.Context, pod *v1.Pod, resourceName v1.ResourceName, downsize, upsize []containerToUpdateInfo) error {
 	logger := klog.FromContext(ctx)
 	logger.V(5).Info("Updating container resources", "pod", klog.KObj(pod))
 
@@ -1316,7 +1332,7 @@ func (m *kubeGenericRuntimeManager) updatePodContainerResources(ctx context.Cont
 		// A container's memory and CPU entries share this currentContainerResources pointer
 		// (see computePodResizeAction), which is how the CPU step sees the memory values applied
 		// here. Writing without a lock is safe because each container appears at most once per
-		// resource list, and the memory and CPU steps run one after the other.
+		// resource, and the memory and CPU steps run one after the other.
 		// Note: We can't rely on GetPodStatus as runtime may lag in actuating the resource values it just accepted.
 		switch resourceName {
 		case v1.ResourceMemory:
@@ -1329,15 +1345,7 @@ func (m *kubeGenericRuntimeManager) updatePodContainerResources(ctx context.Cont
 		return nil
 	}
 
-	// Order the container updates such that resource decreases are applied before increases
-	var downsize, upsize []containerToUpdateInfo
-	for _, cInfo := range containersToUpdate {
-		if cInfo.isDecrease(resourceName) {
-			downsize = append(downsize, cInfo)
-		} else {
-			upsize = append(upsize, cInfo)
-		}
-	}
+	// Decreases are applied before increases.
 	resizeBatch := func(batch []containerToUpdateInfo) error {
 		var wg sync.WaitGroup
 		errs := make([]error, len(batch))
@@ -1459,7 +1467,8 @@ func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *
 	}
 
 	if resizable, _, _ := allocation.IsInPlacePodVerticalScalingAllowed(pod); resizable {
-		changes.ContainersToUpdate = make(map[v1.ResourceName][]containerToUpdateInfo)
+		changes.ContainersToUpsize = make(map[v1.ResourceName][]containerToUpdateInfo)
+		changes.ContainersToDownsize = make(map[v1.ResourceName][]containerToUpdateInfo)
 	}
 
 	// Check initialization progress.
@@ -1880,7 +1889,7 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 	if resizable, _, _ := allocation.IsInPlacePodVerticalScalingAllowed(pod); resizable {
 		updateVolumes := utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingMemoryBackedVolumes) &&
 			(len(podContainerChanges.VolumesToUpsize) > 0 || len(podContainerChanges.VolumesToDownsize) > 0)
-		if len(podContainerChanges.ContainersToUpdate) > 0 || podContainerChanges.UpdatePodResources || podContainerChanges.UpdatePodLevelResources || updateVolumes {
+		if len(podContainerChanges.ContainersToUpsize) > 0 || len(podContainerChanges.ContainersToDownsize) > 0 || podContainerChanges.UpdatePodResources || podContainerChanges.UpdatePodLevelResources || updateVolumes {
 			result.AddSyncResult(m.doPodResizeAction(ctx, pod, podStatus, podContainerChanges))
 		}
 	}
