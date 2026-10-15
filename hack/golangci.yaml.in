@@ -54,6 +54,12 @@ linters:
     # Excluding configuration per-path, per-linter, per-text and per-source.
     rules:
 
+      # hack/testdata/golangci-lint contains test cases which intentionally
+      # trigger linter issues. Ignored during normal linting, checked during
+      # `go test ./test/integration/golangci-lint`.
+      - path: hack/testdata/golangci-lint/
+        text: .
+
       # https://github.com/kubernetes/kubernetes/issues/117288#issuecomment-1507012435
       - linters:
           - gocritic
@@ -176,7 +182,7 @@ linters:
         path: test/e2e/e2e_test\.go|test/e2e/framework/internal/.*|test/e2e/framework/[^/]*\.go|test/e2e/invariants/.*
 
   default: {{if .Base -}} none {{- else -}} standard {{- end}}
-  enable: # please keep this alphabetized
+  enable: # Please keep this alphabetized. Add positive and (where appropriate) negative test cases to hack/testdata/golangci-lint/golangcilint.go
     - depguard
     - forbidigo
     - ginkgolinter
