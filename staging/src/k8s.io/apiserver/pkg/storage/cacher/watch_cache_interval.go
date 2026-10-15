@@ -132,6 +132,16 @@ func newCacheIntervalFromLazySnapshot(resourceVersion uint64, snap store.Snapsho
 	}
 }
 
+// copyStoreElementToWatchCacheEventBuffer avoids a significant amount of allocations in watchCache
+func copyStoreElementToWatchCacheEventBuffer(elem *store.Element, buffer *watchCacheEvent, resourceVersion uint64) {
+	buffer.Type = watch.Added
+	buffer.Object = elem.Object
+	buffer.ObjLabels = elem.Labels
+	buffer.ObjFields = elem.Fields
+	buffer.Key = elem.Key
+	buffer.ResourceVersion = resourceVersion
+}
+
 func storeElementToWatchCacheEvent(elem *store.Element, resourceVersion uint64) *watchCacheEvent {
 	return &watchCacheEvent{
 		Type:            watch.Added,
@@ -290,12 +300,14 @@ type lazySnapshotCacheIntervalSource struct {
 
 func (s *lazySnapshotCacheIntervalSource) All() iter.Seq2[*watchCacheEvent, error] {
 	return func(yield func(*watchCacheEvent, error) bool) {
+		buffer := &watchCacheEvent{}
 		for elem, err := range s.snapshot.RangePrefix("", "").All() {
 			if err != nil {
 				yield(nil, err)
 				return
 			}
-			if !yield(storeElementToWatchCacheEvent(elem, s.resourceVersion), nil) {
+			copyStoreElementToWatchCacheEventBuffer(elem, buffer, s.resourceVersion)
+			if !yield(buffer, nil) {
 				return
 			}
 		}
