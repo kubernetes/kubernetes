@@ -29,9 +29,12 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	corelisters "k8s.io/client-go/listers/core/v1"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/testutil"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/utils/ptr"
 )
 
@@ -112,8 +115,9 @@ func Test_podResourceCollector_CollectWithStability(t *testing.T) {
 	tests := []struct {
 		name string
 
-		pods     []*v1.Pod
-		expected string
+		enableDRANodeAllocatableResources bool
+		pods                              []*v1.Pod
+		expected                          string
 	}{
 		{},
 		{
@@ -728,9 +732,96 @@ func Test_podResourceCollector_CollectWithStability(t *testing.T) {
 				kube_pod_resource_request{namespace="test",node="",pod="foo",priority="",resource="memory",scheduler="",unit="bytes"} 2e+09
 				`,
 		},
+		{
+			name:                              "extra node allocatable resources (like DRA allocations) added when feature enabled",
+			enableDRANodeAllocatableResources: true,
+			pods: []*v1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{Namespace: "test", Name: "dra-pod"},
+					Spec: v1.PodSpec{
+						NodeName: "node-one",
+						Containers: []v1.Container{
+							{
+								Name: "c1",
+								Resources: v1.ResourceRequirements{
+									Requests: v1.ResourceList{"cpu": resource.MustParse("1")},
+									Limits:   v1.ResourceList{"memory": resource.MustParse("1G")},
+								},
+							},
+						},
+					},
+					Status: v1.PodStatus{
+						ExtraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
+							{
+								Source:     v1.ExtraNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "claim1"},
+								Containers: []string{"c1"},
+								Mapping: []v1.NodeAllocatableMappedResources{
+									{Name: v1.ResourceCPU, Quantity: new(resource.MustParse("2"))},
+								},
+								Overhead: []v1.NodeAllocatableOverheadResources{
+									{Name: v1.ResourceMemory, PerPod: new(resource.MustParse("500M"))},
+								},
+							},
+						},
+					},
+				},
+			},
+			expected: `
+				# HELP kube_pod_resource_limit [STABLE] Resources limit for workloads on the cluster, broken down by pod. This shows the resource usage the scheduler and kubelet expect per pod for resources along with the unit for the resource if any.
+				# TYPE kube_pod_resource_limit gauge
+				kube_pod_resource_limit{namespace="test",node="node-one",pod="dra-pod",priority="",resource="memory",scheduler="",unit="bytes"} 1.5e+09
+				# HELP kube_pod_resource_request [STABLE] Resources requested by workloads on the cluster, broken down by pod. This shows the resource usage the scheduler and kubelet expect per pod for resources along with the unit for the resource if any.
+				# TYPE kube_pod_resource_request gauge
+				kube_pod_resource_request{namespace="test",node="node-one",pod="dra-pod",priority="",resource="cpu",scheduler="",unit="cores"} 3
+				kube_pod_resource_request{namespace="test",node="node-one",pod="dra-pod",priority="",resource="memory",scheduler="",unit="bytes"} 5e+08
+				`,
+		},
+		{
+			name: "extra node allocatable resources (like DRA allocations) ignored when feature disabled",
+			pods: []*v1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{Namespace: "test", Name: "dra-pod"},
+					Spec: v1.PodSpec{
+						NodeName: "node-one",
+						Containers: []v1.Container{
+							{
+								Name: "c1",
+								Resources: v1.ResourceRequirements{
+									Requests: v1.ResourceList{"cpu": resource.MustParse("1")},
+									Limits:   v1.ResourceList{"memory": resource.MustParse("1G")},
+								},
+							},
+						},
+					},
+					Status: v1.PodStatus{
+						ExtraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
+							{
+								Source:     v1.ExtraNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "claim1"},
+								Containers: []string{"c1"},
+								Mapping: []v1.NodeAllocatableMappedResources{
+									{Name: v1.ResourceCPU, Quantity: new(resource.MustParse("2"))},
+								},
+								Overhead: []v1.NodeAllocatableOverheadResources{
+									{Name: v1.ResourceMemory, PerPod: new(resource.MustParse("500M"))},
+								},
+							},
+						},
+					},
+				},
+			},
+			expected: `
+				# HELP kube_pod_resource_limit [STABLE] Resources limit for workloads on the cluster, broken down by pod. This shows the resource usage the scheduler and kubelet expect per pod for resources along with the unit for the resource if any.
+				# TYPE kube_pod_resource_limit gauge
+				kube_pod_resource_limit{namespace="test",node="node-one",pod="dra-pod",priority="",resource="memory",scheduler="",unit="bytes"} 1e+09
+				# HELP kube_pod_resource_request [STABLE] Resources requested by workloads on the cluster, broken down by pod. This shows the resource usage the scheduler and kubelet expect per pod for resources along with the unit for the resource if any.
+				# TYPE kube_pod_resource_request gauge
+				kube_pod_resource_request{namespace="test",node="node-one",pod="dra-pod",priority="",resource="cpu",scheduler="",unit="cores"} 1
+				`,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRANodeAllocatableResources, tt.enableDRANodeAllocatableResources)
 			c := NewPodResourcesMetricsCollector(&fakePodLister{pods: tt.pods})
 			registry := metrics.NewKubeRegistry()
 			registry.CustomMustRegister(c)
