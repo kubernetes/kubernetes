@@ -324,3 +324,16 @@ func PodPreemptionPolicy(pod *v1.Pod) v1.PreemptionPolicy {
 	}
 	return v1.PreemptLowerPriority
 }
+
+// IsPodResizeSchedulerEvaluationCompleted returns true if the pod condition SchedulerEvaluationCompleted
+// is set to true with reason DeferredPodResize for the pod's current generation.
+func IsPodResizeSchedulerEvaluationCompleted(pod *v1.Pod) bool {
+	for _, condition := range pod.Status.Conditions {
+		if condition.Type == v1.SchedulerEvaluationCompleted {
+			return condition.Status == v1.ConditionTrue &&
+				condition.Reason == v1.PodReasonDeferredPodResize &&
+				condition.ObservedGeneration == pod.Generation
+		}
+	}
+	return false
+}
