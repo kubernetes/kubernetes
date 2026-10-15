@@ -472,13 +472,14 @@ func groupPods(pods []*v1.Pod, metrics metricsclient.PodMetricsInfo, resource v1
 func calculateRequests(pods []*v1.Pod, container string, resource v1.ResourceName) (map[string]int64, error) {
 	podLevelResourcesEnabled := feature.DefaultFeatureGate.Enabled(features.PodLevelResources)
 	extraNodeAllocatableEnabled := feature.DefaultFeatureGate.Enabled(features.DRANodeAllocatableResources)
+	inPlacePodLevelResourcesVerticalScalingEnabled := feature.DefaultFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling)
 	requests := make(map[string]int64, len(pods))
 	for _, pod := range pods {
 		// See KEP-2837:
 		// https://github.com/kubernetes/enhancements/blob/master/keps/sig-node/2837-pod-level-resource-spec/README.md
 		// A container named in the HPA takes precedence over pod-level requests.
 		if podLevelResourcesEnabled && container == "" {
-			if request, ok := podLevelRequest(pod, resource); ok {
+			if request, ok := podLevelRequest(pod, resource, extraNodeAllocatableEnabled, inPlacePodLevelResourcesVerticalScalingEnabled); ok {
 				requests[pod.Name] = request
 				continue
 			}
@@ -493,14 +494,23 @@ func calculateRequests(pods []*v1.Pod, container string, resource v1.ResourceNam
 }
 
 // podLevelRequest returns the pod-level request for the resource, if set.
-// The spec value is read directly rather than via PodRequests: when set, it is
-// exactly what PodRequests would return (overhead excluded, no status
-// resources), and it avoids aggregating container requests only to discard them.
-func podLevelRequest(pod *v1.Pod, resource v1.ResourceName) (int64, bool) {
+// With in-place pod-level resize enabled, the actual value from pod status is
+// preferred over the spec, since that is what the pod is running with.
+// Pod-level requests may cover only some resources (e.g. CPU at the pod level while
+// memory stays per container). If the target resource is not set at the pod level,
+// it returns false so the caller can fall back to container-level requests.
+func podLevelRequest(pod *v1.Pod, resource v1.ResourceName, extraNodeAllocatableEnabled, inPlacePodLevelResourcesVerticalScalingEnabled bool) (int64, bool) {
 	if pod.Spec.Resources == nil {
 		return 0, false
 	}
-	podRequest, ok := pod.Spec.Resources.Requests[resource]
+	podLevelRequests := resourcehelpers.PodRequests(pod, resourcehelpers.PodResourcesOptions{
+		SkipContainerLevelResources:                    true,
+		ExcludeOverhead:                                true,
+		UseExtraNodeAllocatableResources:               extraNodeAllocatableEnabled,
+		PreferActualPodLevelResources:                  true,
+		InPlacePodLevelResourcesVerticalScalingEnabled: inPlacePodLevelResourcesVerticalScalingEnabled,
+	})
+	podRequest, ok := podLevelRequests[resource]
 	if !ok {
 		return 0, false
 	}
@@ -517,7 +527,10 @@ func calculatePodRequestsFromContainers(pod *v1.Pod, container string, resource 
 			continue
 		}
 		if container == "" || container == c.Name {
-			containerRequest, ok := c.Resources.Requests[resource]
+			containerRequest, ok := resourcehelpers.ContainerActualRequests(pod, c)[resource]
+			if !ok {
+				containerRequest, ok = c.Resources.Requests[resource]
+			}
 			var containerExtraNodeAllocatableRes v1.ResourceList
 			// The pod sum adds the pod's extra node allocatable resources once, below.
 			// Limits, because the requests leave out the pod-scoped part the container can access.

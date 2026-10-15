@@ -18,6 +18,7 @@ package resource
 
 import (
 	"iter"
+	"maps"
 	"strings"
 
 	v1 "k8s.io/api/core/v1"
@@ -56,10 +57,16 @@ type PodResourcesOptions struct {
 	// from the calculation. If pod-level resources are not set in PodSpec,
 	// pod-level resources will always be skipped.
 	SkipPodLevelResources bool
-	// SkipContainerLevelResources
+	// SkipContainerLevelResources controls whether container-level resources are skipped
+	// from the calculation, leaving only pod-level resources.
 	SkipContainerLevelResources bool
 	// Use the ExtraNodeAllocatableResources from pod status to compute the effective pod resources.
 	UseExtraNodeAllocatableResources bool
+	// PreferActualPodLevelResources makes pod-level requests resolve per resource to
+	// pod.status.resources.requests[r] when present, falling back to pod.spec.resources.requests[r].
+	// Takes precedence over UseStatusResources for pod-level requests; container-level
+	// aggregation is unaffected.
+	PreferActualPodLevelResources bool
 }
 
 var supportedPodLevelResources = sets.New(v1.ResourceCPU, v1.ResourceMemory)
@@ -155,7 +162,9 @@ func PodRequests(pod *v1.Pod, opts PodResourcesOptions) v1.ResourceList {
 
 	if !opts.SkipPodLevelResources && IsPodLevelRequestsSet(pod) {
 		effectiveReqs := pod.Spec.Resources.Requests
-		if opts.InPlacePodLevelResourcesVerticalScalingEnabled && opts.UseStatusResources && (pod.Status.Resources != nil || pod.Status.AllocatedResources != nil) {
+		if opts.InPlacePodLevelResourcesVerticalScalingEnabled && opts.PreferActualPodLevelResources {
+			effectiveReqs = actualPodLevelRequests(pod)
+		} else if opts.InPlacePodLevelResourcesVerticalScalingEnabled && opts.UseStatusResources && (pod.Status.Resources != nil || pod.Status.AllocatedResources != nil) {
 			var statusRequests v1.ResourceList
 			if pod.Status.Resources != nil {
 				statusRequests = pod.Status.Resources.Requests
@@ -180,6 +189,22 @@ func applyPodLevelResources(result, effectiveResources v1.ResourceList) {
 			result[resourceName] = quantity
 		}
 	}
+}
+
+// actualPodLevelRequests returns the spec requests, with each resource overridden by its
+// actual value from pod.status.resources.requests when one is reported.
+// Resources the status doesn't report yet keep the spec value.
+func actualPodLevelRequests(pod *v1.Pod) v1.ResourceList {
+	if pod.Status.Resources == nil || len(pod.Status.Resources.Requests) == 0 {
+		return pod.Spec.Resources.Requests
+	}
+	result := maps.Clone(pod.Spec.Resources.Requests)
+	for name, quantity := range pod.Status.Resources.Requests {
+		if _, ok := result[name]; ok {
+			result[name] = quantity
+		}
+	}
+	return result
 }
 
 // effectivePodLevelResources returns max(spec, statuses...) with pod.Spec.Overhead excluded.
@@ -268,6 +293,28 @@ func containerStatusPairs(containers []v1.Container, statuses []v1.ContainerStat
 			}
 		}
 	}
+}
+
+// ContainerActualRequests returns the requests the container is running with:
+// status.resources if reported, then allocatedResources, then the spec. If a pending
+// resize is infeasible the spec is not trusted and nil is returned.
+// container must belong to pod.
+func ContainerActualRequests(pod *v1.Pod, container *v1.Container) v1.ResourceList {
+	return containerActuatedRequests(container, findContainerStatus(pod, container.Name), IsPodResizeInfeasible(pod))
+}
+
+func findContainerStatus(pod *v1.Pod, name string) *v1.ContainerStatus {
+	for i := range pod.Status.ContainerStatuses {
+		if pod.Status.ContainerStatuses[i].Name == name {
+			return &pod.Status.ContainerStatuses[i]
+		}
+	}
+	for i := range pod.Status.InitContainerStatuses {
+		if pod.Status.InitContainerStatuses[i].Name == name {
+			return &pod.Status.InitContainerStatuses[i]
+		}
+	}
+	return nil
 }
 
 func isRestartableInitContainer(container *v1.Container) bool {
