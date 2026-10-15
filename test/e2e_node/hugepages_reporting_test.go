@@ -45,20 +45,20 @@ var _ = SIGDescribe("HugepageAwareMemoryReporting", framework.WithSlow(), framew
 	expectedHugepageBytes := uint64(hugepageCount) * 2 * 1024 * 1024
 	margin := uint64(50 * 1024 * 1024)
 
-	getAvailableMemory := func(ctx context.Context) uint64 {
-		var available uint64
+	getMemoryStats := func(ctx context.Context) (available, workingSet uint64) {
 		gomega.Eventually(ctx, func() error {
 			summary, err := getNodeSummary(ctx)
 			if err != nil {
 				return err
 			}
-			if summary == nil || summary.Node.Memory == nil || summary.Node.Memory.AvailableBytes == nil {
+			if summary == nil || summary.Node.Memory == nil || summary.Node.Memory.AvailableBytes == nil || summary.Node.Memory.WorkingSetBytes == nil {
 				return fmt.Errorf("memory stats not yet available")
 			}
 			available = *summary.Node.Memory.AvailableBytes
+			workingSet = *summary.Node.Memory.WorkingSetBytes
 			return nil
 		}).WithTimeout(time.Minute).WithPolling(2 * time.Second).Should(gomega.Succeed())
-		return available
+		return available, workingSet
 	}
 
 	getNodeMemoryCapacity := func(ctx context.Context) int64 {
@@ -82,7 +82,7 @@ var _ = SIGDescribe("HugepageAwareMemoryReporting", framework.WithSlow(), framew
 			}
 
 			capacityBefore := getNodeMemoryCapacity(ctx)
-			availableBefore := getAvailableMemory(ctx)
+			availableBefore, workingSetBefore := getMemoryStats(ctx)
 
 			ginkgo.By(fmt.Sprintf("Allocating %d x 2Mi hugepages", hugepageCount))
 			setHugepages(ctx, hugepages)
@@ -96,15 +96,16 @@ var _ = SIGDescribe("HugepageAwareMemoryReporting", framework.WithSlow(), framew
 			gomega.Expect(capacityAfter).To(gomega.Equal(capacityBefore),
 				"node memory capacity must not change")
 
-			availableAfter := getAvailableMemory(ctx)
+			availableAfter, workingSetAfter := getMemoryStats(ctx)
 
+			// Working set shifts across kubelet restarts, so compare limit-minus-adjustment instead.
 			drop := uint64(0)
-			if availableBefore > availableAfter {
-				drop = availableBefore - availableAfter
+			if availableBefore+workingSetBefore > availableAfter+workingSetAfter {
+				drop = availableBefore + workingSetBefore - availableAfter - workingSetAfter
 			}
 
-			framework.Logf("enabled: availableBefore=%d availableAfter=%d drop=%d hugepages=%d",
-				availableBefore, availableAfter, drop, expectedHugepageBytes)
+			framework.Logf("enabled: availableBefore=%d workingSetBefore=%d availableAfter=%d workingSetAfter=%d drop=%d hugepages=%d",
+				availableBefore, workingSetBefore, availableAfter, workingSetAfter, drop, expectedHugepageBytes)
 
 			gomega.Expect(drop).To(
 				gomega.BeNumerically(">=", expectedHugepageBytes-margin),
@@ -125,7 +126,7 @@ var _ = SIGDescribe("HugepageAwareMemoryReporting", framework.WithSlow(), framew
 				e2eskipper.Skipf("skipping: 2Mi hugepages not supported on this node")
 			}
 
-			availableBefore := getAvailableMemory(ctx)
+			availableBefore, _ := getMemoryStats(ctx)
 
 			ginkgo.By(fmt.Sprintf("Allocating %d x 2Mi hugepages", hugepageCount))
 			setHugepages(ctx, hugepages)
@@ -135,7 +136,7 @@ var _ = SIGDescribe("HugepageAwareMemoryReporting", framework.WithSlow(), framew
 			restartKubelet(ctx, true)
 			waitForHugepages(f, ctx, hugepages)
 
-			availableAfter := getAvailableMemory(ctx)
+			availableAfter, _ := getMemoryStats(ctx)
 
 			framework.Logf("disabled: availableBefore=%d availableAfter=%d hugepages=%d",
 				availableBefore, availableAfter, expectedHugepageBytes)
