@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"reflect"
 	goruntime "runtime"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -2486,6 +2487,177 @@ func TestWatchListIsSynchronisedWhenNoEventsFromStoreReceived(t *testing.T) {
 			},
 		}},
 	}, true)
+}
+
+func TestStartDispatchingSelectsWatchers(t *testing.T) {
+	nodeNameTrigger := &indexedTriggerFunc{
+		indexName:   "spec.nodeName",
+		indexerFunc: func(obj runtime.Object) string { return obj.(*example.Pod).Spec.NodeName },
+	}
+	podOnNode := func(nodeName string) *example.Pod {
+		return &example.Pod{Spec: example.PodSpec{NodeName: nodeName}}
+	}
+
+	scenarios := []struct {
+		name           string
+		indexedTrigger *indexedTriggerFunc
+		event          *watchCacheEvent
+		expected       []string
+	}{
+		{
+			name:           "namespaced object, trigger value unchanged",
+			indexedTrigger: nodeNameTrigger,
+			event: &watchCacheEvent{
+				Type:       watch.Modified,
+				Object:     podOnNode("node-a"),
+				PrevObject: podOnNode("node-a"),
+				ObjFields:  fields.Set{"metadata.namespace": "ns", "metadata.name": "pod"},
+			},
+			expected: []string{"ns/pod", "ns/", "/pod", "/", "node-a"},
+		},
+		{
+			name:           "namespaced object, trigger value changed",
+			indexedTrigger: nodeNameTrigger,
+			event: &watchCacheEvent{
+				Type:       watch.Modified,
+				Object:     podOnNode("node-a"),
+				PrevObject: podOnNode("node-b"),
+				ObjFields:  fields.Set{"metadata.namespace": "ns", "metadata.name": "pod"},
+			},
+			expected: []string{"ns/pod", "ns/", "/pod", "/", "node-a", "node-b"},
+		},
+		{
+			name:           "cluster-scoped object",
+			indexedTrigger: nodeNameTrigger,
+			event: &watchCacheEvent{
+				Type:      watch.Added,
+				Object:    podOnNode("node-c"),
+				ObjFields: fields.Set{"metadata.name": "pod"},
+			},
+			expected: []string{"/pod", "/", "node-c"},
+		},
+		{
+			name:           "no name field",
+			indexedTrigger: nodeNameTrigger,
+			event: &watchCacheEvent{
+				Type:      watch.Added,
+				Object:    podOnNode("node-without-watcher"),
+				ObjFields: fields.Set{"metadata.namespace": "ns"},
+			},
+			expected: []string{"ns/", "/"},
+		},
+		{
+			name: "trigger not supported",
+			event: &watchCacheEvent{
+				Type:      watch.Added,
+				Object:    podOnNode("node-a"),
+				ObjFields: fields.Set{"metadata.namespace": "ns", "metadata.name": "pod"},
+			},
+			expected: []string{"ns/pod", "ns/", "/pod", "/", "node-a", "node-b", "node-c"},
+		},
+	}
+	for _, scenario := range scenarios {
+		t.Run(scenario.name, func(t *testing.T) {
+			cacher := &Cacher{
+				indexedTrigger: scenario.indexedTrigger,
+				watchers: indexedWatchers{
+					scopeWatchers: map[namespacedName]watchersMap{},
+					indexWatchers: map[string]watchersMap{},
+				},
+			}
+			// Two watchers per key, so the test catches a key that yields only one of its watchers.
+			number := 0
+			for _, scope := range []namespacedName{
+				{namespace: "ns", name: "pod"}, {namespace: "ns"}, {name: "pod"}, {},
+				{namespace: "other-ns", name: "pod"}, {namespace: "ns", name: "other-pod"}, {namespace: "other-ns"}, {name: "other-pod"},
+			} {
+				for range 2 {
+					cacher.watchers.addWatcher(&cacheWatcher{identifier: scope.namespace + "/" + scope.name}, number, watchSelector{scope: scope})
+					number++
+				}
+			}
+			for _, value := range []string{"node-a", "node-b", "node-c"} {
+				for range 2 {
+					cacher.watchers.addWatcher(&cacheWatcher{identifier: value}, number, watchSelector{indexValue: &value})
+					number++
+				}
+			}
+
+			cacher.startDispatching(scenario.event)
+			defer cacher.finishDispatching()
+
+			var selected []string
+			for _, w := range cacher.watchersBuffer {
+				selected = append(selected, w.identifier)
+			}
+			require.ElementsMatch(t, slices.Concat(scenario.expected, scenario.expected), selected)
+		})
+	}
+}
+
+func TestForEachSelectionKey(t *testing.T) {
+	scenarios := []struct {
+		name             string
+		namespace        string
+		objName          string
+		triggerValues    []string
+		triggerSupported bool
+		expected         []string
+	}{
+		{
+			name:             "namespace and name",
+			namespace:        "ns",
+			objName:          "pod",
+			triggerValues:    []string{"node-a"},
+			triggerSupported: true,
+			expected:         []string{"scope ns/pod", "scope ns/", "scope /pod", "scope /", "index value node-a"},
+		},
+		{
+			name:             "namespace only",
+			namespace:        "ns",
+			triggerValues:    []string{"node-a"},
+			triggerSupported: true,
+			expected:         []string{"scope ns/", "scope /", "index value node-a"},
+		},
+		{
+			name:             "name only",
+			objName:          "pod",
+			triggerValues:    []string{"node-a"},
+			triggerSupported: true,
+			expected:         []string{"scope /pod", "scope /", "index value node-a"},
+		},
+		{
+			name:             "neither namespace nor name",
+			triggerSupported: true,
+			expected:         []string{"scope /"},
+		},
+		{
+			name:             "trigger value changed",
+			namespace:        "ns",
+			objName:          "pod",
+			triggerValues:    []string{"node-a", "node-b"},
+			triggerSupported: true,
+			expected:         []string{"scope ns/pod", "scope ns/", "scope /pod", "scope /", "index value node-a", "index value node-b"},
+		},
+		{
+			// The fan-out ignores trigger values, if any.
+			name:          "trigger not supported",
+			namespace:     "ns",
+			objName:       "pod",
+			triggerValues: []string{"node-a"},
+			expected:      []string{"scope ns/pod", "scope ns/", "scope /pod", "scope /", "all index values"},
+		},
+	}
+	for _, scenario := range scenarios {
+		t.Run(scenario.name, func(t *testing.T) {
+			var calls []string
+			forEachSelectionKey(scenario.namespace, scenario.objName, scenario.triggerValues, scenario.triggerSupported,
+				func(scope namespacedName) { calls = append(calls, "scope "+scope.namespace+"/"+scope.name) },
+				func(indexValue string) { calls = append(calls, "index value "+indexValue) },
+				func() { calls = append(calls, "all index values") })
+			require.Equal(t, scenario.expected, calls)
+		})
+	}
 }
 
 func TestForgetWatcher(t *testing.T) {

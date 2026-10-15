@@ -1139,53 +1139,62 @@ func (c *Cacher) startDispatching(event *watchCacheEvent) {
 		return
 	}
 
-	// iterate over watchers for each applicable namespace/name tuple
 	namespace := event.ObjFields["metadata.namespace"]
 	name := event.ObjFields["metadata.name"]
+	forEachSelectionKey(namespace, name, triggerValues, supported,
+		func(scope namespacedName) {
+			for _, watcher := range c.watchers.scopeWatchers[scope] {
+				c.watchersBuffer = append(c.watchersBuffer, watcher)
+			}
+		},
+		func(indexValue string) {
+			for _, watcher := range c.watchers.indexWatchers[indexValue] {
+				c.watchersBuffer = append(c.watchersBuffer, watcher)
+			}
+		},
+		func() {
+			for _, watchers := range c.watchers.indexWatchers {
+				for _, watcher := range watchers {
+					c.watchersBuffer = append(c.watchersBuffer, watcher)
+				}
+			}
+		})
+}
+
+// forEachSelectionKey encodes how an event selects watchers. It calls scope
+// with every namespace/name key of scopeWatchers that matches the event.
+// Then it calls indexValue with each of the event's trigger values or, when
+// the trigger is not supported, allIndexValues once for the fan-out to every
+// watcher in indexWatchers.
+func forEachSelectionKey(namespace, name string, triggerValues []string, triggerSupported bool, scope func(namespacedName), indexValue func(string), allIndexValues func()) {
 	if len(namespace) > 0 {
 		if len(name) > 0 {
 			// namespaced watchers scoped by name
-			for _, watcher := range c.watchers.scopeWatchers[namespacedName{namespace: namespace, name: name}] {
-				c.watchersBuffer = append(c.watchersBuffer, watcher)
-			}
+			scope(namespacedName{namespace: namespace, name: name})
 		}
 		// namespaced watchers not scoped by name
-		for _, watcher := range c.watchers.scopeWatchers[namespacedName{namespace: namespace}] {
-			c.watchersBuffer = append(c.watchersBuffer, watcher)
-		}
+		scope(namespacedName{namespace: namespace})
 	}
 	if len(name) > 0 {
 		// cluster-wide watchers scoped by name
-		for _, watcher := range c.watchers.scopeWatchers[namespacedName{name: name}] {
-			c.watchersBuffer = append(c.watchersBuffer, watcher)
-		}
+		scope(namespacedName{name: name})
 	}
 	// cluster-wide watchers unscoped by name
-	for _, watcher := range c.watchers.scopeWatchers[namespacedName{}] {
-		c.watchersBuffer = append(c.watchersBuffer, watcher)
-	}
+	scope(namespacedName{})
 
-	if supported {
-		// Iterate over watchers interested in the given values of the trigger.
+	if triggerSupported {
+		// Watchers interested in the given values of the trigger.
 		for _, triggerValue := range triggerValues {
-			for _, watcher := range c.watchers.indexWatchers[triggerValue] {
-				c.watchersBuffer = append(c.watchersBuffer, watcher)
-			}
+			indexValue(triggerValue)
 		}
-	} else {
-		// supported equal to false generally means that trigger function
-		// is not defined (or not aware of any indexes). In this case,
-		// watchers filters should generally also don't generate any
-		// trigger values, but can cause problems in case of some
-		// misconfiguration. Thus we paranoidly leave this branch.
-
-		// Iterate over watchers interested in exact values for all values.
-		for _, watchers := range c.watchers.indexWatchers {
-			for _, watcher := range watchers {
-				c.watchersBuffer = append(c.watchersBuffer, watcher)
-			}
-		}
+		return
 	}
+	// triggerSupported equal to false generally means that trigger function
+	// is not defined (or not aware of any indexes). In this case,
+	// watchers filters should generally also don't generate any
+	// trigger values, but can cause problems in case of some
+	// misconfiguration. Thus we paranoidly leave this call.
+	allIndexValues()
 }
 
 // finishDispatching stops all the watchers that were supposed to be
