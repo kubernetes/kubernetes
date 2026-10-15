@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"math/rand"
 	"slices"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -30,6 +31,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	certsv1 "k8s.io/api/certificates/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -736,4 +738,122 @@ func mustRFC3339(t *testing.T, stamp string) time.Time {
 		t.Fatalf("Error while parsing timestamp: %v", err)
 	}
 	return got
+}
+
+// TestPCRDeletedWhileDisconnected checks that the manager survives a
+// PodCertificateRequest deletion that the informer only learns about on
+// relist, which delivers a cache.DeletedFinalStateUnknown tombstone.
+func TestPCRDeletedWhileDisconnected(t *testing.T) {
+	ctx, cancel := context.WithCancel(ktesting.Init(t))
+	defer cancel()
+
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "ns1",
+			Name:      "workload",
+			UID:       "workload-uid",
+		},
+		Spec: corev1.PodSpec{
+			Volumes: []corev1.Volume{
+				{
+					Name: "certificate",
+					VolumeSource: corev1.VolumeSource{
+						Projected: &corev1.ProjectedVolumeSource{
+							Sources: []corev1.VolumeProjection{
+								{
+									PodCertificate: &corev1.PodCertificateProjection{
+										SignerName: "foo.com/signer",
+										KeyType:    "ED25519",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	pcr := certsv1.PodCertificateRequest{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace:       "ns1",
+			Name:            "req-1",
+			ResourceVersion: "1",
+		},
+		Spec: certsv1.PodCertificateRequestSpec{
+			PodName: pod.Name,
+			PodUID:  pod.UID,
+		},
+	}
+
+	kc := fake.NewClientset()
+
+	// Serve PCR lists and watches by hand so the test can drop the delete
+	// event and force the informer to relist, like a kubelet that lost its
+	// watch for longer than the etcd compaction window.
+	var mu sync.Mutex
+	pcrs := []certsv1.PodCertificateRequest{pcr}
+	listRV := "1"
+	kc.PrependReactor("list", "podcertificaterequests", func(action k8stesting.Action) (bool, runtime.Object, error) {
+		mu.Lock()
+		defer mu.Unlock()
+		return true, &certsv1.PodCertificateRequestList{
+			ListMeta: metav1.ListMeta{ResourceVersion: listRV},
+			Items:    slices.Clone(pcrs),
+		}, nil
+	})
+	firstWatch := watch.NewFake()
+	var watchCalls atomic.Int32
+	kc.PrependWatchReactor("podcertificaterequests", func(action k8stesting.Action) (bool, watch.Interface, error) {
+		switch watchCalls.Add(1) {
+		case 1:
+			return true, firstWatch, nil
+		case 2:
+			return true, nil, apierrors.NewResourceExpired("too old resource version: 1 (3)")
+		default:
+			return true, watch.NewFake(), nil
+		}
+	})
+
+	informerFactory := informers.NewSharedInformerFactoryWithOptions(kc, 0)
+	m := NewIssuingManager(
+		kc,
+		&FakeSynchronousPodManager{pods: []*corev1.Pod{pod}},
+		nil,
+		informerFactory.Certificates().V1().PodCertificateRequests(),
+		informerFactory.Core().V1().Nodes(),
+		types.NodeName("node1"),
+		testclock.NewFakeClock(mustRFC3339(t, "2010-01-01T00:00:00Z")),
+	)
+	informerFactory.Start(ctx.Done())
+	defer func() {
+		cancel()
+		informerFactory.Shutdown()
+	}()
+
+	waitForQueuedProjection := func() {
+		t.Helper()
+		if err := wait.PollUntilContextTimeout(ctx, 10*time.Millisecond, 10*time.Second, true, func(ctx context.Context) (bool, error) {
+			return m.projectionQueue.Len() == 1, nil
+		}); err != nil {
+			t.Fatalf("timed out waiting for the projection to be queued: %v", err)
+		}
+		key, _ := m.projectionQueue.Get()
+		m.projectionQueue.Forget(key)
+		m.projectionQueue.Done(key)
+	}
+
+	// The initial list delivers an add, which queues the pod's projection.
+	waitForQueuedProjection()
+
+	// Delete the PCR while the watch is down; the next watch fails with 410
+	// Gone and the informer relists without the PCR.
+	mu.Lock()
+	pcrs = nil
+	listRV = "3"
+	mu.Unlock()
+	firstWatch.Stop()
+
+	// The relist delivers the deletion as a tombstone, which must queue the
+	// projection again instead of panicking.
+	waitForQueuedProjection()
 }
