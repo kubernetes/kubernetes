@@ -16,7 +16,10 @@ limitations under the License.
 
 package validation
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestMaskTrailingDash(t *testing.T) {
 	testCases := []struct {
@@ -41,13 +44,18 @@ func TestMaskTrailingDash(t *testing.T) {
 		},
 		{
 			beforeMasking:        "-foo-",
-			expectedAfterMasking: "-foa",
+			expectedAfterMasking: "-fooa",
 			description:          "has both leading and trailing dashes",
 		},
 		{
 			beforeMasking:        "b-",
-			expectedAfterMasking: "a",
+			expectedAfterMasking: "ba",
 			description:          "has trailing dash",
+		},
+		{
+			beforeMasking:        "a?-",
+			expectedAfterMasking: "a?a",
+			description:          "preserves invalid character before trailing dash",
 		},
 		{
 			beforeMasking:        "ab",
@@ -61,5 +69,37 @@ func TestMaskTrailingDash(t *testing.T) {
 		if afterMasking != tc.expectedAfterMasking {
 			t.Errorf("error in test case: %s. expected: %s, actual: %s", tc.description, tc.expectedAfterMasking, afterMasking)
 		}
+	}
+}
+
+func TestNameValidationAfterMaskingTrailingDash(t *testing.T) {
+	for _, validator := range []struct {
+		name      string
+		validate  ValidateNameFunc
+		maxLength int
+	}{
+		{"DNSSubdomain", NameIsDNSSubdomain, 253},
+		{"DNSLabel", NameIsDNSLabel, 63},
+		{"DNS1035Label", NameIsDNS1035Label, 63},
+	} {
+		t.Run(validator.name, func(t *testing.T) {
+			for _, tc := range []struct {
+				name   string
+				prefix bool
+				valid  bool
+			}{
+				{"foo-", true, true},
+				{"foo-", false, false},
+				{"a?-", true, false},
+				{"--", true, false},
+				{"-", true, false},
+				{strings.Repeat("a", validator.maxLength-1) + "-", true, true},
+				{strings.Repeat("a", validator.maxLength) + "-", true, false},
+			} {
+				if errs := validator.validate(tc.name, tc.prefix); (len(errs) == 0) != tc.valid {
+					t.Errorf("validate(%q, prefix=%t) = %v, want valid=%t", tc.name, tc.prefix, errs, tc.valid)
+				}
+			}
+		})
 	}
 }
