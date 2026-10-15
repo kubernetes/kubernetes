@@ -18,10 +18,12 @@ package kuberuntime
 
 import (
 	"context"
+	"fmt"
 
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
+	crierror "k8s.io/cri-api/pkg/errors"
 	"k8s.io/klog/v2"
 	crededentialprovider "k8s.io/kubernetes/pkg/credentialprovider"
 	"k8s.io/kubernetes/pkg/features"
@@ -48,6 +50,8 @@ func (m *kubeGenericRuntimeManager) PullImage(ctx context.Context, image kubecon
 	}
 
 	var pullErrs []error
+	var suppliedCredentials []bool
+	var notFoundWithCredentials, failedWithoutCredentials bool
 	for _, currentCreds := range credentials {
 		auth := &runtimeapi.AuthConfig{
 			Username:      currentCreds.Username,
@@ -65,6 +69,26 @@ func (m *kubeGenericRuntimeManager) PullImage(ctx context.Context, image kubecon
 		}
 
 		pullErrs = append(pullErrs, err)
+		hasCredentials := auth.Username != "" || auth.Password != "" || auth.Auth != "" || auth.IdentityToken != "" || auth.RegistryToken != ""
+		suppliedCredentials = append(suppliedCredentials, hasCredentials)
+		if hasCredentials {
+			notFoundWithCredentials = notFoundWithCredentials || crierror.IsNotFound(err)
+		} else {
+			failedWithoutCredentials = true
+		}
+	}
+
+	// A failed anonymous fallback can make a missing image look like a credential
+	// failure. Explain the attempts only after all credentials have been tried.
+	if notFoundWithCredentials && failedWithoutCredentials {
+		for i, err := range pullErrs {
+			if suppliedCredentials[i] {
+				pullErrs[i] = fmt.Errorf("with supplied credentials: %w", err)
+			} else {
+				pullErrs[i] = fmt.Errorf("without supplied credentials: %w", err)
+			}
+		}
+		return "", nil, fmt.Errorf("image pull returned NotFound with supplied credentials; check the repository name, tag or digest, and access; pull attempts: %w", utilerrors.NewAggregate(pullErrs))
 	}
 
 	return "", nil, utilerrors.NewAggregate(pullErrs)
