@@ -116,6 +116,73 @@ func TestDeclarativeValidateStatusUpdate(t *testing.T) {
 	}
 }
 
+var driverRegistrationsTestCases = map[string]struct {
+	driverRegistrations []storage.CSINodeDriverRegistration
+	expectedErrs        field.ErrorList
+}{
+	"valid": {
+		driverRegistrations: []storage.CSINodeDriverRegistration{{Name: "foo", NodeID: "bar"}},
+	},
+	"name required": {
+		driverRegistrations: []storage.CSINodeDriverRegistration{{NodeID: "bar"}},
+		expectedErrs: field.ErrorList{
+			field.Required(field.NewPath("spec", "driverRegistrations").Index(0).Child("name"), "").MarkAlpha(),
+		},
+	},
+	"nodeID required": {
+		driverRegistrations: []storage.CSINodeDriverRegistration{{Name: "baz"}},
+		expectedErrs: field.ErrorList{
+			field.Required(field.NewPath("spec", "driverRegistrations").Index(0).Child("nodeID"), "").MarkAlpha(),
+		},
+	},
+}
+
+func TestDeclarativeValidateDriverRegistrations(t *testing.T) {
+	for _, apiVersion := range apiVersions {
+		ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
+			APIPrefix:         "apis",
+			APIGroup:          "storage.k8s.io",
+			APIVersion:        apiVersion,
+			Resource:          "csinodes",
+			IsResourceRequest: true,
+			Verb:              "create",
+		})
+
+		for name, tc := range driverRegistrationsTestCases {
+			t.Run(apiVersion+"/"+name, func(t *testing.T) {
+				obj := mkCSINode(func(node *storage.CSINode) {
+					node.Spec.DriverRegistrations = tc.driverRegistrations
+				})
+				apitesting.VerifyValidationEquivalence(t, ctx, &obj, registry.Strategy, tc.expectedErrs)
+			})
+		}
+	}
+}
+
+func TestDeclarativeValidateDriverRegistrationsUpdate(t *testing.T) {
+	for _, apiVersion := range apiVersions {
+		ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
+			APIPrefix:         "apis",
+			APIGroup:          "storage.k8s.io",
+			APIVersion:        apiVersion,
+			Resource:          "csinodes",
+			Name:              "valid-obj",
+			IsResourceRequest: true,
+			Verb:              "update",
+		})
+
+		for name, tc := range driverRegistrationsTestCases {
+			t.Run(apiVersion+"/"+name, func(t *testing.T) {
+				oldObj := mkCSINode()
+				oldObj.ResourceVersion = "1"
+				updateObj := oldObj.DeepCopy()
+				updateObj.Spec.DriverRegistrations = tc.driverRegistrations
+				apitesting.VerifyUpdateValidationEquivalence(t, ctx, updateObj, &oldObj, registry.Strategy, tc.expectedErrs)
+			})
+		}
+	}
+}
+
 func mkCSINode(tweaks ...func(node *storage.CSINode)) storage.CSINode {
 	node := storage.CSINode{
 		ObjectMeta: metav1.ObjectMeta{

@@ -146,4 +146,9 @@ func dropDisabledCSINodeFields(newObj, oldObj *storage.CSINode) {
 			newObj.Status.StorageHealth = nil
 		}
 	}
+	if !utilfeature.DefaultFeatureGate.Enabled(features.CSIControllerGetNodeInfo) {
+		if oldObj == nil || len(oldObj.Spec.DriverRegistrations) == 0 {
+			newObj.Spec.DriverRegistrations = nil
+		}
+	}
 }
