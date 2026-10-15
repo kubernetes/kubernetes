@@ -22,7 +22,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -600,22 +599,34 @@ type containerToUpdateInfo struct {
 }
 
 // isDecrease returns whether this update decreases resource type resourceName. The resource
-// limit decides the direction if it changes, otherwise the request does.
+// limit decides the direction if it changes, otherwise the request does. A limit of 0 means
+// no limit, so adding a limit is a decrease.
 func (c *containerToUpdateInfo) isDecrease(resourceName v1.ResourceName) bool {
 	switch resourceName {
 	case v1.ResourceMemory:
 		if c.desiredContainerResources.memoryLimit != c.currentContainerResources.memoryLimit {
-			return c.desiredContainerResources.memoryLimit < c.currentContainerResources.memoryLimit
+			return isLimitLower(c.desiredContainerResources.memoryLimit, c.currentContainerResources.memoryLimit)
 		}
 		return c.desiredContainerResources.memoryRequest < c.currentContainerResources.memoryRequest
 	case v1.ResourceCPU:
 		if c.desiredContainerResources.cpuLimit != c.currentContainerResources.cpuLimit {
-			return c.desiredContainerResources.cpuLimit < c.currentContainerResources.cpuLimit
+			return isLimitLower(c.desiredContainerResources.cpuLimit, c.currentContainerResources.cpuLimit)
 		}
 		return c.desiredContainerResources.cpuRequest < c.currentContainerResources.cpuRequest
 	default:
 		return false
 	}
+}
+
+// isLimitLower returns whether limit a is lower than limit b, where 0 means no limit.
+func isLimitLower(a, b int64) bool {
+	if a == 0 {
+		return false
+	}
+	if b == 0 {
+		return true
+	}
+	return a < b
 }
 
 // containerToRemoveInfo contains necessary information to update a container's resources.
@@ -1240,10 +1251,7 @@ func (m *kubeGenericRuntimeManager) validateMemoryResizeAction(
 			*desiredPodResources.Memory < *currentPodResources.Memory) // Pod memory limit decreasing
 
 	decreasingContainerLimits := map[string]int64{} // Map of container name to desired memory limit.
-	// Check upsizes too: adding a memory limit (0 -> N) is classified as an upsize, but it can
-	// still put the limit below current usage.
-	memoryUpdates := slices.Concat(podContainerChanges.ContainersToDownsize[v1.ResourceMemory], podContainerChanges.ContainersToUpsize[v1.ResourceMemory])
-	for _, cUpdate := range memoryUpdates {
+	for _, cUpdate := range podContainerChanges.ContainersToDownsize[v1.ResourceMemory] {
 		if cUpdate.desiredContainerResources.memoryLimit != 0 {
 			if cUpdate.currentContainerResources == nil || cUpdate.currentContainerResources.memoryLimit == 0 || // Limit added
 				cUpdate.desiredContainerResources.memoryLimit < cUpdate.currentContainerResources.memoryLimit { // Limit decreasing

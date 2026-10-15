@@ -3661,7 +3661,7 @@ func TestComputePodActionsForPodResize(t *testing.T) {
 					SandboxID:         podStatus.SandboxStatuses[0].Id,
 					ContainersToStart: []int{},
 					ContainersToKill:  getKillMap(pod, podStatus, []int{}),
-					ContainersToUpsize: map[v1.ResourceName][]containerToUpdateInfo{
+					ContainersToDownsize: map[v1.ResourceName][]containerToUpdateInfo{
 						v1.ResourceCPU: {
 							{
 								container:       &pod.Spec.Containers[0],
@@ -4760,6 +4760,34 @@ func TestContainerToUpdateInfoIsDecrease(t *testing.T) {
 			resource: v1.ResourceCPU,
 			current:  resourceRequirements{cpuLimit: 200, cpuRequest: 100},
 			desired:  resourceRequirements{cpuLimit: 200, cpuRequest: 150},
+			want:     false,
+		},
+		{
+			name:     "memory limit added",
+			resource: v1.ResourceMemory,
+			current:  resourceRequirements{memoryLimit: 0, memoryRequest: 100},
+			desired:  resourceRequirements{memoryLimit: 200, memoryRequest: 100},
+			want:     true,
+		},
+		{
+			name:     "memory limit removed",
+			resource: v1.ResourceMemory,
+			current:  resourceRequirements{memoryLimit: 200, memoryRequest: 100},
+			desired:  resourceRequirements{memoryLimit: 0, memoryRequest: 100},
+			want:     false,
+		},
+		{
+			name:     "cpu limit added",
+			resource: v1.ResourceCPU,
+			current:  resourceRequirements{cpuLimit: 0, cpuRequest: 100},
+			desired:  resourceRequirements{cpuLimit: 200, cpuRequest: 100},
+			want:     true,
+		},
+		{
+			name:     "cpu limit removed",
+			resource: v1.ResourceCPU,
+			current:  resourceRequirements{cpuLimit: 200, cpuRequest: 100},
+			desired:  resourceRequirements{cpuLimit: 0, cpuRequest: 100},
 			want:     false,
 		},
 		{
