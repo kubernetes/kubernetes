@@ -2135,6 +2135,9 @@ func TestEventHandlers_DeferredResizePodGroupMember(t *testing.T) {
 	member := st.MakePod().Name("pod1").Namespace("ns1").UID("pod1").Node("node1").SchedulerName(testSchedulerName).PodGroupName("pg1").Obj()
 	deferredMember := st.MakePod().Name("pod1").Namespace("ns1").UID("pod1").Node("node1").SchedulerName(testSchedulerName).PodGroupName("pg1").
 		Condition(v1.PodResizePending, v1.ConditionTrue, v1.PodReasonDeferred).Obj()
+	evaluatedMember := st.MakePod().Name("pod1").Namespace("ns1").UID("pod1").Node("node1").SchedulerName(testSchedulerName).PodGroupName("pg1").
+		Condition(v1.PodResizePending, v1.ConditionTrue, v1.PodReasonDeferred).
+		Condition(v1.SchedulerEvaluationCompleted, v1.ConditionTrue, v1.PodReasonDeferredPodResize).Obj()
 
 	tests := []struct {
 		name          string
@@ -2164,6 +2167,19 @@ func TestEventHandlers_DeferredResizePodGroupMember(t *testing.T) {
 			initialPod:   deferredMember,
 			updatedPod:   member,
 			expectMember: true,
+		},
+		{
+			name:         "scheduler evaluation completes for assigned member with deferred resize",
+			initialPod:   deferredMember,
+			updatedPod:   evaluatedMember,
+			expectMember: true,
+		},
+		{
+			name:          "SchedulerEvaluationCompleted removed from assigned member that is still deferred",
+			initialPod:    evaluatedMember,
+			updatedPod:    deferredMember,
+			expectInQueue: true,
+			expectMember:  true,
 		},
 		{
 			name:       "delete assigned member with deferred resize",
@@ -2263,6 +2279,63 @@ func TestEventHandlers_DeferredResizePodGroupMember(t *testing.T) {
 			}
 			if readiness.IsReady != tt.expectMember {
 				t.Errorf("Unexpected gang readiness with minCount=1: got %v, want %v", readiness.IsReady, tt.expectMember)
+			}
+		})
+	}
+}
+
+func TestEventHandlers_SchedulerEvaluationCompleted(t *testing.T) {
+	deferred := st.MakePod().Name("pod1").Namespace("ns1").UID("pod1").Node("node1").SchedulerName(testSchedulerName).
+		Condition(v1.PodResizePending, v1.ConditionTrue, v1.PodReasonDeferred).Obj()
+	evaluated := st.MakePod().Name("pod1").Namespace("ns1").UID("pod1").Node("node1").SchedulerName(testSchedulerName).
+		Condition(v1.PodResizePending, v1.ConditionTrue, v1.PodReasonDeferred).
+		Condition(v1.SchedulerEvaluationCompleted, v1.ConditionTrue, v1.PodReasonDeferredPodResize).Obj()
+
+	tests := []struct {
+		name          string
+		initialPod    *v1.Pod
+		updatedPod    *v1.Pod // nil for an add event
+		expectInQueue bool
+	}{
+		{
+			name:       "add: evaluated deferred resize",
+			initialPod: evaluated,
+		},
+		{
+			name:       "update: scheduler evaluation completes",
+			initialPod: deferred,
+			updatedPod: evaluated,
+		},
+		{
+			name:          "update: condition removed while the resize is still deferred",
+			initialPod:    evaluated,
+			updatedPod:    deferred,
+			expectInQueue: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScalingSchedulerPreemption, true)
+			logger, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+
+			sched := &Scheduler{
+				Cache:           internalcache.New(ctx, nil, false, false /* CompositePodGroup */),
+				SchedulingQueue: internalqueue.NewTestQueue(ctx, nil),
+				logger:          logger,
+				Profiles:        profile.Map{testSchedulerName: nil},
+			}
+
+			sched.addPod(tt.initialPod)
+			if tt.updatedPod != nil {
+				sched.updatePod(tt.initialPod, tt.updatedPod)
+			}
+
+			pod := tt.initialPod
+			if _, inQueue := sched.SchedulingQueue.GetPod(ctx, pod.Name, pod.Namespace, pod.Spec.SchedulingGroup); inQueue != tt.expectInQueue {
+				t.Errorf("Unexpected queue state: got inQueue=%v, want inQueue=%v", inQueue, tt.expectInQueue)
 			}
 		})
 	}
