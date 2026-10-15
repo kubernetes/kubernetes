@@ -2541,6 +2541,157 @@ func TestForgetWatcher(t *testing.T) {
 	require.Equal(t, 2, forgetCounter)
 }
 
+// hookTimeBudget runs a hook where dispatchEvent takes its time budget: after
+// startDispatching, with a blocked watcher, before the blocking add. It grants
+// no time, so the add closes the blocked watcher at once.
+type hookTimeBudget struct {
+	onTake func()
+}
+
+func (b *hookTimeBudget) takeAvailable() time.Duration {
+	b.onTake()
+	return 0
+}
+
+func (b *hookTimeBudget) returnUnused(_ time.Duration) {}
+
+// TestNonDrainingStopDuringDispatchIsFinal verifies that a non-draining stop
+// which lands during a dispatch still closes the done channel when the same
+// dispatch then closes the watcher in draining mode. Without such a stop the
+// watcher still drains.
+func TestNonDrainingStopDuringDispatchIsFinal(t *testing.T) {
+	forceRequestWatchProgressSupport(t)
+
+	scenarios := []struct {
+		name   string
+		stop   func(cacher *Cacher, a, w, b watch.Interface)
+		drains bool
+	}{
+		{
+			// Nobody reads the result channel or stops the watcher again, so an
+			// open done channel leaves the watcher goroutine blocked forever.
+			// Other watchers stop in the same dispatch.
+			name: "client Stop",
+			stop: func(_ *Cacher, a, w, b watch.Interface) { a.Stop(); w.Stop(); b.Stop() },
+		},
+		{
+			// It asks for an immediate stop, which must not become a drain.
+			name: "terminateAllWatchers",
+			stop: func(cacher *Cacher, _, _, _ watch.Interface) { cacher.terminateAllWatchers() },
+		},
+		{
+			// The stop of another watcher changes nothing.
+			name:   "no earlier stop",
+			stop:   func(_ *Cacher, a, _, _ watch.Interface) { a.Stop() },
+			drains: true,
+		},
+		{
+			// A second draining stop keeps draining on.
+			name:   "earlier draining stop",
+			stop:   func(_ *Cacher, a, w, _ watch.Interface) { a.Stop(); w.(*cacheWatcher).forget(true) },
+			drains: true,
+		},
+	}
+	for _, scenario := range scenarios {
+		t.Run(scenario.name, func(t *testing.T) {
+			makePod := func(rv int) example.Pod {
+				return example.Pod{ObjectMeta: metav1.ObjectMeta{
+					Name:            fmt.Sprintf("pod-%d", rv),
+					Namespace:       "ns",
+					ResourceVersion: strconv.Itoa(rv),
+				}}
+			}
+			// The client never reads. More initial events than the result channel holds
+			// keep the watcher goroutine blocked before it reads the input channel.
+			const initialEvents = minWatchChanSize + 2
+			backingStorage := &cachertesting.MockStorage{
+				GetListFn: func(_ context.Context, _ string, _ storage.ListOptions, listObj runtime.Object) error {
+					podList := listObj.(*example.PodList)
+					podList.ListMeta = metav1.ListMeta{ResourceVersion: "100"}
+					for rv := 1; rv <= initialEvents; rv++ {
+						podList.Items = append(podList.Items, makePod(rv))
+					}
+					return nil
+				},
+			}
+			// On a fake clock the dispatcher sends a bookmark only when the test steps the clock.
+			fakeClock := testingclock.NewFakeClock(time.Now())
+			cacher, _, err := newTestCacherWithoutSyncing(backingStorage, fakeClock)
+			require.NoError(t, err)
+			defer cacher.Stop()
+			require.NoError(t, cacher.Wait(context.Background()))
+
+			var w *cacheWatcher
+			var others [2]watch.Interface
+			for i := range others {
+				others[i], err = cacher.Watch(context.Background(), "/pods/ns", storage.ListOptions{ResourceVersion: "100", Predicate: storage.Everything})
+				require.NoError(t, err)
+			}
+			cacher.dispatchTimeoutBudget = &hookTimeBudget{onTake: func() { scenario.stop(cacher, others[0], w, others[1]) }}
+
+			pred := storage.Everything
+			pred.AllowWatchBookmarks = true
+			watcher, err := cacher.Watch(context.Background(), "/pods/ns", storage.ListOptions{
+				ResourceVersion:   "100",
+				SendInitialEvents: new(true),
+				Predicate:         pred,
+			})
+			require.NoError(t, err)
+			w = watcher.(*cacheWatcher)
+			require.Equal(t, minWatchChanSize, cap(w.result))
+
+			// A bookmark that is received but not sent makes the close function of add drain.
+			require.NoError(t, wait.PollUntilContextTimeout(context.Background(), 10*time.Millisecond, wait.ForeverTestTimeout, true, func(_ context.Context) (bool, error) {
+				fakeClock.Step(2 * time.Second)
+				return w.wasBookmarkAfterRvReceived(), nil
+			}))
+			require.False(t, w.wasBookmarkAfterRvSent())
+
+			// The bookmark holds one slot, so the last of these events finds the
+			// input channel full and blocks the dispatcher on this watcher.
+			for i := range cap(w.input) {
+				pod := makePod(101 + i)
+				require.NoError(t, cacher.watchCache.Add(&pod))
+			}
+
+			require.NoError(t, wait.PollUntilContextTimeout(context.Background(), 10*time.Millisecond, wait.ForeverTestTimeout, true, func(_ context.Context) (bool, error) {
+				cacher.RLock()
+				defer cacher.RUnlock()
+				return w.stopped, nil
+			}))
+			cacher.RLock()
+			doneClosed := w.isDoneChannelClosedLocked()
+			otherDoneClosed := others[0].(*cacheWatcher).isDoneChannelClosedLocked()
+			cacher.RUnlock()
+			require.Equal(t, !scenario.drains, doneClosed, "only a non-draining stop closes the done channel")
+			require.True(t, otherDoneClosed, "a plain stop of another watcher must not drain")
+
+			// The goroutine exits: the result channel closes behind the buffered events.
+			// These reads would also unblock a goroutine that still drains, so the
+			// closed channel alone proves nothing. Only a count above the channel
+			// size shows a send after the stop.
+			timeout := time.After(wait.ForeverTestTimeout)
+			received := 0
+			for {
+				select {
+				case _, ok := <-w.ResultChan():
+					if !ok {
+						if scenario.drains {
+							require.Equal(t, initialEvents+cap(w.input), received, "the watcher did not drain its input channel")
+							return
+						}
+						require.LessOrEqual(t, received, cap(w.result), "the watcher goroutine sent events after the stop")
+						return
+					}
+					received++
+				case <-timeout:
+					t.Fatal("the watcher goroutine did not exit")
+				}
+			}
+		})
+	}
+}
+
 // TestGetWatchCacheResourceVersion test the following cases:
 //
 // +-----------------+---------------------+-----------------------+

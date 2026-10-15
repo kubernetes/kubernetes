@@ -1218,6 +1218,13 @@ func (c *Cacher) terminateAllWatchers() {
 }
 
 func (c *Cacher) stopWatcherLocked(watcher *cacheWatcher) {
+	// A non-draining stop is final. It can wait in watchersToStop while the same
+	// dispatch asks for a draining stop, which would leave done open. After Stop
+	// nobody reads the result channel, so the watcher goroutine would block on it
+	// forever. terminateAllWatchers skips forgetWatcher, so the latch is set here.
+	if !watcher.drainInputBuffer {
+		watcher.hardStop = true
+	}
 	if c.dispatching {
 		c.watchersToStop = append(c.watchersToStop, watcher)
 	} else {

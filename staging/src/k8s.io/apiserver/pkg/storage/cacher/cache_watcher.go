@@ -76,6 +76,10 @@ type cacheWatcher struct {
 	// and send all event in the input buffer.
 	drainInputBuffer bool
 
+	// hardStop records a non-draining stop. Once set, drainInputBuffer stays
+	// false. Cacher.Lock() protects both fields.
+	hardStop bool
+
 	// bookmarkAfterResourceVersion holds an RV that indicates
 	// when we should start delivering bookmark events.
 	// If this field holds the value of 0 that means
@@ -340,8 +344,9 @@ func (c *cacheWatcher) setBookmarkAfterResourceVersion(bookmarkAfterResourceVers
 
 // setDrainInputBufferLocked if set to true indicates that we should delay closing this watcher
 // until we send all events residing in the input buffer.
+// It has no effect after a non-draining stop.
 func (c *cacheWatcher) setDrainInputBufferLocked(drain bool) {
-	c.drainInputBuffer = drain
+	c.drainInputBuffer = drain && !c.hardStop
 }
 
 // isDoneChannelClosed checks if c.done channel is closed
