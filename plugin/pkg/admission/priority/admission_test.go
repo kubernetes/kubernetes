@@ -1111,10 +1111,10 @@ func TestAdmitCompositePodGroup(t *testing.T) {
 		return admission.NewAttributesRecord(
 			cpg,
 			oldCpg,
-			scheduling.Kind("CompositePodGroup").WithVersion("v1alpha3"),
+			scheduling.Kind("CompositePodGroup").WithVersion("v1beta1"),
 			cpg.ObjectMeta.Namespace,
 			"",
-			scheduling.Resource("compositepodgroups").WithVersion("v1alpha3"),
+			scheduling.Resource("compositepodgroups").WithVersion("v1beta1"),
 			"",
 			operation,
 			options,

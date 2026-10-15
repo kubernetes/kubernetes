@@ -99,6 +99,26 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
+	if err := s.AddGeneratedConversionFunc((*schedulingv1beta1.CompositePodGroup)(nil), (*scheduling.CompositePodGroup)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_CompositePodGroup_To_scheduling_CompositePodGroup(a.(*schedulingv1beta1.CompositePodGroup), b.(*scheduling.CompositePodGroup), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*scheduling.CompositePodGroup)(nil), (*schedulingv1beta1.CompositePodGroup)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_scheduling_CompositePodGroup_To_v1beta1_CompositePodGroup(a.(*scheduling.CompositePodGroup), b.(*schedulingv1beta1.CompositePodGroup), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*schedulingv1beta1.CompositePodGroupList)(nil), (*scheduling.CompositePodGroupList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_CompositePodGroupList_To_scheduling_CompositePodGroupList(a.(*schedulingv1beta1.CompositePodGroupList), b.(*scheduling.CompositePodGroupList), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*scheduling.CompositePodGroupList)(nil), (*schedulingv1beta1.CompositePodGroupList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_scheduling_CompositePodGroupList_To_v1beta1_CompositePodGroupList(a.(*scheduling.CompositePodGroupList), b.(*schedulingv1beta1.CompositePodGroupList), scope)
+	}); err != nil {
+		return err
+	}
 	if err := s.AddGeneratedConversionFunc((*schedulingv1beta1.CompositePodGroupSchedulingConstraints)(nil), (*scheduling.CompositePodGroupSchedulingConstraints)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_v1beta1_CompositePodGroupSchedulingConstraints_To_scheduling_CompositePodGroupSchedulingConstraints(a.(*schedulingv1beta1.CompositePodGroupSchedulingConstraints), b.(*scheduling.CompositePodGroupSchedulingConstraints), scope)
 	}); err != nil {
@@ -116,6 +136,26 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}
 	if err := s.AddGeneratedConversionFunc((*scheduling.CompositePodGroupSchedulingPolicy)(nil), (*schedulingv1beta1.CompositePodGroupSchedulingPolicy)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_scheduling_CompositePodGroupSchedulingPolicy_To_v1beta1_CompositePodGroupSchedulingPolicy(a.(*scheduling.CompositePodGroupSchedulingPolicy), b.(*schedulingv1beta1.CompositePodGroupSchedulingPolicy), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*schedulingv1beta1.CompositePodGroupSpec)(nil), (*scheduling.CompositePodGroupSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_CompositePodGroupSpec_To_scheduling_CompositePodGroupSpec(a.(*schedulingv1beta1.CompositePodGroupSpec), b.(*scheduling.CompositePodGroupSpec), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*scheduling.CompositePodGroupSpec)(nil), (*schedulingv1beta1.CompositePodGroupSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_scheduling_CompositePodGroupSpec_To_v1beta1_CompositePodGroupSpec(a.(*scheduling.CompositePodGroupSpec), b.(*schedulingv1beta1.CompositePodGroupSpec), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*schedulingv1beta1.CompositePodGroupStatus)(nil), (*scheduling.CompositePodGroupStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_CompositePodGroupStatus_To_scheduling_CompositePodGroupStatus(a.(*schedulingv1beta1.CompositePodGroupStatus), b.(*scheduling.CompositePodGroupStatus), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*scheduling.CompositePodGroupStatus)(nil), (*schedulingv1beta1.CompositePodGroupStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_scheduling_CompositePodGroupStatus_To_v1beta1_CompositePodGroupStatus(a.(*scheduling.CompositePodGroupStatus), b.(*schedulingv1beta1.CompositePodGroupStatus), scope)
 	}); err != nil {
 		return err
 	}
@@ -462,6 +502,60 @@ func Convert_scheduling_CompositeGangSchedulingPolicy_To_v1beta1_CompositeGangSc
 	return autoConvert_scheduling_CompositeGangSchedulingPolicy_To_v1beta1_CompositeGangSchedulingPolicy(in, out, s)
 }
 
+func autoConvert_v1beta1_CompositePodGroup_To_scheduling_CompositePodGroup(in *schedulingv1beta1.CompositePodGroup, out *scheduling.CompositePodGroup, s conversion.Scope) error {
+	out.ObjectMeta = in.ObjectMeta
+	if err := Convert_v1beta1_CompositePodGroupSpec_To_scheduling_CompositePodGroupSpec(&in.Spec, &out.Spec, s); err != nil {
+		return err
+	}
+	if err := Convert_v1beta1_CompositePodGroupStatus_To_scheduling_CompositePodGroupStatus(&in.Status, &out.Status, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+// Convert_v1beta1_CompositePodGroup_To_scheduling_CompositePodGroup is an autogenerated conversion function.
+func Convert_v1beta1_CompositePodGroup_To_scheduling_CompositePodGroup(in *schedulingv1beta1.CompositePodGroup, out *scheduling.CompositePodGroup, s conversion.Scope) error {
+	return autoConvert_v1beta1_CompositePodGroup_To_scheduling_CompositePodGroup(in, out, s)
+}
+
+func autoConvert_scheduling_CompositePodGroup_To_v1beta1_CompositePodGroup(in *scheduling.CompositePodGroup, out *schedulingv1beta1.CompositePodGroup, s conversion.Scope) error {
+	out.ObjectMeta = in.ObjectMeta
+	if err := Convert_scheduling_CompositePodGroupSpec_To_v1beta1_CompositePodGroupSpec(&in.Spec, &out.Spec, s); err != nil {
+		return err
+	}
+	if err := Convert_scheduling_CompositePodGroupStatus_To_v1beta1_CompositePodGroupStatus(&in.Status, &out.Status, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+// Convert_scheduling_CompositePodGroup_To_v1beta1_CompositePodGroup is an autogenerated conversion function.
+func Convert_scheduling_CompositePodGroup_To_v1beta1_CompositePodGroup(in *scheduling.CompositePodGroup, out *schedulingv1beta1.CompositePodGroup, s conversion.Scope) error {
+	return autoConvert_scheduling_CompositePodGroup_To_v1beta1_CompositePodGroup(in, out, s)
+}
+
+func autoConvert_v1beta1_CompositePodGroupList_To_scheduling_CompositePodGroupList(in *schedulingv1beta1.CompositePodGroupList, out *scheduling.CompositePodGroupList, s conversion.Scope) error {
+	out.ListMeta = in.ListMeta
+	out.Items = *(*[]scheduling.CompositePodGroup)(unsafe.Pointer(&in.Items))
+	return nil
+}
+
+// Convert_v1beta1_CompositePodGroupList_To_scheduling_CompositePodGroupList is an autogenerated conversion function.
+func Convert_v1beta1_CompositePodGroupList_To_scheduling_CompositePodGroupList(in *schedulingv1beta1.CompositePodGroupList, out *scheduling.CompositePodGroupList, s conversion.Scope) error {
+	return autoConvert_v1beta1_CompositePodGroupList_To_scheduling_CompositePodGroupList(in, out, s)
+}
+
+func autoConvert_scheduling_CompositePodGroupList_To_v1beta1_CompositePodGroupList(in *scheduling.CompositePodGroupList, out *schedulingv1beta1.CompositePodGroupList, s conversion.Scope) error {
+	out.ListMeta = in.ListMeta
+	out.Items = *(*[]schedulingv1beta1.CompositePodGroup)(unsafe.Pointer(&in.Items))
+	return nil
+}
+
+// Convert_scheduling_CompositePodGroupList_To_v1beta1_CompositePodGroupList is an autogenerated conversion function.
+func Convert_scheduling_CompositePodGroupList_To_v1beta1_CompositePodGroupList(in *scheduling.CompositePodGroupList, out *schedulingv1beta1.CompositePodGroupList, s conversion.Scope) error {
+	return autoConvert_scheduling_CompositePodGroupList_To_v1beta1_CompositePodGroupList(in, out, s)
+}
+
 func autoConvert_v1beta1_CompositePodGroupSchedulingConstraints_To_scheduling_CompositePodGroupSchedulingConstraints(in *schedulingv1beta1.CompositePodGroupSchedulingConstraints, out *scheduling.CompositePodGroupSchedulingConstraints, s conversion.Scope) error {
 	*out = *(*scheduling.CompositePodGroupSchedulingConstraints)(unsafe.Pointer(in))
 	return nil
@@ -500,6 +594,46 @@ func autoConvert_scheduling_CompositePodGroupSchedulingPolicy_To_v1beta1_Composi
 // Convert_scheduling_CompositePodGroupSchedulingPolicy_To_v1beta1_CompositePodGroupSchedulingPolicy is an autogenerated conversion function.
 func Convert_scheduling_CompositePodGroupSchedulingPolicy_To_v1beta1_CompositePodGroupSchedulingPolicy(in *scheduling.CompositePodGroupSchedulingPolicy, out *schedulingv1beta1.CompositePodGroupSchedulingPolicy, s conversion.Scope) error {
 	return autoConvert_scheduling_CompositePodGroupSchedulingPolicy_To_v1beta1_CompositePodGroupSchedulingPolicy(in, out, s)
+}
+
+func autoConvert_v1beta1_CompositePodGroupSpec_To_scheduling_CompositePodGroupSpec(in *schedulingv1beta1.CompositePodGroupSpec, out *scheduling.CompositePodGroupSpec, s conversion.Scope) error {
+	*out = *(*scheduling.CompositePodGroupSpec)(unsafe.Pointer(in))
+	return nil
+}
+
+// Convert_v1beta1_CompositePodGroupSpec_To_scheduling_CompositePodGroupSpec is an autogenerated conversion function.
+func Convert_v1beta1_CompositePodGroupSpec_To_scheduling_CompositePodGroupSpec(in *schedulingv1beta1.CompositePodGroupSpec, out *scheduling.CompositePodGroupSpec, s conversion.Scope) error {
+	return autoConvert_v1beta1_CompositePodGroupSpec_To_scheduling_CompositePodGroupSpec(in, out, s)
+}
+
+func autoConvert_scheduling_CompositePodGroupSpec_To_v1beta1_CompositePodGroupSpec(in *scheduling.CompositePodGroupSpec, out *schedulingv1beta1.CompositePodGroupSpec, s conversion.Scope) error {
+	*out = *(*schedulingv1beta1.CompositePodGroupSpec)(unsafe.Pointer(in))
+	return nil
+}
+
+// Convert_scheduling_CompositePodGroupSpec_To_v1beta1_CompositePodGroupSpec is an autogenerated conversion function.
+func Convert_scheduling_CompositePodGroupSpec_To_v1beta1_CompositePodGroupSpec(in *scheduling.CompositePodGroupSpec, out *schedulingv1beta1.CompositePodGroupSpec, s conversion.Scope) error {
+	return autoConvert_scheduling_CompositePodGroupSpec_To_v1beta1_CompositePodGroupSpec(in, out, s)
+}
+
+func autoConvert_v1beta1_CompositePodGroupStatus_To_scheduling_CompositePodGroupStatus(in *schedulingv1beta1.CompositePodGroupStatus, out *scheduling.CompositePodGroupStatus, s conversion.Scope) error {
+	*out = *(*scheduling.CompositePodGroupStatus)(unsafe.Pointer(in))
+	return nil
+}
+
+// Convert_v1beta1_CompositePodGroupStatus_To_scheduling_CompositePodGroupStatus is an autogenerated conversion function.
+func Convert_v1beta1_CompositePodGroupStatus_To_scheduling_CompositePodGroupStatus(in *schedulingv1beta1.CompositePodGroupStatus, out *scheduling.CompositePodGroupStatus, s conversion.Scope) error {
+	return autoConvert_v1beta1_CompositePodGroupStatus_To_scheduling_CompositePodGroupStatus(in, out, s)
+}
+
+func autoConvert_scheduling_CompositePodGroupStatus_To_v1beta1_CompositePodGroupStatus(in *scheduling.CompositePodGroupStatus, out *schedulingv1beta1.CompositePodGroupStatus, s conversion.Scope) error {
+	*out = *(*schedulingv1beta1.CompositePodGroupStatus)(unsafe.Pointer(in))
+	return nil
+}
+
+// Convert_scheduling_CompositePodGroupStatus_To_v1beta1_CompositePodGroupStatus is an autogenerated conversion function.
+func Convert_scheduling_CompositePodGroupStatus_To_v1beta1_CompositePodGroupStatus(in *scheduling.CompositePodGroupStatus, out *schedulingv1beta1.CompositePodGroupStatus, s conversion.Scope) error {
+	return autoConvert_scheduling_CompositePodGroupStatus_To_v1beta1_CompositePodGroupStatus(in, out, s)
 }
 
 func autoConvert_v1beta1_CompositePodGroupTemplate_To_scheduling_CompositePodGroupTemplate(in *schedulingv1beta1.CompositePodGroupTemplate, out *scheduling.CompositePodGroupTemplate, s conversion.Scope) error {
