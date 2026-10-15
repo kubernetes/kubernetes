@@ -443,7 +443,11 @@ func ParseQuantity(str string) (Quantity, error) {
 		if exponent == math.MinInt32 {
 			// inf.Dec negates the scale to apply it, which this value
 			// cannot survive, so the quantity has no representation here.
-			return Quantity{}, ErrSuffix
+			if amount.Sign() != 0 {
+				return Quantity{}, ErrSuffix
+			}
+			// Zero is the same at any exponent.
+			exponent = 0
 		}
 		amount.SetScale(amount.Scale() + Scale(exponent).infScale())
 	} else if base == 2 {
