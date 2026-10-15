@@ -129,7 +129,9 @@ func (sched *Scheduler) addPod(obj interface{}) {
 		return
 	}
 
-	isPodDeferred := utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingSchedulerPreemption) && resource.IsPodResizeDeferred(pod) && !sched.profilesWithoutDeferredPodScheduling.Has(pod.Spec.SchedulerName)
+	isPodDeferred := utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingSchedulerPreemption) &&
+		resource.IsPodResizeDeferred(pod) && !resource.IsPodResizeSchedulerEvaluationCompleted(pod) &&
+		!sched.profilesWithoutDeferredPodScheduling.Has(pod.Spec.SchedulerName)
 	if responsibleForPod(pod, sched.Profiles) && (!assignedPod(pod) || isPodDeferred) {
 		sched.addPodToSchedulingQueue(pod)
 	}
@@ -153,18 +155,18 @@ func (sched *Scheduler) updatePod(oldObj, newObj interface{}) {
 
 	if assignedPod(oldPod) {
 		if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingSchedulerPreemption) && responsibleForPod(newPod, sched.Profiles) && !sched.profilesWithoutDeferredPodScheduling.Has(newPod.Spec.SchedulerName) {
-			oldDeferred := resource.IsPodResizeDeferred(oldPod)
-			newDeferred := resource.IsPodResizeDeferred(newPod)
+			oldDeferred := resource.IsPodResizeDeferred(oldPod) && !resource.IsPodResizeSchedulerEvaluationCompleted(oldPod)
+			newDeferred := resource.IsPodResizeDeferred(newPod) && !resource.IsPodResizeSchedulerEvaluationCompleted(newPod)
 
 			if !oldDeferred && newDeferred {
-				// When an assigned pod transitions to a deferred resize,
-				// we must add it to the scheduling queue so the scheduler can evaluate feasibility and run preemption on the assigned node.
-				logger.V(3).Info("Assigned pod transitioned to deferred resize, adding to scheduling queue", "pod", klog.KObj(newPod))
+				// When an assigned pod transitions to a deferred resize or needs scheduler re-evaluation
+				// after Kubelet clears SchedulerEvaluationCompleted, add it to the scheduling queue.
+				logger.V(3).Info("Assigned pod transitioned to deferred resize pending scheduler evaluation, adding to scheduling queue", "pod", klog.KObj(newPod))
 				sched.addPodToSchedulingQueue(newPod)
 			} else if oldDeferred && !newDeferred {
-				// When an assigned pod is no longer deferred,
+				// When an assigned pod is no longer deferred or scheduler evaluation has completed,
 				// remove it from the scheduling queue so the scheduler stops evaluating preemption for it.
-				logger.V(3).Info("Assigned pod is no longer deferred, removing from scheduling queue", "pod", klog.KObj(newPod))
+				logger.V(3).Info("Assigned pod is no longer deferred or scheduler evaluation completed, removing from scheduling queue", "pod", klog.KObj(newPod))
 				// Pass the deferred version that was queued; otherwise the queue would look for newPod in its pod group.
 				sched.deletePodFromSchedulingQueue(oldPod, false)
 			} else if oldDeferred && newDeferred {
