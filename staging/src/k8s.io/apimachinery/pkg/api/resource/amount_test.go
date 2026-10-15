@@ -267,25 +267,26 @@ func TestScaleCanAlignInfScale(t *testing.T) {
 
 func TestScaleInfScale(t *testing.T) {
 	for _, test := range []struct {
-		name   string
-		scale  Scale
-		result inf.Scale
+		name     string
+		scale    Scale
+		result   inf.Scale
+		resultOK bool
 	}{
-		{"positive scale flips sign", 3, -3},
-		{"negative scale flips sign", -3, 3},
-		{"zero", 0, 0},
-		{"MinInt32+1 flips sign", math.MinInt32 + 1, math.MaxInt32},
+		{"positive scale flips sign", 3, -3, true},
+		{"negative scale flips sign", -3, 3, true},
+		{"zero", 0, 0, true},
+		{"MinInt32+1 flips sign", math.MinInt32 + 1, math.MaxInt32, true},
 		// Scale is an int32 and infScale returns inf.Scale(-s). Negating
 		// math.MinInt32 does not fit in an int32, so the sign is not flipped
 		// and the value stays math.MinInt32 - the same int-negation edge as
 		// -mostNegative for int64. This asserts that behavior of infScale
 		// directly (it is exercised on the inf.Dec path, e.g. ScaledValue on
 		// a Dec-backed Quantity; the int64 backend does not call it).
-		{"MinInt32 does not flip sign", math.MinInt32, math.MinInt32},
+		{"MinInt32 does not flip sign", math.MinInt32, math.MinInt32, false},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			if got := test.scale.infScale(); got != test.result {
-				t.Errorf("%s: Scale(%d).infScale() = %d, want %d", test.name, test.scale, got, test.result)
+			if got, gotOK := test.scale.infScale(); got != test.result || gotOK != test.resultOK {
+				t.Errorf("%s: Scale(%d).infScale() = %d,%v, want %d,%v", test.name, test.scale, got, gotOK, test.result, test.resultOK)
 			}
 		})
 	}

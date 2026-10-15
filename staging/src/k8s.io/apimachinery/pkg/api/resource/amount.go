@@ -34,9 +34,11 @@ import (
 // See Quantity.ScaledValue for more details.
 type Scale int32
 
-// infScale adapts a Scale value to an inf.Scale value.
-func (s Scale) infScale() inf.Scale {
-	return inf.Scale(-s) // inf.Scale is upside-down
+// infScale adapts a Scale value to an inf.Scale value, returning false in overflow cases.
+func (s Scale) infScale() (inf.Scale, bool) {
+	// inf.Scale is upside-down
+	// TODO: saturate instead of wrap in overflow cases
+	return inf.Scale(-s), s != math.MinInt32
 }
 
 // canInfScale reports whether infScale is faithful for s. Scale is int32 and
@@ -99,6 +101,8 @@ const (
 	Tera  Scale = 12
 	Peta  Scale = 15
 	Exa   Scale = 18
+
+	nanoInfScale = inf.Scale(9)
 )
 
 var (
@@ -181,7 +185,9 @@ func (a int64Amount) AsScaledInt64(scale Scale) (result int64, ok bool) {
 func (a int64Amount) AsDec() *inf.Dec {
 	var base inf.Dec
 	base.SetUnscaled(a.value)
-	base.SetScale(a.scale.infScale())
+	// TODO: handle !canInfScale case
+	infScale, _ := a.scale.infScale()
+	base.SetScale(infScale)
 	return &base
 }
 
@@ -371,13 +377,24 @@ func (a *int64Amount) Mul(b int64) bool {
 	return true
 }
 
-// AsScale adjusts this amount to set a minimum scale, rounding up, and returns true iff no precision
-// was lost. (1.1e5).AsScale(5) would return 1.1e5, but (1.1e5).AsScale(6) would return 1e6.
+// AsScale adjusts this amount to set a minimum scale, rounding away from zero,
+// and returns true iff no precision was lost.
+//
+// For example:
+//   - (1.1e5).AsScale(3) returns 1.1e5, true
+//   - (1.1e5).AsScale(4) returns 1.1e5, true
+//   - (1.1e5).AsScale(5) returns 2e5, false
+//   - (1.1e5).AsScale(6) returns 1e6, false
+//   - (-1.1e5).AsScale(5) returns -2e5, false
 func (a int64Amount) AsScale(scale Scale) (int64Amount, bool) {
 	if a.scale >= scale {
 		return a, true
 	}
-	result, exact := negativeScaleInt64(a.value, scale-a.scale)
+	down, _ := narrowScale(widenScale(scale) - a.widenedScale())
+	// We ignore the fits return value from narrowScale. negativeScaleInt64 scales an
+	// int64 mantissa by no more than 19 digits, so if down is larger than 19, the
+	// outcome is the same anyway, and it doesn't matter if it fit or got clamped.
+	result, exact := negativeScaleInt64(a.value, down)
 	return int64Amount{value: result, scale: scale}, exact
 }
 
@@ -458,11 +475,44 @@ type infDecAmount struct {
 	*inf.Dec
 }
 
-// AsScale adjusts this amount to set a minimum scale, rounding up, and returns true iff no precision
-// was lost. (1.1e5).AsScale(5) would return 1.1e5, but (1.1e5).AsScale(6) would return 1e6.
+// AsScale adjusts this amount to set a minimum scale, rounding away from zero,
+// and returns true iff no precision was lost.
+//
+// For example:
+//   - (1.1e5).AsScale(3) returns 1.1e5, true
+//   - (1.1e5).AsScale(4) returns 1.1e5, true
+//   - (1.1e5).AsScale(5) returns 2e5, false
+//   - (1.1e5).AsScale(6) returns 1e6, false
+//   - (-1.1e5).AsScale(5) returns -2e5, false
 func (a infDecAmount) AsScale(scale Scale) (infDecAmount, bool) {
+	oldWidenedScale := a.widenedScale()
+	newWidenedScale := widenScale(scale)
+	infScale, canInfScale := scale.infScale()
+
+	// Short-circuit if the scale is not being increased.
+	// The scale.canInfScale() is check is included for clarity even
+	// though the case is also caught by the scale comparison.
+	if !canInfScale || oldWidenedScale >= newWidenedScale {
+		return infDecAmount{new(inf.Dec).Set(a.Dec)}, true
+	}
+
+	sign := a.Dec.Sign()
+
+	// Short-circuit if the value is zero, since we can skip the rounding.
+	if sign == 0 {
+		return infDecAmount{inf.NewDec(0, infScale)}, true
+	}
+
+	// Short-circuit if we can cheaply determine that the value is less than one unit of scale.
+	_, hi := decimalExponentBounds(a.Dec.UnscaledBig().BitLen(), oldWidenedScale)
+	if hi <= newWidenedScale {
+		// The value is less than one unit of the desired scale, so to implement
+		// AsScale, we round away from zero 1 or -1.
+		return infDecAmount{inf.NewDec(int64(sign), infScale)}, false
+	}
+
 	tmp := &inf.Dec{}
-	tmp.Round(a.Dec, scale.infScale(), inf.RoundUp)
+	tmp.Round(a.Dec, infScale, inf.RoundUp)
 	return infDecAmount{tmp}, tmp.Cmp(a.Dec) == 0
 }
 

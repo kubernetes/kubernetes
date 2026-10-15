@@ -440,12 +440,12 @@ func ParseQuantity(str string) (Quantity, error) {
 
 	// So that no one but us has to think about suffixes, remove it.
 	if base == 10 {
-		if exponent == math.MinInt32 {
-			// inf.Dec negates the scale to apply it, which this value
-			// cannot survive, so the quantity has no representation here.
+		exponentInfScale, canInfScale := Scale(exponent).infScale()
+		if !canInfScale {
 			return Quantity{}, ErrSuffix
 		}
-		amount.SetScale(amount.Scale() + Scale(exponent).infScale())
+		// TODO: handle scale addition overflow
+		amount.SetScale(amount.Scale() + exponentInfScale)
 	} else if base == 2 {
 		// numericSuffix = 2 ** exponent
 		numericSuffix := big.NewInt(1).Lsh(bigOne, uint(exponent))
@@ -464,7 +464,7 @@ func ParseQuantity(str string) (Quantity, error) {
 	// of an amount.  Arguably, this should be inf.RoundHalfUp (normal rounding), but that would have
 	// the side effect of rounding values < .5n to zero.
 	if v, ok := amount.Unscaled(); v != int64(0) || !ok {
-		amount.Round(amount, Nano.infScale(), inf.RoundUp)
+		amount.Round(amount, nanoInfScale, inf.RoundUp)
 	}
 
 	// The max is just a simple cap.
@@ -693,8 +693,15 @@ func (q *Quantity) Sign() int {
 	return q.i.Sign()
 }
 
-// AsScale returns the current value, rounded up to the provided scale, and returns
-// false if the scale resulted in a loss of precision.
+// AsScale returns the current value, rounded away from zero to set a minimum
+// scale, and returns false if the scale resulted in a loss of precision.
+//
+// For example:
+//   - (1.1e5).AsScale(3) returns 1.1e5, true
+//   - (1.1e5).AsScale(4) returns 1.1e5, true
+//   - (1.1e5).AsScale(5) returns 2e5, false
+//   - (1.1e5).AsScale(6) returns 1e6, false
+//   - (-1.1e5).AsScale(5) returns -2e5, false
 func (q *Quantity) AsScale(scale Scale) (CanonicalValue, bool) {
 	if q.d.Dec != nil {
 		return q.d.AsScale(scale)
