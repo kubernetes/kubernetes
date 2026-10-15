@@ -1746,11 +1746,11 @@ func Test_isSchedulableAfterNodeChange(t *testing.T) {
 				Memory:          2,
 				ScalarResources: map[v1.ResourceName]int64{extendedResourceA: 1},
 			}),
-			oldObj: st.MakeNode().Capacity(map[v1.ResourceName]string{
+			oldObj: st.MakeNode().Name("node-a").Capacity(map[v1.ResourceName]string{
 				v1.ResourceMemory: "4",
 				extendedResourceA: "2",
 			}).Obj(),
-			newObj: st.MakeNode().Capacity(map[v1.ResourceName]string{
+			newObj: st.MakeNode().Name("node-a").Capacity(map[v1.ResourceName]string{
 				v1.ResourceMemory: "1",
 				extendedResourceA: "2",
 			}).Obj(),
@@ -1831,7 +1831,17 @@ func Test_isSchedulableAfterNodeChange(t *testing.T) {
 			}).Obj(),
 			expectedHint: fwk.QueueSkip,
 		},
-
+		"skip-queue-nominated-pod-on-new-node-too-small": {
+			pod: func() *v1.Pod {
+				p := newResourcePod(framework.Resource{Memory: 4})
+				p.Status.NominatedNodeName = "target-node"
+				return p
+			}(),
+			newObj: st.MakeNode().Name("target-node").Capacity(map[v1.ResourceName]string{
+				v1.ResourceMemory: "2",
+			}).Obj(),
+			expectedHint: fwk.QueueSkip,
+		},
 		"skip-queue-nominated-pod-when-different-node-decreases": {
 			pod: func() *v1.Pod {
 				p := newResourcePod(framework.Resource{Memory: 4})

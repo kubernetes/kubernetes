@@ -546,10 +546,12 @@ func (f *Fit) isSchedulableAfterNodeChange(logger klog.Logger, pod *v1.Pod, oldO
 		EnableDRAExtendedResource: f.enableDRAExtendedResource,
 	}
 
-	// Leaving in the queue, since the pod won't fit into the modified node anyway.
+	// The node's allocatable is insufficient for the pod regardless of what else runs on it.
 	if !isFit(pod, modifiedNode, draManager, opts) {
-		// The pod no longer fits its nominated node.
-		if pod.Status.NominatedNodeName != "" && pod.Status.NominatedNodeName == modifiedNode.Name {
+		// If this is the pod's nominated node, Fit.Filter will report it as
+		// UnschedulableAndUnresolvable, making the pod eligible to preempt on
+		// other nodes. Re-queue so the scheduler runs a fresh preemption cycle.
+		if originalNode != nil && pod.Status.NominatedNodeName == modifiedNode.Name {
 			logger.V(5).Info("nominated node can no longer accommodate the pod, re-queuing so it can preempt elsewhere", "pod", klog.KObj(pod), "node", klog.KObj(modifiedNode))
 			return fwk.Queue, nil
 		}
