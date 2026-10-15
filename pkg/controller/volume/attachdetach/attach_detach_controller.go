@@ -194,7 +194,8 @@ func NewAttachDetachController(
 		pvcInformer.Lister(),
 		pvInformer.Lister(),
 		adc.csiMigratedPluginManager,
-		adc.intreeToCSITranslator)
+		adc.intreeToCSITranslator,
+		adc.nodeLister)
 
 	_, err := podInformer.Informer().AddEventHandlerWithOptions(kcache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
@@ -520,6 +521,9 @@ func (adc *attachDetachController) podAdd(logger klog.Logger, obj interface{}) {
 	volumeActionFlag := util.DetermineVolumeAction(
 		pod,
 		true /* default volume action */)
+	if volumeActionFlag && util.IsPodTerminatingOnUnhealthyNode(logger, pod, adc.nodeLister) {
+		volumeActionFlag = false
+	}
 
 	util.ProcessPodVolumes(logger, pod, volumeActionFlag, /* addVolumes */
 		adc.desiredStateOfWorld, &adc.volumePluginMgr, adc.pvcLister, adc.pvLister, adc.csiMigratedPluginManager, adc.intreeToCSITranslator)
@@ -543,6 +547,9 @@ func (adc *attachDetachController) podUpdate(logger klog.Logger, oldObj, newObj 
 	volumeActionFlag := util.DetermineVolumeAction(
 		pod,
 		true /* default volume action */)
+	if volumeActionFlag && util.IsPodTerminatingOnUnhealthyNode(logger, pod, adc.nodeLister) {
+		volumeActionFlag = false
+	}
 
 	util.ProcessPodVolumes(logger, pod, volumeActionFlag, /* addVolumes */
 		adc.desiredStateOfWorld, &adc.volumePluginMgr, adc.pvcLister, adc.pvLister, adc.csiMigratedPluginManager, adc.intreeToCSITranslator)
@@ -678,6 +685,9 @@ func (adc *attachDetachController) syncPVCByKey(logger klog.Logger, key string) 
 		volumeActionFlag := util.DetermineVolumeAction(
 			pod,
 			true /* default volume action */)
+		if volumeActionFlag && util.IsPodTerminatingOnUnhealthyNode(logger, pod, adc.nodeLister) {
+			volumeActionFlag = false
+		}
 
 		util.ProcessPodVolumes(logger, pod, volumeActionFlag, /* addVolumes */
 			adc.desiredStateOfWorld, &adc.volumePluginMgr, adc.pvcLister, adc.pvLister, adc.csiMigratedPluginManager, adc.intreeToCSITranslator)
