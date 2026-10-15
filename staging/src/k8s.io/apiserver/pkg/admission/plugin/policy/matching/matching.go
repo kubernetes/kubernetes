@@ -121,6 +121,35 @@ func (m *Matcher) Matches(attr admission.Attributes, o admission.ObjectInterface
 	return true, matchResource, matchKind, nil
 }
 
+// MatchesResourceRulesExact reports whether attr matches the resource rules of
+// mr, ignoring selectors and mr.MatchPolicy: an excludeResourceRules match means
+// no match, and empty resourceRules match everything. A nil mr matches everything.
+func MatchesResourceRulesExact(mr *v1.MatchResources, attr admission.Attributes) bool {
+	if mr == nil {
+		return true
+	}
+	if ExcludedExact(mr, attr) {
+		return false
+	}
+	if len(mr.ResourceRules) == 0 {
+		return true
+	}
+	return matchesResourceRulesExact(mr.ResourceRules, attr)
+}
+
+// ExcludedExact reports whether attr matches any of mr.ExcludeResourceRules,
+// ignoring mr.MatchPolicy. A nil mr excludes nothing.
+func ExcludedExact(mr *v1.MatchResources, attr admission.Attributes) bool {
+	return mr != nil && matchesResourceRulesExact(mr.ExcludeResourceRules, attr)
+}
+
+func matchesResourceRulesExact(namedRules []v1.NamedRuleWithOperations, attr admission.Attributes) bool {
+	// A nil matchPolicy returns before the Equivalent pass, which is the only
+	// user of ObjectInterfaces and the only source of errors.
+	matches, _, _, _ := matchesResourceRules(namedRules, nil, attr, nil)
+	return matches
+}
+
 func matchesResourceRules(namedRules []v1.NamedRuleWithOperations, matchPolicy *v1.MatchPolicyType, attr admission.Attributes, o admission.ObjectInterfaces) (bool, schema.GroupVersionResource, schema.GroupVersionKind, error) {
 	matchKind := attr.GetKind()
 	matchResource := attr.GetResource()
