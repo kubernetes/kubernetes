@@ -1207,6 +1207,122 @@ func TestCapacityUpperBound(t *testing.T) {
 	}
 }
 
+func TestOldestServableLocked(t *testing.T) {
+	testCases := []struct {
+		name     string
+		capacity int
+		// listResourceVersion, when not zero, is the resourceVersion of a
+		// ResetLocked call before the events.
+		listResourceVersion uint64
+		eventRVs            []uint64
+		// resetAfterEvents calls ResetLocked with resetResourceVersion after the events.
+		resetAfterEvents     bool
+		resetResourceVersion uint64
+		expected             uint64
+		expectedOK           bool
+	}{
+		{
+			name:                "list done, no events",
+			capacity:            3,
+			listResourceVersion: 10,
+			expected:            11,
+			expectedOK:          true,
+		},
+		{
+			name:                "list done, no event removed since",
+			capacity:            3,
+			listResourceVersion: 10,
+			eventRVs:            []uint64{15, 16},
+			expected:            11,
+			expectedOK:          true,
+		},
+		{
+			name:                "list done, events removed since",
+			capacity:            3,
+			listResourceVersion: 10,
+			eventRVs:            []uint64{15, 16, 17, 18, 19},
+			expected:            17,
+			expectedOK:          true,
+		},
+		{
+			name:                "list done, start index past the capacity",
+			capacity:            3,
+			listResourceVersion: 10,
+			eventRVs:            []uint64{15, 16, 17, 18, 19, 20, 21},
+			expected:            19,
+			expectedOK:          true,
+		},
+		{
+			name:                 "events removed, then reset and list done",
+			capacity:             3,
+			eventRVs:             []uint64{15, 16, 17, 18, 19},
+			resetAfterEvents:     true,
+			resetResourceVersion: 30,
+			expected:             31,
+			expectedOK:           true,
+		},
+		{
+			name:       "no list, events in the buffer",
+			capacity:   3,
+			eventRVs:   []uint64{15, 16},
+			expected:   15,
+			expectedOK: true,
+		},
+		{
+			name:       "no list, one event in the buffer",
+			capacity:   3,
+			eventRVs:   []uint64{15},
+			expected:   15,
+			expectedOK: true,
+		},
+		{
+			name:       "no list, no events",
+			capacity:   3,
+			expectedOK: false,
+		},
+		{
+			name:             "no list, events removed, then reset",
+			capacity:         3,
+			eventRVs:         []uint64{15, 16, 17, 18, 19},
+			resetAfterEvents: true,
+			expectedOK:       false,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			store := newTestWatchCache(test.capacity, DefaultEventFreshDuration, &cache.Indexers{})
+			defer store.Stop()
+			// Pin the capacity so that a full buffer drops its oldest event.
+			store.history.lowerBoundCapacity = test.capacity
+			store.history.upperBoundCapacity = test.capacity
+			if test.listResourceVersion > 0 {
+				store.history.ResetLocked(test.listResourceVersion)
+			}
+			for _, rv := range test.eventRVs {
+				store.history.updateCache(&watchCacheEvent{ResourceVersion: rv, RecordTime: store.config.clock.Now()})
+			}
+			if test.resetAfterEvents {
+				store.history.ResetLocked(test.resetResourceVersion)
+			}
+
+			got, ok := store.history.oldestServableLocked()
+			if got != test.expected || ok != test.expectedOK {
+				t.Errorf("expected (%d, %v), got (%d, %v)", test.expected, test.expectedOK, got, ok)
+			}
+			// GetIntervalLocked must use the result: 5 is older than every expected value.
+			expectedErr := "watch cache isn't correctly initialized"
+			if test.expectedOK {
+				expectedErr = fmt.Sprintf("too old resource version: 5 (%d)", test.expected-1)
+			}
+			_, err := store.history.GetIntervalLocked(5, store.RLocker())
+			if err == nil || err.Error() != expectedErr {
+				t.Errorf("expected GetIntervalLocked to return the error %q, got: %v", expectedErr, err)
+			}
+		})
+	}
+}
+
 func BenchmarkWatchCache_updateCache(b *testing.B) {
 	store := newTestWatchCache(defaultUpperBoundCapacity, DefaultEventFreshDuration, &cache.Indexers{})
 	defer store.Stop()
