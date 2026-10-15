@@ -43,6 +43,9 @@ const (
 	ValidatingOutOfBudget ValidationErrorType = "out_of_budget"
 	// ValidationNoError indicates that the expression returns without an error.
 	ValidationNoError ValidationErrorType = "no_error"
+	// ValidationCoverageViolation indicates that the binding was not evaluated
+	// because it intercepts a coverage source but not the request's target.
+	ValidationCoverageViolation ValidationErrorType = "coverage_violation"
 )
 
 var (
