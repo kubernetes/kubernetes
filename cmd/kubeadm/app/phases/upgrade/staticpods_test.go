@@ -587,6 +587,80 @@ func TestStaticPodControlPlane(t *testing.T) {
 	}
 }
 
+func TestRollbackEtcdData(t *testing.T) {
+	tests := []struct {
+		name         string
+		backupMember bool
+		wantErr      bool
+	}{
+		{
+			name:         "the backup is restored and files written after it are dropped",
+			backupMember: true,
+		},
+		{
+			name:    "a backup without a member dir leaves the live data dir alone",
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tmp := t.TempDir()
+			dataDir := filepath.Join(tmp, "etcd")
+			backupDir := filepath.Join(tmp, "kubeadm-backup-etcd")
+			live := filepath.Join(dataDir, "member", "live")
+
+			if err := os.MkdirAll(filepath.Join(dataDir, "member"), 0700); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(live, []byte("live"), 0600); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.MkdirAll(backupDir, 0700); err != nil {
+				t.Fatal(err)
+			}
+			if tt.backupMember {
+				if err := os.MkdirAll(filepath.Join(backupDir, "member"), 0700); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.WriteFile(filepath.Join(backupDir, "member", "db"), []byte("backup"), 0600); err != nil {
+					t.Fatal(err)
+				}
+			}
+
+			cfg := &kubeadmapi.InitConfiguration{
+				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
+					Etcd: kubeadmapi.Etcd{
+						Local: &kubeadmapi.LocalEtcd{DataDir: dataDir},
+					},
+				},
+			}
+
+			err := rollbackEtcdData(cfg, &fakeStaticPodPathManager{backupEtcdDir: backupDir})
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("rollbackEtcdData() error = %v, wantErr %v", err, tt.wantErr)
+			}
+
+			if tt.wantErr {
+				if _, err := os.Stat(live); err != nil {
+					t.Errorf("expected the live member dir to be untouched: %v", err)
+				}
+				return
+			}
+
+			if _, err := os.Stat(live); !os.IsNotExist(err) {
+				t.Errorf("expected files written after the backup not to survive, got: %v", err)
+			}
+			got, err := os.ReadFile(filepath.Join(dataDir, "member", "db"))
+			if err != nil {
+				t.Fatalf("expected the backup to be restored: %v", err)
+			}
+			if string(got) != "backup" {
+				t.Errorf("got %q, want %q", got, "backup")
+			}
+		})
+	}
+}
+
 func getAPIServerHash(dir string) (string, error) {
 	manifestPath := constants.GetStaticPodFilepath(constants.KubeAPIServer, dir)
 
