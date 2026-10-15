@@ -21,6 +21,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -41,6 +42,7 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	kubeutil "k8s.io/kubernetes/pkg/kubelet/util"
@@ -87,6 +89,9 @@ type manager struct {
 type podResizeConditions struct {
 	PodResizePending    *v1.PodCondition
 	PodResizeInProgress *v1.PodCondition
+	// clearSchedEvalCond is set when a resize is cleared or deferred due to insufficient resources,
+	// so that the next status update removes SchedulerEvaluationCompleted.
+	clearSchedEvalCond bool
 }
 
 func (prc podResizeConditions) List() []*v1.PodCondition {
@@ -321,6 +326,8 @@ func (m *manager) SetPodResizePendingCondition(podUID types.UID, reason, message
 
 	previousCondition := m.podResizeConditions[podUID].PodResizePending
 
+	clearSchedEvalCond := utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingSchedulerPreemption) &&
+		strings.HasPrefix(reason, lifecycle.InsufficientResourcePrefix)
 	if reason != v1.PodReasonInfeasible {
 		// For all other "pending" reasons, we set the reason to "Deferred".
 		reason = v1.PodReasonDeferred
@@ -329,6 +336,7 @@ func (m *manager) SetPodResizePendingCondition(podUID types.UID, reason, message
 	m.podResizeConditions[podUID] = podResizeConditions{
 		PodResizePending:    updatedPodResizeCondition(v1.PodResizePending, m.podResizeConditions[podUID].PodResizePending, reason, message, observedGeneration),
 		PodResizeInProgress: m.podResizeConditions[podUID].PodResizeInProgress,
+		clearSchedEvalCond:  clearSchedEvalCond,
 	}
 
 	if previousCondition == nil {
@@ -362,6 +370,7 @@ func (m *manager) SetPodResizeInProgressCondition(podUID types.UID, reason, mess
 	m.podResizeConditions[podUID] = podResizeConditions{
 		PodResizeInProgress: updatedPodResizeCondition(v1.PodResizeInProgress, m.podResizeConditions[podUID].PodResizeInProgress, reason, message, observedGeneration),
 		PodResizePending:    m.podResizeConditions[podUID].PodResizePending,
+		clearSchedEvalCond:  m.podResizeConditions[podUID].clearSchedEvalCond,
 	}
 
 	if previousCondition == nil {
@@ -402,6 +411,7 @@ func (m *manager) ClearPodResizePendingCondition(podUID types.UID, resolution me
 	m.podResizeConditions[podUID] = podResizeConditions{
 		PodResizeInProgress: m.podResizeConditions[podUID].PodResizeInProgress,
 		PodResizePending:    nil,
+		clearSchedEvalCond:  utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingSchedulerPreemption),
 	}
 
 	m.observePendingResizeCount()
@@ -422,10 +432,33 @@ func (m *manager) ClearPodResizeInProgressCondition(podUID types.UID) (int64, bo
 	m.podResizeConditions[podUID] = podResizeConditions{
 		PodResizePending:    m.podResizeConditions[podUID].PodResizePending,
 		PodResizeInProgress: nil,
+		clearSchedEvalCond:  m.podResizeConditions[podUID].clearSchedEvalCond,
 	}
 
 	m.recordInProgressResizeCount()
 	return generation, true
+}
+
+func (m *manager) shouldClearSchedEvalCond(podUID types.UID) bool {
+	conds := m.podResizeConditions[podUID]
+	return conds.clearSchedEvalCond || conds.PodResizePending == nil || conds.PodResizePending.Reason != v1.PodReasonDeferred
+}
+
+func (m *manager) getClearSchedEvalCond(podUID types.UID) bool {
+	m.podStatusesLock.RLock()
+	defer m.podStatusesLock.RUnlock()
+
+	return m.shouldClearSchedEvalCond(podUID)
+}
+
+func (m *manager) resetClearSchedEvalCond(podUID types.UID) {
+	m.podStatusesLock.Lock()
+	defer m.podStatusesLock.Unlock()
+
+	if conds, ok := m.podResizeConditions[podUID]; ok && conds.clearSchedEvalCond {
+		conds.clearSchedEvalCond = false
+		m.podResizeConditions[podUID] = conds
+	}
 }
 
 func (m *manager) BackfillPodResizeConditions(pods []*v1.Pod) {
@@ -499,10 +532,24 @@ func (m *manager) SetPodStatus(logger klog.Logger, pod *v1.Pod, status v1.PodSta
 	// Set the observedGeneration for this pod status.
 	status.ObservedGeneration = podutil.CalculatePodStatusObservedGeneration(pod)
 
+	// Remove SchedulerEvaluationCompleted for deferred resize once the resize is re-evaluated or no longer
+	// Deferred, and force an API update so the removal is synced even if kubelet-owned fields are unchanged.
+	stripSEC := false
+	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingSchedulerPreemption) &&
+		m.shouldClearSchedEvalCond(pod.UID) {
+		status.Conditions = slices.DeleteFunc(status.Conditions, func(c v1.PodCondition) bool {
+			if c.Type == v1.SchedulerEvaluationCompleted && c.Reason == v1.PodReasonDeferredPodResize {
+				stripSEC = true
+				return true
+			}
+			return false
+		})
+	}
+
 	// Force a status update if deletion timestamp is set. This is necessary
 	// because if the pod is in the non-running state, the pod worker still
 	// needs to be able to trigger an update and/or deletion.
-	changed, notif := m.updateStatusInternal(logger, pod, status, pod.DeletionTimestamp != nil, false)
+	changed, notif := m.updateStatusInternal(logger, pod, status, pod.DeletionTimestamp != nil || stripSEC, false)
 	notification = notif
 
 	return m.podStatuses[pod.UID].status, changed
@@ -1267,7 +1314,7 @@ func (m *manager) syncPod(ctx context.Context, uid types.UID, status versionedPo
 		return
 	}
 
-	mergedStatus := mergePodStatus(pod, pod.Status, status.status, m.podDeletionSafety.PodCouldHaveRunningContainers(pod))
+	mergedStatus := mergePodStatus(pod, pod.Status, status.status, m.podDeletionSafety.PodCouldHaveRunningContainers(pod), m.getClearSchedEvalCond(uid))
 
 	newPod, patchBytes, unchanged, err := statusutil.PatchPodStatus(ctx, m.kubeClient, pod.Namespace, pod.Name, pod.UID, pod.Status, mergedStatus)
 	logger.V(3).Info("Patch status for pod", "pod", klog.KObj(pod), "podUID", uid, "patch", string(patchBytes))
@@ -1276,6 +1323,7 @@ func (m *manager) syncPod(ctx context.Context, uid types.UID, status versionedPo
 		logger.Error(err, "Failed to update status for pod", "pod", klog.KObj(pod))
 		return
 	}
+	m.resetClearSchedEvalCond(uid)
 	if unchanged {
 		logger.V(3).Info("Status for pod is up-to-date", "pod", klog.KObj(pod), "statusVersion", status.version)
 	} else {
@@ -1376,6 +1424,13 @@ func (m *manager) needsReconcile(logger klog.Logger, uid types.UID, status v1.Po
 	normalizeStatus(pod, podStatus)
 
 	if isPodStatusByKubeletEqual(podStatus, &status) {
+		if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingSchedulerPreemption) &&
+			m.shouldClearSchedEvalCond(uid) &&
+			slices.ContainsFunc(pod.Status.Conditions, func(c v1.PodCondition) bool {
+				return c.Type == v1.SchedulerEvaluationCompleted && c.Reason == v1.PodReasonDeferredPodResize
+			}) {
+			return true
+		}
 		// If the status from the source is the same with the cached status,
 		// reconcile is not needed. Just return.
 		return false
@@ -1451,10 +1506,16 @@ func normalizeStatus(pod *v1.Pod, status *v1.PodStatus) *v1.PodStatus {
 // mergePodStatus merges oldPodStatus and newPodStatus to preserve where pod conditions
 // not owned by kubelet and to ensure terminal phase transition only happens after all
 // running containers have terminated. This method does not modify the old status.
-func mergePodStatus(pod *v1.Pod, oldPodStatus, newPodStatus v1.PodStatus, couldHaveRunningContainers bool) v1.PodStatus {
+func mergePodStatus(pod *v1.Pod, oldPodStatus, newPodStatus v1.PodStatus, couldHaveRunningContainers, dropSEC bool) v1.PodStatus {
 	podConditions := make([]v1.PodCondition, 0, len(oldPodStatus.Conditions)+len(newPodStatus.Conditions))
 
 	for _, c := range oldPodStatus.Conditions {
+		// The kubelet removes SchedulerEvaluationCompleted for deferred resize once the resize is re-evaluated or no longer Deferred.
+		if c.Type == v1.SchedulerEvaluationCompleted && c.Reason == v1.PodReasonDeferredPodResize &&
+			utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingSchedulerPreemption) &&
+			dropSEC {
+			continue
+		}
 		if !kubetypes.PodConditionByKubelet(c.Type) {
 			podConditions = append(podConditions, c)
 		}
