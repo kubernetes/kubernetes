@@ -46,10 +46,11 @@ func ApplyPodLevelMemoryHigh(pod *v1.Pod, rc *ResourceConfig, throttlingFactor f
 	if !podLevelResourcesEnabled || !resourcehelper.IsPodLevelResourcesSet(pod) {
 		return
 	}
-	reqs := resourcehelper.PodRequests(pod, resourcehelper.PodResourcesOptions{})
-	// PodLimits() omits the memory limit unless every container declares it or a pod-level
-	// limit is set, so memoryLimit stays 0 (and memory.high stays unset) otherwise.
-	limits := resourcehelper.PodLimits(pod, resourcehelper.PodResourcesOptions{})
+	opts := resourcehelper.PodResourcesOptions{
+		UseExtraNodeAllocatableResources: utilfeature.DefaultFeatureGate.Enabled(kubefeatures.DRANodeAllocatableResources),
+	}
+	reqs := resourcehelper.PodRequests(pod, opts)
+	limits := resourcehelper.PodLimits(pod, opts)
 	memoryRequest := int64(0)
 	memoryLimit := int64(0)
 	if req, found := reqs[v1.ResourceMemory]; found {

@@ -1393,6 +1393,51 @@ func TestApplyPodLevelMemoryHigh(t *testing.T) {
 			t.Errorf("expected no Unified map for mixed limits, got %v", rc.Unified)
 		}
 	})
+
+	t.Run("extra node allocatable resources are included in memory.high calculation", func(t *testing.T) {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.DRANodeAllocatableResources, true)
+		pod := &v1.Pod{
+			Spec: v1.PodSpec{
+				Resources: &v1.ResourceRequirements{
+					Limits: v1.ResourceList{
+						v1.ResourceMemory: resource.MustParse("512Mi"),
+						v1.ResourceCPU:    resource.MustParse("1"),
+					},
+				},
+				Containers: []v1.Container{
+					{
+						Name:      "c1",
+						Resources: getResourceRequirements(getResourceList("1", "128Mi"), getResourceList("1", "512Mi")),
+					},
+				},
+			},
+			Status: v1.PodStatus{
+				ExtraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
+					{
+						Source:     v1.ExtraNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "claim1"},
+						Containers: []string{"c1"},
+						Mapping: []v1.NodeAllocatableMappedResources{
+							{Name: v1.ResourceMemory, Quantity: new(resource.MustParse("128Mi"))},
+						},
+						Overhead: []v1.NodeAllocatableOverheadResources{
+							{Name: v1.ResourceMemory, PerPod: new(resource.MustParse("64Mi"))},
+						},
+					},
+				},
+			},
+		}
+		rc := &ResourceConfig{}
+		ApplyPodLevelMemoryHigh(pod, rc, 0.9)
+		if rc.Unified == nil {
+			t.Fatal("expected Unified map to be set")
+		}
+		// Total request = 128Mi (container) + 128Mi (mapping) + 64Mi (overhead) = 320Mi
+		// Total limit = 512Mi (pod-level limit covers DRA overhead)
+		want := memoryHighForPod(320*1024*1024, 512*1024*1024, 0.9)
+		if got := rc.Unified[Cgroup2MemoryHigh]; got != want {
+			t.Errorf("Cgroup2MemoryHigh = %q, want %q", got, want)
+		}
+	})
 }
 
 func TestCPUSharesEqualAfterV2RoundTrip(t *testing.T) {
