@@ -3395,6 +3395,11 @@ const (
 	// If both PodResizePending and PodResizeInProgress are set, it means that a new resize was
 	// requested in the middle of a previous pod resize that is still in progress.
 	PodResizeInProgress PodConditionType = "PodResizeInProgress"
+	// SchedulerEvaluationCompleted indicates that the scheduler has completed its evaluation
+	// (and any required preemption) for a deferred resize of an already-scheduled pod.
+	// This condition is only ever set with status True. Rather than transitioning to False, it is
+	// removed by the kubelet once it re-evaluates the resize, or if the resize is no longer deferred.
+	SchedulerEvaluationCompleted PodConditionType = "SchedulerEvaluationCompleted"
 	// AllContainersRestarting indicates that all containers of the pod is being restarted.
 	AllContainersRestarting PodConditionType = "AllContainersRestarting"
 )
