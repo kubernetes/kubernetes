@@ -595,7 +595,7 @@ func TestWaitUntilFreshAndGet(t *testing.T) {
 		store.Add(makeTestPod("bar", 5))
 	}()
 
-	obj, exists, resourceVersion, err := store.WaitUntilFreshAndGet(ctx, 5, "/prefix/ns/bar")
+	obj, exists, resourceVersion, err := store.WaitUntilFreshAndGet(ctx, "5", "/prefix/ns/bar")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -1255,7 +1255,7 @@ func TestHistogramCacheReadWait(t *testing.T) {
 				getCompleted := make(chan struct{})
 				go func() {
 					defer close(getCompleted)
-					if _, _, _, err := store.WaitUntilFreshAndGet(ctx, 5, "prefix/ns/bar"); err != nil {
+					if _, _, _, err := store.WaitUntilFreshAndGet(ctx, "5", "prefix/ns/bar"); err != nil {
 						t.Errorf("unexpected error: %v", err)
 					}
 				}()
@@ -1295,7 +1295,7 @@ func TestHistogramCacheReadWait(t *testing.T) {
 			desc:            "resourceVersion is 0",
 			resourceVersion: 0,
 			run: func(t *testing.T) {
-				if _, _, _, err := store.WaitUntilFreshAndGet(ctx, 0, "prefix/ns/bar"); err != nil {
+				if _, _, _, err := store.WaitUntilFreshAndGet(ctx, "0", "prefix/ns/bar"); err != nil {
 					t.Errorf("unexpected error: %v", err)
 				}
 			},
