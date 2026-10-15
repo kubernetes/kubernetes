@@ -973,6 +973,15 @@ func TestTakeByTopologyNUMAPacked(t *testing.T) {
 			mustParseCPUSet(t, "2-3,10-11,4-7,12-15"),
 			6,
 			"",
+			cpuset.New(4, 5, 6, 7, 12, 13),
+		},
+		{
+			"take full cores from best available UncoreCache - SMT enabled",
+			topoUncoreSingleSocketSMT,
+			StaticPolicyOptions{PreferAlignByUncoreCacheOption: true, FullPhysicalCPUsOnly: true},
+			mustParseCPUSet(t, "2-7,10-15"),
+			6,
+			"",
 			cpuset.New(4, 5, 6, 12, 13, 14),
 		},
 		{
@@ -982,7 +991,7 @@ func TestTakeByTopologyNUMAPacked(t *testing.T) {
 			mustParseCPUSet(t, "1-7,9-15"),
 			10,
 			"",
-			mustParseCPUSet(t, "4-7,12-15,1,9"),
+			mustParseCPUSet(t, "4-7,12-15,1,2"),
 		},
 	}...)
 
@@ -996,6 +1005,7 @@ func TestTakeByTopologyNUMAPacked(t *testing.T) {
 			result, err := takeByTopologyNUMAPacked(logger, tc.topo, tc.availableCPUs, tc.numCPUs, AllocationParams{
 				CPUSortingStrategy:       strategy,
 				PreferAlignByUncoreCache: tc.opts.PreferAlignByUncoreCacheOption,
+				FullPCPUsOnly:            tc.opts.FullPhysicalCPUsOnly,
 			})
 			if tc.expErr != "" && err != nil && err.Error() != tc.expErr {
 				t.Errorf("expected error to be [%v] but it was [%v]", tc.expErr, err)
@@ -1004,6 +1014,30 @@ func TestTakeByTopologyNUMAPacked(t *testing.T) {
 				t.Errorf("expected result [%s] to equal [%s]", result, tc.expResult)
 			}
 		})
+	}
+}
+
+// repro for issue 137315
+func TestTakeByTopologyNUMAPackedUncoreAlignmentOddAmount(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	topo := topoUncoreSingleSocketSMT
+	available := cpuset.New(3, 5, 7, 11, 12, 13, 14, 15)
+
+	// Cache 1 has two full cores and two spare threads, so five CPUs can fit
+	// without crossing a cache boundary (https://github.com/kubernetes/kubernetes/issues/137315).
+	result, err := takeByTopologyNUMAPacked(logger, topo, available, 5, AllocationParams{
+		CPUSortingStrategy:       CPUSortingStrategyPacked,
+		PreferAlignByUncoreCache: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Size() != 5 || !result.IsSubsetOf(available) {
+		t.Fatalf("expected five available CPUs from %s, got %s", available, result)
+	}
+	uncoreIDs := topo.CPUDetails.KeepOnly(result).UncoreCaches()
+	if uncoreIDs.Size() != 1 || uncoreIDs.UnsortedList()[0] != 1 {
+		t.Errorf("expected CPUs within uncore cache 1, got CPUs %s in caches %v", result, uncoreIDs.List())
 	}
 }
 
@@ -1101,6 +1135,7 @@ func TestTakeByTopologyWithSpreadPhysicalCPUsPreferredOption(t *testing.T) {
 		result, err := takeByTopologyNUMAPacked(logger, tc.topo, tc.availableCPUs, tc.numCPUs, AllocationParams{
 			CPUSortingStrategy:       strategy,
 			PreferAlignByUncoreCache: tc.opts.PreferAlignByUncoreCacheOption,
+			FullPCPUsOnly:            tc.opts.FullPhysicalCPUsOnly,
 		})
 		if tc.expErr != "" && err.Error() != tc.expErr {
 			t.Errorf("testCase %q failed, expected error to be [%v] but it was [%v]", tc.description, tc.expErr, err)
@@ -1370,6 +1405,7 @@ func TestTakeByTopologyNUMADistributed(t *testing.T) {
 		t.Run(tc.description, func(t *testing.T) {
 			result, err := takeByTopologyNUMADistributed(logger, tc.topo, tc.availableCPUs, tc.numCPUs, AllocationParams{
 				CPUSortingStrategy: CPUSortingStrategyPacked,
+				FullPCPUsOnly:      tc.opts.FullPhysicalCPUsOnly,
 				CPUGroupSize:       tc.cpuGroupSize,
 				AlignBySocket:      tc.opts.AlignBySocket,
 			})

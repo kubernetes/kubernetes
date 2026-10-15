@@ -1895,11 +1895,10 @@ func TestStaticPolicyAddWithUncoreAlignment(t *testing.T) {
 				"with-single-container",
 			),
 			expCPUAlloc: true,
-			expCSet:     cpuset.New(2, 3, 66),
+			expCSet:     cpuset.New(2, 3, 65),
 		},
 		{
 			// even integer requested on smt-enabled processor with odd integer available cpus on uncore
-			// even integer cpu containers will not be placed on uncore caches with odd integer free cpus
 			description:     "even integer required on odd integer partial uncore",
 			topo:            topoSingleSocketSingleNumaPerSocketSMTSmallUncore, // 8 cpus per uncore
 			numReservedCPUs: 3,
@@ -1919,7 +1918,7 @@ func TestStaticPolicyAddWithUncoreAlignment(t *testing.T) {
 				"with-single-container",
 			),
 			expCPUAlloc: true,
-			expCSet:     cpuset.New(2, 3, 66, 67),
+			expCSet:     cpuset.New(2, 3, 65, 66),
 		},
 		{
 			// large odd integer cpu required on smt-enabled
@@ -1942,11 +1941,11 @@ func TestStaticPolicyAddWithUncoreAlignment(t *testing.T) {
 				"with-single-container",
 			),
 			expCPUAlloc: true,
-			expCSet:     cpuset.New(2, 3, 66, 4, 5, 6, 7, 68, 69, 70, 71), // partial uncore 0 and full uncore 1
+			expCSet:     cpuset.New(2, 3, 65, 4, 5, 6, 7, 68, 69, 70, 71), // partial uncore 0 and full uncore 1
 		},
 		{
-			// avoid SMT misalignment and align to uncore cache
-			description:     "avoid SMT misalignment and align to uncore cache",
+			// align to uncore cache with partial cores
+			description:     "align to uncore cache with partial cores",
 			topo:            topoUncoreSingleSocketSMT, // 8 cpus per uncore
 			numReservedCPUs: 6,
 			reserved:        cpuset.New(0, 1, 2, 8, 9, 10), // first 6 cpus taken from uncore 0
@@ -1967,11 +1966,11 @@ func TestStaticPolicyAddWithUncoreAlignment(t *testing.T) {
 				"with-single-container",
 			),
 			expCPUAlloc: true,
-			expCSet:     cpuset.New(5, 13, 7, 15), // avoids SMT misalignment
+			expCSet:     cpuset.New(5, 7, 12, 13),
 		},
 		{
-			// unable to avoid SMT misalignment of odd-integer cpu container and defaults to packed allocation
-			description:     "unable to avoid SMT misalignment of odd-integer cpu container and defaults to packed allocation",
+			// align odd-integer cpu container to uncore cache with partial cores
+			description:     "align odd-integer cpu container to uncore cache with partial cores",
 			topo:            topoUncoreSingleSocketSMT, // 8 cpus per uncore
 			numReservedCPUs: 6,
 			reserved:        cpuset.New(0, 1, 2, 8, 9, 10), // first 6 cpus taken from uncore 0
@@ -1992,13 +1991,11 @@ func TestStaticPolicyAddWithUncoreAlignment(t *testing.T) {
 				"with-single-container",
 			),
 			expCPUAlloc: true,
-			// uncore cache alignment is not forced at the cost of SMT misalignment
-			// prefer-align-cpus-by-uncore-cache will fall back to default packed allocation
-			expCSet: cpuset.New(3, 11, 12),
+			expCSet:     cpuset.New(5, 7, 12),
 		},
 		{
-			// unable to avoid SMT misalignment of even-integer cpu container and defaults to packed allocation
-			description:     "unable to avoid SMT misalignment of even-integer cpu container and defaults to packed allocation",
+			// align even-integer cpu container to uncore cache with partial cores
+			description:     "align even-integer cpu container to uncore cache with partial cores",
 			topo:            topoUncoreSingleSocketSMT, // 8 cpus per uncore
 			numReservedCPUs: 6,
 			reserved:        cpuset.New(0, 1, 2, 8, 9, 10), // first 6 cpus taken from uncore 0
@@ -2019,7 +2016,7 @@ func TestStaticPolicyAddWithUncoreAlignment(t *testing.T) {
 				"with-single-container",
 			),
 			expCPUAlloc: true,
-			expCSet:     cpuset.New(3, 7, 11, 15), // default static policy will call takeFullCores to avoid SMT misalignment
+			expCSet:     cpuset.New(5, 7, 12, 14),
 		},
 		{
 			// odd integer cpu required on hyperthread-enabled and monolithic uncore cache
@@ -2042,7 +2039,7 @@ func TestStaticPolicyAddWithUncoreAlignment(t *testing.T) {
 				"with-single-container",
 			),
 			expCPUAlloc: true,
-			expCSet:     cpuset.New(2, 3, 4, 122, 123),
+			expCSet:     cpuset.New(2, 3, 4, 5, 6),
 		},
 		{
 			// even integer cpu required on hyperthread-enabled and monolithic uncore cache
@@ -2065,7 +2062,7 @@ func TestStaticPolicyAddWithUncoreAlignment(t *testing.T) {
 				"with-single-container",
 			),
 			expCPUAlloc: true,
-			expCSet:     cpuset.New(2, 3, 122, 123), // takeFullCores
+			expCSet:     cpuset.New(2, 3, 4, 5),
 		},
 		{
 			// test feature compatibility with strict-cpu-reservation on split cache architecture
@@ -2089,7 +2086,7 @@ func TestStaticPolicyAddWithUncoreAlignment(t *testing.T) {
 				"with-single-container",
 			),
 			expCPUAlloc: true,
-			expCSet:     cpuset.New(2, 66), // should avoid reserved cpuset
+			expCSet:     cpuset.New(2, 3), // should avoid reserved cpuset
 		},
 		{
 			// test feature compatibility with strict-cpu-reservation on monolithic uncore architecture
@@ -2113,7 +2110,7 @@ func TestStaticPolicyAddWithUncoreAlignment(t *testing.T) {
 				"with-single-container",
 			),
 			expCPUAlloc: true,
-			expCSet:     cpuset.New(2, 3, 122, 123), // packed assignment avoid reserved cpuset
+			expCSet:     cpuset.New(2, 3, 4, 5), // avoids reserved cpuset
 		},
 	}
 
@@ -2149,10 +2146,11 @@ func TestStaticPolicyAddWithUncoreAlignment(t *testing.T) {
 					t.Errorf("StaticPolicy Allocate() error (%v). expected CPUSet %v but got %v",
 						testCase.description, testCase.expCSet, cset)
 				}
-				// Verify SMT alignment
-				if err := verifySMTAlignment(cset, testCase.topo); err != nil {
-					t.Errorf("StaticPolicy Allocate() error (%v). SMT misalignment: %v",
-						testCase.description, err)
+				if testCase.cpuPolicyOptions[FullPCPUsOnlyOption] == "true" {
+					if err := verifySMTAlignment(cset, testCase.topo); err != nil {
+						t.Errorf("StaticPolicy Allocate() error (%v). SMT misalignment: %v",
+							testCase.description, err)
+					}
 				}
 				return
 			}

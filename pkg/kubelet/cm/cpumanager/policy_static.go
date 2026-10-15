@@ -1122,6 +1122,7 @@ func (p *staticPolicy) takeByTopology(logger klog.Logger, availableCPUs cpuset.C
 	params := AllocationParams{
 		CPUSortingStrategy:       CPUSortingStrategyPacked,
 		PreferAlignByUncoreCache: p.options.PreferAlignByUncoreCacheOption,
+		FullPCPUsOnly:            p.options.FullPhysicalCPUsOnly,
 		CPUGroupSize:             1,
 		AlignBySocket:            p.options.AlignBySocket,
 		MINNUMAsFromHint:         minNUMAsFromHint,
