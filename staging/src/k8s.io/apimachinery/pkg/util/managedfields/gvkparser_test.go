@@ -17,7 +17,6 @@ limitations under the License.
 package managedfields
 
 import (
-	"strings"
 	"testing"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -87,10 +86,30 @@ func TestNewGVKParserFromOpenAPIV3(t *testing.T) {
 }
 
 func TestNewGVKParserFromOpenAPIV3MalformedExtension(t *testing.T) {
+	widgetGVK := schema.GroupVersionKind{Group: "example.com", Version: "v1", Kind: "Widget"}
+	gadgetGVK := schema.GroupVersionKind{Group: "example.com", Version: "v1", Kind: "Gadget"}
 	schemas := map[string]*spec.Schema{
-		"com.example.v1.Widget": objectSchema(spec.Extensions{groupVersionKindExtensionKey: "not-a-list"}, nil),
+		// A schema with a non-list extension is ignored without failing other schemas.
+		"com.example.v1.Broken": objectSchema(spec.Extensions{groupVersionKindExtensionKey: "not-a-list"}, nil),
+		// Malformed entries inside the GVK list are skipped while valid entries still resolve.
+		"com.example.v1.Gadget": objectSchema(spec.Extensions{groupVersionKindExtensionKey: []interface{}{
+			"not-a-map",
+			map[string]interface{}{"group": "example.com", "version": "v1"}, // missing kind
+			map[interface{}]interface{}{"group": gadgetGVK.Group, "version": gadgetGVK.Version, "kind": gadgetGVK.Kind},
+		}}, nil),
+		"com.example.v1.Widget": objectSchema(gvkExtension(widgetGVK), nil),
 	}
-	if _, err := NewGVKParserFromOpenAPIV3(schemas, false); err == nil || !strings.Contains(err.Error(), groupVersionKindExtensionKey) {
-		t.Errorf("expected an error naming the malformed extension, got %v", err)
+	parser, err := NewGVKParserFromOpenAPIV3(schemas, false)
+	if err != nil {
+		t.Fatalf("unexpected error when one schema has a malformed extension: %v", err)
+	}
+	if parser.Type(widgetGVK) == nil {
+		t.Errorf("expected valid schema %v to still be indexed", widgetGVK)
+	}
+	if parser.Type(gadgetGVK) == nil {
+		t.Errorf("expected valid entry %v in partially malformed list to still be indexed", gadgetGVK)
+	}
+	if got := parser.Type(schema.GroupVersionKind{Group: "example.com", Version: "v1", Kind: "Broken"}); got != nil {
+		t.Errorf("expected no type for schema with malformed extension, got %v", got)
 	}
 }
