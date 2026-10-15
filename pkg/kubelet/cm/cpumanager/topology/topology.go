@@ -150,24 +150,18 @@ func (d CPUDetails) CoresNeededInUncoreCache(numCoresNeeded int, cpusPerCore int
 // If SMT/hyperthreading is enabled, only fully available cores are returned
 // to prevent any possible SMT/hyperthreading misalignment
 func (d CPUDetails) coresInUncoreCache(cpusPerCore int, ids ...int) cpuset.CPUSet {
-	// Get all CPUs in the requested uncore caches using existing helper
-	cpusInUncore := d.CPUsInUncoreCaches(ids...)
-
-	// Get unique cores from those CPUs
-	coresInUncore := d.KeepOnly(cpusInUncore).Cores()
-
+	coresInUncore := d.filterCoresMatching(func(info CPUInfo) bool {
+		return slices.Contains(ids, info.UncoreCacheID)
+	})
 	if cpusPerCore == 1 {
 		// SMT/hyperthreading disabled case, return all cores
 		return coresInUncore
 	}
-
+	cpusByCore := d.CPUsByCore()
 	// return only cores that have all CPUs available when SMT/hyperthreading enabled
-	var fullCores []int
-	for _, coreID := range coresInUncore.List() {
-		if d.CPUsInCores(coreID).Size() == cpusPerCore {
-			fullCores = append(fullCores, coreID)
-		}
-	}
+	fullCores := slices.DeleteFunc(coresInUncore.UnsortedList(), func(coreID int) bool {
+		return len(cpusByCore[coreID]) != cpusPerCore
+	})
 	return cpuset.New(fullCores...)
 }
 
