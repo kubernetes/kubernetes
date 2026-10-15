@@ -83,6 +83,37 @@ func TestNewShardedListWatch(t *testing.T) {
 		}
 	}
 
+	sel0, err := sharding.NewShardRangeSelector("object.metadata.uid", 0, 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sel1, err := sharding.NewShardRangeSelector("object.metadata.uid", 1, 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	conflictLW := NewShardedListWatch(&ListWatch{
+		ListWithContextFunc: func(_ context.Context, _ metav1.ListOptions) (runtime.Object, error) {
+			return &v1.PodList{
+				ListMeta: metav1.ListMeta{
+					ResourceVersion: "10",
+					ShardInfo:       &metav1.ShardInfo{Selector: sel1.String()},
+				},
+			}, nil
+		},
+		WatchFuncWithContext: func(_ context.Context, _ metav1.ListOptions) (watch.Interface, error) {
+			return watch.NewFake(), nil
+		},
+	}, sel0)
+	if _, err := conflictLW.List(metav1.ListOptions{}); err == nil {
+		t.Errorf("expected error when server ShardInfo.Selector mismatches configured selector")
+	}
+	if _, err := conflictLW.List(metav1.ListOptions{ShardSelector: sel1.String()}); err == nil {
+		t.Errorf("expected error when ListOptions.ShardSelector conflicts with configured selector")
+	}
+	if _, err := conflictLW.Watch(metav1.ListOptions{ShardSelector: sel1.String()}); err == nil {
+		t.Errorf("expected error when Watch ListOptions.ShardSelector conflicts with configured selector")
+	}
+
 	pods := make([]v1.Pod, 16)
 	for i := range pods {
 		pods[i] = v1.Pod{

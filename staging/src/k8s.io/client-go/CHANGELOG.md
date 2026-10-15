@@ -4,6 +4,16 @@ Go API changes are typically not included in the Kubernetes release notes, so
 noteworthy Go API changes *may* be documented here. This is currently not
 *required*, so consult the git history to see all changes.
 
+### SharedInformer: add SetShardSelector
+
+Mock implementations of the SharedInformer or SharedIndexInformer interfaces
+have to add a SetShardSelector implementation.
+
+```
+- ./tools/cache.SharedInformer.SetShardSelector: added
+...
+```
+
 ### More flexible util/testing.CloseAndRemove
 
 Callers are no longer restricted to passing exactly a testing.T instance.

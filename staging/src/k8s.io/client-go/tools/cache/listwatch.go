@@ -355,7 +355,11 @@ func (s *shardedListWatch) List(options metav1.ListOptions) (runtime.Object, err
 }
 
 func (s *shardedListWatch) ListWithContext(ctx context.Context, options metav1.ListOptions) (runtime.Object, error) {
-	options.ShardSelector = s.selector.String()
+	expected := s.selector.String()
+	if options.ShardSelector != "" && options.ShardSelector != expected {
+		return nil, fmt.Errorf("conflicting shard selector %q, expected %q", options.ShardSelector, expected)
+	}
+	options.ShardSelector = expected
 	list, err := s.lw.ListWithContext(ctx, options)
 	if err != nil {
 		return nil, err
@@ -368,7 +372,10 @@ func (s *shardedListWatch) ListWithContext(ctx context.Context, options metav1.L
 	if !ok {
 		return nil, fmt.Errorf("object %T does not implement metav1.ShardedListInterface", list)
 	}
-	if info := shardedList.GetShardInfo(); info != nil && info.Selector == options.ShardSelector {
+	if info := shardedList.GetShardInfo(); info != nil {
+		if info.Selector != options.ShardSelector {
+			return nil, fmt.Errorf("server applied shard selector %q, expected %q", info.Selector, options.ShardSelector)
+		}
 		return list, nil
 	}
 	s.logClientFallback(ctx)
@@ -398,7 +405,11 @@ func (s *shardedListWatch) Watch(options metav1.ListOptions) (watch.Interface, e
 }
 
 func (s *shardedListWatch) WatchWithContext(ctx context.Context, options metav1.ListOptions) (watch.Interface, error) {
-	options.ShardSelector = s.selector.String()
+	expected := s.selector.String()
+	if options.ShardSelector != "" && options.ShardSelector != expected {
+		return nil, fmt.Errorf("conflicting shard selector %q, expected %q", options.ShardSelector, expected)
+	}
+	options.ShardSelector = expected
 	w, err := s.lw.WatchWithContext(ctx, options)
 	if err != nil {
 		return nil, err
