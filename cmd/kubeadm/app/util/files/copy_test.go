@@ -163,9 +163,8 @@ func TestCopyDir(t *testing.T) {
 			t.Fatalf("failed to write file: %v", err)
 		}
 
-		out, err := CopyDir(srcDir, dstDir)
-		if err != nil {
-			t.Fatalf("CopyDir() error = %v, output: %s", err, out)
+		if err := CopyDir(srcDir, dstDir); err != nil {
+			t.Fatalf("CopyDir() error = %v", err)
 		}
 
 		got, err := os.ReadFile(filepath.Join(dstDir, "a.txt"))
@@ -177,14 +176,42 @@ func TestCopyDir(t *testing.T) {
 		}
 	})
 
+	t.Run("existing destination", func(t *testing.T) {
+		tmp := t.TempDir()
+		src := filepath.Join(tmp, "src")
+		dst := filepath.Join(tmp, "dst")
+		file := filepath.Join("member", "db")
+
+		if err := os.MkdirAll(filepath.Join(src, "member"), 0700); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(src, file), []byte("data"), 0600); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Mkdir(dst, 0700); err != nil {
+			t.Fatal(err)
+		}
+
+		if err := CopyDir(src, dst); err != nil {
+			t.Fatalf("CopyDir failed: %v", err)
+		}
+
+		content, err := os.ReadFile(filepath.Join(dst, file))
+		if err != nil {
+			t.Fatalf("expected the contents of src to be copied into dst: %v", err)
+		}
+		if string(content) != "data" {
+			t.Errorf("expected %q, got %q", "data", string(content))
+		}
+		if _, err := os.Stat(filepath.Join(dst, "src")); !os.IsNotExist(err) {
+			t.Errorf("expected src not to be nested in dst, got: %v", err)
+		}
+	})
+
 	t.Run("source does not exist", func(t *testing.T) {
 		tmp := t.TempDir()
-		out, err := CopyDir(filepath.Join(tmp, "noexist"), filepath.Join(tmp, "dst"))
-		if err == nil {
+		if err := CopyDir(filepath.Join(tmp, "noexist"), filepath.Join(tmp, "dst")); err == nil {
 			t.Error("expected error for non-existent source, got nil")
-		}
-		if len(out) == 0 {
-			t.Error("expected non-empty output on error")
 		}
 	})
 }
