@@ -159,8 +159,7 @@ func (w *watcher) Watch(ctx context.Context, key string, rev int64, opts storage
 	if err != nil {
 		return nil, err
 	}
-	wc := w.createWatchChan(ctx, key, startWatchRV, opts.Recursive, opts.ProgressNotify, opts.RecordTimestamps, opts.Predicate)
-	wc.watchWithoutPrevKV = opts.WatchWithoutPrevKV
+	wc := w.createWatchChan(ctx, key, startWatchRV, opts.Recursive, opts.ProgressNotify, opts.RecordTimestamps, opts.WatchWithoutPrevKV, opts.Predicate)
 	go wc.run(isInitialEventsEndBookmarkRequired(opts), areInitialEventsRequired(rev, opts))
 
 	// For etcd watch we don't have an easy way to answer whether the watch
@@ -173,7 +172,7 @@ func (w *watcher) Watch(ctx context.Context, key string, rev int64, opts storage
 	return wc, nil
 }
 
-func (w *watcher) createWatchChan(ctx context.Context, key string, rev int64, recursive, progressNotify, recordTimestamps bool, pred storage.SelectionPredicate) *watchChan {
+func (w *watcher) createWatchChan(ctx context.Context, key string, rev int64, recursive, progressNotify, recordTimestamps, watchWithoutPrevKV bool, pred storage.SelectionPredicate) *watchChan {
 	wc := &watchChan{
 		watcher:                  w,
 		key:                      key,
@@ -181,6 +180,7 @@ func (w *watcher) createWatchChan(ctx context.Context, key string, rev int64, re
 		recursive:                recursive,
 		progressNotify:           progressNotify,
 		recordTimestamps:         recordTimestamps,
+		watchWithoutPrevKV:       watchWithoutPrevKV,
 		internalPred:             pred,
 		incomingEventChan:        make(chan *event, incomingBufSize),
 		resultChan:               make(chan watch.Event, outgoingBufSize),
