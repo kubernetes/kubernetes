@@ -1496,6 +1496,88 @@ func TestHandleSchedulingFailureForDeferredResizePod(t *testing.T) {
 	}
 }
 
+func TestHandleSchedulingFailureForResolvedDeferredResize(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScalingSchedulerPreemption, true)
+
+	scheduled := v1.PodCondition{Type: v1.PodScheduled, Status: v1.ConditionTrue}
+	deferred := v1.PodCondition{Type: v1.PodResizePending, Status: v1.ConditionTrue, Reason: v1.PodReasonDeferred}
+	evaluated := v1.PodCondition{Type: v1.SchedulerEvaluationCompleted, Status: v1.ConditionTrue, Reason: v1.PodReasonDeferredPodResize}
+	tests := []struct {
+		name string
+		// cachedConditions are the informer pod's conditions when the cycle fails.
+		cachedConditions []v1.PodCondition
+	}{
+		{
+			name:             "no longer deferred",
+			cachedConditions: []v1.PodCondition{scheduled},
+		},
+		{
+			name:             "scheduler evaluation already completed",
+			cachedConditions: []v1.PodCondition{scheduled, deferred, evaluated},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			logger, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+
+			pod := st.MakePod().Name("foo").Namespace("ns").UID("pod-uid").Node("node1").SchedulerName(testSchedulerName).
+				Conditions([]v1.PodCondition{scheduled, deferred}).Obj()
+			cachedPod := pod.DeepCopy()
+			cachedPod.Status.Conditions = tt.cachedConditions
+
+			node := st.MakeNode().Name("node1").Obj()
+			client := clientsetfake.NewClientset(cachedPod, node)
+			informerFactory := informers.NewSharedInformerFactory(client, 0)
+			eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: client.EventsV1()})
+			schedFramework, err := tf.NewFramework(ctx,
+				[]tf.RegisterPluginFunc{
+					tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+					tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+				},
+				testSchedulerName,
+				frameworkruntime.WithClientSet(client),
+				frameworkruntime.WithEventRecorder(eventBroadcaster.NewRecorder(scheme.Scheme, testSchedulerName)),
+				frameworkruntime.WithInformerFactory(informerFactory),
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			ar := metrics.NewMetricsAsyncRecorder(10, time.Second, ctx.Done())
+			queue := internalqueue.NewSchedulingQueue(nil, informerFactory, internalqueue.WithMetricsRecorder(ar))
+			sched := &Scheduler{
+				client:          client,
+				Cache:           internalcache.New(ctx, nil, false, false /* CompositePodGroup */),
+				SchedulingQueue: queue,
+				inPlacePodVerticalScalingSchedulerPreemptionEnabled: true,
+			}
+
+			informerFactory.Start(ctx.Done())
+			informerFactory.WaitForCacheSync(ctx.Done())
+
+			queue.Add(ctx, pod)
+			popped, err := queue.Pop(logger)
+			if err != nil {
+				t.Fatalf("Pop: %v", err)
+			}
+			nominatingInfo := &fwk.NominatingInfo{NominatingMode: fwk.ModeOverride, NominatedNodeName: "node1"}
+			sched.handleSchedulingFailure(ctx, schedFramework, popped.(*framework.QueuedPodInfo), fwk.NewStatus(fwk.Unschedulable, "no fit"), nominatingInfo, time.Now())
+
+			if _, found := queue.GetPod(ctx, pod.Name, pod.Namespace, nil); found {
+				t.Error("expected the pod not to be requeued")
+			}
+			for _, action := range client.Actions() {
+				if action.GetVerb() == "patch" {
+					t.Errorf("unexpected patch of a running pod: %v", action)
+				}
+			}
+		})
+	}
+}
+
 func TestHandleSchedulingFailure_PodGroupFitErrorCloned(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GenericWorkload, true)
 

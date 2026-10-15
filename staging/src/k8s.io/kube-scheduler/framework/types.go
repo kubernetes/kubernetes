@@ -69,8 +69,6 @@ const (
 	UpdatePodLabel
 	// UpdatePodScaleDown is an update for pod's scale down (i.e., any resource request is reduced).
 	UpdatePodScaleDown
-	// UpdatePodScaleUp is an update for pod's scale up (i.e., any resource request is increased).
-	UpdatePodScaleUp
 	// UpdatePodToleration is an addition for pod's tolerations.
 	// (Due to API validation, we can add, but cannot modify or remove tolerations.)
 	UpdatePodToleration
@@ -82,7 +80,7 @@ const (
 	All ActionType = 1<<iota - 1
 
 	// Use the general Update type if you don't either know or care the specific sub-Update type to use.
-	Update = UpdateNodeAllocatable | UpdateNodeLabel | UpdateNodeTaint | UpdateNodeCondition | UpdateNodeAnnotation | UpdateNodeDeclaredFeature | UpdateNodePreemptionPolicy | UpdatePodLabel | UpdatePodScaleDown | UpdatePodScaleUp | UpdatePodToleration | UpdatePodSchedulingGatesEliminated | UpdatePodGeneratedResourceClaim
+	Update = UpdateNodeAllocatable | UpdateNodeLabel | UpdateNodeTaint | UpdateNodeCondition | UpdateNodeAnnotation | UpdateNodeDeclaredFeature | UpdateNodePreemptionPolicy | UpdatePodLabel | UpdatePodScaleDown | UpdatePodToleration | UpdatePodSchedulingGatesEliminated | UpdatePodGeneratedResourceClaim
 
 	// None is a special ActionType that is only used internally.
 	None ActionType = 0
@@ -112,8 +110,6 @@ func (a ActionType) String() string {
 		return "UpdatePodLabel"
 	case UpdatePodScaleDown:
 		return "UpdatePodScaleDown"
-	case UpdatePodScaleUp:
-		return "UpdatePodScaleUp"
 	case UpdatePodToleration:
 		return "UpdatePodToleration"
 	case UpdatePodSchedulingGatesEliminated:

@@ -1582,16 +1582,18 @@ informer_queued_items{group="",name="kube-scheduler",resource="pods",version="v1
 }
 
 func TestDeferredResizeQueueingByProfile(t *testing.T) {
-	newProfile := func(name string, filter ...schedulerapi.Plugin) schedulerapi.KubeSchedulerProfile {
+	newProfile := func(name string, plugins ...schedulerapi.Plugin) schedulerapi.KubeSchedulerProfile {
 		return schedulerapi.KubeSchedulerProfile{
 			SchedulerName: name,
 			Plugins: &schedulerapi.Plugins{
 				QueueSort: schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: names.PrioritySort}}},
-				Filter:    schedulerapi.PluginSet{Enabled: filter},
-				Bind:      schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: names.DefaultBinder}}},
+				Filter:    schedulerapi.PluginSet{Enabled: plugins},
+				Bind:      schedulerapi.PluginSet{Enabled: slices.Concat(plugins, []schedulerapi.Plugin{{Name: names.DefaultBinder}})},
 			},
 		}
 	}
+	filterOnly := newProfile("deferred-pod-scheduling-filter-only")
+	filterOnly.Plugins.Filter.Enabled = []schedulerapi.Plugin{{Name: names.DeferredPodScheduling}}
 
 	tests := []struct {
 		profile       string
@@ -1599,6 +1601,7 @@ func TestDeferredResizeQueueingByProfile(t *testing.T) {
 	}{
 		{profile: "with-deferred-pod-scheduling", expectInQueue: true},
 		{profile: "without-deferred-pod-scheduling", expectInQueue: false},
+		{profile: "deferred-pod-scheduling-filter-only", expectInQueue: false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.profile, func(t *testing.T) {
@@ -1613,6 +1616,7 @@ func TestDeferredResizeQueueingByProfile(t *testing.T) {
 				WithProfiles(
 					newProfile("with-deferred-pod-scheduling", schedulerapi.Plugin{Name: names.DeferredPodScheduling}),
 					newProfile("without-deferred-pod-scheduling"),
+					filterOnly,
 				),
 			)
 			if err != nil {
