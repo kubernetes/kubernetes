@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/apiserver/pkg/admission/coverage"
 	"k8s.io/apiserver/pkg/admission/plugin/policy/generic"
 	"k8s.io/apiserver/pkg/admission/plugin/policy/matching"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
@@ -193,11 +194,109 @@ func TestPolicySourceBindsToPolicies(t *testing.T) {
 
 }
 
+func TestPolicySourceCoverageGaps(t *testing.T) {
+	pods := schema.GroupResource{Resource: "pods"}
+	reqs := []coverage.Requirement{{
+		Resource: pods,
+		Target:   coverage.Shape{Operation: admission.Update, Subresource: "dynamic"},
+		Sources:  []coverage.Shape{{Operation: admission.Create}},
+	}}
+	createPodsConstraints := &v1.MatchResources{
+		ResourceRules: []v1.NamedRuleWithOperations{{
+			RuleWithOperations: v1.RuleWithOperations{
+				Operations: []v1.OperationType{v1.Create},
+				Rule:       v1.Rule{APIGroups: []string{""}, APIVersions: []string{"v1"}, Resources: []string{"pods"}},
+			},
+		}},
+	}
+	targetAttr := admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{Version: "v1", Kind: "Pod"},
+		"default", "my-pod", schema.GroupVersionResource{Version: "v1", Resource: "pods"}, "dynamic", admission.Update, nil, false, nil)
+	wantViolation := &coverage.Violation{
+		Resource: pods,
+		Target:   reqs[0].Target,
+		Source:   reqs[0].Sources[0],
+	}
+
+	initialObjects := []runtime.Object{
+		&FakePolicy{ObjectMeta: metav1.ObjectMeta{Name: "policy1"}, MatchConstraints: createPodsConstraints},
+		&FakeBinding{ObjectMeta: metav1.ObjectMeta{Name: "binding1"}, PolicyName: "policy1"},
+		&FakeBinding{ObjectMeta: metav1.ObjectMeta{Name: "binding2"}, PolicyName: "policy1"},
+		// The param kind isn't known to the REST mapper, so this policy has a
+		// ConfigurationError. It must still get gaps: failurePolicy may
+		// ignore the error, but not a coverage violation.
+		&FakePolicy{ObjectMeta: metav1.ObjectMeta{Name: "policy2"}, MatchConstraints: createPodsConstraints, ParamKind: &v1.ParamKind{APIVersion: "policy.example.com/v1", Kind: "FakeParam"}},
+		&FakeBinding{ObjectMeta: metav1.ObjectMeta{Name: "binding3"}, PolicyName: "policy2"},
+	}
+
+	testCases := []struct {
+		name string
+		reqs []coverage.Requirement
+	}{
+		{name: "no coverage requirements"},
+		{name: "coverage requirements", reqs: reqs},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			var opts []generic.PolicyTestContextOption
+			if tc.reqs != nil {
+				opts = append(opts, generic.WithAdmissionCoverage(tc.reqs))
+			}
+			testContext, testCancel, err := generic.NewPolicyTestContext(
+				t,
+				func(fp *FakePolicy) generic.PolicyAccessor { return fp },
+				func(fb *FakeBinding) generic.BindingAccessor { return fb },
+				func(fp *FakePolicy) generic.Evaluator { return nil },
+				makeTestDispatcher,
+				initialObjects,
+				nil,
+				opts...,
+			)
+			require.NoError(t, err)
+			defer testCancel()
+			require.NoError(t, testContext.Start())
+			require.Equal(t, tc.reqs, testContext.Plugin.GetAdmissionCoverage())
+
+			checkHooks := func(wantBindings map[string]int) {
+				t.Helper()
+				hooks := testContext.Source.Hooks()
+				require.Len(t, hooks, len(wantBindings))
+				for _, hook := range hooks {
+					policyName := hook.Policy.GetName()
+					require.Len(t, hook.Bindings, wantBindings[policyName], "bindings of %s", policyName)
+					if policyName == "policy2" {
+						require.Error(t, hook.ConfigurationError)
+					}
+					if tc.reqs == nil {
+						require.Nil(t, hook.CoverageGaps, "no gaps should be built without coverage requirements")
+						require.Nil(t, hook.CoverageGapsAt(0))
+						continue
+					}
+					require.Len(t, hook.CoverageGaps, len(hook.Bindings), "gaps should be parallel to bindings")
+					for i := range hook.Bindings {
+						gaps := hook.CoverageGapsAt(i)
+						require.NotNil(t, gaps)
+						require.Equal(t, wantViolation, gaps.Check(targetAttr))
+					}
+					require.Nil(t, hook.CoverageGapsAt(len(hook.Bindings)), "an index beyond the gaps should have no gaps")
+				}
+			}
+			checkHooks(map[string]int{"policy1": 2, "policy2": 1})
+
+			// Gaps are rebuilt with the hooks.
+			require.NoError(t, testContext.UpdateAndWait(
+				&FakeBinding{ObjectMeta: metav1.ObjectMeta{Name: "binding4"}, PolicyName: "policy1"},
+			))
+			checkHooks(map[string]int{"policy1": 3, "policy2": 1})
+		})
+	}
+}
+
 type FakePolicy struct {
 	metav1.TypeMeta
 	metav1.ObjectMeta
 
-	ParamKind *v1.ParamKind
+	ParamKind        *v1.ParamKind
+	MatchConstraints *v1.MatchResources
 }
 
 var _ generic.PolicyAccessor = &FakePolicy{}
@@ -225,7 +324,7 @@ func (fp *FakePolicy) GetParamKind() *v1.ParamKind {
 }
 
 func (fb *FakePolicy) GetMatchConstraints() *v1.MatchResources {
-	return nil
+	return fb.MatchConstraints
 }
 
 func (fb *FakePolicy) GetFailurePolicy() *v1.FailurePolicyType {

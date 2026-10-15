@@ -32,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/apiserver/pkg/admission/coverage"
 	admissionauthorizer "k8s.io/apiserver/pkg/admission/plugin/authorizer"
 	"k8s.io/apiserver/pkg/admission/plugin/cel"
 	"k8s.io/apiserver/pkg/admission/plugin/policy/generic"
@@ -48,6 +49,8 @@ func NewDispatcher(a authorizer.UnconditionalAuthorizer, m *matching.Matcher, tc
 		matcher:              m,
 		authz:                a,
 		typeConverterManager: tcm,
+		coverageChecker: generic.NewCoverageChecker[*Policy, *PolicyBinding, PolicyEvaluator](
+			generic.NewPolicyMatcher(m), NewMutatingAdmissionPolicyAccessor, NewMutatingAdmissionPolicyBindingAccessor),
 	}
 	res.Dispatcher = generic.NewPolicyDispatcher[*Policy, *PolicyBinding, PolicyEvaluator](
 		NewMutatingAdmissionPolicyAccessor,
@@ -62,12 +65,34 @@ type dispatcher struct {
 	matcher              *matching.Matcher
 	authz                authorizer.UnconditionalAuthorizer
 	typeConverterManager patch.TypeConverterManager
+	coverageChecker      *generic.CoverageChecker[*Policy, *PolicyBinding, PolicyEvaluator]
 	generic.Dispatcher[PolicyHook]
 }
 
 func (d *dispatcher) Start(ctx context.Context) error {
 	go d.typeConverterManager.Run(ctx)
 	return d.Dispatcher.Start(ctx)
+}
+
+// Dispatch rejects requests that a (policy, binding) pair fails to cover before
+// collecting params or running any mutation.
+func (d *dispatcher) Dispatch(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces, hooks []PolicyHook) error {
+	if violations := d.coverageChecker.Check(a, o, hooks); len(violations) > 0 {
+		return coverageRejection(ctx, a, violations)
+	}
+	return d.Dispatcher.Dispatch(ctx, a, o, hooks)
+}
+
+// coverageRejection rejects a request that (policy, binding) pairs fail to
+// cover. MutatingAdmissionPolicies have no validationActions, so violations
+// always deny. failurePolicy doesn't apply either: it governs failures to
+// evaluate a policy, and these pairs aren't evaluated.
+func coverageRejection(ctx context.Context, a admission.Attributes, violations []generic.CoverageViolation) error {
+	generic.RecordCoverageViolations(ctx, a, coverage.PolicyMutating, violations)
+	for _, v := range violations {
+		celmetrics.Metrics.ObserveRejection(ctx, 0, v.Policy.GetName(), v.Binding.GetName(), celmetrics.MutationCoverageViolation)
+	}
+	return admission.NewForbidden(a, errors.New(violations[0].Message("MutatingAdmissionPolicy")))
 }
 
 func (d *dispatcher) dispatchInvocations(
