@@ -440,12 +440,12 @@ func ParseQuantity(str string) (Quantity, error) {
 
 	// So that no one but us has to think about suffixes, remove it.
 	if base == 10 {
-		if exponent == math.MinInt32 {
-			// inf.Dec negates the scale to apply it, which this value
-			// cannot survive, so the quantity has no representation here.
+		exponentInfScale, canInfScale := Scale(exponent).infScale()
+		if !canInfScale {
 			return Quantity{}, ErrSuffix
 		}
-		amount.SetScale(amount.Scale() + Scale(exponent).infScale())
+		// TODO: handle scale addition overflow
+		amount.SetScale(amount.Scale() + exponentInfScale)
 	} else if base == 2 {
 		// numericSuffix = 2 ** exponent
 		numericSuffix := big.NewInt(1).Lsh(bigOne, uint(exponent))
@@ -464,7 +464,7 @@ func ParseQuantity(str string) (Quantity, error) {
 	// of an amount.  Arguably, this should be inf.RoundHalfUp (normal rounding), but that would have
 	// the side effect of rounding values < .5n to zero.
 	if v, ok := amount.Unscaled(); v != int64(0) || !ok {
-		amount.Round(amount, Nano.infScale(), inf.RoundUp)
+		amount.Round(amount, nanoInfScale, inf.RoundUp)
 	}
 
 	// The max is just a simple cap.

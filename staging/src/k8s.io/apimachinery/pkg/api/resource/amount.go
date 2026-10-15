@@ -34,9 +34,11 @@ import (
 // See Quantity.ScaledValue for more details.
 type Scale int32
 
-// infScale adapts a Scale value to an inf.Scale value.
-func (s Scale) infScale() inf.Scale {
-	return inf.Scale(-s) // inf.Scale is upside-down
+// infScale adapts a Scale value to an inf.Scale value, returning false in overflow cases.
+func (s Scale) infScale() (inf.Scale, bool) {
+	// inf.Scale is upside-down
+	// TODO: saturate instead of wrap in overflow cases
+	return inf.Scale(-s), s != math.MinInt32
 }
 
 // canInfScale reports whether infScale is faithful for s. Scale is int32 and
@@ -99,6 +101,8 @@ const (
 	Tera  Scale = 12
 	Peta  Scale = 15
 	Exa   Scale = 18
+
+	nanoInfScale = inf.Scale(9)
 )
 
 var (
@@ -181,7 +185,9 @@ func (a int64Amount) AsScaledInt64(scale Scale) (result int64, ok bool) {
 func (a int64Amount) AsDec() *inf.Dec {
 	var base inf.Dec
 	base.SetUnscaled(a.value)
-	base.SetScale(a.scale.infScale())
+	// TODO: handle !canInfScale case
+	infScale, _ := a.scale.infScale()
+	base.SetScale(infScale)
 	return &base
 }
 
@@ -481,7 +487,7 @@ type infDecAmount struct {
 func (a infDecAmount) AsScale(scale Scale) (infDecAmount, bool) {
 	oldWidenedScale := a.widenedScale()
 	newWidenedScale := widenScale(scale)
-	canInfScale := scale.canInfScale()
+	infScale, canInfScale := scale.infScale()
 
 	// Short-circuit if the scale is not being increased.
 	// The scale.canInfScale() is check is included for clarity even
@@ -490,7 +496,6 @@ func (a infDecAmount) AsScale(scale Scale) (infDecAmount, bool) {
 		return infDecAmount{new(inf.Dec).Set(a.Dec)}, true
 	}
 
-	infScale := scale.infScale()
 	sign := a.Dec.Sign()
 
 	// Short-circuit if the value is zero, since we can skip the rounding.
