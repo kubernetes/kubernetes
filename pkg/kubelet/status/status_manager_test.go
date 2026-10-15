@@ -2505,7 +2505,7 @@ func TestMergePodStatus(t *testing.T) {
 		t.Run(tc.desc, func(t *testing.T) {
 			oldPodStatus := tc.oldPodStatus(getPodStatus())
 			pod := &v1.Pod{Status: oldPodStatus}
-			output := mergePodStatus(pod, oldPodStatus, tc.newPodStatus(getPodStatus()), tc.hasRunningContainers)
+			output := mergePodStatus(pod, oldPodStatus, tc.newPodStatus(getPodStatus()), tc.hasRunningContainers, false)
 			if !conditionsEqual(output.Conditions, tc.expectPodStatus.Conditions) || !statusEqual(output, tc.expectPodStatus) {
 				t.Fatalf("unexpected output: %s", cmp.Diff(tc.expectPodStatus, output))
 			}
@@ -3555,4 +3555,124 @@ func TestSyncBatch_EvictionPublishedAfterCleanExit(t *testing.T) {
 	require.Len(t, published.Status.ContainerStatuses, 1)
 	require.NotNil(t, published.Status.ContainerStatuses[0].State.Terminated)
 	assert.Equal(t, int32(0), published.Status.ContainerStatuses[0].State.Terminated.ExitCode)
+}
+
+func TestMergePodStatusSchedulerEvaluationCompleted(t *testing.T) {
+	testCases := []struct {
+		desc           string
+		featureEnabled bool
+		reason         string
+		dropSEC        bool
+		deferred       bool
+		expectSEC      bool
+	}{
+		{desc: "removed when the resize was re-evaluated", featureEnabled: true, reason: v1.PodReasonDeferredPodResize, dropSEC: true, deferred: true},
+		{desc: "kept while the resize is deferred", featureEnabled: true, reason: v1.PodReasonDeferredPodResize, deferred: true, expectSEC: true},
+		{desc: "removed when the resize is not deferred", featureEnabled: true, reason: v1.PodReasonDeferredPodResize},
+		{desc: "kept when reason is not DeferredPodResize", featureEnabled: true, reason: "Other", dropSEC: true, expectSEC: true},
+		{desc: "kept when the feature is disabled", reason: v1.PodReasonDeferredPodResize, dropSEC: true, expectSEC: true},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.desc, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScalingSchedulerPreemption, tc.featureEnabled)
+
+			oldPodStatus := getPodStatus()
+			oldPodStatus.Conditions = append(oldPodStatus.Conditions, v1.PodCondition{Type: v1.SchedulerEvaluationCompleted, Status: v1.ConditionTrue, Reason: tc.reason})
+			pod := &v1.Pod{Status: oldPodStatus}
+			m := newTestManager(fake.NewSimpleClientset())
+			if tc.deferred {
+				m.SetPodResizePendingCondition(pod.UID, v1.PodReasonDeferred, "", pod.Generation)
+				if !tc.dropSEC {
+					m.takeClearSchedEvalCond(pod.UID)
+				}
+			}
+
+			merged := mergePodStatus(pod, oldPodStatus, getPodStatus(), false, m.takeClearSchedEvalCond(pod.UID))
+
+			_, cond := podutil.GetPodCondition(&merged, v1.SchedulerEvaluationCompleted)
+			assert.Equal(t, tc.expectSEC, cond != nil)
+		})
+	}
+}
+
+func TestSchedulerEvaluationCompletedRemoval(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScalingSchedulerPreemption, true)
+
+	deferred := v1.PodCondition{Type: v1.PodResizePending, Status: v1.ConditionTrue, Reason: v1.PodReasonDeferred, Message: "insufficient cpu"}
+	sec := v1.PodCondition{Type: v1.SchedulerEvaluationCompleted, Status: v1.ConditionTrue, Reason: v1.PodReasonDeferredPodResize}
+	hasSEC := func(t *testing.T, ctx context.Context, client clientset.Interface, pod *v1.Pod) bool {
+		apiPod, err := client.CoreV1().Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
+		require.NoError(t, err)
+		_, cond := podutil.GetPodCondition(&apiPod.Status, v1.SchedulerEvaluationCompleted)
+		return cond != nil
+	}
+
+	t.Run("re-evaluated deferred resize", func(t *testing.T) {
+		logger, ctx := ktesting.NewTestContext(t)
+		pod := getTestPod()
+		pod.Status.Conditions = []v1.PodCondition{deferred}
+		client := fake.NewSimpleClientset(pod)
+		m := newTestManager(client)
+		m.podManager.(mutablePodManager).AddPod(pod)
+
+		// Initial kubelet status before the scheduler sets SchedulerEvaluationCompleted.
+		m.SetPodResizePendingCondition(pod.UID, v1.PodReasonDeferred, "insufficient cpu", pod.Generation)
+		m.SetPodStatus(logger, pod, v1.PodStatus{Phase: v1.PodRunning, Conditions: []v1.PodCondition{deferred}})
+		m.syncBatch(ctx, false)
+
+		// Scheduler sets SchedulerEvaluationCompleted on the API pod; HandlePodReconcile updates podManager.
+		apiPod, err := client.CoreV1().Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
+		require.NoError(t, err)
+		apiPod.Status.Conditions = append(apiPod.Status.Conditions, sec)
+		apiPod, err = client.CoreV1().Pods(pod.Namespace).UpdateStatus(ctx, apiPod, metav1.UpdateOptions{})
+		require.NoError(t, err)
+		m.podManager.(mutablePodManager).UpdatePod(apiPod)
+
+		// Periodic reconciliation should not fire while the pod stays Deferred.
+		require.Equal(t, 0, m.syncBatch(ctx, true), "expected no reconcile while resize remains deferred")
+		require.True(t, hasSEC(t, ctx, client, pod), "expected the condition to be kept while the resize is deferred")
+
+		// Re-evaluating the resize sets clearSchedEvalCond; generateAPIPodStatus copies non-kubelet conditions
+		// from apiPod, and SetPodStatus strips SchedulerEvaluationCompleted and forces an immediate status sync.
+		m.SetPodResizePendingCondition(pod.UID, v1.PodReasonDeferred, "insufficient cpu", pod.Generation)
+		m.SetPodStatus(logger, apiPod, v1.PodStatus{Phase: v1.PodRunning, Conditions: []v1.PodCondition{deferred, sec}})
+		m.syncBatch(ctx, false)
+		assert.False(t, hasSEC(t, ctx, client, pod), "expected the condition to be removed after the resize was re-evaluated")
+	})
+
+	t.Run("resize not deferred", func(t *testing.T) {
+		logger, ctx := ktesting.NewTestContext(t)
+		pod := getTestPod()
+		client := fake.NewSimpleClientset(pod)
+		m := newTestManager(client)
+		m.podManager.(mutablePodManager).AddPod(pod)
+		m.SetPodStatus(logger, pod, v1.PodStatus{Phase: v1.PodRunning})
+		m.syncBatch(ctx, true)
+
+		// The scheduler's condition lands after the kubelet cleared Deferred.
+		apiPod, err := client.CoreV1().Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
+		require.NoError(t, err)
+		apiPod.Status.Conditions = append(apiPod.Status.Conditions, sec)
+		apiPod, err = client.CoreV1().Pods(pod.Namespace).UpdateStatus(ctx, apiPod, metav1.UpdateOptions{})
+		require.NoError(t, err)
+		m.podManager.(mutablePodManager).UpdatePod(apiPod)
+
+		m.syncBatch(ctx, true)
+		assert.False(t, hasSEC(t, ctx, client, pod), "expected the condition to be removed from a pod that isn't deferred")
+	})
+
+	t.Run("non-DeferredPodResize reason preserved", func(t *testing.T) {
+		logger, ctx := ktesting.NewTestContext(t)
+		pod := getTestPod()
+		otherSEC := v1.PodCondition{Type: v1.SchedulerEvaluationCompleted, Status: v1.ConditionTrue, Reason: "Other"}
+		pod.Status.Conditions = []v1.PodCondition{otherSEC}
+		client := fake.NewSimpleClientset(pod)
+		m := newTestManager(client)
+		m.podManager.(mutablePodManager).AddPod(pod)
+
+		m.SetPodResizePendingCondition(pod.UID, v1.PodReasonDeferred, "insufficient cpu", pod.Generation)
+		m.SetPodStatus(logger, pod, v1.PodStatus{Phase: v1.PodRunning, Conditions: []v1.PodCondition{otherSEC}})
+		m.syncBatch(ctx, true)
+		assert.True(t, hasSEC(t, ctx, client, pod), "expected SchedulerEvaluationCompleted with non-DeferredPodResize reason to be preserved")
+	})
 }
