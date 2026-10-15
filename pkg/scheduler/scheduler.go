@@ -419,13 +419,18 @@ func New(ctx context.Context,
 		compositePodGroupLister = informerFactory.Scheduling().V1beta1().CompositePodGroups().Lister()
 	}
 
-	// DeferredPodScheduling keeps a deferred resize pod on its node and honors the node's resize
-	// preemption policy. A profile without it can't evaluate a deferred resize, so don't queue one for it.
+	// DeferredPodScheduling keeps a deferred resize pod on its node, honors the node's resize preemption
+	// policy, and binds it by marking the evaluation complete. A profile without it at Filter and Bind
+	// can't evaluate a deferred resize, so don't queue one for it.
 	profilesWithoutDeferredPodScheduling := sets.New[string]()
 	if feature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingSchedulerPreemption) {
+		hasDeferredPodScheduling := func(ps schedulerapi.PluginSet) bool {
+			return slices.ContainsFunc(ps.Enabled, func(p schedulerapi.Plugin) bool { return p.Name == names.DeferredPodScheduling })
+		}
 		for profileName, profile := range profiles {
-			if !slices.Contains(profile.ListPlugins().Names(), names.DeferredPodScheduling) {
-				logger.Info("Profile doesn't enable DeferredPodScheduling, so deferred pod resizes won't be evaluated for it", "profile", profileName)
+			plugins := profile.ListPlugins()
+			if !hasDeferredPodScheduling(plugins.Filter) || !hasDeferredPodScheduling(plugins.Bind) {
+				logger.Info("Profile doesn't enable DeferredPodScheduling at Filter and Bind, so deferred pod resizes won't be evaluated for it", "profile", profileName)
 				profilesWithoutDeferredPodScheduling.Insert(profileName)
 			}
 		}

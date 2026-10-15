@@ -314,9 +314,10 @@ func (sched *Scheduler) bindingCycle(
 	logger := klog.FromContext(ctx)
 
 	assumedPod := assumedPodInfo.Pod
+	isDeferredResize := sched.inPlacePodVerticalScalingSchedulerPreemptionEnabled && len(assumedPod.Spec.NodeName) > 0 && compresource.IsPodResizeDeferred(assumedPod)
 
 	var preFlightStatus *fwk.Status
-	if sched.nominatedNodeNameForExpectationEnabled {
+	if !isDeferredResize && sched.nominatedNodeNameForExpectationEnabled {
 		preFlightStatus = schedFramework.RunPreBindPreFlights(ctx, state, assumedPod, scheduleResult.SuggestedHost)
 		if preFlightStatus.Code() == fwk.Error ||
 			// Unschedulable status is not supported in PreBindPreFlight and hence we regard it as an error.
@@ -359,7 +360,11 @@ func (sched *Scheduler) bindingCycle(
 	//
 	// We can call Done() here because
 	// we can free the cluster events stored in the scheduling queue sooner, which is worth for busy clusters memory consumption wise.
-	sched.SchedulingQueue.Done(assumedPod.UID)
+	// Deferred resize pods are not marked assumed in sched.Cache, so keep them in inFlightPods until Bind completes
+	// to prevent concurrent updatePod events from pushing a duplicate entry to activeQ while Bind runs.
+	if !isDeferredResize {
+		sched.SchedulingQueue.Done(assumedPod.UID)
+	}
 
 	// If we are going to run prebind plugins we put the pod in binding map to optimize preemption.
 	if preFlightStatus.IsSuccess() {
@@ -384,6 +389,9 @@ func (sched *Scheduler) bindingCycle(
 	// Run "bind" plugins.
 	if status := sched.bind(ctx, schedFramework, assumedPod, scheduleResult.SuggestedHost, state); !status.IsSuccess() {
 		return status
+	}
+	if isDeferredResize {
+		sched.SchedulingQueue.Done(assumedPod.UID)
 	}
 
 	// Calculating nodeResourceString can be heavy. Avoid it if klog verbosity is below 2.
@@ -425,7 +433,7 @@ func (sched *Scheduler) handleBindingCycleError(
 	// trigger un-reserve plugins to clean up state associated with the reserved Pod
 	if forgetErr := sched.algorithm.UnreserveAndForgetFromCache(ctx, state, fwk, podInfo, scheduleResult.SuggestedHost); forgetErr != nil {
 		utilruntime.HandleErrorWithContext(ctx, forgetErr, "ForgetPod failed")
-	} else {
+	} else if !sched.inPlacePodVerticalScalingSchedulerPreemptionEnabled || !compresource.IsPodResizeDeferred(assumedPod) {
 		// "Forget"ing an assumed Pod in binding cycle should be treated as a PodDelete event,
 		// as the assumed Pod had occupied a certain amount of resources in scheduler cache.
 		//
@@ -437,6 +445,21 @@ func (sched *Scheduler) handleBindingCycleError(
 		} else {
 			sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, framework.EventAssignedPodDelete, assumedPod, nil, nil)
 		}
+	}
+
+	if errors.Is(status.AsError(), framework.ErrStalePodGeneration) {
+		sched.SchedulingQueue.Done(assumedPod.UID)
+		cachedPod, err := fwk.SharedInformerFactory().Core().V1().Pods().Lister().Pods(assumedPod.Namespace).Get(assumedPod.Name)
+		if err != nil {
+			logger.V(4).Info("Pod doesn't exist in informer cache after generation change during binding", "pod", klog.KObj(assumedPod), "err", err)
+			return
+		}
+		if cachedPod.UID == assumedPod.UID &&
+			compresource.IsPodResizeDeferred(cachedPod) &&
+			!util.IsPodResizeSchedulerEvaluationCompleted(cachedPod) {
+			sched.SchedulingQueue.Update(ctx, assumedPod, cachedPod.DeepCopy())
+		}
+		return
 	}
 
 	sched.FailureHandler(ctx, fwk, podInfo, status, clearNominatedNode, start)
@@ -737,6 +760,9 @@ func (sched *Scheduler) finishBinding(logger klog.Logger, fwk framework.Framewor
 		logger.V(1).Info("Failed to bind pod", "pod", klog.KObj(assumed))
 		return
 	}
+	if sched.inPlacePodVerticalScalingSchedulerPreemptionEnabled && compresource.IsPodResizeDeferred(assumed) {
+		return
+	}
 
 	fwk.EventRecorder().WithLogger(logger).Eventf(assumed, nil, v1.EventTypeNormal, "Scheduled", "Binding", "Successfully assigned %v/%v to %v", assumed.Namespace, assumed.Name, targetNode)
 }
@@ -815,8 +841,10 @@ func (sched *Scheduler) handleSchedulingFailure(ctx context.Context, podFwk fram
 	} else {
 		// In the case of extender, the pod may have been bound successfully, but timed out returning its response to the scheduler.
 		// It could result in the live version to carry .spec.nodeName, and that's inconsistent with the internal-queued version.
-		// For deferred resize pods, being assigned to a node in the cache is expected and not an inconsistent extender binding timeout.
-		if len(cachedPod.Spec.NodeName) != 0 && !isDeferredResize {
+		// For deferred resize pods, being assigned to a node in the cache is expected only while the pod still has a deferred resize
+		// awaiting scheduler evaluation.
+		isCachedPodDeferredResize := sched.inPlacePodVerticalScalingSchedulerPreemptionEnabled && compresource.IsPodResizeDeferred(cachedPod) && !util.IsPodResizeSchedulerEvaluationCompleted(cachedPod)
+		if len(cachedPod.Spec.NodeName) != 0 && !isCachedPodDeferredResize {
 			logger.Info("Pod has been assigned to node. Abort adding it back to queue.", "pod", klog.KObj(pod), "node", cachedPod.Spec.NodeName)
 			// We need to call DonePod here because we don't call AddUnschedulablePodIfNotPresent in this case.
 		} else {

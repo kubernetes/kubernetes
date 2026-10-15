@@ -70,10 +70,10 @@ var (
 // isTargetPod indicates whether the pod is the direct subject of this update event.
 func PodSchedulingPropertiesChange(newPod *v1.Pod, oldPod *v1.Pod, isTargetPod bool) (events []fwk.ClusterEvent) {
 	var r fwk.EventResource
-	if newPod.Spec.NodeName != "" {
-		r = fwk.AssignedPod
-	} else if isTargetPod {
+	if isTargetPod {
 		r = fwk.TargetPod
+	} else if newPod.Spec.NodeName != "" {
+		r = fwk.AssignedPod
 	} else {
 		r = fwk.UnscheduledPod
 	}
@@ -81,7 +81,6 @@ func PodSchedulingPropertiesChange(newPod *v1.Pod, oldPod *v1.Pod, isTargetPod b
 	podChangeExtractors := []podChangeExtractor{
 		extractPodLabelsChange,
 		extractPodScaleDown,
-		extractPodScaleUp,
 		extractPodSchedulingGateEliminatedChange,
 		extractPodTolerationChange,
 		extractPodGeneratedResourceClaimChange,
@@ -123,31 +122,6 @@ func extractPodScaleDown(newPod, oldPod *v1.Pod) fwk.ActionType {
 		if oldReq.Cmp(newReq) > 0 {
 			// The resource request of rName is scaled down.
 			return fwk.UpdatePodScaleDown
-		}
-	}
-
-	return fwk.None
-}
-
-// extractPodScaleUp interprets the update of a pod and returns PodRequestScaledUp event if any pod's resource request(s) is scaled up.
-func extractPodScaleUp(newPod, oldPod *v1.Pod) fwk.ActionType {
-	opt := resource.PodResourcesOptions{
-		UseStatusResources: true,
-		InPlacePodLevelResourcesVerticalScalingEnabled: utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling),
-	}
-	newPodRequests := resource.PodRequests(newPod, opt)
-	oldPodRequests := resource.PodRequests(oldPod, opt)
-
-	for rName, newReq := range newPodRequests {
-		oldReq, ok := oldPodRequests[rName]
-		if !ok {
-			// The resource request of rName is added.
-			return fwk.UpdatePodScaleUp
-		}
-
-		if newReq.Cmp(oldReq) > 0 {
-			// The resource request of rName is scaled up.
-			return fwk.UpdatePodScaleUp
 		}
 	}
 
