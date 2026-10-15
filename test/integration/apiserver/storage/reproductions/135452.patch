@@ -2,7 +2,7 @@ diff --git a/staging/src/k8s.io/apiserver/pkg/storage/cacher/cacher.go b/staging
 index 9df8cdd9e34..4019a2bc110 100644
 --- a/staging/src/k8s.io/apiserver/pkg/storage/cacher/cacher.go
 +++ b/staging/src/k8s.io/apiserver/pkg/storage/cacher/cacher.go
-@@ -1336,27 +1336,9 @@ func (c *Cacher) getWatchCacheResourceVersion(ctx context.Context, parsedWatchRe
+@@ -1365,26 +1365,9 @@ func (c *Cacher) getWatchCacheResourceVersion(ctx context.Context, parsedWatchRe
  // otherwise, we allow for establishing the connection because the clients
  // can wait for events without unnecessary blocking.
  func (c *Cacher) waitUntilWatchCacheFreshAndForceAllEvents(ctx context.Context, requestedWatchRV uint64, opts storage.ListOptions) error {
@@ -15,11 +15,10 @@ index 9df8cdd9e34..4019a2bc110 100644
 -		// In this very rare scenario, the worst case will be that this
 -		// request will wait for 3 seconds before it fails.
 -		span := tracing.SpanFromContext(ctx)
--		consistentReadSupported := delegator.ConsistentReadSupported()
 -		c.watchCache.RLock()
 -		span.AddEvent("watchCache locked acquired")
 -		defer c.watchCache.RUnlock()
--		err := c.watchCache.waitUntilFreshLocked(ctx, consistentReadSupported, requestedWatchRV)
+-		err := c.watchCache.waitUntilFreshLocked(ctx, requestedWatchRV)
 -		if err != nil {
 -			return err
 -		}

@@ -1,3 +1,17 @@
+diff --git a/staging/src/k8s.io/apiserver/pkg/storage/cacher/cacher.go b/staging/src/k8s.io/apiserver/pkg/storage/cacher/cacher.go
+index 9df8cdd9e34..b1a40dc8921 100644
+--- a/staging/src/k8s.io/apiserver/pkg/storage/cacher/cacher.go
++++ b/staging/src/k8s.io/apiserver/pkg/storage/cacher/cacher.go
+@@ -711,9 +711,6 @@ func (c *Cacher) Get(ctx context.Context, key string, opts storage.GetOptions, o
+ 	if err != nil {
+ 		return err
+ 	}
+-	if opts.ResourceVersion == "" {
+-		return storage.NewInternalError(fmt.Errorf("cacher doesn't support consistent Get"))
+-	}
+ 	minResourceVersion, err := c.versioner.ParseResourceVersion(opts.ResourceVersion)
+ 	if err != nil {
+ 		return err
 diff --git a/staging/src/k8s.io/apiserver/pkg/storage/cacher/delegator.go b/staging/src/k8s.io/apiserver/pkg/storage/cacher/delegator.go
 index 3e12f481a9c..12d78a04c11 100644
 --- a/staging/src/k8s.io/apiserver/pkg/storage/cacher/delegator.go

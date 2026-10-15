@@ -166,10 +166,76 @@ func (s *watchBreakingStore) expireWatchAfterSync(w watch.Interface, pw *watch.P
 	}
 }
 
+type watchBlockTracker struct {
+	stalling atomic.Bool
+	once     sync.Once
+	ch       chan struct{}
+}
+
+func (t *watchBlockTracker) start() {
+	t.ch = make(chan struct{})
+	t.stalling.Store(true)
+}
+
+// observe reports whether the stall is active and, when ctx is a per-watch context from
+// runWatch (~2s deadline), closes t.ch if ctx remains open past a normal 500ms watch cycle
+// because cacher.Watch is blocked in waitUntilFreshLocked (3s blockTimeout).
+func (t *watchBlockTracker) observe(ctx context.Context) bool {
+	if !t.stalling.Load() {
+		return false
+	}
+	if deadline, ok := ctx.Deadline(); ok && time.Until(deadline) < 5*time.Second {
+		go func() {
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(1000 * time.Millisecond):
+				t.once.Do(func() {
+					close(t.ch)
+				})
+			}
+		}()
+	}
+	return true
+}
+
+func (t *watchBlockTracker) wait(stopCh <-chan struct{}, minDuration time.Duration) {
+	defer t.stalling.Store(false)
+	minTimer := time.NewTimer(minDuration)
+	defer minTimer.Stop()
+
+	select {
+	case <-stopCh:
+		return
+	case <-time.After(10 * time.Second):
+		return
+	case <-t.ch:
+		t.stalling.Store(false)
+	}
+
+	// t.ch closed after the WatchList request had already been blocked for 1s;
+	// wait 2.2s more (3.2s total > 3s blockTimeout) and ensure minDuration elapsed.
+	select {
+	case <-stopCh:
+		return
+	case <-time.After(2200 * time.Millisecond):
+	}
+	select {
+	case <-stopCh:
+	case <-minTimer.C:
+	}
+}
+
 type watchDelayingStore struct {
 	storage.Interface
 	delay   time.Duration
 	stalled atomic.Bool
+	tracker watchBlockTracker
+}
+
+func (s *watchDelayingStore) GetCurrentResourceVersion(ctx context.Context) (uint64, error) {
+	s.tracker.observe(ctx)
+	return s.Interface.GetCurrentResourceVersion(ctx)
 }
 
 func (s *watchDelayingStore) Watch(ctx context.Context, key string, opts storage.ListOptions) (watch.Interface, error) {
@@ -216,17 +282,14 @@ func (s *watchDelayingStore) delayWatchEvents(w watch.Interface, pw *watch.Proxy
 					synced = true
 				}
 			}
-		} else {
+		} else if ev.Type != watch.Bookmark {
 			postSyncEvents++
-			// After initial sync and enough traffic to populate RVCached/RVPast, stall watch
-			// delivery once for s.delay (> 3s blockTimeout + 500ms watch cycle) so concurrent
-			// consistent reads, cached reads, and WatchList requests time out in waitUntilFreshLocked.
+			// After initial sync and enough write traffic to populate RVCached/RVPast, stall
+			// watch delivery once so concurrent consistent reads, cached reads, and WatchList
+			// requests time out in waitUntilFreshLocked (> 3s blockTimeout).
 			if postSyncEvents == 100 && s.delay > 0 && s.stalled.CompareAndSwap(false, true) {
-				select {
-				case <-pw.StopChan():
-					return
-				case <-time.After(s.delay):
-				}
+				s.tracker.start()
+				s.tracker.wait(pw.StopChan(), s.delay)
 			}
 		}
 		select {
@@ -242,7 +305,7 @@ type bookmarkDroppingStore struct {
 	stallDuration time.Duration
 	writesSeen    atomic.Int64
 	stalled       atomic.Bool
-	stalling      atomic.Bool
+	tracker       watchBlockTracker
 	progressCalls atomic.Int64
 	writeMu       sync.RWMutex
 }
@@ -285,23 +348,9 @@ func (s *bookmarkDroppingStore) GetCurrentResourceVersion(ctx context.Context) (
 			defer s.writeMu.Unlock()
 			// Let watchCache drain any watch events from writes completed right before writeMu.Lock().
 			time.Sleep(20 * time.Millisecond)
-			s.stalling.Store(true)
+			s.tracker.start()
 			close(ready)
-			// Report rv+1 for 1.5s (3 watch cycles) so both unary workers and cycling
-			// watch workers enter waitUntilFreshLocked, then stop reporting rv+1 well
-			// before the 3s blockTimeout fires so waking workers do not block again.
-			const rvAdvanceWindow = 1500 * time.Millisecond
-			select {
-			case <-ctx.Done():
-				s.stalling.Store(false)
-				return
-			case <-time.After(rvAdvanceWindow):
-				s.stalling.Store(false)
-			}
-			select {
-			case <-ctx.Done():
-			case <-time.After(s.stallDuration - rvAdvanceWindow):
-			}
+			s.tracker.wait(nil, s.stallDuration)
 		}()
 		<-ready
 	}
@@ -313,7 +362,7 @@ func (s *bookmarkDroppingStore) GetCurrentResourceVersion(ctx context.Context) (
 	// revision advancing on another resource prefix without mutating "/pods".
 	// Because progress bookmarks are dropped, watchCache cannot advance to rv+1
 	// via RequestWatchProgress and consistent reads time out after blockTimeout (3s).
-	if s.stalling.Load() {
+	if s.tracker.observe(ctx) {
 		return rv + 1, nil
 	}
 	return rv, nil

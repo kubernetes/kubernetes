@@ -2,14 +2,14 @@ diff --git a/staging/src/k8s.io/apiserver/pkg/storage/cacher/delegator.go b/stag
 index 3e12f481a9c..8394f1c20b1 100644
 --- a/staging/src/k8s.io/apiserver/pkg/storage/cacher/delegator.go
 +++ b/staging/src/k8s.io/apiserver/pkg/storage/cacher/delegator.go
-@@ -198,7 +198,9 @@ func (c *CacheDelegator) GuaranteedUpdate(ctx context.Context, key string, desti
+@@ -196,7 +196,9 @@ func (c *CacheDelegator) GuaranteedUpdate(ctx context.Context, key string, desti
  	} else if exists {
  		// DeepCopy the object since we modify resource version when serializing the
  		// current object.
--		currObj := elem.(*store.Element).Object.DeepCopyObject()
+-		return c.storage.GuaranteedUpdate(ctx, key, destination, ignoreNotFound, preconditions, tryUpdate, obj.DeepCopyObject())
 +		// BUG INJECTION (GuaranteedUpdate analog of #89828-deepcopy): omit DeepCopy so
 +		// PrepareObjectForStorage and tryUpdate mutate the live cached object in place.
-+		currObj := elem.(*store.Element).Object
- 		return c.storage.GuaranteedUpdate(ctx, key, destination, ignoreNotFound, preconditions, tryUpdate, currObj)
++		return c.storage.GuaranteedUpdate(ctx, key, destination, ignoreNotFound, preconditions, tryUpdate, obj)
  	}
  	// If we couldn't get the object, fallback to no-suggestion.
+ 	return c.storage.GuaranteedUpdate(ctx, key, destination, ignoreNotFound, preconditions, tryUpdate, nil)

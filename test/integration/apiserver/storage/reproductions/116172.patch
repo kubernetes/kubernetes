@@ -2,7 +2,7 @@ diff --git a/staging/src/k8s.io/apiserver/pkg/storage/cacher/cacher.go b/staging
 index 9df8cdd9e34..7c69f4290be 100644
 --- a/staging/src/k8s.io/apiserver/pkg/storage/cacher/cacher.go
 +++ b/staging/src/k8s.io/apiserver/pkg/storage/cacher/cacher.go
-@@ -528,7 +528,7 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
+@@ -533,7 +533,7 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
  		return nil, err
  	}
  
@@ -11,7 +11,7 @@ index 9df8cdd9e34..7c69f4290be 100644
  	if err != nil {
  		return nil, errors.NewTooManyRequests(err.Error(), calculateRetryAfterForUnreadyCache(downtime))
  	}
-@@ -642,24 +642,19 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
+@@ -618,40 +618,27 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
  
  	c.setInitialEventsEndBookmarkIfRequested(cacheInterval, opts, c.watchCache.resourceVersion)
  
@@ -31,15 +31,16 @@ index 9df8cdd9e34..7c69f4290be 100644
 +		// registered while the cache was reinitializing silently missed events.
  
  		// Update watcher.forget function once we can compute it.
- 		watcher.forget = forgetWatcher(c, watcher, c.watcherIdx, scope, triggerValue, triggerSupported)
+ 		watcher.forget = forgetWatcher(c, watcher, c.watcherIdx, selector)
  		// Update the bookMarkAfterResourceVersion
  		watcher.setBookmarkAfterResourceVersion(bookmarkAfterResourceVersionFn())
- 		c.watchers.addWatcher(watcher, c.watcherIdx, scope, triggerValue, triggerSupported)
+ 		c.watchers.addWatcher(watcher, c.watcherIdx, selector)
 -		addedWatcher = true
  
  		// Add it to the queue only when the client support watch bookmarks.
  		if watcher.allowWatchBookmarks {
-@@ -668,14 +663,6 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
+ 			c.bookmarkWatchers.addWatcherThreadUnsafe(watcher)
+ 		}
  		c.watcherIdx++
  	}()
  

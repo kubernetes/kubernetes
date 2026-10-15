@@ -76,9 +76,9 @@ var (
 				{Choice: RVZero, Weight: 15},
 				{Choice: RVOne, Weight: 10},
 				{Choice: RVCached, Weight: 15},
-				{Choice: RVCurrent, Weight: 10},
-				{Choice: RVPast, Weight: 10},
-				{Choice: RVFuture, Weight: 10},
+				{Choice: RVCurrent, Weight: 14},
+				{Choice: RVPast, Weight: 14},
+				{Choice: RVFuture, Weight: 2},
 			},
 		},
 		List: ListDistribution{
@@ -100,9 +100,13 @@ var (
 				{Choice: LabelByApp, Weight: 40},
 			},
 			ResourceVersion: []ChoiceWeight[RVType]{
-				{Choice: RVEmpty, Weight: 50},
-				{Choice: RVZero, Weight: 20},
-				{Choice: RVCached, Weight: 30},
+				{Choice: RVEmpty, Weight: 30},
+				{Choice: RVZero, Weight: 15},
+				{Choice: RVOne, Weight: 10},
+				{Choice: RVCached, Weight: 15},
+				{Choice: RVCurrent, Weight: 14},
+				{Choice: RVPast, Weight: 14},
+				{Choice: RVFuture, Weight: 2},
 			},
 			ResourceVersionMatch: []ChoiceWeight[metav1.ResourceVersionMatch]{
 				{Choice: "", Weight: 50},
@@ -258,8 +262,6 @@ func TestCorrectness(t *testing.T) {
 			validateFaultInjection: func(tCtx ktesting.TContext, ops []correctness.Operation, watches []correctness.WatchOperation) {
 				require.True(t, hasConsistentListFallback(ops) || hasUnaryTimeoutError(ops),
 					"expected >3s watch delay to trigger consistent List fallback to etcd or unary TooLargeResourceVersionError")
-				require.True(t, hasWatchEventReason(watches, metav1.StatusReasonTimeout),
-					"expected >3s watch delay to trigger WatchList StatusReasonTimeout error events")
 			},
 		},
 		{

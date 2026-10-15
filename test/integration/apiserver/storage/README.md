@@ -10,7 +10,7 @@ Inspired by [etcd robustness testing](https://github.com/etcd-io/etcd/tree/main/
 Historical correctness bugs in `cacher` and `etcd3`, and whether this test suite can
 reproduce them. A bug counts as reproducible once its fix has been reverted and
 `TestCorrectness` has been observed to fail. All `Yes` entries were last confirmed at
-[ef06af9b9d0].
+[3ec9b6b8a7a7b62e464a5e40804db8fb40583f20].
 
 | Correctness / Consistency issue | Report | Component | Discovered by | Reproducible | Reproduction command |
 | ------------------------------- | ------ | --------- | ------------- | ------------ | -------------------- |
@@ -31,7 +31,7 @@ reproduce them. A bug counts as reproducible once its fix has been reverted and
 | Inconsistent lists served from etcd when paging with a selector [#94002] | Aug 2020 | etcd3 | Maintainer | Yes | `./test/integration/apiserver/storage/reproduce.sh 94002` |
 | API watch on pods misses container events [#94608] | Sep 2020 | unknown | User | No, container events are not covered | |
 | Delete response carries the pre-delete ResourceVersion [#113380] | Oct 2022 | cacher, etcd3 | Maintainer | Yes | `./test/integration/apiserver/storage/reproduce.sh 58545-unary` |
-| Missed events when watch starts during watch cache reinit [#116172] | Mar 2023 | cacher | Maintainer | No, the cache never re-initializes during a run | `./test/integration/apiserver/storage/reproduce.sh 116172` |
+| Missed events when watch starts during watch cache reinit [#116172] | Mar 2023 | cacher | Maintainer | No, reinit rarely lands mid-`Watch` setup | `./test/integration/apiserver/storage/reproduce.sh 116172` |
 | WatchList sends no `initial-events-end` bookmark when RV unset [#122805] | Jan 2024 | cacher | User | Yes | `./test/integration/apiserver/storage/reproduce.sh 122805` |
 | Non-recursive consistent list from the watch cache errors with "resource version too high" [#123674] | Mar 2024 | cacher | Maintainer | No, all writes target the watched resource | `./test/integration/apiserver/storage/reproduce.sh 123674` |
 | Consistent list from the watch cache ignores `resourceVersion=0` [#123676] | Mar 2024 | cacher | Maintainer | No, consistent read satisfies `NotOlderThan 0` | `./test/integration/apiserver/storage/reproduce.sh 123676` |
@@ -45,7 +45,7 @@ reproduce them. A bug counts as reproducible once its fix has been reverted and
 | Get with no ResourceVersion served from a stale watch cache | n/a | cacher | Synthetic | Yes | `./test/integration/apiserver/storage/reproduce.sh stale-get` |
 | List with no ResourceVersion served from a stale watch cache | n/a | cacher | Synthetic | Yes | `./test/integration/apiserver/storage/reproduce.sh stale-list` |
 
-[ef06af9b9d0]: https://github.com/kubernetes/kubernetes/tree/ef06af9b9d0
+[3ec9b6b8a7a7b62e464a5e40804db8fb40583f20]: https://github.com/kubernetes/kubernetes/tree/3ec9b6b8a7a7b62e464a5e40804db8fb40583f20
 [#35415]: https://github.com/kubernetes/kubernetes/pull/35415
 [#43152]: https://github.com/kubernetes/kubernetes/pull/43152
 [#48394]: https://github.com/kubernetes/kubernetes/pull/48394
