@@ -433,7 +433,7 @@ func (sched *Scheduler) handleBindingCycleError(
 	// trigger un-reserve plugins to clean up state associated with the reserved Pod
 	if forgetErr := sched.algorithm.UnreserveAndForgetFromCache(ctx, state, fwk, podInfo, scheduleResult.SuggestedHost); forgetErr != nil {
 		utilruntime.HandleErrorWithContext(ctx, forgetErr, "ForgetPod failed")
-	} else {
+	} else if !sched.inPlacePodVerticalScalingSchedulerPreemptionEnabled || !compresource.IsPodResizeDeferred(assumedPod) {
 		// "Forget"ing an assumed Pod in binding cycle should be treated as a PodDelete event,
 		// as the assumed Pod had occupied a certain amount of resources in scheduler cache.
 		//
@@ -715,6 +715,9 @@ func (sched *Scheduler) finishBinding(logger klog.Logger, fwk framework.Framewor
 		logger.V(1).Info("Failed to bind pod", "pod", klog.KObj(assumed))
 		return
 	}
+	if sched.inPlacePodVerticalScalingSchedulerPreemptionEnabled && compresource.IsPodResizeDeferred(assumed) {
+		return
+	}
 
 	fwk.EventRecorder().WithLogger(logger).Eventf(assumed, nil, v1.EventTypeNormal, "Scheduled", "Binding", "Successfully assigned %v/%v to %v", assumed.Namespace, assumed.Name, targetNode)
 }
@@ -793,8 +796,10 @@ func (sched *Scheduler) handleSchedulingFailure(ctx context.Context, podFwk fram
 	} else {
 		// In the case of extender, the pod may have been bound successfully, but timed out returning its response to the scheduler.
 		// It could result in the live version to carry .spec.nodeName, and that's inconsistent with the internal-queued version.
-		// For deferred resize pods, being assigned to a node in the cache is expected and not an inconsistent extender binding timeout.
-		if len(cachedPod.Spec.NodeName) != 0 && !isDeferredResize {
+		// For deferred resize pods, being assigned to a node in the cache is expected only while the pod still has a deferred resize
+		// awaiting scheduler evaluation.
+		isCachedPodDeferredResize := sched.inPlacePodVerticalScalingSchedulerPreemptionEnabled && compresource.IsPodResizeDeferred(cachedPod) && !compresource.IsPodResizeSchedulerEvaluationCompleted(cachedPod)
+		if len(cachedPod.Spec.NodeName) != 0 && !isCachedPodDeferredResize {
 			logger.Info("Pod has been assigned to node. Abort adding it back to queue.", "pod", klog.KObj(pod), "node", cachedPod.Spec.NodeName)
 			// We need to call DonePod here because we don't call AddUnschedulablePodIfNotPresent in this case.
 		} else {

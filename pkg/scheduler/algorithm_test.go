@@ -215,6 +215,50 @@ func TestAssumeAndReserveInCache(t *testing.T) {
 	}
 }
 
+// TestAssumeAndReserveInCacheDeferredResize covers a deferred resize, where the pod is already
+// bound and counted in the cache, so there's nothing to assume, reserve, or roll back.
+func TestAssumeAndReserveInCacheDeferredResize(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.InPlacePodVerticalScalingSchedulerPreemption, true)
+	_, ctx := ktesting.NewTestContext(t)
+
+	node1 := st.MakeNode().Name("node1").Obj()
+	pod1 := st.MakePod().Name("pod1").Namespace("default").UID("pod1").Node(node1.Name).
+		Condition(v1.PodResizePending, v1.ConditionTrue, v1.PodReasonDeferred).Obj()
+	plugin := &assumeReserveTestPlugin{
+		fakePodGroupPlugin: &fakePodGroupPlugin{},
+		// Fails the assume if Reserve runs at all.
+		reserveStatus: fwk.NewStatus(fwk.Error, "Reserve ran for a deferred resize"),
+	}
+	f := newAssumeReserveFixture(t, ctx, node1, plugin, pod1)
+	if err := f.algorithm.cache.AddPod(klog.FromContext(ctx), pod1); err != nil {
+		t.Fatalf("Failed to add the bound pod to the cache: %v", err)
+	}
+
+	podInfo, err := framework.NewPodInfo(pod1)
+	if err != nil {
+		t.Fatalf("Failed to create PodInfo: %v", err)
+	}
+	queuedPodInfo := &framework.QueuedPodInfo{PodInfo: podInfo}
+	state := framework.NewCycleState()
+
+	assumedPodInfo, status := f.algorithm.AssumeAndReserveInCache(ctx, state, f.fwk, queuedPodInfo, ScheduleResult{SuggestedHost: node1.Name})
+	if !status.IsSuccess() {
+		t.Fatalf("AssumeAndReserveInCache status = %v, want success", status)
+	}
+	if assumedPodInfo.Pod == pod1 {
+		t.Error("expected assumedPodInfo.Pod to be a deep copy of the input pod, got the same pointer")
+	}
+	if err := f.algorithm.UnreserveAndForgetFromCache(ctx, state, f.fwk, assumedPodInfo, node1.Name); err != nil {
+		t.Errorf("UnreserveAndForgetFromCache error: %v", err)
+	}
+	if plugin.unreserved {
+		t.Error("expected Unreserve not to be called")
+	}
+	if _, err := f.algorithm.cache.GetPod(pod1); err != nil {
+		t.Errorf("expected the bound pod to stay in the cache: %v", err)
+	}
+}
+
 // TestAssumeAndReserveInSnapshot covers the pod group scheduling cycle, where the
 // placement is only tentative: it goes into the snapshot rather than the cache, and
 // the returned revert function has to undo every part of it.
