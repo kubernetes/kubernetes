@@ -199,6 +199,15 @@ func TestIsMemberOf(t *testing.T) {
 	if isMemberOf(set2, pod) {
 		t.Error("isMemberOf returned false positive")
 	}
+	for _, suffix := range []string{"-00", "-01", "-001"} {
+		t.Run(suffix, func(t *testing.T) {
+			pod := newStatefulSetPod(set, 1)
+			pod.Name = set.Name + suffix
+			if isMemberOf(set, pod) {
+				t.Errorf("isMemberOf returned true for non-canonical Pod name %q", pod.Name)
+			}
+		})
+	}
 }
 
 func TestIdentityMatches(t *testing.T) {
