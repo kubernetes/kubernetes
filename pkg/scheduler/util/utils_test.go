@@ -1458,3 +1458,43 @@ func TestGetHostPorts(t *testing.T) {
 		})
 	}
 }
+
+func TestIsPodResizeSchedulerEvaluationCompleted(t *testing.T) {
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Generation: 2,
+		},
+	}
+	if IsPodResizeSchedulerEvaluationCompleted(pod) {
+		t.Errorf("expected IsPodResizeSchedulerEvaluationCompleted to be false when condition is absent")
+	}
+
+	pod.Status.Conditions = []v1.PodCondition{
+		{
+			Type:               v1.SchedulerEvaluationCompleted,
+			Status:             v1.ConditionTrue,
+			Reason:             v1.PodReasonDeferredPodResize,
+			ObservedGeneration: 2,
+		},
+	}
+	if !IsPodResizeSchedulerEvaluationCompleted(pod) {
+		t.Errorf("expected IsPodResizeSchedulerEvaluationCompleted to be true when ObservedGeneration matches pod.Generation")
+	}
+
+	pod.Status.Conditions[0].ObservedGeneration = 1
+	if IsPodResizeSchedulerEvaluationCompleted(pod) {
+		t.Errorf("expected IsPodResizeSchedulerEvaluationCompleted to be false when ObservedGeneration is stale")
+	}
+
+	pod.Status.Conditions[0].ObservedGeneration = 2
+	pod.Status.Conditions[0].Reason = "Other"
+	if IsPodResizeSchedulerEvaluationCompleted(pod) {
+		t.Errorf("expected IsPodResizeSchedulerEvaluationCompleted to be false when reason is not DeferredPodResize")
+	}
+
+	pod.Status.Conditions[0].Reason = v1.PodReasonDeferredPodResize
+	pod.Status.Conditions[0].Status = v1.ConditionFalse
+	if IsPodResizeSchedulerEvaluationCompleted(pod) {
+		t.Errorf("expected IsPodResizeSchedulerEvaluationCompleted to be false when status is False")
+	}
+}
