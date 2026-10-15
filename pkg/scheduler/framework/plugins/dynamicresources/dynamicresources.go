@@ -724,6 +724,9 @@ func (pl *DynamicResources) PreFilter(ctx context.Context, state fwk.CycleState,
 			if allocation != nil {
 				isMapped := false
 				for _, result := range allocation.Devices.Results {
+					if result.AdminAccess != nil && *result.AdminAccess {
+						continue
+					}
 					device, err := getDeviceFromManager(pl.draManager, &result)
 					if err == nil && device != nil && device.NodeAllocatableResources != nil {
 						for _, mapping := range device.NodeAllocatableResources {

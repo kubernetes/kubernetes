@@ -507,6 +507,19 @@ func TestValidateNodeAllocatableDRAClaimSharing(t *testing.T) {
 			},
 			wantStatus: fwk.NewStatus(fwk.Success),
 		},
+		{
+			name: "mapped claim with AdminAccess=true can be shared across pods",
+			pod:  st.MakePod().Name("test-pod").Namespace(claimNameSpace).UID("pod-uid").Obj(),
+			claim: func() *resourceapi.ResourceClaim {
+				c := claimMappedReserved.DeepCopy()
+				c.Status.Allocation.Devices.Results[0].AdminAccess = new(true)
+				return c
+			}(),
+			draManager: &mockDRAManager{
+				resourceSlices: []*resourceapi.ResourceSlice{sliceMapped},
+			},
+			wantStatus: fwk.NewStatus(fwk.Success),
+		},
 	}
 
 	for _, tt := range tests {
@@ -522,6 +535,9 @@ func TestValidateNodeAllocatableDRAClaimSharing(t *testing.T) {
 				if tt.claim.Status.Allocation != nil {
 					isMapped := false
 					for _, result := range tt.claim.Status.Allocation.Devices.Results {
+						if result.AdminAccess != nil && *result.AdminAccess {
+							continue
+						}
 						device, err := getDeviceFromManager(tt.draManager, &result)
 						if err == nil && device != nil && device.NodeAllocatableResources != nil {
 							for _, mapping := range device.NodeAllocatableResources {
@@ -1383,6 +1399,32 @@ func TestBuildNodeAllocatableDRAInfo(t *testing.T) {
 					},
 				},
 			}},
+		},
+		{
+			name: "AdminAccess result contributes no footprint and no status entry",
+			pod: st.MakePod().Name("test-pod").Namespace(claimNameSpace).UID("test-uid").
+				Containers([]v1.Container{{
+					Name: "c1",
+					Resources: v1.ResourceRequirements{
+						Claims: []v1.ResourceClaim{{Name: "admin-claim"}},
+					},
+				}}).
+				Obj(),
+			claims:         []*resourceapi.ResourceClaim{makeClaim("admin-claim", "admin-claim-uid")},
+			resourceSlices: []*resourceapi.ResourceSlice{makeSlice("slice1", combinedDevice)},
+			nodeAllocatableClaimAllocations: map[v1.ObjectReference]*resourceapi.AllocationResult{
+				{Name: "admin-claim", UID: "admin-claim-uid"}: {
+					Devices: resourceapi.DeviceAllocationResult{
+						Results: []resourceapi.DeviceRequestAllocationResult{{
+							Driver:      "dra.example.com",
+							Pool:        "pool1",
+							Device:      "combined-device",
+							AdminAccess: new(true),
+						}},
+					},
+				},
+			},
+			want: []v1.ExtraNodeAllocatableResource{},
 		},
 		{
 			// The init container reuses gpu0 before c1 starts, so each GPU's per-container overhead is needed once:

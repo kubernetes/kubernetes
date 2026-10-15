@@ -63,6 +63,9 @@ func (pl *DynamicResources) calculateAndCheckNodeAllocatableResources(ctx contex
 		}
 		if alloc != nil && len(alloc.Devices.Results) > 0 {
 			for _, result := range alloc.Devices.Results {
+				if result.AdminAccess != nil && *result.AdminAccess {
+					continue
+				}
 				device, err := getDeviceFromSlices(nodeSlices, &result, nodeInfo.Node())
 				if err != nil {
 					logger.Error(err, "Failed to get device from manager", "claim", klog.KObj(claim), "device", result.Device, "pool", result.Pool, "driver", result.Driver)
@@ -257,6 +260,9 @@ func (pl *DynamicResources) buildNodeAllocatableDRAInfo(pod *v1.Pod, nodeAllocat
 		extendedResourceClaimContainers := []string{}
 
 		for _, result := range alloc.Devices.Results {
+			if result.AdminAccess != nil && *result.AdminAccess {
+				continue
+			}
 			device, err := getDeviceFromSlices(resourceSlices, &result, node)
 			if err != nil {
 				return nil, fmt.Errorf("claim %s/%s, device %s, driver %s: %w", key.Namespace, key.Name, result.Device, result.Driver, err)
