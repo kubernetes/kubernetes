@@ -561,6 +561,11 @@ func rollbackEtcdData(cfg *kubeadmapi.InitConfiguration, pathMgr StaticPodPathMa
 	backupEtcdDir := pathMgr.BackupEtcdDir()
 	runningEtcdDir := cfg.Etcd.Local.DataDir
 
+	// Files etcd wrote after the backup must not survive the rollback.
+	if err := os.RemoveAll(filepath.Join(runningEtcdDir, "member")); err != nil {
+		return errors.Wrapf(err, "could not clear the etcd data dir %s, the location of etcd backup: %s", runningEtcdDir, backupEtcdDir)
+	}
+
 	output, err := filesutil.CopyDir(backupEtcdDir, runningEtcdDir)
 	if err != nil {
 		// Let the user know there we're problems, but we tried to reçover
