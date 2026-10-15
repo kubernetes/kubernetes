@@ -350,7 +350,7 @@ kube::golang::is_statically_linked() {
   if [[ -n "${KUBE_STATIC_OVERRIDES_LIST:+x}" ]]; then
     for e in "${KUBE_STATIC_OVERRIDES_LIST[@]}"; do [[ "${1}" == *"/${e}" ]] && return 0; done;
   fi
-  for e in "${KUBE_CGO_BINARIES[@]}"; do [[ "${1}" == *"/${e}" ]] && return 1; done;
+  for e in "${KUBE_CGO_BINARIES[@]:+${KUBE_CGO_BINARIES[@]}}"; do [[ "${1}" == *"/${e}" ]] && return 1; done;
   return 0;
 }
 
