@@ -66,6 +66,7 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/ktesting"
 	"k8s.io/kube-aggregator/pkg/apiserver"
+	openapicommon "k8s.io/kube-openapi/pkg/common"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	"k8s.io/kubernetes/test/e2e/invariants/metrics"
@@ -104,6 +105,9 @@ type TestServerInstanceOptions struct {
 	// any storage is constructed. Does not cover apiextensions (CRDs) or the
 	// aggregator, which build their storage from their own getters.
 	RESTOptionsGetterWrapFunc func(generic.RESTOptionsGetter) generic.RESTOptionsGetter
+	// Wrap the OpenAPI v2 GetDefinitions callback shared across the server chain
+	// (apiextensions-apiserver, kube-apiserver, and kube-aggregator).
+	OpenAPIGetDefinitionsWrapFunc func(openapicommon.GetOpenAPIDefinitions) openapicommon.GetOpenAPIDefinitions
 	// CA file used for requestheader authn during communication between:
 	// 1. kube-apiserver and peer when the local apiserver is not able to serve the request due
 	// to version skew
@@ -474,6 +478,10 @@ func StartTestServer(t ktesting.TB, instanceOptions *TestServerInstanceOptions, 
 	if instanceOptions.RESTOptionsGetterWrapFunc != nil {
 		config.KubeAPIs.ControlPlane.Generic.RESTOptionsGetter =
 			instanceOptions.RESTOptionsGetterWrapFunc(config.KubeAPIs.ControlPlane.Generic.RESTOptionsGetter)
+	}
+	if instanceOptions.OpenAPIGetDefinitionsWrapFunc != nil && config.KubeAPIs.ControlPlane.Generic.OpenAPIConfig != nil {
+		config.KubeAPIs.ControlPlane.Generic.OpenAPIConfig.GetDefinitions =
+			instanceOptions.OpenAPIGetDefinitionsWrapFunc(config.KubeAPIs.ControlPlane.Generic.OpenAPIConfig.GetDefinitions)
 	}
 	completed, err := config.Complete()
 	if err != nil {
