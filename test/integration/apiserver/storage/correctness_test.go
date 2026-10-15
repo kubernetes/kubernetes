@@ -87,6 +87,10 @@ var (
 				{Choice: ScopeNamespace, Weight: 25},
 				{Choice: ScopeObject, Weight: 25},
 			},
+			Recursive: []ChoiceWeight[bool]{
+				{Choice: true, Weight: 70},
+				{Choice: false, Weight: 30},
+			},
 			FieldSelector: []ChoiceWeight[FieldSelector]{
 				{Choice: FieldEverything, Weight: 25},
 				{Choice: FieldByName, Weight: 15},

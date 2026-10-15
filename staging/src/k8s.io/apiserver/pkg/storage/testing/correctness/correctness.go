@@ -1225,6 +1225,538 @@ func readTestCases() []testStep {
 			},
 		},
 		{
+			Name:    "List cluster root non-recursively",
+			Request: Request{Op: OpList, Key: "/pods/", List: listNonRecursive},
+			CorrectResponse: Response{
+				Object: newTestPodList("19"),
+			},
+			InvalidResponses: []Response{
+				{Object: newTestPodList("19", withLabel(pod4, "17", "version", "v2"))},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name:    "List existing pod recursively returns empty list",
+			Request: Request{Op: OpList, Key: pod4Key, List: listRecursive},
+			CorrectResponse: Response{
+				Object: newTestPodList("19"),
+			},
+			InvalidResponses: []Response{
+				{Object: newTestPodList("19", withLabel(pod4, "17", "version", "v2"))},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name: "List existing pod non-recursively with ResourceVersion=0",
+			Request: Request{
+				Op:  OpList,
+				Key: pod4Key,
+				List: ListRequest{Options: storage.ListOptions{
+					ResourceVersion: "0",
+					Recursive:       false,
+					Predicate:       storage.Everything,
+				}},
+			},
+			CorrectResponse: Response{
+				Object: newTestPodList("14", withRV(pod4, "14")),
+			},
+			InvalidResponses: []Response{
+				{Object: newTestPodList("0")},
+				{Object: newTestPodList("14")},
+				{Object: newTestPodList("20", withLabel(pod4, "17", "version", "v2"))},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name: "List non-existing pod non-recursively with ResourceVersion=0",
+			Request: Request{
+				Op:  OpList,
+				Key: pod3Key,
+				List: ListRequest{Options: storage.ListOptions{
+					ResourceVersion: "0",
+					Recursive:       false,
+					Predicate:       storage.Everything,
+				}},
+			},
+			CorrectResponse: Response{
+				Object: newTestPodList("14"),
+			},
+			InvalidResponses: []Response{
+				{Object: newTestPodList("14", withLabel(pod3, "12", "version", "v7"))},
+				{Object: newTestPodList("20")},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name: "List namespace non-recursively with ResourceVersion=0",
+			Request: Request{
+				Op:  OpList,
+				Key: "/pods/ns1",
+				List: ListRequest{Options: storage.ListOptions{
+					ResourceVersion: "0",
+					Recursive:       false,
+					Predicate:       storage.Everything,
+				}},
+			},
+			CorrectResponse: Response{
+				Object: newTestPodList("14"),
+			},
+			InvalidResponses: []Response{
+				{Object: newTestPodList("14", withRV(pod4, "14"))},
+				{Object: newTestPodList("20")},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name: "List cluster root non-recursively with ResourceVersion=0",
+			Request: Request{
+				Op:  OpList,
+				Key: "/pods/",
+				List: ListRequest{Options: storage.ListOptions{
+					ResourceVersion: "0",
+					Recursive:       false,
+					Predicate:       storage.Everything,
+				}},
+			},
+			CorrectResponse: Response{
+				Object: newTestPodList("14"),
+			},
+			InvalidResponses: []Response{
+				{Object: newTestPodList("14", withRV(pod4, "14"))},
+				{Object: newTestPodList("20")},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name: "List existing pod non-recursively with Exact ResourceVersion=15",
+			Request: Request{
+				Op:  OpList,
+				Key: pod5Key,
+				List: ListRequest{Options: storage.ListOptions{
+					ResourceVersion:      "15",
+					ResourceVersionMatch: metav1.ResourceVersionMatchExact,
+					Recursive:            false,
+					Predicate:            storage.Everything,
+				}},
+			},
+			CorrectResponse: Response{
+				Object: newTestPodList("15", withRV(pod5, "15")),
+			},
+			InvalidResponses: []Response{
+				{Object: newTestPodList("15")},
+				{Object: newTestPodList("15", withRV(pod4, "14"), withRV(pod5, "15"))},
+				{Object: newTestPodList("19", withRV(pod5, "15"))},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name: "List non-existing pod non-recursively with Exact ResourceVersion=13",
+			Request: Request{
+				Op:  OpList,
+				Key: pod3Key,
+				List: ListRequest{Options: storage.ListOptions{
+					ResourceVersion:      "13",
+					ResourceVersionMatch: metav1.ResourceVersionMatchExact,
+					Recursive:            false,
+					Predicate:            storage.Everything,
+				}},
+			},
+			CorrectResponse: Response{
+				Object: newTestPodList("13"),
+			},
+			InvalidResponses: []Response{
+				{Object: newTestPodList("13", withLabel(pod3, "12", "version", "v7"))},
+				{Object: newTestPodList("19")},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name: "List namespace non-recursively with Exact ResourceVersion=15",
+			Request: Request{
+				Op:  OpList,
+				Key: "/pods/ns1",
+				List: ListRequest{Options: storage.ListOptions{
+					ResourceVersion:      "15",
+					ResourceVersionMatch: metav1.ResourceVersionMatchExact,
+					Recursive:            false,
+					Predicate:            storage.Everything,
+				}},
+			},
+			CorrectResponse: Response{
+				Object: newTestPodList("15"),
+			},
+			InvalidResponses: []Response{
+				{Object: newTestPodList("15", withRV(pod4, "14"))},
+				{Object: newTestPodList("19")},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name: "List cluster root non-recursively with Exact ResourceVersion=15",
+			Request: Request{
+				Op:  OpList,
+				Key: "/pods/",
+				List: ListRequest{Options: storage.ListOptions{
+					ResourceVersion:      "15",
+					ResourceVersionMatch: metav1.ResourceVersionMatchExact,
+					Recursive:            false,
+					Predicate:            storage.Everything,
+				}},
+			},
+			CorrectResponse: Response{
+				Object: newTestPodList("15"),
+			},
+			InvalidResponses: []Response{
+				{Object: newTestPodList("15", withRV(pod4, "14"), withRV(pod5, "15"))},
+				{Object: newTestPodList("19")},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name: "List pod non-recursively with compacted Exact ResourceVersion=12 returns ResourceExpired",
+			Request: Request{
+				Op:  OpList,
+				Key: pod3Key,
+				List: ListRequest{Options: storage.ListOptions{
+					ResourceVersion:      "12",
+					ResourceVersionMatch: metav1.ResourceVersionMatchExact,
+					Recursive:            false,
+					Predicate:            storage.Everything,
+				}},
+			},
+			CorrectResponse: Response{
+				Object: nil,
+				Err:    apierrors.NewResourceExpired("The resourceVersion for the provided list is too old."),
+			},
+			InvalidResponses: []Response{
+				{Object: newTestPodList("12", withLabel(pod3, "12", "version", "v7"))},
+				{Object: newTestPodList("19")},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name: "List existing pod non-recursively with NotOlderThan ResourceVersion=15",
+			Request: Request{
+				Op:  OpList,
+				Key: pod4Key,
+				List: ListRequest{Options: storage.ListOptions{
+					ResourceVersion:      "15",
+					ResourceVersionMatch: metav1.ResourceVersionMatchNotOlderThan,
+					Recursive:            false,
+					Predicate:            storage.Everything,
+				}},
+			},
+			CorrectResponse: Response{
+				Object: newTestPodList("16", withLabel(pod4, "16", "version", "v1")),
+			},
+			InvalidResponses: []Response{
+				{Object: newTestPodList("14", withRV(pod4, "14"))},
+				{Object: newTestPodList("16", withLabel(pod4, "16", "version", "v1"), withRV(pod5, "15"))},
+				{Object: newTestPodList("20", withLabel(pod4, "17", "version", "v2"))},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name: "List existing pod non-recursively with NotOlderThan compacted ResourceVersion=12",
+			Request: Request{
+				Op:  OpList,
+				Key: pod4Key,
+				List: ListRequest{Options: storage.ListOptions{
+					ResourceVersion:      "12",
+					ResourceVersionMatch: metav1.ResourceVersionMatchNotOlderThan,
+					Recursive:            false,
+					Predicate:            storage.Everything,
+				}},
+			},
+			CorrectResponse: Response{
+				Object: newTestPodList("18", withLabel(pod4, "17", "version", "v2")),
+			},
+			InvalidResponses: []Response{
+				{Object: newTestPodList("12")},
+				{Object: newTestPodList("20", withLabel(pod4, "17", "version", "v2"))},
+				{Object: nil, Err: apierrors.NewResourceExpired("The resourceVersion for the provided list is too old.")},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name: "List namespace non-recursively with NotOlderThan ResourceVersion=15",
+			Request: Request{
+				Op:  OpList,
+				Key: "/pods/ns1",
+				List: ListRequest{Options: storage.ListOptions{
+					ResourceVersion:      "15",
+					ResourceVersionMatch: metav1.ResourceVersionMatchNotOlderThan,
+					Recursive:            false,
+					Predicate:            storage.Everything,
+				}},
+			},
+			CorrectResponse: Response{
+				Object: newTestPodList("16"),
+			},
+			InvalidResponses: []Response{
+				{Object: newTestPodList("14")},
+				{Object: newTestPodList("16", withLabel(pod4, "16", "version", "v1"))},
+				{Object: newTestPodList("20")},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name: "List cluster root non-recursively with NotOlderThan ResourceVersion=15",
+			Request: Request{
+				Op:  OpList,
+				Key: "/pods/",
+				List: ListRequest{Options: storage.ListOptions{
+					ResourceVersion:      "15",
+					ResourceVersionMatch: metav1.ResourceVersionMatchNotOlderThan,
+					Recursive:            false,
+					Predicate:            storage.Everything,
+				}},
+			},
+			CorrectResponse: Response{
+				Object: newTestPodList("16"),
+			},
+			InvalidResponses: []Response{
+				{Object: newTestPodList("14")},
+				{Object: newTestPodList("16", withLabel(pod4, "16", "version", "v1"), withRV(pod5, "15"))},
+				{Object: newTestPodList("20")},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name: "List pod non-recursively with future ResourceVersion=99 returns TooLargeResourceVersionError",
+			Request: Request{
+				Op:  OpList,
+				Key: pod4Key,
+				List: ListRequest{Options: storage.ListOptions{
+					ResourceVersion:      "99",
+					ResourceVersionMatch: metav1.ResourceVersionMatchNotOlderThan,
+					Recursive:            false,
+					Predicate:            storage.Everything,
+				}},
+			},
+			CorrectResponse: Response{
+				Object: nil,
+				Err:    storage.NewTooLargeResourceVersionError(99, 19, 0),
+			},
+			InvalidResponses: []Response{
+				{Object: newTestPodList("19", withLabel(pod4, "17", "version", "v2"))},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name: "List existing pod non-recursively with matching label selector",
+			Request: Request{
+				Op:  OpList,
+				Key: pod4Key,
+				List: ListRequest{Options: storage.ListOptions{
+					Recursive: false,
+					Predicate: storage.SelectionPredicate{
+						Label:    labels.SelectorFromSet(labels.Set{"version": "v2"}),
+						Field:    fields.Everything(),
+						GetAttrs: storage.DefaultNamespaceScopedAttr,
+					},
+				}},
+			},
+			CorrectResponse: Response{
+				Object: newTestPodList("19", withLabel(pod4, "17", "version", "v2")),
+			},
+			InvalidResponses: []Response{
+				{Object: newTestPodList("19")},
+				{Object: newTestPodList("18", withLabel(pod4, "17", "version", "v2"))},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name: "List existing pod non-recursively with non-matching label selector",
+			Request: Request{
+				Op:  OpList,
+				Key: pod4Key,
+				List: ListRequest{Options: storage.ListOptions{
+					Recursive: false,
+					Predicate: storage.SelectionPredicate{
+						Label:    labels.SelectorFromSet(labels.Set{"version": "v1"}),
+						Field:    fields.Everything(),
+						GetAttrs: storage.DefaultNamespaceScopedAttr,
+					},
+				}},
+			},
+			CorrectResponse: Response{
+				Object: newTestPodList("19"),
+			},
+			InvalidResponses: []Response{
+				{Object: newTestPodList("19", withLabel(pod4, "17", "version", "v2"))},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name: "List existing pod non-recursively with matching field selector",
+			Request: Request{
+				Op:  OpList,
+				Key: pod4Key,
+				List: ListRequest{Options: storage.ListOptions{
+					Recursive: false,
+					Predicate: storage.SelectionPredicate{
+						Label:    labels.Everything(),
+						Field:    fields.OneTermEqualSelector("metadata.name", "pod4"),
+						GetAttrs: storage.DefaultNamespaceScopedAttr,
+					},
+				}},
+			},
+			CorrectResponse: Response{
+				Object: newTestPodList("19", withLabel(pod4, "17", "version", "v2")),
+			},
+			InvalidResponses: []Response{
+				{Object: newTestPodList("19")},
+				{Object: newTestPodList("18", withLabel(pod4, "17", "version", "v2"))},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name: "List existing pod non-recursively with non-matching field selector",
+			Request: Request{
+				Op:  OpList,
+				Key: pod4Key,
+				List: ListRequest{Options: storage.ListOptions{
+					Recursive: false,
+					Predicate: storage.SelectionPredicate{
+						Label:    labels.Everything(),
+						Field:    fields.OneTermEqualSelector("metadata.name", "pod5"),
+						GetAttrs: storage.DefaultNamespaceScopedAttr,
+					},
+				}},
+			},
+			CorrectResponse: Response{
+				Object: newTestPodList("19"),
+			},
+			InvalidResponses: []Response{
+				{Object: newTestPodList("19", withLabel(pod4, "17", "version", "v2"))},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name: "List existing pod non-recursively with Exact ResourceVersion=16 and matching label selector",
+			Request: Request{
+				Op:  OpList,
+				Key: pod4Key,
+				List: ListRequest{Options: storage.ListOptions{
+					ResourceVersion:      "16",
+					ResourceVersionMatch: metav1.ResourceVersionMatchExact,
+					Recursive:            false,
+					Predicate: storage.SelectionPredicate{
+						Label:    labels.SelectorFromSet(labels.Set{"version": "v1"}),
+						Field:    fields.Everything(),
+						GetAttrs: storage.DefaultNamespaceScopedAttr,
+					},
+				}},
+			},
+			CorrectResponse: Response{
+				Object: newTestPodList("16", withLabel(pod4, "16", "version", "v1")),
+			},
+			InvalidResponses: []Response{
+				{Object: newTestPodList("16")},
+				{Object: newTestPodList("19")},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name: "List existing pod non-recursively with Exact ResourceVersion=16 and matching field selector",
+			Request: Request{
+				Op:  OpList,
+				Key: pod4Key,
+				List: ListRequest{Options: storage.ListOptions{
+					ResourceVersion:      "16",
+					ResourceVersionMatch: metav1.ResourceVersionMatchExact,
+					Recursive:            false,
+					Predicate: storage.SelectionPredicate{
+						Label:    labels.Everything(),
+						Field:    fields.OneTermEqualSelector("metadata.namespace", "ns1"),
+						GetAttrs: storage.DefaultNamespaceScopedAttr,
+					},
+				}},
+			},
+			CorrectResponse: Response{
+				Object: newTestPodList("16", withLabel(pod4, "16", "version", "v1")),
+			},
+			InvalidResponses: []Response{
+				{Object: newTestPodList("16")},
+				{Object: newTestPodList("19")},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name: "List existing pod non-recursively with Limit=1",
+			Request: Request{
+				Op:  OpList,
+				Key: pod4Key,
+				List: ListRequest{Options: storage.ListOptions{
+					Recursive: false,
+					Predicate: storage.SelectionPredicate{
+						Label: labels.Everything(),
+						Field: fields.Everything(),
+						Limit: 1,
+					},
+				}},
+			},
+			CorrectResponse: Response{
+				Object: newTestPodList("19", withLabel(pod4, "17", "version", "v2")),
+			},
+			InvalidResponses: []Response{
+				{Object: newTestPodListWithContinue("19", new(int64(0)), withLabel(pod4, "17", "version", "v2"))},
+				{Object: newTestPodList("19")},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name: "List existing pod non-recursively with Exact ResourceVersion=15 and Limit=1",
+			Request: Request{
+				Op:  OpList,
+				Key: pod4Key,
+				List: ListRequest{Options: storage.ListOptions{
+					ResourceVersion:      "15",
+					ResourceVersionMatch: metav1.ResourceVersionMatchExact,
+					Recursive:            false,
+					Predicate: storage.SelectionPredicate{
+						Label: labels.Everything(),
+						Field: fields.Everything(),
+						Limit: 1,
+					},
+				}},
+			},
+			CorrectResponse: Response{
+				Object: newTestPodList("15", withRV(pod4, "14")),
+			},
+			InvalidResponses: []Response{
+				{Object: newTestPodListWithContinue("15", new(int64(1)), withRV(pod4, "14"))},
+				{Object: newTestPodList("15")},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
+			Name: "List existing pod non-recursively with legacy ResourceVersion=15 and Limit=1",
+			Request: Request{
+				Op:  OpList,
+				Key: pod4Key,
+				List: ListRequest{Options: storage.ListOptions{
+					ResourceVersion: "15",
+					Recursive:       false,
+					Predicate: storage.SelectionPredicate{
+						Label: labels.Everything(),
+						Field: fields.Everything(),
+						Limit: 1,
+					},
+				}},
+			},
+			CorrectResponse: Response{
+				Object: newTestPodList("19", withLabel(pod4, "17", "version", "v2")),
+			},
+			InvalidResponses: []Response{
+				{Object: newTestPodList("14", withRV(pod4, "14"))},
+				{Object: newTestPodListWithContinue("15", new(int64(1)), withRV(pod4, "14"))},
+				{Object: newTestPodListWithContinue("19", new(int64(0)), withLabel(pod4, "17", "version", "v2"))},
+				{Object: nil, Err: nil},
+			},
+		},
+		{
 			Name: "List pods with Exact ResourceVersion=13 when none exist",
 			Request: Request{
 				Op:  OpList,
@@ -1823,10 +2355,25 @@ func watchTestCases() []watchTestCase {
 		opts.Predicate.AllowWatchBookmarks = true
 		return opts
 	}
+	watchNonRecursive := func(rv string, match metav1.ResourceVersionMatch) storage.ListOptions {
+		opts := watch(rv, match)
+		opts.Recursive = false
+		return opts
+	}
+	watchNonRecursiveWithBookmarks := func(rv string, match metav1.ResourceVersionMatch) storage.ListOptions {
+		opts := watchWithBookmarks(rv, match)
+		opts.Recursive = false
+		return opts
+	}
 	watchList := func(rv string) storage.ListOptions {
 		pred := storage.Everything
 		pred.AllowWatchBookmarks = true
 		return storage.ListOptions{ResourceVersion: rv, ResourceVersionMatch: metav1.ResourceVersionMatchNotOlderThan, Predicate: pred, Recursive: true, SendInitialEvents: new(true)}
+	}
+	watchListNonRecursive := func(rv string) storage.ListOptions {
+		opts := watchList(rv)
+		opts.Recursive = false
+		return opts
 	}
 	return []watchTestCase{
 		{
@@ -1930,6 +2477,74 @@ func watchTestCases() []watchTestCase {
 			Request: WatchRequest{Key: "/pods/ns10/", Options: watchList("1")},
 		},
 		{
+			Name:    "Watch single pod pod1 non-recursively",
+			Request: WatchRequest{Key: "/pods/ns1/pod1", Options: watchNonRecursive("", "")},
+		},
+		{
+			Name:    "Watch single pod pod1 non-recursively with AllowWatchBookmarks",
+			Request: WatchRequest{Key: "/pods/ns1/pod1", Options: watchNonRecursiveWithBookmarks("", "")},
+		},
+		{
+			Name:    "Watch single pod pod1 non-recursively with NotOlderThan",
+			Request: WatchRequest{Key: "/pods/ns1/pod1", Options: watchNonRecursive("", metav1.ResourceVersionMatchNotOlderThan)},
+		},
+		{
+			Name:    "Watch single pod pod1 non-recursively with ResourceVersion=0",
+			Request: WatchRequest{Key: "/pods/ns1/pod1", Options: watchNonRecursive("0", "")},
+		},
+		{
+			Name:    "Watch single pod pod1 non-recursively with ResourceVersion=0 and AllowWatchBookmarks",
+			Request: WatchRequest{Key: "/pods/ns1/pod1", Options: watchNonRecursiveWithBookmarks("0", "")},
+		},
+		{
+			Name:    "Watch single pod pod1 non-recursively with ResourceVersion=0 and NotOlderThan",
+			Request: WatchRequest{Key: "/pods/ns1/pod1", Options: watchNonRecursive("0", metav1.ResourceVersionMatchNotOlderThan)},
+		},
+		{
+			Name:    "Watch single pod pod4 non-recursively with ResourceVersion=1",
+			Request: WatchRequest{Key: "/pods/ns1/pod4", Options: watchNonRecursive("1", "")},
+		},
+		{
+			Name:    "Watch single pod pod4 non-recursively with ResourceVersion=1 and AllowWatchBookmarks",
+			Request: WatchRequest{Key: "/pods/ns1/pod4", Options: watchNonRecursiveWithBookmarks("1", "")},
+		},
+		{
+			Name:    "Watch single pod pod4 non-recursively with ResourceVersion=1 and Exact",
+			Request: WatchRequest{Key: "/pods/ns1/pod4", Options: watchNonRecursive("1", metav1.ResourceVersionMatchExact)},
+		},
+		{
+			Name:    "Watch single pod pod4 non-recursively with ResourceVersion=1 and NotOlderThan",
+			Request: WatchRequest{Key: "/pods/ns1/pod4", Options: watchNonRecursive("1", metav1.ResourceVersionMatchNotOlderThan)},
+		},
+		{
+			Name:    "Watch single pod pod4 non-recursively with ResourceVersion=8",
+			Request: WatchRequest{Key: "/pods/ns1/pod4", Options: watchNonRecursive("8", "")},
+		},
+		{
+			Name:    "Watch single pod pod4 non-recursively with ResourceVersion=8 and AllowWatchBookmarks",
+			Request: WatchRequest{Key: "/pods/ns1/pod4", Options: watchNonRecursiveWithBookmarks("8", "")},
+		},
+		{
+			Name:    "Watch single pod pod4 non-recursively with ResourceVersion=8 and Exact",
+			Request: WatchRequest{Key: "/pods/ns1/pod4", Options: watchNonRecursive("8", metav1.ResourceVersionMatchExact)},
+		},
+		{
+			Name:    "Watch single pod pod4 non-recursively with ResourceVersion=8 and NotOlderThan",
+			Request: WatchRequest{Key: "/pods/ns1/pod4", Options: watchNonRecursive("8", metav1.ResourceVersionMatchNotOlderThan)},
+		},
+		{
+			Name:    "Watch list single pod pod1 non-recursively",
+			Request: WatchRequest{Key: "/pods/ns1/pod1", Options: watchListNonRecursive("")},
+		},
+		{
+			Name:    "Watch list single pod pod1 non-recursively with ResourceVersion=0",
+			Request: WatchRequest{Key: "/pods/ns1/pod1", Options: watchListNonRecursive("0")},
+		},
+		{
+			Name:    "Watch list single pod pod4 non-recursively with ResourceVersion=1",
+			Request: WatchRequest{Key: "/pods/ns1/pod4", Options: watchListNonRecursive("1")},
+		},
+		{
 			Name:        "Watch with empty key returns empty key error",
 			Request:     WatchRequest{Key: "", Options: watch("1", "")},
 			ExpectError: fmt.Errorf("empty key: %q", ""),
@@ -2029,41 +2644,45 @@ func RunTestCorrectness(ctx context.Context, t *testing.T, store storage.Interfa
 	require.NoError(t, err)
 
 	for _, tc := range readTestCases() {
-		var out runtime.Object
-		var err error
-		switch tc.Request.Op {
-		case OpGet:
-			out = &example.Pod{}
-			err = store.Get(ctx, tc.Request.Key, tc.Request.Get.Options, out)
-		case OpList:
-			out = &example.PodList{}
-			err = store.GetList(ctx, tc.Request.Key, tc.Request.List.Options, out)
-		default:
-			t.Fatalf("unknown read operation: %v", tc.Request.Op)
-		}
-		var respObj runtime.Object
-		if err == nil {
-			respObj = out
-		}
-		resp := Response{Object: respObj, Err: err}
-		ok, next, change := model.Step(tc.Request, resp)
-		require.True(t, ok, "step %s failed to match model state transition: req=%+v resp=%+v", tc.Name, tc.Request, resp)
-		require.Equal(t, model, next, "step %s", tc.Name)
-		require.Nil(t, change, "step %s", tc.Name)
-		require.NoError(t, replay.Validate(tc.Request, resp), "step %s", tc.Name)
+		t.Run(tc.Name, func(t *testing.T) {
+			var out runtime.Object
+			var err error
+			switch tc.Request.Op {
+			case OpGet:
+				out = &example.Pod{}
+				err = store.Get(ctx, tc.Request.Key, tc.Request.Get.Options, out)
+			case OpList:
+				out = &example.PodList{}
+				err = store.GetList(ctx, tc.Request.Key, tc.Request.List.Options, out)
+			default:
+				t.Fatalf("unknown read operation: %v", tc.Request.Op)
+			}
+			var respObj runtime.Object
+			if err == nil {
+				respObj = out
+			}
+			resp := Response{Object: respObj, Err: err}
+			ok, next, change := model.Step(tc.Request, resp)
+			require.True(t, ok, "step %s failed to match model state transition: req=%+v resp=%+v", tc.Name, tc.Request, resp)
+			require.Equal(t, model, next, "step %s", tc.Name)
+			require.Nil(t, change, "step %s", tc.Name)
+			require.NoError(t, replay.Validate(tc.Request, resp), "step %s", tc.Name)
+		})
 	}
 
 	validator := NewWatchValidator(versioner, replay, keyFunc)
 	for i, w := range watchCases {
-		var resp WatchResponse
-		if watchErrs[i] != nil {
-			resp = WatchResponse{Err: watchErrs[i]}
-		} else {
-			targetRV, err := replay.LastWatchRV(w.Request)
-			require.NoError(t, err, "step %s", w.Name)
-			resp = WatchResponse{Events: collectEventsTillRV(t, watches[i], versioner, targetRV)}
-		}
-		require.NoError(t, validator.ValidateWatch(w.Request, resp), "step %s", w.Name)
+		t.Run(w.Name, func(t *testing.T) {
+			var resp WatchResponse
+			if watchErrs[i] != nil {
+				resp = WatchResponse{Err: watchErrs[i]}
+			} else {
+				targetRV, err := replay.LastWatchRV(w.Request)
+				require.NoError(t, err, "step %s", w.Name)
+				resp = WatchResponse{Events: collectEventsTillRV(t, watches[i], versioner, targetRV)}
+			}
+			require.NoError(t, validator.ValidateWatch(w.Request, resp), "step %s", w.Name)
+		})
 	}
 }
 
