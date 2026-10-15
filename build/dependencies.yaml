@@ -133,7 +133,7 @@ dependencies:
   # should also be updated, but go-runner is much harder to exploit and has
   # far less relevancy to go updates for Kubernetes more generally.
   - name: "registry.k8s.io/kube-cross: dependents"
-    version: v1.38.0-go1.27.1-bullseye.0
+    version: v1.38.0-go1.27.1-trixie.0
     refPaths:
     - path: build/build-image/cross/VERSION
 
