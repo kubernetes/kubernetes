@@ -569,7 +569,58 @@ func Test_podSchedulingPropertiesChange(t *testing.T) {
 			isTargetPod: true,
 			want:        []fwk.ClusterEvent{{Resource: fwk.AssignedPod, ActionType: fwk.UpdatePodSchedulingGatesEliminated}},
 		},
+		{
+			name: "assigned pod with ExtraNodeAllocatableResources reporting AllocatedResources does not trigger false scale-up",
+			oldPod: &v1.Pod{
+				Spec: v1.PodSpec{
+					NodeName: "node",
+					Containers: []v1.Container{
+						{
+							Name:      "app",
+							Resources: v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("100Mi")}},
+						},
+					},
+				},
+				Status: v1.PodStatus{
+					ExtraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
+						{
+							Source:     v1.ExtraNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "claim-1"},
+							Containers: []string{"app"},
+							Mapping: []v1.NodeAllocatableMappedResources{
+								{Name: v1.ResourceMemory, Quantity: new(resource.MustParse("200Mi"))},
+							},
+						},
+					},
+				},
+			},
+			newPod: &v1.Pod{
+				Spec: v1.PodSpec{
+					NodeName: "node",
+					Containers: []v1.Container{
+						{
+							Name:      "app",
+							Resources: v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("100Mi")}},
+						},
+					},
+				},
+				Status: v1.PodStatus{
+					AllocatedResources: v1.ResourceList{v1.ResourceMemory: resource.MustParse("300Mi")},
+					Resources:          &v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("300Mi")}},
+					ExtraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
+						{
+							Source:     v1.ExtraNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "claim-1"},
+							Containers: []string{"app"},
+							Mapping: []v1.NodeAllocatableMappedResources{
+								{Name: v1.ResourceMemory, Quantity: new(resource.MustParse("200Mi"))},
+							},
+						},
+					},
+				},
+			},
+			want: []fwk.ClusterEvent{{Resource: fwk.AssignedPod, ActionType: fwk.Update}},
+		},
 	}
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRANodeAllocatableResources, true)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := PodSchedulingPropertiesChange(tt.newPod, tt.oldPod, tt.isTargetPod)
