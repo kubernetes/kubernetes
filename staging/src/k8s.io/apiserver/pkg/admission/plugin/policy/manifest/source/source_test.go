@@ -22,6 +22,7 @@ import (
 
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apiserver/pkg/admission/coverage"
 	"k8s.io/apiserver/pkg/admission/plugin/manifest/metrics"
 )
 
@@ -103,6 +104,74 @@ func TestStaticPolicySource_LoadInitial(t *testing.T) {
 	if mock.callCount != 1 {
 		t.Errorf("loadFunc called %d times, want 1", mock.callCount)
 	}
+	if hooks[0].CoverageGaps != nil {
+		t.Errorf("hook has coverage gaps %v without WithCoverageGapsFunc, want none", hooks[0].CoverageGaps)
+	}
+}
+
+func TestStaticPolicySource_CoverageGaps(t *testing.T) {
+	mock := &mockPolicyLoadFunc{
+		policies: []*admissionregistrationv1.ValidatingAdmissionPolicy{validVAP("policy1"), validVAP("policy2")},
+		bindings: []*admissionregistrationv1.ValidatingAdmissionPolicyBinding{
+			validVAPB("binding1", "policy1"),
+			validVAPB("binding2", "policy1"),
+			validVAPB("binding3", "policy2"),
+		},
+		hash: "h1",
+	}
+	gaps := map[string]*coverage.Gaps{}
+	src := NewStaticPolicySource[*admissionregistrationv1.ValidatingAdmissionPolicy, *admissionregistrationv1.ValidatingAdmissionPolicyBinding, mockEvaluator](
+		"/tmp/test-manifests",
+		"test-server",
+		mockCompiler,
+		mock.load,
+		getBindingPolicyName,
+		metrics.VAPManifestType,
+		WithCoverageGapsFunc(func(p *admissionregistrationv1.ValidatingAdmissionPolicy, b *admissionregistrationv1.ValidatingAdmissionPolicyBinding) *coverage.Gaps {
+			c := &coverage.Gaps{}
+			gaps[p.Name+"/"+b.Name] = c
+			return c
+		}),
+	)
+
+	checkHooks := func(t *testing.T) {
+		t.Helper()
+		hooks := src.Hooks()
+		if len(hooks) != len(mock.policies) {
+			t.Fatalf("Hooks() returned %d hooks, want %d", len(hooks), len(mock.policies))
+		}
+		bindings := 0
+		for _, hook := range hooks {
+			bindings += len(hook.Bindings)
+			if len(hook.CoverageGaps) != len(hook.Bindings) {
+				t.Fatalf("hook %q has %d coverage gaps for %d bindings, want them parallel", hook.Policy.Name, len(hook.CoverageGaps), len(hook.Bindings))
+			}
+			for i, binding := range hook.Bindings {
+				want := gaps[hook.Policy.Name+"/"+binding.Name]
+				if want == nil {
+					t.Fatalf("no gaps recorded for %s/%s", hook.Policy.Name, binding.Name)
+				}
+				if got := hook.CoverageGapsAt(i); got != want {
+					t.Errorf("hook %q coverage gaps %d = %p, want %p", hook.Policy.Name, i, got, want)
+				}
+			}
+		}
+		if bindings != len(mock.bindings) {
+			t.Fatalf("Hooks() have %d bindings, want %d", bindings, len(mock.bindings))
+		}
+	}
+
+	if err := src.LoadInitial(); err != nil {
+		t.Fatalf("LoadInitial() returned unexpected error: %v", err)
+	}
+	checkHooks(t)
+
+	// Gaps are rebuilt with the hooks on reload.
+	clear(gaps)
+	mock.bindings = append(mock.bindings, validVAPB("binding4", "policy2"))
+	mock.hash = "h2"
+	src.checkAndReload()
+	checkHooks(t)
 }
 
 func TestStaticPolicySource_HashSkipsReload(t *testing.T) {
