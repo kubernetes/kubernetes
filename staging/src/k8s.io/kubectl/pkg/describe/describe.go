@@ -2010,6 +2010,9 @@ func describeContainerEnvVars(container corev1.Container, resolverFn EnvVarResol
 		case e.ValueFrom.ConfigMapKeyRef != nil:
 			optional := e.ValueFrom.ConfigMapKeyRef.Optional != nil && *e.ValueFrom.ConfigMapKeyRef.Optional
 			w.Write(LEVEL_3, "%s:\t<set to the key '%s' of config map '%s'>\tOptional: %t\n", e.Name, e.ValueFrom.ConfigMapKeyRef.Key, e.ValueFrom.ConfigMapKeyRef.Name, optional)
+		case e.ValueFrom.FileKeyRef != nil:
+			optional := e.ValueFrom.FileKeyRef.Optional != nil && *e.ValueFrom.FileKeyRef.Optional
+			w.Write(LEVEL_3, "%s:\t<set to the key '%s' of file '%s' in volume '%s'>\tOptional: %t\n", e.Name, e.ValueFrom.FileKeyRef.Key, e.ValueFrom.FileKeyRef.Path, e.ValueFrom.FileKeyRef.VolumeName, optional)
 		}
 	}
 }
