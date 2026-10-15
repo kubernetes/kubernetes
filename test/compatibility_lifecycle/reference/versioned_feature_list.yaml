@@ -206,6 +206,10 @@
     lockToDefault: false
     preRelease: Alpha
     version: "1.37"
+  - default: false
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.38"
 - name: ConcurrentWatchObjectDecode
   versionedSpecs:
   - default: false

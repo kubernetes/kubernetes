@@ -970,3 +970,196 @@ type CompositePodGroupSchedulingConstraints struct {
 	// +k8s:listType=atomic
 	Topology []TopologyConstraint `json:"topology,omitempty" protobuf:"bytes,1,rep,name=topology"`
 }
+
+// +genclient
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.38
+// +k8s:supportsSubresource="/status"
+
+// CompositePodGroup represents a runtime instance of pod groups grouped together.
+// CompositePodGroups are created by workload controllers (LWS, JobSet, etc...) from
+// Workload.compositePodGroupTemplates.
+// CompositePodGroup API enablement is toggled by the CompositePodGroup feature gate.
+type CompositePodGroup struct {
+	metav1.TypeMeta `json:""`
+
+	// metadata is the standard object metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
+	//
+	// +optional
+	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+
+	// spec defines the desired state of the CompositePodGroup.
+	//
+	// +required
+	Spec CompositePodGroupSpec `json:"spec" protobuf:"bytes,2,opt,name=spec"`
+
+	// status represents the current observed state of the CompositePodGroup.
+	//
+	// +optional
+	Status CompositePodGroupStatus `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"`
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.38
+
+// CompositePodGroupList contains a list of CompositePodGroup resources.
+type CompositePodGroupList struct {
+	metav1.TypeMeta `json:""`
+	// Standard list metadata.
+	//
+	// +optional
+	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+
+	// Items is the list of CompositePodGroups.
+	Items []CompositePodGroup `json:"items" protobuf:"bytes,2,rep,name=items"`
+}
+
+// CompositePodGroupSpec defines the desired state of CompositePodGroup.
+type CompositePodGroupSpec struct {
+	// parentCompositePodGroupName contains the name of the parent composite pod group
+	// within the same namespace as this composite pod group. It must be a DNS name.
+	// If it's nil, then this composite pod group is a root of a workload's hierarchy.
+	// This field is immutable.
+	//
+	// +optional
+	// +k8s:optional
+	// +k8s:immutable
+	// +k8s:format=k8s-long-name
+	ParentCompositePodGroupName *string `json:"parentCompositePodGroupName,omitempty" protobuf:"bytes,1,opt,name=parentCompositePodGroupName"`
+
+	// workloadRef references an optional CompositePodGroup template within the
+	// Workload object that was used to create the CompositePodGroup.
+	// This field is required.
+	// This field is immutable.
+	//
+	// +required
+	// +k8s:required
+	// +k8s:immutable
+	WorkloadRef *WorkloadReference `json:"workloadRef" protobuf:"bytes,2,opt,name=workloadRef"`
+
+	// schedulingPolicy defines the scheduling policy for this instance of the CompositePodGroup.
+	// Controllers are expected to fill this field by copying it from a CompositePodGroupTemplate.
+	//
+	// +required
+	SchedulingPolicy CompositePodGroupSchedulingPolicy `json:"schedulingPolicy" protobuf:"bytes,3,opt,name=schedulingPolicy"`
+
+	// schedulingConstraints defines optional scheduling constraints (e.g. topology) for this CompositePodGroup.
+	// Controllers are expected to fill this field by copying it from a CompositePodGroupTemplate.
+	// This field is immutable.
+	//
+	// +optional
+	// +k8s:optional
+	// +k8s:immutable
+	SchedulingConstraints *CompositePodGroupSchedulingConstraints `json:"schedulingConstraints,omitempty" protobuf:"bytes,4,opt,name=schedulingConstraints"`
+
+	// disruptionMode defines the mode in which a given CompositePodGroup can be disrupted.
+	// Controllers are expected to fill this field by copying it from a CompositePodGroupTemplate.
+	// One of Single, All. Defaults to Single if unset.
+	// This field is immutable.
+	//
+	// +default={"single": {}}
+	// +optional
+	// +k8s:optional
+	// +k8s:immutable
+	DisruptionMode *CompositeDisruptionMode `json:"disruptionMode,omitempty" protobuf:"bytes,5,opt,name=disruptionMode"`
+
+	// priorityClassName defines the priority that should be considered when scheduling this CompositePodGroup.
+	// Controllers are expected to fill this field by copying it from a CompositePodGroupTemplate.
+	// If left unspecified, it is validated and resolved similarly to the PriorityClassName field in Pods
+	// (i.e. if no priority class is specified, admission control can set this to the global default
+	// priority class if it exists. Otherwise, the composite pod group's priority will be zero).
+	// This field is immutable.
+	//
+	// +optional
+	// +k8s:optional
+	// +k8s:format=k8s-long-name
+	// +k8s:immutable
+	PriorityClassName string `json:"priorityClassName,omitempty" protobuf:"bytes,6,opt,name=priorityClassName"`
+
+	// priority is the value of priority of this composite pod group. Various system components
+	// use this field to find the priority of the composite pod group. When Priority Admission
+	// Controller is enabled, it prevents users from setting this field. The admission
+	// controller populates this field from PriorityClassName.
+	// The higher the value, the higher the priority.
+	// This field is immutable.
+	//
+	// +optional
+	// +k8s:optional
+	// +k8s:immutable
+	Priority *int32 `json:"priority,omitempty" protobuf:"varint,7,opt,name=priority"`
+
+	// preemptionPolicy is the Policy for preempting pods/podgroups with lower priority.
+	// One of Never, PreemptLowerPriority. Defaults to PreemptLowerPriority if unset.
+	// When Priority Admission Controller is enabled, it populates this field from PriorityClassName,
+	// and defaults to PreemptLowerPriority if value is unset in PriorityClass.
+	// This field is immutable.
+	// This field is available only when the PodGroupPreemptionPolicy feature gate is enabled.
+	//
+	// +featureGate=PodGroupPreemptionPolicy
+	// +optional
+	// +k8s:immutable
+	// +k8s:ifDisabled("PodGroupPreemptionPolicy")=+k8s:forbidden
+	// +k8s:ifEnabled("PodGroupPreemptionPolicy")=+k8s:optional
+	PreemptionPolicy *PreemptionPolicy `json:"preemptionPolicy,omitempty" protobuf:"bytes,8,opt,name=preemptionPolicy"`
+}
+
+// CompositePodGroupStatus represents information about the status of a composite pod group.
+type CompositePodGroupStatus struct {
+	// conditions represent the latest observations of the CompositePodGroup's state.
+	//
+	// Known condition types:
+	// - "CompositePodGroupInitiallyScheduled": Indicates whether the overall scheduling requirement
+	//   for the subtree under this CompositePodGroup has been satisfied. Once this condition
+	//   transitions to True, it serves as a terminal state and will never revert to False,
+	//   even if pods are subsequently deleted and group constraints are no longer met.
+	// - "DisruptionTarget": Indicates whether the CompositePodGroup is about to be terminated
+	//   due to disruption such as preemption.
+	//
+	// Known reasons for the CompositePodGroupInitiallyScheduled condition:
+	// - "Scheduled": All required child groups and pods under this CompositePodGroup have been successfully scheduled.
+	// - "Unschedulable": The CompositePodGroup's subtree could not be placed, for example due to unmet
+	//   minGroupCount, placement constraints, or insufficient capacity for its child groups.
+	// - "SchedulerError": The CompositePodGroup cannot be scheduled due to some internal error
+	//   that occurred during scheduling.
+	// - "CompositePodGroupError": The CompositePodGroup cannot be scheduled due to an invalid group layout
+	//   detected during runtime validation. The `message` field details the specific layout violation (such as
+	//   a detected cycle, exceeding the maximum depth of 4, or referencing multiple distinct Workloads).
+	//
+	// Known reasons for the DisruptionTarget condition:
+	// - "PreemptionByScheduler": The CompositePodGroup was preempted by the scheduler to make room for
+	//   higher-priority CompositePodGroups, PodGroups or Pods.
+	//
+	// +optional
+	// +patchMergeKey=type
+	// +patchStrategy=merge
+	// +listType=map
+	// +listMapKey=type
+	// +k8s:alpha(since: "1.37")=+k8s:optional
+	// +k8s:alpha(since: "1.37")=+k8s:listType=map
+	// +k8s:alpha(since: "1.37")=+k8s:listMapKey=type
+	Conditions []metav1.Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,1,rep,name=conditions"`
+}
+
+// Well-known condition types for CompositePodGroups.
+const (
+	// CompositePodGroupInitiallyScheduled represents status of the scheduling process for this CompositePodGroup till first success.
+	CompositePodGroupInitiallyScheduled string = "CompositePodGroupInitiallyScheduled"
+)
+
+// Well-known condition reasons for CompositePodGroups.
+const (
+	// CompositePodGroupReasonScheduled reason in the CompositePodGroupInitiallyScheduled condition indicates that
+	// all required child groups and pods in the CompositePodGroup subtree have been successfully scheduled.
+	CompositePodGroupReasonScheduled string = "Scheduled"
+	// CompositePodGroupReasonUnschedulable reason in the CompositePodGroupInitiallyScheduled condition indicates that
+	// the CompositePodGroup cannot be scheduled, for example due to unmet minGroupCount, placement constraints,
+	// or insufficient capacity for its child groups.
+	CompositePodGroupReasonUnschedulable string = "Unschedulable"
+	// CompositePodGroupReasonSchedulerError reason in the CompositePodGroupInitiallyScheduled condition means that
+	// an internal error occurred during scheduling of the CompositePodGroup or its subtree.
+	CompositePodGroupReasonSchedulerError string = "SchedulerError"
+	// CompositePodGroupReasonCompositePodGroupError reason in the CompositePodGroupInitiallyScheduled condition indicates that
+	// the CompositePodGroup cannot be scheduled due to an invalid group layout detected during runtime validation.
+	CompositePodGroupReasonCompositePodGroupError string = "CompositePodGroupError"
+)
