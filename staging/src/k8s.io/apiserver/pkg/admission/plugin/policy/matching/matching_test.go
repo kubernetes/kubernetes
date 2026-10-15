@@ -583,6 +583,114 @@ func TestMatcher(t *testing.T) {
 	}
 }
 
+func TestMatchesResourceRulesExact(t *testing.T) {
+	equivalentMatch := v1.Equivalent
+	rule := func(group string, resources []string, names ...string) v1.NamedRuleWithOperations {
+		return v1.NamedRuleWithOperations{
+			ResourceNames: names,
+			RuleWithOperations: v1.RuleWithOperations{
+				Operations: []v1.OperationType{v1.Create},
+				Rule:       v1.Rule{APIGroups: []string{group}, APIVersions: []string{"*"}, Resources: resources},
+			},
+		}
+	}
+	deployment := admission.NewAttributesRecord(nil, nil, gvk("apps", "v1", "Deployment"), "ns", "name", gvr("apps", "v1", "deployments"), "", admission.Create, &metav1.CreateOptions{}, false, nil)
+	scale := admission.NewAttributesRecord(nil, nil, gvk("autoscaling", "v1", "Scale"), "ns", "name", gvr("apps", "v1", "deployments"), "scale", admission.Create, &metav1.CreateOptions{}, false, nil)
+
+	testcases := []struct {
+		name          string
+		mr            *v1.MatchResources
+		attrs         admission.Attributes
+		expectMatches bool
+		expectExclude bool
+	}{
+		{
+			name:          "nil matches everything and excludes nothing",
+			attrs:         deployment,
+			expectMatches: true,
+		},
+		{
+			name:          "empty resource rules match everything",
+			mr:            &v1.MatchResources{},
+			attrs:         deployment,
+			expectMatches: true,
+		},
+		{
+			name:          "matching rule",
+			mr:            &v1.MatchResources{ResourceRules: []v1.NamedRuleWithOperations{rule("apps", []string{"deployments"})}},
+			attrs:         deployment,
+			expectMatches: true,
+		},
+		{
+			name:  "main resource rule does not match subresource",
+			mr:    &v1.MatchResources{ResourceRules: []v1.NamedRuleWithOperations{rule("apps", []string{"deployments"})}},
+			attrs: scale,
+		},
+		{
+			name:          "subresource wildcard matches main resource",
+			mr:            &v1.MatchResources{ResourceRules: []v1.NamedRuleWithOperations{rule("apps", []string{"deployments/*"})}},
+			attrs:         deployment,
+			expectMatches: true,
+		},
+		{
+			name:          "matching resource name",
+			mr:            &v1.MatchResources{ResourceRules: []v1.NamedRuleWithOperations{rule("apps", []string{"deployments"}, "name")}},
+			attrs:         deployment,
+			expectMatches: true,
+		},
+		{
+			name:  "non-matching resource name",
+			mr:    &v1.MatchResources{ResourceRules: []v1.NamedRuleWithOperations{rule("apps", []string{"deployments"}, "other")}},
+			attrs: deployment,
+		},
+		{
+			name: "matching exclusion wins",
+			mr: &v1.MatchResources{
+				ResourceRules:        []v1.NamedRuleWithOperations{rule("apps", []string{"deployments/*"})},
+				ExcludeResourceRules: []v1.NamedRuleWithOperations{rule("apps", []string{"deployments/scale"})},
+			},
+			attrs:         scale,
+			expectExclude: true,
+		},
+		{
+			name: "exclusion with non-matching resource name",
+			mr: &v1.MatchResources{
+				ExcludeResourceRules: []v1.NamedRuleWithOperations{rule("apps", []string{"deployments"}, "other")},
+			},
+			attrs:         deployment,
+			expectMatches: true,
+		},
+		{
+			name: "equivalent match policy is ignored for rules",
+			mr: &v1.MatchResources{
+				MatchPolicy:   &equivalentMatch,
+				ResourceRules: []v1.NamedRuleWithOperations{rule("extensions", []string{"deployments"})},
+			},
+			attrs: deployment,
+		},
+		{
+			name: "equivalent match policy is ignored for exclusions",
+			mr: &v1.MatchResources{
+				MatchPolicy:          &equivalentMatch,
+				ExcludeResourceRules: []v1.NamedRuleWithOperations{rule("extensions", []string{"deployments"})},
+			},
+			attrs:         deployment,
+			expectMatches: true,
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := MatchesResourceRulesExact(tc.mr, tc.attrs); got != tc.expectMatches {
+				t.Errorf("MatchesResourceRulesExact() = %v, want %v", got, tc.expectMatches)
+			}
+			if got := ExcludedExact(tc.mr, tc.attrs); got != tc.expectExclude {
+				t.Errorf("ExcludedExact() = %v, want %v", got, tc.expectExclude)
+			}
+		})
+	}
+}
+
 type fakeNamespaceLister struct {
 	namespaces map[string]*corev1.Namespace
 }
