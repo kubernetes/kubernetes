@@ -17,7 +17,9 @@ limitations under the License.
 package logrotation
 
 import (
+	"fmt"
 	"io"
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -26,6 +28,11 @@ import (
 )
 
 const timeLayout string = "20060102-150405"
+
+// rotationRetryInterval is how long Write waits before retrying a rotation that
+// failed. currentSize stays at or above maxSize until a rotation succeeds, so
+// without it every later write would repeat the close, rename and reopen.
+const rotationRetryInterval = time.Second
 
 type rotationFile struct {
 	// required, the max size of the log file in bytes, 0 means no rotation
@@ -38,6 +45,13 @@ type rotationFile struct {
 	currentSize   int64
 	lasSyncTime   time.Time
 	flushInterval time.Duration
+	// when the write, the sync and the rotation last failed, so that retries
+	// are rate limited and a run of failures is logged once. The zero value
+	// means the operation is not currently failing, and time.Since reports a
+	// large duration for it, so the first rotation is never held off.
+	writeFailedAt    time.Time
+	syncFailedAt     time.Time
+	rotationFailedAt time.Time
 }
 
 func Open(filePath string, flushInterval time.Duration, maxSize int64, maxAge time.Duration) (io.WriteCloser, error) {
@@ -69,36 +83,68 @@ func Open(filePath string, flushInterval time.Duration, maxSize int64, maxAge ti
 }
 
 // Write implements the io.Writer interface.
-func (w *rotationFile) Write(p []byte) (n int, err error) {
+//
+// It never reports an error. kube-log-runner hands this writer to os/exec as
+// the wrapped command's stdout and stderr, and os/exec stops draining the pipe
+// after the first write error, which kills the command with SIGPIPE. Losing
+// log output is the lesser harm: a component killed because the filesystem is
+// full can no longer free it, so the node does not recover on its own.
+func (w *rotationFile) Write(p []byte) (int, error) {
 	w.mut.Lock()
 	defer w.mut.Unlock()
 
-	n, err = w.file.Write(p)
+	n, err := w.file.Write(p)
 	if err != nil {
-		return 0, err
+		logFirstFailure(&w.writeFailedAt, "Failed to write to log file %q, dropping log output until it recovers: %v", w.filePath, err)
+	} else {
+		w.writeFailedAt = time.Time{}
 	}
 
 	if w.flushInterval > 0 && time.Since(w.lasSyncTime) >= w.flushInterval {
-		err = w.file.Sync()
-		if err != nil {
-			return 0, err
-		}
+		// Record the attempt whether or not it worked, so that a failing sync
+		// is retried once per flush interval and not on every log line.
 		w.lasSyncTime = time.Now()
+		if err := w.file.Sync(); err != nil {
+			logFirstFailure(&w.syncFailedAt, "Failed to sync log file %q, continuing without flushing: %v", w.filePath, err)
+		} else {
+			w.syncFailedAt = time.Time{}
+		}
 	}
 
 	if w.maxSize > 0 {
-		w.currentSize += int64(len(p))
+		// Only count what reached the file, so that writes failing on a full
+		// filesystem do not add up to a rotation that cannot help.
+		w.currentSize += int64(n)
 
 		// if file size over maxsize rotate the log file
 		if w.currentSize >= w.maxSize {
-			err = w.rotate()
-			if err != nil {
-				return 0, err
+			// A failed rotation must not fail the write either: keep
+			// appending to the current file and retry on a later write.
+			if time.Since(w.rotationFailedAt) >= rotationRetryInterval {
+				if err := w.rotate(); err != nil {
+					logFirstFailure(&w.rotationFailedAt, "Failed to rotate log file %q, will retry every %v: %v", w.filePath, rotationRetryInterval, err)
+				} else {
+					w.rotationFailedAt = time.Time{}
+				}
 			}
 		}
 	}
 
-	return n, nil
+	// Report a full write even when it failed: io.Copy turns a short write
+	// into an error, which has the same effect as returning one.
+	return len(p), nil
+}
+
+// logFirstFailure records when an operation on the log file failed and logs it,
+// but only for the first failure in a run of them. The message goes to
+// kube-log-runner's own stderr, which usually ends up on the filesystem that
+// just failed, so a filesystem that stays full must not turn every log line
+// into another one.
+func logFirstFailure(failedAt *time.Time, format string, args ...any) {
+	if failedAt.IsZero() {
+		log.Printf(format, args...)
+	}
+	*failedAt = time.Now()
 }
 
 func (w *rotationFile) rotate() error {
@@ -108,25 +154,38 @@ func (w *rotationFile) rotate() error {
 	// Remove the extension from the filename
 	pathWithoutExt := strings.TrimSuffix(w.filePath, ext)
 
-	rotateFilePath := pathWithoutExt + "-" + time.Now().Format(timeLayout) + ext
+	timestamp := time.Now().Format(timeLayout)
+	rotateFilePath := pathWithoutExt + "-" + timestamp + ext
 
 	if w.filePath == rotateFilePath {
 		return nil
 	}
 
-	err := w.file.Close()
-	if err != nil {
-		return err
+	// Rotating more than once per second would otherwise rename over, and
+	// silently discard, the previous backup. clean() still matches the ".N"
+	// suffix because time.Parse accepts it as fractional seconds.
+	for i := 1; ; i++ {
+		if _, err := os.Lstat(rotateFilePath); err != nil {
+			break
+		}
+		rotateFilePath = fmt.Sprintf("%s-%s.%d%s", pathWithoutExt, timestamp, i, ext)
 	}
 
-	err = os.Rename(w.filePath, rotateFilePath)
-	if err != nil {
-		return err
-	}
+	closeErr := w.file.Close()
+	renameErr := os.Rename(w.filePath, rotateFilePath)
 
+	// Reopen even if the rename failed, otherwise w.file stays closed and
+	// every later write fails with "file already closed".
+	var err error
 	w.file, err = os.OpenFile(w.filePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		return err
+	}
+	if renameErr != nil {
+		return renameErr
+	}
+	if closeErr != nil {
+		log.Printf("Failed to close log file %q before rotation: %v", w.filePath, closeErr)
 	}
 
 	w.currentSize = 0
