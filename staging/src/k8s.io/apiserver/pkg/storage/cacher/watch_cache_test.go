@@ -105,7 +105,7 @@ func (w *testWatchCache) getCacheIntervalForEvents(resourceVersion uint64, opts 
 	w.RLock()
 	defer w.RUnlock()
 
-	return w.getAllEventsSinceLocked(resourceVersion, "", opts)
+	return w.getAllEventsSinceLocked(context.Background(), resourceVersion, "", opts)
 }
 
 // newTestWatchCache just adds a fake clock.
@@ -441,9 +441,8 @@ func TestMarker(t *testing.T) {
 	}
 }
 
-func TestWaitUntilFreshAndGetList(t *testing.T) {
-	ctx := context.Background()
-	store := newTestWatchCache(3, DefaultEventFreshDuration, &cache.Indexers{
+func testIndexers() *cache.Indexers {
+	return &cache.Indexers{
 		"l:label": func(obj interface{}) ([]string, error) {
 			pod, ok := obj.(*v1.Pod)
 			if !ok {
@@ -461,7 +460,12 @@ func TestWaitUntilFreshAndGetList(t *testing.T) {
 			}
 			return []string{pod.Spec.NodeName}, nil
 		},
-	})
+	}
+}
+
+func TestWaitUntilFreshAndGetList(t *testing.T) {
+	ctx := context.Background()
+	store := newTestWatchCache(3, DefaultEventFreshDuration, testIndexers())
 	defer store.Stop()
 	// In background, update the store.
 	go func() {

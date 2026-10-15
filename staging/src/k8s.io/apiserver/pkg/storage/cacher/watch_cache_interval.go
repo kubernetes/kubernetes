@@ -122,11 +122,12 @@ func newCacheIntervalFromStore(resourceVersion uint64, s store.Snapshot, key str
 
 // newCacheIntervalFromLazySnapshot captures a snapshot under the watch cache
 // lock and traverses it incrementally after the lock is released.
-func newCacheIntervalFromLazySnapshot(resourceVersion uint64, snap store.Snapshot) *watchCacheInterval {
+func newCacheIntervalFromLazySnapshot(resourceVersion uint64, snap store.Snapshot, prefix string) *watchCacheInterval {
 	return &watchCacheInterval{
 		source: &lazySnapshotCacheIntervalSource{
 			snapshot:        snap,
 			resourceVersion: resourceVersion,
+			prefix:          prefix,
 		},
 		resourceVersion: resourceVersion,
 	}
@@ -286,11 +287,12 @@ type lazySnapshotCacheIntervalSource struct {
 	snapshot store.Snapshot
 	// resourceVersion is assigned to every watchCacheEvent produced by this source.
 	resourceVersion uint64
+	prefix          string
 }
 
 func (s *lazySnapshotCacheIntervalSource) All() iter.Seq2[*watchCacheEvent, error] {
 	return func(yield func(*watchCacheEvent, error) bool) {
-		for elem, err := range s.snapshot.RangePrefix("", "").All() {
+		for elem, err := range s.snapshot.RangePrefix(s.prefix, "").All() {
 			if err != nil {
 				yield(nil, err)
 				return
