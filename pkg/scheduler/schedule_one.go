@@ -778,7 +778,7 @@ func (sched *Scheduler) handleSchedulingFailure(ctx context.Context, podFwk fram
 		// won't modify them afterwards.
 		podInfo.UnschedulablePlugins = fitError.unschedulablePlugins.Clone()
 		podInfo.PendingPlugins = fitError.pendingPlugins.Clone()
-		errMsg = fmt.Sprintf("parent pod group is unschedulable: %s", errMsg)
+		errMsg = fmt.Sprintf("parent pod group %q is unschedulable", *pod.Spec.SchedulingGroup.PodGroupName)
 		logger.V(2).Info("Unable to schedule pod belonging to a pod group; waiting", "pod", klog.KObj(pod), "err", errMsg)
 	} else {
 		utilruntime.HandleErrorWithContext(ctx, err, "Error scheduling pod; retrying", "pod", klog.KObj(pod))
