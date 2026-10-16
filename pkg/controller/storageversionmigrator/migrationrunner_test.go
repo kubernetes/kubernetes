@@ -232,7 +232,7 @@ func TestCustomResourceController_Sync(t *testing.T) {
 			},
 		},
 		{
-			name: "Migration failed: CRD condition updated",
+			name: "Migration failed: CRD condition updated, stored versions kept",
 			svms: []*svmv1.StorageVersionMigration{newSVM("test-svm", "example.com", "widgets",
 				metav1.Condition{
 					Type:   string(svmv1.MigrationFailed),
@@ -267,7 +267,7 @@ func TestCustomResourceController_Sync(t *testing.T) {
 							Message: "The migration has failed",
 						},
 					},
-					[]string{"v2"},
+					nil,
 				),
 			},
 		},
