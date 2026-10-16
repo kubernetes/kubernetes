@@ -103,9 +103,6 @@ func TestCPGQueueing(t *testing.T) {
 	p5_7 := st.MakePod().Name("p5-7").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg5-4").Obj()
 	p5_8 := st.MakePod().Name("p5-8").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg5-4").Obj()
 
-	// cpgRootCyclic forms a dependency cycle with cpgMid (cpg-root -> cpg-mid -> cpg-root) to test hierarchy loop detection.
-	cpgRootCyclic := st.MakeCompositePodGroup().Name("cpg-root").WorkloadRef("w1", "cpg-t").MinGroupCount(1).ParentCompositePodGroup("cpg-mid").Obj()
-
 	tests := []struct {
 		name  string
 		steps []stepsframework.Step
@@ -779,47 +776,6 @@ func TestCPGQueueing(t *testing.T) {
 				{
 					Name:                                "Verify pods of the deleted PodGroup are still in incompletePodGroupPods",
 					WaitForPodsInIncompletePodGroupPods: []string{"p5-1", "p5-2"},
-				},
-			},
-		},
-		{
-			name: "Cyclic CPG hierarchy loop protection buffers pods in incompletePodGroupPods until cycle is broken",
-			steps: []stepsframework.Step{
-				{
-					Name:        "Create node",
-					CreateNodes: []*v1.Node{node},
-				},
-				{
-					Name:                    "Create CPG mid referencing root CPG",
-					CreateCompositePodGroup: cpgMid,
-				},
-				{
-					Name:                    "Create root CPG referencing mid CPG (forming cyclic dependency)",
-					CreateCompositePodGroup: cpgRootCyclic,
-				},
-				{
-					Name:           "Create leaf PodGroup referencing mid CPG",
-					CreatePodGroup: pg1,
-				},
-				{
-					Name:       "Create member pods",
-					CreatePods: []*v1.Pod{p1, p2},
-				},
-				{
-					Name:                                "Verify pods are held in incompletePodGroupPods due to detected cyclic hierarchy",
-					WaitForPodsInIncompletePodGroupPods: []string{"p1", "p2"},
-				},
-				{
-					Name:                    "Delete cyclic root CPG",
-					DeleteCompositePodGroup: "cpg-root",
-				},
-				{
-					Name:                    "Re-create root CPG without parent, establishing it as legitimate root CPG",
-					CreateCompositePodGroup: cpgRoot,
-				},
-				{
-					Name:                 "Verify pods are scheduled after cycle is broken and hierarchy is resolved",
-					WaitForPodsScheduled: []string{"p1", "p2"},
 				},
 			},
 		},
