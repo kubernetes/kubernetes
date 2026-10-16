@@ -38,7 +38,7 @@ import (
 // Manager interface provides methods for Kubelet to manage ConfigMap.
 type Manager interface {
 	// Get configmap by configmap namespace and name.
-	GetConfigMap(namespace, name string) (*v1.ConfigMap, error)
+	GetConfigMap(ctx context.Context, namespace, name string) (*v1.ConfigMap, error)
 
 	// WARNING: Register/UnregisterPod functions should be efficient,
 	// i.e. should not block on network operations.
@@ -62,8 +62,8 @@ func NewSimpleConfigMapManager(kubeClient clientset.Interface) Manager {
 	return &simpleConfigMapManager{kubeClient: kubeClient}
 }
 
-func (s *simpleConfigMapManager) GetConfigMap(namespace, name string) (*v1.ConfigMap, error) {
-	return s.kubeClient.CoreV1().ConfigMaps(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+func (s *simpleConfigMapManager) GetConfigMap(ctx context.Context, namespace, name string) (*v1.ConfigMap, error) {
+	return s.kubeClient.CoreV1().ConfigMaps(namespace).Get(ctx, name, metav1.GetOptions{})
 }
 
 func (s *simpleConfigMapManager) RegisterPod(pod *v1.Pod) {
@@ -80,7 +80,7 @@ type configMapManager struct {
 	manager manager.Manager
 }
 
-func (c *configMapManager) GetConfigMap(namespace, name string) (*v1.ConfigMap, error) {
+func (c *configMapManager) GetConfigMap(_ context.Context, namespace, name string) (*v1.ConfigMap, error) {
 	object, err := c.manager.GetObject(namespace, name)
 	if err != nil {
 		return nil, err
@@ -120,9 +120,9 @@ const (
 //   - every GetObject() call tries to fetch the value from local cache; if it is
 //     not there, invalidated or too old, we fetch it from apiserver and refresh the
 //     value in cache; otherwise it is just fetched from cache
-func NewCachingConfigMapManager(kubeClient clientset.Interface, getTTL manager.GetObjectTTLFunc) Manager {
+func NewCachingConfigMapManager(ctx context.Context, kubeClient clientset.Interface, getTTL manager.GetObjectTTLFunc) Manager {
 	getConfigMap := func(namespace, name string, opts metav1.GetOptions) (runtime.Object, error) {
-		return kubeClient.CoreV1().ConfigMaps(namespace).Get(context.TODO(), name, opts)
+		return kubeClient.CoreV1().ConfigMaps(namespace).Get(ctx, name, opts)
 	}
 	configMapStore := manager.NewObjectStore(getConfigMap, clock.RealClock{}, getTTL, defaultTTL)
 	return &configMapManager{
@@ -136,12 +136,12 @@ func NewCachingConfigMapManager(kubeClient clientset.Interface, getTTL manager.G
 //   - whenever a pod is created or updated, we start individual watches for all
 //     referenced objects that aren't referenced from other registered pods
 //   - every GetObject() returns a value from local cache propagated via watches
-func NewWatchingConfigMapManager(kubeClient clientset.Interface, resyncInterval time.Duration) Manager {
+func NewWatchingConfigMapManager(ctx context.Context, kubeClient clientset.Interface, resyncInterval time.Duration) Manager {
 	listConfigMap := func(namespace string, opts metav1.ListOptions) (runtime.Object, error) {
-		return kubeClient.CoreV1().ConfigMaps(namespace).List(context.TODO(), opts)
+		return kubeClient.CoreV1().ConfigMaps(namespace).List(ctx, opts)
 	}
 	watchConfigMap := func(namespace string, opts metav1.ListOptions) (watch.Interface, error) {
-		return kubeClient.CoreV1().ConfigMaps(namespace).Watch(context.TODO(), opts)
+		return kubeClient.CoreV1().ConfigMaps(namespace).Watch(ctx, opts)
 	}
 	newConfigMap := func() runtime.Object {
 		return &v1.ConfigMap{}

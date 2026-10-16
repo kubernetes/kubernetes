@@ -23,11 +23,11 @@ import (
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/klog/v2"
+	"k8s.io/klog/v2/ktesting"
 )
 
 func TestStateMemory_EmptyDirVolumeLimits(t *testing.T) {
-	logger := klog.TODO()
+	logger, _ := ktesting.NewTestContext(t)
 	state := NewStateMemory(logger, PodResourceInfoMap{})
 
 	podUID := types.UID("pod-1")
@@ -40,7 +40,7 @@ func TestStateMemory_EmptyDirVolumeLimits(t *testing.T) {
 
 	// Set volume limit on nonexistent pod should implicitly initialize the pod and insert it
 	targetLimit := resource.MustParse("256Mi")
-	err := state.SetEmptyDirVolumeLimit(podUID, volName, &targetLimit)
+	err := state.SetEmptyDirVolumeLimit(logger, podUID, volName, &targetLimit)
 	require.NoError(t, err)
 
 	// Get volume limit should return the parsed value and true
@@ -63,7 +63,7 @@ func TestStateMemory_EmptyDirVolumeLimits(t *testing.T) {
 	// Set another volume on the same pod should keep existing limits intact
 	anotherVolName := "volume-2"
 	anotherLimit := resource.MustParse("128Mi")
-	err = state.SetEmptyDirVolumeLimit(podUID, anotherVolName, &anotherLimit)
+	err = state.SetEmptyDirVolumeLimit(logger, podUID, anotherVolName, &anotherLimit)
 	require.NoError(t, err)
 
 	// Verify both volumes are present and correct
