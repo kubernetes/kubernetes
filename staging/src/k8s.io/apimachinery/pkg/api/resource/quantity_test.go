@@ -5354,7 +5354,7 @@ func TestParseQuantity(t *testing.T) {
 
 		// min/max int64 + 1
 		{input: "-9223372036854775807", wantAsInt64: ptr.To[int64](-9223372036854775807), wantAsDec: ptrDec("-9223372036854775807")},
-		{input: "9223372036854775808", wantAsInt64: nil, wantAsDec: ptrDec("9223372036854775808"), wantScale: ptr.To(nanoInfScale)}, // should be wantScale: 0
+		{input: "9223372036854775808", wantAsInt64: nil, wantAsDec: ptrDec("9223372036854775808"), wantScale: ptr.To(inf.Scale(0))},
 		// .0
 		{input: "-9223372036854775807.0", wantAsInt64: nil, wantAsDec: ptrDec("-9223372036854775807"), canonical: "-9223372036854775807"}, // should be wantAsInt64: <value>
 		{input: "9223372036854775808.0", wantAsInt64: nil, wantAsDec: ptrDec("9223372036854775808"), canonical: "9223372036854775808"},
@@ -5366,9 +5366,13 @@ func TestParseQuantity(t *testing.T) {
 		{input: "9223372036854775808.1", wantAsInt64: nil, wantAsDec: ptrDec("9223372036854775808.1"), canonical: "9223372036854775808100m"},
 
 		// exponents in the inf.Dec path
-		{input: "1234567890123456789012e10", wantAsInt64: nil, wantAsDec: ptrScaledDec("1234567890123456789012", -10), wantScale: ptr.To(nanoInfScale), canonical: "12345678901234567890120e9"}, // should be wantScale: -10
-		{input: "0.0e-2147483647", wantAsInt64: nil, wantAsDec: ptrScaledDec("0", math.MinInt32), wantScale: ptr.To(inf.Scale(math.MinInt32)), canonical: "0"},                                  // should be wantScale: nanoInfScale
-		{input: "0.00000000000000000000e-2147483647", wantAsInt64: nil, wantAsDec: ptrScaledDec("0", -2147483629), wantScale: ptr.To(inf.Scale(-2147483629)), canonical: "0"},                   // should be wantScale: nanoInfScale
+		{input: "1234567890123456789012e10", wantAsInt64: nil, wantAsDec: ptrScaledDec("1234567890123456789012", -10), wantScale: new(inf.Scale(-10)), canonical: "12345678901234567890120e9"},
+		{input: "1234567890123456789012e2147483647", wantAsInt64: nil, wantAsDec: ptrScaledDec("1234567890123456789012", -math.MaxInt32), wantScale: new(inf.Scale(-math.MaxInt32)), canonical: "12345678901234567890120e2147483646"},
+		{input: "0.0e-2147483647", wantAsInt64: nil, wantAsDec: ptrScaledDec("0", nanoInfScale), wantScale: new(nanoInfScale), canonical: "0"},
+		{input: "0.00000000000000000000e-2147483647", wantAsInt64: nil, wantAsDec: ptrScaledDec("0", nanoInfScale), wantScale: new(nanoInfScale), canonical: "0"},
+		{input: "1e-2147483647", wantAsInt64: nil, wantAsDec: ptrScaledDec("1", nanoInfScale), wantScale: new(nanoInfScale), canonical: "1e-9"},
+		{input: "1.5e-2147483647", wantAsInt64: nil, wantAsDec: ptrScaledDec("1", nanoInfScale), wantScale: new(nanoInfScale), canonical: "1e-9"},
+		{input: "1.234567890123456789012e-2147483647", wantAsInt64: nil, wantAsDec: ptrScaledDec("1", nanoInfScale), wantScale: new(nanoInfScale), canonical: "1e-9"},
 	}
 
 	for _, tt := range tests {
