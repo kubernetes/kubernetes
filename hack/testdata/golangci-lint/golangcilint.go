@@ -42,6 +42,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/klog/v2"
 	"k8s.io/ktesting" // depguard issue: ktesting is allowed only in test files
 )
@@ -118,7 +120,9 @@ func Modernize(a, b int) int {
 }
 
 func Logcheck() {
-	klog.InfoS("message", "key") // logcheck issue: Additional arguments to InfoS should always be Key Value pairs
+	klog.InfoS("message", "key")                                                    // logcheck issue: Additional arguments to InfoS should always be Key Value pairs
+	utilruntime.HandleErrorWithLogger(klog.Background(), nil, "message", "key")     // logcheck issue: Additional arguments to HandleErrorWithLogger should always be Key Value pairs
+	utilruntime.HandleErrorWithContext(context.Background(), nil, "message", "key") // logcheck issue: Additional arguments to HandleErrorWithContext should always be Key Value pairs
 }
 
 func Errcheck() {
