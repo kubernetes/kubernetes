@@ -131,7 +131,7 @@ func withInClusterEndpoint(apiServerURL string, client *http.Client) Option {
 
 // Handler serves verified admission requests and exposes HealthCheck for readiness.
 type Handler struct {
-	verifier *verify.Verifier
+	verifier *Verifier
 	next     AdmissionHandler
 	maxBody  int64
 }
@@ -179,7 +179,7 @@ func (b *builder) buildVerifier(ctx context.Context) (*verify.Verifier, error) {
 }
 
 func newHandler(v *verify.Verifier, next AdmissionHandler, maxBody int64) *Handler {
-	return &Handler{verifier: v, next: next, maxBody: maxBody}
+	return &Handler{verifier: &Verifier{verifier: v}, next: next, maxBody: maxBody}
 }
 
 // ServeHTTP implements http.Handler.
@@ -200,7 +200,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	req := review.Request
 
-	if err := verifyAdmissionRequest(ctx, h.verifier, req, token); err != nil {
+	if err := h.verifier.Verify(ctx, req, token); err != nil {
 		writeResponse(w, req, deniedResponse())
 		return
 	}
@@ -386,15 +386,11 @@ func NewVerifier(ctx context.Context, opts ...Option) (*Verifier, error) {
 // It returns nil on success and the same generic error for every denial,
 // including a nil request. The specific reason is logged, not returned.
 func (v *Verifier) Verify(ctx context.Context, req *admissionv1.AdmissionRequest, token string) error {
-	return verifyAdmissionRequest(ctx, v.verifier, req, token)
-}
-
-func verifyAdmissionRequest(ctx context.Context, verifier *verify.Verifier, req *admissionv1.AdmissionRequest, token string) error {
 	if req == nil {
 		klog.FromContext(ctx).V(2).Info("Webhook token verification denied", "reason", "request body is not a decodable AdmissionReview")
 		return errVerificationFailed
 	}
-	if err := verifier.Verify(ctx, token, req.Resource.Group); err != nil {
+	if err := v.verifier.Verify(ctx, token, req.Resource.Group); err != nil {
 		return errVerificationFailed
 	}
 	// The attestation covers the resource group, but known subresources may carry

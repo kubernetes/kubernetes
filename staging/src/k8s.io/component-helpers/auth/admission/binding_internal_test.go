@@ -41,7 +41,7 @@ func TestHandlerHealthCheckDelegates(t *testing.T) {
 	if err != nil {
 		t.Fatalf("construct core verifier: %v", err)
 	}
-	handler := &Handler{verifier: verifier}
+	handler := &Handler{verifier: &Verifier{verifier: verifier}}
 	if err := handler.HealthCheck(); !errors.Is(err, spy.healthErr) {
 		t.Fatalf("HealthCheck = %v, want issuer readiness error", err)
 	}
