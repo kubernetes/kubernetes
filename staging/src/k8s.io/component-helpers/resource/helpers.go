@@ -69,6 +69,10 @@ type PodResourcesOptions struct {
 	NonMissingContainerRequests v1.ResourceList
 	// SkipContainerLevelResources
 	SkipContainerLevelResources bool
+	// ExcludeDRANodeAllocatableResources controls whether node allocatable resources (e.g. cpu, memory, hugepages)
+	// allocated to the pod through DRA claims, as reported in pod.Status.NodeAllocatableResourceClaimStatuses,
+	// are excluded from the calculation.
+	ExcludeDRANodeAllocatableResources bool
 	// Features contains the feature gate flags used when evaluating pod resources.
 	Features Features
 }
@@ -554,7 +558,7 @@ func addDRANodeAllocatableLimits(specLimits v1.ResourceList, pod *v1.Pod, opts P
 }
 
 func addDRANodeAllocatableClaimResources(resources v1.ResourceList, pod *v1.Pod, opts PodResourcesOptions) {
-	if opts.Features.DRANodeAllocatableResources && len(pod.Status.NodeAllocatableResourceClaimStatuses) > 0 {
+	if opts.Features.DRANodeAllocatableResources && !opts.ExcludeDRANodeAllocatableResources && len(pod.Status.NodeAllocatableResourceClaimStatuses) > 0 {
 		for _, claimStatus := range pod.Status.NodeAllocatableResourceClaimStatuses {
 			// TODO(pravk03): Handle claim references by init containers and peak resource calculation based on that.
 			// Currently, any DRA allocation is always added into the pod footprint.

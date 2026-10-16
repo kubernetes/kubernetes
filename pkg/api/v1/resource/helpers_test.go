@@ -17,6 +17,7 @@ limitations under the License.
 package resource
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -27,6 +28,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/utils/ptr"
 )
 
 const (
@@ -177,6 +179,29 @@ func TestGetResourceRequest(t *testing.T) {
 
 		actual := GetResourceRequest(tc.pod, tc.resourceName)
 		as.Equal(tc.expectedValue, actual, "expected test case [%d] %v: to return %q; got %q instead", idx, tc.cName, tc.expectedValue, actual)
+	}
+}
+
+func TestGetResourceRequestWithDRANodeAllocatableResources(t *testing.T) {
+	pod := getPod(containerName, resources{cpuRequest: "1", memoryRequest: "100Mi"})
+	pod.Status.NodeAllocatableResourceClaimStatuses = []v1.NodeAllocatableResourceClaimStatus{{
+		ResourceClaimName: "claim",
+		Containers:        []string{containerName},
+		Mapping: []v1.NodeAllocatableMappedResources{
+			{Name: v1.ResourceCPU, Quantity: ptr.To(resource.MustParse("2"))},
+		},
+	}}
+
+	for _, enabled := range []bool{true, false} {
+		t.Run(fmt.Sprintf("DRANodeAllocatableResources=%t", enabled), func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRANodeAllocatableResources, enabled)
+			expectedCPU := int64(1000)
+			if enabled {
+				expectedCPU = 3000
+			}
+			assert.Equal(t, expectedCPU, GetResourceRequest(pod, v1.ResourceCPU))
+			assert.Equal(t, int64(100*1024*1024), GetResourceRequest(pod, v1.ResourceMemory))
+		})
 	}
 }
 

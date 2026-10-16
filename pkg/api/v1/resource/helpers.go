@@ -69,7 +69,6 @@ func GetResourceRequestQuantity(pod *v1.Pod, resourceName v1.ResourceName) resou
 	fts := Features()
 	hasPodLevelResources := fts.PodLevelResources && resourcehelper.IsPodLevelResourcesSet(pod)
 
-	// TODO(pravk03): considering DRA Node Allocatable resources for eviction ranking.
 	if rQuantity, ok := resourcehelper.PodRequests(pod, resourcehelper.PodResourcesOptions{
 		SkipContainerLevelResources: hasPodLevelResources,
 		ExcludeOverhead:             true,
