@@ -120,6 +120,16 @@ func TestNominatedPodRequeuesOnNodeAllocatableDecrease(t *testing.T) {
 					t.Fatalf("failed to create node %s: %v", name, err)
 				}
 			}
+			// Register cleanup here so it runs even if the subtest fails, keeping
+			// the shared scheduler clean for the next subtest.
+			t.Cleanup(func() {
+				for _, name := range []string{nominatedNode, otherNode} {
+					_ = cs.CoreV1().Pods(ns).DeleteCollection(testCtx.Ctx, *metav1.NewDeleteOptions(0), metav1.ListOptions{
+						FieldSelector: "spec.nodeName=" + name,
+					})
+					_ = cs.CoreV1().Nodes().Delete(testCtx.Ctx, name, *metav1.NewDeleteOptions(0))
+				}
+			})
 
 			// High-priority filler pods consume both nodes (7Gi each). The target has lower
 			// priority so it cannot preempt them and parks in unschedulableEntities.
@@ -213,14 +223,7 @@ func TestNominatedPodRequeuesOnNodeAllocatableDecrease(t *testing.T) {
 				})
 			}
 
-			// Clean up pods and nodes so the next subtest starts fresh.
 			testutils.CleanupPods(testCtx.Ctx, cs, t, []*v1.Pod{target})
-			for _, name := range []string{nominatedNode, otherNode} {
-				_ = cs.CoreV1().Pods(ns).DeleteCollection(testCtx.Ctx, *metav1.NewDeleteOptions(0), metav1.ListOptions{
-					FieldSelector: "spec.nodeName=" + name,
-				})
-				_ = cs.CoreV1().Nodes().Delete(testCtx.Ctx, name, *metav1.NewDeleteOptions(0))
-			}
 		})
 	}
 }
@@ -228,14 +231,14 @@ func TestNominatedPodRequeuesOnNodeAllocatableDecrease(t *testing.T) {
 // TestPreemptsElsewhereWhenNominatedNodeShrinks is an end-to-end test of the full
 // preemption-and-capacity-decrease flow:
 //
-//  1. Two nodes, each holding one low-priority victim pod (with a long grace period
-//     so they stay Terminating long enough for the test to act).
-//  2. A high-priority target pod preempts on node-a, which gets NominatedNodeName=node-a.
+//  1. Two nodes: node-a holds a low-priority victim, node-b holds a medium-priority victim.
+//  2. A high-priority target pod preempts on node-a and gets NominatedNodeName=node-a.
 //  3. While the victim on node-a is still Terminating, node-a's allocatable is shrunk
 //     below the target's request.
 //  4. The scheduler detects the shrink via the queueing hint, re-queues the target,
 //     and preempts the victim on node-b instead.
 //  5. The target eventually binds to node-b.
+//
 func TestPreemptsElsewhereWhenNominatedNodeShrinks(t *testing.T) {
 	schedulerName := v1.DefaultSchedulerName
 	cfg := configtesting.V1ToInternalWithDefaults(t, configv1.KubeSchedulerConfiguration{
@@ -256,7 +259,6 @@ func TestPreemptsElsewhereWhenNominatedNodeShrinks(t *testing.T) {
 	cs := testCtx.ClientSet
 	ns := testCtx.NS.Name
 
-	// Two nodes, each with 8Gi allocatable.
 	for _, name := range []string{"node-a", "node-b"} {
 		node := st.MakeNode().Name(name).Capacity(map[v1.ResourceName]string{
 			v1.ResourcePods:   "10",
@@ -267,27 +269,29 @@ func TestPreemptsElsewhereWhenNominatedNodeShrinks(t *testing.T) {
 		}
 	}
 
-	// Long grace period keeps victims in Terminating state long enough for the test to act.
-	grace := int64(600)
-
-	// One low-priority victim on each node consuming 6Gi.
+	// victim-node-a has strictly lower priority than victim-node-b, so the scheduler
+	// always picks node-a as the preemption target first, making the test deterministic.
+	victimPriorities := map[string]int32{
+		"node-a": asyncframework.LowPriority,
+		"node-b": asyncframework.MediumPriority,
+	}
 	for _, nodeName := range []string{"node-a", "node-b"} {
+		p := victimPriorities[nodeName]
 		victim := initPausePod(&testutils.PausePodConfig{
 			Name:      "victim-" + nodeName,
 			Namespace: ns,
-			Priority:  &asyncframework.LowPriority,
+			Priority:  &p,
 			NodeName:  nodeName,
 			Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
 				v1.ResourceMemory: resource.MustParse("6Gi"),
 			}},
 		})
-		victim.Spec.TerminationGracePeriodSeconds = &grace
 		if _, err := cs.CoreV1().Pods(ns).Create(testCtx.Ctx, victim, metav1.CreateOptions{}); err != nil {
 			t.Fatalf("failed to create victim on %s: %v", nodeName, err)
 		}
 	}
 
-	// High-priority target requests 4Gi — fits after evicting either victim.
+	// High-priority target requests 4Gi, fits after evicting either victim.
 	target := initPausePod(&testutils.PausePodConfig{
 		Name:      "target",
 		Namespace: ns,
@@ -301,7 +305,7 @@ func TestPreemptsElsewhereWhenNominatedNodeShrinks(t *testing.T) {
 		t.Fatalf("failed to create target pod: %v", err)
 	}
 
-	// Wait for the scheduler to nominate the target to one of the nodes.
+	// The scheduler always nominates node-a first (lowest-priority victim).
 	if err := testutils.WaitForNominatedNodeName(testCtx.Ctx, cs, target); err != nil {
 		t.Fatalf("target pod did not get NominatedNodeName: %v", err)
 	}
@@ -309,50 +313,51 @@ func TestPreemptsElsewhereWhenNominatedNodeShrinks(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to re-fetch target: %v", err)
 	}
-	nominatedNode := target.Status.NominatedNodeName
-	t.Logf("target nominated to %s", nominatedNode)
-
-	// Wait until the victim on the nominated node is Terminating (preemption has acted).
-	if err := wait.PollUntilContextTimeout(testCtx.Ctx, 50*time.Millisecond, 10*time.Second, false,
-		testutils.PodIsGettingEvicted(cs, ns, "victim-"+nominatedNode)); err != nil {
-		t.Fatalf("victim on %s did not enter Terminating state: %v", nominatedNode, err)
+	if target.Status.NominatedNodeName != "node-a" {
+		t.Fatalf("expected target to be nominated to node-a, got %s", target.Status.NominatedNodeName)
 	}
 
-	// Shrink the nominated node's allocatable below the target's request while the
-	// victim is still Terminating. The queueing hint should fire and re-queue the target.
-	node, err := cs.CoreV1().Nodes().Get(testCtx.Ctx, nominatedNode, metav1.GetOptions{})
+	// Wait until the victim on node-a is Terminating (preemption has acted).
+	if err := wait.PollUntilContextTimeout(testCtx.Ctx, 50*time.Millisecond, 10*time.Second, false,
+		testutils.PodIsGettingEvicted(cs, ns, "victim-node-a")); err != nil {
+		t.Fatalf("victim on node-a did not enter Terminating state: %v", err)
+	}
+
+	// Shrink node-a's allocatable below the target's request while the victim is still
+	// Terminating. The queueing hint should fire and re-queue the target.
+	node, err := cs.CoreV1().Nodes().Get(testCtx.Ctx, "node-a", metav1.GetOptions{})
 	if err != nil {
-		t.Fatalf("failed to get node %s: %v", nominatedNode, err)
+		t.Fatalf("failed to get node-a: %v", err)
 	}
 	node.Status.Allocatable[v1.ResourceMemory] = resource.MustParse("1Gi")
 	if _, err := cs.CoreV1().Nodes().UpdateStatus(testCtx.Ctx, node, metav1.UpdateOptions{}); err != nil {
-		t.Fatalf("failed to shrink node %s: %v", nominatedNode, err)
+		t.Fatalf("failed to shrink node-a: %v", err)
 	}
 
-	// Determine the other node.
-	otherNode := "node-b"
-	if nominatedNode == "node-b" {
-		otherNode = "node-a"
-	}
-
-	// The target must be re-nominated to the other node while the first victim is still Terminating.
+	// The target must be re-nominated to node-b while the node-a victim is still Terminating.
 	if err := wait.PollUntilContextTimeout(testCtx.Ctx, 50*time.Millisecond, 10*time.Second, false, func(ctx context.Context) (bool, error) {
 		p, err := cs.CoreV1().Pods(ns).Get(ctx, target.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
-		return p.Status.NominatedNodeName == otherNode, nil
+		return p.Status.NominatedNodeName == "node-b", nil
 	}); err != nil {
-		t.Fatalf("target was not re-nominated to %s after nominated node shrank: %v", otherNode, err)
+		t.Fatalf("target was not re-nominated to node-b after node-a shrank: %v", err)
 	}
 
-	// Confirm the first victim is still Terminating.
-	firstVictim, err := cs.CoreV1().Pods(ns).Get(testCtx.Ctx, "victim-"+nominatedNode, metav1.GetOptions{})
+	// Confirm node-a's victim is still Terminating.
+	firstVictim, err := cs.CoreV1().Pods(ns).Get(testCtx.Ctx, "victim-node-a", metav1.GetOptions{})
 	if err != nil {
-		t.Fatalf("failed to fetch first victim: %v", err)
+		t.Fatalf("failed to fetch victim-node-a: %v", err)
 	}
 	if firstVictim.DeletionTimestamp == nil {
-		t.Errorf("expected victim-%s to still be Terminating, but DeletionTimestamp is nil", nominatedNode)
+		t.Errorf("expected victim-node-a to still be Terminating, but DeletionTimestamp is nil")
+	}
+
+	// Assert that the victim on node-b was preempted before manually cleaning up.
+	if err := wait.PollUntilContextTimeout(testCtx.Ctx, 50*time.Millisecond, 10*time.Second, false,
+		testutils.PodIsGettingEvicted(cs, ns, "victim-node-b")); err != nil {
+		t.Fatalf("victim on node-b was not preempted after re-nomination: %v", err)
 	}
 
 	// Force-delete the victims so the target can actually bind, then wait for it to schedule.
@@ -368,7 +373,7 @@ func TestPreemptsElsewhereWhenNominatedNodeShrinks(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to fetch final target state: %v", err)
 	}
-	if finalTarget.Spec.NodeName != otherNode {
-		t.Errorf("target scheduled on %s, expected %s", finalTarget.Spec.NodeName, otherNode)
+	if finalTarget.Spec.NodeName != "node-b" {
+		t.Errorf("target scheduled on %s, expected node-b", finalTarget.Spec.NodeName)
 	}
 }
