@@ -198,20 +198,3 @@ func (r *Replay) EventsForRVs(request WatchRequest, rvRange *ResourceVersionRang
 func (r *Replay) ResourceVersion() uint64 {
 	return r.changes[len(r.changes)-1].ResourceVersion
 }
-
-func (r *Replay) LastWatchRV(request WatchRequest) (uint64, error) {
-	for i := len(r.changes) - 1; i >= 0; i-- {
-		change := r.changes[i]
-		if !keyInScope(request.Key, request.Options.Recursive, change.Key) {
-			continue
-		}
-		watchEvent, err := change.toWatchEvent(r.versioner, request.Options.Predicate)
-		if err != nil {
-			return 0, err
-		}
-		if watchEvent != nil {
-			return change.ResourceVersion, nil
-		}
-	}
-	return 0, nil
-}
