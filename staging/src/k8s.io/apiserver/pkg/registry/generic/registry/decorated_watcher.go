@@ -58,6 +58,9 @@ func (d *decoratedWatcher) run(ctx context.Context) {
 			}
 			switch recv.Type {
 			case watch.Added, watch.Modified, watch.Deleted, watch.Bookmark:
+				if co, ok := recv.Object.(runtime.CacheableObject); ok {
+					recv.Object = co.GetObject()
+				}
 				d.decorator(recv.Object)
 				send = recv
 			case watch.Error:

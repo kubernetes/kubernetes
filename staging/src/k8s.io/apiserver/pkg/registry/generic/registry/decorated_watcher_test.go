@@ -18,15 +18,37 @@ package registry
 
 import (
 	"context"
+	"io"
 	"testing"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/apis/example"
 )
+
+type fakeCacheableObject struct {
+	obj runtime.Object
+}
+
+func (f *fakeCacheableObject) GetObjectKind() schema.ObjectKind {
+	return f.obj.GetObjectKind()
+}
+
+func (f *fakeCacheableObject) DeepCopyObject() runtime.Object {
+	return &fakeCacheableObject{obj: f.obj.DeepCopyObject()}
+}
+
+func (f *fakeCacheableObject) CacheEncode(id runtime.Identifier, encode func(runtime.Object, io.Writer) error, w io.Writer) error {
+	return encode(f.GetObject(), w)
+}
+
+func (f *fakeCacheableObject) GetObject() runtime.Object {
+	return f.obj.DeepCopyObject()
+}
 
 func TestDecoratedWatcher(t *testing.T) {
 	w := watch.NewFake()
@@ -39,6 +61,8 @@ func TestDecoratedWatcher(t *testing.T) {
 	dw := newDecoratedWatcher(ctx, w, decorator)
 	defer dw.Stop()
 
+	cachedPod := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "cached"}}
+
 	go func() {
 		w.Error(&metav1.Status{Status: "Failure"})
 		w.Add(&example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
@@ -46,6 +70,9 @@ func TestDecoratedWatcher(t *testing.T) {
 		w.Modify(&example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
 		w.Error(&metav1.Status{Status: "Failure"})
 		w.Delete(&example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
+		w.Add(&fakeCacheableObject{obj: cachedPod})
+		w.Modify(&fakeCacheableObject{obj: cachedPod})
+		w.Delete(&fakeCacheableObject{obj: cachedPod})
 	}()
 
 	expectErrorEvent(t, dw) // expect error is plumbed and doesn't force close the watcher
@@ -54,6 +81,13 @@ func TestDecoratedWatcher(t *testing.T) {
 	expectPodEvent(t, dw, watch.Modified)
 	expectErrorEvent(t, dw) // expect error is plumbed and doesn't force close the watcher
 	expectPodEvent(t, dw, watch.Deleted)
+	expectPodEvent(t, dw, watch.Added)
+	expectPodEvent(t, dw, watch.Modified)
+	expectPodEvent(t, dw, watch.Deleted)
+
+	if cachedPod.Annotations["decorated"] != "" {
+		t.Errorf("expected underlying cached object not to be mutated, got annotations: %v", cachedPod.Annotations)
+	}
 
 	// cancel the passed-in context to simulate request timeout
 	cancel()
