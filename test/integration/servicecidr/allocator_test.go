@@ -197,7 +197,7 @@ func TestServiceAllocIPAddressLargeCIDR(t *testing.T) {
 
 func TestMigrateService(t *testing.T) {
 	etcdOptions := framework.SharedEtcd()
-	apiServerOptions := kubeapiservertesting.NewDefaultTestServerOptions()
+	apiServerOptions := &kubeapiservertesting.TestServerInstanceOptions{}
 	s := kubeapiservertesting.StartTestServerOrDie(t,
 		apiServerOptions,
 		[]string{
@@ -243,13 +243,6 @@ func TestMigrateService(t *testing.T) {
 	}
 	ns := framework.CreateNamespaceOrDie(kubeclient, namespace, t)
 	defer framework.DeleteNamespaceOrDie(kubeclient, ns, t)
-
-	// TODO: Understand why the Service can not be obtained with a List, it only works if we trigger an event
-	// by updating the Service.
-	_, err = kubeclient.CoreV1().Services(namespace).Update(context.Background(), svc, metav1.UpdateOptions{})
-	if err != nil {
-		t.Error(err)
-	}
 
 	err = wait.PollImmediate(1*time.Second, 10*time.Second, func() (bool, error) {
 		// The repair loop must create the IP address associated
@@ -380,4 +373,199 @@ func TestInvalidService(t *testing.T) {
 		t.Errorf("unexpected error reason: %v", err)
 	}
 
+}
+
+func TestLegacyServiceStatusUpdateDuplicateIP(t *testing.T) {
+	serviceCIDR := "192.168.0.0/29" // 6 usable IPs: .1 (kubernetes) and .2-.6
+	etcdOptions := framework.SharedEtcd()
+	apiServerOptions := &kubeapiservertesting.TestServerInstanceOptions{}
+	s := kubeapiservertesting.StartTestServerOrDie(t,
+		apiServerOptions,
+		[]string{
+			"--service-cluster-ip-range=" + serviceCIDR,
+			"--disable-admission-plugins=ServiceAccount",
+		},
+		etcdOptions)
+	defer s.TearDownFn()
+
+	client, err := clientset.NewForConfig(s.ClientConfig)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	ctx := context.Background()
+
+	// Wait until the default "kubernetes" service (192.168.0.1) is created.
+	if err := wait.PollUntilContextTimeout(ctx, 250*time.Millisecond, 15*time.Second, true, func(context.Context) (bool, error) {
+		_, err := client.CoreV1().Services(metav1.NamespaceDefault).Get(ctx, "kubernetes", metav1.GetOptions{})
+		if err != nil && !apierrors.IsNotFound(err) {
+			return false, err
+		}
+		return !apierrors.IsNotFound(err), nil
+	}); err != nil {
+		t.Fatalf("creating kubernetes service timed out: %v", err)
+	}
+
+	// Store a legacy pre-1.20 Service directly in etcd with only spec.clusterIP set
+	// (spec.clusterIPs and spec.ipFamilies unset).
+	legacyServiceName := "legacy-lb-service"
+	legacyIP := "192.168.0.2"
+	legacySvc := &v1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:              legacyServiceName,
+			Namespace:         metav1.NamespaceDefault,
+			CreationTimestamp: metav1.NewTime(time.Now().Add(1 * time.Hour)),
+			UID:               "08675309-9376-9376-9376-086753099999",
+		},
+		Spec: v1.ServiceSpec{
+			ClusterIP: legacyIP,
+			Type:      v1.ServiceTypeLoadBalancer,
+			Ports: []v1.ServicePort{
+				{
+					Name:     "http",
+					Port:     80,
+					NodePort: 30080,
+					Protocol: v1.ProtocolTCP,
+				},
+			},
+		},
+	}
+	svcJSON, err := runtime.Encode(legacyscheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), legacySvc)
+	if err != nil {
+		t.Fatalf("Failed creating service JSON: %v", err)
+	}
+	key := "/" + etcdOptions.Prefix + "/services/specs/" + metav1.NamespaceDefault + "/" + legacyServiceName
+	if _, err := s.EtcdClient.Put(ctx, key, string(svcJSON)); err != nil {
+		t.Fatalf("Failed writing legacy service to etcd: %v", err)
+	}
+
+	// Wait for the repair controller to ensure IPAddress/192.168.0.2 exists for legacy-lb-service.
+	if err := wait.PollUntilContextTimeout(ctx, 250*time.Millisecond, 15*time.Second, true, func(ctx context.Context) (bool, error) {
+		ipAddr, err := client.NetworkingV1().IPAddresses().Get(ctx, legacyIP, metav1.GetOptions{})
+		if err != nil {
+			return false, nil
+		}
+		return ipAddr.Spec.ParentRef != nil && ipAddr.Spec.ParentRef.Name == legacyServiceName, nil
+	}); err != nil {
+		t.Fatalf("timed out waiting for IPAddress %s to be created by repair controller: %v", legacyIP, err)
+	}
+
+	// Allocate the remaining 4 IPs in 192.168.0.0/29 (.3, .4, .5, .6).
+	for i := range 4 {
+		svcObj := &v1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: fmt.Sprintf("filler-svc-%d", i),
+			},
+			Spec: v1.ServiceSpec{
+				Type: v1.ServiceTypeClusterIP,
+				Ports: []v1.ServicePort{
+					{Port: 80},
+				},
+			},
+		}
+		if _, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(ctx, svcObj, metav1.CreateOptions{}); err != nil {
+			t.Fatalf("failed to create filler-svc-%d: %v", i, err)
+		}
+	}
+
+	// Confirm the /29 range is now completely full.
+	_, err = client.CoreV1().Services(metav1.NamespaceDefault).Create(ctx, makeService("should-fail-full"), metav1.CreateOptions{})
+	if err == nil || !strings.Contains(err.Error(), "range is full") {
+		t.Fatalf("expected 'range is full' error when CIDR is exhausted, got: %v", err)
+	}
+
+	// Start a watch on Services to observe the watch.Modified event emitted by UpdateStatus.
+	svcList, err := client.CoreV1().Services(metav1.NamespaceDefault).List(ctx, metav1.ListOptions{})
+	if err != nil {
+		t.Fatalf("failed to LIST services: %v", err)
+	}
+	gotLegacySvc, err := client.CoreV1().Services(metav1.NamespaceDefault).Get(ctx, legacyServiceName, metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("failed to GET legacy service: %v", err)
+	}
+	watchCtx, watchCancel := context.WithCancel(ctx)
+	defer watchCancel()
+	w, err := client.CoreV1().Services(metav1.NamespaceDefault).Watch(watchCtx, metav1.ListOptions{
+		ResourceVersion: svcList.ResourceVersion,
+	})
+	if err != nil {
+		t.Fatalf("failed to start service watch: %v", err)
+	}
+	defer w.Stop()
+
+	// Patch/Update the legacy Service's status (simulating cloud-controller-manager service-controller).
+	gotLegacySvc.Status.LoadBalancer.Ingress = []v1.LoadBalancerIngress{{IP: "192.0.2.100"}}
+	if _, err := client.CoreV1().Services(metav1.NamespaceDefault).UpdateStatus(ctx, gotLegacySvc, metav1.UpdateOptions{}); err != nil {
+		t.Fatalf("UpdateStatus on legacy service failed: %v", err)
+	}
+
+	// Inspect the watched Service from the live watch event.
+	for {
+		select {
+		case event := <-w.ResultChan():
+			watchedSvc, ok := event.Object.(*v1.Service)
+			if !ok {
+				t.Fatalf("unexpected watch event (%v) object: %#v", event.Type, event.Object)
+			}
+			if watchedSvc.Name != legacyServiceName {
+				continue
+			}
+			if len(watchedSvc.Spec.ClusterIPs) == 0 {
+				t.Errorf("watched Service %s is missing Spec.ClusterIPs (got %v) even though Spec.ClusterIP=%q",
+					watchedSvc.Name, watchedSvc.Spec.ClusterIPs, watchedSvc.Spec.ClusterIP)
+			}
+			if len(watchedSvc.Spec.IPFamilies) == 0 {
+				t.Errorf("watched Service %s is missing Spec.IPFamilies (got %v)", watchedSvc.Name, watchedSvc.Spec.IPFamilies)
+			}
+		case <-time.After(10 * time.Second):
+			t.Fatalf("timed out waiting for watch event after UpdateStatus")
+		}
+		break
+	}
+	w.Stop()
+	watchCancel()
+
+	// Trigger ipallocator-repair-controller's IPAddress reconciliation (simulating the periodic resync).
+	ipAddr, err := client.NetworkingV1().IPAddresses().Get(ctx, legacyIP, metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("failed to get IPAddress %s: %v", legacyIP, err)
+	}
+	if ipAddr.Annotations == nil {
+		ipAddr.Annotations = map[string]string{}
+	}
+	ipAddr.Annotations["resync-trigger"] = "true"
+	if _, err := client.NetworkingV1().IPAddresses().Update(ctx, ipAddr, metav1.UpdateOptions{}); err != nil {
+		t.Fatalf("failed to update IPAddress %s annotation: %v", legacyIP, err)
+	}
+
+	// Verify that the repair controller does not delete IPAddress/192.168.0.2 or allow
+	// a new Service to steal the IP address.
+	err = wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, 2*time.Second, true, func(ctx context.Context) (bool, error) {
+		_, getErr := client.NetworkingV1().IPAddresses().Get(ctx, legacyIP, metav1.GetOptions{})
+		if apierrors.IsNotFound(getErr) {
+			return true, nil
+		}
+		return false, nil
+	})
+	if err == nil {
+		// IPAddress was erroneously deleted by the repair controller!
+		// Attempt to create a new Service to show it steals 192.168.0.2.
+		var duplicateSvc *v1.Service
+		_ = wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, 3*time.Second, true, func(ctx context.Context) (bool, error) {
+			var createErr error
+			duplicateSvc, createErr = client.CoreV1().Services(metav1.NamespaceDefault).Create(ctx, makeService("new-service"), metav1.CreateOptions{})
+			return createErr == nil, nil
+		})
+		if duplicateSvc != nil {
+			t.Fatalf("IPAddress %s was erroneously deleted by repair controller and re-allocated to %s (both %s and %s now have ClusterIP %s!)",
+				legacyIP, duplicateSvc.Name, legacyServiceName, duplicateSvc.Name, duplicateSvc.Spec.ClusterIP)
+		}
+		t.Fatalf("IPAddress %s was erroneously deleted by repair controller after UpdateStatus on legacy service", legacyIP)
+	}
+
+	// Confirm the /29 range is still completely full and IPAddress/192.168.0.2 still belongs to legacy-lb-service.
+	_, err = client.CoreV1().Services(metav1.NamespaceDefault).Create(ctx, makeService("new-service"), metav1.CreateOptions{})
+	if err == nil || !strings.Contains(err.Error(), "range is full") {
+		t.Fatalf("expected 'range is full' error when CIDR is exhausted, got: %v", err)
+	}
 }
