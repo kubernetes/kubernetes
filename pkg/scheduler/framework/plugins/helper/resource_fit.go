@@ -124,8 +124,12 @@ func Fits(pod *v1.Pod, nodeInfo fwk.NodeInfo, draManager fwk.SharedDRAManager, o
 func FitsRequest(podRequest *framework.Resource, nodeInfo fwk.NodeInfo, ignoredExtendedResources, ignoredResourceGroups sets.Set[string], draManager fwk.SharedDRAManager, opts ResourceRequestsOptions, pod *v1.Pod) []InsufficientResource {
 	insufficientResources := make([]InsufficientResource, 0, 4)
 
+	deltaPods := 1
+	if isPodResizeOnNode(opts, nodeInfo, pod) {
+		deltaPods = 0
+	}
 	allowedPodNumber := nodeInfo.GetAllocatable().GetAllowedPodNumber()
-	if len(nodeInfo.GetPods())+1 > allowedPodNumber {
+	if len(nodeInfo.GetPods())+deltaPods > allowedPodNumber {
 		insufficientResources = append(insufficientResources, InsufficientResource{
 			ResourceName: v1.ResourcePods,
 			Reason:       "Too many pods",
@@ -142,7 +146,7 @@ func FitsRequest(podRequest *framework.Resource, nodeInfo fwk.NodeInfo, ignoredE
 		return insufficientResources
 	}
 
-	deltaMilliCPU, deltaMemory, deltaEphemeralStorage, deltaScalarResources := adjustDeltasToAccomodateCacheDiscrepancy(opts, podRequest, nodeInfo, pod)
+	deltaMilliCPU, deltaMemory, deltaEphemeralStorage, deltaScalarResources := adjustDeltasForPodResize(opts, podRequest, nodeInfo, pod)
 
 	if podRequest.MilliCPU > 0 && deltaMilliCPU > (nodeInfo.GetAllocatable().GetMilliCPU()-nodeInfo.GetRequested().GetMilliCPU()) {
 		insufficientResources = append(insufficientResources, InsufficientResource{
@@ -178,7 +182,7 @@ func FitsRequest(podRequest *framework.Resource, nodeInfo fwk.NodeInfo, ignoredE
 
 	for rName, rQuant := range deltaScalarResources {
 		// Skip in case request quantity is zero
-		if rQuant == 0 {
+		if podRequest.ScalarResources[rName] == 0 {
 			continue
 		}
 
@@ -204,7 +208,7 @@ func FitsRequest(podRequest *framework.Resource, nodeInfo fwk.NodeInfo, ignoredE
 				Requested:    podRequest.ScalarResources[rName],
 				Used:         nodeInfo.GetRequested().GetScalarResources()[rName],
 				Capacity:     nodeInfo.GetAllocatable().GetScalarResources()[rName],
-				Unresolvable: rQuant > nodeInfo.GetAllocatable().GetScalarResources()[rName],
+				Unresolvable: podRequest.ScalarResources[rName] > nodeInfo.GetAllocatable().GetScalarResources()[rName],
 			})
 		}
 	}
@@ -212,47 +216,21 @@ func FitsRequest(podRequest *framework.Resource, nodeInfo fwk.NodeInfo, ignoredE
 	return insufficientResources
 }
 
-// adjustDeltasToAccomodateCacheDiscrepancy calculates the resource requests to evaluate
-// for a pod. For an assigned pod, its desired resources are already accounted for in the
-// node cache (max(desired, allocated, actual)), so ideally we only check if the node is
-// overallocated. This function exists to amortize asynchronous discrepancies between the
-// pod info in the scheduling queue and the node snapshot cache.
-func adjustDeltasToAccomodateCacheDiscrepancy(opts ResourceRequestsOptions, podRequest *framework.Resource, nodeInfo fwk.NodeInfo, pod *v1.Pod) (int64, int64, int64, map[v1.ResourceName]int64) {
-	deltaMilliCPU := podRequest.MilliCPU
-	deltaMemory := podRequest.Memory
-	deltaEphemeralStorage := podRequest.EphemeralStorage
-	deltaScalarResources := podRequest.ScalarResources
+func isPodResizeOnNode(opts ResourceRequestsOptions, nodeInfo fwk.NodeInfo, pod *v1.Pod) bool {
+	return opts.EnableInPlacePodVerticalScalingSchedulerPreemption && pod != nil && resource.IsPodResizeDeferred(pod) && pod.Spec.NodeName == nodeInfo.Node().Name
+}
 
-	if !opts.EnableInPlacePodVerticalScalingSchedulerPreemption || pod == nil || len(pod.Spec.NodeName) == 0 || pod.Spec.NodeName != nodeInfo.Node().Name {
-		return deltaMilliCPU, deltaMemory, deltaEphemeralStorage, deltaScalarResources
+// adjustDeltasForPodResize calculates the resource deltas to evaluate for a pod.
+// A deferred resize pod on its node is already counted in nodeInfo at max(desired, allocated, actual),
+// so its delta is 0 and we only check whether the node is overcommitted.
+func adjustDeltasForPodResize(opts ResourceRequestsOptions, podRequest *framework.Resource, nodeInfo fwk.NodeInfo, pod *v1.Pod) (int64, int64, int64, map[v1.ResourceName]int64) {
+	if !isPodResizeOnNode(opts, nodeInfo, pod) {
+		return podRequest.MilliCPU, podRequest.Memory, podRequest.EphemeralStorage, podRequest.ScalarResources
 	}
 
-	var cachedPodInfo fwk.PodInfo
-	for _, pInfo := range nodeInfo.GetPods() {
-		if pInfo.GetPod().UID == pod.UID {
-			cachedPodInfo = pInfo
-			break
-		}
+	adjustedScalars := make(map[v1.ResourceName]int64, len(podRequest.ScalarResources))
+	for rName := range podRequest.ScalarResources {
+		adjustedScalars[rName] = 0
 	}
-	if cachedPodInfo == nil {
-		return deltaMilliCPU, deltaMemory, deltaEphemeralStorage, deltaScalarResources
-	}
-
-	cachedRes := cachedPodInfo.CalculateResource().Resource
-	// We take max(0, ...) to prevent negative deltas when podRequest < cachedRes (e.g., during scale-down
-	// or asynchronous cache lag). Allowing a negative delta would improperly reduce the node's requested
-	// usage before the Kubelet has actually freed the resources. If a stale larger cachedRes causes
-	// preemption to fail, eventual cache convergence will emit a scale-down event to wake up the pod.
-	deltaMilliCPU = max(0, podRequest.MilliCPU-cachedRes.GetMilliCPU())
-	deltaMemory = max(0, podRequest.Memory-cachedRes.GetMemory())
-	deltaEphemeralStorage = max(0, podRequest.EphemeralStorage-cachedRes.GetEphemeralStorage())
-
-	adjustedScalars := make(map[v1.ResourceName]int64)
-	cachedScalars := cachedRes.GetScalarResources()
-	for rName, rQuant := range podRequest.ScalarResources {
-		adjustedScalars[rName] = max(0, rQuant-cachedScalars[rName])
-	}
-	deltaScalarResources = adjustedScalars
-
-	return deltaMilliCPU, deltaMemory, deltaEphemeralStorage, deltaScalarResources
+	return 0, 0, 0, adjustedScalars
 }
