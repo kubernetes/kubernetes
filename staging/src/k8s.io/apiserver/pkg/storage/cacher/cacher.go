@@ -645,7 +645,30 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 	watcher.bookmarkAfterResourceVersion = bookmarkAfterResourceVersion
 
 	var cacheInterval *watchCacheInterval
-	cacheInterval, err = c.watchCache.getAllEventsSinceLocked(ctx, requiredResourceVersion, key, opts)
+
+	if opts.SendInitialEvents != nil && *opts.SendInitialEvents {
+		cacheInterval, _, err = c.watchCache.getIntervalFromStoreLocked(ctx, key, opts)
+	} else {
+		if requiredResourceVersion == 0 {
+			if opts.SendInitialEvents == nil {
+				// resourceVersion = 0 means that we don't require any specific starting point
+				// and we would like to start watching from ~now.
+				// However, to keep backward compatibility, we additionally need to return the
+				// current state and only then start watching from that point.
+				//
+				// TODO: In v2 api, we should stop returning the current state - #13969.
+				cacheInterval, _, err = c.watchCache.getIntervalFromStoreLocked(ctx, key, opts)
+			} else {
+				// SendInitialEvents = false and resourceVersion = 0
+				// means that the request would like to start watching
+				// from Any resourceVersion
+				cacheInterval, err = c.watchCache.history.GetIntervalLocked(currentResourceVersion, c.watchCache.RWMutex.RLocker())
+			}
+		} else {
+			cacheInterval, err = c.watchCache.history.GetIntervalLocked(requiredResourceVersion, c.watchCache.RWMutex.RLocker())
+		}
+	}
+
 	if err != nil {
 		// To match the uncached watch implementation, once we have passed authn/authz/admission,
 		// and successfully parsed a resource version, other errors must fail with a watch event of type ERROR,
