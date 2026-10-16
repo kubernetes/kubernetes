@@ -590,11 +590,18 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 		}
 		requiredResourceVersion = rv
 	}
+	bookmarkAfterResourceVersionFn := func() uint64 { return 0 }
 
-	// Determine a function that computes the bookmarkAfterResourceVersion
-	bookmarkAfterResourceVersionFn, err := c.getBookmarkAfterResourceVersionLockedFunc(requestedWatchRV, requiredResourceVersion, opts)
-	if err != nil {
-		return newErrWatcher(err), nil
+	if isListWatchRequest(opts) {
+		switch {
+		case len(opts.ResourceVersion) == 0:
+			bookmarkAfterResourceVersionFn = func() uint64 { return requiredResourceVersion }
+		case requestedWatchRV == 0:
+			// here we assume that watchCache locked is already held
+			bookmarkAfterResourceVersionFn = func() uint64 { return c.watchCache.resourceVersion }
+		default:
+			bookmarkAfterResourceVersionFn = func() uint64 { return requestedWatchRV }
+		}
 	}
 	// Note that we cannot do it under Cacher lock, to avoid a deadlock, since the
 	// underlying watchCache is calling processEvent under its lock.
@@ -1308,26 +1315,6 @@ func (c *Cacher) LastSyncResourceVersion() (uint64, error) {
 
 	resourceVersion := c.reflector.LastSyncResourceVersion()
 	return c.versioner.ParseResourceVersion(resourceVersion)
-}
-
-// getBookmarkAfterResourceVersionLockedFunc returns a function that
-// spits a ResourceVersion after which the bookmark event will be delivered.
-//
-// The returned function must be called under the watchCache lock.
-func (c *Cacher) getBookmarkAfterResourceVersionLockedFunc(parsedResourceVersion, requiredResourceVersion uint64, opts storage.ListOptions) (func() uint64, error) {
-	if !isListWatchRequest(opts) {
-		return func() uint64 { return 0 }, nil
-	}
-
-	switch {
-	case len(opts.ResourceVersion) == 0:
-		return func() uint64 { return requiredResourceVersion }, nil
-	case parsedResourceVersion == 0:
-		// here we assume that watchCache locked is already held
-		return func() uint64 { return c.watchCache.resourceVersion }, nil
-	default:
-		return func() uint64 { return parsedResourceVersion }, nil
-	}
 }
 
 // isListWatchRequest is mirrored in staging/src/k8s.io/apiserver/pkg/endpoints/handlers/get.go
