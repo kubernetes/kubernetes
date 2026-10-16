@@ -397,8 +397,14 @@ func (c *containerLogManager) compressLog(log string) error {
 		return fmt.Errorf("failed to compress %q to %q: %w", log, tmpLog, err)
 	}
 	// The archive needs to be closed before renaming, otherwise an error will occur on Windows.
-	w.Close()
-	f.Close()
+	// Closing flushes the rest of the compressed data, so a failure here means the
+	// archive is incomplete and the original log must be kept.
+	if err := w.Close(); err != nil {
+		return fmt.Errorf("failed to compress %q to %q: %w", log, tmpLog, err)
+	}
+	if err := f.Close(); err != nil {
+		return fmt.Errorf("failed to close %q: %w", tmpLog, err)
+	}
 	compressedLog := log + compressSuffix
 	if err := c.osInterface.Rename(tmpLog, compressedLog); err != nil {
 		return fmt.Errorf("failed to rename %q to %q: %w", tmpLog, compressedLog, err)
