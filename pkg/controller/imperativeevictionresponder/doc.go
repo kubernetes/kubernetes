@@ -14,6 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package imperativeevictionresponder contains a controller that intercepts declarative pod eviction requests and
-// evicts pods using the imperative eviction API.
+// Package imperativeevictionresponder implements the built-in "imperative-eviction.k8s.io/evictor"
+// responder for declarative Evictions (lifecycle.k8s.io), evicting target pods via the imperative
+// pods/eviction subresource.
 package imperativeevictionresponder

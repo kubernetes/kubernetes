@@ -219,11 +219,11 @@ func NewControllerDescriptors() map[string]*ControllerDescriptor {
 	register(newDeviceTaintEvictionControllerDescriptor())
 	register(newLegacyServiceAccountTokenCleanerControllerDescriptor())
 	register(newValidatingAdmissionPolicyStatusControllerDescriptor())
+	register(newImperativeEvictionResponderControllerDescriptor())
 	register(newTaintEvictionControllerDescriptor())
 	register(newServiceCIDRsControllerDescriptor())
 	register(newStorageVersionMigratorControllerDescriptor())
 	register(newSELinuxWarningControllerDescriptor())
-	register(newImperativeEvictionResponderControllerDescriptor())
 
 	for _, alias := range aliases.UnsortedList() {
 		if _, ok := controllers[alias]; ok {

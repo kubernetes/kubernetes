@@ -23,7 +23,6 @@ import (
 
 	lifecyclev1alpha1 "k8s.io/api/lifecycle/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	apimachinerytypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/ptr"
 )
 
@@ -475,13 +474,13 @@ func TestToResponderStatusApplyConfiguration(t *testing.T) {
 func TestLastEvictionAttempts(t *testing.T) {
 	now := time.Now()
 	attemptsTracker := NewLastEvictionAttempts()
-	testUID := apimachinerytypes.UID("c10bd213-64bf-4cfd-9b5a-2541fbbd5b02")
+	testKey := "default/c10bd213-64bf-4cfd-9b5a-2541fbbd5b02"
 
-	attemptsTracker.set(testUID, now)
+	attemptsTracker.set(testKey, now)
 	attemptsTracker.set("7d5c4d97-68bd-4a1c-8695-6ea49962caa7", now)
 	attemptsTracker.set("7c4d5933-f269-4846-9e78-f56640d0ba6e", time.Now())
 
-	got, ok := attemptsTracker.get(testUID)
+	got, ok := attemptsTracker.get(testKey)
 	if !ok {
 		t.Errorf("expected ok, got %v", ok)
 	}
@@ -489,8 +488,8 @@ func TestLastEvictionAttempts(t *testing.T) {
 		t.Errorf("expected %v, got %v", now, got)
 	}
 
-	attemptsTracker.remove(testUID)
-	got, ok = attemptsTracker.get(testUID)
+	attemptsTracker.remove(testKey)
+	got, ok = attemptsTracker.get(testKey)
 	if ok {
 		t.Errorf("expected nok, got %v", ok)
 	}

@@ -47,13 +47,13 @@ import (
 
 const (
 	// We need to know which evictions we have to sync for a pod.
-	evictionByPodUIDIndexKey = "evictionByPodUID"
+	evictionByPodIndexKey = "evictionByPod"
 )
 
-// ImperativeEvictionResponderController is a default imperative-eviction.k8s.io/evictor responder
-// controller for pods. This responder is executed last (priority 100), after all other responders
-// have run, and attempts to evict a pod using the imperative eviction API
-// (pods/<name>/eviction subresource). It fulfills  the declarative Eviction API contract.
+// ImperativeEvictionResponderController implements the default "imperative-eviction.k8s.io/evictor"
+// responder (priority 100) for declarative Evictions (lifecycle.k8s.io). When marked Active after
+// higher-priority responders have completed or timed out, it evicts the target pod using the
+// imperative pods/<name>/eviction subresource (policy/v1) and reports progress in Eviction.status.responders.
 type ImperativeEvictionResponderController struct {
 	controllerName string
 
@@ -65,7 +65,7 @@ type ImperativeEvictionResponderController struct {
 	podLister       corelisters.PodLister
 	podListerSynced cache.InformerSynced
 
-	// evictionIndexer allows looking up evictions by Pod UID
+	// evictionIndexer allows looking up evictions by Pod namespace and UID
 	evictionIndexer cache.Indexer
 
 	// queue tracks Eviction keys
@@ -143,7 +143,7 @@ func NewController(
 		DeleteFunc: func(deletedEviction lifecycleinformers.DeletedEviction) {
 			// clean up lastEvictionAttempts
 			if deletedEviction.OptionalObj != nil && deletedEviction.OptionalObj.Spec.Target.Pod != nil {
-				c.lastEvictionAttempts.remove(deletedEviction.OptionalObj.Spec.Target.Pod.UID)
+				c.lastEvictionAttempts.remove(evictionIndexValueForEviction(deletedEviction.OptionalObj))
 			}
 		},
 	}, cache.HandlerOptions{Logger: &logger}); err != nil {
@@ -151,13 +151,13 @@ func NewController(
 	}
 
 	if err := evictionInformer.Informer().AddIndexers(cache.Indexers{
-		evictionByPodUIDIndexKey: func(obj interface{}) ([]string, error) {
+		evictionByPodIndexKey: func(obj interface{}) ([]string, error) {
 			eviction, ok := obj.(*lifecyclev1alpha1.Eviction)
 			if !ok {
 				return nil, fmt.Errorf("unexpected object type %T", obj)
 			}
-			if eviction.Spec.Target.Pod != nil {
-				return []string{string(eviction.Spec.Target.Pod.UID)}, nil
+			if idx := evictionIndexValueForEviction(eviction); len(idx) > 0 {
+				return []string{idx}, nil
 			}
 			return nil, nil
 		},
@@ -171,7 +171,7 @@ func NewController(
 			if !oldPod.DeletionTimestamp.Equal(newPod.DeletionTimestamp) ||
 				(oldPod.Status.Phase != newPod.Status.Phase && apiv1pod.IsPodTerminal(newPod)) {
 				// pod has been evicted
-				c.lastEvictionAttempts.remove(newPod.UID)
+				c.lastEvictionAttempts.remove(evictionIndexValueForPod(newPod))
 				// returns a single eviction or an error if more
 				evictions, err := c.listActiveEvictionsForPod(newPod)
 				if err != nil {
@@ -206,7 +206,7 @@ func (c *ImperativeEvictionResponderController) enqueue(logger klog.Logger, obj 
 
 // deletePod enqueues the Eviction for a deleted Pod.
 func (c *ImperativeEvictionResponderController) deletePod(logger klog.Logger, pod *v1.Pod) {
-	c.lastEvictionAttempts.remove(pod.UID)
+	c.lastEvictionAttempts.remove(evictionIndexValueForPod(pod))
 	// returns a single eviction or an error if more
 	evictions, err := c.listActiveEvictionsForPod(pod)
 	if err != nil {
@@ -334,6 +334,7 @@ func (c *ImperativeEvictionResponderController) sync(ctx context.Context, key st
 	lastEvictionMessage := ptr.Deref(lastResponderStatus.Message, "")
 	var expectedCompletionTime *time.Time
 	var addAfter *time.Duration
+	var lastEvictionAttemptTime *time.Time
 	switch {
 	case isNotFound || pod.UID != podTarget.UID:
 		evictionCompleted = true
@@ -354,7 +355,7 @@ func (c *ImperativeEvictionResponderController) sync(ctx context.Context, key st
 		evictionCompleted = true
 		evictionMessage = fmt.Sprintf("%q pod has been fully terminated (pod phase=%q)", pod.Name, pod.Status.Phase)
 	default:
-		evictionMessage, addAfter = c.evict(ctx, eviction, pod, lastEvictionMessage)
+		evictionMessage, lastEvictionAttemptTime, addAfter = c.evict(ctx, pod, lastEvictionMessage)
 	}
 
 	if evictionCompleted {
@@ -405,13 +406,24 @@ func (c *ImperativeEvictionResponderController) sync(ctx context.Context, key st
 		if err != nil {
 			return nil, err
 		}
+
+		// update last eviction attempt only once we have a confirmation that the status update has gone through
+		if lastEvictionAttemptTime != nil {
+			c.lastEvictionAttempts.set(evictionIndexValueForPod(pod), *lastEvictionAttemptTime)
+		} else if pod != nil {
+			c.lastEvictionAttempts.remove(evictionIndexValueForPod(pod))
+		}
 	}
 	return addAfter, nil
 }
 
-func (c *ImperativeEvictionResponderController) evict(ctx context.Context, eviction *lifecyclev1alpha1.Eviction, pod *v1.Pod, lastEvictionMessage string) (string, *time.Duration) {
+// evict attempts to evict a pod, it returns
+// - evictionMessage describing the eviction result
+// - lastAttemptTime indicating when the last eviction occurred
+// - the time at which the next eviction attempt should happen
+func (c *ImperativeEvictionResponderController) evict(ctx context.Context, pod *v1.Pod, lastEvictionMessage string) (string, *time.Time, *time.Duration) {
 	logger := klog.FromContext(ctx)
-	lastAttemptTime, ok := c.lastEvictionAttempts.get(pod.UID)
+	lastAttemptTime, ok := c.lastEvictionAttempts.get(evictionIndexValueForPod(pod))
 	// Apply backoff to /eviction calls, skip if we are too early since the last failed eviction.
 	if ok {
 		attempts := getRecordedAttempts(lastEvictionMessage)
@@ -422,7 +434,7 @@ func (c *ImperativeEvictionResponderController) evict(ctx context.Context, evict
 		lastAttemptAddAfter := exponentialBackoff(c.heartbeatMinDurationBetweenUpdates, c.maxImperativeEvictionBackoff, attempts)
 		addAfter := lastAttemptTime.Add(lastAttemptAddAfter).Sub(c.clock.Now())
 		if addAfter > 0 {
-			return lastEvictionMessage, &addAfter
+			return lastEvictionMessage, &lastAttemptTime, &addAfter
 		}
 	}
 
@@ -438,9 +450,13 @@ func (c *ImperativeEvictionResponderController) evict(ctx context.Context, evict
 		},
 	})
 
+	if errors.IsNotFound(err) {
+		// sync immediately again to read the pod update from the lister
+		return lastEvictionMessage, &lastAttemptTime, new(time.Second)
+	}
 	if err != nil {
+		lastAttemptTime = c.clock.Now()
 		oldAttempts := getRecordedAttempts(lastEvictionMessage)
-		c.lastEvictionAttempts.set(pod.UID, c.clock.Now())
 		// 10 minutes max backoff
 		addAfter := exponentialBackoff(c.heartbeatMinDurationBetweenUpdates, c.maxImperativeEvictionBackoff, oldAttempts)
 		// use suggested server delay if present
@@ -451,19 +467,18 @@ func (c *ImperativeEvictionResponderController) evict(ctx context.Context, evict
 
 		evictionMessage := fmt.Sprintf("%q pod deletion via the /eviction subresource failed (attempts=%d): %v", pod.Name, attempts, err)
 		logger.V(4).Info(evictionMessage, "pod", klog.KObj(pod))
-		return evictionMessage, &addAfter
+		return evictionMessage, &lastAttemptTime, &addAfter
 	}
 
-	c.lastEvictionAttempts.remove(pod.UID)
 	evictionMessage := fmt.Sprintf("%q pod has been marked for deletion via the /eviction subresource and will be terminated gracefully", pod.Name)
-	return evictionMessage, nil
+	return evictionMessage, nil, nil
 }
 
 // listActiveEvictionsForPod returns a list with Evictions whose eviction.Spec.Target.Pod.UID equal to the given Pod UID
 // and are active.
 // Returns an error if there is more than 1 active Eviction in the returned list, but also the list with evictions.
 func (c *ImperativeEvictionResponderController) listActiveEvictionsForPod(pod *v1.Pod) ([]*lifecyclev1alpha1.Eviction, error) {
-	all, err := c.evictionIndexer.ByIndex(evictionByPodUIDIndexKey, string(pod.UID))
+	all, err := c.evictionIndexer.ByIndex(evictionByPodIndexKey, evictionIndexValueForPod(pod))
 	if err != nil {
 		return nil, err
 	}
@@ -492,4 +507,20 @@ func (c *ImperativeEvictionResponderController) listActiveEvictionsForPod(pod *v
 
 func evictionKey(eviction metav1.ObjectMetaAccessor) string {
 	return eviction.GetObjectMeta().GetNamespace() + "/" + eviction.GetObjectMeta().GetName()
+}
+
+// evictionIndexValueForPod is used for indexing both evictionIndexer and lastEvictionAttempts
+func evictionIndexValueForPod(pod *v1.Pod) string {
+	if pod != nil {
+		return pod.Namespace + "/" + string(pod.UID)
+	}
+	return ""
+}
+
+// evictionIndexValueForEviction is used for indexing both evictionIndexer and lastEvictionAttempts
+func evictionIndexValueForEviction(eviction *lifecyclev1alpha1.Eviction) string {
+	if eviction != nil && eviction.Spec.Target.Pod != nil {
+		return eviction.Namespace + "/" + string(eviction.Spec.Target.Pod.UID)
+	}
+	return ""
 }

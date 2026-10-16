@@ -25,7 +25,6 @@ import (
 
 	lifecyclev1alpha1 "k8s.io/api/lifecycle/v1alpha1"
 	"k8s.io/apimachinery/pkg/api/meta"
-	apimachinerytypes "k8s.io/apimachinery/pkg/types"
 	lifecycleapplyv1alpha1 "k8s.io/client-go/applyconfigurations/lifecycle/v1alpha1"
 	"k8s.io/utils/ptr"
 )
@@ -125,30 +124,30 @@ func toResponderStatusApplyConfiguration(status lifecyclev1alpha1.ResponderStatu
 
 type lastEvictionAttempts struct {
 	lock             sync.RWMutex
-	evictionAttempts map[apimachinerytypes.UID]time.Time
+	evictionAttempts map[string]time.Time
 }
 
 func NewLastEvictionAttempts() *lastEvictionAttempts {
 	return &lastEvictionAttempts{
-		evictionAttempts: make(map[apimachinerytypes.UID]time.Time),
+		evictionAttempts: make(map[string]time.Time),
 	}
 }
 
-func (l *lastEvictionAttempts) set(uid apimachinerytypes.UID, evictionAttempt time.Time) {
+func (l *lastEvictionAttempts) set(key string, evictionAttempt time.Time) {
 	l.lock.Lock()
 	defer l.lock.Unlock()
-	l.evictionAttempts[uid] = evictionAttempt
+	l.evictionAttempts[key] = evictionAttempt
 }
 
-func (l *lastEvictionAttempts) remove(uid apimachinerytypes.UID) {
+func (l *lastEvictionAttempts) remove(key string) {
 	l.lock.Lock()
 	defer l.lock.Unlock()
-	delete(l.evictionAttempts, uid)
+	delete(l.evictionAttempts, key)
 }
 
-func (l *lastEvictionAttempts) get(uid apimachinerytypes.UID) (time.Time, bool) {
+func (l *lastEvictionAttempts) get(key string) (time.Time, bool) {
 	l.lock.RLock()
 	defer l.lock.RUnlock()
-	result, ok := l.evictionAttempts[uid]
+	result, ok := l.evictionAttempts[key]
 	return result, ok
 }
