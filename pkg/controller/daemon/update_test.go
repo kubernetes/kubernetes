@@ -1156,21 +1156,27 @@ func TestDedupCurHistories(t *testing.T) {
 			// Only pods owned by the deleted duplicate may be relabeled. In
 			// particular pods from older histories must never be touched,
 			// otherwise the daemonset rolling update never replaces them.
+			// Assert with IsPodUpdated, the helper the rolling update uses
+			// to decide whether a pod still needs to be replaced.
+			generation, err := util.GetTemplateGeneration(ds)
+			if err != nil {
+				generation = nil
+			}
 			for podName, startHash := range map[string]string{
 				podKeep.Name: keepHash,
 				podDup.Name:  dupHash,
 				podOld.Name:  oldHash,
 			} {
-				want := startHash
-				if startHash == deletedLabel {
-					want = keptLabel
-				}
+				// Pods of the kept history or of the deleted duplicate end
+				// up on the kept history; pods of older histories must stay
+				// outdated so the rolling update replaces them.
+				wantUpdated := startHash == keptLabel || startHash == deletedLabel
 				pod, err := client.CoreV1().Pods(ds.Namespace).Get(ctx, podName, metav1.GetOptions{})
 				if err != nil {
 					t.Fatalf("unexpected error getting pod %q: %v", podName, err)
 				}
-				if got := pod.Labels[apps.DefaultDaemonSetUniqueLabelKey]; got != want {
-					t.Errorf("pod %q: expected unique label %q, got %q", podName, want, got)
+				if got := util.IsPodUpdated(pod, keptLabel, generation); got != wantUpdated {
+					t.Errorf("pod %q: expected updated=%t, got %t", podName, wantUpdated, got)
 				}
 			}
 		})
