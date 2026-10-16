@@ -26,6 +26,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/features"
 
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -52,15 +53,15 @@ var _ = SIGDescribe("Service Serving Signer",
 			namespace := f.Namespace.Name
 
 			serverDeploy := serverDeployment(namespace)
-
 			ginkgo.By("Creating server deployment...")
 			_, err := f.ClientSet.AppsV1().Deployments(namespace).Create(ctx, serverDeploy, metav1.CreateOptions{})
 			if err != nil {
 				framework.Failf("failed to create server deployment: %v", err)
 			}
 
+			serverSvc := serverService()
 			ginkgo.By("Creating server service...")
-			_, err = f.ClientSet.CoreV1().Services(namespace).Create(ctx, e2eservice.CreateServiceSpec("test-service", "", false, map[string]string{"test-role": "tls-server"}), metav1.CreateOptions{})
+			_, err = f.ClientSet.CoreV1().Services(namespace).Create(ctx, serverSvc, metav1.CreateOptions{})
 			if err != nil {
 				framework.Failf("failed to create server service: %v", err)
 			}
@@ -120,7 +121,12 @@ func serverDeployment(namespace string) *appsv1.Deployment {
 	d.Namespace = namespace
 
 	container := &d.Spec.Template.Spec.Containers[0]
-	container.Args = []string{"webhook", "--tls-cert-file=/run/tls-config/tls.crt", "--tls-private-key-file=/run/tls-config/tls.key"}
+	container.Args = []string{"webhook", "--port=8443", "--tls-cert-file=/run/tls-config/tls.crt", "--tls-private-key-file=/run/tls-config/tls.key"}
+	container.Ports = []corev1.ContainerPort{{
+		Name:          "https",
+		ContainerPort: 8443,
+		Protocol:      corev1.ProtocolTCP,
+	}}
 	container.VolumeMounts = []corev1.VolumeMount{{
 		Name:      "certs",
 		ReadOnly:  true,
@@ -144,4 +150,16 @@ func serverDeployment(namespace string) *appsv1.Deployment {
 	}}
 
 	return d
+}
+
+func serverService() *corev1.Service {
+	s := e2eservice.CreateServiceSpec("test-service", "", false, map[string]string{"test-role": "tls-server"})
+	s.Spec.Ports = []corev1.ServicePort{{
+		Name:       "https",
+		Port:       443,
+		TargetPort: intstr.FromString("https"),
+		Protocol:   corev1.ProtocolTCP,
+	}}
+
+	return s
 }
