@@ -48,19 +48,6 @@ func (s Scale) canInfScale() bool {
 	return s != math.MinInt32
 }
 
-// canAlignInfScale reports whether a subtraction between scales s and other can
-// be represented on the inf.Dec fallback: both scales must be representable as
-// an inf.Scale, and their alignment delta must fit in int32 so aligning the two
-// operands there does not overflow. The delta is widened here so the check
-// itself does not overflow. It does not bound the cost of that alignment.
-func (s Scale) canAlignInfScale(other Scale) bool {
-	if !s.canInfScale() || !other.canInfScale() {
-		return false
-	}
-	delta := widenScale(s) - widenScale(other)
-	return delta >= -math.MaxInt32 && delta <= math.MaxInt32
-}
-
 // widenedScale is a Scale widened to int64, so it also holds a negated
 // inf.Scale and the difference of two scales without overflow.
 // Conversions should happen only via widenScale, widenInfScale and
@@ -283,6 +270,68 @@ func cmpDec(x, y *inf.Dec) int {
 	return x.Cmp(y)
 }
 
+// maxScaleGap bounds how many orders of magnitude may be between a non-zero
+// coarser-scale operand and a finer-scale operand for Add and Sub without
+// precision loss. If non-zero operands exceed this gap, the finer-scale operand
+// is rounded away from zero to be within `maxScaleGap` of the coarser-scale
+// operand. When either operand is zero, the non-zero operand's value and scale
+// are preserved without rounding.
+//
+// This limit was selected for the following reasons:
+//   - 29 digits is enough for the sum of two Quantities to be exact within
+//     the int64 range (A single int64 value has at most 19 digits).
+//   - Worst case running time is within 10x of normal expected running time.
+const maxScaleGap = 29
+
+// boundScaleGap returns x and y, replacing the finer-scale operand with a copy
+// rounded away from zero when x and y are more than maxScaleGap orders of
+// magnitude apart. Neither x nor y is mutated. Callers must handle zero
+// operands before calling boundScaleGap.
+func boundScaleGap(x, y *inf.Dec) (*inf.Dec, *inf.Dec) {
+	xScale, yScale := widenInfScale(x.Scale()), widenInfScale(y.Scale())
+	if xScale-yScale > maxScaleGap {
+		rounded, _ := infDecAmount{y}.AsScale(Scale(xScale - maxScaleGap))
+		return x, rounded.Dec
+	}
+	if yScale-xScale > maxScaleGap {
+		rounded, _ := infDecAmount{x}.AsScale(Scale(yScale - maxScaleGap))
+		return rounded.Dec, y
+	}
+	return x, y
+}
+
+// addDecBoundedScale adds x to y, but bounds the scale gap between the operands
+// using boundScaleGap.
+func addDecBoundedScale(x, y *inf.Dec) *inf.Dec {
+	// short-circuit if one of the operands is zero
+	if y.Sign() == 0 {
+		return new(inf.Dec).Set(x)
+	}
+	if x.Sign() == 0 {
+		return new(inf.Dec).Set(y)
+	}
+
+	// bound the scale between the operands if needed before adding
+	x, y = boundScaleGap(x, y)
+	return new(inf.Dec).Add(x, y)
+}
+
+// subDecBoundedScale subtracts y from x, but bounds the scale gap between the operands
+// using boundScaleGap.
+func subDecBoundedScale(x, y *inf.Dec) *inf.Dec {
+	// short-circuit if one of the operands is zero
+	if y.Sign() == 0 {
+		return new(inf.Dec).Set(x)
+	}
+	if x.Sign() == 0 {
+		return new(inf.Dec).Neg(y)
+	}
+
+	// bound the scale between the operands if needed before subtracting
+	x, y = boundScaleGap(x, y)
+	return new(inf.Dec).Sub(x, y)
+}
+
 // Add adds two int64Amounts together, matching scales. It will return false and not mutate
 // a if overflow or underflow would result.
 func (a *int64Amount) Add(b int64Amount) bool {
@@ -300,7 +349,15 @@ func (a *int64Amount) Add(b int64Amount) bool {
 		}
 		a.value = c
 	case a.scale > b.scale:
-		c, ok := positiveScaleInt64(a.value, a.scale-b.scale)
+		// Widen first: the delta of two int32 scales can need 33 bits.
+		up, fits := narrowScale(a.widenedScale() - b.widenedScale())
+		if !fits {
+			// a.value is non-zero (handled above), so this check is included for
+			// clarity even though the result of the scale comparison would be
+			// handled in the same way by positiveScaleInt64.
+			return false
+		}
+		c, ok := positiveScaleInt64(a.value, up)
 		if !ok {
 			return false
 		}
@@ -311,7 +368,15 @@ func (a *int64Amount) Add(b int64Amount) bool {
 		a.scale = b.scale
 		a.value = c
 	default:
-		c, ok := positiveScaleInt64(b.value, b.scale-a.scale)
+		// Widen first: the delta of two int32 scales can need 33 bits.
+		up, fits := narrowScale(b.widenedScale() - a.widenedScale())
+		if !fits {
+			// b.value is non-zero (handled above), so this check is included for
+			// clarity even though the result of the scale comparison would be
+			// handled in the same way by positiveScaleInt64.
+			return false
+		}
+		c, ok := positiveScaleInt64(b.value, up)
 		if !ok {
 			return false
 		}
@@ -326,14 +391,15 @@ func (a *int64Amount) Add(b int64Amount) bool {
 
 // Sub removes b from a. It returns false without mutating a when this
 // subtraction cannot be performed safely on the int64 fast path and the caller
-// can represent the operands and their alignment in the decimal fallback.
+// can represent the operands in the decimal fallback.
 func (a *int64Amount) Sub(b int64Amount) bool {
-	if b.value == mostNegative && a.scale.canAlignInfScale(b.scale) {
+	if b.value == mostNegative && a.scale.canInfScale() && b.scale.canInfScale() {
 		// -b.value overflows int64, so leave a unchanged and let the caller fall
-		// back to inf.Dec. That fallback aligns both operands, so it is only
-		// correct when both scales and their alignment delta can be represented
-		// there; anything else stays on the int64 path and keeps its existing
+		// back to inf.Dec when both scales can be represented there; otherwise try
+		// the int64 path so same-scale MinInt32 subtraction keeps its existing
 		// wrapped result.
+		// TODO: Once int64Amount.AsDec handles math.MinInt32, drop the canInfScale
+		// checks and always fall back to inf.Dec for mostNegative.
 		return false
 	}
 	return a.Add(int64Amount{value: -b.value, scale: b.scale})

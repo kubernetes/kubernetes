@@ -60,6 +60,10 @@ func TestInt64AmountAdd(t *testing.T) {
 		{int64Amount{value: mostPositive, scale: -1}, int64Amount{value: 1, scale: -1}, int64Amount{value: 0, scale: -1}, false},
 		{int64Amount{value: mostPositive, scale: -1}, int64Amount{value: 0, scale: -1}, int64Amount{value: mostPositive, scale: -1}, true},
 		{int64Amount{value: mostPositive / 10, scale: 1}, int64Amount{value: 10, scale: 0}, int64Amount{value: mostPositive, scale: -1}, false},
+
+		// Scale deltas exceeding math.MaxInt32 do not fit in Scale and must fail.
+		{int64Amount{value: 1, scale: math.MaxInt32}, int64Amount{value: 1, scale: -1}, int64Amount{}, false},
+		{int64Amount{value: 5, scale: math.MinInt32}, int64Amount{value: 1, scale: 0}, int64Amount{}, false},
 	} {
 		c := test.a
 		ok := c.Add(test.b)
@@ -232,34 +236,6 @@ func TestInt64AmountAsScaledInt64(t *testing.T) {
 			}
 			if ok != test.ok {
 				t.Errorf("%v: expected ok: %t, got ok: %t", test.name, test.ok, ok)
-			}
-		})
-	}
-}
-
-// TestScaleCanAlignInfScale locks the boundaries of the guard that gates the
-// decimal fallback in Sub: both operands must be representable, and their
-// alignment delta must fit int32. Directly pinning it here guards against the
-// range check being narrowed to one side, the bound flipping to a strict
-// comparison, or the delta regressing to int32 arithmetic.
-func TestScaleCanAlignInfScale(t *testing.T) {
-	for _, tc := range []struct {
-		name string
-		a    Scale
-		b    Scale
-		want bool
-	}{
-		{"same-scale", 0, 0, true},
-		{"positive-max-delta", Scale(math.MaxInt32), 0, true},
-		{"negative-max-delta", 0, Scale(math.MaxInt32), true},
-		{"positive-delta-overflow", Scale(math.MaxInt32), -1, false},
-		{"negative-delta-overflow", -1, Scale(math.MaxInt32), false},
-		{"receiver-min-int32", Scale(math.MinInt32), 0, false},
-		{"other-min-int32", 0, Scale(math.MinInt32), false},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			if got := tc.a.canAlignInfScale(tc.b); got != tc.want {
-				t.Fatalf("Scale(%d).canAlignInfScale(%d) = %t, want %t", tc.a, tc.b, got, tc.want)
 			}
 		})
 	}
