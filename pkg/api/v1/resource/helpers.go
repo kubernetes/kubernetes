@@ -71,9 +71,10 @@ func GetResourceRequestQuantity(pod *v1.Pod, resourceName v1.ResourceName) resou
 
 	// TODO(pravk03): considering DRA Node Allocatable resources for eviction ranking.
 	if rQuantity, ok := resourcehelper.PodRequests(pod, resourcehelper.PodResourcesOptions{
-		ExcludeContainerLevelResources: hasPodLevelResources,
-		ExcludeOverhead:                true,
-		Features:                       fts,
+		ExcludeContainerLevelResources:     hasPodLevelResources,
+		ExcludeOverhead:                    true,
+		ExcludeDRANodeAllocatableResources: true,
+		Features:                           fts,
 	})[resourceName]; ok {
 		requestQuantity.Add(rQuantity)
 	}

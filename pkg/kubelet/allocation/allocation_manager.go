@@ -388,7 +388,10 @@ func (m *manager) isResizeIncreasingRequests(pod *v1.Pod) bool {
 		return false
 	}
 
-	opts := v1resource.PodResourcesOptions()
+	opts := resourcehelper.PodResourcesOptions{
+		Features:                           v1resource.Features(),
+		ExcludeDRANodeAllocatableResources: true,
+	}
 	oldRequest := resourcehelper.PodRequests(allocatedPod, opts)
 	newRequest := resourcehelper.PodRequests(pod, opts)
 

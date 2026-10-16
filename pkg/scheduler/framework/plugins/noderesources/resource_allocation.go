@@ -235,7 +235,9 @@ func (r *resourceAllocationScorer) calculatePodResourceRequest(pod *v1.Pod, reso
 
 	opts := resourcehelper.PodResourcesOptions{
 		UseStatusResources: true,
-		Features:           r.fts.ResourceFeatures(),
+		// TODO(pravk03): Evaluate including DRANodeAllocatableResources in resource allocation scoring.
+		ExcludeDRANodeAllocatableResources: true,
+		Features:                           r.fts.ResourceFeatures(),
 	}
 
 	if !r.useRequested {

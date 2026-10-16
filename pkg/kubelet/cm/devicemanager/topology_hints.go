@@ -299,8 +299,9 @@ func (m *ManagerImpl) getNUMANodeIds(topology *pluginapi.TopologyInfo) []int {
 func (m *ManagerImpl) getPodDeviceRequest(pod *v1.Pod) map[string]int {
 	// for these device plugin resources, requests == limits
 	limits := resource.PodLimits(pod, resource.PodResourcesOptions{
-		ExcludeOverhead: true,
-		Features:        v1resource.Features(),
+		ExcludeOverhead:                    true,
+		ExcludeDRANodeAllocatableResources: true,
+		Features:                           v1resource.Features(),
 	})
 	podRequests := make(map[string]int)
 	for resourceName, quantity := range limits {

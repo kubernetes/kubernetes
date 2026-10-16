@@ -570,7 +570,10 @@ func (m *managerImpl) emptyDirLimitEviction(logger klog.Logger, podStats statsap
 }
 
 func (m *managerImpl) podEphemeralStorageLimitEviction(logger klog.Logger, podStats statsapi.PodStats, pod *v1.Pod) bool {
-	podLimits := resourcehelper.PodLimits(pod, v1resource.PodResourcesOptions())
+	podLimits := resourcehelper.PodLimits(pod, resourcehelper.PodResourcesOptions{
+		Features:                           v1resource.Features(),
+		ExcludeDRANodeAllocatableResources: true,
+	})
 	_, found := podLimits[v1.ResourceEphemeralStorage]
 	if !found {
 		return false
