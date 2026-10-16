@@ -104,7 +104,7 @@ func (w *WebService) PathParameter(name, description string) *Parameter {
 // PathParameter creates a new Parameter of kind Path for documentation purposes.
 // It is initialized as required with string as its DataType.
 func PathParameter(name, description string) *Parameter {
-	p := &Parameter{&ParameterData{Name: name, Description: description, Required: true, DataType: "string"}}
+	p := &Parameter{data: ParameterData{Name: name, Description: description, Required: true, DataType: "string"}}
 	p.bePath()
 	return p
 }
@@ -118,7 +118,7 @@ func (w *WebService) QueryParameter(name, description string) *Parameter {
 // QueryParameter creates a new Parameter of kind Query for documentation purposes.
 // It is initialized as not required with string as its DataType.
 func QueryParameter(name, description string) *Parameter {
-	p := &Parameter{&ParameterData{Name: name, Description: description, Required: false, DataType: "string", CollectionFormat: CollectionFormatCSV.String()}}
+	p := &Parameter{data: ParameterData{Name: name, Description: description, Required: false, DataType: "string", CollectionFormat: CollectionFormatCSV.String()}}
 	p.beQuery()
 	return p
 }
@@ -132,7 +132,7 @@ func (w *WebService) BodyParameter(name, description string) *Parameter {
 // BodyParameter creates a new Parameter of kind Body for documentation purposes.
 // It is initialized as required without a DataType.
 func BodyParameter(name, description string) *Parameter {
-	p := &Parameter{&ParameterData{Name: name, Description: description, Required: true}}
+	p := &Parameter{data: ParameterData{Name: name, Description: description, Required: true}}
 	p.beBody()
 	return p
 }
@@ -146,7 +146,7 @@ func (w *WebService) HeaderParameter(name, description string) *Parameter {
 // HeaderParameter creates a new Parameter of kind (Http) Header for documentation purposes.
 // It is initialized as not required with string as its DataType.
 func HeaderParameter(name, description string) *Parameter {
-	p := &Parameter{&ParameterData{Name: name, Description: description, Required: false, DataType: "string"}}
+	p := &Parameter{data: ParameterData{Name: name, Description: description, Required: false, DataType: "string"}}
 	p.beHeader()
 	return p
 }
@@ -160,7 +160,7 @@ func (w *WebService) FormParameter(name, description string) *Parameter {
 // FormParameter creates a new Parameter of kind Form (using application/x-www-form-urlencoded) for documentation purposes.
 // It is initialized as required with string as its DataType.
 func FormParameter(name, description string) *Parameter {
-	p := &Parameter{&ParameterData{Name: name, Description: description, Required: false, DataType: "string"}}
+	p := &Parameter{data: ParameterData{Name: name, Description: description, Required: false, DataType: "string"}}
 	p.beForm()
 	return p
 }
@@ -172,7 +172,7 @@ func (w *WebService) MultiPartFormParameter(name, description string) *Parameter
 }
 
 func MultiPartFormParameter(name, description string) *Parameter {
-	p := &Parameter{&ParameterData{Name: name, Description: description, Required: false, DataType: "string"}}
+	p := &Parameter{data: ParameterData{Name: name, Description: description, Required: false, DataType: "string"}}
 	p.beMultiPartForm()
 	return p
 }
@@ -188,20 +188,20 @@ func (w *WebService) Route(builder *RouteBuilder) *WebService {
 
 // RemoveRoute removes the specified route, looks for something that matches 'path' and 'method'
 func (w *WebService) RemoveRoute(path, method string) error {
-    if !w.dynamicRoutes {
-        return errors.New("dynamic routes are not enabled.")
-    }
-    w.routesLock.Lock()
-    defer w.routesLock.Unlock()
-    newRoutes := []Route{}
-    for _, route := range w.routes {
-        if route.Method == method && route.Path == path {
-            continue
-        }
-        newRoutes = append(newRoutes, route)
-    }
-    w.routes = newRoutes
-    return nil
+	if !w.dynamicRoutes {
+		return errors.New("dynamic routes are not enabled.")
+	}
+	w.routesLock.Lock()
+	defer w.routesLock.Unlock()
+	newRoutes := []Route{}
+	for _, route := range w.routes {
+		if route.Method == method && route.Path == path {
+			continue
+		}
+		newRoutes = append(newRoutes, route)
+	}
+	w.routes = newRoutes
+	return nil
 }
 
 // Method creates a new RouteBuilder and initialize its http method
