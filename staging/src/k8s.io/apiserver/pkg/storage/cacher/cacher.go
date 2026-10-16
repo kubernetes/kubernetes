@@ -613,17 +613,17 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 
 	currentResourceVersion := c.watchCache.resourceVersion
 
-	bookmarkAfterResourceVersionFn := func() uint64 { return 0 }
+	bookmarkAfterResourceVersion := uint64(0)
 	var initialEventsEndBookmark *watchCacheEvent
 	if isListWatchRequest(opts) {
 		switch {
 		case len(opts.ResourceVersion) == 0:
-			bookmarkAfterResourceVersionFn = func() uint64 { return requiredResourceVersion }
+			bookmarkAfterResourceVersion = requiredResourceVersion
 		case requestedWatchRV == 0:
 			// here we assume that watchCache locked is already held
-			bookmarkAfterResourceVersionFn = func() uint64 { return currentResourceVersion }
+			bookmarkAfterResourceVersion = currentResourceVersion
 		default:
-			bookmarkAfterResourceVersionFn = func() uint64 { return requestedWatchRV }
+			bookmarkAfterResourceVersion = requestedWatchRV
 		}
 		// We don't need to set the InitialEventsAnnotation for this bookmark event,
 		// because this will be automatically set during event conversion in cacheWatcher.convertToWatchEvent method
@@ -663,7 +663,7 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 		// Update watcher.forget function once we can compute it.
 		watcher.forget = forgetWatcher(c, watcher, c.watcherIdx, selector)
 		// Update the bookMarkAfterResourceVersion
-		watcher.setBookmarkAfterResourceVersion(bookmarkAfterResourceVersionFn())
+		watcher.setBookmarkAfterResourceVersion(bookmarkAfterResourceVersion)
 		c.watchers.addWatcher(watcher, c.watcherIdx, selector)
 		addedWatcher = true
 
