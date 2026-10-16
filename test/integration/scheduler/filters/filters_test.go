@@ -1277,6 +1277,55 @@ func TestInterPodAffinityWithNamespaceSelector(t *testing.T) {
 			},
 			fits: false,
 		},
+		{
+			name: "NegativeNamespaceSelector",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "pod-negative-ns-selector",
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{Name: "container", Image: imageutils.GetPauseImageName()}},
+					Affinity: &v1.Affinity{
+						PodAntiAffinity: &v1.PodAntiAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
+								{
+									LabelSelector: &metav1.LabelSelector{
+										MatchExpressions: []metav1.LabelSelectorRequirement{
+											{
+												Key:      "service",
+												Operator: metav1.LabelSelectorOpIn,
+												Values:   []string{"securityscan"},
+											},
+										},
+									},
+									NamespaceSelector: &metav1.LabelSelector{
+										MatchExpressions: []metav1.LabelSelectorRequirement{
+											{
+												Key:      "team",
+												Operator: metav1.LabelSelectorOpNotIn,
+												Values:   []string{"team1"},
+											},
+										},
+									},
+									TopologyKey: "region",
+								},
+							},
+						},
+					},
+				},
+			},
+			existingPod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "pod-in-excluded-namespace",
+					Labels:    podLabel,
+					Namespace: "ns2",
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{Name: "container", Image: imageutils.GetPauseImageName()}},
+				},
+			},
+			fits: true,
+		},
 	}
 
 	for _, test := range tests {
