@@ -639,7 +639,10 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 		}
 	}
 	// Update the bookMarkAfterResourceVersion
-	watcher.setBookmarkAfterResourceVersion(bookmarkAfterResourceVersion)
+	if bookmarkAfterResourceVersion == 0 {
+		watcher.state = cacheWatcherBookmarkSent // if no specific RV was requested we assume no-op
+	}
+	watcher.bookmarkAfterResourceVersion = bookmarkAfterResourceVersion
 
 	var cacheInterval *watchCacheInterval
 	cacheInterval, err = c.watchCache.getAllEventsSinceLocked(ctx, requiredResourceVersion, key, opts)

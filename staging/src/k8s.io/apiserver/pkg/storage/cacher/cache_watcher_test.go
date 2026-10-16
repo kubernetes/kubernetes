@@ -356,7 +356,7 @@ func TestTimeBucketWatchersBasic(t *testing.T) {
 
 	newWatcher := func(deadline time.Time) *cacheWatcher {
 		w := newCacheWatcher(0, filter, forget, storage.APIObjectVersioner{}, deadline, true, schema.GroupResource{Resource: "pods"}, metrics.NewNoopWatcherMetricsObservers(), nil, "")
-		w.setBookmarkAfterResourceVersion(0)
+		w.state = cacheWatcherBookmarkSent
 		return w
 	}
 
@@ -501,7 +501,7 @@ func TestCacheWatcherDrainingNoBookmarkAfterResourceVersionReceived(t *testing.T
 		{Object: &v1.Pod{}},
 	}
 	w = newCacheWatcher(0, filter, forget, storage.APIObjectVersioner{}, time.Now(), true, schema.GroupResource{Resource: "pods"}, metrics.NewNoopWatcherMetricsObservers(), nil, "")
-	w.setBookmarkAfterResourceVersion(10)
+	w.bookmarkAfterResourceVersion = 10
 	go w.process(context.Background(), intervalFromEvents(initEvents), nil, 0)
 
 	// get an event so that
@@ -569,7 +569,7 @@ func TestCacheWatcherDrainingNoBookmarkAfterResourceVersionSent(t *testing.T) {
 
 	fakeClock := testingclock.NewFakeClock(time.Now())
 	w = newCacheWatcher(2, filter, forget, storage.APIObjectVersioner{}, time.Now(), true, schema.GroupResource{Resource: "pods"}, metrics.NewWatcherMetricsObservers(schema.GroupResource{Resource: "pods"}), fakeClock, "")
-	w.setBookmarkAfterResourceVersion(10)
+	w.bookmarkAfterResourceVersion = 10
 	go w.process(ctx, intervalFromEvents(initEvents), nil, 0)
 	watchInitializationSignal.Wait()
 
@@ -666,7 +666,7 @@ apiserver_watch_events_dispatch_duration_seconds_count{group="",resource="pods",
 func TestBookmarkAfterResourceVersionWatchers(t *testing.T) {
 	newWatcher := func(id string, deadline time.Time) *cacheWatcher {
 		w := newCacheWatcher(0, func(_ string, _ labels.Set, _ fields.Set, _ runtime.Object) bool { return true }, func(bool) {}, storage.APIObjectVersioner{}, deadline, true, schema.GroupResource{Resource: "pods"}, metrics.NewNoopWatcherMetricsObservers(), nil, id)
-		w.setBookmarkAfterResourceVersion(10)
+		w.bookmarkAfterResourceVersion = 10
 		return w
 	}
 
