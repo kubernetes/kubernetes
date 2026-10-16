@@ -144,7 +144,13 @@ func (ev *Evaluator) evaluate(ctx context.Context, state fwk.CycleState, pod *v1
 				// Leave UnschedulablePlugins or PendingPlugins as nil as it won't be used on moving Pods.
 			},
 		}
-		fitError.Diagnosis.NodeToStatus.SetAbsentNodesStatus(fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "Preemption is not helpful for scheduling"))
+		absentMsg := "Preemption is not helpful for scheduling"
+		if isResize {
+			// A deferred resize pod can only stay on its assigned node, so report on that node alone.
+			fitError.NumAllNodes = 1
+			absentMsg = "Preemption is not helpful for pod resize"
+		}
+		fitError.Diagnosis.NodeToStatus.SetAbsentNodesStatus(fwk.NewStatus(fwk.UnschedulableAndUnresolvable, absentMsg))
 		// Specify nominatedNodeName to clear the pod's nominatedNodeName status, if applicable.
 		return nil, framework.NewPostFilterResultWithNominatedNode(""), fwk.NewStatus(fwk.Unschedulable, fitError.Error())
 	}
@@ -206,6 +212,10 @@ func (ev *Evaluator) Preempt(ctx context.Context, state fwk.CycleState, pod *v1.
 	// 5) Actuate the preemption.
 	if status := ev.executor.ActuatePodPreemption(ctx, bestCandidate, pod, ev.PluginName); !status.IsSuccess() {
 		return nil, status
+	}
+
+	if isDeferredResize {
+		return framework.NewPostFilterResultWithNominatedNode(bestCandidate.Name()), fwk.NewStatus(fwk.Success, fmt.Sprintf("found potential victims for pod resize on node %v, preempting %d victims", bestCandidate.Name(), len(bestCandidate.Victims().Pods)))
 	}
 
 	return framework.NewPostFilterResultWithNominatedNode(bestCandidate.Name()), fwk.NewStatus(fwk.Success, fmt.Sprintf("found a potential placement for pod on node %v, preempting %d victims", bestCandidate.Name(), len(bestCandidate.Victims().Pods)))

@@ -302,6 +302,10 @@ func (sched *Scheduler) schedulingAlgorithm(
 			logger.Error(err, "Error selecting node for pod", "pod", klog.KObj(pod))
 			return ScheduleResult{nominatingInfo: clearNominatedNode}, fwk.AsStatus(err)
 		}
+		// A deferred resize pod can only stay on its assigned node, so report on that node alone.
+		if sched.inPlacePodVerticalScalingSchedulerPreemptionEnabled && compresource.IsPodResizeDeferred(pod) {
+			fitError.NumAllNodes = 1
+		}
 
 		// We do not want to run PostFilters for single pods in PodGroup cycle.
 		// Instead we will run PodGroupPostFilter at the end of PodGroup cycle.
@@ -838,6 +842,12 @@ func (sched *Scheduler) handleSchedulingFailure(ctx context.Context, podFwk fram
 		// awaiting scheduler evaluation.
 		isCachedPodDeferredResize := sched.inPlacePodVerticalScalingSchedulerPreemptionEnabled && compresource.IsPodResizeDeferred(cachedPod) && !compresource.IsPodResizeSchedulerEvaluationCompleted(cachedPod)
 		if len(cachedPod.Spec.NodeName) != 0 && !isCachedPodDeferredResize {
+			if isDeferredResize {
+				// The resize was resolved or already evaluated since the pod was queued, so there is
+				// nothing to retry or report.
+				logger.V(3).Info("Deferred pod resize no longer needs scheduler evaluation. Abort adding it back to queue.", "pod", klog.KObj(pod))
+				return
+			}
 			logger.Info("Pod has been assigned to node. Abort adding it back to queue.", "pod", klog.KObj(pod), "node", cachedPod.Spec.NodeName)
 			// We need to call DonePod here because we don't call AddUnschedulablePodIfNotPresent in this case.
 		} else {
@@ -858,18 +868,12 @@ func (sched *Scheduler) handleSchedulingFailure(ctx context.Context, podFwk fram
 		}
 	}
 
-	// Deferred resize pods are already bound to and running on their assigned node. The scheduler only
-	// evaluates resize feasibility and executes preemption; Kubelet actuates the resize in-place.
-	// Return early to avoid binding operations or setting nominated node status.
-	if isDeferredResize {
-		return
-	}
-
 	// Update the scheduling queue with the nominated pod information. Without
 	// this, there would be a race condition between the next scheduling cycle
 	// and the time the scheduler receives a Pod Update for the nominated pod.
 	// Here we check for nil only for tests.
-	if sched.SchedulingQueue != nil {
+	// Skip for deferred resize pods as they are already bound to their node and do not use NominatedNodeName.
+	if !isDeferredResize && sched.SchedulingQueue != nil {
 		sched.SchedulingQueue.AddNominatedPod(logger, nominatedPodInfo, nominatingInfo)
 	}
 
@@ -880,6 +884,13 @@ func (sched *Scheduler) handleSchedulingFailure(ctx context.Context, podFwk fram
 
 	msg := truncateMessage(errMsg)
 	podFwk.EventRecorder().WithLogger(logger).Eventf(pod, nil, v1.EventTypeWarning, "FailedScheduling", "Scheduling", msg)
+
+	// Deferred resize pods are already bound to and running on their assigned node. The scheduler only
+	// evaluates resize feasibility and executes preemption; Kubelet actuates the resize in-place.
+	// Return early to avoid overwriting PodScheduled=False or setting nominated node status.
+	if isDeferredResize {
+		return
+	}
 	if err := updatePod(ctx, sched.client, podFwk.APICacher(), pod, &v1.PodCondition{
 		Type:               v1.PodScheduled,
 		ObservedGeneration: podutil.CalculatePodConditionObservedGeneration(&pod.Status, pod.Generation, v1.PodScheduled),
