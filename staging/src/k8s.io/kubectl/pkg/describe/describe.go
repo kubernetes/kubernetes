@@ -4077,7 +4077,7 @@ func describeNodeResource(nodeNonTerminatedPodsList *corev1.PodList, node *corev
 
 	for _, pod := range nodeNonTerminatedPodsList.Items {
 		// TODO(pravk03): Evaluate including DRANodeAllocatableResources in node resource descriptions.
-		opts := resourcehelper.PodResourcesOptions{UseStatusResources: true, ExcludeDRANodeAllocatableResources: true, Features: resourcehelper.AllFeatures()}
+		opts := resourcehelper.PodResourcesOptions{UseStatusResources: true, ExcludeDRANodeAllocatableResources: true, Features: resourcehelper.EnableAllFeatures()}
 		req := resourcehelper.PodRequests(&pod, opts)
 		limit := resourcehelper.PodLimits(&pod, opts)
 		cpuReq, cpuLimit, memoryReq, memoryLimit := req[corev1.ResourceCPU], limit[corev1.ResourceCPU], req[corev1.ResourceMemory], limit[corev1.ResourceMemory]
@@ -4133,7 +4133,7 @@ func getPodsTotalRequestsAndLimits(podList *corev1.PodList) (reqs map[corev1.Res
 	for _, pod := range podList.Items {
 		// Use the same accounting as the per-pod rows above so that the totals
 		// agree with them while a pod is being resized in place.
-		opts := resourcehelper.PodResourcesOptions{UseStatusResources: true, ExcludeDRANodeAllocatableResources: true, Features: resourcehelper.AllFeatures()}
+		opts := resourcehelper.PodResourcesOptions{UseStatusResources: true, ExcludeDRANodeAllocatableResources: true, Features: resourcehelper.EnableAllFeatures()}
 		podReqs := resourcehelper.PodRequests(&pod, opts)
 		podLimits := resourcehelper.PodLimits(&pod, opts)
 		for podReqName, podReqValue := range podReqs {

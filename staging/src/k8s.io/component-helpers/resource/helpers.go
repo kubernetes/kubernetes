@@ -43,8 +43,8 @@ type Features struct {
 	DRANodeAllocatableResources             bool
 }
 
-// AllFeatures returns a Features struct with all features enabled.
-func AllFeatures() Features {
+// EnableAllFeatures returns a Features struct with all features enabled.
+func EnableAllFeatures() Features {
 	return Features{
 		PodLevelResources:                       true,
 		InPlacePodVerticalScaling:               true,
