@@ -553,18 +553,6 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 		return newErrWatcher(fmt.Errorf("a watch stream was requested by the client but the required storage feature %s is disabled", storage.RequestWatchProgress)), nil
 	}
 
-	// Determine the ResourceVersion to which the watch cache must be synchronized
-	requiredResourceVersion, err := c.getWatchCacheResourceVersion(ctx, requestedWatchRV, opts)
-	if err != nil {
-		return newErrWatcher(err), nil
-	}
-
-	// Determine a function that computes the bookmarkAfterResourceVersion
-	bookmarkAfterResourceVersionFn, err := c.getBookmarkAfterResourceVersionLockedFunc(requestedWatchRV, requiredResourceVersion, opts)
-	if err != nil {
-		return newErrWatcher(err), nil
-	}
-
 	// Determine watch timeout('0' means deadline is not set, ignore checking)
 	deadline, _ := ctx.Deadline()
 
@@ -586,6 +574,18 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 		c.clock,
 		identifier,
 	)
+
+	// Determine the ResourceVersion to which the watch cache must be synchronized
+	requiredResourceVersion, err := c.getWatchCacheResourceVersion(ctx, requestedWatchRV, opts)
+	if err != nil {
+		return newErrWatcher(err), nil
+	}
+
+	// Determine a function that computes the bookmarkAfterResourceVersion
+	bookmarkAfterResourceVersionFn, err := c.getBookmarkAfterResourceVersionLockedFunc(requestedWatchRV, requiredResourceVersion, opts)
+	if err != nil {
+		return newErrWatcher(err), nil
+	}
 
 	// note that c.waitUntilWatchCacheFreshAndForceAllEvents must be called without
 	// the c.watchCache.RLock held otherwise we are at risk of a deadlock
