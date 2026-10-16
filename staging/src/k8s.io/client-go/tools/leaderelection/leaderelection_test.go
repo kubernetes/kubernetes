@@ -745,6 +745,52 @@ func TestReleaseMethodCallsGet(t *testing.T) {
 	}
 }
 
+// TestReleaseDoesNotClearAnotherHolder verifies that release leaves the lease
+// alone when the server says someone else holds it, even if this elector's
+// cached record still names it as the holder, as it can after an outage.
+func TestReleaseDoesNotClearAnotherHolder(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	objectType := "leases"
+
+	lockMeta := metav1.ObjectMeta{Namespace: "foo", Name: "bar"}
+	resourceLockConfig := rl.ResourceLockConfig{
+		Identity:      "baz",
+		EventRecorder: record.NewFakeRecorder(100),
+	}
+	c := &fake.Clientset{}
+	c.AddReactor("get", objectType, func(action fakeclient.Action) (bool, runtime.Object, error) {
+		return true, createLockObject(t, objectType, action.GetNamespace(), action.(fakeclient.GetAction).GetName(), &rl.LeaderElectionRecord{
+			HolderIdentity:       "other",
+			LeaseDurationSeconds: 10,
+		}), nil
+	})
+	c.AddReactor("update", objectType, func(action fakeclient.Action) (bool, runtime.Object, error) {
+		t.Errorf("release must not update a lease held by someone else")
+		return true, action.(fakeclient.UpdateAction).GetObject(), nil
+	})
+
+	le := &LeaderElector{
+		config: LeaderElectionConfig{
+			Lock: &rl.LeaseLock{
+				LeaseMeta:  lockMeta,
+				LockConfig: resourceLockConfig,
+				Client:     c.CoordinationV1(),
+			},
+			LeaseDuration: 10 * time.Second,
+			Callbacks:     LeaderCallbacks{OnNewLeader: func(l string) {}},
+		},
+		// Stale cache: the last record this elector observed named it as holder.
+		observedRecord: rl.LeaderElectionRecord{HolderIdentity: "baz"},
+		observedTime:   time.Now(),
+		clock:          clock.RealClock{},
+		metrics:        globalMetricsFactory.newLeaderMetrics(),
+	}
+
+	if !le.release(logger) {
+		t.Errorf("expected release to report success without touching the lease")
+	}
+}
+
 // TestReleaseRetriesOnConflict verifies that release retries when the
 // Update call returns a conflict error (e.g. from an inflight renew).
 func TestReleaseRetriesOnConflict(t *testing.T) {
