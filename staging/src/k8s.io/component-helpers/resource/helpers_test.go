@@ -2529,6 +2529,53 @@ func TestPodRequestsAndLimitsWithDRA(t *testing.T) {
 			},
 		},
 		{
+			description: "DRANodeAllocatableResources enabled but excluded",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "c1",
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceCPU: resource.MustParse("100m"),
+								},
+								Requests: v1.ResourceList{
+									v1.ResourceCPU: resource.MustParse("100m"),
+								},
+								Claims: []v1.ResourceClaim{
+									{Name: "claim-1"},
+								},
+							},
+						},
+					},
+					ResourceClaims: []v1.PodResourceClaim{
+						{
+							Name:              "claim-1",
+							ResourceClaimName: new("node-allocatable-claim"),
+						},
+					},
+				},
+				Status: v1.PodStatus{
+					NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+						{
+							ResourceClaimName: "node-allocatable-claim",
+							Containers:        []string{"c1"},
+							Mapping: []v1.NodeAllocatableMappedResources{
+								{Name: v1.ResourceCPU, Quantity: new(resource.MustParse("50m"))},
+							},
+						},
+					},
+				},
+			},
+			options: PodResourcesOptions{ExcludeDRANodeAllocatableResources: true, Features: AllFeatures()},
+			expectedRequests: v1.ResourceList{
+				v1.ResourceCPU: resource.MustParse("100m"),
+			},
+			expectedLimits: v1.ResourceList{
+				v1.ResourceCPU: resource.MustParse("100m"),
+			},
+		},
+		{
 			description: "Pod Level Resources overrides the claim request/limit",
 			pod: &v1.Pod{
 				Spec: v1.PodSpec{

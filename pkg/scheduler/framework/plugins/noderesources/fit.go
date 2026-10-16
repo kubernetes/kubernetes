@@ -431,7 +431,9 @@ func (f *Fit) haveEnoughRelevantResourcesDecreased(targetPod *v1.Pod, originalPo
 	originalMaxResourceReq, modifiedMaxResourceReq := &framework.Resource{}, &framework.Resource{}
 	opts := resource.PodResourcesOptions{
 		UseStatusResources: true,
-		Features:           f.fts.ResourceFeatures(),
+		// TODO(pravk03): Evaluate including DRANodeAllocatableResources when checking for freed resources.
+		ExcludeDRANodeAllocatableResources: true,
+		Features:                           f.fts.ResourceFeatures(),
 	}
 	originalMaxResourceReq.SetMaxResource(resource.PodRequests(originalPod, opts))
 	modifiedMaxResourceReq.SetMaxResource(resource.PodRequests(modifiedPod, opts))
@@ -515,7 +517,8 @@ func (f *Fit) isSchedulableAfterDeviceClassEvent(logger klog.Logger, pod *v1.Pod
 		return fwk.Queue, err
 	}
 	opts := resource.PodResourcesOptions{
-		Features: f.fts.ResourceFeatures(),
+		ExcludeDRANodeAllocatableResources: true,
+		Features:                           f.fts.ResourceFeatures(),
 	}
 	if originalClass != nil {
 		if ptr.Deref(originalClass.Spec.ExtendedResourceName, "") == ptr.Deref(modifiedClass.Spec.ExtendedResourceName, "") {
