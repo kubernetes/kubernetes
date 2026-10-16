@@ -61,10 +61,9 @@ func TestInt64AmountAdd(t *testing.T) {
 		{int64Amount{value: mostPositive, scale: -1}, int64Amount{value: 0, scale: -1}, int64Amount{value: mostPositive, scale: -1}, true},
 		{int64Amount{value: mostPositive / 10, scale: 1}, int64Amount{value: 10, scale: 0}, int64Amount{value: mostPositive, scale: -1}, false},
 
-		// TODO: Scale deltas exceeding math.MaxInt32 wrap to a negative int32 in Add,
-		// causing positiveScaleInt64 to skip scaling and return true with a bogus sum.
-		{int64Amount{value: 1, scale: math.MaxInt32}, int64Amount{value: 1, scale: -1}, int64Amount{value: 2, scale: -1}, true},
-		{int64Amount{value: 5, scale: math.MinInt32}, int64Amount{value: 1, scale: 0}, int64Amount{value: 6, scale: math.MinInt32}, true},
+		// Scale deltas exceeding math.MaxInt32 do not fit in Scale and must fail.
+		{int64Amount{value: 1, scale: math.MaxInt32}, int64Amount{value: 1, scale: -1}, int64Amount{}, false},
+		{int64Amount{value: 5, scale: math.MinInt32}, int64Amount{value: 1, scale: 0}, int64Amount{}, false},
 	} {
 		c := test.a
 		ok := c.Add(test.b)

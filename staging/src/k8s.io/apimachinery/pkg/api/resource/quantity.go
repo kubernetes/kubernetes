@@ -742,6 +742,9 @@ func (q *Quantity) widenedScale() widenedScale {
 // Add adds the provide y quantity to the current value. If the current value is zero,
 // the format of the quantity will be updated to the format of y.
 //
+// If non-zero operand values are more than 29 orders of magnitude apart, the finer-grained
+// operand is rounded away from zero before the values are summed.
+//
 // This function is unsafe to call concurrently with method calls from other
 // goroutines (even to read-only methods).
 func (q *Quantity) Add(y Quantity) {
@@ -757,11 +760,14 @@ func (q *Quantity) Add(y Quantity) {
 		q.Format = y.Format
 	}
 	q.ToDec()
-	q.d.Dec = new(inf.Dec).Add(q.d.Dec, y.internalReadOnlyDec())
+	q.d.Dec = addDecBoundedScale(q.d.Dec, y.internalReadOnlyDec())
 }
 
 // Sub subtracts the provided quantity from the current value in place. If the current
 // value is zero, the format of the quantity will be updated to the format of y.
+//
+// If non-zero operand values are more than 29 orders of magnitude apart, the finer-grained
+// operand is rounded away from zero before the values are subtracted.
 //
 // This function is unsafe to call concurrently with method calls from other
 // goroutines (even to read-only methods).
@@ -782,7 +788,7 @@ func (q *Quantity) Sub(y Quantity) {
 		return
 	}
 	q.ToDec()
-	q.d.Dec = new(inf.Dec).Sub(q.d.Dec, y.internalReadOnlyDec())
+	q.d.Dec = subDecBoundedScale(q.d.Dec, y.internalReadOnlyDec())
 }
 
 // Mul multiplies the provided y to the current value.
