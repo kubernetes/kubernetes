@@ -2736,15 +2736,62 @@ func TestPodEligibleToPreemptOthers(t *testing.T) {
 			features: feature.Features{EnableGenericWorkload: true},
 			expected: false,
 		},
+		{
+			name: "deferred resize pod: lower-priority preemption victim terminating on assigned node",
+			pod: st.MakePod().Name("p").UID("p").Node("node1").Priority(highPriority).
+				Condition(v1.PodResizePending, v1.ConditionTrue, v1.PodReasonDeferred).Obj(),
+			pods: []*v1.Pod{
+				st.MakePod().Name("v1").UID("v1").Node("node1").Priority(lowPriority).Terminating().
+					Condition(v1.DisruptionTarget, v1.ConditionTrue, v1.PodReasonPreemptionByScheduler).Obj(),
+			},
+			nodes:    []string{"node1"},
+			features: feature.Features{EnableInPlacePodVerticalScalingSchedulerPreemption: true},
+			expected: false,
+		},
+		{
+			name: "deferred resize pod: higher-priority pod terminating by preemption on assigned node",
+			pod: st.MakePod().Name("p").UID("p").Node("node1").Priority(midPriority).
+				Condition(v1.PodResizePending, v1.ConditionTrue, v1.PodReasonDeferred).Obj(),
+			pods: []*v1.Pod{
+				st.MakePod().Name("v1").UID("v1").Node("node1").Priority(highPriority).Terminating().
+					Condition(v1.DisruptionTarget, v1.ConditionTrue, v1.PodReasonPreemptionByScheduler).Obj(),
+			},
+			nodes:    []string{"node1"},
+			features: feature.Features{EnableInPlacePodVerticalScalingSchedulerPreemption: true},
+			expected: true,
+		},
+		{
+			name: "deferred resize pod: lower-priority pod terminating for non-preemption reason on assigned node",
+			pod: st.MakePod().Name("p").UID("p").Node("node1").Priority(highPriority).
+				Condition(v1.PodResizePending, v1.ConditionTrue, v1.PodReasonDeferred).Obj(),
+			pods: []*v1.Pod{
+				st.MakePod().Name("v1").UID("v1").Node("node1").Priority(lowPriority).Terminating().Obj(),
+			},
+			nodes:    []string{"node1"},
+			features: feature.Features{EnableInPlacePodVerticalScalingSchedulerPreemption: true},
+			expected: true,
+		},
+		{
+			name: "deferred resize pod: no terminating pods on assigned node",
+			pod: st.MakePod().Name("p").UID("p").Node("node1").Priority(highPriority).
+				Condition(v1.PodResizePending, v1.ConditionTrue, v1.PodReasonDeferred).Obj(),
+			pods: []*v1.Pod{
+				st.MakePod().Name("v1").UID("v1").Node("node1").Priority(lowPriority).Obj(),
+			},
+			nodes:    []string{"node1"},
+			features: feature.Features{EnableInPlacePodVerticalScalingSchedulerPreemption: true},
+			expected: true,
+		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate,
 				featuregatetesting.FeatureOverrides{
-					features.GenericWorkload:                 test.features.EnableGenericWorkload,
-					features.TopologyAwareWorkloadScheduling: test.features.EnableCompositePodGroup,
-					features.CompositePodGroup:               test.features.EnableCompositePodGroup,
+					features.GenericWorkload:                              test.features.EnableGenericWorkload,
+					features.TopologyAwareWorkloadScheduling:              test.features.EnableCompositePodGroup,
+					features.CompositePodGroup:                            test.features.EnableCompositePodGroup,
+					features.InPlacePodVerticalScalingSchedulerPreemption: test.features.EnableInPlacePodVerticalScalingSchedulerPreemption,
 				})
 			logger, ctx := ktesting.NewTestContext(t)
 			ctx, cancel := context.WithCancel(ctx)
