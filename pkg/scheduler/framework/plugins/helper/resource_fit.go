@@ -125,7 +125,8 @@ func FitsRequest(podRequest *framework.Resource, nodeInfo fwk.NodeInfo, ignoredE
 	insufficientResources := make([]InsufficientResource, 0, 4)
 
 	// A deferred resize pod on its node is already counted in nodeInfo at max(desired, allocated, actual),
-	// so it adds nothing and we only check whether the node is overcommitted.
+	// so it adds nothing and we only check whether the node is overcommitted. This relies on
+	// refreshResizingPodFromCache having already confirmed that the pod is present on this node in the snapshot.
 	alreadyCounted := isPodResizeOnNode(opts, nodeInfo, pod)
 	added := podRequest
 	addedPods := 1

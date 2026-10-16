@@ -101,11 +101,18 @@ func (ev *Evaluator) evaluate(ctx context.Context, state fwk.CycleState, pod *v1
 	// It's safe to directly fetch pod here. Because the informer cache has already been
 	// initialized when creating the Scheduler obj.
 	// However, tests may need to manually initialize the shared pod informer.
+	isResize := ev.fts.EnableInPlacePodVerticalScalingSchedulerPreemption && compresource.IsPodResizeDeferred(pod)
+	evaluatedUID := pod.UID
 	podNamespace, podName := pod.Namespace, pod.Name
 	pod, err := ev.PodLister.Pods(podNamespace).Get(podName)
 	if err != nil {
 		logger.Error(err, "Could not get the updated preemptor pod object", "pod", klog.KRef(podNamespace, podName))
 		return nil, nil, fwk.AsStatus(err)
+	}
+	// The queued copy of a deferred resize pod can be stale. Don't preempt for a resize that was
+	// resolved or already evaluated since, or for a recreated pod.
+	if isResize && (pod.UID != evaluatedUID || !compresource.IsPodResizeDeferred(pod) || util.IsPodResizeSchedulerEvaluationCompleted(pod)) {
+		return nil, nil, fwk.NewStatus(fwk.Unschedulable, fmt.Sprintf("pod resize on node %v is no longer deferred or already evaluated", pod.Spec.NodeName))
 	}
 
 	// 1) Ensure the preemptor is eligible to preempt other pods.
