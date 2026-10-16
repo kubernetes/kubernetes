@@ -575,10 +575,20 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 		identifier,
 	)
 
-	// Determine the ResourceVersion to which the watch cache must be synchronized
-	requiredResourceVersion, err := c.getWatchCacheResourceVersion(ctx, requestedWatchRV, opts)
-	if err != nil {
-		return newErrWatcher(err), nil
+	var requiredResourceVersion uint64
+	switch {
+	case len(opts.ResourceVersion) != 0:
+		requiredResourceVersion = requestedWatchRV
+	case opts.SendInitialEvents == nil && opts.ResourceVersion == "":
+		// legacy case
+		requiredResourceVersion = 0
+	default:
+		// consistent
+		rv, err := c.storage.GetCurrentResourceVersion(ctx)
+		if err != nil {
+			return newErrWatcher(err), nil
+		}
+		requiredResourceVersion = rv
 	}
 
 	// Determine a function that computes the bookmarkAfterResourceVersion
@@ -1323,29 +1333,6 @@ func (c *Cacher) getBookmarkAfterResourceVersionLockedFunc(parsedResourceVersion
 // isListWatchRequest is mirrored in staging/src/k8s.io/apiserver/pkg/endpoints/handlers/get.go
 func isListWatchRequest(opts storage.ListOptions) bool {
 	return opts.SendInitialEvents != nil && *opts.SendInitialEvents && opts.Predicate.AllowWatchBookmarks
-}
-
-// getWatchCacheResourceVersion returns a ResourceVersion to which the watch cache must be synchronized to
-//
-// Depending on the input parameters, the semantics of the returned ResourceVersion are:
-//   - must be at Exact RV (when parsedWatchResourceVersion > 0)
-//   - can be at Any RV (when parsedWatchResourceVersion = 0)
-//   - must be at Most Recent RV (return an RV from etcd)
-//
-// note that the above semantic is enforced by the API validation (defined elsewhere):
-//
-//	if SendInitiaEvents != nil => ResourceVersionMatch = NotOlderThan
-//	if ResourceVersionmatch != nil => ResourceVersionMatch = NotOlderThan & SendInitialEvents != nil
-func (c *Cacher) getWatchCacheResourceVersion(ctx context.Context, parsedWatchResourceVersion uint64, opts storage.ListOptions) (uint64, error) {
-	if len(opts.ResourceVersion) != 0 {
-		return parsedWatchResourceVersion, nil
-	}
-	// legacy case
-	if opts.SendInitialEvents == nil && opts.ResourceVersion == "" {
-		return 0, nil
-	}
-	rv, err := c.storage.GetCurrentResourceVersion(ctx)
-	return rv, err
 }
 
 // waitUntilWatchCacheFreshAndForceAllEventsLocked waits until cache is at least
