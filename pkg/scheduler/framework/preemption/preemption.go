@@ -150,7 +150,10 @@ func (ev *Evaluator) evaluate(ctx context.Context, state fwk.CycleState, pod *v1
 	}
 
 	// 3) Interact with registered Extenders to filter out some candidates if needed.
-	candidates, status = ev.callExtenders(logger, pod, candidates)
+	// Extenders sit out a resize, as in the scheduling cycle (see Framework.WithRelevantPlugins).
+	if !isResize {
+		candidates, status = ev.callExtenders(logger, pod, candidates)
+	}
 	if !status.IsSuccess() {
 		return nil, nil, status
 	}
@@ -189,6 +192,16 @@ func (ev *Evaluator) Preempt(ctx context.Context, state fwk.CycleState, pod *v1.
 	}
 
 	logger.V(2).Info("the target node for the preemption is determined", "node", bestCandidate.Name(), "pod", klog.KObj(pod))
+
+	isDeferredResize := ev.fts.EnableInPlacePodVerticalScalingSchedulerPreemption && resource.IsPodResizeDeferred(pod)
+
+	// SelectVictimsOnNode returns Unschedulable if there are no potential victims or if the pod still
+	// does not fit after removing them (causing ev.evaluate above to return non-Success). Reaching here
+	// with 0 victims means SelectVictimsOnNode returned Success after reprieving every potential victim
+	// using max(allocated, actual), so the deferred resize fits without preempting any pod.
+	if len(bestCandidate.Victims().Pods) == 0 && isDeferredResize {
+		return &fwk.PostFilterResult{NominatingInfo: &fwk.NominatingInfo{NominatingMode: fwk.ModeNoop}}, fwk.NewStatus(fwk.Success, fmt.Sprintf("pod fits on node %v without preemption after reprieve", bestCandidate.Name()))
+	}
 
 	// 5) Actuate the preemption.
 	if status := ev.executor.ActuatePodPreemption(ctx, bestCandidate, pod, ev.PluginName); !status.IsSuccess() {
@@ -489,11 +502,14 @@ func (ev *Evaluator) DryRunPreemption(ctx context.Context, state fwk.CycleState,
 		pods, numPDBViolations, status := ev.SelectVictimsOnNode(ctx, state.Clone(), pod, nodeInfo.Snapshot(), allPossibleVictims, pdbs)
 
 		// In-tree filters may succeed with no victims when only extender-managed
-		// resources are constrained. HTTPExtender.Filter cannot observe simulated
-		// victim removal, so keep the node as a candidate and let ProcessPreemption
-		// add victims. Without a preempt-capable extender, empty victims means
+		// resources are constrained, or when a deferred resize pod fits alongside
+		// candidate victims' allocated/actual resources after reprieve.
+		// HTTPExtender.Filter cannot observe simulated victim removal, so keep the
+		// node as a candidate and let ProcessPreemption add victims. Without a
+		// preempt-capable extender or deferred resize reprieve, empty victims means
 		// preemption cannot help this node (not an error).
-		if status.IsSuccess() && (len(pods) != 0 || ev.hasInterestedPreemptExtender(pod)) {
+		isDeferredResize := ev.fts.EnableInPlacePodVerticalScalingSchedulerPreemption && resource.IsPodResizeDeferred(pod)
+		if status.IsSuccess() && (len(pods) != 0 || ev.hasInterestedPreemptExtender(pod) || isDeferredResize) {
 			victims := extenderv1.Victims{
 				Pods:             pods,
 				NumPDBViolations: int64(numPDBViolations),

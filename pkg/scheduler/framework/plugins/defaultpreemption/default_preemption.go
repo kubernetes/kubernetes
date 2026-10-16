@@ -33,6 +33,7 @@ import (
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
+	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 	"k8s.io/kubernetes/pkg/scheduler/framework/preemption"
@@ -308,9 +309,17 @@ func (pl *DefaultPreemption) SelectVictimsOnNode(
 
 		return nil
 	}
+	isDeferredResizePreemptor := pl.fts.EnableInPlacePodVerticalScalingSchedulerPreemption && resourcehelper.IsPodResizeDeferred(preemptor)
 	addVictim := func(pu *preemption.DomainVictim) error {
 		for _, pi := range pu.Pods() {
 			nodeInfo := nameToNode[pi.GetPod().Spec.NodeName]
+			if isDeferredResizePreemptor {
+				// During reprieve for a deferred resize preemptor, evaluate candidate victims using
+				// max(allocated, actual) by overwriting unfulfilled desired spec requests with allocated
+				// resources, matching Kubelet's admission calculation and avoiding over-preemption when
+				// multiple pods on the node have pending resizes.
+				pi = podInfoWithAllocatedResources(pi)
+			}
 			// See the block comment in SelectVictimsOnNode: only mainNode's NodeInfo
 			// is mutated; remote nodes go through PreFilterExtension only.
 			if pi.GetPod().Spec.NodeName == mainNodeName {
@@ -511,4 +520,53 @@ func (pl *DefaultPreemption) PodGroupPostFilter(ctx context.Context, state fwk.P
 		return res, fwk.NewStatus(status.Code(), "pod group preemption: "+msg)
 	}
 	return res, status
+}
+
+// podInfoWithAllocatedResources returns a PodInfo whose spec requests are replaced with the
+// allocated resources from status, so CalculateResource() evaluates max(allocated, actual)
+// instead of max(desired, allocated, actual). CalculateResource takes the desired term from
+// spec: container requests, or pod-level requests when set. Pod-level status only replaces the
+// allocated and actual terms, so both spec levels are replaced.
+func podInfoWithAllocatedResources(pi fwk.PodInfo) fwk.PodInfo {
+	if pi.GetPod() == nil {
+		return pi
+	}
+	pod := pi.GetPod().DeepCopy()
+
+	// Status.AllocatedResources is the kubelet's pod-level aggregate (which can include overhead
+	// or DRA node-allocatable quantities), so only overwrite resource names already present in
+	// pod-level spec requests.
+	if pod.Spec.Resources != nil && pod.Status.AllocatedResources != nil {
+		for rName := range pod.Spec.Resources.Requests {
+			if qty, ok := pod.Status.AllocatedResources[rName]; ok {
+				pod.Spec.Resources.Requests[rName] = qty
+			}
+		}
+	}
+
+	allocByContainer := make(map[string]v1.ResourceList, len(pod.Status.ContainerStatuses)+len(pod.Status.InitContainerStatuses))
+	for _, cs := range pod.Status.InitContainerStatuses {
+		if cs.AllocatedResources != nil {
+			allocByContainer[cs.Name] = cs.AllocatedResources
+		}
+	}
+	for _, cs := range pod.Status.ContainerStatuses {
+		if cs.AllocatedResources != nil {
+			allocByContainer[cs.Name] = cs.AllocatedResources
+		}
+	}
+	for i := range pod.Spec.InitContainers {
+		if alloc, ok := allocByContainer[pod.Spec.InitContainers[i].Name]; ok {
+			pod.Spec.InitContainers[i].Resources.Requests = alloc
+		}
+	}
+	for i := range pod.Spec.Containers {
+		if alloc, ok := allocByContainer[pod.Spec.Containers[i].Name]; ok {
+			pod.Spec.Containers[i].Resources.Requests = alloc
+		}
+	}
+
+	// Ignore the error: NewPodInfo still returns a usable PodInfo when affinity terms fail to parse.
+	newPI, _ := framework.NewPodInfo(pod)
+	return newPI
 }
