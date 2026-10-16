@@ -127,6 +127,10 @@ func (sched *Scheduler) scheduleOnePod(ctx context.Context, podInfo *framework.Q
 	podsToActivate := framework.NewPodsToActivate()
 	state.Write(framework.PodsToActivateKey, podsToActivate)
 
+	// Queueing hints need no filtering: the queue only consults the plugins that rejected the pod,
+	// and plugins dropped here never run.
+	schedFramework = schedFramework.WithRelevantPlugins(ctx, state, pod)
+
 	schedulingCycleCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 

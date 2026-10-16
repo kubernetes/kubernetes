@@ -97,10 +97,17 @@ type DefaultPreemption struct {
 
 var _ fwk.PostFilterPlugin = &DefaultPreemption{}
 var _ fwk.PreEnqueuePlugin = &DefaultPreemption{}
+var _ fwk.RelevancePlugin = &DefaultPreemption{}
 
 // Name returns name of the plugin. It is used in logs, etc.
 func (pl *DefaultPreemption) Name() string {
 	return Name
+}
+
+// IsRelevantForPodResize returns nil to indicate that DefaultPreemption is relevant for pod resizes,
+// as it evaluates and executes preemption on the pod's node to make room for the deferred resize.
+func (pl *DefaultPreemption) IsRelevantForPodResize(ctx context.Context, cycleState fwk.CycleState, pod *v1.Pod) *fwk.Status {
+	return nil
 }
 
 // New initializes a new plugin and returns it. The plugin type is retained to allow modification.

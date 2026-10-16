@@ -45,12 +45,11 @@ var _ fwk.SignPlugin = &InterPodAffinity{}
 
 // InterPodAffinity is a plugin that checks inter pod affinity
 type InterPodAffinity struct {
-	parallelizer                                       fwk.Parallelizer
-	args                                               config.InterPodAffinityArgs
-	sharedLister                                       fwk.SharedLister
-	nsLister                                           listersv1.NamespaceLister
-	enableInPlacePodVerticalScalingSchedulerPreemption bool
-	enableInterPodAffinityHostnameFastPath             bool
+	parallelizer                           fwk.Parallelizer
+	args                                   config.InterPodAffinityArgs
+	sharedLister                           fwk.SharedLister
+	nsLister                               listersv1.NamespaceLister
+	enableInterPodAffinityHostnameFastPath bool
 }
 
 // Name returns name of the plugin. It is used in logs, etc.
@@ -109,12 +108,11 @@ func New(_ context.Context, plArgs runtime.Object, h fwk.Handle, fts feature.Fea
 		return nil, err
 	}
 	pl := &InterPodAffinity{
-		parallelizer: h.Parallelizer(),
-		args:         args,
-		sharedLister: h.SnapshotSharedLister(),
-		nsLister:     h.SharedInformerFactory().Core().V1().Namespaces().Lister(),
-		enableInPlacePodVerticalScalingSchedulerPreemption: fts.EnableInPlacePodVerticalScalingSchedulerPreemption,
-		enableInterPodAffinityHostnameFastPath:             fts.EnableInterPodAffinityHostnameFastPath,
+		parallelizer:                           h.Parallelizer(),
+		args:                                   args,
+		sharedLister:                           h.SnapshotSharedLister(),
+		nsLister:                               h.SharedInformerFactory().Core().V1().Namespaces().Lister(),
+		enableInterPodAffinityHostnameFastPath: fts.EnableInterPodAffinityHostnameFastPath,
 	}
 
 	return pl, nil

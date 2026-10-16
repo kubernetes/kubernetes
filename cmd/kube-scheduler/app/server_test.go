@@ -280,7 +280,6 @@ leaderElection:
 					plugins.PreFilter.Enabled = []config.Plugin{
 						{Name: "NodeResourcesFit"},
 						{Name: "NodePorts"},
-						{Name: "TaintToleration"},
 						{Name: "DynamicResources"},
 					}
 					plugins.PreScore.Enabled = []config.Plugin{

@@ -443,6 +443,20 @@ type Plugin interface {
 	Name() string
 }
 
+// RelevancePlugin allows a scheduling plugin to declare whether it is relevant
+// for evaluating a pod with a deferred in-place resize. The framework consults it
+// only for such pods, and only while the InPlacePodVerticalScalingSchedulerPreemption
+// feature is enabled. Plugins that don't implement it are skipped for those pods.
+type RelevancePlugin interface {
+	Plugin
+	// IsRelevantForPodResize returns a Status indicating whether this plugin is relevant
+	// for evaluating the given resizing pod. Only Skip opts the plugin out: the framework
+	// then skips all of its extension points during the scheduling cycle and preemption,
+	// and skips its PreEnqueue check. QueueSort, Sign and EnqueueExtensions are unaffected.
+	// Reserve and Unreserve never run for a pod with a deferred resize, relevant or not.
+	IsRelevantForPodResize(ctx context.Context, cycleState CycleState, pod *v1.Pod) *Status
+}
+
 // PreEnqueuePlugin is an interface that must be implemented by "PreEnqueue" plugins.
 // These plugins are called prior to adding Pods to activeQ or backoffQ.
 // Note: an preEnqueue plugin is expected to be lightweight and efficient, so it's not expected to

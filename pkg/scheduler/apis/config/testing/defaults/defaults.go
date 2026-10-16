@@ -69,8 +69,6 @@ var ExpandedPluginsV1 = &config.Plugins{
 	PreFilter: config.PluginSet{
 		Enabled: []config.Plugin{
 			{Name: names.NodeName},
-			{Name: names.NodeUnschedulable},
-			{Name: names.TaintToleration},
 			{Name: names.NodeAffinity},
 			{Name: names.NodePorts},
 			{Name: names.NodeResourcesFit},

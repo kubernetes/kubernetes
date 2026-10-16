@@ -10351,6 +10351,100 @@ func TestPriorityQueue_DeferredPodGroupCompatibility(t *testing.T) {
 		})
 	}
 }
+
+// relevancePreEnqueuePlugin is a preEnqueuePlugin that implements fwk.RelevancePlugin.
+type relevancePreEnqueuePlugin struct {
+	preEnqueuePlugin
+	relevance *fwk.Status
+}
+
+func (pl *relevancePreEnqueuePlugin) IsRelevantForPodResize(_ context.Context, _ fwk.CycleState, _ *v1.Pod) *fwk.Status {
+	return pl.relevance
+}
+
+func TestPriorityQueue_PreEnqueueForDeferredResize(t *testing.T) {
+	metrics.Register()
+	deferredPod := st.MakePod().Name("p").Namespace("ns1").UID("p").Node("node1").
+		Condition(v1.PodResizePending, v1.ConditionTrue, v1.PodReasonDeferred).Obj()
+	pendingPod := st.MakePod().Name("p").Namespace("ns1").UID("p").Obj()
+
+	// Every plugin gates every pod (no allowlists), so the pod reaches activeQ only if its plugin is skipped.
+	tests := []struct {
+		name        string
+		gateEnabled bool
+		pod         *v1.Pod
+		plugin      fwk.PreEnqueuePlugin
+		wantGatedBy string
+	}{
+		{
+			name:        "deferred resize skips a plugin that doesn't implement RelevancePlugin",
+			gateEnabled: true,
+			pod:         deferredPod,
+			plugin:      &preEnqueuePlugin{name: "not-implementing"},
+		},
+		{
+			name:        "deferred resize skips a plugin that opts out",
+			gateEnabled: true,
+			pod:         deferredPod,
+			plugin:      &relevancePreEnqueuePlugin{preEnqueuePlugin: preEnqueuePlugin{name: "opted-out"}, relevance: fwk.NewStatus(fwk.Skip)},
+		},
+		{
+			name:        "deferred resize runs a plugin that opts in",
+			gateEnabled: true,
+			pod:         deferredPod,
+			plugin:      &relevancePreEnqueuePlugin{preEnqueuePlugin: preEnqueuePlugin{name: "relevant"}},
+			wantGatedBy: "relevant",
+		},
+		{
+			name:        "pod without a deferred resize runs every plugin",
+			gateEnabled: true,
+			pod:         pendingPod,
+			plugin:      &preEnqueuePlugin{name: "not-implementing"},
+			wantGatedBy: "not-implementing",
+		},
+		{
+			name:        "deferred resize runs every plugin with the gate disabled",
+			pod:         deferredPod,
+			plugin:      &preEnqueuePlugin{name: "not-implementing"},
+			wantGatedBy: "not-implementing",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// The queue reads the gate at construction.
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScalingSchedulerPreemption, tt.gateEnabled)
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+
+			m := map[string]map[string]fwk.PreEnqueuePlugin{"": {tt.plugin.Name(): tt.plugin}}
+			q := NewTestQueue(ctx, newDefaultQueueSort(), WithPreEnqueuePluginMap(m))
+			defer q.Close()
+			q.Add(ctx, tt.pod)
+
+			lookup := newQueuedPodInfoForLookup(tt.pod)
+			entity := q.unschedulableEntities.get(lookup)
+			if tt.wantGatedBy == "" {
+				if entity != nil {
+					t.Fatalf("Expected the plugin to be skipped, but the pod is in unschedulableEntities (gated: %v)", entity.Gated())
+				}
+				if !q.activeQ.has(lookup) {
+					t.Fatal("Expected the pod in activeQ")
+				}
+				return
+			}
+			pInfo, ok := entity.(*framework.QueuedPodInfo)
+			if !ok || !pInfo.Gated() {
+				t.Fatalf("Expected the pod to be gated by %q, got %v", tt.wantGatedBy, entity)
+			}
+			if pInfo.GatingPlugin != tt.wantGatedBy {
+				t.Errorf("Unexpected gating plugin: want %q, got %q", tt.wantGatedBy, pInfo.GatingPlugin)
+			}
+		})
+	}
+}
+
 func TestPriorityQueue_PreQueueingHint(t *testing.T) {
 	tests := []struct {
 		name           string

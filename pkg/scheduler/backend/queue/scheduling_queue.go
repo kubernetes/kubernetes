@@ -766,6 +766,11 @@ func (p *PriorityQueue) runPreEnqueuePluginsForPod(ctx context.Context, pInfo *f
 // runPreEnqueuePlugin runs the PreEnqueue plugin and update pInfo's fields accordingly if needed.
 func (p *PriorityQueue) runPreEnqueuePlugin(ctx context.Context, pl fwk.PreEnqueuePlugin, pInfo *framework.QueuedPodInfo, shouldRecordMetric bool) *fwk.Status {
 	pod := pInfo.Pod
+	if p.isInPlacePodVerticalScalingSchedulerPreemptionEnabled && resource.IsPodResizeDeferred(pod) &&
+		!framework.IsRelevantForPodResize(ctx, framework.NewCycleState(), pl, pod) {
+		// As in the scheduling cycle (see Framework.WithRelevantPlugins), irrelevant plugins sit out a resize.
+		return nil
+	}
 	startTime := p.clock.Now()
 	s := pl.PreEnqueue(ctx, pod)
 	if shouldRecordMetric {

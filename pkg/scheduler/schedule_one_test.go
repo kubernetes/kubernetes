@@ -2265,6 +2265,13 @@ func NewFakeFramework(ctx context.Context, schedQueue internalqueue.SchedulingQu
 		err
 }
 
+// WithRelevantPlugins keeps the fake's overrides on the filtered framework.
+func (ff *FakeFramework) WithRelevantPlugins(ctx context.Context, state fwk.CycleState, pod *v1.Pod) framework.Framework {
+	filtered := *ff
+	filtered.Framework = ff.Framework.WithRelevantPlugins(ctx, state, pod)
+	return &filtered
+}
+
 func (ff *FakeFramework) WaitOnPermit(ctx context.Context, pod *v1.Pod) *fwk.Status {
 	return ff.waitOnPermitFn(ctx, pod)
 }
@@ -5351,8 +5358,10 @@ func TestScheduler_DeferredResizePluginSkipping(t *testing.T) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	// Create a node and a deferred resize pod assigned to that node
-	node := &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node1"}}
+	// Create a node and a deferred resize pod assigned to that node. The taint and the cordon would make
+	// TaintToleration and NodeUnschedulable reject the node, so the pod only fits if they sit out.
+	node := st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{v1.ResourcePods: "10"}).
+		Taints([]v1.Taint{{Key: "dedicated", Effect: v1.TaintEffectNoSchedule}}).Unschedulable(true).Obj()
 	pod := st.MakePod().Name("pod1").Namespace("ns1").UID("pod1").Node("node1").
 		Condition(v1.PodResizePending, v1.ConditionTrue, v1.PodReasonDeferred).Obj()
 
@@ -5382,8 +5391,8 @@ func TestScheduler_DeferredResizePluginSkipping(t *testing.T) {
 		tf.RegisterPluginAsExtensions(interpodaffinity.Name, frameworkruntime.FactoryAdapter(fts, interpodaffinity.New), "PreFilter", "Filter"),
 		tf.RegisterPluginAsExtensions(nodedeclaredfeatures.Name, frameworkruntime.FactoryAdapter(fts, nodedeclaredfeatures.New), "PreFilter", "Filter"),
 		tf.RegisterPluginAsExtensions(dynamicresources.Name, frameworkruntime.FactoryAdapter(fts, dynamicresources.New), "PreFilter", "Filter"),
-		tf.RegisterPluginAsExtensions(tainttoleration.Name, frameworkruntime.FactoryAdapter(fts, tainttoleration.New), "PreFilter", "Filter"),
-		tf.RegisterPluginAsExtensions(nodeunschedulable.Name, frameworkruntime.FactoryAdapter(fts, nodeunschedulable.New), "PreFilter", "Filter"),
+		tf.RegisterPluginAsExtensions(tainttoleration.Name, frameworkruntime.FactoryAdapter(fts, tainttoleration.New), "Filter"),
+		tf.RegisterPluginAsExtensions(nodeunschedulable.Name, frameworkruntime.FactoryAdapter(fts, nodeunschedulable.New), "Filter"),
 		tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 	}
 
@@ -5409,9 +5418,13 @@ func TestScheduler_DeferredResizePluginSkipping(t *testing.T) {
 
 	state := framework.NewCycleState()
 	podInfo := queuedPodInfoForPod(pod)
-
-	// Run schedulePod
-	_, _ = sched.algorithm.SchedulePod(ctx, schedFramework, state, podInfo)
+	result, err := sched.algorithm.SchedulePod(ctx, schedFramework.WithRelevantPlugins(ctx, state, pod), state, podInfo)
+	if err != nil {
+		t.Fatalf("SchedulePod failed for the deferred resize pod: %v", err)
+	}
+	if result.SuggestedHost != node.Name {
+		t.Errorf("Got suggested host %q, want %q", result.SuggestedHost, node.Name)
+	}
 
 	// Verify the skipped plugins
 	skipped := state.GetSkipFilterPlugins()
@@ -5535,6 +5548,7 @@ func TestScheduler_DeferredResizePostFilterPluginSkipping(t *testing.T) {
 			informerFactory.WaitForCacheSync(ctx.Done())
 
 			state := framework.NewCycleState()
+			schedFramework = schedFramework.WithRelevantPlugins(ctx, state, pod)
 
 			// Run PostFilter plugins directly
 			_, status := schedFramework.RunPostFilterPlugins(ctx, state, pod, framework.NewDefaultNodeToStatus())

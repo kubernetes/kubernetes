@@ -41,6 +41,7 @@ var _ fwk.PreFilterPlugin = &DeferredPodScheduling{}
 var _ fwk.FilterPlugin = &DeferredPodScheduling{}
 var _ fwk.EnqueueExtensions = &DeferredPodScheduling{}
 var _ fwk.BindPlugin = &DeferredPodScheduling{}
+var _ fwk.RelevancePlugin = &DeferredPodScheduling{}
 
 const (
 	Name                                  = names.DeferredPodScheduling
@@ -49,6 +50,11 @@ const (
 
 func (pl *DeferredPodScheduling) Name() string {
 	return Name
+}
+
+// IsRelevantForPodResize returns nil to indicate that DeferredPodScheduling is relevant for pod resizes.
+func (pl *DeferredPodScheduling) IsRelevantForPodResize(ctx context.Context, cycleState fwk.CycleState, pod *v1.Pod) *fwk.Status {
+	return nil
 }
 
 // EventsToRegister returns the possible events that may make a Pod

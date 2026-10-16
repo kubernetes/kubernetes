@@ -51,7 +51,6 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	componentmetrics "k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/testutil"
-	compresource "k8s.io/component-helpers/resource"
 	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
@@ -167,8 +166,8 @@ func (pl *TestPlugin) Filter(ctx context.Context, state fwk.CycleState, pod *v1.
 	return nil
 }
 
-// SkipOnDeferredFilterPlugin is a mock plugin used to verify that skipped plugins
-// are bypassed in preemption and reprieve dry-runs.
+// SkipOnDeferredFilterPlugin is a mock plugin that does not implement RelevancePlugin,
+// used to verify that irrelevant plugins are bypassed in preemption and reprieve dry-runs.
 type SkipOnDeferredFilterPlugin struct{}
 
 func newSkipOnDeferredFilterPlugin(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
@@ -179,12 +178,7 @@ func (pl *SkipOnDeferredFilterPlugin) Name() string {
 	return "skip-on-deferred"
 }
 
-// PreFilter returns Skip for deferred resize pods, causing the framework to
-// bypass execution of its Filter method. For other pods, it returns Success.
 func (pl *SkipOnDeferredFilterPlugin) PreFilter(ctx context.Context, state fwk.CycleState, p *v1.Pod, nodes []fwk.NodeInfo) (*fwk.PreFilterResult, *fwk.Status) {
-	if compresource.IsPodResizeDeferred(p) {
-		return nil, fwk.NewStatus(fwk.Skip)
-	}
 	return nil, nil
 }
 
@@ -193,7 +187,7 @@ func (pl *SkipOnDeferredFilterPlugin) PreFilterExtensions() fwk.PreFilterExtensi
 }
 
 // Filter always returns Unschedulable. This method should only be reached
-// and executed if PreFilter did not return Skip (i.e. for non-deferred pods).
+// and executed if the plugin was not skipped (i.e. for non-deferred pods).
 func (pl *SkipOnDeferredFilterPlugin) Filter(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) *fwk.Status {
 	return fwk.NewStatus(fwk.Unschedulable, "SkipOnDeferredFilterPlugin: always fail for non-deferred pods")
 }
@@ -646,7 +640,9 @@ func TestPostFilter(t *testing.T) {
 					t.Fatal(err)
 				}
 
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScalingSchedulerPreemption, tt.features.EnableInPlacePodVerticalScalingSchedulerPreemption)
 				state := framework.NewCycleState()
+				schedFwk = schedFwk.WithRelevantPlugins(ctx, state, tt.pod)
 				// Ensure <state> is populated.
 				if _, status, _ := schedFwk.RunPreFilterPlugins(ctx, state, tt.pod); !status.IsSuccess() {
 					t.Errorf("Unexpected PreFilter Status: %v", status)
