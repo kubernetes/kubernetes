@@ -30,9 +30,13 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/sharding"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/json"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	clientfeatures "k8s.io/client-go/features"
 	clientfeaturestesting "k8s.io/client-go/features/testing"
@@ -261,5 +265,96 @@ func newPartialObjectMetadata(apiVersion, kind, namespace, name string) *metav1.
 			Namespace: namespace,
 			Name:      name,
 		},
+	}
+}
+
+func TestMetadataSharedInformerFactoryWithShardSelector(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	gvr := schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "deployments"}
+	const initialObjects = 12
+	objs := make([]runtime.Object, 0, initialObjects)
+	for i := range initialObjects {
+		obj := newPartialObjectMetadata("apps/v1", "Deployment", "ns-foo", fmt.Sprintf("deploy-%02d", i))
+		obj.UID = types.UID(fmt.Sprintf("%d-uid-deploy", i))
+		objs = append(objs, obj)
+	}
+
+	scheme := fake.NewTestScheme()
+	if err := metav1.AddMetaToScheme(scheme); err != nil {
+		t.Fatalf("AddMetaToScheme: %v", err)
+	}
+	fakeClient := fake.NewSimpleMetadataClient(scheme, objs...)
+
+	const totalShards = 3
+	factories := make([]SharedInformerFactory, totalShards)
+	selectors := make([]sharding.Selector, totalShards)
+	seenInitial := make(map[string]int, initialObjects)
+
+	for shard := range totalShards {
+		sel, err := sharding.NewShardRangeSelector("object.metadata.uid", shard, totalShards)
+		if err != nil {
+			t.Fatalf("NewShardRangeSelector: %v", err)
+		}
+		selectors[shard] = sel
+
+		factories[shard] = NewSharedInformerFactoryWithOptions(fakeClient, 0, WithShardSelector(sel))
+		informer := factories[shard].ForResource(gvr)
+		_ = informer.Informer()
+		factories[shard].Start(ctx.Done())
+		t.Cleanup(factories[shard].Shutdown)
+		if synced := factories[shard].WaitForCacheSync(ctx.Done()); !synced[gvr] {
+			t.Fatalf("shard %d informer for %s failed to sync", shard, gvr)
+		}
+
+		items, err := informer.Lister().ByNamespace("ns-foo").List(labels.Everything())
+		if err != nil {
+			t.Fatalf("shard %d lister failed: %v", shard, err)
+		}
+		for _, item := range items {
+			metaObj := item.(*metav1.PartialObjectMetadata)
+			uid := string(metaObj.UID)
+			if matched, err := sel.Matches(metaObj); err != nil || !matched {
+				t.Errorf("shard %d cached out-of-shard object %s (uid %s, err %v)", shard, metaObj.Name, uid, err)
+			}
+			if prev, dup := seenInitial[uid]; dup {
+				t.Errorf("object %s (uid %s) seen in both shard %d and %d", metaObj.Name, uid, prev, shard)
+			}
+			seenInitial[uid] = shard
+		}
+	}
+	if len(seenInitial) != initialObjects {
+		t.Errorf("expected %d total initial objects across shards, got %d", initialObjects, len(seenInitial))
+	}
+
+	const watchObjects = 6
+	for offset := range watchObjects {
+		i := initialObjects + offset
+		obj := newPartialObjectMetadata("apps/v1", "Deployment", "ns-foo", fmt.Sprintf("deploy-%02d", i))
+		obj.UID = types.UID(fmt.Sprintf("%d-uid-deploy", i))
+		if _, err := fakeClient.Resource(gvr).Namespace("ns-foo").(fake.MetadataClient).CreateFake(obj, metav1.CreateOptions{}); err != nil {
+			t.Fatalf("CreateFake: %v", err)
+		}
+	}
+
+	if err := wait.PollUntilContextCancel(ctx, 10*time.Millisecond, true, func(_ context.Context) (bool, error) {
+		total := 0
+		for shard := range totalShards {
+			items, err := factories[shard].ForResource(gvr).Lister().ByNamespace("ns-foo").List(labels.Everything())
+			if err != nil {
+				return false, err
+			}
+			for _, item := range items {
+				metaObj := item.(*metav1.PartialObjectMetadata)
+				if matched, err := selectors[shard].Matches(metaObj); err != nil || !matched {
+					return false, fmt.Errorf("shard %d cached out-of-shard object %s", shard, metaObj.Name)
+				}
+			}
+			total += len(items)
+		}
+		return total == initialObjects+watchObjects, nil
+	}); err != nil {
+		t.Fatalf("failed waiting for sharded watch events across informers: %v", err)
 	}
 }

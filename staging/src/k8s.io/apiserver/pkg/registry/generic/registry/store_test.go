@@ -50,6 +50,7 @@ import (
 	"k8s.io/apiserver/pkg/apis/example"
 	examplev1 "k8s.io/apiserver/pkg/apis/example/v1"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage"
@@ -58,7 +59,9 @@ import (
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/apiserver/pkg/storage/storagebackend/factory"
 	storagetesting "k8s.io/apiserver/pkg/storage/testing"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/cache"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 )
 
 var scheme = runtime.NewScheme()
@@ -3638,5 +3641,28 @@ func TestStorePendingGracefulDeleteRV(t *testing.T) {
 				t.Errorf("Expected ResourceVersion %q, got %q", expectedRV, returnedRV)
 			}
 		})
+	}
+}
+
+func TestStoreInvalidShardSelector(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ShardedListAndWatch, true)
+
+	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), "test")
+	destroyFunc, registry := NewTestGenericStoreRegistry(t)
+	defer destroyFunc()
+
+	opts := &metainternalversion.ListOptions{
+		ShardSelector: "invalidSelector()",
+	}
+	if _, err := registry.List(ctx, opts); !errors.IsBadRequest(err) {
+		t.Errorf("List with invalid ShardSelector: expected BadRequest (400), got %v", err)
+	}
+
+	w, err := registry.Watch(ctx, opts)
+	if err == nil {
+		w.Stop()
+	}
+	if !errors.IsBadRequest(err) {
+		t.Errorf("Watch with invalid ShardSelector: expected BadRequest (400), got %v", err)
 	}
 }
