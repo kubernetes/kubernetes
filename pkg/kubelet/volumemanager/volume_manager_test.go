@@ -724,15 +724,14 @@ func TestWaitForAllPodsUnmount(t *testing.T) {
 			podManager.SetPods(pods)
 
 			if test.podMode != "" {
-				for i := 0; i < test.numPods; i++ {
-					volumeName := v1.UniqueVolumeName(node.Status.VolumesAttached[i].Name)
-					go simulateVolumeInUseUpdate(volumeName, ctx.Done(), manager)
-				}
-
 				volumeMarkTimeout := 10*time.Second + time.Duration(test.numPods/10)*5*time.Second
 				err := wait.PollUntilContextTimeout(ctx, 50*time.Millisecond, volumeMarkTimeout, true, func(context.Context) (bool, error) {
 					inUseVolumes := manager.GetVolumesInUse()
-					return len(inUseVolumes) == test.numPods, nil
+					if len(inUseVolumes) != test.numPods {
+						return false, nil
+					}
+					manager.MarkVolumesAsReportedInUse(inUseVolumes)
+					return true, nil
 				})
 
 				require.NoError(t, err, "Timeout waiting for all %d volumes to be marked as in-use", test.numPods)
