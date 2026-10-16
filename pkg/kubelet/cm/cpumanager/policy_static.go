@@ -1119,20 +1119,25 @@ func (p *staticPolicy) podGuaranteedCPUs(logger klog.Logger, pod *v1.Pod) int {
 }
 
 func (p *staticPolicy) takeByTopology(logger klog.Logger, availableCPUs cpuset.CPUSet, numCPUs int, minNUMAsFromHint int) (cpuset.CPUSet, error) {
-	cpuSortingStrategy := CPUSortingStrategyPacked
+	params := AllocationParams{
+		CPUSortingStrategy:       CPUSortingStrategyPacked,
+		PreferAlignByUncoreCache: p.options.PreferAlignByUncoreCacheOption,
+		CPUGroupSize:             1,
+		AlignBySocket:            p.options.AlignBySocket,
+		MINNUMAsFromHint:         minNUMAsFromHint,
+	}
 	if p.options.DistributeCPUsAcrossCores {
-		cpuSortingStrategy = CPUSortingStrategySpread
+		params.CPUSortingStrategy = CPUSortingStrategySpread
+	}
+	if p.options.FullPhysicalCPUsOnly {
+		params.CPUGroupSize = p.cpuGroupSize
 	}
 
 	if p.options.DistributeCPUsAcrossNUMA {
-		cpuGroupSize := 1
-		if p.options.FullPhysicalCPUsOnly {
-			cpuGroupSize = p.cpuGroupSize
-		}
-		return takeByTopologyNUMADistributed(logger, p.topology, availableCPUs, numCPUs, cpuGroupSize, cpuSortingStrategy, p.options.AlignBySocket, minNUMAsFromHint)
+		return takeByTopologyNUMADistributed(logger, p.topology, availableCPUs, numCPUs, params)
 	}
 
-	return takeByTopologyNUMAPacked(logger, p.topology, availableCPUs, numCPUs, cpuSortingStrategy, p.options.PreferAlignByUncoreCacheOption)
+	return takeByTopologyNUMAPacked(logger, p.topology, availableCPUs, numCPUs, params)
 }
 
 func (p *staticPolicy) GetTopologyHints(logger klog.Logger, s state.State, pod *v1.Pod, container *v1.Container, operation lifecycle.Operation) map[string][]topologymanager.TopologyHint {

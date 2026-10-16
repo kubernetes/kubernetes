@@ -315,15 +315,18 @@ type cpuAccumulator struct {
 	// By default, cpus is sorted by sortAvailableCPUsPacked()
 	// If packed is false, cpu is sorted by sortAvailableCPUsSpread()
 	availableCPUSorter availableCPUSorter
+
+	params AllocationParams
 }
 
-func newCPUAccumulator(logger klog.Logger, topo *topology.CPUTopology, availableCPUs cpuset.CPUSet, numCPUs int, cpuSortingStrategy CPUSortingStrategy) *cpuAccumulator {
+func newCPUAccumulator(logger klog.Logger, topo *topology.CPUTopology, availableCPUs cpuset.CPUSet, numCPUs int, params AllocationParams) *cpuAccumulator {
 	acc := &cpuAccumulator{
 		logger:        logger,
 		topo:          topo,
 		details:       topo.CPUDetails.KeepOnly(availableCPUs),
 		numCPUsNeeded: numCPUs,
 		result:        cpuset.New(),
+		params:        params,
 	}
 
 	if topo.NumSockets >= topo.NumNUMANodes {
@@ -332,7 +335,7 @@ func newCPUAccumulator(logger klog.Logger, topo *topology.CPUTopology, available
 		acc.numaOrSocketsFirst = &socketsFirst{acc}
 	}
 
-	if cpuSortingStrategy == CPUSortingStrategyPacked {
+	if params.CPUSortingStrategy == CPUSortingStrategyPacked {
 		acc.availableCPUSorter = &sortCPUsPacked{acc}
 	} else {
 		acc.availableCPUSorter = &sortCPUsSpread{acc}
@@ -694,13 +697,13 @@ func (a *cpuAccumulator) takeRemainingCPUs() {
 
 // rangeNUMANodesNeededToSatisfy returns minimum and maximum (in this order) number of NUMA nodes
 // needed to satisfy the cpuAccumulator's goal of accumulating `a.numCPUsNeeded` CPUs, assuming that
-// CPU groups have size given by the `cpuGroupSize` argument.
+// CPU groups have size given by `a.params.CPUGroupSize`.
 //
-// When minNumNUMAsFromHint is greater than 0, it raises the minimum NUMA node count
+// When a.params.MINNUMAsFromHint is greater than 0, it raises the minimum NUMA node count
 // to honor the TopologyManager's topology hint. This ensures CPU allocation alignes with device
 // topology (e.g., GPUs, NICs that span multiple NUMA nodes). If the hint exceeds the maximum feasible NUMA count,
-// minNumNUMAsFromHint is ignored.
-func (a *cpuAccumulator) rangeNUMANodesNeededToSatisfy(cpuGroupSize int, minNumNUMAsFromHint int) (minNumNUMAs, maxNumNUMAs int) {
+// a.params.MINNUMAsFromHint is ignored.
+func (a *cpuAccumulator) rangeNUMANodesNeededToSatisfy() (minNumNUMAs, maxNumNUMAs int) {
 	// Get the total number of NUMA nodes in the system.
 	numNUMANodes := a.topo.CPUDetails.NUMANodes().Size()
 
@@ -711,14 +714,14 @@ func (a *cpuAccumulator) rangeNUMANodesNeededToSatisfy(cpuGroupSize int, minNumN
 	numCPUs := a.topo.CPUDetails.CPUs().Size()
 
 	// Get the total number of 'cpuGroups' in the system.
-	numCPUGroups := (numCPUs-1)/cpuGroupSize + 1
+	numCPUGroups := (numCPUs-1)/a.params.CPUGroupSize + 1
 
 	// Calculate the number of 'cpuGroups' per NUMA Node in the system (rounding up).
 	numCPUGroupsPerNUMANode := (numCPUGroups-1)/numNUMANodes + 1
 
 	// Calculate the number of available 'cpuGroups' across all NUMA nodes as
 	// well as the number of 'cpuGroups' that need to be allocated (rounding up).
-	numCPUGroupsNeeded := (a.numCPUsNeeded-1)/cpuGroupSize + 1
+	numCPUGroupsNeeded := (a.numCPUsNeeded-1)/a.params.CPUGroupSize + 1
 
 	// Calculate the minimum number of numa nodes required to satisfy the
 	// allocation (rounding up).
@@ -731,11 +734,11 @@ func (a *cpuAccumulator) rangeNUMANodesNeededToSatisfy(cpuGroupSize int, minNumN
 	// ensuring we distribute across at least that many NUMA nodes. This
 	// prevents CPUManager from shrinking a multi-NUMA affinity back to fewer
 	// nodes than what TopologyManager intended (e.g., for GPU/NIC alignment).
-	if minNumNUMAsFromHint > 0 {
-		if minNumNUMAsFromHint > minNumNUMAs && minNumNUMAsFromHint <= maxNumNUMAs {
-			minNumNUMAs = minNumNUMAsFromHint
-		} else if minNumNUMAsFromHint > maxNumNUMAs {
-			a.logger.V(4).Info("NUMA affinity hint exceeds maximum feasible NUMA count, ignoring", "minNumNUMAsFromHint", minNumNUMAsFromHint, "maxNumNUMAs", maxNumNUMAs)
+	if a.params.MINNUMAsFromHint > 0 {
+		if a.params.MINNUMAsFromHint > minNumNUMAs && a.params.MINNUMAsFromHint <= maxNumNUMAs {
+			minNumNUMAs = a.params.MINNUMAsFromHint
+		} else if a.params.MINNUMAsFromHint > maxNumNUMAs {
+			a.logger.V(4).Info("NUMA affinity hint exceeds maximum feasible NUMA count, ignoring", "minNumNUMAsFromHint", a.params.MINNUMAsFromHint, "maxNumNUMAs", maxNumNUMAs)
 		}
 	}
 	return
@@ -785,6 +788,14 @@ func (a *cpuAccumulator) iterateCombinations(n []int, k int, f func([]int) LoopC
 	}
 
 	helper(n, k, 0, []int{}, f)
+}
+
+type AllocationParams struct {
+	CPUSortingStrategy       CPUSortingStrategy
+	PreferAlignByUncoreCache bool
+	CPUGroupSize             int
+	AlignBySocket            bool
+	MINNUMAsFromHint         int
 }
 
 // takeByTopologyNUMAPacked returns a CPUSet containing `numCPUs` CPUs taken from the CPUs in the
@@ -837,8 +848,8 @@ func (a *cpuAccumulator) iterateCombinations(n []int, k int, f func([]int) LoopC
 // the least amount of free CPUs to the one with the highest amount of free CPUs (i.e. in ascending
 // order of free CPUs). For any NUMA node, the cores are selected from the ones in the socket with
 // the least amount of free CPUs to the one with the highest amount of free CPUs.
-func takeByTopologyNUMAPacked(logger klog.Logger, topo *topology.CPUTopology, availableCPUs cpuset.CPUSet, numCPUs int, cpuSortingStrategy CPUSortingStrategy, preferAlignByUncoreCache bool) (cpuset.CPUSet, error) {
-	acc := newCPUAccumulator(logger, topo, availableCPUs, numCPUs, cpuSortingStrategy)
+func takeByTopologyNUMAPacked(logger klog.Logger, topo *topology.CPUTopology, availableCPUs cpuset.CPUSet, numCPUs int, params AllocationParams) (cpuset.CPUSet, error) {
+	acc := newCPUAccumulator(logger, topo, availableCPUs, numCPUs, params)
 	if acc.isSatisfied() {
 		return acc.result, nil
 	}
@@ -863,7 +874,7 @@ func takeByTopologyNUMAPacked(logger klog.Logger, topo *topology.CPUTopology, av
 	// 2. If PreferAlignByUncoreCache is enabled, acquire whole UncoreCaches
 	//    if available and the container requires at least a UncoreCache's-worth
 	//    of CPUs. Otherwise, acquire CPUs from the least amount of UncoreCaches.
-	if preferAlignByUncoreCache {
+	if params.PreferAlignByUncoreCache {
 		acc.takeUncoreCache()
 		if acc.isSatisfied() {
 			return acc.result, nil
@@ -873,7 +884,7 @@ func takeByTopologyNUMAPacked(logger klog.Logger, topo *topology.CPUTopology, av
 	// 3. Acquire whole cores, if available and the container requires at least
 	//    a core's-worth of CPUs.
 	//    If `CPUSortingStrategySpread` is specified, skip taking the whole core.
-	if cpuSortingStrategy != CPUSortingStrategySpread {
+	if params.CPUSortingStrategy != CPUSortingStrategySpread {
 		acc.takeFullCores()
 		if acc.isSatisfied() {
 			return acc.result, nil
@@ -950,27 +961,28 @@ func takeByTopologyNUMAPacked(logger klog.Logger, topo *topology.CPUTopology, av
 // allocation of CPUs as "balanced" as possible.
 //
 // NOTE: This algorithm has been generalized to take an additional
-// 'cpuGroupSize' parameter to ensure that CPUs are always allocated in groups
+// 'params.CPUGroupSize' parameter to ensure that CPUs are always allocated in groups
 // of size 'cpuGroupSize' according to the algorithm described above. This is
 // important, for example, to ensure that all CPUs (i.e. all hyperthreads) from
 // a single core are allocated together.
 //
-// minNUMAsFromHint is the NUMA node count from the TopologyManager's topology
+// params.MINNUMAsFromHint is the NUMA node count from the TopologyManager's topology
 // hint. When non-zero, it raises the minimum NUMA node count for distribution,
 // ensuring CPU allocation stays aligned with device topology (e.g., GPUs, NICs).
 // Pass 0 to use the default behavior (minimum NUMAs needed to satisfy the request).
-func takeByTopologyNUMADistributed(logger klog.Logger, topo *topology.CPUTopology, availableCPUs cpuset.CPUSet, numCPUs int, cpuGroupSize int, cpuSortingStrategy CPUSortingStrategy, alignBySocket bool, minNUMAsFromHint int) (cpuset.CPUSet, error) {
+func takeByTopologyNUMADistributed(logger klog.Logger, topo *topology.CPUTopology, availableCPUs cpuset.CPUSet, numCPUs int, params AllocationParams) (cpuset.CPUSet, error) {
+	// PreferAlignByUncoreCache is not supported by distributed allocation.
+	params.PreferAlignByUncoreCache = false
+
 	// If the number of CPUs requested cannot be handed out in chunks of
 	// 'cpuGroupSize', then we just call out the packing algorithm since we
 	// can't distribute CPUs in this chunk size.
-	// PreferAlignByUncoreCache feature not implemented here yet and set to false.
-	// Support for PreferAlignByUncoreCache to be done at beta release.
-	if (numCPUs % cpuGroupSize) != 0 {
-		return takeByTopologyNUMAPacked(logger, topo, availableCPUs, numCPUs, cpuSortingStrategy, false)
+	if (numCPUs % params.CPUGroupSize) != 0 {
+		return takeByTopologyNUMAPacked(logger, topo, availableCPUs, numCPUs, params)
 	}
 
 	// Otherwise build an accumulator to start allocating CPUs from.
-	acc := newCPUAccumulator(logger, topo, availableCPUs, numCPUs, cpuSortingStrategy)
+	acc := newCPUAccumulator(logger, topo, availableCPUs, numCPUs, params)
 	if acc.isSatisfied() {
 		return acc.result, nil
 	}
@@ -984,7 +996,7 @@ func takeByTopologyNUMADistributed(logger klog.Logger, topo *topology.CPUTopolog
 	// Calculate the minimum and maximum possible number of NUMA nodes that
 	// could satisfy this request. This is used to optimize how many iterations
 	// of the loop we need to go through below.
-	minNUMAs, maxNUMAs := acc.rangeNUMANodesNeededToSatisfy(cpuGroupSize, minNUMAsFromHint)
+	minNUMAs, maxNUMAs := acc.rangeNUMANodesNeededToSatisfy()
 
 	// Try combinations of 1,2,3,... NUMA nodes until we find a combination
 	// where we can evenly distribute CPUs across them. To optimize things, we
@@ -1001,7 +1013,7 @@ func takeByTopologyNUMADistributed(logger klog.Logger, topo *topology.CPUTopolog
 		acc.iterateCombinations(numas, k, func(combo []int) LoopControl {
 			// If we've already found a combo with a balance of 0 in a
 			// different iteration, then don't bother checking any others.
-			if bestBalance == 0 && (!alignBySocket || bestBalanceInOneSocket) {
+			if bestBalance == 0 && (!params.AlignBySocket || bestBalanceInOneSocket) {
 				return Break
 			}
 
@@ -1015,20 +1027,20 @@ func takeByTopologyNUMADistributed(logger klog.Logger, topo *topology.CPUTopolog
 			// 'cpuGroupSize' across the NUMA nodes in this combo.
 			numCPUGroups := 0
 			for _, numa := range combo {
-				numCPUGroups += (acc.details.CPUsInNUMANodes(numa).Size() / cpuGroupSize)
+				numCPUGroups += (acc.details.CPUsInNUMANodes(numa).Size() / params.CPUGroupSize)
 			}
-			if (numCPUGroups * cpuGroupSize) < numCPUs {
+			if (numCPUGroups * params.CPUGroupSize) < numCPUs {
 				return Continue
 			}
 
 			//  Calculate an even distribution of CPUs in groups of size
 			// 'cpuGroupSize'.
-			distribution := (numCPUs / len(combo) / cpuGroupSize) * cpuGroupSize
-			if alignBySocket {
+			distribution := (numCPUs / len(combo) / params.CPUGroupSize) * params.CPUGroupSize
+			if params.AlignBySocket {
 				for _, numa := range combo {
 					// distribution should not be more than available CPUs
 					// in each NUMA node in combo if alignBySocket is set.
-					availableCPUsInNUMA := acc.details.CPUsInNUMANodes(numa).Size() / cpuGroupSize * cpuGroupSize
+					availableCPUsInNUMA := acc.details.CPUsInNUMANodes(numa).Size() / params.CPUGroupSize * params.CPUGroupSize
 					if distribution > availableCPUsInNUMA {
 						distribution = availableCPUsInNUMA
 					}
@@ -1066,7 +1078,7 @@ func takeByTopologyNUMADistributed(logger klog.Logger, topo *topology.CPUTopolog
 			// 'distribution' number of CPUs.
 			var remainderCombo []int
 			for _, numa := range combo {
-				if availableAfterAllocation[numa] >= cpuGroupSize {
+				if availableAfterAllocation[numa] >= params.CPUGroupSize {
 					remainderCombo = append(remainderCombo, numa)
 				}
 			}
@@ -1105,9 +1117,9 @@ func takeByTopologyNUMADistributed(logger klog.Logger, topo *topology.CPUTopolog
 					// group cannot be handed out, so a raw CPU sum overcounts.
 					availableGroups := 0
 					for _, numa := range subset {
-						availableGroups += availableAfterAllocation[numa] / cpuGroupSize
+						availableGroups += availableAfterAllocation[numa] / params.CPUGroupSize
 					}
-					if availableGroups*cpuGroupSize < remainder {
+					if availableGroups*params.CPUGroupSize < remainder {
 						return Continue
 					}
 
@@ -1119,11 +1131,11 @@ func takeByTopologyNUMADistributed(logger klog.Logger, topo *topology.CPUTopolog
 							if remainder == 0 {
 								break
 							}
-							if availableAfterAllocation[numa] < cpuGroupSize {
+							if availableAfterAllocation[numa] < params.CPUGroupSize {
 								continue
 							}
-							availableAfterAllocation[numa] -= cpuGroupSize
-							remainder -= cpuGroupSize
+							availableAfterAllocation[numa] -= params.CPUGroupSize
+							remainder -= params.CPUGroupSize
 						}
 					}
 
@@ -1146,11 +1158,11 @@ func takeByTopologyNUMADistributed(logger klog.Logger, topo *topology.CPUTopolog
 			// combinations in the same socket category, pick the one with the
 			// lower balance score.
 			inSameSocket := false
-			if alignBySocket {
+			if params.AlignBySocket {
 				inSameSocket = topo.CPUDetails.AreNUMANodesInSameSocket(combo)
 			}
 			isBetter := bestLocalBalance < bestBalance
-			if alignBySocket && inSameSocket != bestBalanceInOneSocket {
+			if params.AlignBySocket && inSameSocket != bestBalanceInOneSocket {
 				isBetter = inSameSocket
 			}
 
@@ -1158,7 +1170,7 @@ func takeByTopologyNUMADistributed(logger klog.Logger, topo *topology.CPUTopolog
 				bestBalance = bestLocalBalance
 				bestRemainder = bestLocalRemainder
 				bestCombo = combo
-				if alignBySocket {
+				if params.AlignBySocket {
 					bestBalanceInOneSocket = inSameSocket
 				}
 			}
@@ -1176,18 +1188,18 @@ func takeByTopologyNUMADistributed(logger klog.Logger, topo *topology.CPUTopolog
 		// Otherwise, start allocating CPUs from the NUMA node combination
 		// chosen. First allocate an even distribution of CPUs in groups of
 		// size 'cpuGroupSize' from 'bestCombo'.
-		distribution := (numCPUs / len(bestCombo) / cpuGroupSize) * cpuGroupSize
+		distribution := (numCPUs / len(bestCombo) / params.CPUGroupSize) * params.CPUGroupSize
 		// At this stage we are past NUMA-node selection (so we no longer need to
 		// consider alignBySocket); that happened when choosing bestCombo. Here we
 		// only ensure we do not ask any selected NUMA node for more CPUs than it can provide.
 		for _, numa := range bestCombo {
-			availableCPUsInNUMA := acc.details.CPUsInNUMANodes(numa).Size() / cpuGroupSize * cpuGroupSize
+			availableCPUsInNUMA := acc.details.CPUsInNUMANodes(numa).Size() / params.CPUGroupSize * params.CPUGroupSize
 			if distribution > availableCPUsInNUMA {
 				distribution = availableCPUsInNUMA
 			}
 		}
 		for _, numa := range bestCombo {
-			cpus, _ := takeByTopologyNUMAPacked(logger, acc.topo, acc.details.CPUsInNUMANodes(numa), distribution, cpuSortingStrategy, false)
+			cpus, _ := takeByTopologyNUMAPacked(logger, acc.topo, acc.details.CPUsInNUMANodes(numa), distribution, params)
 			acc.take(cpus)
 		}
 
@@ -1199,12 +1211,12 @@ func takeByTopologyNUMADistributed(logger klog.Logger, topo *topology.CPUTopolog
 				if remainder == 0 {
 					break
 				}
-				if acc.details.CPUsInNUMANodes(numa).Size() < cpuGroupSize {
+				if acc.details.CPUsInNUMANodes(numa).Size() < params.CPUGroupSize {
 					continue
 				}
-				cpus, _ := takeByTopologyNUMAPacked(logger, acc.topo, acc.details.CPUsInNUMANodes(numa), cpuGroupSize, cpuSortingStrategy, false)
+				cpus, _ := takeByTopologyNUMAPacked(logger, acc.topo, acc.details.CPUsInNUMANodes(numa), params.CPUGroupSize, params)
 				acc.take(cpus)
-				remainder -= cpuGroupSize
+				remainder -= params.CPUGroupSize
 			}
 		}
 
@@ -1226,5 +1238,5 @@ func takeByTopologyNUMADistributed(logger klog.Logger, topo *topology.CPUTopolog
 
 	// If we never found a combination of NUMA nodes that we could properly
 	// distribute CPUs across, fall back to the packing algorithm.
-	return takeByTopologyNUMAPacked(logger, topo, availableCPUs, numCPUs, cpuSortingStrategy, false)
+	return takeByTopologyNUMAPacked(logger, topo, availableCPUs, numCPUs, params)
 }
