@@ -110,11 +110,12 @@ type storageKeyReverseFunc func(key storageKey) (name string, namespace string, 
 
 // watchChan implements watch.Interface.
 type watchChan struct {
-	watcher        *watcher
-	key            string
-	initialRev     int64
-	recursive      bool
-	progressNotify bool
+	watcher            *watcher
+	key                string
+	initialRev         int64
+	recursive          bool
+	progressNotify     bool
+	watchWithoutPrevKV bool
 	// recordTimestamps enables wrapping watch events with decode timestamps and
 	// etcd client-side watch response buffer logging.
 	recordTimestamps         bool
@@ -143,11 +144,22 @@ func (w *watcher) Watch(ctx context.Context, key string, rev int64, opts storage
 	if opts.ProgressNotify && w.newFunc == nil {
 		return nil, apierrors.NewInternalError(errors.New("progressNotify for watch is unsupported by the etcd storage because no newFunc was provided"))
 	}
+	if opts.WatchWithoutPrevKV {
+		if !opts.Predicate.Empty() {
+			return nil, apierrors.NewInternalError(errors.New("watchWithoutPrevKV requires an empty predicate"))
+		}
+		if w.newFunc == nil {
+			return nil, apierrors.NewInternalError(errors.New("watchWithoutPrevKV requires a newFunc"))
+		}
+		if w.reverseKeyFunc == nil {
+			return nil, apierrors.NewInternalError(errors.New("watchWithoutPrevKV requires a reverseKeyFunc"))
+		}
+	}
 	startWatchRV, err := w.getStartWatchResourceVersion(ctx, rev, opts)
 	if err != nil {
 		return nil, err
 	}
-	wc := w.createWatchChan(ctx, key, startWatchRV, opts.Recursive, opts.ProgressNotify, opts.RecordTimestamps, opts.Predicate)
+	wc := w.createWatchChan(ctx, key, startWatchRV, opts.Recursive, opts.ProgressNotify, opts.RecordTimestamps, opts.WatchWithoutPrevKV, opts.Predicate)
 	go wc.run(isInitialEventsEndBookmarkRequired(opts), areInitialEventsRequired(rev, opts))
 
 	// For etcd watch we don't have an easy way to answer whether the watch
@@ -160,7 +172,7 @@ func (w *watcher) Watch(ctx context.Context, key string, rev int64, opts storage
 	return wc, nil
 }
 
-func (w *watcher) createWatchChan(ctx context.Context, key string, rev int64, recursive, progressNotify, recordTimestamps bool, pred storage.SelectionPredicate) *watchChan {
+func (w *watcher) createWatchChan(ctx context.Context, key string, rev int64, recursive, progressNotify, recordTimestamps, watchWithoutPrevKV bool, pred storage.SelectionPredicate) *watchChan {
 	wc := &watchChan{
 		watcher:                  w,
 		key:                      key,
@@ -168,6 +180,7 @@ func (w *watcher) createWatchChan(ctx context.Context, key string, rev int64, re
 		recursive:                recursive,
 		progressNotify:           progressNotify,
 		recordTimestamps:         recordTimestamps,
+		watchWithoutPrevKV:       watchWithoutPrevKV,
 		internalPred:             pred,
 		incomingEventChan:        make(chan *event, incomingBufSize),
 		resultChan:               make(chan watch.Event, outgoingBufSize),
@@ -478,7 +491,10 @@ func (wc *watchChan) startWatching(watchClosedCh chan struct{}, initialEventsEnd
 			return e
 		}())
 	}
-	opts := []clientv3.OpOption{clientv3.WithRev(wc.initialRev + 1), clientv3.WithPrevKV()}
+	opts := []clientv3.OpOption{clientv3.WithRev(wc.initialRev + 1)}
+	if !wc.watchWithoutPrevKV {
+		opts = append(opts, clientv3.WithPrevKV())
+	}
 	if wc.recursive {
 		opts = append(opts, clientv3.WithPrefix())
 	}
@@ -521,7 +537,7 @@ func (wc *watchChan) startWatching(watchClosedCh chan struct{}, initialEventsEnd
 				}
 			}
 			metrics.RecordEtcdEvent(wc.watcher.groupResource)
-			parsedEvent, err := parseEvent(e)
+			parsedEvent, err := parseEvent(e, !wc.watchWithoutPrevKV)
 			if err != nil {
 				logWatchChannelErr(err)
 				// sendError doesn't guarantee that no more items will be put into resultChan.
@@ -837,6 +853,25 @@ func (wc *watchChan) prepareObjs(e *event) (curObj runtime.Object, oldObj runtim
 	if e.isProgressNotify {
 		// progressNotify events doesn't contain neither current nor previous object version,
 		return nil, nil, nil
+	}
+	if e.isDeleted && wc.watchWithoutPrevKV {
+		// The watch cache already has the full object. Only its identity and the
+		// deletion revision are needed to remove it and publish the cached object.
+		name, namespace, err := wc.watcher.reverseKeyFunc(e.key)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to reverse watch event key %q: %w", e.key, err)
+		}
+		oldObj = wc.watcher.newFunc()
+		accessor, err := meta.Accessor(oldObj)
+		if err != nil {
+			return nil, nil, err
+		}
+		accessor.SetName(name)
+		accessor.SetNamespace(namespace)
+		if err := wc.watcher.versioner.UpdateObject(oldObj, uint64(e.rev)); err != nil {
+			return nil, nil, err
+		}
+		return nil, oldObj, nil
 	}
 
 	if !e.isDeleted {
