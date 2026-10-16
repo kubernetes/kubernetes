@@ -59,8 +59,10 @@ const (
 )
 
 // PostImageGCHook allows external sources to react to GC collect events.
-// `remainingImages` is a list of images that were left on the system after garbage
-// collection finished.
+// `remainingImages` holds the IDs, without the runtime handler, of every image
+// left on the system after garbage collection finished. It must include in-use
+// and pinned images too, not just the eviction candidates GC kept: hooks may
+// treat any image missing from the list as removed.
 type PostImageGCHook func(ctx context.Context, remainingImages []string, gcStart time.Time)
 
 // StatsProvider is an interface for fetching stats used during image garbage
@@ -417,9 +419,8 @@ func (im *realImageGCManager) GarbageCollect(ctx context.Context, beganGC time.T
 	return nil
 }
 
-// remainingImages returns the IDs of all images still known after a GC pass.
-// This must include in-use and pinned images, not just the eviction candidates
-// that survived: post-GC hooks treat anything missing from the list as gone.
+// remainingImages returns the IDs of all images still known after a GC pass,
+// as required by PostImageGCHook.
 func (im *realImageGCManager) remainingImages() []string {
 	im.imageRecordsLock.Lock()
 	defer im.imageRecordsLock.Unlock()
