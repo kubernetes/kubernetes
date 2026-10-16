@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"os"
 	"sort"
+	"sync"
 	"testing"
 	"time"
 
@@ -150,6 +151,12 @@ func newTestBinder(t *testing.T, ctx context.Context) *testEnv {
 	client := &fake.Clientset{}
 	logger := klog.FromContext(ctx)
 	reactor := pvtesting.NewVolumeReactor(ctx, client, nil, nil, nil)
+
+	pvWatchStarted, pvcWatchStarted := make(chan struct{}), make(chan struct{})
+	watchStarted := map[string]func(){
+		"persistentvolumes":      sync.OnceFunc(func() { close(pvWatchStarted) }),
+		"persistentvolumeclaims": sync.OnceFunc(func() { close(pvcWatchStarted) }),
+	}
 	// TODO refactor all tests to use real watch mechanism, see #72327
 	client.AddWatchReactor("*", func(action k8stesting.Action) (handled bool, ret watch.Interface, err error) {
 		gvr := action.GetResource()
@@ -157,6 +164,9 @@ func newTestBinder(t *testing.T, ctx context.Context) *testEnv {
 		watch, err := reactor.Watch(logger, gvr, ns)
 		if err != nil {
 			return false, nil, err
+		}
+		if started, ok := watchStarted[gvr.Resource]; ok {
+			started()
 		}
 		return true, watch, nil
 	})
@@ -196,6 +206,16 @@ func newTestBinder(t *testing.T, ctx context.Context) *testEnv {
 		if !synced {
 			logger.Error(nil, "Error syncing informer", "informer", v)
 			os.Exit(1)
+		}
+	}
+	// Wait for the PV and PVC watches to start. The above WaitForCacheSync can return
+	// before the informers call Watch. Unlike a real apiserver, VolumeReactor does not
+	// send events for changes made before a watch started.
+	for _, started := range []chan struct{}{pvWatchStarted, pvcWatchStarted} {
+		select {
+		case <-started:
+		case <-ctx.Done():
+			t.Fatalf("PV and PVC informers did not start watching: %v", context.Cause(ctx))
 		}
 	}
 
