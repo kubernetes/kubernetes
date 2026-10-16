@@ -28,6 +28,13 @@ import (
 // ResourceRequirements describes the compute resource requirements.
 type ResourceRequirementsApplyConfiguration struct {
 	// limits describes the maximum amount of compute resources allowed.
+	// For cpu and memory, if the limit is omitted or set to 0 at both the container and
+	// pod level, no limit is set on the container. For hugepages, if the limit is omitted
+	// at both levels, the container is limited to 0.
+	// If a cpu, memory or hugepages limit is not set at the pod level, the kubelet sets the
+	// pod cgroup limit from the aggregate of the container limits. For cpu and memory, the
+	// pod cgroup is not limited if the pod-level limit is set to 0, or if it is omitted and
+	// any init or regular container omits that limit or sets it to 0.
 	// More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
 	Limits *corev1.ResourceList `json:"limits,omitempty"`
 	// requests describes the minimum amount of compute resources required.
