@@ -326,6 +326,22 @@ func TestNewShardedListWatch(t *testing.T) {
 					if errorsSeen != 1 {
 						t.Errorf("shard %d expected 1 error event, got %d", shard, errorsSeen)
 					}
+
+					// Verify Stop() unblocks the filter loop even when an event is pending on ResultChan().
+					stopFakeWatch := watch.NewFake()
+					stopLW := NewShardedListWatch(&ListWatch{
+						WatchFuncWithContext: func(_ context.Context, _ metav1.ListOptions) (watch.Interface, error) {
+							return stopFakeWatch, nil
+						},
+					}, sel)
+					stopW, err := ToListerWatcherWithContext(stopLW).WatchWithContext(context.Background(), metav1.ListOptions{})
+					if err != nil {
+						t.Fatalf("WatchWithContext: %v", err)
+					}
+					stopFakeWatch.Error(&metav1.Status{Status: metav1.StatusFailure, Message: "context canceled"})
+					stopW.Stop()
+					for range stopW.ResultChan() {
+					}
 				}
 
 				if len(seen) != len(pods) {
