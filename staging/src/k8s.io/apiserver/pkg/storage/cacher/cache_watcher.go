@@ -120,6 +120,7 @@ func newCacheWatcher(
 		watcherMetrics:      watcherMetrics,
 		clock:               clk,
 		identifier:          identifier,
+		state:               cacheWatcherWaitingForBookmark,
 	}
 }
 
@@ -330,11 +331,9 @@ func (c *cacheWatcher) markBookmarkAfterRvSent(event *watchCacheEvent) {
 
 // setBookmarkAfterResourceVersion sets the bookmarkAfterResourceVersion and the state associated with it
 func (c *cacheWatcher) setBookmarkAfterResourceVersion(bookmarkAfterResourceVersion uint64) {
-	state := cacheWatcherWaitingForBookmark
 	if bookmarkAfterResourceVersion == 0 {
-		state = cacheWatcherBookmarkSent // if no specific RV was requested we assume no-op
+		c.state = cacheWatcherBookmarkSent // if no specific RV was requested we assume no-op
 	}
-	c.state = state
 	c.bookmarkAfterResourceVersion = bookmarkAfterResourceVersion
 }
 
