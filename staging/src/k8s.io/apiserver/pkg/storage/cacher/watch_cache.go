@@ -375,21 +375,17 @@ func (c *watchCache) WaitUntilFreshAndGetList(ctx context.Context, key string, o
 }
 
 func (c *watchCache) waitUntilFreshAndGetList(ctx context.Context, key string, opts storage.ListOptions) (listResp, string, error) {
-	var listRV uint64
-	var err error
+	var resourceVersion string
 	if opts.ResourceVersionMatch == "" && opts.ResourceVersion == "" {
-		// Consistent read
-		listRV, err = c.config.getCurrentRV(ctx)
-		if err != nil {
-			return listResp{}, "", err
-		}
+		resourceVersion = ""
 	} else {
-		listRV, err = c.config.versioner.ParseResourceVersion(opts.ResourceVersion)
-		if err != nil {
-			return listResp{}, "", err
+		if opts.ResourceVersion == "" {
+			resourceVersion = "0"
+		} else {
+			resourceVersion = opts.ResourceVersion
 		}
 	}
-	obj, exists, readResourceVersion, err := c.WaitUntilFreshAndGet(ctx, listRV, key)
+	obj, exists, readResourceVersion, err := c.WaitUntilFreshAndGet(ctx, resourceVersion, key)
 	if err != nil {
 		return listResp{}, "", err
 	}
@@ -557,10 +553,21 @@ func (w *watchCache) notFresh(resourceVersion uint64) bool {
 }
 
 // WaitUntilFreshAndGet returns a pointers to <storeElement> object.
-func (w *watchCache) WaitUntilFreshAndGet(ctx context.Context, minResourceVersion uint64, key string) (interface{}, bool, uint64, error) {
+func (w *watchCache) WaitUntilFreshAndGet(ctx context.Context, resourceVersion string, key string) (interface{}, bool, uint64, error) {
 	span := tracing.SpanFromContext(ctx)
+	var minResourceVersion uint64
+	var err error
+	if resourceVersion == "" {
+		minResourceVersion, err = w.config.getCurrentRV(ctx)
+	} else {
+		minResourceVersion, err = w.config.versioner.ParseResourceVersion(resourceVersion)
+	}
+	if err != nil {
+		return nil, false, 0, err
+	}
 	var snap store.Snapshot
 	var readResourceVersion uint64
+
 	if minResourceVersion == 0 {
 		snap = w.storage.LatestSnapshot()
 		readResourceVersion = snap.ResourceVersion()

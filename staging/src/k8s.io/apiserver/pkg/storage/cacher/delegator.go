@@ -80,7 +80,7 @@ func (c *CacheDelegator) EnableResourceSizeEstimation(keys storage.KeysFunc) err
 func (c *CacheDelegator) Delete(ctx context.Context, key string, out runtime.Object, preconditions *storage.Preconditions, validateDeletion storage.ValidateObjectFunc, cachedExistingObject runtime.Object, opts storage.DeleteOptions) error {
 	// Ignore the suggestion and try to pass down the current version of the object
 	// read from cache.
-	if obj, exists, _, err := c.cacher.get(ctx, key, 0); err != nil {
+	if obj, exists, _, err := c.cacher.get(ctx, key, "0"); err != nil {
 		klog.Errorf("GetByKey returned error: %v", err)
 	} else if exists && preconditions.Check(key, obj) == nil {
 		// DeepCopy the object since we modify resource version when serializing the
@@ -191,7 +191,7 @@ func shouldDelegateListOnNotReadyCache(opts storage.ListOptions) bool {
 func (c *CacheDelegator) GuaranteedUpdate(ctx context.Context, key string, destination runtime.Object, ignoreNotFound bool, preconditions *storage.Preconditions, tryUpdate storage.UpdateFunc, cachedExistingObject runtime.Object) error {
 	// Ignore the suggestion and try to pass down the current version of the object
 	// read from cache.
-	if obj, exists, _, err := c.cacher.get(ctx, key, 0); err != nil {
+	if obj, exists, _, err := c.cacher.get(ctx, key, "0"); err != nil {
 		klog.Errorf("GetByKey returned error: %v", err)
 	} else if exists && preconditions.Check(key, obj) == nil {
 		// DeepCopy the object since we modify resource version when serializing the

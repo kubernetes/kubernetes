@@ -714,17 +714,13 @@ func (c *Cacher) Get(ctx context.Context, key string, opts storage.GetOptions, o
 	if opts.ResourceVersion == "" {
 		return storage.NewInternalError(fmt.Errorf("cacher doesn't support consistent Get"))
 	}
-	minResourceVersion, err := c.versioner.ParseResourceVersion(opts.ResourceVersion)
-	if err != nil {
-		return err
-	}
 
 	objVal, err := conversion.EnforcePtr(objPtr)
 	if err != nil {
 		return err
 	}
 
-	obj, exists, readResourceVersion, err := c.get(ctx, key, minResourceVersion)
+	obj, exists, readResourceVersion, err := c.get(ctx, key, opts.ResourceVersion)
 	if err != nil {
 		return err
 	}
@@ -742,8 +738,8 @@ func (c *Cacher) Get(ctx context.Context, key string, opts storage.GetOptions, o
 	return nil
 }
 
-func (c *Cacher) get(ctx context.Context, key string, minResourceVersion uint64) (runtime.Object, bool, uint64, error) {
-	obj, exists, readResourceVersion, err := c.watchCache.WaitUntilFreshAndGet(ctx, minResourceVersion, key)
+func (c *Cacher) get(ctx context.Context, key string, resourceVersion string) (runtime.Object, bool, uint64, error) {
+	obj, exists, readResourceVersion, err := c.watchCache.WaitUntilFreshAndGet(ctx, resourceVersion, key)
 	if err != nil {
 		return nil, false, 0, err
 	}
