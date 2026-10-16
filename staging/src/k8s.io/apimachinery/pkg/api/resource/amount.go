@@ -38,7 +38,10 @@ type Scale int32
 func (s Scale) infScale() (inf.Scale, bool) {
 	// inf.Scale is upside-down
 	// TODO: saturate instead of wrap in overflow cases
-	return inf.Scale(-s), s != math.MinInt32
+	if s == math.MinInt32 {
+		return math.MaxInt32, false
+	}
+	return inf.Scale(-s), true
 }
 
 // canInfScale reports whether infScale is faithful for s. Scale is int32 and

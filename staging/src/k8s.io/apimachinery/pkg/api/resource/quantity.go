@@ -583,7 +583,7 @@ func (q *Quantity) AsApproximateFloat64() float64 {
 	var exponent int
 	if q.d.Dec != nil {
 		base, _ = big.NewFloat(0).SetInt(q.d.Dec.UnscaledBig()).Float64()
-		exponent = int(-q.d.Dec.Scale())
+		exponent = -int(q.d.Dec.Scale())
 	} else {
 		base = float64(q.i.value)
 		exponent = int(q.i.scale)
@@ -601,24 +601,48 @@ func (q *Quantity) AsApproximateFloat64() float64 {
 // value of the quantity is outside the range of a float64 +Inf/-Inf will be
 // returned.
 func (q *Quantity) AsFloat64Slow() float64 {
+	scale := q.widenedScale()
+	sign := q.Sign()
+
+	// special case 0 regardless of scale
+	if sign == 0 {
+		return 0.0
+	}
+
 	infDec := q.internalReadOnlyDec()
+	unscaledBig := new(big.Int).Set(infDec.UnscaledBig())
+
+	// Move factors of 10 from the value into the scale.
+	unscaledBig, scaleFromValue := removeBigIntFactors(unscaledBig, bigTen)
+	scale += widenedScale(scaleFromValue)
+
+	// smaller than the smallest representable non-zero float
+	if scale < -324 {
+		return 0.0
+	}
+
+	// outside float range limits, return +Inf/-Inf
+	if scale > 309 {
+		return math.Inf(sign)
+	}
 
 	var absScale int64
-	if infDec.Scale() < 0 {
-		absScale = int64(-infDec.Scale())
+	if scale < 0 {
+		absScale = -int64(scale)
 	} else {
-		absScale = int64(infDec.Scale())
+		absScale = int64(scale)
 	}
+
 	pow10AbsScale := big.NewInt(10)
 	pow10AbsScale = pow10AbsScale.Exp(pow10AbsScale, big.NewInt(absScale), nil)
 
 	var resultBigFloat *big.Float
-	if infDec.Scale() < 0 {
-		resultBigInt := new(big.Int).Mul(infDec.UnscaledBig(), pow10AbsScale)
+	if scale > 0 {
+		resultBigInt := new(big.Int).Mul(unscaledBig, pow10AbsScale)
 		resultBigFloat = new(big.Float).SetInt(resultBigInt)
 	} else {
 		pow10AbsScaleFloat := new(big.Float).SetInt(pow10AbsScale)
-		resultBigFloat = new(big.Float).SetInt(infDec.UnscaledBig())
+		resultBigFloat = new(big.Float).SetInt(unscaledBig)
 		resultBigFloat = resultBigFloat.Quo(resultBigFloat, pow10AbsScaleFloat)
 	}
 
