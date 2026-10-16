@@ -489,7 +489,7 @@ func TestCPGQueueing(t *testing.T) {
 			},
 		},
 		{
-			name: "Node update (taint removal) triggers queueing hint for complete CPG tree from unschedulableQ",
+			name: "Node update (taint removal) unblocks complete CPG tree rejected by TaintToleration",
 			steps: []stepsframework.Step{
 				{
 					Name:        "Create initial tainted node",
@@ -531,7 +531,7 @@ func TestCPGQueueing(t *testing.T) {
 			},
 		},
 		{
-			name: "Intermediate CPG creation triggers queueing hint for incomplete CPG hierarchy",
+			name: "Intermediate CPG creation completes the hierarchy and releases pods buffered in incompletePodGroupPods",
 			steps: []stepsframework.Step{
 				{
 					Name:        "Create initial node",
@@ -564,7 +564,7 @@ func TestCPGQueueing(t *testing.T) {
 			},
 		},
 		{
-			name: "Pod deletion triggers queueing hint for complete CPG tree from unschedulableQ",
+			name: "Pod deletion unblocks complete CPG tree rejected by NodeResourcesFit",
 			steps: []stepsframework.Step{
 				{
 					Name:        "Create initial node",
