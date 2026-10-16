@@ -609,6 +609,7 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 	currentResourceVersion := c.watchCache.resourceVersion
 
 	bookmarkAfterResourceVersionFn := func() uint64 { return 0 }
+	var initialEventsEndBookmark *watchCacheEvent
 	if isListWatchRequest(opts) {
 		switch {
 		case len(opts.ResourceVersion) == 0:
@@ -619,19 +620,6 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 		default:
 			bookmarkAfterResourceVersionFn = func() uint64 { return requestedWatchRV }
 		}
-	}
-
-	var cacheInterval *watchCacheInterval
-	cacheInterval, err = c.watchCache.getAllEventsSinceLocked(ctx, requiredResourceVersion, key, opts)
-	if err != nil {
-		// To match the uncached watch implementation, once we have passed authn/authz/admission,
-		// and successfully parsed a resource version, other errors must fail with a watch event of type ERROR,
-		// rather than a directly returned error.
-		return newErrWatcher(err), nil
-	}
-
-	var initialEventsEndBookmark *watchCacheEvent
-	if isListWatchRequest(opts) {
 		// We don't need to set the InitialEventsAnnotation for this bookmark event,
 		// because this will be automatically set during event conversion in cacheWatcher.convertToWatchEvent method
 		initialEventsEndBookmark = &watchCacheEvent{
@@ -644,6 +632,15 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 			klog.Errorf("failure to set resourceVersion to %d on initialEventsEndBookmark event %+v for watchlist request and wait for bookmark trigger to send", initialEventsEndBookmark.ResourceVersion, initialEventsEndBookmark.Object)
 			initialEventsEndBookmark = nil
 		}
+	}
+
+	var cacheInterval *watchCacheInterval
+	cacheInterval, err = c.watchCache.getAllEventsSinceLocked(ctx, requiredResourceVersion, key, opts)
+	if err != nil {
+		// To match the uncached watch implementation, once we have passed authn/authz/admission,
+		// and successfully parsed a resource version, other errors must fail with a watch event of type ERROR,
+		// rather than a directly returned error.
+		return newErrWatcher(err), nil
 	}
 
 	addedWatcher := false
