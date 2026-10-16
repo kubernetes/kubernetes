@@ -241,34 +241,6 @@ func TestInt64AmountAsScaledInt64(t *testing.T) {
 	}
 }
 
-// TestScaleCanAlignInfScale locks the boundaries of the guard that gates the
-// decimal fallback in Sub: both operands must be representable, and their
-// alignment delta must fit int32. Directly pinning it here guards against the
-// range check being narrowed to one side, the bound flipping to a strict
-// comparison, or the delta regressing to int32 arithmetic.
-func TestScaleCanAlignInfScale(t *testing.T) {
-	for _, tc := range []struct {
-		name string
-		a    Scale
-		b    Scale
-		want bool
-	}{
-		{"same-scale", 0, 0, true},
-		{"positive-max-delta", Scale(math.MaxInt32), 0, true},
-		{"negative-max-delta", 0, Scale(math.MaxInt32), true},
-		{"positive-delta-overflow", Scale(math.MaxInt32), -1, false},
-		{"negative-delta-overflow", -1, Scale(math.MaxInt32), false},
-		{"receiver-min-int32", Scale(math.MinInt32), 0, false},
-		{"other-min-int32", 0, Scale(math.MinInt32), false},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			if got := tc.a.canAlignInfScale(tc.b); got != tc.want {
-				t.Fatalf("Scale(%d).canAlignInfScale(%d) = %t, want %t", tc.a, tc.b, got, tc.want)
-			}
-		})
-	}
-}
-
 func TestScaleInfScale(t *testing.T) {
 	for _, test := range []struct {
 		name     string

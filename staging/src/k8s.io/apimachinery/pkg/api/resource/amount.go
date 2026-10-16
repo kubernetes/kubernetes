@@ -48,19 +48,6 @@ func (s Scale) canInfScale() bool {
 	return s != math.MinInt32
 }
 
-// canAlignInfScale reports whether a subtraction between scales s and other can
-// be represented on the inf.Dec fallback: both scales must be representable as
-// an inf.Scale, and their alignment delta must fit in int32 so aligning the two
-// operands there does not overflow. The delta is widened here so the check
-// itself does not overflow. It does not bound the cost of that alignment.
-func (s Scale) canAlignInfScale(other Scale) bool {
-	if !s.canInfScale() || !other.canInfScale() {
-		return false
-	}
-	delta := widenScale(s) - widenScale(other)
-	return delta >= -math.MaxInt32 && delta <= math.MaxInt32
-}
-
 // widenedScale is a Scale widened to int64, so it also holds a negated
 // inf.Scale and the difference of two scales without overflow.
 // Conversions should happen only via widenScale, widenInfScale and
@@ -404,14 +391,15 @@ func (a *int64Amount) Add(b int64Amount) bool {
 
 // Sub removes b from a. It returns false without mutating a when this
 // subtraction cannot be performed safely on the int64 fast path and the caller
-// can represent the operands and their alignment in the decimal fallback.
+// can represent the operands in the decimal fallback.
 func (a *int64Amount) Sub(b int64Amount) bool {
-	if b.value == mostNegative && a.scale.canAlignInfScale(b.scale) {
+	if b.value == mostNegative && a.scale.canInfScale() && b.scale.canInfScale() {
 		// -b.value overflows int64, so leave a unchanged and let the caller fall
-		// back to inf.Dec. That fallback aligns both operands, so it is only
-		// correct when both scales and their alignment delta can be represented
-		// there; anything else stays on the int64 path and keeps its existing
+		// back to inf.Dec when both scales can be represented there; otherwise try
+		// the int64 path so same-scale MinInt32 subtraction keeps its existing
 		// wrapped result.
+		// TODO: Once int64Amount.AsDec handles math.MinInt32, drop the canInfScale
+		// checks and always fall back to inf.Dec for mostNegative.
 		return false
 	}
 	return a.Add(int64Amount{value: -b.value, scale: b.scale})
