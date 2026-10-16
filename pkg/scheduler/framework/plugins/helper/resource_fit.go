@@ -153,33 +153,38 @@ func FitsRequest(podRequest *framework.Resource, nodeInfo fwk.NodeInfo, ignoredE
 		return insufficientResources
 	}
 
-	if podRequest.MilliCPU > 0 && added.MilliCPU > (nodeInfo.GetAllocatable().GetMilliCPU()-nodeInfo.GetRequested().GetMilliCPU()) {
+	requested := nodeInfo.GetRequested()
+	if alreadyCounted {
+		requested = effectiveRequestedForResize(nodeInfo, pod)
+	}
+
+	if podRequest.MilliCPU > 0 && added.MilliCPU > (nodeInfo.GetAllocatable().GetMilliCPU()-requested.GetMilliCPU()) {
 		insufficientResources = append(insufficientResources, InsufficientResource{
 			ResourceName: v1.ResourceCPU,
 			Reason:       "Insufficient cpu",
 			Requested:    podRequest.MilliCPU,
-			Used:         nodeInfo.GetRequested().GetMilliCPU(),
+			Used:         requested.GetMilliCPU(),
 			Capacity:     nodeInfo.GetAllocatable().GetMilliCPU(),
 			Unresolvable: podRequest.MilliCPU > nodeInfo.GetAllocatable().GetMilliCPU(),
 		})
 	}
-	if podRequest.Memory > 0 && added.Memory > (nodeInfo.GetAllocatable().GetMemory()-nodeInfo.GetRequested().GetMemory()) {
+	if podRequest.Memory > 0 && added.Memory > (nodeInfo.GetAllocatable().GetMemory()-requested.GetMemory()) {
 		insufficientResources = append(insufficientResources, InsufficientResource{
 			ResourceName: v1.ResourceMemory,
 			Reason:       "Insufficient memory",
 			Requested:    podRequest.Memory,
-			Used:         nodeInfo.GetRequested().GetMemory(),
+			Used:         requested.GetMemory(),
 			Capacity:     nodeInfo.GetAllocatable().GetMemory(),
 			Unresolvable: podRequest.Memory > nodeInfo.GetAllocatable().GetMemory(),
 		})
 	}
 	if podRequest.EphemeralStorage > 0 &&
-		added.EphemeralStorage > (nodeInfo.GetAllocatable().GetEphemeralStorage()-nodeInfo.GetRequested().GetEphemeralStorage()) {
+		added.EphemeralStorage > (nodeInfo.GetAllocatable().GetEphemeralStorage()-requested.GetEphemeralStorage()) {
 		insufficientResources = append(insufficientResources, InsufficientResource{
 			ResourceName: v1.ResourceEphemeralStorage,
 			Reason:       "Insufficient ephemeral-storage",
 			Requested:    podRequest.EphemeralStorage,
-			Used:         nodeInfo.GetRequested().GetEphemeralStorage(),
+			Used:         requested.GetEphemeralStorage(),
 			Capacity:     nodeInfo.GetAllocatable().GetEphemeralStorage(),
 			Unresolvable: podRequest.GetEphemeralStorage() > nodeInfo.GetAllocatable().GetEphemeralStorage(),
 		})
@@ -206,12 +211,12 @@ func FitsRequest(podRequest *framework.Resource, nodeInfo fwk.NodeInfo, ignoredE
 		if ShouldDelegateResourceToDRA(rName, nodeInfo, draManager, opts) {
 			continue
 		}
-		if added.ScalarResources[rName] > (nodeInfo.GetAllocatable().GetScalarResources()[rName] - nodeInfo.GetRequested().GetScalarResources()[rName]) {
+		if added.ScalarResources[rName] > (nodeInfo.GetAllocatable().GetScalarResources()[rName] - requested.GetScalarResources()[rName]) {
 			insufficientResources = append(insufficientResources, InsufficientResource{
 				ResourceName: rName,
 				Reason:       fmt.Sprintf("Insufficient %v", rName),
 				Requested:    rQuant,
-				Used:         nodeInfo.GetRequested().GetScalarResources()[rName],
+				Used:         requested.GetScalarResources()[rName],
 				Capacity:     nodeInfo.GetAllocatable().GetScalarResources()[rName],
 				Unresolvable: rQuant > nodeInfo.GetAllocatable().GetScalarResources()[rName],
 			})
@@ -223,4 +228,78 @@ func FitsRequest(podRequest *framework.Resource, nodeInfo fwk.NodeInfo, ignoredE
 
 func isPodResizeOnNode(opts ResourceRequestsOptions, nodeInfo fwk.NodeInfo, pod *v1.Pod) bool {
 	return opts.EnableInPlacePodVerticalScalingSchedulerPreemption && pod != nil && resource.IsPodResizeDeferred(pod) && pod.Spec.NodeName == nodeInfo.Node().Name
+}
+
+// effectiveRequestedForResize returns nodeInfo.GetRequested() with other deferred resize pods on
+// the node counted at max(allocated, actual) rather than max(desired, allocated, actual), matching
+// Kubelet's resize admission calculation. The evaluated pod itself stays at max(desired, allocated, actual).
+func effectiveRequestedForResize(nodeInfo fwk.NodeInfo, pod *v1.Pod) fwk.Resource {
+	var adjusted *framework.Resource
+	for _, pi := range nodeInfo.GetPods() {
+		other := pi.GetPod()
+		if other.UID == pod.UID || !resource.IsPodResizeDeferred(other) {
+			continue
+		}
+		if adjusted == nil {
+			adjusted = nodeInfo.GetRequested().(*framework.Resource).Clone()
+		}
+		withDesired := pi.(*framework.PodInfo).CalculateResource().Resource
+		withoutDesired := podInfoWithAllocatedResources(pi).CalculateResource().Resource
+		adjusted.MilliCPU -= withDesired.GetMilliCPU() - withoutDesired.GetMilliCPU()
+		adjusted.Memory -= withDesired.GetMemory() - withoutDesired.GetMemory()
+		adjusted.EphemeralStorage -= withDesired.GetEphemeralStorage() - withoutDesired.GetEphemeralStorage()
+		for rName, rQuant := range withDesired.GetScalarResources() {
+			adjusted.ScalarResources[rName] -= rQuant - withoutDesired.GetScalarResources()[rName]
+		}
+	}
+	if adjusted == nil {
+		return nodeInfo.GetRequested()
+	}
+	return adjusted
+}
+
+// podInfoWithAllocatedResources returns a PodInfo whose spec requests are replaced with the
+// allocated resources from status, so CalculateResource() evaluates max(allocated, actual)
+// instead of max(desired, allocated, actual). CalculateResource takes the desired term from
+// spec: container requests, or pod-level requests when set. Pod-level status only replaces the
+// allocated and actual terms, so both spec levels are replaced.
+func podInfoWithAllocatedResources(pi fwk.PodInfo) *framework.PodInfo {
+	pod := pi.GetPod().DeepCopy()
+
+	// Status.AllocatedResources is the kubelet's pod-level aggregate (which can include overhead
+	// or DRA node-allocatable quantities), so only overwrite resource names already present in
+	// pod-level spec requests.
+	if pod.Spec.Resources != nil && pod.Status.AllocatedResources != nil {
+		for rName := range pod.Spec.Resources.Requests {
+			if qty, ok := pod.Status.AllocatedResources[rName]; ok {
+				pod.Spec.Resources.Requests[rName] = qty
+			}
+		}
+	}
+
+	allocByContainer := make(map[string]v1.ResourceList, len(pod.Status.ContainerStatuses)+len(pod.Status.InitContainerStatuses))
+	for _, cs := range pod.Status.InitContainerStatuses {
+		if cs.AllocatedResources != nil {
+			allocByContainer[cs.Name] = cs.AllocatedResources
+		}
+	}
+	for _, cs := range pod.Status.ContainerStatuses {
+		if cs.AllocatedResources != nil {
+			allocByContainer[cs.Name] = cs.AllocatedResources
+		}
+	}
+	for i := range pod.Spec.InitContainers {
+		if alloc, ok := allocByContainer[pod.Spec.InitContainers[i].Name]; ok {
+			pod.Spec.InitContainers[i].Resources.Requests = alloc
+		}
+	}
+	for i := range pod.Spec.Containers {
+		if alloc, ok := allocByContainer[pod.Spec.Containers[i].Name]; ok {
+			pod.Spec.Containers[i].Resources.Requests = alloc
+		}
+	}
+
+	// Ignore the error: NewPodInfo still returns a usable PodInfo when affinity terms fail to parse.
+	newPI, _ := framework.NewPodInfo(pod)
+	return newPI
 }
