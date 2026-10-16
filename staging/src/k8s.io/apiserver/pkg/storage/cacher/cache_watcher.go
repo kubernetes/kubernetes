@@ -456,6 +456,11 @@ func (c *cacheWatcher) process(ctx context.Context, cacheInterval *watchCacheInt
 	if err != nil {
 		return
 	}
+
+	// send bookmark after sending all events in cacheInterval for watchlist request
+	if cacheInterval != nil && cacheInterval.initialEventsEndBookmark != nil {
+		c.sendWatchCacheEvent(cacheInterval.initialEventsEndBookmark)
+	}
 	// At this point we already start processing incoming watch events.
 	// However, the init event can still be processed because their serialization
 	// and sending to the client happens asynchrnously.
@@ -538,10 +543,6 @@ func (c *cacheWatcher) processInitialEvents(cacheInterval *watchCacheInterval, r
 		klog.V(2).Infof("processing %d initEvents of %s (%s) took %v", initEventCount, c.groupResource, c.identifier, processingTime)
 	}
 
-	// send bookmark after sending all events in cacheInterval for watchlist request
-	if cacheInterval.initialEventsEndBookmark != nil {
-		c.sendWatchCacheEvent(cacheInterval.initialEventsEndBookmark)
-	}
 	return resourceVersion, nil
 }
 
