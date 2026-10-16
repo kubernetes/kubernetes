@@ -3425,7 +3425,7 @@ func TestFilterWithAttrsAndPrefixFunction_ShardMatchAndLabels(t *testing.T) {
 		ShardSelector: selectorIncludingUID(uid),
 		GetAttrs:      storage.DefaultNamespaceScopedAttr,
 	}
-	filter := filterWithAttrsAndPrefixFunction("/pods/", pred, gr)
+	filter := filterWithAttrsAndPrefixFunction("/pods/", pred, true, gr)
 
 	if !filter("/pods/default/pod1", labels.Set{"app": "web"}, fields.Set{"metadata.name": "pod1", "metadata.namespace": "default"}, pod) {
 		t.Error("expected filter to match: shard matches and labels match")
@@ -3444,7 +3444,7 @@ func TestFilterWithAttrsAndPrefixFunction_ShardMatchButLabelMismatch(t *testing.
 		ShardSelector: selectorIncludingUID(uid),
 		GetAttrs:      storage.DefaultNamespaceScopedAttr,
 	}
-	filter := filterWithAttrsAndPrefixFunction("/pods/", pred, gr)
+	filter := filterWithAttrsAndPrefixFunction("/pods/", pred, true, gr)
 
 	if filter("/pods/default/pod2", labels.Set{"app": "api"}, fields.Set{"metadata.name": "pod2", "metadata.namespace": "default"}, pod) {
 		t.Error("expected filter to reject: shard matches but labels don't")
@@ -3463,7 +3463,7 @@ func TestFilterWithAttrsAndPrefixFunction_ShardMismatch(t *testing.T) {
 		ShardSelector: selectorExcludingUID(uid),
 		GetAttrs:      storage.DefaultNamespaceScopedAttr,
 	}
-	filter := filterWithAttrsAndPrefixFunction("/pods/", pred, gr)
+	filter := filterWithAttrsAndPrefixFunction("/pods/", pred, true, gr)
 
 	if filter("/pods/default/pod3", labels.Set{"app": "web"}, fields.Set{"metadata.name": "pod3", "metadata.namespace": "default"}, pod) {
 		t.Error("expected filter to reject: shard does not match")
@@ -3480,7 +3480,7 @@ func TestFilterWithAttrsAndPrefixFunction_NilShardSelector(t *testing.T) {
 		Field:    fields.Everything(),
 		GetAttrs: storage.DefaultNamespaceScopedAttr,
 	}
-	filter := filterWithAttrsAndPrefixFunction("/pods/", pred, gr)
+	filter := filterWithAttrsAndPrefixFunction("/pods/", pred, true, gr)
 
 	if !filter("/pods/default/pod4", labels.Set{"app": "web"}, fields.Set{"metadata.name": "pod4", "metadata.namespace": "default"}, pod) {
 		t.Error("expected filter to match: nil ShardSelector should pass everything through")
@@ -3497,7 +3497,7 @@ func TestFilterWithAttrsAndPrefixFunction_EverythingSelector(t *testing.T) {
 		ShardSelector: sharding.Everything(),
 		GetAttrs:      storage.DefaultNamespaceScopedAttr,
 	}
-	filter := filterWithAttrsAndPrefixFunction("/pods/", pred, gr)
+	filter := filterWithAttrsAndPrefixFunction("/pods/", pred, true, gr)
 
 	if !filter("/pods/default/pod5", labels.Set{}, fields.Set{"metadata.name": "pod5", "metadata.namespace": "default"}, pod) {
 		t.Error("expected filter to match: Everything() selector should pass all objects")
@@ -3515,7 +3515,7 @@ func TestFilterWithAttrsAndPrefixFunction_WrongPrefix(t *testing.T) {
 		ShardSelector: selectorIncludingUID(uid),
 		GetAttrs:      storage.DefaultNamespaceScopedAttr,
 	}
-	filter := filterWithAttrsAndPrefixFunction("/pods/", pred, gr)
+	filter := filterWithAttrsAndPrefixFunction("/pods/", pred, true, gr)
 
 	if filter("/configmaps/default/cm1", nil, nil, pod) {
 		t.Error("expected filter to reject: key prefix doesn't match")
@@ -3537,7 +3537,7 @@ func TestFilterWithAttrsAndPrefixFunction_ShardErrorDropsEvent(t *testing.T) {
 		}),
 		GetAttrs: storage.DefaultNamespaceScopedAttr,
 	}
-	filter := filterWithAttrsAndPrefixFunction("/pods/", pred, gr)
+	filter := filterWithAttrsAndPrefixFunction("/pods/", pred, true, gr)
 
 	if filter("/pods/default/pod-err", nil, nil, obj) {
 		t.Error("expected filter to reject: shard matching should fail on unstructured object")
@@ -3563,7 +3563,7 @@ func TestFilterWithAttrsAndPrefixFunction_NamespaceSharding(t *testing.T) {
 		ShardSelector: sel,
 		GetAttrs:      storage.DefaultNamespaceScopedAttr,
 	}
-	filter := filterWithAttrsAndPrefixFunction("/pods/", pred, gr)
+	filter := filterWithAttrsAndPrefixFunction("/pods/", pred, true, gr)
 
 	if !filter("/pods/my-namespace/pod-ns", labels.Set{}, fields.Set{"metadata.name": "pod-ns", "metadata.namespace": ns}, pod) {
 		t.Error("expected filter to match: namespace-based shard selector should match")
@@ -3589,7 +3589,7 @@ func TestFilterWithAttrsAndPrefixFunction_NamespaceShardingMismatch(t *testing.T
 		ShardSelector: sel,
 		GetAttrs:      storage.DefaultNamespaceScopedAttr,
 	}
-	filter := filterWithAttrsAndPrefixFunction("/pods/", pred, gr)
+	filter := filterWithAttrsAndPrefixFunction("/pods/", pred, true, gr)
 
 	if filter("/pods/other-namespace/pod-ns2", labels.Set{}, fields.Set{"metadata.name": "pod-ns2", "metadata.namespace": ns}, pod) {
 		t.Error("expected filter to reject: namespace hash doesn't fall in shard range")

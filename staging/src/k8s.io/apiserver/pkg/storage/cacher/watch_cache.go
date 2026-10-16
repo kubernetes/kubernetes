@@ -697,8 +697,7 @@ func (w *watchCache) getAllEventsSinceLocked(ctx context.Context, resourceVersio
 // that covers the entire storage state.
 // This function assumes to be called under the watchCache lock.
 func (w *watchCache) getIntervalFromStoreLocked(ctx context.Context, key string, opts storage.ListOptions) (*watchCacheInterval, string, error) {
-	_, matchesSingle := opts.Predicate.MatchesSingle()
-	matchesSingle = matchesSingle && !opts.Recursive
+	matchesSingle := !opts.Recursive
 	// When not matching a single key, an immutable snapshot lets us
 	// defer the O(N) interval build off the watchCache lock.
 	if !matchesSingle {

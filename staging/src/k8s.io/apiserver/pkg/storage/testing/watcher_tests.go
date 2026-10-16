@@ -739,6 +739,15 @@ func RunTestClusterScopedWatch(ctx context.Context, t *testing.T, store storage.
 				{basePodAssigned("t6-foo2", "t6-bar1"), false, ""},
 			},
 		},
+		{
+			name:          "cluster-wide watch, non-recursive, request without name, without field selector",
+			recursive:     false,
+			fieldSelector: fields.Everything(),
+			watchTests: []*testWatchStruct{
+				{basePod("t7-foo1"), false, ""},
+				{basePodUpdated("t7-foo1"), false, ""},
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -1050,6 +1059,25 @@ func RunTestNamespaceScopedWatch(ctx context.Context, t *testing.T, store storag
 				{baseNamespacedPod("t19-foo2", "t19-ns1"), true, watch.Added},
 				{baseNamespacedPodUpdated("t19-foo2", "t19-ns1"), true, watch.Modified},
 				{baseNamespacedPodAssigned("t19-foo2", "t19-ns1", "t19-bar1"), true, watch.Deleted},
+			},
+		},
+		{
+			name:          "namespaced watch, non-recursive, request without name, request without namespace, without field selector",
+			recursive:     false,
+			fieldSelector: fields.Everything(),
+			watchTests: []*testWatchStruct{
+				{baseNamespacedPod("t20-foo1", "t20-ns1"), false, ""},
+				{baseNamespacedPodUpdated("t20-foo1", "t20-ns1"), false, ""},
+			},
+		},
+		{
+			name:               "namespaced watch, non-recursive, request without name, request with namespace, without field selector",
+			requestedNamespace: "t21-ns1",
+			recursive:          false,
+			fieldSelector:      fields.Everything(),
+			watchTests: []*testWatchStruct{
+				{baseNamespacedPod("t21-foo1", "t21-ns1"), false, ""},
+				{baseNamespacedPodUpdated("t21-foo1", "t21-ns1"), false, ""},
 			},
 		},
 	}

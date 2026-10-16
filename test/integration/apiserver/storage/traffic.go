@@ -153,6 +153,7 @@ type PreconditionsDistribution struct {
 type WatchDistribution struct {
 	KeyTarget           []ChoiceWeight[KeyTarget]
 	Scope               []ChoiceWeight[KeyScope]
+	Recursive           []ChoiceWeight[bool]
 	FieldSelector       []ChoiceWeight[FieldSelector]
 	LabelSelector       []ChoiceWeight[LabelSelector]
 	SendInitialEvents   []ChoiceWeight[bool]
@@ -600,6 +601,9 @@ func randomWatchRequest(ctx context.Context, store storage.Interface, keys []typ
 		default:
 			panic(fmt.Sprintf("%v: unknown watch scope", scope))
 		}
+	}
+	if len(distribution.Recursive) > 0 {
+		recursive = PickRandom(distribution.Recursive)
 	}
 
 	pred := pickPredicate(key, distribution.FieldSelector, distribution.LabelSelector)
