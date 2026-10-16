@@ -25,6 +25,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	cadvisorapi "github.com/google/cadvisor/lib/model"
@@ -1027,16 +1028,46 @@ func (m *kubeGenericRuntimeManager) doPodResizeAction(ctx context.Context, pod *
 	// If resize results in net pod resource increase, set pod cgroup config before resizing containers.
 	// If resize results in net pod resource decrease, set pod cgroup config after resizing containers.
 	// If an error occurs at any point, abort. Let future syncpod iterations retry the unfinished stuff.
+	resizeOneVolume := func(volume v1.Volume) error {
+		desiredSize := volume.EmptyDir.SizeLimit
+		if err := m.runtimeHelper.ResizeEphemeralVolume(pod, volume.Name, desiredSize); err != nil {
+			return fmt.Errorf("failed to resize volume %s: %w", volume.Name, err)
+		}
+		if err := m.actuatedState.SetEmptyDirVolumeLimit(pod.UID, volume.Name, desiredSize); err != nil {
+			return fmt.Errorf("failed to update actuated emptyDir volume limit checkpoint for %s: %w", volume.Name, err)
+		}
+		return nil
+	}
+
 	updateVolumeSize := func(volumes []v1.Volume) error {
-		if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingMemoryBackedVolumes) {
+		if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingMemoryBackedVolumes) {
+			return nil
+		}
+		if utilfeature.DefaultFeatureGate.Enabled(features.KubeletParallelContainerOps) {
+			var wg sync.WaitGroup
+			results := make(chan error, len(volumes))
 			for _, vol := range volumes {
-				desiredSize := vol.EmptyDir.SizeLimit
-				if err := m.runtimeHelper.ResizeEphemeralVolume(pod, vol.Name, desiredSize); err != nil {
-					return fmt.Errorf("failed to resize volume %s: %w", vol.Name, err)
+				wg.Add(1)
+				go func(vol v1.Volume) {
+					defer wg.Done()
+					defer utilruntime.HandleCrashWithContext(ctx)
+					if err := resizeOneVolume(vol); err != nil {
+						results <- err
+					}
+				}(vol)
+			}
+			wg.Wait()
+			close(results)
+			for err := range results {
+				if err != nil {
+					return err
 				}
-				if err := m.actuatedState.SetEmptyDirVolumeLimit(pod.UID, vol.Name, desiredSize); err != nil {
-					return fmt.Errorf("failed to update actuated emptyDir volume limit checkpoint for %s: %w", vol.Name, err)
-				}
+			}
+			return nil
+		}
+		for _, vol := range volumes {
+			if err := resizeOneVolume(vol); err != nil {
+				return err
 			}
 		}
 		return nil
@@ -1217,11 +1248,31 @@ func (m *kubeGenericRuntimeManager) validateMemoryResizeAction(
 	return nil
 }
 
+func (c *containerToUpdateInfo) isDecrease(resourceName v1.ResourceName) bool {
+	if c.currentContainerResources == nil {
+		return false
+	}
+	switch resourceName {
+	case v1.ResourceMemory:
+		if c.desiredContainerResources.memoryLimit != c.currentContainerResources.memoryLimit {
+			return c.desiredContainerResources.memoryLimit < c.currentContainerResources.memoryLimit
+		}
+		return c.desiredContainerResources.memoryRequest < c.currentContainerResources.memoryRequest
+	case v1.ResourceCPU:
+		if c.desiredContainerResources.cpuLimit != c.currentContainerResources.cpuLimit {
+			return c.desiredContainerResources.cpuLimit < c.currentContainerResources.cpuLimit
+		}
+		return c.desiredContainerResources.cpuRequest < c.currentContainerResources.cpuRequest
+	default:
+		return false
+	}
+}
+
 func (m *kubeGenericRuntimeManager) updatePodContainerResources(ctx context.Context, pod *v1.Pod, resourceName v1.ResourceName, containersToUpdate []containerToUpdateInfo) error {
 	logger := klog.FromContext(ctx)
 	logger.V(5).Info("Updating container resources", "pod", klog.KObj(pod))
 
-	for _, cInfo := range containersToUpdate {
+	updateOneContainer := func(cInfo containerToUpdateInfo) error {
 		container := cInfo.container.DeepCopy()
 		// If updating memory limit, use most recently configured CPU request and limit values.
 		// If updating CPU request and limit, use most recently configured memory request and limit values.
@@ -1263,6 +1314,49 @@ func (m *kubeGenericRuntimeManager) updatePodContainerResources(ctx context.Cont
 		case v1.ResourceCPU:
 			cInfo.currentContainerResources.cpuLimit = cInfo.desiredContainerResources.cpuLimit
 			cInfo.currentContainerResources.cpuRequest = cInfo.desiredContainerResources.cpuRequest
+		}
+		return nil
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletParallelContainerOps) {
+		var downsize, upsize []containerToUpdateInfo
+		for _, cInfo := range containersToUpdate {
+			if cInfo.isDecrease(resourceName) {
+				downsize = append(downsize, cInfo)
+			} else {
+				upsize = append(upsize, cInfo)
+			}
+		}
+		runBatch := func(batch []containerToUpdateInfo) error {
+			errCh := make(chan error, len(batch))
+			var wg sync.WaitGroup
+			for _, cInfo := range batch {
+				wg.Add(1)
+				go func(cInfo containerToUpdateInfo) {
+					defer wg.Done()
+					defer utilruntime.HandleCrashWithContext(ctx)
+					if err := updateOneContainer(cInfo); err != nil {
+						errCh <- err
+					}
+				}(cInfo)
+			}
+			wg.Wait()
+			close(errCh)
+			var errs []error
+			for err := range errCh {
+				errs = append(errs, err)
+			}
+			return utilerrors.NewAggregate(errs)
+		}
+		if err := runBatch(downsize); err != nil {
+			return err
+		}
+		return runBatch(upsize)
+	} else {
+		for _, cInfo := range containersToUpdate {
+			if err := updateOneContainer(cInfo); err != nil {
+				return err
+			}
 		}
 	}
 	return nil
@@ -1610,14 +1704,46 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 		}
 	} else {
 		// Step 3: kill any running containers in this pod which are not to keep.
-		for containerID, containerInfo := range podContainerChanges.ContainersToKill {
+		deleteContainer := func(containerID kubecontainer.ContainerID, containerInfo containerToKillInfo) *kubecontainer.SyncResult {
 			logger.V(3).Info("Killing unwanted container for pod", "containerName", containerInfo.name, "containerID", containerID, "pod", klog.KObj(pod))
 			killContainerResult := kubecontainer.NewSyncResult(kubecontainer.KillContainer, containerInfo.name)
-			result.AddSyncResult(killContainerResult)
 			if err := m.killContainer(ctx, pod, containerID, containerInfo.name, containerInfo.message, containerInfo.reason, nil, nil); err != nil {
 				killContainerResult.Fail(kubecontainer.ErrKillContainer, err.Error())
 				logger.Error(err, "killContainer for pod failed", "containerName", containerInfo.name, "containerID", containerID, "pod", klog.KObj(pod))
+			}
+			return killContainerResult
+		}
+		if utilfeature.DefaultFeatureGate.Enabled(features.KubeletParallelContainerOps) {
+			var wg sync.WaitGroup
+			killResults := make(chan *kubecontainer.SyncResult, len(podContainerChanges.ContainersToKill))
+			for containerID, containerInfo := range podContainerChanges.ContainersToKill {
+				wg.Add(1)
+				go func(containerID kubecontainer.ContainerID, containerInfo containerToKillInfo) {
+					defer wg.Done()
+					defer utilruntime.HandleCrashWithContext(ctx)
+					killResults <- deleteContainer(containerID, containerInfo)
+				}(containerID, containerInfo)
+			}
+			wg.Wait()
+			close(killResults)
+			var hasErr bool
+			for killResult := range killResults {
+				result.AddSyncResult(killResult)
+				if killResult.Error != nil {
+					hasErr = true
+				}
+			}
+			if hasErr {
 				return
+			}
+
+		} else {
+			for containerID, containerInfo := range podContainerChanges.ContainersToKill {
+				killResult := deleteContainer(containerID, containerInfo)
+				result.AddSyncResult(killResult)
+				if killResult.Error != nil {
+					return
+				}
 			}
 		}
 
@@ -1802,9 +1928,12 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 	// currently: "container", "init container" or "ephemeral container"
 	// metricLabel is the label used to describe this type of container in monitoring metrics.
 	// currently: "container", "init_container" or "ephemeral_container"
+	var resultMutex sync.Mutex
 	startWithInitState := func(ctx context.Context, typeName, metricLabel string, spec *startSpec, podSandboxConfig *runtimeapi.PodSandboxConfig, imageVolumePullResults imageVolumePulls) error {
 		startContainerResult := kubecontainer.NewSyncResult(kubecontainer.StartContainer, spec.container.Name)
+		resultMutex.Lock()
 		result.AddSyncResult(startContainerResult)
+		resultMutex.Unlock()
 
 		isInBackOff, msg, err := m.doBackOff(ctx, pod, spec.container, podStatus, backOff)
 		if isInBackOff {
@@ -1896,13 +2025,27 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 	// These are started "prior" to init containers to allow running ephemeral containers even when there
 	// are errors starting an init container. In practice init containers will start first since ephemeral
 	// containers cannot be specified on pod creation.
-	for _, idx := range podContainerChanges.EphemeralContainersToStart {
+	if len(podContainerChanges.EphemeralContainersToStart) > 0 {
 		start := lazyStart()
 		if start == nil {
 			return
 		}
-
-		start(ctx, "ephemeral container", metrics.EphemeralContainer, ephemeralContainerStartSpec(&pod.Spec.EphemeralContainers[idx]))
+		if utilfeature.DefaultFeatureGate.Enabled(features.KubeletParallelContainerOps) {
+			var wg sync.WaitGroup
+			for _, idx := range podContainerChanges.EphemeralContainersToStart {
+				wg.Add(1)
+				go func(idx int) {
+					defer wg.Done()
+					defer utilruntime.HandleCrashWithContext(ctx)
+					_ = start(ctx, "ephemeral container", metrics.EphemeralContainer, ephemeralContainerStartSpec(&pod.Spec.EphemeralContainers[idx]))
+				}(idx)
+			}
+			wg.Wait()
+		} else {
+			for _, idx := range podContainerChanges.EphemeralContainersToStart {
+				_ = start(ctx, "ephemeral container", metrics.EphemeralContainer, ephemeralContainerStartSpec(&pod.Spec.EphemeralContainers[idx]))
+			}
+		}
 	}
 
 	// Step 8: start init containers.
@@ -1943,13 +2086,27 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 	}
 
 	// Step 9: start containers in podContainerChanges.ContainersToStart.
-	for _, idx := range podContainerChanges.ContainersToStart {
+	if len(podContainerChanges.ContainersToStart) > 0 {
 		start := lazyStart()
 		if start == nil {
 			return
 		}
-
-		start(ctx, "container", metrics.Container, containerStartSpec(&pod.Spec.Containers[idx]))
+		if utilfeature.DefaultFeatureGate.Enabled(features.KubeletParallelContainerOps) {
+			var wg sync.WaitGroup
+			for _, idx := range podContainerChanges.ContainersToStart {
+				wg.Add(1)
+				go func(idx int) {
+					defer wg.Done()
+					defer utilruntime.HandleCrashWithContext(ctx)
+					_ = start(ctx, "container", metrics.Container, containerStartSpec(&pod.Spec.Containers[idx]))
+				}(idx)
+			}
+			wg.Wait()
+		} else {
+			for _, idx := range podContainerChanges.ContainersToStart {
+				_ = start(ctx, "container", metrics.Container, containerStartSpec(&pod.Spec.Containers[idx]))
+			}
+		}
 	}
 
 	return result
@@ -2035,24 +2192,18 @@ func (m *kubeGenericRuntimeManager) getImageVolumes(ctx context.Context, pod *v1
 		return nil, err
 	}
 
-	res := make(imageVolumePulls)
-	for _, volume := range pod.Spec.Volumes {
-		if volume.Image == nil {
-			continue
-		}
-
-		objectRef, _ := ref.GetReference(legacyscheme.Scheme, pod) // objectRef can be nil, no error check required
+	objectRef, _ := ref.GetReference(legacyscheme.Scheme, pod) // objectRef can be nil, no error check required
+	pullVolume := func(volume v1.Volume) imageVolumePullResult {
 		ref, msg, err := m.imagePuller.EnsureImageExists(
 			ctx, objectRef, pod, volume.Image.Reference, pullSecrets, podSandboxConfig, podRuntimeHandler, volume.Image.PullPolicy,
 		)
 		if err != nil {
 			logger.Error(err, "Failed to ensure image", "pod", klog.KObj(pod))
-			res[volume.Name] = imageVolumePullResult{err: err, msg: msg}
-			continue
+			return imageVolumePullResult{err: err, msg: msg}
 		}
 
 		logger.V(4).Info("Pulled image", "ref", ref, "pod", klog.KObj(pod))
-		res[volume.Name] = imageVolumePullResult{spec: &runtimeapi.ImageSpec{
+		return imageVolumePullResult{spec: &runtimeapi.ImageSpec{
 			Image:              ref,
 			UserSpecifiedImage: volume.Image.Reference,
 			RuntimeHandler:     podRuntimeHandler,
@@ -2060,7 +2211,38 @@ func (m *kubeGenericRuntimeManager) getImageVolumes(ctx context.Context, pod *v1
 		}}
 	}
 
-	return res, nil
+	res := make(imageVolumePulls)
+	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletParallelContainerOps) {
+		var (
+			mu sync.Mutex
+			wg sync.WaitGroup
+		)
+		for _, volume := range pod.Spec.Volumes {
+			if volume.Image == nil {
+				continue
+			}
+			wg.Add(1)
+			go func(volume v1.Volume) {
+				defer wg.Done()
+				defer utilruntime.HandleCrashWithContext(ctx)
+				pullRes := pullVolume(volume)
+				mu.Lock()
+				res[volume.Name] = pullRes
+				mu.Unlock()
+			}(volume)
+		}
+		wg.Wait()
+		return res, nil
+	} else {
+		for _, volume := range pod.Spec.Volumes {
+			if volume.Image == nil {
+				continue
+			}
+			res[volume.Name] = pullVolume(volume)
+		}
+
+		return res, nil
+	}
 }
 
 // If a container is still in backoff, the function will return a brief backoff error and
