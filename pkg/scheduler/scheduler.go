@@ -356,13 +356,18 @@ func New(ctx context.Context,
 	}
 
 	preEnqueuePluginMap := make(map[string]map[string]fwk.PreEnqueuePlugin)
+	resizePreEnqueuePluginMap := make(map[string]map[string]fwk.PreEnqueuePlugin)
 	queueingHintsPerProfile := make(internalqueue.QueueingHintMapPerProfile)
 	var returnErr error
 	for profileName, profile := range profiles {
 		plugins := profile.PreEnqueuePlugins()
 		preEnqueuePluginMap[profileName] = make(map[string]fwk.PreEnqueuePlugin, len(plugins))
+		resizePreEnqueuePluginMap[profileName] = make(map[string]fwk.PreEnqueuePlugin)
 		for _, plugin := range plugins {
 			preEnqueuePluginMap[profileName][plugin.Name()] = plugin
+			if framework.IsRelevantForPodResize(plugin) {
+				resizePreEnqueuePluginMap[profileName][plugin.Name()] = plugin
+			}
 		}
 
 		queueingHintsPerProfile[profileName], err = buildQueueingHintMap(ctx, profile.EnqueueExtensions())
@@ -390,6 +395,7 @@ func New(ctx context.Context,
 		internalqueue.WithPodLister(podLister),
 		internalqueue.WithPodMaxInUnschedulablePodsDuration(options.podMaxInUnschedulablePodsDuration),
 		internalqueue.WithPreEnqueuePluginMap(preEnqueuePluginMap),
+		internalqueue.WithResizePreEnqueuePluginMap(resizePreEnqueuePluginMap),
 		internalqueue.WithQueueingHintMapPerProfile(queueingHintsPerProfile),
 		internalqueue.WithPluginMetricsSamplePercent(pluginMetricsSamplePercent),
 		internalqueue.WithMetricsRecorder(comps.metricsRecorder),

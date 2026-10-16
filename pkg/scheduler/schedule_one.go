@@ -30,12 +30,14 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	compresource "k8s.io/component-helpers/resource"
 	"k8s.io/klog/v2"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
 	fwk "k8s.io/kube-scheduler/framework"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/backend/queue"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
@@ -527,6 +529,9 @@ func hasExtenderFilters(fwk framework.Framework) bool {
 }
 
 func findNodesThatPassExtenders(ctx context.Context, extenders []fwk.Extender, pod *v1.Pod, feasibleNodes []framework.NodeWithRank, statuses *framework.NodeToStatus) ([]framework.NodeWithRank, error) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingSchedulerPreemption) && compresource.IsPodResizeDeferred(pod) {
+		return feasibleNodes, nil
+	}
 	logger := klog.FromContext(ctx)
 
 	// Extenders are called sequentially.
@@ -598,7 +603,10 @@ func prioritizeNodes(
 	rankedNodes []framework.NodeWithRank,
 ) ([]fwk.NodePluginScores, error) {
 	logger := klog.FromContext(ctx)
-	extenders := schedFramework.Extenders()
+	var extenders []fwk.Extender
+	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingSchedulerPreemption) || !compresource.IsPodResizeDeferred(pod) {
+		extenders = schedFramework.Extenders()
+	}
 
 	var nodes []fwk.NodeInfo
 	if len(rankedNodes) > 0 {
@@ -738,6 +746,9 @@ func (sched *Scheduler) bind(ctx context.Context, schedFramework framework.Frame
 
 // TODO(#87159): Move this to a Plugin.
 func (sched *Scheduler) extendersBinding(logger klog.Logger, schedFramework framework.Framework, pod *v1.Pod, node string) (bool, error) {
+	if sched.inPlacePodVerticalScalingSchedulerPreemptionEnabled && compresource.IsPodResizeDeferred(pod) {
+		return false, nil
+	}
 	for _, extender := range schedFramework.Extenders() {
 		if !extender.IsBinder() || !extender.IsInterested(pod) {
 			continue
