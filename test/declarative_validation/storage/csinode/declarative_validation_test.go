@@ -89,6 +89,13 @@ func TestDeclarativeValidateStatusUpdate(t *testing.T) {
 		})
 
 		conditionReasonPath := field.NewPath("status", "storageHealth").Index(0).Child("healthConditions").Index(0).Child("reason")
+		conditionMessagePath := field.NewPath("status", "storageHealth").Index(0).Child("healthConditions").Index(0).Child("message")
+		conditionStatusTypePath := field.NewPath("status", "storageHealth").Index(0).Child("healthConditions").Index(0).Child("status")
+
+		validStorageHealthStatusTypes := []storage.StorageHealthStatusType{
+			storage.StorageDegraded,
+			storage.StorageUnreachable,
+		}
 		tests := map[string]struct {
 			storageHealth []storage.StorageHealth
 			expectedErrs  field.ErrorList
@@ -135,6 +142,19 @@ func TestDeclarativeValidateStatusUpdate(t *testing.T) {
 					field.TooLong(conditionReasonPath, "", 256).WithOrigin("maxBytes").MarkAlpha(),
 				},
 			},
+			"message length can not be greater than 1024": {
+				storageHealth: []storage.StorageHealth{{
+					Name: "foo",
+					HealthConditions: []storage.StorageHealthCondition{{
+						Status:  storage.StorageUnreachable,
+						Reason:  "BackendDown",
+						Message: strings.Repeat("a", 1025),
+					}},
+				}},
+				expectedErrs: field.ErrorList{
+					field.TooLong(conditionMessagePath, "", 1024).WithOrigin("maxBytes").MarkAlpha(),
+				},
+			},
 			"reason format is invalid": {
 				storageHealth: []storage.StorageHealth{{
 					Name: "foo",
@@ -145,6 +165,29 @@ func TestDeclarativeValidateStatusUpdate(t *testing.T) {
 				}},
 				expectedErrs: field.ErrorList{
 					field.Invalid(conditionReasonPath, "", "").WithOrigin("format=k8s-condition-reason").MarkAlpha(),
+				},
+			},
+			"storage health status type is required": {
+				storageHealth: []storage.StorageHealth{{
+					Name: "foo",
+					HealthConditions: []storage.StorageHealthCondition{{
+						Reason: "BackendDown",
+					}},
+				}},
+				expectedErrs: field.ErrorList{
+					field.Required(conditionStatusTypePath, "").MarkAlpha(),
+				},
+			},
+			"invalid storage health status type": {
+				storageHealth: []storage.StorageHealth{{
+					Name: "foo",
+					HealthConditions: []storage.StorageHealthCondition{{
+						Status: "badvalue",
+						Reason: "BackendDown",
+					}},
+				}},
+				expectedErrs: field.ErrorList{
+					field.NotSupported(conditionStatusTypePath, "", validStorageHealthStatusTypes).MarkAlpha(),
 				},
 			},
 		}

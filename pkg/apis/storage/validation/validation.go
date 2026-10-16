@@ -305,21 +305,23 @@ const maxStorageHealthConditions = 16
 
 func validateStorageHealthCondition(condition storage.StorageHealthCondition, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	if !validStorageHealthStatusTypes.Has(condition.Status) {
-		allErrs = append(allErrs, field.NotSupported(fldPath.Child("status"), condition.Status, sets.List(validStorageHealthStatusTypes)))
+	if len(condition.Status) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("status"), "").MarkCoveredByDeclarative().MarkAlpha())
+	} else if !validStorageHealthStatusTypes.Has(condition.Status) {
+		allErrs = append(allErrs, field.NotSupported(fldPath.Child("status"), condition.Status, sets.List(validStorageHealthStatusTypes)).MarkCoveredByDeclarative().MarkAlpha())
 	}
 	if len(condition.Reason) == 0 {
-		allErrs = append(allErrs, field.Required(fldPath.Child("reason"), "").MarkCoveredByDeclarative())
+		allErrs = append(allErrs, field.Required(fldPath.Child("reason"), "").MarkCoveredByDeclarative().MarkAlpha())
 	} else {
 		for _, msg := range metav1validation.IsValidConditionReason(condition.Reason) {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("reason"), condition.Reason, msg).WithOrigin("format=k8s-condition-reason").MarkCoveredByDeclarative())
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("reason"), condition.Reason, msg).WithOrigin("format=k8s-condition-reason").MarkCoveredByDeclarative().MarkAlpha())
 		}
 		if len(condition.Reason) > 256 {
-			allErrs = append(allErrs, field.TooLong(fldPath.Child("reason"), condition.Reason, 256).WithOrigin("maxBytes").MarkCoveredByDeclarative())
+			allErrs = append(allErrs, field.TooLong(fldPath.Child("reason"), condition.Reason, 256).WithOrigin("maxBytes").MarkCoveredByDeclarative().MarkAlpha())
 		}
 	}
 	if len(condition.Message) > 1024 {
-		allErrs = append(allErrs, field.TooLong(fldPath.Child("message"), condition.Message, 1024))
+		allErrs = append(allErrs, field.TooLong(fldPath.Child("message"), condition.Message, 1024).WithOrigin("maxBytes").MarkCoveredByDeclarative().MarkAlpha())
 	}
 	if condition.AccessMode != nil && !validStorageHealthAccessModes.Has(*condition.AccessMode) {
 		allErrs = append(allErrs, field.NotSupported(fldPath.Child("accessMode"), *condition.AccessMode, sets.List(validStorageHealthAccessModes)))
