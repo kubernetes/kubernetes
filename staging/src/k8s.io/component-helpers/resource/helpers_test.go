@@ -85,8 +85,8 @@ func TestPodRequestsAndLimits(t *testing.T) {
 		},
 	}
 	for idx, tc := range cases {
-		resRequests := PodRequests(tc.pod, PodResourcesOptions{Features: AllFeatures()})
-		resLimits := PodLimits(tc.pod, PodResourcesOptions{Features: AllFeatures()})
+		resRequests := PodRequests(tc.pod, PodResourcesOptions{Features: EnableAllFeatures()})
+		resLimits := PodLimits(tc.pod, PodResourcesOptions{Features: EnableAllFeatures()})
 
 		if !equality.Semantic.DeepEqual(tc.expectedRequests, resRequests) {
 			t.Errorf("test case failure[%d]: %v, requests:\n expected:\t%v\ngot\t\t%v", idx, tc.cName, tc.expectedRequests, resRequests)
@@ -272,8 +272,8 @@ func TestPodRequestsAndLimitsWithoutOverhead(t *testing.T) {
 		},
 	}
 	for idx, tc := range cases {
-		resRequests := PodRequests(tc.pod, PodResourcesOptions{ExcludeOverhead: true, Features: AllFeatures()})
-		resLimits := PodLimits(tc.pod, PodResourcesOptions{ExcludeOverhead: true, Features: AllFeatures()})
+		resRequests := PodRequests(tc.pod, PodResourcesOptions{ExcludeOverhead: true, Features: EnableAllFeatures()})
+		resLimits := PodLimits(tc.pod, PodResourcesOptions{ExcludeOverhead: true, Features: EnableAllFeatures()})
 
 		if !equality.Semantic.DeepEqual(tc.expectedRequests, resRequests) {
 			t.Errorf("test case failure[%d]: %v, requests:\n expected:\t%v\ngot\t\t%v", idx, tc.name, tc.expectedRequests, resRequests)
@@ -439,7 +439,7 @@ func TestPodResourceRequests(t *testing.T) {
 				Status: v1.ConditionTrue,
 				Reason: v1.PodReasonInfeasible,
 			}},
-			options: PodResourcesOptions{UseStatusResources: true, Features: AllFeatures()},
+			options: PodResourcesOptions{UseStatusResources: true, Features: EnableAllFeatures()},
 			containers: []v1.Container{
 				{
 					Name: "container-1",
@@ -471,7 +471,7 @@ func TestPodResourceRequests(t *testing.T) {
 				Status: v1.ConditionTrue,
 				Reason: v1.PodReasonInfeasible,
 			}},
-			options: PodResourcesOptions{UseStatusResources: true, Features: AllFeatures()},
+			options: PodResourcesOptions{UseStatusResources: true, Features: EnableAllFeatures()},
 			containers: []v1.Container{
 				{
 					Name: "container-1",
@@ -501,7 +501,7 @@ func TestPodResourceRequests(t *testing.T) {
 			expectedRequests: v1.ResourceList{
 				v1.ResourceCPU: resource.MustParse("4"),
 			},
-			options: PodResourcesOptions{UseStatusResources: true, Features: AllFeatures()},
+			options: PodResourcesOptions{UseStatusResources: true, Features: EnableAllFeatures()},
 			containers: []v1.Container{
 				{
 					Name: "container-1",
@@ -531,7 +531,7 @@ func TestPodResourceRequests(t *testing.T) {
 				// Note: EphemeralStorage is not resizable, but that doesn't matter for the purposes of this test.
 				v1.ResourceEphemeralStorage: resource.MustParse("30G"),
 			},
-			options: PodResourcesOptions{UseStatusResources: true, Features: AllFeatures()},
+			options: PodResourcesOptions{UseStatusResources: true, Features: EnableAllFeatures()},
 			containers: []v1.Container{
 				{
 					Name: "container-1",
@@ -604,7 +604,7 @@ func TestPodResourceRequests(t *testing.T) {
 				Status: v1.ConditionTrue,
 				Reason: v1.PodReasonInfeasible,
 			}},
-			options: PodResourcesOptions{UseStatusResources: true, Features: AllFeatures()},
+			options: PodResourcesOptions{UseStatusResources: true, Features: EnableAllFeatures()},
 			initContainers: []v1.Container{
 				{
 					Name:          "restartable-init-1",
@@ -632,7 +632,7 @@ func TestPodResourceRequests(t *testing.T) {
 			expectedRequests: v1.ResourceList{
 				v1.ResourceCPU: resource.MustParse("4"),
 			},
-			options: PodResourcesOptions{UseStatusResources: true, Features: AllFeatures()},
+			options: PodResourcesOptions{UseStatusResources: true, Features: EnableAllFeatures()},
 			initContainers: []v1.Container{
 				{
 					Name:          "restartable-init-1",
@@ -874,7 +874,7 @@ func TestPodResourceRequests(t *testing.T) {
 			expectedRequests: v1.ResourceList{
 				v1.ResourceCPU: resource.MustParse("3"),
 			},
-			options: PodResourcesOptions{UseStatusResources: true, Features: AllFeatures()},
+			options: PodResourcesOptions{UseStatusResources: true, Features: EnableAllFeatures()},
 			containers: []v1.Container{
 				{
 					Name: "c1",
@@ -924,7 +924,7 @@ func TestPodResourceRequests(t *testing.T) {
 				},
 			}
 			populatePodStatusResourcesForTest(p)
-			tc.options.Features = AllFeatures()
+			tc.options.Features = EnableAllFeatures()
 			request := PodRequests(p, tc.options)
 			if !equality.Semantic.DeepEqual(request, tc.expectedRequests) {
 				t.Errorf("got=%v, want=%v, diff=%s", request, tc.expectedRequests, diff.Diff(request, tc.expectedRequests))
@@ -953,7 +953,7 @@ func TestPodResourceRequestsReuse(t *testing.T) {
 		Reuse: v1.ResourceList{
 			v1.ResourceCPU: resource.MustParse("25"),
 		},
-		Features: AllFeatures(),
+		Features: EnableAllFeatures(),
 	}
 	requests := PodRequests(p, opts)
 
@@ -1349,7 +1349,7 @@ func TestPodResourceLimits(t *testing.T) {
 			expectedLimits: v1.ResourceList{
 				v1.ResourceMemory: resource.MustParse("2Gi"),
 			},
-			options: PodResourcesOptions{UseStatusResources: true, Features: AllFeatures()},
+			options: PodResourcesOptions{UseStatusResources: true, Features: EnableAllFeatures()},
 			containers: []v1.Container{
 				{
 					Name: "container-1",
@@ -1376,7 +1376,7 @@ func TestPodResourceLimits(t *testing.T) {
 			expectedLimits: v1.ResourceList{
 				v1.ResourceMemory: resource.MustParse("2Gi"),
 			},
-			options: PodResourcesOptions{UseStatusResources: true, Features: AllFeatures()},
+			options: PodResourcesOptions{UseStatusResources: true, Features: EnableAllFeatures()},
 			containers: []v1.Container{
 				{
 					Name: "container-1",
@@ -1430,7 +1430,7 @@ func TestPodResourceLimits(t *testing.T) {
 			expectedLimits: v1.ResourceList{
 				v1.ResourceMemory: resource.MustParse("2Gi"),
 			},
-			options: PodResourcesOptions{UseStatusResources: true, Features: AllFeatures()},
+			options: PodResourcesOptions{UseStatusResources: true, Features: EnableAllFeatures()},
 			initContainers: []v1.Container{
 				{
 					Name:          "restartable-init-1",
@@ -1458,7 +1458,7 @@ func TestPodResourceLimits(t *testing.T) {
 			expectedLimits: v1.ResourceList{
 				v1.ResourceMemory: resource.MustParse("2Gi"),
 			},
-			options: PodResourcesOptions{UseStatusResources: true, Features: AllFeatures()},
+			options: PodResourcesOptions{UseStatusResources: true, Features: EnableAllFeatures()},
 			initContainers: []v1.Container{
 				{
 					Name:          "restartable-init-1",
@@ -1514,7 +1514,7 @@ func TestPodResourceLimits(t *testing.T) {
 			expectedLimits: v1.ResourceList{
 				v1.ResourceCPU: resource.MustParse("3"),
 			},
-			options: PodResourcesOptions{UseStatusResources: true, Features: AllFeatures()},
+			options: PodResourcesOptions{UseStatusResources: true, Features: EnableAllFeatures()},
 			containers: []v1.Container{
 				{
 					Name: "c1",
@@ -1623,7 +1623,7 @@ func TestPodResourceLimits(t *testing.T) {
 				},
 			}
 			populatePodStatusResourcesForTest(p)
-			tc.options.Features = AllFeatures()
+			tc.options.Features = EnableAllFeatures()
 			limits := PodLimits(p, tc.options)
 			if !equality.Semantic.DeepEqual(limits, tc.expectedLimits) {
 				t.Errorf("got=%v, want=%v, diff=%s", limits, tc.expectedLimits, diff.Diff(limits, tc.expectedLimits))
@@ -1759,7 +1759,7 @@ func TestPodLevelResourceRequests(t *testing.T) {
 	}{
 		{
 			name:             "nil",
-			opts:             PodResourcesOptions{Features: AllFeatures()},
+			opts:             PodResourcesOptions{Features: EnableAllFeatures()},
 			expectedRequests: v1.ResourceList{},
 		},
 		{
@@ -1771,7 +1771,7 @@ func TestPodLevelResourceRequests(t *testing.T) {
 		{
 			name:             "pod level memory resource with PodLevelResources true",
 			podResources:     v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("2Mi")}},
-			opts:             PodResourcesOptions{Features: AllFeatures()},
+			opts:             PodResourcesOptions{Features: EnableAllFeatures()},
 			expectedRequests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("2Mi")},
 		},
 		{
@@ -1782,7 +1782,7 @@ func TestPodLevelResourceRequests(t *testing.T) {
 					Resources: v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("2m")}},
 				},
 			},
-			opts:             PodResourcesOptions{Features: AllFeatures()},
+			opts:             PodResourcesOptions{Features: EnableAllFeatures()},
 			expectedRequests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("2Mi"), v1.ResourceCPU: resource.MustParse("2m")},
 		},
 		{
@@ -1793,7 +1793,7 @@ func TestPodLevelResourceRequests(t *testing.T) {
 					Resources: v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceStorage: resource.MustParse("3Mi")}},
 				},
 			},
-			opts:             PodResourcesOptions{Features: AllFeatures()},
+			opts:             PodResourcesOptions{Features: EnableAllFeatures()},
 			expectedRequests: v1.ResourceList{v1.ResourceStorage: resource.MustParse("3Mi")},
 		},
 		{
@@ -1804,7 +1804,7 @@ func TestPodLevelResourceRequests(t *testing.T) {
 					Resources: v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("3Mi")}},
 				},
 			},
-			opts:             PodResourcesOptions{Features: AllFeatures()},
+			opts:             PodResourcesOptions{Features: EnableAllFeatures()},
 			expectedRequests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("3Mi")},
 		},
 		{
@@ -1819,7 +1819,7 @@ func TestPodLevelResourceRequests(t *testing.T) {
 					},
 				},
 			},
-			opts:             PodResourcesOptions{Features: AllFeatures()},
+			opts:             PodResourcesOptions{Features: EnableAllFeatures()},
 			expectedRequests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("3Mi"), v1.ResourceCPU: resource.MustParse("2m")},
 		},
 		{
@@ -1840,7 +1840,7 @@ func TestPodLevelResourceRequests(t *testing.T) {
 					},
 				},
 			},
-			opts:             PodResourcesOptions{Features: AllFeatures()},
+			opts:             PodResourcesOptions{Features: EnableAllFeatures()},
 			expectedRequests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("6Mi"), v1.ResourceCPU: resource.MustParse("8m")},
 		},
 		{
@@ -1865,7 +1865,7 @@ func TestPodLevelResourceRequests(t *testing.T) {
 					},
 				},
 			},
-			opts:             PodResourcesOptions{Features: AllFeatures()},
+			opts:             PodResourcesOptions{Features: EnableAllFeatures()},
 			expectedRequests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("5Mi"), v1.ResourceCPU: resource.MustParse("4m")},
 		},
 		{
@@ -1916,7 +1916,7 @@ func TestPodLevelResourceRequests(t *testing.T) {
 					RestartPolicy: &restartAlways,
 				},
 			},
-			opts:             PodResourcesOptions{Features: AllFeatures()},
+			opts:             PodResourcesOptions{Features: EnableAllFeatures()},
 			expectedRequests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("8Mi"), v1.ResourceCPU: resource.MustParse("6m")},
 		},
 		{
@@ -1950,7 +1950,7 @@ func TestPodLevelResourceRequests(t *testing.T) {
 					},
 				},
 			},
-			opts:             PodResourcesOptions{Features: AllFeatures()},
+			opts:             PodResourcesOptions{Features: EnableAllFeatures()},
 			expectedRequests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("11Mi"), v1.ResourceCPU: resource.MustParse("12m")},
 		},
 		{
@@ -1990,7 +1990,7 @@ func TestPodLevelResourceRequests(t *testing.T) {
 					},
 				},
 			},
-			opts:             PodResourcesOptions{Features: AllFeatures()},
+			opts:             PodResourcesOptions{Features: EnableAllFeatures()},
 			expectedRequests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("15Mi"), v1.ResourceCPU: resource.MustParse("18m")},
 		},
 		{
@@ -2004,7 +2004,7 @@ func TestPodLevelResourceRequests(t *testing.T) {
 					v1.ResourceHugePagesPrefix + "2Mi": resource.MustParse("2Mi"),
 				},
 			},
-			opts:             PodResourcesOptions{Features: AllFeatures()},
+			opts:             PodResourcesOptions{Features: EnableAllFeatures()},
 			expectedRequests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("10Mi"), v1.ResourceHugePagesPrefix + "2Mi": resource.MustParse("2Mi")},
 		},
 		{
@@ -2020,7 +2020,7 @@ func TestPodLevelResourceRequests(t *testing.T) {
 					v1.ResourceHugePagesPrefix + "1Gi": resource.MustParse("1Gi"),
 				},
 			},
-			opts:             PodResourcesOptions{Features: AllFeatures()},
+			opts:             PodResourcesOptions{Features: EnableAllFeatures()},
 			expectedRequests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1"), v1.ResourceHugePagesPrefix + "2Mi": resource.MustParse("2Mi"), v1.ResourceHugePagesPrefix + "1Gi": resource.MustParse("1Gi")},
 		},
 		{
@@ -2046,7 +2046,7 @@ func TestPodLevelResourceRequests(t *testing.T) {
 					},
 				},
 			},
-			opts:             PodResourcesOptions{Features: AllFeatures()},
+			opts:             PodResourcesOptions{Features: EnableAllFeatures()},
 			expectedRequests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1"), v1.ResourceHugePagesPrefix + "2Mi": resource.MustParse("10Mi")},
 		},
 		{
@@ -2075,7 +2075,7 @@ func TestPodLevelResourceRequests(t *testing.T) {
 					},
 				},
 			},
-			opts:             PodResourcesOptions{Features: AllFeatures()},
+			opts:             PodResourcesOptions{Features: EnableAllFeatures()},
 			expectedRequests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1"), v1.ResourceHugePagesPrefix + "2Mi": resource.MustParse("10Mi"), v1.ResourceHugePagesPrefix + "1Gi": resource.MustParse("2Gi")},
 		},
 		{
@@ -2102,7 +2102,7 @@ func TestPodLevelResourceRequests(t *testing.T) {
 					},
 				},
 			},
-			opts:             PodResourcesOptions{Features: AllFeatures()},
+			opts:             PodResourcesOptions{Features: EnableAllFeatures()},
 			expectedRequests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1"), v1.ResourceMemory: resource.MustParse("4Mi"), v1.ResourceHugePagesPrefix + "2Mi": resource.MustParse("10Mi"), v1.ResourceHugePagesPrefix + "1Gi": resource.MustParse("1Gi")},
 		},
 	}
@@ -2188,7 +2188,7 @@ func TestPodRequestsAndLimitsWithDRA(t *testing.T) {
 					},
 				},
 			},
-			options: PodResourcesOptions{Features: AllFeatures()},
+			options: PodResourcesOptions{Features: EnableAllFeatures()},
 			expectedRequests: v1.ResourceList{
 				v1.ResourceCPU:    resource.MustParse("100m"),
 				v1.ResourceMemory: resource.MustParse("1Gi"),
@@ -2242,7 +2242,7 @@ func TestPodRequestsAndLimitsWithDRA(t *testing.T) {
 					},
 				},
 			},
-			options: PodResourcesOptions{Features: AllFeatures()},
+			options: PodResourcesOptions{Features: EnableAllFeatures()},
 			expectedRequests: v1.ResourceList{
 				v1.ResourceCPU:      resource.MustParse("150m"), // 100m + 50m
 				v1.ResourceMemory:   resource.MustParse("1Gi"),
@@ -2304,7 +2304,7 @@ func TestPodRequestsAndLimitsWithDRA(t *testing.T) {
 					},
 				},
 			},
-			options: PodResourcesOptions{Features: AllFeatures()},
+			options: PodResourcesOptions{Features: EnableAllFeatures()},
 			expectedRequests: v1.ResourceList{
 				v1.ResourceCPU:    resource.MustParse("175m"),  // 100m + 50m + 25m
 				v1.ResourceMemory: resource.MustParse("1.5Gi"), // 1Gi + 512Mi
@@ -2355,7 +2355,7 @@ func TestPodRequestsAndLimitsWithDRA(t *testing.T) {
 					},
 				},
 			},
-			options: PodResourcesOptions{Features: AllFeatures()},
+			options: PodResourcesOptions{Features: EnableAllFeatures()},
 			expectedRequests: v1.ResourceList{
 				v1.ResourceCPU: resource.MustParse("350m"), // 100m + 200m + 50m (claim counted once)
 			},
@@ -2427,7 +2427,7 @@ func TestPodRequestsAndLimitsWithDRA(t *testing.T) {
 					},
 				},
 			},
-			options: PodResourcesOptions{Features: AllFeatures()},
+			options: PodResourcesOptions{Features: EnableAllFeatures()},
 			expectedRequests: v1.ResourceList{
 				v1.ResourceCPU:      resource.MustParse("375m"),  // 100m + 200m + 50m + 25m
 				v1.ResourceMemory:   resource.MustParse("1.5Gi"), // 1Gi + 1Gi + 1Gi + 512Mi
@@ -2476,7 +2476,7 @@ func TestPodRequestsAndLimitsWithDRA(t *testing.T) {
 					},
 				},
 			},
-			options: PodResourcesOptions{Features: AllFeatures()},
+			options: PodResourcesOptions{Features: EnableAllFeatures()},
 			expectedRequests: v1.ResourceList{
 				v1.ResourceCPU: resource.MustParse("125m"), // max(100m, 50m) + 25m
 			},
@@ -2567,7 +2567,7 @@ func TestPodRequestsAndLimitsWithDRA(t *testing.T) {
 					},
 				},
 			},
-			options: PodResourcesOptions{ExcludeDRANodeAllocatableResources: true, Features: AllFeatures()},
+			options: PodResourcesOptions{ExcludeDRANodeAllocatableResources: true, Features: EnableAllFeatures()},
 			expectedRequests: v1.ResourceList{
 				v1.ResourceCPU: resource.MustParse("100m"),
 			},
@@ -2615,7 +2615,7 @@ func TestPodRequestsAndLimitsWithDRA(t *testing.T) {
 					},
 				},
 			},
-			options: PodResourcesOptions{Features: AllFeatures()},
+			options: PodResourcesOptions{Features: EnableAllFeatures()},
 			expectedRequests: v1.ResourceList{
 				v1.ResourceCPU:    resource.MustParse("2"),   // Pod level resource should not be overridden by claim request (3)
 				v1.ResourceMemory: resource.MustParse("1Gi"), // Container level resource should be included
@@ -2672,7 +2672,7 @@ func TestPodRequestsAndLimitsWithDRA(t *testing.T) {
 					},
 				},
 			},
-			options: PodResourcesOptions{Features: AllFeatures()},
+			options: PodResourcesOptions{Features: EnableAllFeatures()},
 			expectedRequests: v1.ResourceList{
 				v1.ResourceCPU:    resource.MustParse("200m"),
 				v1.ResourceMemory: resource.MustParse("4072Mi"), // 1Gi (c1) + 1Gi (c2) + 1Gi (flat pod overhead) + 2 * 500Mi (container overhead) = 4072Mi
@@ -2744,7 +2744,7 @@ func TestPodRequestsAndLimitsWithDRA(t *testing.T) {
 					},
 				},
 			},
-			options: PodResourcesOptions{Features: AllFeatures()},
+			options: PodResourcesOptions{Features: EnableAllFeatures()},
 			expectedRequests: v1.ResourceList{
 				v1.ResourceMemory: resource.MustParse("6120Mi"),
 			},
@@ -2785,7 +2785,7 @@ func TestPodRequestsAndLimitsWithDRA(t *testing.T) {
 					},
 				},
 			},
-			options: PodResourcesOptions{Features: AllFeatures()},
+			options: PodResourcesOptions{Features: EnableAllFeatures()},
 			expectedRequests: v1.ResourceList{
 				v1.ResourceMemory: resource.MustParse("2Gi"), // 1Gi (c1) + 1Gi (flat pod overhead) = 2Gi
 			},
@@ -2826,7 +2826,7 @@ func TestPodRequestsAndLimitsWithDRA(t *testing.T) {
 					},
 				},
 			},
-			options: PodResourcesOptions{Features: AllFeatures()},
+			options: PodResourcesOptions{Features: EnableAllFeatures()},
 			expectedRequests: v1.ResourceList{
 				v1.ResourceMemory: resource.MustParse("1524Mi"), // 1Gi (c1) + 500Mi (container overhead) = 1524Mi
 			},
@@ -2867,7 +2867,7 @@ func TestPodRequestsAndLimitsWithDRA(t *testing.T) {
 					},
 				},
 			},
-			options: PodResourcesOptions{Features: AllFeatures()},
+			options: PodResourcesOptions{Features: EnableAllFeatures()},
 			expectedRequests: v1.ResourceList{
 				v1.ResourceMemory: resource.MustParse("3Gi"), // 1Gi (c1) + 2Gi (unreferenced mapping) = 3Gi
 			},
@@ -2909,7 +2909,7 @@ func TestPodRequestsAndLimitsWithDRA(t *testing.T) {
 					},
 				},
 			},
-			options: PodResourcesOptions{Features: AllFeatures()},
+			options: PodResourcesOptions{Features: EnableAllFeatures()},
 			expectedRequests: v1.ResourceList{
 				v1.ResourceMemory: resource.MustParse("2Gi"), // 1Gi (c1) + 1Gi (PerPod) + 0 * 500Mi (PerContainer) = 2Gi
 			},
@@ -2950,7 +2950,7 @@ func TestPodRequestsAndLimitsWithDRA(t *testing.T) {
 					},
 				},
 			},
-			options: PodResourcesOptions{Features: AllFeatures()},
+			options: PodResourcesOptions{Features: EnableAllFeatures()},
 			expectedRequests: v1.ResourceList{
 				v1.ResourceMemory: resource.MustParse("1Gi"), // 1Gi (c1) + 0 * 500Mi = 1Gi
 			},
@@ -3023,7 +3023,7 @@ func TestPodRequestsAndLimitsWithDRA(t *testing.T) {
 			},
 			options: PodResourcesOptions{
 				UseStatusResources: true,
-				Features:           AllFeatures(),
+				Features:           EnableAllFeatures(),
 			},
 			expectedRequests: v1.ResourceList{
 				v1.ResourceMemory: resource.MustParse("6Gi"), // c1 max(spec: 1Gi, allocated: 1Gi, actuated: 2Gi) = 2Gi + c2 2Gi + 2 containers * 1Gi DRA claim = 6Gi
@@ -3110,7 +3110,7 @@ func TestPodRequestsAndLimitsWithDRA(t *testing.T) {
 			},
 			options: PodResourcesOptions{
 				UseStatusResources: true,
-				Features:           AllFeatures(),
+				Features:           EnableAllFeatures(),
 			},
 			expectedRequests: v1.ResourceList{
 				v1.ResourceCPU:    resource.MustParse("3"),
@@ -3199,7 +3199,7 @@ func TestPodRequestsAndLimitsWithDRA(t *testing.T) {
 			},
 			options: PodResourcesOptions{
 				UseStatusResources: true,
-				Features:           AllFeatures(),
+				Features:           EnableAllFeatures(),
 			},
 			expectedRequests: v1.ResourceList{
 				v1.ResourceCPU:    resource.MustParse("4"),
@@ -3284,7 +3284,7 @@ func TestPodRequestsAndLimitsWithDRA(t *testing.T) {
 			},
 			options: PodResourcesOptions{
 				UseStatusResources: true,
-				Features:           AllFeatures(),
+				Features:           EnableAllFeatures(),
 			},
 			expectedLimits: v1.ResourceList{
 				v1.ResourceCPU:    resource.MustParse("3"),
@@ -3369,7 +3369,7 @@ func TestPodRequestsAndLimitsWithDRA(t *testing.T) {
 			},
 			options: PodResourcesOptions{
 				UseStatusResources: true,
-				Features:           AllFeatures(),
+				Features:           EnableAllFeatures(),
 			},
 			expectedLimits: v1.ResourceList{
 				v1.ResourceCPU:    resource.MustParse("4"),
@@ -3554,7 +3554,7 @@ func TestPodRequestsAndLimitsWithDRA(t *testing.T) {
 					},
 				},
 			},
-			options: PodResourcesOptions{Features: AllFeatures()},
+			options: PodResourcesOptions{Features: EnableAllFeatures()},
 			expectedRequests: v1.ResourceList{
 				v1.ResourceCPU:    resource.MustParse("150m"),   // 100m + 50m DRA
 				v1.ResourceMemory: resource.MustParse("1536Mi"), // 1Gi + 512Mi DRA
@@ -3597,7 +3597,7 @@ func TestPodRequestsAndLimitsWithDRA(t *testing.T) {
 					},
 				},
 			},
-			options: PodResourcesOptions{Features: AllFeatures()},
+			options: PodResourcesOptions{Features: EnableAllFeatures()},
 			expectedRequests: v1.ResourceList{
 				v1.ResourceCPU:      resource.MustParse("100m"),
 				hugePageResource1Gi: resource.MustParse("1"),
@@ -3834,7 +3834,7 @@ func TestAggregateContainerRequestsAndLimits(t *testing.T) {
 		},
 		{
 			name:    "regularcontainers with empty requests, but status with non-empty requests",
-			options: PodResourcesOptions{UseStatusResources: true, Features: AllFeatures()},
+			options: PodResourcesOptions{UseStatusResources: true, Features: EnableAllFeatures()},
 			containers: []v1.Container{
 				{
 					Name:      "container-1",
@@ -3858,7 +3858,7 @@ func TestAggregateContainerRequestsAndLimits(t *testing.T) {
 		},
 		{
 			name:    "always-restart init containers with empty requests, but status with non-empty requests",
-			options: PodResourcesOptions{UseStatusResources: true, Features: AllFeatures()},
+			options: PodResourcesOptions{UseStatusResources: true, Features: EnableAllFeatures()},
 			initContainers: []v1.Container{
 				{
 					Name:          "container-1",
@@ -3883,7 +3883,7 @@ func TestAggregateContainerRequestsAndLimits(t *testing.T) {
 		},
 		{
 			name:    "aggregate container request resolves max of sums instead of sum of maxes",
-			options: PodResourcesOptions{UseStatusResources: true, Features: AllFeatures()},
+			options: PodResourcesOptions{UseStatusResources: true, Features: EnableAllFeatures()},
 			containers: []v1.Container{
 				{
 					Name: "c1",
@@ -3915,7 +3915,7 @@ func TestAggregateContainerRequestsAndLimits(t *testing.T) {
 		},
 		{
 			name:    "aggregate container limit resolves max of sums instead of sum of maxes",
-			options: PodResourcesOptions{UseStatusResources: true, Features: AllFeatures()},
+			options: PodResourcesOptions{UseStatusResources: true, Features: EnableAllFeatures()},
 			containers: []v1.Container{
 				{
 					Name: "c1",
@@ -3953,7 +3953,7 @@ func TestAggregateContainerRequestsAndLimits(t *testing.T) {
 			name: "aggregate container request/limit resolves directly from pod status when PLR vertical scaling enabled",
 			options: PodResourcesOptions{
 				UseStatusResources: true,
-				Features:           AllFeatures(),
+				Features:           EnableAllFeatures(),
 			},
 			containers: []v1.Container{
 				{
@@ -3980,7 +3980,7 @@ func TestAggregateContainerRequestsAndLimits(t *testing.T) {
 			name: "falls back to container status aggregation when PLR vertical scaling enabled but podAllocatedResources is nil",
 			options: PodResourcesOptions{
 				UseStatusResources: true,
-				Features:           AllFeatures(),
+				Features:           EnableAllFeatures(),
 			},
 			containers: []v1.Container{
 				{
@@ -4017,7 +4017,7 @@ func TestAggregateContainerRequestsAndLimits(t *testing.T) {
 			name: "falls back to container status aggregation when PLR vertical scaling enabled but podResources is nil",
 			options: PodResourcesOptions{
 				UseStatusResources: true,
-				Features:           AllFeatures(),
+				Features:           EnableAllFeatures(),
 			},
 			containers: []v1.Container{
 				{
@@ -4060,7 +4060,7 @@ func TestAggregateContainerRequestsAndLimits(t *testing.T) {
 					Resources:             tc.podResources,
 				},
 			}
-			tc.options.Features = AllFeatures()
+			tc.options.Features = EnableAllFeatures()
 			resRequests := AggregateContainerRequests(testPod, tc.options)
 			resLimits := AggregateContainerLimits(testPod, tc.options)
 
@@ -4198,7 +4198,7 @@ func TestPodResourceLimitsWithSharedDRAClaims(t *testing.T) {
 	// Unique DRA overhead = 2 containers * 3Gi = 6Gi.
 	// Expected limits = 4Gi + 6Gi = 10Gi.
 	limitsNoStatus := PodLimits(testPod, PodResourcesOptions{
-		Features:           AllFeatures(),
+		Features:           EnableAllFeatures(),
 		UseStatusResources: false,
 	})
 	expectedNoStatus := v1.ResourceList{
@@ -4218,7 +4218,7 @@ func TestPodResourceLimitsWithSharedDRAClaims(t *testing.T) {
 		},
 	}
 	limitsWithStatus := PodLimits(testPodWithStatus, PodResourcesOptions{
-		Features:           AllFeatures(),
+		Features:           EnableAllFeatures(),
 		UseStatusResources: true,
 	})
 	expectedWithStatus := v1.ResourceList{
@@ -4242,7 +4242,7 @@ func TestPodResourceLimitsWithSharedDRAClaims(t *testing.T) {
 		},
 	}
 	limitsResize := PodLimits(testPodResize, PodResourcesOptions{
-		Features:           AllFeatures(),
+		Features:           EnableAllFeatures(),
 		UseStatusResources: true,
 	})
 	expectedResize := v1.ResourceList{
@@ -4308,7 +4308,7 @@ func TestPodResourceRequestsWithSharedDRAClaims(t *testing.T) {
 	// Unique DRA overhead = 2 containers * 3Gi = 6Gi.
 	// Expected requests = 4Gi + 6Gi = 10Gi.
 	requestsNoStatus := PodRequests(testPod, PodResourcesOptions{
-		Features:           AllFeatures(),
+		Features:           EnableAllFeatures(),
 		UseStatusResources: false,
 	})
 	expectedNoStatus := v1.ResourceList{
@@ -4331,7 +4331,7 @@ func TestPodResourceRequestsWithSharedDRAClaims(t *testing.T) {
 		v1.ResourceMemory: resource.MustParse("10Gi"),
 	}
 	requestsWithStatus := PodRequests(testPodWithStatus, PodResourcesOptions{
-		Features:           AllFeatures(),
+		Features:           EnableAllFeatures(),
 		UseStatusResources: true,
 	})
 	expectedWithStatus := v1.ResourceList{
@@ -4358,7 +4358,7 @@ func TestPodResourceRequestsWithSharedDRAClaims(t *testing.T) {
 		v1.ResourceMemory: resource.MustParse("10Gi"),
 	}
 	requestsResize := PodRequests(testPodResize, PodResourcesOptions{
-		Features:           AllFeatures(),
+		Features:           EnableAllFeatures(),
 		UseStatusResources: true,
 	})
 	expectedResize := v1.ResourceList{
@@ -4674,7 +4674,7 @@ func TestPodRequestsAndLimitsVerticalScalingWrappers(t *testing.T) {
 			},
 			opts: PodResourcesOptions{
 				UseStatusResources: true,
-				Features:           AllFeatures(),
+				Features:           EnableAllFeatures(),
 			},
 			expectedRequests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("3.5")},
 			expectedLimits:   v1.ResourceList{v1.ResourceCPU: resource.MustParse("5")},
@@ -4714,7 +4714,7 @@ func TestPodRequestsAndLimitsVerticalScalingWrappers(t *testing.T) {
 			},
 			opts: PodResourcesOptions{
 				UseStatusResources: true,
-				Features:           AllFeatures(),
+				Features:           EnableAllFeatures(),
 			},
 			expectedRequests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("4")},
 			expectedLimits:   v1.ResourceList{v1.ResourceCPU: resource.MustParse("8")},
@@ -4775,7 +4775,7 @@ func TestPodRequestsAndLimitsVerticalScalingWrappers(t *testing.T) {
 				NonMissingContainerRequests: v1.ResourceList{
 					v1.ResourceMemory: resource.MustParse("100Mi"),
 				},
-				Features: AllFeatures(),
+				Features: EnableAllFeatures(),
 			},
 			expectedRequests: v1.ResourceList{
 				v1.ResourceCPU:    resource.MustParse("1"),
@@ -4801,7 +4801,7 @@ func TestPodRequestsAndLimitsVerticalScalingWrappers(t *testing.T) {
 				NonMissingContainerRequests: v1.ResourceList{
 					v1.ResourceMemory: resource.MustParse("100Mi"),
 				},
-				Features: AllFeatures(),
+				Features: EnableAllFeatures(),
 			},
 			expectedRequests: v1.ResourceList{
 				v1.ResourceCPU:    resource.MustParse("1"),
@@ -4854,7 +4854,7 @@ func TestResizeConditionsAndSupportedResources(t *testing.T) {
 }
 
 func TestAllFeatures(t *testing.T) {
-	features := AllFeatures()
+	features := EnableAllFeatures()
 	v := reflect.ValueOf(features)
 	for i := 0; i < v.NumField(); i++ {
 		field := v.Type().Field(i)
@@ -4982,7 +4982,7 @@ func TestPodResourcesFeaturesGating(t *testing.T) {
 			name: "UseStatusResources false with AllFeatures ignores status resources",
 			opts: PodResourcesOptions{
 				UseStatusResources: false,
-				Features:           AllFeatures(),
+				Features:           EnableAllFeatures(),
 			},
 			expectedRequests: v1.ResourceList{
 				v1.ResourceCPU:    resource.MustParse("2"),
