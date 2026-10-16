@@ -574,14 +574,10 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 		c.clock,
 		identifier,
 	)
-
-	var requiredResourceVersion uint64
+	requiredResourceVersion := uint64(0)
 	switch {
 	case len(opts.ResourceVersion) != 0:
-		requiredResourceVersion = requestedWatchRV
 	case opts.SendInitialEvents == nil && opts.ResourceVersion == "":
-		// legacy case
-		requiredResourceVersion = 0
 	default:
 		// consistent
 		rv, err := c.storage.GetCurrentResourceVersion(ctx)
@@ -589,6 +585,22 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 			return newErrWatcher(err), nil
 		}
 		requiredResourceVersion = rv
+	}
+
+	// Note that we cannot do it under Cacher lock, to avoid a deadlock, since the
+	// underlying watchCache is calling processEvent under its lock.
+	c.watchCache.RLock()
+	span.AddEvent("watchCache locked acquired")
+	defer c.watchCache.RUnlock()
+
+	switch {
+	case requiredResourceVersion != 0:
+	case len(opts.ResourceVersion) != 0:
+		requiredResourceVersion = requestedWatchRV
+	case opts.SendInitialEvents == nil && opts.ResourceVersion == "":
+		// legacy case
+		requiredResourceVersion = 0
+
 	}
 	bookmarkAfterResourceVersionFn := func() uint64 { return 0 }
 
@@ -603,11 +615,6 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 			bookmarkAfterResourceVersionFn = func() uint64 { return requestedWatchRV }
 		}
 	}
-	// Note that we cannot do it under Cacher lock, to avoid a deadlock, since the
-	// underlying watchCache is calling processEvent under its lock.
-	c.watchCache.RLock()
-	span.AddEvent("watchCache locked acquired")
-	defer c.watchCache.RUnlock()
 
 	err = c.waitUntilWatchCacheFreshAndForceAllEventsLocked(ctx, requiredResourceVersion, opts)
 	if err != nil {
