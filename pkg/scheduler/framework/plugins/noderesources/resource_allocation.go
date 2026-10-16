@@ -54,6 +54,7 @@ type resourceAllocationScorer struct {
 	enableInPlacePodVerticalScaling               bool
 	enablePodLevelResources                       bool
 	enableDRAExtendedResource                     bool
+	enableDRANodeAllocatableResources             bool
 	enableInPlacePodLevelResourcesVerticalScaling bool
 	// used to decide whether to use Requested or NonZeroRequested for
 	// cpu and memory.
@@ -239,7 +240,8 @@ func (r *resourceAllocationScorer) calculatePodResourceRequest(pod *v1.Pod, reso
 		UseStatusResources: r.enableInPlacePodVerticalScaling,
 		InPlacePodLevelResourcesVerticalScalingEnabled: r.enableInPlacePodLevelResourcesVerticalScaling,
 		// SkipPodLevelResources is set to false when PodLevelResources feature is enabled.
-		SkipPodLevelResources: !r.enablePodLevelResources,
+		SkipPodLevelResources:                    !r.enablePodLevelResources,
+		UseDRANodeAllocatableResourceClaimStatus: r.enableDRANodeAllocatableResources,
 	}
 
 	if !r.useRequested {

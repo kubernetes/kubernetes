@@ -579,3 +579,49 @@ func Test_podSchedulingPropertiesChange(t *testing.T) {
 		})
 	}
 }
+
+func Test_podSchedulingPropertiesChange_DRANodeAllocatableResources(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRANodeAllocatableResources, true)
+
+	makePodWithDRAClaim := func(cpuQty string) *v1.Pod {
+		return &v1.Pod{
+			Spec: v1.PodSpec{
+				NodeName: "node1",
+				Containers: []v1.Container{
+					{
+						Name: "app",
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("100m")},
+							Claims:   []v1.ResourceClaim{{Name: "dra-claim"}},
+						},
+					},
+				},
+				ResourceClaims: []v1.PodResourceClaim{
+					{Name: "dra-claim", ResourceClaimName: new("dra-claim")},
+				},
+			},
+			Status: v1.PodStatus{
+				NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+					{
+						ResourceClaimName: "dra-claim",
+						Containers:        []string{"app"},
+						Mapping: []v1.NodeAllocatableMappedResources{{
+							Name:     v1.ResourceCPU,
+							Quantity: new(resource.MustParse(cpuQty)),
+						}},
+					},
+				},
+			},
+		}
+	}
+
+	podSmall := makePodWithDRAClaim("50m")
+	podBig := makePodWithDRAClaim("150m")
+
+	if got := PodSchedulingPropertiesChange(podSmall, podBig, false); !reflect.DeepEqual(got, []fwk.ClusterEvent{{Resource: fwk.AssignedPod, ActionType: fwk.UpdatePodScaleDown}}) {
+		t.Errorf("expected UpdatePodScaleDown, got %v", got)
+	}
+	if got := PodSchedulingPropertiesChange(podBig, podSmall, false); !reflect.DeepEqual(got, []fwk.ClusterEvent{{Resource: fwk.AssignedPod, ActionType: fwk.Update}}) {
+		t.Errorf("expected Update, got %v", got)
+	}
+}

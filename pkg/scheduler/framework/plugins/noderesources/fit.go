@@ -96,6 +96,7 @@ type Fit struct {
 	enableInPlacePodVerticalScaling                    bool
 	enablePodLevelResources                            bool
 	enableDRAExtendedResource                          bool
+	enableDRANodeAllocatableResources                  bool
 	enableInPlacePodLevelResourcesVerticalScaling      bool
 	enableInPlacePodVerticalScalingSchedulerPreemption bool
 	handle                                             fwk.Handle
@@ -180,8 +181,9 @@ func (f *Fit) Name() string {
 // Filtering and scoring based on the container resources and overheads.
 func (pl *Fit) SignPod(ctx context.Context, pod *v1.Pod) ([]fwk.SignFragment, *fwk.Status) {
 	opts := ResourceRequestsOptions{
-		EnablePodLevelResources:   pl.enablePodLevelResources,
-		EnableDRAExtendedResource: pl.enableDRAExtendedResource,
+		EnablePodLevelResources:           pl.enablePodLevelResources,
+		EnableDRAExtendedResource:         pl.enableDRAExtendedResource,
+		EnableDRANodeAllocatableResources: pl.enableDRANodeAllocatableResources,
 	}
 	if pl.enableDRAExtendedResource {
 		podRequest := computePodResourceRequest(pod, opts)
@@ -226,6 +228,7 @@ func NewFit(_ context.Context, plArgs runtime.Object, h fwk.Handle, fts feature.
 	if err != nil {
 		return nil, err
 	}
+	scorer.enableDRANodeAllocatableResources = fts.EnableDRANodeAllocatableResources
 	if fts.EnableDRAExtendedResource {
 		scorer.enableDRAExtendedResource = true
 		scorer.draManager = h.SharedDRAManager()
@@ -239,12 +242,13 @@ func NewFit(_ context.Context, plArgs runtime.Object, h fwk.Handle, fts feature.
 	}
 
 	pl := &Fit{
-		ignoredResources:                sets.New(args.IgnoredResources...),
-		ignoredResourceGroups:           sets.New(args.IgnoredResourceGroups...),
-		enableInPlacePodVerticalScaling: fts.EnableInPlacePodVerticalScaling,
-		handle:                          h,
-		enablePodLevelResources:         fts.EnablePodLevelResources,
-		enableDRAExtendedResource:       fts.EnableDRAExtendedResource,
+		ignoredResources:                  sets.New(args.IgnoredResources...),
+		ignoredResourceGroups:             sets.New(args.IgnoredResourceGroups...),
+		enableInPlacePodVerticalScaling:   fts.EnableInPlacePodVerticalScaling,
+		handle:                            h,
+		enablePodLevelResources:           fts.EnablePodLevelResources,
+		enableDRAExtendedResource:         fts.EnableDRAExtendedResource,
+		enableDRANodeAllocatableResources: fts.EnableDRANodeAllocatableResources,
 
 		enableInPlacePodLevelResourcesVerticalScaling: fts.EnableInPlacePodLevelResourcesVerticalScaling,
 
@@ -261,6 +265,7 @@ func NewFit(_ context.Context, plArgs runtime.Object, h fwk.Handle, fts feature.
 		if err != nil {
 			return nil, err
 		}
+		placementScorer.enableDRANodeAllocatableResources = fts.EnableDRANodeAllocatableResources
 		pl.placementScorer = placementScorer
 	}
 
@@ -285,7 +290,10 @@ func computePodResourceRequest(pod *v1.Pod, opts ResourceRequestsOptions) *preFi
 
 // PreFilter invoked at the prefilter extension point.
 func (f *Fit) PreFilter(ctx context.Context, cycleState fwk.CycleState, pod *v1.Pod, nodes []fwk.NodeInfo) (*fwk.PreFilterResult, *fwk.Status) {
-	result := computePodResourceRequest(pod, ResourceRequestsOptions{EnablePodLevelResources: f.enablePodLevelResources})
+	result := computePodResourceRequest(pod, ResourceRequestsOptions{
+		EnablePodLevelResources:           f.enablePodLevelResources,
+		EnableDRANodeAllocatableResources: f.enableDRANodeAllocatableResources,
+	})
 
 	cycleState.Write(preFilterStateKey, result)
 	return nil, nil
@@ -402,7 +410,11 @@ func (f *Fit) haveEnoughRelevantResourcesDecreased(targetPod *v1.Pod, originalPo
 
 	// the other pod was scheduled, so modification or deletion may free up some resources.
 	originalMaxResourceReq, modifiedMaxResourceReq := &framework.Resource{}, &framework.Resource{}
-	opts := resource.PodResourcesOptions{UseStatusResources: f.enableInPlacePodVerticalScaling, InPlacePodLevelResourcesVerticalScalingEnabled: f.enableInPlacePodLevelResourcesVerticalScaling}
+	opts := resource.PodResourcesOptions{
+		UseStatusResources: f.enableInPlacePodVerticalScaling,
+		InPlacePodLevelResourcesVerticalScalingEnabled: f.enableInPlacePodLevelResourcesVerticalScaling,
+		UseDRANodeAllocatableResourceClaimStatus:       f.enableDRANodeAllocatableResources,
+	}
 	originalMaxResourceReq.SetMaxResource(resource.PodRequests(originalPod, opts))
 	modifiedMaxResourceReq.SetMaxResource(resource.PodRequests(modifiedPod, opts))
 
@@ -456,8 +468,9 @@ func (f *Fit) isSchedulableAfterNodeChange(logger klog.Logger, pod *v1.Pod, oldO
 	}
 
 	opts := ResourceRequestsOptions{
-		EnablePodLevelResources:   f.enablePodLevelResources,
-		EnableDRAExtendedResource: f.enableDRAExtendedResource,
+		EnablePodLevelResources:           f.enablePodLevelResources,
+		EnableDRAExtendedResource:         f.enableDRAExtendedResource,
+		EnableDRANodeAllocatableResources: f.enableDRANodeAllocatableResources,
 	}
 
 	// Leaving in the queue, since the pod won't fit into the modified node anyway.
@@ -582,6 +595,7 @@ func (f *Fit) Filter(ctx context.Context, cycleState fwk.CycleState, pod *v1.Pod
 	opts := ResourceRequestsOptions{
 		EnablePodLevelResources:                            f.enablePodLevelResources,
 		EnableDRAExtendedResource:                          f.enableDRAExtendedResource,
+		EnableDRANodeAllocatableResources:                  f.enableDRANodeAllocatableResources,
 		EnableInPlacePodVerticalScalingSchedulerPreemption: f.enableInPlacePodVerticalScalingSchedulerPreemption,
 	}
 
