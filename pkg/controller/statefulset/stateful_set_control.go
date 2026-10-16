@@ -888,15 +888,14 @@ func updateStatefulSetAfterInvariantEstablished(ctx context.Context, ssc *defaul
 		}
 	}
 
-	// Collect all targets in the range between getStartOrdinal(set) and getEndOrdinal(set).
-	// Count any targets in that range  that are unavailable. Select the (MaxUnavailable - Unavailable)
-	// Pods, in order with respect to their ordinal for termination.
-	// Delete those pods and count the successful deletions.
-	// Update the status with the correct number of deletions.
+	// Count unavailable pods only in the update range (ordinals >= partition / updateMin).
+	// Pods below the partition are not candidates for this rolling update, so they must not
+	// consume the maxUnavailable budget (KEP-961). Then select up to
+	// (maxUnavailable - unavailable) pods in that range for termination, high ordinal first.
 	unavailablePods := 0
 	// For Parallel pod management, additionally count old and unavailable, within the maxUnavailable limit.
 	unavailablePodsNeedingUpdate := 0
-	for target := len(replicas) - 1; target >= 0; target-- {
+	for target := len(replicas) - 1; target >= updateMin; target-- {
 		pod := replicas[target]
 		if isUnavailable(pod, set.Spec.MinReadySeconds, now) {
 			unavailablePods++
