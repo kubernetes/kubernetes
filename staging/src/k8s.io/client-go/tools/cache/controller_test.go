@@ -1006,6 +1006,163 @@ func (m *mockTxnStore) Transaction(txns ...Transaction) *TransactionError {
 	return nil
 }
 
+// TestProcessLoopUnkeyableObject checks that the handler receives the same events and the store
+// ends up in the same state with and without batch processing, when an object whose key cannot
+// be computed is queued between Deltas of repeated keys.
+func TestProcessLoopUnkeyableObject(t *testing.T) {
+	cm := func(name string, rv int) *v1.ConfigMap {
+		return &v1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Namespace: "ns", Name: name, ResourceVersion: strconv.Itoa(rv)}}
+	}
+	keyFunc := func(obj interface{}) (string, error) {
+		if configMap, ok := obj.(*v1.ConfigMap); ok && configMap.Name == "broken" {
+			return "", errors.New("test key func error")
+		}
+		return DeletionHandlingMetaNamespaceKeyFunc(obj)
+	}
+
+	// Every Delta has a unique resource version, increasing in queue order.
+	testCases := []struct {
+		name            string
+		deltas          []Delta
+		expectedHistory []eventRecord
+		expectedStore   map[string]string
+		expectedStoreRV string
+
+		expectedNonBatchProcessCalls   int
+		expectedBatchProcessCalls      int
+		expectedBatchProcessBatchCalls int
+	}{
+		{
+			name: "unkeyable object between repeated keys",
+			deltas: []Delta{
+				{Added, cm("a", 1)}, {Added, cm("b", 2)}, {Updated, cm("a", 3)},
+				{Added, cm("broken", 4)},
+				{Updated, cm("b", 5)}, {Updated, cm("a", 6)}, {Deleted, cm("b", 7)}, {Added, cm("c", 8)},
+			},
+			expectedHistory: []eventRecord{
+				{Action: "add", Key: "ns/a", EventRV: "1"},
+				{Action: "add", Key: "ns/b", EventRV: "2"},
+				{Action: "update", Key: "ns/a", OldRV: "1", EventRV: "3"},
+				{Action: "update", Key: "ns/b", OldRV: "2", EventRV: "5"},
+				{Action: "update", Key: "ns/a", OldRV: "3", EventRV: "6"},
+				{Action: "delete", Key: "ns/b", EventRV: "7"},
+				{Action: "add", Key: "ns/c", EventRV: "8"},
+			},
+			expectedStore:   map[string]string{"ns/a": "6", "ns/c": "8"},
+			expectedStoreRV: "8",
+
+			expectedNonBatchProcessCalls:   8,
+			expectedBatchProcessCalls:      0,
+			expectedBatchProcessBatchCalls: 4,
+		},
+		{
+			name:   "unkeyable object first",
+			deltas: []Delta{{Added, cm("broken", 1)}, {Added, cm("a", 2)}, {Updated, cm("a", 3)}},
+			expectedHistory: []eventRecord{
+				{Action: "add", Key: "ns/a", EventRV: "2"},
+				{Action: "update", Key: "ns/a", OldRV: "2", EventRV: "3"},
+			},
+			expectedStore:   map[string]string{"ns/a": "3"},
+			expectedStoreRV: "3",
+
+			expectedNonBatchProcessCalls:   3,
+			expectedBatchProcessCalls:      3,
+			expectedBatchProcessBatchCalls: 0,
+		},
+		{
+			name:   "unkeyable object last",
+			deltas: []Delta{{Added, cm("a", 1)}, {Updated, cm("a", 2)}, {Added, cm("broken", 3)}},
+			expectedHistory: []eventRecord{
+				{Action: "add", Key: "ns/a", EventRV: "1"},
+				{Action: "update", Key: "ns/a", OldRV: "1", EventRV: "2"},
+			},
+			expectedStore:   map[string]string{"ns/a": "2"},
+			expectedStoreRV: "2",
+
+			expectedNonBatchProcessCalls:   3,
+			expectedBatchProcessCalls:      1,
+			expectedBatchProcessBatchCalls: 1,
+		},
+		{
+			name:   "consecutive unkeyable objects",
+			deltas: []Delta{{Added, cm("a", 1)}, {Added, cm("broken", 2)}, {Updated, cm("broken", 3)}, {Updated, cm("a", 4)}},
+			expectedHistory: []eventRecord{
+				{Action: "add", Key: "ns/a", EventRV: "1"},
+				{Action: "update", Key: "ns/a", OldRV: "1", EventRV: "4"},
+			},
+			expectedStore:   map[string]string{"ns/a": "4"},
+			expectedStoreRV: "4",
+
+			expectedNonBatchProcessCalls:   4,
+			expectedBatchProcessCalls:      2,
+			expectedBatchProcessBatchCalls: 1,
+		},
+	}
+
+	for _, tc := range testCases {
+		for _, batch := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s/batch=%v", tc.name, batch), func(t *testing.T) {
+				logger, ctx := ktesting.NewTestContext(t)
+
+				store := NewStore(keyFunc)
+				recorder := newEventRecorder(store, keyFunc)
+				fifo := NewRealFIFO(keyFunc, store, nil)
+				// tell the FIFO it is populated so Add events don't get IsInInitialList=true
+				require.NoError(t, fifo.Replace(nil, ""))
+				// RealFIFO rejects unkeyable objects when they are added, so the Deltas are queued directly.
+				fifo.items = append(fifo.items, tc.deltas...)
+				fifo.Close()
+				var processCalls, processBatchCalls int
+				config := &Config{
+					Queue: fifo,
+					Process: func(obj interface{}, isInInitialList bool) error {
+						processCalls++
+						return processDeltas(logger, recorder, store, obj.(Deltas), isInInitialList, keyFunc)
+					},
+				}
+				// Without ProcessBatch, processLoop processes one Delta at a time regardless of feature gates.
+				if batch {
+					config.ProcessBatch = func(deltas []Delta, isInInitialList bool) error {
+						processBatchCalls++
+						return processDeltasInBatch(logger, recorder, store, deltas, isInInitialList, keyFunc)
+					}
+				}
+				c := New(config).(*controller)
+
+				// processLoop returns once the closed queue is drained.
+				c.processLoop(ctx)
+
+				// What a handler observes in the store during its callback depends on how the
+				// Deltas are batched, so only the final store state is compared.
+				history := recorder.getHistory()
+				for i := range history {
+					history[i].StoreRV = ""
+				}
+				assert.Equal(t, tc.expectedHistory, history)
+				assert.Equal(t, tc.expectedStore, storeResourceVersions(t, store))
+				assert.Equal(t, tc.expectedStoreRV, store.LastStoreSyncResourceVersion())
+				if batch {
+					assert.Equal(t, tc.expectedBatchProcessCalls, processCalls)
+					assert.Equal(t, tc.expectedBatchProcessBatchCalls, processBatchCalls)
+				} else {
+					assert.Equal(t, tc.expectedNonBatchProcessCalls, processCalls)
+				}
+			})
+		}
+	}
+}
+
+// storeResourceVersions returns the resource version of every object in the store by key.
+func storeResourceVersions(t *testing.T, store Store) map[string]string {
+	rvs := map[string]string{}
+	for _, obj := range store.List() {
+		accessor, err := meta.Accessor(obj)
+		require.NoError(t, err)
+		rvs[accessor.GetNamespace()+"/"+accessor.GetName()] = accessor.GetResourceVersion()
+	}
+	return rvs
+}
+
 func TestReplaceEvents(t *testing.T) {
 	_, ctx := ktesting.NewTestContext(t)
 	ctx, cancel := context.WithCancel(ctx)
@@ -1097,8 +1254,8 @@ func testReplaceEvents(t *testing.T, ctx context.Context, fifo Queue, m *eventRe
 			},
 			expectedHistory: []eventRecord{
 				{Action: "delete", Key: "default/pod-3", EventRV: "3", StoreRV: ""},
-				{Action: "update", Key: "default/pod-1", EventRV: "4", StoreRV: "4"},
-				{Action: "update", Key: "default/pod-2", EventRV: "5", StoreRV: "5"},
+				{Action: "update", Key: "default/pod-1", OldRV: "1", EventRV: "4", StoreRV: "4"},
+				{Action: "update", Key: "default/pod-2", OldRV: "2", EventRV: "5", StoreRV: "5"},
 				{Action: "add", Key: "default/pod-4", EventRV: "6", StoreRV: "6"},
 			},
 			replaceRV: "6",
@@ -1430,6 +1587,7 @@ func testResourceVersionWithNonMetaTransform(t *testing.T, ctx context.Context, 
 type eventRecord struct {
 	Action          string
 	Key             string
+	OldRV           string
 	EventRV         string
 	StoreRV         string
 	IsInInitialList bool
@@ -1453,22 +1611,27 @@ func newEventRecorder(store Store, keyFunc KeyFunc) *eventRecorder {
 }
 
 func (m *eventRecorder) OnAdd(obj interface{}, isInInitialList bool) {
-	m.record("add", obj, isInInitialList)
+	m.record("add", nil, obj, isInInitialList)
 }
-func (m *eventRecorder) OnUpdate(_, obj interface{}) {
-	m.record("update", obj, false)
+func (m *eventRecorder) OnUpdate(oldObj, obj interface{}) {
+	m.record("update", oldObj, obj, false)
 }
 func (m *eventRecorder) OnDelete(obj interface{}) {
-	m.record("delete", obj, false)
+	m.record("delete", nil, obj, false)
 }
 
-func (m *eventRecorder) record(action string, obj interface{}, isInInitialList bool) {
+func (m *eventRecorder) record(action string, oldObj, obj interface{}, isInInitialList bool) {
 	m.historyLock.Lock()
 	defer m.historyLock.Unlock()
 	key, _ := m.keyFunc(obj)
 
 	if deleted, ok := obj.(DeletedFinalStateUnknown); ok {
 		obj = deleted.Obj
+	}
+
+	oldRV := ""
+	if accessor, err := meta.Accessor(oldObj); err == nil {
+		oldRV = accessor.GetResourceVersion()
 	}
 
 	eventRV := ""
@@ -1486,6 +1649,7 @@ func (m *eventRecorder) record(action string, obj interface{}, isInInitialList b
 	m.history = append(m.history, eventRecord{
 		Action:          action,
 		Key:             key,
+		OldRV:           oldRV,
 		EventRV:         eventRV,
 		StoreRV:         storeRV,
 		IsInInitialList: isInInitialList,
