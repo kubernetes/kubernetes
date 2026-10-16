@@ -2853,6 +2853,93 @@ func testComputePodResourceRequestWithNodeAllocatableDRA(tCtx ktesting.TContext)
 	}
 }
 
+func TestDeferredResizeFitAtMaxPodCapacity(t *testing.T) {
+	testCtx := ktesting.Init(t)
+
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "pod1",
+			UID:  "pod1-uid",
+		},
+		Spec: v1.PodSpec{
+			NodeName: "test-node",
+			Containers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU:    *resource.NewMilliQuantity(800, resource.DecimalSI),
+							v1.ResourceMemory: *resource.NewQuantity(1600, resource.BinarySI),
+						},
+					},
+				},
+			},
+		},
+		Status: v1.PodStatus{
+			Conditions: []v1.PodCondition{
+				{
+					Type:   v1.PodResizePending,
+					Reason: v1.PodReasonDeferred,
+				},
+			},
+		},
+	}
+
+	nodeInfo := framework.NewNodeInfo(pod)
+	nodeInfo.SetNode(&v1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-node",
+		},
+		Status: v1.NodeStatus{
+			Allocatable: v1.ResourceList{
+				v1.ResourceCPU:    *resource.NewMilliQuantity(1000, resource.DecimalSI),
+				v1.ResourceMemory: *resource.NewQuantity(2000, resource.BinarySI),
+				v1.ResourcePods:   *resource.NewQuantity(1, resource.DecimalSI),
+			},
+		},
+	})
+
+	fh, _ := runtime.NewFramework(testCtx, nil, nil)
+	testCtx.Cleanup(func() {
+		runtime.WaitForShutdown(fh)
+	})
+
+	p, err := NewFit(testCtx, &config.NodeResourcesFitArgs{ScoringStrategy: defaultScoringStrategy}, fh, plfeature.Features{
+		EnablePodLevelResources:                            true,
+		EnableInPlacePodVerticalScalingSchedulerPreemption: true,
+	})
+	testCtx.ExpectNoError(err, "create fit plugin")
+
+	cycleState := framework.NewCycleState()
+	_, preFilterStatus := p.(fwk.PreFilterPlugin).PreFilter(testCtx, cycleState, pod, nil)
+	if !preFilterStatus.IsSuccess() {
+		testCtx.Fatalf("prefilter failed with status: %v", preFilterStatus)
+	}
+
+	if gotStatus := p.(fwk.FilterPlugin).Filter(testCtx, cycleState, pod, nodeInfo); !gotStatus.IsSuccess() {
+		testCtx.Errorf("expected Filter to succeed at max pod capacity for assigned resize pod, got: %v", gotStatus)
+	}
+	if gotInsufficient := Fits(pod, nodeInfo, nil, ResourceRequestsOptions{
+		EnablePodLevelResources:                            true,
+		EnableInPlacePodVerticalScalingSchedulerPreemption: true,
+	}); len(gotInsufficient) != 0 {
+		testCtx.Errorf("expected no insufficient resources from Fits at max pod capacity, got: %v", gotInsufficient)
+	}
+
+	// Without the deferred resize, nodeName alone doesn't mark a resize, so the pod counts in full.
+	notDeferred := pod.DeepCopy()
+	notDeferred.Status.Conditions = nil
+	var gotNames []v1.ResourceName
+	for _, r := range Fits(notDeferred, nodeInfo, nil, ResourceRequestsOptions{
+		EnablePodLevelResources:                            true,
+		EnableInPlacePodVerticalScalingSchedulerPreemption: true,
+	}) {
+		gotNames = append(gotNames, r.ResourceName)
+	}
+	if diff := cmp.Diff([]v1.ResourceName{v1.ResourcePods, v1.ResourceCPU, v1.ResourceMemory}, gotNames); diff != "" {
+		testCtx.Errorf("Unexpected insufficient resources for a pod without a deferred resize (-want,+got):\n%s", diff)
+	}
+}
+
 func TestDeferredResizeFit(t *testing.T) {
 	testCtx := ktesting.Init(t)
 
@@ -2906,8 +2993,8 @@ func TestDeferredResizeFit(t *testing.T) {
 							{
 								Resources: v1.ResourceRequirements{
 									Requests: v1.ResourceList{
-										v1.ResourceCPU:    *resource.NewMilliQuantity(500, resource.DecimalSI),
-										v1.ResourceMemory: *resource.NewQuantity(1000, resource.BinarySI),
+										v1.ResourceCPU:    *resource.NewMilliQuantity(800, resource.DecimalSI),
+										v1.ResourceMemory: *resource.NewQuantity(1600, resource.BinarySI),
 									},
 								},
 							},
@@ -2921,7 +3008,7 @@ func TestDeferredResizeFit(t *testing.T) {
 		},
 		{
 			// Exactly the same as the previous test case, but the flag is disabled.
-			// In this case, we will have double counting (diff between old and target) and it will fail to fit.
+			// In this case, we will have double counting and it will fail to fit.
 			name: "feature gate is false - double counting causes fit failure",
 			pod: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
@@ -2962,8 +3049,8 @@ func TestDeferredResizeFit(t *testing.T) {
 							{
 								Resources: v1.ResourceRequirements{
 									Requests: v1.ResourceList{
-										v1.ResourceCPU:    *resource.NewMilliQuantity(500, resource.DecimalSI),
-										v1.ResourceMemory: *resource.NewQuantity(1000, resource.BinarySI),
+										v1.ResourceCPU:    *resource.NewMilliQuantity(800, resource.DecimalSI),
+										v1.ResourceMemory: *resource.NewQuantity(1600, resource.BinarySI),
 									},
 								},
 							},
@@ -3015,7 +3102,7 @@ func TestDeferredResizeFit(t *testing.T) {
 							{
 								Resources: v1.ResourceRequirements{
 									Requests: v1.ResourceList{
-										v1.ResourceCPU: *resource.NewMilliQuantity(500, resource.DecimalSI),
+										v1.ResourceCPU: *resource.NewMilliQuantity(800, resource.DecimalSI),
 									},
 								},
 							},
@@ -3085,7 +3172,7 @@ func TestDeferredResizeFit(t *testing.T) {
 							{
 								Resources: v1.ResourceRequirements{
 									Requests: v1.ResourceList{
-										v1.ResourceCPU: *resource.NewMilliQuantity(500, resource.DecimalSI),
+										v1.ResourceCPU: *resource.NewMilliQuantity(1200, resource.DecimalSI),
 									},
 								},
 							},
