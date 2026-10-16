@@ -5247,11 +5247,19 @@ func TestParseQuantity(t *testing.T) {
 		}
 		return &infDecAmount{d}
 	}
+	ptrScaledDec := func(unscaled string, scale inf.Scale) *infDecAmount {
+		u, ok := new(big.Int).SetString(unscaled, 10)
+		if !ok {
+			t.Fatalf("invalid unscaled: %s", unscaled)
+		}
+		return &infDecAmount{inf.NewDecBig(u, scale)}
+	}
 
 	tests := []struct {
 		input       string
 		wantAsInt64 *int64
 		wantAsDec   *infDecAmount
+		wantScale   *inf.Scale
 		canonical   string
 	}{
 		// min/max 18 digits
@@ -5346,7 +5354,7 @@ func TestParseQuantity(t *testing.T) {
 
 		// min/max int64 + 1
 		{input: "-9223372036854775807", wantAsInt64: ptr.To[int64](-9223372036854775807), wantAsDec: ptrDec("-9223372036854775807")},
-		{input: "9223372036854775808", wantAsInt64: nil, wantAsDec: ptrDec("9223372036854775808")},
+		{input: "9223372036854775808", wantAsInt64: nil, wantAsDec: ptrDec("9223372036854775808"), wantScale: ptr.To(nanoInfScale)}, // should be wantScale: 0
 		// .0
 		{input: "-9223372036854775807.0", wantAsInt64: nil, wantAsDec: ptrDec("-9223372036854775807"), canonical: "-9223372036854775807"}, // should be wantAsInt64: <value>
 		{input: "9223372036854775808.0", wantAsInt64: nil, wantAsDec: ptrDec("9223372036854775808"), canonical: "9223372036854775808"},
@@ -5356,6 +5364,11 @@ func TestParseQuantity(t *testing.T) {
 		// .1
 		{input: "-9223372036854775807.1", wantAsInt64: nil, wantAsDec: ptrDec("-9223372036854775807.1"), canonical: "-9223372036854775807100m"},
 		{input: "9223372036854775808.1", wantAsInt64: nil, wantAsDec: ptrDec("9223372036854775808.1"), canonical: "9223372036854775808100m"},
+
+		// exponents in the inf.Dec path
+		{input: "1234567890123456789012e10", wantAsInt64: nil, wantAsDec: ptrScaledDec("1234567890123456789012", -10), wantScale: ptr.To(nanoInfScale), canonical: "12345678901234567890120e9"}, // should be wantScale: -10
+		{input: "0.0e-2147483647", wantAsInt64: nil, wantAsDec: ptrScaledDec("0", math.MinInt32), wantScale: ptr.To(inf.Scale(math.MinInt32)), canonical: "0"},                                  // should be wantScale: nanoInfScale
+		{input: "0.00000000000000000000e-2147483647", wantAsInt64: nil, wantAsDec: ptrScaledDec("0", -2147483629), wantScale: ptr.To(inf.Scale(-2147483629)), canonical: "0"},                   // should be wantScale: nanoInfScale
 	}
 
 	for _, tt := range tests {
@@ -5381,6 +5394,11 @@ func TestParseQuantity(t *testing.T) {
 			if tt.wantAsDec != nil {
 				if q.AsDec().Cmp(tt.wantAsDec.Dec) != 0 {
 					t.Errorf("AsDec() returned %s for input %q, want %s", q.AsDec().String(), tt.input, tt.wantAsDec.Dec.String())
+				}
+			}
+			if tt.wantScale != nil {
+				if got := q.AsDec().Scale(); got != *tt.wantScale {
+					t.Errorf("AsDec().Scale() = %d for input %q, want %d", got, tt.input, *tt.wantScale)
 				}
 			}
 
