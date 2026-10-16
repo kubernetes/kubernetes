@@ -21,13 +21,12 @@ import (
 	"context"
 	"fmt"
 
+	cadvisorapi "github.com/google/cadvisor/lib/model"
 	"k8s.io/klog/v2"
 
-	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
-	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/util"
 )
@@ -108,7 +107,11 @@ func (sp *summaryProviderImpl) Get(ctx context.Context, updateStats bool) (*stat
 
 	memory := rootStats.Memory
 	if utilfeature.DefaultFeatureGate.Enabled(features.HugepageAwareEviction) {
-		memory = adjustForHugePages(memory, node)
+		machineInfo, err := sp.provider.GetCachedMachineInfo()
+		if err != nil {
+			return nil, fmt.Errorf("failed to get machine info: %v", err)
+		}
+		memory = adjustForHugePages(memory, machineInfo)
 	}
 	nodeStats := statsapi.NodeStats{
 		NodeName:         node.Name,
@@ -152,7 +155,11 @@ func (sp *summaryProviderImpl) GetCPUAndMemoryStats(ctx context.Context) (*stats
 
 	memory := rootStats.Memory
 	if utilfeature.DefaultFeatureGate.Enabled(features.HugepageAwareEviction) {
-		memory = adjustForHugePages(memory, node)
+		machineInfo, err := sp.provider.GetCachedMachineInfo()
+		if err != nil {
+			return nil, fmt.Errorf("failed to get machine info: %v", err)
+		}
+		memory = adjustForHugePages(memory, machineInfo)
 	}
 	nodeStats := statsapi.NodeStats{
 		NodeName:         node.Name,
@@ -170,7 +177,7 @@ func (sp *summaryProviderImpl) GetCPUAndMemoryStats(ctx context.Context) (*stats
 }
 
 // adjustForHugePages returns a copy of memoryStats with AvailableBytes reduced
-// by the node's total hugepage capacity.
+// by the machine's total hugepage reservation.
 //
 // The root cgroup's memory limit is set to MemTotal (which includes
 // hugepage-reserved RAM), but the memory cgroup controller does not track
@@ -178,16 +185,20 @@ func (sp *summaryProviderImpl) GetCPUAndMemoryStats(ctx context.Context) (*stats
 // (limit - WorkingSet) to overstate real available regular memory by the
 // hugepage reservation amount, delaying eviction until the node is under
 // severe memory pressure.
-func adjustForHugePages(memory *statsapi.MemoryStats, node *v1.Node) *statsapi.MemoryStats {
-	if memory == nil || memory.AvailableBytes == nil || node == nil {
+//
+// The reservation comes from machineInfo rather than node.Status.Capacity:
+// after a kubelet restart the node object still carries the previous
+// kubelet's hugepage capacity until the first node status update, which
+// lands after the first eviction sync.
+func adjustForHugePages(memory *statsapi.MemoryStats, machineInfo *cadvisorapi.MachineInfo) *statsapi.MemoryStats {
+	if memory == nil || memory.AvailableBytes == nil || machineInfo == nil {
 		return memory
 	}
 
 	var totalHugePageBytes uint64
-	for name, quantity := range node.Status.Capacity {
-		if v1helper.IsHugePageResourceName(name) {
-			totalHugePageBytes += uint64(quantity.Value())
-		}
+	for _, hugePages := range machineInfo.HugePages {
+		// PageSize is in KiB.
+		totalHugePageBytes += hugePages.PageSize * 1024 * hugePages.NumPages
 	}
 	if totalHugePageBytes == 0 {
 		return memory

@@ -81,6 +81,8 @@ type Provider interface {
 	GetNode(context.Context) (*v1.Node, error)
 	// GetNodeConfig returns the configuration of the local node.
 	GetNodeConfig() cm.NodeConfig
+	// GetCachedMachineInfo returns the machine info cached at kubelet startup.
+	GetCachedMachineInfo() (*cadvisorapi.MachineInfo, error)
 	// ListVolumesForPod returns the stats of the volume used by the pod with
 	// the podUID.
 	ListVolumesForPod(podUID types.UID) (map[string]volume.Volume, bool)
