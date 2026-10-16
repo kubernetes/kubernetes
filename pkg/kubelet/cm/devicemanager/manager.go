@@ -34,6 +34,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/types"
 	errorsutil "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/server/healthz"
@@ -140,8 +141,9 @@ func (m *ManagerImpl) rollbackReservationLocked(podUID, contName, resource strin
 	m.regenerateAllocatedDevicesLocked()
 }
 
-func (s *sourcesReadyStub) AddSource(_ string) {}
-func (s *sourcesReadyStub) AllReady() bool     { return true }
+func (s *sourcesReadyStub) AddSource(_ string)               {}
+func (s *sourcesReadyStub) AllReady() bool                   { return true }
+func (s *sourcesReadyStub) SourceForPodReady(types.UID) bool { return true }
 
 // NewManagerImpl creates a new manager.
 func NewManagerImpl(logger klog.Logger, topology []cadvisorapi.Node, topologyAffinityStore topologymanager.Store) (*ManagerImpl, error) {

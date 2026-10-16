@@ -489,3 +489,21 @@ func setExtraEnvs() {
 		os.Setenv(name, value)
 	}
 }
+
+// PauseAPIServer pauses the apiserver process using SIGSTOP.
+// This simulates an apiserver outage without killing the process.
+// Use ResumeAPIServer to resume it.
+func PauseAPIServer() error {
+	if e2es == nil {
+		return fmt.Errorf("e2es is nil, services not started")
+	}
+	return e2es.PauseServices()
+}
+
+// ResumeAPIServer resumes the apiserver process using SIGCONT.
+func ResumeAPIServer() error {
+	if e2es == nil {
+		return fmt.Errorf("e2es is nil, services not started")
+	}
+	return e2es.ResumeServices()
+}

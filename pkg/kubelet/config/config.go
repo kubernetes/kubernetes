@@ -50,6 +50,7 @@ type PodConfig struct {
 	// contains the list of all configured sources
 	sourcesLock sync.Mutex
 	sources     sets.Set[string]
+	allReady    bool
 }
 
 type sourceUpdate struct {
@@ -95,7 +96,44 @@ func (c *PodConfig) SeenAllSources(logger klog.Logger, seenSources sets.Set[stri
 	c.sourcesLock.Lock()
 	defer c.sourcesLock.Unlock()
 	logger.V(5).Info("Looking for sources, have seen", "sources", sets.List(c.sources), "seenSources", seenSources)
-	return seenSources.HasAll(sets.List(c.sources)...) && c.pods.seenSources(sets.List(c.sources)...)
+	if !c.allReady {
+		c.allReady = seenSources.HasAll(sets.List(c.sources)...) && c.pods.seenSources(sets.List(c.sources)...)
+		if c.allReady {
+			c.pods.podLock.Lock()
+			c.pods.podSources = nil
+			c.pods.podLock.Unlock()
+		}
+	}
+	return c.allReady
+}
+
+// SourceForPodReady returns whether the source for a given pod has been seen.
+// This allows the pod manager to DeleteOrphanedPods before all sources are reporting, which allows
+// static pods to be updated before the kubelet connects to the apiserver.
+func (c *PodConfig) SourceForPodReady(uid types.UID) bool {
+	if c.pods == nil {
+		return false
+	}
+
+	c.pods.podLock.RLock()
+	// Defensive programming. Ideally callers would call SeenAllSources() first,
+	// but this is trivial to add.
+	if c.pods.podSources == nil {
+		return true
+	}
+	source, found := c.pods.podSources[uid]
+	c.pods.podLock.RUnlock()
+
+	if !found {
+		// Pod not found in any source, be conservative
+		return false
+	}
+
+	c.pods.sourcesSeenLock.RLock()
+	defer c.pods.sourcesSeenLock.RUnlock()
+
+	// Check if the source is ready
+	return c.pods.sourcesSeen.Has(source)
 }
 
 // Updates returns a channel of updates to the configuration, properly denormalized.
@@ -111,6 +149,8 @@ type podStorage struct {
 	podLock sync.RWMutex
 	// map of source name to pod uid to pod reference
 	pods map[string]map[types.UID]*v1.Pod
+	// map of pod UID to source - persists even after pod is removed from pods map
+	podSources map[types.UID]string
 
 	// ensures that updates are delivered in strict order
 	// on the updates channel
@@ -133,6 +173,7 @@ type podStorage struct {
 func newPodStorage(updates chan<- kubetypes.PodUpdate, recorder record.EventRecorderLogger, startupSLIObserver podStartupSLIObserver) *podStorage {
 	return &podStorage{
 		pods:               make(map[string]map[types.UID]*v1.Pod),
+		podSources:         make(map[types.UID]string),
 		updates:            updates,
 		sourcesSeen:        sets.Set[string]{},
 		recorder:           recorder,
@@ -211,6 +252,10 @@ func (s *podStorage) merge(ctx context.Context, source string, update sourceUpda
 			}
 			if existing, found := oldPods[ref.UID]; found {
 				pods[ref.UID] = existing
+				// Only track pod sources while not all sources are ready
+				if s.podSources != nil {
+					s.podSources[ref.UID] = source
+				}
 				needUpdate, needReconcile, needGracefulDelete := checkAndUpdatePod(existing, ref)
 				if needUpdate {
 					updatePods = append(updatePods, existing)
@@ -223,6 +268,10 @@ func (s *podStorage) merge(ctx context.Context, source string, update sourceUpda
 			}
 			recordFirstSeenTime(logger, ref)
 			pods[ref.UID] = ref
+			// Only track pod sources while not all sources are ready
+			if s.podSources != nil {
+				s.podSources[ref.UID] = source
+			}
 			addPods = append(addPods, ref)
 		}
 	}
@@ -237,6 +286,8 @@ func (s *podStorage) merge(ctx context.Context, source string, update sourceUpda
 		if _, found := pods[uid]; !found {
 			// this is a delete
 			removePods = append(removePods, existing)
+			// Don't remove from podSources here - we need it for SourceForPodReady during deletion.
+			// The map will be cleared when all sources are ready (podSources set to nil).
 		}
 	}
 

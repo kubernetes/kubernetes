@@ -34,6 +34,7 @@ import (
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/kubeletconfig"
 	utilstore "k8s.io/kubernetes/pkg/kubelet/util/store"
@@ -490,7 +491,7 @@ func (m *UsernsManager) GetOrCreateUserNamespaceMappings(logger klog.Logger, pod
 // CleanupOrphanedPodUsernsAllocations reconciliates the state of user namespace
 // allocations with the pods actually running. It frees any user namespace
 // allocation for orphaned pods.
-func (m *UsernsManager) CleanupOrphanedPodUsernsAllocations(ctx context.Context, pods []*v1.Pod, runningPods []*kubecontainer.Pod) error {
+func (m *UsernsManager) CleanupOrphanedPodUsernsAllocations(ctx context.Context, pods []*v1.Pod, runningPods []*kubecontainer.Pod, sourceForPodReady config.SourceForPodReadyFn) error {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.UserNamespacesSupport) {
 		return nil
 	}
@@ -519,6 +520,10 @@ func (m *UsernsManager) CleanupOrphanedPodUsernsAllocations(ctx context.Context,
 
 	// Lets remove all the pods "found" that are not known.
 	for _, podUID := range found {
+		// Wait for relevant source to be ready before doing cleanup
+		if !sourceForPodReady(podUID) {
+			continue
+		}
 		if allPods.Has(string(podUID)) {
 			continue
 		}
@@ -529,6 +534,11 @@ func (m *UsernsManager) CleanupOrphanedPodUsernsAllocations(ctx context.Context,
 
 	// Lets remove any existing allocation for a pod that is not "found".
 	for podUID := range m.usedBy {
+		// Wait for relevant source to be ready before doing cleanup
+		// Pass nil since we only have UID, not the full pod object
+		if !sourceForPodReady(podUID) {
+			continue
+		}
 		if allFound.Has(string(podUID)) {
 			continue
 		}
