@@ -198,6 +198,31 @@ const (
 	LabelValueNonViolatingPDB = "non-violating"
 )
 
+func withContainerAllocatedResources(pod *v1.Pod, allocMap map[v1.ResourceName]string) *v1.Pod {
+	res := v1.ResourceList{}
+	for k, v := range allocMap {
+		res[k] = resource.MustParse(v)
+	}
+	pod.Status.ContainerStatuses = make([]v1.ContainerStatus, len(pod.Spec.Containers))
+	for i, c := range pod.Spec.Containers {
+		pod.Status.ContainerStatuses[i] = v1.ContainerStatus{
+			Name:               c.Name,
+			AllocatedResources: res.DeepCopy(),
+		}
+	}
+	return pod
+}
+
+func withPodAllocatedResources(pod *v1.Pod, allocMap map[v1.ResourceName]string) *v1.Pod {
+	res := v1.ResourceList{}
+	for k, v := range allocMap {
+		res[k] = resource.MustParse(v)
+	}
+	pod.Status.AllocatedResources = res
+	pod.Status.Resources = &v1.ResourceRequirements{Requests: res.DeepCopy()}
+	return pod
+}
+
 func TestPostFilter(t *testing.T) {
 	onePodRes := map[v1.ResourceName]string{v1.ResourcePods: "1"}
 	nodeRes := map[v1.ResourceName]string{v1.ResourceCPU: "200m", v1.ResourceMemory: "400"}
@@ -446,6 +471,81 @@ func TestPostFilter(t *testing.T) {
 			wantStatus: fwk.NewStatus(fwk.Success, "preemption: found a potential placement for pod on node node1, preempting 1 victims"),
 		},
 		{
+			name: "regular pod preemption counts non-victim deferred resize pods on the node at max(desired, allocated, actual)",
+			pod: st.MakePod().Name("p").UID("p").Namespace(v1.NamespaceDefault).Priority(highPriority).Req(map[v1.ResourceName]string{
+				v1.ResourceCPU:    "100m",
+				v1.ResourceMemory: "100",
+			}).Obj(),
+			pods: []*v1.Pod{
+				// After evicting p1, p (100m/100) would fit if p-nonvictim were counted at allocated (50m/50),
+				// but a non-resize preemptor must reserve p-nonvictim's desired resize (150m/150).
+				withContainerAllocatedResources(
+					st.MakePod().Name("p-nonvictim").UID("p-nonvictim").Namespace(v1.NamespaceDefault).Priority(highPriority).Node("node1").Req(map[v1.ResourceName]string{
+						v1.ResourceCPU:    "150m",
+						v1.ResourceMemory: "150",
+					}).Condition(v1.PodResizePending, v1.ConditionTrue, v1.PodReasonDeferred).Obj(),
+					map[v1.ResourceName]string{v1.ResourceCPU: "50m", v1.ResourceMemory: "50"},
+				),
+				st.MakePod().Name("p1").UID("p1").Namespace(v1.NamespaceDefault).Priority(lowPriority).Node("node1").Req(map[v1.ResourceName]string{
+					v1.ResourceCPU:    "50m",
+					v1.ResourceMemory: "50",
+				}).Obj(),
+			},
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{
+					v1.ResourceCPU:    "200m",
+					v1.ResourceMemory: "200",
+				}).Obj(),
+			},
+			filteredNodesStatuses: framework.NewNodeToStatus(map[string]*fwk.Status{
+				"node1": fwk.NewStatus(fwk.Unschedulable),
+			}, fwk.NewStatus(fwk.UnschedulableAndUnresolvable)),
+			features: feature.Features{
+				EnableInPlacePodVerticalScalingSchedulerPreemption: true,
+			},
+			wantResult: framework.NewPostFilterResultWithNominatedNode(""),
+			wantStatus: fwk.NewStatus(fwk.Unschedulable, "preemption: 0/1 nodes are available: 1 Insufficient cpu, 1 Insufficient memory."),
+		},
+		{
+			name: "regular pod preemption counts candidate victim deferred resize pods at max(desired, allocated, actual) during reprieve",
+			pod: st.MakePod().Name("p").UID("p").Namespace(v1.NamespaceDefault).Priority(highPriority).Req(map[v1.ResourceName]string{
+				v1.ResourceCPU:    "100m",
+				v1.ResourceMemory: "100",
+			}).Obj(),
+			pods: []*v1.Pod{
+				// Counting victims at allocated (50m/50) would reprieve one alongside p (100m+50m <= 200m);
+				// counting them at desired (150m/150) requires evicting both.
+				withContainerAllocatedResources(
+					st.MakePod().Name("p1").UID("p1").Namespace(v1.NamespaceDefault).Priority(lowPriority).Node("node1").Req(map[v1.ResourceName]string{
+						v1.ResourceCPU:    "150m",
+						v1.ResourceMemory: "150",
+					}).Condition(v1.PodResizePending, v1.ConditionTrue, v1.PodReasonDeferred).Obj(),
+					map[v1.ResourceName]string{v1.ResourceCPU: "50m", v1.ResourceMemory: "50"},
+				),
+				withContainerAllocatedResources(
+					st.MakePod().Name("p2").UID("p2").Namespace(v1.NamespaceDefault).Priority(lowPriority).Node("node1").Req(map[v1.ResourceName]string{
+						v1.ResourceCPU:    "150m",
+						v1.ResourceMemory: "150",
+					}).Condition(v1.PodResizePending, v1.ConditionTrue, v1.PodReasonDeferred).Obj(),
+					map[v1.ResourceName]string{v1.ResourceCPU: "50m", v1.ResourceMemory: "50"},
+				),
+			},
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{
+					v1.ResourceCPU:    "200m",
+					v1.ResourceMemory: "200",
+				}).Obj(),
+			},
+			filteredNodesStatuses: framework.NewNodeToStatus(map[string]*fwk.Status{
+				"node1": fwk.NewStatus(fwk.Unschedulable),
+			}, fwk.NewStatus(fwk.UnschedulableAndUnresolvable)),
+			features: feature.Features{
+				EnableInPlacePodVerticalScalingSchedulerPreemption: true,
+			},
+			wantResult: framework.NewPostFilterResultWithNominatedNode("node1"),
+			wantStatus: fwk.NewStatus(fwk.Success, "preemption: found a potential placement for pod on node node1, preempting 2 victims"),
+		},
+		{
 			name: "deferred pod resize preemption success (mitigates double counting)",
 			pod: st.MakePod().Name("p").UID("p").Namespace(v1.NamespaceDefault).Node("node1").Priority(highPriority).Req(map[v1.ResourceName]string{
 				v1.ResourceCPU:    "200m",
@@ -557,6 +657,173 @@ func TestPostFilter(t *testing.T) {
 			},
 			wantResult: framework.NewPostFilterResultWithNominatedNode(""),
 			wantStatus: fwk.NewStatus(fwk.Unschedulable, "preemption: 0/2 nodes are available: 1 No preemption victims found for incoming pod, 1 Preemption is not helpful for scheduling."),
+		},
+		{
+			name: "deferred pod resize preemption reprieves victims using max(allocated, actual) (partial reprieve)",
+			pod: withContainerAllocatedResources(
+				st.MakePod().Name("p").UID("p").Namespace(v1.NamespaceDefault).Node("node1").Priority(highPriority).Req(map[v1.ResourceName]string{
+					v1.ResourceCPU:    "100m",
+					v1.ResourceMemory: "100",
+				}).Condition(v1.PodResizePending, v1.ConditionTrue, v1.PodReasonDeferred).Obj(),
+				map[v1.ResourceName]string{v1.ResourceCPU: "50m", v1.ResourceMemory: "50"},
+			),
+			pods: []*v1.Pod{
+				withContainerAllocatedResources(
+					st.MakePod().Name("p").UID("p").Namespace(v1.NamespaceDefault).Node("node1").Priority(highPriority).Req(map[v1.ResourceName]string{
+						v1.ResourceCPU:    "100m",
+						v1.ResourceMemory: "100",
+					}).Condition(v1.PodResizePending, v1.ConditionTrue, v1.PodReasonDeferred).Obj(),
+					map[v1.ResourceName]string{v1.ResourceCPU: "50m", v1.ResourceMemory: "50"},
+				),
+				// Victims p1, p2, p3 each have unfulfilled deferred resizes requesting 200m/200,
+				// but only 50m/50 allocated. With max(allocated, actual), 2 of the 3 victims fit
+				// alongside p (100m + 50m + 50m = 200m), so only 1 victim needs to be preempted.
+				withContainerAllocatedResources(
+					st.MakePod().Name("p1").UID("p1").Namespace(v1.NamespaceDefault).Priority(lowPriority).Node("node1").Req(map[v1.ResourceName]string{
+						v1.ResourceCPU:    "200m",
+						v1.ResourceMemory: "200",
+					}).Condition(v1.PodResizePending, v1.ConditionTrue, v1.PodReasonDeferred).Obj(),
+					map[v1.ResourceName]string{v1.ResourceCPU: "50m", v1.ResourceMemory: "50"},
+				),
+				withContainerAllocatedResources(
+					st.MakePod().Name("p2").UID("p2").Namespace(v1.NamespaceDefault).Priority(lowPriority).Node("node1").Req(map[v1.ResourceName]string{
+						v1.ResourceCPU:    "200m",
+						v1.ResourceMemory: "200",
+					}).Condition(v1.PodResizePending, v1.ConditionTrue, v1.PodReasonDeferred).Obj(),
+					map[v1.ResourceName]string{v1.ResourceCPU: "50m", v1.ResourceMemory: "50"},
+				),
+				withContainerAllocatedResources(
+					st.MakePod().Name("p3").UID("p3").Namespace(v1.NamespaceDefault).Priority(lowPriority).Node("node1").Req(map[v1.ResourceName]string{
+						v1.ResourceCPU:    "200m",
+						v1.ResourceMemory: "200",
+					}).Condition(v1.PodResizePending, v1.ConditionTrue, v1.PodReasonDeferred).Obj(),
+					map[v1.ResourceName]string{v1.ResourceCPU: "50m", v1.ResourceMemory: "50"},
+				),
+			},
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{
+					v1.ResourceCPU:    "200m",
+					v1.ResourceMemory: "200",
+				}).Obj(),
+			},
+			filteredNodesStatuses: framework.NewNodeToStatus(map[string]*fwk.Status{
+				"node1": fwk.NewStatus(fwk.Unschedulable),
+			}, fwk.NewStatus(fwk.UnschedulableAndUnresolvable)),
+			features: feature.Features{
+				EnableInPlacePodVerticalScalingSchedulerPreemption: true,
+			},
+			wantResult: framework.NewPostFilterResultWithNominatedNode("node1"),
+			wantStatus: fwk.NewStatus(fwk.Success, "preemption: found a potential placement for pod on node node1, preempting 1 victims"),
+		},
+		{
+			name: "deferred pod resize preemption evaluates non-victim deferred resize pods on the node using max(allocated, actual)",
+			pod: withContainerAllocatedResources(
+				st.MakePod().Name("p").UID("p").Namespace(v1.NamespaceDefault).Node("node1").Priority(highPriority).Req(map[v1.ResourceName]string{
+					v1.ResourceCPU:    "100m",
+					v1.ResourceMemory: "100",
+				}).Condition(v1.PodResizePending, v1.ConditionTrue, v1.PodReasonDeferred).Obj(),
+				map[v1.ResourceName]string{v1.ResourceCPU: "50m", v1.ResourceMemory: "50"},
+			),
+			pods: []*v1.Pod{
+				withContainerAllocatedResources(
+					st.MakePod().Name("p").UID("p").Namespace(v1.NamespaceDefault).Node("node1").Priority(highPriority).Req(map[v1.ResourceName]string{
+						v1.ResourceCPU:    "100m",
+						v1.ResourceMemory: "100",
+					}).Condition(v1.PodResizePending, v1.ConditionTrue, v1.PodReasonDeferred).Obj(),
+					map[v1.ResourceName]string{v1.ResourceCPU: "50m", v1.ResourceMemory: "50"},
+				),
+				// p-nonvictim is an equal-priority pod (not a candidate victim) with an unfulfilled
+				// deferred resize requesting 100m/100, but only 50m/50 allocated. Evaluating it at
+				// max(allocated, actual) means p (100m) + p-nonvictim (50m) + 1 reprieved victim (50m)
+				// fits in 200m, so p only preempts 1 victim instead of preempting a second victim on
+				// behalf of p-nonvictim's desired resize.
+				withContainerAllocatedResources(
+					st.MakePod().Name("p-nonvictim").UID("p-nonvictim").Namespace(v1.NamespaceDefault).Priority(highPriority).Node("node1").Req(map[v1.ResourceName]string{
+						v1.ResourceCPU:    "100m",
+						v1.ResourceMemory: "100",
+					}).Condition(v1.PodResizePending, v1.ConditionTrue, v1.PodReasonDeferred).Obj(),
+					map[v1.ResourceName]string{v1.ResourceCPU: "50m", v1.ResourceMemory: "50"},
+				),
+				st.MakePod().Name("p1").UID("p1").Namespace(v1.NamespaceDefault).Priority(lowPriority).Node("node1").Req(map[v1.ResourceName]string{
+					v1.ResourceCPU:    "50m",
+					v1.ResourceMemory: "50",
+				}).Obj(),
+				st.MakePod().Name("p2").UID("p2").Namespace(v1.NamespaceDefault).Priority(lowPriority).Node("node1").Req(map[v1.ResourceName]string{
+					v1.ResourceCPU:    "50m",
+					v1.ResourceMemory: "50",
+				}).Obj(),
+			},
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{
+					v1.ResourceCPU:    "200m",
+					v1.ResourceMemory: "200",
+				}).Obj(),
+			},
+			filteredNodesStatuses: framework.NewNodeToStatus(map[string]*fwk.Status{
+				"node1": fwk.NewStatus(fwk.Unschedulable),
+			}, fwk.NewStatus(fwk.UnschedulableAndUnresolvable)),
+			features: feature.Features{
+				EnableInPlacePodVerticalScalingSchedulerPreemption: true,
+			},
+			wantResult: framework.NewPostFilterResultWithNominatedNode("node1"),
+			wantStatus: fwk.NewStatus(fwk.Success, "preemption: found a potential placement for pod on node node1, preempting 1 victims"),
+		},
+		{
+			name: "deferred pod resize preemption reprieves victims with pod-level resources using max(allocated, actual)",
+			pod: withContainerAllocatedResources(
+				st.MakePod().Name("p").UID("p").Namespace(v1.NamespaceDefault).Node("node1").Priority(highPriority).Req(map[v1.ResourceName]string{
+					v1.ResourceCPU:    "100m",
+					v1.ResourceMemory: "100",
+				}).Condition(v1.PodResizePending, v1.ConditionTrue, v1.PodReasonDeferred).Obj(),
+				map[v1.ResourceName]string{v1.ResourceCPU: "50m", v1.ResourceMemory: "50"},
+			),
+			pods: []*v1.Pod{
+				withContainerAllocatedResources(
+					st.MakePod().Name("p").UID("p").Namespace(v1.NamespaceDefault).Node("node1").Priority(highPriority).Req(map[v1.ResourceName]string{
+						v1.ResourceCPU:    "100m",
+						v1.ResourceMemory: "100",
+					}).Condition(v1.PodResizePending, v1.ConditionTrue, v1.PodReasonDeferred).Obj(),
+					map[v1.ResourceName]string{v1.ResourceCPU: "50m", v1.ResourceMemory: "50"},
+				),
+				// Victims p1, p2, p3 request 200m/200 at pod level, but only 50m/50 is allocated and in use.
+				// Counting them at max(allocated, actual) means 2 of the 3 victims fit back alongside p.
+				withPodAllocatedResources(
+					st.MakePod().Name("p1").UID("p1").Namespace(v1.NamespaceDefault).Priority(lowPriority).Node("node1").Resources(v1.ResourceRequirements{Requests: v1.ResourceList{
+						v1.ResourceCPU:    resource.MustParse("200m"),
+						v1.ResourceMemory: resource.MustParse("200"),
+					}}).Condition(v1.PodResizePending, v1.ConditionTrue, v1.PodReasonDeferred).Obj(),
+					map[v1.ResourceName]string{v1.ResourceCPU: "50m", v1.ResourceMemory: "50"},
+				),
+				withPodAllocatedResources(
+					st.MakePod().Name("p2").UID("p2").Namespace(v1.NamespaceDefault).Priority(lowPriority).Node("node1").Resources(v1.ResourceRequirements{Requests: v1.ResourceList{
+						v1.ResourceCPU:    resource.MustParse("200m"),
+						v1.ResourceMemory: resource.MustParse("200"),
+					}}).Condition(v1.PodResizePending, v1.ConditionTrue, v1.PodReasonDeferred).Obj(),
+					map[v1.ResourceName]string{v1.ResourceCPU: "50m", v1.ResourceMemory: "50"},
+				),
+				withPodAllocatedResources(
+					st.MakePod().Name("p3").UID("p3").Namespace(v1.NamespaceDefault).Priority(lowPriority).Node("node1").Resources(v1.ResourceRequirements{Requests: v1.ResourceList{
+						v1.ResourceCPU:    resource.MustParse("200m"),
+						v1.ResourceMemory: resource.MustParse("200"),
+					}}).Condition(v1.PodResizePending, v1.ConditionTrue, v1.PodReasonDeferred).Obj(),
+					map[v1.ResourceName]string{v1.ResourceCPU: "50m", v1.ResourceMemory: "50"},
+				),
+			},
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{
+					v1.ResourceCPU:    "200m",
+					v1.ResourceMemory: "200",
+				}).Obj(),
+			},
+			filteredNodesStatuses: framework.NewNodeToStatus(map[string]*fwk.Status{
+				"node1": fwk.NewStatus(fwk.Unschedulable),
+			}, fwk.NewStatus(fwk.UnschedulableAndUnresolvable)),
+			features: feature.Features{
+				EnablePodLevelResources:                            true,
+				EnableInPlacePodVerticalScalingSchedulerPreemption: true,
+			},
+			wantResult: framework.NewPostFilterResultWithNominatedNode("node1"),
+			wantStatus: fwk.NewStatus(fwk.Success, "preemption: found a potential placement for pod on node node1, preempting 1 victims"),
 		},
 	}
 
