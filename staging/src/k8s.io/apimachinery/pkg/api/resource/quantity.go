@@ -1016,11 +1016,13 @@ func NewMilliQuantity(value int64, format Format) *Quantity {
 
 // NewScaledQuantity returns a new Quantity representing the given
 // value * 10^scale in DecimalSI format.
+//
+// A scale of math.MinInt32, which inf.Dec cannot represent, is rounded away
+// from zero to math.MinInt32+1.
 func NewScaledQuantity(value int64, scale Scale) *Quantity {
-	return &Quantity{
-		i:      int64Amount{value: value, scale: scale},
-		Format: DecimalSI,
-	}
+	q := &Quantity{Format: DecimalSI}
+	q.SetScaled(value, scale)
+	return q
 }
 
 // Value returns the value of q rounded to an integer, away from zero. It
@@ -1082,12 +1084,19 @@ func (q *Quantity) SetMilli(value int64) {
 
 // SetScaled sets q's value to be value * 10^scale
 //
+// A scale of math.MinInt32, which inf.Dec cannot represent, is rounded away
+// from zero to math.MinInt32+1.
+//
 // This function is unsafe to call concurrently with method calls from other
 // goroutines (even to read-only methods).
 func (q *Quantity) SetScaled(value int64, scale Scale) {
 	q.s = cachedString{}
 	q.d.Dec = nil
-	q.i = int64Amount{value: value, scale: scale}
+
+	// Round math.MinInt32 away from zero to math.MinInt32+1, the smallest Scale
+	// representable as an inf.Scale. We ignore the exact return value because
+	// SetScaled does not report precision loss.
+	q.i, _ = int64Amount{value: value, scale: scale}.AsScale(math.MinInt32 + 1)
 }
 
 // QuantityValue makes it possible to use a Quantity as value for a command
