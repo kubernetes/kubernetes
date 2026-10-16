@@ -343,6 +343,9 @@ func (pl *DefaultPreemption) SelectVictimsOnNode(
 
 	// No preemption victims found for incoming preemptor, and so we don't need to evaluate the node again since its state didn't change.
 	if len(potentialVictims) == 0 {
+		if isDeferredResizePreemptor {
+			return nil, 0, fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "No preemption victims found for pod resize")
+		}
 		return nil, 0, fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "No preemption victims found for incoming pod")
 	}
 

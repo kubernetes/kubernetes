@@ -1466,13 +1466,45 @@ func TestHandleSchedulingFailureForDeferredResizePod(t *testing.T) {
 	}
 	poppedPod := popped.(*framework.QueuedPodInfo)
 
+	eventCh := make(chan *eventsv1.Event, 1)
+	stopFunc, err := eventBroadcaster.StartEventWatcher(func(obj runtime.Object) {
+		if e, ok := obj.(*eventsv1.Event); ok {
+			select {
+			case eventCh <- e:
+			default:
+			}
+		}
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer stopFunc()
+
 	nominatingInfo := &fwk.NominatingInfo{NominatingMode: fwk.ModeOverride, NominatedNodeName: "node1"}
 	sched.handleSchedulingFailure(ctx, schedFramework, poppedPod, fwk.NewStatus(fwk.Unschedulable, "no fit"), nominatingInfo, time.Now())
+
+	select {
+	case e := <-eventCh:
+		if e.Reason != "FailedScheduling" {
+			t.Errorf("expected event reason FailedScheduling, got %q", e.Reason)
+		}
+		if e.Type != v1.EventTypeWarning {
+			t.Errorf("expected event type %q, got %q", v1.EventTypeWarning, e.Type)
+		}
+		if e.Note != "no fit" {
+			t.Errorf("expected event note %q, got %q", "no fit", e.Note)
+		}
+	case <-time.After(wait.ForeverTestTimeout):
+		t.Fatal("timed out waiting for FailedScheduling event")
+	}
 
 	// Assert queue status: pod should be added back to the queue
 	_, found := queue.GetPod(ctx, pod.Name, pod.Namespace, nil)
 	if !found {
 		t.Errorf("expected pod to be in queue")
+	}
+	if got := queue.NominatedPodsForNode(logger, "node1"); len(got) != 0 {
+		t.Errorf("expected no nominated pods in queue, got %v", got)
 	}
 
 	// Retrieve the pod from client to verify status updates
@@ -1533,7 +1565,8 @@ func TestHandleSchedulingFailureForResolvedDeferredResize(t *testing.T) {
 			node := st.MakeNode().Name("node1").Obj()
 			client := clientsetfake.NewClientset(cachedPod, node)
 			informerFactory := informers.NewSharedInformerFactory(client, 0)
-			eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: client.EventsV1()})
+			// FakeRecorder records synchronously, so an empty channel after the call means no event.
+			recorder := events.NewFakeRecorder(1)
 			schedFramework, err := tf.NewFramework(ctx,
 				[]tf.RegisterPluginFunc{
 					tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
@@ -1541,7 +1574,7 @@ func TestHandleSchedulingFailureForResolvedDeferredResize(t *testing.T) {
 				},
 				testSchedulerName,
 				frameworkruntime.WithClientSet(client),
-				frameworkruntime.WithEventRecorder(eventBroadcaster.NewRecorder(scheme.Scheme, testSchedulerName)),
+				frameworkruntime.WithEventRecorder(recorder),
 				frameworkruntime.WithInformerFactory(informerFactory),
 			)
 			if err != nil {
@@ -1570,6 +1603,11 @@ func TestHandleSchedulingFailureForResolvedDeferredResize(t *testing.T) {
 
 			if _, found := queue.GetPod(ctx, pod.Name, pod.Namespace, nil); found {
 				t.Error("expected the pod not to be requeued")
+			}
+			select {
+			case e := <-recorder.Events:
+				t.Errorf("unexpected event for resolved deferred resize: %s", e)
+			default:
 			}
 			for _, action := range client.Actions() {
 				if action.GetVerb() == "patch" {
