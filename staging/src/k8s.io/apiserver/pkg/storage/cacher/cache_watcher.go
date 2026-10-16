@@ -37,17 +37,17 @@ import (
 
 // possible states of the cache watcher
 const (
-	// cacheWatcherWaitingForBookmark indicates the cacher
+	// needsBookmark indicates the cacher
 	// is waiting for a bookmark event with a specific RV set
-	cacheWatcherWaitingForBookmark = iota
+	needsBookmark = iota
 
 	// cacheWatcherBookmarkReceived indicates that the cacher
 	// has received a bookmark event with required RV
 	cacheWatcherBookmarkReceived
 
-	// cacheWatcherBookmarkSent indicates that the cacher
+	// bookmarkOK indicates that the cacher
 	// has already sent a bookmark event to a client
-	cacheWatcherBookmarkSent
+	bookmarkOK
 )
 
 // cacheWatcher implements watch.Interface
@@ -120,7 +120,6 @@ func newCacheWatcher(
 		watcherMetrics:      watcherMetrics,
 		clock:               clk,
 		identifier:          identifier,
-		state:               cacheWatcherWaitingForBookmark,
 	}
 }
 
@@ -279,7 +278,7 @@ func (c *cacheWatcher) wasBookmarkAfterRvReceived() bool {
 // wasBookmarkAfterRvReceivedLocked checks if the given cacheWatcher
 // have seen a bookmark event >= bookmarkAfterResourceVersion
 func (c *cacheWatcher) wasBookmarkAfterRvReceivedLocked() bool {
-	return c.state != cacheWatcherWaitingForBookmark
+	return c.state != needsBookmark
 }
 
 // markBookmarkAfterRvAsReceived indicates that the given cacheWatcher
@@ -302,7 +301,7 @@ func (c *cacheWatcher) markBookmarkAfterRvAsReceived(event *watchCacheEvent) {
 // wasBookmarkAfterRvSentLocked checks if a bookmark event
 // with an RV >= the bookmarkAfterResourceVersion has been sent by this watcher
 func (c *cacheWatcher) wasBookmarkAfterRvSentLocked() bool {
-	return c.state == cacheWatcherBookmarkSent
+	return c.state == bookmarkOK
 }
 
 // wasBookmarkAfterRvSent same as wasBookmarkAfterRvSentLocked just acquires a lock
@@ -324,7 +323,7 @@ func (c *cacheWatcher) markBookmarkAfterRvSent(event *watchCacheEvent) {
 		c.stateMutex.Lock()
 		defer c.stateMutex.Unlock()
 		if !c.wasBookmarkAfterRvSentLocked() {
-			c.state = cacheWatcherBookmarkSent
+			c.state = bookmarkOK
 		}
 	}
 }
@@ -481,13 +480,6 @@ func (c *cacheWatcher) processInitialEvents(cacheInterval *watchCacheInterval, r
 	// consider increase size of result buffer in those cases.
 	const initProcessThreshold = 500 * time.Millisecond
 	startTime := time.Now()
-
-	// cacheInterval may be created from a version being more fresh than requested
-	// (e.g. for NotOlderThan semantic). In such a case, we need to prevent watch event
-	// with lower resourceVersion from being delivered to ensure watch contract.
-	if cacheInterval.resourceVersion > resourceVersion {
-		resourceVersion = cacheInterval.resourceVersion
-	}
 
 	initEventCount := 0
 	for event, err := range cacheInterval.All() {

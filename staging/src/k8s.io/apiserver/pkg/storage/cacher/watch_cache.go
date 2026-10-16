@@ -657,6 +657,35 @@ func (w *watchCache) suggestedWatchChannelSize(indexExists, triggerUsed bool) in
 	return w.history.suggestedWatchChannelSize(indexExists, triggerUsed)
 }
 
+func shouldGetInitialEventsFromStore(resourceVersion uint64, opts storage.ListOptions) bool {
+	if opts.SendInitialEvents != nil && *opts.SendInitialEvents {
+		return true
+	}
+	if resourceVersion == 0 && opts.SendInitialEvents == nil {
+		// resourceVersion = 0 means that we don't require any specific starting point
+		// and we would like to start watching from ~now.
+		// However, to keep backward compatibility, we additionally need to return the
+		// current state and only then start watching from that point.
+		//
+		// TODO: In v2 api, we should stop returning the current state - #13969.
+		return true
+	}
+	return false
+}
+
+func (w *watchCache) waitAndGetIntervalFromStoreLocked(ctx context.Context, minResourceVersion uint64, key string, opts storage.ListOptions) (*watchCacheInterval, error) {
+	span := tracing.SpanFromContext(ctx)
+	if err := w.waitUntilFreshLocked(ctx, minResourceVersion); err != nil {
+		return nil, err
+	}
+	span.AddEvent("watchCache fresh enough")
+	interval, _, err := w.getIntervalFromStoreLocked(ctx, key, opts)
+	if err != nil {
+		return nil, err
+	}
+	return interval, nil
+}
+
 // getIntervalFromStoreLocked returns a watchCacheInterval
 // that covers the entire storage state.
 // This function assumes to be called under the watchCache lock.

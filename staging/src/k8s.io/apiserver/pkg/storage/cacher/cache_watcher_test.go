@@ -356,7 +356,7 @@ func TestTimeBucketWatchersBasic(t *testing.T) {
 
 	newWatcher := func(deadline time.Time) *cacheWatcher {
 		w := newCacheWatcher(0, filter, forget, storage.APIObjectVersioner{}, deadline, true, schema.GroupResource{Resource: "pods"}, metrics.NewNoopWatcherMetricsObservers(), nil, "")
-		w.state = cacheWatcherBookmarkSent
+		w.state = bookmarkOK
 		return w
 	}
 
