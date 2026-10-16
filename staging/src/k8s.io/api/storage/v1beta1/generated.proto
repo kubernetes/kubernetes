@@ -553,6 +553,7 @@ message StorageHealth {
   // At most 16 conditions may be reported.
   // +optional
   // +listType=atomic
+  // +k8s:alpha(since: "1.38")=+k8s:optional
   repeated StorageHealthCondition healthConditions = 2;
 }
 
@@ -566,6 +567,9 @@ message StorageHealthCondition {
 
   // reason is a brief CamelCase machine-parseable reason.
   // +required
+  // +k8s:alpha(since: "1.38")=+k8s:required
+  // +k8s:alpha(since: "1.38")=+k8s:maxBytes=256
+  // +k8s:alpha(since: "1.38")=+k8s:format=k8s-condition-reason
   // Maximum permitted length of a reason is 256 characters.
   optional string reason = 2;
 
