@@ -551,6 +551,7 @@ message StorageHealth {
   // +optional
   // +listType=atomic
   // +k8s:alpha(since: "1.38")=+k8s:optional
+  // +k8s:alpha(since: "1.38")=+k8s:maxItems=16
   repeated StorageHealthCondition healthConditions = 2;
 }
 
@@ -560,10 +561,11 @@ message StorageHealthCondition {
   // status is the health status category.
   // One of "StorageUnreachable", "StorageDegraded".
   // +required
+  // +k8s:alpha(since: "1.38")=+k8s:required
   optional string status = 1;
 
   // reason is a brief CamelCase machine-parseable reason.
-  // Maximum permitted length of a reason is 256 characters.
+  // Maximum permitted length of a reason is 256 bytes.
   // +required
   // +k8s:alpha(since: "1.38")=+k8s:required
   // +k8s:alpha(since: "1.38")=+k8s:maxBytes=256
@@ -571,8 +573,10 @@ message StorageHealthCondition {
   optional string reason = 2;
 
   // message is a human-readable description.
+  // Maximum permitted length of a message is 1024 bytes.
   // +optional
-  // Maximum permitted length of a message is 1024 characters.
+  // +k8s:alpha(since: "1.38")=+k8s:optional
+  // +k8s:alpha(since: "1.38")=+k8s:maxBytes=1024
   optional string message = 3;
 
   // accessMode is the access mode affected. Nil means all access modes are affected.

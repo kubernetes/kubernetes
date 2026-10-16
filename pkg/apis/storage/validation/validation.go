@@ -305,8 +305,10 @@ const maxStorageHealthConditions = 16
 
 func validateStorageHealthCondition(condition storage.StorageHealthCondition, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	if !validStorageHealthStatusTypes.Has(condition.Status) {
-		allErrs = append(allErrs, field.NotSupported(fldPath.Child("status"), condition.Status, sets.List(validStorageHealthStatusTypes)))
+	if len(condition.Status) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("status"), "").MarkCoveredByDeclarative())
+	} else if !validStorageHealthStatusTypes.Has(condition.Status) {
+		allErrs = append(allErrs, field.NotSupported(fldPath.Child("status"), condition.Status, sets.List(validStorageHealthStatusTypes)).MarkCoveredByDeclarative())
 	}
 	if len(condition.Reason) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("reason"), "").MarkCoveredByDeclarative())
@@ -319,7 +321,7 @@ func validateStorageHealthCondition(condition storage.StorageHealthCondition, fl
 		}
 	}
 	if len(condition.Message) > 1024 {
-		allErrs = append(allErrs, field.TooLong(fldPath.Child("message"), condition.Message, 1024))
+		allErrs = append(allErrs, field.TooLong(fldPath.Child("message"), condition.Message, 1024).WithOrigin("maxBytes").MarkCoveredByDeclarative())
 	}
 	if condition.AccessMode != nil && !validStorageHealthAccessModes.Has(*condition.AccessMode) {
 		allErrs = append(allErrs, field.NotSupported(fldPath.Child("accessMode"), *condition.AccessMode, sets.List(validStorageHealthAccessModes)))
@@ -334,7 +336,7 @@ func validateStorageHealth(health storage.StorageHealth, fldPath *field.Path) fi
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, apivalidation.ValidateCSIDriverName(health.Name, fldPath.Child("name"), apivalidation.RequiredCovered)...)
 	if len(health.HealthConditions) > maxStorageHealthConditions {
-		allErrs = append(allErrs, field.TooMany(fldPath.Child("healthConditions"), len(health.HealthConditions), maxStorageHealthConditions))
+		allErrs = append(allErrs, field.TooMany(fldPath.Child("healthConditions"), len(health.HealthConditions), maxStorageHealthConditions).WithOrigin("maxItems").MarkCoveredByDeclarative())
 		return allErrs
 	}
 	for i, condition := range health.HealthConditions {
