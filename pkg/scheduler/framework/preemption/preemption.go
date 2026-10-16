@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	policylisters "k8s.io/client-go/listers/policy/v1"
+	compresource "k8s.io/component-helpers/resource"
 	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/klog/v2"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
@@ -226,6 +227,9 @@ func (ev *Evaluator) findCandidates(ctx context.Context, state fwk.CycleState, a
 // or omit the node to reject it. Candidates that still have no victims after all extenders
 // run are dropped.
 func (ev *Evaluator) callExtenders(logger klog.Logger, pod *v1.Pod, candidates []fwk.PreemptionCandidate) ([]fwk.PreemptionCandidate, *fwk.Status) {
+	if ev.fts.EnableInPlacePodVerticalScalingSchedulerPreemption && compresource.IsPodResizeDeferred(pod) {
+		return candidates, nil
+	}
 	extenders := ev.Handler.Extenders()
 	nodeLister := ev.Handler.MutableSnapshotSharedLister().NodeInfos()
 	if len(extenders) == 0 {
@@ -300,6 +304,9 @@ func (ev *Evaluator) callExtenders(logger klog.Logger, pod *v1.Pod, candidates [
 // via ProcessPreemption, which is the only HTTP extender API that can observe
 // proposed victims.
 func (ev *Evaluator) hasInterestedPreemptExtender(pod *v1.Pod) bool {
+	if ev.fts.EnableInPlacePodVerticalScalingSchedulerPreemption && compresource.IsPodResizeDeferred(pod) {
+		return false
+	}
 	for _, extender := range ev.Handler.Extenders() {
 		if extender.SupportsPreemption() && extender.IsInterested(pod) {
 			return true
