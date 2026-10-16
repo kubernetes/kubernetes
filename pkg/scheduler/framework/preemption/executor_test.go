@@ -372,6 +372,7 @@ func TestPrepareCandidate(t *testing.T) {
 			expectedDeletedPod:    []string{"victim1"},
 			expectedStatus:        nil,
 			expectedPreemptingMap: sets.New(types.UID("preemptor")),
+			expectedActivatedPods: map[string]*v1.Pod{preemptor.Name: preemptor},
 		},
 		{
 			name: "podgroup preemptor, one victim without condition",
@@ -393,6 +394,7 @@ func TestPrepareCandidate(t *testing.T) {
 			expectedDeletedPod:    []string{"victim1"},
 			expectedStatus:        nil,
 			expectedPreemptingMap: sets.New(types.UID("pg1")),
+			expectedActivatedPods: map[string]*v1.Pod{preemptor.Name: preemptor},
 		},
 		{
 			name: "compositepodgroup preemptor, one victim without condition",
@@ -414,6 +416,7 @@ func TestPrepareCandidate(t *testing.T) {
 			expectedDeletedPod:    []string{"victim1"},
 			expectedStatus:        nil,
 			expectedPreemptingMap: sets.New(types.UID("cpg1")),
+			expectedActivatedPods: map[string]*v1.Pod{preemptor.Name: preemptor},
 		},
 		{
 			name: "one victim, but victim is already being deleted",
@@ -449,6 +452,7 @@ func TestPrepareCandidate(t *testing.T) {
 			nodeNames:             []string{node1Name},
 			expectedStatus:        nil,
 			expectedPreemptingMap: sets.New(types.UID("preemptor")),
+			expectedActivatedPods: map[string]*v1.Pod{preemptor.Name: preemptor},
 		},
 		{
 			name: "one victim with same condition",
@@ -469,6 +473,7 @@ func TestPrepareCandidate(t *testing.T) {
 			expectedDeletedPod:    []string{"victim1"},
 			expectedStatus:        nil,
 			expectedPreemptingMap: sets.New(types.UID("preemptor")),
+			expectedActivatedPods: map[string]*v1.Pod{preemptor.Name: preemptor},
 		},
 		{
 			name: "one victim, not-found victim error is ignored when patching",
@@ -487,6 +492,7 @@ func TestPrepareCandidate(t *testing.T) {
 			expectedDeletedPod:    []string{"victim1"},
 			expectedStatus:        nil,
 			expectedPreemptingMap: sets.New(types.UID("preemptor")),
+			expectedActivatedPods: map[string]*v1.Pod{preemptor.Name: preemptor},
 		},
 		{
 			name: "one victim, but pod deletion failed",
@@ -544,6 +550,7 @@ func TestPrepareCandidate(t *testing.T) {
 			expectedDeletedPod:    []string{"victim1"},
 			expectedStatus:        nil,
 			expectedPreemptingMap: sets.New(types.UID("preemptor")),
+			expectedActivatedPods: map[string]*v1.Pod{preemptor.Name: preemptor},
 		},
 		{
 			name: "one victim, but patch pod failed",
@@ -612,6 +619,7 @@ func TestPrepareCandidate(t *testing.T) {
 			expectedDeletedPod:    []string{"victim1"},
 			expectedStatus:        nil,
 			expectedPreemptingMap: sets.New(types.UID("pg1")),
+			expectedActivatedPods: map[string]*v1.Pod{preemptor.Name: preemptor},
 		},
 		{
 			name: "metrics: pod preemptor with PDB violations",
@@ -632,6 +640,7 @@ func TestPrepareCandidate(t *testing.T) {
 			expectedDeletedPod:    []string{"victim1"},
 			expectedStatus:        nil,
 			expectedPreemptingMap: sets.New(types.UID("preemptor")),
+			expectedActivatedPods: map[string]*v1.Pod{preemptor.Name: preemptor},
 		},
 		{
 			name: "metrics: podgroup preemptor with PDB violations and disruptions",
@@ -654,6 +663,7 @@ func TestPrepareCandidate(t *testing.T) {
 			expectedDeletedPod:    []string{"victim1"},
 			expectedStatus:        nil,
 			expectedPreemptingMap: sets.New(types.UID("pg1")),
+			expectedActivatedPods: map[string]*v1.Pod{preemptor.Name: preemptor},
 		},
 		{
 			name: "metrics: compositepodgroup preemptor with PDB violations and disruptions",
@@ -1012,6 +1022,7 @@ func TestPrepareCandidateAsyncSetsPreemptingSets(t *testing.T) {
 						defer apiDispatcher.Close()
 					}
 
+					schedulingQueue := internalqueue.NewSchedulingQueue(nil, informerFactory)
 					schedFramework, err := tf.NewFramework(
 						ctx,
 						registeredPlugins, "",
@@ -1023,7 +1034,8 @@ func TestPrepareCandidateAsyncSetsPreemptingSets(t *testing.T) {
 						frameworkruntime.WithPodsInPreBind(frameworkruntime.NewPodsInPreBindMap()),
 						frameworkruntime.WithSnapshotSharedLister(internalcache.NewSnapshot(testPods, nodes)),
 						frameworkruntime.WithEventRecorder(eventBroadcaster.NewRecorder(scheme.Scheme, "test-scheduler")),
-						frameworkruntime.WithPodNominator(internalqueue.NewSchedulingQueue(nil, informerFactory)),
+						frameworkruntime.WithPodNominator(schedulingQueue),
+						frameworkruntime.WithPodActivator(schedulingQueue),
 					)
 					if err != nil {
 						t.Fatal(err)
@@ -1345,7 +1357,7 @@ func TestAsyncPreemptionFailure(t *testing.T) {
 				t.Errorf("Last victim's preemption attempted - wanted: %v, got: %v", precedingVictimsPreempted, preemptionAttemptedPods.Has(lastVictimName))
 			}
 
-			// Verify that the preemptor is activated if and only if the async preemption fails.
+			// Verify that the preemptor is activated once the async preemption goroutine completes.
 			if tt.preemptorGenericPodGroup != nil {
 				if len(fakeActivator.activatedPods) != len(tt.preemptorPods) {
 					t.Errorf("Expected %d pods to be activated, but got %v", len(tt.preemptorPods), fakeActivator.activatedPods)
@@ -1356,8 +1368,8 @@ func TestAsyncPreemptionFailure(t *testing.T) {
 					}
 				}
 			} else {
-				if _, ok := fakeActivator.activatedPods[preemptorPod.Name]; ok != !tt.expectSuccessfulPreemption {
-					t.Errorf("Preemptor activated - wanted: %v, got: %v", !tt.expectSuccessfulPreemption, ok)
+				if _, ok := fakeActivator.activatedPods[preemptorPod.Name]; !ok {
+					t.Errorf("Expected preemptor pod %s to be activated, but got %v", preemptorPod.Name, fakeActivator.activatedPods)
 				}
 			}
 
@@ -1581,7 +1593,7 @@ func TestPreemptPod(t *testing.T) {
 	}
 }
 
-func TestPrepareCandidateAsyncActivatesPreemptorAfterLastVictimInMemoryPreemption(t *testing.T) {
+func TestPrepareCandidateAsyncActivatesPreemptorOnCompletion(t *testing.T) {
 	preemptorPod := st.MakePod().Name("p").UID("p").Priority(highPriority).Obj()
 	secondPreemptorPod := st.MakePod().Name("p2").UID("p2").Priority(highPriority).Obj()
 	preemptorPodGroup := &schedulingv1beta1.PodGroup{ObjectMeta: metav1.ObjectMeta{Name: "pg", UID: "pg"}}
@@ -1599,8 +1611,13 @@ func TestPrepareCandidateAsyncActivatesPreemptorAfterLastVictimInMemoryPreemptio
 		addVictimToWaiting          bool
 		preemptorGenericPodGroup    *fwk.GenericPodGroup
 		preemptorPods               []*v1.Pod
+		victimAlreadyDeleted        bool
 		wantPreemptorActivate       bool
 	}{
+		{
+			name:                  "no victims",
+			wantPreemptorActivate: false,
+		},
 		{
 			name:                  "last waiting pod",
 			victimPods:            []*v1.Pod{waitingVictim},
@@ -1621,6 +1638,12 @@ func TestPrepareCandidateAsyncActivatesPreemptorAfterLastVictimInMemoryPreemptio
 			inMemoryVictim:              preBindVictim.DeepCopy(),
 			addVictimToPrebindOnPreempt: true,
 			wantPreemptorActivate:       true,
+		},
+		{
+			name:                  "last victim already deleted via API",
+			victimPods:            []*v1.Pod{apiVictim.DeepCopy()},
+			victimAlreadyDeleted:  true,
+			wantPreemptorActivate: true,
 		},
 		{
 			name:                  "last waiting pod after API-deleted victim",
@@ -1648,16 +1671,18 @@ func TestPrepareCandidateAsyncActivatesPreemptorAfterLastVictimInMemoryPreemptio
 			wantPreemptorActivate:    true,
 		},
 		{
-			name:               "non-last waiting pod",
-			victimPods:         []*v1.Pod{waitingVictim.DeepCopy(), apiVictim.DeepCopy()},
-			inMemoryVictim:     waitingVictim.DeepCopy(),
-			addVictimToWaiting: true,
+			name:                  "non-last waiting pod",
+			victimPods:            []*v1.Pod{waitingVictim.DeepCopy(), apiVictim.DeepCopy()},
+			inMemoryVictim:        waitingVictim.DeepCopy(),
+			addVictimToWaiting:    true,
+			wantPreemptorActivate: true,
 		},
 		{
-			name:               "non-last preBind pod",
-			victimPods:         []*v1.Pod{preBindVictim.DeepCopy(), apiVictim.DeepCopy()},
-			inMemoryVictim:     preBindVictim.DeepCopy(),
-			addVictimToPrebind: true,
+			name:                  "non-last preBind pod",
+			victimPods:            []*v1.Pod{preBindVictim.DeepCopy(), apiVictim.DeepCopy()},
+			inMemoryVictim:        preBindVictim.DeepCopy(),
+			addVictimToPrebind:    true,
+			wantPreemptorActivate: true,
 		},
 	}
 
@@ -1695,7 +1720,9 @@ func TestPrepareCandidateAsyncActivatesPreemptorAfterLastVictimInMemoryPreemptio
 			}
 			podsForSnapshot := make([]*v1.Pod, 0, len(tt.victimPods))
 			for _, pod := range tt.victimPods {
-				objects = append(objects, pod)
+				if !tt.victimAlreadyDeleted {
+					objects = append(objects, pod)
+				}
 				podsForSnapshot = append(podsForSnapshot, pod)
 			}
 			cs := clientsetfake.NewClientset(objects...)

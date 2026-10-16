@@ -213,8 +213,6 @@ func (e *Executor) prepareCandidateAsync(c fwk.PreemptionCandidate, preemptor Ex
 	}
 
 	errCh := parallelize.NewResultChannel[error]()
-	// PreEnqueue only watches the last victim for completion, so activate when that victim won't emit a deletion event.
-	preemptedLastVictimInMemory := false
 	preemptPod := func(index int) {
 		victim := victimPods[index]
 		if _, err := e.PreemptPod(ctx, c, preemptor, victim, pluginName); err != nil {
@@ -240,11 +238,14 @@ func (e *Executor) prepareCandidateAsync(c fwk.PreemptionCandidate, preemptor Ex
 			metrics.PreemptionGoroutinesExecutionTotal.WithLabelValues(result).Inc()
 		}()
 		defer func() {
-			if result == metrics.GoroutineResultError || preemptedLastVictimInMemory {
-				// When API call isn't successful or no victim deletion event will be produced, the preemptor's
-				// Pods may get stuck in the unschedulable pod pool in the worst case.
-				e.fh.Activate(logger, preemptor.Pods())
-			}
+			// The preemptor has left `preempting` by the time this runs, so its PreEnqueue gate is
+			// open. Not every completion produces a victim deletion event to reopen it: an in-memory
+			// preemption produces none, an already deleted victim produces none, and a victim that
+			// was assumed and then forgotten by someone else (e.g. rejected by a Permit plugin) is
+			// dropped by deletePodFromSchedulingQueue even though its deletion did reach the API.
+			// Those cases are not enumerable from here, so don't try. Activate() is a no-op for a
+			// Pod that is already in activeQ.
+			e.fh.Activate(logger, preemptor.Pods())
 		}()
 		defer cancel()
 		logger.V(2).Info("Start the preemption asynchronously", "preemptor", klog.KObj(preemptor), "node", c.Name(), "numVictims", len(c.Victims().Pods), "numVictimsToDelete", len(victimPods))
@@ -289,12 +290,9 @@ func (e *Executor) prepareCandidateAsync(c fwk.PreemptionCandidate, preemptor Ex
 			e.lastVictimsPendingPreemption[preemptor.UID()] = pendingVictim{namespace: lastVictim.Namespace, name: lastVictim.Name}
 			e.mu.Unlock()
 
-			preemptedInMemory, err := e.PreemptPod(ctx, c, preemptor, lastVictim, pluginName)
-			if err != nil {
+			if _, err := e.PreemptPod(ctx, c, preemptor, lastVictim, pluginName); err != nil {
 				utilruntime.HandleErrorWithContext(ctx, err, "Error occurred during async preemption of the last victim")
 				result = metrics.GoroutineResultError
-			} else if preemptedInMemory {
-				preemptedLastVictimInMemory = true
 			}
 		}
 		e.mu.Lock()
