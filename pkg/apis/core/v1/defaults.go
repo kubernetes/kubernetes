@@ -541,7 +541,10 @@ func defaultPodRequests(obj *v1.Pod) {
 		podReqs = make(v1.ResourceList)
 	}
 
-	aggrCtrReqs := resourcehelper.AggregateContainerRequests(obj, v1resource.PodResourcesOptions())
+	aggrCtrReqs := resourcehelper.AggregateContainerRequests(obj, resourcehelper.PodResourcesOptions{
+		Features:                           v1resource.Features(),
+		ExcludeDRANodeAllocatableResources: true,
+	})
 
 	// When containers specify requests for a resource (supported by
 	// PodLevelResources feature) and pod-level requests are not set, the pod-level requests
@@ -595,7 +598,10 @@ func defaultHugePagePodLimits(pod *v1.Pod) {
 		podLims = make(v1.ResourceList)
 	}
 
-	aggrCtrLims := resourcehelper.AggregateContainerLimits(pod, v1resource.PodResourcesOptions())
+	aggrCtrLims := resourcehelper.AggregateContainerLimits(pod, resourcehelper.PodResourcesOptions{
+		Features:                           v1resource.Features(),
+		ExcludeDRANodeAllocatableResources: true,
+	})
 
 	// When containers specify limits for hugepages and pod-level limits are not
 	// set for that resource, the pod-level limit will default to the aggregated

@@ -109,7 +109,9 @@ type podChangeExtractor func(newPod *v1.Pod, oldPod *v1.Pod) fwk.ActionType
 func extractPodScaleDown(newPod, oldPod *v1.Pod) fwk.ActionType {
 	opt := resource.PodResourcesOptions{
 		UseStatusResources: true,
-		Features:           schedfeature.ResourceFeaturesFromGate(utilfeature.DefaultFeatureGate),
+		// TODO(pravk03): Evaluate including DRANodeAllocatableResources in pod scale events.
+		ExcludeDRANodeAllocatableResources: true,
+		Features:                           schedfeature.ResourceFeaturesFromGate(utilfeature.DefaultFeatureGate),
 	}
 	newPodRequests := resource.PodRequests(newPod, opt)
 	oldPodRequests := resource.PodRequests(oldPod, opt)
@@ -134,7 +136,9 @@ func extractPodScaleDown(newPod, oldPod *v1.Pod) fwk.ActionType {
 func extractPodScaleUp(newPod, oldPod *v1.Pod) fwk.ActionType {
 	opt := resource.PodResourcesOptions{
 		UseStatusResources: true,
-		Features:           schedfeature.ResourceFeaturesFromGate(utilfeature.DefaultFeatureGate),
+		// TODO(pravk03): Evaluate including DRANodeAllocatableResources in pod scale events.
+		ExcludeDRANodeAllocatableResources: true,
+		Features:                           schedfeature.ResourceFeaturesFromGate(utilfeature.DefaultFeatureGate),
 	}
 	newPodRequests := resource.PodRequests(newPod, opt)
 	oldPodRequests := resource.PodRequests(oldPod, opt)

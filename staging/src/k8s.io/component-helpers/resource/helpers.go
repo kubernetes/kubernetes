@@ -62,7 +62,8 @@ type PodResourcesOptions struct {
 	// resources for pending resizes, and actuated container/pod resources for in-progress
 	// resizes) should be considered when evaluating the pod resources, assuming the relevant
 	// vertical scaling feature gates (InPlacePodVerticalScaling, InPlacePodLevelResourcesVerticalScaling)
-	// are enabled in Features. It does not affect DRA node allocatable resources.
+	// are enabled in Features. It does not affect DRA node allocatable resources; see
+	// ExcludeDRANodeAllocatableResources.
 	UseStatusResources bool
 	// ExcludeOverhead controls if pod overhead is excluded from the calculation.
 	ExcludeOverhead bool
@@ -73,6 +74,10 @@ type PodResourcesOptions struct {
 	// excluded from the PodRequests calculation, so only pod-level requests (if set and enabled)
 	// and overhead are counted.
 	ExcludeContainerLevelResources bool
+	// ExcludeDRANodeAllocatableResources controls whether node allocatable resources (e.g. cpu, memory, hugepages)
+	// allocated to the pod through DRA claims, as reported in pod.Status.NodeAllocatableResourceClaimStatuses,
+	// are excluded from the calculation.
+	ExcludeDRANodeAllocatableResources bool
 	// Features contains the feature gate flags used when evaluating pod resources.
 	Features Features
 }
@@ -90,7 +95,7 @@ func (o PodResourcesOptions) usePodLevelStatusResources() bool {
 // includeDRANodeAllocatableResources returns true if node allocatable resources allocated
 // through DRA claims should be included.
 func (o PodResourcesOptions) includeDRANodeAllocatableResources() bool {
-	return o.Features.DRANodeAllocatableResources
+	return o.Features.DRANodeAllocatableResources && !o.ExcludeDRANodeAllocatableResources
 }
 
 var supportedPodLevelResources = sets.New(v1.ResourceCPU, v1.ResourceMemory)

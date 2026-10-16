@@ -201,7 +201,9 @@ func (p *Plugin) validateRequestsWithinAllocatable(pod *corev1.Pod, allocatable 
 	memAllocatable := allocatable.Memory()
 
 	requests := resource.PodRequests(pod, resource.PodResourcesOptions{
-		Features: p.resourceFeatures,
+		// TODO(pravk03): Evaluate including DRANodeAllocatableResources when validating requests against allocatable.
+		ExcludeDRANodeAllocatableResources: true,
+		Features:                           p.resourceFeatures,
 	})
 	cpuRequests := requests[corev1.ResourceCPU]
 	memRequests := requests[corev1.ResourceMemory]

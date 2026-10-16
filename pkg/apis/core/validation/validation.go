@@ -4956,7 +4956,10 @@ func validatePodResourceConsistency(spec *core.PodSpec, fldPath *field.Path) fie
 	// v1PodSpec i.e. (&v1.Pod{Spec: *v1PodSpec}, is created on the fly, and passed
 	// to the AggregateContainerRequests method to facilitate proper resource
 	// calculation without modifying AggregateContainerRequests method.
-	aggrContainerReqs := resourcehelper.AggregateContainerRequests(&v1.Pod{Spec: *v1PodSpec}, v1resource.PodResourcesOptions())
+	aggrContainerReqs := resourcehelper.AggregateContainerRequests(&v1.Pod{Spec: *v1PodSpec}, resourcehelper.PodResourcesOptions{
+		Features:                           v1resource.Features(),
+		ExcludeDRANodeAllocatableResources: true,
+	})
 
 	// Pod-level requests must be >= aggregate requests of all containers in a pod.
 	for resourceName, ctrReqs := range aggrContainerReqs {
@@ -4979,7 +4982,10 @@ func validatePodResourceConsistency(spec *core.PodSpec, fldPath *field.Path) fie
 	// This is also why hugepages overcommitment is not allowed in pod level resources,
 	// the pod cgroup values must reflect the request/limit set at pod level, and the
 	// container level cgroup values must be within that limit.
-	aggrContainerLims := resourcehelper.AggregateContainerLimits(&v1.Pod{Spec: *v1PodSpec}, v1resource.PodResourcesOptions())
+	aggrContainerLims := resourcehelper.AggregateContainerLimits(&v1.Pod{Spec: *v1PodSpec}, resourcehelper.PodResourcesOptions{
+		Features:                           v1resource.Features(),
+		ExcludeDRANodeAllocatableResources: true,
+	})
 	for resourceName, ctrLims := range aggrContainerLims {
 		if !helper.IsHugePageResourceName(core.ResourceName(resourceName)) {
 			continue

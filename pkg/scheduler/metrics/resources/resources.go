@@ -199,7 +199,8 @@ func podRequestsAndLimitsByLifecycle(pod *v1.Pod, reuseReqs, reuseLimits v1.Reso
 	}
 
 	fts := schedfeature.ResourceFeaturesFromGate(utilfeature.DefaultFeatureGate)
-	reqs = resourcehelper.PodRequests(pod, resourcehelper.PodResourcesOptions{Reuse: reuseReqs, Features: fts})
-	limits = resourcehelper.PodLimits(pod, resourcehelper.PodResourcesOptions{Reuse: reuseLimits, Features: fts})
+	// TODO(pravk03): Evaluate including DRANodeAllocatableResources in pod resource metrics.
+	reqs = resourcehelper.PodRequests(pod, resourcehelper.PodResourcesOptions{Reuse: reuseReqs, ExcludeDRANodeAllocatableResources: true, Features: fts})
+	limits = resourcehelper.PodLimits(pod, resourcehelper.PodResourcesOptions{Reuse: reuseLimits, ExcludeDRANodeAllocatableResources: true, Features: fts})
 	return
 }

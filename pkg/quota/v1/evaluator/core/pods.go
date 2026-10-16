@@ -400,8 +400,10 @@ func PodUsageFunc(obj runtime.Object, clock clock.Clock) (corev1.ResourceList, e
 	}
 
 	opts := resourcehelper.PodResourcesOptions{
-		UseStatusResources: feature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling),
-		Features:           v1resource.Features(),
+		UseStatusResources: true,
+		// TODO(pravk03): Evaluate include DRANodeAllocatableResources in quota evaluation.
+		ExcludeDRANodeAllocatableResources: true,
+		Features:                           v1resource.Features(),
 	}
 	requests := resourcehelper.PodRequests(pod, opts)
 	limits := resourcehelper.PodLimits(pod, opts)

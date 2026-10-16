@@ -2173,7 +2173,10 @@ func defaultHugePagePodLevelLimits(pod *api.Pod, v1Pod *apiv1.Pod) {
 		podLims = make(api.ResourceList)
 	}
 
-	aggrCtrLims := resourcehelper.AggregateContainerLimits(v1Pod, v1resource.PodResourcesOptions())
+	aggrCtrLims := resourcehelper.AggregateContainerLimits(v1Pod, resourcehelper.PodResourcesOptions{
+		Features:                           v1resource.Features(),
+		ExcludeDRANodeAllocatableResources: true,
+	})
 	for key, aggrCtrLim := range aggrCtrLims {
 		coreKey := api.ResourceName(key)
 		// Only default hugepages here; non-hugepage resources (CPU/Memory) are overcommittable and defaulted in subsequent steps.
@@ -2210,7 +2213,10 @@ func defaultPodLevelRequests(pod *api.Pod, v1Pod *apiv1.Pod) {
 		podReqs = make(api.ResourceList)
 	}
 
-	aggrCtrReqs := resourcehelper.AggregateContainerRequests(v1Pod, v1resource.PodResourcesOptions())
+	aggrCtrReqs := resourcehelper.AggregateContainerRequests(v1Pod, resourcehelper.PodResourcesOptions{
+		Features:                           v1resource.Features(),
+		ExcludeDRANodeAllocatableResources: true,
+	})
 	for key, aggrCtrReq := range aggrCtrReqs {
 		coreKey := api.ResourceName(key)
 		if _, exists := podReqs[coreKey]; !exists && resourcehelper.IsSupportedPodLevelResource(key) && helper.IsOvercommitAllowed(coreKey) {
@@ -2312,7 +2318,10 @@ func aggregateContainerLimits(spec *api.PodSpec, candidates sets.Set[api.Resourc
 		return nil
 	}
 
-	return resourcehelper.AggregateContainerLimits(v1Pod, v1resource.PodResourcesOptions())
+	return resourcehelper.AggregateContainerLimits(v1Pod, resourcehelper.PodResourcesOptions{
+		Features:                           v1resource.Features(),
+		ExcludeDRANodeAllocatableResources: true,
+	})
 }
 
 var initContainerAnnotations = map[string]struct{}{
