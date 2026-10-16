@@ -39,52 +39,59 @@ import (
 func Validate(config *kubeproxyconfig.KubeProxyConfiguration) field.ErrorList {
 	allErrs := field.ErrorList{}
 
-	newPath := field.NewPath("KubeProxyConfiguration")
+	// Paths must match the public v1alpha1 configuration, not the internal types.
 
 	effectiveFeatures := utilfeature.DefaultFeatureGate.DeepCopy()
 	if err := effectiveFeatures.SetFromMap(config.FeatureGates); err != nil {
-		allErrs = append(allErrs, field.Invalid(newPath.Child("featureGates"), config.FeatureGates, err.Error()))
+		allErrs = append(allErrs, field.Invalid(field.NewPath("featureGates"), config.FeatureGates, err.Error()))
 	}
 
-	allErrs = append(allErrs, validateKubeProxyIPTablesConfiguration(config.IPTables, newPath.Child("KubeProxyIPTablesConfiguration"))...)
+	// For historical reasons, we have to validate the IPTables-specific config regardless of whether we are actually using iptables mode.
+	allErrs = append(allErrs, validateKubeProxyIPTablesConfiguration(config.IPTables, field.NewPath("iptables"))...)
+
+	// Now validate the ipvs/nftables config if we're using one of those modes.
+	backendConfigPath := field.NewPath(string(config.Mode))
 	switch config.Mode {
 	case kubeproxyconfig.ProxyModeIPVS:
-		allErrs = append(allErrs, validateKubeProxyIPVSConfiguration(config.IPVS, newPath.Child("KubeProxyIPVSConfiguration"))...)
+		allErrs = append(allErrs, validateKubeProxyIPVSConfiguration(config.IPVS, backendConfigPath)...)
 	case kubeproxyconfig.ProxyModeNFTables:
-		allErrs = append(allErrs, validateKubeProxyNFTablesConfiguration(config.NFTables, newPath.Child("KubeProxyNFTablesConfiguration"))...)
+		allErrs = append(allErrs, validateKubeProxyNFTablesConfiguration(config.NFTables, backendConfigPath)...)
+	default:
+		// All other modes, including the default and kernelspace, use the iptables sync periods in v1alpha1 conversion.
+		backendConfigPath = field.NewPath("iptables")
 	}
-	allErrs = append(allErrs, validateKubeProxyLinuxConfiguration(config.Linux, newPath.Child("KubeProxyLinuxConfiguration"))...)
-	allErrs = append(allErrs, validateProxyMode(config.Mode, newPath.Child("Mode"))...)
-	allErrs = append(allErrs, validateClientConnectionConfiguration(config.ClientConnection, newPath.Child("ClientConnection"))...)
+	allErrs = append(allErrs, validateKubeProxyLinuxConfiguration(config.Linux, nil)...)
+	allErrs = append(allErrs, validateProxyMode(config.Mode, field.NewPath("mode"))...)
+	allErrs = append(allErrs, validateClientConnectionConfiguration(config.ClientConnection, field.NewPath("clientConnection"))...)
 
 	if config.ConfigSyncPeriod.Duration <= 0 {
-		allErrs = append(allErrs, field.Invalid(newPath.Child("ConfigSyncPeriod"), config.ConfigSyncPeriod, "must be greater than 0"))
+		allErrs = append(allErrs, field.Invalid(field.NewPath("configSyncPeriod"), config.ConfigSyncPeriod, "must be greater than 0"))
 	}
 	if config.SyncPeriod.Duration <= 0 {
-		allErrs = append(allErrs, field.Invalid(newPath.Child("SyncPeriod"), config.SyncPeriod, "must be greater than 0"))
+		allErrs = append(allErrs, field.Invalid(backendConfigPath.Child("syncPeriod"), config.SyncPeriod, "must be greater than 0"))
 	}
 	if config.MinSyncPeriod.Duration < 0 {
-		allErrs = append(allErrs, field.Invalid(newPath.Child("MinSyncPeriod"), config.MinSyncPeriod, "must be greater than or equal to 0"))
+		allErrs = append(allErrs, field.Invalid(backendConfigPath.Child("minSyncPeriod"), config.MinSyncPeriod, "must be greater than or equal to 0"))
 	}
 	if config.MinSyncPeriod.Duration > config.SyncPeriod.Duration {
-		allErrs = append(allErrs, field.Invalid(newPath.Child("SyncPeriod"), config.MinSyncPeriod, fmt.Sprintf("must be greater than or equal to %s", newPath.Child("MinSyncPeriod").String())))
+		allErrs = append(allErrs, field.Invalid(backendConfigPath.Child("syncPeriod"), config.MinSyncPeriod, fmt.Sprintf("must be greater than or equal to %s", backendConfigPath.Child("minSyncPeriod").String())))
 	}
 
 	if netutils.ParseIPSloppy(config.BindAddress) == nil {
-		allErrs = append(allErrs, field.Invalid(newPath.Child("BindAddress"), config.BindAddress, "not a valid textual representation of an IP address"))
+		allErrs = append(allErrs, field.Invalid(field.NewPath("bindAddress"), config.BindAddress, "not a valid textual representation of an IP address"))
 	}
 
 	if config.HealthzBindAddress != "" {
-		allErrs = append(allErrs, validateHostPort(config.HealthzBindAddress, newPath.Child("HealthzBindAddress"))...)
+		allErrs = append(allErrs, validateHostPort(config.HealthzBindAddress, field.NewPath("healthzBindAddress"))...)
 	}
-	allErrs = append(allErrs, validateHostPort(config.MetricsBindAddress, newPath.Child("MetricsBindAddress"))...)
+	allErrs = append(allErrs, validateHostPort(config.MetricsBindAddress, field.NewPath("metricsBindAddress"))...)
 
-	allErrs = append(allErrs, validateKubeProxyNodePortAddress(config.NodePortAddresses, newPath.Child("NodePortAddresses"))...)
-	allErrs = append(allErrs, validateShowHiddenMetricsVersion(config.ShowHiddenMetricsForVersion, newPath.Child("ShowHiddenMetricsForVersion"))...)
+	allErrs = append(allErrs, validateKubeProxyNodePortAddress(config.NodePortAddresses, field.NewPath("nodePortAddresses"))...)
+	allErrs = append(allErrs, validateShowHiddenMetricsVersion(config.ShowHiddenMetricsForVersion, field.NewPath("showHiddenMetricsForVersion"))...)
 
-	allErrs = append(allErrs, validateDetectLocalMode(config.DetectLocalMode, newPath.Child("DetectLocalMode"))...)
-	allErrs = append(allErrs, validateDetectLocalConfiguration(config.DetectLocalMode, config.DetectLocal, newPath.Child("DetectLocalConfiguration"))...)
-	allErrs = append(allErrs, logsapi.Validate(&config.Logging, effectiveFeatures, newPath.Child("logging"))...)
+	allErrs = append(allErrs, validateDetectLocalMode(config.DetectLocalMode, field.NewPath("detectLocalMode"))...)
+	allErrs = append(allErrs, validateDetectLocalConfiguration(config.DetectLocalMode, config.DetectLocal)...)
+	allErrs = append(allErrs, logsapi.Validate(&config.Logging, effectiveFeatures, field.NewPath("logging"))...)
 
 	return allErrs
 }
@@ -93,7 +100,7 @@ func validateKubeProxyIPTablesConfiguration(config kubeproxyconfig.KubeProxyIPTa
 	allErrs := field.ErrorList{}
 
 	if config.MasqueradeBit != nil && (*config.MasqueradeBit < 0 || *config.MasqueradeBit > 31) {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("MasqueradeBit"), config.MasqueradeBit, "must be within the range [0, 31]"))
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("masqueradeBit"), config.MasqueradeBit, "must be within the range [0, 31]"))
 	}
 	return allErrs
 }
@@ -102,7 +109,7 @@ func validateKubeProxyIPVSConfiguration(config kubeproxyconfig.KubeProxyIPVSConf
 	allErrs := field.ErrorList{}
 
 	allErrs = append(allErrs, validateIPVSTimeout(config, fldPath)...)
-	allErrs = append(allErrs, validateIPVSExcludeCIDRs(config.ExcludeCIDRs, fldPath.Child("ExcludeCidrs"))...)
+	allErrs = append(allErrs, validateIPVSExcludeCIDRs(config.ExcludeCIDRs, fldPath.Child("excludeCIDRs"))...)
 
 	return allErrs
 }
@@ -111,7 +118,7 @@ func validateKubeProxyNFTablesConfiguration(config kubeproxyconfig.KubeProxyNFTa
 	allErrs := field.ErrorList{}
 
 	if config.MasqueradeBit != nil && (*config.MasqueradeBit < 0 || *config.MasqueradeBit > 31) {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("MasqueradeBit"), config.MasqueradeBit, "must be within the range [0, 31]"))
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("masqueradeBit"), config.MasqueradeBit, "must be within the range [0, 31]"))
 	}
 
 	return allErrs
@@ -120,10 +127,10 @@ func validateKubeProxyNFTablesConfiguration(config kubeproxyconfig.KubeProxyNFTa
 func validateKubeProxyLinuxConfiguration(config kubeproxyconfig.KubeProxyLinuxConfiguration, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
-	allErrs = append(allErrs, validateKubeProxyConntrackConfiguration(config.Conntrack, fldPath.Child("KubeProxyConntrackConfiguration"))...)
+	allErrs = append(allErrs, validateKubeProxyConntrackConfiguration(config.Conntrack, fldPath.Child("conntrack"))...)
 
 	if config.OOMScoreAdj != nil && (*config.OOMScoreAdj < -1000 || *config.OOMScoreAdj > 1000) {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("OOMScoreAdj"), *config.OOMScoreAdj, "must be within the range [-1000, 1000]"))
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("oomScoreAdj"), *config.OOMScoreAdj, "must be within the range [-1000, 1000]"))
 	}
 
 	return allErrs
@@ -133,29 +140,29 @@ func validateKubeProxyConntrackConfiguration(config kubeproxyconfig.KubeProxyCon
 	allErrs := field.ErrorList{}
 
 	if config.MaxPerCore != nil && *config.MaxPerCore < 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("MaxPerCore"), config.MaxPerCore, "must be greater than or equal to 0"))
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("maxPerCore"), config.MaxPerCore, "must be greater than or equal to 0"))
 	}
 
 	if config.Min != nil && *config.Min < 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("Min"), config.Min, "must be greater than or equal to 0"))
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("min"), config.Min, "must be greater than or equal to 0"))
 	}
 
 	// config.TCPEstablishedTimeout has a default value, so can't be nil.
 	if config.TCPEstablishedTimeout.Duration < 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("TCPEstablishedTimeout"), config.TCPEstablishedTimeout, "must be greater than or equal to 0"))
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("tcpEstablishedTimeout"), config.TCPEstablishedTimeout, "must be greater than or equal to 0"))
 	}
 
 	// config.TCPCloseWaitTimeout has a default value, so can't be nil.
 	if config.TCPCloseWaitTimeout.Duration < 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("TCPCloseWaitTimeout"), config.TCPCloseWaitTimeout, "must be greater than or equal to 0"))
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("tcpCloseWaitTimeout"), config.TCPCloseWaitTimeout, "must be greater than or equal to 0"))
 	}
 
 	if config.UDPTimeout.Duration < 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("UDPTimeout"), config.UDPTimeout, "must be greater than or equal to 0"))
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("udpTimeout"), config.UDPTimeout, "must be greater than or equal to 0"))
 	}
 
 	if config.UDPStreamTimeout.Duration < 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("UDPStreamTimeout"), config.UDPStreamTimeout, "must be greater than or equal to 0"))
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("udpStreamTimeout"), config.UDPStreamTimeout, "must be greater than or equal to 0"))
 	}
 
 	return allErrs
@@ -184,7 +191,7 @@ func validateProxyModeLinux(mode kubeproxyconfig.ProxyMode, fldPath *field.Path)
 	}
 
 	errMsg := fmt.Sprintf("must be %s or blank (blank means the best-available proxy [currently iptables])", strings.Join(sets.List(validModes), ", "))
-	return field.ErrorList{field.Invalid(fldPath.Child("ProxyMode"), string(mode), errMsg)}
+	return field.ErrorList{field.Invalid(fldPath, string(mode), errMsg)}
 }
 
 func validateProxyModeWindows(mode kubeproxyconfig.ProxyMode, fldPath *field.Path) field.ErrorList {
@@ -197,7 +204,7 @@ func validateProxyModeWindows(mode kubeproxyconfig.ProxyMode, fldPath *field.Pat
 	}
 
 	errMsg := fmt.Sprintf("must be %s or blank (blank means the most-available proxy [currently 'kernelspace'])", strings.Join(sets.List(validModes), ", "))
-	return field.ErrorList{field.Invalid(fldPath.Child("ProxyMode"), string(mode), errMsg)}
+	return field.ErrorList{field.Invalid(fldPath, string(mode), errMsg)}
 }
 
 func validateDetectLocalMode(mode kubeproxyconfig.LocalMode, fldPath *field.Path) field.ErrorList {
@@ -218,7 +225,7 @@ func validateDetectLocalMode(mode kubeproxyconfig.LocalMode, fldPath *field.Path
 
 func validateClientConnectionConfiguration(config componentbaseconfig.ClientConnectionConfiguration, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(config.Burst), fldPath.Child("Burst"))...)
+	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(config.Burst), fldPath.Child("burst"))...)
 	return allErrs
 }
 
@@ -272,15 +279,15 @@ func validateIPVSTimeout(config kubeproxyconfig.KubeProxyIPVSConfiguration, fldP
 	allErrs := field.ErrorList{}
 
 	if config.TCPTimeout.Duration < 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("TCPTimeout"), config.TCPTimeout, "must be greater than or equal to 0"))
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("tcpTimeout"), config.TCPTimeout, "must be greater than or equal to 0"))
 	}
 
 	if config.TCPFinTimeout.Duration < 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("TCPFinTimeout"), config.TCPFinTimeout, "must be greater than or equal to 0"))
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("tcpFinTimeout"), config.TCPFinTimeout, "must be greater than or equal to 0"))
 	}
 
 	if config.UDPTimeout.Duration < 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("UDPTimeout"), config.UDPTimeout, "must be greater than or equal to 0"))
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("udpTimeout"), config.UDPTimeout, "must be greater than or equal to 0"))
 	}
 
 	return allErrs
@@ -323,9 +330,10 @@ func validateDualStackCIDRStrings(cidrStrings []string, fldPath *field.Path) fie
 	case len(cidrStrings) > 2:
 		allErrs = append(allErrs, field.Invalid(fldPath, cidrStrings, "must be a either a single CIDR or dual-stack pair of CIDRs (e.g. [10.100.0.0/16, fde4:8dba:82e1::/48]"))
 	default:
-		for i, cidrString := range cidrStrings {
+		// clusterCIDR is a comma-separated string in the public configuration.
+		for _, cidrString := range cidrStrings {
 			if _, _, err := netutils.ParseCIDRSloppy(cidrString); err != nil {
-				allErrs = append(allErrs, field.Invalid(fldPath.Index(i), cidrString, "must be a valid CIDR block (e.g. 10.100.0.0/16 or fde4:8dba:82e1::/48)"))
+				allErrs = append(allErrs, field.Invalid(fldPath, cidrString, "must be a comma-delimited list of CIDR blocks (e.g. \"10.100.0.0/16,fde4:8dba:82e1::/48\")"))
 			}
 		}
 		if len(cidrStrings) == 2 {
@@ -338,16 +346,16 @@ func validateDualStackCIDRStrings(cidrStrings []string, fldPath *field.Path) fie
 	return allErrs
 }
 
-func validateDetectLocalConfiguration(mode kubeproxyconfig.LocalMode, config kubeproxyconfig.DetectLocalConfiguration, fldPath *field.Path) field.ErrorList {
+func validateDetectLocalConfiguration(mode kubeproxyconfig.LocalMode, config kubeproxyconfig.DetectLocalConfiguration) field.ErrorList {
 	allErrs := field.ErrorList{}
 	switch mode {
 	case kubeproxyconfig.LocalModeBridgeInterface:
-		allErrs = append(allErrs, validateInterface(config.BridgeInterface, fldPath.Child("InterfaceName"))...)
+		allErrs = append(allErrs, validateInterface(config.BridgeInterface, field.NewPath("detectLocal", "bridgeInterface"))...)
 	case kubeproxyconfig.LocalModeInterfaceNamePrefix:
-		allErrs = append(allErrs, validateInterface(config.InterfaceNamePrefix, fldPath.Child("InterfacePrefix"))...)
+		allErrs = append(allErrs, validateInterface(config.InterfaceNamePrefix, field.NewPath("detectLocal", "interfaceNamePrefix"))...)
 	case kubeproxyconfig.LocalModeClusterCIDR:
 		if len(config.ClusterCIDRs) > 0 {
-			allErrs = append(allErrs, validateDualStackCIDRStrings(config.ClusterCIDRs, fldPath.Child("ClusterCIDRs"))...)
+			allErrs = append(allErrs, validateDualStackCIDRStrings(config.ClusterCIDRs, field.NewPath("clusterCIDR"))...)
 		}
 	}
 	return allErrs
