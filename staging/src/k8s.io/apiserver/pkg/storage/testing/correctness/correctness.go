@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -30,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/apis/example"
 	"k8s.io/apiserver/pkg/storage"
@@ -2503,72 +2505,89 @@ func watchTestCases() []watchTestCase {
 			ExpectMaxRV: 18,
 		},
 		{
-			Name:    "Watch single pod pod1 non-recursively",
-			Request: WatchRequest{Key: "/pods/ns1/pod1", Options: watchNonRecursive("", "")},
+			Name:        "Watch single pod pod1 non-recursively",
+			Request:     WatchRequest{Key: "/pods/ns1/pod1", Options: watchNonRecursive("", "")},
+			ExpectMaxRV: 4,
 		},
 		{
-			Name:    "Watch single pod pod1 non-recursively with AllowWatchBookmarks",
-			Request: WatchRequest{Key: "/pods/ns1/pod1", Options: watchNonRecursiveWithBookmarks("", "")},
+			Name:        "Watch single pod pod1 non-recursively with AllowWatchBookmarks",
+			Request:     WatchRequest{Key: "/pods/ns1/pod1", Options: watchNonRecursiveWithBookmarks("", "")},
+			ExpectMaxRV: 4,
 		},
 		{
-			Name:    "Watch single pod pod1 non-recursively with NotOlderThan",
-			Request: WatchRequest{Key: "/pods/ns1/pod1", Options: watchNonRecursive("", metav1.ResourceVersionMatchNotOlderThan)},
+			Name:        "Watch single pod pod1 non-recursively with NotOlderThan",
+			Request:     WatchRequest{Key: "/pods/ns1/pod1", Options: watchNonRecursive("", metav1.ResourceVersionMatchNotOlderThan)},
+			ExpectMaxRV: 4,
 		},
 		{
-			Name:    "Watch single pod pod1 non-recursively with ResourceVersion=0",
-			Request: WatchRequest{Key: "/pods/ns1/pod1", Options: watchNonRecursive("0", "")},
+			Name:        "Watch single pod pod1 non-recursively with ResourceVersion=0",
+			Request:     WatchRequest{Key: "/pods/ns1/pod1", Options: watchNonRecursive("0", "")},
+			ExpectMaxRV: 4,
 		},
 		{
-			Name:    "Watch single pod pod1 non-recursively with ResourceVersion=0 and AllowWatchBookmarks",
-			Request: WatchRequest{Key: "/pods/ns1/pod1", Options: watchNonRecursiveWithBookmarks("0", "")},
+			Name:        "Watch single pod pod1 non-recursively with ResourceVersion=0 and AllowWatchBookmarks",
+			Request:     WatchRequest{Key: "/pods/ns1/pod1", Options: watchNonRecursiveWithBookmarks("0", "")},
+			ExpectMaxRV: 4,
 		},
 		{
-			Name:    "Watch single pod pod1 non-recursively with ResourceVersion=0 and NotOlderThan",
-			Request: WatchRequest{Key: "/pods/ns1/pod1", Options: watchNonRecursive("0", metav1.ResourceVersionMatchNotOlderThan)},
+			Name:        "Watch single pod pod1 non-recursively with ResourceVersion=0 and NotOlderThan",
+			Request:     WatchRequest{Key: "/pods/ns1/pod1", Options: watchNonRecursive("0", metav1.ResourceVersionMatchNotOlderThan)},
+			ExpectMaxRV: 4,
 		},
 		{
-			Name:    "Watch single pod pod4 non-recursively with ResourceVersion=1",
-			Request: WatchRequest{Key: "/pods/ns1/pod4", Options: watchNonRecursive("1", "")},
+			Name:        "Watch single pod pod4 non-recursively with ResourceVersion=1",
+			Request:     WatchRequest{Key: "/pods/ns1/pod4", Options: watchNonRecursive("1", "")},
+			ExpectMaxRV: 17,
 		},
 		{
-			Name:    "Watch single pod pod4 non-recursively with ResourceVersion=1 and AllowWatchBookmarks",
-			Request: WatchRequest{Key: "/pods/ns1/pod4", Options: watchNonRecursiveWithBookmarks("1", "")},
+			Name:        "Watch single pod pod4 non-recursively with ResourceVersion=1 and AllowWatchBookmarks",
+			Request:     WatchRequest{Key: "/pods/ns1/pod4", Options: watchNonRecursiveWithBookmarks("1", "")},
+			ExpectMaxRV: 17,
 		},
 		{
-			Name:    "Watch single pod pod4 non-recursively with ResourceVersion=1 and Exact",
-			Request: WatchRequest{Key: "/pods/ns1/pod4", Options: watchNonRecursive("1", metav1.ResourceVersionMatchExact)},
+			Name:        "Watch single pod pod4 non-recursively with ResourceVersion=1 and Exact",
+			Request:     WatchRequest{Key: "/pods/ns1/pod4", Options: watchNonRecursive("1", metav1.ResourceVersionMatchExact)},
+			ExpectMaxRV: 17,
 		},
 		{
-			Name:    "Watch single pod pod4 non-recursively with ResourceVersion=1 and NotOlderThan",
-			Request: WatchRequest{Key: "/pods/ns1/pod4", Options: watchNonRecursive("1", metav1.ResourceVersionMatchNotOlderThan)},
+			Name:        "Watch single pod pod4 non-recursively with ResourceVersion=1 and NotOlderThan",
+			Request:     WatchRequest{Key: "/pods/ns1/pod4", Options: watchNonRecursive("1", metav1.ResourceVersionMatchNotOlderThan)},
+			ExpectMaxRV: 17,
 		},
 		{
-			Name:    "Watch single pod pod4 non-recursively with ResourceVersion=8",
-			Request: WatchRequest{Key: "/pods/ns1/pod4", Options: watchNonRecursive("8", "")},
+			Name:        "Watch single pod pod4 non-recursively with ResourceVersion=8",
+			Request:     WatchRequest{Key: "/pods/ns1/pod4", Options: watchNonRecursive("8", "")},
+			ExpectMaxRV: 17,
 		},
 		{
-			Name:    "Watch single pod pod4 non-recursively with ResourceVersion=8 and AllowWatchBookmarks",
-			Request: WatchRequest{Key: "/pods/ns1/pod4", Options: watchNonRecursiveWithBookmarks("8", "")},
+			Name:        "Watch single pod pod4 non-recursively with ResourceVersion=8 and AllowWatchBookmarks",
+			Request:     WatchRequest{Key: "/pods/ns1/pod4", Options: watchNonRecursiveWithBookmarks("8", "")},
+			ExpectMaxRV: 17,
 		},
 		{
-			Name:    "Watch single pod pod4 non-recursively with ResourceVersion=8 and Exact",
-			Request: WatchRequest{Key: "/pods/ns1/pod4", Options: watchNonRecursive("8", metav1.ResourceVersionMatchExact)},
+			Name:        "Watch single pod pod4 non-recursively with ResourceVersion=8 and Exact",
+			Request:     WatchRequest{Key: "/pods/ns1/pod4", Options: watchNonRecursive("8", metav1.ResourceVersionMatchExact)},
+			ExpectMaxRV: 17,
 		},
 		{
-			Name:    "Watch single pod pod4 non-recursively with ResourceVersion=8 and NotOlderThan",
-			Request: WatchRequest{Key: "/pods/ns1/pod4", Options: watchNonRecursive("8", metav1.ResourceVersionMatchNotOlderThan)},
+			Name:        "Watch single pod pod4 non-recursively with ResourceVersion=8 and NotOlderThan",
+			Request:     WatchRequest{Key: "/pods/ns1/pod4", Options: watchNonRecursive("8", metav1.ResourceVersionMatchNotOlderThan)},
+			ExpectMaxRV: 17,
 		},
 		{
-			Name:    "Watch list single pod pod1 non-recursively",
-			Request: WatchRequest{Key: "/pods/ns1/pod1", Options: watchListNonRecursive("")},
+			Name:        "Watch list single pod pod1 non-recursively",
+			Request:     WatchRequest{Key: "/pods/ns1/pod1", Options: watchListNonRecursive("")},
+			ExpectMaxRV: 4,
 		},
 		{
-			Name:    "Watch list single pod pod1 non-recursively with ResourceVersion=0",
-			Request: WatchRequest{Key: "/pods/ns1/pod1", Options: watchListNonRecursive("0")},
+			Name:        "Watch list single pod pod1 non-recursively with ResourceVersion=0",
+			Request:     WatchRequest{Key: "/pods/ns1/pod1", Options: watchListNonRecursive("0")},
+			ExpectMaxRV: 4,
 		},
 		{
-			Name:    "Watch list single pod pod4 non-recursively with ResourceVersion=1",
-			Request: WatchRequest{Key: "/pods/ns1/pod4", Options: watchListNonRecursive("1")},
+			Name:        "Watch list single pod pod4 non-recursively with ResourceVersion=1",
+			Request:     WatchRequest{Key: "/pods/ns1/pod4", Options: watchListNonRecursive("1")},
+			ExpectMaxRV: 17,
 		},
 		{
 			Name:        "Watch with empty key returns empty key error",
@@ -2699,6 +2718,7 @@ func RunTestCorrectness(ctx context.Context, t *testing.T, store storage.Interfa
 	validator := NewWatchValidator(versioner, replay, keyFunc)
 	for i, w := range watchCases {
 		t.Run(w.Name, func(t *testing.T) {
+			t.Parallel()
 			var resp WatchResponse
 			if watchErrs[i] != nil {
 				resp = WatchResponse{Err: watchErrs[i]}
@@ -2712,25 +2732,40 @@ func RunTestCorrectness(ctx context.Context, t *testing.T, store storage.Interfa
 
 func collectEventsTillRV(t *testing.T, watcher watch.Interface, versioner storage.Versioner, targetRV uint64) []watch.Event {
 	events := []watch.Event{}
-	for e := range watcher.ResultChan() {
-		if cacheable, ok := e.Object.(runtime.CacheableObject); ok {
-			e.Object = cacheable.GetObject()
+	var maxRV uint64
+	for {
+		timeout := wait.ForeverTestTimeout
+		if maxRV >= targetRV {
+			timeout = 100 * time.Millisecond
 		}
-		events = append(events, e)
-		if e.Type == watch.Error {
-			_, open := <-watcher.ResultChan()
-			require.False(t, open, "watch channel should be closed after watch.Error")
-			break
-		}
-		accessor, err := meta.Accessor(e.Object)
-		require.NoError(t, err)
-		rv, err := versioner.ParseResourceVersion(accessor.GetResourceVersion())
-		require.NoError(t, err)
-		if rv >= targetRV {
-			break
+		select {
+		case e, open := <-watcher.ResultChan():
+			if !open {
+				return events
+			}
+			if cacheable, ok := e.Object.(runtime.CacheableObject); ok {
+				e.Object = cacheable.GetObject()
+			}
+			events = append(events, e)
+			if e.Type == watch.Error {
+				_, open := <-watcher.ResultChan()
+				require.False(t, open, "watch channel should be closed after watch.Error")
+				return events
+			}
+			accessor, err := meta.Accessor(e.Object)
+			require.NoError(t, err)
+			rv, err := versioner.ParseResourceVersion(accessor.GetResourceVersion())
+			require.NoError(t, err)
+			if rv > maxRV {
+				maxRV = rv
+			}
+		case <-time.After(timeout):
+			if maxRV < targetRV {
+				t.Fatalf("timed out waiting for watch event with RV >= %d (maxRV=%d)", targetRV, maxRV)
+			}
+			return events
 		}
 	}
-	return events
 }
 
 func newTestPod(name, namespace string, uid types.UID, rv string) *example.Pod {

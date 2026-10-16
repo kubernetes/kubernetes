@@ -112,6 +112,7 @@ func runSlowWatcherScenario(b *testing.B, registry compbasemetrics.KubeRegistry,
 	healthy, err := cacher.Watch(context.Background(), "/pods/ns", storage.ListOptions{
 		ResourceVersion: "100",
 		Predicate:       storage.Everything,
+		Recursive:       true,
 	})
 	if err != nil {
 		b.Fatal(err)
