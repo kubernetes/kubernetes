@@ -80,7 +80,7 @@ var map_EndpointSlice = map[string]string{
 	"metadata":    "Standard object's metadata.",
 	"addressType": "addressType specifies the type of address carried by this EndpointSlice. All addresses in this slice must be the same type. This field is immutable after creation. The following address types are currently supported: * IPv4: Represents an IPv4 Address. * IPv6: Represents an IPv6 Address. * FQDN: Represents a Fully Qualified Domain Name.",
 	"endpoints":   "endpoints is a list of unique endpoints in this slice. Each slice may include a maximum of 1000 endpoints.",
-	"ports":       "ports specifies the list of network ports exposed by each endpoint in this slice. Each port must have a unique name. When ports is empty, it indicates that there are no defined ports. When a port is defined with a nil port value, it indicates \"all ports\". Each slice may include a maximum of 100 ports.",
+	"ports":       "ports specifies the list of network ports exposed by each endpoint in this slice. Each port must have a unique name. When ports is empty, it indicates that there are no defined ports. When a port is defined with a nil port value, it indicates \"all ports\". Each slice may include a maximum of 20000 ports.",
 }
 
 func (EndpointSlice) SwaggerDoc() map[string]string {
