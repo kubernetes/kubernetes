@@ -53,6 +53,7 @@ var (
 	runtimeObject                                = types.Name{Package: "k8s.io/apimachinery/pkg/runtime", Name: "Object"}
 	schemaGroupResource                          = types.Name{Package: "k8s.io/apimachinery/pkg/runtime/schema", Name: "GroupResource"}
 	schemaGroupVersionResource                   = types.Name{Package: "k8s.io/apimachinery/pkg/runtime/schema", Name: "GroupVersionResource"}
+	shardingSelector                             = types.Name{Package: "k8s.io/apimachinery/pkg/sharding", Name: "Selector"}
 	stringsBuilder                               = types.Name{Package: "strings", Name: "Builder"}
 	syncMutex                                    = types.Name{Package: "sync", Name: "Mutex"}
 	timeDuration                                 = types.Name{Package: "time", Name: "Duration"}
