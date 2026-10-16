@@ -43,7 +43,8 @@ type attributeProvider interface {
 // We don't need to track *which* devices are part of the set, only
 // how many.
 type distinctAttributeConstraint struct {
-	logger            klog.Logger // Includes name and attribute name, so no need to repeat in log messages.
+	logger            klog.Logger  // Includes name and attribute name, so no need to repeat in log messages.
+	loggerV7          *klog.Logger // Non-nil only if V(7) is enabled, to avoid the cost of building log arguments otherwise.
 	requestNames      sets.Set[string]
 	attributeName     draapi.FullyQualifiedName
 	features          Features
@@ -64,7 +65,9 @@ func (m *distinctAttributeConstraint) add(request *requestData, device *draapi.D
 	}
 	if attribute == nil {
 		// Doesn't have the attribute.
-		m.logger.V(7).Info("Constraint not satisfied, attribute not set")
+		if m.loggerV7 != nil {
+			m.loggerV7.Info("Constraint not satisfied, attribute not set")
+		}
 		return false, nil
 	}
 
@@ -93,11 +96,15 @@ func (m *distinctAttributeConstraint) add(request *requestData, device *draapi.D
 	}
 
 	if !m.matchesAttribute(attribute, newSet) {
-		m.logger.V(7).Info("Constraint not satisfied, has some duplicated attributes")
+		if m.loggerV7 != nil {
+			m.loggerV7.Info("Constraint not satisfied, has some duplicated attributes")
+		}
 		return false, nil
 	}
 	m.attributes = append(m.attributes, attribute)
-	m.logger.V(7).Info("Constraint satisfied by device", "device", deviceID, "numDevices", len(m.attributes))
+	if m.loggerV7 != nil {
+		m.loggerV7.Info("Constraint satisfied by device", "device", deviceID, "numDevices", len(m.attributes))
+	}
 	return true, nil
 }
 
@@ -108,7 +115,9 @@ func (m *distinctAttributeConstraint) remove(request *requestData, device *draap
 	}
 
 	m.attributes = m.attributes[:len(m.attributes)-1]
-	m.logger.V(7).Info("Device removed from constraint set", "device", deviceID, "numDevices", len(m.attributes))
+	if m.loggerV7 != nil {
+		m.loggerV7.Info("Device removed from constraint set", "device", deviceID, "numDevices", len(m.attributes))
+	}
 }
 
 func (m *distinctAttributeConstraint) matches(request *requestData) bool {
@@ -135,14 +144,18 @@ func (m *distinctAttributeConstraint) matchesAttribute(attribute any, newSet *de
 			if newSet.intersection(existingSet) != nil {
 				// New device has common elements with an existing device.
 				// This violates the distinct constraint.
-				m.logger.V(7).Info("Constraint not satisfied, devices have common elements")
+				if m.loggerV7 != nil {
+					m.loggerV7.Info("Constraint not satisfied, devices have common elements")
+				}
 				return false
 			}
 		}
 
 		// New device is disjoint from all existing devices.
 		// The constraint is satisfied.
-		m.logger.V(7).Info("Constraint satisfied, new device is disjoint from all existing devices")
+		if m.loggerV7 != nil {
+			m.loggerV7.Info("Constraint satisfied, new device is disjoint from all existing devices")
+		}
 		return true
 	}
 
@@ -152,47 +165,71 @@ func (m *distinctAttributeConstraint) matchesAttribute(attribute any, newSet *de
 		case string:
 			candidate, ok := attribute.(string)
 			if !ok {
-				m.logger.V(7).Info("Attribute types don't match", "existing", attr, "candidate", attribute)
+				if m.loggerV7 != nil {
+					m.loggerV7.Info("Attribute types don't match", "existing", attr, "candidate", attribute)
+				}
 				continue
 			}
 			if existing == candidate {
-				m.logger.V(7).Info("String values duplicated")
+				if m.loggerV7 != nil {
+					m.loggerV7.Info("String values duplicated")
+				}
 				return false
 			}
-			m.logger.V(7).Info("Attribute values don't match", "existing", attr, "candidate", attribute)
+			if m.loggerV7 != nil {
+				m.loggerV7.Info("Attribute values don't match", "existing", attr, "candidate", attribute)
+			}
 		case int64:
 			candidate, ok := attribute.(int64)
 			if !ok {
-				m.logger.V(7).Info("Attribute types don't match", "existing", attr, "candidate", attribute)
+				if m.loggerV7 != nil {
+					m.loggerV7.Info("Attribute types don't match", "existing", attr, "candidate", attribute)
+				}
 				continue
 			}
 			if existing == candidate {
-				m.logger.V(7).Info("Int values duplicated")
+				if m.loggerV7 != nil {
+					m.loggerV7.Info("Int values duplicated")
+				}
 				return false
 			}
-			m.logger.V(7).Info("Attribute values don't match", "existing", attr, "candidate", attribute)
+			if m.loggerV7 != nil {
+				m.loggerV7.Info("Attribute values don't match", "existing", attr, "candidate", attribute)
+			}
 		case bool:
 			candidate, ok := attribute.(bool)
 			if !ok {
-				m.logger.V(7).Info("Attribute types don't match", "existing", attr, "candidate", attribute)
+				if m.loggerV7 != nil {
+					m.loggerV7.Info("Attribute types don't match", "existing", attr, "candidate", attribute)
+				}
 				continue
 			}
 			if existing == candidate {
-				m.logger.V(7).Info("Bool values duplicated")
+				if m.loggerV7 != nil {
+					m.loggerV7.Info("Bool values duplicated")
+				}
 				return false
 			}
-			m.logger.V(7).Info("Attribute values don't match", "existing", attr, "candidate", attribute)
+			if m.loggerV7 != nil {
+				m.loggerV7.Info("Attribute values don't match", "existing", attr, "candidate", attribute)
+			}
 		case semver.Version:
 			candidate, ok := attribute.(semver.Version)
 			if !ok {
-				m.logger.V(7).Info("Attribute types don't match", "existing", attr, "candidate", attribute)
+				if m.loggerV7 != nil {
+					m.loggerV7.Info("Attribute types don't match", "existing", attr, "candidate", attribute)
+				}
 				continue
 			}
 			if existing.Equals(candidate) {
-				m.logger.V(7).Info("Version values duplicated")
+				if m.loggerV7 != nil {
+					m.loggerV7.Info("Version values duplicated")
+				}
 				return false
 			}
-			m.logger.V(7).Info("Attribute values don't match", "existing", attr, "candidate", attribute)
+			if m.loggerV7 != nil {
+				m.loggerV7.Info("Attribute values don't match", "existing", attr, "candidate", attribute)
+			}
 		default:
 			// Dead code, existing values were checked already.
 			return false
