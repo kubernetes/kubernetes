@@ -1522,28 +1522,61 @@ func TestQuantityMinInt32ScaleConstructors(t *testing.T) {
 			q.SetScaled(value, math.MinInt32)
 			return q
 		},
+		"SetScaledOverDec": func(value int64) Quantity {
+			q := MustParse("1.5")
+			q.SetScaled(value, math.MinInt32)
+			return q
+		},
 	}
 	next := *NewScaledQuantity(1, math.MinInt32+1)
 	for _, tc := range []struct {
 		value int64
+		// scaledNext is the expected value at scale math.MinInt32+1.
+		scaledNext int64
 		// cmpNext is the result of Cmp against 1*10^(MinInt32+1).
-		cmpNext int
+		cmpNext       int
+		decScaledNext *int64
+		decScaledOK   *bool
+		decCmpNext    *int
 	}{
-		{value: 0, cmpNext: -1},
-		{value: 5, cmpNext: -1},
-		{value: -5, cmpNext: -1},
-		{value: 10, cmpNext: 0},
-		{value: 15, cmpNext: 1},
-		{value: math.MaxInt64, cmpNext: 1},
-		{value: math.MinInt64, cmpNext: -1},
+		{value: 0, scaledNext: 0, cmpNext: -1},
+		// TODO: Should be cmpNext=0 and agree on the inf.Dec route once MinInt32 rounds to MinInt32+1.
+		{value: 5, scaledNext: 1, cmpNext: -1, decScaledNext: new(int64(mostPositive)), decScaledOK: new(false), decCmpNext: new(1)},
+		// TODO: Should agree on the inf.Dec route once MinInt32 rounds to MinInt32+1.
+		{value: -5, scaledNext: -1, cmpNext: -1, decScaledNext: new(int64(mostNegative)), decScaledOK: new(false)},
+		// TODO: Should agree on the inf.Dec route once MinInt32 rounds to MinInt32+1.
+		{value: 10, scaledNext: 1, cmpNext: 0, decScaledNext: new(int64(mostPositive)), decScaledOK: new(false), decCmpNext: new(1)},
+		// TODO: Should agree on the inf.Dec route once MinInt32 rounds to MinInt32+1.
+		{value: 15, scaledNext: 2, cmpNext: 1, decScaledNext: new(int64(mostPositive)), decScaledOK: new(false)},
+		// TODO: Should agree on the inf.Dec route once MinInt32 rounds to MinInt32+1.
+		{value: math.MaxInt64, scaledNext: math.MaxInt64/10 + 1, cmpNext: 1, decScaledNext: new(int64(mostPositive)), decScaledOK: new(false)},
+		// TODO: Should agree on the inf.Dec route once MinInt32 rounds to MinInt32+1.
+		{value: math.MinInt64, scaledNext: math.MinInt64/10 - 1, cmpNext: -1, decScaledNext: new(int64(mostNegative)), decScaledOK: new(false)},
 	} {
 		for name, construct := range constructors {
 			q := construct(tc.value)
-			if got, ok := q.AsScaledInt64(math.MinInt32); got != tc.value || !ok {
-				t.Errorf("%s(%d, MinInt32): AsScaledInt64(MinInt32) = (%d, %t), want (%d, true)", name, tc.value, got, ok, tc.value)
+			if got, ok := q.AsScaledInt64(math.MinInt32 + 1); got != tc.scaledNext || !ok {
+				t.Errorf("%s(%d, MinInt32): AsScaledInt64(MinInt32+1) = (%d, %t), want (%d, true)", name, tc.value, got, ok, tc.scaledNext)
 			}
 			if got := q.Cmp(next); got != tc.cmpNext {
 				t.Errorf("%s(%d, MinInt32): Cmp(1e-2147483647) = %d, want %d", name, tc.value, got, tc.cmpNext)
+			}
+			decScaledNext, decScaledOK, decCmpNext := tc.scaledNext, true, tc.cmpNext
+			if tc.decScaledNext != nil {
+				decScaledNext = *tc.decScaledNext
+			}
+			if tc.decScaledOK != nil {
+				decScaledOK = *tc.decScaledOK
+			}
+			if tc.decCmpNext != nil {
+				decCmpNext = *tc.decCmpNext
+			}
+			q.ToDec()
+			if got, ok := q.AsScaledInt64(math.MinInt32 + 1); got != decScaledNext || ok != decScaledOK {
+				t.Errorf("%s(%d, MinInt32) ToDec(): AsScaledInt64(MinInt32+1) = (%d, %t), want (%d, %t)", name, tc.value, got, ok, decScaledNext, decScaledOK)
+			}
+			if got := q.Cmp(next); got != decCmpNext {
+				t.Errorf("%s(%d, MinInt32) ToDec(): Cmp(1e-2147483647) = %d, want %d", name, tc.value, got, decCmpNext)
 			}
 		}
 	}

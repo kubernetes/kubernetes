@@ -228,6 +228,13 @@ func TestInt64AmountAsScaledInt64(t *testing.T) {
 		{"test when i.scale < 0 and fraction doesn't exist", int64Amount{value: 100, scale: -1}, 0, 10, true},
 		{"test when i.value < 0 and fraction exists", int64Amount{value: -1932, scale: 2}, 4, -20, true},
 		{"test when i.value < 0 and fraction doesn't exists", int64Amount{value: -1900, scale: 2}, 4, -19, true},
+		{"minint32 target saturates", int64Amount{value: 7, scale: 0}, math.MinInt32, mostPositive, false},
+		{"minint32 source rounds up", int64Amount{value: 1, scale: math.MinInt32}, 0, 1, true},
+		{"minint32 source negative rounds up", int64Amount{value: -1, scale: math.MinInt32}, 0, -1, true},
+		{"minint32 source exact at minint32+1", int64Amount{value: 10, scale: math.MinInt32}, math.MinInt32 + 1, 1, true},
+		{"minint32 source at minint32 target", int64Amount{value: 1, scale: math.MinInt32}, math.MinInt32, 1, true},
+		{"minint32 source at maxint32 target", int64Amount{value: 1, scale: math.MinInt32}, math.MaxInt32, 1, true},
+		{"zero value at minint32 scale", int64Amount{value: 0, scale: math.MinInt32}, math.MaxInt32, 0, true},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			r, ok := test.i.AsScaledInt64(test.scaled)
@@ -236,6 +243,35 @@ func TestInt64AmountAsScaledInt64(t *testing.T) {
 			}
 			if ok != test.ok {
 				t.Errorf("%v: expected ok: %t, got ok: %t", test.name, test.ok, ok)
+			}
+		})
+	}
+}
+
+func TestInt64AmountAsScale(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		in    int64Amount
+		scale Scale
+		want  int64Amount
+		exact bool
+	}{
+		{"already at target scale", int64Amount{value: 5, scale: math.MinInt32}, math.MinInt32, int64Amount{value: 5, scale: math.MinInt32}, true},
+		{"above target scale", int64Amount{value: 5, scale: math.MinInt32 + 1}, math.MinInt32 + 1, int64Amount{value: 5, scale: math.MinInt32 + 1}, true},
+		{"zero at minint32 to minint32+1", int64Amount{value: 0, scale: math.MinInt32}, math.MinInt32 + 1, int64Amount{value: 0, scale: math.MinInt32 + 1}, true},
+		{"positive at minint32 rounds away from zero to minint32+1", int64Amount{value: 5, scale: math.MinInt32}, math.MinInt32 + 1, int64Amount{value: 1, scale: math.MinInt32 + 1}, false},
+		{"negative at minint32 rounds away from zero to minint32+1", int64Amount{value: -5, scale: math.MinInt32}, math.MinInt32 + 1, int64Amount{value: -1, scale: math.MinInt32 + 1}, false},
+		{"multiple of 10 at minint32 is exact at minint32+1", int64Amount{value: 10, scale: math.MinInt32}, math.MinInt32 + 1, int64Amount{value: 1, scale: math.MinInt32 + 1}, true},
+		{"maxint64 at minint32 rounds up to minint32+1", int64Amount{value: mostPositive, scale: math.MinInt32}, math.MinInt32 + 1, int64Amount{value: mostPositive/10 + 1, scale: math.MinInt32 + 1}, false},
+		{"minint64 at minint32 rounds down to minint32+1", int64Amount{value: mostNegative, scale: math.MinInt32}, math.MinInt32 + 1, int64Amount{value: mostNegative/10 - 1, scale: math.MinInt32 + 1}, false},
+		{"minint32 to zero", int64Amount{value: 5, scale: math.MinInt32}, 0, int64Amount{value: 1, scale: 0}, false},
+		{"maxint64 at minint32 to 3", int64Amount{value: mostPositive, scale: math.MinInt32}, 3, int64Amount{value: 1, scale: 3}, false},
+		{"minint64 at minint32 to 3", int64Amount{value: mostNegative, scale: math.MinInt32}, 3, int64Amount{value: -1, scale: 3}, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got, exact := tc.in.AsScale(tc.scale)
+			if got != tc.want || exact != tc.exact {
+				t.Errorf("%+v.AsScale(%d) = (%+v, %t), want (%+v, %t)", tc.in, tc.scale, got, exact, tc.want, tc.exact)
 			}
 		})
 	}
