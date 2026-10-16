@@ -98,7 +98,7 @@ var _ = SIGDescribe("HugepageAwareMemoryReporting", framework.WithSlow(), framew
 
 			availableAfter, workingSetAfter := getMemoryStats(ctx)
 
-			// Working set shifts across kubelet restarts, so compare limit-minus-adjustment instead.
+			// Working set drifts across kubelet restarts; the sum cancels it.
 			drop := uint64(0)
 			if availableBefore+workingSetBefore > availableAfter+workingSetAfter {
 				drop = availableBefore + workingSetBefore - availableAfter - workingSetAfter
@@ -126,7 +126,7 @@ var _ = SIGDescribe("HugepageAwareMemoryReporting", framework.WithSlow(), framew
 				e2eskipper.Skipf("skipping: 2Mi hugepages not supported on this node")
 			}
 
-			availableBefore, _ := getMemoryStats(ctx)
+			availableBefore, workingSetBefore := getMemoryStats(ctx)
 
 			ginkgo.By(fmt.Sprintf("Allocating %d x 2Mi hugepages", hugepageCount))
 			setHugepages(ctx, hugepages)
@@ -136,24 +136,19 @@ var _ = SIGDescribe("HugepageAwareMemoryReporting", framework.WithSlow(), framew
 			restartKubelet(ctx, true)
 			waitForHugepages(f, ctx, hugepages)
 
-			availableAfter, _ := getMemoryStats(ctx)
+			availableAfter, workingSetAfter := getMemoryStats(ctx)
 
-			framework.Logf("disabled: availableBefore=%d availableAfter=%d hugepages=%d",
-				availableBefore, availableAfter, expectedHugepageBytes)
-
-			// With the feature gate disabled, hugepage reservation is NOT explicitly
-			// subtracted from memory.available via adjustForHugePages. However, the
-			// cgroup-based WorkingSet already reflects some of the hugepage reservation
-			// because the kernel removes hugepages from the free pool, so AvailableBytes
-			// (= Limit - WorkingSet) drops naturally. The drop should still be smaller
-			// than the full hugepage reservation, since adjustForHugePages is not
-			// applied (it would subtract the entire hugepage capacity on top).
+			// hugetlb is not charged to the memory cgroup, so the sum must not move.
 			drop := uint64(0)
-			if availableBefore > availableAfter {
-				drop = availableBefore - availableAfter
+			if availableBefore+workingSetBefore > availableAfter+workingSetAfter {
+				drop = availableBefore + workingSetBefore - availableAfter - workingSetAfter
 			}
+
+			framework.Logf("disabled: availableBefore=%d workingSetBefore=%d availableAfter=%d workingSetAfter=%d drop=%d hugepages=%d",
+				availableBefore, workingSetBefore, availableAfter, workingSetAfter, drop, expectedHugepageBytes)
+
 			gomega.Expect(drop).To(
-				gomega.BeNumerically("<", expectedHugepageBytes),
+				gomega.BeNumerically("<", margin),
 				"memory.available should NOT decrease by the full hugepage reservation when feature gate is disabled")
 		})
 	})
