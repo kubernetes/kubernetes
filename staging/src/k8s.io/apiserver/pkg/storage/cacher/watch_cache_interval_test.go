@@ -601,23 +601,23 @@ func TestCacheIntervalSourceSelection(t *testing.T) {
 			wantKeys:         []string{"/prefix/ns/pod1"},
 		},
 		{
-			name: "single key with everything predicate serves from lazy snapshot",
+			name: "single key with everything predicate serves from eager snapshot",
 			key:  "/prefix/ns/pod1",
 			opts: storage.ListOptions{
 				Recursive: false,
 				Predicate: storage.Everything,
 			},
-			wantLazySnapshot: true,
+			wantLazySnapshot: false,
 			wantKeys:         []string{"/prefix/ns/pod1"},
 		},
 		{
-			name: "single key with namespace predicate serves from lazy snapshot",
+			name: "single key with namespace predicate serves from eager snapshot",
 			key:  "/prefix/ns/pod1",
 			opts: storage.ListOptions{
 				Recursive: false,
 				Predicate: storage.SelectionPredicate{Field: fields.SelectorFromSet(fields.Set{"metadata.namespace": "ns"})},
 			},
-			wantLazySnapshot: true,
+			wantLazySnapshot: false,
 			wantKeys:         []string{"/prefix/ns/pod1"},
 		},
 		{
@@ -721,24 +721,24 @@ func TestCacheIntervalSourceSelection(t *testing.T) {
 			wantKeys:         nil,
 		},
 		{
-			name: "prefix key with non-recursive everything predicate serves from lazy snapshot",
+			name: "prefix key with non-recursive everything predicate serves empty from eager snapshot",
 			key:  "/prefix/",
 			opts: storage.ListOptions{
 				Recursive: false,
 				Predicate: storage.Everything,
 			},
-			wantLazySnapshot: true,
-			wantKeys:         []string{"/prefix/ns/pod1", "/prefix/ns/pod2", "/prefix/other/pod3"},
+			wantLazySnapshot: false,
+			wantKeys:         nil,
 		},
 		{
-			name: "prefix key with non-recursive namespace predicate serves from lazy snapshot",
+			name: "prefix key with non-recursive namespace predicate serves empty from eager snapshot",
 			key:  "/prefix/",
 			opts: storage.ListOptions{
 				Recursive: false,
 				Predicate: storage.SelectionPredicate{Field: fields.SelectorFromSet(fields.Set{"metadata.namespace": "ns"})},
 			},
-			wantLazySnapshot: true,
-			wantKeys:         []string{"/prefix/ns/pod1", "/prefix/ns/pod2", "/prefix/other/pod3"},
+			wantLazySnapshot: false,
+			wantKeys:         nil,
 		},
 		{
 			name: "prefix key with non-recursive single object predicate serves empty from eager snapshot",
@@ -761,24 +761,24 @@ func TestCacheIntervalSourceSelection(t *testing.T) {
 			wantKeys:         nil,
 		},
 		{
-			name: "namespace prefix key with non-recursive everything predicate serves from lazy snapshot",
+			name: "namespace prefix key with non-recursive everything predicate serves empty from eager snapshot",
 			key:  "/prefix/ns/",
 			opts: storage.ListOptions{
 				Recursive: false,
 				Predicate: storage.Everything,
 			},
-			wantLazySnapshot: true,
-			wantKeys:         []string{"/prefix/ns/pod1", "/prefix/ns/pod2"},
+			wantLazySnapshot: false,
+			wantKeys:         nil,
 		},
 		{
-			name: "namespace prefix key with non-recursive namespace predicate serves from lazy snapshot",
+			name: "namespace prefix key with non-recursive namespace predicate serves empty from eager snapshot",
 			key:  "/prefix/ns/",
 			opts: storage.ListOptions{
 				Recursive: false,
 				Predicate: storage.SelectionPredicate{Field: fields.SelectorFromSet(fields.Set{"metadata.namespace": "ns"})},
 			},
-			wantLazySnapshot: true,
-			wantKeys:         []string{"/prefix/ns/pod1", "/prefix/ns/pod2"},
+			wantLazySnapshot: false,
+			wantKeys:         nil,
 		},
 		{
 			name: "namespace prefix key with non-recursive single object predicate serves empty from eager snapshot",

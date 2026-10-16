@@ -697,16 +697,15 @@ func (w *watchCache) getAllEventsSinceLocked(ctx context.Context, resourceVersio
 // that covers the entire storage state.
 // This function assumes to be called under the watchCache lock.
 func (w *watchCache) getIntervalFromStoreLocked(ctx context.Context, key string, opts storage.ListOptions) (*watchCacheInterval, string, error) {
-	_, matchesSingle := opts.Predicate.MatchesSingle()
-	matchesSingle = matchesSingle && !opts.Recursive
-	// When not matching a single key, an immutable snapshot lets us
-	// defer the O(N) interval build off the watchCache lock.
-	if !matchesSingle {
+	// Recursive expects key to be a prefix thus storage.PrepareKey ensures it has "/" suffix.
+	// For requests with selector matching single object, we expect the caller to set opts.Recursive=false and use the full key.
+	if opts.Recursive {
 		snapshot, index := w.getLatestSnapshotLocked(ctx, opts.Predicate.MatcherIndex(ctx))
 		return newCacheIntervalFromLazySnapshot(w.resourceVersion, snapshot, key), index, nil
 	}
+	// Non-recursive expects key to be an exact match.
 	snap := w.storage.LatestSnapshot()
 	w.checkSnapshotResourceVersion(snap, w.resourceVersion)
-	interval, err := newCacheIntervalFromStore(w.resourceVersion, snap, key, matchesSingle)
+	interval, err := newCacheIntervalFromStore(w.resourceVersion, snap, key, true)
 	return interval, "", err
 }
