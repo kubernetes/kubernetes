@@ -4944,3 +4944,92 @@ func TestSelectVictimsOnNode_DeferredResizeAtMaxPods(t *testing.T) {
 		t.Errorf("Expected 0 victims evicted for pod count alone at max pod capacity, got: %v", gotPods)
 	}
 }
+
+func TestPostFilter_ResolvedDeferredResize(t *testing.T) {
+	logger, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	fts := feature.Features{
+		EnableInPlacePodVerticalScalingSchedulerPreemption: true,
+	}
+
+	node := st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{
+		v1.ResourceCPU:    "200m",
+		v1.ResourceMemory: "200",
+	}).Obj()
+
+	// The cycle's pod snapshot is still Deferred, but the informer lister has the resolved pod (no longer Deferred).
+	cyclePod := st.MakePod().Name("p").UID("p").Namespace(v1.NamespaceDefault).Node("node1").Priority(highPriority).Req(map[v1.ResourceName]string{
+		v1.ResourceCPU:    "200m",
+		v1.ResourceMemory: "200",
+	}).Condition(v1.PodResizePending, v1.ConditionTrue, v1.PodReasonDeferred).Obj()
+
+	listerPod := st.MakePod().Name("p").UID("p").Namespace(v1.NamespaceDefault).Node("node1").Priority(highPriority).Req(map[v1.ResourceName]string{
+		v1.ResourceCPU:    "100m",
+		v1.ResourceMemory: "100",
+	}).Obj()
+
+	victimPod := st.MakePod().Name("p1").UID("p1").Namespace(v1.NamespaceDefault).Node("node1").Priority(lowPriority).Req(map[v1.ResourceName]string{
+		v1.ResourceCPU:    "100m",
+		v1.ResourceMemory: "100",
+	}).Obj()
+
+	cs := clientsetfake.NewClientset(listerPod, victimPod, node)
+	informerFactory := informers.NewSharedInformerFactory(cs, 0)
+	registeredPlugins := []tf.RegisterPluginFunc{
+		tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+		tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+		tf.RegisterPluginAsExtensions(noderesources.Name, frameworkruntime.FactoryAdapter(fts, noderesources.NewFit), "Filter", "PreFilter"),
+	}
+
+	cache := internalcache.New(ctx, nil, false, false)
+	snapshot := internalcache.NewTestSnapshotWithPodGroups([]*v1.Pod{cyclePod, victimPod}, []*v1.Node{node}, nil, nil)
+
+	schedFwk, err := tf.NewFramework(
+		ctx,
+		registeredPlugins, "",
+		frameworkruntime.WithClientSet(cs),
+		frameworkruntime.WithEventRecorder(&events.FakeRecorder{}),
+		frameworkruntime.WithPodNominator(internalqueue.NewSchedulingQueue(nil, informerFactory)),
+		frameworkruntime.WithSnapshotSharedLister(snapshot),
+		frameworkruntime.WithMutableSnapshotLister(snapshot),
+		frameworkruntime.WithInformerFactory(informerFactory),
+		frameworkruntime.WithLogger(logger),
+		frameworkruntime.WithPodGroupManager(cache),
+		frameworkruntime.WithPreemptionManager(func(fh fwk.Handle) fwk.PreemptionManager {
+			return preemption.NewPreemptionManager(fh, fts)
+		}),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	pl, err := New(ctx, getDefaultDefaultPreemptionArgs(), schedFwk, fts)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	informerFactory.Start(ctx.Done())
+	informerFactory.WaitForCacheSync(ctx.Done())
+
+	cycleState := framework.NewCycleState()
+	if _, status, _ := schedFwk.RunPreFilterPlugins(ctx, cycleState, cyclePod); !status.IsSuccess() {
+		t.Fatalf("Unexpected PreFilter status: %v", status)
+	}
+
+	filteredNodesStatuses := framework.NewNodeToStatus(map[string]*fwk.Status{
+		"node1": fwk.NewStatus(fwk.Unschedulable),
+	}, fwk.NewStatus(fwk.UnschedulableAndUnresolvable))
+
+	gotResult, gotStatus := pl.PostFilter(ctx, cycleState, cyclePod, filteredNodesStatuses)
+	if !gotStatus.IsSuccess() {
+		t.Fatalf("Expected PostFilter to succeed with ModeNoop when lister pod is resolved, got: %v", gotStatus)
+	}
+	if gotResult == nil || gotResult.Mode() != fwk.ModeNoop {
+		t.Errorf("Expected ModeNoop PostFilterResult, got: %+v", gotResult)
+	}
+	if _, err := cs.CoreV1().Pods(victimPod.Namespace).Get(ctx, victimPod.Name, metav1.GetOptions{}); err != nil {
+		t.Errorf("Expected victim pod not to be preempted, got error: %v", err)
+	}
+}

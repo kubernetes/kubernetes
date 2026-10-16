@@ -129,14 +129,15 @@ func (sched *Scheduler) addPod(obj interface{}) {
 		return
 	}
 
+	// Cache first: scheduling a deferred resize pod assumes nodeInfo already counts it.
+	if assignedPod(pod) {
+		sched.addAssignedPodToCache(pod)
+	}
 	isPodDeferred := utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingSchedulerPreemption) &&
 		resource.IsPodResizeDeferred(pod) && !resource.IsPodResizeSchedulerEvaluationCompleted(pod) &&
 		!sched.profilesWithoutDeferredPodScheduling.Has(pod.Spec.SchedulerName)
 	if responsibleForPod(pod, sched.Profiles) && (!assignedPod(pod) || isPodDeferred) {
 		sched.addPodToSchedulingQueue(pod)
-	}
-	if assignedPod(pod) {
-		sched.addAssignedPodToCache(pod)
 	}
 }
 
@@ -154,6 +155,7 @@ func (sched *Scheduler) updatePod(oldObj, newObj interface{}) {
 	}
 
 	if assignedPod(oldPod) {
+		sched.updateAssignedPodInCache(oldPod, newPod)
 		if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingSchedulerPreemption) && responsibleForPod(newPod, sched.Profiles) && !sched.profilesWithoutDeferredPodScheduling.Has(newPod.Spec.SchedulerName) {
 			oldDeferred := resource.IsPodResizeDeferred(oldPod) && !resource.IsPodResizeSchedulerEvaluationCompleted(oldPod)
 			newDeferred := resource.IsPodResizeDeferred(newPod) && !resource.IsPodResizeSchedulerEvaluationCompleted(newPod)
@@ -175,7 +177,6 @@ func (sched *Scheduler) updatePod(oldObj, newObj interface{}) {
 				sched.SchedulingQueue.Update(klog.NewContext(context.Background(), logger), oldPod, newPod)
 			}
 		}
-		sched.updateAssignedPodInCache(oldPod, newPod)
 	} else if assignedPod(newPod) {
 		// This update means binding operation. We can treat it as adding the pod to a cache
 		// (addition to the cache will handle this binding appropriately).
