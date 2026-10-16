@@ -576,7 +576,7 @@ func TestPostFilter(t *testing.T) {
 				EnableInPlacePodVerticalScalingSchedulerPreemption: true,
 			},
 			wantResult: framework.NewPostFilterResultWithNominatedNode("node1"),
-			wantStatus: fwk.NewStatus(fwk.Success, "preemption: found a potential placement for pod on node node1, preempting 1 victims"),
+			wantStatus: fwk.NewStatus(fwk.Success, "preemption: found potential victims for pod resize on node node1, preempting 1 victims"),
 		},
 		{
 			name: "deferred pod resize preemption success (bypasses skipped filter plugins)",
@@ -615,7 +615,7 @@ func TestPostFilter(t *testing.T) {
 				Predicates:       []tf.FitPredicate{tf.ErrorPredicateExtender},
 			},
 			wantResult: framework.NewPostFilterResultWithNominatedNode("node1"),
-			wantStatus: fwk.NewStatus(fwk.Success, "preemption: found a potential placement for pod on node node1, preempting 1 victims"),
+			wantStatus: fwk.NewStatus(fwk.Success, "preemption: found potential victims for pod resize on node node1, preempting 1 victims"),
 		},
 		{
 			name: "deferred pod resize preemption fails because victim search is isolated to host node",
@@ -656,7 +656,38 @@ func TestPostFilter(t *testing.T) {
 				Predicates:       []tf.FitPredicate{tf.TruePredicateExtender},
 			},
 			wantResult: framework.NewPostFilterResultWithNominatedNode(""),
-			wantStatus: fwk.NewStatus(fwk.Unschedulable, "preemption: 0/2 nodes are available: 1 No preemption victims found for incoming pod, 1 Preemption is not helpful for scheduling."),
+			wantStatus: fwk.NewStatus(fwk.Unschedulable, "preemption: 0/1 nodes are available: 1 No preemption victims found for pod resize."),
+		},
+		{
+			name: "deferred pod resize preemption is not helpful when the assigned node is unresolvable",
+			pod: st.MakePod().Name("p").UID("p").Namespace(v1.NamespaceDefault).Node("node1").Priority(highPriority).Req(map[v1.ResourceName]string{
+				v1.ResourceCPU:    "200m",
+				v1.ResourceMemory: "200",
+			}).Condition(v1.PodResizePending, v1.ConditionTrue, v1.PodReasonDeferred).Obj(),
+			pods: []*v1.Pod{
+				st.MakePod().Name("p").UID("p").Namespace(v1.NamespaceDefault).Node("node1").Priority(highPriority).Req(map[v1.ResourceName]string{
+					v1.ResourceCPU:    "200m",
+					v1.ResourceMemory: "200",
+				}).Condition(v1.PodResizePending, v1.ConditionTrue, v1.PodReasonDeferred).Obj(),
+			},
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{
+					v1.ResourceCPU:    "200m",
+					v1.ResourceMemory: "200",
+				}).Obj(),
+				st.MakeNode().Name("node2").Capacity(map[v1.ResourceName]string{
+					v1.ResourceCPU:    "200m",
+					v1.ResourceMemory: "200",
+				}).Obj(),
+			},
+			filteredNodesStatuses: framework.NewNodeToStatus(map[string]*fwk.Status{
+				"node1": fwk.NewStatus(fwk.UnschedulableAndUnresolvable),
+			}, fwk.NewStatus(fwk.UnschedulableAndUnresolvable)),
+			features: feature.Features{
+				EnableInPlacePodVerticalScalingSchedulerPreemption: true,
+			},
+			wantResult: framework.NewPostFilterResultWithNominatedNode(""),
+			wantStatus: fwk.NewStatus(fwk.Unschedulable, "preemption: 0/1 nodes are available: 1 Preemption is not helpful for pod resize."),
 		},
 		{
 			name: "deferred pod resize preemption reprieves victims using max(allocated, actual) (partial reprieve)",
@@ -713,7 +744,7 @@ func TestPostFilter(t *testing.T) {
 				EnableInPlacePodVerticalScalingSchedulerPreemption: true,
 			},
 			wantResult: framework.NewPostFilterResultWithNominatedNode("node1"),
-			wantStatus: fwk.NewStatus(fwk.Success, "preemption: found a potential placement for pod on node node1, preempting 1 victims"),
+			wantStatus: fwk.NewStatus(fwk.Success, "preemption: found potential victims for pod resize on node node1, preempting 1 victims"),
 		},
 		{
 			name: "deferred pod resize preemption evaluates non-victim deferred resize pods on the node using max(allocated, actual)",
@@ -766,7 +797,7 @@ func TestPostFilter(t *testing.T) {
 				EnableInPlacePodVerticalScalingSchedulerPreemption: true,
 			},
 			wantResult: framework.NewPostFilterResultWithNominatedNode("node1"),
-			wantStatus: fwk.NewStatus(fwk.Success, "preemption: found a potential placement for pod on node node1, preempting 1 victims"),
+			wantStatus: fwk.NewStatus(fwk.Success, "preemption: found potential victims for pod resize on node node1, preempting 1 victims"),
 		},
 		{
 			name: "deferred pod resize preemption reprieves victims with pod-level resources using max(allocated, actual)",
@@ -823,7 +854,7 @@ func TestPostFilter(t *testing.T) {
 				EnableInPlacePodVerticalScalingSchedulerPreemption: true,
 			},
 			wantResult: framework.NewPostFilterResultWithNominatedNode("node1"),
-			wantStatus: fwk.NewStatus(fwk.Success, "preemption: found a potential placement for pod on node node1, preempting 1 victims"),
+			wantStatus: fwk.NewStatus(fwk.Success, "preemption: found potential victims for pod resize on node node1, preempting 1 victims"),
 		},
 	}
 
