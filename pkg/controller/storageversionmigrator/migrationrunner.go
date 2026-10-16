@@ -365,8 +365,12 @@ func (crc *MigrationRunnerController) finishCRDMigration(ctx context.Context, cr
 			return err
 		}
 		migratingCond := apihelpers.FindCRDCondition(crd, apiextensionsv1.StorageMigrating)
+		// A failed migration may have left objects in an older version, so
+		// only a successful one may drop old versions from storedVersions.
+		// Otherwise those versions could be removed from the CRD and the
+		// remaining objects would become unreadable.
 		var canUpdateStoredVersions bool
-		if migratingCond != nil && migratingCond.ObservedGeneration == crd.Generation {
+		if success && migratingCond != nil && migratingCond.ObservedGeneration == crd.Generation {
 			canUpdateStoredVersions = true
 		}
 
