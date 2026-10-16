@@ -157,12 +157,22 @@ func (d CPUDetails) coresInUncoreCache(cpusPerCore int, ids ...int) cpuset.CPUSe
 		// SMT/hyperthreading disabled case, return all cores
 		return coresInUncore
 	}
-	cpusByCore := d.CPUsByCore()
 	// return only cores that have all CPUs available when SMT/hyperthreading enabled
+	count := cpuCountByCore(d, coresInUncore)
 	fullCores := slices.DeleteFunc(coresInUncore.UnsortedList(), func(coreID int) bool {
-		return len(cpusByCore[coreID]) != cpusPerCore
+		return count[coreID] != cpusPerCore
 	})
 	return cpuset.New(fullCores...)
+}
+
+func cpuCountByCore(d CPUDetails, restriction cpuset.CPUSet) map[int]int {
+	cpuCountByCore := make(map[int]int, restriction.Size())
+	for _, info := range d {
+		if restriction.Contains(info.CoreID) {
+			cpuCountByCore[info.CoreID]++
+		}
+	}
+	return cpuCountByCore
 }
 
 // CPUsInUncoreCaches returns all the logical CPU IDs associated with the given
