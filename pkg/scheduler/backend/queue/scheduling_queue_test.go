@@ -1546,7 +1546,7 @@ func TestPriorityQueue_QueuedPodGroupInfoChildrenSorted(t *testing.T) {
 		var order []fwk.EntityKey
 		for _, child := range children {
 			order = append(order, child.GetKey())
-			order = append(order, flattenChildrenPreOrder(child.Children)...)
+			order = append(order, flattenChildrenPreOrder(child.Children())...)
 		}
 		return order
 	}
@@ -1641,7 +1641,7 @@ func TestPriorityQueue_QueuedPodGroupInfoChildrenSorted(t *testing.T) {
 				if entity == nil {
 					t.Fatalf("expected cpg-root to be present in queue")
 				}
-				gotOrderedChildren = flattenChildrenPreOrder(entity.(*framework.QueuedPodGroupInfo).Children)
+				gotOrderedChildren = flattenChildrenPreOrder(entity.(*framework.QueuedPodGroupInfo).Children())
 			})
 			if diff := cmp.Diff(tt.wantOrderedChildren, gotOrderedChildren); diff != "" {
 				t.Errorf("unexpected children order in queue (-want, +got):\n%s", diff)
@@ -6353,7 +6353,6 @@ func makeQueuedPodGroup(namespace, pgName string, podInfos ...*framework.QueuedP
 	pgqi := &framework.QueuedPodGroupInfo{
 		PodGroupInfo: &framework.PodGroupInfo{
 			GenericPodGroup: fwk.NewGenericPodGroup(pg),
-			Children:        make([]*framework.PodGroupInfo, 0),
 		},
 	}
 	for _, pInfo := range podInfos {
@@ -10245,7 +10244,7 @@ func findPodGroupInfoInActiveQ(q *PriorityQueue, namespace, name string, entityT
 		if pgi.GetNamespace() == namespace && pgi.GetName() == name && pgi.GetType() == entityType {
 			return pgi
 		}
-		for _, child := range pgi.Children {
+		for _, child := range pgi.Children() {
 			if found := search(child); found != nil {
 				return found
 			}

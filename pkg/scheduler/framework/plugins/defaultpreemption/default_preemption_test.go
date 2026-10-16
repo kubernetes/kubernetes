@@ -4374,11 +4374,9 @@ func newPGInfo(pg *v1beta1.PodGroup, pods ...*v1.Pod) *framework.PodGroupInfo {
 
 // newCPGInfo creates a PodGroupInfo representing a CompositePodGroup hierarchy.
 func newCPGInfo(cpg *v1alpha3.CompositePodGroup, children []*framework.PodGroupInfo, pods ...*v1.Pod) *framework.PodGroupInfo {
-	return &framework.PodGroupInfo{
-		GenericPodGroup: fwk.NewGenericCompositePodGroup(cpg),
-		UnscheduledPods: pods,
-		Children:        children,
-	}
+	pgi := framework.NewPodGroupInfo(fwk.NewGenericCompositePodGroup(cpg), children...)
+	pgi.UnscheduledPods = pods
+	return pgi
 }
 
 // extractGroups is an auxiliary method to extract all PodGroups and CompositePodGroups
@@ -4398,7 +4396,7 @@ func extractGroups(pgInfo *framework.PodGroupInfo) ([]*v1beta1.PodGroup, []*v1al
 		if info.CompositePodGroup != nil {
 			cpgs = append(cpgs, info.CompositePodGroup)
 		}
-		for _, child := range info.Children {
+		for _, child := range info.Children() {
 			traverse(child)
 		}
 	}
