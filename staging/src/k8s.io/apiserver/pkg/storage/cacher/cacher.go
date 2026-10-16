@@ -647,7 +647,18 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 	var cacheInterval *watchCacheInterval
 
 	if opts.SendInitialEvents != nil && *opts.SendInitialEvents {
-		cacheInterval, _, err = c.watchCache.getIntervalFromStoreLocked(ctx, key, opts)
+		_, matchesSingle := opts.Predicate.MatchesSingle()
+		matchesSingle = matchesSingle && !opts.Recursive
+		// When not matching a single key, an immutable snapshot lets us
+		// defer the O(N) interval build off the watchCache lock.
+		if !matchesSingle {
+			snapshot, _ := c.watchCache.getLatestSnapshotLocked(ctx, opts.Predicate.MatcherIndex(ctx))
+			cacheInterval = newCacheIntervalFromLazySnapshot(currentResourceVersion, snapshot, key)
+		} else {
+			snap := c.watchCache.storage.LatestSnapshot()
+			c.watchCache.checkSnapshotResourceVersion(snap, currentResourceVersion)
+			cacheInterval, err = newCacheIntervalFromStore(currentResourceVersion, snap, key, matchesSingle)
+		}
 	} else {
 		if requiredResourceVersion == 0 {
 			if opts.SendInitialEvents == nil {
@@ -657,7 +668,18 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 				// current state and only then start watching from that point.
 				//
 				// TODO: In v2 api, we should stop returning the current state - #13969.
-				cacheInterval, _, err = c.watchCache.getIntervalFromStoreLocked(ctx, key, opts)
+				_, matchesSingle := opts.Predicate.MatchesSingle()
+				matchesSingle = matchesSingle && !opts.Recursive
+				// When not matching a single key, an immutable snapshot lets us
+				// defer the O(N) interval build off the watchCache lock.
+				if !matchesSingle {
+					snapshot, _ := c.watchCache.getLatestSnapshotLocked(ctx, opts.Predicate.MatcherIndex(ctx))
+					cacheInterval = newCacheIntervalFromLazySnapshot(currentResourceVersion, snapshot, key)
+				} else {
+					snap := c.watchCache.storage.LatestSnapshot()
+					c.watchCache.checkSnapshotResourceVersion(snap, currentResourceVersion)
+					cacheInterval, err = newCacheIntervalFromStore(currentResourceVersion, snap, key, matchesSingle)
+				}
 			} else {
 				// SendInitialEvents = false and resourceVersion = 0
 				// means that the request would like to start watching
