@@ -1,4 +1,9 @@
 rules:
+  # The framework may access feature gates directly.
+  - selectorRegexp: ^k8s[.]io/apiserver/pkg/util/feature$
+    allowedPrefixes:
+      - k8s.io/apiserver/pkg/util/feature
+
   # The core E2E framework is meant to be a normal Kubernetes client,
   # which means that it shouldn't depend on internal code.
   # The following packages are okay to use:
