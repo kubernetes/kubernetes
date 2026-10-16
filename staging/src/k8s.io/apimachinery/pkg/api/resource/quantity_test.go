@@ -2947,21 +2947,31 @@ func TestMostNegativeAtUnrepresentableScaleStaysInt64(t *testing.T) {
 		// The guard must look at the receiver's scale too. A mostNegative
 		// subtrahend at a normal scale would otherwise force the inf.Dec fallback,
 		// which promotes this MinInt32-scale receiver and panics in the rescale.
+		// It stays on int64 only because 0 - MinInt32 overflows int32 to MinInt32
+		// in int64Amount.Add, skipping scaling in positiveScaleInt64.
 		q := intQuantity(5, minScale, DecimalSI)
 		q.Sub(intQuantity(mostNegative, 0, DecimalSI))
 		if q.d.Dec != nil {
 			t.Fatal("Sub promoted a MinInt32-scale receiver to inf.Dec")
+		}
+		if want := (int64Amount{value: mostNegative + 5, scale: minScale}); q.i != want {
+			t.Fatalf("Sub result = %#v, want %#v", q.i, want)
 		}
 	})
 
 	t.Run("unalignableScaleDeltaStaysInt64", func(t *testing.T) {
 		// Both scales are representable on their own, but their alignment delta
 		// (MaxInt32+1) is not. Forcing the inf.Dec fallback here would overflow
-		// the rescale exponent and panic, so this stays on the int64 path.
+		// the rescale exponent and panic, so this stays on the int64 path, where
+		// MaxInt32 - (-1) overflows int32 to MinInt32 in int64Amount.Add and skips
+		// scaling in positiveScaleInt64.
 		q := intQuantity(1, Scale(math.MaxInt32), DecimalSI)
 		q.Sub(intQuantity(mostNegative, -1, DecimalSI))
 		if q.d.Dec != nil {
 			t.Fatal("Sub promoted an unalignable scale pair to inf.Dec")
+		}
+		if want := (int64Amount{value: mostNegative + 1, scale: -1}); q.i != want {
+			t.Fatalf("Sub result = %#v, want %#v", q.i, want)
 		}
 	})
 }
