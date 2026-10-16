@@ -321,3 +321,10 @@ func NewPostFilterResultWithNominatedNode(name string) *fwk.PostFilterResult {
 		},
 	}
 }
+
+// IsRelevantForPodResize reports whether the plugin runs for a pod with a deferred resize:
+// only plugins that implement fwk.RelevancePlugin and return true do.
+func IsRelevantForPodResize(pl fwk.Plugin) bool {
+	rp, ok := pl.(fwk.RelevancePlugin)
+	return ok && rp.IsRelevantForPodResize()
+}

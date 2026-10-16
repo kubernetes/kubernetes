@@ -21,7 +21,6 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/component-helpers/resource"
 	v1helper "k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
@@ -33,11 +32,9 @@ import (
 // NodeUnschedulable plugin filters nodes that set node.Spec.Unschedulable=true unless
 // the pod tolerates {key=node.kubernetes.io/unschedulable, effect:NoSchedule} taint.
 type NodeUnschedulable struct {
-	enableInPlacePodVerticalScalingSchedulerPreemption bool
-	enableTaintTolerationComparisonOperators           bool
+	enableTaintTolerationComparisonOperators bool
 }
 
-var _ fwk.PreFilterPlugin = &NodeUnschedulable{}
 var _ fwk.FilterPlugin = &NodeUnschedulable{}
 var _ fwk.EnqueueExtensions = &NodeUnschedulable{}
 var _ fwk.SignPlugin = &NodeUnschedulable{}
@@ -124,24 +121,8 @@ func (pl *NodeUnschedulable) SignPod(ctx context.Context, pod *v1.Pod) ([]fwk.Si
 	}, nil
 }
 
-// PreFilter invoked at the prefilter extension point.
-func (pl *NodeUnschedulable) PreFilter(ctx context.Context, cycleState fwk.CycleState, pod *v1.Pod, nodes []fwk.NodeInfo) (*fwk.PreFilterResult, *fwk.Status) {
-	if pl.enableInPlacePodVerticalScalingSchedulerPreemption && resource.IsPodResizeDeferred(pod) {
-		return nil, fwk.NewStatus(fwk.Skip)
-	}
-	return nil, nil
-}
-
-// PreFilterExtensions do not exist for this plugin.
-func (pl *NodeUnschedulable) PreFilterExtensions() fwk.PreFilterExtensions {
-	return nil
-}
-
 // Filter invoked at the filter extension point.
 func (pl *NodeUnschedulable) Filter(ctx context.Context, _ fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) *fwk.Status {
-	if pl.enableInPlacePodVerticalScalingSchedulerPreemption && resource.IsPodResizeDeferred(pod) {
-		return nil
-	}
 	node := nodeInfo.Node()
 
 	if !node.Spec.Unschedulable {
@@ -164,7 +145,6 @@ func (pl *NodeUnschedulable) Filter(ctx context.Context, _ fwk.CycleState, pod *
 // New initializes a new plugin and returns it.
 func New(_ context.Context, _ runtime.Object, _ fwk.Handle, fts feature.Features) (fwk.Plugin, error) {
 	return &NodeUnschedulable{
-		enableInPlacePodVerticalScalingSchedulerPreemption: fts.EnableInPlacePodVerticalScalingSchedulerPreemption,
-		enableTaintTolerationComparisonOperators:           fts.EnableTaintTolerationComparisonOperators,
+		enableTaintTolerationComparisonOperators: fts.EnableTaintTolerationComparisonOperators,
 	}, nil
 }

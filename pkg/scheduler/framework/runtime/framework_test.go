@@ -5875,3 +5875,117 @@ func newQueuedPodGroupInfoForTest(ns, name string) *framework.QueuedPodGroupInfo
 		},
 	}
 }
+
+type relevanceTestPlugin struct {
+	*TestPlugin
+	relevant bool
+}
+
+var _ fwk.RelevancePlugin = &relevanceTestPlugin{}
+
+func (p *relevanceTestPlugin) IsRelevantForPodResize() bool {
+	return p.relevant
+}
+
+func TestResizePlugins(t *testing.T) {
+	regularPod := st.MakePod().Name("regular").UID("regular").Obj()
+	deferredResizePod := st.MakePod().Name("deferred").UID("deferred").
+		Condition(v1.PodResizePending, v1.ConditionTrue, v1.PodReasonDeferred).Obj()
+	// Both irrelevant plugins reject every node, so a filter run that doesn't skip them fails.
+	rejectAll := injectedResult{FilterStatus: int(fwk.Unschedulable)}
+	notImplementing := &TestPlugin{name: "not-implementing", inj: rejectAll}
+	optedOut := &relevanceTestPlugin{TestPlugin: &TestPlugin{name: "opted-out", inj: rejectAll}, relevant: false}
+	relevant := &relevanceTestPlugin{TestPlugin: &TestPlugin{name: "relevant"}, relevant: true}
+	allPlugins := []fwk.Plugin{notImplementing, optedOut, relevant}
+	allNames := []string{notImplementing.Name(), optedOut.Name(), relevant.Name()}
+
+	tests := []struct {
+		name              string
+		enableFeatureGate bool
+		pod               *v1.Pod
+		wantPlugins       []string
+	}{
+		{
+			name:        "feature gate disabled, deferred resize pod: all plugins run",
+			pod:         deferredResizePod,
+			wantPlugins: allNames,
+		},
+		{
+			name:              "regular pod: all plugins run",
+			enableFeatureGate: true,
+			pod:               regularPod,
+			wantPlugins:       allNames,
+		},
+		{
+			name:              "deferred resize pod: only relevant plugins run",
+			enableFeatureGate: true,
+			pod:               deferredResizePod,
+			wantPlugins:       []string{relevant.Name()},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScalingSchedulerPreemption, tt.enableFeatureGate)
+			_, ctx := ktesting.NewTestContext(t)
+
+			f := &frameworkImpl{
+				snapshotSharedLister: cache.NewEmptySnapshot(),
+				pluginsMap:           map[string]fwk.Plugin{},
+			}
+			for _, pl := range allPlugins {
+				f.pluginsMap[pl.Name()] = pl
+				f.preFilterPlugins = append(f.preFilterPlugins, pl.(fwk.PreFilterPlugin))
+				f.filterPlugins = append(f.filterPlugins, pl.(fwk.FilterPlugin))
+				f.postFilterPlugins = append(f.postFilterPlugins, pl.(fwk.PostFilterPlugin))
+				f.preScorePlugins = append(f.preScorePlugins, pl.(fwk.PreScorePlugin))
+				f.scorePlugins = append(f.scorePlugins, pl.(fwk.ScorePlugin))
+				f.reservePlugins = append(f.reservePlugins, pl.(fwk.ReservePlugin))
+				f.permitPlugins = append(f.permitPlugins, pl.(fwk.PermitPlugin))
+				f.preBindPlugins = append(f.preBindPlugins, pl.(fwk.PreBindPlugin))
+				f.bindPlugins = append(f.bindPlugins, pl.(fwk.BindPlugin))
+				f.postBindPlugins = append(f.postBindPlugins, pl.(fwk.PostBindPlugin))
+			}
+			f.setResizePlugins()
+
+			for extensionPoint, got := range map[string][]string{
+				"PreFilter":  pluginNames(pluginsForPod(f, tt.pod, f.preFilterPlugins, f.resizePreFilterPlugins)),
+				"Filter":     pluginNames(pluginsForPod(f, tt.pod, f.filterPlugins, f.resizeFilterPlugins)),
+				"PostFilter": pluginNames(pluginsForPod(f, tt.pod, f.postFilterPlugins, f.resizePostFilterPlugins)),
+				"PreScore":   pluginNames(pluginsForPod(f, tt.pod, f.preScorePlugins, f.resizePreScorePlugins)),
+				"Score":      pluginNames(pluginsForPod(f, tt.pod, f.scorePlugins, f.resizeScorePlugins)),
+				"Reserve":    pluginNames(pluginsForPod(f, tt.pod, f.reservePlugins, f.resizeReservePlugins)),
+				"Permit":     pluginNames(pluginsForPod(f, tt.pod, f.permitPlugins, f.resizePermitPlugins)),
+				"PreBind":    pluginNames(pluginsForPod(f, tt.pod, f.preBindPlugins, f.resizePreBindPlugins)),
+				"Bind":       pluginNames(pluginsForPod(f, tt.pod, f.bindPlugins, f.resizeBindPlugins)),
+				"PostBind":   pluginNames(pluginsForPod(f, tt.pod, f.postBindPlugins, f.resizePostBindPlugins)),
+			} {
+				if diff := cmp.Diff(tt.wantPlugins, got); diff != "" {
+					t.Errorf("Unexpected %s plugins (-want,+got):\n%s", extensionPoint, diff)
+				}
+			}
+
+			state := framework.NewCycleState()
+			if _, status, _ := f.RunPreFilterPlugins(ctx, state, tt.pod); !status.IsSuccess() {
+				t.Fatalf("RunPreFilterPlugins failed: %v", status)
+			}
+			if skipped := state.GetSkipFilterPlugins(); len(skipped) != 0 {
+				t.Errorf("Expected SkipFilterPlugins to be empty, got %v", skipped)
+			}
+			nodeInfo := framework.NewNodeInfo()
+			nodeInfo.SetNode(st.MakeNode().Name(nodeName).Obj())
+			status := f.RunFilterPlugins(ctx, state, tt.pod, nodeInfo)
+			if wantRejected := len(tt.wantPlugins) == len(allNames); status.IsRejected() != wantRejected {
+				t.Errorf("RunFilterPlugins status = %v, want rejected = %v", status, wantRejected)
+			}
+		})
+	}
+}
+
+func pluginNames[T fwk.Plugin](plugins []T) []string {
+	var names []string
+	for _, pl := range plugins {
+		names = append(names, pl.Name())
+	}
+	return names
+}

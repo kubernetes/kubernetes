@@ -47,6 +47,7 @@ var _ fwk.PreScorePlugin = &Fit{}
 var _ fwk.ScorePlugin = &Fit{}
 var _ fwk.SignPlugin = &Fit{}
 var _ fwk.PlacementScorePlugin = &Fit{}
+var _ fwk.RelevancePlugin = &Fit{}
 
 const (
 	// Name is the name of the plugin used in the plugin registry and configurations.
@@ -100,6 +101,12 @@ type Fit struct {
 	handle                                             fwk.Handle
 	*resourceAllocationScorer
 	placementScorer *resourceAllocationScorer
+}
+
+// IsRelevantForPodResize returns true to indicate that NodeResourcesFit is relevant for pod resizes,
+// as it evaluates whether the node has sufficient resources for the resized pod.
+func (f *Fit) IsRelevantForPodResize() bool {
+	return true
 }
 
 // ScoreExtensions of the Score plugin.

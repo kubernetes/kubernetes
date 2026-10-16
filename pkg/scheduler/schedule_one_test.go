@@ -5351,8 +5351,10 @@ func TestScheduler_DeferredResizePluginSkipping(t *testing.T) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	// Create a node and a deferred resize pod assigned to that node
-	node := &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node1"}}
+	// Create a node and a deferred resize pod assigned to that node. The taint and the cordon would make
+	// TaintToleration and NodeUnschedulable reject the node, so the pod only fits if they sit out.
+	node := st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{v1.ResourcePods: "10"}).
+		Taints([]v1.Taint{{Key: "dedicated", Effect: v1.TaintEffectNoSchedule}}).Unschedulable(true).Obj()
 	pod := st.MakePod().Name("pod1").Namespace("ns1").UID("pod1").Node("node1").
 		Condition(v1.PodResizePending, v1.ConditionTrue, v1.PodReasonDeferred).Obj()
 
@@ -5382,8 +5384,8 @@ func TestScheduler_DeferredResizePluginSkipping(t *testing.T) {
 		tf.RegisterPluginAsExtensions(interpodaffinity.Name, frameworkruntime.FactoryAdapter(fts, interpodaffinity.New), "PreFilter", "Filter"),
 		tf.RegisterPluginAsExtensions(nodedeclaredfeatures.Name, frameworkruntime.FactoryAdapter(fts, nodedeclaredfeatures.New), "PreFilter", "Filter"),
 		tf.RegisterPluginAsExtensions(dynamicresources.Name, frameworkruntime.FactoryAdapter(fts, dynamicresources.New), "PreFilter", "Filter"),
-		tf.RegisterPluginAsExtensions(tainttoleration.Name, frameworkruntime.FactoryAdapter(fts, tainttoleration.New), "PreFilter", "Filter"),
-		tf.RegisterPluginAsExtensions(nodeunschedulable.Name, frameworkruntime.FactoryAdapter(fts, nodeunschedulable.New), "PreFilter", "Filter"),
+		tf.RegisterPluginAsExtensions(tainttoleration.Name, frameworkruntime.FactoryAdapter(fts, tainttoleration.New), "Filter"),
+		tf.RegisterPluginAsExtensions(nodeunschedulable.Name, frameworkruntime.FactoryAdapter(fts, nodeunschedulable.New), "Filter"),
 		tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 	}
 
@@ -5409,54 +5411,16 @@ func TestScheduler_DeferredResizePluginSkipping(t *testing.T) {
 
 	state := framework.NewCycleState()
 	podInfo := queuedPodInfoForPod(pod)
-
-	// Run schedulePod
-	_, _ = sched.algorithm.SchedulePod(ctx, schedFramework, state, podInfo)
-
-	// Verify the skipped plugins
-	skipped := state.GetSkipFilterPlugins()
-
-	// Irrelevant plugins should be skipped
-	irrelevant := []string{
-		nodeaffinity.Name,
-		podtopologyspread.Name,
-		nodevolumelimits.CSIName,
-		nodeports.Name,
-		volumebinding.Name,
-		volumezone.Name,
-		volumerestrictions.Name,
-		interpodaffinity.Name,
-		nodedeclaredfeatures.Name,
-		dynamicresources.Name,
-		tainttoleration.Name,
-		nodeunschedulable.Name,
+	result, err := sched.algorithm.SchedulePod(ctx, schedFramework, state, podInfo)
+	if err != nil {
+		t.Fatalf("SchedulePod failed for the deferred resize pod: %v", err)
+	}
+	if result.SuggestedHost != node.Name {
+		t.Errorf("Got suggested host %q, want %q", result.SuggestedHost, node.Name)
 	}
 
-	for _, name := range irrelevant {
-		if !skipped.Has(name) {
-			t.Errorf("Expected plugin %s to be skipped, but it was not", name)
-		}
-	}
-
-	// Relevant plugins must NOT be skipped
-	relevant := []string{
-		nodename.Name,
-		noderesources.Name,
-	}
-
-	for _, name := range relevant {
-		if skipped.Has(name) {
-			t.Errorf("Expected plugin %s to NOT be skipped, but it was", name)
-		}
-	}
-
-	// Assert lengths for future-proofing. If new plugins are registered in this test but not
-	// categorized as relevant/irrelevant or not implemented properly, these length assertions will fail.
-	if len(relevant) != 2 {
-		t.Errorf("Expected exactly 2 relevant plugins, got %d", len(relevant))
-	}
-	if len(skipped) != len(irrelevant) {
-		t.Errorf("Expected exactly %d skipped plugins, got %d (skipped list: %v)", len(irrelevant), len(skipped), skipped.UnsortedList())
+	if skipped := state.GetSkipFilterPlugins(); len(skipped) != 0 {
+		t.Errorf("Expected no plugins in SkipFilterPlugins (irrelevant plugins are excluded from the resize plugin list rather than marked skipped), got %v", skipped.UnsortedList())
 	}
 }
 

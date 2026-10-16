@@ -23,7 +23,6 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/component-helpers/resource"
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
@@ -503,9 +502,6 @@ func (pl *InterPodAffinity) getIncomingAffinityAntiAffinityCounts(ctx context.Co
 // Finally, if no global tracking maps were populated, no host-scoped evaluation is needed, and the incoming pod
 // has no terms of its own, PreFilter returns `fwk.Skip` to completely bypass this plugin during the Filter phase.
 func (pl *InterPodAffinity) PreFilter(ctx context.Context, cycleState fwk.CycleState, pod *v1.Pod, allNodes []fwk.NodeInfo) (*fwk.PreFilterResult, *fwk.Status) {
-	if pl.enableInPlacePodVerticalScalingSchedulerPreemption && resource.IsPodResizeDeferred(pod) {
-		return nil, fwk.NewStatus(fwk.Skip)
-	}
 	s := &preFilterState{
 		enableInterPodAffinityHostnameFastPath: pl.enableInterPodAffinityHostnameFastPath,
 	}
@@ -820,9 +816,6 @@ func satisfiesSelfAffinityCheck(state *preFilterState, nodeInfo fwk.NodeInfo) bo
 //     - Dynamically iterates over the local node's pods that have host-scoped anti-affinity to see if
 //     they reject the incoming pod.
 func (pl *InterPodAffinity) Filter(ctx context.Context, cycleState fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) *fwk.Status {
-	if pl.enableInPlacePodVerticalScalingSchedulerPreemption && resource.IsPodResizeDeferred(pod) {
-		return nil
-	}
 
 	state, err := getPreFilterState(cycleState)
 	if err != nil {
