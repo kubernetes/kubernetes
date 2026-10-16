@@ -20,6 +20,7 @@ import (
 	"context"
 	"maps"
 	"reflect"
+	"slices"
 	"testing"
 	"time"
 
@@ -1676,7 +1677,11 @@ func TestUpdateCompositePodGroup(t *testing.T) {
 			}
 
 			if tt.cpgEnabled {
-				sched.Cache.AddGenericPodGroup(fwk.NewGenericCompositePodGroup(oldCPG))
+				initialCPG, ok := tt.oldCPG.(*schedulingv1alpha3.CompositePodGroup)
+				if !ok {
+					initialCPG = oldCPG
+				}
+				sched.Cache.AddGenericPodGroup(fwk.NewGenericCompositePodGroup(initialCPG))
 			}
 
 			if tt.triggerQueueingHint {
@@ -1990,6 +1995,203 @@ func TestEventHandlers_DeferredResize(t *testing.T) {
 			inCache := err == nil
 			if inCache != tt.expectInCache {
 				t.Errorf("Unexpected cache state: got inCache=%v, want inCache=%v", inCache, tt.expectInCache)
+			}
+		})
+	}
+}
+
+// TestUpdatePodGroupRecreatedWithDifferentParent verifies that recreating a
+// PodGroup with a different UID updates its parent CompositePodGroup links.
+func TestUpdatePodGroupRecreatedWithDifferentParent(t *testing.T) {
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.GenericWorkload:                 true,
+		features.TopologyAwareWorkloadScheduling: true,
+		features.CompositePodGroup:               true,
+	})
+
+	logger, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	oldParent := st.MakeCompositePodGroup().Namespace("ns1").Name("old-parent").Obj()
+	newParent := st.MakeCompositePodGroup().Namespace("ns1").Name("new-parent").Obj()
+	oldPG := st.MakePodGroup().Namespace("ns1").Name("pg1").UID("old-uid").ParentCompositePodGroup("old-parent").Obj()
+	oldPG.ResourceVersion = "1"
+	newPG := st.MakePodGroup().Namespace("ns1").Name("pg1").UID("new-uid").ParentCompositePodGroup("new-parent").Obj()
+	newPG.ResourceVersion = "2"
+
+	sched := &Scheduler{
+		Cache:                    internalcache.New(ctx, nil, true, true),
+		SchedulingQueue:          internalqueue.NewTestQueue(ctx, nil),
+		podGroupHierarchyTracker: gangscheduling.NewHierarchyTracker(true),
+		logger:                   logger,
+	}
+
+	sched.Cache.AddGenericPodGroup(fwk.NewGenericCompositePodGroup(oldParent))
+	sched.Cache.AddGenericPodGroup(fwk.NewGenericCompositePodGroup(newParent))
+	sched.Cache.AddGenericPodGroup(fwk.NewGenericPodGroup(oldPG))
+
+	sched.updatePodGroup(oldPG, newPG)
+
+	oldState, err := sched.Cache.CompositePodGroupStates().Get("ns1", "old-parent")
+	if err != nil {
+		t.Fatalf("getting old parent state: %v", err)
+	}
+	newState, err := sched.Cache.CompositePodGroupStates().Get("ns1", "new-parent")
+	if err != nil {
+		t.Fatalf("getting new parent state: %v", err)
+	}
+
+	childKey := fwk.PodGroupKey("ns1", "pg1")
+	if slices.Contains(oldState.GetChildren(), childKey) {
+		t.Fatalf("old parent still contains recreated PodGroup %v", childKey)
+	}
+
+	if !slices.Contains(newState.GetChildren(), childKey) {
+		t.Fatalf("new parent does not contain recreated PodGroup %v", childKey)
+	}
+}
+
+// TestRecreatedPodGroupQueueingHints verifies that recreation is processed as
+// Delete followed by Add for both PodGroup and CompositePodGroup.
+func TestRecreatedPodGroupQueueingHints(t *testing.T) {
+	tests := []struct {
+		name     string
+		resource fwk.EventResource
+		run      func(*Scheduler, any, any)
+		oldObj   any
+		newObj   any
+	}{
+		{
+			name:     "PodGroup",
+			resource: fwk.PodGroup,
+			oldObj: func() *schedulingapi.PodGroup {
+				obj := st.MakePodGroup().Namespace("ns1").Name("pg1").UID("old-uid").Obj()
+				obj.ResourceVersion = "1"
+				return obj
+			}(),
+			newObj: func() *schedulingapi.PodGroup {
+				obj := st.MakePodGroup().Namespace("ns1").Name("pg1").UID("new-uid").Obj()
+				obj.ResourceVersion = "2"
+				return obj
+			}(),
+			run: func(s *Scheduler, oldObj, newObj any) {
+				s.updatePodGroup(oldObj, newObj)
+			},
+		},
+		{
+			name:     "CompositePodGroup",
+			resource: fwk.CompositePodGroup,
+			oldObj: func() *schedulingv1alpha3.CompositePodGroup {
+				obj := st.MakeCompositePodGroup().Namespace("ns1").Name("cpg1").UID("old-uid").Obj()
+				obj.ResourceVersion = "1"
+				return obj
+			}(),
+			newObj: func() *schedulingv1alpha3.CompositePodGroup {
+				obj := st.MakeCompositePodGroup().Namespace("ns1").Name("cpg1").UID("new-uid").Obj()
+				obj.ResourceVersion = "2"
+				return obj
+			}(),
+			run: func(s *Scheduler, oldObj, newObj any) {
+				s.updateCompositePodGroup(oldObj, newObj)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cpgEnabled := tt.resource == fwk.CompositePodGroup
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.GenericWorkload:                 true,
+				features.TopologyAwareWorkloadScheduling: cpgEnabled,
+				features.CompositePodGroup:               cpgEnabled,
+			})
+
+			logger, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+
+			type observedEvent struct {
+				action fwk.ActionType
+				oldObj any
+				newObj any
+			}
+			var observed []observedEvent
+
+			queueingHintMap := internalqueue.QueueingHintMapPerProfile{
+				testSchedulerName: {
+					fwk.ClusterEvent{Resource: tt.resource, ActionType: fwk.Delete}: {
+						{PluginName: "recreate-test", QueueingHintFn: func(logger klog.Logger, pod *v1.Pod, oldObj, newObj any) (fwk.QueueingHint, error) {
+							observed = append(observed, observedEvent{action: fwk.Delete, oldObj: oldObj, newObj: newObj})
+							return fwk.QueueSkip, nil
+						}},
+					},
+					fwk.ClusterEvent{Resource: tt.resource, ActionType: fwk.Add}: {
+						{PluginName: "recreate-test", QueueingHintFn: func(logger klog.Logger, pod *v1.Pod, oldObj, newObj any) (fwk.QueueingHint, error) {
+							observed = append(observed, observedEvent{action: fwk.Add, oldObj: oldObj, newObj: newObj})
+							return fwk.QueueSkip, nil
+						}},
+					},
+					fwk.ClusterEvent{Resource: tt.resource, ActionType: fwk.Update}: {
+						{PluginName: "recreate-test", QueueingHintFn: func(logger klog.Logger, pod *v1.Pod, oldObj, newObj any) (fwk.QueueingHint, error) {
+							observed = append(observed, observedEvent{action: fwk.Update, oldObj: oldObj, newObj: newObj})
+							return fwk.QueueSkip, nil
+						}},
+					},
+				},
+			}
+
+			pod := st.MakePod().Namespace("ns1").Name("p").UID("pod-uid").SchedulerName(testSchedulerName).Obj()
+			client := fake.NewClientset(pod)
+			apiDispatcher := apidispatcher.New(client, 16, apicalls.Relevances)
+			apiDispatcher.Run(logger)
+			defer apiDispatcher.Close()
+
+			queue := internalqueue.NewTestQueue(ctx, nil,
+				internalqueue.WithQueueingHintMapPerProfile(queueingHintMap),
+				internalqueue.WithAPIDispatcher(apiDispatcher),
+			)
+			sched := &Scheduler{
+				Cache:                    internalcache.New(ctx, nil, true, cpgEnabled),
+				SchedulingQueue:          queue,
+				podGroupHierarchyTracker: gangscheduling.NewHierarchyTracker(cpgEnabled),
+				logger:                   logger,
+			}
+
+			if tt.resource == fwk.PodGroup {
+				sched.addPodGroup(tt.oldObj)
+			} else {
+				sched.addCompositePodGroup(tt.oldObj)
+			}
+
+			queue.Add(ctx, pod)
+			poppedEntity, err := queue.Pop(logger)
+			if err != nil {
+				t.Fatalf("popping pod: %v", err)
+			}
+			poppedPod := poppedEntity.(*framework.QueuedPodInfo)
+			poppedPod.QueueingParams.Timestamp = time.Now().Add(-10 * time.Minute)
+			poppedPod.QueueingParams.UnschedulablePlugins = sets.New("recreate-test")
+			if err := queue.AddUnschedulablePodIfNotPresent(ctx, poppedPod, queue.SchedulingCycle()); err != nil {
+				t.Fatalf("adding unschedulable pod: %v", err)
+			}
+
+			tt.run(sched, tt.oldObj, tt.newObj)
+
+			if len(observed) != 2 {
+				t.Fatalf("expected exactly 2 queueing hints (Delete, Add), got %d: %#v", len(observed), observed)
+			}
+			if observed[0].action != fwk.Delete {
+				t.Errorf("first event = %v, want Delete", observed[0].action)
+			}
+			if observed[0].oldObj != tt.oldObj || observed[0].newObj != nil {
+				t.Errorf("Delete args = (%v, %v), want (%v, nil)", observed[0].oldObj, observed[0].newObj, tt.oldObj)
+			}
+			if observed[1].action != fwk.Add {
+				t.Errorf("second event = %v, want Add", observed[1].action)
+			}
+			if observed[1].oldObj != nil || observed[1].newObj != tt.newObj {
+				t.Errorf("Add args = (%v, %v), want (nil, %v)", observed[1].oldObj, observed[1].newObj, tt.newObj)
 			}
 		})
 	}

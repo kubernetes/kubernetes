@@ -502,7 +502,7 @@ func (sched *Scheduler) addPodGroup(obj any) {
 
 func (sched *Scheduler) updatePodGroup(oldObj, newObj any) {
 	evt := fwk.ClusterEvent{Resource: fwk.PodGroup, ActionType: fwk.Update}
-	defer metrics.EventHandlingLatency.ObserveSince(time.Now(), evt.Label())()
+	start := time.Now()
 	logger := sched.logger
 	oldPG, ok := oldObj.(*schedulingv1beta1.PodGroup)
 	if !ok {
@@ -514,6 +514,13 @@ func (sched *Scheduler) updatePodGroup(oldObj, newObj any) {
 		utilruntime.HandleErrorWithLogger(logger, nil, "Cannot convert newObj to *v1beta1.PodGroup", "newObj", newObj)
 		return
 	}
+
+	if oldPG.UID != newPG.UID {
+		sched.deletePodGroup(oldPG)
+		sched.addPodGroup(newPG)
+		return
+	}
+	defer metrics.EventHandlingLatency.ObserveSince(start, evt.Label())()
 
 	if oldPG.ResourceVersion == newPG.ResourceVersion {
 		return
@@ -576,7 +583,7 @@ func (sched *Scheduler) addCompositePodGroup(obj any) {
 
 func (sched *Scheduler) updateCompositePodGroup(oldObj, newObj any) {
 	evt := fwk.ClusterEvent{Resource: fwk.CompositePodGroup, ActionType: fwk.Update}
-	defer metrics.EventHandlingLatency.ObserveSince(time.Now(), evt.Label())()
+	start := time.Now()
 	logger := sched.logger
 	oldCPG, ok := oldObj.(*schedulingv1alpha3.CompositePodGroup)
 	if !ok {
@@ -588,6 +595,13 @@ func (sched *Scheduler) updateCompositePodGroup(oldObj, newObj any) {
 		utilruntime.HandleErrorWithLogger(logger, nil, "Cannot convert newObj to *v1alpha3.CompositePodGroup", "newObj", newObj)
 		return
 	}
+
+	if oldCPG.UID != newCPG.UID {
+		sched.deleteCompositePodGroup(oldCPG)
+		sched.addCompositePodGroup(newCPG)
+		return
+	}
+	defer metrics.EventHandlingLatency.ObserveSince(start, evt.Label())()
 
 	if oldCPG.ResourceVersion == newCPG.ResourceVersion {
 		return
