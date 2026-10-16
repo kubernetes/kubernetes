@@ -1258,12 +1258,12 @@ func (tc *Controller) claimEvictionTime(claim *resourceapi.ResourceClaim) *evict
 			taints.Insert(taint)
 			if when == nil {
 				when = newEvictionTime
-				tc.logger.V(5).Info("Claim is affected by device taint", "claim", klog.KObj(claim), "device", allocatedDevice, "taint", taint, "evictionTime", when)
+				tc.logger.V(5).Info("Claim is affected by device taint", "claim", klog.KObj(claim), "device", allocatedDevice, "taint", taint, "evictionTime", klog.SafePtr(when))
 				continue
 			}
 			if newEvictionTime != nil && newEvictionTime.Before(when) {
 				when = newEvictionTime
-				tc.logger.V(5).Info("Claim is affected by device taint", "claim", klog.KObj(claim), "device", allocatedDevice, "taint", taint, "evictionTime", when)
+				tc.logger.V(5).Info("Claim is affected by device taint", "claim", klog.KObj(claim), "device", allocatedDevice, "taint", taint, "evictionTime", klog.SafePtr(when))
 			}
 		}
 	}
@@ -1535,7 +1535,7 @@ func (tc *Controller) handlePods(claim *resourceapi.ResourceClaim) {
 			podGroupKey := claim.Namespace + "/" + consumer.Name
 			pods, err := tc.podInformer.Informer().GetIndexer().ByIndex(podGroupIndex, podGroupKey)
 			if err != nil {
-				utilruntime.HandleErrorWithLogger(tc.logger, err, "retrieve Pods for PodGroup %s from cache", podGroupKey)
+				utilruntime.HandleErrorWithLogger(tc.logger, err, "retrieve Pods for PodGroup from cache", "podGroup", klog.KRef(claim.Namespace, consumer.Name))
 				continue
 			}
 			for _, obj := range pods {
