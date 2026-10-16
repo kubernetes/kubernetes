@@ -32,7 +32,7 @@ type cacheIntervalSource interface {
 
 // watchCacheInterval serves as an abstraction over a source
 // of watchCacheEvents. It delegates iteration to a cacheIntervalSource
-// and holds common metadata (resourceVersion, initialEventsEndBookmark).
+// and holds the resourceVersion from which it was constructed.
 type watchCacheInterval struct {
 	// source provides the iteration logic for this interval.
 	source cacheIntervalSource
@@ -40,9 +40,6 @@ type watchCacheInterval struct {
 	// resourceVersion is the resourceVersion from which
 	// the interval was constructed.
 	resourceVersion uint64
-
-	// initialEventsEndBookmark will be sent after sending all events in cacheInterval
-	initialEventsEndBookmark *watchCacheEvent
 }
 
 func (wci *watchCacheInterval) All() iter.Seq2[*watchCacheEvent, error] {

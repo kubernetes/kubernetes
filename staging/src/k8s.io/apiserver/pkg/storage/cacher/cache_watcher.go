@@ -447,7 +447,7 @@ func (c *cacheWatcher) sendWatchCacheEvent(event *watchCacheEvent) (builtAt, sen
 	return builtAt, sentAt
 }
 
-func (c *cacheWatcher) process(ctx context.Context, cacheInterval *watchCacheInterval, resourceVersion uint64) {
+func (c *cacheWatcher) process(ctx context.Context, cacheInterval *watchCacheInterval, initialEventsEndBookmark *watchCacheEvent, resourceVersion uint64) {
 	defer utilruntime.HandleCrashWithContext(ctx)
 	defer close(c.result)
 	defer c.Stop()
@@ -458,8 +458,8 @@ func (c *cacheWatcher) process(ctx context.Context, cacheInterval *watchCacheInt
 	}
 
 	// send bookmark after sending all events in cacheInterval for watchlist request
-	if cacheInterval != nil && cacheInterval.initialEventsEndBookmark != nil {
-		c.sendWatchCacheEvent(cacheInterval.initialEventsEndBookmark)
+	if initialEventsEndBookmark != nil {
+		c.sendWatchCacheEvent(initialEventsEndBookmark)
 	}
 	// At this point we already start processing incoming watch events.
 	// However, the init event can still be processed because their serialization
