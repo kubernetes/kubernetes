@@ -600,25 +600,25 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 	case opts.SendInitialEvents == nil && opts.ResourceVersion == "":
 		// legacy case
 		requiredResourceVersion = 0
-
 	}
-	bookmarkAfterResourceVersionFn := func() uint64 { return 0 }
 
+	err = c.waitUntilWatchCacheFreshAndForceAllEventsLocked(ctx, requiredResourceVersion, opts)
+	if err != nil {
+		return newErrWatcher(err), nil
+	}
+	currentResourceVersion := c.watchCache.resourceVersion
+
+	bookmarkAfterResourceVersionFn := func() uint64 { return 0 }
 	if isListWatchRequest(opts) {
 		switch {
 		case len(opts.ResourceVersion) == 0:
 			bookmarkAfterResourceVersionFn = func() uint64 { return requiredResourceVersion }
 		case requestedWatchRV == 0:
 			// here we assume that watchCache locked is already held
-			bookmarkAfterResourceVersionFn = func() uint64 { return c.watchCache.resourceVersion }
+			bookmarkAfterResourceVersionFn = func() uint64 { return currentResourceVersion }
 		default:
 			bookmarkAfterResourceVersionFn = func() uint64 { return requestedWatchRV }
 		}
-	}
-
-	err = c.waitUntilWatchCacheFreshAndForceAllEventsLocked(ctx, requiredResourceVersion, opts)
-	if err != nil {
-		return newErrWatcher(err), nil
 	}
 
 	var cacheInterval *watchCacheInterval
@@ -637,7 +637,7 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 		initialEventsEndBookmark = &watchCacheEvent{
 			Type:            watch.Bookmark,
 			Object:          c.newFunc(),
-			ResourceVersion: c.watchCache.resourceVersion,
+			ResourceVersion: currentResourceVersion,
 		}
 
 		if err := c.versioner.UpdateObject(initialEventsEndBookmark.Object, initialEventsEndBookmark.ResourceVersion); err != nil {
