@@ -331,6 +331,14 @@ func (sched *Scheduler) schedulingAlgorithm(
 			logger.V(5).Info("Status after running PostFilter plugins for pod", "pod", klog.KObj(pod), "status", msg)
 		}
 
+		// PostFilter returns (Success, ModeNoop) for a deferred resize pod that needs no preemption: every
+		// candidate victim was reprieved using max(allocated, actual), or the queued copy is stale. Either
+		// way, proceed to the binding cycle; DeferredPodScheduling.Bind re-reads the pod before marking the
+		// evaluation complete.
+		if sched.inPlacePodVerticalScalingSchedulerPreemptionEnabled && compresource.IsPodResizeDeferred(pod) && status.IsSuccess() && result != nil && result.Mode() == fwk.ModeNoop {
+			return ScheduleResult{SuggestedHost: pod.Spec.NodeName, EvaluatedNodes: 1, FeasibleNodes: 1}, nil
+		}
+
 		var nominatingInfo *fwk.NominatingInfo
 		if result != nil {
 			nominatingInfo = result.NominatingInfo
