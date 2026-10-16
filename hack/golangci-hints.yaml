@@ -54,6 +54,12 @@ linters:
     # Excluding configuration per-path, per-linter, per-text and per-source.
     rules:
 
+      # hack/testdata/golangci-lint contains test cases which intentionally
+      # trigger linter issues. Ignored during normal linting, checked during
+      # `go test ./test/integration/golangci-lint`.
+      - path: hack/testdata/golangci-lint/
+        text: .
+
       # https://github.com/kubernetes/kubernetes/issues/117288#issuecomment-1507012435
       - linters:
           - gocritic
