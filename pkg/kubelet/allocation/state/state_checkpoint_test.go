@@ -26,6 +26,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
 )
@@ -317,4 +318,118 @@ func Test_stateCheckpoint_formatUpgraded(t *testing.T) {
 	actualPodResourceAllocation = sc.cache.GetPodResourceInfoMap()
 
 	require.Equal(t, expectedPodResourceAllocation, actualPodResourceAllocation, "pod resource allocation info is not equal")
+}
+
+type failCheckpointManager struct {
+	checkpointmanager.CheckpointManager
+}
+
+func (f *failCheckpointManager) CreateCheckpoint(checkpointName string, checkpoint checkpointmanager.Checkpoint) error {
+	return fmt.Errorf("injected checkpoint write failure")
+}
+
+// Test_stateCheckpoint_rollbackOnStoreFailure verifies that when storeState fails,
+// Set* methods revert the in-memory cache to its previous state, preventing a split-brain between memory and disk.
+func Test_stateCheckpoint_rollbackOnStoreFailure(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+
+	podUID := types.UID("pod-1")
+	containerName := "c1"
+	initialResources := v1.ResourceRequirements{
+		Requests: v1.ResourceList{
+			v1.ResourceCPU:    resource.MustParse("100m"),
+			v1.ResourceMemory: resource.MustParse("128Mi"),
+		},
+	}
+	updatedResources := v1.ResourceRequirements{
+		Requests: v1.ResourceList{
+			v1.ResourceCPU:    resource.MustParse("500m"),
+			v1.ResourceMemory: resource.MustParse("256Mi"),
+		},
+	}
+
+	t.Run("SetPodResourceInfo reverts cache on storeState failure", func(t *testing.T) {
+		testDir := getTestDir(t)
+		scState, err := NewStateCheckpoint(logger, testDir, testCheckpoint)
+		require.NoError(t, err)
+		sc := scState.(*stateCheckpoint)
+
+		// Set initial state that is successfully persisted.
+		initialInfo := PodResourceInfo{
+			ContainerResources: map[string]v1.ResourceRequirements{
+				containerName: initialResources,
+			},
+		}
+		require.NoError(t, sc.SetPodResourceInfo(logger, podUID, initialInfo))
+
+		// Inject failing checkpoint manager.
+		sc.checkpointManager = &failCheckpointManager{CheckpointManager: sc.checkpointManager}
+
+		// Attempt to update; expect failure.
+		updatedInfo := PodResourceInfo{
+			ContainerResources: map[string]v1.ResourceRequirements{
+				containerName: updatedResources,
+			},
+		}
+		err = sc.SetPodResourceInfo(logger, podUID, updatedInfo)
+		require.Error(t, err, "expected SetPodResourceInfo to fail when storeState fails")
+
+		// In-memory cache must reflect the original state, not the failed update.
+		inMemory, found := sc.GetPodResourceInfo(podUID)
+		require.True(t, found)
+		require.Equal(t, initialInfo, inMemory, "cache must be reverted to pre-update state on storeState failure")
+	})
+
+	t.Run("SetContainerResources reverts cache on storeState failure", func(t *testing.T) {
+		testDir := getTestDir(t)
+		scState, err := NewStateCheckpoint(logger, testDir, testCheckpoint)
+		require.NoError(t, err)
+		sc := scState.(*stateCheckpoint)
+
+		// Persist initial state.
+		initialInfo := PodResourceInfo{
+			ContainerResources: map[string]v1.ResourceRequirements{
+				containerName: initialResources,
+			},
+		}
+		require.NoError(t, sc.SetPodResourceInfo(logger, podUID, initialInfo))
+
+		// Inject failing checkpoint manager.
+		sc.checkpointManager = &failCheckpointManager{CheckpointManager: sc.checkpointManager}
+
+		err = sc.SetContainerResources(logger, podUID, containerName, updatedResources)
+		require.Error(t, err)
+
+		inMemory, found := sc.GetPodResourceInfo(podUID)
+		require.True(t, found)
+		require.Equal(t, initialResources, inMemory.ContainerResources[containerName], "container resources must be reverted on storeState failure")
+	})
+
+	t.Run("SetPodResourceInfo for new pod removes entry on storeState failure", func(t *testing.T) {
+		testDir := getTestDir(t)
+		scState, err := NewStateCheckpoint(logger, testDir, testCheckpoint)
+		require.NoError(t, err)
+		sc := scState.(*stateCheckpoint)
+
+		// Persist initial state for another pod so the checkpoint file already exists.
+		require.NoError(t, sc.SetPodResourceInfo(logger, "other-pod", PodResourceInfo{
+			ContainerResources: map[string]v1.ResourceRequirements{
+				containerName: initialResources,
+			},
+		}))
+
+		// Inject failing checkpoint manager.
+		sc.checkpointManager = &failCheckpointManager{CheckpointManager: sc.checkpointManager}
+
+		// Attempt to add a brand-new pod entry; should fail and be removed from cache.
+		err = sc.SetPodResourceInfo(logger, "new-pod", PodResourceInfo{
+			ContainerResources: map[string]v1.ResourceRequirements{
+				containerName: updatedResources,
+			},
+		})
+		require.Error(t, err)
+
+		_, found := sc.GetPodResourceInfo("new-pod")
+		require.False(t, found, "new pod entry must be removed from cache on storeState failure")
+	})
 }
