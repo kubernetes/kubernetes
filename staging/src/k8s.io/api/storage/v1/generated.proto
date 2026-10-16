@@ -560,6 +560,7 @@ message StorageHealthCondition {
   // status is the health status category.
   // One of "StorageUnreachable", "StorageDegraded".
   // +required
+  // +k8s:alpha(since: "1.38")=+k8s:required
   optional string status = 1;
 
   // reason is a brief CamelCase machine-parseable reason.
@@ -572,6 +573,8 @@ message StorageHealthCondition {
 
   // message is a human-readable description.
   // +optional
+  // +k8s:alpha(since: "1.38")=+k8s:optional
+  // +k8s:alpha(since: "1.38")=+k8s:maxBytes=1024
   // Maximum permitted length of a message is 1024 characters.
   optional string message = 3;
 

@@ -692,6 +692,7 @@ type VolumeNodeResources struct {
 
 // StorageHealthStatusType describes the health status category of a storage backend.
 // +enum
+// +k8s:alpha(since: "1.38")=+k8s:enum
 // +k8s:validation-gen-nolint
 type StorageHealthStatusType string
 
@@ -708,6 +709,7 @@ type StorageHealthCondition struct {
 	// status is the health status category.
 	// One of "StorageUnreachable", "StorageDegraded".
 	// +required
+	// +k8s:alpha(since: "1.38")=+k8s:required
 	Status StorageHealthStatusType `json:"status" protobuf:"bytes,1,opt,name=status,casttype=StorageHealthStatusType"`
 	// reason is a brief CamelCase machine-parseable reason.
 	// +required
@@ -718,6 +720,8 @@ type StorageHealthCondition struct {
 	Reason string `json:"reason" protobuf:"bytes,2,opt,name=reason"`
 	// message is a human-readable description.
 	// +optional
+	// +k8s:alpha(since: "1.38")=+k8s:optional
+	// +k8s:alpha(since: "1.38")=+k8s:maxBytes=1024
 	// Maximum permitted length of a message is 1024 characters.
 	Message string `json:"message,omitempty" protobuf:"bytes,3,opt,name=message"`
 	// accessMode is the access mode affected. Nil means all access modes are affected.
