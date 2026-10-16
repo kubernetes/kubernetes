@@ -66,6 +66,13 @@ type PodResourcesOptions struct {
 
 var supportedPodLevelResources = sets.New(v1.ResourceCPU, v1.ResourceMemory)
 
+// limitOnlyResources are resources that only support cgroup limits (e.g. swap).
+// Requests must not be set and must not be defaulted from limits for these resources.
+// Keeping limitOnlyResources disjoint from supportedPodLevelResources and
+// standardContainerResources ensures that QoS, PodRequests/PodLimits aggregation,
+// defaultPodRequests, LimitRange, and ResourceQuota invariants remain untouched for all callers.
+var limitOnlyResources = sets.New(v1.ResourceSwap)
+
 func SupportedPodLevelResources() sets.Set[v1.ResourceName] {
 	return supportedPodLevelResources.Clone().Insert(v1.ResourceHugePagesPrefix)
 }
@@ -75,6 +82,12 @@ func SupportedPodLevelResources() sets.Set[v1.ResourceName] {
 // the resource is supported.
 func IsSupportedPodLevelResource(name v1.ResourceName) bool {
 	return supportedPodLevelResources.Has(name) || strings.HasPrefix(string(name), v1.ResourceHugePagesPrefix)
+}
+
+// IsLimitOnlyResource returns true for resources that only support limits
+// (e.g. swap). Requests must not be set or defaulted for these resources.
+func IsLimitOnlyResource(name v1.ResourceName) bool {
+	return limitOnlyResources.Has(name)
 }
 
 // IsPodLevelResourcesSet check if PodLevelResources pod-level resources are set.
@@ -449,6 +462,9 @@ func AggregateContainerLimits(pod *v1.Pod, opts PodResourcesOptions) v1.Resource
 // addResourceList adds the resources in newList to list.
 func addResourceList(list, newList v1.ResourceList) {
 	for name, quantity := range newList {
+		if IsLimitOnlyResource(name) {
+			continue
+		}
 		if value, ok := list[name]; !ok {
 			list[name] = quantity.DeepCopy()
 		} else {
@@ -461,6 +477,9 @@ func addResourceList(list, newList v1.ResourceList) {
 // maxResourceList sets list to the greater of list/newList for every resource in newList
 func maxResourceList(list, newList v1.ResourceList) {
 	for name, quantity := range newList {
+		if IsLimitOnlyResource(name) {
+			continue
+		}
 		if value, ok := list[name]; !ok || quantity.Cmp(value) > 0 {
 			list[name] = quantity.DeepCopy()
 		}

@@ -18,6 +18,8 @@ package cm
 
 import (
 	"context"
+	"strconv"
+	"strings"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -40,6 +42,77 @@ var _ func(string) ([]int, error) = getCgroupProcs
 var _ func(types.UID) string = GetPodCgroupNameSuffix
 var _ func(string, bool, string) string = NodeAllocatableRoot
 var _ func(klog.Logger, string) (string, error) = GetKubeletContainer
+
+const (
+	// Cgroup2SwapMaxFile is the cgroup v2 swap limit interface file. Mirrors
+	// Cgroup2MaxSwapFilename (linux-only) for code shared across platforms.
+	Cgroup2SwapMaxFile = "memory.swap.max"
+	// Cgroup2Unlimited is the value cgroup v2 reports for an unset limit.
+	Cgroup2Unlimited = "max"
+)
+
+// PodSwapLimit returns the explicit pod-level swap limit
+// (pod.spec.resources.limits.swap, in bytes) and whether it is set.
+// KEP-5359: pod-level swap is a plain cgroup ceiling; the kubelet never derives
+// it from container limits.
+func PodSwapLimit(pod *v1.Pod) (int64, bool) {
+	if pod == nil || pod.Spec.Resources == nil {
+		return 0, false
+	}
+	q, ok := pod.Spec.Resources.Limits[v1.ResourceSwap]
+	if !ok {
+		return 0, false
+	}
+	return q.Value(), true
+}
+
+// SwapLimitFromConfig extracts memory.swap.max from a ResourceConfig's
+// Unified map. ok is false when the key is absent or set to "max" (unlimited),
+// so callers can treat both as "no limit".
+func SwapLimitFromConfig(rc *ResourceConfig) (limit int64, ok bool) {
+	if rc == nil || rc.Unified == nil {
+		return 0, false
+	}
+	val, found := rc.Unified[Cgroup2SwapMaxFile]
+	if !found || val == Cgroup2Unlimited {
+		return 0, false
+	}
+	parsed, err := strconv.ParseInt(strings.TrimSpace(val), 10, 64)
+	if err != nil {
+		return 0, false
+	}
+	return parsed, true
+}
+
+// SetSwapLimit records memory.swap.max in rc.Unified. A nil limit writes "max"
+// (unlimited), which is how a previously set pod-level swap limit is cleared.
+func SetSwapLimit(rc *ResourceConfig, limit *int64) {
+	if rc.Unified == nil {
+		rc.Unified = map[string]string{}
+	}
+	if limit == nil {
+		rc.Unified[Cgroup2SwapMaxFile] = Cgroup2Unlimited
+		return
+	}
+	rc.Unified[Cgroup2SwapMaxFile] = strconv.FormatInt(*limit, 10)
+}
+
+// UnifiedWithoutSwap returns a copy of unified with memory.swap.max removed.
+// The in-place resize memory pass copies the pod's Unified map wholesale;
+// swap is actuated in its own ordered pass (see doPodResizeAction).
+func UnifiedWithoutSwap(unified map[string]string) map[string]string {
+	if unified == nil {
+		return nil
+	}
+	out := make(map[string]string, len(unified))
+	for k, v := range unified {
+		if k == Cgroup2SwapMaxFile {
+			continue
+		}
+		out[k] = v
+	}
+	return out
+}
 
 // hardEvictionReservation returns a resourcelist that includes reservation of resources based on hard eviction thresholds.
 func hardEvictionReservation(thresholds []evictionapi.Threshold, capacity v1.ResourceList) v1.ResourceList {

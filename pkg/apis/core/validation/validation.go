@@ -4643,6 +4643,8 @@ type PodValidationOptions struct {
 	AllowSysAdminWhenPrivilegeEscalationFalse bool
 	// Allow podCertificate volumes to specify ML-DSA algorithms in the keyType field
 	AllowMLDSAPodCertificateKeyTypes bool
+	// Allow containers and pods to specify swap resource limits (KEP-5359)
+	AllowWorkloadControlledSwap bool
 }
 
 // validatePodMetadataAndSpec tests if required fields in the pod.metadata and pod.spec are set,
@@ -5010,6 +5012,21 @@ func validatePodResourceConsistency(spec *core.PodSpec, fldPath *field.Path) fie
 			}
 		}
 	}
+	for i, ctr := range spec.InitContainers {
+		for resourceName, ctrLimit := range ctr.Resources.Limits {
+			if !resourcehelper.IsLimitOnlyResource(v1.ResourceName(resourceName)) {
+				continue
+			}
+			podSpecLimits, exists := spec.Resources.Limits[resourceName]
+			if !exists {
+				continue
+			}
+			if ctrLimit.Cmp(podSpecLimits) > 0 {
+				fldPath := fldPath.Child("initContainers").Index(i).Key(resourceName.String()).Child("limits")
+				allErrs = append(allErrs, field.Invalid(fldPath, ctrLimit.String(), fmt.Sprintf("must be less than or equal to pod limits of %s", podSpecLimits.String())))
+			}
+		}
+	}
 	return allErrs
 }
 
@@ -5082,6 +5099,9 @@ func validateWindows(spec *core.PodSpec, fldPath *field.Path) field.ErrorList {
 		allErrs = append(allErrs, field.Forbidden(fldPath.Child("shareProcessNamespace"), "cannot be set for a windows pod"))
 	}
 	podshelper.VisitContainersWithPath(spec, fldPath, func(c *core.Container, cFldPath *field.Path) bool {
+		if _, ok := c.Resources.Limits[core.ResourceSwap]; ok {
+			allErrs = append(allErrs, field.Forbidden(cFldPath.Child("resources", "limits").Key(string(core.ResourceSwap)), "cannot be set for a windows pod"))
+		}
 		// validate container security context
 		sc := c.SecurityContext
 		// OS based podSecurityContext validation
@@ -6599,7 +6619,7 @@ func ValidatePodResize(newPod, oldPod *core.Pod, opts PodValidationOptions) fiel
 	// Ensure that only CPU and memory resources are mutable for regular containers.
 	var newContainers []core.Container
 	for ix, container := range newPodSpecCopy.Containers {
-		dropCPUMemoryResourcesFromContainer(&container, &oldPod.Spec.Containers[ix])
+		dropCPUMemoryResourcesFromContainer(&container, &oldPod.Spec.Containers[ix], opts)
 		if !apiequality.Semantic.DeepEqual(container, oldPod.Spec.Containers[ix]) {
 			// This likely means that the user has made changes to resources other than CPU and memory for regular container.
 			errs := field.Forbidden(specPath, "only cpu and memory resources are mutable")
@@ -6617,7 +6637,7 @@ func ValidatePodResize(newPod, oldPod *core.Pod, opts PodValidationOptions) fiel
 		modifiedContainer := !apiequality.Semantic.DeepEqual(container, oldPod.Spec.InitContainers[ix])
 
 		if canResize {
-			dropCPUMemoryResourcesFromContainer(&container, &oldPod.Spec.InitContainers[ix])
+			dropCPUMemoryResourcesFromContainer(&container, &oldPod.Spec.InitContainers[ix], opts)
 			if !apiequality.Semantic.DeepEqual(container, oldPod.Spec.InitContainers[ix]) {
 				// This likely means that the user has made changes to resources other than CPU and memory for sidecar container.
 				errs := field.Forbidden(specPath.Child("initContainers").Index(ix), "only cpu and memory resources for init or sidecar containers are mutable")
@@ -6755,7 +6775,7 @@ func validatePodLevelResourcesResize(newPod, oldPod *core.Pod, podSpecToMutate *
 
 	}
 
-	podSpecToMutate.Resources = dropCPUMemoryResourceRequirementsUpdates(podSpecToMutate.Resources, oldPod.Spec.Resources)
+	podSpecToMutate.Resources = dropCPUMemoryResourceRequirementsUpdates(podSpecToMutate.Resources, oldPod.Spec.Resources, opts)
 
 	if !apiequality.Semantic.DeepEqual(podSpecToMutate.Resources, oldPod.Spec.Resources) {
 		// This likely means that the user has made changes to pod-level resources other
@@ -6780,7 +6800,16 @@ func validatePodLevelResourcesResize(newPod, oldPod *core.Pod, podSpecToMutate *
 	return allErrs
 }
 
-func dropCPUMemoryUpdates(resourceList, oldResourceList core.ResourceList) core.ResourceList {
+// resizableResources returns the set of resource names whose values may change
+// on a resize. swap (KEP-5359) joins cpu and memory when the gate is enabled.
+func resizableResources(opts PodValidationOptions) []core.ResourceName {
+	if opts.AllowWorkloadControlledSwap {
+		return []core.ResourceName{core.ResourceCPU, core.ResourceMemory, core.ResourceSwap}
+	}
+	return []core.ResourceName{core.ResourceCPU, core.ResourceMemory}
+}
+
+func dropCPUMemoryUpdates(resourceList, oldResourceList core.ResourceList, opts PodValidationOptions) core.ResourceList {
 	var mungedResourceList core.ResourceList
 	if resourceList == nil {
 		if oldResourceList == nil {
@@ -6790,13 +6819,11 @@ func dropCPUMemoryUpdates(resourceList, oldResourceList core.ResourceList) core.
 	} else {
 		mungedResourceList = resourceList.DeepCopy()
 	}
-	delete(mungedResourceList, core.ResourceCPU)
-	delete(mungedResourceList, core.ResourceMemory)
-	if cpu, found := oldResourceList[core.ResourceCPU]; found {
-		mungedResourceList[core.ResourceCPU] = cpu
-	}
-	if mem, found := oldResourceList[core.ResourceMemory]; found {
-		mungedResourceList[core.ResourceMemory] = mem
+	for _, name := range resizableResources(opts) {
+		delete(mungedResourceList, name)
+		if old, found := oldResourceList[name]; found {
+			mungedResourceList[name] = old
+		}
 	}
 	return mungedResourceList
 }
@@ -6804,9 +6831,9 @@ func dropCPUMemoryUpdates(resourceList, oldResourceList core.ResourceList) core.
 // dropCPUMemoryResourcesFromContainer deletes the cpu and memory resources from the
 // container, and copies them from the old pod container resources if present.
 // TODO(ndixita): refactor to reuse dropCPUMemoryResourceRequirementsUpdates
-func dropCPUMemoryResourcesFromContainer(container *core.Container, oldPodSpecContainer *core.Container) {
-	lim := dropCPUMemoryUpdates(container.Resources.Limits, oldPodSpecContainer.Resources.Limits)
-	req := dropCPUMemoryUpdates(container.Resources.Requests, oldPodSpecContainer.Resources.Requests)
+func dropCPUMemoryResourcesFromContainer(container *core.Container, oldPodSpecContainer *core.Container, opts PodValidationOptions) {
+	lim := dropCPUMemoryUpdates(container.Resources.Limits, oldPodSpecContainer.Resources.Limits, opts)
+	req := dropCPUMemoryUpdates(container.Resources.Requests, oldPodSpecContainer.Resources.Requests, opts)
 	// Resource claims are immutable during pod resize and the original configuration must be preserved.
 	container.Resources = core.ResourceRequirements{Limits: lim, Requests: req, Claims: container.Resources.Claims}
 }
@@ -6814,7 +6841,7 @@ func dropCPUMemoryResourcesFromContainer(container *core.Container, oldPodSpecCo
 // dropCPUMemoryResourceRequirementsUpdates deletes the cpu and memory resources
 // from the `resources` field, and copies them from old Pod spec's resources field
 // if present.
-func dropCPUMemoryResourceRequirementsUpdates(resources *core.ResourceRequirements, oldPodResources *core.ResourceRequirements) *core.ResourceRequirements {
+func dropCPUMemoryResourceRequirementsUpdates(resources *core.ResourceRequirements, oldPodResources *core.ResourceRequirements, opts PodValidationOptions) *core.ResourceRequirements {
 	if resources == nil {
 		return resources
 	}
@@ -6828,8 +6855,8 @@ func dropCPUMemoryResourceRequirementsUpdates(resources *core.ResourceRequiremen
 		oldLims = oldPodResources.Limits // +k8s:verify-mutation:reason=clone'
 	}
 
-	resources.Requests = dropCPUMemoryUpdates(resources.Requests, oldReqs)
-	resources.Limits = dropCPUMemoryUpdates(resources.Limits, oldLims)
+	resources.Requests = dropCPUMemoryUpdates(resources.Requests, oldReqs, opts)
+	resources.Limits = dropCPUMemoryUpdates(resources.Limits, oldLims, opts)
 
 	// Set the entire Resources block to nil if two conditions are met:
 	// 1. The old PodSpec Resources lacked any Resources
@@ -8269,11 +8296,21 @@ func validateBasicResource(quantity resource.Quantity, fldPath *field.Path) fiel
 }
 
 func validatePodResourceRequirements(requirements *core.ResourceRequirements, podClaimNames sets.Set[string], fldPath *field.Path, opts PodValidationOptions) field.ErrorList {
-	return validateResourceRequirements(requirements, validatePodResourceName, podClaimNames, fldPath, opts)
+	return validateResourceRequirements(requirements, func(resourceName core.ResourceName, fldPath *field.Path) field.ErrorList {
+		if resourceName == core.ResourceSwap && opts.AllowWorkloadControlledSwap {
+			return nil
+		}
+		return validatePodResourceName(resourceName, fldPath)
+	}, podClaimNames, fldPath, opts)
 }
 
 func ValidateContainerResourceRequirements(requirements *core.ResourceRequirements, podClaimNames sets.Set[string], fldPath *field.Path, opts PodValidationOptions) field.ErrorList {
-	return validateResourceRequirements(requirements, ValidateContainerResourceName, podClaimNames, fldPath, opts)
+	return validateResourceRequirements(requirements, func(resourceName core.ResourceName, fldPath *field.Path) field.ErrorList {
+		if resourceName == core.ResourceSwap && opts.AllowWorkloadControlledSwap {
+			return nil
+		}
+		return ValidateContainerResourceName(resourceName, fldPath)
+	}, podClaimNames, fldPath, opts)
 }
 
 // Validates resource requirement spec.
@@ -8309,10 +8346,18 @@ func validateResourceRequirements(requirements *core.ResourceRequirements, resou
 	for resourceName, quantity := range requirements.Requests {
 		fldPath := reqPath.Key(string(resourceName))
 		// Validate resource name.
-		allErrs = append(allErrs, resourceNameFn(resourceName, fldPath)...)
+		nameErrs := resourceNameFn(resourceName, fldPath)
+		allErrs = append(allErrs, nameErrs...)
 
 		// Validate resource quantity.
 		allErrs = append(allErrs, ValidateResourceQuantityValue(resourceName, quantity, fldPath)...)
+
+		if resourcehelper.IsLimitOnlyResource(v1.ResourceName(resourceName)) {
+			if len(nameErrs) == 0 {
+				allErrs = append(allErrs, field.Forbidden(fldPath, fmt.Sprintf("%s may only be specified in limits, not requests", resourceName)))
+			}
+			continue
+		}
 
 		// Check that request <= limit.
 		limitQuantity, exists := requirements.Limits[resourceName]
