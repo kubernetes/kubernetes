@@ -442,8 +442,9 @@ func (pl *DefaultPreemption) SelectVictimsOnNode(
 // There're several reasons:
 //  1. The pod has a preemptionPolicy of Never.
 //  2. The pod has already preempted other pods and the victims are in their graceful termination period.
-//     Currently we check the node that is nominated for this pod, and as long as there are
-//     terminating pods on this node, we don't attempt to preempt more pods.
+//     Currently we check the node that is nominated for this pod (or the assigned node for a deferred
+//     in-place resize pod), and as long as there are terminating pods on this node, we don't attempt to
+//     preempt more pods.
 func (pl *DefaultPreemption) PodEligibleToPreemptOthers(_ context.Context, pod *v1.Pod, nominatedNodeStatus *fwk.Status) (bool, string) {
 	if pod.Spec.PreemptionPolicy != nil && *pod.Spec.PreemptionPolicy == v1.PreemptNever {
 		return false, "not eligible due to preemptionPolicy=Never."
@@ -451,17 +452,28 @@ func (pl *DefaultPreemption) PodEligibleToPreemptOthers(_ context.Context, pod *
 
 	nodeInfos := pl.fh.MutableSnapshotSharedLister().NodeInfos()
 	nomNodeName := pod.Status.NominatedNodeName
+	isResize := len(nomNodeName) == 0 && pl.fts.EnableInPlacePodVerticalScalingSchedulerPreemption && resourcehelper.IsPodResizeDeferred(pod)
 	if len(nomNodeName) > 0 {
 		// If the pod's nominated node is considered as UnschedulableAndUnresolvable by the filters,
 		// then the pod should be considered for preempting again.
 		if nominatedNodeStatus.Code() == fwk.UnschedulableAndUnresolvable {
 			return true, ""
 		}
+	} else if isResize {
+		// Deferred resize pods are already bound to a node and do not set NominatedNodeName.
+		// Check their assigned node so they do not trigger another round of preemption while
+		// previously preempted victims on that node are still terminating.
+		nomNodeName = pod.Spec.NodeName
+	}
 
+	if len(nomNodeName) > 0 {
 		if nodeInfo, _ := nodeInfos.Get(nomNodeName); nodeInfo != nil {
 			for _, p := range nodeInfo.GetPods() {
 				victim := preemption.NewPodVictim(p)
 				if pl.isPreemptionAllowed(nodeInfo, victim, pod) && preemption.PodTerminatingByPreemption(p.GetPod()) {
+					if isResize {
+						return false, "not eligible due to a terminating pod on the assigned node."
+					}
 					// There is a terminating pod on the nominated node.
 					return false, "not eligible due to a terminating pod on the nominated node."
 				}
