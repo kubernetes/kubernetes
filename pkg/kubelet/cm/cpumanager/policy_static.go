@@ -1565,3 +1565,7 @@ func updateAllocationPerNUMAMetric(logger klog.Logger, topo *topology.CPUTopolog
 		metrics.CPUManagerAllocationPerNUMA.WithLabelValues(strconv.Itoa(numaNode)).Set(float64(numaCount[numaNode]))
 	}
 }
+
+func (p *staticPolicy) CanAllocateExclusively() bool {
+	return true
+}

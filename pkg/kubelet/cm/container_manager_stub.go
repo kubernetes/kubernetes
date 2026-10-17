@@ -216,6 +216,10 @@ func (cm *containerManagerStub) ContainerHasExclusiveCPUs(_ klog.Logger, _ *v1.P
 	return false
 }
 
+func (cm *containerManagerStub) AllocationMode(res v1.ResourceName) ResourceAllocationMode {
+	return ResourceAllocationModeUnsupported
+}
+
 func NewStubContainerManager() ContainerManager {
 	return &containerManagerStub{shouldResetExtendedResourceCapacity: false}
 }
