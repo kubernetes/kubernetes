@@ -491,10 +491,7 @@ func TestAuthenticateRequestClearHeaders(t *testing.T) {
 				}),
 				nil,
 				&authenticatorfactory.RequestHeaderConfig{
-					UsernameHeaders:     headerrequest.StaticStringSlice(testcase.nameHeaders),
-					UIDHeaders:          headerrequest.StaticStringSlice(testcase.uidHeaders),
-					GroupHeaders:        headerrequest.StaticStringSlice(testcase.groupHeaders),
-					ExtraHeaderPrefixes: headerrequest.StaticStringSlice(testcase.extraPrefixHeaders),
+					Config: headerrequest.NewStaticRequestHeaderConfig(testcase.nameHeaders, testcase.uidHeaders, testcase.groupHeaders, testcase.extraPrefixHeaders, nil),
 				},
 			)
 
@@ -512,6 +509,40 @@ func TestAuthenticateRequestClearHeaders(t *testing.T) {
 				t.Errorf("unexpected final headers (-want +got):\n%s", diff)
 			}
 		})
+	}
+}
+
+func TestAuthenticateRequestSharesRequestHeaderSnapshot(t *testing.T) {
+	snapshot := &headerrequest.RequestHeaderConfig{UsernameHeaders: []string{"X-Custom-User"}}
+	snapshotCalls := 0
+	auth := WithAuthentication(
+		http.HandlerFunc(func(_ http.ResponseWriter, req *http.Request) {
+			if req.Header.Get("X-Custom-User") != "" {
+				t.Errorf("expected the custom request header to be cleared")
+			}
+		}),
+		authenticator.RequestFunc(func(req *http.Request) (*authenticator.Response, bool, error) {
+			got, found := headerrequest.RequestHeaderConfigFromContext(req.Context())
+			if !found || got != snapshot {
+				t.Errorf("expected the filter snapshot in the authentication context, got %v, found=%v", got, found)
+			}
+			return &authenticator.Response{User: &user.DefaultInfo{Name: "panda"}}, true, nil
+		}),
+		http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {
+			t.Errorf("unexpected authentication failure")
+		}),
+		nil,
+		&authenticatorfactory.RequestHeaderConfig{
+			Config: headerrequest.RequestHeaderConfigProviderFunc(func() *headerrequest.RequestHeaderConfig {
+				snapshotCalls++
+				return snapshot
+			}),
+		},
+	)
+
+	auth.ServeHTTP(httptest.NewRecorder(), &http.Request{Header: http.Header{"X-Custom-User": {"alice"}}})
+	if snapshotCalls != 1 {
+		t.Fatalf("expected one request header snapshot, got %d", snapshotCalls)
 	}
 }
 
