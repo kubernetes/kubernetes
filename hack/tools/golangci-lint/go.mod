@@ -8,7 +8,7 @@ require (
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2
 	golang.org/x/tools v0.52.0
 	sigs.k8s.io/kube-api-linter v0.0.0-20260716143926-092fe0c72997
-	sigs.k8s.io/logtools v0.10.1
+	sigs.k8s.io/logtools v0.11.0
 )
 
 require (
