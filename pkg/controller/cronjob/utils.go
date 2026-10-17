@@ -175,7 +175,22 @@ func mostRecentScheduleTime(cj *batchv1.CronJob, now time.Time, schedule cron.Sc
 	}
 
 	if mostRecentTime.IsZero() {
-		return earliestTime, nil, missedSchedules, nil
+		// The interval estimate can land after the last missed run in a schedule
+		// gap. Bisect the interval instead of scanning all missed schedules.
+		lower, upper := t1, potentialEarliest
+		for lower.Before(upper) {
+			mid := lower.Add(upper.Sub(lower) / 2)
+			if !mid.After(lower) {
+				break
+			}
+			next := schedule.Next(mid)
+			if next.After(now) {
+				upper = mid
+			} else {
+				lower = next
+			}
+		}
+		mostRecentTime = lower
 	}
 	return earliestTime, &mostRecentTime, missedSchedules, nil
 }
