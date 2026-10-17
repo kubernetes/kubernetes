@@ -282,3 +282,8 @@ func (b *ObjectMetaApplyConfiguration) GetName() *string {
 func (b *ObjectMetaApplyConfiguration) GetNamespace() *string {
 	return b.Namespace
 }
+
+// GetResourceVersion retrieves the value of the ResourceVersion field in the declarative configuration.
+func (b *ObjectMetaApplyConfiguration) GetResourceVersion() *string {
+	return b.ResourceVersion
+}
