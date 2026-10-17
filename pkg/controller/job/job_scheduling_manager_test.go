@@ -1052,3 +1052,63 @@ func TestSyncGangMinCount(t *testing.T) {
 		})
 	}
 }
+
+func TestDesiredGangMinCount(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	indexed := batch.IndexedCompletion
+	nonIndexed := batch.NonIndexedCompletion
+
+	testCases := map[string]struct {
+		parallelism      int32
+		completions      *int32
+		completionMode   *batch.CompletionMode
+		explicitMinCount *int32
+		succeeded        int32
+		failedIndexes    *string
+		want             int32
+	}{
+		"preserves the initial gang size while enough indexed work remains": {
+			parallelism: 10, completions: new(int32(100)), completionMode: &indexed, succeeded: 9, want: 10,
+		},
+		"shrinks an indexed gang in the tail": {
+			parallelism: 10, completions: new(int32(100)), completionMode: &indexed, succeeded: 95, want: 5,
+		},
+		"excludes permanently failed indexes": {
+			parallelism: 3, completions: new(int32(3)), completionMode: &indexed, succeeded: 1, failedIndexes: new("2"), want: 1,
+		},
+		"counts compressed failed index ranges": {
+			parallelism: 5, completions: new(int32(10)), completionMode: &indexed, succeeded: 4, failedIndexes: new("1-2,7"), want: 3,
+		},
+		"shrinks a non-indexed gang in the tail": {
+			parallelism: 4, completions: new(int32(4)), completionMode: &nonIndexed, succeeded: 2, want: 2,
+		},
+		"clamps the threshold to one after all work is accounted for": {
+			parallelism: 3, completions: new(int32(3)), completionMode: &indexed, succeeded: 2, failedIndexes: new("2"), want: 1,
+		},
+		"leaves an explicit minCount unchanged": {
+			parallelism: 4, completions: new(int32(4)), completionMode: &indexed, explicitMinCount: new(int32(3)), succeeded: 3, want: 3,
+		},
+		"leaves a work-queue Job unchanged": {
+			parallelism: 4, completionMode: &nonIndexed, succeeded: 0, want: 4,
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			job := newGangSchedulingJob("test", tc.parallelism)
+			job.Spec.Completions = tc.completions
+			job.Spec.CompletionMode = tc.completionMode
+			job.Spec.Scheduling.SchedulingPolicy.Gang.MinCount = tc.explicitMinCount
+			job.Status.Succeeded = tc.succeeded
+			job.Status.FailedIndexes = tc.failedIndexes
+
+			resolvedMinCount := tc.parallelism
+			if tc.explicitMinCount != nil {
+				resolvedMinCount = *tc.explicitMinCount
+			}
+			if got := desiredGangMinCount(logger, job, resolvedMinCount); got != tc.want {
+				t.Errorf("desiredGangMinCount() = %d, want %d", got, tc.want)
+			}
+		})
+	}
+}
