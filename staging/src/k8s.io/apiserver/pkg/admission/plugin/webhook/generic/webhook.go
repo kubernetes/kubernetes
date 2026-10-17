@@ -45,7 +45,9 @@ import (
 	webhookutil "k8s.io/apiserver/pkg/util/webhook"
 	"k8s.io/client-go/informers"
 	coreinformers "k8s.io/client-go/informers/core/v1"
+	"k8s.io/client-go/kubernetes"
 	clientset "k8s.io/client-go/kubernetes"
+	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/component-base/featuregate"
 )
 
@@ -91,6 +93,8 @@ type Webhook struct {
 	// excludeVirtualResources caches whether the ExcludeAdmissionWebhookVirtualResources
 	// feature is enabled, set once via InspectFeatureGates to avoid a gate lookup per request.
 	excludeVirtualResources bool
+
+	kubeClient kubernetes.Interface // FIXME: should be just CTB-specific client
 }
 
 var (
@@ -102,8 +106,9 @@ var (
 	_ admission.Interface                                  = &Webhook{}
 )
 
-type sourceFactory func(f informers.SharedInformerFactory, excludedWebhookResources sets.Set[schema.GroupResource]) Source
+type sourceFactory func(f informers.SharedInformerFactory, excludedWebhookResources sets.Set[schema.GroupResource], kubeClient kubernetes.Interface) Source
 type dispatcherFactory func(cm *webhookutil.ClientManager) Dispatcher
+type dispatcherFactory2 func(cm *webhookutil.ClientManager, client corev1.ServiceAccountInterface) Dispatcher
 
 // ReloadableSource extends Source with a method to run a reload loop
 // that watches for configuration changes and blocks until the context is canceled.
@@ -209,6 +214,7 @@ func (a *Webhook) InspectFeatureGates(featureGates featuregate.FeatureGate) {
 // It sets external ClientSet for admission plugins that need it
 func (a *Webhook) SetExternalKubeClientSet(client clientset.Interface) {
 	a.namespaceMatcher.Client = client
+	a.kubeClient = client // FIXME: unify these?
 }
 
 // SetExternalKubeInformerFactory implements the WantsExternalKubeInformerFactory interface.
@@ -238,9 +244,9 @@ func (a *Webhook) ValidateInitialization() error {
 			return fmt.Errorf("kubernetes client is not properly setup")
 		}
 		if a.excludeVirtualResources {
-			a.apiSource = a.apiSourceFactory(a.apiSourceInformers, a.excludedAdmissionResources)
+			a.apiSource = a.apiSourceFactory(a.apiSourceInformers, a.excludedAdmissionResources, a.kubeClient)
 		} else {
-			a.apiSource = a.apiSourceFactory(a.apiSourceInformers, nil)
+			a.apiSource = a.apiSourceFactory(a.apiSourceInformers, nil, nil) // TODO: consider - should we allow CTBs from static files? Probably not - we want to avoid any changes to these via API.
 		}
 	}
 
@@ -412,6 +418,7 @@ func (a *Webhook) Dispatch(ctx context.Context, attr admission.Attributes, o adm
 		// so that admission cannot wedge a cluster out of its own auth path.
 		return nil
 	}
+
 	if a.isExcludedFromAPIHooks(attr) {
 		// Admission config resources are excluded from API-based webhooks to prevent circular
 		// dependencies. However, static (manifest-based) webhooks are safe to evaluate since
@@ -428,6 +435,7 @@ func (a *Webhook) Dispatch(ctx context.Context, attr admission.Attributes, o adm
 	if !a.WaitForReady() {
 		return admission.NewForbidden(attr, fmt.Errorf("not yet ready to handle request"))
 	}
+
 	hooks := a.hookSource.Webhooks()
 	return a.dispatcher.Dispatch(ctx, attr, o, hooks)
 }
