@@ -29,6 +29,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubetypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/informers"
+	corelisters "k8s.io/client-go/listers/core/v1"
 	csitrans "k8s.io/csi-translation-lib"
 	"k8s.io/klog/v2/ktesting"
 	tf "k8s.io/kubernetes/pkg/scheduler/testing/framework"
@@ -355,4 +356,145 @@ func setup(nodeName string, t *testing.T) (*volume.VolumePluginMgr, csimigration
 	}
 
 	return plugMgr, intreeToCSITranslator, csiTranslator, pvLister, pvcLister
+}
+
+func TestIsPodTerminatingOnUnhealthyNode(t *testing.T) {
+	now := metav1.Now()
+	tests := []struct {
+		name       string
+		pod        *v1.Pod
+		nodes      []*v1.Node
+		hasLister  bool
+		wantResult bool
+	}{
+		{
+			name:       "nil pod",
+			pod:        nil,
+			hasLister:  true,
+			wantResult: false,
+		},
+		{
+			name: "pod without DeletionTimestamp",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod1", Namespace: "default"},
+				Spec:       v1.PodSpec{NodeName: "node1"},
+			},
+			nodes: []*v1.Node{
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "node1"},
+					Status: v1.NodeStatus{
+						Conditions: []v1.NodeCondition{
+							{Type: v1.NodeReady, Status: v1.ConditionFalse},
+						},
+					},
+				},
+			},
+			hasLister:  true,
+			wantResult: false,
+		},
+		{
+			name: "pod without NodeName",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod1", Namespace: "default", DeletionTimestamp: &now},
+				Spec:       v1.PodSpec{NodeName: ""},
+			},
+			hasLister:  true,
+			wantResult: false,
+		},
+		{
+			name: "nil nodeLister",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod1", Namespace: "default", DeletionTimestamp: &now},
+				Spec:       v1.PodSpec{NodeName: "node1"},
+			},
+			hasLister:  false,
+			wantResult: false,
+		},
+		{
+			name: "pod terminating on ready node",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod1", Namespace: "default", DeletionTimestamp: &now},
+				Spec:       v1.PodSpec{NodeName: "node1"},
+			},
+			nodes: []*v1.Node{
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "node1"},
+					Status: v1.NodeStatus{
+						Conditions: []v1.NodeCondition{
+							{Type: v1.NodeReady, Status: v1.ConditionTrue},
+						},
+					},
+				},
+			},
+			hasLister:  true,
+			wantResult: false,
+		},
+		{
+			name: "pod terminating on not ready node (ConditionFalse)",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod1", Namespace: "default", DeletionTimestamp: &now},
+				Spec:       v1.PodSpec{NodeName: "node1"},
+			},
+			nodes: []*v1.Node{
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "node1"},
+					Status: v1.NodeStatus{
+						Conditions: []v1.NodeCondition{
+							{Type: v1.NodeReady, Status: v1.ConditionFalse},
+						},
+					},
+				},
+			},
+			hasLister:  true,
+			wantResult: true,
+		},
+		{
+			name: "pod terminating on not ready node (ConditionUnknown)",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod1", Namespace: "default", DeletionTimestamp: &now},
+				Spec:       v1.PodSpec{NodeName: "node1"},
+			},
+			nodes: []*v1.Node{
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "node1"},
+					Status: v1.NodeStatus{
+						Conditions: []v1.NodeCondition{
+							{Type: v1.NodeReady, Status: v1.ConditionUnknown},
+						},
+					},
+				},
+			},
+			hasLister:  true,
+			wantResult: true,
+		},
+		{
+			name: "pod terminating on non-existent node",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod1", Namespace: "default", DeletionTimestamp: &now},
+				Spec:       v1.PodSpec{NodeName: "non-existent-node"},
+			},
+			nodes:      []*v1.Node{},
+			hasLister:  true,
+			wantResult: true,
+		},
+	}
+
+	logger, _ := ktesting.NewTestContext(t)
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			var nodeLister corelisters.NodeLister
+			if tc.hasLister {
+				fakeInformerFactory := informers.NewSharedInformerFactory(fake.NewSimpleClientset(), 0)
+				nodeInformer := fakeInformerFactory.Core().V1().Nodes()
+				for _, n := range tc.nodes {
+					nodeInformer.Informer().GetStore().Add(n)
+				}
+				nodeLister = nodeInformer.Lister()
+			}
+			got := IsPodTerminatingOnUnhealthyNode(logger, tc.pod, nodeLister)
+			if got != tc.wantResult {
+				t.Errorf("IsPodTerminatingOnUnhealthyNode() = %v, want %v", got, tc.wantResult)
+			}
+		})
+	}
 }
