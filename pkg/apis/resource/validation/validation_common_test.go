@@ -88,3 +88,64 @@ func TestTruncateIfTooLong(t *testing.T) {
 		})
 	}
 }
+
+func TestSemverRe(t *testing.T) {
+	for name, tc := range map[string]struct {
+		version string
+		valid   bool
+	}{
+		"valid-simple": {
+			version: "1.2.3",
+			valid:   true,
+		},
+		"valid-zero": {
+			version: "0.0.0",
+			valid:   true,
+		},
+		"valid-prerelease-and-build": {
+			version: "1.2.3-alpha.1+build.20240305",
+			valid:   true,
+		},
+		"invalid-leading-zero": {
+			version: "01.0.0",
+			valid:   false,
+		},
+		"invalid-not-semver": {
+			version: "not-a-version",
+			valid:   false,
+		},
+		// Numeric identifiers are capped at 18 digits so that they
+		// always fit into an int64, even though semver.org itself
+		// does not impose such a limit.
+		"valid-18-digit-number-fits-int64": {
+			version: "999999999999999999.0.0",
+			valid:   true,
+		},
+		"invalid-19-digit-number-too-long": {
+			version: "9999999999999999999.0.0",
+			valid:   false,
+		},
+		"invalid-uint64-max-too-long": {
+			version: "18446744073709551615.0.0",
+			valid:   false,
+		},
+		// Numeric pre-release identifiers are parsed by blang/semver
+		// the same way as major/minor/patch, so they are capped too.
+		"valid-18-digit-prerelease-fits-int64": {
+			version: "1.0.0-999999999999999999",
+			valid:   true,
+		},
+		"invalid-19-digit-prerelease-too-long": {
+			version: "1.0.0-9999999999999999999",
+			valid:   false,
+		},
+		"invalid-19-digit-prerelease-after-alpha-too-long": {
+			version: "1.0.0-alpha.9999999999999999999",
+			valid:   false,
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			assert.Equal(t, tc.valid, semverRe.MatchString(tc.version))
+		})
+	}
+}
