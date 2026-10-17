@@ -439,7 +439,9 @@ func (im *realImageGCManager) freeOldImages(ctx context.Context, images []evicti
 	for _, image := range images {
 		logger.V(5).Info("Evaluating image ID for possible garbage collection based on image age", "imageID", image.id)
 		// Evaluate whether image is older than MaxAge.
-		if freeTime.Sub(image.lastUsed) > im.policy.MaxAge {
+		// An image no container has used (its pod may be stuck in
+		// CreateContainerConfigError) has a zero lastUsed; age it from when it was first seen.
+		if freeTime.Sub(image.lastUsed) > im.policy.MaxAge && freeTime.Sub(image.firstDetected) > im.policy.MaxAge {
 			if err := im.freeImage(ctx, image, ImageGarbageCollectedTotalReasonAge); err != nil {
 				deletionErrors = append(deletionErrors, err)
 				remainingImages = append(remainingImages, image)
