@@ -219,6 +219,33 @@ func TestListGlobalVolumes(t *testing.T) {
 		}
 	})
 
+	t.Run("skips a volume directory with no globalmount", func(t *testing.T) {
+		plug, tmpDir := newTestPlugin(t, nil)
+		t.Cleanup(func() { _ = os.RemoveAll(tmpDir) })
+		pluginDir := plug.host.GetPluginDir(plug.GetPluginName())
+
+		// removeMountDir removes globalmount before vol_data.json, so an
+		// unstage interrupted between the two leaves the file and no staged
+		// volume.
+		volDir := stage(t, pluginDir, driver, "", volumeData("unstaged-pv", "handle-of-the-unstaged-pv"))
+		if err := os.Remove(filepath.Join(volDir, globalMountInGlobalPath)); err != nil {
+			t.Fatalf("remove globalmount: %v", err)
+		}
+		stage(t, pluginDir, driver, "", volumeData("staged-pv", "handle-of-the-staged-pv"))
+
+		found, err := plug.ListGlobalVolumes()
+		if err != nil {
+			t.Fatalf("ListGlobalVolumes: %v", err)
+		}
+		if len(found) != 1 || found[0].Spec.Name() != "staged-pv" {
+			names := make([]string, 0, len(found))
+			for _, gv := range found {
+				names = append(names, gv.Spec.Name())
+			}
+			t.Fatalf("got %v, want only staged-pv", names)
+		}
+	})
+
 	t.Run("reports nothing when no volume was ever staged", func(t *testing.T) {
 		plug, tmpDir := newTestPlugin(t, nil)
 		t.Cleanup(func() { _ = os.RemoveAll(tmpDir) })

@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 
 	api "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -105,9 +106,20 @@ func (p *csiPlugin) ListGlobalVolumes() ([]volume.GlobalVolume, error) {
 // describeGlobalVolume turns one staged volume directory into a GlobalVolume,
 // reporting whether it could be described at all.
 func (p *csiPlugin) describeGlobalVolume(volDir string) (volume.GlobalVolume, bool) {
+	// A volume directory with no globalmount in it holds no staged volume, as
+	// when an unstage stopped after removing globalmount but before removing
+	// vol_data.json. The entry is looked up in a listing of the volume
+	// directory rather than with a stat of globalmount itself, which on a
+	// mounted volume reaches the filesystem behind it and would block kubelet
+	// startup on an unreachable NFS server.
 	deviceMountPath := filepath.Join(volDir, globalMountInGlobalPath)
-	if _, err := os.Stat(deviceMountPath); err != nil {
-		klog.V(4).Info(log("skipping %s, no staged volume: %v", volDir, err))
+	entries, err := os.ReadDir(volDir)
+	if err != nil {
+		klog.V(4).Info(log("skipping %s: %v", volDir, err))
+		return volume.GlobalVolume{}, false
+	}
+	if !slices.ContainsFunc(entries, func(e os.DirEntry) bool { return e.Name() == globalMountInGlobalPath }) {
+		klog.V(4).Info(log("skipping %s, no staged volume", volDir))
 		return volume.GlobalVolume{}, false
 	}
 
