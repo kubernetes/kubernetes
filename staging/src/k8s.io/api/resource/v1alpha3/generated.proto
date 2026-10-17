@@ -188,6 +188,7 @@ message DeviceTaintRuleSpec {
   // a selector, no devices are matches.
   //
   // +optional
+  // +k8s:optional
   optional DeviceTaintSelector deviceSelector = 1;
 
   // taint is the taint that gets applied to matching devices.
@@ -238,6 +239,8 @@ message DeviceTaintSelector {
   // This fields corresponds to slice.spec.driver.
   //
   // +optional
+  // +k8s:optional
+  // +k8s:alpha(since: "1.38")=+k8s:dependentForbidden("all")
   optional string driver = 2;
 
   // pool is the pool name. If pool is set, only devices in that pool are selected.
@@ -250,6 +253,8 @@ message DeviceTaintSelector {
   // their pool name.
   //
   // +optional
+  // +k8s:optional
+  // +k8s:alpha(since: "1.38")=+k8s:dependentForbidden("all")
   optional string pool = 3;
 
   // device is the name of the device. If device is set, only devices with that name are selected.
@@ -259,7 +264,23 @@ message DeviceTaintSelector {
   // but is not required.
   //
   // +optional
+  // +k8s:optional
+  // +k8s:alpha(since: "1.38")=+k8s:dependentForbidden("all")
   optional string device = 4;
+
+  // all explicitly selects every device from every driver in the
+  // cluster when set to true. It must not be combined with driver, pool,
+  // or device: those must all be unset when all is true.
+  //
+  // Leaving driver, pool, and device all unset also selects every
+  // device, for historical reasons, but doing so without setting all
+  // is deprecated and may be rejected in a future release. Set all
+  // explicitly instead.
+  //
+  // +optional
+  // +k8s:optional
+  // +k8s:alpha(since: "1.38")=+k8s:neq=false
+  optional bool all = 6;
 }
 
 // PartitionTypeStatus reports allocatability for a single partition type,

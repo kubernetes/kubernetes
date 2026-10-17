@@ -209,6 +209,84 @@ func TestValidateDeviceTaint(t *testing.T) {
 				return taintRule
 			}(),
 		},
+		"all-true": {
+			taintRule: func() *resourceapi.DeviceTaintRule {
+				taintRule := testDeviceTaintRule(goodName, validDeviceTaintRuleSpec)
+				taintRule.Spec.DeviceSelector = &resourceapi.DeviceTaintSelector{
+					All: ptr.To(true),
+				}
+				return taintRule
+			}(),
+		},
+		"all-false": {
+			wantFailures: field.ErrorList{field.Invalid(field.NewPath("spec", "deviceSelector", "all"), false, "must be either unset or set to true").WithOrigin("neq").MarkCoveredByDeclarative()},
+			taintRule: func() *resourceapi.DeviceTaintRule {
+				taintRule := testDeviceTaintRule(goodName, validDeviceTaintRuleSpec)
+				taintRule.Spec.DeviceSelector = &resourceapi.DeviceTaintSelector{
+					All: ptr.To(false),
+				}
+				return taintRule
+			}(),
+		},
+		"all-false-combined-with-driver": {
+			wantFailures: field.ErrorList{
+				field.Forbidden(field.NewPath("spec", "deviceSelector", "all"), "may not be set when driver is set").WithOrigin("dependentForbidden").MarkCoveredByDeclarative(),
+				field.Invalid(field.NewPath("spec", "deviceSelector", "all"), false, "must be either unset or set to true").WithOrigin("neq").MarkCoveredByDeclarative(),
+			},
+			taintRule: func() *resourceapi.DeviceTaintRule {
+				taintRule := testDeviceTaintRule(goodName, validDeviceTaintRuleSpec)
+				taintRule.Spec.DeviceSelector = &resourceapi.DeviceTaintSelector{
+					All:    ptr.To(false),
+					Driver: ptr.To(goodName),
+				}
+				return taintRule
+			}(),
+		},
+		"all-true-combined-with-driver": {
+			wantFailures: field.ErrorList{field.Forbidden(field.NewPath("spec", "deviceSelector", "all"), "may not be set when driver is set").WithOrigin("dependentForbidden").MarkCoveredByDeclarative()},
+			taintRule: func() *resourceapi.DeviceTaintRule {
+				taintRule := testDeviceTaintRule(goodName, validDeviceTaintRuleSpec)
+				taintRule.Spec.DeviceSelector = &resourceapi.DeviceTaintSelector{
+					All:    ptr.To(true),
+					Driver: ptr.To(goodName),
+				}
+				return taintRule
+			}(),
+		},
+		"all-true-combined-with-pool": {
+			wantFailures: field.ErrorList{field.Forbidden(field.NewPath("spec", "deviceSelector", "all"), "may not be set when pool is set").WithOrigin("dependentForbidden").MarkCoveredByDeclarative()},
+			taintRule: func() *resourceapi.DeviceTaintRule {
+				taintRule := testDeviceTaintRule(goodName, validDeviceTaintRuleSpec)
+				taintRule.Spec.DeviceSelector = &resourceapi.DeviceTaintSelector{
+					All:  ptr.To(true),
+					Pool: ptr.To(goodName),
+				}
+				return taintRule
+			}(),
+		},
+		"all-true-combined-with-device": {
+			wantFailures: field.ErrorList{field.Forbidden(field.NewPath("spec", "deviceSelector", "all"), "may not be set when device is set").WithOrigin("dependentForbidden").MarkCoveredByDeclarative()},
+			taintRule: func() *resourceapi.DeviceTaintRule {
+				taintRule := testDeviceTaintRule(goodName, validDeviceTaintRuleSpec)
+				taintRule.Spec.DeviceSelector = &resourceapi.DeviceTaintSelector{
+					All:    ptr.To(true),
+					Device: ptr.To(goodName),
+				}
+				return taintRule
+			}(),
+		},
+		"all-true-combined-with-driver-pool-and-device": {
+			wantFailures: field.ErrorList{
+				field.Forbidden(field.NewPath("spec", "deviceSelector", "all"), "may not be set when driver is set").WithOrigin("dependentForbidden").MarkCoveredByDeclarative(),
+				field.Forbidden(field.NewPath("spec", "deviceSelector", "all"), "may not be set when pool is set").WithOrigin("dependentForbidden").MarkCoveredByDeclarative(),
+				field.Forbidden(field.NewPath("spec", "deviceSelector", "all"), "may not be set when device is set").WithOrigin("dependentForbidden").MarkCoveredByDeclarative(),
+			},
+			taintRule: func() *resourceapi.DeviceTaintRule {
+				taintRule := testDeviceTaintRule(goodName, validDeviceTaintRuleSpec)
+				taintRule.Spec.DeviceSelector.All = ptr.To(true)
+				return taintRule
+			}(),
+		},
 		// Minimal tests for DeviceTaint. Full coverage of validateDeviceTaint is in ResourceSlice test.
 		"valid-taint": {
 			taintRule: func() *resourceapi.DeviceTaintRule {

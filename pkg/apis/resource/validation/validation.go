@@ -1908,6 +1908,28 @@ func validateDeviceTaintSelector(filter, oldFilter *resource.DeviceTaintSelector
 	if filter.Device != nil {
 		allErrs = append(allErrs, validateDeviceName(*filter.Device, fldPath.Child("device"))...)
 	}
+	if filter.All != nil {
+		// Declarative validation (+k8s:dependentForbidden on driver, pool and
+		// device) reports an error on "all" for each of those fields that is
+		// set, regardless of the value of "all".
+		for _, sibling := range []struct {
+			name string
+			set  bool
+		}{
+			{"driver", filter.Driver != nil},
+			{"pool", filter.Pool != nil},
+			{"device", filter.Device != nil},
+		} {
+			if sibling.set {
+				allErrs = append(allErrs, field.Forbidden(fldPath.Child("all"),
+					fmt.Sprintf("may not be set when %s is set", sibling.name)).WithOrigin("dependentForbidden").MarkCoveredByDeclarative())
+			}
+		}
+		if !*filter.All {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("all"), *filter.All,
+				"must be either unset or set to true").WithOrigin("neq").MarkCoveredByDeclarative())
+		}
+	}
 
 	return allErrs
 }

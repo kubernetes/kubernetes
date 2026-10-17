@@ -1042,6 +1042,7 @@ type DeviceTaintRuleSpec struct {
 	// a selector, no devices are matches.
 	//
 	// +optional
+	// +k8s:optional
 	DeviceSelector *DeviceTaintSelector `json:"deviceSelector,omitempty" protobuf:"bytes,1,opt,name=deviceSelector"`
 
 	// taint is the taint that gets applied to matching devices.
@@ -1070,6 +1071,8 @@ type DeviceTaintSelector struct {
 	// This fields corresponds to slice.spec.driver.
 	//
 	// +optional
+	// +k8s:optional
+	// +k8s:alpha(since: "1.38")=+k8s:dependentForbidden("all")
 	Driver *string `json:"driver,omitempty" protobuf:"bytes,2,opt,name=driver"`
 
 	// pool is the pool name. If pool is set, only devices in that pool are selected.
@@ -1082,6 +1085,8 @@ type DeviceTaintSelector struct {
 	// their pool name.
 	//
 	// +optional
+	// +k8s:optional
+	// +k8s:alpha(since: "1.38")=+k8s:dependentForbidden("all")
 	Pool *string `json:"pool,omitempty" protobuf:"bytes,3,opt,name=pool"`
 
 	// device is the device name. If device is set, only devices with that name are selected.
@@ -1091,6 +1096,8 @@ type DeviceTaintSelector struct {
 	// but is not required.
 	//
 	// +optional
+	// +k8s:optional
+	// +k8s:alpha(since: "1.38")=+k8s:dependentForbidden("all")
 	Device *string `json:"device,omitempty" protobuf:"bytes,4,opt,name=device"`
 
 	// Selectors contains the same selection criteria as a ResourceClaim.
@@ -1105,6 +1112,20 @@ type DeviceTaintSelector struct {
 	// result. Without that the eviction controller cannot evaluate these CEL expressions.
 	//
 	// Selectors []DeviceSelector `json:"selectors,omitempty" protobuf:"bytes,5,rep,name=selectors"`
+
+	// all explicitly selects every device from every driver in the
+	// cluster when set to true. It must not be combined with driver, pool,
+	// or device: those must all be unset when all is true.
+	//
+	// Leaving driver, pool, and device all unset also selects every
+	// device, for historical reasons, but doing so without setting all
+	// is deprecated and may be rejected in a future release. Set all
+	// explicitly instead.
+	//
+	// +optional
+	// +k8s:optional
+	// +k8s:alpha(since: "1.38")=+k8s:neq=false
+	All *bool `json:"all,omitempty" protobuf:"varint,6,opt,name=all"`
 }
 
 // DeviceTaintRuleStatus provides information about an on-going pod eviction.
