@@ -410,6 +410,16 @@ func (h *kmsv2PluginProbe) rotateDEKOnKeyIDChange(ctx context.Context, statusKey
 
 	transformer, encObject, cacheKey, errGen := envelopekmsv2.GenerateTransformer(ctx, uid, h.service, useSeed)
 
+	if errGen == nil && encObject != nil {
+		_, errGen = h.service.Decrypt(ctx, uid, &kmsservice.DecryptRequest{
+			Ciphertext:  encObject.EncryptedDEKSource,
+			KeyID:       encObject.KeyID,
+			Annotations: encObject.Annotations,
+		})
+		if errGen != nil {
+			errGen = fmt.Errorf("failed to decrypt newly encrypted DEK, error: %w", errGen)
+		}
+	}
 	if encObject == nil {
 		encObject = &kmstypes.EncryptedObject{} // avoid nil panics
 	}
