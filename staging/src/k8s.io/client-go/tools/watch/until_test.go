@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	fakeclient "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/klog/v2/ktesting"
 )
 
 type fakePod struct {
@@ -42,7 +43,8 @@ func (obj *fakePod) GetObjectKind() schema.ObjectKind { return schema.EmptyObjec
 func (obj *fakePod) DeepCopyObject() runtime.Object   { panic("DeepCopyObject not supported by fakePod") }
 
 func TestUntil(t *testing.T) {
-	fw := watch.NewFake()
+	logger, _ := ktesting.NewTestContext(t)
+	fw := watch.NewFakeWithOptions(watch.FakeOptions{Logger: &logger})
 	go func() {
 		var obj *fakePod
 		fw.Add(obj)
@@ -72,7 +74,8 @@ func TestUntil(t *testing.T) {
 }
 
 func TestUntilMultipleConditions(t *testing.T) {
-	fw := watch.NewFake()
+	logger, _ := ktesting.NewTestContext(t)
+	fw := watch.NewFakeWithOptions(watch.FakeOptions{Logger: &logger})
 	go func() {
 		var obj *fakePod
 		fw.Add(obj)
@@ -101,7 +104,8 @@ func TestUntilMultipleConditions(t *testing.T) {
 }
 
 func TestUntilMultipleConditionsFail(t *testing.T) {
-	fw := watch.NewFake()
+	logger, _ := ktesting.NewTestContext(t)
+	fw := watch.NewFakeWithOptions(watch.FakeOptions{Logger: &logger})
 	go func() {
 		var obj *fakePod
 		fw.Add(obj)
@@ -131,7 +135,8 @@ func TestUntilMultipleConditionsFail(t *testing.T) {
 }
 
 func TestUntilTimeout(t *testing.T) {
-	fw := watch.NewFake()
+	logger, _ := ktesting.NewTestContext(t)
+	fw := watch.NewFakeWithOptions(watch.FakeOptions{Logger: &logger})
 	go func() {
 		var obj *fakePod
 		fw.Add(obj)
@@ -162,7 +167,8 @@ func TestUntilTimeout(t *testing.T) {
 }
 
 func TestUntilErrorCondition(t *testing.T) {
-	fw := watch.NewFake()
+	logger, _ := ktesting.NewTestContext(t)
+	fw := watch.NewFakeWithOptions(watch.FakeOptions{Logger: &logger})
 	go func() {
 		var obj *fakePod
 		fw.Add(obj)
