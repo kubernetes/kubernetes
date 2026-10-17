@@ -584,6 +584,16 @@ func TestMergeResourceConfig(t *testing.T) {
 	}
 }
 
+func TestMergeResourceConfigDoesNotMutateSource(t *testing.T) {
+	source := &cm.ResourceConfig{Unified: map[string]string{"key1": "value1"}}
+	update := &cm.ResourceConfig{Unified: map[string]string{"key1": "newValue1", "key2": "value2"}}
+
+	merged := mergeResourceConfig(source, update)
+
+	assert.Equal(t, map[string]string{"key1": "newValue1", "key2": "value2"}, merged.Unified)
+	assert.Equal(t, map[string]string{"key1": "value1"}, source.Unified, "merge must not mutate the source Unified map")
+}
+
 func TestConvertResourceConfigToLinuxContainerResources(t *testing.T) {
 	resCfg := &cm.ResourceConfig{
 		Memory:        ptr.To[int64](2048),
