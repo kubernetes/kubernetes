@@ -406,6 +406,7 @@ func (cm *containerManagerImpl) NewPodContainerManager() PodContainerManager {
 			podContainerManager:     cm,
 			memoryReservationPolicy: cm.MemoryReservationPolicy,
 			memoryThrottlingFactor:  cm.MemoryThrottlingFactor,
+			recorder:                cm.recorder,
 		}
 	}
 	return &podContainerManagerNoop{
