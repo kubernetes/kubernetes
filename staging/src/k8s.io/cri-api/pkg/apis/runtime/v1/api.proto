@@ -623,6 +623,15 @@ message PodSandboxConfig {
     LinuxPodSandboxConfig linux = 8;
     // Optional configurations specific to Windows hosts.
     WindowsPodSandboxConfig windows = 9;
+    // default_network selects whether the sandbox network namespace is
+    // attached to the default pod network. It only applies when
+    // NamespaceOption.network is POD; for NODE (host network) sandboxes
+    // there is no sandbox network namespace and runtimes MUST ignore this
+    // field. Kubelets that predate the field leave it unset
+    // (DEFAULT_NETWORK_POD).
+    // Feature gate: PodDefaultNetwork
+    // See https://kep.k8s.io/6313 for more details.
+    PodSandboxDefaultNetwork default_network = 10;
 }
 
 message RunPodSandboxRequest {
@@ -1904,6 +1913,9 @@ message RuntimeFeatures {
     // mount_options is set to true if the runtime supports additional bind
     // mount options (noexec, nodev, nosuid) on container mounts.
     bool mount_options = 3;
+    // default_network_none is set to true if the runtime supports creating
+    // sandboxes with PodSandboxDefaultNetwork DEFAULT_NETWORK_NONE.
+    bool default_network_none = 4;
 }
 
 message StatusResponse {
@@ -2396,3 +2408,20 @@ message UpdatePodSandboxResourcesRequest {
 }
 
 message UpdatePodSandboxResourcesResponse {}
+
+// PodSandboxDefaultNetwork selects whether a sandbox network namespace is
+// attached to the default pod network.
+// See https://kep.k8s.io/6313 for more details.
+enum PodSandboxDefaultNetwork {
+    // DEFAULT_NETWORK_POD attaches the sandbox network namespace to the
+    // default pod network. The runtime performs its configured network
+    // plumbing (e.g., invokes CNI plugins on Linux). This is the default and
+    // matches historical behavior.
+    DEFAULT_NETWORK_POD = 0;
+    // DEFAULT_NETWORK_NONE creates the sandbox network namespace with only
+    // the loopback interface configured and does not attach it to the
+    // default pod network. The runtime MUST NOT perform its
+    // default-pod-network plumbing and MUST report an empty IP in
+    // PodSandboxStatus.
+    DEFAULT_NETWORK_NONE = 1;
+}
