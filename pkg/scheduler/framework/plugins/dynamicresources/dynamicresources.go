@@ -307,7 +307,7 @@ func podResourceClaimIndexFunc(obj interface{}) ([]string, error) {
 		// An index function that returns an error panics the informer, so we
 		// tolerate an unexpected object type by indexing it under no keys.
 		//
-		// Return early without allocating the set when there are no
+		// Return early without allocating the slice when there are no
 		// resource claims.
 		return nil, nil
 	}
@@ -317,7 +317,7 @@ func podResourceClaimIndexFunc(obj interface{}) ([]string, error) {
 		if err != nil || claimName == nil {
 			continue
 		}
-		// Duplicates are fine for the indexer
+		// Duplicates are fine for the indexer.
 		keys = append(keys, pod.Namespace+"/"+*claimName)
 	}
 	return keys, nil
