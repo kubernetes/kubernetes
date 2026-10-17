@@ -394,7 +394,8 @@ func TestAllocatable(t *testing.T) {
 		},
 	}
 
-	if _, err := testCtx.ClientSet.CoreV1().Nodes().UpdateStatus(context.TODO(), allocNode, metav1.UpdateOptions{}); err != nil {
+	allocNode, err = testCtx.ClientSet.CoreV1().Nodes().UpdateStatus(context.TODO(), allocNode, metav1.UpdateOptions{})
+	if err != nil {
 		t.Fatalf("Failed to update node with Status.Allocatable: %v", err)
 	}
 
@@ -414,6 +415,19 @@ func TestAllocatable(t *testing.T) {
 		t.Errorf("Test allocatable awareness: %s Pod got scheduled unexpectedly, %v", testAllocPod2.Name, err)
 	} else {
 		t.Logf("Test allocatable awareness: %s Pod not scheduled as expected", testAllocPod2.Name)
+	}
+
+	// 8. Raise Allocatable back above the pending pod's request. The node update must
+	// requeue the unschedulable pod and the scheduler must use the new value.
+	allocNode.Status.Allocatable[v1.ResourceCPU] = *resource.NewMilliQuantity(30, resource.DecimalSI)
+	allocNode.Status.Allocatable[v1.ResourceMemory] = *resource.NewQuantity(30, resource.BinarySI)
+	if _, err := testCtx.ClientSet.CoreV1().Nodes().UpdateStatus(context.TODO(), allocNode, metav1.UpdateOptions{}); err != nil {
+		t.Fatalf("Failed to raise node Status.Allocatable: %v", err)
+	}
+
+	// 9. Test: the pending pod should now be scheduled.
+	if err := testutils.WaitForPodToScheduleWithTimeout(testCtx.Ctx, testCtx.ClientSet, testAllocPod2, time.Second*10); err != nil {
+		t.Errorf("Test allocatable increase: %s Pod not scheduled after Allocatable was raised: %v", testAllocPod2.Name, err)
 	}
 }
 
