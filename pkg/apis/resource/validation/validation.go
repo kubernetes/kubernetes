@@ -885,11 +885,16 @@ func validateResourceSliceSpec(spec, oldSpec *resource.ResourceSliceSpec, fldPat
 		}
 	}
 
-	allErrs = append(allErrs, validateSet(spec.SharedCounters, resource.ResourceSliceMaxCounterSets,
-		validateCounterSet,
-		func(counterSet resource.CounterSet) string {
-			return counterSet.Name
-		}, fldPath.Child("sharedCounters"), sizeCovered, uniquenessCovered)...)
+	// An unchanged sharedCounters list is accepted as it is stored, matching
+	// the atomic list ratcheting behavior of generated validation.
+	sharedCountersChanged := oldSpec == nil || !apiequality.Semantic.DeepEqual(spec.SharedCounters, oldSpec.SharedCounters)
+	if sharedCountersChanged {
+		allErrs = append(allErrs, validateSet(spec.SharedCounters, resource.ResourceSliceMaxCounterSets,
+			validateCounterSet,
+			func(counterSet resource.CounterSet) string {
+				return counterSet.Name
+			}, fldPath.Child("sharedCounters"), sizeCovered, uniquenessCovered)...)
+	}
 
 	// The name format is validated declaratively; see the field's tags.
 	if spec.PartitionTypeAttribute != nil {
@@ -1031,7 +1036,6 @@ func validateCounterSet(counterSet resource.CounterSet, fldPath *field.Path) fie
 	if len(counterSet.Counters) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("counters"), "").MarkCoveredByDeclarative())
 	} else {
-		// The size limit is enforced for across all sets by the caller.
 		allErrs = append(allErrs, validateMap(counterSet.Counters, resource.ResourceSliceMaxCountersPerCounterSet, validation.DNS1123LabelMaxLength,
 			validateCounterName, validateDeviceCounter, fldPath.Child("counters"), keysCovered)...)
 	}
@@ -1607,8 +1611,11 @@ func isFractionalQuantity(q apiresource.Quantity) bool {
 }
 
 func validateDeviceCounter(counter resource.Counter, fldPath *field.Path) field.ErrorList {
-	// Any parsed quantity is valid.
-	return nil
+	var allErrs field.ErrorList
+	if counter.Value.Sign() < 0 {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("value"), counter.Value.String(), "must be greater than or equal to 0"))
+	}
+	return allErrs
 }
 
 func validateQualifiedName(name resource.QualifiedName, fldPath *field.Path) field.ErrorList {

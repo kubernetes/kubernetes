@@ -653,6 +653,8 @@ type DeviceCapacity struct {
 type Counter struct {
 	// Value defines how much of a certain device counter is available.
 	//
+	// Must be greater than or equal to zero.
+	//
 	// +required
 	Value resource.Quantity
 }
