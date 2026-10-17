@@ -2407,6 +2407,10 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 		},
 		VolumeName: "volume",
 	})
+	invalidUpdateClaimVolumeName := validUpdateClaim.DeepCopy()
+	invalidUpdateClaimVolumeName.Spec.VolumeName = "other-volume"
+	invalidUpdateClaimVolumeNameCleared := validUpdateClaim.DeepCopy()
+	invalidUpdateClaimVolumeNameCleared.Spec.VolumeName = ""
 	invalidUpdateClaimResources := testVolumeClaim("foo", "ns", core.PersistentVolumeClaimSpec{
 		AccessModes: []core.PersistentVolumeAccessMode{
 			core.ReadWriteOnce,
@@ -2826,6 +2830,7 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 		isExpectedFailure           bool
 		oldClaim                    *core.PersistentVolumeClaim
 		newClaim                    *core.PersistentVolumeClaim
+		expectedVolumeNameError     string
 		enableRecoverFromExpansion  bool
 		enableVolumeAttributesClass bool
 	}{
@@ -2838,6 +2843,18 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 			isExpectedFailure: false,
 			oldClaim:          validUpdateClaim,
 			newClaim:          validUpdateClaim,
+		},
+		"invalid-update-volumeName": {
+			isExpectedFailure:       true,
+			oldClaim:                validUpdateClaim,
+			newClaim:                invalidUpdateClaimVolumeName,
+			expectedVolumeNameError: "field cannot be modified once set",
+		},
+		"invalid-clear-volumeName": {
+			isExpectedFailure:       true,
+			oldClaim:                validUpdateClaim,
+			newClaim:                invalidUpdateClaimVolumeNameCleared,
+			expectedVolumeNameError: "field cannot be cleared once set",
 		},
 		"invalid-update-change-resources-on-bound-claim": {
 			isExpectedFailure: true,
@@ -3141,6 +3158,24 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 			}
 			if len(errs) > 0 && !scenario.isExpectedFailure {
 				t.Errorf("Unexpected failure for scenario: %s - %+v", name, errs)
+			}
+			if scenario.expectedVolumeNameError != "" {
+				var volumeNameError *field.Error
+				for _, err := range errs {
+					if err.Field == "spec.volumeName" {
+						volumeNameError = err
+						break
+					}
+				}
+				if volumeNameError == nil {
+					t.Fatalf("Expected an error for spec.volumeName, got: %v", errs)
+				}
+				if !volumeNameError.CoveredByDeclarative {
+					t.Errorf("Expected spec.volumeName error to be covered by declarative validation: %v", volumeNameError)
+				}
+				if volumeNameError.Detail != scenario.expectedVolumeNameError {
+					t.Errorf("Expected spec.volumeName error detail %q, got %q", scenario.expectedVolumeNameError, volumeNameError.Detail)
+				}
 			}
 		})
 	}
