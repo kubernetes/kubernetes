@@ -1439,3 +1439,101 @@ func getMaxItemRV(t *testing.T, versioner storage.Versioner, items []interface{}
 	}
 	return maxRV
 }
+
+func TestWaitUntilFreshConcurrentWaitersAndCleanup(t *testing.T) {
+	s := newTestWatchCache(100, DefaultEventFreshDuration, &cache.Indexers{})
+	defer s.Stop()
+	require.NoError(t, s.Add(makeTestPod("pod", 1)))
+
+	// 1. Cancelled context cleans up waiter entry when last waiter leaves.
+	cancelCtx, cancel := context.WithCancel(context.Background())
+	cancelDone := make(chan error, 1)
+	go func() {
+		cancelDone <- s.waitUntilFresh(cancelCtx, 999)
+	}()
+	require.Eventually(t, func() bool {
+		s.waiter.mu.Lock()
+		defer s.waiter.mu.Unlock()
+		return len(s.waiter.byRV) == 1 && len(s.waiter.heap) == 1
+	}, time.Second, time.Millisecond)
+	cancel()
+	require.ErrorIs(t, <-cancelDone, context.Canceled)
+	s.waiter.mu.Lock()
+	require.Empty(t, s.waiter.byRV)
+	require.Empty(t, s.waiter.heap)
+	s.waiter.mu.Unlock()
+
+	// 2. Multiple waiters across distinct and shared RVs wake in order.
+	const numRVs = 50
+	const waitersPerRV = 4
+	var wg wait.Group
+	for rv := uint64(2); rv <= numRVs+1; rv++ {
+		for range waitersPerRV {
+			targetRV := rv
+			wg.Start(func() {
+				_, exists, gotRV, err := s.WaitUntilFreshAndGet(context.Background(), strconv.FormatUint(targetRV, 10), "/prefix/ns/pod")
+				require.NoError(t, err)
+				require.True(t, exists)
+				require.GreaterOrEqual(t, gotRV, targetRV)
+			})
+		}
+	}
+
+	require.Eventually(t, func() bool {
+		s.waiter.mu.Lock()
+		defer s.waiter.mu.Unlock()
+		return len(s.waiter.byRV) == numRVs
+	}, 2*time.Second, time.Millisecond)
+
+	for rv := uint64(2); rv <= numRVs+1; rv++ {
+		require.NoError(t, s.Update(makeTestPod("pod", rv)))
+	}
+	wg.Wait()
+
+	s.waiter.mu.Lock()
+	require.Empty(t, s.waiter.byRV)
+	require.Empty(t, s.waiter.heap)
+	s.waiter.mu.Unlock()
+}
+
+func BenchmarkWaitUntilFreshManyWaiters(b *testing.B) {
+	const numWaiters = 350
+	const lookahead = uint64(numWaiters)
+
+	s := newTestWatchCache(4096, DefaultEventFreshDuration, &cache.Indexers{})
+	defer s.Stop()
+	s.config.clock = clock.RealClock{}
+	require.NoError(b, s.Add(makeTestPod("pod", 1)))
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	var wg wait.Group
+	for i := range numWaiters {
+		offset := uint64(i + 1)
+		wg.Start(func() {
+			for {
+				cur := s.waiter.currentRV.Load()
+				if err := s.waitUntilFresh(ctx, cur+offset); err != nil {
+					return
+				}
+			}
+		})
+	}
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := range b.N {
+		rv := uint64(i + 2)
+		if err := s.Update(makeTestPod("pod", rv)); err != nil {
+			b.Fatal(err)
+		}
+	}
+	b.StopTimer()
+	cancel()
+	for i := range lookahead + 1 {
+		s.waiter.notify(uint64(b.N) + 2 + i)
+	}
+	wg.Wait()
+}
+
