@@ -558,6 +558,9 @@ type churnOp struct {
 	Number int
 	// Intervals of churning. Defaults to 500 millisecond.
 	IntervalMilliseconds int64
+	// WaitForPodsScheduledBeforeDeletion ensures each pod is scheduled before
+	// it is deleted in Recreate mode.
+	WaitForPodsScheduledBeforeDeletion bool
 	// Namespace the churning objects should be created in. Defaults to a unique
 	// namespace of the format "namespace-<number>".
 	// Optional
@@ -575,6 +578,9 @@ func (co *churnOp) isValid(_ bool) error {
 	}
 	if co.Mode == Recreate && co.Number == 0 {
 		return fmt.Errorf("number cannot be 0 when mode is %v", Recreate)
+	}
+	if co.WaitForPodsScheduledBeforeDeletion && co.Mode != Recreate {
+		return fmt.Errorf("WaitForPodsScheduledBeforeDeletion can only be set when mode is %v", Recreate)
 	}
 	if len(co.TemplatePaths) == 0 {
 		return fmt.Errorf("at least one template spec file needs to be specified")
