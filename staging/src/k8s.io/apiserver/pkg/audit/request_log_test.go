@@ -18,9 +18,14 @@ package audit
 
 import (
 	"context"
+	"encoding/json"
+	"encoding/json/jsontext"
+	"fmt"
 	"io"
 	"strings"
 	"testing"
+
+	"github.com/google/go-cmp/cmp"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -29,6 +34,108 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	auditinternal "k8s.io/apiserver/pkg/apis/audit"
 )
+
+type managedFieldsEncodingProbe string
+
+// The legacy engine would encode the underlying string instead of this marker.
+func (managedFieldsEncodingProbe) MarshalJSONTo(enc *jsontext.Encoder) error {
+	return enc.WriteToken(jsontext.String("json/v2"))
+}
+
+type managedFieldsEncodingObject struct {
+	metav1.TypeMeta   `json:""`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+	Probe             managedFieldsEncodingProbe `json:"probe"`
+}
+
+func (o *managedFieldsEncodingObject) DeepCopyObject() runtime.Object {
+	copy := *o
+	o.ObjectMeta.DeepCopyInto(&copy.ObjectMeta)
+	return &copy
+}
+
+// TestManagedFieldsOmissionUsesJSONV2 verifies request and response audit
+// encoding with managed fields retained or omitted, including v2 dispatch,
+// injected TypeMeta, preserved metadata, and an unchanged input object.
+func TestManagedFieldsOmissionUsesJSONV2(t *testing.T) {
+	gvk := schema.GroupVersionKind{Group: "test.example", Version: "v1", Kind: "EncodingProbe"}
+	scheme := runtime.NewScheme()
+	scheme.AddKnownTypeWithName(gvk, &managedFieldsEncodingObject{})
+	codecs := serializer.NewCodecFactory(scheme)
+	for _, request := range []bool{true, false} {
+		for _, omit := range []bool{false, true} {
+			t.Run(fmt.Sprintf("request=%t/omit=%t", request, omit), func(t *testing.T) {
+				obj := &managedFieldsEncodingObject{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "example",
+						ManagedFields: []metav1.ManagedFieldsEntry{{
+							Manager: "test-manager", Operation: metav1.ManagedFieldsOperationApply,
+						}},
+					},
+					Probe: "legacy encoding",
+				}
+				original := obj.DeepCopyObject()
+				ctx := WithAuditContext(context.Background())
+				ac := AuditContextFrom(ctx)
+				sink := &capturingAuditSink{}
+				if err := ac.Init(RequestAuditConfig{Level: auditinternal.LevelRequestResponse, OmitManagedFields: omit}, sink); err != nil {
+					t.Fatal(err)
+				}
+				// Exercise the policy decision, copy/removal, and real negotiated
+				// JSON encoder together, rather than replacing encoding with a mock.
+				if request {
+					LogRequestObject(ctx, obj, gvk.GroupVersion(), gvk.GroupVersion().WithResource("probes"), "", codecs.WithoutConversion())
+				} else {
+					LogResponseObject(ctx, obj, gvk.GroupVersion(), codecs.WithoutConversion())
+				}
+				ac.ProcessEventStage(ctx, auditinternal.StageResponseComplete)
+				if diff := cmp.Diff(original, obj); diff != "" {
+					t.Errorf("input object changed (-want +got):\n%s", diff)
+				}
+				if len(sink.events) != 1 {
+					t.Fatalf("captured %d audit events, want 1", len(sink.events))
+				}
+				encoded := sink.events[0].ResponseObject
+				if request {
+					encoded = sink.events[0].RequestObject
+				}
+				if encoded == nil {
+					t.Fatal("audit event has no encoded object")
+				}
+				var got struct {
+					metav1.TypeMeta
+					Metadata map[string]json.RawMessage `json:"metadata"`
+					Probe    string                     `json:"probe"`
+				}
+				if err := json.Unmarshal(encoded.Raw, &got); err != nil {
+					t.Fatal(err)
+				}
+				if got.Probe != "json/v2" {
+					t.Errorf("encoding probe = %q, want json/v2", got.Probe)
+				}
+				if got.GroupVersionKind() != gvk {
+					t.Errorf("encoded GVK = %v, want %v", got.GroupVersionKind(), gvk)
+				}
+				if name := string(got.Metadata["name"]); name != `"example"` {
+					t.Errorf("encoded name = %s, want %q", name, "example")
+				}
+				fields, present := got.Metadata["managedFields"]
+				if present == omit {
+					t.Errorf("managedFields present = %t, want %t", present, !omit)
+				}
+				if !omit {
+					var entries []metav1.ManagedFieldsEntry
+					if err := json.Unmarshal(fields, &entries); err != nil {
+						t.Fatal(err)
+					}
+					if diff := cmp.Diff(obj.ManagedFields, entries); diff != "" {
+						t.Errorf("managedFields changed (-want +got):\n%s", diff)
+					}
+				}
+			})
+		}
+	}
+}
 
 func TestLogResponseObjectWithPod(t *testing.T) {
 	testPod := &corev1.Pod{
