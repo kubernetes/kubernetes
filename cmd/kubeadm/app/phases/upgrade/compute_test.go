@@ -904,7 +904,7 @@ func TestGetAvailableUpgrades(t *testing.T) {
 	// Kubernetes release.
 	for _, rt := range tests {
 		t.Run(rt.name, func(t *testing.T) {
-			actualUpgrades, actualErr := GetAvailableUpgrades(rt.vg, rt.allowExperimental, rt.allowRCs, &output.TextPrinter{})
+			actualUpgrades, actualErr := GetAvailableUpgrades(rt.vg, rt.allowExperimental, rt.allowRCs, constants.CoreDNSVersion, &output.TextPrinter{})
 			if diff := cmp.Diff(rt.expectedUpgrades, actualUpgrades); len(diff) > 0 {
 				t.Errorf("failed TestGetAvailableUpgrades\n\texpected upgrades:\n%v\n\tgot:\n%v\n\tdiff:\n%v", rt.expectedUpgrades, actualUpgrades, diff)
 			}
@@ -916,6 +916,36 @@ func TestGetAvailableUpgrades(t *testing.T) {
 			if diff := cmp.Diff(rt.expectedUpgrades, actualUpgrades); len(diff) > 0 {
 				t.Logf("diff: %s", cmp.Diff(rt.expectedUpgrades, actualUpgrades))
 				t.Errorf("failed TestGetAvailableUpgrades\n\texpected upgrades:\n%v\n\tgot:\n%v\n\tdiff:\n%v", rt.expectedUpgrades, actualUpgrades, diff)
+			}
+		})
+	}
+}
+
+func TestGetAvailableUpgradesDNSVersionOverride(t *testing.T) {
+	// The tag is shown as is, e.g. with the "v" prefix and for versions unknown to corefile-migration.
+	for _, dnsVersion := range []string{"v1.8.0", "v99.0.0-custom"} {
+		t.Run(dnsVersion, func(t *testing.T) {
+			vg := &fakeVersionGetter{
+				clusterVersion:     "v1.15.1",
+				componentVersion:   "v1.15.1",
+				kubeletVersion:     "v1.15.1",
+				kubeadmVersion:     "v1.15.3",
+				etcdVersion:        fakeCurrentEtcdVersion,
+				stablePatchVersion: "v1.15.3",
+				stableVersion:      "v1.15.3",
+				coreDNSVersion:     fakeCurrentCoreDNSVersion,
+			}
+			upgrades, err := GetAvailableUpgrades(vg, false, false, dnsVersion, &output.TextPrinter{})
+			if err != nil {
+				t.Fatalf("unexpected failure: %v", err)
+			}
+			if len(upgrades) == 0 {
+				t.Fatal("expected at least one upgrade")
+			}
+			for _, u := range upgrades {
+				if u.After.DNSVersion != dnsVersion {
+					t.Errorf("expected After.DNSVersion %q, got %q", dnsVersion, u.After.DNSVersion)
+				}
 			}
 		})
 	}
