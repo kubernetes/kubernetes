@@ -227,7 +227,7 @@ func getCgroupConfigInternal(rl v1.ResourceList, compressibleResourcesOnly bool)
 	setCompressibleResources := func() {
 		if q, exists := rl[v1.ResourceCPU]; exists {
 			// CPU is defined in milli-cores.
-			val := MilliCPUToShares(q.MilliValue())
+			val := MilliCPUToCgroupShares(q.MilliValue())
 			rc.CPUShares = &val
 		}
 	}

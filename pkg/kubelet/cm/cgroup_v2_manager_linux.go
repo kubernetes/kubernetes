@@ -171,6 +171,7 @@ func (c *cgroupV2impl) buildCgroupUnifiedPath(name CgroupName) string {
 
 // Convert cgroup v2 cpu.weight value to cgroup v1 cpu.shares
 // https://github.com/kubernetes/enhancements/tree/master/keps/sig-node/2254-cgroup-v2#phase-1-convert-from-cgroups-v1-settings-to-v2
+// The inverse uses the same cgroupV2MaxShares as getCPUWeight.
 func cpuWeightToCPUShares(cpuWeight uint64) uint64 {
-	return uint64((((cpuWeight - 1) * 262142) / 9999) + 2)
+	return (((cpuWeight - 1) * (cgroupV2MaxShares.Load() - 2)) / 9999) + 2
 }

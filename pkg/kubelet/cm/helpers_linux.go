@@ -23,6 +23,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"sync/atomic"
 
 	libcontainercgroups "github.com/opencontainers/cgroups"
 	v1 "k8s.io/api/core/v1"
@@ -159,6 +160,39 @@ func MilliCPUToShares(milliCPU int64) uint64 {
 	return uint64(shares)
 }
 
+// cgroupV2MaxShares is the shares value that maps to the maximum cpu.weight
+// for cgroups managed directly by the kubelet (node allocatable, QoS and pod
+// cgroups). It defaults to MaxShares, which keeps the historical conversion.
+// On cgroup v2 nodes with more than MaxShares/SharesPerCPU CPUs it is raised to
+// cover the node's capacity; otherwise every request at or above that many
+// CPUs collapses onto the same cpu.weight.
+var cgroupV2MaxShares atomic.Uint64
+
+func init() {
+	cgroupV2MaxShares.Store(MaxShares)
+}
+
+// SetCgroupV2CPUCapacity scales the shares-to-weight conversion used for
+// kubelet-managed cgroups to the node's CPU capacity. It must only be called on
+// cgroup v2 hosts: cgroup v1 cpu.shares cannot exceed MaxShares.
+// Capacities at or below MaxShares/SharesPerCPU CPUs leave the conversion unchanged.
+func SetCgroupV2CPUCapacity(milliCPU int64) {
+	shares := uint64(max(milliCPU, 0)) * SharesPerCPU / MilliCPUToCPU
+	cgroupV2MaxShares.Store(max(shares, MaxShares))
+}
+
+// MilliCPUToCgroupShares converts milliCPU to shares for cgroups the kubelet
+// writes itself. Unlike MilliCPUToShares, the result may exceed MaxShares on
+// cgroup v2 hosts configured via SetCgroupV2CPUCapacity. It must not be sent
+// to container runtimes, which reject or clamp shares above MaxShares.
+func MilliCPUToCgroupShares(milliCPU int64) uint64 {
+	if milliCPU == 0 {
+		return MinShares
+	}
+	shares := uint64(max(milliCPU, 0)) * SharesPerCPU / MilliCPUToCPU
+	return min(max(shares, MinShares), cgroupV2MaxShares.Load())
+}
+
 // HugePageLimits converts the API representation to a map
 // from huge page size (in bytes) to huge page limit (in bytes).
 func HugePageLimits(resourceList v1.ResourceList) map[int64]int64 {
@@ -232,7 +266,7 @@ func ResourceConfigForPod(allocatedPod *v1.Pod, enforceCPULimits bool, cpuPeriod
 	}
 
 	// convert to CFS values
-	cpuShares := MilliCPUToShares(cpuRequests)
+	cpuShares := MilliCPUToCgroupShares(cpuRequests)
 	cpuQuota := MilliCPUToQuota(cpuLimits, int64(cpuPeriod))
 
 	// quota is not capped when cfs quota is disabled

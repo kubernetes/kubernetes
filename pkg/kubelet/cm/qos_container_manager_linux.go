@@ -237,7 +237,7 @@ func (m *qosContainerManagerImpl) setCPUCgroupConfig(configs map[v1.PodQOSClass]
 	configs[v1.PodQOSBestEffort].ResourceParameters.CPUShares = &bestEffortCPUShares
 
 	// set burstable shares based on current observe state
-	burstableCPUShares := MilliCPUToShares(burstablePodCPURequest)
+	burstableCPUShares := MilliCPUToCgroupShares(burstablePodCPURequest)
 	configs[v1.PodQOSBurstable].ResourceParameters.CPUShares = &burstableCPUShares
 	return nil
 }
