@@ -90,7 +90,7 @@ func NewTTLController(ctx context.Context, nodeInformer informers.NodeInformer, 
 			},
 		),
 	}
-	_, _ = nodeInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
+	_, err := nodeInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			ttlc.addNode(logger, obj)
 		},
@@ -100,9 +100,8 @@ func NewTTLController(ctx context.Context, nodeInformer informers.NodeInformer, 
 		DeleteFunc: func(obj interface{}) {
 			ttlc.deleteNode(logger, obj)
 		},
-	}, cache.HandlerOptions{
-		Logger: &logger,
-	})
+	}, cache.HandlerOptions{Logger: &logger})
+	utilruntime.Must(err)
 
 	ttlc.nodeStore = listers.NewNodeLister(nodeInformer.Informer().GetIndexer())
 	ttlc.hasSynced = nodeInformer.Informer().HasSynced
