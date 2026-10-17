@@ -25,20 +25,24 @@ import (
 
 	"github.com/spf13/cobra"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/server/healthz"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/discovery"
 	cacheddiscovery "k8s.io/client-go/discovery/cached/memory"
 	"k8s.io/client-go/informers"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/metadata"
 	"k8s.io/client-go/metadata/metadatainformer"
+	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/restmapper"
 	"k8s.io/client-go/tools/leaderelection"
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
+	"k8s.io/client-go/transport"
 	cloudprovider "k8s.io/cloud-provider"
 	cloudcontrollerconfig "k8s.io/cloud-provider/app/config"
 	configv1alpha "k8s.io/cloud-provider/config/v1alpha1"
@@ -216,13 +220,24 @@ func Run(c *cloudcontrollerconfig.CompletedConfig, cloud cloudprovider.Interface
 		}
 	}
 
-	run := func(ctx context.Context, controllerInitializers map[string]InitFunc) {
-		clientBuilder := clientbuilder.SimpleControllerClientBuilder{
-			ClientConfig: c.Kubeconfig,
-		}
+	// recoveryEnabled is whether the elector runs in recovery mode and the
+	// controllers' clients go through its write gate. A replica that loses
+	// its lease still exits, since cloud provider API calls are not gated.
+	recoveryEnabled := utilfeature.DefaultFeatureGate.Enabled(cmfeatures.LeaderElectionRecovery)
+
+	// run builds and runs the given controllers. election is the leader
+	// election they run under, or nil without leader election.
+	run := func(ctx context.Context, controllerInitializers map[string]InitFunc, election *electionRun) {
+		clientBuilder, controllerClientBuilder := clientBuildersFor(c, election)
 		controllerContext, err := CreateControllerContext(c, clientBuilder, ctx.Done())
 		if err != nil {
 			klog.Fatalf("error building controller context: %v", err)
+		}
+		if recoveryEnabled {
+			// Controllers take their clients from the context so that they go
+			// through the election's write gate, see clientBuilderFor. Without
+			// recovery the context keeps the informer builder as before.
+			controllerContext.ClientBuilder = controllerClientBuilder
 		}
 		if err := startControllers(ctx, cloud, controllerContext, c, ctx.Done(), controllerInitializers, healthzHandler); err != nil {
 			klog.Fatalf("error running controllers: %v", err)
@@ -231,7 +246,7 @@ func Run(c *cloudcontrollerconfig.CompletedConfig, cloud cloudprovider.Interface
 
 	if !c.ComponentConfig.Generic.LeaderElection.LeaderElect {
 		ctx := wait.ContextForChannel(stopCh)
-		run(ctx, controllerInitializers)
+		run(ctx, controllerInitializers, nil)
 		<-stopCh
 		return nil
 	}
@@ -258,6 +273,7 @@ func Run(c *cloudcontrollerconfig.CompletedConfig, cloud cloudprovider.Interface
 	}
 
 	// Start the main lock
+	mainRun := &electionRun{}
 	go leaderElectAndRun(c, id, electionChecker,
 		c.ComponentConfig.Generic.LeaderElection.ResourceLock,
 		c.ComponentConfig.Generic.LeaderElection.ResourceName,
@@ -272,13 +288,14 @@ func Run(c *cloudcontrollerconfig.CompletedConfig, cloud cloudprovider.Interface
 					// Signal the main lock is acquired, and thus migration lock is ready to attempt.
 					close(leaderMigrator.MigrationReady)
 				}
-				run(ctx, initializers)
+				run(ctx, initializers, mainRun)
 			},
 			OnStoppedLeading: func() {
 				klog.ErrorS(nil, "leaderelection lost")
 				klog.FlushAndExit(klog.ExitFlushTimeout, 1)
 			},
-		})
+		},
+		recoveryEnabled, mainRun)
 
 	// If Leader Migration is enabled, proceed to attempt the migration lock.
 	if leaderMigrator != nil {
@@ -286,19 +303,21 @@ func Run(c *cloudcontrollerconfig.CompletedConfig, cloud cloudprovider.Interface
 		<-leaderMigrator.MigrationReady
 
 		// Start the migration lock.
+		migrationRun := &electionRun{}
 		go leaderElectAndRun(c, id, electionChecker,
 			c.ComponentConfig.Generic.LeaderMigration.ResourceLock,
 			c.ComponentConfig.Generic.LeaderMigration.LeaderName,
 			leaderelection.LeaderCallbacks{
 				OnStartedLeading: func(ctx context.Context) {
 					klog.Info("leader migration: starting migrated controllers.")
-					run(ctx, filterInitializers(controllerInitializers, leaderMigrator.FilterFunc, leadermigration.ControllerMigrated))
+					run(ctx, filterInitializers(controllerInitializers, leaderMigrator.FilterFunc, leadermigration.ControllerMigrated), migrationRun)
 				},
 				OnStoppedLeading: func() {
 					klog.ErrorS(nil, "migration leaderelection lost")
 					klog.FlushAndExit(klog.ExitFlushTimeout, 1)
 				},
-			})
+			},
+			recoveryEnabled, migrationRun)
 	}
 
 	<-stopCh
@@ -539,7 +558,7 @@ func ResyncPeriod(c *cloudcontrollerconfig.CompletedConfig) func() time.Duration
 
 // leaderElectAndRun runs the leader election, and runs the callbacks once the leader lease is acquired.
 // TODO: extract this function into staging/controller-manager
-func leaderElectAndRun(c *cloudcontrollerconfig.CompletedConfig, lockIdentity string, electionChecker *leaderelection.HealthzAdaptor, resourceLock string, leaseName string, callbacks leaderelection.LeaderCallbacks) {
+func leaderElectAndRun(c *cloudcontrollerconfig.CompletedConfig, lockIdentity string, electionChecker *leaderelection.HealthzAdaptor, resourceLock string, leaseName string, callbacks leaderelection.LeaderCallbacks, recoveryEnabled bool, run *electionRun) {
 	rl, err := resourcelock.NewFromKubeconfig(resourceLock,
 		c.ComponentConfig.Generic.LeaderElection.ResourceNamespace,
 		leaseName,
@@ -553,7 +572,7 @@ func leaderElectAndRun(c *cloudcontrollerconfig.CompletedConfig, lockIdentity st
 		klog.Fatalf("error creating lock: %v", err)
 	}
 
-	leaderelection.RunOrDie(context.TODO(), leaderelection.LeaderElectionConfig{
+	lec := leaderelection.LeaderElectionConfig{
 		Lock:          rl,
 		LeaseDuration: c.ComponentConfig.Generic.LeaderElection.LeaseDuration.Duration,
 		RenewDeadline: c.ComponentConfig.Generic.LeaderElection.RenewDeadline.Duration,
@@ -561,9 +580,108 @@ func leaderElectAndRun(c *cloudcontrollerconfig.CompletedConfig, lockIdentity st
 		Callbacks:     callbacks,
 		WatchDog:      electionChecker,
 		Name:          leaseName,
-	})
+	}
+	if !recoveryEnabled {
+		leaderelection.RunOrDie(context.TODO(), lec)
+		panic("leaderelection.RunOrDie returned instead of exiting")
+	}
 
-	panic("unreachable")
+	// Recovery mode: the elector keeps renewing after a failed renew deadline
+	// instead of returning, and the callbacks can reach it through run.
+	lec.Recovery = recoveryConfigFor(c)
+	le, err := leaderelection.NewLeaderElector(lec)
+	if err != nil {
+		klog.Fatalf("error creating leader elector: %v", err)
+	}
+	if electionChecker != nil {
+		electionChecker.SetLeaderElection(le)
+	}
+	run.elector = le
+	le.Run(context.TODO())
+
+	panic("leader election ended without the controller manager exiting")
+}
+
+// clientBuildersFor returns the builder for the controller context's informers
+// and the builder for controller clients for the controllers run under
+// election. Without recovery or without an election these are the builders the
+// config was completed with. With both, they are builders whose clients go
+// through the election's write gate.
+func clientBuildersFor(c *cloudcontrollerconfig.CompletedConfig, election *electionRun) (rootClientBuilder clientbuilder.SimpleControllerClientBuilder, controllerClientBuilder clientbuilder.ControllerClientBuilder) {
+	if writeGate := election.writeGate(); writeGate != nil {
+		return gatedClientBuilders(c, writeGate)
+	}
+	return clientbuilder.SimpleControllerClientBuilder{ClientConfig: c.Kubeconfig}, controllerManagerClientBuilder(c.ClientBuilder)
+}
+
+// gatedClientBuilders returns the builder for the controller context's
+// informers and the builder for controller clients, with every client they
+// build going through writeGate. They are built per elector so that each
+// elector's controllers go through its own gate.
+func gatedClientBuilders(c *cloudcontrollerconfig.CompletedConfig, writeGate transport.WrapperFunc) (rootClientBuilder clientbuilder.SimpleControllerClientBuilder, controllerClientBuilder clientbuilder.ControllerClientBuilder) {
+	rootConfig := restclient.CopyConfig(c.Kubeconfig)
+	rootConfig.Wrap(writeGate)
+	rootClientBuilder = clientbuilder.SimpleControllerClientBuilder{ClientConfig: rootConfig}
+	if !c.ComponentConfig.KubeCloudShared.UseServiceAccountCredentials {
+		return rootClientBuilder, rootClientBuilder
+	}
+	anonConfig := restclient.AnonymousClientConfig(c.Kubeconfig)
+	anonConfig.Wrap(writeGate)
+	// The core client stays ungated: the dynamic builder uses it to create
+	// service accounts and refresh their tokens for the per-controller
+	// clients, which must keep working while the gate is closed.
+	return rootClientBuilder, clientbuilder.NewDynamicClientBuilder(anonConfig, c.Client.CoreV1(), metav1.NamespaceSystem)
+}
+
+// controllerManagerClientBuilder returns b as the controller manager's builder
+// interface, adding discovery clients when b does not have them.
+func controllerManagerClientBuilder(b cloudprovider.ControllerClientBuilder) clientbuilder.ControllerClientBuilder {
+	if cb, ok := b.(clientbuilder.ControllerClientBuilder); ok {
+		return cb
+	}
+	return discoveryClientBuilder{b}
+}
+
+type discoveryClientBuilder struct {
+	cloudprovider.ControllerClientBuilder
+}
+
+func (b discoveryClientBuilder) DiscoveryClient(name string) (discovery.DiscoveryInterface, error) {
+	client, err := b.Client(name)
+	if err != nil {
+		return nil, err
+	}
+	return client.Discovery(), nil
+}
+
+func (b discoveryClientBuilder) DiscoveryClientOrDie(name string) discovery.DiscoveryInterface {
+	return b.ClientOrDie(name).Discovery()
+}
+
+// electionRun is the state of one leader election loop, shared between the
+// code that starts it and its callbacks.
+type electionRun struct {
+	elector *leaderelection.LeaderElector
+}
+
+// writeGate returns the elector's write gate for the controllers' clients, or
+// nil if there is no election or it does not run in recovery mode, which is
+// when it has no elector of its own.
+func (r *electionRun) writeGate() transport.WrapperFunc {
+	if r == nil || r.elector == nil {
+		return nil
+	}
+	return r.elector.WriteGate()
+}
+
+// recoveryConfigFor returns the elector's recovery config. A zero deadline
+// means no limit.
+func recoveryConfigFor(c *cloudcontrollerconfig.CompletedConfig) *leaderelection.RecoveryConfig {
+	recoveryConfig := &leaderelection.RecoveryConfig{}
+	if d := c.ComponentConfig.Generic.LeaderElectionRecoveryDeadline.Duration; d != 0 {
+		recoveryConfig.RecoveryDeadline = &d
+	}
+	return recoveryConfig
 }
 
 // filterInitializers returns initializers that has filterFunc(name) == expected.
