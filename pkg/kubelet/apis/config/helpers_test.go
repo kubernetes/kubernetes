@@ -243,6 +243,8 @@ var (
 		"IPTablesMasqueradeBit",
 		"ImageGCHighThresholdPercent",
 		"ImageGCLowThresholdPercent",
+		"ImageGCPeriod.Duration",
+		"ContainerGCPeriod.Duration",
 		"ImageMinimumGCAge.Duration",
 		"ImageMaximumGCAge.Duration",
 		"ImagePullCredentialsVerificationPolicy",

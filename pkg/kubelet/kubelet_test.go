@@ -3565,7 +3565,9 @@ func TestNewMainKubeletStandAlone(t *testing.T) {
 	require.NoError(t, err)
 
 	kubeCfg := &kubeletconfiginternal.KubeletConfiguration{
-		SyncFrequency: metav1.Duration{Duration: time.Minute},
+		SyncFrequency:     metav1.Duration{Duration: time.Minute},
+		ContainerGCPeriod: metav1.Duration{Duration: time.Minute},
+		ImageGCPeriod:     metav1.Duration{Duration: 5 * time.Minute},
 		ConfigMapAndSecretChangeDetectionStrategy: kubeletconfiginternal.WatchChangeDetectionStrategy,
 		ContainerLogMaxSize:                       "10Mi",
 		ContainerLogMaxFiles:                      5,
@@ -3728,7 +3730,9 @@ func TestNewMainKubeletWithCertAndCAReloadingEnabled(t *testing.T) {
 	require.NoError(t, err)
 
 	kubeCfg := &kubeletconfiginternal.KubeletConfiguration{
-		SyncFrequency: metav1.Duration{Duration: time.Minute},
+		SyncFrequency:     metav1.Duration{Duration: time.Minute},
+		ContainerGCPeriod: metav1.Duration{Duration: time.Minute},
+		ImageGCPeriod:     metav1.Duration{Duration: 5 * time.Minute},
 		ConfigMapAndSecretChangeDetectionStrategy: kubeletconfiginternal.WatchChangeDetectionStrategy,
 		ContainerLogMaxSize:                       "10Mi",
 		ContainerLogMaxFiles:                      5,

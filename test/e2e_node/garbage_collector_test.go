@@ -27,6 +27,7 @@ import (
 	internalapi "k8s.io/cri-api/pkg/apis"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/kubelet/pkg/types"
+	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	admissionapi "k8s.io/pod-security-admission/api"
@@ -44,6 +45,10 @@ const (
 	garbageCollectDuration = 3 * time.Minute
 	setupDuration          = 10 * time.Minute
 	runtimePollInterval    = 10 * time.Second
+
+	// containerGCPeriodForTest overrides the kubelet's ContainerGCPeriod for this suite only,
+	// so these specs don't have to wait on the 1-minute production default.
+	containerGCPeriodForTest = 10 * time.Second
 )
 
 type testPodSpec struct {
@@ -75,6 +80,11 @@ type testRun struct {
 var _ = SIGDescribe("GarbageCollect", framework.WithSerial(), framework.WithNodeConformance(), func() {
 	f := framework.NewDefaultFramework("garbage-collect-test")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
+
+	// Shorten ContainerGCPeriod for this suite only; the production default is 1 minute.
+	tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
+		initialConfig.ContainerGCPeriod = metav1.Duration{Duration: containerGCPeriodForTest}
+	})
 	containerNamePrefix := "gc-test-container-"
 	podNamePrefix := "gc-test-pod-"
 

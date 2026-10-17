@@ -128,6 +128,12 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration, featur
 			}
 		}
 	}
+	if kc.ContainerGCPeriod.Duration < 0 {
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: containerGCPeriod %v must not be negative", kc.ContainerGCPeriod.Duration))
+	}
+	if kc.ImageGCPeriod.Duration < 0 {
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: imageGCPeriod %v must not be negative", kc.ImageGCPeriod.Duration))
+	}
 	if kc.ImageMinimumGCAge.Duration < 0 {
 		allErrors = append(allErrors, fmt.Errorf("invalid configuration: imageMinimumGCAge %v must not be negative", kc.ImageMinimumGCAge.Duration))
 	}
