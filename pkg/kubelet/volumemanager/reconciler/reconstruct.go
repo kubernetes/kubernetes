@@ -182,8 +182,11 @@ func (rc *reconciler) reconstructGlobalVolume(logger klog.Logger, plugin volumep
 		logger.Error(err, "Could not add global mount to actual state of world", "volumeName", volumeName)
 		return
 	}
-	if err := rc.actualStateOfWorld.MarkDeviceAsUncertain(
-		volumeName, "", globalVolume.DeviceMountPath, globalVolume.SELinuxMountContext); err != nil {
+	// Marked as found during reconstruction, like the device of a reconstructed
+	// pod volume, so that a pod mounting it later and failing MountDevice does
+	// not mark it unmounted while the global mount is still in place.
+	if err := rc.actualStateOfWorld.MarkDeviceAsUncertainViaReconstruction(
+		volumeName, globalVolume.DeviceMountPath, globalVolume.SELinuxMountContext); err != nil {
 		logger.Error(err, "Could not mark global mount device as uncertain", "volumeName", volumeName, "deviceMountPath", globalVolume.DeviceMountPath)
 		// Leaving the volume behind would be worse than not having found it:
 		// with no pod and no mounted device, the reconciler would take it for a

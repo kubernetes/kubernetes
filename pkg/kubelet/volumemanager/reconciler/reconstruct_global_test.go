@@ -154,6 +154,22 @@ func TestReconstructGlobalVolumes(t *testing.T) {
 		}
 	})
 
+	t.Run("marks the staged device as found during reconstruction", func(t *testing.T) {
+		logger, _ := ktesting.NewTestContext(t)
+		staged := stagedVolume("staged-pv", "fake-device1")
+		rc, plugin := setup(t, staged)
+
+		rc.reconstructGlobalVolumes(logger)
+
+		// A pod that later wants this volume runs MountDevice on it, and a
+		// final error there marks an uncertain device unmounted unless it was
+		// found during reconstruction. Marked unmounted, the volume would be
+		// reported unused while the global mount is still in place.
+		if volumeName := uniqueName(t, plugin, staged); !rc.actualStateOfWorld.IsVolumeDeviceReconstructed(volumeName) {
+			t.Errorf("volume %q is not marked as found during reconstruction", volumeName)
+		}
+	})
+
 	t.Run("leaves a volume a pod directory already accounted for", func(t *testing.T) {
 		logger, _ := ktesting.NewTestContext(t)
 		staged := stagedVolume("staged-pv", "fake-device1")
