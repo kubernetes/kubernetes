@@ -518,7 +518,7 @@ func (e *Store) ListPredicate(ctx context.Context, p storage.SelectionPredicate,
 	if utilfeature.DefaultFeatureGate.Enabled(features.ShardedListAndWatch) && options.ShardSelector != "" {
 		sel, err := sharding.Parse(options.ShardSelector)
 		if err != nil {
-			return nil, fmt.Errorf("invalid shard selector: %w", err)
+			return nil, apierrors.NewBadRequest(fmt.Sprintf("invalid shard selector: %v", err))
 		}
 		p.ShardSelector = sel
 	}
@@ -1598,7 +1598,7 @@ func (e *Store) Watch(ctx context.Context, options *metainternalversion.ListOpti
 		if utilfeature.DefaultFeatureGate.Enabled(features.ShardedListAndWatch) && options.ShardSelector != "" {
 			sel, err := sharding.Parse(options.ShardSelector)
 			if err != nil {
-				return nil, fmt.Errorf("invalid shard selector: %w", err)
+				return nil, apierrors.NewBadRequest(fmt.Sprintf("invalid shard selector: %v", err))
 			}
 			predicate.ShardSelector = sel
 		}

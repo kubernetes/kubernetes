@@ -414,20 +414,51 @@ func (s *shardedListWatch) WatchWithContext(ctx context.Context, options metav1.
 	if err != nil {
 		return nil, err
 	}
-	return watch.Filter(w, func(in watch.Event) (watch.Event, bool) {
-		if in.Type == watch.Bookmark || in.Type == watch.Error {
-			return in, true
+	sw := &shardedWatcher{
+		incoming: w,
+		result:   make(chan watch.Event),
+		done:     make(chan struct{}),
+	}
+	go func() {
+		defer close(sw.result)
+		for event := range w.ResultChan() {
+			if event.Type != watch.Bookmark && event.Type != watch.Error {
+				matched, err := s.selector.Matches(event.Object)
+				if err != nil {
+					utilruntime.HandleErrorWithContext(ctx, err, "Unable to match watch event against shard selector")
+					continue
+				}
+				if !matched {
+					s.logClientFallback(ctx)
+					continue
+				}
+			}
+			select {
+			case sw.result <- event:
+			case <-sw.done:
+				return
+			}
 		}
-		matched, err := s.selector.Matches(in.Object)
-		if err != nil {
-			utilruntime.HandleErrorWithContext(ctx, err, "Unable to match watch event against shard selector")
-			return in, false
-		}
-		if !matched {
-			s.logClientFallback(ctx)
-		}
-		return in, matched
-	}), nil
+	}()
+	return sw, nil
+}
+
+type shardedWatcher struct {
+	incoming watch.Interface
+	result   chan watch.Event
+	done     chan struct{}
+	stopOnce sync.Once
+}
+
+func (sw *shardedWatcher) ResultChan() <-chan watch.Event {
+	return sw.result
+}
+
+func (sw *shardedWatcher) Stop() {
+	sw.stopOnce.Do(func() {
+		close(sw.done)
+		sw.incoming.Stop()
+	})
 }
 
 func (s *shardedListWatch) IsWatchListSemanticsUnSupported() bool {

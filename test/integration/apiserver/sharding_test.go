@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"math/big"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -27,16 +28,22 @@ import (
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apiextensions-apiserver/test/integration/fixtures"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/sharding"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/dynamic"
+	clientfeatures "k8s.io/client-go/features"
+	clientfeaturestesting "k8s.io/client-go/features/testing"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/metadata"
+	"k8s.io/client-go/metadata/metadatainformer"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/ktesting"
 	apiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
@@ -116,6 +123,10 @@ func setupSharding(t *testing.T, flags ...string) (context.Context, clientset.In
 	if err != nil {
 		t.Fatal(err)
 	}
+	metadataClient, err := metadata.NewForConfig(server.ClientConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
 	apiExtensionsClient, err := apiextensionsclientset.NewForConfig(server.ClientConfig)
 	if err != nil {
 		t.Fatal(err)
@@ -185,6 +196,36 @@ func setupSharding(t *testing.T, flags ...string) (context.Context, clientset.In
 			},
 			delete: func(ctx context.Context, namespace, name string) error {
 				return dynamicClient.Resource(crGVR).Namespace(namespace).Delete(ctx, name, metav1.DeleteOptions{})
+			},
+		},
+		{
+			name: "metadata",
+			gvr:  v1.SchemeGroupVersion.WithResource("configmaps"),
+			create: func(ctx context.Context, namespace, generateName string) (metav1.Object, error) {
+				return client.CoreV1().ConfigMaps(namespace).Create(ctx, &v1.ConfigMap{
+					ObjectMeta: metav1.ObjectMeta{GenerateName: generateName},
+				}, metav1.CreateOptions{})
+			},
+			list: func(ctx context.Context, namespace string, opts metav1.ListOptions) (*shardedList, error) {
+				list, err := metadataClient.Resource(v1.SchemeGroupVersion.WithResource("configmaps")).Namespace(namespace).List(ctx, opts)
+				if err != nil {
+					return nil, err
+				}
+				items := make([]metav1.Object, 0, len(list.Items))
+				for i := range list.Items {
+					items = append(items, &list.Items[i])
+				}
+				return &shardedList{resourceVersion: list.ResourceVersion, shardInfo: list.ShardInfo, items: items}, nil
+			},
+			watch: func(ctx context.Context, namespace string, opts metav1.ListOptions) (watch.Interface, error) {
+				return metadataClient.Resource(v1.SchemeGroupVersion.WithResource("configmaps")).Namespace(namespace).Watch(ctx, opts)
+			},
+			update: func(ctx context.Context, obj metav1.Object) error {
+				_, err := client.CoreV1().ConfigMaps(obj.GetNamespace()).Update(ctx, obj.(*v1.ConfigMap), metav1.UpdateOptions{})
+				return err
+			},
+			delete: func(ctx context.Context, namespace, name string) error {
+				return metadataClient.Resource(v1.SchemeGroupVersion.WithResource("configmaps")).Namespace(namespace).Delete(ctx, name, metav1.DeleteOptions{})
 			},
 		},
 	}
@@ -623,4 +664,180 @@ func verifyObjectInOneShard(ctx context.Context, t *testing.T, res dynamic.Resou
 	if err := res.Delete(context.TODO(), created.GetName(), *metav1.NewDeleteOptions(0)); err != nil {
 		t.Logf("cleanup delete failed: %v", err)
 	}
+}
+
+func TestShardedInvalidSelector(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ShardedListAndWatch, true)
+
+	ctx, client, _, resources := setupSharding(t)
+
+	invalidSelectors := []string{
+		"invalidSelector()",
+		"shardRange(object.metadata.invalidField, '0x0000000000000000', '0x8000000000000000')",
+		"shardRange(object.metadata.uid, '0x8000000000000000', '0x0000000000000000')",
+		"shardRange(object.metadata.uid, 'not-hex', '0x8000000000000000')",
+	}
+
+	for _, r := range resources {
+		t.Run(r.name, func(t *testing.T) {
+			ns := framework.CreateNamespaceOrDie(client, "shard-invalid-"+r.name, t)
+			defer framework.DeleteNamespaceOrDie(client, ns, t)
+
+			for _, selector := range invalidSelectors {
+				_, err := r.list(ctx, ns.Name, metav1.ListOptions{
+					ShardSelector: selector,
+				})
+				if !apierrors.IsBadRequest(err) {
+					t.Errorf("List with invalid selector %q: expected BadRequest (400), got: %v", selector, err)
+				}
+
+				w, err := r.watch(ctx, ns.Name, metav1.ListOptions{
+					ShardSelector: selector,
+				})
+				if err == nil {
+					w.Stop()
+				}
+				if !apierrors.IsBadRequest(err) {
+					t.Errorf("Watch with invalid selector %q: expected BadRequest (400), got: %v", selector, err)
+				}
+			}
+		})
+	}
+}
+
+func TestShardedMetadataInformer(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ShardedListAndWatch, true)
+
+	ctx := ktesting.Init(t)
+	server, err := apiservertesting.StartTestServer(t, apiservertesting.NewDefaultTestServerOptions(), nil, framework.SharedEtcd())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(server.TearDownFn)
+
+	client, err := clientset.NewForConfig(server.ClientConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rawMetadataClient, err := metadata.NewForConfig(server.ClientConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var echoedListResponses atomic.Int32
+	metadataClient := &shardAssertingMetadataClient{
+		delegate:        rawMetadataClient,
+		t:               t,
+		echoedListCount: &echoedListResponses,
+	}
+
+	ns := framework.CreateNamespaceOrDie(client, "shard-metadata-informer", t)
+	defer framework.DeleteNamespaceOrDie(client, ns, t)
+
+	const numObjects = 20
+	for range numObjects {
+		if _, err := client.CoreV1().ConfigMaps(ns.Name).Create(ctx, &v1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{GenerateName: "cm-meta-"},
+		}, metav1.CreateOptions{}); err != nil {
+			t.Fatalf("failed to create ConfigMap: %v", err)
+		}
+	}
+
+	cmGVR := v1.SchemeGroupVersion.WithResource("configmaps")
+	for _, watchList := range []bool{false, true} {
+		t.Run(fmt.Sprintf("watchList=%v", watchList), func(t *testing.T) {
+			clientfeaturestesting.SetFeatureDuringTest(t, clientfeatures.WatchListClient, watchList)
+
+			const numShards = 3
+			seen := make(map[string]int, numObjects)
+			for shard := range numShards {
+				sel, err := sharding.NewShardRangeSelector("object.metadata.uid", shard, numShards)
+				if err != nil {
+					t.Fatalf("NewShardRangeSelector: %v", err)
+				}
+
+				factory := metadatainformer.NewSharedInformerFactoryWithOptions(metadataClient, 0, metadatainformer.WithShardSelector(sel))
+				informer := factory.ForResource(cmGVR)
+				_ = informer.Informer()
+
+				informerCtx, cancel := context.WithCancel(ctx)
+				factory.Start(informerCtx.Done())
+				synced := factory.WaitForCacheSync(informerCtx.Done())
+				cancel()
+				factory.Shutdown()
+				if !synced[cmGVR] {
+					t.Fatalf("shard %d metadata informer failed to sync", shard)
+				}
+
+				items, err := informer.Lister().ByNamespace(ns.Name).List(labels.Everything())
+				if err != nil {
+					t.Fatalf("shard %d lister failed: %v", shard, err)
+				}
+				for _, item := range items {
+					metaObj := item.(*metav1.PartialObjectMetadata)
+					uid := string(metaObj.UID)
+					if matched, err := sel.Matches(metaObj); err != nil || !matched {
+						t.Errorf("shard %d cached out-of-shard PartialObjectMetadata %s (uid %s, err %v)", shard, metaObj.Name, uid, err)
+					}
+					if prev, dup := seen[uid]; dup {
+						t.Errorf("object %s (uid %s) appeared in both shard %d and %d", metaObj.Name, uid, prev, shard)
+					}
+					seen[uid] = shard
+				}
+			}
+			if len(seen) != numObjects {
+				t.Errorf("expected %d total objects across metadata informer shards, got %d", numObjects, len(seen))
+			}
+			if !watchList && echoedListResponses.Load() != numShards {
+				t.Errorf("expected %d PartialObjectMetadataList responses with echoed ShardInfo, got %d", numShards, echoedListResponses.Load())
+			}
+		})
+	}
+}
+
+type shardAssertingMetadataClient struct {
+	delegate        metadata.Interface
+	t               *testing.T
+	echoedListCount *atomic.Int32
+}
+
+func (c *shardAssertingMetadataClient) Resource(resource schema.GroupVersionResource) metadata.Getter {
+	return &shardAssertingMetadataGetter{
+		Getter:          c.delegate.Resource(resource),
+		t:               c.t,
+		echoedListCount: c.echoedListCount,
+	}
+}
+
+type shardAssertingMetadataGetter struct {
+	metadata.Getter
+	t               *testing.T
+	echoedListCount *atomic.Int32
+}
+
+func (g *shardAssertingMetadataGetter) Namespace(ns string) metadata.ResourceInterface {
+	return &shardAssertingMetadataResource{
+		ResourceInterface: g.Getter.Namespace(ns),
+		t:                 g.t,
+		echoedListCount:   g.echoedListCount,
+	}
+}
+
+type shardAssertingMetadataResource struct {
+	metadata.ResourceInterface
+	t               *testing.T
+	echoedListCount *atomic.Int32
+}
+
+func (r *shardAssertingMetadataResource) List(ctx context.Context, opts metav1.ListOptions) (*metav1.PartialObjectMetadataList, error) {
+	list, err := r.ResourceInterface.List(ctx, opts)
+	if err != nil {
+		return nil, err
+	}
+	if opts.ShardSelector != "" {
+		if list.ShardInfo == nil || list.ShardInfo.Selector != opts.ShardSelector {
+			r.t.Errorf("PartialObjectMetadataList ShardInfo = %v, want selector %q", list.ShardInfo, opts.ShardSelector)
+		}
+		r.echoedListCount.Add(1)
+	}
+	return list, nil
 }
