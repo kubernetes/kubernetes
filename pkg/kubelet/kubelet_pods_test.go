@@ -45,6 +45,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregate "k8s.io/component-base/featuregate"
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/record"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -419,20 +420,21 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 	trueValue := true
 	falseValue := false
 	testCases := []struct {
-		name               string                 // the name of the test case
-		ns                 string                 // the namespace to generate environment for
-		enableServiceLinks *bool                  // enabling service links
-		container          *v1.Container          // the container to use
-		nilLister          bool                   // whether the lister should be nil
-		staticPod          bool                   // whether the pod should be a static pod (versus an API pod)
-		unsyncedServices   bool                   // whether the services should NOT be synced
-		configMap          *v1.ConfigMap          // an optional ConfigMap to pull from
-		secret             *v1.Secret             // an optional Secret to pull from
-		podIPs             []string               // the pod IPs
-		expectedEnvs       []kubecontainer.EnvVar // a set of expected environment vars
-		expectedError      bool                   // does the test fail
-		expectedEvent      string                 // does the test emit an event
-	}{
+			name               string                 // the name of the test case
+			ns                 string                 // the namespace to generate environment for
+			enableServiceLinks *bool                  // enabling service links
+			container          *v1.Container          // the container to use
+			nilLister          bool                   // whether the lister should be nil
+			staticPod          bool                   // whether the pod should be a static pod (versus an API pod)
+			unsyncedServices   bool                   // whether the services should NOT be synced
+			configMap          *v1.ConfigMap          // an optional ConfigMap to pull from
+			secret             *v1.Secret             // an optional Secret to pull from
+			podIPs             []string               // the pod IPs
+			expectedEnvs       []kubecontainer.EnvVar // a set of expected environment vars
+			expectedError      bool                   // does the test fail
+			expectedEvent      string                 // does the test emit an event
+			featureGates       map[featuregate.Feature]bool // feature gates to enable for this test
+		}{
 		{
 			name:               "if services aren't synced, non-static pods should fail",
 			ns:                 "test1",
@@ -2046,8 +2048,7 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 			select {
 			case e := <-fakeRecorder.Events:
 				assert.Equal(t, tc.expectedEvent, e)
-			default:
-				assert.Equal(t, "", tc.expectedEvent)
+			default:				assert.Equal(t, "", tc.expectedEvent)
 			}
 			if tc.expectedError {
 				assert.Error(t, err, tc.name)
@@ -2059,8 +2060,226 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 				assert.Equal(t, tc.expectedEnvs, result, "[%s] env entries", tc.name)
 			}
 		})
-
 	}
+}
+
+// TestMakeEnvironmentVariablesWithFeatureGate tests makeEnvironmentVariables with
+// the EnvVarKeyInference feature gate enabled.
+func TestMakeEnvironmentVariablesWithFeatureGate(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	falseValue := false
+
+	type testCase struct {
+		name               string
+		ns                 string
+		enableServiceLinks *bool
+		container          *v1.Container
+		nilLister          bool
+		configMap          *v1.ConfigMap
+		secret             *v1.Secret
+		podIPs             []string
+		expectedEnvs       []kubecontainer.EnvVar
+		expectedError      bool
+	}
+
+	testCases := []testCase{
+		{
+			name:               "configmapkeyref_infer_key_from_env_name",
+			ns:                 "test1",
+			enableServiceLinks: &falseValue,
+			container: &v1.Container{
+				Env: []v1.EnvVar{
+					{
+						Name: "REPLACE_ME",
+						ValueFrom: &v1.EnvVarSource{
+							ConfigMapKeyRef: &v1.ConfigMapKeySelector{
+								LocalObjectReference: v1.LocalObjectReference{Name: "test-config-map"},
+								Key:                  "",
+							},
+						},
+					},
+				},
+			},
+			nilLister: false,
+			configMap: &v1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "test1",
+					Name:      "test-configmap",
+				},
+				Data: map[string]string{
+					"REPLACE_ME": "FROM_CONFIG_MAP",
+				},
+			},
+			expectedEnvs: []kubecontainer.EnvVar{
+				{Name: "REPLACE_ME", Value: "FROM_CONFIG_MAP"},
+				{Name: "KUBERNETES_SERVICE_HOST", Value: "1.2.3.1"},
+				{Name: "KUBERNETES_SERVICE_PORT", Value: "8081"},
+				{Name: "KUBERNETES_PORT", Value: "tcp://1.2.3.1:8081"},
+				{Name: "KUBERNETES_PORT_8081_TCP", Value: "tcp://1.2.3.1:8081"},
+				{Name: "KUBERNETES_PORT_8081_TCP_PROTO", Value: "tcp"},
+				{Name: "KUBERNETES_PORT_8081_TCP_PORT", Value: "8081"},
+				{Name: "KUBERNETES_PORT_8081_TCP_ADDR", Value: "1.2.3.1"},
+			},
+		},
+		{
+			name:               "secretkeyref_infer_key_from_env_name",
+			ns:                 "test1",
+			enableServiceLinks: &falseValue,
+			container: &v1.Container{
+				Env: []v1.EnvVar{
+					{
+						Name: "REPLACE_ME",
+						ValueFrom: &v1.EnvVarSource{
+							SecretKeyRef: &v1.SecretKeySelector{
+								LocalObjectReference: v1.LocalObjectReference{Name: "test-secret"},
+								Key:                  "",
+							},
+						},
+					},
+				},
+			},
+			nilLister: false,
+			secret: &v1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "test1",
+					Name:      "test-secret",
+				},
+				Data: map[string][]byte{
+					"REPLACE_ME": []byte("FROM_SECRET"),
+				},
+			},
+			expectedEnvs: []kubecontainer.EnvVar{
+				{Name: "REPLACE_ME", Value: "FROM_SECRET"},
+				{Name: "KUBERNETES_SERVICE_HOST", Value: "1.2.3.1"},
+				{Name: "KUBERNETES_SERVICE_PORT", Value: "8081"},
+				{Name: "KUBERNETES_PORT", Value: "tcp://1.2.3.1:8081"},
+				{Name: "KUBERNETES_PORT_8081_TCP", Value: "tcp://1.2.3.1:8081"},
+				{Name: "KUBERNETES_PORT_8081_TCP_PROTO", Value: "tcp"},
+				{Name: "KUBERNETES_PORT_8081_TCP_PORT", Value: "8081"},
+				{Name: "KUBERNETES_PORT_8081_TCP_ADDR", Value: "1.2.3.1"},
+			},
+		},
+		{
+			name:               "configmapkeyref_infer_key_not_found",
+			ns:                 "test1",
+			enableServiceLinks: &falseValue,
+			container: &v1.Container{
+				Env: []v1.EnvVar{
+					{
+						Name: "NONEXISTENT_KEY",
+						ValueFrom: &v1.EnvVarSource{
+							ConfigMapKeyRef: &v1.ConfigMapKeySelector{
+								LocalObjectReference: v1.LocalObjectReference{Name: "test-config-map"},
+								Key:                  "",
+							},
+						},
+					},
+				},
+			},
+			nilLister: false,
+			configMap: &v1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "test1",
+					Name:      "test-configmap",
+				},
+				Data: map[string]string{
+					"REPLACE_ME": "FROM_CONFIG_MAP",
+				},
+			},
+			expectedError: true,
+		},
+		{
+			name:               "secretkeyref_infer_key_not_found",
+			ns:                 "test1",
+			enableServiceLinks: &falseValue,
+			container: &v1.Container{
+				Env: []v1.EnvVar{
+					{
+						Name: "NONEXISTENT_KEY",
+						ValueFrom: &v1.EnvVarSource{
+							SecretKeyRef: &v1.SecretKeySelector{
+								LocalObjectReference: v1.LocalObjectReference{Name: "test-secret"},
+								Key:                  "",
+							},
+						},
+					},
+				},
+			},
+			nilLister: false,
+			secret: &v1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "test1",
+					Name:      "test-secret",
+				},
+				Data: map[string][]byte{
+					"REPLACE_ME": []byte("FROM_SECRET"),
+				},
+			},
+			expectedError: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EnvVarKeyInference, true)
+
+			kl := newTestKubeletForEnvVars(t, tc.nilLister, tc.configMap, tc.secret)
+			defer kl.Cleanup()
+
+			testPod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace:   tc.ns,
+					Name:        "test-pod",
+					Annotations: map[string]string{},
+				},
+				Spec: v1.PodSpec{
+					EnableServiceLinks: tc.enableServiceLinks,
+				},
+			}
+
+			result, err := kl.kubelet.makeEnvironmentVariables(tCtx, testPod, tc.container, "1.2.3.4", tc.podIPs, kubecontainer.VolumeMap{})
+			if tc.expectedError {
+				assert.Error(t, err, tc.name)
+			} else {
+				assert.NoError(t, err, "[%s]", tc.name)
+
+				sort.Sort(envs(result))
+				sort.Sort(envs(tc.expectedEnvs))
+				assert.Equal(t, tc.expectedEnvs, result, "[%s] env entries", tc.name)
+			}
+		})
+	}
+}
+
+// newTestKubeletForEnvVars creates a test kubelet configured for environment variable tests.
+func newTestKubeletForEnvVars(t *testing.T, nilLister bool, configMap *v1.ConfigMap, secret *v1.Secret) *TestKubelet {
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+
+	services := []*v1.Service{
+		buildService("kubernetes", metav1.NamespaceDefault, "1.2.3.1", "TCP", 8081),
+		buildService("test", "test1", "1.2.3.3", "TCP", 8083),
+	}
+
+	if !nilLister {
+		testKubelet.kubelet.serviceLister = &testServiceLister{services: services}
+	}
+
+	testKubelet.fakeKubeClient.AddReactor("get", "configmaps", func(action core.Action) (bool, runtime.Object, error) {
+		var err error
+		if configMap == nil {
+			err = apierrors.NewNotFound(action.GetResource().GroupResource(), "configmap-name")
+		}
+		return true, configMap, err
+	})
+	testKubelet.fakeKubeClient.AddReactor("get", "secrets", func(action core.Action) (bool, runtime.Object, error) {
+		var err error
+		if secret == nil {
+			err = apierrors.NewNotFound(action.GetResource().GroupResource(), "secret-name")
+		}
+		return true, secret, err
+	})
+
+	return testKubelet
 }
 
 func waitingState(cName string) v1.ContainerStatus {
