@@ -32,11 +32,14 @@ type containerAllocation struct {
 }
 
 type podResourceSummary struct {
-	// TODO: resources v1.ResourceRequirements, add pod-level resources here once resizing pod-level resources is supported
-	InitContainers []containerAllocation `json:"initContainers,omitempty"`
-	Containers     []containerAllocation `json:"containers,omitempty"`
-	Generation     int64                 `json:"generation"`
-	Error          string                `json:"error,omitempty"`
+	// Resources is the pod-level resource requirements (pod.Spec.Resources) when set.
+	// Included for InPlacePodLevelResourcesVerticalScaling so resize events report
+	// the full pod allocation, not just container resources.
+	Resources      *v1.ResourceRequirements `json:"resources,omitempty"`
+	InitContainers []containerAllocation    `json:"initContainers,omitempty"`
+	Containers     []containerAllocation    `json:"containers,omitempty"`
+	Generation     int64                    `json:"generation"`
+	Error          string                   `json:"error,omitempty"`
 }
 
 // PodResizeCompletedMsg generates the pod resize completed event message.
@@ -71,6 +74,11 @@ func podResizeMessage(logger klog.Logger, pod *v1.Pod, generation int64, errorMs
 // Returns the desired resources from the podspec.
 func makeResourceSummaryFromSpec(logger klog.Logger, pod *v1.Pod, generation int64, errorMessage string) (string, error) {
 	specResources := &podResourceSummary{Generation: generation, Error: errorMessage}
+	// Include pod-level resources if present so ResizeStarted/Completed events
+	// capture the pod envelope alongside container allocations.
+	if pod.Spec.Resources != nil && (len(pod.Spec.Resources.Requests) > 0 || len(pod.Spec.Resources.Limits) > 0) {
+		specResources.Resources = pod.Spec.Resources.DeepCopy()
+	}
 	for container, containerType := range podutil.ContainerIter(&pod.Spec, podutil.InitContainers|podutil.Containers) {
 		allocation := containerAllocation{
 			Name:      container.Name,
