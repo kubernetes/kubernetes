@@ -17,6 +17,8 @@ limitations under the License.
 package model
 
 import (
+	"maps"
+
 	apimachineryvalidation "k8s.io/apimachinery/pkg/util/validation"
 	apiservercel "k8s.io/apiserver/pkg/cel"
 	"k8s.io/apiserver/pkg/cel/common"
@@ -34,7 +36,118 @@ import (
 //
 // The CEL declaration for objects with XPreserveUnknownFields does not expose unknown fields.
 func SchemaDeclType(s *schema.Structural, isResourceRoot bool) *apiservercel.DeclType {
-	return common.SchemaDeclType(&Structural{Structural: s}, isResourceRoot)
+	return common.SchemaDeclType(&Structural{Structural: foldAllOfBounds(s)}, isResourceRoot)
+}
+
+// foldAllOfBounds returns a schema where, on every node, the maxLength, maxItems and
+// maxProperties bounds declared inside allOf members (including allOf members nested in other
+// allOf members) are folded into the bounds declared directly on the node, keeping the tightest
+// bound of each kind. Tools like controller-gen declare bounds inside allOf when multiple
+// validation markers apply to a single field, and the CEL cost estimator only consults the
+// bounds attached directly to a node, so without folding such fields are cost estimated as
+// unbounded (https://github.com/kubernetes/kubernetes/issues/134029).
+//
+// Bounds are only folded for the node types they constrain: maxLength for strings and
+// x-kubernetes-int-or-string nodes, maxItems for arrays and maxProperties for objects.
+// Bounds declared for descendant paths inside allOf members (items, properties and
+// additionalProperties of a member) are not folded.
+//
+// Only allOf members are folded: because every allOf member must hold, the tightest member
+// bound is guaranteed to bound the value, so folding it can never under-estimate cost.
+// anyOf, oneOf and not members provide no such guarantee for any individual member and are
+// deliberately ignored.
+//
+// The input schema is shared and must not be mutated, so folding is copy on write: the
+// original pointer is returned whenever no folding is needed.
+func foldAllOfBounds(s *schema.Structural) *schema.Structural {
+	if s == nil {
+		return nil
+	}
+
+	out := s
+	copyOnWrite := func() {
+		if out == s {
+			shallow := *s
+			out = &shallow
+		}
+	}
+
+	if items := foldAllOfBounds(s.Items); items != s.Items {
+		copyOnWrite()
+		out.Items = items
+	}
+	if s.AdditionalProperties != nil && s.AdditionalProperties.Structural != nil {
+		if folded := foldAllOfBounds(s.AdditionalProperties.Structural); folded != s.AdditionalProperties.Structural {
+			copyOnWrite()
+			out.AdditionalProperties = &schema.StructuralOrBool{Structural: folded, Bool: s.AdditionalProperties.Bool}
+		}
+	}
+	// foldedProps is cloned from the full Properties map when the first property needs
+	// folding, then the folded properties overwrite their clones; it stays nil if no
+	// property needs folding.
+	var foldedProps map[string]schema.Structural
+	for name := range s.Properties {
+		prop := s.Properties[name]
+		if folded := foldAllOfBounds(&prop); folded != &prop {
+			if foldedProps == nil {
+				foldedProps = maps.Clone(s.Properties)
+			}
+			foldedProps[name] = *folded
+		}
+	}
+	if foldedProps != nil {
+		copyOnWrite()
+		out.Properties = foldedProps
+	}
+
+	if s.ValueValidation == nil || len(s.ValueValidation.AllOf) == 0 {
+		return out
+	}
+
+	var get func(*schema.ValueValidation) *int64
+	var set func(*schema.ValueValidation, *int64)
+	switch {
+	case s.Type == "string" || s.XIntOrString:
+		get = func(vv *schema.ValueValidation) *int64 { return vv.MaxLength }
+		set = func(vv *schema.ValueValidation, bound *int64) { vv.MaxLength = bound }
+	case s.Type == "array":
+		get = func(vv *schema.ValueValidation) *int64 { return vv.MaxItems }
+		set = func(vv *schema.ValueValidation, bound *int64) { vv.MaxItems = bound }
+	case s.Type == "object":
+		get = func(vv *schema.ValueValidation) *int64 { return vv.MaxProperties }
+		set = func(vv *schema.ValueValidation, bound *int64) { vv.MaxProperties = bound }
+	default:
+		return out
+	}
+
+	direct := get(s.ValueValidation)
+	tightest := tightestAllOfBound(get, s.ValueValidation.AllOf)
+	if tightest == nil || (direct != nil && *direct <= *tightest) {
+		return out
+	}
+
+	copyOnWrite()
+	vv := *out.ValueValidation
+	set(&vv, new(*tightest))
+	out.ValueValidation = &vv
+	return out
+}
+
+// tightestAllOfBound returns the smallest bound selected by get that is declared across the
+// given allOf members, recursing into allOf members nested inside other allOf members, or nil
+// if no member declares one.
+func tightestAllOfBound(get func(*schema.ValueValidation) *int64, allOf []schema.NestedValueValidation) *int64 {
+	var tightest *int64
+	for i := range allOf {
+		member := &allOf[i]
+		if bound := get(&member.ValueValidation); bound != nil && (tightest == nil || *bound < *tightest) {
+			tightest = bound
+		}
+		if bound := tightestAllOfBound(get, member.AllOf); bound != nil && (tightest == nil || *bound < *tightest) {
+			tightest = bound
+		}
+	}
+	return tightest
 }
 
 // WithTypeAndObjectMeta ensures the kind, apiVersion and
