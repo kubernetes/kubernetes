@@ -160,6 +160,10 @@ type Config struct {
 	// socks5 proxying does not currently support spdy streaming endpoints.
 	Proxy func(*http.Request) (*url.URL, error)
 
+	// ConnectionPool specifies connection pooling configuration to create multiple
+	// connections to the same endpoint and load balance across them.
+	ConnectionPool *transport.ConnectionPoolConfig
+
 	// Version forces a specific version to be used (if registered)
 	// Do we need this?
 	// Version string
@@ -656,6 +660,7 @@ func AnonymousClientConfig(config *Config) *Config {
 		Timeout:                   config.Timeout,
 		Dial:                      config.Dial,
 		Proxy:                     config.Proxy,
+		ConnectionPool:            config.ConnectionPool,
 	}
 }
 
@@ -701,6 +706,12 @@ func CopyConfig(config *Config) *Config {
 		Timeout:                   config.Timeout,
 		Dial:                      config.Dial,
 		Proxy:                     config.Proxy,
+	}
+	if config.ConnectionPool != nil {
+		c.ConnectionPool = &transport.ConnectionPoolConfig{
+			Size:     config.ConnectionPool.Size,
+			Strategy: config.ConnectionPool.Strategy,
+		}
 	}
 	if config.ExecProvider != nil && config.ExecProvider.Config != nil {
 		c.ExecProvider.Config = config.ExecProvider.Config.DeepCopyObject()
