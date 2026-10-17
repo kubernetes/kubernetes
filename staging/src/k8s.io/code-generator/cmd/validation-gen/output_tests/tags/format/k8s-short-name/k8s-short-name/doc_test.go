@@ -20,7 +20,6 @@ import (
 	"testing"
 
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/utils/ptr"
 )
 
 func Test(t *testing.T) {
@@ -28,19 +27,19 @@ func Test(t *testing.T) {
 
 	st.Value(&Struct{
 		ShortNameField:        "foo-bar",
-		ShortNamePtrField:     ptr.To("foo-bar"),
+		ShortNamePtrField:     new("foo-bar"),
 		ShortNameTypedefField: "foo-bar",
 	}).ExpectValid()
 
 	st.Value(&Struct{
 		ShortNameField:        "1234",
-		ShortNamePtrField:     ptr.To("1234"),
+		ShortNamePtrField:     new("1234"),
 		ShortNameTypedefField: "1234",
 	}).ExpectValid()
 
 	st.Value(&Struct{
 		ShortNameField:        "",
-		ShortNamePtrField:     ptr.To(""),
+		ShortNamePtrField:     new(""),
 		ShortNameTypedefField: "",
 	}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField().ByOrigin(), field.ErrorList{
 		field.Invalid(field.NewPath("shortNameField"), nil, "").WithOrigin("format=k8s-short-name"),
@@ -50,7 +49,7 @@ func Test(t *testing.T) {
 
 	st.Value(&Struct{
 		ShortNameField:        "Not a DNS label",
-		ShortNamePtrField:     ptr.To("Not a DNS label"),
+		ShortNamePtrField:     new("Not a DNS label"),
 		ShortNameTypedefField: "Not a DNS label",
 	}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField().ByOrigin(), field.ErrorList{
 		field.Invalid(field.NewPath("shortNameField"), nil, "").WithOrigin("format=k8s-short-name"),
