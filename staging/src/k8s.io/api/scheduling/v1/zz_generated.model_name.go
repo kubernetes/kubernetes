@@ -30,3 +30,83 @@ func (in PriorityClass) OpenAPIModelName() string {
 func (in PriorityClassList) OpenAPIModelName() string {
 	return "io.k8s.api.scheduling.v1.PriorityClassList"
 }
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
+func (in TopologyConstraint) OpenAPIModelName() string {
+	return "io.k8s.api.scheduling.v1.TopologyConstraint"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
+func (in WorkloadCompositePodGroupAllDisruptionMode) OpenAPIModelName() string {
+	return "io.k8s.api.scheduling.v1.WorkloadCompositePodGroupAllDisruptionMode"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
+func (in WorkloadCompositePodGroupBasicSchedulingPolicy) OpenAPIModelName() string {
+	return "io.k8s.api.scheduling.v1.WorkloadCompositePodGroupBasicSchedulingPolicy"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
+func (in WorkloadCompositePodGroupDisruptionMode) OpenAPIModelName() string {
+	return "io.k8s.api.scheduling.v1.WorkloadCompositePodGroupDisruptionMode"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
+func (in WorkloadCompositePodGroupGangSchedulingPolicy) OpenAPIModelName() string {
+	return "io.k8s.api.scheduling.v1.WorkloadCompositePodGroupGangSchedulingPolicy"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
+func (in WorkloadCompositePodGroupSchedulingConstraints) OpenAPIModelName() string {
+	return "io.k8s.api.scheduling.v1.WorkloadCompositePodGroupSchedulingConstraints"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
+func (in WorkloadCompositePodGroupSchedulingPolicy) OpenAPIModelName() string {
+	return "io.k8s.api.scheduling.v1.WorkloadCompositePodGroupSchedulingPolicy"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
+func (in WorkloadCompositePodGroupSingleDisruptionMode) OpenAPIModelName() string {
+	return "io.k8s.api.scheduling.v1.WorkloadCompositePodGroupSingleDisruptionMode"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
+func (in WorkloadPodGroupAllDisruptionMode) OpenAPIModelName() string {
+	return "io.k8s.api.scheduling.v1.WorkloadPodGroupAllDisruptionMode"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
+func (in WorkloadPodGroupBasicSchedulingPolicy) OpenAPIModelName() string {
+	return "io.k8s.api.scheduling.v1.WorkloadPodGroupBasicSchedulingPolicy"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
+func (in WorkloadPodGroupDisruptionMode) OpenAPIModelName() string {
+	return "io.k8s.api.scheduling.v1.WorkloadPodGroupDisruptionMode"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
+func (in WorkloadPodGroupGangSchedulingPolicy) OpenAPIModelName() string {
+	return "io.k8s.api.scheduling.v1.WorkloadPodGroupGangSchedulingPolicy"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
+func (in WorkloadPodGroupResourceClaim) OpenAPIModelName() string {
+	return "io.k8s.api.scheduling.v1.WorkloadPodGroupResourceClaim"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
+func (in WorkloadPodGroupSchedulingConstraints) OpenAPIModelName() string {
+	return "io.k8s.api.scheduling.v1.WorkloadPodGroupSchedulingConstraints"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
+func (in WorkloadPodGroupSchedulingPolicy) OpenAPIModelName() string {
+	return "io.k8s.api.scheduling.v1.WorkloadPodGroupSchedulingPolicy"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
+func (in WorkloadPodGroupSingleDisruptionMode) OpenAPIModelName() string {
+	return "io.k8s.api.scheduling.v1.WorkloadPodGroupSingleDisruptionMode"
+}

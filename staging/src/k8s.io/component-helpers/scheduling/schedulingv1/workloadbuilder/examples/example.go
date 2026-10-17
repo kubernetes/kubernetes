@@ -20,7 +20,7 @@ import (
 	"context"
 	"fmt"
 
-	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
+	schedulingv1 "k8s.io/api/scheduling/v1"
 	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -38,11 +38,11 @@ func ExampleOutOfTreeControllerValidation() {
 	ctx := context.Background()
 	schedulingPath := field.NewPath("spec", "scheduling")
 
-	policy := &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{
-		Basic: &schedulingv1alpha3.WorkloadPodGroupBasicSchedulingPolicy{},
+	policy := &schedulingv1.WorkloadPodGroupSchedulingPolicy{
+		Basic: &schedulingv1.WorkloadPodGroupBasicSchedulingPolicy{},
 	}
-	mode := &schedulingv1alpha3.WorkloadPodGroupDisruptionMode{
-		All: &schedulingv1alpha3.WorkloadPodGroupAllDisruptionMode{},
+	mode := &schedulingv1.WorkloadPodGroupDisruptionMode{
+		All: &schedulingv1.WorkloadPodGroupAllDisruptionMode{},
 	}
 
 	item := &workloadbuilder.WorkloadItem{
@@ -91,11 +91,11 @@ func ExampleJobControllerE2E() {
 	//    with the field paths where the controller embeds them. A nil sub-field
 	//    is left nil so it can fall back to the controller default field-by-field.
 	userInput := workloadbuilder.WorkloadInput{
-		Policy: workloadbuilder.PolicyInput{PodGroupData: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{
-			Gang: &schedulingv1alpha3.WorkloadPodGroupGangSchedulingPolicy{}, // minCount defaulted below
+		Policy: workloadbuilder.PolicyInput{PodGroupData: &schedulingv1.WorkloadPodGroupSchedulingPolicy{
+			Gang: &schedulingv1.WorkloadPodGroupGangSchedulingPolicy{}, // minCount defaulted below
 		}, PathElements: []string{"schedulingPolicy"}},
-		Constraints: workloadbuilder.ConstraintsInput{PodGroupData: &schedulingv1alpha3.WorkloadPodGroupSchedulingConstraints{
-			Topology: []schedulingv1alpha3.TopologyConstraint{{Key: "kubernetes.io/hostname"}},
+		Constraints: workloadbuilder.ConstraintsInput{PodGroupData: &schedulingv1.WorkloadPodGroupSchedulingConstraints{
+			Topology: []schedulingv1.TopologyConstraint{{Key: "kubernetes.io/hostname"}},
 		}, PathElements: []string{"schedulingConstraints"}},
 		// DisruptionMode and ResourceClaims left unset: use the defaults.
 	}

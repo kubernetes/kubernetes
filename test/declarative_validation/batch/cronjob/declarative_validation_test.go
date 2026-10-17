@@ -20,7 +20,7 @@ import (
 	"strings"
 	"testing"
 
-	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
+	schedulingv1 "k8s.io/api/scheduling/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
@@ -192,11 +192,11 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 		},
 		"too many resource claims": {
 			input: mkCronJob(tweakJobSchedulingGang(4), tweakJobResourceClaims(
-				schedulingv1alpha3.WorkloadPodGroupResourceClaim{Name: "c1", ResourceClaimName: new("rc1")},
-				schedulingv1alpha3.WorkloadPodGroupResourceClaim{Name: "c2", ResourceClaimName: new("rc2")},
-				schedulingv1alpha3.WorkloadPodGroupResourceClaim{Name: "c3", ResourceClaimName: new("rc3")},
-				schedulingv1alpha3.WorkloadPodGroupResourceClaim{Name: "c4", ResourceClaimName: new("rc4")},
-				schedulingv1alpha3.WorkloadPodGroupResourceClaim{Name: "c5", ResourceClaimName: new("rc5")},
+				schedulingv1.WorkloadPodGroupResourceClaim{Name: "c1", ResourceClaimName: new("rc1")},
+				schedulingv1.WorkloadPodGroupResourceClaim{Name: "c2", ResourceClaimName: new("rc2")},
+				schedulingv1.WorkloadPodGroupResourceClaim{Name: "c3", ResourceClaimName: new("rc3")},
+				schedulingv1.WorkloadPodGroupResourceClaim{Name: "c4", ResourceClaimName: new("rc4")},
+				schedulingv1.WorkloadPodGroupResourceClaim{Name: "c5", ResourceClaimName: new("rc5")},
 			)),
 			enableWorkloadWithJob: true,
 			expectedErrs: field.ErrorList{
@@ -205,8 +205,8 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 		},
 		"resource claim with duplicate entries": {
 			input: mkCronJob(tweakJobSchedulingGang(4), tweakJobResourceClaims(
-				schedulingv1alpha3.WorkloadPodGroupResourceClaim{Name: "claim", ResourceClaimName: new("rc-1")},
-				schedulingv1alpha3.WorkloadPodGroupResourceClaim{Name: "claim", ResourceClaimName: new("rc-2")},
+				schedulingv1.WorkloadPodGroupResourceClaim{Name: "claim", ResourceClaimName: new("rc-1")},
+				schedulingv1.WorkloadPodGroupResourceClaim{Name: "claim", ResourceClaimName: new("rc-2")},
 			)),
 			enableWorkloadWithJob: true,
 			expectedErrs: field.ErrorList{
@@ -215,7 +215,7 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 		},
 		"resource claim with neither name nor template": {
 			input: mkCronJob(tweakJobSchedulingGang(4), tweakJobResourceClaims(
-				schedulingv1alpha3.WorkloadPodGroupResourceClaim{Name: "claim"},
+				schedulingv1.WorkloadPodGroupResourceClaim{Name: "claim"},
 			)),
 			enableWorkloadWithJob: true,
 			expectedErrs: field.ErrorList{
@@ -224,7 +224,7 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 		},
 		"resource claim with invalid short name": {
 			input: mkCronJob(tweakJobSchedulingGang(4), tweakJobResourceClaims(
-				schedulingv1alpha3.WorkloadPodGroupResourceClaim{Name: "../claim", ResourceClaimName: new("rc")},
+				schedulingv1.WorkloadPodGroupResourceClaim{Name: "../claim", ResourceClaimName: new("rc")},
 			)),
 			enableWorkloadWithJob: true,
 			expectedErrs: field.ErrorList{
@@ -233,7 +233,7 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 		},
 		"resource claim with empty name": {
 			input: mkCronJob(tweakJobSchedulingGang(4), tweakJobResourceClaims(
-				schedulingv1alpha3.WorkloadPodGroupResourceClaim{Name: "", ResourceClaimName: new("rc")},
+				schedulingv1.WorkloadPodGroupResourceClaim{Name: "", ResourceClaimName: new("rc")},
 			)),
 			enableWorkloadWithJob: true,
 			expectedErrs: field.ErrorList{
@@ -242,7 +242,7 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 		},
 		"resource claim with invalid resourceClaimName": {
 			input: mkCronJob(tweakJobSchedulingGang(4), tweakJobResourceClaims(
-				schedulingv1alpha3.WorkloadPodGroupResourceClaim{Name: "claim", ResourceClaimName: new(".foo_bar")},
+				schedulingv1.WorkloadPodGroupResourceClaim{Name: "claim", ResourceClaimName: new(".foo_bar")},
 			)),
 			enableWorkloadWithJob: true,
 			expectedErrs: field.ErrorList{
@@ -251,7 +251,7 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 		},
 		"resource claim with invalid resourceClaimTemplateName": {
 			input: mkCronJob(tweakJobSchedulingGang(4), tweakJobResourceClaims(
-				schedulingv1alpha3.WorkloadPodGroupResourceClaim{Name: "claim", ResourceClaimTemplateName: new(".foo_bar")},
+				schedulingv1.WorkloadPodGroupResourceClaim{Name: "claim", ResourceClaimTemplateName: new(".foo_bar")},
 			)),
 			enableWorkloadWithJob: true,
 			expectedErrs: field.ErrorList{
@@ -431,11 +431,11 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 		},
 		"adding a resource claim is immutable": {
 			old: mkCronJob(tweakJobSchedulingGang(4), tweakJobResourceClaims(
-				schedulingv1alpha3.WorkloadPodGroupResourceClaim{Name: "claim-a", ResourceClaimName: new("rc-a")},
+				schedulingv1.WorkloadPodGroupResourceClaim{Name: "claim-a", ResourceClaimName: new("rc-a")},
 			)),
 			update: mkCronJob(tweakJobSchedulingGang(4), tweakJobResourceClaims(
-				schedulingv1alpha3.WorkloadPodGroupResourceClaim{Name: "claim-a", ResourceClaimName: new("rc-a")},
-				schedulingv1alpha3.WorkloadPodGroupResourceClaim{Name: "claim-b", ResourceClaimName: new("rc-b")},
+				schedulingv1.WorkloadPodGroupResourceClaim{Name: "claim-a", ResourceClaimName: new("rc-a")},
+				schedulingv1.WorkloadPodGroupResourceClaim{Name: "claim-b", ResourceClaimName: new("rc-b")},
 			)),
 			enableWorkloadWithJob: true,
 			expectedErrs: field.ErrorList{
@@ -444,11 +444,11 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 		},
 		"removing a resource claim is immutable": {
 			old: mkCronJob(tweakJobSchedulingGang(4), tweakJobResourceClaims(
-				schedulingv1alpha3.WorkloadPodGroupResourceClaim{Name: "claim-a", ResourceClaimName: new("rc-a")},
-				schedulingv1alpha3.WorkloadPodGroupResourceClaim{Name: "claim-b", ResourceClaimName: new("rc-b")},
+				schedulingv1.WorkloadPodGroupResourceClaim{Name: "claim-a", ResourceClaimName: new("rc-a")},
+				schedulingv1.WorkloadPodGroupResourceClaim{Name: "claim-b", ResourceClaimName: new("rc-b")},
 			)),
 			update: mkCronJob(tweakJobSchedulingGang(4), tweakJobResourceClaims(
-				schedulingv1alpha3.WorkloadPodGroupResourceClaim{Name: "claim-a", ResourceClaimName: new("rc-a")},
+				schedulingv1.WorkloadPodGroupResourceClaim{Name: "claim-a", ResourceClaimName: new("rc-a")},
 			)),
 			enableWorkloadWithJob: true,
 			expectedErrs: field.ErrorList{
@@ -457,10 +457,10 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 		},
 		"changing a resource claim name is immutable": {
 			old: mkCronJob(tweakJobSchedulingGang(4), tweakJobResourceClaims(
-				schedulingv1alpha3.WorkloadPodGroupResourceClaim{Name: "claim-a", ResourceClaimName: new("rc-a")},
+				schedulingv1.WorkloadPodGroupResourceClaim{Name: "claim-a", ResourceClaimName: new("rc-a")},
 			)),
 			update: mkCronJob(tweakJobSchedulingGang(4), tweakJobResourceClaims(
-				schedulingv1alpha3.WorkloadPodGroupResourceClaim{Name: "claim-a", ResourceClaimName: new("rc-b")},
+				schedulingv1.WorkloadPodGroupResourceClaim{Name: "claim-a", ResourceClaimName: new("rc-b")},
 			)),
 			enableWorkloadWithJob: true,
 			expectedErrs: field.ErrorList{
@@ -469,10 +469,10 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 		},
 		"changing a resource claim template name is immutable": {
 			old: mkCronJob(tweakJobSchedulingGang(4), tweakJobResourceClaims(
-				schedulingv1alpha3.WorkloadPodGroupResourceClaim{Name: "claim-a", ResourceClaimTemplateName: new("rct-a")},
+				schedulingv1.WorkloadPodGroupResourceClaim{Name: "claim-a", ResourceClaimTemplateName: new("rct-a")},
 			)),
 			update: mkCronJob(tweakJobSchedulingGang(4), tweakJobResourceClaims(
-				schedulingv1alpha3.WorkloadPodGroupResourceClaim{Name: "claim-a", ResourceClaimTemplateName: new("rct-b")},
+				schedulingv1.WorkloadPodGroupResourceClaim{Name: "claim-a", ResourceClaimTemplateName: new("rct-b")},
 			)),
 			enableWorkloadWithJob: true,
 			expectedErrs: field.ErrorList{
@@ -502,8 +502,8 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 func tweakJobSchedulingBasic() func(*batch.CronJob) {
 	return func(cj *batch.CronJob) {
 		cj.Spec.JobTemplate.Spec.Scheduling = &batch.JobSchedulingConfiguration{
-			SchedulingPolicy: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{
-				Basic: &schedulingv1alpha3.WorkloadPodGroupBasicSchedulingPolicy{},
+			SchedulingPolicy: &schedulingv1.WorkloadPodGroupSchedulingPolicy{
+				Basic: &schedulingv1.WorkloadPodGroupBasicSchedulingPolicy{},
 			},
 		}
 	}
@@ -512,8 +512,8 @@ func tweakJobSchedulingBasic() func(*batch.CronJob) {
 func tweakJobSchedulingGang(minCount int32) func(*batch.CronJob) {
 	return func(cj *batch.CronJob) {
 		cj.Spec.JobTemplate.Spec.Scheduling = &batch.JobSchedulingConfiguration{
-			SchedulingPolicy: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{
-				Gang: &schedulingv1alpha3.WorkloadPodGroupGangSchedulingPolicy{MinCount: new(minCount)},
+			SchedulingPolicy: &schedulingv1.WorkloadPodGroupSchedulingPolicy{
+				Gang: &schedulingv1.WorkloadPodGroupGangSchedulingPolicy{MinCount: new(minCount)},
 			},
 		}
 	}
@@ -522,7 +522,7 @@ func tweakJobSchedulingGang(minCount int32) func(*batch.CronJob) {
 func tweakJobSchedulingEmptyPolicy() func(*batch.CronJob) {
 	return func(cj *batch.CronJob) {
 		cj.Spec.JobTemplate.Spec.Scheduling = &batch.JobSchedulingConfiguration{
-			SchedulingPolicy: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{},
+			SchedulingPolicy: &schedulingv1.WorkloadPodGroupSchedulingPolicy{},
 		}
 	}
 }
@@ -536,9 +536,9 @@ func tweakJobSchedulingNoPolicy() func(*batch.CronJob) {
 func tweakJobSchedulingBothPolicies() func(*batch.CronJob) {
 	return func(cj *batch.CronJob) {
 		cj.Spec.JobTemplate.Spec.Scheduling = &batch.JobSchedulingConfiguration{
-			SchedulingPolicy: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{
-				Basic: &schedulingv1alpha3.WorkloadPodGroupBasicSchedulingPolicy{},
-				Gang:  &schedulingv1alpha3.WorkloadPodGroupGangSchedulingPolicy{MinCount: new(int32(1))},
+			SchedulingPolicy: &schedulingv1.WorkloadPodGroupSchedulingPolicy{
+				Basic: &schedulingv1.WorkloadPodGroupBasicSchedulingPolicy{},
+				Gang:  &schedulingv1.WorkloadPodGroupGangSchedulingPolicy{MinCount: new(int32(1))},
 			},
 		}
 	}
@@ -550,11 +550,11 @@ func tweakJobTopologyConstraint(key string) func(*batch.CronJob) {
 			tweakJobSchedulingGang(4)(cj)
 		}
 		if cj.Spec.JobTemplate.Spec.Scheduling.SchedulingConstraints == nil {
-			cj.Spec.JobTemplate.Spec.Scheduling.SchedulingConstraints = &schedulingv1alpha3.WorkloadPodGroupSchedulingConstraints{}
+			cj.Spec.JobTemplate.Spec.Scheduling.SchedulingConstraints = &schedulingv1.WorkloadPodGroupSchedulingConstraints{}
 		}
 		cj.Spec.JobTemplate.Spec.Scheduling.SchedulingConstraints.Topology = append(
 			cj.Spec.JobTemplate.Spec.Scheduling.SchedulingConstraints.Topology,
-			schedulingv1alpha3.TopologyConstraint{Key: key},
+			schedulingv1.TopologyConstraint{Key: key},
 		)
 	}
 }
@@ -564,7 +564,7 @@ func tweakJobDisruptionModeNeither() func(*batch.CronJob) {
 		if cj.Spec.JobTemplate.Spec.Scheduling == nil {
 			tweakJobSchedulingGang(4)(cj)
 		}
-		cj.Spec.JobTemplate.Spec.Scheduling.DisruptionMode = &schedulingv1alpha3.WorkloadPodGroupDisruptionMode{}
+		cj.Spec.JobTemplate.Spec.Scheduling.DisruptionMode = &schedulingv1.WorkloadPodGroupDisruptionMode{}
 	}
 }
 
@@ -573,8 +573,8 @@ func tweakJobDisruptionModeSingle() func(*batch.CronJob) {
 		if cj.Spec.JobTemplate.Spec.Scheduling == nil {
 			tweakJobSchedulingGang(4)(cj)
 		}
-		cj.Spec.JobTemplate.Spec.Scheduling.DisruptionMode = &schedulingv1alpha3.WorkloadPodGroupDisruptionMode{
-			Single: &schedulingv1alpha3.WorkloadPodGroupSingleDisruptionMode{},
+		cj.Spec.JobTemplate.Spec.Scheduling.DisruptionMode = &schedulingv1.WorkloadPodGroupDisruptionMode{
+			Single: &schedulingv1.WorkloadPodGroupSingleDisruptionMode{},
 		}
 	}
 }
@@ -584,13 +584,13 @@ func tweakJobDisruptionModeAll() func(*batch.CronJob) {
 		if cj.Spec.JobTemplate.Spec.Scheduling == nil {
 			tweakJobSchedulingGang(4)(cj)
 		}
-		cj.Spec.JobTemplate.Spec.Scheduling.DisruptionMode = &schedulingv1alpha3.WorkloadPodGroupDisruptionMode{
-			All: &schedulingv1alpha3.WorkloadPodGroupAllDisruptionMode{},
+		cj.Spec.JobTemplate.Spec.Scheduling.DisruptionMode = &schedulingv1.WorkloadPodGroupDisruptionMode{
+			All: &schedulingv1.WorkloadPodGroupAllDisruptionMode{},
 		}
 	}
 }
 
-func tweakJobResourceClaims(claims ...schedulingv1alpha3.WorkloadPodGroupResourceClaim) func(*batch.CronJob) {
+func tweakJobResourceClaims(claims ...schedulingv1.WorkloadPodGroupResourceClaim) func(*batch.CronJob) {
 	return func(cj *batch.CronJob) {
 		if cj.Spec.JobTemplate.Spec.Scheduling == nil {
 			tweakJobSchedulingGang(4)(cj)
