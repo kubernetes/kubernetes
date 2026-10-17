@@ -305,6 +305,10 @@ func TestGenerateWorkload(t *testing.T) {
 			wantBasic:             true,
 			wantPriorityClassName: "high-priority",
 		},
+		"long job name yields a valid template name": {
+			job:       newJob(strings.Repeat("a", 58), 4, nil),
+			wantBasic: true,
+		},
 	}
 
 	for name, tc := range testCases {
@@ -325,6 +329,11 @@ func TestGenerateWorkload(t *testing.T) {
 			tpl := wl.Spec.PodGroupTemplates[0]
 			if tpl.Name != podGroupTemplateName(tc.job) {
 				t.Errorf("template name = %q, want %q", tpl.Name, podGroupTemplateName(tc.job))
+			}
+			// spec.podGroupTemplates[].name is a DNS label, limited to 63 bytes,
+			// so it must stay bounded regardless of Job name length.
+			for _, msg := range validation.IsDNS1123Label(tpl.Name) {
+				t.Errorf("template name %q is not a valid DNS label: %s", tpl.Name, msg)
 			}
 			if tc.wantBasic {
 				if tpl.SchedulingPolicy.Basic == nil {
@@ -498,7 +507,7 @@ func TestEnsureWorkloadAndPodGroup(t *testing.T) {
 
 	baseJob := newGangSchedulingJob("test-job", 4)
 	workloadName := computeWorkloadName(baseJob)
-	templateName := fmt.Sprintf("%s-pgt-%d", baseJob.Name, 0)
+	templateName := podGroupTemplateName(baseJob)
 	podGroupName := computePodGroupName(workloadName, templateName)
 
 	makeWorkload := func(name, jobName string) *schedulingv1beta1.Workload {
@@ -899,7 +908,7 @@ func TestCreatePodGroup(t *testing.T) {
 	clientSet := fake.NewClientset()
 	jm, _ := newControllerWithSchedulingInformers(ctx, t, clientSet)
 	job := newGangSchedulingJob("my-job", 4)
-	templateName := fmt.Sprintf("%s-pgt-%d", job.Name, 0)
+	templateName := podGroupTemplateName(job)
 
 	testCases := map[string]struct {
 		workloadName      string
