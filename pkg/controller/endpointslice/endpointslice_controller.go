@@ -305,16 +305,16 @@ func (c *Controller) Run(ctx context.Context, workers int) {
 	logger.V(2).Info("Starting service queue worker threads", "total", workers)
 	for i := 0; i < workers; i++ {
 		wg.Go(func() {
-			wait.Until(func() { c.serviceQueueWorker(logger) }, c.workerLoopPeriod, ctx.Done())
+			wait.UntilWithContext(ctx, c.serviceQueueWorker, c.workerLoopPeriod)
 		})
 		wg.Go(func() {
-			wait.Until(func() { c.podQueueWorker(logger) }, c.workerLoopPeriod, ctx.Done())
+			wait.UntilWithContext(ctx, c.podQueueWorker, c.workerLoopPeriod)
 		})
 	}
 
 	logger.V(2).Info("Starting topology queue worker threads", "total", 1)
 	wg.Go(func() {
-		wait.Until(func() { c.topologyQueueWorker(logger) }, c.workerLoopPeriod, ctx.Done())
+		wait.UntilWithContext(ctx, c.topologyQueueWorker, c.workerLoopPeriod)
 	})
 	<-ctx.Done()
 }
@@ -323,40 +323,40 @@ func (c *Controller) Run(ctx context.Context, workers int) {
 // them, and marks them done. You may run as many of these in parallel as you
 // wish; the workqueue guarantees that they will not end up processing the same
 // service at the same time
-func (c *Controller) serviceQueueWorker(logger klog.Logger) {
-	for c.processNextServiceWorkItem(logger) {
+func (c *Controller) serviceQueueWorker(ctx context.Context) {
+	for c.processNextServiceWorkItem(ctx) {
 	}
 }
 
-func (c *Controller) processNextServiceWorkItem(logger klog.Logger) bool {
+func (c *Controller) processNextServiceWorkItem(ctx context.Context) bool {
 	cKey, quit := c.serviceQueue.Get()
 	if quit {
 		return false
 	}
 	defer c.serviceQueue.Done(cKey)
 
-	err := c.syncService(logger, cKey)
-	c.handleErr(logger, err, cKey)
+	err := c.syncService(ctx, cKey)
+	c.handleErr(ctx, err, cKey)
 
 	return true
 }
 
-func (c *Controller) topologyQueueWorker(logger klog.Logger) {
-	for c.processNextTopologyWorkItem(logger) {
+func (c *Controller) topologyQueueWorker(ctx context.Context) {
+	for c.processNextTopologyWorkItem(ctx) {
 	}
 }
 
-func (c *Controller) processNextTopologyWorkItem(logger klog.Logger) bool {
+func (c *Controller) processNextTopologyWorkItem(ctx context.Context) bool {
 	key, quit := c.topologyQueue.Get()
 	if quit {
 		return false
 	}
 	defer c.topologyQueue.Done(key)
-	c.checkNodeTopologyDistribution(logger)
+	c.checkNodeTopologyDistribution(ctx)
 	return true
 }
 
-func (c *Controller) handleErr(logger klog.Logger, err error, key string) {
+func (c *Controller) handleErr(ctx context.Context, err error, key string) {
 	trackSync(err)
 
 	if err == nil {
@@ -364,6 +364,7 @@ func (c *Controller) handleErr(logger klog.Logger, err error, key string) {
 		return
 	}
 
+	logger := klog.FromContext(ctx)
 	if c.serviceQueue.NumRequeues(key) < maxRetries {
 		logger.Info("Error syncing endpoint slices for service, retrying", "key", key, "err", err)
 		c.serviceQueue.AddRateLimited(key)
@@ -372,10 +373,11 @@ func (c *Controller) handleErr(logger klog.Logger, err error, key string) {
 
 	logger.Info("Retry budget exceeded, dropping service out of the queue", "key", key, "err", err)
 	c.serviceQueue.Forget(key)
-	utilruntime.HandleError(err)
+	utilruntime.HandleErrorWithContext(ctx, err, "Error syncing endpoint slices for service", "key", key)
 }
 
-func (c *Controller) syncService(logger klog.Logger, key string) error {
+func (c *Controller) syncService(ctx context.Context, key string) error {
+	logger := klog.FromContext(ctx)
 	startTime := time.Now()
 	defer func() {
 		logger.V(4).Info("Finished syncing service endpoint slices", "key", key, "elapsedTime", time.Since(startTime))
@@ -460,30 +462,31 @@ func (c *Controller) syncService(logger klog.Logger, key string) error {
 	return nil
 }
 
-func (c *Controller) podQueueWorker(logger klog.Logger) {
-	for c.processNextPodWorkItem(logger) {
+func (c *Controller) podQueueWorker(ctx context.Context) {
+	for c.processNextPodWorkItem(ctx) {
 	}
 }
 
-func (c *Controller) processNextPodWorkItem(logger klog.Logger) bool {
+func (c *Controller) processNextPodWorkItem(ctx context.Context) bool {
 	cKey, quit := c.podQueue.Get()
 	if quit {
 		return false
 	}
 	defer c.podQueue.Done(cKey)
 
-	err := c.syncPod(logger, cKey)
-	c.handlePodErr(logger, err, cKey)
+	err := c.syncPod(ctx, cKey)
+	c.handlePodErr(ctx, err, cKey)
 
 	return true
 }
 
-func (c *Controller) handlePodErr(logger klog.Logger, err error, key *endpointsliceutil.PodProjectionKey) {
+func (c *Controller) handlePodErr(ctx context.Context, err error, key *endpointsliceutil.PodProjectionKey) {
 	if err == nil {
 		c.podQueue.Forget(key)
 		return
 	}
 
+	logger := klog.FromContext(ctx)
 	if c.podQueue.NumRequeues(key) < maxRetries {
 		logger.V(2).Info("Error syncing pod, retrying", "PodProjectionKey", *key)
 		c.podQueue.AddRateLimited(key)
@@ -492,10 +495,11 @@ func (c *Controller) handlePodErr(logger klog.Logger, err error, key *endpointsl
 
 	logger.Info("Dropping pod out of the queue", "PodProjectionKey", *key)
 	c.podQueue.Forget(key)
-	utilruntime.HandleError(err)
+	utilruntime.HandleErrorWithContext(ctx, err, "Error syncing pod", "PodProjectionKey", *key)
 }
 
-func (c *Controller) syncPod(logger klog.Logger, key *endpointsliceutil.PodProjectionKey) error {
+func (c *Controller) syncPod(ctx context.Context, key *endpointsliceutil.PodProjectionKey) error {
+	logger := klog.FromContext(ctx)
 	startTime := time.Now()
 	defer func() {
 		logger.V(4).Info("Finished syncing pod", "PodProjectionKey", *key, "elapsedTime", time.Since(startTime))
@@ -638,10 +642,11 @@ func (c *Controller) deleteNode() {
 
 // checkNodeTopologyDistribution updates Nodes in the topology cache and then
 // queues any Services that are past the threshold.
-func (c *Controller) checkNodeTopologyDistribution(logger klog.Logger) {
+func (c *Controller) checkNodeTopologyDistribution(ctx context.Context) {
 	if c.topologyCache == nil {
 		return
 	}
+	logger := klog.FromContext(ctx)
 	nodes, err := c.nodeLister.List(labels.Everything())
 	if err != nil {
 		logger.Error(err, "Error listing Nodes")
