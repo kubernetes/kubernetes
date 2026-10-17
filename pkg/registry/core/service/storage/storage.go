@@ -130,6 +130,7 @@ func NewREST(
 	// users can patch the status to remove the finalizer,
 	// hence statusStore must participate on the AfterDelete
 	// hook to release the allocated resources
+	statusStore.Decorator = genericStore.defaultOnRead
 	statusStore.AfterDelete = genericStore.afterDelete
 
 	return genericStore, &StatusREST{store: &statusStore}, &svcreg.ProxyREST{Redirector: genericStore, ProxyTransport: proxyTransport}, nil

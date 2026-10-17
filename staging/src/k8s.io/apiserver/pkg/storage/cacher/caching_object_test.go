@@ -141,6 +141,11 @@ func TestCachingObjectRaces(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			object.SetNamespace("namespace")
+			object.Decorate(func(obj runtime.Object) {
+				if p, ok := obj.(*v1.Pod); ok {
+					p.Annotations = map[string]string{"decorated": "true"}
+				}
+			})
 			buffer := bytes.NewBuffer(nil)
 			for _, encoder := range encoders {
 				buffer.Reset()
@@ -187,5 +192,63 @@ func TestCachingObjectLazyDeepCopy(t *testing.T) {
 	object.SetResourceVersion("234")
 	if object.deepCopied != true {
 		t.Errorf("object not deep-copied on change")
+	}
+}
+
+func TestCachingObjectDecorate(t *testing.T) {
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            "name",
+			ResourceVersion: "1",
+		},
+	}
+	object, err := newCachingObject(pod)
+	if err != nil {
+		t.Fatalf("couldn't create cachingObject: %v", err)
+	}
+
+	encodeAnnotations := func(obj runtime.Object, w io.Writer) error {
+		p := obj.(*v1.Pod)
+		_, err := w.Write([]byte(p.Annotations["decorated"]))
+		return err
+	}
+
+	// Verify that a nil decorator is a no-op and does not consume decorateOnce.
+	object.Decorate(nil)
+
+	var decorateCalls int32
+	object.Decorate(func(obj runtime.Object) {
+		atomic.AddInt32(&decorateCalls, 1)
+		if p, ok := obj.(*v1.Pod); ok {
+			p.Annotations = map[string]string{"decorated": "true"}
+		}
+	})
+	object.Decorate(func(obj runtime.Object) {
+		t.Errorf("second decorator should not overwrite first decorator")
+	})
+
+	for i := 0; i < 5; i++ {
+		buffer := bytes.NewBuffer(nil)
+		if err := object.CacheEncode("test", encodeAnnotations, buffer); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if got := buffer.String(); got != "true" {
+			t.Fatalf("expected decorated=true, got %q", got)
+		}
+	}
+	if got := atomic.LoadInt32(&decorateCalls); got != 1 {
+		t.Fatalf("expected decorator to run once during CacheEncode, got %d", got)
+	}
+
+	// Verify DeepCopyObject preserves the registered decorator.
+	copied := object.DeepCopyObject().(runtime.CacheableObject)
+	if gotPod := copied.GetObject().(*v1.Pod); gotPod.Annotations["decorated"] != "true" {
+		t.Fatalf("expected DeepCopyObject().GetObject() to be decorated, got %v", gotPod.Annotations)
+	}
+	if got := atomic.LoadInt32(&decorateCalls); got != 2 {
+		t.Fatalf("expected 2 total decorator calls (CacheEncode + DeepCopy GetObject), got %d", got)
+	}
+	if pod.Annotations["decorated"] != "" {
+		t.Fatalf("expected underlying object not to be mutated, got %v", pod.Annotations)
 	}
 }

@@ -18,9 +18,14 @@ package registry
 
 import (
 	"context"
+
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 )
+
+type decoratableCachingObject interface {
+	Decorate(func(runtime.Object))
+}
 
 type decoratedWatcher struct {
 	w         watch.Interface
@@ -57,10 +62,14 @@ func (d *decoratedWatcher) run(ctx context.Context) {
 				return
 			}
 			switch recv.Type {
-			case watch.Added, watch.Modified, watch.Deleted, watch.Bookmark:
-				d.decorator(recv.Object)
+			case watch.Added, watch.Modified, watch.Deleted:
+				if dco, ok := recv.Object.(decoratableCachingObject); ok {
+					dco.Decorate(d.decorator)
+				} else {
+					d.decorator(recv.Object)
+				}
 				send = recv
-			case watch.Error:
+			case watch.Bookmark, watch.Error:
 				send = recv
 			}
 			select {

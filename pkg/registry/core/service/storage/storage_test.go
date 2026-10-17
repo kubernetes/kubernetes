@@ -11945,3 +11945,74 @@ func TestUpdateServiceLoadBalancerStatus(t *testing.T) {
 		})
 	}
 }
+
+func TestStatusDefaultOnRead(t *testing.T) {
+	storage, statusStorage, cleanup := newStorage(t, []api.IPFamily{api.IPv4Protocol})
+	defer cleanup()
+
+	ctx := genericregistrytest.NewNamespaceScopeContext(storage.Store, metav1.NamespaceDefault)
+
+	legacySvc := &api.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "legacy-svc",
+			Namespace: metav1.NamespaceDefault,
+		},
+		Spec: api.ServiceSpec{
+			ClusterIP:       "10.0.0.10",
+			SessionAffinity: api.ServiceAffinityNone,
+			Type:            api.ServiceTypeLoadBalancer,
+			Ports: []api.ServicePort{{
+				Port:       80,
+				Protocol:   api.ProtocolTCP,
+				TargetPort: intstr.FromInt32(80),
+			}},
+		},
+	}
+	key, err := storage.KeyFunc(ctx, legacySvc.Name)
+	if err != nil {
+		t.Fatalf("KeyFunc failed: %v", err)
+	}
+	out := &api.Service{}
+	if err := storage.Storage.Create(ctx, key, legacySvc, out, 0, false); err != nil {
+		t.Fatalf("Storage.Create failed: %v", err)
+	}
+
+	gotObj, err := statusStorage.Get(ctx, legacySvc.Name, &metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("statusStorage.Get failed: %v", err)
+	}
+	gotSvc := gotObj.(*api.Service)
+	if want, got := []string{"10.0.0.10"}, gotSvc.Spec.ClusterIPs; !reflect.DeepEqual(want, got) {
+		t.Errorf("statusStorage.Get clusterIPs: expected %v, got %v", want, got)
+	}
+	if want, got := []api.IPFamily{api.IPv4Protocol}, gotSvc.Spec.IPFamilies; !reflect.DeepEqual(want, got) {
+		t.Errorf("statusStorage.Get ipFamilies: expected %v, got %v", want, got)
+	}
+	if gotSvc.Spec.IPFamilyPolicy == nil || *gotSvc.Spec.IPFamilyPolicy != api.IPFamilyPolicySingleStack {
+		t.Errorf("statusStorage.Get ipFamilyPolicy: expected %v, got %v", api.IPFamilyPolicySingleStack, gotSvc.Spec.IPFamilyPolicy)
+	}
+
+	toUpdate := out.DeepCopy()
+	toUpdate.Status = api.ServiceStatus{
+		LoadBalancer: api.LoadBalancerStatus{
+			Ingress: []api.LoadBalancerIngress{{
+				IP:     "1.2.3.4",
+				IPMode: ptr.To(api.LoadBalancerIPModeVIP),
+			}},
+		},
+	}
+	updatedObj, _, err := statusStorage.Update(ctx, toUpdate.Name, rest.DefaultUpdatedObjectInfo(toUpdate), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{})
+	if err != nil {
+		t.Fatalf("statusStorage.Update failed: %v", err)
+	}
+	updatedSvc := updatedObj.(*api.Service)
+	if want, got := []string{"10.0.0.10"}, updatedSvc.Spec.ClusterIPs; !reflect.DeepEqual(want, got) {
+		t.Errorf("statusStorage.Update clusterIPs: expected %v, got %v", want, got)
+	}
+	if want, got := []api.IPFamily{api.IPv4Protocol}, updatedSvc.Spec.IPFamilies; !reflect.DeepEqual(want, got) {
+		t.Errorf("statusStorage.Update ipFamilies: expected %v, got %v", want, got)
+	}
+	if updatedSvc.Spec.IPFamilyPolicy == nil || *updatedSvc.Spec.IPFamilyPolicy != api.IPFamilyPolicySingleStack {
+		t.Errorf("statusStorage.Update ipFamilyPolicy: expected %v, got %v", api.IPFamilyPolicySingleStack, updatedSvc.Spec.IPFamilyPolicy)
+	}
+}
