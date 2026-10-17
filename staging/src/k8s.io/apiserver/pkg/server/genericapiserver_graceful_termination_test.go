@@ -564,6 +564,90 @@ func TestGracefulTerminationWithKeepListeningDuringGracefulTerminationEnabled(t 
 	}
 }
 
+// This test checks that the watch wait group has entered waiting mode
+// before active watch handlers observe the shutdown signal.
+func TestGracefulTerminationWatchShutdownOrdering(t *testing.T) {
+	s := newGenericAPIServer(t, &fakeAudit{}, true)
+	client := newClient(false)
+	doer := setupDoer(t, s.SecureServingInfo)
+
+	// the more watches, the more likely one of them wins the race
+	const n = 200
+	startedWG := sync.WaitGroup{}
+	startedWG.Add(n)
+	var lock sync.Mutex
+	var shutdownBeforeWait int
+	s.Handler.NonGoRestfulMux.Handle("/apis/watches.group/v1/namespaces/foo/bar", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		signals := apirequest.ServerShutdownSignalFrom(req.Context())
+		startedWG.Done()
+		if signals == nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		<-signals.ShuttingDown()
+
+		// After observing shutdown, a positive Add should be rejected.
+		// Success means the watch wait group has not yet entered waiting mode.
+		if err := s.WatchRequestWaitGroup.Add(1); err == nil {
+			s.WatchRequestWaitGroup.Add(-1)
+			lock.Lock()
+			shutdownBeforeWait++
+			lock.Unlock()
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	signals := &s.lifecycleSignals
+	signals.WatchTerminationStarted = wrapLifecycleSignal(t, signals.WatchTerminationStarted, func(_ lifecycleSignal) {
+		// NOTE: this is invoked with WatchRequestWaitGroup locked
+		select {
+		case <-signals.NotAcceptingNewRequest.Signaled():
+		default:
+			t.Errorf("Expected %s to be signaled before %s", signals.NotAcceptingNewRequest.Name(), signals.WatchTerminationStarted.Name())
+		}
+	}, nil)
+
+	_, ctx := ktesting.NewTestContext(t)
+	stopCtx, stop := context.WithCancelCause(ctx)
+	defer stop(errors.New("test has completed"))
+	runCompletedCh := make(chan struct{})
+	go func() {
+		defer close(runCompletedCh)
+		if err := s.PrepareRun().RunWithContext(stopCtx); err != nil {
+			t.Errorf("unexpected error from RunWithContext: %v", err)
+		}
+	}()
+	waitForAPIServerStarted(t, doer)
+
+	resultCh := make(chan result, n)
+	for i := 0; i < n; i++ {
+		go func() {
+			resultCh <- doer.Do(client, func(httptrace.GotConnInfo) {}, "/apis/watches.group/v1/namespaces/foo/bar?watch=true", 0)
+		}()
+	}
+	startedCh := make(chan struct{})
+	go func() {
+		defer close(startedCh)
+		startedWG.Wait()
+	}()
+	waitForeverUntil(t, startedCh, "in-flight watch requests did not reach the server")
+
+	stop(errors.New("shutting down"))
+	for i := 0; i < n; i++ {
+		resultGot := <-resultCh
+		if err := assertResponseStatusCode(resultGot, http.StatusOK); err != nil {
+			t.Errorf("%s", err.Error())
+		}
+	}
+	waitForeverUntil(t, runCompletedCh, "the apiserver Run method did not return")
+
+	lock.Lock()
+	defer lock.Unlock()
+	if shutdownBeforeWait != 0 {
+		t.Errorf("%d of %d watch handlers observed shutdown before the watch wait group entered waiting mode", shutdownBeforeWait, n)
+	}
+}
+
 func TestMuxAndDiscoveryComplete(t *testing.T) {
 	// setup
 	testSignal1 := make(chan struct{})

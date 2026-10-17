@@ -260,6 +260,59 @@ func TestRateLimitedSafeWaitGroupWithBurstOfOne(t *testing.T) {
 	}
 }
 
+func TestRateLimitedSafeWaitGroupSignalFromFactory(t *testing.T) {
+	target := &rateLimitedSafeWaitGroupWrapper{
+		RateLimitedSafeWaitGroup: &RateLimitedSafeWaitGroup{},
+	}
+	n := 100
+	for i := 0; i < n; i++ {
+		if err := target.Add(1); err != nil {
+			t.Fatalf("unexpected error from Add: %v", err)
+		}
+	}
+
+	limiter := &limiterWrapper{}
+	signalCh := make(chan struct{})
+	doneWG := sync.WaitGroup{}
+	doneWG.Add(n)
+	addErrCh := make(chan error, 1)
+	for i := 0; i < n; i++ {
+		go func() {
+			defer doneWG.Done()
+			<-signalCh
+			target.Done()
+		}()
+	}
+	go func() {
+		<-signalCh
+		err := target.Add(1)
+		if err == nil {
+			// don't leave Wait blocked forever
+			target.Done()
+		}
+		addErrCh <- err
+	}()
+
+	activeAt, activeNow, err := target.Wait(func(count int) (RateLimiter, context.Context, context.CancelFunc) {
+		close(signalCh)
+		return limiter, context.Background(), func() {}
+	})
+	doneWG.Wait()
+
+	if err != nil {
+		t.Errorf("unexpected error from Wait: %v", err)
+	}
+	if activeAt != n || activeNow != 0 {
+		t.Errorf("expected count before Wait to be: %d and after: 0, but got: %d and %d", n, activeAt, activeNow)
+	}
+	if invoked := limiter.invoked(); invoked != n {
+		t.Errorf("expected rate limiter to be called %d times, but got: %d", n, invoked)
+	}
+	if err := <-addErrCh; err == nil {
+		t.Errorf("expected Add to return error after the factory has been invoked")
+	}
+}
+
 type waitResult struct {
 	before, after int
 	err           error
