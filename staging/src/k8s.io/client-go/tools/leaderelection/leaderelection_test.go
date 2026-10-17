@@ -1097,6 +1097,7 @@ func assertEqualEvents(t *testing.T, expected []string, actual <-chan string) {
 
 func TestFastPathLeaderElection(t *testing.T) {
 	objectType := "leases"
+	identity := "baz"
 	var (
 		lockObj    runtime.Object
 		updates    int
@@ -1109,23 +1110,16 @@ func TestFastPathLeaderElection(t *testing.T) {
 		lockOps = []string{}
 		cancelFunc = nil
 	}
-	lec := LeaderElectionConfig{
-		LeaseDuration: 15 * time.Second,
-		RenewDeadline: 2 * time.Second,
-		RetryPeriod:   1 * time.Second,
-
-		Callbacks: LeaderCallbacks{
-			OnNewLeader:      func(identity string) {},
-			OnStoppedLeading: func() {},
-			OnStartedLeading: func(context.Context) {
-			},
-		},
-	}
 
 	tests := []struct {
 		name            string
+		coordinated     bool
 		reactors        []Reactor
 		expectedLockOps []string
+		// lockOpsPrefix, if set, is checked instead of expectedLockOps:
+		// the recorded ops must start with the prefix, and remaining ops must all equal lockOpsTail.
+		lockOpsPrefix []string
+		lockOpsTail   string
 	}{
 		{
 			name: "Exercise fast path after lock acquired",
@@ -1208,6 +1202,152 @@ func TestFastPathLeaderElection(t *testing.T) {
 			},
 			expectedLockOps: []string{"get", "create", "update", "update", "get", "update", "update"},
 		},
+		{
+			name:        "Exercise fast path after coordinated lock acquired",
+			coordinated: true,
+			reactors: []Reactor{
+				{
+					verb:       "get",
+					objectType: objectType,
+					reaction: func(action fakeclient.Action) (handled bool, ret runtime.Object, err error) {
+						lockOps = append(lockOps, "get")
+						if lockObj != nil {
+							return true, lockObj, nil
+						}
+						// Coordinated leases are created externally; return a pre-existing lease
+						lockObj = createLockObject(t, objectType, action.GetNamespace(), action.(fakeclient.GetAction).GetName(), &rl.LeaderElectionRecord{
+							HolderIdentity:       identity,
+							LeaseDurationSeconds: 15,
+							RenewTime:            metav1.NewTime(time.Now()),
+							AcquireTime:          metav1.NewTime(time.Now()),
+						})
+						return true, lockObj, nil
+					},
+				},
+				{
+					verb:       "update",
+					objectType: objectType,
+					reaction: func(action fakeclient.Action) (handled bool, ret runtime.Object, err error) {
+						updates++
+						lockOps = append(lockOps, "update")
+						if updates == 3 {
+							cancelFunc()
+						}
+						lockObj = action.(fakeclient.UpdateAction).GetObject()
+						return true, lockObj, nil
+					},
+				},
+			},
+			// acquire: get + update, then 2 fast-path renewals: update, update (no get)
+			expectedLockOps: []string{"get", "update", "update", "update"},
+		},
+		{
+			name:        "Fallback to slow path after coordinated fast path conflict",
+			coordinated: true,
+			reactors: []Reactor{
+				{
+					verb:       "get",
+					objectType: objectType,
+					reaction: func(action fakeclient.Action) (handled bool, ret runtime.Object, err error) {
+						lockOps = append(lockOps, "get")
+						if lockObj != nil {
+							return true, lockObj, nil
+						}
+						lockObj = createLockObject(t, objectType, action.GetNamespace(), action.(fakeclient.GetAction).GetName(), &rl.LeaderElectionRecord{
+							HolderIdentity:       identity,
+							LeaseDurationSeconds: 15,
+							RenewTime:            metav1.NewTime(time.Now()),
+							AcquireTime:          metav1.NewTime(time.Now()),
+						})
+						return true, lockObj, nil
+					},
+				},
+				{
+					verb:       "update",
+					objectType: objectType,
+					reaction: func(action fakeclient.Action) (handled bool, ret runtime.Object, err error) {
+						updates++
+						lockOps = append(lockOps, "update")
+						switch updates {
+						case 2:
+							return true, nil, errors.NewConflict(action.(fakeclient.UpdateAction).GetResource().GroupResource(), "fake conflict", nil)
+						case 4:
+							cancelFunc()
+						}
+						lockObj = action.(fakeclient.UpdateAction).GetObject()
+						return true, lockObj, nil
+					},
+				},
+			},
+			// acquire: get + update, then renewal 1: update(conflict) + get + update (slow path),
+			// then renewal 2: update (fast path again)
+			expectedLockOps: []string{"get", "update", "update", "get", "update", "update"},
+		},
+		{
+			name:        "Fast path conflict when server sets PreferredHolder (end of term)",
+			coordinated: true,
+			reactors: []Reactor{
+				{
+					verb:       "get",
+					objectType: objectType,
+					reaction: func(action fakeclient.Action) (handled bool, ret runtime.Object, err error) {
+						lockOps = append(lockOps, "get")
+						if lockObj != nil {
+							return true, lockObj.DeepCopyObject(), nil
+						}
+						lockObj = createLockObject(t, objectType, action.GetNamespace(), action.(fakeclient.GetAction).GetName(), &rl.LeaderElectionRecord{
+							HolderIdentity:       identity,
+							LeaseDurationSeconds: 15,
+							RenewTime:            metav1.NewTime(time.Now()),
+							AcquireTime:          metav1.NewTime(time.Now()),
+						})
+						return true, lockObj.DeepCopyObject(), nil
+					},
+				},
+				{
+					verb:       "update",
+					objectType: objectType,
+					reaction: func(action fakeclient.Action) (handled bool, ret runtime.Object, err error) {
+						updates++
+						lockOps = append(lockOps, "update")
+						switch updates {
+						case 1:
+							// First update: acquire succeeds.
+							lockObj = action.(fakeclient.UpdateAction).GetObject().DeepCopyObject()
+							return true, lockObj.DeepCopyObject(), nil
+						case 2:
+							// Second update: fast-path renewal succeeds normally.
+							lockObj = action.(fakeclient.UpdateAction).GetObject().DeepCopyObject()
+							// After this write, the CLE server sets PreferredHolder
+							// on the canonical lease (bumping rv in a real apiserver).
+							preferred := "other-candidate"
+							lockObj.(*coordinationv1.Lease).Spec.PreferredHolder = &preferred
+							return true, action.(fakeclient.UpdateAction).GetObject().DeepCopyObject(), nil
+						case 3:
+							// Third update: fast-path conflicts because the server
+							// modified the lease (set PreferredHolder, bumped rv).
+							return true, nil, errors.NewConflict(action.(fakeclient.UpdateAction).GetResource().GroupResource(), "server set PreferredHolder", nil)
+						case 4:
+							cancelFunc()
+							lockObj = action.(fakeclient.UpdateAction).GetObject().DeepCopyObject()
+							return true, lockObj.DeepCopyObject(), nil
+						}
+						lockObj = action.(fakeclient.UpdateAction).GetObject().DeepCopyObject()
+						return true, lockObj.DeepCopyObject(), nil
+					},
+				},
+			},
+			// acquire: get + update
+			// renewal 1: update (fast path succeeds)
+			// renewal 2: update (fast path, rv conflict from server PreferredHolder write)
+			//   → slow path: get (sees PreferredHolder) → returns false
+			// renewal 3+: fast path skipped (PreferredHolder in observed) → slow path:
+			//   get → PreferredHolder → returns false (retries until RenewDeadline expires)
+			// The exact number of trailing GETs depends on timing, so we assert the
+			// deterministic prefix and verify the tail is all "get" operations.
+			lockOpsPrefix: []string{"get", "update", "update", "update", "get"},
+			lockOpsTail:   "get",
+		},
 	}
 
 	for i := range tests {
@@ -1219,7 +1359,7 @@ func TestFastPathLeaderElection(t *testing.T) {
 
 			recorder := record.NewFakeRecorder(100)
 			resourceLockConfig := rl.ResourceLockConfig{
-				Identity:      "baz",
+				Identity:      identity,
 				EventRecorder: recorder,
 			}
 			c := &fake.Clientset{}
@@ -1235,7 +1375,18 @@ func TestFastPathLeaderElection(t *testing.T) {
 				t.Fatal("resourcelock.New() = ", err)
 			}
 
-			lec.Lock = lock
+			lec := LeaderElectionConfig{
+				Lock:          lock,
+				LeaseDuration: 15 * time.Second,
+				RenewDeadline: 2 * time.Second,
+				RetryPeriod:   1 * time.Second,
+				Coordinated:   test.coordinated,
+				Callbacks: LeaderCallbacks{
+					OnNewLeader:      func(identity string) {},
+					OnStoppedLeading: func() {},
+					OnStartedLeading: func(context.Context) {},
+				},
+			}
 			elector, err := NewLeaderElector(lec)
 			if err != nil {
 				t.Fatal("Failed to create leader elector: ", err)
@@ -1245,7 +1396,16 @@ func TestFastPathLeaderElection(t *testing.T) {
 			cancelFunc = cancel
 
 			elector.Run(ctx)
-			assert.Equal(t, test.expectedLockOps, lockOps, "Expected lock ops %q, got %q", test.expectedLockOps, lockOps)
+			if test.lockOpsPrefix != nil {
+				if assert.GreaterOrEqual(t, len(lockOps), len(test.lockOpsPrefix)+1, "Expected at least %d ops (prefix + tail), got %d: %q", len(test.lockOpsPrefix)+1, len(lockOps), lockOps) {
+					assert.Equal(t, test.lockOpsPrefix, lockOps[:len(test.lockOpsPrefix)], "Lock ops prefix mismatch: got %q", lockOps)
+					for i := len(test.lockOpsPrefix); i < len(lockOps); i++ {
+						assert.Equal(t, test.lockOpsTail, lockOps[i], "Lock op [%d] expected %q, got %q (full: %q)", i, test.lockOpsTail, lockOps[i], lockOps)
+					}
+				}
+			} else {
+				assert.Equal(t, test.expectedLockOps, lockOps, "Expected lock ops %q, got %q", test.expectedLockOps, lockOps)
+			}
 		})
 	}
 }
