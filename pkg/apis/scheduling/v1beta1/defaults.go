@@ -45,3 +45,12 @@ func SetDefaults_PodGroup(in *v1beta1.PodGroup) {
 		}
 	}
 }
+
+func SetDefaults_CompositePodGroup(in *v1beta1.CompositePodGroup) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodGroupPreemptionPolicy) {
+		if in.Spec.PreemptionPolicy == nil {
+			preemptLowerPriority := v1beta1.PreemptLowerPriority
+			in.Spec.PreemptionPolicy = &preemptLowerPriority
+		}
+	}
+}
