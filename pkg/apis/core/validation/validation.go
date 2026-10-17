@@ -2847,14 +2847,8 @@ func ValidateEnv(vars []core.EnvVar, fldPath *field.Path, opts PodValidationOpti
 		if len(ev.Name) == 0 {
 			allErrs = append(allErrs, field.Required(idxPath.Child("name"), ""))
 		} else {
-			if opts.AllowRelaxedEnvironmentVariableValidation {
-				for _, msg := range validation.IsRelaxedEnvVarName(ev.Name) {
-					allErrs = append(allErrs, field.Invalid(idxPath.Child("name"), ev.Name, msg))
-				}
-			} else {
-				for _, msg := range validation.IsEnvVarName(ev.Name) {
-					allErrs = append(allErrs, field.Invalid(idxPath.Child("name"), ev.Name, msg))
-				}
+			for _, msg := range validation.IsRelaxedEnvVarName(ev.Name) {
+				allErrs = append(allErrs, field.Invalid(idxPath.Child("name"), ev.Name, msg))
 			}
 		}
 		allErrs = append(allErrs, validateEnvVarValueFrom(ev, idxPath.Child("valueFrom"), opts)...)
@@ -3002,14 +2996,8 @@ func ValidateEnvFrom(vars []core.EnvFromSource, fldPath *field.Path, opts PodVal
 	for i, ev := range vars {
 		idxPath := fldPath.Index(i)
 		if len(ev.Prefix) > 0 {
-			if opts.AllowRelaxedEnvironmentVariableValidation {
-				for _, msg := range validation.IsRelaxedEnvVarName(ev.Prefix) {
-					allErrs = append(allErrs, field.Invalid(idxPath.Child("prefix"), ev.Prefix, msg))
-				}
-			} else {
-				for _, msg := range validation.IsEnvVarName(ev.Prefix) {
-					allErrs = append(allErrs, field.Invalid(idxPath.Child("prefix"), ev.Prefix, msg))
-				}
+			for _, msg := range validation.IsRelaxedEnvVarName(ev.Prefix) {
+				allErrs = append(allErrs, field.Invalid(idxPath.Child("prefix"), ev.Prefix, msg))
 			}
 		}
 
@@ -4597,8 +4585,6 @@ type PodValidationOptions struct {
 	// The top-level resource being validated is a Pod, not just a PodSpec
 	// embedded in some other resource.
 	ResourceIsPod bool
-	// Allow relaxed validation of environment variable names
-	AllowRelaxedEnvironmentVariableValidation bool
 	// Allow only Recursive value of SELinuxChangePolicy.
 	AllowOnlyRecursiveSELinuxChangePolicy bool
 	// Indicates whether PodLevelResources feature is enabled or disabled.
