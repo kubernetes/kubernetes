@@ -28,6 +28,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	auditinternal "k8s.io/apiserver/pkg/apis/audit"
+	"k8s.io/component-base/metrics/legacyregistry"
+	"k8s.io/component-base/metrics/testutil"
 )
 
 func TestLogResponseObjectWithPod(t *testing.T) {
@@ -359,4 +361,28 @@ func (s *capturingAuditSink) ProcessEvents(events ...*auditinternal.Event) bool 
 		s.events = append(s.events, eventCopy)
 	}
 	return true
+}
+
+func TestProcessEventStageRecordsAuditEventMetric(t *testing.T) {
+	legacyregistry.Reset()
+	t.Cleanup(legacyregistry.Reset)
+
+	ctx := WithAuditContext(context.Background())
+	ac := AuditContextFrom(ctx)
+	captureSink := &capturingAuditSink{}
+	if err := ac.Init(RequestAuditConfig{Level: auditinternal.LevelRequestResponse}, captureSink); err != nil {
+		t.Fatalf("failed to initialize audit context: %v", err)
+	}
+	if !ac.ProcessEventStage(ctx, auditinternal.StageResponseComplete) {
+		t.Fatal("expected ProcessEventStage to succeed")
+	}
+
+	const expected = `
+# HELP apiserver_audit_event_total [BETA] Counter of audit events generated and sent to the audit backend.
+# TYPE apiserver_audit_event_total counter
+apiserver_audit_event_total 1
+`
+	if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(expected), "apiserver_audit_event_total"); err != nil {
+		t.Fatal(err)
+	}
 }
