@@ -311,7 +311,7 @@ type KubeletVolumeHost interface {
 	// CSIDriverSynced returns the informer synced for the CSIDriver API Object
 	CSIDriversSynced() cache.InformerSynced
 	// WaitForCacheSync is a helper function that waits for cache sync for CSIDriverLister
-	WaitForCacheSync() error
+	WaitForCacheSync(ctx context.Context) error
 	// Returns hostutil.HostUtils
 	GetHostUtil() hostutil.HostUtils
 
