@@ -22,6 +22,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"golang.org/x/net/websocket"
@@ -191,6 +192,14 @@ type Conn struct {
 	ready            chan struct{}
 	ws               *websocket.Conn
 	timeout          time.Duration
+
+	// deadlineMu orders the deadline updates below, so that a frame written
+	// concurrently cannot move the write deadline past writeDeadline.
+	deadlineMu sync.Mutex
+	// writeDeadline is the deadline SetWriteDeadline set, or zero. The idle
+	// timeout extends the connection's deadline on every frame, but never the
+	// write deadline past this one.
+	writeDeadline time.Time
 }
 
 // NewConn creates a WebSocket connection that supports a set of channels. Channels begin each
@@ -215,9 +224,13 @@ func (conn *Conn) SetIdleTimeout(duration time.Duration) {
 
 // SetWriteDeadline sets a timeout on writing to the websocket connection. The
 // passed "duration" identifies how far into the future the write must complete
-// by before the timeout fires.
+// by before the timeout fires. It holds for every later write: the idle
+// timeout does not extend it.
 func (conn *Conn) SetWriteDeadline(duration time.Duration) {
-	conn.ws.SetWriteDeadline(time.Now().Add(duration)) //nolint:errcheck
+	conn.deadlineMu.Lock()
+	defer conn.deadlineMu.Unlock()
+	conn.writeDeadline = time.Now().Add(duration)
+	conn.ws.SetWriteDeadline(conn.writeDeadline) //nolint:errcheck
 }
 
 // Open the connection and create channels for reading and writing. It returns
@@ -296,9 +309,18 @@ func (conn *Conn) handshake(config *websocket.Config, req *http.Request) error {
 }
 
 func (conn *Conn) resetTimeout() {
-	if conn.timeout > 0 {
-		conn.ws.SetDeadline(time.Now().Add(conn.timeout))
+	if conn.timeout <= 0 {
+		return
 	}
+	conn.deadlineMu.Lock()
+	defer conn.deadlineMu.Unlock()
+	idle := time.Now().Add(conn.timeout)
+	conn.ws.SetReadDeadline(idle) //nolint:errcheck
+	write := idle
+	if !conn.writeDeadline.IsZero() && conn.writeDeadline.Before(idle) {
+		write = conn.writeDeadline
+	}
+	conn.ws.SetWriteDeadline(write) //nolint:errcheck
 }
 
 // closeNonThreadSafe cleans up by closing streams and the websocket
