@@ -17,14 +17,15 @@ limitations under the License.
 package preemption
 
 import (
+	"context"
 	"iter"
+	"slices"
 
 	v1 "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1"
-	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/util/sets"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	policylisters "k8s.io/client-go/listers/policy/v1"
 	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	fwk "k8s.io/kube-scheduler/framework"
@@ -111,7 +112,7 @@ func victimRank(vi Victim) int {
 // If the next parent is missing, or cannot be listed, the traversal stops.
 // This method assumes that GenericWorkload feature gate is enabled.
 // The cpgLister should be non-nil only if the CompositePodGroup feature gate is enabled.
-// TODO: log/return an error if there is a gap in the hierarchy.
+// TODO: log/return an error if there is a gap in the hierarchy or a cycle.
 func traverseHierarchyUp(
 	namespace string,
 	startKey fwk.EntityKey,
@@ -120,12 +121,14 @@ func traverseHierarchyUp(
 ) iter.Seq[*fwk.GenericPodGroup] {
 	return func(yield func(*fwk.GenericPodGroup) bool) {
 		currentKey := startKey
-		visited := sets.New[fwk.EntityKey]()
-		for range schedulingv1beta1.WorkloadMaxTreeDepth {
-			if visited.Has(currentKey) {
-				break
+		var visited []fwk.EntityKey
+		for {
+			if slices.Contains(visited, currentKey) {
+				visited = append(visited, currentKey)
+				utilruntime.HandleErrorWithContext(context.TODO(), nil, "Cycle detected in composite pod group hierarchy", "cycle", visited)
+				return
 			}
-			visited.Insert(currentKey)
+			visited = append(visited, currentKey)
 
 			var gpg *fwk.GenericPodGroup
 			switch currentKey.Type {
