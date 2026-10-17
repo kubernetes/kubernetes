@@ -288,6 +288,11 @@ func validateJobSpec(spec, oldSpec *batch.JobSpec, fldPath *field.Path, opts api
 	// no-op when spec.scheduling is unset.
 	allErrs = append(allErrs, validateGangMinCount(spec, fldPath.Child("scheduling"))...)
 
+	// Controllers treat a user-supplied schedulingGroup as authoritative, so
+	// spec.scheduling would have no effect. Reject the combination unless the
+	// old object already had both (v1.37 alpha carve-out).
+	allErrs = append(allErrs, validateSchedulingAndSchedulingGroup(spec, oldSpec, fldPath.Child("scheduling"))...)
+
 	// Controller-policy checks that declarative validation cannot express:
 	// the resolved scheduling policy and disruption mode must be in the Job's
 	// allow-lists, and the Basic policy cannot be combined with All disruption.
@@ -683,6 +688,19 @@ func validateGangMinCount(spec *batch.JobSpec, fldPath *field.Path) field.ErrorL
 		fldPath.Child("schedulingPolicy", "gang", "minCount"),
 		*spec.Scheduling.SchedulingPolicy.Gang.MinCount,
 		fmt.Sprintf("must not be greater than parallelism (%d)", parallelism))}
+}
+
+// validateSchedulingAndSchedulingGroup rejects spec.scheduling when the pod
+// template already carries schedulingGroup.
+func validateSchedulingAndSchedulingGroup(spec, oldSpec *batch.JobSpec, fldPath *field.Path) field.ErrorList {
+	if spec == nil || spec.Scheduling == nil || spec.Template.Spec.SchedulingGroup == nil {
+		return nil
+	}
+	if oldSpec != nil && oldSpec.Scheduling != nil && oldSpec.Template.Spec.SchedulingGroup != nil {
+		return nil
+	}
+	return field.ErrorList{field.Invalid(fldPath, spec.Scheduling,
+		"must not be set together with spec.template.spec.schedulingGroup")}
 }
 
 // validateJobSchedulingUpdate enforces the spec.scheduling immutability
