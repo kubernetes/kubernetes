@@ -110,6 +110,11 @@ var _ = SIGDescribe("Swap", "[LinuxOnly]", ginkgo.Ordered, feature.Swap, framewo
 				msg = "setting swap behavior to LimitedSwap"
 			}
 
+			// Configure MemoryThrottlingFactor to set memory.high below memory.max, giving the kernel
+			// runway to throttle allocations and page anonymous memory out to swap before an OOM kill.
+			throttlingFactor := 0.8
+			initialConfig.MemoryThrottlingFactor = &throttlingFactor
+
 			ginkgo.By(msg)
 		}
 
@@ -219,7 +224,9 @@ var _ = SIGDescribe("Swap", "[LinuxOnly]", ginkgo.Ordered, feature.Swap, framewo
 					var swapUsage *resource.Quantity
 					gomega.Eventually(func() error {
 						stressPod = getUpdatedPod(f, stressPod)
-						gomega.Expect(stressPod.Status.Phase).To(gomega.Equal(v1.PodRunning), "pod should be running")
+						if stressPod.Status.Phase != v1.PodRunning {
+							return fmt.Errorf("pod %s is not running yet, current phase: %s", stressPod.Name, stressPod.Status.Phase)
+						}
 
 						var err error
 						swapUsage, err = getSwapUsage(f, stressPod)
@@ -261,7 +268,9 @@ var _ = SIGDescribe("Swap", "[LinuxOnly]", ginkgo.Ordered, feature.Swap, framewo
 					ginkgo.By("Expecting the pod exceed limits and avoid an OOM kill since it would use swap")
 					gomega.Eventually(func() error {
 						stressPod = getUpdatedPod(f, stressPod)
-						gomega.Expect(stressPod.Status.Phase).To(gomega.Equal(v1.PodRunning), "pod should be running")
+						if stressPod.Status.Phase != v1.PodRunning {
+							return fmt.Errorf("pod %s is not running yet, current phase: %s", stressPod.Name, stressPod.Status.Phase)
+						}
 
 						var err error
 						swapUsage, err = getSwapUsage(f, stressPod)
@@ -307,7 +316,9 @@ var _ = SIGDescribe("Swap", "[LinuxOnly]", ginkgo.Ordered, feature.Swap, framewo
 					var swapUsage *resource.Quantity
 					gomega.Eventually(func() error {
 						stressPod = getUpdatedPod(f, stressPod)
-						gomega.Expect(stressPod.Status.Phase).To(gomega.Equal(v1.PodRunning), "pod should be running")
+						if stressPod.Status.Phase != v1.PodRunning {
+							return fmt.Errorf("pod %s is not running yet, current phase: %s", stressPod.Name, stressPod.Status.Phase)
+						}
 
 						var err error
 						swapUsage, err = getSwapUsage(f, stressPod)
@@ -409,6 +420,12 @@ func getSleepingPod(namespace string) *v1.Pod {
 }
 
 func getStressPod(f *framework.Framework, stressSize, memAllocSize *resource.Quantity) *v1.Pod {
+	allocSize := memAllocSize
+	maxAllocChunk := resource.MustParse("10Mi")
+	if allocSize.Cmp(maxAllocChunk) > 0 {
+		allocSize = &maxAllocChunk
+	}
+
 	return &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "stress-pod-" + rand.String(5),
@@ -421,7 +438,7 @@ func getStressPod(f *framework.Framework, stressSize, memAllocSize *resource.Qua
 					Name:            "stress-container",
 					Image:           imageutils.GetE2EImage(imageutils.Agnhost),
 					ImagePullPolicy: v1.PullAlways,
-					Args:            []string{"stress", "--mem-alloc-size", memAllocSize.String(), "--mem-alloc-sleep", "1000ms", "--mem-total", strconv.Itoa(int(stressSize.Value()))},
+					Args:            []string{"stress", "--mem-alloc-size", allocSize.String(), "--mem-alloc-sleep", "1000ms", "--mem-total", strconv.Itoa(int(stressSize.Value()))},
 				},
 			},
 		},
