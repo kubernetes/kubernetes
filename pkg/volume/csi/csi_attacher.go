@@ -619,9 +619,15 @@ func makeDeviceMountPath(plugin *csiPlugin, spec *volume.Spec) (string, error) {
 		return "", errors.New("makeDeviceMountPath failed, CSIPersistentVolumeSource volume handle is empty")
 	}
 
-	result := sha256.Sum256([]byte(fmt.Sprintf("%s", csiSource.VolumeHandle)))
-	volSha := fmt.Sprintf("%x", result)
-	return filepath.Join(plugin.host.GetPluginDir(plugin.GetPluginName()), driver, volSha, globalMountInGlobalPath), nil
+	return filepath.Join(plugin.host.GetPluginDir(plugin.GetPluginName()), driver, globalVolumeDirName(csiSource.VolumeHandle), globalMountInGlobalPath), nil
+}
+
+// globalVolumeDirName is the name of the directory MountDevice stages a volume
+// under, below the driver's directory. The fallback that finds a global mount
+// through a pod's mount reference checks a directory against it as well, so
+// both have to compute it the same way.
+func globalVolumeDirName(volumeHandle string) string {
+	return fmt.Sprintf("%x", sha256.Sum256([]byte(volumeHandle)))
 }
 
 func verifyAttachmentStatus(attachment *storage.VolumeAttachment, volumeHandle string) (bool, error) {

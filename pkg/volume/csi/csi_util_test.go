@@ -130,7 +130,7 @@ func TestSaveVolumeData(t *testing.T) {
 		specVolID := fmt.Sprintf("spec-volid-%d", i)
 		targetPath := getTargetPath(testPodUID, specVolID, plug.host)
 		mountDir := filepath.Join(targetPath, "mount")
-		if err := os.MkdirAll(mountDir, 0755); err != nil && !os.IsNotExist(err) {
+		if err := os.MkdirAll(mountDir, 0o755); err != nil && !os.IsNotExist(err) {
 			t.Errorf("failed to create dir [%s]: %v", mountDir, err)
 		}
 
@@ -241,7 +241,7 @@ func TestFindGlobalMountDataFromPodMount(t *testing.T) {
 			t.Fatalf("setup pod-local dir: %v", err)
 		}
 
-		globalDataDir := filepath.Join(tmpDir, "plugins", CSIPluginName, driver, "somehash")
+		globalDataDir := filepath.Join(tmpDir, "plugins", CSIPluginName, driver, generateSha(volHandle))
 		if err := os.MkdirAll(filepath.Join(globalDataDir, globalMountInGlobalPath), 0o755); err != nil {
 			t.Fatalf("setup global dir: %v", err)
 		}
@@ -260,7 +260,10 @@ func TestFindGlobalMountDataFromPodMount(t *testing.T) {
 		}
 		fake.MountPoints = mountPoints(filepath.Join(podLocalDir, "mount"), filepath.Join(globalDataDir, globalMountInGlobalPath))
 
-		return plug, podLocalDir, globalDataDir
+		// The mount table holds resolved paths, but the data directory is
+		// expected under the plugin directory as the host names it, which is
+		// where MountDevice and UnmountDevice look for it.
+		return plug, podLocalDir, filepath.Join(plug.host.GetPluginDir(CSIPluginName), driver, generateSha(volHandle))
 	}
 
 	// bound is the healthy layout: SetUpAt bind mounted the global mount into
@@ -307,6 +310,78 @@ func TestFindGlobalMountDataFromPodMount(t *testing.T) {
 		}
 	})
 
+	t.Run("follows a reference at any depth under globalmount", func(t *testing.T) {
+		// CSI does not say how deep below the staging path a driver publishes.
+		plug, podLocalDir, globalDataDir := setup(t, "staged-pv", func(podMount, globalMount string) []mount.MountPoint {
+			return []mount.MountPoint{
+				{Device: device, Path: filepath.Join(globalMount, "a", "b", "c")},
+				{Device: device, Path: podMount},
+			}
+		})
+
+		dir, _, err := findGlobalMountDataFromPodMount(plug.host, podLocalDir, "staged-pv")
+		if err != nil {
+			t.Fatalf("findGlobalMountDataFromPodMount: %v", err)
+		}
+		if dir != globalDataDir {
+			t.Errorf("dir: got %q, want %q", dir, globalDataDir)
+		}
+	})
+
+	t.Run("a directory named globalmount outside the plugin directory is not followed", func(t *testing.T) {
+		// Its volume data names this very volume, so only where it sits keeps
+		// it from being taken.
+		var elsewhere string
+		plug, podLocalDir, _ := setup(t, "staged-pv", func(podMount, globalMount string) []mount.MountPoint {
+			dataDir := filepath.Join(t.TempDir(), "mnt", "data")
+			elsewhere = filepath.Join(dataDir, globalMountInGlobalPath)
+			if err := os.MkdirAll(elsewhere, 0o755); err != nil {
+				t.Fatalf("setup: %v", err)
+			}
+			if err := saveVolumeData(dataDir, volDataFileName, map[string]string{
+				volDataKey.specVolID:  "staged-pv",
+				volDataKey.volHandle:  volHandle,
+				volDataKey.driverName: driver,
+			}); err != nil {
+				t.Fatalf("save vol_data.json: %v", err)
+			}
+			return []mount.MountPoint{
+				{Device: device, Path: elsewhere},
+				{Device: device, Path: podMount},
+			}
+		})
+
+		if dir, _, err := findGlobalMountDataFromPodMount(plug.host, podLocalDir, "staged-pv"); err == nil {
+			t.Fatalf("followed %q, which is not a CSI global mount, to %q", elsewhere, dir)
+		}
+	})
+
+	t.Run("volume data under a directory that is not its hash is skipped", func(t *testing.T) {
+		// MountDevice names the directory sha256(volumeHandle), so data under
+		// any other name was not written by it for this mount.
+		plug, podLocalDir, _ := setup(t, "staged-pv", func(podMount, globalMount string) []mount.MountPoint {
+			dataDir := filepath.Join(filepath.Dir(filepath.Dir(globalMount)), "not-the-hash")
+			if err := os.MkdirAll(filepath.Join(dataDir, globalMountInGlobalPath), 0o755); err != nil {
+				t.Fatalf("setup: %v", err)
+			}
+			if err := saveVolumeData(dataDir, volDataFileName, map[string]string{
+				volDataKey.specVolID:  "staged-pv",
+				volDataKey.volHandle:  volHandle,
+				volDataKey.driverName: driver,
+			}); err != nil {
+				t.Fatalf("save vol_data.json: %v", err)
+			}
+			return []mount.MountPoint{
+				{Device: device, Path: filepath.Join(dataDir, globalMountInGlobalPath)},
+				{Device: device, Path: podMount},
+			}
+		})
+
+		if dir, _, err := findGlobalMountDataFromPodMount(plug.host, podLocalDir, "staged-pv"); err == nil {
+			t.Fatalf("took volume data from %q, a directory not named after its volume handle", dir)
+		}
+	})
+
 	t.Run("an inline volume does not pair with a PV of the same name", func(t *testing.T) {
 		// The staged PV is named "data". So is an inline ephemeral volume in
 		// some pod, which is legal: one name is a PV name, the other an entry
@@ -336,8 +411,9 @@ func TestFindGlobalMountDataFromPodMount(t *testing.T) {
 	})
 
 	t.Run("volume data naming no driver is skipped", func(t *testing.T) {
-		pluginDir := t.TempDir()
-		dataDir := filepath.Join(pluginDir, testDriver, "somehash")
+		plug, _ := newTestPlugin(t, nil)
+		pluginDir := plug.host.GetPluginDir(CSIPluginName)
+		dataDir := filepath.Join(pluginDir, testDriver, generateSha(""))
 		if err := os.MkdirAll(dataDir, 0o755); err != nil {
 			t.Fatalf("setup data dir: %v", err)
 		}
@@ -346,7 +422,6 @@ func TestFindGlobalMountDataFromPodMount(t *testing.T) {
 		}); err != nil {
 			t.Fatalf("save vol_data.json: %v", err)
 		}
-		plug, _ := newTestPlugin(t, nil)
 		fake := plug.host.GetMounter().(*mount.FakeMounter)
 		fake.MountPoints = []mount.MountPoint{
 			{Device: "/dev/sdb", Path: filepath.Join(dataDir, globalMountInGlobalPath)},
@@ -375,11 +450,12 @@ func TestFindGlobalMountDataFromPodMount(t *testing.T) {
 		}
 	})
 
-	// stageAlso adds one more global mount on the same device, with the given
-	// volume data, and returns its data dir and mount point.
-	stageAlso := func(t *testing.T, name string, data map[string]string) (string, string) {
+	// stageAlso adds one more global mount beside globalMount, staged the way
+	// MountDevice stages it, and returns its data dir and mount point.
+	stageAlso := func(t *testing.T, globalMount string, data map[string]string) (string, string) {
 		t.Helper()
-		dataDir := filepath.Join(filepath.Dir(t.TempDir()), name)
+		pluginDir := filepath.Dir(filepath.Dir(filepath.Dir(globalMount)))
+		dataDir := filepath.Join(pluginDir, data[volDataKey.driverName], generateSha(data[volDataKey.volHandle]))
 		if err := os.MkdirAll(filepath.Join(dataDir, globalMountInGlobalPath), 0o755); err != nil {
 			t.Fatalf("setup global dir: %v", err)
 		}
@@ -392,7 +468,7 @@ func TestFindGlobalMountDataFromPodMount(t *testing.T) {
 	t.Run("picks the global mount of this volume among several on one device", func(t *testing.T) {
 		var otherMount string
 		plug, podLocalDir, globalDataDir := setup(t, "staged-pv", func(podMount, globalMount string) []mount.MountPoint {
-			_, otherMount = stageAlso(t, "other", map[string]string{
+			_, otherMount = stageAlso(t, globalMount, map[string]string{
 				volDataKey.specVolID:  "other-pv",
 				volDataKey.volHandle:  "handle-of-the-other-pv",
 				volDataKey.driverName: driver,
@@ -414,10 +490,9 @@ func TestFindGlobalMountDataFromPodMount(t *testing.T) {
 	})
 
 	t.Run("two global mounts that name no volume are ambiguous", func(t *testing.T) {
-		unnamed := map[string]string{volDataKey.volHandle: "some-handle", volDataKey.driverName: driver}
 		plug, podLocalDir, _ := setup(t, "staged-pv", func(podMount, globalMount string) []mount.MountPoint {
-			_, first := stageAlso(t, "first", unnamed)
-			_, second := stageAlso(t, "second", unnamed)
+			_, first := stageAlso(t, globalMount, map[string]string{volDataKey.volHandle: "first-handle", volDataKey.driverName: driver})
+			_, second := stageAlso(t, globalMount, map[string]string{volDataKey.volHandle: "second-handle", volDataKey.driverName: driver})
 			return []mount.MountPoint{
 				{Device: device, Path: first},
 				{Device: device, Path: second},
@@ -434,15 +509,13 @@ func TestFindGlobalMountDataFromPodMount(t *testing.T) {
 		// A pre-feature file names no volume, and the KEP accepts it on the
 		// mount reference alone. Another volume's named mount on the same
 		// device does not make it ambiguous: it is the only unnamed one.
-		var unnamedDir string
 		plug, podLocalDir, _ := setup(t, "staged-pv", func(podMount, globalMount string) []mount.MountPoint {
-			_, other := stageAlso(t, "other", map[string]string{
+			_, other := stageAlso(t, globalMount, map[string]string{
 				volDataKey.specVolID:  "other-pv",
 				volDataKey.volHandle:  "handle-of-the-other-pv",
 				volDataKey.driverName: driver,
 			})
-			var unnamed string
-			unnamedDir, unnamed = stageAlso(t, "unnamed", map[string]string{volDataKey.volHandle: "some-handle", volDataKey.driverName: driver})
+			_, unnamed := stageAlso(t, globalMount, map[string]string{volDataKey.volHandle: "some-handle", volDataKey.driverName: driver})
 			return []mount.MountPoint{
 				{Device: device, Path: other},
 				{Device: device, Path: unnamed},
@@ -454,8 +527,29 @@ func TestFindGlobalMountDataFromPodMount(t *testing.T) {
 		if err != nil {
 			t.Fatalf("findGlobalMountDataFromPodMount: %v", err)
 		}
+		unnamedDir := filepath.Join(plug.host.GetPluginDir(CSIPluginName), driver, generateSha("some-handle"))
 		if dir != unnamedDir || data[volDataKey.volHandle] != "some-handle" {
 			t.Errorf("got %q with handle %q, want the unnamed mount %q", dir, data[volDataKey.volHandle], unnamedDir)
+		}
+	})
+
+	t.Run("a reference that is not a globalmount is skipped", func(t *testing.T) {
+		// The data directory setup wrote names staged-pv, so only the
+		// globalmount-name check keeps a plain sibling of globalmount on the
+		// same device from being followed. A driver binds a pod from the
+		// globalmount, or a subdirectory of it, never from a sibling; taking
+		// that sibling would load the neighbouring vol_data.json by filesystem
+		// accident rather than because the pod is mounted from it.
+		plug, podLocalDir, _ := setup(t, "staged-pv", func(podMount, globalMount string) []mount.MountPoint {
+			sibling := filepath.Join(filepath.Dir(globalMount), "notglobalmount")
+			return []mount.MountPoint{
+				{Device: device, Path: sibling},
+				{Device: device, Path: podMount},
+			}
+		})
+
+		if _, _, err := findGlobalMountDataFromPodMount(plug.host, podLocalDir, "staged-pv"); err == nil {
+			t.Fatal("a mount reference that is not a globalmount was followed; it must be skipped")
 		}
 	})
 }
@@ -491,7 +585,7 @@ func TestNewUnmounterFallsBackToGlobalMount(t *testing.T) {
 			t.Fatalf("setup pod-local dir: %v", err)
 		}
 
-		globalDataDir := filepath.Join(tmpDir, "plugins", CSIPluginName, driver, "somehash")
+		globalDataDir := filepath.Join(tmpDir, "plugins", CSIPluginName, driver, generateSha(volHandle))
 		if err := os.MkdirAll(filepath.Join(globalDataDir, globalMountInGlobalPath), 0o755); err != nil {
 			t.Fatalf("setup global dir: %v", err)
 		}
@@ -577,7 +671,7 @@ func TestPluginConstructVolumeSpecFallbackSpecVolID(t *testing.T) {
 		if err := os.MkdirAll(filepath.Join(podLocalDir, "mount"), 0o755); err != nil {
 			t.Fatalf("setup pod-local dir: %v", err)
 		}
-		globalDataDir := filepath.Join(tmpDir, "plugins", CSIPluginName, driver, "somehash")
+		globalDataDir := filepath.Join(tmpDir, "plugins", CSIPluginName, driver, generateSha(volHandle))
 		if err := os.MkdirAll(filepath.Join(globalDataDir, globalMountInGlobalPath), 0o755); err != nil {
 			t.Fatalf("setup global dir: %v", err)
 		}
@@ -628,4 +722,31 @@ func TestPluginConstructVolumeSpecFallbackSpecVolID(t *testing.T) {
 				volName, rec.Spec.PersistentVolume.Spec.CSI.VolumeHandle)
 		}
 	})
+}
+
+func TestParseGlobalMountRef(t *testing.T) {
+	for _, tc := range []struct {
+		name, ref      string
+		driver, volSha string
+		ok             bool
+	}{
+		{"globalmount itself", "/var/lib/kubelet/plugins/kubernetes.io/csi/drv/abc/globalmount", "drv", "abc", true},
+		{"one level below", "/var/lib/kubelet/plugins/kubernetes.io/csi/drv/abc/globalmount/vol", "drv", "abc", true},
+		{"three levels below", "/var/lib/kubelet/plugins/kubernetes.io/csi/drv/abc/globalmount/a/b/c", "drv", "abc", true},
+		{"resolved kubelet root", "/data/kubelet/plugins/kubernetes.io/csi/drv/abc/globalmount", "drv", "abc", true},
+		{"globalmount elsewhere", "/mnt/data/globalmount", "", "", false},
+		{"globalmount deep elsewhere", "/srv/exports/drv/abc/globalmount", "", "", false},
+		{"other plugin's globalmount", "/var/lib/kubelet/plugins/kubernetes.io/other/drv/abc/globalmount", "", "", false},
+		{"plugin directory itself", "/var/lib/kubelet/plugins/kubernetes.io/csi", "", "", false},
+		{"volume directory", "/var/lib/kubelet/plugins/kubernetes.io/csi/drv/abc", "", "", false},
+		{"not globalmount", "/var/lib/kubelet/plugins/kubernetes.io/csi/drv/abc/other", "", "", false},
+		{"raw block publish", "/var/lib/kubelet/plugins/kubernetes.io/csi/volumeDevices/publish/pv/pod", "", "", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			driver, volSha, ok := parseGlobalMountRef(tc.ref)
+			if driver != tc.driver || volSha != tc.volSha || ok != tc.ok {
+				t.Errorf("parseGlobalMountRef(%q) = %q, %q, %v; want %q, %q, %v", tc.ref, driver, volSha, ok, tc.driver, tc.volSha, tc.ok)
+			}
+		})
+	}
 }

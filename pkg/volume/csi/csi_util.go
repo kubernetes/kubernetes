@@ -23,7 +23,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
+	"strings"
 	"time"
 
 	api "k8s.io/api/core/v1"
@@ -105,7 +107,7 @@ func loadVolumeData(dir string, fileName string) (map[string]string, error) {
 // spec, which is not unique on the node, and it never stages a global mount of
 // its own, so every name match it produced would be someone else's volume.
 func findGlobalMountDataFromPodMount(host volume.VolumeHost, mountPath, specVolID string) (string, map[string]string, error) {
-	podMountPath := filepath.Join(mountPath, "mount")
+	podMountPath := GetCSIMounterPath(mountPath)
 	refs, err := volumeutil.GetReliableMountRefs(host.GetMounter(), podMountPath)
 	if err != nil {
 		return "", nil, fmt.Errorf("failed to read mount references for %q: %w", podMountPath, err)
@@ -115,23 +117,14 @@ func findGlobalMountDataFromPodMount(host volume.VolumeHost, mountPath, specVolI
 	var unnamedData map[string]string
 	unnamed := 0
 	for _, ref := range refs {
-		// vol_data.json sits beside the globalmount directory MountDevice
-		// stages into, so a reference named globalmount is found through its
-		// parent. A driver that publishes from a subdirectory of globalmount,
-		// as ceph-csi RBD does with globalmount/<volID>, is found through its
-		// grandparent. Checking the contents rather than the path prefix keeps
-		// this correct when the kubelet root is reached through a symlink,
-		// where the mount table reports the resolved path and GetPluginDir does
-		// not.
-		var dir string
-		switch {
-		case filepath.Base(ref) == globalMountInGlobalPath:
-			dir = filepath.Dir(ref)
-		case filepath.Base(filepath.Dir(ref)) == globalMountInGlobalPath:
-			dir = filepath.Dir(filepath.Dir(ref))
-		default:
+		driver, volSha, ok := parseGlobalMountRef(ref)
+		if !ok {
 			continue
 		}
+		// The data is read from the plugin directory rather than from the path
+		// the mount table reports, which differs from it when the kubelet root
+		// is reached through a symlink.
+		dir := filepath.Join(host.GetPluginDir(CSIPluginName), driver, volSha)
 		data, err := loadVolumeData(dir, volDataFileName)
 		if err != nil {
 			klog.V(4).Info(log("skipping mount reference %s with no readable volume data: %v", ref, err))
@@ -139,6 +132,12 @@ func findGlobalMountDataFromPodMount(host volume.VolumeHost, mountPath, specVolI
 		}
 		if data[volDataKey.driverName] == "" || data[volDataKey.volHandle] == "" {
 			klog.V(4).Info(log("skipping mount reference %s, volume data names no driver or handle", ref))
+			continue
+		}
+		// MountDevice names the directory after the driver and the hash of the
+		// volume handle, so data naming anything else is not this mount's.
+		if data[volDataKey.driverName] != driver || globalVolumeDirName(data[volDataKey.volHandle]) != volSha {
+			klog.V(4).Info(log("skipping mount reference %s, its volume data names another volume", ref))
 			continue
 		}
 		// References match by superblock and root, so every volume staged from one export shows up here.
@@ -162,6 +161,28 @@ func findGlobalMountDataFromPodMount(host volume.VolumeHost, mountPath, specVolI
 	default:
 		return "", nil, fmt.Errorf("%d CSI global mounts that name no volume are bind mounted at %q", unnamed, podMountPath)
 	}
+}
+
+// parseGlobalMountRef returns the driver and volume hash of a mount reference
+// that lies in a CSI global mount, that is, at or below
+// kubernetes.io/csi/<driver>/<sha>/globalmount. A driver may publish from any
+// subdirectory of globalmount, as ceph-csi RBD does with globalmount/<volID>,
+// since CSI does not say how deep the published path may be. Anything else,
+// including a directory that happens to be named globalmount elsewhere on the
+// node, is not reported.
+func parseGlobalMountRef(ref string) (string, string, bool) {
+	parts := strings.Split(filepath.Clean(ref), string(filepath.Separator))
+	plugin := strings.Split(CSIPluginName, "/")
+	for i := 0; i+len(plugin)+2 < len(parts); i++ {
+		if !slices.Equal(parts[i:i+len(plugin)], plugin) {
+			continue
+		}
+		rest := parts[i+len(plugin):]
+		if rest[2] == globalMountInGlobalPath && rest[0] != "" && rest[1] != "" {
+			return rest[0], rest[1], true
+		}
+	}
+	return "", "", false
 }
 
 func getCSISourceFromSpec(spec *volume.Spec) (*api.CSIPersistentVolumeSource, error) {

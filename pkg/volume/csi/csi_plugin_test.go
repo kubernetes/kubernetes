@@ -1585,7 +1585,7 @@ func TestPluginConstructVolumeSpecFallsBackToGlobalMount(t *testing.T) {
 		tmpDir = resolved
 		podLocalDir = filepath.Join(tmpDir, "pods", "pod-uid", "volumes", "kubernetes.io~csi", specVolID)
 	}
-	globalDataDir := filepath.Join(tmpDir, "plugins", CSIPluginName, testDriver, "anyhashhere")
+	globalDataDir := filepath.Join(tmpDir, "plugins", CSIPluginName, testDriver, generateSha(volHandle))
 	if err := os.MkdirAll(filepath.Join(globalDataDir, globalMountInGlobalPath), 0o755); err != nil {
 		t.Fatalf("setup global dir: %v", err)
 	}
@@ -1654,7 +1654,7 @@ func TestPluginConstructVolumeSpecGateOffKeepsOldBehavior(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(podLocalDir, "mount"), 0o755); err != nil {
 		t.Fatalf("setup pod-local dir: %v", err)
 	}
-	globalDataDir := filepath.Join(tmpDir, "plugins", CSIPluginName, testDriver, "anyhashhere")
+	globalDataDir := filepath.Join(tmpDir, "plugins", CSIPluginName, testDriver, generateSha(volHandle))
 	if err := os.MkdirAll(filepath.Join(globalDataDir, globalMountInGlobalPath), 0o755); err != nil {
 		t.Fatalf("setup global dir: %v", err)
 	}
