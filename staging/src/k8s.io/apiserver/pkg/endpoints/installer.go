@@ -20,8 +20,10 @@ import (
 	"fmt"
 	"net/http"
 	"reflect"
+	"slices"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 	"unicode"
 
@@ -38,7 +40,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/managedfields"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/endpoints/deprecation"
 	"k8s.io/apiserver/pkg/endpoints/discovery"
@@ -52,6 +53,18 @@ import (
 	"k8s.io/apiserver/pkg/storageversion"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	versioninfo "k8s.io/component-base/version"
+)
+
+var (
+	// prettyParameter is shared across all routes registered by APIInstaller
+	// and must not be mutated after creation.
+	prettyParameter = restful.QueryParameter("pretty", "If 'true', then the output is pretty printed. Defaults to 'false' unless the user-agent indicates a browser or command-line HTTP tool (curl and wget).")
+
+	// objectTypeParamsCache caches the read-only []*restful.Parameter slice for a
+	// given struct reflect.Type across route registrations. Cached parameters are
+	// shared across WebService and Route registrations and must not be mutated
+	// after creation.
+	objectTypeParamsCache sync.Map // map[reflect.Type][]*restful.Parameter
 )
 
 const (
@@ -820,7 +833,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			}
 			route := ws.GET(action.Path).To(handler).
 				Doc(doc).
-				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed. Defaults to 'false' unless the user-agent indicates a browser or command-line HTTP tool (curl and wget).")).
+				Param(prettyParameter).
 				Operation("read"+namespaced+kind+cases.Title(language.English).String(subresource)+operationSuffix).
 				Produces(append(storageMeta.ProducesMIMETypes(action.Verb), mediaTypes...)...).
 				Returns(http.StatusOK, "OK", producedObject).
@@ -841,7 +854,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			handler = utilwarning.AddWarningsHandler(handler, warnings)
 			route := ws.GET(action.Path).To(handler).
 				Doc(doc).
-				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed. Defaults to 'false' unless the user-agent indicates a browser or command-line HTTP tool (curl and wget).")).
+				Param(prettyParameter).
 				Operation("list"+namespaced+kind+cases.Title(language.English).String(subresource)+operationSuffix).
 				Produces(append(storageMeta.ProducesMIMETypes(action.Verb), allMediaTypes...)...).
 				Returns(http.StatusOK, "OK", versionedList).
@@ -874,7 +887,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			handler = utilwarning.AddWarningsHandler(handler, warnings)
 			route := ws.PUT(action.Path).To(handler).
 				Doc(doc).
-				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed. Defaults to 'false' unless the user-agent indicates a browser or command-line HTTP tool (curl and wget).")).
+				Param(prettyParameter).
 				Operation("replace"+namespaced+kind+cases.Title(language.English).String(subresource)+operationSuffix).
 				Produces(append(storageMeta.ProducesMIMETypes(action.Verb), mediaTypes...)...).
 				Returns(http.StatusOK, "OK", producedObject).
@@ -906,7 +919,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			handler = utilwarning.AddWarningsHandler(handler, warnings)
 			route := ws.PATCH(action.Path).To(handler).
 				Doc(doc).
-				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed. Defaults to 'false' unless the user-agent indicates a browser or command-line HTTP tool (curl and wget).")).
+				Param(prettyParameter).
 				Consumes(supportedTypes...).
 				Operation("patch"+namespaced+kind+cases.Title(language.English).String(subresource)+operationSuffix).
 				Produces(append(storageMeta.ProducesMIMETypes(action.Verb), mediaTypes...)...).
@@ -936,7 +949,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			}
 			route := ws.POST(action.Path).To(handler).
 				Doc(doc).
-				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed. Defaults to 'false' unless the user-agent indicates a browser or command-line HTTP tool (curl and wget).")).
+				Param(prettyParameter).
 				Operation("create"+namespaced+kind+cases.Title(language.English).String(subresource)+operationSuffix).
 				Produces(append(storageMeta.ProducesMIMETypes(action.Verb), mediaTypes...)...).
 				Returns(http.StatusOK, "OK", producedObject).
@@ -965,7 +978,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			handler = utilwarning.AddWarningsHandler(handler, warnings)
 			route := ws.DELETE(action.Path).To(handler).
 				Doc(doc).
-				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed. Defaults to 'false' unless the user-agent indicates a browser or command-line HTTP tool (curl and wget).")).
+				Param(prettyParameter).
 				Operation("delete"+namespaced+kind+cases.Title(language.English).String(subresource)+operationSuffix).
 				Produces(append(storageMeta.ProducesMIMETypes(action.Verb), mediaTypes...)...).
 				Writes(deleteReturnType).
@@ -989,7 +1002,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			handler = utilwarning.AddWarningsHandler(handler, warnings)
 			route := ws.DELETE(action.Path).To(handler).
 				Doc(doc).
-				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed. Defaults to 'false' unless the user-agent indicates a browser or command-line HTTP tool (curl and wget).")).
+				Param(prettyParameter).
 				Operation("deletecollection"+namespaced+kind+cases.Title(language.English).String(subresource)+operationSuffix).
 				Produces(append(storageMeta.ProducesMIMETypes(action.Verb), mediaTypes...)...).
 				Writes(versionedStatus).
@@ -1017,7 +1030,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			handler = utilwarning.AddWarningsHandler(handler, warnings)
 			route := ws.GET(action.Path).To(handler).
 				Doc(doc).
-				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed. Defaults to 'false' unless the user-agent indicates a browser or command-line HTTP tool (curl and wget).")).
+				Param(prettyParameter).
 				Operation("watch"+namespaced+kind+cases.Title(language.English).String(subresource)+operationSuffix).
 				Produces(allMediaTypes...).
 				Returns(http.StatusOK, "OK", versionedWatchEvent).
@@ -1038,7 +1051,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			handler = utilwarning.AddWarningsHandler(handler, warnings)
 			route := ws.GET(action.Path).To(handler).
 				Doc(doc).
-				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed. Defaults to 'false' unless the user-agent indicates a browser or command-line HTTP tool (curl and wget).")).
+				Param(prettyParameter).
 				Operation("watch"+namespaced+kind+cases.Title(language.English).String(subresource)+"List"+operationSuffix).
 				Produces(allMediaTypes...).
 				Returns(http.StatusOK, "OK", versionedWatchEvent).
@@ -1154,48 +1167,58 @@ func addParams(route *restful.RouteBuilder, params []*restful.Parameter) {
 // Go JSON behavior for omitting a field) become query parameters. The name of the query parameter is
 // the JSON field name. If a description struct tag is set on the field, that description is used on the
 // query parameter. In essence, it converts a standard JSON top level object into a query param schema.
+// The registered *restful.Parameter definitions are cached by struct type and shared across routes, so
+// callers must not mutate them after registration.
 func AddObjectParams(ws *restful.WebService, route *restful.RouteBuilder, obj interface{}, excludedNames ...string) error {
 	sv, err := conversion.EnforcePtr(obj)
 	if err != nil {
 		return err
 	}
 	st := sv.Type()
-	excludedNameSet := sets.NewString(excludedNames...)
-	switch st.Kind() {
-	case reflect.Struct:
-		for i := 0; i < st.NumField(); i++ {
-			name := st.Field(i).Name
-			sf, ok := st.FieldByName(name)
-			if !ok {
-				continue
+	var params []*restful.Parameter
+	if cached, ok := objectTypeParamsCache.Load(st); ok {
+		params = cached.([]*restful.Parameter)
+	} else {
+		if st.Kind() == reflect.Struct {
+			params = make([]*restful.Parameter, 0, st.NumField())
+			var swaggerDoc map[string]string
+			if docable, ok := obj.(documentable); ok {
+				swaggerDoc = docable.SwaggerDoc()
 			}
-			switch sf.Type.Kind() {
-			case reflect.Interface, reflect.Struct:
-			case reflect.Pointer:
-				// TODO: This is a hack to let metav1.Time through. This needs to be fixed in a more generic way eventually. bug #36191
-				if (sf.Type.Elem().Kind() == reflect.Interface || sf.Type.Elem().Kind() == reflect.Struct) && strings.TrimPrefix(sf.Type.String(), "*") != "metav1.Time" {
+			for field := range st.Fields() {
+				name := field.Name
+				sf, ok := st.FieldByName(name)
+				if !ok {
 					continue
 				}
-				fallthrough
-			default:
-				jsonTag, _ := sf.Tag.Lookup("json")
-				if len(jsonTag) == 0 {
-					continue
+				switch sf.Type.Kind() {
+				case reflect.Interface, reflect.Struct:
+				case reflect.Pointer:
+					// TODO: This is a hack to let metav1.Time through. This needs to be fixed in a more generic way eventually. bug #36191
+					if (sf.Type.Elem().Kind() == reflect.Interface || sf.Type.Elem().Kind() == reflect.Struct) && strings.TrimPrefix(sf.Type.String(), "*") != "metav1.Time" {
+						continue
+					}
+					fallthrough
+				default:
+					jsonTag, _ := sf.Tag.Lookup("json")
+					if len(jsonTag) == 0 {
+						continue
+					}
+					jsonName, _, _ := strings.Cut(jsonTag, ",")
+					if len(jsonName) == 0 {
+						continue
+					}
+					params = append(params, restful.QueryParameter(jsonName, swaggerDoc[jsonName]).DataType(typeToJSON(sf.Type.String())))
 				}
-				jsonName := strings.SplitN(jsonTag, ",", 2)[0]
-				if len(jsonName) == 0 {
-					continue
-				}
-				if excludedNameSet.Has(jsonName) {
-					continue
-				}
-				var desc string
-				if docable, ok := obj.(documentable); ok {
-					desc = docable.SwaggerDoc()[jsonName]
-				}
-				route.Param(ws.QueryParameter(jsonName, desc).DataType(typeToJSON(sf.Type.String())))
 			}
 		}
+		objectTypeParamsCache.Store(st, params)
+	}
+	for _, param := range params {
+		if slices.Contains(excludedNames, param.Data().Name) {
+			continue
+		}
+		route.Param(param)
 	}
 	return nil
 }

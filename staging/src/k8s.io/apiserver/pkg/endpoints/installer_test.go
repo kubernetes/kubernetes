@@ -17,12 +17,68 @@ limitations under the License.
 package endpoints
 
 import (
+	"net/http"
 	"testing"
 
+	restful "github.com/emicklei/go-restful/v3"
 	"github.com/stretchr/testify/require"
 	apidiscoveryv2 "k8s.io/api/apidiscovery/v2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
+
+func TestAddObjectParamsCaching(t *testing.T) {
+	ws1 := new(restful.WebService)
+	route1 := ws1.GET("/items").To(func(*restful.Request, *restful.Response) {})
+	require.NoError(t, AddObjectParams(ws1, route1, &metav1.ListOptions{}, "watch", "allowWatchBookmarks"))
+	ws1.Route(route1)
+
+	ws2 := new(restful.WebService)
+	route2 := ws2.GET("/items").To(func(*restful.Request, *restful.Response) {})
+	require.NoError(t, AddObjectParams(ws2, route2, &metav1.ListOptions{}))
+	ws2.Route(route2)
+
+	ws3 := new(restful.WebService)
+	route3 := ws3.GET("/items").To(func(*restful.Request, *restful.Response) {})
+	require.NoError(t, AddObjectParams(ws3, route3, &metav1.ListOptions{}))
+	ws3.Route(route3)
+
+	params1 := ws1.Routes()[0].ParameterDocs
+	params2 := ws2.Routes()[0].ParameterDocs
+	params3 := ws3.Routes()[0].ParameterDocs
+
+	require.NotEmpty(t, params2)
+	require.Len(t, params1, len(params2)-2)
+	require.Len(t, params3, len(params2))
+
+	for _, p := range params1 {
+		require.NotEqual(t, "watch", p.Data().Name)
+		require.NotEqual(t, "allowWatchBookmarks", p.Data().Name)
+	}
+
+	hasWatch := false
+	for i := range params2 {
+		require.Same(t, params2[i], params3[i], "expected cached *restful.Parameter pointer reuse for %s", params2[i].Data().Name)
+		if params2[i].Data().Name == "watch" {
+			hasWatch = true
+		}
+	}
+	require.True(t, hasWatch, "expected unexcluded ListOptions route to include watch parameter")
+}
+
+func TestPrettyParameterUnchanged(t *testing.T) {
+	before := prettyParameter.Data()
+
+	ws := new(restful.WebService)
+	route := ws.GET("/items").
+		To(func(req *restful.Request, resp *restful.Response) {
+			resp.WriteHeader(http.StatusOK)
+		}).
+		Param(prettyParameter)
+	ws.Route(route)
+
+	require.Same(t, prettyParameter, ws.Routes()[0].ParameterDocs[0])
+	require.Equal(t, before, prettyParameter.Data())
+}
 
 func TestIsVowel(t *testing.T) {
 	tests := []struct {
