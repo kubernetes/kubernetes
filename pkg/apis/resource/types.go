@@ -254,7 +254,7 @@ type CounterSet struct {
 	// The maximum number of counters is 32.
 	//
 	// +required
-	Counters map[string]Counter
+	Counters map[string]SharedCounter
 }
 
 // DriverNameMaxLength is the maximum valid length of a driver name in the
@@ -595,7 +595,7 @@ type DeviceCounterConsumption struct {
 	// The maximum number of counters is 32.
 	//
 	// +required
-	Counters map[string]Counter
+	Counters map[string]ConsumeCounter
 
 	// CompatibilityGroups is a list of opaque group names for
 	// this counter set consumption.
@@ -649,12 +649,56 @@ type DeviceCapacity struct {
 	RequestPolicy *CapacityRequestPolicy
 }
 
-// Counter describes a quantity associated with a device.
-type Counter struct {
-	// Value defines how much of a certain device counter is available.
+// SharedCounter describes a quantity that is available in a counter set.
+type SharedCounter struct {
+	// Value defines how much of a certain device counter is available
+	// for consumption by devices.
 	//
 	// +required
-	Value resource.Quantity
+	Value *resource.Quantity
+
+	// RequestPolicy defines how this counter must be consumed when
+	// a device references this counter through ValueFrom.
+	//
+	// If nil, the counter cannot be referenced through ValueFrom.
+	//
+	// +optional
+	// +featureGate=DRASharedConsumableCapacity
+	RequestPolicy *CapacityRequestPolicy
+}
+
+// ConsumeCounter describes how much of a counter a device consumes.
+type ConsumeCounter struct {
+	// Value defines the statically consumed amount.
+	//
+	// Exactly one of Value or ValueFrom must be specified.
+	//
+	// +optional
+	Value *resource.Quantity
+
+	// ValueFrom looks up the requested capacity value in a ResourceClaim via
+	// the capacity name. That value is then consumed from the counter instead
+	// of using a static value defined by the driver.
+	//
+	// Exactly one of Value or ValueFrom must be specified.
+	//
+	// +optional
+	// +featureGate=DRASharedConsumableCapacity
+	ValueFrom *CounterValueFrom
+}
+
+// CounterValueFrom looks up the requested capacity value in a ResourceClaim
+// via the capacity name.
+type CounterValueFrom struct {
+	// CapacityName is the name of a device capacity.
+	// This is the same name that users set in capacity requests.
+	//
+	// If this name has no domain prefix, the driver
+	// name from the ResourceSlice is used as the domain when matching against
+	// capacity requests.
+	//
+	// +required
+	CapacityName QualifiedName
 }
 
 // CapacityRequestPolicyDiscreteMaxOptions limits the number of discrete capacity values allowed in a requestPolicy.
@@ -1888,6 +1932,11 @@ type DeviceAllocationResult struct {
 // entries in allocation.devices.results.
 const AllocationResultsMaxSize = 32
 
+// DeviceRequestAllocationResultMaxConsumedCounterSets is the maximum number of
+// counter sets in either scope of DeviceRequestAllocationResult.ConsumedCounters. It matches
+// the maximum number of counter sets that one device may consume.
+const DeviceRequestAllocationResultMaxConsumedCounterSets = ResourceSliceMaxDeviceCounterConsumptionsPerDevice
+
 // DeviceRequestAllocationResult contains the allocation result for one request.
 type DeviceRequestAllocationResult struct {
 	// Request is the name of the request in the claim which caused this
@@ -2006,6 +2055,38 @@ type DeviceRequestAllocationResult struct {
 	// +listType=set
 	// +featureGate=DRAOptionalNodeOperations
 	SkipNodeOperations []SkipNodeOperation
+
+	// ConsumedCounters records counter consumption at allocation time.
+	// An empty object records known zero consumption; nil means the snapshot
+	// is unavailable.
+	// +optional
+	// +featureGate=DRASharedConsumableCapacity
+	ConsumedCounters *CounterConsumption
+}
+
+// CounterConsumption separates physical device costs from allocation costs.
+type CounterConsumption struct {
+	// PerDevice is recorded on every share and charged once per device.
+	// +optional
+	// +listType=map
+	// +listMapKey=counterSet
+	PerDevice []CounterSetConsumption
+
+	// PerAllocation is charged for each allocation independently.
+	// +optional
+	// +listType=map
+	// +listMapKey=counterSet
+	PerAllocation []CounterSetConsumption
+}
+
+// CounterSetConsumption records the resolved consumption for one counter set
+// at allocation time.
+type CounterSetConsumption struct {
+	// CounterSet is the name of the counter set.
+	CounterSet string
+
+	// Counters records the quantity consumed for each counter.
+	Counters map[string]resource.Quantity
 }
 
 // DeviceAllocationConfiguration gets embedded in an AllocationResult.

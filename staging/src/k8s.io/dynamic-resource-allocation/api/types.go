@@ -76,7 +76,7 @@ type ResourceSliceSpec struct {
 
 type CounterSet struct {
 	Name     UniqueString
-	Counters map[string]resourceapi.Counter `json:",omitempty"`
+	Counters map[string]resourceapi.SharedCounter `json:",omitempty"`
 }
 
 type ResourcePool struct {
@@ -103,6 +103,6 @@ type Device struct {
 
 type DeviceCounterConsumption struct {
 	CounterSet          UniqueString
-	Counters            map[string]resourceapi.Counter `json:",omitempty"`
-	CompatibilityGroups []string                       `json:",omitempty"`
+	Counters            map[string]resourceapi.ConsumeCounter `json:",omitempty"`
+	CompatibilityGroups []string                              `json:",omitempty"`
 }

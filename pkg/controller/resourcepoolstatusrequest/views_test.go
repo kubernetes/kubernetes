@@ -28,17 +28,17 @@ import (
 func qty(s string) resource.Quantity { return resource.MustParse(s) }
 
 func counterSet(name string, counters map[string]string) resourcev1.CounterSet {
-	c := make(map[string]resourcev1.Counter, len(counters))
+	c := make(map[string]resourcev1.SharedCounter, len(counters))
 	for k, v := range counters {
-		c[k] = resourcev1.Counter{Value: qty(v)}
+		c[k] = resourcev1.SharedCounter{Value: ptr.To(qty(v))}
 	}
 	return resourcev1.CounterSet{Name: name, Counters: c}
 }
 
 func consumes(set string, counters map[string]string) resourcev1.DeviceCounterConsumption {
-	c := make(map[string]resourcev1.Counter, len(counters))
+	c := make(map[string]resourcev1.ConsumeCounter, len(counters))
 	for k, v := range counters {
-		c[k] = resourcev1.Counter{Value: qty(v)}
+		c[k] = resourcev1.ConsumeCounter{Value: ptr.To(qty(v))}
 	}
 	return resourcev1.DeviceCounterConsumption{CounterSet: set, Counters: c}
 }
