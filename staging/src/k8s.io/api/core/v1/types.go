@@ -5892,21 +5892,8 @@ type PodStatus struct {
 	// +optional
 	Resources *ResourceRequirements `json:"resources,omitempty" protobuf:"bytes,20,opt,name=resources"`
 
-	// NodeAllocatableResourceClaimStatuses contains the status of node-allocatable resources
-	// that were allocated for this pod through DRA claims. This includes resources currently
-	// reported in v1.Node `status.allocatable` that are not extended resources
-	// (see https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#extended-resources).
-	// Examples include "cpu", "memory", "ephemeral-storage", and hugepages.
-	// +featureGate=DRANodeAllocatableResources
-	// +optional
-	// +patchStrategy=merge
-	// +patchMergeKey=resourceClaimName
-	// +listType=map
-	// +listMapKey=resourceClaimName
-	// +k8s:optional
-	// +k8s:listType=map
-	// +k8s:listMapKey=resourceClaimName
-	NodeAllocatableResourceClaimStatuses []NodeAllocatableResourceClaimStatus `json:"nodeAllocatableResourceClaimStatuses,omitempty" patchStrategy:"merge" patchMergeKey:"resourceClaimName" protobuf:"bytes,21,rep,name=nodeAllocatableResourceClaimStatuses"`
+	// NodeAllocatableResourceClaimStatuses is tombstoned since it got replaced with ExtraNodeAllocatableResources.
+	// NodeAllocatableResourceClaimStatuses []NodeAllocatableResourceClaimStatus `json:"nodeAllocatableResourceClaimStatuses,omitempty" patchStrategy:"merge" patchMergeKey:"resourceClaimName" protobuf:"bytes,21,rep,name=nodeAllocatableResourceClaimStatuses"`
 
 	// volumeHealth contains node-reported health for each volume the pod is using.
 	// Populated by the kubelet on the pod's node.
@@ -5918,6 +5905,18 @@ type PodStatus struct {
 	// +k8s:listType=map
 	// +k8s:listMapKey=name
 	VolumeHealth []PodVolumeHealth `json:"volumeHealth,omitempty" protobuf:"bytes,22,rep,name=volumeHealth"`
+
+	// extraNodeAllocatableResources lists node allocatable resources that were
+	// allocated to this pod outside of its spec requests, for example through DRA
+	// claims. These are resources reported in v1.Node `status.allocatable` that are
+	// not extended resources (see https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#extended-resources),
+	// such as "cpu", "memory", "ephemeral-storage", and hugepages.
+	// +featureGate=DRANodeAllocatableResources
+	// +optional
+	// +listType=atomic
+	// +k8s:optional
+	// +k8s:listType=atomic
+	ExtraNodeAllocatableResources []ExtraNodeAllocatableResource `json:"extraNodeAllocatableResources,omitempty" protobuf:"bytes,23,rep,name=extraNodeAllocatableResources"`
 }
 
 // +genclient
@@ -9044,13 +9043,20 @@ type ImageVolumeSource struct {
 	PullPolicy PullPolicy `json:"pullPolicy,omitempty" protobuf:"bytes,2,opt,name=pullPolicy,casttype=PullPolicy"`
 }
 
-// NodeAllocatableResourceClaimStatus describes the status of node allocatable resources allocated via DRA.
-type NodeAllocatableResourceClaimStatus struct {
-	// resourceClaimName is the resource claim referenced by the pod that resulted in this node allocatable resource allocation.
+// ExtraNodeAllocatableResource describes the status of
+// node allocatable resources allocated outside of direct spec requests.
+type ExtraNodeAllocatableResource struct {
+	// ResourceClaimName is tombstoned since it got replaced with Source.
+	// ResourceClaimName string `json:"resourceClaimName" protobuf:"bytes,1,opt,name=resourceClaimName"`
+
+	// source identifies the object in the pod's namespace that this resource
+	// contribution originates from (e.g., a ResourceClaim).
 	// +required
 	// +k8s:required
-	ResourceClaimName string `json:"resourceClaimName" protobuf:"bytes,1,opt,name=resourceClaimName"`
-	// containers lists the names of all containers in this pod that reference the claim.
+	Source ExtraNodeAllocatableReference `json:"source" protobuf:"bytes,6,opt,name=source"`
+
+	// containers lists the names of the containers in this pod, including init
+	// containers, that use the source.
 	// +optional
 	// +listType=set
 	// +k8s:optional
@@ -9060,7 +9066,8 @@ type NodeAllocatableResourceClaimStatus struct {
 	// Resources is tombstoned since it got replaced with more granular Mapping and Overhead fields.
 	// Resources map[ResourceName]resource.Quantity `json:"resources,omitempty" protobuf:"bytes,3,rep,name=resources"`
 
-	// mapping contains allocations through devices mapped in the device spec's `nodeAllocatableResources[...].mapping` field.
+	// mapping contains fixed node allocatable resource quantities allocated once per source.
+	// When source.kind is ResourceClaim, this contains allocations through devices mapped in the device spec's `nodeAllocatableResources[...].mapping` field.
 	// This is used by kubelet for pod level and container-level cgroup enforcement.
 	// +optional
 	// +patchStrategy=merge
@@ -9071,7 +9078,10 @@ type NodeAllocatableResourceClaimStatus struct {
 	// +k8s:listType=map
 	// +k8s:listMapKey=name
 	Mapping []NodeAllocatableMappedResources `json:"mapping,omitempty" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,4,rep,name=mapping"`
-	// overhead contains allocations through devices mapped in the device spec's `nodeAllocatableResources[...].overhead` field.
+
+	// overhead contains variable node allocatable resource overheads incurred per pod (PerPod) and
+	// per referencing container (PerContainer) when using the source.
+	// When source.kind is ResourceClaim, this contains allocations through devices mapped in the device spec's `nodeAllocatableResources[...].overhead` field.
 	// This is used by kubelet for pod level and container-level cgroup enforcement.
 	// +optional
 	// +patchStrategy=merge
@@ -9084,15 +9094,39 @@ type NodeAllocatableResourceClaimStatus struct {
 	Overhead []NodeAllocatableOverheadResources `json:"overhead,omitempty" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,5,rep,name=overhead"`
 }
 
+// ExtraNodeAllocatableReference identifies the source object in the pod's namespace
+// contributing extra node allocatable resources to a pod.
+// +structType=atomic
+type ExtraNodeAllocatableReference struct {
+	// apiGroup is the group of the referenced object.
+	// Kubernetes API groups are the core group, groups without a dot, "k8s.io",
+	// and groups ending in ".k8s.io"; of these, only "resource.k8s.io" is supported.
+	// Any other group can be used by out-of-tree scheduler plugins, and for those,
+	// only the format of apiGroup, kind, and name is validated.
+	// +required
+	// +k8s:required
+	APIGroup string `json:"apiGroup,omitempty" protobuf:"bytes,1,opt,name=apiGroup"`
+	// kind is the type of the referenced object.
+	// For apiGroup "resource.k8s.io", only "ResourceClaim" is supported.
+	// +required
+	// +k8s:required
+	Kind string `json:"kind" protobuf:"bytes,2,opt,name=kind"`
+	// name is the name of the source object in the pod's namespace
+	// (e.g., name of the resource claim).
+	// +required
+	// +k8s:required
+	Name string `json:"name" protobuf:"bytes,3,opt,name=name"`
+}
+
 // NodeAllocatableMappedResources describes mapped node allocatable resource allocations.
 type NodeAllocatableMappedResources struct {
 	// name is the name of the resource (e.g., cpu, memory).
 	// +required
 	// +k8s:required
 	Name ResourceName `json:"name" protobuf:"bytes,1,opt,name=name,casttype=ResourceName"`
-	// quantity is the total node allocatable resource capacity allocated for the claim.
-	// This claim's allocated devices is shared by all the containers referencing the claim.
-	// Kubelet adds this value to both requests and limits at the pod-level cgroup, and to limits at the container-level cgroup for each container referencing the claim.
+	// quantity is the total node allocatable resource capacity allocated for the source.
+	// This source's allocated devices are shared by all the containers referencing the source.
+	// Kubelet adds this value to both requests and limits at the pod-level cgroup, and to limits at the container-level cgroup for each container referencing the source.
 	// +required
 	// +k8s:required
 	Quantity *resource.Quantity `json:"quantity" protobuf:"bytes,2,opt,name=quantity"`
@@ -9110,9 +9144,9 @@ type NodeAllocatableOverheadResources struct {
 	// +optional
 	// +k8s:optional
 	PerPod *resource.Quantity `json:"perPod,omitempty" protobuf:"bytes,2,opt,name=perPod"`
-	// perContainer is the variable overhead quantity applied for each container referencing the claim.
-	// The container references are recorded in `nodeAllocatableResourceClaimStatuses.containers`.
-	// The total overhead quantity allocated for the claim is computed as:
+	// perContainer is the variable overhead quantity applied for each container referencing the source.
+	// The container references are recorded in `extraNodeAllocatableResources.containers`.
+	// The total overhead quantity allocated for the source is computed as:
 	// Quantity = PerPod + (PerContainer * NumReferences)
 	// Kubelet accounts for this overhead in cgroups:
 	// - Pod-level cgroup (requests and limits): Kubelet adds PerPod + (PerContainer * NumReferences).

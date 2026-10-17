@@ -1273,7 +1273,13 @@ func evictionMessage(resourceToReclaim v1.ResourceName, pod *v1.Pod, stats stats
 	for _, containerStats := range podStats.Containers {
 		for _, container := range containers {
 			if container.Name == containerStats.Name {
-				requests := container.Resources.Requests[resourceToReclaim]
+				requests := container.Resources.Requests[resourceToReclaim].DeepCopy()
+				if utilfeature.DefaultFeatureGate.Enabled(features.DRANodeAllocatableResources) {
+					// A container's effective request includes its extra node allocatable
+					// resources (like DRA allocations), matching how its cgroup limits are sized.
+					extraNodeAllocatableRes := resourcehelper.GetContainerExtraNodeAllocatableResources(pod, container.Name)
+					requests.Add(extraNodeAllocatableRes[resourceToReclaim])
+				}
 				var usage *resource.Quantity
 				switch resourceToReclaim {
 				case v1.ResourceEphemeralStorage:

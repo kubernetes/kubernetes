@@ -153,12 +153,14 @@ var ExpandedPluginsV1 = &config.Plugins{
 	},
 	Reserve: config.PluginSet{
 		Enabled: []config.Plugin{
+			{Name: names.NodeResourcesFit},
 			{Name: names.VolumeBinding},
 			{Name: names.DynamicResources},
 		},
 	},
 	PreBind: config.PluginSet{
 		Enabled: []config.Plugin{
+			{Name: names.NodeResourcesFit},
 			{Name: names.VolumeBinding},
 			{Name: names.DynamicResources},
 		},

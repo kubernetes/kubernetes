@@ -337,6 +337,16 @@ func (in ExecAction) OpenAPIModelName() string {
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
+func (in ExtraNodeAllocatableReference) OpenAPIModelName() string {
+	return "io.k8s.api.core.v1.ExtraNodeAllocatableReference"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
+func (in ExtraNodeAllocatableResource) OpenAPIModelName() string {
+	return "io.k8s.api.core.v1.ExtraNodeAllocatableResource"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
 func (in FCVolumeSource) OpenAPIModelName() string {
 	return "io.k8s.api.core.v1.FCVolumeSource"
 }
@@ -554,11 +564,6 @@ func (in NodeAllocatableMappedResources) OpenAPIModelName() string {
 // OpenAPIModelName returns the OpenAPI model name for this type.
 func (in NodeAllocatableOverheadResources) OpenAPIModelName() string {
 	return "io.k8s.api.core.v1.NodeAllocatableOverheadResources"
-}
-
-// OpenAPIModelName returns the OpenAPI model name for this type.
-func (in NodeAllocatableResourceClaimStatus) OpenAPIModelName() string {
-	return "io.k8s.api.core.v1.NodeAllocatableResourceClaimStatus"
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.

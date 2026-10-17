@@ -140,15 +140,15 @@ type PodStatusApplyConfiguration struct {
 	// applied at the pod level if pod-level requests or limits are set in
 	// PodSpec.Resources
 	Resources *ResourceRequirementsApplyConfiguration `json:"resources,omitempty"`
-	// NodeAllocatableResourceClaimStatuses contains the status of node-allocatable resources
-	// that were allocated for this pod through DRA claims. This includes resources currently
-	// reported in v1.Node `status.allocatable` that are not extended resources
-	// (see https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#extended-resources).
-	// Examples include "cpu", "memory", "ephemeral-storage", and hugepages.
-	NodeAllocatableResourceClaimStatuses []NodeAllocatableResourceClaimStatusApplyConfiguration `json:"nodeAllocatableResourceClaimStatuses,omitempty"`
 	// volumeHealth contains node-reported health for each volume the pod is using.
 	// Populated by the kubelet on the pod's node.
 	VolumeHealth []PodVolumeHealthApplyConfiguration `json:"volumeHealth,omitempty"`
+	// extraNodeAllocatableResources lists node allocatable resources that were
+	// allocated to this pod outside of its spec requests, for example through DRA
+	// claims. These are resources reported in v1.Node `status.allocatable` that are
+	// not extended resources (see https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#extended-resources),
+	// such as "cpu", "memory", "ephemeral-storage", and hugepages.
+	ExtraNodeAllocatableResources []ExtraNodeAllocatableResourceApplyConfiguration `json:"extraNodeAllocatableResources,omitempty"`
 }
 
 // PodStatusApplyConfiguration constructs a declarative configuration of the PodStatus type for use with
@@ -352,19 +352,6 @@ func (b *PodStatusApplyConfiguration) WithResources(value *ResourceRequirementsA
 	return b
 }
 
-// WithNodeAllocatableResourceClaimStatuses adds the given value to the NodeAllocatableResourceClaimStatuses field in the declarative configuration
-// and returns the receiver, so that objects can be build by chaining "With" function invocations.
-// If called multiple times, values provided by each call will be appended to the NodeAllocatableResourceClaimStatuses field.
-func (b *PodStatusApplyConfiguration) WithNodeAllocatableResourceClaimStatuses(values ...*NodeAllocatableResourceClaimStatusApplyConfiguration) *PodStatusApplyConfiguration {
-	for i := range values {
-		if values[i] == nil {
-			panic("nil value passed to WithNodeAllocatableResourceClaimStatuses")
-		}
-		b.NodeAllocatableResourceClaimStatuses = append(b.NodeAllocatableResourceClaimStatuses, *values[i])
-	}
-	return b
-}
-
 // WithVolumeHealth adds the given value to the VolumeHealth field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the VolumeHealth field.
@@ -374,6 +361,19 @@ func (b *PodStatusApplyConfiguration) WithVolumeHealth(values ...*PodVolumeHealt
 			panic("nil value passed to WithVolumeHealth")
 		}
 		b.VolumeHealth = append(b.VolumeHealth, *values[i])
+	}
+	return b
+}
+
+// WithExtraNodeAllocatableResources adds the given value to the ExtraNodeAllocatableResources field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, values provided by each call will be appended to the ExtraNodeAllocatableResources field.
+func (b *PodStatusApplyConfiguration) WithExtraNodeAllocatableResources(values ...*ExtraNodeAllocatableResourceApplyConfiguration) *PodStatusApplyConfiguration {
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithExtraNodeAllocatableResources")
+		}
+		b.ExtraNodeAllocatableResources = append(b.ExtraNodeAllocatableResources, *values[i])
 	}
 	return b
 }

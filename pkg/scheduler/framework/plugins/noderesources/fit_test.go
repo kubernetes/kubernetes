@@ -17,6 +17,8 @@ limitations under the License.
 package noderesources
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"testing"
 
@@ -32,6 +34,8 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/kubernetes/fake"
+	clienttesting "k8s.io/client-go/testing"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/ktesting"
 	fwk "k8s.io/kube-scheduler/framework"
@@ -2777,10 +2781,10 @@ func testComputePodResourceRequestWithNodeAllocatableDRA(tCtx ktesting.TContext)
 					},
 				},
 				Status: v1.PodStatus{
-					NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+					ExtraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
 						{
-							ResourceClaimName: "node-allocatable-claim",
-							Containers:        []string{"c1"},
+							Source:     v1.ExtraNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "node-allocatable-claim"},
+							Containers: []string{"c1"},
 							Mapping: []v1.NodeAllocatableMappedResources{{
 								Name:     v1.ResourceCPU,
 								Quantity: new(resource.MustParse("50m")),
@@ -2791,7 +2795,7 @@ func testComputePodResourceRequestWithNodeAllocatableDRA(tCtx ktesting.TContext)
 			},
 			expected: &preFilterState{
 				Resource: framework.Resource{
-					MilliCPU: 150, // NodeAllocatableResourceClaimStatus + standard request
+					MilliCPU: 150, // ExtraNodeAllocatableResource + standard request
 					Memory:   1024 * 1024 * 1024,
 				},
 			},
@@ -2825,10 +2829,10 @@ func testComputePodResourceRequestWithNodeAllocatableDRA(tCtx ktesting.TContext)
 					},
 				},
 				Status: v1.PodStatus{
-					NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+					ExtraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
 						{
-							ResourceClaimName: "node-allocatable-claim",
-							Containers:        []string{"c1"},
+							Source:     v1.ExtraNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "node-allocatable-claim"},
+							Containers: []string{"c1"},
 							Mapping: []v1.NodeAllocatableMappedResources{{
 								Name:     v1.ResourceCPU,
 								Quantity: new(resource.MustParse("50m")),
@@ -2873,10 +2877,10 @@ func testComputePodResourceRequestWithNodeAllocatableDRA(tCtx ktesting.TContext)
 					},
 				},
 				Status: v1.PodStatus{
-					NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+					ExtraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
 						{
-							ResourceClaimName: "node-allocatable-claim",
-							Containers:        []string{"c1"},
+							Source:     v1.ExtraNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "node-allocatable-claim"},
+							Containers: []string{"c1"},
 							Overhead: []v1.NodeAllocatableOverheadResources{{
 								Name:         v1.ResourceCPU,
 								PerPod:       new(resource.MustParse("50m")),
@@ -2922,10 +2926,10 @@ func testComputePodResourceRequestWithNodeAllocatableDRA(tCtx ktesting.TContext)
 					},
 				},
 				Status: v1.PodStatus{
-					NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+					ExtraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
 						{
-							ResourceClaimName: "node-allocatable-claim",
-							Containers:        []string{"c1"},
+							Source:     v1.ExtraNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "node-allocatable-claim"},
+							Containers: []string{"c1"},
 							Mapping: []v1.NodeAllocatableMappedResources{{
 								Name:     v1.ResourceCPU,
 								Quantity: new(resource.MustParse("50m")),
@@ -3286,4 +3290,492 @@ func TestDeferredResizeFit(t *testing.T) {
 			}
 		})
 	}
+}
+
+func makeExtraNodeAllocatableResources(claimName, cpu string) []v1.ExtraNodeAllocatableResource {
+	return []v1.ExtraNodeAllocatableResource{{
+		Source:     v1.ExtraNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: claimName},
+		Containers: []string{"c1"},
+		Mapping: []v1.NodeAllocatableMappedResources{{
+			Name:     v1.ResourceCPU,
+			Quantity: new(resource.MustParse(cpu)),
+		}},
+	}}
+}
+
+func newNodeAllocatableCycleState(extraResources map[string][]v1.ExtraNodeAllocatableResource) fwk.CycleState {
+	cs := framework.NewCycleState()
+	for nodeName, resources := range extraResources {
+		framework.GetOrCreateExtraNodeAllocatableResourcesState(cs).Set(nodeName, "DynamicResources", resources)
+	}
+	return cs
+}
+
+func TestFitFilterWithExtraNodeAllocatableResources(t *testing.T) {
+	testCtx := ktesting.Init(t)
+	nodeName := "node-1"
+	pod := st.MakePod().Name("test-pod").Namespace("test-ns").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj()
+	existingPod := st.MakePod().Name("existing").Namespace("test-ns").Node(nodeName).Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj()
+
+	tests := []struct {
+		name                              string
+		nodeInfo                          *framework.NodeInfo
+		enableDRANodeAllocatableResources bool
+		extraResources                    map[string][]v1.ExtraNodeAllocatableResource
+		wantStatus                        *fwk.Status
+	}{
+		{
+			name:                              "no entries",
+			nodeInfo:                          framework.NewNodeInfo(),
+			enableDRANodeAllocatableResources: true,
+		},
+		{
+			name:                              "entries fit",
+			nodeInfo:                          framework.NewNodeInfo(),
+			enableDRANodeAllocatableResources: true,
+			extraResources: map[string][]v1.ExtraNodeAllocatableResource{
+				nodeName: makeExtraNodeAllocatableResources("claim1", "1"),
+			},
+		},
+		{
+			name:                              "entries exceed allocatable",
+			nodeInfo:                          framework.NewNodeInfo(),
+			enableDRANodeAllocatableResources: true,
+			extraResources: map[string][]v1.ExtraNodeAllocatableResource{
+				nodeName: makeExtraNodeAllocatableResources("claim1", "2"),
+			},
+			wantStatus: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, getErrReason(v1.ResourceCPU)),
+		},
+		{
+			name:                              "entries exceed free resources but not allocatable",
+			nodeInfo:                          framework.NewNodeInfo(existingPod),
+			enableDRANodeAllocatableResources: true,
+			extraResources: map[string][]v1.ExtraNodeAllocatableResource{
+				nodeName: makeExtraNodeAllocatableResources("claim1", "500m"),
+			},
+			wantStatus: fwk.NewStatus(fwk.Unschedulable, getErrReason(v1.ResourceCPU)),
+		},
+		{
+			name:                              "entries for another node are ignored",
+			nodeInfo:                          framework.NewNodeInfo(),
+			enableDRANodeAllocatableResources: true,
+			extraResources: map[string][]v1.ExtraNodeAllocatableResource{
+				"other-node": makeExtraNodeAllocatableResources("claim1", "2"),
+			},
+		},
+		{
+			name:                              "feature disabled",
+			nodeInfo:                          framework.NewNodeInfo(),
+			enableDRANodeAllocatableResources: false,
+			extraResources: map[string][]v1.ExtraNodeAllocatableResource{
+				nodeName: makeExtraNodeAllocatableResources("claim1", "2"),
+			},
+		},
+	}
+
+	for _, test := range tests {
+		testCtx.Run(test.name, func(tCtx ktesting.TContext) {
+			node := st.MakeNode().Name(nodeName).Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Obj()
+			test.nodeInfo.SetNode(node)
+
+			p, err := NewFit(tCtx, &config.NodeResourcesFitArgs{ScoringStrategy: defaultScoringStrategy}, nil, plfeature.Features{
+				EnableDRANodeAllocatableResources: test.enableDRANodeAllocatableResources,
+			})
+			tCtx.ExpectNoError(err, "create fit plugin")
+
+			cycleState := newNodeAllocatableCycleState(test.extraResources)
+			_, preFilterStatus := p.(fwk.PreFilterPlugin).PreFilter(tCtx, cycleState, pod, nil)
+			if !preFilterStatus.IsSuccess() {
+				tCtx.Errorf("prefilter failed with status: %v", preFilterStatus)
+			}
+
+			gotStatus := p.(fwk.FilterPlugin).Filter(tCtx, cycleState, pod, test.nodeInfo)
+			if diff := cmp.Diff(test.wantStatus, gotStatus); diff != "" {
+				tCtx.Errorf("status does not match (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}
+func TestFitScoreWithExtraNodeAllocatableResources(t *testing.T) {
+	testCtx := ktesting.Init(t)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRANodeAllocatableResources, true)
+	nodeName := "node-1"
+	claim := v1.ExtraNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "claim1"}
+	mapped := func(source v1.ExtraNodeAllocatableReference) []v1.ExtraNodeAllocatableResource {
+		return []v1.ExtraNodeAllocatableResource{{
+			Source:     source,
+			Containers: []string{"c1"},
+			Mapping:    []v1.NodeAllocatableMappedResources{{Name: v1.ResourceCPU, Quantity: ptr.To(resource.MustParse("2"))}},
+		}}
+	}
+	requests := map[v1.ResourceName]string{v1.ResourceCPU: "1", v1.ResourceMemory: "1000"}
+	existingPod := func(entries []v1.ExtraNodeAllocatableResource) *v1.Pod {
+		pod := st.MakePod().UID("existing").Name("existing").Namespace("test-ns").Node(nodeName).Req(requests).Obj()
+		pod.Status.ExtraNodeAllocatableResources = entries
+		return pod
+	}
+	pod := st.MakePod().UID("new").Name("new").Namespace("test-ns").Req(requests).Obj()
+
+	tests := []struct {
+		name                              string
+		strategy                          config.ScoringStrategyType
+		existingPods                      []*v1.Pod
+		enableDRANodeAllocatableResources bool
+		extraResources                    map[string][]v1.ExtraNodeAllocatableResource
+		runPreScore                       bool
+		wantScore                         int64
+	}{
+		{
+			// CPU: (8 - 1) / 8 = 87. Memory: 90.
+			name:                              "no entries",
+			strategy:                          config.LeastAllocated,
+			enableDRANodeAllocatableResources: true,
+			runPreScore:                       true,
+			wantScore:                         88,
+		},
+		{
+			// CPU: (8 - 1 - 2) / 8 = 62. Memory: 90.
+			name:                              "entries are added to the pod requests",
+			strategy:                          config.LeastAllocated,
+			enableDRANodeAllocatableResources: true,
+			extraResources: map[string][]v1.ExtraNodeAllocatableResource{
+				nodeName: makeExtraNodeAllocatableResources("claim1", "2"),
+			},
+			runPreScore: true,
+			wantScore:   76,
+		},
+		{
+			// CPU: (1 + 2) / 8 = 37. Memory: 10.
+			name:                              "entries are added to the pod requests with MostAllocated",
+			strategy:                          config.MostAllocated,
+			enableDRANodeAllocatableResources: true,
+			extraResources: map[string][]v1.ExtraNodeAllocatableResource{
+				nodeName: makeExtraNodeAllocatableResources("claim1", "2"),
+			},
+			runPreScore: true,
+			wantScore:   23,
+		},
+		{
+			name:                              "entries are added to the pod requests if PreScore not called",
+			strategy:                          config.LeastAllocated,
+			enableDRANodeAllocatableResources: true,
+			extraResources: map[string][]v1.ExtraNodeAllocatableResource{
+				nodeName: makeExtraNodeAllocatableResources("claim1", "2"),
+			},
+			wantScore: 76,
+		},
+		{
+			name:                              "entries for another node are ignored",
+			strategy:                          config.LeastAllocated,
+			enableDRANodeAllocatableResources: true,
+			extraResources: map[string][]v1.ExtraNodeAllocatableResource{
+				"other-node": makeExtraNodeAllocatableResources("claim1", "2"),
+			},
+			runPreScore: true,
+			wantScore:   88,
+		},
+		{
+			name:                              "feature disabled",
+			strategy:                          config.LeastAllocated,
+			enableDRANodeAllocatableResources: false,
+			extraResources: map[string][]v1.ExtraNodeAllocatableResource{
+				nodeName: makeExtraNodeAllocatableResources("claim1", "2"),
+			},
+			runPreScore: true,
+			wantScore:   88,
+		},
+		{
+			// Node: 1 + 2 (claim1, accounted to the existing pod) = 3. CPU: (8 - 3 - 1 - 2) / 8 = 25. Memory: 80.
+			name:                              "claim is accounted to every pod",
+			strategy:                          config.LeastAllocated,
+			existingPods:                      []*v1.Pod{existingPod(mapped(claim))},
+			enableDRANodeAllocatableResources: true,
+			extraResources:                    map[string][]v1.ExtraNodeAllocatableResource{nodeName: mapped(claim)},
+			runPreScore:                       true,
+			wantScore:                         52,
+		},
+	}
+
+	for _, test := range tests {
+		testCtx.Run(test.name, func(tCtx ktesting.TContext) {
+			node := st.MakeNode().Name(nodeName).Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "8", v1.ResourceMemory: "10000"}).Obj()
+			nodeInfo := framework.NewNodeInfo(test.existingPods...)
+			nodeInfo.SetNode(node)
+
+			p, err := NewFit(tCtx, &config.NodeResourcesFitArgs{
+				ScoringStrategy: &config.ScoringStrategy{Type: test.strategy, Resources: defaultScoringStrategy.Resources},
+			}, nil, plfeature.Features{
+				EnableDRANodeAllocatableResources: test.enableDRANodeAllocatableResources,
+			})
+			tCtx.ExpectNoError(err, "create fit plugin")
+
+			cycleState := newNodeAllocatableCycleState(test.extraResources)
+			if test.runPreScore {
+				if status := p.(fwk.PreScorePlugin).PreScore(tCtx, cycleState, pod, []fwk.NodeInfo{nodeInfo}); !status.IsSuccess() {
+					tCtx.Fatalf("prescore failed with status: %v", status)
+				}
+			}
+
+			gotScore, status := p.(fwk.ScorePlugin).Score(tCtx, cycleState, pod, nodeInfo)
+			if !status.IsSuccess() {
+				tCtx.Fatalf("score failed with status: %v", status)
+			}
+			if diff := cmp.Diff(test.wantScore, gotScore); diff != "" {
+				tCtx.Errorf("score does not match (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestFitPreBindAndUnreserveWithExtraNodeAllocatableResources(t *testing.T) {
+	testCtx := ktesting.Init(t)
+	nodeName := "node-1"
+
+	tests := []struct {
+		name                              string
+		enableDRANodeAllocatableResources bool
+		extraResources                    map[string][]v1.ExtraNodeAllocatableResource
+		wantPatchTypes                    []types.PatchType
+	}{
+		{
+			name:                              "feature disabled",
+			enableDRANodeAllocatableResources: false,
+			extraResources: map[string][]v1.ExtraNodeAllocatableResource{
+				nodeName: makeExtraNodeAllocatableResources("claim1", "1"),
+			},
+		},
+		{
+			name:                              "no entries",
+			enableDRANodeAllocatableResources: true,
+		},
+		{
+			name:                              "entries for another node",
+			enableDRANodeAllocatableResources: true,
+			extraResources: map[string][]v1.ExtraNodeAllocatableResource{
+				"other-node": makeExtraNodeAllocatableResources("claim1", "1"),
+			},
+		},
+		{
+			name:                              "entries for node",
+			enableDRANodeAllocatableResources: true,
+			extraResources: map[string][]v1.ExtraNodeAllocatableResource{
+				nodeName: makeExtraNodeAllocatableResources("claim1", "1"),
+			},
+			// PreBind persists the status, Unreserve clears it.
+			wantPatchTypes: []types.PatchType{types.StrategicMergePatchType, types.MergePatchType},
+		},
+	}
+
+	for _, test := range tests {
+		testCtx.Run(test.name, func(tCtx ktesting.TContext) {
+			pod := st.MakePod().Name("test-pod").Namespace("test-ns").UID("pod-uid").Obj()
+			client := fake.NewClientset(pod.DeepCopy())
+			fh, err := runtime.NewFramework(tCtx, nil, nil, runtime.WithClientSet(client))
+			tCtx.ExpectNoError(err, "create framework")
+			tCtx.Cleanup(func() {
+				runtime.WaitForShutdown(fh)
+			})
+			p, err := NewFit(tCtx, &config.NodeResourcesFitArgs{ScoringStrategy: defaultScoringStrategy}, fh, plfeature.Features{
+				EnableDRANodeAllocatableResources: test.enableDRANodeAllocatableResources,
+			})
+			tCtx.ExpectNoError(err, "create fit plugin")
+
+			cycleState := newNodeAllocatableCycleState(test.extraResources)
+			// Assume sets the status recorded for the node before PreBind.
+			pod.Status.ExtraNodeAllocatableResources = test.extraResources[nodeName]
+
+			result, preFlightStatus := p.(fwk.PreBindPlugin).PreBindPreFlight(tCtx, cycleState, pod, nodeName)
+			if result == nil || result.AllowParallel {
+				tCtx.Errorf("PreBindPreFlight() result = %+v, want AllowParallel=false", result)
+			}
+			if wantSkip := test.wantPatchTypes == nil; preFlightStatus.IsSkip() != wantSkip {
+				tCtx.Errorf("PreBindPreFlight() status = %v, want skip %v", preFlightStatus, wantSkip)
+			}
+			if status := p.(fwk.PreBindPlugin).PreBind(tCtx, cycleState, pod, nodeName); !status.IsSuccess() {
+				tCtx.Errorf("PreBind() status = %v, want success", status)
+			}
+			p.(fwk.ReservePlugin).Unreserve(tCtx, cycleState, pod, nodeName)
+
+			var gotPatchTypes []types.PatchType
+			for _, action := range client.Actions() {
+				if action.Matches("patch", "pods") && action.GetSubresource() == "status" {
+					gotPatchTypes = append(gotPatchTypes, action.(clienttesting.PatchAction).GetPatchType())
+				}
+			}
+			if diff := cmp.Diff(test.wantPatchTypes, gotPatchTypes); diff != "" {
+				tCtx.Errorf("pod status patches do not match (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestPatchExtraNodeAllocatableResources(t *testing.T) {
+	pod := st.MakePod().Name("test-pod").Namespace("test-ns").UID("pod-uid").Obj()
+
+	tests := []struct {
+		name                               string
+		assumedPodStatus                   v1.PodStatus
+		finalExtraNodeAllocatableResources []v1.ExtraNodeAllocatableResource
+		wantPatch                          bool
+		setPatchError                      error
+		wantStatus                         *fwk.Status
+	}{
+		{
+			name:       "no node allocatable resource claims for this pod",
+			wantPatch:  false,
+			wantStatus: nil,
+		},
+		{
+			name: "assumed pod status same as new status",
+			assumedPodStatus: v1.PodStatus{
+				ExtraNodeAllocatableResources: makeExtraNodeAllocatableResources("claim1", "1"),
+			},
+			finalExtraNodeAllocatableResources: makeExtraNodeAllocatableResources("claim1", "1"),
+			wantPatch:                          true,
+			wantStatus:                         nil,
+		},
+		{
+			name: "assumed pod status different from new status",
+			assumedPodStatus: v1.PodStatus{
+				ExtraNodeAllocatableResources: makeExtraNodeAllocatableResources("claim1", "1"),
+			},
+			finalExtraNodeAllocatableResources: makeExtraNodeAllocatableResources("claim1", "2"),
+			wantPatch:                          false,
+			wantStatus:                         fwk.AsStatus(errors.New("assumed pod status does not match calculated status to be patched")),
+		},
+		{
+			name: "assumed pod status non-empty while calculated status is empty",
+			assumedPodStatus: v1.PodStatus{
+				ExtraNodeAllocatableResources: makeExtraNodeAllocatableResources("claim1", "1"),
+			},
+			finalExtraNodeAllocatableResources: nil,
+			wantPatch:                          false,
+			wantStatus:                         fwk.AsStatus(errors.New("assumed pod status does not match calculated status to be patched")),
+		},
+		{
+			name: "pod status patch error",
+			assumedPodStatus: v1.PodStatus{
+				ExtraNodeAllocatableResources: makeExtraNodeAllocatableResources("claim1", "1"),
+			},
+			finalExtraNodeAllocatableResources: makeExtraNodeAllocatableResources("claim1", "1"),
+			wantPatch:                          true,
+			setPatchError:                      errors.New("inject patch error"),
+			wantStatus:                         fwk.AsStatus(fmt.Errorf("updating pod test-ns/test-pod ExtraNodeAllocatableResources: %w", errors.New("inject patch error"))),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.Background()
+
+			podToUpdate := pod.DeepCopy()
+			podToUpdate.Status = *tt.assumedPodStatus.DeepCopy()
+
+			fakeClient := fake.NewClientset(podToUpdate)
+			pl := newFitWithClientSet(ctx, t, fakeClient)
+			if tt.setPatchError != nil {
+				fakeClient.PrependReactor("patch", "pods", func(action clienttesting.Action) (handled bool, ret apiruntime.Object, err error) {
+					return true, nil, tt.setPatchError
+				})
+			}
+			status := pl.patchExtraNodeAllocatableResources(ctx, podToUpdate, tt.finalExtraNodeAllocatableResources)
+
+			if tt.wantStatus != nil && status != nil {
+				if tt.wantStatus.Code() != status.Code() {
+					t.Errorf("patchExtraNodeAllocatableResources() status code = %v, want %v", status.Code(), tt.wantStatus.Code())
+				}
+				if tt.wantStatus.AsError().Error() != status.AsError().Error() {
+					t.Errorf("patchExtraNodeAllocatableResources() status error = %v, want %v", status.AsError().Error(), tt.wantStatus.AsError().Error())
+				}
+			} else if tt.wantStatus != status {
+				t.Errorf("patchExtraNodeAllocatableResources() status = %v, want %v", status, tt.wantStatus)
+			}
+
+			actions := fakeClient.Actions()
+			gotPatch := false
+			for _, action := range actions {
+				if action.Matches("patch", "pods") && action.GetSubresource() == "status" {
+					gotPatch = true
+					break
+				}
+			}
+
+			if gotPatch != tt.wantPatch {
+				t.Errorf("patchExtraNodeAllocatableResources() gotPatch = %v, want %v", gotPatch, tt.wantPatch)
+			}
+		})
+	}
+}
+
+func TestClearExtraNodeAllocatableResources(t *testing.T) {
+	pod := st.MakePod().Name("test-pod").Namespace("test-ns").UID("pod-uid").Obj()
+
+	tests := []struct {
+		name             string
+		initialPodStatus v1.PodStatus
+		wantPatch        bool
+	}{
+		{
+			name:             "no status to clear",
+			initialPodStatus: v1.PodStatus{},
+			wantPatch:        false,
+		},
+		{
+			name: "status cleared",
+			initialPodStatus: v1.PodStatus{
+				ExtraNodeAllocatableResources: makeExtraNodeAllocatableResources("claim1", "1"),
+			},
+			wantPatch: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.Background()
+
+			podToUpdate := pod.DeepCopy()
+			podToUpdate.Status = *tt.initialPodStatus.DeepCopy()
+
+			fakeClient := fake.NewClientset(podToUpdate)
+			pl := newFitWithClientSet(ctx, t, fakeClient)
+
+			pl.clearExtraNodeAllocatableResources(ctx, podToUpdate)
+
+			actions := fakeClient.Actions()
+			gotPatch := false
+			for _, action := range actions {
+				if action.Matches("patch", "pods") && action.GetSubresource() == "status" {
+					gotPatch = true
+					patchAction := action.(clienttesting.PatchAction)
+					if patchAction.GetPatchType() != types.MergePatchType {
+						t.Errorf("patch type = %q, want %q", patchAction.GetPatchType(), types.MergePatchType)
+					}
+					wantPatch := `{"metadata":{"uid":"pod-uid"},"status":{"extraNodeAllocatableResources":[]}}`
+					if diff := cmp.Diff(wantPatch, string(patchAction.GetPatch())); diff != "" {
+						t.Errorf("clear patch mismatch (-want +got):\n%s", diff)
+					}
+					break
+				}
+			}
+
+			if gotPatch != tt.wantPatch {
+				t.Errorf("clearExtraNodeAllocatableResources() gotPatch = %v, want %v", gotPatch, tt.wantPatch)
+			}
+		})
+	}
+}
+
+func newFitWithClientSet(ctx context.Context, t *testing.T, client *fake.Clientset) *Fit {
+	t.Helper()
+	ctx, cancel := context.WithCancel(ctx)
+	fh, err := runtime.NewFramework(ctx, nil, nil, runtime.WithClientSet(client))
+	if err != nil {
+		cancel()
+		t.Fatalf("Failed to create framework: %v", err)
+	}
+	t.Cleanup(func() {
+		cancel()
+		runtime.WaitForShutdown(fh)
+	})
+	return &Fit{handle: fh}
 }
