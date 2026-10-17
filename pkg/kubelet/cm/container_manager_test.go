@@ -22,6 +22,9 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 func TestParsePercentage(t *testing.T) {
@@ -87,6 +90,74 @@ func TestParsePercentage(t *testing.T) {
 
 			require.NoError(t, err)
 			require.Equal(t, testCase.expected, result)
+		})
+	}
+}
+
+func TestSystemPartitionConfigHasPod(t *testing.T) {
+	podIn := func(namespace string) *v1.Pod {
+		return &v1.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: namespace}}
+	}
+
+	testCases := []struct {
+		name   string
+		config *SystemPartitionConfig
+		pod    *v1.Pod
+		want   bool
+	}{
+		{
+			name:   "nil namespace set",
+			config: &SystemPartitionConfig{},
+			pod:    podIn("kube-system"),
+			want:   false,
+		},
+		{
+			name:   "empty namespace set",
+			config: &SystemPartitionConfig{Namespaces: sets.New[string]()},
+			pod:    podIn("kube-system"),
+			want:   false,
+		},
+		{
+			name:   "listed namespace",
+			config: &SystemPartitionConfig{Namespaces: sets.New("kube-system")},
+			pod:    podIn("kube-system"),
+			want:   true,
+		},
+		{
+			name:   "unlisted namespace",
+			config: &SystemPartitionConfig{Namespaces: sets.New("kube-system")},
+			pod:    podIn("default"),
+			want:   false,
+		},
+		{
+			name:   "one of several listed namespaces",
+			config: &SystemPartitionConfig{Namespaces: sets.New("kube-system", "monitoring")},
+			pod:    podIn("monitoring"),
+			want:   true,
+		},
+		{
+			name:   "no partition config",
+			config: nil,
+			pod:    podIn("kube-system"),
+			want:   false,
+		},
+		{
+			name:   "no pod",
+			config: &SystemPartitionConfig{Namespaces: sets.New("kube-system")},
+			pod:    nil,
+			want:   false,
+		},
+		{
+			name:   "no partition config and pod",
+			config: nil,
+			pod:    nil,
+			want:   false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			require.Equal(t, tc.want, tc.config.HasPod(tc.pod))
 		})
 	}
 }

@@ -22,9 +22,12 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	internalapi "k8s.io/cri-api/pkg/apis"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	kubefeatures "k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/cm/containermap"
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
@@ -89,4 +92,21 @@ func buildContainerMapAndRunningSetFromRuntime(ctx context.Context, runtimeServi
 		}
 	}
 	return containerMap, runningSet
+}
+
+// PodRunsOnce reports whether the kubelet does not run the pod again once its
+// containers are killed: the pod never restarts, and with ContainerRestartRules
+// none of its containers restarts on its own either.
+func PodRunsOnce(pod *v1.Pod) bool {
+	if pod.Spec.RestartPolicy != v1.RestartPolicyNever {
+		return false
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.ContainerRestartRules) {
+		for _, c := range pod.Spec.Containers {
+			if podutil.IsContainerRestartable(pod.Spec, c) {
+				return false
+			}
+		}
+	}
+	return true
 }

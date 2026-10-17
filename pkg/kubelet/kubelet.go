@@ -574,6 +574,13 @@ func NewMainKubelet(ctx context.Context,
 		KernelMemcgNotification:  kernelMemcgNotification,
 		PodCgroupRoot:            kubeDeps.ContainerManager.GetPodCgroupRoot(),
 	}
+	// The root is empty unless the container manager actually runs a system
+	// partition, e.g. not on cgroup v1 even with one configured.
+	if kubeDeps.ContainerManager.GetSystemPartitionCgroupRoot() != "" {
+		if sp := kubeDeps.ContainerManager.GetNodeConfig().SystemPartition; sp != nil {
+			evictionConfig.Thresholds = append(evictionConfig.Thresholds, sp.EvictionThresholds...)
+		}
+	}
 
 	var serviceLister corelisters.ServiceLister
 	var serviceHasSynced cache.InformerSynced
@@ -1789,6 +1796,9 @@ func (kl *Kubelet) initializeModules(ctx context.Context) error {
 	metrics.RegisterCollectors(
 		collectors.NewVolumeStatsCollector(kl),
 		collectors.NewLogMetricsCollector(kl.StatsProvider.ListPodStats),
+		collectors.NewPartitionMetricsCollector(func() map[string]cm.PartitionStats {
+			return kl.containerManager.PartitionStats(logger)
+		}),
 	)
 	metrics.SetNodeName(kl.nodeName)
 	servermetrics.Register()
@@ -1866,7 +1876,7 @@ func (kl *Kubelet) initializeRuntimeDependentModules(ctx context.Context) {
 	}
 	// eviction manager must start after cadvisor because it needs to know if the container runtime has a dedicated imagefs
 	// Eviction decisions are based on the allocated (rather than desired) pod resources.
-	kl.evictionManager.Start(ctx, kl.StatsProvider, kl.getAllocatedPods, kl.PodIsFinished, evictionMonitoringPeriod)
+	kl.evictionManager.Start(ctx, kl.StatsProvider, kl.getAllocatedPods, kl.systemPartitionPodFunc(), kl.PodIsFinished, evictionMonitoringPeriod)
 
 	// container log manager must start after container runtime is up to retrieve information from container runtime
 	// and inform container to reopen log file after log rotation.
@@ -2204,16 +2214,7 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 		// expected to run only once and if the kubelet is restarted then
 		// they are not expected to run again.
 		// We don't create and apply updates to cgroup if its a run once pod and was killed above
-		runOnce := pod.Spec.RestartPolicy == v1.RestartPolicyNever
-		// With ContainerRestartRules, if any container is restartable, the pod should be restarted.
-		if utilfeature.DefaultFeatureGate.Enabled(features.ContainerRestartRules) {
-			for _, c := range pod.Spec.Containers {
-				if podutil.IsContainerRestartable(pod.Spec, c) {
-					runOnce = false
-				}
-			}
-		}
-		if !podKilled || !runOnce {
+		if !podKilled || !cm.PodRunsOnce(pod) {
 			if !pcm.Exists(pod) {
 				if err := kl.containerManager.UpdateQOSCgroups(logger); err != nil {
 					logger.V(2).Info("Failed to update QoS cgroups while syncing pod", "pod", klog.KObj(pod), "err", err)

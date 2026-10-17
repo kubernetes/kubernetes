@@ -196,6 +196,27 @@ func (cm *FakeContainerManager) GetPodCgroupRoot() string {
 	return ""
 }
 
+func (cm *FakeContainerManager) GetSystemPartitionCgroupRoot() string {
+	cm.Lock()
+	defer cm.Unlock()
+	cm.CalledFunctions = append(cm.CalledFunctions, "GetSystemPartitionCgroupRoot")
+	return ""
+}
+
+func (cm *FakeContainerManager) IsPodInSystemPartition(_ *v1.Pod) bool {
+	cm.Lock()
+	defer cm.Unlock()
+	cm.CalledFunctions = append(cm.CalledFunctions, "IsPodInSystemPartition")
+	return false
+}
+
+func (cm *FakeContainerManager) PartitionStats(_ klog.Logger) map[string]PartitionStats {
+	cm.Lock()
+	defer cm.Unlock()
+	cm.CalledFunctions = append(cm.CalledFunctions, "PartitionStats")
+	return nil
+}
+
 func (cm *FakeContainerManager) GetDevices(_, _ string) []*podresourcesapi.ContainerDevices {
 	cm.Lock()
 	defer cm.Unlock()
