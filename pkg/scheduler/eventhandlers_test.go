@@ -1677,11 +1677,7 @@ func TestUpdateCompositePodGroup(t *testing.T) {
 			}
 
 			if tt.cpgEnabled {
-				if old, ok := tt.oldCPG.(*schedulingv1alpha3.CompositePodGroup); ok {
-					sched.Cache.AddGenericPodGroup(fwk.NewGenericCompositePodGroup(old))
-				} else {
-					sched.Cache.AddGenericPodGroup(fwk.NewGenericCompositePodGroup(oldCPG))
-				}
+				sched.Cache.AddGenericPodGroup(fwk.NewGenericCompositePodGroup(oldCPG))
 			}
 
 			if tt.triggerQueueingHint {
